@@ -4,7 +4,7 @@
   "private": true,
   "description": "火宝短剧 — AI 短剧制作工具（桌面版编排入口）",
   "scripts": {
-    "dev:backend": "cd backend && npm run dev",
+    "dev:backend": "cd backend && PORT=5679 npm run dev",
     "dev:frontend": "cd frontend && npm run dev",
     "dev:desktop": "cd desktop && npm run dev",
     "build:frontend": "cd frontend && npm run generate",

@@ -1,0 +1,31 @@
+{
+  "configs": [
+    {
+      "service_type": "text",
+      "provider": "openai",
+      "name": "GLM 5.3 (local)",
+      "base_url": "https://open.bigmodel.cn/api/coding/paas/v4",
+      "api_key": "<ZHIPU_API_KEY>",
+      "model": ["glm-5.3"],
+      "priority": 100
+    },
+    {
+      "service_type": "image",
+      "provider": "openai",
+      "name": "GPT Image (codex)",
+      "base_url": "http://127.0.0.1:5681",
+      "api_key": "<codex-image.json 里的 token>",
+      "model": ["gpt-image-2"],
+      "priority": 100
+    },
+    {
+      "service_type": "video",
+      "provider": "comfyui",
+      "name": "MiniMax H3 (ComfyUI)",
+      "base_url": "http://<comfyui-host>:8188",
+      "api_key": "",
+      "model": ["MiniMax-H3-ComfyUI"],
+      "priority": 100
+    }
+  ]
+}

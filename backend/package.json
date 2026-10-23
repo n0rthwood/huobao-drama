@@ -8,7 +8,8 @@
     "start": "tsx src/index.ts",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "backfill-artwork": "tsx scripts/backfill-artwork.ts"
+    "backfill-artwork": "tsx scripts/backfill-artwork.ts",
+    "apply-local-config": "tsx scripts/apply-local-config.ts"
   },
   "keywords": [],
   "author": "",
@@ -40,11 +41,5 @@
     "mysql2": "^3.22.5",
     "tsx": "^4.21.0",
     "typescript": "^6.0.2"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "ffmpeg-static",
-      "ffprobe-static"
-    ]
   }
 }

@@ -3,6 +3,8 @@ import { fileURLToPath } from 'node:url'
 export default defineNuxtConfig({
   srcDir: 'app/',
   ssr: false,
+  // 固定端口 + 监听所有网卡，局域网 IP 可直接访问；strictPort 防止端口被占时静默换端口
+  devServer: { host: '0.0.0.0', port: 3013 },
   devtools: { enabled: false },
   experimental: {
     appManifest: false,
@@ -42,6 +44,7 @@ export default defineNuxtConfig({
         '/api': { target: 'http://localhost:5679', changeOrigin: true },
         '/static': { target: 'http://localhost:5679', changeOrigin: true },
       },
+      strictPort: true,
     },
   },
   compatibilityDate: '2025-05-15',
