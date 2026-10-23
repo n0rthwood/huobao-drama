@@ -57,6 +57,8 @@ interface GenerateVideoParams {
   seed?: number
   promptExtend?: boolean
   watermark?: boolean
+  continuitySourceStoryboardId?: number
+  continuitySourceVideoUrl?: string
   configId?: number
 }
 
@@ -128,6 +130,8 @@ export async function generateVideo(params: GenerateVideoParams): Promise<number
     seed: params.seed,
     promptExtend: params.promptExtend,
     watermark: params.watermark,
+    continuitySourceStoryboardId: params.continuitySourceStoryboardId,
+    continuitySourceVideoUrl: params.continuitySourceVideoUrl,
   })
 
   logTaskStart('VideoTask', 'enqueue', {

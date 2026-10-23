@@ -8,6 +8,59 @@ import { EXTRACT_TARGETS, getExtractionStatus, startExtraction, type ExtractTarg
 import { getVideoPromptBatchStatus, startVideoPromptBatch } from '../services/video-prompts.js'
 
 const app = new Hono()
+type ImageOwnerKind = 'character' | 'scene' | 'prop'
+
+async function attachImageVersions<T extends { id: number; imageUrl: string | null }>(
+  rows: T[],
+  kind: ImageOwnerKind,
+) {
+  const ids = new Set(rows.map(row => row.id))
+  const tasks = (await db.select().from(schema.sysTask))
+    .filter(task => task.type === 'image' && task.status === 'completed')
+    .filter((task) => {
+      const ownerId = kind === 'character' ? task.characterId : kind === 'scene' ? task.sceneId : task.propId
+      return ownerId != null && ids.has(ownerId)
+    })
+  return rows.map((row) => {
+    const versions: Array<{
+      id: number | null
+      url: string | null
+      provider: string | null
+      model: string | null
+      prompt: string | null
+      created_at: string | null
+      is_current: boolean
+    }> = tasks
+      .filter((task) => {
+        const ownerId = kind === 'character' ? task.characterId : kind === 'scene' ? task.sceneId : task.propId
+        return ownerId === row.id
+      })
+      .map(task => ({
+        id: task.id,
+        url: task.localPath || task.resultUrl,
+        provider: task.provider,
+        model: task.model,
+        prompt: task.prompt,
+        created_at: task.createdAt,
+        is_current: Boolean((task.localPath || task.resultUrl) && (task.localPath || task.resultUrl) === row.imageUrl),
+      }))
+      .filter(version => Boolean(version.url))
+      .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
+    if (row.imageUrl && !versions.some(version => version.url === row.imageUrl)) {
+      versions.unshift({
+        id: null,
+        url: row.imageUrl,
+        provider: 'legacy',
+        model: null,
+        prompt: null,
+        created_at: null,
+        is_current: true,
+      })
+    }
+    return { ...toSnakeCase(row), image_versions: versions }
+  })
+}
+
 
 // POST /episodes — Create a new episode
 app.post('/', async (c) => {
@@ -98,7 +151,7 @@ app.get('/:id/characters', async (c) => {
   if (!charIds.length) return success(c, [])
   const allChars = await db.select().from(schema.characters)
   const result = allChars.filter(ch => charIds.includes(ch.id) && !ch.deletedAt)
-  return success(c, toSnakeCaseArray(result))
+  return success(c, await attachImageVersions(result, 'character'))
 })
 
 // GET /episodes/:id/scenes — scenes linked to this episode
@@ -110,7 +163,7 @@ app.get('/:id/scenes', async (c) => {
   if (!sceneIds.length) return success(c, [])
   const allScenes = await db.select().from(schema.scenes)
   const result = allScenes.filter(sc => sceneIds.includes(sc.id) && !sc.deletedAt)
-  return success(c, toSnakeCaseArray(result))
+  return success(c, await attachImageVersions(result, 'scene'))
 })
 
 // GET /episodes/:id/props — props linked to this episode
@@ -122,7 +175,7 @@ app.get('/:id/props', async (c) => {
   if (!propIds.length) return success(c, [])
   const allProps = await db.select().from(schema.props)
   const result = allProps.filter(p => propIds.includes(p.id) && !p.deletedAt)
-  return success(c, toSnakeCaseArray(result))
+  return success(c, await attachImageVersions(result, 'prop'))
 })
 
 // POST /episodes/:id/extract — 异步提取资产（target: characters | scenes | props），立即返回，前端轮询状态
@@ -199,17 +252,58 @@ app.get('/:episode_id/storyboards', async (c) => {
   const allProps = (await db.select().from(schema.props))
     .filter(p => episodePropIds.includes(p.id) && !p.deletedAt)
 
-  return success(c, rows.map((row) => ({
-    ...toSnakeCase(row),
-    character_ids: charIdsByStoryboard.get(row.id) || [],
-    prop_ids: propIdsByStoryboard.get(row.id) || [],
-    characters: allChars
-      .filter(ch => (charIdsByStoryboard.get(row.id) || []).includes(ch.id))
-      .map(ch => toSnakeCase(ch)),
-    props: allProps
-      .filter(p => (propIdsByStoryboard.get(row.id) || []).includes(p.id))
-      .map(p => toSnakeCase(p)),
-  })))
+  const videoTasks = (await db.select().from(schema.sysTask))
+    .filter(task => task.type === 'video' && task.status === 'completed' && task.storyboardId)
+
+  return success(c, rows.map((row) => {
+    let assetVersionSelection: Record<string, string> = {}
+    try {
+      assetVersionSelection = row.assetVersionSelection ? JSON.parse(row.assetVersionSelection) : {}
+    } catch {
+      assetVersionSelection = {}
+    }
+    const videoVersions: Array<{
+      id: number | null
+      url: string | null
+      provider: string | null
+      model: string | null
+      created_at: string | null
+      is_current: boolean
+    }> = videoTasks
+      .filter(task => task.storyboardId === row.id && (task.localPath || task.resultUrl))
+      .map(task => ({
+        id: task.id,
+        url: task.localPath || task.resultUrl,
+        provider: task.provider,
+        model: task.model,
+        created_at: task.createdAt,
+        is_current: (task.localPath || task.resultUrl) === row.videoUrl,
+      }))
+      .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
+    if (row.videoUrl && !videoVersions.some(version => version.url === row.videoUrl)) {
+      videoVersions.unshift({
+        id: null,
+        url: row.videoUrl,
+        provider: 'legacy',
+        model: null,
+        created_at: null,
+        is_current: true,
+      })
+    }
+    return {
+      ...toSnakeCase(row),
+      asset_version_selection: assetVersionSelection,
+      video_versions: videoVersions,
+      character_ids: charIdsByStoryboard.get(row.id) || [],
+      prop_ids: propIdsByStoryboard.get(row.id) || [],
+      characters: allChars
+        .filter(ch => (charIdsByStoryboard.get(row.id) || []).includes(ch.id))
+        .map(ch => toSnakeCase(ch)),
+      props: allProps
+        .filter(p => (propIdsByStoryboard.get(row.id) || []).includes(p.id))
+        .map(p => toSnakeCase(p)),
+    }
+  }))
 })
 
 // GET /episodes/:id/pipeline-status — 流水线进度

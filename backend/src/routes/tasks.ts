@@ -1,10 +1,11 @@
 import { Hono } from 'hono'
 import { eq } from 'drizzle-orm'
-import { db, schema } from '../db/index.js'
-import { success, created, badRequest } from '../utils/response.js'
+import { db, getInsertId, schema } from '../db/index.js'
+import { success, created, badRequest, now } from '../utils/response.js'
 import { generateImage, generateVideo } from '../services/generation.js'
 import { getActiveConfig, getConfigById } from '../services/ai.js'
 import { getDramaStylePrompt } from '../services/style-preset.js'
+import { extractVideoTailFrame } from '../utils/video-poster.js'
 import { logTaskError, logTaskPayload, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
 
 const app = new Hono()
@@ -52,6 +53,7 @@ function normalizeVideoRequest(body: any) {
     seed: body.seed ?? parameters.seed,
     prompt_extend: body.prompt_extend ?? parameters.prompt_extend,
     watermark: body.watermark ?? parameters.watermark,
+    inherit_previous_tail: body.inherit_previous_tail === true || parameters.inherit_previous_tail === true,
     official_media: media,
   }
 }
@@ -105,6 +107,22 @@ function validateVideoRequest(body: any, provider?: string): string | null {
   return null
 }
 
+async function resolvePreviousTailFrame(storyboard: typeof schema.storyboards.$inferSelect) {
+  const rows = await db.select().from(schema.storyboards)
+    .where(eq(schema.storyboards.episodeId, storyboard.episodeId))
+    .orderBy(schema.storyboards.storyboardNumber)
+  const index = rows.findIndex(row => row.id === storyboard.id)
+  if (index <= 0) throw new Error('第一镜没有上一镜，不能启用尾帧衔接')
+  const previous = rows[index - 1]!
+  const previousVideo = previous.videoUrl || previous.composedVideoUrl
+  if (!previousVideo) throw new Error(`上一镜 #${previous.storyboardNumber} 还没有采用视频，无法提取尾帧`)
+  return {
+    firstFrameUrl: await extractVideoTailFrame(previousVideo),
+    sourceStoryboardId: previous.id,
+    sourceVideoUrl: previousVideo,
+  }
+}
+
 // POST /tasks — 发起生成任务（body.type: image | video）
 app.post('/', async (c) => {
   const body = await c.req.json()
@@ -123,8 +141,10 @@ app.post('/', async (c) => {
     let configId: number | undefined = body.config_id
     let episodeResolution: string | undefined
     let storyboardDramaId: number | undefined
+    let storyboard: typeof schema.storyboards.$inferSelect | undefined
     if (body.storyboard_id) {
       const [sb] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, Number(body.storyboard_id)))
+      storyboard = sb
       if (sb) {
         const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, sb.episodeId))
         const locked = type === 'image' ? ep?.imageConfigId : ep?.videoConfigId
@@ -132,6 +152,16 @@ app.post('/', async (c) => {
         if (type === 'video' && ep?.resolution) episodeResolution = ep.resolution
         storyboardDramaId = ep?.dramaId ?? undefined
       }
+    }
+
+    if (type === 'video' && videoBody?.inherit_previous_tail) {
+      if (!storyboard) return badRequest(c, '启用尾帧衔接时 storyboard_id 必填')
+      const continuity = await resolvePreviousTailFrame(storyboard)
+      videoBody.first_frame_url = continuity.firstFrameUrl
+      videoBody.continuity_source_storyboard_id = continuity.sourceStoryboardId
+      videoBody.continuity_source_video_url = continuity.sourceVideoUrl
+      // 首尾帧模式与参考图模式是不同工作流；启用衔接时以连续性首帧为准。
+      videoBody.reference_image_urls = []
     }
 
     if (type === 'video' && videoBody) {
@@ -193,6 +223,8 @@ app.post('/', async (c) => {
         seed: videoBody!.seed,
         promptExtend: videoBody!.prompt_extend,
         watermark: videoBody!.watermark,
+        continuitySourceStoryboardId: videoBody!.continuity_source_storyboard_id,
+        continuitySourceVideoUrl: videoBody!.continuity_source_video_url,
         configId,
       })
 
@@ -204,6 +236,55 @@ app.post('/', async (c) => {
     logTaskError('TaskAPI', 'generate', { type, error: err.message })
     return badRequest(c, err.message)
   }
+})
+
+// POST /tasks/register-upload — 把手动上传的资产图片纳入同一版本历史
+app.post('/register-upload', async (c) => {
+  const body = await c.req.json()
+  const kind = String(body.asset_type || '')
+  const assetId = Number(body.asset_id)
+  const localPath = String(body.local_path || '').trim()
+  if (!['character', 'scene', 'prop'].includes(kind)) return badRequest(c, 'asset_type 必须是 character / scene / prop')
+  if (!assetId || !localPath.startsWith('static/')) return badRequest(c, 'asset_id 与有效的 static 本地路径必填')
+
+  const ownerFields: { characterId?: number; sceneId?: number; propId?: number } = {}
+  let dramaId: number | null = null
+  if (kind === 'character') {
+    const [asset] = await db.select().from(schema.characters).where(eq(schema.characters.id, assetId))
+    if (!asset || asset.deletedAt) return badRequest(c, '角色不存在')
+    ownerFields.characterId = assetId
+    dramaId = asset.dramaId
+    await db.update(schema.characters).set({ imageUrl: localPath, localPath, updatedAt: now() }).where(eq(schema.characters.id, assetId))
+  } else if (kind === 'scene') {
+    const [asset] = await db.select().from(schema.scenes).where(eq(schema.scenes.id, assetId))
+    if (!asset || asset.deletedAt) return badRequest(c, '场景不存在')
+    ownerFields.sceneId = assetId
+    dramaId = asset.dramaId
+    await db.update(schema.scenes).set({ imageUrl: localPath, localPath, status: 'completed', updatedAt: now() }).where(eq(schema.scenes.id, assetId))
+  } else {
+    const [asset] = await db.select().from(schema.props).where(eq(schema.props.id, assetId))
+    if (!asset || asset.deletedAt) return badRequest(c, '道具不存在')
+    ownerFields.propId = assetId
+    dramaId = asset.dramaId
+    await db.update(schema.props).set({ imageUrl: localPath, localPath, updatedAt: now() }).where(eq(schema.props.id, assetId))
+  }
+
+  const ts = now()
+  const result = await db.insert(schema.sysTask).values({
+    type: 'image',
+    ...ownerFields,
+    dramaId,
+    provider: 'upload',
+    model: 'manual-upload',
+    params: JSON.stringify({ source: 'manual-upload' }),
+    resultUrl: localPath,
+    localPath,
+    status: 'completed',
+    createdAt: ts,
+    updatedAt: ts,
+    completedAt: ts,
+  })
+  return created(c, { id: getInsertId(result), local_path: localPath })
 })
 
 // GET /tasks/:id — 轮询任务状态
@@ -219,12 +300,18 @@ app.get('/', async (c) => {
   const type = c.req.query('type')
   const storyboardId = c.req.query('storyboard_id')
   const dramaId = c.req.query('drama_id')
+  const characterId = c.req.query('character_id')
+  const sceneId = c.req.query('scene_id')
+  const propId = c.req.query('prop_id')
 
   let rows = await db.select().from(schema.sysTask)
 
   if (type) rows = rows.filter(r => r.type === type)
   if (storyboardId) rows = rows.filter(r => r.storyboardId === Number(storyboardId))
   if (dramaId) rows = rows.filter(r => r.dramaId === Number(dramaId))
+  if (characterId) rows = rows.filter(r => r.characterId === Number(characterId))
+  if (sceneId) rows = rows.filter(r => r.sceneId === Number(sceneId))
+  if (propId) rows = rows.filter(r => r.propId === Number(propId))
 
   return success(c, rows)
 })

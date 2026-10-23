@@ -629,7 +629,15 @@
       "unnamedProp": "未命名道具",
       "unnamedScene": "未命名场景",
       "propSingleImage": "道具单品图",
-      "propImage": "道具图"
+      "propImage": "道具图",
+      "versions": "备选版本",
+      "versionCount": "{n} 个版本",
+      "currentVersion": "当前采用",
+      "useVersion": "采用这个版本",
+      "versionHint": "重绘和上传都会保留为独立版本；点击缩略图切换当前采用版本。",
+      "unknownEngine": "未知引擎",
+      "versionSelected": "已切换当前采用版本",
+      "versionSelectFailed": "切换版本失败"
     },
     "create": {
       "title": "新增{type}",
@@ -721,7 +729,9 @@
       "notReady": "未生成",
       "unbound": "未绑定",
       "gotoGenerate": "去生成 →",
-      "empty": "当前集还没有场景、角色或道具，先到「资产」提取素材后即可绑定。"
+      "empty": "当前集还没有场景、角色或道具，先到「资产」提取素材后即可绑定。",
+      "chooseVersion": "选择{name}的素材版本",
+      "versionSelected": "分镜已改用{name}的所选版本"
     },
     "vid": {
       "shotCount": "{n} 个镜头",
@@ -778,7 +788,13 @@
       "confirmNote": "将按以上配置逐镜头发起生成；失败的任务之后可点「重试失败」一键重跑。",
       "confirmStart": "开始生成 ({n})",
       "selectMissing": "选未生成",
-      "aspectRatio": "画面比例"
+      "aspectRatio": "画面比例",
+      "unknownEngine": "未知引擎",
+      "continuity": "承接上一镜尾帧",
+      "continuityFirstShot": "第一镜没有上一镜，不能启用",
+      "continuityNeedsPrevious": "上一镜 #{n} 尚无采用视频",
+      "continuityAvailable": "将提取上一镜 #{n} 的采用视频尾帧作为首帧",
+      "continuityEnabledHint": "已启用：生成时提取上一镜 #{n} 尾帧并切换到首帧/首尾帧工作流；本镜绑定的普通参考图不会发送"
     },
     "inspector": {
       "videoPromptPlaceholder": "用 {'@'}角色名 / {'@'}场景名 引用参考素材，生成时自动映射为参考图片；再按时间段描述画面运动与镜头…",

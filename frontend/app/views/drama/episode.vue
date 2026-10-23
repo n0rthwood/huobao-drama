@@ -693,6 +693,18 @@
                               <span :class="['storyboard-ref-state', asset.bound && asset.ready ? 'is-ready' : '']">
                                 {{ asset.bound ? (asset.ready ? t('episode.ref.usable') : t('episode.ref.notReady')) : t('episode.ref.unbound') }}
                               </span>
+                              <select
+                                v-if="asset.bound && asset.versions.length > 1"
+                                class="storyboard-ref-version-select"
+                                :value="asset.imageUrl"
+                                :aria-label="t('episode.ref.chooseVersion', { name: asset.name })"
+                                @click.stop
+                                @change.stop="setShotAssetVersion(selectedSb, asset, $event.target.value)"
+                              >
+                                <option v-for="version in asset.versions" :key="version.id ?? version.url" :value="version.url">
+                                  {{ versionLabel(version) }}
+                                </option>
+                              </select>
                               <button v-if="asset.bound && !asset.ready" type="button" class="storyboard-ref-goto" @click.stop="prodTab = 'assets'">{{ t('episode.ref.gotoGenerate') }}</button>
                             </div>
                           </div>
@@ -801,6 +813,7 @@
                 >
                   <video :src="'/' + taskVideoPath(h)" :poster="posterOf('/' + taskVideoPath(h)) || undefined" preload="none" muted playsinline tabindex="-1" />
                   <span class="video-history-time">{{ formatHistoryTime(taskCreatedAt(h)) }}</span>
+                  <span class="video-history-engine">{{ h.provider || t('episode.vid.unknownEngine') }}<template v-if="h.model"> · {{ h.model }}</template></span>
                   <span v-if="isCurrentVideo(h)" class="video-history-badge">{{ t('episode.vid.current') }}</span>
                   <button v-else type="button" class="video-history-del" :title="t('episode.vid.deleteRecord')" @click.stop="removeHistoryVideo(h)">×</button>
                 </div>
@@ -849,6 +862,18 @@
                       </span>
                     </div>
                     <div class="video-param-hint">{{ t('episode.inspector.durationHint') }}</div>
+                    <label :class="['video-continuity-row', { disabled: !canUseContinuity(selectedSb) }]">
+                      <input
+                        type="checkbox"
+                        :checked="isContinuityEnabled(selectedSb)"
+                        :disabled="!canUseContinuity(selectedSb)"
+                        @change="toggleContinuity(selectedSb, $event.target.checked)"
+                      />
+                      <span>
+                        <strong>{{ t('episode.vid.continuity') }}</strong>
+                        <small>{{ continuityHint(selectedSb) }}</small>
+                      </span>
+                    </label>
                   </section>
                   <div class="video-inspector-effective">
                     {{ t('episode.inspector.effective', { model: effectiveVideoModelLabel || t('episode.vid.defaultModel'), res: episodeResolutionShort, dur: effectiveVideoDuration }) }}
@@ -1161,6 +1186,29 @@
                     <svg v-else width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                   </span>
                 </button>
+
+                <section v-if="assetVersions(assetDetail.item).length" class="asset-version-panel">
+                  <div class="asset-version-head">
+                    <strong>{{ t('episode.asset.versions') }}</strong>
+                    <span>{{ t('episode.asset.versionCount', { n: assetVersions(assetDetail.item).length }) }}</span>
+                  </div>
+                  <div class="asset-version-list">
+                    <button
+                      v-for="version in assetVersions(assetDetail.item)"
+                      :key="version.id ?? version.url"
+                      type="button"
+                      :class="['asset-version-card', { current: isCurrentAssetVersion(assetDetail.item, version) }]"
+                      :title="isCurrentAssetVersion(assetDetail.item, version) ? t('episode.asset.currentVersion') : t('episode.asset.useVersion')"
+                      :disabled="switchingAssetVersion"
+                      @click="selectAssetVersion(version)"
+                    >
+                      <img :src="thumbOf(versionImageSrc(version))" loading="lazy" @error="thumbFallback($event, versionImageSrc(version))" />
+                      <span class="asset-version-meta">{{ version.provider || t('episode.asset.unknownEngine') }}<template v-if="version.model"> · {{ version.model }}</template></span>
+                      <span v-if="isCurrentAssetVersion(assetDetail.item, version)" class="asset-version-current">{{ t('episode.asset.currentVersion') }}</span>
+                    </button>
+                  </div>
+                  <p class="asset-version-hint">{{ t('episode.asset.versionHint') }}</p>
+                </section>
 
                 <div class="asset-detail-meta-row">
                   <div class="asset-detail-meta-item">
@@ -1692,6 +1740,7 @@ const assetDetailDraft = ref({ appearance: '', styling: '', prompt: '', lighting
 const assetPromptDraft = ref('')
 const assetPromptDirty = ref(false)
 const savingAssetDetail = ref(false)
+const switchingAssetVersion = ref(false)
 
 function isPendingCharImage(id) {
   return pendingCharImageIds.value.includes(id)
@@ -1954,6 +2003,49 @@ function assetImageSrc(item) {
   if (!raw) return ''
   if (/^https?:\/\//i.test(raw) || raw.startsWith('/')) return raw
   return `/${raw}`
+}
+
+function assetVersions(item) {
+  const versions = item?.image_versions || item?.imageVersions
+  if (!Array.isArray(versions)) return []
+  return versions.filter(version => version?.url)
+}
+
+function versionImageSrc(version) {
+  const raw = String(version?.url || '')
+  if (!raw) return ''
+  if (/^https?:\/\//i.test(raw) || raw.startsWith('/')) return raw
+  return `/${raw}`
+}
+
+function isCurrentAssetVersion(item, version) {
+  const current = String(item?.image_url || item?.imageUrl || '').replace(/^\/+/, '')
+  const candidate = String(version?.url || '').replace(/^\/+/, '')
+  return Boolean(current && candidate && current === candidate)
+}
+
+async function selectAssetVersion(version) {
+  const detail = assetDetail.value
+  const path = String(version?.url || '').replace(/^\/+/, '')
+  if (!detail.open || !detail.item?.id || !path || isCurrentAssetVersion(detail.item, version)) return
+  switchingAssetVersion.value = true
+  try {
+    const payload = { image_url: path, local_path: path }
+    if (detail.type === 'character') await characterAPI.update(detail.item.id, payload)
+    else if (detail.type === 'scene') await sceneAPI.update(detail.item.id, payload)
+    else await propAPI.update(detail.item.id, payload)
+    detail.item.image_url = path
+    detail.item.imageUrl = path
+    for (const candidate of assetVersions(detail.item)) candidate.is_current = candidate.url === version.url
+    const list = detail.type === 'character' ? chars.value : detail.type === 'scene' ? scenes.value : propItems.value
+    const target = list.find(item => item.id === detail.item.id)
+    if (target && target !== detail.item) Object.assign(target, detail.item)
+    toast.success(t('episode.asset.versionSelected'))
+  } catch (e) {
+    toastError(e, { fallback: 'episode.asset.versionSelectFailed' })
+  } finally {
+    switchingAssetVersion.value = false
+  }
 }
 
 function assetDetailTitle(detail) {
@@ -2234,19 +2326,16 @@ function batchVideos() {
 function retryFailedVideos() {
   openBatchVideoConfirm(sbs.value.filter(s => videoTaskState(s) === 'failed'))
 }
-function confirmBatchVideos() {
+async function confirmBatchVideos() {
   const targets = [...batchVideoConfirm.value.targets]
   batchVideoConfirm.value = { open: false, targets: [] }
   if (!targets.length) return
-  const ids = targets.map(s => s.id)
-  targets.forEach(sb => genVid(sb, { silent: true }))
-  toast.success(t('episode.vid.batchStarted', { n: ids.length }))
-  watchAsyncResult(() => ids.every(id => {
-    const target = sbs.value.find(s => s.id === id)
-    const done = !!getVideoUrl(target)
-    if (done) pendingVideoIds.value = pendingVideoIds.value.filter(item => item !== id)
-    return done
-  }), 80, 4000)
+  toast.success(t('episode.vid.batchStarted', { n: targets.length }))
+  // 等前一镜任务完成并自动回写为采用版本后再提交下一镜；失败时停止，避免连续镜头使用旧视频。
+  for (const sb of targets) {
+    const completed = await genVid(sb, { silent: true, awaitCompletion: true })
+    if (!completed) break
+  }
   if (videoSelectMode.value) toggleVideoSelectMode()
 }
 
@@ -3113,6 +3202,44 @@ function formatHistoryTime(iso) {
   return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
 }
 
+function storyboardAssetVersionSelection(sb) {
+  const raw = sb?.asset_version_selection ?? sb?.assetVersionSelection
+  if (!raw) return {}
+  if (typeof raw === 'object' && !Array.isArray(raw)) return raw
+  try {
+    const parsed = JSON.parse(raw)
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+function selectedAssetImage(sb, kind, item) {
+  const key = `${kind}:${item?.id}`
+  return storyboardAssetVersionSelection(sb)[key] || item?.image_url || item?.imageUrl || ''
+}
+
+function versionLabel(version) {
+  const engine = version?.provider || t('episode.asset.unknownEngine')
+  const model = version?.model ? ` · ${version.model}` : ''
+  const time = formatHistoryTime(version?.created_at || version?.createdAt)
+  return `${engine}${model}${time ? ` · ${time}` : ''}`
+}
+
+async function setShotAssetVersion(sb, asset, url) {
+  if (!sb || !asset?.id || !url) return
+  const selection = { ...storyboardAssetVersionSelection(sb), [`${asset.kind}:${asset.id}`]: url }
+  sb.asset_version_selection = selection
+  sb.assetVersionSelection = selection
+  try {
+    await storyboardAPI.update(sb.id, { asset_version_selection: selection })
+    toast.success(t('episode.ref.versionSelected', { name: asset.name }))
+  } catch (e) {
+    toastError(e)
+    await refresh()
+  }
+}
+
 function getShotReferenceImages(sb) {
   const refs = []
   const pushRef = (value) => {
@@ -3120,12 +3247,12 @@ function getShotReferenceImages(sb) {
     refs.push(value)
   }
   const scene = getStoryboardScene(sb)
-  pushRef(scene?.image_url || scene?.imageUrl)
+  pushRef(selectedAssetImage(sb, 'scene', scene))
   for (const char of getStoryboardCharacters(sb)) {
-    pushRef(char?.image_url || char?.imageUrl)
+    pushRef(selectedAssetImage(sb, 'character', char))
   }
   for (const prop of getStoryboardProps(sb)) {
-    pushRef(prop?.image_url || prop?.imageUrl)
+    pushRef(selectedAssetImage(sb, 'prop', prop))
   }
   return refs
 }
@@ -3135,7 +3262,8 @@ function getShotReferenceImages(sb) {
 function shotBindableAssets(sb) {
   const out = []
   for (const char of visualChars.value) {
-    const imageUrl = char.image_url || char.imageUrl || ''
+    const versions = assetVersions(char)
+    const imageUrl = selectedAssetImage(sb, 'character', char)
     out.push({
       key: `character-${char.id}`,
       id: char.id,
@@ -3144,12 +3272,14 @@ function shotBindableAssets(sb) {
       name: char.name || t('episode.asset.unnamedChar'),
       meta: char.role || t('episode.asset.charPortrait'),
       imageUrl,
+      versions,
       ready: !!imageUrl,
       bound: getStoryboardCharacterIds(sb).includes(char.id),
     })
   }
   for (const scene of scenes.value) {
-    const imageUrl = scene.image_url || scene.imageUrl || ''
+    const versions = assetVersions(scene)
+    const imageUrl = selectedAssetImage(sb, 'scene', scene)
     out.push({
       key: `scene-${scene.id}`,
       id: scene.id,
@@ -3158,12 +3288,14 @@ function shotBindableAssets(sb) {
       name: `${scene.location} · ${scene.time || t('episode.asset.noTime')}`,
       meta: scene.time || t('episode.asset.sceneImage'),
       imageUrl,
+      versions,
       ready: !!imageUrl,
       bound: (sb?.scene_id || sb?.sceneId) === scene.id,
     })
   }
   for (const prop of propItems.value) {
-    const imageUrl = prop.image_url || prop.imageUrl || ''
+    const versions = assetVersions(prop)
+    const imageUrl = selectedAssetImage(sb, 'prop', prop)
     out.push({
       key: `prop-${prop.id}`,
       id: prop.id,
@@ -3172,6 +3304,7 @@ function shotBindableAssets(sb) {
       name: prop.name || t('episode.asset.unnamedProp'),
       meta: prop.type || t('episode.asset.propSingleImage'),
       imageUrl,
+      versions,
       ready: !!imageUrl,
       bound: getStoryboardPropIds(sb).includes(prop.id),
     })
@@ -3222,21 +3355,21 @@ const mentionOptions = computed(() => {
       value: c.name,
       kind: 'character',
       group: t('common.role'),
-      image: thumbOf(assetImageSrc(c)),
+      image: thumbOf(assetImageSrc({ imageUrl: selectedAssetImage(sb, 'character', c) })),
     })),
     ...(scene ? [{
       label: `${scene.location} · ${scene.time || t('episode.asset.noTime')}`,
       value: scene.location,
       kind: 'scene',
       group: t('common.scene'),
-      image: thumbOf(assetImageSrc(scene)),
+      image: thumbOf(assetImageSrc({ imageUrl: selectedAssetImage(sb, 'scene', scene) })),
     }] : []),
     ...getStoryboardProps(sb).map(p => ({
       label: p.name,
       value: p.name,
       kind: 'prop',
       group: t('common.prop'),
-      image: thumbOf(assetImageSrc(p)),
+      image: thumbOf(assetImageSrc({ imageUrl: selectedAssetImage(sb, 'prop', p) })),
     })),
   ]
 })
@@ -3251,12 +3384,12 @@ function getShotReferenceIndexMap(sb) {
     ordered.push({ name, imageUrl: url })
   }
   const scene = getStoryboardScene(sb)
-  push(scene?.location || '', scene?.image_url || scene?.imageUrl)
+  push(scene?.location || '', selectedAssetImage(sb, 'scene', scene))
   for (const char of getStoryboardCharacters(sb)) {
-    push(char.name || '', char?.image_url || char?.imageUrl)
+    push(char.name || '', selectedAssetImage(sb, 'character', char))
   }
   for (const prop of getStoryboardProps(sb)) {
-    push(prop.name || '', prop?.image_url || prop?.imageUrl)
+    push(prop.name || '', selectedAssetImage(sb, 'prop', prop))
   }
   const nameToIndex = {}
   ordered.forEach((a, i) => { if (a.name && !(a.name in nameToIndex)) nameToIndex[a.name] = i + 1 })
@@ -3293,6 +3426,44 @@ function onVideoDurationChange(e) {
   updateField(sb, 'duration', v)
 }
 
+function previousStoryboard(sb) {
+  const index = sbs.value.findIndex(item => item.id === sb?.id)
+  return index > 0 ? sbs.value[index - 1] : null
+}
+
+function isContinuityEnabled(sb) {
+  return (sb?.continuity_mode || sb?.continuityMode || 'none') === 'previous_tail'
+}
+
+function canUseContinuity(sb) {
+  const previous = previousStoryboard(sb)
+  return Boolean(previous && hasVid(previous))
+}
+
+function continuityHint(sb) {
+  const previous = previousStoryboard(sb)
+  if (!previous) return t('episode.vid.continuityFirstShot')
+  if (!hasVid(previous)) return t('episode.vid.continuityNeedsPrevious', { n: previous.storyboard_number || previous.storyboardNumber })
+  return isContinuityEnabled(sb)
+    ? t('episode.vid.continuityEnabledHint', { n: previous.storyboard_number || previous.storyboardNumber })
+    : t('episode.vid.continuityAvailable', { n: previous.storyboard_number || previous.storyboardNumber })
+}
+
+async function toggleContinuity(sb, enabled) {
+  if (!sb || (enabled && !canUseContinuity(sb))) return
+  const previous = sb.continuity_mode || sb.continuityMode || 'none'
+  const mode = enabled ? 'previous_tail' : 'none'
+  sb.continuity_mode = mode
+  sb.continuityMode = mode
+  try {
+    await storyboardAPI.update(sb.id, { continuity_mode: mode })
+  } catch (e) {
+    sb.continuity_mode = previous
+    sb.continuityMode = previous
+    toastError(e)
+  }
+}
+
 function pickFile(accept, cb) {
   const input = document.createElement('input')
   input.type = 'file'
@@ -3316,11 +3487,8 @@ function uploadAssetImage(kind, id) {
     if (!uploadingAssetKeys.value.includes(key)) uploadingAssetKeys.value.push(key)
     try {
       const res = await uploadAPI.image(file)
-      // 与生图回写保持一致：存相对路径（static/...），前端展示时补前导斜杠
-      const payload = { image_url: res.path, local_path: res.path }
-      if (kind === 'character') await characterAPI.update(id, payload)
-      else if (kind === 'scene') await sceneAPI.update(id, payload)
-      else await propAPI.update(id, payload)
+      // 手动上传也是一个正式版本：注册到 sys_task，后端同时把它设为当前采用版本。
+      await taskAPI.registerUpload(kind, id, res.path)
       toast.success(t('episode.upload.assetDone', { type: assetUploadLabelMap.value[kind] || '' }))
       await refresh()
     } catch (e) {
@@ -3338,8 +3506,9 @@ function onAssetRefsUpdate(item, refs) {
 }
 
 async function genVid(sb, opts = {}) {
-  const referenceImages = getShotReferenceImages(sb)
-  // 参考素材完全来自分镜绑定的角色/场景/道具图片
+  const inheritPreviousTail = isContinuityEnabled(sb)
+  const referenceImages = inheritPreviousTail ? [] : getShotReferenceImages(sb)
+  // 连续模式走首帧/首尾帧工作流；普通模式使用当前分镜选定的素材版本作为参考图。
   const params = {
     storyboard_id: sb.id,
     drama_id: dramaId,
@@ -3350,10 +3519,12 @@ async function genVid(sb, opts = {}) {
     model: bareModelName(videoModel.value) || undefined,
     config_id: ownerConfigId(videoModelOptions.value, videoModel.value),
     reference_image_urls: referenceImages,
+    inherit_previous_tail: inheritPreviousTail,
+    last_frame_url: sb.last_frame_image || sb.lastFrameImage || undefined,
   }
-  if (!params.prompt && !referenceImages.length) {
+  if (!params.prompt && !referenceImages.length && !inheritPreviousTail) {
     toast.error(t('episode.vid.needRefOrPrompt'))
-    return
+    return false
   }
   try {
     delete failedVideoMessages.value[sb.id]
@@ -3361,7 +3532,8 @@ async function genVid(sb, opts = {}) {
     const generation = await taskAPI.generate({ type: 'video', ...params })
     if (!opts.silent) toast.success(t('episode.vid.generating'))
     await refresh()
-    pollVideoGeneration(generation?.id, sb.id)
+    const polling = pollVideoGeneration(generation?.id, sb.id)
+    return opts.awaitCompletion ? await polling : true
   } catch (e) {
     pendingVideoIds.value = pendingVideoIds.value.filter(item => item !== sb.id)
     failedVideoMessages.value = {
@@ -3369,6 +3541,7 @@ async function genVid(sb, opts = {}) {
       [sb.id]: e.message || t('episode.vid.genFailed'),
     }
     toastError(e, { fallback: 'episode.vid.genFailed' })
+    return false
   }
 }
 async function pollVideoGeneration(generationId, storyboardId) {
@@ -3379,10 +3552,11 @@ async function pollVideoGeneration(generationId, storyboardId) {
       if (done) pendingVideoIds.value = pendingVideoIds.value.filter(item => item !== storyboardId)
       return done
     }, 60, 4000)
-    return
+    return false
   }
-  for (let i = 0; i < 120; i++) {
-    await sleep(4000)
+  // 与后端视频任务 10s × 300 的终态预算一致，避免长队列/长模型在前端先被判超时。
+  for (let i = 0; i < 300; i++) {
+    await sleep(10_000)
     try {
       const res = await taskAPI.get(generationId)
       await refresh()
@@ -3390,7 +3564,7 @@ async function pollVideoGeneration(generationId, storyboardId) {
         pendingVideoIds.value = pendingVideoIds.value.filter(item => item !== storyboardId)
         delete failedVideoMessages.value[storyboardId]
         toast.success(t('episode.vid.genDone'))
-        return
+        return true
       }
       if (res?.status === 'failed') {
         pendingVideoIds.value = pendingVideoIds.value.filter(item => item !== storyboardId)
@@ -3400,7 +3574,7 @@ async function pollVideoGeneration(generationId, storyboardId) {
           [storyboardId]: errMsg,
         }
         toastError(errMsg, { fallback: 'episode.vid.genFailed' })
-        return
+        return false
       }
     } catch {}
   }
@@ -3410,6 +3584,7 @@ async function pollVideoGeneration(generationId, storyboardId) {
     [storyboardId]: t('episode.vid.genTimeout'),
   }
   toast.error(t('episode.vid.genTimeout'))
+  return false
 }
 async function doMerge(ids) {
   const storyboardIds = Array.isArray(ids) ? ids : undefined
@@ -4175,6 +4350,17 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.storyboard-ref-version-select {
+  flex: 1 0 100%;
+  min-width: 0;
+  height: 24px;
+  padding: 0 6px;
+  border: 1px solid var(--surface-outline);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  color: var(--text-1);
+  font-size: 10px;
+}
 .storyboard-ref-empty {
   padding: 14px 10px;
   color: var(--text-3);
@@ -4827,6 +5013,20 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
   font-family: var(--font-mono);
   font-size: 9px;
 }
+.video-history-engine {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  top: 4px;
+  overflow: hidden;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(0,0,0,0.62);
+  color: #fff;
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .video-history-badge {
   position: absolute;
   right: 4px;
@@ -5299,6 +5499,22 @@ button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
 .video-param-value { color: var(--text-1); text-align: right; font-size: 11px; }
 .video-param-control { display: inline-flex; align-items: center; gap: 6px; }
 .video-param-unit { font-size: 11px; color: var(--text-2); }
+.video-continuity-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--accent-glow);
+  color: var(--text-1);
+  cursor: pointer;
+}
+.video-continuity-row.disabled { opacity: 0.55; cursor: not-allowed; }
+.video-continuity-row input { margin-top: 2px; accent-color: var(--accent); }
+.video-continuity-row span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.video-continuity-row strong { font-size: 11px; }
+.video-continuity-row small { color: var(--text-3); font-size: 9.5px; line-height: 1.35; }
 .video-duration-input { width: 56px; height: 24px; padding: 2px 6px; font-size: 12px; font-weight: 700; font-family: var(--font-mono); text-align: center; }
 
 /* Prod grid */
@@ -5462,6 +5678,62 @@ button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
   display: block;
   object-fit: cover;
 }
+.asset-version-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.asset-version-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--text-2);
+  font-size: 11px;
+}
+.asset-version-head span { color: var(--text-3); font-size: 10px; }
+.asset-version-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.asset-version-card {
+  position: relative;
+  min-width: 0;
+  aspect-ratio: 1;
+  overflow: hidden;
+  padding: 0;
+  border: 1.5px solid var(--surface-outline);
+  border-radius: var(--radius-sm);
+  background: var(--bg-2);
+  cursor: pointer;
+}
+.asset-version-card.current { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow); }
+.asset-version-card img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.asset-version-meta {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+  padding: 3px 4px;
+  background: rgba(0,0,0,0.64);
+  color: #fff;
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.asset-version-current {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  padding: 1px 4px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 8px;
+  font-weight: 700;
+}
+.asset-version-hint { margin: 0; color: var(--text-3); font-size: 10px; line-height: 1.45; }
 .asset-detail-media-empty {
   width: 100%;
   height: 100%;

@@ -120,13 +120,18 @@ export const propAPI = {
 // 统一生成任务（图片/视频）：POST 带 type 字段，列表按 type 过滤
 export const taskAPI = {
   generate: (d: any) => api.post('/tasks', d),
+  registerUpload: (assetType: 'character' | 'scene' | 'prop', assetId: number, localPath: string) =>
+    api.post('/tasks/register-upload', { asset_type: assetType, asset_id: assetId, local_path: localPath }),
   get: (id: number) => api.get(`/tasks/${id}`),
   del: (id: number) => api.del(`/tasks/${id}`),
-  list: (params?: { type?: 'image' | 'video'; drama_id?: number; storyboard_id?: number }) => {
+  list: (params?: { type?: 'image' | 'video'; drama_id?: number; storyboard_id?: number; character_id?: number; scene_id?: number; prop_id?: number }) => {
     const query = new URLSearchParams()
     if (params?.type) query.set('type', params.type)
     if (params?.drama_id) query.set('drama_id', String(params.drama_id))
     if (params?.storyboard_id) query.set('storyboard_id', String(params.storyboard_id))
+    if (params?.character_id) query.set('character_id', String(params.character_id))
+    if (params?.scene_id) query.set('scene_id', String(params.scene_id))
+    if (params?.prop_id) query.set('prop_id', String(params.prop_id))
     return api.get(`/tasks${query.size ? `?${query.toString()}` : ''}`)
   },
   // 按集聚合生成任务（sys_task + video_merges）

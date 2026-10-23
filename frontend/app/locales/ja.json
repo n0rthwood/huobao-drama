@@ -629,7 +629,15 @@
       "unnamedProp": "名称未設定の小道具",
       "unnamedScene": "名称未設定のシーン",
       "propSingleImage": "小道具単品図",
-      "propImage": "小道具図"
+      "propImage": "小道具図",
+      "versions": "候補バージョン",
+      "versionCount": "{n} バージョン",
+      "currentVersion": "採用中",
+      "useVersion": "このバージョンを採用",
+      "versionHint": "再生成とアップロードは別バージョンとして保持されます。サムネイルをクリックして採用します。",
+      "unknownEngine": "不明なエンジン",
+      "versionSelected": "採用バージョンを切り替えました",
+      "versionSelectFailed": "バージョンの切り替えに失敗しました"
     },
     "create": {
       "title": "{type}を追加",
@@ -721,7 +729,9 @@
       "notReady": "未生成",
       "unbound": "未紐付け",
       "gotoGenerate": "生成へ →",
-      "empty": "この話にはシーン、キャラクター、小道具がまだありません。先に「資産」で素材を抽出すると紐付けできます。"
+      "empty": "この話にはシーン、キャラクター、小道具がまだありません。先に「資産」で素材を抽出すると紐付けできます。",
+      "chooseVersion": "{name} の素材バージョンを選択",
+      "versionSelected": "このショットで {name} の選択バージョンを使用します"
     },
     "vid": {
       "shotCount": "{n} ショット",
@@ -778,7 +788,13 @@
       "confirmNote": "上記の設定でショットごとに生成を開始します。失敗したタスクは後で「失敗を再試行」からまとめて再実行できます。",
       "confirmStart": "生成開始 ({n})",
       "selectMissing": "未生成を選択",
-      "aspectRatio": "アスペクト比"
+      "aspectRatio": "アスペクト比",
+      "unknownEngine": "不明なエンジン",
+      "continuity": "前ショットの終端を引き継ぐ",
+      "continuityFirstShot": "最初のショットには前ショットがありません",
+      "continuityNeedsPrevious": "前ショット #{n} に採用動画がありません",
+      "continuityAvailable": "前ショット #{n} の終端フレームを先頭フレームに使用します",
+      "continuityEnabledHint": "有効：ショット #{n} の終端フレームを抽出して先頭/終端フレーム方式で生成します。このショットの通常参照画像は送信されません"
     },
     "inspector": {
       "videoPromptPlaceholder": "{'@'}キャラクター名 / {'@'}シーン名 で参照素材を指定（生成時に参照画像へ自動マッピング）。時間帯ごとに画面の動きとカメラを記述…",

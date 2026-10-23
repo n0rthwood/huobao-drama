@@ -107,6 +107,8 @@ export const sqliteSchemaStatements = [
     first_frame_image TEXT,
     last_frame_image TEXT,
     reference_images TEXT,
+    asset_version_selection TEXT,
+    continuity_mode TEXT DEFAULT 'none',
     video_url TEXT,
     subtitle_url TEXT,
     composed_video_url TEXT,
@@ -304,6 +306,9 @@ export const sqliteSchemaStatements = [
 const columnAdditions: { table: string; column: string; type: string }[] = [
   // 场景参考图（与 characters/props 的 reference_images 同语义：用户上传的生图输入）
   { table: 'scenes', column: 'reference_images', type: 'TEXT' },
+  // 分镜级素材版本选择 + 可选的前镜尾帧衔接模式
+  { table: 'storyboards', column: 'asset_version_selection', type: 'TEXT' },
+  { table: 'storyboards', column: 'continuity_mode', type: "TEXT DEFAULT 'none'" },
 ]
 
 function applyColumnAdditions(sqlite: Database.Database) {

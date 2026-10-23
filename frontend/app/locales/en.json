@@ -629,7 +629,15 @@
       "unnamedProp": "Unnamed prop",
       "unnamedScene": "Unnamed scene",
       "propSingleImage": "Prop product shot",
-      "propImage": "Prop image"
+      "propImage": "Prop image",
+      "versions": "Alternates",
+      "versionCount": "{n} versions",
+      "currentVersion": "Selected",
+      "useVersion": "Use this version",
+      "versionHint": "Every regeneration and upload remains as a separate version. Click a thumbnail to select it.",
+      "unknownEngine": "Unknown engine",
+      "versionSelected": "Selected asset version updated",
+      "versionSelectFailed": "Failed to switch version"
     },
     "create": {
       "title": "Add {type}",
@@ -721,7 +729,9 @@
       "notReady": "Not generated",
       "unbound": "Unbound",
       "gotoGenerate": "Go generate →",
-      "empty": "No scenes, characters or props in this episode yet. Extract assets in “Assets” first, then bind them here."
+      "empty": "No scenes, characters or props in this episode yet. Extract assets in “Assets” first, then bind them here.",
+      "chooseVersion": "Choose a version of {name}",
+      "versionSelected": "This shot now uses the selected version of {name}"
     },
     "vid": {
       "shotCount": "{n} shots",
@@ -778,7 +788,13 @@
       "confirmNote": "Generation will start shot by shot with the above config; failed tasks can be retried later via \"Retry failed\".",
       "confirmStart": "Start ({n})",
       "selectMissing": "Select without video",
-      "aspectRatio": "Aspect Ratio"
+      "aspectRatio": "Aspect Ratio",
+      "unknownEngine": "Unknown engine",
+      "continuity": "Continue from previous shot",
+      "continuityFirstShot": "The first shot has no previous shot",
+      "continuityNeedsPrevious": "Previous shot #{n} has no selected video",
+      "continuityAvailable": "Use the tail frame of selected video #{n} as this shot's first frame",
+      "continuityEnabledHint": "Enabled: extract shot #{n}'s tail frame and use the first/last-frame workflow; this shot's regular reference images are not sent"
     },
     "inspector": {
       "videoPromptPlaceholder": "Reference assets with {'@'}character / {'@'}scene — auto-mapped to reference images on generation; then describe motion and camera per time segment…",
