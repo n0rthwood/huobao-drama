@@ -40,10 +40,11 @@ configs/   — 遗留死配置，代码零引用
 
 ### Backend
 - **HTTP**: Hono（入口 `src/index.ts`），路由挂 `/api/v1`，`/static` 服务 DATA_ROOT，生产托管前端静态目录
-- **Database**: SQLite（better-sqlite3 + WAL），`SQLITE_PATH` 覆盖库文件位置；DDL 在 `src/db/sqlite-schema.ts`，启动时幂等重放；Drizzle 表定义 `src/db/schema.ts`（sqlite-core）
+- **Database**: SQLite（better-sqlite3 + WAL），`SQLITE_PATH` 覆盖库文件位置；DDL 在 `src/db/sqlite-schema.ts`，启动时幂等重放（建表 + `columnAdditions` 按 `PRAGMA table_info` 补列）；Drizzle 表定义 `src/db/schema.ts`（sqlite-core）
 - **路径锚点**: `src/utils/paths.ts` 统一解析 DATA_ROOT/STORAGE_ROOT；桌面版由 Electron 主进程注入 env（`HUOBAO_DATA_DIR`/`SQLITE_PATH`/`WORKSPACE_PATH`/`FRONTEND_DIST`/`FFMPEG_BIN`/`FFPROBE_BIN`），dev 走仓库相对路径默认值
 - **AI Agents**: Mastra，4 个 agent（script_rewriter / extractor / storyboard_breaker / prompt_generator），instructions 从 `workspace/prompts/*.md` + skills 动态拼接，模型按请求解析；fetch 补丁链适配国内中转站（关思考/温度/max_tokens）
 - **媒体生成**: `services/generation.ts` 统一任务生命周期（sys_task 表），适配器模式：图片 openai/gemini/volcengine，视频 volcengine/minimax
+- **资产参考图**: `services/reference-images.ts` + `routes/reference-images.ts`（角色/场景/道具三类共用）：`POST`/`DELETE /{characters|scenes|props}/:id/reference-images` 维护 `reference_images`（JSON 字符串数组，文件落在 `static/uploads/reference_images/{kind}/{id}/`）。生图默认带上该资产已保存的参考图（请求显式传 `reference_images` 才覆盖，批量生成不接受）；参考图是「输入」，与成片图 `image_url`/`local_path` 互不写入；删除资产时连带清理该资产的参考图目录。厂商张数上限由 adapter 报错，不做静默截断
 - **视频拼接**: `services/ffmpeg-merge.ts`，FFmpeg 二进制内置（ffmpeg-static），可用 `FFMPEG_BIN`/`FFPROBE_BIN` 覆盖
 
 ### Frontend

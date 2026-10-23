@@ -244,6 +244,8 @@ Paste your **source novel** into the workbench, then hit "AI Rewrite" to produce
 
 Run **extraction** on the script to get the character / scene / prop list, then generate a consistent reference image for each (or in batch). These images are injected as reference material when generating videos.
 
+Every character / scene / prop card keeps its own persistent set of **reference images** (uploaded once, they survive reloads): generating that asset's image automatically passes its own saved references, and batch character generation resolves each character's own set. References are generation *input* — they never overwrite the card's final image (generated or directly uploaded), and can be previewed or removed at any time.
+
 <p align="center">
   <img src="docs/screenshots/06-assets.png" alt="Asset production" width="800">
 </p>
