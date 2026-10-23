@@ -251,6 +251,9 @@
                         <svg v-else width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                         {{ t('episode.asset.upload') }}
                       </button>
+                      <button class="btn btn-sm btn-danger" type="button" :title="t('episode.asset.delChar')" :aria-label="t('episode.asset.delChar')" @click.stop="askDeleteMaterial(m)">
+                        {{ t('common.delete') }}
+                      </button>
                     </div>
                   </div>
                   <div class="asset-final-prompt" :title="m.finalPrompt || ''">
@@ -311,6 +314,9 @@
                   <button class="btn btn-sm" type="button" :disabled="isPending(m)" @click.stop="generateMaterial(m)">
                     <span v-if="isPending(m)" class="ring-spinner sm"></span>
                     {{ matHasImage(m) ? t('episode.asset.regen') : (isPending(m) ? t('episode.asset.generating') : t('episode.asset.generate')) }}
+                  </button>
+                  <button class="btn btn-sm btn-danger" type="button" :title="g.kindKey === 'scene' ? t('episode.asset.delScene') : t('episode.asset.delProp')" :aria-label="g.kindKey === 'scene' ? t('episode.asset.delScene') : t('episode.asset.delProp')" @click.stop="askDeleteMaterial(m)">
+                    {{ t('common.delete') }}
                   </button>
                 </div>
               </div>
@@ -480,6 +486,7 @@
 
           <footer class="dialog-foot mat-detail-foot">
             <div class="mat-detail-secondary-actions">
+              <button class="btn btn-danger" @click="askDeleteMaterial(editTarget)">{{ t('common.delete') }}</button>
               <button class="btn" @click="closeEdit">{{ t('common.close') }}</button>
             </div>
             <div class="mat-detail-primary-actions">
@@ -558,6 +565,14 @@
       @confirm="confirmDelEpisode"
       @cancel="episodeToDelete = null"
     />
+    <ConfirmDialog
+      :open="!!assetToDelete"
+      :title="t('episode.delete.title', { type: assetDeleteTypeLabel })"
+      :message="t('episode.delete.message', { type: assetDeleteTypeLabel, name: assetDeleteName })"
+      :loading="deletingAsset"
+      @confirm="confirmDeleteMaterial"
+      @cancel="assetToDelete = null"
+    />
   </div>
 </template>
 
@@ -578,6 +593,8 @@ const creatingEpisode = ref(false)
 const newEpisodeTitle = ref('')
 const episodeToDelete = ref(null)
 const deletingEpisode = ref(false)
+const assetToDelete = ref(null)
+const deletingAsset = ref(false)
 
 // 视频分辨率：创建集时固定（持久化到 episodes.resolution），集卡片上可修改
 const resolutionOptions = computed(() => ([
@@ -688,9 +705,45 @@ async function confirmDelEpisode() {
   }
 }
 
-/* ===== 素材库 Tab ===== */
-const activeTab = ref('episodes')
-const assetTab = ref('all')
+function assetKindLabel(kind) {
+  if (kind === 'character') return t('common.role')
+  if (kind === 'scene') return t('common.scene')
+  return t('common.prop')
+}
+
+const assetDeleteTypeLabel = computed(() => assetKindLabel(assetToDelete.value?.kindKey))
+const assetDeleteName = computed(() => assetToDelete.value?.name || assetToDelete.value?.location || '')
+
+function askDeleteMaterial(material) {
+  assetToDelete.value = material
+}
+
+async function confirmDeleteMaterial() {
+  const material = assetToDelete.value
+  if (!material || deletingAsset.value) return
+  deletingAsset.value = true
+  try {
+    if (material.kindKey === 'character') await characterAPI.del(material.id)
+    else if (material.kindKey === 'scene') await sceneAPI.del(material.id)
+    else await propAPI.del(material.id)
+    if (editTarget.value?.kindKey === material.kindKey && editTarget.value?.id === material.id) closeEdit()
+    assetToDelete.value = null
+    toast.success(t('episode.delete.deleted', { type: assetKindLabel(material.kindKey) }))
+    await load()
+  } catch (e) {
+    toastError(e)
+  } finally {
+    deletingAsset.value = false
+  }
+}
+
+/* ===== 素材库 Tab（deeplink：?tab=episodes|assets &filter=all|character|scene|prop &asset=类型-id）===== */
+const { replaceQuery } = useQuerySync()
+const urlTab = queryEnum(route.query.tab, ['episodes', 'assets'])
+const pendingAssetLink = queryTypedId(route.query.asset, ['character', 'scene', 'prop'])
+// URL 携带 tab（含非法值）即以 URL 为准，非法回退默认；asset 参数隐含素材库页签
+const activeTab = ref(pendingAssetLink ? 'assets' : ((querySingle(route.query.tab) && urlTab) || 'episodes'))
+const assetTab = ref(queryEnum(route.query.filter, ['all', 'character', 'scene', 'prop']) || 'all')
 const assetViewer = ref({ open: false, src: '', title: '' })
 const pendingMaterials = ref(new Set())
 const assetTabs = computed(() => ([
@@ -914,7 +967,29 @@ async function saveEdit() {
   }
 }
 
-onMounted(load)
+// ===== 子状态 → URL 同步（replace：页签切换不进历史栈，返回键 = 回列表/上一页）=====
+watch([activeTab, assetTab, editDialog, editTarget], () => {
+  const query = { tab: activeTab.value }
+  if (activeTab.value === 'assets') query.filter = assetTab.value
+  const m = editTarget.value
+  if (editDialog.value && m?.id) query.asset = `${m.kindKey}-${m.id}`
+  replaceQuery(query)
+})
+
+// deeplink ?asset=类型-id：数据就绪后打开素材编辑弹窗；素材已删除/不存在则静默忽略
+function applyAssetDeeplink() {
+  if (!querySingle(route.query.asset)) return
+  const m = pendingAssetLink
+    ? materials.value.find(x => x.kindKey === pendingAssetLink.type && x.id === pendingAssetLink.id)
+    : null
+  if (!m) {
+    replaceQuery({ tab: activeTab.value, ...(activeTab.value === 'assets' ? { filter: assetTab.value } : {}) })
+    return
+  }
+  openEdit(m)
+}
+
+onMounted(async () => { await load(); applyAssetDeeplink() })
 </script>
 
 <style scoped>

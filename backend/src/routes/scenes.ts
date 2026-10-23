@@ -5,9 +5,14 @@ import { success, created, badRequest, now } from '../utils/response.js'
 import { generateImage } from '../services/generation.js'
 import { getDramaStylePrompt } from '../services/style-preset.js'
 import { ensureSceneFinalPrompt } from '../services/final-prompt.js'
-import { logTaskError, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
+import { logTaskError, logTaskStart, logTaskSuccess, logTaskWarn } from '../utils/task-logger.js'
+import { deleteAllReferenceImages, partitionMissingReferences, resolveReferenceImages } from '../services/reference-images.js'
+import { mountReferenceImageRoutes } from './reference-images.js'
 
 const app = new Hono()
+
+// POST/DELETE /scenes/:id/reference-images — 场景参考图（生图输入，与成片图互不影响）
+mountReferenceImageRoutes(app, 'scene')
 
 // POST /scenes — 手动新增场景（传入 episode_id 时关联到该集）
 app.post('/', async (c) => {
@@ -84,12 +89,16 @@ app.post('/:id/generate-image', async (c) => {
     scene.lighting || '电影感光影',
     '画面中没有任何人物，空场景，只有场景本身',
   ].filter(Boolean).join(', ')
+  // 默认用场景自己保存的参考图；请求显式传 reference_images（含空数组）时以请求为准
+  const resolved = resolveReferenceImages(scene.referenceImages, body.reference_images)
+  const { present: referenceImages, missing } = partitionMissingReferences(resolved)
+  if (missing.length) logTaskWarn('SceneImage', 'reference-missing', { sceneId: id, missing })
   try {
-    logTaskStart('SceneImage', 'generate', { sceneId: id, episodeId: ep.id, dramaId: scene.dramaId, location: scene.location })
+    logTaskStart('SceneImage', 'generate', { sceneId: id, episodeId: ep.id, dramaId: scene.dramaId, location: scene.location, references: referenceImages.length })
     await db.update(schema.scenes).set({ status: 'processing', updatedAt: now() }).where(eq(schema.scenes.id, id))
-    const genId = await generateImage({ sceneId: id, dramaId: scene.dramaId, prompt, model: body.model, configId: body.config_id ?? ep.imageConfigId ?? undefined })
+    const genId = await generateImage({ sceneId: id, dramaId: scene.dramaId, prompt, model: body.model, referenceImages: referenceImages.length ? referenceImages : undefined, configId: body.config_id ?? ep.imageConfigId ?? undefined })
     logTaskSuccess('SceneImage', 'generate', { sceneId: id, generationId: genId })
-    return success(c, { image_generation_id: genId })
+    return success(c, { image_generation_id: genId, reference_images: referenceImages, missing_reference_images: missing })
   } catch (err: any) {
     logTaskError('SceneImage', 'generate', { sceneId: id, error: err.message })
     await db.update(schema.scenes).set({ status: 'failed', updatedAt: now() }).where(eq(schema.scenes.id, id))
@@ -122,6 +131,8 @@ app.post('/:id/generate-prompt', async (c) => {
 app.delete('/:id', async (c) => {
   const id = Number(c.req.param('id'))
   await db.update(schema.scenes).set({ deletedAt: now(), updatedAt: now() }).where(eq(schema.scenes.id, id))
+  // 参考图是场景私有的生图输入，随场景一起清理（成片图保留，与既有行为一致）
+  deleteAllReferenceImages('scene', id)
   return success(c)
 })
 

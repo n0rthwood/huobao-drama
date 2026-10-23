@@ -74,6 +74,21 @@
     "confirmDialog": {
       "title": "确认删除"
     },
+    "referenceImages": {
+      "label": "参考图",
+      "hint": "引导生成，不是成片图",
+      "add": "添加",
+      "full": "参考图最多 {max} 张",
+      "remove": "删除这张参考图",
+      "empty": "暂无参考图，生成时仅用提示词",
+      "added": "参考图已添加",
+      "removed": "参考图已删除",
+      "previewTitle": "参考图 {index}",
+      "missing": "文件缺失",
+      "missingHint": "文件已不存在，生成时会跳过，建议删除该条",
+      "confirmTitle": "删除参考图",
+      "confirmMessage": "删除后这张参考图不再参与生成，文件也会被移除。成片图不受影响。"
+    },
     "localeSwitcher": {
       "label": "切换界面语言"
     },

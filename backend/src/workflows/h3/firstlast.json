@@ -1,0 +1,624 @@
+{
+ "92": {
+  "inputs": {
+   "filename_prefix": "video/firstlast_minimax_h3",
+   "format": "auto",
+   "format.codec": "auto",
+   "codec": "auto",
+   "video-preview": "",
+   "video": [
+    "105:91",
+    0
+   ]
+  },
+  "class_type": "SaveVideo",
+  "_meta": {
+   "title": "保存视频"
+  }
+ },
+ "114": {
+  "inputs": {
+   "image": "V20_Brush_front_hero.jpg"
+  },
+  "class_type": "LoadImage",
+  "_meta": {
+   "title": "加载图像"
+  }
+ },
+ "115": {
+  "inputs": {
+   "aspect_ratio": "16:9 (Widescreen)",
+   "megapixels": 0.5,
+   "multiple": 32
+  },
+  "class_type": "ResolutionSelector",
+  "_meta": {
+   "title": "分辨率选择器"
+  }
+ },
+ "119": {
+  "inputs": {
+   "upscale_method": "nearest-exact",
+   "megapixels": 0.9,
+   "resolution_steps": 32
+  },
+  "class_type": "ImageScaleToTotalPixels",
+  "_meta": {
+   "title": "缩放图像（像素）"
+  }
+ },
+ "120": {
+  "inputs": {
+   "image": [
+    "119",
+    0
+   ]
+  },
+  "class_type": "GetImageSize",
+  "_meta": {
+   "title": "获取图像尺寸"
+  }
+ },
+ "105:11": {
+  "inputs": {
+   "vae_name": "minimax_h3_video_vae_fp16.safetensors"
+  },
+  "class_type": "VAELoader",
+  "_meta": {
+   "title": "加载VAE"
+  }
+ },
+ "105:24": {
+  "inputs": {
+   "vae_name": "minimax_h3_audio_vae_fp32.safetensors"
+  },
+  "class_type": "VAELoader",
+  "_meta": {
+   "title": "加载VAE"
+  }
+ },
+ "105:23": {
+  "inputs": {
+   "samples": [
+    "105:14",
+    0
+   ],
+   "vae": [
+    "105:24",
+    0
+   ]
+  },
+  "class_type": "VAEDecodeAudio",
+  "_meta": {
+   "title": "VAE解码（音频）"
+  }
+ },
+ "105:10": {
+  "inputs": {
+   "samples": [
+    "105:14",
+    0
+   ],
+   "vae": [
+    "105:11",
+    0
+   ]
+  },
+  "class_type": "VAEDecode",
+  "_meta": {
+   "title": "VAE解码"
+  }
+ },
+ "105:17": {
+  "inputs": {
+   "sampler_name": "res_multistep"
+  },
+  "class_type": "KSamplerSelect",
+  "_meta": {
+   "title": "K采样器选择"
+  }
+ },
+ "105:9": {
+  "inputs": {
+   "scheduler": "simple",
+   "steps": 8,
+   "denoise": 1.0,
+   "model": [
+    "105:122",
+    0
+   ]
+  },
+  "class_type": "BasicScheduler",
+  "_meta": {
+   "title": "基本调度器"
+  }
+ },
+ "105:14": {
+  "inputs": {
+   "noise": [
+    "105:15",
+    0
+   ],
+   "guider": [
+    "105:16",
+    0
+   ],
+   "sampler": [
+    "105:17",
+    0
+   ],
+   "sigmas": [
+    "105:9",
+    0
+   ],
+   "latent_image": [
+    "105:104",
+    1
+   ]
+  },
+  "class_type": "SamplerCustomAdvanced",
+  "_meta": {
+   "title": "自定义采样器（高级）"
+  }
+ },
+ "105:16": {
+  "inputs": {
+   "model": [
+    "105:122",
+    0
+   ],
+   "conditioning": [
+    "105:104",
+    0
+   ]
+  },
+  "class_type": "BasicGuider",
+  "_meta": {
+   "title": "基本引导器"
+  }
+ },
+ "105:6": {
+  "inputs": {
+   "unet_name": "minimax_h3_fl2va_pruned_bf16.safetensors",
+   "weight_dtype": "default"
+  },
+  "class_type": "UNETLoader",
+  "_meta": {
+   "title": "UNet加载器"
+  }
+ },
+ "105:13": {
+  "inputs": {
+   "clip_name": "qwen3vl_32b_minimax_h3_int8_convrot.safetensors",
+   "type": "minimax",
+   "device": "default"
+  },
+  "class_type": "CLIPLoader",
+  "_meta": {
+   "title": "加载CLIP"
+  }
+ },
+ "105:15": {
+  "inputs": {
+   "noise_seed": 757358688076805
+  },
+  "class_type": "RandomNoise",
+  "_meta": {
+   "title": "随机噪波"
+  }
+ },
+ "105:91": {
+  "inputs": {
+   "fps": 24.0,
+   "bit_depth": 8,
+   "color_space": "sRGB",
+   "codec": "none",
+   "images": [
+    "105:10",
+    0
+   ],
+   "audio": [
+    "105:23",
+    0
+   ]
+  },
+  "class_type": "CreateVideo",
+  "_meta": {
+   "title": "创建视频"
+  }
+ },
+ "105:104": {
+  "inputs": {
+   "prompt": "{\"integrated_multimodal_description\": \"Product showcase of the industrial sorting machine shown in the reference first frame, shown full and centered. Slow cinematic dolly from a three-quarter angle left to right along the machine. The machine has four labeled sections from left to right: the tall 'HOPPER' feed tower, then the 'BRUSH' cleaning section, then the 'SORTER' cabinet. Along the front edge, seven numbered outlets labeled 1 to 7 deliver the sorted product. As the camera passes each section, a glowing holographic tooltip callout appears and points to that section with its name in clean sans-serif capitals, then fades. Studio lighting sweeps across brushed metal surfaces and blue accent LEDs, clean dark gradient background, premium tech commercial look.\", \"overall_soundscape\": \"low ambient studio hum, soft mechanical product flow in the hopper, gentle sorter actuation clicks, futuristic UI blips as each tooltip appears\", \"non_diegetic_music\": \"confident electronic corporate track, building subtly\"}",
+   "width": 960,
+   "height": 544,
+   "length": [
+    "105:107",
+    1
+   ],
+   "clip": [
+    "98",
+    1
+   ],
+   "vae": [
+    "105:11",
+    0
+   ],
+   "first_frame": [
+    "208",
+    0
+   ],
+   "last_frame": [
+    "308",
+    0
+   ]
+  },
+  "class_type": "MiniMaxH3ImageToVideo",
+  "_meta": {
+   "title": "MiniMax H3 图像转视频"
+  }
+ },
+ "105:107": {
+  "inputs": {
+   "expression": "max(5, round(a * 24)) + (5 - (max(5, round(a * 24)) % 17)) % 17",
+   "values.a": [
+    "105:111",
+    0
+   ]
+  },
+  "class_type": "ComfyMathExpression",
+  "_meta": {
+   "title": "数学表达式"
+  }
+ },
+ "105:111": {
+  "inputs": {
+   "value": 15.0
+  },
+  "class_type": "PrimitiveFloat",
+  "_meta": {
+   "title": "Float (duration)"
+  }
+ },
+ "105:121": {
+  "inputs": {
+   "lora_name": "minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors",
+   "strength_model": 1.0,
+   "model": [
+    "98",
+    0
+   ]
+  },
+  "class_type": "LoraLoaderModelOnly",
+  "_meta": {
+   "title": "LoRA加载器（仅模型）"
+  }
+ },
+ "105:122": {
+  "inputs": {
+   "switch": [
+    "105:126",
+    0
+   ],
+   "on_false": [
+    "98",
+    0
+   ],
+   "on_true": [
+    "105:121",
+    0
+   ]
+  },
+  "class_type": "ComfySwitchNode",
+  "_meta": {
+   "title": "If/Else Switch (Model)"
+  }
+ },
+ "105:123": {
+  "inputs": {
+   "switch": [
+    "105:126",
+    0
+   ],
+   "on_false": [
+    "105:124",
+    0
+   ],
+   "on_true": [
+    "105:125",
+    0
+   ]
+  },
+  "class_type": "ComfySwitchNode",
+  "_meta": {
+   "title": "If/Else Switch (Steps)"
+  }
+ },
+ "105:124": {
+  "inputs": {
+   "value": 20
+  },
+  "class_type": "PrimitiveInt",
+  "_meta": {
+   "title": "整数"
+  }
+ },
+ "105:125": {
+  "inputs": {
+   "value": 8
+  },
+  "class_type": "PrimitiveInt",
+  "_meta": {
+   "title": "整数"
+  }
+ },
+ "105:126": {
+  "inputs": {
+   "value": false
+  },
+  "class_type": "PrimitiveBoolean",
+  "_meta": {
+   "title": "Boolean (Enable Lightning LoRA)"
+  }
+ },
+ "98": {
+  "class_type": "LoraLoader",
+  "inputs": {
+   "lora_name": "minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors",
+   "strength_model": 1.0,
+   "strength_clip": 1.0,
+   "model": [
+    "105:6",
+    0
+   ],
+   "clip": [
+    "105:13",
+    0
+   ]
+  }
+ },
+ "200": {
+  "class_type": "LoadImage",
+  "inputs": {
+   "image": "V20_Brush_front_hero.jpg"
+  }
+ },
+ "201": {
+  "class_type": "GetImageSize",
+  "inputs": {
+   "image": [
+    "200",
+    0
+   ]
+  }
+ },
+ "202": {
+  "class_type": "ComfyMathExpression",
+  "inputs": {
+   "expression": "min(960 / a, 544 / b)",
+   "values.a": [
+    "201",
+    0
+   ],
+   "values.b": [
+    "201",
+    1
+   ]
+  }
+ },
+ "203": {
+  "class_type": "ComfyMathExpression",
+  "inputs": {
+   "expression": "max(32, int(floor(a * b / 32)) * 32)",
+   "values.a": [
+    "202",
+    0
+   ],
+   "values.b": [
+    "201",
+    0
+   ]
+  }
+ },
+ "204": {
+  "class_type": "ComfyMathExpression",
+  "inputs": {
+   "expression": "max(32, int(floor(a * b / 32)) * 32)",
+   "values.a": [
+    "202",
+    0
+   ],
+   "values.b": [
+    "201",
+    1
+   ]
+  }
+ },
+ "205": {
+  "class_type": "ImageScale",
+  "inputs": {
+   "upscale_method": "lanczos",
+   "width": [
+    "203",
+    1
+   ],
+   "height": [
+    "204",
+    1
+   ],
+   "crop": "disabled",
+   "image": [
+    "200",
+    0
+   ]
+  }
+ },
+ "206": {
+  "class_type": "ComfyMathExpression",
+  "inputs": {
+   "expression": "max(0, int(floor((544 - a) / 2)))",
+   "values.a": [
+    "204",
+    0
+   ]
+  }
+ },
+ "207": {
+  "class_type": "ComfyMathExpression",
+  "inputs": {
+   "expression": "max(0, int(floor((960 - a) / 2)))",
+   "values.a": [
+    "203",
+    0
+   ]
+  }
+ },
+ "208": {
+  "class_type": "ImagePadForOutpaint",
+  "inputs": {
+   "image": [
+    "205",
+    0
+   ],
+   "left": [
+    "207",
+    1
+   ],
+   "top": [
+    "206",
+    1
+   ],
+   "right": [
+    "207",
+    1
+   ],
+   "bottom": [
+    "206",
+    1
+   ],
+   "feathering": 0
+  }
+ },
+ "300": {
+  "class_type": "LoadImage",
+  "inputs": {
+   "image": "V20_Brush_front_hero.jpg"
+  }
+ },
+ "301": {
+  "class_type": "GetImageSize",
+  "inputs": {
+   "image": [
+    "300",
+    0
+   ]
+  }
+ },
+ "302": {
+  "class_type": "ComfyMathExpression",
+  "inputs": {
+   "expression": "min(960 / a, 544 / b)",
+   "values.a": [
+    "301",
+    0
+   ],
+   "values.b": [
+    "301",
+    1
+   ]
+  }
+ },
+ "303": {
+  "class_type": "ComfyMathExpression",
+  "inputs": {
+   "expression": "max(32, int(floor(a * b / 32)) * 32)",
+   "values.a": [
+    "302",
+    0
+   ],
+   "values.b": [
+    "301",
+    0
+   ]
+  }
+ },
+ "304": {
+  "class_type": "ComfyMathExpression",
+  "inputs": {
+   "expression": "max(32, int(floor(a * b / 32)) * 32)",
+   "values.a": [
+    "302",
+    0
+   ],
+   "values.b": [
+    "301",
+    1
+   ]
+  }
+ },
+ "305": {
+  "class_type": "ImageScale",
+  "inputs": {
+   "upscale_method": "lanczos",
+   "width": [
+    "303",
+    1
+   ],
+   "height": [
+    "304",
+    1
+   ],
+   "crop": "disabled",
+   "image": [
+    "300",
+    0
+   ]
+  }
+ },
+ "306": {
+  "class_type": "ComfyMathExpression",
+  "inputs": {
+   "expression": "max(0, int(floor((544 - a) / 2)))",
+   "values.a": [
+    "304",
+    0
+   ]
+  }
+ },
+ "307": {
+  "class_type": "ComfyMathExpression",
+  "inputs": {
+   "expression": "max(0, int(floor((960 - a) / 2)))",
+   "values.a": [
+    "303",
+    0
+   ]
+  }
+ },
+ "308": {
+  "class_type": "ImagePadForOutpaint",
+  "inputs": {
+   "image": [
+    "305",
+    0
+   ],
+   "left": [
+    "307",
+    1
+   ],
+   "top": [
+    "306",
+    1
+   ],
+   "right": [
+    "307",
+    1
+   ],
+   "bottom": [
+    "306",
+    1
+   ],
+   "feathering": 0
+  }
+ }
+}

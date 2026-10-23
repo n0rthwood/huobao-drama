@@ -165,13 +165,13 @@ let lastLoggedTextEndpointKey = ''
  * 这里在请求体注入各厂商风格的关思考参数,让模型不产出 reasoning_content。
  *
  * - 默认开启;AI_DISABLE_THINKING=false 可关闭注入
- * - 官方 OpenAI / Gemini 端点跳过(官方 API 会拒绝未知参数)
+ * - 官方 OpenAI / Gemini / 智谱端点跳过(官方 API 会拒绝未知参数；GLM-5.x 始终思考，传 disabled 会 400)
  * - AI_THINKING_OFF_PATCH 可传 JSON 覆盖注入的 OpenAI 风格参数(适配不同中转站)
  */
 const thinkingOffEnabled = (process.env.AI_DISABLE_THINKING ?? 'true').toLowerCase() !== 'false'
 
 function isOfficialTextHost(baseURL: string) {
-  return /api\.openai\.com|generativelanguage\.googleapis\.com/.test(baseURL)
+  return /api\.openai\.com|generativelanguage\.googleapis\.com|open\.bigmodel\.cn/.test(baseURL)
 }
 
 function openaiThinkingOffPatch(): Record<string, any> {

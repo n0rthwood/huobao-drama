@@ -12,6 +12,9 @@ export interface ImageProviderAdapter {
    */
   buildGenerateRequest(config: AIConfig, record: ImageGenerationRecord): ProviderRequest
 
+  /** 可选：提交前的异步预处理（如把参考图上传到上游），抛错会作为任务失败原因落库 */
+  prepare?(config: AIConfig, record: ImageGenerationRecord): Promise<ImageGenerationRecord>
+
   /**
    * 解析生成响应，判断是同步还是异步
    */
@@ -27,7 +30,7 @@ export interface ImageProviderAdapter {
   /**
    * 解析轮询响应
    */
-  parsePollResponse(result: any): ImagePollResponse
+  parsePollResponse(result: any, config?: AIConfig): ImagePollResponse
 
   /**
    * 从响应中提取图片 URL（用于直接下载）
@@ -50,11 +53,17 @@ export interface VideoProviderAdapter {
 
   buildGenerateRequest(config: AIConfig, record: VideoGenerationRecord): ProviderRequest
 
+  /**
+   * 可选：提交前的异步预处理（如把参考图上传到上游、扩写提示词）。
+   * 返回的记录交给 buildGenerateRequest；抛错会作为任务失败原因落库。
+   */
+  prepare?(config: AIConfig, record: VideoGenerationRecord): Promise<VideoGenerationRecord>
+
   parseGenerateResponse(result: any): VideoGenResponse
 
   buildPollRequest(config: AIConfig, taskId: string): ProviderRequest
 
-  parsePollResponse(result: any): VideoPollResponse
+  parsePollResponse(result: any, config: AIConfig): VideoPollResponse
 
   extractVideoUrl(result: any): string | null
 }
@@ -87,6 +96,8 @@ export interface ImageGenerationRecord {
   size?: string | null
   frameType?: string | null
   referenceImages?: string | null
+  /** Adapter 内部在 prepare 与 buildGenerateRequest 之间传递的数据，不落库 */
+  extra?: Record<string, unknown>
   // ... 其他字段
 }
 
@@ -110,6 +121,8 @@ export interface VideoGenerationRecord {
   seed?: number | null
   promptExtend?: number | boolean | null
   watermark?: number | boolean | null
+  /** Adapter 内部在 prepare 与 buildGenerateRequest 之间传递的数据，不落库 */
+  extra?: Record<string, unknown>
   // ... 其他字段
 }
 

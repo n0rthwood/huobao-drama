@@ -4,7 +4,7 @@ import { db, getInsertId, schema } from '../db/index.js'
 import { success, notFound, created, badRequest, now } from '../utils/response.js'
 import { toSnakeCase } from '../utils/transform.js'
 import { joinProviderUrl } from '../services/adapters/url.js'
-import { isOfficialProvider, parseConfigTemperature } from '../services/ai.js'
+import { hasVersionedPath, isOfficialProvider, parseConfigTemperature } from '../services/ai.js'
 import { redactUrl, logTaskError, logTaskProgress, logTaskSuccess } from '../utils/task-logger.js'
 
 const app = new Hono()
@@ -64,7 +64,7 @@ function buildProbe(serviceType: string, provider: string, baseUrl: string, mode
   if (p === 'openai') {
     return {
       method: 'GET',
-      url: joinProviderUrl(baseUrl, '/v1', '/models'),
+      url: joinProviderUrl(baseUrl, hasVersionedPath(baseUrl) ? '' : '/v1', '/models'),
       headers: bearerHeaders(apiKey),
       body: undefined,
     }
@@ -91,6 +91,16 @@ function buildProbe(serviceType: string, provider: string, baseUrl: string, mode
       url: joinProviderUrl(baseUrl, '/v2', '/video_generation'),
       headers: bearerHeaders(apiKey, true),
       body: {},
+    }
+  }
+
+  if (p === 'comfyui') {
+    // ComfyUI 无鉴权概念，/system_stats 返回 200 即引擎可达；有 key（反代场景）才带 Authorization
+    return {
+      method: 'GET',
+      url: joinProviderUrl(baseUrl, '', '/system_stats'),
+      headers: bearerHeaders(apiKey),
+      body: undefined,
     }
   }
 

@@ -74,6 +74,21 @@
     "confirmDialog": {
       "title": "削除の確認"
     },
+    "referenceImages": {
+      "label": "参照画像",
+      "hint": "生成のガイド用で、完成画像ではありません",
+      "add": "追加",
+      "full": "参照画像は最大 {max} 枚です",
+      "remove": "この参照画像を削除",
+      "empty": "参照画像なし — プロンプトのみで生成します",
+      "added": "参照画像を追加しました",
+      "removed": "参照画像を削除しました",
+      "previewTitle": "参照画像 {index}",
+      "missing": "ファイルなし",
+      "missingHint": "ファイルが存在しません。生成時はスキップされます。この項目を削除してください",
+      "confirmTitle": "参照画像の削除",
+      "confirmMessage": "この参照画像は生成に使われなくなり、ファイルも削除されます。完成画像には影響しません。"
+    },
     "localeSwitcher": {
       "label": "表示言語を切り替え"
     },

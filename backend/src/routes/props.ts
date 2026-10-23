@@ -6,11 +6,16 @@ import { toSnakeCase } from '../utils/transform.js'
 import { generateImage } from '../services/generation.js'
 import { getDramaStylePrompt } from '../services/style-preset.js'
 import { ensurePropFinalPrompt } from '../services/final-prompt.js'
-import { logTaskError, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
+import { logTaskError, logTaskStart, logTaskSuccess, logTaskWarn } from '../utils/task-logger.js'
+import { deleteAllReferenceImages, partitionMissingReferences, resolveReferenceImages } from '../services/reference-images.js'
+import { mountReferenceImageRoutes } from './reference-images.js'
 
 const app = new Hono()
 // 道具图：白底单品静物，方形画布
 const PROP_IMAGE_SIZE = '1024x1024'
+
+// POST/DELETE /props/:id/reference-images — 道具参考图（生图输入，与成片图互不影响）
+mountReferenceImageRoutes(app, 'prop')
 
 // POST /props — 手动新增道具（传入 episode_id 时关联到该集）
 app.post('/', async (c) => {
@@ -42,6 +47,8 @@ app.post('/', async (c) => {
 app.delete('/:id', async (c) => {
   const id = Number(c.req.param('id'))
   await db.update(schema.props).set({ deletedAt: now(), updatedAt: now() }).where(eq(schema.props.id, id))
+  // 参考图是道具私有的生图输入，随道具一起清理（成片图保留，与既有行为一致）
+  deleteAllReferenceImages('prop', id)
   return success(c)
 })
 
@@ -114,11 +121,15 @@ app.post('/:id/generate-image', async (c) => {
   const stylePrompt = await getDramaStylePrompt(prop.dramaId)
   const finalPrompt = await ensurePropFinalPrompt(prop, ep.id, false, { model: body.text_model, configId: body.text_config_id ?? undefined })
   const prompt = finalPrompt || propImagePrompt(prop, stylePrompt)
+  // 默认用道具自己保存的参考图；请求显式传 reference_images（含空数组）时以请求为准
+  const resolved = resolveReferenceImages(prop.referenceImages, body.reference_images)
+  const { present: referenceImages, missing } = partitionMissingReferences(resolved)
+  if (missing.length) logTaskWarn('PropImage', 'reference-missing', { propId: id, missing })
   try {
-    logTaskStart('PropImage', 'generate', { propId: id, episodeId: ep.id, dramaId: prop.dramaId })
-    const genId = await generateImage({ propId: id, dramaId: prop.dramaId, prompt, model: body.model, size: PROP_IMAGE_SIZE, configId: body.config_id ?? ep.imageConfigId ?? undefined })
+    logTaskStart('PropImage', 'generate', { propId: id, episodeId: ep.id, dramaId: prop.dramaId, references: referenceImages.length })
+    const genId = await generateImage({ propId: id, dramaId: prop.dramaId, prompt, model: body.model, size: PROP_IMAGE_SIZE, referenceImages: referenceImages.length ? referenceImages : undefined, configId: body.config_id ?? ep.imageConfigId ?? undefined })
     logTaskSuccess('PropImage', 'generate', { propId: id, generationId: genId })
-    return success(c, { image_generation_id: genId })
+    return success(c, { image_generation_id: genId, reference_images: referenceImages, missing_reference_images: missing })
   } catch (err: any) {
     logTaskError('PropImage', 'generate', { propId: id, error: err.message })
     return badRequest(c, err.message)

@@ -29,9 +29,9 @@ app.get('/', async (c) => {
     const eps = await db.select().from(schema.episodes)
       .where(and(eq(schema.episodes.dramaId, drama.id), isNull(schema.episodes.deletedAt)))
     const chars = await db.select().from(schema.characters)
-      .where(eq(schema.characters.dramaId, drama.id))
+      .where(and(eq(schema.characters.dramaId, drama.id), isNull(schema.characters.deletedAt)))
     const scns = await db.select().from(schema.scenes)
-      .where(eq(schema.scenes.dramaId, drama.id))
+      .where(and(eq(schema.scenes.dramaId, drama.id), isNull(schema.scenes.deletedAt)))
     return {
       ...toSnakeCase(drama),
       tags: drama.tags ? JSON.parse(drama.tags) : [],
@@ -88,17 +88,18 @@ app.get('/stats', async (c) => {
 // GET /dramas/:id - Get drama detail
 app.get('/:id', async (c) => {
   const id = Number(c.req.param('id'))
-  const [drama] = await db.select().from(schema.dramas).where(eq(schema.dramas.id, id))
+  const [drama] = await db.select().from(schema.dramas)
+    .where(and(eq(schema.dramas.id, id), isNull(schema.dramas.deletedAt)))
   if (!drama) return notFound(c, '剧本不存在')
 
   const eps = await db.select().from(schema.episodes)
     .where(and(eq(schema.episodes.dramaId, id), isNull(schema.episodes.deletedAt)))
   const chars = await db.select().from(schema.characters)
-    .where(eq(schema.characters.dramaId, id))
+    .where(and(eq(schema.characters.dramaId, id), isNull(schema.characters.deletedAt)))
   const scns = await db.select().from(schema.scenes)
-    .where(eq(schema.scenes.dramaId, id))
+    .where(and(eq(schema.scenes.dramaId, id), isNull(schema.scenes.deletedAt)))
   const prps = await db.select().from(schema.props)
-    .where(eq(schema.props.dramaId, id))
+    .where(and(eq(schema.props.dramaId, id), isNull(schema.props.deletedAt)))
 
   return success(c, {
     ...toSnakeCase(drama),
@@ -142,10 +143,12 @@ app.put('/:id/characters', async (c) => {
   const ts = now()
 
   for (const char of chars) {
+    // 参考图只由 /characters/:id/reference-images 维护（单写者），批量保存不碰这一列
+    const { reference_images, referenceImages, ...fields } = char
     if (char.id) {
-      await db.update(schema.characters).set({ ...char, updatedAt: ts }).where(eq(schema.characters.id, char.id))
+      await db.update(schema.characters).set({ ...fields, updatedAt: ts }).where(eq(schema.characters.id, char.id))
     } else {
-      await db.insert(schema.characters).values({ ...char, dramaId, createdAt: ts, updatedAt: ts })
+      await db.insert(schema.characters).values({ ...fields, dramaId, createdAt: ts, updatedAt: ts })
     }
   }
   return success(c)

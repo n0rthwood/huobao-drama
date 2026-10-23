@@ -76,6 +76,7 @@ export const sqliteSchemaStatements = [
     final_prompt TEXT,
     storyboard_count INTEGER DEFAULT 1,
     image_url TEXT,
+    reference_images TEXT,
     status TEXT DEFAULT 'pending',
     local_path TEXT,
     created_at TEXT NOT NULL,
@@ -297,6 +298,25 @@ export const sqliteSchemaStatements = [
 ]
 
 /**
+ * 存量库补列 — CREATE TABLE IF NOT EXISTS 不会给老表加列。
+ * SQLite 的 ADD COLUMN 不重建表、可空列无默认值即无数据改写，按 PRAGMA table_info 幂等跳过。
+ */
+const columnAdditions: { table: string; column: string; type: string }[] = [
+  // 场景参考图（与 characters/props 的 reference_images 同语义：用户上传的生图输入）
+  { table: 'scenes', column: 'reference_images', type: 'TEXT' },
+]
+
+function applyColumnAdditions(sqlite: Database.Database) {
+  for (const { table, column, type } of columnAdditions) {
+    // PRAGMA 返回固定形状，better-sqlite3 无静态类型，按已知结果结构断言
+    const columns = sqlite.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]
+    if (columns.some(col => col.name === column)) continue
+    sqlite.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`)
+    console.log(`🧱 表 ${table} 补列 ${column}`)
+  }
+}
+
+/**
  * 风格预设种子数据 — value 存入 dramas.style，prompt 注入生图提示词（作为前缀拼接）
  *
  * prompt 统一按多维结构书写，保证跨模型/跨镜头的风格控制力：
@@ -378,6 +398,7 @@ export function initSqliteSchema(sqlite: Database.Database) {
   for (const statement of sqliteSchemaStatements) {
     sqlite.exec(statement)
   }
+  applyColumnAdditions(sqlite)
   const insertSeed = sqlite.prepare(SEED_SQL)
   const upgradeSeed = sqlite.prepare(UPGRADE_SQL)
   const removeSeed = sqlite.prepare(REMOVE_SQL)

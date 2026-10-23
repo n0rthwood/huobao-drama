@@ -30,8 +30,8 @@ export function parseConfigTemperature(settingsRaw: string | null | undefined): 
 
 export const officialProviders: Record<ServiceType, readonly string[]> = {
   text: ['openai', 'gemini', 'volcengine'],
-  image: ['openai', 'gemini', 'volcengine'],
-  video: ['volcengine', 'minimax', 'aliyun'],
+  image: ['openai', 'gemini', 'volcengine', 'comfyui'],
+  video: ['volcengine', 'minimax', 'aliyun', 'comfyui'],
 }
 
 export function isOfficialProvider(serviceType?: string | null, provider?: string | null): boolean {
@@ -39,10 +39,21 @@ export function isOfficialProvider(serviceType?: string | null, provider?: strin
   return !!providers && providers.includes((provider || '').toLowerCase())
 }
 
+/** baseUrl 路径是否已以 /v<数字> 结尾 */
+export function hasVersionedPath(baseUrl: string): boolean {
+  try {
+    return /\/v\d+$/.test(new URL(baseUrl).pathname.replace(/\/+$/, ''))
+  } catch {
+    return false
+  }
+}
+
 export function getTextProviderBaseUrl(config: AIConfig) {
   const provider = config.provider.toLowerCase()
 
   if (provider === 'openai') {
+    // 已带版本段（如智谱 .../paas/v4）的地址原样使用，避免被拼成 /v4/v1
+    if (hasVersionedPath(config.baseUrl)) return config.baseUrl.replace(/\/+$/, '')
     return joinProviderUrl(config.baseUrl, '/v1', '')
   }
 

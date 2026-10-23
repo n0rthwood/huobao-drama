@@ -74,6 +74,21 @@
     "confirmDialog": {
       "title": "Confirm delete"
     },
+    "referenceImages": {
+      "label": "References",
+      "hint": "Guides generation, not the final image",
+      "add": "Add",
+      "full": "At most {max} reference images",
+      "remove": "Remove this reference image",
+      "empty": "No reference images — generation uses the prompt only",
+      "added": "Reference image added",
+      "removed": "Reference image removed",
+      "previewTitle": "Reference image {index}",
+      "missing": "File missing",
+      "missingHint": "File no longer exists; it is skipped during generation — remove this entry",
+      "confirmTitle": "Remove reference image",
+      "confirmMessage": "This reference image will no longer guide generation and its file will be deleted. The final image is unaffected."
+    },
     "localeSwitcher": {
       "label": "Switch UI language"
     },

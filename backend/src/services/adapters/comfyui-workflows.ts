@@ -1,0 +1,143 @@
+/**
+ * ComfyUI MiniMax-H3 工作流模板填充
+ *
+ * 模板（src/workflows/h3/*.json）是 ComfyUI 的 API 格式工作流，拷自 175 vidgen-studio/templates，
+ * 已适配 175 上安装的 bf16 权重；h3-int8/ 是低显存实例（2×3060）的变体，仅换 unet/clip 文件名
+ * （fl2va int8 convrot + qwen3vl nvfp4 awq，拓扑与 bf16 逐节点相同，且无 ref2va → 不支持参考图模式）。
+ * 这里只按固定节点 ID 填参数，移植自 vidgen-studio 的 templates_fill.py。
+ * 模板经 JSON import 打进 esbuild bundle，桌面版无需额外资源路径。
+ */
+import firstlastTemplate from '../../workflows/h3/firstlast.json'
+import referenceTemplate from '../../workflows/h3/reference.json'
+import t2vTemplate from '../../workflows/h3/t2v.json'
+import firstlastInt8Template from '../../workflows/h3-int8/firstlast.json'
+import t2vInt8Template from '../../workflows/h3-int8/t2v.json'
+
+import { asWorkflow, cloneNode as node, randomSeed, type Workflow } from './comfyui-client'
+
+export type H3Variant = 'standard' | 'int8'
+
+const TEMPLATES: Record<H3Variant, { t2v: Workflow; firstlast: Workflow; reference?: Workflow }> = {
+  standard: {
+    t2v: asWorkflow(t2vTemplate),
+    firstlast: asWorkflow(firstlastTemplate),
+    reference: asWorkflow(referenceTemplate),
+  },
+  int8: { t2v: asWorkflow(t2vInt8Template), firstlast: asWorkflow(firstlastInt8Template) },
+}
+
+/** 步数 ≤8 挂 turbo LoRA（为 ~8 步蒸馏）；>8 走基础模型并取消 LoRA */
+const DEFAULT_STEPS = 8
+const MAX_PIXELS = 1344 * 768
+/**
+ * 参考图模式用基础 ref2va 权重且不挂 LoRA（175 上没有 ref2v turbo LoRA），不是蒸馏模型：
+ * 实测 4 步背景是未收敛的噪点/拖影，20 步清晰完整，耗时几乎不变（耗时主要是固定开销）。
+ */
+const REFERENCE_STEPS = 20
+
+/** 项目侧档位 → 横屏边长；竖屏互换宽高 */
+const LANDSCAPE_SIZES: Record<string, Record<string, [number, number]>> = {
+  '16:9': { '480p': [832, 480], '720p': [960, 544], '1080p': [1344, 768] },
+  '4:3': { '480p': [640, 480], '720p': [896, 672], '1080p': [1152, 864] },
+  '1:1': { '480p': [512, 512], '720p': [768, 768], '1080p': [992, 992] },
+}
+
+export function pickResolution(resolution: string | null | undefined, aspectRatio: string | null | undefined): [number, number] {
+  const tier = (resolution || '').toLowerCase()
+  const tierKey = tier === '480p' || tier === '1080p' ? tier : '720p'
+  const ratio = (aspectRatio || '').trim()
+  const portrait = ratio === '9:16' || ratio === '3:4'
+  const landscapeKey = portrait ? (ratio === '9:16' ? '16:9' : '4:3') : ratio
+  const [w, h] = (LANDSCAPE_SIZES[landscapeKey] ?? LANDSCAPE_SIZES['16:9'])[tierKey]
+  const size: [number, number] = portrait ? [h, w] : [w, h]
+  if (size[0] % 32 || size[1] % 32 || size[0] * size[1] > MAX_PIXELS) {
+    throw new Error(`分辨率不合法: ${size[0]}x${size[1]}（需为 32 的倍数且不超过 1344×768 像素总量）`)
+  }
+  return size
+}
+
+function load(variant: H3Variant, name: 't2v' | 'firstlast'): Workflow {
+  const wf = TEMPLATES[variant][name]
+  if (!wf) throw new Error(`H3 ${variant} 实例不支持 ${name} 工作流`)
+  return structuredClone(wf)
+}
+
+
+/** t2v / firstlast 共用的 turbo、时长、seed、输出前缀 */
+function applyTurbo(wf: Workflow, durationS: number, seed: number, jobId: string, steps: number): void {
+  node(wf, '105:111').inputs.value = durationS
+  const turbo = steps <= 8
+  node(wf, '105:126').inputs.value = turbo
+  node(wf, turbo ? '105:125' : '105:124').inputs.value = steps
+  node(wf, '105:15').inputs.noise_seed = seed
+  node(wf, '92').inputs.filename_prefix = `huobao/${jobId}`
+}
+
+export interface FillBase {
+  variant?: H3Variant
+  prompt: string
+  durationS: number
+  width: number
+  height: number
+  seed: number | null | undefined
+  jobId: string
+  steps?: number
+}
+
+export function buildT2v(p: FillBase): Workflow {
+  const wf = load(p.variant ?? 'standard', 't2v')
+  node(wf, '114').inputs.text = p.prompt
+  node(wf, '116').inputs.width = p.width
+  node(wf, '116').inputs.height = p.height
+  applyTurbo(wf, p.durationS, randomSeed(p.seed), p.jobId, p.steps ?? DEFAULT_STEPS)
+  return wf
+}
+
+export function buildFirstLast(p: FillBase & { firstName: string; lastName?: string }): Workflow {
+  const wf = load(p.variant ?? 'standard', 'firstlast')
+  const gen = node(wf, '105:104').inputs
+  gen.prompt = p.prompt
+  gen.width = p.width
+  gen.height = p.height
+  node(wf, '200').inputs.image = p.firstName
+  if (p.lastName) {
+    node(wf, '300').inputs.image = p.lastName
+  } else {
+    for (let id = 300; id <= 308; id++) delete wf[String(id)]
+    delete gen.last_frame
+  }
+  // 首/尾帧按目标画幅等比缩放后居中补边（letterbox）
+  const fit = `min(${p.width} / a, ${p.height} / b)`
+  const padTop = `max(0, int(floor((${p.height} - a) / 2)))`
+  const padLeft = `max(0, int(floor((${p.width} - a) / 2)))`
+  const expressions: Record<string, string> = {
+    '202': fit, '206': padTop, '207': padLeft,
+    '302': fit, '306': padTop, '307': padLeft,
+  }
+  for (const [id, expression] of Object.entries(expressions)) {
+    if (wf[id]) wf[id].inputs.expression = expression
+  }
+  applyTurbo(wf, p.durationS, randomSeed(p.seed), p.jobId, p.steps ?? DEFAULT_STEPS)
+  return wf
+}
+
+/** 参考图模式：模板是 ref2va 基础权重（无 LoRA，仅 standard 实例有此权重），步数固定为 REFERENCE_STEPS */
+export function buildReference(p: Omit<FillBase, 'steps'> & { refNames: string[] }): Workflow {
+  const wf = structuredClone(TEMPLATES.standard.reference)
+  if (!wf) throw new Error('H3 参考图工作流不可用')
+  node(wf, '124').inputs.steps = REFERENCE_STEPS
+  node(wf, '1').inputs.value = p.prompt
+  node(wf, '133').inputs.value = p.durationS
+  node(wf, '129').inputs.noise_seed = randomSeed(p.seed)
+  const gen = node(wf, '131').inputs
+  gen.width = p.width
+  gen.height = p.height
+  delete gen['ref_images.ref_image_0']
+  p.refNames.forEach((name, i) => {
+    const loaderId = `refimg${i}`
+    wf[loaderId] = { class_type: 'LoadImage', inputs: { image: name, upload: 'image' } }
+    gen[`ref_images.ref_image_${i}`] = [loaderId, 0]
+  })
+  node(wf, '92').inputs.filename_prefix = `huobao/${p.jobId}`
+  return wf
+}

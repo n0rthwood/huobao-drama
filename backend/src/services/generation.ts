@@ -9,7 +9,7 @@ import { now } from '../utils/response.js'
 import { downloadFile, fetchImageAsCompressedDataUrl, generateImageThumb, readImageAsCompressedDataUrl, readImageAsDataUrl, saveBase64Image } from '../utils/storage.js'
 import { extractVideoPoster } from '../utils/video-poster.js'
 import { getImageAdapter, getVideoAdapter } from './adapters/registry'
-import type { AIConfig } from './adapters/types'
+import type { AIConfig, ImageGenerationRecord, VideoGenerationRecord } from './adapters/types'
 import { logTaskError, logTaskPayload, logTaskProgress, logTaskStart, logTaskSuccess, logTaskWarn, redactUrl } from '../utils/task-logger.js'
 
 type TaskType = 'image' | 'video'
@@ -208,14 +208,16 @@ async function processTask(id: number, config: AIConfig) {
     if (type === 'image') {
       const adapter = getImageAdapter(config.provider)
       const resolvedReferenceImages = await normalizeReferenceImages(params.referenceImages)
-      ;({ url, method, headers, body } = adapter.buildGenerateRequest(config, {
+      const imageRecord: ImageGenerationRecord = {
         id: record.id,
         model: record.model,
         prompt: record.prompt,
         size: params.size,
         frameType: params.frameType,
         referenceImages: resolvedReferenceImages.length ? JSON.stringify(resolvedReferenceImages) : null,
-      }))
+      }
+      const preparedImage = adapter.prepare ? await adapter.prepare(config, imageRecord) : imageRecord
+      ;({ url, method, headers, body } = adapter.buildGenerateRequest(config, preparedImage))
     } else {
       const adapter = getVideoAdapter(config.provider)
       const resolvedImageUrl = await normalizeVideoReferenceUrl(params.imageUrl)
@@ -226,7 +228,7 @@ async function processTask(id: number, config: AIConfig) {
       const resolvedReferenceVideoUrls = resolvePublicMediaUrls(params.referenceVideoUrls, 'video')
       const resolvedReferenceAudioUrls = resolvePublicMediaUrls(params.referenceAudioUrls, 'audio')
       const resolvedReferenceFileUrl = resolvePublicMediaUrl(params.referenceFileUrl, 'file')
-      ;({ url, method, headers, body } = adapter.buildGenerateRequest(config, {
+      const videoRecord: VideoGenerationRecord = {
         id: record.id,
         model: record.model,
         prompt: record.prompt,
@@ -246,7 +248,10 @@ async function processTask(id: number, config: AIConfig) {
         seed: params.seed,
         promptExtend: params.promptExtend,
         watermark: params.watermark,
-      }))
+      }
+      // 可选预处理（如 ComfyUI：上传参考图、扩写提示词）；抛错落入 catch 写入 error_msg
+      const prepared = adapter.prepare ? await adapter.prepare(config, videoRecord) : videoRecord
+      ;({ url, method, headers, body } = adapter.buildGenerateRequest(config, prepared))
     }
 
     logTaskProgress(label, 'request', {
@@ -368,7 +373,7 @@ async function pollTask(record: SysTaskRecord, config: AIConfig, taskId: string)
       const result = await resp.json() as any
 
       // 图片/视频 PollResponse 结构不同，这里统一按 any 取值后按 type 分支
-      const pollResp: any = adapter.parsePollResponse(result)
+      const pollResp: any = adapter.parsePollResponse(result, config)
 
       if (pollResp.status === 'completed') {
         if (type === 'image') {
@@ -519,7 +524,8 @@ async function normalizeReferenceImages(refs: string[] | null | undefined): Prom
     return value
   }))
 
-  return normalized.filter((item): item is string => !!item).slice(0, 6)
+  // 不做张数截断：厂商上限由各 adapter 明确报错（静默丢参考图会让用户得到无法解释的结果）
+  return normalized.filter((item): item is string => !!item)
 }
 
 async function normalizeVideoReferenceUrl(value: string | null | undefined): Promise<string | null> {

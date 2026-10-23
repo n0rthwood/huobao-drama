@@ -256,6 +256,18 @@
             <div class="prod-section-bar">
               <span class="dim" style="font-size:12px">{{ t('episode.prod.assets') }}</span>
               <span class="tag mono">{{ t('episode.prod.readyCount', { ready: assetReadyCount, total: assetTotalCount }) }}</span>
+              <div class="seg asset-extract-filter" role="tablist" :aria-label="t('episode.prod.assets')">
+                <button
+                  v-for="et in [{ key: '', label: t('index.status.all') }, ...EXTRACT_TARGETS]"
+                  :key="et.key || 'all'"
+                  type="button"
+                  class="seg-item"
+                  role="tab"
+                  :class="{ on: (extractTab || '') === et.key }"
+                  :aria-selected="(extractTab || '') === et.key"
+                  @click="extractTab = et.key || null"
+                >{{ et.label }}</button>
+              </div>
               <div class="ml-auto flex gap-1 asset-bar-actions">
                 <button
                   v-for="et in EXTRACT_TARGETS"
@@ -300,6 +312,7 @@
               </button>
             </div>
             <template v-else>
+            <template v-if="!extractTab || extractTab === 'characters'">
             <div class="asset-section-title">
               {{ t('common.role') }}
               <button class="asset-add-btn" @click="openAssetCreate('character')"><Plus :size="11" /> {{ t('common.add') }}</button>
@@ -316,7 +329,7 @@
                 @keydown.enter.prevent="openAssetDetail('character', c)"
                 @keydown.space.prevent="openAssetDetail('character', c)"
               >
-                <button class="asset-del-btn" :title="t('episode.asset.delChar')" @click.stop="askDeleteAsset('character', c)"><X :size="11" /></button>
+                <button class="asset-del-btn" :title="t('episode.asset.delChar')" :aria-label="t('episode.asset.delChar')" @click.stop="askDeleteAsset('character', c)"><Trash2 :size="11" /><span>{{ t('common.delete') }}</span></button>
                 <div class="character-asset-main">
                   <div class="character-asset-overview"><div class="character-portrait">
                       <img
@@ -361,10 +374,19 @@
                     <span class="afp-label">{{ t('episode.asset.finalPromptTurnaround') }}</span>
                     <span :class="['afp-text', !(c.final_prompt || c.finalPrompt) && 'dim']">{{ c.final_prompt || c.finalPrompt || t('episode.asset.finalPromptAutoTurnaround') }}</span>
                   </div>
+                  <ReferenceImageManager
+                    asset-type="character"
+                    :asset-id="c.id"
+                    :references="c.reference_images ?? c.referenceImages"
+                    @update="onAssetRefsUpdate(c, $event)"
+                    @preview="openImageViewer"
+                  />
                 </div>
               </article>
             </div>
             </template>
+            </template>
+            <template v-if="!extractTab || extractTab === 'scenes'">
 
             <div class="asset-section-title">
               {{ t('common.scene') }}
@@ -382,7 +404,7 @@
                 @keydown.enter.prevent="openAssetDetail('scene', s)"
                 @keydown.space.prevent="openAssetDetail('scene', s)"
               >
-                <button class="asset-del-btn" :title="t('episode.asset.delScene')" @click.stop="askDeleteAsset('scene', s)"><X :size="11" /></button>
+                <button class="asset-del-btn" :title="t('episode.asset.delScene')" :aria-label="t('episode.asset.delScene')" @click.stop="askDeleteAsset('scene', s)"><Trash2 :size="11" /><span>{{ t('common.delete') }}</span></button>
                 <div class="asset-cover wide">
                   <img
                     v-if="s.image_url || s.imageUrl"
@@ -405,6 +427,13 @@
                     <span class="afp-label">{{ t('episode.asset.finalPromptFixed') }}</span>
                     {{ s.final_prompt || s.finalPrompt || t('episode.asset.finalPromptAutoFixed') }}
                   </div>
+                  <ReferenceImageManager
+                    asset-type="scene"
+                    :asset-id="s.id"
+                    :references="s.reference_images ?? s.referenceImages"
+                    @update="onAssetRefsUpdate(s, $event)"
+                    @preview="openImageViewer"
+                  />
                 </div>
                 <div class="asset-foot">
                   <span :class="['dot', (s.image_url || s.imageUrl) && 'ok', isPendingSceneImage(s.id) && 'pending']" />
@@ -422,6 +451,8 @@
             </div>
             </template>
 
+            </template>
+            <template v-if="!extractTab || extractTab === 'props'">
             <div class="asset-section-title">
               {{ t('common.prop') }}
               <button class="asset-add-btn" @click="openAssetCreate('prop')"><Plus :size="11" /> {{ t('common.add') }}</button>
@@ -437,7 +468,7 @@
                 @keydown.enter.prevent="openAssetDetail('prop', p)"
                 @keydown.space.prevent="openAssetDetail('prop', p)"
               >
-                <button class="asset-del-btn" :title="t('episode.asset.delProp')" @click.stop="askDeleteAsset('prop', p)"><X :size="11" /></button>
+                <button class="asset-del-btn" :title="t('episode.asset.delProp')" :aria-label="t('episode.asset.delProp')" @click.stop="askDeleteAsset('prop', p)"><Trash2 :size="11" /><span>{{ t('common.delete') }}</span></button>
                 <div class="asset-cover wide">
                   <img
                     v-if="p.image_url || p.imageUrl"
@@ -462,6 +493,13 @@
                     <span class="afp-label">{{ t('episode.asset.finalPromptWhiteBg') }}</span>
                     {{ p.final_prompt || p.finalPrompt || t('episode.asset.finalPromptAutoWhiteBg') }}
                   </div>
+                  <ReferenceImageManager
+                    asset-type="prop"
+                    :asset-id="p.id"
+                    :references="p.reference_images ?? p.referenceImages"
+                    @update="onAssetRefsUpdate(p, $event)"
+                    @preview="openImageViewer"
+                  />
                 </div>
                 <div class="asset-foot">
                   <span :class="['dot', (p.image_url || p.imageUrl) && 'ok', isPendingPropImage(p.id) && 'pending']" />
@@ -478,6 +516,7 @@
               </div>
             </div>
             <div v-else class="asset-props-empty">{{ t('episode.asset.propsEmpty') }}</div>
+            </template>
             </template>
           </div>
 
@@ -1432,13 +1471,14 @@ import { toast } from 'vue-sonner'
 import { useI18n } from 'vue-i18n'
 import {
   Users, FileText, FolderKanban, Clapperboard, Download, Loader2,
-  Plus, X, ListTodo, CircleHelp,
+  Plus, X, Trash2, ListTodo, CircleHelp,
 } from 'lucide-vue-next'
 import { api, dramaAPI, episodeAPI, storyboardAPI, characterAPI, sceneAPI, propAPI, taskAPI, mergeAPI, aiConfigAPI, uploadAPI } from '~/composables/useApi'
 import { startTour, autoTour } from '~/composables/useTour'
 import { useAgent } from '~/composables/useAgent'
 import { toastError, mapError, MODERATION_RE } from '~/composables/useToast'
 import LocaleSwitcher from '~/components/LocaleSwitcher.vue'
+import ReferenceImageManager from '~/components/ReferenceImageManager.vue'
 
 definePageMeta({ layout: 'studio' })
 
@@ -1450,7 +1490,7 @@ const episodeNumber = Number(route.params.episodeNumber)
 
 const drama = ref(null), episode = ref(null), chars = ref([]), scenes = ref([]), propItems = ref([]), sbs = ref([]), mergeData = ref(null)
 // 工作台面板位置记忆（按剧集隔离）：仅页面刷新(reload)时恢复到上次所在步骤；
-// 从列表/详情页点击进入时始终默认「剧本」面板
+// 从列表/详情页点击进入时始终默认「剧本」面板；URL query 显式携带子状态时优先于本地记忆
 const PANEL_STORE_KEY = `huobao:workbench:panel:${dramaId}:${episodeNumber}`
 const isPageReload = (() => {
   try { return performance.getEntriesByType('navigation')[0]?.type === 'reload' } catch { return false }
@@ -1459,9 +1499,21 @@ const storedPanel = (() => {
   if (!isPageReload) return null
   try { return JSON.parse(localStorage.getItem(PANEL_STORE_KEY) || 'null') } catch { return null }
 })()
-// 首个 refresh 时若已恢复面板位置，跳过按内容自动重置 scriptStep
-let panelRestored = !!storedPanel
-const panel = ref(['production', 'export'].includes(storedPanel?.panel) ? storedPanel.panel : 'script')
+// ===== 子状态 deeplink：?panel=script|production|export &step=0|1 &tab=assets|videos &extract=characters|scenes|props &asset=类型-id =====
+const { replaceQuery } = useQuerySync()
+const urlPanel = queryEnum(route.query.panel, ['script', 'production', 'export'])
+const urlStep = queryEnum(route.query.step, ['0', '1'])
+const urlProdTab = queryEnum(route.query.tab, ['assets', 'videos'])
+// extract：资产面板的类型筛选页签（null = 全部），与左侧 EXTRACT_TARGETS 三类一致
+const urlExtract = queryEnum(route.query.extract, ['characters', 'scenes', 'props'])
+const pendingAssetLink = queryTypedId(route.query.asset, ['character', 'scene', 'prop'])
+// 任一面板子状态出现在 URL（含非法值）即以 URL 为完整来源，缺失子参数取默认值，忽略本地记忆
+const urlPanelGiven = !!(querySingle(route.query.panel) || urlStep || urlProdTab || querySingle(route.query.extract))
+// 首个 refresh 时若已恢复面板位置（URL 显式 step 或无 URL 面板参数时的本地记忆），跳过按内容自动重置 scriptStep
+let panelRestored = urlStep !== null || (!urlPanelGiven && !!storedPanel)
+const panel = ref(urlPanelGiven
+  ? (urlPanel || (urlProdTab || urlExtract ? 'production' : 'script'))
+  : (['production', 'export'].includes(storedPanel?.panel) ? storedPanel.panel : 'script'))
 const { running: rn, runningType: rt, run: runAgent } = useAgent()
 
 const localRaw = ref(''), localScript = ref('')
@@ -1505,10 +1557,13 @@ async function loadExportMerges() {
   try { exportMerges.value = await mergeAPI.list(epId.value) || [] } catch { /* 静默 */ }
 }
 
-const scriptStep = ref(storedPanel ? (storedPanel.scriptStep === 0 ? 0 : 1) : 0)
+// URL 为面板来源时 step 缺失取默认 0（由 refresh 按内容自动推进），不继承本地记忆
+const scriptStep = ref(urlStep !== null ? Number(urlStep) : (urlPanelGiven ? 0 : (storedPanel ? (storedPanel.scriptStep === 0 ? 0 : 1) : 0)))
 // 旧版本地存储的 'storyboard' 子步骤已并入 'videos'（视频制作）
 const storedProdTab = storedPanel?.prodTab === 'storyboard' ? 'videos' : storedPanel?.prodTab
-const prodTab = ref(['assets', 'videos'].includes(storedProdTab) ? storedProdTab : 'assets')
+const prodTab = ref(urlProdTab || (urlPanelGiven ? 'assets' : (['assets', 'videos'].includes(storedProdTab) ? storedProdTab : 'assets')))
+// 资产类型筛选页签：null=全部（三段平铺）| characters|scenes|props（只看该类），deeplink ?extract=
+const extractTab = ref(urlExtract)
 // 面板位置变化即持久化
 watch([panel, scriptStep, prodTab], ([p, s, pt]) => {
   try { localStorage.setItem(PANEL_STORE_KEY, JSON.stringify({ panel: p, scriptStep: s, prodTab: pt })) } catch { /* 静默 */ }
@@ -1553,7 +1608,6 @@ function startVideoColDrag(which, e) {
   target.addEventListener('pointercancel', onUp)
   target.setPointerCapture?.(e.pointerId)
 }
-const activeExtractTab = ref('characters')
 const prodTabIdx = computed({
   get: () => prodTabDefs.value.findIndex(d => d.id === prodTab.value),
   set: (v) => { prodTab.value = prodTabDefs.value[v]?.id || 'assets' },
@@ -1672,6 +1726,30 @@ function closeAssetDetail() {
   assetPromptDraft.value = ''
   assetPromptDirty.value = false
 }
+
+// ===== 子状态 → URL 同步（deeplink）：replace 更新，不污染历史栈，返回键 = 退出工作台 =====
+// URL 始终镜像当前面板/子步骤/类型筛选/资产弹窗，任意时刻复制地址即可分享/刷新还原
+// 水合守卫：首个 refresh 会按内容自动重置 scriptStep，若此时就 replace 会抢在
+// applyAssetDeeplink 之前把 URL 里的 asset 参数冲掉（query 变化重建组件后链路丢失），
+// 故在 onMounted 完成数据加载 + 资产弹窗回放后再整体同步一次
+let workbenchHydrated = false
+let workbenchDirty = false
+function syncWorkbenchQuery() {
+  if (!workbenchHydrated) { workbenchDirty = true; return }
+  const query = { panel: panel.value }
+  // step 仅在剧本面板、tab/extract 仅在制作面板可见，只写当前有意义的键，保持 URL 简洁
+  if (panel.value === 'script') query.step = String(scriptStep.value)
+  if (panel.value === 'production') {
+    query.tab = prodTab.value
+    if (prodTab.value === 'assets' && extractTab.value) query.extract = extractTab.value
+  }
+  if (assetDetail.value.open && assetDetail.value.item?.id) {
+    query.asset = `${assetDetail.value.type}-${assetDetail.value.item.id}`
+  }
+  replaceQuery(query)
+}
+watch([panel, scriptStep, prodTab, extractTab], syncWorkbenchQuery)
+watch(assetDetail, syncWorkbenchQuery)
 
 // ─── 手动新增资产 ────────────────────────────────────────────
 // 类型短显示名渲染时求值（不模块级固化），逻辑判断一律用 kind code
@@ -2036,11 +2114,13 @@ const RESOLUTION_TIERS = {
   volcengine: ['480p', '720p'],
   minimax: ['720p', '1080p'],
   aliyun: ['480p', '720p', '1080p'],
+  comfyui: ['480p', '720p', '1080p'],
 }
 const RESOLUTION_DISPLAY = {
   volcengine: { '480p': '480p', '720p': '720p', '1080p': '720p' },
   minimax: { '480p': '768P', '720p': '768P', '1080p': '2K' },
   aliyun: { '480p': '480P', '720p': '720P', '1080p': '1080P' },
+  comfyui: { '480p': '480p', '720p': '720p', '1080p': '1080p' },
 }
 const resolutionProvider = computed(() => RESOLUTION_TIERS[selectedVideoConfig.value?.provider] ? selectedVideoConfig.value.provider : 'volcengine')
 const resolutionOptions = computed(() => RESOLUTION_TIERS[resolutionProvider.value].map(key => ({
@@ -3251,6 +3331,12 @@ function uploadAssetImage(kind, id) {
   })
 }
 
+// 参考图（生图输入）增删由 ReferenceImageManager 直接调服务端：
+// 以响应返回的数组为准覆盖本地值，不做乐观更新；成片图 image_url 不受影响
+function onAssetRefsUpdate(item, refs) {
+  item.reference_images = refs
+}
+
 async function genVid(sb, opts = {}) {
   const referenceImages = getShotReferenceImages(sb)
   // 参考素材完全来自分镜绑定的角色/场景/道具图片
@@ -3364,7 +3450,29 @@ async function loadConfigs() {
   } catch (e) { console.error('Failed to load AI configs', e) }
 }
 
-onMounted(async () => { await refresh(); loadConfigs(); syncExtractStatus() })
+// deeplink ?asset=类型-id：数据就绪后打开对应资产详情弹窗（并定位到资产面板）；
+// 资产已删除/不存在时静默忽略，停留在按 URL/localStorage 恢复的面板
+function applyAssetDeeplink() {
+  if (!pendingAssetLink) return
+  const { type, id } = pendingAssetLink
+  const list = type === 'character' ? chars.value : type === 'scene' ? scenes.value : propItems.value
+  const item = list.find(x => x.id === id)
+  if (!item) return
+  panel.value = 'production'
+  prodTab.value = 'assets'
+  openAssetDetail(type, item)
+}
+
+// 水合完成：数据就绪 + 资产弹窗回放后开启 URL 同步；带参数进入或水合期间状态已变化时整体同步一次
+const WORKBENCH_QUERY_KEYS = ['panel', 'step', 'tab', 'extract', 'asset']
+onMounted(async () => {
+  await refresh()
+  applyAssetDeeplink()
+  workbenchHydrated = true
+  if (workbenchDirty || WORKBENCH_QUERY_KEYS.some(k => k in route.query)) syncWorkbenchQuery()
+  loadConfigs()
+  syncExtractStatus()
+})
 
 // ===== 应用内引导（工作台）：沿左侧进度栏走 6 步流水线 =====
 const EPISODE_TOUR = [
@@ -4165,6 +4273,9 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
 /* 资产栏动作：提取（虚线中性）与批量生成（强调色）视觉分组 */
 .asset-bar-actions { align-items: center; }
 .asset-bar-divider { width: 1px; height: 16px; margin: 0 4px; background: var(--surface-outline-strong); }
+.asset-extract-filter { flex-shrink: 0; }
+/* 压过全局 .seg-item{padding:7px 16px}，与资产栏动作按钮同高收紧 */
+.asset-extract-filter .seg-item { padding: 4px 12px; font-size: 12px; }
 .asset-btn-extract {
   background: transparent;
   color: var(--text-2);
@@ -4202,22 +4313,24 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
   top: 8px;
   right: 8px;
   z-index: 3;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 9px;
   border: none;
-  background: rgba(0, 0, 0, 0.5);
+  border-radius: 999px;
+  background: var(--action-danger);
   color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
   cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.15s, background 0.15s;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.24);
+  transition: filter 0.15s, transform 0.15s, box-shadow 0.15s;
 }
-.asset-del-btn:hover { background: var(--action-danger); }
-.character-asset-card:hover .asset-del-btn,
-.asset-click-card:hover .asset-del-btn { opacity: 1; }
+.asset-del-btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.asset-del-btn:focus-visible { outline: none; box-shadow: 0 0 0 3.5px var(--button-focus); }
 
 /* 分镜勾选：选择后批量生成视频提示词 */
 .shot-check {

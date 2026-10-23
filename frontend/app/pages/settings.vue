@@ -700,7 +700,11 @@ import { confirmUnifiedLanguage } from '~/composables/useUnifiedLanguage'
 const { t, locale } = useI18n()
 
 const showBrandImage = ref(true)
-const tab = ref('ai')
+const route = useRoute()
+const { replaceQuery } = useQuerySync()
+// 设置页 deeplink：?tab=ai|general|styles|agents|storage|about（非法值静默回退 ai）
+const SETTINGS_TABS = ['ai', 'general', 'styles', 'agents', 'storage', 'about']
+const tab = ref(queryEnum(route.query.tab, SETTINGS_TABS) || 'ai')
 const baseTabs = computed(() => [
   { id: 'ai', label: t('settings.tabs.ai'), icon: Cpu },
   { id: 'general', label: t('settings.tabs.general'), icon: Languages },
@@ -749,7 +753,7 @@ const serviceTypes = computed(() => [
   { type: 'image', label: t('common.serviceType.image') },
   { type: 'video', label: t('common.serviceType.video') },
 ])
-const providers = ['gemini', 'openai', 'volcengine', 'minimax', 'aliyun']
+const providers = ['gemini', 'openai', 'volcengine', 'minimax', 'aliyun', 'comfyui']
 const providerSelectOptions = computed(() => providers.map(p => ({ label: p, value: p })))
 const serviceMeta = computed(() => ({
   text: { label: t('common.serviceType.text'), desc: t('settings.ai.meta.text') },
@@ -764,11 +768,13 @@ const providerPresets = {
   image: {
     gemini: { label: 'Gemini 官方', baseUrl: 'https://generativelanguage.googleapis.com', models: ['gemini-3-pro-image', 'gemini-3.1-flash-image'] },
     openai: { label: 'OpenAI 官方', baseUrl: 'https://api.openai.com', models: ['gpt-image-2'] },
+    comfyui: { label: 'ComfyUI · Qwen Image 2.1 本地', baseUrl: 'http://127.0.0.1:8189', models: ['qwen-image-2.1'] },
   },
   video: {
     aliyun: { label: '阿里云百炼 Wan 3.0', baseUrl: 'https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com', models: ['wan3.0-video', 'wan3.0-video-prime'] },
     volcengine: { label: 'Seedance 2.0 官方', baseUrl: 'https://ark.cn-beijing.volces.com', models: ['doubao-seedance-2-0-mini-260615', 'doubao-seedance-2-0-fast-260128', 'doubao-seedance-2-0-260128'] },
     minimax: { label: 'MiniMax H3 官方', baseUrl: 'https://api.minimaxi.com', models: ['MiniMax-H3'] },
+    comfyui: { label: 'ComfyUI · MiniMax H3 本地', baseUrl: 'http://127.0.0.1:8188', models: ['MiniMax-H3-ComfyUI'] },
   },
 }
 const huobaoQuickConfigs = computed(() => {
@@ -927,7 +933,7 @@ async function saveCfg() {
 
 // ===== Agent Configs =====
 const agentCfgs = ref([])
-const agentPane = ref('prompt')   // 右侧子 tab：prompt | skills
+const agentPane = ref(queryEnum(route.query.pane, ['prompt', 'skills']) || 'prompt')   // 右侧子 tab：prompt | skills
 const agentSaving = ref(false)
 const agentSaved = ref(null)
 const agentForm = reactive({ system_prompt: '' })
@@ -992,7 +998,8 @@ async function saveAgentCfg(type) {
 }
 
 // ===== Skills =====
-const selectedAgent = ref('script_rewriter')
+// deeplink ?agent=：Agent 列表选择（白名单来自 agentDefs，非法值回退默认）
+const selectedAgent = ref(queryEnum(route.query.agent, agentDefs.value.map(d => d.type)) || 'script_rewriter')
 const allSkills = ref([])   // { id, name, description }[]
 const editingSkill = ref(null)
 const skillContent = ref('')
@@ -1004,6 +1011,17 @@ const newSkillForm = reactive({ id: '', name: '', description: '' })
 const selectedAgentType = computed(() => selectedAgent.value)
 const selectedAgentLabel = computed(() => agentDefs.value.find(a => a.type === selectedAgent.value)?.label || '')
 const selectedAgentIcon = computed(() => agentDefs.value.find(a => a.type === selectedAgent.value)?.icon || '')
+
+// ===== 子状态 → URL 同步（replace：页签切换不进历史栈，返回键 = 离开设置页）=====
+// pane/agent 仅在 agents 页签下可见，只在此时写入，保持 URL 简洁
+watch([tab, agentPane, selectedAgent], () => {
+  const query = { tab: tab.value }
+  if (tab.value === 'agents') {
+    query.pane = agentPane.value
+    query.agent = selectedAgent.value
+  }
+  replaceQuery(query)
+})
 
 // ===== 通用：AI 内容语言（全局设置，与界面语言相互独立） =====
 const contentLanguage = ref('zh')

@@ -6,10 +6,15 @@ import { toSnakeCase } from '../utils/transform.js'
 import { generateImage } from '../services/generation.js'
 import { getDramaStylePrompt } from '../services/style-preset.js'
 import { ensureCharacterFinalPrompt } from '../services/final-prompt.js'
-import { logTaskError, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
+import { logTaskError, logTaskStart, logTaskSuccess, logTaskWarn } from '../utils/task-logger.js'
+import { deleteAllReferenceImages, partitionMissingReferences, resolveReferenceImages } from '../services/reference-images.js'
+import { mountReferenceImageRoutes } from './reference-images.js'
 
 const app = new Hono()
 const CHARACTER_IMAGE_SIZE = '1920x1080'
+
+// POST/DELETE /characters/:id/reference-images — 角色参考图（生图输入，与成片图互不影响）
+mountReferenceImageRoutes(app, 'character')
 
 // POST /characters — 手动新增角色（传入 episode_id 时关联到该集）
 app.post('/', async (c) => {
@@ -74,6 +79,8 @@ app.put('/:id', async (c) => {
 app.delete('/:id', async (c) => {
   const id = Number(c.req.param('id'))
   await db.update(schema.characters).set({ deletedAt: now() }).where(eq(schema.characters.id, id))
+  // 参考图是角色私有的生图输入，随角色一起清理（成片图保留，与既有行为一致）
+  deleteAllReferenceImages('character', id)
   return success(c)
 })
 
@@ -91,11 +98,15 @@ app.post('/:id/generate-image', async (c) => {
   const stylePrompt = await getDramaStylePrompt(char.dramaId)
   const finalPrompt = await ensureCharacterFinalPrompt(char, ep.id, false, { model: body.text_model, configId: body.text_config_id ?? undefined })
   const prompt = finalPrompt || characterImagePrompt(char, stylePrompt)
+  // 默认用角色自己保存的参考图；请求显式传 reference_images（含空数组）时以请求为准
+  const resolved = resolveReferenceImages(char.referenceImages, body.reference_images)
+  const { present: referenceImages, missing } = partitionMissingReferences(resolved)
+  if (missing.length) logTaskWarn('CharacterImage', 'reference-missing', { characterId: id, missing })
   try {
-    logTaskStart('CharacterImage', 'generate', { characterId: id, episodeId: ep.id, dramaId: char.dramaId })
-    const genId = await generateImage({ characterId: id, dramaId: char.dramaId, prompt, model: body.model, size: CHARACTER_IMAGE_SIZE, configId: body.config_id ?? ep.imageConfigId ?? undefined })
+    logTaskStart('CharacterImage', 'generate', { characterId: id, episodeId: ep.id, dramaId: char.dramaId, references: referenceImages.length })
+    const genId = await generateImage({ characterId: id, dramaId: char.dramaId, prompt, model: body.model, size: CHARACTER_IMAGE_SIZE, referenceImages: referenceImages.length ? referenceImages : undefined, configId: body.config_id ?? ep.imageConfigId ?? undefined })
     logTaskSuccess('CharacterImage', 'generate', { characterId: id, generationId: genId })
-    return success(c, { image_generation_id: genId })
+    return success(c, { image_generation_id: genId, reference_images: referenceImages, missing_reference_images: missing })
   } catch (err: any) {
     logTaskError('CharacterImage', 'generate', { characterId: id, error: err.message })
     return badRequest(c, err.message)
@@ -128,6 +139,8 @@ app.post('/batch-generate-images', async (c) => {
   const body = await c.req.json()
   const ids: number[] = body.character_ids || []
   if (!body.episode_id) return badRequest(c, 'episode_id 必填')
+  // 批量不接受统一参考图：一套参考图套到所有角色是误用，各角色用自己保存的参考图
+  if (body.reference_images !== undefined) return badRequest(c, '批量生成不支持统一参考图，请在角色卡片上分别管理参考图')
   const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, Number(body.episode_id)))
   if (!ep) return badRequest(c, '剧集不存在')
   const results: number[] = []
@@ -137,8 +150,10 @@ app.post('/batch-generate-images', async (c) => {
     if (!char) continue
     const finalPrompt = await ensureCharacterFinalPrompt(char, ep.id, false, { model: body.text_model, configId: body.text_config_id ?? undefined })
     const prompt = finalPrompt || characterImagePrompt(char, stylePrompt)
+    const { present: referenceImages, missing } = partitionMissingReferences(resolveReferenceImages(char.referenceImages))
+    if (missing.length) logTaskWarn('CharacterImage', 'reference-missing', { characterId: cid, missing })
     try {
-      const genId = await generateImage({ characterId: cid, dramaId: char.dramaId, prompt, model: body.model, size: CHARACTER_IMAGE_SIZE, configId: body.config_id ?? ep.imageConfigId ?? undefined })
+      const genId = await generateImage({ characterId: cid, dramaId: char.dramaId, prompt, model: body.model, size: CHARACTER_IMAGE_SIZE, referenceImages: referenceImages.length ? referenceImages : undefined, configId: body.config_id ?? ep.imageConfigId ?? undefined })
       results.push(genId)
     } catch {}
   }
