@@ -10,7 +10,7 @@ import { STORAGE_ROOT } from './paths.js'
 /**
  * 下载远程文件到本地存储
  */
-export async function downloadFile(url: string, subDir: string): Promise<string> {
+export async function downloadFile(url: string, subDir: string, headers?: Record<string, string>): Promise<string> {
   const dir = path.join(STORAGE_ROOT, subDir)
   fs.mkdirSync(dir, { recursive: true })
 
@@ -18,7 +18,7 @@ export async function downloadFile(url: string, subDir: string): Promise<string>
   const filename = `${uuid()}${ext}`
   const filePath = path.join(dir, filename)
 
-  const resp = await fetch(url)
+  const resp = await fetch(url, { headers })
   if (!resp.ok) throw new Error(`Download failed: ${resp.status}`)
 
   const buffer = Buffer.from(await resp.arrayBuffer())

@@ -48,8 +48,19 @@ export function baseOf(config: AIConfig): string {
   return config.baseUrl.replace(/\/+$/, '')
 }
 
+/**
+ * ComfyUI 网关鉴权头。api_key 为空 → 不带鉴权（LAN/ZeroTier 直连入口）；
+ * api_key 形如 "user:password"（含冒号）→ Caddy 公网入口的 HTTP Basic auth；
+ * 其它 → Bearer token（兼容旧用法）。凭据只存 ai_service_configs，不进 URL
+ * （Node fetch 拒绝 URL 内嵌 user:pass）、不进日志（task-logger 会打码 Authorization）。
+ */
 export function authHeaders(config: AIConfig): Record<string, string> {
-  return config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {}
+  if (!config.apiKey) return {}
+  if (config.apiKey.includes(':')) {
+    const basic = Buffer.from(config.apiKey, 'utf8').toString('base64')
+    return { Authorization: `Basic ${basic}` }
+  }
+  return { Authorization: `Bearer ${config.apiKey}` }
 }
 
 /** 引擎串行执行：提交前等队列清空，最长等待 30 分钟 */

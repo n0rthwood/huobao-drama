@@ -8,9 +8,16 @@ import { getActiveConfig, getConfigById } from './ai.js'
 import { now } from '../utils/response.js'
 import { downloadFile, fetchImageAsCompressedDataUrl, generateImageThumb, readImageAsCompressedDataUrl, readImageAsDataUrl, saveBase64Image } from '../utils/storage.js'
 import { extractVideoPoster } from '../utils/video-poster.js'
+import { authHeaders } from './adapters/comfyui-client'
 import { getImageAdapter, getVideoAdapter } from './adapters/registry'
 import type { AIConfig, ImageGenerationRecord, VideoGenerationRecord } from './adapters/types'
 import { logTaskError, logTaskPayload, logTaskProgress, logTaskStart, logTaskSuccess, logTaskWarn, redactUrl } from '../utils/task-logger.js'
+
+/** ComfyUI 公网网关的 /view 取件要带网关鉴权头；其它 provider 的输出直链无需鉴权。
+ *  四个完成回调调用点需保持同一行为，故收敛成一处。 */
+function downloadHeaders(config: AIConfig): Record<string, string> | undefined {
+  return config.provider.toLowerCase() === 'comfyui' ? authHeaders(config) : undefined
+}
 
 type TaskType = 'image' | 'video'
 
@@ -283,7 +290,7 @@ async function processTask(id: number, config: AIConfig) {
 
       if (!isAsync && imageUrl) {
         logTaskProgress(label, 'sync-complete', { id, imageUrl })
-        await handleImageComplete(record, imageUrl)
+        await handleImageComplete(record, imageUrl, downloadHeaders(config))
         return
       }
 
@@ -308,7 +315,7 @@ async function processTask(id: number, config: AIConfig) {
 
     if (!isAsync && videoUrl) {
       logTaskProgress(label, 'sync-complete', { id, videoUrl })
-      await handleVideoComplete(record, videoUrl, params.duration)
+      await handleVideoComplete(record, videoUrl, params.duration, downloadHeaders(config))
       return
     }
 
@@ -376,7 +383,7 @@ async function pollTask(record: SysTaskRecord, config: AIConfig, taskId: string)
         if (type === 'image') {
           if (pollResp.imageUrl) {
             logTaskSuccess(label, 'poll-complete', { id: record.id, taskId, imageUrl: pollResp.imageUrl })
-            await handleImageComplete(record, pollResp.imageUrl)
+            await handleImageComplete(record, pollResp.imageUrl, downloadHeaders(config))
             return
           }
           if (adapter.provider === 'gemini') {
@@ -390,7 +397,7 @@ async function pollTask(record: SysTaskRecord, config: AIConfig, taskId: string)
           }
         } else if (pollResp.videoUrl) {
           logTaskSuccess(label, 'poll-complete', { id: record.id, taskId, videoUrl: pollResp.videoUrl })
-          await handleVideoComplete(record, pollResp.videoUrl, pollResp.duration)
+          await handleVideoComplete(record, pollResp.videoUrl, pollResp.duration, downloadHeaders(config))
           return
         }
       }
@@ -412,8 +419,8 @@ async function pollTask(record: SysTaskRecord, config: AIConfig, taskId: string)
   await failTask(record.id, 'Timeout: polling attempts exhausted')
 }
 
-async function handleImageComplete(record: SysTaskRecord, imageUrl: string) {
-  const localPath = await downloadFile(imageUrl, 'images')
+async function handleImageComplete(record: SysTaskRecord, imageUrl: string, headers?: Record<string, string>) {
+  const localPath = await downloadFile(imageUrl, 'images', headers)
   // 列表页缩略图（前端按命名约定推导地址，失败不影响主流程）
   await generateImageThumb(localPath)
 
@@ -460,8 +467,8 @@ async function writeBackImageAssets(record: SysTaskRecord, localPath: string) {
   }
 }
 
-async function handleVideoComplete(record: SysTaskRecord, videoUrl: string, duration: number | null | undefined) {
-  const localPath = await downloadFile(videoUrl, 'videos')
+async function handleVideoComplete(record: SysTaskRecord, videoUrl: string, duration: number | null | undefined, headers?: Record<string, string>) {
+  const localPath = await downloadFile(videoUrl, 'videos', headers)
   // 海报帧供列表/封面展示，避免前端为显示首帧缓冲整个视频
   await extractVideoPoster(localPath)
   await db.update(schema.sysTask)

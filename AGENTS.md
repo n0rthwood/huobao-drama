@@ -136,15 +136,15 @@ Issue 整理完成后、实施前，必须让 **Fabel（Anthropic）或 Astra（
 - 流程：`prepare`（扩写提示词 → 等引擎队列空 → 上传参考图 `/upload/image`）→ `POST /prompt` → 轮询 `/history/{id}` → `/view` 下载。
 - 模式：无图 t2v（8 步 + turbo LoRA）；首帧（可选尾帧）firstlast（同上）；参考图 reference（基础 ref2va 权重、无 LoRA、**20 步**：4 步实测背景是未收敛的噪点，20 步清晰且耗时几乎不变）。不支持参考视频/音频。
 - **提示词契约（质量关键）**：H3 引擎逐字分词，必须是英文三段式 `integrated_multimodal_description / overall_soundscape / non_diegetic_music`（首尾帧前加对齐声明）。裸中文会导致画面发糊。`buildH3Prompt` 对非契约文本用当前文本模型（GLM）扩写，失败即报错，不回退为裸提示词。
-- 服务器资料：ComfyUI 地址在本机 `providers.json`；模型为 bf16 的 fl2va/ref2va + int8 文本编码器 + turbo 8 步 LoRA；引擎串行执行。
-- **低显存 H3 INT8 实例**：本机 `providers.json` 中配置独立实例，模型名包含 `MiniMax-H3-INT8-ComfyUI`（含 `int8` 触发变体模板 `workflows/h3-int8/{t2v,firstlast}.json`，与 bf16 模板逐节点同拓扑，仅换权重名）。实例使用 2×RTX 3060 12GB + ComfyUI 0.35，权重 `minimax_h3_fl2va_pruned_int8_convrot` + `qwen3vl_32b_minimax_h3_nvfp4_awq` + 同名 turbo LoRA；**没有 ref2va（只有未验证的 fused refdelta），参考图模式会明确报错**；仅 t2v / 首帧（可选尾帧）。优先级 80，默认仍是 bf16 实例。
+- 服务器资料（2026-10-26 起）：**唯一视频实例在 `.102` tcs3（RTX 3090）**，经 Caddy `https://102.joyai.dev/video`（Cloudflare 隧道）访问，模型名 `MiniMax-H3-INT8-ComfyUI` 触发变体模板 `workflows/h3-int8/{t2v,firstlast}.json`（fl2va int8 convrot + qwen3vl nvfp4_awq + turbo 8 步 LoRA）。该实例**没有 ref2va**，参考图模式会明确报错；仅 t2v / 首帧（可选尾帧）。bf16 实例（原 `.175`）已随 GPU 重排退役。引擎串行执行。
+- 网关鉴权：base URL 走公网 Cloudflare 入口时 Caddy 要 HTTP Basic auth；凭据只存 `ai_service_configs.api_key`（格式 `user:password`，含冒号即 Basic），`comfyui-client.ts` 的 `authHeaders` 会在队列/上传/提交/轮询/`/view` 下载全程带上。口令绝不入库/入文档。
 
-### ComfyUI（另一实例）：Qwen Image 2.1 + Wan 2.2
-- 一台 GB10 上跑两个 ComfyUI 实例（0.42.0），仅监听 127.0.0.1，由 Caddy 网关（:80，局域网无鉴权）按前缀转发：`/image/` → 8189（Qwen Image 2.1）、`/video/` → 8188（Wan 2.2）。主项目 base URL 填 `http://<host>/image` 与 `http://<host>/video`；adapter 把所有路径拼在 base URL 之后，所以前缀自然生效。两个实例共用同一块 GPU，不要并发提交。
-- 通用 ComfyUI 逻辑在 `adapters/comfyui-client.ts`（上传 `/upload/image`、`POST /prompt`、`/history`、`/view`、等队列空、节点校验错误解析）。provider 统一叫 `comfyui`，**按模型名分发工作流族**：视频 `MiniMax-H3*` → H3，`Wan*` → Wan；图片 `qwen-image*` → Qwen。新增模型 = 加模板 JSON（`backend/src/workflows/<family>/`）+ 填充函数 + adapter 里加一个分支。
-- 模板取自服务器 `/history` 里已跑通的任务（API 格式）：Qwen `workflows/qwen/{t2i,i2i}.json`、Wan `workflows/wan/{t2v,i2v,flf,ref}.json`。
+### ComfyUI（Qwen Image 2.1）
+- 入口（2026-10-26 起）：`.110`（2×RTX 3060）的 Caddy `https://110.joyai.dev/image`（Cloudflare 隧道，HTTP Basic auth，凭据同上存 api_key）。LAN 备选 `http://172.30.3.110/image`（免鉴权）。adapter 把所有路径拼在 base URL 之后，前缀自然生效，`waitEngineIdle` 只等该实例的队列。
+- 去噪器是 azukivc 的 **Q6_K GGUF**（`UnetLoaderGGUF`，city96 ComfyUI-GGUF；`.110` 没有 safetensors 扩散模型，HF 上也无可用 Q8_0 GGUF），文本编码器仍是 Comfy-Org int8 convrot，VAE bf16。速度参考（3060，25 步）：1024² ≈ 89–93 s。
+- 通用 ComfyUI 图像逻辑在 `adapters/comfyui-client.ts`（上传 `/upload/image`、`POST /prompt`、`/history`、`/view`、等队列空、节点校验错误解析）。provider 统一叫 `comfyui`，图片 `qwen-image*` → Qwen。新增图像模型 = 加模板 JSON（`backend/src/workflows/qwen/`）+ 填充函数 + adapter 分支。
+- 模板取自服务器 `/history` 里已跑通的任务（API 格式）：Qwen `workflows/qwen/{t2i,i2i}.json`。
 - Qwen Image 2.1：`TextEncodeQwenImage21`（参考图作为 `images.image_N` 自动增长输入，提示词用 `<image1>` 指代；没写时 adapter 自动补前缀）+ `QwenImage21Cache` + `KSampler`（euler/simple，25 步，cfg 1.0）。文生图用 `EmptyLatentImage`（尺寸对齐 32、总像素 ≤2048²），图生图尺寸跟随参考图。
-- Wan 2.2 14B fp8：双专家（high_noise 前半步、low_noise 后半步，两个 `KSamplerAdvanced`），服务器已有 4 个 lightx2v 4 步 LoRA（i2v v1、t2v v1.1），但项目仍走官方 **20 步 cfg 3.5**；16fps，帧数 4n+1，上限 81 帧（5 秒）；提示词直接用中文（umt5），负向提示词用模板自带的官方中文。支持文生视频、首帧 i2v、首尾帧、参考图 Fun VACE（参考图只取第一张）；首尾帧 shift 8.0/cfg 4.0，参考图 shift 8.0/cfg 3.5 写死在模板中。
 
 ## 待办
 

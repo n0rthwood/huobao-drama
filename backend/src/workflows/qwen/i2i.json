@@ -1,110 +1,109 @@
 {
-  "1": {
-    "class_type": "UNETLoader",
-    "inputs": {
-      "unet_name": "qwen_image_2.1_int8_convrot.safetensors",
-      "weight_dtype": "default"
-    }
-  },
-  "2": {
-    "class_type": "CLIPLoader",
-    "inputs": {
-      "clip_name": "qwen3vl_8b_int8_convrot.safetensors",
-      "type": "qwen_image",
-      "device": "default"
-    }
-  },
-  "3": {
-    "class_type": "VAELoader",
-    "inputs": {
-      "vae_name": "qwen_image_2.1_vae_bf16.safetensors"
-    }
-  },
-  "6": {
-    "class_type": "QwenImage21Cache",
-    "inputs": {
-      "model": [
-        "1",
-        0
-      ],
-      "device": "auto",
-      "dtype": "default"
-    }
-  },
-  "101": {
-    "class_type": "LoadImage",
-    "inputs": {
-      "image": "43b79df46cba_0.png"
-    }
-  },
-  "4": {
-    "class_type": "TextEncodeQwenImage21",
-    "inputs": {
-      "clip": [
-        "2",
-        0
-      ],
-      "vae": [
-        "3",
-        0
-      ],
-      "prompt": "在 <image1> 的文字下方加一只坐着的橘猫,其它保持不变",
-      "negative_prompt": "",
-      "resolution": 1024,
-      "images.image_1": [
-        "101",
-        0
-      ]
-    }
-  },
-  "7": {
-    "class_type": "KSampler",
-    "inputs": {
-      "model": [
-        "6",
-        0
-      ],
-      "positive": [
-        "4",
-        0
-      ],
-      "negative": [
-        "4",
-        1
-      ],
-      "latent_image": [
-        "4",
-        2
-      ],
-      "seed": 3395272501171009,
-      "steps": 25,
-      "cfg": 1.0,
-      "sampler_name": "euler",
-      "scheduler": "simple",
-      "denoise": 1.0
-    }
-  },
-  "8": {
-    "class_type": "VAEDecode",
-    "inputs": {
-      "samples": [
-        "7",
-        0
-      ],
-      "vae": [
-        "3",
-        0
-      ]
-    }
-  },
-  "9": {
-    "class_type": "SaveImage",
-    "inputs": {
-      "images": [
-        "8",
-        0
-      ],
-      "filename_prefix": "studio/43b79df46cba"
-    }
+ "1": {
+  "class_type": "UnetLoaderGGUF",
+  "inputs": {
+   "unet_name": "qwen-image-2.1-Q6_K.gguf"
   }
+ },
+ "2": {
+  "class_type": "CLIPLoader",
+  "inputs": {
+   "clip_name": "qwen3vl_8b_int8_convrot.safetensors",
+   "type": "qwen_image",
+   "device": "default"
+  }
+ },
+ "3": {
+  "class_type": "VAELoader",
+  "inputs": {
+   "vae_name": "qwen_image_2.1_vae_bf16.safetensors"
+  }
+ },
+ "6": {
+  "class_type": "QwenImage21Cache",
+  "inputs": {
+   "model": [
+    "1",
+    0
+   ],
+   "device": "auto",
+   "dtype": "default"
+  }
+ },
+ "101": {
+  "class_type": "LoadImage",
+  "inputs": {
+   "image": "43b79df46cba_0.png"
+  }
+ },
+ "4": {
+  "class_type": "TextEncodeQwenImage21",
+  "inputs": {
+   "clip": [
+    "2",
+    0
+   ],
+   "vae": [
+    "3",
+    0
+   ],
+   "prompt": "在 <image1> 的文字下方加一只坐着的橘猫,其它保持不变",
+   "negative_prompt": "",
+   "resolution": 1024,
+   "images.image_1": [
+    "101",
+    0
+   ]
+  }
+ },
+ "7": {
+  "class_type": "KSampler",
+  "inputs": {
+   "model": [
+    "6",
+    0
+   ],
+   "positive": [
+    "4",
+    0
+   ],
+   "negative": [
+    "4",
+    1
+   ],
+   "latent_image": [
+    "4",
+    2
+   ],
+   "seed": 3395272501171009,
+   "steps": 25,
+   "cfg": 1.0,
+   "sampler_name": "euler",
+   "scheduler": "simple",
+   "denoise": 1.0
+  }
+ },
+ "8": {
+  "class_type": "VAEDecode",
+  "inputs": {
+   "samples": [
+    "7",
+    0
+   ],
+   "vae": [
+    "3",
+    0
+   ]
+  }
+ },
+ "9": {
+  "class_type": "SaveImage",
+  "inputs": {
+   "images": [
+    "8",
+    0
+   ],
+   "filename_prefix": "studio/43b79df46cba"
+  }
+ }
 }
