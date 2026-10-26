@@ -51,6 +51,15 @@
             :options="resolutionOptions"
             hide-default
           />
+          <button
+            class="btn btn-sm ep-continuity-toggle"
+            :class="{ 'is-on': episodeContinuityEnabled }"
+            :disabled="!episode"
+            :title="t('episode.vid.continuityTip')"
+            @click="toggleEpisodeContinuity"
+          >
+            {{ t('episode.vid.continuity') }} · {{ episodeContinuityEnabled ? t('episode.vid.continuityStateOn') : t('episode.vid.continuityStateOff') }}
+          </button>
         </div>
         <div class="studio-actions">
           <LocaleSwitcher />
@@ -537,17 +546,44 @@
                   <svg v-else width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                   {{ videoPromptBatch.running ? t('episode.sb.promptProgress', { done: videoPromptBatch.completed, total: videoPromptBatch.total }) : (videoSelectMode && selectedVideoSbIds.length ? t('episode.sb.promptSelected', { n: selectedVideoSbIds.length }) : t('episode.sb.batchPrompts')) }}
                 </button>
-                <button v-if="videoTaskFailedCount" class="btn btn-sm video-retry-failed" @click="retryFailedVideos">
+                <button v-if="videoTaskFailedCount" class="btn btn-sm video-retry-failed" :disabled="videoBatchRunning" @click="retryFailedVideos">
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
                   {{ t('episode.vid.retryFailed', { n: videoTaskFailedCount }) }}
                 </button>
                 <button class="btn btn-sm" :class="{ 'is-on': videoSelectMode }" @click="toggleVideoSelectMode">
                   {{ videoSelectMode ? t('episode.vid.selectDone', { n: selectedVideoSbIds.length }) : t('episode.vid.select') }}
                 </button>
-                <button class="btn btn-sm" :disabled="!sbs.length" @click="batchVideos">
+                <button class="btn btn-sm" :disabled="!sbs.length || videoBatchRunning" :title="videoBatchRunning ? t('episode.vid.batchAlreadyRunning') : undefined" @click="batchVideos">
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
                   {{ videoSelectMode && selectedVideoSbIds.length ? t('episode.vid.batchSelected', { n: selectedVideoSbIds.length }) : t('episode.vid.batchVideos') }}
                 </button>
+              </div>
+            </div>
+            <div v-if="videoBatchVisible" :class="['video-batch-banner', { 'is-running': videoBatchRunning }]">
+              <span class="video-batch-state">{{ t('episode.vid.batchBannerTitle') }} · {{ videoBatchStatusLabel }}</span>
+              <span class="video-batch-sep">·</span>
+              <span>{{ t('episode.vid.batchProgress', { done: videoBatchDoneCount, total: videoBatchItems.length }) }}</span>
+              <template v-if="videoBatchRunning && videoBatchCurrentNumber">
+                <span class="video-batch-sep">·</span>
+                <span>{{ t('episode.vid.batchCurrent', { n: videoBatchCurrentNumber }) }}</span>
+              </template>
+              <template v-if="videoBatchFailedItems.length">
+                <span class="video-batch-sep">·</span>
+                <span class="video-batch-issue">{{ t('episode.vid.batchFailedCount', { n: videoBatchFailedItems.length }) }}</span>
+              </template>
+              <template v-if="videoBatchSkippedItems.length">
+                <span class="video-batch-sep">·</span>
+                <span class="video-batch-issue">{{ t('episode.vid.batchSkippedCount', { n: videoBatchSkippedItems.length }) }}</span>
+              </template>
+              <button v-if="videoBatchRunning" class="btn btn-sm ml-auto" :disabled="videoBatchStopping" @click="cancelVideoBatch">{{ t('episode.vid.batchStop') }}</button>
+              <div v-if="videoBatchIssues.length" class="video-batch-issues">
+                <span v-for="item in videoBatchIssues" :key="item.storyboard_id" :title="item.error || ''">
+                  {{ t('episode.vid.batchIssueItem', {
+                    n: item.storyboard_number,
+                    state: item.state === 'failed' ? t('episode.vid.batchItemFailed') : t('episode.vid.batchItemSkipped'),
+                    msg: mapError(item.error) || t('episode.vid.batchNoReason'),
+                  }) }}
+                </span>
               </div>
             </div>
             <div v-if="!sbs.length" class="step-empty video-task-empty-state">
@@ -628,6 +664,10 @@
                         <span class="video-task-sep">·</span>
                         <span class="video-task-loc truncate">{{ task.meta }}</span>
                       </template>
+                      <template v-if="isContinuityEffective(task.storyboard)">
+                        <span class="video-task-sep">·</span>
+                        <span class="video-task-continuity" :title="t('episode.vid.continuityBadgeTip')">{{ t('episode.vid.continuityBadge') }}</span>
+                      </template>
                     </div>
                     <div v-if="task.error" class="video-task-error" :title="task.error">
                       {{ mapError(task.error) }}
@@ -637,7 +677,7 @@
                   <button
                     class="btn btn-icon btn-sm video-task-action"
                     :title="videoTaskActionLabel(task.storyboard)"
-                    :disabled="videoTaskState(task.storyboard) === 'pending'"
+                    :disabled="videoTaskState(task.storyboard) === 'pending' || videoBatchRunning"
                     @click.stop="genVid(task.storyboard)"
                   >
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
@@ -862,18 +902,22 @@
                       </span>
                     </div>
                     <div class="video-param-hint">{{ t('episode.inspector.durationHint') }}</div>
-                    <label :class="['video-continuity-row', { disabled: !canUseContinuity(selectedSb) }]">
-                      <input
-                        type="checkbox"
-                        :checked="isContinuityEnabled(selectedSb)"
-                        :disabled="!canUseContinuity(selectedSb)"
-                        @change="toggleContinuity(selectedSb, $event.target.checked)"
-                      />
-                      <span>
+                    <div :class="['video-continuity-row', { disabled: !previousStoryboard(selectedSb) }]">
+                      <div class="video-continuity-head">
                         <strong>{{ t('episode.vid.continuity') }}</strong>
-                        <small>{{ continuityHint(selectedSb) }}</small>
-                      </span>
-                    </label>
+                        <select
+                          class="input video-continuity-select"
+                          :value="continuityMode(selectedSb)"
+                          :disabled="!previousStoryboard(selectedSb)"
+                          :aria-label="t('episode.vid.continuity')"
+                          @change="setContinuityMode(selectedSb, $event.target.value)"
+                        >
+                          <option v-for="opt in continuityModeOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                        </select>
+                      </div>
+                      <small>{{ continuityHint(selectedSb) }}</small>
+                      <small v-if="continuityWarning(selectedSb)" class="video-continuity-warn">{{ continuityWarning(selectedSb) }}</small>
+                    </div>
                   </section>
                   <div class="video-inspector-effective">
                     {{ t('episode.inspector.effective', { model: effectiveVideoModelLabel || t('episode.vid.defaultModel'), res: episodeResolutionShort, dur: effectiveVideoDuration }) }}
@@ -1492,6 +1536,7 @@
             <div class="batch-video-row"><span>{{ t('episode.vid.confirmTotal') }}</span><strong>{{ t('episode.vid.confirmApprox', { n: batchVideoTotalDuration }) }}</strong></div>
             <div class="batch-video-row"><span>{{ t('episode.vid.confirmModel') }}</span><strong>{{ effectiveVideoModelLabel || t('episode.vid.defaultModel') }}</strong></div>
             <div class="batch-video-row"><span>{{ t('episode.vid.confirmResolution') }}</span><strong>{{ episodeResolutionLabel }}</strong></div>
+            <p class="batch-video-note">{{ t('episode.vid.confirmSerialNote', { n: batchVideoContinuityCount }) }}</p>
             <p class="batch-video-note">{{ t('episode.vid.confirmNote') }}</p>
           </div>
           <footer class="dialog-foot">
@@ -2101,6 +2146,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleImageViewerKeydown)
   stopGenTasksPolling()
+  stopVideoBatchPolling()
 })
 
 function isPendingSceneImage(id) {
@@ -2237,6 +2283,27 @@ async function changeEpisodeResolution(val) {
     toastError(e)
   }
 }
+// 集级尾帧承接开关：auto 模式的分镜按拆分标记（continuity_boundary）决定是否承接上一镜尾帧
+const episodeContinuityEnabled = computed(() => {
+  const value = episode.value?.continuity_enabled ?? episode.value?.continuityEnabled
+  return value === undefined || value === null ? true : Boolean(value)
+})
+async function toggleEpisodeContinuity() {
+  if (!episode.value) return
+  const prev = episode.value.continuity_enabled ?? episode.value.continuityEnabled
+  const next = !episodeContinuityEnabled.value
+  episode.value.continuity_enabled = next
+  episode.value.continuityEnabled = next
+  try {
+    await episodeAPI.update(epId.value, { continuity_enabled: next })
+    toast.success(t(next ? 'episode.vid.continuityOnToast' : 'episode.vid.continuityOffToast'))
+    await refresh() // 各镜生效状态由后端重算
+  } catch (e) {
+    episode.value.continuity_enabled = prev
+    episode.value.continuityEnabled = prev
+    toastError(e)
+  }
+}
 // 画面比例在创建项目时固定，视频生成统一使用
 const dramaAspectRatio = computed(() => drama.value?.aspect_ratio || drama.value?.aspectRatio || '16:9')
 
@@ -2305,7 +2372,11 @@ const effectiveVideoDuration = computed(() => Number(selectedSb.value?.duration 
 const batchVideoTotalDuration = computed(() =>
   batchVideoConfirm.value.targets.reduce((sum, sb) => sum + (Number(sb.duration) || 5), 0))
 
+const batchVideoContinuityCount = computed(() =>
+  batchVideoConfirm.value.targets.filter(sb => isContinuityEffective(sb)).length)
+
 function openBatchVideoConfirm(pool) {
+  if (videoBatchRunning.value) { toast.info(t('episode.vid.batchAlreadyRunning')); return }
   const targets = pool.filter(s => !isPendingVideo(s.id))
   if (!targets.length) { toast.info(t('episode.vid.noneToGenerate')); return }
   batchVideoConfirm.value = { open: true, targets }
@@ -2322,16 +2393,96 @@ function retryFailedVideos() {
   openBatchVideoConfirm(sbs.value.filter(s => videoTaskState(s) === 'failed'))
 }
 async function confirmBatchVideos() {
-  const targets = [...batchVideoConfirm.value.targets]
+  // 串行批量在服务端执行：按分镜顺序逐镜生成，承接镜头自动取上一镜尾帧，提交后可关闭页面
+  const targets = [...batchVideoConfirm.value.targets].sort((a, b) => shotNumber(a) - shotNumber(b))
   batchVideoConfirm.value = { open: false, targets: [] }
   if (!targets.length) return
-  toast.success(t('episode.vid.batchStarted', { n: targets.length }))
-  // 等前一镜任务完成并自动回写为采用版本后再提交下一镜；失败时停止，避免连续镜头使用旧视频。
-  for (const sb of targets) {
-    const completed = await genVid(sb, { silent: true, awaitCompletion: true })
-    if (!completed) break
+  try {
+    applyVideoBatch(await episodeAPI.startVideoBatch(epId.value, {
+      storyboard_ids: targets.map(sb => sb.id),
+      model: bareModelName(videoModel.value) || undefined,
+      config_id: ownerConfigId(videoModelOptions.value, videoModel.value),
+    }))
+    startVideoBatchPolling()
+    toast.success(t('episode.vid.batchStarted', { n: targets.length }))
+    if (videoSelectMode.value) toggleVideoSelectMode()
+  } catch (e) {
+    toastError(e, { fallback: 'episode.vid.genFailed' })
   }
-  if (videoSelectMode.value) toggleVideoSelectMode()
+}
+
+// ===== 服务端串行批量视频：进度轮询 =====
+const videoBatch = ref(null)
+const videoBatchItems = computed(() => videoBatch.value?.items || [])
+const videoBatchRunning = computed(() => videoBatch.value?.status === 'running')
+const videoBatchDoneCount = computed(() => videoBatchItems.value.filter(i => i.state === 'completed').length)
+const videoBatchFailedItems = computed(() => videoBatchItems.value.filter(i => i.state === 'failed'))
+const videoBatchSkippedItems = computed(() => videoBatchItems.value.filter(i => i.state === 'skipped'))
+const videoBatchIssues = computed(() => [...videoBatchFailedItems.value, ...videoBatchSkippedItems.value])
+const videoBatchCurrentNumber = computed(() => {
+  const id = videoBatch.value?.current_storyboard_id ?? videoBatch.value?.currentStoryboardId ?? null
+  return videoBatchItems.value.find(i => i.storyboard_id === id)?.storyboard_number || 0
+})
+const videoBatchStatusLabel = computed(() => {
+  const status = videoBatch.value?.status
+  if (status === 'running') return t(videoBatchStopping.value ? 'episode.vid.batchStateStopping' : 'episode.vid.batchStateRunning')
+  if (status === 'cancelled') return t('episode.vid.batchStateCancelled')
+  return t('episode.vid.batchStateDone')
+})
+// 已请求停止：在跑的那一镜跑完后批次才转为已停止
+const videoBatchStopping = computed(() => videoBatchRunning.value && Boolean(videoBatch.value?.cancel_requested))
+const videoBatchVisible = computed(() => Boolean(videoBatch.value) && (videoBatchRunning.value || videoBatchIssues.value.length > 0))
+let videoBatchTimer = null
+let videoBatchSettledCount = -1
+
+// 批量状态回写到列表：正在生成的镜头标为生成中，失败原因沿用列表的失败提示
+function applyVideoBatch(status) {
+  const batch = status && status.status ? status : null
+  videoBatch.value = batch
+  const batchIds = new Set(videoBatchItems.value.map(i => i.storyboard_id))
+  const runningId = batch?.status === 'running' ? (batch.current_storyboard_id ?? batch.currentStoryboardId ?? null) : null
+  pendingVideoIds.value = pendingVideoIds.value.filter(id => !batchIds.has(id) || id === runningId)
+  if (runningId && !pendingVideoIds.value.includes(runningId)) pendingVideoIds.value.push(runningId)
+  for (const item of videoBatchItems.value) {
+    if (item.state === 'failed' && item.error) {
+      failedVideoMessages.value = { ...failedVideoMessages.value, [item.storyboard_id]: item.error }
+    }
+  }
+  return batch
+}
+async function loadVideoBatch() {
+  if (!epId.value) return
+  let batch = null
+  try {
+    batch = applyVideoBatch(await episodeAPI.videoBatch(epId.value))
+  } catch { return }
+  const settled = videoBatchItems.value.filter(i => i.state !== 'pending' && i.state !== 'running').length
+  const wasPolling = Boolean(videoBatchTimer)
+  if (videoBatchSettledCount >= 0 && settled !== videoBatchSettledCount) await refresh() // 每完成一镜刷新，视频逐个出现
+  videoBatchSettledCount = settled
+  if (batch?.status === 'running') {
+    startVideoBatchPolling()
+  } else {
+    stopVideoBatchPolling()
+    if (wasPolling) {
+      await refresh()
+      toast.success(batch?.status === 'cancelled' ? t('episode.vid.batchCancelledToast') : t('episode.vid.batchDoneToast'))
+    }
+  }
+}
+function startVideoBatchPolling() {
+  if (!videoBatchTimer) videoBatchTimer = setInterval(loadVideoBatch, 10_000)
+}
+function stopVideoBatchPolling() {
+  if (videoBatchTimer) { clearInterval(videoBatchTimer); videoBatchTimer = null }
+}
+async function cancelVideoBatch() {
+  try {
+    applyVideoBatch(await episodeAPI.cancelVideoBatch(epId.value))
+    toast.success(t('episode.vid.batchStopped'))
+  } catch (e) {
+    toastError(e)
+  }
 }
 
 // 配置变化后校验持久化的模型是否仍存在（配置被删/模型被移除时回退默认，避免把失效模型传给后端）
@@ -2967,7 +3118,12 @@ function doBreakdown() {
 - 每个镜头必须根据剧本内容，从上述当前集已有角色中选出出场的角色绑定 character_ids（ID 必须来自上述列表；有角色出场就必须绑定，不要遗漏）
 - 每个镜头尽量匹配上述已有场景填写 scene_id（ID 必须来自上述列表），不要凭空创造新场景
 - 每个镜头出现关键道具（被使用、交接、特写或在画面中明显可见）时，从上述当前集已有道具中绑定 prop_ids（ID 必须来自上述列表）；没有道具出现可传空数组
-- 只有纯环境空镜头才可以不绑定角色`, dramaId, epId.value, onBreakdownDone, chatModelOverride(), chatConfigId())
+- 只有纯环境空镜头才可以不绑定角色
+
+尾帧承接标记：
+- 先调用 read_storyboard_context 查看本集 continuity_enabled（集级尾帧承接开关）
+- 每个镜头都要判断与上一镜的关系并填写 continuity：画面连贯、同场景同时间直接接续填 "continue"；换场、跳时间、换视角的硬切填 "cut"（第一镜固定为 "cut"）
+- 标记为 continue 的镜头在生成视频时会用上一镜尾帧作为首帧：它的 video_prompt 开头不要重新建立空间与人物站位，直接从上一镜结束画面继续；标记为 cut 的镜头照常在首段重新建立空间`, dramaId, epId.value, onBreakdownDone, chatModelOverride(), chatConfigId())
 }
 
 /** 拆分完成后刷新并自动补齐缺失的视频提示词（兜住 Agent 漏写/截断） */
@@ -2992,7 +3148,8 @@ async function genVideoPrompt(sb) {
 
 该分镜信息:时长 ${sb.duration || 10}s;场景:${getSceneName(sb) || '未绑定'};角色:${charNames};道具:${propNames}。
 
-请先调用 read_storyboard_context 获取该分镜的画面描述(含【镜头N】子镜头与台词/旁白)、氛围及时长,据此生成 video_prompt(按 3 秒分段换行、用 @角色名/@场景名/@道具名 引用参考素材；段落内允许多镜头切镜,但不跨场景,切镜点对齐 description 的【镜头N】结构),然后调用 update_storyboard 保存到分镜 ID:${sb.id}。只更新 video_prompt 字段,不要改动其他字段,不要重新拆分整集。`,
+请先调用 read_storyboard_context 获取该分镜的画面描述(含【镜头N】子镜头与台词/旁白)、氛围及时长,据此生成 video_prompt(按 3 秒分段换行、用 @角色名/@场景名/@道具名 引用参考素材；段落内允许多镜头切镜,但不跨场景,切镜点对齐 description 的【镜头N】结构),然后调用 update_storyboard 保存到分镜 ID:${sb.id}。只更新 video_prompt 字段,不要改动其他字段,不要重新拆分整集。
+尾帧承接:read_storyboard_context 返回该分镜 continues_from_previous=true 时,本镜会用上一镜尾帧作为首帧,video_prompt 开头不要重新建立空间与人物站位,直接从上一镜结束画面继续运动;为 false 时按常规在首段重新建立空间。`,
       drama_id: dramaId,
       episode_id: epId.value,
       model: chatModelOverride() || undefined,
@@ -3369,44 +3526,6 @@ const mentionOptions = computed(() => {
   ]
 })
 
-// 按参考图顺序（场景图在前、角色图居中、道具图在后）为 @名字 建立索引映射，供视频提示词引用替换
-function getShotReferenceIndexMap(sb) {
-  const ordered = []
-  const seen = new Set()
-  const push = (name, url) => {
-    if (!url || seen.has(url) || ordered.length >= refImageLimit) return
-    seen.add(url)
-    ordered.push({ name, imageUrl: url })
-  }
-  const scene = getStoryboardScene(sb)
-  push(scene?.location || '', selectedAssetImage(sb, 'scene', scene))
-  for (const char of getStoryboardCharacters(sb)) {
-    push(char.name || '', selectedAssetImage(sb, 'character', char))
-  }
-  for (const prop of getStoryboardProps(sb)) {
-    push(prop.name || '', selectedAssetImage(sb, 'prop', prop))
-  }
-  const nameToIndex = {}
-  ordered.forEach((a, i) => { if (a.name && !(a.name in nameToIndex)) nameToIndex[a.name] = i + 1 })
-  return nameToIndex
-}
-
-// 将视频提示词里的 @名字 替换为 @图片N名字（N 为参考图序号，1 起），生成时使用
-function resolveVideoPromptRefs(sb) {
-  const prompt = sb.video_prompt || sb.videoPrompt || ''
-  const map = getShotReferenceIndexMap(sb)
-  const names = Object.keys(map).sort((a, b) => b.length - a.length)
-  if (!names.length) return prompt
-  return prompt.replace(/@([^\s@]+)/g, (m, raw) => {
-    for (const name of names) {
-      if (raw.startsWith(name)) {
-        return `@图片${map[name]}${name}${raw.slice(name.length)}`
-      }
-    }
-    return m
-  })
-}
-
 // 分镜时长（视频生成参数区直接编辑并保存到分镜）：
 // 统一限制 2-30s，列表/批量/单次生成统一读取该值；超出厂商支持范围由后端适配器收敛
 function onVideoDurationChange(e) {
@@ -3426,35 +3545,64 @@ function previousStoryboard(sb) {
   return index > 0 ? sbs.value[index - 1] : null
 }
 
-function isContinuityEnabled(sb) {
-  return (sb?.continuity_mode || sb?.continuityMode || 'none') === 'previous_tail'
+// ===== 尾帧承接 =====
+// 模式 auto 跟随剧集开关与拆分标记（continuity_boundary），previous_tail / none 为本镜强制覆盖；
+// 是否真正生效由后端计算后随分镜返回（continuity_effective）。
+function shotNumber(sb) {
+  return sb?.storyboard_number || sb?.storyboardNumber || 0
 }
-
-function canUseContinuity(sb) {
-  const previous = previousStoryboard(sb)
-  return Boolean(previous && hasVid(previous))
+function continuityMode(sb) {
+  return sb?.continuity_mode || sb?.continuityMode || 'auto'
 }
-
+function continuityBoundary(sb) {
+  return sb?.continuity_boundary || sb?.continuityBoundary || null
+}
+function isContinuityEffective(sb) {
+  return Boolean(sb?.continuity_effective ?? sb?.continuityEffective)
+}
+const continuityModeOptions = computed(() => [
+  { value: 'auto', label: t('episode.vid.continuityModeAuto') },
+  { value: 'previous_tail', label: t('episode.vid.continuityModeForce') },
+  { value: 'none', label: t('episode.vid.continuityModeNone') },
+])
+function continuityBoundaryLabel(sb) {
+  const boundary = continuityBoundary(sb)
+  if (boundary === 'continue') return t('episode.vid.continuityBoundaryContinue')
+  if (boundary === 'cut') return t('episode.vid.continuityBoundaryCut')
+  return t('episode.vid.continuityBoundaryUnset')
+}
 function continuityHint(sb) {
   const previous = previousStoryboard(sb)
   if (!previous) return t('episode.vid.continuityFirstShot')
-  if (!hasVid(previous)) return t('episode.vid.continuityNeedsPrevious', { n: previous.storyboard_number || previous.storyboardNumber })
-  return isContinuityEnabled(sb)
-    ? t('episode.vid.continuityEnabledHint', { n: previous.storyboard_number || previous.storyboardNumber })
-    : t('episode.vid.continuityAvailable', { n: previous.storyboard_number || previous.storyboardNumber })
+  const parts = [continuityBoundaryLabel(sb)]
+  if (continuityMode(sb) === 'auto') {
+    parts.push(t(episodeContinuityEnabled.value ? 'episode.vid.continuityEpisodeOn' : 'episode.vid.continuityEpisodeOff'))
+  }
+  if (isContinuityEffective(sb)) {
+    parts.push(t('episode.vid.continuityEffectiveYes', { n: shotNumber(previous) }))
+    if (!hasVid(previous)) parts.push(t('episode.vid.continuityNeedsPrevious', { n: shotNumber(previous) }))
+  } else {
+    parts.push(t('episode.vid.continuityEffectiveNo'))
+  }
+  return parts.join(' · ')
 }
-
-async function toggleContinuity(sb, enabled) {
-  if (!sb || (enabled && !canUseContinuity(sb))) return
-  const previous = sb.continuity_mode || sb.continuityMode || 'none'
-  const mode = enabled ? 'previous_tail' : 'none'
+// 强制承接但拆分标记为切换/未判定：提示词是按换镜写的，转场可能突兀
+function continuityWarning(sb) {
+  if (!previousStoryboard(sb) || continuityMode(sb) !== 'previous_tail') return ''
+  return continuityBoundary(sb) === 'continue' ? '' : t('episode.vid.continuityCutWarn')
+}
+async function setContinuityMode(sb, mode) {
+  if (!sb || !['auto', 'previous_tail', 'none'].includes(mode)) return
+  const prev = continuityMode(sb)
+  if (mode === prev) return
   sb.continuity_mode = mode
   sb.continuityMode = mode
   try {
     await storyboardAPI.update(sb.id, { continuity_mode: mode })
+    await refresh() // 生效结果由后端计算，保存后回读
   } catch (e) {
-    sb.continuity_mode = previous
-    sb.continuityMode = previous
+    sb.continuity_mode = prev
+    sb.continuityMode = prev
     toastError(e)
   }
 }
@@ -3500,35 +3648,23 @@ function onAssetRefsUpdate(item, refs) {
   item.reference_images = refs
 }
 
-async function genVid(sb, opts = {}) {
-  const inheritPreviousTail = isContinuityEnabled(sb)
-  const referenceImages = inheritPreviousTail ? [] : getShotReferenceImages(sb)
-  // 连续模式走首帧/首尾帧工作流；普通模式使用当前分镜选定的素材版本作为参考图。
-  const params = {
-    storyboard_id: sb.id,
-    drama_id: dramaId,
-    prompt: resolveVideoPromptRefs(sb),
-    duration: Number(sb.duration || 10),
-    aspect_ratio: dramaAspectRatio.value,
-    generate_audio: true,
-    model: bareModelName(videoModel.value) || undefined,
-    config_id: ownerConfigId(videoModelOptions.value, videoModel.value),
-    reference_image_urls: referenceImages,
-    inherit_previous_tail: inheritPreviousTail,
-    last_frame_url: sb.last_frame_image || sb.lastFrameImage || undefined,
-  }
-  if (!params.prompt && !referenceImages.length && !inheritPreviousTail) {
-    toast.error(t('episode.vid.needRefOrPrompt'))
+// 单镜视频生成：参考图、@图片N 映射、承接首帧、分辨率等全部由后端按分镜组装
+async function genVid(sb) {
+  if (!sb || videoBatchRunning.value) {
+    if (videoBatchRunning.value) toast.info(t('episode.vid.batchAlreadyRunning'))
     return false
   }
   try {
     delete failedVideoMessages.value[sb.id]
     if (!isPendingVideo(sb.id)) pendingVideoIds.value.push(sb.id)
-    const generation = await taskAPI.generate({ type: 'video', ...params })
-    if (!opts.silent) toast.success(t('episode.vid.generating'))
+    const generation = await storyboardAPI.generateVideo(sb.id, {
+      model: bareModelName(videoModel.value) || undefined,
+      config_id: ownerConfigId(videoModelOptions.value, videoModel.value),
+    })
+    toast.success(t('episode.vid.generating'))
     await refresh()
-    const polling = pollVideoGeneration(generation?.id, sb.id)
-    return opts.awaitCompletion ? await polling : true
+    void pollVideoGeneration(generation?.id, sb.id)
+    return true
   } catch (e) {
     pendingVideoIds.value = pendingVideoIds.value.filter(item => item !== sb.id)
     failedVideoMessages.value = {
@@ -3642,6 +3778,7 @@ onMounted(async () => {
   if (workbenchDirty || WORKBENCH_QUERY_KEYS.some(k => k in route.query)) syncWorkbenchQuery()
   loadConfigs()
   syncExtractStatus()
+  loadVideoBatch() // 批量进度在服务端，刷新页面后继续展示
 })
 
 // ===== 应用内引导（工作台）：沿左侧进度栏走 6 步流水线 =====
@@ -5494,22 +5631,47 @@ button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
 .video-param-value { color: var(--text-1); text-align: right; font-size: 11px; }
 .video-param-control { display: inline-flex; align-items: center; gap: 6px; }
 .video-param-unit { font-size: 11px; color: var(--text-2); }
+.ep-continuity-toggle { white-space: nowrap; }
 .video-continuity-row {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: start;
-  gap: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   margin-top: 4px;
   padding-top: 8px;
   border-top: 1px solid var(--accent-glow);
   color: var(--text-1);
-  cursor: pointer;
 }
-.video-continuity-row.disabled { opacity: 0.55; cursor: not-allowed; }
-.video-continuity-row input { margin-top: 2px; accent-color: var(--accent); }
-.video-continuity-row span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.video-continuity-row.disabled { opacity: 0.65; }
+.video-continuity-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .video-continuity-row strong { font-size: 11px; }
 .video-continuity-row small { color: var(--text-3); font-size: 9.5px; line-height: 1.35; }
+.video-continuity-warn { color: var(--warn, #e0a33e); }
+.video-continuity-select { height: 24px; padding: 2px 6px; font-size: 11px; max-width: 140px; }
+.video-task-continuity {
+  padding: 0 5px;
+  border: 1px solid var(--accent-glow);
+  border-radius: 999px;
+  color: var(--accent);
+  font-size: 9.5px;
+  line-height: 15px;
+}
+.video-batch-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--surface-outline);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  font-size: 11px;
+}
+.video-batch-banner.is-running { border-color: var(--accent-glow); }
+.video-batch-state { font-weight: 700; }
+.video-batch-sep { color: var(--text-3); }
+.video-batch-issue { color: var(--text-2); }
+.video-batch-issues { flex-basis: 100%; display: flex; flex-direction: column; gap: 2px; color: var(--text-3); font-size: 9.5px; line-height: 1.4; }
 .video-duration-input { width: 56px; height: 24px; padding: 2px 6px; font-size: 12px; font-weight: 700; font-family: var(--font-mono); text-align: center; }
 
 /* Prod grid */

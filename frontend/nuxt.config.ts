@@ -1,10 +1,14 @@
 import { fileURLToPath } from 'node:url'
 
+// 开发期后端地址与前端端口可用环境变量覆盖（多工作树并行开发时避免端口/后端冲突）
+const DEV_BACKEND = process.env.HUOBAO_DEV_BACKEND || 'http://localhost:5679'
+const DEV_PORT = Number(process.env.HUOBAO_DEV_PORT || 3013)
+
 export default defineNuxtConfig({
   srcDir: 'app/',
   ssr: false,
   // 固定端口 + 监听所有网卡，局域网 IP 可直接访问；strictPort 防止端口被占时静默换端口
-  devServer: { host: '0.0.0.0', port: 3013 },
+  devServer: { host: '0.0.0.0', port: DEV_PORT },
   devtools: { enabled: false },
   experimental: {
     appManifest: false,
@@ -41,8 +45,8 @@ export default defineNuxtConfig({
   vite: {
     server: {
       proxy: {
-        '/api': { target: 'http://localhost:5679', changeOrigin: true },
-        '/static': { target: 'http://localhost:5679', changeOrigin: true },
+        '/api': { target: DEV_BACKEND, changeOrigin: true },
+        '/static': { target: DEV_BACKEND, changeOrigin: true },
       },
       strictPort: true,
     },

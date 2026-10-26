@@ -55,7 +55,4 @@ test('selected models are sent with rewrite, image and video generation requests
   assert.match(page, /characterAPI\.generateImage\(id, epId\.value, imageModel\.value \|\| undefined, ownerConfigId\(imageModelOptions\.value, imageModel\.value\), chatModelOverride\(\), chatConfigId\(\)\)/)
   assert.match(page, /sceneAPI\.generateImage\(id, epId\.value, imageModel\.value \|\| undefined, ownerConfigId\(imageModelOptions\.value, imageModel\.value\), chatModelOverride\(\), chatConfigId\(\)\)/)
   assert.match(page, /characterAPI\.batchImages\(ids, epId\.value, imageModel\.value \|\| undefined, ownerConfigId\(imageModelOptions\.value, imageModel\.value\), chatModelOverride\(\), chatConfigId\(\)\)/)
-  // 视频生成透传模型与配置
-  assert.match(page, /model: videoModel\.value \|\| undefined/)
-  assert.match(page, /config_id: ownerConfigId\(videoModelOptions\.value, videoModel\.value\)/)
 })

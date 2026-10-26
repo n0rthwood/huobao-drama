@@ -56,12 +56,24 @@ export const episodeAPI = {
   extractStatus: (id: number) => api.get(`/episodes/${id}/extract-status`),
   generateVideoPrompts: (id: number, model?: string, configId?: number, storyboardIds?: number[]) => api.post(`/episodes/${id}/generate-video-prompts`, { model: model || undefined, config_id: configId || undefined, storyboard_ids: storyboardIds?.length ? storyboardIds : undefined }),
   videoPromptsStatus: (id: number) => api.get(`/episodes/${id}/video-prompts-status`),
+  // 集级串行视频批量：后端按分镜顺序生成，承接镜头自动取上一镜尾帧作为首帧
+  startVideoBatch: (id: number, data: { storyboard_ids?: number[]; model?: string; config_id?: number }) =>
+    api.post(`/episodes/${id}/video-batch`, {
+      storyboard_ids: data.storyboard_ids?.length ? data.storyboard_ids : undefined,
+      model: data.model || undefined,
+      config_id: data.config_id || undefined,
+    }),
+  videoBatch: (id: number) => api.get(`/episodes/${id}/video-batch`),
+  cancelVideoBatch: (id: number) => api.post(`/episodes/${id}/video-batch/cancel`),
 }
 
 export const storyboardAPI = {
   create: (data: any) => api.post('/storyboards', data),
   update: (id: number, data: any) => api.put(`/storyboards/${id}`, data),
   del: (id: number) => api.del(`/storyboards/${id}`),
+  // 视频生成参数（参考图 / @图片N 映射 / 承接首帧 / 分辨率）全部由后端组装
+  generateVideo: (id: number, data: { model?: string; config_id?: number }) =>
+    api.post(`/storyboards/${id}/generate-video`, { model: data.model || undefined, config_id: data.config_id || undefined }),
 }
 
 /**
@@ -117,9 +129,8 @@ export const propAPI = {
   delReference: (id: number, url: string) => api.del<ReferenceImagesResp>(`/props/${id}/reference-images?url=${encodeURIComponent(url)}`),
 }
 
-// 统一生成任务（图片/视频）：POST 带 type 字段，列表按 type 过滤
+// 生成任务列表/详情（图片生成走各资产 API，视频生成走 storyboardAPI.generateVideo 与集级批量）
 export const taskAPI = {
-  generate: (d: any) => api.post('/tasks', d),
   registerUpload: (assetType: 'character' | 'scene' | 'prop', assetId: number, localPath: string) =>
     api.post('/tasks/register-upload', { asset_type: assetType, asset_id: assetId, local_path: localPath }),
   get: (id: number) => api.get(`/tasks/${id}`),
