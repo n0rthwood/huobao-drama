@@ -39,12 +39,24 @@ Organize each segment's content in this order (items with no content may be omit
 
 **Time range + scene @reference + shot size/camera move + character @reference + main action·expression + dialogue/narration + mood and lighting**
 
-- **The first segment must establish the space**: scene + camera position + each character's position and state, so the audience knows at a glance where we are and whom to watch
+- **First segment**: when the storyboard's `continues_from_previous` is `false`, the first segment must establish the space — scene + camera position + each character's position and state, so the audience knows at a glance where we are and whom to watch; when `true`, use the "Continuing from the previous shot" rules below
 - **Cuts**: start a post-cut segment with a transition word such as "cut to / cut back", and restate the shot size and subject; cut points should align with the `【镜头N】` structure in the storyboard `description`
 - **Shot size/camera move**: one camera state per segment (close shot / medium shot / wide shot / close-up; static / push / pull / pan / tracking); the camera move is continuous within a single sub-shot and may change after a cut
 - **Action**: one main action per segment, with concrete visible verbs (walk, turn around, look up, clench, pause)
 - **All emotion must become visible description**: no abstract words like "he is very sad / the mood is tense" — write it as "he lowers his head, fingers clench the rim of the cup, breathing grows heavier"
 - **Dialogue/narration**: write "CharacterName says: "line""; narration as "Narration: content"; a long line that cannot be spoken within 3 seconds is split across multiple segments; a segment without dialogue may note ambient/action sounds (e.g. "machines keep roaring")
+
+## Continuing from the Previous Shot (continues_from_previous)
+
+Every storyboard in `read_storyboard_context` carries `continues_from_previous`. When it is `true`, the system automatically uses the **last frame of the previous storyboard's video** as this video's **first frame** (reference images are still sent as usual), therefore:
+
+- First read the previous storyboard (`shot_number` minus one)'s `result` (fall back to the end of its `description` if there is no result) to confirm what the ending frame looks like
+- **The first time segment must open by continuing the previous shot's ending frame**, and keep the same framing and character positions within that segment, for example:
+  `0-3s: continuing from the previous shot's final frame (@Xiaoming still stands in front of the @cafe counter, back to the camera); the camera holds still as he slowly turns his head.`
+- Do not re-establish the space in the first segment; do not cut, change shot size, or change angle at 0 seconds — cuts start from the second segment at the earliest
+- The info header and `@references` are written as usual (reference images are still sent)
+
+When `continues_from_previous` is `false`, follow the existing rule: the first segment establishes the space.
 
 ## Reference Rules
 
@@ -57,7 +69,7 @@ Organize each segment's content in this order (items with no content may be omit
 ## Timeline Rules
 
 - Number of segments = storyboard-segment duration ÷ 3 seconds (rounded up); the segment time ranges must add up exactly to the total segment duration
-- Content pacing: the first segment establishes → middle segments advance the action/conflict → the final segment lands on the result or emotional beat
+- Content pacing: the first segment establishes the space (or continues from the previous shot's ending frame) → middle segments advance the action/conflict → the final segment lands on the result or emotional beat
 
 ## Prohibitions
 

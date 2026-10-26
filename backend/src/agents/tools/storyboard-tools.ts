@@ -10,6 +10,7 @@ import { eq } from 'drizzle-orm'
 import { now } from '../../utils/response.js'
 import { logTaskProgress, logTaskSuccess } from '../../utils/task-logger.js'
 import { getDramaId, getEpisodeId } from '../context.js'
+import { loadEpisodeContinuity } from '../../services/continuity.js'
 
 async function syncStoryboardCharacters(storyboardId: number, characterIds: number[]) {
   await db.delete(schema.storyboardCharacters)
@@ -176,6 +177,9 @@ const readStoryboardContext = createTool({
         image_url: p.imageUrl || '',
       }))
 
+    // 承接尾帧标注：effective = 该分镜是否实际承接上一镜结尾画面
+    const continuityMap = await loadEpisodeContinuity(episodeId)
+
     const existingStoryboardPayload = await Promise.all(existingStoryboards
       .filter(sb => !sb.deletedAt)
       .map(async (sb) => {
@@ -193,8 +197,12 @@ const readStoryboardContext = createTool({
           shot_type: sb.shotType || '',
           duration: sb.duration || 0,
           description: sb.description || '',
+          result: sb.result || '',
           atmosphere: sb.atmosphere || '',
           video_prompt: sb.videoPrompt || '',
+          continuity_boundary: sb.continuityBoundary || null,
+          continuity_mode: sb.continuityMode || 'auto',
+          continues_from_previous: continuityMap.get(sb.id)?.effective === true,
         }
       }))
 
@@ -204,6 +212,7 @@ const readStoryboardContext = createTool({
         title: ep.title,
         episode_number: ep.episodeNumber,
         description: ep.description || '',
+        continuity_enabled: ep.continuityEnabled !== false,
       },
       script,
       characters,
@@ -243,6 +252,7 @@ const storyboardFields = z.object({
   scene_id: z.number().nullable().optional(),
   character_ids: z.array(z.number()).optional(),
   prop_ids: z.array(z.number()).optional(),
+  continuity: z.enum(['continue', 'cut']).optional().describe("Transition from the previous shot: 'continue' means this shot starts exactly where the previous shot ended (same scene, immediately following moment, characters carried over) and the system will feed the previous video's last frame as this shot's first frame; 'cut' means a hard cut (scene change, time jump, flashback, or the first shot of the episode). Omit when unsure."),
 })
 
 const saveStoryboards = createTool({
@@ -296,6 +306,7 @@ const saveStoryboards = createTool({
           videoPrompt: sb.video_prompt, bgmPrompt: sb.bgm_prompt,
           soundEffect: sb.sound_effect,
           sceneId: sb.scene_id, duration: sb.duration || 10,
+          continuityBoundary: sb.continuity,
           updatedAt: ts,
         }).where(eq(schema.storyboards.id, existingId))
         await syncStoryboardCharacters(existingId, sb.character_ids || [])
@@ -311,6 +322,7 @@ const saveStoryboards = createTool({
           atmosphere: sb.atmosphere, imagePrompt: sb.image_prompt,
           videoPrompt: sb.video_prompt, bgmPrompt: sb.bgm_prompt,
           soundEffect: sb.sound_effect,
+          continuityBoundary: sb.continuity,
           sceneId: sb.scene_id, duration: sb.duration || 10,
           createdAt: ts, updatedAt: ts,
         })
@@ -363,6 +375,7 @@ const updateStoryboard = createTool({
     character_ids: z.array(z.number()).optional(),
     prop_ids: z.array(z.number()).optional(),
     duration: z.number().optional(),
+    continuity: z.enum(['continue', 'cut']).optional().describe("Transition from the previous shot: 'continue' means this shot starts exactly where the previous shot ended (same scene, immediately following moment, characters carried over) and the system will feed the previous video's last frame as this shot's first frame; 'cut' means a hard cut."),
   }),
   execute: async ({ storyboard_id, ...fields }, context) => {
     const ids = requireIds(context)
@@ -421,6 +434,7 @@ const updateStoryboard = createTool({
     if ('sound_effect' in fields) updates.soundEffect = fields.sound_effect
     if ('description' in fields) updates.description = fields.description
     if ('scene_id' in fields) updates.sceneId = fields.scene_id
+    if ('continuity' in fields) updates.continuityBoundary = fields.continuity
     if ('duration' in fields) updates.duration = fields.duration
     await db.update(schema.storyboards).set(updates).where(eq(schema.storyboards.id, storyboard_id))
     if ('character_ids' in fields) await syncStoryboardCharacters(storyboard_id, fields.character_ids || [])

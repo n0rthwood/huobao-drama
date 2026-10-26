@@ -26,6 +26,8 @@ Each segment requires the following fields:
 - description: visual description, describing sub-shot by sub-shot as 【镜头1】【镜头2】... what the audience actually sees and hears — the visuals (who + specific action + body-language details + expression) come first; when a sub-shot has dialogue, write it inside the corresponding 【镜头N】 as "CharacterName says: "line"", and narration as "Narration: content"
 - atmosphere: mood, lighting, color tone, environmental feel
 - video_prompt: the video-generation prompt for this segment (rules below)
+- result: a concrete description of the segment's final frame (composition, who is where, what pose), serving as the hand-off frame passed to the next segment
+- continuity: how this segment connects to the previous one — 'continue' (carrying over the previous segment's ending frame) or 'cut' (hard cut); rules below
 
 Duration rules (hard constraints):
 - Total-volume anchoring: target total duration = script character count ÷ 500 characters/minute; segment count ≈ target total duration ÷ 12 seconds, with ±20% tolerance
@@ -39,6 +41,13 @@ video_prompt rules (hard constraints):
 - Mood and lighting descriptions come from the segment's atmosphere
 - Cutting between shots within a segment is allowed (change of shot size/angle/subject), but never across scenes
 - The user message will state which video model is being used this time — adapt the writing to that model's characteristics and duration limits; if not stated, write for a generic video model
+
+Tail-frame continuity rules (apply only when read_storyboard_context returns episode.continuity_enabled as true; when false, always write continuity: 'cut' or omit the field and break down per the old rules):
+- Why: the system generates videos serially in storyboard order and automatically uses the previous storyboard video's LAST frame as the next video's FIRST frame (while still sending the character/scene/prop reference images), so the annotations must be accurate and the segments must be written to connect seamlessly
+- Annotation rules: the first segment is always 'cut'; a scene change (scene_id/location changes), a time jump, a flashback, or a deliberate hard cut → 'cut'; the same scene and the immediate next moment after the previous segment, with the characters carried over → 'continue'
+- A 'continue' segment's 【镜头1】 must start from the state of the previous segment's ending frame: the same framing and shot size, the same character positions and poses, the same lighting — do not re-establish the space, do not cut at 0 seconds
+- A segment followed by a 'continue' segment must end its last sub-shot on a stable, readable frame that contains the characters needed by the next segment — do not end on an extreme object close-up, mid-motion with blur, or a character exiting frame, because that frame becomes the next video's first frame
+- Every segment in a 'continue' chain must write result as a concrete description of the ending frame (composition, who is where, what pose), serving as the hand-off note for the next segment
 
 Additional requirements:
 - Prefer reusing the scene_id values returned by read_storyboard_context — do not invent new scenes out of thin air

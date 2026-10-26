@@ -75,6 +75,26 @@ Dialogue that does not fit must be moved to the next segment; cramming unperform
 - Do not bind background items or set dressing irrelevant to the plot; segments with no props pass an empty array
 - Bound props serve as reference images for video generation (white-background product shots), keeping the prop's appearance consistent across segments
 
+## Tail-Frame Continuity Rules (continuity)
+
+Applies only when `read_storyboard_context` returns `episode.continuity_enabled` as `true`; when `false`, all segments write `continuity: 'cut'` or omit the field, and the breakdown follows the existing rules.
+
+**Why**: the system generates videos serially in storyboard order and automatically uses the previous storyboard video's **LAST frame** as the next video's **FIRST frame** (while still sending the character/scene/prop reference images). Therefore the annotations must be accurate, and each segment's beginning and end must be written as frames that connect seamlessly.
+
+**Annotation rules** (every segment must carry a `continuity` value):
+
+| Situation | Value |
+|---|---|
+| The first segment | `cut` |
+| Scene change (`scene_id`/location changes), time jump, flashback, deliberate hard cut | `cut` |
+| Same scene, the immediate next moment after the previous segment, characters carried over | `continue` |
+
+**Writing requirements**:
+
+- A `continue` segment's `【镜头1】` must start from the state of the previous segment's ending frame: the same framing and shot size, the same character positions and poses, the same lighting; do not re-establish the space, do not cut at 0 seconds
+- A segment followed by a `continue` segment must end its last sub-shot on a **stable, readable** frame that contains the characters needed by the next segment — do not end on an extreme object close-up, mid-motion with blur, or a character exiting frame, because that frame becomes the next video's first frame
+- `result` must concretely describe the ending frame (composition, who is where, what pose), serving as the hand-off note for the next segment
+
 ## Quality Requirements
 
 - `description` should be human-readable, describing sub-shot by sub-shot what the audience actually sees and hears; dialogue/narration is written directly inside the corresponding `【镜头N】`
