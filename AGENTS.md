@@ -139,12 +139,11 @@ Issue 整理完成后、实施前，必须让 **Fabel（Anthropic）或 Astra（
 - 服务器资料：ComfyUI 地址在本机 `providers.json`；模型为 bf16 的 fl2va/ref2va + int8 文本编码器 + turbo 8 步 LoRA；引擎串行执行。
 - **低显存 H3 INT8 实例**：本机 `providers.json` 中配置独立实例，模型名包含 `MiniMax-H3-INT8-ComfyUI`（含 `int8` 触发变体模板 `workflows/h3-int8/{t2v,firstlast}.json`，与 bf16 模板逐节点同拓扑，仅换权重名）。实例使用 2×RTX 3060 12GB + ComfyUI 0.35，权重 `minimax_h3_fl2va_pruned_int8_convrot` + `qwen3vl_32b_minimax_h3_nvfp4_awq` + 同名 turbo LoRA；**没有 ref2va（只有未验证的 fused refdelta），参考图模式会明确报错**；仅 t2v / 首帧（可选尾帧）。优先级 80，默认仍是 bf16 实例。
 
-### ComfyUI（另一实例）：Qwen Image 2.1 + Wan 2.2
-- 一台 GB10 上跑两个 ComfyUI 实例（0.42.0），仅监听 127.0.0.1，由 Caddy 网关（:80，局域网无鉴权）按前缀转发：`/image/` → 8189（Qwen Image 2.1）、`/video/` → 8188（Wan 2.2）。主项目 base URL 填 `http://<host>/image` 与 `http://<host>/video`；adapter 把所有路径拼在 base URL 之后，所以前缀自然生效。两个实例共用同一块 GPU，不要并发提交。
-- 通用 ComfyUI 逻辑在 `adapters/comfyui-client.ts`（上传 `/upload/image`、`POST /prompt`、`/history`、`/view`、等队列空、节点校验错误解析）。provider 统一叫 `comfyui`，**按模型名分发工作流族**：视频 `MiniMax-H3*` → H3，`Wan*` → Wan；图片 `qwen-image*` → Qwen。新增模型 = 加模板 JSON（`backend/src/workflows/<family>/`）+ 填充函数 + adapter 里加一个分支。
-- 模板取自服务器 `/history` 里已跑通的任务（API 格式）：Qwen `workflows/qwen/{t2i,i2i}.json`、Wan `workflows/wan/{t2v,i2v,flf,ref}.json`。
+### ComfyUI（Qwen Image 2.1）
+- Caddy 网关（:80，局域网无鉴权）将 `/image/` 转发到 Qwen Image 2.1 实例。主项目 base URL 填 `http://<host>/image`；adapter 把所有路径拼在 base URL 之后，所以前缀自然生效。
+- 通用 ComfyUI 图像逻辑在 `adapters/comfyui-client.ts`（上传 `/upload/image`、`POST /prompt`、`/history`、`/view`、等队列空、节点校验错误解析）。provider 统一叫 `comfyui`，图片 `qwen-image*` → Qwen。新增图像模型 = 加模板 JSON（`backend/src/workflows/qwen/`）+ 填充函数 + adapter 分支。
+- 模板取自服务器 `/history` 里已跑通的任务（API 格式）：Qwen `workflows/qwen/{t2i,i2i}.json`。
 - Qwen Image 2.1：`TextEncodeQwenImage21`（参考图作为 `images.image_N` 自动增长输入，提示词用 `<image1>` 指代；没写时 adapter 自动补前缀）+ `QwenImage21Cache` + `KSampler`（euler/simple，25 步，cfg 1.0）。文生图用 `EmptyLatentImage`（尺寸对齐 32、总像素 ≤2048²），图生图尺寸跟随参考图。
-- Wan 2.2 14B fp8：双专家（high_noise 前半步、low_noise 后半步，两个 `KSamplerAdvanced`），服务器已有 4 个 lightx2v 4 步 LoRA（i2v v1、t2v v1.1），但项目仍走官方 **20 步 cfg 3.5**；16fps，帧数 4n+1，上限 81 帧（5 秒）；提示词直接用中文（umt5），负向提示词用模板自带的官方中文。支持文生视频、首帧 i2v、首尾帧、参考图 Fun VACE（参考图只取第一张）；首尾帧 shift 8.0/cfg 4.0，参考图 shift 8.0/cfg 3.5 写死在模板中。
 
 ## 待办
 
