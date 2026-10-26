@@ -134,10 +134,17 @@ Issue 整理完成后、实施前，必须让 **Fabel（Anthropic）或 Astra（
 ### 视频：MiniMax H3（ComfyUI）
 - provider `comfyui`：`adapters/comfyui-video.ts` + `comfyui-workflows.ts` + `h3-prompt.ts`；工作流模板在 `backend/src/workflows/h3/{t2v,firstlast,reference}.json`（ComfyUI API 格式，按固定节点 ID 填参数，随 JSON import 打进 bundle）。
 - 流程：`prepare`（扩写提示词 → 等引擎队列空 → 上传参考图 `/upload/image`）→ `POST /prompt` → 轮询 `/history/{id}` → `/view` 下载。
-- 模式：无图 t2v（8 步 + turbo LoRA）；首帧（可选尾帧）firstlast（同上）；参考图 reference（基础 ref2va 权重、无 LoRA、**20 步**：4 步实测背景是未收敛的噪点，20 步清晰且耗时几乎不变）。不支持参考视频/音频。
-- **提示词契约（质量关键）**：H3 引擎逐字分词，必须是英文三段式 `integrated_multimodal_description / overall_soundscape / non_diegetic_music`（首尾帧前加对齐声明）。裸中文会导致画面发糊。`buildH3Prompt` 对非契约文本用当前文本模型（GLM）扩写，失败即报错，不回退为裸提示词。
-- 服务器资料（2026-10-26 起）：**唯一视频实例在 `.102` tcs3（RTX 3090）**，经 Caddy `https://102.joyai.dev/video`（Cloudflare 隧道）访问，模型名 `MiniMax-H3-INT8-ComfyUI` 触发变体模板 `workflows/h3-int8/{t2v,firstlast}.json`（fl2va int8 convrot + qwen3vl nvfp4_awq + turbo 8 步 LoRA）。该实例**没有 ref2va**，参考图模式会明确报错；仅 t2v / 首帧（可选尾帧）。bf16 实例（原 `.175`）已随 GPU 重排退役。引擎串行执行。
+- 模式：无图 t2v（8 步 + turbo LoRA）；首帧（可选尾帧）firstlast（同上）；参考图 reference（标准变体用基础 ref2va 权重、无 LoRA、**20 步**：4 步实测背景是未收敛的噪点，20 步清晰且耗时几乎不变；int8 变体用 fused refdelta 4 步蒸馏）。不支持参考视频/音频。
+- **参考图 + 首/尾帧引导**：reference 模式下首帧/尾帧不再被丢弃，`buildReference` 追加 `LoadImage + MiniMaxH3AddGuide`（首帧 `frame_idx=0`、尾帧 `frame_idx=-1`，串在 `MiniMaxH3ReferenceToVideo` 之后，最后把 `BasicGuider.conditioning` 指到末个引导节点）。引导帧**不占用 Picture 编号**，`@图片N` 映射照旧。102 实测（fused refdelta int8 路径）：3 张参考图 + 首帧引导、12 秒、960×544 可跑通，第 0 帧与上一镜尾帧 SSIM 0.918；7 张参考图 + 首帧引导 + 尾帧引导（`frame_idx=-1`）、15 秒也可跑通（约 387 s，首/尾帧 SSIM 0.936/0.973）。
+- **提示词契约（质量关键）**：H3 引擎逐字分词，必须是英文三段式 `integrated_multimodal_description / overall_soundscape / non_diegetic_music`（首尾帧/引导帧前加对齐声明，由代码生成）。裸中文会导致画面发糊。`buildH3Prompt` 对非契约文本用当前文本模型（GLM）扩写，失败即报错，不回退为裸提示词；reference + 首帧引导时还会要求 GLM 从上一镜结尾无缝续写、不重新交代空间。
+- 服务器资料（2026-10-26 起）：**唯一视频实例在 `.102` tcs3（RTX 3090）**，经 Caddy `https://102.joyai.dev/video`（Cloudflare 隧道）访问，模型名 `MiniMax-H3-INT8-ComfyUI` 触发变体模板 `workflows/h3-int8/{t2v,firstlast,reference}.json`（fl2va int8 convrot + fused refdelta int8 + qwen3vl nvfp4_awq + turbo 8 步 LoRA）。参考图模式走 fused refdelta，无需 `ref2va`。bf16 实例（原 `.175`）已随 GPU 重排退役。引擎串行执行。
 - 网关鉴权：base URL 走公网 Cloudflare 入口时 Caddy 要 HTTP Basic auth；凭据只存 `ai_service_configs.api_key`（格式 `user:password`，含冒号即 Basic），`comfyui-client.ts` 的 `authHeaders` 会在队列/上传/提交/轮询/`/view` 下载全程带上。口令绝不入库/入文档。
+
+### 尾帧承接与服务端批量视频
+- 生效规则唯一实现在 `services/continuity.ts`：上一镜 = 同集内未删除、按 `storyboard_number` 排序的前一镜，第一镜永不承接；`storyboards.continuity_mode` 三态（`auto` 默认 / `previous_tail` 强制承接 / `none` 强制不承接）覆盖剧集开关 `episodes.continuity_enabled`（默认开启），`auto` 还要求 LLM 标注 `storyboards.continuity_boundary = continue`（NULL 视为硬切）。
+- 视频请求一律由后端 `services/storyboard-video.ts` 组装（参考图顺序场景→角色→道具、素材版本选择、去重上限 9、`@名字 → @图片N名字`、风格词、时长/画幅/分辨率、分镜尾帧图）。承接镜头在**提交的那一刻**提取上一镜采用视频的尾帧作为首帧，**参考图照常发送**；上一镜没有采用视频直接报错。单镜入口 `POST /storyboards/:id/generate-video`，`POST /tasks` 不再有 `inherit_previous_tail`。
+- 服务端批量 `services/video-batch.ts` + `POST|GET /episodes/:id/video-batch`、`POST /episodes/:id/video-batch/cancel`：按分镜顺序串行（提交 → 等 sys_task 终态 → 下一镜），状态持久化在 `video_batches`，后端重启后 `resumeVideoBatches()` 自动恢复（被打断的那一镜重新提交，接受上游可能的重复任务）。失败/跳过会断开承接链，依赖它的后续镜头标为 `skipped`，到下一个切换边界恢复。停止只是不再提交新的镜头，在跑的那一镜跑完后批次转 `cancelled`。
+- 能力校验：video adapter 的 `supportsFrameGuides`（comfyui/minimax = true，volcengine = false）。Seedance 收到首/尾帧明确报错，不静默丢弃；批量启动前预检"承接镜头的上一镜不在批内且无采用视频"和"模型不支持首帧引导"，列出镜头号后拒绝启动。
 
 ### ComfyUI（Qwen Image 2.1）
 - 入口（2026-10-26 起）：`.110`（2×RTX 3060）的 Caddy `https://110.joyai.dev/image`（Cloudflare 隧道，HTTP Basic auth，凭据同上存 api_key）。LAN 备选 `http://172.30.3.110/image`（免鉴权）。adapter 把所有路径拼在 base URL 之后，前缀自然生效，`waitEngineIdle` 只等该实例的队列。
