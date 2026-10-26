@@ -40,6 +40,7 @@ export const sqliteSchemaStatements = [
     image_config_id INTEGER,
     video_config_id INTEGER,
     resolution TEXT DEFAULT '720p',
+    continuity_enabled INTEGER DEFAULT 1,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     deleted_at TEXT
@@ -108,7 +109,8 @@ export const sqliteSchemaStatements = [
     last_frame_image TEXT,
     reference_images TEXT,
     asset_version_selection TEXT,
-    continuity_mode TEXT DEFAULT 'none',
+    continuity_mode TEXT DEFAULT 'auto',
+    continuity_boundary TEXT,
     video_url TEXT,
     subtitle_url TEXT,
     composed_video_url TEXT,
@@ -297,6 +299,17 @@ export const sqliteSchemaStatements = [
     value TEXT NOT NULL,
     updated_at TEXT NOT NULL
   )`,
+
+  // 服务端批量视频任务（按分镜顺序串行），持久化以便重启恢复
+  `CREATE TABLE IF NOT EXISTS video_batches (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    episode_id INTEGER NOT NULL,
+    status TEXT DEFAULT 'running',
+    options TEXT,
+    items TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  )`,
 ]
 
 /**
@@ -306,19 +319,26 @@ export const sqliteSchemaStatements = [
 const columnAdditions: { table: string; column: string; type: string }[] = [
   // 场景参考图（与 characters/props 的 reference_images 同语义：用户上传的生图输入）
   { table: 'scenes', column: 'reference_images', type: 'TEXT' },
-  // 分镜级素材版本选择 + 可选的前镜尾帧衔接模式
+  // 分镜级素材版本选择 + 尾帧承接（分镜三态覆盖 + LLM 标注的边界）
   { table: 'storyboards', column: 'asset_version_selection', type: 'TEXT' },
-  { table: 'storyboards', column: 'continuity_mode', type: "TEXT DEFAULT 'none'" },
+  { table: 'storyboards', column: 'continuity_mode', type: "TEXT DEFAULT 'auto'" },
+  { table: 'storyboards', column: 'continuity_boundary', type: 'TEXT' },
+  // 单集默认尾帧承接开关（存量剧集默认开启）
+  { table: 'episodes', column: 'continuity_enabled', type: 'INTEGER DEFAULT 1' },
 ]
 
-function applyColumnAdditions(sqlite: Database.Database) {
+/** 返回本次实际新增的列，键为 `表.列`，供一次性数据迁移判断是否首次升级 */
+function applyColumnAdditions(sqlite: Database.Database): Set<string> {
+  const added = new Set<string>()
   for (const { table, column, type } of columnAdditions) {
     // PRAGMA 返回固定形状，better-sqlite3 无静态类型，按已知结果结构断言
     const columns = sqlite.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]
     if (columns.some(col => col.name === column)) continue
     sqlite.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`)
+    added.add(`${table}.${column}`)
     console.log(`🧱 表 ${table} 补列 ${column}`)
   }
+  return added
 }
 
 /**
@@ -403,7 +423,14 @@ export function initSqliteSchema(sqlite: Database.Database) {
   for (const statement of sqliteSchemaStatements) {
     sqlite.exec(statement)
   }
-  applyColumnAdditions(sqlite)
+  const addedColumns = applyColumnAdditions(sqlite)
+  // 一次性迁移：continuity_boundary 首次补列时，把旧的二态默认值 none 改为三态默认值 auto。
+  // 旧 none 都是从未被用户改过的默认值，改为 auto 后在分镜被标注之前行为不变。
+  // 仅在首次升级的那一次启动执行，之后用户显式选择的 none 不会被覆盖。
+  if (addedColumns.has('storyboards.continuity_boundary')) {
+    const res = sqlite.prepare("UPDATE storyboards SET continuity_mode = 'auto' WHERE continuity_mode = 'none' OR continuity_mode IS NULL").run()
+    if (res.changes > 0) console.log(`🔗 ${res.changes} 个分镜的承接模式由 none 迁移为 auto`)
+  }
   const insertSeed = sqlite.prepare(SEED_SQL)
   const upgradeSeed = sqlite.prepare(UPGRADE_SQL)
   const removeSeed = sqlite.prepare(REMOVE_SQL)

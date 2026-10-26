@@ -47,6 +47,8 @@ function parseUrlArray(raw?: string | null): string[] {
 
 export class MiniMaxVideoAdapter implements VideoProviderAdapter {
   provider = 'minimax'
+  /** content[] 可同时携带 first_frame / last_frame 与 reference_image */
+  supportsFrameGuides = true
 
   buildGenerateRequest(config: AIConfig, record: VideoGenerationRecord): ProviderRequest {
     const model = record.model || config.model || DEFAULT_MODEL

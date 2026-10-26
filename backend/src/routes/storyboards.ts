@@ -3,7 +3,9 @@ import { eq } from 'drizzle-orm'
 import { db, getInsertId, schema } from '../db/index.js'
 import { success, created, now, badRequest } from '../utils/response.js'
 import { toSnakeCase } from '../utils/transform.js'
-import { logTaskPayload, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
+import { logTaskError, logTaskPayload, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
+import { submitStoryboardVideo } from '../services/storyboard-video.js'
+import { findActiveBatchForStoryboard } from '../services/video-batch.js'
 
 const app = new Hono()
 function normalizeAssetVersionSelection(value: unknown): string | null {
@@ -21,19 +23,6 @@ function normalizeAssetVersionSelection(value: unknown): string | null {
   }
   return Object.keys(normalized).length ? JSON.stringify(normalized) : null
 }
-async function validateContinuitySource(storyboard: typeof schema.storyboards.$inferSelect) {
-  const rows = await db.select().from(schema.storyboards)
-    .where(eq(schema.storyboards.episodeId, storyboard.episodeId))
-    .orderBy(schema.storyboards.storyboardNumber)
-  const index = rows.findIndex(row => row.id === storyboard.id)
-  if (index <= 0) throw new Error('第一镜没有上一镜，不能启用尾帧衔接')
-  const previous = rows[index - 1]!
-  if (!(previous.videoUrl || previous.composedVideoUrl)) {
-    throw new Error(`上一镜 #${previous.storyboardNumber} 还没有采用视频，不能启用尾帧衔接`)
-  }
-}
-
-
 
 async function syncStoryboardCharacters(storyboardId: number, characterIds: number[]) {
   await db.delete(schema.storyboardCharacters)
@@ -164,6 +153,7 @@ app.put('/:id', async (c) => {
     bgm_prompt: 'bgmPrompt', sound_effect: 'soundEffect',
     video_url: 'videoUrl',
     continuity_mode: 'continuityMode',
+    continuity_boundary: 'continuityBoundary',
   }
 
   const updates: Record<string, any> = { updatedAt: now() }
@@ -177,17 +167,15 @@ app.put('/:id', async (c) => {
       return badRequest(c, (err as Error).message)
     }
   }
-  if ('continuity_mode' in body && !['none', 'previous_tail'].includes(body.continuity_mode)) {
-    return badRequest(c, 'continuity_mode 只支持 none / previous_tail')
+  // 承接三态覆盖：是否真正承接在生成时判定（不再要求上一镜已经有视频）
+  if ('continuity_mode' in body && !['auto', 'previous_tail', 'none'].includes(body.continuity_mode)) {
+    return badRequest(c, 'continuity_mode 只支持 auto / previous_tail / none')
   }
-  if (body.continuity_mode === 'previous_tail') {
-    try {
-      await validateContinuitySource(storyboard)
-    } catch (err) {
-      return badRequest(c, (err as Error).message)
-    }
+  // 承接边界由拆分镜 LLM 标注；NULL 表示未标注（按硬切处理）
+  if ('continuity_boundary' in body && body.continuity_boundary != null
+    && !['continue', 'cut'].includes(body.continuity_boundary)) {
+    return badRequest(c, 'continuity_boundary 只支持 continue / cut 或留空')
   }
-
 
   await validateStoryboardBindings(
     storyboard.episodeId,
@@ -206,6 +194,25 @@ app.put('/:id', async (c) => {
     propIds: body.prop_ids,
   })
   return success(c)
+})
+
+// POST /storyboards/:id/generate-video — 单镜视频生成：参考图/提示词编号/风格/时长/承接首帧全部由后端组装
+app.post('/:id/generate-video', async (c) => {
+  const id = Number(c.req.param('id'))
+  const body = await c.req.json().catch(() => ({} as Record<string, any>))
+  logTaskStart('StoryboardAPI', 'generate-video', { storyboardId: id, model: body.model, configId: body.config_id })
+  try {
+    const batchId = await findActiveBatchForStoryboard(id)
+    if (batchId) return badRequest(c, '该镜头正排在批量视频队列中，请等待批量完成或先停止批量')
+    const taskId = await submitStoryboardVideo(id, { model: body.model, configId: body.config_id })
+    const [record] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, taskId))
+    logTaskSuccess('StoryboardAPI', 'generate-video', { storyboardId: id, taskId, provider: record?.provider })
+    return created(c, record)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '视频生成失败'
+    logTaskError('StoryboardAPI', 'generate-video', { storyboardId: id, error: message })
+    return badRequest(c, message)
+  }
 })
 
 // DELETE /storyboards/:id

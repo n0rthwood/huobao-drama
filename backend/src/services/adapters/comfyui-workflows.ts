@@ -123,8 +123,54 @@ export function buildFirstLast(p: FillBase & { firstName: string; lastName?: str
   return wf
 }
 
+/** 按 class_type 定位节点（模板节点号在不同实例上可能不同，引导节点接线按类型解析） */
+function findByClass(wf: Workflow, classType: string): string {
+  const id = Object.keys(wf).find(key => wf[key]!.class_type === classType)
+  if (!id) throw new Error(`工作流模板缺少 ${classType} 节点`)
+  return id
+}
+
+/**
+ * 参考图模式追加首/尾帧引导：LoadImage → MiniMaxH3AddGuide（首帧 frame_idx=0，尾帧 frame_idx=-1），
+ * 逐个串在 ReferenceToVideo 之后，最后把 BasicGuider 的 conditioning 指向末个引导节点。
+ * 引导帧不占用 Picture 编号，@图片N 的映射照旧。
+ */
+function appendFrameGuides(wf: Workflow, refNodeId: string, firstName?: string, lastName?: string): void {
+  const guides: Array<{ image: string; frameIdx: number }> = []
+  if (firstName) guides.push({ image: firstName, frameIdx: 0 })
+  if (lastName) guides.push({ image: lastName, frameIdx: -1 })
+  if (!guides.length) return
+
+  const guiderId = findByClass(wf, 'BasicGuider')
+  const videoVae = node(wf, findByClass(wf, 'VAEDecode')).inputs.vae
+  const audioVae = node(wf, findByClass(wf, 'VAEDecodeAudio')).inputs.vae
+  // MiniMaxH3AddGuide 只输出 CONDITIONING；latent 始终取 ReferenceToVideo 的输出 1
+  let positive: unknown = [refNodeId, 0]
+  const latent: unknown = [refNodeId, 1]
+  guides.forEach((guide, i) => {
+    const loaderId = `guideimg${i}`
+    const guideId = `guide${i}`
+    wf[loaderId] = { class_type: 'LoadImage', inputs: { image: guide.image, upload: 'image' } }
+    wf[guideId] = {
+      class_type: 'MiniMaxH3AddGuide',
+      inputs: {
+        positive,
+        latent,
+        frame_idx: guide.frameIdx,
+        vae: videoVae,
+        audio_vae: audioVae,
+        image: [loaderId, 0],
+      },
+    }
+    positive = [guideId, 0]
+  })
+  node(wf, guiderId).inputs.conditioning = positive
+}
+
 /** 参考图模式：standard = ref2va 基础权重固定 20 步；int8 = fused refdelta 4 步蒸馏(102 的 int8 权重集里唯一可用的参考路径) */
-export function buildReference(p: Omit<FillBase, 'steps'> & { refNames: string[] }): Workflow {
+export function buildReference(
+  p: Omit<FillBase, 'steps'> & { refNames: string[]; firstName?: string; lastName?: string },
+): Workflow {
   const variant = p.variant ?? 'standard'
   const wf = structuredClone(TEMPLATES[variant].reference)
   if (!wf) throw new Error(`H3 ${variant} 参考图工作流不可用`)
@@ -132,7 +178,8 @@ export function buildReference(p: Omit<FillBase, 'steps'> & { refNames: string[]
   node(wf, '1').inputs.value = p.prompt
   node(wf, '133').inputs.value = p.durationS
   node(wf, '129').inputs.noise_seed = randomSeed(p.seed)
-  const gen = node(wf, '131').inputs
+  const refNodeId = findByClass(wf, 'MiniMaxH3ReferenceToVideo')
+  const gen = node(wf, refNodeId).inputs
   gen.width = p.width
   gen.height = p.height
   delete gen['ref_images.ref_image_0']
@@ -141,6 +188,7 @@ export function buildReference(p: Omit<FillBase, 'steps'> & { refNames: string[]
     wf[loaderId] = { class_type: 'LoadImage', inputs: { image: name, upload: 'image' } }
     gen[`ref_images.ref_image_${i}`] = [loaderId, 0]
   })
+  appendFrameGuides(wf, refNodeId, p.firstName, p.lastName)
   node(wf, '92').inputs.filename_prefix = `huobao/${p.jobId}`
   return wf
 }

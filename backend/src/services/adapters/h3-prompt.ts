@@ -68,6 +68,12 @@ const MODE_EXTRA: Record<H3Mode, string> = {
     '声明保留程度,严禁发明参考图中不存在的结构或部件。',
 }
 
+/** 参考图 + 首帧引导（尾帧承接）时追加给 LLM 的约束：开头是上一镜结尾的连续画面 */
+const REFERENCE_CONTINUITY_EXTRA =
+  '\n本镜还带有首帧引导:画面从上一镜的最后一帧无缝继续——不要重新交代空间,不要以切镜开场。' +
+  '[Shot 1] 必须以 "The shot continues seamlessly from the previous moment" 开头。' +
+  '<Picture N> 编号只指代参考图,不包含引导帧。'
+
 /** 引擎把帧数吸附到 17k+5 网格，返回实际时长（秒） */
 export function effectiveDuration(durationS: number): number {
   const n = Math.max(5, Math.round(durationS * H3_FPS))
@@ -76,8 +82,20 @@ export function effectiveDuration(durationS: number): number {
 
 /** 对齐声明由代码生成，不交给 LLM */
 function alignmentLine(mode: H3Mode, eff: number, hasFirst: boolean, hasLast: boolean): string {
-  if (mode !== 'firstlast') return ''
   const end = eff.toFixed(2)
+  if (mode === 'reference') {
+    // 引导帧不占 Picture 编号，声明按"锚定帧"书写
+    const lines: string[] = []
+    if (hasFirst) {
+      lines.push('For the target video, at 0.00 seconds the video starts exactly from the anchored first-frame guide, ' +
+        'which is the final frame of the previous shot (same characters, poses, framing and lighting).')
+    }
+    if (hasLast) {
+      lines.push(`At the ${end}-second mark the video ends exactly on the anchored last-frame guide.`)
+    }
+    return lines.join(' ')
+  }
+  if (mode !== 'firstlast') return ''
   if (hasFirst && hasLast) {
     return 'How the reference pictures align with the target video — ' +
       'Picture 1 aligns with the 0.00-second mark of the target video; ' +
@@ -130,13 +148,19 @@ interface ChatCompletionResponse {
 }
 
 /** 用当前启用的文本模型（OpenAI 兼容）把用户描述扩写成 H3 三键提示词 */
-async function expandWithTextModel(mode: H3Mode, userText: string, effDuration: number): Promise<H3PromptObject> {
+async function expandWithTextModel(
+  mode: H3Mode,
+  userText: string,
+  effDuration: number,
+  hasFirst: boolean,
+): Promise<H3PromptObject> {
   const text = await getTextConfig()
   if (text.provider.toLowerCase() === 'gemini') {
     throw new Error('H3 提示词扩写需要 OpenAI 兼容的文本服务（当前启用的是 gemini）')
   }
   const url = `${getTextProviderBaseUrl(text)}/chat/completions`
-  const baseSystem = `${BASE_SYSTEM}${MODE_EXTRA[mode]}` +
+  const continuityExtra = mode === 'reference' && hasFirst ? REFERENCE_CONTINUITY_EXTRA : ''
+  const baseSystem = `${BASE_SYSTEM}${MODE_EXTRA[mode]}${continuityExtra}` +
     `\n本视频总时长为 ${effDuration.toFixed(2)} 秒(对齐后的有效时长):` +
     `所有镜头切换时间戳必须严格递增且落在 0–${effDuration.toFixed(2)} 秒内。`
 
@@ -180,7 +204,11 @@ export async function buildH3Prompt(
   hasLast: boolean,
 ): Promise<string> {
   const prompt = userPrompt.trim()
-  if (prompt.includes(`${DESCRIPTION_KEY}:`)) return prompt
-  const obj = await expandWithTextModel(mode, prompt, effectiveDuration(durationS))
+  if (prompt.includes(`${DESCRIPTION_KEY}:`)) {
+    // 已是契约格式：仍补上代码生成的对齐声明（首/尾帧或引导帧），已包含则不重复
+    const align = alignmentLine(mode, effectiveDuration(durationS), hasFirst, hasLast)
+    return align && !prompt.includes(align) ? `${align}\n\n${prompt}` : prompt
+  }
+  const obj = await expandWithTextModel(mode, prompt, effectiveDuration(durationS), hasFirst)
   return renderFinalPrompt(obj, mode, durationS, hasFirst, hasLast)
 }

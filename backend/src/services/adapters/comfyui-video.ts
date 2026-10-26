@@ -45,6 +45,8 @@ function clampDuration(record: VideoGenerationRecord, min: number, max: number):
 
 export class ComfyUIVideoAdapter implements VideoProviderAdapter {
   provider = 'comfyui'
+  /** 参考图模式下首/尾帧走 MiniMaxH3AddGuide，不占用 Picture 编号 */
+  supportsFrameGuides = true
 
   async prepare(config: AIConfig, record: VideoGenerationRecord): Promise<VideoGenerationRecord> {
     if (parseUrlArray(record.referenceVideoUrls).length || parseUrlArray(record.referenceAudioUrls).length) {
@@ -69,6 +71,9 @@ export class ComfyUIVideoAdapter implements VideoProviderAdapter {
     const extra: PreparedExtra = { prompt, mode, variant, refNames: [] }
     if (mode === 'reference') {
       extra.refNames = await Promise.all(refSources.map((src, i) => uploadImage(config, src, `${tag}_ref${i}`)))
+      // 参考图模式同时支持首/尾帧引导（AddGuide），两者不互斥
+      if (firstSource) extra.firstName = await uploadImage(config, firstSource, `${tag}_first`)
+      if (lastSource) extra.lastName = await uploadImage(config, lastSource, `${tag}_last`)
     } else if (mode === 'firstlast') {
       extra.firstName = await uploadImage(config, firstSource, `${tag}_first`)
       if (lastSource) extra.lastName = await uploadImage(config, lastSource, `${tag}_last`)
@@ -84,7 +89,7 @@ export class ComfyUIVideoAdapter implements VideoProviderAdapter {
     const [width, height] = pickResolution(record.resolution, record.aspectRatio)
     const common = { variant: extra.variant, prompt: extra.prompt, durationS, width, height, seed: record.seed, jobId }
     const workflow =
-      extra.mode === 'reference' ? buildReference({ ...common, refNames: extra.refNames })
+      extra.mode === 'reference' ? buildReference({ ...common, refNames: extra.refNames, firstName: extra.firstName, lastName: extra.lastName })
       : extra.mode === 'firstlast' ? buildFirstLast({ ...common, firstName: extra.firstName!, lastName: extra.lastName })
       : buildT2v(common)
     return buildPromptRequest(config, workflow)

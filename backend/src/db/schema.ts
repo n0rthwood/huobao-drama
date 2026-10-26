@@ -38,6 +38,8 @@ export const episodes = sqliteTable('episodes', {
   imageConfigId: integer('image_config_id'),
   videoConfigId: integer('video_config_id'),
   resolution: text('resolution').default('720p'),
+  // 单集默认尾帧承接开关：对本集所有 continuity_mode='auto' 的分镜生效
+  continuityEnabled: integer('continuity_enabled', { mode: 'boolean' }).default(true),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
   deletedAt: text('deleted_at'),
@@ -130,7 +132,10 @@ export const storyboards = sqliteTable('storyboards', {
   lastFrameImage: text('last_frame_image'),
   referenceImages: text('reference_images'),
   assetVersionSelection: text('asset_version_selection'),
-  continuityMode: text('continuity_mode').default('none'),
+  // auto=跟随剧集开关与 LLM 标注；previous_tail=强制承接；none=强制不承接
+  continuityMode: text('continuity_mode').default('auto'),
+  // LLM 拆分镜时标注的边界：continue=承接上一镜，cut=硬切；NULL=未标注（按硬切处理）
+  continuityBoundary: text('continuity_boundary'),
   videoUrl: text('video_url'),
   subtitleUrl: text('subtitle_url'),
   composedVideoUrl: text('composed_video_url'),
@@ -241,6 +246,17 @@ export const videoMerges = sqliteTable('video_merges', {
   createdAt: text('created_at').notNull(),
   completedAt: text('completed_at'),
   deletedAt: text('deleted_at'),
+})
+
+// 服务端批量视频任务：按分镜顺序串行生成，持久化以便重启恢复与跨页面查看进度
+export const videoBatches = sqliteTable('video_batches', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  episodeId: integer('episode_id').notNull(),
+  status: text('status').default('running'), // running | done | cancelled
+  options: text('options'), // JSON: { model?, configId? }
+  items: text('items'), // JSON: BatchItem[]
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
 })
 
 export const props = sqliteTable('props', {

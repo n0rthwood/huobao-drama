@@ -51,6 +51,12 @@ export interface ImageProviderAdapter {
 export interface VideoProviderAdapter {
   provider: string
 
+  /**
+   * 是否支持首帧/尾帧引导（可与参考图、文本同时发送）。
+   * false 的厂商收到首/尾帧会直接报错，不静默丢弃；承接镜头在组装阶段就会被拦下。
+   */
+  supportsFrameGuides?: boolean
+
   buildGenerateRequest(config: AIConfig, record: VideoGenerationRecord): ProviderRequest
 
   /**

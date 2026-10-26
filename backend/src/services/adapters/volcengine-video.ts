@@ -36,6 +36,8 @@ function parseUrlArray(raw?: string | null): string[] {
 
 export class VolcEngineVideoAdapter implements VideoProviderAdapter {
   provider = 'volcengine'
+  /** Seedance 只接受多模态参考，没有首/尾帧通道 */
+  supportsFrameGuides = false
 
   buildGenerateRequest(config: AIConfig, record: VideoGenerationRecord): ProviderRequest {
     const model = record.model || config.model || DEFAULT_MODEL
@@ -47,6 +49,10 @@ export class VolcEngineVideoAdapter implements VideoProviderAdapter {
     const refImages = parseUrlArray(record.referenceImageUrls)
     const refVideos = parseUrlArray(record.referenceVideoUrls)
     const refAudios = parseUrlArray(record.referenceAudioUrls)
+    // 首帧/尾帧/单图没有对应通道：明确报错，不静默丢弃（尾帧承接必须换用支持的模型）
+    if ((record.firstFrameUrl || '').trim() || (record.lastFrameUrl || '').trim() || (record.imageUrl || '').trim()) {
+      throw new Error('Seedance 只支持多模态参考图，不支持首帧/尾帧引导，无法承接上一镜尾帧')
+    }
 
     if (refImages.length > REF_LIMITS.images || refVideos.length > REF_LIMITS.videos || refAudios.length > REF_LIMITS.audios) {
       throw new Error(`参考素材超限：图片≤${REF_LIMITS.images}、视频≤${REF_LIMITS.videos}、音频≤${REF_LIMITS.audios}`)

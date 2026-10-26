@@ -6,7 +6,6 @@ import { success, created, badRequest, now } from '../utils/response.js'
 import { generateImage, generateVideo } from '../services/generation.js'
 import { getActiveConfig, getConfigById, validateVideoModel } from '../services/ai.js'
 import { getDramaStylePrompt } from '../services/style-preset.js'
-import { extractVideoTailFrame } from '../utils/video-poster.js'
 import { logTaskError, logTaskPayload, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
 
 const app = new Hono()
@@ -29,7 +28,6 @@ const videoRequestSchema = z.object({
   seed: z.number().optional(),
   prompt_extend: z.boolean().optional(),
   watermark: z.boolean().optional(),
-  inherit_previous_tail: z.boolean().optional().default(false),
   continuity_source_storyboard_id: z.number().int().optional(),
   continuity_source_video_url: z.string().optional(),
 }).superRefine((data, ctx) => {
@@ -43,22 +41,6 @@ const videoRequestSchema = z.object({
 })
 
 type VideoRequest = z.infer<typeof videoRequestSchema>
-
-async function resolvePreviousTailFrame(storyboard: typeof schema.storyboards.$inferSelect) {
-  const rows = await db.select().from(schema.storyboards)
-    .where(eq(schema.storyboards.episodeId, storyboard.episodeId))
-    .orderBy(schema.storyboards.storyboardNumber)
-  const index = rows.findIndex(row => row.id === storyboard.id)
-  if (index <= 0) throw new Error('第一镜没有上一镜，不能启用尾帧衔接')
-  const previous = rows[index - 1]!
-  const previousVideo = previous.videoUrl || previous.composedVideoUrl
-  if (!previousVideo) throw new Error(`上一镜 #${previous.storyboardNumber} 还没有采用视频，无法提取尾帧`)
-  return {
-    firstFrameUrl: await extractVideoTailFrame(previousVideo),
-    sourceStoryboardId: previous.id,
-    sourceVideoUrl: previousVideo,
-  }
-}
 
 // POST /tasks — 发起生成任务（body.type: image | video）
 app.post('/', async (c) => {
@@ -82,10 +64,8 @@ app.post('/', async (c) => {
     let configId: number | undefined = body.config_id
     let episodeResolution: string | undefined
     let storyboardDramaId: number | undefined
-    let storyboard: typeof schema.storyboards.$inferSelect | undefined
     if (body.storyboard_id) {
       const [sb] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, Number(body.storyboard_id)))
-      storyboard = sb
       if (sb) {
         const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, sb.episodeId))
         const locked = type === 'image' ? ep?.imageConfigId : ep?.videoConfigId
@@ -93,16 +73,6 @@ app.post('/', async (c) => {
         if (type === 'video' && ep?.resolution) episodeResolution = ep.resolution
         storyboardDramaId = ep?.dramaId ?? undefined
       }
-    }
-
-    if (type === 'video' && videoBody?.inherit_previous_tail) {
-      if (!storyboard) return badRequest(c, '启用尾帧衔接时 storyboard_id 必填')
-      const continuity = await resolvePreviousTailFrame(storyboard)
-      videoBody.first_frame_url = continuity.firstFrameUrl
-      videoBody.continuity_source_storyboard_id = continuity.sourceStoryboardId
-      videoBody.continuity_source_video_url = continuity.sourceVideoUrl
-      // 首尾帧模式与参考图模式是不同工作流；启用衔接时以连续性首帧为准。
-      videoBody.reference_image_urls = []
     }
 
     if (type === 'video' && videoBody) {
