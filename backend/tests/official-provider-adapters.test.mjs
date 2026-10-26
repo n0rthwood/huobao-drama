@@ -58,14 +58,17 @@ test('backend rejects unsupported providers at DB and route boundaries', () => {
   assert.match(ai, /officialProviders/)
   assert.match(ai, /text:\s*\[\s*'openai',\s*'gemini',\s*'volcengine'\s*\]/)
   assert.match(ai, /image:\s*\[\s*'openai',\s*'gemini',\s*'volcengine'\s*\]/)
-  assert.match(ai, /video:\s*\[\s*'volcengine',\s*'minimax',\s*'aliyun'\s*\]/)
+  assert.match(ai, /video:\s*\[\s*'volcengine',\s*'minimax',\s*'comfyui'\s*\]/)
   assert.doesNotMatch(ai, /'deepseek'/)
   assert.doesNotMatch(ai, /'ali'/)
   assert.doesNotMatch(ai, /'vidu'/)
+  assert.doesNotMatch(ai, /'aliyun'/)
   assert.doesNotMatch(ai, /audio:\s*\[/)
   assert.match(ai, /isOfficialProvider/)
   assert.match(ai, /isOfficialProvider\(serviceType,\s*r\.provider\)/)
   assert.match(ai, /isOfficialProvider\(row\.serviceType as ServiceType,\s*row\.provider\)/)
+  assert.match(ai, /validateVideoModel/)
+  assert.match(ai, /minimax-h3/)
 
   assert.match(route, /isOfficialProvider/)
   assert.match(route, /isOfficialProvider\(body\.service_type,\s*body\.provider\)/)
@@ -82,10 +85,12 @@ test('AI config routes reject unsupported service/provider pairs in create, test
   assert.match(createRoute, /if \(!body\.service_type \|\| !body\.provider\)/)
   assert.match(createRoute, /isOfficialProvider\(body\.service_type,\s*body\.provider\)/)
   assert.match(createRoute, /badRequest\(c,\s*'不支持的 service_type\/provider'\)/)
+  assert.match(createRoute, /validateConfigModels\(body\.service_type,\s*body\.provider,\s*body\.model\)/)
 
   assert.match(testRoute, /if \(!body\.service_type \|\| !body\.provider \|\| !body\.base_url\)/)
   assert.match(testRoute, /isOfficialProvider\(body\.service_type,\s*body\.provider\)/)
   assert.match(testRoute, /badRequest\(c,\s*'不支持的 service_type\/provider'\)/)
+  assert.match(testRoute, /validateConfigModels\(body\.service_type,\s*body\.provider,\s*body\.model\)/)
 
   assert.match(updateRoute, /const serviceType = 'service_type' in body \? body\.service_type : existing\.serviceType/)
   assert.match(updateRoute, /const provider = 'provider' in body \? body\.provider : existing\.provider/)
@@ -93,6 +98,7 @@ test('AI config routes reject unsupported service/provider pairs in create, test
   assert.doesNotMatch(updateRoute, /body\.provider \|\| existing\.provider/)
   assert.match(updateRoute, /isOfficialProvider\(serviceType,\s*provider\)/)
   assert.match(updateRoute, /badRequest\(c,\s*'不支持的 service_type\/provider'\)/)
+  assert.match(updateRoute, /validateConfigModels\(serviceType,\s*provider,\s*models\)/)
 })
 
 test('AI config update route persists service type changes after validation', () => {
@@ -118,14 +124,12 @@ test('AI config probe uses provider-specific auth schemes', () => {
   assert.match(route, /p === 'openai'/)
   assert.match(route, /p === 'volcengine'/)
   assert.match(route, /p === 'minimax'/)
-  assert.match(route, /p === 'aliyun'/)
-  assert.match(route, /X-DashScope-Async': 'enable'/)
-  assert.match(route, /\/services\/aigc\/video-generation\/video-synthesis/)
   assert.match(route, /'\/chat\/completions'/)
   assert.doesNotMatch(route, /viduHeaders/)
   assert.doesNotMatch(route, /p === 'deepseek'/)
   assert.doesNotMatch(route, /p === 'ali'/)
   assert.doesNotMatch(route, /p === 'vidu'/)
+  assert.doesNotMatch(route, /p === 'aliyun'/)
 })
 
 test('removed providers no longer ship adapters or webhook routes', () => {
@@ -134,6 +138,7 @@ test('removed providers no longer ship adapters or webhook routes', () => {
 
   assert.doesNotMatch(registry, /ali-image|ali-video|vidu-video/)
   assert.doesNotMatch(registry, /AliImageAdapter|AliVideoAdapter|ViduVideoAdapter/)
+  assert.doesNotMatch(registry, /aliyun|AliyunWanVideoAdapter/)
   assert.doesNotMatch(index, /webhooks/)
 })
 
@@ -170,7 +175,6 @@ test('new image and video models use their current API shapes', () => {
   const openaiImage = read('src/services/adapters/openai-image.ts')
   const geminiImage = read('src/services/adapters/gemini-image.ts')
   const volcVideo = read('src/services/adapters/volcengine-video.ts')
-  const wanVideo = read('src/services/adapters/aliyun-wan-video.ts')
 
   assert.match(openaiImage, /isGptImage2/)
   assert.match(openaiImage, /normalizeGptImage2Size/)
@@ -185,13 +189,4 @@ test('new image and video models use their current API shapes', () => {
   assert.match(volcVideo, /reference_video/)
   assert.match(volcVideo, /reference_audio/)
   assert.match(volcVideo, /generate_audio:\s*record\.generateAudio/)
-  // Wan 3.0 使用阿里云百炼官方异步视频生成协议
-  assert.match(wanVideo, /wan3\.0-video-prime/)
-  assert.match(wanVideo, /wan3\.0-video/)
-  assert.match(wanVideo, /\/services\/aigc\/video-generation\/video-synthesis/)
-  assert.match(wanVideo, /X-DashScope-Async': 'enable'/)
-  assert.match(wanVideo, /body:\s*\{ model, input, parameters \}/)
-  assert.match(wanVideo, /\/tasks\/\$\{encodeURIComponent\(taskId\)\}/)
-  assert.match(wanVideo, /output\.task_status/)
-  assert.match(wanVideo, /output_video_duration/)
 })

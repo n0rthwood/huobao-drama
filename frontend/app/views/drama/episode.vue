@@ -2201,17 +2201,15 @@ const visualChars = computed(() => chars.value.filter(c => !isNarratorCharacter(
 const lockedVideoConfigId = computed(() => episode.value?.video_config_id || episode.value?.videoConfigId || null)
 // 集视频分辨率：顶栏直接修改（持久化 episodes.resolution，生成任务按此值锁定）。
 // 内部统一存 480p/720p/1080p 三档，界面按当前选中的视频模型显示厂商原生档位
-// （Seedance 480p/720p、MiniMax 768P/2K、Wan 3.0 480P/720P/1080P），适配器再映射为官方枚举
+// （Seedance 480p/720p、MiniMax 768P/2K），适配器再映射为官方枚举
 const RESOLUTION_TIERS = {
   volcengine: ['480p', '720p'],
   minimax: ['720p', '1080p'],
-  aliyun: ['480p', '720p', '1080p'],
   comfyui: ['480p', '720p', '1080p'],
 }
 const RESOLUTION_DISPLAY = {
   volcengine: { '480p': '480p', '720p': '720p', '1080p': '720p' },
   minimax: { '480p': '768P', '720p': '768P', '1080p': '2K' },
-  aliyun: { '480p': '480P', '720p': '720P', '1080p': '1080P' },
   comfyui: { '480p': '480p', '720p': '720p', '1080p': '1080p' },
 }
 const resolutionProvider = computed(() => RESOLUTION_TIERS[selectedVideoConfig.value?.provider] ? selectedVideoConfig.value.provider : 'volcengine')
@@ -2289,11 +2287,8 @@ const selectedVideoConfig = computed(() => {
     .filter(config => config.is_active)
     .sort((a, b) => (b.priority || 0) - (a.priority || 0))[0]
 })
-const isWan3Video = computed(() => selectedVideoConfig.value?.provider === 'aliyun'
-  || bareModelName(videoModel.value).startsWith('wan3.0-video'))
-
-// 参考图上限（Wan 3.0 官方 10 张，其他模型 9 张），绑定素材收集与 @名字 映射统一读取
-const refImageLimit = computed(() => isWan3Video.value ? 10 : 9)
+// 参考图上限固定为 9 张，绑定素材收集与 @名字映射统一读取
+const refImageLimit = 9
 
 // 本次生成的生效配置（模型/分辨率/时长），用于右侧小结与批量确认弹窗
 const effectiveVideoModelLabel = computed(() => {
@@ -3243,7 +3238,7 @@ async function setShotAssetVersion(sb, asset, url) {
 function getShotReferenceImages(sb) {
   const refs = []
   const pushRef = (value) => {
-    if (!value || refs.includes(value) || refs.length >= refImageLimit.value) return
+    if (!value || refs.includes(value) || refs.length >= refImageLimit) return
     refs.push(value)
   }
   const scene = getStoryboardScene(sb)
@@ -3379,7 +3374,7 @@ function getShotReferenceIndexMap(sb) {
   const ordered = []
   const seen = new Set()
   const push = (name, url) => {
-    if (!url || seen.has(url) || ordered.length >= refImageLimit.value) return
+    if (!url || seen.has(url) || ordered.length >= refImageLimit) return
     seen.add(url)
     ordered.push({ name, imageUrl: url })
   }

@@ -48,8 +48,6 @@ interface GenerateVideoParams {
   referenceImageUrls?: string[]
   referenceVideoUrls?: string[]
   referenceAudioUrls?: string[]
-  referenceFileUrl?: string
-  referenceLinkUrl?: string
   generateAudio?: boolean
   duration?: number
   aspectRatio?: string
@@ -120,8 +118,6 @@ export async function generateVideo(params: GenerateVideoParams): Promise<number
     referenceImageUrls: params.referenceImageUrls,
     referenceVideoUrls: params.referenceVideoUrls,
     referenceAudioUrls: params.referenceAudioUrls,
-    referenceFileUrl: params.referenceFileUrl,
-    referenceLinkUrl: params.referenceLinkUrl,
     generateAudio: params.generateAudio === false ? 0 : 1,
     duration: params.duration,
     aspectRatio: params.aspectRatio,
@@ -231,7 +227,6 @@ async function processTask(id: number, config: AIConfig) {
       // 参考视频/音频文件较大，不适合 dataURL 内联，需解析为公网可访问 URL
       const resolvedReferenceVideoUrls = resolvePublicMediaUrls(params.referenceVideoUrls, 'video')
       const resolvedReferenceAudioUrls = resolvePublicMediaUrls(params.referenceAudioUrls, 'audio')
-      const resolvedReferenceFileUrl = resolvePublicMediaUrl(params.referenceFileUrl, 'file')
       const videoRecord: VideoGenerationRecord = {
         id: record.id,
         model: record.model,
@@ -243,8 +238,6 @@ async function processTask(id: number, config: AIConfig) {
         referenceImageUrls: resolvedReferenceImageUrls.length ? JSON.stringify(resolvedReferenceImageUrls) : null,
         referenceVideoUrls: resolvedReferenceVideoUrls.length ? JSON.stringify(resolvedReferenceVideoUrls) : null,
         referenceAudioUrls: resolvedReferenceAudioUrls.length ? JSON.stringify(resolvedReferenceAudioUrls) : null,
-        referenceFileUrl: resolvedReferenceFileUrl,
-        referenceLinkUrl: params.referenceLinkUrl,
         generateAudio: params.generateAudio,
         duration: params.duration,
         aspectRatio: params.aspectRatio,
@@ -562,14 +555,14 @@ async function normalizeVideoReferenceUrls(refs: string[] | null | undefined): P
  * http(s)/dataURL 直通；本地 static 路径需要 PUBLIC_BASE_URL 拼成公网地址，
  * 未配置时抛出可操作的中文错误（落入 catch 写入 error_msg 供前端展示）。
  */
-function resolvePublicMediaUrl(value: string | null | undefined, kind: 'video' | 'audio' | 'file'): string | null {
+function resolvePublicMediaUrl(value: string | null | undefined, kind: 'video' | 'audio'): string | null {
   const raw = String(value || '').trim()
   if (!raw) return null
   if (raw.startsWith('http://') || raw.startsWith('https://') || raw.startsWith('data:')) return raw
   if (raw.startsWith('static/') || raw.startsWith('/static/')) {
     const base = (process.env.PUBLIC_BASE_URL || '').trim().replace(/\/+$/, '')
     if (!base) {
-      const label = kind === 'video' ? '视频' : kind === 'audio' ? '音频' : '文件'
+      const label = kind === 'video' ? '视频' : '音频'
       throw new Error(
         `参考${label}为本地路径 ${raw}，但后端未配置 PUBLIC_BASE_URL，上游视频生成 API 无法访问内网地址。` +
         `请在 backend/.env 配置 PUBLIC_BASE_URL（如 https://your-domain.com）后重试，或改用公网 URL。`,

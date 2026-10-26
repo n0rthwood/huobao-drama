@@ -4,7 +4,7 @@ import { db, getInsertId, schema } from '../db/index.js'
 import { success, notFound, created, badRequest, now } from '../utils/response.js'
 import { toSnakeCase } from '../utils/transform.js'
 import { joinProviderUrl } from '../services/adapters/url.js'
-import { hasVersionedPath, isOfficialProvider, parseConfigTemperature } from '../services/ai.js'
+import { hasVersionedPath, isOfficialProvider, parseConfigTemperature, validateConfigModels } from '../services/ai.js'
 import { redactUrl, logTaskError, logTaskProgress, logTaskSuccess } from '../utils/task-logger.js'
 
 const app = new Hono()
@@ -104,18 +104,6 @@ function buildProbe(serviceType: string, provider: string, baseUrl: string, mode
     }
   }
 
-  if (p === 'aliyun') {
-    // Wan 3.0 仅支持异步提交；空请求体不会创建计费任务，仅用于验证地域端点与鉴权是否可达。
-    return {
-      method: 'POST',
-      url: joinProviderUrl(baseUrl, '/api/v1', '/services/aigc/video-generation/video-synthesis'),
-      headers: {
-        ...bearerHeaders(apiKey, true),
-        'X-DashScope-Async': 'enable',
-      },
-      body: {},
-    }
-  }
 
   return {
     method: 'GET',
@@ -147,6 +135,9 @@ app.post('/', async (c) => {
   if (!isOfficialProvider(body.service_type, body.provider)) {
     return badRequest(c, '不支持的 service_type/provider')
   }
+  const modelError = validateConfigModels(body.service_type, body.provider, body.model)
+  if (modelError) return badRequest(c, modelError)
+
 
   let temperature: number | null = null
   if ('temperature' in body) {
@@ -186,6 +177,9 @@ app.post('/test', async (c) => {
   if (!isOfficialProvider(body.service_type, body.provider)) {
     return badRequest(c, '不支持的 service_type/provider')
   }
+  const modelError = validateConfigModels(body.service_type, body.provider, body.model)
+  if (modelError) return badRequest(c, modelError)
+
 
   const model = Array.isArray(body.model) ? body.model[0] : body.model
   const probe = buildProbe(body.service_type, body.provider, body.base_url, model, body.api_key)
@@ -269,6 +263,13 @@ app.put('/:id', async (c) => {
   if (!isOfficialProvider(serviceType, provider)) {
     return badRequest(c, '不支持的 service_type/provider')
   }
+  let models: unknown = body.model
+  if (!('model' in body)) {
+    try { models = existing.model ? JSON.parse(existing.model) : [] } catch { models = [] }
+  }
+  const modelError = validateConfigModels(serviceType, provider, models)
+  if (modelError) return badRequest(c, modelError)
+
 
   const updates: Record<string, any> = { updatedAt: now() }
 

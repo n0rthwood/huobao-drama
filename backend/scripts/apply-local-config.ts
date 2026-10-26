@@ -12,7 +12,7 @@ import os from 'os'
 import path from 'path'
 import { and, eq } from 'drizzle-orm'
 import { db, schema } from '../src/db/index.js'
-import { isOfficialProvider } from '../src/services/ai.js'
+import { isOfficialProvider, validateConfigModels } from '../src/services/ai.js'
 import { now } from '../src/utils/response.js'
 
 const configDir = process.env.HUOBAO_LOCAL_CONFIG_DIR || path.join(os.homedir(), '.config', 'huobao-drama-local')
@@ -52,6 +52,11 @@ for (const [i, e] of entries.entries()) {
   }
   if (!isOfficialProvider(e.service_type, e.provider)) {
     console.error(`${label} 不支持的 service_type/provider: ${e.service_type}/${e.provider}`)
+    process.exit(1)
+  }
+  const modelError = validateConfigModels(e.service_type, e.provider, e.model)
+  if (modelError) {
+    console.error(`${label} ${modelError}`)
     process.exit(1)
   }
   const model = Array.isArray(e.model) ? e.model : []

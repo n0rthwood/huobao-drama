@@ -96,7 +96,7 @@ data/       — 생성된 에셋과 SQLite 데이터베이스
 |---|---|
 | **텍스트** | OpenAI(호환 API), Gemini |
 | **이미지** | OpenAI, Gemini, Volcano Engine |
-| **영상** | Volcano Engine Seedance 2.0(Standard / Fast / Mini), MiniMax H3, Alibaba Bailian Wan 3.0(Prime / Standard) |
+| **영상** | Volcano Engine Seedance 2.0(Standard / Fast / Mini), MiniMax H3 |
 
 ---
 
@@ -254,7 +254,7 @@ cd backend && npx tsx scripts/import-mysql-to-sqlite.ts
 
 "영상 제작" 페이지에서 먼저 **스토리보드 분할**을 실행하세요(AI가 컷을 나누고 영상 프롬프트 생성). 그 후:
 
-- 상단 바에서 **영상 모델** 선택(Seedance / Wan 3.0 / MiniMax 등). 해상도와 길이 옵션은 모델에 연동됩니다
+- 상단 바에서 **영상 모델** 선택(Seedance / MiniMax 등). 해상도와 길이 옵션은 모델에 연동됩니다
 - 오른쪽에서 각 컷의 프롬프트를 확인·조정(`@캐릭터명` 참조는 자동으로 참조 이미지에 매핑)
 - "일괄 영상 생성"으로 작업 시작. 실패한 작업은 원클릭 재시도
 
@@ -506,6 +506,10 @@ A: 백엔드는 최초 시작 시 모든 테이블을 자동으로 생성합니�
 ---
 
 ## 📋 업데이트 로그
+
+### 미출시
+
+- 로컬 워크플로와 서비스 구성을 포함한 Wan 영상 생성을 종료했습니다.
 
 ### v4.0.0 (2026-08)
 

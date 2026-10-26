@@ -14,7 +14,6 @@ const FILENAMES: Record<string, string> = {
   doubao: 'doubao-color.png',
   moonshot: 'kimi-color.png',
   qwen: 'qwen-color.png',
-  aliyun: 'qwen-color.png',  // 阿里云 Wan 系列与 Qwen 同属阿里，共用图标
   zhipu: 'zhipu-color.png',
   xai: 'grok.png',
   xiaomi: 'xiaomi-color.png',
@@ -40,7 +39,7 @@ const MODEL_PROVIDER_HINTS: [RegExp, string][] = [
   [/claude/i, 'claude'],
   [/gemini/i, 'gemini'],
   [/kimi|moonshot/i, 'moonshot'],
-  [/qwen|^wan[\d.-]/i, 'qwen'],
+  [/qwen/i, 'qwen'],
   [/glm|zhipu|chatglm/i, 'zhipu'],
   [/grok/i, 'xai'],
   [/^(gpt|chatgpt|o[1-9])/i, 'openai'],

@@ -91,7 +91,9 @@ test('tasks route validates reference-mode requirements for video tasks', () => 
   assert.doesNotMatch(route, /文生视频模式必须提供 prompt/)
   assert.doesNotMatch(route, /首帧模式必须提供 first_frame_url/)
   assert.doesNotMatch(route, /首尾帧模式必须同时提供/)
-  // Wan 3.0 官方入参兼容层会把 input.media 归一到 first_frame_url/last_frame_url 等扁平字段
+  // 仅接受通用扁平入参。
+  assert.doesNotMatch(route, /input\.media/)
+  assert.doesNotMatch(route, /official_media/)
 
   // 多模态参考校验并固定 reference 模式
   assert.match(route, /参考素材超限：图片≤9、视频≤3、音频≤3/)

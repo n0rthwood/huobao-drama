@@ -7,7 +7,6 @@ import { GeminiImageAdapter } from './gemini-image'
 import { VolcEngineImageAdapter } from './volcengine-image'
 import { VolcEngineVideoAdapter } from './volcengine-video'
 import { MiniMaxVideoAdapter } from './minimax-video'
-import { AliyunWanVideoAdapter } from './aliyun-wan-video'
 import { ComfyUIVideoAdapter } from './comfyui-video'
 import { ComfyUIImageAdapter } from './comfyui-image'
 import type { ImageProviderAdapter, VideoProviderAdapter } from './types'
@@ -24,7 +23,6 @@ export const imageAdapters: Record<string, ImageProviderAdapter> = {
 export const videoAdapters: Record<string, VideoProviderAdapter> = {
   volcengine: new VolcEngineVideoAdapter(),
   minimax: new MiniMaxVideoAdapter(),
-  aliyun: new AliyunWanVideoAdapter(),
   comfyui: new ComfyUIVideoAdapter(),
 }
 

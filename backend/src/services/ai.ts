@@ -31,12 +31,34 @@ export function parseConfigTemperature(settingsRaw: string | null | undefined): 
 export const officialProviders: Record<ServiceType, readonly string[]> = {
   text: ['openai', 'gemini', 'volcengine'],
   image: ['openai', 'gemini', 'volcengine', 'comfyui'],
-  video: ['volcengine', 'minimax', 'aliyun', 'comfyui'],
+  video: ['volcengine', 'minimax', 'comfyui'],
 }
 
 export function isOfficialProvider(serviceType?: string | null, provider?: string | null): boolean {
   const providers = officialProviders[serviceType as ServiceType]
   return !!providers && providers.includes((provider || '').toLowerCase())
+}
+
+export function validateVideoModel(provider: string | null | undefined, model: string | null | undefined): string | null {
+  if ((provider || '').toLowerCase() !== 'comfyui' || !model) return null
+  return model.toLowerCase().startsWith('minimax-h3')
+    ? null
+    : 'ComfyUI 视频仅支持 MiniMax-H3 模型'
+}
+
+export function validateConfigModels(
+  serviceType: string | null | undefined,
+  provider: string | null | undefined,
+  models: unknown,
+): string | null {
+  if (serviceType !== 'video' || (provider || '').toLowerCase() !== 'comfyui') return null
+  const values = Array.isArray(models) ? models : models == null ? [] : [models]
+  for (const model of values) {
+    if (typeof model !== 'string') return '模型必须为字符串'
+    const error = validateVideoModel(provider, model)
+    if (error) return error
+  }
+  return null
 }
 
 /** baseUrl 路径是否已以 /v<数字> 结尾 */

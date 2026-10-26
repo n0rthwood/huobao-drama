@@ -96,7 +96,7 @@ data/       — 生成アセットと SQLite データベース
 |---|---|
 | **テキスト** | OpenAI（互換 API）、Gemini |
 | **画像** | OpenAI、Gemini、Volcano Engine |
-| **動画** | Volcano Engine Seedance 2.0（Standard / Fast / Mini）、MiniMax H3、Alibaba Bailian Wan 3.0（Prime / Standard） |
+| **動画** | Volcano Engine Seedance 2.0（Standard / Fast / Mini）、MiniMax H3 |
 
 ---
 
@@ -254,7 +254,7 @@ cd backend && npx tsx scripts/import-mysql-to-sqlite.ts
 
 「動画制作」ページでまず**絵コンテ分割**を実行（AI がカット割りし動画プロンプトを生成）。その後：
 
-- 上部バーで**動画モデル**を選択（Seedance / Wan 3.0 / MiniMax など）。解像度と尺の選択肢はモデルに連動
+- 上部バーで**動画モデル**を選択（Seedance / MiniMax など）。解像度と尺の選択肢はモデルに連動
 - 右側で各カットのプロンプトを確認・調整（`@キャラ名` 参照は自動で参照画像にマッピング）
 - 「一括動画生成」でタスク開始。失敗タスクはワンクリックでリトライ
 
@@ -506,6 +506,10 @@ A: バックエンドは初回起動時に全テーブルを自動作成しま�
 ---
 
 ## 📋 更新履歴
+
+### 未リリース
+
+- ローカルワークフローとサービス設定を含む Wan 動画生成を廃止。
 
 ### v4.0.0 (2026-08)
 

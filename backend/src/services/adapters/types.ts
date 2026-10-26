@@ -112,8 +112,6 @@ export interface VideoGenerationRecord {
   referenceImageUrls?: string | null
   referenceVideoUrls?: string | null
   referenceAudioUrls?: string | null
-  referenceFileUrl?: string | null
-  referenceLinkUrl?: string | null
   generateAudio?: number | boolean | null
   duration?: number | null
   aspectRatio?: string | null

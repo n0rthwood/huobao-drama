@@ -96,7 +96,7 @@ The interface ships in **中文 / English / 日本語 / 한국어**, with a glob
 |---|---|
 | **Text** | OpenAI (compatible APIs), Gemini |
 | **Image** | OpenAI, Gemini, Volcano Engine |
-| **Video** | Volcano Engine Seedance 2.0 (Standard / Fast / Mini), MiniMax H3, Alibaba Bailian Wan 3.0 (Prime / Standard) |
+| **Video** | Volcano Engine Seedance 2.0 (Standard / Fast / Mini), MiniMax H3 |
 
 ---
 
@@ -254,7 +254,7 @@ Every character / scene / prop card keeps its own persistent set of **reference 
 
 On the "Video Production" page, first run **storyboard breakdown** (AI splits shots and writes video prompts). Then:
 
-- Pick the **video model** in the top bar (Seedance / Wan 3.0 / MiniMax…); resolution and duration tiers follow the model
+- Pick the **video model** in the top bar (Seedance / MiniMax…); resolution and duration tiers follow the model
 - Review and tweak each shot's prompt on the right (`@character` references map to reference images automatically)
 - Click "Batch Generate Videos"; failed tasks can be retried in one click
 
@@ -506,6 +506,10 @@ A: The backend creates all tables automatically on first launch — check the lo
 ---
 
 ## 📋 Changelog
+
+### Unreleased
+
+- Retired Wan video generation, including its local workflows and provider configuration.
 
 ### v4.0.0 (2026-08)
 
