@@ -11,6 +11,7 @@ import firstlastTemplate from '../../workflows/h3/firstlast.json'
 import referenceTemplate from '../../workflows/h3/reference.json'
 import t2vTemplate from '../../workflows/h3/t2v.json'
 import firstlastInt8Template from '../../workflows/h3-int8/firstlast.json'
+import referenceInt8Template from '../../workflows/h3-int8/reference.json'
 import t2vInt8Template from '../../workflows/h3-int8/t2v.json'
 
 import { asWorkflow, cloneNode as node, randomSeed, type Workflow } from './comfyui-client'
@@ -23,7 +24,7 @@ const TEMPLATES: Record<H3Variant, { t2v: Workflow; firstlast: Workflow; referen
     firstlast: asWorkflow(firstlastTemplate),
     reference: asWorkflow(referenceTemplate),
   },
-  int8: { t2v: asWorkflow(t2vInt8Template), firstlast: asWorkflow(firstlastInt8Template) },
+  int8: { t2v: asWorkflow(t2vInt8Template), firstlast: asWorkflow(firstlastInt8Template), reference: asWorkflow(referenceInt8Template) },
 }
 
 /** 步数 ≤8 挂 turbo LoRA（为 ~8 步蒸馏）；>8 走基础模型并取消 LoRA */
@@ -34,6 +35,7 @@ const MAX_PIXELS = 1344 * 768
  * 实测 4 步背景是未收敛的噪点/拖影，20 步清晰完整，耗时几乎不变（耗时主要是固定开销）。
  */
 const REFERENCE_STEPS = 20
+const REFERENCE_STEPS_INT8 = 4
 
 /** 项目侧档位 → 横屏边长；竖屏互换宽高 */
 const LANDSCAPE_SIZES: Record<string, Record<string, [number, number]>> = {
@@ -121,11 +123,12 @@ export function buildFirstLast(p: FillBase & { firstName: string; lastName?: str
   return wf
 }
 
-/** 参考图模式：模板是 ref2va 基础权重（无 LoRA，仅 standard 实例有此权重），步数固定为 REFERENCE_STEPS */
+/** 参考图模式：standard = ref2va 基础权重固定 20 步；int8 = fused refdelta 4 步蒸馏(102 的 int8 权重集里唯一可用的参考路径) */
 export function buildReference(p: Omit<FillBase, 'steps'> & { refNames: string[] }): Workflow {
-  const wf = structuredClone(TEMPLATES.standard.reference)
-  if (!wf) throw new Error('H3 参考图工作流不可用')
-  node(wf, '124').inputs.steps = REFERENCE_STEPS
+  const variant = p.variant ?? 'standard'
+  const wf = structuredClone(TEMPLATES[variant].reference)
+  if (!wf) throw new Error(`H3 ${variant} 参考图工作流不可用`)
+  node(wf, '124').inputs.steps = variant === 'int8' ? REFERENCE_STEPS_INT8 : REFERENCE_STEPS
   node(wf, '1').inputs.value = p.prompt
   node(wf, '133').inputs.value = p.durationS
   node(wf, '129').inputs.noise_seed = randomSeed(p.seed)

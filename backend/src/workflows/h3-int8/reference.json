@@ -1,0 +1,242 @@
+{
+ "127": {
+  "class_type": "UNETLoader",
+  "inputs": {
+   "unet_name": "minimax_h3_fused_refdelta_r1024_turbo8_mystic07_int8_convrot.safetensors",
+   "weight_dtype": "default"
+  }
+ },
+ "901": {
+  "class_type": "MiniMaxChunkFeedForward",
+  "inputs": {
+   "model": [
+    "127",
+    0
+   ],
+   "chunks": 4,
+   "seq_threshold": 4096
+  }
+ },
+ "900": {
+  "class_type": "H3SLAAttention",
+  "inputs": {
+   "model": [
+    "901",
+    0
+   ],
+   "sparsity_ratio": 0.9,
+   "block_size": "64",
+   "min_seq_len": 8192,
+   "dense_last_steps": 0,
+   "protect_audio": true,
+   "enabled": true
+  }
+ },
+ "142": {
+  "class_type": "MiniMaxH3SigmaShift",
+  "inputs": {
+   "model": [
+    "900",
+    0
+   ],
+   "shift_video": 12.0,
+   "shift_audio": 3.0
+  }
+ },
+ "119": {
+  "class_type": "VAELoader",
+  "inputs": {
+   "vae_name": "minimax_h3_video_vae_int8_convrot.safetensors"
+  }
+ },
+ "120": {
+  "class_type": "VAELoader",
+  "inputs": {
+   "vae_name": "minimax_h3_audio_vae_fp32.safetensors"
+  }
+ },
+ "128": {
+  "class_type": "CLIPLoader",
+  "inputs": {
+   "clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+   "type": "minimax",
+   "device": "default"
+  }
+ },
+ "1": {
+  "class_type": "PrimitiveStringMultiline",
+  "inputs": {
+   "value": "{\"integrated_multimodal_description\": \"A professional studio product film of the exact industrial date-processing machine shown in the reference pictures: a long modular line in brushed stainless steel with blue accents. Its layout is fixed and never changes: the single infeed hopper and inclined bucket elevator stand at one end only, the long horizontal brush-polishing bed with perforated steel covers runs along the middle, and the seven small numbered grading outlets with two angled blue discharge conveyors sit at the opposite end. There is exactly one hopper in the entire system, at the elevator end as in the references; no other hopper, funnel or bin exists anywhere on the line. The back of the line is a continuous plain brushed-stainless-steel wall with square section legs and a small gray control box; its geometry, panel lines, proportions and finish match the reference pictures exactly. the machine stands completely alone on a subtly reflective white studio floor in front of a seamless light-gray cyclorama, lit by soft diffused studio light; absolutely no factory background, no clutter, no people, no on-screen text. The film opens exactly on the wide front framing of <Picture 1>, then the camera begins one continuous, perfectly smooth 360-degree orbit, gliding to the left at constant speed and constant height at the machine's mid-line: past the elevator end where glossy golden-brown dates pour into the machine's only hopper and ride up the inclined elevator on its cleats, then onto the near flank of the brush machine where dates tumble and roll over the spinning brush rollers; the segment ends on this clean side view of the line after five seconds. Commercial cinematography, steady motorized-turntable motion, coherent reflections on the brushed steel, photorealistic.\", \"overall_soundscape\": \"quiet studio room tone, soft electric motor hum, rhythmic rotating brushes, gentle clatter of dates rolling over stainless steel\", \"non_diegetic_music\": \"sparse elegant corporate underscore, warm piano notes and airy synth pads slowly swelling with the camera motion\"}"
+  }
+ },
+ "133": {
+  "class_type": "PrimitiveFloat",
+  "inputs": {
+   "value": 5.0
+  }
+ },
+ "132": {
+  "class_type": "ComfyMathExpression",
+  "inputs": {
+   "expression": "max(5, round(a * 24)) + (5 - (max(5, round(a * 24)) % 17)) % 17",
+   "values.a": [
+    "133",
+    0
+   ]
+  }
+ },
+ "200": {
+  "class_type": "LoadImage",
+  "inputs": {
+   "image": "v20_pp/p0_hero.png",
+   "upload": "image"
+  }
+ },
+ "131": {
+  "class_type": "MiniMaxH3ReferenceToVideo",
+  "inputs": {
+   "clip": [
+    "128",
+    0
+   ],
+   "prompt": [
+    "1",
+    0
+   ],
+   "width": 960,
+   "height": 384,
+   "length": [
+    "132",
+    1
+   ],
+   "vae": [
+    "119",
+    0
+   ],
+   "audio_vae": [
+    "120",
+    0
+   ],
+   "ref_image_size": "max",
+   "ref_images.ref_image_0": [
+    "200",
+    0
+   ]
+  }
+ },
+ "129": {
+  "class_type": "RandomNoise",
+  "inputs": {
+   "noise_seed": 20260918
+  }
+ },
+ "135": {
+  "class_type": "KSamplerSelect",
+  "inputs": {
+   "sampler_name": "res_multistep"
+  }
+ },
+ "124": {
+  "class_type": "BasicScheduler",
+  "inputs": {
+   "model": [
+    "142",
+    0
+   ],
+   "scheduler": "simple",
+   "steps": 4,
+   "denoise": 1.0
+  }
+ },
+ "126": {
+  "class_type": "BasicGuider",
+  "inputs": {
+   "model": [
+    "142",
+    0
+   ],
+   "conditioning": [
+    "131",
+    0
+   ]
+  }
+ },
+ "125": {
+  "class_type": "SamplerCustomAdvanced",
+  "inputs": {
+   "noise": [
+    "129",
+    0
+   ],
+   "guider": [
+    "126",
+    0
+   ],
+   "sampler": [
+    "135",
+    0
+   ],
+   "sigmas": [
+    "124",
+    0
+   ],
+   "latent_image": [
+    "131",
+    1
+   ]
+  }
+ },
+ "122": {
+  "class_type": "VAEDecode",
+  "inputs": {
+   "samples": [
+    "125",
+    0
+   ],
+   "vae": [
+    "119",
+    0
+   ]
+  }
+ },
+ "121": {
+  "class_type": "VAEDecodeAudio",
+  "inputs": {
+   "samples": [
+    "125",
+    0
+   ],
+   "vae": [
+    "120",
+    0
+   ]
+  }
+ },
+ "130": {
+  "class_type": "CreateVideo",
+  "inputs": {
+   "images": [
+    "122",
+    0
+   ],
+   "audio": [
+    "121",
+    0
+   ],
+   "fps": 24,
+   "bit_depth": 8
+  }
+ },
+ "92": {
+  "class_type": "SaveVideo",
+  "inputs": {
+   "video": [
+    "130",
+    0
+   ],
+   "format": "auto",
+   "codec": "auto",
+   "filename_prefix": "video/v20_orbit_seg1"
+  }
+ }
+}

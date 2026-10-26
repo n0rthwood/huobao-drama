@@ -1,8 +1,9 @@
 /**
  * ComfyUI（无头）MiniMax-H3 视频 Adapter。
  *
- * 模型名以 minimax-h3 开头；含 int8 的模型走低显存模板 h3-int8/，
- * 该实例无 ref2va，因此不支持参考图。通用的上传、提交、轮询与取件逻辑
+ * 模型名以 minimax-h3 开头；含 int8 的模型走低显存模板 h3-int8/
+ * （t2v/firstlast 走 turbo 8 步；参考图走 fused refdelta 4 步蒸馏——
+ * 102 的 int8 权重集没有 ref2va 基础权重）。通用的上传、提交、轮询与取件逻辑
  * 位于 comfyui-client.ts；此处只做 H3 的参数映射。
  */
 import type {
@@ -61,9 +62,6 @@ export class ComfyUIVideoAdapter implements VideoProviderAdapter {
     const tag = `huobao_${record.id}`
     const variant: PreparedExtra['variant'] = model.toLowerCase().includes('int8') ? 'int8' : 'standard'
     const mode: H3Mode = refSources.length ? 'reference' : firstSource ? 'firstlast' : 't2v'
-    if (variant === 'int8' && mode === 'reference') {
-      throw new Error('H3 INT8 实例没有 ref2va 权重，不支持参考图模式；请改用 bf16 实例或去参考图')
-    }
     const durationS = clampDuration(record, 4, 15)
     // 先扩写提示词（失败即报错，不浪费引擎时间），再等引擎空闲、上传图片
     const prompt = await buildH3Prompt(userPrompt, mode, durationS, !!firstSource, !!lastSource)
