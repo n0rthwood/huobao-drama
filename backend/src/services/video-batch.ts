@@ -13,6 +13,7 @@ import { getActiveConfig, getConfigById } from './ai.js'
 import { getVideoAdapter } from './adapters/registry'
 import { loadEpisodeKeyframes } from './keyframes.js'
 import { listEpisodeStoryboards, submitStoryboardVideo } from './storyboard-video.js'
+import { blockingIssuesFor, checkStoryboardRefs } from './storyboard-assets.js'
 import { logTaskError, logTaskProgress, logTaskStart, logTaskSuccess, logTaskWarn } from '../utils/task-logger.js'
 
 export type BatchStatus = 'running' | 'done' | 'cancelled'
@@ -181,7 +182,17 @@ export async function startEpisodeVideoBatch(
     throw new Error(`以下镜头的关键帧尚未确认，请先在「分镜关键帧」步骤逐镜确认：${unconfirmed.map(n => `#${n}`).join('、')}`)
   }
 
-  // 预检 2：关键帧驱动视频必须由支持关键帧引导的模型生成
+  // 预检 2：视频提示词的 @引用 与绑定一致（与「关键帧未确认」同口径，不创建批次）
+  const blockedShots: number[] = []
+  for (const sb of storyboards) {
+    const issues = await checkStoryboardRefs(sb)
+    if (blockingIssuesFor(issues, 'video_prompt').length) blockedShots.push(sb.storyboardNumber)
+  }
+  if (blockedShots.length) {
+    throw new Error(`以下镜头的视频提示词与参考图不一致，请先在「分镜关键帧」步骤修正：${blockedShots.map(n => `#${n}`).join('、')}`)
+  }
+
+  // 预检 3：关键帧驱动视频必须由支持关键帧引导的模型生成
   const configId = opts.configId ?? episode.videoConfigId ?? undefined
   const config = configId ? (await getConfigById(configId)) ?? await getActiveConfig('video') : await getActiveConfig('video')
   if (!config) throw new Error('未配置视频模型，请先到「设置」页添加并启用 AI 服务')

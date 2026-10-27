@@ -143,6 +143,11 @@
             <div class="kf-row-meta">
               <span :class="['kf-state', 'is-' + shotState(sb)]">{{ shotStateLabel(sb) }}</span>
               <span v-if="kf(sb).inheritsFirst" class="kf-inherit-tag" :title="t('episode.kf.inheritTip')">{{ t('episode.kf.inherit') }}</span>
+              <span
+                v-if="issuesOf(sb).length"
+                :class="['kf-ref-issue-count', issuesOf(sb).some(i => i.severity === 'block') ? 'is-block' : 'is-warn']"
+                :title="issuesOf(sb).map(i => i.message).join(t('common.listJoin'))"
+              >{{ t('episode.ref.issueCount', { n: issuesOf(sb).length }) }}</span>
               <span class="kf-row-dur">{{ sb.duration || 10 }}s</span>
             </div>
           </div>
@@ -159,22 +164,30 @@
           <section class="kf-section">
             <span class="kf-section-label">{{ t('episode.sb.descSection') }}</span>
             <label class="kf-field">
-              <span class="kf-field-label">{{ t('episode.sb.descLabel') }} <span class="dim">({{ t('episode.sb.descHint') }})</span></span>
+              <span class="kf-field-label">
+                {{ t('episode.sb.descLabel') }} <span class="dim">({{ t('episode.sb.descHint') }})</span>
+                <FieldSaveStatus class="kf-field-save" v-bind="fieldSaveOf('description')" />
+              </span>
               <textarea
                 :value="selected.description || ''"
                 class="textarea"
                 rows="6"
                 :placeholder="t('episode.sb.descPlaceholder')"
+                @input="emit('field-dirty', selected, 'description', $event.target.value)"
                 @blur="emit('update-field', selected, 'description', $event.target.value)"
               />
             </label>
             <label class="kf-field">
-              <span class="kf-field-label">{{ t('episode.sb.atmosphere') }}</span>
+              <span class="kf-field-label">
+                {{ t('episode.sb.atmosphere') }}
+                <FieldSaveStatus class="kf-field-save" v-bind="fieldSaveOf('atmosphere')" />
+              </span>
               <textarea
                 :value="selected.atmosphere || ''"
                 class="textarea"
                 rows="2"
                 :placeholder="t('episode.sb.atmospherePlaceholder')"
+                @input="emit('field-dirty', selected, 'atmosphere', $event.target.value)"
                 @blur="emit('update-field', selected, 'atmosphere', $event.target.value)"
               />
             </label>
@@ -207,7 +220,11 @@
             <div class="kf-section-head">
               <span class="kf-section-label">{{ t('episode.ref.title') }}</span>
               <span class="tag mono">{{ t('episode.ref.boundCount', { bound: assets.filter(a => a.bound).length, total: assets.length }) }}</span>
+              <span v-if="refIssues.length" :class="['kf-ref-issue-count', hasBlockingIssue ? 'is-block' : 'is-warn']">
+                {{ t('episode.ref.issueCount', { n: refIssues.length }) }}
+              </span>
             </div>
+            <RefIssueList :issues="refIssues" />
             <div class="kf-ref-list">
               <template v-for="g in refKinds" :key="g.kind">
                 <div v-if="assets.filter(a => a.kind === g.kind).length" class="kf-ref-group">
@@ -264,12 +281,15 @@
               <button
                 type="button"
                 class="btn btn-sm"
-                :disabled="isSlotPending(selected, slot) || batchRunning"
+                :disabled="isSlotPending(selected, slot) || batchRunning || slotBlocked(selected, slot)"
+                :title="slotBlocked(selected, slot) ? slotBlockReason(selected, slot) : undefined"
                 @click="generateSlot(selected, slot)"
               >
                 {{ isSlotPending(selected, slot)
                   ? t('episode.kf.generating')
-                  : (slot === 'first' && kf(selected).inheritsFirst ? t('episode.kf.generateOwnFirst') : (slotImage(selected, slot) ? t('episode.kf.regenerate') : t('episode.kf.generate'))) }}
+                  : (slotBlocked(selected, slot)
+                    ? t('episode.ref.blockedGenerate')
+                    : (slot === 'first' && kf(selected).inheritsFirst ? t('episode.kf.generateOwnFirst') : (slotImage(selected, slot) ? t('episode.kf.regenerate') : t('episode.kf.generate')))) }}
               </button>
             </div>
 
@@ -299,16 +319,21 @@
                   />
                 </div>
                 <label class="kf-field">
-                  <span class="kf-field-label">{{ t('episode.kf.promptLabel', { slot: slotLabel(slot) }) }}</span>
+                  <span class="kf-field-label">
+                    {{ t('episode.kf.promptLabel', { slot: slotLabel(slot) }) }}
+                    <FieldSaveStatus class="kf-field-save" v-bind="fieldSaveOf(SLOT_PROMPT_FIELD[slot])" />
+                  </span>
                   <MentionTextarea
                     :model-value="slotPrompt(selected, slot)"
                     :options="mentions"
                     :rows="4"
                     input-class="textarea kf-prompt"
                     :placeholder="t('episode.kf.promptPlaceholder')"
+                    @update:model-value="v => emit('field-dirty', selected, SLOT_PROMPT_FIELD[slot], v)"
                     @commit="v => emit('update-field', selected, SLOT_PROMPT_FIELD[slot], v)"
                   />
                 </label>
+                <RefIssueList :issues="slotIssues(selected, slot)" />
 
                 <div v-if="slot === 'mid'" class="kf-slot-row">
                   <span class="kf-slot-row-label">{{ t('episode.kf.midTime') }}</span>
@@ -319,10 +344,12 @@
                     min="0.5"
                     class="input kf-mid-time"
                     :placeholder="t('episode.kf.midTimeAuto')"
+                    @input="emit('field-dirty', selected, 'mid_frame_time', $event.target.value === '' ? null : Number($event.target.value))"
                     @change="onMidTimeChange(selected, $event)"
                   />
                   <span class="kf-slot-row-unit">{{ t('episode.kf.midTimeUnit') }}</span>
                   <span class="dim" style="font-size:11px">{{ t('episode.kf.midTimeRange', { max: midTimeMax(selected) }) }}</span>
+                  <FieldSaveStatus class="ml-auto" v-bind="fieldSaveOf('mid_frame_time')" />
                 </div>
 
                 <div class="kf-slot-row">
@@ -371,19 +398,48 @@
           </button>
         </header>
         <div class="dialog-body kf-batch-body">
-          <div class="kf-batch-row"><span>{{ t('episode.kf.batchCount') }}</span><strong>{{ t('episode.kf.batchCountValue', { n: batchConfirm.count }) }}</strong></div>
-          <div class="kf-batch-row">
-            <span>{{ t('episode.kf.batchEta') }}</span>
-            <strong>{{ batchEstimateText }}</strong>
-          </div>
-          <div v-if="batchEstimateNote" class="kf-batch-row kf-batch-row-note"><span /><span class="dim">{{ batchEstimateNote }}</span></div>
-          <div class="kf-batch-row"><span>{{ t('episode.kf.batchModel') }}</span><strong>{{ imageModelLabel || t('episode.vid.defaultModel') }}</strong></div>
-          <p class="kf-batch-note">{{ batchConfirm.regenerate ? t('episode.kf.batchRegenNote') : t('episode.kf.batchMissingNote') }}</p>
-          <p class="kf-batch-note">{{ t('episode.kf.batchNote') }}</p>
+          <div v-if="batchConfirm.loading" class="kf-batch-loading">{{ t('episode.kf.batchPreviewLoading') }}</div>
+          <template v-else>
+            <div class="kf-batch-row"><span>{{ t('episode.kf.batchCount') }}</span><strong>{{ t('episode.kf.batchCountValue', { n: checkedItems.length }) }}</strong></div>
+            <div class="kf-batch-row">
+              <span>{{ t('episode.kf.batchEta') }}</span>
+              <strong>{{ batchEstimateText }}</strong>
+            </div>
+            <div v-if="batchEstimateNote" class="kf-batch-row kf-batch-row-note"><span /><span class="dim">{{ batchEstimateNote }}</span></div>
+            <div class="kf-batch-row"><span>{{ t('episode.kf.batchModel') }}</span><strong>{{ imageModelLabel || t('episode.vid.defaultModel') }}</strong></div>
+            <div class="kf-batch-actions">
+              <span class="dim">{{ batchConfirm.scoped ? t('episode.kf.batchScopeSelected', { n: batchConfirm.ids.length }) : t('episode.kf.batchScopeAll') }}</span>
+              <button type="button" class="kf-quick-btn ml-auto" @click="setAllChecked(true)">{{ t('episode.sb.selectAll') }}</button>
+              <button type="button" class="kf-quick-btn" @click="setAllChecked(false)">{{ t('episode.sb.clear') }}</button>
+            </div>
+            <div class="kf-batch-list">
+              <div v-for="group in previewGroups" :key="group.storyboard_id" class="kf-batch-group">
+                <div class="kf-batch-group-head">#{{ String(group.storyboard_number).padStart(2, '0') }}</div>
+                <label
+                  v-for="item in group.items"
+                  :key="item.slot"
+                  :class="['kf-batch-item', 'is-' + item.status, { disabled: item.status === 'blocked' || item.status === 'skipped' }]"
+                >
+                  <input
+                    type="checkbox"
+                    :checked="item.checked"
+                    :disabled="item.status === 'blocked' || item.status === 'skipped'"
+                    @change="item.checked = $event.target.checked"
+                  />
+                  <span class="kf-batch-item-slot">{{ slotLabel(item.slot) }}</span>
+                  <span class="kf-batch-item-status">{{ previewStatusLabel(item) }}</span>
+                  <span v-if="item.reason" class="kf-batch-item-reason">{{ item.reason }}</span>
+                  <span v-else-if="blockReasonOf(item)" class="kf-batch-item-reason">{{ blockReasonOf(item) }}</span>
+                </label>
+              </div>
+              <div v-if="!previewGroups.length" class="kf-batch-empty">{{ t('episode.kf.batchNothing') }}</div>
+            </div>
+            <p class="kf-batch-note">{{ t('episode.kf.batchNote') }}</p>
+          </template>
         </div>
         <footer class="dialog-foot">
           <button class="btn" @click="batchConfirm.open = false">{{ t('common.cancel') }}</button>
-          <button class="btn btn-primary" @click="startBatch">{{ t('episode.kf.batchStart', { n: batchConfirm.count }) }}</button>
+          <button class="btn btn-primary" :disabled="batchConfirm.loading || !checkedItems.length" @click="startBatch">{{ t('episode.kf.batchStart', { n: checkedItems.length }) }}</button>
         </footer>
       </div>
     </div>
@@ -407,19 +463,21 @@ import { toast } from 'vue-sonner'
 import { useI18n } from 'vue-i18n'
 import { Loader2 } from 'lucide-vue-next'
 import { episodeAPI, storyboardAPI, taskAPI, imageQueueAPI } from '~/composables/useApi'
-import { toastError, mapError } from '~/composables/useToast'
+import { toastError, toastServerMessage, mapError } from '~/composables/useToast'
 import MentionTextarea from '~/components/MentionTextarea.vue'
 import ProgressRing from '~/components/ProgressRing.vue'
 import ConfirmDialog from '~/components/ConfirmDialog.vue'
+import FieldSaveStatus from '~/components/FieldSaveStatus.vue'
+import RefIssueList from '~/components/RefIssueList.vue'
 import {
   useNowTicker,
   ringPropsFromTask,
   ringPropsFromBatchItem,
   isActiveTaskStatus,
-  isTerminalTaskStatus,
   isActiveBatchItemState,
   formatSeconds,
 } from '~/composables/useTaskProgress'
+import { useTasks } from '~/composables/useTasks'
 
 const { t } = useI18n()
 
@@ -442,8 +500,10 @@ const props = defineProps({
   aspectRatio: { type: String, default: '16:9' },
   breaking: { type: Boolean, default: false },
   agentBusy: { type: Boolean, default: false },
+  // (sb, field) => { status, at }；字段级保存状态由工作台（episode.vue）统一维护
+  fieldSave: { type: Function, default: () => ({ status: 'idle', at: 0 }) },
 })
-const emit = defineEmits(['break', 'refresh', 'preview', 'goto-assets', 'toggle-bind', 'set-version', 'update-field'])
+const emit = defineEmits(['break', 'refresh', 'preview', 'goto-assets', 'toggle-bind', 'set-version', 'update-field', 'field-dirty'])
 
 const SLOT_KEYS = ['first', 'mid', 'last']
 const SLOT_PROMPT_FIELD = { first: 'first_frame_prompt', mid: 'mid_frame_prompt', last: 'last_frame_prompt' }
@@ -458,6 +518,7 @@ const KEYFRAME_SIZES = {
 }
 
 const now = useNowTicker()
+const { latestKeyframeTask, registerTask, refreshTasks, onTaskFinished } = useTasks()
 
 function slotLabel(slot) {
   if (slot === 'first') return t('episode.kf.slotFirst')
@@ -481,14 +542,43 @@ function onThumbError(e, raw) {
   const full = imgSrc(raw)
   if (full && e.target.src !== new URL(full, window.location.origin).href) e.target.src = full
 }
+// 关键帧版本带版本号（按创建时间从 1 编号，服务端给出）；资产版本没有版本号，只显示引擎/模型/时间
 function versionLabel(version) {
+  const no = Number(version?.version_no ?? version?.versionNo)
+  const prefix = Number.isFinite(no) && no > 0 ? `${t('episode.kf.versionNo', { n: no })} · ` : ''
   const engine = version?.provider || t('episode.asset.unknownEngine')
   const model = version?.model ? ` · ${version.model}` : ''
   const iso = version?.created_at || version?.createdAt || ''
   const d = iso ? new Date(iso) : null
   const p = n => String(n).padStart(2, '0')
   const time = d && !Number.isNaN(d.getTime()) ? ` · ${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}` : ''
-  return `${engine}${model}${time}`
+  return `${prefix}${engine}${model}${time}`
+}
+
+// ===== 参考图 ↔ 提示词一致性问题（后端 ref_issues，message 可直接展示） =====
+function issuesOf(sb) {
+  const list = sb?.ref_issues || sb?.refIssues
+  return Array.isArray(list) ? list : []
+}
+/** 某槽位的问题：该槽位提示词字段上的问题 + 绑定级问题（fields 为空） */
+function slotIssues(sb, slot) {
+  const field = SLOT_PROMPT_FIELD[slot]
+  return issuesOf(sb).filter(issue => {
+    const fields = Array.isArray(issue?.fields) ? issue.fields : []
+    return !fields.length || fields.includes(field)
+  })
+}
+function slotBlocked(sb, slot) {
+  return slotIssues(sb, slot).some(issue => issue.severity === 'block')
+}
+function slotBlockReason(sb, slot) {
+  return slotIssues(sb, slot).filter(i => i.severity === 'block').map(i => i.message).join(t('common.listJoin'))
+}
+
+/** 字段保存状态：由工作台按（分镜, 字段）维护 */
+function fieldSaveOf(field) {
+  const info = selected.value ? props.fieldSave(selected.value, field) : null
+  return { status: info?.status || 'idle', at: Number(info?.at || 0) }
 }
 
 // ===== 分镜关键帧状态：规则由后端计算，随分镜 JSON 的 keyframes 字段返回 =====
@@ -563,6 +653,8 @@ const selected = computed(() => props.storyboards.find(sb => sb.id === selectedI
 const selectedIndex = computed(() => props.storyboards.findIndex(sb => sb.id === selectedId.value))
 const assets = computed(() => (selected.value ? props.bindableAssets(selected.value) : []))
 const mentions = computed(() => (selected.value ? props.mentionOptionsFor(selected.value) : []))
+const refIssues = computed(() => (selected.value ? issuesOf(selected.value) : []))
+const hasBlockingIssue = computed(() => refIssues.value.some(issue => issue.severity === 'block'))
 
 watch(() => props.storyboards, (list) => {
   if (!list.length) { selectedId.value = 0; return }
@@ -618,14 +710,17 @@ watch(() => props.storyboards, (list) => {
   selectedIds.value = selectedIds.value.filter(id => list.some(sb => sb.id === id))
 })
 
-// ===== 单张关键帧生成：提交后按 sys_task 轮询（queued 也算进行中，cancelled 为终态） =====
-// 任务由服务端排队/超时，前端不设客户端超时；轮询失败（网络/5xx）只是跳过本轮，不改任务状态。
-const slotTasks = ref({})
+// ===== 单张关键帧生成：状态来自全局任务 store =====
+// 槽位归属取 sys_task.params.frameType（后端同时透出 frame_type），
+// 轮询与完成联动都在 store 里，组件卸载/切页/刷新后进度环自动恢复。
+const FRAME_TYPE = { first: 'first_frame', mid: 'mid_frame', last: 'last_frame' }
+const SLOT_BY_FRAME_TYPE = { first_frame: 'first', mid_frame: 'mid', last_frame: 'last' }
 const submittingSlots = ref([])
-let pollStopped = false
 
 function slotKey(sbId, slot) { return `${sbId}:${slot}` }
-function slotTaskOf(sb, slot) { return slotTasks.value[slotKey(sb?.id, slot)] || null }
+function slotTaskOf(sb, slot) {
+  return sb?.id ? latestKeyframeTask(sb.id, FRAME_TYPE[slot]) : null
+}
 
 function isSlotPending(sb, slot) {
   if (submittingSlots.value.includes(slotKey(sb?.id, slot))) return true
@@ -672,72 +767,60 @@ function slotCancellable(sb, slot) {
   const task = slotTaskOf(sb, slot)
   return Boolean(task?.cancellable) && isActiveTaskStatus(task?.status)
 }
-function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)) }
 
 async function generateSlot(sb, slot) {
   if (!sb || isSlotPending(sb, slot)) return
   if (batchRunning.value) { toast.info(t('episode.kf.batchAlreadyRunning')); return }
   const prompt = slotPrompt(sb, slot).trim()
   if (!prompt) { toast.warning(t('episode.kf.promptRequired')); return }
+  // 参考图与提示词不一致（缺图/未绑定/场景冲突/未知引用）时拦截，后端同样会 400
+  if (slotBlocked(sb, slot)) {
+    toast.error(t('episode.ref.slotBlocked', { slot: slotLabel(slot), reason: slotBlockReason(sb, slot) }), { duration: 7000 })
+    return
+  }
   const key = slotKey(sb.id, slot)
   submittingSlots.value = [...submittingSlots.value, key]
-  // 重试即新建任务：先清掉上一次的失败/取消记录，避免旧错误残留
-  const { [key]: _dropped, ...rest } = slotTasks.value
-  slotTasks.value = rest
   try {
+    // 重试即新建任务：新任务 id 更大，slotRing 自然盖掉上一次的失败/取消记录
     const task = await storyboardAPI.generateKeyframe(sb.id, slot, {
       prompt,
       model: props.imageModel || undefined,
       config_id: props.imageConfigId || undefined,
     })
-    if (task?.id) slotTasks.value = { ...slotTasks.value, [key]: task }
+    registerTask(task)
     toast.success(t('episode.kf.genStarted', { slot: slotLabel(slot) }))
     emit('refresh')
-    void pollKeyframeTask(task?.id, sb.id, slot)
   } catch (e) {
-    toastError(e, { fallback: 'episode.kf.genFailed' })
+    toastServerMessage(e, { fallback: 'episode.kf.genFailed' })
   } finally {
     submittingSlots.value = submittingSlots.value.filter(k => k !== key)
   }
 }
 
-async function pollKeyframeTask(taskId, sbId, slot) {
-  if (!taskId) return
-  const key = slotKey(sbId, slot)
-  while (!pollStopped) {
-    await sleep(3500)
-    if (pollStopped) return
-    let res = null
-    try { res = await taskAPI.get(taskId) } catch { continue } // 网络/服务端错误：下一轮再试
-    if (!res) continue
-    slotTasks.value = { ...slotTasks.value, [key]: res }
-    if (!isTerminalTaskStatus(res.status)) continue
-    if (res.status === 'completed') {
-      // 已完成的任务保留在 slotTasks 里：slotRing 用它盖掉旧批次项遗留的失败/取消蒙层
-      toast.success(t('episode.kf.genDone', { slot: slotLabel(slot) }))
-      emit('refresh')
-      if (selected.value?.id === sbId) await loadVersions()
-      return
-    }
-    if (res.status === 'failed') {
-      // 失败状态保留在 slotTasks 里：槽位的进度环显示原因并提供重试
-      toastError(res.error_msg || res.errorMsg, { fallback: 'episode.kf.genFailed' })
-      emit('refresh')
-      return
-    }
-    toast.info(t('episode.kf.genCancelled', { slot: slotLabel(slot) }))
-    emit('refresh')
-    return
+// 完成联动：store 发现任务转为终态时通知，这里只刷新数据与版本列表（不再自己轮询）
+onTaskFinished((task) => {
+  if (task.type !== 'image' || !task.storyboard_id) return
+  const slot = SLOT_BY_FRAME_TYPE[String(task.frame_type || task.params?.frameType || '')]
+  if (!slot) return
+  if (!props.storyboards.some(sb => sb.id === task.storyboard_id)) return
+  // 批次子任务由批次轮询统一提示，避免重复 toast
+  if (!batchItems.value.some(item => Number(item.task_id) === Number(task.id))) {
+    if (task.status === 'completed') toast.success(t('episode.kf.genDone', { slot: slotLabel(slot) }))
+    else if (task.status === 'failed') toastError(task.error_msg, { fallback: 'episode.kf.genFailed' })
+    else if (task.status === 'cancelled') toast.info(t('episode.kf.genCancelled', { slot: slotLabel(slot) }))
   }
-}
+  emit('refresh')
+  if (selected.value?.id === task.storyboard_id) void loadVersions()
+})
 
 async function cancelSlot(sb, slot) {
   const task = slotTaskOf(sb, slot)
   if (!task?.id) return
   try {
     const res = await taskAPI.cancel(task.id)
-    slotTasks.value = { ...slotTasks.value, [slotKey(sb.id, slot)]: res || task }
+    registerTask(res)
     toast.success(t('episode.kf.slotCancelRequested'))
+    await refreshTasks()
   } catch (e) {
     toastError(e, { fallback: 'common.ring.cancelFailed' })
   }
@@ -934,11 +1017,26 @@ async function retryFailedBatch() {
   }
 }
 
-const batchConfirm = ref({ open: false, regenerate: false, ids: [], count: 0 })
+// 批量确认框 = 服务端预览清单（分镜 × 槽位）+ 勾选；选择模式只缩小预览范围
+const batchConfirm = ref({ open: false, loading: false, scoped: false, ids: [], items: [] })
+const checkedItems = computed(() => batchConfirm.value.items.filter(item => item.checked))
+const previewGroups = computed(() => {
+  const groups = []
+  for (const item of batchConfirm.value.items) {
+    let group = groups.find(g => g.storyboard_id === item.storyboard_id)
+    if (!group) {
+      group = { storyboard_id: item.storyboard_id, storyboard_number: item.storyboard_number, items: [] }
+      groups.push(group)
+    }
+    group.items.push(item)
+  }
+  return groups.sort((a, b) => (a.storyboard_number || 0) - (b.storyboard_number || 0))
+})
 // 批量确认框的耗时估计：来自任务服务的实测数据（GET /image-queue/estimate）
 const batchEstimate = ref({ loading: false, data: null })
 const batchEstimateText = computed(() => {
-  const count = batchConfirm.value.count
+  const count = checkedItems.value.length
+  if (!count) return '—'
   if (batchEstimate.value.loading) return t('episode.kf.batchEtaEstimating')
   const data = batchEstimate.value.data
   // 非 qwen-jobs 供应商没有服务端队列与实测数据，回落到粗略估计
@@ -981,42 +1079,87 @@ async function loadBatchEstimate(pool, count) {
     batchEstimate.value = { loading: false, data: null } // 估计拿不到就回落到粗略文案
   }
 }
-// 待生成槽位：没有提示词的槽位跳过（承接分镜没有自有首帧提示词即跳过首帧）；
-// 勾选模式重生成全部槽位，否则只补缺图
-function slotTargets(sb, regenerate) {
-  const k = kf(sb)
-  const out = []
-  for (const slot of SLOT_KEYS) {
-    if (!slotPrompt(sb, slot).trim()) continue
-    const image = slot === 'first' ? slotOwnImage(sb, 'first') || k.first : slotImage(sb, slot)
-    if (regenerate || !image) out.push(slot)
+function setAllChecked(value) {
+  for (const item of batchConfirm.value.items) {
+    if (item.status === 'blocked' || item.status === 'skipped') continue
+    item.checked = value
   }
-  return out
 }
-function openBatchConfirm() {
+function previewStatusLabel(item) {
+  if (item.status === 'missing') return t('episode.kf.previewMissing')
+  if (item.status === 'changed') return t('episode.kf.previewChanged')
+  if (item.status === 'unchanged') {
+    const matched = Number(item.matched_version_no) || 0
+    const current = Number(item.selected_version_no) || 0
+    return current
+      ? t('episode.kf.previewUnchanged', { n: matched, m: current })
+      : t('episode.kf.previewUnchangedNoSelection', { n: matched })
+  }
+  if (item.status === 'blocked') return t('episode.kf.previewBlocked')
+  return t('episode.kf.previewSkipped')
+}
+/** 被拦截项的原因：优先列出阻断问题，其次列出全部问题 */
+function blockReasonOf(item) {
+  const issues = Array.isArray(item?.issues) ? item.issues : []
+  const blocking = issues.filter(i => i.severity === 'block')
+  return (blocking.length ? blocking : issues).map(i => i.message).join(t('common.listJoin'))
+}
+async function openBatchConfirm() {
   if (batchRunning.value) { toast.info(t('episode.kf.batchAlreadyRunning')); return }
-  const regenerate = selectMode.value && selectedIds.value.length > 0
-  const pool = regenerate ? props.storyboards.filter(sb => selectedIds.value.includes(sb.id)) : props.storyboards
-  const count = pool.reduce((sum, sb) => sum + slotTargets(sb, regenerate).length, 0)
-  if (!count) { toast.info(t('episode.kf.batchNothing')); return }
-  batchConfirm.value = { open: true, regenerate, ids: regenerate ? pool.map(sb => sb.id) : [], count }
-  void loadBatchEstimate(pool, count)
+  const scoped = selectMode.value && selectedIds.value.length > 0
+  const ids = scoped ? [...selectedIds.value] : []
+  batchConfirm.value = { open: true, loading: true, scoped, ids, items: [] }
+  batchEstimate.value = { loading: false, data: null }
+  try {
+    const res = await episodeAPI.keyframeBatchPreview(props.episodeId, {
+      storyboard_ids: ids,
+      model: props.imageModel || undefined,
+      config_id: props.imageConfigId || undefined,
+    })
+    const items = (Array.isArray(res?.items) ? res.items : []).map(item => ({
+      ...item,
+      checked: Boolean(item.checked) && item.status !== 'blocked' && item.status !== 'skipped',
+    }))
+    if (!items.length) {
+      batchConfirm.value = { open: false, loading: false, scoped: false, ids: [], items: [] }
+      toast.info(t('episode.kf.batchNothing'))
+      return
+    }
+    batchConfirm.value = { open: true, loading: false, scoped, ids, items }
+  } catch (e) {
+    batchConfirm.value = { open: false, loading: false, scoped: false, ids: [], items: [] }
+    toastServerMessage(e, { fallback: 'episode.kf.genFailed' })
+  }
 }
+// 勾选变化后重新问一次实测耗时（按勾选数），连续点选时合并成一次请求
+let estimateTimer = null
+watch(() => (batchConfirm.value.open ? checkedItems.value.length : 0), (count) => {
+  if (estimateTimer) { clearTimeout(estimateTimer); estimateTimer = null }
+  if (!batchConfirm.value.open || !count) {
+    batchEstimate.value = { loading: false, data: null }
+    return
+  }
+  batchEstimate.value = { loading: true, data: batchEstimate.value.data }
+  estimateTimer = setTimeout(() => {
+    const ids = new Set(checkedItems.value.map(item => item.storyboard_id))
+    void loadBatchEstimate(props.storyboards.filter(sb => ids.has(sb.id)), count)
+  }, 300)
+})
 async function startBatch() {
-  const { ids, count } = batchConfirm.value
-  batchConfirm.value = { open: false, regenerate: false, ids: [], count: 0 }
-  if (!count) return
+  const items = checkedItems.value.map(item => ({ storyboard_id: item.storyboard_id, slot: item.slot }))
+  batchConfirm.value = { open: false, loading: false, scoped: false, ids: [], items: [] }
+  if (!items.length) return
   try {
     applyBatch(await episodeAPI.startKeyframeBatch(props.episodeId, {
-      storyboard_ids: ids.length ? ids : undefined,
+      items,
       model: props.imageModel || undefined,
       config_id: props.imageConfigId || undefined,
     }))
     startPolling()
-    toast.success(t('episode.kf.batchStarted', { n: count }))
+    toast.success(t('episode.kf.batchStarted', { n: items.length }))
     if (selectMode.value) toggleSelectMode()
   } catch (e) {
-    toastError(e, { fallback: 'episode.kf.genFailed' })
+    toastServerMessage(e, { fallback: 'episode.kf.genFailed' })
   }
 }
 async function cancelBatch() {
@@ -1086,8 +1229,8 @@ watch(() => props.episodeId, () => {
   syncPromptBatch()
 })
 onBeforeUnmount(() => {
-  pollStopped = true
   stopPolling()
+  if (estimateTimer) { clearTimeout(estimateTimer); estimateTimer = null }
 })
 </script>
 
@@ -1303,7 +1446,7 @@ onBeforeUnmount(() => {
 .kf-section-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .kf-section-label { font-size: 12px; font-weight: 600; color: var(--text-1); }
 .kf-field { display: flex; flex-direction: column; gap: 4px; }
-.kf-field-label { font-size: 11px; color: var(--text-2); }
+.kf-field-label { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-2); }
 .kf-boundary { display: flex; gap: 6px; }
 .kf-boundary .is-on { border-color: var(--accent); color: var(--accent-text); }
 
@@ -1367,8 +1510,35 @@ onBeforeUnmount(() => {
 .kf-foot-hint { font-size: 12px; color: var(--text-2); flex: 1; min-width: 0; }
 
 /* 批量确认弹窗 */
-.kf-batch-dialog { width: min(440px, 92vw); }
+.kf-batch-dialog { width: min(620px, 94vw); }
 .kf-batch-body { display: flex; flex-direction: column; gap: 8px; }
 .kf-batch-row { display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: var(--text-2); }
 .kf-batch-note { font-size: 12px; color: var(--text-3); line-height: 1.7; margin: 0; }
+.kf-batch-loading { font-size: 13px; color: var(--text-2); padding: 18px 0; text-align: center; }
+.kf-batch-actions { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.kf-batch-list {
+  display: flex; flex-direction: column; gap: 8px;
+  max-height: 320px; overflow-y: auto;
+  border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 8px;
+}
+.kf-batch-group { display: flex; flex-direction: column; gap: 2px; }
+.kf-batch-group-head { font-size: 11px; font-weight: 600; color: var(--text-3); }
+.kf-batch-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 6px; border-radius: var(--radius-sm);
+  font-size: 12px; color: var(--text-1); cursor: pointer;
+}
+.kf-batch-item:hover { background: var(--bg-hover); }
+.kf-batch-item.disabled { cursor: default; color: var(--text-3); }
+.kf-batch-item-slot { min-width: 48px; }
+.kf-batch-item-status { color: var(--text-2); }
+.kf-batch-item.is-blocked .kf-batch-item-status { color: var(--action-danger); }
+.kf-batch-item.is-unchanged .kf-batch-item-status { color: var(--text-3); }
+.kf-batch-item-reason { flex: 1; min-width: 0; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kf-batch-empty { font-size: 12px; color: var(--text-3); text-align: center; padding: 12px 0; }
+/* 字段保存状态靠右跟在字段标签行尾 */
+.kf-field-save { margin-left: auto; }
+.kf-ref-issue-count { font-size: 11px; }
+.kf-ref-issue-count.is-block { color: var(--action-danger); }
+.kf-ref-issue-count.is-warn { color: var(--tag-warning-text); }
 </style>

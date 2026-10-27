@@ -7,8 +7,15 @@ import { buildAgentRequestContext } from '../agents/context.js'
 import { mastra } from '../mastra/index.js'
 import { success, badRequest } from '../utils/response.js'
 import { logTaskError, logTaskPayload, logTaskProgress, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
+import { createTextTask, finishTextTask, resolveTextModel, type TextTaskKind } from '../services/text-task.js'
 
 const app = new Hono()
+
+/** 同步 chat 跑的文本任务：只有这两类进任务中心（提取/提示词有各自的批量入口） */
+const CHAT_TASK_KINDS: Record<string, TextTaskKind> = {
+  script_rewriter: 'script_rewrite',
+  storyboard_breaker: 'storyboard_breaker',
+}
 
 // Mastra v1.17 的 ToolCallChunk / ToolResultChunk 结构：
 // { type: 'tool-call', payload: { toolCallId, toolName, args } }
@@ -63,6 +70,22 @@ app.post('/:type/chat', async (c) => {
     textConfigId: body.config_id || undefined,
   })
 
+  // 同步 chat 也进任务中心：开始建 text 任务，结束写 completed/failed（HTTP 交互不变）
+  const kind = CHAT_TASK_KINDS[agentType]
+  let taskId: number | null = null
+  if (kind) {
+    const resolved = await resolveTextModel({ model: body.model || undefined, configId: body.config_id || undefined })
+    taskId = await createTextTask({
+      kind,
+      episodeId: Number(episode_id),
+      dramaId: Number(drama_id),
+      prompt: typeof message === 'string' ? message : null,
+      provider: resolved.provider,
+      model: resolved.model,
+      configId: body.config_id || resolved.configId || undefined,
+    })
+  }
+
   const startTime = performance.now()
 
   try {
@@ -71,6 +94,7 @@ app.post('/:type/chat', async (c) => {
       { maxSteps: 20, requestContext },
     )
 
+    if (taskId) await finishTextTask(taskId, 'completed')
     const elapsed = ((performance.now() - startTime) / 1000).toFixed(1)
     logTaskSuccess('Agent', agentType, { elapsedSeconds: elapsed })
 
@@ -99,11 +123,13 @@ app.post('/:type/chat', async (c) => {
       toolCalls: normalizedToolCalls,
       toolResults: normalizedToolResults,
     })
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const errMessage = err instanceof Error ? err.message : 'Agent 执行失败'
+    if (taskId) await finishTextTask(taskId, 'failed', { errorMsg: errMessage })
     const elapsed = ((performance.now() - startTime) / 1000).toFixed(1)
-    logTaskError('Agent', agentType, { elapsedSeconds: elapsed, error: err.message })
-    console.error(err.stack || err)
-    return badRequest(c, err.message || 'Agent 执行失败')
+    logTaskError('Agent', agentType, { elapsedSeconds: elapsed, error: errMessage })
+    console.error(err instanceof Error ? err.stack || err.message : String(err))
+    return badRequest(c, errMessage)
   }
 })
 

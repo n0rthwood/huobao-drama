@@ -22,7 +22,7 @@ export interface RemoteState {
   updated_at?: string
 }
 
-/** 后端任务 JSON（/tasks、/episodes/:id/generation-tasks 等；驼峰为 /tasks 的原始行） */
+/** 后端任务 JSON（/tasks、/tasks/active、/tasks/center 等；驼峰为 /tasks 的原始行） */
 export interface TaskLike {
   id?: number
   type?: string

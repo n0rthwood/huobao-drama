@@ -12,7 +12,16 @@ import { getVideoAdapter } from './adapters/registry'
 import { generateVideo } from './generation.js'
 import { getDramaStylePrompt } from './style-preset.js'
 import { loadEpisodeKeyframes } from './keyframes.js'
-import { collectStoryboardAssetRefs, indexRefs, resolvePromptRefs } from './storyboard-assets.js'
+import {
+  blockingIssuesFor,
+  collectStoryboardAssetRefs,
+  computeRefIssues,
+  describeIssues,
+  indexRefs,
+  loadEpisodeAssets,
+  promptFieldsOf,
+  resolvePromptRefs,
+} from './storyboard-assets.js'
 
 export interface StoryboardVideoOptions {
   model?: string
@@ -60,6 +69,21 @@ export async function buildStoryboardVideoRequest(
     throw new Error(`当前视频模型不支持关键帧引导（${config.provider}），请改用 MiniMax-H3 等支持的模型`)
   }
 
+  // 视频提示词的 @引用 必须与绑定一致（Issue #7），否则会出现“提到了却没带参考图”
+  const refIssues = computeRefIssues({
+    prompts: promptFieldsOf(storyboard),
+    assets: await loadEpisodeAssets(storyboard, episode.id),
+    sceneId: storyboard.sceneId ?? null,
+    characterIds: (await db.select().from(schema.storyboardCharacters)
+      .where(eq(schema.storyboardCharacters.storyboardId, storyboardId))).map(link => link.characterId),
+    propIds: (await db.select().from(schema.storyboardProps)
+      .where(eq(schema.storyboardProps.storyboardId, storyboardId))).map(link => link.propId),
+  })
+  const blocking = blockingIssuesFor(refIssues, 'video_prompt')
+  if (blocking.length) {
+    throw new Error(`分镜 #${storyboard.storyboardNumber} 的视频提示词与参考图不一致：${describeIssues(blocking)}`)
+  }
+
   // ===== 参考图：首帧关键帧 → 场景 → 角色 → 道具 =====
   const assetRefs = await collectStoryboardAssetRefs(storyboard, episode.id)
   const { urls: referenceImageUrls, nameToIndex } = indexRefs([
@@ -68,14 +92,19 @@ export async function buildStoryboardVideoRequest(
     ...assetRefs,
   ])
 
-  let prompt = resolvePromptRefs((storyboard.videoPrompt || '').trim(), nameToIndex, (index, name) => `@图片${index}${name}`)
+  const rawPrompt = (storyboard.videoPrompt || '').trim()
+  let prompt = resolvePromptRefs(rawPrompt, nameToIndex, (index, name) => `@图片${index}${name}`)
   if (!prompt && !referenceImageUrls.length) {
     throw new Error('视频生成需要至少一个参考素材或提示词')
   }
   // 项目视觉风格词注入提示词最前方（与图片侧口径一致）
+  let sourcePrompt = rawPrompt
   if (prompt) {
     const stylePrompt = await getDramaStylePrompt(episode.dramaId)
-    if (stylePrompt) prompt = `${stylePrompt}，\n${prompt}`
+    if (stylePrompt) {
+      prompt = `${stylePrompt}，\n${prompt}`
+      sourcePrompt = `${stylePrompt}，\n${sourcePrompt}`
+    }
   }
 
   // 中间帧引导只有部分模型支持（H3 走 MiniMaxH3AddGuide），不支持的模型只发首尾帧
@@ -92,6 +121,9 @@ export async function buildStoryboardVideoRequest(
       model,
       referenceMode: 'reference',
       firstFrameUrl: keyframes.first || undefined,
+      episodeId: episode.id,
+      sourcePrompt,
+      refNameIndex: nameToIndex,
       midFrameUrl,
       midFrameTime: midFrameUrl ? storyboard.midFrameTime ?? undefined : undefined,
       lastFrameUrl: keyframes.last || undefined,

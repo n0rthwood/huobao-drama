@@ -114,6 +114,7 @@ export const sqliteSchemaStatements = [
     keyframes_confirmed INTEGER DEFAULT 0,
     reference_images TEXT,
     asset_version_selection TEXT,
+    field_saved_at TEXT,
     continuity_boundary TEXT,
     video_url TEXT,
     subtitle_url TEXT,
@@ -214,6 +215,7 @@ export const sqliteSchemaStatements = [
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     type TEXT NOT NULL,
     storyboard_id INTEGER,
+    episode_id INTEGER,
     drama_id INTEGER,
     scene_id INTEGER,
     character_id INTEGER,
@@ -345,8 +347,12 @@ const columnAdditions: { table: string; column: string; type: string }[] = [
   { table: 'storyboards', column: 'mid_frame_time', type: 'REAL' },
   { table: 'storyboards', column: 'mid_frame_image', type: 'TEXT' },
   { table: 'storyboards', column: 'keyframes_confirmed', type: 'INTEGER DEFAULT 0' },
+  // 字段级保存时间（JSON：字段 → unix 秒）
+  { table: 'storyboards', column: 'field_saved_at', type: 'TEXT' },
   // qwen-jobs 远端任务快照（排队位置/进度/估计）+ 提交请求体，重启后据此恢复
   { table: 'sys_task', column: 'remote_state', type: 'TEXT' },
+  // 任务归属的集：全局任务中心按剧/集筛选与编号，启动时按 storyboard_id 回填存量行
+  { table: 'sys_task', column: 'episode_id', type: 'INTEGER' },
 ]
 
 /**
@@ -461,6 +467,8 @@ export function initSqliteSchema(sqlite: Database.Database) {
     sqlite.exec(statement)
   }
   applyColumnAdditions(sqlite)
+  // 依赖补列的索引：旧库要等 ADD COLUMN 之后才能建
+  sqlite.exec('CREATE INDEX IF NOT EXISTS idx_sys_task_episode_id ON sys_task (episode_id)')
   applyColumnRemovals(sqlite)
   const insertSeed = sqlite.prepare(SEED_SQL)
   const upgradeSeed = sqlite.prepare(UPGRADE_SQL)

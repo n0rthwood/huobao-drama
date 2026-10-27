@@ -104,7 +104,7 @@ app.post('/:id/generate-image', async (c) => {
   if (missing.length) logTaskWarn('CharacterImage', 'reference-missing', { characterId: id, missing })
   try {
     logTaskStart('CharacterImage', 'generate', { characterId: id, episodeId: ep.id, dramaId: char.dramaId, references: referenceImages.length })
-    const genId = await generateImage({ characterId: id, dramaId: char.dramaId, prompt, model: body.model, size: CHARACTER_IMAGE_SIZE, referenceImages: referenceImages.length ? referenceImages : undefined, configId: body.config_id ?? ep.imageConfigId ?? undefined })
+    const genId = await generateImage({ characterId: id, episodeId: ep.id, dramaId: char.dramaId, prompt, model: body.model, size: CHARACTER_IMAGE_SIZE, referenceImages: referenceImages.length ? referenceImages : undefined, configId: body.config_id ?? ep.imageConfigId ?? undefined })
     logTaskSuccess('CharacterImage', 'generate', { characterId: id, generationId: genId })
     return success(c, { image_generation_id: genId, reference_images: referenceImages, missing_reference_images: missing })
   } catch (err: any) {
@@ -153,7 +153,7 @@ app.post('/batch-generate-images', async (c) => {
     const { present: referenceImages, missing } = partitionMissingReferences(resolveReferenceImages(char.referenceImages))
     if (missing.length) logTaskWarn('CharacterImage', 'reference-missing', { characterId: cid, missing })
     try {
-      const genId = await generateImage({ characterId: cid, dramaId: char.dramaId, prompt, model: body.model, size: CHARACTER_IMAGE_SIZE, referenceImages: referenceImages.length ? referenceImages : undefined, configId: body.config_id ?? ep.imageConfigId ?? undefined })
+      const genId = await generateImage({ characterId: cid, episodeId: ep.id, dramaId: char.dramaId, prompt, model: body.model, size: CHARACTER_IMAGE_SIZE, referenceImages: referenceImages.length ? referenceImages : undefined, configId: body.config_id ?? ep.imageConfigId ?? undefined })
       results.push(genId)
     } catch {}
   }

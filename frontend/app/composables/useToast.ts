@@ -61,3 +61,16 @@ export function mapError(err: unknown, opts?: { fallback?: string }): string {
 export function toastError(err: unknown, opts?: { fallback?: string; duration?: number }): void {
   toast.error(mapError(err, opts), { duration: opts?.duration ?? 5000 })
 }
+
+/**
+ * 服务端拦截类错误（一致性问题列表等）：message 是后端拼好的中文长句，
+ * mapError 会因长度/技术特征回退成泛化文案，这里原样展示，其余情况仍走 mapError。
+ */
+export function toastServerMessage(err: unknown, opts?: { fallback?: string; duration?: number }): void {
+  const msg = messageOf(err).trim()
+  if (msg && CJK_RE.test(msg) && !/https?:\/\/|\{|\}/.test(msg)) {
+    toast.error(msg, { duration: opts?.duration ?? 7000 })
+    return
+  }
+  toastError(err, opts)
+}

@@ -127,7 +127,7 @@ app.post('/:id/generate-image', async (c) => {
   if (missing.length) logTaskWarn('PropImage', 'reference-missing', { propId: id, missing })
   try {
     logTaskStart('PropImage', 'generate', { propId: id, episodeId: ep.id, dramaId: prop.dramaId, references: referenceImages.length })
-    const genId = await generateImage({ propId: id, dramaId: prop.dramaId, prompt, model: body.model, size: PROP_IMAGE_SIZE, referenceImages: referenceImages.length ? referenceImages : undefined, configId: body.config_id ?? ep.imageConfigId ?? undefined })
+    const genId = await generateImage({ propId: id, episodeId: ep.id, dramaId: prop.dramaId, prompt, model: body.model, size: PROP_IMAGE_SIZE, referenceImages: referenceImages.length ? referenceImages : undefined, configId: body.config_id ?? ep.imageConfigId ?? undefined })
     logTaskSuccess('PropImage', 'generate', { propId: id, generationId: genId })
     return success(c, { image_generation_id: genId, reference_images: referenceImages, missing_reference_images: missing })
   } catch (err: any) {

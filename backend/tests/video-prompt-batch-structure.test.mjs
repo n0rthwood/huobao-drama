@@ -12,8 +12,8 @@ test('video prompt batch service runs per-shot async agent loop', () => {
   assert.match(svc, /filter\(sb => !\(sb\.videoPrompt \|\| ''\)\.trim\(\)\)/)
   assert.match(svc, /storyboardIds\?\.length/)
   assert.match(svc, /storyboardIds\.includes\(sb\.id\)/)
-  // 运行中不重复启动
-  assert.match(svc, /status === 'running'\) return \{ started: false, total: -1 \}/)
+  // 运行中不重复启动（状态来自 sys_task，不再是进程内 Map）
+  assert.match(svc, /findActiveTextTask\(episodeId, 'video_prompts'\)\) return \{ started: false, total: -1 \}/)
   // 逐个分镜调用 prompt_generator，以落库结果判定成败
   assert.match(svc, /mastra\.getAgent\('prompt_generator'\)/)
   assert.match(svc, /read_storyboard_context/)

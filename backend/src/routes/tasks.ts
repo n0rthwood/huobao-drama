@@ -9,6 +9,8 @@ import { getDramaStylePrompt } from '../services/style-preset.js'
 import { logTaskError, logTaskPayload, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
 import { serializeTask, serializeTasks } from '../services/sys-task.js'
 import { cancelImageTask, discardRemoteJob } from '../services/qwen-jobs.js'
+import { enrichTask, listActiveTasks, listTaskCenter } from '../services/task-center.js'
+import { retryTask } from '../services/task-retry.js'
 
 const app = new Hono()
 
@@ -103,6 +105,7 @@ app.post('/', async (c) => {
     const id = type === 'image'
       ? await generateImage({
         storyboardId: body.storyboard_id,
+        episodeId: body.episode_id ? Number(body.episode_id) : undefined,
         dramaId: body.drama_id,
         sceneId: body.scene_id,
         characterId: body.character_id,
@@ -115,6 +118,7 @@ app.post('/', async (c) => {
       })
       : await generateVideo({
         storyboardId: body.storyboard_id,
+        episodeId: body.episode_id ? Number(body.episode_id) : undefined,
         dramaId: body.drama_id,
         prompt: videoPrompt,
         model: videoBody!.model,
@@ -195,12 +199,53 @@ app.post('/register-upload', async (c) => {
   return created(c, { id: getInsertId(result), local_path: localPath })
 })
 
-// GET /tasks/:id — 轮询任务状态
+// GET /tasks/center — 全局任务中心列表（含批次父行与导出行，分页）
+// 注意：必须注册在 /:id 之前，否则 center / active 会被当成任务 id
+app.get('/center', async (c) => {
+  const typeParam = c.req.query('type')
+  const statusParam = c.req.query('status')
+  const type = typeParam === 'image' || typeParam === 'video' || typeParam === 'text' ? typeParam : undefined
+  const status = statusParam === 'active' || statusParam === 'completed' || statusParam === 'failed' || statusParam === 'cancelled'
+    ? statusParam
+    : undefined
+  const data = await listTaskCenter({
+    dramaId: c.req.query('drama_id') ? Number(c.req.query('drama_id')) : undefined,
+    episodeId: c.req.query('episode_id') ? Number(c.req.query('episode_id')) : undefined,
+    type,
+    status,
+    scope: c.req.query('scope') === 'all' ? 'all' : 'recent',
+    page: c.req.query('page') ? Number(c.req.query('page')) : 1,
+    pageSize: c.req.query('page_size') ? Number(c.req.query('page_size')) : 20,
+  })
+  return success(c, data)
+})
+
+// GET /tasks/active — 全部活跃任务（扁平，含批次子任务与文本任务）+ 顶层活跃数
+app.get('/active', async (c) => {
+  return success(c, await listActiveTasks())
+})
+
+// POST /tasks/:id/retry — 换模型重试，一律新建任务（提示词不可改）
+app.post('/:id/retry', async (c) => {
+  const id = Number(c.req.param('id'))
+  const body = await c.req.json().catch(() => ({} as Record<string, unknown>))
+  const configId = body.config_id != null ? Number(body.config_id) : undefined
+  const model = typeof body.model === 'string' && body.model.trim() ? body.model.trim() : undefined
+  try {
+    const newId = await retryTask(id, { configId, model })
+    const [row] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, newId))
+    return created(c, await enrichTask(row))
+  } catch (err) {
+    return badRequest(c, err instanceof Error ? err.message : '重试失败')
+  }
+})
+
+// GET /tasks/:id — 轮询任务状态（带编号与归属信息）
 app.get('/:id', async (c) => {
   const id = Number(c.req.param('id'))
   const [row] = await db.select().from(schema.sysTask)
     .where(eq(schema.sysTask.id, id))
-  return success(c, row ? serializeTask(row) : null)
+  return success(c, await enrichTask(row))
 })
 
 // GET /tasks — 按 type / storyboard_id / drama_id 过滤

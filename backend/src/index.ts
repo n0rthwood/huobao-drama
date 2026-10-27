@@ -33,6 +33,7 @@ import { resumeVideoBatches } from './services/video-batch.js'
 import { resumeKeyframeBatches } from './services/keyframe-batch.js'
 import { startQwenJobsTracker } from './services/qwen-jobs.js'
 import { QWEN_JOBS_PROVIDER } from './services/sys-task.js'
+import { backfillTaskEpisodeIds, failInterruptedTextTasks } from './services/task-center.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(__dirname, '../..')
@@ -100,6 +101,7 @@ db.update(schema.sysTask)
   .set({ status: 'failed', errorMsg: '服务重启，生成任务中断，请重试', updatedAt: now() })
   .where(and(
     eq(schema.sysTask.status, 'processing'),
+    ne(schema.sysTask.type, 'text'),
     or(isNull(schema.sysTask.provider), ne(schema.sysTask.provider, QWEN_JOBS_PROVIDER)),
   ))
   .then(res => {
@@ -107,6 +109,10 @@ db.update(schema.sysTask)
     if (affected > 0) console.log(`🔁 已清理 ${affected} 个中断的生成任务`)
   })
   .catch(err => console.error('清理中断任务失败:', err?.message))
+  // 文本任务（提取 / 提示词批量 / 剧本改写 / 拆分分镜）的执行线程同样随重启丢失，标记为失败供一键重试
+  .then(() => failInterruptedTextTasks())
+  // 存量任务补归属集：全局任务中心按剧/集筛选与编号
+  .then(() => backfillTaskEpisodeIds())
   // 清理完成后再恢复批量任务：被重启打断的那一张/那一镜此时已是 failed，由批次重新提交
   .then(() => startQwenJobsTracker())
   .then(() => resumeKeyframeBatches())
