@@ -28,7 +28,9 @@ test('settings page exposes official provider templates only', () => {
   assert.doesNotMatch(useApi, /huobaoPreset/i)
   assert.doesNotMatch(useApi, /\/huobao-preset/)
 
-  assert.match(settingsPage, /const providers = \['gemini', 'openai', 'volcengine', 'minimax', 'comfyui'\]/)
+  assert.match(settingsPage, /const providers = \['gemini', 'openai', 'volcengine', 'minimax', 'comfyui', 'qwen-jobs'\]/)
+  // 图片配置的下拉里不再出现 comfyui（图片走 qwen-jobs），文本/视频不出现 qwen-jobs
+  assert.match(settingsPage, /const PROVIDER_EXCLUDE = \{ text: \['qwen-jobs', 'comfyui'\], image: \['comfyui'\], video: \['qwen-jobs'\] \}/)
   assert.match(settingsPage, /https:\/\/generativelanguage\.googleapis\.com/)
   assert.match(settingsPage, /https:\/\/api\.openai\.com/)
   assert.match(settingsPage, /https:\/\/ark\.cn-beijing\.volces\.com/)
@@ -80,11 +82,14 @@ test('only text service configs expose the connection test button', () => {
 test('settings page offers the supported official provider presets', () => {
   assert.match(providerPresetBlock('text'), /deepseek-v4-pro/)
   assert.doesNotMatch(providerPresetBlock('text'), /minimax/i)
-  assert.doesNotMatch(providerPresetBlock('image'), /'ali'|minimax/i)
+  // 图片服务已切到 qwen-jobs 任务 API，ComfyUI 原生图片路径不再是可选项（视频仍保留 comfyui）
+  assert.doesNotMatch(providerPresetBlock('image'), /'ali'|minimax|comfyui/i)
+  assert.match(providerPresetBlock('image'), /'qwen-jobs'/)
   assert.match(providerPresetBlock('video'), /volcengine/)
   assert.match(providerPresetBlock('video'), /minimax/)
   assert.doesNotMatch(providerPresetBlock('video'), /aliyun/)
   assert.doesNotMatch(providerPresetBlock('video'), /'vidu'/i)
+  assert.match(providerPresetBlock('video'), /comfyui/)
   assert.doesNotMatch(settingsPage, /audio:\s*\{/)
 })
 

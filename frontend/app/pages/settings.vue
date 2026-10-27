@@ -753,8 +753,12 @@ const serviceTypes = computed(() => [
   { type: 'image', label: t('common.serviceType.image') },
   { type: 'video', label: t('common.serviceType.video') },
 ])
-const providers = ['gemini', 'openai', 'volcengine', 'minimax', 'comfyui']
-const providerSelectOptions = computed(() => providers.map(p => ({ label: p, value: p })))
+const providers = ['gemini', 'openai', 'volcengine', 'minimax', 'comfyui', 'qwen-jobs']
+// qwen-jobs 只服务图片；comfyui 的图片路径已下线（图片走 qwen-jobs 任务 API），只保留视频（H3）
+const PROVIDER_EXCLUDE = { text: ['qwen-jobs', 'comfyui'], image: ['comfyui'], video: ['qwen-jobs'] }
+const providerSelectOptions = computed(() => providers
+  .filter(p => !(PROVIDER_EXCLUDE[cfgForm.service_type] || []).includes(p))
+  .map(p => ({ label: p, value: p })))
 const serviceMeta = computed(() => ({
   text: { label: t('common.serviceType.text'), desc: t('settings.ai.meta.text') },
   image: { label: t('common.serviceType.image'), desc: t('settings.ai.meta.image') },
@@ -768,7 +772,7 @@ const providerPresets = {
   image: {
     gemini: { label: 'Gemini 官方', baseUrl: 'https://generativelanguage.googleapis.com', models: ['gemini-3-pro-image', 'gemini-3.1-flash-image'] },
     openai: { label: 'OpenAI 官方', baseUrl: 'https://api.openai.com', models: ['gpt-image-2'] },
-    comfyui: { label: 'ComfyUI · Qwen Image 2.1 本地', baseUrl: 'http://127.0.0.1:8189', models: ['qwen-image-2.1'] },
+    'qwen-jobs': { label: 'qwen-jobs · Qwen Image 2.1 任务服务', baseUrl: 'https://110.joyai.dev/image', models: ['qwen-image-2.1'] },
   },
   video: {
     volcengine: { label: 'Seedance 2.0 官方', baseUrl: 'https://ark.cn-beijing.volces.com', models: ['doubao-seedance-2-0-mini-260615', 'doubao-seedance-2-0-fast-260128', 'doubao-seedance-2-0-260128'] },
