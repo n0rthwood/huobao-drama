@@ -11,9 +11,17 @@ import { db, getInsertId, schema } from '../db/index.js'
 import { now } from '../utils/response.js'
 import { getActiveConfig, getConfigById } from './ai.js'
 import { getVideoAdapter } from './adapters/registry'
-import { loadEpisodeKeyframes } from './keyframes.js'
-import { listEpisodeStoryboards, submitStoryboardVideo } from './storyboard-video.js'
-import { blockingIssuesFor, checkStoryboardRefs } from './storyboard-assets.js'
+import { loadEpisodeKeyframes, type StoryboardKeyframeState } from './keyframes.js'
+import {
+  buildStoryboardVideoRequest,
+  describeSignatureDiff,
+  listEpisodeStoryboards,
+  loadVideoVersions,
+  submitStoryboardVideo,
+  type StoryboardVideoRequest,
+} from './storyboard-video.js'
+import { blockingIssuesFor, checkStoryboardRefs, describeIssues } from './storyboard-assets.js'
+import { isActiveTaskStatus } from './sys-task.js'
 import { logTaskError, logTaskProgress, logTaskStart, logTaskSuccess, logTaskWarn } from '../utils/task-logger.js'
 
 export type BatchStatus = 'running' | 'done' | 'cancelled'
@@ -149,10 +157,143 @@ export async function cancelEpisodeVideoBatch(episodeId: number): Promise<VideoB
   return toStatus(row!)
 }
 
-/** 启动批量：目标为所选分镜，未指定则是尚未生成视频的分镜；预检不通过直接抛错（不创建批次） */
-export async function startEpisodeVideoBatch(
+export interface VideoPreviewItem {
+  storyboard_id: number
+  storyboard_number: number
+  /** missing=无视频 changed=与所有可比较版本不同 unchanged=命中历史签名 unknown=历史版本缺字段 blocked=阻断 skipped=不可生成 */
+  status: 'missing' | 'changed' | 'unchanged' | 'unknown' | 'blocked' | 'skipped'
+  /** 默认勾选（missing / changed） */
+  checked: boolean
+  /** 可勾选（blocked / skipped 不可勾） */
+  selectable: boolean
+  matched_version_no?: number
+  /** 当前采用视频对应的版本号 */
+  adopted_version_no?: number | null
+  /** changed 的变化分项（提示词 / 关键帧 / 参考图 / 时长画幅 / 模型） */
+  change_reasons?: string[]
+  reason?: string
+}
+
+/** 本集正在排队/运行中的视频分镜（同一镜不重复提交） */
+async function loadActiveStoryboardIds(): Promise<Set<number>> {
+  return new Set((await db.select().from(schema.sysTask))
+    .filter(task => task.type === 'video' && isActiveTaskStatus(task.status) && task.storyboardId)
+    .map(task => task.storyboardId as number))
+}
+
+/** 某镜此刻是否被阻断（关键帧未确认 / 视频提示词与绑定不一致）；可生成时返回 null */
+async function videoBlockReason(
+  sb: typeof schema.storyboards.$inferSelect,
+  keyframes: Map<number, StoryboardKeyframeState>,
+): Promise<string | null> {
+  if (!keyframes.get(sb.id)?.confirmed) return '关键帧尚未确认'
+  const blocking = blockingIssuesFor(await checkStoryboardRefs(sb), 'video_prompt')
+  if (blocking.length) return `视频提示词与参考图不一致：${describeIssues(blocking)}`
+  return null
+}
+
+/**
+ * 批量预览：逐镜判断输入是否相对历史版本发生变化。
+ * 与提交共用 buildStoryboardVideoRequest，所以签名口径与真正提交完全一致。
+ * 分类优先级：命中任一历史版本 → unchanged；否则有可比较版本 → changed；
+ * 全部历史版本缺字段 → unknown；没有任何版本 → missing。
+ */
+export async function previewEpisodeVideoBatch(
   episodeId: number,
   opts: { storyboardIds?: number[]; model?: string; configId?: number } = {},
+): Promise<VideoPreviewItem[]> {
+  const [episode] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId))
+  if (!episode) throw new Error('剧集不存在')
+  const storyboards = await listEpisodeStoryboards(episodeId)
+  if (!storyboards.length) throw new Error('本集还没有分镜，请先拆分分镜')
+
+  const keyframes = await loadEpisodeKeyframes(episodeId)
+  const active = await loadActiveStoryboardIds()
+  // “选择”模式只缩小范围，勾选默认值仍按签名判断
+  const targets = opts.storyboardIds?.length
+    ? storyboards.filter(sb => opts.storyboardIds!.includes(sb.id))
+    : storyboards
+
+  const result: VideoPreviewItem[] = []
+  for (const sb of targets) {
+    const base = { storyboard_id: sb.id, storyboard_number: sb.storyboardNumber }
+    if (active.has(sb.id)) {
+      result.push({ ...base, status: 'skipped', checked: false, selectable: false, reason: '该镜头正在生成中' })
+      continue
+    }
+    const blocked = await videoBlockReason(sb, keyframes)
+    if (blocked) {
+      result.push({ ...base, status: 'blocked', checked: false, selectable: false, reason: blocked })
+      continue
+    }
+
+    let request: StoryboardVideoRequest
+    try {
+      request = await buildStoryboardVideoRequest(sb.id, { model: opts.model, configId: opts.configId })
+    } catch (err) {
+      result.push({
+        ...base,
+        status: 'blocked',
+        checked: false,
+        selectable: false,
+        reason: err instanceof Error ? err.message : '无法组装生成请求',
+      })
+      continue
+    }
+
+    const versions = await loadVideoVersions(sb.id)
+    const adoptedVideo = sb.videoUrl || sb.composedVideoUrl || null
+    const adopted = versions.find(version => version.video === adoptedVideo) ?? null
+    if (!versions.length) {
+      result.push({ ...base, status: 'missing', checked: true, selectable: true, adopted_version_no: null })
+      continue
+    }
+    const matched = versions.find(version => version.signature && version.signature === request.signature)
+    if (matched) {
+      result.push({
+        ...base,
+        status: 'unchanged',
+        checked: false,
+        selectable: true,
+        matched_version_no: matched.version_no,
+        adopted_version_no: adopted?.version_no ?? null,
+      })
+      continue
+    }
+    // 变化原因与“当前采用的版本”比较；采用版本缺字段/找不到时退回最新的可比较版本
+    const comparable = adopted?.parts
+      ? adopted
+      : [...versions].reverse().find(version => version.parts) ?? null
+    if (!comparable?.parts) {
+      result.push({
+        ...base,
+        status: 'unknown',
+        checked: false,
+        selectable: true,
+        adopted_version_no: adopted?.version_no ?? null,
+        reason: '旧版本缺少对比信息，无法判断',
+      })
+      continue
+    }
+    result.push({
+      ...base,
+      status: 'changed',
+      checked: true,
+      selectable: true,
+      adopted_version_no: adopted?.version_no ?? null,
+      change_reasons: describeSignatureDiff(request.signatureParts, comparable.parts),
+    })
+  }
+  return result
+}
+
+/**
+ * 启动批量：目标必须是预览里明确勾选的分镜（唯一调用方是前端的预览清单）。
+ * 不再做整集预检，只检查所选镜头；提交时再逐镜复查阻断（变为阻断的标 skipped，批次继续）。
+ */
+export async function startEpisodeVideoBatch(
+  episodeId: number,
+  opts: { storyboardIds: number[]; model?: string; configId?: number },
 ): Promise<VideoBatchStatus> {
   if (await loadRunningBatch(episodeId)) throw new Error('本集已有批量视频在运行')
 
@@ -161,38 +302,15 @@ export async function startEpisodeVideoBatch(
 
   const storyboards = await listEpisodeStoryboards(episodeId)
   if (!storyboards.length) throw new Error('本集还没有分镜')
+  if (!opts.storyboardIds?.length) throw new Error('没有需要生成的分镜')
 
   // 正在生成中的分镜不纳入批量，避免同一镜被重复提交
-  const processingIds = new Set((await db.select().from(schema.sysTask))
-    .filter(task => task.type === 'video' && task.status === 'processing' && task.storyboardId)
-    .map(task => task.storyboardId as number))
-
-  const selected = opts.storyboardIds?.length
-    ? storyboards.filter(sb => opts.storyboardIds!.includes(sb.id))
-    : storyboards.filter(sb => !(sb.videoUrl || sb.composedVideoUrl))
+  const processingIds = await loadActiveStoryboardIds()
+  const selected = storyboards.filter(sb => opts.storyboardIds.includes(sb.id))
   const targets = selected.filter(sb => !processingIds.has(sb.id))
   if (!targets.length) throw new Error('没有需要生成的分镜')
 
-  // 预检 1：本集所有分镜的关键帧都必须已人工确认（不只是本批选中的）
-  const keyframes = await loadEpisodeKeyframes(episodeId)
-  const unconfirmed = storyboards
-    .filter(sb => !keyframes.get(sb.id)?.confirmed)
-    .map(sb => sb.storyboardNumber)
-  if (unconfirmed.length) {
-    throw new Error(`以下镜头的关键帧尚未确认，请先在「分镜关键帧」步骤逐镜确认：${unconfirmed.map(n => `#${n}`).join('、')}`)
-  }
-
-  // 预检 2：视频提示词的 @引用 与绑定一致（与「关键帧未确认」同口径，不创建批次）
-  const blockedShots: number[] = []
-  for (const sb of storyboards) {
-    const issues = await checkStoryboardRefs(sb)
-    if (blockingIssuesFor(issues, 'video_prompt').length) blockedShots.push(sb.storyboardNumber)
-  }
-  if (blockedShots.length) {
-    throw new Error(`以下镜头的视频提示词与参考图不一致，请先在「分镜关键帧」步骤修正：${blockedShots.map(n => `#${n}`).join('、')}`)
-  }
-
-  // 预检 3：关键帧驱动视频必须由支持关键帧引导的模型生成
+  // 预检：关键帧驱动视频必须由支持关键帧引导的模型生成（整批共用同一配置）
   const configId = opts.configId ?? episode.videoConfigId ?? undefined
   const config = configId ? (await getConfigById(configId)) ?? await getActiveConfig('video') : await getActiveConfig('video')
   if (!config) throw new Error('未配置视频模型，请先到「设置」页添加并启用 AI 服务')
@@ -245,15 +363,21 @@ async function waitForTask(taskId: number): Promise<{ ok: boolean; error: string
 
 /**
  * sys_task 置为 completed 与把视频写回 storyboards.video_url 是两条语句（generation.ts handleVideoComplete），
- * 中间有一次 await。下一镜承接时要读上一镜的采用视频，这里等采用结果落库后再推进。
+ * 中间有一次 await。下一镜承接时要读上一镜的采用视频，这里等这一镜的产物真正落到分镜上再推进。
+ * 判定以任务终态为主（调用前已终态）、`video_url === 任务 local_path` 为辅：镜头本来就有旧视频时，
+ * 只看“非空”会立刻返回，重生成场景下等于没等。用户中途手动切换采用版本时由超时兜底。
  */
-async function waitForAdoptedVideo(storyboardId: number): Promise<void> {
+async function waitForAdoptedVideo(taskId: number, storyboardId: number): Promise<void> {
   const deadline = Date.now() + ADOPT_WAIT_TIMEOUT_MS
   for (;;) {
+    const [task] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, taskId))
+    const produced = task?.localPath || task?.resultUrl || null
+    // 任务终态但没有产物路径（理论上不会发生）：无从比对，直接推进
+    if (!produced) return
     const [sb] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, storyboardId))
-    if (sb?.videoUrl || sb?.composedVideoUrl) return
+    if (sb?.videoUrl === produced || sb?.composedVideoUrl === produced) return
     if (Date.now() > deadline) {
-      logTaskWarn('VideoBatch', 'adopt wait timeout', { storyboardId })
+      logTaskWarn('VideoBatch', 'adopt wait timeout', { storyboardId, taskId })
       return
     }
     await new Promise(resolve => setTimeout(resolve, ADOPT_POLL_INTERVAL_MS))
@@ -305,23 +429,28 @@ async function runBatch(batchId: number): Promise<void> {
         shotNumber: item.storyboard_number,
       })
 
-      try {
-        // 关键帧可能在批次排队期间被改动：提交前复查确认状态，未确认的这一镜直接失败
-        const keyframes = (await loadEpisodeKeyframes(row.episodeId)).get(item.storyboard_id)
-        if (!keyframes?.confirmed) {
-          throw new Error(`分镜 #${item.storyboard_number} 的关键帧尚未确认`)
+      // 预览之后才变成阻断的镜头（关键帧被改动/提示词与绑定不一致）：标记 skipped，批次继续下一镜
+      const blocked = await videoBlockReason(
+        (await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, item.storyboard_id)))[0]!,
+        await loadEpisodeKeyframes(row.episodeId),
+      )
+      if (blocked) {
+        item.state = 'skipped'
+        item.error = `分镜 #${item.storyboard_number} ${blocked}`
+      } else {
+        try {
+          const taskId = await submitStoryboardVideo(item.storyboard_id, options)
+          item.task_id = taskId
+          await saveItems(batchId, items)
+          const result = await waitForTask(taskId)
+          item.state = result.ok ? 'completed' : 'failed'
+          item.error = result.error
+          // 等这一镜的新视频写回分镜后再推进，下一镜承接读到的才是刚生成的那条
+          if (result.ok) await waitForAdoptedVideo(taskId, item.storyboard_id)
+        } catch (err) {
+          item.state = 'failed'
+          item.error = err instanceof Error ? err.message : '生成失败'
         }
-        const taskId = await submitStoryboardVideo(item.storyboard_id, options)
-        item.task_id = taskId
-        await saveItems(batchId, items)
-        const result = await waitForTask(taskId)
-        item.state = result.ok ? 'completed' : 'failed'
-        item.error = result.error
-        // 等采用结果写回分镜后再推进，前端刷新能立刻看到这一镜的视频
-        if (result.ok) await waitForAdoptedVideo(item.storyboard_id)
-      } catch (err) {
-        item.state = 'failed'
-        item.error = err instanceof Error ? err.message : '生成失败'
       }
 
       if (item.state === 'failed') {
