@@ -6243,8 +6243,10 @@ button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
   text-align: center;
 }
 .merge-card-pending.is-failed { color: var(--error); background: var(--error-bg); }
-.merge-card-meta { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-3); min-width: 0; }
+.merge-card-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; font-size: 11px; color: var(--text-3); min-width: 0; }
+.merge-card-meta > span { white-space: nowrap; }
 .merge-card-meta .btn { margin-left: auto; }
+.merge-card-meta .btn + .btn { margin-left: 0; }
 .merge-card.playable { cursor: pointer; }
 .merge-card.playable:hover { border-color: var(--border-strong); box-shadow: var(--shadow-card); }
 .merge-card-thumb { position: relative; }
