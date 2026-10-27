@@ -24,61 +24,24 @@ import {
 import { checkStoryboardRefs } from '../services/storyboard-assets.js'
 import { parseFieldSavedAt } from '../services/storyboard-fields.js'
 import { lookupGeneratedAt } from '../services/media-time.js'
+import {
+  AssetLibraryError,
+  isAssetKind,
+  linkAssetToEpisode,
+  loadImageVersions,
+  unlinkAssetFromEpisode,
+} from '../services/asset-library.js'
+import type { AssetKind } from '../services/reference-images.js'
 
 const app = new Hono()
-type ImageOwnerKind = 'character' | 'scene' | 'prop'
 
 async function attachImageVersions<T extends { id: number; imageUrl: string | null }>(
   rows: T[],
-  kind: ImageOwnerKind,
+  kind: AssetKind,
 ) {
-  const ids = new Set(rows.map(row => row.id))
-  const tasks = (await db.select().from(schema.sysTask))
-    .filter(task => task.type === 'image' && task.status === 'completed')
-    .filter((task) => {
-      const ownerId = kind === 'character' ? task.characterId : kind === 'scene' ? task.sceneId : task.propId
-      return ownerId != null && ids.has(ownerId)
-    })
+  const versionsOf = await loadImageVersions(kind, rows)
   return rows.map((row) => {
-    const versions: Array<{
-      id: number | null
-      url: string | null
-      provider: string | null
-      model: string | null
-      prompt: string | null
-      created_at: string | null
-      generated_at: number | null
-      is_current: boolean
-    }> = tasks
-      .filter((task) => {
-        const ownerId = kind === 'character' ? task.characterId : kind === 'scene' ? task.sceneId : task.propId
-        return ownerId === row.id
-      })
-      .map(task => ({
-        id: task.id,
-        url: task.localPath || task.resultUrl,
-        provider: task.provider,
-        model: task.model,
-        prompt: task.prompt,
-        created_at: task.createdAt,
-        generated_at: task.generatedAt ?? null,
-        is_current: Boolean((task.localPath || task.resultUrl) && (task.localPath || task.resultUrl) === row.imageUrl),
-      }))
-      .filter(version => Boolean(version.url))
-      .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
-    if (row.imageUrl && !versions.some(version => version.url === row.imageUrl)) {
-      // 版本任务已被删除的历史图：没有时间来源，不显示时间
-      versions.unshift({
-        id: null,
-        url: row.imageUrl,
-        provider: 'legacy',
-        model: null,
-        prompt: null,
-        created_at: null,
-        generated_at: null,
-        is_current: true,
-      })
-    }
+    const versions = versionsOf.get(row.id) ?? []
     return {
       ...toSnakeCase(row),
       image_versions: versions,
@@ -202,6 +165,35 @@ app.get('/:id/props', async (c) => {
   const allProps = await db.select().from(schema.props)
   const result = allProps.filter(p => propIds.includes(p.id) && !p.deletedAt)
   return success(c, await attachImageVersions(result, 'prop'))
+})
+
+// POST /episodes/:id/assets/link — 把本项目已有资产关联到本集（资产管理器·本项目复用）
+app.post('/:id/assets/link', async (c) => {
+  const episodeId = Number(c.req.param('id'))
+  const body: unknown = await c.req.json()
+  const kind = body && typeof body === 'object' && 'kind' in body ? body.kind : undefined
+  const assetIdRaw = body && typeof body === 'object' && 'asset_id' in body ? body.asset_id : undefined
+  if (!isAssetKind(kind)) return badRequest(c, 'kind 必须是 character / scene / prop')
+  const assetId = Number(assetIdRaw)
+  if (!Number.isInteger(assetId) || assetId <= 0) return badRequest(c, 'asset_id 必填')
+  try {
+    return success(c, await linkAssetToEpisode(episodeId, kind, assetId))
+  } catch (err) {
+    if (err instanceof AssetLibraryError) {
+      return err.status === 404 ? notFound(c, err.message) : badRequest(c, err.message)
+    }
+    throw err
+  }
+})
+
+// DELETE /episodes/:id/assets/link?kind=&asset_id= — 取消关联（不删资产，幂等）
+app.delete('/:id/assets/link', async (c) => {
+  const episodeId = Number(c.req.param('id'))
+  const kind = c.req.query('kind')
+  if (!isAssetKind(kind)) return badRequest(c, 'kind 必须是 character / scene / prop')
+  const assetId = Number(c.req.query('asset_id'))
+  if (!Number.isInteger(assetId) || assetId <= 0) return badRequest(c, 'asset_id 必填')
+  return success(c, await unlinkAssetFromEpisode(episodeId, kind, assetId))
 })
 
 // POST /episodes/:id/extract — 异步提取资产（target: characters | scenes | props），立即返回，前端轮询状态

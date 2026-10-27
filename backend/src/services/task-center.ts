@@ -23,6 +23,7 @@ import { aggregateBatchItems, type KeyframeBatchItem } from './keyframe-batch-pr
 import { parseTextTaskParams } from './text-task.js'
 import { composeEpisodeLabel, composeTaskLabel, type TaskTargetKind } from './task-label.js'
 import { toUnixSeconds } from './media-time.js'
+import { IMPORTED_TASK_PROVIDER } from './asset-library.js'
 
 export type { TaskLabelInput, TaskTargetKind } from './task-label.js'
 export { composeEpisodeLabel, composeTaskLabel, renderRefPrompt } from './task-label.js'
@@ -333,6 +334,8 @@ export async function listTaskCenter(filters: CenterFilters): Promise<{
   const rows: CenterRow[] = []
 
   for (const row of allTasks) {
+    // 跨项目导入复制出的版本行（Issue #9）不是真的跑过的任务，不进任务中心
+    if (row.provider === IMPORTED_TASK_PROVIDER) continue
     if (childIds.has(row.id)) continue
     if (filters.type && row.type !== filters.type) continue
     if (!matchesTaskStatus(filters.status, row.status)) continue
