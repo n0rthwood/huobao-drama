@@ -14,6 +14,8 @@ import {
   ReferenceImageError,
   removeReferenceImage,
 } from '../services/reference-images.js'
+import { addReferenceImagesFromLibrary } from '../services/media-library.js'
+import { libraryFail } from './media-library.js'
 
 function fail(c: Context, err: unknown) {
   if (err instanceof ReferenceImageError) {
@@ -33,6 +35,20 @@ export function mountReferenceImageRoutes(app: Hono, kind: AssetKind) {
       return success(c, { reference_images: refs })
     } catch (err) {
       return fail(c, err)
+    }
+  })
+
+  // 从素材库选择已有图片作为参考图：复制文件（新 uuid），uploaded_at = 选择当时
+  app.post('/:id/reference-images/from-library', async (c) => {
+    const id = Number(c.req.param('id'))
+    const body: unknown = await c.req.json().catch(() => ({}))
+    const urls = body && typeof body === 'object' && 'urls' in body ? body.urls : undefined
+    try {
+      const result = await addReferenceImagesFromLibrary(kind, id, urls)
+      return success(c, { reference_images: result.entries, added: result.added, skipped: result.skipped })
+    } catch (err) {
+      if (err instanceof ReferenceImageError) return fail(c, err)
+      return libraryFail(c, err)
     }
   })
 

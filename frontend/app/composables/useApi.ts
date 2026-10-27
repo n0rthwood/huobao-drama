@@ -175,9 +175,14 @@ export const storyboardAPI = {
 export interface ReferenceImage {
   path: string
   uploaded_at: number | null
+  /** 从素材库选入时记录的源图相对路径，用于同一资产的重复选入去重 */
+  copied_from?: string
 }
 
 export type ReferenceImagesResp = { reference_images: ReferenceImage[] }
+
+/** 从素材库选入参考图：added = 实际复制数，skipped = 同源去重跳过数 */
+export type LibraryRefsResp = ReferenceImagesResp & { added: number; skipped: number }
 
 /** 宽容读取资产行里的参考图列：对象数组 / JSON 字符串都接受，其它一律空数组 */
 export function parseReferenceImages(raw: unknown): ReferenceImage[] {
@@ -201,7 +206,10 @@ export function parseReferenceImages(raw: unknown): ReferenceImage[] {
       const path = String(entry.path ?? '').trim()
       if (!path) return null
       const uploadedAt = Number(entry.uploaded_at)
-      return { path, uploaded_at: Number.isFinite(uploadedAt) && uploadedAt > 0 ? uploadedAt : null }
+      const copiedFrom = String(entry.copied_from ?? '').trim()
+      const parsed: ReferenceImage = { path, uploaded_at: Number.isFinite(uploadedAt) && uploadedAt > 0 ? uploadedAt : null }
+      if (copiedFrom) parsed.copied_from = copiedFrom
+      return parsed
     })
     .filter((entry): entry is ReferenceImage => !!entry)
 }
@@ -216,6 +224,7 @@ export const characterAPI = {
   batchImages: (ids: number[], episodeId: number, model?: string, configId?: number, textModel?: string, textConfigId?: number) => api.post('/characters/batch-generate-images', { character_ids: ids, episode_id: episodeId, model: model || undefined, config_id: configId || undefined, text_model: textModel || undefined, text_config_id: textConfigId || undefined }),
   addReference: (id: number, file: File) => uploadReq<ReferenceImagesResp>(`/characters/${id}/reference-images`, file),
   delReference: (id: number, url: string) => api.del<ReferenceImagesResp>(`/characters/${id}/reference-images?url=${encodeURIComponent(url)}`),
+  addRefsFromLibrary: (id: number, urls: string[]) => api.post<LibraryRefsResp>(`/characters/${id}/reference-images/from-library`, { urls }),
 }
 
 export const sceneAPI = {
@@ -226,6 +235,7 @@ export const sceneAPI = {
   generateImage: (id: number, episodeId: number, model?: string, configId?: number, textModel?: string, textConfigId?: number, referenceImages?: string[]) => api.post(`/scenes/${id}/generate-image`, { episode_id: episodeId, model: model || undefined, config_id: configId || undefined, text_model: textModel || undefined, text_config_id: textConfigId || undefined, reference_images: referenceImages }),
   addReference: (id: number, file: File) => uploadReq<ReferenceImagesResp>(`/scenes/${id}/reference-images`, file),
   delReference: (id: number, url: string) => api.del<ReferenceImagesResp>(`/scenes/${id}/reference-images?url=${encodeURIComponent(url)}`),
+  addRefsFromLibrary: (id: number, urls: string[]) => api.post<LibraryRefsResp>(`/scenes/${id}/reference-images/from-library`, { urls }),
 }
 
 export const propAPI = {
@@ -236,12 +246,20 @@ export const propAPI = {
   generateImage: (id: number, episodeId: number, model?: string, configId?: number, textModel?: string, textConfigId?: number, referenceImages?: string[]) => api.post(`/props/${id}/generate-image`, { episode_id: episodeId, model: model || undefined, config_id: configId || undefined, text_model: textModel || undefined, text_config_id: textConfigId || undefined, reference_images: referenceImages }),
   addReference: (id: number, file: File) => uploadReq<ReferenceImagesResp>(`/props/${id}/reference-images`, file),
   delReference: (id: number, url: string) => api.del<ReferenceImagesResp>(`/props/${id}/reference-images?url=${encodeURIComponent(url)}`),
+  addRefsFromLibrary: (id: number, urls: string[]) => api.post<LibraryRefsResp>(`/props/${id}/reference-images/from-library`, { urls }),
 }
 
 // 生成任务列表/详情（图片生成走各资产 API，视频生成走 storyboardAPI.generateVideo 与集级批量）
 export const taskAPI = {
-  registerUpload: (assetType: 'character' | 'scene' | 'prop', assetId: number, localPath: string) =>
-    api.post('/tasks/register-upload', { asset_type: assetType, asset_id: assetId, local_path: localPath }),
+  // source='media-library' 时后端把 params 记为 { source:'media-library', copied_from }
+  registerUpload: (assetType: 'character' | 'scene' | 'prop', assetId: number, localPath: string, copiedFrom?: string) =>
+    api.post('/tasks/register-upload', {
+      asset_type: assetType,
+      asset_id: assetId,
+      local_path: localPath,
+      source: copiedFrom ? 'media-library' : undefined,
+      copied_from: copiedFrom || undefined,
+    }),
   get: (id: number) => api.get<TaskRow>(`/tasks/${id}`),
   del: (id: number) => api.del(`/tasks/${id}`),
   // 取消任务：qwen-jobs 调远端取消（排队中立即取消，运行中由服务端决定是否中断）
@@ -300,6 +318,63 @@ export const uploadAPI = {
   image: (f: File) => uploadReq<{ url: string; path: string }>('/upload/image', f),
   video: (f: File) => uploadReq<{ url: string; path: string }>('/upload/video', f),
   audio: (f: File) => uploadReq<{ url: string; path: string }>('/upload/audio', f),
+}
+
+/** 素材管理器：按 项目 → 剧集 → 资产/分镜 → 版本/关键帧/参考图 浏览历史图片 */
+export interface LibraryImage {
+  path: string
+  url: string
+  thumb_url: string
+  drama_id: number
+  drama_title: string
+  episode_ids: number[]
+  kind: 'character' | 'scene' | 'prop' | 'storyboard'
+  owner_id: number
+  owner_name: string
+  slot: 'first_frame' | 'mid_frame' | 'last_frame' | null
+  source: 'version' | 'legacy' | 'reference'
+  version_index: number | null
+  generated_at: number | null
+  provider: string | null
+  model: string | null
+  source_label: string
+}
+
+export interface LibraryTreeNode {
+  id: number
+  name: string
+  kind: LibraryImage['kind']
+  count: number
+  slots?: Array<{ slot: 'first_frame' | 'mid_frame' | 'last_frame'; label: string; count: number }>
+}
+
+export interface LibraryTree {
+  drama: { id: number; title: string; count: number }
+  episodes: Array<{
+    id: number
+    episode_number: number
+    title: string
+    count: number
+    characters: LibraryTreeNode[]
+    scenes: LibraryTreeNode[]
+    props: LibraryTreeNode[]
+    storyboards: LibraryTreeNode[]
+  }>
+  unassigned: { count: number; characters: LibraryTreeNode[]; scenes: LibraryTreeNode[]; props: LibraryTreeNode[] }
+}
+
+export const mediaLibraryAPI = {
+  dramas: () => api.get<{ items: Array<{ id: number; title: string; count: number }> }>('/media-library/dramas'),
+  tree: (dramaId: number) => api.get<LibraryTree>(`/media-library/tree?drama_id=${dramaId}`),
+  images: (params: { drama_id?: number; episode_id?: number | 'unassigned'; kind?: string; owner_id?: number; slot?: string; page?: number; page_size?: number } = {}) => {
+    const query = new URLSearchParams()
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== null && value !== '') query.set(key, String(value))
+    }
+    return api.get<{ items: LibraryImage[]; total: number; page: number; page_size: number }>(`/media-library/images${query.size ? `?${query.toString()}` : ''}`)
+  },
+  // 复制库内图片为一次「新上传」，返回结构与 uploadAPI.image 一致（多带源图路径）
+  copy: (url: string) => api.post<{ url: string; path: string; copied_from: string }>('/media-library/copy', { url }),
 }
 export const mergeAPI = {
   merge: (epId: number, storyboardIds?: number[]) => api.post(`/merge/episodes/${epId}/merge`, storyboardIds?.length ? { storyboard_ids: storyboardIds } : {}),
