@@ -100,6 +100,50 @@ export const episodeAPI = {
     }),
   videoBatch: (id: number) => api.get(`/episodes/${id}/video-batch`),
   cancelVideoBatch: (id: number) => api.post(`/episodes/${id}/video-batch/cancel`),
+  // 资产管理器（#9）：本项目已有资产关联到本集 / 取消关联（不删资产）
+  linkAsset: (id: number, kind: AssetKindName, assetId: number) =>
+    api.post(`/episodes/${id}/assets/link`, { kind, asset_id: assetId }),
+  unlinkAsset: (id: number, kind: AssetKindName, assetId: number) =>
+    api.del(`/episodes/${id}/assets/link?kind=${kind}&asset_id=${assetId}`),
+}
+
+export type AssetKindName = 'character' | 'scene' | 'prop'
+
+export interface LibraryAsset {
+  kind: AssetKindName
+  id: number
+  drama_id: number
+  drama_title: string
+  name: string
+  subtitle: string
+  image_url: string | null
+  version_count: number
+  reference_count: number
+  episodes: Array<{ id: number; episode_number: number; title: string }>
+}
+
+/**
+ * 资产管理器（#9）：浏览全部项目的资产、跨项目全量复制导入。
+ * 本项目内复用走 episodeAPI.linkAsset（关联同一资产，不复制）。
+ */
+export const assetLibraryAPI = {
+  list: (params: { drama_id?: number; kind?: AssetKindName; q?: string; target_drama_id?: number } = {}) => {
+    const query = new URLSearchParams()
+    if (params.drama_id != null) query.set('drama_id', String(params.drama_id))
+    if (params.kind) query.set('kind', params.kind)
+    if (params.q) query.set('q', params.q)
+    if (params.target_drama_id != null) query.set('target_drama_id', String(params.target_drama_id))
+    const qs = query.toString()
+    return api.get<{
+      dramas: Array<{ id: number; title: string; asset_count: number }>
+      items: LibraryAsset[]
+      taken_names?: Record<AssetKindName, string[]>
+    }>(`/asset-library${qs ? `?${qs}` : ''}`)
+  },
+  detail: (kind: AssetKindName, id: number) => api.get(`/asset-library/${kind}/${id}`),
+  // 跨项目全量复制：文本 + 当前图 + 全部历史版本 + 参考图都复制一份，源与副本互不影响
+  import: (dramaId: number, data: { kind: AssetKindName; source_id: number; name?: string; episode_id?: number | null }) =>
+    api.post(`/dramas/${dramaId}/assets/import`, data),
 }
 
 export const storyboardAPI = {

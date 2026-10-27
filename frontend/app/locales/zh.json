@@ -209,6 +209,32 @@
       "confirmTitle": "删除参考图",
       "confirmMessage": "删除后这张参考图不再参与生成，文件也会被移除。成片图不受影响。"
     },
+    "assetBrowser": {
+      "title": "资产管理器",
+      "subtitleEpisode": "从资产库选资产：本项目的关联到本集，其他项目的全量复制导入",
+      "subtitleDrama": "从其他项目全量复制导入资产到本项目",
+      "currentDrama": "本项目",
+      "noDrama": "没有可导入的项目",
+      "searchPlaceholder": "搜索名字或描述",
+      "selected": "已选 {n}",
+      "empty": "没有匹配的资产",
+      "versions": "{n} 个版本",
+      "refs": "{n} 张参考图",
+      "inEpisodes": "已在 {list}",
+      "noEpisode": "未关联剧集",
+      "alreadyLinked": "已在本集",
+      "willLink": "关联到本集",
+      "willImport": "全量复制导入",
+      "renameLabel": "导入后的名字",
+      "nameRequired": "名字不能为空",
+      "nameTaken": "名字已被占用，请改名",
+      "progress": "处理中 {done}/{total}",
+      "confirm": "导入 / 关联",
+      "doneToast": "已关联 {linked} 个、导入 {imported} 个资产",
+      "skippedToast": "跳过了 {n} 个源文件缺失的版本/参考图",
+      "openEpisode": "从资产库导入",
+      "openDrama": "从其他项目导入"
+    },
     "localeSwitcher": {
       "label": "切换界面语言"
     },

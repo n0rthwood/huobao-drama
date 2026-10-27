@@ -173,16 +173,29 @@
 
     <!-- 素材库 -->
     <div v-else-if="activeTab === 'assets'" class="assets-wrap">
-      <div class="seg asset-filter">
-        <button
-          v-for="t in assetTabs"
-          :key="t.value"
-          type="button"
-          class="seg-item"
-          :class="{ on: assetTab === t.value }"
-          @click="assetTab = t.value"
-        >{{ t.label }}</button>
+      <div class="asset-filter-bar">
+        <div class="seg asset-filter">
+          <button
+            v-for="t in assetTabs"
+            :key="t.value"
+            type="button"
+            class="seg-item"
+            :class="{ on: assetTab === t.value }"
+            @click="assetTab = t.value"
+          >{{ t.label }}</button>
+        </div>
+        <button class="btn btn-sm asset-import-btn" @click="assetBrowserOpen = true">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 6h-8l-2-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2z"/></svg>
+          {{ t('components.assetBrowser.openDrama') }}
+        </button>
       </div>
+
+      <AssetBrowserDialog
+        v-if="assetBrowserOpen"
+        :drama-id="dramaId"
+        @close="assetBrowserOpen = false"
+        @done="load"
+      />
 
       <!-- 全部素材为空 -->
       <div v-if="!materials.length" class="empty-state">
@@ -606,6 +619,7 @@ import { dramaAPI, episodeAPI, characterAPI, sceneAPI, propAPI, uploadAPI, taskA
 import BaseSelect from '~/components/BaseSelect.vue'
 import ProgressRing from '~/components/ProgressRing.vue'
 import MediaTime from '~/components/MediaTime.vue'
+import AssetBrowserDialog from '~/components/AssetBrowserDialog.vue'
 import { useNowTicker, ringPropsFromTask, isActiveTaskStatus } from '~/composables/useTaskProgress'
 
 const { t, locale } = useI18n()
@@ -769,6 +783,8 @@ const pendingAssetLink = queryTypedId(route.query.asset, ['character', 'scene', 
 // URL 携带 tab（含非法值）即以 URL 为准，非法回退默认；asset 参数隐含素材库页签
 const activeTab = ref(pendingAssetLink ? 'assets' : ((querySingle(route.query.tab) && urlTab) || 'episodes'))
 const assetTab = ref(queryEnum(route.query.filter, ['all', 'character', 'scene', 'prop']) || 'all')
+// 资产管理器（#9）：从其他项目全量复制导入资产到本项目（不关联剧集）
+const assetBrowserOpen = ref(false)
 const assetViewer = ref({ open: false, src: '', title: '' })
 const assetTabs = computed(() => ([
   { label: t('index.status.all'), value: 'all' },
@@ -1330,6 +1346,9 @@ onUnmounted(() => {
 }
 
 /* ===== 素材库 ===== */
+.asset-filter-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+.asset-filter-bar .asset-filter { margin-bottom: 0; }
+.asset-import-btn { margin-left: auto; }
 .asset-filter { margin-bottom: 16px; }
 
 .asset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; align-items: stretch; }

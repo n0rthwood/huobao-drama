@@ -277,6 +277,10 @@
                   {{ (et.key === 'characters' ? chars.length : et.key === 'scenes' ? scenes.length : propItems.length) ? t('episode.prod.reextract', { type: et.label }) : t('episode.prod.extract', { type: et.label }) }}
                 </button>
                 <span class="asset-bar-divider" />
+                <button class="btn btn-sm asset-btn-extract" @click="assetBrowserOpen = true">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 6h-8l-2-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2z"/></svg>
+                  {{ t('components.assetBrowser.openEpisode') }}
+                </button>
                 <button class="btn btn-sm asset-btn-batch" @click="batchCharImages">
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
                   {{ t('episode.prod.batchChar') }}
@@ -1546,6 +1550,14 @@
         @confirm="confirmDeleteMerge"
         @cancel="mergeDelete.open = false"
       />
+
+      <AssetBrowserDialog
+        v-if="assetBrowserOpen && episode"
+        :drama-id="dramaId"
+        :episode-id="episode.id"
+        @close="assetBrowserOpen = false"
+        @done="refresh"
+      />
     </main>
     </div>
   </div>
@@ -1570,6 +1582,7 @@ import FieldSaveStatus from '~/components/FieldSaveStatus.vue'
 import RefIssueList from '~/components/RefIssueList.vue'
 import TaskCenterButton from '~/components/TaskCenterButton.vue'
 import MediaTime from '~/components/MediaTime.vue'
+import AssetBrowserDialog from '~/components/AssetBrowserDialog.vue'
 import { mediaTimeLabel, mediaTimeOfPath } from '~/utils/mediaTime'
 import {
   useNowTicker,
@@ -1589,6 +1602,8 @@ const dramaId = Number(route.params.id)
 const episodeNumber = Number(route.params.episodeNumber)
 
 const drama = ref(null), episode = ref(null), chars = ref([]), scenes = ref([]), propItems = ref([]), sbs = ref([]), mergeData = ref(null)
+// 资产管理器（#9）：本项目资产关联到本集 / 其他项目资产全量复制导入并关联
+const assetBrowserOpen = ref(false)
 // 工作台面板位置记忆（按剧集隔离）：仅页面刷新(reload)时恢复到上次所在步骤；
 // 从列表/详情页点击进入时始终默认「剧本」面板；URL query 显式携带子状态时优先于本地记忆
 const PANEL_STORE_KEY = `huobao:workbench:panel:${dramaId}:${episodeNumber}`
