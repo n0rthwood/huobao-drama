@@ -13,6 +13,7 @@ import { getImageAdapter, getVideoAdapter } from './adapters/registry'
 import type { AIConfig, ImageGenerationRecord, VideoGenerationRecord } from './adapters/types'
 import { logTaskError, logTaskPayload, logTaskProgress, logTaskStart, logTaskSuccess, logTaskWarn, redactUrl } from '../utils/task-logger.js'
 import { FRAME_TYPE_SLOT, invalidateKeyframeConfirmation } from './keyframes.js'
+import { completionStamp } from './media-time.js'
 import {
   cancelQwenJob,
   createQwenJob,
@@ -562,7 +563,7 @@ export async function completeImageTaskFromBytes(record: SysTaskRecord, bytes: B
   const localPath = await saveImageBuffer(bytes, contentType, 'images')
   await generateImageThumb(localPath)
   const res = await db.update(schema.sysTask)
-    .set({ localPath, status: 'completed', completedAt: now(), updatedAt: now() })
+    .set({ localPath, status: 'completed', ...completionStamp(), updatedAt: now() })
     .where(and(eq(schema.sysTask.id, record.id), inArray(schema.sysTask.status, ACTIVE_TASK_STATUSES)))
   if (!(res?.changes ?? 0)) {
     logTaskWarn('ImageTask', 'completion dropped (task no longer active)', { id: record.id, status: record.status })
@@ -655,7 +656,7 @@ async function handleImageComplete(record: SysTaskRecord, imageUrl: string, head
   await generateImageThumb(localPath)
 
   await db.update(schema.sysTask)
-    .set({ resultUrl: imageUrl, localPath, status: 'completed', completedAt: now(), updatedAt: now() })
+    .set({ resultUrl: imageUrl, localPath, status: 'completed', ...completionStamp(), updatedAt: now() })
     .where(eq(schema.sysTask.id, record.id))
 
   logTaskSuccess('ImageTask', 'downloaded', { id: record.id, provider: record.provider, localPath })
@@ -668,7 +669,7 @@ async function handleImageCompleteBase64(record: SysTaskRecord, base64Data: stri
   await generateImageThumb(localPath)
 
   await db.update(schema.sysTask)
-    .set({ localPath, status: 'completed', completedAt: now(), updatedAt: now() })
+    .set({ localPath, status: 'completed', ...completionStamp(), updatedAt: now() })
     .where(eq(schema.sysTask.id, record.id))
 
   logTaskSuccess('ImageTask', 'saved-base64', { id: record.id, provider: record.provider, mimeType, localPath })
@@ -706,7 +707,7 @@ async function handleVideoComplete(record: SysTaskRecord, videoUrl: string, dura
   // 海报帧供列表/封面展示，避免前端为显示首帧缓冲整个视频
   await extractVideoPoster(localPath)
   await db.update(schema.sysTask)
-    .set({ resultUrl: videoUrl, localPath, status: 'completed', completedAt: now(), updatedAt: now() })
+    .set({ resultUrl: videoUrl, localPath, status: 'completed', ...completionStamp(), updatedAt: now() })
     .where(eq(schema.sysTask.id, record.id))
 
   logTaskSuccess('VideoTask', 'downloaded', { id: record.id, localPath, storyboardId: record.storyboardId, duration })

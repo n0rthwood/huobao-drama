@@ -124,24 +124,42 @@ export const storyboardAPI = {
 }
 
 /**
- * 资产参考图（角色/场景/道具通用）：库里存 JSON 字符串数组，读时宽容解析。
+ * 资产参考图（角色/场景/道具通用）：库里存 JSON 对象数组 `[{ path, uploaded_at }]`
+ * （`uploaded_at` 为 unix 秒，存量数据缺文件时为 null）。
  * 参考图是「生成输入」，与成片图 image_url/local_path 互不影响。
  */
-export type ReferenceImagesResp = { reference_images: string[] }
+export interface ReferenceImage {
+  path: string
+  uploaded_at: number | null
+}
 
-export function parseReferenceImages(raw: unknown): string[] {
-  if (Array.isArray(raw)) return raw.map(item => String(item ?? '').trim()).filter(Boolean)
-  if (typeof raw !== 'string') return []
-  const text = raw.trim()
-  if (!text) return []
-  if (text.startsWith('[')) {
-    try {
-      const parsed: unknown = JSON.parse(text)
-      if (Array.isArray(parsed)) return parsed.map(item => String(item ?? '').trim()).filter(Boolean)
-    } catch {}
-    return []
-  }
-  return /^(https?:\/\/|\/?static\/)/.test(text) ? [text] : []
+export type ReferenceImagesResp = { reference_images: ReferenceImage[] }
+
+/** 宽容读取资产行里的参考图列：对象数组 / JSON 字符串都接受，其它一律空数组 */
+export function parseReferenceImages(raw: unknown): ReferenceImage[] {
+  const list = Array.isArray(raw)
+    ? raw
+    : (() => {
+      if (typeof raw !== 'string') return []
+      const text = raw.trim()
+      if (!text.startsWith('[')) return []
+      try {
+        const parsed: unknown = JSON.parse(text)
+        return Array.isArray(parsed) ? parsed : []
+      } catch {
+        return []
+      }
+    })()
+  return list
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null
+      const entry = item as Record<string, unknown>
+      const path = String(entry.path ?? '').trim()
+      if (!path) return null
+      const uploadedAt = Number(entry.uploaded_at)
+      return { path, uploaded_at: Number.isFinite(uploadedAt) && uploadedAt > 0 ? uploadedAt : null }
+    })
+    .filter((entry): entry is ReferenceImage => !!entry)
 }
 
 export const characterAPI = {
@@ -243,6 +261,9 @@ export const mergeAPI = {
   merge: (epId: number, storyboardIds?: number[]) => api.post(`/merge/episodes/${epId}/merge`, storyboardIds?.length ? { storyboard_ids: storyboardIds } : {}),
   status: (epId: number) => api.get(`/merge/episodes/${epId}/merge`),
   list: (epId: number) => api.get<any[]>(`/merge/episodes/${epId}/merges`),
+  // 删除成片：软删记录 + 删除磁盘文件；返回回退后的 episodes.video_url
+  del: (epId: number, mergeId: number) =>
+    api.del<{ id: number; deleted: boolean; episode_video_url: string | null }>(`/merge/episodes/${epId}/merges/${mergeId}`),
 }
 export const aiConfigAPI = {
   list: (t?: string) => api.get(`/ai-configs${t ? `?service_type=${t}` : ''}`),

@@ -1,4 +1,12 @@
 {
+  "mediaTime": {
+    "seconds": "{n} 秒前",
+    "minutes": "{n} 分钟前",
+    "hours": "{n} 小时前",
+    "hoursMinutes": "{h} 小时 {m} 分钟前",
+    "days": "{n} 天前",
+    "months": "{n} 个月前"
+  },
   "taskCenter": {
     "button": "任务",
     "title": "任务中心",
@@ -1115,7 +1123,12 @@
       "markedDone": "已完成",
       "markDoneTitle": "手动标记本集导出完成（可再次点击取消）",
       "markedDoneToast": "已标记为完成",
-      "unmarkDoneToast": "已取消完成标记"
+      "unmarkDoneToast": "已取消完成标记",
+      "deleteMerge": "删除该成片",
+      "deleteMergeBusy": "拼接进行中，无法删除",
+      "deleteMergeTitle": "删除成片",
+      "deleteMergeMessage": "删除后该成片的视频文件会一并删除，无法恢复。确定删除吗？",
+      "deleteMergeDone": "成片已删除"
     },
     "image": {
       "generatingChar": "角色图片生成中",

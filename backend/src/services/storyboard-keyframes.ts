@@ -139,6 +139,8 @@ export interface KeyframeVersion {
   provider: string | null
   model: string | null
   created_at: string | null
+  /** 产出时刻（unix 秒），前端按浏览器时区显示 */
+  generated_at: number | null
   /** 按创建时间正序从 1 编号 */
   version_no: number
   /** 早期任务缺字段时为 null（与任何当前请求都不匹配） */
@@ -170,6 +172,7 @@ export async function loadKeyframeVersions(
     provider: task.provider,
     model: task.model,
     created_at: task.createdAt,
+    generated_at: task.generatedAt ?? null,
     version_no: index + 1,
     signature: signatureFromTask(task),
   }))

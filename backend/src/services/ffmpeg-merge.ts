@@ -8,6 +8,7 @@ import { db, getInsertId, schema } from '../db/index.js'
 import { eq } from 'drizzle-orm'
 import { now } from '../utils/response.js'
 import { logTaskError, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
+import { completionStamp } from './media-time.js'
 import { extractVideoPoster } from '../utils/video-poster.js'
 import { ffmpeg, checkFfmpegSuite } from '../utils/ffmpeg.js'
 import { DATA_ROOT, STORAGE_ROOT } from '../utils/paths.js'
@@ -136,7 +137,7 @@ async function doMerge(mergeId: number, episodeId: number, videos: string[]) {
 
   // 更新 merge 记录
   await db.update(schema.videoMerges)
-    .set({ status: 'completed', mergedUrl: mergedRelative, duration, completedAt: now() })
+    .set({ status: 'completed', mergedUrl: mergedRelative, duration, ...completionStamp() })
     .where(eq(schema.videoMerges.id, mergeId))
 
   // 更新 episode

@@ -242,6 +242,8 @@ export const sysTask = sqliteTable('sys_task', {
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
   completedAt: text('completed_at'),
+  // 媒体生成时间（unix 秒）：完成时与 completed_at 一起写入，前端按浏览器时区显示
+  generatedAt: integer('generated_at'),
 })
 
 export const videoMerges = sqliteTable('video_merges', {
@@ -259,6 +261,8 @@ export const videoMerges = sqliteTable('video_merges', {
   errorMsg: text('error_msg'),
   createdAt: text('created_at').notNull(),
   completedAt: text('completed_at'),
+  // 成片生成时间（unix 秒），与 sys_task.generated_at 同口径
+  generatedAt: integer('generated_at'),
   deletedAt: text('deleted_at'),
 })
 

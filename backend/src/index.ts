@@ -34,6 +34,8 @@ import { resumeKeyframeBatches } from './services/keyframe-batch.js'
 import { startQwenJobsTracker } from './services/qwen-jobs.js'
 import { QWEN_JOBS_PROVIDER } from './services/sys-task.js'
 import { backfillTaskEpisodeIds, failInterruptedTextTasks } from './services/task-center.js'
+import { backfillGeneratedAt } from './services/media-time.js'
+import { migrateReferenceImages } from './services/reference-images.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(__dirname, '../..')
@@ -113,6 +115,10 @@ db.update(schema.sysTask)
   .then(() => failInterruptedTextTasks())
   // 存量任务补归属集：全局任务中心按剧/集筛选与编号
   .then(() => backfillTaskEpisodeIds())
+  // 存量媒体补生成时间（unix 秒，按 completed_at || created_at），幂等
+  .then(() => backfillGeneratedAt())
+  // 参考图存储结构迁移：字符串路径 → { path, uploaded_at }，幂等
+  .then(() => migrateReferenceImages())
   // 清理完成后再恢复批量任务：被重启打断的那一张/那一镜此时已是 failed，由批次重新提交
   .then(() => startQwenJobsTracker())
   .then(() => resumeKeyframeBatches())

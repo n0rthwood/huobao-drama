@@ -232,11 +232,14 @@ export const sqliteSchemaStatements = [
     error_msg TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
-    completed_at TEXT
+    completed_at TEXT,
+    generated_at INTEGER
   )`,
   `CREATE INDEX IF NOT EXISTS idx_sys_task_type ON sys_task (type)`,
   `CREATE INDEX IF NOT EXISTS idx_sys_task_drama_id ON sys_task (drama_id)`,
   `CREATE INDEX IF NOT EXISTS idx_sys_task_storyboard_id ON sys_task (storyboard_id)`,
+  // 当前媒体按路径反查生成时间（资产/分镜每个响应一次批量 IN 查询）
+  `CREATE INDEX IF NOT EXISTS idx_sys_task_local_path ON sys_task (local_path)`,
 
   `CREATE TABLE IF NOT EXISTS video_merges (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -253,6 +256,7 @@ export const sqliteSchemaStatements = [
     error_msg TEXT,
     created_at TEXT NOT NULL,
     completed_at TEXT,
+    generated_at INTEGER,
     deleted_at TEXT
   )`,
 
@@ -353,6 +357,9 @@ const columnAdditions: { table: string; column: string; type: string }[] = [
   { table: 'sys_task', column: 'remote_state', type: 'TEXT' },
   // 任务归属的集：全局任务中心按剧/集筛选与编号，启动时按 storyboard_id 回填存量行
   { table: 'sys_task', column: 'episode_id', type: 'INTEGER' },
+  // 媒体生成时间（unix 秒）：完成时写入，启动时按 completed_at || created_at 回填存量行
+  { table: 'sys_task', column: 'generated_at', type: 'INTEGER' },
+  { table: 'video_merges', column: 'generated_at', type: 'INTEGER' },
 ]
 
 /**

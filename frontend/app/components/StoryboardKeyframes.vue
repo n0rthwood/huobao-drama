@@ -306,6 +306,7 @@
                   <template v-else>{{ t('episode.kf.slotEmpty') }}</template>
                 </span>
               </button>
+              <MediaTime class="kf-preview-time" :at="slotTimeOf(selected, slot)" />
 
               <div class="kf-slot-main">
                 <div v-if="slotRing(selected, slot)" class="kf-slot-task">
@@ -469,6 +470,8 @@ import ProgressRing from '~/components/ProgressRing.vue'
 import ConfirmDialog from '~/components/ConfirmDialog.vue'
 import FieldSaveStatus from '~/components/FieldSaveStatus.vue'
 import RefIssueList from '~/components/RefIssueList.vue'
+import MediaTime from '~/components/MediaTime.vue'
+import { mediaTimeLabel, mediaTimeOfPath } from '~/utils/mediaTime'
 import {
   useNowTicker,
   ringPropsFromTask,
@@ -548,11 +551,8 @@ function versionLabel(version) {
   const prefix = Number.isFinite(no) && no > 0 ? `${t('episode.kf.versionNo', { n: no })} · ` : ''
   const engine = version?.provider || t('episode.asset.unknownEngine')
   const model = version?.model ? ` · ${version.model}` : ''
-  const iso = version?.created_at || version?.createdAt || ''
-  const d = iso ? new Date(iso) : null
-  const p = n => String(n).padStart(2, '0')
-  const time = d && !Number.isNaN(d.getTime()) ? ` · ${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}` : ''
-  return `${prefix}${engine}${model}${time}`
+  const time = mediaTimeLabel(version?.generated_at ?? version?.generatedAt, t, now.value)
+  return `${prefix}${engine}${model}${time ? ` · ${time}` : ''}`
 }
 
 // ===== 参考图 ↔ 提示词一致性问题（后端 ref_issues，message 可直接展示） =====
@@ -597,6 +597,10 @@ function kf(sb) {
 function slotImage(sb, slot) {
   const k = kf(sb)
   return slot === 'first' ? k.first : slot === 'mid' ? k.mid : k.last
+}
+/** 该槽位生效关键帧的生成时间（unix 秒）；反查不到 → null，不显示 */
+function slotTimeOf(sb, slot) {
+  return mediaTimeOfPath(sb, slotImage(sb, slot))
 }
 // 槽位自有选定图（首帧承接时为空），版本下拉以此为当前值
 function slotOwnImage(sb, slot) {

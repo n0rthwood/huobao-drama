@@ -22,6 +22,7 @@ import {
 import { aggregateBatchItems, type KeyframeBatchItem } from './keyframe-batch-progress.js'
 import { parseTextTaskParams } from './text-task.js'
 import { composeEpisodeLabel, composeTaskLabel, type TaskTargetKind } from './task-label.js'
+import { toUnixSeconds } from './media-time.js'
 
 export type { TaskLabelInput, TaskTargetKind } from './task-label.js'
 export { composeEpisodeLabel, composeTaskLabel, renderRefPrompt } from './task-label.js'
@@ -214,7 +215,9 @@ export interface ParentRow {
   progress: number
   counts: Record<string, number>
   created_at: string
+  created_at_unix: number | null
   updated_at: string
+  updated_at_unix: number | null
   children: TaskRow[]
 }
 
@@ -228,7 +231,11 @@ export interface MergeRow {
   result_url: string | null
   error_msg: string | null
   created_at: string
+  created_at_unix: number | null
   updated_at: string
+  updated_at_unix: number | null
+  /** 成片产出时刻（unix 秒），未完成为 null */
+  generated_at: number | null
 }
 
 export type CenterRow = TaskRow | ParentRow | MergeRow
@@ -369,7 +376,9 @@ export async function listTaskCenter(filters: CenterFilters): Promise<{
       progress: aggregate.progress,
       counts: aggregate.counts,
       created_at: batch.createdAt,
+      created_at_unix: toUnixSeconds(batch.createdAt),
       updated_at: batch.updatedAt,
+      updated_at_unix: toUnixSeconds(batch.updatedAt),
       children,
     })
   }
@@ -396,7 +405,10 @@ export async function listTaskCenter(filters: CenterFilters): Promise<{
         result_url: merge.mergedUrl ?? null,
         error_msg: merge.errorMsg ?? null,
         created_at: merge.createdAt,
+        created_at_unix: toUnixSeconds(merge.createdAt),
         updated_at: merge.completedAt || merge.createdAt,
+        updated_at_unix: toUnixSeconds(merge.completedAt || merge.createdAt),
+        generated_at: merge.generatedAt ?? null,
       })
     }
   }

@@ -355,6 +355,7 @@
                       <span class="asset-cover-badge" :class="(c.image_url || c.imageUrl) ? 'is-ready' : (isPendingCharImage(c.id) ? 'is-pending' : '')">
                         {{ (c.image_url || c.imageUrl) ? t('episode.asset.portraitReady') : (isPendingCharImage(c.id) ? t('episode.asset.portraitPending') : t('episode.asset.portraitTodo')) }}
                       </span>
+                      <MediaTime v-if="c.image_generated_at" class="asset-cover-time" :at="c.image_generated_at" />
                     </div>
 
                     <div class="character-asset-head">
@@ -437,6 +438,7 @@
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                   </div>
                   <span class="asset-cover-badge" :class="(s.image_url || s.imageUrl) ? 'is-ready' : (isPendingSceneImage(s.id) ? 'is-pending' : '')">{{ (s.image_url || s.imageUrl) ? t('episode.asset.ready') : (isPendingSceneImage(s.id) ? t('episode.asset.generating') : t('episode.asset.todo')) }}</span>
+                  <MediaTime v-if="s.image_generated_at" class="asset-cover-time" :at="s.image_generated_at" />
                 </div>
                 <div class="asset-body">
                   <div class="asset-name" :title="s.location">{{ s.location }}</div>
@@ -511,6 +513,7 @@
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
                   </div>
                   <span class="asset-cover-badge" :class="(p.image_url || p.imageUrl) ? 'is-ready' : (isPendingPropImage(p.id) ? 'is-pending' : '')">{{ (p.image_url || p.imageUrl) ? t('episode.asset.ready') : (isPendingPropImage(p.id) ? t('episode.asset.generating') : t('episode.asset.todo')) }}</span>
+                  <MediaTime v-if="p.image_generated_at" class="asset-cover-time" :at="p.image_generated_at" />
                 </div>
                 <div class="asset-body">
                   <div class="prop-name-row">
@@ -794,6 +797,7 @@
                     {{ videoTaskStatusLabel(selectedSb) }}
                   </span>
                   <span v-if="selectedSb.duration" class="video-player-sub">{{ selectedSb.duration }}s</span>
+                  <MediaTime :at="mediaTimeOf(selectedSb, previewVideoUrl || getVideoUrl(selectedSb))" />
                 </div>
                 <button
                   v-if="previewVideoUrl"
@@ -860,7 +864,7 @@
                   @keydown.enter.prevent="previewHistoryVideo(h)"
                 >
                   <video :src="'/' + taskVideoPath(h)" :poster="posterOf('/' + taskVideoPath(h)) || undefined" preload="none" muted playsinline tabindex="-1" />
-                  <span class="video-history-time">{{ formatHistoryTime(taskCreatedAt(h)) }}</span>
+                  <MediaTime class="video-history-time" :at="taskGeneratedAt(h)" />
                   <span class="video-history-engine">{{ h.provider || t('episode.vid.unknownEngine') }}<template v-if="h.model"> · {{ h.model }}</template></span>
                   <span v-if="isCurrentVideo(h)" class="video-history-badge">{{ t('episode.vid.current') }}</span>
                   <button v-else type="button" class="video-history-del" :title="t('episode.vid.deleteRecord')" @click.stop="removeHistoryVideo(h)">×</button>
@@ -916,6 +920,7 @@
                         />
                         <span v-else class="video-keyframe-thumb-empty">{{ t('episode.kf.slotEmpty') }}</span>
                         <small>{{ slot.label }}</small>
+                        <MediaTime :at="mediaTimeOf(selectedSb, shotKeyframeImage(selectedSb, slot.slot))" />
                       </button>
                     </div>
                     <div v-if="!isShotConfirmed(selectedSb)" class="video-keyframe-hint">{{ t('episode.kf.gateShotUnconfirmed') }}</div>
@@ -1033,7 +1038,7 @@
                     </span>
                   </div>
                   <div class="merge-card-meta">
-                    <span class="mono">{{ formatHistoryTime(m.created_at) }}</span>
+                    <MediaTime :at="m.generated_at || m.created_at_unix" />
                     <span v-if="m.duration">· {{ m.duration }}s</span>
                     <a
                       v-if="m.status === 'completed' && m.merged_url"
@@ -1045,6 +1050,16 @@
                       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                       {{ t('common.download') }}
                     </a>
+                    <button
+                      type="button"
+                      class="btn btn-sm merge-card-del"
+                      :disabled="isMergeInProgress(m) || deletingMergeId === m.id"
+                      :title="isMergeInProgress(m) ? t('episode.export.deleteMergeBusy') : t('episode.export.deleteMerge')"
+                      @click.stop="askDeleteMerge(m)"
+                    >
+                      <Trash2 :size="11" />
+                      {{ t('common.delete') }}
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1109,6 +1124,7 @@
                   </div>
                   <div class="exp-row-line">
                     <span class="truncate" style="flex:1;font-size:11px">{{ sb.description || sb.title || '—' }}</span>
+                    <MediaTime v-if="hasVid(sb)" :at="mediaTimeOf(sb, getVideoUrl(sb))" />
                     <span :class="['dot', hasVid(sb) && 'ok']" />
                   </div>
                 </div>
@@ -1168,6 +1184,7 @@
                     <svg v-else width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                   </span>
                 </button>
+                <MediaTime v-if="assetDetail.item?.image_generated_at" class="asset-detail-media-time" :at="assetDetail.item.image_generated_at" />
 
                 <section v-if="assetVersions(assetDetail.item).length" class="asset-version-panel">
                   <div class="asset-version-head">
@@ -1186,6 +1203,7 @@
                     >
                       <img :src="thumbOf(versionImageSrc(version))" loading="lazy" @error="thumbFallback($event, versionImageSrc(version))" />
                       <span class="asset-version-meta">{{ version.provider || t('episode.asset.unknownEngine') }}<template v-if="version.model"> · {{ version.model }}</template></span>
+                      <MediaTime :at="version.generated_at" />
                       <span v-if="isCurrentAssetVersion(assetDetail.item, version)" class="asset-version-current">{{ t('episode.asset.currentVersion') }}</span>
                     </button>
                   </div>
@@ -1402,7 +1420,7 @@
         <div class="dialog image-viewer-dialog merge-viewer-dialog">
           <div class="image-viewer-head">
             <div class="image-viewer-title">{{ t('episode.viewer.filmPreview') }}</div>
-            <span class="dim" style="font-size:11px">{{ formatHistoryTime(activeMerge.created_at) }}<template v-if="activeMerge.duration"> · {{ activeMerge.duration }}s</template></span>
+            <span class="dim" style="font-size:11px"><MediaTime :at="activeMerge.generated_at || activeMerge.created_at_unix" /><template v-if="activeMerge.duration"> · {{ activeMerge.duration }}s</template></span>
             <a :href="'/' + activeMerge.merged_url" download class="btn btn-sm" style="margin-left:auto">
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               {{ t('episode.viewer.downloadFilm') }}
@@ -1519,6 +1537,15 @@
         @confirm="confirmDeleteAsset"
         @cancel="assetDelete.open = false"
       />
+
+      <ConfirmDialog
+        :open="mergeDelete.open"
+        :title="t('episode.export.deleteMergeTitle')"
+        :message="t('episode.export.deleteMergeMessage')"
+        :loading="mergeDelete.loading"
+        @confirm="confirmDeleteMerge"
+        @cancel="mergeDelete.open = false"
+      />
     </main>
     </div>
   </div>
@@ -1542,6 +1569,8 @@ import ProgressRing from '~/components/ProgressRing.vue'
 import FieldSaveStatus from '~/components/FieldSaveStatus.vue'
 import RefIssueList from '~/components/RefIssueList.vue'
 import TaskCenterButton from '~/components/TaskCenterButton.vue'
+import MediaTime from '~/components/MediaTime.vue'
+import { mediaTimeLabel, mediaTimeOfPath } from '~/utils/mediaTime'
 import {
   useNowTicker,
   ringPropsFromTask,
@@ -1626,6 +1655,41 @@ function toggleSelectAllExport() {
 async function loadExportMerges() {
   if (!epId.value) return
   try { exportMerges.value = await mergeAPI.list(epId.value) || [] } catch { /* 静默 */ }
+}
+
+// ─── 删除成片 ────────────────────────────────────────────────
+const mergeDelete = ref({ open: false, item: null, loading: false })
+const deletingMergeId = computed(() => (mergeDelete.value.loading ? mergeDelete.value.item?.id ?? null : null))
+
+/** 拼接进行中的成片不可删（后端同样拒绝） */
+function isMergeInProgress(m) {
+  const status = m?.status || 'pending'
+  return status === 'pending' || status === 'processing' || status === 'queued' || status === 'running'
+}
+
+function askDeleteMerge(m) {
+  if (!m || isMergeInProgress(m)) return
+  mergeDelete.value = { open: true, item: m, loading: false }
+}
+
+async function confirmDeleteMerge() {
+  const item = mergeDelete.value.item
+  if (!item || mergeDelete.value.loading) return
+  mergeDelete.value.loading = true
+  try {
+    const res = await mergeAPI.del(epId.value, item.id)
+    if (activeMerge.value?.id === item.id) activeMerge.value = null
+    mergeDelete.value.open = false
+    toast.success(t('episode.export.deleteMergeDone'))
+    // 成片列表 / 剧集「已合成」状态 / 任务中心导出行同步
+    if (episode.value) episode.value.video_url = res?.episode_video_url ?? null
+    await loadExportMerges()
+    await loadEpisodeTasks(epId.value)
+  } catch (e) {
+    toastError(e, { fallback: 'common.deleteFailed' })
+  } finally {
+    mergeDelete.value.loading = false
+  }
 }
 
 // URL 为面板来源时 step 缺失取默认 0（由 refresh 按内容自动推进），不继承本地记忆
@@ -3322,6 +3386,10 @@ const previewVideoUrl = ref('') // 正在预览的历史视频(相对路径);空
 // 注意:扁平 /tasks 返回原始行(camelCase),任务中心接口返回 snake_case,两种命名都兼容
 function taskVideoPath(t) { return t?.local_path || t?.localPath || t?.result_url || t?.resultUrl || '' }
 function taskCreatedAt(t) { return t?.created_at || t?.createdAt || '' }
+/** 任务产出时刻（unix 秒）：未完成的任务退回提交时间 */
+function taskGeneratedAt(t) { return t?.generated_at ?? t?.generatedAt ?? t?.created_at_unix ?? null }
+/** 分镜「当前媒体」（关键帧 / 视频）的生成时间：后端按路径反查后随分镜返回 */
+const mediaTimeOf = mediaTimeOfPath
 function isCurrentVideo(t) { const p = taskVideoPath(t); return !!p && p === getVideoUrl(selectedSb.value) }
 
 async function loadSbVideoHistory() {
@@ -3361,13 +3429,6 @@ async function removeHistoryVideo(t) {
   } catch (e) { toastError(e, { fallback: 'common.deleteFailed' }) }
 }
 
-function formatHistoryTime(iso) {
-  if (!iso) return ''
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
-  const p = n => String(n).padStart(2, '0')
-  return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
-}
 
 function storyboardAssetVersionSelection(sb) {
   const raw = sb?.asset_version_selection ?? sb?.assetVersionSelection
@@ -3389,7 +3450,7 @@ function selectedAssetImage(sb, kind, item) {
 function versionLabel(version) {
   const engine = version?.provider || t('episode.asset.unknownEngine')
   const model = version?.model ? ` · ${version.model}` : ''
-  const time = formatHistoryTime(version?.created_at || version?.createdAt)
+  const time = mediaTimeLabel(version?.generated_at ?? version?.generatedAt, t, now.value)
   return `${engine}${model}${time ? ` · ${time}` : ''}`
 }
 
@@ -4783,6 +4844,21 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
   left: 7px;
   display: inline-flex;
   align-items: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  color: var(--text-2);
+  font-size: 9.5px;
+  font-weight: 700;
+}
+/* 媒体生成时间：压在封面右下角，与左上角的状态徽章对称 */
+.asset-cover-time {
+  position: absolute;
+  right: 7px;
+  bottom: 7px;
   padding: 2px 7px;
   border-radius: 999px;
   background: rgba(255,255,255,0.85);
