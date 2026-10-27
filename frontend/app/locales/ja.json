@@ -743,6 +743,7 @@
       "uploadImage": "画像をアップロード",
       "appearance": "外見：",
       "styling": "スタイリング：",
+      "stylingVersion": "本話の衣装：",
       "lighting": "光照 · ",
       "appearanceTodo": "外見未入力",
       "stylingTodo": "スタイリング未入力",

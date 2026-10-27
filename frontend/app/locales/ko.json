@@ -743,6 +743,7 @@
       "uploadImage": "이미지 업로드",
       "appearance": "외모: ",
       "styling": "스타일링: ",
+      "stylingVersion": "이번 화 의상: ",
       "lighting": "조명 · ",
       "appearanceTodo": "외모 미입력",
       "stylingTodo": "스타일링 미입력",

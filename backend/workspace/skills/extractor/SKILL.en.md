@@ -5,61 +5,44 @@ description: Rules and methods for extracting characters, scenes, and props
 
 # Character, Scene & Prop Extraction Guide
 
+## Guiding Principle: Everything Serves Visual Continuity
+
+Every asset you extract becomes an image-generation reference that storyboards cite with @. When deciding "should I extract this, and how do I word it", ask only one question: **does this information help the picture stay consistent across different shots?** Descriptions must be definite and unambiguous — writings such as "or", "possibly", "about", "light pink or beige tones" that hand the choice back to the model are forbidden; lock it down once and for all.
+
 ## Character Extraction Rules
 
 Extracted character fields (corresponding one-to-one with the `save_dedup_characters` tool parameters):
 - **name** (required): the character's full name
 - **role**: the character's positioning — protagonist / supporting / extra
-- **appearance**: appearance description (300-500 characters) — gender, age impression, facial features, physique, bearing. **Do not output the character's personality traits separately; convert them into outward bearing and expression woven into the appearance description** (e.g. "cold personality" should be written as "a cold gaze, a restrained expression, rarely smiling")
-- **styling**: styling — hairstyle, clothing, makeup, accessories, etc.
+- **appearance**: appearance description (200-400 characters) — gender, age impression, facial features, physique, **relative body size** (e.g. "roughly two thirds the height of Papa Pig"); when several characters share a frame this is the key information that prevents proportion drift. Write only **static visible features**; convert personality into one line of permanent bearing (e.g. "a cold gaze, rarely smiling"), do not write behavioural processes ("holds his breath in concentration while training" and similar time-based descriptions are noise for single-frame image generation)
+- **styling**: **base styling** — the character's regular hairstyle, regular clothing, regular accessories. Once the base look is established it is never rewritten (the tool preserves existing non-empty fields); it must match the character asset image. If you find the text conflicting with the image, report it to the user in your closing message; do not silently change the field to accommodate the image
+- **styling_version**: **per-episode styling version** (optional) — fill this in when the script gives the character a complete new outfit (vacation outfit, snow gear, formal dress, etc.): `name` (a 2-6 character version name, e.g. "Hawaiian Vacation Outfit") + `description` (a definite description of the whole outfit: the cut, colour and pattern of every single item). A complete outfit always goes through a styling version and **never** into styling; hats, glasses, sunglasses, helmets and other accessories that can be put on and taken off separately are not styling versions — extract them as props
 - **description**: backstory and character relationships (optional supplement)
 
 ## Scene Extraction Rules
 
 Extracted scene fields (corresponding one-to-one with the `save_dedup_scenes` tool parameters):
-- **location** (required): the specific place name
-- **time**: time period (e.g. daytime / dusk / late night); the same location at a different time period counts as a new scene
-- **prompt**: scene description — space, set dressing, period texture, key visual elements (pure background, no people)
-- **lighting**: scene lighting — light sources, color tone, brightness contrast, mood
+- **location** (required): the specific place name. **One physical space = one scene**: "at the living room desk" and "in front of the living room sofa" are camera positions inside the living room, not independent scenes — always use "living room"; framing of sub-areas is left to the shot-size and camera-position language of the storyboard
+- **time**: the time period (day / dusk / late night, etc.); only the same location at a different time period counts as a new scene
+- **prompt**: scene description — the space, the fixed furnishings and their **relative positions** (pure background, no characters). Large fixed items the plot will use (TV, desk, sofa, window) must have their positional relationships stated; **movable objects that characters pick up or use (cups, books, newspapers, dumbbells, mats) must never be written into the scene** — they are props, and baking them into the scene image makes them impossible to control separately
+- **lighting**: scene light and shadow — light sources, colour tone, brightness, atmosphere
 
 ## Prop Extraction Rules
 
-**Core principle: prefer extracting too few over too many.** Props are high-cost assets used to generate white-background product shots and referenced by video close-ups; only plot-critical props are worth extracting. An episode usually has **0-3** key props; if there are more than 3, rank them by plot importance and keep only the top 3.
+For the detailed decision criteria, category enumeration and description style see the **prop-extraction** skill, which must be followed. Key points:
+- Any object the script explicitly describes, that a character holds / uses / wears, that appears across shots, or that is stood on or looked into must be extracted, and there is **no quantity limit** — how many are used per shot is decided at the storyboard layer within the 9-reference-image budget, not compressed at the extraction layer
+- A pair of objects (two dumbbells) counts as one prop; a complete outfit is not a prop (it goes through the character styling version)
 
-Both of the following conditions must be met — neither is optional:
-1. **Directly drives the plot**: the item's appearance, handover, damage, or discovery triggers a plot turn (e.g. a murder weapon, a token, a key document, a love-token gift, key evidence).
-2. **Worth generating a dedicated image**: later storyboards will give it close-ups or it recurs, so it needs a fixed appearance.
-
-**Three self-check questions** (ask and answer for yourself for each candidate prop; if any answer is "no", drop it):
-- (1) Does the plot still hold if it is removed? → If yes, **do not extract** (it is just a decorative prop)
-- (2) Is it just an everyday item the character casually uses (phone, chopsticks, water cup, cigarettes, umbrella)? → If yes, **do not extract**
-- (3) Is it part of the set dressing (tables and chairs, lamps, doors and windows, wall hangings, tableware)? → If yes, **do not extract** (these belong in the scene description)
-
-**Typical non-props**: ordinary items used casually with no effect on the plot's direction; set dressing and furniture; items mentioned only once and never again; a character's regular attire (belongs in character styling).
-
-If no prop qualifies, **do not force an extraction** — just pass an empty array when calling `save_dedup_props`.
-
-Extracted prop fields (corresponding one-to-one with the `save_dedup_props` tool parameters):
-- **name** (required): prop name
-- **type**: category — daily / weapon / transportation / decoration / document, etc.
-- **description**: physical appearance of the item only (material, color, shape, size, degree of wear, signs of damage, etc.); do not describe its plot purpose or its relation to characters or anything else
-
-Props **do not need an image prompt** — a prop's final prompt is generated by the prompt-generation Agent before image generation (white-background product-shot specification).
-
-## Steps
+## Usage Steps
 
 1. Call `read_script_for_extraction` to read the current episode's script
-2. Call `read_existing_characters` to view existing project characters and the characters already linked to the current episode
-3. Call `read_existing_scenes` to view existing project scenes and the scenes already linked to the current episode
-4. Call `read_existing_props` to view existing project props and the props already linked to the current episode
-5. Only extract the characters, scenes, and props actually involved in the current episode
-6. Call `save_dedup_characters` to save the characters and automatically link them to the current episode
-7. Call `save_dedup_scenes` to save the scenes and automatically link them to the current episode
-8. Call `save_dedup_props` to save the props and automatically link them to the current episode
+2. Call `read_existing_characters` / `read_existing_scenes` / `read_existing_props` to see the project's existing assets and their links to the current episode
+3. Extract only the characters, scenes and props the current episode actually involves
+4. Call `save_dedup_characters` / `save_dedup_scenes` / `save_dedup_props` to save them and automatically link them to the current episode
 
 ## Current-Episode Rules
 
-- The goal is to fill in the characters, scenes, and props needed by the "current episode", not to rescan the entire project
-- If an asset already exists in the project but is not yet linked to the current episode, reuse it and link it to the current episode
-- Deduplication rules: characters/props are matched exactly by name, scenes are matched exactly by [location + time period]; on a hit, prefer reuse — do not create duplicates
-- Near-name deduplication: when a name carries a parenthesized qualifier or alias, compare by the main part before the parentheses (e.g. "Lin Xiaoyu (protagonist)" and "Lin Xiaoyu" are the same character/prop — reuse the existing one); the normalized_name returned by read_existing_characters / read_existing_props is the normalized name, and normalized_location works the same way for scenes — use these for the judgment
+- The goal is to complete the assets the "current episode" needs, not to rescan the whole project
+- Anything already present in the project but not linked to the current episode should be reused and linked to the current episode
+- Deduplication: characters / props match by exact name; scenes match by [location + time period], and when location names contain one another prefer treating them as the same space and reuse it
+- Near-name deduplication: when a name carries a parenthesised qualifier or an alias, compare by the main body before the parenthesis; the `normalized_name` / `normalized_location` returned by `read_existing_*` is the normalised result — judge by it

@@ -743,6 +743,7 @@
       "uploadImage": "上传图片",
       "appearance": "样貌：",
       "styling": "妆造：",
+      "stylingVersion": "本集造型：",
       "lighting": "光照 · ",
       "appearanceTodo": "样貌待补充",
       "stylingTodo": "妆造待补充",

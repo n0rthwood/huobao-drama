@@ -15,6 +15,7 @@ import { eq, and } from 'drizzle-orm'
 import { now } from '../../utils/response.js'
 import { logTaskProgress, logTaskSuccess } from '../../utils/task-logger.js'
 import { getDramaId, getEpisodeId } from '../context.js'
+import { parseStylingVersion, saveStylingVersion } from '../../services/styling-version.js'
 
 // ─── 关联辅助 ────────────────────────────────────────────────
 async function linkCharToEpisode(episodeId: number, characterId: number) {
@@ -104,6 +105,12 @@ const readExistingCharacters = createTool({
     const links = await db.select().from(schema.episodeCharacters)
       .where(eq(schema.episodeCharacters.episodeId, episodeId))
     const linkedIds = new Set(links.map(link => link.characterId))
+    // 本集造型版本（Issue #15）：让提取 Agent 知道本集已有哪套造型，避免重复写进基础 styling
+    const versionByCharId = new Map<number, unknown>()
+    for (const link of links) {
+      const parsed = parseStylingVersion(link.stylingVersion)
+      if (parsed) versionByCharId.set(link.characterId, parsed)
+    }
     const chars = (await db.select().from(schema.characters)
       .where(eq(schema.characters.dramaId, dramaId)))
       .filter(c => !c.deletedAt)
@@ -113,6 +120,7 @@ const readExistingCharacters = createTool({
       role: c.role || '',
       appearance: c.appearance || '',
       styling: c.styling || '',
+      episode_styling_version: versionByCharId.get(c.id) ?? null,
       normalized_name: normalizeName(c.name), // 用于判断近名复用：括号定位/别名视为同名
     }))
     const payload = {
@@ -179,6 +187,11 @@ const saveDedupCharacters = createTool({
       description: z.string().optional(),
       appearance: z.string().optional(),
       styling: z.string().optional(),
+      // 本集成套造型（Issue #15 Q1=B）：写进集关联，绝不覆盖基础形象的 styling
+      styling_version: z.object({
+        name: z.string(),
+        description: z.string().optional(),
+      }).optional(),
     })),
   }),
   execute: async ({ characters }, context) => {
@@ -186,7 +199,10 @@ const saveDedupCharacters = createTool({
     if ('error' in ids) return ids
     const { episodeId, dramaId } = ids
     const ts = now()
-    const results = { created: 0, merged: 0 }
+    const results = { created: 0, merged: 0, styling_versions: 0 }
+    // 合并时被忽略的改写：基础形象一旦有值就不再被单集提取覆盖，这里如实回报给 Agent
+    const ignored: string[] = []
+    const stylingVersions: string[] = []
     logTaskProgress('ExtractTool', 'save-characters-begin', {
       episodeId,
       dramaId,
@@ -201,19 +217,24 @@ const saveDedupCharacters = createTool({
       const normName = normalizeName(char.name)
       const existing = exact || (normName ? charsInProject.find(c => c.name && normalizeName(c.name) === normName) : undefined)
       const matchedViaNorm = !!existing && existing !== exact
+      let charId: number
 
       if (existing) {
         // 归一化命中：括号定位/别名等近名视作同一角色复用，避免重复创建
         if (matchedViaNorm) logTaskProgress('ExtractTool', 'save-characters-reuse', { episodeId, dramaId, extracted: char.name, reused: existing.name })
-        // 已存在：合并信息，保留 ID
+        // 合并策略（Issue #15）：基础形象以**已有非空值**为准，新文本只补空白字段。
+        // 旧实现用本集文本直接覆盖 styling/appearance，导致 E3 的度假造型污染了全剧的基础形象。
+        if (char.styling && existing.styling && char.styling !== existing.styling) ignored.push(`${existing.name}.styling`)
+        if (char.appearance && existing.appearance && char.appearance !== existing.appearance) ignored.push(`${existing.name}.appearance`)
         await db.update(schema.characters).set({
-          role: char.role || existing.role,
-          description: char.description || existing.description,
-          appearance: char.appearance || existing.appearance,
-          styling: char.styling || char.description || existing.styling,
+          role: existing.role || char.role || '',
+          description: existing.description || char.description || '',
+          appearance: existing.appearance || char.appearance || '',
+          styling: existing.styling || char.styling || char.description || '',
           updatedAt: ts,
         }).where(eq(schema.characters.id, existing.id))
         await linkCharToEpisode(episodeId, existing.id)
+        charId = existing.id
         results.merged++
       } else {
         // 新增角色
@@ -227,17 +248,31 @@ const saveDedupCharacters = createTool({
           createdAt: ts,
           updatedAt: ts,
         })
-        const charId = getInsertId(res)
+        charId = getInsertId(res)
         await linkCharToEpisode(episodeId, charId)
         results.created++
+      }
+
+      if (char.styling_version?.name?.trim()) {
+        const saved = await saveStylingVersion(episodeId, charId, {
+          name: char.styling_version.name.trim(),
+          description: char.styling_version.description || '',
+        })
+        if (saved) {
+          results.styling_versions++
+          stylingVersions.push(`${char.name}：${saved.name}`)
+        }
       }
     }
 
     const payload = {
-      message: `角色保存完成：新增 ${results.created}，合并更新 ${results.merged}`,
+      message: `角色保存完成：新增 ${results.created}，合并更新 ${results.merged}，本集造型版本 ${results.styling_versions}`,
       ...results,
+      // 基础形象被保护、未采纳的改写（不是错误：单集造型请用 styling_version）
+      ignored_overwrites: ignored,
+      saved_styling_versions: stylingVersions,
     }
-    logTaskSuccess('ExtractTool', 'save-characters-complete', { episodeId, ...results })
+    logTaskSuccess('ExtractTool', 'save-characters-complete', { episodeId, ...results, ignored: ignored.length })
     return payload
   },
 })
@@ -301,9 +336,29 @@ const saveDedupScenes = createTool({
       }
     }
 
+    // 近地点提示（Issue #15）：同一物理空间被按时段/机位拆成多个场景资产时，每个资产各自出图，
+    // 画面就会每次不同。这里只**提示**互为前缀/包含关系的候选，不做任何自动合并。
+    const finalScenes = (await db.select().from(schema.scenes)
+      .where(eq(schema.scenes.dramaId, dramaId)))
+      .filter(s => !s.deletedAt)
+    const nearby: string[] = []
+    for (const a of finalScenes) {
+      for (const b of finalScenes) {
+        if (a.id >= b.id) continue
+        const na = normalizeLocation(a.location)
+        const nb = normalizeLocation(b.location)
+        if (!na || !nb || na === nb) continue
+        if (!na.includes(nb) && !nb.includes(na)) continue
+        nearby.push(`「${a.location}${a.time ? `·${a.time}` : ''}」与「${b.location}${b.time ? `·${b.time}` : ''}」可能是同一物理空间`)
+      }
+    }
     const payload = {
       message: `场景保存完成：新增 ${results.created}，复用已有 ${results.reused}`,
       ...results,
+      near_location_hints: nearby,
+      hint: nearby.length
+        ? '以上地点疑似同一物理空间的不同子区域/时段。一个物理空间只建一个场景资产，子区域与时段靠分镜提示词表达；如确属不同空间可忽略本提示。'
+        : '',
     }
     logTaskSuccess('ExtractTool', 'save-scenes-complete', { episodeId, ...results })
     return payload

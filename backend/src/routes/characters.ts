@@ -8,6 +8,8 @@ import { getDramaStylePrompt } from '../services/style-preset.js'
 import { ensureCharacterFinalPrompt } from '../services/final-prompt.js'
 import { logTaskError, logTaskStart, logTaskSuccess, logTaskWarn } from '../utils/task-logger.js'
 import { deleteAllReferenceImages, partitionMissingReferences, resolveReferenceImages } from '../services/reference-images.js'
+import { deleteAssetLinks } from '../services/asset-links.js'
+import { getStylingVersion, saveStylingVersion } from '../services/styling-version.js'
 import { mountReferenceImageRoutes } from './reference-images.js'
 
 const app = new Hono()
@@ -81,6 +83,8 @@ app.delete('/:id', async (c) => {
   await db.update(schema.characters).set({ deletedAt: now() }).where(eq(schema.characters.id, id))
   // 参考图是角色私有的生图输入，随角色一起清理（成片图保留，与既有行为一致）
   deleteAllReferenceImages('character', id)
+  // 集关联/分镜绑定不保留：残留行会让提取与 @引用 继续看到已删角色（Issue #15）
+  await deleteAssetLinks('character', id)
   return success(c)
 })
 
@@ -132,6 +136,75 @@ app.post('/:id/generate-prompt', async (c) => {
   }
   logTaskSuccess('FinalPrompt', 'character-generate', { characterId: id })
   return success(c, { final_prompt: finalPrompt })
+})
+
+// PUT /characters/:id/styling-version — 保存本集造型版本的文字（Issue #15，不动基础形象）
+app.put('/:id/styling-version', async (c) => {
+  const id = Number(c.req.param('id'))
+  const body = await c.req.json()
+  if (!body.episode_id) return badRequest(c, 'episode_id 必填')
+  if (!body.name?.trim()) return badRequest(c, '造型名必填')
+  const saved = await saveStylingVersion(Number(body.episode_id), id, {
+    name: String(body.name).trim(),
+    description: body.description ? String(body.description) : undefined,
+    image_path: body.image_path !== undefined ? String(body.image_path || '') : undefined,
+  })
+  if (!saved) return badRequest(c, '该角色未关联到本集，无法保存造型版本')
+  return success(c, { styling_version: saved })
+})
+
+// POST /characters/:id/styling-version/generate-image — 以基础形象图做 image_edit 出造型图
+app.post('/:id/styling-version/generate-image', async (c) => {
+  const id = Number(c.req.param('id'))
+  const body = await c.req.json()
+  const [char] = await db.select().from(schema.characters).where(eq(schema.characters.id, id))
+  if (!char) return badRequest(c, '角色不存在')
+  if (!body.episode_id) return badRequest(c, 'episode_id 必填')
+  const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, Number(body.episode_id)))
+  if (!ep) return badRequest(c, '剧集不存在')
+
+  // 造型文本可随请求一并更新（提取写入后再手工改的场景）
+  const existing = await getStylingVersion(ep.id, id)
+  const name = String(body.name || existing?.name || '').trim()
+  if (!name) return badRequest(c, '本集没有造型版本，请先保存造型名与描述')
+  const description = String(body.description ?? existing?.description ?? '').trim()
+  if (!description) return badRequest(c, '造型描述为空，无法出图')
+  // 造型版本写在集关联行上：没有关联就没有落点，先挡住，避免出一张无处回写的图
+  const saved = await saveStylingVersion(ep.id, id, { name, description })
+  if (!saved) return badRequest(c, '该角色未关联到本集，无法生成造型版本图')
+
+  // image_edit：基础形象图是唯一参考，保证换装后还是同一个角色
+  const baseImage = char.imageUrl || ''
+  if (!baseImage) return badRequest(c, '角色还没有基础形象图，请先生成角色图再出造型版本')
+  const stylePrompt = await getDramaStylePrompt(char.dramaId)
+  const prompt = [
+    stylePrompt || '',
+    `保持参考图中${char.name}的物种、体型、五官、毛色与三视图构图完全不变，只更换其身上的服装`,
+    `换装为：${description}`,
+    '服装合身、完整可见，不改变角色比例与姿态',
+    '白色背景',
+    '高质量',
+  ].filter(Boolean).join(', ')
+  try {
+    logTaskStart('CharacterImage', 'styling-version', { characterId: id, episodeId: ep.id, name })
+    const genId = await generateImage({
+      characterId: id,
+      episodeId: ep.id,
+      dramaId: char.dramaId,
+      prompt,
+      model: body.model,
+      size: CHARACTER_IMAGE_SIZE,
+      referenceImages: [baseImage],
+      configId: body.config_id ?? ep.imageConfigId ?? undefined,
+      characterVersion: { episodeId: ep.id, name },
+    })
+    logTaskSuccess('CharacterImage', 'styling-version', { characterId: id, generationId: genId })
+    return success(c, { image_generation_id: genId, styling_version: { name, description, image_path: existing?.image_path || '' } })
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err)
+    logTaskError('CharacterImage', 'styling-version', { characterId: id, error: message })
+    return badRequest(c, message)
+  }
 })
 
 // POST /characters/batch-generate-images

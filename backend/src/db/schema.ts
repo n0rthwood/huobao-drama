@@ -64,10 +64,13 @@ export const characters = sqliteTable('characters', {
 })
 
 // Episode-Character many-to-many
+// styling_version：本集的角色造型版本（Issue #15，JSON {name, description, image_path}）；
+// 只决定本集分镜默认选用哪张角色图，不覆盖 characters.styling / image_url 等基础形象字段。
 export const episodeCharacters = sqliteTable('episode_characters', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   episodeId: integer('episode_id').notNull(),
   characterId: integer('character_id').notNull(),
+  stylingVersion: text('styling_version'),
   createdAt: text('created_at').notNull(),
 })
 

@@ -7,6 +7,7 @@
  */
 import { and, eq } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
+import { parseStylingVersion, type StylingVersion } from './styling-version.js'
 
 /** 参考图上限（与前端面板、Seedance 多模态上限一致） */
 const REF_IMAGE_LIMIT = 9
@@ -32,13 +33,24 @@ function parseAssetVersionSelection(raw: string | null | undefined): Record<stri
   }
 }
 
+/**
+ * 某资产在本镜使用的图片：人工选版 > 本集角色造型版本图 > 资产当前成片图。
+ * 造型版本（Issue #15）只对角色生效，且永远让位于分镜上的人工选择。
+ */
 function selectedAssetImage(
   selection: Record<string, string>,
   kind: AssetKind,
   item: { id: number; imageUrl: string | null } | null,
+  stylingVersions?: Map<number, StylingVersion>,
 ): string {
   if (!item) return ''
-  return selection[`${kind}:${item.id}`] || item.imageUrl || ''
+  const manual = selection[`${kind}:${item.id}`]
+  if (manual) return manual
+  if (kind === 'character') {
+    const costume = stylingVersions?.get(item.id)
+    if (costume?.image_path) return costume.image_path
+  }
+  return item.imageUrl || ''
 }
 
 /**
@@ -66,6 +78,12 @@ export async function collectStoryboardAssetRefs(
   const episodeCharLinks = await db.select().from(schema.episodeCharacters)
     .where(eq(schema.episodeCharacters.episodeId, episodeId))
   const episodeCharIds = episodeCharLinks.map(link => link.characterId)
+  // 本集造型版本（Issue #15）：没有人工选版时，角色参考图默认用这套造型的图
+  const stylingVersions = new Map<number, StylingVersion>()
+  for (const link of episodeCharLinks) {
+    const parsed = parseStylingVersion(link.stylingVersion)
+    if (parsed) stylingVersions.set(link.characterId, parsed)
+  }
   const characters = (await db.select().from(schema.characters))
     .filter(ch => episodeCharIds.includes(ch.id) && !ch.deletedAt)
     .filter(ch => !NARRATOR_KEYWORDS.some(keyword => `${ch.name || ''} ${ch.role || ''}`.toLowerCase().includes(keyword)))
@@ -83,7 +101,7 @@ export async function collectStoryboardAssetRefs(
 
   const refs: AssetRef[] = []
   refs.push({ name: scene?.location || '', url: selectedAssetImage(selection, 'scene', scene) })
-  for (const char of characters) refs.push({ name: char.name || '', url: selectedAssetImage(selection, 'character', char) })
+  for (const char of characters) refs.push({ name: char.name || '', url: selectedAssetImage(selection, 'character', char, stylingVersions) })
   for (const prop of props) refs.push({ name: prop.name || '', url: selectedAssetImage(selection, 'prop', prop) })
   return refs.filter(ref => !!ref.url)
 }
@@ -141,6 +159,8 @@ export const SLOT_PROMPT_FIELD: Record<'first' | 'mid' | 'last', PromptField> = 
 export type RefIssueCode =
   | 'missing_image' | 'unbound_mention' | 'scene_conflict' | 'unknown_mention'
   | 'unmentioned_binding' | 'over_capacity'
+  // Issue #15：视频提示词为空（阻断生成）与肢体风险（仅警告，不阻断）
+  | 'empty_video_prompt' | 'limb_risk'
 
 export interface RefIssue {
   code: RefIssueCode
@@ -181,8 +201,15 @@ export async function loadEpisodeAssets(
   const scenes = (await db.select().from(schema.scenes))
     .filter(row => episodeSceneIds.includes(row.id) && !row.deletedAt)
 
-  const episodeCharIds = (await db.select().from(schema.episodeCharacters)
-    .where(eq(schema.episodeCharacters.episodeId, episodeId))).map(link => link.characterId)
+  const episodeCharLinks = await db.select().from(schema.episodeCharacters)
+    .where(eq(schema.episodeCharacters.episodeId, episodeId))
+  const episodeCharIds = episodeCharLinks.map(link => link.characterId)
+  // 本集造型版本（Issue #15）：没有人工选版时默认用造型图
+  const stylingVersions = new Map<number, StylingVersion>()
+  for (const link of episodeCharLinks) {
+    const parsed = parseStylingVersion(link.stylingVersion)
+    if (parsed) stylingVersions.set(link.characterId, parsed)
+  }
   const characters = (await db.select().from(schema.characters))
     .filter(ch => episodeCharIds.includes(ch.id) && !ch.deletedAt)
     .filter(ch => !NARRATOR_KEYWORDS.some(keyword => `${ch.name || ''} ${ch.role || ''}`.toLowerCase().includes(keyword)))
@@ -197,7 +224,7 @@ export async function loadEpisodeAssets(
     entries.push({ kind: 'scene', id: scene.id, name: (scene.location || '').trim(), imageUrl: selectedAssetImage(selection, 'scene', scene) })
   }
   for (const ch of characters) {
-    entries.push({ kind: 'character', id: ch.id, name: (ch.name || '').trim(), imageUrl: selectedAssetImage(selection, 'character', ch) })
+    entries.push({ kind: 'character', id: ch.id, name: (ch.name || '').trim(), imageUrl: selectedAssetImage(selection, 'character', ch, stylingVersions) })
   }
   for (const prop of props) {
     entries.push({ kind: 'prop', id: prop.id, name: (prop.name || '').trim(), imageUrl: selectedAssetImage(selection, 'prop', prop) })
@@ -322,6 +349,54 @@ export function computeBindingSync(input: RefCheckInput): BindingSyncResult {
   }
 }
 
+/**
+ * 肢体风险 lint（Issue #15，**仅警告，永不阻断生成**）
+ *
+ * 线上实证：猴宝宝 3 条腿、鼠妈妈 3 只手，对应的提示词里要么没写四肢去向，
+ * 要么写了「不要搞成 3 条腿」这类负向指令（生成模型不认负向）。
+ * 这里按 video-prompt / keyframe-prompt 技能里的写法规则做机械检查，提醒改写。
+ */
+/** 负向肢体指令：模型不认，必须改成正向完整枚举 */
+const NEGATIVE_LIMB_PATTERN = /(不要|不能|避免|别|禁止|no\s|avoid\s)[^，。；\n]{0,12}(腿|手|爪|肢|臂|脚)/
+/** 高风险姿态/构图（Fabel 阶段 A 清单）：易出多肢、融肢、角色复制，必须逐肢写明终态 */
+const RISKY_POSE_WORDS = [
+  '盘腿', '盘坐', '盘起', '蹲', '抠', '转身', '二郎腿', '翘腿', '单腿', '递', '接', '抱',
+  '镜子', '镜面', '倒影', '反打', '镜中', '穿衣镜', '背对', '抱膝',
+]
+/** 四肢状态词：出现任一即视为写明了四肢去向 */
+const LIMB_STATE_WORDS = [
+  '双手', '左手', '右手', '双臂', '左臂', '右臂', '双腿', '左腿', '右腿',
+  '双脚', '脚掌', '双爪', '前爪', '后腿', '手中', '手里', '手上',
+]
+
+export function limbRiskIssues(prompts: Record<PromptField, string>): RefIssue[] {
+  const issues: RefIssue[] = []
+  for (const field of PROMPT_FIELDS) {
+    const text = (prompts[field] || '').trim()
+    if (!text) continue
+    if (NEGATIVE_LIMB_PATTERN.test(text)) {
+      issues.push({
+        code: 'limb_risk', severity: 'warn', fields: [field],
+        message: `${field} 里有「不要/避免 + 肢体」的负向写法，生成模型不认；请改成正向完整枚举（例如「双腿向身前收拢盘起，双脚收于身下，双手抱膝」）`,
+      })
+    }
+    const risky = RISKY_POSE_WORDS.filter(word => text.includes(word))
+    if (!risky.length) continue
+    // 视频提示词逐段检查，关键帧提示词整体检查
+    const segments = field === 'video_prompt'
+      ? text.split('\n').map(line => line.trim()).filter(Boolean)
+      : [text]
+    const bad = segments.filter(seg => RISKY_POSE_WORDS.some(word => seg.includes(word))
+      && !LIMB_STATE_WORDS.some(word => seg.includes(word)))
+    if (!bad.length) continue
+    issues.push({
+      code: 'limb_risk', severity: 'warn', fields: [field],
+      message: `${field} 出现高风险姿态（${risky.join('、')}）但${field === 'video_prompt' ? `有 ${bad.length} 段` : ''}没有写明四肢状态，容易画出多肢/缺肢；请逐段写明双手（含持物在哪只手）与双腿的姿态`,
+    })
+  }
+  return issues
+}
+
 /** 一致性问题（纯函数，便于测试）：阻断 = missing_image / unbound_mention / scene_conflict / unknown_mention */
 export function computeRefIssues(input: RefCheckInput): RefIssue[] {
   const mentions = mentionsByField(input.prompts, input.assets)
@@ -428,6 +503,20 @@ export function computeRefIssues(input: RefCheckInput): RefIssue[] {
     })
   }
 
+  // 分镜完整性（Issue #15）：video_prompt 为空直接阻断视频生成——线上 E3#5 就是空提示词
+  // 却仍可提交，结果画面完全由参考图随机决定。
+  if (!(input.prompts.video_prompt || '').trim()) {
+    add('empty_video_prompt', {
+      code: 'empty_video_prompt', severity: 'block', fields: ['video_prompt'],
+      message: '视频提示词为空，请先生成或填写 video_prompt 再生成视频',
+    })
+  }
+
+  // 肢体风险：只警告，不进 blockingIssuesFor
+  for (const issue of limbRiskIssues(input.prompts)) {
+    add(`${issue.code}:${issue.fields.join(',')}:${issue.message}`, issue)
+  }
+
   return [...issues.values()]
 }
 
@@ -454,6 +543,42 @@ export async function checkStoryboardRefs(
     characterIds: bindings.characterIds,
     propIds: bindings.propIds,
   })
+}
+
+/**
+ * 造型版本自动选版（Issue #15）：本镜绑定的角色在本集有造型图、且 asset_version_selection
+ * 还没有该角色的键时，把造型图写成该镜的选定版本。人工已选的键一律不动。
+ * 写进库（而不是只在运行时兜底），这样前端版本选择器显示的就是实际使用的那张图。
+ * 所有分镜写入路径（save_storyboards / update_storyboard / PUT /storyboards/:id）都经由
+ * syncStoryboardBindingsFromPrompts 调用它，绑定同步之后执行，只覆盖本镜真正出场的角色。
+ */
+export async function autofillCostumeSelection(
+  storyboardId: number,
+  characterIds: number[],
+): Promise<Record<string, string>> {
+  const [storyboard] = await db.select().from(schema.storyboards)
+    .where(eq(schema.storyboards.id, storyboardId))
+  if (!storyboard) return {}
+  const selection = parseAssetVersionSelection(storyboard.assetVersionSelection)
+  if (!characterIds.length) return selection
+  const links = await db.select().from(schema.episodeCharacters)
+    .where(eq(schema.episodeCharacters.episodeId, storyboard.episodeId))
+  let changed = false
+  for (const link of links) {
+    if (!characterIds.includes(link.characterId)) continue
+    const version = parseStylingVersion(link.stylingVersion)
+    if (!version?.image_path) continue
+    const key = `character:${link.characterId}`
+    if (selection[key]) continue
+    selection[key] = version.image_path
+    changed = true
+  }
+  if (changed) {
+    await db.update(schema.storyboards)
+      .set({ assetVersionSelection: JSON.stringify(selection) })
+      .where(eq(schema.storyboards.id, storyboardId))
+  }
+  return selection
 }
 
 /**
@@ -494,6 +619,8 @@ export async function syncStoryboardBindingsFromPrompts(
       }
     }
   }
+  // 绑定确定之后再自动选版：只给本镜出场的角色写入本集造型图，人工已选不覆盖（Issue #15）
+  await autofillCostumeSelection(storyboardId, sync.characterIds)
   const issues = computeRefIssues({ ...input, characterIds: sync.characterIds, propIds: sync.propIds })
   return { sync, issues, characterIds: sync.characterIds, propIds: sync.propIds }
 }
