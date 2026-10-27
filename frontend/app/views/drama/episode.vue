@@ -1515,6 +1515,7 @@ import StoryboardKeyframes from '~/components/StoryboardKeyframes.vue'
 import ProgressRing from '~/components/ProgressRing.vue'
 import FieldSaveStatus from '~/components/FieldSaveStatus.vue'
 import RefIssueList from '~/components/RefIssueList.vue'
+import TaskCenterButton from '~/components/TaskCenterButton.vue'
 import {
   useNowTicker,
   ringPropsFromTask,
@@ -3828,6 +3829,7 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
+  min-width: 0;
 }
 
 .studio-title {
@@ -3835,6 +3837,10 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
   line-height: 1;
   letter-spacing: -0.04em;
   white-space: nowrap;
+  /* 长剧名在窄窗口省略，避免把右侧顶栏内容顶出视口 */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .studio-episode-chip {
@@ -3889,12 +3895,15 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
   display: flex;
   align-items: center;
   gap: 6px;
-  flex-shrink: 0;
+  /* 空间不足时由右侧模型选择区收缩，任务按钮所在的 .studio-actions 不收缩 */
+  flex-shrink: 1;
+  min-width: 0;
 }
 
 .studio-actions {
   display: flex;
   gap: 6px;
+  flex-shrink: 0;
 }
 .studio-topbar .btn {
   height: 26px;
@@ -4656,7 +4665,13 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
   margin-right: 12px;
   padding-right: 12px;
   border-right: 1px solid var(--border);
+  /* 顶栏变窄时整体收缩，选择器文字省略而不是把任务按钮挤出视口 */
+  flex-shrink: 1;
+  min-width: 0;
 }
+.studio-model-picks :deep(.model-select) { min-width: 0; flex-shrink: 1; }
+.studio-model-picks :deep(.model-select-label) { flex-shrink: 0; }
+.studio-model-picks :deep(.model-select-trigger) { min-width: 0; }
 .asset-final-prompt {
   display: flex;
   flex-direction: column;

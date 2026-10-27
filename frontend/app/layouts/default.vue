@@ -61,6 +61,7 @@ import { LayoutGrid, Settings, TriangleAlert, Github } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { aiConfigAPI } from '~/composables/useApi'
 import brandLogo from '~/assets/brand-logo.png'
+import TaskCenterButton from '~/components/TaskCenterButton.vue'
 
 const { t, locale } = useI18n()
 const route = useRoute()
