@@ -104,6 +104,8 @@ interface GenerateVideoParams extends TaskOriginParams {
   promptExtend?: boolean
   watermark?: boolean
   configId?: number
+  /** #11 开场转场：T=转场秒数，E=本次实际加长的秒数（duration 已含 E） */
+  transition?: { T: number; E: number }
 }
 
 export async function generateImage(params: GenerateImageParams): Promise<number> {
@@ -177,6 +179,7 @@ export async function generateVideo(params: GenerateVideoParams): Promise<number
     seed: params.seed,
     promptExtend: params.promptExtend,
     watermark: params.watermark,
+    transition: params.transition,
     ...originParams(params),
   })
 
@@ -713,8 +716,10 @@ async function handleVideoComplete(record: SysTaskRecord, videoUrl: string, dura
   logTaskSuccess('VideoTask', 'downloaded', { id: record.id, localPath, storyboardId: record.storyboardId, duration })
 
   if (record.storyboardId) {
+    // storyboards.duration 是「内容时长」：带转场提交时视频比它长 E 秒（#11），
+    // 把返回时长写回会让下次生成再叠加一次转场，所以只写视频地址。
     await db.update(schema.storyboards)
-      .set({ videoUrl: localPath, duration: duration || undefined, updatedAt: now() })
+      .set({ videoUrl: localPath, updatedAt: now() })
       .where(eq(schema.storyboards.id, record.storyboardId))
   }
 }

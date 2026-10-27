@@ -153,6 +153,9 @@ export const storyboardAPI = {
   // 视频生成参数（关键帧引导、参考图 / @图片N 映射 / 分辨率）全部由后端组装
   generateVideo: (id: number, data: { model?: string; config_id?: number }) =>
     api.post(`/storyboards/${id}/generate-video`, { model: data.model || undefined, config_id: data.config_id || undefined }),
+  // 承接镜头的开场转场：AI 审核并生成，返回更新后的分镜（#11）
+  generateTransition: (id: number, data: { model?: string; config_id?: number } = {}) =>
+    api.post(`/storyboards/${id}/transition`, { model: data.model || undefined, config_id: data.config_id || undefined }),
   // 关键帧槽位：first | mid | last
   generateKeyframe: (id: number, slot: 'first' | 'mid' | 'last', data: { prompt?: string; model?: string; config_id?: number } = {}) =>
     api.post(`/storyboards/${id}/keyframes/${slot}/generate`, {

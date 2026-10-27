@@ -1139,6 +1139,22 @@
       "slotCancelRequested": "このキーフレームのキャンセルを要求しました",
       "genCancelled": "{slot}の生成をキャンセルしました"
     },
+    "trans": {
+      "section": "トランジション",
+      "send": "トランジションを送信",
+      "generate": "AI 審査してトランジション生成",
+      "generated": "トランジションを生成しました",
+      "summary": "前カット #{n} {from} → 本カット {to}",
+      "verdictPending": "未審査",
+      "verdictSceneTime": "トランジションが必要：時間／場所の変化",
+      "verdictContinuity": "アクション接続：{issues}",
+      "verdictNone": "トランジション不要",
+      "manual": "手動編集（前回の判定：{verdict}）",
+      "stale": "前後のカットが変更されました。再審査を推奨します",
+      "durationHint": "{content} 秒 + トランジション {seconds} 秒 = {total} 秒",
+      "placeholder": "トランジション：前カットの終了画面から始め、T 秒以内に本カットの開始画面へ着地させる。キャラクターは {'@'}名前 のみで指定…",
+      "unknownPlace": "場所未設定"
+    },
     "inspector": {
       "videoPromptPlaceholder": "{'@'}キャラクター名 / {'@'}シーン名 で参照素材を指定（生成時に参照画像へ自動マッピング）。時間帯ごとに画面の動きとカメラを記述…",
       "noRefs": "この分镜には参照素材が紐付けられていません",

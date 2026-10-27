@@ -1139,6 +1139,22 @@
       "slotCancelRequested": "已请求取消该关键帧",
       "genCancelled": "{slot}生成已取消"
     },
+    "trans": {
+      "section": "转场",
+      "send": "发送转场描述",
+      "generate": "AI 审核并生成转场",
+      "generated": "转场已生成",
+      "summary": "上一镜 #{n} {from} → 本镜 {to}",
+      "verdictPending": "尚未审核",
+      "verdictSceneTime": "需要转场：时间/地点变化",
+      "verdictContinuity": "动作衔接：{issues}",
+      "verdictNone": "无需转场",
+      "manual": "手动编辑（原审核：{verdict}）",
+      "stale": "上下镜已修改，建议重新审核",
+      "durationHint": "{content} 秒 + {seconds} 秒转场 = {total} 秒",
+      "placeholder": "转场描述：从上一镜结尾画面出发，在 T 秒内过渡到本镜开场画面；角色只用 {'@'}角色名 引用…",
+      "unknownPlace": "未填写场景"
+    },
     "inspector": {
       "videoPromptPlaceholder": "用 {'@'}角色名 / {'@'}场景名 引用参考素材，生成时自动映射为参考图片；再按时间段描述画面运动与镜头…",
       "noRefs": "当前分镜未绑定参考素材",

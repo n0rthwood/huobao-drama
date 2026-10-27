@@ -18,6 +18,8 @@ import { loadAgentSkills, skillWorkspaces } from './skills.js'
 import { loadAgentPromptFile, loadBasePromptFile } from './prompts.js'
 import { buildLanguageDirective } from './language.js'
 import { getContentLanguageFromRC } from './context.js'
+import { TRANSITION_WRITER_PROMPT } from './default-prompts/transition-writer.js'
+import { transitionTools } from './tools/transition-tools.js'
 
 // Default prompts (used when workspace/prompts/<type>.md 文件缺失时兜底)
 export const DEFAULT_PROMPTS: Record<string, { name: string; instructions: string }> = {
@@ -170,6 +172,7 @@ video_prompt 规则（硬约束）：
 2. 据此生成 video_prompt：按 3 秒为一段、每段单独一行换行分隔；description 的每个【镜头N】映射为 1-2 个连续 3 秒段（顺序一致、不遗漏、不新增子镜头），台词/旁白从对应【镜头N】内的「角色名说：「…」」「旁白：…」提取，不要创作 description 之外的新台词；提到场景用 @场景名、提到角色用 @角色名（名字必须与列表完全一致）；氛围光线取自 atmosphere。一个分镜段落内允许切镜（换景别/角度/对象），段与段之间可以是不同镜头，但不跨场景；切镜点对齐分镜 description 的【镜头N】结构
 3. 生成时会自动把 @名字 替换为对应参考图片标记（如 @小明 → @图片1小明），因此名字必须精确匹配场景/角色列表，不要缩写或加额外符号
 4. 关键帧对齐：视频的第 0 帧就是该分镜的首关键帧画面（inherits_first 为 true 时是上一分镜的尾关键帧），第一段必须从这张画面已经呈现的状态继续演下去，保持同一机位与人物位置，不要重新建立空间、不要在 0 秒切镜；mid_frame_time 有值时必须让某个分段的起点正好落在该秒数且画面与 mid_frame_prompt 一致；最后一段收在 last_frame_prompt 的画面上
+   - 承接镜头（inherits_first 为 true）若已写好开场转场段：提交视频时转场会拼在视频描述之前，视频描述的第一段改为「接在转场之后」——从转场结束时落定的本镜开场画面继续演，不要重复描写转场本身
 5. 调用 update_storyboard 保存时参数只传两个键：storyboard_id 和 video_prompt。不要回传该分镜的其他任何字段（title、description、scene_id 等一律不传）
 
 通用规范：
@@ -177,6 +180,10 @@ video_prompt 规则（硬约束）：
 - 绝对图像优先（关键帧提示词与视频提示词）：角色长相完全由参考图决定，禁止描写角色的物种、服装、颜色、发型、体型、五官、年龄等任何外观属性，角色一律只用 @角色名 指代；角色名只是代号，不要据此推断长相
 - 项目设定的视觉风格描述会由工具在保存图片提示词时自动注入到最终提示词的最前方，不要自行添加风格词
 - 必须实际调用保存工具，不要只在回复中给出提示词`,
+  },
+  transition_writer: {
+    name: '转场设计',
+    instructions: TRANSITION_WRITER_PROMPT,
   },
 }
 
@@ -373,6 +380,8 @@ const AGENT_TOOLS: Record<string, Record<string, any>> = {
     readStoryboardContext: storyboardTools.readStoryboardContext,
     updateStoryboard: storyboardTools.updateStoryboard,
   },
+  // 转场设计：提示词里的 update_storyboard 指向只写转场字段的实现
+  transition_writer: transitionTools,
 }
 
 /** instructions 按请求解析：prompt 文件（或默认）+ 技能全文拼接 + 目标语言指令块

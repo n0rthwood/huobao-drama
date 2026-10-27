@@ -774,6 +774,57 @@
               <div v-if="selectedSb" class="video-task-side">
               <div class="video-main-col">
               <div class="video-main-scroll">
+                  <section v-if="shotInheritsFirst(selectedSb)" class="video-inspector-section transition-section">
+                    <div class="video-inspector-prompt-head">
+                      <span class="video-inspector-label video-inspector-label-hero">{{ t('episode.trans.section') }}</span>
+                      <FieldSaveStatus
+                        :status="fieldSaveInfo(selectedSb, 'transition_prompt').status"
+                        :at="fieldSaveInfo(selectedSb, 'transition_prompt').at"
+                      />
+                      <span class="ml-auto" />
+                      <label class="transition-send">
+                        <input
+                          type="checkbox"
+                          :checked="transitionEnabledOf(selectedSb)"
+                          @change="e => setTransitionEnabled(selectedSb, e.target.checked)"
+                        >
+                        {{ t('episode.trans.send') }}
+                      </label>
+                      <button
+                        type="button"
+                        class="btn btn-sm"
+                        :disabled="transitionGeneratingIds.includes(selectedSb?.id)"
+                        @click="genTransition(selectedSb)"
+                      >
+                        <Loader2 v-if="transitionGeneratingIds.includes(selectedSb?.id)" :size="11" class="animate-spin" />
+                        {{ t('episode.trans.generate') }}
+                      </button>
+                    </div>
+                    <div class="transition-summary">
+                      <span>{{ t('episode.trans.summary', {
+                        n: prevShotOf(selectedSb) ? sbs.indexOf(prevShotOf(selectedSb)) + 1 : '-',
+                        from: prevShotOf(selectedSb) ? shotPlaceLabel(prevShotOf(selectedSb)) : '—',
+                        to: shotPlaceLabel(selectedSb),
+                      }) }}</span>
+                      <span class="transition-verdict">{{ transitionVerdictLabel(selectedSb) }}</span>
+                      <span v-if="transitionReviewOf(selectedSb)?.technique" class="tag mono">{{ transitionReviewOf(selectedSb).technique }}</span>
+                      <span v-if="transitionReviewOf(selectedSb)?.edited_manually" class="transition-manual">
+                        {{ t('episode.trans.manual', { verdict: transitionVerdictLabel(selectedSb) }) }}
+                      </span>
+                    </div>
+                    <div v-if="transitionStaleOf(selectedSb)" class="transition-stale">{{ t('episode.trans.stale') }}</div>
+                    <MentionTextarea
+                      :model-value="selectedSb.transition_prompt || selectedSb.transitionPrompt || ''"
+                      :options="mentionOptions"
+                      :rows="5"
+                      input-class="textarea video-inspector-prompt"
+                      :placeholder="t('episode.trans.placeholder')"
+                      @update:model-value="v => markFieldDirty(selectedSb, 'transition_prompt', v)"
+                      @commit="v => updateField(selectedSb, 'transition_prompt', v)"
+                    />
+                    <RefIssueList :issues="transitionIssues(selectedSb)" />
+                    <div class="transition-duration">{{ transitionDurationHint(selectedSb) }}</div>
+                  </section>
                   <section class="video-inspector-section">
                     <div class="video-inspector-prompt-head">
                       <span class="video-inspector-label video-inspector-label-hero">{{ t('episode.sb.videoPromptSection') }}</span>
@@ -2894,7 +2945,7 @@ const selectedVideoTaskNumber = computed(() => {
 
 // ===== 字段级保存状态：键为「分镜 id : 字段」，关键帧页与视频页共用 =====
 // 自动保存且需要给出保存反馈的字段（其余字段如绑定 ids 只做一致性提示，不显示保存状态）
-const SAVE_STATUS_FIELDS = ['description', 'atmosphere', 'first_frame_prompt', 'mid_frame_prompt', 'mid_frame_time', 'last_frame_prompt', 'video_prompt']
+const SAVE_STATUS_FIELDS = ['description', 'atmosphere', 'first_frame_prompt', 'mid_frame_prompt', 'mid_frame_time', 'last_frame_prompt', 'video_prompt', 'transition_prompt']
 const fieldSaveStates = ref({})
 
 function fieldSaveKey(sb, field) { return `${sb?.id}:${field}` }
@@ -2966,6 +3017,8 @@ function applyStoryboardUpdate(sb, res, before, field) {
   if (Array.isArray(res.character_ids)) assign('character_ids', res.character_ids)
   if (Array.isArray(res.prop_ids)) assign('prop_ids', res.prop_ids)
   if ('scene_id' in res) assign('scene_id', res.scene_id ?? null)
+  // 手动保存转场描述后后端会把 edited_manually 置 true，这里同步回本地（#11）
+  if ('transition_review' in res) assign('transition_review', res.transition_review ?? null)
   if (Array.isArray(res.ref_issues)) {
     assign('ref_issues', res.ref_issues)
     toastNewRefIssues(before || [], res.ref_issues)
@@ -3769,6 +3822,91 @@ function videoBlockIssues(sb) {
 }
 function videoBlockReason(sb) {
   return videoBlockIssues(sb).map(issue => issue.message).join(t('common.listJoin'))
+}
+
+// ===== 开场转场（#11）：只有承接镜头（首帧继承上一镜尾帧）才显示 =====
+const transitionGeneratingIds = ref([])
+const TRANSITION_MAX_DURATION = 15
+
+function shotInheritsFirst(sb) {
+  return Boolean(sb?.keyframes?.inherits_first)
+}
+function transitionReviewOf(sb) {
+  return sb?.transition_review || sb?.transitionReview || null
+}
+function transitionEnabledOf(sb) {
+  const value = sb?.transition_enabled ?? sb?.transitionEnabled
+  return value !== false && value !== 0
+}
+function transitionStaleOf(sb) {
+  return Boolean(sb?.transition_stale ?? sb?.transitionStale)
+}
+function prevShotOf(sb) {
+  const index = sbs.value.indexOf(sb)
+  return index > 0 ? sbs.value[index - 1] : null
+}
+/** 摘要里的「场景/时间」：优先分镜自己的 location/time，回落到绑定场景 */
+function shotPlaceLabel(sb) {
+  const scene = getSceneName(sb)
+  const place = (sb?.location || '').trim() || scene || t('episode.trans.unknownPlace')
+  const time = (sb?.time || '').trim()
+  return time ? `${place} · ${time}` : place
+}
+/** 转场秒数 T：审核给出的秒数，没有则 3 秒 */
+function transitionSeconds(sb) {
+  return Number(transitionReviewOf(sb)?.seconds) || 3
+}
+function transitionVerdictLabel(sb) {
+  const review = transitionReviewOf(sb)
+  if (!review) return t('episode.trans.verdictPending')
+  if (review.verdict === 'scene_time') return t('episode.trans.verdictSceneTime')
+  if (review.verdict === 'continuity') {
+    const hazards = (review.hazards || []).concat(review.changes || []).filter(Boolean)
+    return t('episode.trans.verdictContinuity', { issues: hazards.slice(0, 2).join(t('common.listJoin')) || '—' })
+  }
+  return t('episode.trans.verdictNone')
+}
+/** 预计时长提示：12 秒 + 3 秒转场 = 15 秒 */
+function transitionDurationHint(sb) {
+  const content = Number(sb?.duration || 0)
+  const seconds = transitionSeconds(sb)
+  return t('episode.trans.durationHint', {
+    content,
+    seconds,
+    total: Math.min(content + seconds, TRANSITION_MAX_DURATION),
+  })
+}
+function transitionIssues(sb) {
+  return refIssuesOf(sb).filter(issue => (issue?.fields || []).includes('transition_prompt'))
+}
+/** AI 审核并生成转场（单镜）：后端同步跑转场 agent 并落库 */
+async function genTransition(sb) {
+  if (!sb || transitionGeneratingIds.value.includes(sb.id)) return
+  transitionGeneratingIds.value.push(sb.id)
+  try {
+    await storyboardAPI.generateTransition(sb.id, {
+      model: chatModelOverride() || undefined,
+      config_id: chatConfigId() || undefined,
+    })
+    toast.success(t('episode.trans.generated'))
+    await refresh()
+  } catch (e) {
+    toastError(e)
+  } finally {
+    transitionGeneratingIds.value = transitionGeneratingIds.value.filter(id => id !== sb.id)
+  }
+}
+async function setTransitionEnabled(sb, enabled) {
+  if (!sb) return
+  sb.transition_enabled = enabled
+  sb.transitionEnabled = enabled
+  try {
+    await storyboardAPI.update(sb.id, { transition_enabled: enabled })
+  } catch (e) {
+    sb.transition_enabled = !enabled
+    sb.transitionEnabled = !enabled
+    toastError(e)
+  }
 }
 
 // 单镜视频生成：关键帧引导、参考图、@图片N 映射、分辨率等全部由后端按分镜组装
@@ -5674,6 +5812,15 @@ button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
   justify-content: space-between;
   gap: 8px;
 }
+/* 开场转场区（承接镜头，#11） */
+.transition-section { padding-bottom: 10px; border-bottom: 1px solid var(--line-1); }
+.transition-section :deep(.video-inspector-prompt) { min-height: 88px; }
+.transition-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; color: var(--text-2); }
+.transition-verdict { color: var(--text-1); font-weight: 600; }
+.transition-manual { color: var(--text-3); }
+.transition-stale { font-size: 12px; color: var(--warning, #c58b1b); }
+.transition-duration { font-size: 12px; color: var(--text-3); }
+.transition-send { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-2); cursor: pointer; }
 /* MentionTextarea 内部元素需 :deep 穿透（scoped 样式默认到不了子组件内部） */
 :deep(.video-inspector-prompt) {
   min-height: 176px;

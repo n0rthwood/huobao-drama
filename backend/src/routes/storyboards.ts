@@ -13,6 +13,12 @@ import {
   syncStoryboardBindingsFromPrompts,
 } from '../services/storyboard-assets.js'
 import { parseFieldSavedAt, stampFieldSavedAt } from '../services/storyboard-fields.js'
+import {
+  currentTransitionSignature,
+  markTransitionEditedManually,
+  parseTransitionReview,
+} from '../services/transition.js'
+import { runTransitionReview } from '../services/transition-agent.js'
 import { serializeTask } from '../services/sys-task.js'
 import {
   SLOT_LABEL,
@@ -178,12 +184,15 @@ app.put('/:id', async (c) => {
     last_frame_prompt: 'lastFramePrompt',
     mid_frame_time: 'midFrameTime',
     continuity_boundary: 'continuityBoundary',
+    transition_prompt: 'transitionPrompt',
   }
 
   const updates: Record<string, any> = { updatedAt: now() }
   for (const [snakeKey, camelKey] of Object.entries(fieldMap)) {
     if (snakeKey in body) updates[camelKey] = body[snakeKey]
   }
+  // 「发送转场描述」开关
+  if ('transition_enabled' in body) updates.transitionEnabled = body.transition_enabled === true
   if ('asset_version_selection' in body) {
     try {
       updates.assetVersionSelection = normalizeAssetVersionSelection(body.asset_version_selection)
@@ -220,6 +229,8 @@ app.put('/:id', async (c) => {
   await db.update(schema.storyboards).set(updates).where(eq(schema.storyboards.id, id))
   if ('character_ids' in body) await syncStoryboardCharacters(id, body.character_ids || [])
   if ('prop_ids' in body) await syncStoryboardProps(id, body.prop_ids || [])
+  // 用户手动保存转场描述：标记 edited_manually，之后不再被自动审核覆盖（#11）
+  if ('transition_prompt' in body) await markTransitionEditedManually(storyboard)
 
   // 提示词被写入时绑定完全跟随 @引用（同一请求里显式传入的 ids 以提示词为准被覆盖）；
   // 纯绑定编辑（没写提示词）保持用户的选择不动
@@ -245,6 +256,7 @@ app.put('/:id', async (c) => {
     character_ids: characterIds,
     prop_ids: propIds,
     scene_id: updated?.sceneId ?? null,
+    transition_review: parseTransitionReview(updated?.transitionReview),
     ref_issues: refIssues,
     ref_sync: {
       bound: sync?.sync.bound ?? [],
@@ -269,6 +281,13 @@ async function storyboardJson(id: number) {
     ...toSnakeCase(row),
     asset_version_selection: assetVersionSelection,
     field_saved_at: parseFieldSavedAt(row.fieldSavedAt),
+    transition_review: parseTransitionReview(row.transitionReview),
+    transition_stale: await (async () => {
+      const review = parseTransitionReview(row.transitionReview)
+      if (!review) return false
+      const signature = await currentTransitionSignature(row.id)
+      return !!signature && signature !== review.input_signature
+    })(),
     ref_issues: await checkStoryboardRefs(row),
     keyframes: keyframesJson((await loadEpisodeKeyframes(row.episodeId)).get(row.id)),
     character_ids: await getStoryboardCharacterIds(row.id),
@@ -389,6 +408,22 @@ app.post('/:id/confirm-keyframes', async (c) => {
     .where(eq(schema.storyboards.id, id))
   logTaskSuccess('StoryboardAPI', 'confirm-keyframes', { storyboardId: id, confirmed })
   return success(c, await storyboardJson(id))
+})
+
+// POST /storyboards/:id/transition — AI 审核并生成本镜的开场转场（承接镜头，#11）
+app.post('/:id/transition', async (c) => {
+  const id = Number(c.req.param('id'))
+  const body = await c.req.json().catch(() => ({} as Record<string, any>))
+  logTaskStart('StoryboardAPI', 'transition', { storyboardId: id, model: body.model, configId: body.config_id })
+  try {
+    await runTransitionReview(id, { model: body.model, configId: body.config_id })
+    logTaskSuccess('StoryboardAPI', 'transition', { storyboardId: id })
+    return success(c, await storyboardJson(id))
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '转场生成失败'
+    logTaskError('StoryboardAPI', 'transition', { storyboardId: id, error: message })
+    return badRequest(c, message)
+  }
 })
 
 // POST /storyboards/:id/generate-video — 单镜视频生成：关键帧/参考图/提示词编号/风格/时长全部由后端组装（要求该镜已确认关键帧）

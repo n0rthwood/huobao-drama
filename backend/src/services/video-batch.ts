@@ -23,6 +23,7 @@ import {
 import { blockingIssuesFor, checkStoryboardRefs, describeIssues } from './storyboard-assets.js'
 import { isActiveTaskStatus } from './sys-task.js'
 import { logTaskError, logTaskProgress, logTaskStart, logTaskSuccess, logTaskWarn } from '../utils/task-logger.js'
+import { transitionStatus } from './transition.js'
 
 export type BatchStatus = 'running' | 'done' | 'cancelled'
 export type BatchItemState = 'pending' | 'running' | 'completed' | 'failed' | 'skipped'
@@ -227,9 +228,11 @@ export async function previewEpisodeVideoBatch(
       continue
     }
 
+    // 预览不跑转场 agent（写库且耗时）：需要转场却还没审核的镜头直接归为 changed
+    const pendingTransition = (await transitionStatus(sb, keyframes.get(sb.id)?.inheritsFirst === true)).needsReview
     let request: StoryboardVideoRequest
     try {
-      request = await buildStoryboardVideoRequest(sb.id, { model: opts.model, configId: opts.configId })
+      request = await buildStoryboardVideoRequest(sb.id, { model: opts.model, configId: opts.configId, autoTransition: false })
     } catch (err) {
       result.push({
         ...base,
@@ -246,6 +249,17 @@ export async function previewEpisodeVideoBatch(
     const adopted = versions.find(version => version.video === adoptedVideo) ?? null
     if (!versions.length) {
       result.push({ ...base, status: 'missing', checked: true, selectable: true, adopted_version_no: null })
+      continue
+    }
+    if (pendingTransition) {
+      result.push({
+        ...base,
+        status: 'changed',
+        checked: true,
+        selectable: true,
+        adopted_version_no: adopted?.version_no ?? null,
+        reason: '提交前将自动生成转场',
+      })
       continue
     }
     // 命中任一历史版本即未变化；当前采用的版本也命中时优先报它，文案才贴合用户看到的那条视频
