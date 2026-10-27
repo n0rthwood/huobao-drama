@@ -110,6 +110,12 @@ Issue 整理完成后、实施前，必须让 **Fabel（Anthropic）或 Astra（
   - `codex-image.json`：codex 生图包装服务的端口/token/并发。
 - 应用配置：`cd backend && npm run apply-local-config`（按 `service_type + provider + name` 幂等写入 SQLite `ai_service_configs`）。
 - 代码与预设中不要写内网 IP 或真实 key。
+- **升级到 qwen-jobs（2026-10-27，必须手工同步一次）**：
+  1. `~/.config/huobao-drama-local/providers.json` 里图片服务条目的 `provider` 从 `comfyui` 改成 `qwen-jobs`（`base_url` `https://110.joyai.dev/image`、`api_key`、`model` 不变）。
+  2. 本地库 `ai_service_configs` 的现有图片行**原地**改 provider，保留行 id（`episodes.image_config_id` 指向它，新建行会让集锁定失效）：
+     `UPDATE ai_service_configs SET provider='qwen-jobs', updated_at=datetime('now') WHERE service_type='image' AND provider='comfyui';`
+     不要靠 `apply-local-config` 完成这一步——它按 `(service_type, provider, name)` upsert，会新建一行。
+  3. 110 侧已把 ComfyUI 原生接口收到 qwen-jobs 后面，旧的 `/image/prompt`、`/image/history` 路径不再可用。
 
 ## 供应商（Provider）架构
 
@@ -145,18 +151,20 @@ Issue 整理完成后、实施前，必须让 **Fabel（Anthropic）或 Astra（
 - 数据：`storyboards` 的 `first_frame_prompt / mid_frame_prompt / last_frame_prompt`（每张关键帧各自的提示词）、`mid_frame_time`（秒，必须落在 0.5 与 时长-0.5 之间，PUT 越界报 400）、`first_frame_image / mid_frame_image / last_frame_image`（各槽位选定版本）、`keyframes_confirmed`。版本 = `sys_task`（type=image，`params.frameType` 为 `first_frame/mid_frame/last_frame`），默认选最新生成的那张。保留 LLM 标注的 `continuity_boundary`（continue/cut）。`image_prompt` 不迁移、不再写入。
 - 规则唯一实现在 `services/keyframes.ts`：上一镜 = 同集内未删除、按 `storyboard_number` 排序的前一镜，第一镜永不继承；`continuity_boundary='continue'` 且自己没有首帧图 → **继承上一镜的尾帧关键帧**（`inherits_first`）。就绪 = 有效首帧 + 尾帧都有图，且"写了中间帧提示词的分镜必须有中间帧图"。确认 = 已就绪且人工点过确认；任一槽位选定图变化（新图生成完成、切换版本、改继承）自动取消确认，并连带取消继承它的下一镜；删除分镜时继承首帧的下一镜也取消确认。
 - 关键帧生成 `services/storyboard-keyframes.ts`：参考图 = 场景 → 角色 → 道具的选定版本（**不含任何关键帧**，实测把首帧当参考图生成尾帧会崩坏），提示词 = 风格词 + 槽位提示词（`@名字` → Qwen 的 `<imageN>名字`，其它厂商 `图片N名字`），尺寸按剧集画幅（16:9=1344×768、9:16=768×1344、4:3=1152×864、3:4=864×1152、1:1=1024×1024）。接口：`POST /storyboards/:id/keyframes/:slot/generate`（可带改过的 `prompt`）、`GET …/versions`、`PUT /storyboards/:id/keyframes/:slot`（`{image}` 选版本 / `{inherit:true}` 仅首帧）、`POST /storyboards/:id/confirm-keyframes`。
-- 剧集批量 `services/keyframe-batch.ts` + `POST|GET /episodes/:id/keyframe-batch`、`…/cancel`：按"分镜 × 槽位"串行（提交 → 等 sys_task 终态 → 等写回 → 下一张），持久化在 `keyframe_batches`，重启由 `resumeKeyframeBatches()` 恢复。默认只补缺图的槽位；带 `storyboard_ids` 时对所选分镜全部重新生成；继承首帧且无自有首帧提示词的分镜跳过首帧槽位，没有中间帧提示词就没有中间帧槽位，提示词为空的槽位记为 `skipped`。提示词补齐：`POST /episodes/:id/generate-keyframe-prompts` + `GET /episodes/:id/keyframe-prompts-status`。
+- 剧集批量 `services/keyframe-batch.ts` + `POST|GET /episodes/:id/keyframe-batch`、`…/cancel`、`…/retry-failed`：**provider 为 `qwen-jobs` 时一次性提交全部待生成槽位**（每提交一张立即把 sys_task id 落盘，重启恢复不会重复提交），之后只跟踪各 sys_task 状态，写回由各自完成时进行——三张关键帧互不作为参考图，并发安全。其它 provider 没有服务端队列，保持原来的严格串行（提交 → 等 sys_task 终态 → 等写回 → 下一张）。停止 = 取消所有未结束项（排队的立即取消，运行中的按服务端规则），`retry-failed` 对失败/已取消项**新建 sys_task** 重提。状态 JSON 除原有字段外还有 `eta_seconds`（未完成项 `estimated_finish_seconds` 的最大值）、`progress`（按 `estimate.run_seconds` 加权：完成=1、运行中=fraction）、`counts` 与各项 `queue_position/progress/remaining_seconds/estimated_finish_seconds`；聚合是纯函数 `services/keyframe-batch-progress.ts`（有行为测试）。持久化在 `keyframe_batches`，重启由 `resumeKeyframeBatches()` 恢复。默认只补缺图的槽位；带 `storyboard_ids` 时对所选分镜全部重新生成；继承首帧且无自有首帧提示词的分镜跳过首帧槽位，没有中间帧提示词就没有中间帧槽位，提示词为空的槽位记为 `skipped`。提示词补齐：`POST /episodes/:id/generate-keyframe-prompts` + `GET /episodes/:id/keyframe-prompts-status`。
 - 视频闸门：单镜 `POST /storyboards/:id/generate-video` 要求该镜已确认（否则 400 `分镜 #N 的关键帧尚未确认`）；批量 `POST /episodes/:id/video-batch` 预检**本集所有分镜**都已确认（列出未确认镜号）+ 模型支持关键帧引导，每一镜提交前再复查一次确认状态。
 - 视频组装 `services/storyboard-video.ts`：参考图 = [生效首帧关键帧, 场景, 角色, 道具]（去重 ≤9），所以素材编号从 `@图片2` 起；首帧同时作为第 0 帧引导，中间帧（仅 `supportsMidFrameGuide` 的模型）与尾帧作引导帧。能力位：`supportsFrameGuides`（comfyui/minimax = true，volcengine = false，Seedance 直接报"当前视频模型不支持关键帧引导"）、`supportsMidFrameGuide`（仅 comfyui）。
 - **以图片为准（所有提示词层的硬规则）**：关键帧提示词、视频提示词、分镜描述与 H3 的 GLM 扩写都**不得**描述角色的物种、衣着、颜色、发型等外形属性；角色只用 `@名字`（提示词）或 `the character in <Picture N>`（H3）指代，名字只是昵称，不能据此推断外形。剧集 2 的"鼠妈妈 → 灰老鼠"就是文字与图片打架造成的。
 - 服务端批量视频 `services/video-batch.ts` + `POST|GET /episodes/:id/video-batch`、`…/cancel`：按分镜顺序串行，状态持久化在 `video_batches`，重启由 `resumeVideoBatches()` 恢复（被打断的那一镜重新提交）。停止只是不再提交新的镜头，在跑的那一镜跑完后批次转 `cancelled`（没有 runner 时直接落盘 `cancelled`）。
 
-### ComfyUI（Qwen Image 2.1）
-- 入口（2026-10-26 起）：`.110`（2×RTX 3060）的 Caddy `https://110.joyai.dev/image`（Cloudflare 隧道，HTTP Basic auth，凭据同上存 api_key）。LAN 备选 `http://172.30.3.110/image`（免鉴权）。adapter 把所有路径拼在 base URL 之后，前缀自然生效，`waitEngineIdle` 只等该实例的队列。
-- 去噪器是 azukivc 的 **Q6_K GGUF**（`UnetLoaderGGUF`，city96 ComfyUI-GGUF；`.110` 没有 safetensors 扩散模型，HF 上也无可用 Q8_0 GGUF），文本编码器仍是 Comfy-Org int8 convrot，VAE bf16。速度参考（3060，25 步）：1024² ≈ 89–93 s。
-- 通用 ComfyUI 图像逻辑在 `adapters/comfyui-client.ts`（上传 `/upload/image`、`POST /prompt`、`/history`、`/view`、等队列空、节点校验错误解析）。provider 统一叫 `comfyui`，图片 `qwen-image*` → Qwen。新增图像模型 = 加模板 JSON（`backend/src/workflows/qwen/`）+ 填充函数 + adapter 分支。
-- 模板取自服务器 `/history` 里已跑通的任务（API 格式）：Qwen `workflows/qwen/{t2i,i2i}.json`。
-- Qwen Image 2.1：`TextEncodeQwenImage21`（参考图作为 `images.image_N` 自动增长输入，提示词用 `<image1>` 指代；没写时 adapter 自动补前缀）+ `QwenImage21Cache` + `KSampler`（euler/simple，25 步，cfg 1.0）。文生图用 `EmptyLatentImage`（尺寸对齐 32、总像素 ≤2048²）。图生图默认尺寸跟随第 1 张参考图；**关键帧（`frameType` 为 `first_frame/mid_frame/last_frame`）走显式 `EmptyLatentImage`**，即使第 1 张参考图是角色三视图也按剧集画幅出图（实测 1344×768 正常且不丢形象）；角色/道具参考图编辑仍跟随参考图尺寸，行为不变。
+### 图片生成（Qwen Image 2.1 / qwen-jobs）
+- 入口：`.110`（2×RTX 3060）的 `https://110.joyai.dev/image`（Cloudflare 隧道 + HTTP Basic auth，凭据只存 `ai_service_configs.api_key`，格式 `user:password`，火宝用 `huobao` 账号）。LAN 备选 `http://172.30.3.110/image`（免鉴权）。ComfyUI 不再对外暴露，它是该服务的私有 worker（每卡一个，一次一张）。
+- provider 叫 **`qwen-jobs`**：服务端持久化排队、跨应用公平调度（火宝/studio 轮流出队）、按任务 ID 查询与取消、按分辨率实测时间估计。应用**不再提交工作流**，只传参数，三种固定模式：无参考图 → `text_to_image`（`pickQwenSize`：对齐 32、总像素 ≤2048²）；有参考图且是关键帧（`frameType` 命中槽位）→ `reference_to_image`（按剧集画幅出图）；其余有参考图 → `image_edit`（输出跟随第 1 张参考图，用于角色/道具）。提示词用 `<image1>` 指代参考图，没写时自动补前缀；参考图最多 9 张。
+- 客户端 `adapters/qwen-jobs-client.ts`：`POST /v1/files`（按 sha256 进程内缓存 file id）、`POST /v1/jobs`（幂等键 `huobao-sys_task-<id>`）、`GET /v1/jobs?ids=`（≤100 批量）、`POST /v1/jobs/{id}/cancel`、`DELETE /v1/jobs/{id}`、`GET /v1/jobs/{id}/outputs/{n}`、`/v1/capacity`、`/v1/estimate`。
+- 生命周期：`generation.ts` 提交前把完整请求体写进 `sys_task.remote_state.request`（含已上传的 file id）再调远端，拿到远端 id 立即落盘 `task_id`；之后由常驻追踪器 `services/qwen-jobs.ts` 每 3 s 批量查询，回写 `status`（queued→`queued`、running→`processing`）与 `remote_state`（排队位置/进度/估计）。成功时**先取回字节落盘再标 `completed`**（服务端取回即删，再取 410）。**没有客户端超时**：20 分钟超时与 worker 掉线由服务端处理。网络错误/5xx/网关 530 一律当瞬时故障下轮重试，只有远端 failed/cancelled、记录消失（连续 3 轮查不到）、输出已回收（410）才是终态。
+- 重启恢复：`index.ts` 的启动清理**跳过** qwen-jobs 的活跃任务；有 `task_id` 的由追踪器继续跟，没有 `task_id`（提交途中重启）的按同一幂等键原样重发（服务端去重，不会重复跑）。任何**重试都必须新建 sys_task**（新幂等键），否则服务端会直接返回原任务而不重跑。
+- 任务状态：`sys_task.status` 为 `queued | processing | completed | failed | cancelled`，活跃判断一律用 `isActiveTaskStatus()`（`services/sys-task.ts`）。所有返回任务的接口用 `serializeTask()` 输出 snake_case + 已解析的 `remote_state`（剥掉内部键 request/config_id/idempotency_key）+ `cancellable`。`POST /tasks/:id/cancel` 取消（非 qwen-jobs 返回 400）；`GET /image-queue/estimate?config_id&size&references&count` 给前端等待估计（整批 = 当前等待 + ⌈张数 / 在线卡数⌉ × 单张，在线卡数 = total − offline）。
+- 速度参考（3060，25 步）：1024² ≈ 90 s，1344×768 三参考图关键帧 ≈ 175 s。模型：azukivc Q6_K GGUF + Comfy-Org int8 convrot 文本编码器 + bf16 VAE（固化在服务端，仓库里不再有工作流模板）。
 
 ## 待办
 
