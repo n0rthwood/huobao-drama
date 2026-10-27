@@ -13,6 +13,7 @@ import { generateImage } from './generation.js'
 import { SLOT_FRAME_TYPE, SLOT_LABEL, slotPrompt, type KeyframeSlot } from './keyframes.js'
 import { collectStoryboardAssetRefs, indexRefs, resolvePromptRefs } from './storyboard-assets.js'
 import { getDramaStylePrompt } from './style-preset.js'
+import { isQwenJobsTask } from './sys-task.js'
 
 /** 剧集画幅 → 关键帧尺寸（与 H3 的 1080p 档位同画幅，生图侧统一按长边 1344） */
 const KEYFRAME_SIZES: Record<string, string> = {
@@ -54,10 +55,10 @@ export async function submitStoryboardKeyframe(
   if (!config) throw new Error('未配置图片模型，请先到「设置」页添加并启用 AI 服务')
 
   const { urls, nameToIndex } = indexRefs(await collectStoryboardAssetRefs(storyboard, episode.id))
-  // ComfyUI(Qwen) 用 <imageN> 指代参考图；其余厂商没有占位语法，退化成“图片N”
-  const isComfyUI = config.provider.toLowerCase() === 'comfyui'
+  // qwen-jobs（Qwen Image 2.1）用 <imageN> 指代参考图；其余厂商没有占位语法，退化成“图片N”
+  const supportsImageTags = isQwenJobsTask(config.provider)
   let finalPrompt = resolvePromptRefs(prompt, nameToIndex, (index, name) =>
-    isComfyUI ? `<image${index}>${name}` : `图片${index}${name}`)
+    supportsImageTags ? `<image${index}>${name}` : `图片${index}${name}`)
   const stylePrompt = await getDramaStylePrompt(episode.dramaId)
   if (stylePrompt) finalPrompt = `${stylePrompt}，\n${finalPrompt}`
 

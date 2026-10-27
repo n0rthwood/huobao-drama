@@ -6,13 +6,30 @@ import { db, getInsertId, schema } from '../db/index.js'
 import { eq } from 'drizzle-orm'
 import { getActiveConfig, getConfigById } from './ai.js'
 import { now } from '../utils/response.js'
-import { downloadFile, fetchImageAsCompressedDataUrl, generateImageThumb, readImageAsCompressedDataUrl, readImageAsDataUrl, saveBase64Image } from '../utils/storage.js'
+import { downloadFile, fetchImageAsCompressedDataUrl, generateImageThumb, readImageAsCompressedDataUrl, readImageAsDataUrl, saveBase64Image, saveImageBuffer } from '../utils/storage.js'
 import { extractVideoPoster } from '../utils/video-poster.js'
 import { authHeaders } from './adapters/comfyui-client'
 import { getImageAdapter, getVideoAdapter } from './adapters/registry'
 import type { AIConfig, ImageGenerationRecord, VideoGenerationRecord } from './adapters/types'
 import { logTaskError, logTaskPayload, logTaskProgress, logTaskStart, logTaskSuccess, logTaskWarn, redactUrl } from '../utils/task-logger.js'
 import { FRAME_TYPE_SLOT, invalidateKeyframeConfirmation } from './keyframes.js'
+import {
+  createQwenJob,
+  pickQwenSize,
+  QWEN_MAX_REFS,
+  QwenJobsError,
+  uploadReferenceImage,
+  withReferenceHint,
+  type QwenJobMode,
+  type QwenJobRequest,
+} from './adapters/qwen-jobs-client.js'
+import {
+  isQwenJobsTask,
+  mapRemoteStatus,
+  patchTaskRemoteState,
+  qwenIdempotencyKey,
+  remoteSnapshot,
+} from './sys-task.js'
 
 /** ComfyUI 公网网关的 /view 取件要带网关鉴权头；其它 provider 的输出直链无需鉴权。
  *  四个完成回调调用点需保持同一行为，故收敛成一处。 */
@@ -215,6 +232,11 @@ async function processTask(id: number, config: AIConfig) {
     let url: string, method: string, headers: Record<string, string>, body: unknown
 
     if (type === 'image') {
+      // qwen-jobs：服务端排队的任务 API，提交后由追踪器（services/qwen-jobs.ts）按远端 id 跟踪
+      if (isQwenJobsTask(config.provider)) {
+        await submitQwenJobsImage(record, config, params)
+        return
+      }
       const adapter = getImageAdapter(config.provider)
       const resolvedReferenceImages = await normalizeReferenceImages(params.referenceImages)
       const imageRecord: ImageGenerationRecord = {
@@ -338,7 +360,7 @@ async function markPolling(id: number, taskId: string | undefined) {
   logTaskProgress('SysTask', 'poll-start', { id, taskId })
 }
 
-async function failTask(id: number, message: string) {
+export async function failTask(id: number, message: string) {
   logTaskError('SysTask', 'failed', { id, error: message })
   await db.update(schema.sysTask)
     .set({ status: 'failed', errorMsg: message, updatedAt: now() })
@@ -346,6 +368,76 @@ async function failTask(id: number, message: string) {
 }
 
 type SysTaskRecord = typeof schema.sysTask.$inferSelect
+
+/**
+ * qwen-jobs 提交：先把完整请求体（含已上传的 file id）落盘到 remote_state.request，
+ * 再调 POST /v1/jobs —— 提交途中重启时启动恢复可按同一幂等键原样重发（服务端去重）。
+ */
+async function submitQwenJobsImage(record: SysTaskRecord, config: AIConfig, params: Record<string, any>) {
+  const refs = (await normalizeReferenceImages(params.referenceImages)).slice(0, QWEN_MAX_REFS)
+  const fileIds: string[] = []
+  for (const ref of refs) fileIds.push(await uploadReferenceImage(config, ref))
+
+  // 关键帧（frameType 命中槽位）必须按剧集画幅出图 → reference_to_image；
+  // 角色/道具的编辑跟随第 1 张参考图 → image_edit（不能带 width/height）
+  const isKeyframe = !!FRAME_TYPE_SLOT[String(params.frameType || '')]
+  const mode: QwenJobMode = !fileIds.length ? 'text_to_image' : isKeyframe ? 'reference_to_image' : 'image_edit'
+  const [width, height] = pickQwenSize(params.size)
+  const body: QwenJobRequest = {
+    mode,
+    prompt: withReferenceHint(record.prompt || '', fileIds.length),
+    metadata: { sys_task_id: String(record.id) },
+    ...(mode === 'image_edit' ? {} : { width, height }),
+    ...(fileIds.length ? { reference_images: fileIds } : {}),
+  }
+  const idempotencyKey = qwenIdempotencyKey(record.id)
+  await patchTaskRemoteState(record.id, { request: body, config_id: config.id, idempotency_key: idempotencyKey }, { status: 'queued' })
+  logTaskPayload('ImageTask', 'qwen-jobs request', { id: record.id, body })
+  await sendQwenJob(record.id, config, body, idempotencyKey)
+}
+
+/**
+ * 调远端建任务并立即落盘远端 id。
+ * 409/422（幂等冲突、参考文件已回收）属终态；网络错误/5xx/网关抖动不是：
+ * 请求体已落盘，任务保持 queued 且没有 task_id，追踪器下一拍按同一幂等键重发。
+ */
+async function sendQwenJob(id: number, config: AIConfig, body: QwenJobRequest, idempotencyKey: string) {
+  try {
+    const job = await createQwenJob(config, body, idempotencyKey)
+    await patchTaskRemoteState(id, remoteSnapshot(job), {
+      taskId: job.id,
+      status: mapRemoteStatus(job.status) ?? 'processing',
+    })
+    logTaskProgress('ImageTask', 'qwen-jobs submitted', { id, jobId: job.id, status: job.status })
+  } catch (err) {
+    if (err instanceof QwenJobsError && (err.status === 409 || err.status === 422)) {
+      await failTask(id, `${err.message}（请重试，将重新上传参考图并新建任务）`)
+      return
+    }
+    if (err instanceof QwenJobsError && err.transient) {
+      logTaskWarn('ImageTask', 'qwen-jobs submit retry', { id, error: err.message })
+      return
+    }
+    throw err
+  }
+}
+
+/** 启动恢复：请求体已落盘但没有远端 id（提交途中重启），按同一幂等键原样重发 */
+export async function resubmitQwenJobsTask(id: number, config: AIConfig, body: QwenJobRequest, idempotencyKey: string) {
+  logTaskProgress('ImageTask', 'qwen-jobs resubmit', { id, idempotencyKey })
+  await sendQwenJob(id, config, body, idempotencyKey)
+}
+
+/** 远端输出取回后落盘并走与其它 provider 相同的完成链路（落盘成功才标 completed） */
+export async function completeImageTaskFromBytes(record: SysTaskRecord, bytes: Buffer, contentType: string) {
+  const localPath = await saveImageBuffer(bytes, contentType, 'images')
+  await generateImageThumb(localPath)
+  await db.update(schema.sysTask)
+    .set({ localPath, status: 'completed', completedAt: now(), updatedAt: now() })
+    .where(eq(schema.sysTask.id, record.id))
+  logTaskSuccess('ImageTask', 'downloaded', { id: record.id, provider: record.provider, localPath })
+  await writeBackImageAssets(record, localPath)
+}
 
 async function pollTask(record: SysTaskRecord, config: AIConfig, taskId: string) {
   const type = record.type as TaskType

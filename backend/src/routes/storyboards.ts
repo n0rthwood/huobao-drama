@@ -6,6 +6,7 @@ import { toSnakeCase } from '../utils/transform.js'
 import { logTaskError, logTaskPayload, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
 import { submitStoryboardVideo } from '../services/storyboard-video.js'
 import { submitStoryboardKeyframe } from '../services/storyboard-keyframes.js'
+import { serializeTask } from '../services/sys-task.js'
 import {
   SLOT_LABEL,
   SLOT_FRAME_TYPE,
@@ -265,7 +266,7 @@ app.post('/:id/keyframes/:slot/generate', async (c) => {
     const taskId = await submitStoryboardKeyframe(id, slot, { model: body.model, configId: body.config_id })
     const [record] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, taskId))
     logTaskSuccess('StoryboardAPI', 'generate-keyframe', { storyboardId: id, slot, taskId, provider: record?.provider })
-    return created(c, record)
+    return created(c, record ? serializeTask(record) : null)
   } catch (err) {
     const message = err instanceof Error ? err.message : '关键帧生成失败'
     logTaskError('StoryboardAPI', 'generate-keyframe', { storyboardId: id, slot, error: message })

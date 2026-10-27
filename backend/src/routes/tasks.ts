@@ -7,6 +7,8 @@ import { generateImage, generateVideo } from '../services/generation.js'
 import { getActiveConfig, getConfigById, validateVideoModel } from '../services/ai.js'
 import { getDramaStylePrompt } from '../services/style-preset.js'
 import { logTaskError, logTaskPayload, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
+import { serializeTask, serializeTasks } from '../services/sys-task.js'
+import { cancelImageTask, discardRemoteJob } from '../services/qwen-jobs.js'
 
 const app = new Hono()
 
@@ -91,7 +93,7 @@ app.post('/', async (c) => {
     logTaskPayload('TaskAPI', 'request body', body)
 
     // 视频生成时把项目视觉风格词注入提示词最前方（与图片侧的自动注入保持一致口径）
-    let videoPrompt = videoBody?.prompt
+    let videoPrompt = videoBody?.prompt ?? ''
     if (type === 'video' && String(videoPrompt || '').trim()) {
       const dramaId = body.drama_id ?? storyboardDramaId ?? null
       const stylePrompt = await getDramaStylePrompt(dramaId)
@@ -136,7 +138,7 @@ app.post('/', async (c) => {
     const [record] = await db.select().from(schema.sysTask)
       .where(eq(schema.sysTask.id, id))
     logTaskSuccess('TaskAPI', 'generate', { taskId: id, type, provider: record?.provider })
-    return created(c, record)
+    return created(c, record ? serializeTask(record) : null)
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : '生成任务失败'
     logTaskError('TaskAPI', 'generate', { type, error: message })
@@ -198,7 +200,7 @@ app.get('/:id', async (c) => {
   const id = Number(c.req.param('id'))
   const [row] = await db.select().from(schema.sysTask)
     .where(eq(schema.sysTask.id, id))
-  return success(c, row || null)
+  return success(c, row ? serializeTask(row) : null)
 })
 
 // GET /tasks — 按 type / storyboard_id / drama_id 过滤
@@ -219,12 +221,24 @@ app.get('/', async (c) => {
   if (sceneId) rows = rows.filter(r => r.sceneId === Number(sceneId))
   if (propId) rows = rows.filter(r => r.propId === Number(propId))
 
-  return success(c, rows)
+  return success(c, serializeTasks(rows))
 })
 
-// DELETE /tasks/:id
+// POST /tasks/:id/cancel — 取消排队/运行中的 qwen-jobs 任务（其它供应商不支持）
+app.post('/:id/cancel', async (c) => {
+  const id = Number(c.req.param('id'))
+  try {
+    return success(c, serializeTask(await cancelImageTask(id)))
+  } catch (err) {
+    return badRequest(c, err instanceof Error ? err.message : '取消失败')
+  }
+})
+
+// DELETE /tasks/:id — 丢弃任务记录；qwen-jobs 的远端任务一并取消并清理文件
 app.delete('/:id', async (c) => {
   const id = Number(c.req.param('id'))
+  const [row] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, id))
+  if (row) await discardRemoteJob(row)
   await db.delete(schema.sysTask).where(eq(schema.sysTask.id, id))
   return success(c)
 })
