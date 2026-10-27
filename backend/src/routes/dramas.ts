@@ -151,16 +151,14 @@ app.delete('/:id', async (c) => {
 // 文本字段 + 当前图 + 全部历史版本 + 参考图都复制成新行/新文件，源与副本此后互不影响。
 app.post('/:id/assets/import', async (c) => {
   const targetDramaId = Number(c.req.param('id'))
-  const body: unknown = await c.req.json()
-  const read = (key: string): unknown => (body && typeof body === 'object' && key in body
-    ? (body as Record<string, unknown>)[key]
-    : undefined)
-  const kind = read('kind')
+  const raw: unknown = await c.req.json()
+  const body = raw && typeof raw === 'object' ? raw : null
+  const kind = body && 'kind' in body ? body.kind : undefined
   if (!isAssetKind(kind)) return badRequest(c, 'kind 必须是 character / scene / prop')
-  const sourceId = Number(read('source_id'))
+  const sourceId = Number(body && 'source_id' in body ? body.source_id : undefined)
   if (!Number.isInteger(sourceId) || sourceId <= 0) return badRequest(c, 'source_id 必填')
-  const nameRaw = read('name')
-  const episodeIdRaw = read('episode_id')
+  const nameRaw = body && 'name' in body ? body.name : undefined
+  const episodeIdRaw = body && 'episode_id' in body ? body.episode_id : undefined
   try {
     return success(c, await importAsset({
       targetDramaId,
@@ -175,9 +173,10 @@ app.post('/:id/assets/import', async (c) => {
       // 同名冲突：带上建议名，前端直接填进改名输入框
       return c.json({ code: 400, message: err.message, data: { suggestion: err.suggestion ?? null } }, 400)
     }
-    // 文件复制等 IO 失败：importAsset 已回滚（无残留行/文件），这里告诉用户原因
-    logTaskError('AssetImport', 'import-failed', { dramaId: targetDramaId, kind, sourceId, error: (err as Error).message })
-    return serverError(c, `导入失败，已回滚：${(err as Error).message}`)
+    // 文件复制等 IO 失败：importAsset 已尽力回滚；详细原因（含服务器路径）只进日志，不回给客户端
+    const message = err instanceof Error ? err.message : String(err)
+    logTaskError('AssetImport', 'import-failed', { dramaId: targetDramaId, kind, sourceId, error: message })
+    return serverError(c, '导入失败，已回滚本次复制的数据与文件，请重试或联系管理员')
   }
 })
 
