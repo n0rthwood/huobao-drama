@@ -1,14 +1,29 @@
 /**
  * 资产提取任务 — 异步执行，按「集 × 类型」粒度跟踪
  * 角色 / 场景 / 道具 可分别单独提取，同一集的不同类型可并行
- * 任务状态为进程内内存态：后端重启后运行中的任务状态丢失（Agent 调用本身已被中断）
+ * 任务状态持久化在 sys_task(type='text', params.kind=extract_*)：刷新/切页可恢复，后端重启时标记为失败
  */
 import { mastra } from '../mastra/index.js'
 import { buildAgentRequestContext } from '../agents/context.js'
 import { logTaskError, logTaskProgress, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
+import {
+  createTextTask,
+  findActiveTextTask,
+  findLatestTextTask,
+  finishTextTask,
+  resolveTextModel,
+  textTaskOutcome,
+  type TextTaskKind,
+} from './text-task.js'
 
 export type ExtractTarget = 'characters' | 'scenes' | 'props'
 export const EXTRACT_TARGETS: ExtractTarget[] = ['characters', 'scenes', 'props']
+
+export const EXTRACT_TASK_KINDS: Record<ExtractTarget, TextTaskKind> = {
+  characters: 'extract_characters',
+  scenes: 'extract_scenes',
+  props: 'extract_props',
+}
 
 export interface ExtractTask {
   status: 'running' | 'done' | 'error'
@@ -16,9 +31,6 @@ export interface ExtractTask {
   finished_at?: string
   error?: string
 }
-
-const tasks = new Map<string, ExtractTask>()
-const keyOf = (episodeId: number, target: string) => `${episodeId}:${target}`
 
 /** 每类资产的提取指令：限定只提取该类型，并要求与已有数据去重合并 */
 const EXTRACT_MESSAGES: Record<ExtractTarget, string> = {
@@ -28,12 +40,26 @@ const EXTRACT_MESSAGES: Record<ExtractTarget, string> = {
 }
 
 /** 启动异步提取任务（立即返回）；同集同类型已在运行时返回 false；可指定文本模型覆盖 */
-export function startExtraction(episodeId: number, dramaId: number, target: ExtractTarget, opts: { model?: string; configId?: number } = {}): boolean {
-  const key = keyOf(episodeId, target)
-  if (tasks.get(key)?.status === 'running') return false
+export async function startExtraction(
+  episodeId: number,
+  dramaId: number,
+  target: ExtractTarget,
+  opts: { model?: string; configId?: number; retryOf?: number } = {},
+): Promise<boolean> {
+  const kind = EXTRACT_TASK_KINDS[target]
+  if (await findActiveTextTask(episodeId, kind)) return false
 
-  const task: ExtractTask = { status: 'running', started_at: new Date().toISOString() }
-  tasks.set(key, task)
+  const resolved = await resolveTextModel(opts)
+  const taskId = await createTextTask({
+    kind,
+    episodeId,
+    dramaId,
+    prompt: EXTRACT_MESSAGES[target],
+    provider: resolved.provider,
+    model: resolved.model,
+    configId: opts.configId ?? resolved.configId ?? undefined,
+    retryOf: opts.retryOf,
+  })
 
   logTaskStart('Extract', target, { episodeId, dramaId, model: opts.model || undefined, configId: opts.configId || undefined })
   ;(async () => {
@@ -61,10 +87,9 @@ export function startExtraction(episodeId: number, dramaId: number, target: Extr
       },
     })
   })()
-    .then((result: any) => {
-      task.status = 'done'
-      task.finished_at = new Date().toISOString()
-      const toolNames = (result?.toolCalls || []).map((t: any) => t?.toolName).filter(Boolean)
+    .then(async (result) => {
+      await finishTextTask(taskId, 'completed')
+      const toolNames = (result?.toolCalls || []).map(t => t?.payload?.toolName).filter(Boolean)
       logTaskSuccess('Extract', target, {
         episodeId,
         steps: result?.steps?.length,
@@ -72,18 +97,27 @@ export function startExtraction(episodeId: number, dramaId: number, target: Extr
         reply: (result?.text || '').slice(0, 300) || undefined,
       })
     })
-    .catch((err: any) => {
-      task.status = 'error'
-      task.finished_at = new Date().toISOString()
-      task.error = err?.message || '提取失败'
-      logTaskError('Extract', target, { episodeId, error: err?.message })
+    .catch(async (err: unknown) => {
+      const message = err instanceof Error ? err.message : '提取失败'
+      await finishTextTask(taskId, 'failed', { errorMsg: message })
+      logTaskError('Extract', target, { episodeId, error: message })
     })
   return true
 }
 
 /** 查询某集三类资产的提取任务状态（未启动过的类型为 null） */
-export function getExtractionStatus(episodeId: number): Record<ExtractTarget, ExtractTask | null> {
+export async function getExtractionStatus(episodeId: number): Promise<Record<ExtractTarget, ExtractTask | null>> {
   const result = {} as Record<ExtractTarget, ExtractTask | null>
-  for (const target of EXTRACT_TARGETS) result[target] = tasks.get(keyOf(episodeId, target)) || null
+  for (const target of EXTRACT_TARGETS) {
+    const row = await findLatestTextTask(episodeId, EXTRACT_TASK_KINDS[target])
+    result[target] = row
+      ? {
+        status: textTaskOutcome(row.status),
+        started_at: row.createdAt,
+        finished_at: row.completedAt || undefined,
+        error: row.errorMsg || undefined,
+      }
+      : null
+  }
   return result
 }

@@ -1,35 +1,36 @@
 /**
  * 批量视频提示词任务 — 异步为缺少 video_prompt 的分镜逐个运行 prompt_generator Agent
- * 进程内内存态：按集跟踪一份任务，运行中不重复启动；重启后状态丢失
+ * 状态持久化在 sys_task(type='text', params.kind='video_prompts')，进度写 params.progress；
+ * 按集跟踪，运行中不重复启动；后端重启时由启动清理标记为失败
  */
 import { eq } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
 import { mastra } from '../mastra/index.js'
 import { buildAgentRequestContext } from '../agents/context.js'
 import { logTaskError, logTaskProgress, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
+import {
+  createTextTask,
+  findActiveTextTask,
+  findLatestTextTask,
+  finishTextTask,
+  promptBatchStatusFrom,
+  resolveTextModel,
+  updateTextTaskProgress,
+  type PromptBatchStatus,
+  type TextTaskProgress,
+} from './text-task.js'
 
-export interface VideoPromptBatchStatus {
-  status: 'running' | 'done' | 'error'
-  total: number
-  completed: number
-  failed: number
-  current_storyboard_id?: number
-  started_at: string
-  finished_at?: string
-  error?: string
-}
-
-const tasks = new Map<number, VideoPromptBatchStatus>()
+export type VideoPromptBatchStatus = PromptBatchStatus
 
 /** 启动批量生成（立即返回）；运行中返回 started:false,total:-1；无待生成分镜返回 started:false,total:0；
  *  传入 storyboardIds 时只处理所选分镜（即使已有提示词也重新生成），否则处理全部缺失提示词的分镜 */
 export async function startVideoPromptBatch(
   episodeId: number,
   dramaId: number,
-  opts: { model?: string; configId?: number } = {},
+  opts: { model?: string; configId?: number; retryOf?: number } = {},
   storyboardIds?: number[],
 ): Promise<{ started: boolean; total: number }> {
-  if (tasks.get(episodeId)?.status === 'running') return { started: false, total: -1 }
+  if (await findActiveTextTask(episodeId, 'video_prompts')) return { started: false, total: -1 }
 
   const sbs = await db.select().from(schema.storyboards)
     .where(eq(schema.storyboards.episodeId, episodeId))
@@ -47,14 +48,20 @@ export async function startVideoPromptBatch(
     if (cfg) videoLabel = `${cfg.name} (${cfg.provider})`
   }
 
-  const task: VideoPromptBatchStatus = {
-    status: 'running',
-    total: pending.length,
-    completed: 0,
-    failed: 0,
-    started_at: new Date().toISOString(),
-  }
-  tasks.set(episodeId, task)
+  const resolved = await resolveTextModel(opts)
+  const progress: TextTaskProgress = { completed: 0, failed: 0, total: pending.length }
+  const taskId = await createTextTask({
+    kind: 'video_prompts',
+    episodeId,
+    dramaId,
+    provider: resolved.provider,
+    model: resolved.model,
+    configId: opts.configId ?? resolved.configId ?? undefined,
+    // 落盘实际处理范围（而非调用方传入的可选列表），重试时按同一批分镜重跑
+    storyboardIds: pending.map(sb => sb.id),
+    progress,
+    retryOf: opts.retryOf,
+  })
 
   logTaskStart('VideoPrompt', 'batch', { episodeId, dramaId, total: pending.length, model: opts.model || undefined })
   ;(async () => {
@@ -67,8 +74,9 @@ export async function startVideoPromptBatch(
       textConfigId: opts.configId || undefined,
     })
     for (const sb of pending) {
-      task.current_storyboard_id = sb.id
-      logTaskProgress('VideoPrompt', 'batch-shot', { episodeId, storyboardId: sb.id, index: task.completed + task.failed + 1, total: task.total })
+      progress.current_storyboard_id = sb.id
+      await updateTextTaskProgress(taskId, progress)
+      logTaskProgress('VideoPrompt', 'batch-shot', { episodeId, storyboardId: sb.id, index: progress.completed + progress.failed + 1, total: progress.total })
       try {
         await agent.generate([{
           role: 'user',
@@ -77,32 +85,31 @@ export async function startVideoPromptBatch(
         }], { maxSteps: 8, requestContext })
         // 以实际落库为准判定成败
         const [fresh] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, sb.id))
-        if ((fresh?.videoPrompt || '').trim()) task.completed++
+        if ((fresh?.videoPrompt || '').trim()) progress.completed++
         else {
-          task.failed++
+          progress.failed++
           logTaskError('VideoPrompt', 'batch-shot', { storyboardId: sb.id, error: 'agent finished but video_prompt is empty' })
         }
-      } catch (err: any) {
-        task.failed++
-        logTaskError('VideoPrompt', 'batch-shot', { storyboardId: sb.id, error: err?.message })
+      } catch (err: unknown) {
+        progress.failed++
+        logTaskError('VideoPrompt', 'batch-shot', { storyboardId: sb.id, error: err instanceof Error ? err.message : String(err) })
       }
     }
   })()
-    .then(() => {
-      task.status = 'done'
-      task.finished_at = new Date().toISOString()
-      task.current_storyboard_id = undefined
-      logTaskSuccess('VideoPrompt', 'batch', { episodeId, total: task.total, completed: task.completed, failed: task.failed })
+    .then(async () => {
+      progress.current_storyboard_id = undefined
+      await finishTextTask(taskId, 'completed', { progress })
+      logTaskSuccess('VideoPrompt', 'batch', { episodeId, total: progress.total, completed: progress.completed, failed: progress.failed })
     })
-    .catch((err: any) => {
-      task.status = 'error'
-      task.finished_at = new Date().toISOString()
-      task.error = err?.message || '批量生成失败'
-      logTaskError('VideoPrompt', 'batch', { episodeId, error: err?.message })
+    .catch(async (err: unknown) => {
+      const message = err instanceof Error ? err.message : '批量生成失败'
+      progress.current_storyboard_id = undefined
+      await finishTextTask(taskId, 'failed', { errorMsg: message, progress })
+      logTaskError('VideoPrompt', 'batch', { episodeId, error: message })
     })
   return { started: true, total: pending.length }
 }
 
-export function getVideoPromptBatchStatus(episodeId: number): VideoPromptBatchStatus | null {
-  return tasks.get(episodeId) || null
+export async function getVideoPromptBatchStatus(episodeId: number): Promise<VideoPromptBatchStatus | null> {
+  return promptBatchStatusFrom(await findLatestTextTask(episodeId, 'video_prompts'))
 }

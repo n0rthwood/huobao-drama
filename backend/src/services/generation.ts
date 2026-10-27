@@ -52,7 +52,21 @@ const POLL_PROFILES: Record<TaskType, { attempts: number; intervalMs: number; ma
   video: { attempts: 300, intervalMs: 10_000, maxDurationMs: null },
 }
 
-interface GenerateImageParams {
+/**
+ * 重试相关的可选字段（全链路共用）：
+ * - episodeId：任务归属集，供全局任务中心按集筛选/编号
+ * - sourcePrompt：渲染前的源提示词（含风格前缀，@名字 未解析），换厂商重试时据此重新渲染
+ * - refNameIndex：资产名 → 参考图序号（1 基），重新渲染引用格式时用
+ * - retryOf：来源任务 id
+ */
+interface TaskOriginParams {
+  episodeId?: number
+  sourcePrompt?: string
+  refNameIndex?: Record<string, number>
+  retryOf?: number
+}
+
+interface GenerateImageParams extends TaskOriginParams {
   storyboardId?: number
   dramaId?: number
   sceneId?: number
@@ -66,7 +80,7 @@ interface GenerateImageParams {
   configId?: number
 }
 
-interface GenerateVideoParams {
+interface GenerateVideoParams extends TaskOriginParams {
   storyboardId?: number
   dramaId?: number
   prompt: string
@@ -100,6 +114,7 @@ export async function generateImage(params: GenerateImageParams): Promise<number
 
   const id = await createTask('image', config, {
     storyboardId: params.storyboardId,
+    episodeId: await resolveEpisodeId(params),
     dramaId: params.dramaId,
     sceneId: params.sceneId,
     characterId: params.characterId,
@@ -110,6 +125,7 @@ export async function generateImage(params: GenerateImageParams): Promise<number
     size: params.size || '1920x1080',
     frameType: params.frameType,
     referenceImages: params.referenceImages,
+    ...originParams(params),
   })
 
   logTaskStart('ImageTask', 'enqueue', {
@@ -138,6 +154,7 @@ export async function generateVideo(params: GenerateVideoParams): Promise<number
 
   const id = await createTask('video', config, {
     storyboardId: params.storyboardId,
+    episodeId: await resolveEpisodeId(params),
     dramaId: params.dramaId,
     prompt: params.prompt,
     model: params.model || config.model,
@@ -159,6 +176,7 @@ export async function generateVideo(params: GenerateVideoParams): Promise<number
     seed: params.seed,
     promptExtend: params.promptExtend,
     watermark: params.watermark,
+    ...originParams(params),
   })
 
   logTaskStart('VideoTask', 'enqueue', {
@@ -177,11 +195,31 @@ export async function generateVideo(params: GenerateVideoParams): Promise<number
   return id
 }
 
+/**
+ * 任务归属集：显式传入优先，否则由分镜反查（分镜任务必有集，资产出图可空）。
+ */
+async function resolveEpisodeId(params: TaskOriginParams & { storyboardId?: number }): Promise<number | undefined> {
+  if (params.episodeId) return params.episodeId
+  if (!params.storyboardId) return undefined
+  const [sb] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, params.storyboardId))
+  return sb?.episodeId ?? undefined
+}
+
+/** 换厂商重试需要的溯源字段，只在有值时写入 params */
+function originParams(params: TaskOriginParams): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  if (params.sourcePrompt) out.sourcePrompt = params.sourcePrompt
+  if (params.refNameIndex && Object.keys(params.refNameIndex).length) out.refNameIndex = params.refNameIndex
+  if (params.retryOf) out.retry_of = params.retryOf
+  return out
+}
+
 async function createTask(
   type: TaskType,
   config: AIConfig,
   fields: {
     storyboardId?: number
+    episodeId?: number
     dramaId?: number
     sceneId?: number
     characterId?: number

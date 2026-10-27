@@ -141,6 +141,8 @@ export const storyboards = sqliteTable('storyboards', {
   keyframesConfirmed: integer('keyframes_confirmed', { mode: 'boolean' }).default(false),
   referenceImages: text('reference_images'),
   assetVersionSelection: text('asset_version_selection'),
+  // 字段级保存时间（JSON：字段 → unix 秒），整行 updated_at 会被生图回写污染
+  fieldSavedAt: text('field_saved_at'),
   // LLM 拆分镜时标注的边界：continue=承接上一镜（首帧继承其尾帧关键帧），cut=硬切；NULL=未标注（按硬切处理）
   continuityBoundary: text('continuity_boundary'),
   videoUrl: text('video_url'),
@@ -215,8 +217,10 @@ export const stylePresets = sqliteTable('style_presets', {
 // 统一生成任务表：图片/视频生成共用，type 区分，生成参数存 params(JSON)
 export const sysTask = sqliteTable('sys_task', {
   id: integer('id').primaryKey({ autoIncrement: true }),
-  type: text('type').notNull(), // image | video
+  type: text('type').notNull(), // image | video | text
   storyboardId: integer('storyboard_id'),
+  // 任务归属的集（分镜任务取分镜所属集；资产出图为发起时所在集，可空；文本任务必填）
+  episodeId: integer('episode_id'),
   dramaId: integer('drama_id'),
   sceneId: integer('scene_id'),
   characterId: integer('character_id'),
