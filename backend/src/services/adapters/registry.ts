@@ -8,15 +8,17 @@ import { VolcEngineImageAdapter } from './volcengine-image'
 import { VolcEngineVideoAdapter } from './volcengine-video'
 import { MiniMaxVideoAdapter } from './minimax-video'
 import { ComfyUIVideoAdapter } from './comfyui-video'
-import { ComfyUIImageAdapter } from './comfyui-image'
 import type { ImageProviderAdapter, VideoProviderAdapter } from './types'
 
-// 图片 Adapter 注册表
+/**
+ * 图片 Adapter 注册表。
+ * qwen-jobs 不在其中：它不是「请求 → 轮询」式 HTTP adapter，而是服务端排队的任务 API，
+ * 由 services/qwen-jobs.ts 的追踪器驱动（见 generation.ts 的 isQwenJobsTask 分支）。
+ */
 export const imageAdapters: Record<string, ImageProviderAdapter> = {
   openai: new OpenAIImageAdapter(),
   gemini: new GeminiImageAdapter(),
   volcengine: new VolcEngineImageAdapter(),
-  comfyui: new ComfyUIImageAdapter(),
 }
 
 // 视频 Adapter 注册表
