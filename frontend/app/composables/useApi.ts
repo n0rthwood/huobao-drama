@@ -56,7 +56,24 @@ export const episodeAPI = {
   extractStatus: (id: number) => api.get(`/episodes/${id}/extract-status`),
   generateVideoPrompts: (id: number, model?: string, configId?: number, storyboardIds?: number[]) => api.post(`/episodes/${id}/generate-video-prompts`, { model: model || undefined, config_id: configId || undefined, storyboard_ids: storyboardIds?.length ? storyboardIds : undefined }),
   videoPromptsStatus: (id: number) => api.get(`/episodes/${id}/video-prompts-status`),
-  // 集级串行视频批量：后端按分镜顺序生成，承接镜头自动取上一镜尾帧作为首帧
+  // 批量补齐关键帧提示词（首/中/尾三槽），与视频提示词批量同一套异步状态模型
+  generateKeyframePrompts: (id: number, data: { storyboard_ids?: number[]; model?: string; config_id?: number } = {}) =>
+    api.post(`/episodes/${id}/generate-keyframe-prompts`, {
+      storyboard_ids: data.storyboard_ids?.length ? data.storyboard_ids : undefined,
+      model: data.model || undefined,
+      config_id: data.config_id || undefined,
+    }),
+  keyframePromptsStatus: (id: number) => api.get(`/episodes/${id}/keyframe-prompts-status`),
+  // 集级串行关键帧批量：后端按「分镜 × 槽位」逐张生成，默认只补缺图，带 storyboard_ids 时对所选分镜全部重生成
+  startKeyframeBatch: (id: number, data: { storyboard_ids?: number[]; model?: string; config_id?: number }) =>
+    api.post(`/episodes/${id}/keyframe-batch`, {
+      storyboard_ids: data.storyboard_ids?.length ? data.storyboard_ids : undefined,
+      model: data.model || undefined,
+      config_id: data.config_id || undefined,
+    }),
+  keyframeBatch: (id: number) => api.get(`/episodes/${id}/keyframe-batch`),
+  cancelKeyframeBatch: (id: number) => api.post(`/episodes/${id}/keyframe-batch/cancel`),
+  // 集级串行视频批量：后端按分镜顺序生成，要求本集全部分镜关键帧已确认
   startVideoBatch: (id: number, data: { storyboard_ids?: number[]; model?: string; config_id?: number }) =>
     api.post(`/episodes/${id}/video-batch`, {
       storyboard_ids: data.storyboard_ids?.length ? data.storyboard_ids : undefined,
@@ -71,9 +88,21 @@ export const storyboardAPI = {
   create: (data: any) => api.post('/storyboards', data),
   update: (id: number, data: any) => api.put(`/storyboards/${id}`, data),
   del: (id: number) => api.del(`/storyboards/${id}`),
-  // 视频生成参数（参考图 / @图片N 映射 / 承接首帧 / 分辨率）全部由后端组装
+  // 视频生成参数（关键帧引导、参考图 / @图片N 映射 / 分辨率）全部由后端组装
   generateVideo: (id: number, data: { model?: string; config_id?: number }) =>
     api.post(`/storyboards/${id}/generate-video`, { model: data.model || undefined, config_id: data.config_id || undefined }),
+  // 关键帧槽位：first | mid | last
+  generateKeyframe: (id: number, slot: 'first' | 'mid' | 'last', data: { prompt?: string; model?: string; config_id?: number } = {}) =>
+    api.post(`/storyboards/${id}/keyframes/${slot}/generate`, {
+      prompt: data.prompt || undefined,
+      model: data.model || undefined,
+      config_id: data.config_id || undefined,
+    }),
+  keyframeVersions: (id: number, slot: 'first' | 'mid' | 'last') => api.get(`/storyboards/${id}/keyframes/${slot}/versions`),
+  // { image } 选定该槽位版本；{ inherit: true } 仅首帧：清除自有首帧改用上一镜尾帧
+  selectKeyframe: (id: number, slot: 'first' | 'mid' | 'last', data: { image?: string; inherit?: boolean }) =>
+    api.put(`/storyboards/${id}/keyframes/${slot}`, data),
+  confirmKeyframes: (id: number, confirmed: boolean) => api.post(`/storyboards/${id}/confirm-keyframes`, { confirmed }),
 }
 
 /**
