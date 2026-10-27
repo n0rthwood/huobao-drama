@@ -7,6 +7,7 @@
  *   config_id（追踪器据此找回 baseUrl/凭据）、idempotency_key。
  * 这三个内部键只存库，不出 API。
  */
+import { randomUUID } from 'node:crypto'
 import { and, eq, inArray } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
 import { now } from '../utils/response.js'
@@ -132,9 +133,13 @@ export function mapRemoteStatus(status: QwenJob['status']): SysTaskStatus | null
   return null
 }
 
-/** 幂等键：重试必须新建 sys_task（新 key），否则服务端会原样返回旧任务而不重跑 */
+/**
+ * 幂等键：每个 sys_task 首次提交时新生成并随请求体落盘，重启重发沿用落盘的键。
+ * 只用 sys_task id 不够——id 在数据库重建/拷贝（如 worktree QA）后会重复，服务端按 key 去重会把
+ * 新任务当成旧任务（409 idempotency_conflict）。重试必须新建 sys_task（新 key）。
+ */
 export function qwenIdempotencyKey(taskId: number): string {
-  return `huobao-sys_task-${taskId}`
+  return `huobao-sys_task-${taskId}-${randomUUID()}`
 }
 
 /** API 输出：snake_case + remote_state 已解析（剥掉内部键）+ cancellable */

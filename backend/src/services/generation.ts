@@ -395,7 +395,8 @@ async function submitQwenJobsImage(record: SysTaskRecord, config: AIConfig, para
   if (refs.length > QWEN_MAX_REFS) {
     throw new Error(`参考图超限：共 ${refs.length} 张，单次最多 ${QWEN_MAX_REFS} 张，请减少绑定的角色/场景/道具`)
   }
-  const idempotencyKey = qwenIdempotencyKey(record.id)
+  // 已落盘过请求的（重启恢复后走完整提交路径）沿用原键，否则新生成
+  const idempotencyKey = parseRemoteState(record.remoteState).idempotency_key || qwenIdempotencyKey(record.id)
 
   for (let attempt = 1; attempt <= 2; attempt++) {
     const fileIds: string[] = []
@@ -486,8 +487,8 @@ async function sendQwenJob(
 /**
  * 追踪器驱动的恢复（含启动恢复）：
  * - remote_state.request 已落盘但没有远端 id（提交途中重启）→ 按同一幂等键原样重发；
- * - 连请求体都没有（createTask 后、上传参考图途中重启）→ 用 sys_task.params 走完整提交路径，
- *   幂等键同样是 huobao-sys_task-<id>，服务端已存在同内容任务时原样返回，不会重复出图。
+ * - 连请求体都没有（createTask 后、上传参考图途中重启）→ 用 sys_task.params 走完整提交路径；
+ *   这种行从未调过 POST /v1/jobs，新生成幂等键即可（键随请求体一起落盘）。
  * 本进程正在提交的任务直接跳过，避免追踪器与提交线程重复上传。
  */
 export async function resumeQwenJobsTask(row: SysTaskRecord, config: AIConfig): Promise<void> {

@@ -22,9 +22,13 @@ function runInBackend(body) {
     }
     const config = { id: 1, provider: 'qwen-jobs', baseUrl: 'http://qwen-jobs.invalid/image', apiKey: 'huobao:secret' }
     const png = 'data:image/png;base64,' + Buffer.from('fake-png-bytes').toString('base64')
+    // tsx --eval 走 cjs，不支持顶层 await；失败时必须非 0 退出，否则父进程只拿到空输出
     void (async () => {
       ${body}
-    })()
+    })().catch(err => {
+      console.error(err)
+      process.exit(1)
+    })
   `
   const out = execFileSync('npx', ['tsx', '--eval', script], { cwd: backendRoot, encoding: 'utf8' })
   return JSON.parse(out)
