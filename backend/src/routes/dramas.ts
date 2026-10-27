@@ -1,9 +1,11 @@
 import { Hono } from 'hono'
 import { and, eq, isNull, like, desc } from 'drizzle-orm'
 import { db, getInsertId, schema } from '../db/index.js'
-import { success, badRequest, notFound, created, now } from '../utils/response.js'
+import { success, badRequest, notFound, created, now, serverError } from '../utils/response.js'
 import { toSnakeCase, toSnakeCaseArray } from '../utils/transform.js'
 import { lookupGeneratedAt } from '../services/media-time.js'
+import { logTaskError } from '../utils/task-logger.js'
+import { AssetLibraryError, importAsset, isAssetKind } from '../services/asset-library.js'
 
 const app = new Hono()
 
@@ -143,6 +145,40 @@ app.delete('/:id', async (c) => {
   const id = Number(c.req.param('id'))
   await db.update(schema.dramas).set({ deletedAt: now() }).where(eq(schema.dramas.id, id))
   return success(c)
+})
+
+// POST /dramas/:id/assets/import — 跨项目全量复制导入一个资产（可选同时关联到某一集）
+// 文本字段 + 当前图 + 全部历史版本 + 参考图都复制成新行/新文件，源与副本此后互不影响。
+app.post('/:id/assets/import', async (c) => {
+  const targetDramaId = Number(c.req.param('id'))
+  const body: unknown = await c.req.json()
+  const read = (key: string): unknown => (body && typeof body === 'object' && key in body
+    ? (body as Record<string, unknown>)[key]
+    : undefined)
+  const kind = read('kind')
+  if (!isAssetKind(kind)) return badRequest(c, 'kind 必须是 character / scene / prop')
+  const sourceId = Number(read('source_id'))
+  if (!Number.isInteger(sourceId) || sourceId <= 0) return badRequest(c, 'source_id 必填')
+  const nameRaw = read('name')
+  const episodeIdRaw = read('episode_id')
+  try {
+    return success(c, await importAsset({
+      targetDramaId,
+      kind,
+      sourceId,
+      name: typeof nameRaw === 'string' ? nameRaw : undefined,
+      episodeId: episodeIdRaw == null ? null : Number(episodeIdRaw),
+    }))
+  } catch (err) {
+    if (err instanceof AssetLibraryError) {
+      if (err.status === 404) return notFound(c, err.message)
+      // 同名冲突：带上建议名，前端直接填进改名输入框
+      return c.json({ code: 400, message: err.message, data: { suggestion: err.suggestion ?? null } }, 400)
+    }
+    // 文件复制等 IO 失败：importAsset 已回滚（无残留行/文件），这里告诉用户原因
+    logTaskError('AssetImport', 'import-failed', { dramaId: targetDramaId, kind, sourceId, error: (err as Error).message })
+    return serverError(c, `导入失败，已回滚：${(err as Error).message}`)
+  }
 })
 
 // PUT /dramas/:id/characters - Save characters

@@ -209,6 +209,32 @@
       "confirmTitle": "参照画像の削除",
       "confirmMessage": "この参照画像は生成に使われなくなり、ファイルも削除されます。完成画像には影響しません。"
     },
+    "assetBrowser": {
+      "title": "アセットマネージャー",
+      "subtitleEpisode": "アセットを選択：本プロジェクトのものは本話に紐付け、他プロジェクトのものは全量コピー",
+      "subtitleDrama": "他プロジェクトのアセットを本プロジェクトへ全量コピー",
+      "currentDrama": "本プロジェクト",
+      "noDrama": "取り込める プロジェクトがありません",
+      "searchPlaceholder": "名前や説明を検索",
+      "selected": "{n} 件選択",
+      "empty": "一致するアセットがありません",
+      "versions": "{n} バージョン",
+      "refs": "参考画像 {n} 枚",
+      "inEpisodes": "{list} に存在",
+      "noEpisode": "話に未紐付け",
+      "alreadyLinked": "本話に追加済み",
+      "willLink": "本話に紐付け",
+      "willImport": "全量コピー",
+      "renameLabel": "取り込み後の名前",
+      "nameRequired": "名前は必須です",
+      "nameTaken": "名前が重複しています。変更してください",
+      "progress": "処理中 {done}/{total}",
+      "confirm": "取り込み / 紐付け",
+      "doneToast": "{linked} 件を紐付け、{imported} 件を取り込みました",
+      "skippedToast": "元ファイルが無い {n} 件をスキップしました",
+      "openEpisode": "アセットライブラリから取り込む",
+      "openDrama": "他プロジェクトから取り込む"
+    },
     "localeSwitcher": {
       "label": "表示言語を切り替え"
     },

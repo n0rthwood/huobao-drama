@@ -60,8 +60,9 @@ export class ReferenceImageError extends Error {
   }
 }
 
-/** 存储子目录（相对 STORAGE_ROOT），saveUploadedFile 返回 `static/<subDir>/<uuid><ext>` */
-function referenceSubDir(kind: AssetKind, assetId: number) {
+/** 存储子目录（相对 STORAGE_ROOT），saveUploadedFile 返回 `static/<subDir>/<uuid><ext>`；
+ *  资产导入复制参考图时也用它定位新资产自己的目录（services/asset-library.ts） */
+export function referenceSubDir(kind: AssetKind, assetId: number) {
   return `uploads/reference_images/${kind}/${assetId}`
 }
 

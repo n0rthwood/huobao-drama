@@ -146,6 +146,17 @@ Issue 整理完成后、实施前，必须让 **Fabel（Anthropic）或 Astra（
 - 服务器资料（2026-10-26 起）：**唯一视频实例在 `.102` tcs3（RTX 3090）**，2026-10-27 起经路由器 DNAT `http://tianan2.riadev.top:10280/video` 访问（Basic auth，`.164` 实测上传 ~19 MB/s）；**不要用** Cloudflare 隧道 `https://102.joyai.dev/video`——上行只有 ~32 KB/s，4 张参考图并行上传超过 `uploadImage` 的 120 s 超时（任务 #80/#92 `The operation was aborted due to timeout`）。模型名 `MiniMax-H3-INT8-ComfyUI` 触发变体模板 `workflows/h3-int8/{t2v,firstlast,reference}.json`（fl2va int8 convrot + fused refdelta int8 + qwen3vl nvfp4_awq + turbo 8 步 LoRA）。参考图模式走 fused refdelta，无需 `ref2va`。bf16 实例（原 `.175`）已随 GPU 重排退役。引擎串行执行。
 - 网关鉴权：base URL 走公网入口（`tianan2:10280` 或 Cloudflare 隧道）时 Caddy 要 HTTP Basic auth；凭据只存 `ai_service_configs.api_key`（格式 `user:password`，含冒号即 Basic），`comfyui-client.ts` 的 `authHeaders` 会在队列/上传/提交/轮询/`/view` 下载全程带上。口令绝不入库/入文档。
 
+### 资产管理器（跨集复用 / 跨项目导入，Issue #9）
+- 资产属于**项目**（`characters/scenes/props.drama_id`），剧集通过 `episode_*` 关联表拥有资产；历史版本 = `sys_task`（`type='image' AND status='completed'`，owner 指向资产），当前版本 = 资产行 `image_url`。
+- 唯一实现 `services/asset-library.ts`（版本装配 `loadImageVersions()` 也被 `routes/episodes.ts` 复用）：
+  - **本项目内复用 = 关联同一资产**：`POST /episodes/:id/assets/link {kind, asset_id}`（幂等；跨项目资产拒绝；本集已有同名资产拒绝，因为 `@提及` 同名先到先得），`DELETE /episodes/:id/assets/link?kind=&asset_id=` 取消关联（不删资产）。
+  - **跨项目 = 全量复制**：`POST /dramas/:id/assets/import {kind, source_id, name?, episode_id?}` 复制文本字段 + 当前图 + 全部历史版本 + 参考图（都是新 uuid 文件），源与副本此后互不影响。复制出的版本行 `provider='import'`（常量 `IMPORTED_TASK_PROVIDER`），原 provider/model/task id 记在 `params.imported_from`，**保留原 `created_at`/`completed_at`/`generated_at`**、参考图保留原 `uploaded_at`（全量复制，历史时间不变）；派生字段重置（`scenes.storyboard_count=0`、`status` 按有无图重算、`characters.sort_order` 追加末尾、`scenes.episode_id=null`）。
+  - 同名冲突**强制改名**（角色/道具比 `name`、场景比 `location`，与 `@` 解析口径一致），默认 `名字-2`、`名字-3`…：规则是纯函数 `suggestUniqueName()`，前端同源实现在 `frontend/app/utils/assetName.js`，`GET /asset-library/suggest-name?kind&drama_id&name` 也给同样的结果。
+  - 源文件缺失只跳过该版本/参考图并在结果里计数（`skipped_versions`/`skipped_reference_images`），外部 http 地址原样保留；只有真正的 IO 失败才整体**补偿回滚**（删掉本次插入的资产行、sys_task 行、关联行和复制出的文件，接口返回 500「导入失败，已回滚：…」）。
+  - 浏览接口 `GET /asset-library?drama_id&kind&q&target_drama_id`（`target_drama_id` 额外返回目标项目已占用的名字）与 `GET /asset-library/:kind/:id`（文本字段 + 全部版本 + 参考图 + 所属剧集）。
+- 导入产生的版本行按 `provider='import'` 排除出全局任务中心（`services/task-center.ts`）。
+- 前端唯一组件 `components/AssetBrowserDialog.vue`，两个入口都显式 import：剧集资产页工具栏「从资产库导入」（本项目 → 关联，其他项目 → 复制并关联到本集）、项目素材库页「从其他项目导入」（只复制，不关联，左栏不显示本项目）。已在本集的资产标「已在本集」且不可选。
+
 ### 分镜关键帧与视频
 - 流程：资产 → 拆分分镜（含分镜提示词）→ **分镜关键帧（独立步骤，人工确认）** → 视频 → 导出。旧的"提取上一镜视频尾帧承接"已整体删除（`extractVideoTailFrame`、`episodes.continuity_enabled`、`storyboards.continuity_mode` 均不再存在）。
 - 数据：`storyboards` 的 `first_frame_prompt / mid_frame_prompt / last_frame_prompt`（每张关键帧各自的提示词）、`mid_frame_time`（秒，必须落在 0.5 与 时长-0.5 之间，PUT 越界报 400）、`first_frame_image / mid_frame_image / last_frame_image`（各槽位选定版本）、`keyframes_confirmed`。版本 = `sys_task`（type=image，`params.frameType` 为 `first_frame/mid_frame/last_frame`），默认选最新生成的那张。保留 LLM 标注的 `continuity_boundary`（continue/cut）。`image_prompt` 不迁移、不再写入。

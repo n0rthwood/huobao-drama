@@ -209,6 +209,32 @@
       "confirmTitle": "Remove reference image",
       "confirmMessage": "This reference image will no longer guide generation and its file will be deleted. The final image is unaffected."
     },
+    "assetBrowser": {
+      "title": "Asset manager",
+      "subtitleEpisode": "Pick assets: assets of this project are linked to this episode, assets of other projects are fully copied",
+      "subtitleDrama": "Import assets from other projects into this project (full copy)",
+      "currentDrama": "This project",
+      "noDrama": "No project to import from",
+      "searchPlaceholder": "Search name or description",
+      "selected": "{n} selected",
+      "empty": "No matching asset",
+      "versions": "{n} versions",
+      "refs": "{n} reference images",
+      "inEpisodes": "In {list}",
+      "noEpisode": "Not linked to any episode",
+      "alreadyLinked": "Already in this episode",
+      "willLink": "Link to this episode",
+      "willImport": "Full copy import",
+      "renameLabel": "Name after import",
+      "nameRequired": "Name is required",
+      "nameTaken": "Name already taken, please rename",
+      "progress": "Working {done}/{total}",
+      "confirm": "Import / Link",
+      "doneToast": "Linked {linked}, imported {imported}",
+      "skippedToast": "Skipped {n} versions/reference images with missing source files",
+      "openEpisode": "Import from asset library",
+      "openDrama": "Import from another project"
+    },
     "localeSwitcher": {
       "label": "Switch UI language"
     },
