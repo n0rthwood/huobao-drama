@@ -73,8 +73,8 @@ export interface KeyframeRequest {
   issues: RefIssue[]
 }
 
-/** 参考图的文件名（签名只看文件名，和本机存储路径/域名无关） */
-function refBasename(url: string): string {
+/** 参考图/引导帧的文件名（签名只看文件名，和本机存储路径/域名无关） */
+export function refBasename(url: string): string {
   const path = url.split('?')[0] || ''
   return path.split('/').filter(Boolean).pop() || path
 }

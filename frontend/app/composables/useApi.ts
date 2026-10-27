@@ -84,10 +84,17 @@ export const episodeAPI = {
   cancelKeyframeBatch: (id: number) => api.post(`/episodes/${id}/keyframe-batch/cancel`),
   // 失败/已取消的关键帧项重新提交（每项新建 sys_task，不复用原任务）
   retryFailedKeyframeBatch: (id: number) => api.post(`/episodes/${id}/keyframe-batch/retry-failed`),
-  // 集级串行视频批量：后端按分镜顺序生成，要求本集全部分镜关键帧已确认
-  startVideoBatch: (id: number, data: { storyboard_ids?: number[]; model?: string; config_id?: number }) =>
-    api.post(`/episodes/${id}/video-batch`, {
+  // 批量视频预览：逐镜按输入签名列出 缺视频/已变化/未变化(同第N版)/无法判断/阻断/跳过
+  previewVideoBatch: (id: number, data: { storyboard_ids?: number[]; model?: string; config_id?: number }) =>
+    api.post(`/episodes/${id}/video-batch/preview`, {
       storyboard_ids: data.storyboard_ids?.length ? data.storyboard_ids : undefined,
+      model: data.model || undefined,
+      config_id: data.config_id || undefined,
+    }),
+  // 集级串行视频批量：按预览勾选的镜头，后端按分镜顺序生成
+  startVideoBatch: (id: number, data: { storyboard_ids: number[]; model?: string; config_id?: number }) =>
+    api.post(`/episodes/${id}/video-batch`, {
+      storyboard_ids: data.storyboard_ids,
       model: data.model || undefined,
       config_id: data.config_id || undefined,
     }),

@@ -11,6 +11,7 @@ import { isKeyframeSlot, keyframesJson, loadEpisodeKeyframes, type KeyframeSlot 
 import {
   cancelEpisodeVideoBatch,
   getEpisodeVideoBatch,
+  previewEpisodeVideoBatch,
   startEpisodeVideoBatch,
 } from '../services/video-batch.js'
 import {
@@ -233,13 +234,33 @@ app.get('/:id/video-prompts-status', async (c) => {
   return success(c, await getVideoPromptBatchStatus(id))
 })
 
-// POST /episodes/:id/video-batch — 服务端批量视频（按分镜顺序串行，脱离浏览器）
-app.post('/:id/video-batch', async (c) => {
+// POST /episodes/:id/video-batch/preview — 逐镜列出 缺视频/已变化/未变化(同第N版)/无法判断/阻断/跳过
+app.post('/:id/video-batch/preview', async (c) => {
   const id = Number(c.req.param('id'))
   const body = await c.req.json().catch(() => ({} as Record<string, any>))
   try {
-    const status = await startEpisodeVideoBatch(id, {
+    const items = await previewEpisodeVideoBatch(id, {
       storyboardIds: Array.isArray(body.storyboard_ids) ? body.storyboard_ids.map(Number) : undefined,
+      model: body.model,
+      configId: body.config_id,
+    })
+    return success(c, { items })
+  } catch (err) {
+    return badRequest(c, err instanceof Error ? err.message : '批量视频预览失败')
+  }
+})
+
+// POST /episodes/:id/video-batch — 服务端批量视频（按预览勾选的分镜顺序串行，脱离浏览器）
+app.post('/:id/video-batch', async (c) => {
+  const id = Number(c.req.param('id'))
+  const body = await c.req.json().catch(() => ({} as Record<string, any>))
+  const storyboardIds = Array.isArray(body.storyboard_ids)
+    ? body.storyboard_ids.map(Number).filter((n: number) => Number.isInteger(n) && n > 0)
+    : []
+  if (!storyboardIds.length) return badRequest(c, '请先在清单里勾选要生成的镜头')
+  try {
+    const status = await startEpisodeVideoBatch(id, {
+      storyboardIds,
       model: body.model,
       configId: body.config_id,
     })

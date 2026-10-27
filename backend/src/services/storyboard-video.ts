@@ -22,6 +22,8 @@ import {
   promptFieldsOf,
   resolvePromptRefs,
 } from './storyboard-assets.js'
+import { createHash } from 'node:crypto'
+import { refBasename } from './storyboard-keyframes.js'
 
 export interface StoryboardVideoOptions {
   model?: string
@@ -34,6 +36,81 @@ export interface StoryboardVideoRequest {
   dramaId: number
   /** 直接可交给 generateVideo 的参数 */
   params: Parameters<typeof generateVideo>[0]
+  /** 实际落到 sys_task 的厂商/模型（model 已回落到配置默认值） */
+  provider: string
+  model: string
+  /** 本次请求的内容签名与分项摘要（批量预览判定“是否变化”） */
+  signature: string
+  signatureParts: VideoSignatureParts
+}
+
+/** 签名分项：变化原因按分项比较得出 */
+export interface VideoSignatureParts {
+  /** 最终提交的提示词（含风格词；#11 的转场段也写在这里，自动纳入签名） */
+  prompt: string
+  /** 首/中/尾引导帧文件名 + 中间帧引导时间 */
+  guides: string
+  /** 参考图文件名（按发送顺序） */
+  refs: string
+  /** 提交时长（整数秒）/ 画幅 / 分辨率 */
+  spec: string
+  /** provider + model */
+  engine: string
+}
+
+export type VideoSignaturePart = keyof VideoSignatureParts
+
+export interface VideoSignatureInput {
+  prompt: string
+  firstFrameUrl?: string | null
+  midFrameUrl?: string | null
+  midFrameTime?: number | null
+  lastFrameUrl?: string | null
+  referenceImageUrls?: string[] | null
+  duration: number
+  aspectRatio: string
+  resolution?: string | null
+  provider: string
+  model: string
+}
+
+const SIGNATURE_PART_LABEL: Record<VideoSignaturePart, string> = {
+  prompt: '提示词',
+  guides: '关键帧',
+  refs: '参考图',
+  spec: '时长/画幅',
+  engine: '模型',
+}
+
+function digest(value: unknown): string {
+  return createHash('sha256').update(JSON.stringify(value)).digest('hex')
+}
+
+/**
+ * 视频内容签名 = sha256(各分项摘要)。输入来自 buildStoryboardVideoRequest 的最终输出，
+ * 所以后续往提交参数里加东西（#11 的转场段进提示词、转场加长后的提交时长）会自动纳入签名，
+ * 无需改这里。
+ *
+ * 注意（#11 联动）：承接镜头“转场尚未审核 → 预览归为 changed”这一条不靠签名判断——
+ * 转场文本要到提交前才生成，签名提前算不出来；该规则由 #11 在预览里按审核状态直接标注。
+ */
+export function computeVideoSignature(input: VideoSignatureInput): {
+  signature: string
+  parts: VideoSignatureParts
+} {
+  const parts: VideoSignatureParts = {
+    prompt: digest(input.prompt || ''),
+    guides: digest([
+      refBasename(input.firstFrameUrl || ''),
+      refBasename(input.midFrameUrl || ''),
+      input.midFrameUrl ? input.midFrameTime ?? null : null,
+      refBasename(input.lastFrameUrl || ''),
+    ]),
+    refs: digest((input.referenceImageUrls || []).map(refBasename)),
+    spec: digest([Math.round(Number(input.duration) || 0), input.aspectRatio || '', input.resolution || '']),
+    engine: digest([input.provider || '', input.model || '']),
+  }
+  return { signature: digest(parts), parts }
 }
 
 /** 组装分镜的视频生成请求（不提交） */
@@ -110,31 +187,131 @@ export async function buildStoryboardVideoRequest(
   // 中间帧引导只有部分模型支持（H3 走 MiniMaxH3AddGuide），不支持的模型只发首尾帧
   const midFrameUrl = adapter.supportsMidFrameGuide ? keyframes.mid || undefined : undefined
 
+  const params = {
+    storyboardId,
+    dramaId: episode.dramaId,
+    prompt,
+    model,
+    referenceMode: 'reference' as const,
+    firstFrameUrl: keyframes.first || undefined,
+    episodeId: episode.id,
+    sourcePrompt,
+    refNameIndex: nameToIndex,
+    midFrameUrl,
+    midFrameTime: midFrameUrl ? storyboard.midFrameTime ?? undefined : undefined,
+    lastFrameUrl: keyframes.last || undefined,
+    referenceImageUrls,
+    generateAudio: true,
+    duration: Number(storyboard.duration || 10),
+    aspectRatio: drama?.aspectRatio || '16:9',
+    resolution: episode.resolution || undefined,
+    configId,
+  }
+
+  // 签名取请求的最终输出，与 sys_task 落库的 params 同一份口径
+  const resolvedModel = model || config.model || ''
+  const { signature, parts } = computeVideoSignature({
+    prompt: params.prompt,
+    firstFrameUrl: params.firstFrameUrl,
+    midFrameUrl: params.midFrameUrl,
+    midFrameTime: params.midFrameTime,
+    lastFrameUrl: params.lastFrameUrl,
+    referenceImageUrls: params.referenceImageUrls,
+    duration: params.duration,
+    aspectRatio: params.aspectRatio,
+    resolution: params.resolution,
+    provider: config.provider,
+    model: resolvedModel,
+  })
+
   return {
     storyboardId,
     episodeId: episode.id,
     dramaId: episode.dramaId,
-    params: {
-      storyboardId,
-      dramaId: episode.dramaId,
-      prompt,
-      model,
-      referenceMode: 'reference',
-      firstFrameUrl: keyframes.first || undefined,
-      episodeId: episode.id,
-      sourcePrompt,
-      refNameIndex: nameToIndex,
-      midFrameUrl,
-      midFrameTime: midFrameUrl ? storyboard.midFrameTime ?? undefined : undefined,
-      lastFrameUrl: keyframes.last || undefined,
-      referenceImageUrls,
-      generateAudio: true,
-      duration: Number(storyboard.duration || 10),
-      aspectRatio: drama?.aspectRatio || '16:9',
-      resolution: episode.resolution || undefined,
-      configId,
-    },
+    params,
+    provider: config.provider,
+    model: resolvedModel,
+    signature,
+    signatureParts: parts,
   }
+}
+
+export interface VideoVersion {
+  id: number
+  /** 任务产出的视频（本地路径优先，与 storyboards.video_url 同一口径） */
+  video: string
+  created_at: string | null
+  /** 按创建时间正序从 1 编号 */
+  version_no: number
+  /** 早期任务缺字段时为 null（无法比较） */
+  signature: string | null
+  parts: VideoSignatureParts | null
+}
+
+/**
+ * 历史版本（sys_task）的签名。#5 之前的任务缺少引导帧/时长等字段时返回 null，
+ * 作为 unknown 单列，不报错也不当成“已变化”。
+ */
+export function videoSignatureFromTask(task: {
+  prompt: string | null
+  provider: string | null
+  model: string | null
+  params: string | null
+}): { signature: string; parts: VideoSignatureParts } | null {
+  if (!task.prompt || !task.provider || !task.model) return null
+  let params: Record<string, unknown> = {}
+  try {
+    const parsed: unknown = JSON.parse(task.params || '{}')
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
+    params = parsed as Record<string, unknown>
+  } catch {
+    return null
+  }
+  const firstFrameUrl = typeof params.firstFrameUrl === 'string' ? params.firstFrameUrl : null
+  const aspectRatio = typeof params.aspectRatio === 'string' ? params.aspectRatio : null
+  const duration = Number(params.duration)
+  if (!firstFrameUrl || !aspectRatio || !Number.isFinite(duration) || duration <= 0) return null
+  return computeVideoSignature({
+    prompt: task.prompt,
+    firstFrameUrl,
+    midFrameUrl: typeof params.midFrameUrl === 'string' ? params.midFrameUrl : null,
+    midFrameTime: typeof params.midFrameTime === 'number' ? params.midFrameTime : null,
+    lastFrameUrl: typeof params.lastFrameUrl === 'string' ? params.lastFrameUrl : null,
+    referenceImageUrls: Array.isArray(params.referenceImageUrls)
+      ? (params.referenceImageUrls as unknown[]).filter((item): item is string => typeof item === 'string')
+      : [],
+    duration,
+    aspectRatio,
+    resolution: typeof params.resolution === 'string' ? params.resolution : null,
+    provider: task.provider,
+    model: task.model,
+  })
+}
+
+/** 某分镜的历史视频版本（含版本号与签名），按创建时间正序 */
+export async function loadVideoVersions(storyboardId: number): Promise<VideoVersion[]> {
+  const tasks = (await db.select().from(schema.sysTask))
+    .filter(task => task.type === 'video' && task.status === 'completed' && task.storyboardId === storyboardId)
+    .filter(task => task.localPath || task.resultUrl)
+    .sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')) || a.id - b.id)
+  return tasks.map((task, index) => {
+    const computed = videoSignatureFromTask(task)
+    return {
+      id: task.id,
+      video: (task.localPath || task.resultUrl)!,
+      created_at: task.createdAt,
+      version_no: index + 1,
+      signature: computed?.signature ?? null,
+      parts: computed?.parts ?? null,
+    }
+  })
+}
+
+/** 与某个历史版本逐分项比较，返回变化的分项中文名（用于预览的「变化原因」） */
+export function describeSignatureDiff(current: VideoSignatureParts, previous: VideoSignatureParts): string[] {
+  return (Object.keys(SIGNATURE_PART_LABEL) as VideoSignaturePart[])
+    .filter(part => current[part] !== previous[part])
+    .map(part => SIGNATURE_PART_LABEL[part])
 }
 
 /** 组装并提交分镜视频生成，返回 sys_task id */

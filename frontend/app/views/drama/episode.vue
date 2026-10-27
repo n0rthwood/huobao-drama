@@ -598,7 +598,7 @@
                   <svg v-else width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                   {{ videoPromptBatch.running ? t('episode.sb.promptProgress', { done: videoPromptBatch.completed, total: videoPromptBatch.total }) : (videoSelectMode && selectedVideoSbIds.length ? t('episode.sb.promptSelected', { n: selectedVideoSbIds.length }) : t('episode.sb.batchPrompts')) }}
                 </button>
-                <button v-if="videoTaskFailedCount" class="btn btn-sm video-retry-failed" :disabled="videoBatchRunning || !allKeyframesConfirmed" @click="retryFailedVideos">
+                <button v-if="videoTaskFailedCount" class="btn btn-sm video-retry-failed" :disabled="videoBatchRunning" @click="retryFailedVideos">
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
                   {{ t('episode.vid.retryFailed', { n: videoTaskFailedCount }) }}
                 </button>
@@ -607,8 +607,8 @@
                 </button>
                 <button
                   class="btn btn-sm"
-                  :disabled="!sbs.length || videoBatchRunning || !allKeyframesConfirmed"
-                  :title="videoBatchRunning ? t('episode.vid.batchAlreadyRunning') : (allKeyframesConfirmed ? undefined : t('episode.kf.gateBanner', { done: keyframesConfirmedCount, total: sbs.length }))"
+                  :disabled="!sbs.length || videoBatchRunning"
+                  :title="videoBatchRunning ? t('episode.vid.batchAlreadyRunning') : undefined"
                   @click="batchVideos"
                 >
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
@@ -1470,17 +1470,43 @@
             </button>
           </header>
           <div class="dialog-body batch-video-body">
-            <div class="batch-video-row"><span>{{ t('episode.vid.confirmShots') }}</span><strong>{{ t('episode.vid.confirmShotsValue', { n: batchVideoConfirm.targets.length }) }}</strong></div>
-            <div class="batch-video-row"><span>{{ t('episode.vid.confirmTotal') }}</span><strong>{{ t('episode.vid.confirmApprox', { n: batchVideoTotalDuration }) }}</strong></div>
-            <div class="batch-video-row"><span>{{ t('episode.vid.confirmModel') }}</span><strong>{{ effectiveVideoModelLabel || t('episode.vid.defaultModel') }}</strong></div>
-            <div class="batch-video-row"><span>{{ t('episode.vid.confirmResolution') }}</span><strong>{{ episodeResolutionLabel }}</strong></div>
-            <p class="batch-video-note">{{ t('episode.vid.confirmSerialNote') }}</p>
-            <p v-if="!videoProviderSupportsMidFrame" class="batch-video-note">{{ t('episode.kf.videoNoMidSupport') }}</p>
-            <p class="batch-video-note">{{ t('episode.vid.confirmNote') }}</p>
+            <div v-if="batchVideoConfirm.loading" class="batch-video-loading">{{ t('episode.vid.previewLoading') }}</div>
+            <template v-else>
+              <div class="batch-video-row"><span>{{ t('episode.vid.confirmShots') }}</span><strong>{{ t('episode.vid.confirmShotsValue', { n: checkedVideoItems.length }) }}</strong></div>
+              <div class="batch-video-row"><span>{{ t('episode.vid.confirmTotal') }}</span><strong>{{ t('episode.vid.confirmApprox', { n: batchVideoTotalDuration }) }}</strong></div>
+              <div class="batch-video-row"><span>{{ t('episode.vid.confirmModel') }}</span><strong>{{ effectiveVideoModelLabel || t('episode.vid.defaultModel') }}</strong></div>
+              <div class="batch-video-row"><span>{{ t('episode.vid.confirmResolution') }}</span><strong>{{ episodeResolutionLabel }}</strong></div>
+              <div class="batch-video-actions">
+                <span class="dim">{{ batchVideoConfirm.scoped ? t('episode.kf.batchScopeSelected', { n: batchVideoConfirm.ids.length }) : t('episode.kf.batchScopeAll') }}</span>
+                <button type="button" class="btn btn-sm ml-auto" @click="setAllVideoChecked(true)">{{ t('episode.sb.selectAll') }}</button>
+                <button type="button" class="btn btn-sm" @click="setAllVideoChecked(false)">{{ t('episode.sb.clear') }}</button>
+              </div>
+              <div class="batch-video-list">
+                <label
+                  v-for="item in batchVideoConfirm.items"
+                  :key="item.storyboard_id"
+                  :class="['batch-video-item', 'is-' + item.status, { disabled: !item.selectable }]"
+                >
+                  <input
+                    type="checkbox"
+                    :checked="item.checked"
+                    :disabled="!item.selectable"
+                    @change="item.checked = $event.target.checked"
+                  />
+                  <span class="batch-video-item-shot">#{{ String(item.storyboard_number).padStart(2, '0') }}</span>
+                  <span class="batch-video-item-status">{{ videoPreviewStatusLabel(item) }}</span>
+                  <span v-if="videoPreviewReason(item)" class="batch-video-item-reason">{{ videoPreviewReason(item) }}</span>
+                </label>
+                <div v-if="!batchVideoConfirm.items.length" class="batch-video-empty">{{ t('episode.vid.previewNothing') }}</div>
+              </div>
+              <p class="batch-video-note">{{ t('episode.vid.confirmSerialNote') }}</p>
+              <p v-if="!videoProviderSupportsMidFrame" class="batch-video-note">{{ t('episode.kf.videoNoMidSupport') }}</p>
+              <p class="batch-video-note">{{ t('episode.vid.confirmNote') }}</p>
+            </template>
           </div>
           <footer class="dialog-foot">
             <button class="btn" @click="batchVideoConfirm.open = false">{{ t('common.cancel') }}</button>
-            <button class="btn btn-primary" @click="confirmBatchVideos">{{ t('episode.vid.confirmStart', { n: batchVideoConfirm.targets.length }) }}</button>
+            <button class="btn btn-primary" :disabled="batchVideoConfirm.loading || !checkedVideoItems.length" @click="confirmBatchVideos">{{ t('episode.vid.confirmStart', { n: checkedVideoItems.length }) }}</button>
           </footer>
         </div>
       </div>
@@ -2208,7 +2234,7 @@ function toggleVideoFilter(state) {
 // ===== 批量视频：选择模式 + 生成前确认（视频生成成本高，避免误触全量触发） =====
 const videoSelectMode = ref(false)
 const selectedVideoSbIds = ref([])
-const batchVideoConfirm = ref({ open: false, targets: [] })
+const batchVideoConfirm = ref({ open: false, loading: false, scoped: false, ids: [], items: [] })
 
 function isVideoSbSelected(id) { return selectedVideoSbIds.value.includes(id) }
 function toggleVideoSbSelect(id) {
@@ -2348,50 +2374,76 @@ const episodeResolutionLabel = computed(() =>
 const episodeResolutionShort = computed(() =>
   RESOLUTION_DISPLAY[resolutionProvider.value][episodeResolution.value] || episodeResolution.value)
 const effectiveVideoDuration = computed(() => Number(selectedSb.value?.duration || 10))
-const batchVideoTotalDuration = computed(() =>
-  batchVideoConfirm.value.targets.reduce((sum, sb) => sum + (Number(sb.duration) || 5), 0))
+const checkedVideoItems = computed(() => batchVideoConfirm.value.items.filter(item => item.checked))
+const batchVideoTotalDuration = computed(() => checkedVideoItems.value.reduce((sum, item) => {
+  const sb = sbs.value.find(s => s.id === item.storyboard_id)
+  return sum + (Number(sb?.duration) || 5)
+}, 0))
 
-function openBatchVideoConfirm(pool) {
+function setAllVideoChecked(value) {
+  for (const item of batchVideoConfirm.value.items) {
+    if (!item.selectable) continue
+    item.checked = value
+  }
+}
+function videoPreviewStatusLabel(item) {
+  if (item.status === 'missing') return t('episode.vid.previewMissing')
+  if (item.status === 'changed') return t('episode.vid.previewChanged')
+  if (item.status === 'unchanged') return t('episode.vid.previewUnchanged', { n: Number(item.matched_version_no) || 0 })
+  if (item.status === 'unknown') return t('episode.vid.previewUnknown')
+  if (item.status === 'blocked') return t('episode.vid.previewBlocked')
+  return t('episode.vid.previewSkipped')
+}
+function videoPreviewReason(item) {
+  if (item.status === 'changed' && item.change_reasons?.length) {
+    return t('episode.vid.previewChangedReason', { parts: item.change_reasons.join(t('common.listJoin')) })
+  }
+  return item.reason || ''
+}
+
+/** 批量视频确认框 = 服务端预览清单（逐镜按输入签名比较）+ 勾选；选择模式只缩小预览范围 */
+async function openBatchVideoConfirm(storyboardIds) {
   if (videoBatchRunning.value) { toast.info(t('episode.vid.batchAlreadyRunning')); return }
-  // 关键帧门槛：本集所有分镜确认后才允许批量视频（后端同样会预检并列出未确认分镜号）
-  if (!allKeyframesConfirmed.value) {
-    toast.warning(t('episode.kf.gateBanner', { done: keyframesConfirmedCount.value, total: sbs.value.length }))
-    return
+  const scoped = Boolean(storyboardIds?.length)
+  batchVideoConfirm.value = { open: true, loading: true, scoped, ids: storyboardIds || [], items: [] }
+  try {
+    const res = await episodeAPI.previewVideoBatch(epId.value, {
+      storyboard_ids: scoped ? storyboardIds : undefined,
+      model: bareModelName(videoModel.value) || undefined,
+      config_id: ownerConfigId(videoModelOptions.value, videoModel.value),
+    })
+    const items = (res?.items || []).map(item => ({ ...item, checked: Boolean(item.checked) }))
+    batchVideoConfirm.value = { ...batchVideoConfirm.value, loading: false, items }
+    if (!items.some(item => item.selectable)) toast.info(t('episode.vid.previewNothing'))
+  } catch (e) {
+    batchVideoConfirm.value = { open: false, loading: false, scoped: false, ids: [], items: [] }
+    toastServerMessage(e, { fallback: 'episode.vid.previewFailed' })
   }
-  const targets = pool.filter(s => !isPendingVideo(s.id))
-  if (!targets.length) { toast.info(t('episode.vid.noneToGenerate')); return }
-  // 参考图 ↔ 视频提示词一致性预检：有阻断问题的镜号直接列出，不创建批次（后端同样预检）
-  const blocked = targets.filter(s => videoBlockIssues(s).length)
-  if (blocked.length) {
-    toast.error(t('episode.ref.videoBatchBlocked', { shots: blocked.map(s => `#${shotNumber(s)}`).join(t('common.listJoin')) }), { duration: 7000 })
-    return
-  }
-  batchVideoConfirm.value = { open: true, targets }
 }
 function batchVideos() {
-  // 选择模式且有勾选 → 仅所选（允许重出已完成镜头）；否则全部未完成（待生成+失败）
+  // 选择模式且有勾选 → 只预览所选；否则预览全集（已有视频的镜头按签名判断是否变化）
   const useSelection = videoSelectMode.value && selectedVideoSbIds.value.length
-  const pool = useSelection
-    ? sbs.value.filter(s => selectedVideoSbIds.value.includes(s.id))
-    : sbs.value.filter(s => !hasVid(s))
-  openBatchVideoConfirm(pool)
+  openBatchVideoConfirm(useSelection ? [...selectedVideoSbIds.value] : null)
 }
 function retryFailedVideos() {
-  openBatchVideoConfirm(sbs.value.filter(s => videoTaskState(s) === 'failed'))
+  openBatchVideoConfirm(sbs.value.filter(s => videoTaskState(s) === 'failed').map(s => s.id))
 }
 async function confirmBatchVideos() {
   // 串行批量在服务端执行：按分镜顺序逐镜生成，关键帧作为首/中/尾引导帧，提交后可关闭页面
-  const targets = [...batchVideoConfirm.value.targets].sort((a, b) => shotNumber(a) - shotNumber(b))
-  batchVideoConfirm.value = { open: false, targets: [] }
-  if (!targets.length) return
+  const ids = checkedVideoItems.value
+    .slice()
+    .sort((a, b) => (a.storyboard_number || 0) - (b.storyboard_number || 0))
+    .map(item => item.storyboard_id)
+  batchVideoConfirm.value = { open: false, loading: false, scoped: false, ids: [], items: [] }
+  if (!ids.length) return
   try {
     applyVideoBatch(await episodeAPI.startVideoBatch(epId.value, {
-      storyboard_ids: targets.map(sb => sb.id),
+      storyboard_ids: ids,
       model: bareModelName(videoModel.value) || undefined,
       config_id: ownerConfigId(videoModelOptions.value, videoModel.value),
     }))
     startVideoBatchPolling()
-    toast.success(t('episode.vid.batchStarted', { n: targets.length }))
+    toast.success(t('episode.vid.batchStarted', { n: ids.length }))
     if (videoSelectMode.value) toggleVideoSelectMode()
   } catch (e) {
     toastServerMessage(e, { fallback: 'episode.vid.genFailed' })
@@ -5241,7 +5293,7 @@ button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
   font-weight: 600;
 }
 /* 批量生成确认弹窗 */
-.batch-video-dialog { width: 420px; max-width: calc(100vw - 48px); }
+.batch-video-dialog { width: 520px; max-width: calc(100vw - 48px); }
 .batch-video-body { display: flex; flex-direction: column; gap: 10px; }
 .batch-video-row {
   display: flex;
@@ -5256,6 +5308,28 @@ button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
 }
 .batch-video-row strong { color: var(--text-0); font-weight: 600; }
 .batch-video-note { margin: 4px 0 0; font-size: 11px; color: var(--text-3); line-height: 1.6; }
+.batch-video-loading { font-size: 13px; color: var(--text-2); padding: 18px 0; text-align: center; }
+.batch-video-actions { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.batch-video-list {
+  display: flex; flex-direction: column; gap: 2px;
+  /* 矮窗口下也要看得见清单：不被同列的摘要行挤扁 */
+  flex: 1 1 auto; min-height: 132px; max-height: 320px; overflow-y: auto;
+  border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 8px;
+}
+.batch-video-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 6px; border-radius: var(--radius-sm);
+  font-size: 12px; color: var(--text-1); cursor: pointer;
+}
+.batch-video-item:hover { background: var(--bg-hover); }
+.batch-video-item.disabled { cursor: default; color: var(--text-3); }
+.batch-video-item-shot { min-width: 34px; font-family: var(--font-mono); }
+.batch-video-item-status { color: var(--text-2); white-space: nowrap; }
+.batch-video-item.is-blocked .batch-video-item-status { color: var(--action-danger); }
+.batch-video-item.is-unchanged .batch-video-item-status,
+.batch-video-item.is-unknown .batch-video-item-status { color: var(--text-3); }
+.batch-video-item-reason { flex: 1; min-width: 0; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.batch-video-empty { font-size: 12px; color: var(--text-3); text-align: center; padding: 12px 0; }
 .video-task-row {
   display: grid;
   grid-template-columns: 56px minmax(0, 1fr) auto;
