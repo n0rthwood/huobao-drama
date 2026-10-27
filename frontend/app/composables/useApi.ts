@@ -1,3 +1,5 @@
+import type { TaskRow, CenterRow } from '~/composables/useTasks'
+
 const BASE = '/api/v1'
 
 async function req<T = any>(method: string, path: string, body?: any): Promise<T> {
@@ -64,10 +66,17 @@ export const episodeAPI = {
       config_id: data.config_id || undefined,
     }),
   keyframePromptsStatus: (id: number) => api.get(`/episodes/${id}/keyframe-prompts-status`),
-  // 集级关键帧批量：qwen-jobs 供应商下一次性提交全部槽位，由服务端排队调度
-  startKeyframeBatch: (id: number, data: { storyboard_ids?: number[]; model?: string; config_id?: number }) =>
-    api.post(`/episodes/${id}/keyframe-batch`, {
+  // 批量关键帧预览：逐「分镜 × 槽位」给出 缺图/已变化/未变化(同第 N 版)/被拦截/跳过 与默认勾选
+  keyframeBatchPreview: (id: number, data: { storyboard_ids?: number[]; model?: string; config_id?: number } = {}) =>
+    api.post(`/episodes/${id}/keyframe-batch/preview`, {
       storyboard_ids: data.storyboard_ids?.length ? data.storyboard_ids : undefined,
+      model: data.model || undefined,
+      config_id: data.config_id || undefined,
+    }),
+  // 集级关键帧批量：按预览勾选的 items 显式提交，由服务端排队调度
+  startKeyframeBatch: (id: number, data: { items: Array<{ storyboard_id: number; slot: 'first' | 'mid' | 'last' }>; model?: string; config_id?: number }) =>
+    api.post(`/episodes/${id}/keyframe-batch`, {
+      items: data.items,
       model: data.model || undefined,
       config_id: data.config_id || undefined,
     }),
@@ -164,7 +173,7 @@ export const propAPI = {
 export const taskAPI = {
   registerUpload: (assetType: 'character' | 'scene' | 'prop', assetId: number, localPath: string) =>
     api.post('/tasks/register-upload', { asset_type: assetType, asset_id: assetId, local_path: localPath }),
-  get: (id: number) => api.get(`/tasks/${id}`),
+  get: (id: number) => api.get<TaskRow>(`/tasks/${id}`),
   del: (id: number) => api.del(`/tasks/${id}`),
   // 取消任务：qwen-jobs 调远端取消（排队中立即取消，运行中由服务端决定是否中断）
   cancel: (id: number) => api.post(`/tasks/${id}/cancel`),
@@ -178,8 +187,19 @@ export const taskAPI = {
     if (params?.prop_id) query.set('prop_id', String(params.prop_id))
     return api.get(`/tasks${query.size ? `?${query.toString()}` : ''}`)
   },
-  // 按集聚合生成任务（sys_task + video_merges）
-  listByEpisode: (episodeId: number) => api.get<{ tasks: any[]; merges: any[] }>(`/episodes/${episodeId}/generation-tasks`),
+  // 任务中心列表（分页 + 筛选；批次作为可展开父行返回，子任务不在顶层重复）
+  center: (params: { drama_id?: number; episode_id?: number; type?: string; status?: string; scope?: 'recent' | 'all'; page?: number; page_size?: number } = {}) => {
+    const query = new URLSearchParams()
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== null && value !== '') query.set(key, String(value))
+    }
+    return api.get<{ items: CenterRow[]; total: number; page: number; page_size: number }>(`/tasks/center${query.size ? `?${query.toString()}` : ''}`)
+  },
+  // 全部活跃任务（含批次子任务与文本任务）+ 顶层进行中数量，供全局 store 轮询
+  active: () => api.get<{ items: TaskRow[]; active_count: number }>('/tasks/active'),
+  // 换模型重试：始终新建任务，返回新任务行
+  retry: (id: number, data: { config_id?: number; model?: string } = {}) =>
+    api.post<TaskRow>(`/tasks/${id}/retry`, { config_id: data.config_id || undefined, model: data.model || undefined }),
 }
 
 // 图片任务队列（qwen-jobs）：提交前的耗时预估。非 qwen-jobs 供应商返回 { supported: false }

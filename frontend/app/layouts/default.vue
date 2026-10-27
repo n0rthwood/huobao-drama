@@ -27,6 +27,7 @@
       </nav>
 
       <div class="header-right">
+        <TaskCenterButton />
         <a
           class="github-link"
           href="https://github.com/chatfire-AI/huobao-drama"
