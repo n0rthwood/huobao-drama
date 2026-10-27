@@ -5312,7 +5312,8 @@ button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
 .batch-video-actions { display: flex; align-items: center; gap: 6px; font-size: 12px; }
 .batch-video-list {
   display: flex; flex-direction: column; gap: 2px;
-  max-height: 320px; overflow-y: auto;
+  /* 矮窗口下也要看得见清单：不被同列的摘要行挤扁 */
+  flex: 1 1 auto; min-height: 132px; max-height: 320px; overflow-y: auto;
   border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 8px;
 }
 .batch-video-item {

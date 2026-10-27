@@ -852,7 +852,6 @@
       "blockedGenerate": "Issues to fix",
       "slotBlocked": "{slot} cannot be generated: {reason}",
       "videoBlocked": "This shot cannot generate video: {reason}",
-      "videoBatchBlocked": "These shots have prompt/reference mismatches: {shots}",
       "clickAdd": "Click to add as reference",
       "clickRemove": "Click to remove from references",
       "shortChar": "C",

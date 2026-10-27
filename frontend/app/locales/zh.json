@@ -852,7 +852,6 @@
       "blockedGenerate": "有问题待解决",
       "slotBlocked": "{slot}无法生成：{reason}",
       "videoBlocked": "该分镜无法生成视频：{reason}",
-      "videoBatchBlocked": "以下分镜的视频提示词与参考图不一致，请先处理：{shots}",
       "clickAdd": "点击添加为参考",
       "clickRemove": "点击移出参考",
       "shortChar": "角",

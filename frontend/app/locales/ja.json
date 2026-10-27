@@ -852,7 +852,6 @@
       "blockedGenerate": "未解決の問題あり",
       "slotBlocked": "{slot}を生成できません：{reason}",
       "videoBlocked": "このショットは動画を生成できません：{reason}",
-      "videoBatchBlocked": "次のショットはプロンプトと参照素材が一致していません：{shots}",
       "clickAdd": "クリックで参照に追加",
       "clickRemove": "クリックで参照から除外",
       "shortChar": "役",
