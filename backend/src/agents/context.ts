@@ -8,6 +8,8 @@ import { getContentLanguage, type ContentLanguage } from '../services/app-settin
 export interface AgentRequestContextValues {
   episodeId: number
   dramaId: number
+  /** 单镜任务（转场设计）作用的分镜 */
+  storyboardId?: number
   modelOverride?: string
   textConfigId?: number
   /** AI 内容语言；缺省时读全局设置（app_settings.content_language） */
@@ -20,6 +22,7 @@ export function buildAgentRequestContext(values: AgentRequestContextValues): Req
   rc.set('dramaId', values.dramaId)
   if (values.modelOverride) rc.set('modelOverride', values.modelOverride)
   if (values.textConfigId) rc.set('textConfigId', values.textConfigId)
+  if (values.storyboardId) rc.set('storyboardId', values.storyboardId)
   // 语言在构建处统一解析：4 条链路（chat/提取/图片提示词/视频提示词）都经过这里，
   // 全局设置一处生效；显式传入 values.language 可按请求覆盖
   rc.set('language', values.language ?? getContentLanguage())
@@ -33,6 +36,11 @@ export function getEpisodeId(requestContext: RequestContext | undefined): number
 
 export function getDramaId(requestContext: RequestContext | undefined): number | null {
   const v = requestContext?.get('dramaId' as never)
+  return typeof v === 'number' ? v : null
+}
+
+export function getStoryboardId(requestContext: RequestContext | undefined): number | null {
+  const v = requestContext?.get('storyboardId' as never)
   return typeof v === 'number' ? v : null
 }
 

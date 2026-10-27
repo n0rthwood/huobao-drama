@@ -40,6 +40,7 @@ Organize each segment's content in this order (items with no content may be omit
 **Time range + scene @reference + shot size/camera move + character @reference + main action·expression + dialogue/narration + mood and lighting**
 
 - **First segment**: the video's frame 0 *is* the storyboard's **first keyframe image** (for a carried-over segment, the previous segment's last keyframe). The first segment must carry on from the state that image already shows — keep the same camera position and the same character positions and poses; do not re-establish the space and do not cut at 0 seconds; cuts start from the second segment at the earliest
+  - When a carried-over shot already has an opening-transition block: the first segment follows the opening transition — carry on from this shot's opening picture as it settles when the transition ends; the transition itself is owned by the transition description and must not be repeated in the video prompt
 - **Cuts**: start a post-cut segment with a transition word such as "cut to / cut back", and restate the shot size and subject; cut points should align with the `【镜头N】` structure in the storyboard `description`
 - **Shot size/camera move**: one camera state per segment (close shot / medium shot / wide shot / close-up; static / push / pull / pan / tracking); the camera move is continuous within a single sub-shot and may change after a cut
 - **Action**: one main action per segment, with concrete visible verbs (walk, turn around, look up, clench, pause)

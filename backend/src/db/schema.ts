@@ -145,6 +145,10 @@ export const storyboards = sqliteTable('storyboards', {
   fieldSavedAt: text('field_saved_at'),
   // LLM 拆分镜时标注的边界：continue=承接上一镜（首帧继承其尾帧关键帧），cut=硬切；NULL=未标注（按硬切处理）
   continuityBoundary: text('continuity_boundary'),
+  // 承接镜头的开场转场（#11）：描述文本 / 是否随视频提示词一起发送 / 最近一次审核结果（JSON）
+  transitionPrompt: text('transition_prompt'),
+  transitionEnabled: integer('transition_enabled', { mode: 'boolean' }).notNull().default(true),
+  transitionReview: text('transition_review'),
   videoUrl: text('video_url'),
   subtitleUrl: text('subtitle_url'),
   composedVideoUrl: text('composed_video_url'),

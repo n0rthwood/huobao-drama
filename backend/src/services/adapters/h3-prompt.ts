@@ -100,6 +100,12 @@ function keyframeExtra(hasFirst: boolean, midTime: number | undefined, hasLast: 
   return parts.join('')
 }
 
+/**
+ * 开场转场段（#11）：提示词以「开场转场（0–T 秒）：」开头时追加给 LLM 的英文规则。
+ * 由 Fabel（anthropic/claude-fable-5）编写，原样落库。
+ */
+const TRANSITION_RULE = "\nOPENING TRANSITION SEGMENT RULES (applies to [Shot 1] only)\n\n1. Trigger. If the shot's video prompt begins with an opening-transition block marked 「开场转场（0–T秒）：...」, the first T seconds of [Shot 1] ARE that transition. If no such block exists, ignore these rules and expand [Shot 1] normally from <Picture 1>.\n\n2. Start point. [Shot 1] MUST open exactly on <Picture 1> (the final frame of the previous shot). Where the technique calls for it, hold that frame for about 0.5 s before any transition movement begins.\n\n3. Landing point. Execute the specified transition technique within 0–T s so that at exactly T seconds the frame has fully settled on this shot's opening picture: position, pose, each paw/hand with its held prop and landing point, body orientation, gaze and lighting all in place. From T seconds onward, continue seamlessly with the normal video description of the shot. The transition and the rest of the shot form ONE unbroken clip.\n\n4. Fidelity. Translate and expand the Chinese transition block faithfully into English: keep the technique, the exact T value, the order of events, camera directions, occluders, light behavior, sound cues and left/right paw assignments exactly as written. Do not substitute a different technique, reorder events, change T, or invent extra beats.\n\n5. JSON contract unchanged. Your response remains the same strict three-key JSON defined above: exactly the same three keys, nothing added, removed or renamed. The transition text lives inside the existing [Shot 1] description value; it is never a separate key, shot or segment of its own.\n\n6. Mid-frame guidance shifts later. If a mid-frame anchor (<Picture 2>) with guidance time t is provided, place its guidance at t + E seconds on the final timeline, where E = min(T, max(0, 15 - original_duration)). Upstream guarantees t + E >= T + 0.5, so the shifted anchor always lands at least 0.5 s after the transition ends. NEVER place mid-frame guidance inside the 0–T transition window.\n\n7. No editing-room vocabulary. This is a single continuous generation with no cutting table. Do not write \"cut to\", \"the scene switches/changes to\", \"transition to the next scene\", \"montage\", \"in the next shot\" or similar. Describe the transition only as continuous in-lens events (camera moves, occlusion, character action, light change, focus shift, speed change) or optics the model can simulate (cross dissolve, fade through black/white, flash to white, soft-focus ripple). Sole exception: if the transition block itself prescribes an insert close-up, a cut-back or a crisp micro jump (e.g. cutaway_insert, insert_hands_closeup, clock_calendar, jump_cut_lapse, micro_jump, beat_snap), render exactly that and nothing more.\n\n8. Limbs and hands must be explicit. Whenever a character moves, grabs, releases, presses or supports, state which paw/hand acts, what the other paw/hand is doing meanwhile, and the landing point of each (where a prop is set down, where it is picked up from, where each paw/hand ends up). Never let a held prop appear, vanish or change hands without a described action. Preserve the left/right roles given in the transition block verbatim.\n\n9. Appearance comes from pictures only. Never describe characters' looks, fur or skin color, clothing or build; appearance is defined by <Picture 1> and the bound reference images. Write only actions, positions, orientation, gaze, expression intensity, camera and light."
+
 /** 引擎把帧数吸附到 17k+5 网格，返回实际时长（秒） */
 export function effectiveDuration(durationS: number): number {
   return effectiveFrames(durationS) / H3_FPS
@@ -196,7 +202,9 @@ async function expandWithTextModel(
   const anchorExtra = mode === 'reference'
     ? keyframeExtra(anchors.hasFirst, anchors.midTime, anchors.hasLast)
     : ''
-  const baseSystem = `${BASE_SYSTEM}${MODE_EXTRA[mode]}${anchorExtra}` +
+  // 带开场转场段的提示词（#11）：追加转场扩写规则
+  const transitionExtra = userText.includes('开场转场（') ? TRANSITION_RULE : ''
+  const baseSystem = `${BASE_SYSTEM}${MODE_EXTRA[mode]}${anchorExtra}${transitionExtra}` +
     `\n本视频总时长为 ${effDuration.toFixed(2)} 秒(对齐后的有效时长):` +
     `所有镜头切换时间戳必须严格递增且落在 0–${effDuration.toFixed(2)} 秒内。`
 

@@ -24,6 +24,7 @@ import {
 import { checkStoryboardRefs } from '../services/storyboard-assets.js'
 import { parseFieldSavedAt } from '../services/storyboard-fields.js'
 import { lookupGeneratedAt } from '../services/media-time.js'
+import { parseTransitionReview, transitionInputSignature } from '../services/transition.js'
 import {
   AssetLibraryError,
   isAssetKind,
@@ -469,6 +470,15 @@ app.get('/:episode_id/storyboards', async (c) => {
       ref_issues: await checkStoryboardRefs(row),
       keyframes: keyframesJson(keyframes.get(row.id)),
       video_versions: videoVersions,
+      transition_review: parseTransitionReview(row.transitionReview),
+      // 上下镜输入变化后旧审核即失效，前端据此提示「建议重新审核」（#11）
+      transition_stale: (() => {
+        const review = parseTransitionReview(row.transitionReview)
+        const prevId = keyframes.get(row.id)?.previousId
+        const prev = prevId ? rows.find(item => item.id === prevId) : null
+        if (!review || !prev || !keyframes.get(row.id)?.inheritsFirst) return false
+        return transitionInputSignature(prev, keyframes.get(prev.id)?.last ?? null, row) !== review.input_signature
+      })(),
       // 路径 → 生成时间（unix 秒）：关键帧槽位、分镜视频等「当前媒体」共用，反查不到的路径不在表里
       media_generated_at: Object.fromEntries(
         [row.videoUrl, row.firstFrameImage, row.midFrameImage, row.lastFrameImage,

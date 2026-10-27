@@ -116,6 +116,9 @@ export const sqliteSchemaStatements = [
     asset_version_selection TEXT,
     field_saved_at TEXT,
     continuity_boundary TEXT,
+    transition_prompt TEXT,
+    transition_enabled INTEGER NOT NULL DEFAULT 1,
+    transition_review TEXT,
     video_url TEXT,
     subtitle_url TEXT,
     composed_video_url TEXT,
@@ -353,6 +356,10 @@ const columnAdditions: { table: string; column: string; type: string }[] = [
   { table: 'storyboards', column: 'keyframes_confirmed', type: 'INTEGER DEFAULT 0' },
   // 字段级保存时间（JSON：字段 → unix 秒）
   { table: 'storyboards', column: 'field_saved_at', type: 'TEXT' },
+  // 承接镜头的开场转场（#11）：存量行 transition_prompt=NULL、transition_enabled=1、transition_review=NULL
+  { table: 'storyboards', column: 'transition_prompt', type: 'TEXT' },
+  { table: 'storyboards', column: 'transition_enabled', type: 'INTEGER NOT NULL DEFAULT 1' },
+  { table: 'storyboards', column: 'transition_review', type: 'TEXT' },
   // qwen-jobs 远端任务快照（排队位置/进度/估计）+ 提交请求体，重启后据此恢复
   { table: 'sys_task', column: 'remote_state', type: 'TEXT' },
   // 任务归属的集：全局任务中心按剧/集筛选与编号，启动时按 storyboard_id 回填存量行

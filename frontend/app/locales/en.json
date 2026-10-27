@@ -1139,6 +1139,22 @@
       "slotCancelRequested": "Cancellation requested for this keyframe",
       "genCancelled": "{slot} generation cancelled"
     },
+    "trans": {
+      "section": "Transition",
+      "send": "Send transition",
+      "generate": "AI review & write transition",
+      "generated": "Transition generated",
+      "summary": "Previous shot #{n} {from} → this shot {to}",
+      "verdictPending": "Not reviewed yet",
+      "verdictSceneTime": "Transition required: time/place change",
+      "verdictContinuity": "Action bridge: {issues}",
+      "verdictNone": "No transition needed",
+      "manual": "Manually edited (last review: {verdict})",
+      "stale": "Neighbouring shots changed — review again",
+      "durationHint": "{content}s + {seconds}s transition = {total}s",
+      "placeholder": "Transition: start from the previous shot's final frame and settle on this shot's opening picture within T seconds; reference characters only with {'@'}name…",
+      "unknownPlace": "No place set"
+    },
     "inspector": {
       "videoPromptPlaceholder": "Reference assets with {'@'}character / {'@'}scene — auto-mapped to reference images on generation; then describe motion and camera per time segment…",
       "noRefs": "No reference assets bound to this shot",

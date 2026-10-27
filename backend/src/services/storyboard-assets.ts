@@ -123,11 +123,12 @@ export function resolvePromptRefs(
 
 // ─── 提示词 @引用 ↔ 分镜绑定一致性（Issue #7）────────────────────────────
 
-/** 参与一致性检查的提示词字段（关键帧三槽位 + 视频） */
+/** 参与一致性检查的提示词字段（关键帧三槽位 + 视频 + 承接镜头的开场转场） */
 export type PromptField = 'first_frame_prompt' | 'mid_frame_prompt' | 'last_frame_prompt' | 'video_prompt'
+  | 'transition_prompt'
 
 export const PROMPT_FIELDS: PromptField[] = [
-  'first_frame_prompt', 'mid_frame_prompt', 'last_frame_prompt', 'video_prompt',
+  'first_frame_prompt', 'mid_frame_prompt', 'last_frame_prompt', 'video_prompt', 'transition_prompt',
 ]
 
 /** 关键帧槽位 → 对应提示词字段（槽位级问题过滤用） */
@@ -204,13 +205,14 @@ export async function loadEpisodeAssets(
   return entries.filter(entry => !!entry.name)
 }
 
-/** 分镜的 4 个提示词字段（已 trim） */
+/** 分镜的 5 个提示词字段（已 trim） */
 export function promptFieldsOf(storyboard: typeof schema.storyboards.$inferSelect): Record<PromptField, string> {
   return {
     first_frame_prompt: (storyboard.firstFramePrompt || '').trim(),
     mid_frame_prompt: (storyboard.midFramePrompt || '').trim(),
     last_frame_prompt: (storyboard.lastFramePrompt || '').trim(),
     video_prompt: (storyboard.videoPrompt || '').trim(),
+    transition_prompt: (storyboard.transitionPrompt || '').trim(),
   }
 }
 
@@ -415,7 +417,8 @@ export function computeRefIssues(input: RefCheckInput): RefIssue[] {
     if (!fields.length) continue
     const overflowed: PromptField[] = []
     for (const field of fields) {
-      const limit = field === 'video_prompt' ? REF_IMAGE_LIMIT - 1 : REF_IMAGE_LIMIT
+      // 视频侧（含转场段）首帧关键帧先占 1 张
+      const limit = field === 'video_prompt' || field === 'transition_prompt' ? REF_IMAGE_LIMIT - 1 : REF_IMAGE_LIMIT
       if (position > limit) overflowed.push(field)
     }
     if (!overflowed.length) continue

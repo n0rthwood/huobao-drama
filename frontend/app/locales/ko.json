@@ -1139,6 +1139,22 @@
       "slotCancelRequested": "이 키프레임의 취소를 요청했습니다",
       "genCancelled": "{slot} 생성을 취소했습니다"
     },
+    "trans": {
+      "section": "전환",
+      "send": "전환 설명 전송",
+      "generate": "AI 검토 후 전환 생성",
+      "generated": "전환을 생성했습니다",
+      "summary": "이전 컷 #{n} {from} → 이번 컷 {to}",
+      "verdictPending": "아직 검토하지 않음",
+      "verdictSceneTime": "전환 필요: 시간/장소 변화",
+      "verdictContinuity": "동작 연결: {issues}",
+      "verdictNone": "전환 불필요",
+      "manual": "수동 편집(직전 판정: {verdict})",
+      "stale": "앞뒤 컷이 수정되었습니다. 다시 검토하세요",
+      "durationHint": "{content}초 + 전환 {seconds}초 = {total}초",
+      "placeholder": "전환: 이전 컷의 마지막 화면에서 시작해 T초 안에 이번 컷의 시작 화면으로 안착시킵니다. 캐릭터는 {'@'}이름 으로만 지칭…",
+      "unknownPlace": "장소 미입력"
+    },
     "inspector": {
       "videoPromptPlaceholder": "{'@'}캐릭터명 / {'@'}장멸명 으로 참조 소재를 지정(생성 시 참조 이미지로 자동 매핑). 시간대별로 화면의 움직임과 침라를 기술…",
       "noRefs": "이 스토리보드에는 참조 소재가 연결되어 있지 않습니다",

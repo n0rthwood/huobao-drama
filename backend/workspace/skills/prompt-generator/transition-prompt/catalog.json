@@ -1,0 +1,1396 @@
+{
+  "version": 1,
+  "generated_by": "anthropic/claude-fable-5 (Fabel) — huobao-drama Issue #11",
+  "notes_zh": "本文件是转场手法 technique_id 的唯一合法来源，内容与 SKILL.md 第 2、3 节逐条一致。转场固定占视频开头 0–T 秒，transition_prompt 本身不带「开场转场（0–T秒）：」前缀，由系统拼接。单段生成没有剪辑台：所有手法都写成镜头内可拍摄的连续事件（运镜、遮挡、光线、焦点、速度、主体动作）或模型可模拟的光学效果（叠化、淡变、闪白、柔焦涟漪）；纯剪辑语汇为次选且已改写为镜头内可执行描述。",
+  "defaults": {
+    "scene_time_default_seconds": 3.0,
+    "continuity_seconds_min": 1.0,
+    "continuity_seconds_max": 3.0,
+    "absolute_min_seconds": 1.0,
+    "total_cap_seconds": 15,
+    "initial_hold_seconds": 0.5,
+    "mid_frame_rule": "E = min(T, max(0, 15 - duration)); require mid_frame_time + E >= T + 0.5 when mid_frame_time exists",
+    "shrink_rule_zh": "约束不满足时把 T 降为 mid_frame_time + E - 0.5（向下取 0.5 的倍数，最低 1.0），并从 fast_fallback 改选 is_fast 手法；降到 1.0 仍不满足时由系统放弃转场，agent 照常输出并在 reason 注明「时长约束过紧」。"
+  },
+  "fast_fallback": {
+    "scene_time": [
+      "light_flash",
+      "whip_pan",
+      "beat_snap",
+      "rack_focus"
+    ],
+    "continuity": [
+      "breath_beat",
+      "micro_jump",
+      "rack_focus"
+    ]
+  },
+  "selection_note_zh": "表内自上而下取第一条命中的行；行内候选从左到右依次尝试，跳过「不适用条件命中 / T 不在该手法秒数范围内 / 对当前视频模型可执行性为 low 且后面还有非 low 候选」的项。当前视频模型未告知时按 H3 评估。",
+  "selection_note_en": "Pick the first matching row top-down; within a row try candidates left to right, skipping any whose not-applicable conditions hit, whose seconds range cannot contain T, or whose executability for the current video model is low while a non-low candidate remains. Default to H3 when the model is unspecified.",
+  "selection": {
+    "scene_time": [
+      {
+        "when_zh": "跨昼夜且地点变化",
+        "when_en": "Day-night flip plus location change",
+        "candidates": [
+          "fade_black",
+          "zoom_through",
+          "dissolve",
+          "whip_pan"
+        ]
+      },
+      {
+        "when_zh": "白天时段内的地点变化（两头都明亮）",
+        "when_en": "Location change within daytime, both ends bright",
+        "candidates": [
+          "occlusion_wipe",
+          "whip_pan",
+          "motion_follow",
+          "dissolve"
+        ]
+      },
+      {
+        "when_zh": "相邻空间且人物可自然走动、时间差小",
+        "when_en": "Adjacent spaces, character can plausibly walk over, small time gap",
+        "candidates": [
+          "motion_follow",
+          "oner_walkthrough",
+          "occlusion_wipe"
+        ]
+      },
+      {
+        "when_zh": "同一空间内的时段或昼夜变化",
+        "when_en": "Same space, time-of-day or day-night change",
+        "candidates": [
+          "timelapse_light",
+          "dissolve",
+          "jump_cut_lapse",
+          "clock_calendar"
+        ]
+      },
+      {
+        "when_zh": "跨天（翌日、数日后）",
+        "when_en": "Next day or several days later",
+        "candidates": [
+          "fade_black",
+          "timelapse_light",
+          "jump_cut_lapse",
+          "clock_calendar"
+        ]
+      },
+      {
+        "when_zh": "季节变化",
+        "when_en": "Season change",
+        "candidates": [
+          "season_change",
+          "dissolve",
+          "fade_black"
+        ]
+      },
+      {
+        "when_zh": "跨年或数年",
+        "when_en": "A year or more passes",
+        "candidates": [
+          "fade_black",
+          "season_change",
+          "montage_flash"
+        ]
+      },
+      {
+        "when_zh": "进入回忆或梦境",
+        "when_en": "Entering a memory or dream",
+        "candidates": [
+          "memory_dream",
+          "fade_white",
+          "dissolve"
+        ]
+      },
+      {
+        "when_zh": "走出回忆或梦境",
+        "when_en": "Leaving a memory or dream",
+        "candidates": [
+          "memory_dream",
+          "dissolve",
+          "fade_black"
+        ]
+      },
+      {
+        "when_zh": "仅情绪基调骤变（时空不变）",
+        "when_en": "Mood shift only, same time and place",
+        "candidates": [
+          "rack_focus",
+          "speed_ramp",
+          "sound_bridge",
+          "light_flash"
+        ]
+      },
+      {
+        "when_zh": "其他未覆盖组合（兜底）",
+        "when_en": "Any other combination (fallback)",
+        "candidates": [
+          "dissolve",
+          "fade_black"
+        ]
+      }
+    ],
+    "continuity": [
+      {
+        "when_zh": "仅需放下旧道具",
+        "when_en": "Only need to put the old prop down",
+        "candidates": [
+          "put_down_prop",
+          "insert_hands_closeup",
+          "micro_jump"
+        ]
+      },
+      {
+        "when_zh": "仅需拿起新道具",
+        "when_en": "Only need to pick the new prop up",
+        "candidates": [
+          "pick_up_prop",
+          "insert_hands_closeup",
+          "micro_jump"
+        ]
+      },
+      {
+        "when_zh": "需放下旧物并拿起新物",
+        "when_en": "Put the old prop down and pick the new one up",
+        "candidates": [
+          "swap_prop",
+          "insert_hands_closeup",
+          "micro_jump"
+        ]
+      },
+      {
+        "when_zh": "姿态或位置变化（无道具冲突）",
+        "when_en": "Posture or position change, no prop conflict",
+        "candidates": [
+          "rise_relocate",
+          "match_on_action",
+          "micro_jump"
+        ]
+      },
+      {
+        "when_zh": "道具与姿态/位置复合变化：先按上面三行确定道具基底手法，把位移与姿态并入其模板步骤；装不下再顺延",
+        "when_en": "Compound prop plus posture/position change: pick the prop-base technique per the rows above and fold the move into its steps; overflow falls through",
+        "candidates": [
+          "put_down_prop",
+          "pick_up_prop",
+          "swap_prop",
+          "insert_hands_closeup",
+          "occlusion_wipe"
+        ]
+      },
+      {
+        "when_zh": "hazards 仅剩轻量项（视线、表情、朝向微调）且不匹配其他行",
+        "when_en": "Only lightweight hazards remain (gaze, expression, tiny orientation tweak) and no other row matches",
+        "candidates": [
+          "breath_beat"
+        ]
+      },
+      {
+        "when_zh": "灯光等环境状态需由角色动作改变（按开关等）",
+        "when_en": "Environment state such as a lamp must change via character action",
+        "candidates": [
+          "pick_up_prop",
+          "timelapse_light",
+          "micro_jump"
+        ]
+      },
+      {
+        "when_zh": "平稳衔接不可行或 T ≤ 1.5 秒",
+        "when_en": "Smooth bridging infeasible or T ≤ 1.5s",
+        "candidates": [
+          "micro_jump",
+          "breath_beat",
+          "whip_pan",
+          "light_flash"
+        ]
+      }
+    ]
+  },
+  "techniques": [
+    {
+      "technique_id": "whip_pan",
+      "name_zh": "甩镜转场",
+      "name_en": "Whip Pan",
+      "category": "short_video",
+      "is_fast": true,
+      "applicable": {
+        "time_span": [
+          "minutes",
+          "hours",
+          "day_night",
+          "days"
+        ],
+        "location_change": [
+          "none",
+          "adjacent",
+          "far",
+          "indoor_outdoor"
+        ],
+        "narrative": [
+          "normal",
+          "emotion"
+        ],
+        "action_only": false,
+        "note_zh": "节奏明快、情绪昂扬的任意时空变化；T 被压缩时的快速首选之一，运动模糊天然掩盖空间切换"
+      },
+      "not_applicable": [
+        "沉静、哀伤、需要凝视的慢节奏段落",
+        "连续多镜已使用（避免晕眩与套路感）"
+      ],
+      "seconds_min": 1.0,
+      "seconds_max": 2.0,
+      "executability": {
+        "h3": "high",
+        "minimax": "high"
+      },
+      "template_zh": "画面从{上一镜结尾画面}开始保持约0.5秒；镜头向{方向}猛然甩动，强烈的方向性运动模糊覆盖整个画面、原有空间信息被完全抹去；甩动减速、模糊散去，画面落定为{本镜开场画面}；第{T}秒镜头完全静止。",
+      "template_en": "[0-{T}s] Open exactly on <Picture 1>: {PREV_END}. Hold about 0.5s, then the camera whips {DIRECTION} at high speed; heavy directional motion blur floods the frame and erases all spatial detail. The whip decelerates, the blur clears, and the frame settles on {THIS_START}; the camera is fully static by {T} seconds.",
+      "example": "（#2→#3）画面从明亮的上午阳台开始：@基尼 稳稳站在瑜伽垫中央、一条小爪贴在腿侧保持树式，保持约0.5秒；镜头向右猛然甩动，强烈运动模糊抹去阳台的栏杆与绿植；甩动减速、模糊散去，画面落定为 @书房 夜晚——暖黄台灯光晕笼罩小书桌，@基尼 坐在桌前、两只前爪搭在摊开书本两侧；第2秒镜头完全静止。"
+    },
+    {
+      "technique_id": "occlusion_wipe",
+      "name_zh": "遮挡转场",
+      "name_en": "Occlusion Wipe",
+      "category": "short_video",
+      "is_fast": false,
+      "applicable": {
+        "time_span": [
+          "minutes",
+          "hours",
+          "day_night",
+          "days"
+        ],
+        "location_change": [
+          "none",
+          "adjacent",
+          "far",
+          "indoor_outdoor"
+        ],
+        "narrative": [
+          "normal"
+        ],
+        "action_only": false,
+        "note_zh": "画面可安排可信前景（叶影、身影、家具边沿）贴镜掠过时；全遮挡瞬间天然掩盖任何状态切换，也是连续性残留的强力退路"
+      },
+      "not_applicable": [
+        "画面中找不到可信的前景遮挡物且角色不移动"
+      ],
+      "seconds_min": 1.5,
+      "seconds_max": 3.0,
+      "executability": {
+        "h3": "high",
+        "minimax": "high"
+      },
+      "template_zh": "画面从{上一镜结尾画面}开始保持约0.5秒；{遮挡物}从{方向}进入并贴着镜头快速掠过，瞬间占满整个画面形成完全遮挡；遮挡物移出画面的同时，露出的画面已是{本镜开场画面}；第{T}秒遮挡物完全出画、镜头稳定。",
+      "template_en": "[0-{T}s] Open on <Picture 1>: {PREV_END}. After about 0.5s, {OCCLUDER} enters from {DIRECTION} and sweeps right past the lens, filling the frame completely for an instant; as it clears, the revealed frame is already {THIS_START}; the occluder fully exits and the camera steadies by {T} seconds.",
+      "example": "（#2→#3）画面从明亮的上午阳台开始：@基尼 树式站稳在瑜伽垫上，保持约0.5秒；一片深绿色的盆栽叶影从左侧贴着镜头快速掠过、瞬间占满画面；叶影右移出画时，露出的画面已是 @书房 夜晚——暖黄台灯光晕笼罩小书桌，@基尼 坐在桌前、两只前爪搭在摊开书本两侧；第3秒叶影完全出画、镜头稳定。"
+    },
+    {
+      "technique_id": "zoom_through",
+      "name_zh": "推拉穿越",
+      "name_en": "Zoom Through",
+      "category": "short_video",
+      "is_fast": false,
+      "applicable": {
+        "time_span": [
+          "hours",
+          "day_night",
+          "days"
+        ],
+        "location_change": [
+          "adjacent",
+          "far",
+          "indoor_outdoor"
+        ],
+        "narrative": [
+          "normal",
+          "emotion"
+        ],
+        "action_only": false,
+        "note_zh": "画面中有门窗、灯光、暗部、纹理等可作穿越锚点时；推入全遮蔽再拉出，空间切换藏在满幅的一刻"
+      },
+      "not_applicable": [
+        "T 小于 2 秒",
+        "画面中没有门窗、灯光、暗部等穿越锚点"
+      ],
+      "seconds_min": 2.0,
+      "seconds_max": 3.0,
+      "executability": {
+        "h3": "medium",
+        "minimax": "medium"
+      },
+      "template_zh": "画面从{上一镜结尾画面}开始；镜头加速推近{穿越锚点}，其明暗或纹理迅速放大占满整个画面形成全遮蔽；随即镜头从同样的明暗或纹理中拉出，画面已是{本镜开场画面}；第{T}秒拉出完成、机位稳定。",
+      "template_en": "[0-{T}s] Open on <Picture 1>: {PREV_END}. The camera accelerates and pushes in toward {ANCHOR} until its light or texture fills the whole frame; the camera then pulls back out of that same fill, and the frame is now {THIS_START}; the pull-out completes and the camera locks by {T} seconds.",
+      "example": "（#2→#3）画面从上午阳台开始：@基尼 树式站稳在瑜伽垫上；镜头加速推近她身后被阳光照亮的白墙亮部，暖白亮光放大占满整个画面；随即镜头从一团暖黄光晕中拉出——那是 @书房 的台灯，夜色中光晕笼罩小书桌，@基尼 坐在桌前、两只前爪搭在摊开书本两侧；第3秒拉出完成、机位稳定。"
+    },
+    {
+      "technique_id": "roll_spin",
+      "name_zh": "旋转转场",
+      "name_en": "Roll Spin",
+      "category": "short_video",
+      "is_fast": false,
+      "applicable": {
+        "time_span": [
+          "minutes",
+          "hours",
+          "day_night"
+        ],
+        "location_change": [
+          "none",
+          "adjacent",
+          "far"
+        ],
+        "narrative": [
+          "normal",
+          "emotion"
+        ],
+        "action_only": false,
+        "note_zh": "兴奋、眩晕、天旋地转或翻转感的段落；环形模糊掩盖空间切换"
+      },
+      "not_applicable": [
+        "沉静庄重段落",
+        "T 小于 1.5 秒",
+        "对画面稳定要求高的镜头（旋转易产生畸变）"
+      ],
+      "seconds_min": 1.5,
+      "seconds_max": 3.0,
+      "executability": {
+        "h3": "medium",
+        "minimax": "medium"
+      },
+      "template_zh": "画面从{上一镜结尾画面}开始保持约0.5秒；镜头沿视轴快速旋转，环形运动模糊搅散空间细节；旋转减速回正时，画面已是{本镜开场画面}；第{T}秒画面水平回正、完全稳定。",
+      "template_en": "[0-{T}s] Open on <Picture 1>: {PREV_END}. Hold about 0.5s, then the camera rolls rapidly around the lens axis; circular motion blur churns away spatial detail. As the roll decelerates back to level, the frame is now {THIS_START}; the horizon settles and locks by {T} seconds.",
+      "example": "（#2→#3）画面从明亮的上午阳台开始：@基尼 树式站稳，保持约0.5秒；镜头顺时针快速旋转，环形模糊搅散阳台的光影；旋转减速回正时，画面已是 @书房 夜晚——暖黄台灯下 @基尼 坐在桌前、两只前爪搭在摊开书本两侧；第2.5秒画面回正稳定。"
+    },
+    {
+      "technique_id": "motion_follow",
+      "name_zh": "跟随动作转场",
+      "name_en": "Follow-Motion Transition",
+      "category": "short_video",
+      "is_fast": false,
+      "applicable": {
+        "time_span": [
+          "none",
+          "minutes",
+          "hours"
+        ],
+        "location_change": [
+          "adjacent"
+        ],
+        "narrative": [
+          "normal"
+        ],
+        "action_only": false,
+        "note_zh": "人物可在两镜之间自然走动到达的相邻空间；镜头跟随 + 沿途前景掠过完成换景"
+      },
+      "not_applicable": [
+        "远距离或跨城（走不过去）",
+        "跨昼夜且无灯光渐变动机",
+        "人物不移动"
+      ],
+      "seconds_min": 2.0,
+      "seconds_max": 3.0,
+      "executability": {
+        "h3": "high",
+        "minimax": "medium"
+      },
+      "template_zh": "画面从{上一镜结尾画面}开始；{@角色}转身起步朝{方向}移动（写明先迈哪只爪或脚、身体如何转向），镜头跟随，沿途{遮挡物}贴着镜头短暂掠过并遮挡画面；{@角色}走入新位置停稳时，镜头随之停稳，画面为{本镜开场画面}；第{T}秒动作与镜头同时落定。",
+      "template_en": "[0-{T}s] Open on <Picture 1>: {PREV_END}. {@CHARACTER} turns and sets off {DIRECTION} (state which paw or foot moves first and how the body turns); the camera tracks the move while a foreground {OCCLUDER} briefly wipes the lens along the way; as {@CHARACTER} arrives and settles, the camera locks onto {THIS_START} by {T} seconds.",
+      "example": "（假设 #2 → 相邻客厅、同为上午的新镜）画面从明亮的上午阳台开始：@基尼 收起树式、四爪落地，右前爪先迈、身体转向左侧门口小跑，镜头跟随，门框边沿贴着镜头短暂掠过遮挡画面；@基尼 跑进 @客厅 在地毯中央停住坐定；第3秒动作与镜头同时落定。"
+    },
+    {
+      "technique_id": "object_to_lens",
+      "name_zh": "贴镜遮挡转场",
+      "name_en": "Object-to-Lens Wipe",
+      "category": "short_video",
+      "is_fast": false,
+      "applicable": {
+        "time_span": [
+          "minutes",
+          "hours",
+          "day_night"
+        ],
+        "location_change": [
+          "none",
+          "adjacent",
+          "far"
+        ],
+        "narrative": [
+          "normal",
+          "emotion"
+        ],
+        "action_only": false,
+        "note_zh": "俏皮、角色主动感强的段落；爪掌或物件盖满镜头的一刻完成切换"
+      },
+      "not_applicable": [
+        "严肃沉重戏份",
+        "角色距镜头过远且无靠近动机"
+      ],
+      "seconds_min": 1.5,
+      "seconds_max": 2.5,
+      "executability": {
+        "h3": "high",
+        "minimax": "high"
+      },
+      "template_zh": "画面从{上一镜结尾画面}开始；{@角色}抬起一只前爪或手伸向镜头（写明另一只爪或手保持的持物与位置），掌面逐渐贴近直至完全盖住镜头、画面被遮黑；掌面移开的瞬间，画面已是{本镜开场画面}；第{T}秒掌面完全出画、镜头稳定。",
+      "template_en": "[0-{T}s] Open on <Picture 1>: {PREV_END}. {@CHARACTER} raises one forepaw or hand toward the lens (state what the other paw or hand is holding and where it stays); the pad closes in until it fully covers the lens and the frame goes dark. The instant it withdraws, the frame is {THIS_START}; fully clear and steady by {T} seconds.",
+      "example": "（#2→#3）画面从上午阳台开始：@基尼 放下贴在腿侧的小爪、四爪站稳后，抬起右前爪伸向镜头（左前爪撑在垫上稳住身体），粉色掌面逐渐盖满镜头、画面全暗；掌面移开的瞬间已是 @书房 夜晚——@基尼 坐在暖黄台灯下的书桌前，两只前爪搭在摊开书本两侧；第2.5秒掌面完全出画、镜头稳定。"
+    },
+    {
+      "technique_id": "light_flash",
+      "name_zh": "闪白光效转场",
+      "name_en": "Light Flash",
+      "category": "short_video",
+      "is_fast": true,
+      "applicable": {
+        "time_span": [
+          "minutes",
+          "hours",
+          "day_night",
+          "days",
+          "season",
+          "years"
+        ],
+        "location_change": [
+          "none",
+          "adjacent",
+          "far",
+          "indoor_outdoor"
+        ],
+        "narrative": [
+          "normal",
+          "emotion"
+        ],
+        "action_only": false,
+        "note_zh": "万能快速手法：过曝瞬间同时抹掉空间与道具残留；T 被压缩到 1–1.5 秒时的首选"
+      },
+      "not_applicable": [
+        "压抑、恐怖等需要暗化的氛围（改用 fade_black）",
+        "连续多镜重复使用（闪烁疲劳）"
+      ],
+      "seconds_min": 1.0,
+      "seconds_max": 1.5,
+      "executability": {
+        "h3": "high",
+        "minimax": "high"
+      },
+      "template_zh": "画面从{上一镜结尾画面}开始；{光源动机}的亮度迅速增强，整个画面在约0.3秒内过曝成纯白；白光立即回落，显现{本镜开场画面}；第{T}秒曝光恢复正常、镜头稳定。",
+      "template_en": "[0-{T}s] Open on <Picture 1>: {PREV_END}. The brightness of {LIGHT_SOURCE} swells rapidly until the frame overexposes to pure white within about 0.3s; the white immediately falls away to reveal {THIS_START}; exposure normalizes and the camera is steady by {T} seconds.",
+      "example": "（#2→#3，T 被压缩时的快速替代）画面从明亮的上午阳台开始：@基尼 树式站稳；阳光亮度迅速增强，画面在0.3秒内过曝成纯白；白光回落，显现 @书房 夜晚——暖黄台灯光晕下 @基尼 坐在桌前、两只前爪搭在摊开书本两侧；第1.2秒曝光恢复、镜头稳定。"
+    },
+    {
+      "technique_id": "speed_ramp",
+      "name_zh": "变速转场",
+      "name_en": "Speed Ramp",
+      "category": "short_video",
+      "is_fast": false,
+      "applicable": {
+        "time_span": [
+          "minutes",
+          "hours"
+        ],
+        "location_change": [
+          "none",
+          "adjacent"
+        ],
+        "narrative": [
+          "normal",
+          "emotion"
+        ],
+        "action_only": false,
+        "note_zh": "上一镜结尾带动作时的提速衔接；也可把放下、拿起等衔接动作提速完成，兼具动感"
+      },
+      "not_applicable": [
+        "上一镜结尾与本镜开场都完全静止（无速度可变）"
+      ],
+      "seconds_min": 2.0,
+      "seconds_max": 3.0,
+      "executability": {
+        "h3": "medium",
+        "minimax": "medium"
+      },
+      "template_zh": "画面从{上一镜结尾画面}开始；{@角色}正在进行的{收尾动作}骤然加速（写明双爪或双手分别在做什么），动作带起明显运动模糊；在模糊顶点动作骤停，画面瞬间清晰定格为{本镜开场画面}；第{T}秒速度恢复正常、画面稳定。",
+      "template_en": "[0-{T}s] Open on <Picture 1>: {PREV_END}. The action {@CHARACTER} is finishing suddenly accelerates (state what each paw or hand does), dragging heavy motion blur; at the blur peak the motion snaps to a stop and the frame locks sharp on {THIS_START}; speed returns to normal and the frame is steady by {T} seconds.",
+      "example": "（#1→#2 的动感替代写法）画面从清晨的 @阳台 开始：@基尼 双爪各握一只迷你哑铃举在胸前；她放哑铃的动作骤然加速——右爪、左爪先后把哑铃放到垫边，动作带起运动模糊；模糊顶点骤停，画面瞬间清晰：@基尼 已空爪蹲踞在瑜伽垫中央、准备缓缓站起；第3秒速度恢复正常、画面稳定。"
+    },
+    {
+      "technique_id": "beat_snap",
+      "name_zh": "卡点骤变转场",
+      "name_en": "Beat-Synced Snap",
+      "category": "short_video",
+      "is_fast": true,
+      "applicable": {
+        "time_span": [
+          "hours",
+          "day_night",
+          "days",
+          "season"
+        ],
+        "location_change": [
+          "none",
+          "adjacent",
+          "far"
+        ],
+        "narrative": [
+          "normal",
+          "emotion"
+        ],
+        "action_only": false,
+        "note_zh": "音乐感、爽感段落：主体留在画面同一区域，环境、光线与姿态随一声节拍骤然切换"
+      },
+      "not_applicable": [
+        "更换角色服装或外形（以图片为准，禁止描写）",
+        "柔和抒情段落"
+      ],
+      "seconds_min": 1.0,
+      "seconds_max": 2.0,
+      "executability": {
+        "h3": "medium",
+        "minimax": "medium"
+      },
+      "template_zh": "画面从{上一镜结尾画面}开始，{@角色}保持姿态约0.5秒；随着一声清脆的{节拍音}（音效），画面在两三帧内骤变为{本镜开场画面}——机位与景别尽量不变，{@角色}仍在画面同一区域，但环境、光线与其姿态已切换到位；第{T}秒骤变完成、画面稳定。",
+      "template_en": "[0-{T}s] Open on <Picture 1>: {PREV_END}; {@CHARACTER} holds the pose for about 0.5s. On a crisp {BEAT_SOUND} (sound effect), the frame snaps within 2-3 frames to {THIS_START} — camera and framing stay as close as possible, {@CHARACTER} remains in the same screen region, while environment, light and pose have switched; the snap completes and holds by {T} seconds.",
+      "example": "（#2→#3）画面从明亮的上午阳台开始：@基尼 树式站稳保持约0.5秒；随着一声清脆的指响般节拍音，画面在两三帧内骤变——机位景别不变，环境已成 @书房 夜晚：暖黄台灯光晕代替阳光，@基尼 已坐在书桌前、两只前爪搭在摊开书本两侧；第1.5秒骤变完成、画面稳定。"
+    },
+    {
+      "technique_id": "dissolve",
+      "name_zh": "叠化",
+      "name_en": "Cross Dissolve",
+      "category": "cinematic",
+      "is_fast": false,
+      "applicable": {
+        "time_span": [
+          "hours",
+          "day_night",
+          "days",
+          "season",
+          "years"
+        ],
+        "location_change": [
+          "none",
+          "adjacent",
+          "far",
+          "indoor_outdoor"
+        ],
+        "narrative": [
+          "normal",
+          "memory",
+          "emotion"
+        ],
+        "action_only": false,
+        "note_zh": "最通用的电影转场兜底：抒情、时间流逝、空间更换皆可"
+      },
+      "not_applicable": [
+        "需要强节奏冲击的爽点",
+        "T 小于 2 秒"
+      ],
+      "seconds_min": 2.0,
+      "seconds_max": 3.0,
+      "executability": {
+        "h3": "high",
+        "minimax": "medium"
+      },
+      "template_zh": "画面从{上一镜结尾画面}开始并渐渐变得透明，同时{本镜开场画面}在同一画框中逐渐浮现，两层影像在中段短暂重叠相融；旧画面完全隐去、新画面清晰稳定，叠化在第{T}秒完成。",
+      "template_en": "[0-{T}s] Open on <Picture 1>: {PREV_END}. The image gradually turns translucent while {THIS_START} fades up within the same frame; the two images briefly overlap mid-way, then the old image vanishes and the new one holds sharp and steady; the dissolve completes by {T} seconds.",
+      "example": "（#2→#3）画面从明亮的上午阳台开始：@基尼 树式站稳在瑜伽垫上；画面渐渐变得透明，@书房 夜晚的影像在同一画框中浮现——暖黄台灯光晕笼罩小书桌，@基尼 坐在桌前、两只前爪搭在摊开书本两侧；两层影像短暂相融后旧画面完全隐去；第3秒叠化完成、画面清晰稳定。"
+    },
+    {
+      "technique_id": "fade_black",
+      "name_zh": "经黑渐隐渐显",
+      "name_en": "Fade Through Black",
+      "category": "cinematic",
+      "is_fast": false,
+      "applicable": {
+        "time_span": [
+          "day_night",
+          "days",
+          "season",
+          "years"
+        ],
+        "location_change": [
+          "none",
+          "adjacent",
+          "far",
+          "indoor_outdoor"
+        ],
+        "narrative": [
+          "normal"
+        ],
+        "action_only": false,
+        "note_zh": "进入夜晚或较暗场景、较大时间跨度、章节感收束的首选；黑场天然抹除一切残留"
+      },
+      "not_applicable": [
+        "两头都是高调明亮且节奏要快",
+        "T 小于 2 秒"
+      ],
+      "seconds_min": 2.0,
+      "seconds_max": 3.0,
+      "executability": {
+        "h3": "high",
+        "minimax": "high"
+      },
+      "template_zh": "画面从{上一镜结尾画面}开始，整体亮度平滑下落，在转场前半段沉入全黑；黑场中{本镜环境声}先行进入；后半段画面从黑中缓缓亮起，显现{本镜开场画面}；第{T}秒曝光恢复正常并稳定。",
+      "template_en": "[0-{T}s] Open on <Picture 1>: {PREV_END}. Brightness falls smoothly, sinking to full black in the first half of the transition; in the black, {NEXT_AMBIENCE} enters first; the image then fades up from black into {THIS_START}, reaching normal exposure and locking by {T} seconds.",
+      "example": "（#2→#3，范例答案）画面从明亮的上午阳台开始：@基尼 树式站稳、眼神亮晶晶；画面整体亮度平滑下落，约1.5秒沉入全黑；黑场中先响起夜晚室内安静的底噪与轻微纸页声；画面从黑中缓缓亮起——@书房 夜晚，暖黄台灯光晕笼罩小书桌，@基尼 坐在桌前、两只前爪搭在摊开书本两侧；第3秒曝光恢复正常并稳定。"
+    },
+    {
+      "technique_id": "fade_white",
+      "name_zh": "经白渐隐渐显",
+      "name_en": "Fade Through White",
+      "category": "cinematic",
+      "is_fast": false,
+      "applicable": {
+        "time_span": [
+          "hours",
+          "day_night",
+          "days"
+        ],
+        "location_change": [
+          "none",
+          "adjacent",
+          "far",
+          "indoor_outdoor"
+        ],
+        "narrative": [
+          "normal",
+          "memory",
+          "dream",
+          "emotion"
+        ],
+        "action_only": false,
+        "note_zh": "柔和抒情、回忆梦境入口、明亮场景之间的时间跳跃"
+      },
+      "not_applicable": [
+        "进入黑暗场景（反差突兀）",
+        "惊悚压抑氛围"
+      ],
+      "seconds_min": 2.0,
+      "seconds_max": 3.0,
+      "executability": {
+        "h3": "high",
+        "minimax": "high"
+      },
+      "template_zh": "画面从{上一镜结尾画面}开始，被柔和的白光渐渐充满，在转场前半段完全化为柔白；后半段白色缓缓退去，显现{本镜开场画面}；第{T}秒曝光恢复正常、画面稳定。",
+      "template_en": "[0-{T}s] Open on <Picture 1>: {PREV_END}. A soft white glow gradually floods the frame, turning it fully white in the first half; the white then recedes to reveal {THIS_START}; exposure normalizes and the frame steadies by {T} seconds.",
+      "example": "（假设 #4 → 次日清晨回到阳台的新镜）画面从夜晚书房的暖黄灯下开始：@基尼 右爪握笔、左爪按纸写完最后一行；画面被柔白渐渐充满、约1.5秒完全化为柔白；白色退去时已是次日清晨的 @阳台——@基尼 空着双爪站在训练垫旁的晨光里；第3秒曝光恢复、画面稳定。"
+    },
+    {
+      "technique_id": "match_cut",
+      "name_zh": "形状匹配转场",
+      "name_en": "Shape Match Cut",
+      "category": "cinematic",
+      "is_fast": false,
+      "applicable": {
+        "time_span": [
+          "hours",
+          "day_night",
+          "days",
+          "season",
+          "years"
+        ],
+        "location_change": [
+          "none",
+          "adjacent",
+          "far",
+          "indoor_outdoor"
+        ],
+        "narrative": [
+          "normal",
+          "emotion"
+        ],
+        "action_only": false,
+        "note_zh": "两镜存在形状、颜色或构图相近的锚点物（圆形光斑↔台灯光晕等）；剪辑语汇次选，已改写为镜头内形变"
+      },
+      "not_applicable": [
+        "两镜找不到可信的形状或颜色匹配物",
+        "节奏急促段落"
+      ],
+      "seconds_min": 2.0,
+      "seconds_max": 3.0,
+      "executability": {
+        "h3": "medium",
+        "minimax": "low"
+      },
+      "template_zh": "画面从{上一镜结尾画面}开始；镜头缓缓推近画面中的{匹配物A}，使其形状占据画面中心；该形状保持在画面同一位置，其颜色、质感与周围环境渐变融合，化为{匹配物B}；镜头再缓缓拉开，露出{本镜开场画面}；第{T}秒拉开完成、画面稳定。",
+      "template_en": "[0-{T}s] Open on <Picture 1>: {PREV_END}. The camera slowly pushes in on {MATCH_A} until its shape holds the center of frame; keeping that shape in place, its color, texture and surroundings gradually morph into {MATCH_B}; the camera then pulls back to reveal {THIS_START}; the pull-back completes and steadies by {T} seconds.",
+      "example": "（#2→#3）画面从明亮的上午阳台开始：@基尼 树式站稳；镜头缓缓推近她身旁地面上一块圆形的明亮光斑，光斑占据画面中心；圆形保持原位，色温由亮白渐变为暖黄、四周随之暗成夜色——它化为 @书房 的台灯光晕；镜头缓缓拉开，露出 @基尼 坐在书桌前、两只前爪搭在摊开书本两侧的画面；第3秒拉开完成、画面稳定。"
+    },
+    {
+      "technique_id": "match_on_action",
+      "name_zh": "动作匹配转场",
+      "name_en": "Match on Action",
+      "category": "cinematic",
+      "is_fast": false,
+      "applicable": {
+        "time_span": [
+          "none",
+          "minutes",
+          "hours",
+          "day_night"
+        ],
+        "location_change": [
+          "none",
+          "adjacent",
+          "far"
+        ],
+        "narrative": [
+          "normal"
+        ],
+        "action_only": true,
+        "note_zh": "上一镜结尾动作与本镜开场动作同类或同方向、同一人物；动作不断，环境在动作中途切换"
+      },
+      "not_applicable": [
+        "两头动作方向冲突且无法改写为同向",
+        "人物不同"
+      ],
+      "seconds_min": 1.5,
+      "seconds_max": 3.0,
+      "executability": {
+        "h3": "medium",
+        "minimax": "medium"
+      },
+      "template_zh": "画面从{上一镜结尾画面}开始；{@角色}开始做{衔接动作}（写明发力的爪或手与另一只的位置），动作进行到一半时，周围环境与光线以快速叠化换为本镜环境，而{@角色}的动作不中断地顺势完成，落点即{本镜开场画面}；第{T}秒动作完成、画面稳定。",
+      "template_en": "[0-{T}s] Open on <Picture 1>: {PREV_END}. {@CHARACTER} begins {BRIDGE_ACTION} (state the acting paw or hand and where the other stays); halfway through the motion, the surrounding environment and light cross-dissolve into the new scene while the motion continues unbroken, landing exactly on {THIS_START}; the action completes and the frame steadies by {T} seconds.",
+      "example": "（#2→#3）画面从明亮的上午阳台开始：@基尼 树式站稳后放下贴腿的小爪，身体前倾准备坐下（右前爪先撑向身前地面）；下坐动作进行到一半时，周围环境快速叠化为 @书房 夜晚的暖黄灯光与书桌；@基尼 顺势坐定在桌前，两只前爪自然落在摊开书本两侧；第3秒动作完成、画面稳定。"
+    },
+    {
+      "technique_id": "jump_cut_lapse",
+      "name_zh": "跳切时间流逝",
+      "name_en": "Jump-Cut Time Lapse",
+      "category": "cinematic",
+      "is_fast": false,
+      "applicable": {
+        "time_span": [
+          "hours",
+          "day_night",
+          "days"
+        ],
+        "location_change": [
+          "none"
+        ],
+        "narrative": [
+          "normal"
+        ],
+        "action_only": false,
+        "note_zh": "同机位同场景的时间流逝（重复劳作、等待）；剪辑语汇次选，以镜头内两次干脆跳变实现"
+      },
+      "not_applicable": [
+        "跨场景",
+        "T 小于 2 秒"
+      ],
+      "seconds_min": 2.0,
+      "seconds_max": 3.0,
+      "executability": {
+        "h3": "medium",
+        "minimax": "low"
+      },
+      "template_zh": "画面从{上一镜结尾画面}开始保持约0.5秒；保持机位与构图完全不变，画面连续发生两次干脆的轻微跳切，每次跳切{@角色}的姿态与环境细节（光线角度、道具位置）都明显推进一步，表现时间悄然流逝；第二次跳切后画面即为{本镜开场画面}，保持静止到第{T}秒。",
+      "template_en": "[0-{T}s] Open on <Picture 1>: {PREV_END}; hold about 0.5s. With camera and framing locked, the frame makes two crisp micro jump cuts; at each jump, the pose of {@CHARACTER} and the environment details (light angle, prop positions) advance a visible step, showing time quietly passing; after the second jump the frame is {THIS_START}, holding still until {T} seconds.",
+      "example": "（#3→#4）画面从 @书房 夜晚开始：@基尼 两只前爪按在摊开书本两侧低头阅读，保持约0.5秒；机位构图不变，连续两次轻微跳切——第一次跳切后书页已翻过大半、她的头更低；第二次跳切后笔记本已摊到身前，@基尼 右爪握住铅笔、左爪轻按纸页，笔尖落在纸上；保持静止到第2.5秒。"
+    },
+    {
+      "technique_id": "timelapse_light",
+      "name_zh": "光影流转",
+      "name_en": "Timelapse Light Sweep",
+      "category": "cinematic",
+      "is_fast": false,
+      "applicable": {
+        "time_span": [
+          "hours",
+          "day_night"
+        ],
+        "location_change": [
+          "none"
+        ],
+        "narrative": [
+          "normal"
+        ],
+        "action_only": false,
+        "note_zh": "同一空间内时间跳跃的首选：延时速度的光线流转最自然，人物以轻微虚化快动作换位"
+      },
+      "not_applicable": [
+        "跨空间",
+        "时间几乎不变"
+      ],
+      "seconds_min": 2.0,
+      "seconds_max": 3.0,
+      "executability": {
+        "h3": "high",
+        "minimax": "high"
+      },
+      "template_zh": "画面从{上一镜结尾画面}开始；机位保持不变，光线以延时摄影的速度流转：{光线轨迹}；{@角色}在光影流转中以轻微虚化的快动作过渡到本镜的位置与姿态（写明双爪或双手的最终状态；两镜道具或垫面、摆设有增减不同时，由{@角色}在这段快动作内完成放下、收走、带出画外或铺设就位——旧道具收至{放置位置}（出画或不与本镜开场画面冲突处），不得写成物体自行变形、凭空出现或消失）；光线定格为{新光线}时，画面即{本镜开场画面}；第{T}秒光线与人物同时稳定。",
+      "template_en": "[0-{T}s] Open on <Picture 1>: {PREV_END}. With the camera locked, light sweeps at timelapse speed: {LIGHT_PATH}; within the moving light, {@CHARACTER} shifts in softly blurred fast-motion to this shot's position and pose (state the final state of both paws or hands; if props, mats or dressing differ between the two shots, {@CHARACTER} puts down, stows, carries out of frame or lays out those items within this same fast-motion — old props end at {PLACE}, out of frame or somewhere not contradicting this shot's opening; never write objects morphing, appearing or vanishing on their own); as the light settles into {NEW_LIGHT}, the frame is {THIS_START}; light and character lock together by {T} seconds.",
+      "example": "（#1→#2，表现「短时间流逝」的备选答案）画面从清晨的 @阳台 开始：@基尼 双爪各握一只迷你哑铃举在胸前；机位不变，阳光以延时速度流转——光斑沿地面横移、影子变短、光色由清晨金黄转为上午亮白；光影流转间 @基尼 以轻微虚化的快动作完成收整——先后把两只哑铃提到画面边缘的栏杆绿植脚下放稳、近乎出画，把训练垫卷起带出画外、从画面边缘取回瑜伽垫铺开在中央；光线定格为上午的明亮阳光时，@基尼 已站上瑜伽垫中央、一条小爪抬起贴向腿侧、树式刚摆出一半，另一只前爪自然垂在体侧；第3秒光线与人物同时稳定。"
+    },
+    {
+      "technique_id": "clock_calendar",
+      "name_zh": "时钟日历指示",
+      "name_en": "Clock or Calendar Insert",
+      "category": "cinematic",
+      "is_fast": false,
+      "applicable": {
+        "time_span": [
+          "hours",
+          "days"
+        ],
+        "location_change": [
+          "none"
+        ],
+        "narrative": [
+          "normal"
+        ],
+        "action_only": false,
+        "note_zh": "场景参考图或绑定道具中确实存在时钟、日历、屏幕等计时物时，用其快速变化明示时间跳跃"
+      },
+      "not_applicable": [
+        "场景参考图与绑定道具中不存在计时物（禁止凭空发明，以图片为准）",
+        "跨场景"
+      ],
+      "seconds_min": 2.0,
+      "seconds_max": 3.0,
+      "executability": {
+        "h3": "medium",
+        "minimax": "low"
+      },
+      "template_zh": "画面从{上一镜结尾画面}开始保持约0.5秒；镜头切入场景中{计时物}的特写（必须是场景参考图或绑定道具中已存在的物件），其指针、页面或数字以可见的快速变化从{旧时刻}走到{新时刻}，周围光线随之同步改变；切回原景别时画面已是{本镜开场画面}；第{T}秒稳定。",
+      "template_en": "[0-{T}s] Open on <Picture 1>: {PREV_END}; hold about 0.5s. Cut in to a close-up of {TIME_PROP} in the scene (it must already exist in the scene reference or bound props); its hands, page or digits visibly race from {OLD_TIME} to {NEW_TIME} while the ambient light shifts in sync; cutting back, the frame is {THIS_START}; steady by {T} seconds.",
+      "example": "（#3→#4，假设 @书房 场景图中有一座小闹钟）画面从 @书房 夜晚开始：@基尼 两爪按着摊开的书本低头阅读，保持约0.5秒；切入桌上小闹钟的特写，指针从21:00快速走到21:20，台灯光晕微微摇曳；切回中景时 @基尼 右爪已握住铅笔、左爪轻按摊开的笔记本，笔尖落向纸页；第3秒稳定。"
+    },
+    {
+      "technique_id": "season_change",
+      "name_zh": "季节更替",
+      "name_en": "Season Change",
+      "category": "cinematic",
+      "is_fast": false,
+      "applicable": {
+        "time_span": [
+          "season",
+          "years"
+        ],
+        "location_change": [
+          "none",
+          "adjacent"
+        ],
+        "narrative": [
+          "normal"
+        ],
+        "action_only": false,
+        "note_zh": "室外或有窗、植物可见的空间：机位不动，植物与光质逐项渐变完成换季"
+      },
+      "not_applicable": [
+        "封闭无窗空间",
+        "小时级以下时间跨度"
+      ],
+      "seconds_min": 2.5,
+      "seconds_max": 3.0,
+      "executability": {
+        "h3": "medium",
+        "minimax": "medium"
+      },
+      "template_zh": "画面从{上一镜结尾画面}开始；机位保持不变，环境以匀速渐变完成季节更替：{环境季节变化描述}（植物形态、天色、光质逐项变化），{@角色}的身影可被前景短暂遮挡或轻微虚化以掩盖状态切换；渐变完成时画面为{本镜开场画面}；第{T}秒稳定。",
+      "template_en": "[0-{T}s] Open on <Picture 1>: {PREV_END}. With the camera locked, the environment morphs steadily through a season change: {SEASON_SHIFT} (plants, sky and light quality shifting item by item); {@CHARACTER} may be briefly occluded by foreground or softly blurred to mask the state switch; when the morph completes the frame is {THIS_START}; steady by {T} seconds.",
+      "example": "（假设 #2 的阳台由春入夏）画面从 @阳台 开始：@基尼 树式站稳；机位不变，栏杆旁绿植匀速抽高变密、花盆开出小花，阳光由柔和转为盛夏的高亮与清晰硬影，@基尼 的身影被前景掠过的绿叶短暂遮挡；渐变完成时已是盛夏正午的 @阳台，@基尼 空爪立于瑜伽垫中央准备开始新动作；第3秒稳定。"
+    },
+    {
+      "technique_id": "montage_flash",
+      "name_zh": "微蒙太奇",
+      "name_en": "Micro-Montage",
+      "category": "cinematic",
+      "is_fast": false,
+      "applicable": {
+        "time_span": [
+          "days",
+          "season",
+          "years"
+        ],
+        "location_change": [
+          "none"
+        ],
+        "narrative": [
+          "normal",
+          "emotion"
+        ],
+        "action_only": false,
+        "note_zh": "大跨度、过程感叙事（练习了许多天）；在同一画框内快速叠化2-3个极短片段，全部位于本镜或上一镜场景内。最后手段"
+      },
+      "not_applicable": [
+        "普通承接（有更简单手法时）",
+        "片段需要出现未绑定场景时",
+        "T 小于 2.5 秒"
+      ],
+      "seconds_min": 2.5,
+      "seconds_max": 3.0,
+      "executability": {
+        "h3": "low",
+        "minimax": "low"
+      },
+      "template_zh": "画面从{上一镜结尾画面}开始；在同一画框内以快速叠化连续闪过两到三个极短片段（每个约0.5-0.8秒，全部位于本镜场景或上一镜场景之内）：{片段1}；{片段2}；{片段3（可省）}，表现{时间跨度或过程}；最后一个片段叠化定格为{本镜开场画面}；第{T}秒稳定。",
+      "template_en": "[0-{T}s] Open on <Picture 1>: {PREV_END}. Within the same frame, two or three very short vignettes flash by in quick dissolves (about 0.5-0.8s each, all inside this shot's scene or the previous shot's scene): {VIGNETTE_1}; {VIGNETTE_2}; {VIGNETTE_3 (optional)}, conveying {SPAN_OR_PROCESS}; the last vignette dissolves and locks into {THIS_START}; steady by {T} seconds.",
+      "example": "（#3→#4）画面从 @书房 夜晚开始：@基尼 两爪按着书本阅读；同一画框内快速叠化闪过三个极短片段——她右爪翻过一页；她双爪合上书本推向桌角；她把笔记本拉到身前摊开；最后一个片段叠化定格为 @基尼 右爪握铅笔、左爪按住笔记本、笔尖落在纸页上的画面；第3秒稳定。"
+    },
+    {
+      "technique_id": "cutaway_insert",
+      "name_zh": "插入空镜",
+      "name_en": "Cutaway Insert",
+      "category": "cinematic",
+      "is_fast": false,
+      "applicable": {
+        "time_span": [
+          "minutes",
+          "hours",
+          "day_night"
+        ],
+        "location_change": [
+          "none",
+          "adjacent",
+          "far"
+        ],
+        "narrative": [
+          "normal"
+        ],
+        "action_only": false,
+        "note_zh": "需要喘息或分隔感的承接；插入物必须属于本镜场景（或天空等通用空镜），空镜内完成光线过渡"
+      },
+      "not_applicable": [
+        "插入物在本镜场景中不存在且非天空等通用空镜",
+        "高速动作中"
+      ],
+      "seconds_min": 1.5,
+      "seconds_max": 3.0,
+      "executability": {
+        "h3": "medium",
+        "minimax": "medium"
+      },
+      "template_zh": "画面从{上一镜结尾画面}开始保持约0.5秒；切入{本镜场景中的静物或天色}的空镜特写约1秒，特写中光线由{旧光线}渐变为{新光线}；切回原景别时画面已是{本镜开场画面}；第{T}秒稳定。",
+      "template_en": "[0-{T}s] Open on <Picture 1>: {PREV_END}; hold about 0.5s. Cut in to an empty close-up of {STILL_OBJECT} belonging to this shot's scene for about 1 second, its light shifting from {OLD_LIGHT} to {NEW_LIGHT}; cutting back, the frame is {THIS_START}; steady by {T} seconds.",
+      "example": "（#2→#3）画面从明亮的上午阳台开始：@基尼 树式站稳，保持约0.5秒；切入 @书房 台灯的空镜特写——昏暗中暖黄灯光亮起、光晕铺开（约1秒）；切回中景时已是 @书房 夜晚全貌，@基尼 坐在桌前、两只前爪搭在摊开书本两侧；第2.5秒稳定。"
+    },
+    {
+      "technique_id": "sound_bridge",
+      "name_zh": "声音先行",
+      "name_en": "Sound Bridge (J-cut)",
+      "category": "cinematic",
+      "is_fast": false,
+      "applicable": {
+        "time_span": [
+          "minutes",
+          "hours",
+          "day_night"
+        ],
+        "location_change": [
+          "none",
+          "adjacent",
+          "far",
+          "indoor_outdoor"
+        ],
+        "narrative": [
+          "normal",
+          "emotion"
+        ],
+        "action_only": false,
+        "note_zh": "H3 等有原生音频的模型优先：下一场景的环境声先入，画面随后以柔和叠化跟上；需与画面手法配合"
+      },
+      "not_applicable": [
+        "MiniMax 等无音频控制的模型单独使用",
+        "强节奏卡点段落"
+      ],
+      "seconds_min": 1.5,
+      "seconds_max": 3.0,
+      "executability": {
+        "h3": "medium",
+        "minimax": "low"
+      },
+      "template_zh": "画面从{上一镜结尾画面}开始；{本镜环境声}先行进入并渐强，画面仍停留在原状态约1秒；随后画面以柔和叠化换为{本镜开场画面}，声画在第{T}秒完全同步稳定。（需与叠化等画面手法配合；仅支持有音频的视频模型。）",
+      "template_en": "[0-{T}s] Open on <Picture 1>: {PREV_END}. {NEXT_AMBIENCE} enters first and swells while the image holds for about 1 second; the image then softly dissolves into {THIS_START}, and sound and picture lock in sync by {T} seconds. (Pair with a visual device such as a dissolve; audio-capable models only.)",
+      "example": "（#2→#3）画面从明亮的上午阳台开始：@基尼 树式站稳；夜晚室内安静的底噪与轻微纸页声先行进入并渐强，画面仍停在阳台约1秒；随后画面柔和叠化为 @书房 夜晚——暖黄台灯下 @基尼 坐在桌前、两爪搭在摊开书本两侧；第3秒声画同步稳定。"
+    },
+    {
+      "technique_id": "rack_focus",
+      "name_zh": "焦点转移",
+      "name_en": "Rack Focus",
+      "category": "cinematic",
+      "is_fast": true,
+      "applicable": {
+        "time_span": [
+          "none",
+          "minutes",
+          "hours"
+        ],
+        "location_change": [
+          "none"
+        ],
+        "narrative": [
+          "normal",
+          "emotion"
+        ],
+        "action_only": true,
+        "note_zh": "同空间内注意力转移、小时间差；全虚瞬间掩盖状态切换，是电影感的快速手法"
+      },
+      "not_applicable": [
+        "画面中缺少可供焦点转移的前景或背景层次"
+      ],
+      "seconds_min": 1.0,
+      "seconds_max": 2.0,
+      "executability": {
+        "h3": "medium",
+        "minimax": "medium"
+      },
+      "template_zh": "画面从{上一镜结尾画面}开始；焦点从{@角色或A物}缓缓移向{前景或背景的B物}，原主体渐渐虚化成柔和色块；在画面全虚的瞬间内容过渡，焦点回拉时清晰呈现的已是{本镜开场画面}；第{T}秒焦点锁定、画面稳定。",
+      "template_en": "[0-{T}s] Open on <Picture 1>: {PREV_END}. Focus racks slowly from {SUBJECT_A} to {SUBJECT_B} in the foreground or background; the original subject melts into soft bokeh; at the instant of full blur the content transitions, and as focus racks back it resolves on {THIS_START}; focus locks and the frame steadies by {T} seconds.",
+      "example": "（#3→#4 的快速替代）画面从 @书房 夜晚开始：@基尼 两爪按着书本低头阅读；焦点从她缓缓移向桌面前景的铅笔，书本与她虚化成暖色光斑；画面全虚的瞬间内容过渡，焦点回拉时清晰呈现：@基尼 右爪已握住铅笔、左爪轻按摊开的笔记本，笔尖正落向纸页；第1.5秒焦点锁定、画面稳定。"
+    },
+    {
+      "technique_id": "oner_walkthrough",
+      "name_zh": "一镜穿越",
+      "name_en": "Walkthrough Oner",
+      "category": "cinematic",
+      "is_fast": false,
+      "applicable": {
+        "time_span": [
+          "none",
+          "minutes",
+          "hours"
+        ],
+        "location_change": [
+          "adjacent"
+        ],
+        "narrative": [
+          "normal"
+        ],
+        "action_only": false,
+        "note_zh": "有门、走廊实际连通的相邻空间；一镜到底跟拍穿越，沿途光线渐变"
+      },
+      "not_applicable": [
+        "无实际连通路径的两个空间",
+        "T 小于 2.5 秒",
+        "跨昼夜且过道内无光线渐变动机"
+      ],
+      "seconds_min": 2.5,
+      "seconds_max": 3.0,
+      "executability": {
+        "h3": "medium",
+        "minimax": "medium"
+      },
+      "template_zh": "画面从{上一镜结尾画面}开始；镜头保持不间断的一镜，跟随{@角色}（或自行移动）向{方向}穿过{门口或过道}，沿途光线由{旧光线}渐变为{新光线}；穿出后镜头停稳，画面为{本镜开场画面}，全程无剪切；第{T}秒落定。",
+      "template_en": "[0-{T}s] Open on <Picture 1>: {PREV_END}. In one unbroken take, the camera follows {@CHARACTER} (or moves on its own) {DIRECTION} through {DOORWAY_OR_PASSAGE}, the light grading from {OLD_LIGHT} to {NEW_LIGHT} along the way; emerging, the camera settles on {THIS_START} with no cut anywhere; locked by {T} seconds.",
+      "example": "（假设 #2 → 相邻客厅的新镜）画面从明亮的上午阳台开始：@基尼 收起树式四爪落地，右前爪先迈、小跑向左侧门口，镜头不间断地跟随她穿过门框，光线由户外亮白渐变为室内柔和；穿出门后镜头停稳：@客厅 里 @基尼 在地毯中央坐定；第3秒落定、全程无剪切。"
+    },
+    {
+      "technique_id": "pov_shift",
+      "name_zh": "主观视点转场",
+      "name_en": "POV Shift",
+      "category": "cinematic",
+      "is_fast": false,
+      "applicable": {
+        "time_span": [
+          "minutes",
+          "hours",
+          "day_night"
+        ],
+        "location_change": [
+          "none",
+          "adjacent"
+        ],
+        "narrative": [
+          "normal",
+          "emotion",
+          "memory"
+        ],
+        "action_only": false,
+        "note_zh": "有明确视线动机时：推近眼部→切入主观视点→视野中变化→拉回客观机位"
+      },
+      "not_applicable": [
+        "没有合理的视线动机"
+      ],
+      "seconds_min": 2.0,
+      "seconds_max": 3.0,
+      "executability": {
+        "h3": "medium",
+        "minimax": "medium"
+      },
+      "template_zh": "画面从{上一镜结尾画面}开始；镜头推近{@角色}的眼部特写（只写神态强度与视线方向），随后切换为其主观视点：视野中{注视对象}渐渐变化、亮起或靠近；从主观视点拉回客观机位时，画面已是{本镜开场画面}；第{T}秒稳定。",
+      "template_en": "[0-{T}s] Open on <Picture 1>: {PREV_END}. The camera pushes in to a close-up of the eyes of {@CHARACTER} (write only gaze direction and intensity), then switches to the character's POV: in the view, {GAZE_TARGET} gradually changes, lights up or draws closer; pulling back from the POV to an objective camera, the frame is {THIS_START}; steady by {T} seconds.",
+      "example": "（#2→#3）画面从明亮的上午阳台开始：@基尼 树式完成、目光转向室内方向；镜头推近至她的眼部特写，切入她的主观视点——视野尽头昏暗的室内亮起一盏暖黄台灯、光晕渐渐放大；拉回客观机位时已是 @书房 夜晚，@基尼 坐在桌前、两只前爪搭在摊开书本两侧；第3秒稳定。"
+    },
+    {
+      "technique_id": "memory_dream",
+      "name_zh": "回忆梦境转场",
+      "name_en": "Memory-Dream Transition",
+      "category": "cinematic",
+      "is_fast": false,
+      "applicable": {
+        "time_span": [
+          "none",
+          "minutes",
+          "hours",
+          "day_night",
+          "days",
+          "season",
+          "years"
+        ],
+        "location_change": [
+          "none",
+          "adjacent",
+          "far",
+          "indoor_outdoor"
+        ],
+        "narrative": [
+          "memory",
+          "dream"
+        ],
+        "action_only": false,
+        "note_zh": "进入或走出回忆、梦境、幻想：柔焦光晕、色调漂移、轻微涟漪"
+      },
+      "not_applicable": [
+        "普通线性时间承接（非回忆或梦境）"
+      ],
+      "seconds_min": 2.0,
+      "seconds_max": 3.0,
+      "executability": {
+        "h3": "medium",
+        "minimax": "medium"
+      },
+      "template_zh": "画面从{上一镜结尾画面}开始；画面边缘泛起柔焦光晕、色调向{偏暖泛白或偏冷低饱和}漂移，轻微的波纹感掠过画面，现实细节渐渐模糊；朦胧顶点后画面重新聚实，带着回忆或梦境的色调质感，呈现{本镜开场画面}；第{T}秒聚实稳定。",
+      "template_en": "[0-{T}s] Open on <Picture 1>: {PREV_END}. A soft-focus glow blooms at the frame edges, the palette drifts {warm-white or cool-desaturated}, a faint ripple passes across the frame, and present-day detail blurs away; past the haze peak, the image resolves again with a memory-or-dream tonal quality, revealing {THIS_START}; resolved and steady by {T} seconds.",
+      "example": "（假设 #4 后接「回忆清晨举铁」的新镜，该镜绑定 @阳台）画面从夜晚书房的暖黄灯下开始：@基尼 右爪握笔停在纸页上方、目光放远；画面边缘泛起柔焦光晕、色调偏暖泛白、轻微波纹掠过；朦胧顶点后画面聚实——带着泛白回忆色调的清晨 @阳台，@基尼 双爪各握一只迷你哑铃举到胸前；第3秒聚实稳定。"
+    },
+    {
+      "technique_id": "put_down_prop",
+      "name_zh": "放下道具",
+      "name_en": "Put Down Prop",
+      "category": "action_bridge",
+      "is_fast": false,
+      "applicable": {
+        "time_span": [
+          "none",
+          "minutes"
+        ],
+        "location_change": [
+          "none"
+        ],
+        "narrative": [
+          "normal"
+        ],
+        "action_only": true,
+        "note_zh": "上一镜手持物在本镜不再需要时的首选；可并入小幅移步与朝向调整"
+      },
+      "not_applicable": [
+        "手持物在本镜仍需使用（无需放下）"
+      ],
+      "seconds_min": 1.5,
+      "seconds_max": 3.0,
+      "executability": {
+        "h3": "high",
+        "minimax": "high"
+      },
+      "template_zh": "画面从{上一镜结尾画面}开始；{@角色}俯身，持着{旧道具}的那只爪或手把它轻放到{放置位置}，另一只爪或手同步放下另一件、撑稳身体或自然垂下（写明左右分工）；随后直起身，必要时小步移到{目标位置}，双爪或双手空出，身体转向{本镜朝向}；到第{T}秒，{@角色}已处于{本镜开场画面}的位置与姿态。",
+      "template_en": "[0-{T}s] Open on <Picture 1>: {PREV_END}. {@CHARACTER} bends down; the paw or hand holding {OLD_PROP} sets it gently at {PLACE}, while the other paw or hand sets down its own item, braces the body or hangs free (state left-right roles); the character then straightens up, steps to {TARGET_POS} if needed, both paws or hands now empty, body turning toward {ORIENTATION}; by {T} seconds {@CHARACTER} is in the position and pose of {THIS_START}.",
+      "example": "（#1→#2，范例答案）画面从清晨的 @阳台 开始：@基尼 站在训练垫上、两只前爪各握一只迷你哑铃举在胸前；她俯下身，右爪先把哑铃轻放到垫边，左爪随即把另一只哑铃并排放下，双爪空出撑在垫面上；随后她直起身、小步挪到瑜伽垫中央蹲踞站稳，身体转向正面；到第3秒，@基尼 已空爪蹲踞在瑜伽垫中央、准备缓缓站起——即本镜开场画面。"
+    },
+    {
+      "technique_id": "pick_up_prop",
+      "name_zh": "拿起道具",
+      "name_en": "Pick Up Prop",
+      "category": "action_bridge",
+      "is_fast": false,
+      "applicable": {
+        "time_span": [
+          "none",
+          "minutes"
+        ],
+        "location_change": [
+          "none"
+        ],
+        "narrative": [
+          "normal"
+        ],
+        "action_only": true,
+        "note_zh": "本镜开场需要手持新道具而上一镜双手为空或按在他处；也可写「操作开关」类动作"
+      },
+      "not_applicable": [
+        "上一镜手中还有旧物未交代去向（先用 swap_prop）"
+      ],
+      "seconds_min": 1.5,
+      "seconds_max": 3.0,
+      "executability": {
+        "h3": "high",
+        "minimax": "high"
+      },
+      "template_zh": "画面从{上一镜结尾画面}开始；{@角色}的一只爪或手离开{原位置}伸向{新道具}（写明是哪只，另一只爪或手保持按住或扶稳{支撑物}），稳稳握住{新道具}后移到{使用位置}；到第{T}秒，{@角色}呈{本镜开场画面}的姿态，{新道具}已就位。",
+      "template_en": "[0-{T}s] Open on <Picture 1>: {PREV_END}. One paw or hand of {@CHARACTER} leaves {FROM_POS} and reaches for {NEW_PROP} (state which one, while the other keeps pressing or steadying {SUPPORT}); it grips {NEW_PROP} firmly and brings it to {USE_POS}; by {T} seconds {@CHARACTER} is in the pose of {THIS_START} with {NEW_PROP} in place.",
+      "example": "（#3→#4，范例答案）画面从 @书房 夜晚开始：@基尼 两只前爪分别按在摊开书本的两侧低头阅读；她的左爪把身前的笔记本轻轻拉正并按住，右爪离开书页、伸向桌面上的铅笔并稳稳握住，移到笔记本纸页上方落下笔尖；到第2秒，@基尼 右爪握笔、左爪按住笔记本——即本镜开场画面。"
+    },
+    {
+      "technique_id": "swap_prop",
+      "name_zh": "道具交接",
+      "name_en": "Prop Swap",
+      "category": "action_bridge",
+      "is_fast": false,
+      "applicable": {
+        "time_span": [
+          "none",
+          "minutes"
+        ],
+        "location_change": [
+          "none"
+        ],
+        "narrative": [
+          "normal"
+        ],
+        "action_only": true,
+        "note_zh": "旧物需放下且新物需拿起的完整交接；两步动作各约1-1.5秒"
+      },
+      "not_applicable": [
+        "只需单向放下或拿起（用 put_down_prop 或 pick_up_prop）",
+        "T 小于 2 秒"
+      ],
+      "seconds_min": 2.0,
+      "seconds_max": 3.0,
+      "executability": {
+        "h3": "high",
+        "minimax": "medium"
+      },
+      "template_zh": "画面从{上一镜结尾画面}开始；{@角色}先用一只爪或手把{旧道具}放到{放置位置}（写明左右，另一只爪或手的状态），随即伸向{新道具}并握稳、移到{使用位置}；到第{T}秒，{@角色}已是{本镜开场画面}的姿态——旧物离手、{新道具}就位。",
+      "template_en": "[0-{T}s] Open on <Picture 1>: {PREV_END}. {@CHARACTER} first sets {OLD_PROP} down at {PLACE} with one paw or hand (state which, and what the other is doing), then reaches to {NEW_PROP}, grips it and brings it to {USE_POS}; by {T} seconds {@CHARACTER} is in the pose of {THIS_START} — old prop released, {NEW_PROP} in place.",
+      "example": "（#3→#4 备选）画面从 @书房 夜晚开始：@基尼 两爪按着摊开的书本；她先用右爪把书本轻轻合拢推到桌面左上角（左爪扶住桌沿），再把笔记本拉到身前摊开，右爪伸向铅笔握稳、笔尖移到纸页上方，左爪改为轻按笔记本；到第3秒，@基尼 右爪握笔、左爪按纸——即本镜开场画面。"
+    },
+    {
+      "technique_id": "rise_relocate",
+      "name_zh": "起身走位",
+      "name_en": "Rise and Relocate",
+      "category": "action_bridge",
+      "is_fast": false,
+      "applicable": {
+        "time_span": [
+          "none",
+          "minutes"
+        ],
+        "location_change": [
+          "none"
+        ],
+        "narrative": [
+          "normal"
+        ],
+        "action_only": true,
+        "note_zh": "同一空间内的姿态与位置变化（坐↔站↔移步）；可把放下或拿起道具并入步骤"
+      },
+      "not_applicable": [
+        "需要跨场景移动（用 motion_follow 或 oner_walkthrough）",
+        "T 小于 2 秒且动作幅度大"
+      ],
+      "seconds_min": 2.0,
+      "seconds_max": 3.0,
+      "executability": {
+        "h3": "high",
+        "minimax": "high"
+      },
+      "template_zh": "画面从{上一镜结尾画面}开始；{@角色}按步骤收起当前姿势（写明先动哪只爪或脚、重心如何转移，可在步骤中并入放下或拿起道具），起身、坐下或移步到{目标位置}，身体转向{本镜朝向}并稳定为本镜开场姿态；镜头可随动作轻微跟移后停稳；到第{T}秒，画面即{本镜开场画面}。",
+      "template_en": "[0-{T}s] Open on <Picture 1>: {PREV_END}. {@CHARACTER} unwinds the current pose step by step (state which paw or foot moves first and how the weight shifts; prop put-downs or pick-ups may be folded into the steps), then rises, sits or steps to {TARGET_POS}, turning toward {ORIENTATION} and settling into this shot's opening pose; the camera may track slightly and then lock; by {T} seconds the frame is {THIS_START}.",
+      "example": "（#1→#2 备选）画面从清晨的 @阳台 开始：@基尼 双爪举着哑铃；她先放低双爪、右爪先左爪后把两只哑铃搁到垫边，随后重心后移、后腿发力撑起身体，小步挪到瑜伽垫中央蹲踞站稳、身体转向正面；到第3秒，@基尼 空爪蹲踞在瑜伽垫中央、准备缓缓站起——即本镜开场画面。"
+    },
+    {
+      "technique_id": "breath_beat",
+      "name_zh": "呼吸停顿",
+      "name_en": "Breath Beat",
+      "category": "action_bridge",
+      "is_fast": true,
+      "applicable": {
+        "time_span": [
+          "none"
+        ],
+        "location_change": [
+          "none"
+        ],
+        "narrative": [
+          "normal"
+        ],
+        "action_only": true,
+        "note_zh": "状态几乎一致、只剩视线/表情/微姿态差时的最小衔接；也是 T 压到 1 秒时的连续性保底"
+      },
+      "not_applicable": [
+        "存在手持物、位置、姿态等硬残留（停顿解决不了）"
+      ],
+      "seconds_min": 1.0,
+      "seconds_max": 1.5,
+      "executability": {
+        "h3": "high",
+        "minimax": "high"
+      },
+      "template_zh": "画面从{上一镜结尾画面}开始；{@角色}完成当前动作的最后一拍后静止，轻轻呼出一口气、肩背略微松沉，视线转向{本镜注视方向}，姿态微调为本镜开场状态（写明双爪或双手位置不变或如何微调）；第{T}秒画面即{本镜开场画面}，机位不变。",
+      "template_en": "[0-{T}s] Open on <Picture 1>: {PREV_END}. {@CHARACTER} finishes the last beat of the current action and stills, exhaling softly, shoulders easing; the gaze turns toward {GAZE_DIR} and the pose micro-adjusts into this shot's opening state (state that both paws or hands stay put, or how they adjust); by {T} seconds the frame is {THIS_START} with the camera unchanged.",
+      "example": "（构造的同动作承接：#4 → 继续写字的下一镜）画面从 @书房 夜晚开始：@基尼 右爪握笔、左爪按纸写完一行；她笔尖离纸停住，轻呼一口气、肩背微松，视线移回页首，笔尖重新落到下一行起点（左爪保持按住纸页）；第1秒画面即本镜开场的书写姿态，机位不变。"
+    },
+    {
+      "technique_id": "insert_hands_closeup",
+      "name_zh": "特写遮挡交接",
+      "name_en": "Close-up Insert Handoff",
+      "category": "action_bridge",
+      "is_fast": false,
+      "applicable": {
+        "time_span": [
+          "none",
+          "minutes"
+        ],
+        "location_change": [
+          "none"
+        ],
+        "narrative": [
+          "normal"
+        ],
+        "action_only": true,
+        "note_zh": "道具交接较复杂、全景里做显得拖沓时：切入爪/手部特写，在特写里完成交接再切回"
+      },
+      "not_applicable": [
+        "角色爪或手部无法合理入画（距离过远）",
+        "T 小于 1.5 秒"
+      ],
+      "seconds_min": 1.5,
+      "seconds_max": 3.0,
+      "executability": {
+        "h3": "medium",
+        "minimax": "medium"
+      },
+      "template_zh": "画面从{上一镜结尾画面}开始保持约0.5秒；切入{@角色}爪或手部特写：特写中完成道具交接——写明哪只爪或手放下{旧道具}到{放置位置}、哪只握起{新道具}（无新道具则双爪空出）；切回原景别时，{@角色}整体已是{本镜开场画面}的姿态；第{T}秒稳定。",
+      "template_en": "[0-{T}s] Open on <Picture 1>: {PREV_END}; hold about 0.5s. Cut in to a close-up of the paws or hands of {@CHARACTER}: the handoff happens inside the close-up — state which paw or hand sets {OLD_PROP} down at {PLACE} and which grips {NEW_PROP} (or both end empty); cutting back to the original framing, {@CHARACTER} is already in the pose of {THIS_START}; steady by {T} seconds.",
+      "example": "（#1→#2）画面从清晨的 @阳台 开始：@基尼 双爪各握哑铃举在胸前，保持约0.5秒；切入爪部特写——右爪把哑铃轻放到垫边，左爪的哑铃随即并排放下，双爪在垫面上撑稳；切回中景时 @基尼 已空爪蹲踞在瑜伽垫中央、准备缓缓站起；第2.5秒稳定。"
+    },
+    {
+      "technique_id": "micro_jump",
+      "name_zh": "轻微跳切",
+      "name_en": "Micro Jump Cut",
+      "category": "action_bridge",
+      "is_fast": true,
+      "applicable": {
+        "time_span": [
+          "none",
+          "minutes",
+          "hours"
+        ],
+        "location_change": [
+          "none"
+        ],
+        "narrative": [
+          "normal"
+        ],
+        "action_only": true,
+        "note_zh": "连续性退路：平稳动作在 T 内装不下或状态矛盾过大时，同机位一次干脆跳变完成状态重置"
+      },
+      "not_applicable": [
+        "有充足时间做平稳动作衔接时（优先动作桥）",
+        "连续多镜重复使用（频闪感）"
+      ],
+      "seconds_min": 1.0,
+      "seconds_max": 2.0,
+      "executability": {
+        "h3": "medium",
+        "minimax": "low"
+      },
+      "template_zh": "画面从{上一镜结尾画面}开始保持约一半转场时长；随后画面发生一次干脆的轻微跳切：机位与景别不变，{@角色}仍在画面同一区域，但{旧道具}已离手归位、姿态直接变为{本镜开场画面}的状态；跳切后保持静止到第{T}秒。",
+      "template_en": "[0-{T}s] Open on <Picture 1>: {PREV_END}; hold for about half the transition. Then one crisp micro jump cut: camera and framing unchanged, {@CHARACTER} stays in the same screen region, but {OLD_PROP} is already out of hand and in place, the pose switching directly to {THIS_START}; hold still after the jump until {T} seconds.",
+      "example": "（#1→#2 退路）画面从清晨的 @阳台 开始：@基尼 双爪各握哑铃举在胸前，保持约0.5秒；画面一次干脆的轻微跳切：机位景别不变，两只哑铃已并排躺在垫边，@基尼 空爪蹲踞在瑜伽垫中央、准备缓缓站起；跳切后保持静止到第1秒。"
+    }
+  ]
+}

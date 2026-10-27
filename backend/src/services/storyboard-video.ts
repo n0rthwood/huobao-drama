@@ -24,10 +24,19 @@ import {
 } from './storyboard-assets.js'
 import { createHash } from 'node:crypto'
 import { refBasename } from './storyboard-keyframes.js'
+import {
+  composeTransitionPrompt,
+  parseTransitionReview,
+  planTransitionTiming,
+  transitionStatus,
+} from './transition.js'
+import { runTransitionReview } from './transition-agent.js'
 
 export interface StoryboardVideoOptions {
   model?: string
   configId?: number
+  /** 承接镜头缺转场时是否同步跑转场 agent；批量预览传 false（只组装，不写库） */
+  autoTransition?: boolean
 }
 
 export interface StoryboardVideoRequest {
@@ -146,30 +155,70 @@ export async function buildStoryboardVideoRequest(
     throw new Error(`当前视频模型不支持关键帧引导（${config.provider}），请改用 MiniMax-H3 等支持的模型`)
   }
 
-  // 视频提示词的 @引用 必须与绑定一致（Issue #7），否则会出现“提到了却没带参考图”
+  // ===== 开场转场（#11）：承接镜头提交前自动审核/生成，手动编辑过的不覆盖 =====
+  let sb = storyboard
+  const contentDuration = Number(sb.duration || 10)
+  let transition: { text: string; seconds: number; extra: number } | null = null
+  let submitDuration = contentDuration
+  let midGuideTime = sb.midFrameTime ?? null
+  if (keyframes.inheritsFirst && sb.transitionEnabled !== false) {
+    const status = await transitionStatus(sb, true)
+    if (status.needsReview && opts.autoTransition !== false) {
+      // 失败就让整次生成失败，不带着空转场提交
+      await runTransitionReview(storyboardId)
+      const [fresh] = await db.select().from(schema.storyboards)
+        .where(eq(schema.storyboards.id, storyboardId))
+      if (fresh) sb = fresh
+    }
+    const review = parseTransitionReview(sb.transitionReview)
+    const text = (sb.transitionPrompt || '').trim()
+    // 手动编辑：有文字就用（秒数沿用上次审核，没有则 3 秒）；AI 审核：verdict ≠ none 才用；
+    // 预览模式（autoTransition=false）下仍待审核的镜头按“暂无转场”组装
+    const stillPending = status.needsReview && opts.autoTransition === false
+    const wanted = stillPending ? false
+      : review?.edited_manually ? !!text : (!!review && review.verdict !== 'none' && !!text)
+    if (wanted && review) {
+      const plan = planTransitionTiming(review.seconds || 3, contentDuration, sb.midFrameTime ?? null)
+      if (!plan.dropReason) {
+        transition = { text, seconds: plan.seconds, extra: plan.extra }
+        submitDuration = plan.submitDuration
+        midGuideTime = plan.midGuideTime
+      }
+    }
+  }
+
+  // 视频提示词的 @引用 必须与绑定一致（Issue #7），否则会出现“提到了却没带参考图”；
+  // 带转场提交时，转场段里的 @引用 同样参与检查
   const refIssues = computeRefIssues({
-    prompts: promptFieldsOf(storyboard),
-    assets: await loadEpisodeAssets(storyboard, episode.id),
-    sceneId: storyboard.sceneId ?? null,
+    prompts: promptFieldsOf(sb),
+    assets: await loadEpisodeAssets(sb, episode.id),
+    sceneId: sb.sceneId ?? null,
     characterIds: (await db.select().from(schema.storyboardCharacters)
       .where(eq(schema.storyboardCharacters.storyboardId, storyboardId))).map(link => link.characterId),
     propIds: (await db.select().from(schema.storyboardProps)
       .where(eq(schema.storyboardProps.storyboardId, storyboardId))).map(link => link.propId),
   })
-  const blocking = blockingIssuesFor(refIssues, 'video_prompt')
+  const blocking = [
+    ...blockingIssuesFor(refIssues, 'video_prompt'),
+    ...(transition ? blockingIssuesFor(refIssues, 'transition_prompt') : []),
+  ].filter((issue, index, list) => list.indexOf(issue) === index)
   if (blocking.length) {
-    throw new Error(`分镜 #${storyboard.storyboardNumber} 的视频提示词与参考图不一致：${describeIssues(blocking)}`)
+    throw new Error(`分镜 #${sb.storyboardNumber} 的视频提示词与参考图不一致：${describeIssues(blocking)}`)
   }
 
   // ===== 参考图：首帧关键帧 → 场景 → 角色 → 道具 =====
-  const assetRefs = await collectStoryboardAssetRefs(storyboard, episode.id)
+  const assetRefs = await collectStoryboardAssetRefs(sb, episode.id)
   const { urls: referenceImageUrls, nameToIndex } = indexRefs([
     // 关键帧没有名字，不参与 @名字 编号，但占用 1 号位
     { name: '', url: keyframes.first! },
     ...assetRefs,
   ])
 
-  const rawPrompt = (storyboard.videoPrompt || '').trim()
+  const videoPrompt = (sb.videoPrompt || '').trim()
+  // 转场段写在视频描述之前，风格词随后注入到最前方（风格词 + 开场转场段 + 视频描述）
+  const rawPrompt = transition
+    ? composeTransitionPrompt(transition.text, videoPrompt, transition.seconds, transition.extra)
+    : videoPrompt
   let prompt = resolvePromptRefs(rawPrompt, nameToIndex, (index, name) => `@图片${index}${name}`)
   if (!prompt && !referenceImageUrls.length) {
     throw new Error('视频生成需要至少一个参考素材或提示词')
@@ -198,11 +247,12 @@ export async function buildStoryboardVideoRequest(
     sourcePrompt,
     refNameIndex: nameToIndex,
     midFrameUrl,
-    midFrameTime: midFrameUrl ? storyboard.midFrameTime ?? undefined : undefined,
+    midFrameTime: midFrameUrl ? midGuideTime ?? undefined : undefined,
     lastFrameUrl: keyframes.last || undefined,
     referenceImageUrls,
     generateAudio: true,
-    duration: Number(storyboard.duration || 10),
+    duration: submitDuration,
+    ...(transition ? { transition: { T: transition.seconds, E: transition.extra } } : {}),
     aspectRatio: drama?.aspectRatio || '16:9',
     resolution: episode.resolution || undefined,
     configId,
