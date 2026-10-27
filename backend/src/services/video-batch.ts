@@ -248,7 +248,10 @@ export async function previewEpisodeVideoBatch(
       result.push({ ...base, status: 'missing', checked: true, selectable: true, adopted_version_no: null })
       continue
     }
-    const matched = versions.find(version => version.signature && version.signature === request.signature)
+    // 命中任一历史版本即未变化；当前采用的版本也命中时优先报它，文案才贴合用户看到的那条视频
+    const matched = adopted?.signature === request.signature
+      ? adopted
+      : versions.find(version => version.signature && version.signature === request.signature)
     if (matched) {
       result.push({
         ...base,
