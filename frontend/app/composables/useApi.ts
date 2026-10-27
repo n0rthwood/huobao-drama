@@ -64,7 +64,7 @@ export const episodeAPI = {
       config_id: data.config_id || undefined,
     }),
   keyframePromptsStatus: (id: number) => api.get(`/episodes/${id}/keyframe-prompts-status`),
-  // 集级串行关键帧批量：后端按「分镜 × 槽位」逐张生成，默认只补缺图，带 storyboard_ids 时对所选分镜全部重生成
+  // 集级关键帧批量：qwen-jobs 供应商下一次性提交全部槽位，由服务端排队调度
   startKeyframeBatch: (id: number, data: { storyboard_ids?: number[]; model?: string; config_id?: number }) =>
     api.post(`/episodes/${id}/keyframe-batch`, {
       storyboard_ids: data.storyboard_ids?.length ? data.storyboard_ids : undefined,
@@ -73,6 +73,8 @@ export const episodeAPI = {
     }),
   keyframeBatch: (id: number) => api.get(`/episodes/${id}/keyframe-batch`),
   cancelKeyframeBatch: (id: number) => api.post(`/episodes/${id}/keyframe-batch/cancel`),
+  // 失败/已取消的关键帧项重新提交（每项新建 sys_task，不复用原任务）
+  retryFailedKeyframeBatch: (id: number) => api.post(`/episodes/${id}/keyframe-batch/retry-failed`),
   // 集级串行视频批量：后端按分镜顺序生成，要求本集全部分镜关键帧已确认
   startVideoBatch: (id: number, data: { storyboard_ids?: number[]; model?: string; config_id?: number }) =>
     api.post(`/episodes/${id}/video-batch`, {
@@ -164,6 +166,8 @@ export const taskAPI = {
     api.post('/tasks/register-upload', { asset_type: assetType, asset_id: assetId, local_path: localPath }),
   get: (id: number) => api.get(`/tasks/${id}`),
   del: (id: number) => api.del(`/tasks/${id}`),
+  // 取消任务：qwen-jobs 调远端取消（排队中立即取消，运行中由服务端决定是否中断）
+  cancel: (id: number) => api.post(`/tasks/${id}/cancel`),
   list: (params?: { type?: 'image' | 'video'; drama_id?: number; storyboard_id?: number; character_id?: number; scene_id?: number; prop_id?: number }) => {
     const query = new URLSearchParams()
     if (params?.type) query.set('type', params.type)
@@ -176,6 +180,18 @@ export const taskAPI = {
   },
   // 按集聚合生成任务（sys_task + video_merges）
   listByEpisode: (episodeId: number) => api.get<{ tasks: any[]; merges: any[] }>(`/episodes/${episodeId}/generation-tasks`),
+}
+
+// 图片任务队列（qwen-jobs）：提交前的耗时预估。非 qwen-jobs 供应商返回 { supported: false }
+export const imageQueueAPI = {
+  estimate: (params: { config_id?: number; size?: string; references?: number; count?: number } = {}) => {
+    const query = new URLSearchParams()
+    if (params.config_id) query.set('config_id', String(params.config_id))
+    if (params.size) query.set('size', params.size)
+    if (params.references !== undefined) query.set('references', String(params.references))
+    if (params.count) query.set('count', String(params.count))
+    return api.get(`/image-queue/estimate${query.size ? `?${query.toString()}` : ''}`)
+  },
 }
 
 async function uploadReq<T = any>(path: string, file: File): Promise<T> {
