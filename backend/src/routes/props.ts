@@ -8,6 +8,7 @@ import { getDramaStylePrompt } from '../services/style-preset.js'
 import { ensurePropFinalPrompt } from '../services/final-prompt.js'
 import { logTaskError, logTaskStart, logTaskSuccess, logTaskWarn } from '../utils/task-logger.js'
 import { deleteAllReferenceImages, partitionMissingReferences, resolveReferenceImages } from '../services/reference-images.js'
+import { deleteAssetLinks } from '../services/asset-links.js'
 import { mountReferenceImageRoutes } from './reference-images.js'
 
 const app = new Hono()
@@ -49,6 +50,8 @@ app.delete('/:id', async (c) => {
   await db.update(schema.props).set({ deletedAt: now(), updatedAt: now() }).where(eq(schema.props.id, id))
   // 参考图是道具私有的生图输入，随道具一起清理（成片图保留，与既有行为一致）
   deleteAllReferenceImages('prop', id)
+  // 集关联/分镜绑定不保留：残留行会让提取与 @引用 继续看到已删道具（Issue #15）
+  await deleteAssetLinks('prop', id)
   return success(c)
 })
 

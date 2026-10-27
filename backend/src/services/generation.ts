@@ -14,6 +14,7 @@ import type { AIConfig, ImageGenerationRecord, VideoGenerationRecord } from './a
 import { logTaskError, logTaskPayload, logTaskProgress, logTaskStart, logTaskSuccess, logTaskWarn, redactUrl } from '../utils/task-logger.js'
 import { FRAME_TYPE_SLOT, invalidateKeyframeConfirmation } from './keyframes.js'
 import { completionStamp } from './media-time.js'
+import { saveStylingVersion } from './styling-version.js'
 import {
   cancelQwenJob,
   createQwenJob,
@@ -79,6 +80,11 @@ interface GenerateImageParams extends TaskOriginParams {
   referenceImages?: string[]
   frameType?: string
   configId?: number
+  /**
+   * 角色造型版本出图（Issue #15）：仍带 characterId（任务落在该角色的版本历史里），
+   * 但完成后只回写 episode_characters.styling_version.image_path，**不动**角色基础形象图。
+   */
+  characterVersion?: { episodeId: number; name: string }
 }
 
 interface GenerateVideoParams extends TaskOriginParams {
@@ -128,6 +134,7 @@ export async function generateImage(params: GenerateImageParams): Promise<number
     size: params.size || '1920x1080',
     frameType: params.frameType,
     referenceImages: params.referenceImages,
+    characterVersion: params.characterVersion,
     ...originParams(params),
   })
 
@@ -695,7 +702,16 @@ async function writeBackImageAssets(record: SysTaskRecord, localPath: string) {
     if (slot) await invalidateKeyframeConfirmation(record.storyboardId)
   }
   if (record.characterId) {
-    await db.update(schema.characters).set({ imageUrl: localPath, updatedAt: now() }).where(eq(schema.characters.id, record.characterId))
+    // 造型版本出图（Issue #15）：只回写本集造型图，基础形象图保持不变
+    const version = params.characterVersion as { episodeId?: number; name?: string } | undefined
+    if (version?.episodeId && version.name) {
+      const saved = await saveStylingVersion(Number(version.episodeId), record.characterId, { name: version.name, image_path: localPath })
+      if (saved) logTaskSuccess('ImageTask', 'styling-version-image', { id: record.id, characterId: record.characterId, episodeId: version.episodeId, name: version.name })
+      // 关联行被删（角色已从本集移除）：图片仍在任务历史里，但无处落版本
+      else logTaskWarn('ImageTask', 'styling-version-link-missing', { id: record.id, characterId: record.characterId, episodeId: version.episodeId })
+    } else {
+      await db.update(schema.characters).set({ imageUrl: localPath, updatedAt: now() }).where(eq(schema.characters.id, record.characterId))
+    }
   }
   if (record.sceneId) {
     await db.update(schema.scenes).set({ imageUrl: localPath, status: 'completed', updatedAt: now() }).where(eq(schema.scenes.id, record.sceneId))

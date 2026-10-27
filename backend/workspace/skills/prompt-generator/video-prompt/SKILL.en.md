@@ -1,89 +1,102 @@
 ---
 name: video-prompt
-description: Video prompt specification — generates a time-segmented video-generation prompt from storyboard-segment content, with cuts allowed within a segment
+description: Video prompt specification — produces video-generation prompts split by time, allowing cuts inside a segment, with the limb state written out segment by segment
 ---
 
-# Video Prompt (storyboard segment → video_prompt)
+# Video Prompts (storyboard segment → video_prompt)
 
-From a single storyboard segment's description (containing the 【镜头N】 sub-shot structure and dialogue/narration) / atmosphere / duration, generate the `video_prompt` that drives AI video generation. **One storyboard segment = one 8-15-second video, with cuts allowed inside it**: consecutive segments may be different shots (change of shot size/angle/subject), joined with hard cuts; but the whole segment **never crosses scenes** and never uses flashbacks.
+From a single storyboard segment's description (containing the `【镜头N】` sub-shot structure plus dialogue/narration), `atmosphere` and `duration`, produce the `video_prompt` that drives AI video generation. **One storyboard segment = one 8–15 second video, cuts allowed inside**; but it **never crosses scenes** and never flashes back.
 
 ## Format
 
-The **first line of the `video_prompt` is the header**: first introduce which characters and scene appear in this video, then follow with the time segments. Characters and scenes are always referenced with @ (during generation they are replaced with the corresponding reference-image markers, so the video model first locks onto "who" and "where").
+**The first line of `video_prompt` is an information header**: first introduce which characters and scene this video contains, then the time-split lines follow. Characters, scenes and props are always referenced with @.
 
 ```
-Characters: @Xiaoming, @Xiaohong; Scene: @Coffee Shop.
-0-3s: @Coffee Shop, close shot, static camera; @Xiaoming looks down at his phone, fingers repeatedly tapping the table, expression anxious.
-3-6s: Cut to a wide shot of the doorway; the doorbell rings as @Xiaohong pushes the door open and walks in, bringing in a gust of cold air.
-6-9s: Cut back to a medium shot; @Xiaohong walks over with a smile and sits down across from Xiaoming; Xiaoming says: "You finally made it."
+Characters: @XiaoMing, @XiaoHong; scene: @Cafe; props: @Letter.
+0-3s: @Cafe, close shot, static camera, @XiaoMing sits in the window booth, his right hand pinching the @Letter resting on the table, his left hand on the rim of the cup, both legs naturally together under the table, head lowered reading the letter, brow slightly furrowed.
+3-6s: cut to a wide shot of the doorway, the doorbell rings, @XiaoHong pushes the door and walks in, her right hand on the door frame, her left hand carrying a bag, both legs stepping into the shop.
+6-9s: cut back to a medium shot, @XiaoHong walks to the table and sits down, both hands on the tabletop, @XiaoMing raises his head, his right hand still pinching the @Letter, and says: "You finally came."
 ```
 
-Header rules:
-- Only list the characters who actually appear in this storyboard segment and the bound scene — do not list those who do not appear
-- When a prop has a notable appearance, it may be appended to the header (e.g. `; Props: @Letter`)
-- The header is its own line, ending with a period, followed by the time segments
+Information-header rules:
+- List only the characters actually appearing in this storyboard segment and the scene and props bound to it
+- The header is its own line ending with a period; the time splits follow after it
 
-Split into 3-second segments, each segment on its own line separated by newlines, with time ranges continuous and adjoining (no overlaps, no gaps).
+Split into 3-second segments, one per line, separated by line breaks, with continuous time ranges (no overlap, no gap).
+
+## Opening Transition Segment (works together with the transition-prompt skill)
+
+A carried-over shot (`inherits_first` is true) may carry an **opening transition segment** (produced by the transition-prompt skill, written at the start of the video prompt; submitted duration = min(content duration + transition duration T, 15s)):
+
+- **Do not delete it and do not rewrite its structure**; the transition text stays at the start according to the transition-prompt skill's rules
+- This skill's limb-state and one-action-per-segment rules **apply segment by segment starting from the first content segment after the transition segment**
+- The transition segment itself must also satisfy: one main action only, and the final limb states of both sides of the transition (the previous shot's closing pose → this shot's opening pose) written out; props held or worn continuously through the transition stay @-referenced continuously (for example, still holding the @MiniDumbbell while moving into the yoga action)
+- When there is no transition segment, the first segment continues from the first keyframe image (see "Keyframe Alignment")
 
 ## Mapping to the Storyboard Description
 
-The `description` is the sole content source of the video_prompt (visuals, actions, dialogue, and narration are all in it). Conversion rules:
+`description` is the only content source for video_prompt:
 
-- Each `【镜头N】` in the `description` maps to **1-2 consecutive 3-second segments** — same order, no omissions, no merging, no new sub-shots
-- Dialogue/narration is extracted from the "CharacterName says: "..."" / "Narration: ..." entries inside the corresponding `【镜头N】` and assigned to that sub-shot's mapped segments; **do not invent new dialogue beyond the description**
-- Visual actions follow the `description`; `atmosphere` is only used to supplement each segment's lighting, color tone, and mood descriptions
+- Each `【镜头N】` maps to **1–2 consecutive 3-second segments**, in the same order, none omitted, none merged, no sub-shots invented
+- Dialogue/narration is taken from the matching `【镜头N】` and assigned to the segments that sub-shot maps to; **never write new dialogue**
+- On-screen action follows `description`; `atmosphere` is used only to add lighting, color and mood
 
-## Within-Segment Structure
+## Structure Inside a Segment
 
-Organize each segment's content in this order (items with no content may be omitted, but action/visuals are mandatory):
+Organize every segment in this order (items with no content may be omitted, but the action/image must be there):
 
-**Time range + scene @reference + shot size/camera move + character @reference + main action·expression + dialogue/narration + mood and lighting**
+**time range ＋ scene @reference ＋ shot size/camera move ＋ character @reference ＋ main action · limb state · expression ＋ prop @reference and its state ＋ dialogue/narration ＋ mood and lighting**
 
-- **First segment**: the video's frame 0 *is* the storyboard's **first keyframe image** (for a carried-over segment, the previous segment's last keyframe). The first segment must carry on from the state that image already shows — keep the same camera position and the same character positions and poses; do not re-establish the space and do not cut at 0 seconds; cuts start from the second segment at the earliest
-  - When a carried-over shot already has an opening-transition block: the first segment follows the opening transition — carry on from this shot's opening picture as it settles when the transition ends; the transition itself is owned by the transition description and must not be repeated in the video prompt
-- **Cuts**: start a post-cut segment with a transition word such as "cut to / cut back", and restate the shot size and subject; cut points should align with the `【镜头N】` structure in the storyboard `description`
-- **Shot size/camera move**: one camera state per segment (close shot / medium shot / wide shot / close-up; static / push / pull / pan / tracking); the camera move is continuous within a single sub-shot and may change after a cut
-- **Action**: one main action per segment, with concrete visible verbs (walk, turn around, look up, clench, pause)
-- **All emotion must become visible description**: no abstract words like "he is very sad / the mood is tense" — write it as "he lowers his head, fingers clench the rim of the cup, breathing grows heavier"
-- **Dialogue/narration**: write "CharacterName says: "line""; narration as "Narration: content"; a long line that cannot be spoken within 3 seconds is split across multiple segments; a segment without dialogue may note ambient/action sounds (e.g. "machines keep roaring")
+- **One main action per segment**: only one character may change one limb state per segment; verbs are concrete and visible (walk, turn around, raise the head, clench). Never stuff an action chain (put down — twist around — fold back up) into one segment
+- **Limb state**: for every character present, write both hands in each segment (including which hand holds what) and the current pose of both legs; high-risk poses (cross-legged, crouched, one-legged stance, legs crossed, turning around) use a positive, exhaustive enumeration: "both legs drawn up and folded in front of the body, both feet tucked under, both hands hugging the knees"; **negative instructions are forbidden** ("no third leg" does not work)
+- **Rewrite occluded actions**: actions behind the body or hidden by the torso become equivalent actions visible from a side-on angle
+- **Contact interaction**: when two characters touch, write both parties' final limb states, with a unique contact point
+- **Worn state**: hats, glasses and sunglasses are declared in every segment (worn / held in which hand / not in frame); putting on and taking off each occupy a main action of their own
+- **Cuts**: a cut segment starts with "cut to / cut back to" and re-establishes shot size and subject; cut points align with `【镜头N】`; no more than 1 consecutive pure close-up segment, and a close-up segment must be flanked by a full-body/medium anchoring segment
+- **Turn emotion into visible description**: do not write "he is very sad", write "he lowers his head, both hands clenching the rim of the cup"
 
-## Keyframe Alignment (Hard Rule)
+## Keyframe Alignment (hard rule)
 
-Before the video is generated, each storyboard segment has already had its three static keyframe images confirmed — first frame / (optional) mid frame / last frame. The video uses the first keyframe as its frame-0 anchor and the mid and last keyframes as timeline anchors. `read_storyboard_context` returns `first_frame_prompt`, `mid_frame_prompt`, `mid_frame_time`, `last_frame_prompt`, and `inherits_first`; align to them:
+`read_storyboard_context` returns `first_frame_prompt`, `mid_frame_prompt`, `mid_frame_time`, `last_frame_prompt` and `inherits_first`, and you must align to them:
 
-- **First frame**: the first segment carries on from the first keyframe image. When `inherits_first` is `true` the first frame is the previous segment's last keyframe (read that segment's `last_frame_prompt` / `result` to learn what the image shows); again, do not re-establish the space
-- **Mid frame**: when `mid_frame_time` has a value, the **start of one time segment must land exactly on that second**, and the visuals at that segment's opening must match `mid_frame_prompt` (usually this is a cut)
-- **Last frame**: the final segment must land on the frame described by `last_frame_prompt`
-- Keyframe prompts describe only frozen instants; the video prompt is responsible for writing the movement and performance *between* two keyframes — do not copy the keyframe prompts verbatim
+- **First frame**: with no transition segment, the first segment continues from the first keyframe image (when `inherits_first` is true, that is the previous storyboard's last keyframe; read the previous shot's `last_frame_prompt` / `result` to understand the image), keeping the same camera position and character placement, without re-establishing the space and without cutting at second 0; with a transition segment, the transition handles the spatial join and the first content segment after it continues from the transition's end image
+- **Mid frame**: when `mid_frame_time` has a value, some segment's **start must land exactly on that second**, and that segment's opening image must match `mid_frame_prompt`
+- **Last frame**: the final segment lands on the `last_frame_prompt` image, with the characters' held/worn states matching it
+- Keyframe prompts describe frozen instants; the video prompt writes the movement and performance between two frames — do not copy them verbatim
 
-## Absolute Rule: Images Win
+## Absolute Rule: Images Come First
 
-A character's look is decided entirely by the reference images and the keyframes; the moment the text contradicts the images, the frame falls apart:
-
-- **Never** describe a character's species, race, clothing, colors, hairstyle, body type, age, facial features, or any other appearance attribute
-- Characters are always referenced only as `@CharacterName`; **character names are merely labels** — do not infer looks from a name
-- Write only the visible position, pose, action, expression, eyeline, and prop interaction, plus shot size, camera move, lighting and mood
+- **Never** describe a character's species, race, clothing, colors, hairstyle, body type, age or facial features; a character is referred to only as `@CharacterName`; clothing is decided by the styling-version reference image, so never write clothing in text
+- **Allowed**: relative size ratios ("@MouseMom is about two-thirds the height of @PigDad"); the worn state of wearable props ("@Sunglasses perched on the bridge of the nose")
+- Write only visible position, pose, limb state, action, expression, eyeline and prop interaction, plus shot size, camera movement, lighting and mood
 
 ## Reference Rules
 
-- `@SceneName` — scene reference; the name must exactly match the location in the scene list
-- `@CharacterName` — character reference; the name must exactly match the name in the character list
-- `@PropName` — prop reference; the name must exactly match the name in the prop list; reference a prop when it is clearly visible in frame, used, or shown in close-up
-- During generation, each `@name` is automatically replaced with the corresponding reference-image marker (e.g. `@Xiaoming` → `@Image1Xiaoming`), so names must match exactly — do not abbreviate or add extra symbols
-- **Every segment must have at least one @ reference anchoring the frame**; any segment in which a character appears must @ that character; only reference scenes/characters/props already bound to this storyboard segment
+- `@SceneName` / `@CharacterName` / `@PropName` must match the lists returned by read_storyboard_context exactly (they are automatically replaced with reference-image markers — never abbreviate them or add symbols)
+- **At least one @ reference per segment**; a segment in which a character appears must @ that character; held and worn props are @-referenced in every segment in which they exist; only reference assets bound to this storyboard segment
+- Mirror images: a single segment features either the mirror image or the real body as subject; the mirror's contents are written out and match the real body; a television inside the frame only plays program footage and this film's characters must never appear on it
+
+## Reference Image Budget (hard constraint)
+
+- A shot may use at most 9 reference images; during video generation the first keyframe already takes 1, leaving: scene 1 + characters N + props M ≤ 8
+- When over budget, drop by priority: scene > characters present > props that are used or shown in close-up > props that are merely visible
+- A prop that is dropped loses both its binding and its @ mention — never leave a name that is "@-mentioned but not bound"
+- Only @ assets bound to this storyboard segment
 
 ## Timeline Rules
 
-- Number of segments = storyboard-segment duration ÷ 3 seconds (rounded up); the segment time ranges must add up exactly to the total segment duration
-- Content pacing: the first segment carries on from the first keyframe image → middle segments advance the action/conflict (aligning with the mid keyframe at `mid_frame_time`) → the final segment lands on the last keyframe's image
+- Number of content segments = the storyboard segment's duration ÷ 3 seconds (rounded up), and the segments' time ranges add up to the segment's total duration; when there is a transition segment, the content timeline starts after the transition segment ends and the total follows the submitted duration
+- Content rhythm: the first content segment continues from the anchor-frame image → the middle segments push the action forward (aligning to the mid keyframe at `mid_frame_time`) → the final segment lands on the last-frame image
 
 ## Prohibitions
 
-- Cross-scene switching, flashbacks (a segment takes place in a single scene only)
-- Referencing scene/character names outside the lists; any appearance description of a character (species/clothing/colors/hairstyle/body type/facial features/age)
-- Abstract psychological description, literary metaphor (the model only recognizes visible imagery)
-- Language that does not match the session language directive
+- Scene changes, flashbacks
+- Names outside the reference lists; character appearance description; negative limb instructions
+- More than one main action in a segment; two or more consecutive pure close-up segments driving the action
+- Abstract psychological description, literary metaphor
+- Deleting or rewriting the structure of the opening transition segment
+- A language that does not match the conversation language instruction
 
 ## Saving
 
-Call `update_storyboard` to update only this storyboard segment's `video_prompt` field; do not modify any other field, and do not re-breakdown the whole episode.
+Call `update_storyboard` to update only this storyboard segment's `video_prompt` field — do not touch other fields and do not re-breakdown the whole episode.

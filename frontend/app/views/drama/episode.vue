@@ -402,6 +402,23 @@
                     <span class="afp-label">{{ t('episode.asset.finalPromptTurnaround') }}</span>
                     <span :class="['afp-text', !(c.final_prompt || c.finalPrompt) && 'dim']">{{ c.final_prompt || c.finalPrompt || t('episode.asset.finalPromptAutoTurnaround') }}</span>
                   </div>
+                  <div v-if="c.styling_version" class="asset-styling-version">
+                    <img
+                      v-if="c.styling_version.image_path"
+                      :src="stylingVersionSrc(c)"
+                      class="styling-version-thumb"
+                      :alt="c.styling_version.name"
+                      @click.stop="openImageViewer(stylingVersionSrc(c), `${c.name} · ${c.styling_version.name}`)"
+                    />
+                    <div class="styling-version-text">
+                      <span class="afp-label">{{ t('episode.asset.stylingVersion') }}</span>
+                      <span class="afp-text">{{ c.styling_version.name }}</span>
+                    </div>
+                    <button class="btn btn-sm ml-auto" :disabled="stylingVersionBusy.includes(c.id)" @click.stop="genStylingVersionImg(c.id)">
+                      <Loader2 v-if="stylingVersionBusy.includes(c.id)" :size="11" class="animate-spin" />
+                      {{ c.styling_version.image_path ? t('episode.asset.regen') : t('episode.asset.generate') }}
+                    </button>
+                  </div>
                   <ReferenceImageManager
                     asset-type="character"
                     :asset-id="c.id"
@@ -2241,6 +2258,11 @@ function versionImageSrc(version) {
   return `/${raw}`
 }
 
+// 本集造型版本图（Issue #15）：styling_version.image_path 与资产图同样是相对路径
+function stylingVersionSrc(character) {
+  return versionImageSrc({ url: character?.styling_version?.image_path || '' })
+}
+
 function isCurrentAssetVersion(item, version) {
   const current = String(item?.image_url || item?.imageUrl || '').replace(/^\/+/, '')
   const candidate = String(version?.url || '').replace(/^\/+/, '')
@@ -3431,6 +3453,23 @@ function genCharImg(id) {
   return submitAssetImage('character', id,
     () => characterAPI.generateImage(id, epId.value, bareModelName(imageModel.value) || undefined, ownerConfigId(imageModelOptions.value, imageModel.value), chatModelOverride(), chatConfigId()),
     'episode.image.generatingChar')
+}
+// 本集造型版本出图（Issue #15）：以角色基础形象图换装，不走角色基础图的生成路径
+const stylingVersionBusy = ref([])
+async function genStylingVersionImg(id) {
+  if (stylingVersionBusy.value.includes(id)) return
+  stylingVersionBusy.value = [...stylingVersionBusy.value, id]
+  try {
+    registerCreatedTasks(await characterAPI.generateStylingVersionImage(
+      id, epId.value, bareModelName(imageModel.value) || undefined, ownerConfigId(imageModelOptions.value, imageModel.value),
+    ))
+    toast.success(t('episode.image.generatingChar'))
+    await refresh()
+  } catch (e) {
+    toastError(e)
+  } finally {
+    stylingVersionBusy.value = stylingVersionBusy.value.filter(x => x !== id)
+  }
 }
 function genSceneImg(id) {
   return submitAssetImage('scene', id,
@@ -5009,6 +5048,22 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
   font-size: 10.5px;
   line-height: 1.5;
 }
+.asset-styling-version {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 7px;
+  border-top: 1px solid var(--border);
+  font-size: 10.5px;
+}
+.styling-version-thumb {
+  width: 40px;
+  height: 24px;
+  object-fit: cover;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.styling-version-text { display: flex; flex-direction: column; min-width: 0; }
 .afp-label {
   font-size: 9.5px;
   font-weight: 700;

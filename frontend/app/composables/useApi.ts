@@ -225,6 +225,9 @@ export const characterAPI = {
   // referenceImages 省略 → 服务端用该资产已保存的参考图；传 [] → 明确不用参考图
   generateImage: (id: number, episodeId: number, model?: string, configId?: number, textModel?: string, textConfigId?: number, referenceImages?: string[]) => api.post(`/characters/${id}/generate-image`, { episode_id: episodeId, model: model || undefined, config_id: configId || undefined, text_model: textModel || undefined, text_config_id: textConfigId || undefined, reference_images: referenceImages }),
   batchImages: (ids: number[], episodeId: number, model?: string, configId?: number, textModel?: string, textConfigId?: number) => api.post('/characters/batch-generate-images', { character_ids: ids, episode_id: episodeId, model: model || undefined, config_id: configId || undefined, text_model: textModel || undefined, text_config_id: textConfigId || undefined }),
+  // 本集造型版本（Issue #15）：文字保存与以基础形象图换装出图
+  saveStylingVersion: (id: number, episodeId: number, name: string, description?: string) => api.put(`/characters/${id}/styling-version`, { episode_id: episodeId, name, description }),
+  generateStylingVersionImage: (id: number, episodeId: number, model?: string, configId?: number) => api.post(`/characters/${id}/styling-version/generate-image`, { episode_id: episodeId, model: model || undefined, config_id: configId || undefined }),
   addReference: (id: number, file: File) => uploadReq<ReferenceImagesResp>(`/characters/${id}/reference-images`, file),
   delReference: (id: number, url: string) => api.del<ReferenceImagesResp>(`/characters/${id}/reference-images?url=${encodeURIComponent(url)}`),
   addRefsFromLibrary: (id: number, urls: string[]) => api.post<LibraryRefsResp>(`/characters/${id}/reference-images/from-library`, { urls }),

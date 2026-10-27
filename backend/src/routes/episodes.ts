@@ -8,6 +8,7 @@ import { EXTRACT_TARGETS, getExtractionStatus, startExtraction, type ExtractTarg
 import { getVideoPromptBatchStatus, startVideoPromptBatch } from '../services/video-prompts.js'
 import { getKeyframePromptBatchStatus, startKeyframePromptBatch } from '../services/keyframe-prompts.js'
 import { isKeyframeSlot, keyframesJson, loadEpisodeKeyframes, type KeyframeSlot } from '../services/keyframes.js'
+import { parseStylingVersion } from '../services/styling-version.js'
 import {
   cancelEpisodeVideoBatch,
   getEpisodeVideoBatch,
@@ -141,7 +142,13 @@ app.get('/:id/characters', async (c) => {
   if (!charIds.length) return success(c, [])
   const allChars = await db.select().from(schema.characters)
   const result = allChars.filter(ch => charIds.includes(ch.id) && !ch.deletedAt)
-  return success(c, await attachImageVersions(result, 'character'))
+  const withVersions = await attachImageVersions(result, 'character')
+  // 本集造型版本（Issue #15）：前端在集资产页展示/重出这套造型图
+  const stylingByCharId = new Map(links.map(l => [l.characterId, parseStylingVersion(l.stylingVersion)]))
+  return success(c, withVersions.map((row: Record<string, any>) => ({
+    ...row,
+    styling_version: stylingByCharId.get(Number(row.id)) ?? null,
+  })))
 })
 
 // GET /episodes/:id/scenes — scenes linked to this episode

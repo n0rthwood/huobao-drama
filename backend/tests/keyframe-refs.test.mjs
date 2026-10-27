@@ -16,9 +16,9 @@ const sqlitePath = path.join(mkdtempSync(path.join(tmpdir(), 'kf-refs-')), 'test
 
 function call(fn, args) {
   const script = `
-    import { computeRefIssues, computeBindingSync, parseMentions } from './src/services/storyboard-assets.ts'
+    import { computeRefIssues, computeBindingSync, parseMentions, limbRiskIssues } from './src/services/storyboard-assets.ts'
     import { computeKeyframeSignature, signatureFromTask } from './src/services/storyboard-keyframes.ts'
-    const api = { computeRefIssues, computeBindingSync, parseMentions, computeKeyframeSignature, signatureFromTask }
+    const api = { computeRefIssues, computeBindingSync, parseMentions, limbRiskIssues, computeKeyframeSignature, signatureFromTask }
     const [fn, args] = JSON.parse(process.env.REFS_INPUT)
     process.stdout.write('@@' + JSON.stringify(api[fn](...args)))
   `
@@ -104,10 +104,52 @@ test('mentioning a character that is not bound blocks generation', () => {
     characterIds: [],
     propIds: [],
   }])
-  assert.equal(issues.length, 1)
-  assert.equal(issues[0].code, 'unbound_mention')
-  assert.equal(issues[0].severity, 'block')
-  assert.deepEqual(issues[0].fields, ['last_frame_prompt'])
+  // video_prompt 为空另外产生 empty_video_prompt（Issue #15），这里只看 @ 引用问题
+  const mentionIssues = issues.filter(issue => issue.code !== 'empty_video_prompt')
+  assert.equal(mentionIssues.length, 1)
+  assert.equal(mentionIssues[0].code, 'unbound_mention')
+  assert.equal(mentionIssues[0].severity, 'block')
+  assert.deepEqual(mentionIssues[0].fields, ['last_frame_prompt'])
+})
+
+test('empty video_prompt blocks only the video field (Issue #15)', () => {
+  const issues = call('computeRefIssues', [{
+    prompts: prompts({ first_frame_prompt: '客厅全景' }),
+    assets: [],
+    sceneId: null,
+    characterIds: [],
+    propIds: [],
+  }])
+  const empty = issues.find(issue => issue.code === 'empty_video_prompt')
+  assert.equal(empty.severity, 'block')
+  assert.deepEqual(empty.fields, ['video_prompt'])
+})
+
+test('video_prompt present produces no empty_video_prompt issue (Issue #15)', () => {
+  const issues = call('computeRefIssues', [{
+    prompts: prompts({ video_prompt: '0-3秒：双手扶着桌沿，双腿并拢坐下。' }),
+    assets: [],
+    sceneId: null,
+    characterIds: [],
+    propIds: [],
+  }])
+  assert.equal(issues.some(issue => issue.code === 'empty_video_prompt'), false)
+})
+
+test('limb lint warns on negative limb wording and unspecified risky poses (Issue #15)', () => {
+  const issues = call('limbRiskIssues', [prompts({
+    video_prompt: '0-3秒：猴宝宝盘腿坐在垫子上，看着前方。\n3-6秒：双手合十，不要搞成3条腿。',
+  })])
+  assert.equal(issues.length, 2)
+  assert.ok(issues.every(issue => issue.code === 'limb_risk' && issue.severity === 'warn'))
+  assert.ok(issues.every(issue => issue.fields.length === 1 && issue.fields[0] === 'video_prompt'))
+})
+
+test('limb lint stays quiet when every risky segment states limb positions (Issue #15)', () => {
+  const issues = call('limbRiskIssues', [prompts({
+    video_prompt: '0-3秒：双腿向身前收拢盘起，双脚收于身下，双手抱膝。',
+  })])
+  assert.deepEqual(issues, [])
 })
 
 test('mentioning another scene is a blocking conflict and never rebinds the scene', () => {

@@ -132,6 +132,7 @@ export const sqliteSchemaStatements = [
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     episode_id INTEGER NOT NULL,
     character_id INTEGER NOT NULL,
+    styling_version TEXT,
     created_at TEXT NOT NULL
   )`,
   `CREATE INDEX IF NOT EXISTS idx_episode_characters_episode_id ON episode_characters (episode_id)`,
@@ -367,6 +368,8 @@ const columnAdditions: { table: string; column: string; type: string }[] = [
   // 媒体生成时间（unix 秒）：完成时写入，启动时按 completed_at || created_at 回填存量行
   { table: 'sys_task', column: 'generated_at', type: 'INTEGER' },
   { table: 'video_merges', column: 'generated_at', type: 'INTEGER' },
+  // 本集角色造型版本（Issue #15，JSON {name, description, image_path}）
+  { table: 'episode_characters', column: 'styling_version', type: 'TEXT' },
 ]
 
 /**
@@ -395,6 +398,28 @@ function applyColumnAdditions(sqlite: Database.Database): void {
     if (columns.some(col => col.name === column)) continue
     sqlite.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`)
     console.log(`🧱 表 ${table} 补列 ${column}`)
+  }
+}
+
+/**
+ * 存量清理（Issue #15）— 资产软删/硬删后残留的集关联行。
+ * 残留关联会让提取 Agent 与 @引用 看到已删资产（线上 E1 就有 3 条），
+ * 删除行即可，幂等：资产已不存在或 deleted_at 非空的关联一律清掉。
+ */
+const STALE_LINK_CLEANUPS: { table: string; column: string; asset: string }[] = [
+  { table: 'episode_characters', column: 'character_id', asset: 'characters' },
+  { table: 'episode_scenes', column: 'scene_id', asset: 'scenes' },
+  { table: 'episode_props', column: 'prop_id', asset: 'props' },
+  { table: 'storyboard_characters', column: 'character_id', asset: 'characters' },
+  { table: 'storyboard_props', column: 'prop_id', asset: 'props' },
+]
+
+function cleanupStaleAssetLinks(sqlite: Database.Database): void {
+  for (const { table, column, asset } of STALE_LINK_CLEANUPS) {
+    const res = sqlite.prepare(
+      `DELETE FROM ${table} WHERE ${column} NOT IN (SELECT id FROM ${asset} WHERE deleted_at IS NULL)`,
+    ).run()
+    if (res.changes > 0) console.log(`🧹 清理 ${table} 中指向已删资产的关联 ${res.changes} 条`)
   }
 }
 
@@ -484,6 +509,7 @@ export function initSqliteSchema(sqlite: Database.Database) {
   // 依赖补列的索引：旧库要等 ADD COLUMN 之后才能建
   sqlite.exec('CREATE INDEX IF NOT EXISTS idx_sys_task_episode_id ON sys_task (episode_id)')
   applyColumnRemovals(sqlite)
+  cleanupStaleAssetLinks(sqlite)
   const insertSeed = sqlite.prepare(SEED_SQL)
   const upgradeSeed = sqlite.prepare(UPGRADE_SQL)
   const removeSeed = sqlite.prepare(REMOVE_SQL)
