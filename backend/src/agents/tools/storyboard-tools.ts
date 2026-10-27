@@ -10,7 +10,7 @@ import { eq } from 'drizzle-orm'
 import { now } from '../../utils/response.js'
 import { logTaskProgress, logTaskSuccess } from '../../utils/task-logger.js'
 import { getDramaId, getEpisodeId } from '../context.js'
-import { loadEpisodeContinuity } from '../../services/continuity.js'
+import { loadEpisodeKeyframes } from '../../services/keyframes.js'
 
 async function syncStoryboardCharacters(storyboardId: number, characterIds: number[]) {
   await db.delete(schema.storyboardCharacters)
@@ -177,16 +177,21 @@ const readStoryboardContext = createTool({
         image_url: p.imageUrl || '',
       }))
 
-    // 承接尾帧标注：effective = 该分镜是否实际承接上一镜结尾画面
-    const continuityMap = await loadEpisodeContinuity(episodeId)
-
-    const existingStoryboardPayload = await Promise.all(existingStoryboards
+    // 关键帧状态：inherits_first 表示该分镜首帧承接上一分镜的尾关键帧（continue 边界且自身未选首帧）
+    const keyframeMap = await loadEpisodeKeyframes(episodeId)
+    const aliveStoryboards = existingStoryboards
       .filter(sb => !sb.deletedAt)
+      .sort((a, b) => a.storyboardNumber - b.storyboardNumber)
+    const byId = new Map(aliveStoryboards.map(sb => [sb.id, sb]))
+
+    const existingStoryboardPayload = await Promise.all(aliveStoryboards
       .map(async (sb) => {
         const links = await db.select().from(schema.storyboardCharacters)
           .where(eq(schema.storyboardCharacters.storyboardId, sb.id))
         const sbPropLinks = await db.select().from(schema.storyboardProps)
           .where(eq(schema.storyboardProps.storyboardId, sb.id))
+        const kf = keyframeMap.get(sb.id)
+        const prev = kf?.previousId ? byId.get(kf.previousId) : undefined
         return {
           id: sb.id,
           shot_number: sb.storyboardNumber,
@@ -201,8 +206,13 @@ const readStoryboardContext = createTool({
           atmosphere: sb.atmosphere || '',
           video_prompt: sb.videoPrompt || '',
           continuity_boundary: sb.continuityBoundary || null,
-          continuity_mode: sb.continuityMode || 'auto',
-          continues_from_previous: continuityMap.get(sb.id)?.effective === true,
+          first_frame_prompt: sb.firstFramePrompt || '',
+          mid_frame_prompt: sb.midFramePrompt || '',
+          mid_frame_time: sb.midFrameTime ?? null,
+          last_frame_prompt: sb.lastFramePrompt || '',
+          inherits_first: kf?.inheritsFirst === true,
+          previous_last_frame_prompt: prev?.lastFramePrompt || '',
+          previous_result: prev?.result || '',
         }
       }))
 
@@ -212,7 +222,6 @@ const readStoryboardContext = createTool({
         title: ep.title,
         episode_number: ep.episodeNumber,
         description: ep.description || '',
-        continuity_enabled: ep.continuityEnabled !== false,
       },
       script,
       characters,
@@ -244,7 +253,10 @@ const storyboardFields = z.object({
   description: z.string().optional(),
   result: z.string().optional(),
   atmosphere: z.string().optional(),
-  image_prompt: z.string().optional(),
+  first_frame_prompt: z.string().optional().describe("Keyframe prompt for the FIRST still frame of this segment (opening moment of 【镜头1】). Self-contained: scene, who is in frame, pose, framing, lighting. Reference characters only by @名字 — never describe species, clothing, colours, hairstyle or any appearance attribute. Leave empty when continuity is 'continue' (the first frame is inherited from the previous segment's last keyframe)."),
+  mid_frame_prompt: z.string().optional().describe("Keyframe prompt for an optional MID still frame, describing the opening moment of the chosen sub-shot at mid_frame_time. Same self-contained and @名字-only rules. Omit when the segment has only one sub-shot."),
+  mid_frame_time: z.number().optional().describe("Time in SECONDS from the start of this segment for the mid keyframe. Must be the start time of a sub-shot 【镜头N】 other than the first one, and must fall inside the segment (strictly between 0.5s and duration-0.5s). Omit for single-sub-shot segments or when mid_frame_prompt is omitted."),
+  last_frame_prompt: z.string().optional().describe("Keyframe prompt for the LAST still frame of this segment, matching `result`. Same self-contained and @名字-only rules. Must be a stable, readable frame because the next segment may inherit it as its first frame."),
   video_prompt: z.string().optional(),
   bgm_prompt: z.string().optional(),
   sound_effect: z.string().optional(),
@@ -252,7 +264,7 @@ const storyboardFields = z.object({
   scene_id: z.number().nullable().optional(),
   character_ids: z.array(z.number()).optional(),
   prop_ids: z.array(z.number()).optional(),
-  continuity: z.enum(['continue', 'cut']).optional().describe("Transition from the previous shot: 'continue' means this shot starts exactly where the previous shot ended (same scene, immediately following moment, characters carried over) and the system will feed the previous video's last frame as this shot's first frame; 'cut' means a hard cut (scene change, time jump, flashback, or the first shot of the episode). Omit when unsure."),
+  continuity: z.enum(['continue', 'cut']).optional().describe("Transition from the previous shot: 'continue' means this shot starts exactly where the previous shot ended (same scene, immediately following moment, characters carried over) and this shot inherits the previous shot's LAST keyframe image as its own first keyframe, so first_frame_prompt must be left empty; 'cut' means a hard cut (scene change, time jump, flashback, or the first shot of the episode) and needs its own first_frame_prompt. Omit when unsure."),
 })
 
 const saveStoryboards = createTool({
@@ -302,7 +314,11 @@ const saveStoryboards = createTool({
           angle: sb.angle, movement: sb.movement,
           location: sb.location, time: sb.time,
           description: sb.description, result: sb.result,
-          atmosphere: sb.atmosphere, imagePrompt: sb.image_prompt,
+          atmosphere: sb.atmosphere,
+          firstFramePrompt: sb.first_frame_prompt,
+          midFramePrompt: sb.mid_frame_prompt,
+          midFrameTime: sb.mid_frame_time,
+          lastFramePrompt: sb.last_frame_prompt,
           videoPrompt: sb.video_prompt, bgmPrompt: sb.bgm_prompt,
           soundEffect: sb.sound_effect,
           sceneId: sb.scene_id, duration: sb.duration || 10,
@@ -319,7 +335,11 @@ const saveStoryboards = createTool({
           angle: sb.angle, movement: sb.movement,
           location: sb.location, time: sb.time,
           description: sb.description, result: sb.result,
-          atmosphere: sb.atmosphere, imagePrompt: sb.image_prompt,
+          atmosphere: sb.atmosphere,
+          firstFramePrompt: sb.first_frame_prompt,
+          midFramePrompt: sb.mid_frame_prompt,
+          midFrameTime: sb.mid_frame_time,
+          lastFramePrompt: sb.last_frame_prompt,
           videoPrompt: sb.video_prompt, bgmPrompt: sb.bgm_prompt,
           soundEffect: sb.sound_effect,
           continuityBoundary: sb.continuity,
@@ -366,7 +386,10 @@ const updateStoryboard = createTool({
     time: z.string().optional(),
     result: z.string().optional(),
     atmosphere: z.string().optional(),
-    image_prompt: z.string().optional(),
+    first_frame_prompt: z.string().optional().describe("Keyframe prompt for the FIRST still frame of this segment (opening moment of 【镜头1】). Self-contained: scene, who is in frame, pose, framing, lighting. Reference characters only by @名字 — never describe species, clothing, colours, hairstyle or any appearance attribute. Leave empty when continuity is 'continue'."),
+    mid_frame_prompt: z.string().optional().describe("Keyframe prompt for an optional MID still frame, describing the opening moment of the chosen sub-shot at mid_frame_time. Same self-contained and @名字-only rules. Omit when the segment has only one sub-shot."),
+    mid_frame_time: z.number().optional().describe("Time in SECONDS from the start of this segment for the mid keyframe. Must be the start time of a sub-shot 【镜头N】 other than the first one, and must fall strictly between 0.5s and duration-0.5s. Omit for single-sub-shot segments."),
+    last_frame_prompt: z.string().optional().describe("Keyframe prompt for the LAST still frame of this segment, matching `result`. Same self-contained and @名字-only rules. Must be a stable, readable frame because the next segment may inherit it as its first frame."),
     video_prompt: z.string().optional(),
     bgm_prompt: z.string().optional(),
     sound_effect: z.string().optional(),
@@ -375,7 +398,7 @@ const updateStoryboard = createTool({
     character_ids: z.array(z.number()).optional(),
     prop_ids: z.array(z.number()).optional(),
     duration: z.number().optional(),
-    continuity: z.enum(['continue', 'cut']).optional().describe("Transition from the previous shot: 'continue' means this shot starts exactly where the previous shot ended (same scene, immediately following moment, characters carried over) and the system will feed the previous video's last frame as this shot's first frame; 'cut' means a hard cut."),
+    continuity: z.enum(['continue', 'cut']).optional().describe("Transition from the previous shot: 'continue' means this shot starts exactly where the previous shot ended and inherits the previous shot's LAST keyframe image as its first keyframe (first_frame_prompt stays empty); 'cut' means a hard cut and needs its own first_frame_prompt."),
   }),
   execute: async ({ storyboard_id, ...fields }, context) => {
     const ids = requireIds(context)
@@ -428,7 +451,10 @@ const updateStoryboard = createTool({
     if ('time' in fields) updates.time = fields.time
     if ('result' in fields) updates.result = fields.result
     if ('atmosphere' in fields) updates.atmosphere = fields.atmosphere
-    if ('image_prompt' in fields) updates.imagePrompt = fields.image_prompt
+    if ('first_frame_prompt' in fields) updates.firstFramePrompt = fields.first_frame_prompt
+    if ('mid_frame_prompt' in fields) updates.midFramePrompt = fields.mid_frame_prompt
+    if ('mid_frame_time' in fields) updates.midFrameTime = fields.mid_frame_time
+    if ('last_frame_prompt' in fields) updates.lastFramePrompt = fields.last_frame_prompt
     if ('video_prompt' in fields) updates.videoPrompt = fields.video_prompt
     if ('bgm_prompt' in fields) updates.bgmPrompt = fields.bgm_prompt
     if ('sound_effect' in fields) updates.soundEffect = fields.sound_effect

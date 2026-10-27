@@ -39,12 +39,13 @@ try {
 const AGENT_SKILL_MAP: Record<string, string[]> = {
   script_rewriter: ['script-rewriter'],
   extractor: ['extractor'],
-  storyboard_breaker: ['storyboard-breaker'],
+  storyboard_breaker: ['storyboard-breaker', 'prompt-generator/keyframe-prompt'],
   prompt_generator: [
     'prompt-generator/character-prompt',
     'prompt-generator/scene-prompt',
     'prompt-generator/prop-prompt',
     'prompt-generator/video-prompt',
+    'prompt-generator/keyframe-prompt',
   ],
 }
 

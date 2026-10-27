@@ -39,24 +39,29 @@ Organize each segment's content in this order (items with no content may be omit
 
 **Time range + scene @reference + shot size/camera move + character @reference + main action·expression + dialogue/narration + mood and lighting**
 
-- **First segment**: when the storyboard's `continues_from_previous` is `false`, the first segment must establish the space — scene + camera position + each character's position and state, so the audience knows at a glance where we are and whom to watch; when `true`, use the "Continuing from the previous shot" rules below
+- **First segment**: the video's frame 0 *is* the storyboard's **first keyframe image** (for a carried-over segment, the previous segment's last keyframe). The first segment must carry on from the state that image already shows — keep the same camera position and the same character positions and poses; do not re-establish the space and do not cut at 0 seconds; cuts start from the second segment at the earliest
 - **Cuts**: start a post-cut segment with a transition word such as "cut to / cut back", and restate the shot size and subject; cut points should align with the `【镜头N】` structure in the storyboard `description`
 - **Shot size/camera move**: one camera state per segment (close shot / medium shot / wide shot / close-up; static / push / pull / pan / tracking); the camera move is continuous within a single sub-shot and may change after a cut
 - **Action**: one main action per segment, with concrete visible verbs (walk, turn around, look up, clench, pause)
 - **All emotion must become visible description**: no abstract words like "he is very sad / the mood is tense" — write it as "he lowers his head, fingers clench the rim of the cup, breathing grows heavier"
 - **Dialogue/narration**: write "CharacterName says: "line""; narration as "Narration: content"; a long line that cannot be spoken within 3 seconds is split across multiple segments; a segment without dialogue may note ambient/action sounds (e.g. "machines keep roaring")
 
-## Continuing from the Previous Shot (continues_from_previous)
+## Keyframe Alignment (Hard Rule)
 
-Every storyboard in `read_storyboard_context` carries `continues_from_previous`. When it is `true`, the system automatically uses the **last frame of the previous storyboard's video** as this video's **first frame** (reference images are still sent as usual), therefore:
+Before the video is generated, each storyboard segment has already had its three static keyframe images confirmed — first frame / (optional) mid frame / last frame. The video uses the first keyframe as its frame-0 anchor and the mid and last keyframes as timeline anchors. `read_storyboard_context` returns `first_frame_prompt`, `mid_frame_prompt`, `mid_frame_time`, `last_frame_prompt`, and `inherits_first`; align to them:
 
-- First read the previous storyboard (`shot_number` minus one)'s `result` (fall back to the end of its `description` if there is no result) to confirm what the ending frame looks like
-- **The first time segment must open by continuing the previous shot's ending frame**, and keep the same framing and character positions within that segment, for example:
-  `0-3s: continuing from the previous shot's final frame (@Xiaoming still stands in front of the @cafe counter, back to the camera); the camera holds still as he slowly turns his head.`
-- Do not re-establish the space in the first segment; do not cut, change shot size, or change angle at 0 seconds — cuts start from the second segment at the earliest
-- The info header and `@references` are written as usual (reference images are still sent)
+- **First frame**: the first segment carries on from the first keyframe image. When `inherits_first` is `true` the first frame is the previous segment's last keyframe (read that segment's `last_frame_prompt` / `result` to learn what the image shows); again, do not re-establish the space
+- **Mid frame**: when `mid_frame_time` has a value, the **start of one time segment must land exactly on that second**, and the visuals at that segment's opening must match `mid_frame_prompt` (usually this is a cut)
+- **Last frame**: the final segment must land on the frame described by `last_frame_prompt`
+- Keyframe prompts describe only frozen instants; the video prompt is responsible for writing the movement and performance *between* two keyframes — do not copy the keyframe prompts verbatim
 
-When `continues_from_previous` is `false`, follow the existing rule: the first segment establishes the space.
+## Absolute Rule: Images Win
+
+A character's look is decided entirely by the reference images and the keyframes; the moment the text contradicts the images, the frame falls apart:
+
+- **Never** describe a character's species, race, clothing, colors, hairstyle, body type, age, facial features, or any other appearance attribute
+- Characters are always referenced only as `@CharacterName`; **character names are merely labels** — do not infer looks from a name
+- Write only the visible position, pose, action, expression, eyeline, and prop interaction, plus shot size, camera move, lighting and mood
 
 ## Reference Rules
 
@@ -69,12 +74,12 @@ When `continues_from_previous` is `false`, follow the existing rule: the first s
 ## Timeline Rules
 
 - Number of segments = storyboard-segment duration ÷ 3 seconds (rounded up); the segment time ranges must add up exactly to the total segment duration
-- Content pacing: the first segment establishes the space (or continues from the previous shot's ending frame) → middle segments advance the action/conflict → the final segment lands on the result or emotional beat
+- Content pacing: the first segment carries on from the first keyframe image → middle segments advance the action/conflict (aligning with the mid keyframe at `mid_frame_time`) → the final segment lands on the last keyframe's image
 
 ## Prohibitions
 
 - Cross-scene switching, flashbacks (a segment takes place in a single scene only)
-- Referencing scene/character names outside the lists
+- Referencing scene/character names outside the lists; any appearance description of a character (species/clothing/colors/hairstyle/body type/facial features/age)
 - Abstract psychological description, literary metaphor (the model only recognizes visible imagery)
 - Language that does not match the session language directive
 
