@@ -155,6 +155,31 @@ async function saveItems(batchId: number, items: KeyframeBatchItem[]) {
     .where(eq(schema.keyframeBatches.id, batchId))
 }
 
+/** 同一批次的 items 读-改-写串行化：停止与 runner 的提交并发，不能用过期快照互相覆盖 */
+const itemQueues = new Map<number, Promise<KeyframeBatchItem[]>>()
+
+async function mutateItems(
+  batchId: number,
+  mutate: (items: KeyframeBatchItem[]) => void,
+): Promise<KeyframeBatchItem[]> {
+  const run = (itemQueues.get(batchId) ?? Promise.resolve([] as KeyframeBatchItem[]))
+    .catch(() => [] as KeyframeBatchItem[])
+    .then(async () => {
+      const row = await loadBatch(batchId)
+      if (!row) return []
+      const items = parseItems(row.items)
+      mutate(items)
+      await saveItems(batchId, items)
+      return items
+    })
+  itemQueues.set(batchId, run)
+  try {
+    return await run
+  } finally {
+    if (itemQueues.get(batchId) === run) itemQueues.delete(batchId)
+  }
+}
+
 async function setBatchStatus(batchId: number, status: KeyframeBatchStatus) {
   await db.update(schema.keyframeBatches)
     .set({ status, updatedAt: now() })
@@ -201,21 +226,50 @@ export async function getEpisodeKeyframeBatch(episodeId: number): Promise<Keyfra
   return latest ? await toStatus(latest) : null
 }
 
-/** 取消所有未结束项：已提交的调远端取消，未提交的直接作废 */
-async function cancelUnfinishedItems(items: KeyframeBatchItem[]): Promise<void> {
-  for (const item of items) {
-    if (!UNFINISHED_STATES.includes(item.state)) continue
-    if (item.task_id != null) {
-      await cancelImageTask(item.task_id).catch(err => {
-        logTaskWarn('KeyframeBatch', 'cancel item failed', {
-          taskId: item.task_id,
-          error: err instanceof Error ? err.message : String(err),
-        })
-      })
+/**
+ * 取消该批次所有未结束项：已提交的调远端取消，未提交的直接作废。
+ * 远端取消只是暂时失败（网关抖动/5xx）时**不**把项标成已取消 —— 那会让仍在跑的
+ * 远端任务把图片写回来。这类项保持未结束，由 sys_task 追踪器继续重试取消
+ * （它自己有重试上限，到点会把任务置为终态），下一拍再收敛。返回仍未结束的项数。
+ */
+async function cancelUnfinishedItems(batchId: number): Promise<number> {
+  const row = await loadBatch(batchId)
+  if (!row) return 0
+  // 远端取消放在锁外：它是网络调用，不能挡住 runner/停止接口的其它落盘
+  const settled = new Set<number>()
+  for (const item of parseItems(row.items)) {
+    if (!UNFINISHED_STATES.includes(item.state) || item.task_id == null) continue
+    const [task] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, item.task_id))
+    // sys_task 不存在或已终结：没有什么可取消的了
+    if (!task || !isActiveTaskStatus(task.status)) {
+      settled.add(item.task_id)
+      continue
     }
-    item.state = 'cancelled'
-    item.error = item.error ?? '已取消'
+    // 暂时性失败不会抛（cancelImageTask 内部保留取消意图，由追踪器重试）：
+    // 这里抛出的都是补救不了的（供应商不支持取消 / 配置已删），重试也没用，直接作废
+    const updated = await cancelImageTask(item.task_id).catch(err => {
+      logTaskWarn('KeyframeBatch', 'cancel item unrecoverable', {
+        batchId, taskId: item.task_id, error: err instanceof Error ? err.message : String(err),
+      })
+      return 'unrecoverable' as const
+    })
+    if (updated === 'unrecoverable' || !isActiveTaskStatus(updated.status)) settled.add(item.task_id)
   }
+
+  let remaining = 0
+  await mutateItems(batchId, items => {
+    for (const item of items) {
+      if (!UNFINISHED_STATES.includes(item.state)) continue
+      // 没有 sys_task 的项直接作废；有 task 的只在它确实终结后才作废
+      if (item.task_id == null || settled.has(item.task_id)) {
+        item.state = 'cancelled'
+        item.error = item.error ?? '已取消'
+        continue
+      }
+      remaining++
+    }
+  })
+  return remaining
 }
 
 /** 停止：取消该批次所有未结束的关键帧任务 */
@@ -230,10 +284,10 @@ export async function cancelEpisodeKeyframeBatch(episodeId: number): Promise<Key
 
   if (await batchUsesQwenJobs(episodeId, options)) {
     // 服务端排队：立即取消，不等 runner 的下一拍（排队项马上结束，运行项按服务端规则）
-    const items = parseItems(running.items)
-    await cancelUnfinishedItems(items)
-    await saveItems(running.id, items)
+    const remaining = await cancelUnfinishedItems(running.id)
     await setBatchStatus(running.id, 'cancelled')
+    // 还有没收敛的项（远端取消暂时失败，或提交正好在途）：交给 runner 继续重试
+    if (remaining > 0) void runParallelBatch(running.id)
   } else if (!activeRunners.has(running.id)) {
     // 串行模式且没有 runner 在驱动：直接落盘 cancelled，避免批次永远占着本集的互斥位
     await setBatchStatus(running.id, 'cancelled')
@@ -356,81 +410,119 @@ function itemStateFromTask(status: string | null | undefined): KeyframeBatchItem
 /**
  * 并发驱动（qwen-jobs）：一次性提交全部待生成项，然后只跟踪各 sys_task 的状态。
  * 写回由生成链路在各自完成时进行（关键帧之间没有生成依赖）。
+ *
+ * 停止是随时可能发生的：每张提交前都重新确认一次停止标记，所有落盘都走 mutateItems
+ * 的读-改-写（绝不用自己手里的过期快照覆盖已落盘的 cancelled），停止后才提交出去的
+ * 那一张会立刻被远端取消。远端取消一时失败的项保持未结束，这里按拍重试直到收敛。
  */
 async function runParallelBatch(batchId: number): Promise<void> {
   if (activeRunners.has(batchId)) return
   activeRunners.add(batchId)
   try {
+    let drainTicks = 0
     for (;;) {
       const row = await loadBatch(batchId)
       if (!row) return
-      if (row.status !== 'running') {
-        logTaskWarn('KeyframeBatch', 'batch stopped', { batchId, status: row.status })
-        return
-      }
-      const items = parseItems(row.items)
       const options = parseOptions(row.options)
 
-      if (options.cancelRequested) {
-        await cancelUnfinishedItems(items)
-        await saveItems(batchId, items)
-        await setBatchStatus(batchId, 'cancelled')
-        logTaskWarn('KeyframeBatch', 'batch cancelled', { batchId, episodeId: row.episodeId })
-        return
+      // 停止（或批次已被置为非 running）：收敛所有未结束项，收不干净就下一拍接着取消
+      if (options.cancelRequested || row.status !== 'running') {
+        const remaining = await cancelUnfinishedItems(batchId)
+        // 批次状态先落 cancelled：UI 立刻看到停止，未确认的项继续重试
+        if (row.status === 'running') {
+          await setBatchStatus(batchId, 'cancelled')
+          logTaskWarn('KeyframeBatch', 'batch cancelled', { batchId, episodeId: row.episodeId, remaining })
+        }
+        if (!remaining) return
+        if (drainTicks++ % 20 === 0) {
+          logTaskWarn('KeyframeBatch', 'cancel drain retry', { batchId, remaining, ticks: drainTicks })
+        }
+        await new Promise(resolve => setTimeout(resolve, PARALLEL_TICK_MS))
+        continue
       }
 
       // 提交：每提交一张立即落盘 sys_task id，重启恢复时不会重复提交
-      for (const item of items) {
-        if (item.state !== 'pending') continue
+      for (const target of parseItems(row.items)) {
+        if (target.state !== 'pending') continue
+        // 每张之前重新确认：停止请求可能刚刚落盘
+        const fresh = await loadBatch(batchId)
+        if (!fresh || fresh.status !== 'running' || parseOptions(fresh.options).cancelRequested) break
+        const current = parseItems(fresh.items)
+          .find(item => item.storyboard_id === target.storyboard_id && item.slot === target.slot)
+        if (!current || current.state !== 'pending') continue
+
+        let taskId: number | null = null
+        let error: string | null = null
         try {
-          item.task_id = await submitStoryboardKeyframe(item.storyboard_id, item.slot, options)
-          item.state = 'queued'
-          item.error = null
+          taskId = await submitStoryboardKeyframe(target.storyboard_id, target.slot, options)
+        } catch (err) {
+          error = err instanceof Error ? err.message : '生成失败'
+          logTaskError('KeyframeBatch', 'keyframe', {
+            batchId, storyboardId: target.storyboard_id, slot: target.slot, error,
+          })
+        }
+        let cancelledDuringSubmit = false
+        await mutateItems(batchId, items => {
+          const item = items.find(it => it.storyboard_id === target.storyboard_id && it.slot === target.slot)
+          if (!item) return
+          if (!UNFINISHED_STATES.includes(item.state)) {
+            // 提交途中批次被停止：保留已落盘的 cancelled，只补上 task_id 以便取消远端
+            if (taskId != null) {
+              item.task_id = taskId
+              cancelledDuringSubmit = true
+            }
+            return
+          }
+          item.task_id = taskId
+          item.state = taskId != null ? 'queued' : 'failed'
+          item.error = taskId != null ? null : error
+        })
+        if (cancelledDuringSubmit && taskId != null) {
+          logTaskWarn('KeyframeBatch', 'cancel item submitted after stop', { batchId, taskId })
+          await cancelImageTask(taskId).catch(err => {
+            logTaskWarn('KeyframeBatch', 'cancel item failed', {
+              batchId, taskId, error: err instanceof Error ? err.message : String(err),
+            })
+          })
+        } else if (taskId != null) {
           logTaskProgress('KeyframeBatch', 'keyframe submit', {
             batchId,
-            storyboardId: item.storyboard_id,
-            shotNumber: item.storyboard_number,
-            slot: item.slot,
-            taskId: item.task_id,
-          })
-        } catch (err) {
-          item.state = 'failed'
-          item.error = err instanceof Error ? err.message : '生成失败'
-          logTaskError('KeyframeBatch', 'keyframe', {
-            batchId,
-            storyboardId: item.storyboard_id,
-            slot: item.slot,
-            error: item.error,
+            storyboardId: target.storyboard_id,
+            shotNumber: target.storyboard_number,
+            slot: target.slot,
+            taskId,
           })
         }
-        await saveItems(batchId, items)
       }
 
-      // 跟踪：sys_task 状态 → 批次项状态
-      const taskIds = items.map(item => item.task_id).filter((id): id is number => id != null)
+      // 跟踪：sys_task 状态 → 批次项状态（只推进未结束项，不复活已取消的）
+      const tracking = parseItems((await loadBatch(batchId))?.items)
+      const taskIds = tracking.map(item => item.task_id).filter((id): id is number => id != null)
       const tasks = (await db.select().from(schema.sysTask)).filter(task => taskIds.includes(task.id))
-      let changed = false
-      for (const item of items) {
-        if (item.task_id == null || item.state === 'skipped') continue
-        const task = tasks.find(t => t.id === item.task_id)
-        if (!task) continue
-        const next = itemStateFromTask(task.status)
-        if (next === item.state) continue
-        item.state = next
-        item.error = next === 'failed' ? (task.errorMsg || '生成失败') : item.error
-        changed = true
-        if (next === 'completed') {
-          logTaskSuccess('KeyframeBatch', 'keyframe', {
-            batchId,
-            storyboardId: item.storyboard_id,
-            slot: item.slot,
-            taskId: item.task_id,
-          })
+      const completed: KeyframeBatchItem[] = []
+      const items = await mutateItems(batchId, list => {
+        for (const item of list) {
+          if (item.task_id == null || !UNFINISHED_STATES.includes(item.state)) continue
+          const task = tasks.find(t => t.id === item.task_id)
+          if (!task) continue
+          const next = itemStateFromTask(task.status)
+          if (next === item.state) continue
+          item.state = next
+          item.error = next === 'failed' ? (task.errorMsg || '生成失败') : item.error
+          if (next === 'completed') completed.push(item)
         }
+      })
+      for (const item of completed) {
+        logTaskSuccess('KeyframeBatch', 'keyframe', {
+          batchId, storyboardId: item.storyboard_id, slot: item.slot, taskId: item.task_id,
+        })
       }
-      if (changed) await saveItems(batchId, items)
 
       if (!items.some(item => UNFINISHED_STATES.includes(item.state))) {
+        // 跟踪期间可能刚收到停止：别把已停止的批次写成 done，交给下一拍的停止分支
+        const latest = await loadBatch(batchId)
+        if (!latest) return
+        if (latest.status !== 'running' || parseOptions(latest.options).cancelRequested) continue
         await setBatchStatus(batchId, 'done')
         logTaskSuccess('KeyframeBatch', 'batch', {
           batchId,
@@ -575,16 +667,20 @@ async function runBatch(batchId: number): Promise<void> {
  * 启动时恢复被重启打断的批次。
  * qwen-jobs：已提交的项保留 task_id，由追踪器继续跟，只有还没提交的 pending 会被提交。
  * 其它 provider：中断的那一张重新提交（它的 sys_task 已被启动清理标记为 failed）。
+ * 已停止但还有未结束项的批次（远端取消在重启前没确认完）同样要恢复 runner，
+ * 由它继续重试取消，直到每一项都真的终结。
  */
 export async function resumeKeyframeBatches(): Promise<void> {
   try {
-    const rows = await db.select().from(schema.keyframeBatches)
-      .where(eq(schema.keyframeBatches.status, 'running'))
+    const rows = (await db.select().from(schema.keyframeBatches)).filter(row =>
+      row.status === 'running'
+      || (row.status === 'cancelled' && parseItems(row.items).some(item => UNFINISHED_STATES.includes(item.state))))
     for (const row of rows) {
       const items = parseItems(row.items)
       logTaskProgress('KeyframeBatch', 'resume', {
         batchId: row.id,
         episodeId: row.episodeId,
+        status: row.status,
         pending: items.filter(item => item.state === 'pending').length,
         tracking: items.filter(item => item.state === 'queued' || item.state === 'running').length,
       })

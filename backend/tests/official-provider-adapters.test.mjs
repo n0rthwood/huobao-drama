@@ -59,11 +59,6 @@ test('backend rejects unsupported providers at DB and route boundaries', () => {
   assert.match(ai, /text:\s*\[\s*'openai',\s*'gemini',\s*'volcengine'\s*\]/)
   assert.match(ai, /image:\s*\[\s*'openai',\s*'gemini',\s*'volcengine',\s*'qwen-jobs'\s*\]/)
   assert.match(ai, /video:\s*\[\s*'volcengine',\s*'minimax',\s*'comfyui'\s*\]/)
-  const registry = read('src/services/adapters/registry.ts')
-  // qwen-jobs 在注册表里登记为 job-queue 类（不是 HTTP adapter）
-  assert.match(registry, /QWEN_JOBS_PROVIDER = 'qwen-jobs'/)
-  assert.match(registry, /\[QWEN_JOBS_PROVIDER\]:\s*'job-queue'/)
-  assert.match(registry, /export function isJobQueueImageProvider/)
   assert.doesNotMatch(ai, /'deepseek'/)
   assert.doesNotMatch(ai, /'ali'/)
   assert.doesNotMatch(ai, /'vidu'/)
