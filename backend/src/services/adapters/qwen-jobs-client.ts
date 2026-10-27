@@ -94,9 +94,13 @@ export class QwenJobsError extends Error {
     this.name = 'QwenJobsError'
   }
 
-  /** 网络中断、网关抖动（530/502）、5xx：任务仍然有效，下一轮重试 */
+  /**
+   * 网络中断、网关抖动（530/502）、5xx：任务仍然有效，下一轮重试。
+   * 429 queue_full 同样是暂时的：服务端队列满时请求体没有被记账（幂等键未落盘），
+   * 原样重发同一个 body + Idempotency-Key 即可，不该让任务失败。
+   */
   get transient(): boolean {
-    return this.status === 0 || this.status >= 500
+    return this.status === 0 || this.status === 429 || this.status >= 500
   }
 }
 
@@ -167,6 +171,23 @@ async function request(
 
 /** 进程内 sha256 → file id 缓存：同一组参考图（角色三视图等）跨任务只上传一次 */
 const fileIdCache = new Map<string, string>()
+
+/**
+ * 服务端在没有任何排队/运行任务引用某个文件后会把它删除，缓存里的 id 随之失效
+ * （再提交会得到 422 unknown reference image）。按 file id 清掉对应缓存，
+ * 下一次提交会重新上传（同内容会拿回同一个 id，只是多一次上传）。
+ */
+export function evictQwenFileIds(ids: readonly string[]): number {
+  let removed = 0
+  if (!ids.length) return removed
+  const drop = new Set(ids)
+  for (const [key, value] of fileIdCache) {
+    if (!drop.has(value)) continue
+    fileIdCache.delete(key)
+    removed++
+  }
+  return removed
+}
 
 function decodeSource(source: string): { bytes: Buffer; mime: string } {
   const match = /^data:([^;,]+)(;base64)?,(.*)$/s.exec(source)

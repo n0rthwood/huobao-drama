@@ -7,10 +7,11 @@
  *   config_id（追踪器据此找回 baseUrl/凭据）、idempotency_key。
  * 这三个内部键只存库，不出 API。
  */
-import { eq } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
 import { now } from '../utils/response.js'
 import { toSnakeCase } from '../utils/transform.js'
+import { logTaskWarn } from '../utils/task-logger.js'
 import type { QwenJob, QwenJobRequest } from './adapters/qwen-jobs-client.js'
 
 import { isJobQueueImageProvider } from './adapters/registry.js'
@@ -21,6 +22,8 @@ export type SysTaskRow = typeof schema.sysTask.$inferSelect
 export type SysTaskStatus = 'queued' | 'processing' | 'completed' | 'failed' | 'cancelled'
 
 /** 活跃（未终结）任务：排队中或生成中 */
+export const ACTIVE_TASK_STATUSES: SysTaskStatus[] = ['queued', 'processing']
+
 export function isActiveTaskStatus(status: string | null | undefined): boolean {
   return status === 'queued' || status === 'processing'
 }
@@ -40,6 +43,8 @@ export interface RemoteState {
   estimate?: QwenJob['estimate']
   estimated_finish_seconds?: number | null
   cancel_requested?: boolean
+  /** 本地已请求取消但远端还没确认（取消接口失败/提交在途）：追踪器据此重试取消且永不写回结果 */
+  cancel_pending?: boolean
   updated_at?: string
 }
 
@@ -66,18 +71,56 @@ export function remoteSnapshot(job: QwenJob): RemoteState {
   }
 }
 
-/** 合并写入 remote_state（保留 request/config_id 等内部键），可同时改状态与远端任务 id */
+async function applyRemoteStatePatch(
+  id: number,
+  patch: RemoteState,
+  extra: { status?: SysTaskStatus; taskId?: string; resultUrl?: string; errorMsg?: string | null },
+): Promise<SysTaskRow | null> {
+  const [row] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, id))
+  if (!row) return null
+  const merged: RemoteState = { ...parseRemoteState(row.remoteState), ...patch }
+  const { status, ...rest } = extra
+  await db.update(schema.sysTask)
+    .set({ remoteState: JSON.stringify(merged), updatedAt: now(), ...rest })
+    .where(eq(schema.sysTask.id, id))
+  if (status) {
+    await db.update(schema.sysTask)
+      .set({ status, updatedAt: now() })
+      .where(and(eq(schema.sysTask.id, id), inArray(schema.sysTask.status, ACTIVE_TASK_STATUSES)))
+  }
+  const [fresh] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, id))
+  if (status && fresh && fresh.status !== status) {
+    logTaskWarn('SysTask', 'terminal status kept', { id, kept: fresh.status, ignored: status })
+  }
+  return fresh ?? null
+}
+
+/** 同一任务的 remote_state 读-改-写串行化：取消与提交并发时不能用过期快照盖掉对方写入的键 */
+const patchQueues = new Map<number, Promise<SysTaskRow | null>>()
+
+/**
+ * 合并写入 remote_state（保留 request/config_id 等内部键），可同时改状态与远端任务 id。
+ *
+ * remote_state 与 task_id 无条件落盘：取消链路要靠 task_id 找到刚建好的远端任务。
+ * 状态迁移则带 `status IN (queued, processing)` 条件，终态永不被改回活跃 ——
+ * 提交与取消是并发的，迟到的提交结果绝不能把用户已取消的任务复活。
+ * 返回写入后的那一行：调用方据此判断“这次写入落在一个已终结的任务上”，
+ * 从而把刚建好的远端任务取消掉。
+ */
 export async function patchTaskRemoteState(
   id: number,
   patch: RemoteState,
   extra: { status?: SysTaskStatus; taskId?: string; resultUrl?: string; errorMsg?: string | null } = {},
-): Promise<void> {
-  const [row] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, id))
-  if (!row) return
-  const merged: RemoteState = { ...parseRemoteState(row.remoteState), ...patch }
-  await db.update(schema.sysTask)
-    .set({ remoteState: JSON.stringify(merged), updatedAt: now(), ...extra })
-    .where(eq(schema.sysTask.id, id))
+): Promise<SysTaskRow | null> {
+  const run = (patchQueues.get(id) ?? Promise.resolve(null))
+    .catch(() => null)
+    .then(() => applyRemoteStatePatch(id, patch, extra))
+  patchQueues.set(id, run)
+  try {
+    return await run
+  } finally {
+    if (patchQueues.get(id) === run) patchQueues.delete(id)
+  }
 }
 
 /** 远端任务状态 → sys_task 状态（succeeded 要先落盘再标 completed，故不在此映射） */
@@ -96,7 +139,11 @@ export function qwenIdempotencyKey(taskId: number): string {
 
 /** API 输出：snake_case + remote_state 已解析（剥掉内部键）+ cancellable */
 export function serializeTask(row: SysTaskRow): Record<string, any> {
-  const { request: _request, config_id: _configId, idempotency_key: _key, ...visible } = parseRemoteState(row.remoteState)
+  const {
+    request: _request, config_id: _configId, idempotency_key: _key, cancel_pending: cancelPending, ...visible
+  } = parseRemoteState(row.remoteState)
+  // 本地已请求取消：对前端就是“取消中”，与服务端自己的 cancel_requested 同一个字段
+  if (cancelPending) visible.cancel_requested = true
   return {
     ...toSnakeCase(row),
     remote_state: Object.keys(visible).length ? visible : null,

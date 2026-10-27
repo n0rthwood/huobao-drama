@@ -11,7 +11,6 @@
  */
 import { eq } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
-import { now } from '../utils/response.js'
 import { getActiveConfig, getConfigById, type AIConfig } from './ai.js'
 import {
   QwenJobsError,
@@ -22,14 +21,13 @@ import {
   listQwenJobs,
   type QwenJob,
 } from './adapters/qwen-jobs-client.js'
-import { completeImageTaskFromBytes, failTask, resubmitQwenJobsTask } from './generation.js'
+import { completeImageTaskFromBytes, failTask, resumeQwenJobsTask } from './generation.js'
 import {
   isActiveTaskStatus,
   isQwenJobsTask,
   mapRemoteStatus,
   parseRemoteState,
   patchTaskRemoteState,
-  qwenIdempotencyKey,
   remoteSnapshot,
   type SysTaskRow,
 } from './sys-task.js'
@@ -43,9 +41,16 @@ const missingTicks = new Map<number, number>()
 let timer: NodeJS.Timeout | null = null
 let ticking = false
 
-export async function listActiveQwenJobsTasks(): Promise<SysTaskRow[]> {
-  return (await db.select().from(schema.sysTask))
-    .filter(row => row.type === 'image' && isQwenJobsTask(row.provider) && isActiveTaskStatus(row.status))
+/**
+ * 追踪器要看的行：活跃任务，外加"本地已终结但远端取消还没确认"的行
+ * （提交与取消撞车：task_id 已落盘，远端任务还活着）—— 否则那个远端任务没人去取消。
+ */
+async function listTrackedQwenJobsTasks(): Promise<SysTaskRow[]> {
+  return (await db.select().from(schema.sysTask)).filter(row => {
+    if (row.type !== 'image' || !isQwenJobsTask(row.provider)) return false
+    if (isActiveTaskStatus(row.status)) return true
+    return !!row.taskId && !!parseRemoteState(row.remoteState).cancel_pending
+  })
 }
 
 /** 任务提交时用的那套网关与凭据；配置被删/停用时退回当前启用的图片配置 */
@@ -60,8 +65,52 @@ async function configForTask(row: SysTaskRow, cache: Map<number, AIConfig | null
   return cache.get(0) ?? null
 }
 
+/**
+ * 远端取消的唯一入口：取消意图（cancel_pending）先落盘，再调 POST /v1/jobs/{id}/cancel。
+ * 网络/5xx/429 等暂时性失败保留 cancel_pending，追踪器下一拍继续重试 —— 重试期间
+ * 这个任务永远不会被标完成，也就不会写回任何图片，而且超时不会把它当成已取消。
+ * 非暂时性失败（404/鉴权/请求被拒）补救不了，本地直接作废让任务进入终态；
+ * 远端记录彻底消失的情况由 handleMissing 兜底。
+ */
+async function cancelRemoteJob(row: SysTaskRow, config: AIConfig, jobId: string): Promise<void> {
+  try {
+    const job = await cancelQwenJob(config, jobId)
+    const done = job.status === 'cancelled' || job.status === 'failed' || job.status === 'succeeded'
+    await patchTaskRemoteState(
+      row.id,
+      { ...remoteSnapshot(job), cancel_pending: !done },
+      done ? { status: 'cancelled' } : {},
+    )
+    return
+  } catch (err) {
+    if (err instanceof QwenJobsError && err.transient) {
+      logTaskWarn('ImageTask', 'qwen-jobs cancel retry', {
+        id: row.id, jobId, error: err.message,
+      })
+      return
+    }
+    logTaskWarn('ImageTask', 'qwen-jobs cancel rejected, cancelled locally', {
+      id: row.id, jobId, error: err instanceof Error ? err.message : String(err),
+    })
+  }
+  await patchTaskRemoteState(row.id, { cancel_pending: false }, { status: 'cancelled' })
+}
+
 async function applyJob(row: SysTaskRow, config: AIConfig, job: QwenJob): Promise<void> {
   missingTicks.delete(row.id)
+
+  // 本地已请求取消：绝不取件、绝不写回；远端还活着就继续推进取消
+  if (parseRemoteState(row.remoteState).cancel_pending) {
+    if (job.status === 'queued' || job.status === 'running') {
+      // 服务端已经收下取消请求（运行中的任务按它自己的规则收尾）：等它变终态即可
+      if (job.cancel_requested) await patchTaskRemoteState(row.id, remoteSnapshot(job))
+      else await cancelRemoteJob(row, config, job.id)
+      return
+    }
+    await patchTaskRemoteState(row.id, { ...remoteSnapshot(job), cancel_pending: false }, { status: 'cancelled' })
+    logTaskWarn('ImageTask', 'qwen-jobs cancelled after remote finish', { id: row.id, jobId: job.id, remote: job.status })
+    return
+  }
 
   if (job.status === 'succeeded') {
     // 取件即删：必须先把字节落盘，再标完成
@@ -69,6 +118,11 @@ async function applyJob(row: SysTaskRow, config: AIConfig, job: QwenJob): Promis
       const { bytes, contentType } = await downloadQwenOutput(config, job.id, job.outputs?.[0]?.index ?? 0)
       await patchTaskRemoteState(row.id, remoteSnapshot(job), { resultUrl: `qwen-jobs:${job.id}/0` })
       const [fresh] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, row.id))
+      // 下载期间被取消（状态已终结，或取消意图已落盘但远端还没确认）：不落盘、不写回
+      if (fresh && (!isActiveTaskStatus(fresh.status) || parseRemoteState(fresh.remoteState).cancel_pending)) {
+        logTaskWarn('ImageTask', 'qwen-jobs result dropped (cancelled)', { id: row.id, jobId: job.id })
+        return
+      }
       await completeImageTaskFromBytes(fresh ?? row, bytes, contentType)
       logTaskSuccess('ImageTask', 'qwen-jobs completed', { id: row.id, jobId: job.id })
     } catch (err) {
@@ -102,6 +156,10 @@ async function handleMissing(row: SysTaskRow): Promise<void> {
   missingTicks.set(row.id, count)
   if (count < MISSING_TICKS_BEFORE_FAIL) return
   missingTicks.delete(row.id)
+  // 远端记录没了就没什么可取消的：清掉取消意图，否则这一行会被一直轮询
+  if (parseRemoteState(row.remoteState).cancel_pending) {
+    await patchTaskRemoteState(row.id, { cancel_pending: false }, { status: 'cancelled' })
+  }
   await failTask(row.id, '远端任务记录已消失（可能已过保留期），请重试')
 }
 
@@ -109,7 +167,7 @@ async function tick(): Promise<void> {
   if (ticking) return
   ticking = true
   try {
-    const rows = await listActiveQwenJobsTasks()
+    const rows = await listTrackedQwenJobsTasks()
     if (!rows.length) return
     const cache = new Map<number, AIConfig | null>()
     const groups = new Map<string, { config: AIConfig; rows: SysTaskRow[] }>()
@@ -118,6 +176,8 @@ async function tick(): Promise<void> {
       const config = await configForTask(row, cache)
       if (!config) {
         logTaskWarn('ImageTask', 'qwen-jobs config missing', { id: row.id })
+        // 还没提交过（没有远端 id）且没有可用配置：永远也提交不出去，不能让它一直活跃
+        if (!row.taskId) await failTask(row.id, '图片服务配置不存在或已停用，任务无法提交，请检查配置后重试')
         continue
       }
       const key = `${config.baseUrl}|${config.apiKey}`
@@ -127,20 +187,10 @@ async function tick(): Promise<void> {
     }
 
     for (const { config, rows: groupRows } of groups.values()) {
-      // 提交途中重启：请求体已落盘但没有远端 id，按同一幂等键原样重发
-      const pending = groupRows.filter(row => !row.taskId)
-      for (const row of pending) {
-        const state = parseRemoteState(row.remoteState)
-        if (!state.request) continue
-        try {
-          await resubmitQwenJobsTask(row.id, config, state.request, state.idempotency_key || qwenIdempotencyKey(row.id))
-        } catch (err) {
-          logTaskWarn('ImageTask', 'qwen-jobs resubmit retry', {
-            id: row.id,
-            error: err instanceof Error ? err.message : String(err),
-          })
-        }
-      }
+      // 没有远端 id 的行：请求体已落盘的原样重发，连请求体都没有的（上传途中重启）
+      // 回到完整提交路径。都用同一个幂等键，服务端不会重复出图。
+      // 上传可能很慢，所以不阻塞本拍的轮询；重入由 generation 的在途集合挡住。
+      for (const row of groupRows.filter(row => !row.taskId)) void resumeQwenJobsTask(row, config)
 
       const tracked = groupRows.filter(row => row.taskId)
       for (let i = 0; i < tracked.length; i += QWEN_JOBS_IDS_CHUNK) {
@@ -182,7 +232,11 @@ export function startQwenJobsTracker(): void {
   void tick()
 }
 
-/** 取消一个 qwen-jobs 任务：排队中立即取消，运行中按服务端规则结束，最终都是 cancelled */
+/**
+ * 取消一个 qwen-jobs 任务：排队中立即取消，运行中按服务端规则结束，最终都是 cancelled。
+ * 取消意图先落盘（cancel_pending）：远端取消失败时任务保持活跃但永不写回，
+ * 由追踪器继续重试；调用方用返回行的状态判断是否已经真正结束。
+ */
 export async function cancelImageTask(taskId: number): Promise<SysTaskRow> {
   const [row] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, taskId))
   if (!row) throw new Error('任务不存在')
@@ -190,16 +244,14 @@ export async function cancelImageTask(taskId: number): Promise<SysTaskRow> {
   if (!isActiveTaskStatus(row.status)) return row
 
   if (!row.taskId) {
-    // 还没拿到远端 id（提交途中）：本地直接作废，追踪器不会再重发
-    await db.update(schema.sysTask)
-      .set({ status: 'cancelled', updatedAt: now() })
-      .where(eq(schema.sysTask.id, taskId))
+    // 还没拿到远端 id（提交途中）：本地立即作废。提交线程落盘 task_id 时会看到终态，
+    // 由它把刚建好的远端任务取消 —— 这里不需要 cancel_pending。
+    await patchTaskRemoteState(taskId, {}, { status: 'cancelled' })
   } else {
-    const cache = new Map<number, AIConfig | null>()
-    const config = await configForTask(row, cache)
+    const config = await configForTask(row, new Map<number, AIConfig | null>())
     if (!config) throw new Error('图片服务配置不存在，无法取消')
-    const job = await cancelQwenJob(config, row.taskId)
-    await patchTaskRemoteState(taskId, remoteSnapshot(job), job.status === 'cancelled' ? { status: 'cancelled' } : {})
+    await patchTaskRemoteState(taskId, { cancel_pending: true })
+    await cancelRemoteJob(row, config, row.taskId)
   }
   logTaskWarn('ImageTask', 'qwen-jobs cancel', { id: taskId, jobId: row.taskId })
   const [updated] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, taskId))
