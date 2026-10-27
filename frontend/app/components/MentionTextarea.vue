@@ -266,6 +266,7 @@ function setText(next, caret) {
   }
   text.value = next
   closeMention()
+  nextTick(syncScroll)
   emit('update:modelValue', next)
   emit('commit', next)
 }
@@ -274,13 +275,18 @@ function onInput(e) {
   text.value = e.target.value
   emit('update:modelValue', e.target.value)
   updateMentionState()
+  syncScroll()
 }
 
-function onScroll() {
+function syncScroll() {
   if (backdropEl.value && taEl.value) {
     backdropEl.value.scrollTop = taEl.value.scrollTop
     backdropEl.value.scrollLeft = taEl.value.scrollLeft
   }
+}
+
+function onScroll() {
+  syncScroll()
   closeMention()
 }
 
@@ -350,6 +356,8 @@ function onBlur(e) {
   border-color: transparent;
   box-shadow: none;
   overflow: hidden;
+  /* 与 textarea 同样预留滚动条槽位：两层文字区宽度一致，换行位置相同，光标不会逐行偏移 */
+  scrollbar-gutter: stable;
   pointer-events: none;
 }
 .mention-backdrop-content {
@@ -365,6 +373,8 @@ function onBlur(e) {
   min-height: 0;
   width: 100%;
   resize: none;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
   background: transparent;
   color: transparent;
   caret-color: var(--text-0);
@@ -372,10 +382,9 @@ function onBlur(e) {
 .mention-input::placeholder {
   color: var(--text-3);
 }
-/* @引用 着色：不改字距/内边距，保证与透明文本逐字对齐 */
+/* @引用 着色：不改字距/字重/内边距，保证与透明文本逐字对齐 */
 .mention-backdrop :deep(.mention-token) {
   border-radius: 4px;
-  font-weight: 600;
 }
 .mention-backdrop :deep(.mention-token-role) {
   color: var(--accent-text);
