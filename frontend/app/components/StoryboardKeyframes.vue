@@ -634,17 +634,37 @@ function isSlotPending(sb, slot) {
   return item ? isActiveBatchItemState(item.state) : false
 }
 
-/** 槽位的进度环属性：批次项优先（批量时批次状态最全），否则用单张任务 */
+/**
+ * 单张任务是否比批次项更新：活跃任务、批次项没有任务、或任务 id/created_at 更新。
+ * 单张重试会新建 sys_task，旧批次项仍停在 failed/cancelled，必须让新任务盖过它。
+ */
+function slotTaskIsNewer(task, item) {
+  if (!task) return false
+  if (!item || item.task_id == null) return true
+  if (isActiveTaskStatus(task.status)) return true
+  const a = Number(task.id)
+  const b = Number(item.task_id)
+  if (Number.isFinite(a) && Number.isFinite(b) && a !== b) return a > b
+  if (a === b) return false // 同一个任务：用批次项（含排队位次等更全的信息）
+  return String(task.created_at || task.createdAt || '') > String(item.created_at || '')
+}
+
+/** 槽位的进度环属性：最新的那次生成优先（单张重试盖过旧批次项），否则用批次项 */
 function slotRing(sb, slot) {
+  const key = slotKey(sb?.id, slot)
   const item = batchItemOf(sb?.id, slot)
+  // 正在提交单张重试：先显示“排队中”，不要停留在旧批次项的失败态
+  if (submittingSlots.value.includes(key)) return ringPropsFromTask({ status: 'queued' }, now.value)
+  const task = slotTaskOf(sb, slot)
+  if (slotTaskIsNewer(task, item)) {
+    // 更新的任务已完成：清掉旧批次项留下的失败/取消蒙层
+    return task.status === 'completed' ? null : ringPropsFromTask(task, now.value)
+  }
+  // 批次项更新（或与任务同源）：以批次项为准；都不适用就不显示环，
+  // 旧的终态任务不得盖在更新的批次结果上
   if (item && item.state !== 'skipped' && item.state !== 'completed') {
     const ring = ringPropsFromBatchItem(item)
     if (ring.status) return ring
-  }
-  const task = slotTaskOf(sb, slot)
-  if (task && task.status !== 'completed') return ringPropsFromTask(task, now.value)
-  if (submittingSlots.value.includes(slotKey(sb?.id, slot))) {
-    return { ...ringPropsFromTask({ status: 'queued' }, now.value) }
   }
   return null
 }
@@ -693,8 +713,7 @@ async function pollKeyframeTask(taskId, sbId, slot) {
     slotTasks.value = { ...slotTasks.value, [key]: res }
     if (!isTerminalTaskStatus(res.status)) continue
     if (res.status === 'completed') {
-      const { [key]: _done, ...others } = slotTasks.value
-      slotTasks.value = others
+      // 已完成的任务保留在 slotTasks 里：slotRing 用它盖掉旧批次项遗留的失败/取消蒙层
       toast.success(t('episode.kf.genDone', { slot: slotLabel(slot) }))
       emit('refresh')
       if (selected.value?.id === sbId) await loadVersions()
