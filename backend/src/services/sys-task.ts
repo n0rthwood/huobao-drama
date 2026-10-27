@@ -13,7 +13,9 @@ import { now } from '../utils/response.js'
 import { toSnakeCase } from '../utils/transform.js'
 import type { QwenJob, QwenJobRequest } from './adapters/qwen-jobs-client.js'
 
-export const QWEN_JOBS_PROVIDER = 'qwen-jobs'
+import { isJobQueueImageProvider } from './adapters/registry.js'
+
+export { QWEN_JOBS_PROVIDER } from './adapters/registry.js'
 
 export type SysTaskRow = typeof schema.sysTask.$inferSelect
 export type SysTaskStatus = 'queued' | 'processing' | 'completed' | 'failed' | 'cancelled'
@@ -23,8 +25,9 @@ export function isActiveTaskStatus(status: string | null | undefined): boolean {
   return status === 'queued' || status === 'processing'
 }
 
+/** 该任务是否走服务端任务队列（qwen-jobs）——provider → 执行方式的映射在 adapters/registry.ts */
 export function isQwenJobsTask(provider: string | null | undefined): boolean {
-  return (provider || '').toLowerCase() === QWEN_JOBS_PROVIDER
+  return isJobQueueImageProvider(provider)
 }
 
 export interface RemoteState {
