@@ -84,6 +84,17 @@ export async function saveBase64Image(base64Data: string, mimeType: string, subD
   return `static/${subDir}/${filename}`
 }
 
+/**
+ * 保存已取回的图片字节（qwen-jobs 取件即删，必须先落盘再标完成）
+ */
+export async function saveImageBuffer(bytes: Buffer, mimeType: string, subDir: string): Promise<string> {
+  const dir = path.join(STORAGE_ROOT, subDir)
+  fs.mkdirSync(dir, { recursive: true })
+  const filename = `${uuid()}${mimeTypeToExt(mimeType)}`
+  fs.writeFileSync(path.join(dir, filename), bytes)
+  return `static/${subDir}/${filename}`
+}
+
 /** 由图片相对路径推导缩略图路径：static/images/x.png → static/images/x_thumb.webp */
 export function thumbPathFor(relativePath: string): string {
   return relativePath.replace(/\.[^./]+$/, '_thumb.webp')

@@ -32,28 +32,52 @@
     </div>
 
     <div v-if="batchVisible" :class="['kf-batch-banner', { 'is-running': batchRunning }]">
-      <span class="kf-batch-state">{{ t('episode.kf.batchBannerTitle') }} · {{ batchStatusLabel }}</span>
-      <span class="kf-batch-sep">·</span>
-      <span>{{ t('episode.kf.batchProgress', { done: batchDoneCount, total: batchItems.length }) }}</span>
-      <template v-if="batchRunning && batchCurrentNumber">
+      <div class="kf-batch-line">
+        <span class="kf-batch-state">{{ t('episode.kf.batchBannerTitle') }} · {{ batchStatusLabel }}</span>
         <span class="kf-batch-sep">·</span>
-        <span>{{ t('episode.kf.batchCurrent', { n: batchCurrentNumber, slot: slotLabel(batchCurrentSlot) }) }}</span>
-      </template>
-      <template v-if="batchFailedItems.length">
-        <span class="kf-batch-sep">·</span>
-        <span class="kf-batch-issue">{{ t('episode.kf.batchFailedCount', { n: batchFailedItems.length }) }}</span>
-      </template>
-      <template v-if="batchSkippedItems.length">
-        <span class="kf-batch-sep">·</span>
-        <span class="kf-batch-issue">{{ t('episode.kf.batchSkippedCount', { n: batchSkippedItems.length }) }}</span>
-      </template>
-      <button v-if="batchRunning" class="btn btn-sm ml-auto" :disabled="batchStopping" @click="cancelBatch">{{ t('episode.kf.batchStop') }}</button>
+        <span>{{ t('episode.kf.batchProgress', { done: batchCounts.completed, total: batchItems.length }) }}</span>
+        <template v-if="batchCounts.queued">
+          <span class="kf-batch-sep">·</span>
+          <span>{{ t('episode.kf.batchCountQueued', { n: batchCounts.queued }) }}</span>
+        </template>
+        <template v-if="batchCounts.running">
+          <span class="kf-batch-sep">·</span>
+          <span>{{ t('episode.kf.batchCountRunning', { n: batchCounts.running }) }}</span>
+        </template>
+        <template v-if="batchCounts.failed">
+          <span class="kf-batch-sep">·</span>
+          <span class="kf-batch-issue">{{ t('episode.kf.batchFailedCount', { n: batchCounts.failed }) }}</span>
+        </template>
+        <template v-if="batchCounts.cancelled">
+          <span class="kf-batch-sep">·</span>
+          <span class="kf-batch-issue">{{ t('episode.kf.batchCountCancelled', { n: batchCounts.cancelled }) }}</span>
+        </template>
+        <template v-if="batchCounts.skipped">
+          <span class="kf-batch-sep">·</span>
+          <span class="kf-batch-issue">{{ t('episode.kf.batchSkippedCount', { n: batchCounts.skipped }) }}</span>
+        </template>
+        <template v-if="batchEtaText">
+          <span class="kf-batch-sep">·</span>
+          <span class="kf-batch-eta">{{ batchEtaText }}</span>
+        </template>
+        <div class="ml-auto flex gap-1">
+          <button v-if="batchRetryableCount" class="btn btn-sm" :disabled="batchRetrying" @click="retryFailedBatch">
+            <Loader2 v-if="batchRetrying" :size="11" class="animate-spin" />
+            {{ t('episode.kf.batchRetryFailed') }}
+          </button>
+          <button v-if="batchRunning" class="btn btn-sm" :disabled="batchStopping" @click="cancelConfirm = true">{{ t('episode.kf.batchStop') }}</button>
+        </div>
+      </div>
+      <div class="kf-batch-progress" role="progressbar" :aria-valuenow="batchPercent" aria-valuemin="0" aria-valuemax="100">
+        <span class="kf-batch-progress-fill" :style="{ width: batchPercent + '%' }" />
+        <span class="kf-batch-progress-text">{{ batchPercent }}%</span>
+      </div>
       <div v-if="batchIssues.length" class="kf-batch-issues">
         <span v-for="item in batchIssues" :key="`${item.storyboard_id}-${item.slot}`" :title="item.error || ''">
           {{ t('episode.kf.batchIssueItem', {
             n: item.storyboard_number,
             slot: slotLabel(item.slot),
-            state: item.state === 'failed' ? t('episode.kf.batchItemFailed') : t('episode.kf.batchItemSkipped'),
+            state: item.state === 'failed' ? t('episode.kf.batchItemFailed') : (item.state === 'cancelled' ? t('episode.kf.batchItemCancelled') : t('episode.kf.batchItemSkipped')),
             msg: mapError(item.error) || t('episode.kf.batchNoReason'),
           }) }}
         </span>
@@ -110,8 +134,9 @@
                 :title="slotLabel(slot)"
               >
                 <img v-if="slotImage(sb, slot)" :src="thumbOf(imgSrc(slotImage(sb, slot)))" loading="lazy" @error="onThumbError($event, slotImage(sb, slot))" />
-                <Loader2 v-else-if="isSlotPending(sb, slot)" :size="12" class="animate-spin" />
-                <span v-else class="kf-thumb-empty">{{ slotShort(slot) }}</span>
+                <span v-else-if="!slotRing(sb, slot)" class="kf-thumb-empty">{{ slotShort(slot) }}</span>
+                <!-- 重生成时旧图还在，进度环叠在图上 -->
+                <ProgressRing v-if="slotRing(sb, slot)" v-bind="slotRing(sb, slot)" compact :size="22" class="kf-thumb-ring" />
                 <span class="kf-thumb-tag">{{ slotShort(slot) }}</span>
               </div>
             </div>
@@ -242,7 +267,6 @@
                 :disabled="isSlotPending(selected, slot) || batchRunning"
                 @click="generateSlot(selected, slot)"
               >
-                <Loader2 v-if="isSlotPending(selected, slot)" :size="11" class="animate-spin" />
                 {{ isSlotPending(selected, slot)
                   ? t('episode.kf.generating')
                   : (slot === 'first' && kf(selected).inheritsFirst ? t('episode.kf.generateOwnFirst') : (slotImage(selected, slot) ? t('episode.kf.regenerate') : t('episode.kf.generate'))) }}
@@ -258,12 +282,22 @@
               >
                 <img v-if="slotImage(selected, slot)" :src="thumbOf(imgSrc(slotImage(selected, slot)))" loading="lazy" @error="onThumbError($event, slotImage(selected, slot))" />
                 <span v-else class="kf-preview-empty">
-                  <Loader2 v-if="isSlotPending(selected, slot)" :size="16" class="animate-spin" />
+                  <template v-if="isSlotPending(selected, slot)">{{ t('episode.kf.generating') }}</template>
                   <template v-else>{{ t('episode.kf.slotEmpty') }}</template>
                 </span>
               </button>
 
               <div class="kf-slot-main">
+                <div v-if="slotRing(selected, slot)" class="kf-slot-task">
+                  <ProgressRing
+                    v-bind="slotRing(selected, slot)"
+                    :size="42"
+                    :cancellable="slotCancellable(selected, slot)"
+                    retryable
+                    @cancel="cancelSlot(selected, slot)"
+                    @retry="generateSlot(selected, slot)"
+                  />
+                </div>
                 <label class="kf-field">
                   <span class="kf-field-label">{{ t('episode.kf.promptLabel', { slot: slotLabel(slot) }) }}</span>
                   <MentionTextarea
@@ -338,7 +372,11 @@
         </header>
         <div class="dialog-body kf-batch-body">
           <div class="kf-batch-row"><span>{{ t('episode.kf.batchCount') }}</span><strong>{{ t('episode.kf.batchCountValue', { n: batchConfirm.count }) }}</strong></div>
-          <div class="kf-batch-row"><span>{{ t('episode.kf.batchEta') }}</span><strong>{{ t('episode.kf.batchEtaValue', { n: batchConfirm.count * 3 }) }}</strong></div>
+          <div class="kf-batch-row">
+            <span>{{ t('episode.kf.batchEta') }}</span>
+            <strong>{{ batchEstimateText }}</strong>
+          </div>
+          <div v-if="batchEstimateNote" class="kf-batch-row kf-batch-row-note"><span /><span class="dim">{{ batchEstimateNote }}</span></div>
           <div class="kf-batch-row"><span>{{ t('episode.kf.batchModel') }}</span><strong>{{ imageModelLabel || t('episode.vid.defaultModel') }}</strong></div>
           <p class="kf-batch-note">{{ batchConfirm.regenerate ? t('episode.kf.batchRegenNote') : t('episode.kf.batchMissingNote') }}</p>
           <p class="kf-batch-note">{{ t('episode.kf.batchNote') }}</p>
@@ -349,6 +387,17 @@
         </footer>
       </div>
     </div>
+
+    <ConfirmDialog
+      :open="cancelConfirm"
+      :title="t('episode.kf.batchStop')"
+      :message="t('episode.kf.batchStopConfirm')"
+      :confirm-text="t('episode.kf.batchStop')"
+      :loading-text="t('episode.kf.batchStateStopping')"
+      :loading="batchStopping"
+      @cancel="cancelConfirm = false"
+      @confirm="cancelBatch"
+    />
   </div>
 </template>
 
@@ -357,9 +406,20 @@ import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { toast } from 'vue-sonner'
 import { useI18n } from 'vue-i18n'
 import { Loader2 } from 'lucide-vue-next'
-import { episodeAPI, storyboardAPI, taskAPI } from '~/composables/useApi'
+import { episodeAPI, storyboardAPI, taskAPI, imageQueueAPI } from '~/composables/useApi'
 import { toastError, mapError } from '~/composables/useToast'
 import MentionTextarea from '~/components/MentionTextarea.vue'
+import ProgressRing from '~/components/ProgressRing.vue'
+import ConfirmDialog from '~/components/ConfirmDialog.vue'
+import {
+  useNowTicker,
+  ringPropsFromTask,
+  ringPropsFromBatchItem,
+  isActiveTaskStatus,
+  isTerminalTaskStatus,
+  isActiveBatchItemState,
+  formatSeconds,
+} from '~/composables/useTaskProgress'
 
 const { t } = useI18n()
 
@@ -378,6 +438,8 @@ const props = defineProps({
   imageModelLabel: { type: String, default: '' },
   chatModel: { type: String, default: '' },
   chatConfigId: { type: Number, default: 0 },
+  // 剧集画幅，用于向 /image-queue/estimate 询问该尺寸的实测单张耗时
+  aspectRatio: { type: String, default: '16:9' },
   breaking: { type: Boolean, default: false },
   agentBusy: { type: Boolean, default: false },
 })
@@ -385,6 +447,17 @@ const emit = defineEmits(['break', 'refresh', 'preview', 'goto-assets', 'toggle-
 
 const SLOT_KEYS = ['first', 'mid', 'last']
 const SLOT_PROMPT_FIELD = { first: 'first_frame_prompt', mid: 'mid_frame_prompt', last: 'last_frame_prompt' }
+// 关键帧出图尺寸：与后端 storyboard-keyframes.ts 的 KEYFRAME_SIZES 一致，
+// 仅用于提交前向任务服务询问该分辨率的实测耗时
+const KEYFRAME_SIZES = {
+  '16:9': '1344x768',
+  '9:16': '768x1344',
+  '4:3': '1152x864',
+  '3:4': '864x1152',
+  '1:1': '1024x1024',
+}
+
+const now = useNowTicker()
 
 function slotLabel(slot) {
   if (slot === 'first') return t('episode.kf.slotFirst')
@@ -545,11 +618,59 @@ watch(() => props.storyboards, (list) => {
   selectedIds.value = selectedIds.value.filter(id => list.some(sb => sb.id === id))
 })
 
-// ===== 单张关键帧生成：提交后按任务轮询，完成即刷新分镜与版本列表 =====
-const pendingSlots = ref([])
+// ===== 单张关键帧生成：提交后按 sys_task 轮询（queued 也算进行中，cancelled 为终态） =====
+// 任务由服务端排队/超时，前端不设客户端超时；轮询失败（网络/5xx）只是跳过本轮，不改任务状态。
+const slotTasks = ref({})
+const submittingSlots = ref([])
+let pollStopped = false
+
+function slotKey(sbId, slot) { return `${sbId}:${slot}` }
+function slotTaskOf(sb, slot) { return slotTasks.value[slotKey(sb?.id, slot)] || null }
+
 function isSlotPending(sb, slot) {
-  if (pendingSlots.value.includes(`${sb?.id}:${slot}`)) return true
-  return batchItemOf(sb?.id, slot)?.state === 'running'
+  if (submittingSlots.value.includes(slotKey(sb?.id, slot))) return true
+  if (isActiveTaskStatus(slotTaskOf(sb, slot)?.status)) return true
+  const item = batchItemOf(sb?.id, slot)
+  return item ? isActiveBatchItemState(item.state) : false
+}
+
+/**
+ * 单张任务是否比批次项更新：活跃任务、批次项没有任务、或任务 id/created_at 更新。
+ * 单张重试会新建 sys_task，旧批次项仍停在 failed/cancelled，必须让新任务盖过它。
+ */
+function slotTaskIsNewer(task, item) {
+  if (!task) return false
+  if (!item || item.task_id == null) return true
+  if (isActiveTaskStatus(task.status)) return true
+  const a = Number(task.id)
+  const b = Number(item.task_id)
+  if (Number.isFinite(a) && Number.isFinite(b) && a !== b) return a > b
+  if (a === b) return false // 同一个任务：用批次项（含排队位次等更全的信息）
+  return String(task.created_at || task.createdAt || '') > String(item.created_at || '')
+}
+
+/** 槽位的进度环属性：最新的那次生成优先（单张重试盖过旧批次项），否则用批次项 */
+function slotRing(sb, slot) {
+  const key = slotKey(sb?.id, slot)
+  const item = batchItemOf(sb?.id, slot)
+  // 正在提交单张重试：先显示“排队中”，不要停留在旧批次项的失败态
+  if (submittingSlots.value.includes(key)) return ringPropsFromTask({ status: 'queued' }, now.value)
+  const task = slotTaskOf(sb, slot)
+  if (slotTaskIsNewer(task, item)) {
+    // 更新的任务已完成：清掉旧批次项留下的失败/取消蒙层
+    return task.status === 'completed' ? null : ringPropsFromTask(task, now.value)
+  }
+  // 批次项更新（或与任务同源）：以批次项为准；都不适用就不显示环，
+  // 旧的终态任务不得盖在更新的批次结果上
+  if (item && item.state !== 'skipped' && item.state !== 'completed') {
+    const ring = ringPropsFromBatchItem(item)
+    if (ring.status) return ring
+  }
+  return null
+}
+function slotCancellable(sb, slot) {
+  const task = slotTaskOf(sb, slot)
+  return Boolean(task?.cancellable) && isActiveTaskStatus(task?.status)
 }
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)) }
 
@@ -558,47 +679,67 @@ async function generateSlot(sb, slot) {
   if (batchRunning.value) { toast.info(t('episode.kf.batchAlreadyRunning')); return }
   const prompt = slotPrompt(sb, slot).trim()
   if (!prompt) { toast.warning(t('episode.kf.promptRequired')); return }
-  const key = `${sb.id}:${slot}`
-  pendingSlots.value = [...pendingSlots.value, key]
+  const key = slotKey(sb.id, slot)
+  submittingSlots.value = [...submittingSlots.value, key]
+  // 重试即新建任务：先清掉上一次的失败/取消记录，避免旧错误残留
+  const { [key]: _dropped, ...rest } = slotTasks.value
+  slotTasks.value = rest
   try {
     const task = await storyboardAPI.generateKeyframe(sb.id, slot, {
       prompt,
       model: props.imageModel || undefined,
       config_id: props.imageConfigId || undefined,
     })
+    if (task?.id) slotTasks.value = { ...slotTasks.value, [key]: task }
     toast.success(t('episode.kf.genStarted', { slot: slotLabel(slot) }))
     emit('refresh')
     void pollKeyframeTask(task?.id, sb.id, slot)
   } catch (e) {
-    pendingSlots.value = pendingSlots.value.filter(k => k !== key)
     toastError(e, { fallback: 'episode.kf.genFailed' })
+  } finally {
+    submittingSlots.value = submittingSlots.value.filter(k => k !== key)
   }
 }
 
-// 单张约 3 分钟，留足排队余量：5s × 180 ≈ 15 分钟
 async function pollKeyframeTask(taskId, sbId, slot) {
-  const key = `${sbId}:${slot}`
-  try {
-    if (!taskId) return
-    for (let i = 0; i < 180; i++) {
-      await sleep(5000)
-      let res = null
-      try { res = await taskAPI.get(taskId) } catch { continue }
-      if (res?.status === 'completed') {
-        toast.success(t('episode.kf.genDone', { slot: slotLabel(slot) }))
-        emit('refresh')
-        if (selected.value?.id === sbId) await loadVersions()
-        return
-      }
-      if (res?.status === 'failed') {
-        toastError(res?.error_msg || res?.errorMsg, { fallback: 'episode.kf.genFailed' })
-        emit('refresh')
-        return
-      }
+  if (!taskId) return
+  const key = slotKey(sbId, slot)
+  while (!pollStopped) {
+    await sleep(3500)
+    if (pollStopped) return
+    let res = null
+    try { res = await taskAPI.get(taskId) } catch { continue } // 网络/服务端错误：下一轮再试
+    if (!res) continue
+    slotTasks.value = { ...slotTasks.value, [key]: res }
+    if (!isTerminalTaskStatus(res.status)) continue
+    if (res.status === 'completed') {
+      // 已完成的任务保留在 slotTasks 里：slotRing 用它盖掉旧批次项遗留的失败/取消蒙层
+      toast.success(t('episode.kf.genDone', { slot: slotLabel(slot) }))
+      emit('refresh')
+      if (selected.value?.id === sbId) await loadVersions()
+      return
     }
-    toast.error(t('episode.kf.genTimeout'))
-  } finally {
-    pendingSlots.value = pendingSlots.value.filter(k => k !== key)
+    if (res.status === 'failed') {
+      // 失败状态保留在 slotTasks 里：槽位的进度环显示原因并提供重试
+      toastError(res.error_msg || res.errorMsg, { fallback: 'episode.kf.genFailed' })
+      emit('refresh')
+      return
+    }
+    toast.info(t('episode.kf.genCancelled', { slot: slotLabel(slot) }))
+    emit('refresh')
+    return
+  }
+}
+
+async function cancelSlot(sb, slot) {
+  const task = slotTaskOf(sb, slot)
+  if (!task?.id) return
+  try {
+    const res = await taskAPI.cancel(task.id)
+    slotTasks.value = { ...slotTasks.value, [slotKey(sb.id, slot)]: res || task }
+    toast.success(t('episode.kf.slotCancelRequested'))
+  } catch (e) {
+    toastError(e, { fallback: 'common.ring.cancelFailed' })
   }
 }
 
@@ -716,18 +857,52 @@ function pollPromptBatch(attempts = 240) {
   setTimeout(() => tick(attempts), 2500)
 }
 
-// ===== 集级串行关键帧批量：进度在服务端，刷新页面后继续展示 =====
+// ===== 集级关键帧批量：全部任务一次性提交到服务端队列，进度/估计由服务端给出 =====
 const batch = ref(null)
 const batchItems = computed(() => batch.value?.items || [])
 const batchRunning = computed(() => batch.value?.status === 'running')
-const batchDoneCount = computed(() => batchItems.value.filter(i => i.state === 'completed').length)
 const batchFailedItems = computed(() => batchItems.value.filter(i => i.state === 'failed'))
+const batchCancelledItems = computed(() => batchItems.value.filter(i => i.state === 'cancelled'))
 const batchSkippedItems = computed(() => batchItems.value.filter(i => i.state === 'skipped'))
-const batchIssues = computed(() => [...batchFailedItems.value, ...batchSkippedItems.value])
-const batchCurrentId = computed(() => batch.value?.current_storyboard_id ?? batch.value?.currentStoryboardId ?? null)
-const batchCurrentSlot = computed(() => batch.value?.current_slot ?? batch.value?.currentSlot ?? '')
-const batchCurrentNumber = computed(() =>
-  batchItems.value.find(i => i.storyboard_id === batchCurrentId.value)?.storyboard_number || 0)
+const batchIssues = computed(() => [...batchFailedItems.value, ...batchCancelledItems.value, ...batchSkippedItems.value])
+// counts 由服务端给出；老批次（没有 counts）按 items 兜底统计
+const batchCounts = computed(() => {
+  const given = batch.value?.counts
+  if (given) {
+    return {
+      pending: given.pending || 0,
+      queued: (given.queued || 0) + (given.pending || 0),
+      running: given.running || 0,
+      completed: given.completed || 0,
+      failed: given.failed || 0,
+      cancelled: given.cancelled || 0,
+      skipped: given.skipped || 0,
+    }
+  }
+  const count = state => batchItems.value.filter(i => i.state === state).length
+  return {
+    pending: count('pending'),
+    queued: count('queued') + count('pending'),
+    running: count('running'),
+    completed: count('completed'),
+    failed: count('failed'),
+    cancelled: count('cancelled'),
+    skipped: count('skipped'),
+  }
+})
+const batchPercent = computed(() => {
+  const given = Number(batch.value?.progress)
+  if (Number.isFinite(given)) return Math.round(Math.min(1, Math.max(0, given)) * 100)
+  const total = batchItems.value.length
+  return total ? Math.round((batchCounts.value.completed / total) * 100) : 0
+})
+const batchEtaText = computed(() => {
+  if (!batchRunning.value) return ''
+  const eta = Number(batch.value?.eta_seconds ?? batch.value?.etaSeconds)
+  if (!Number.isFinite(eta)) return ''
+  return t('episode.kf.batchRemaining', { time: formatSeconds(t, eta) })
+})
+const batchRetryableCount = computed(() => batchCounts.value.failed + batchCounts.value.cancelled)
 const batchStopping = computed(() => batchRunning.value && Boolean(batch.value?.cancel_requested ?? batch.value?.cancelRequested))
 const batchStatusLabel = computed(() => {
   const status = batch.value?.status
@@ -736,12 +911,76 @@ const batchStatusLabel = computed(() => {
   return t('episode.kf.batchStateDone')
 })
 const batchVisible = computed(() => Boolean(batch.value) && (batchRunning.value || batchIssues.value.length > 0))
+// 批次项（含已结束的失败/取消项）驱动槽位进度环与重试入口
 function batchItemOf(sbId, slot) {
-  if (!batchRunning.value) return null
+  if (!batch.value) return null
   return batchItems.value.find(i => i.storyboard_id === sbId && i.slot === slot) || null
+}
+const cancelConfirm = ref(false)
+const batchRetrying = ref(false)
+async function retryFailedBatch() {
+  if (batchRetrying.value) return
+  const n = batchRetryableCount.value
+  if (!n) { toast.info(t('episode.kf.batchRetryFailedNothing')); return }
+  batchRetrying.value = true
+  try {
+    applyBatch(await episodeAPI.retryFailedKeyframeBatch(props.episodeId))
+    startPolling()
+    toast.success(t('episode.kf.batchRetryFailedDone', { n }))
+  } catch (e) {
+    toastError(e, { fallback: 'episode.kf.genFailed' })
+  } finally {
+    batchRetrying.value = false
+  }
 }
 
 const batchConfirm = ref({ open: false, regenerate: false, ids: [], count: 0 })
+// 批量确认框的耗时估计：来自任务服务的实测数据（GET /image-queue/estimate）
+const batchEstimate = ref({ loading: false, data: null })
+const batchEstimateText = computed(() => {
+  const count = batchConfirm.value.count
+  if (batchEstimate.value.loading) return t('episode.kf.batchEtaEstimating')
+  const data = batchEstimate.value.data
+  // 非 qwen-jobs 供应商没有服务端队列与实测数据，回落到粗略估计
+  if (!data || data.supported === false) return t('episode.kf.batchEtaValue', { n: count * 3 })
+  if (data.total_seconds === null || data.total_seconds === undefined) return t('episode.kf.batchEtaOffline')
+  return t('episode.kf.batchEtaApiValue', {
+    total: formatSeconds(t, data.total_seconds),
+    per: formatSeconds(t, data.per_image_seconds),
+  })
+})
+const batchEstimateNote = computed(() => {
+  const data = batchEstimate.value.data
+  if (batchEstimate.value.loading || !data || data.supported === false) return ''
+  const parts = []
+  if (Number(data.queue_wait_seconds) > 0) parts.push(t('episode.kf.batchEtaQueueWait', { time: formatSeconds(t, data.queue_wait_seconds) }))
+  if (Number(data.online_workers) > 0) parts.push(t('episode.kf.batchEtaWorkers', { n: data.online_workers }))
+  if (data.basis) parts.push(t('episode.kf.batchEtaBasis', { basis: data.basis }))
+  return parts.join(' · ')
+})
+// 关键帧的参考图数量按本批最多的一镜算，估计宁可偏保守
+function maxBoundRefs(pool) {
+  let max = 0
+  for (const sb of pool) {
+    const bound = props.bindableAssets(sb).filter(a => a.bound).length
+    if (bound > max) max = bound
+  }
+  return max
+}
+async function loadBatchEstimate(pool, count) {
+  batchEstimate.value = { loading: true, data: null }
+  try {
+    const data = await imageQueueAPI.estimate({
+      config_id: props.imageConfigId || undefined,
+      size: KEYFRAME_SIZES[props.aspectRatio] || KEYFRAME_SIZES['16:9'],
+      references: maxBoundRefs(pool),
+      count,
+    })
+    batchEstimate.value = { loading: false, data }
+  } catch {
+    batchEstimate.value = { loading: false, data: null } // 估计拿不到就回落到粗略文案
+  }
+}
 // 待生成槽位：没有提示词的槽位跳过（承接分镜没有自有首帧提示词即跳过首帧）；
 // 勾选模式重生成全部槽位，否则只补缺图
 function slotTargets(sb, regenerate) {
@@ -761,6 +1000,7 @@ function openBatchConfirm() {
   const count = pool.reduce((sum, sb) => sum + slotTargets(sb, regenerate).length, 0)
   if (!count) { toast.info(t('episode.kf.batchNothing')); return }
   batchConfirm.value = { open: true, regenerate, ids: regenerate ? pool.map(sb => sb.id) : [], count }
+  void loadBatchEstimate(pool, count)
 }
 async function startBatch() {
   const { ids, count } = batchConfirm.value
@@ -780,6 +1020,7 @@ async function startBatch() {
   }
 }
 async function cancelBatch() {
+  cancelConfirm.value = false
   try {
     applyBatch(await episodeAPI.cancelKeyframeBatch(props.episodeId))
     toast.success(t('episode.kf.batchStopped'))
@@ -797,7 +1038,7 @@ async function loadBatch() {
   if (!props.episodeId) return
   let current = null
   try { current = applyBatch(await episodeAPI.keyframeBatch(props.episodeId)) } catch { return }
-  const settled = batchItems.value.filter(i => i.state !== 'pending' && i.state !== 'running').length
+  const settled = batchItems.value.filter(i => !isActiveBatchItemState(i.state)).length
   const wasPolling = Boolean(batchTimer)
   if (batchSettledCount >= 0 && settled !== batchSettledCount) {
     emit('refresh') // 每完成一张刷新，关键帧逐个出现
@@ -816,7 +1057,8 @@ async function loadBatch() {
   }
 }
 function startPolling() {
-  if (!batchTimer) batchTimer = setInterval(loadBatch, 10_000)
+  // 任务并发出图，3.5s 轮询让排队位置/剩余时间跟得上
+  if (!batchTimer) batchTimer = setInterval(loadBatch, 3500)
 }
 function stopPolling() {
   if (batchTimer) { clearInterval(batchTimer); batchTimer = null }
@@ -843,7 +1085,10 @@ watch(() => props.episodeId, () => {
   loadBatch()
   syncPromptBatch()
 })
-onBeforeUnmount(stopPolling)
+onBeforeUnmount(() => {
+  pollStopped = true
+  stopPolling()
+})
 </script>
 
 <style scoped>
@@ -861,9 +1106,8 @@ onBeforeUnmount(stopPolling)
 /* ===== 批量进度条 ===== */
 .kf-batch-banner {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 6px;
-  flex-wrap: wrap;
   padding: 8px 10px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -882,6 +1126,55 @@ onBeforeUnmount(stopPolling)
   gap: 2px;
   font-size: 11px;
   color: var(--text-3);
+}
+.kf-batch-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.kf-batch-eta { color: var(--accent); font-weight: 600; }
+.kf-batch-progress {
+  position: relative;
+  height: 14px;
+  border-radius: 7px;
+  background: var(--bg-3, var(--bg-1));
+  overflow: hidden;
+}
+.kf-batch-progress-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 7px;
+  transition: width 0.6s linear;
+}
+.kf-batch-progress-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-1);
+  font-variant-numeric: tabular-nums;
+}
+.kf-slot-task {
+  display: flex;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-2);
+}
+.kf-batch-row-note { align-items: flex-start; }
+.kf-thumb-ring {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: inherit;
 }
 
 /* ===== 空状态 ===== */

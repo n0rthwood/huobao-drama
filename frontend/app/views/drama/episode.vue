@@ -312,6 +312,19 @@
               </button>
             </div>
             <template v-else>
+            <div v-if="imageQueue.total" class="image-queue-bar">
+              <span class="image-queue-title">{{ t('episode.image.queueTitle') }}</span>
+              <span class="image-queue-sep">·</span>
+              <span>{{ t('episode.image.queueSummary', { queued: imageQueue.queued, running: imageQueue.running }) }}</span>
+              <template v-if="imageQueueEtaText">
+                <span class="image-queue-sep">·</span>
+                <span class="image-queue-eta">{{ imageQueueEtaText }}</span>
+              </template>
+              <div class="image-queue-progress" role="progressbar" :aria-valuenow="imageQueuePercent" aria-valuemin="0" aria-valuemax="100">
+                <span class="image-queue-progress-fill" :style="{ width: imageQueuePercent + '%' }" />
+              </div>
+              <span class="image-queue-percent">{{ t('episode.image.queueProgress', { percent: imageQueuePercent }) }}</span>
+            </div>
             <template v-if="!extractTab || extractTab === 'characters'">
             <div class="asset-section-title">
               {{ t('common.role') }}
@@ -369,6 +382,16 @@
                         {{ t('episode.asset.upload') }}
                       </button>
                     </div>
+                  </div>
+                  <div v-if="assetImageRing('character', c.id)" class="asset-task-ring" @click.stop>
+                    <ProgressRing
+                      v-bind="assetImageRing('character', c.id)"
+                      :size="36"
+                      :cancellable="isAssetImageCancellable('character', c.id)"
+                      retryable
+                      @cancel="cancelAssetImage('character', c.id)"
+                      @retry="retryAssetImage('character', c.id)"
+                    />
                   </div>
                   <div class="asset-final-prompt" :title="c.final_prompt || c.finalPrompt || ''">
                     <span class="afp-label">{{ t('episode.asset.finalPromptTurnaround') }}</span>
@@ -433,6 +456,16 @@
                     :references="s.reference_images ?? s.referenceImages"
                     @update="onAssetRefsUpdate(s, $event)"
                     @preview="openImageViewer"
+                  />
+                </div>
+                <div v-if="assetImageRing('scene', s.id)" class="asset-task-ring" @click.stop>
+                  <ProgressRing
+                    v-bind="assetImageRing('scene', s.id)"
+                    :size="36"
+                    :cancellable="isAssetImageCancellable('scene', s.id)"
+                    retryable
+                    @cancel="cancelAssetImage('scene', s.id)"
+                    @retry="retryAssetImage('scene', s.id)"
                   />
                 </div>
                 <div class="asset-foot">
@@ -501,6 +534,16 @@
                     @preview="openImageViewer"
                   />
                 </div>
+                <div v-if="assetImageRing('prop', p.id)" class="asset-task-ring" @click.stop>
+                  <ProgressRing
+                    v-bind="assetImageRing('prop', p.id)"
+                    :size="36"
+                    :cancellable="isAssetImageCancellable('prop', p.id)"
+                    retryable
+                    @cancel="cancelAssetImage('prop', p.id)"
+                    @retry="retryAssetImage('prop', p.id)"
+                  />
+                </div>
                 <div class="asset-foot">
                   <span :class="['dot', (p.image_url || p.imageUrl) && 'ok', isPendingPropImage(p.id) && 'pending']" />
                   <button class="btn btn-sm ml-auto" :title="t('episode.asset.uploadPropImage')" :disabled="isUploadingAsset('prop', p.id)" @click.stop="uploadAssetImage('prop', p.id)">
@@ -533,6 +576,7 @@
             :image-model-label="effectiveImageModelLabel"
             :chat-model="chatModelOverride() || ''"
             :chat-config-id="chatConfigId() || 0"
+            :aspect-ratio="dramaAspectRatio"
             :breaking="rt === 'storyboard_breaker'"
             :agent-busy="rn"
             @break="doBreakdown"
@@ -1136,7 +1180,15 @@
                   <div v-if="row.kind === 'video' && videoModerationHint(row.errorMsg)" class="video-task-error-hint">{{ videoModerationHint(row.errorMsg) }}</div>
                 </div>
               </div>
-              <span :class="['video-task-status', 'is-' + genTaskStateClass(row.status)]">
+              <ProgressRing
+                v-if="row.ring && row.ring.status && row.ring.status !== 'completed'"
+                v-bind="row.ring"
+                :size="32"
+                :cancellable="row.cancellable"
+                class="gen-task-ring"
+                @cancel="cancelGenTask(row)"
+              />
+              <span v-else :class="['video-task-status', 'is-' + genTaskStateClass(row.status)]">
                 <span :class="['dot', genTaskStateClass(row.status) === 'done' && 'ok', genTaskStateClass(row.status) === 'pending' && 'pending']" />
                 {{ genTaskStatusLabel(row.status) }}
               </span>
@@ -1539,6 +1591,14 @@ import { toastError, mapError, MODERATION_RE } from '~/composables/useToast'
 import LocaleSwitcher from '~/components/LocaleSwitcher.vue'
 import ReferenceImageManager from '~/components/ReferenceImageManager.vue'
 import StoryboardKeyframes from '~/components/StoryboardKeyframes.vue'
+import ProgressRing from '~/components/ProgressRing.vue'
+import {
+  useNowTicker,
+  ringPropsFromTask,
+  isActiveTaskStatus,
+  summarizeTasks,
+  formatSeconds,
+} from '~/composables/useTaskProgress'
 
 definePageMeta({ layout: 'studio' })
 
@@ -1708,9 +1768,12 @@ function toggleSidebar() {
 /** 顶栏文本模型覆盖参数：未选择时为 undefined，后端回退到 Agent/文本配置默认 */
 function chatModelOverride() { return bareModelName(chatModel.value) || undefined }
 function chatConfigId() { return ownerConfigId(textModelOptions.value, chatModel.value) }
-const pendingCharImageIds = ref([])
-const pendingSceneImageIds = ref([])
-const pendingPropImageIds = ref([])
+// ===== 素材图片生成：按 sys_task 跟踪（排队位置 / 进度 / 失败原因 / 取消） =====
+// 任务记录来自 loadGenTasks（/episodes/:id/generation-tasks），不再靠反复刷新等 image_url 出现
+const now = useNowTicker()
+const ASSET_TASK_FIELD = { character: 'character_id', scene: 'scene_id', prop: 'prop_id' }
+// 已点生成、后端尚未返回 sys_task 的空窗期（返回后立即被真实任务接管）
+const submittingAssetImages = ref([])
 const pendingVideoIds = ref([])
 const failedVideoMessages = ref({})
 // 任务列表面板：顶栏按钮触发的右侧抽屉,按集聚合 sys_task + video_merges
@@ -1718,6 +1781,60 @@ const genTasks = ref([])
 const genMerges = ref([])
 const taskDrawer = ref(false)
 let genTasksTimer = null
+
+const imageTasks = computed(() => genTasks.value.filter(task => task.type === 'image'))
+const activeImageTasks = computed(() => imageTasks.value.filter(task => isActiveTaskStatus(task.status)))
+// 集级「图片生成队列」汇总条：加权整体进度 + 最晚一张的预计完成时间
+const imageQueue = computed(() => summarizeTasks(activeImageTasks.value, now.value))
+const imageQueueEtaText = computed(() =>
+  imageQueue.value.etaSeconds === null ? '' : t('episode.image.queueEta', { time: formatSeconds(t, imageQueue.value.etaSeconds) }))
+const imageQueuePercent = computed(() => Math.round(imageQueue.value.progress * 100))
+
+/** 该素材最新的一条图片任务（按 created_at、id 兜底） */
+function latestAssetImageTask(type, id) {
+  const field = ASSET_TASK_FIELD[type]
+  let latest = null
+  for (const task of imageTasks.value) {
+    if (task[field] !== id) continue
+    const newer = !latest
+      || String(task.created_at || '') > String(latest.created_at || '')
+      || (String(task.created_at || '') === String(latest.created_at || '') && task.id > latest.id)
+    if (newer) latest = task
+  }
+  return latest
+}
+function isAssetImagePending(type, id) {
+  if (submittingAssetImages.value.includes(`${type}:${id}`)) return true
+  return isActiveTaskStatus(latestAssetImageTask(type, id)?.status)
+}
+/** 卡片进度环：排队/生成中/失败/已取消时显示，已完成的卡片直接看图 */
+function assetImageRing(type, id) {
+  if (submittingAssetImages.value.includes(`${type}:${id}`)) return ringPropsFromTask({ status: 'queued' }, now.value)
+  const task = latestAssetImageTask(type, id)
+  if (!task || task.status === 'completed') return null
+  return ringPropsFromTask(task, now.value)
+}
+function isAssetImageCancellable(type, id) {
+  const task = latestAssetImageTask(type, id)
+  return Boolean(task?.cancellable) && isActiveTaskStatus(task?.status)
+}
+async function cancelAssetImage(type, id) {
+  const task = latestAssetImageTask(type, id)
+  if (!task?.id) return
+  try {
+    await taskAPI.cancel(task.id)
+    toast.success(t('episode.image.taskCancelRequested'))
+    await loadGenTasks()
+  } catch (e) {
+    toastError(e, { fallback: 'episode.image.taskCancelFailed' })
+  }
+}
+// 重试 = 重新走各资产的生成接口（后端每次都新建 sys_task）
+function retryAssetImage(type, id) {
+  if (type === 'character') return genCharImg(id)
+  if (type === 'scene') return genSceneImg(id)
+  return genPropImg(id)
+}
 
 function openTaskDrawer() {
   taskDrawer.value = true
@@ -1755,7 +1872,7 @@ const savingAssetDetail = ref(false)
 const switchingAssetVersion = ref(false)
 
 function isPendingCharImage(id) {
-  return pendingCharImageIds.value.includes(id)
+  return isAssetImagePending('character', id)
 }
 
 function openImageViewer(src, title = '') {
@@ -1908,11 +2025,6 @@ const generatingPromptKeys = ref([])
 
 function isGeneratingPrompt(type, id) {
   return generatingPromptKeys.value.includes(`${type}:${id}`)
-}
-
-/** 该资产图片是否在外层「生成」流程中（含提示词阶段与生图阶段） */
-function isAssetImagePending(type, id) {
-  return type === 'character' ? isPendingCharImage(id) : type === 'scene' ? isPendingSceneImage(id) : isPendingPropImage(id)
 }
 
 /**
@@ -2117,7 +2229,7 @@ onBeforeUnmount(() => {
 })
 
 function isPendingSceneImage(id) {
-  return pendingSceneImageIds.value.includes(id)
+  return isAssetImagePending('scene', id)
 }
 
 function isPendingVideo(id) {
@@ -2491,7 +2603,7 @@ async function loadGenTasks() {
     for (const [sbId, t] of latestBySb) {
       // 分镜已有视频(失败后重试成功)时不再报历史错误
       if (hasVid(sbs.value.find(s => s.id === sbId))) continue
-      if (t.status === 'processing') pending.add(sbId)
+      if (isActiveTaskStatus(t.status)) pending.add(sbId)
       else if (t.status === 'failed') failed[sbId] = t.error_msg || t('episode.status.failed')
     }
     // 刚点击提交、任务记录尚未加载出来的本地状态保留,避免状态闪退
@@ -2508,8 +2620,20 @@ function stopGenTasksPolling() {
   if (genTasksTimer) { clearInterval(genTasksTimer); genTasksTimer = null }
 }
 
+// 抽屉里的取消：qwen-jobs 图片任务可取消，其余供应商后端返回 400
+async function cancelGenTask(row) {
+  if (!row?.id || row.kind === 'merge') return
+  try {
+    await taskAPI.cancel(row.id)
+    toast.success(t('episode.image.taskCancelRequested'))
+    await loadGenTasks()
+  } catch (e) {
+    toastError(e, { fallback: 'episode.image.taskCancelFailed' })
+  }
+}
+
 const genTaskActiveCount = computed(() =>
-  genTasks.value.filter(t => t.status === 'processing').length +
+  genTasks.value.filter(t => isActiveTaskStatus(t.status)).length +
   genMerges.value.filter(m => m.status === 'processing' || m.status === 'pending').length
 )
 const genTaskDoneCount = computed(() =>
@@ -2543,19 +2667,22 @@ function genTaskTargetLabel(task) {
 
 // 统一行结构：image / video / merge 三类合并按时间倒序
 const genTaskRows = computed(() => {
-  const taskRows = genTasks.value.map(t => ({
-    key: `task-${t.id}`,
-    kind: t.type, // image | video
-    id: t.id,
-    targetLabel: genTaskTargetLabel(t),
-    provider: t.provider || '',
-    model: t.model || '',
-    status: t.status || 'processing',
-    errorMsg: t.error_msg || '',
-    previewUrl: t.local_path || t.result_url || '',
-    prompt: t.prompt || '',
-    createdAt: t.created_at || '',
-    completedAt: t.completed_at || '',
+  const taskRows = genTasks.value.map(task => ({
+    key: `task-${task.id}`,
+    kind: task.type, // image | video
+    id: task.id,
+    targetLabel: genTaskTargetLabel(task),
+    provider: task.provider || '',
+    model: task.model || '',
+    status: task.status || 'processing',
+    errorMsg: task.error_msg || '',
+    previewUrl: task.local_path || task.result_url || '',
+    prompt: task.prompt || '',
+    createdAt: task.created_at || '',
+    completedAt: task.completed_at || '',
+    // 排队位置/进度/剩余时间（qwen-jobs 任务服务透传）
+    ring: task.status === 'completed' ? null : ringPropsFromTask(task, now.value),
+    cancellable: Boolean(task.cancellable) && isActiveTaskStatus(task.status),
   }))
   const mergeRows = genMerges.value.map(m => ({
     key: `merge-${m.id}`,
@@ -2565,6 +2692,8 @@ const genTaskRows = computed(() => {
     provider: m.provider || 'ffmpeg',
     model: m.model || '',
     status: m.status || 'pending',
+    ring: null,
+    cancellable: false,
     errorMsg: m.error_msg || '',
     previewUrl: m.merged_url || '',
     prompt: '',
@@ -2581,13 +2710,15 @@ function genTaskKindLabel(kind) {
 function genTaskStatusLabel(status) {
   if (status === 'completed') return t('episode.status.done')
   if (status === 'failed') return t('episode.status.failed')
+  if (status === 'cancelled') return t('common.ring.cancelled')
+  if (status === 'queued') return t('common.ring.queued')
   return t('episode.status.generating')
 }
 
 // 映射到现有 video-task-status 的样式类:is-done / is-pending / is-failed
 function genTaskStateClass(status) {
   if (status === 'completed') return 'done'
-  if (status === 'failed') return 'failed'
+  if (status === 'failed' || status === 'cancelled') return 'failed'
   return 'pending'
 }
 
@@ -2604,10 +2735,12 @@ function genTaskDuration(row) {
   return ms >= 60000 ? `${Math.floor(ms / 60000)}m${Math.round((ms % 60000) / 1000)}s` : `${Math.round(ms / 1000)}s`
 }
 
-// 抽屉打开且有进行中任务时,4s 轮询;关闭或全部结束时停止
-watch([taskDrawer, genTaskActiveCount], ([open, active]) => {
+// 有进行中的任务就 4s 轮询：抽屉开着要看列表，素材卡片与「图片生成队列」汇总条也靠它刷新
+const genTasksPolling = computed(() =>
+  (taskDrawer.value && genTaskActiveCount.value > 0) || activeImageTasks.value.length > 0)
+watch(genTasksPolling, (on) => {
   stopGenTasksPolling()
-  if (open && active > 0) {
+  if (on) {
     genTasksTimer = setInterval(loadGenTasks, 4000)
   }
 })
@@ -3158,124 +3291,81 @@ function watchAsyncResult(check, attempts = 24, delay = 2500) {
   })()
 }
 
-async function genCharImg(id) {
+function isPendingPropImage(id) {
+  return isAssetImagePending('prop', id)
+}
+// 单张生成：后端同步建好 sys_task 再返回，提交后拉一次任务列表，卡片即接上进度环
+async function submitAssetImage(type, id, call, startedToastKey) {
+  const key = `${type}:${id}`
+  if (isAssetImagePending(type, id)) return
+  submittingAssetImages.value = [...submittingAssetImages.value, key]
   try {
-    if (!isPendingCharImage(id)) pendingCharImageIds.value.push(id)
-    const char = chars.value.find(c => c.id === id)
-    if (char && !(char.final_prompt || char.finalPrompt)) {
+    const list = type === 'character' ? chars.value : type === 'scene' ? scenes.value : propItems.value
+    const item = list.find(x => x.id === id)
+    if (item && !(item.final_prompt || item.finalPrompt)) {
       toast.info(t('episode.asset.generatingPrompt'))
       try {
-        await ensureAssetPrompt('character', id)
+        await ensureAssetPrompt(type, id)
       } catch {} // 提示词生成失败不阻断：后端生图前会再兜底生成或回退本地拼接
     }
-    await characterAPI.generateImage(id, epId.value, bareModelName(imageModel.value) || undefined, ownerConfigId(imageModelOptions.value, imageModel.value), chatModelOverride(), chatConfigId())
-    toast.success(t('episode.image.generatingChar'))
-    await refresh()
-    watchAsyncResult(() => {
-      const char = chars.value.find(c => c.id === id)
-      const done = !!(char?.image_url || char?.imageUrl)
-      if (done) pendingCharImageIds.value = pendingCharImageIds.value.filter(item => item !== id)
-      return done
-    })
+    await call()
+    toast.success(t(startedToastKey))
+    await refresh() // refresh() 内部已重新拉取任务列表
   } catch (e) {
-    pendingCharImageIds.value = pendingCharImageIds.value.filter(item => item !== id)
     toastError(e)
+  } finally {
+    submittingAssetImages.value = submittingAssetImages.value.filter(k => k !== key)
+  }
+}
+function genCharImg(id) {
+  return submitAssetImage('character', id,
+    () => characterAPI.generateImage(id, epId.value, bareModelName(imageModel.value) || undefined, ownerConfigId(imageModelOptions.value, imageModel.value), chatModelOverride(), chatConfigId()),
+    'episode.image.generatingChar')
+}
+function genSceneImg(id) {
+  return submitAssetImage('scene', id,
+    () => sceneAPI.generateImage(id, epId.value, bareModelName(imageModel.value) || undefined, ownerConfigId(imageModelOptions.value, imageModel.value), chatModelOverride(), chatConfigId()),
+    'episode.image.generatingScene')
+}
+function genPropImg(id) {
+  return submitAssetImage('prop', id,
+    () => propAPI.generateImage(id, epId.value, bareModelName(imageModel.value) || undefined, ownerConfigId(imageModelOptions.value, imageModel.value), chatModelOverride(), chatConfigId()),
+    'episode.image.generatingProp')
+}
+// 批量：一次性全部提交，服务端排队，前端只负责把任务列表拉回来
+async function submitAssetImageBatch(type, ids, submit, startedToastKey) {
+  const keys = ids.map(id => `${type}:${id}`)
+  submittingAssetImages.value = [...new Set([...submittingAssetImages.value, ...keys])]
+  try {
+    await submit()
+    toast.success(t(startedToastKey))
+    await refresh()
+  } catch (e) {
+    toastError(e)
+  } finally {
+    submittingAssetImages.value = submittingAssetImages.value.filter(k => !keys.includes(k))
   }
 }
 function batchCharImages() {
   const ids = visualChars.value.filter(c => !(c.image_url || c.imageUrl)).map(c => c.id)
   if (!ids.length) { toast.info(t('episode.image.allCharsDone')); return }
-  pendingCharImageIds.value = [...new Set([...pendingCharImageIds.value, ...ids])]
-  characterAPI.batchImages(ids, epId.value, bareModelName(imageModel.value) || undefined, ownerConfigId(imageModelOptions.value, imageModel.value), chatModelOverride(), chatConfigId()).then(async () => {
-    toast.success(t('episode.image.batchGeneratingChar'))
-    await refresh()
-    watchAsyncResult(() => ids.every(id => {
-      const char = chars.value.find(c => c.id === id)
-      const done = !!(char?.image_url || char?.imageUrl)
-      if (done) pendingCharImageIds.value = pendingCharImageIds.value.filter(item => item !== id)
-      return done
-    }), 36)
-  }).catch(e => {
-    pendingCharImageIds.value = pendingCharImageIds.value.filter(item => !ids.includes(item))
-    toastError(e)
-  })
-}
-async function genSceneImg(id) {
-  try {
-    if (!isPendingSceneImage(id)) pendingSceneImageIds.value.push(id)
-    const scene = scenes.value.find(s => s.id === id)
-    if (scene && !(scene.final_prompt || scene.finalPrompt)) {
-      toast.info(t('episode.asset.generatingPrompt'))
-      try {
-        await ensureAssetPrompt('scene', id)
-      } catch {} // 提示词生成失败不阻断：后端生图前会再兜底生成或回退本地拼接
-    }
-    await sceneAPI.generateImage(id, epId.value, bareModelName(imageModel.value) || undefined, ownerConfigId(imageModelOptions.value, imageModel.value), chatModelOverride(), chatConfigId())
-    toast.success(t('episode.image.generatingScene'))
-    await refresh()
-    watchAsyncResult(() => {
-      const scene = scenes.value.find(s => s.id === id)
-      const done = !!(scene?.image_url || scene?.imageUrl)
-      if (done) pendingSceneImageIds.value = pendingSceneImageIds.value.filter(item => item !== id)
-      return done
-    })
-  } catch (e) {
-    pendingSceneImageIds.value = pendingSceneImageIds.value.filter(item => item !== id)
-    toastError(e)
-  }
-}
-function isPendingPropImage(id) {
-  return pendingPropImageIds.value.includes(id)
-}
-async function genPropImg(id) {
-  try {
-    if (!isPendingPropImage(id)) pendingPropImageIds.value.push(id)
-    const prop = propItems.value.find(p => p.id === id)
-    if (prop && !(prop.final_prompt || prop.finalPrompt)) {
-      toast.info(t('episode.asset.generatingPrompt'))
-      try {
-        await ensureAssetPrompt('prop', id)
-      } catch {} // 提示词生成失败不阻断：后端生图前会再兜底生成或回退本地拼接
-    }
-    await propAPI.generateImage(id, epId.value, bareModelName(imageModel.value) || undefined, ownerConfigId(imageModelOptions.value, imageModel.value), chatModelOverride(), chatConfigId())
-    toast.success(t('episode.image.generatingProp'))
-    await refresh()
-    watchAsyncResult(() => {
-      const prop = propItems.value.find(p => p.id === id)
-      const done = !!(prop?.image_url || prop?.imageUrl)
-      if (done) pendingPropImageIds.value = pendingPropImageIds.value.filter(item => item !== id)
-      return done
-    })
-  } catch (e) {
-    pendingPropImageIds.value = pendingPropImageIds.value.filter(item => item !== id)
-    toastError(e)
-  }
+  void submitAssetImageBatch('character', ids,
+    () => characterAPI.batchImages(ids, epId.value, bareModelName(imageModel.value) || undefined, ownerConfigId(imageModelOptions.value, imageModel.value), chatModelOverride(), chatConfigId()),
+    'episode.image.batchGeneratingChar')
 }
 function batchSceneImages() {
   const ids = scenes.value.filter(s => !(s.image_url || s.imageUrl)).map(s => s.id)
   if (!ids.length) { toast.info(t('episode.image.allScenesDone')); return }
-  pendingSceneImageIds.value = [...new Set([...pendingSceneImageIds.value, ...ids])]
-  ids.forEach(id => { sceneAPI.generateImage(id, epId.value, bareModelName(imageModel.value) || undefined, ownerConfigId(imageModelOptions.value, imageModel.value), chatModelOverride(), chatConfigId()).then(() => refresh()).catch(e => toastError(e)) })
-  toast.success(t('episode.image.batchGeneratingScene'))
-  watchAsyncResult(() => ids.every(id => {
-    const scene = scenes.value.find(s => s.id === id)
-    const done = !!(scene?.image_url || scene?.imageUrl)
-    if (done) pendingSceneImageIds.value = pendingSceneImageIds.value.filter(item => item !== id)
-    return done
-  }), 36)
+  void submitAssetImageBatch('scene', ids,
+    () => Promise.all(ids.map(id => sceneAPI.generateImage(id, epId.value, bareModelName(imageModel.value) || undefined, ownerConfigId(imageModelOptions.value, imageModel.value), chatModelOverride(), chatConfigId()))),
+    'episode.image.batchGeneratingScene')
 }
 function batchPropImages() {
   const ids = propItems.value.filter(p => !(p.image_url || p.imageUrl)).map(p => p.id)
   if (!ids.length) { toast.info(t('episode.image.allPropsDone')); return }
-  pendingPropImageIds.value = [...new Set([...pendingPropImageIds.value, ...ids])]
-  ids.forEach(id => { propAPI.generateImage(id, epId.value, bareModelName(imageModel.value) || undefined, ownerConfigId(imageModelOptions.value, imageModel.value), chatModelOverride(), chatConfigId()).then(() => refresh()).catch(e => toastError(e)) })
-  toast.success(t('episode.image.batchGeneratingProp'))
-  watchAsyncResult(() => ids.every(id => {
-    const prop = propItems.value.find(p => p.id === id)
-    const done = !!(prop?.image_url || prop?.imageUrl)
-    if (done) pendingPropImageIds.value = pendingPropImageIds.value.filter(item => item !== id)
-    return done
-  }), 36)
+  void submitAssetImageBatch('prop', ids,
+    () => Promise.all(ids.map(id => propAPI.generateImage(id, epId.value, bareModelName(imageModel.value) || undefined, ownerConfigId(imageModelOptions.value, imageModel.value), chatModelOverride(), chatConfigId()))),
+    'episode.image.batchGeneratingProp')
 }
 function getVideoUrl(s) { return s?.video_url || s?.videoUrl || s?.composed_video_url || s?.composedVideoUrl || null }
 function hasVid(s) { return !!getVideoUrl(s) }
@@ -3647,6 +3737,11 @@ async function pollVideoGeneration(generationId, storyboardId) {
           [storyboardId]: errMsg,
         }
         toastError(errMsg, { fallback: 'episode.vid.genFailed' })
+        return false
+      }
+      if (res?.status === 'cancelled') {
+        pendingVideoIds.value = pendingVideoIds.value.filter(item => item !== storyboardId)
+        toast.info(t('common.ring.cancelled'))
         return false
       }
     } catch {}
@@ -4757,6 +4852,45 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
   text-overflow: ellipsis;
 }
 .asset-foot { display: flex; align-items: center; gap: 4px; padding: 7px 11px; border-top: 1px solid var(--border); }
+/* 图片生成队列汇总条 + 卡片进度环 */
+.image-queue-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  padding: 8px 11px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--bg-2);
+  font-size: 12px;
+  color: var(--text-2);
+}
+.image-queue-title { font-weight: 600; color: var(--text-1); }
+.image-queue-sep { color: var(--text-3); }
+.image-queue-eta { color: var(--accent); font-weight: 600; }
+.image-queue-progress {
+  flex: 1;
+  min-width: 120px;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--bg-3, var(--bg-1));
+  overflow: hidden;
+}
+.image-queue-progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--accent);
+  transition: width 0.6s linear;
+}
+.image-queue-percent { font-variant-numeric: tabular-nums; }
+.asset-task-ring {
+  display: flex;
+  padding: 7px 11px;
+  border-top: 1px solid var(--border);
+}
+.gen-task-ring { flex: none; }
 
 /* Frame grid */
 .frame-grid { display: flex; flex-direction: column; gap: 8px; }

@@ -260,6 +260,16 @@
                     <span class="afp-label">{{ t('episode.asset.finalPromptTurnaround') }}</span>
                     <span :class="['afp-text', !m.finalPrompt && 'dim']">{{ m.finalPrompt || t('episode.asset.finalPromptAutoTurnaround') }}</span>
                   </div>
+                  <div v-if="materialRing(m)" class="asset-task-ring" @click.stop>
+                    <ProgressRing
+                      v-bind="materialRing(m)"
+                      :size="36"
+                      :cancellable="isMaterialCancellable(m)"
+                      retryable
+                      @cancel="cancelMaterial(m)"
+                      @retry="generateMaterial(m)"
+                    />
+                  </div>
                 </div>
               </article>
             </div>
@@ -303,6 +313,16 @@
                     <span class="afp-label">{{ g.kindKey === 'scene' ? t('episode.asset.finalPromptFixed') : t('episode.asset.finalPromptWhiteBg') }}</span>
                     {{ m.finalPrompt || (g.kindKey === 'scene' ? t('episode.asset.finalPromptAutoFixed') : t('episode.asset.finalPromptAutoWhiteBg')) }}
                   </div>
+                </div>
+                <div v-if="materialRing(m)" class="asset-task-ring" @click.stop>
+                  <ProgressRing
+                    v-bind="materialRing(m)"
+                    :size="36"
+                    :cancellable="isMaterialCancellable(m)"
+                    retryable
+                    @cancel="cancelMaterial(m)"
+                    @retry="generateMaterial(m)"
+                  />
                 </div>
                 <div class="asset-foot">
                   <span :class="['dot', matHasImage(m) && 'ok', isPending(m) && 'pending']" />
@@ -580,8 +600,10 @@
 import { toast } from 'vue-sonner'
 import { toastError } from '~/composables/useToast'
 import { useI18n } from 'vue-i18n'
-import { dramaAPI, episodeAPI, characterAPI, sceneAPI, propAPI, uploadAPI } from '~/composables/useApi'
+import { dramaAPI, episodeAPI, characterAPI, sceneAPI, propAPI, uploadAPI, taskAPI } from '~/composables/useApi'
 import BaseSelect from '~/components/BaseSelect.vue'
+import ProgressRing from '~/components/ProgressRing.vue'
+import { useNowTicker, ringPropsFromTask, isActiveTaskStatus } from '~/composables/useTaskProgress'
 
 const { t, locale } = useI18n()
 
@@ -745,7 +767,6 @@ const pendingAssetLink = queryTypedId(route.query.asset, ['character', 'scene', 
 const activeTab = ref(pendingAssetLink ? 'assets' : ((querySingle(route.query.tab) && urlTab) || 'episodes'))
 const assetTab = ref(queryEnum(route.query.filter, ['all', 'character', 'scene', 'prop']) || 'all')
 const assetViewer = ref({ open: false, src: '', title: '' })
-const pendingMaterials = ref(new Set())
 const assetTabs = computed(() => ([
   { label: t('index.status.all'), value: 'all' },
   { label: t('common.role'), value: 'character' },
@@ -800,44 +821,87 @@ const assetGroups = computed(() => {
 })
 
 function pendingKey(m) { return `${m.kindKey}:${m.id}` }
-function isPending(m) { return pendingMaterials.value.has(pendingKey(m)) }
 
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)) }
+// ===== 素材生图：按 sys_task 跟踪（排队位置 / 进度 / 失败原因 / 取消） =====
+const now = useNowTicker()
+const imageTasks = ref([])
+const submittingMaterials = ref([]) // 已提交、任务列表还没拉回来的空窗期
+const MATERIAL_TASK_FIELD = { character: 'character_id', scene: 'scene_id', prop: 'prop_id' }
+let imageTasksTimer = null
+
+let completedTaskCount = -1
+async function loadImageTasks() {
+  try {
+    const rows = await taskAPI.list({ type: 'image', drama_id: dramaId })
+    imageTasks.value = Array.isArray(rows) ? rows : (rows?.items || [])
+  } catch { /* 网络/服务端错误：保留上一轮状态，下一轮再试 */ }
+  // 有任务刚完成就重新拉剧本数据，新图随之出现
+  const completed = imageTasks.value.filter(task => task.status === 'completed').length
+  if (completedTaskCount >= 0 && completed !== completedTaskCount) await load()
+  completedTaskCount = completed
+  syncImageTaskPolling()
+}
+function syncImageTaskPolling() {
+  const active = imageTasks.value.some(task => isActiveTaskStatus(task.status))
+  if (active && !imageTasksTimer) imageTasksTimer = setInterval(loadImageTasks, 4000)
+  if (!active && imageTasksTimer) { clearInterval(imageTasksTimer); imageTasksTimer = null }
+}
+function latestMaterialTask(m) {
+  const field = MATERIAL_TASK_FIELD[m?.kindKey]
+  if (!field) return null
+  let latest = null
+  for (const task of imageTasks.value) {
+    if (task[field] !== m.id) continue
+    const newer = !latest
+      || String(task.created_at || '') > String(latest.created_at || '')
+      || (String(task.created_at || '') === String(latest.created_at || '') && task.id > latest.id)
+    if (newer) latest = task
+  }
+  return latest
+}
+function isPending(m) {
+  if (submittingMaterials.value.includes(pendingKey(m))) return true
+  return isActiveTaskStatus(latestMaterialTask(m)?.status)
+}
+function materialRing(m) {
+  if (submittingMaterials.value.includes(pendingKey(m))) return ringPropsFromTask({ status: 'queued' }, now.value)
+  const task = latestMaterialTask(m)
+  if (!task || task.status === 'completed') return null
+  return ringPropsFromTask(task, now.value)
+}
+function isMaterialCancellable(m) {
+  const task = latestMaterialTask(m)
+  return Boolean(task?.cancellable) && isActiveTaskStatus(task?.status)
+}
+async function cancelMaterial(m) {
+  const task = latestMaterialTask(m)
+  if (!task?.id) return
+  try {
+    await taskAPI.cancel(task.id)
+    toast.success(t('episode.image.taskCancelRequested'))
+    await loadImageTasks()
+  } catch (e) {
+    toastError(e, { fallback: 'episode.image.taskCancelFailed' })
+  }
+}
 
 async function generateMaterial(m) {
   const epId = drama.value?.episodes?.[0]?.id
   if (!epId) { toast.error(t('detail.mat.needEpisodeForImage')); return }
   const key = pendingKey(m)
-  if (pendingMaterials.value.has(key)) return
-  pendingMaterials.value = new Set(pendingMaterials.value).add(key)
+  if (isPending(m)) return
+  submittingMaterials.value = [...submittingMaterials.value, key]
   try {
     if (m.kindKey === 'character') await characterAPI.generateImage(m.id, epId)
     else if (m.kindKey === 'scene') await sceneAPI.generateImage(m.id, epId)
     else await propAPI.generateImage(m.id, epId)
     toast.success(t('detail.mat.generating', { kind: m.kind, name: m.name }))
-    pollMaterial(m)
+    await loadImageTasks()
   } catch (e) {
-    pendingMaterials.value = new Set([...pendingMaterials.value].filter(k => k !== key))
     toastError(e)
+  } finally {
+    submittingMaterials.value = submittingMaterials.value.filter(k => k !== key)
   }
-}
-
-// 生图为异步任务：轮询重新加载 drama，直到该素材 imageUrl 出现
-async function pollMaterial(m) {
-  const key = pendingKey(m)
-  for (let i = 0; i < 40; i++) {
-    await sleep(2500)
-    await load()
-    const d = drama.value
-    const list = m.kindKey === 'character' ? d?.characters : m.kindKey === 'scene' ? d?.scenes : d?.props
-    const rec = list?.find(x => x.id === m.id)
-    if (rec && matImage(rec)) {
-      pendingMaterials.value = new Set([...pendingMaterials.value].filter(k => k !== key))
-      return
-    }
-  }
-  pendingMaterials.value = new Set([...pendingMaterials.value].filter(k => k !== key))
-  toast.info(t('detail.mat.genTimeout', { kind: m.kind, name: m.name }))
 }
 
 function switchToAssets() {
@@ -989,7 +1053,14 @@ function applyAssetDeeplink() {
   openEdit(m)
 }
 
-onMounted(async () => { await load(); applyAssetDeeplink() })
+onMounted(async () => {
+  await load()
+  applyAssetDeeplink()
+  await loadImageTasks()
+})
+onUnmounted(() => {
+  if (imageTasksTimer) { clearInterval(imageTasksTimer); imageTasksTimer = null }
+})
 </script>
 
 <style scoped>
@@ -1495,6 +1566,7 @@ onMounted(async () => { await load(); applyAssetDeeplink() })
   text-overflow: ellipsis;
 }
 .asset-foot { display: flex; align-items: center; gap: 4px; padding: 7px 11px; border-top: 1px solid var(--border); }
+.asset-task-ring { display: flex; padding: 7px 11px; border-top: 1px solid var(--border); }
 .prop-name-row {
   display: flex;
   align-items: center;

@@ -16,8 +16,10 @@ import {
 import {
   cancelEpisodeKeyframeBatch,
   getEpisodeKeyframeBatch,
+  retryFailedKeyframeBatch,
   startEpisodeKeyframeBatch,
 } from '../services/keyframe-batch.js'
+import { serializeTasks } from '../services/sys-task.js'
 
 const app = new Hono()
 type ImageOwnerKind = 'character' | 'scene' | 'prop'
@@ -282,7 +284,7 @@ app.get('/:id/keyframe-prompts-status', async (c) => {
   return success(c, getKeyframePromptBatchStatus(id))
 })
 
-// POST /episodes/:id/keyframe-batch — 服务端批量关键帧（按分镜 × 槽位串行，脱离浏览器）
+// POST /episodes/:id/keyframe-batch — 服务端批量关键帧（qwen-jobs 一次性全部提交，其它 provider 串行）
 app.post('/:id/keyframe-batch', async (c) => {
   const id = Number(c.req.param('id'))
   const body = await c.req.json().catch(() => ({} as Record<string, any>))
@@ -304,13 +306,23 @@ app.get('/:id/keyframe-batch', async (c) => {
   return success(c, await getEpisodeKeyframeBatch(id))
 })
 
-// POST /episodes/:id/keyframe-batch/cancel — 停止：不再提交新的关键帧，在跑的那一张继续完成
+// POST /episodes/:id/keyframe-batch/cancel — 停止：取消该批次所有未结束的关键帧任务
 app.post('/:id/keyframe-batch/cancel', async (c) => {
   const id = Number(c.req.param('id'))
   try {
     return success(c, await cancelEpisodeKeyframeBatch(id))
   } catch (err) {
     return badRequest(c, err instanceof Error ? err.message : '停止批量关键帧失败')
+  }
+})
+
+// POST /episodes/:id/keyframe-batch/retry-failed — 只重提失败/已取消项（新建 sys_task）
+app.post('/:id/keyframe-batch/retry-failed', async (c) => {
+  const id = Number(c.req.param('id'))
+  try {
+    return success(c, await retryFailedKeyframeBatch(id))
+  } catch (err) {
+    return badRequest(c, err instanceof Error ? err.message : '重试失败项失败')
   }
 })
 
@@ -446,7 +458,7 @@ app.get('/:id/generation-tasks', async (c) => {
     .slice(0, 20)
 
   return success(c, {
-    tasks: toSnakeCaseArray(tasks),
+    tasks: serializeTasks(tasks),
     merges: toSnakeCaseArray(merges),
   })
 })

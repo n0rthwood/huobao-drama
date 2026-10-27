@@ -3,16 +3,38 @@
  * 创建(processing) → 适配器构建请求 → 同步完成或异步轮询 → 下载落盘 → 回写业务表
  */
 import { db, getInsertId, schema } from '../db/index.js'
-import { eq } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import { getActiveConfig, getConfigById } from './ai.js'
 import { now } from '../utils/response.js'
-import { downloadFile, fetchImageAsCompressedDataUrl, generateImageThumb, readImageAsCompressedDataUrl, readImageAsDataUrl, saveBase64Image } from '../utils/storage.js'
+import { downloadFile, fetchImageAsCompressedDataUrl, generateImageThumb, readImageAsCompressedDataUrl, readImageAsDataUrl, saveBase64Image, saveImageBuffer } from '../utils/storage.js'
 import { extractVideoPoster } from '../utils/video-poster.js'
 import { authHeaders } from './adapters/comfyui-client'
 import { getImageAdapter, getVideoAdapter } from './adapters/registry'
 import type { AIConfig, ImageGenerationRecord, VideoGenerationRecord } from './adapters/types'
 import { logTaskError, logTaskPayload, logTaskProgress, logTaskStart, logTaskSuccess, logTaskWarn, redactUrl } from '../utils/task-logger.js'
 import { FRAME_TYPE_SLOT, invalidateKeyframeConfirmation } from './keyframes.js'
+import {
+  cancelQwenJob,
+  createQwenJob,
+  evictQwenFileIds,
+  pickQwenSize,
+  QWEN_MAX_REFS,
+  QwenJobsError,
+  uploadReferenceImage,
+  withReferenceHint,
+  type QwenJobMode,
+  type QwenJobRequest,
+} from './adapters/qwen-jobs-client.js'
+import {
+  ACTIVE_TASK_STATUSES,
+  isActiveTaskStatus,
+  isQwenJobsTask,
+  mapRemoteStatus,
+  parseRemoteState,
+  patchTaskRemoteState,
+  qwenIdempotencyKey,
+  remoteSnapshot,
+} from './sys-task.js'
 
 /** ComfyUI 公网网关的 /view 取件要带网关鉴权头；其它 provider 的输出直链无需鉴权。
  *  四个完成回调调用点需保持同一行为，故收敛成一处。 */
@@ -215,6 +237,18 @@ async function processTask(id: number, config: AIConfig) {
     let url: string, method: string, headers: Record<string, string>, body: unknown
 
     if (type === 'image') {
+      // qwen-jobs：服务端排队的任务 API，提交后由追踪器（services/qwen-jobs.ts）按远端 id 跟踪
+      if (isQwenJobsTask(config.provider)) {
+        // 追踪器可能已经抢先在恢复这一行（3 s 一拍）：同一任务只允许一个提交在途
+        if (inFlightQwenSubmits.has(record.id)) return
+        inFlightQwenSubmits.add(record.id)
+        try {
+          await submitQwenJobsImage(record, config, params)
+        } finally {
+          inFlightQwenSubmits.delete(record.id)
+        }
+        return
+      }
       const adapter = getImageAdapter(config.provider)
       const resolvedReferenceImages = await normalizeReferenceImages(params.referenceImages)
       const imageRecord: ImageGenerationRecord = {
@@ -338,14 +372,166 @@ async function markPolling(id: number, taskId: string | undefined) {
   logTaskProgress('SysTask', 'poll-start', { id, taskId })
 }
 
-async function failTask(id: number, message: string) {
+export async function failTask(id: number, message: string) {
   logTaskError('SysTask', 'failed', { id, error: message })
+  // 终态不覆盖：用户取消过的任务不能再被迟到的失败改写
   await db.update(schema.sysTask)
     .set({ status: 'failed', errorMsg: message, updatedAt: now() })
-    .where(eq(schema.sysTask.id, id))
+    .where(and(eq(schema.sysTask.id, id), inArray(schema.sysTask.status, ACTIVE_TASK_STATUSES)))
 }
 
 type SysTaskRecord = typeof schema.sysTask.$inferSelect
+
+/** 本进程正在提交（上传参考图 → POST /v1/jobs）的任务：追踪器据此不重复提交 */
+const inFlightQwenSubmits = new Set<number>()
+
+/**
+ * qwen-jobs 提交：先把完整请求体（含已上传的 file id）落盘到 remote_state.request，
+ * 再调 POST /v1/jobs —— 提交途中重启时启动恢复可按同一幂等键原样重发（服务端去重）。
+ * 参考图被服务端回收（422 unknown reference image）时清掉 file id 缓存并重传一次。
+ */
+async function submitQwenJobsImage(record: SysTaskRecord, config: AIConfig, params: Record<string, any>) {
+  const refs = await normalizeReferenceImages(params.referenceImages)
+  if (refs.length > QWEN_MAX_REFS) {
+    throw new Error(`参考图超限：共 ${refs.length} 张，单次最多 ${QWEN_MAX_REFS} 张，请减少绑定的角色/场景/道具`)
+  }
+  const idempotencyKey = qwenIdempotencyKey(record.id)
+
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const fileIds: string[] = []
+    for (const ref of refs) fileIds.push(await uploadReferenceImage(config, ref))
+
+    // 关键帧（frameType 命中槽位）必须按剧集画幅出图 → reference_to_image；
+    // 角色/道具的编辑跟随第 1 张参考图 → image_edit（不能带 width/height）
+    const isKeyframe = !!FRAME_TYPE_SLOT[String(params.frameType || '')]
+    const mode: QwenJobMode = !fileIds.length ? 'text_to_image' : isKeyframe ? 'reference_to_image' : 'image_edit'
+    const [width, height] = pickQwenSize(params.size)
+    const body: QwenJobRequest = {
+      mode,
+      prompt: withReferenceHint(record.prompt || '', fileIds.length),
+      metadata: { sys_task_id: String(record.id) },
+      ...(mode === 'image_edit' ? {} : { width, height }),
+      ...(fileIds.length ? { reference_images: fileIds } : {}),
+    }
+    const row = await patchTaskRemoteState(
+      record.id,
+      { request: body, config_id: config.id, idempotency_key: idempotencyKey },
+      { status: 'queued' },
+    )
+    // 上传期间被取消：请求体已落盘但不提交，追踪器也只看活跃任务
+    if (!row || !isActiveTaskStatus(row.status)) {
+      logTaskWarn('ImageTask', 'qwen-jobs submit skipped (cancelled)', { id: record.id, status: row?.status })
+      return
+    }
+    logTaskPayload('ImageTask', 'qwen-jobs request', { id: record.id, body })
+    const result = await sendQwenJob(record.id, config, body, idempotencyKey)
+    // 服务端已回收参考文件：缓存已在 sendQwenJob 里清掉，重新上传后再提交一次
+    if (result !== 'stale_refs') return
+    logTaskWarn('ImageTask', 'qwen-jobs re-upload refs', { id: record.id, attempt })
+  }
+  await failTask(record.id, '参考图已被服务端回收，重新上传后仍然提交失败，请重试')
+}
+
+type SendResult = 'submitted' | 'retry_later' | 'stale_refs' | 'failed'
+
+/**
+ * 调远端建任务并立即落盘远端 id。
+ * 422 unknown reference（参考文件被回收）可重传一次；409 幂等冲突是终态。
+ * 网络错误/5xx/网关抖动/429 queue_full 都不是终态：请求体已落盘，任务保持 queued
+ * 且没有 task_id，追踪器下一拍按同一幂等键原样重发（服务端对失败请求不记幂等键）。
+ */
+async function sendQwenJob(
+  id: number,
+  config: AIConfig,
+  body: QwenJobRequest,
+  idempotencyKey: string,
+): Promise<SendResult> {
+  try {
+    const job = await createQwenJob(config, body, idempotencyKey)
+    const row = await patchTaskRemoteState(id, remoteSnapshot(job), {
+      taskId: job.id,
+      status: mapRemoteStatus(job.status) ?? 'processing',
+    })
+    // 提交在途时本地已终结（取消/失败）：远端任务马上取消，别让它白占一张卡
+    if (row && !isActiveTaskStatus(row.status)) {
+      logTaskWarn('ImageTask', 'qwen-jobs cancel after local terminal', { id, jobId: job.id, status: row.status })
+      await patchTaskRemoteState(id, { cancel_pending: true })
+      await cancelQwenJob(config, job.id).catch(err => {
+        // 取消失败：cancel_pending 已落盘，追踪器会接着重试
+        logTaskWarn('ImageTask', 'qwen-jobs cancel retry', { id, jobId: job.id, error: err instanceof Error ? err.message : String(err) })
+      })
+      return 'submitted'
+    }
+    logTaskProgress('ImageTask', 'qwen-jobs submitted', { id, jobId: job.id, status: job.status })
+    return 'submitted'
+  } catch (err) {
+    if (err instanceof QwenJobsError && err.transient) {
+      logTaskWarn('ImageTask', 'qwen-jobs submit retry', { id, error: err.message })
+      return 'retry_later'
+    }
+    if (err instanceof QwenJobsError && (err.status === 409 || err.status === 422)) {
+      const refs = body.reference_images ?? []
+      const evicted = evictQwenFileIds(refs)
+      if (err.status === 422 && refs.length) {
+        logTaskWarn('ImageTask', 'qwen-jobs stale refs', { id, evicted, error: err.message })
+        return 'stale_refs'
+      }
+      await failTask(id, `${err.message}（请重试，将重新上传参考图并新建任务）`)
+      return 'failed'
+    }
+    throw err
+  }
+}
+
+/**
+ * 追踪器驱动的恢复（含启动恢复）：
+ * - remote_state.request 已落盘但没有远端 id（提交途中重启）→ 按同一幂等键原样重发；
+ * - 连请求体都没有（createTask 后、上传参考图途中重启）→ 用 sys_task.params 走完整提交路径，
+ *   幂等键同样是 huobao-sys_task-<id>，服务端已存在同内容任务时原样返回，不会重复出图。
+ * 本进程正在提交的任务直接跳过，避免追踪器与提交线程重复上传。
+ */
+export async function resumeQwenJobsTask(row: SysTaskRecord, config: AIConfig): Promise<void> {
+  if (inFlightQwenSubmits.has(row.id)) return
+  inFlightQwenSubmits.add(row.id)
+  try {
+    const state = parseRemoteState(row.remoteState)
+    const idempotencyKey = state.idempotency_key || qwenIdempotencyKey(row.id)
+    if (state.request) {
+      logTaskProgress('ImageTask', 'qwen-jobs resubmit', { id: row.id, idempotencyKey })
+      const result = await sendQwenJob(row.id, config, state.request, idempotencyKey)
+      if (result !== 'stale_refs') return
+      // 参考文件已被回收：回到完整提交路径重新上传
+    }
+    logTaskProgress('ImageTask', 'qwen-jobs resume submit', { id: row.id, idempotencyKey })
+    await submitQwenJobsImage(row, config, parseTaskParams(row.params))
+  } catch (err) {
+    if (err instanceof QwenJobsError && err.transient) {
+      logTaskWarn('ImageTask', 'qwen-jobs resume retry', { id: row.id, error: err.message })
+      return
+    }
+    await failTask(row.id, err instanceof Error ? err.message : String(err))
+  } finally {
+    inFlightQwenSubmits.delete(row.id)
+  }
+}
+
+/**
+ * 远端输出取回后落盘并走与其它 provider 相同的完成链路（落盘成功才标 completed）。
+ * 下载期间任务可能已被取消：completed 只在任务仍活跃时落库，否则不写回任何图片。
+ */
+export async function completeImageTaskFromBytes(record: SysTaskRecord, bytes: Buffer, contentType: string) {
+  const localPath = await saveImageBuffer(bytes, contentType, 'images')
+  await generateImageThumb(localPath)
+  const res = await db.update(schema.sysTask)
+    .set({ localPath, status: 'completed', completedAt: now(), updatedAt: now() })
+    .where(and(eq(schema.sysTask.id, record.id), inArray(schema.sysTask.status, ACTIVE_TASK_STATUSES)))
+  if (!(res?.changes ?? 0)) {
+    logTaskWarn('ImageTask', 'completion dropped (task no longer active)', { id: record.id, status: record.status })
+    return
+  }
+  logTaskSuccess('ImageTask', 'downloaded', { id: record.id, provider: record.provider, localPath })
+  await writeBackImageAssets(record, localPath)
+}
 
 async function pollTask(record: SysTaskRecord, config: AIConfig, taskId: string) {
   const type = record.type as TaskType

@@ -94,6 +94,16 @@ function buildProbe(serviceType: string, provider: string, baseUrl: string, mode
     }
   }
 
+  if (p === 'qwen-jobs') {
+    // qwen-jobs 任务服务：/v1/capacity 返回卡状态即服务可达；凭据是网关 Basic 的 user:password
+    return {
+      method: 'GET',
+      url: joinProviderUrl(baseUrl, '', '/v1/capacity'),
+      headers: apiKey ? { Authorization: `Basic ${Buffer.from(apiKey, 'utf8').toString('base64')}` } : {},
+      body: undefined,
+    }
+  }
+
   if (p === 'comfyui') {
     // ComfyUI 无鉴权概念，/system_stats 返回 200 即引擎可达；有 key（反代场景）才带 Authorization
     return {

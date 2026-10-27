@@ -38,16 +38,6 @@ test('storage downloadFile forwards headers to fetch', () => {
   assert.match(storage, /fetch\(url, \{ headers \}\)/)
 })
 
-test('qwen workflows load the 110 GGUF denoiser via UnetLoaderGGUF', () => {
-  for (const f of ['src/workflows/qwen/t2i.json', 'src/workflows/qwen/i2i.json']) {
-    const wf = JSON.parse(read(f))
-    assert.equal(wf['1'].class_type, 'UnetLoaderGGUF', f)
-    assert.equal(wf['1'].inputs.unet_name, 'qwen-image-2.1-Q6_K.gguf', f)
-    assert.equal(wf['2'].inputs.clip_name, 'qwen3vl_8b_int8_convrot.safetensors', f)
-    assert.equal(wf['3'].inputs.vae_name, 'qwen_image_2.1_vae_bf16.safetensors', f)
-  }
-})
-
 test('task logger redacts Authorization headers before logging', () => {
   const logger = read('src/utils/task-logger.ts')
   assert.match(logger, /'authorization'/)

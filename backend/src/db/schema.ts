@@ -230,6 +230,9 @@ export const sysTask = sqliteTable('sys_task', {
   taskId: text('task_id'),
   resultUrl: text('result_url'),
   localPath: text('local_path'),
+  // qwen-jobs 任务快照 + 内部键（request/config_id/idempotency_key），见 services/sys-task.ts
+  remoteState: text('remote_state'),
+  // queued | processing | completed | failed | cancelled
   status: text('status').default('processing'),
   errorMsg: text('error_msg'),
   createdAt: text('created_at').notNull(),
