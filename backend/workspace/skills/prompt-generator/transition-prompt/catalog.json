@@ -821,9 +821,9 @@
         "h3": "high",
         "minimax": "high"
       },
-      "template_zh": "画面从{上一镜结尾画面}开始；机位保持不变，光线以延时摄影的速度流转：{光线轨迹}；{@角色}在光影流转中以轻微虚化的快动作过渡到本镜的位置与姿态（写明双爪或双手的最终状态）；光线定格为{新光线}时，画面即{本镜开场画面}；第{T}秒光线与人物同时稳定。",
-      "template_en": "[0-{T}s] Open on <Picture 1>: {PREV_END}. With the camera locked, light sweeps at timelapse speed: {LIGHT_PATH}; within the moving light, {@CHARACTER} shifts in softly blurred fast-motion to this shot's position and pose (state the final state of both paws or hands); as the light settles into {NEW_LIGHT}, the frame is {THIS_START}; light and character lock together by {T} seconds.",
-      "example": "（#1→#2，表现「短时间流逝」的备选答案）画面从清晨的 @阳台 开始：@基尼 双爪各握一只迷你哑铃举在胸前；机位不变，阳光以延时速度流转——光斑沿地面横移、影子变短、光色由清晨金黄转为上午亮白；光影流转间 @基尼 的身影以轻微虚化的快动作放下哑铃（两只并排搁到垫边）、移到瑜伽垫中央；光线定格为上午的明亮阳光时，@基尼 已空爪蹲踞在瑜伽垫中央、准备缓缓站起；第3秒光线与人物同时稳定。"
+      "template_zh": "画面从{上一镜结尾画面}开始；机位保持不变，光线以延时摄影的速度流转：{光线轨迹}；{@角色}在光影流转中以轻微虚化的快动作过渡到本镜的位置与姿态（写明双爪或双手的最终状态；两镜道具或垫面、摆设有增减不同时，由{@角色}在这段快动作内完成放下、收走、带出画外或铺设就位——旧道具收至{放置位置}（出画或不与本镜开场画面冲突处），不得写成物体自行变形、凭空出现或消失）；光线定格为{新光线}时，画面即{本镜开场画面}；第{T}秒光线与人物同时稳定。",
+      "template_en": "[0-{T}s] Open on <Picture 1>: {PREV_END}. With the camera locked, light sweeps at timelapse speed: {LIGHT_PATH}; within the moving light, {@CHARACTER} shifts in softly blurred fast-motion to this shot's position and pose (state the final state of both paws or hands; if props, mats or dressing differ between the two shots, {@CHARACTER} puts down, stows, carries out of frame or lays out those items within this same fast-motion — old props end at {PLACE}, out of frame or somewhere not contradicting this shot's opening; never write objects morphing, appearing or vanishing on their own); as the light settles into {NEW_LIGHT}, the frame is {THIS_START}; light and character lock together by {T} seconds.",
+      "example": "（#1→#2，表现「短时间流逝」的备选答案）画面从清晨的 @阳台 开始：@基尼 双爪各握一只迷你哑铃举在胸前；机位不变，阳光以延时速度流转——光斑沿地面横移、影子变短、光色由清晨金黄转为上午亮白；光影流转间 @基尼 以轻微虚化的快动作完成收整——先后把两只哑铃提到画面边缘的栏杆绿植脚下放稳、近乎出画，把训练垫卷起带出画外、从画面边缘取回瑜伽垫铺开在中央；光线定格为上午的明亮阳光时，@基尼 已站上瑜伽垫中央、一条小爪抬起贴向腿侧、树式刚摆出一半，另一只前爪自然垂在体侧；第3秒光线与人物同时稳定。"
     },
     {
       "technique_id": "clock_calendar",

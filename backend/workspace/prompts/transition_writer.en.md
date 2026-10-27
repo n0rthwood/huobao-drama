@@ -23,8 +23,8 @@ Tool usage (when the runtime exposes tools):
 ## 2. Three-Step Decision
 
 **Step 1 — Verdict.** Compare `prev_shot.end_state_desc` with `this_shot.opening_desc`.
-- Time, location or narrative layer (memory/dream) changes → `verdict = "scene_time"`.
-- Same scene-time, but residues differ → `verdict = "continuity"`. Check seven axes: held items per paw/hand; posture; position; orientation; gaze/expression; prop placement; environment state (lamp/door).
+- Time (period-of-day, day/night, day+ spans; a minute-level label still counts if light/environment visibly differ), location or narrative layer (memory/dream) changes → `verdict = "scene_time"`.
+- Same location and characters, time treated as unchanged (labeled gap ≤ ~30 min, no visible difference in light/environment), but residues differ → `verdict = "continuity"`. Check seven axes: held items per paw/hand; posture; position; orientation; gaze/expression; prop placement; environment state (lamp/door).
 - States match on all axes → `verdict = "none"`: output nulls for technique_id/seconds/transition_prompt, with a brief reason.
 Record deltas in `changes` and residues in `hazards` (tag hard vs lightweight mentally; hard = held items, position, posture, environment state).
 
@@ -75,14 +75,16 @@ Before emitting, re-check your draft id against this list. Known illegal aliases
 - Include the initial ~0.5s hold where the template requires it.
 - **@ only bound assets.** Use @ handles only for assets in `this_shot.bound_assets`. Describe previous-shot scenes/objects in plain words without @.
 - **Image wins.** Reference images are authoritative for appearance. Never describe wardrobe or appearance changes; never invent props, occluders, clocks or calendars that are absent from the scene reference and bound props (`clock_calendar` requires an existing timepiece; `beat_snap` is forbidden for costume changes).
-- **Hands are stated.** Every bridge action states what **each paw or hand** does and exactly where it lands (which moves first, what the other steadies, final placement).
+- **Hands are stated.** Every bridge action states what **each paw or hand** does and exactly where it lands (which moves first, what the other steadies, final placement). Two extra checks:
+  - Left/right follows `this_start`: if it names a side, match it; if it only says "one paw / the other paw", never invent a side (the first-frame guidance image may disagree) — use stable referents like "one forepaw / the other forepaw" or "the paw nearer the pencil", kept consistent throughout.
+  - Placement passes a landing-residue check: prefer a placement already stated in `this_start`; otherwise it must not contradict `this_start` — carry the prop out of frame, to the frame edge, or behind an occluder, so at second T no prop remains in frame that this shot's opening does not contain.
 - `sound_bridge` only on audio-capable models (h3) and always paired with a visual device; on minimax skip it per the executability rule.
 - Avoid repeating whip_pan / light_flash / beat_snap / micro_jump across consecutive shots.
 - `montage_flash` is a last resort; all vignettes must stay inside this or the previous shot's scene.
 
 ## 5. Output Format (strict JSON)
 
-Output **exactly one JSON object** — no markdown fences, no commentary, no trailing text:
+Output **exactly one JSON object** — no markdown fences, no commentary, no trailing text. Field names are fixed verbatim as verdict / changes / hazards / technique_id / seconds / transition_prompt / reason (it is `technique_id`, never `technique` or `technique_name`):
 
 ```
 {
@@ -96,7 +98,7 @@ Output **exactly one JSON object** — no markdown fences, no commentary, no tra
 }
 ```
 
-- `changes`: time/location/narrative deltas; empty array if none.
+- `changes`: time/location/narrative deltas; both sides quote only the objective states of `prev_end` / `this_start` — never put the solution (placement, action design) on the "new" side; empty array if none.
 - `hazards`: continuity residues; empty array if none.
 - `seconds`: equals T; 0.5 steps; inside the technique's range; null when no transition.
 - `transition_prompt`: the filled `template_en`, English, no system prefix; null when no transition.

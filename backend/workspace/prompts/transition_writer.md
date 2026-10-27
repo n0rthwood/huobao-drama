@@ -25,8 +25,8 @@ model: ""
 
 **第 1 步｜判定 verdict**。对 prev_end 与 this_start 做逐项快照比较（左爪/左手持物、右爪/右手持物、双爪搭放点、姿态、站位、朝向、视线、关键道具位置与形态、灯光与环境状态、神态强度），差异写入 `changes`（格式「维度：旧 → 新」），其中需要动作或手法才能消解的硬矛盾写入 `hazards`：
 - 完全一致或差异不可察觉 → `"none"`（technique_id=null、seconds=0、transition_prompt=""，reason 说明即可，仍需照常提交）；
-- 时间跨度或地点变化、进出回忆/梦境（narrative=memory/dream）、情绪基调骤变 → `"scene_time"`；
-- 同时间、同地点、同人物，仅道具/姿态/位置/视线等状态差异 → `"continuity"`。
+- 时间跨度（时段、昼夜、跨天及以上；分钟级标注但光线/环境描述已有可见变化的，同样算时间变化）或地点变化、进出回忆/梦境（narrative=memory/dream）、情绪基调骤变 → `"scene_time"`；
+- 同地点、同人物，且时间视作未变（时间标注差 ≤ 约30分钟、光线与环境描述无可见差异），仅道具/姿态/位置/视线/景别等状态差异 → `"continuity"`。
 
 **第 2 步｜定时长 T（seconds）**：
 - 预算：scene_time 默认 3.0 秒；continuity 在 1.0–3.0 秒内取「装得下衔接动作的最小值」（单件放下/拿起≈1–1.5s，完整交接≈2–3s，起身/移步≈1–1.5s）。T 恒为 0.5 的倍数，绝对下限 1.0 秒。
@@ -42,7 +42,9 @@ model: ""
 3. **逐槽位填模板**：使用所选手法的中文模板，保留事件顺序与收尾句式；用 context 的具体内容替换 {上一镜结尾画面}{本镜开场画面}{T} 等槽位。
 4. **@ 引用**：只能 @ this_assets 中已绑定的资产；上一镜画面涉及、但本镜未绑定的场景或道具，用普通文字描述（如「明亮的上午阳台」），不加 @。
 5. **以图片为准**：禁止描写角色外形、服装、毛色、体型等外观（一律由参考图决定）；只写动作、位置、朝向、视线、神态强度、镜头与光线。
-6. **肢体写明**（为后续肢体状态规则做准备）：每个动作必须写明是哪只爪/手在动、另一只同时在做什么、各自的落点在哪里；持物不得凭空出现、消失或换手——放下必须写明放置位置，拿起必须写明来源位置。
+6. **肢体写明**（为后续肢体状态规则做准备）：每个动作必须写明是哪只爪/手在动、另一只同时在做什么、各自的落点在哪里；持物不得凭空出现、消失或换手——放下必须写明放置位置，拿起必须写明来源位置。另过两条核验：
+   - **左右以 this_start 为准**：this_start 写明左/右的，过程与落点必须一致；this_start 只写「一只/另一只」的，禁止自行指定左右（首帧引导图未必与你同侧），改用「一只前爪／另一只前爪」「靠近铅笔的那只前爪」等稳定指代，并全程一致。
+   - **放置位置过落点残影检查**：放置位置优先取 this_start 已写明之处；this_start 未提及该道具时，放置处不得与 this_start 描述冲突——写成带出画外、放到画面边缘或遮挡处，保证第 T 秒画面内不残留本镜开场画面没有的道具。
 7. **禁剪辑台语汇**：不得出现「切至」「切换到」「转场到」「下一个场景」「cut to」等；仅当所选手法模板本身含「切入特写/切回/跳切」（cutaway_insert、insert_hands_closeup、clock_calendar、jump_cut_lapse、micro_jump、beat_snap）时按模板原样书写，不得自创。
 8. **语言**：transition_prompt 用中文（英文扩写由下游 H3 规则处理）。
 
@@ -56,9 +58,9 @@ whip_pan、occlusion_wipe、zoom_through、roll_spin、motion_follow、object_to
 
 ## 五、输出 JSON（严格模式）
 
-只输出一个 JSON 对象，7 个字段齐全、无多余字段、无注释、无尾逗号：
+只输出一个 JSON 对象，7 个字段齐全、无多余字段、无注释、无尾逗号；字段名逐字固定为 verdict / changes / hazards / technique_id / seconds / transition_prompt / reason（是 technique_id，不是 technique、technique_name 等变体）：
 - `verdict`（string）："scene_time" | "continuity" | "none"；
-- `changes`（string[]）：差异清单「维度：旧 → 新」；none 时为 []；
+- `changes`（string[]）：差异清单「维度：旧 → 新」，两侧只摘录 prev_end / this_start 的客观状态，不得把解决方案（如放置位置、动作设计）写进「新」侧；none 时为 []；
 - `hazards`（string[]）：硬残留风险清单；无则 []；
 - `technique_id`（string|null）：合法 id；none 时为 null；
 - `seconds`（number）：T，0.5 的倍数、1.0 ≤ T ≤ 3.0 且在所选手法秒数范围内；none 时为 0；

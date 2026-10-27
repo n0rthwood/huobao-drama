@@ -15,8 +15,8 @@ description: 转场提示词规范 — 承接分镜的转场审核、32 个手�
 纯剪辑语汇（match cut、jump cut、蒙太奇）是**次选**，目录中已全部改写为镜头内可执行的描述。转场内允许的切镜（特写插入、空镜插入、跳切类）必须先保持首帧画面至少 0.5 秒。
 
 **三种审核结论（verdict）**：
-- `scene_time`：时间、地点、季节、跨年、叙事（回忆/梦境）或情绪基调发生变化 → 必须转场；
-- `continuity`：时空都没变，但上一镜结尾与本镜开场之间存在动作/道具/姿态等状态残留 → 写衔接转场；
+- `scene_time`：时间（时段、昼夜、跨天及以上；分钟级标注但光线/环境已有可见变化的，同样算时间变化）、地点、季节、跨年、叙事（回忆/梦境）或情绪基调发生变化 → 必须转场；
+- `continuity`：时空视作未变（同一地点，时间标注差 ≤ 约30分钟，且光线与环境描述无可见差异），但上一镜结尾与本镜开场之间存在动作/道具/姿态等状态残留 → 写衔接转场；
 - `none`：状态完全一致 → 不写转场（`transition_prompt` 为空字符串）。
 
 **时长规则摘要**：T 为转场秒数（`scene_time` 默认 3.0；`continuity` 按动作量 1.0–3.0）。提交时长 = `min(分镜时长 + T, 15)`；实际加长 E = 提交时长 − 分镜时长；中间帧引导时间 = `mid_frame_time + E`，且必须 ≥ T + 0.5 秒（校验与缩减公式见第 3.5 节）。目录中 `is_fast=true` 的手法可在 1–1.5 秒内完成，供 T 被压缩时使用。
@@ -32,7 +32,7 @@ description: 转场提示词规范 — 承接分镜的转场审核、32 个手�
 | 中文槽位 | 英文槽位 | 填法 |
 |---|---|---|
 | {上一镜结尾画面} | {PREV_END} | 从上一镜 `last_frame_prompt` 提炼 1–2 句：空间与光线（非本镜绑定资产用普通文字）、{@角色} 的位置姿态、**每只爪/手的持物状态** |
-| {本镜开场画面} | {THIS_START} | 从本镜 `video_prompt` 第一段（没有则 description【镜头1】开场）提炼 1–2 句；**必须包含 @场景名 与出场 @角色名**、位置姿态、手部状态 |
+| {本镜开场画面} | {THIS_START} | 从本镜 `video_prompt` 第一段（没有则 description【镜头1】开场）提炼 1–2 句；**必须包含 @场景名 与出场 @角色名**、位置姿态、手部状态；左右未写明时保持「一只/另一只」的原有指代，不得自行指定左右 |
 | {@角色} | {@CHARACTER} | 本镜绑定的角色引用，名字与列表完全一致 |
 | {T} | {T} | 转场秒数（一位小数） |
 | {方向} | {DIRECTION} | 甩/摇/移动方向（左/右/上/下） |
@@ -44,7 +44,7 @@ description: 转场提示词规范 — 承接分镜的转场审核、32 个手�
 | {本镜环境声} | {NEXT_AMBIENCE} | 下一场景的环境声（只写声音，不写台词） |
 | {节拍音} | {BEAT_SOUND} | 卡点音效（指响、鼓点、清脆一响） |
 | {旧道具}/{新道具} | {OLD_PROP}/{NEW_PROP} | 残留道具 / 本镜需要的道具；绑定了才可 @，否则用文字 |
-| {放置位置}/{使用位置}/{原位置}/{支撑物}/{目标位置} | {PLACE}/{USE_POS}/{FROM_POS}/{SUPPORT}/{TARGET_POS} | 道具与肢体的空间锚点 |
+| {放置位置}/{使用位置}/{原位置}/{支撑物}/{目标位置} | {PLACE}/{USE_POS}/{FROM_POS}/{SUPPORT}/{TARGET_POS} | 道具与肢体的空间锚点；{放置位置}优先取本镜开场画面已写明之处，否则须选不与本镜开场画面冲突的位置（出画、画面边缘或遮挡处），确保第 T 秒画面内无本镜开场没有的残留道具 |
 | {本镜朝向}/{本镜注视方向}/{注视对象} | {ORIENTATION}/{GAZE_DIR}/{GAZE_TARGET} | 身体朝向、视线目标 |
 | {匹配物A}/{匹配物B} | {MATCH_A}/{MATCH_B} | 形状匹配的两个锚点物 |
 | {衔接动作}/{收尾动作} | {BRIDGE_ACTION} | 匹配/提速的具体动作（逐爪写明） |
@@ -171,9 +171,9 @@ description: 转场提示词规范 — 承接分镜的转场审核、32 个手�
 #### timelapse_light ｜ 光影流转 / Timelapse Light Sweep ｜ 电影艺术 ｜ 2.0–3.0s ｜ — ｜ 高/高
 - 适用：小时～昼夜；**仅同一空间**；同一空间内时间跳跃的首选：延时速度的光线流转最自然，人物以轻微虚化快动作换位。
 - 不适用：跨空间；时间几乎不变。
-- 模板（中）：画面从{上一镜结尾画面}开始；机位保持不变，光线以延时摄影的速度流转：{光线轨迹}；{@角色}在光影流转中以轻微虚化的快动作过渡到本镜的位置与姿态（写明双爪或双手的最终状态）；光线定格为{新光线}时，画面即{本镜开场画面}；第{T}秒光线与人物同时稳定。
-- Template (EN): [0-{T}s] Open on <Picture 1>: {PREV_END}. With the camera locked, light sweeps at timelapse speed: {LIGHT_PATH}; within the moving light, {@CHARACTER} shifts in softly blurred fast-motion to this shot's position and pose (state the final state of both paws or hands); as the light settles into {NEW_LIGHT}, the frame is {THIS_START}; light and character lock together by {T} seconds.
-- 示例（#1→#2，表现「短时间流逝」的备选答案）：画面从清晨的 @阳台 开始：@基尼 双爪各握一只迷你哑铃举在胸前；机位不变，阳光以延时速度流转——光斑沿地面横移、影子变短、光色由清晨金黄转为上午亮白；光影流转间 @基尼 的身影以轻微虚化的快动作放下哑铃（两只并排搁到垫边）、移到瑜伽垫中央；光线定格为上午的明亮阳光时，@基尼 已空爪蹲踞在瑜伽垫中央、准备缓缓站起；第3秒光线与人物同时稳定。
+- 模板（中）：画面从{上一镜结尾画面}开始；机位保持不变，光线以延时摄影的速度流转：{光线轨迹}；{@角色}在光影流转中以轻微虚化的快动作过渡到本镜的位置与姿态（写明双爪或双手的最终状态；两镜道具或垫面、摆设有增减不同时，由{@角色}在这段快动作内完成放下、收走、带出画外或铺设就位——旧道具收至{放置位置}（出画或不与本镜开场画面冲突处），不得写成物体自行变形、凭空出现或消失）；光线定格为{新光线}时，画面即{本镜开场画面}；第{T}秒光线与人物同时稳定。
+- Template (EN): [0-{T}s] Open on <Picture 1>: {PREV_END}. With the camera locked, light sweeps at timelapse speed: {LIGHT_PATH}; within the moving light, {@CHARACTER} shifts in softly blurred fast-motion to this shot's position and pose (state the final state of both paws or hands; if props, mats or dressing differ between the two shots, {@CHARACTER} puts down, stows, carries out of frame or lays out those items within this same fast-motion — old props end at {PLACE}, out of frame or somewhere not contradicting this shot's opening; never write objects morphing, appearing or vanishing on their own); as the light settles into {NEW_LIGHT}, the frame is {THIS_START}; light and character lock together by {T} seconds.
+- 示例（#1→#2，表现「短时间流逝」的备选答案）：画面从清晨的 @阳台 开始：@基尼 双爪各握一只迷你哑铃举在胸前；机位不变，阳光以延时速度流转——光斑沿地面横移、影子变短、光色由清晨金黄转为上午亮白；光影流转间 @基尼 以轻微虚化的快动作完成收整——先后把两只哑铃提到画面边缘的栏杆绿植脚下放稳、近乎出画，把训练垫卷起带出画外、从画面边缘取回瑜伽垫铺开在中央；光线定格为上午的明亮阳光时，@基尼 已站上瑜伽垫中央、一条小爪抬起贴向腿侧、树式刚摆出一半，另一只前爪自然垂在体侧；第3秒光线与人物同时稳定。
 
 #### clock_calendar ｜ 时钟日历指示 / Clock or Calendar Insert ｜ 电影艺术 ｜ 2.0–3.0s ｜ — ｜ 中/低
 - 适用：小时～跨天；**仅同一空间**；场景参考图或绑定道具中确实存在时钟、日历、屏幕等计时物时，用其快速变化明示时间跳跃。
@@ -305,7 +305,7 @@ description: 转场提示词规范 — 承接分镜的转场审核、32 个手�
 - 中间帧约束：E = min(T, max(0, 15 − duration))；存在 mid_frame_time 时必须满足 **mid_frame_time + E ≥ T + 0.5**（转场把中间帧引导整体后移 E 秒，须保证引导点落在转场结束至少 0.5 秒之后；总时长上限 15 秒）。
 - 收缩规则：不满足时把 T 降为 mid_frame_time + E − 0.5（向下取 0.5 的倍数，最低 1.0），并改从快速手法选（scene_time：light_flash / whip_pan / beat_snap / rack_focus；continuity：breath_beat / micro_jump / rack_focus）；降到 1.0 仍不满足 → 由系统放弃转场，agent 照常输出并在 reason 注明「时长约束过紧」。
 
-**第 3 步｜查表选手法（technique_id）**：在 3.2 速查表自上而下取**第一条命中的行**；行内候选**从左到右**依次尝试，跳过：① 该手法任一「不适用」条件命中；② 其秒数范围装不下当前 T，且无法把 T 重定进范围再通过第 2 步复核；③ 其对当前视频模型执行性为「低」且行内后面仍有非低候选（当前视频模型未告知时按 H3 评估）。选定后把 seconds 定稿在该手法秒数范围内，回第 2 步复核约束，然后按模板写 transition_prompt。
+**第 3 步｜查表选手法（technique_id）**：在 3.2 速查表自上而下取**第一条命中的行**；行内候选**从左到右**依次尝试，跳过：① 该手法任一「不适用」条件命中；② 其秒数范围装不下当前 T，且无法把 T 重定进范围再通过第 2 步复核；③ 其对当前视频模型执行性为「低」且行内后面仍有非低候选（当前视频模型未告知时按 H3 评估）。选定后把 seconds 定稿在该手法秒数范围内，回第 2 步复核约束，然后按模板写 transition_prompt。时间标注差 ≤ 约30分钟且光线/环境无可见差异的，不走本表，按第 4 节连续性专项处理。
 
 ### 3.2 速查表
 
@@ -391,6 +391,7 @@ description: 转场提示词规范 — 承接分镜的转场审核、32 个手�
 6. **朝向残留**：身体或面部朝向变化。
 7. **视线/表情残留**：注视对象、神态强度不同（轻量项）。
 8. **环境状态残留**：灯具开关、光线角度等需要动机的环境差（极轻微光线漂移可由画面自然过渡，不计）。
+9. **左右与落点核验**：this_start 未写明左右的肢体，转场文本不得自行指定左右（用「一只前爪／另一只前爪」等稳定指代）；被放下的旧道具必须落在 this_start 写明之处或出画/画面边缘，第 T 秒画面内不得残留本镜开场没有的道具。
 
 ### 4.2 逐项比较方法（状态快照法）
 
