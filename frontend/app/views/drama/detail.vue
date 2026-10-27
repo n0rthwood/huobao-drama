@@ -265,6 +265,10 @@
                         <svg v-else width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                         {{ t('episode.asset.upload') }}
                       </button>
+                      <button class="btn btn-sm" type="button" :title="t('components.mediaLibrary.pickAsset')" :disabled="isUploading(m)" @click.stop="openMaterialLibrary(m)">
+                        <Images :size="11" />
+                        {{ t('components.mediaLibrary.pick') }}
+                      </button>
                       <button class="btn btn-sm btn-danger" type="button" :title="t('episode.asset.delChar')" :aria-label="t('episode.asset.delChar')" @click.stop="askDeleteMaterial(m)">
                         {{ t('common.delete') }}
                       </button>
@@ -345,6 +349,10 @@
                     <span v-if="isUploading(m)" class="ring-spinner sm"></span>
                     <svg v-else width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                     {{ t('episode.asset.upload') }}
+                  </button>
+                  <button class="btn btn-sm" type="button" :title="t('components.mediaLibrary.pickAsset')" :disabled="isUploading(m)" @click.stop="openMaterialLibrary(m)">
+                    <Images :size="11" />
+                    {{ t('components.mediaLibrary.pick') }}
                   </button>
                   <button class="btn btn-sm" type="button" :disabled="isPending(m)" @click.stop="generateMaterial(m)">
                     <span v-if="isPending(m)" class="ring-spinner sm"></span>
@@ -536,6 +544,14 @@
               </button>
               <button
                 class="btn"
+                :disabled="isUploading(editTarget)"
+                @click="openMaterialLibrary(editTarget)"
+              >
+                <Images :size="11" />
+                {{ t('components.mediaLibrary.pickAsset') }}
+              </button>
+              <button
+                class="btn"
                 :disabled="isPending(editTarget)"
                 @click="generateMaterial(editTarget)"
               >
@@ -608,6 +624,15 @@
       @confirm="confirmDeleteMaterial"
       @cancel="assetToDelete = null"
     />
+
+    <MediaLibraryDialog
+      :open="materialLibrary.open"
+      :drama-id="dramaId"
+      :submitting="materialLibrary.loading"
+      :title="t('components.mediaLibrary.pickAsset')"
+      @close="materialLibrary.open = false"
+      @pick="applyMaterialFromLibrary"
+    />
   </div>
 </template>
 
@@ -615,11 +640,13 @@
 import { toast } from 'vue-sonner'
 import { toastError } from '~/composables/useToast'
 import { useI18n } from 'vue-i18n'
-import { dramaAPI, episodeAPI, characterAPI, sceneAPI, propAPI, uploadAPI, taskAPI } from '~/composables/useApi'
+import { dramaAPI, episodeAPI, characterAPI, sceneAPI, propAPI, uploadAPI, taskAPI, mediaLibraryAPI } from '~/composables/useApi'
+import { Images } from 'lucide-vue-next'
 import BaseSelect from '~/components/BaseSelect.vue'
 import ProgressRing from '~/components/ProgressRing.vue'
 import MediaTime from '~/components/MediaTime.vue'
 import AssetBrowserDialog from '~/components/AssetBrowserDialog.vue'
+import MediaLibraryDialog from '~/components/MediaLibraryDialog.vue'
 import { useNowTicker, ringPropsFromTask, isActiveTaskStatus } from '~/composables/useTaskProgress'
 
 const { t, locale } = useI18n()
@@ -943,11 +970,8 @@ function uploadMaterial(m) {
     uploadingMaterials.value = new Set(uploadingMaterials.value).add(key)
     try {
       const res = await uploadAPI.image(file)
-      // 与生图回写保持一致：存相对路径（static/...），展示时补前导斜杠
-      const payload = { image_url: res.path, local_path: res.path }
-      if (m.kindKey === 'character') await characterAPI.update(m.id, payload)
-      else if (m.kindKey === 'scene') await sceneAPI.update(m.id, payload)
-      else await propAPI.update(m.id, payload)
+      // 与剧集资产页一致：手动上传也是一个正式版本，registerUpload 同时把它设为当前图
+      await taskAPI.registerUpload(m.kindKey, m.id, res.path)
       toast.success(t('detail.mat.uploaded', { kind: m.kind, name: m.name }))
       await load()
       // 详情弹窗打开时同步刷新预览
@@ -961,6 +985,35 @@ function uploadMaterial(m) {
     }
   }
   input.click()
+}
+
+// 从素材库选资产图：复制库内图片 → 注册为新版本并设为当前图（与普通上传同一条路径）
+const materialLibrary = ref({ open: false, loading: false, target: null })
+function openMaterialLibrary(m) {
+  materialLibrary.value = { open: true, loading: false, target: m }
+}
+async function applyMaterialFromLibrary(urls) {
+  const target = materialLibrary.value.target
+  const url = urls[0]
+  if (!url || !target || materialLibrary.value.loading) return
+  const key = pendingKey(target)
+  materialLibrary.value = { ...materialLibrary.value, loading: true }
+  uploadingMaterials.value = new Set(uploadingMaterials.value).add(key)
+  try {
+    const copy = await mediaLibraryAPI.copy(url)
+    await taskAPI.registerUpload(target.kindKey, target.id, copy.path, copy.copied_from)
+    toast.success(t('components.mediaLibrary.assetApplied'))
+    materialLibrary.value = { open: false, loading: false, target: null }
+    await load()
+    if (editTarget.value && editTarget.value.kindKey === target.kindKey && editTarget.value.id === target.id) {
+      editTarget.value = { ...editTarget.value, image_url: copy.path, local_path: copy.path }
+    }
+  } catch (e) {
+    toastError(e)
+    materialLibrary.value = { ...materialLibrary.value, loading: false }
+  } finally {
+    uploadingMaterials.value = new Set([...uploadingMaterials.value].filter(k => k !== key))
+  }
 }
 
 function openAssetViewer(m) {
@@ -1460,9 +1513,12 @@ onUnmounted(() => {
   justify-content: space-between;
   gap: 8px;
   min-width: 0;
+  /* 操作按钮（生成/上传/素材库）放不下时整体换行，而不是把名字挤成竖排 */
+  flex-wrap: wrap;
 }
 .character-title-block {
   min-width: 0;
+  flex: 1 1 150px;
   display: flex;
   flex-direction: column;
   gap: 4px;

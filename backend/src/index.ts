@@ -25,6 +25,7 @@ import settings from './routes/settings.js'
 import storage from './routes/storage.js'
 import serverUpdate from './routes/serverUpdate.js'
 import assetLibrary from './routes/asset-library.js'
+import mediaLibrary from './routes/media-library.js'
 import { requestLogger, errorHandler } from './middleware/logger.js'
 import { db, schema } from './db/index.js'
 import { and, eq, isNull, ne, or } from 'drizzle-orm'
@@ -80,6 +81,7 @@ api.route('/storage', storage)
 api.route('/settings', settings)
 api.route('/server-update', serverUpdate)
 api.route('/asset-library', assetLibrary)
+api.route('/media-library', mediaLibrary)
 
 app.route('/api/v1', api)
 

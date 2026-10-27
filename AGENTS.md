@@ -157,6 +157,14 @@ Issue 整理完成后、实施前，必须让 **Fabel（Anthropic）或 Astra（
 - 导入产生的版本行按 `provider='import'` 排除出全局任务中心（`services/task-center.ts`）。
 - 前端唯一组件 `components/AssetBrowserDialog.vue`，两个入口都显式 import：剧集资产页工具栏「从资产库导入」（本项目 → 关联，其他项目 → 复制并关联到本集）、项目素材库页「从其他项目导入」（只复制，不关联，左栏不显示本项目）。已在本集的资产标「已在本集」且不可选。
 
+### 素材管理器（历史图片浏览与选用，Issue #10）
+- 与「资产管理器」互补：资产管理器复制**整个资产**，素材管理器只复制**一张图片**（与源资产的文本、版本无任何关系）。
+- 唯一实现 `services/media-library.ts`：`collectLibraryImages()` 一次扫描建立「可见图片全集」，树的计数、分页列表、复制接口的白名单校验共用同一份结果。来源三类：完成的图片任务（资产版本 / 分镜首中尾关键帧）、资产 `image_url` 里没有对应任务的 legacy 图、各资产已上传的参考图；只列磁盘存在的文件，软删项目/剧集/资产与已删版本不出现。资产归集走 `episode_*` 关联表，关键帧经 `storyboard_id → storyboards.episode_id`（存量 `sys_task.episode_id` 为空，不可依赖）。
+- 接口：`GET /media-library/dramas`、`GET /media-library/tree?drama_id=`（懒加载第二层）、`GET /media-library/images?drama_id&episode_id&kind&owner_id&slot&page&page_size`、`POST /media-library/copy {url}` → `{url, path, copied_from}`（结构同 `/upload/image`）、`POST /{characters,scenes,props}/:id/reference-images/from-library {urls}`。**复制类接口一律先过白名单**（`assertLibraryImage`，不在素材库内一律 403），库外的任意服务器路径无法插入。
+- 选图 = 一次「新上传」：资产图 → `POST /tasks/register-upload`（`source='media-library'`，`params={source,copied_from}`）注册为新版本并设为当前图，`generated_at` 取选择时刻；参考图 → 复制进该资产自己的参考图目录，条目写 `{path, uploaded_at=选择时刻, copied_from=源图相对路径}`。`copied_from` 只由 from-library 写入，用于同一资产同源去重；超上限（`REFERENCE_IMAGE_MAX_COUNT`）整批拒绝，不复制半份。参考图读写仍只经 `services/reference-images.ts`。
+- 项目素材库页的上传与剧集资产页一致：`uploadAPI.image → taskAPI.registerUpload`，都会多出一个 `provider='upload'` 的版本。
+- 前端唯一组件 `components/MediaLibraryDialog.vue`（显式 import）：参考图入口多选并显示上限，资产图入口单选；入口在 `ReferenceImageManager.vue`、`episode.vue` 资产卡片与详情弹窗、`detail.vue` 素材卡片与编辑弹窗。
+
 ### 分镜关键帧与视频
 - 流程：资产 → 拆分分镜（含分镜提示词）→ **分镜关键帧（独立步骤，人工确认）** → 视频 → 导出。旧的"提取上一镜视频尾帧承接"已整体删除（`extractVideoTailFrame`、`episodes.continuity_enabled`、`storyboards.continuity_mode` 均不再存在）。
 - 数据：`storyboards` 的 `first_frame_prompt / mid_frame_prompt / last_frame_prompt`（每张关键帧各自的提示词）、`mid_frame_time`（秒，必须落在 0.5 与 时长-0.5 之间，PUT 越界报 400）、`first_frame_image / mid_frame_image / last_frame_image`（各槽位选定版本）、`keyframes_confirmed`。版本 = `sys_task`（type=image，`params.frameType` 为 `first_frame/mid_frame/last_frame`），默认选最新生成的那张。保留 LLM 标注的 `continuity_boundary`（continue/cut）。`image_prompt` 不迁移、不再写入。

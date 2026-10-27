@@ -157,6 +157,9 @@ app.post('/register-upload', async (c) => {
   const kind = String(body.asset_type || '')
   const assetId = Number(body.asset_id)
   const localPath = String(body.local_path || '').trim()
+  // 从素材库选图走同一注册入口，只在 params 里区分来源（source=media-library + 源图路径）
+  const fromLibrary = String(body.source || '') === 'media-library'
+  const copiedFrom = String(body.copied_from || '').trim()
   if (!['character', 'scene', 'prop'].includes(kind)) return badRequest(c, 'asset_type 必须是 character / scene / prop')
   if (!assetId || !localPath.startsWith('static/')) return badRequest(c, 'asset_id 与有效的 static 本地路径必填')
 
@@ -189,7 +192,9 @@ app.post('/register-upload', async (c) => {
     dramaId,
     provider: 'upload',
     model: 'manual-upload',
-    params: JSON.stringify({ source: 'manual-upload' }),
+    params: JSON.stringify(fromLibrary
+      ? { source: 'media-library', copied_from: copiedFrom || undefined }
+      : { source: 'manual-upload' }),
     resultUrl: localPath,
     localPath,
     status: 'completed',

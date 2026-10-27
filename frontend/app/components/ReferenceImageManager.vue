@@ -14,6 +14,16 @@
         <Plus v-else :size="10" />
         {{ t('components.referenceImages.add') }}
       </button>
+      <button
+        class="ref-add-btn"
+        :disabled="picking || refs.length >= max"
+        :title="refs.length >= max ? t('components.referenceImages.full', { max }) : t('components.mediaLibrary.pickRef')"
+        @click.stop="libraryOpen = true"
+      >
+        <Loader2 v-if="picking" :size="10" class="animate-spin" />
+        <Images v-else :size="10" />
+        {{ t('components.mediaLibrary.pick') }}
+      </button>
     </div>
 
     <div v-if="refs.length" class="ref-strip">
@@ -58,17 +68,29 @@
       @confirm="doRemove"
       @cancel="cancelRemove"
     />
+
+    <MediaLibraryDialog
+      :open="libraryOpen"
+      multi
+      :limit="Math.max(0, max - refs.length)"
+      :drama-id="dramaId"
+      :submitting="picking"
+      :title="t('components.mediaLibrary.pickRef')"
+      @close="libraryOpen = false"
+      @pick="pickFromLibrary"
+    />
   </div>
 </template>
 
 <script setup>
-import { Loader2, ImageOff, Plus, X } from 'lucide-vue-next'
+import { Images, Loader2, ImageOff, Plus, X } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { characterAPI, parseReferenceImages, propAPI, sceneAPI } from '~/composables/useApi'
 import { thumbFallback, thumbOf } from '~/composables/useMedia'
 import { toastError } from '~/composables/useToast'
 import MediaTime from '~/components/MediaTime.vue'
+import MediaLibraryDialog from '~/components/MediaLibraryDialog.vue'
 
 const { t } = useI18n()
 
@@ -79,6 +101,8 @@ const props = defineProps({
   // 资产行里的 reference_images 原值（对象数组 [{path, uploaded_at}] / JSON 字符串 / null 都接受）
   references: { type: [String, Array], default: null },
   max: { type: Number, default: 10 },
+  // 素材管理器默认展开的项目
+  dramaId: { type: [Number, String], default: 0 },
 })
 
 const emit = defineEmits(['update', 'preview'])
@@ -90,6 +114,8 @@ const removing = ref('')
 const pendingRemove = ref('')
 const confirmOpen = ref(false)
 const broken = ref([])
+const libraryOpen = ref(false)
+const picking = ref(false)
 
 const refs = computed(() => parseReferenceImages(props.references))
 const assetApi = computed(() => API_BY_TYPE[props.assetType])
@@ -137,6 +163,23 @@ function pickAndUpload() {
     }
   }
   input.click()
+}
+
+// 从素材库选图：服务端复制文件（uploaded_at = 选择当时），同源重复选入会被去重
+async function pickFromLibrary(urls) {
+  if (!urls.length || picking.value) return
+  picking.value = true
+  try {
+    const res = await assetApi.value.addRefsFromLibrary(props.assetId, urls)
+    emit('update', parseReferenceImages(res?.reference_images))
+    if (res.added) toast.success(t('components.mediaLibrary.refAdded', { n: res.added }))
+    if (res.skipped) toast.success(t('components.mediaLibrary.refSkipped', { n: res.skipped }))
+    libraryOpen.value = false
+  } catch (err) {
+    toastError(err)
+  } finally {
+    picking.value = false
+  }
 }
 
 function askRemove(item) {

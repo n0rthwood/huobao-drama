@@ -23,10 +23,14 @@ import { logTaskWarn } from '../utils/task-logger.js'
 
 export type AssetKind = 'character' | 'scene' | 'prop'
 
-/** 持久化的参考图条目（上传时间为 unix 秒；存量数据文件缺失时为 null，前端不显示时间） */
+/**
+ * 持久化的参考图条目（上传时间为 unix 秒；存量数据文件缺失时为 null，前端不显示时间）。
+ * `copied_from` 只由「从素材库选择」写入，记源图相对路径，用于同一资产的重复选入去重。
+ */
 export interface ReferenceImageEntry {
   path: string
   uploaded_at: number | null
+  copied_from?: string
 }
 
 /**
@@ -72,7 +76,13 @@ function toEntry(item: unknown): ReferenceImageEntry | null {
   const value = String(record.path ?? '').trim()
   if (!value) return null
   const uploadedAt = Number(record.uploaded_at)
-  return { path: value, uploaded_at: Number.isFinite(uploadedAt) && uploadedAt > 0 ? Math.floor(uploadedAt) : null }
+  const copiedFrom = String(record.copied_from ?? '').trim()
+  const entry: ReferenceImageEntry = {
+    path: value,
+    uploaded_at: Number.isFinite(uploadedAt) && uploadedAt > 0 ? Math.floor(uploadedAt) : null,
+  }
+  if (copiedFrom) entry.copied_from = copiedFrom
+  return entry
 }
 
 /**
@@ -134,14 +144,16 @@ export function partitionMissingReferences(refs: string[]): { present: string[];
   return { present, missing }
 }
 
-async function loadReferences(kind: AssetKind, assetId: number): Promise<ReferenceImageEntry[]> {
+/** 读取某资产的参考图条目（资产不存在报 404）；素材库选图也经此读当前状态 */
+export async function loadReferences(kind: AssetKind, assetId: number): Promise<ReferenceImageEntry[]> {
   const table = ASSET_TABLES[kind]
   const [row] = await db.select().from(table).where(eq(table.id, assetId))
   if (!row) throw new ReferenceImageError(`${ASSET_LABELS[kind]}不存在`, 404)
   return parseReferenceImages(row.referenceImages)
 }
 
-async function persist(kind: AssetKind, assetId: number, refs: ReferenceImageEntry[]): Promise<ReferenceImageEntry[]> {
+/** 参考图列唯一写入点（素材库选图经 persistReferences 走同一入口） */
+export async function persistReferences(kind: AssetKind, assetId: number, refs: ReferenceImageEntry[]): Promise<ReferenceImageEntry[]> {
   const table = ASSET_TABLES[kind]
   await db.update(table)
     .set({ referenceImages: refs.length ? JSON.stringify(refs) : null, updatedAt: now() })
@@ -172,7 +184,7 @@ export async function addReferenceImage(kind: AssetKind, assetId: number, file: 
   const next = current.some(entry => entry.path === stored)
     ? current
     : [...current, { path: stored, uploaded_at: uploadedAt }]
-  return persist(kind, assetId, next)
+  return persistReferences(kind, assetId, next)
 }
 
 /**
@@ -188,7 +200,7 @@ export async function removeReferenceImage(kind: AssetKind, assetId: number, tar
   if (index < 0) throw new ReferenceImageError('参考图不存在', 404)
 
   const next = current.filter((_, i) => i !== index)
-  await persist(kind, assetId, next)
+  await persistReferences(kind, assetId, next)
 
   const abs = ownedAbsolutePath(kind, assetId, value)
   if (abs) {

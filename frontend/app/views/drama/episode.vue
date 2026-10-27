@@ -382,6 +382,10 @@
                         <svg v-else width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                         {{ t('episode.asset.upload') }}
                       </button>
+                      <button class="btn btn-sm" :title="t('components.mediaLibrary.pickAsset')" :disabled="isUploadingAsset('character', c.id)" @click.stop="openAssetLibrary('character', c.id)">
+                        <Images :size="11" />
+                        {{ t('components.mediaLibrary.pick') }}
+                      </button>
                     </div>
                   </div>
                   <div v-if="assetImageRing('character', c.id)" class="asset-task-ring" @click.stop>
@@ -402,6 +406,7 @@
                     asset-type="character"
                     :asset-id="c.id"
                     :references="c.reference_images ?? c.referenceImages"
+                    :drama-id="dramaId"
                     @update="onAssetRefsUpdate(c, $event)"
                     @preview="openImageViewer"
                   />
@@ -456,6 +461,7 @@
                     asset-type="scene"
                     :asset-id="s.id"
                     :references="s.reference_images ?? s.referenceImages"
+                    :drama-id="dramaId"
                     @update="onAssetRefsUpdate(s, $event)"
                     @preview="openImageViewer"
                   />
@@ -476,6 +482,10 @@
                     <Loader2 v-if="isUploadingAsset('scene', s.id)" :size="11" class="animate-spin" />
                     <svg v-else width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                     {{ t('episode.asset.upload') }}
+                  </button>
+                  <button class="btn btn-sm" :title="t('components.mediaLibrary.pickAsset')" :disabled="isUploadingAsset('scene', s.id)" @click.stop="openAssetLibrary('scene', s.id)">
+                    <Images :size="11" />
+                    {{ t('components.mediaLibrary.pick') }}
                   </button>
                   <button class="btn btn-sm" :disabled="isPendingSceneImage(s.id)" @click.stop="genSceneImg(s.id)">
                     <Loader2 v-if="isPendingSceneImage(s.id)" :size="11" class="animate-spin" />
@@ -533,6 +543,7 @@
                     asset-type="prop"
                     :asset-id="p.id"
                     :references="p.reference_images ?? p.referenceImages"
+                    :drama-id="dramaId"
                     @update="onAssetRefsUpdate(p, $event)"
                     @preview="openImageViewer"
                   />
@@ -553,6 +564,10 @@
                     <Loader2 v-if="isUploadingAsset('prop', p.id)" :size="11" class="animate-spin" />
                     <svg v-else width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                     {{ t('episode.asset.upload') }}
+                  </button>
+                  <button class="btn btn-sm" :title="t('components.mediaLibrary.pickAsset')" :disabled="isUploadingAsset('prop', p.id)" @click.stop="openAssetLibrary('prop', p.id)">
+                    <Images :size="11" />
+                    {{ t('components.mediaLibrary.pick') }}
                   </button>
                   <button class="btn btn-sm" :disabled="isPendingPropImage(p.id)" @click.stop="genPropImg(p.id)">
                     <Loader2 v-if="isPendingPropImage(p.id)" :size="11" class="animate-spin" />
@@ -1348,6 +1363,14 @@
                 {{ t('episode.asset.uploadImage') }}
               </button>
               <button
+                class="btn"
+                :disabled="isUploadingAsset(assetDetail.type, assetDetail.item.id)"
+                @click="openAssetLibrary(assetDetail.type, assetDetail.item.id)"
+              >
+                <Images :size="11" />
+                {{ t('components.mediaLibrary.pickAsset') }}
+              </button>
+              <button
                 v-if="assetDetail.type === 'character'"
                 class="btn"
                 :disabled="isPendingCharImage(assetDetail.item.id)"
@@ -1558,6 +1581,15 @@
         @close="assetBrowserOpen = false"
         @done="refresh"
       />
+
+      <MediaLibraryDialog
+        :open="assetLibrary.open"
+        :drama-id="dramaId"
+        :submitting="assetLibrary.loading"
+        :title="t('components.mediaLibrary.pickAsset')"
+        @close="assetLibrary.open = false"
+        @pick="applyAssetImageFromLibrary"
+      />
     </main>
     </div>
   </div>
@@ -1570,12 +1602,13 @@ import {
   Users, FileText, FolderKanban, Clapperboard, Download, Loader2, Images,
   Plus, X, Trash2, CircleHelp,
 } from 'lucide-vue-next'
-import { api, dramaAPI, episodeAPI, storyboardAPI, characterAPI, sceneAPI, propAPI, taskAPI, mergeAPI, aiConfigAPI, uploadAPI } from '~/composables/useApi'
+import { api, dramaAPI, episodeAPI, storyboardAPI, characterAPI, sceneAPI, propAPI, taskAPI, mergeAPI, aiConfigAPI, uploadAPI, mediaLibraryAPI } from '~/composables/useApi'
 import { startTour, autoTour } from '~/composables/useTour'
 import { useAgent } from '~/composables/useAgent'
 import { toastError, mapError, toastServerMessage, MODERATION_RE } from '~/composables/useToast'
 import LocaleSwitcher from '~/components/LocaleSwitcher.vue'
 import ReferenceImageManager from '~/components/ReferenceImageManager.vue'
+import MediaLibraryDialog from '~/components/MediaLibraryDialog.vue'
 import StoryboardKeyframes from '~/components/StoryboardKeyframes.vue'
 import ProgressRing from '~/components/ProgressRing.vue'
 import FieldSaveStatus from '~/components/FieldSaveStatus.vue'
@@ -3692,6 +3725,32 @@ function uploadAssetImage(kind, id) {
   })
 }
 
+// 从素材库选资产图：复制一份库内图片，再按「一次新上传」注册为新版本并设为当前图
+const assetLibrary = ref({ open: false, loading: false, kind: '', id: 0 })
+function openAssetLibrary(kind, id) {
+  assetLibrary.value = { open: true, loading: false, kind, id }
+}
+async function applyAssetImageFromLibrary(urls) {
+  const { kind, id } = assetLibrary.value
+  const url = urls[0]
+  if (!url || !kind || !id || assetLibrary.value.loading) return
+  assetLibrary.value = { ...assetLibrary.value, loading: true }
+  const key = `${kind}:${id}`
+  if (!uploadingAssetKeys.value.includes(key)) uploadingAssetKeys.value.push(key)
+  try {
+    const copy = await mediaLibraryAPI.copy(url)
+    await taskAPI.registerUpload(kind, id, copy.path, copy.copied_from)
+    toast.success(t('components.mediaLibrary.assetApplied'))
+    assetLibrary.value = { open: false, loading: false, kind: '', id: 0 }
+    await refresh()
+  } catch (e) {
+    toastError(e)
+    assetLibrary.value = { ...assetLibrary.value, loading: false }
+  } finally {
+    uploadingAssetKeys.value = uploadingAssetKeys.value.filter(k => k !== key)
+  }
+}
+
 // 参考图（生图输入）增删由 ReferenceImageManager 直接调服务端：
 // 以响应返回的数组为准覆盖本地值，不做乐观更新；成片图 image_url 不受影响
 function onAssetRefsUpdate(item, refs) {
@@ -4766,9 +4825,12 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
   justify-content: space-between;
   gap: 8px;
   min-width: 0;
+  /* 操作按钮（生成/上传/素材库）放不下时整体换行，而不是把名字挤成竖排 */
+  flex-wrap: wrap;
 }
 .character-title-block {
   min-width: 0;
+  flex: 1 1 150px;
   display: flex;
   flex-direction: column;
   gap: 4px;
