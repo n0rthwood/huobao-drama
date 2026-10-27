@@ -546,18 +546,26 @@ export async function checkStoryboardRefs(
 }
 
 /**
- * 造型版本自动选版（Issue #15）：本集角色有造型图、且分镜的 asset_version_selection
+ * 造型版本自动选版（Issue #15）：本镜绑定的角色在本集有造型图、且 asset_version_selection
  * 还没有该角色的键时，把造型图写成该镜的选定版本。人工已选的键一律不动。
  * 写进库（而不是只在运行时兜底），这样前端版本选择器显示的就是实际使用的那张图。
+ * 所有分镜写入路径（save_storyboards / update_storyboard / PUT /storyboards/:id）都经由
+ * syncStoryboardBindingsFromPrompts 调用它，绑定同步之后执行，只覆盖本镜真正出场的角色。
  */
 export async function autofillCostumeSelection(
-  storyboard: typeof schema.storyboards.$inferSelect,
+  storyboardId: number,
+  characterIds: number[],
 ): Promise<Record<string, string>> {
+  const [storyboard] = await db.select().from(schema.storyboards)
+    .where(eq(schema.storyboards.id, storyboardId))
+  if (!storyboard) return {}
   const selection = parseAssetVersionSelection(storyboard.assetVersionSelection)
+  if (!characterIds.length) return selection
   const links = await db.select().from(schema.episodeCharacters)
     .where(eq(schema.episodeCharacters.episodeId, storyboard.episodeId))
   let changed = false
   for (const link of links) {
+    if (!characterIds.includes(link.characterId)) continue
     const version = parseStylingVersion(link.stylingVersion)
     if (!version?.image_path) continue
     const key = `character:${link.characterId}`
@@ -568,7 +576,7 @@ export async function autofillCostumeSelection(
   if (changed) {
     await db.update(schema.storyboards)
       .set({ assetVersionSelection: JSON.stringify(selection) })
-      .where(eq(schema.storyboards.id, storyboard.id))
+      .where(eq(schema.storyboards.id, storyboardId))
   }
   return selection
 }
@@ -583,10 +591,7 @@ export async function syncStoryboardBindingsFromPrompts(
   const [storyboard] = await db.select().from(schema.storyboards)
     .where(eq(schema.storyboards.id, storyboardId))
   if (!storyboard) throw new Error('镜头不存在')
-  await autofillCostumeSelection(storyboard)
-  const [refreshed] = await db.select().from(schema.storyboards)
-    .where(eq(schema.storyboards.id, storyboardId))
-  const assets = await loadEpisodeAssets(refreshed!, refreshed!.episodeId)
+  const assets = await loadEpisodeAssets(storyboard, storyboard.episodeId)
   const bindings = await loadBindings(storyboardId)
   const input: RefCheckInput = {
     prompts: promptFieldsOf(storyboard),
@@ -614,6 +619,8 @@ export async function syncStoryboardBindingsFromPrompts(
       }
     }
   }
+  // 绑定确定之后再自动选版：只给本镜出场的角色写入本集造型图，人工已选不覆盖（Issue #15）
+  await autofillCostumeSelection(storyboardId, sync.characterIds)
   const issues = computeRefIssues({ ...input, characterIds: sync.characterIds, propIds: sync.propIds })
   return { sync, issues, characterIds: sync.characterIds, propIds: sync.propIds }
 }
