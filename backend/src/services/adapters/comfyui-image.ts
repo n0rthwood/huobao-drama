@@ -21,6 +21,7 @@ import {
   waitEngineIdle,
 } from './comfyui-client'
 import { buildQwenI2i, buildQwenT2i, pickQwenSize, QWEN_MAX_REFS } from './comfyui-qwen-workflows'
+import { FRAME_TYPE_SLOT } from '../keyframes.js'
 
 const IMAGE_EXT = /\.(png|jpe?g|webp)$/i
 
@@ -60,12 +61,20 @@ export class ComfyUIImageAdapter implements ImageProviderAdapter {
     const extra = record.extra as PreparedExtra | undefined
     if (!extra) throw new Error('ComfyUI adapter 需要先执行 prepare')
     const jobId = `img${record.id}`
+    const [width, height] = pickQwenSize(record.size)
+    // 关键帧必须按剧集画幅出图，给 i2i 显式 latent；其余图生图（角色/道具参考图编辑）
+    // 仍让输出尺寸跟随第 1 张参考图，行为不变
+    const explicitLatent = !!record.size && !!FRAME_TYPE_SLOT[String(record.frameType || '')]
     const workflow = extra.refNames.length
-      ? buildQwenI2i({ prompt: extra.prompt, seed: null, jobId, refNames: extra.refNames })
-      : (() => {
-          const [width, height] = pickQwenSize(record.size)
-          return buildQwenT2i({ prompt: extra.prompt, seed: null, jobId, width, height })
-        })()
+      ? buildQwenI2i({
+        prompt: extra.prompt,
+        seed: null,
+        jobId,
+        refNames: extra.refNames,
+        width: explicitLatent ? width : undefined,
+        height: explicitLatent ? height : undefined,
+      })
+      : buildQwenT2i({ prompt: extra.prompt, seed: null, jobId, width, height })
     return buildPromptRequest(config, workflow)
   }
 

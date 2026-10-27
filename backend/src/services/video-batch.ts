@@ -1,7 +1,8 @@
 /**
  * 服务端批量视频生成 — 按分镜顺序串行，脱离浏览器
  *
- * 提交 → 等待 sys_task 终态（完成即自动采用）→ 下一镜；承接镜头的尾帧在它提交的那一刻才提取。
+ * 提交 → 等待 sys_task 终态（完成即自动采用）→ 下一镜。
+ * 前提是本集所有分镜的关键帧都已人工确认；每一镜在提交前再复查一次确认状态。
  * 批次状态持久化在 video_batches，后端重启（开发机 tsx watch 很常见）后自动恢复：
  * 被重启中断的那一镜重新提交（接受上游可能残留的重复任务）。
  */
@@ -10,7 +11,7 @@ import { db, getInsertId, schema } from '../db/index.js'
 import { now } from '../utils/response.js'
 import { getActiveConfig, getConfigById } from './ai.js'
 import { getVideoAdapter } from './adapters/registry'
-import { loadEpisodeContinuity } from './continuity.js'
+import { loadEpisodeKeyframes } from './keyframes.js'
 import { listEpisodeStoryboards, submitStoryboardVideo } from './storyboard-video.js'
 import { logTaskError, logTaskProgress, logTaskStart, logTaskSuccess, logTaskWarn } from '../utils/task-logger.js'
 
@@ -23,7 +24,6 @@ export interface VideoBatchItem {
   state: BatchItemState
   task_id: number | null
   error: string | null
-  continuity: boolean
 }
 
 export interface VideoBatchStatus {
@@ -172,35 +172,21 @@ export async function startEpisodeVideoBatch(
   const targets = selected.filter(sb => !processingIds.has(sb.id))
   if (!targets.length) throw new Error('没有需要生成的分镜')
 
-  const continuity = await loadEpisodeContinuity(episodeId)
-  const targetIds = new Set(targets.map(sb => sb.id))
-  const numberById = new Map(storyboards.map(sb => [sb.id, sb.storyboardNumber]))
-
-  // 预检 1：承接镜头的上一镜必须在本批更早位置，或已有采用视频
-  const missingSource: number[] = []
-  for (const sb of targets) {
-    const entry = continuity.get(sb.id)
-    if (!entry?.effective || !entry.previousId) continue
-    const previous = storyboards.find(row => row.id === entry.previousId)
-    const previousInBatch = targetIds.has(entry.previousId)
-      && (numberById.get(entry.previousId) ?? 0) < sb.storyboardNumber
-    if (!previousInBatch && !(previous?.videoUrl || previous?.composedVideoUrl)) {
-      missingSource.push(sb.storyboardNumber)
-    }
-  }
-  if (missingSource.length) {
-    throw new Error(`以下镜头需要承接上一镜尾帧，但上一镜既不在本次批量中、也没有采用视频：${missingSource.map(n => `#${n}`).join('、')}`)
+  // 预检 1：本集所有分镜的关键帧都必须已人工确认（不只是本批选中的）
+  const keyframes = await loadEpisodeKeyframes(episodeId)
+  const unconfirmed = storyboards
+    .filter(sb => !keyframes.get(sb.id)?.confirmed)
+    .map(sb => sb.storyboardNumber)
+  if (unconfirmed.length) {
+    throw new Error(`以下镜头的关键帧尚未确认，请先在「分镜关键帧」步骤逐镜确认：${unconfirmed.map(n => `#${n}`).join('、')}`)
   }
 
-  // 预检 2：有承接镜头时，所选模型必须支持首帧引导
-  const continuityNumbers = targets.filter(sb => continuity.get(sb.id)?.effective).map(sb => sb.storyboardNumber)
-  if (continuityNumbers.length) {
-    const configId = opts.configId ?? episode.videoConfigId ?? undefined
-    const config = configId ? (await getConfigById(configId)) ?? await getActiveConfig('video') : await getActiveConfig('video')
-    if (!config) throw new Error('未配置视频模型，请先到「设置」页添加并启用 AI 服务')
-    if (!getVideoAdapter(config.provider).supportsFrameGuides) {
-      throw new Error(`当前视频模型（${config.provider}）不支持首帧引导，无法生成承接镜头：${continuityNumbers.map(n => `#${n}`).join('、')}`)
-    }
+  // 预检 2：关键帧驱动视频必须由支持关键帧引导的模型生成
+  const configId = opts.configId ?? episode.videoConfigId ?? undefined
+  const config = configId ? (await getConfigById(configId)) ?? await getActiveConfig('video') : await getActiveConfig('video')
+  if (!config) throw new Error('未配置视频模型，请先到「设置」页添加并启用 AI 服务')
+  if (!getVideoAdapter(config.provider).supportsFrameGuides) {
+    throw new Error(`当前视频模型不支持关键帧引导（${config.provider}），请改用 MiniMax-H3 等支持的模型`)
   }
 
   const items: VideoBatchItem[] = targets.map(sb => ({
@@ -209,7 +195,6 @@ export async function startEpisodeVideoBatch(
     state: 'pending',
     task_id: null,
     error: null,
-    continuity: !!continuity.get(sb.id)?.effective,
   }))
 
   const ts = now()
@@ -226,7 +211,6 @@ export async function startEpisodeVideoBatch(
     batchId,
     episodeId,
     total: items.length,
-    continuityShots: continuityNumbers.length,
     model: opts.model || undefined,
   })
   void runBatch(batchId)
@@ -262,24 +246,6 @@ async function waitForAdoptedVideo(storyboardId: number): Promise<void> {
       return
     }
     await new Promise(resolve => setTimeout(resolve, ADOPT_POLL_INTERVAL_MS))
-  }
-}
-
-/** 失败/跳过的镜头会断开承接链：后续依赖它的镜头标为跳过，到下一个切换边界恢复 */
-async function applySkipChain(episodeId: number, items: VideoBatchItem[]): Promise<void> {
-  const continuity = await loadEpisodeContinuity(episodeId)
-  const storyboards = await listEpisodeStoryboards(episodeId)
-  const numberById = new Map(storyboards.map(sb => [sb.id, sb.storyboardNumber]))
-  const broken = new Set(items
-    .filter(item => item.state === 'failed' || item.state === 'skipped')
-    .map(item => item.storyboard_id))
-  for (const item of items) {
-    if (item.state !== 'pending') continue
-    const entry = continuity.get(item.storyboard_id)
-    if (!entry?.effective || !entry.previousId || !broken.has(entry.previousId)) continue
-    item.state = 'skipped'
-    item.error = `上一镜 #${numberById.get(entry.previousId) ?? '?'} 未成功生成，跳过承接`
-    broken.add(item.storyboard_id)
   }
 }
 
@@ -326,17 +292,21 @@ async function runBatch(batchId: number): Promise<void> {
         batchId,
         storyboardId: item.storyboard_id,
         shotNumber: item.storyboard_number,
-        continuity: item.continuity,
       })
 
       try {
+        // 关键帧可能在批次排队期间被改动：提交前复查确认状态，未确认的这一镜直接失败
+        const keyframes = (await loadEpisodeKeyframes(row.episodeId)).get(item.storyboard_id)
+        if (!keyframes?.confirmed) {
+          throw new Error(`分镜 #${item.storyboard_number} 的关键帧尚未确认`)
+        }
         const taskId = await submitStoryboardVideo(item.storyboard_id, options)
         item.task_id = taskId
         await saveItems(batchId, items)
         const result = await waitForTask(taskId)
         item.state = result.ok ? 'completed' : 'failed'
         item.error = result.error
-        // 下一镜可能要承接这一镜的尾帧：等采用结果写回分镜后再推进
+        // 等采用结果写回分镜后再推进，前端刷新能立刻看到这一镜的视频
         if (result.ok) await waitForAdoptedVideo(item.storyboard_id)
       } catch (err) {
         item.state = 'failed'
@@ -350,7 +320,6 @@ async function runBatch(batchId: number): Promise<void> {
           shotNumber: item.storyboard_number,
           error: item.error,
         })
-        await applySkipChain(row.episodeId, items)
       } else {
         logTaskSuccess('VideoBatch', 'shot', {
           batchId,

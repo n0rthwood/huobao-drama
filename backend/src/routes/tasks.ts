@@ -28,8 +28,6 @@ const videoRequestSchema = z.object({
   seed: z.number().optional(),
   prompt_extend: z.boolean().optional(),
   watermark: z.boolean().optional(),
-  continuity_source_storyboard_id: z.number().int().optional(),
-  continuity_source_video_url: z.string().optional(),
 }).superRefine((data, ctx) => {
   if (data.reference_audio_urls.length > 0 && data.reference_image_urls.length + data.reference_video_urls.length === 0) {
     ctx.addIssue({ code: 'custom', message: '参考音频需要至少 1 个参考图片或视频' })
@@ -132,8 +130,6 @@ app.post('/', async (c) => {
         seed: videoBody!.seed,
         promptExtend: videoBody!.prompt_extend,
         watermark: videoBody!.watermark,
-        continuitySourceStoryboardId: videoBody!.continuity_source_storyboard_id,
-        continuitySourceVideoUrl: videoBody!.continuity_source_video_url,
         configId,
       })
 

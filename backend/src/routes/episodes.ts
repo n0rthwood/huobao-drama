@@ -6,12 +6,18 @@ import { toSnakeCaseArray, toSnakeCase } from '../utils/transform.js'
 import { getActiveConfigId } from '../services/ai.js'
 import { EXTRACT_TARGETS, getExtractionStatus, startExtraction, type ExtractTarget } from '../services/extraction.js'
 import { getVideoPromptBatchStatus, startVideoPromptBatch } from '../services/video-prompts.js'
-import { loadEpisodeContinuity } from '../services/continuity.js'
+import { getKeyframePromptBatchStatus, startKeyframePromptBatch } from '../services/keyframe-prompts.js'
+import { keyframesJson, loadEpisodeKeyframes } from '../services/keyframes.js'
 import {
   cancelEpisodeVideoBatch,
   getEpisodeVideoBatch,
   startEpisodeVideoBatch,
 } from '../services/video-batch.js'
+import {
+  cancelEpisodeKeyframeBatch,
+  getEpisodeKeyframeBatch,
+  startEpisodeKeyframeBatch,
+} from '../services/keyframe-batch.js'
 
 const app = new Hono()
 type ImageOwnerKind = 'character' | 'scene' | 'prop'
@@ -115,7 +121,7 @@ app.put('/:id', async (c) => {
   const id = Number(c.req.param('id'))
   const body = await c.req.json()
 
-  const allowed = ['content', 'script_content', 'title', 'description', 'status', 'resolution', 'continuity_enabled']
+  const allowed = ['content', 'script_content', 'title', 'description', 'status', 'resolution']
   const updates: Record<string, any> = {}
   for (const key of allowed) {
     if (key in body) updates[key] = body[key]
@@ -123,10 +129,6 @@ app.put('/:id', async (c) => {
   if (Object.keys(updates).length === 0) return badRequest(c, '没有可更新的字段')
   if ('resolution' in updates && !['480p', '720p', '1080p'].includes(updates.resolution)) {
     return badRequest(c, 'resolution 只支持 480p / 720p / 1080p')
-  }
-  // 单集默认尾帧承接开关：对本集所有 continuity_mode='auto' 的分镜生效
-  if ('continuity_enabled' in updates && typeof updates.continuity_enabled !== 'boolean') {
-    return badRequest(c, 'continuity_enabled 只支持布尔值')
   }
 
   // Map snake_case to camelCase for drizzle
@@ -137,7 +139,6 @@ app.put('/:id', async (c) => {
   if ('description' in updates) drizzleUpdates.description = updates.description
   if ('status' in updates) drizzleUpdates.status = updates.status
   if ('resolution' in updates) drizzleUpdates.resolution = updates.resolution
-  if ('continuity_enabled' in updates) drizzleUpdates.continuityEnabled = updates.continuity_enabled
 
   await db.update(schema.episodes).set(drizzleUpdates).where(eq(schema.episodes.id, id))
   return success(c)
@@ -260,6 +261,59 @@ app.post('/:id/video-batch/cancel', async (c) => {
   }
 })
 
+// POST /episodes/:id/generate-keyframe-prompts — 异步批量补齐关键帧提示词（立即返回，前端轮询状态）
+app.post('/:id/generate-keyframe-prompts', async (c) => {
+  const id = Number(c.req.param('id'))
+  const body = await c.req.json().catch(() => ({}))
+  const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, id))
+  if (!ep) return notFound(c, '剧集不存在')
+  const storyboardIds = Array.isArray(body.storyboard_ids)
+    ? body.storyboard_ids.map(Number).filter((n: number) => Number.isInteger(n) && n > 0)
+    : undefined
+  const result = await startKeyframePromptBatch(ep.id, ep.dramaId, { model: body.model || undefined, configId: body.config_id ?? undefined }, storyboardIds)
+  if (result.total === -1) return success(c, { status: 'running', already_running: true })
+  if (!result.started) return success(c, { status: 'idle', total: 0 })
+  return success(c, { status: 'running', total: result.total })
+})
+
+// GET /episodes/:id/keyframe-prompts-status — 查询批量关键帧提示词任务状态
+app.get('/:id/keyframe-prompts-status', async (c) => {
+  const id = Number(c.req.param('id'))
+  return success(c, getKeyframePromptBatchStatus(id))
+})
+
+// POST /episodes/:id/keyframe-batch — 服务端批量关键帧（按分镜 × 槽位串行，脱离浏览器）
+app.post('/:id/keyframe-batch', async (c) => {
+  const id = Number(c.req.param('id'))
+  const body = await c.req.json().catch(() => ({} as Record<string, any>))
+  try {
+    const status = await startEpisodeKeyframeBatch(id, {
+      storyboardIds: Array.isArray(body.storyboard_ids) ? body.storyboard_ids.map(Number) : undefined,
+      model: body.model,
+      configId: body.config_id,
+    })
+    return success(c, status)
+  } catch (err) {
+    return badRequest(c, err instanceof Error ? err.message : '批量关键帧启动失败')
+  }
+})
+
+// GET /episodes/:id/keyframe-batch — 最近一次批量的进度（刷新页面后仍可查看）
+app.get('/:id/keyframe-batch', async (c) => {
+  const id = Number(c.req.param('id'))
+  return success(c, await getEpisodeKeyframeBatch(id))
+})
+
+// POST /episodes/:id/keyframe-batch/cancel — 停止：不再提交新的关键帧，在跑的那一张继续完成
+app.post('/:id/keyframe-batch/cancel', async (c) => {
+  const id = Number(c.req.param('id'))
+  try {
+    return success(c, await cancelEpisodeKeyframeBatch(id))
+  } catch (err) {
+    return badRequest(c, err instanceof Error ? err.message : '停止批量关键帧失败')
+  }
+})
+
 // GET /episodes/:episode_id/storyboards
 app.get('/:episode_id/storyboards', async (c) => {
   const episodeId = Number(c.req.param('episode_id'))
@@ -298,8 +352,8 @@ app.get('/:episode_id/storyboards', async (c) => {
   const videoTasks = (await db.select().from(schema.sysTask))
     .filter(task => task.type === 'video' && task.status === 'completed' && task.storyboardId)
 
-  // 承接是否真正生效（剧集开关 + LLM 标注 + 分镜三态覆盖），界面据此显示承接标记
-  const continuity = await loadEpisodeContinuity(episodeId)
+  // 关键帧状态（生效首帧、就绪、确认），界面据此显示状态与承接标记
+  const keyframes = await loadEpisodeKeyframes(episodeId)
 
   return success(c, rows.map((row) => {
     let assetVersionSelection: Record<string, string> = {}
@@ -339,7 +393,7 @@ app.get('/:episode_id/storyboards', async (c) => {
     return {
       ...toSnakeCase(row),
       asset_version_selection: assetVersionSelection,
-      continuity_effective: !!continuity.get(row.id)?.effective,
+      keyframes: keyframesJson(keyframes.get(row.id)),
       video_versions: videoVersions,
       character_ids: charIdsByStoryboard.get(row.id) || [],
       prop_ids: propIdsByStoryboard.get(row.id) || [],

@@ -44,7 +44,12 @@ export function buildQwenT2i(p: QwenFill & { width: number; height: number }): W
   return wf
 }
 
-export function buildQwenI2i(p: QwenFill & { refNames: string[] }): Workflow {
+/**
+ * 图生图：默认 latent 来自编码器输出（尺寸跟随第 1 张参考图）。
+ * 传入 width/height 时插入显式 `EmptyLatentImage` 并改接 KSampler，
+ * 输出尺寸就固定为目标画幅——关键帧必须按剧集画幅出图，不能跟随三视图之类的参考图。
+ */
+export function buildQwenI2i(p: QwenFill & { refNames: string[]; width?: number; height?: number }): Workflow {
   const wf = structuredClone(TEMPLATES.i2i)
   const encoder = node(wf, '4').inputs
   encoder.prompt = p.prompt
@@ -57,6 +62,10 @@ export function buildQwenI2i(p: QwenFill & { refNames: string[] }): Workflow {
     wf[loaderId] = { class_type: 'LoadImage', inputs: { image: name } }
     encoder[`images.image_${i + 1}`] = [loaderId, 0]
   })
+  if (p.width && p.height) {
+    wf['5'] = { class_type: 'EmptyLatentImage', inputs: { width: p.width, height: p.height, batch_size: 1 } }
+    node(wf, '7').inputs.latent_image = ['5', 0]
+  }
   node(wf, '7').inputs.seed = randomSeed(p.seed)
   node(wf, '9').inputs.filename_prefix = `huobao/${p.jobId}`
   return wf

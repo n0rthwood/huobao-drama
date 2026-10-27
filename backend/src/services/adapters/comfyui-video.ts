@@ -35,6 +35,8 @@ interface PreparedExtra {
   mode: H3Mode
   variant: 'standard' | 'int8'
   firstName?: string
+  midName?: string
+  midTime?: number
   lastName?: string
   refNames: string[]
 }
@@ -45,8 +47,10 @@ function clampDuration(record: VideoGenerationRecord, min: number, max: number):
 
 export class ComfyUIVideoAdapter implements VideoProviderAdapter {
   provider = 'comfyui'
-  /** 参考图模式下首/尾帧走 MiniMaxH3AddGuide，不占用 Picture 编号 */
+  /** 参考图模式下首/中/尾关键帧走 MiniMaxH3AddGuide，不占用 Picture 编号 */
   supportsFrameGuides = true
+  /** MiniMaxH3AddGuide 的 frame_idx 可指向任意帧，支持按时间点锚定中间关键帧 */
+  supportsMidFrameGuide = true
 
   async prepare(config: AIConfig, record: VideoGenerationRecord): Promise<VideoGenerationRecord> {
     if (parseUrlArray(record.referenceVideoUrls).length || parseUrlArray(record.referenceAudioUrls).length) {
@@ -59,20 +63,32 @@ export class ComfyUIVideoAdapter implements VideoProviderAdapter {
     const modelError = validateVideoModel(config.provider, model)
     if (modelError) throw new Error(`${modelError}: ${model}`)
     const firstSource = (record.firstFrameUrl || record.imageUrl || '').trim()
+    const midSource = (record.midFrameUrl || '').trim()
+    const midTime = record.midFrameTime != null ? Number(record.midFrameTime) : undefined
     const lastSource = (record.lastFrameUrl || '').trim()
     const refSources = parseUrlArray(record.referenceImageUrls)
     const tag = `huobao_${record.id}`
     const variant: PreparedExtra['variant'] = model.toLowerCase().includes('int8') ? 'int8' : 'standard'
     const mode: H3Mode = refSources.length ? 'reference' : firstSource ? 'firstlast' : 't2v'
     const durationS = clampDuration(record, 4, 15)
+    // 中间帧引导只在参考图模式可用（firstlast 模板没有 AddGuide 链）
+    const useMid = mode === 'reference' && !!midSource && midTime != null && Number.isFinite(midTime)
     // 先扩写提示词（失败即报错，不浪费引擎时间），再等引擎空闲、上传图片
-    const prompt = await buildH3Prompt(userPrompt, mode, durationS, !!firstSource, !!lastSource)
+    const prompt = await buildH3Prompt(userPrompt, mode, durationS, {
+      hasFirst: !!firstSource,
+      midTime: useMid ? midTime : undefined,
+      hasLast: !!lastSource,
+    })
     await waitEngineIdle(config)
     const extra: PreparedExtra = { prompt, mode, variant, refNames: [] }
     if (mode === 'reference') {
       extra.refNames = await Promise.all(refSources.map((src, i) => uploadImage(config, src, `${tag}_ref${i}`)))
-      // 参考图模式同时支持首/尾帧引导（AddGuide），两者不互斥
+      // 参考图模式同时支持首/中/尾关键帧引导（AddGuide），与参考图不互斥
       if (firstSource) extra.firstName = await uploadImage(config, firstSource, `${tag}_first`)
+      if (useMid) {
+        extra.midName = await uploadImage(config, midSource, `${tag}_mid`)
+        extra.midTime = midTime
+      }
       if (lastSource) extra.lastName = await uploadImage(config, lastSource, `${tag}_last`)
     } else if (mode === 'firstlast') {
       extra.firstName = await uploadImage(config, firstSource, `${tag}_first`)
@@ -89,7 +105,14 @@ export class ComfyUIVideoAdapter implements VideoProviderAdapter {
     const [width, height] = pickResolution(record.resolution, record.aspectRatio)
     const common = { variant: extra.variant, prompt: extra.prompt, durationS, width, height, seed: record.seed, jobId }
     const workflow =
-      extra.mode === 'reference' ? buildReference({ ...common, refNames: extra.refNames, firstName: extra.firstName, lastName: extra.lastName })
+      extra.mode === 'reference' ? buildReference({
+        ...common,
+        refNames: extra.refNames,
+        firstName: extra.firstName,
+        midName: extra.midName,
+        midTime: extra.midTime,
+        lastName: extra.lastName,
+      })
       : extra.mode === 'firstlast' ? buildFirstLast({ ...common, firstName: extra.firstName!, lastName: extra.lastName })
       : buildT2v(common)
     return buildPromptRequest(config, workflow)

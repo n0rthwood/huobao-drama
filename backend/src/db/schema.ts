@@ -3,7 +3,7 @@
  * 自 MySQL 迁移：varchar(x)→text（SQLite 不校验长度）、int→integer、
  * boolean→integer boolean mode、时间戳仍为 text 存 ISO 字符串，表/列名不变。
  */
-import { sqliteTable, text, integer, primaryKey } from 'drizzle-orm/sqlite-core'
+import { sqliteTable, text, integer, real, primaryKey } from 'drizzle-orm/sqlite-core'
 
 export const dramas = sqliteTable('dramas', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -38,8 +38,6 @@ export const episodes = sqliteTable('episodes', {
   imageConfigId: integer('image_config_id'),
   videoConfigId: integer('video_config_id'),
   resolution: text('resolution').default('720p'),
-  // 单集默认尾帧承接开关：对本集所有 continuity_mode='auto' 的分镜生效
-  continuityEnabled: integer('continuity_enabled', { mode: 'boolean' }).default(true),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
   deletedAt: text('deleted_at'),
@@ -121,6 +119,7 @@ export const storyboards = sqliteTable('storyboards', {
   movement: text('movement'),
   result: text('result'),
   atmosphere: text('atmosphere'),
+  // 旧版单帧提示词：新流程改用三个关键帧提示词，仅保留列供存量数据读取，不再写入
   imagePrompt: text('image_prompt'),
   videoPrompt: text('video_prompt'),
   bgmPrompt: text('bgm_prompt'),
@@ -128,13 +127,21 @@ export const storyboards = sqliteTable('storyboards', {
   description: text('description'),
   duration: integer('duration').default(0),
   composedImage: text('composed_image'),
+  // 关键帧三槽位：各槽位选定版本的图片地址（首帧为空且承接上一镜时继承其尾帧）
   firstFrameImage: text('first_frame_image'),
+  midFrameImage: text('mid_frame_image'),
   lastFrameImage: text('last_frame_image'),
+  // 每张关键帧各自的提示词（拆分镜时由 LLM 生成，用户可改）
+  firstFramePrompt: text('first_frame_prompt'),
+  midFramePrompt: text('mid_frame_prompt'),
+  lastFramePrompt: text('last_frame_prompt'),
+  // 中间关键帧的时间点（秒，落在 0.5 ~ 时长-0.5 之间）
+  midFrameTime: real('mid_frame_time'),
+  // 人工确认关键帧：视频生成的前提
+  keyframesConfirmed: integer('keyframes_confirmed', { mode: 'boolean' }).default(false),
   referenceImages: text('reference_images'),
   assetVersionSelection: text('asset_version_selection'),
-  // auto=跟随剧集开关与 LLM 标注；previous_tail=强制承接；none=强制不承接
-  continuityMode: text('continuity_mode').default('auto'),
-  // LLM 拆分镜时标注的边界：continue=承接上一镜，cut=硬切；NULL=未标注（按硬切处理）
+  // LLM 拆分镜时标注的边界：continue=承接上一镜（首帧继承其尾帧关键帧），cut=硬切；NULL=未标注（按硬切处理）
   continuityBoundary: text('continuity_boundary'),
   videoUrl: text('video_url'),
   subtitleUrl: text('subtitle_url'),
@@ -255,6 +262,17 @@ export const videoBatches = sqliteTable('video_batches', {
   status: text('status').default('running'), // running | done | cancelled
   options: text('options'), // JSON: { model?, configId? }
   items: text('items'), // JSON: BatchItem[]
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+})
+
+// 服务端批量关键帧任务：按分镜 × 槽位顺序串行生成，结构与 video_batches 相同
+export const keyframeBatches = sqliteTable('keyframe_batches', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  episodeId: integer('episode_id').notNull(),
+  status: text('status').default('running'), // running | done | cancelled
+  options: text('options'), // JSON: { model?, configId? }
+  items: text('items'), // JSON: KeyframeBatchItem[]
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 })

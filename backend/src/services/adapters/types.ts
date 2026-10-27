@@ -50,12 +50,14 @@ export interface ImageProviderAdapter {
  */
 export interface VideoProviderAdapter {
   provider: string
-
   /**
-   * 是否支持首帧/尾帧引导（可与参考图、文本同时发送）。
-   * false 的厂商收到首/尾帧会直接报错，不静默丢弃；承接镜头在组装阶段就会被拦下。
+   * 是否支持首帧/尾帧关键帧引导（可与参考图、文本同时发送）。
+   * false 的厂商收到关键帧会直接报错，不静默丢弃；在组装阶段就会被拦下。
    */
   supportsFrameGuides?: boolean
+
+  /** 是否支持中间帧引导（按时间点锚定）；不支持的模型只收首/尾帧 */
+  supportsMidFrameGuide?: boolean
 
   buildGenerateRequest(config: AIConfig, record: VideoGenerationRecord): ProviderRequest
 
@@ -114,6 +116,9 @@ export interface VideoGenerationRecord {
   referenceMode?: string | null
   imageUrl?: string | null
   firstFrameUrl?: string | null
+  /** 中间关键帧引导图与它对齐的时间点（秒） */
+  midFrameUrl?: string | null
+  midFrameTime?: number | null
   lastFrameUrl?: string | null
   referenceImageUrls?: string | null
   referenceVideoUrls?: string | null

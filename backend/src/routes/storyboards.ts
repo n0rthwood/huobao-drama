@@ -5,7 +5,20 @@ import { success, created, now, badRequest } from '../utils/response.js'
 import { toSnakeCase } from '../utils/transform.js'
 import { logTaskError, logTaskPayload, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
 import { submitStoryboardVideo } from '../services/storyboard-video.js'
+import { submitStoryboardKeyframe } from '../services/storyboard-keyframes.js'
+import {
+  SLOT_LABEL,
+  SLOT_FRAME_TYPE,
+  invalidateKeyframeConfirmation,
+  isKeyframeSlot,
+  keyframesJson,
+  loadEpisodeKeyframes,
+  loadStoryboardKeyframes,
+  slotOwnImage,
+  type KeyframeSlot,
+} from '../services/keyframes.js'
 import { findActiveBatchForStoryboard } from '../services/video-batch.js'
+import { findActiveKeyframeBatchForStoryboard } from '../services/keyframe-batch.js'
 
 const app = new Hono()
 function normalizeAssetVersionSelection(value: unknown): string | null {
@@ -148,11 +161,14 @@ app.put('/:id', async (c) => {
     title: 'title', description: 'description', shot_type: 'shotType',
     angle: 'angle', movement: 'movement', duration: 'duration',
     video_prompt: 'videoPrompt',
-    image_prompt: 'imagePrompt', scene_id: 'sceneId', location: 'location',
+    scene_id: 'sceneId', location: 'location',
     time: 'time', atmosphere: 'atmosphere', result: 'result',
     bgm_prompt: 'bgmPrompt', sound_effect: 'soundEffect',
     video_url: 'videoUrl',
-    continuity_mode: 'continuityMode',
+    first_frame_prompt: 'firstFramePrompt',
+    mid_frame_prompt: 'midFramePrompt',
+    last_frame_prompt: 'lastFramePrompt',
+    mid_frame_time: 'midFrameTime',
     continuity_boundary: 'continuityBoundary',
   }
 
@@ -167,14 +183,19 @@ app.put('/:id', async (c) => {
       return badRequest(c, (err as Error).message)
     }
   }
-  // 承接三态覆盖：是否真正承接在生成时判定（不再要求上一镜已经有视频）
-  if ('continuity_mode' in body && !['auto', 'previous_tail', 'none'].includes(body.continuity_mode)) {
-    return badRequest(c, 'continuity_mode 只支持 auto / previous_tail / none')
-  }
   // 承接边界由拆分镜 LLM 标注；NULL 表示未标注（按硬切处理）
   if ('continuity_boundary' in body && body.continuity_boundary != null
     && !['continue', 'cut'].includes(body.continuity_boundary)) {
     return badRequest(c, 'continuity_boundary 只支持 continue / cut 或留空')
+  }
+  // 中间关键帧时间点：首尾各留 0.5 秒，否则引导帧会和首/尾帧挤在一起
+  if ('mid_frame_time' in body && body.mid_frame_time != null) {
+    const duration = Number(('duration' in body ? body.duration : storyboard.duration) || 0)
+    const midTime = Number(body.mid_frame_time)
+    if (!Number.isFinite(midTime) || midTime <= 0.5 || midTime >= duration - 0.5) {
+      return badRequest(c, `mid_frame_time 必须在 0.5 秒与 ${Math.max(0, duration - 0.5)} 秒之间`)
+    }
+    updates.midFrameTime = midTime
   }
 
   await validateStoryboardBindings(
@@ -196,7 +217,158 @@ app.put('/:id', async (c) => {
   return success(c)
 })
 
-// POST /storyboards/:id/generate-video — 单镜视频生成：参考图/提示词编号/风格/时长/承接首帧全部由后端组装
+// ─── 分镜关键帧 ────────────────────────────────────────────────
+
+/** 单镜的完整 JSON（含关键帧计算字段），关键帧接口统一返回这个形状 */
+async function storyboardJson(id: number) {
+  const [row] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, id))
+  if (!row) return null
+  let assetVersionSelection: Record<string, string> = {}
+  try {
+    assetVersionSelection = row.assetVersionSelection ? JSON.parse(row.assetVersionSelection) : {}
+  } catch {
+    assetVersionSelection = {}
+  }
+  return {
+    ...toSnakeCase(row),
+    asset_version_selection: assetVersionSelection,
+    keyframes: keyframesJson((await loadEpisodeKeyframes(row.episodeId)).get(row.id)),
+    character_ids: await getStoryboardCharacterIds(row.id),
+    prop_ids: await getStoryboardPropIds(row.id),
+  }
+}
+
+function parseSlot(value: string | undefined): KeyframeSlot | null {
+  return isKeyframeSlot(value) ? value : null
+}
+
+// POST /storyboards/:id/keyframes/:slot/generate — 生成某个槽位的关键帧（可同时保存改过的提示词）
+app.post('/:id/keyframes/:slot/generate', async (c) => {
+  const id = Number(c.req.param('id'))
+  const slot = parseSlot(c.req.param('slot'))
+  if (!slot) return badRequest(c, 'slot 只支持 first / mid / last')
+  const body = await c.req.json().catch(() => ({} as Record<string, any>))
+  logTaskStart('StoryboardAPI', 'generate-keyframe', { storyboardId: id, slot, model: body.model, configId: body.config_id })
+  try {
+    const batchId = await findActiveKeyframeBatchForStoryboard(id)
+    if (batchId) return badRequest(c, '该镜头正排在批量关键帧队列中，请等待批量完成或先停止批量')
+    // 只保存非空提示词：空串不能把已有的槽位提示词抹掉（生成随后也会因提示词为空而报错）
+    const editedPrompt = typeof body.prompt === 'string' ? body.prompt.trim() : ''
+    if (editedPrompt) {
+      const promptPatch = slot === 'first' ? { firstFramePrompt: editedPrompt }
+        : slot === 'mid' ? { midFramePrompt: editedPrompt }
+        : { lastFramePrompt: editedPrompt }
+      await db.update(schema.storyboards)
+        .set({ ...promptPatch, updatedAt: now() })
+        .where(eq(schema.storyboards.id, id))
+    }
+    const taskId = await submitStoryboardKeyframe(id, slot, { model: body.model, configId: body.config_id })
+    const [record] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, taskId))
+    logTaskSuccess('StoryboardAPI', 'generate-keyframe', { storyboardId: id, slot, taskId, provider: record?.provider })
+    return created(c, record)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '关键帧生成失败'
+    logTaskError('StoryboardAPI', 'generate-keyframe', { storyboardId: id, slot, error: message })
+    return badRequest(c, message)
+  }
+})
+
+// GET /storyboards/:id/keyframes/:slot/versions — 该槽位的历史版本（最新在前）
+app.get('/:id/keyframes/:slot/versions', async (c) => {
+  const id = Number(c.req.param('id'))
+  const slot = parseSlot(c.req.param('slot'))
+  if (!slot) return badRequest(c, 'slot 只支持 first / mid / last')
+  const frameType = SLOT_FRAME_TYPE[slot]
+  const tasks = (await db.select().from(schema.sysTask))
+    .filter(task => task.type === 'image' && task.status === 'completed' && task.storyboardId === id)
+    .filter((task) => {
+      try {
+        const params: unknown = JSON.parse(task.params || '{}')
+        return !!params && typeof params === 'object' && 'frameType' in params && params.frameType === frameType
+      } catch {
+        return false
+      }
+    })
+  const versions = tasks
+    .filter(task => task.localPath || task.resultUrl)
+    .map(task => ({
+      id: task.id,
+      image: task.localPath || task.resultUrl,
+      prompt: task.prompt,
+      provider: task.provider,
+      model: task.model,
+      created_at: task.createdAt,
+    }))
+    .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
+  return success(c, versions)
+})
+
+// PUT /storyboards/:id/keyframes/:slot — 选定某个版本，或（仅首帧）改为继承上一镜尾帧
+app.put('/:id/keyframes/:slot', async (c) => {
+  const id = Number(c.req.param('id'))
+  const slot = parseSlot(c.req.param('slot'))
+  if (!slot) return badRequest(c, 'slot 只支持 first / mid / last')
+  const body = await c.req.json().catch(() => ({} as Record<string, any>))
+  const [storyboard] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, id))
+  if (!storyboard) return badRequest(c, '镜头不存在')
+
+  if (body.inherit === true) {
+    if (slot !== 'first') return badRequest(c, '只有首帧可以继承上一镜的尾帧')
+    const state = (await loadEpisodeKeyframes(storyboard.episodeId)).get(id)
+    if (!state?.previousId || storyboard.continuityBoundary !== 'continue') {
+      return badRequest(c, '该镜头没有可继承的上一镜（需要标注为承接且不是第一镜）')
+    }
+    await db.update(schema.storyboards)
+      .set({ firstFrameImage: null, updatedAt: now() })
+      .where(eq(schema.storyboards.id, id))
+  } else {
+    const image = String(body.image || '').trim()
+    if (!image) return badRequest(c, '缺少 image')
+    const frameType = SLOT_FRAME_TYPE[slot]
+    const owned = (await db.select().from(schema.sysTask))
+      .filter(task => task.type === 'image' && task.status === 'completed' && task.storyboardId === id)
+      .some((task) => {
+        if ((task.localPath || task.resultUrl) !== image) return false
+        try {
+          const params: unknown = JSON.parse(task.params || '{}')
+          return !!params && typeof params === 'object' && 'frameType' in params && params.frameType === frameType
+        } catch {
+          return false
+        }
+      })
+    if (!owned) return badRequest(c, `该图片不是本镜${SLOT_LABEL[slot]}的历史版本`)
+    const imagePatch = slot === 'first' ? { firstFrameImage: image }
+      : slot === 'mid' ? { midFrameImage: image }
+      : { lastFrameImage: image }
+    await db.update(schema.storyboards)
+      .set({ ...imagePatch, updatedAt: now() })
+      .where(eq(schema.storyboards.id, id))
+  }
+
+  // 选定图变化 → 人工确认作废（并连带继承它的下一镜）
+  await invalidateKeyframeConfirmation(id)
+  logTaskSuccess('StoryboardAPI', 'select-keyframe', { storyboardId: id, slot, inherit: body.inherit === true })
+  return success(c, await storyboardJson(id))
+})
+
+// POST /storyboards/:id/confirm-keyframes — 人工确认/取消确认，视频生成的闸门
+app.post('/:id/confirm-keyframes', async (c) => {
+  const id = Number(c.req.param('id'))
+  const body = await c.req.json().catch(() => ({} as Record<string, any>))
+  const confirmed = body.confirmed === true
+  const state = await loadStoryboardKeyframes(id)
+  if (!state) return badRequest(c, '镜头不存在')
+  if (confirmed && !state.ready) {
+    return badRequest(c, '关键帧未就绪，首帧与尾帧必须都有图；写了中间帧提示词的分镜还需要中间帧图')
+  }
+  await db.update(schema.storyboards)
+    .set({ keyframesConfirmed: confirmed, updatedAt: now() })
+    .where(eq(schema.storyboards.id, id))
+  logTaskSuccess('StoryboardAPI', 'confirm-keyframes', { storyboardId: id, confirmed })
+  return success(c, await storyboardJson(id))
+})
+
+// POST /storyboards/:id/generate-video — 单镜视频生成：关键帧/参考图/提示词编号/风格/时长全部由后端组装（要求该镜已确认关键帧）
 app.post('/:id/generate-video', async (c) => {
   const id = Number(c.req.param('id'))
   const body = await c.req.json().catch(() => ({} as Record<string, any>))
@@ -219,9 +391,20 @@ app.post('/:id/generate-video', async (c) => {
 app.delete('/:id', async (c) => {
   const id = Number(c.req.param('id'))
   logTaskStart('StoryboardAPI', 'delete', { storyboardId: id })
+  const [storyboard] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, id))
+  // 删除后“上一镜”会变，继承首帧的下一镜要重新确认
+  const nextRows = storyboard
+    ? (await db.select().from(schema.storyboards).where(eq(schema.storyboards.episodeId, storyboard.episodeId)))
+      .filter(row => !row.deletedAt && row.id !== id && row.storyboardNumber > storyboard.storyboardNumber)
+      .sort((a, b) => a.storyboardNumber - b.storyboardNumber)
+    : []
+  const next = nextRows[0]
   await db.delete(schema.storyboardCharacters).where(eq(schema.storyboardCharacters.storyboardId, id))
   await db.delete(schema.storyboardProps).where(eq(schema.storyboardProps.storyboardId, id))
   await db.delete(schema.storyboards).where(eq(schema.storyboards.id, id))
+  if (next && !slotOwnImage(next, 'first') && next.continuityBoundary === 'continue') {
+    await invalidateKeyframeConfirmation(next.id)
+  }
   logTaskSuccess('StoryboardAPI', 'delete', { storyboardId: id })
   return success(c)
 })

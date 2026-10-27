@@ -15,6 +15,7 @@ import referenceInt8Template from '../../workflows/h3-int8/reference.json'
 import t2vInt8Template from '../../workflows/h3-int8/t2v.json'
 
 import { asWorkflow, cloneNode as node, randomSeed, type Workflow } from './comfyui-client'
+import { effectiveFrames, H3_FPS } from './h3-prompt'
 
 export type H3Variant = 'standard' | 'int8'
 
@@ -131,14 +132,25 @@ function findByClass(wf: Workflow, classType: string): string {
 }
 
 /**
- * 参考图模式追加首/尾帧引导：LoadImage → MiniMaxH3AddGuide（首帧 frame_idx=0，尾帧 frame_idx=-1），
- * 逐个串在 ReferenceToVideo 之后，最后把 BasicGuider 的 conditioning 指向末个引导节点。
+ * 参考图模式追加关键帧引导：LoadImage → MiniMaxH3AddGuide，逐个串在 ReferenceToVideo 之后，
+ * 最后把 BasicGuider 的 conditioning 指向末个引导节点。
+ * 首帧 frame_idx=0；中间帧按时间点换算帧号（引擎的 17k+5 帧网格）；尾帧 frame_idx=-1。
  * 引导帧不占用 Picture 编号，@图片N 的映射照旧。
  */
-function appendFrameGuides(wf: Workflow, refNodeId: string, firstName?: string, lastName?: string): void {
+function appendFrameGuides(
+  wf: Workflow,
+  refNodeId: string,
+  frames: number,
+  p: { firstName?: string; midName?: string; midTime?: number | null; lastName?: string },
+): void {
   const guides: Array<{ image: string; frameIdx: number }> = []
-  if (firstName) guides.push({ image: firstName, frameIdx: 0 })
-  if (lastName) guides.push({ image: lastName, frameIdx: -1 })
+  if (p.firstName) guides.push({ image: p.firstName, frameIdx: 0 })
+  if (p.midName && p.midTime != null) {
+    // 首尾各留一帧，避免中间帧引导与首/尾帧引导落在同一帧上
+    const idx = Math.round(p.midTime * H3_FPS)
+    guides.push({ image: p.midName, frameIdx: Math.min(Math.max(idx, 1), Math.max(1, frames - 2)) })
+  }
+  if (p.lastName) guides.push({ image: p.lastName, frameIdx: -1 })
   if (!guides.length) return
 
   const guiderId = findByClass(wf, 'BasicGuider')
@@ -169,7 +181,13 @@ function appendFrameGuides(wf: Workflow, refNodeId: string, firstName?: string, 
 
 /** 参考图模式：standard = ref2va 基础权重固定 20 步；int8 = fused refdelta 4 步蒸馏(102 的 int8 权重集里唯一可用的参考路径) */
 export function buildReference(
-  p: Omit<FillBase, 'steps'> & { refNames: string[]; firstName?: string; lastName?: string },
+  p: Omit<FillBase, 'steps'> & {
+    refNames: string[]
+    firstName?: string
+    midName?: string
+    midTime?: number | null
+    lastName?: string
+  },
 ): Workflow {
   const variant = p.variant ?? 'standard'
   const wf = structuredClone(TEMPLATES[variant].reference)
@@ -188,7 +206,7 @@ export function buildReference(
     wf[loaderId] = { class_type: 'LoadImage', inputs: { image: name, upload: 'image' } }
     gen[`ref_images.ref_image_${i}`] = [loaderId, 0]
   })
-  appendFrameGuides(wf, refNodeId, p.firstName, p.lastName)
+  appendFrameGuides(wf, refNodeId, effectiveFrames(p.durationS), p)
   node(wf, '92').inputs.filename_prefix = `huobao/${p.jobId}`
   return wf
 }

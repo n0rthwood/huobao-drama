@@ -29,6 +29,7 @@ import { eq } from 'drizzle-orm'
 import { now } from './utils/response.js'
 import { DATA_ROOT } from './utils/paths.js'
 import { resumeVideoBatches } from './services/video-batch.js'
+import { resumeKeyframeBatches } from './services/keyframe-batch.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(__dirname, '../..')
@@ -99,7 +100,8 @@ db.update(schema.sysTask)
     if (affected > 0) console.log(`🔁 已清理 ${affected} 个中断的生成任务`)
   })
   .catch(err => console.error('清理中断任务失败:', err?.message))
-  // 清理完成后再恢复批量视频：被重启打断的那一镜此时已是 failed，由批次重新提交
+  // 清理完成后再恢复批量任务：被重启打断的那一张/那一镜此时已是 failed，由批次重新提交
+  .then(() => resumeKeyframeBatches())
   .then(() => resumeVideoBatches())
 
 serve({ fetch: app.fetch, port })

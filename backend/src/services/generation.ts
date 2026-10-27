@@ -12,6 +12,7 @@ import { authHeaders } from './adapters/comfyui-client'
 import { getImageAdapter, getVideoAdapter } from './adapters/registry'
 import type { AIConfig, ImageGenerationRecord, VideoGenerationRecord } from './adapters/types'
 import { logTaskError, logTaskPayload, logTaskProgress, logTaskStart, logTaskSuccess, logTaskWarn, redactUrl } from '../utils/task-logger.js'
+import { FRAME_TYPE_SLOT, invalidateKeyframeConfirmation } from './keyframes.js'
 
 /** ComfyUI 公网网关的 /view 取件要带网关鉴权头；其它 provider 的输出直链无需鉴权。
  *  四个完成回调调用点需保持同一行为，故收敛成一处。 */
@@ -51,6 +52,9 @@ interface GenerateVideoParams {
   referenceMode?: string
   imageUrl?: string
   firstFrameUrl?: string
+  /** 中间关键帧引导（仅 supportsMidFrameGuide 的模型会收到） */
+  midFrameUrl?: string
+  midFrameTime?: number
   lastFrameUrl?: string
   referenceImageUrls?: string[]
   referenceVideoUrls?: string[]
@@ -62,8 +66,6 @@ interface GenerateVideoParams {
   seed?: number
   promptExtend?: boolean
   watermark?: boolean
-  continuitySourceStoryboardId?: number
-  continuitySourceVideoUrl?: string
   configId?: number
 }
 
@@ -121,6 +123,8 @@ export async function generateVideo(params: GenerateVideoParams): Promise<number
     referenceMode: params.referenceMode || 'reference',
     imageUrl: params.imageUrl,
     firstFrameUrl: params.firstFrameUrl,
+    midFrameUrl: params.midFrameUrl,
+    midFrameTime: params.midFrameTime,
     lastFrameUrl: params.lastFrameUrl,
     referenceImageUrls: params.referenceImageUrls,
     referenceVideoUrls: params.referenceVideoUrls,
@@ -133,8 +137,6 @@ export async function generateVideo(params: GenerateVideoParams): Promise<number
     seed: params.seed,
     promptExtend: params.promptExtend,
     watermark: params.watermark,
-    continuitySourceStoryboardId: params.continuitySourceStoryboardId,
-    continuitySourceVideoUrl: params.continuitySourceVideoUrl,
   })
 
   logTaskStart('VideoTask', 'enqueue', {
@@ -229,6 +231,7 @@ async function processTask(id: number, config: AIConfig) {
       const adapter = getVideoAdapter(config.provider)
       const resolvedImageUrl = await normalizeVideoReferenceUrl(params.imageUrl)
       const resolvedFirstFrameUrl = await normalizeVideoReferenceUrl(params.firstFrameUrl)
+      const resolvedMidFrameUrl = await normalizeVideoReferenceUrl(params.midFrameUrl)
       const resolvedLastFrameUrl = await normalizeVideoReferenceUrl(params.lastFrameUrl)
       const resolvedReferenceImageUrls = await normalizeVideoReferenceUrls(params.referenceImageUrls)
       // 参考视频/音频文件较大，不适合 dataURL 内联，需解析为公网可访问 URL
@@ -241,6 +244,8 @@ async function processTask(id: number, config: AIConfig) {
         referenceMode: params.referenceMode,
         imageUrl: resolvedImageUrl,
         firstFrameUrl: resolvedFirstFrameUrl,
+        midFrameUrl: resolvedMidFrameUrl,
+        midFrameTime: params.midFrameTime,
         lastFrameUrl: resolvedLastFrameUrl,
         referenceImageUrls: resolvedReferenceImageUrls.length ? JSON.stringify(resolvedReferenceImageUrls) : null,
         referenceVideoUrls: resolvedReferenceVideoUrls.length ? JSON.stringify(resolvedReferenceVideoUrls) : null,
@@ -450,11 +455,15 @@ async function handleImageCompleteBase64(record: SysTaskRecord, base64Data: stri
 async function writeBackImageAssets(record: SysTaskRecord, localPath: string) {
   const params = parseTaskParams(record.params)
   if (record.storyboardId) {
+    const slot = FRAME_TYPE_SLOT[String(params.frameType || '')]
     const sbUpdate: Record<string, any> = { updatedAt: now() }
-    if (params.frameType === 'first_frame') sbUpdate.firstFrameImage = localPath
-    else if (params.frameType === 'last_frame') sbUpdate.lastFrameImage = localPath
+    if (slot === 'first') sbUpdate.firstFrameImage = localPath
+    else if (slot === 'mid') sbUpdate.midFrameImage = localPath
+    else if (slot === 'last') sbUpdate.lastFrameImage = localPath
     else sbUpdate.composedImage = localPath
     await db.update(schema.storyboards).set(sbUpdate).where(eq(schema.storyboards.id, record.storyboardId))
+    // 新关键帧自动成为该槽位的选定版本 → 之前的人工确认作废（并连带继承它的下一镜）
+    if (slot) await invalidateKeyframeConfirmation(record.storyboardId)
   }
   if (record.characterId) {
     await db.update(schema.characters).set({ imageUrl: localPath, updatedAt: now() }).where(eq(schema.characters.id, record.characterId))
