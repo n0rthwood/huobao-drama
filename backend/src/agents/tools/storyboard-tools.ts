@@ -11,6 +11,8 @@ import { now } from '../../utils/response.js'
 import { logTaskProgress, logTaskSuccess } from '../../utils/task-logger.js'
 import { getDramaId, getEpisodeId } from '../context.js'
 import { loadEpisodeKeyframes } from '../../services/keyframes.js'
+import { PROMPT_FIELDS, syncStoryboardBindingsFromPrompts } from '../../services/storyboard-assets.js'
+import { stampFieldSavedAt } from '../../services/storyboard-fields.js'
 
 async function syncStoryboardCharacters(storyboardId: number, characterIds: number[]) {
   await db.delete(schema.storyboardCharacters)
@@ -351,6 +353,16 @@ const saveStoryboards = createTool({
         await syncStoryboardCharacters(newId, sb.character_ids || [])
         await syncStoryboardProps(newId, sb.prop_ids || [])
       }
+      // 关键帧/视频提示词写入后：打字段保存时间 + 绑定跟随 @引用（LLM 不必自己传 ids）
+      const savedId = existingId ?? shotToId.get(sb.shot_number)!
+      const writtenFields = Object.entries(sb).filter(([, value]) => value !== undefined).map(([key]) => key)
+      const [savedRow] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, savedId))
+      const stamp = stampFieldSavedAt(savedRow?.fieldSavedAt, writtenFields)
+      if (stamp.json) {
+        await db.update(schema.storyboards).set({ fieldSavedAt: stamp.json })
+          .where(eq(schema.storyboards.id, savedId))
+      }
+      await syncStoryboardBindingsFromPrompts(savedId)
     }
 
     // 整集时长 = 当前全部存活分镜时长之和（分批保存时不能再按单批累加）
@@ -462,9 +474,15 @@ const updateStoryboard = createTool({
     if ('scene_id' in fields) updates.sceneId = fields.scene_id
     if ('continuity' in fields) updates.continuityBoundary = fields.continuity
     if ('duration' in fields) updates.duration = fields.duration
+    const stamp = stampFieldSavedAt(storyboard.fieldSavedAt, Object.keys(fields))
+    if (stamp.json) updates.fieldSavedAt = stamp.json
     await db.update(schema.storyboards).set(updates).where(eq(schema.storyboards.id, storyboard_id))
     if ('character_ids' in fields) await syncStoryboardCharacters(storyboard_id, fields.character_ids || [])
     if ('prop_ids' in fields) await syncStoryboardProps(storyboard_id, fields.prop_ids || [])
+    // 提示词被写入时绑定完全跟随 @引用（显式传入的 ids 以提示词为准被覆盖）
+    if (PROMPT_FIELDS.some(field => field in fields)) {
+      await syncStoryboardBindingsFromPrompts(storyboard_id)
+    }
     logTaskSuccess('StoryboardTool', 'update-complete', {
       episodeId,
       storyboardId: storyboard_id,

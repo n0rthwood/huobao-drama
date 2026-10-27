@@ -2,12 +2,12 @@ import { Hono } from 'hono'
 import { and, eq, isNull } from 'drizzle-orm'
 import { db, getInsertId, schema } from '../db/index.js'
 import { success, notFound, badRequest, now } from '../utils/response.js'
-import { toSnakeCaseArray, toSnakeCase } from '../utils/transform.js'
+import { toSnakeCase } from '../utils/transform.js'
 import { getActiveConfigId } from '../services/ai.js'
 import { EXTRACT_TARGETS, getExtractionStatus, startExtraction, type ExtractTarget } from '../services/extraction.js'
 import { getVideoPromptBatchStatus, startVideoPromptBatch } from '../services/video-prompts.js'
 import { getKeyframePromptBatchStatus, startKeyframePromptBatch } from '../services/keyframe-prompts.js'
-import { keyframesJson, loadEpisodeKeyframes } from '../services/keyframes.js'
+import { isKeyframeSlot, keyframesJson, loadEpisodeKeyframes, type KeyframeSlot } from '../services/keyframes.js'
 import {
   cancelEpisodeVideoBatch,
   getEpisodeVideoBatch,
@@ -18,8 +18,10 @@ import {
   getEpisodeKeyframeBatch,
   retryFailedKeyframeBatch,
   startEpisodeKeyframeBatch,
+  previewEpisodeKeyframeBatch,
 } from '../services/keyframe-batch.js'
-import { serializeTasks } from '../services/sys-task.js'
+import { checkStoryboardRefs } from '../services/storyboard-assets.js'
+import { parseFieldSavedAt } from '../services/storyboard-fields.js'
 
 const app = new Hono()
 type ImageOwnerKind = 'character' | 'scene' | 'prop'
@@ -200,14 +202,14 @@ app.post('/:id/extract', async (c) => {
   if (!EXTRACT_TARGETS.includes(target)) return badRequest(c, 'target 必须是 characters / scenes / props')
   const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, id))
   if (!ep) return notFound(c, '剧集不存在')
-  const started = startExtraction(ep.id, ep.dramaId, target, { model: body.model || undefined, configId: body.config_id ?? undefined })
+  const started = await startExtraction(ep.id, ep.dramaId, target, { model: body.model || undefined, configId: body.config_id ?? undefined })
   return success(c, { target, status: 'running', already_running: !started })
 })
 
 // GET /episodes/:id/extract-status — 查询三类资产提取任务状态
 app.get('/:id/extract-status', async (c) => {
   const id = Number(c.req.param('id'))
-  return success(c, getExtractionStatus(id))
+  return success(c, await getExtractionStatus(id))
 })
 
 // POST /episodes/:id/generate-video-prompts — 异步批量为缺少视频提示词的分镜生成（立即返回，前端轮询状态）
@@ -228,7 +230,7 @@ app.post('/:id/generate-video-prompts', async (c) => {
 // GET /episodes/:id/video-prompts-status — 查询批量视频提示词任务状态
 app.get('/:id/video-prompts-status', async (c) => {
   const id = Number(c.req.param('id'))
-  return success(c, getVideoPromptBatchStatus(id))
+  return success(c, await getVideoPromptBatchStatus(id))
 })
 
 // POST /episodes/:id/video-batch — 服务端批量视频（按分镜顺序串行，脱离浏览器）
@@ -281,16 +283,41 @@ app.post('/:id/generate-keyframe-prompts', async (c) => {
 // GET /episodes/:id/keyframe-prompts-status — 查询批量关键帧提示词任务状态
 app.get('/:id/keyframe-prompts-status', async (c) => {
   const id = Number(c.req.param('id'))
-  return success(c, getKeyframePromptBatchStatus(id))
+  return success(c, await getKeyframePromptBatchStatus(id))
 })
 
-// POST /episodes/:id/keyframe-batch — 服务端批量关键帧（qwen-jobs 一次性全部提交，其它 provider 串行）
-app.post('/:id/keyframe-batch', async (c) => {
+// POST /episodes/:id/keyframe-batch/preview — 逐个“分镜 × 槽位”列出 缺图/已变化/未变化(同第N版)/阻断/跳过
+app.post('/:id/keyframe-batch/preview', async (c) => {
   const id = Number(c.req.param('id'))
   const body = await c.req.json().catch(() => ({} as Record<string, any>))
   try {
-    const status = await startEpisodeKeyframeBatch(id, {
+    const items = await previewEpisodeKeyframeBatch(id, {
       storyboardIds: Array.isArray(body.storyboard_ids) ? body.storyboard_ids.map(Number) : undefined,
+      model: body.model,
+      configId: body.config_id,
+    })
+    return success(c, { items })
+  } catch (err) {
+    return badRequest(c, err instanceof Error ? err.message : '批量关键帧预览失败')
+  }
+})
+
+// POST /episodes/:id/keyframe-batch — 服务端批量关键帧（按勾选的 分镜 × 槽位 入批）
+app.post('/:id/keyframe-batch', async (c) => {
+  const id = Number(c.req.param('id'))
+  const body = await c.req.json().catch(() => ({} as Record<string, any>))
+  const items: Array<{ storyboard_id: number; slot: KeyframeSlot }> = []
+  for (const raw of Array.isArray(body.items) ? (body.items as unknown[]) : []) {
+    if (!raw || typeof raw !== 'object') continue
+    const entry = raw as { storyboard_id?: unknown; slot?: unknown }
+    const storyboardId = Number(entry.storyboard_id)
+    if (!Number.isInteger(storyboardId) || !isKeyframeSlot(entry.slot)) continue
+    items.push({ storyboard_id: storyboardId, slot: entry.slot })
+  }
+  if (!items.length) return badRequest(c, 'items 必须是 [{ storyboard_id, slot }] 且 slot 为 first/mid/last')
+  try {
+    const status = await startEpisodeKeyframeBatch(id, {
+      items,
       model: body.model,
       configId: body.config_id,
     })
@@ -367,7 +394,7 @@ app.get('/:episode_id/storyboards', async (c) => {
   // 关键帧状态（生效首帧、就绪、确认），界面据此显示状态与承接标记
   const keyframes = await loadEpisodeKeyframes(episodeId)
 
-  return success(c, rows.map((row) => {
+  return success(c, await Promise.all(rows.map(async (row) => {
     let assetVersionSelection: Record<string, string> = {}
     try {
       assetVersionSelection = row.assetVersionSelection ? JSON.parse(row.assetVersionSelection) : {}
@@ -405,6 +432,8 @@ app.get('/:episode_id/storyboards', async (c) => {
     return {
       ...toSnakeCase(row),
       asset_version_selection: assetVersionSelection,
+      field_saved_at: parseFieldSavedAt(row.fieldSavedAt),
+      ref_issues: await checkStoryboardRefs(row),
       keyframes: keyframesJson(keyframes.get(row.id)),
       video_versions: videoVersions,
       character_ids: charIdsByStoryboard.get(row.id) || [],
@@ -416,53 +445,11 @@ app.get('/:episode_id/storyboards', async (c) => {
         .filter(p => (propIdsByStoryboard.get(row.id) || []).includes(p.id))
         .map(p => toSnakeCase(p)),
     }
-  }))
+  })))
 })
 
 // GET /episodes/:id/pipeline-status — 流水线进度
-// GET /episodes/:id/generation-tasks — 按集聚合 sys_task + video_merges
-// sys_task 无 episode_id,通过 storyboard/scene/character/prop 关联键归属到当前集
-app.get('/:id/generation-tasks', async (c) => {
-  const episodeId = Number(c.req.param('id'))
-  const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId))
-  if (!ep) return notFound(c, '剧集不存在')
-
-  const sbs = await db.select().from(schema.storyboards).where(eq(schema.storyboards.episodeId, episodeId))
-  const storyboardIds = new Set(sbs.map(s => s.id))
-
-  const epScenes = await db.select().from(schema.episodeScenes).where(eq(schema.episodeScenes.episodeId, episodeId))
-  const sceneIds = new Set(epScenes.map(r => r.sceneId))
-  // 兼容 scenes.episodeId 直挂的旧数据
-  const directScenes = await db.select().from(schema.scenes).where(eq(schema.scenes.episodeId, episodeId))
-  directScenes.forEach(s => sceneIds.add(s.id))
-
-  const epChars = await db.select().from(schema.episodeCharacters).where(eq(schema.episodeCharacters.episodeId, episodeId))
-  const characterIds = new Set(epChars.map(r => r.characterId))
-
-  const dramaProps = await db.select().from(schema.props).where(eq(schema.props.dramaId, ep.dramaId))
-  const propIds = new Set(dramaProps.map(p => p.id))
-
-  const allTasks = await db.select().from(schema.sysTask).where(eq(schema.sysTask.dramaId, ep.dramaId))
-  const tasks = allTasks
-    .filter(t =>
-      (t.storyboardId && storyboardIds.has(t.storyboardId)) ||
-      (t.sceneId && sceneIds.has(t.sceneId)) ||
-      (t.characterId && characterIds.has(t.characterId)) ||
-      (t.propId && propIds.has(t.propId))
-    )
-    .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
-
-  const merges = (await db.select().from(schema.videoMerges)
-    .where(and(eq(schema.videoMerges.episodeId, episodeId), isNull(schema.videoMerges.deletedAt))))
-    .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
-    .slice(0, 20)
-
-  return success(c, {
-    tasks: serializeTasks(tasks),
-    merges: toSnakeCaseArray(merges),
-  })
-})
-
+// 按集聚合任务的旧接口 /generation-tasks 已删除：任务中心统一走 GET /tasks/center（sys_task.episode_id）
 app.get('/:id/pipeline-status', async (c) => {
   const episodeId = Number(c.req.param('id'))
   const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId))

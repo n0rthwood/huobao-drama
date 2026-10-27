@@ -23,7 +23,22 @@ import {
   type KeyframeSlot,
 } from './keyframes.js'
 import { listEpisodeStoryboards } from './storyboard-video.js'
-import { submitStoryboardKeyframe } from './storyboard-keyframes.js'
+import {
+  buildKeyframeRequest,
+  loadKeyframeBuildContext,
+  loadKeyframeVersions,
+  submitStoryboardKeyframe,
+} from './storyboard-keyframes.js'
+import {
+  SLOT_PROMPT_FIELD,
+  blockingIssuesFor,
+  checkStoryboardRefs,
+  computeRefIssues,
+  describeIssues,
+  loadEpisodeAssets,
+  promptFieldsOf,
+  type RefIssue,
+} from './storyboard-assets.js'
 import { getActiveConfig, getConfigById } from './ai.js'
 import { cancelImageTask } from './qwen-jobs.js'
 import { isActiveTaskStatus, isQwenJobsTask, parseRemoteState, type RemoteState } from './sys-task.js'
@@ -321,13 +336,128 @@ export async function retryFailedKeyframeBatch(episodeId: number): Promise<Keyfr
   return await toStatus(row!)
 }
 
+export interface KeyframePreviewItem {
+  storyboard_id: number
+  storyboard_number: number
+  slot: KeyframeSlot
+  /** missing=无图 changed=与所有历史版本不同 unchanged=命中历史签名 blocked=一致性阻断 skipped=不可生成 */
+  status: 'missing' | 'changed' | 'unchanged' | 'blocked' | 'skipped'
+  /** 默认勾选（missing / changed） */
+  checked: boolean
+  matched_version_no?: number
+  selected_version_no?: number | null
+  issues?: RefIssue[]
+  reason?: string
+}
+
+/** 本集正在排队/运行中的关键帧槽位（同一张不重复提交） */
+async function loadActiveSlots(): Promise<string[]> {
+  return (await db.select().from(schema.sysTask))
+    .filter(task => task.type === 'image' && isActiveTaskStatus(task.status) && task.storyboardId)
+    .map(task => `${task.storyboardId}:${frameTypeOf(task.params)}`)
+}
+
 /**
- * 启动批量：未指定分镜时只补缺图的槽位；指定分镜时对它们的全部槽位重新生成。
- * 继承首帧且没有自有首帧提示词的分镜跳过首帧槽位；没有中间帧提示词就没有中间帧槽位。
+ * 批量预览：逐个“分镜 × 槽位”判断是否需要重生成。
+ * 与启动共用 buildKeyframeRequest，所以签名口径与真正提交完全一致。
+ */
+export async function previewEpisodeKeyframeBatch(
+  episodeId: number,
+  opts: { storyboardIds?: number[]; model?: string; configId?: number } = {},
+): Promise<KeyframePreviewItem[]> {
+  const [episode] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId))
+  if (!episode) throw new Error('剧集不存在')
+  const storyboards = await listEpisodeStoryboards(episodeId)
+  if (!storyboards.length) throw new Error('本集还没有分镜，请先拆分分镜')
+
+  const context = await loadKeyframeBuildContext(episodeId, { model: opts.model, configId: opts.configId })
+  const keyframes = await loadEpisodeKeyframes(episodeId)
+  const active = await loadActiveSlots()
+  // “选择”模式只缩小范围，勾选默认值仍按签名判断
+  const targets = opts.storyboardIds?.length
+    ? storyboards.filter(sb => opts.storyboardIds!.includes(sb.id))
+    : storyboards
+
+  const result: KeyframePreviewItem[] = []
+  for (const sb of targets) {
+    const state = keyframes.get(sb.id)
+    const assets = await loadEpisodeAssets(sb, episodeId)
+    const characterIds = (await db.select().from(schema.storyboardCharacters)
+      .where(eq(schema.storyboardCharacters.storyboardId, sb.id))).map(link => link.characterId)
+    const propIds = (await db.select().from(schema.storyboardProps)
+      .where(eq(schema.storyboardProps.storyboardId, sb.id))).map(link => link.propId)
+    const issues = computeRefIssues({
+      prompts: promptFieldsOf(sb),
+      assets,
+      sceneId: sb.sceneId ?? null,
+      characterIds,
+      propIds,
+    })
+
+    for (const slot of KEYFRAME_SLOTS) {
+      // 中间帧只在 LLM 给了提示词时才存在，不写进清单
+      if (slot === 'mid' && !slotPrompt(sb, 'mid')) continue
+      const base = { storyboard_id: sb.id, storyboard_number: sb.storyboardNumber, slot }
+      if (!slotPrompt(sb, slot)) {
+        result.push({
+          ...base,
+          status: 'skipped',
+          checked: false,
+          reason: slot === 'first' && state?.inheritsFirst
+            ? '承接上一镜尾帧，没有自有首帧提示词'
+            : `${SLOT_LABEL[slot]}提示词为空`,
+        })
+        continue
+      }
+      if (active.includes(`${sb.id}:${SLOT_FRAME_TYPE[slot]}`)) {
+        result.push({ ...base, status: 'skipped', checked: false, reason: '该槽位正在生成中' })
+        continue
+      }
+      const blocking = blockingIssuesFor(issues, SLOT_PROMPT_FIELD[slot])
+      if (blocking.length) {
+        result.push({ ...base, status: 'blocked', checked: false, issues: blocking, reason: describeIssues(blocking) })
+        continue
+      }
+
+      let signature: string
+      try {
+        signature = (await buildKeyframeRequest(sb.id, slot, {
+          model: opts.model, configId: opts.configId, context, assets, characterIds, propIds,
+        })).signature
+      } catch (err) {
+        result.push({ ...base, status: 'skipped', checked: false, reason: err instanceof Error ? err.message : '无法组装生成请求' })
+        continue
+      }
+
+      const versions = await loadKeyframeVersions(sb.id, slot)
+      const ownImage = slotOwnImage(sb, slot)
+      const selected = versions.find(version => version.image === ownImage) ?? null
+      if (!ownImage) {
+        result.push({ ...base, status: 'missing', checked: true, selected_version_no: null })
+        continue
+      }
+      const matched = versions.find(version => version.signature && version.signature === signature)
+      result.push(matched
+        ? {
+          ...base,
+          status: 'unchanged',
+          checked: false,
+          matched_version_no: matched.version_no,
+          selected_version_no: selected?.version_no ?? null,
+        }
+        : { ...base, status: 'changed', checked: true, selected_version_no: selected?.version_no ?? null })
+    }
+  }
+  return result
+}
+
+/**
+ * 启动批量：按前端勾选的 items（分镜 × 槽位）入批。
+ * 预览之后才变成阻断/正在生成/提示词被清空的项跳过并标注原因，不让整批失败。
  */
 export async function startEpisodeKeyframeBatch(
   episodeId: number,
-  opts: { storyboardIds?: number[]; model?: string; configId?: number } = {},
+  opts: { items: Array<{ storyboard_id: number; slot: KeyframeSlot }>; model?: string; configId?: number },
 ): Promise<KeyframeBatchStatusJson> {
   if (await loadRunningBatch(episodeId)) throw new Error('本集已有批量关键帧在运行')
 
@@ -336,44 +466,47 @@ export async function startEpisodeKeyframeBatch(
 
   const storyboards = await listEpisodeStoryboards(episodeId)
   if (!storyboards.length) throw new Error('本集还没有分镜，请先拆分分镜')
+  if (!opts.items?.length) throw new Error('没有需要生成的关键帧')
 
-  const keyframes = await loadEpisodeKeyframes(episodeId)
-  const regenerate = !!opts.storyboardIds?.length
-  const targets = regenerate
-    ? storyboards.filter(sb => opts.storyboardIds!.includes(sb.id))
-    : storyboards
-
-  // 正在生成中（排队或运行）的同槽位不纳入批量，避免同一张被重复提交
-  const active = new Set((await db.select().from(schema.sysTask))
-    .filter(task => task.type === 'image' && isActiveTaskStatus(task.status) && task.storyboardId)
-    .map(task => `${task.storyboardId}:${frameTypeOf(task.params)}`))
+  const active = await loadActiveSlots()
+  const issuesByStoryboard = new Map<number, RefIssue[]>()
 
   const items: KeyframeBatchItem[] = []
-  for (const sb of targets) {
-    const state = keyframes.get(sb.id)
-    for (const slot of KEYFRAME_SLOTS) {
-      // 承接分镜没有自有首帧提示词时，首帧用上一镜尾帧，不生成
-      if (slot === 'first' && state?.inheritsFirst && !slotPrompt(sb, 'first')) continue
-      // 中间帧只在 LLM 给了提示词时才存在
-      if (slot === 'mid' && !slotPrompt(sb, 'mid')) continue
-      if (active.has(`${sb.id}:${SLOT_FRAME_TYPE[slot]}`)) continue
-      // 默认只补缺图：首帧按“生效首帧”判断（继承到的也算有图）
-      if (!regenerate) {
-        const existing = slot === 'first' ? state?.first ?? slotOwnImage(sb, 'first') : slotOwnImage(sb, slot)
-        if (existing) continue
-      }
-      const prompt = slotPrompt(sb, slot)
-      items.push({
-        storyboard_id: sb.id,
-        storyboard_number: sb.storyboardNumber,
-        slot,
-        state: prompt ? 'pending' : 'skipped',
-        task_id: null,
-        error: prompt ? null : `${SLOT_LABEL[slot]}提示词为空，已跳过`,
-      })
+  const seen: string[] = []
+  for (const target of opts.items) {
+    const key = `${target.storyboard_id}:${target.slot}`
+    if (seen.includes(key)) continue
+    seen.push(key)
+    const sb = storyboards.find(row => row.id === target.storyboard_id)
+    if (!sb) continue
+    const item: KeyframeBatchItem = {
+      storyboard_id: sb.id,
+      storyboard_number: sb.storyboardNumber,
+      slot: target.slot,
+      state: 'pending',
+      task_id: null,
+      error: null,
     }
+    if (!slotPrompt(sb, target.slot)) {
+      item.state = 'skipped'
+      item.error = `${SLOT_LABEL[target.slot]}提示词为空，已跳过`
+    } else if (active.includes(`${sb.id}:${SLOT_FRAME_TYPE[target.slot]}`)) {
+      item.state = 'skipped'
+      item.error = '该槽位正在生成中，已跳过'
+    } else {
+      if (!issuesByStoryboard.has(sb.id)) issuesByStoryboard.set(sb.id, await checkStoryboardRefs(sb))
+      const blocking = blockingIssuesFor(issuesByStoryboard.get(sb.id)!, SLOT_PROMPT_FIELD[target.slot])
+      if (blocking.length) {
+        item.state = 'skipped'
+        item.error = `参考图与提示词不一致，已跳过：${describeIssues(blocking)}`
+      }
+    }
+    items.push(item)
   }
-  if (!items.some(item => item.state === 'pending')) throw new Error('没有需要生成的关键帧')
+  if (!items.some(item => item.state === 'pending')) {
+    const reason = items.find(item => item.error)?.error
+    throw new Error(reason ? `没有需要生成的关键帧：${reason}` : '没有需要生成的关键帧')
+  }
 
   const ts = now()
   const options: BatchOptions = { model: opts.model, configId: opts.configId }

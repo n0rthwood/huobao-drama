@@ -5,7 +5,14 @@ import { success, created, now, badRequest } from '../utils/response.js'
 import { toSnakeCase } from '../utils/transform.js'
 import { logTaskError, logTaskPayload, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
 import { submitStoryboardVideo } from '../services/storyboard-video.js'
-import { submitStoryboardKeyframe } from '../services/storyboard-keyframes.js'
+import { loadKeyframeVersions, submitStoryboardKeyframe } from '../services/storyboard-keyframes.js'
+import {
+  PROMPT_FIELDS,
+  SLOT_PROMPT_FIELD,
+  checkStoryboardRefs,
+  syncStoryboardBindingsFromPrompts,
+} from '../services/storyboard-assets.js'
+import { parseFieldSavedAt, stampFieldSavedAt } from '../services/storyboard-fields.js'
 import { serializeTask } from '../services/sys-task.js'
 import {
   SLOT_LABEL,
@@ -206,16 +213,44 @@ app.put('/:id', async (c) => {
     'prop_ids' in body ? body.prop_ids : await getStoryboardPropIds(id),
   )
 
+  // 字段级保存时间：整行 updated_at 会被生图回写污染，输入框的“已保存”只认这里
+  const stamp = stampFieldSavedAt(storyboard.fieldSavedAt, Object.keys(body))
+  if (stamp.json) updates.fieldSavedAt = stamp.json
+
   await db.update(schema.storyboards).set(updates).where(eq(schema.storyboards.id, id))
   if ('character_ids' in body) await syncStoryboardCharacters(id, body.character_ids || [])
   if ('prop_ids' in body) await syncStoryboardProps(id, body.prop_ids || [])
+
+  // 提示词被写入时绑定完全跟随 @引用（同一请求里显式传入的 ids 以提示词为准被覆盖）；
+  // 纯绑定编辑（没写提示词）保持用户的选择不动
+  const wrotePrompt = PROMPT_FIELDS.some(field => field in body)
+  const sync = wrotePrompt
+    ? await syncStoryboardBindingsFromPrompts(id)
+    : null
+  const characterIds = sync?.characterIds ?? await getStoryboardCharacterIds(id)
+  const propIds = sync?.propIds ?? await getStoryboardPropIds(id)
+  const [updated] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, id))
+  const refIssues = sync?.issues ?? await checkStoryboardRefs(updated!)
+
   logTaskSuccess('StoryboardAPI', 'update', {
     storyboardId: id,
     updatedFields: Object.keys(updates),
-    characterIds: body.character_ids,
-    propIds: body.prop_ids,
+    characterIds: characterIds.join(','),
+    propIds: propIds.join(','),
+    bound: sync?.sync.bound.map(item => item.name).join(',') || undefined,
+    unbound: sync?.sync.unbound.map(item => item.name).join(',') || undefined,
   })
-  return success(c)
+  return success(c, {
+    saved_at: stamp.savedAt,
+    character_ids: characterIds,
+    prop_ids: propIds,
+    scene_id: updated?.sceneId ?? null,
+    ref_issues: refIssues,
+    ref_sync: {
+      bound: sync?.sync.bound ?? [],
+      unbound: sync?.sync.unbound ?? [],
+    },
+  })
 })
 
 // ─── 分镜关键帧 ────────────────────────────────────────────────
@@ -233,6 +268,8 @@ async function storyboardJson(id: number) {
   return {
     ...toSnakeCase(row),
     asset_version_selection: assetVersionSelection,
+    field_saved_at: parseFieldSavedAt(row.fieldSavedAt),
+    ref_issues: await checkStoryboardRefs(row),
     keyframes: keyframesJson((await loadEpisodeKeyframes(row.episodeId)).get(row.id)),
     character_ids: await getStoryboardCharacterIds(row.id),
     prop_ids: await getStoryboardPropIds(row.id),
@@ -256,12 +293,18 @@ app.post('/:id/keyframes/:slot/generate', async (c) => {
     // 只保存非空提示词：空串不能把已有的槽位提示词抹掉（生成随后也会因提示词为空而报错）
     const editedPrompt = typeof body.prompt === 'string' ? body.prompt.trim() : ''
     if (editedPrompt) {
+      const [row] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, id))
+      if (!row) return badRequest(c, '镜头不存在')
+      const field = SLOT_PROMPT_FIELD[slot]
       const promptPatch = slot === 'first' ? { firstFramePrompt: editedPrompt }
         : slot === 'mid' ? { midFramePrompt: editedPrompt }
         : { lastFramePrompt: editedPrompt }
+      const stamp = stampFieldSavedAt(row.fieldSavedAt, [field])
       await db.update(schema.storyboards)
-        .set({ ...promptPatch, updatedAt: now() })
+        .set({ ...promptPatch, fieldSavedAt: stamp.json ?? row.fieldSavedAt, updatedAt: now() })
         .where(eq(schema.storyboards.id, id))
+      // 提示词写入 → 绑定跟随 @引用（与 PUT /storyboards/:id 同口径）
+      await syncStoryboardBindingsFromPrompts(id)
     }
     const taskId = await submitStoryboardKeyframe(id, slot, { model: body.model, configId: body.config_id })
     const [record] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, taskId))
@@ -274,34 +317,13 @@ app.post('/:id/keyframes/:slot/generate', async (c) => {
   }
 })
 
-// GET /storyboards/:id/keyframes/:slot/versions — 该槽位的历史版本（最新在前）
+// GET /storyboards/:id/keyframes/:slot/versions — 该槽位的历史版本（最新在前，版本号按时间正序从 1 起）
 app.get('/:id/keyframes/:slot/versions', async (c) => {
   const id = Number(c.req.param('id'))
   const slot = parseSlot(c.req.param('slot'))
   if (!slot) return badRequest(c, 'slot 只支持 first / mid / last')
-  const frameType = SLOT_FRAME_TYPE[slot]
-  const tasks = (await db.select().from(schema.sysTask))
-    .filter(task => task.type === 'image' && task.status === 'completed' && task.storyboardId === id)
-    .filter((task) => {
-      try {
-        const params: unknown = JSON.parse(task.params || '{}')
-        return !!params && typeof params === 'object' && 'frameType' in params && params.frameType === frameType
-      } catch {
-        return false
-      }
-    })
-  const versions = tasks
-    .filter(task => task.localPath || task.resultUrl)
-    .map(task => ({
-      id: task.id,
-      image: task.localPath || task.resultUrl,
-      prompt: task.prompt,
-      provider: task.provider,
-      model: task.model,
-      created_at: task.createdAt,
-    }))
-    .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
-  return success(c, versions)
+  const versions = await loadKeyframeVersions(id, slot)
+  return success(c, [...versions].reverse())
 })
 
 // PUT /storyboards/:id/keyframes/:slot — 选定某个版本，或（仅首帧）改为继承上一镜尾帧
