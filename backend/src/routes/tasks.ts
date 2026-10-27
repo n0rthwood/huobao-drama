@@ -11,6 +11,7 @@ import { serializeTask, serializeTasks } from '../services/sys-task.js'
 import { cancelImageTask, discardRemoteJob } from '../services/qwen-jobs.js'
 import { enrichTask, listActiveTasks, listTaskCenter } from '../services/task-center.js'
 import { retryTask } from '../services/task-retry.js'
+import { completionStamp } from '../services/media-time.js'
 
 const app = new Hono()
 
@@ -194,7 +195,7 @@ app.post('/register-upload', async (c) => {
     status: 'completed',
     createdAt: ts,
     updatedAt: ts,
-    completedAt: ts,
+    ...completionStamp(ts),
   })
   return created(c, { id: getInsertId(result), local_path: localPath })
 })

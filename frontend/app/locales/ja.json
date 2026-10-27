@@ -1,4 +1,12 @@
 {
+  "mediaTime": {
+    "seconds": "{n} 秒前",
+    "minutes": "{n} 分前",
+    "hours": "{n} 時間前",
+    "hoursMinutes": "{h} 時間 {m} 分前",
+    "days": "{n} 日前",
+    "months": "{n} か月前"
+  },
   "taskCenter": {
     "button": "タスク",
     "title": "タスクセンター",
@@ -1115,7 +1123,12 @@
       "markedDone": "完了",
       "markDoneTitle": "このエピソードの書き出しを手動で完了にします（再クリックで解除）",
       "markedDoneToast": "完了としてマークしました",
-      "unmarkDoneToast": "完了マークを解除しました"
+      "unmarkDoneToast": "完了マークを解除しました",
+      "deleteMerge": "この完成動画を削除",
+      "deleteMergeBusy": "結合中のため削除できません",
+      "deleteMergeTitle": "完成動画を削除",
+      "deleteMergeMessage": "削除すると動画ファイルも一緒に削除され、復元できません。削除しますか？",
+      "deleteMergeDone": "完成動画を削除しました"
     },
     "image": {
       "generatingChar": "キャラクター画像を生成中",

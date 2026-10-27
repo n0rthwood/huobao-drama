@@ -14,6 +14,7 @@ import { now } from '../utils/response.js'
 import { toSnakeCase } from '../utils/transform.js'
 import { logTaskWarn } from '../utils/task-logger.js'
 import type { QwenJob, QwenJobRequest } from './adapters/qwen-jobs-client.js'
+import { toUnixSeconds } from './media-time.js'
 
 import { isJobQueueImageProvider } from './adapters/registry.js'
 
@@ -151,6 +152,9 @@ export function serializeTask(row: SysTaskRow): Record<string, any> {
   if (cancelPending) visible.cancel_requested = true
   return {
     ...toSnakeCase(row),
+    // 时间统一按 unix 秒出 API（前端 MediaTime 不再解析 ISO 字符串）
+    created_at_unix: toUnixSeconds(row.createdAt),
+    completed_at_unix: toUnixSeconds(row.completedAt),
     remote_state: Object.keys(visible).length ? visible : null,
     cancellable: isActiveTaskStatus(row.status) && isQwenJobsTask(row.provider),
   }

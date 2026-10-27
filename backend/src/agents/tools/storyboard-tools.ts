@@ -12,6 +12,7 @@ import { logTaskProgress, logTaskSuccess } from '../../utils/task-logger.js'
 import { getDramaId, getEpisodeId } from '../context.js'
 import { loadEpisodeKeyframes } from '../../services/keyframes.js'
 import { PROMPT_FIELDS, syncStoryboardBindingsFromPrompts } from '../../services/storyboard-assets.js'
+import { parseReferenceImages, referenceImagePaths } from '../../services/reference-images.js'
 import { stampFieldSavedAt } from '../../services/storyboard-fields.js'
 
 async function syncStoryboardCharacters(storyboardId: number, characterIds: number[]) {
@@ -152,7 +153,8 @@ const readStoryboardContext = createTool({
         appearance: c.appearance || '',
         styling: c.styling || '',
         image_url: c.imageUrl || '',
-        reference_images: c.referenceImages || '',
+        // 参考图现在存 [{path, uploaded_at}]，给 LLM 的上下文只要路径
+        reference_images: referenceImagePaths(parseReferenceImages(c.referenceImages)),
       }))
 
     const scenes = scns

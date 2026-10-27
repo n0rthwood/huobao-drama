@@ -230,6 +230,7 @@
                       <span class="asset-cover-badge" :class="matHasImage(m) ? 'is-ready' : (isPending(m) ? 'is-pending' : '')">
                         {{ matHasImage(m) ? t('episode.asset.portraitReady') : (isPending(m) ? t('episode.asset.portraitPending') : t('episode.asset.portraitTodo')) }}
                       </span>
+                      <MediaTime v-if="m.image_generated_at" class="asset-cover-time" :at="m.image_generated_at" />
                     </div>
                     <div class="character-asset-head">
                       <div class="character-title-block">
@@ -295,6 +296,7 @@
                   <span class="asset-cover-badge" :class="matHasImage(m) ? 'is-ready' : (isPending(m) ? 'is-pending' : '')">
                     {{ matHasImage(m) ? t('episode.asset.ready') : (isPending(m) ? t('episode.asset.generating') : t('episode.asset.todo')) }}
                   </span>
+                  <MediaTime v-if="m.image_generated_at" class="asset-cover-time" :at="m.image_generated_at" />
                 </div>
                 <div class="asset-body">
                   <template v-if="g.kindKey === 'scene'">
@@ -603,6 +605,7 @@ import { useI18n } from 'vue-i18n'
 import { dramaAPI, episodeAPI, characterAPI, sceneAPI, propAPI, uploadAPI, taskAPI } from '~/composables/useApi'
 import BaseSelect from '~/components/BaseSelect.vue'
 import ProgressRing from '~/components/ProgressRing.vue'
+import MediaTime from '~/components/MediaTime.vue'
 import { useNowTicker, ringPropsFromTask, isActiveTaskStatus } from '~/composables/useTaskProgress'
 
 const { t, locale } = useI18n()
@@ -1517,6 +1520,21 @@ onUnmounted(() => {
   left: 7px;
   display: inline-flex;
   align-items: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--header-bg);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-xs);
+  color: var(--text-2);
+  font-size: 9.5px;
+  font-weight: 700;
+}
+/* 媒体生成时间：压在封面右下角，与左上角的状态徽章对称 */
+.asset-cover-time {
+  position: absolute;
+  right: 7px;
+  bottom: 7px;
   padding: 2px 7px;
   border-radius: 999px;
   background: var(--header-bg);

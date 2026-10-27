@@ -3,6 +3,7 @@ import { and, eq, isNull, like, desc } from 'drizzle-orm'
 import { db, getInsertId, schema } from '../db/index.js'
 import { success, badRequest, notFound, created, now } from '../utils/response.js'
 import { toSnakeCase, toSnakeCaseArray } from '../utils/transform.js'
+import { lookupGeneratedAt } from '../services/media-time.js'
 
 const app = new Hono()
 
@@ -101,13 +102,22 @@ app.get('/:id', async (c) => {
   const prps = await db.select().from(schema.props)
     .where(and(eq(schema.props.dramaId, id), isNull(schema.props.deletedAt)))
 
+  // 当前成片图的生成时间：一次批量反查 sys_task（反查不到 → 不带时间字段）
+  const assets = [...chars, ...scns, ...prps]
+  const generatedAt = await lookupGeneratedAt(assets.map(row => row.imageUrl))
+  const withTime = <T extends { imageUrl: string | null }>(rows: T[]) =>
+    rows.map(row => ({
+      ...toSnakeCase(row),
+      image_generated_at: (row.imageUrl ? generatedAt.get(row.imageUrl) : undefined) ?? null,
+    }))
+
   return success(c, {
     ...toSnakeCase(drama),
     tags: drama.tags ? JSON.parse(drama.tags) : [],
     episodes: toSnakeCaseArray(eps),
-    characters: toSnakeCaseArray(chars),
-    scenes: toSnakeCaseArray(scns),
-    props: toSnakeCaseArray(prps),
+    characters: withTime(chars),
+    scenes: withTime(scns),
+    props: withTime(prps),
   })
 })
 

@@ -10,6 +10,7 @@ import { and, desc, eq, inArray } from 'drizzle-orm'
 import { db, getInsertId, schema } from '../db/index.js'
 import { now } from '../utils/response.js'
 import { getActiveConfig, getConfigById } from './ai.js'
+import { completionStamp } from './media-time.js'
 import { ACTIVE_TASK_STATUSES, type SysTaskRow } from './sys-task.js'
 
 export type TextTaskKind =
@@ -128,8 +129,10 @@ export async function finishTextTask(
 ): Promise<void> {
   if (extra.progress) await patchTextTaskParams(id, { progress: extra.progress })
   const ts = now()
+  // 文本任务没有媒体产物：只有成功完成才算一次「产出」，失败行不写生成时间
+  const stamp = status === 'completed' ? completionStamp(ts) : { completedAt: ts }
   await db.update(schema.sysTask)
-    .set({ status, errorMsg: extra.errorMsg ?? null, updatedAt: ts, completedAt: ts })
+    .set({ status, errorMsg: extra.errorMsg ?? null, updatedAt: ts, ...stamp })
     .where(eq(schema.sysTask.id, id))
 }
 

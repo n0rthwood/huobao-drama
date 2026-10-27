@@ -23,6 +23,7 @@ import {
 } from '../services/keyframe-batch.js'
 import { checkStoryboardRefs } from '../services/storyboard-assets.js'
 import { parseFieldSavedAt } from '../services/storyboard-fields.js'
+import { lookupGeneratedAt } from '../services/media-time.js'
 
 const app = new Hono()
 type ImageOwnerKind = 'character' | 'scene' | 'prop'
@@ -46,6 +47,7 @@ async function attachImageVersions<T extends { id: number; imageUrl: string | nu
       model: string | null
       prompt: string | null
       created_at: string | null
+      generated_at: number | null
       is_current: boolean
     }> = tasks
       .filter((task) => {
@@ -59,11 +61,13 @@ async function attachImageVersions<T extends { id: number; imageUrl: string | nu
         model: task.model,
         prompt: task.prompt,
         created_at: task.createdAt,
+        generated_at: task.generatedAt ?? null,
         is_current: Boolean((task.localPath || task.resultUrl) && (task.localPath || task.resultUrl) === row.imageUrl),
       }))
       .filter(version => Boolean(version.url))
       .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
     if (row.imageUrl && !versions.some(version => version.url === row.imageUrl)) {
+      // 版本任务已被删除的历史图：没有时间来源，不显示时间
       versions.unshift({
         id: null,
         url: row.imageUrl,
@@ -71,10 +75,15 @@ async function attachImageVersions<T extends { id: number; imageUrl: string | nu
         model: null,
         prompt: null,
         created_at: null,
+        generated_at: null,
         is_current: true,
       })
     }
-    return { ...toSnakeCase(row), image_versions: versions }
+    return {
+      ...toSnakeCase(row),
+      image_versions: versions,
+      image_generated_at: versions.find(version => version.is_current)?.generated_at ?? null,
+    }
   })
 }
 
@@ -415,6 +424,14 @@ app.get('/:episode_id/storyboards', async (c) => {
   // 关键帧状态（生效首帧、就绪、确认），界面据此显示状态与承接标记
   const keyframes = await loadEpisodeKeyframes(episodeId)
 
+  // 「当前媒体」（三个槽位的生效关键帧 + 当前分镜视频）的生成时间：一次批量反查
+  const mediaPaths: Array<string | null> = []
+  for (const row of rows) {
+    const state = keyframes.get(row.id)
+    mediaPaths.push(row.videoUrl, row.firstFrameImage, row.midFrameImage, row.lastFrameImage,
+      state?.first ?? null, state?.mid ?? null, state?.last ?? null)
+  }
+  const mediaGeneratedAt = await lookupGeneratedAt(mediaPaths)
   return success(c, await Promise.all(rows.map(async (row) => {
     let assetVersionSelection: Record<string, string> = {}
     try {
@@ -428,6 +445,7 @@ app.get('/:episode_id/storyboards', async (c) => {
       provider: string | null
       model: string | null
       created_at: string | null
+      generated_at: number | null
       is_current: boolean
     }> = videoTasks
       .filter(task => task.storyboardId === row.id && (task.localPath || task.resultUrl))
@@ -437,6 +455,7 @@ app.get('/:episode_id/storyboards', async (c) => {
         provider: task.provider,
         model: task.model,
         created_at: task.createdAt,
+        generated_at: task.generatedAt ?? null,
         is_current: (task.localPath || task.resultUrl) === row.videoUrl,
       }))
       .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
@@ -447,6 +466,7 @@ app.get('/:episode_id/storyboards', async (c) => {
         provider: 'legacy',
         model: null,
         created_at: null,
+        generated_at: null,
         is_current: true,
       })
     }
@@ -457,6 +477,13 @@ app.get('/:episode_id/storyboards', async (c) => {
       ref_issues: await checkStoryboardRefs(row),
       keyframes: keyframesJson(keyframes.get(row.id)),
       video_versions: videoVersions,
+      // 路径 → 生成时间（unix 秒）：关键帧槽位、分镜视频等「当前媒体」共用，反查不到的路径不在表里
+      media_generated_at: Object.fromEntries(
+        [row.videoUrl, row.firstFrameImage, row.midFrameImage, row.lastFrameImage,
+          keyframes.get(row.id)?.first ?? null, keyframes.get(row.id)?.mid ?? null, keyframes.get(row.id)?.last ?? null]
+          .filter((p): p is string => !!p && mediaGeneratedAt.has(p))
+          .map(p => [p, mediaGeneratedAt.get(p)!]),
+      ),
       character_ids: charIdsByStoryboard.get(row.id) || [],
       prop_ids: propIdsByStoryboard.get(row.id) || [],
       characters: allChars
@@ -479,7 +506,9 @@ app.get('/:id/pipeline-status', async (c) => {
   const chars = await db.select().from(schema.characters).where(eq(schema.characters.dramaId, ep.dramaId))
   const scenes = await db.select().from(schema.scenes).where(eq(schema.scenes.dramaId, ep.dramaId))
   const sbs = await db.select().from(schema.storyboards).where(eq(schema.storyboards.episodeId, episodeId))
-  const merges = await db.select().from(schema.videoMerges).where(eq(schema.videoMerges.episodeId, episodeId))
+  // 软删的成片不参与「已合成」判断：文件已被删除，继续展示会产生死链
+  const merges = await db.select().from(schema.videoMerges)
+    .where(and(eq(schema.videoMerges.episodeId, episodeId), isNull(schema.videoMerges.deletedAt)))
 
   const sbsWithImage = sbs.filter(s => s.composedImage)
   const sbsWithVideo = sbs.filter(s => s.videoUrl)

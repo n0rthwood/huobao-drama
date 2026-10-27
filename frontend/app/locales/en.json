@@ -1,4 +1,12 @@
 {
+  "mediaTime": {
+    "seconds": "{n} seconds ago",
+    "minutes": "{n} minutes ago",
+    "hours": "{n} hours ago",
+    "hoursMinutes": "{h} h {m} min ago",
+    "days": "{n} days ago",
+    "months": "{n} months ago"
+  },
   "taskCenter": {
     "button": "Tasks",
     "title": "Task Center",
@@ -1115,7 +1123,12 @@
       "markedDone": "Done",
       "markDoneTitle": "Manually mark this episode's export as done (click again to undo)",
       "markedDoneToast": "Marked as done",
-      "unmarkDoneToast": "Done mark removed"
+      "unmarkDoneToast": "Done mark removed",
+      "deleteMerge": "Delete this film",
+      "deleteMergeBusy": "Merging in progress, cannot delete",
+      "deleteMergeTitle": "Delete film",
+      "deleteMergeMessage": "The merged video file will be deleted as well and cannot be restored. Delete it?",
+      "deleteMergeDone": "Film deleted"
     },
     "image": {
       "generatingChar": "Character image generating",

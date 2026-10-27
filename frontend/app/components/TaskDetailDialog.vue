@@ -59,11 +59,11 @@
             </div>
             <div class="task-detail-cell">
               <dt>{{ t('taskCenter.detail.createdAt') }}</dt>
-              <dd>{{ formatTime(live.created_at) }}</dd>
+              <dd><MediaTime :at="live.created_at_unix" /></dd>
             </div>
             <div v-if="live.completed_at" class="task-detail-cell">
               <dt>{{ t('taskCenter.detail.completedAt') }}</dt>
-              <dd>{{ formatTime(live.completed_at) }}</dd>
+              <dd><MediaTime :at="live.generated_at ?? live.completed_at_unix" /></dd>
             </div>
             <div v-if="elapsedText" class="task-detail-cell">
               <dt>{{ t('taskCenter.detail.elapsed') }}</dt>
@@ -96,6 +96,7 @@
             <div class="task-detail-section-title">{{ t('taskCenter.detail.result') }}</div>
             <video v-if="live.type === 'video'" :src="mediaSrc(resultUrl)" controls preload="metadata" playsinline class="task-detail-result" />
             <img v-else :src="mediaSrc(resultUrl)" :alt="live.label || ''" loading="lazy" class="task-detail-result" />
+            <MediaTime :at="live.generated_at ?? live.completed_at_unix" />
           </div>
         </div>
 
@@ -152,6 +153,7 @@ import { X, Loader2 } from 'lucide-vue-next'
 import ProgressRing from '~/components/ProgressRing.vue'
 import ModelSelect from '~/components/ModelSelect.vue'
 import ConfirmDialog from '~/components/ConfirmDialog.vue'
+import MediaTime from '~/components/MediaTime.vue'
 import { taskAPI } from '~/composables/useApi'
 import { mapError, toastError, toastServerMessage } from '~/composables/useToast'
 import { loadModelOptions, bareModelName } from '~/composables/useModelOptions'
@@ -223,11 +225,7 @@ const elapsedText = computed(() => {
   return formatSeconds(t, Math.round((end - start) / 1000))
 })
 
-function formatTime(value) {
-  const ms = Date.parse(String(value || ''))
-  if (!Number.isFinite(ms)) return '—'
-  return new Date(ms).toLocaleString()
-}
+
 function mediaSrc(url) {
   if (!url) return ''
   return /^(https?:)?\/\//.test(url) || url.startsWith('/') ? url : '/' + url

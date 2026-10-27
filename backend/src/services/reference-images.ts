@@ -2,8 +2,13 @@
  * 资产参考图服务 — 角色 / 场景 / 道具共用一套持久化参考图
  *
  * 语义边界（与成片图严格分离）：
- * - `reference_images`：用户上传的「输入」参考图，JSON 字符串数组（相对路径 static/...），只由本服务写
- * - `image_url` / `local_path`：生图或用户直传的「输出」成片图，本服务绝不触碰
+ * - `reference_images`：用户上传的「输入」参考图，JSON 对象数组 `[{ path, uploaded_at }]`
+ *   （`path` 为相对路径 static/...，`uploaded_at` 为 unix 秒，文件缺失的存量数据为 null），
+ *   只由本服务写；
+ * - `image_url` / `local_path`：生图或用户直传的「输出」成片图，本服务绝不触碰。
+ *
+ * 旧版存的是裸路径字符串数组，启动时由 `migrateReferenceImages()` 一次性转成对象数组
+ * （`uploaded_at` 取文件 mtime，文件不存在则 null），**不保留字符串兼容分支**。
  *
  * 落盘位置 static/uploads/reference_images/{kind}/{assetId}/{uuid}.{ext}，与成片图共用
  * /static 静态托管与缩略图链路（thumbOf → *_thumb.webp），前端零配置可预览。
@@ -17,6 +22,12 @@ import { generateImageThumb, getAbsolutePath, saveUploadedFile, thumbPathFor } f
 import { logTaskWarn } from '../utils/task-logger.js'
 
 export type AssetKind = 'character' | 'scene' | 'prop'
+
+/** 持久化的参考图条目（上传时间为 unix 秒；存量数据文件缺失时为 null，前端不显示时间） */
+export interface ReferenceImageEntry {
+  path: string
+  uploaded_at: number | null
+}
 
 /**
  * 三张资产表在本服务只用到 id / reference_images / updated_at，列定义完全一致；
@@ -54,34 +65,54 @@ function referenceSubDir(kind: AssetKind, assetId: number) {
   return `uploads/reference_images/${kind}/${assetId}`
 }
 
-/**
- * 宽容读取历史值：NULL / 空串 / 非法 JSON / 非数组 → []
- * 合法 JSON 数组按字符串过滤；旧数据若是裸路径/URL 则视为单张。
- */
-export function parseReferenceImages(raw: unknown): string[] {
-  if (Array.isArray(raw)) {
-    return raw.map(item => String(item ?? '').trim()).filter(Boolean)
-  }
-  if (typeof raw !== 'string') return []
-  const text = raw.trim()
-  if (!text) return []
-  if (text.startsWith('[')) {
-    try {
-      const parsed: unknown = JSON.parse(text)
-      if (Array.isArray(parsed)) return parsed.map(item => String(item ?? '').trim()).filter(Boolean)
-    } catch {}
-    return []
-  }
-  return /^(https?:\/\/|\/?static\/)/.test(text) ? [text] : []
+function toEntry(item: unknown): ReferenceImageEntry | null {
+  if (!item || typeof item !== 'object') return null
+  const record = item as Record<string, unknown>
+  const value = String(record.path ?? '').trim()
+  if (!value) return null
+  const uploadedAt = Number(record.uploaded_at)
+  return { path: value, uploaded_at: Number.isFinite(uploadedAt) && uploadedAt > 0 ? Math.floor(uploadedAt) : null }
 }
 
 /**
- * 生成时的有效参考图：
+ * 读取持久化值 → 条目数组。NULL / 空串 / 非法 JSON / 非数组 → []。
+ * 只认对象形态；旧的字符串条目由启动迁移负责转换（见 migrateReferenceImages）。
+ */
+export function parseReferenceImages(raw: unknown): ReferenceImageEntry[] {
+  const list = Array.isArray(raw)
+    ? raw
+    : (() => {
+      if (typeof raw !== 'string') return []
+      const text = raw.trim()
+      if (!text.startsWith('[')) return []
+      try {
+        const parsed: unknown = JSON.parse(text)
+        return Array.isArray(parsed) ? parsed : []
+      } catch {
+        return []
+      }
+    })()
+  return list.map(toEntry).filter((entry): entry is ReferenceImageEntry => !!entry)
+}
+
+/** 条目数组 → 路径数组（生图组装只关心路径） */
+export function referenceImagePaths(entries: ReferenceImageEntry[]): string[] {
+  return entries.map(entry => entry.path)
+}
+
+/**
+ * 生成时的有效参考图路径：
  * 请求未带 reference_images → 用资产保存的参考图；带了（含空数组）→ 以请求为准。
+ * 请求侧允许裸路径数组（生图入参本来就只是路径）或条目数组。
  */
 export function resolveReferenceImages(saved: unknown, override?: unknown): string[] {
-  if (override !== undefined && override !== null) return parseReferenceImages(override)
-  return parseReferenceImages(saved)
+  if (override !== undefined && override !== null) {
+    if (!Array.isArray(override)) return []
+    return override
+      .map(item => (typeof item === 'string' ? item.trim() : toEntry(item)?.path ?? ''))
+      .filter(Boolean)
+  }
+  return referenceImagePaths(parseReferenceImages(saved))
 }
 
 /**
@@ -102,14 +133,14 @@ export function partitionMissingReferences(refs: string[]): { present: string[];
   return { present, missing }
 }
 
-async function loadReferences(kind: AssetKind, assetId: number): Promise<string[]> {
+async function loadReferences(kind: AssetKind, assetId: number): Promise<ReferenceImageEntry[]> {
   const table = ASSET_TABLES[kind]
   const [row] = await db.select().from(table).where(eq(table.id, assetId))
   if (!row) throw new ReferenceImageError(`${ASSET_LABELS[kind]}不存在`, 404)
   return parseReferenceImages(row.referenceImages)
 }
 
-async function persist(kind: AssetKind, assetId: number, refs: string[]): Promise<string[]> {
+async function persist(kind: AssetKind, assetId: number, refs: ReferenceImageEntry[]): Promise<ReferenceImageEntry[]> {
   const table = ASSET_TABLES[kind]
   await db.update(table)
     .set({ referenceImages: refs.length ? JSON.stringify(refs) : null, updatedAt: now() })
@@ -118,7 +149,7 @@ async function persist(kind: AssetKind, assetId: number, refs: string[]): Promis
 }
 
 /** 追加一张参考图：校验 → 落盘 → 入库（成片图 image_url/local_path 不受影响） */
-export async function addReferenceImage(kind: AssetKind, assetId: number, file: File): Promise<string[]> {
+export async function addReferenceImage(kind: AssetKind, assetId: number, file: File): Promise<ReferenceImageEntry[]> {
   const current = await loadReferences(kind, assetId)
   if (current.length >= REFERENCE_IMAGE_MAX_COUNT) {
     throw new ReferenceImageError(`参考图最多 ${REFERENCE_IMAGE_MAX_COUNT} 张，请先删除部分参考图`)
@@ -136,7 +167,10 @@ export async function addReferenceImage(kind: AssetKind, assetId: number, file: 
   const stored = await saveUploadedFile(buffer, referenceSubDir(kind, assetId), file.name)
   // 与上传/生图一致：同步生成列表缩略图，失败不阻断
   await generateImageThumb(stored)
-  const next = current.includes(stored) ? current : [...current, stored]
+  const uploadedAt = Math.floor(Date.now() / 1000)
+  const next = current.some(entry => entry.path === stored)
+    ? current
+    : [...current, { path: stored, uploaded_at: uploadedAt }]
   return persist(kind, assetId, next)
 }
 
@@ -145,11 +179,11 @@ export async function addReferenceImage(kind: AssetKind, assetId: number, file: 
  * 文件残留无害，库里留悬挂条目有害，故顺序不可反。
  * 只允许删除该资产自己目录下的文件（精确匹配 + 前缀 + 绝对路径双重校验）。
  */
-export async function removeReferenceImage(kind: AssetKind, assetId: number, target: string): Promise<string[]> {
+export async function removeReferenceImage(kind: AssetKind, assetId: number, target: string): Promise<ReferenceImageEntry[]> {
   const value = String(target || '').trim()
   if (!value) throw new ReferenceImageError('url 必填')
   const current = await loadReferences(kind, assetId)
-  const index = current.indexOf(value)
+  const index = current.findIndex(entry => entry.path === value)
   if (index < 0) throw new ReferenceImageError('参考图不存在', 404)
 
   const next = current.filter((_, i) => i !== index)
@@ -161,6 +195,57 @@ export async function removeReferenceImage(kind: AssetKind, assetId: number, tar
     unlinkQuietly(ownedAbsolutePath(kind, assetId, thumbPathFor(value)))
   }
   return next
+}
+
+/**
+ * 启动迁移：旧的字符串路径数组 → `[{ path, uploaded_at }]`。
+ * `uploaded_at` 取文件 mtime（参考图上传后不再改写，可近似上传时间），文件不存在则 null。
+ * 幂等：已是对象形态的行不写库。
+ */
+export async function migrateReferenceImages(): Promise<number> {
+  let migrated = 0
+  for (const kind of Object.keys(ASSET_TABLES) as AssetKind[]) {
+    const table = ASSET_TABLES[kind]
+    const rows = await db.select().from(table)
+    for (const row of rows) {
+      const raw = row.referenceImages
+      if (!raw) continue
+      let list: unknown[]
+      try {
+        const parsed: unknown = JSON.parse(String(raw))
+        if (!Array.isArray(parsed)) continue
+        list = parsed
+      } catch {
+        continue
+      }
+      if (!list.some(item => typeof item === 'string')) continue
+      const entries = list
+        .map((item) => {
+          if (typeof item !== 'string') return toEntry(item)
+          const value = item.trim()
+          if (!value) return null
+          return { path: value, uploaded_at: fileMtimeSeconds(value) }
+        })
+        .filter((entry): entry is ReferenceImageEntry => !!entry)
+      await db.update(table)
+        .set({ referenceImages: entries.length ? JSON.stringify(entries) : null })
+        .where(eq(table.id, row.id))
+      migrated += 1
+    }
+  }
+  if (migrated > 0) console.log(`🖼️  已迁移 ${migrated} 行参考图存储结构（[{path, uploaded_at}]）`)
+  return migrated
+}
+
+/** 本地参考图文件的 mtime（unix 秒）；远程 URL / 文件缺失 → null */
+function fileMtimeSeconds(stored: string): number | null {
+  if (!(stored.startsWith('static/') || stored.startsWith('/static/'))) return null
+  try {
+    const stat = fs.statSync(getAbsolutePath(stored.startsWith('/') ? stored.slice(1) : stored))
+    return Math.floor(stat.mtimeMs / 1000)
+  } catch {
+    return null
+  }
 }
 
 /**

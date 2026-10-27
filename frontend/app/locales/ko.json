@@ -1,4 +1,12 @@
 {
+  "mediaTime": {
+    "seconds": "{n}초 전",
+    "minutes": "{n}분 전",
+    "hours": "{n}시간 전",
+    "hoursMinutes": "{h}시간 {m}분 전",
+    "days": "{n}일 전",
+    "months": "{n}개월 전"
+  },
   "taskCenter": {
     "button": "작업",
     "title": "작업 센터",
@@ -1115,7 +1123,12 @@
       "markedDone": "완료됨",
       "markDoneTitle": "이 에피소드의 납출을 수동으로 완료 표시(다시 클릭하면 해제)",
       "markedDoneToast": "완료로 표시했습니다",
-      "unmarkDoneToast": "완료 표시를 해제했습니다"
+      "unmarkDoneToast": "완료 표시를 해제했습니다",
+      "deleteMerge": "이 완성본 삭제",
+      "deleteMergeBusy": "병합 중이어서 삭제할 수 없습니다",
+      "deleteMergeTitle": "완성본 삭제",
+      "deleteMergeMessage": "삭제하면 영상 파일도 함께 삭제되며 복구할 수 없습니다. 삭제할까요?",
+      "deleteMergeDone": "완성본을 삭제했습니다"
     },
     "image": {
       "generatingChar": "캐릭터 이미지 생성 중",

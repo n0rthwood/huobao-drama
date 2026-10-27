@@ -58,7 +58,7 @@
             <div class="tc-row-meta">
               <span v-if="row.provider" class="truncate">{{ row.provider }}{{ row.model ? ' · ' + row.model : '' }}</span>
               <span v-if="isParentRow(row) && row.counts" class="tc-row-counts">{{ countsText(row) }}</span>
-              <span class="tc-row-time">{{ shortTime(row.created_at) }}</span>
+              <MediaTime class="tc-row-time" :at="rowTime(row)" />
               <span v-if="row.error_msg" class="tc-row-error truncate">{{ mapError(row.error_msg) }}</span>
             </div>
           </div>
@@ -84,7 +84,7 @@
               </div>
               <div class="tc-row-meta">
                 <span v-if="child.error_msg" class="tc-row-error truncate">{{ mapError(child.error_msg) }}</span>
-                <span v-else class="tc-row-time">{{ shortTime(child.created_at) }}</span>
+                <MediaTime v-else class="tc-row-time" :at="rowTime(child)" />
               </div>
             </div>
             <ProgressRing
@@ -123,6 +123,7 @@ import { ChevronRight, ListTodo, RefreshCw } from 'lucide-vue-next'
 import ProgressRing from '~/components/ProgressRing.vue'
 import TaskDetailDialog from '~/components/TaskDetailDialog.vue'
 import BaseSelect from '~/components/BaseSelect.vue'
+import MediaTime from '~/components/MediaTime.vue'
 import { taskAPI, dramaAPI } from '~/composables/useApi'
 import { mapError } from '~/composables/useToast'
 import { useTasks, absorbRows, isParentRow } from '~/composables/useTasks'
@@ -247,10 +248,9 @@ function rowRing(row) {
   return ringPropsFromTask(row, now.value)
 }
 
-function shortTime(value) {
-  const ms = Date.parse(String(value || ''))
-  if (!Number.isFinite(ms)) return ''
-  return new Date(ms).toLocaleString()
+/** 行时间（unix 秒）：已完成取产出时刻，未完成取提交时间（Issue #14 决策 #3） */
+function rowTime(row) {
+  return row?.generated_at ?? row?.completed_at_unix ?? row?.created_at_unix ?? null
 }
 
 function toggleExpand(row) {

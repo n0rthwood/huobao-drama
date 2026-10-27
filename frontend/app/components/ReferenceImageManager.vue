@@ -17,27 +17,33 @@
     </div>
 
     <div v-if="refs.length" class="ref-strip">
-      <div v-for="(item, i) in refs" :key="item" class="ref-item" :class="{ 'is-broken': broken.includes(item) }">
+      <div
+        v-for="(entry, i) in refs"
+        :key="entry.path"
+        class="ref-item"
+        :class="{ 'is-broken': broken.includes(entry.path) }"
+      >
         <img
-          v-if="!broken.includes(item)"
-          :src="thumbOf(srcOf(item))"
+          v-if="!broken.includes(entry.path)"
+          :src="thumbOf(srcOf(entry.path))"
           class="ref-thumb"
           loading="lazy"
           :alt="t('components.referenceImages.previewTitle', { index: i + 1 })"
-          @error="onThumbError($event, item)"
-          @click.stop="emit('preview', srcOf(item), t('components.referenceImages.previewTitle', { index: i + 1 }))"
+          @error="onThumbError($event, entry.path)"
+          @click.stop="emit('preview', srcOf(entry.path), t('components.referenceImages.previewTitle', { index: i + 1 }))"
         />
         <div v-else class="ref-missing" :title="t('components.referenceImages.missingHint')">
           <ImageOff :size="12" />
           <span>{{ t('components.referenceImages.missing') }}</span>
         </div>
+        <MediaTime v-if="entry.uploaded_at" class="ref-time" :at="entry.uploaded_at" />
         <button
           class="ref-del-btn"
           :title="t('components.referenceImages.remove')"
-          :disabled="removing === item"
-          @click.stop="askRemove(item)"
+          :disabled="removing === entry.path"
+          @click.stop="askRemove(entry.path)"
         >
-          <Loader2 v-if="removing === item" :size="9" class="animate-spin" />
+          <Loader2 v-if="removing === entry.path" :size="9" class="animate-spin" />
           <X v-else :size="9" />
         </button>
       </div>
@@ -62,6 +68,7 @@ import { toast } from 'vue-sonner'
 import { characterAPI, parseReferenceImages, propAPI, sceneAPI } from '~/composables/useApi'
 import { thumbFallback, thumbOf } from '~/composables/useMedia'
 import { toastError } from '~/composables/useToast'
+import MediaTime from '~/components/MediaTime.vue'
 
 const { t } = useI18n()
 
@@ -69,7 +76,7 @@ const props = defineProps({
   // character / scene / prop：三类资产的参考图交互完全一致
   assetType: { type: String, required: true },
   assetId: { type: [Number, String], required: true },
-  // 资产行里的 reference_images 原值（JSON 字符串 / 数组 / null 都接受）
+  // 资产行里的 reference_images 原值（对象数组 [{path, uploaded_at}] / JSON 字符串 / null 都接受）
   references: { type: [String, Array], default: null },
   max: { type: Number, default: 10 },
 })
@@ -245,6 +252,20 @@ async function doRemove() {
   font-size: 9px;
   text-align: center;
   padding: 0 2px;
+}
+/* 上传时间压在缩略图底部，46px 的格子里不额外占高度 */
+.ref-time {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 1px 2px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 9px;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .ref-del-btn {
   position: absolute;
