@@ -91,6 +91,8 @@ export interface ProviderRequest {
 }
 
 export interface AIConfig {
+  /** ai_service_configs 行 id —— 异步任务重启后据此找回同一网关与凭据 */
+  id?: number
   provider: string
   baseUrl: string
   apiKey: string

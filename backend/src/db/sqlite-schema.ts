@@ -225,6 +225,7 @@ export const sqliteSchemaStatements = [
     task_id TEXT,
     result_url TEXT,
     local_path TEXT,
+    remote_state TEXT,
     status TEXT DEFAULT 'processing',
     error_msg TEXT,
     created_at TEXT NOT NULL,
@@ -344,6 +345,8 @@ const columnAdditions: { table: string; column: string; type: string }[] = [
   { table: 'storyboards', column: 'mid_frame_time', type: 'REAL' },
   { table: 'storyboards', column: 'mid_frame_image', type: 'TEXT' },
   { table: 'storyboards', column: 'keyframes_confirmed', type: 'INTEGER DEFAULT 0' },
+  // qwen-jobs 远端任务快照（排队位置/进度/估计）+ 提交请求体，重启后据此恢复
+  { table: 'sys_task', column: 'remote_state', type: 'TEXT' },
 ]
 
 /**

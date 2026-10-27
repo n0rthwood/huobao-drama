@@ -9,6 +9,8 @@ import { joinProviderUrl } from './adapters/url.js'
 export type ServiceType = 'text' | 'image' | 'video'
 
 export interface AIConfig {
+  /** ai_service_configs 行 id —— 异步任务重启后据此找回同一网关与凭据 */
+  id?: number
   provider: string
   baseUrl: string
   apiKey: string
@@ -30,7 +32,7 @@ export function parseConfigTemperature(settingsRaw: string | null | undefined): 
 
 export const officialProviders: Record<ServiceType, readonly string[]> = {
   text: ['openai', 'gemini', 'volcengine'],
-  image: ['openai', 'gemini', 'volcengine', 'comfyui'],
+  image: ['openai', 'gemini', 'volcengine', 'qwen-jobs'],
   video: ['volcengine', 'minimax', 'comfyui'],
 }
 
@@ -120,6 +122,7 @@ export async function getActiveConfig(serviceType: ServiceType): Promise<AIConfi
     })
   }
   return {
+    id: active.id,
     provider: active.provider || '',
     baseUrl: active.baseUrl,
     apiKey: active.apiKey,
@@ -173,6 +176,7 @@ export async function getConfigById(id: number): Promise<AIConfig | null> {
     })
   }
   return {
+    id: row.id,
     provider: row.provider || '',
     baseUrl: row.baseUrl,
     apiKey: row.apiKey,
