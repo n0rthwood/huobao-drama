@@ -122,12 +122,21 @@ export async function updateTextTaskProgress(id: number, progress: TextTaskProgr
   await patchTextTaskParams(id, { progress })
 }
 
+/** 思考内容落盘进度（Issue #19）：reasoning_chars 为累计字符数，由 reasoning-sink 节流调用 */
+export async function updateTextTaskReasoningChars(id: number, chars: number): Promise<void> {
+  await patchTextTaskParams(id, { reasoning_chars: chars })
+}
+
 export async function finishTextTask(
   id: number,
   status: 'completed' | 'failed',
-  extra: { errorMsg?: string | null; progress?: TextTaskProgress } = {},
+  extra: { errorMsg?: string | null; progress?: TextTaskProgress; outputText?: string } = {},
 ): Promise<void> {
   if (extra.progress) await patchTextTaskParams(id, { progress: extra.progress })
+  // 最终正文全文保存（Issue #19，Q5 不截断），只在详情接口透出，不进任务列表
+  if (typeof extra.outputText === 'string' && extra.outputText) {
+    await patchTextTaskParams(id, { output_text: extra.outputText })
+  }
   const ts = now()
   // 文本任务没有媒体产物：只有成功完成才算一次「产出」，失败行不写生成时间
   const stamp = status === 'completed' ? completionStamp(ts) : { completedAt: ts }

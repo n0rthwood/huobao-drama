@@ -5,6 +5,7 @@ import { Hono } from 'hono'
 import { validAgentTypes } from '../agents/index.js'
 import { buildAgentRequestContext } from '../agents/context.js'
 import { runAgent } from '../agents/run.js'
+import { createReasoningSink } from '../agents/reasoning-sink.js'
 import { mastra } from '../mastra/index.js'
 import { success, badRequest } from '../utils/response.js'
 import { logTaskError, logTaskPayload, logTaskProgress, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
@@ -87,6 +88,7 @@ app.post('/:type/chat', async (c) => {
     })
   }
 
+  const sink = taskId ? createReasoningSink(taskId) : undefined
   const startTime = performance.now()
 
   try {
@@ -94,9 +96,11 @@ app.post('/:type/chat', async (c) => {
       agent,
       [{ role: 'user', content: message }],
       { maxSteps: 20, requestContext },
+      sink,
     )
 
-    if (taskId) await finishTextTask(taskId, 'completed')
+    if (taskId) await finishTextTask(taskId, 'completed', { outputText: result.text || '' })
+
     const elapsed = ((performance.now() - startTime) / 1000).toFixed(1)
     logTaskSuccess('Agent', agentType, { elapsedSeconds: elapsed })
 

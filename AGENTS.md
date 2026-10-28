@@ -129,13 +129,18 @@ Issue 整理完成后、实施前，必须让 **Fabel（Anthropic）或 Astra（
 ### 文本：GLM 5.3
 - 配成 `text / openai`，base URL `https://open.bigmodel.cn/api/coding/paas/v4`（智谱 coding 套餐专用端点），模型 `glm-5.3`，key 来自环境变量 `ZHIPU_API_KEY`（写入本机 `providers.json`）。
 - GLM-5.x 始终思考：`agents/index.ts` 的 `isOfficialTextHost` 包含 `open.bigmodel.cn`，不会注入 `thinking: disabled`（否则 400）。
-- reasoning 与 content 共享 `max_tokens`，项目默认注入 16384，不要调小。**本机 `backend/.env`（不入库，dotenv 加载）设 `AI_MAX_TOKENS=32768`**（2026-10-28，#15 live 落地）：#15 的拆分镜规则变长后，长剧集（5 镜 × 4 条提示词）在 16384 下推理 + 输出会在调用 `save_storyboards` 之前被截断，表现为「Agent 正常结束但什么都没保存」；GLM coding 端点实测接受 32768。重建本机环境时要同步这一项。
+- reasoning 与 content 共享 `max_tokens`，项目默认注入 16384，不要调小。**本机 `backend/.env`（不入库，dotenv 加载）设 `AI_MAX_TOKENS=131072`**（2026-10-28，#19 live 生效）：GLM coding 端点 `max_tokens` 只接受 `[1,131072]`（131073 报 1210），实测 3.2 万 token 输入 + 131072 正常；32768 时代码注入值过小，拆分分镜一次推理 + 输出就能吃满（实测 31662/30764），`finish=length` 截断表现为「Agent 正常结束但什么都没保存」。重建本机环境时要同步这一项。
 
 ### 文本 Agent 调用：一律流式（Issue #17）
 - 所有 Agent 执行都走 `agents/run.ts runAgent()`（`agent.stream()` → `getFullOutput()` → 有 `error` 即抛），返回结构与 `generate()` 相同；**不要再直接调用 `agent.generate()`**。原因：非流式请求要等模型把推理 + 全部输出生成完才回响应头，长输出（拆分分镜）超过 undici 默认 `headersTimeout=300s`，AI SDK 再重试 2 次 → 约 900 s 后 `Headers Timeout Error`（任务 #281）。HTTP 接口仍是非流式，前端不变。
 - GLM 与 DeepSeek 流式下都会把**工具调用参数生成完再一次性下发**（实测 DeepSeek 1817 字参数前约 22 s 无数据，GLM 约 10 s），一次 `saveStoryboards` 参数可达上万 token。所以 `agents/index.ts getModel` 的 fetch 底层用 npm `undici` 的专用 dispatcher（`bodyTimeout` 15 分钟，`TEXT_MODEL_BODY_TIMEOUT_MS`），fetch 与 dispatcher 必须同源自 npm undici，只作用于文本模型请求。
 - DeepSeek（配置走路由器公网入口 `/deepseek`）流式正文逐 token 返回、工具调用正常；Cloudflare 隧道入口同样支持流式，但隧道对长时间无数据会断，工具参数缓冲期仍可能 524，**继续用路由器入口**。
 - H3 提示词扩写（`adapters/h3-prompt.ts`）是单次短输出直连请求、自带 300 s 总超时，不经 Agent，仍为非流式。
+
+### 文本任务思考内容可见（Issue #19）
+- 有 `sys_task` 的文本 Agent 调用（chat 路由、提取、关键帧/视频提示词批量、换模型重试）都会给 `runAgent` 传 `createReasoningSink(taskId)`；`agents/index.ts` 的 fetch 链最外层 `createReasoningCaptureFetch` 对 SSE 响应 tee 一路解析 `delta.reasoning_content`（AI SDK 不透出该字段），落盘到 `DATA_ROOT/text-tasks/<taskId>.reasoning.txt`（追加、永久保留），`params.reasoning_chars` 节流记累计字数。
+- 最终正文全文存 `params.output_text`（只在 `GET /tasks/:id` 顶层返回，列表/`/tasks/active` 不带）；思考内容读 `GET /tasks/:id/reasoning?tail=`（默认尾部 4096，`offset+tail` 翻全文）。
+- 前端 `TaskDetailDialog`：进行中思考块每 3 s 拉尾部并自动滚底（用户上滚暂停跟随），结束后折叠可展开全文；错误块可滚动且带「复制错误信息」（`utils/clipboard.js`，非安全上下文降级 `execCommand`），任务中心行级/子任务错误行也有复制按钮。
 
 ### 图片：GPT Image（codex 包装服务）
 - `tools/codex-image/server.mjs`：本机常驻、OpenAI 兼容（`/v1/images/generations`、`/v1/images/edits`、`/v1/models`、`/health`），监听 `127.0.0.1:<port>`，Bearer token 鉴权。

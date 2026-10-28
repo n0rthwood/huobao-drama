@@ -12,10 +12,10 @@ import { cancelImageTask, discardRemoteJob } from '../services/qwen-jobs.js'
 import { enrichTask, listActiveTasks, listTaskCenter } from '../services/task-center.js'
 import { retryTask } from '../services/task-retry.js'
 import { completionStamp } from '../services/media-time.js'
+import { readReasoningFile } from '../agents/reasoning-sink.js'
+import { parseTextTaskParams } from '../services/text-task.js'
 
 const app = new Hono()
-
-type TaskType = 'image' | 'video'
 
 const videoRequestSchema = z.object({
   prompt: z.string().optional().default(''),
@@ -246,14 +246,27 @@ app.post('/:id/retry', async (c) => {
   }
 })
 
-// GET /tasks/:id — 轮询任务状态（带编号与归属信息）
+// GET /tasks/:id/reasoning — 文本任务的思考内容（Issue #19）；tail 取尾部，offset+tail 取区间
+app.get('/:id/reasoning', async (c) => {
+  const id = Number(c.req.param('id'))
+  const [row] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, id))
+  if (!row) return badRequest(c, '任务不存在')
+  if (row.type !== 'text') return badRequest(c, '仅文本任务有思考内容')
+  const tail = c.req.query('tail') ? Math.max(1, Number(c.req.query('tail')) || 1) : 4096
+  const offset = c.req.query('offset') != null ? Math.max(0, Number(c.req.query('offset')) || 0) : null
+  const result = await readReasoningFile(id, offset == null ? { tail } : { offset, limit: tail })
+  return success(c, result)
+})
+
+// GET /tasks/:id — 轮询任务状态（带编号与归属信息）；详情额外带 output_text 全文（不进列表行）
 app.get('/:id', async (c) => {
   const id = Number(c.req.param('id'))
   const [row] = await db.select().from(schema.sysTask)
     .where(eq(schema.sysTask.id, id))
-  return success(c, await enrichTask(row))
+  const enriched = await enrichTask(row)
+  const outputText = parseTextTaskParams(row?.params)?.output_text
+  return success(c, enriched && typeof outputText === 'string' ? { ...enriched, output_text: outputText } : enriched)
 })
-
 // GET /tasks — 按 type / storyboard_id / drama_id 过滤
 app.get('/', async (c) => {
   const type = c.req.query('type')
