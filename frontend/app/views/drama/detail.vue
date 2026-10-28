@@ -514,12 +514,12 @@
                 <span class="dim">{{ t('detail.mat.finalPromptSub') }}</span>
                 <button
                   class="btn btn-sm mat-detail-prompt-gen"
-                  :disabled="finalPromptGen || !firstEpisodeId"
+                  :disabled="generatingPromptKeys.includes(pendingKey(editTarget)) || !firstEpisodeId"
                   :title="firstEpisodeId ? t('detail.mat.genPromptTitle') : t('detail.mat.needEpisodeFirst')"
                   @click="generateFinalPrompt(editTarget)"
                 >
-                  <svg v-if="!finalPromptGen" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3m0 12v3m9-9h-3M6 12H3m13.5-6.5L14 8m-4 8-2.5 2.5m11 0L16 16M8 8 5.5 5.5"/><circle cx="12" cy="12" r="3"/></svg>
-                  {{ finalPromptGen ? t('episode.asset.generating') + '…' : (editDraft.finalPrompt ? t('episode.sb.regenPrompt') : t('episode.asset.genPrompt')) }}
+                  <svg v-if="!generatingPromptKeys.includes(pendingKey(editTarget))" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3m0 12v3m9-9h-3M6 12H3m13.5-6.5L14 8m-4 8-2.5 2.5m11 0L16 16M8 8 5.5 5.5"/><circle cx="12" cy="12" r="3"/></svg>
+                  {{ generatingPromptKeys.includes(pendingKey(editTarget)) ? t('episode.asset.generating') + '…' : (editDraft.finalPrompt ? t('episode.sb.regenPrompt') : t('episode.asset.genPrompt')) }}
                 </button>
               </div>
               <textarea
@@ -1097,42 +1097,71 @@ const editSaving = ref(false)
 const editTarget = ref(null)
 const editDraft = reactive({})
 
+/** 素材弹窗可编辑的信息字段（按类型）；最终提示词单独处理 */
+const EDIT_INFO_FIELDS = {
+  character: ['name', 'role', 'appearance', 'description', 'styling'],
+  scene: ['location', 'time', 'prompt', 'lighting'],
+  prop: ['name', 'type', 'description'],
+}
+
 function openEdit(m) {
   editTarget.value = m
   // 按类型初始化 draft
   Object.keys(editDraft).forEach(k => delete editDraft[k])
-  if (m.kindKey === 'character') {
-    Object.assign(editDraft, { name: m.name || '', role: m.role || '', appearance: m.appearance || '', description: m.description || '', styling: m.styling || '' })
-  } else if (m.kindKey === 'scene') {
-    Object.assign(editDraft, { location: m.location || '', time: m.time || '', prompt: m.prompt || '', lighting: m.lighting || '' })
-  } else {
-    Object.assign(editDraft, { name: m.name || '', type: m.type || '', description: m.description || '' })
-  }
+  for (const key of EDIT_INFO_FIELDS[m.kindKey]) editDraft[key] = m[key] || ''
   editDraft.finalPrompt = m.finalPrompt || m.final_prompt || ''
   editDialog.value = true
 }
 
-// 生成/重新生成最终提示词（不生图）：调用各类型 generate-prompt 接口，结果写回 draft
-const finalPromptGen = ref(false)
+/** 弹窗是否仍在编辑这个素材：异步回调回来时弹窗可能已换成别的素材（Issue #24） */
+function isEditing(m) {
+  return editDialog.value && editTarget.value?.kindKey === m.kindKey && editTarget.value?.id === m.id
+}
+
+function updateAsset(m, payload) {
+  if (m.kindKey === 'character') return characterAPI.update(m.id, payload)
+  if (m.kindKey === 'scene') return sceneAPI.update(m.id, payload)
+  return propAPI.update(m.id, payload)
+}
+
+// 生成/重新生成最终提示词（不生图）：按素材记录「生成中」，结果只写回仍在编辑的同一素材
+const generatingPromptKeys = ref([])
 const firstEpisodeId = computed(() => drama.value?.episodes?.[0]?.id || null)
 async function generateFinalPrompt(m) {
   const epId = firstEpisodeId.value
   if (!epId) { toast.error(t('detail.mat.needEpisodeForPrompt')); return }
-  finalPromptGen.value = true
+  const key = pendingKey(m)
+  if (generatingPromptKeys.value.includes(key)) return
+  generatingPromptKeys.value = [...generatingPromptKeys.value, key]
   try {
+    // 信息改了还没保存：先保存（后端会让旧提示词失效），提示词按最新信息生成（Issue #24）
+    const infoPatch = {}
+    for (const field of EDIT_INFO_FIELDS[m.kindKey]) {
+      if ((editDraft[field] ?? '') !== (m[field] ?? '')) infoPatch[field] = editDraft[field]
+    }
+    if (Object.keys(infoPatch).length) {
+      const saved = await updateAsset(m, infoPatch)
+      if (isEditing(m)) editTarget.value = { ...editTarget.value, ...infoPatch, finalPrompt: saved?.final_prompt || '' }
+      toast.success(t('episode.asset.savedBeforePrompt'))
+    }
     let res
     if (m.kindKey === 'character') res = await characterAPI.generatePrompt(m.id, epId, true)
     else if (m.kindKey === 'scene') res = await sceneAPI.generatePrompt(m.id, epId, true)
     else res = await propAPI.generatePrompt(m.id, epId, true)
     const fp = res?.final_prompt || res?.finalPrompt
     if (!fp) throw new Error(t('episode.asset.promptGenFailedRetry'))
-    editTarget.value = { ...m, finalPrompt: fp }
-    editDraft.finalPrompt = fp
-    toast.success(t('episode.asset.promptGenerated'))
+    if (isEditing(m)) {
+      editTarget.value = { ...editTarget.value, finalPrompt: fp }
+      editDraft.finalPrompt = fp
+      toast.success(t('episode.asset.promptGenerated'))
+    } else {
+      toast.success(t('episode.asset.promptReadyFor', { name: m.name || m.location || '' }))
+    }
   } catch (e) {
     toastError(e)
   } finally {
-    finalPromptGen.value = false
+    generatingPromptKeys.value = generatingPromptKeys.value.filter(k => k !== key)
+    load()
   }
 }
 
@@ -1148,14 +1177,15 @@ async function saveEdit() {
   if (target.kindKey === 'character' && !String(editDraft.name ?? '').trim()) { toast.error(t('episode.create.nameRequired')); return }
   if (target.kindKey === 'scene' && !String(editDraft.location ?? '').trim()) { toast.error(t('detail.mat.locationRequired')); return }
   if (target.kindKey === 'prop' && !String(editDraft.name ?? '').trim()) { toast.error(t('episode.create.nameRequired')); return }
+  const payload = {}
+  for (const key of EDIT_INFO_FIELDS[target.kindKey]) payload[key] = editDraft[key]
+  // 最终提示词只在被改过时提交：回传旧稿会挡住「改信息 → 旧提示词失效」（Issue #24）
+  if ((editDraft.finalPrompt || '') !== (target.finalPrompt || target.final_prompt || '')) payload.finalPrompt = editDraft.finalPrompt || null
   editSaving.value = true
   try {
-    const fp = editDraft.finalPrompt || null
-    if (target.kindKey === 'character') await characterAPI.update(target.id, { name: editDraft.name, role: editDraft.role, appearance: editDraft.appearance, description: editDraft.description, styling: editDraft.styling, finalPrompt: fp })
-    else if (target.kindKey === 'scene') await sceneAPI.update(target.id, { location: editDraft.location, time: editDraft.time, prompt: editDraft.prompt, lighting: editDraft.lighting, finalPrompt: fp })
-    else await propAPI.update(target.id, { name: editDraft.name, type: editDraft.type, description: editDraft.description, finalPrompt: fp })
+    await updateAsset(target, payload)
     toast.success(t('common.saved'))
-    closeEdit()
+    if (isEditing(target)) closeEdit()
     load()
   } catch (e) {
     toastError(e)

@@ -822,6 +822,8 @@
       "generatingPrompt": "最終プロンプトを生成中…",
       "promptGenerated": "最終プロンプトを生成しました",
       "promptRegenerated": "最終プロンプトを再生成しました",
+      "promptReadyFor": "「{name}」の最終プロンプトを生成しました",
+      "savedBeforePrompt": "変更を先に保存し、最新の情報でプロンプトを生成します…",
       "promptGenFailedRetry": "最終プロンプトの生成に失敗しました。もう一度お試しください",
       "promptGenFailed": "最終プロンプトの生成に失敗しました",
       "promptCopied": "最終プロンプトをコピーしました",

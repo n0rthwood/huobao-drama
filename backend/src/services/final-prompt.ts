@@ -4,7 +4,9 @@
  * - 角色 → 三视图（character turnaround：正面/侧面/背面）
  * - 场景 → 固定视角 + 前景/中景/后景
  * - 道具 → 白底单品静物（single product shot on pure white background）
- * 缺失时运行 prompt_generator Agent 创作并保存；失败返回 ''，由调用方回退到本地拼接提示词
+ * 缺失时运行 prompt_generator Agent 创作并保存；失败返回 ''，由调用方回退到本地拼接提示词。
+ * 成功 = Agent 本次确实保存了新提示词：读回的提示词非空且与运行前不同（Issue #24）。
+ * 只读回旧稿（Agent 没调用 save_*_final_prompt）视为失败，绝不把旧稿当新稿返回。
  */
 import { eq } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
@@ -33,6 +35,13 @@ async function runPromptAgent(episodeId: number, dramaId: number, message: strin
   await runAgent(agent, [{ role: 'user', content: message }], { maxSteps: 12, requestContext })
 }
 
+/** Agent 运行后读回的提示词：与运行前相同（没保存新稿）或为空都算失败 */
+function savedNewPrompt(kind: string, id: number, before: string | null, after: string | null | undefined): string {
+  if (after && after !== before) return after
+  logTaskError('FinalPrompt', `${kind}-generate`, { [`${kind}Id`]: id, error: 'agent did not save a new final prompt' })
+  return ''
+}
+
 /** 确保角色拥有三视图最终提示词，返回最终提示词（失败返回 ''）；force 时忽略已有提示词强制重新生成 */
 export async function ensureCharacterFinalPrompt(char: CharacterRow, episodeId: number, force = false, opts?: PromptAgentOptions): Promise<string> {
   if (char.finalPrompt && !force) return char.finalPrompt
@@ -41,7 +50,7 @@ export async function ensureCharacterFinalPrompt(char: CharacterRow, episodeId: 
     await runPromptAgent(episodeId, char.dramaId,
       `为角色「${char.name}」(character_id=${char.id}) 生成三视图最终提示词，并调用 save_character_final_prompt 保存。`, opts)
     const [fresh] = await db.select().from(schema.characters).where(eq(schema.characters.id, char.id))
-    return fresh?.finalPrompt || ''
+    return savedNewPrompt('character', char.id, char.finalPrompt, fresh?.finalPrompt)
   } catch (err: any) {
     logTaskError('FinalPrompt', 'character-generate', { characterId: char.id, error: err.message })
     return ''
@@ -60,8 +69,9 @@ export async function ensureSceneFinalPrompt(scene: SceneRow, episodeId: number,
     await runPromptAgent(episodeId, scene.dramaId,
       `为场景「${scene.location}」(scene_id=${scene.id}) 生成固定视角（前景/中景/后景）最终提示词，并调用 save_scene_final_prompt 保存。注意：这是无人物空镜——场景图中不能出现任何的人（含背影、剪影、倒影、照片里的人），即使场景描述提到人物活动也必须剔除，只保留场景本身。${time ? `场景时间是「${time}」：提示词必须原样写出「${time}」，光线按该时段描写。` : ''}`, opts)
     const [fresh] = await db.select().from(schema.scenes).where(eq(schema.scenes.id, scene.id))
-    // Agent 没能保存引用时间的提示词时，旧提示词仍然无效，交给调用方回退拼接（回退拼接包含 time）
-    return fresh?.finalPrompt && sceneFinalPromptCoversTime(fresh.finalPrompt, fresh.time) ? fresh.finalPrompt : ''
+    const saved = savedNewPrompt('scene', scene.id, scene.finalPrompt, fresh?.finalPrompt)
+    // Agent 没能保存引用时间的提示词时，交给调用方回退拼接（回退拼接包含 time）
+    return saved && sceneFinalPromptCoversTime(saved, fresh?.time) ? saved : ''
   } catch (err: any) {
     logTaskError('FinalPrompt', 'scene-generate', { sceneId: scene.id, error: err.message })
     return ''
@@ -76,7 +86,7 @@ export async function ensurePropFinalPrompt(prop: PropRow, episodeId: number, fo
     await runPromptAgent(episodeId, prop.dramaId,
       `为道具「${prop.name}」(prop_id=${prop.id}) 生成白底单品最终提示词，并调用 save_prop_final_prompt 保存。`, opts)
     const [fresh] = await db.select().from(schema.props).where(eq(schema.props.id, prop.id))
-    return fresh?.finalPrompt || ''
+    return savedNewPrompt('prop', prop.id, prop.finalPrompt, fresh?.finalPrompt)
   } catch (err: any) {
     logTaskError('FinalPrompt', 'prop-generate', { propId: prop.id, error: err.message })
     return ''

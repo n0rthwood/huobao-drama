@@ -2186,15 +2186,18 @@ const assetFinalPrompt = computed(() => {
   return item?.final_prompt || item?.finalPrompt || ''
 })
 
+/** 资产弹窗当前是否仍打开着这个资产：异步回调回来时弹窗可能已换成别的资产（Issue #24） */
+function isAssetDialogOn(type, id) {
+  return assetDetail.value.open && assetDetail.value.type === type && assetDetail.value.item?.id === id
+}
+
 /** 把生成好的最终提示词同步到列表项与弹窗项 */
 function applyFinalPrompt(type, id, fp) {
   const patch = { final_prompt: fp, finalPrompt: fp }
   const list = type === 'character' ? chars.value : type === 'scene' ? scenes.value : propItems.value
   const target = list.find(x => x.id === id)
   if (target) Object.assign(target, patch)
-  if (assetDetail.value.open && assetDetail.value.type === type && assetDetail.value.item?.id === id) {
-    Object.assign(assetDetail.value.item, patch)
-  }
+  if (isAssetDialogOn(type, id)) Object.assign(assetDetail.value.item, patch)
 }
 
 const generatingPromptKeys = ref([])
@@ -2226,17 +2229,39 @@ async function ensureAssetPrompt(type, id, force = false) {
   }
 }
 
-/** 弹窗内生成最终提示词（不生图）；已有最终提示词时重新生成（force） */
+/**
+ * 弹窗内生成最终提示词（不生图）；已有最终提示词时重新生成（force）。
+ * 信息草稿改了还没保存时先保存，提示词按最新信息生成（Issue #24）。
+ * 生成期间弹窗可能已切到别的资产：完成后只在弹窗仍是这个资产时写文本框，否则只提示。
+ */
 async function genAssetFinalPrompt() {
-  const detail = assetDetail.value
-  if (!detail.open || !detail.item?.id) return
-  const force = !!assetFinalPrompt.value
+  const { open, type, item } = assetDetail.value
+  if (!open || !item?.id) return
+  const infoPatch = assetInfoPatch(type, item)
+  if (!infoPatch) return
+  if (Object.keys(infoPatch).length) {
+    savingAssetDetail.value = true
+    try {
+      await persistAssetDetail(type, item, infoPatch)
+      toast.success(t('episode.asset.savedBeforePrompt'))
+    } catch (e) {
+      toastServerMessage(e, { fallback: 'episode.asset.saveFailed' })
+      return
+    } finally {
+      savingAssetDetail.value = false
+    }
+  }
+  const force = !!(item.final_prompt || item.finalPrompt)
   try {
-    const fp = await ensureAssetPrompt(detail.type, detail.item.id, force)
+    const fp = await ensureAssetPrompt(type, item.id, force)
     if (!fp) throw new Error(t('episode.asset.promptGenFailedRetry'))
-    assetPromptDraft.value = fp
-    assetPromptDirty.value = false
-    toast.success(force ? t('episode.asset.promptRegenerated') : t('episode.asset.promptGenerated'))
+    if (isAssetDialogOn(type, item.id)) {
+      assetPromptDraft.value = fp
+      assetPromptDirty.value = false
+      toast.success(force ? t('episode.asset.promptRegenerated') : t('episode.asset.promptGenerated'))
+    } else {
+      toast.success(t('episode.asset.promptReadyFor', { name: item.name || item.location || '' }))
+    }
   } catch (e) {
     toastError(e, { fallback: 'episode.asset.promptGenFailed' })
   }
@@ -2253,58 +2278,72 @@ async function copyAssetFinalPrompt() {
   }
 }
 
-async function saveAssetDetail() {
-  const detail = assetDetail.value
-  if (!detail.open || !detail.item?.id) return
-  const item = detail.item
-  // 只提交真正修改过的字段：无修改保存不应触发后端的提示词失效置空
-  const payload = {}
-  let infoChanged = false
-  if (detail.type === 'character') {
-    if (assetDetailDraft.value.appearance !== (item.appearance || '')) payload.appearance = assetDetailDraft.value.appearance
-    if (assetDetailDraft.value.styling !== (item.styling || '')) payload.styling = assetDetailDraft.value.styling
-  } else if (detail.type === 'scene') {
-    if (assetDetailDraft.value.prompt !== (item.prompt || '')) payload.prompt = assetDetailDraft.value.prompt
-    if (assetDetailDraft.value.lighting !== (item.lighting || '')) payload.lighting = assetDetailDraft.value.lighting
-    const time = assetDetailDraft.value.time.trim()
+/**
+ * 弹窗信息草稿里改了值的字段（不含最终提示词）：只提交真正修改过的字段。
+ * 场景时间被清空时提示并返回 null（不可保存）。
+ */
+function assetInfoPatch(type, item) {
+  const draft = assetDetailDraft.value
+  const patch = {}
+  if (type === 'character') {
+    if (draft.appearance !== (item.appearance || '')) patch.appearance = draft.appearance
+    if (draft.styling !== (item.styling || '')) patch.styling = draft.styling
+  } else if (type === 'scene') {
+    if (draft.prompt !== (item.prompt || '')) patch.prompt = draft.prompt
+    if (draft.lighting !== (item.lighting || '')) patch.lighting = draft.lighting
+    const time = draft.time.trim()
     if (!time) {
       toast.error(t('episode.asset.timeRequired'))
-      return
+      return null
     }
-    if (time !== (item.time || '')) payload.time = time
-  } else {
-    if (assetDetailDraft.value.description !== (item.description || '')) payload.description = assetDetailDraft.value.description
+    if (time !== (item.time || '')) patch.time = time
+  } else if (draft.description !== (item.description || '')) {
+    patch.description = draft.description
   }
-  infoChanged = Object.keys(payload).length > 0
+  return patch
+}
+
+/**
+ * PUT 资产并同步列表项与弹窗项。最终提示词一律以服务端返回行为准：
+ * 改了影响画面的字段时旧提示词已被后端置空（Issue #24），场景改时间同理（Issue #21）。
+ * await 之后只在弹窗仍是这个资产时回写草稿。
+ */
+async function persistAssetDetail(type, item, payload) {
+  const res = type === 'character'
+    ? await characterAPI.update(item.id, payload)
+    : type === 'scene'
+      ? await sceneAPI.update(item.id, payload)
+      : await propAPI.update(item.id, payload)
+  const fp = res?.final_prompt || null
+  const patch = { final_prompt: fp, finalPrompt: fp }
+  for (const key of Object.keys(payload)) {
+    if (key !== 'final_prompt' && res?.[key] !== undefined) patch[key] = res[key]
+  }
+  Object.assign(item, patch)
+  const list = type === 'character' ? chars.value : type === 'scene' ? scenes.value : propItems.value
+  const target = list.find(x => x.id === item.id)
+  if (target && target !== item) Object.assign(target, patch)
+  if (isAssetDialogOn(type, item.id)) {
+    if (type === 'scene') assetDetailDraft.value.time = item.time || ''
+    assetPromptDraft.value = fp || ''
+    assetPromptDirty.value = false
+  }
+}
+
+async function saveAssetDetail() {
+  const { open, type, item } = assetDetail.value
+  if (!open || !item?.id) return
+  const payload = assetInfoPatch(type, item)
+  if (!payload) return
   // 手动编辑过最终提示词才提交；空串视为清空
   if (assetPromptDirty.value) payload.final_prompt = assetPromptDraft.value.trim() || ''
-  if (!infoChanged && !assetPromptDirty.value) {
+  if (!Object.keys(payload).length) {
     toast.info(t('episode.asset.noChanges'))
     return
   }
   savingAssetDetail.value = true
   try {
-    let res = null
-    if (detail.type === 'character') res = await characterAPI.update(item.id, payload)
-    else if (detail.type === 'scene') res = await sceneAPI.update(item.id, payload)
-    else res = await propAPI.update(item.id, payload)
-    // 本地同步：手动编辑的提示词以草稿为准；仅信息字段变更时提示词已被后端置空
-    const { final_prompt, ...infoPatch } = payload
-    let promptValue = assetPromptDirty.value ? (payload.final_prompt || null) : (infoChanged ? null : (item.final_prompt || item.finalPrompt || null))
-    // 服务端返回整行时以它为准（场景改时间后提示词是否失效由服务端决定）
-    if (res && typeof res === 'object' && res.id === item.id) {
-      for (const key of Object.keys(infoPatch)) {
-        if (res[key] !== undefined) infoPatch[key] = res[key]
-      }
-      if (res.final_prompt !== undefined) promptValue = res.final_prompt || null
-    }
-    Object.assign(item, infoPatch, { final_prompt: promptValue, finalPrompt: promptValue })
-    const list = detail.type === 'character' ? chars.value : detail.type === 'scene' ? scenes.value : propItems.value
-    const target = list.find(x => x.id === item.id)
-    if (target) Object.assign(target, infoPatch, { final_prompt: promptValue, finalPrompt: promptValue })
-    if (detail.type === 'scene') assetDetailDraft.value.time = item.time || ''
-    assetPromptDraft.value = promptValue || ''
-    assetPromptDirty.value = false
+    await persistAssetDetail(type, item, payload)
     toast.success(t('episode.asset.saved'))
   } catch (e) {
     toastServerMessage(e, { fallback: 'episode.asset.saveFailed' })
