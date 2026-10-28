@@ -47,6 +47,9 @@ importers:
       sharp:
         specifier: ^0.34.5
         version: 0.34.5
+      undici:
+        specifier: ^7.30.1
+        version: 7.30.1
       uuid:
         specifier: ^13.0.0
         version: 13.0.2

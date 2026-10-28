@@ -1,9 +1,10 @@
 /**
- * Agent 聊天路由 — 非流式版本
+ * Agent 聊天路由 — HTTP 非流式：服务端以流式调用模型（runAgent），读完后一次性返回
  */
 import { Hono } from 'hono'
 import { validAgentTypes } from '../agents/index.js'
 import { buildAgentRequestContext } from '../agents/context.js'
+import { runAgent } from '../agents/run.js'
 import { mastra } from '../mastra/index.js'
 import { success, badRequest } from '../utils/response.js'
 import { logTaskError, logTaskPayload, logTaskProgress, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
@@ -89,7 +90,8 @@ app.post('/:type/chat', async (c) => {
   const startTime = performance.now()
 
   try {
-    const result = await agent.generate(
+    const result = await runAgent(
+      agent,
       [{ role: 'user', content: message }],
       { maxSteps: 20, requestContext },
     )

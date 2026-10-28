@@ -6,6 +6,7 @@ import { eq } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
 import { mastra } from '../mastra/index.js'
 import { buildAgentRequestContext } from '../agents/context.js'
+import { runAgent } from '../agents/run.js'
 import { logTaskError, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
 import {
   legalTechniqueIds,
@@ -54,7 +55,8 @@ export async function runTransitionReview(
   const errors: string[] = []
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
-      await agent.generate(
+      await runAgent(
+        agent,
         [{
           role: 'user',
           content: `请为分镜 #${pair.current.storyboardNumber}（承接上一镜 #${pair.previous.storyboardNumber} 的尾帧）设计开场转场。${USER_MESSAGE_SUFFIX}`,
