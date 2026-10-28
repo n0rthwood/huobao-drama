@@ -129,7 +129,7 @@ Issue 整理完成后、实施前，必须让 **Fabel（Anthropic）或 Astra（
 ### 文本：GLM 5.3
 - 配成 `text / openai`，base URL `https://open.bigmodel.cn/api/coding/paas/v4`（智谱 coding 套餐专用端点），模型 `glm-5.3`，key 来自环境变量 `ZHIPU_API_KEY`（写入本机 `providers.json`）。
 - GLM-5.x 始终思考：`agents/index.ts` 的 `isOfficialTextHost` 包含 `open.bigmodel.cn`，不会注入 `thinking: disabled`（否则 400）。
-- reasoning 与 content 共享 `max_tokens`，项目默认注入 16384，不要调小。
+- reasoning 与 content 共享 `max_tokens`，项目默认注入 16384，不要调小。**本机 `backend/.env`（不入库，dotenv 加载）设 `AI_MAX_TOKENS=32768`**（2026-10-28，#15 live 落地）：#15 的拆分镜规则变长后，长剧集（5 镜 × 4 条提示词）在 16384 下推理 + 输出会在调用 `save_storyboards` 之前被截断，表现为「Agent 正常结束但什么都没保存」；GLM coding 端点实测接受 32768。重建本机环境时要同步这一项。
 
 ### 图片：GPT Image（codex 包装服务）
 - `tools/codex-image/server.mjs`：本机常驻、OpenAI 兼容（`/v1/images/generations`、`/v1/images/edits`、`/v1/models`、`/health`），监听 `127.0.0.1:<port>`，Bearer token 鉴权。
