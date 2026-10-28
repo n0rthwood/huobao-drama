@@ -10,12 +10,10 @@
       >
         <img v-if="lead.image" :src="thumbOf(srcOf(lead.image))" :alt="lead.label" loading="lazy" @error="thumbFallback($event, srcOf(lead.image))" />
         <span v-else class="target-asset-missing">{{ t('episode.ref.targetMissingImage') }}</span>
+        <span class="target-asset-no">{{ t('episode.ref.targetRefNo', { n: 1 }) }}</span>
       </button>
       <div class="target-asset-main">
-        <span class="target-asset-head">
-          <span class="target-asset-no">{{ t('episode.ref.targetRefNo', { n: 1 }) }}</span>
-          <span class="target-asset-name">{{ lead.label }}</span>
-        </span>
+        <span class="target-asset-name" :title="lead.label">{{ lead.label }}</span>
         <span class="target-asset-meta">{{ t('episode.ref.targetLeadMeta') }}</span>
       </div>
     </div>
@@ -34,12 +32,10 @@
       >
         <img v-if="item.image" :src="thumbOf(srcOf(item.image))" :alt="item.name" loading="lazy" @error="thumbFallback($event, srcOf(item.image))" />
         <span v-else class="target-asset-missing">{{ t('episode.ref.targetMissingImage') }}</span>
+        <span v-if="item.ref_no" class="target-asset-no">{{ t('episode.ref.targetRefNo', { n: item.ref_no }) }}</span>
       </button>
       <div class="target-asset-main">
-        <span class="target-asset-head">
-          <span v-if="item.ref_no" class="target-asset-no">{{ t('episode.ref.targetRefNo', { n: item.ref_no }) }}</span>
-          <span class="target-asset-name">{{ item.name }}</span>
-        </span>
+        <span class="target-asset-name" :title="item.name">{{ item.name }}</span>
         <span class="target-asset-meta">
           {{ kindLabel(item.kind) }}
           <template v-if="!item.image"> · {{ t('episode.ref.targetMissingImage') }}</template>
@@ -137,34 +133,42 @@ function onVersionChange(item, value) {
 </script>
 
 <style scoped>
-.target-assets { display: flex; flex-direction: column; gap: 5px; }
+/* 流式卡片网格：卡片宽 120–180px，空间变大时卡片保持最大尺寸、只增加列数 */
+.target-assets {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 180px));
+  justify-content: start;
+  gap: 8px;
+}
 .target-asset {
-  display: flex; align-items: flex-start; gap: 8px;
-  padding: 5px 6px; border: 1px solid var(--border); border-radius: 7px;
+  display: flex; flex-direction: column; min-width: 0; max-width: 180px;
+  border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
   background: var(--surface-raised);
 }
 .target-asset.is-missing { border-color: var(--error); }
+.target-asset.is-lead { border-color: var(--accent); }
 .target-asset-thumb {
-  width: 34px; height: 34px; flex: none; padding: 0;
-  border: 1px solid var(--border); border-radius: 6px; overflow: hidden;
-  background: var(--bg-2); color: var(--text-3); font-size: 11px; cursor: pointer;
+  position: relative; width: 100%; aspect-ratio: 1; padding: 0;
+  border: 0; border-bottom: 1px solid var(--border); overflow: hidden;
+  background: var(--bg-2); color: var(--text-3); font-size: 11px; cursor: zoom-in;
+  display: flex; align-items: center; justify-content: center;
 }
 .target-asset-thumb:disabled { cursor: default; }
-.target-asset-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.target-asset-missing { font-size: 10px; color: var(--error); }
-.target-asset-main { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
-.target-asset-head { display: flex; align-items: baseline; gap: 5px; min-width: 0; }
+.target-asset-thumb img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.target-asset-missing { font-size: 11px; color: var(--error); }
+.target-asset-main { min-width: 0; display: flex; flex-direction: column; gap: 2px; padding: 5px 6px 6px; }
 .target-asset-no {
-  flex: none; padding: 0 4px; border-radius: 4px;
-  background: var(--bg-2); color: var(--text-2);
+  position: absolute; top: 4px; left: 4px;
+  padding: 0 4px; border-radius: 4px;
+  background: rgba(0, 0, 0, 0.55); color: #fff;
   font-family: var(--font-mono); font-size: 10px;
 }
 .target-asset-name { font-size: 12px; color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.target-asset-meta { font-size: 11px; color: var(--text-3); }
+.target-asset-meta { font-size: 11px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .target-asset-version {
-  max-width: 220px; margin-top: 2px; padding: 1px 4px;
+  width: 100%; max-width: 100%; margin-top: 2px; padding: 1px 4px;
   border: 1px solid var(--border); border-radius: 5px;
   background: var(--bg-2); color: var(--text-2); font-size: 11px;
 }
-.target-assets-empty { font-size: 11px; color: var(--text-3); }
+.target-assets-empty { grid-column: 1 / -1; font-size: 11px; color: var(--text-3); }
 </style>

@@ -6,7 +6,7 @@
     </div>
     <textarea
       ref="taEl"
-      :class="[inputClass, 'mention-input']"
+      :class="[inputClass, 'mention-input', { 'is-autogrow': autogrow }]"
       :rows="rows"
       :placeholder="placeholder"
       :value="text"
@@ -61,6 +61,8 @@ const props = defineProps({
   rows: { type: [Number, String], default: 4 },
   placeholder: { type: String, default: '' },
   inputClass: { type: String, default: '' },
+  // 随内容自动增高（rows 为最小行数），不出现内部滚动条
+  autogrow: { type: Boolean, default: false },
 })
 const emit = defineEmits(['update:modelValue', 'commit'])
 
@@ -91,6 +93,7 @@ function closeOnOuterScroll(e) {
 onMounted(() => {
   window.addEventListener('scroll', closeOnOuterScroll, true)
   window.addEventListener('resize', closeOnOuterScroll)
+  nextTick(autoGrow)
 })
 onBeforeUnmount(() => {
   window.removeEventListener('scroll', closeOnOuterScroll, true)
@@ -100,6 +103,7 @@ onBeforeUnmount(() => {
 watch(() => props.modelValue, (v) => {
   if (v !== text.value) text.value = v
   mention.value.open = false
+  nextTick(autoGrow)
 })
 
 // 可引用名（按长度降序，保证最长匹配优先）及其分组样式（kind code 判断）
@@ -266,7 +270,7 @@ function setText(next, caret) {
   }
   text.value = next
   closeMention()
-  nextTick(syncScroll)
+  nextTick(() => { syncScroll(); autoGrow() })
   emit('update:modelValue', next)
   emit('commit', next)
 }
@@ -276,6 +280,16 @@ function onInput(e) {
   emit('update:modelValue', e.target.value)
   updateMentionState()
   syncScroll()
+  autoGrow()
+}
+
+// 自动增高：内容超过最小行数时跟随内容长高（镜像层 inset:0 自动跟随），不出现内部滚动条
+function autoGrow() {
+  if (!props.autogrow) return
+  const ta = taEl.value
+  if (!ta) return
+  ta.style.height = 'auto'
+  ta.style.height = `${ta.scrollHeight}px`
 }
 
 function syncScroll() {
@@ -378,6 +392,11 @@ function onBlur(e) {
   background: transparent;
   color: transparent;
   caret-color: var(--text-0);
+}
+/* 自动增高模式：高度由脚本按内容设置，不参与 flex 收缩，也不出现内部滚动条 */
+.mention-input.is-autogrow {
+  flex: none;
+  overflow-y: hidden;
 }
 .mention-input::placeholder {
   color: var(--text-3);

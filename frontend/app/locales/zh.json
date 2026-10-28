@@ -217,7 +217,9 @@
       "missing": "文件缺失",
       "missingHint": "文件已不存在，生成时会跳过，建议删除该条",
       "confirmTitle": "删除参考图",
-      "confirmMessage": "删除后这张参考图不再参与生成，文件也会被移除。成片图不受影响。"
+      "confirmMessage": "删除后这张参考图不再参与生成，文件也会被移除。成片图不受影响。",
+      "copiedFrom": "素材库",
+      "copiedFromTitle": "来自素材库：{src}"
     },
     "assetBrowser": {
       "title": "资产管理器",
@@ -840,7 +842,22 @@
       "versionHint": "重绘和上传都会保留为独立版本；点击缩略图切换当前采用版本。",
       "unknownEngine": "未知引擎",
       "versionSelected": "已切换当前采用版本",
-      "versionSelectFailed": "切换版本失败"
+      "versionSelectFailed": "切换版本失败",
+      "timeCustom": "自填",
+      "timePlaceholder": "如：清晨 / 雨后黄昏",
+      "timeHint": "时间会写进场景提示词",
+      "timeRequired": "场景时间不能为空",
+      "refSectionTitle": "参考图",
+      "refSectionHint": "引导生成，不是成片图；可添加、删除或从素材库选择",
+      "timePeriods": {
+        "dawn": "清晨",
+        "morning": "上午",
+        "noon": "正午",
+        "afternoon": "午后",
+        "dusk": "黄昏",
+        "night": "夜晚",
+        "lateNight": "深夜"
+      }
     },
     "create": {
       "title": "新增{type}",
@@ -962,7 +979,8 @@
       "targetVersionDefault": "默认",
       "targetVersionDefaultImage": "默认图",
       "targetVersionSelected": "{name} 已改用所选版本",
-      "targetVersionReset": "{name} 已恢复默认版本"
+      "targetVersionReset": "{name} 已恢复默认版本",
+      "cardOpenDetail": "点击卡片查看详情与历史版本"
     },
     "vid": {
       "shotCount": "{n} 个镜头",

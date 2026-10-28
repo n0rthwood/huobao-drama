@@ -1664,7 +1664,7 @@ onUnmounted(() => {
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   box-shadow: var(--shadow-xs);
-  color: var(--text-2);
+  color: var(--text-1);
   font-size: 9.5px;
   font-weight: 700;
 }
@@ -1679,16 +1679,17 @@ onUnmounted(() => {
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   box-shadow: var(--shadow-xs);
-  color: var(--text-2);
+  color: var(--text-1);
   font-size: 9.5px;
   font-weight: 700;
 }
+/* 状态色只给文字与描边，背景始终是主题的半透明底色，压在任何封面上都可读 */
 .asset-cover-badge.is-ready {
-  background: var(--success-bg);
-  color: var(--tag-success-text);
+  box-shadow: var(--shadow-xs), inset 0 0 0 1px var(--success);
+  color: var(--success);
 }
 .asset-cover-badge.is-pending {
-  background: var(--accent-bg);
+  box-shadow: var(--shadow-xs), inset 0 0 0 1px var(--accent);
   color: var(--accent-text);
 }
 .asset-cover-empty { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: var(--text-3); }

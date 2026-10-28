@@ -217,7 +217,9 @@
       "missing": "File missing",
       "missingHint": "File no longer exists; it is skipped during generation — remove this entry",
       "confirmTitle": "Remove reference image",
-      "confirmMessage": "This reference image will no longer guide generation and its file will be deleted. The final image is unaffected."
+      "confirmMessage": "This reference image will no longer guide generation and its file will be deleted. The final image is unaffected.",
+      "copiedFrom": "Library",
+      "copiedFromTitle": "From media library: {src}"
     },
     "assetBrowser": {
       "title": "Asset manager",
@@ -840,7 +842,22 @@
       "versionHint": "Every regeneration and upload remains as a separate version. Click a thumbnail to select it.",
       "unknownEngine": "Unknown engine",
       "versionSelected": "Selected asset version updated",
-      "versionSelectFailed": "Failed to switch version"
+      "versionSelectFailed": "Failed to switch version",
+      "timeCustom": "Custom",
+      "timePlaceholder": "e.g. dawn / dusk after rain",
+      "timeHint": "Time of day goes into the scene prompt",
+      "timeRequired": "Scene time cannot be empty",
+      "refSectionTitle": "Reference images",
+      "refSectionHint": "Guides generation, not the final image; add, remove or pick from the library",
+      "timePeriods": {
+        "dawn": "Dawn",
+        "morning": "Morning",
+        "noon": "Noon",
+        "afternoon": "Afternoon",
+        "dusk": "Dusk",
+        "night": "Night",
+        "lateNight": "Late night"
+      }
     },
     "create": {
       "title": "Add {type}",
@@ -962,7 +979,8 @@
       "targetVersionDefault": "Default",
       "targetVersionDefaultImage": "Default image",
       "targetVersionSelected": "{name} now uses the selected version",
-      "targetVersionReset": "{name} restored to the default version"
+      "targetVersionReset": "{name} restored to the default version",
+      "cardOpenDetail": "Click the card for details and past versions"
     },
     "vid": {
       "shotCount": "{n} shots",
