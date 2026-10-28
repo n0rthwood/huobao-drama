@@ -9,7 +9,8 @@
       </button>
       <div class="head-info">
         <h1 class="page-title">{{ drama.title }}</h1>
-        <span v-if="drama.style" class="tag tag-accent">{{ drama.style }}</span>
+        <span v-if="drama.style" class="tag tag-accent">{{ styleLabel(drama.style) }}</span>
+        <span v-if="drama.aspect_ratio" class="tag mono">{{ drama.aspect_ratio }}</span>
         <div class="page-meta">
           <span class="meta-item">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -25,6 +26,9 @@
           </span>
         </div>
       </div>
+      <button class="btn btn-ghost btn-icon head-action" :title="t('detail.settings.button')" :aria-label="t('detail.settings.button')" @click="openSettings">
+        <Settings2 :size="16" />
+      </button>
       <button class="btn btn-primary head-action" @click="openAddEpisode">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
           <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
@@ -608,6 +612,33 @@
         </div>
       </div>
     </div>
+
+    <div v-if="showSettings" class="overlay" @click.self="showSettings = false">
+      <div class="dialog ep-dialog">
+        <div class="dialog-head">
+          <div class="dialog-title">{{ t('detail.settings.title') }}</div>
+          <button class="btn btn-icon btn-sm btn-ghost ml-auto dialog-close" @click="showSettings = false">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="dialog-body">
+          <label class="field">
+            <span class="field-label">{{ t('detail.settings.style') }}</span>
+            <BaseSelect v-model="settingsForm.style" :options="settingsStyleOptions" :placeholder="t('detail.settings.stylePlaceholder')" searchable />
+            <span v-if="settingsForm.style !== drama.style" class="field-hint settings-warn">{{ t('detail.settings.styleChangeHint') }}</span>
+          </label>
+          <label class="field">
+            <span class="field-label">{{ t('detail.settings.aspectRatio') }}</span>
+            <BaseSelect v-model="settingsForm.aspect_ratio" :options="settingsAspectOptions" :placeholder="t('detail.settings.aspectRatioPlaceholder')" />
+            <span v-if="settingsForm.aspect_ratio !== drama.aspect_ratio" class="field-hint settings-warn">{{ t('detail.settings.aspectChangeHint') }}</span>
+          </label>
+        </div>
+        <div class="dialog-foot">
+          <button class="btn" @click="showSettings = false">{{ t('common.cancel') }}</button>
+          <button class="btn btn-primary" :disabled="settingsSaving || !settingsForm.aspect_ratio" @click="saveSettings">{{ t('detail.settings.save') }}</button>
+        </div>
+      </div>
+    </div>
     <ConfirmDialog
       :open="!!episodeToDelete"
       :title="t('detail.ep.deleteTitle')"
@@ -641,8 +672,9 @@ import { toast } from 'vue-sonner'
 import { toastError } from '~/composables/useToast'
 import { useI18n } from 'vue-i18n'
 import { dramaAPI, episodeAPI, characterAPI, sceneAPI, propAPI, uploadAPI, taskAPI, mediaLibraryAPI } from '~/composables/useApi'
-import { Images } from 'lucide-vue-next'
+import { Images, Settings2 } from 'lucide-vue-next'
 import BaseSelect from '~/components/BaseSelect.vue'
+import { useStylePresets, ASPECT_RATIO_OPTIONS } from '~/composables/useStylePresets'
 import ProgressRing from '~/components/ProgressRing.vue'
 import MediaTime from '~/components/MediaTime.vue'
 import AssetBrowserDialog from '~/components/AssetBrowserDialog.vue'
@@ -727,6 +759,35 @@ async function load() {
     drama.value = await dramaAPI.get(dramaId)
   } catch (e) {
     toastError(e)
+  }
+}
+
+// ===== 项目设置（风格 / 画幅） =====
+const { presets: stylePresets, load: loadStylePresets, label: styleLabel } = useStylePresets()
+const showSettings = ref(false)
+const settingsSaving = ref(false)
+const settingsForm = ref({ style: '', aspect_ratio: '' })
+const settingsStyleOptions = computed(() => stylePresets.value.map(p => ({ label: p.name, value: p.value })))
+// 只有白名单画幅可选；legacy 值（如 adaptive）不在选项内，需选一个合法值才能保存
+const settingsAspectOptions = computed(() => ASPECT_RATIO_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value })))
+
+function openSettings() {
+  const validRatio = ASPECT_RATIO_OPTIONS.some(o => o.value === drama.value.aspect_ratio)
+  settingsForm.value = { style: drama.value.style || '', aspect_ratio: validRatio ? drama.value.aspect_ratio : '' }
+  showSettings.value = true
+}
+
+async function saveSettings() {
+  settingsSaving.value = true
+  try {
+    await dramaAPI.update(dramaId, { style: settingsForm.value.style, aspect_ratio: settingsForm.value.aspect_ratio })
+    await load()
+    toast.success(t('detail.settings.saved'))
+    showSettings.value = false
+  } catch (e) {
+    toastError(e)
+  } finally {
+    settingsSaving.value = false
   }
 }
 
@@ -1126,6 +1187,7 @@ function applyAssetDeeplink() {
 }
 
 onMounted(async () => {
+  loadStylePresets().catch(toastError)
   await load()
   applyAssetDeeplink()
   await loadImageTasks()
@@ -1390,6 +1452,7 @@ onUnmounted(() => {
 .field { display: flex; flex-direction: column; gap: 8px; }
 .field-label { font-size: 12.5px; font-weight: 600; color: var(--text-1); }
 .field-hint { font-size: 12px; color: var(--text-3); }
+.settings-warn { color: var(--warn-text); line-height: 1.6; }
 
 .dialog-foot-copy {
   margin-right: auto;

@@ -169,7 +169,7 @@
               <span v-if="selectedStyleDesc" class="field-hint">{{ selectedStyleDesc }}</span>
             </label>
             <label class="field">
-              <span class="field-label">{{ t('index.createDialog.aspectRatio') }}</span>
+              <span class="field-label">{{ t('index.createDialog.aspectRatio') }} <span class="required">*</span></span>
               <BaseSelect v-model="form.aspect_ratio" :options="aspectRatioOptions" :placeholder="t('index.createDialog.aspectRatioPlaceholder')" />
               <span class="field-hint">{{ t('index.createDialog.aspectRatioHint') }}</span>
             </label>
@@ -202,7 +202,8 @@ import { toast } from 'vue-sonner'
 import { toastError } from '~/composables/useToast'
 import { useI18n } from 'vue-i18n'
 import { Clock, CircleHelp } from 'lucide-vue-next'
-import { dramaAPI, stylePresetAPI } from '~/composables/useApi'
+import { dramaAPI } from '~/composables/useApi'
+import { useStylePresets, ASPECT_RATIO_OPTIONS } from '~/composables/useStylePresets'
 import BaseSelect from '~/components/BaseSelect.vue'
 import { startTour, autoTour } from '~/composables/useTour'
 
@@ -221,17 +222,12 @@ const sortOptions = computed(() => ([
 const activeMenuId = ref(null)
 const dramaToDelete = ref(null)
 const deletingDrama = ref(false)
-const form = ref({ title: '', style: '', aspect_ratio: '16:9' })
-const stylePresets = ref([])
+const form = ref({ title: '', style: '', aspect_ratio: '' })
+const { presets: stylePresets, load: loadStylePresets, label: styleLabel } = useStylePresets()
 const styleSelectOptions = computed(() => stylePresets.value.map(p => ({ label: p.name, value: p.value })))
 const selectedStyleDesc = computed(() => stylePresets.value.find(p => p.value === form.value.style)?.description || '')
-// 常量数组 label 渲染时求值（语言切换即时生效），value 为逻辑值
-const aspectRatioOptions = computed(() => ([
-  { label: t('index.ratio.landscape'), value: '16:9' },
-  { label: t('index.ratio.portrait'), value: '9:16' },
-  { label: t('index.ratio.square'), value: '1:1' },
-  { label: t('index.ratio.adaptive'), value: 'adaptive' },
-]))
+// label 渲染时求值（语言切换即时生效）；画幅不预选，创建时必须明确选择
+const aspectRatioOptions = computed(() => ASPECT_RATIO_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value })))
 const filters = computed(() => ([
   { label: t('index.status.all'), value: 'all' },
   { label: t('index.status.draft'), value: 'draft' },
@@ -263,10 +259,6 @@ async function setDramaStatus(d, status) {
   }
 }
 
-function styleLabel(key) {
-  return stylePresets.value.find(p => p.value === key)?.name || key || ''
-}
-
 // 封面：单色灰阶 + 首字符（状态色只以小圆点出现，封面保持中性）
 function coverInitial(d) {
   return String(d.title || '?').trim().slice(0, 1).toUpperCase() || '?'
@@ -290,9 +282,8 @@ const filteredDramas = computed(() => {
 async function load() {
   loading.value = true
   try {
-    const [res, presets] = await Promise.all([dramaAPI.list(), stylePresetAPI.list()])
+    const [res] = await Promise.all([dramaAPI.list(), loadStylePresets(true)])
     dramas.value = res.items || []
-    stylePresets.value = presets || []
     if (!form.value.style && stylePresets.value.length) {
       form.value.style = stylePresets.value[0].value
     }
@@ -305,6 +296,10 @@ async function load() {
 
 async function create() {
   if (!form.value.title?.trim()) return
+  if (!form.value.aspect_ratio) {
+    toast.error(t('index.createDialog.aspectRatioRequired'))
+    return
+  }
   try {
     const d = await dramaAPI.create(form.value)
     showCreate.value = false

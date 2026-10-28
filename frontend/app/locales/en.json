@@ -313,8 +313,9 @@
     "ratio": {
       "landscape": "16:9 · Landscape",
       "portrait": "9:16 · Portrait",
-      "square": "1:1 · Square",
-      "adaptive": "Adaptive"
+      "landscape43": "4:3 · Landscape",
+      "portrait34": "3:4 · Portrait",
+      "square": "1:1 · Square"
     },
     "status": {
       "all": "All",
@@ -331,7 +332,8 @@
       "stylePlaceholder": "Select a style",
       "aspectRatio": "Aspect ratio",
       "aspectRatioPlaceholder": "Select aspect ratio",
-      "aspectRatioHint": "Fixed after creation; all videos will use this ratio",
+      "aspectRatioHint": "Sets the output ratio for keyframes and videos; can be changed later in Project Settings",
+      "aspectRatioRequired": "Please choose an aspect ratio",
       "submit": "Create project"
     },
     "deleteDialog": {
@@ -351,6 +353,18 @@
       "sceneCount": "{n} scenes",
       "epCount": "{n} episodes",
       "addEpisode": "Add Episode"
+    },
+    "settings": {
+      "button": "Project Settings",
+      "title": "Project Settings",
+      "style": "Visual style",
+      "stylePlaceholder": "Select a style",
+      "aspectRatio": "Aspect ratio",
+      "aspectRatioPlaceholder": "Select aspect ratio",
+      "styleChangeHint": "After changing the style: newly generated image/video prompts use the new style; the final prompts of all characters, scenes and props in this project (including manual edits) will be cleared and rewritten in the new style on the next image generation; existing images/videos are not regenerated automatically.",
+      "aspectChangeHint": "After changing the aspect ratio: new keyframes/videos use the new ratio; existing content is not regenerated automatically, and batch previews will mark affected shots as \"changed\".",
+      "save": "Save",
+      "saved": "Project settings saved"
     },
     "tabs": {
       "episodes": "Episodes",

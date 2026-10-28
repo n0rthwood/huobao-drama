@@ -313,8 +313,9 @@
     "ratio": {
       "landscape": "16:9 · 横屏",
       "portrait": "9:16 · 竖屏",
-      "square": "1:1 · 方形",
-      "adaptive": "自适应"
+      "landscape43": "4:3 · 横屏",
+      "portrait34": "3:4 · 竖屏",
+      "square": "1:1 · 方形"
     },
     "status": {
       "all": "全部",
@@ -331,7 +332,8 @@
       "stylePlaceholder": "选择风格",
       "aspectRatio": "画面比例",
       "aspectRatioPlaceholder": "选择画面比例",
-      "aspectRatioHint": "创建后固定，视频生成将统一使用该比例",
+      "aspectRatioHint": "决定关键帧与视频的出图比例；创建后可在「项目设置」中修改",
+      "aspectRatioRequired": "请选择画面比例",
       "submit": "创建项目"
     },
     "deleteDialog": {
@@ -351,6 +353,18 @@
       "sceneCount": "{n} 场景",
       "epCount": "{n} 集",
       "addEpisode": "添加集"
+    },
+    "settings": {
+      "button": "项目设置",
+      "title": "项目设置",
+      "style": "视觉风格",
+      "stylePlaceholder": "选择风格",
+      "aspectRatio": "画面比例",
+      "aspectRatioPlaceholder": "选择画面比例",
+      "styleChangeHint": "修改风格后：新生成的图片/视频提示词按新风格注入；本项目所有角色/场景/道具的「最终提示词」（含手工修改过的）将被清空，下次生图时按新风格重写；已生成的图片/视频不会自动重做。",
+      "aspectChangeHint": "修改画幅后：新生成的关键帧/视频按新比例出图；已生成内容不会自动重做，批量预览会把受影响镜头标为「已变化」。",
+      "save": "保存",
+      "saved": "项目设置已保存"
     },
     "tabs": {
       "episodes": "剧集列表",
