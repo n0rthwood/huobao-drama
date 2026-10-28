@@ -13,13 +13,6 @@ test('drama creation no longer pre-creates episodes from total_episodes', () => 
   assert.doesNotMatch(dramas, /Create default episodes/)
 })
 
-test('drama creation records a fixed aspect ratio for video generation', () => {
-  const dramas = read('src/routes/dramas.ts')
-
-  assert.match(dramas, /aspectRatio: body\.aspect_ratio \|\| '16:9'/)
-  assert.match(dramas, /if \(body\.aspect_ratio !== undefined\) updates\.aspectRatio = body\.aspect_ratio/)
-})
-
 test('style presets route is mounted and implements CRUD', () => {
   const entry = read('src/index.ts')
   const route = read('src/routes/stylePresets.ts')

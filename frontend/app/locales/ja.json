@@ -313,8 +313,9 @@
     "ratio": {
       "landscape": "16:9 · 横",
       "portrait": "9:16 · 縦",
-      "square": "1:1 · 正方形",
-      "adaptive": "自動"
+      "landscape43": "4:3 · 横",
+      "portrait34": "3:4 · 縦",
+      "square": "1:1 · 正方形"
     },
     "status": {
       "all": "すべて",
@@ -331,7 +332,8 @@
       "stylePlaceholder": "スタイルを選択",
       "aspectRatio": "アスペクト比",
       "aspectRatioPlaceholder": "アスペクト比を選択",
-      "aspectRatioHint": "作成後に固定され、動画生成はこの比率で統一されます",
+      "aspectRatioHint": "キーフレームと動画の出力比率を決めます。作成後も「プロジェクト設定」で変更できます",
+      "aspectRatioRequired": "画面比率を選択してください",
       "submit": "プロジェクトを作成"
     },
     "deleteDialog": {
@@ -351,6 +353,18 @@
       "sceneCount": "{n} シーン",
       "epCount": "{n} 話",
       "addEpisode": "話を追加"
+    },
+    "settings": {
+      "button": "プロジェクト設定",
+      "title": "プロジェクト設定",
+      "style": "ビジュアルスタイル",
+      "stylePlaceholder": "スタイルを選択",
+      "aspectRatio": "アスペクト比",
+      "aspectRatioPlaceholder": "アスペクト比を選択",
+      "styleChangeHint": "スタイル変更後：新しく生成する画像/動画のプロンプトには新しいスタイルが適用されます。このプロジェクトのすべてのキャラクター/シーン/小道具の「最終プロンプト」（手動編集分を含む）はクリアされ、次回の画像生成時に新しいスタイルで書き直されます。生成済みの画像/動画は自動では再生成されません。",
+      "aspectChangeHint": "アスペクト比変更後：新しく生成するキーフレーム/動画は新しい比率で出力されます。生成済みの内容は自動では再生成されず、一括プレビューで影響を受けるショットが「変更あり」と表示されます。",
+      "save": "保存",
+      "saved": "プロジェクト設定を保存しました"
     },
     "tabs": {
       "episodes": "エピソード一覧",

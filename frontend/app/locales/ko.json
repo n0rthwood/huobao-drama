@@ -313,8 +313,9 @@
     "ratio": {
       "landscape": "16:9 · 가로",
       "portrait": "9:16 · 세로",
-      "square": "1:1 · 정사각형",
-      "adaptive": "자동"
+      "landscape43": "4:3 · 가로",
+      "portrait34": "3:4 · 세로",
+      "square": "1:1 · 정사각형"
     },
     "status": {
       "all": "전체",
@@ -331,7 +332,8 @@
       "stylePlaceholder": "스타일 선택",
       "aspectRatio": "화면 비율",
       "aspectRatioPlaceholder": "화면 비율 선택",
-      "aspectRatioHint": "생성 후 고정되며, 영상 생성은 이 비율로 통일됩니다",
+      "aspectRatioHint": "키프레임과 영상의 출력 비율을 결정합니다. 생성 후에도 「프로젝트 설정」에서 변경할 수 있습니다",
+      "aspectRatioRequired": "화면 비율을 선택해 주세요",
       "submit": "프로젝트 생성"
     },
     "deleteDialog": {
@@ -351,6 +353,18 @@
       "sceneCount": "장면 {n}",
       "epCount": "{n}화",
       "addEpisode": "화 추가"
+    },
+    "settings": {
+      "button": "프로젝트 설정",
+      "title": "프로젝트 설정",
+      "style": "비주얼 스타일",
+      "stylePlaceholder": "스타일 선택",
+      "aspectRatio": "화면 비율",
+      "aspectRatioPlaceholder": "화면 비율 선택",
+      "styleChangeHint": "스타일 변경 후: 새로 생성하는 이미지/영상 프롬프트에 새 스타일이 적용됩니다. 이 프로젝트의 모든 캐릭터/장면/소품의 '최종 프롬프트'(수동 수정분 포함)는 삭제되며 다음 이미지 생성 시 새 스타일로 다시 작성됩니다. 이미 생성된 이미지/영상은 자동으로 다시 생성되지 않습니다.",
+      "aspectChangeHint": "화면 비율 변경 후: 새로 생성하는 키프레임/영상은 새 비율로 출력됩니다. 이미 생성된 내용은 자동으로 다시 생성되지 않으며, 일괄 미리보기에서 영향받는 샷이 '변경됨'으로 표시됩니다.",
+      "save": "저장",
+      "saved": "프로젝트 설정이 저장되었습니다"
     },
     "tabs": {
       "episodes": "에피소드 목록",

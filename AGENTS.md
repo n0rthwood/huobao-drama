@@ -199,6 +199,13 @@ Issue 整理完成后、实施前，必须让 **Fabel（Anthropic）或 Astra（
 - 任务状态：`sys_task.status` 为 `queued | processing | completed | failed | cancelled`，活跃判断一律用 `isActiveTaskStatus()`（`services/sys-task.ts`）。所有返回任务的接口用 `serializeTask()` 输出 snake_case + 已解析的 `remote_state`（剥掉内部键 request/config_id/idempotency_key）+ `cancellable`。`POST /tasks/:id/cancel` 取消（非 qwen-jobs 返回 400）；`GET /image-queue/estimate?config_id&size&references&count` 给前端等待估计（整批 = 当前等待 + ⌈张数 / 在线卡数⌉ × 单张，在线卡数 = total − offline）。
 - 速度参考（3060，25 步）：1024² ≈ 90 s，1344×768 三参考图关键帧 ≈ 175 s。模型：azukivc Q6_K GGUF + Comfy-Org int8 convrot 文本编码器 + bf16 VAE（固化在服务端，仓库里不再有工作流模板）。
 
+### 项目设置（风格 / 画幅，Issue #16）
+- 风格 = `dramas.style`（存 `style_presets.value`），由 `services/style-preset.ts getDramaStylePrompt()` 解析成预设英文词，**自动前置**到关键帧、分镜视频、手动视频任务与资产兜底提示词；Agent 保存资产最终提示词时会把风格词**烘焙进** `characters/scenes/props.final_prompt`。剧本改写/拆分分镜不写风格词。
+- 画幅 = `dramas.aspect_ratio`，白名单 `16:9 / 9:16 / 4:3 / 3:4 / 1:1`（`routes/dramas.ts ASPECT_RATIOS`，与 `KEYFRAME_SIZES`、H3 `pickResolution` 一致）。`POST /dramas` 必须带合法画幅（无默认，前端创建对话框不预选，必选）；`PUT /dramas/:id` 画幅不在白名单 → 400，项目不存在 → 404。不再有 `adaptive`（它在 qwen 关键帧与 H3 上静默回落 16:9）；存量 legacy 值只读兼容，不能再写入。
+- 创建后在项目详情页「项目设置」（齿轮按钮）可改风格与画幅；页头显示风格预设名（`composables/useStylePresets.ts` 的 `label()`，模块级预设清单，`ASPECT_RATIO_OPTIONS` 也在这里）与画幅。
+- **改风格（新值 ≠ 原值）时后端清空本项目三类资产的全部 `final_prompt`**（含手工修改过的），下次生图由 `services/final-prompt.ts ensure*FinalPrompt` 按新风格重写；同值保存不清空。已生成的图片/视频不自动重做：关键帧与视频签名都对**含风格词的最终提示词**和尺寸/画幅取哈希，改动后批量预览自动把旧镜头标「已变化」。
+- 角色定妆照固定 1920x1080（`routes/characters.ts CHARACTER_IMAGE_SIZE`），不随项目画幅变化。
+
 ### 全局任务中心
 - `sys_task` 多了 `episode_id`（分镜任务由分镜反查、资产出图取发起时所在集、文本任务必填；启动时 `backfillTaskEpisodeIds()` 按 `storyboard_id` 回填存量行）与 `type='text'`。**文本任务不再存进程内存**：提取（`services/extraction.ts`）、关键帧/视频提示词批量（`keyframe-prompts.ts`/`video-prompts.ts`）、同步 chat 的剧本改写与拆分分镜（`routes/agent.ts`）都在开始时建 `sys_task(type='text')`，`params.kind` ∈ `extract_characters|extract_scenes|extract_props|keyframe_prompts|video_prompts|script_rewrite|storyboard_breaker`，进度写 `params.progress`（`{completed,total,failed,current_storyboard_id}`，**不复用 `remote_state`**，那是 qwen-jobs 追踪器的）。`/extract-status`、`/keyframe-prompts-status`、`/video-prompts-status` 响应结构不变，只是改成从库里读（函数变成 async）。
 - 重启：启动清理对 `type='text'` 的活跃任务一律标 `failed`（`error_msg='后端重启中断'`，`failInterruptedTextTasks()`），不自动重跑；图像/视频规则不变（qwen-jobs 交追踪器、其它 provider 标失败、批次照旧恢复）。

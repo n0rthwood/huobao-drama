@@ -9,6 +9,10 @@ import { AssetLibraryError, importAsset, isAssetKind } from '../services/asset-l
 
 const app = new Hono()
 
+/** 项目画幅白名单：与关键帧 KEYFRAME_SIZES / H3 pickResolution 支持的档位一致 */
+const ASPECT_RATIOS: Record<string, true> = { '16:9': true, '9:16': true, '4:3': true, '3:4': true, '1:1': true }
+const ASPECT_RATIO_MESSAGE = '请选择画面比例（16:9 / 9:16 / 4:3 / 3:4 / 1:1）'
+
 // GET /dramas - List dramas
 app.get('/', async (c) => {
   const page = Number(c.req.query('page') || 1)
@@ -54,13 +58,14 @@ app.get('/', async (c) => {
 // POST /dramas - Create drama
 app.post('/', async (c) => {
   const body = await c.req.json()
+  if (ASPECT_RATIOS[body.aspect_ratio] !== true) return badRequest(c, ASPECT_RATIO_MESSAGE)
   const ts = now()
   const res = await db.insert(schema.dramas).values({
     title: body.title,
     description: body.description,
     genre: body.genre,
     style: body.style,
-    aspectRatio: body.aspect_ratio || '16:9',
+    aspectRatio: body.aspect_ratio,
     tags: body.tags ? JSON.stringify(body.tags) : null,
     metadata: body.metadata,
     status: 'draft',
@@ -127,7 +132,13 @@ app.get('/:id', async (c) => {
 app.put('/:id', async (c) => {
   const id = Number(c.req.param('id'))
   const body = await c.req.json()
-  const updates: Record<string, any> = { updatedAt: now() }
+  const [current] = await db.select().from(schema.dramas).where(eq(schema.dramas.id, id))
+  if (!current) return notFound(c, '项目不存在')
+  if (body.aspect_ratio !== undefined && ASPECT_RATIOS[body.aspect_ratio] !== true) {
+    return badRequest(c, ASPECT_RATIO_MESSAGE)
+  }
+  const ts = now()
+  const updates: Record<string, any> = { updatedAt: ts }
   if (body.title !== undefined) updates.title = body.title
   if (body.description !== undefined) updates.description = body.description
   if (body.genre !== undefined) updates.genre = body.genre
@@ -137,6 +148,13 @@ app.put('/:id', async (c) => {
   if (body.tags !== undefined) updates.tags = JSON.stringify(body.tags)
   if (body.metadata !== undefined) updates.metadata = body.metadata
   await db.update(schema.dramas).set(updates).where(eq(schema.dramas.id, id))
+
+  // 资产的 final_prompt 烘焙了旧风格词：换风格后全部清空，下次生图由 ensure*FinalPrompt 按新风格重写
+  if (body.style !== undefined && body.style !== current.style) {
+    for (const table of [schema.characters, schema.scenes, schema.props]) {
+      await db.update(table).set({ finalPrompt: null, updatedAt: ts }).where(eq(table.dramaId, id))
+    }
+  }
   return success(c)
 })
 
