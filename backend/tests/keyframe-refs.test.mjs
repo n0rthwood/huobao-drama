@@ -1,5 +1,5 @@
 /**
- * 参考图 ↔ 提示词一致性与关键帧签名的行为测试（Issue #7）。
+ * 参考图 ↔ 提示词一致性、生成目标级绑定（Issue #7/#18）与关键帧签名的行为测试。
  * 纯函数在 TS 里，用仓库自带的 tsx 子进程跑并以 JSON 回传；
  * 被测模块会 import db，所以用 SQLITE_PATH 指向临时库，绝不碰开发库。
  */
@@ -16,9 +16,9 @@ const sqlitePath = path.join(mkdtempSync(path.join(tmpdir(), 'kf-refs-')), 'test
 
 function call(fn, args) {
   const script = `
-    import { computeRefIssues, computeBindingSync, parseMentions, limbRiskIssues } from './src/services/storyboard-assets.ts'
+    import { computeRefIssues, computeBindingSync, computeTargetSync, parseMentions, limbRiskIssues, targetAssetRefs, targetAssetsJson } from './src/services/storyboard-assets.ts'
     import { computeKeyframeSignature, signatureFromTask } from './src/services/storyboard-keyframes.ts'
-    const api = { computeRefIssues, computeBindingSync, parseMentions, limbRiskIssues, computeKeyframeSignature, signatureFromTask }
+    const api = { computeRefIssues, computeBindingSync, computeTargetSync, parseMentions, limbRiskIssues, targetAssetRefs, targetAssetsJson, computeKeyframeSignature, signatureFromTask }
     const [fn, args] = JSON.parse(process.env.REFS_INPUT)
     process.stdout.write('@@' + JSON.stringify(api[fn](...args)))
   `
@@ -30,10 +30,23 @@ function call(fn, args) {
   return JSON.parse(out.slice(out.lastIndexOf('@@') + 2))
 }
 
-const asset = (kind, id, name, imageUrl = `/files/${name}.png`) => ({ kind, id, name, imageUrl })
+const asset = (kind, id, name, defaultImage = `/files/${name}.png`) => ({ kind, id, name, defaultImage })
+const bind = (kind, assetId, selectedImage = null) => ({ kind, assetId, selectedImage })
+const bindings = (over = {}) => ({ first: [], mid: [], last: [], video: [], ...over })
 const prompts = (over = {}) => ({
-  first_frame_prompt: '', mid_frame_prompt: '', last_frame_prompt: '', video_prompt: '', ...over,
+  first_frame_prompt: '', mid_frame_prompt: '', last_frame_prompt: '', video_prompt: '', transition_prompt: '', ...over,
 })
+
+// 线上 E3 #2 的本集资产（Issue #18 实证）
+const e3Assets = [
+  asset('scene', 8, '客厅'),
+  asset('character', 5, '猪爸爸'), asset('character', 6, '鼠妈妈'), asset('character', 7, '猴宝宝', '/files/猴宝宝-造型.png'),
+  asset('prop', 14, '落地穿衣镜'), asset('prop', 15, '遥控器'), asset('prop', 16, '巴拿马帽'), asset('prop', 17, '墨镜'),
+]
+const e3Inherited = () => [
+  bind('scene', 8), bind('character', 5), bind('character', 6), bind('character', 7),
+  bind('prop', 14), bind('prop', 15), bind('prop', 16), bind('prop', 17),
+]
 
 test('mentions match the longest asset name first', () => {
   const result = call('parseMentions', ['@小明妈妈 看着 @小明，@路人甲 走开', ['小明', '小明妈妈']])
@@ -41,11 +54,10 @@ test('mentions match the longest asset name first', () => {
   assert.deepEqual(result.unknown, ['路人甲'])
 })
 
-test('all four prompts empty keeps the existing bindings', () => {
+test('asset pool: all prompts empty keeps the existing pool', () => {
   const result = call('computeBindingSync', [{
     prompts: prompts(),
     assets: [asset('character', 1, '小明'), asset('character', 2, '小红')],
-    sceneId: null,
     characterIds: [1, 2],
     propIds: [],
   }])
@@ -54,12 +66,10 @@ test('all four prompts empty keeps the existing bindings', () => {
   assert.deepEqual(result.unbound, [])
 })
 
-test('prompt mentions override explicitly supplied binding ids', () => {
+test('asset pool: prompt mentions override explicitly supplied ids', () => {
   const result = call('computeBindingSync', [{
     prompts: prompts({ first_frame_prompt: '@小红 站在门口' }),
-    // 同一请求显式传入的 character_ids
     assets: [asset('character', 1, '小明'), asset('character', 2, '小红'), asset('prop', 5, '钥匙')],
-    sceneId: null,
     characterIds: [1],
     propIds: [5],
   }])
@@ -69,7 +79,66 @@ test('prompt mentions override explicitly supplied binding ids', () => {
   assert.deepEqual(result.unbound.map(item => item.name), ['小明', '钥匙'])
 })
 
-test('unknown / unbound / missing image mentions block, unmentioned binding only warns', () => {
+test('saving the E3 #2 mid-frame prompt drops the unrelated inherited refs (Issue #18)', () => {
+  const midPrompt = '@客厅，近景：@猴宝宝 扶正 @巴拿马帽 的帽檐，鼻梁上架着 @墨镜'
+  const plans = call('computeTargetSync', [
+    prompts({ mid_frame_prompt: midPrompt, last_frame_prompt: '@落地穿衣镜 映出 @猴宝宝，背景 @猪爸爸 与 @鼠妈妈' }),
+    e3Assets,
+    bindings({ mid: e3Inherited(), last: e3Inherited() }),
+    ['mid'],
+  ])
+  // 只重算写入的目标：尾帧不在计划里
+  assert.deepEqual(plans.map(plan => plan.target), ['mid'])
+  assert.deepEqual(plans[0].add, [])
+  assert.deepEqual(plans[0].remove.map(item => item.name), ['猪爸爸', '鼠妈妈', '落地穿衣镜', '遥控器'])
+
+  const kept = [bind('scene', 8), bind('character', 7), bind('prop', 16), bind('prop', 17)]
+  const refs = call('targetAssetRefs', [e3Assets, kept])
+  assert.deepEqual(refs.map(ref => ref.name), ['客厅', '猴宝宝', '巴拿马帽', '墨镜'])
+  // 未选版的角色默认用本集造型图
+  assert.equal(refs[1].url, '/files/猴宝宝-造型.png')
+})
+
+test('target sync binds new mentions, keeps still-mentioned ones and clears an emptied prompt', () => {
+  const assets = [asset('scene', 7, '客厅'), asset('character', 1, '小明'), asset('character', 2, '小红'), asset('prop', 5, '钥匙')]
+  const plans = call('computeTargetSync', [
+    prompts({ first_frame_prompt: '@客厅 里 @小明 与 @小红', last_frame_prompt: '', video_prompt: '@小明 开门', transition_prompt: '@钥匙 落地' }),
+    assets,
+    bindings({ first: [bind('character', 1, '/files/小明-v2.png')], last: [bind('character', 2)] }),
+    ['first', 'last', 'video'],
+  ])
+  const byTarget = Object.fromEntries(plans.map(plan => [plan.target, plan]))
+  assert.deepEqual(byTarget.first.add.map(item => item.name), ['客厅', '小红'])
+  assert.deepEqual(byTarget.first.remove, [])
+  assert.deepEqual(byTarget.last.remove.map(item => item.name), ['小红'])
+  // 转场段拼进视频提示词一起提交，其 @ 归视频绑定
+  assert.deepEqual(byTarget.video.add.map(item => item.name), ['小明', '钥匙'])
+})
+
+test('selected version wins over the default image and ref order is scene → character → prop', () => {
+  const assets = [asset('scene', 7, '客厅'), asset('character', 1, '小明'), asset('character', 2, '小红'), asset('prop', 5, '钥匙')]
+  const refs = call('targetAssetRefs', [assets, [bind('prop', 5), bind('character', 2), bind('character', 1, '/files/小明-v2.png'), bind('scene', 7)]])
+  assert.deepEqual(refs, [
+    { name: '客厅', url: '/files/客厅.png' },
+    { name: '小明', url: '/files/小明-v2.png' },
+    { name: '小红', url: '/files/小红.png' },
+    { name: '钥匙', url: '/files/钥匙.png' },
+  ])
+})
+
+test('video ref numbers start after the first keyframe; deduped images share a number', () => {
+  const assets = [asset('scene', 7, '客厅'), asset('character', 1, '小明'), asset('character', 2, '小红', '')]
+  const json = call('targetAssetsJson', [assets, bindings({
+    first: [bind('character', 1), bind('scene', 7, '/files/小明.png')],
+    video: [bind('scene', 7), bind('character', 1), bind('character', 2)],
+  })])
+  assert.deepEqual(json.first.map(item => [item.name, item.ref_no]), [['客厅', 1], ['小明', 1]])
+  assert.deepEqual(json.video.map(item => [item.name, item.ref_no]), [['客厅', 2], ['小明', 3], ['小红', null]])
+  assert.equal(json.first[0].selected_image, '/files/小明.png')
+  assert.equal(json.first[0].default_image, '/files/客厅.png')
+})
+
+test('unknown / missing image mentions block; a binding the slot prompt does not mention only warns on that slot', () => {
   const issues = call('computeRefIssues', [{
     prompts: prompts({
       first_frame_prompt: '@小明 与 @小红 对视，@幽灵 飘过',
@@ -81,9 +150,10 @@ test('unknown / unbound / missing image mentions block, unmentioned binding only
       asset('prop', 5, '钥匙'),
       asset('prop', 6, '雨伞'),
     ],
-    sceneId: null,
-    characterIds: [1, 2],
-    propIds: [5, 6],
+    bindings: bindings({
+      first: [bind('character', 1), bind('character', 2), bind('prop', 6)],
+      video: [bind('prop', 5)],
+    }),
   }])
   const byCode = Object.fromEntries(issues.map(issue => [issue.code, issue]))
   assert.equal(byCode.unknown_mention.severity, 'block')
@@ -93,32 +163,36 @@ test('unknown / unbound / missing image mentions block, unmentioned binding only
   assert.deepEqual(byCode.missing_image.fields, ['first_frame_prompt'])
   assert.equal(byCode.unmentioned_binding.severity, 'warn')
   assert.equal(byCode.unmentioned_binding.name, '雨伞')
+  assert.deepEqual(byCode.unmentioned_binding.fields, ['first_frame_prompt'])
   assert.equal(issues.some(issue => issue.code === 'unbound_mention'), false)
 })
 
-test('mentioning a character that is not bound blocks generation', () => {
+test('a mention bound on another slot but not on this one blocks only this slot', () => {
   const issues = call('computeRefIssues', [{
-    prompts: prompts({ last_frame_prompt: '@小明 回头' }),
+    prompts: prompts({ first_frame_prompt: '@小明 回头', last_frame_prompt: '@小明 回头', video_prompt: '@小明 回头' }),
     assets: [asset('character', 1, '小明')],
-    sceneId: null,
-    characterIds: [],
-    propIds: [],
+    bindings: bindings({ first: [bind('character', 1)], video: [bind('character', 1)] }),
   }])
-  // video_prompt 为空另外产生 empty_video_prompt（Issue #15），这里只看 @ 引用问题
-  const mentionIssues = issues.filter(issue => issue.code !== 'empty_video_prompt')
-  assert.equal(mentionIssues.length, 1)
-  assert.equal(mentionIssues[0].code, 'unbound_mention')
-  assert.equal(mentionIssues[0].severity, 'block')
-  assert.deepEqual(mentionIssues[0].fields, ['last_frame_prompt'])
+  assert.equal(issues.length, 1)
+  assert.equal(issues[0].code, 'unbound_mention')
+  assert.equal(issues[0].severity, 'block')
+  assert.deepEqual(issues[0].fields, ['last_frame_prompt'])
+})
+
+test('a keyframe may mention any episode scene, not only the shot pool scene (Issue #18 Q2)', () => {
+  const issues = call('computeRefIssues', [{
+    prompts: prompts({ first_frame_prompt: '@天台 的夜景', video_prompt: '@客厅 里' }),
+    assets: [asset('scene', 7, '客厅'), asset('scene', 8, '天台')],
+    bindings: bindings({ first: [bind('scene', 8)], video: [bind('scene', 7)] }),
+  }])
+  assert.deepEqual(issues, [])
 })
 
 test('empty video_prompt blocks only the video field (Issue #15)', () => {
   const issues = call('computeRefIssues', [{
     prompts: prompts({ first_frame_prompt: '客厅全景' }),
     assets: [],
-    sceneId: null,
-    characterIds: [],
-    propIds: [],
+    bindings: bindings(),
   }])
   const empty = issues.find(issue => issue.code === 'empty_video_prompt')
   assert.equal(empty.severity, 'block')
@@ -129,9 +203,7 @@ test('video_prompt present produces no empty_video_prompt issue (Issue #15)', ()
   const issues = call('computeRefIssues', [{
     prompts: prompts({ video_prompt: '0-3秒：双手扶着桌沿，双腿并拢坐下。' }),
     assets: [],
-    sceneId: null,
-    characterIds: [],
-    propIds: [],
+    bindings: bindings(),
   }])
   assert.equal(issues.some(issue => issue.code === 'empty_video_prompt'), false)
 })
@@ -152,45 +224,19 @@ test('limb lint stays quiet when every risky segment states limb positions (Issu
   assert.deepEqual(issues, [])
 })
 
-test('mentioning another scene is a blocking conflict and never rebinds the scene', () => {
-  const issues = call('computeRefIssues', [{
-    prompts: prompts({ first_frame_prompt: '@天台 的夜景' }),
-    assets: [asset('scene', 7, '客厅'), asset('scene', 8, '天台')],
-    sceneId: 7,
-    characterIds: [],
-    propIds: [],
-  }])
-  const conflict = issues.find(issue => issue.code === 'scene_conflict')
-  assert.equal(conflict.severity, 'block')
-  assert.equal(conflict.asset_id, 8)
-  assert.match(conflict.message, /客厅/)
-
-  const sync = call('computeBindingSync', [{
-    prompts: prompts({ first_frame_prompt: '@天台 的夜景' }),
-    assets: [asset('scene', 7, '客厅'), asset('scene', 8, '天台')],
-    sceneId: 7,
-    characterIds: [],
-    propIds: [],
-  }])
-  assert.deepEqual(sync.characterIds, [])
-  assert.deepEqual(sync.bound, [])
-})
-
-test('refs beyond the 9 image limit warn instead of blocking', () => {
+test('refs beyond the 9 image limit warn per target instead of blocking', () => {
   const characters = Array.from({ length: 10 }, (_, index) => asset('character', index + 1, `角色${index + 1}`))
-  const mention = characters.map(ch => `@${ch.name}`).join(' ')
+  const mention = '@客厅 ' + characters.map(ch => `@${ch.name}`).join(' ')
+  const bound = [bind('scene', 7), ...characters.map(ch => bind('character', ch.id))]
   const issues = call('computeRefIssues', [{
     prompts: prompts({ first_frame_prompt: mention, video_prompt: mention }),
     assets: [asset('scene', 7, '客厅'), ...characters],
-    sceneId: 7,
-    characterIds: characters.map(ch => ch.id),
-    propIds: [],
+    bindings: bindings({ first: bound, video: bound }),
   }])
   const overflow = issues.filter(issue => issue.code === 'over_capacity')
-  // 场景占 1 张 → 第 9、10 个角色超出关键帧上限；视频侧首帧再占 1 张 → 第 8 个角色只在视频提示词里超限
-  assert.deepEqual(overflow.map(issue => issue.name), ['角色8', '角色9', '角色10'])
-  assert.deepEqual(overflow[0].fields, ['video_prompt'])
-  assert.deepEqual(overflow[1].fields, ['first_frame_prompt', 'video_prompt'])
+  // 场景占 1 张 → 关键帧第 9、10 个角色超限；视频侧首帧再占 1 张 → 第 8、9、10 个角色超限
+  assert.deepEqual(overflow.filter(issue => issue.fields[0] === 'first_frame_prompt').map(issue => issue.name), ['角色9', '角色10'])
+  assert.deepEqual(overflow.filter(issue => issue.fields[0] === 'video_prompt').map(issue => issue.name), ['角色8', '角色9', '角色10'])
   assert.equal(overflow.every(issue => issue.severity === 'warn'), true)
 })
 

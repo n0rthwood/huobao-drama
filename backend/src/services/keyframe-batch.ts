@@ -36,6 +36,7 @@ import {
   computeRefIssues,
   describeIssues,
   loadEpisodeAssets,
+  loadTargetBindings,
   promptFieldsOf,
   type RefIssue,
 } from './storyboard-assets.js'
@@ -378,21 +379,12 @@ export async function previewEpisodeKeyframeBatch(
     ? storyboards.filter(sb => opts.storyboardIds!.includes(sb.id))
     : storyboards
 
+  const assets = await loadEpisodeAssets(episodeId)
   const result: KeyframePreviewItem[] = []
   for (const sb of targets) {
     const state = keyframes.get(sb.id)
-    const assets = await loadEpisodeAssets(sb, episodeId)
-    const characterIds = (await db.select().from(schema.storyboardCharacters)
-      .where(eq(schema.storyboardCharacters.storyboardId, sb.id))).map(link => link.characterId)
-    const propIds = (await db.select().from(schema.storyboardProps)
-      .where(eq(schema.storyboardProps.storyboardId, sb.id))).map(link => link.propId)
-    const issues = computeRefIssues({
-      prompts: promptFieldsOf(sb),
-      assets,
-      sceneId: sb.sceneId ?? null,
-      characterIds,
-      propIds,
-    })
+    const bindings = await loadTargetBindings(sb.id)
+    const issues = computeRefIssues({ prompts: promptFieldsOf(sb), assets, bindings })
 
     for (const slot of KEYFRAME_SLOTS) {
       // 中间帧只在 LLM 给了提示词时才存在，不写进清单
@@ -422,7 +414,7 @@ export async function previewEpisodeKeyframeBatch(
       let signature: string
       try {
         signature = (await buildKeyframeRequest(sb.id, slot, {
-          model: opts.model, configId: opts.configId, context, assets, characterIds, propIds,
+          model: opts.model, configId: opts.configId, context, assets, bindings,
         })).signature
       } catch (err) {
         result.push({ ...base, status: 'skipped', checked: false, reason: err instanceof Error ? err.message : '无法组装生成请求' })

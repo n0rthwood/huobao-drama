@@ -143,7 +143,6 @@ export const storyboards = sqliteTable('storyboards', {
   // 人工确认关键帧：视频生成的前提
   keyframesConfirmed: integer('keyframes_confirmed', { mode: 'boolean' }).default(false),
   referenceImages: text('reference_images'),
-  assetVersionSelection: text('asset_version_selection'),
   // 字段级保存时间（JSON：字段 → unix 秒），整行 updated_at 会被生图回写污染
   fieldSavedAt: text('field_saved_at'),
   // LLM 拆分镜时标注的边界：continue=承接上一镜（首帧继承其尾帧关键帧），cut=硬切；NULL=未标注（按硬切处理）
@@ -174,6 +173,21 @@ export const storyboardProps = sqliteTable('storyboard_props', {
 }, (table) => [
   primaryKey({ columns: [table.storyboardId, table.propId] }),
 ])
+
+/**
+ * 生成目标级素材绑定（Issue #18）：每张关键帧（first/mid/last）与视频（video）各自的参考素材。
+ * 绑定 = 该目标提示词里 @ 到的本集场景/角色/道具，提示词写入后自动重算；
+ * selected_image 为该目标上的人工选版，NULL = 默认（本集造型图 > 资产当前图）。
+ */
+export const storyboardTargetAssets = sqliteTable('storyboard_target_assets', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  storyboardId: integer('storyboard_id').notNull(),
+  target: text('target').notNull(),
+  kind: text('kind').notNull(),
+  assetId: integer('asset_id').notNull(),
+  selectedImage: text('selected_image'),
+  createdAt: text('created_at').notNull(),
+})
 
 export const aiServiceConfigs = sqliteTable('ai_service_configs', {
   id: integer('id').primaryKey({ autoIncrement: true }),

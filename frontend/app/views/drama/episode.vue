@@ -604,6 +604,9 @@
             :episode-id="epId"
             :storyboards="sbs"
             :bindable-assets="shotBindableAssets"
+            :target-assets-for="shotTargetAssets"
+            :asset-versions-for="targetAssetVersions"
+            :set-target-version="setTargetAssetVersion"
             :mention-options-for="shotMentionOptions"
             :ref-kinds="REF_KINDS"
             :image-model="bareModelName(imageModel)"
@@ -620,7 +623,6 @@
             @preview="openImageViewer"
             @goto-assets="prodTab = 'assets'"
             @toggle-bind="toggleShotBind"
-            @set-version="setShotAssetVersion"
             @update-field="updateField"
             @field-dirty="markFieldDirty"
           />
@@ -962,24 +964,16 @@
                   <section class="video-inspector-section">
                     <div class="video-inspector-prompt-head">
                       <span class="video-inspector-label">{{ t('episode.inspector.boundRefs') }}</span>
-                      <span class="tag mono">{{ boundRefAssets.length }}</span>
+                      <span class="tag mono">{{ shotVideoRefCount(selectedSb) }}</span>
                     </div>
-                    <div v-if="boundRefAssets.length" class="video-bound-refs">
-                      <button
-                        v-for="asset in boundRefAssets"
-                        :key="asset.key"
-                        type="button"
-                        class="video-bound-ref"
-                        :disabled="!asset.ready"
-                        :title="`${asset.name} · ${asset.typeLabel}`"
-                        @click="asset.ready && openImageViewer(assetImageSrc({ imageUrl: asset.imageUrl }), `${asset.name} ${asset.typeLabel}`)"
-                      >
-                        <img v-if="asset.ready" :src="thumbOf(assetImageSrc({ imageUrl: asset.imageUrl }))" :alt="asset.name" loading="lazy" @error="thumbFallback($event, assetImageSrc({ imageUrl: asset.imageUrl }))" />
-                        <span v-else class="video-bound-ref-empty">{{ asset.kind === 'scene' ? t('episode.ref.shortScene') : asset.kind === 'prop' ? t('episode.ref.shortProp') : t('episode.ref.shortChar') }}</span>
-                        <small>{{ asset.name }}</small>
-                      </button>
-                    </div>
-                    <div v-else class="video-bound-refs-empty">{{ t('episode.inspector.noBoundRefs') }}</div>
+                    <TargetAssetList
+                      :items="videoTargetAssets"
+                      :versions-for="targetAssetVersions"
+                      :lead="videoTargetLead"
+                      :busy="targetVersionSaving"
+                      @preview="openImageViewer"
+                      @select-version="(item, image) => setTargetAssetVersion(selectedSb, 'video', item, image)"
+                    />
                   </section>
                   <section class="video-inspector-section">
                     <div class="video-inspector-prompt-head">
@@ -1683,8 +1677,9 @@ import FieldSaveStatus from '~/components/FieldSaveStatus.vue'
 import RefIssueList from '~/components/RefIssueList.vue'
 import TaskCenterButton from '~/components/TaskCenterButton.vue'
 import MediaTime from '~/components/MediaTime.vue'
+import TargetAssetList from '~/components/TargetAssetList.vue'
 import AssetBrowserDialog from '~/components/AssetBrowserDialog.vue'
-import { mediaTimeLabel, mediaTimeOfPath } from '~/utils/mediaTime'
+import { mediaTimeOfPath } from '~/utils/mediaTime'
 import {
   useNowTicker,
   ringPropsFromTask,
@@ -2390,7 +2385,7 @@ function videoTaskActionLabel(sb) {
 
 const allVideoTaskRows = computed(() => sbs.value.map((sb, index) => {
   const duration = Number(sb.duration || 5)
-  const referenceCount = getShotReferenceImages(sb).length
+  const referenceCount = shotVideoRefCount(sb)
   const sceneName = getSceneName(sb)
   return {
     id: sb.id,
@@ -2532,9 +2527,6 @@ const selectedVideoConfig = computed(() => {
     .filter(config => config.is_active)
     .sort((a, b) => (b.priority || 0) - (a.priority || 0))[0]
 })
-// 参考图上限固定为 9 张，绑定素材收集与 @名字映射统一读取
-const refImageLimit = 9
-
 // 本次生成的生效配置（模型/分辨率/时长），用于右侧小结与批量确认弹窗
 const effectiveVideoModelLabel = computed(() => {
   const explicit = bareModelName(videoModel.value)
@@ -3041,6 +3033,8 @@ function applyStoryboardUpdate(sb, res, before, field) {
   if ('scene_id' in res) assign('scene_id', res.scene_id ?? null)
   // 手动保存转场描述后后端会把 edited_manually 置 true，这里同步回本地（#11）
   if ('transition_review' in res) assign('transition_review', res.transition_review ?? null)
+  // 目标级参考图（#18）：提示词保存 / 目标选版后后端返回最新装配结果
+  if (res.target_assets && typeof res.target_assets === 'object') assign('target_assets', res.target_assets)
   if (Array.isArray(res.ref_issues)) {
     assign('ref_issues', res.ref_issues)
     toastNewRefIssues(before || [], res.ref_issues)
@@ -3570,61 +3564,69 @@ async function removeHistoryVideo(t) {
 }
 
 
-function storyboardAssetVersionSelection(sb) {
-  const raw = sb?.asset_version_selection ?? sb?.assetVersionSelection
-  if (!raw) return {}
-  if (typeof raw === 'object' && !Array.isArray(raw)) return raw
-  try {
-    const parsed = JSON.parse(raw)
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
-  } catch {
-    return {}
-  }
+// ===== 目标级参考图（后端 target_assets）：首/中/尾关键帧与视频各自由该目标提示词的 @ 自动绑定 =====
+function storyboardTargetAssets(sb) {
+  const raw = sb?.target_assets ?? sb?.targetAssets
+  return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {}
 }
 
-function selectedAssetImage(sb, kind, item) {
-  const key = `${kind}:${item?.id}`
-  return storyboardAssetVersionSelection(sb)[key] || item?.image_url || item?.imageUrl || ''
+/** (sb, target) => 该目标实际发送的参考图列表（后端已按 场景→角色→道具 排好序） */
+function shotTargetAssets(sb, target) {
+  const list = storyboardTargetAssets(sb)[target]
+  return Array.isArray(list) ? list : []
 }
 
-function versionLabel(version) {
-  const engine = version?.provider || t('episode.asset.unknownEngine')
-  const model = version?.model ? ` · ${version.model}` : ''
-  const time = mediaTimeLabel(version?.generated_at ?? version?.generatedAt, t, now.value)
-  return `${engine}${model}${time ? ` · ${time}` : ''}`
+function findAssetOfKind(kind, id) {
+  const assetId = Number(id)
+  if (!assetId) return null
+  if (kind === 'scene') return scenes.value.find(s => s.id === assetId) || null
+  if (kind === 'prop') return propItems.value.find(p => p.id === assetId) || null
+  return visualChars.value.find(c => c.id === assetId) || null
 }
 
-async function setShotAssetVersion(sb, asset, url) {
-  if (!sb || !asset?.id || !url) return
-  const selection = { ...storyboardAssetVersionSelection(sb), [`${asset.kind}:${asset.id}`]: url }
-  sb.asset_version_selection = selection
-  sb.assetVersionSelection = selection
+/** 目标参考图的候选版本 = 该资产的图片版本列表 */
+function targetAssetVersions(item) {
+  const asset = findAssetOfKind(item?.kind, item?.asset_id)
+  return asset ? assetVersions(asset) : []
+}
+
+/** 目标级选版（image 为 null 恢复默认）；返回体带该分镜最新 target_assets 与 ref_issues */
+const targetVersionSaving = ref(false)
+async function setTargetAssetVersion(sb, target, item, image) {
+  if (!sb?.id || !item?.kind || !item?.asset_id || targetVersionSaving.value) return
   const before = refIssuesOf(sb)
+  targetVersionSaving.value = true
   try {
-    const res = await storyboardAPI.update(sb.id, { asset_version_selection: selection })
+    const res = await storyboardAPI.setTargetAsset(sb.id, target, {
+      kind: item.kind,
+      asset_id: item.asset_id,
+      image: image || null,
+    })
     applyStoryboardUpdate(sb, res, before)
-    toast.success(t('episode.ref.versionSelected', { name: asset.name }))
+    toast.success(image
+      ? t('episode.ref.targetVersionSelected', { name: item.name })
+      : t('episode.ref.targetVersionReset', { name: item.name }))
   } catch (e) {
     toastError(e)
     await refresh()
+  } finally {
+    targetVersionSaving.value = false
   }
 }
 
-function getShotReferenceImages(sb) {
-  const refs = []
-  const pushRef = (value) => {
-    if (!value || refs.includes(value) || refs.length >= refImageLimit) return
-    refs.push(value)
+// 视频目标：首帧关键帧固定占 1 号位，其余参考图由视频 / 转场提示词的 @ 决定
+const videoTargetAssets = computed(() => shotTargetAssets(selectedSb.value, 'video'))
+const videoTargetLead = computed(() => {
+  const image = shotKeyframeImage(selectedSb.value, 'first')
+  return image ? { image, label: t('episode.kf.slotFirst') } : null
+})
+function shotVideoRefCount(sb) {
+  let max = shotKeyframeImage(sb, 'first') ? 1 : 0
+  for (const item of shotTargetAssets(sb, 'video')) {
+    const no = Number(item?.ref_no)
+    if (Number.isFinite(no) && no > max) max = no
   }
-  const scene = getStoryboardScene(sb)
-  pushRef(selectedAssetImage(sb, 'scene', scene))
-  for (const char of getStoryboardCharacters(sb)) {
-    pushRef(selectedAssetImage(sb, 'character', char))
-  }
-  for (const prop of getStoryboardProps(sb)) {
-    pushRef(selectedAssetImage(sb, 'prop', prop))
-  }
-  return refs
+  return max
 }
 
 // 右侧参考素材面板：本集全部可绑定素材（场景单选、角色/道具多选），bound 标记是否已绑定
@@ -3632,8 +3634,7 @@ function getShotReferenceImages(sb) {
 function shotBindableAssets(sb) {
   const out = []
   for (const char of visualChars.value) {
-    const versions = assetVersions(char)
-    const imageUrl = selectedAssetImage(sb, 'character', char)
+    const imageUrl = char.image_url || char.imageUrl || ''
     out.push({
       key: `character-${char.id}`,
       id: char.id,
@@ -3642,14 +3643,12 @@ function shotBindableAssets(sb) {
       name: char.name || t('episode.asset.unnamedChar'),
       meta: char.role || t('episode.asset.charPortrait'),
       imageUrl,
-      versions,
       ready: !!imageUrl,
       bound: getStoryboardCharacterIds(sb).includes(char.id),
     })
   }
   for (const scene of scenes.value) {
-    const versions = assetVersions(scene)
-    const imageUrl = selectedAssetImage(sb, 'scene', scene)
+    const imageUrl = scene.image_url || scene.imageUrl || ''
     out.push({
       key: `scene-${scene.id}`,
       id: scene.id,
@@ -3658,14 +3657,12 @@ function shotBindableAssets(sb) {
       name: `${scene.location} · ${scene.time || t('episode.asset.noTime')}`,
       meta: scene.time || t('episode.asset.sceneImage'),
       imageUrl,
-      versions,
       ready: !!imageUrl,
       bound: (sb?.scene_id || sb?.sceneId) === scene.id,
     })
   }
   for (const prop of propItems.value) {
-    const versions = assetVersions(prop)
-    const imageUrl = selectedAssetImage(sb, 'prop', prop)
+    const imageUrl = prop.image_url || prop.imageUrl || ''
     out.push({
       key: `prop-${prop.id}`,
       id: prop.id,
@@ -3674,7 +3671,6 @@ function shotBindableAssets(sb) {
       name: prop.name || t('episode.asset.unnamedProp'),
       meta: prop.type || t('episode.asset.propSingleImage'),
       imageUrl,
-      versions,
       ready: !!imageUrl,
       bound: getStoryboardPropIds(sb).includes(prop.id),
     })
@@ -3683,14 +3679,6 @@ function shotBindableAssets(sb) {
   return out
 }
 
-// 右侧参考素材面板渲染用：当前分镜可绑定的全部素材
-const refBindableAssets = computed(() => {
-  const sb = selectedSb.value
-  return sb ? shotBindableAssets(sb) : []
-})
-
-// 右栏「绑定参考图」：当前分镜已绑定素材（生成时作为参考图提交），按分组顺序平铺展示
-const boundRefAssets = computed(() => refBindableAssets.value.filter(a => a.bound))
 
 // 参考面板分组顺序（kind code 驱动，label 渲染时求值）
 const REF_KINDS = computed(() => ([
@@ -3713,32 +3701,32 @@ function toggleShotBind(sb, asset) {
   toggleStoryboardProp(sb, asset.id)
 }
 
-// 视频提示词 @ 引用候选：仅当前分镜已绑定的角色与道具（按名字引用）、场景（按地点引用），展示顺序：角色 → 场景 → 道具
+// 提示词 @ 引用候选：场景取本集全部场景（关键帧级场景由 @ 决定，不限于本镜池），
+// 角色 / 道具仍来自本镜资产池。展示顺序：角色 → 场景 → 道具
 // kind 为逻辑值（MentionTextarea 按 kind 着色/选图标），group 为显示文案
 function shotMentionOptions(sb) {
   if (!sb) return []
-  const scene = getStoryboardScene(sb)
   return [
     ...getStoryboardCharacters(sb).map(c => ({
       label: c.name,
       value: c.name,
       kind: 'character',
       group: t('common.role'),
-      image: thumbOf(assetImageSrc({ imageUrl: selectedAssetImage(sb, 'character', c) })),
+      image: thumbOf(assetImageSrc(c)),
     })),
-    ...(scene ? [{
+    ...scenes.value.map(scene => ({
       label: `${scene.location} · ${scene.time || t('episode.asset.noTime')}`,
       value: scene.location,
       kind: 'scene',
       group: t('common.scene'),
-      image: thumbOf(assetImageSrc({ imageUrl: selectedAssetImage(sb, 'scene', scene) })),
-    }] : []),
+      image: thumbOf(assetImageSrc(scene)),
+    })),
     ...getStoryboardProps(sb).map(p => ({
       label: p.name,
       value: p.name,
       kind: 'prop',
       group: t('common.prop'),
-      image: thumbOf(assetImageSrc({ imageUrl: selectedAssetImage(sb, 'prop', p) })),
+      image: thumbOf(assetImageSrc(p)),
     })),
   ]
 }
@@ -5887,40 +5875,6 @@ button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
 .video-inspector-params dt { color: var(--text-3); }
 .video-inspector-params dd { margin: 0; color: var(--text-1); text-align: right; }
 .video-inspector-action { width: 100%; min-height: 32px; height: 32px; padding: 0 12px; font-size: 12.5px; }
-/* 绑定参考图：当前分镜已绑定素材的图片平铺（生成时作为参考图提交） */
-.video-bound-refs { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 8px; }
-.video-bound-ref {
-  position: relative;
-  aspect-ratio: 1;
-  overflow: hidden;
-  padding: 0;
-  border: 1px solid var(--surface-outline);
-  border-radius: var(--radius);
-  background: var(--bg-2);
-  color: var(--text-3);
-  cursor: pointer;
-  transition: border-color 0.15s var(--ease-out);
-}
-.video-bound-ref:hover { border-color: var(--accent); }
-.video-bound-ref:disabled { cursor: default; }
-.video-bound-ref:disabled:hover { border-color: var(--surface-outline); }
-.video-bound-ref img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.video-bound-ref small {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  padding: 2px 5px;
-  background: rgba(0,0,0,0.58);
-  color: #fff;
-  font-size: 9.5px;
-  text-align: left;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.video-bound-ref-empty { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 11px; }
-.video-bound-refs-empty { padding: 10px; border: 1px dashed var(--surface-outline); border-radius: var(--radius); color: var(--text-3); font-size: 11px; line-height: 1.5; }
 .video-param-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12px; white-space: nowrap; }
 .video-param-name { color: var(--text-1); font-weight: 600; flex-shrink: 0; }
 .video-param-value { color: var(--text-1); text-align: right; font-size: 11px; }

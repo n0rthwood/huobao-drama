@@ -45,7 +45,7 @@ configs/   — 遗留死配置，代码零引用
 - **AI Agents**: Mastra，4 个 agent（script_rewriter / extractor / storyboard_breaker / prompt_generator），instructions 从 `workspace/prompts/*.md` + skills 动态拼接，模型按请求解析；fetch 补丁链适配国内中转站（关思考/温度/max_tokens）
 - **媒体生成与版本**: `services/generation.ts` 统一任务生命周期；`sys_task` 同时作为角色/场景/道具图片与分镜视频的版本历史，记录 provider/model/prompt/本地结果。手工上传通过 `POST /tasks/register-upload` 写入 completed 图片任务。业务表的 `image_url` / `video_url` 表示当前采用版本
 - **生成适配器**: 图片 openai/gemini/volcengine/qwen-jobs（qwen-jobs 是 110 的服务端排队任务 API，由 `services/qwen-jobs.ts` 追踪器驱动，不是 adapter），视频 volcengine/minimax/comfyui；工作台可按 provider/model 切换引擎
-- **分镜素材锁定**: `storyboards.asset_version_selection` 保存 `character:<id>` / `scene:<id>` / `prop:<id>` 到具体版本 URL 的映射；生成视频时优先使用该分镜锁定版本，不受素材全局当前版本后续切换影响
+- **素材绑定与版本锁定**: 每张关键帧（first/mid/last）与视频各自一份绑定（`storyboard_target_assets`），= 该目标提示词 @ 到的场景/角色/道具，提示词写入时自动重算；`selected_image` 把该目标上的资产锁定到具体版本 URL，不受素材全局当前版本后续切换影响。分镜级 `scene_id` + `storyboard_characters/props` 只是 @ 候选资产池，不参与发图
 - **镜头连续性**: `storyboards.continuity_mode = previous_tail` 时，视频提交前从立即上一镜的当前采用视频提取尾帧并作为首帧，同时清空普通参考图以进入首帧/首尾帧工作流；第一镜和上一镜无采用视频时拒绝启用。批量视频按镜号串行，保证依赖顺序
 - **视频拼接**: `services/ffmpeg-merge.ts` 按镜号读取每个分镜的 `video_url` 当前采用版本后拼接；FFmpeg 二进制内置（ffmpeg-static），可用 `FFMPEG_BIN`/`FFPROBE_BIN` 覆盖
 

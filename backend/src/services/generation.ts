@@ -14,7 +14,6 @@ import type { AIConfig, ImageGenerationRecord, VideoGenerationRecord } from './a
 import { logTaskError, logTaskPayload, logTaskProgress, logTaskStart, logTaskSuccess, logTaskWarn, redactUrl } from '../utils/task-logger.js'
 import { FRAME_TYPE_SLOT, invalidateKeyframeConfirmation } from './keyframes.js'
 import { completionStamp } from './media-time.js'
-import { autofillCostumeSelection } from './storyboard-assets.js'
 import { saveStylingVersion } from './styling-version.js'
 import {
   cancelQwenJob,
@@ -707,18 +706,9 @@ async function writeBackImageAssets(record: SysTaskRecord, localPath: string) {
     const version = params.characterVersion as { episodeId?: number; name?: string } | undefined
     if (version?.episodeId && version.name) {
       const saved = await saveStylingVersion(Number(version.episodeId), record.characterId, { name: version.name, image_path: localPath })
+      // 造型图是关键帧/视频绑定里角色的默认图（读时解析，Issue #18），无需回写选版
       if (saved) {
         logTaskSuccess('ImageTask', 'styling-version-image', { id: record.id, characterId: record.characterId, episodeId: version.episodeId, name: version.name })
-        // 造型图是出图完成后才有的：把本集已存在、且绑定了该角色的分镜补上自动选版（人工已选不覆盖）
-        const sbs = await db.select().from(schema.storyboards)
-          .where(eq(schema.storyboards.episodeId, Number(version.episodeId)))
-        for (const sb of sbs) {
-          if (sb.deletedAt) continue
-          const bound = await db.select().from(schema.storyboardCharacters)
-            .where(and(eq(schema.storyboardCharacters.storyboardId, sb.id), eq(schema.storyboardCharacters.characterId, record.characterId)))
-          if (!bound.length) continue
-          await autofillCostumeSelection(sb.id, [record.characterId])
-        }
       }
       // 关联行被删（角色已从本集移除）：图片仍在任务历史里，但无处落版本
       else logTaskWarn('ImageTask', 'styling-version-link-missing', { id: record.id, characterId: record.characterId, episodeId: version.episodeId })

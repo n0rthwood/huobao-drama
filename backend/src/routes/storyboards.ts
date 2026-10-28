@@ -10,6 +10,11 @@ import {
   PROMPT_FIELDS,
   SLOT_PROMPT_FIELD,
   checkStoryboardRefs,
+  deleteTargetBindings,
+  isBindingTarget,
+  loadEpisodeAssets,
+  loadStoryboardTargetAssets,
+  setTargetAssetImage,
   syncStoryboardBindingsFromPrompts,
 } from '../services/storyboard-assets.js'
 import { parseFieldSavedAt, stampFieldSavedAt } from '../services/storyboard-fields.js'
@@ -35,21 +40,6 @@ import { findActiveBatchForStoryboard } from '../services/video-batch.js'
 import { findActiveKeyframeBatchForStoryboard } from '../services/keyframe-batch.js'
 
 const app = new Hono()
-function normalizeAssetVersionSelection(value: unknown): string | null {
-  if (value == null || value === '') return null
-  const input = typeof value === 'string' ? JSON.parse(value) : value
-  if (!input || typeof input !== 'object' || Array.isArray(input)) {
-    throw new Error('asset_version_selection 必须是对象')
-  }
-  const normalized: Record<string, string> = {}
-  for (const [key, path] of Object.entries(input)) {
-    if (!/^(character|scene|prop):\d+$/.test(key) || typeof path !== 'string' || !path.trim()) {
-      throw new Error('asset_version_selection 包含无效的资产键或版本地址')
-    }
-    normalized[key] = path.trim()
-  }
-  return Object.keys(normalized).length ? JSON.stringify(normalized) : null
-}
 
 async function syncStoryboardCharacters(storyboardId: number, characterIds: number[]) {
   await db.delete(schema.storyboardCharacters)
@@ -193,13 +183,6 @@ app.put('/:id', async (c) => {
   }
   // 「发送转场描述」开关
   if ('transition_enabled' in body) updates.transitionEnabled = body.transition_enabled === true
-  if ('asset_version_selection' in body) {
-    try {
-      updates.assetVersionSelection = normalizeAssetVersionSelection(body.asset_version_selection)
-    } catch (err) {
-      return badRequest(c, (err as Error).message)
-    }
-  }
   // 承接边界由拆分镜 LLM 标注；NULL 表示未标注（按硬切处理）
   if ('continuity_boundary' in body && body.continuity_boundary != null
     && !['continue', 'cut'].includes(body.continuity_boundary)) {
@@ -232,16 +215,18 @@ app.put('/:id', async (c) => {
   // 用户手动保存转场描述：标记 edited_manually，之后不再被自动审核覆盖（#11）
   if ('transition_prompt' in body) await markTransitionEditedManually(storyboard)
 
-  // 提示词被写入时绑定完全跟随 @引用（同一请求里显式传入的 ids 以提示词为准被覆盖）；
-  // 纯绑定编辑（没写提示词）保持用户的选择不动
+  // 提示词被写入时：资产池跟随 @ 并集（同一请求里显式传入的 ids 以提示词为准被覆盖），
+  // 写入的关键帧/视频目标按各自提示词的 @ 重算绑定；纯资产池编辑（没写提示词）保持用户的选择不动
   const wrotePrompt = PROMPT_FIELDS.some(field => field in body)
   const sync = wrotePrompt
-    ? await syncStoryboardBindingsFromPrompts(id)
+    ? await syncStoryboardBindingsFromPrompts(id, Object.keys(body))
     : null
   const characterIds = sync?.characterIds ?? await getStoryboardCharacterIds(id)
   const propIds = sync?.propIds ?? await getStoryboardPropIds(id)
   const [updated] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, id))
-  const refIssues = sync?.issues ?? await checkStoryboardRefs(updated!)
+  const assets = sync ? null : await loadEpisodeAssets(updated!.episodeId)
+  const refIssues = sync?.issues ?? await checkStoryboardRefs(updated!, assets!)
+  const targetAssets = sync?.targetAssets ?? await loadStoryboardTargetAssets(updated!, assets!)
 
   logTaskSuccess('StoryboardAPI', 'update', {
     storyboardId: id,
@@ -258,10 +243,39 @@ app.put('/:id', async (c) => {
     scene_id: updated?.sceneId ?? null,
     transition_review: parseTransitionReview(updated?.transitionReview),
     ref_issues: refIssues,
+    target_assets: targetAssets,
     ref_sync: {
       bound: sync?.sync.bound ?? [],
       unbound: sync?.sync.unbound ?? [],
     },
+  })
+})
+
+// PUT /storyboards/:id/target-assets/:target — 给某张关键帧 / 视频上已绑定的资产选版（image=null 恢复默认）
+app.put('/:id/target-assets/:target', async (c) => {
+  const id = Number(c.req.param('id'))
+  const target = c.req.param('target')
+  if (!isBindingTarget(target)) return badRequest(c, 'target 只支持 first / mid / last / video')
+  const body = await c.req.json().catch(() => ({} as Record<string, any>))
+  const kind = body.kind
+  const assetId = Number(body.asset_id)
+  if (!['scene', 'character', 'prop'].includes(kind) || !Number.isInteger(assetId) || assetId <= 0) {
+    return badRequest(c, 'kind 只支持 scene / character / prop，asset_id 必须是正整数')
+  }
+  const image = body.image == null || body.image === '' ? null : typeof body.image === 'string' ? body.image.trim() : undefined
+  if (image === undefined || image === '') return badRequest(c, 'image 必须是图片地址或 null（恢复默认）')
+  const [storyboard] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, id))
+  if (!storyboard || storyboard.deletedAt) return badRequest(c, '镜头不存在')
+  try {
+    await setTargetAssetImage(id, target, kind, assetId, image)
+  } catch (err) {
+    return badRequest(c, (err as Error).message)
+  }
+  logTaskSuccess('StoryboardAPI', 'set-target-asset', { storyboardId: id, target, kind, assetId, image: image ?? 'default' })
+  const assets = await loadEpisodeAssets(storyboard.episodeId)
+  return success(c, {
+    target_assets: await loadStoryboardTargetAssets(storyboard, assets),
+    ref_issues: await checkStoryboardRefs(storyboard, assets),
   })
 })
 
@@ -271,15 +285,9 @@ app.put('/:id', async (c) => {
 async function storyboardJson(id: number) {
   const [row] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, id))
   if (!row) return null
-  let assetVersionSelection: Record<string, string> = {}
-  try {
-    assetVersionSelection = row.assetVersionSelection ? JSON.parse(row.assetVersionSelection) : {}
-  } catch {
-    assetVersionSelection = {}
-  }
   return {
     ...toSnakeCase(row),
-    asset_version_selection: assetVersionSelection,
+    target_assets: await loadStoryboardTargetAssets(row),
     field_saved_at: parseFieldSavedAt(row.fieldSavedAt),
     transition_review: parseTransitionReview(row.transitionReview),
     transition_stale: await (async () => {
@@ -322,8 +330,8 @@ app.post('/:id/keyframes/:slot/generate', async (c) => {
       await db.update(schema.storyboards)
         .set({ ...promptPatch, fieldSavedAt: stamp.json ?? row.fieldSavedAt, updatedAt: now() })
         .where(eq(schema.storyboards.id, id))
-      // 提示词写入 → 绑定跟随 @引用（与 PUT /storyboards/:id 同口径）
-      await syncStoryboardBindingsFromPrompts(id)
+      // 提示词写入 → 资产池与该槽位绑定跟随 @引用（与 PUT /storyboards/:id 同口径）
+      await syncStoryboardBindingsFromPrompts(id, [field])
     }
     const taskId = await submitStoryboardKeyframe(id, slot, { model: body.model, configId: body.config_id })
     const [record] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, taskId))
@@ -459,6 +467,7 @@ app.delete('/:id', async (c) => {
   const next = nextRows[0]
   await db.delete(schema.storyboardCharacters).where(eq(schema.storyboardCharacters.storyboardId, id))
   await db.delete(schema.storyboardProps).where(eq(schema.storyboardProps.storyboardId, id))
+  await deleteTargetBindings({ storyboardId: id })
   await db.delete(schema.storyboards).where(eq(schema.storyboards.id, id))
   if (next && !slotOwnImage(next, 'first') && next.continuityBoundary === 'continue') {
     await invalidateKeyframeConfirmation(next.id)

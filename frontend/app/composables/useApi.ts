@@ -168,6 +168,12 @@ export const storyboardAPI = {
   selectKeyframe: (id: number, slot: 'first' | 'mid' | 'last', data: { image?: string; inherit?: boolean }) =>
     api.put(`/storyboards/${id}/keyframes/${slot}`, data),
   confirmKeyframes: (id: number, confirmed: boolean) => api.post(`/storyboards/${id}/confirm-keyframes`, { confirmed }),
+  // 目标级（首/中/尾关键帧、视频）参考图选版：image 为 null 表示恢复默认
+  setTargetAsset: (
+    id: number,
+    target: 'first' | 'mid' | 'last' | 'video',
+    data: { kind: 'scene' | 'character' | 'prop'; asset_id: number; image: string | null },
+  ) => api.put(`/storyboards/${id}/target-assets/${target}`, data),
 }
 
 /**

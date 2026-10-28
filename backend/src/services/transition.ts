@@ -207,7 +207,7 @@ export async function buildTransitionContext(storyboardId: number): Promise<Reco
   if (!pair) throw new Error('该镜头不是承接镜头（没有继承上一镜尾帧），无需转场')
   const { current, previous } = pair
   const [episode] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, pair.episodeId))
-  const assets = await loadEpisodeAssets(current, pair.episodeId)
+  const assets = await loadEpisodeAssets(pair.episodeId)
   const boundCharacterIds = (await db.select().from(schema.storyboardCharacters)
     .where(eq(schema.storyboardCharacters.storyboardId, current.id))).map(link => link.characterId)
   const boundPropIds = (await db.select().from(schema.storyboardProps)

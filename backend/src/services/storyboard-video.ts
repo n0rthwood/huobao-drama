@@ -2,8 +2,9 @@
  * 分镜视频请求组装 — 单镜生成与服务端批量共用的唯一实现
  *
  * 画面由关键帧驱动：生效首帧既作为 <Picture 1> 参考图、又作为第 0 帧引导（实测能消除开头“瞬移”），
- * 中间帧/尾帧只作引导帧。参考图顺序 = 首帧关键帧 → 场景 → 角色 → 道具（去重、最多 9 张），
- * 因此素材在提示词里的编号从 2 起。关键帧未经人工确认的分镜拒绝生成。
+ * 中间帧/尾帧只作引导帧。参考图顺序 = 首帧关键帧 → 视频绑定素材（视频提示词 + 转场段 @ 到的
+ * 场景 → 角色 → 道具，Issue #18；去重、最多 9 张），因此素材在提示词里的编号从 2 起。
+ * 关键帧未经人工确认的分镜拒绝生成。
  */
 import { and, eq, isNull } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
@@ -14,13 +15,14 @@ import { getDramaStylePrompt } from './style-preset.js'
 import { loadEpisodeKeyframes } from './keyframes.js'
 import {
   blockingIssuesFor,
-  collectStoryboardAssetRefs,
   computeRefIssues,
   describeIssues,
   indexRefs,
   loadEpisodeAssets,
+  loadTargetBindings,
   promptFieldsOf,
   resolvePromptRefs,
+  targetAssetRefs,
 } from './storyboard-assets.js'
 import { createHash } from 'node:crypto'
 import { refBasename } from './storyboard-keyframes.js'
@@ -187,17 +189,11 @@ export async function buildStoryboardVideoRequest(
     }
   }
 
-  // 视频提示词的 @引用 必须与绑定一致（Issue #7），否则会出现“提到了却没带参考图”；
-  // 带转场提交时，转场段里的 @引用 同样参与检查
-  const refIssues = computeRefIssues({
-    prompts: promptFieldsOf(sb),
-    assets: await loadEpisodeAssets(sb, episode.id),
-    sceneId: sb.sceneId ?? null,
-    characterIds: (await db.select().from(schema.storyboardCharacters)
-      .where(eq(schema.storyboardCharacters.storyboardId, storyboardId))).map(link => link.characterId),
-    propIds: (await db.select().from(schema.storyboardProps)
-      .where(eq(schema.storyboardProps.storyboardId, storyboardId))).map(link => link.propId),
-  })
+  // 视频提示词的 @引用 必须与视频绑定一致（Issue #7/#18），否则会出现“提到了却没带参考图”；
+  // 带转场提交时，转场段里的 @引用 同样参与检查（转场写入时已同步到视频绑定）
+  const assets = await loadEpisodeAssets(episode.id)
+  const bindings = await loadTargetBindings(storyboardId)
+  const refIssues = computeRefIssues({ prompts: promptFieldsOf(sb), assets, bindings })
   const blocking = [
     ...blockingIssuesFor(refIssues, 'video_prompt'),
     ...(transition ? blockingIssuesFor(refIssues, 'transition_prompt') : []),
@@ -206,12 +202,11 @@ export async function buildStoryboardVideoRequest(
     throw new Error(`分镜 #${sb.storyboardNumber} 的视频提示词与参考图不一致：${describeIssues(blocking)}`)
   }
 
-  // ===== 参考图：首帧关键帧 → 场景 → 角色 → 道具 =====
-  const assetRefs = await collectStoryboardAssetRefs(sb, episode.id)
+  // ===== 参考图：首帧关键帧 → 视频绑定的场景 → 角色 → 道具 =====
   const { urls: referenceImageUrls, nameToIndex } = indexRefs([
     // 关键帧没有名字，不参与 @名字 编号，但占用 1 号位
     { name: '', url: keyframes.first! },
-    ...assetRefs,
+    ...targetAssetRefs(assets, bindings.video),
   ])
 
   const videoPrompt = (sb.videoPrompt || '').trim()

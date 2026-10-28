@@ -83,8 +83,8 @@ const updateStoryboard = createTool({
         transitionPrompt: input.verdict === 'none' ? '' : input.transition_prompt.trim(),
         reason: input.reason || '',
       })
-      // 转场里的 @名字 同样参与绑定与 #7 一致性检查
-      await syncStoryboardBindingsFromPrompts(storyboardId)
+      // 转场段拼在视频提示词前一起提交：其中的 @名字 归视频绑定，同样参与 #7 一致性检查
+      await syncStoryboardBindingsFromPrompts(storyboardId, ['transition_prompt'])
       logTaskSuccess('TransitionTool', 'save', {
         storyboardId,
         verdict: review.verdict,

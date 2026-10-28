@@ -923,7 +923,6 @@
       "days": "{n} 日前"
     },
     "ref": {
-      "title": "参照素材",
       "copy": "キャラクター / シーン / 小道具を動画参照として紐付け",
       "boundCount": "{bound}/{total} 紐付け済み",
       "issueCount": "整合性の問題 {n} 件",
@@ -943,7 +942,17 @@
       "gotoGenerate": "生成へ →",
       "empty": "この話にはシーン、キャラクター、小道具がまだありません。先に「資産」で素材を抽出すると紐付けできます。",
       "chooseVersion": "{name} の素材バージョンを選択",
-      "versionSelected": "このショットで {name} の選択バージョンを使用します"
+      "poolTitle": "ショット素材プール（{'@'} 候補）",
+      "poolCopy": "バインドしたキャラ / シーン / 小道具はこのショットの {'@'} 候補で、実際に送信する参照画像は決めません",
+      "targetTitle": "このフレームの参照画像",
+      "targetEmpty": "プロンプトで {'@'} した素材がここに自動表示されます",
+      "targetRefNo": "画像{n}",
+      "targetMissingImage": "画像なし",
+      "targetLeadMeta": "先頭キーフレーム",
+      "targetVersionDefault": "デフォルト",
+      "targetVersionDefaultImage": "デフォルト画像",
+      "targetVersionSelected": "{name} は選択したバージョンに変更されました",
+      "targetVersionReset": "{name} はデフォルトに戻りました"
     },
     "vid": {
       "shotCount": "{n} ショット",
@@ -1186,8 +1195,7 @@
       "durationUnit": "秒（2-30）",
       "durationHint": "変更すると分镜に即時保存され、リストとバッチ生成にも反映されます",
       "effective": "{model} · {res} · {dur}秒",
-      "boundRefs": "绑定参照画像",
-      "noBoundRefs": "绑定された素材なし（中央の「参照素材」で绑定）"
+      "boundRefs": "绑定参照画像"
     },
     "export": {
       "notReadyDesc": "先に分镜と制作の工程を完了してください",

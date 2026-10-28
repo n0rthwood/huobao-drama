@@ -923,7 +923,6 @@
       "days": "{n} 天前"
     },
     "ref": {
-      "title": "参考素材",
       "copy": "绑定角色 / 场景 / 道具作为视频参考",
       "boundCount": "{bound}/{total} 已绑定",
       "issueCount": "{n} 个一致性问题",
@@ -943,7 +942,17 @@
       "gotoGenerate": "去生成 →",
       "empty": "当前集还没有场景、角色或道具，先到「资产」提取素材后即可绑定。",
       "chooseVersion": "选择{name}的素材版本",
-      "versionSelected": "分镜已改用{name}的所选版本"
+      "poolTitle": "本镜资产池（{'@'} 候选）",
+      "poolCopy": "绑定的角色 / 场景 / 道具是本镜提示词的 {'@'} 候选，不决定实际发送的参考图",
+      "targetTitle": "本帧参考图",
+      "targetEmpty": "提示词里 {'@'} 到的资产会自动出现在这里",
+      "targetRefNo": "图{n}",
+      "targetMissingImage": "缺图",
+      "targetLeadMeta": "首帧关键帧",
+      "targetVersionDefault": "默认",
+      "targetVersionDefaultImage": "默认图",
+      "targetVersionSelected": "{name} 已改用所选版本",
+      "targetVersionReset": "{name} 已恢复默认版本"
     },
     "vid": {
       "shotCount": "{n} 个镜头",
@@ -1186,8 +1195,7 @@
       "durationUnit": "s（2-30）",
       "durationHint": "修改即保存到分镜，列表与批量生成同步生效",
       "effective": "{model} · {res} · {dur}s",
-      "boundRefs": "绑定参考图",
-      "noBoundRefs": "暂无绑定素材（在中间「参考素材」区点击绑定）"
+      "boundRefs": "绑定参考图"
     },
     "export": {
       "notReadyDesc": "请先完成分镜和制作流程",

@@ -923,7 +923,6 @@
       "days": "{n} d ago"
     },
     "ref": {
-      "title": "Reference Assets",
       "copy": "Bind characters / scenes / props as video references",
       "boundCount": "{bound}/{total} bound",
       "issueCount": "{n} consistency issues",
@@ -943,7 +942,17 @@
       "gotoGenerate": "Go generate →",
       "empty": "No scenes, characters or props in this episode yet. Extract assets in “Assets” first, then bind them here.",
       "chooseVersion": "Choose a version of {name}",
-      "versionSelected": "This shot now uses the selected version of {name}"
+      "poolTitle": "Shot Asset Pool ({'@'} candidates)",
+      "poolCopy": "Bound characters / scenes / props are the {'@'} candidates for this shot; they do not decide the references actually sent",
+      "targetTitle": "Frame References",
+      "targetEmpty": "Assets {'@'}-mentioned in the prompt show up here automatically",
+      "targetRefNo": "Ref {n}",
+      "targetMissingImage": "No image",
+      "targetLeadMeta": "First keyframe",
+      "targetVersionDefault": "Default",
+      "targetVersionDefaultImage": "Default image",
+      "targetVersionSelected": "{name} now uses the selected version",
+      "targetVersionReset": "{name} restored to the default version"
     },
     "vid": {
       "shotCount": "{n} shots",
@@ -1186,8 +1195,7 @@
       "durationUnit": "s (2-30)",
       "durationHint": "Edits save to the storyboard instantly and apply to list and batch generation",
       "effective": "{model} · {res} · {dur}s",
-      "boundRefs": "Bound References",
-      "noBoundRefs": "No bound assets (bind in the center \"References\" panel)"
+      "boundRefs": "Bound References"
     },
     "export": {
       "notReadyDesc": "Please finish the storyboard and production steps first",
