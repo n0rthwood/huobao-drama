@@ -139,6 +139,14 @@ Issue 整理完成后、实施前，必须让 **Fabel（Anthropic）或 Astra（
 - GLM-5.x 始终思考：`agents/index.ts` 的 `isOfficialTextHost` 包含 `open.bigmodel.cn`，不会注入 `thinking: disabled`（否则 400）。
 - reasoning 与 content 共享 `max_tokens`，项目默认注入 16384，不要调小。**本机 `backend/.env`（不入库，dotenv 加载）设 `AI_MAX_TOKENS=131072`**（2026-10-28，#19 live 生效）：GLM coding 端点 `max_tokens` 只接受 `[1,131072]`（131073 报 1210），实测 3.2 万 token 输入 + 131072 正常；32768 时代码注入值过小，拆分分镜一次推理 + 输出就能吃满（实测 31662/30764），`finish=length` 截断表现为「Agent 正常结束但什么都没保存」。重建本机环境时要同步这一项。
 
+### 文本：DeepSeek V4.1 Flash 1017（本地引擎，Issue #23）
+- 配成 `text / openai`，名称 `DeepSeek V4.1 Flash 1017 (local)`，base URL 走路由器公网入口 `http://tianan2.riadev.top:17580/deepseek`（`getTextProviderBaseUrl` 自动补 `/v1`），模型 `deepseek-chat`；key 与 omp `deepseek` provider 同一把，只写进本机 `providers.json`。优先级 90，默认文本模型仍是 GLM 5.3（100），要用时在模型下拉里选。
+- 入口：**不用** Cloudflare 隧道 `…joyai.dev/deepseek`。它对长时间无数据的响应会 524（2026-10-28 实测单次长输出约 126 s 时 524），工具参数缓冲期同样有风险（见下节「一律流式」）；路由器入口实测单次 196 s / 9607 token 正常。
+- 思考语义：引擎对 model 名一视同仁，`deepseek-reasoner` 这个 id **不会**自动开思考，只有请求带 `"reasoning_effort": "high"` 才思考并返回 `reasoning_content`。火宝对非官方端点一律注入 `thinking: disabled` / `enable_thinking: false` / `reasoning_effort: "none"`（`createThinkingOffFetch`），所以 DeepSeek 在火宝里**永不思考**（引擎日志 `thinking=False`），不配 `deepseek-reasoner`（与 `deepseek-chat` 等价）；DeepSeek 任务在 #19 思考面板里没有内容属正常。
+- 输出上限：引擎 `max_model_len=1048576`，本机 `AI_MAX_TOKENS=131072` 可直接用。
+- 旧 Qwen3.6 端口（`.175:8300`）现在转发到同一个 DeepSeek 引擎，**只为让其它旧应用的配置不挂**；火宝的「Qwen3.6 (175)」配置已停用（`is_active=0`），并已从 `providers.json` 删除——`apply-local-config` 对文件内条目一律写 `is_active=true`，留着会被重新启用。不要再给火宝配置该端口。
+- 实测（2026-10-28）：tool call 正常；第 1 集「拆分分镜」117 s，`readStoryboardContext` → `saveStoryboards` 存下 4 镜，角色/道具绑定正确。
+
 ### 文本 Agent 调用：一律流式（Issue #17）
 - 所有 Agent 执行都走 `agents/run.ts runAgent()`（`agent.stream()` → `getFullOutput()` → 有 `error` 即抛），返回结构与 `generate()` 相同；**不要再直接调用 `agent.generate()`**。原因：非流式请求要等模型把推理 + 全部输出生成完才回响应头，长输出（拆分分镜）超过 undici 默认 `headersTimeout=300s`，AI SDK 再重试 2 次 → 约 900 s 后 `Headers Timeout Error`（任务 #281）。HTTP 接口仍是非流式，前端不变。
 - GLM 与 DeepSeek 流式下都会把**工具调用参数生成完再一次性下发**（实测 DeepSeek 1817 字参数前约 22 s 无数据，GLM 约 10 s），一次 `saveStoryboards` 参数可达上万 token。所以 `agents/index.ts getModel` 的 fetch 底层用 npm `undici` 的专用 dispatcher（`bodyTimeout` 15 分钟，`TEXT_MODEL_BODY_TIMEOUT_MS`），fetch 与 dispatcher 必须同源自 npm undici，只作用于文本模型请求。
