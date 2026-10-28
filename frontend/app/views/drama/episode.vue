@@ -860,7 +860,16 @@
                         @click="genVideoPrompt(selectedSb)"
                       >
                         <Loader2 v-if="videoPromptGeneratingIds.includes(selectedSb?.id)" :size="11" class="animate-spin" />
-                        {{ (selectedSb.video_prompt || selectedSb.videoPrompt) ? t('episode.sb.regenPrompt') : t('episode.sb.aiGenerate') }}
+                        {{ (selectedSb.video_prompt || selectedSb.videoPrompt) ? t('episode.sb.regenVideoPrompt') : t('episode.sb.aiGenerateVideoPrompt') }}
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-sm"
+                        :disabled="videoTaskState(selectedSb) === 'pending' || !isShotConfirmed(selectedSb)"
+                        :title="!isShotConfirmed(selectedSb) ? t('episode.kf.gateShotUnconfirmed') : undefined"
+                        @click="genVid(selectedSb)"
+                      >
+                        {{ promptHeadVideoActionLabel(selectedSb) }}
                       </button>
                     </div>
                     <MentionTextarea
@@ -2500,6 +2509,14 @@ function videoTaskActionLabel(sb) {
   if (state === 'done') return t('episode.asset.regen')
   if (state === 'pending') return t('episode.asset.generating')
   return t('episode.asset.generate')
+}
+
+/** 视频提示词区旁的视频重跑入口：显式文案（重绘 / 生成视频），避免与「重新生成提示词」混淆 */
+function promptHeadVideoActionLabel(sb) {
+  const state = videoTaskState(sb)
+  if (state === 'done') return t('episode.asset.regen')
+  if (state === 'pending') return t('episode.asset.generating')
+  return t('episode.vid.generateVideo')
 }
 
 const allVideoTaskRows = computed(() => sbs.value.map((sb, index) => {

@@ -917,6 +917,8 @@
       "videoPromptSection": "영상 프롬프트",
       "regenPrompt": "다시 생성",
       "aiGenerate": "AI로 생성",
+      "aiGenerateVideoPrompt": "AI로 프롬프트 생성",
+      "regenVideoPrompt": "프롬프트 다시 생성",
       "videoPromptCopy": "이 스토리보드의 화면 설명(대사/나레이션 포함)과 분위기를 바탕으로 생성",
       "videoPromptPlaceholder": "{'@'}캐릭터명 / {'@'}장멸명 으로 참조 소재를 지정하고, 3초마다 줄 바꿈하여 화면의 움직임과 침라를 기술. AI로 생성해 프롬프트 Agent에 맡길 수도 있습니다…",
       "breaking": "스토리보드 분해 중...",
