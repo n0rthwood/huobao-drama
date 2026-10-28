@@ -1,11 +1,11 @@
 /**
  * 分镜关键帧生成请求组装 — 单张生成、批量预览与批量生成共用的唯一实现
  *
- * 参考图 = 分镜绑定素材（场景 → 角色 → 道具）的选定版本，**不含任何关键帧**：
+ * 参考图 = 该槽位绑定素材（槽位提示词 @ 到的场景 → 角色 → 道具，Issue #18）的选定版本，**不含任何关键帧**：
  * 实测把首帧作为额外参考图去生成尾帧会让画面崩坏，三张关键帧各自独立生成。
  * 提示词 = 剧集风格词 + 槽位提示词（@名字 换成模型的图片引用写法）。
  * 尺寸按剧集画幅固定（Qwen i2i 用显式 latent，不跟随第一张参考图）。
- * 提示词里 @ 的角色/道具与绑定不一致时拒绝组装（Issue #7），由调用方返回 400。
+ * 提示词里 @ 的资产与该槽位绑定不一致时拒绝组装（Issue #7），由调用方返回 400。
  */
 import { createHash } from 'node:crypto'
 import { eq } from 'drizzle-orm'
@@ -16,15 +16,17 @@ import { SLOT_FRAME_TYPE, SLOT_LABEL, slotPrompt, type KeyframeSlot } from './ke
 import {
   SLOT_PROMPT_FIELD,
   blockingIssuesFor,
-  collectStoryboardAssetRefs,
   computeRefIssues,
   describeIssues,
   indexRefs,
   loadEpisodeAssets,
+  loadTargetBindings,
   promptFieldsOf,
   resolvePromptRefs,
+  targetAssetRefs,
   type EpisodeAssetEntry,
   type RefIssue,
+  type TargetBindings,
 } from './storyboard-assets.js'
 import { getDramaStylePrompt } from './style-preset.js'
 import { isQwenJobsTask } from './sys-task.js'
@@ -212,8 +214,7 @@ export async function buildKeyframeRequest(
   opts: KeyframeGenerationOptions & {
     context?: KeyframeBuildContext
     assets?: EpisodeAssetEntry[]
-    characterIds?: number[]
-    propIds?: number[]
+    bindings?: TargetBindings
   } = {},
 ): Promise<KeyframeRequest> {
   const [storyboard] = await db.select().from(schema.storyboards)
@@ -226,26 +227,16 @@ export async function buildKeyframeRequest(
   }
 
   const context = opts.context ?? await loadKeyframeBuildContext(storyboard.episodeId, opts)
-  const assets = opts.assets ?? await loadEpisodeAssets(storyboard, storyboard.episodeId)
+  const assets = opts.assets ?? await loadEpisodeAssets(storyboard.episodeId)
+  const bindings = opts.bindings ?? await loadTargetBindings(storyboardId)
 
-  const charLinks = opts.characterIds ?? (await db.select().from(schema.storyboardCharacters)
-    .where(eq(schema.storyboardCharacters.storyboardId, storyboardId))).map(link => link.characterId)
-  const propLinks = opts.propIds ?? (await db.select().from(schema.storyboardProps)
-    .where(eq(schema.storyboardProps.storyboardId, storyboardId))).map(link => link.propId)
-
-  const issues = computeRefIssues({
-    prompts: promptFieldsOf(storyboard),
-    assets,
-    sceneId: storyboard.sceneId ?? null,
-    characterIds: charLinks,
-    propIds: propLinks,
-  })
+  const issues = computeRefIssues({ prompts: promptFieldsOf(storyboard), assets, bindings })
   const blocking = blockingIssuesFor(issues, SLOT_PROMPT_FIELD[slot])
   if (blocking.length) {
     throw new Error(`分镜 #${storyboard.storyboardNumber} 的${SLOT_LABEL[slot]}参考图与提示词不一致：${describeIssues(blocking)}`)
   }
 
-  const { urls, nameToIndex } = indexRefs(await collectStoryboardAssetRefs(storyboard, storyboard.episodeId))
+  const { urls, nameToIndex } = indexRefs(targetAssetRefs(assets, bindings[slot]))
   // qwen-jobs（Qwen Image 2.1）用 <imageN> 指代参考图；其余厂商没有占位语法，退化成“图片N”
   const supportsImageTags = isQwenJobsTask(context.config.provider)
   let finalPrompt = resolvePromptRefs(prompt, nameToIndex, (index, name) =>

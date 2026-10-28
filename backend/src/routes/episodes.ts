@@ -22,7 +22,7 @@ import {
   startEpisodeKeyframeBatch,
   previewEpisodeKeyframeBatch,
 } from '../services/keyframe-batch.js'
-import { checkStoryboardRefs } from '../services/storyboard-assets.js'
+import { checkStoryboardRefs, loadEpisodeAssets, loadStoryboardTargetAssets } from '../services/storyboard-assets.js'
 import { parseFieldSavedAt } from '../services/storyboard-fields.js'
 import { lookupGeneratedAt } from '../services/media-time.js'
 import { parseTransitionReview, transitionInputSignature } from '../services/transition.js'
@@ -432,13 +432,9 @@ app.get('/:episode_id/storyboards', async (c) => {
       state?.first ?? null, state?.mid ?? null, state?.last ?? null)
   }
   const mediaGeneratedAt = await lookupGeneratedAt(mediaPaths)
+  // 本集可 @ 资产整集只查一次，各分镜的目标级绑定与一致性问题共用
+  const episodeAssets = await loadEpisodeAssets(episodeId)
   return success(c, await Promise.all(rows.map(async (row) => {
-    let assetVersionSelection: Record<string, string> = {}
-    try {
-      assetVersionSelection = row.assetVersionSelection ? JSON.parse(row.assetVersionSelection) : {}
-    } catch {
-      assetVersionSelection = {}
-    }
     const videoVersions: Array<{
       id: number | null
       url: string | null
@@ -472,9 +468,9 @@ app.get('/:episode_id/storyboards', async (c) => {
     }
     return {
       ...toSnakeCase(row),
-      asset_version_selection: assetVersionSelection,
+      target_assets: await loadStoryboardTargetAssets(row, episodeAssets),
       field_saved_at: parseFieldSavedAt(row.fieldSavedAt),
-      ref_issues: await checkStoryboardRefs(row),
+      ref_issues: await checkStoryboardRefs(row, episodeAssets),
       keyframes: keyframesJson(keyframes.get(row.id)),
       video_versions: videoVersions,
       transition_review: parseTransitionReview(row.transitionReview),

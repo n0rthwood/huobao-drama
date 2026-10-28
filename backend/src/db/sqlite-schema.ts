@@ -113,7 +113,6 @@ export const sqliteSchemaStatements = [
     mid_frame_time REAL,
     keyframes_confirmed INTEGER DEFAULT 0,
     reference_images TEXT,
-    asset_version_selection TEXT,
     field_saved_at TEXT,
     continuity_boundary TEXT,
     transition_prompt TEXT,
@@ -169,6 +168,19 @@ export const sqliteSchemaStatements = [
     PRIMARY KEY (storyboard_id, prop_id)
   )`,
   `CREATE INDEX IF NOT EXISTS idx_storyboard_props_prop_id ON storyboard_props (prop_id)`,
+
+  // 生成目标级素材绑定（Issue #18）：target ∈ first|mid|last|video，kind ∈ scene|character|prop
+  `CREATE TABLE IF NOT EXISTS storyboard_target_assets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    storyboard_id INTEGER NOT NULL,
+    target TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    asset_id INTEGER NOT NULL,
+    selected_image TEXT,
+    created_at TEXT NOT NULL,
+    UNIQUE (storyboard_id, target, kind, asset_id)
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_storyboard_target_assets_asset ON storyboard_target_assets (kind, asset_id)`,
 
   `CREATE TABLE IF NOT EXISTS ai_service_configs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -345,8 +357,7 @@ export const sqliteSchemaStatements = [
 const columnAdditions: { table: string; column: string; type: string }[] = [
   // 场景参考图（与 characters/props 的 reference_images 同语义：用户上传的生图输入）
   { table: 'scenes', column: 'reference_images', type: 'TEXT' },
-  // 分镜级素材版本选择 + LLM 标注的承接边界
-  { table: 'storyboards', column: 'asset_version_selection', type: 'TEXT' },
+  // LLM 标注的承接边界
   { table: 'storyboards', column: 'continuity_boundary', type: 'TEXT' },
   // 分镜关键帧：三个槽位的提示词、中间帧时间与选定图、人工确认标记
   { table: 'storyboards', column: 'first_frame_prompt', type: 'TEXT' },
@@ -380,6 +391,8 @@ const columnAdditions: { table: string; column: string; type: string }[] = [
 const columnRemovals: { table: string; column: string }[] = [
   { table: 'episodes', column: 'continuity_enabled' },
   { table: 'storyboards', column: 'continuity_mode' },
+  // 分镜级素材版本选择 → storyboard_target_assets.selected_image（Issue #18，先迁移再删列）
+  { table: 'storyboards', column: 'asset_version_selection' },
 ]
 
 function applyColumnRemovals(sqlite: Database.Database): void {
@@ -421,6 +434,75 @@ function cleanupStaleAssetLinks(sqlite: Database.Database): void {
     ).run()
     if (res.changes > 0) console.log(`🧹 清理 ${table} 中指向已删资产的关联 ${res.changes} 条`)
   }
+  const targetRes = sqlite.prepare(
+    `DELETE FROM storyboard_target_assets WHERE storyboard_id NOT IN (SELECT id FROM storyboards WHERE deleted_at IS NULL)
+      OR (kind = 'scene' AND asset_id NOT IN (SELECT id FROM scenes WHERE deleted_at IS NULL))
+      OR (kind = 'character' AND asset_id NOT IN (SELECT id FROM characters WHERE deleted_at IS NULL))
+      OR (kind = 'prop' AND asset_id NOT IN (SELECT id FROM props WHERE deleted_at IS NULL))`,
+  ).run()
+  if (targetRes.changes > 0) console.log(`🧹 清理 storyboard_target_assets 中失效的绑定 ${targetRes.changes} 条`)
+}
+
+/** 生成目标 → 决定其绑定的提示词列（与 services/storyboard-assets.ts TARGET_PROMPT_FIELDS 同口径） */
+const TARGET_PROMPT_COLUMNS: Record<string, string[]> = {
+  first: ['first_frame_prompt'],
+  mid: ['mid_frame_prompt'],
+  last: ['last_frame_prompt'],
+  video: ['video_prompt', 'transition_prompt'],
+}
+
+/**
+ * 存量迁移（Issue #18）— 只在 storyboard_target_assets 表首次创建时执行一次：
+ * 每个未删除分镜里提示词非空的生成目标都继承分镜当前的绑定（场景 + 角色 + 道具）；
+ * 提示词为空的目标不会被生成（如承接上一镜的首帧），不写绑定，之后写入提示词时按 @ 计算。
+ * 选版取 asset_version_selection 的对应键；与本集造型图相同的条目是 #15 自动选版写入的，
+ * 迁移成 NULL（读时解析结果相同），之后造型图重出仍会自动跟随。
+ * 迁移后的参考图序列与迁移前逐字节一致；用户改哪一帧的提示词，那一帧才按 @ 重算。
+ */
+function migrateStoryboardTargetAssets(sqlite: Database.Database): void {
+  const hasSelection = (sqlite.prepare('PRAGMA table_info(storyboards)').all() as { name: string }[])
+    .some(col => col.name === 'asset_version_selection')
+  const storyboards = sqlite.prepare(
+    `SELECT id, episode_id, scene_id, first_frame_prompt, mid_frame_prompt, last_frame_prompt, video_prompt, transition_prompt${hasSelection ? ', asset_version_selection' : ''} FROM storyboards WHERE deleted_at IS NULL`,
+  ).all() as Array<Record<string, string | number | null> & { id: number; episode_id: number; scene_id: number | null; asset_version_selection?: string | null }>
+  const charsOf = sqlite.prepare('SELECT character_id AS id FROM storyboard_characters WHERE storyboard_id = ?')
+  const propsOf = sqlite.prepare('SELECT prop_id AS id FROM storyboard_props WHERE storyboard_id = ?')
+  const stylingOf = sqlite.prepare('SELECT character_id, styling_version FROM episode_characters WHERE episode_id = ?')
+  const insert = sqlite.prepare(
+    'INSERT OR IGNORE INTO storyboard_target_assets (storyboard_id, target, kind, asset_id, selected_image, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+  )
+  const ts = new Date().toISOString()
+  let rows = 0
+  sqlite.transaction(() => {
+    for (const sb of storyboards) {
+      let selection: Record<string, string> = {}
+      try {
+        const parsed: unknown = sb.asset_version_selection ? JSON.parse(sb.asset_version_selection) : {}
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) selection = parsed as Record<string, string>
+      } catch { /* 非法 JSON 视为无选版 */ }
+      const styling = new Map<number, string>()
+      for (const link of stylingOf.all(sb.episode_id) as { character_id: number; styling_version: string | null }[]) {
+        try {
+          const parsed = link.styling_version ? JSON.parse(link.styling_version) as { image_path?: unknown } : null
+          if (parsed && typeof parsed.image_path === 'string' && parsed.image_path) styling.set(link.character_id, parsed.image_path)
+        } catch { /* 忽略 */ }
+      }
+      const assets: { kind: string; id: number }[] = []
+      if (sb.scene_id != null) assets.push({ kind: 'scene', id: sb.scene_id })
+      for (const row of charsOf.all(sb.id) as { id: number }[]) assets.push({ kind: 'character', id: row.id })
+      for (const row of propsOf.all(sb.id) as { id: number }[]) assets.push({ kind: 'prop', id: row.id })
+      const targets = Object.keys(TARGET_PROMPT_COLUMNS)
+        .filter(target => TARGET_PROMPT_COLUMNS[target]!.some(column => String(sb[column] ?? '').trim()))
+      for (const asset of assets) {
+        let selected: string | null = selection[`${asset.kind}:${asset.id}`] || null
+        if (selected && asset.kind === 'character' && styling.get(asset.id) === selected) selected = null
+        for (const target of targets) {
+          rows += insert.run(sb.id, target, asset.kind, asset.id, selected, ts).changes
+        }
+      }
+    }
+  })()
+  console.log(`🧩 生成目标级素材绑定迁移：${storyboards.length} 个分镜，写入 ${rows} 条（继承分镜绑定）`)
 }
 
 /**
@@ -502,12 +584,18 @@ const UPGRADE_SQL = 'UPDATE style_presets SET "name" = ?, "prompt" = ?, "descrip
 const REMOVE_SQL = 'DELETE FROM style_presets WHERE "value" = ? AND "prompt" = ?'
 
 export function initSqliteSchema(sqlite: Database.Database) {
+  // 目标级绑定表是否已存在：不存在说明是首次升级到 #18，需要一次性继承分镜绑定
+  const hadTargetAssets = !!sqlite.prepare(
+    "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'storyboard_target_assets'",
+  ).get()
   for (const statement of sqliteSchemaStatements) {
     sqlite.exec(statement)
   }
   applyColumnAdditions(sqlite)
   // 依赖补列的索引：旧库要等 ADD COLUMN 之后才能建
   sqlite.exec('CREATE INDEX IF NOT EXISTS idx_sys_task_episode_id ON sys_task (episode_id)')
+  // 先迁移（要读 asset_version_selection）再删列
+  if (!hadTargetAssets) migrateStoryboardTargetAssets(sqlite)
   applyColumnRemovals(sqlite)
   cleanupStaleAssetLinks(sqlite)
   const insertSeed = sqlite.prepare(SEED_SQL)

@@ -1,13 +1,19 @@
 /**
- * 分镜参考素材装配 — 关键帧生成与视频生成共用的唯一实现
+ * 参考素材绑定与装配 — 关键帧生成与视频生成共用的唯一实现（Issue #18）
  *
- * 顺序与前端预览一致：场景 → 角色（本集角色、排除旁白、按角色列表顺序）→ 道具；
- * 优先用分镜选定的素材版本（asset_version_selection），否则用素材当前成片图；去重后最多 9 张。
+ * 绑定以「生成目标」为主体：首帧 / 中间帧 / 尾帧 / 视频各自一份（storyboard_target_assets），
+ * = 该目标提示词里 @ 到的本集场景/角色/道具，提示词写入后自动重算，不提供手动增删。
+ * 每个目标上的资产可单独选版（selected_image），未选时 = 本集造型图（角色）> 资产当前图。
+ *
+ * 分镜级绑定（storyboards.scene_id + storyboard_characters/props）保留为「本镜资产池」：
+ * 5 个提示词 @ 的并集，供 @ 候选、拆分分镜初始绑定与提示词/转场生成上下文使用，不参与发图。
+ *
+ * 装配顺序：场景 → 角色（本集角色、排除旁白、按角色列表顺序）→ 道具；按图片去重后最多 9 张，
  * 提示词里的 @名字 按同一顺序替换为各模型的图片引用写法。
  */
-import { and, eq } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
-import { parseStylingVersion, type StylingVersion } from './styling-version.js'
+import { parseStylingVersion } from './styling-version.js'
 
 /** 参考图上限（与前端面板、Seedance 多模态上限一致） */
 const REF_IMAGE_LIMIT = 9
@@ -15,95 +21,14 @@ const REF_IMAGE_LIMIT = 9
 /** 旁白角色识别：提取产物中的旁白角色不参与画面生成（与前端 isNarratorCharacter 同口径） */
 const NARRATOR_KEYWORDS = ['旁白', '画外音', 'narrator', 'ナレーター', 'ナレーション', '내레이션', '해설']
 
-type AssetKind = 'scene' | 'character' | 'prop'
+export type AssetKind = 'scene' | 'character' | 'prop'
+
+const KIND_ORDER: Record<AssetKind, number> = { scene: 0, character: 1, prop: 2 }
+const KIND_LABEL: Record<AssetKind, string> = { scene: '场景', character: '角色', prop: '道具' }
 
 export interface AssetRef {
   name: string
   url: string
-}
-
-function parseAssetVersionSelection(raw: string | null | undefined): Record<string, string> {
-  if (!raw) return {}
-  try {
-    const parsed: unknown = JSON.parse(raw)
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
-    return parsed as Record<string, string>
-  } catch {
-    return {}
-  }
-}
-
-/**
- * 某资产在本镜使用的图片：人工选版 > 本集角色造型版本图 > 资产当前成片图。
- * 造型版本（Issue #15）只对角色生效，且永远让位于分镜上的人工选择。
- */
-function selectedAssetImage(
-  selection: Record<string, string>,
-  kind: AssetKind,
-  item: { id: number; imageUrl: string | null } | null,
-  stylingVersions?: Map<number, StylingVersion>,
-): string {
-  if (!item) return ''
-  const manual = selection[`${kind}:${item.id}`]
-  if (manual) return manual
-  if (kind === 'character') {
-    const costume = stylingVersions?.get(item.id)
-    if (costume?.image_path) return costume.image_path
-  }
-  return item.imageUrl || ''
-}
-
-/**
- * 分镜绑定素材的参考图（场景 → 角色 → 道具），不含任何关键帧。
- * 调用方可在前面插入关键帧，再按最终顺序生成 @名字 的编号映射。
- */
-export async function collectStoryboardAssetRefs(
-  storyboard: typeof schema.storyboards.$inferSelect,
-  episodeId: number,
-): Promise<AssetRef[]> {
-  const selection = parseAssetVersionSelection(storyboard.assetVersionSelection)
-
-  // 与前端一致：场景取自本集已关联且未删除的场景列表，软删/解绑的场景不参与参考图与编号
-  const sceneLinks = await db.select().from(schema.episodeScenes)
-    .where(eq(schema.episodeScenes.episodeId, episodeId))
-  const episodeSceneIds = sceneLinks.map(link => link.sceneId)
-  const scene = storyboard.sceneId && episodeSceneIds.includes(storyboard.sceneId)
-    ? (await db.select().from(schema.scenes).where(eq(schema.scenes.id, storyboard.sceneId)))
-      .filter(row => !row.deletedAt)[0] ?? null
-    : null
-
-  const charLinks = await db.select().from(schema.storyboardCharacters)
-    .where(eq(schema.storyboardCharacters.storyboardId, storyboard.id))
-  const boundCharIds = charLinks.map(link => link.characterId)
-  const episodeCharLinks = await db.select().from(schema.episodeCharacters)
-    .where(eq(schema.episodeCharacters.episodeId, episodeId))
-  const episodeCharIds = episodeCharLinks.map(link => link.characterId)
-  // 本集造型版本（Issue #15）：没有人工选版时，角色参考图默认用这套造型的图
-  const stylingVersions = new Map<number, StylingVersion>()
-  for (const link of episodeCharLinks) {
-    const parsed = parseStylingVersion(link.stylingVersion)
-    if (parsed) stylingVersions.set(link.characterId, parsed)
-  }
-  const characters = (await db.select().from(schema.characters))
-    .filter(ch => episodeCharIds.includes(ch.id) && !ch.deletedAt)
-    .filter(ch => !NARRATOR_KEYWORDS.some(keyword => `${ch.name || ''} ${ch.role || ''}`.toLowerCase().includes(keyword)))
-    .filter(ch => boundCharIds.includes(ch.id))
-
-  const propLinks = await db.select().from(schema.storyboardProps)
-    .where(eq(schema.storyboardProps.storyboardId, storyboard.id))
-  const boundPropIds = propLinks.map(link => link.propId)
-  const episodePropLinks = await db.select().from(schema.episodeProps)
-    .where(eq(schema.episodeProps.episodeId, episodeId))
-  const episodePropIds = episodePropLinks.map(link => link.propId)
-  const props = (await db.select().from(schema.props))
-    .filter(p => episodePropIds.includes(p.id) && !p.deletedAt)
-    .filter(p => boundPropIds.includes(p.id))
-
-  const refs: AssetRef[] = []
-  refs.push({ name: scene?.location || '', url: selectedAssetImage(selection, 'scene', scene) })
-  for (const char of characters) refs.push({ name: char.name || '', url: selectedAssetImage(selection, 'character', char, stylingVersions) })
-  for (const prop of props) refs.push({ name: prop.name || '', url: selectedAssetImage(selection, 'prop', prop) })
-  return refs.filter(ref => !!ref.url)
 }
 
 /** 去重并截断到上限，同时给有名字的参考图编号（1 起，顺序即发送顺序） */
@@ -139,7 +64,7 @@ export function resolvePromptRefs(
   })
 }
 
-// ─── 提示词 @引用 ↔ 分镜绑定一致性（Issue #7）────────────────────────────
+// ─── 提示词字段与生成目标 ────────────────────────────────────────────
 
 /** 参与一致性检查的提示词字段（关键帧三槽位 + 视频 + 承接镜头的开场转场） */
 export type PromptField = 'first_frame_prompt' | 'mid_frame_prompt' | 'last_frame_prompt' | 'video_prompt'
@@ -156,8 +81,45 @@ export const SLOT_PROMPT_FIELD: Record<'first' | 'mid' | 'last', PromptField> = 
   last: 'last_frame_prompt',
 }
 
+/** 生成目标：三张关键帧 + 视频 */
+export type BindingTarget = 'first' | 'mid' | 'last' | 'video'
+
+export const BINDING_TARGETS: BindingTarget[] = ['first', 'mid', 'last', 'video']
+
+/** 目标 → 决定其绑定的提示词字段；转场段拼在视频提示词前一起提交，所以归视频 */
+export const TARGET_PROMPT_FIELDS: Record<BindingTarget, PromptField[]> = {
+  first: ['first_frame_prompt'],
+  mid: ['mid_frame_prompt'],
+  last: ['last_frame_prompt'],
+  video: ['video_prompt', 'transition_prompt'],
+}
+
+const FIELD_TARGET: Record<PromptField, BindingTarget> = {
+  first_frame_prompt: 'first',
+  mid_frame_prompt: 'mid',
+  last_frame_prompt: 'last',
+  video_prompt: 'video',
+  transition_prompt: 'video',
+}
+
+const TARGET_LABEL: Record<BindingTarget, string> = { first: '首帧', mid: '中间帧', last: '尾帧', video: '视频' }
+
+export function isBindingTarget(value: unknown): value is BindingTarget {
+  return typeof value === 'string' && (BINDING_TARGETS as string[]).includes(value)
+}
+
+/** 写入了哪些提示词字段 → 需要重算哪些目标 */
+export function targetsOfFields(fields: readonly string[]): BindingTarget[] {
+  const targets: BindingTarget[] = []
+  for (const field of fields) {
+    const target = FIELD_TARGET[field as PromptField]
+    if (target && !targets.includes(target)) targets.push(target)
+  }
+  return targets
+}
+
 export type RefIssueCode =
-  | 'missing_image' | 'unbound_mention' | 'scene_conflict' | 'unknown_mention'
+  | 'missing_image' | 'unbound_mention' | 'unknown_mention'
   | 'unmentioned_binding' | 'over_capacity'
   // Issue #15：视频提示词为空（阻断生成）与肢体风险（仅警告，不阻断）
   | 'empty_video_prompt' | 'limb_risk'
@@ -174,27 +136,19 @@ export interface RefIssue {
   message: string
 }
 
-/** 本集资产（角色/道具/场景）的名字与可用图，用于解析 @引用 */
+// ─── 本集资产 ────────────────────────────────────────────────────────
+
+/** 本集资产（角色/道具/场景）的名字与默认参考图，用于解析 @引用 */
 export interface EpisodeAssetEntry {
   kind: AssetKind
   id: number
   name: string
-  /** 该分镜选定版本下的图片地址（空串 = 没有可用参考图） */
-  imageUrl: string
+  /** 未选版时使用的图片：角色 = 本集造型图 > 当前成片图；场景/道具 = 当前成片图（空串 = 没有可用图） */
+  defaultImage: string
 }
 
-const KIND_LABEL: Record<AssetKind, string> = { scene: '场景', character: '角色', prop: '道具' }
-
-/**
- * 本集全部可被 @ 的资产（场景 → 角色 → 道具，顺序与参考图装配一致）。
- * `imageUrl` 按分镜的版本选择解析，因此需要分镜行。
- */
-export async function loadEpisodeAssets(
-  storyboard: typeof schema.storyboards.$inferSelect,
-  episodeId: number,
-): Promise<EpisodeAssetEntry[]> {
-  const selection = parseAssetVersionSelection(storyboard.assetVersionSelection)
-
+/** 本集全部可被 @ 的资产（场景 → 角色 → 道具，顺序即参考图装配顺序） */
+export async function loadEpisodeAssets(episodeId: number): Promise<EpisodeAssetEntry[]> {
   const sceneLinks = await db.select().from(schema.episodeScenes)
     .where(eq(schema.episodeScenes.episodeId, episodeId))
   const episodeSceneIds = sceneLinks.map(link => link.sceneId)
@@ -205,10 +159,10 @@ export async function loadEpisodeAssets(
     .where(eq(schema.episodeCharacters.episodeId, episodeId))
   const episodeCharIds = episodeCharLinks.map(link => link.characterId)
   // 本集造型版本（Issue #15）：没有人工选版时默认用造型图
-  const stylingVersions = new Map<number, StylingVersion>()
+  const costumeImages = new Map<number, string>()
   for (const link of episodeCharLinks) {
-    const parsed = parseStylingVersion(link.stylingVersion)
-    if (parsed) stylingVersions.set(link.characterId, parsed)
+    const image = parseStylingVersion(link.stylingVersion)?.image_path
+    if (image) costumeImages.set(link.characterId, image)
   }
   const characters = (await db.select().from(schema.characters))
     .filter(ch => episodeCharIds.includes(ch.id) && !ch.deletedAt)
@@ -221,13 +175,13 @@ export async function loadEpisodeAssets(
 
   const entries: EpisodeAssetEntry[] = []
   for (const scene of scenes) {
-    entries.push({ kind: 'scene', id: scene.id, name: (scene.location || '').trim(), imageUrl: selectedAssetImage(selection, 'scene', scene) })
+    entries.push({ kind: 'scene', id: scene.id, name: (scene.location || '').trim(), defaultImage: scene.imageUrl || '' })
   }
   for (const ch of characters) {
-    entries.push({ kind: 'character', id: ch.id, name: (ch.name || '').trim(), imageUrl: selectedAssetImage(selection, 'character', ch, stylingVersions) })
+    entries.push({ kind: 'character', id: ch.id, name: (ch.name || '').trim(), defaultImage: costumeImages.get(ch.id) || ch.imageUrl || '' })
   }
   for (const prop of props) {
-    entries.push({ kind: 'prop', id: prop.id, name: (prop.name || '').trim(), imageUrl: selectedAssetImage(selection, 'prop', prop) })
+    entries.push({ kind: 'prop', id: prop.id, name: (prop.name || '').trim(), defaultImage: prop.imageUrl || '' })
   }
   return entries.filter(entry => !!entry.name)
 }
@@ -263,23 +217,6 @@ export function parseMentions(text: string, names: string[]): { matched: string[
   return { matched, unknown }
 }
 
-export interface RefCheckInput {
-  prompts: Record<PromptField, string>
-  assets: EpisodeAssetEntry[]
-  sceneId: number | null
-  characterIds: number[]
-  propIds: number[]
-}
-
-export interface BindingSyncResult {
-  characterIds: number[]
-  propIds: number[]
-  bound: Array<{ kind: AssetKind; id: number; name: string }>
-  unbound: Array<{ kind: AssetKind; id: number; name: string }>
-  /** 4 个提示词全空时不动绑定 */
-  changed: boolean
-}
-
 /** 同名资产以第一个（场景 → 角色 → 道具）为准，与参考图编号同口径 */
 function assetByName(assets: EpisodeAssetEntry[]): Map<string, EpisodeAssetEntry> {
   const map = new Map<string, EpisodeAssetEntry>()
@@ -305,11 +242,159 @@ function mentionsByField(
   return result
 }
 
+const assetKey = (kind: string, id: number) => `${kind}:${id}`
+
+// ─── 生成目标级绑定 ──────────────────────────────────────────────────
+
+export interface TargetBinding {
+  kind: AssetKind
+  assetId: number
+  /** 人工选版；null = 默认图 */
+  selectedImage: string | null
+}
+
+export type TargetBindings = Record<BindingTarget, TargetBinding[]>
+
+/** 已绑定资产在本集资产里的条目（按装配顺序）；已删除/已解除本集关联/旁白的绑定不参与 */
+function boundEntries(assets: EpisodeAssetEntry[], bindings: TargetBinding[]): Array<{ asset: EpisodeAssetEntry; image: string; binding: TargetBinding }> {
+  const order = new Map(assets.map((asset, index) => [assetKey(asset.kind, asset.id), index]))
+  const byKey = new Map(assets.map(asset => [assetKey(asset.kind, asset.id), asset]))
+  return bindings
+    .filter(binding => byKey.has(assetKey(binding.kind, binding.assetId)))
+    .sort((a, b) => (KIND_ORDER[a.kind] - KIND_ORDER[b.kind])
+      || (order.get(assetKey(a.kind, a.assetId))! - order.get(assetKey(b.kind, b.assetId))!))
+    .map(binding => {
+      const asset = byKey.get(assetKey(binding.kind, binding.assetId))!
+      return { asset, binding, image: binding.selectedImage || asset.defaultImage }
+    })
+}
+
+/** 某个目标的参考素材（场景 → 角色 → 道具，不含关键帧），调用方可在前面插入关键帧后再 indexRefs */
+export function targetAssetRefs(assets: EpisodeAssetEntry[], bindings: TargetBinding[]): AssetRef[] {
+  return boundEntries(assets, bindings)
+    .filter(entry => !!entry.image)
+    .map(entry => ({ name: entry.asset.name, url: entry.image }))
+}
+
+export interface TargetAssetJson {
+  kind: AssetKind
+  asset_id: number
+  name: string
+  /** 实际发送的图片（空串 = 没有可用图） */
+  image: string
+  selected_image: string | null
+  default_image: string
+  /** 在实际发送的参考图里的编号（1 起；视频的 1 号是首帧关键帧）；null = 无图 / 去重 / 超上限 */
+  ref_no: number | null
+}
+
+/** 前端展示用：各目标的绑定，顺序 = 发送顺序 */
+export function targetAssetsJson(assets: EpisodeAssetEntry[], bindings: TargetBindings): Record<BindingTarget, TargetAssetJson[]> {
+  const result = {} as Record<BindingTarget, TargetAssetJson[]>
+  for (const target of BINDING_TARGETS) {
+    const entries = boundEntries(assets, bindings[target] || [])
+    // 视频参考图第 1 张固定是首帧关键帧（视频生成要求首帧已就绪）
+    const lead: AssetRef[] = target === 'video' ? [{ name: '', url: '\u0000first-keyframe' }] : []
+    const { urls } = indexRefs([...lead, ...entries.map(entry => ({ name: entry.asset.name, url: entry.image }))])
+    result[target] = entries.map(entry => {
+      const position = entry.image ? urls.indexOf(entry.image) : -1
+      return {
+        kind: entry.asset.kind,
+        asset_id: entry.asset.id,
+        name: entry.asset.name,
+        image: entry.image,
+        selected_image: entry.binding.selectedImage,
+        default_image: entry.asset.defaultImage,
+        ref_no: position >= 0 ? position + 1 : null,
+      }
+    })
+  }
+  return result
+}
+
+export async function loadTargetBindings(storyboardId: number): Promise<TargetBindings> {
+  const rows = await db.select().from(schema.storyboardTargetAssets)
+    .where(eq(schema.storyboardTargetAssets.storyboardId, storyboardId))
+  const result: TargetBindings = { first: [], mid: [], last: [], video: [] }
+  for (const row of rows) {
+    if (!isBindingTarget(row.target)) continue
+    result[row.target].push({ kind: row.kind as AssetKind, assetId: row.assetId, selectedImage: row.selectedImage || null })
+  }
+  return result
+}
+
+/** 目标的期望绑定 = 该目标各字段 @ 到的本集资产（按装配顺序） */
+function wantedForTarget(
+  target: BindingTarget,
+  mentions: Record<PromptField, { matched: EpisodeAssetEntry[] }>,
+): EpisodeAssetEntry[] {
+  const wanted = new Map<string, EpisodeAssetEntry>()
+  for (const field of TARGET_PROMPT_FIELDS[target]) {
+    for (const asset of mentions[field].matched) wanted.set(assetKey(asset.kind, asset.id), asset)
+  }
+  return [...wanted.values()]
+}
+
+export interface TargetSyncPlan {
+  target: BindingTarget
+  add: Array<{ kind: AssetKind; id: number; name: string }>
+  remove: Array<{ kind: AssetKind; id: number; name: string }>
+}
+
 /**
- * 绑定 = 4 个提示词里 @ 到的本集角色/道具的并集（场景不自动修改）。
- * 4 个提示词全空时保留现有绑定（拆分分镜产生的初始绑定供提示词生成参考）。
+ * 目标级绑定重算（纯函数）：绑定 = 该目标提示词 @ 到的资产；仍被 @ 的保留原选版，
+ * 不再 @ 的解绑，提示词为空则清空。只算传入的目标，其他目标不动。
  */
-export function computeBindingSync(input: RefCheckInput): BindingSyncResult {
+export function computeTargetSync(
+  prompts: Record<PromptField, string>,
+  assets: EpisodeAssetEntry[],
+  bindings: TargetBindings,
+  targets: BindingTarget[],
+): TargetSyncPlan[] {
+  const mentions = mentionsByField(prompts, assets)
+  const byKey = new Map(assets.map(asset => [assetKey(asset.kind, asset.id), asset]))
+  return targets.map(target => {
+    const wanted = wantedForTarget(target, mentions)
+    const current = bindings[target] || []
+    const currentKeys = new Set(current.map(binding => assetKey(binding.kind, binding.assetId)))
+    const wantedKeys = new Set(wanted.map(asset => assetKey(asset.kind, asset.id)))
+    return {
+      target,
+      add: wanted.filter(asset => !currentKeys.has(assetKey(asset.kind, asset.id)))
+        .map(asset => ({ kind: asset.kind, id: asset.id, name: asset.name })),
+      remove: current.filter(binding => !wantedKeys.has(assetKey(binding.kind, binding.assetId)))
+        .map(binding => ({
+          kind: binding.kind,
+          id: binding.assetId,
+          name: byKey.get(assetKey(binding.kind, binding.assetId))?.name || `#${binding.assetId}`,
+        })),
+    }
+  })
+}
+
+// ─── 本镜资产池（分镜级） ────────────────────────────────────────────
+
+export interface PoolSyncInput {
+  prompts: Record<PromptField, string>
+  assets: EpisodeAssetEntry[]
+  characterIds: number[]
+  propIds: number[]
+}
+
+export interface BindingSyncResult {
+  characterIds: number[]
+  propIds: number[]
+  bound: Array<{ kind: AssetKind; id: number; name: string }>
+  unbound: Array<{ kind: AssetKind; id: number; name: string }>
+  /** 5 个提示词全空时不动资产池 */
+  changed: boolean
+}
+
+/**
+ * 资产池 = 5 个提示词里 @ 到的本集角色/道具的并集（场景不自动修改）。
+ * 提示词全空时保留现有资产池（拆分分镜产生的初始绑定供提示词生成参考）。
+ */
+export function computeBindingSync(input: PoolSyncInput): BindingSyncResult {
   const unchanged: BindingSyncResult = {
     characterIds: [...input.characterIds], propIds: [...input.propIds], bound: [], unbound: [], changed: false,
   }
@@ -318,7 +403,7 @@ export function computeBindingSync(input: RefCheckInput): BindingSyncResult {
   const mentions = mentionsByField(input.prompts, input.assets)
   const mentioned = new Map<string, EpisodeAssetEntry>()
   for (const field of PROMPT_FIELDS) {
-    for (const asset of mentions[field].matched) mentioned.set(`${asset.kind}:${asset.id}`, asset)
+    for (const asset of mentions[field].matched) mentioned.set(assetKey(asset.kind, asset.id), asset)
   }
   const wantedChars = [...mentioned.values()].filter(a => a.kind === 'character')
   const wantedProps = [...mentioned.values()].filter(a => a.kind === 'prop')
@@ -329,15 +414,15 @@ export function computeBindingSync(input: RefCheckInput): BindingSyncResult {
     const current = asset.kind === 'character' ? input.characterIds : input.propIds
     if (!current.includes(asset.id)) bound.push({ kind: asset.kind, id: asset.id, name: asset.name })
   }
-  const byId = new Map(input.assets.map(asset => [`${asset.kind}:${asset.id}`, asset]))
+  const byId = new Map(input.assets.map(asset => [assetKey(asset.kind, asset.id), asset]))
   for (const id of input.characterIds) {
     if (!wantedChars.some(asset => asset.id === id)) {
-      unbound.push({ kind: 'character', id, name: byId.get(`character:${id}`)?.name || `#${id}` })
+      unbound.push({ kind: 'character', id, name: byId.get(assetKey('character', id))?.name || `#${id}` })
     }
   }
   for (const id of input.propIds) {
     if (!wantedProps.some(asset => asset.id === id)) {
-      unbound.push({ kind: 'prop', id, name: byId.get(`prop:${id}`)?.name || `#${id}` })
+      unbound.push({ kind: 'prop', id, name: byId.get(assetKey('prop', id))?.name || `#${id}` })
     }
   }
   return {
@@ -348,6 +433,8 @@ export function computeBindingSync(input: RefCheckInput): BindingSyncResult {
     changed: bound.length > 0 || unbound.length > 0,
   }
 }
+
+// ─── 一致性问题 ──────────────────────────────────────────────────────
 
 /**
  * 肢体风险 lint（Issue #15，**仅警告，永不阻断生成**）
@@ -397,11 +484,20 @@ export function limbRiskIssues(prompts: Record<PromptField, string>): RefIssue[]
   return issues
 }
 
-/** 一致性问题（纯函数，便于测试）：阻断 = missing_image / unbound_mention / scene_conflict / unknown_mention */
+export interface RefCheckInput {
+  prompts: Record<PromptField, string>
+  assets: EpisodeAssetEntry[]
+  bindings: TargetBindings
+}
+
+/**
+ * 一致性问题（纯函数，按生成目标判定）：
+ * 阻断 = unknown_mention / unbound_mention / missing_image / empty_video_prompt；
+ * 警告 = unmentioned_binding / over_capacity / limb_risk。
+ */
 export function computeRefIssues(input: RefCheckInput): RefIssue[] {
   const mentions = mentionsByField(input.prompts, input.assets)
-  const byId = new Map(input.assets.map(asset => [`${asset.kind}:${asset.id}`, asset]))
-  const boundScene = input.sceneId != null ? byId.get(`scene:${input.sceneId}`) ?? null : null
+  const byKey = new Map(input.assets.map(asset => [assetKey(asset.kind, asset.id), asset]))
 
   /** 同一问题在多个字段出现时合并，fields 累加 */
   const issues = new Map<string, RefIssue>()
@@ -411,96 +507,66 @@ export function computeRefIssues(input: RefCheckInput): RefIssue[] {
     for (const field of issue.fields) if (!existing.fields.includes(field)) existing.fields.push(field)
   }
 
-  for (const field of PROMPT_FIELDS) {
-    for (const raw of mentions[field].unknown) {
-      add(`unknown_mention:${raw}`, {
-        code: 'unknown_mention', severity: 'block', fields: [field], name: raw,
-        message: `“@${raw}” 不是本集的角色/场景/道具，请改成本集资产或去掉 @`,
+  for (const target of BINDING_TARGETS) {
+    const bindings = input.bindings[target] || []
+    const bindingOf = new Map(bindings.map(binding => [assetKey(binding.kind, binding.assetId), binding]))
+    const label = TARGET_LABEL[target]
+
+    for (const field of TARGET_PROMPT_FIELDS[target]) {
+      for (const raw of mentions[field].unknown) {
+        add(`unknown_mention:${raw}`, {
+          code: 'unknown_mention', severity: 'block', fields: [field], name: raw,
+          message: `“@${raw}” 不是本集的角色/场景/道具，请改成本集资产或去掉 @`,
+        })
+      }
+      for (const asset of mentions[field].matched) {
+        const key = assetKey(asset.kind, asset.id)
+        const binding = bindingOf.get(key)
+        if (!binding) {
+          add(`unbound_mention:${target}:${key}`, {
+            code: 'unbound_mention', severity: 'block', fields: [field], kind: asset.kind, asset_id: asset.id, name: asset.name,
+            message: `@${asset.name} 还没有绑定到${label}，生成时不会带上它的参考图；重新保存${label}提示词即可按 @ 自动绑定`,
+          })
+        } else if (!(binding.selectedImage || asset.defaultImage)) {
+          add(`missing_image:${key}`, {
+            code: 'missing_image', severity: 'block', fields: [field], kind: asset.kind, asset_id: asset.id, name: asset.name,
+            message: `@${asset.name} 还没有可用的${KIND_LABEL[asset.kind]}图，请先生成${KIND_LABEL[asset.kind]}图`,
+          })
+        }
+      }
+    }
+
+    // 绑定了但该目标提示词没有 @ 它（存量继承的分镜绑定）：仍会被发送，下次保存该目标提示词时解绑
+    const fields = TARGET_PROMPT_FIELDS[target]
+    const hasPrompt = fields.some(field => (input.prompts[field] || '').trim())
+    if (hasPrompt) {
+      const mentioned = new Set(wantedForTarget(target, mentions).map(asset => assetKey(asset.kind, asset.id)))
+      for (const binding of bindings) {
+        const key = assetKey(binding.kind, binding.assetId)
+        const asset = byKey.get(key)
+        if (!asset || mentioned.has(key)) continue
+        add(`unmentioned_binding:${target}:${key}`, {
+          code: 'unmentioned_binding', severity: 'warn', fields: [fields[0]!], kind: asset.kind, asset_id: asset.id, name: asset.name,
+          message: `${label}绑定了${KIND_LABEL[asset.kind]}「${asset.name}」但${label}提示词没有 @ 它，生成时仍会发送它的参考图；保存一次${label}提示词即按 @ 自动解绑`,
+        })
+      }
+    }
+
+    // 装配上限：按图片去重后最多 9 张（视频侧首帧关键帧先占 1 张）
+    const limit = target === 'video' ? REF_IMAGE_LIMIT - 1 : REF_IMAGE_LIMIT
+    const seen: string[] = []
+    for (const entry of boundEntries(input.assets, bindings)) {
+      if (!entry.image) continue
+      if (!seen.includes(entry.image)) seen.push(entry.image)
+      if (seen.indexOf(entry.image) + 1 <= limit) continue
+      const key = assetKey(entry.asset.kind, entry.asset.id)
+      const overflowed = fields.filter(field => mentions[field].matched.some(asset => assetKey(asset.kind, asset.id) === key))
+      if (!overflowed.length) continue
+      add(`over_capacity:${target}:${key}`, {
+        code: 'over_capacity', severity: 'warn', fields: overflowed, kind: entry.asset.kind, asset_id: entry.asset.id, name: entry.asset.name,
+        message: `${label}参考图最多 ${REF_IMAGE_LIMIT} 张${target === 'video' ? '（首帧占 1 张）' : ''}，@${entry.asset.name} 被截断，本次生成不会带上它的参考图`,
       })
     }
-    for (const asset of mentions[field].matched) {
-      const key = `${asset.kind}:${asset.id}`
-      if (asset.kind === 'scene') {
-        if (input.sceneId !== asset.id) {
-          add(`scene_conflict:${key}`, {
-            code: 'scene_conflict', severity: 'block', fields: [field], kind: 'scene', asset_id: asset.id, name: asset.name,
-            message: boundScene
-              ? `提示词 @了场景「${asset.name}」，但本镜绑定的场景是「${boundScene.name}」，请改提示词或改绑场景`
-              : `提示词 @了场景「${asset.name}」，但本镜没有绑定场景，请先绑定该场景`,
-          })
-          continue
-        }
-        if (!asset.imageUrl) {
-          add(`missing_image:${key}`, {
-            code: 'missing_image', severity: 'block', fields: [field], kind: 'scene', asset_id: asset.id, name: asset.name,
-            message: `@${asset.name} 还没有可用的场景图，请先生成场景图`,
-          })
-        }
-        continue
-      }
-      const bound = asset.kind === 'character' ? input.characterIds.includes(asset.id) : input.propIds.includes(asset.id)
-      if (!bound) {
-        add(`unbound_mention:${key}`, {
-          code: 'unbound_mention', severity: 'block', fields: [field], kind: asset.kind, asset_id: asset.id, name: asset.name,
-          message: `@${asset.name} 没有绑定到本镜，生成时不会带上它的参考图，请重新绑定或去掉 @`,
-        })
-      } else if (!asset.imageUrl) {
-        add(`missing_image:${key}`, {
-          code: 'missing_image', severity: 'block', fields: [field], kind: asset.kind, asset_id: asset.id, name: asset.name,
-          message: `@${asset.name} 还没有可用的${KIND_LABEL[asset.kind]}图，请先生成${KIND_LABEL[asset.kind]}图`,
-        })
-      }
-    }
-  }
-
-  const anyPrompt = PROMPT_FIELDS.some(field => (input.prompts[field] || '').trim())
-  const mentionedIds = new Set<string>()
-  const mentionFields = new Map<string, PromptField[]>()
-  for (const field of PROMPT_FIELDS) {
-    for (const asset of mentions[field].matched) {
-      const key = `${asset.kind}:${asset.id}`
-      mentionedIds.add(key)
-      mentionFields.set(key, [...(mentionFields.get(key) || []), field])
-    }
-  }
-
-  // 已绑定但没有任何提示词 @ 它：下次保存提示词会被同步解绑
-  if (anyPrompt) {
-    for (const [kind, ids] of [['character', input.characterIds], ['prop', input.propIds]] as const) {
-      for (const id of ids) {
-        if (mentionedIds.has(`${kind}:${id}`)) continue
-        const name = byId.get(`${kind}:${id}`)?.name || `#${id}`
-        add(`unmentioned_binding:${kind}:${id}`, {
-          code: 'unmentioned_binding', severity: 'warn', fields: [], kind, asset_id: id, name,
-          message: `已绑定${KIND_LABEL[kind]}「${name}」但提示词里没有 @ 它，下次保存提示词会自动解绑`,
-        })
-      }
-    }
-  }
-
-  // 装配上限：场景 → 角色 → 道具、按图片去重后最多 9 张（视频侧首帧关键帧先占 1 张）
-  const orderedBound = input.assets.filter(asset => asset.kind === 'scene'
-    ? asset.id === input.sceneId
-    : (asset.kind === 'character' ? input.characterIds : input.propIds).includes(asset.id))
-    .filter(asset => !!asset.imageUrl)
-  const seen: string[] = []
-  for (const asset of orderedBound) {
-    if (!seen.includes(asset.imageUrl)) seen.push(asset.imageUrl)
-    const position = seen.indexOf(asset.imageUrl) + 1
-    const key = `${asset.kind}:${asset.id}`
-    const fields = mentionFields.get(key) || []
-    if (!fields.length) continue
-    const overflowed: PromptField[] = []
-    for (const field of fields) {
-      // 视频侧（含转场段）首帧关键帧先占 1 张
-      const limit = field === 'video_prompt' || field === 'transition_prompt' ? REF_IMAGE_LIMIT - 1 : REF_IMAGE_LIMIT
-      if (position > limit) overflowed.push(field)
-    }
-    if (!overflowed.length) continue
-    add(`over_capacity:${key}`, {
-      code: 'over_capacity', severity: 'warn', fields: overflowed, kind: asset.kind, asset_id: asset.id, name: asset.name,
-      message: `参考图最多 ${REF_IMAGE_LIMIT} 张，@${asset.name} 被截断，本次生成不会带上它的参考图`,
-    })
   }
 
   // 分镜完整性（Issue #15）：video_prompt 为空直接阻断视频生成——线上 E3#5 就是空提示词
@@ -520,8 +586,38 @@ export function computeRefIssues(input: RefCheckInput): RefIssue[] {
   return [...issues.values()]
 }
 
-/** 当前分镜绑定（角色/道具 id） */
-async function loadBindings(storyboardId: number): Promise<{ characterIds: number[]; propIds: number[] }> {
+/** 分镜当前的一致性问题（读库版本） */
+export async function checkStoryboardRefs(
+  storyboard: typeof schema.storyboards.$inferSelect,
+  assets?: EpisodeAssetEntry[],
+): Promise<RefIssue[]> {
+  return computeRefIssues({
+    prompts: promptFieldsOf(storyboard),
+    assets: assets ?? await loadEpisodeAssets(storyboard.episodeId),
+    bindings: await loadTargetBindings(storyboard.id),
+  })
+}
+
+/** 分镜各目标的绑定（读库版本，API 输出用） */
+export async function loadStoryboardTargetAssets(
+  storyboard: typeof schema.storyboards.$inferSelect,
+  assets?: EpisodeAssetEntry[],
+): Promise<Record<BindingTarget, TargetAssetJson[]>> {
+  return targetAssetsJson(assets ?? await loadEpisodeAssets(storyboard.episodeId), await loadTargetBindings(storyboard.id))
+}
+
+/** 某个目标的参考素材（读库版本，关键帧/视频组装用） */
+export async function collectTargetAssetRefs(
+  storyboardId: number,
+  target: BindingTarget,
+  assets: EpisodeAssetEntry[],
+): Promise<AssetRef[]> {
+  return targetAssetRefs(assets, (await loadTargetBindings(storyboardId))[target])
+}
+
+// ─── 写库 ────────────────────────────────────────────────────────────
+
+async function loadPool(storyboardId: number): Promise<{ characterIds: number[]; propIds: number[] }> {
   const charLinks = await db.select().from(schema.storyboardCharacters)
     .where(eq(schema.storyboardCharacters.storyboardId, storyboardId))
   const propLinks = await db.select().from(schema.storyboardProps)
@@ -529,78 +625,30 @@ async function loadBindings(storyboardId: number): Promise<{ characterIds: numbe
   return { characterIds: charLinks.map(l => l.characterId), propIds: propLinks.map(l => l.propId) }
 }
 
-/** 分镜当前的一致性问题（读库版本） */
-export async function checkStoryboardRefs(
-  storyboard: typeof schema.storyboards.$inferSelect,
-  assets?: EpisodeAssetEntry[],
-): Promise<RefIssue[]> {
-  const list = assets ?? await loadEpisodeAssets(storyboard, storyboard.episodeId)
-  const bindings = await loadBindings(storyboard.id)
-  return computeRefIssues({
-    prompts: promptFieldsOf(storyboard),
-    assets: list,
-    sceneId: storyboard.sceneId ?? null,
-    characterIds: bindings.characterIds,
-    propIds: bindings.propIds,
-  })
-}
-
 /**
- * 造型版本自动选版（Issue #15）：本镜绑定的角色在本集有造型图、且 asset_version_selection
- * 还没有该角色的键时，把造型图写成该镜的选定版本。人工已选的键一律不动。
- * 写进库（而不是只在运行时兜底），这样前端版本选择器显示的就是实际使用的那张图。
- * 所有分镜写入路径（save_storyboards / update_storyboard / PUT /storyboards/:id）都经由
- * syncStoryboardBindingsFromPrompts 调用它，绑定同步之后执行，只覆盖本镜真正出场的角色。
- */
-export async function autofillCostumeSelection(
-  storyboardId: number,
-  characterIds: number[],
-): Promise<Record<string, string>> {
-  const [storyboard] = await db.select().from(schema.storyboards)
-    .where(eq(schema.storyboards.id, storyboardId))
-  if (!storyboard) return {}
-  const selection = parseAssetVersionSelection(storyboard.assetVersionSelection)
-  if (!characterIds.length) return selection
-  const links = await db.select().from(schema.episodeCharacters)
-    .where(eq(schema.episodeCharacters.episodeId, storyboard.episodeId))
-  let changed = false
-  for (const link of links) {
-    if (!characterIds.includes(link.characterId)) continue
-    const version = parseStylingVersion(link.stylingVersion)
-    if (!version?.image_path) continue
-    const key = `character:${link.characterId}`
-    if (selection[key]) continue
-    selection[key] = version.image_path
-    changed = true
-  }
-  if (changed) {
-    await db.update(schema.storyboards)
-      .set({ assetVersionSelection: JSON.stringify(selection) })
-      .where(eq(schema.storyboards.id, storyboardId))
-  }
-  return selection
-}
-
-/**
- * 提示词写入后把角色/道具绑定同步成 @引用 的并集（写库），返回同步结果与最新问题列表。
- * 调用方必须在提示词已落库之后调用。
+ * 提示词写入后的同步（写库）：资产池跟随 5 个提示词的 @ 并集；
+ * `fields` 对应的生成目标按各自提示词的 @ 重算绑定（其他目标不动）。
+ * 调用方必须在提示词已落库之后调用，并传入本次写入的提示词字段。
  */
 export async function syncStoryboardBindingsFromPrompts(
   storyboardId: number,
-): Promise<{ sync: BindingSyncResult; issues: RefIssue[]; characterIds: number[]; propIds: number[] }> {
+  fields: readonly string[],
+): Promise<{
+  sync: BindingSyncResult
+  targetSync: TargetSyncPlan[]
+  issues: RefIssue[]
+  characterIds: number[]
+  propIds: number[]
+  targetAssets: Record<BindingTarget, TargetAssetJson[]>
+}> {
   const [storyboard] = await db.select().from(schema.storyboards)
     .where(eq(schema.storyboards.id, storyboardId))
   if (!storyboard) throw new Error('镜头不存在')
-  const assets = await loadEpisodeAssets(storyboard, storyboard.episodeId)
-  const bindings = await loadBindings(storyboardId)
-  const input: RefCheckInput = {
-    prompts: promptFieldsOf(storyboard),
-    assets,
-    sceneId: storyboard.sceneId ?? null,
-    characterIds: bindings.characterIds,
-    propIds: bindings.propIds,
-  }
-  const sync = computeBindingSync(input)
+  const assets = await loadEpisodeAssets(storyboard.episodeId)
+  const prompts = promptFieldsOf(storyboard)
+
+  const pool = await loadPool(storyboardId)
+  const sync = computeBindingSync({ prompts, assets, ...pool })
   if (sync.changed) {
     for (const item of sync.bound) {
       if (item.kind === 'character') {
@@ -619,10 +667,66 @@ export async function syncStoryboardBindingsFromPrompts(
       }
     }
   }
-  // 绑定确定之后再自动选版：只给本镜出场的角色写入本集造型图，人工已选不覆盖（Issue #15）
-  await autofillCostumeSelection(storyboardId, sync.characterIds)
-  const issues = computeRefIssues({ ...input, characterIds: sync.characterIds, propIds: sync.propIds })
-  return { sync, issues, characterIds: sync.characterIds, propIds: sync.propIds }
+
+  const targetSync = computeTargetSync(prompts, assets, await loadTargetBindings(storyboardId), targetsOfFields(fields))
+  const ts = new Date().toISOString()
+  for (const plan of targetSync) {
+    for (const item of plan.add) {
+      await db.insert(schema.storyboardTargetAssets).values({
+        storyboardId, target: plan.target, kind: item.kind, assetId: item.id, selectedImage: null, createdAt: ts,
+      }).onConflictDoNothing()
+    }
+    for (const item of plan.remove) {
+      await db.delete(schema.storyboardTargetAssets).where(and(
+        eq(schema.storyboardTargetAssets.storyboardId, storyboardId),
+        eq(schema.storyboardTargetAssets.target, plan.target),
+        eq(schema.storyboardTargetAssets.kind, item.kind),
+        eq(schema.storyboardTargetAssets.assetId, item.id),
+      ))
+    }
+  }
+
+  const bindings = await loadTargetBindings(storyboardId)
+  return {
+    sync,
+    targetSync,
+    issues: computeRefIssues({ prompts, assets, bindings }),
+    characterIds: sync.characterIds,
+    propIds: sync.propIds,
+    targetAssets: targetAssetsJson(assets, bindings),
+  }
+}
+
+/** 给某个目标上已绑定的资产选版（image=null 恢复默认）；未绑定时抛错 */
+export async function setTargetAssetImage(
+  storyboardId: number,
+  target: BindingTarget,
+  kind: AssetKind,
+  assetId: number,
+  image: string | null,
+): Promise<void> {
+  const where = and(
+    eq(schema.storyboardTargetAssets.storyboardId, storyboardId),
+    eq(schema.storyboardTargetAssets.target, target),
+    eq(schema.storyboardTargetAssets.kind, kind),
+    eq(schema.storyboardTargetAssets.assetId, assetId),
+  )
+  const [row] = await db.select().from(schema.storyboardTargetAssets).where(where)
+  if (!row) throw new Error(`该${KIND_LABEL[kind]}没有绑定到${TARGET_LABEL[target]}（绑定由${TARGET_LABEL[target]}提示词的 @ 决定）`)
+  await db.update(schema.storyboardTargetAssets).set({ selectedImage: image }).where(where)
+}
+
+/** 删除分镜 / 资产时清理目标级绑定 */
+export async function deleteTargetBindings(filter: { storyboardId: number } | { kind: AssetKind; assetIds: number[] }): Promise<void> {
+  if ('storyboardId' in filter) {
+    await db.delete(schema.storyboardTargetAssets).where(eq(schema.storyboardTargetAssets.storyboardId, filter.storyboardId))
+    return
+  }
+  if (!filter.assetIds.length) return
+  await db.delete(schema.storyboardTargetAssets).where(and(
+    eq(schema.storyboardTargetAssets.kind, filter.kind),
+    inArray(schema.storyboardTargetAssets.assetId, filter.assetIds),
+  ))
 }
 
 /** 某个提示词字段相关的阻断问题（字段级 + 绑定级） */

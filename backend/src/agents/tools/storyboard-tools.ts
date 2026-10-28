@@ -11,7 +11,7 @@ import { now } from '../../utils/response.js'
 import { logTaskProgress, logTaskSuccess } from '../../utils/task-logger.js'
 import { getDramaId, getEpisodeId } from '../context.js'
 import { loadEpisodeKeyframes } from '../../services/keyframes.js'
-import { PROMPT_FIELDS, syncStoryboardBindingsFromPrompts } from '../../services/storyboard-assets.js'
+import { PROMPT_FIELDS, deleteTargetBindings, syncStoryboardBindingsFromPrompts } from '../../services/storyboard-assets.js'
 import { parseReferenceImages, referenceImagePaths } from '../../services/reference-images.js'
 import { stampFieldSavedAt } from '../../services/storyboard-fields.js'
 
@@ -298,6 +298,7 @@ const saveStoryboards = createTool({
           .where(eq(schema.storyboardCharacters.storyboardId, storyboardId))
         await db.delete(schema.storyboardProps)
           .where(eq(schema.storyboardProps.storyboardId, storyboardId))
+        await deleteTargetBindings({ storyboardId })
       }
       await db.delete(schema.storyboards).where(eq(schema.storyboards.episodeId, episodeId))
     }
@@ -364,7 +365,7 @@ const saveStoryboards = createTool({
         await db.update(schema.storyboards).set({ fieldSavedAt: stamp.json })
           .where(eq(schema.storyboards.id, savedId))
       }
-      await syncStoryboardBindingsFromPrompts(savedId)
+      await syncStoryboardBindingsFromPrompts(savedId, writtenFields)
     }
 
     // 整集时长 = 当前全部存活分镜时长之和（分批保存时不能再按单批累加）
@@ -481,9 +482,9 @@ const updateStoryboard = createTool({
     await db.update(schema.storyboards).set(updates).where(eq(schema.storyboards.id, storyboard_id))
     if ('character_ids' in fields) await syncStoryboardCharacters(storyboard_id, fields.character_ids || [])
     if ('prop_ids' in fields) await syncStoryboardProps(storyboard_id, fields.prop_ids || [])
-    // 提示词被写入时绑定完全跟随 @引用（显式传入的 ids 以提示词为准被覆盖）
+    // 提示词被写入时：资产池跟随 @ 并集（显式传入的 ids 以提示词为准被覆盖），写入的目标按各自 @ 重算
     if (PROMPT_FIELDS.some(field => field in fields)) {
-      await syncStoryboardBindingsFromPrompts(storyboard_id)
+      await syncStoryboardBindingsFromPrompts(storyboard_id, Object.keys(fields))
     }
     logTaskSuccess('StoryboardTool', 'update-complete', {
       episodeId,
