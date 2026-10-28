@@ -8,6 +8,7 @@ import { Agent } from '@mastra/core/agent'
 import type { RequestContext } from '@mastra/core/request-context'
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { createOpenAI } from '@ai-sdk/openai'
+import { Agent as HttpAgent, fetch as undiciFetch } from 'undici'
 import { getTextConfig, getTextProviderBaseUrl, getConfigById } from '../services/ai.js'
 import { logTaskProgress } from '../utils/task-logger.js'
 import { scriptTools } from './tools/script-tools.js'
@@ -193,6 +194,23 @@ export const validAgentTypes = Object.keys(DEFAULT_PROMPTS)
 let lastLoggedTextEndpointKey = ''
 
 /**
+ * 文本模型请求的底层 fetch：放宽数据块间隔（bodyTimeout）
+ *
+ * 背景：Agent 已改为流式调用（agents/run.ts），响应头秒级返回；但 GLM 与 DeepSeek 都会把
+ * 工具调用参数生成完再一次性下发（实测 DeepSeek 1817 字参数前约 22s 无数据），
+ * 拆分分镜一次 saveStoryboards 的参数可达上万 token，静默期会超过 undici 默认 bodyTimeout=300s。
+ * 15 分钟覆盖 AI_MAX_TOKENS=32768 量级的输出。fetch 与 dispatcher 同取自 npm undici
+ * （npm 版 dispatcher 交给 Node 内置 fetch 不保证兼容），只作用于文本模型请求，不改全局 dispatcher。
+ */
+const TEXT_MODEL_BODY_TIMEOUT_MS = 15 * 60_000
+const textModelDispatcher = new HttpAgent({ bodyTimeout: TEXT_MODEL_BODY_TIMEOUT_MS })
+type UndiciInput = Parameters<typeof undiciFetch>[0]
+type UndiciInit = NonNullable<Parameters<typeof undiciFetch>[1]>
+// 全局 fetch 与 npm undici 的 Request/Response 类型同构但不同源，TS 无法统一，故在此边界断言
+const textModelFetch = ((input: UndiciInput, init?: UndiciInit) =>
+  undiciFetch(input, { ...init, dispatcher: textModelDispatcher })) as unknown as typeof fetch
+
+/**
  * 关闭思考(thinking)模式
  *
  * 背景：new-api 类中转站对 thinking 模型强制要求多轮请求回传 reasoning_content,
@@ -254,7 +272,7 @@ function createThinkingOffFetch(providerName: string, baseURL: string): typeof f
         }
       }
     } catch { /* 解析失败则原样透传 */ }
-    return fetch(input, init)
+    return textModelFetch(input, init)
   }
 }
 
@@ -267,7 +285,7 @@ function createThinkingOffFetch(providerName: string, baseURL: string): typeof f
  * inner 传 thinking-off fetch 时可链式叠加两个补丁。
  */
 function createTemperatureFetch(providerName: string, temperature: number, inner?: typeof fetch): typeof fetch {
-  const base = inner || fetch
+  const base = inner || textModelFetch
   return async (input: any, init?: any) => {
     try {
       if (init?.body && typeof init.body === 'string') {
@@ -307,7 +325,7 @@ function isOfficialOpenAIHost(baseURL: string) {
 }
 
 function createMaxTokensFetch(providerName: string, inner?: typeof fetch): typeof fetch {
-  const base = inner || fetch
+  const base = inner || textModelFetch
   return async (input: any, init?: any) => {
     try {
       if (init?.body && typeof init.body === 'string') {
@@ -351,7 +369,7 @@ async function getModel(fileModel: string | undefined, modelOverride?: string, t
     ? createTemperatureFetch(providerName, temperature, thinkingOffFetch)
     : thinkingOffFetch
   const fetchImpl = isOfficialOpenAIHost(resolvedBaseURL)
-    ? tempFetch
+    ? tempFetch ?? textModelFetch
     : createMaxTokensFetch(providerName, tempFetch)
 
   if (providerName === 'gemini') {

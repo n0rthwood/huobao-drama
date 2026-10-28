@@ -5,6 +5,7 @@
  */
 import { mastra } from '../mastra/index.js'
 import { buildAgentRequestContext } from '../agents/context.js'
+import { runAgent } from '../agents/run.js'
 import { logTaskError, logTaskProgress, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
 import {
   createTextTask,
@@ -76,7 +77,7 @@ export async function startExtraction(
       modelOverride: opts.model || undefined,
       textConfigId: opts.configId || undefined,
     })
-    return agent.generate([{ role: 'user', content: EXTRACT_MESSAGES[target] }], {
+    return runAgent(agent, [{ role: 'user', content: EXTRACT_MESSAGES[target] }], {
       maxSteps: 20,
       requestContext,
       // 逐步打印 Agent 进展：调用了哪些工具、输出了什么

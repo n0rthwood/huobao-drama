@@ -10,6 +10,7 @@ import { eq } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
 import { mastra } from '../mastra/index.js'
 import { buildAgentRequestContext } from '../agents/context.js'
+import { runAgent } from '../agents/run.js'
 import { logTaskError, logTaskProgress } from '../utils/task-logger.js'
 
 type CharacterRow = typeof schema.characters.$inferSelect
@@ -28,7 +29,7 @@ async function runPromptAgent(episodeId: number, dramaId: number, message: strin
     modelOverride: opts?.model || undefined,
     textConfigId: opts?.configId || undefined,
   })
-  await agent.generate([{ role: 'user', content: message }], { maxSteps: 12, requestContext })
+  await runAgent(agent, [{ role: 'user', content: message }], { maxSteps: 12, requestContext })
 }
 
 /** 确保角色拥有三视图最终提示词，返回最终提示词（失败返回 ''）；force 时忽略已有提示词强制重新生成 */
