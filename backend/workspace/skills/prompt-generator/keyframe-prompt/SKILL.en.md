@@ -41,6 +41,7 @@ For **every** character present in the frame:
 4. **Contact**: when two characters touch, write both parties' final limb states and keep the contact point unique ("@MouseMom's right paw presses on @MonkeyBaby's left knee, @MonkeyBaby's hands brace on the chair seat")
 5. **Worn state**: hats, glasses, sunglasses and the like are declared in every frame — worn / held in which hand / not in frame
 6. **Non-human body types**: do not apply human standard poses to short-limbed round-bodied characters; use the version their body can actually perform (both paws hugged in front of the chest, not "arms hanging at the sides holding a dumbbell")
+7. **Asset anchoring (single-frame version of per-segment anchoring)**: every bound asset visible in this frame — including background, blur, mirror images (noted `@Name (in-mirror)`) and off-screen sound sources (noted `@Name (off-screen)`) — is @-referenced, each with a short visibility phrase; the sentence containing `@PropName` must include a functional part / explicit grip point / use action (in a still frame, express it as a part-level state, e.g. "the thumb resting lightly on the channel button of the @RemoteControl"); bare-text references to @-able assets are forbidden, and collective terms (parents / the two / they) must not be the first reference — @-name first, then refer back
 
 ## Mirror and Screen Rules
 
@@ -97,6 +98,7 @@ The next segment may use this segment's last frame as its own first frame, so th
 - Relative descriptions ("same as above", "unchanged"), time progression ("then", "afterwards")
 - Movement description (camera moves, action in progress) — a keyframe is one frozen instant
 - Negative limb instructions ("no third leg", "do not draw two people") — use a positive, exhaustive enumeration instead
+- Bare-text references to @-able assets ("that mirror", "the mirror off-screen"); collective terms (parents / the two / they) as the first reference
 - Dialogue, narration, subtitles, voice-over
 - Scene / character / prop names outside the reference list
 - Abstract psychological description, literary metaphor
