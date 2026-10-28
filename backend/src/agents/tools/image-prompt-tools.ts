@@ -15,6 +15,7 @@ import { eq } from 'drizzle-orm'
 import { now } from '../../utils/response.js'
 import { getDramaStylePrompt } from '../../services/style-preset.js'
 import { getDramaId } from '../context.js'
+import { sceneFinalPromptCoversTime, sceneTimeMissingMessage } from '../../services/scene-time.js'
 
 // ─── 角色提示词 ───────────────────────────────────────
 
@@ -98,10 +99,10 @@ const readScenes = createTool({
 
 const saveSceneFinalPrompt = createTool({
   id: 'save_scene_final_prompt',
-  description: '保存为场景创作的固定视角（前景/中景/后景）最终提示词。项目视觉风格会由工具自动拼接，prompt 参数中不要包含风格词。',
+  description: '保存为场景创作的固定视角（前景/中景/后景）最终提示词。项目视觉风格会由工具自动拼接，prompt 参数中不要包含风格词。场景 time 非空时 prompt 必须原样包含 time 文字，否则拒绝保存。',
   inputSchema: z.object({
     scene_id: z.number(),
-    prompt: z.string().describe('场景固定视角最终提示词（使用会话语言指令指定的目标语言，不含风格词）'),
+    prompt: z.string().describe('场景固定视角最终提示词（使用会话语言指令指定的目标语言，不含风格词；必须原样包含场景 time）'),
   }),
   execute: async ({ scene_id, prompt }, context) => {
     const dramaId = getDramaId(context?.requestContext)
@@ -109,6 +110,10 @@ const saveSceneFinalPrompt = createTool({
     const [s] = await db.select().from(schema.scenes)
       .where(eq(schema.scenes.id, scene_id))
     if (!s) return { error: 'Scene not found' }
+    // 场景时间是正式字段（Issue #21）：最终提示词必须引用它，不满足则让 Agent 重写
+    if (!sceneFinalPromptCoversTime(prompt, s.time)) {
+      return { error: `${sceneTimeMissingMessage(s.time!)}；未保存，请按 time 改写后重新调用 save_scene_final_prompt`, saved: false }
+    }
 
     const stylePrompt = await getDramaStylePrompt(dramaId)
     const finalPrompt = stylePrompt ? `${stylePrompt}, ${prompt}` : prompt

@@ -47,7 +47,7 @@ All set dressing, period texture, and key visual elements in `prompt` (scene des
 ## Viewpoint & Atmosphere
 
 - A stable eye-level or slightly high-angle wide shot; no extreme high/low angles, fisheye, or tilted composition (it will be reused repeatedly as a fixed scene)
-- Determine the time period and overall lighting scheme from `location` + `time` (day / night / dusk are completely different lighting schemes)
+- Determine the time period and overall lighting scheme from `location` + `time` (day / night / dusk are completely different lighting schemes). **When `time` is not empty, the prompt must contain the exact `time` text verbatim** (e.g. "afternoon"), with lighting written for that period and never contradicting the period in `lighting` — `save_scene_final_prompt` rejects prompts that do not contain the `time` text
 - Make mood words concrete: "oppressive" → "stifling air, dim and low light"; do not write only abstract emotion words
 - Do not mix unrelated words into the output
 
