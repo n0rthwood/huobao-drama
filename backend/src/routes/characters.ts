@@ -11,6 +11,7 @@ import { deleteAllReferenceImages, partitionMissingReferences, resolveReferenceI
 import { deleteAssetLinks } from '../services/asset-links.js'
 import { getStylingVersion, saveStylingVersion } from '../services/styling-version.js'
 import { mountReferenceImageRoutes } from './reference-images.js'
+import { planFinalPromptWrite, promptSourceChanged } from '../services/asset-prompt-invalidation.js'
 
 const app = new Hono()
 const CHARACTER_IMAGE_SIZE = '1920x1080'
@@ -64,17 +65,23 @@ function characterImagePrompt(char: typeof schema.characters.$inferSelect, style
 app.put('/:id', async (c) => {
   const id = Number(c.req.param('id'))
   const body = await c.req.json()
+  const [char] = await db.select().from(schema.characters).where(eq(schema.characters.id, id))
+  if (!char) return badRequest(c, '角色不存在')
   const updates: Record<string, any> = { updatedAt: now() }
   for (const key of ['name', 'role', 'description', 'appearance', 'styling', 'imageUrl', 'localPath']) {
     const snakeKey = key.replace(/[A-Z]/g, m => '_' + m.toLowerCase())
     if (snakeKey in body) updates[key] = body[snakeKey]
     else if (key in body) updates[key] = body[key]
   }
-  // 手动编辑最终提示词时以传入值为准；未传入则保留原值（修改信息时不再自动置空）
-  if (body.final_prompt !== undefined) updates.finalPrompt = body.final_prompt || null
-  else if (body.finalPrompt !== undefined) updates.finalPrompt = body.finalPrompt || null
+  // 手写最终提示词以传入值为准；否则样貌/造型/描述改了值 → 旧提示词失效（Issue #24）
+  Object.assign(updates, planFinalPromptWrite({
+    currentFinalPrompt: char.finalPrompt,
+    finalPrompt: body.final_prompt !== undefined ? body.final_prompt : body.finalPrompt,
+    sourceChanged: promptSourceChanged('character', char, updates),
+  }))
   await db.update(schema.characters).set(updates).where(eq(schema.characters.id, id))
-  return success(c)
+  const [updated] = await db.select().from(schema.characters).where(eq(schema.characters.id, id))
+  return success(c, toSnakeCase(updated))
 })
 
 // DELETE /characters/:id

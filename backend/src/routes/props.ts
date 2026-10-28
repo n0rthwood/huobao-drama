@@ -10,6 +10,7 @@ import { logTaskError, logTaskStart, logTaskSuccess, logTaskWarn } from '../util
 import { deleteAllReferenceImages, partitionMissingReferences, resolveReferenceImages } from '../services/reference-images.js'
 import { deleteAssetLinks } from '../services/asset-links.js'
 import { mountReferenceImageRoutes } from './reference-images.js'
+import { planFinalPromptWrite, promptSourceChanged } from '../services/asset-prompt-invalidation.js'
 
 const app = new Hono()
 // 道具图：白底单品静物，方形画布
@@ -59,6 +60,8 @@ app.delete('/:id', async (c) => {
 app.put('/:id', async (c) => {
   const id = Number(c.req.param('id'))
   const body = await c.req.json()
+  const [prop] = await db.select().from(schema.props).where(eq(schema.props.id, id))
+  if (!prop) return badRequest(c, '道具不存在')
   const updates: Record<string, any> = { updatedAt: now() }
   if (body.name !== undefined) updates.name = body.name
   if (body.type !== undefined) updates.type = body.type
@@ -68,11 +71,15 @@ app.put('/:id', async (c) => {
   else if (body.imageUrl !== undefined) updates.imageUrl = body.imageUrl
   if (body.local_path !== undefined) updates.localPath = body.local_path
   else if (body.localPath !== undefined) updates.localPath = body.localPath
-  // 手动编辑最终提示词时以传入值为准；未传入则保留原值（修改信息时不再自动置空）
-  if (body.final_prompt !== undefined) updates.finalPrompt = body.final_prompt || null
-  else if (body.finalPrompt !== undefined) updates.finalPrompt = body.finalPrompt || null
+  // 手写最终提示词以传入值为准；否则名称/类型/描述改了值 → 旧提示词失效（Issue #24）
+  Object.assign(updates, planFinalPromptWrite({
+    currentFinalPrompt: prop.finalPrompt,
+    finalPrompt: body.final_prompt !== undefined ? body.final_prompt : body.finalPrompt,
+    sourceChanged: promptSourceChanged('prop', prop, updates),
+  }))
   await db.update(schema.props).set(updates).where(eq(schema.props.id, id))
-  return success(c)
+  const [updated] = await db.select().from(schema.props).where(eq(schema.props.id, id))
+  return success(c, toSnakeCase(updated))
 })
 
 /** 本地兜底提示词：白底单品，不掺杂其他元素 */

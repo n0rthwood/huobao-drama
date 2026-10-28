@@ -822,6 +822,8 @@
       "generatingPrompt": "최종 프롬프트 생성 중…",
       "promptGenerated": "최종 프롬프트가 생성되었습니다",
       "promptRegenerated": "최종 프롬프트가 다시 생성되었습니다",
+      "promptReadyFor": "「{name}」의 최종 프롬프트가 생성되었습니다",
+      "savedBeforePrompt": "변경 사항을 먼저 저장하고 최신 정보로 프롬프트를 생성합니다…",
       "promptGenFailedRetry": "최종 프롬프트 생성에 실패했습니다. 다시 시도하세요",
       "promptGenFailed": "최종 프롬프트 생성에 실패했습니다",
       "promptCopied": "최종 프롬프트가 복사되었습니다",

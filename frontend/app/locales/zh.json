@@ -822,6 +822,8 @@
       "generatingPrompt": "正在生成最终提示词…",
       "promptGenerated": "最终提示词已生成",
       "promptRegenerated": "最终提示词已重新生成",
+      "promptReadyFor": "「{name}」的最终提示词已生成",
+      "savedBeforePrompt": "已先保存修改，按最新信息生成提示词…",
       "promptGenFailedRetry": "最终提示词生成失败，请重试",
       "promptGenFailed": "最终提示词生成失败",
       "promptCopied": "最终提示词已复制",

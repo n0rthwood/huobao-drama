@@ -822,6 +822,8 @@
       "generatingPrompt": "Generating final prompt…",
       "promptGenerated": "Final prompt generated",
       "promptRegenerated": "Final prompt regenerated",
+      "promptReadyFor": "Final prompt for \"{name}\" is ready",
+      "savedBeforePrompt": "Changes saved first; generating the prompt from the latest details…",
       "promptGenFailedRetry": "Final prompt generation failed, please retry",
       "promptGenFailed": "Final prompt generation failed",
       "promptCopied": "Final prompt copied",

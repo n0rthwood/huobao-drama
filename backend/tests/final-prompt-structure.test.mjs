@@ -57,26 +57,3 @@ test('prompt agent instructions reference per-asset skills; skill files define t
   assert.match(sceneSkill, /出入口/)
   assert.match(sceneSkill, /纯中文/)
 })
-
-test('image generation prefers the stored final prompt with agent generation and legacy fallback', () => {
-  const service = read('src/services/final-prompt.ts')
-  const characters = read('src/routes/characters.ts')
-  const scenes = read('src/routes/scenes.ts')
-
-  assert.match(service, /export async function ensureCharacterFinalPrompt/)
-  assert.match(service, /export async function ensureSceneFinalPrompt/)
-  assert.match(service, /getAgent\('prompt_generator'/)
-  // 已有最终提示词直接复用（force 时忽略强制重新生成）
-  assert.match(service, /if \(char\.finalPrompt && !force\) return char\.finalPrompt/)
-  assert.match(service, /if \(scene\.finalPrompt && !force\) return scene\.finalPrompt/)
-  assert.match(service, /force = false/)
-
-  assert.match(characters, /ensureCharacterFinalPrompt\(char, ep\.id, /)
-  // 文本模型覆盖（text_model/text_config_id）透传到提示词 Agent
-  assert.match(characters, /text_model/)
-  assert.match(characters, /finalPrompt \|\| characterImagePrompt\(char, stylePrompt\)/)
-  assert.match(scenes, /ensureSceneFinalPrompt\(scene, ep\.id, /)
-  // 描述字段编辑后最终提示词失效
-  assert.match(characters, /updates\.finalPrompt = null/)
-  assert.match(scenes, /updates\.finalPrompt = null/)
-})

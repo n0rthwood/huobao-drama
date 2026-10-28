@@ -6,7 +6,8 @@
  * 1. 角色 → 三视图（character turnaround：正面/侧面/背面）
  * 2. 场景 → 固定视角 + 前景/中景/后景分层构图
  * 3. 道具 → 白底单品静物（single product shot on pure white background）
- * 工具负责读取资产信息与保存 Agent 产出的最终提示词（保存时注入项目视觉风格）
+ * 工具负责读取资产信息与保存 Agent 产出的最终提示词（保存时注入项目视觉风格）。
+ * 读取工具不返回已存的最终提示词：重写必须只依据最新的资产信息，不能照着旧稿改（Issue #24）
  */
 import { createTool } from '@mastra/core/tools'
 import { z } from 'zod'
@@ -37,7 +38,6 @@ const readCharacters = createTool({
         description: c.description || '',
         appearance: c.appearance || '',
         styling: c.styling || '',
-        final_prompt: c.finalPrompt || '',
       })),
     }
   },
@@ -91,7 +91,6 @@ const readScenes = createTool({
         time: s.time || '',
         prompt: s.prompt || '',
         lighting: s.lighting || '',
-        final_prompt: s.finalPrompt || '',
       })),
     }
   },
@@ -148,7 +147,6 @@ const readProps = createTool({
         name: p.name,
         type: p.type || '',
         description: p.description || '',
-        final_prompt: p.finalPrompt || '',
       })),
     }
   },

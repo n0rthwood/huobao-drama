@@ -10,6 +10,7 @@ import { deleteAllReferenceImages, partitionMissingReferences, resolveReferenceI
 import { deleteAssetLinks } from '../services/asset-links.js'
 import { mountReferenceImageRoutes } from './reference-images.js'
 import { planSceneTimePatch } from '../services/scene-time.js'
+import { promptSourceChanged } from '../services/asset-prompt-invalidation.js'
 import { toSnakeCase } from '../utils/transform.js'
 
 const app = new Hono()
@@ -52,20 +53,21 @@ app.put('/:id', async (c) => {
   const body = await c.req.json()
   const [scene] = await db.select().from(schema.scenes).where(eq(schema.scenes.id, id))
   if (!scene) return badRequest(c, '场景不存在')
-  // 场景时间不变量（Issue #21）：提示词必须引用 time，改时间让旧提示词失效
+  const updates: Record<string, any> = { updatedAt: now() }
+  if (body.location !== undefined) updates.location = body.location
+  if (body.prompt !== undefined) updates.prompt = body.prompt
+  if (body.description !== undefined) updates.prompt = body.description
+  if (body.lighting !== undefined) updates.lighting = body.lighting
+  // 场景时间不变量（Issue #21）：提示词必须引用 time；改时间或画面字段让旧提示词失效（Issue #24）
   const timePatch = planSceneTimePatch({
     currentTime: scene.time,
     currentFinalPrompt: scene.finalPrompt,
     time: body.time,
     finalPrompt: body.final_prompt !== undefined ? body.final_prompt : body.finalPrompt,
+    sourceChanged: promptSourceChanged('scene', scene, updates),
   })
   if ('error' in timePatch) return badRequest(c, timePatch.error)
-  const updates: Record<string, any> = { updatedAt: now() }
-  if (body.location !== undefined) updates.location = body.location
   if (timePatch.time !== undefined) updates.time = timePatch.time
-  if (body.prompt !== undefined) updates.prompt = body.prompt
-  if (body.description !== undefined) updates.prompt = body.description
-  if (body.lighting !== undefined) updates.lighting = body.lighting
   // 用户上传场景图：直接写入图片地址与本地路径
   const uploadedImage = body.image_url ?? body.imageUrl
   if (uploadedImage !== undefined) {
