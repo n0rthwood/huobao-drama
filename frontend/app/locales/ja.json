@@ -217,7 +217,9 @@
       "missing": "ファイルなし",
       "missingHint": "ファイルが存在しません。生成時はスキップされます。この項目を削除してください",
       "confirmTitle": "参照画像の削除",
-      "confirmMessage": "この参照画像は生成に使われなくなり、ファイルも削除されます。完成画像には影響しません。"
+      "confirmMessage": "この参照画像は生成に使われなくなり、ファイルも削除されます。完成画像には影響しません。",
+      "copiedFrom": "ライブラリ",
+      "copiedFromTitle": "素材ライブラリから：{src}"
     },
     "assetBrowser": {
       "title": "アセットマネージャー",
@@ -840,7 +842,22 @@
       "versionHint": "再生成とアップロードは別バージョンとして保持されます。サムネイルをクリックして採用します。",
       "unknownEngine": "不明なエンジン",
       "versionSelected": "採用バージョンを切り替えました",
-      "versionSelectFailed": "バージョンの切り替えに失敗しました"
+      "versionSelectFailed": "バージョンの切り替えに失敗しました",
+      "timeCustom": "自由入力",
+      "timePlaceholder": "例：早朝 / 雨上がりの夕暮れ",
+      "timeHint": "時間帯はシーンのプロンプトに入ります",
+      "timeRequired": "シーンの時間は空にできません",
+      "refSectionTitle": "参考画像",
+      "refSectionHint": "生成のガイドで完成画像ではありません。追加・削除・ライブラリから選択できます",
+      "timePeriods": {
+        "dawn": "早朝",
+        "morning": "午前",
+        "noon": "正午",
+        "afternoon": "午後",
+        "dusk": "夕暮れ",
+        "night": "夜",
+        "lateNight": "深夜"
+      }
     },
     "create": {
       "title": "{type}を追加",
@@ -962,7 +979,8 @@
       "targetVersionDefault": "デフォルト",
       "targetVersionDefaultImage": "デフォルト画像",
       "targetVersionSelected": "{name} は選択したバージョンに変更されました",
-      "targetVersionReset": "{name} はデフォルトに戻りました"
+      "targetVersionReset": "{name} はデフォルトに戻りました",
+      "cardOpenDetail": "カードをクリックで詳細と履歴バージョン"
     },
     "vid": {
       "shotCount": "{n} ショット",

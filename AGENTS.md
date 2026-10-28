@@ -96,6 +96,14 @@ Issue 整理完成后、实施前，必须让 **Fabel（Anthropic）或 Astra（
 - 后端 Hono：`5679`。根目录 `npm run dev:backend` 已固定 `PORT=5679`（本机环境变量可能带 `PORT=5010`，属于 omp web UI）。
 - 本机只应有这两个监听；验证：`curl localhost:3013/api/v1/health`、`curl localhost:5679/api/v1/health`。
 
+### 页面尺寸规格（Issue #20，前端改版必须遵守）
+- 工作台（`layouts/studio.vue` + `views/drama/episode.vue` 的 `.studio`）**最小可用宽度 1280px**：更窄的视口由布局层横向滚动，不再收缩内容；因此 episode.vue 不再有 `max-width` 收缩断点，新增样式也不要加。
+- 按 1440 / 1920 设计；≥2560 时卡片保持最大尺寸、只增加列数，不放大单卡。
+- 所有展示图片的区域一律是**流式卡片网格**（`repeat(auto-fill, minmax(最小, 最大))` + `justify-content: start`），卡片同时有最小与最大宽度，图片 `object-fit: contain`：本帧参考图/视频绑定参考图 `TargetAssetList` 120–180px、本镜资产池 160–240px（图片区约 60% 卡片高度）、`ReferenceImageManager` 紧凑 64–96px / 大号（详情弹窗）120–200px。禁止整行长条 + 小缩略图，也不要在有横向空间时竖排一列。
+- 关键帧槽位 = 左图片列 `clamp(320px, 30%, 640px)`（按剧集画幅 `aspect-ratio`，时间/版本等元信息在图片下方）+ 右提示词列 `minmax(420px, 1fr)`（`MentionTextarea` 带 `autogrow`），「本帧参考图」横跨整行；分镜列表宽度 `clamp(260px, 18vw, 340px)`。
+- 覆盖在图片上的标签（`.asset-cover-badge` / `.asset-cover-time`）背景与文字都必须取主题变量（`--header-bg` / `--text-1`），禁止写死白底。
+- 选中状态必须有明确标识（描边 + 勾选按钮 `aria-pressed`），不能只靠颜色文字或透明度。
+
 ### 进程管理：pm2（不要用 omp 会话跑 dev 服务）
 - 前后端 dev 服务（保留热加载）由 pm2 管理，配置 `ecosystem.config.cjs`（`huobao-backend` 5679、`huobao-frontend` 3013）。omp 会话/daemon 结束后进程会跟着丢，所以**不要**用 omp 的 bash service/daemon 启动它们。
 - pm2 装在 `~/.local`（全局 `/usr` 无写权限，不要 sudo）。**一律通过 `scripts/pm2.sh` 调用**：`scripts/pm2.sh start ecosystem.config.cjs | restart all | stop all | status | logs huobao-backend`。

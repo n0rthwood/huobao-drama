@@ -623,6 +623,7 @@
             @preview="openImageViewer"
             @goto-assets="prodTab = 'assets'"
             @toggle-bind="toggleShotBind"
+            @open-asset="openPoolAssetDetail"
             @update-field="updateField"
             @field-dirty="markFieldDirty"
           />
@@ -1309,6 +1310,26 @@
                   <span class="dim">{{ assetDetail.type === 'character' ? t('episode.asset.editHintChar') : assetDetail.type === 'prop' ? t('episode.asset.editHintProp') : t('episode.asset.editHintScene') }}</span>
                 </div>
 
+                <div v-if="assetDetail.type === 'scene'" class="asset-detail-time-row">
+                  <span class="asset-detail-time-label">{{ t('episode.asset.timeLabel') }}</span>
+                  <select
+                    class="input asset-detail-time-select"
+                    :value="TIME_PERIODS.includes(assetDetailDraft.time) ? assetDetailDraft.time : '__custom__'"
+                    :aria-label="t('episode.asset.timeLabel')"
+                    @change="onSceneTimePreset($event.target.value)"
+                  >
+                    <option v-for="period in TIME_PERIODS" :key="period" :value="period">{{ timePeriodLabel(period) }}</option>
+                    <option value="__custom__">{{ t('episode.asset.timeCustom') }}</option>
+                  </select>
+                  <input
+                    v-model="assetDetailDraft.time"
+                    class="input asset-detail-time-input"
+                    :placeholder="t('episode.asset.timePlaceholder')"
+                    :aria-label="t('episode.asset.timeCustom')"
+                  />
+                  <span class="dim asset-detail-time-hint">{{ t('episode.asset.timeHint') }}</span>
+                </div>
+
                 <div v-if="assetDetail.type === 'prop'" class="asset-detail-edit-grid asset-detail-edit-grid--prop">
                   <label class="asset-detail-edit-field">
                     <span>{{ t('episode.asset.appearanceOfObject') }}</span>
@@ -1362,6 +1383,23 @@
 
               </section>
             </div>
+
+            <section class="asset-detail-ref-panel">
+              <div class="asset-detail-section-title">
+                <span>{{ t('episode.asset.refSectionTitle') }}</span>
+                <span class="dim">{{ t('episode.asset.refSectionHint') }}</span>
+              </div>
+              <ReferenceImageManager
+                :key="`${assetDetail.type}-${assetDetail.item.id}`"
+                :asset-type="assetDetail.type"
+                :asset-id="assetDetail.item.id"
+                :references="assetDetail.item.reference_images ?? assetDetail.item.referenceImages"
+                :drama-id="dramaId"
+                size="large"
+                @update="onAssetRefsUpdate(assetDetail.item, $event)"
+                @preview="openImageViewer"
+              />
+            </section>
 
             <section class="asset-detail-prompt-panel">
               <div class="asset-detail-section-title">
@@ -1975,7 +2013,7 @@ async function toggleExportDone() {
   }
 }
 const assetDetail = ref({ open: false, type: '', item: null })
-const assetDetailDraft = ref({ appearance: '', styling: '', prompt: '', lighting: '', description: '' })
+const assetDetailDraft = ref({ appearance: '', styling: '', prompt: '', lighting: '', description: '', time: '' })
 // 最终提示词手动编辑：dirty 时才随保存提交，避免无修改保存误清空 Agent 生成的提示词
 const assetPromptDraft = ref('')
 const assetPromptDirty = ref(false)
@@ -1995,6 +2033,24 @@ function closeImageViewer() {
   imageViewer.value = { open: false, src: '', title: '' }
 }
 
+// 场景时段词表：与 #21 的提取/提示词规则同一套（入库值固定为中文词，界面按语言显示）
+const TIME_PERIODS = ['清晨', '上午', '正午', '午后', '黄昏', '夜晚', '深夜']
+const TIME_PERIOD_KEYS = {
+  清晨: 'dawn', 上午: 'morning', 正午: 'noon', 午后: 'afternoon', 黄昏: 'dusk', 夜晚: 'night', 深夜: 'lateNight',
+}
+function timePeriodLabel(period) {
+  const key = TIME_PERIOD_KEYS[period]
+  return key ? t(`episode.asset.timePeriods.${key}`) : period
+}
+function onSceneTimePreset(value) {
+  if (value === '__custom__') {
+    // 切到自填：保留已有自填值，常用时段值清空让用户输入
+    if (TIME_PERIODS.includes(assetDetailDraft.value.time)) assetDetailDraft.value.time = ''
+    return
+  }
+  assetDetailDraft.value.time = value
+}
+
 function openAssetDetail(type, item) {
   if (!item) return
   assetDetail.value = { open: true, type, item }
@@ -2004,14 +2060,23 @@ function openAssetDetail(type, item) {
     prompt: item.prompt || (type === 'prop' ? '' : item.description) || '',
     lighting: item.lighting || '',
     description: item.description || '',
+    time: item.time || '',
   }
   assetPromptDraft.value = item.final_prompt || item.finalPrompt || ''
   assetPromptDirty.value = false
 }
 
+/** 关键帧资产池卡片 → 打开同一个资产详情弹窗（卡片携带 kind code 与资产 id） */
+function openPoolAssetDetail(asset) {
+  if (!asset?.kind) return
+  const list = asset.kind === 'character' ? chars.value : asset.kind === 'scene' ? scenes.value : propItems.value
+  const item = list.find(x => x.id === asset.id)
+  if (item) openAssetDetail(asset.kind, item)
+}
+
 function closeAssetDetail() {
   assetDetail.value = { open: false, type: '', item: null }
-  assetDetailDraft.value = { appearance: '', styling: '', prompt: '', lighting: '', description: '' }
+  assetDetailDraft.value = { appearance: '', styling: '', prompt: '', lighting: '', description: '', time: '' }
   assetPromptDraft.value = ''
   assetPromptDirty.value = false
 }
@@ -2201,6 +2266,12 @@ async function saveAssetDetail() {
   } else if (detail.type === 'scene') {
     if (assetDetailDraft.value.prompt !== (item.prompt || '')) payload.prompt = assetDetailDraft.value.prompt
     if (assetDetailDraft.value.lighting !== (item.lighting || '')) payload.lighting = assetDetailDraft.value.lighting
+    const time = assetDetailDraft.value.time.trim()
+    if (!time) {
+      toast.error(t('episode.asset.timeRequired'))
+      return
+    }
+    if (time !== (item.time || '')) payload.time = time
   } else {
     if (assetDetailDraft.value.description !== (item.description || '')) payload.description = assetDetailDraft.value.description
   }
@@ -2213,21 +2284,30 @@ async function saveAssetDetail() {
   }
   savingAssetDetail.value = true
   try {
-    if (detail.type === 'character') await characterAPI.update(item.id, payload)
-    else if (detail.type === 'scene') await sceneAPI.update(item.id, payload)
-    else await propAPI.update(item.id, payload)
+    let res = null
+    if (detail.type === 'character') res = await characterAPI.update(item.id, payload)
+    else if (detail.type === 'scene') res = await sceneAPI.update(item.id, payload)
+    else res = await propAPI.update(item.id, payload)
     // 本地同步：手动编辑的提示词以草稿为准；仅信息字段变更时提示词已被后端置空
     const { final_prompt, ...infoPatch } = payload
-    const promptValue = assetPromptDirty.value ? (payload.final_prompt || null) : (infoChanged ? null : (item.final_prompt || item.finalPrompt || null))
+    let promptValue = assetPromptDirty.value ? (payload.final_prompt || null) : (infoChanged ? null : (item.final_prompt || item.finalPrompt || null))
+    // 服务端返回整行时以它为准（场景改时间后提示词是否失效由服务端决定）
+    if (res && typeof res === 'object' && res.id === item.id) {
+      for (const key of Object.keys(infoPatch)) {
+        if (res[key] !== undefined) infoPatch[key] = res[key]
+      }
+      if (res.final_prompt !== undefined) promptValue = res.final_prompt || null
+    }
     Object.assign(item, infoPatch, { final_prompt: promptValue, finalPrompt: promptValue })
     const list = detail.type === 'character' ? chars.value : detail.type === 'scene' ? scenes.value : propItems.value
     const target = list.find(x => x.id === item.id)
     if (target) Object.assign(target, infoPatch, { final_prompt: promptValue, finalPrompt: promptValue })
-    if (assetPromptDirty.value) assetPromptDraft.value = payload.final_prompt || ''
+    if (detail.type === 'scene') assetDetailDraft.value.time = item.time || ''
+    assetPromptDraft.value = promptValue || ''
     assetPromptDirty.value = false
     toast.success(t('episode.asset.saved'))
   } catch (e) {
-    toastError(e, { fallback: 'episode.asset.saveFailed' })
+    toastServerMessage(e, { fallback: 'episode.asset.saveFailed' })
   } finally {
     savingAssetDetail.value = false
   }
@@ -4102,6 +4182,8 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
   flex-direction: column;
   height: 100vh;
   overflow: hidden;
+  /* 页面尺寸规格：最小可用宽度 1280px，更窄由外层横向滚动，不再继续压缩 */
+  min-width: 1280px;
   padding: 8px;
   gap: 8px;
   background: var(--surface-base);
@@ -5104,11 +5186,12 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
   align-items: center;
   padding: 2px 7px;
   border-radius: 999px;
-  background: rgba(255,255,255,0.85);
+  /* 背景与文字都取主题变量：深色主题下不再是白底浅字 */
+  background: var(--header-bg);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-  color: var(--text-2);
+  box-shadow: var(--shadow-xs);
+  color: var(--text-1);
   font-size: 9.5px;
   font-weight: 700;
 }
@@ -5119,20 +5202,21 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
   bottom: 7px;
   padding: 2px 7px;
   border-radius: 999px;
-  background: rgba(255,255,255,0.85);
+  background: var(--header-bg);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-  color: var(--text-2);
+  box-shadow: var(--shadow-xs);
+  color: var(--text-1);
   font-size: 9.5px;
   font-weight: 700;
 }
+/* 状态色只给文字与描边，背景始终是主题的半透明底色，压在任何封面上都可读 */
 .asset-cover-badge.is-ready {
-  background: var(--success-bg);
-  color: var(--tag-success-text);
+  box-shadow: var(--shadow-xs), inset 0 0 0 1px var(--success);
+  color: var(--success);
 }
 .asset-cover-badge.is-pending {
-  background: var(--accent-bg);
+  box-shadow: var(--shadow-xs), inset 0 0 0 1px var(--accent);
   color: var(--accent-text);
 }
 .asset-cover-empty { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: var(--text-3); }
@@ -5834,6 +5918,11 @@ button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
   background: var(--surface-muted);
 }
 .video-inspector-section { display: flex; flex-direction: column; gap: 7px; }
+/* 检查器窄栏（可拖拽，常在 260–340px）：卡片按栏宽均分成多列，不留整列空白 */
+.video-inspector-section :deep(.target-assets) {
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+}
+.video-inspector-section :deep(.target-asset) { max-width: 180px; }
 .video-inspector-label { color: var(--text-0); font-size: 12px; font-weight: 700; }
 .video-inspector-label-hero {
   color: var(--accent);
@@ -6216,10 +6305,24 @@ button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
+/* 单字段分组（角色/场景/道具）：整列占满宽度，不留半宽空白 */
 .asset-detail-edit-grid--character,
-.asset-detail-edit-grid--scene {
+.asset-detail-edit-grid--scene,
+.asset-detail-edit-grid--prop {
   grid-template-columns: 1fr;
 }
+/* 场景时间：常用时段下拉 + 自填输入 */
+.asset-detail-time-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.asset-detail-time-label { font-size: 12px; font-weight: 600; color: var(--text-1); flex: none; }
+.asset-detail-time-select { width: 140px; flex: none; }
+.asset-detail-time-input { flex: 1; min-width: 160px; }
+.asset-detail-time-hint { font-size: 11px; flex: none; }
 .asset-detail-edit-field {
   min-width: 0;
   display: flex;
@@ -6331,6 +6434,17 @@ button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
   flex-direction: column;
   gap: 8px;
 }
+/* 弹窗内参考图区：大号卡片网格，横跨整个弹窗宽度 */
+.asset-detail-ref-panel {
+  min-width: 0;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--surface-outline);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.asset-detail-ref-panel :deep(.ref-images) { border-top: 0; padding-top: 0; }
 .asset-detail-prompt-head-actions {
   display: flex;
   align-items: center;
@@ -6614,225 +6728,5 @@ button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
 /* Shared */
 .dim { color: var(--text-3); }
 
-@media (max-width: 1080px) {
-  .studio-body {
-    grid-template-columns: 1fr;
-  }
-
-  .video-task-workbench.has-player {
-    grid-template-columns: var(--vleft, 208px) minmax(0, 1fr);
-  }
-
-  .video-task-side {
-    grid-template-columns: minmax(0, 1fr) var(--vright, 260px);
-  }
-
-  .split-layout,
-  .export-split {
-    flex-direction: column;
-  }
-
-  .sb-scene-select { max-width: none; flex: 1; }
-
-  .detail-panel {
-    min-height: 420px;
-  }
-
-  .field-grid-4 {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .character-asset-grid {
-    grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
-  }
-
-  .video-task-head {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .video-task-metrics {
-    width: 100%;
-    margin-left: 0;
-    justify-content: flex-start;
-  }
-
-  .video-task-row {
-    grid-template-columns: 56px minmax(0, 1fr);
-  }
-
-  .video-task-action {
-    justify-self: start;
-  }
-
-  .image-viewer-overlay {
-    padding: 16px;
-  }
-
-  .image-viewer-dialog {
-    width: calc(100vw - 32px);
-    max-height: calc(100vh - 32px);
-  }
-
-  .asset-detail-overlay {
-    padding: 16px;
-  }
-
-  .asset-detail-dialog {
-    width: calc(100vw - 32px);
-    max-height: calc(100vh - 32px);
-  }
-
-  .asset-detail-shell {
-    grid-template-columns: 1fr;
-  }
-
-  .asset-detail-preview-panel {
-    position: static;
-  }
-
-  .asset-detail-grid,
-  .asset-detail-edit-grid,
-  .asset-detail-text-block {
-    grid-template-columns: 1fr;
-  }
-
-}
-
-@media (max-width: 860px) {
-  .studio {
-    padding: 8px;
-    gap: 8px;
-  }
-
-  .studio-topbar-main {
-    align-items: flex-start;
-  }
-
-  .studio-topbar {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .studio-topbar-side {
-    justify-content: space-between;
-  }
-
-  .sidebar {
-    max-height: 340px;
-  }
-
-  .studio-topbar-side,
-  .studio-actions {
-    flex-wrap: wrap;
-  }
-
-  .toolbar-right,
-  .export-bar {
-    flex-wrap: wrap;
-  }
-
-  .asset-grid,
-  .character-asset-grid,
-  .prod-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .character-asset-card {
-    min-height: 0;
-  }
-
-  .character-asset-overview {
-    grid-template-columns: 1fr;
-  }
-
-  .character-portrait {
-    width: auto;
-  }
-
-  .character-asset-main {
-    padding: 10px;
-  }
-
-  .character-asset-head {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .video-task-workbench {
-    grid-template-columns: 1fr;
-    overflow-y: auto;
-  }
-
-  /* 窄屏纵向堆叠后无栏间分界，隐藏拖拽分隔条 */
-  .video-col-divider { display: none; }
-
-  .video-task-inspector {
-    border-top: 1px solid var(--surface-outline);
-    border-left: 0;
-  }
-
-  .video-task-side {
-    display: flex;
-    flex-direction: column;
-    border-top: 1px solid var(--surface-outline);
-    border-left: 0;
-  }
-
-  /* 窄屏：中列改为纵向堆叠，由外层 workbench 整体滚动 */
-  .video-main-col {
-    display: flex;
-    flex-direction: column;
-    flex: none;
-  }
-
-  .video-main-scroll {
-    flex: none;
-    overflow: visible;
-  }
-
-  .video-task-side .video-task-inspector {
-    flex: none; /* 窄屏下由外层 workbench 整体滚动，检查器按内容撑开，不参与 flex 收缩 */
-    border-top: 0;
-    display: flex;
-    flex-direction: column;
-    overflow: visible;
-  }
-
-  .video-inspector-body {
-    overflow: visible;
-  }
-
-  .video-task-player {
-    flex: none; /* 禁止收缩：否则 stage 的 min-height 会使其溢出播放器并遮挡下方检查器 */
-  }
-
-  .video-player-stage {
-    flex: none;
-    max-height: 220px;
-  }
-
-  .frame-row {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .detail-hero {
-    grid-template-columns: 1fr;
-  }
-
-  .field-grid-2,
-  .field-grid-4 {
-    grid-template-columns: 1fr;
-  }
-
-  .frame-thumbs {
-    width: 100%;
-  }
-
-  .frame-thumb {
-    width: 100%;
-  }
-
-}
+/* 窄视口不再收缩：工作台 min-width 1280px，比它更窄时由外层横向滚动（页面尺寸规格见 AGENTS.md） */
 </style>

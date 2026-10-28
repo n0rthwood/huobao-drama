@@ -1,5 +1,5 @@
 <template>
-  <div class="ref-images" @click.stop>
+  <div :class="['ref-images', `is-${size}`]" @click.stop>
     <div class="ref-head">
       <span class="ref-label">{{ t('components.referenceImages.label') }}</span>
       <span class="ref-count" :class="{ dim: !refs.length }">{{ refs.length }}/{{ max }}</span>
@@ -26,36 +26,45 @@
       </button>
     </div>
 
-    <div v-if="refs.length" class="ref-strip">
+    <div v-if="refs.length" class="ref-grid">
       <div
         v-for="(entry, i) in refs"
         :key="entry.path"
         class="ref-item"
         :class="{ 'is-broken': broken.includes(entry.path) }"
       >
-        <img
-          v-if="!broken.includes(entry.path)"
-          :src="thumbOf(srcOf(entry.path))"
-          class="ref-thumb"
-          loading="lazy"
-          :alt="t('components.referenceImages.previewTitle', { index: i + 1 })"
-          @error="onThumbError($event, entry.path)"
-          @click.stop="emit('preview', srcOf(entry.path), t('components.referenceImages.previewTitle', { index: i + 1 }))"
-        />
-        <div v-else class="ref-missing" :title="t('components.referenceImages.missingHint')">
-          <ImageOff :size="12" />
-          <span>{{ t('components.referenceImages.missing') }}</span>
+        <div class="ref-media">
+          <img
+            v-if="!broken.includes(entry.path)"
+            :src="thumbOf(srcOf(entry.path))"
+            class="ref-thumb"
+            loading="lazy"
+            :alt="t('components.referenceImages.previewTitle', { index: i + 1 })"
+            @error="onThumbError($event, entry.path)"
+            @click.stop="emit('preview', srcOf(entry.path), t('components.referenceImages.previewTitle', { index: i + 1 }))"
+          />
+          <div v-else class="ref-missing" :title="t('components.referenceImages.missingHint')">
+            <ImageOff :size="12" />
+            <span>{{ t('components.referenceImages.missing') }}</span>
+          </div>
+          <button
+            class="ref-del-btn"
+            :title="t('components.referenceImages.remove')"
+            :disabled="removing === entry.path"
+            @click.stop="askRemove(entry.path)"
+          >
+            <Loader2 v-if="removing === entry.path" :size="9" class="animate-spin" />
+            <X v-else :size="9" />
+          </button>
         </div>
-        <MediaTime v-if="entry.uploaded_at" class="ref-time" :at="entry.uploaded_at" />
-        <button
-          class="ref-del-btn"
-          :title="t('components.referenceImages.remove')"
-          :disabled="removing === entry.path"
-          @click.stop="askRemove(entry.path)"
-        >
-          <Loader2 v-if="removing === entry.path" :size="9" class="animate-spin" />
-          <X v-else :size="9" />
-        </button>
+        <div class="ref-foot">
+          <MediaTime v-if="entry.uploaded_at" class="ref-time" :at="entry.uploaded_at" />
+          <span
+            v-if="entry.copied_from"
+            class="ref-source"
+            :title="t('components.referenceImages.copiedFromTitle', { src: entry.copied_from })"
+          >{{ t('components.referenceImages.copiedFrom') }} · {{ sourceName(entry.copied_from) }}</span>
+        </div>
       </div>
     </div>
     <div v-else class="ref-empty dim">{{ t('components.referenceImages.empty') }}</div>
@@ -103,6 +112,8 @@ const props = defineProps({
   max: { type: Number, default: 10 },
   // 素材管理器默认展开的项目
   dramaId: { type: [Number, String], default: 0 },
+  // compact = 资产卡片内（64–96px），large = 详情弹窗（120–200px）
+  size: { type: String, default: 'compact' },
 })
 
 const emit = defineEmits(['update', 'preview'])
@@ -125,6 +136,12 @@ function srcOf(item) {
   if (!item) return ''
   if (/^(https?:\/\/|data:|\/)/i.test(item)) return item
   return `/${item}`
+}
+
+// 来源素材的文件名（copied_from 存的是素材库里的相对路径），完整路径在 title 里
+function sourceName(item) {
+  const value = String(item || '').split('?')[0]
+  return value.split('/').filter(Boolean).pop() || value
 }
 
 // 缩略图缺失先回退原图；原图也加载不出来 → 标记为「文件缺失」，用删除按钮补救
@@ -259,27 +276,41 @@ async function doRemove() {
 }
 .ref-add-btn:hover:not(:disabled) { color: var(--accent-text); border-color: var(--accent-text); }
 .ref-add-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.ref-strip {
-  display: flex;
+/* 流式卡片网格：紧凑（资产卡片内）64–96px，大号（详情弹窗）120–200px；
+   空间变大时卡片保持最大尺寸、只增加列数 */
+.ref-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 96px));
+  justify-content: start;
   gap: 6px;
-  overflow-x: auto;
-  padding-bottom: 2px;
 }
+.ref-images.is-large .ref-grid {
+  grid-template-columns: repeat(auto-fill, minmax(120px, 200px));
+  gap: 10px;
+}
+.ref-images.is-large .ref-media { aspect-ratio: 4 / 3; }
 .ref-item {
-  position: relative;
-  flex: none;
-  width: 46px;
-  height: 46px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  max-width: 96px;
   border-radius: 6px;
   overflow: hidden;
   border: 1px solid var(--border);
   background: var(--surface-soft);
 }
+.ref-images.is-large .ref-item { max-width: 200px; }
 .ref-item.is-broken { border-color: var(--action-danger); }
+.ref-media {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  background: var(--bg-2);
+}
 .ref-thumb {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   cursor: zoom-in;
   display: block;
 }
@@ -296,20 +327,38 @@ async function doRemove() {
   text-align: center;
   padding: 0 2px;
 }
-/* 上传时间压在缩略图底部，46px 的格子里不额外占高度 */
+/* 来源信息（上传时间 / 从哪张素材复制）在图片下方；窄卡片内换行显示 */
+.ref-foot {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px 4px;
+  padding: 2px 4px 3px;
+  min-width: 0;
+}
 .ref-time {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  padding: 1px 2px;
-  background: rgba(0, 0, 0, 0.55);
-  color: #fff;
   font-size: 9px;
-  text-align: center;
+  color: var(--text-3);
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
+.ref-images.is-large .ref-time { font-size: 10.5px; }
+.ref-source {
+  margin-left: auto;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--accent-bg);
+  color: var(--accent-text);
+  font-size: 9px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ref-images.is-large .ref-source { font-size: 10.5px; }
 .ref-del-btn {
   position: absolute;
   top: 2px;

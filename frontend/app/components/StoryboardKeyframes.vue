@@ -230,29 +230,50 @@
               <template v-for="g in refKinds" :key="g.kind">
                 <div v-if="assets.filter(a => a.kind === g.kind).length" class="kf-ref-group">
                   <div class="kf-ref-group-label">{{ g.label }}</div>
-                  <div
-                    v-for="asset in assets.filter(a => a.kind === g.kind)"
-                    :key="asset.key"
-                    :class="['kf-ref-item', { bound: asset.bound }]"
-                    :title="asset.bound ? t('episode.ref.clickRemove') : t('episode.ref.clickAdd')"
-                    @click="emit('toggle-bind', selected, asset)"
-                  >
-                    <button
-                      type="button"
-                      class="kf-ref-thumb"
-                      :disabled="!asset.ready"
-                      @click.stop="asset.ready && emit('preview', imgSrc(asset.imageUrl), `${asset.name} ${asset.typeLabel}`)"
+                  <div class="kf-pool-grid">
+                    <div
+                      v-for="asset in assets.filter(a => a.kind === g.kind)"
+                      :key="asset.key"
+                      :class="['kf-pool-card', { bound: asset.bound }]"
+                      role="button"
+                      tabindex="0"
+                      :title="t('episode.ref.cardOpenDetail')"
+                      @click="emit('open-asset', asset)"
+                      @keydown.enter.prevent="emit('open-asset', asset)"
+                      @keydown.space.prevent="emit('open-asset', asset)"
                     >
-                      <img v-if="asset.ready" :src="thumbOf(imgSrc(asset.imageUrl))" loading="lazy" @error="onThumbError($event, asset.imageUrl)" />
-                      <span v-else>{{ asset.kind === 'scene' ? t('episode.ref.shortScene') : asset.kind === 'prop' ? t('episode.ref.shortProp') : t('episode.ref.shortChar') }}</span>
-                    </button>
-                    <div class="kf-ref-main">
-                      <span class="kf-ref-name">{{ asset.name }}</span>
-                      <span class="kf-ref-meta">{{ asset.typeLabel }} · {{ asset.meta }}</span>
-                      <span :class="['kf-ref-state', asset.bound && asset.ready ? 'is-ready' : '']">
-                        {{ asset.bound ? (asset.ready ? t('episode.ref.usable') : t('episode.ref.notReady')) : t('episode.ref.unbound') }}
-                      </span>
-                      <button v-if="asset.bound && !asset.ready" type="button" class="kf-ref-goto" @click.stop="emit('goto-assets')">{{ t('episode.ref.gotoGenerate') }}</button>
+                      <div class="kf-pool-media">
+                        <img
+                          v-if="asset.ready"
+                          :src="thumbOf(imgSrc(asset.imageUrl))"
+                          loading="lazy"
+                          :alt="asset.name"
+                          @error="onThumbError($event, asset.imageUrl)"
+                        />
+                        <span v-else class="kf-pool-media-empty">
+                          {{ asset.kind === 'scene' ? t('episode.ref.shortScene') : asset.kind === 'prop' ? t('episode.ref.shortProp') : t('episode.ref.shortChar') }}
+                        </span>
+                        <button
+                          type="button"
+                          class="kf-pool-check"
+                          :aria-pressed="asset.bound ? 'true' : 'false'"
+                          :aria-label="asset.bound ? t('episode.ref.clickRemove') : t('episode.ref.clickAdd')"
+                          :title="asset.bound ? t('episode.ref.clickRemove') : t('episode.ref.clickAdd')"
+                          @click.stop="emit('toggle-bind', selected, asset)"
+                        >
+                          <svg v-if="asset.bound" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        </button>
+                      </div>
+                      <div class="kf-pool-body">
+                        <span class="kf-pool-name" :title="asset.name">{{ asset.name }}</span>
+                        <span class="kf-pool-meta">{{ asset.typeLabel }} · {{ asset.meta }}</span>
+                        <span class="kf-pool-foot">
+                          <span :class="['kf-ref-state', asset.bound && asset.ready ? 'is-ready' : '']">
+                            {{ asset.bound ? (asset.ready ? t('episode.ref.usable') : t('episode.ref.notReady')) : t('episode.ref.unbound') }}
+                          </span>
+                          <button v-if="asset.bound && !asset.ready" type="button" class="kf-ref-goto" @click.stop="emit('goto-assets')">{{ t('episode.ref.gotoGenerate') }}</button>
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -283,19 +304,43 @@
             </div>
 
             <div class="kf-slot-body">
-              <button
-                type="button"
-                :class="['kf-preview', { empty: !slotImage(selected, slot) }]"
-                :disabled="!slotImage(selected, slot)"
-                @click="emit('preview', imgSrc(slotImage(selected, slot)), `${t('episode.kf.editorTitle', { n: String(selectedIndex + 1).padStart(2, '0') })} · ${slotLabel(slot)}`)"
-              >
-                <img v-if="slotImage(selected, slot)" :src="thumbOf(imgSrc(slotImage(selected, slot)))" loading="lazy" @error="onThumbError($event, slotImage(selected, slot))" />
-                <span v-else class="kf-preview-empty">
-                  <template v-if="isSlotPending(selected, slot)">{{ t('episode.kf.generating') }}</template>
-                  <template v-else>{{ t('episode.kf.slotEmpty') }}</template>
-                </span>
-              </button>
-              <MediaTime class="kf-preview-time" :at="slotTimeOf(selected, slot)" />
+              <div class="kf-slot-media">
+                <button
+                  type="button"
+                  :class="['kf-preview', { empty: !slotImage(selected, slot) }]"
+                  :style="{ aspectRatio: previewAspect }"
+                  :disabled="!slotImage(selected, slot)"
+                  @click="emit('preview', imgSrc(slotImage(selected, slot)), `${t('episode.kf.editorTitle', { n: String(selectedIndex + 1).padStart(2, '0') })} · ${slotLabel(slot)}`)"
+                >
+                  <img v-if="slotImage(selected, slot)" :src="thumbOf(imgSrc(slotImage(selected, slot)))" loading="lazy" @error="onThumbError($event, slotImage(selected, slot))" />
+                  <span v-else class="kf-preview-empty">
+                    <template v-if="isSlotPending(selected, slot)">{{ t('episode.kf.generating') }}</template>
+                    <template v-else>{{ t('episode.kf.slotEmpty') }}</template>
+                  </span>
+                </button>
+                <MediaTime class="kf-preview-time" :at="slotTimeOf(selected, slot)" />
+
+                <div class="kf-slot-row kf-slot-version-row">
+                  <span class="kf-slot-row-label">{{ t('episode.kf.version') }}</span>
+                  <select
+                    v-if="versions[slot] && versions[slot].length"
+                    class="input kf-version-select"
+                    :value="slotOwnImage(selected, slot) || ''"
+                    :aria-label="t('episode.kf.version')"
+                    @change="selectVersion(selected, slot, $event.target.value)"
+                  >
+                    <option v-if="!slotOwnImage(selected, slot)" value="">{{ t('episode.kf.versionUnset') }}</option>
+                    <option v-for="v in versions[slot]" :key="v.id ?? v.image" :value="v.image">{{ versionLabel(v) }}</option>
+                  </select>
+                  <span v-else class="dim" style="font-size:11px">{{ t('episode.kf.noVersions') }}</span>
+                </div>
+                <button
+                  v-if="slot === 'first' && previousOf(selected) && (selected.continuity_boundary || selected.continuityBoundary) === 'continue' && !kf(selected).inheritsFirst"
+                  type="button"
+                  class="btn btn-sm kf-slot-inherit-btn"
+                  @click="useInherit(selected)"
+                >{{ t('episode.kf.backToInherit') }}</button>
+              </div>
 
               <div class="kf-slot-main">
                 <div v-if="slotRing(selected, slot)" class="kf-slot-task">
@@ -308,7 +353,7 @@
                     @retry="generateSlot(selected, slot)"
                   />
                 </div>
-                <label class="kf-field">
+                <label class="kf-field kf-prompt-field">
                   <span class="kf-field-label">
                     {{ t('episode.kf.promptLabel', { slot: slotLabel(slot) }) }}
                     <FieldSaveStatus class="kf-field-save" v-bind="fieldSaveOf(SLOT_PROMPT_FIELD[slot])" />
@@ -317,6 +362,7 @@
                     :model-value="slotPrompt(selected, slot)"
                     :options="mentions"
                     :rows="4"
+                    autogrow
                     input-class="textarea kf-prompt"
                     :placeholder="t('episode.kf.promptPlaceholder')"
                     @update:model-value="v => emit('field-dirty', selected, SLOT_PROMPT_FIELD[slot], v)"
@@ -324,20 +370,6 @@
                   />
                 </label>
                 <RefIssueList :issues="slotIssues(selected, slot)" />
-
-                <div class="kf-slot-refs">
-                  <div class="kf-slot-refs-head">
-                    <span class="kf-slot-row-label">{{ t('episode.ref.targetTitle') }}</span>
-                    <span class="tag mono">{{ targetAssets(selected, slot).length }}</span>
-                  </div>
-                  <TargetAssetList
-                    :items="targetAssets(selected, slot)"
-                    :versions-for="assetVersionsFor"
-                    :busy="targetVersionBusy"
-                    @preview="(src, title) => emit('preview', src, title)"
-                    @select-version="(item, image) => onSelectTargetVersion(selected, slot, item, image)"
-                  />
-                </div>
 
                 <div v-if="slot === 'mid'" class="kf-slot-row">
                   <span class="kf-slot-row-label">{{ t('episode.kf.midTime') }}</span>
@@ -355,28 +387,21 @@
                   <span class="dim" style="font-size:11px">{{ t('episode.kf.midTimeRange', { max: midTimeMax(selected) }) }}</span>
                   <FieldSaveStatus class="ml-auto" v-bind="fieldSaveOf('mid_frame_time')" />
                 </div>
-
-                <div class="kf-slot-row">
-                  <span class="kf-slot-row-label">{{ t('episode.kf.version') }}</span>
-                  <select
-                    v-if="versions[slot] && versions[slot].length"
-                    class="input kf-version-select"
-                    :value="slotOwnImage(selected, slot) || ''"
-                    :aria-label="t('episode.kf.version')"
-                    @change="selectVersion(selected, slot, $event.target.value)"
-                  >
-                    <option v-if="!slotOwnImage(selected, slot)" value="">{{ t('episode.kf.versionUnset') }}</option>
-                    <option v-for="v in versions[slot]" :key="v.id ?? v.image" :value="v.image">{{ versionLabel(v) }}</option>
-                  </select>
-                  <span v-else class="dim" style="font-size:11px">{{ t('episode.kf.noVersions') }}</span>
-                  <button
-                    v-if="slot === 'first' && previousOf(selected) && (selected.continuity_boundary || selected.continuityBoundary) === 'continue' && !kf(selected).inheritsFirst"
-                    type="button"
-                    class="btn btn-sm ml-auto"
-                    @click="useInherit(selected)"
-                  >{{ t('episode.kf.backToInherit') }}</button>
-                </div>
               </div>
+            </div>
+
+            <div class="kf-slot-refs">
+              <div class="kf-slot-refs-head">
+                <span class="kf-slot-row-label">{{ t('episode.ref.targetTitle') }}</span>
+                <span class="tag mono">{{ targetAssets(selected, slot).length }}</span>
+              </div>
+              <TargetAssetList
+                :items="targetAssets(selected, slot)"
+                :versions-for="assetVersionsFor"
+                :busy="targetVersionBusy"
+                @preview="(src, title) => emit('preview', src, title)"
+                @select-version="(item, image) => onSelectTargetVersion(selected, slot, item, image)"
+              />
             </div>
           </section>
         </div>
@@ -516,7 +541,10 @@ const props = defineProps({
   // (sb, field) => { status, at }；字段级保存状态由工作台（episode.vue）统一维护
   fieldSave: { type: Function, default: () => ({ status: 'idle', at: 0 }) },
 })
-const emit = defineEmits(['break', 'refresh', 'preview', 'goto-assets', 'toggle-bind', 'update-field', 'field-dirty'])
+const emit = defineEmits(['break', 'refresh', 'preview', 'goto-assets', 'toggle-bind', 'open-asset', 'update-field', 'field-dirty'])
+
+// 槽位预览图按剧集画幅完整显示（CSS aspect-ratio 语法用 /）
+const previewAspect = computed(() => String(props.aspectRatio || '16:9').replace(':', ' / ') || '16 / 9')
 
 // ===== 目标级参考图（按槽位，只读；绑定由该槽位提示词的 @ 决定） =====
 const targetVersionBusy = ref(false)
@@ -1370,7 +1398,8 @@ onBeforeUnmount(() => {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 300px minmax(0, 1fr);
+  /* 分镜列表：有上下限的伸缩宽度，不写死 */
+  grid-template-columns: clamp(260px, 18vw, 340px) minmax(0, 1fr);
   gap: 10px;
 }
 .kf-list {
@@ -1481,29 +1510,47 @@ onBeforeUnmount(() => {
 .kf-boundary .is-on { border-color: var(--accent); color: var(--accent-text); }
 
 /* 参考素材绑定（原视频步骤的绑定面板，迁移到关键帧步骤） */
-.kf-ref-list { display: flex; flex-direction: column; gap: 8px; }
-.kf-ref-group { display: flex; flex-direction: column; gap: 4px; }
+.kf-ref-list { display: flex; flex-direction: column; gap: 10px; }
+.kf-ref-group { display: flex; flex-direction: column; gap: 6px; }
 .kf-ref-group-label { font-size: 11px; color: var(--text-3); }
-.kf-ref-item {
-  display: flex; align-items: center; gap: 8px;
-  padding: 5px 6px; border: 1px solid var(--border); border-radius: 7px;
+/* 资产池卡片：流式网格，卡片 160–240px，空间变大时卡片保持最大尺寸、只增加列数；图片区占卡片高度 60% */
+.kf-pool-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 240px));
+  justify-content: start;
+  gap: 8px;
+}
+.kf-pool-card {
+  /* 固定卡片高度，让图片区稳定占 60%（百分比 flex-basis 需要确定高度） */
+  display: flex; flex-direction: column; height: 216px; min-width: 0; max-width: 240px;
+  border: 1px solid var(--border); border-radius: 9px; overflow: hidden;
   background: var(--surface-raised); cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
-.kf-ref-item:hover { border-color: var(--accent); }
-.kf-ref-item:not(.bound) { opacity: 0.68; }
-.kf-ref-item:not(.bound):hover { opacity: 1; }
-.kf-ref-item.bound { border-color: var(--border-strong); }
-.kf-ref-thumb {
-  width: 34px; height: 34px; flex: none;
-  border: 1px solid var(--border); border-radius: 6px; overflow: hidden;
-  background: var(--bg-2); color: var(--text-3); font-size: 11px;
-  display: flex; align-items: center; justify-content: center; cursor: zoom-in;
+.kf-pool-card:hover { border-color: var(--border-strong); }
+.kf-pool-card.bound { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.kf-pool-media {
+  position: relative; flex: 0 0 60%; min-height: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg-2); color: var(--text-3); font-size: 12px;
 }
-.kf-ref-thumb:disabled { cursor: default; }
-.kf-ref-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.kf-ref-main { min-width: 0; display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 6px; }
-.kf-ref-name { font-size: 12px; color: var(--text-1); }
-.kf-ref-meta { font-size: 11px; color: var(--text-3); }
+.kf-pool-media img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.kf-pool-media-empty { font-size: 12px; }
+.kf-pool-check {
+  position: absolute; top: 6px; right: 6px;
+  width: 22px; height: 22px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border-strong); border-radius: 6px;
+  background: var(--surface-raised); color: var(--text-3); cursor: pointer;
+}
+.kf-pool-check[aria-pressed='true'] {
+  border-color: var(--accent); background: var(--accent); color: var(--surface-raised);
+}
+.kf-pool-check:hover { border-color: var(--accent); }
+.kf-pool-body { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px 7px; min-width: 0; }
+.kf-pool-name { font-size: 12px; font-weight: 600; color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kf-pool-meta { font-size: 11px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kf-pool-foot { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .kf-ref-state { font-size: 11px; color: var(--text-3); }
 .kf-ref-state.is-ready { color: var(--success); }
 .kf-ref-pool-hint { margin: 2px 0 0; font-size: 11px; color: var(--text-3); }
@@ -1512,19 +1559,23 @@ onBeforeUnmount(() => {
 .kf-slot-refs { display: flex; flex-direction: column; gap: 4px; }
 .kf-slot-refs-head { display: flex; align-items: center; gap: 6px; }
 
-/* 三个槽位卡片 */
-.kf-slot-body { display: grid; grid-template-columns: 208px minmax(0, 1fr); gap: 10px; }
+/* 三个槽位卡片：左图片列随空间伸缩（最小 320 / 最大 640），右提示词列占满剩余宽度 */
+.kf-slot-body { display: grid; grid-template-columns: clamp(320px, 30%, 640px) minmax(420px, 1fr); gap: 12px; align-items: start; }
+.kf-slot-media { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .kf-preview {
-  aspect-ratio: 16 / 9;
+  width: 100%;
   border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
   background: var(--surface-raised); padding: 0; cursor: zoom-in;
   display: flex; align-items: center; justify-content: center;
 }
 .kf-preview.empty { border-style: dashed; cursor: default; }
-.kf-preview img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.kf-preview img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .kf-preview-empty { font-size: 12px; color: var(--text-3); }
+.kf-slot-version-row { gap: 6px; }
+.kf-slot-inherit-btn { align-self: flex-start; }
 .kf-slot-main { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.kf-prompt { min-height: 88px; }
+.kf-prompt-field { flex: 1; min-width: 0; }
+.kf-prompt { min-height: 96px; }
 .kf-slot-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .kf-slot-row-label { font-size: 11px; color: var(--text-2); }
 .kf-slot-row-unit { font-size: 11px; color: var(--text-3); }
