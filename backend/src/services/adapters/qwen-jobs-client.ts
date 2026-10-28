@@ -104,6 +104,9 @@ export class QwenJobsError extends Error {
   }
 }
 
+/** qwen-jobs 公平调度与任务/文件归属用的客户端身份，由应用自己声明（网关不再写入） */
+const QWEN_CLIENT_ID = 'huobao'
+
 function baseOf(config: AIConfig): string {
   return config.baseUrl.replace(/\/+$/, '')
 }
@@ -157,7 +160,7 @@ async function request(
   try {
     resp = await fetch(`${baseOf(config)}${path}`, {
       method: init.method || 'GET',
-      headers: { ...qwenAuthHeaders(config), ...init.headers },
+      headers: { 'X-Qwen-Client': QWEN_CLIENT_ID, ...qwenAuthHeaders(config), ...init.headers },
       body: init.body,
       signal: AbortSignal.timeout(init.timeoutMs ?? 30_000),
     })
