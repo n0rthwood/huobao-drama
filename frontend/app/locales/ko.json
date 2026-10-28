@@ -923,7 +923,6 @@
       "days": "{n}일 전"
     },
     "ref": {
-      "title": "참조 소재",
       "copy": "캐릭터 / 장면 / 소품을 영상 참조로 연결",
       "boundCount": "{bound}/{total} 연결됨",
       "issueCount": "일관성 문제 {n}건",
@@ -943,7 +942,17 @@
       "gotoGenerate": "생성하러 가기 →",
       "empty": "이 화에는 장면, 캐릭터, 소품이 아직 없습니다. 먼저 「에셋」에서 소재를 추출하면 연결할 수 있습니다.",
       "chooseVersion": "{name}의 소재 버전 선택",
-      "versionSelected": "이 샷은 이제 {name}의 선택한 버전을 사용합니다"
+      "poolTitle": "샷 자산 풀({'@'} 후보)",
+      "poolCopy": "바인딩된 캐릭터 / 장면 / 소품은 이 샷의 {'@'} 후보이며 실제 전송되는 참조 이미지를 결정하지 않습니다",
+      "targetTitle": "이 프레임 참조 이미지",
+      "targetEmpty": "프롬프트에서 {'@'}한 자산이 자동으로 표시됩니다",
+      "targetRefNo": "이미지{n}",
+      "targetMissingImage": "이미지 없음",
+      "targetLeadMeta": "첫 키프레임",
+      "targetVersionDefault": "기본",
+      "targetVersionDefaultImage": "기본 이미지",
+      "targetVersionSelected": "{name}이(가) 선택한 버전으로 변경되었습니다",
+      "targetVersionReset": "{name}이(가) 기본 버전으로 복원되었습니다"
     },
     "vid": {
       "shotCount": "샷 {n}개",
@@ -1186,8 +1195,7 @@
       "durationUnit": "초(2-30)",
       "durationHint": "수정 시 스토리보드에 즉시 저장되어 목록 및 배치 생성에도 적용됩니다",
       "effective": "{model} · {res} · {dur}초",
-      "boundRefs": "바인딩 참조 이미지",
-      "noBoundRefs": "바인딩된 에셋 없음（중앙 \"참조 에셋\"에서 바인딩）"
+      "boundRefs": "바인딩 참조 이미지"
     },
     "export": {
       "notReadyDesc": "먼저 스토리보드와 제작 단계를 완료하세요",

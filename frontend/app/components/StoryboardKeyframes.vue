@@ -218,12 +218,13 @@
 
           <section class="kf-section">
             <div class="kf-section-head">
-              <span class="kf-section-label">{{ t('episode.ref.title') }}</span>
+              <span class="kf-section-label">{{ t('episode.ref.poolTitle') }}</span>
               <span class="tag mono">{{ t('episode.ref.boundCount', { bound: assets.filter(a => a.bound).length, total: assets.length }) }}</span>
               <span v-if="refIssues.length" :class="['kf-ref-issue-count', hasBlockingIssue ? 'is-block' : 'is-warn']">
                 {{ t('episode.ref.issueCount', { n: refIssues.length }) }}
               </span>
             </div>
+            <p class="kf-ref-pool-hint">{{ t('episode.ref.poolCopy') }}</p>
             <RefIssueList :issues="refIssues" />
             <div class="kf-ref-list">
               <template v-for="g in refKinds" :key="g.kind">
@@ -251,18 +252,6 @@
                       <span :class="['kf-ref-state', asset.bound && asset.ready ? 'is-ready' : '']">
                         {{ asset.bound ? (asset.ready ? t('episode.ref.usable') : t('episode.ref.notReady')) : t('episode.ref.unbound') }}
                       </span>
-                      <select
-                        v-if="asset.bound && asset.versions.length > 1"
-                        class="kf-ref-version-select"
-                        :value="asset.imageUrl"
-                        :aria-label="t('episode.ref.chooseVersion', { name: asset.name })"
-                        @click.stop
-                        @change.stop="emit('set-version', selected, asset, $event.target.value)"
-                      >
-                        <option v-for="version in asset.versions" :key="version.id ?? version.url" :value="version.url">
-                          {{ versionLabel(version) }}
-                        </option>
-                      </select>
                       <button v-if="asset.bound && !asset.ready" type="button" class="kf-ref-goto" @click.stop="emit('goto-assets')">{{ t('episode.ref.gotoGenerate') }}</button>
                     </div>
                   </div>
@@ -335,6 +324,20 @@
                   />
                 </label>
                 <RefIssueList :issues="slotIssues(selected, slot)" />
+
+                <div class="kf-slot-refs">
+                  <div class="kf-slot-refs-head">
+                    <span class="kf-slot-row-label">{{ t('episode.ref.targetTitle') }}</span>
+                    <span class="tag mono">{{ targetAssets(selected, slot).length }}</span>
+                  </div>
+                  <TargetAssetList
+                    :items="targetAssets(selected, slot)"
+                    :versions-for="assetVersionsFor"
+                    :busy="targetVersionBusy"
+                    @preview="(src, title) => emit('preview', src, title)"
+                    @select-version="(item, image) => onSelectTargetVersion(selected, slot, item, image)"
+                  />
+                </div>
 
                 <div v-if="slot === 'mid'" class="kf-slot-row">
                   <span class="kf-slot-row-label">{{ t('episode.kf.midTime') }}</span>
@@ -471,6 +474,7 @@ import ConfirmDialog from '~/components/ConfirmDialog.vue'
 import FieldSaveStatus from '~/components/FieldSaveStatus.vue'
 import RefIssueList from '~/components/RefIssueList.vue'
 import MediaTime from '~/components/MediaTime.vue'
+import TargetAssetList from '~/components/TargetAssetList.vue'
 import { mediaTimeLabel, mediaTimeOfPath } from '~/utils/mediaTime'
 import {
   useNowTicker,
@@ -491,6 +495,12 @@ const props = defineProps({
   // (sb) => 可绑定资产列表；由工作台提供，避免资产状态在两处各算一遍
   // Function 类型的 default 就是默认值本身（不会被当作工厂调用）
   bindableAssets: { type: Function, default: () => [] },
+  // (sb, target) => 该目标（first|mid|last|video）实际发送的参考图（后端 target_assets）
+  targetAssetsFor: { type: Function, default: () => [] },
+  // (targetAsset) => 该资产的候选图版本列表
+  assetVersionsFor: { type: Function, default: () => [] },
+  // (sb, target, targetAsset, image|null) => Promise：目标级选版（null = 恢复默认）
+  setTargetVersion: { type: Function, default: async () => {} },
   // (sb) => MentionTextarea 的 @引用候选
   mentionOptionsFor: { type: Function, default: () => [] },
   refKinds: { type: Array, default: () => [] },
@@ -506,7 +516,23 @@ const props = defineProps({
   // (sb, field) => { status, at }；字段级保存状态由工作台（episode.vue）统一维护
   fieldSave: { type: Function, default: () => ({ status: 'idle', at: 0 }) },
 })
-const emit = defineEmits(['break', 'refresh', 'preview', 'goto-assets', 'toggle-bind', 'set-version', 'update-field', 'field-dirty'])
+const emit = defineEmits(['break', 'refresh', 'preview', 'goto-assets', 'toggle-bind', 'update-field', 'field-dirty'])
+
+// ===== 目标级参考图（按槽位，只读；绑定由该槽位提示词的 @ 决定） =====
+const targetVersionBusy = ref(false)
+function targetAssets(sb, target) {
+  const list = props.targetAssetsFor(sb, target)
+  return Array.isArray(list) ? list : []
+}
+async function onSelectTargetVersion(sb, target, item, image) {
+  if (targetVersionBusy.value) return
+  targetVersionBusy.value = true
+  try {
+    await props.setTargetVersion(sb, target, item, image)
+  } finally {
+    targetVersionBusy.value = false
+  }
+}
 
 const SLOT_KEYS = ['first', 'mid', 'last']
 const SLOT_PROMPT_FIELD = { first: 'first_frame_prompt', mid: 'mid_frame_prompt', last: 'last_frame_prompt' }
@@ -1060,22 +1086,23 @@ const batchEstimateNote = computed(() => {
   if (data.basis) parts.push(t('episode.kf.batchEtaBasis', { basis: data.basis }))
   return parts.join(' · ')
 })
-// 关键帧的参考图数量按本批最多的一镜算，估计宁可偏保守
-function maxBoundRefs(pool) {
+// 关键帧的参考图数量按本批（分镜 × 槽位）最多的一帧算，估计宁可偏保守
+function maxTargetRefs(items) {
   let max = 0
-  for (const sb of pool) {
-    const bound = props.bindableAssets(sb).filter(a => a.bound).length
-    if (bound > max) max = bound
+  for (const item of items) {
+    const sb = props.storyboards.find(s => s.id === item.storyboard_id)
+    const count = targetAssets(sb, item.slot).length
+    if (count > max) max = count
   }
   return max
 }
-async function loadBatchEstimate(pool, count) {
+async function loadBatchEstimate(items, count) {
   batchEstimate.value = { loading: true, data: null }
   try {
     const data = await imageQueueAPI.estimate({
       config_id: props.imageConfigId || undefined,
       size: KEYFRAME_SIZES[props.aspectRatio] || KEYFRAME_SIZES['16:9'],
-      references: maxBoundRefs(pool),
+      references: maxTargetRefs(items),
       count,
     })
     batchEstimate.value = { loading: false, data }
@@ -1145,8 +1172,7 @@ watch(() => (batchConfirm.value.open ? checkedItems.value.length : 0), (count) =
   }
   batchEstimate.value = { loading: true, data: batchEstimate.value.data }
   estimateTimer = setTimeout(() => {
-    const ids = new Set(checkedItems.value.map(item => item.storyboard_id))
-    void loadBatchEstimate(props.storyboards.filter(sb => ids.has(sb.id)), count)
+    void loadBatchEstimate([...checkedItems.value], count)
   }, 300)
 })
 async function startBatch() {
@@ -1480,13 +1506,11 @@ onBeforeUnmount(() => {
 .kf-ref-meta { font-size: 11px; color: var(--text-3); }
 .kf-ref-state { font-size: 11px; color: var(--text-3); }
 .kf-ref-state.is-ready { color: var(--success); }
-.kf-ref-version-select {
-  font-size: 11px; max-width: 190px;
-  border: 1px solid var(--border); border-radius: 5px;
-  background: var(--bg-2); color: var(--text-2); padding: 1px 4px;
-}
+.kf-ref-pool-hint { margin: 2px 0 0; font-size: 11px; color: var(--text-3); }
 .kf-ref-goto { font-size: 11px; color: var(--accent-text); background: none; border: none; cursor: pointer; padding: 0; }
 .kf-ref-empty { font-size: 12px; color: var(--text-3); }
+.kf-slot-refs { display: flex; flex-direction: column; gap: 4px; }
+.kf-slot-refs-head { display: flex; align-items: center; gap: 6px; }
 
 /* 三个槽位卡片 */
 .kf-slot-body { display: grid; grid-template-columns: 208px minmax(0, 1fr); gap: 10px; }
