@@ -917,6 +917,8 @@
       "videoPromptSection": "Video Prompt",
       "regenPrompt": "Regenerate",
       "aiGenerate": "AI Generate",
+      "aiGenerateVideoPrompt": "AI generate prompt",
+      "regenVideoPrompt": "Regenerate prompt",
       "videoPromptCopy": "Generated from this shot's visual description (including dialogue/narration) and atmosphere",
       "videoPromptPlaceholder": "Reference assets with {'@'}character / {'@'}scene, describe motion and camera per 3-second line; or click AI Generate for the prompt Agent…",
       "breaking": "Breaking the storyboard...",
