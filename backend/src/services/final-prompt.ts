@@ -12,6 +12,7 @@ import { mastra } from '../mastra/index.js'
 import { buildAgentRequestContext } from '../agents/context.js'
 import { runAgent } from '../agents/run.js'
 import { logTaskError, logTaskProgress } from '../utils/task-logger.js'
+import { sceneFinalPromptCoversTime } from './scene-time.js'
 
 type CharacterRow = typeof schema.characters.$inferSelect
 type SceneRow = typeof schema.scenes.$inferSelect
@@ -47,15 +48,20 @@ export async function ensureCharacterFinalPrompt(char: CharacterRow, episodeId: 
   }
 }
 
-/** 确保场景拥有固定视角（前中后景）最终提示词，返回最终提示词（失败返回 ''）；force 时忽略已有提示词强制重新生成 */
+/**
+ * 确保场景拥有固定视角（前中后景）最终提示词，返回最终提示词（失败返回 ''）；force 时忽略已有提示词强制重新生成。
+ * 已存提示词没有引用当前场景时间（Issue #21）视为无效，重新生成。
+ */
 export async function ensureSceneFinalPrompt(scene: SceneRow, episodeId: number, force = false, opts?: PromptAgentOptions): Promise<string> {
-  if (scene.finalPrompt && !force) return scene.finalPrompt
+  if (scene.finalPrompt && !force && sceneFinalPromptCoversTime(scene.finalPrompt, scene.time)) return scene.finalPrompt
+  const time = (scene.time || '').trim()
   try {
-    logTaskProgress('FinalPrompt', 'scene-generate', { sceneId: scene.id, episodeId })
+    logTaskProgress('FinalPrompt', 'scene-generate', { sceneId: scene.id, episodeId, time: time || undefined })
     await runPromptAgent(episodeId, scene.dramaId,
-      `为场景「${scene.location}」(scene_id=${scene.id}) 生成固定视角（前景/中景/后景）最终提示词，并调用 save_scene_final_prompt 保存。注意：这是无人物空镜——场景图中不能出现任何的人（含背影、剪影、倒影、照片里的人），即使场景描述提到人物活动也必须剔除，只保留场景本身。`, opts)
+      `为场景「${scene.location}」(scene_id=${scene.id}) 生成固定视角（前景/中景/后景）最终提示词，并调用 save_scene_final_prompt 保存。注意：这是无人物空镜——场景图中不能出现任何的人（含背影、剪影、倒影、照片里的人），即使场景描述提到人物活动也必须剔除，只保留场景本身。${time ? `场景时间是「${time}」：提示词必须原样写出「${time}」，光线按该时段描写。` : ''}`, opts)
     const [fresh] = await db.select().from(schema.scenes).where(eq(schema.scenes.id, scene.id))
-    return fresh?.finalPrompt || ''
+    // Agent 没能保存引用时间的提示词时，旧提示词仍然无效，交给调用方回退拼接（回退拼接包含 time）
+    return fresh?.finalPrompt && sceneFinalPromptCoversTime(fresh.finalPrompt, fresh.time) ? fresh.finalPrompt : ''
   } catch (err: any) {
     logTaskError('FinalPrompt', 'scene-generate', { sceneId: scene.id, error: err.message })
     return ''

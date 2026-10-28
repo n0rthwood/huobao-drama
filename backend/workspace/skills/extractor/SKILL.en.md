@@ -23,9 +23,9 @@ Extracted character fields (corresponding one-to-one with the `save_dedup_charac
 
 Extracted scene fields (corresponding one-to-one with the `save_dedup_scenes` tool parameters):
 - **location** (required): the specific place name. **One physical space = one scene**: "at the living room desk" and "in front of the living room sofa" are camera positions inside the living room, not independent scenes — always use "living room"; framing of sub-areas is left to the shot-size and camera-position language of the storyboard
-- **time**: the time period (day / dusk / late night, etc.); only the same location at a different time period counts as a new scene
+- **time** (required): a concrete time of day — early morning / morning / noon / afternoon / dusk / evening / late night, or the period the script states explicitly. If the script does not say, infer it from the plot; **never leave it empty**. The time of day goes in `time` only — writing it into `lighting` instead does not count; only the same location at a different time period counts as a new scene
 - **prompt**: scene description — the space, the fixed furnishings and their **relative positions** (pure background, no characters). Large fixed items the plot will use (TV, desk, sofa, window) must have their positional relationships stated; **movable objects that characters pick up or use (cups, books, newspapers, dumbbells, mats) must never be written into the scene** — they are props, and baking them into the scene image makes them impossible to control separately
-- **lighting**: scene light and shadow — light sources, colour tone, brightness, atmosphere
+- **lighting**: scene light and shadow — light sources, colour tone, brightness, atmosphere; it must match `time` (an "afternoon" scene gets afternoon light, never night-time lamps)
 
 ## Prop Extraction Rules
 

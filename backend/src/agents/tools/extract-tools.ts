@@ -284,7 +284,9 @@ const saveDedupScenes = createTool({
   inputSchema: z.object({
     scenes: z.array(z.object({
       location: z.string(),
-      time: z.string().optional(),
+      // 场景时间是正式字段（Issue #21）：必填，时段只能写在这里，不能用 lighting 代替
+      time: z.string().trim().min(1, 'time 必填：写具体时段（清晨/上午/正午/午后/黄昏/夜晚/深夜或剧本明确的时段），不能留空、不能只写进 lighting')
+        .describe('Required time of day, e.g. 清晨/上午/正午/午后/黄昏/夜晚/深夜. Never empty; lighting must match it.'),
       prompt: z.string().optional(),
       description: z.string().optional(),
       lighting: z.string().optional(),
