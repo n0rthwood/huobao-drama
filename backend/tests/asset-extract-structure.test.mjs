@@ -22,7 +22,7 @@ test('extraction service runs per-target async tasks', () => {
   assert.match(svc, /本次只提取道具/)
   // fire-and-forget 异步执行 extractor Agent
   assert.match(svc, /mastra\.getAgent\('extractor'\)/)
-  assert.match(svc, /\.then\(async \(result\) => \{[\s\S]*finishTextTask\(taskId, 'completed'\)/)
+  assert.match(svc, /\.then\(async \(result\) => \{[\s\S]*finishTextTask\(taskId, 'completed'/)
   assert.match(svc, /\.catch\(async \(err/)
   // 逐步打印 Agent 进展（工具调用 + 文本），完成时打印汇总
   assert.match(svc, /onStepFinish/)

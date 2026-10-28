@@ -6,6 +6,7 @@
 import { mastra } from '../mastra/index.js'
 import { buildAgentRequestContext } from '../agents/context.js'
 import { runAgent } from '../agents/run.js'
+import { createReasoningSink } from '../agents/reasoning-sink.js'
 import { logTaskError, logTaskProgress, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
 import {
   createTextTask,
@@ -83,7 +84,7 @@ export async function startExtraction(
       // 逐步打印 Agent 进展：调用了哪些工具、输出了什么
       onStepFinish: (step: any) => {
         const tools = (step?.toolCalls || [])
-          .map((t: any) => t?.toolName || t?.payload?.toolName)
+          .map((t: any) => t?.payload?.toolName)
           .filter(Boolean)
         logTaskProgress('Extract', `${target}-step`, {
           episodeId,
@@ -91,10 +92,10 @@ export async function startExtraction(
           text: (step?.text || '').slice(0, 200) || undefined,
         })
       },
-    })
+    }, createReasoningSink(taskId))
   })()
     .then(async (result) => {
-      await finishTextTask(taskId, 'completed')
+      await finishTextTask(taskId, 'completed', { outputText: result?.text || '' })
       const toolNames = (result?.toolCalls || []).map(t => t?.payload?.toolName).filter(Boolean)
       logTaskSuccess('Extract', target, {
         episodeId,

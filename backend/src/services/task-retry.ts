@@ -11,6 +11,7 @@ import { db, schema } from '../db/index.js'
 import { mastra } from '../mastra/index.js'
 import { buildAgentRequestContext } from '../agents/context.js'
 import { runAgent } from '../agents/run.js'
+import { createReasoningSink } from '../agents/reasoning-sink.js'
 import { getActiveConfig, getConfigById, validateVideoModel, type AIConfig } from './ai.js'
 import { getVideoAdapter } from './adapters/registry.js'
 import { generateImage, generateVideo } from './generation.js'
@@ -192,11 +193,8 @@ async function retryChatText(row: SysTaskRow, kind: TextTaskKind, episodeId: num
     modelOverride: opts.model || undefined,
     textConfigId: opts.configId || undefined,
   })
-  runAgent(agent, [{ role: 'user', content: message }], { maxSteps: 20, requestContext })
-    .then(() => finishTextTask(taskId, 'completed'))
-    .catch((err: unknown) => finishTextTask(taskId, 'failed', {
-      errorMsg: err instanceof Error ? err.message : 'Agent 执行失败',
-    }))
+  runAgent(agent, [{ role: 'user', content: message }], { maxSteps: 20, requestContext }, createReasoningSink(taskId))
+    .then(result => finishTextTask(taskId, 'completed', { outputText: result.text || '' }))
   return taskId
 }
 

@@ -92,7 +92,17 @@
       "retryStarted": "再実行タスク #{id} を作成しました",
       "retryFailed": "再実行に失敗しました",
       "overwriteTitle": "再実行すると既存の内容を上書きします",
-      "overwriteMessage": "「{kind}」を再実行すると、この話の脚本 / 分镜が新しい結果で上書きされます。続行しますか？"
+      "overwriteMessage": "「{kind}」を再実行すると、この話の脚本 / 分镜が新しい結果で上書きされます。続行しますか？",
+      "errorTitle": "エラー情報",
+      "copyError": "エラーをコピー",
+      "copied": "コピーしました",
+      "copyFailed": "コピーに失敗しました",
+      "thinking": "思考プロセス",
+      "thinkingLive": "思考中…",
+      "noThinking": "このモデルは思考を返しません",
+      "viewFull": "全文を見る",
+      "chars": "全 {n} 文字",
+      "output": "出力"
     }
   },
   "app": {

@@ -276,6 +276,13 @@ export const taskAPI = {
   del: (id: number) => api.del(`/tasks/${id}`),
   // 取消任务：qwen-jobs 调远端取消（排队中立即取消，运行中由服务端决定是否中断）
   cancel: (id: number) => api.post(`/tasks/${id}/cancel`),
+  // 文本任务的思考内容（Issue #19）：tail 取尾部；offset+tail 翻看全文
+  reasoning: (id: number, opts: { tail?: number; offset?: number } = {}) => {
+    const query = new URLSearchParams()
+    if (opts.offset != null) query.set('offset', String(opts.offset))
+    query.set('tail', String(opts.tail ?? 4096))
+    return api.get(`/tasks/${id}/reasoning?${query.toString()}`)
+  },
   list: (params?: { type?: 'image' | 'video'; drama_id?: number; storyboard_id?: number; character_id?: number; scene_id?: number; prop_id?: number }) => {
     const query = new URLSearchParams()
     if (params?.type) query.set('type', params.type)

@@ -8,6 +8,7 @@ import { db, schema } from '../db/index.js'
 import { mastra } from '../mastra/index.js'
 import { buildAgentRequestContext } from '../agents/context.js'
 import { runAgent } from '../agents/run.js'
+import { createReasoningSink } from '../agents/reasoning-sink.js'
 import { logTaskError, logTaskProgress, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
 import {
   createTextTask,
@@ -79,6 +80,7 @@ export async function startVideoPromptBatch(
     retryOf: opts.retryOf,
   })
 
+  const outputs: string[] = []
   logTaskStart('VideoPrompt', 'batch', { episodeId, dramaId, total: pending.length, model: opts.model || undefined })
   ;(async () => {
     const agent = mastra.getAgent('prompt_generator')
@@ -89,6 +91,7 @@ export async function startVideoPromptBatch(
       modelOverride: opts.model || undefined,
       textConfigId: opts.configId || undefined,
     })
+    const sink = createReasoningSink(taskId)
     for (const sb of pending) {
       progress.current_storyboard_id = sb.id
       await updateTextTaskProgress(taskId, progress)
@@ -111,11 +114,13 @@ export async function startVideoPromptBatch(
         const transitionHint = hasTransition
           ? '本镜已写好开场转场段（提交视频时会自动拼在视频描述之前）：视频描述的第一段要接在转场结束后的画面上继续演，不要重复描写转场本身。'
           : ''
-        await runAgent(agent, [{
+        sink.heading(`分镜 #${sb.storyboardNumber}`)
+        const result = await runAgent(agent, [{
           role: 'user',
           content: `请为分镜 #${sb.storyboardNumber}(ID:${sb.id})生成视频提示词(video_prompt)。视频模型:${videoLabel},请根据该模型的特性和时长限制生成。
 请先调用 read_storyboard_context 获取该分镜的画面描述(含【镜头N】子镜头与台词/旁白)、氛围、时长及三条关键帧提示词(first_frame_prompt/mid_frame_prompt/mid_frame_time/last_frame_prompt)，据此生成 video_prompt(第一行是信息头：列出该分镜出场的人物与场景，用 @角色名/@场景名 引用；之后按 3 秒分段换行、用 @角色名/@场景名/@道具名 引用参考素材；段落内允许多镜头切镜，段与段可以是不同景别/角度/对象，但不跨场景，切镜点对齐分镜 description 的【镜头N】结构)。关键帧对齐：视频的首帧就是该分镜的首关键帧画面，第一段必须从首关键帧已经呈现的画面继续演下去，不要额外重新建立空间；若有 mid_frame_time，必须让某个分段的起点正好落在该秒数并与中关键帧画面一致；最后一段收在尾关键帧的画面上。图像优先(绝对规则)：禁止描写角色的物种、服装、颜色、发型、体型等任何外观属性，角色一律只用 @角色名 指代，外观完全由参考图决定。${transitionHint}然后调用 update_storyboard 保存到分镜 ID:${sb.id}。update_storyboard 参数只传 storyboard_id 和 video_prompt 两个键,不要回传该分镜的其他任何字段,不要重新拆分整集。`,
-        }], { maxSteps: 8, requestContext })
+        }], { maxSteps: 8, requestContext }, sink)
+        outputs.push(`分镜 #${sb.storyboardNumber}：${result.text || ''}`)
         // 以实际落库为准判定成败
         const [fresh] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, sb.id))
         if ((fresh?.videoPrompt || '').trim()) progress.completed++
@@ -131,7 +136,7 @@ export async function startVideoPromptBatch(
   })()
     .then(async () => {
       progress.current_storyboard_id = undefined
-      await finishTextTask(taskId, 'completed', { progress })
+      await finishTextTask(taskId, 'completed', { progress, outputText: outputs.filter(s => s.trim()).join('\n\n') })
       logTaskSuccess('VideoPrompt', 'batch', { episodeId, total: progress.total, completed: progress.completed, failed: progress.failed })
     })
     .catch(async (err: unknown) => {

@@ -92,7 +92,17 @@
       "retryStarted": "Retry task #{id} created",
       "retryFailed": "Retry failed",
       "overwriteTitle": "Retry overwrites existing content",
-      "overwriteMessage": "Re-running “{kind}” overwrites this episode's script / storyboards with the new result. Continue?"
+      "overwriteMessage": "Re-running “{kind}” overwrites this episode's script / storyboards with the new result. Continue?",
+      "errorTitle": "Error",
+      "copyError": "Copy error",
+      "copied": "Copied",
+      "copyFailed": "Copy failed",
+      "thinking": "Thinking",
+      "thinkingLive": "Thinking…",
+      "noThinking": "This model returned no thinking content",
+      "viewFull": "View full text",
+      "chars": "{n} chars",
+      "output": "Output"
     }
   },
   "app": {

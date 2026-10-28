@@ -123,12 +123,17 @@ async function loadLookups(rows: SysTaskRow[], extraEpisodeIds: number[] = []): 
 
 function paramsOf(row: SysTaskRow): Record<string, unknown> {
   if (!row.params) return {}
+  let parsed: unknown
   try {
-    const parsed: unknown = JSON.parse(row.params)
-    return parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : {}
+    parsed = JSON.parse(row.params)
   } catch {
     return {}
   }
+  if (!parsed || typeof parsed !== 'object') return {}
+  const params = { ...(parsed as Record<string, unknown>) }
+  // output_text 全文只在 GET /tasks/:id 顶层返回，列表/活跃轮询不携带（Issue #19）
+  delete params.output_text
+  return params
 }
 
 export type TaskRow = Record<string, unknown> & { row_type: 'task'; id: number }
@@ -178,6 +183,7 @@ export function buildTaskRow(row: SysTaskRow, lookups: NameLookups): TaskRow {
     frame_type: frameType,
     kind,
     progress: row.type === 'text' ? parseTextTaskParams(row.params)?.progress ?? null : null,
+    reasoning_chars: row.type === 'text' && typeof params.reasoning_chars === 'number' ? params.reasoning_chars : null,
     retry_of: typeof params.retry_of === 'number' ? params.retry_of : null,
     label: composeTaskLabel({
       type: row.type,

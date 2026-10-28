@@ -92,7 +92,17 @@
       "retryStarted": "재시도 작업 #{id}을(를) 생성했습니다",
       "retryFailed": "재시도 실패",
       "overwriteTitle": "재시도하면 기존 내용을 덮어씁니다",
-      "overwriteMessage": "「{kind}」을(를) 다시 실행하면 이번 화의 대본 / 스토리보드가 새 결과로 덮어써집니다. 계속할까요?"
+      "overwriteMessage": "「{kind}」을(를) 다시 실행하면 이번 화의 대본 / 스토리보드가 새 결과로 덮어써집니다. 계속할까요?",
+      "errorTitle": "오류 정보",
+      "copyError": "오류 복사",
+      "copied": "복사됨",
+      "copyFailed": "복사 실패",
+      "thinking": "사고 과정",
+      "thinkingLive": "사고 중…",
+      "noThinking": "이 모델은 사고 내용을 반환하지 않습니다",
+      "viewFull": "전체 보기",
+      "chars": "총 {n}자",
+      "output": "출력"
     }
   },
   "app": {

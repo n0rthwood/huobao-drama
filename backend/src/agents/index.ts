@@ -8,7 +8,8 @@ import { Agent } from '@mastra/core/agent'
 import type { RequestContext } from '@mastra/core/request-context'
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { createOpenAI } from '@ai-sdk/openai'
-import { Agent as HttpAgent, fetch as undiciFetch } from 'undici'
+import { Agent as HttpAgent, fetch as undiciFetch, Response as UndiciResponse } from 'undici'
+import { captureReasoningFromStream, getActiveReasoningSink } from './reasoning-sink.js'
 import { getTextConfig, getTextProviderBaseUrl, getConfigById } from '../services/ai.js'
 import { logTaskProgress } from '../utils/task-logger.js'
 import { scriptTools } from './tools/script-tools.js'
@@ -211,6 +212,30 @@ const textModelFetch = ((input: UndiciInput, init?: UndiciInit) =>
   undiciFetch(input, { ...init, dispatcher: textModelDispatcher })) as unknown as typeof fetch
 
 /**
+ * 思考内容截取（Issue #19）：@ai-sdk/openai 的 chat 流解析只读 content/tool_calls/annotations，
+ * GLM/DeepSeek 的 delta.reasoning_content 被丢弃；这里在最外层对 SSE 响应 tee 一路自行解析。
+ * 换 @ai-sdk/openai-compatible 会改变全部 OpenAI 兼容端点的 provider 语义（新依赖、行为面大），
+ * tee 对 #17 的补丁链/超时零侵入。无活跃 sink 或非 SSE 响应时原样透传。
+ */
+function createReasoningCaptureFetch(inner: typeof fetch): typeof fetch {
+  return ((input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+    // sink 在请求发起时从 ALS 取（AI SDK 消费流时可能已脱离 runAgent 的上下文）
+    const sink = getActiveReasoningSink()
+    return inner(input, init).then((res) => {
+      const body = res.body
+      if (!sink || !body || res.status >= 300
+        || !(res.headers.get('content-type') || '').includes('text/event-stream')) {
+        return res
+      }
+      const [forSdk, forCapture] = body.tee()
+      void captureReasoningFromStream(forCapture, sink)
+      // res 在运行时就是 undici Response，这里只是过类型边界（init 取 status/statusText/headers）
+      return new UndiciResponse(forSdk, res as unknown as ConstructorParameters<typeof UndiciResponse>[1])
+    })
+  }) as unknown as typeof fetch
+}
+
+/**
  * 关闭思考(thinking)模式
  *
  * 背景：new-api 类中转站对 thinking 模型强制要求多轮请求回传 reasoning_content,
@@ -368,9 +393,11 @@ async function getModel(fileModel: string | undefined, modelOverride?: string, t
   const tempFetch = temperature !== null
     ? createTemperatureFetch(providerName, temperature, thinkingOffFetch)
     : thinkingOffFetch
-  const fetchImpl = isOfficialOpenAIHost(resolvedBaseURL)
-    ? tempFetch ?? textModelFetch
-    : createMaxTokensFetch(providerName, tempFetch)
+  const fetchImpl = createReasoningCaptureFetch(
+    isOfficialOpenAIHost(resolvedBaseURL)
+      ? tempFetch ?? textModelFetch
+      : createMaxTokensFetch(providerName, tempFetch),
+  )
 
   if (providerName === 'gemini') {
     const googleProvider = createGoogleGenerativeAI({

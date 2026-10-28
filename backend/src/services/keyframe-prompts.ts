@@ -8,6 +8,7 @@ import { db, schema } from '../db/index.js'
 import { mastra } from '../mastra/index.js'
 import { buildAgentRequestContext } from '../agents/context.js'
 import { runAgent } from '../agents/run.js'
+import { createReasoningSink } from '../agents/reasoning-sink.js'
 import { logTaskError, logTaskProgress, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
 import { loadEpisodeKeyframes } from './keyframes.js'
 import {
@@ -62,6 +63,7 @@ export async function startKeyframePromptBatch(
     retryOf: opts.retryOf,
   })
 
+  const outputs: string[] = []
   logTaskStart('KeyframePrompt', 'batch', { episodeId, dramaId, total: pending.length, model: opts.model || undefined })
   ;(async () => {
     const agent = mastra.getAgent('prompt_generator')
@@ -72,12 +74,14 @@ export async function startKeyframePromptBatch(
       modelOverride: opts.model || undefined,
       textConfigId: opts.configId || undefined,
     })
+    const sink = createReasoningSink(taskId)
     for (const sb of pending) {
       progress.current_storyboard_id = sb.id
       await updateTextTaskProgress(taskId, progress)
       logTaskProgress('KeyframePrompt', 'batch-shot', { episodeId, storyboardId: sb.id, index: progress.completed + progress.failed + 1, total: progress.total })
+      sink.heading(`分镜 #${sb.storyboardNumber}`)
       try {
-        await runAgent(agent, [{
+        const result = await runAgent(agent, [{
           role: 'user',
           content: `请为分镜 #${sb.storyboardNumber}(ID:${sb.id})生成关键帧提示词(first_frame_prompt、mid_frame_prompt、mid_frame_time、last_frame_prompt)，严格遵循 keyframe-prompt 技能规范。
 请先调用 read_storyboard_context 读取该分镜的 description(含【镜头N】子镜头)、result、atmosphere、duration、continuity_boundary 及 inherits_first，然后写出关键帧提示词：
@@ -87,7 +91,8 @@ export async function startKeyframePromptBatch(
 - mid_frame_prompt + mid_frame_time = 除第一个子镜头外最重要的那个子镜头的起始瞬间，mid_frame_time 以秒为单位、必须落在 0.5 秒与 duration-0.5 秒之间；该分镜只有一个子镜头时两者都不要写
 - last_frame_prompt = 段落结尾瞬间，与 result 一致，必须是稳定清晰、可被下一镜当作开场的画面
 最后调用 update_storyboard 保存到分镜 ID:${sb.id}。update_storyboard 参数只传 storyboard_id 以及上述关键帧字段,不要回传该分镜的其他任何字段(title、description、video_prompt、scene_id 等一律不传),不要重新拆分整集。`,
-        }], { maxSteps: 8, requestContext })
+        }], { maxSteps: 8, requestContext }, sink)
+        outputs.push(`分镜 #${sb.storyboardNumber}：${result.text || ''}`)
         // 以实际落库为准判定成败：尾关键帧提示词是必选项
         const [fresh] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, sb.id))
         if ((fresh?.lastFramePrompt || '').trim()) progress.completed++
@@ -103,7 +108,7 @@ export async function startKeyframePromptBatch(
   })()
     .then(async () => {
       progress.current_storyboard_id = undefined
-      await finishTextTask(taskId, 'completed', { progress })
+      await finishTextTask(taskId, 'completed', { progress, outputText: outputs.filter(s => s.trim()).join('\n\n') })
       logTaskSuccess('KeyframePrompt', 'batch', { episodeId, total: progress.total, completed: progress.completed, failed: progress.failed })
     })
     .catch(async (err: unknown) => {

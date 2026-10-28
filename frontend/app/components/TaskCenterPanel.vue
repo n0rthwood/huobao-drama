@@ -60,6 +60,12 @@
               <span v-if="isParentRow(row) && row.counts" class="tc-row-counts">{{ countsText(row) }}</span>
               <MediaTime class="tc-row-time" :at="rowTime(row)" />
               <span v-if="row.error_msg" class="tc-row-error truncate">{{ mapError(row.error_msg) }}</span>
+              <button
+                v-if="row.error_msg"
+                class="btn btn-ghost btn-icon tc-error-copy"
+                :title="t('taskCenter.detail.copyError')"
+                @click.stop="copyRowError(row)"
+              ><Copy :size="12" /></button>
             </div>
           </div>
           <ProgressRing
@@ -84,6 +90,12 @@
               </div>
               <div class="tc-row-meta">
                 <span v-if="child.error_msg" class="tc-row-error truncate">{{ mapError(child.error_msg) }}</span>
+                <button
+                  v-if="child.error_msg"
+                  class="btn btn-ghost btn-icon tc-error-copy"
+                  :title="t('taskCenter.detail.copyError')"
+                  @click.stop="copyRowError(child)"
+                ><Copy :size="12" /></button>
                 <MediaTime v-else class="tc-row-time" :at="rowTime(child)" />
               </div>
             </div>
@@ -119,7 +131,9 @@
  */
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ChevronRight, ListTodo, RefreshCw } from 'lucide-vue-next'
+import { ChevronRight, ListTodo, RefreshCw, Copy } from 'lucide-vue-next'
+import { toast } from 'vue-sonner'
+import { copyToClipboard } from '~/utils/clipboard'
 import ProgressRing from '~/components/ProgressRing.vue'
 import TaskDetailDialog from '~/components/TaskDetailDialog.vue'
 import BaseSelect from '~/components/BaseSelect.vue'
@@ -263,6 +277,12 @@ function onRowClick(row) {
   if (isParentRow(row)) { toggleExpand(row); return }
   openDetail(row)
 }
+// 复制完整错误信息（截断显示只影响列表观感，剪贴板要完整原文，Issue #19）
+async function copyRowError(row) {
+  const ok = await copyToClipboard(row?.error_msg || '')
+  if (ok) toast.success(t('taskCenter.detail.copied'))
+  else toast.error(t('taskCenter.detail.copyFailed'))
+}
 function openDetail(row) {
   detailTask.value = row
 }
@@ -378,6 +398,8 @@ defineExpose({ reload })
 }
 .tc-row-meta { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-3); min-width: 0; }
 .tc-row-error { color: var(--danger-text, #d9534f); }
+.tc-error-copy { padding: 1px; flex: none; color: var(--text-3); }
+.tc-error-copy:hover { color: var(--text-1); }
 .tc-row-time { flex-shrink: 0; }
 .tc-row-counts { flex-shrink: 0; }
 .tc-row-status { font-size: 11px; font-weight: 600; color: var(--text-2); flex-shrink: 0; }
