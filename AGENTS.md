@@ -124,6 +124,7 @@ Issue 整理完成后、实施前，必须让 **Fabel（Anthropic）或 Astra（
      `UPDATE ai_service_configs SET provider='qwen-jobs', updated_at=datetime('now') WHERE service_type='image' AND provider='comfyui';`
      不要靠 `apply-local-config` 完成这一步——它按 `(service_type, provider, name)` upsert，会新建一行。
   3. 110 侧已把 ComfyUI 原生接口收到 qwen-jobs 后面，旧的 `/image/prompt`、`/image/history` 路径不再可用。
+- **FLUX 图片服务（2026-10-29，Issue #27）**：本机 `providers.json` 另有 `image/qwen-jobs` 的 `FLUX.1-dev` / `FLUX.1-schnell` 两行（内网 FLUX 任务服务，LAN 无鉴权）。FLUX 不支持 `image_edit`，带参考图一律 `reference_to_image` 且只用第 1 张参考图 + `denoising_strength=0.75`（多张降级会记 warning 并写入任务 metadata）；模型名以 `flux` 开头即走 FLUX 分支（`isFluxJobsConfig`）。
 
 ## 供应商（Provider）架构
 
