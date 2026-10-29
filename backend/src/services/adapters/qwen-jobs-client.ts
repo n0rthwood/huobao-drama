@@ -31,6 +31,7 @@ export interface QwenJobRequest {
   height?: number
   reference_images?: string[]
   seed?: number
+  denoising_strength?: number
   steps?: number
   metadata?: Record<string, string>
 }
@@ -135,6 +136,63 @@ export function withReferenceHint(prompt: string, refCount: number): string {
   if (!refCount || /<image\d+>/i.test(prompt)) return prompt
   const tags = Array.from({ length: refCount }, (_, i) => `<image${i + 1}>`).join('、')
   return `以 ${tags} 为参考：${prompt}`
+}
+
+/** FLUX 任务服务（qwen-jobs v1 克隆）的参考图 img2img 去噪强度：服务端默认一致 */
+export const FLUX_DENOISING_STRENGTH = 0.75
+
+/**
+ * 是否 FLUX 任务服务（qwen-jobs 协议克隆，模型名 flux-dev / flux-schnell）。
+ * FLUX 不支持 image_edit，reference_to_image 只接受恰好 1 张参考图（img2img），
+ * 请求体字段也不容忍任何多余字段，提交前必须走 FLUX 专用的 body 组装。
+ */
+export function isFluxJobsConfig(config: AIConfig): boolean {
+  return /(^|[,;\s])flux[-\s]/i.test(` ${config.model || ''} `) || /(^|[,;\s])flux$/i.test(` ${config.model || ''} `)
+}
+
+export interface ImageJobBodyOptions {
+  prompt: string
+  /** 已上传的参考图 file id（FLUX 只用第 1 张） */
+  fileIds: string[]
+  /** 关键帧槽位任务（按剧集画幅出图） */
+  isKeyframe: boolean
+  /** "WxH" 画幅 */
+  size: string | null | undefined
+  flux: boolean
+}
+
+/** 多参考图在 FLUX 下被降级为第 1 张时的说明，写入任务 metadata（远端任务详情可查） */
+export const FLUX_REFS_DROPPED_NOTE = 'flux_reference_to_image_only_takes_1_reference'
+
+/**
+ * qwen-jobs 图片任务请求体组装（generation.ts 唯一构造点）。
+ * - Qwen：无参考图 text_to_image；关键帧 reference_to_image（带画幅）；其余 image_edit（跟随第 1 张参考图，不带画幅），提示词补 <imageN> 标记。
+ * - FLUX：无参考图 text_to_image；有参考图一律 reference_to_image（img2img，只带第 1 张参考图，
+ *   画幅照常、显式 denoising_strength），提示词不加 <imageN>（FLUX 不解析）。
+ */
+export function buildImageJobBody(opts: ImageJobBodyOptions): QwenJobRequest {
+  const { prompt, fileIds, isKeyframe, size, flux } = opts
+  const [width, height] = pickQwenSize(size)
+  if (flux) {
+    const refs = fileIds.slice(0, 1)
+    const mode: QwenJobMode = refs.length ? 'reference_to_image' : 'text_to_image'
+    return {
+      mode,
+      prompt,
+      metadata: {},
+      width,
+      height,
+      ...(refs.length ? { reference_images: refs, denoising_strength: FLUX_DENOISING_STRENGTH } : {}),
+    }
+  }
+  const mode: QwenJobMode = !fileIds.length ? 'text_to_image' : isKeyframe ? 'reference_to_image' : 'image_edit'
+  return {
+    mode,
+    prompt: withReferenceHint(prompt, fileIds.length),
+    metadata: {},
+    ...(mode === 'image_edit' ? {} : { width, height }),
+    ...(fileIds.length ? { reference_images: fileIds } : {}),
+  }
 }
 
 async function toError(resp: Response): Promise<QwenJobsError> {

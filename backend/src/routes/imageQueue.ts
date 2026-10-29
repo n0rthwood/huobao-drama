@@ -7,7 +7,7 @@ import { Hono } from 'hono'
 import { success, badRequest } from '../utils/response.js'
 import { getActiveConfig, getConfigById } from '../services/ai.js'
 import { isQwenJobsTask } from '../services/sys-task.js'
-import { getQwenCapacity, getQwenEstimate, pickQwenSize, type QwenJobMode } from '../services/adapters/qwen-jobs-client.js'
+import { getQwenCapacity, getQwenEstimate, isFluxJobsConfig, pickQwenSize, type QwenJobMode } from '../services/adapters/qwen-jobs-client.js'
 
 const app = new Hono()
 
@@ -25,8 +25,10 @@ app.get('/estimate', async (c) => {
   const count = Math.max(1, Number(c.req.query('count') || 1))
   const size = c.req.query('size')
   // 有参考图且指定画幅 = 关键帧（reference_to_image）；只有参考图 = 角色/道具编辑
-  const mode: QwenJobMode = !references ? 'text_to_image' : size ? 'reference_to_image' : 'image_edit'
-  const [width, height] = pickQwenSize(size)
+  // FLUX 服务不支持 image_edit：估计与提交一样按 reference_to_image（默认 1024²）算
+  let mode: QwenJobMode = !references ? 'text_to_image' : size ? 'reference_to_image' : 'image_edit'
+  if (isFluxJobsConfig(config) && mode === 'image_edit') mode = 'reference_to_image'
+  const [width, height] = pickQwenSize(mode === 'reference_to_image' && !size ? '1024x1024' : size)
 
   try {
     const [estimate, capacity] = await Promise.all([

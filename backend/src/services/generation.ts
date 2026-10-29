@@ -16,16 +16,16 @@ import { FRAME_TYPE_SLOT, invalidateKeyframeConfirmation } from './keyframes.js'
 import { completionStamp } from './media-time.js'
 import { saveStylingVersion } from './styling-version.js'
 import {
+  buildImageJobBody,
   cancelQwenJob,
   createQwenJob,
   evictQwenFileIds,
-  pickQwenSize,
+  isFluxJobsConfig,
+  FLUX_REFS_DROPPED_NOTE,
   QWEN_MAX_REFS,
   QwenJobsError,
-  uploadReferenceImage,
-  withReferenceHint,
-  type QwenJobMode,
   type QwenJobRequest,
+  uploadReferenceImage,
 } from './adapters/qwen-jobs-client.js'
 import {
   ACTIVE_TASK_STATUSES,
@@ -449,20 +449,27 @@ async function submitQwenJobsImage(record: SysTaskRecord, config: AIConfig, para
 
   for (let attempt = 1; attempt <= 2; attempt++) {
     const fileIds: string[] = []
-    for (const ref of refs) fileIds.push(await uploadReferenceImage(config, ref))
-
-    // 关键帧（frameType 命中槽位）必须按剧集画幅出图 → reference_to_image；
-    // 角色/道具的编辑跟随第 1 张参考图 → image_edit（不能带 width/height）
-    const isKeyframe = !!FRAME_TYPE_SLOT[String(params.frameType || '')]
-    const mode: QwenJobMode = !fileIds.length ? 'text_to_image' : isKeyframe ? 'reference_to_image' : 'image_edit'
-    const [width, height] = pickQwenSize(params.size)
-    const body: QwenJobRequest = {
-      mode,
-      prompt: withReferenceHint(record.prompt || '', fileIds.length),
-      metadata: { sys_task_id: String(record.id) },
-      ...(mode === 'image_edit' ? {} : { width, height }),
-      ...(fileIds.length ? { reference_images: fileIds } : {}),
+    // FLUX：reference_to_image 只收 1 张参考图（img2img），多张时降级为第 1 张；
+    // 降级说明写入任务 metadata（远端任务详情可查）并记 warning，不静默丢弃。
+    const flux = isFluxJobsConfig(config)
+    if (flux && refs.length > 1) {
+      logTaskWarn('ImageTask', 'flux uses only the first reference image', { id: record.id, refs: refs.length })
     }
+    for (const ref of (flux ? refs.slice(0, 1) : refs)) fileIds.push(await uploadReferenceImage(config, ref))
+
+    // Qwen：关键帧按剧集画幅 reference_to_image，角色/道具编辑 image_edit（不带画幅），提示词补 <imageN>；
+    // FLUX：有参考图一律 reference_to_image + denoising_strength，只带第 1 张，不加 <imageN>。
+    const isKeyframe = !!FRAME_TYPE_SLOT[String(params.frameType || '')]
+    const body: QwenJobRequest = buildImageJobBody({
+      prompt: record.prompt || '',
+      fileIds,
+      isKeyframe,
+      size: params.size,
+      flux,
+    })
+    body.metadata = flux && refs.length > 1
+      ? { sys_task_id: String(record.id), [FLUX_REFS_DROPPED_NOTE]: String(refs.length) }
+      : { sys_task_id: String(record.id) }
     const row = await patchTaskRemoteState(
       record.id,
       { request: body, config_id: config.id, idempotency_key: idempotencyKey },
