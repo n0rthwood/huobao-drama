@@ -90,3 +90,57 @@ test('queue_full, gateway and network errors are transient; request errors are t
     invalid: false, conflict: false, notFound: false, gone: false,
   })
 })
+
+test('FLUX configs are detected case-insensitively; qwen models are not', () => {
+  const result = runInBackend(`
+    const { isFluxJobsConfig } = client
+    const cfg = model => ({ provider: 'qwen-jobs', baseUrl: 'http://x', apiKey: '', model })
+    process.stdout.write(JSON.stringify({
+      dev: isFluxJobsConfig(cfg('flux-dev')),
+      schnell: isFluxJobsConfig(cfg('flux-schnell')),
+      upper: isFluxJobsConfig(cfg('FLUX-dev')),
+      qwen: isFluxJobsConfig(cfg('qwen-image-2.1')),
+      multi: isFluxJobsConfig(cfg('qwen-image-2.1, flux-dev')),
+      empty: isFluxJobsConfig(cfg('')),
+    }))
+  `)
+  assert.deepEqual(result, { dev: true, schnell: true, upper: true, qwen: false, multi: true, empty: false })
+})
+
+test('image job body: qwen keeps image_edit semantics, flux maps refs to reference_to_image', () => {
+  const result = runInBackend(`
+    const { buildImageJobBody, FLUX_DENOISING_STRENGTH } = client
+    const base = { prompt: 'P', size: '1344x768' }
+    const out = {
+      qwenNoRefs: buildImageJobBody({ ...base, fileIds: [], isKeyframe: false, flux: false }),
+      qwenKeyframe: buildImageJobBody({ ...base, fileIds: ['f1', 'f2'], isKeyframe: true, flux: false }),
+      qwenEdit: buildImageJobBody({ ...base, fileIds: ['f1', 'f2'], isKeyframe: false, flux: false }),
+      fluxNoRefs: buildImageJobBody({ ...base, fileIds: [], isKeyframe: false, flux: true }),
+      fluxRef: buildImageJobBody({ ...base, fileIds: ['f1', 'f2'], isKeyframe: false, flux: true }),
+      fluxKeyframe: buildImageJobBody({ ...base, fileIds: ['f1'], isKeyframe: true, flux: true }),
+      strength: FLUX_DENOISING_STRENGTH,
+    }
+    process.stdout.write(JSON.stringify(out))
+  `)
+  // Qwen 路径逐字段回归（与旧内联构造一致）
+  assert.deepEqual(result.qwenNoRefs, { mode: 'text_to_image', prompt: 'P', metadata: {}, width: 1344, height: 768 })
+  assert.deepEqual(result.qwenKeyframe, {
+    mode: 'reference_to_image', prompt: '以 <image1>、<image2> 为参考：P', metadata: {},
+    width: 1344, height: 768, reference_images: ['f1', 'f2'],
+  })
+  assert.deepEqual(result.qwenEdit, {
+    mode: 'image_edit', prompt: '以 <image1>、<image2> 为参考：P', metadata: {},
+    reference_images: ['f1', 'f2'],
+  })
+  // FLUX 路径：text_to_image 带画幅；参考图一律 reference_to_image + 0.75，只带第 1 张，无 <imageN>
+  assert.deepEqual(result.fluxNoRefs, { mode: 'text_to_image', prompt: 'P', metadata: {}, width: 1344, height: 768 })
+  assert.deepEqual(result.fluxRef, {
+    mode: 'reference_to_image', prompt: 'P', metadata: {}, width: 1344, height: 768,
+    reference_images: ['f1'], denoising_strength: 0.75,
+  })
+  assert.deepEqual(result.fluxKeyframe, {
+    mode: 'reference_to_image', prompt: 'P', metadata: {}, width: 1344, height: 768,
+    reference_images: ['f1'], denoising_strength: 0.75,
+  })
+  assert.equal(result.strength, 0.75)
+})
