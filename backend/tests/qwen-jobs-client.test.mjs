@@ -102,9 +102,11 @@ test('FLUX configs are detected case-insensitively; qwen models are not', () => 
       qwen: isFluxJobsConfig(cfg('qwen-image-2.1')),
       multi: isFluxJobsConfig(cfg('qwen-image-2.1, flux-dev')),
       empty: isFluxJobsConfig(cfg('')),
+      serviceId: isFluxJobsConfig(cfg('flux1-schnell-nf4')),
+      qwenPrefixTrap: isFluxJobsConfig(cfg('qwen-image-2.1,fluxish')),
     }))
   `)
-  assert.deepEqual(result, { dev: true, schnell: true, upper: true, qwen: false, multi: true, empty: false })
+  assert.deepEqual(result, { dev: true, schnell: true, upper: true, qwen: false, multi: true, empty: false, serviceId: true, qwenPrefixTrap: true })
 })
 
 test('image job body: qwen keeps image_edit semantics, flux maps refs to reference_to_image', () => {

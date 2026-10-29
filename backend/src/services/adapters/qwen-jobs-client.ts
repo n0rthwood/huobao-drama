@@ -147,7 +147,7 @@ export const FLUX_DENOISING_STRENGTH = 0.75
  * 请求体字段也不容忍任何多余字段，提交前必须走 FLUX 专用的 body 组装。
  */
 export function isFluxJobsConfig(config: AIConfig): boolean {
-  return /(^|[,;\s])flux[-\s]/i.test(` ${config.model || ''} `) || /(^|[,;\s])flux$/i.test(` ${config.model || ''} `)
+  return /(^|[,;\s])flux/i.test(` ${config.model || ''} `)
 }
 
 export interface ImageJobBodyOptions {
