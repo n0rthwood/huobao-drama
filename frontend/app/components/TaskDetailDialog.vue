@@ -268,8 +268,7 @@ const elapsedText = computed(() => {
 })
 
 function mediaSrc(url) {
-  if (!url) return ''
-  return /^(https?:)?\/\//.test(url) || url.startsWith('/') ? url : '/' + url
+  return mediaUrl(url)
 }
 
 // ===== 错误复制（Issue #19） =====

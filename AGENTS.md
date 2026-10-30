@@ -90,11 +90,14 @@ Issue 整理完成后、实施前，必须让 **Fabel（Anthropic）或 Astra（
 火宝短剧（Huobao Drama）：AI 短剧一站式制作（小说 → 剧本 → 资产提取 → 生图 → 分镜 → 生视频 → FFmpeg 导出）。
 项目结构、命令与架构总览见 `CLAUDE.md`，本文件只记录 Agent 开发时容易踩坑的补充信息。
 
-## 开发服务
+## 开发服务 / 生产托管
 
-- 前端 Nuxt dev：`0.0.0.0:3013`，`strictPort: true`（端口被占会直接报错，不会漂移到 3014）。`host: true` 会让当前 Nuxt 版本崩溃，必须写字符串 `'0.0.0.0'`。
-- 后端 Hono：`5679`。根目录 `npm run dev:backend` 已固定 `PORT=5679`（本机环境变量可能带 `PORT=5010`，属于 omp web UI）。
-- 本机只应有这两个监听；验证：`curl localhost:3013/api/v1/health`、`curl localhost:5679/api/v1/health`。
+- **生产（常驻，唯一 pm2 应用）**：`huobao-backend`（`npm start` = tsx 非 watch，`NODE_ENV=production`，:5679）同源托管 UI + `/api/v1` + `/static`。UI 来自 release 产物 `~/huobao-releases/current`（`FRONTEND_DIST`），**不跑 Nuxt dev**。
+- **部署前缀（2026-10-30 起）**：SPA 以 `baseURL='/huobao/'` 构建（`nuxt.config.ts` 读 `HUOBAO_BASE_PATH`，默认 `/huobao/`），入口 **`https://164.joyai.dev/huobao/`**（LAN `http://172.30.3.164/huobao/` 免鉴权；`huobao.joyai.dev` 已 301 到这里）。Caddy `handle_path` 剥掉 `/huobao`，所以后端无需感知前缀；**前端所有绝对路径必须过 `app/utils/url.ts` 的 `apiBase()`/`mediaUrl()`/`appBase()`**（basePath 走 `runtimeConfig.public`，**不要用 `import.meta.env.BASE_URL`**——SPA 构建里它是相对值 `'./'`，深链页面上相对 fetch 会解析成 `/huobao/drama/api/...`）。新增 `<img>/<video>/fetch` 时一律用这些工具，别再手写 `'/static/...'` 或 `'/api/v1/...'`。
+- 发布：`scripts/release.sh`（`nuxt generate` → 原子发布到 `~/huobao-releases/<UTC 时间戳>` → 切换 `current` 软链 → `pm2 restart huobao-backend` → smoke：后端直连 health/index + Caddy 前缀路径 `/huobao/`、`/huobao/api/v1/health`、深链、hash 资源，并校验 index.html 以 `/huobao/_nuxt/` 为基址）。增量约 5–7 s；保留最近 5 个版本（`HUOBAO_RELEASES`/`HUOBAO_RELEASES_KEEP` 可覆盖）。回滚 = 把 `current` 指回旧时间戳再 restart。
+- 前端热加载开发（可选，非常驻）：在 `frontend/` 手工 `HUOBAO_BASE_PATH=/ npm run dev`（默认会带 `/huobao/` 前缀跑），`0.0.0.0:3013`，`strictPort: true`。`host: true` 会让当前 Nuxt 版本崩溃，必须写字符串 `'0.0.0.0'`。它只用于开发；生产入口是 `164.joyai.dev/huobao/`。
+- 后端：`5679`。根目录 `npm run dev:backend` 已固定 `PORT=5679`（本机环境变量可能带 `PORT=5010`，属于 omp web UI）。
+- 常驻监听只有 `:5679`；验证：`curl localhost:5679/api/v1/health`、`curl -s -o /dev/null -w '%{http_code}' localhost/huobao/drama/1`（经 Caddy 的深链必须 200）。
 
 ### 页面尺寸规格（Issue #20，前端改版必须遵守）
 - 工作台（`layouts/studio.vue` + `views/drama/episode.vue` 的 `.studio`）**最小可用宽度 1280px**：更窄的视口由布局层横向滚动，不再收缩内容；因此 episode.vue 不再有 `max-width` 收缩断点，新增样式也不要加。
@@ -104,12 +107,12 @@ Issue 整理完成后、实施前，必须让 **Fabel（Anthropic）或 Astra（
 - 覆盖在图片上的标签（`.asset-cover-badge` / `.asset-cover-time`）背景与文字都必须取主题变量（`--header-bg` / `--text-1`），禁止写死白底。
 - 选中状态必须有明确标识（描边 + 勾选按钮 `aria-pressed`），不能只靠颜色文字或透明度。
 
-### 进程管理：pm2（不要用 omp 会话跑 dev 服务）
-- 前后端 dev 服务（保留热加载）由 pm2 管理，配置 `ecosystem.config.cjs`（`huobao-backend` 5679、`huobao-frontend` 3013）。omp 会话/daemon 结束后进程会跟着丢，所以**不要**用 omp 的 bash service/daemon 启动它们。
-- pm2 装在 `~/.local`（全局 `/usr` 无写权限，不要 sudo）。**一律通过 `scripts/pm2.sh` 调用**：`scripts/pm2.sh start ecosystem.config.cjs | restart all | stop all | status | logs huobao-backend`。
-- **环境变量隔离（重要）**：pm2 daemon 与子进程继承启动它的 shell 环境，omp 会话里有 `PORT`、`OMP_WEB_*`、`OMPCODE`、`NODE_ENV` 等变量。`scripts/pm2.sh` 用 `env -i` 清空环境，只传 `HOME/USER/LANG/PATH`；**不要直接敲 `pm2`**（哪怕只是 `pm2 -v`，也会拉起带污染环境的 daemon；误操作后 `scripts/pm2.sh kill` 再重启）。后端的 `PORT=5679` 写在 `ecosystem.config.cjs` 的 `env` 里。
+### 进程管理：pm2（生产单应用；不要用 omp 会话跑服务）
+- `ecosystem.config.cjs` 只有 `huobao-backend`（`npm start`，:5679，`NODE_ENV=production`，`FRONTEND_DIST=~/huobao-releases/current`）。omp 会话/daemon 结束后进程会跟着丢，所以**不要**用 omp 的 bash service/daemon 启动它。
+- pm2 装在 `~/.local`（全局 `/usr` 无写权限，不要 sudo）。**一律通过 `scripts/pm2.sh` 调用**：`scripts/pm2.sh start ecosystem.config.cjs | restart huobao-backend | stop all | status | logs huobao-backend`。
+- **环境变量隔离（重要）**：pm2 daemon 与子进程继承启动它的 shell 环境，omp 会话里有 `PORT`、`OMP_WEB_*`、`OMPCODE`、`NODE_ENV` 等变量。`scripts/pm2.sh` 用 `env -i` 清空环境，只传 `HOME/USER/LANG/PATH`；**不要直接敲 `pm2`**（哪怕只是 `pm2 -v`，也会拉起带污染环境的 daemon；误操作后 `scripts/pm2.sh kill` 再重启）。`PORT=5679`、`FRONTEND_DIST` 写在 `ecosystem.config.cjs` 的 `env` 里；改这些后要 `delete` + `start`（`restart` 不更新 env）。
 - 验证无泄漏：`for p in $(pgrep -f "tsx.*src/index|nuxt"); do tr '\0' '\n' < /proc/$p/environ | grep -E '^OMP'; done` 应无输出。
-- 开机自启未配置（需 root）：自行执行 `pm2 startup` 打印的 sudo 命令，再 `scripts/pm2.sh save`。
+- 改过应用集合后 `scripts/pm2.sh save`（开机 `pm2 resurrect` 按 dump 恢复）。
 
 ## 敏感配置规则（重要）
 

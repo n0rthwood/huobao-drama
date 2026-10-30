@@ -93,6 +93,15 @@ app.use('/static/*', async (c, next) => {
 })
 app.use('/static/*', serveStatic({ root: DATA_ROOT }))
 
+// release 产物每次文件名带 hash，但 index.html 必须立刻生效：HTML 一律 no-store，
+// 避免浏览器拿旧 index.html 去请求已删除的 /_nuxt/* 资源。
+app.use('*', async (c, next) => {
+  await next()
+  if (c.res.headers.get('content-type')?.includes('text/html')) {
+    c.header('Cache-Control', 'no-store')
+  }
+})
+
 // Serve frontend (production build) — 桌面版由主进程注入 FRONTEND_DIST（resources/frontend）
 const distPath = process.env.FRONTEND_DIST || path.join(projectRoot, 'frontend', 'dist')
 app.use('*', serveStatic({ root: distPath }))

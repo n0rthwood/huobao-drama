@@ -737,8 +737,8 @@
                     </span>
                     <video
                       v-if="hasVid(task.storyboard)"
-                      :src="'/' + getVideoUrl(task.storyboard)"
-                      :poster="posterOf('/' + getVideoUrl(task.storyboard)) || undefined"
+                      :src="mediaUrl(getVideoUrl(task.storyboard))"
+                      :poster="posterOf(mediaUrl(getVideoUrl(task.storyboard))) || undefined"
                       preload="none"
                       playsinline
                       muted
@@ -907,7 +907,7 @@
                 </button>
                 <a
                   v-if="previewVideoUrl || hasVid(selectedSb)"
-                  :href="'/' + (previewVideoUrl || getVideoUrl(selectedSb))"
+                  :href="mediaUrl(previewVideoUrl || getVideoUrl(selectedSb))"
                   download
                   class="btn btn-sm"
                 >
@@ -919,8 +919,8 @@
                 <video
                   v-if="previewVideoUrl || hasVid(selectedSb)"
                   :key="previewVideoUrl || getVideoUrl(selectedSb)"
-                  :src="'/' + (previewVideoUrl || getVideoUrl(selectedSb))"
-                  :poster="posterOf('/' + (previewVideoUrl || getVideoUrl(selectedSb))) || undefined"
+                  :src="mediaUrl(previewVideoUrl || getVideoUrl(selectedSb))"
+                  :poster="posterOf(mediaUrl(previewVideoUrl || getVideoUrl(selectedSb))) || undefined"
                   controls
                   preload="metadata"
                   playsinline
@@ -962,7 +962,7 @@
                   @click="previewHistoryVideo(h)"
                   @keydown.enter.prevent="previewHistoryVideo(h)"
                 >
-                  <video :src="'/' + taskVideoPath(h)" :poster="posterOf('/' + taskVideoPath(h)) || undefined" preload="none" muted playsinline tabindex="-1" />
+                  <video :src="mediaUrl(taskVideoPath(h))" :poster="posterOf(mediaUrl(taskVideoPath(h))) || undefined" preload="none" muted playsinline tabindex="-1" />
                   <MediaTime class="video-history-time" :at="taskGeneratedAt(h)" />
                   <span class="video-history-engine">{{ h.provider || t('episode.vid.unknownEngine') }}<template v-if="h.model"> · {{ h.model }}</template></span>
                   <span v-if="isCurrentVideo(h)" class="video-history-badge">{{ t('episode.vid.current') }}</span>
@@ -1114,8 +1114,8 @@
                   <div class="merge-card-thumb">
                     <video
                       v-if="m.status === 'completed' && m.merged_url"
-                      :src="'/' + m.merged_url"
-                      :poster="posterOf('/' + m.merged_url) || undefined"
+                      :src="mediaUrl(m.merged_url)"
+                      :poster="posterOf(mediaUrl(m.merged_url)) || undefined"
                       preload="none"
                       muted
                       playsinline
@@ -1133,7 +1133,7 @@
                     <span v-if="m.duration">· {{ m.duration }}s</span>
                     <a
                       v-if="m.status === 'completed' && m.merged_url"
-                      :href="'/' + m.merged_url"
+                      :href="mediaUrl(m.merged_url)"
                       download
                       class="btn btn-sm"
                       @click.stop
@@ -1189,8 +1189,8 @@
                   <div class="exp-thumb">
                     <video
                       v-if="hasVid(sb)"
-                      :src="'/' + getVideoUrl(sb)"
-                      :poster="posterOf('/' + getVideoUrl(sb)) || undefined"
+                      :src="mediaUrl(getVideoUrl(sb))"
+                      :poster="posterOf(mediaUrl(getVideoUrl(sb))) || undefined"
                       preload="none"
                       muted
                       playsinline
@@ -1531,7 +1531,7 @@
           <div class="image-viewer-head">
             <div class="image-viewer-title">{{ t('episode.export.shotPreview', { n: shotNumberOf(previewShot) }) }}</div>
             <span v-if="previewShot.duration" class="dim" style="font-size:11px">{{ previewShot.duration }}s</span>
-            <a :href="'/' + getVideoUrl(previewShot)" download class="btn btn-sm" style="margin-left:auto">
+            <a :href="mediaUrl(getVideoUrl(previewShot))" download class="btn btn-sm" style="margin-left:auto">
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               {{ t('common.download') }}
             </a>
@@ -1542,7 +1542,7 @@
           <div class="merge-viewer-body">
             <video
               :key="previewShot.id"
-              :src="'/' + getVideoUrl(previewShot)"
+              :src="mediaUrl(getVideoUrl(previewShot))"
               controls
               autoplay
               playsinline
@@ -1557,7 +1557,7 @@
           <div class="image-viewer-head">
             <div class="image-viewer-title">{{ t('episode.viewer.filmPreview') }}</div>
             <span class="dim" style="font-size:11px"><MediaTime :at="activeMerge.generated_at || activeMerge.created_at_unix" /><template v-if="activeMerge.duration"> · {{ activeMerge.duration }}s</template></span>
-            <a :href="'/' + activeMerge.merged_url" download class="btn btn-sm" style="margin-left:auto">
+            <a :href="mediaUrl(activeMerge.merged_url)" download class="btn btn-sm" style="margin-left:auto">
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               {{ t('episode.viewer.downloadFilm') }}
             </a>
@@ -1568,7 +1568,7 @@
           <div class="merge-viewer-body">
             <video
               :key="activeMerge.id"
-              :src="'/' + activeMerge.merged_url"
+              :src="mediaUrl(activeMerge.merged_url)"
               controls
               autoplay
               playsinline
@@ -2362,10 +2362,7 @@ async function saveAssetDetail() {
 }
 
 function assetImageSrc(item) {
-  const raw = item?.image_url || item?.imageUrl || ''
-  if (!raw) return ''
-  if (/^https?:\/\//i.test(raw) || raw.startsWith('/')) return raw
-  return `/${raw}`
+  return mediaUrl(item?.image_url || item?.imageUrl || '')
 }
 
 function assetVersions(item) {
@@ -2375,10 +2372,7 @@ function assetVersions(item) {
 }
 
 function versionImageSrc(version) {
-  const raw = String(version?.url || '')
-  if (!raw) return ''
-  if (/^https?:\/\//i.test(raw) || raw.startsWith('/')) return raw
-  return `/${raw}`
+  return mediaUrl(version?.url)
 }
 
 // 本集造型版本图（Issue #15）：styling_version.image_path 与资产图同样是相对路径

@@ -25,7 +25,7 @@ const FILENAMES: Record<string, string> = {
 /** provider → 当前主题下的图标 URL；未知厂商返回 undefined（调用方回退字母徽标） */
 export function providerIconUrl(provider?: string | null): string | undefined {
   const file = FILENAMES[(provider || '').toLowerCase()]
-  return file ? `/icons/${resolvedTheme.value}/${file}` : undefined
+  return file ? `${appBase()}icons/${resolvedTheme.value}/${file}` : undefined
 }
 
 /**

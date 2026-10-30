@@ -98,6 +98,9 @@ The interface ships in **中文 / English / 日本語 / 한국어**, with a glob
 | **Image** | OpenAI, Gemini, Volcano Engine |
 | **Video** | Volcano Engine Seedance 2.0 (Standard / Fast / Mini), MiniMax H3 |
 
+For a ComfyUI video provider, `MiniMax-H3-FastH3-Omni-INT8` selects the FastH3 Omni INT8 reference model with eight sampling steps. Install the official `fasth3_omniref_8step_pruned_int8_convrot.safetensors` checkpoint in the engine's diffusion models directory. The existing `MiniMax-H3-INT8-ComfyUI` selection remains unchanged. Omni requires at least one reference image or a first frame; first, middle, and last frame guides can be combined with reference images. Text-only requests require a different model.
+The direct `POST /api/v1/tasks` video API accepts `mid_frame_url` and `mid_frame_time` together for a middle-frame guide, in addition to `first_frame_url`, `last_frame_url`, and `reference_image_urls`.
+
 ---
 
 ## 🚀 Quick Start

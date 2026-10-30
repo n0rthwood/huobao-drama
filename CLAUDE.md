@@ -25,8 +25,9 @@ configs/   — 遗留死配置，代码零引用
 - `npm run backfill-artwork` — 存量图片/视频补缩略图与海报帧
 
 ### Frontend (`frontend/`)
-- `npm run dev` — Vite 开发服务（端口 3013，代理 /api 与 /static 到 5679）
+- `npm run dev` — Vite 开发服务（端口 3013，代理 /api 与 /static 到 5679；仅开发用，不再是常驻 pm2 应用）
 - `npm run generate` — 产出含 index.html 的静态站点（`.output/public`；`nuxt build` 不产 index.html，不能用于静态托管）
+- 发布走根目录 `scripts/release.sh`：`nuxt generate` → 原子发布到 `~/huobao-releases/<ts>` → 切换 `current` → `pm2 restart huobao-backend` → smoke。生产 UI 由后端 :5679 按 `FRONTEND_DIST` 同源托管。
 
 ### Desktop (`desktop/`，根目录 `npm run dist` 串联全流程)
 - `npm run dev` — 打包后端 bundle + Electron 窗口运行

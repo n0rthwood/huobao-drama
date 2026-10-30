@@ -131,11 +131,9 @@ const picking = ref(false)
 const refs = computed(() => parseReferenceImages(props.references))
 const assetApi = computed(() => API_BY_TYPE[props.assetType])
 
-// 与成片图一致：库里存相对路径（static/...），展示时补前导斜杠
+// 与成片图一致：库里存相对路径（static/...），展示时补站点前缀
 function srcOf(item) {
-  if (!item) return ''
-  if (/^(https?:\/\/|data:|\/)/i.test(item)) return item
-  return `/${item}`
+  return mediaUrl(item)
 }
 
 // 来源素材的文件名（copied_from 存的是素材库里的相对路径），完整路径在 title 里

@@ -1,6 +1,6 @@
 import type { TaskRow, CenterRow } from '~/composables/useTasks'
 
-const BASE = '/api/v1'
+// 子路径部署：'/api/v1' 或 '/huobao/api/v1'（见 utils/url.ts）
 
 async function req<T = any>(method: string, path: string, body?: any): Promise<T> {
   const opts: RequestInit = { method, headers: { 'Content-Type': 'application/json' } }
@@ -10,7 +10,7 @@ async function req<T = any>(method: string, path: string, body?: any): Promise<T
   console.log(`%c[API] %c${method} %c${path}`, 'color:#888', 'color:#4fc3f7;font-weight:bold', 'color:#ccc', body || '')
 
   try {
-    const resp = await fetch(`${BASE}${path}`, opts)
+    const resp = await fetch(`${apiBase()}${path}`, opts)
     const json = await resp.json()
     const ms = Math.round(performance.now() - start)
 
@@ -324,7 +324,7 @@ async function uploadReq<T = any>(path: string, file: File): Promise<T> {
   const fd = new FormData()
   fd.append('file', file)
   console.log(`%c[API] %cPOST %c${path} %c${file.name}`, 'color:#888', 'color:#4fc3f7;font-weight:bold', 'color:#ccc', 'color:#888')
-  const resp = await fetch(`${BASE}${path}`, { method: 'POST', body: fd })
+  const resp = await fetch(`${apiBase()}${path}`, { method: 'POST', body: fd })
   const json = await resp.json()
   if (!resp.ok || (json.code && json.code >= 400)) {
     console.log(`%c[API] %cPOST ${path} %c${resp.status}`, 'color:#888', 'color:#ef5350', 'color:#ef5350;font-weight:bold')

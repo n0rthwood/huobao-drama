@@ -85,10 +85,7 @@ const { t } = useI18n()
 const now = useNowTicker()
 
 function srcOf(raw) {
-  const value = String(raw || '')
-  if (!value) return ''
-  if (/^https?:\/\//i.test(value) || value.startsWith('/')) return value
-  return `/${value}`
+  return mediaUrl(raw)
 }
 
 function kindLabel(kind) {

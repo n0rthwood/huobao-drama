@@ -590,10 +590,7 @@ function slotShort(slot) {
 }
 
 function imgSrc(raw) {
-  const value = String(raw || '')
-  if (!value) return ''
-  if (/^https?:\/\//i.test(value) || value.startsWith('/')) return value
-  return `/${value}`
+  return mediaUrl(raw)
 }
 function onThumbError(e, raw) {
   const full = imgSrc(raw)

@@ -200,7 +200,7 @@ function onThumbError(e, image) {
   const el = e.target
   if (!el || el.dataset.fbk) return
   el.dataset.fbk = '1'
-  el.src = image.url
+  el.src = mediaUrl(image.url)
 }
 
 async function loadDramas() {

@@ -886,9 +886,7 @@ const KIND_ORDER = { character: 0, scene: 1, prop: 2 }
 function matImage(m) { return m.image_url || m.imageUrl || m.localPath || m.local_path || '' }
 function matHasImage(m) { return !!matImage(m) }
 function assetSrc(m) {
-  const raw = matImage(m)
-  if (!raw) return ''
-  return /^https?:\/\//i.test(raw) || raw.startsWith('/') ? raw : `/${raw}`
+  return mediaUrl(matImage(m))
 }
 function matCreatedAt(m) { return m.created_at || m.updated_at || m.createdAt || m.updatedAt }
 function matDesc(m) {

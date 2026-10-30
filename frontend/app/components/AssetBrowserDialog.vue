@@ -175,8 +175,7 @@ function kindLabel(value) {
 }
 
 function srcOf(value) {
-  if (!value) return ''
-  return /^(https?:\/\/|data:|\/)/i.test(value) ? value : `/${value}`
+  return mediaUrl(value)
 }
 
 const keyOf = item => `${item.kind}-${item.id}`
