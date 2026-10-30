@@ -22,6 +22,8 @@ const videoRequestSchema = z.object({
   model: z.string().optional(),
   image_url: z.string().optional(),
   first_frame_url: z.string().optional(),
+  mid_frame_url: z.string().optional(),
+  mid_frame_time: z.number().finite().nonnegative().optional(),
   last_frame_url: z.string().optional(),
   reference_image_urls: z.array(z.string().trim().min(1)).max(9, '参考素材超限：图片≤9、视频≤3、音频≤3').optional().default([]),
   reference_video_urls: z.array(z.string().trim().min(1)).max(3, '参考素材超限：图片≤9、视频≤3、音频≤3').optional().default([]),
@@ -34,6 +36,9 @@ const videoRequestSchema = z.object({
   prompt_extend: z.boolean().optional(),
   watermark: z.boolean().optional(),
 }).superRefine((data, ctx) => {
+  if (!!data.mid_frame_url !== (data.mid_frame_time != null)) {
+    ctx.addIssue({ code: 'custom', message: '中间关键帧及其时间必须同时提供' })
+  }
   if (data.reference_audio_urls.length > 0 && data.reference_image_urls.length + data.reference_video_urls.length === 0) {
     ctx.addIssue({ code: 'custom', message: '参考音频需要至少 1 个参考图片或视频' })
   }
@@ -126,6 +131,8 @@ app.post('/', async (c) => {
         referenceMode: 'reference',
         imageUrl: videoBody!.image_url,
         firstFrameUrl: videoBody!.first_frame_url,
+        midFrameUrl: videoBody!.mid_frame_url,
+        midFrameTime: videoBody!.mid_frame_time,
         lastFrameUrl: videoBody!.last_frame_url,
         referenceImageUrls: videoBody!.reference_image_urls,
         referenceVideoUrls: videoBody!.reference_video_urls,
