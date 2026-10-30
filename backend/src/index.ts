@@ -14,6 +14,7 @@ import characters from './routes/characters.js'
 import tasks from './routes/tasks.js'
 import upload from './routes/upload.js'
 import imageQueue from './routes/imageQueue.js'
+import videoQueue from './routes/videoQueue.js'
 import aiConfigs, { aiProviders } from './routes/aiConfigs.js'
 import stylePresets from './routes/stylePresets.js'
 import prompts from './routes/prompts.js'
@@ -74,6 +75,7 @@ api.route('/style-presets', stylePresets)
 api.route('/prompts', prompts)
 api.route('/agent', agent)
 api.route('/image-queue', imageQueue)
+api.route('/video-queue', videoQueue)
 api.route('/merge', merge)
 api.route('/skills', skills)
 api.route('/props', props)
