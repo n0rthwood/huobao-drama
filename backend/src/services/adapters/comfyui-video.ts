@@ -33,6 +33,7 @@ const DEFAULT_DURATION_S = 5
 interface PreparedExtra {
   prompt: string
   mode: H3Mode
+  omni: boolean
   variant: 'standard' | 'int8'
   firstName?: string
   midName?: string
@@ -68,7 +69,10 @@ export class ComfyUIVideoAdapter implements VideoProviderAdapter {
     const lastSource = (record.lastFrameUrl || '').trim()
     const refSources = parseUrlArray(record.referenceImageUrls)
     const tag = `huobao_${record.id}`
+    const omni = model.toLowerCase() === 'minimax-h3-fasth3-omni-int8'
     const variant: PreparedExtra['variant'] = model.toLowerCase().includes('int8') ? 'int8' : 'standard'
+    if (omni && !refSources.length && firstSource) refSources.push(firstSource)
+    if (omni && !refSources.length) throw new Error('FastH3-Omni 需要至少一张参考图或首帧')
     const mode: H3Mode = refSources.length ? 'reference' : firstSource ? 'firstlast' : 't2v'
     const durationS = clampDuration(record, 4, 15)
     // 中间帧引导只在参考图模式可用（firstlast 模板没有 AddGuide 链）
@@ -80,7 +84,7 @@ export class ComfyUIVideoAdapter implements VideoProviderAdapter {
       hasLast: !!lastSource,
     })
     await waitEngineIdle(config)
-    const extra: PreparedExtra = { prompt, mode, variant, refNames: [] }
+    const extra: PreparedExtra = { prompt, mode, variant, omni, refNames: [] }
     if (mode === 'reference') {
       extra.refNames = await Promise.all(refSources.map((src, i) => uploadImage(config, src, `${tag}_ref${i}`)))
       // 参考图模式同时支持首/中/尾关键帧引导（AddGuide），与参考图不互斥
@@ -107,6 +111,7 @@ export class ComfyUIVideoAdapter implements VideoProviderAdapter {
     const workflow =
       extra.mode === 'reference' ? buildReference({
         ...common,
+        omni: extra.omni,
         refNames: extra.refNames,
         firstName: extra.firstName,
         midName: extra.midName,

@@ -182,6 +182,7 @@ function appendFrameGuides(
 /** 参考图模式：standard = ref2va 基础权重固定 20 步；int8 = fused refdelta 4 步蒸馏(102 的 int8 权重集里唯一可用的参考路径) */
 export function buildReference(
   p: Omit<FillBase, 'steps'> & {
+    omni?: boolean
     refNames: string[]
     firstName?: string
     midName?: string
@@ -193,6 +194,10 @@ export function buildReference(
   const wf = structuredClone(TEMPLATES[variant].reference)
   if (!wf) throw new Error(`H3 ${variant} 参考图工作流不可用`)
   node(wf, '124').inputs.steps = variant === 'int8' ? REFERENCE_STEPS_INT8 : REFERENCE_STEPS
+  if (p.omni) {
+    node(wf, '127').inputs.unet_name = 'fasth3_omniref_8step_pruned_int8_convrot.safetensors'
+    node(wf, '124').inputs.steps = 8
+  }
   node(wf, '1').inputs.value = p.prompt
   node(wf, '133').inputs.value = p.durationS
   node(wf, '129').inputs.noise_seed = randomSeed(p.seed)
