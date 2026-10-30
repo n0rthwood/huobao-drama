@@ -320,6 +320,17 @@ export const imageQueueAPI = {
   },
 }
 
+// 视频任务耗时预估（#28）：墙钟 = 提交 → 完成，文案须称「预计完成/总耗时」
+export const videoQueueAPI = {
+  estimate: (params: { config_id?: number; model?: string; duration: number }) => {
+    const query = new URLSearchParams()
+    if (params.config_id) query.set('config_id', String(params.config_id))
+    if (params.model) query.set('model', params.model)
+    query.set('duration', String(params.duration))
+    return api.get(`/video-queue/estimate?${query.toString()}`)
+  },
+}
+
 async function uploadReq<T = any>(path: string, file: File): Promise<T> {
   const fd = new FormData()
   fd.append('file', file)

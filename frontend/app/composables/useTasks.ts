@@ -270,6 +270,18 @@ export function latestVideoTask(storyboardId: number): TaskRow | null {
   return latest
 }
 
+/** 某分镜最新的一条进行中（queued/processing）视频任务 */
+export function latestActiveVideoTask(storyboardId: number): TaskRow | null {
+  let latest: TaskRow | null = null
+  for (const task of Object.values(tasksById.value)) {
+    if (task.type !== 'video') continue
+    if (Number(task.storyboard_id) !== Number(storyboardId)) continue
+    if (!isActiveTaskStatus(task.status)) continue
+    if (isNewer(task, latest)) latest = task
+  }
+  return latest
+}
+
 export function openTaskCenter(opts: { episodeId?: number | null; dramaId?: number | null } = {}): void {
   centerEpisodeId.value = opts.episodeId ?? null
   centerDramaId.value = opts.dramaId ?? null

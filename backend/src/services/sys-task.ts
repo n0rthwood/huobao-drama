@@ -156,8 +156,19 @@ export function serializeTask(row: SysTaskRow): Record<string, any> {
     created_at_unix: toUnixSeconds(row.createdAt),
     completed_at_unix: toUnixSeconds(row.completedAt),
     remote_state: Object.keys(visible).length ? visible : null,
+    elapsed_ms: elapsedMs(row),
     cancellable: isActiveTaskStatus(row.status) && isQwenJobsTask(row.provider),
   }
+}
+
+/** 墙钟耗时（毫秒）：completed 用 completed_at-created_at，活跃用 now-created_at；时间缺失/倒挂返回 null */
+function elapsedMs(row: SysTaskRow): number | null {
+  const created = Date.parse(row.createdAt)
+  if (!Number.isFinite(created)) return null
+  if (isActiveTaskStatus(row.status)) return Date.now() - created
+  const completed = Date.parse(row.completedAt ?? '')
+  if (!Number.isFinite(completed) || completed <= created) return null
+  return completed - created
 }
 
 export function serializeTasks(rows: SysTaskRow[]): Record<string, any>[] {
