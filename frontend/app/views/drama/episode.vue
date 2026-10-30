@@ -747,6 +747,7 @@
                     <div v-else class="video-task-empty">
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
                     </div>
+                    <ProgressRing v-if="videoRing(task.storyboard)" v-bind="videoRing(task.storyboard)" class="video-task-ring" compact :size="22" />
                     <span class="video-task-index">#{{ String(task.index + 1).padStart(2, '0') }}</span>
                   </div>
                   <div class="video-task-main">
@@ -792,263 +793,269 @@
               </section>
 
               <div v-if="selectedSb" class="video-task-side">
-              <div class="video-main-col">
-              <div class="video-main-scroll">
-                  <section v-if="shotInheritsFirst(selectedSb)" class="video-inspector-section transition-section">
-                    <div class="video-inspector-prompt-head">
-                      <span class="video-inspector-label video-inspector-label-hero">{{ t('episode.trans.section') }}</span>
-                      <FieldSaveStatus
-                        :status="fieldSaveInfo(selectedSb, 'transition_prompt').status"
-                        :at="fieldSaveInfo(selectedSb, 'transition_prompt').at"
+                <!-- 中列（#28 Q1）：播放器 + 视频历史条 + 绑定素材 + 关键帧缩略图 -->
+                <div class="video-main-col">
+                  <aside class="video-task-player">
+                    <div class="video-player-head">
+                      <div class="video-player-head-info">
+                        <div class="video-player-title">{{ t('episode.vid.playerTitle', { n: String(selectedVideoTaskNumber).padStart(2, '0') }) }}</div>
+                        <span :class="['video-task-status', 'is-' + videoTaskState(selectedSb)]">
+                          <span :class="['dot', videoTaskState(selectedSb) === 'done' && 'ok', videoTaskState(selectedSb) === 'pending' && 'pending']" />
+                          {{ videoTaskStatusLabel(selectedSb) }}
+                        </span>
+                        <span v-if="selectedSb.duration" class="video-player-sub">{{ selectedSb.duration }}s</span>
+                        <MediaTime :at="mediaTimeOf(selectedSb, previewVideoUrl || getVideoUrl(selectedSb))" />
+                      </div>
+                      <button
+                        v-if="previewVideoUrl"
+                        class="btn btn-sm btn-primary"
+                        @click="setAsMainVideo"
+                      >
+                        {{ t('episode.vid.setMain') }}
+                      </button>
+                      <a
+                        v-if="previewVideoUrl || hasVid(selectedSb)"
+                        :href="mediaUrl(previewVideoUrl || getVideoUrl(selectedSb))"
+                        download
+                        class="btn btn-sm"
+                      >
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 2 0 0 1-2 2H5a2 2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        {{ t('common.download') }}
+                      </a>
+                    </div>
+                    <div class="video-player-stage">
+                      <video
+                        v-if="previewVideoUrl || hasVid(selectedSb)"
+                        :key="previewVideoUrl || getVideoUrl(selectedSb)"
+                        :src="mediaUrl(previewVideoUrl || getVideoUrl(selectedSb))"
+                        :poster="posterOf(mediaUrl(previewVideoUrl || getVideoUrl(selectedSb))) || undefined"
+                        controls
+                        preload="metadata"
+                        playsinline
+                        class="video-player-video"
                       />
-                      <span class="ml-auto" />
-                      <label class="transition-send">
-                        <input
-                          type="checkbox"
-                          :checked="transitionEnabledOf(selectedSb)"
-                          @change="e => setTransitionEnabled(selectedSb, e.target.checked)"
+                      <div v-else class="video-player-empty">
+                        <ProgressRing v-if="videoRing(selectedSb)" v-bind="videoRing(selectedSb)" compact :size="42" />
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+                        <div class="video-player-empty-copy">
+                          <div class="video-player-empty-title">{{ videoTaskState(selectedSb) === 'pending' ? t('episode.vid.emptyGenerating') : t('episode.vid.emptyNoVideo') }}</div>
+                          <div class="video-player-empty-desc">{{ videoTaskState(selectedSb) === 'pending' ? t('episode.vid.emptyGeneratingDesc') : t('episode.vid.emptyNoVideoDesc') }}</div>
+                        </div>
+                        <button
+                          v-if="videoTaskState(selectedSb) !== 'pending'"
+                          class="btn btn-primary btn-sm video-player-empty-action"
+                          :disabled="!isShotConfirmed(selectedSb) || videoBlockIssues(selectedSb).length > 0"
+                          :title="videoBlockIssues(selectedSb).length
+                            ? t('episode.ref.videoBlocked', { reason: videoBlockReason(selectedSb) })
+                            : (isShotConfirmed(selectedSb) ? undefined : t('episode.kf.gateShotUnconfirmed'))"
+                          @click="genVid(selectedSb)"
                         >
-                        {{ t('episode.trans.send') }}
-                      </label>
-                      <button
-                        type="button"
-                        class="btn btn-sm"
-                        :disabled="transitionGeneratingIds.includes(selectedSb?.id)"
-                        @click="genTransition(selectedSb)"
+                          {{ t('episode.vid.generateVideo') }}
+                        </button>
+                      </div>
+                    </div>
+                  </aside>
+
+                  <div v-if="sbVideoHistory.length" class="video-player-history">
+                    <div class="video-player-history-head">
+                      <span>{{ t('episode.vid.history') }}</span>
+                      <span class="video-player-history-count">{{ sbVideoHistory.length }}</span>
+                    </div>
+                    <div class="video-player-history-list">
+                      <div
+                        v-for="h in sbVideoHistory"
+                        :key="h.id"
+                        :class="['video-history-item', { current: isCurrentVideo(h), viewing: !!previewVideoUrl && previewVideoUrl === taskVideoPath(h) }]"
+                        role="button"
+                        tabindex="0"
+                        @click="previewHistoryVideo(h)"
+                        @keydown.enter.prevent="previewHistoryVideo(h)"
                       >
-                        <Loader2 v-if="transitionGeneratingIds.includes(selectedSb?.id)" :size="11" class="animate-spin" />
-                        {{ t('episode.trans.generate') }}
-                      </button>
+                        <video :src="mediaUrl(taskVideoPath(h))" :poster="posterOf(mediaUrl(taskVideoPath(h))) || undefined" preload="none" muted playsinline tabindex="-1" />
+                        <MediaTime class="video-history-time" :at="taskGeneratedAt(h)" />
+                        <span v-if="historyElapsedTook(h)" class="video-history-took">{{ t('episode.vid.elapsedTook', { time: historyElapsedTook(h) }) }}</span>
+                        <span class="video-history-engine">{{ h.provider || t('episode.vid.unknownEngine') }}<template v-if="h.model"> · {{ h.model }}</template></span>
+                        <span v-if="isCurrentVideo(h)" class="video-history-badge">{{ t('episode.vid.current') }}</span>
+                        <button v-else type="button" class="video-history-del" :title="t('episode.vid.deleteRecord')" @click.stop="removeHistoryVideo(h)">×</button>
+                      </div>
                     </div>
-                    <div class="transition-summary">
-                      <span>{{ t('episode.trans.summary', {
-                        n: prevShotOf(selectedSb) ? sbs.indexOf(prevShotOf(selectedSb)) + 1 : '-',
-                        from: prevShotOf(selectedSb) ? shotPlaceLabel(prevShotOf(selectedSb)) : '—',
-                        to: shotPlaceLabel(selectedSb),
-                      }) }}</span>
-                      <span class="transition-verdict">{{ transitionVerdictLabel(selectedSb) }}</span>
-                      <span v-if="transitionReviewOf(selectedSb)?.technique" class="tag mono">{{ transitionReviewOf(selectedSb).technique }}</span>
-                      <span v-if="transitionReviewOf(selectedSb)?.edited_manually" class="transition-manual">
-                        {{ t('episode.trans.manual', { verdict: transitionVerdictLabel(selectedSb) }) }}
-                      </span>
-                    </div>
-                    <div v-if="transitionStaleOf(selectedSb)" class="transition-stale">{{ t('episode.trans.stale') }}</div>
-                    <MentionTextarea
-                      :model-value="selectedSb.transition_prompt || selectedSb.transitionPrompt || ''"
-                      :options="mentionOptions"
-                      :rows="5"
-                      input-class="textarea video-inspector-prompt"
-                      :placeholder="t('episode.trans.placeholder')"
-                      @update:model-value="v => markFieldDirty(selectedSb, 'transition_prompt', v)"
-                      @commit="v => updateField(selectedSb, 'transition_prompt', v)"
-                    />
-                    <RefIssueList :issues="transitionIssues(selectedSb)" />
-                    <div class="transition-duration">{{ transitionDurationHint(selectedSb) }}</div>
-                  </section>
-                  <section class="video-inspector-section">
-                    <div class="video-inspector-prompt-head">
-                      <span class="video-inspector-label video-inspector-label-hero">{{ t('episode.sb.videoPromptSection') }}</span>
-                      <FieldSaveStatus
-                        :status="fieldSaveInfo(selectedSb, 'video_prompt').status"
-                        :at="fieldSaveInfo(selectedSb, 'video_prompt').at"
+                  </div>
+
+                  <div class="video-inspector-body">
+                    <section class="video-inspector-section">
+                      <div class="video-inspector-prompt-head">
+                        <span class="video-inspector-label">{{ t('episode.inspector.boundRefs') }}</span>
+                        <span class="tag mono">{{ shotVideoRefCount(selectedSb) }}</span>
+                      </div>
+                      <TargetAssetList
+                        :items="videoTargetAssets"
+                        :versions-for="targetAssetVersions"
+                        :lead="videoTargetLead"
+                        :busy="targetVersionSaving"
+                        @preview="openImageViewer"
+                        @select-version="(item, image) => setTargetAssetVersion(selectedSb, 'video', item, image)"
                       />
-                      <span class="ml-auto" />
-                      <button
-                        type="button"
-                        class="btn btn-sm"
-                        :disabled="videoPromptGeneratingIds.includes(selectedSb?.id) || videoPromptBatch.running"
-                        @click="genVideoPrompt(selectedSb)"
-                      >
-                        <Loader2 v-if="videoPromptGeneratingIds.includes(selectedSb?.id)" :size="11" class="animate-spin" />
-                        {{ (selectedSb.video_prompt || selectedSb.videoPrompt) ? t('episode.sb.regenVideoPrompt') : t('episode.sb.aiGenerateVideoPrompt') }}
-                      </button>
-                      <button
-                        type="button"
-                        class="btn btn-sm"
-                        :disabled="videoTaskState(selectedSb) === 'pending' || !isShotConfirmed(selectedSb)"
-                        :title="!isShotConfirmed(selectedSb) ? t('episode.kf.gateShotUnconfirmed') : undefined"
-                        @click="genVid(selectedSb)"
-                      >
-                        {{ promptHeadVideoActionLabel(selectedSb) }}
-                      </button>
-                    </div>
-                    <MentionTextarea
-                      :model-value="selectedSb.video_prompt || selectedSb.videoPrompt || ''"
-                      :options="mentionOptions"
-                      :rows="14"
-                      input-class="textarea video-inspector-prompt"
-                      :placeholder="t('episode.inspector.videoPromptPlaceholder')"
-                      @update:model-value="v => markFieldDirty(selectedSb, 'video_prompt', v)"
-                      @commit="v => updateField(selectedSb, 'video_prompt', v)"
-                    />
-                    <RefIssueList :issues="videoPromptIssues(selectedSb)" />
-                  </section>
-              </div>
-              </div>
-
-              <aside class="video-task-inspector">
-            <aside class="video-task-player">
-              <div class="video-player-head">
-                <div class="video-player-head-info">
-                  <div class="video-player-title">{{ t('episode.vid.playerTitle', { n: String(selectedVideoTaskNumber).padStart(2, '0') }) }}</div>
-                  <span :class="['video-task-status', 'is-' + videoTaskState(selectedSb)]">
-                    <span :class="['dot', videoTaskState(selectedSb) === 'done' && 'ok', videoTaskState(selectedSb) === 'pending' && 'pending']" />
-                    {{ videoTaskStatusLabel(selectedSb) }}
-                  </span>
-                  <span v-if="selectedSb.duration" class="video-player-sub">{{ selectedSb.duration }}s</span>
-                  <MediaTime :at="mediaTimeOf(selectedSb, previewVideoUrl || getVideoUrl(selectedSb))" />
-                </div>
-                <button
-                  v-if="previewVideoUrl"
-                  class="btn btn-sm btn-primary"
-                  @click="setAsMainVideo"
-                >
-                  {{ t('episode.vid.setMain') }}
-                </button>
-                <a
-                  v-if="previewVideoUrl || hasVid(selectedSb)"
-                  :href="mediaUrl(previewVideoUrl || getVideoUrl(selectedSb))"
-                  download
-                  class="btn btn-sm"
-                >
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                  {{ t('common.download') }}
-                </a>
-              </div>
-              <div class="video-player-stage">
-                <video
-                  v-if="previewVideoUrl || hasVid(selectedSb)"
-                  :key="previewVideoUrl || getVideoUrl(selectedSb)"
-                  :src="mediaUrl(previewVideoUrl || getVideoUrl(selectedSb))"
-                  :poster="posterOf(mediaUrl(previewVideoUrl || getVideoUrl(selectedSb))) || undefined"
-                  controls
-                  preload="metadata"
-                  playsinline
-                  class="video-player-video"
-                />
-                <div v-else class="video-player-empty">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
-                  <div class="video-player-empty-copy">
-                    <div class="video-player-empty-title">{{ videoTaskState(selectedSb) === 'pending' ? t('episode.vid.emptyGenerating') : t('episode.vid.emptyNoVideo') }}</div>
-                    <div class="video-player-empty-desc">{{ videoTaskState(selectedSb) === 'pending' ? t('episode.vid.emptyGeneratingDesc') : t('episode.vid.emptyNoVideoDesc') }}</div>
+                    </section>
+                    <section class="video-inspector-section">
+                      <div class="video-inspector-prompt-head">
+                        <span class="video-inspector-label">{{ t('episode.kf.videoRefTitle') }}</span>
+                        <span :class="['video-keyframe-state', isShotConfirmed(selectedSb) ? 'is-confirmed' : 'is-unconfirmed']">
+                          {{ isShotConfirmed(selectedSb) ? t('episode.kf.stateConfirmed') : t('episode.kf.stateUnconfirmed') }}
+                        </span>
+                      </div>
+                      <div class="video-keyframe-thumbs">
+                        <button
+                          v-for="slot in KEYFRAME_SLOTS"
+                          :key="slot.slot"
+                          type="button"
+                          class="video-keyframe-thumb"
+                          :disabled="!shotKeyframeImage(selectedSb, slot.slot)"
+                          :title="slot.label"
+                          @click="openImageViewer(assetImageSrc({ imageUrl: shotKeyframeImage(selectedSb, slot.slot) }), slot.label)"
+                        >
+                          <img
+                            v-if="shotKeyframeImage(selectedSb, slot.slot)"
+                            :src="thumbOf(assetImageSrc({ imageUrl: shotKeyframeImage(selectedSb, slot.slot) }))"
+                            :alt="slot.label"
+                            loading="lazy"
+                            @error="thumbFallback($event, assetImageSrc({ imageUrl: shotKeyframeImage(selectedSb, slot.slot) }))"
+                          />
+                          <span v-else class="video-keyframe-thumb-empty">{{ t('episode.kf.slotEmpty') }}</span>
+                          <small>{{ slot.label }}</small>
+                          <MediaTime :at="mediaTimeOf(selectedSb, shotKeyframeImage(selectedSb, slot.slot))" />
+                        </button>
+                      </div>
+                      <div v-if="!isShotConfirmed(selectedSb)" class="video-keyframe-hint">{{ t('episode.kf.gateShotUnconfirmed') }}</div>
+                    </section>
                   </div>
-                  <button
-                    v-if="videoTaskState(selectedSb) !== 'pending'"
-                    class="btn btn-primary btn-sm video-player-empty-action"
-                    :disabled="!isShotConfirmed(selectedSb) || videoBlockIssues(selectedSb).length > 0"
-                    :title="videoBlockIssues(selectedSb).length
-                      ? t('episode.ref.videoBlocked', { reason: videoBlockReason(selectedSb) })
-                      : (isShotConfirmed(selectedSb) ? undefined : t('episode.kf.gateShotUnconfirmed'))"
-                    @click="genVid(selectedSb)"
-                  >
-                    {{ t('episode.vid.generateVideo') }}
-                  </button>
-                </div>
-              </div>
-            </aside>
-
-            <div v-if="sbVideoHistory.length" class="video-player-history">
-              <div class="video-player-history-head">
-                <span>{{ t('episode.vid.history') }}</span>
-                <span class="video-player-history-count">{{ sbVideoHistory.length }}</span>
-              </div>
-              <div class="video-player-history-list">
-                <div
-                  v-for="h in sbVideoHistory"
-                  :key="h.id"
-                  :class="['video-history-item', { current: isCurrentVideo(h), viewing: !!previewVideoUrl && previewVideoUrl === taskVideoPath(h) }]"
-                  role="button"
-                  tabindex="0"
-                  @click="previewHistoryVideo(h)"
-                  @keydown.enter.prevent="previewHistoryVideo(h)"
-                >
-                  <video :src="mediaUrl(taskVideoPath(h))" :poster="posterOf(mediaUrl(taskVideoPath(h))) || undefined" preload="none" muted playsinline tabindex="-1" />
-                  <MediaTime class="video-history-time" :at="taskGeneratedAt(h)" />
-                  <span class="video-history-engine">{{ h.provider || t('episode.vid.unknownEngine') }}<template v-if="h.model"> · {{ h.model }}</template></span>
-                  <span v-if="isCurrentVideo(h)" class="video-history-badge">{{ t('episode.vid.current') }}</span>
-                  <button v-else type="button" class="video-history-del" :title="t('episode.vid.deleteRecord')" @click.stop="removeHistoryVideo(h)">×</button>
-                </div>
-              </div>
-            </div>
-                <div class="video-inspector-body">
-                  <section class="video-inspector-section">
-                    <div class="video-inspector-prompt-head">
-                      <span class="video-inspector-label">{{ t('episode.inspector.boundRefs') }}</span>
-                      <span class="tag mono">{{ shotVideoRefCount(selectedSb) }}</span>
-                    </div>
-                    <TargetAssetList
-                      :items="videoTargetAssets"
-                      :versions-for="targetAssetVersions"
-                      :lead="videoTargetLead"
-                      :busy="targetVersionSaving"
-                      @preview="openImageViewer"
-                      @select-version="(item, image) => setTargetAssetVersion(selectedSb, 'video', item, image)"
-                    />
-                  </section>
-                  <section class="video-inspector-section">
-                    <div class="video-inspector-prompt-head">
-                      <span class="video-inspector-label">{{ t('episode.kf.videoRefTitle') }}</span>
-                      <span :class="['video-keyframe-state', isShotConfirmed(selectedSb) ? 'is-confirmed' : 'is-unconfirmed']">
-                        {{ isShotConfirmed(selectedSb) ? t('episode.kf.stateConfirmed') : t('episode.kf.stateUnconfirmed') }}
-                      </span>
-                    </div>
-                    <div class="video-keyframe-thumbs">
-                      <button
-                        v-for="slot in KEYFRAME_SLOTS"
-                        :key="slot.slot"
-                        type="button"
-                        class="video-keyframe-thumb"
-                        :disabled="!shotKeyframeImage(selectedSb, slot.slot)"
-                        :title="slot.label"
-                        @click="openImageViewer(assetImageSrc({ imageUrl: shotKeyframeImage(selectedSb, slot.slot) }), slot.label)"
-                      >
-                        <img
-                          v-if="shotKeyframeImage(selectedSb, slot.slot)"
-                          :src="thumbOf(assetImageSrc({ imageUrl: shotKeyframeImage(selectedSb, slot.slot) }))"
-                          :alt="slot.label"
-                          loading="lazy"
-                          @error="thumbFallback($event, assetImageSrc({ imageUrl: shotKeyframeImage(selectedSb, slot.slot) }))"
-                        />
-                        <span v-else class="video-keyframe-thumb-empty">{{ t('episode.kf.slotEmpty') }}</span>
-                        <small>{{ slot.label }}</small>
-                        <MediaTime :at="mediaTimeOf(selectedSb, shotKeyframeImage(selectedSb, slot.slot))" />
-                      </button>
-                    </div>
-                    <div v-if="!isShotConfirmed(selectedSb)" class="video-keyframe-hint">{{ t('episode.kf.gateShotUnconfirmed') }}</div>
-                  </section>
                 </div>
 
-                <!-- 分镜时长 + 生成操作常驻底部：不随检查器内容滚动 -->
-                <div class="video-inspector-footer">
-                  <section class="video-inspector-section video-params-card">
-                    <div class="video-param-row">
-                      <span class="video-param-name">{{ t('episode.inspector.duration') }}</span>
-                      <span class="video-param-control">
-                        <input
-                          :value="selectedSb.duration || 10"
-                          type="number"
-                          min="2"
-                          max="30"
-                          class="input video-duration-input"
-                          @change="onVideoDurationChange"
+                <!-- 右栏检查器（#28 Q1）：转场 + 视频提示词编辑，时长/生效配置/生成常驻底部 -->
+                <aside class="video-task-inspector">
+                  <div class="video-inspector-body video-inspector-prompts">
+                    <section v-if="shotInheritsFirst(selectedSb)" class="video-inspector-section transition-section">
+                      <div class="video-inspector-prompt-head">
+                        <span class="video-inspector-label video-inspector-label-hero">{{ t('episode.trans.section') }}</span>
+                        <FieldSaveStatus
+                          :status="fieldSaveInfo(selectedSb, 'transition_prompt').status"
+                          :at="fieldSaveInfo(selectedSb, 'transition_prompt').at"
                         />
-                        <span class="video-param-unit">{{ t('episode.inspector.durationUnit') }}</span>
-                      </span>
-                    </div>
-                    <div class="video-param-hint">{{ t('episode.inspector.durationHint') }}</div>
-                  </section>
-                  <div class="video-inspector-effective">
-                    {{ t('episode.inspector.effective', { model: effectiveVideoModelLabel || t('episode.vid.defaultModel'), res: episodeResolutionShort, dur: effectiveVideoDuration }) }}
+                        <span class="ml-auto" />
+                        <label class="transition-send">
+                          <input
+                            type="checkbox"
+                            :checked="transitionEnabledOf(selectedSb)"
+                            @change="e => setTransitionEnabled(selectedSb, e.target.checked)"
+                          >
+                          {{ t('episode.trans.send') }}
+                        </label>
+                        <button
+                          type="button"
+                          class="btn btn-sm"
+                          :disabled="transitionGeneratingIds.includes(selectedSb?.id)"
+                          @click="genTransition(selectedSb)"
+                        >
+                          <Loader2 v-if="transitionGeneratingIds.includes(selectedSb?.id)" :size="11" class="animate-spin" />
+                          {{ t('episode.trans.generate') }}
+                        </button>
+                      </div>
+                      <div class="transition-summary">
+                        <span>{{ t('episode.trans.summary', {
+                          n: prevShotOf(selectedSb) ? sbs.indexOf(prevShotOf(selectedSb)) + 1 : '-',
+                          from: prevShotOf(selectedSb) ? shotPlaceLabel(prevShotOf(selectedSb)) : '—',
+                          to: shotPlaceLabel(selectedSb),
+                        }) }}</span>
+                        <span class="transition-verdict">{{ transitionVerdictLabel(selectedSb) }}</span>
+                        <span v-if="transitionReviewOf(selectedSb)?.technique" class="tag mono">{{ transitionReviewOf(selectedSb).technique }}</span>
+                        <span v-if="transitionReviewOf(selectedSb)?.edited_manually" class="transition-manual">
+                          {{ t('episode.trans.manual', { verdict: transitionVerdictLabel(selectedSb) }) }}
+                        </span>
+                      </div>
+                      <div v-if="transitionStaleOf(selectedSb)" class="transition-stale">{{ t('episode.trans.stale') }}</div>
+                      <MentionTextarea
+                        :model-value="selectedSb.transition_prompt || selectedSb.transitionPrompt || ''"
+                        :options="mentionOptions"
+                        :rows="5"
+                        input-class="textarea video-inspector-prompt"
+                        :placeholder="t('episode.trans.placeholder')"
+                        @update:model-value="v => markFieldDirty(selectedSb, 'transition_prompt', v)"
+                        @commit="v => updateField(selectedSb, 'transition_prompt', v)"
+                      />
+                      <RefIssueList :issues="transitionIssues(selectedSb)" />
+                      <div class="transition-duration">{{ transitionDurationHint(selectedSb) }}</div>
+                    </section>
+                    <section class="video-inspector-section">
+                      <div class="video-inspector-prompt-head">
+                        <span class="video-inspector-label video-inspector-label-hero">{{ t('episode.sb.videoPromptSection') }}</span>
+                        <FieldSaveStatus
+                          :status="fieldSaveInfo(selectedSb, 'video_prompt').status"
+                          :at="fieldSaveInfo(selectedSb, 'video_prompt').at"
+                        />
+                        <span class="ml-auto" />
+                        <button
+                          type="button"
+                          class="btn btn-sm"
+                          :disabled="videoPromptGeneratingIds.includes(selectedSb?.id) || videoPromptBatch.running"
+                          @click="genVideoPrompt(selectedSb)"
+                        >
+                          <Loader2 v-if="videoPromptGeneratingIds.includes(selectedSb?.id)" :size="11" class="animate-spin" />
+                          {{ (selectedSb.video_prompt || selectedSb.videoPrompt) ? t('episode.sb.regenVideoPrompt') : t('episode.sb.aiGenerateVideoPrompt') }}
+                        </button>
+                        <button
+                          type="button"
+                          class="btn btn-sm"
+                          :disabled="videoTaskState(selectedSb) === 'pending' || !isShotConfirmed(selectedSb)"
+                          :title="!isShotConfirmed(selectedSb) ? t('episode.kf.gateShotUnconfirmed') : undefined"
+                          @click="genVid(selectedSb)"
+                        >
+                          {{ promptHeadVideoActionLabel(selectedSb) }}
+                        </button>
+                      </div>
+                      <MentionTextarea
+                        :model-value="selectedSb.video_prompt || selectedSb.videoPrompt || ''"
+                        :options="mentionOptions"
+                        :rows="14"
+                        input-class="textarea video-inspector-prompt"
+                        :placeholder="t('episode.inspector.videoPromptPlaceholder')"
+                        @update:model-value="v => markFieldDirty(selectedSb, 'video_prompt', v)"
+                        @commit="v => updateField(selectedSb, 'video_prompt', v)"
+                      />
+                      <RefIssueList :issues="videoPromptIssues(selectedSb)" />
+                    </section>
                   </div>
-                  <button
-                    class="btn btn-primary video-inspector-action"
-                    :disabled="videoTaskState(selectedSb) === 'pending' || !isShotConfirmed(selectedSb)"
-                    @click="genVid(selectedSb)"
-                  >
-                    {{ videoTaskActionLabel(selectedSb) }}
-                  </button>
-                </div>
-              </aside>
+
+                  <!-- 分镜时长 + 生成操作常驻底部：不随提示词区滚动 -->
+                  <div class="video-inspector-footer">
+                    <section class="video-inspector-section video-params-card">
+                      <div class="video-param-row">
+                        <span class="video-param-name">{{ t('episode.inspector.duration') }}</span>
+                        <span class="video-param-control">
+                          <input
+                            :value="selectedSb.duration || 10"
+                            type="number"
+                            min="2"
+                            max="30"
+                            class="input video-duration-input"
+                            @change="onVideoDurationChange"
+                          />
+                          <span class="video-param-unit">{{ t('episode.inspector.durationUnit') }}</span>
+                        </span>
+                      </div>
+                      <div class="video-param-hint">{{ t('episode.inspector.durationHint') }}</div>
+                    </section>
+                    <div class="video-inspector-effective">
+                      {{ t('episode.inspector.effective', { model: effectiveVideoModelLabel || t('episode.vid.defaultModel'), res: episodeResolutionShort, dur: effectiveVideoDuration }) }}
+                    </div>
+                    <div class="video-eta-line" :title="videoEtaLine">{{ videoEtaLine }}</div>
+                    <button
+                      class="btn btn-primary video-inspector-action"
+                      :disabled="videoTaskState(selectedSb) === 'pending' || !isShotConfirmed(selectedSb)"
+                      @click="genVid(selectedSb)"
+                    >
+                      {{ videoTaskActionLabel(selectedSb) }}
+                    </button>
+                  </div>
+                </aside>
               </div>
               <div
                 class="video-col-divider is-left"
@@ -1711,7 +1718,7 @@ import {
   Users, FileText, FolderKanban, Clapperboard, Download, Loader2, Images,
   Plus, X, Trash2, CircleHelp,
 } from 'lucide-vue-next'
-import { api, dramaAPI, episodeAPI, storyboardAPI, characterAPI, sceneAPI, propAPI, taskAPI, mergeAPI, aiConfigAPI, uploadAPI, mediaLibraryAPI } from '~/composables/useApi'
+import { api, dramaAPI, episodeAPI, storyboardAPI, characterAPI, sceneAPI, propAPI, taskAPI, mergeAPI, aiConfigAPI, uploadAPI, mediaLibraryAPI, videoQueueAPI } from '~/composables/useApi'
 import { startTour, autoTour } from '~/composables/useTour'
 import { useAgent } from '~/composables/useAgent'
 import { toastError, mapError, toastServerMessage, MODERATION_RE } from '~/composables/useToast'
@@ -1734,7 +1741,7 @@ import {
   summarizeTasks,
   formatSeconds,
 } from '~/composables/useTaskProgress'
-import { useTasks } from '~/composables/useTasks'
+import { useTasks, latestActiveVideoTask } from '~/composables/useTasks'
 
 definePageMeta({ layout: 'studio' })
 
@@ -1863,8 +1870,8 @@ watch([panel, scriptStep, prodTab], ([p, s, pt]) => {
 })
 // ===== 视频制作三栏宽度：拖拽调节 + 全局持久化（双击分隔条恢复默认） =====
 const VIDEO_COL_STORE_KEY = 'huobao:workbench:video-cols'
-const VIDEO_COL_DEFAULTS = { left: 236, right: 340 }
-const VIDEO_COL_LIMITS = { left: [180, 420], right: [260, 560] }
+const VIDEO_COL_DEFAULTS = { left: 236, right: 420 }
+const VIDEO_COL_LIMITS = { left: [180, 420], right: [320, 640] }
 const storedVideoCols = (() => {
   try {
     const c = JSON.parse(localStorage.getItem(VIDEO_COL_STORE_KEY) || 'null')
@@ -2484,10 +2491,30 @@ function videoModerationHint(msg) {
 }
 
 function videoTaskState(sb) {
+  // 活跃任务优先：有旧视频的镜头重绘中不能显示「已完成」（#28，与 #25 的根因 A 同源）
+  if (latestActiveVideoTask(sb?.id) || isPendingVideo(sb?.id)) return 'pending'
   if (hasVid(sb)) return 'done'
-  if (isPendingVideo(sb?.id)) return 'pending'
   if (videoFailMessage(sb?.id)) return 'failed'
   return 'ready'
+}
+
+/**
+ * 进行中（queued/processing）视频任务 → 进度环属性；无进行中任务返回 null（不显示环）。
+ * 只认活跃任务：hasVid 的「已有旧视频」不再吞掉重生成中的进度（#28）。
+ */
+function videoRing(sb) {
+  const task = latestActiveVideoTask(sb?.id)
+  return task ? ringPropsFromTask(task, now.value) : null
+}
+
+/** 秒 → 紧凑时长（`Xm Ys` / `Xs`），ETA 与已用时共用 */
+function fmtDur(seconds) {
+  const total = Math.round(Number(seconds))
+  if (!Number.isFinite(total) || total < 0) return ''
+  if (total < 60) return `${total}s`
+  const m = Math.floor(total / 60)
+  const s = total % 60
+  return s ? `${m}m ${s}s` : `${m}m`
 }
 
 function videoTaskStatusLabel(sb) {
@@ -2681,6 +2708,58 @@ const episodeResolutionLabel = computed(() =>
 const episodeResolutionShort = computed(() =>
   RESOLUTION_DISPLAY[resolutionProvider.value][episodeResolution.value] || episodeResolution.value)
 const effectiveVideoDuration = computed(() => Number(selectedSb.value?.duration || 10))
+// ===== 单镜视频耗时预估（#28）：实测墙钟（提交→完成），config/model/duration 变化后防抖重取 =====
+const videoEstimate = ref({ loading: false, data: null })
+let videoEstimateTimer = null
+let videoEstimateSeq = 0
+// selectedSb 在 setup 更后面才声明，watch 的 getter 在 immediate 时会立刻求值 → 必须挂到 onMounted 之后再注册
+onMounted(() => {
+  watch(() => [selectedSb.value?.id, videoModel.value, selectedVideoConfig.value?.id, effectiveVideoModelLabel.value, effectiveVideoDuration.value], () => {
+    if (videoEstimateTimer) { clearTimeout(videoEstimateTimer); videoEstimateTimer = null }
+    videoEstimate.value = { loading: true, data: null }
+    videoEstimateTimer = setTimeout(() => { void loadVideoEstimate() }, 300)
+  }, { immediate: true })
+})
+async function loadVideoEstimate() {
+  const seq = ++videoEstimateSeq
+  try {
+    const data = await videoQueueAPI.estimate({
+      config_id: selectedVideoConfig.value?.id || undefined,
+      model: effectiveVideoModelLabel.value || undefined,
+      duration: effectiveVideoDuration.value,
+    })
+    if (seq !== videoEstimateSeq) return // 过期响应丢弃
+    videoEstimate.value = { loading: false, data }
+  } catch {
+    if (seq !== videoEstimateSeq) return
+    videoEstimate.value = { loading: false, data: null } // 拿不到就回落「暂无预估」
+  }
+}
+onBeforeUnmount(() => { if (videoEstimateTimer) clearTimeout(videoEstimateTimer) })
+// 生成中已用时间：本地时钟（useNowTicker）从任务 created_at 持续推导，不用接口快照
+function taskCreatedUnix(t) { return t?.created_at_unix ?? (t?.created_at ? Math.floor(Date.parse(t.created_at) / 1000) : null) }
+const activeVideoElapsedSeconds = computed(() => {
+  const task = latestActiveVideoTask(selectedSb.value?.id)
+  const created = task ? taskCreatedUnix(task) : null
+  return created ? Math.max(0, Math.floor(now.value / 1000 - created)) : null
+})
+// footer 预估文案：生成中显示「已用 … / 预计 …」，平时只显示预估；墙钟口径须称「预计完成/总耗时」
+const videoEstimateBaseText = computed(() => {
+  const { loading, data } = videoEstimate.value
+  if (loading) return t('episode.vid.etaEstimating')
+  if (!data || data.supported === false || data.run_seconds == null) return t('episode.vid.etaNone')
+  const fallback = data.basis === 'fallback-model'
+  return t(fallback ? 'episode.vid.etaFallback' : 'episode.vid.etaValue', {
+    time: fmtDur(data.run_seconds),
+    n: Number(data.samples) || 0,
+    model: (fallback ? data.source_model : data.requested_model) || '',
+  })
+})
+const videoEtaLine = computed(() => {
+  const used = activeVideoElapsedSeconds.value
+  if (used == null) return videoEstimateBaseText.value
+  return `${t('episode.vid.elapsedUsed', { time: fmtDur(used) })} / ${videoEstimateBaseText.value}`
+})
 const checkedVideoItems = computed(() => batchVideoConfirm.value.items.filter(item => item.checked))
 const batchVideoTotalDuration = computed(() => checkedVideoItems.value.reduce((sum, item) => {
   const sb = sbs.value.find(s => s.id === item.storyboard_id)
@@ -3652,6 +3731,11 @@ function taskVideoPath(t) { return t?.local_path || t?.localPath || t?.result_ur
 function taskCreatedAt(t) { return t?.created_at || t?.createdAt || '' }
 /** 任务产出时刻（unix 秒）：未完成的任务退回提交时间 */
 function taskGeneratedAt(t) { return t?.generated_at ?? t?.generatedAt ?? t?.created_at_unix ?? null }
+/** 历史条实测总耗时（serializeTask 的 elapsed_ms 墙钟快照）：缺失/非法返回 '' 隐藏 */
+function historyElapsedTook(t) {
+  const ms = Number(t?.elapsed_ms ?? t?.elapsedMs)
+  return Number.isFinite(ms) && ms > 0 ? fmtDur(ms / 1000) : ''
+}
 /** 分镜「当前媒体」（关键帧 / 视频）的生成时间：后端按路径反查后随分镜返回 */
 const mediaTimeOf = mediaTimeOfPath
 function isCurrentVideo(t) { const p = taskVideoPath(t); return !!p && p === getVideoUrl(selectedSb.value) }
@@ -5417,7 +5501,7 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
   min-width: 0;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) var(--vright, 340px);
+  grid-template-columns: minmax(0, 1fr) var(--vright, 420px);
   border-left: 1px solid var(--border);
   background: var(--surface-muted);
 }
@@ -5432,7 +5516,7 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
   touch-action: none;
 }
 .video-col-divider.is-left { left: calc(var(--vleft, 236px) - 4px); }
-.video-col-divider.is-right { right: calc(var(--vright, 340px) - 4px); }
+.video-col-divider.is-right { right: calc(var(--vright, 420px) - 4px); }
 .video-col-divider::after {
   content: '';
   position: absolute;
@@ -5449,20 +5533,12 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
   box-shadow: 0 0 6px var(--accent-glow);
 }
 :global(body.is-video-col-dragging) { cursor: col-resize; user-select: none; }
-/* 中列：纯编辑区（分镜描述/氛围/视频提示词），占满高度 */
+/* 中列：播放器 + 历史条 + 绑定素材/关键帧（提示词移入右栏检查器），顶部媒体区固定、下方滚动 */
 .video-main-col {
   min-width: 0;
   min-height: 0;
   display: flex;
-}
-.video-main-scroll {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 14px 16px 16px;
   background: var(--surface-raised);
 }
 .video-player-history {
@@ -5523,6 +5599,18 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
 .video-history-time {
   position: absolute;
   left: 4px;
+  bottom: 4px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(0,0,0,0.6);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+/* 历史条每条的实测总耗时（elapsed_ms 缺失时隐藏） */
+.video-history-took {
+  position: absolute;
+  right: 4px;
   bottom: 4px;
   padding: 1px 4px;
   border-radius: 3px;
@@ -5603,7 +5691,7 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
 .video-player-stage {
   flex: none;
   aspect-ratio: 16 / 9;
-  max-height: 220px;
+  max-height: 300px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -5747,6 +5835,20 @@ button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* footer 预估/已用耗时行：与生效配置小结同款式 */
+.video-eta-line {
+  padding: 3px 8px;
+  border-radius: var(--radius);
+  background: var(--overlay-track);
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 1.4;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 /* 生成参数：强调卡片，时长是当前分镜生成的核心参数 */
 .video-params-card {
   padding: 7px 10px;
@@ -5850,6 +5952,15 @@ button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
   justify-content: center;
   color: var(--text-3);
 }
+/* 缩略图上的进行中进度环：旧视频/空态两种卡片都叠加 */
+.video-task-ring {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.38);
+}
 .video-task-index {
   position: absolute;
   left: 3px;
@@ -5941,8 +6052,8 @@ button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
   border-left: 1px solid var(--border);
   background: var(--surface-muted);
 }
-.video-task-inspector .video-task-player,
-.video-task-inspector .video-player-history {
+.video-main-col .video-task-player,
+.video-main-col .video-player-history {
   flex: none;
 }
 .video-inspector-head {
@@ -5968,11 +6079,11 @@ button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
   background: var(--surface-muted);
 }
 .video-inspector-section { display: flex; flex-direction: column; gap: 7px; }
-/* 检查器窄栏（可拖拽，常在 260–340px）：卡片按栏宽均分成多列，不留整列空白 */
+/* 中列素材卡：中列比旧检查器宽，卡片放宽到 160–240px */
 .video-inspector-section :deep(.target-assets) {
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
 }
-.video-inspector-section :deep(.target-asset) { max-width: 180px; }
+.video-inspector-section :deep(.target-asset) { max-width: 240px; }
 .video-inspector-label { color: var(--text-0); font-size: 12px; font-weight: 700; }
 .video-inspector-label-hero {
   color: var(--accent);

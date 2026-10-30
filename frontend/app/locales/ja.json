@@ -1069,7 +1069,13 @@
       "batchStateCancelled": "停止済み",
       "batchDoneToast": "一括動画生成が完了しました",
       "batchCancelledToast": "一括動画生成を停止しました",
-      "confirmSerialNote": "分镜順に直列で生成し、キーフレームを先頭／中間／終端のガイドとして使用します。処理はサーバー側で行われるためページを閉じても構いません"
+      "confirmSerialNote": "分镜順に直列で生成し、キーフレームを先頭／中間／終端のガイドとして使用します。処理はサーバー側で行われるためページを閉じても構いません",
+      "etaEstimating": "見積もり中…",
+      "etaValue": "約 {time} の見込み（実測 {n} 回 · {model}）",
+      "etaFallback": "約 {time} の見込み（実測 {n} 回 · 参照元 {model}）",
+      "etaNone": "見積もりなし",
+      "elapsedUsed": "経過 {time}",
+      "elapsedTook": "所要 {time}"
     },
     "kf": {
       "slotFirst": "先頭フレーム",

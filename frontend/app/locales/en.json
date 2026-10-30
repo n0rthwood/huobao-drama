@@ -1069,7 +1069,13 @@
       "batchStateCancelled": "Stopped",
       "batchDoneToast": "Batch video generation finished",
       "batchCancelledToast": "Batch video generation stopped",
-      "confirmSerialNote": "Generated serially in shot order with the keyframes as first/mid/last frame guides; it runs on the server, so you can close the page"
+      "confirmSerialNote": "Generated serially in shot order with the keyframes as first/mid/last frame guides; it runs on the server, so you can close the page",
+      "etaEstimating": "Estimating…",
+      "etaValue": "Est. about {time} ({n} measured runs · {model})",
+      "etaFallback": "Est. about {time} ({n} measured runs · from {model})",
+      "etaNone": "No estimate available",
+      "elapsedUsed": "{time} elapsed",
+      "elapsedTook": "Took {time}"
     },
     "kf": {
       "slotFirst": "First frame",

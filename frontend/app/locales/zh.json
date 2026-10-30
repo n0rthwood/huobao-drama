@@ -1069,7 +1069,13 @@
       "batchStateCancelled": "已停止",
       "batchDoneToast": "批量视频生成完成",
       "batchCancelledToast": "批量视频生成已停止",
-      "confirmSerialNote": "按分镜顺序串行生成，关键帧作为首/中/尾引导帧；生成在服务端进行，可以关闭页面"
+      "confirmSerialNote": "按分镜顺序串行生成，关键帧作为首/中/尾引导帧；生成在服务端进行，可以关闭页面",
+      "etaEstimating": "预估中…",
+      "etaValue": "预计约 {time}（{n} 次实测 · {model}）",
+      "etaFallback": "预计约 {time}（{n} 次实测 · 来源 {model}）",
+      "etaNone": "暂无预估",
+      "elapsedUsed": "已用 {time}",
+      "elapsedTook": "用时 {time}"
     },
     "kf": {
       "slotFirst": "首帧",

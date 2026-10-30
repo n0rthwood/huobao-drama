@@ -1069,7 +1069,13 @@
       "batchStateCancelled": "중지됨",
       "batchDoneToast": "일괄 영상 생성이 완료되었습니다",
       "batchCancelledToast": "일괄 영상 생성을 중지했습니다",
-      "confirmSerialNote": "스토리보드 순서대로 직렬 생성하며 키프레임을 첫/중간/끝 가이드 프레임으로 사용합니다. 서버에서 실행되므로 페이지를 닫아도 됩니다"
+      "confirmSerialNote": "스토리보드 순서대로 직렬 생성하며 키프레임을 첫/중간/끝 가이드 프레임으로 사용합니다. 서버에서 실행되므로 페이지를 닫아도 됩니다",
+      "etaEstimating": "예상 시간 계산 중…",
+      "etaValue": "약 {time} 예상 (실측 {n}회 · {model})",
+      "etaFallback": "약 {time} 예상 (실측 {n}회 · 출처 {model})",
+      "etaNone": "예상 시간 없음",
+      "elapsedUsed": "경과 {time}",
+      "elapsedTook": "소요 {time}"
     },
     "kf": {
       "slotFirst": "첫 프레임",
