@@ -12,6 +12,7 @@ export const sqliteSchemaStatements = [
     title TEXT NOT NULL,
     description TEXT,
     genre TEXT,
+    documentary_rules TEXT,
     style TEXT DEFAULT '3d',
     aspect_ratio TEXT DEFAULT '16:9',
     total_episodes INTEGER DEFAULT 1,
@@ -54,6 +55,9 @@ export const sqliteSchemaStatements = [
     appearance TEXT,
     styling TEXT,
     final_prompt TEXT,
+    final_prompt_source TEXT,
+    final_prompt_updated_at TEXT,
+    archival_images TEXT,
     personality TEXT,
     image_url TEXT,
     reference_images TEXT,
@@ -74,6 +78,8 @@ export const sqliteSchemaStatements = [
     prompt TEXT NOT NULL,
     lighting TEXT,
     final_prompt TEXT,
+    final_prompt_source TEXT,
+    final_prompt_updated_at TEXT,
     storyboard_count INTEGER DEFAULT 1,
     image_url TEXT,
     reference_images TEXT,
@@ -284,6 +290,8 @@ export const sqliteSchemaStatements = [
     description TEXT,
     prompt TEXT,
     final_prompt TEXT,
+    final_prompt_source TEXT,
+    final_prompt_updated_at TEXT,
     image_url TEXT,
     reference_images TEXT,
     local_path TEXT,
@@ -348,6 +356,24 @@ export const sqliteSchemaStatements = [
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   )`,
+
+  // 资料检索记录（Issue #32）：Agent 每次调用维基系检索工具落一行，资产详情的「资料来源」读它
+  `CREATE TABLE IF NOT EXISTS research_citations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    drama_id INTEGER,
+    episode_id INTEGER,
+    asset_kind TEXT,
+    asset_id INTEGER,
+    asset_name TEXT,
+    tool TEXT NOT NULL,
+    query TEXT,
+    title TEXT,
+    source_url TEXT,
+    lang TEXT,
+    snippet TEXT,
+    status TEXT NOT NULL DEFAULT 'ok',
+    retrieved_at TEXT NOT NULL
+  )`,
 ]
 
 /**
@@ -381,6 +407,17 @@ const columnAdditions: { table: string; column: string; type: string }[] = [
   { table: 'video_merges', column: 'generated_at', type: 'INTEGER' },
   // 本集角色造型版本（Issue #15，JSON {name, description, image_path}）
   { table: 'episode_characters', column: 'styling_version', type: 'TEXT' },
+  // 纪录片规则显式开关（Issue #32）：'auto' | 'on' | 'off'；NULL 等价 'auto'（按 genre 关键字判定）
+  { table: 'dramas', column: 'documentary_rules', type: 'TEXT' },
+  // 最终提示词来源标记（Issue #32）：'agent' = 提示词 Agent 保存，'external' = 外部直写
+  { table: 'characters', column: 'final_prompt_source', type: 'TEXT' },
+  { table: 'characters', column: 'final_prompt_updated_at', type: 'TEXT' },
+  { table: 'scenes', column: 'final_prompt_source', type: 'TEXT' },
+  { table: 'scenes', column: 'final_prompt_updated_at', type: 'TEXT' },
+  { table: 'props', column: 'final_prompt_source', type: 'TEXT' },
+  { table: 'props', column: 'final_prompt_updated_at', type: 'TEXT' },
+  // 史料参考画像（Issue #32，JSON 数组）：与 reference_images 严格分离，生图链路不读
+  { table: 'characters', column: 'archival_images', type: 'TEXT' },
 ]
 
 /**
@@ -551,6 +588,12 @@ export const stylePresetSeeds = [
     name: '黑白漫画', value: 'noir', sortOrder: 9,
     prompt: 'black and white manga illustration, high-contrast monochrome ink work, dynamic hatching and cross-hatching shading, bold solid blacks with dramatic negative space, screentone gray gradation, expressive confident ink linework, cinematic noir lighting, professional manga page quality, consistent character design across shots, strictly no color, avoid grayscale blur smudging, avoid painterly soft edges, avoid photorealism, avoid 3D render look',
     description: '黑白漫/ Noir 高对比墨水风',
+  },
+  // 纪录片/历史题材（Issue #32 Q9）：原本只存在于用户本机库，随版本库发布为正式预设
+  {
+    name: '冷峻档案纪实', value: 'documentary-archival', sortOrder: 10,
+    prompt: 'cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark',
+    description: '历史纪录片档案质感：35mm 胶片、冷峻低饱和、年代考据美术',
   },
 ]
 

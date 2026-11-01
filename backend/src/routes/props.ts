@@ -12,6 +12,7 @@ import { deleteAssetLinks } from '../services/asset-links.js'
 import { mountReferenceImageRoutes } from './reference-images.js'
 import { EMPTY_ASSET_NAME_MESSAGE, normalizeAssetName } from '../services/asset-name.js'
 import { planFinalPromptWrite, promptSourceChanged } from '../services/asset-prompt-invalidation.js'
+import { mountReExtractRoute } from './asset-reextract.js'
 
 const app = new Hono()
 // 道具图：白底单品静物，方形画布
@@ -19,6 +20,8 @@ const PROP_IMAGE_SIZE = '1024x1024'
 
 // POST/DELETE /props/:id/reference-images — 道具参考图（生图输入，与成片图互不影响）
 mountReferenceImageRoutes(app, 'prop')
+// POST /props/:id/re-extract — 单资产重新提取（Issue #32）
+mountReExtractRoute(app, 'prop')
 
 // POST /props — 手动新增道具（传入 episode_id 时关联到该集）
 app.post('/', async (c) => {
@@ -81,6 +84,7 @@ app.put('/:id', async (c) => {
     currentFinalPrompt: prop.finalPrompt,
     finalPrompt: body.final_prompt !== undefined ? body.final_prompt : body.finalPrompt,
     sourceChanged: promptSourceChanged('prop', prop, updates),
+    at: updates.updatedAt,
   }))
   await db.update(schema.props).set(updates).where(eq(schema.props.id, id))
   const [updated] = await db.select().from(schema.props).where(eq(schema.props.id, id))

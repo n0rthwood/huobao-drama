@@ -50,19 +50,43 @@ const AGENT_SKILL_MAP: Record<string, string[]> = {
   transition_writer: ['prompt-generator/transition-prompt'],
 }
 
+/**
+ * 题材规则集的附加技能目录（Issue #32）— 基础技能正文一字不改，命中题材时叠加。
+ * 非纪录片项目零影响：loadAgentSkills 只在 opts.genreRuleset 命中时才注入这些目录。
+ */
+const GENRE_SKILL_MAP: Record<string, Record<string, string[]>> = {
+  documentary: {
+    extractor: ['documentary/documentary-extraction'],
+    prompt_generator: [
+      'documentary/documentary-character-prompt',
+      'documentary/documentary-scene-prompt',
+      'documentary/documentary-prop-prompt',
+    ],
+  },
+}
+
+/** 某 Agent 在所有题材下可能用到的附加目录（Workspace 的 skills 解析器要能发现它们） */
+function genrePrefixes(agentType: string): string[] {
+  return Object.values(GENRE_SKILL_MAP).flatMap(byAgent => byAgent[agentType] || [])
+}
+
 /** 每个 Agent 的 Workspace（filesystem 工作目录 + 原生技能注册）
  *  skills 用动态解析器按目录前缀匹配：设置页新建的子技能无需重启即可被发现 */
 export const skillWorkspaces: Record<string, Workspace> = Object.fromEntries(
-  Object.entries(AGENT_SKILL_MAP).map(([agentType, prefixes]) => [
-    agentType,
-    new Workspace({
-      id: `workspace-${agentType}`,
-      name: `${agentType} workspace`,
-      filesystem: localFilesystem(),
-      skills: () => scanSkillPaths().filter(p =>
-        prefixes.some(prefix => p === `skills/${prefix}` || p.startsWith(`skills/${prefix}/`))),
-    }),
-  ]),
+  Object.entries(AGENT_SKILL_MAP).map(([agentType, basePrefixes]) => {
+    // 题材 addendum 目录也要能被 workspace.skills 解析到（注入与否由 loadAgentSkills 决定）
+    const prefixes = [...basePrefixes, ...genrePrefixes(agentType)]
+    return [
+      agentType,
+      new Workspace({
+        id: `workspace-${agentType}`,
+        name: `${agentType} workspace`,
+        filesystem: localFilesystem(),
+        skills: () => scanSkillPaths().filter(p =>
+          prefixes.some(prefix => p === `skills/${prefix}` || p.startsWith(`skills/${prefix}/`))),
+      }),
+    ]
+  }),
 )
 
 /** 递归扫描 workspace/skills/ 下所有含 SKILL.md 的目录（相对 workspace 根的路径） */
@@ -119,15 +143,24 @@ async function readLocalizedSkill(relPath: string, lang: string): Promise<string
 /** 读取 Agent 专属技能全文（经 workspace.skills API，保持原注入格式）
  *  AGENT_SKILL_MAP 的目录按前缀匹配：目录自身及其子目录下所有 SKILL.md 都会注入，
  *  因此设置页新建的子技能（如 storyboard-breaker/xxx）无需改代码即可生效。
+ *  opts.genreRuleset 命中时额外叠加 GENRE_SKILL_MAP 的 addendum 目录（Issue #32），
+ *  排在基础技能之后，作为覆盖层阅读；未命中时技能文本与改动前逐字一致。
  *  lang 非 zh 时逐技能优先 SKILL.<lang>.md，缺失回退基础版（中文） */
-export async function loadAgentSkills(agentType: string, lang?: string | null): Promise<string> {
+export async function loadAgentSkills(
+  agentType: string,
+  lang?: string | null,
+  opts?: { genreRuleset?: string | null },
+): Promise<string> {
   const workspace = skillWorkspaces[agentType]
-  const prefixes = AGENT_SKILL_MAP[agentType] || []
+  const basePrefixes = AGENT_SKILL_MAP[agentType] || []
+  const addendumPrefixes = opts?.genreRuleset ? (GENRE_SKILL_MAP[opts.genreRuleset]?.[agentType] || []) : []
+  const prefixes = [...basePrefixes, ...addendumPrefixes]
   if (!workspace || !prefixes.length) return ''
 
   const allPaths = scanSkillPaths().map(p => p.replace(/^skills\//, ''))
-  const relPaths = allPaths.filter(p =>
-    prefixes.some(prefix => p === prefix || p.startsWith(prefix + '/')))
+  // 按 prefixes 顺序分组：基础技能在前，题材 addendum 在后
+  const relPaths = prefixes.flatMap(prefix =>
+    allPaths.filter(p => p === prefix || p.startsWith(prefix + '/')))
 
   const useLocalized = Boolean(lang && lang !== 'zh')
   const contents: string[] = []

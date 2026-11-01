@@ -12,12 +12,15 @@ import { mountReferenceImageRoutes } from './reference-images.js'
 import { planSceneTimePatch } from '../services/scene-time.js'
 import { EMPTY_ASSET_NAME_MESSAGE, normalizeAssetName } from '../services/asset-name.js'
 import { promptSourceChanged } from '../services/asset-prompt-invalidation.js'
+import { mountReExtractRoute } from './asset-reextract.js'
 import { toSnakeCase } from '../utils/transform.js'
 
 const app = new Hono()
 
 // POST/DELETE /scenes/:id/reference-images — 场景参考图（生图输入，与成片图互不影响）
 mountReferenceImageRoutes(app, 'scene')
+// POST /scenes/:id/re-extract — 单资产重新提取（Issue #32）
+mountReExtractRoute(app, 'scene')
 
 // POST /scenes — 手动新增场景（传入 episode_id 时关联到该集）
 app.post('/', async (c) => {
@@ -70,6 +73,7 @@ app.put('/:id', async (c) => {
     time: body.time,
     finalPrompt: body.final_prompt !== undefined ? body.final_prompt : body.finalPrompt,
     sourceChanged: promptSourceChanged('scene', scene, updates),
+    at: updates.updatedAt,
   })
   if ('error' in timePatch) return badRequest(c, timePatch.error)
   if (timePatch.time !== undefined) updates.time = timePatch.time
@@ -81,7 +85,11 @@ app.put('/:id', async (c) => {
   }
   if (body.local_path !== undefined) updates.localPath = body.local_path
   else if (body.localPath !== undefined) updates.localPath = body.localPath
-  if (timePatch.finalPrompt !== undefined) updates.finalPrompt = timePatch.finalPrompt
+  if (timePatch.finalPrompt !== undefined) {
+    updates.finalPrompt = timePatch.finalPrompt
+    updates.finalPromptSource = timePatch.finalPromptSource ?? null
+    updates.finalPromptUpdatedAt = timePatch.finalPromptUpdatedAt ?? null
+  }
   await db.update(schema.scenes).set(updates).where(eq(schema.scenes.id, id))
   const [updated] = await db.select().from(schema.scenes).where(eq(schema.scenes.id, id))
   return success(c, toSnakeCase(updated))

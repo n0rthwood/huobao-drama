@@ -17,6 +17,7 @@ import { logTaskProgress, logTaskSuccess, logTaskWarn } from '../../utils/task-l
 import { getDramaId, getEpisodeId } from '../context.js'
 import { parseStylingVersion, saveStylingVersion } from '../../services/styling-version.js'
 import { normalizeAssetName } from '../../services/asset-name.js'
+import { linkCitationsToAsset } from '../../services/research-citations.js'
 
 // ─── 关联辅助 ────────────────────────────────────────────────
 async function linkCharToEpisode(episodeId: number, characterId: number) {
@@ -120,6 +121,8 @@ const readExistingCharacters = createTool({
       id: c.id,
       name: c.name,
       role: c.role || '',
+      // 身份/势力/年代/叙事作用写在 description（Issue #32）：合并判断要看得到它
+      description: c.description || '',
       appearance: c.appearance || '',
       styling: c.styling || '',
       episode_styling_version: versionByCharId.get(c.id) ?? null,
@@ -184,11 +187,11 @@ const saveDedupCharacters = createTool({
   description: 'Save extracted characters with deduplication. Existing characters (same name) are merged/updated; new ones are created. All are linked to the current episode.',
   inputSchema: z.object({
     characters: z.array(z.object({
-      name: z.string(),
-      role: z.string().optional(),
-      description: z.string().optional(),
-      appearance: z.string().optional(),
-      styling: z.string().optional(),
+      name: z.string().describe('角色名，与剧本原文一致'),
+      role: z.string().optional().describe('短身份标签（如「沙皇 · 谕令签发者」），不写长句'),
+      description: z.string().optional().describe('身份、地位、所属势力、年代、在本集中的叙事作用；只有提示词 Agent 读得到'),
+      appearance: z.string().optional().describe('静态可见的外貌特征（脸型、发型、髭形、身材、年龄感）；全链路都会读，进生图提示词'),
+      styling: z.string().optional().describe('常规服装/配饰/可持有的身份符号（冠冕、绶带、胸甲、朝服、仪仗、持物）；全链路都会读，进生图提示词'),
       // 本集成套造型（Issue #15 Q1=B）：写进集关联，绝不覆盖基础形象的 styling
       styling_version: z.object({
         name: z.string(),
@@ -261,6 +264,9 @@ const saveDedupCharacters = createTool({
         results.created++
       }
 
+      // 本次提取期间以该角色名落的检索记录归属到这一行（Issue #32，资产详情「资料来源」按 asset_id 读）
+      await linkCitationsToAsset(episodeId, 'character', char.name, charId)
+
       if (char.styling_version?.name?.trim()) {
         const saved = await saveStylingVersion(episodeId, charId, {
           name: char.styling_version.name.trim(),
@@ -325,7 +331,6 @@ const saveDedupScenes = createTool({
       const normLocation = normalizeLocation(scene.location)
       const existing = scenesInProject.find(s => s.location === scene.location && s.time === (scene.time || ''))
         || (normLocation ? scenesInProject.find(s => normalizeLocation(s.location) === normLocation && s.time === (scene.time || '')) : undefined)
-
       if (existing) {
         // 已存在完全匹配的场景：关联并补齐描述/光影
         await db.update(schema.scenes).set({
@@ -334,6 +339,7 @@ const saveDedupScenes = createTool({
           updatedAt: ts,
         }).where(eq(schema.scenes.id, existing.id))
         await linkSceneToEpisode(episodeId, existing.id)
+        await linkCitationsToAsset(episodeId, 'scene', scene.location, existing.id)
         results.reused++
       } else {
         const res = await db.insert(schema.scenes).values({
@@ -347,6 +353,7 @@ const saveDedupScenes = createTool({
         })
         const sceneId = getInsertId(res)
         await linkSceneToEpisode(episodeId, sceneId)
+        await linkCitationsToAsset(episodeId, 'scene', scene.location, sceneId)
         results.created++
       }
     }
@@ -465,6 +472,7 @@ const saveDedupProps = createTool({
           updatedAt: ts,
         }).where(eq(schema.props.id, existing.id))
         await linkPropToEpisode(episodeId, existing.id)
+        await linkCitationsToAsset(episodeId, 'prop', prop.name, existing.id)
         results.merged++
       } else {
         const res = await db.insert(schema.props).values({
@@ -477,6 +485,7 @@ const saveDedupProps = createTool({
         })
         const propId = getInsertId(res)
         await linkPropToEpisode(episodeId, propId)
+        await linkCitationsToAsset(episodeId, 'prop', prop.name, propId)
         results.created++
       }
     }

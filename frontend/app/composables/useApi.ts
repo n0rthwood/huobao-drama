@@ -223,6 +223,64 @@ export function parseReferenceImages(raw: unknown): ReferenceImage[] {
     .filter((entry): entry is ReferenceImage => !!entry)
 }
 
+/**
+ * 纪录片/历史题材的资料检索与史料参考（Issue #32）。
+ * 史料参考（archival_images）与参考图（reference_images）严格分离：前者只做出处留档，不参与生图。
+ */
+export interface ArchivalImage {
+  path: string
+  file_title?: string
+  source_page_url?: string
+  file_url?: string
+  artist?: string
+  work_date?: string
+  license?: string
+  license_url?: string
+  retrieved_at?: string
+}
+
+export interface CommonsFile {
+  file_title: string
+  thumb_url?: string
+  file_url?: string
+  source_page_url?: string
+  artist?: string
+  work_date?: string
+  license?: string
+  license_url?: string
+  mime?: string
+  width?: number
+  height?: number
+}
+
+export type CommonsSearchResp = { query: string; results: CommonsFile[]; retrieved_at: string }
+
+export interface ResearchCitation {
+  id: number
+  drama_id: number
+  episode_id: number | null
+  asset_kind: AssetKindName
+  asset_id: number
+  asset_name: string
+  tool: string
+  query: string
+  title: string
+  source_url: string
+  lang: string
+  snippet: string
+  // 'failed' = 检索不可用，该资产只用了剧本原文
+  status: string
+  retrieved_at: string
+}
+
+/** 「重新提取本资产信息」：先清空提取字段再跑提取 Agent，进度走 episodeAPI.extractStatus */
+export type ReExtractResp = { started: boolean; asset_id: number; cleared_fields: string[] }
+
+export const researchAPI = {
+  commonsSearch: (q: string, limit?: number) => api.get<CommonsSearchResp>(`/research/commons/search?q=${encodeURIComponent(q)}${limit ? `&limit=${limit}` : ''}`),
+  citations: (assetKind: AssetKindName, assetId: number) => api.get<ResearchCitation[]>(`/research/citations?asset_kind=${assetKind}&asset_id=${assetId}`),
+}
+
 export const characterAPI = {
   create: (data: any) => api.post('/characters', data),
   update: (id: number, data: any) => api.put(`/characters/${id}`, data),
@@ -237,6 +295,10 @@ export const characterAPI = {
   addReference: (id: number, file: File) => uploadReq<ReferenceImagesResp>(`/characters/${id}/reference-images`, file),
   delReference: (id: number, url: string) => api.del<ReferenceImagesResp>(`/characters/${id}/reference-images?url=${encodeURIComponent(url)}`),
   addRefsFromLibrary: (id: number, urls: string[]) => api.post<LibraryRefsResp>(`/characters/${id}/reference-images/from-library`, { urls }),
+  // 史料参考（Issue #32）：只做档案留存，严格不进生图链路
+  addArchivalImage: (id: number, fileTitle: string) => api.post<ArchivalImage[]>(`/characters/${id}/archival-images`, { file_title: fileTitle }),
+  removeArchivalImage: (id: number, path: string) => api.del<ArchivalImage[]>(`/characters/${id}/archival-images?path=${encodeURIComponent(path)}`),
+  reExtract: (id: number, episodeId: number, textModel?: string, textConfigId?: number) => api.post<ReExtractResp>(`/characters/${id}/re-extract`, { episode_id: episodeId, text_model: textModel || undefined, text_config_id: textConfigId || undefined }),
 }
 
 export const sceneAPI = {
@@ -248,6 +310,7 @@ export const sceneAPI = {
   addReference: (id: number, file: File) => uploadReq<ReferenceImagesResp>(`/scenes/${id}/reference-images`, file),
   delReference: (id: number, url: string) => api.del<ReferenceImagesResp>(`/scenes/${id}/reference-images?url=${encodeURIComponent(url)}`),
   addRefsFromLibrary: (id: number, urls: string[]) => api.post<LibraryRefsResp>(`/scenes/${id}/reference-images/from-library`, { urls }),
+  reExtract: (id: number, episodeId: number, textModel?: string, textConfigId?: number) => api.post<ReExtractResp>(`/scenes/${id}/re-extract`, { episode_id: episodeId, text_model: textModel || undefined, text_config_id: textConfigId || undefined }),
 }
 
 export const propAPI = {
@@ -259,6 +322,7 @@ export const propAPI = {
   addReference: (id: number, file: File) => uploadReq<ReferenceImagesResp>(`/props/${id}/reference-images`, file),
   delReference: (id: number, url: string) => api.del<ReferenceImagesResp>(`/props/${id}/reference-images?url=${encodeURIComponent(url)}`),
   addRefsFromLibrary: (id: number, urls: string[]) => api.post<LibraryRefsResp>(`/props/${id}/reference-images/from-library`, { urls }),
+  reExtract: (id: number, episodeId: number, textModel?: string, textConfigId?: number) => api.post<ReExtractResp>(`/props/${id}/re-extract`, { episode_id: episodeId, text_model: textModel || undefined, text_config_id: textConfigId || undefined }),
 }
 
 // 生成任务列表/详情（图片生成走各资产 API，视频生成走 storyboardAPI.generateVideo 与集级批量）

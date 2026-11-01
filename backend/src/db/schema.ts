@@ -10,6 +10,8 @@ export const dramas = sqliteTable('dramas', {
   title: text('title').notNull(),
   description: text('description'),
   genre: text('genre'),
+  // 纪录片规则显式开关（Issue #32）：'auto'（跟随 genre 关键字）| 'on' | 'off'；NULL 等价 'auto'
+  documentaryRules: text('documentary_rules'),
   style: text('style').default('3d'),
   aspectRatio: text('aspect_ratio').default('16:9'),
   totalEpisodes: integer('total_episodes').default(1),
@@ -52,6 +54,11 @@ export const characters = sqliteTable('characters', {
   appearance: text('appearance'),
   styling: text('styling'),
   finalPrompt: text('final_prompt'),
+  // 最终提示词来源（Issue #32）：'agent' = 提示词 Agent 保存，'external' = 外部 PUT 直写
+  finalPromptSource: text('final_prompt_source'),
+  finalPromptUpdatedAt: text('final_prompt_updated_at'),
+  // 史料参考画像（Issue #32，JSON 数组）：生图链路任何环节都不读，与 reference_images 严格分离
+  archivalImages: text('archival_images'),
   personality: text('personality'),
   imageUrl: text('image_url'),
   referenceImages: text('reference_images'),
@@ -99,6 +106,8 @@ export const scenes = sqliteTable('scenes', {
   prompt: text('prompt').notNull(),
   lighting: text('lighting'),
   finalPrompt: text('final_prompt'),
+  finalPromptSource: text('final_prompt_source'),
+  finalPromptUpdatedAt: text('final_prompt_updated_at'),
   storyboardCount: integer('storyboard_count').default(1),
   imageUrl: text('image_url'),
   referenceImages: text('reference_images'),
@@ -317,6 +326,8 @@ export const props = sqliteTable('props', {
   description: text('description'),
   prompt: text('prompt'),
   finalPrompt: text('final_prompt'),
+  finalPromptSource: text('final_prompt_source'),
+  finalPromptUpdatedAt: text('final_prompt_updated_at'),
   imageUrl: text('image_url'),
   referenceImages: text('reference_images'),
   localPath: text('local_path'),
@@ -357,4 +368,26 @@ export const appSettings = sqliteTable('app_settings', {
   key: text('key').primaryKey(),
   value: text('value').notNull(),
   updatedAt: text('updated_at').notNull(),
+})
+
+/**
+ * 资料检索记录（Issue #32）— Agent 每次调用维基系检索工具落一行，UI 的「资料来源」列表读它。
+ * assetId 在提取阶段还不知道（资产行可能刚创建），先按 assetName 落库，
+ * save_dedup_* 落库后回填 assetId。status：'ok' = 检索成功，'failed' = 不可用（降级为只用剧本原文）。
+ */
+export const researchCitations = sqliteTable('research_citations', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  dramaId: integer('drama_id'),
+  episodeId: integer('episode_id'),
+  assetKind: text('asset_kind'),
+  assetId: integer('asset_id'),
+  assetName: text('asset_name'),
+  tool: text('tool').notNull(),
+  query: text('query'),
+  title: text('title'),
+  sourceUrl: text('source_url'),
+  lang: text('lang'),
+  snippet: text('snippet'),
+  status: text('status').notNull().default('ok'),
+  retrievedAt: text('retrieved_at').notNull(),
 })

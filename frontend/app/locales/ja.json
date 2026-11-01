@@ -289,6 +289,52 @@
       "effectRefresh": "確認すると画面が自動で再読み込みされます",
       "confirm": "切替して再読み込み",
       "refreshing": "言語を切替しました。再読み込み中…"
+    },
+    "promptSource": {
+      "agent": "Agent 生成",
+      "external": "Agent 以外（外部書き込み）",
+      "empty": "未生成（フォールバックのプロンプトを使用）",
+      "agentHint": "本プロジェクトのルールに従って Agent が生成",
+      "externalHint": "外部書き込み（手動編集または API 直書き）。Agent のルールに従いません",
+      "emptyHint": "最終プロンプト未生成。画像生成時はフォールバックを使用します",
+      "updatedAt": "更新日時：{time}",
+      "rewrite": "Agent に書き直させる",
+      "rewriting": "書き直し中…",
+      "rewriteHint": "現在のジャンルルールで最終プロンプトを再生成します（既存の内容は上書き）",
+      "unknown": "出所不明（旧バージョン生成）",
+      "unknownHint": "この最終プロンプトは出所記録が導入される前のものです。現在のルールで Agent に書き直させることができます"
+    },
+    "archival": {
+      "label": "史料リファレンス",
+      "add": "検索して追加",
+      "searchPlaceholder": "Wikimedia Commons を検索（例：ピョートル1世 肖像）",
+      "search": "検索",
+      "searching": "検索中…",
+      "searchFailed": "検索に失敗しました",
+      "noResults": "結果がありません。キーワードを変えてください",
+      "addThis": "「{title}」を追加",
+      "added": "史料リファレンスを追加しました",
+      "removed": "史料リファレンスを削除しました",
+      "remove": "この史料リファレンスを削除",
+      "empty": "史料リファレンスはまだありません",
+      "artist": "作者",
+      "workDate": "年代",
+      "license": "ライセンス",
+      "sourcePage": "出典ページ",
+      "retrievedAt": "取得日時",
+      "unknown": "不明",
+      "notUsedForGeneration": "史料リファレンスは画像生成に使われません（参考画像とは厳密に分離）",
+      "confirmTitle": "史料リファレンスを削除",
+      "confirmMessage": "削除するとこの史料ファイルと出典情報が失われます。参考画像と生成画像には影響しません。"
+    },
+    "citations": {
+      "label": "資料出典",
+      "refresh": "更新",
+      "loading": "読み込み中…",
+      "loadFailed": "資料出典の読み込みに失敗しました",
+      "unavailable": "検索なし。脚本本文のみを使用",
+      "empty": "資料出典の記録はありません",
+      "untitled": "タイトルなし"
     }
   },
   "composables": {
@@ -442,6 +488,17 @@
       "needEpisodeForImage": "素材画像を生成するには、先に「エピソード一覧」で 1 話以上作成してください",
       "needEpisodeForPrompt": "最終プロンプトを生成するには、先に「エピソード一覧」で 1 話以上作成してください",
       "locationRequired": "場所を入力してください"
+    },
+    "documentary": {
+      "label": "ドキュメンタリールール",
+      "placeholder": "ドキュメンタリールールを選択",
+      "auto": "自動（ジャンルに従う）",
+      "on": "強制オン",
+      "off": "強制オフ",
+      "effective": "現在の適用：{value}",
+      "hint": "スイッチはジャンルのキーワードより優先されます。有効時は抽出とプロンプトがドキュメンタリー/歴史ルールに従います。",
+      "rulesetDocumentary": "ドキュメンタリールール",
+      "rulesetNone": "ジャンルルールなし"
     }
   },
   "settings": {
@@ -1311,6 +1368,26 @@
       "smooth": "標準",
       "hd": "高画質",
       "uhd": "超高画質"
+    },
+    "documentary": {
+      "archivalSectionTitle": "史料リファレンス",
+      "archivalSectionHint": "出典の記録のみ。生成には使いません",
+      "citationsSectionTitle": "資料出典",
+      "citationsSectionHint": "Agent が実際に参照した項目",
+      "reExtract": "この素材を再抽出",
+      "reExtractHint": "この素材の抽出フィールドを空にして抽出 Agent を再実行します",
+      "reExtractTitle": "この素材を再抽出",
+      "reExtractMessage": "{type}「{name}」の抽出フィールド（{fields}）と最終プロンプトを空にしてから、抽出 Agent を再実行します。生成済み画像と参考画像には影響しません。",
+      "reExtractStarted": "再抽出を開始しました。完了後に自動で更新されます",
+      "fields": {
+        "role": "役柄",
+        "description": "概要",
+        "appearance": "外見",
+        "styling": "スタイリング",
+        "prompt": "画面の説明",
+        "lighting": "ライティング",
+        "type": "種類"
+      }
     }
   },
   "errors": {

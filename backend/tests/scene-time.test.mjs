@@ -25,13 +25,14 @@ function run(script, input) {
 const planScript = `
   import { planSceneTimePatch } from './src/services/scene-time.ts'
   const cases = JSON.parse(process.env.SCENE_INPUT)
-  process.stdout.write('@@' + JSON.stringify(cases.map(c => planSceneTimePatch(c))))
+  // at 由路由层传入（Issue #32 的来源标记）；测试固定一个时间戳
+  process.stdout.write('@@' + JSON.stringify(cases.map(c => planSceneTimePatch({ at: '2026-01-01T00:00:00.000Z', ...c }))))
 `
 const plan = (...cases) => run(planScript, cases)
 
 test('changing the time invalidates an old prompt even if it mentions the new period elsewhere', () => {
   const [result] = plan({ currentTime: '午后', currentFinalPrompt: '午后的客厅，避免夜晚冷色调', time: '夜晚' })
-  assert.deepEqual(result, { time: '夜晚', finalPrompt: null })
+  assert.deepEqual(result, { time: '夜晚', finalPrompt: null, finalPromptSource: null, finalPromptUpdatedAt: null })
 })
 
 test('a manual prompt written together with the new time is kept when it cites the time', () => {
@@ -39,7 +40,7 @@ test('a manual prompt written together with the new time is kept when it cites t
     { currentTime: '午后', currentFinalPrompt: '午后的客厅', time: '夜晚', finalPrompt: '夜晚的客厅，台灯暖光' },
     { currentTime: '午后', currentFinalPrompt: '午后的客厅', time: '夜晚', finalPrompt: '客厅，台灯暖光' },
   )
-  assert.deepEqual(ok, { time: '夜晚', finalPrompt: '夜晚的客厅，台灯暖光' })
+  assert.deepEqual(ok, { time: '夜晚', finalPrompt: '夜晚的客厅，台灯暖光', finalPromptSource: 'external', finalPromptUpdatedAt: '2026-01-01T00:00:00.000Z' })
   assert.match(bad.error, /夜晚/)
 })
 
@@ -51,7 +52,7 @@ test('any manual prompt lacking the scene time is rejected; resending the stored
   )
   assert.match(bad.error, /Afternoon/)
   assert.deepEqual(unchanged, { time: '午后' })
-  assert.deepEqual(cleared, { finalPrompt: null })
+  assert.deepEqual(cleared, { finalPrompt: null, finalPromptSource: null, finalPromptUpdatedAt: null })
 })
 
 test('the time cannot be cleared, and an empty time places no requirement on the prompt', () => {
@@ -60,7 +61,7 @@ test('the time cannot be cleared, and an empty time places no requirement on the
     { currentTime: '', currentFinalPrompt: null, time: '', finalPrompt: '客厅全景' },
   )
   assert.match(clear.error, /不能清空/)
-  assert.deepEqual(emptyStays, { time: '', finalPrompt: '客厅全景' })
+  assert.deepEqual(emptyStays, { time: '', finalPrompt: '客厅全景', finalPromptSource: 'external', finalPromptUpdatedAt: '2026-01-01T00:00:00.000Z' })
 })
 
 test('save_scene_final_prompt refuses a prompt without the scene time and saves one that cites it (case-insensitive)', () => {

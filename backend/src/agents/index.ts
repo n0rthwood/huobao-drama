@@ -16,10 +16,11 @@ import { scriptTools } from './tools/script-tools.js'
 import { extractTools } from './tools/extract-tools.js'
 import { storyboardTools } from './tools/storyboard-tools.js'
 import { imagePromptTools } from './tools/image-prompt-tools.js'
+import { researchTools } from './tools/research-tools.js'
 import { loadAgentSkills, skillWorkspaces } from './skills.js'
 import { loadAgentPromptFile, loadBasePromptFile } from './prompts.js'
 import { buildLanguageDirective } from './language.js'
-import { getContentLanguageFromRC } from './context.js'
+import { getContentLanguageFromRC, getGenreRuleset } from './context.js'
 import { TRANSITION_WRITER_PROMPT } from './default-prompts/transition-writer.js'
 import { transitionTools } from './tools/transition-tools.js'
 
@@ -418,7 +419,8 @@ async function getModel(fileModel: string | undefined, modelOverride?: string, t
 
 const AGENT_TOOLS: Record<string, Record<string, any>> = {
   script_rewriter: scriptTools,
-  extractor: extractTools,
+  // 提取 Agent 自带维基系检索（Issue #32，v1 只挂这一个 Agent）
+  extractor: { ...extractTools, ...researchTools },
   storyboard_breaker: storyboardTools,
   prompt_generator: {
     ...imagePromptTools,
@@ -437,7 +439,7 @@ function buildInstructions(type: string) {
     const lang = getContentLanguageFromRC(requestContext)
     const promptFile = await loadAgentPromptFile(type, lang)
     const baseInstructions = promptFile?.instructions || defaults.instructions
-    const skillInstructions = await loadAgentSkills(type, lang)
+    const skillInstructions = await loadAgentSkills(type, lang, { genreRuleset: getGenreRuleset(requestContext) })
     const languageDirective = buildLanguageDirective(lang)
     return [baseInstructions, skillInstructions, languageDirective]
       .filter(Boolean)
