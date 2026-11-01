@@ -40,10 +40,20 @@ function takeBudget(runId: string): boolean {
   return true
 }
 
+/**
+ * 调用纪律写在工具描述里（Issue #32 第 2 轮）：模型每一步都能看到工具描述，
+ * 而技能正文只在系统提示词里出现一次——把「怎么查」放这里，能在不增加
+ * 技能文本长度的前提下稳定约束检索次数（第 2 轮一集用掉 21 次调用）。
+ */
+const RESEARCH_PROTOCOL = `调用纪律：每个人物/地点/器物最多 wiki_search 1 次 + wiki_summary 1 次；`
+  + `只有确实需要服饰、仪仗、身份符号等可画细节时才追加 1 次 wiki_extract。`
+  + `剧本已写清楚的对象不要查。检索到或查无条目都立即停止对该对象的检索，不要换词重试。`
+  + `返回 degraded:true 时不要重试，改为只用剧本原文。`
+
 const subjectShape = {
   subject_kind: z.enum(ASSET_KINDS).optional().describe('本次检索服务于哪类资产（用于资料来源记录）'),
-  subject_name: z.string().optional().describe('本次检索服务于哪个资产的名字，必须与保存时的名字完全一致'),
-  lang: z.enum(WIKI_LANGS).optional().describe('维基百科语言版本，默认 zh'),
+  subject_name: z.string().optional().describe('本次检索服务于哪个资产的名字，必须与保存时的名字完全一致；不传则这条记录挂不到该资产的「资料来源」上'),
+  lang: z.enum(WIKI_LANGS).optional().describe('维基百科语言版本，默认 zh；俄方人物用 ru 命中率更高'),
 }
 
 type Subject = { subject_kind?: typeof ASSET_KINDS[number]; subject_name?: string }
@@ -87,7 +97,7 @@ async function degrade(info: RunInfo, subject: Subject, tool: string, query: str
 
 const wikiSearchTool = createTool({
   id: 'wiki_search',
-  description: '在维基百科检索条目，返回候选条目标题与摘要片段。只用于补全历史人物/地点/器物的事实，不得把链接或来源写进资产字段。',
+  description: '在维基百科检索条目，返回候选条目标题与摘要片段。只用于补全历史人物/地点/器物的事实，不得把链接或来源写进资产字段。' + RESEARCH_PROTOCOL,
   inputSchema: z.object({
     query: z.string().describe('检索词，例如「彼得一世」「涅尔琴斯克条约」'),
     ...subjectShape,
@@ -126,7 +136,7 @@ const wikiSearchTool = createTool({
 
 const wikiSummaryTool = createTool({
   id: 'wiki_summary',
-  description: '读取某个维基百科条目的摘要（首段）。先用 wiki_search 确认条目标题再调用。',
+  description: '读取某个维基百科条目的摘要（首段），取身份、年代与生平要点。先用 wiki_search 确认条目标题再调用。' + RESEARCH_PROTOCOL,
   inputSchema: z.object({
     title: z.string().describe('条目标题，必须来自 wiki_search 的结果'),
     ...subjectShape,
@@ -163,7 +173,7 @@ const wikiSummaryTool = createTool({
 
 const wikiExtractTool = createTool({
   id: 'wiki_extract',
-  description: '读取某个维基百科条目的正文（可指定小节，如「肖像」「服饰」「生平」）。用于取服饰/仪仗/身份符号等可画细节。',
+  description: '读取某个维基百科条目的正文（可指定小节，如「肖像」「服饰」「生平」）。只在需要服饰/仪仗/身份符号等可画细节时调用。' + RESEARCH_PROTOCOL,
   inputSchema: z.object({
     title: z.string().describe('条目标题，必须来自 wiki_search 的结果'),
     section: z.string().optional().describe('只取该小节（按标题匹配）；不传则返回全文开头部分'),

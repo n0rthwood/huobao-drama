@@ -188,10 +188,10 @@ const saveDedupCharacters = createTool({
   inputSchema: z.object({
     characters: z.array(z.object({
       name: z.string().describe('角色名，与剧本原文一致'),
-      role: z.string().optional().describe('短身份标签（如「沙皇 · 谕令签发者」），不写长句'),
+      role: z.string().optional().describe('短身份标签（如「沙皇 · 谕令签发者」），不写长句、不写生平'),
       description: z.string().optional().describe('身份、地位、所属势力、年代、在本集中的叙事作用；只有提示词 Agent 读得到'),
-      appearance: z.string().optional().describe('静态可见的外貌特征（脸型、发型、髭形、身材、年龄感）；全链路都会读，进生图提示词'),
-      styling: z.string().optional().describe('常规服装/配饰/可持有的身份符号（冠冕、绶带、胸甲、朝服、仪仗、持物）；全链路都会读，进生图提示词'),
+      appearance: z.string().optional().describe('静态可见的外貌特征（脸型、发型、髭形、身材、年龄感）；全链路都会读，进生图提示词。不写情绪、动作、环境、背景'),
+      styling: z.string().optional().describe('常规服装/配饰/可持有的身份符号（冠冕、绶带、胸甲、朝服、仪仗、持物），逐项写死款式与颜色；全链路都会读，进生图提示词。不写环境与背景。以上任何字段都不得出现 URL、域名、「据维基百科」「资料来源」等来源标注'),
       // 本集成套造型（Issue #15 Q1=B）：写进集关联，绝不覆盖基础形象的 styling
       styling_version: z.object({
         name: z.string(),
