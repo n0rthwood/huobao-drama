@@ -23,8 +23,11 @@ const out = kind === 'plan'
 process.stdout.write(JSON.stringify(out))
 `)
 
+// 直接用本地 tsx 二进制：npx 每次调用都要解析一次包，整套测试并发跑时会互相拖慢甚至超时
+const tsxBin = join(backendRoot, 'node_modules', '.bin', 'tsx')
+
 function run(kind, payload) {
-  const out = execFileSync('npx', ['tsx', entry], {
+  const out = execFileSync(tsxBin, [entry], {
     cwd: backendRoot,
     encoding: 'utf8',
     env: { ...process.env, TRANSITION_INPUT: JSON.stringify([kind, payload]) },

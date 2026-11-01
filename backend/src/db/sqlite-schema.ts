@@ -42,6 +42,9 @@ export const sqliteSchemaStatements = [
     tts_config_id INTEGER,
     narration_enabled INTEGER NOT NULL DEFAULT 0,
     subtitle_timing TEXT NOT NULL DEFAULT 'sentence',
+    audio_mix_mode TEXT NOT NULL DEFAULT 'replace',
+    audio_bed_gain_db REAL,
+    narration_fit_default TEXT,
     resolution TEXT DEFAULT '720p',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
@@ -126,6 +129,7 @@ export const sqliteSchemaStatements = [
     narration_audio_url TEXT,
     narration_meta TEXT,
     subtitle_timing TEXT,
+    narration_fit TEXT,
     video_url TEXT,
     subtitle_url TEXT,
     composed_video_url TEXT,
@@ -399,6 +403,11 @@ const columnAdditions: { table: string; column: string; type: string }[] = [
   // 字幕时间码模式（#30 Q10）：剧集级默认 sentence，分镜级 NULL = 继承
   { table: 'episodes', column: 'subtitle_timing', type: "TEXT NOT NULL DEFAULT 'sentence'" },
   { table: 'storyboards', column: 'subtitle_timing', type: 'TEXT' },
+  // 旁白与画面的时长/音轨匹配（#31）：存量行默认 = 替代 + 尾部留白，与 #30 的默认行为等价
+  { table: 'episodes', column: 'audio_mix_mode', type: "TEXT NOT NULL DEFAULT 'replace'" },
+  { table: 'episodes', column: 'audio_bed_gain_db', type: 'REAL' },
+  { table: 'episodes', column: 'narration_fit_default', type: 'TEXT' },
+  { table: 'storyboards', column: 'narration_fit', type: 'TEXT' },
 ]
 
 /**
