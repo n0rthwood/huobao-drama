@@ -118,15 +118,31 @@ export async function saveNarrationFit(
 ): Promise<NarrationFitPreview> {
   const { sb, ep, dv, da, t } = await measure(storyboardId)
 
-  const record: NarrationFitRecord = {
-    mode: body.mode === 'tempo' ? 'tempo' : 'pad',
+  // 枚举值一律显式校验：静默回落会让前端/脚本的拼写错误变成「保存成功但行为不同」
+  if (body.mode !== 'pad' && body.mode !== 'tempo') {
+    throw new Error('mode 只支持 pad / tempo')
   }
-  if (body.pad_ms !== undefined && body.pad_ms !== null) record.pad_ms = Number(body.pad_ms)
-  if (body.pad_position === 'head' || body.pad_position === 'tail') record.pad_position = body.pad_position
+  const record: NarrationFitRecord = { mode: body.mode }
+  if (body.pad_ms !== undefined && body.pad_ms !== null) {
+    const padMs = Number(body.pad_ms)
+    if (!Number.isFinite(padMs)) throw new Error('pad_ms 必须是数字（毫秒）')
+    record.pad_ms = padMs
+  }
+  if (body.pad_position !== undefined && body.pad_position !== null) {
+    if (body.pad_position !== 'head' && body.pad_position !== 'tail') {
+      throw new Error('pad_position 只支持 head / tail')
+    }
+    record.pad_position = body.pad_position
+  }
   if (body.tempo_override !== undefined && body.tempo_override !== null && body.tempo_override !== '') {
-    record.tempo_override = Number(body.tempo_override)
+    const tempo = Number(body.tempo_override)
+    if (!Number.isFinite(tempo)) throw new Error('tempo_override 必须是数字')
+    record.tempo_override = tempo
   }
-  if (body.audio_mix_mode === 'mix' || body.audio_mix_mode === 'replace') {
+  if (body.audio_mix_mode !== undefined && body.audio_mix_mode !== null) {
+    if (body.audio_mix_mode !== 'mix' && body.audio_mix_mode !== 'replace') {
+      throw new Error('audio_mix_mode 只支持 replace / mix')
+    }
     record.audio_mix_mode = body.audio_mix_mode
   }
 
@@ -151,5 +167,15 @@ export async function saveNarrationFit(
     .set({ narrationFit: JSON.stringify(record), updatedAt: now() })
     .where(eq(schema.storyboards.id, storyboardId))
 
+  return previewNarrationFit(storyboardId)
+}
+
+/** 清除本镜的匹配参数覆盖，回到继承剧集默认 */
+export async function clearNarrationFit(storyboardId: number): Promise<NarrationFitPreview> {
+  const [sb] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, storyboardId))
+  if (!sb) throw new Error('镜头不存在')
+  await db.update(schema.storyboards)
+    .set({ narrationFit: null, updatedAt: now() })
+    .where(eq(schema.storyboards.id, storyboardId))
   return previewNarrationFit(storyboardId)
 }

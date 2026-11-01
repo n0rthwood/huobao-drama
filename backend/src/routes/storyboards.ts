@@ -26,7 +26,7 @@ import {
 import { runTransitionReview } from '../services/transition-agent.js'
 import { generateShotVoice, regenerateShotSubtitle } from '../services/narration-voice.js'
 import { ComposeBlockedError, composeShot } from '../services/shot-compose.js'
-import { previewNarrationFit, saveNarrationFit } from '../services/narration-fit-service.js'
+import { clearNarrationFit, previewNarrationFit, saveNarrationFit } from '../services/narration-fit-service.js'
 import { serializeTask } from '../services/sys-task.js'
 import {
   SLOT_LABEL,
@@ -531,6 +531,16 @@ app.put('/:id/narration-fit', async (c) => {
       }, 400)
     }
     return badRequest(c, message)
+  }
+})
+
+// DELETE /storyboards/:id/narration-fit — 清除本镜覆盖，回到继承剧集默认
+app.delete('/:id/narration-fit', async (c) => {
+  const id = Number(c.req.param('id'))
+  try {
+    return success(c, await clearNarrationFit(id))
+  } catch (err) {
+    return badRequest(c, err instanceof Error ? err.message : '清除匹配参数失败')
   }
 })
 
