@@ -58,6 +58,52 @@
             :options="subtitleTimingOptions"
             hide-default
           />
+          <!-- 旁白音轨与默认时长匹配（#31）：集级默认，镜级可覆盖 -->
+          <ModelSelect
+            v-if="narrationEnabledOf"
+            v-model="episodeAudioMixMode"
+            :label="t('episode.fit.episodeMixLabel')"
+            :options="audioMixModeOptions"
+            hide-default
+          />
+          <label v-if="narrationEnabledOf && episodeAudioMixMode === 'mix'" class="studio-num">
+            {{ t('episode.fit.episodeBedGain') }}
+            <input
+              class="input studio-num-input"
+              type="number"
+              max="0"
+              step="1"
+              :value="episodeBedGainDb"
+              @change="episodeBedGainDb = $event.target.value"
+            />
+          </label>
+          <ModelSelect
+            v-if="narrationEnabledOf"
+            v-model="episodeFitMode"
+            :label="t('episode.fit.episodeFitLabel')"
+            :options="fitModeOptions"
+            hide-default
+          />
+          <template v-if="narrationEnabledOf && episodeFitMode === 'pad'">
+            <label class="studio-num">
+              {{ t('episode.fit.episodeFitPad') }}
+              <input
+                class="input studio-num-input"
+                type="number"
+                min="0"
+                :max="MAX_PAD_SECONDS"
+                step="0.1"
+                :value="episodeFitPadSeconds"
+                @change="episodeFitPadSeconds = $event.target.value"
+              />
+            </label>
+            <ModelSelect
+              v-model="episodeFitPadPosition"
+              :label="t('episode.fit.episodeFitPosition')"
+              :options="fitPositionOptions"
+              hide-default
+            />
+          </template>
         </div>
         <div class="studio-actions">
           <LocaleSwitcher />
@@ -627,6 +673,8 @@
             :field-save="fieldSaveInfo"
             :narration-enabled="narrationEnabledOf"
             :episode-timing="episodeSubtitleTiming"
+            :episode-mix-mode="episodeAudioMixMode"
+            :episode-fit-default="episodeFitDefault"
             :narration-batch="narrationBatch"
             :narration-voice-batch="narrationVoiceBatch"
             @break="doBreakdown"
@@ -1014,6 +1062,8 @@
                         :storyboard="selectedSb"
                         :field-save="fieldSaveInfo(selectedSb, 'narration_text')"
                         :episode-timing="episodeSubtitleTiming"
+                        :episode-mix-mode="episodeAudioMixMode"
+                        :episode-fit-default="episodeFitDefault"
                         show-compose
                         @update-field="updateField"
                         @field-dirty="markFieldDirty"
@@ -3703,6 +3753,100 @@ async function changeEpisodeSubtitleTiming(val) {
   }
 }
 
+// ===== 旁白音轨与时长匹配（#31）：集级音轨模式 / 底音增益 / 默认匹配 =====
+const MAX_PAD_SECONDS = 3
+const DEFAULT_BED_GAIN_DB = -18
+const audioMixModeOptions = computed(() => [
+  { key: 'replace', model: t('episode.fit.mixReplace') },
+  { key: 'mix', model: t('episode.fit.mixMix') },
+])
+const fitModeOptions = computed(() => [
+  { key: 'pad', model: t('episode.fit.modePad') },
+  { key: 'tempo', model: t('episode.fit.modeTempo') },
+])
+const fitPositionOptions = computed(() => [
+  { key: 'tail', model: t('episode.fit.padTail') },
+  { key: 'head', model: t('episode.fit.padHead') },
+])
+
+/** 乐观写集级字段：失败回滚并提示 */
+async function updateEpisodeFields(patch, prevPatch) {
+  if (!episode.value) return
+  Object.assign(episode.value, patch)
+  try {
+    await episodeAPI.update(epId.value, patch)
+  } catch (e) {
+    Object.assign(episode.value, prevPatch)
+    toastError(e)
+  }
+}
+
+const episodeAudioMixMode = computed({
+  get: () => ((episode.value?.audio_mix_mode ?? episode.value?.audioMixMode) === 'mix' ? 'mix' : 'replace'),
+  set: (val) => {
+    if (val === episodeAudioMixMode.value) return
+    const prev = episode.value?.audio_mix_mode
+    void updateEpisodeFields({ audio_mix_mode: val, audioMixMode: val }, { audio_mix_mode: prev, audioMixMode: prev })
+  },
+})
+
+const episodeBedGainDb = computed({
+  get: () => {
+    const v = Number(episode.value?.audio_bed_gain_db ?? episode.value?.audioBedGainDb)
+    return Number.isFinite(v) && v !== 0 ? v : DEFAULT_BED_GAIN_DB
+  },
+  set: (raw) => {
+    const val = Math.min(Number(raw) || 0, 0)
+    if (val === episodeBedGainDb.value) return
+    const prev = episode.value?.audio_bed_gain_db
+    void updateEpisodeFields(
+      { audio_bed_gain_db: val, audioBedGainDb: val },
+      { audio_bed_gain_db: prev, audioBedGainDb: prev },
+    )
+  },
+})
+
+/** 集级默认匹配：库里存 JSON 字符串，前端按对象读写 */
+const episodeFitDefault = computed(() => {
+  const raw = episode.value?.narration_fit_default ?? episode.value?.narrationFitDefault
+  if (!raw) return { mode: 'pad', pad_ms: 800, pad_position: 'tail' }
+  if (typeof raw === 'object') return raw
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return { mode: 'pad', pad_ms: 800, pad_position: 'tail' }
+  }
+})
+async function saveEpisodeFitDefault(next) {
+  const prev = episode.value?.narration_fit_default
+  const json = JSON.stringify(next)
+  await updateEpisodeFields(
+    { narration_fit_default: json, narrationFitDefault: json },
+    { narration_fit_default: prev, narrationFitDefault: prev },
+  )
+}
+const episodeFitMode = computed({
+  get: () => (episodeFitDefault.value.mode === 'tempo' ? 'tempo' : 'pad'),
+  set: (val) => {
+    if (val === episodeFitMode.value) return
+    void saveEpisodeFitDefault({ ...episodeFitDefault.value, mode: val })
+  },
+})
+const episodeFitPadSeconds = computed({
+  get: () => ((Number(episodeFitDefault.value.pad_ms) || 0) / 1000).toFixed(1),
+  set: (raw) => {
+    const sec = Math.min(Math.max(Number(raw) || 0, 0), MAX_PAD_SECONDS)
+    void saveEpisodeFitDefault({ ...episodeFitDefault.value, mode: 'pad', pad_ms: Math.round(sec * 1000) })
+  },
+})
+const episodeFitPadPosition = computed({
+  get: () => (episodeFitDefault.value.pad_position === 'head' ? 'head' : 'tail'),
+  set: (val) => {
+    if (val === episodeFitPadPosition.value) return
+    void saveEpisodeFitDefault({ ...episodeFitDefault.value, mode: 'pad', pad_position: val })
+  },
+})
+
 // 切换剧集时间码后重出全部已配音镜头的字幕（不重跑 TTS）
 const subtitleRegenConfirm = ref(false)
 const subtitleRegenRunning = ref(false)
@@ -4708,6 +4852,21 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
   /* 空间不足时由右侧模型选择区收缩，任务按钮所在的 .studio-actions 不收缩 */
   flex-shrink: 1;
   min-width: 0;
+}
+
+/* 顶栏内联数字输入（#31 底音增益 / 默认留白） */
+.studio-num {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+.studio-num-input {
+  width: 60px;
+  height: 26px;
+  font-size: 10.5px;
 }
 
 .studio-actions {

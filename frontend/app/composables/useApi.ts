@@ -2,6 +2,12 @@ import type { TaskRow, CenterRow } from '~/composables/useTasks'
 
 // 子路径部署：'/api/v1' 或 '/huobao/api/v1'（见 utils/url.ts）
 
+/** 非 2xx 时抛出的错误：除 message 外保留原始响应体，供结构化错误（#31 阻断原因）渲染 */
+export interface ApiError extends Error {
+  status?: number
+  body?: Record<string, unknown>
+}
+
 async function req<T = any>(method: string, path: string, body?: any): Promise<T> {
   const opts: RequestInit = { method, headers: { 'Content-Type': 'application/json' } }
   if (body) opts.body = JSON.stringify(body)
@@ -16,7 +22,11 @@ async function req<T = any>(method: string, path: string, body?: any): Promise<T
 
     if (!resp.ok || (json.code && json.code >= 400)) {
       console.log(`%c[API] %c${method} ${path} %c${resp.status} %c${ms}ms`, 'color:#888', 'color:#ef5350', 'color:#ef5350;font-weight:bold', 'color:#888', json.message || '')
-      throw new Error(json.message || `${resp.status}`)
+      // 结构化错误体（如 #31 的 block_reason / gap_ratio）挂在 err.body 上，调用方可按字段渲染
+      const apiErr: ApiError = new Error(json.message || `${resp.status}`)
+      apiErr.status = resp.status
+      apiErr.body = json
+      throw apiErr
     }
 
     console.log(`%c[API] %c${method} ${path} %c${resp.status} %c${ms}ms`, 'color:#888', 'color:#66bb6a', 'color:#66bb6a;font-weight:bold', 'color:#888')
@@ -169,6 +179,51 @@ export interface ComposePlan {
   tail_pad?: number
 }
 
+/** 匹配预览里的合成计划（#31，后端 narration-fit.ts 的 ComposePlan，单位秒） */
+export interface NarrationFitPlan {
+  dv: number
+  da: number
+  daScaled: number
+  t: number
+  d: number
+  narrationStart: number
+  freezeSeconds: number
+  trim: boolean
+  availSeconds: number
+  /** 正 = 旁白偏长，负 = 旁白偏短 */
+  gapRatio: number
+  blocked: boolean
+  blockReason: 'narration_too_long' | 'narration_gap_too_large' | null
+}
+
+/** 本镜旁白/画面匹配参数的生效值（#31），三个 narration-fit 接口共用的返回体 */
+export interface NarrationFitPreview {
+  storyboard_id: number
+  mode: 'pad' | 'tempo'
+  pad_ms: number
+  pad_position: 'head' | 'tail'
+  tempo: number
+  /** null = 未手调，合成时按实测时长现算 */
+  tempo_override: number | null
+  audio_mix_mode: 'replace' | 'mix'
+  bed_gain_db: number
+  /** true = 本镜没有自己的覆盖，继承剧集默认 */
+  inherited: boolean
+  plan: NarrationFitPlan
+  suggested_chars: number
+  tempo_available: boolean
+  limits: { min_tempo: number; max_tempo: number; max_pad_seconds: number }
+}
+
+/** PUT /narration-fit 的请求体；省略的键表示不改动（audio_mix_mode 省略 = 继承剧集） */
+export interface NarrationFitBody {
+  mode: 'pad' | 'tempo'
+  pad_ms?: number
+  pad_position?: 'head' | 'tail'
+  tempo_override?: number | null
+  audio_mix_mode?: 'replace' | 'mix'
+}
+
 export const storyboardAPI = {
   create: (data: any) => api.post('/storyboards', data),
   update: (id: number, data: any) => api.put(`/storyboards/${id}`, data),
@@ -204,6 +259,13 @@ export const storyboardAPI = {
   regenerateSubtitle: (id: number) => api.post(`/storyboards/${id}/narration/subtitle`, {}),
   compose: (id: number) =>
     api.post<{ composed_video_url: string; duration_ms: number; plan: ComposePlan; burned: boolean }>(`/storyboards/${id}/compose`, {}),
+  // 旁白/画面时长与音轨匹配（#31）：预览是纯计算（不跑 ffmpeg），保存越界时抛带 body 的 400
+  narrationFitPreview: (id: number) =>
+    api.get<NarrationFitPreview>(`/storyboards/${id}/narration-fit/preview`),
+  saveNarrationFit: (id: number, body: NarrationFitBody) =>
+    api.put<NarrationFitPreview>(`/storyboards/${id}/narration-fit`, body),
+  clearNarrationFit: (id: number) =>
+    api.del<NarrationFitPreview>(`/storyboards/${id}/narration-fit`),
 }
 
 /**

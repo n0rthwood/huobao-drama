@@ -6,6 +6,7 @@ const appRoot = new URL('../app/', import.meta.url)
 const readApp = (path) => readFileSync(new URL(path, appRoot), 'utf8')
 
 const narrationBlock = readApp('components/NarrationBlock.vue')
+const fitPanel = readApp('components/NarrationFitPanel.vue')
 const breakdownDialog = readApp('components/BreakdownNarrationDialog.vue')
 const keyframes = readApp('components/StoryboardKeyframes.vue')
 const episodeView = readApp('views/drama/episode.vue')
@@ -106,6 +107,62 @@ test('all four locales carry identical narration key sets', () => {
     assert.deepEqual([...sets[i]].sort(), [...base].sort(), `${LOCALES[i]} key set differs from zh`)
   }
   for (const key of ['episode.narration.section', 'episode.compose.section', 'episode.breakdown.title', 'common.serviceType.tts', 'settings.ai.meta.tts']) {
+    assert.ok(base.has(key), `missing ${key}`)
+  }
+})
+
+test('narration fit panel drives the #31 duration and audio-track match', () => {
+  // 试听必须是纯前端变速（零请求）
+  assert.match(fitPanel, /playbackRate/)
+  assert.match(fitPanel, /preservesPitch/)
+  assert.match(fitPanel, /mediaUrl\(audioUrl\.value\)/)
+  // 两种匹配方式 + 留白位置 + 高级倍率 + 恢复自动
+  assert.match(fitPanel, /episode\.fit\.modePad/)
+  assert.match(fitPanel, /episode\.fit\.modeTempo/)
+  assert.match(fitPanel, /episode\.fit\.padHead/)
+  assert.match(fitPanel, /episode\.fit\.padTail/)
+  assert.match(fitPanel, /tempo_override/)
+  assert.match(fitPanel, /episode\.fit\.tempoAuto/)
+  assert.match(fitPanel, /tempo_available/)
+  // 继承与恢复继承
+  assert.match(fitPanel, /clearNarrationFit/)
+  assert.match(fitPanel, /episode\.fit\.inherited/)
+  // 阻断按 block_reason 渲染，不解析中文 message
+  assert.match(fitPanel, /episode\.fit\.blocked\.\$\{reason\}/)
+  assert.match(fitPanel, /body\?\.block_reason/)
+})
+
+test('narration block mounts the fit panel next to the voice audio', () => {
+  assert.match(narrationBlock, /import NarrationFitPanel from '~\/components\/NarrationFitPanel\.vue'/)
+  assert.match(narrationBlock, /<NarrationFitPanel/)
+  assert.match(narrationBlock, /:episode-fit-default="episodeFitDefault"/)
+  assert.match(narrationBlock, /:episode-mix-mode="episodeMixMode"/)
+})
+
+test('episode topbar carries the episode-level audio mix and default fit', () => {
+  assert.match(episodeView, /episodeAudioMixMode/)
+  assert.match(episodeView, /audio_bed_gain_db/)
+  assert.match(episodeView, /narration_fit_default/)
+  assert.match(episodeView, /episode\.fit\.episodeMixLabel/)
+})
+
+test('api client exposes the three narration-fit endpoints', () => {
+  assert.match(useApi, /narrationFitPreview/)
+  assert.match(useApi, /saveNarrationFit/)
+  assert.match(useApi, /clearNarrationFit/)
+  assert.match(useApi, /storyboards\/\$\{id\}\/narration-fit\/preview/)
+  // 结构化 400 体必须保留给调用方
+  assert.match(useApi, /apiErr\.body = json/)
+})
+
+test('all four locales carry identical episode.fit key sets', () => {
+  const sets = LOCALES.map(lang => new Set([...keyPaths(localeJson(lang))].filter(k => k.startsWith('episode.fit.'))))
+  const [base] = sets
+  assert.ok(base.size > 0, 'episode.fit is missing from zh')
+  for (let i = 1; i < sets.length; i++) {
+    assert.deepEqual([...sets[i]].sort(), [...base].sort(), `${LOCALES[i]} episode.fit key set differs from zh`)
+  }
+  for (const key of ['episode.fit.section', 'episode.fit.blocked.narration_gap_too_large', 'episode.fit.blocked.narration_too_long']) {
     assert.ok(base.has(key), `missing ${key}`)
   }
 })

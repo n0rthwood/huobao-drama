@@ -221,6 +221,8 @@
               :storyboard="selected"
               :field-save="fieldSaveOf('narration_text')"
               :episode-timing="episodeTiming"
+              :episode-mix-mode="episodeMixMode"
+              :episode-fit-default="episodeFitDefault"
               @update-field="(sb, field, value) => emit('update-field', sb, field, value)"
               @field-dirty="(sb, field, value) => emit('field-dirty', sb, field, value)"
               @refresh="emit('refresh')"
@@ -578,6 +580,9 @@ const props = defineProps({
   // 旁白（#30）：剧集级开关与字幕时间码，以及两个集级批量任务的进度
   narrationEnabled: { type: Boolean, default: false },
   episodeTiming: { type: String, default: 'sentence' },
+  // 旁白音轨与默认时长匹配（#31）：透传给每镜匹配面板做「继承」展示
+  episodeMixMode: { type: String, default: 'replace' },
+  episodeFitDefault: { type: Object, default: null },
   narrationBatch: { type: Object, default: () => ({ running: false, total: 0, completed: 0 }) },
   narrationVoiceBatch: { type: Object, default: () => ({ running: false, total: 0, completed: 0 }) },
 })
