@@ -146,6 +146,67 @@ export const assetLibraryAPI = {
     api.post(`/dramas/${dramaId}/assets/import`, data),
 }
 
+/** 资产批量生成（#33）：角色 / 场景 / 道具 / 全部资产四个入口共用一个端点，只是 scope 不同 */
+export type AssetBatchScope = 'characters' | 'scenes' | 'props' | 'all'
+
+export interface AssetBatchParams {
+  scope: AssetBatchScope
+  episode_id: number
+  rewrite_prompts: boolean
+  overwrite_images: boolean
+  model?: string
+  config_id?: number
+  text_model?: string
+  text_config_id?: number
+}
+
+export interface AssetBatchPreview {
+  total: number
+  will_generate: { missing_prompt: number; reuse_prompt: number; rewrite_prompt: number }
+  skipped: { has_image: number; running: number; faithful: number }
+  running: AssetBatchStatus | null
+}
+
+export interface AssetBatchItem {
+  kind: AssetKindName
+  asset_id: number
+  name: string
+  selection: string
+  state: string
+  prompt_outcome: string | null
+  task_id: number | null
+  error: string | null
+}
+
+export interface AssetBatchStatus {
+  id: number
+  drama_id: number
+  episode_id: number | null
+  scope: AssetBatchScope
+  status: 'running' | 'completed' | 'failed' | 'cancelled'
+  cancel_requested: boolean
+  options: { rewrite_prompts: boolean; overwrite_images: boolean }
+  counts: {
+    total: number
+    skipped: { has_image: number; running: number; faithful: number }
+    prompt: { done: number; failed: number; reused: number; regenerated: number; unchanged_after_rewrite: number }
+    image: { submitted: number; done: number; failed: number }
+  }
+  items: AssetBatchItem[]
+  created_at: string
+  updated_at: string
+  error: string | null
+}
+
+export const assetBatchAPI = {
+  preview: (dramaId: number, data: AssetBatchParams) =>
+    api.post<AssetBatchPreview>(`/dramas/${dramaId}/assets/batch-generate/preview`, data),
+  start: (dramaId: number, data: AssetBatchParams) =>
+    api.post<AssetBatchStatus>(`/dramas/${dramaId}/assets/batch-generate`, data),
+  status: (dramaId: number) => api.get<AssetBatchStatus | null>(`/dramas/${dramaId}/assets/batch-generate`),
+  cancel: (dramaId: number) => api.post<AssetBatchStatus>(`/dramas/${dramaId}/assets/batch-generate/cancel`),
+}
+
 export const storyboardAPI = {
   create: (data: any) => api.post('/storyboards', data),
   update: (id: number, data: any) => api.put(`/storyboards/${id}`, data),
@@ -230,7 +291,6 @@ export const characterAPI = {
   generatePrompt: (id: number, episodeId: number, force = false, textModel?: string, textConfigId?: number) => api.post(`/characters/${id}/generate-prompt`, { episode_id: episodeId, force, text_model: textModel || undefined, text_config_id: textConfigId || undefined }),
   // referenceImages 省略 → 服务端用该资产已保存的参考图；传 [] → 明确不用参考图
   generateImage: (id: number, episodeId: number, model?: string, configId?: number, textModel?: string, textConfigId?: number, referenceImages?: string[]) => api.post(`/characters/${id}/generate-image`, { episode_id: episodeId, model: model || undefined, config_id: configId || undefined, text_model: textModel || undefined, text_config_id: textConfigId || undefined, reference_images: referenceImages }),
-  batchImages: (ids: number[], episodeId: number, model?: string, configId?: number, textModel?: string, textConfigId?: number) => api.post('/characters/batch-generate-images', { character_ids: ids, episode_id: episodeId, model: model || undefined, config_id: configId || undefined, text_model: textModel || undefined, text_config_id: textConfigId || undefined }),
   // 本集造型版本（Issue #15）：文字保存与以基础形象图换装出图
   saveStylingVersion: (id: number, episodeId: number, name: string, description?: string) => api.put(`/characters/${id}/styling-version`, { episode_id: episodeId, name, description }),
   generateStylingVersionImage: (id: number, episodeId: number, model?: string, configId?: number) => api.post(`/characters/${id}/styling-version/generate-image`, { episode_id: episodeId, model: model || undefined, config_id: configId || undefined }),

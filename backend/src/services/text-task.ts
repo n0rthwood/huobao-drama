@@ -21,10 +21,13 @@ export type TextTaskKind =
   | 'video_prompts'
   | 'script_rewrite'
   | 'storyboard_breaker'
+  /** 资产批量生成的父任务（Issue #33）：详细进度在 params.asset_batch */
+  | 'asset_batch'
 
 export const TEXT_TASK_KINDS: TextTaskKind[] = [
   'extract_characters', 'extract_scenes', 'extract_props',
   'keyframe_prompts', 'video_prompts', 'script_rewrite', 'storyboard_breaker',
+  'asset_batch',
 ]
 
 export interface TextTaskProgress {
@@ -109,7 +112,7 @@ export async function createTextTask(input: {
 }
 
 /** 合并写 params（保留 kind/storyboardIds 等其它键） */
-async function patchTextTaskParams(id: number, patch: Partial<TextTaskParams>): Promise<void> {
+export async function patchTextTaskParams(id: number, patch: Partial<TextTaskParams>): Promise<void> {
   const [row] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, id))
   if (!row) return
   const merged = { ...(parseTextTaskParams(row.params) || {}), ...patch }

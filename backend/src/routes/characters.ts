@@ -5,7 +5,7 @@ import { success, created, badRequest, now } from '../utils/response.js'
 import { toSnakeCase } from '../utils/transform.js'
 import { generateImage } from '../services/generation.js'
 import { getDramaStylePrompt } from '../services/style-preset.js'
-import { ensureCharacterFinalPrompt } from '../services/final-prompt.js'
+import { ensureCharacterFinalPrompt, savedPromptOf } from '../services/final-prompt.js'
 import { logTaskError, logTaskStart, logTaskSuccess, logTaskWarn } from '../utils/task-logger.js'
 import { deleteAllReferenceImages, partitionMissingReferences, resolveReferenceImages } from '../services/reference-images.js'
 import { deleteAssetLinks } from '../services/asset-links.js'
@@ -107,7 +107,7 @@ app.post('/:id/generate-image', async (c) => {
   if (!ep) return badRequest(c, '剧集不存在')
 
   const stylePrompt = await getDramaStylePrompt(char.dramaId)
-  const finalPrompt = await ensureCharacterFinalPrompt(char, ep.id, false, { model: body.text_model, configId: body.text_config_id ?? undefined })
+  const finalPrompt = savedPromptOf(await ensureCharacterFinalPrompt(char, ep.id, false, { model: body.text_model, configId: body.text_config_id ?? undefined }))
   const prompt = finalPrompt || characterImagePrompt(char, stylePrompt)
   // 默认用角色自己保存的参考图；请求显式传 reference_images（含空数组）时以请求为准
   const resolved = resolveReferenceImages(char.referenceImages, body.reference_images)
@@ -136,7 +136,7 @@ app.post('/:id/generate-prompt', async (c) => {
   if (!ep) return badRequest(c, '剧集不存在')
 
   logTaskStart('FinalPrompt', 'character-generate', { characterId: id, episodeId: ep.id, force: !!body.force })
-  const finalPrompt = await ensureCharacterFinalPrompt(char, ep.id, !!body.force, { model: body.text_model, configId: body.text_config_id ?? undefined })
+  const finalPrompt = savedPromptOf(await ensureCharacterFinalPrompt(char, ep.id, !!body.force, { model: body.text_model, configId: body.text_config_id ?? undefined }))
   if (!finalPrompt) {
     logTaskError('FinalPrompt', 'character-generate', { characterId: id, error: 'agent returned empty prompt' })
     return badRequest(c, '最终提示词生成失败，请重试')
@@ -212,33 +212,6 @@ app.post('/:id/styling-version/generate-image', async (c) => {
     logTaskError('CharacterImage', 'styling-version', { characterId: id, error: message })
     return badRequest(c, message)
   }
-})
-
-// POST /characters/batch-generate-images
-app.post('/batch-generate-images', async (c) => {
-  const body = await c.req.json()
-  const ids: number[] = body.character_ids || []
-  if (!body.episode_id) return badRequest(c, 'episode_id 必填')
-  // 批量不接受统一参考图：一套参考图套到所有角色是误用，各角色用自己保存的参考图
-  if (body.reference_images !== undefined) return badRequest(c, '批量生成不支持统一参考图，请在角色卡片上分别管理参考图')
-  const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, Number(body.episode_id)))
-  if (!ep) return badRequest(c, '剧集不存在')
-  const results: number[] = []
-  const stylePrompt = await getDramaStylePrompt(ep.dramaId)
-  for (const cid of ids) {
-    const [char] = await db.select().from(schema.characters).where(eq(schema.characters.id, cid))
-    if (!char) continue
-    const finalPrompt = await ensureCharacterFinalPrompt(char, ep.id, false, { model: body.text_model, configId: body.text_config_id ?? undefined })
-    const prompt = finalPrompt || characterImagePrompt(char, stylePrompt)
-    const { present: referenceImages, missing } = partitionMissingReferences(resolveReferenceImages(char.referenceImages))
-    if (missing.length) logTaskWarn('CharacterImage', 'reference-missing', { characterId: cid, missing })
-    try {
-      const genId = await generateImage({ characterId: cid, episodeId: ep.id, dramaId: char.dramaId, prompt, model: body.model, size: CHARACTER_IMAGE_SIZE, referenceImages: referenceImages.length ? referenceImages : undefined, configId: body.config_id ?? ep.imageConfigId ?? undefined })
-      results.push(genId)
-    } catch {}
-  }
-  logTaskSuccess('CharacterImage', 'batch-generate', { episodeId: ep.id, requested: ids.length, started: results.length })
-  return success(c, { count: results.length, ids: results })
 })
 
 export default app

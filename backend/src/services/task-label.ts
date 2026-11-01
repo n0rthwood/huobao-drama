@@ -24,6 +24,7 @@ const TEXT_KIND_LABEL: Record<TextTaskKind, string> = {
   video_prompts: '视频提示词',
   script_rewrite: '剧本改写',
   storyboard_breaker: '拆分分镜',
+  asset_batch: '资产批量',
 }
 
 const ASSET_KIND_LABEL: Record<string, string> = {
