@@ -33,6 +33,17 @@ import {
   loadImageVersions,
   unlinkAssetFromEpisode,
 } from '../services/asset-library.js'
+import {
+  DEFAULT_SUBTITLE_TIMING,
+  estimateNarrationSeconds,
+  narrationCharCount,
+  narrationIssues,
+  narrationStatus,
+  parseNarrationMeta,
+} from '../services/narration.js'
+import { getNarrationScriptStatus, startNarrationScript } from '../services/narration-script.js'
+import { getVoiceBatchStatus, resolveSubtitleTiming, startVoiceBatch } from '../services/narration-voice.js'
+import { getComposeBatchStatus, startComposeBatch } from '../services/shot-compose.js'
 import type { AssetKind } from '../services/reference-images.js'
 
 const app = new Hono()
@@ -77,6 +88,9 @@ app.post('/', async (c) => {
     title: body.title || `第${nextNum}集`,
     imageConfigId,
     videoConfigId,
+    // 语音合成配置：没有启用的 TTS 配置时留空，不挡住未用旁白功能的用户建集
+    ttsConfigId: body.tts_config_id ?? await getActiveConfigId('tts'),
+    subtitleTiming: DEFAULT_SUBTITLE_TIMING,
     // 视频分辨率在创建集时固定（480p/720p/1080p），后续可通过 PUT 修改；各视频适配器再映射为厂商档位
     resolution: ['480p', '720p', '1080p'].includes(body.resolution) ? body.resolution : '720p',
     createdAt: ts,
@@ -100,7 +114,10 @@ app.put('/:id', async (c) => {
   const id = Number(c.req.param('id'))
   const body = await c.req.json()
 
-  const allowed = ['content', 'script_content', 'title', 'description', 'status', 'resolution']
+  const allowed = [
+    'content', 'script_content', 'title', 'description', 'status', 'resolution',
+    'narration_enabled', 'tts_config_id', 'subtitle_timing',
+  ]
   const updates: Record<string, any> = {}
   for (const key of allowed) {
     if (key in body) updates[key] = body[key]
@@ -108,6 +125,9 @@ app.put('/:id', async (c) => {
   if (Object.keys(updates).length === 0) return badRequest(c, '没有可更新的字段')
   if ('resolution' in updates && !['480p', '720p', '1080p'].includes(updates.resolution)) {
     return badRequest(c, 'resolution 只支持 480p / 720p / 1080p')
+  }
+  if ('subtitle_timing' in updates && !['sentence', 'char'].includes(updates.subtitle_timing)) {
+    return badRequest(c, 'subtitle_timing 只支持 sentence / char')
   }
 
   // Map snake_case to camelCase for drizzle
@@ -118,6 +138,9 @@ app.put('/:id', async (c) => {
   if ('description' in updates) drizzleUpdates.description = updates.description
   if ('status' in updates) drizzleUpdates.status = updates.status
   if ('resolution' in updates) drizzleUpdates.resolution = updates.resolution
+  if ('narration_enabled' in updates) drizzleUpdates.narrationEnabled = updates.narration_enabled === true
+  if ('tts_config_id' in updates) drizzleUpdates.ttsConfigId = updates.tts_config_id ?? null
+  if ('subtitle_timing' in updates) drizzleUpdates.subtitleTiming = updates.subtitle_timing
 
   await db.update(schema.episodes).set(drizzleUpdates).where(eq(schema.episodes.id, id))
   return success(c)
@@ -241,6 +264,82 @@ app.post('/:id/generate-video-prompts', async (c) => {
 app.get('/:id/video-prompts-status', async (c) => {
   const id = Number(c.req.param('id'))
   return success(c, await getVideoPromptBatchStatus(id))
+})
+
+// ─── 旁白 / 配音 / 分镜合成（Issue #30）────────────────────────────
+
+// POST /episodes/:id/generate-narration — 整集旁白写作（narration_writer），立即返回
+app.post('/:id/generate-narration', async (c) => {
+  const id = Number(c.req.param('id'))
+  const body = await c.req.json().catch(() => ({} as Record<string, any>))
+  const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, id))
+  if (!ep) return notFound(c, '剧集不存在')
+  if (ep.narrationEnabled !== true) return badRequest(c, '本集未开启旁白，请先在拆分分镜前的选项里开启')
+  const storyboardIds = Array.isArray(body.storyboard_ids)
+    ? body.storyboard_ids.map(Number).filter((n: number) => Number.isInteger(n) && n > 0)
+    : undefined
+  const result = await startNarrationScript(
+    ep.id,
+    ep.dramaId,
+    { model: body.model || undefined, configId: body.config_id ?? undefined },
+    storyboardIds,
+  )
+  if (result.total === -1) return success(c, { status: 'running', already_running: true })
+  if (!result.started) return success(c, { status: 'idle', total: 0 })
+  return success(c, { status: 'running', total: result.total })
+})
+
+// GET /episodes/:id/narration-status — 旁白写作任务状态
+app.get('/:id/narration-status', async (c) => {
+  return success(c, await getNarrationScriptStatus(Number(c.req.param('id'))))
+})
+
+// POST /episodes/:id/narration/voice-batch — 批量旁白配音
+app.post('/:id/narration/voice-batch', async (c) => {
+  const id = Number(c.req.param('id'))
+  const body = await c.req.json().catch(() => ({} as Record<string, any>))
+  const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, id))
+  if (!ep) return notFound(c, '剧集不存在')
+  const storyboardIds = Array.isArray(body.storyboard_ids)
+    ? body.storyboard_ids.map(Number).filter((n: number) => Number.isInteger(n) && n > 0)
+    : undefined
+  try {
+    const result = await startVoiceBatch(ep.id, ep.dramaId, storyboardIds)
+    if (result.total === -1) return success(c, { status: 'running', already_running: true })
+    if (!result.started) return success(c, { status: 'idle', total: 0 })
+    return success(c, { status: 'running', total: result.total })
+  } catch (err) {
+    return badRequest(c, err instanceof Error ? err.message : '批量配音启动失败')
+  }
+})
+
+// GET /episodes/:id/narration/voice-batch-status
+app.get('/:id/narration/voice-batch-status', async (c) => {
+  return success(c, await getVoiceBatchStatus(Number(c.req.param('id'))))
+})
+
+// POST /episodes/:id/compose-batch — 批量合成分镜成片（视频 + 旁白 + 字幕）
+app.post('/:id/compose-batch', async (c) => {
+  const id = Number(c.req.param('id'))
+  const body = await c.req.json().catch(() => ({} as Record<string, any>))
+  const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, id))
+  if (!ep) return notFound(c, '剧集不存在')
+  const storyboardIds = Array.isArray(body.storyboard_ids)
+    ? body.storyboard_ids.map(Number).filter((n: number) => Number.isInteger(n) && n > 0)
+    : undefined
+  try {
+    const result = await startComposeBatch(ep.id, ep.dramaId, storyboardIds)
+    if (result.total === -1) return success(c, { status: 'running', already_running: true })
+    if (!result.started) return success(c, { status: 'idle', total: 0 })
+    return success(c, { status: 'running', total: result.total })
+  } catch (err) {
+    return badRequest(c, err instanceof Error ? err.message : '批量合成启动失败')
+  }
+})
+
+// GET /episodes/:id/compose-batch-status
+app.get('/:id/compose-batch-status', async (c) => {
+  return success(c, await getComposeBatchStatus(Number(c.req.param('id'))))
 })
 
 // POST /episodes/:id/video-batch/preview — 逐镜列出 缺视频/已变化/未变化(同第N版)/无法判断/阻断/跳过
@@ -432,8 +531,10 @@ app.get('/:episode_id/storyboards', async (c) => {
       state?.first ?? null, state?.mid ?? null, state?.last ?? null)
   }
   const mediaGeneratedAt = await lookupGeneratedAt(mediaPaths)
-  // 本集可 @ 资产整集只查一次，各分镜的目标级绑定与一致性问题共用
   const episodeAssets = await loadEpisodeAssets(episodeId)
+  // 旁白状态由服务端算好（前端不自己推）：开关 + 文本 + 配音 + 合成签名
+  const [narrationEpisode] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId))
+  const episodeNarrationEnabled = narrationEpisode?.narrationEnabled === true
   return success(c, await Promise.all(rows.map(async (row) => {
     const videoVersions: Array<{
       id: number | null
@@ -470,7 +571,29 @@ app.get('/:episode_id/storyboards', async (c) => {
       ...toSnakeCase(row),
       target_assets: await loadStoryboardTargetAssets(row, episodeAssets),
       field_saved_at: parseFieldSavedAt(row.fieldSavedAt),
-      ref_issues: await checkStoryboardRefs(row, episodeAssets),
+      ref_issues: [
+        ...await checkStoryboardRefs(row, episodeAssets),
+        ...narrationIssues({
+          episodeNarrationEnabled,
+          shotNarrationEnabled: row.narrationEnabled !== false,
+          narrationText: row.narrationText,
+          meta: parseNarrationMeta(row.narrationMeta),
+        }),
+      ],
+      narration_meta: parseNarrationMeta(row.narrationMeta),
+      narration_status: narrationStatus({
+        episodeNarrationEnabled,
+        shotNarrationEnabled: row.narrationEnabled !== false,
+        narrationText: row.narrationText,
+        narrationAudioUrl: row.narrationAudioUrl,
+        videoUrl: row.videoUrl,
+        composedVideoUrl: row.composedVideoUrl,
+        subtitleUrl: row.subtitleUrl,
+        meta: parseNarrationMeta(row.narrationMeta),
+      }),
+      narration_chars: narrationCharCount(row.narrationText),
+      narration_estimate_seconds: estimateNarrationSeconds(row.narrationText),
+      subtitle_timing_effective: resolveSubtitleTiming(narrationEpisode?.subtitleTiming, row.subtitleTiming),
       keyframes: keyframesJson(keyframes.get(row.id)),
       video_versions: videoVersions,
       transition_review: parseTransitionReview(row.transitionReview),

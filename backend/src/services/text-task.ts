@@ -21,10 +21,14 @@ export type TextTaskKind =
   | 'video_prompts'
   | 'script_rewrite'
   | 'storyboard_breaker'
+  | 'narration_script'
+  | 'narration_tts'
+  | 'shot_compose'
 
 export const TEXT_TASK_KINDS: TextTaskKind[] = [
   'extract_characters', 'extract_scenes', 'extract_props',
   'keyframe_prompts', 'video_prompts', 'script_rewrite', 'storyboard_breaker',
+  'narration_script', 'narration_tts', 'shot_compose',
 ]
 
 export interface TextTaskProgress {

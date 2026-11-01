@@ -39,6 +39,9 @@ export const sqliteSchemaStatements = [
     thumbnail TEXT,
     image_config_id INTEGER,
     video_config_id INTEGER,
+    tts_config_id INTEGER,
+    narration_enabled INTEGER NOT NULL DEFAULT 0,
+    subtitle_timing TEXT NOT NULL DEFAULT 'sentence',
     resolution TEXT DEFAULT '720p',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
@@ -118,6 +121,11 @@ export const sqliteSchemaStatements = [
     transition_prompt TEXT,
     transition_enabled INTEGER NOT NULL DEFAULT 1,
     transition_review TEXT,
+    narration_text TEXT,
+    narration_enabled INTEGER NOT NULL DEFAULT 1,
+    narration_audio_url TEXT,
+    narration_meta TEXT,
+    subtitle_timing TEXT,
     video_url TEXT,
     subtitle_url TEXT,
     composed_video_url TEXT,
@@ -381,6 +389,16 @@ const columnAdditions: { table: string; column: string; type: string }[] = [
   { table: 'video_merges', column: 'generated_at', type: 'INTEGER' },
   // 本集角色造型版本（Issue #15，JSON {name, description, image_path}）
   { table: 'episode_characters', column: 'styling_version', type: 'TEXT' },
+  // 旁白 / 字幕 / 配音（#30）：剧集级开关与 TTS 配置，每镜文稿 / 开关 / 配音 / 状态 blob
+  { table: 'episodes', column: 'tts_config_id', type: 'INTEGER' },
+  { table: 'episodes', column: 'narration_enabled', type: 'INTEGER NOT NULL DEFAULT 0' },
+  { table: 'storyboards', column: 'narration_text', type: 'TEXT' },
+  { table: 'storyboards', column: 'narration_enabled', type: 'INTEGER NOT NULL DEFAULT 1' },
+  { table: 'storyboards', column: 'narration_audio_url', type: 'TEXT' },
+  { table: 'storyboards', column: 'narration_meta', type: 'TEXT' },
+  // 字幕时间码模式（#30 Q10）：剧集级默认 sentence，分镜级 NULL = 继承
+  { table: 'episodes', column: 'subtitle_timing', type: "TEXT NOT NULL DEFAULT 'sentence'" },
+  { table: 'storyboards', column: 'subtitle_timing', type: 'TEXT' },
 ]
 
 /**

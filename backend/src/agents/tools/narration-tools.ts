@@ -1,0 +1,110 @@
+/**
+ * 旁白写作 Agent 工具（Issue #30）
+ *
+ * 旁白文本的唯一写入方。`save_narrations` 只写 narration_text / narration_enabled / duration
+ * 三个字段，绝不触碰分镜的其它内容（画面描述、提示词、绑定一律不动）。
+ */
+import { createTool } from '@mastra/core/tools'
+import type { ToolExecutionContext } from '@mastra/core/tools'
+import { z } from 'zod'
+import { eq } from 'drizzle-orm'
+import { db, schema } from '../../db/index.js'
+import { now } from '../../utils/response.js'
+import { logTaskProgress, logTaskSuccess } from '../../utils/task-logger.js'
+import { getEpisodeId } from '../context.js'
+import { storyboardTools } from './storyboard-tools.js'
+import {
+  DEFAULT_TAIL_PAD_SECONDS,
+  MAX_NARRATION_CHARS,
+  MAX_SHOT_SECONDS,
+  MIN_SHOT_SECONDS,
+  NARRATION_CHARS_PER_SECOND,
+  narrationCharCount,
+  parseNarrationMeta,
+  sha256,
+} from '../../services/narration.js'
+import { stampFieldSavedAt } from '../../services/storyboard-fields.js'
+
+const saveNarrations = createTool({
+  id: 'save_narrations',
+  description: 'Save the narration script for shots of this episode. Call in batches of at most 8 shots, upserted by shot_number. Only narration text / narration flag / duration are written — no other storyboard field is touched.',
+  inputSchema: z.object({
+    narrations: z.array(z.object({
+      shot_number: z.number().describe('Shot number of the storyboard in this episode.'),
+      narration: z.string().describe(`Narration script for this shot, in the target content language. Must be at most ${MAX_NARRATION_CHARS} characters (TTS hard limit per segment) and should fit the shot duration at 3.8–5.1 characters per second.`),
+      narration_enabled: z.boolean().optional().describe('false means this shot is deliberately left as pure visuals with no narration; narration must then be an empty string.'),
+    })),
+  }),
+  execute: async ({ narrations }, context: ToolExecutionContext | undefined) => {
+    const episodeId = getEpisodeId(context?.requestContext)
+    if (!episodeId) return { error: 'Missing episode context' }
+
+    const rows = await db.select().from(schema.storyboards)
+      .where(eq(schema.storyboards.episodeId, episodeId))
+    const byShot = new Map(rows.filter(sb => !sb.deletedAt).map(sb => [sb.storyboardNumber, sb]))
+
+    logTaskProgress('NarrationTool', 'save-begin', {
+      episodeId,
+      count: narrations.length,
+      shotNumbers: narrations.map(n => n.shot_number).join(','),
+    })
+
+    const saved: number[] = []
+    const rejected: { shot_number: number; reason: string }[] = []
+    const ts = now()
+
+    for (const item of narrations) {
+      const sb = byShot.get(item.shot_number)
+      if (!sb) {
+        rejected.push({ shot_number: item.shot_number, reason: 'shot_number not found in this episode' })
+        continue
+      }
+      const enabled = item.narration_enabled !== false
+      const text = enabled ? (item.narration || '').trim() : ''
+      const chars = narrationCharCount(text)
+      if (enabled && !chars) {
+        rejected.push({ shot_number: item.shot_number, reason: 'narration is empty; set narration_enabled=false for a pure-visual shot' })
+        continue
+      }
+      if (chars > MAX_NARRATION_CHARS) {
+        rejected.push({
+          shot_number: item.shot_number,
+          reason: `narration is ${chars} characters, exceeding the hard limit of ${MAX_NARRATION_CHARS}; shorten it and save again`,
+        })
+        continue
+      }
+
+      // 时长按旁白字数估算（内容段，不含转场）：字数 ÷ 4.5 字/秒 + 尾部留白，钳到 4–15 秒
+      const duration = enabled
+        ? Math.max(MIN_SHOT_SECONDS, Math.min(MAX_SHOT_SECONDS, Math.ceil(chars / NARRATION_CHARS_PER_SECOND + DEFAULT_TAIL_PAD_SECONDS)))
+        : sb.duration || MIN_SHOT_SECONDS
+
+      const meta = parseNarrationMeta(sb.narrationMeta)
+      meta.text_sha256 = sha256(text)
+      const stamp = stampFieldSavedAt(sb.fieldSavedAt, ['narration_text'])
+
+      await db.update(schema.storyboards).set({
+        narrationText: text,
+        narrationEnabled: enabled,
+        duration,
+        narrationMeta: JSON.stringify(meta),
+        ...(stamp.json ? { fieldSavedAt: stamp.json } : {}),
+        updatedAt: ts,
+      }).where(eq(schema.storyboards.id, sb.id))
+      saved.push(item.shot_number)
+    }
+
+    logTaskSuccess('NarrationTool', 'save', {
+      episodeId,
+      saved: saved.length,
+      rejected: rejected.length,
+      shotNumbers: saved.join(','),
+    })
+    return { saved_shot_numbers: saved, rejected }
+  },
+})
+
+export const narrationTools = {
+  readStoryboardContext: storyboardTools.readStoryboardContext,
+  saveNarrations,
+}

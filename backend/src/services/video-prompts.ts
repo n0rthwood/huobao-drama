@@ -90,6 +90,8 @@ export async function startVideoPromptBatch(
       dramaId,
       modelOverride: opts.model || undefined,
       textConfigId: opts.configId || undefined,
+      // 开了旁白的集：条件技能要求视频提示词里不得出现旁白台词（旁白走独立音轨）
+      narrationEnabled: ep?.narrationEnabled === true,
     })
     const sink = createReasoningSink(taskId)
     for (const sb of pending) {

@@ -10,6 +10,7 @@ export const TRACKED_SAVE_FIELDS = [
   'description', 'atmosphere',
   'first_frame_prompt', 'mid_frame_prompt', 'mid_frame_time', 'last_frame_prompt',
   'video_prompt',
+  'narration_text',
 ] as const
 
 export type TrackedSaveField = typeof TRACKED_SAVE_FIELDS[number]

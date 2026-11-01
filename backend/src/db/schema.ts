@@ -37,6 +37,12 @@ export const episodes = sqliteTable('episodes', {
   thumbnail: text('thumbnail'),
   imageConfigId: integer('image_config_id'),
   videoConfigId: integer('video_config_id'),
+  // 本集锁定的语音合成（TTS）服务配置（#30）
+  ttsConfigId: integer('tts_config_id'),
+  // 剧集级旁白开关（#30）：1 = 产出旁白文本 + 配音 + 合成时烧录字幕；0 = 现有流程完全不变
+  narrationEnabled: integer('narration_enabled', { mode: 'boolean' }).notNull().default(false),
+  // 本集字幕时间码模式（#30 Q10）：sentence = 分句边界（默认），char = 逐字时间戳
+  subtitleTiming: text('subtitle_timing').notNull().default('sentence'),
   resolution: text('resolution').default('720p'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
@@ -151,6 +157,13 @@ export const storyboards = sqliteTable('storyboards', {
   transitionPrompt: text('transition_prompt'),
   transitionEnabled: integer('transition_enabled', { mode: 'boolean' }).notNull().default(true),
   transitionReview: text('transition_review'),
+  // 本镜旁白（#30）：文稿 / 是否出旁白（纯画面镜头可单独关掉）/ 配音文件 / 状态 blob（JSON）
+  narrationText: text('narration_text'),
+  narrationEnabled: integer('narration_enabled', { mode: 'boolean' }).notNull().default(true),
+  narrationAudioUrl: text('narration_audio_url'),
+  narrationMeta: text('narration_meta'),
+  // 本镜字幕时间码模式覆盖（#30 Q10）；NULL = 继承剧集级 subtitle_timing
+  subtitleTiming: text('subtitle_timing'),
   videoUrl: text('video_url'),
   subtitleUrl: text('subtitle_url'),
   composedVideoUrl: text('composed_video_url'),

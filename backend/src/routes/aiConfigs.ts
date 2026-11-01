@@ -5,6 +5,7 @@ import { success, notFound, created, badRequest, now } from '../utils/response.j
 import { toSnakeCase } from '../utils/transform.js'
 import { joinProviderUrl } from '../services/adapters/url.js'
 import { hasVersionedPath, isOfficialProvider, parseConfigTemperature, validateConfigModels } from '../services/ai.js'
+import { fetchDefaultVoice } from '../services/tts.js'
 import { redactUrl, logTaskError, logTaskProgress, logTaskSuccess } from '../utils/task-logger.js'
 
 const app = new Hono()
@@ -17,12 +18,22 @@ function normalizeTemperature(v: any): number | null {
   return n
 }
 
-/** 把 settings JSON 中的 temperature 透出为顶层字段，便于前端直接读写 */
-function withParsedFields(r: any) {
+/** 把 settings JSON 中的可写字段透出为顶层字段，便于前端直接读写（api_key 不在此列） */
+function withParsedFields(r: Record<string, unknown>) {
+  let settings: Record<string, unknown> = {}
+  try {
+    const raw = r.settings
+    settings = typeof raw === 'string' && raw ? JSON.parse(raw) : {}
+  } catch {
+    settings = {}
+  }
+  const { temperature: _temperature, ...ttsSettings } = settings
   return {
     ...toSnakeCase(r),
-    model: r.model ? JSON.parse(r.model) : [],
-    temperature: parseConfigTemperature(r.settings),
+    model: typeof r.model === 'string' && r.model ? JSON.parse(r.model) : [],
+    temperature: parseConfigTemperature(typeof r.settings === 'string' ? r.settings : null),
+    // TTS 的音色与可选参数（voice 由后端在保存时固定，前端只读展示）
+    tts_settings: r.serviceType === 'tts' ? ttsSettings : undefined,
   }
 }
 
@@ -114,6 +125,16 @@ function buildProbe(serviceType: string, provider: string, baseUrl: string, mode
     }
   }
 
+  if (p === 'voxcpm') {
+    // VoxCPM 语音合成：/api/status 返回 {"engine":{"ok":true,…}} 即引擎可达；LAN 部署无鉴权
+    return {
+      method: 'GET',
+      url: joinProviderUrl(baseUrl, '', '/api/status'),
+      headers: bearerHeaders(apiKey),
+      body: undefined,
+    }
+  }
+
 
   return {
     method: 'GET',
@@ -132,6 +153,48 @@ app.get('/', async (c) => {
   const parsed = rows.map(withParsedFields)
   return success(c, parsed)
 })
+
+/**
+ * TTS 可选参数（#30）：instructions / cfg_value / inference_timesteps / seed。
+ * 合并进 settings JSON，省略/置空的键视为清除；`voice` 由 pinDefaultVoice 固定，不在这里改。
+ */
+function mergeTtsSettings(settings: Record<string, any>, raw: unknown): Record<string, any> {
+  const input = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+  for (const key of ['instructions', 'cfg_value', 'inference_timesteps', 'seed'] as const) {
+    const value = input[key]
+    if (value === undefined || value === null || value === '') {
+      delete settings[key]
+      continue
+    }
+    settings[key] = key === 'instructions' ? String(value) : Number(value)
+  }
+  return settings
+}
+
+/**
+ * TTS 配置保存后固定默认音色（#30 Q11：火宝不做音色挑选 UI）。
+ * `/v1/audio/speech` 不带 voice 会用随机音色，整集听感会漂，所以保存时向服务取一次
+ * 列表首项写进 settings.voice，之后不随服务端列表变化而漂移。失败不阻断保存。
+ */
+async function pinDefaultVoice(configId: number): Promise<void> {
+  const [row] = await db.select().from(schema.aiServiceConfigs)
+    .where(eq(schema.aiServiceConfigs.id, configId))
+  if (!row || row.serviceType !== 'tts') return
+  let settings: Record<string, any> = {}
+  try { settings = row.settings ? JSON.parse(row.settings) : {} } catch { settings = {} }
+  if (typeof settings.voice === 'string' && settings.voice.trim()) return
+  try {
+    const voice = await fetchDefaultVoice(row.baseUrl, row.apiKey)
+    if (!voice) return
+    settings.voice = voice
+    await db.update(schema.aiServiceConfigs)
+      .set({ settings: JSON.stringify(settings), updatedAt: now() })
+      .where(eq(schema.aiServiceConfigs.id, configId))
+    logTaskSuccess('AIConfig', 'tts-default-voice-pinned', { configId, voice })
+  } catch (err) {
+    logTaskError('AIConfig', 'tts-default-voice', { configId, error: err instanceof Error ? err.message : String(err) })
+  }
+}
 
 // POST /ai-configs
 app.post('/', async (c) => {
@@ -167,13 +230,19 @@ app.post('/', async (c) => {
     model: JSON.stringify(body.model || []),
     priority: body.priority || 0,
     isActive: true,
-    settings: temperature !== null ? JSON.stringify({ temperature }) : null,
+    settings: (() => {
+      const settings: Record<string, any> = temperature !== null ? { temperature } : {}
+      if ('tts_settings' in body) mergeTtsSettings(settings, body.tts_settings)
+      return Object.keys(settings).length ? JSON.stringify(settings) : null
+    })(),
     createdAt: ts,
     updatedAt: ts,
   })
 
+  const configId = getInsertId(res)
+  if (body.service_type === 'tts') await pinDefaultVoice(configId)
   const [row] = await db.select().from(schema.aiServiceConfigs)
-    .where(eq(schema.aiServiceConfigs.id, getInsertId(res)))
+    .where(eq(schema.aiServiceConfigs.id, configId))
 
   return created(c, withParsedFields(row))
 })
@@ -291,22 +360,26 @@ app.put('/:id', async (c) => {
   if ('model' in body) updates.model = JSON.stringify(body.model)
   if ('priority' in body) updates.priority = body.priority
   if ('is_active' in body) updates.isActive = body.is_active
-  if ('temperature' in body) {
-    let temperature: number | null
-    try {
-      temperature = normalizeTemperature(body.temperature)
-    } catch {
-      return badRequest(c, 'temperature 须为 0 到 2 之间的数字')
-    }
-    // 与已有 settings 合并，清空的 temperature 从 JSON 中移除
+  if ('temperature' in body || 'tts_settings' in body) {
+    // 与已有 settings 合并：清空的 temperature 从 JSON 中移除，已固定的 voice 保留不动
     let settings: Record<string, any> = {}
     try { settings = existing.settings ? JSON.parse(existing.settings) : {} } catch { settings = {} }
-    if (temperature === null) delete settings.temperature
-    else settings.temperature = temperature
+    if ('temperature' in body) {
+      let temperature: number | null
+      try {
+        temperature = normalizeTemperature(body.temperature)
+      } catch {
+        return badRequest(c, 'temperature 须为 0 到 2 之间的数字')
+      }
+      if (temperature === null) delete settings.temperature
+      else settings.temperature = temperature
+    }
+    if ('tts_settings' in body) mergeTtsSettings(settings, body.tts_settings)
     updates.settings = Object.keys(settings).length ? JSON.stringify(settings) : null
   }
 
   await db.update(schema.aiServiceConfigs).set(updates).where(eq(schema.aiServiceConfigs.id, id))
+  if (serviceType === 'tts') await pinDefaultVoice(id)
   return success(c)
 })
 
