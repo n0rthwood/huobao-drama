@@ -1429,7 +1429,9 @@
                 :key="`archival-${assetDetail.item.id}`"
                 :character-id="assetDetail.item.id"
                 :archival-images="assetDetail.item.archival_images ?? assetDetail.item.archivalImages"
+                :episode-id="epId"
                 @update="onAssetArchivalUpdate(assetDetail.item, $event)"
+                @appearance="onAssetAppearanceFromPortrait(assetDetail.item, $event)"
                 @preview="openImageViewer"
               />
             </section>
@@ -3553,10 +3555,13 @@ async function confirmReExtract() {
   }
 }
 
-/** 清空本地行的提取字段与最终提示词来源标记，与后端 re-extract 的清空范围一致 */
-function applyReExtractCleared(type, id) {
+/**
+ * 清空本地行的提取字段与最终提示词来源标记，与后端 re-extract 的清空范围一致。
+ * keys 可收窄：按史料画像补充外貌时只有 appearance 会被后端改写，其它提取字段仍然有效。
+ */
+function applyReExtractCleared(type, id, keys = REEXTRACT_FIELD_KEYS[type] || []) {
   const patch = { final_prompt: '', finalPrompt: '', final_prompt_source: null, final_prompt_updated_at: null }
-  for (const key of REEXTRACT_FIELD_KEYS[type] || []) patch[key] = ''
+  for (const key of keys) patch[key] = ''
   const list = type === 'character' ? chars.value : type === 'scene' ? scenes.value : propItems.value
   const target = list.find(x => x.id === id)
   if (target) Object.assign(target, patch)
@@ -3564,7 +3569,7 @@ function applyReExtractCleared(type, id) {
     Object.assign(assetDetail.value.item, patch)
     assetPromptDraft.value = ''
     assetPromptDirty.value = false
-    for (const key of REEXTRACT_FIELD_KEYS[type] || []) {
+    for (const key of keys) {
       if (key in assetDetailDraft.value) assetDetailDraft.value[key] = ''
     }
   }
@@ -4212,6 +4217,18 @@ function onAssetRefsUpdate(item, refs) {
 // 史料参考（Issue #32）：只做出处留档，不进生图；同样以服务端返回的数组为准
 function onAssetArchivalUpdate(item, entries) {
   item.archival_images = entries
+}
+
+// 按史料画像补充外貌（Issue #32）：后端只改写 appearance，所以走同一套清空路径但只收窄到该字段，
+// 最终提示词与来源徽标照常清空（外貌变了提示词就作废），再把新外貌写回行与弹窗草稿
+function onAssetAppearanceFromPortrait(item, appearance) {
+  const id = item?.id
+  if (!id) return
+  applyReExtractCleared('character', id, ['appearance'])
+  const target = chars.value.find(x => x.id === id)
+  if (target) target.appearance = appearance
+  item.appearance = appearance
+  if (isAssetDialogOn('character', id)) assetDetailDraft.value.appearance = appearance
 }
 
 // 视频提示词的一致性问题：槽位字段为 video_prompt 的问题 + 绑定级问题（fields 为空）

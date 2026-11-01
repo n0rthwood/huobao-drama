@@ -3,6 +3,17 @@
     <div class="arch-head">
       <span class="arch-label">{{ t('components.archival.label') }}</span>
       <span class="arch-count" :class="{ dim: !items.length }">{{ items.length }}/{{ max }}</span>
+      <button
+        class="arch-toggle arch-portrait"
+        type="button"
+        :disabled="portraitDisabled"
+        :title="portraitHint"
+        @click.stop="runPortraitAppearance"
+      >
+        <Loader2 v-if="portraitRunning" :size="10" class="animate-spin" />
+        <ScanFace v-else :size="10" />
+        {{ portraitRunning ? t('components.archival.portraitRunning') : t('components.archival.portraitAction') }}
+      </button>
       <button class="arch-toggle" type="button" @click.stop="searchOpen = !searchOpen">
         <Plus v-if="!searchOpen" :size="10" />
         <X v-else :size="10" />
@@ -11,6 +22,9 @@
     </div>
 
     <p class="arch-notice">{{ t('components.archival.notUsedForGeneration') }}</p>
+    <p v-if="portraitModelNote" class="arch-portrait-note">{{ portraitModelNote }}</p>
+    <p v-if="portraitDoneNote" class="arch-portrait-note">{{ t('components.archival.portraitDone') }}</p>
+    <p v-if="portraitError" class="arch-error">{{ portraitError }}</p>
 
     <div v-if="searchOpen" class="arch-search">
       <input
@@ -105,7 +119,7 @@
  *
  * 检索只走后端白名单代理（Commons），前端不接受任意 URL。
  */
-import { Loader2, ImageOff, Plus, X } from 'lucide-vue-next'
+import { Loader2, ImageOff, Plus, X, ScanFace } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { characterAPI, researchAPI } from '~/composables/useApi'
@@ -118,10 +132,12 @@ const props = defineProps({
   characterId: { type: [Number, String], required: true },
   // 角色行里的 archival_images 原值（对象数组 / JSON 字符串 / null 都接受）
   archivalImages: { type: [String, Array], default: null },
+  // 本集 id：「按史料画像补充外貌」要按集跑文本任务，没有它就不能发起
+  episodeId: { type: Number, required: true },
   max: { type: Number, default: 10 },
 })
 
-const emit = defineEmits(['update', 'preview'])
+const emit = defineEmits(['update', 'preview', 'appearance'])
 
 const searchOpen = ref(false)
 const query = ref('')
@@ -210,6 +226,86 @@ async function doRemove() {
     removing.value = ''
   }
 }
+
+/**
+ * 「按史料画像补充外貌」（Issue #32）：让模型读这些史料画像，把具体长相写回 characters.appearance。
+ * 画像全程只是「被读的档案」，不会写进 reference_images —— 带参考图的角色走 image_edit，
+ * 三视图人设格式会被底图毁掉。能否读图取决于后端挑到的文本模型，故由后端实测探测。
+ */
+const portraitRunning = ref(false)
+const portraitError = ref('')
+const portraitModelNote = ref('')
+const portraitDoneNote = ref(false)
+let portraitTimer = null
+// 卸载后仍在途的 GET 回来时不能再排下一轮、也不能往已销毁的面板里 emit
+let portraitStopped = false
+
+const portraitDisabled = computed(() => portraitRunning.value || !items.value.length || !Number(props.episodeId))
+const portraitHint = computed(() => {
+  if (!items.value.length) return t('components.archival.portraitNeedImages')
+  if (!Number(props.episodeId)) return t('components.archival.portraitNeedEpisode')
+  return t('components.archival.portraitHint')
+})
+
+function stopPortraitPoll() {
+  if (portraitTimer) { clearTimeout(portraitTimer); portraitTimer = null }
+}
+
+async function runPortraitAppearance() {
+  if (portraitDisabled.value) return
+  portraitRunning.value = true
+  portraitError.value = ''
+  portraitModelNote.value = ''
+  portraitDoneNote.value = false
+  try {
+    const res = await characterAPI.appearanceFromPortrait(props.characterId, Number(props.episodeId))
+    if (portraitStopped) return
+    const vision = res?.vision || {}
+    portraitModelNote.value = vision.used
+      ? t('components.archival.portraitVisionUsed', { model: vision.model || vision.config_name || '' })
+      : t('components.archival.portraitVisionMissing')
+    pollPortrait()
+  } catch (err) {
+    portraitRunning.value = false
+    portraitError.value = err?.message || t('components.archival.portraitFailed')
+  }
+}
+
+// 任务走后端文本任务队列：3s 轮询到 done/error 为止；status 还是 null 说明任务行刚落库，继续等。
+// 组件卸载立刻停表，弹窗关掉后不该再打接口。
+function pollPortrait(left = 100) {
+  stopPortraitPoll()
+  if (left <= 0) {
+    portraitRunning.value = false
+    portraitError.value = t('components.archival.portraitFailed')
+    return
+  }
+  portraitTimer = setTimeout(async () => {
+    portraitTimer = null
+    try {
+      const st = await characterAPI.appearanceFromPortraitStatus(props.characterId)
+      if (portraitStopped) return
+      if (st?.status === 'done') {
+        portraitRunning.value = false
+        portraitDoneNote.value = true
+        emit('appearance', st.appearance || '')
+        toast.success(t('components.archival.portraitDone'))
+        return
+      }
+      if (st?.status === 'error') {
+        portraitRunning.value = false
+        portraitError.value = st.error || t('components.archival.portraitFailed')
+        return
+      }
+      pollPortrait(left - 1)
+    } catch (err) {
+      portraitRunning.value = false
+      portraitError.value = err?.message || t('components.archival.portraitFailed')
+    }
+  }, 3000)
+}
+
+onBeforeUnmount(() => { portraitStopped = true; stopPortraitPoll() })
 </script>
 
 <style scoped>
@@ -247,6 +343,15 @@ async function doRemove() {
   cursor: pointer;
 }
 .arch-toggle:hover { color: var(--accent-text); border-color: var(--accent-text); }
+.arch-toggle:disabled { opacity: 0.5; cursor: not-allowed; }
+.arch-toggle:disabled:hover { color: var(--text-2); border-color: var(--border-strong); }
+/* 两个 toggle 并排时只让第一个吃掉剩余空间，否则 auto 会被平分、按钮跑到中间 */
+.arch-head .arch-portrait + .arch-toggle { margin-left: 0; }
+.arch-portrait-note {
+  margin: 0;
+  font-size: 10.5px;
+  color: var(--text-2);
+}
 .arch-notice {
   margin: 0;
   padding: 4px 8px;

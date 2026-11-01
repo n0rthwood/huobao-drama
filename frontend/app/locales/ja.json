@@ -64,7 +64,8 @@
       "keyframe_prompts": "キーフレームのプロンプト",
       "video_prompts": "動画プロンプト",
       "script_rewrite": "脚本リライト",
-      "storyboard_breaker": "分镜の分割"
+      "storyboard_breaker": "分镜の分割",
+      "portrait_appearance": "史料画像から容姿を補完"
     },
     "detail": {
       "title": "タスク詳細",
@@ -325,7 +326,16 @@
       "unknown": "不明",
       "notUsedForGeneration": "史料リファレンスは画像生成に使われません（参考画像とは厳密に分離）",
       "confirmTitle": "史料リファレンスを削除",
-      "confirmMessage": "削除するとこの史料ファイルと出典情報が失われます。参考画像と生成画像には影響しません。"
+      "confirmMessage": "削除するとこの史料ファイルと出典情報が失われます。参考画像と生成画像には影響しません。",
+      "portraitAction": "史料画像から容姿を補完",
+      "portraitRunning": "画像を読み取り中…",
+      "portraitHint": "これらの史料画像をモデルに読ませ、具体的な容姿をキャラクターの外見に書き込みます",
+      "portraitNeedImages": "先に史料画像を登録してください",
+      "portraitNeedEpisode": "先に対象の話数を開いてください",
+      "portraitVisionUsed": "今回は {model} が画像を読み取りました",
+      "portraitVisionMissing": "画像を読めるテキストモデルが見つからず、文字資料のみを使用しました",
+      "portraitDone": "容姿を更新しました。最終プロンプトは無効になったため、生成し直してください",
+      "portraitFailed": "容姿の補完に失敗しました"
     },
     "citations": {
       "label": "資料出典",

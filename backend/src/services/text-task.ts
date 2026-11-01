@@ -21,10 +21,13 @@ export type TextTaskKind =
   | 'video_prompts'
   | 'script_rewrite'
   | 'storyboard_breaker'
+  // 按史料画像补充角色外貌（Issue #32）：按「集 × 类型」判重，与提取任务互不阻塞
+  | 'portrait_appearance'
 
 export const TEXT_TASK_KINDS: TextTaskKind[] = [
   'extract_characters', 'extract_scenes', 'extract_props',
   'keyframe_prompts', 'video_prompts', 'script_rewrite', 'storyboard_breaker',
+  'portrait_appearance',
 ]
 
 export interface TextTaskProgress {
@@ -41,6 +44,8 @@ export interface TextTaskParams {
   storyboardIds?: number[]
   configId?: number
   retry_of?: number
+  /** 纪录片角色花名册（Issue #32）：先定人再提取，保证多次运行的角色覆盖一致 */
+  roster?: { name: string; basis?: string; reason?: string }[]
   [key: string]: unknown
 }
 
@@ -108,8 +113,8 @@ export async function createTextTask(input: {
   return getInsertId(res)
 }
 
-/** 合并写 params（保留 kind/storyboardIds 等其它键） */
-async function patchTextTaskParams(id: number, patch: Partial<TextTaskParams>): Promise<void> {
+/** 合并写 params（保留 kind/storyboardIds 等其它键）；花名册与画像外貌等任务也复用这套读-合-写 */
+export async function patchTextTaskParams(id: number, patch: Partial<TextTaskParams>): Promise<void> {
   const [row] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, id))
   if (!row) return
   const merged = { ...(parseTextTaskParams(row.params) || {}), ...patch }

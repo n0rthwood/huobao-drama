@@ -24,6 +24,7 @@ const TEXT_KIND_LABEL: Record<TextTaskKind, string> = {
   video_prompts: '视频提示词',
   script_rewrite: '剧本改写',
   storyboard_breaker: '拆分分镜',
+  portrait_appearance: '按史料画像补充外貌',
 }
 
 const ASSET_KIND_LABEL: Record<string, string> = {

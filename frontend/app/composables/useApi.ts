@@ -276,6 +276,26 @@ export interface ResearchCitation {
 /** 「重新提取本资产信息」：先清空提取字段再跑提取 Agent，进度走 episodeAPI.extractStatus */
 export type ReExtractResp = { started: boolean; asset_id: number; cleared_fields: string[] }
 
+/**
+ * 「按史料画像补充外貌」（Issue #32）：读该角色已入库的史料画像推出具体长相，写回 characters.appearance。
+ * 史料画像始终只是「被读」的档案，绝不进 reference_images，否则三视图人设会被 image_edit 毁掉。
+ * 能否读图取决于所选文本模型，后端实测探测，vision.used=false 时只用文字资料兜底。
+ */
+export type PortraitAppearanceResp = {
+  started: boolean
+  task_id: number
+  vision: { used: boolean; config_name?: string; model?: string }
+  portraits: number
+}
+export type PortraitAppearanceStatusResp = {
+  status: 'running' | 'done' | 'error' | null
+  source: 'vision' | 'text' | null
+  model: string | null
+  appearance: string | null
+  error: string | null
+  updated_at: string | null
+}
+
 export const researchAPI = {
   commonsSearch: (q: string, limit?: number) => api.get<CommonsSearchResp>(`/research/commons/search?q=${encodeURIComponent(q)}${limit ? `&limit=${limit}` : ''}`),
   citations: (assetKind: AssetKindName, assetId: number) => api.get<ResearchCitation[]>(`/research/citations?asset_kind=${assetKind}&asset_id=${assetId}`),
@@ -299,6 +319,8 @@ export const characterAPI = {
   addArchivalImage: (id: number, fileTitle: string) => api.post<ArchivalImage[]>(`/characters/${id}/archival-images`, { file_title: fileTitle }),
   removeArchivalImage: (id: number, path: string) => api.del<ArchivalImage[]>(`/characters/${id}/archival-images?path=${encodeURIComponent(path)}`),
   reExtract: (id: number, episodeId: number, textModel?: string, textConfigId?: number) => api.post<ReExtractResp>(`/characters/${id}/re-extract`, { episode_id: episodeId, text_model: textModel || undefined, text_config_id: textConfigId || undefined }),
+  appearanceFromPortrait: (id: number, episodeId: number, textConfigId?: number) => api.post<PortraitAppearanceResp>(`/characters/${id}/appearance-from-portrait`, { episode_id: episodeId, text_config_id: textConfigId || undefined }),
+  appearanceFromPortraitStatus: (id: number) => api.get<PortraitAppearanceStatusResp>(`/characters/${id}/appearance-from-portrait`),
 }
 
 export const sceneAPI = {

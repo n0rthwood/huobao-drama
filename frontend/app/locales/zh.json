@@ -64,7 +64,8 @@
       "keyframe_prompts": "关键帧提示词",
       "video_prompts": "视频提示词",
       "script_rewrite": "剧本改写",
-      "storyboard_breaker": "拆分分镜"
+      "storyboard_breaker": "拆分分镜",
+      "portrait_appearance": "按史料画像补充外貌"
     },
     "detail": {
       "title": "任务详情",
@@ -325,7 +326,16 @@
       "unknown": "未知",
       "notUsedForGeneration": "史料参考不参与生图（与参考图严格分离）",
       "confirmTitle": "删除史料参考",
-      "confirmMessage": "删除后这条史料参考及其出处信息会被移除。参考图与成片图不受影响。"
+      "confirmMessage": "删除后这条史料参考及其出处信息会被移除。参考图与成片图不受影响。",
+      "portraitAction": "按史料画像补充外貌",
+      "portraitRunning": "正在读画像…",
+      "portraitHint": "让模型读这些史料画像，把具体长相写进角色外貌",
+      "portraitNeedImages": "请先入库史料画像",
+      "portraitNeedEpisode": "请先打开具体某一集",
+      "portraitVisionUsed": "本次用 {model} 读画像",
+      "portraitVisionMissing": "未找到可读图的文本模型，仅用文字资料",
+      "portraitDone": "已更新外貌，最终提示词已失效，请重新生成提示词",
+      "portraitFailed": "补充外貌失败"
     },
     "citations": {
       "label": "资料来源",

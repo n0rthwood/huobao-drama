@@ -64,7 +64,8 @@
       "keyframe_prompts": "Keyframe prompts",
       "video_prompts": "Video prompts",
       "script_rewrite": "Script rewrite",
-      "storyboard_breaker": "Storyboard breakdown"
+      "storyboard_breaker": "Storyboard breakdown",
+      "portrait_appearance": "Appearance from archival portraits"
     },
     "detail": {
       "title": "Task detail",
@@ -325,7 +326,16 @@
       "unknown": "Unknown",
       "notUsedForGeneration": "Archival references are never used for image generation (strictly separate from reference images)",
       "confirmTitle": "Remove archival reference",
-      "confirmMessage": "This removes the archival file and its provenance record. Reference images and generated images are unaffected."
+      "confirmMessage": "This removes the archival file and its provenance record. Reference images and generated images are unaffected.",
+      "portraitAction": "Derive appearance from archival portraits",
+      "portraitRunning": "Reading the portraits…",
+      "portraitHint": "Let the model read these archival portraits and write concrete facial traits into the character's appearance",
+      "portraitNeedImages": "Add archival portraits first",
+      "portraitNeedEpisode": "Open a specific episode first",
+      "portraitVisionUsed": "Portraits read by {model} this time",
+      "portraitVisionMissing": "No image-capable text model found, used the written material only",
+      "portraitDone": "Appearance updated. The final prompt is now stale — regenerate it.",
+      "portraitFailed": "Failed to derive the appearance"
     },
     "citations": {
       "label": "Sources",

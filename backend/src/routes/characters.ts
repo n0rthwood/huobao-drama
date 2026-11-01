@@ -15,6 +15,7 @@ import { mountReferenceImageRoutes } from './reference-images.js'
 import { planFinalPromptWrite, promptSourceChanged } from '../services/asset-prompt-invalidation.js'
 import { mountReExtractRoute } from './asset-reextract.js'
 import { addArchivalImage, removeArchivalImage } from '../services/archival-images.js'
+import { getPortraitAppearanceStatus, startPortraitAppearance } from '../services/portrait-appearance.js'
 
 const app = new Hono()
 const CHARACTER_IMAGE_SIZE = '1920x1080'
@@ -50,6 +51,39 @@ app.delete('/:id/archival-images', async (c) => {
   } catch (err) {
     return badRequest(c, err instanceof Error ? err.message : '删除失败')
   }
+})
+
+// POST /characters/:id/appearance-from-portrait — 按史料画像补充外貌（Issue #32）
+// 只写 appearance（并作废旧的最终提示词），绝不写 reference_images：角色一旦有参考图就走 image_edit，三视图定妆会被画像构图顶掉
+app.post('/:id/appearance-from-portrait', async (c) => {
+  const id = Number(c.req.param('id'))
+  const body = await c.req.json()
+  const episodeId = Number(body.episode_id)
+  if (!episodeId) return badRequest(c, 'episode_id 必填')
+
+  const result = await startPortraitAppearance(id, {
+    episodeId,
+    configId: body.text_config_id ?? undefined,
+  })
+  if (!result.started) {
+    return badRequest(c, result.reason === 'running'
+      ? '该集的同类任务正在运行，请等它结束'
+      : '该角色还没有史料画像')
+  }
+  return success(c, {
+    started: true,
+    task_id: result.taskId,
+    vision: result.vision,
+    portraits: result.portraits,
+  })
+})
+
+// GET /characters/:id/appearance-from-portrait?episode_id=N — 任务状态与本次产出
+app.get('/:id/appearance-from-portrait', async (c) => {
+  const id = Number(c.req.param('id'))
+  const episodeId = Number(c.req.query('episode_id'))
+  if (!episodeId) return badRequest(c, 'episode_id 必填')
+  return success(c, await getPortraitAppearanceStatus(id, episodeId))
 })
 
 // POST /characters — 手动新增角色（传入 episode_id 时关联到该集）
