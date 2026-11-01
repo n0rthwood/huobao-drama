@@ -51,6 +51,13 @@
             :options="resolutionOptions"
             hide-default
           />
+          <ModelSelect
+            v-if="narrationEnabledOf"
+            v-model="episodeSubtitleTiming"
+            :label="t('episode.narration.episodeTimingLabel')"
+            :options="subtitleTimingOptions"
+            hide-default
+          />
         </div>
         <div class="studio-actions">
           <LocaleSwitcher />
@@ -618,6 +625,10 @@
             :breaking="rt === 'storyboard_breaker'"
             :agent-busy="rn"
             :field-save="fieldSaveInfo"
+            :narration-enabled="narrationEnabledOf"
+            :episode-timing="episodeSubtitleTiming"
+            :narration-batch="narrationBatch"
+            :narration-voice-batch="narrationVoiceBatch"
             @break="doBreakdown"
             @refresh="refresh"
             @preview="openImageViewer"
@@ -626,6 +637,8 @@
             @open-asset="openPoolAssetDetail"
             @update-field="updateField"
             @field-dirty="markFieldDirty"
+            @batch-narration="batchNarration"
+            @batch-narration-voice="batchNarrationVoice"
           />
 
           <!-- Sub: Video Production（视频提示词 + 视频生成，关键帧确认后可用） -->
@@ -655,6 +668,17 @@
                 >
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
                   {{ videoSelectMode && selectedVideoSbIds.length ? t('episode.vid.batchSelected', { n: selectedVideoSbIds.length }) : t('episode.vid.batchVideos') }}
+                </button>
+                <button
+                  v-if="narrationEnabledOf"
+                  class="btn btn-sm"
+                  :disabled="!sbs.length || shotComposeBatch.running"
+                  @click="batchCompose(videoSelectMode && selectedVideoSbIds.length ? selectedVideoSbIds : undefined)"
+                >
+                  <Loader2 v-if="shotComposeBatch.running" :size="11" class="animate-spin" />
+                  {{ shotComposeBatch.running
+                    ? t('episode.compose.batchProgress', { done: shotComposeBatch.completed, total: shotComposeBatch.total })
+                    : (videoSelectMode && selectedVideoSbIds.length ? t('episode.compose.batchSelected', { n: selectedVideoSbIds.length }) : t('episode.compose.batch')) }}
                 </button>
               </div>
             </div>
@@ -984,6 +1008,18 @@
                       <RefIssueList :issues="transitionIssues(selectedSb)" />
                       <div class="transition-duration">{{ transitionDurationHint(selectedSb) }}</div>
                     </section>
+                    <!-- 旁白 + 本镜合成（#30 C.3）：在转场与视频提示词之间 -->
+                    <section v-if="narrationEnabledOf" class="video-inspector-section">
+                      <NarrationBlock
+                        :storyboard="selectedSb"
+                        :field-save="fieldSaveInfo(selectedSb, 'narration_text')"
+                        :episode-timing="episodeSubtitleTiming"
+                        show-compose
+                        @update-field="updateField"
+                        @field-dirty="markFieldDirty"
+                        @refresh="refresh"
+                      />
+                    </section>
                     <section class="video-inspector-section">
                       <div class="video-inspector-prompt-head">
                         <span class="video-inspector-label video-inspector-label-hero">{{ t('episode.sb.videoPromptSection') }}</span>
@@ -1042,6 +1078,7 @@
                         </span>
                       </div>
                       <div class="video-param-hint">{{ t('episode.inspector.durationHint') }}</div>
+                      <div v-if="narrationEnabledOf" class="video-param-hint">{{ t('episode.compose.durationNote') }}</div>
                     </section>
                     <div class="video-inspector-effective">
                       {{ t('episode.inspector.effective', { model: effectiveVideoModelLabel || t('episode.vid.defaultModel'), res: episodeResolutionShort, dur: effectiveVideoDuration }) }}
@@ -1183,6 +1220,15 @@
                   </button>
                 </div>
               </div>
+              <div v-if="narrationEnabledOf && uncomposedSelectedCount" class="export-compose-warn">
+                {{ t('episode.compose.mergeWarnUncomposed', { n: uncomposedSelectedCount }) }}
+              </div>
+              <div v-if="mergeSkipped.length" class="export-compose-skipped">
+                <div class="export-compose-skipped-title">{{ t('episode.compose.skippedTitle') }}</div>
+                <span v-for="item in mergeSkipped" :key="item.storyboard_number">
+                  {{ t('episode.compose.skippedItem', { n: item.storyboard_number, reason: mapError(item.reason) || item.reason }) }}
+                </span>
+              </div>
               <div class="export-grid">
                 <div
                   v-for="(sb, i) in sbs"
@@ -1224,6 +1270,9 @@
                     <span class="truncate" style="flex:1;font-size:11px">{{ sb.description || sb.title || '—' }}</span>
                     <MediaTime v-if="hasVid(sb)" :at="mediaTimeOf(sb, getVideoUrl(sb))" />
                     <span :class="['dot', hasVid(sb) && 'ok']" />
+                    <span v-if="narrationEnabledOf" :class="['exp-compose-state', isComposed(sb) ? 'is-done' : 'is-todo']">
+                      {{ isComposed(sb) ? t('episode.compose.composed') : t('episode.compose.notComposed') }}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -1690,6 +1739,25 @@
         @cancel="mergeDelete.open = false"
       />
 
+      <BreakdownNarrationDialog
+        :open="breakdownDialog"
+        :default-enabled="narrationEnabledOf"
+        :has-narration-data="hasNarrationContent"
+        :has-storyboards="Boolean(sbs.length)"
+        @cancel="breakdownDialog = false"
+        @confirm="confirmBreakdown"
+      />
+
+      <ConfirmDialog
+        :open="subtitleRegenConfirm"
+        :title="t('episode.narration.regenAllTitle')"
+        :message="t('episode.narration.regenAllMessage')"
+        :confirm-text="t('episode.narration.regenSubtitle')"
+        :loading="subtitleRegenRunning"
+        @confirm="regenerateAllSubtitles"
+        @cancel="subtitleRegenConfirm = false"
+      />
+
       <AssetBrowserDialog
         v-if="assetBrowserOpen && episode"
         :drama-id="dramaId"
@@ -1733,6 +1801,8 @@ import TaskCenterButton from '~/components/TaskCenterButton.vue'
 import MediaTime from '~/components/MediaTime.vue'
 import TargetAssetList from '~/components/TargetAssetList.vue'
 import AssetBrowserDialog from '~/components/AssetBrowserDialog.vue'
+import NarrationBlock from '~/components/NarrationBlock.vue'
+import BreakdownNarrationDialog from '~/components/BreakdownNarrationDialog.vue'
 import { mediaTimeOfPath } from '~/utils/mediaTime'
 import {
   useNowTicker,
@@ -3168,7 +3238,7 @@ const selectedVideoTaskNumber = computed(() => {
 
 // ===== 字段级保存状态：键为「分镜 id : 字段」，关键帧页与视频页共用 =====
 // 自动保存且需要给出保存反馈的字段（其余字段如绑定 ids 只做一致性提示，不显示保存状态）
-const SAVE_STATUS_FIELDS = ['description', 'atmosphere', 'first_frame_prompt', 'mid_frame_prompt', 'mid_frame_time', 'last_frame_prompt', 'video_prompt', 'transition_prompt']
+const SAVE_STATUS_FIELDS = ['description', 'atmosphere', 'first_frame_prompt', 'mid_frame_prompt', 'mid_frame_time', 'last_frame_prompt', 'video_prompt', 'transition_prompt', 'narration_text']
 const fieldSaveStates = ref({})
 
 function fieldSaveKey(sb, field) { return `${sb?.id}:${field}` }
@@ -3530,7 +3600,34 @@ function pollVideoPromptBatch(attempts = 240) {
   }
   setTimeout(() => tick(attempts), 2500)
 }
+// ===== 拆分分镜（#30 C.1）：先问旁白，再跑拆分 Agent，开关打开时串联旁白写作 =====
+const breakdownDialog = ref(false)
+/** 本集是否已有审核过的旁白内容：重拆会把分镜连同旁白/配音一起删掉 */
+const hasNarrationContent = computed(() => sbs.value.some(sb =>
+  String(sb?.narration_text || sb?.narrationText || '').trim() || (sb?.narration_audio_url || sb?.narrationAudioUrl)))
+
 function doBreakdown() {
+  breakdownDialog.value = true
+}
+
+async function confirmBreakdown(narrationEnabled) {
+  breakdownDialog.value = false
+  if (narrationEnabled !== narrationEnabledOf.value) {
+    try {
+      await episodeAPI.update(epId.value, { narration_enabled: narrationEnabled })
+      if (episode.value) {
+        episode.value.narration_enabled = narrationEnabled
+        episode.value.narrationEnabled = narrationEnabled
+      }
+    } catch (e) {
+      toastError(e)
+      return
+    }
+  }
+  runBreakdownAgent()
+}
+
+function runBreakdownAgent() {
   const charList = chars.value.length
     ? chars.value.map(c => `${c.name}(ID:${c.id})`).join('、')
     : '（当前集还没有角色）'
@@ -3568,12 +3665,153 @@ function doBreakdown() {
 - 角色一律用 @角色名 引用；角色名只是昵称，不可据此推断外形`, dramaId, epId.value, onBreakdownDone, chatModelOverride(), chatConfigId())
 }
 
-/** 拆分完成后刷新并自动补齐缺失的视频提示词（兜住 Agent 漏写/截断） */
+/** 拆分完成后刷新、自动补齐缺失的视频提示词（兜住 Agent 漏写/截断），开关打开时接着跑旁白写作 */
 async function onBreakdownDone() {
   await refresh()
   const missing = sbs.value.filter(sb => !(sb.video_prompt || sb.videoPrompt || '').trim())
   if (missing.length) batchVideoPrompts()
+  if (narrationEnabledOf.value) await batchNarration()
 }
+
+// ===== 旁白（#30）：集级开关 / 字幕时间码 / 三个集级批量任务 =====
+const narrationEnabledOf = computed(() => Boolean(episode.value?.narration_enabled ?? episode.value?.narrationEnabled))
+const SUBTITLE_TIMINGS = ['sentence', 'char']
+const subtitleTimingOptions = computed(() => [
+  { key: 'sentence', model: t('episode.narration.timingSentence') },
+  { key: 'char', model: t('episode.narration.timingChar') },
+])
+const episodeSubtitleTiming = computed({
+  get: () => {
+    const v = episode.value?.subtitle_timing ?? episode.value?.subtitleTiming
+    return SUBTITLE_TIMINGS.includes(v) ? v : 'sentence'
+  },
+  set: (val) => { void changeEpisodeSubtitleTiming(val) },
+})
+async function changeEpisodeSubtitleTiming(val) {
+  if (!episode.value || val === episodeSubtitleTiming.value) return
+  const prev = episode.value.subtitle_timing
+  episode.value.subtitle_timing = val
+  episode.value.subtitleTiming = val
+  try {
+    await episodeAPI.update(epId.value, { subtitle_timing: val })
+    // 已有配音的镜头字幕仍按旧模式切分，提供一次性重出
+    if (sbs.value.some(sb => sb.narration_audio_url || sb.narrationAudioUrl)) subtitleRegenConfirm.value = true
+  } catch (e) {
+    episode.value.subtitle_timing = prev
+    episode.value.subtitleTiming = prev
+    toastError(e)
+  }
+}
+
+// 切换剧集时间码后重出全部已配音镜头的字幕（不重跑 TTS）
+const subtitleRegenConfirm = ref(false)
+const subtitleRegenRunning = ref(false)
+async function regenerateAllSubtitles() {
+  if (subtitleRegenRunning.value) return
+  subtitleRegenRunning.value = true
+  const targets = sbs.value.filter(sb => (sb.narration_audio_url || sb.narrationAudioUrl)
+    && !(sb.subtitle_timing ?? sb.subtitleTiming))
+  let failed = 0
+  for (const sb of targets) {
+    try { await storyboardAPI.regenerateSubtitle(sb.id) } catch { failed += 1 }
+  }
+  subtitleRegenRunning.value = false
+  subtitleRegenConfirm.value = false
+  await refresh()
+  if (failed) toast.error(t('episode.narration.subtitleBatchFailed', { n: failed }))
+  else toast.success(t('episode.narration.subtitleDone'))
+}
+
+const narrationBatch = ref({ running: false, total: 0, completed: 0 })
+const narrationVoiceBatch = ref({ running: false, total: 0, completed: 0 })
+const shotComposeBatch = ref({ running: false, total: 0, completed: 0 })
+
+/** 集级文本批量（旁白写作 / 旁白配音 / 分镜合成）共用的轮询：与视频提示词批量同一套状态模型 */
+function pollTextBatch(stateRef, statusFn, doneKey, attempts = 240) {
+  const tick = async (left) => {
+    try {
+      const st = await statusFn()
+      if (st && st.status !== 'running') {
+        stateRef.value = { running: false, total: 0, completed: 0 }
+        await refresh()
+        if (st.status === 'done') {
+          toast.success(st.failed ? t('episode.narration.batchDoneFailed', { n: st.failed }) : t(doneKey))
+        } else {
+          toastError(st.error, { fallback: 'episode.narration.batchFailed' })
+        }
+        return
+      }
+      if (st) {
+        const prev = stateRef.value.completed
+        stateRef.value = { running: true, total: st.total || 0, completed: st.completed || 0 }
+        if ((st.completed || 0) !== prev) await refresh()
+      }
+    } catch {}
+    if (left > 0) setTimeout(() => tick(left - 1), 2500)
+    else stateRef.value = { running: false, total: 0, completed: 0 }
+  }
+  setTimeout(() => tick(attempts), 2500)
+}
+
+async function batchNarration(storyboardIds) {
+  if (narrationBatch.value.running) return
+  try {
+    const res = await episodeAPI.generateNarration(epId.value, {
+      storyboard_ids: storyboardIds,
+      model: chatModelOverride() || undefined,
+      config_id: chatConfigId() || undefined,
+    })
+    if (!res?.total) { toast.info(t('episode.narration.batchNothing')); return }
+    narrationBatch.value = { running: true, total: res.total, completed: 0 }
+    toast.info(t('episode.narration.batchStarted', { n: res.total }))
+    pollTextBatch(narrationBatch, () => episodeAPI.narrationStatus(epId.value), 'episode.narration.batchDone')
+  } catch (e) {
+    toastError(e)
+  }
+}
+
+async function batchNarrationVoice(storyboardIds) {
+  if (narrationVoiceBatch.value.running) return
+  try {
+    const res = await episodeAPI.narrationVoiceBatch(epId.value, storyboardIds)
+    if (!res?.total) { toast.info(t('episode.narration.batchNothing')); return }
+    narrationVoiceBatch.value = { running: true, total: res.total, completed: 0 }
+    toast.info(t('episode.narration.voiceBatchStarted', { n: res.total }))
+    pollTextBatch(narrationVoiceBatch, () => episodeAPI.narrationVoiceBatchStatus(epId.value), 'episode.narration.voiceBatchDone')
+  } catch (e) {
+    toastError(e)
+  }
+}
+
+async function batchCompose(storyboardIds) {
+  if (shotComposeBatch.value.running) return
+  try {
+    const res = await episodeAPI.composeBatch(epId.value, storyboardIds)
+    if (!res?.total) { toast.info(t('episode.compose.batchNothing')); return }
+    shotComposeBatch.value = { running: true, total: res.total, completed: 0 }
+    toast.info(t('episode.compose.batchStarted', { n: res.total }))
+    pollTextBatch(shotComposeBatch, () => episodeAPI.composeBatchStatus(epId.value), 'episode.compose.batchDone')
+  } catch (e) {
+    toastError(e)
+  }
+}
+
+function narrationStatusOf(sb) {
+  return sb?.narration_status || sb?.narrationStatus || 'missing'
+}
+function isComposed(sb) {
+  return Boolean(sb?.composed_video_url || sb?.composedVideoUrl)
+}
+function narrationIssuesOf(sb) {
+  return refIssuesOf(sb).filter(i => i.code === 'narration_too_long' || i.code === 'narration_voice_stale')
+}
+
+// 导出页：上一次拼接被跳过的镜头（镜号 + 原因），以及选中但未合成的镜头数
+const mergeSkipped = ref([])
+const uncomposedSelectedCount = computed(() => {
+  if (!narrationEnabledOf.value) return 0
+  return sbs.value.filter(sb => exportSelectedReadyIds.value.includes(sb.id) && !isComposed(sb)).length
+})
 
 // 按需为单个分镜生成视频提示词：由 prompt_generator 读取分镜字段生成并保存到 video_prompt
 async function genVideoPrompt(sb) {
@@ -4240,9 +4478,13 @@ async function doMerge(ids) {
     toast.error(t('episode.export.selectFirst'))
     return
   }
+  mergeSkipped.value = []
   try {
-    await mergeAPI.merge(epId.value, storyboardIds)
+    const res = await mergeAPI.merge(epId.value, storyboardIds)
+    // 开关打开时没有合成版本的镜头会被跳过，接口逐条返回镜号与原因（#30 B.8）
+    mergeSkipped.value = Array.isArray(res?.skipped) ? res.skipped : []
     toast.success(t('episode.export.mergingToast'))
+    if (mergeSkipped.value.length) toast.warning(t('episode.compose.mergeSkippedToast', { n: mergeSkipped.value.length }))
   } catch (e) {
     toastError(e, { fallback: 'episode.export.mergeFailed' })
     return
@@ -6885,6 +7127,36 @@ button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
   font-weight: 600;
 }
 .exp-row-line { display: flex; align-items: center; gap: 8px; min-width: 0; }
+
+/* 旁白开关打开时的导出页提示（#30 C.5） */
+.export-compose-warn {
+  padding: 6px 10px;
+  border: 1px solid var(--tag-warning-text);
+  border-radius: 6px;
+  color: var(--tag-warning-text);
+  font-size: 11px;
+}
+.export-compose-skipped {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--text-2);
+}
+.export-compose-skipped-title {
+  width: 100%;
+  font-weight: 600;
+  color: var(--text-1);
+}
+.exp-compose-state {
+  font-size: 11px;
+  white-space: nowrap;
+}
+.exp-compose-state.is-done { color: var(--tag-success-text); }
+.exp-compose-state.is-todo { color: var(--text-3); }
 
 /* Shared */
 .dim { color: var(--text-3); }

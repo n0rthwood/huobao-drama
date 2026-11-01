@@ -100,6 +100,20 @@ export const episodeAPI = {
     }),
   videoBatch: (id: number) => api.get(`/episodes/${id}/video-batch`),
   cancelVideoBatch: (id: number) => api.post(`/episodes/${id}/video-batch/cancel`),
+  // 旁白（#30）：旁白写作 / 批量配音 / 批量合成，都是集级文本任务，与视频提示词批量同一套状态模型
+  generateNarration: (id: number, data: { storyboard_ids?: number[]; model?: string; config_id?: number } = {}) =>
+    api.post(`/episodes/${id}/generate-narration`, {
+      storyboard_ids: data.storyboard_ids?.length ? data.storyboard_ids : undefined,
+      model: data.model || undefined,
+      config_id: data.config_id || undefined,
+    }),
+  narrationStatus: (id: number) => api.get(`/episodes/${id}/narration-status`),
+  narrationVoiceBatch: (id: number, storyboardIds?: number[]) =>
+    api.post(`/episodes/${id}/narration/voice-batch`, { storyboard_ids: storyboardIds?.length ? storyboardIds : undefined }),
+  narrationVoiceBatchStatus: (id: number) => api.get(`/episodes/${id}/narration/voice-batch-status`),
+  composeBatch: (id: number, storyboardIds?: number[]) =>
+    api.post(`/episodes/${id}/compose-batch`, { storyboard_ids: storyboardIds?.length ? storyboardIds : undefined }),
+  composeBatchStatus: (id: number) => api.get(`/episodes/${id}/compose-batch-status`),
   // 资产管理器（#9）：本项目已有资产关联到本集 / 取消关联（不删资产）
   linkAsset: (id: number, kind: AssetKindName, assetId: number) =>
     api.post(`/episodes/${id}/assets/link`, { kind, asset_id: assetId }),
@@ -146,6 +160,15 @@ export const assetLibraryAPI = {
     api.post(`/dramas/${dramaId}/assets/import`, data),
 }
 
+/** 单镜合成计划（#30）：合成服务按实测配音时长与转场偏移算出的时间预算，单位秒 */
+export interface ComposePlan {
+  video_duration?: number
+  audio_duration?: number
+  target_duration?: number
+  transition_t?: number
+  tail_pad?: number
+}
+
 export const storyboardAPI = {
   create: (data: any) => api.post('/storyboards', data),
   update: (id: number, data: any) => api.put(`/storyboards/${id}`, data),
@@ -174,6 +197,13 @@ export const storyboardAPI = {
     target: 'first' | 'mid' | 'last' | 'video',
     data: { kind: 'scene' | 'character' | 'prop'; asset_id: number; image: string | null },
   ) => api.put(`/storyboards/${id}/target-assets/${target}`, data),
+  // 旁白配音（#30，同步返回音频与字幕）/ 仅重出字幕（切换时间码模式后不重跑 TTS）/ 本镜合成
+  generateNarrationVoice: (id: number) =>
+    api.post<{ audio_url: string; subtitle_url: string; duration_ms: number; duration: number; cues: number; subtitle_source: string }>(
+      `/storyboards/${id}/narration/voice`, {}),
+  regenerateSubtitle: (id: number) => api.post(`/storyboards/${id}/narration/subtitle`, {}),
+  compose: (id: number) =>
+    api.post<{ composed_video_url: string; duration_ms: number; plan: ComposePlan; burned: boolean }>(`/storyboards/${id}/compose`, {}),
 }
 
 /**

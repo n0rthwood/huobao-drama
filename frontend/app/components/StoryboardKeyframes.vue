@@ -16,6 +16,28 @@
             ? t('episode.kf.promptProgress', { done: promptBatch.completed, total: promptBatch.total })
             : (selectMode && selectedIds.length ? t('episode.kf.promptSelected', { n: selectedIds.length }) : t('episode.kf.batchPrompts')) }}
         </button>
+        <button
+          v-if="narrationEnabled"
+          class="btn btn-sm"
+          :disabled="narrationBatch.running || !storyboards.length"
+          @click="emit('batch-narration', selectMode && selectedIds.length ? selectedIds : undefined)"
+        >
+          <Loader2 v-if="narrationBatch.running" :size="11" class="animate-spin" />
+          {{ narrationBatch.running
+            ? t('episode.narration.batchProgress', { done: narrationBatch.completed, total: narrationBatch.total })
+            : t('episode.narration.batchScript') }}
+        </button>
+        <button
+          v-if="narrationEnabled"
+          class="btn btn-sm"
+          :disabled="narrationVoiceBatch.running || !storyboards.length"
+          @click="emit('batch-narration-voice', selectMode && selectedIds.length ? selectedIds : undefined)"
+        >
+          <Loader2 v-if="narrationVoiceBatch.running" :size="11" class="animate-spin" />
+          {{ narrationVoiceBatch.running
+            ? t('episode.narration.voiceBatchProgress', { done: narrationVoiceBatch.completed, total: narrationVoiceBatch.total })
+            : t('episode.narration.batchVoice') }}
+        </button>
         <button class="btn btn-sm" :class="{ 'is-on': selectMode }" :disabled="!storyboards.length" @click="toggleSelectMode">
           {{ selectMode ? t('episode.vid.selectDone', { n: selectedIds.length }) : t('episode.vid.select') }}
         </button>
@@ -191,6 +213,18 @@
                 @blur="emit('update-field', selected, 'atmosphere', $event.target.value)"
               />
             </label>
+          </section>
+
+          <!-- 每镜旁白审核（#30 C.2）：只在剧集旁白开关打开时出现 -->
+          <section v-if="narrationEnabled" class="kf-section">
+            <NarrationBlock
+              :storyboard="selected"
+              :field-save="fieldSaveOf('narration_text')"
+              :episode-timing="episodeTiming"
+              @update-field="(sb, field, value) => emit('update-field', sb, field, value)"
+              @field-dirty="(sb, field, value) => emit('field-dirty', sb, field, value)"
+              @refresh="emit('refresh')"
+            />
           </section>
 
           <section class="kf-section">
@@ -500,6 +534,7 @@ import FieldSaveStatus from '~/components/FieldSaveStatus.vue'
 import RefIssueList from '~/components/RefIssueList.vue'
 import MediaTime from '~/components/MediaTime.vue'
 import TargetAssetList from '~/components/TargetAssetList.vue'
+import NarrationBlock from '~/components/NarrationBlock.vue'
 import { mediaTimeLabel, mediaTimeOfPath } from '~/utils/mediaTime'
 import {
   useNowTicker,
@@ -540,8 +575,16 @@ const props = defineProps({
   agentBusy: { type: Boolean, default: false },
   // (sb, field) => { status, at }；字段级保存状态由工作台（episode.vue）统一维护
   fieldSave: { type: Function, default: () => ({ status: 'idle', at: 0 }) },
+  // 旁白（#30）：剧集级开关与字幕时间码，以及两个集级批量任务的进度
+  narrationEnabled: { type: Boolean, default: false },
+  episodeTiming: { type: String, default: 'sentence' },
+  narrationBatch: { type: Object, default: () => ({ running: false, total: 0, completed: 0 }) },
+  narrationVoiceBatch: { type: Object, default: () => ({ running: false, total: 0, completed: 0 }) },
 })
-const emit = defineEmits(['break', 'refresh', 'preview', 'goto-assets', 'toggle-bind', 'open-asset', 'update-field', 'field-dirty'])
+const emit = defineEmits([
+  'break', 'refresh', 'preview', 'goto-assets', 'toggle-bind', 'open-asset', 'update-field', 'field-dirty',
+  'batch-narration', 'batch-narration-voice',
+])
 
 // 槽位预览图按剧集画幅完整显示（CSS aspect-ratio 语法用 /）
 const previewAspect = computed(() => String(props.aspectRatio || '16:9').replace(':', ' / ') || '16 / 9')
