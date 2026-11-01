@@ -157,36 +157,43 @@ export interface AlignItem {
   text: string
 }
 /**
- * 读取某次合成 job 的对齐数据（`GET <base>/api/jobs/<job_id>/timestamps?level=char|sentence`）。
- * 服务端 job 过期、未启用对齐器或不支持该级别时返回 null，由字幕生成回落比例分配。
+ * 读取某次合成 job 的逐字对齐数据（`GET <base>/api/jobs/<job_id>/timestamps?level=char`）。
+ *
+ * 服务端只支持 `level=word|char`（实测 `level=sentence` → `400 {"detail":"level 只能是 word 或 char"}`），
+ * 所以**两种字幕模式都走逐字对齐**：sentence 模式由 `buildSubtitleCues` 把逐字时间戳按句聚合。
+ * 一次失败后重试一次（对齐器可能还在落盘）；仍失败返回 null，由字幕生成回落按字数比例分配。
  */
-export async function fetchAlign(
+export async function fetchCharAlign(
   config: AIConfig,
   jobId: string,
-  level: 'char' | 'sentence',
+  attempts = 2,
 ): Promise<AlignItem[] | null> {
-
-  const url = joinProviderUrl(config.baseUrl, '', `/api/jobs/${encodeURIComponent(jobId)}/timestamps?level=${level}`)
-  try {
-    const resp = await fetch(url, {
-      headers: config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {},
-      signal: AbortSignal.timeout(300_000),
-    })
-    if (!resp.ok) {
-      logTaskProgress('TTS', 'align-unavailable', { jobId, level, status: String(resp.status) })
-      return null
+  // joinProviderUrl 把整段写进 url.pathname，查询串里的 ? 会被百分号编码进路径（实测 404），
+  // 所以路径与查询分开拼
+  const url = `${joinProviderUrl(config.baseUrl, '', `/api/jobs/${encodeURIComponent(jobId)}/timestamps`)}?level=char`
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      const resp = await fetch(url, {
+        headers: config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {},
+        signal: AbortSignal.timeout(300_000),
+      })
+      if (!resp.ok) {
+        logTaskProgress('TTS', 'align-unavailable', { jobId, attempt: String(attempt), status: String(resp.status) })
+      } else {
+        const data = await resp.json() as { items?: unknown }
+        const items = Array.isArray(data?.items) ? data.items : []
+        const parsed: AlignItem[] = []
+        for (const raw of items) {
+          const item = raw as { start?: unknown; end?: unknown; text?: unknown }
+          if (!Number.isFinite(item?.start) || !Number.isFinite(item?.end)) continue
+          parsed.push({ start: Number(item.start), end: Number(item.end), text: String(item.text ?? '') })
+        }
+        if (parsed.length) return parsed
+        logTaskProgress('TTS', 'align-empty', { jobId, attempt: String(attempt) })
+      }
+    } catch (err) {
+      logTaskProgress('TTS', 'align-failed', { jobId, attempt: String(attempt), error: err instanceof Error ? err.message : String(err) })
     }
-    const data = await resp.json() as { items?: unknown }
-    const items = Array.isArray(data?.items) ? data.items : []
-    const parsed: AlignItem[] = []
-    for (const raw of items) {
-      const item = raw as { start?: unknown; end?: unknown; text?: unknown }
-      if (!Number.isFinite(item?.start) || !Number.isFinite(item?.end)) continue
-      parsed.push({ start: Number(item.start), end: Number(item.end), text: String(item.text ?? '') })
-    }
-    return parsed.length ? parsed : null
-  } catch (err) {
-    logTaskProgress('TTS', 'align-failed', { jobId, level, error: err instanceof Error ? err.message : String(err) })
-    return null
   }
+  return null
 }

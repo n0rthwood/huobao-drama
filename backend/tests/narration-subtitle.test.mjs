@@ -47,26 +47,23 @@ test('比例分配：cue 文本拼接等于原文，末条不超过配音时长'
   for (const cue of cues) assert.ok(cue.endMs > cue.startMs)
 })
 
-test('sentence 模式：句级对齐可用时一句一条，不跨句', () => {
-  const sentences = splitSentences(TEXT)
-  const sentenceItems = [
-    { start: 0, end: 5.2, text: sentences[0] },
-    { start: 5.2, end: 9.0, text: sentences[1] },
-  ]
-  const result = buildSubtitleCues({ text: TEXT, durationMs: 9000, timing: 'sentence', sentenceItems })
-  assert.equal(result.source, 'sentence')
-  assert.equal(result.cues.length, 2)
-  assert.equal(result.cues[0].startMs, 0)
-  assert.equal(result.cues[1].startMs, 5200)
-})
-
-test('sentence 模式：无句级对齐时由逐字时间戳按句聚合', () => {
+test('sentence 模式：逐字时间戳按句聚合，一句一条且不跨句', () => {
   const normalized = TEXT.replace(/\s+/g, '')
+  const sentences = splitSentences(normalized)
   const charItems = [...normalized].map((ch, i) => ({ start: i * 0.2, end: (i + 1) * 0.2, text: ch }))
   const result = buildSubtitleCues({ text: TEXT, durationMs: normalized.length * 200, timing: 'sentence', charItems })
   assert.equal(result.source, 'sentence')
   assert.equal(result.cues[0].startMs, 0)
   assert.equal(stripPunct(result.cues.map(c => c.text.replace('\n', '')).join('')), stripPunct(TEXT))
+  // 每条字幕完整落在某一句内（不跨句）
+  let offset = 0
+  for (const sentence of sentences) {
+    const windowStart = offset * 200
+    const windowEnd = (offset + sentence.length) * 200
+    const inside = result.cues.filter(c => c.startMs >= windowStart && c.endMs <= windowEnd)
+    assert.ok(inside.length >= 1, `句「${sentence}」没有对应字幕`)
+    offset += sentence.length
+  }
 })
 
 test('char 模式：逐字时间戳，按标点切条', () => {

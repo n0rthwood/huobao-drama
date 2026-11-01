@@ -13,7 +13,7 @@ import { now } from '../utils/response.js'
 import { STORAGE_ROOT } from '../utils/paths.js'
 import { logTaskError, logTaskProgress, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
 import { getActiveConfig, getConfigById, type AIConfig } from './ai.js'
-import { NARRATION_SUBDIR, fetchAlign, synthesizeNarration } from './tts.js'
+import { NARRATION_SUBDIR, fetchCharAlign, synthesizeNarration } from './tts.js'
 import { buildSubtitleCues, renderSrt } from './subtitle.js'
 import {
   DEFAULT_SUBTITLE_TIMING,
@@ -91,24 +91,15 @@ export async function generateShotVoice(storyboardId: number): Promise<VoiceResu
 
   const synthesis = await synthesizeNarration(config, text)
 
-  // 字幕：两种时间码模式都基于这一次整镜合成的音频
+  // 字幕：两种时间码模式都基于这一次整镜合成的音频，对齐数据统一取逐字时间戳
+  // （TTS 服务只支持 level=word|char，sentence 模式由 buildSubtitleCues 按句聚合）
   const timing = resolveSubtitleTiming(ep.subtitleTiming, sb.subtitleTiming)
-  let charItems = null
-  let sentenceItems = null
-  if (synthesis.jobId) {
-    if (timing === 'sentence') {
-      sentenceItems = await fetchAlign(config, synthesis.jobId, 'sentence')
-      if (!sentenceItems) charItems = await fetchAlign(config, synthesis.jobId, 'char')
-    } else {
-      charItems = await fetchAlign(config, synthesis.jobId, 'char')
-    }
-  }
+  const charItems = synthesis.jobId ? await fetchCharAlign(config, synthesis.jobId) : null
   const subtitle = buildSubtitleCues({
     text,
     durationMs: synthesis.durationMs,
     timing,
     charItems,
-    sentenceItems,
   })
 
   const srtDir = path.join(STORAGE_ROOT, NARRATION_SUBDIR)
@@ -263,17 +254,8 @@ export async function regenerateShotSubtitle(storyboardId: number): Promise<{ su
   const config = await resolveTtsConfig(ep)
   const timing = resolveSubtitleTiming(ep.subtitleTiming, sb.subtitleTiming)
 
-  let charItems = null
-  let sentenceItems = null
-  if (meta.audio.job_id) {
-    if (timing === 'sentence') {
-      sentenceItems = await fetchAlign(config, meta.audio.job_id, 'sentence')
-      if (!sentenceItems) charItems = await fetchAlign(config, meta.audio.job_id, 'char')
-    } else {
-      charItems = await fetchAlign(config, meta.audio.job_id, 'char')
-    }
-  }
-  const subtitle = buildSubtitleCues({ text, durationMs: meta.audio.duration_ms, timing, charItems, sentenceItems })
+  const charItems = meta.audio.job_id ? await fetchCharAlign(config, meta.audio.job_id) : null
+  const subtitle = buildSubtitleCues({ text, durationMs: meta.audio.duration_ms, timing, charItems })
 
   const srtDir = path.join(STORAGE_ROOT, NARRATION_SUBDIR)
   fs.mkdirSync(srtDir, { recursive: true })

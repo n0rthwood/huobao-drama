@@ -157,15 +157,13 @@ export interface BuildSubtitleInput {
   text: string
   durationMs: number
   timing: SubtitleTiming
-  /** 逐字对齐数据（两种模式都用它作主路径） */
+  /** 逐字对齐数据（两种模式唯一的对齐数据源；TTS 服务不支持 level=sentence） */
   charItems?: AlignItem[] | null
-  /** 句级对齐数据（sentence 模式优先用；缺失时由逐字数据按句聚合） */
-  sentenceItems?: AlignItem[] | null
 }
 
 /**
- * 生成字幕条目。两种模式共用一次整镜合成的音频：
- * - sentence：以句为单位取时间窗（句级对齐优先，其次逐字聚合），句内超长再按比例拆
+ * 生成字幕条目。两种模式共用一次整镜合成的音频，对齐数据都来自逐字时间戳：
+ * - sentence：逐字时间戳按句聚合，一句一条（句内超长再按字数比例拆，不跨句）
  * - char：逐字时间戳，按标点切条
  */
 export function buildSubtitleCues(input: BuildSubtitleInput): SubtitleResult {
@@ -175,18 +173,7 @@ export function buildSubtitleCues(input: BuildSubtitleInput): SubtitleResult {
   const sentences = splitSentences(normalized)
 
   if (input.timing === 'sentence') {
-    // 1) 句级对齐可用且句数一致 → 直接用它的时间窗
-    const sent = input.sentenceItems?.filter(i => (i.text || '').replace(/\s+/g, ''))
-    if (sent && sent.length === sentences.length) {
-      const cues: SubtitleCue[] = []
-      sentences.forEach((sentence, idx) => {
-        const startMs = Math.round(sent[idx].start * 1000)
-        const endMs = Math.max(Math.round(sent[idx].end * 1000), startMs + 1)
-        cues.push(...proportionalSpans(splitChunks(sentence), startMs, endMs))
-      })
-      return { cues, source: 'sentence', timing: 'sentence' }
-    }
-    // 2) 逐字对齐按句聚合
+    // 逐字对齐按句聚合（服务端 level=sentence 返回 400，没有句级对齐可用）
     const spans = input.charItems?.length ? charSpansFrom(input.charItems, normalized) : null
     if (spans) {
       const cues: SubtitleCue[] = []
