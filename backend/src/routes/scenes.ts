@@ -10,6 +10,7 @@ import { deleteAllReferenceImages, partitionMissingReferences, resolveReferenceI
 import { deleteAssetLinks } from '../services/asset-links.js'
 import { mountReferenceImageRoutes } from './reference-images.js'
 import { planSceneTimePatch } from '../services/scene-time.js'
+import { EMPTY_ASSET_NAME_MESSAGE, normalizeAssetName } from '../services/asset-name.js'
 import { promptSourceChanged } from '../services/asset-prompt-invalidation.js'
 import { toSnakeCase } from '../utils/transform.js'
 
@@ -22,12 +23,13 @@ mountReferenceImageRoutes(app, 'scene')
 app.post('/', async (c) => {
   const body = await c.req.json()
   if (!body.drama_id) return badRequest(c, 'drama_id 必填')
-  if (!body.location?.trim()) return badRequest(c, '地点必填')
+  const location = normalizeAssetName(body.location)
+  if (!location) return badRequest(c, EMPTY_ASSET_NAME_MESSAGE)
   const ts = now()
   const res = await db.insert(schema.scenes).values({
     dramaId: body.drama_id,
     episodeId: body.episode_id,
-    location: body.location.trim(),
+    location,
     time: body.time || '',
     prompt: body.prompt || body.description || body.location,
     lighting: body.lighting || '',
@@ -54,7 +56,10 @@ app.put('/:id', async (c) => {
   const [scene] = await db.select().from(schema.scenes).where(eq(schema.scenes.id, id))
   if (!scene) return badRequest(c, '场景不存在')
   const updates: Record<string, any> = { updatedAt: now() }
-  if (body.location !== undefined) updates.location = body.location
+  if (body.location !== undefined) {
+    updates.location = normalizeAssetName(body.location)
+    if (!updates.location) return badRequest(c, EMPTY_ASSET_NAME_MESSAGE)
+  }
   if (body.prompt !== undefined) updates.prompt = body.prompt
   if (body.description !== undefined) updates.prompt = body.description
   if (body.lighting !== undefined) updates.lighting = body.lighting

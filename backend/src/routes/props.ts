@@ -10,6 +10,7 @@ import { logTaskError, logTaskStart, logTaskSuccess, logTaskWarn } from '../util
 import { deleteAllReferenceImages, partitionMissingReferences, resolveReferenceImages } from '../services/reference-images.js'
 import { deleteAssetLinks } from '../services/asset-links.js'
 import { mountReferenceImageRoutes } from './reference-images.js'
+import { EMPTY_ASSET_NAME_MESSAGE, normalizeAssetName } from '../services/asset-name.js'
 import { planFinalPromptWrite, promptSourceChanged } from '../services/asset-prompt-invalidation.js'
 
 const app = new Hono()
@@ -23,10 +24,11 @@ mountReferenceImageRoutes(app, 'prop')
 app.post('/', async (c) => {
   const body = await c.req.json()
   if (!body.drama_id) return badRequest(c, 'drama_id 必填')
-  if (!body.name?.trim()) return badRequest(c, '名称必填')
+  const name = normalizeAssetName(body.name)
+  if (!name) return badRequest(c, EMPTY_ASSET_NAME_MESSAGE)
   const ts = now()
   const res = await db.insert(schema.props).values({
-    name: body.name.trim(),
+    name,
     type: body.type || '',
     description: body.description || '',
     dramaId: body.drama_id,
@@ -63,7 +65,10 @@ app.put('/:id', async (c) => {
   const [prop] = await db.select().from(schema.props).where(eq(schema.props.id, id))
   if (!prop) return badRequest(c, '道具不存在')
   const updates: Record<string, any> = { updatedAt: now() }
-  if (body.name !== undefined) updates.name = body.name
+  if (body.name !== undefined) {
+    updates.name = normalizeAssetName(body.name)
+    if (!updates.name) return badRequest(c, EMPTY_ASSET_NAME_MESSAGE)
+  }
   if (body.type !== undefined) updates.type = body.type
   if (body.description !== undefined) updates.description = body.description
   // 用户上传道具图：直接写入图片地址与本地路径

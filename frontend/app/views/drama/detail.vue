@@ -1139,7 +1139,14 @@ async function generateFinalPrompt(m) {
     }
     if (Object.keys(infoPatch).length) {
       const saved = await updateAsset(m, infoPatch)
-      if (isEditing(m)) editTarget.value = { ...editTarget.value, ...infoPatch, finalPrompt: saved?.final_prompt || '' }
+      // 名字等字段以服务端返回为准（资产名会被规范化，Issue #34）
+      for (const field of Object.keys(infoPatch)) {
+        if (saved?.[field] !== undefined) infoPatch[field] = saved[field]
+      }
+      if (isEditing(m)) {
+        editTarget.value = { ...editTarget.value, ...infoPatch, finalPrompt: saved?.final_prompt || '' }
+        Object.assign(editDraft, infoPatch)
+      }
       toast.success(t('episode.asset.savedBeforePrompt'))
     }
     let res
