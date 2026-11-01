@@ -13,9 +13,10 @@ import { z } from 'zod'
 import { db, getInsertId, schema } from '../../db/index.js'
 import { eq, and } from 'drizzle-orm'
 import { now } from '../../utils/response.js'
-import { logTaskProgress, logTaskSuccess } from '../../utils/task-logger.js'
+import { logTaskProgress, logTaskSuccess, logTaskWarn } from '../../utils/task-logger.js'
 import { getDramaId, getEpisodeId } from '../context.js'
 import { parseStylingVersion, saveStylingVersion } from '../../services/styling-version.js'
+import { normalizeAssetName } from '../../services/asset-name.js'
 
 // ─── 关联辅助 ────────────────────────────────────────────────
 async function linkCharToEpisode(episodeId: number, characterId: number) {
@@ -51,18 +52,19 @@ async function linkPropToEpisode(episodeId: number, propId: number) {
 // ─── 名字归一化（近名去重） ───────────────────────────────────
 // 提取时同一角色/道具可能出现不同书写形式（如「林小雨」与「林小雨（主角）」、
 // 「林小雨(女主)」、「林小雨 」）。归一化后做精确比较，命中即复用已有，不重复创建。
+// 空白与 `_` 一并去掉：资产名里的空白会被规范化成 `_`（Issue #34），「斋桑湖北岸」仍要命中「斋桑湖_北岸」。
 function normalizeName(name: string): string {
   return (name || '')
     .replace(/[（(][^（()）]*[）)]/g, '') // 去掉成对的中/英文括号内容（角色定位/别名）
     .replace(/[（(].*$/, '')              // 兜底：未闭合括号从首个括号截断
-    .replace(/[\s　]+/g, '')          // 去空白与全角空格
+    .replace(/[\s　_]+/g, '')        // 去空白、全角空格与 _
     .toLowerCase()
     .trim()
 }
 
-// 场景地点只做空白归一化（不删括号：如「火车站（候车厅）」与「火车站（站台）」是不同场景）
+// 场景地点只做空白（含 _）归一化（不删括号：如「火车站（候车厅）」与「火车站（站台）」是不同场景）
 function normalizeLocation(loc: string): string {
-  return (loc || '').replace(/[\s　]+/g, '').toLowerCase().trim()
+  return (loc || '').replace(/[\s　_]+/g, '').toLowerCase().trim()
 }
 
 type ToolContext = ToolExecutionContext | undefined
@@ -210,6 +212,12 @@ const saveDedupCharacters = createTool({
     })
 
     for (const char of characters) {
+      // 资产名规则（Issue #34）：先规范化再查重与写库；规范化后为空的条目跳过
+      char.name = normalizeAssetName(char.name)
+      if (!char.name) {
+        logTaskWarn('ExtractTool', 'save-characters-skip-empty-name', { episodeId, dramaId })
+        continue
+      }
       const charsInProject = (await db.select().from(schema.characters)
         .where(eq(schema.characters.dramaId, dramaId)))
         .filter(c => !c.deletedAt)
@@ -305,6 +313,11 @@ const saveDedupScenes = createTool({
     })
 
     for (const scene of scenes) {
+      scene.location = normalizeAssetName(scene.location)
+      if (!scene.location) {
+        logTaskWarn('ExtractTool', 'save-scenes-skip-empty-location', { episodeId, dramaId })
+        continue
+      }
       // 按地点+时间段精确匹配；地点仅做空白/大小写归一化（不删括号，避免误合并）
       const scenesInProject = (await db.select().from(schema.scenes)
         .where(eq(schema.scenes.dramaId, dramaId)))
@@ -428,6 +441,11 @@ const saveDedupProps = createTool({
     })
 
     for (const prop of props) {
+      prop.name = normalizeAssetName(prop.name)
+      if (!prop.name) {
+        logTaskWarn('ExtractTool', 'save-props-skip-empty-name', { episodeId, dramaId })
+        continue
+      }
       const propsInProject = (await db.select().from(schema.props)
         .where(eq(schema.props.dramaId, dramaId)))
         .filter(p => !p.deletedAt)

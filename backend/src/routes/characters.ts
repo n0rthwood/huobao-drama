@@ -10,6 +10,7 @@ import { logTaskError, logTaskStart, logTaskSuccess, logTaskWarn } from '../util
 import { deleteAllReferenceImages, partitionMissingReferences, resolveReferenceImages } from '../services/reference-images.js'
 import { deleteAssetLinks } from '../services/asset-links.js'
 import { getStylingVersion, saveStylingVersion } from '../services/styling-version.js'
+import { EMPTY_ASSET_NAME_MESSAGE, normalizeAssetName } from '../services/asset-name.js'
 import { mountReferenceImageRoutes } from './reference-images.js'
 import { planFinalPromptWrite, promptSourceChanged } from '../services/asset-prompt-invalidation.js'
 
@@ -23,10 +24,11 @@ mountReferenceImageRoutes(app, 'character')
 app.post('/', async (c) => {
   const body = await c.req.json()
   if (!body.drama_id) return badRequest(c, 'drama_id 必填')
-  if (!body.name?.trim()) return badRequest(c, '名称必填')
+  const name = normalizeAssetName(body.name)
+  if (!name) return badRequest(c, EMPTY_ASSET_NAME_MESSAGE)
   const ts = now()
   const res = await db.insert(schema.characters).values({
-    name: body.name.trim(),
+    name,
     role: body.role || '',
     description: body.description || '',
     appearance: body.appearance || '',
@@ -72,6 +74,10 @@ app.put('/:id', async (c) => {
     const snakeKey = key.replace(/[A-Z]/g, m => '_' + m.toLowerCase())
     if (snakeKey in body) updates[key] = body[snakeKey]
     else if (key in body) updates[key] = body[key]
+  }
+  if ('name' in updates) {
+    updates.name = normalizeAssetName(updates.name)
+    if (!updates.name) return badRequest(c, EMPTY_ASSET_NAME_MESSAGE)
   }
   // 手写最终提示词以传入值为准；否则样貌/造型/描述改了值 → 旧提示词失效（Issue #24）
   Object.assign(updates, planFinalPromptWrite({

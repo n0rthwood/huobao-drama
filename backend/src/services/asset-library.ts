@@ -33,6 +33,7 @@ import {
   type AssetKind,
   type ReferenceImageEntry,
 } from './reference-images.js'
+import { EMPTY_ASSET_NAME_MESSAGE, normalizeAssetName } from './asset-name.js'
 
 export const ASSET_KINDS: AssetKind[] = ['character', 'scene', 'prop']
 
@@ -386,6 +387,7 @@ function textFieldsOf(kind: AssetKind, row: AssetRow): Record<string, string> {
 
 /**
  * 在已占用名字集合里给 `base` 找唯一名：`名字` → `名字-2` → `名字-3` …
+ * `base` 先按资产名规则规范化（Issue #34）。
  * 纯函数（前后端同一规则；批量导入时把同批次已选名字一起传进来）。
  */
 export function suggestUniqueName(base: string, taken: Iterable<string>): string {
@@ -394,7 +396,7 @@ export function suggestUniqueName(base: string, taken: Iterable<string>): string
     const value = String(item ?? '').trim()
     if (value) used.add(value)
   }
-  const name = String(base ?? '').trim()
+  const name = normalizeAssetName(base)
   if (!used.has(name)) return name
   for (let suffix = 2; ; suffix += 1) {
     const candidate = `${name}-${suffix}`
@@ -519,8 +521,8 @@ export async function importAsset(input: {
     episode = row
   }
 
-  const name = String(input.name ?? '').trim() || assetDisplayName(kind, source)
-  if (!name) throw new AssetLibraryError('名称必填')
+  const name = normalizeAssetName(input.name) || normalizeAssetName(assetDisplayName(kind, source))
+  if (!name) throw new AssetLibraryError(EMPTY_ASSET_NAME_MESSAGE)
   const taken = await takenAssetNames(kind, targetDramaId)
   if (taken.includes(name)) {
     throw new AssetLibraryError(

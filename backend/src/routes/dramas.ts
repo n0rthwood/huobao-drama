@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { and, eq, isNull, like, desc } from 'drizzle-orm'
 import { db, getInsertId, schema } from '../db/index.js'
 import { success, badRequest, notFound, created, now, serverError } from '../utils/response.js'
+import { EMPTY_ASSET_NAME_MESSAGE, normalizeAssetName } from '../services/asset-name.js'
 import { toSnakeCase, toSnakeCaseArray } from '../utils/transform.js'
 import { lookupGeneratedAt } from '../services/media-time.js'
 import { logTaskError } from '../utils/task-logger.js'
@@ -203,6 +204,13 @@ app.put('/:id/characters', async (c) => {
   const dramaId = Number(c.req.param('id'))
   const body = await c.req.json()
   const chars = body.characters || []
+  // 资产名规则（Issue #34）：先整批规范化与校验，任何一条为空都不写库
+  for (const char of chars) {
+    if (!char.id || 'name' in char) {
+      char.name = normalizeAssetName(char.name)
+      if (!char.name) return badRequest(c, EMPTY_ASSET_NAME_MESSAGE)
+    }
+  }
   const ts = now()
 
   for (const char of chars) {

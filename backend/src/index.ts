@@ -39,6 +39,7 @@ import { QWEN_JOBS_PROVIDER } from './services/sys-task.js'
 import { backfillTaskEpisodeIds, failInterruptedTextTasks } from './services/task-center.js'
 import { backfillGeneratedAt } from './services/media-time.js'
 import { migrateReferenceImages } from './services/reference-images.js'
+import { migrateAssetNames } from './services/asset-name-migration.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(__dirname, '../..')
@@ -134,6 +135,8 @@ db.update(schema.sysTask)
   .then(() => backfillGeneratedAt())
   // 参考图存储结构迁移：字符串路径 → { path, uploaded_at }，幂等
   .then(() => migrateReferenceImages())
+  // 资产名规范化迁移（Issue #34）：非法名改成合法名并重写分镜 @引用，幂等
+  .then(() => migrateAssetNames())
   // 清理完成后再恢复批量任务：被重启打断的那一张/那一镜此时已是 failed，由批次重新提交
   .then(() => startQwenJobsTracker())
   .then(() => resumeKeyframeBatches())
