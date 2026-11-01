@@ -40,6 +40,13 @@ export const episodes = sqliteTable('episodes', {
   imageConfigId: integer('image_config_id'),
   videoConfigId: integer('video_config_id'),
   resolution: text('resolution').default('720p'),
+  // 纪录片选角名册（Issue #32）：JSON [{name, basis, reason, source}]，人在集页面复核后保存
+  characterRoster: text('character_roster'),
+  // 名册复核时所依据的剧本指纹（sha256）：剧本改了就判定名册过期，必须重新复核
+  characterRosterHash: text('character_roster_hash'),
+  // 'draft' = 提取 Agent 首轮生成、待人复核；'approved' = 人已复核保存
+  characterRosterStatus: text('character_roster_status'),
+  characterRosterUpdatedAt: text('character_roster_updated_at'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
   deletedAt: text('deleted_at'),

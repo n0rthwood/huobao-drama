@@ -1,0 +1,36 @@
+{
+  "reference_images_empty": true,
+  "no_source_urls_in_prompts": true,
+  "character_three_view_markers": {
+    "51": true,
+    "52": true,
+    "54": true,
+    "59": true
+  },
+  "vision_sources": {
+    "52": {
+      "status": "done",
+      "source": "vision",
+      "model": "deepseek-chat",
+      "appearance": "长脸，下颌略方，深色卷发，齐耳长度，前额无刘海，唇上短髭，浓密微翘，46 岁，左眼下方有痣，鼻梁挺直。",
+      "error": null,
+      "updated_at": "2026-11-01T22:10:37.402Z"
+    },
+    "54": {
+      "status": "done",
+      "source": "vision",
+      "model": "deepseek-chat",
+      "appearance": "长脸，面颊清瘦，清代男子剃发，前额及两鬓剃光，脑后留辫，上唇有稀疏八字髭，下颏有细长须，66 岁，眼睑下垂，颧骨微高，鼻梁挺直。",
+      "error": null,
+      "updated_at": "2026-11-01T22:13:00.170Z"
+    },
+    "59": {
+      "status": "done",
+      "source": "vision",
+      "model": "deepseek-chat",
+      "appearance": "长脸，额头高而宽，深色长卷发，中分，垂至肩际，为本人真发，无髭须，28 岁，眉骨突出，眼窝深，鼻梁长直。",
+      "error": null,
+      "updated_at": "2026-11-01T22:17:55.105Z"
+    }
+  }
+}

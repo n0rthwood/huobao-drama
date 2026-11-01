@@ -277,6 +277,10 @@
                   {{ (et.key === 'characters' ? chars.length : et.key === 'scenes' ? scenes.length : propItems.length) ? t('episode.prod.reextract', { type: et.label }) : t('episode.prod.extract', { type: et.label }) }}
                 </button>
                 <span class="asset-bar-divider" />
+                <button v-if="isDocumentary" class="btn btn-sm asset-btn-extract" @click="openRosterDialog">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M16 11a4 4 0 1 0-8 0"/><path d="M3 21v-2a5 5 0 0 1 5-5h8a5 5 0 0 1 5 5v2"/></svg>
+                  {{ t('episode.roster.open') }}
+                </button>
                 <button class="btn btn-sm asset-btn-extract" @click="assetBrowserOpen = true">
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 6h-8l-2-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2z"/></svg>
                   {{ t('components.assetBrowser.openEpisode') }}
@@ -1634,6 +1638,55 @@
         </div>
       </div>
 
+      <div v-if="roster.open" class="overlay" @click.self="roster.open = false">
+        <div class="dialog roster-dialog">
+          <header class="dialog-head">
+            <h2 class="dialog-title">{{ t('episode.roster.title') }}</h2>
+            <button class="btn btn-ghost btn-icon" @click="roster.open = false">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </header>
+          <div class="dialog-body roster-body">
+            <div class="roster-status">
+              <span v-if="!roster.exists" class="roster-badge roster-badge-none">{{ t('episode.roster.statusNone') }}</span>
+              <span v-else-if="roster.status === 'approved'" class="roster-badge roster-badge-approved">{{ t('episode.roster.statusApproved') }}</span>
+              <span v-else class="roster-badge roster-badge-draft">{{ t('episode.roster.statusDraft') }}</span>
+              <span v-if="roster.stale" class="roster-badge roster-badge-stale">{{ t('episode.roster.statusStale') }}</span>
+              <span v-if="roster.updated_at" class="dim roster-updated">{{ roster.updated_at }}</span>
+            </div>
+            <div class="roster-hint dim">{{ t('episode.roster.hint') }}</div>
+            <div v-if="roster.loading" class="roster-empty">{{ t('common.loading') }}</div>
+            <template v-else>
+              <div v-if="!roster.cast.length" class="roster-empty">{{ t('episode.roster.empty') }}</div>
+              <div v-for="(member, idx) in roster.cast" :key="idx" class="roster-row">
+                <div class="roster-row-head">
+                  <input v-model="member.name" class="input roster-name" :placeholder="t('episode.roster.namePlaceholder')" />
+                  <span class="roster-source" :class="member.source === 'human' ? 'roster-source-human' : 'roster-source-agent'">
+                    {{ member.source === 'human' ? t('episode.roster.sourceHuman') : t('episode.roster.sourceAgent') }}
+                  </span>
+                  <button class="btn btn-ghost btn-icon" :title="t('common.delete')" @click="roster.cast.splice(idx, 1)">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  </button>
+                </div>
+                <input v-model="member.reason" class="input roster-reason" :placeholder="t('episode.roster.reasonPlaceholder')" />
+                <textarea v-model="member.basis" class="textarea roster-basis" rows="2" :placeholder="t('episode.roster.basisPlaceholder')" />
+              </div>
+              <button class="btn btn-sm roster-add" @click="roster.cast.push({ name: '', basis: '', reason: '', source: 'human' })">
+                <Plus :size="11" /> {{ t('episode.roster.add') }}
+              </button>
+            </template>
+          </div>
+          <footer class="dialog-foot">
+            <button class="btn" @click="roster.open = false">{{ t('common.cancel') }}</button>
+            <button class="btn" :disabled="roster.saving" @click="saveRoster('draft')">{{ t('episode.roster.saveDraft') }}</button>
+            <button class="btn btn-primary" :disabled="roster.saving" @click="saveRoster('approved')">
+              <Loader2 v-if="roster.saving" :size="12" class="animate-spin" />
+              {{ t('episode.roster.confirm') }}
+            </button>
+          </footer>
+        </div>
+      </div>
+
       <div v-if="assetCreate.open" class="overlay" @click.self="assetCreate.open = false">
         <div class="dialog asset-create-dialog">
           <header class="dialog-head">
@@ -1816,6 +1869,49 @@ const episodeNumber = Number(route.params.episodeNumber)
 const drama = ref(null), episode = ref(null), chars = ref([]), scenes = ref([]), propItems = ref([]), sbs = ref([]), mergeData = ref(null)
 // 资产管理器（#9）：本项目资产关联到本集 / 其他项目资产全量复制导入并关联
 const assetBrowserOpen = ref(false)
+// 纪录片选角名册（Issue #32）：谁该建卡的契约。首轮由提取 Agent 生成草稿（待复核），
+// 人在这里增删后点「确认名册」锁定；之后每次提取都照同一份名册执行，剧本改动则标记过期。
+const isDocumentary = computed(() => drama.value?.genre_ruleset === 'documentary')
+const roster = ref({ open: false, loading: false, saving: false, exists: false, status: null, stale: false, updated_at: null, current_hash: '', cast: [] })
+
+async function openRosterDialog() {
+  roster.value.open = true
+  roster.value.loading = true
+  try {
+    const data = await episodeAPI.characterRoster(epId.value)
+    roster.value.exists = !!data?.exists
+    roster.value.status = data?.status || null
+    roster.value.stale = !!data?.stale
+    roster.value.updated_at = data?.updated_at || null
+    // 打开时的剧本指纹随保存回传：中途有人改了剧本就拒绝保存，不让人为旧正文签字
+    roster.value.current_hash = data?.current_hash || ''
+    roster.value.cast = (data?.cast || []).map(m => ({ name: m.name || '', basis: m.basis || '', reason: m.reason || '', source: m.source || 'agent' }))
+  } catch (e) {
+    toastError(e)
+  } finally {
+    roster.value.loading = false
+  }
+}
+
+async function saveRoster(status) {
+  const cast = roster.value.cast.filter(m => (m.name || '').trim())
+  roster.value.saving = true
+  try {
+    const data = await episodeAPI.saveCharacterRoster(epId.value, cast, status, roster.value.current_hash)
+    roster.value.exists = !!data?.exists
+    roster.value.status = data?.status || null
+    roster.value.stale = !!data?.stale
+    roster.value.updated_at = data?.updated_at || null
+    roster.value.current_hash = data?.current_hash || ''
+    roster.value.cast = (data?.cast || []).map(m => ({ name: m.name || '', basis: m.basis || '', reason: m.reason || '', source: m.source || 'human' }))
+    toast.success(status === 'approved' ? t('episode.roster.confirmed') : t('episode.roster.draftSaved'))
+    if (status === 'approved') roster.value.open = false
+  } catch (e) {
+    toastError(e)
+  } finally {
+    roster.value.saving = false
+  }
+}
 // 工作台面板位置记忆（按剧集隔离）：仅页面刷新(reload)时恢复到上次所在步骤；
 // 从列表/详情页点击进入时始终默认「剧本」面板；URL query 显式携带子状态时优先于本地记忆
 const PANEL_STORE_KEY = `huobao:workbench:panel:${dramaId}:${episodeNumber}`
@@ -5282,6 +5378,26 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
 /* 新增资产弹窗 */
 .asset-create-dialog { width: 440px; max-width: calc(100vw - 48px); }
 .asset-create-body { display: flex; flex-direction: column; gap: 10px; }
+
+/* 选角名册弹窗（纪录片）：草稿 / 已确认 / 过期三态一眼可辨 */
+.roster-dialog { width: 560px; max-width: calc(100vw - 48px); }
+.roster-body { display: flex; flex-direction: column; gap: 10px; max-height: 60vh; overflow-y: auto; }
+.roster-status { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.roster-badge { font-size: 11px; padding: 1px 7px; border-radius: 10px; border: 1px solid var(--border); }
+.roster-badge-draft { color: #b45309; border-color: #b45309; }
+.roster-badge-approved { color: var(--accent); border-color: var(--accent); }
+.roster-badge-stale { color: #b91c1c; border-color: #b91c1c; }
+.roster-badge-none { color: var(--text-dim); }
+.roster-updated { font-size: 11px; }
+.roster-hint { font-size: 11px; line-height: 1.5; }
+.roster-empty { font-size: 12px; color: var(--text-dim); padding: 10px 0; }
+.roster-row { display: flex; flex-direction: column; gap: 5px; padding: 8px; border: 1px solid var(--border); border-radius: 8px; }
+.roster-row-head { display: flex; align-items: center; gap: 6px; }
+.roster-name { flex: 1; }
+.roster-source { font-size: 10px; padding: 1px 6px; border-radius: 8px; border: 1px solid var(--border); white-space: nowrap; }
+.roster-source-human { color: var(--accent); border-color: var(--accent); }
+.roster-source-agent { color: var(--text-dim); }
+.roster-add { align-self: flex-start; }
 
 /* Asset grid */
 .asset-section-title {

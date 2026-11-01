@@ -34,6 +34,9 @@ import {
   unlinkAssetFromEpisode,
 } from '../services/asset-library.js'
 import type { AssetKind } from '../services/reference-images.js'
+import { loadEpisodeRosterRecord, saveEpisodeRosterRecord } from '../services/character-roster.js'
+import type { RosterEntryInput } from '../services/character-roster.js'
+import { normalizeAssetName } from '../services/asset-name.js'
 
 const app = new Hono()
 
@@ -220,6 +223,60 @@ app.post('/:id/extract', async (c) => {
 app.get('/:id/extract-status', async (c) => {
   const id = Number(c.req.param('id'))
   return success(c, await getExtractionStatus(id))
+})
+
+// GET /episodes/:id/character-roster — 纪录片选角名册（谁该建卡的契约，人在集页面复核）
+app.get('/:id/character-roster', async (c) => {
+  const id = Number(c.req.param('id'))
+  const record = await loadEpisodeRosterRecord(id)
+  if (!record) return notFound(c, '剧集不存在')
+  return success(c, {
+    cast: record.cast ?? [],
+    exists: record.cast !== null,
+    status: record.status,
+    stale: record.stale,
+    script_hash: record.script_hash,
+    current_hash: record.current_hash,
+    updated_at: record.updated_at,
+  })
+})
+
+// PUT /episodes/:id/character-roster — 人复核后保存名册（status 缺省按「已确认」保存）
+app.put('/:id/character-roster', async (c) => {
+  const id = Number(c.req.param('id'))
+  const body = await c.req.json().catch(() => ({} as Record<string, unknown>))
+  if (!Array.isArray(body.cast)) return badRequest(c, 'cast 必须是数组')
+  // 逐条校验：空对象/null 会被规范化成空名字而静默丢弃，那等于「确认了一份被悄悄删人的名册」
+  for (const [index, row] of (body.cast as unknown[]).entries()) {
+    if (!row || typeof row !== 'object' || Array.isArray(row)) return badRequest(c, `cast[${index}] 必须是对象`)
+    const entry = row as Record<string, unknown>
+    if (typeof entry.name !== 'string' || !normalizeAssetName(entry.name)) {
+      return badRequest(c, `cast[${index}].name 必须是非空名字（空白与 \\ / : * ? " < > | @ 会自动替换为 _）`)
+    }
+    for (const key of ['basis', 'reason', 'source'] as const) {
+      if (entry[key] !== undefined && typeof entry[key] !== 'string') return badRequest(c, `cast[${index}].${key} 必须是字符串`)
+    }
+  }
+  const existing = await loadEpisodeRosterRecord(id)
+  if (!existing) return notFound(c, '剧集不存在')
+  // 打开名册后剧本被改过就不许直接确认：否则人是在为旧正文签字（前端把 GET 返回的 current_hash 回传）
+  if (typeof body.expected_hash === 'string' && body.expected_hash && body.expected_hash !== existing.current_hash) {
+    return badRequest(c, '剧本在你打开名册之后发生了改动，请重新打开「选角名册」复核后再保存')
+  }
+  const status = body.status === 'draft' ? 'draft' : 'approved'
+  // 人手动保存的成员标 source='human'（Agent 草稿里原有的 source 会被保留），
+  // 复核即以**当前剧本**重新盖指纹：名册与这一版正文绑定
+  const record = await saveEpisodeRosterRecord(id, body.cast as RosterEntryInput[], status, 'human')
+  if (!record) return notFound(c, '剧集不存在')
+  return success(c, {
+    cast: record.cast ?? [],
+    exists: record.cast !== null,
+    status: record.status,
+    stale: record.stale,
+    script_hash: record.script_hash,
+    current_hash: record.current_hash,
+    updated_at: record.updated_at,
+  })
 })
 
 // POST /episodes/:id/generate-video-prompts — 异步批量为缺少视频提示词的分镜生成（立即返回，前端轮询状态）

@@ -78,11 +78,11 @@ app.post('/:id/appearance-from-portrait', async (c) => {
   })
 })
 
-// GET /characters/:id/appearance-from-portrait?episode_id=N — 任务状态与本次产出
+// GET /characters/:id/appearance-from-portrait[?episode_id=N] — 任务状态与本次产出
+// episode_id 可选：状态查询是只读的，缺它就按角色找最近一次任务，不该因为少一个参数就 400
 app.get('/:id/appearance-from-portrait', async (c) => {
   const id = Number(c.req.param('id'))
-  const episodeId = Number(c.req.query('episode_id'))
-  if (!episodeId) return badRequest(c, 'episode_id 必填')
+  const episodeId = Number(c.req.query('episode_id')) || null
   return success(c, await getPortraitAppearanceStatus(id, episodeId))
 })
 

@@ -1,64 +1,94 @@
 /**
- * 纪录片提取的「选角名单」（Issue #32）
+ * 纪录片提取的「选角名册」（Issue #32）
  *
- * 为什么要有这一步：同一份剧本连跑三次，提取出的角色数是 14 / 11 / 8 —— 模型是在
- * 写保存参数的同时**顺带**决定谁该建卡的，名单从来没被写下来过，于是每次漏的人都不一样。
- * 这里把「谁该建卡」变成一个显式、可检查的步骤：Agent 先按剧本顺序登记名单（save_character_roster），
- * 名单落在本次提取任务的 params.roster 上（人在任务日志/任务详情里看得见），
- * 保存角色时由代码把名单与本集已建的角色卡对账，缺谁直接回报给模型补建。
+ * 为什么要有它：同一份剧本连跑三次，提取出的角色数是 15 / 15 / 13——模型每次重新决定
+ * 谁该建卡，名单从没被固定下来，于是每次漏的人都不一样。名册把「谁该建卡」变成**一份人复核过、
+ * 跟着集走的契约**：
+ * 1. 首轮提取由 Agent 生成草稿（status='draft'，每条带入选依据与理由）；
+ * 2. 人在集页面「选角名册」里增删复核并保存（status='approved'）；
+ * 3. 之后每次提取**只能照名册执行**：不得改名、不得私自增删，名册之外的人不建卡；
+ * 4. 剧本改动（指纹变化）即判定名册过期，必须重新生成草稿并由人复核。
  *
  * 只作用于纪录片规则集：非纪录片项目的提取链路完全不走这里（调用方按 genreRuleset 判定）。
- * 本模块只依赖 services 同层（text-task / asset-name），不得 import agents/*。
+ * 本模块只依赖 services 同层（text-task / asset-name）与 db，不得 import agents/*。
  */
+import { createHash } from 'crypto'
+import { eq } from 'drizzle-orm'
+import { db, schema } from '../db/index.js'
+import { now } from '../utils/response.js'
 import { normalizeAssetName, normalizeNearName } from './asset-name.js'
-import { findActiveTextTask, parseTextTaskParams, patchTextTaskParams } from './text-task.js'
+import { findActiveTextTask, patchTextTaskParams } from './text-task.js'
 
-/** Agent 登记的一条名单项 */
+/** 名册成员的来源：'agent' = 提取 Agent 首轮草稿，'human' = 人在界面上增补/改写 */
+export type RosterSource = 'agent' | 'human'
+export type RosterStatus = 'draft' | 'approved'
+
+/** 外部（工具参数 / 接口入参 / 历史数据）传进来的一条名册项 */
 export interface RosterEntryInput {
   name: string
   basis?: string
   reason?: string
+  source?: string
 }
 
 export interface RosterEntry {
   name: string
   basis: string
   reason: string
+  source: RosterSource
 }
 
 export interface RosterNormalizeResult {
-  /** 规范化 + 去重后的名单（保留首次出现的顺序与写法） */
+  /** 规范化 + 去重后的名册（保留首次出现的顺序与写法） */
   cast: RosterEntry[]
-  /** 被并入前一条的近名/别名写法，形如「沃尔康斯基 → 沃尔孔斯基」 */
+  /** 被并入前一条的近名/别名写法，形如「沃尔孔斯基（总督） → 沃尔孔斯基」 */
   merged: string[]
   /** 规范化后为空、无法作为资产名的条目（原样回报） */
   skipped: string[]
 }
 
 export interface RosterDiff {
-  /** 名单里有、但还没有角色卡的人（要补建） */
+  /** 名册里有、但还没有角色卡的人（要补建） */
   missing_from_roster: string[]
-  /** 已保存、但名单从未登记过的名字（要么补登记，要么本来就不该建卡） */
+  /** 已保存、但名册从未登记过的名字（要么由人补进名册，要么本来就不该建卡） */
   not_in_roster: string[]
 }
 
-export interface EpisodeRoster {
-  taskId: number
-  /** 本次运行还没登记过名单时为 null（与「登记了一个空名单」区分开） */
+export interface EpisodeRosterRecord {
+  episodeId: number
+  /** 从未生成过名册时为 null（与「名册为空」区分开） */
   cast: RosterEntry[] | null
+  status: RosterStatus | null
+  /** 名册复核时所依据的剧本指纹 */
+  script_hash: string | null
+  /** 本集剧本当前的指纹（剧本为空时为空串） */
+  current_hash: string
+  /** 有名册但剧本已改动：名册过期，必须重新生成草稿并由人复核 */
+  stale: boolean
+  updated_at: string | null
 }
 
-/** 名单成员的比较口径：先按资产名规则规范化（Issue #34），再做近名归一化 */
+/** 名册成员的比较口径：先按资产名规则规范化（Issue #34），再做近名归一化 */
 export function rosterKey(name: string): string {
   return normalizeNearName(normalizeAssetName(name))
 }
 
+/** 剧本指纹：名册复核的对象是这份正文，正文一变名册即过期 */
+export function scriptFingerprint(script: string | null | undefined): string {
+  const text = (script || '').replace(/\r\n/g, '\n').trim()
+  if (!text) return ''
+  return createHash('sha256').update(text, 'utf8').digest('hex')
+}
+
 /**
- * 规范化名单：名字按资产名规则写死（它就是角色卡的名字），同一个人的不同译名/别名/
+ * 规范化名册：名字按资产名规则写死（它就是角色卡的名字），同一个人的不同译名/别名/
  * 带头衔写法按 rosterKey 合并成一条，保留先出现的那条（basis/reason 以先出现的为准，
  * 先出现的缺字段时用后来的补上）。
  */
-export function normalizeRoster(entries: RosterEntryInput[] | null | undefined): RosterNormalizeResult {
+export function normalizeRoster(
+  entries: RosterEntryInput[] | null | undefined,
+  defaultSource: RosterSource = 'agent',
+): RosterNormalizeResult {
   const cast: RosterEntry[] = []
   const merged: string[] = []
   const skipped: string[] = []
@@ -75,6 +105,7 @@ export function normalizeRoster(entries: RosterEntryInput[] | null | undefined):
     const hitIndex = key ? indexByKey.get(key) : undefined
     const basis = String(raw?.basis ?? '').trim()
     const reason = String(raw?.reason ?? '').trim()
+    const source: RosterSource = raw?.source === 'human' ? 'human' : defaultSource
     if (hitIndex !== undefined) {
       const hit = cast[hitIndex]
       if (!hit.basis && basis) hit.basis = basis
@@ -83,14 +114,14 @@ export function normalizeRoster(entries: RosterEntryInput[] | null | undefined):
       continue
     }
     if (key) indexByKey.set(key, cast.length)
-    cast.push({ name, basis, reason })
+    cast.push({ name, basis, reason, source })
   }
 
   return { cast, merged, skipped }
 }
 
 /**
- * 名单与已保存角色对账（纯函数）：两侧都按 rosterKey 比较，返回的是原始写法。
+ * 名册与已保存角色对账（纯函数）：两侧都按 rosterKey 比较，返回的是原始写法。
  * 调用方用两次：savedNames 传本集已关联的角色名 → 取 missing_from_roster；
  * savedNames 传本次保存的角色名 → 取 not_in_roster。
  */
@@ -117,54 +148,92 @@ export function diffRosterAgainstSaved(rosterNames: string[], savedNames: string
 }
 
 /**
- * 读取本集正在运行的提取任务上的名单。
- * 返回 null = 当前没有「提取角色」任务在跑（名单是一次运行的契约，没有运行就没有名单）。
+ * 把一个写法归位到名册上的正式名字（纯函数）。
+ * 提取 Agent 每次运行都可能写出不同的译名/带头衔写法；名册是契约，名字不许漂移——
+ * 近名命中就改写成名册上的名字，命中不了返回 null（= 名册之外的人，不建卡）。
  */
-export async function loadEpisodeRoster(episodeId: number): Promise<EpisodeRoster | null> {
-  const task = await findActiveTextTask(episodeId, 'extract_characters')
-  if (!task) return null
-  const roster = parseTextTaskParams(task.params)?.roster
-  if (!Array.isArray(roster)) return { taskId: task.id, cast: null }
-  return { taskId: task.id, cast: normalizeRoster(roster as RosterEntryInput[]).cast }
+export function canonicalizeToRoster(name: string, cast: RosterEntry[]): string | null {
+  const key = rosterKey(name)
+  if (!key) return null
+  return cast.find(entry => rosterKey(entry.name) === key)?.name ?? null
 }
 
-export interface RosterSaveResult {
-  taskId: number
-  cast: RosterEntry[]
-  merged: string[]
-  skipped: string[]
-  /** 本次调用新增的成员（第二次登记补人时只回报增量） */
-  added: string[]
-}
-
-/**
- * 把名单写进本集提取任务的 params.roster（合并式：第二次登记是**补人**，不会删掉先登记的人；
- * 名单一旦登记就是本次运行的契约，漏登记的人只能补，不能靠覆盖悄悄去掉）。
- * 返回 null = 当前没有「提取角色」任务在跑。
- */
-export async function saveEpisodeRoster(
-  episodeId: number,
-  entries: RosterEntryInput[],
-): Promise<RosterSaveResult | null> {
-  const existing = await loadEpisodeRoster(episodeId)
-  if (!existing) return null
-  const before = existing.cast || []
-  const beforeKeys = new Set(before.map(e => rosterKey(e.name)))
-  const normalized = normalizeRoster([...before, ...entries])
-  await patchTextTaskParams(existing.taskId, { roster: normalized.cast })
+/** 提案与名册的差异（纯函数）：人复核时要看见 Agent 想加谁、想去掉谁，系统不自动采纳 */
+export function rosterProposalDiff(cast: RosterEntry[], proposed: RosterEntry[]) {
+  const diff = diffRosterAgainstSaved(cast.map(e => e.name), proposed.map(e => e.name))
   return {
-    taskId: existing.taskId,
-    cast: normalized.cast,
-    merged: normalized.merged,
-    skipped: normalized.skipped,
-    added: normalized.cast.filter(e => !beforeKeys.has(rosterKey(e.name))).map(e => e.name),
+    // 提案里有、名册里没有的人（要人在界面上决定是否补进名册）
+    proposed_additions: diff.not_in_roster,
+    // 名册里有、提案里没有的人（名册不会因此删人）
+    proposed_removals: diff.missing_from_roster,
   }
 }
 
-/** 没有名单时给 Agent 的可执行指令（纪录片提取的硬门槛） */
-export const ROSTER_REQUIRED_MESSAGE =
-  '纪录片提取未登记选角名单：请先调用 save_character_roster，按剧本顺序把本集所有符合「谁该建卡」的人物一次登记齐（每人写 name / basis / reason），再调用 save_dedup_characters 保存。'
+/** 读取本集名册（含剧本指纹与过期判定）；剧集不存在返回 null */
+export async function loadEpisodeRosterRecord(episodeId: number): Promise<EpisodeRosterRecord | null> {
+  const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId))
+  if (!ep) return null
+  const currentHash = scriptFingerprint(ep.scriptContent || ep.content)
+  let cast: RosterEntry[] | null = null
+  if (ep.characterRoster) {
+    try {
+      const parsed = JSON.parse(ep.characterRoster)
+      if (Array.isArray(parsed)) cast = normalizeRoster(parsed as RosterEntryInput[]).cast
+    } catch {
+      cast = null
+    }
+  }
+  return {
+    episodeId,
+    cast,
+    status: ep.characterRosterStatus === 'approved' ? 'approved' : (cast ? 'draft' : null),
+    script_hash: ep.characterRosterHash || null,
+    current_hash: currentHash,
+    // 剧本或名册任一侧没有指纹时不判过期（老数据按可用处理，人仍可随时复核）
+    stale: !!cast && !!ep.characterRosterHash && !!currentHash && ep.characterRosterHash !== currentHash,
+    updated_at: ep.characterRosterUpdatedAt || null,
+  }
+}
 
-/** 没有在跑的提取任务时的说明（名单只能挂在一次提取运行上） */
-export const ROSTER_NO_TASK_MESSAGE =
-  '本集没有正在运行的「提取角色」任务，选角名单无处登记：请从「提取角色」入口发起一次提取运行，再在该运行里调用 save_character_roster 与 save_dedup_characters。'
+/**
+ * 写名册：status='draft' 是 Agent 首轮草稿，'approved' 是人复核后保存。
+ * 指纹一律按**当前剧本**重新计算：名册复核的对象就是这一版正文。
+ */
+export async function saveEpisodeRosterRecord(
+  episodeId: number,
+  entries: RosterEntryInput[],
+  status: RosterStatus,
+  defaultSource: RosterSource = 'agent',
+): Promise<EpisodeRosterRecord | null> {
+  const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId))
+  if (!ep) return null
+  const normalized = normalizeRoster(entries, defaultSource)
+  const ts = now()
+  await db.update(schema.episodes).set({
+    characterRoster: JSON.stringify(normalized.cast),
+    characterRosterHash: scriptFingerprint(ep.scriptContent || ep.content),
+    characterRosterStatus: status,
+    characterRosterUpdatedAt: ts,
+    updatedAt: ts,
+  }).where(eq(schema.episodes.id, episodeId))
+  return loadEpisodeRosterRecord(episodeId)
+}
+
+/**
+ * 把本次运行实际使用的名册记在提取任务的 params 上（只作溯源与任务日志，不是契约本体）。
+ * 没有在跑的「提取角色」任务时静默跳过：名册本体在 episodes 上，不依赖任务行。
+ */
+export async function recordRunRoster(episodeId: number, cast: RosterEntry[]): Promise<boolean> {
+  const task = await findActiveTextTask(episodeId, 'extract_characters')
+  if (!task) return false
+  await patchTextTaskParams(task.id, { roster: cast })
+  return true
+}
+
+/** 名册还没生成时给 Agent 的可执行指令（纪录片提取的硬门槛） */
+export const ROSTER_REQUIRED_MESSAGE =
+  '本集还没有选角名册：请先调用 save_character_roster，按剧本顺序把所有符合「谁该建卡」的人物一次登记齐（每人写 name / basis / reason），再调用 save_dedup_characters 保存角色。'
+
+/** 剧本改动后名册过期的指令 */
+export const ROSTER_STALE_MESSAGE =
+  '本集的选角名册是针对旧版剧本复核的，剧本已改动：请重新调用 save_character_roster，按当前剧本重建名册草稿（会覆盖旧草稿并标记为待复核），再调用 save_dedup_characters。'

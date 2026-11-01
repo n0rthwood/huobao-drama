@@ -1398,6 +1398,26 @@
         "lighting": "光线",
         "type": "类型"
       }
+    },
+    "roster": {
+      "open": "选角名册",
+      "title": "选角名册（谁该建卡）",
+      "hint": "名册是提取的契约：名册上的每一个人都会建卡，名册之外的人不会。首轮由提取 Agent 生成草稿，确认后每次提取都照同一份名册执行；剧本改动后名册会标记为过期，需要重新复核。",
+      "statusNone": "尚未生成",
+      "statusDraft": "待复核（AI 草稿）",
+      "statusApproved": "已确认",
+      "statusStale": "剧本已改动，需重新复核",
+      "empty": "名册为空：运行一次角色提取生成草稿，或在这里手动添加。",
+      "add": "添加成员",
+      "namePlaceholder": "角色卡名字（与剧本原文一致）",
+      "reasonPlaceholder": "入选理由：决策 / 行动 / 亲历 + 具体动作",
+      "basisPlaceholder": "剧本依据：点到此人的那句原文",
+      "sourceAgent": "AI 草稿",
+      "sourceHuman": "人工",
+      "saveDraft": "存为草稿",
+      "confirm": "确认名册",
+      "confirmed": "名册已确认，之后的提取将照此执行",
+      "draftSaved": "草稿已保存（仍待复核）"
     }
   },
   "errors": {

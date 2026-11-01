@@ -56,6 +56,10 @@ export const episodeAPI = {
   pipelineStatus: (id: number) => api.get(`/episodes/${id}/pipeline-status`),
   extract: (id: number, target: string, model?: string, configId?: number) => api.post(`/episodes/${id}/extract`, { target, model: model || undefined, config_id: configId || undefined }),
   extractStatus: (id: number) => api.get(`/episodes/${id}/extract-status`),
+  // 纪录片选角名册（Issue #32）：谁该建卡的契约，人在集页面复核确认后提取才照它执行
+  characterRoster: (id: number) => api.get(`/episodes/${id}/character-roster`),
+  saveCharacterRoster: (id: number, cast: { name: string; basis?: string; reason?: string; source?: string }[], status: 'draft' | 'approved' = 'approved', expectedHash?: string) =>
+    api.put(`/episodes/${id}/character-roster`, { cast, status, expected_hash: expectedHash || undefined }),
   generateVideoPrompts: (id: number, model?: string, configId?: number, storyboardIds?: number[]) => api.post(`/episodes/${id}/generate-video-prompts`, { model: model || undefined, config_id: configId || undefined, storyboard_ids: storyboardIds?.length ? storyboardIds : undefined }),
   videoPromptsStatus: (id: number) => api.get(`/episodes/${id}/video-prompts-status`),
   // 批量补齐关键帧提示词（首/中/尾三槽），与视频提示词批量同一套异步状态模型
@@ -320,7 +324,7 @@ export const characterAPI = {
   removeArchivalImage: (id: number, path: string) => api.del<ArchivalImage[]>(`/characters/${id}/archival-images?path=${encodeURIComponent(path)}`),
   reExtract: (id: number, episodeId: number, textModel?: string, textConfigId?: number) => api.post<ReExtractResp>(`/characters/${id}/re-extract`, { episode_id: episodeId, text_model: textModel || undefined, text_config_id: textConfigId || undefined }),
   appearanceFromPortrait: (id: number, episodeId: number, textConfigId?: number) => api.post<PortraitAppearanceResp>(`/characters/${id}/appearance-from-portrait`, { episode_id: episodeId, text_config_id: textConfigId || undefined }),
-  appearanceFromPortraitStatus: (id: number) => api.get<PortraitAppearanceStatusResp>(`/characters/${id}/appearance-from-portrait`),
+  appearanceFromPortraitStatus: (id: number, episodeId: number) => api.get<PortraitAppearanceStatusResp>(`/characters/${id}/appearance-from-portrait?episode_id=${episodeId}`),
 }
 
 export const sceneAPI = {

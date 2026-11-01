@@ -201,6 +201,12 @@ const SYSTEM_PROMPT = [
   '你是历史纪录片的人物造型顾问。依据史料画像与史料文字，写出该人物在【故事年份】时的可画外貌。',
   '只写静态可见的面部与体貌特征：脸型、发型（若是时代假发，写明是假发及其形制）、髭须、身材、年龄感、辨识性特征。',
   '不写服装、配饰、勋章、冠冕（那是造型字段）；不写背景、环境、情绪、动作；不写画作风格或画家笔法。',
+  // 实测缺陷（彼得一世第 1 次）：半身像里看不出身高，模型按画面比例写了「中等偏高」，
+  // 而史料文字明写他身高逾两米——身高体格必须只认文字。
+  '`build`（身材体格，含身高）**只能**取自史料文字里的明确记载；画像是半身/胸像时看不出身高，一律不得据画面推断。文字没有记载就留空。',
+  // 实测缺陷：「左颊或右颊有痣」这种两可写法进了提示词就是让生图模型自己掷骰子。
+  '不许写两可与推测：禁止出现「或」「可能」「似乎」「大约」「疑似」这类词；拿不准的特征直接留空，不要给备选项。',
+  '`age_at_story` 写成确定的岁数（故事年份减出生年），例如「47 岁」；算不出就留空，不要写「四十余岁」之类的模糊区间。',
   '绝对不要出现任何网址、域名、「据维基百科」「资料来源」「参见」「[1]」之类的来源标注。',
   '每个字段一个简短中文短语（不超过 20 字），没有依据的字段留空字符串，不要编造。',
   '只输出 JSON，不要任何解释文字：',
@@ -462,16 +468,19 @@ async function recordProvenance(
 }
 
 /**
- * 状态接口：该集该角色最近一次 portrait_appearance 任务。
+ * 状态接口：该角色最近一次 portrait_appearance 任务（给了集号就限定在该集）。
  * sys_task 行按「集」落库，同一集里不同角色各有各的任务行，必须按 params.character_id
  * 过滤——否则会把别的角色的模型/外貌回给当前角色。进行中的那条优先。
  */
 export async function getPortraitAppearanceStatus(
   characterId: number,
-  episodeId: number,
+  episodeId: number | null,
 ): Promise<PortraitAppearanceStatus> {
+  const where = episodeId
+    ? and(eq(schema.sysTask.type, 'text'), eq(schema.sysTask.episodeId, episodeId))
+    : eq(schema.sysTask.type, 'text')
   const rows = (await db.select().from(schema.sysTask)
-    .where(and(eq(schema.sysTask.type, 'text'), eq(schema.sysTask.episodeId, episodeId)))
+    .where(where)
     .orderBy(desc(schema.sysTask.id))
   ).filter(r => textTaskKindOf(r) === 'portrait_appearance'
     && parseTextTaskParams(r.params)?.character_id === characterId)

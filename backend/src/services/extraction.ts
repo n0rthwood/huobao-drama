@@ -71,7 +71,7 @@ export async function startSingleAssetExtraction(
   const label = { characters: '角色', scenes: '场景', props: '道具' }[target]
   const message = `请只针对本集剧本中的${label}「${assetName}」重新提取信息并保存，不要处理其它${label}；`
     + `提取与去重规范以系统提示词与技能为准。该${label}的既有字段已被清空，请完整重写。`
-  return startExtractorRun(episodeId, dramaId, target, message, opts)
+  return startExtractorRun(episodeId, dramaId, target, message, { ...opts, singleAssetName: assetName })
 }
 
 /** 提取 Agent 的统一运行入口（整集提取与单资产重提取共用） */
@@ -80,7 +80,7 @@ async function startExtractorRun(
   dramaId: number,
   target: ExtractTarget,
   message: string,
-  opts: { model?: string; configId?: number; retryOf?: number } = {},
+  opts: { model?: string; configId?: number; retryOf?: number; singleAssetName?: string } = {},
 ): Promise<boolean> {
   const kind = EXTRACT_TASK_KINDS[target]
   if (await findActiveTextTask(episodeId, kind)) return false
@@ -106,6 +106,7 @@ async function startExtractorRun(
       dramaId,
       modelOverride: opts.model || undefined,
       textConfigId: opts.configId || undefined,
+      singleAssetName: opts.singleAssetName,
     })
     return runAgent(agent, [{ role: 'user', content: message }], {
       maxSteps: 20,

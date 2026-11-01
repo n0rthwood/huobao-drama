@@ -41,6 +41,10 @@ export const sqliteSchemaStatements = [
     image_config_id INTEGER,
     video_config_id INTEGER,
     resolution TEXT DEFAULT '720p',
+    character_roster TEXT,
+    character_roster_hash TEXT,
+    character_roster_status TEXT,
+    character_roster_updated_at TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     deleted_at TEXT
@@ -418,6 +422,11 @@ const columnAdditions: { table: string; column: string; type: string }[] = [
   { table: 'props', column: 'final_prompt_updated_at', type: 'TEXT' },
   // 史料参考画像（Issue #32，JSON 数组）：与 reference_images 严格分离，生图链路不读
   { table: 'characters', column: 'archival_images', type: 'TEXT' },
+  // 纪录片选角名册（Issue #32）：谁该建卡的名册本体 + 复核时的剧本指纹 + draft/approved 状态
+  { table: 'episodes', column: 'character_roster', type: 'TEXT' },
+  { table: 'episodes', column: 'character_roster_hash', type: 'TEXT' },
+  { table: 'episodes', column: 'character_roster_status', type: 'TEXT' },
+  { table: 'episodes', column: 'character_roster_updated_at', type: 'TEXT' },
 ]
 
 /**

@@ -16,6 +16,8 @@ export interface AgentRequestContextValues {
   textConfigId?: number
   /** AI 内容语言；缺省时读全局设置（app_settings.content_language） */
   language?: ContentLanguage
+  /** 单资产重提取作用的资产名（Issue #32）：名册完整性只对这一个人要求，不牵连其它成员 */
+  singleAssetName?: string
   /** 题材规则集（Issue #32）；缺省时按项目的 genre + 纪录片开关解析 */
   genreRuleset?: GenreRuleset | null
   /** 本次运行的检索预算作用域（构建处生成，调用方不传） */
@@ -29,6 +31,7 @@ export function buildAgentRequestContext(values: AgentRequestContextValues): Req
   if (values.modelOverride) rc.set('modelOverride', values.modelOverride)
   if (values.textConfigId) rc.set('textConfigId', values.textConfigId)
   if (values.storyboardId) rc.set('storyboardId', values.storyboardId)
+  if (values.singleAssetName) rc.set('singleAssetName', values.singleAssetName)
   // 语言在构建处统一解析：4 条链路（chat/提取/图片提示词/视频提示词）都经过这里，
   // 全局设置一处生效；显式传入 values.language 可按请求覆盖
   rc.set('language', values.language ?? getContentLanguage())
@@ -68,6 +71,12 @@ export function getContentLanguageFromRC(requestContext: RequestContext | undefi
 export function getGenreRuleset(requestContext: RequestContext | undefined): GenreRuleset | null {
   const v = requestContext?.get('genreRuleset' as never)
   return v === 'documentary' ? 'documentary' : null
+}
+
+/** 读取单资产重提取的目标资产名；整集提取为 null */
+export function getSingleAssetName(requestContext: RequestContext | undefined): string | null {
+  const v = requestContext?.get('singleAssetName' as never)
+  return typeof v === 'string' && v ? v : null
 }
 
 /** 读取本次 Agent 运行的检索预算作用域 id */

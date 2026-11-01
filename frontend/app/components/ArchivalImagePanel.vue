@@ -283,7 +283,7 @@ function pollPortrait(left = 100) {
   portraitTimer = setTimeout(async () => {
     portraitTimer = null
     try {
-      const st = await characterAPI.appearanceFromPortraitStatus(props.characterId)
+      const st = await characterAPI.appearanceFromPortraitStatus(props.characterId, Number(props.episodeId))
       if (portraitStopped) return
       if (st?.status === 'done') {
         portraitRunning.value = false

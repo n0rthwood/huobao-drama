@@ -25,7 +25,7 @@ function run(script) {
   return JSON.parse(out.slice(out.lastIndexOf('@@') + 2))
 }
 
-const IMPORT = `import { normalizeRoster, diffRosterAgainstSaved, rosterKey } from './src/services/character-roster.ts'`
+const IMPORT = `import { normalizeRoster, diffRosterAgainstSaved, rosterKey, canonicalizeToRoster, rosterProposalDiff, scriptFingerprint } from './src/services/character-roster.ts'`
 
 test('normalizeRoster pins names to the asset-name rules and merges aliases of the same person', () => {
   const result = run(`
@@ -108,4 +108,72 @@ test('rosterKey is the single comparison yardstick: asset-name rules then near-n
   assert.equal(underscored, plain)
   assert.equal(titled, lower)
   assert.equal(blank, '')
+})
+
+test('canonicalizeToRoster pins a drifting spelling back onto the roster name, or rejects it', () => {
+  const result = run(`
+    ${IMPORT}
+    const cast = [
+      { name: '沃尔孔斯基', basis: '', reason: '', source: 'agent' },
+      { name: '布赫_戈尔', basis: '', reason: '', source: 'human' },
+    ]
+    process.stdout.write('@@' + JSON.stringify([
+      canonicalizeToRoster('沃尔孔斯基（总督）', cast),
+      canonicalizeToRoster('布赫 戈尔', cast),
+      canonicalizeToRoster('布赫戈尔', cast),
+      canonicalizeToRoster('戈利岑', cast),
+      canonicalizeToRoster('  ', cast),
+    ]))
+  `)
+  const [titled, spaced, dropped, stranger, blank] = result
+  // 名册上的写法是唯一写法：近名一律归位，归不了位的返回 null（= 不建卡）
+  assert.equal(titled, '沃尔孔斯基')
+  assert.equal(spaced, '布赫_戈尔')
+  assert.equal(dropped, '布赫_戈尔')
+  assert.equal(stranger, null)
+  assert.equal(blank, null)
+})
+
+test('rosterProposalDiff reports what the agent would add or drop, and never mutates the roster', () => {
+  const result = run(`
+    ${IMPORT}
+    const cast = normalizeRoster([{ name: '彼得一世' }, { name: '沃尔孔斯基' }, { name: '阿列克谢' }]).cast
+    const proposal = normalizeRoster([{ name: '彼得一世（沙皇）' }, { name: '戈利岑' }]).cast
+    process.stdout.write('@@' + JSON.stringify({ diff: rosterProposalDiff(cast, proposal), castAfter: cast.map(e => e.name) }))
+  `)
+  assert.deepEqual(result.diff.proposed_additions, ['戈利岑'])
+  assert.deepEqual(result.diff.proposed_removals, ['沃尔孔斯基', '阿列克谢'])
+  assert.deepEqual(result.castAfter, ['彼得一世', '沃尔孔斯基', '阿列克谢'])
+})
+
+test('normalizeRoster keeps the human source marker and defaults the rest to agent', () => {
+  const result = run(`
+    ${IMPORT}
+    process.stdout.write('@@' + JSON.stringify([
+      normalizeRoster([{ name: '康熙' }, { name: '测绘员', source: 'human' }]).cast,
+      normalizeRoster([{ name: '康熙' }], 'human').cast,
+    ]))
+  `)
+  const [mixed, humanDefault] = result
+  assert.deepEqual(mixed.map(e => e.source), ['agent', 'human'])
+  assert.equal(humanDefault[0].source, 'human')
+})
+
+test('scriptFingerprint ignores trailing whitespace and CRLF but changes with the text', () => {
+  const result = run(`
+    ${IMPORT}
+    process.stdout.write('@@' + JSON.stringify([
+      scriptFingerprint('S1 彼得一世下令\\n'),
+      scriptFingerprint('S1 彼得一世下令\\r\\n  '),
+      scriptFingerprint('S1 彼得一世下令。'),
+      scriptFingerprint(''),
+      scriptFingerprint(null),
+    ]))
+  `)
+  const [base, sameCrlf, edited, empty, nullish] = result
+  assert.equal(sameCrlf, base)
+  assert.notEqual(edited, base)
+  // 剧本为空时没有指纹：不会把「空剧本」判成名册过期
+  assert.equal(empty, '')
+  assert.equal(nullish, '')
 })
