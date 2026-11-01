@@ -1,0 +1,17 @@
+验收 5d（reused → 照常出图）与验收 8（幂等重按）
+
+前置：批次 567 跑完 39 个资产的提示词与图像提交后被手动停止（验收 7），其中 10 张图像已完成并回写。
+再把角色 13 的 image_url 置空（模拟「有提示词、无图」），重按「批量角色」且两个勾选都不勾：
+
+POST /dramas/3/assets/batch-generate {"scope":"characters","episode_id":5}
+→ counts: {"total":12,"skipped":{"has_image":11,...},"prompt":{"done":1,"reused":1,...}}
+→ items: 11 × (state=skip_has_image)  +  1 × {asset_id:13, selection:'ready', prompt_outcome:'reused', state:'submitted', task_id:608}
+
+结论：
+- 已完成（有图 + 有提示词）的 11 个角色被跳过，重按只处理未完成项 → 幂等重按成立（验收 8）。
+- 角色 13 直接复用库里的提示词（prompt_outcome='reused'，未调用 prompt_generator）并提交图像任务（验收 5d）。
+
+验收 7（取消）两次证据：
+- 批次 546：取消后父任务 cancelled，6 个已提交的 qwen-jobs 任务全部 cancelled，剩余项 cancelled，无新派发。
+- 批次 567：取消后 counts 冻结在 prompt 39/39、image submitted 39、done 10、failed 0，29 个在途/排队项转 cancelled，
+  父任务 status=cancelled、cancel_requested=true。
