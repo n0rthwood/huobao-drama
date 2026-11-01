@@ -36,8 +36,8 @@ model: ""
 
 ```json
 {"narrations": [
-  {"shot_number": 1, "narration": "1720년, 청과 준가르와 러시아가 이 초원에 동시에 수를 두었다."},
-  {"shot_number": 2, "narration": "5월, 강희제의 두 갈래 대군이 칭하이와 쓰촨·윈난에서 라싸로 향했다."},
+  {"shot_number": 1, "narration": "一七二〇年，清、准、俄三方在这片草原上同时落子。"},
+  {"shot_number": 2, "narration": "五月，康熙的两路大军从青海与川滇出发，目标是拉萨。"},
   {"shot_number": 7, "narration": "", "narration_enabled": false}
 ]}
 ```

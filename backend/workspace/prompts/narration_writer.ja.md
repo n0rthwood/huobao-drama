@@ -36,8 +36,8 @@ model: ""
 
 ```json
 {"narrations": [
-  {"shot_number": 1, "narration": "一七二〇年、清・ジュンガル・ロシアがこの草原で同時に手を打った。"},
-  {"shot_number": 2, "narration": "五月、康熙帝の二軍が青海と川滇から出発し、ラサを目指した。"},
+  {"shot_number": 1, "narration": "一七二〇年，清、准、俄三方在这片草原上同时落子。"},
+  {"shot_number": 2, "narration": "五月，康熙的两路大军从青海与川滇出发，目标是拉萨。"},
   {"shot_number": 7, "narration": "", "narration_enabled": false}
 ]}
 ```
