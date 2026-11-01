@@ -16,7 +16,7 @@
 | 5b | 有旧提示词 + 重写失败 → failed、不拿旧稿出图 | ✅ | 批次 553：角色 14–24 的 `final_prompt` sha256 前后完全一致，12 项全部 `task_id=null`，批次期间角色图像任务数 18 → 18 未增 |
 | 5c | `unchanged_after_rewrite` → 照常出图并单列计数 | ✅ | 批次 565（假文本服务回放逐字相同的提示词）：角色 14 `prompt_outcome=unchanged_after_rewrite`、`task_id=566` 且图像完成，`counts.prompt.unchanged_after_rewrite=1`，提示词 hash 未变 |
 | 5d | 未勾重写、已有提示词 → reused 并出图 | ✅ | 批次 607：角色 13（有提示词无图）→ selection=ready、prompt_outcome=reused、task_id=608，未调用 prompt_generator |
-| 6 | 忠实素材保护 | ✅ | drama 3 的 6 个 `provider='upload'` 当前图（场景 29、道具 25/26/39/40/41）在「覆盖 + 重写」全量批量里全部 `skip_faithful`，未产生图像任务、提示词未改；另用 11 个人工注册的 upload 版本行验证角色侧同样被跳过（批次 565，`skipped.faithful=11`） |
+| 6 | 忠实素材保护 | ✅（与运行前备份逐字段对比） | drama 3 的 6 个 `provider='upload'` 当前图（场景 29、道具 25/26/39/40/41）在「覆盖 + 重写」全量批量里全部 `skip_faithful`，未产生图像任务、提示词未改；另用 11 个人工注册的 upload 版本行验证角色侧同样被跳过（批次 565，`skipped.faithful=11`）；与 `~/huobao-backup/huobao.sqlite3.pre-issue33-20261101-201429` 对比，这 6 个资产的 `image_url` 与 `final_prompt` 全部逐字未变 |
 | 7 | 取消 | ✅ | 批次 546：取消后父任务 `cancelled`，6 个已提交 qwen-jobs 任务全部 `cancelled`，剩余项 `cancelled`，无新派发 |
 | 8 | 幂等重按 | ✅ | 批次 607：11 个已完成角色 skip_has_image，只处理未完成的 1 项 |
 | 9 | 同剧单批次 | ✅ | 运行中再调 start → `400 该项目已有资产批量在运行，请等待或先停止`；UI 四个按钮同时置灰（`02-batch-running.png`） |
