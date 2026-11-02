@@ -159,6 +159,8 @@ export interface ImageJobBodyOptions {
   /** "WxH" 画幅 */
   size: string | null | undefined
   flux: boolean
+  /** Poster 任务模式（Issue #39）：initial 按画幅出图；composite/layers 跟随参考图尺寸 */
+  posterMode?: string | null
 }
 
 /** 多参考图在 FLUX 下被降级为第 1 张时的说明，写入任务 metadata（远端任务详情可查） */
@@ -185,7 +187,10 @@ export function buildImageJobBody(opts: ImageJobBodyOptions): QwenJobRequest {
       ...(refs.length ? { reference_images: refs, denoising_strength: FLUX_DENOISING_STRENGTH } : {}),
     }
   }
-  const mode: QwenJobMode = !fileIds.length ? 'text_to_image' : isKeyframe ? 'reference_to_image' : 'image_edit'
+  // Poster initial 需要按剧集画幅出图；composite/layers 的第一张参考图已是 Poster 画幅，
+  // 用 image_edit 跟随它并保留文字保真度。
+  const fixedAspect = isKeyframe || opts.posterMode === 'initial'
+  const mode: QwenJobMode = !fileIds.length ? 'text_to_image' : fixedAspect ? 'reference_to_image' : 'image_edit'
   return {
     mode,
     prompt: withReferenceHint(prompt, fileIds.length),

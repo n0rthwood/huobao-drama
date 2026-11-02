@@ -697,12 +697,22 @@ export const mediaLibraryAPI = {
   copy: (url: string) => api.post<{ url: string; path: string; copied_from: string }>('/media-library/copy', { url }),
 }
 export const mergeAPI = {
-  merge: (epId: number, storyboardIds?: number[]) => api.post(`/merge/episodes/${epId}/merge`, storyboardIds?.length ? { storyboard_ids: storyboardIds } : {}),
+  merge: (epId: number, storyboardIds?: number[], poster?: { versionId: number; duration: number }) => api.post(`/merge/episodes/${epId}/merge`, {
+    ...(storyboardIds?.length ? { storyboard_ids: storyboardIds } : {}),
+    ...(poster?.versionId ? { poster_version_id: poster.versionId, poster_duration: poster.duration } : {}),
+  }),
   status: (epId: number) => api.get(`/merge/episodes/${epId}/merge`),
   list: (epId: number) => api.get<any[]>(`/merge/episodes/${epId}/merges`),
   // 删除成片：软删记录 + 删除磁盘文件；返回回退后的 episodes.video_url
   del: (epId: number, mergeId: number) =>
     api.del<{ id: number; deleted: boolean; episode_video_url: string | null }>(`/merge/episodes/${epId}/merges/${mergeId}`),
+}
+export const posterAPI = {
+  get: (epId: number) => api.get(`/episodes/${epId}/poster`),
+  save: (epId: number, data: Record<string, unknown>) => api.put(`/episodes/${epId}/poster`, data),
+  generate: (epId: number, data: Record<string, unknown>) => api.post(`/episodes/${epId}/poster/generate`, data),
+  registerVersion: (epId: number, data: Record<string, unknown>) => api.post(`/episodes/${epId}/poster/versions`, data),
+  selectVersion: (epId: number, versionId: number) => api.put(`/episodes/${epId}/poster/select`, { version_id: versionId }),
 }
 export const aiConfigAPI = {
   list: (t?: string) => api.get(`/ai-configs${t ? `?service_type=${t}` : ''}`),

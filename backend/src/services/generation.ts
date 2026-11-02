@@ -6,7 +6,7 @@ import { db, getInsertId, schema } from '../db/index.js'
 import { and, eq, inArray } from 'drizzle-orm'
 import { getActiveConfig, getConfigById } from './ai.js'
 import { now } from '../utils/response.js'
-import { downloadFile, fetchImageAsCompressedDataUrl, generateImageThumb, readImageAsCompressedDataUrl, readImageAsDataUrl, saveBase64Image, saveImageBuffer } from '../utils/storage.js'
+import { downloadFile, fetchImageAsCompressedDataUrl, generateImageThumb, readImageAsCompressedDataUrl, readImageAsDataUrl, readImageAsPngDataUrl, saveBase64Image, saveImageBuffer } from '../utils/storage.js'
 import { extractVideoPoster } from '../utils/video-poster.js'
 import { authHeaders } from './adapters/comfyui-client'
 import { getImageAdapter, getVideoAdapter } from './adapters/registry'
@@ -66,6 +66,10 @@ interface TaskOriginParams {
   sourcePrompt?: string
   refNameIndex?: Record<string, number>
   retryOf?: number
+  /** Poster 任务归属（Issue #39）：只带 episode/drama，完成后回写 poster_versions */
+  posterId?: number
+  posterGenMode?: 'initial' | 'composite' | 'layers'
+  posterTextPrompt?: string
 }
 
 interface GenerateImageParams extends TaskOriginParams {
@@ -120,6 +124,9 @@ export async function generateImage(params: GenerateImageParams): Promise<number
     ? (await getConfigById(params.configId)) ?? await getActiveConfig('image')
     : await getActiveConfig('image')
   if (!config) throw new Error('未配置图片模型，请先到「设置」页添加并启用 AI 服务')
+  if (params.posterGenMode === 'layers' && isFluxJobsConfig({ ...config, model: params.model || config.model })) {
+    throw new Error('FLUX 不支持底图＋文字图层的双参考图模式，请改用合成图再生成')
+  }
 
   const id = await createTask('image', config, {
     storyboardId: params.storyboardId,
@@ -222,6 +229,9 @@ function originParams(params: TaskOriginParams): Record<string, unknown> {
   if (params.sourcePrompt) out.sourcePrompt = params.sourcePrompt
   if (params.refNameIndex && Object.keys(params.refNameIndex).length) out.refNameIndex = params.refNameIndex
   if (params.retryOf) out.retry_of = params.retryOf
+  if (params.posterId) out.posterId = params.posterId
+  if (params.posterGenMode) out.posterGenMode = params.posterGenMode
+  if (params.posterTextPrompt) out.text_prompt = params.posterTextPrompt
   return out
 }
 
@@ -299,7 +309,9 @@ async function processTask(id: number, config: AIConfig) {
         return
       }
       const adapter = getImageAdapter(config.provider)
-      const resolvedReferenceImages = await normalizeReferenceImages(params.referenceImages)
+      const resolvedReferenceImages = params.posterId
+        ? await normalizePosterReferenceImages(params.posterGenMode, params.referenceImages)
+        : await normalizeReferenceImages(params.referenceImages)
       const imageRecord: ImageGenerationRecord = {
         id: record.id,
         model: record.model,
@@ -440,7 +452,9 @@ const inFlightQwenSubmits = new Set<number>()
  * 参考图被服务端回收（422 unknown reference image）时清掉 file id 缓存并重传一次。
  */
 async function submitQwenJobsImage(record: SysTaskRecord, config: AIConfig, params: Record<string, any>) {
-  const refs = await normalizeReferenceImages(params.referenceImages)
+  const refs = params.posterId
+    ? await normalizePosterReferenceImages(params.posterGenMode, params.referenceImages)
+    : await normalizeReferenceImages(params.referenceImages)
   if (refs.length > QWEN_MAX_REFS) {
     throw new Error(`参考图超限：共 ${refs.length} 张，单次最多 ${QWEN_MAX_REFS} 张，请减少绑定的角色/场景/道具`)
   }
@@ -451,7 +465,7 @@ async function submitQwenJobsImage(record: SysTaskRecord, config: AIConfig, para
     const fileIds: string[] = []
     // FLUX：reference_to_image 只收 1 张参考图（img2img），多张时降级为第 1 张；
     // 降级说明写入任务 metadata（远端任务详情可查）并记 warning，不静默丢弃。
-    const flux = isFluxJobsConfig(config)
+    const flux = isFluxJobsConfig(record.params && params.posterId ? { ...config, model: record.model || config.model } : config)
     if (flux && refs.length > 1) {
       logTaskWarn('ImageTask', 'flux uses only the first reference image', { id: record.id, refs: refs.length })
     }
@@ -466,6 +480,7 @@ async function submitQwenJobsImage(record: SysTaskRecord, config: AIConfig, para
       isKeyframe,
       size: params.size,
       flux,
+      posterMode: params.posterGenMode,
     })
     body.metadata = flux && refs.length > 1
       ? { sys_task_id: String(record.id), [FLUX_REFS_DROPPED_NOTE]: String(refs.length) }
@@ -697,6 +712,31 @@ async function handleImageCompleteBase64(record: SysTaskRecord, base64Data: stri
 // 图片完成后回写业务表：分镜(按 frameType)、角色、场景、道具
 async function writeBackImageAssets(record: SysTaskRecord, localPath: string) {
   const params = parseTaskParams(record.params)
+  const posterId = Number(params.posterId || 0)
+  if (posterId) {
+    // Poster 生图只新增候选版本，不改当前底图/排版，也不自动选中（用户显式选择）
+    if (record.episodeId && record.dramaId) {
+      await db.insert(schema.posterVersions).values({
+        posterId,
+        episodeId: record.episodeId,
+        dramaId: record.dramaId,
+        kind: 'generate',
+        image: localPath,
+        prompt: record.prompt || null,
+        textPrompt: typeof params.text_prompt === 'string' ? params.text_prompt : null,
+        mode: typeof params.posterGenMode === 'string' ? params.posterGenMode : null,
+        referenceImages: Array.isArray(params.referenceImages) ? JSON.stringify(params.referenceImages) : null,
+        provider: record.provider || null,
+        model: record.model || null,
+        sysTaskId: record.id,
+        createdAt: now(),
+        generatedAt: Math.floor(Date.now() / 1000),
+      })
+      logTaskSuccess('ImageTask', 'poster-version-saved', { id: record.id, posterId })
+    } else {
+      logTaskWarn('ImageTask', 'poster-task-missing-episode', { id: record.id, posterId })
+    }
+  }
   if (record.storyboardId) {
     const slot = FRAME_TYPE_SLOT[String(params.frameType || '')]
     const sbUpdate: Record<string, any> = { updatedAt: now() }
@@ -795,6 +835,37 @@ async function normalizeReferenceImages(refs: string[] | null | undefined): Prom
   }))
 
   // 不做张数截断：厂商上限由各 adapter 明确报错（静默丢参考图会让用户得到无法解释的结果）
+  return normalized.filter((item): item is string => !!item)
+}
+
+/** Poster 合成图/文字图层的 PNG 长边上限，与关键帧出图档位一致 */
+const POSTER_PNG_MAX_SIDE = 1344
+
+/**
+ * Poster 二次生成的参考图：合成图/底图/透明文字图层必须保留 alpha 与文字清晰度，
+ * 走 PNG；initial 的资产参考图仍用通用 JPEG 归一化，避免多图 payload 膨胀。
+ */
+async function normalizePosterReferenceImages(
+  mode: string | undefined,
+  refs: string[] | null | undefined,
+): Promise<string[]> {
+  if (mode !== 'composite' && mode !== 'layers') return normalizeReferenceImages(refs)
+  if (!Array.isArray(refs) || !refs.length) return []
+
+  const deduped = Array.from(new Set(refs.map(item => String(item || '').trim()).filter(Boolean)))
+  const normalized = await Promise.all(deduped.map(async value => {
+    if (value.startsWith('static/') || value.startsWith('/static/')) {
+      const localPath = value.startsWith('/static/') ? value.slice(1) : value
+      try {
+        return await readImageAsPngDataUrl(localPath, POSTER_PNG_MAX_SIDE)
+      } catch (err) {
+        logTaskWarn('ImageTask', 'poster-reference-read-failed', { path: localPath, error: (err as Error).message })
+        return null
+      }
+    }
+    // data URL / 远程 URL：上传环节保留原字节（含 alpha）
+    return value
+  }))
   return normalized.filter((item): item is string => !!item)
 }
 

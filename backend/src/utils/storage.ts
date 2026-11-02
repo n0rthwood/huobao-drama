@@ -139,6 +139,19 @@ export async function readImageAsCompressedDataUrl(
 }
 
 /**
+ * 读取图片为 PNG data URL：保留透明通道，长边限制到 maxSide。
+ * Poster 的合成图/底图/文字图层需要 alpha 与文字清晰度，不能走 JPEG 压缩管线。
+ */
+export async function readImageAsPngDataUrl(relativePath: string, maxSide = 1344): Promise<string> {
+  const buffer = await sharp(getAbsolutePath(relativePath))
+    .rotate()
+    .resize({ width: maxSide, height: maxSide, fit: 'inside', withoutEnlargement: true })
+    .png()
+    .toBuffer()
+  return `data:image/png;base64,${buffer.toString('base64')}`
+}
+
+/**
  * 下载远程图片并压缩为 data URL（远程参考图归一化，供 multipart/base64 上传类厂商使用）
  */
 export async function fetchImageAsCompressedDataUrl(

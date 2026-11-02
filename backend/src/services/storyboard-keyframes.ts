@@ -31,8 +31,8 @@ import {
 import { getDramaStylePrompt } from './style-preset.js'
 import { isQwenJobsTask } from './sys-task.js'
 
-/** 剧集画幅 → 关键帧尺寸（与 H3 的 1080p 档位同画幅，生图侧统一按长边 1344） */
-const KEYFRAME_SIZES: Record<string, string> = {
+/** 剧集画幅 → 关键帧尺寸（与 H3 的 1080p 档位同画幅，生图侧统一按长边 1344）；Poster 复用同一档位 */
+export const KEYFRAME_SIZES: Record<string, string> = {
   '16:9': '1344x768',
   '9:16': '768x1344',
   '4:3': '1152x864',

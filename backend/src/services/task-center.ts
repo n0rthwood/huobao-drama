@@ -159,6 +159,8 @@ export function buildTaskRow(row: SysTaskRow, lookups: NameLookups): TaskRow {
   } else if (row.propId != null) {
     targetKind = 'prop'
     targetName = lookups.props.get(row.propId) ?? null
+  } else if (params.posterId) {
+    targetKind = 'episode'
   } else if (row.type === 'text') {
     targetKind = 'episode'
   }
@@ -194,6 +196,7 @@ export function buildTaskRow(row: SysTaskRow, lookups: NameLookups): TaskRow {
       kind,
       targetKind,
       targetName,
+      poster: !!params.posterId,
     }),
   }
 }

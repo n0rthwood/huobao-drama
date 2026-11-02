@@ -59,6 +59,16 @@
         :style="{ animationDelay: `${i * 0.05}s` }"
         @click="navigateTo(`/drama/${drama.id}/episode/${ep.episode_number || ep.episodeNumber}`)"
       >
+        <!-- Poster 缩略图（Issue #39）：有最终 Poster 时显示，无则保持原卡片布局 -->
+        <div v-if="ep.thumbnail" class="ep-thumb">
+          <img
+            :src="thumbOf(mediaUrl(ep.thumbnail))"
+            :alt="ep.title"
+            loading="lazy"
+            @error="thumbFallback($event, mediaUrl(ep.thumbnail))"
+          />
+        </div>
+
         <!-- 上区：编号 + 标题元数据 + 状态 -->
         <div class="ep-card-top">
           <div :class="['ep-number', `ep-num-${epStatus(ep)}`]">
@@ -1418,6 +1428,21 @@ onUnmounted(() => {
 }
 .ep-card:hover {
   border-color: var(--border-strong);
+}
+
+/* Poster 缩略图：固定 16:9 展示位，contain 保证竖版海报文字不被裁掉 */
+.ep-thumb {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #0b0d12;
+}
+.ep-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
 }
 
 /* 上区：编号 + 标题元数据 + 状态 */

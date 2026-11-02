@@ -329,8 +329,53 @@ export const videoMerges = sqliteTable('video_merges', {
   completedAt: text('completed_at'),
   // 成片生成时间（unix 秒），与 sys_task.generated_at 同口径
   generatedAt: integer('generated_at'),
+  // Poster 片头（Issue #39）：静态海报图 + 展示秒数；与成片封面 *_poster.jpg 无关
+  introImage: text('intro_image'),
+  introDuration: real('intro_duration'),
   deletedAt: text('deleted_at'),
 })
+
+// 剧集 Poster（Issue #39）：每集一份编辑工程，保留生图候选与排版保存版本
+export const episodePosters = sqliteTable('episode_posters', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  dramaId: integer('drama_id').notNull(),
+  episodeId: integer('episode_id').notNull(),
+  // 画面 prompt 与针对文字的描述
+  prompt: text('prompt'),
+  textPrompt: text('text_prompt'),
+  // 本集资产参考图快照 JSON（[{path, label}]）
+  referenceImages: text('reference_images'),
+  // 当前编辑底图
+  baseImage: text('base_image'),
+  // 文字图层布局 JSON
+  layout: text('layout'),
+  selectedVersionId: integer('selected_version_id'),
+  finalImage: text('final_image'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+})
+
+// Poster 版本：kind = generate（AI 候选）| composite（本地合成）
+export const posterVersions = sqliteTable('poster_versions', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  posterId: integer('poster_id').notNull(),
+  episodeId: integer('episode_id').notNull(),
+  dramaId: integer('drama_id').notNull(),
+  kind: text('kind').notNull(),
+  image: text('image'),
+  baseImage: text('base_image'),
+  layout: text('layout'),
+  prompt: text('prompt'),
+  textPrompt: text('text_prompt'),
+  mode: text('mode'),
+  referenceImages: text('reference_images'),
+  provider: text('provider'),
+  model: text('model'),
+  sysTaskId: integer('sys_task_id'),
+  createdAt: text('created_at').notNull(),
+  generatedAt: integer('generated_at'),
+})
+
 
 // 服务端批量视频任务：按分镜顺序串行生成，持久化以便重启恢复与跨页面查看进度
 export const videoBatches = sqliteTable('video_batches', {

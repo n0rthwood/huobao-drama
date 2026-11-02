@@ -146,3 +146,20 @@ test('image job body: qwen keeps image_edit semantics, flux maps refs to referen
   })
   assert.equal(result.strength, 0.75)
 })
+
+test('poster reference generation fixes initial aspect but edits composite/layers at reference dimensions', () => {
+  const result = runInBackend(`
+    const base = { prompt: 'Poster', size: '768x1344', fileIds: ['base', 'text'], isKeyframe: false, flux: false }
+    process.stdout.write(JSON.stringify(['initial', 'composite', 'layers'].map(posterMode =>
+      client.buildImageJobBody({ ...base, posterMode }))))
+  `)
+  assert.equal(result[0].mode, 'reference_to_image')
+  assert.equal(result[0].width, 768)
+  assert.equal(result[0].height, 1344)
+  for (const request of result.slice(1)) {
+    assert.equal(request.mode, 'image_edit')
+    assert.equal('width' in request, false)
+    assert.equal('height' in request, false)
+    assert.deepEqual(request.reference_images, ['base', 'text'])
+  }
+})
