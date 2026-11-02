@@ -26,7 +26,8 @@ import {
 import { runTransitionReview } from '../services/transition-agent.js'
 import { generateShotVoice, regenerateShotSubtitle } from '../services/narration-voice.js'
 import { writeShotNarration } from '../services/narration-script.js'
-import { ComposeBlockedError, composeShot } from '../services/shot-compose.js'
+import { composeShot } from '../services/shot-compose.js'
+import { ComposeBlockedError } from '../services/narration-fit.js'
 import { clearNarrationFit, previewNarrationFit, saveNarrationFit } from '../services/narration-fit-service.js'
 import { serializeTask } from '../services/sys-task.js'
 import {

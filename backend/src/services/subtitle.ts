@@ -239,3 +239,28 @@ export function renderSrt(cues: SubtitleCue[]): string {
     .map((cue, idx) => `${idx + 1}\n${srtTimestamp(cue.startMs)} --> ${srtTimestamp(cue.endMs)}\n${cue.text}\n`)
     .join('\n')
 }
+
+/**
+ * 解析 SRT（只取时间码与文本，用于平移/缩放后重写，以及校验字幕文件是否真的有内容）。
+ * 解析不出任何一条就是空字幕：调用方据此阻断，不得当作「没有字幕可烧」静默成功。
+ */
+export function parseSrt(raw: string): SubtitleCue[] {
+  const cues: SubtitleCue[] = []
+  const blocks = raw.replace(/\r\n/g, '\n').split(/\n{2,}/)
+  for (const block of blocks) {
+    const lines = block.split('\n').filter(l => l.trim())
+    if (lines.length < 2) continue
+    const timeLine = lines.find(l => l.includes('-->'))
+    if (!timeLine) continue
+    const [startRaw, endRaw] = timeLine.split('-->').map(s => s.trim())
+    const toMs = (v: string) => {
+      const m = v.match(/(\d+):(\d+):(\d+)[,.](\d+)/)
+      if (!m) return 0
+      return Number(m[1]) * 3_600_000 + Number(m[2]) * 60_000 + Number(m[3]) * 1000 + Number(m[4])
+    }
+    const textLines = lines.slice(lines.indexOf(timeLine) + 1)
+    if (!textLines.length) continue
+    cues.push({ startMs: toMs(startRaw), endMs: toMs(endRaw), text: textLines.join('\n') })
+  }
+  return cues
+}

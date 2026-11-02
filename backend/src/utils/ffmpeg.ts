@@ -34,6 +34,33 @@ if (ffprobePath) ffmpeg.setFfprobePath(ffprobePath)
 
 export { ffmpeg }
 
+/**
+ * 生成静音 WAV（PCM16）。
+ *
+ * 为什么不用 `-f lavfi anullsrc`：fluent-ffmpeg 运行前会用 `ffmpeg -formats` 的输出
+ * 校验每个输入的 `-f`，而 FFmpeg 7 把 lavfi 列为「虚拟输入设备」（` D d lavfi`），
+ * 不在它能解析的格式表里，于是整条命令在执行前就被判 `Input format lavfi is not available`。
+ * 真实 WAV 文件绕开这个解析器，产出等价。
+ */
+export function writeSilentWav(filePath: string, sampleRate: number, channels: number, duration: number): void {
+  const dataSize = Math.max(0, Math.round(sampleRate * channels * 2 * duration))
+  const header = Buffer.alloc(44)
+  header.write('RIFF', 0, 'ascii')
+  header.writeUInt32LE(36 + dataSize, 4)
+  header.write('WAVE', 8, 'ascii')
+  header.write('fmt ', 12, 'ascii')
+  header.writeUInt32LE(16, 16)
+  header.writeUInt16LE(1, 20)
+  header.writeUInt16LE(channels, 22)
+  header.writeUInt32LE(sampleRate, 24)
+  header.writeUInt32LE(sampleRate * channels * 2, 28)
+  header.writeUInt16LE(channels * 2, 32)
+  header.writeUInt16LE(16, 34)
+  header.write('data', 36, 'ascii')
+  header.writeUInt32LE(dataSize, 40)
+  fs.writeFileSync(filePath, Buffer.concat([header, Buffer.alloc(dataSize)]))
+}
+
 /** spawn 一次 -version 验证二进制真实可执行（含同步 EFTYPE 兜底） */
 function probeBinary(binPath: string | null): Promise<boolean> {
   if (!binPath || !fs.existsSync(binPath)) return Promise.resolve(false)

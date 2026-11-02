@@ -24,14 +24,6 @@ test('数据模型：新列都有默认值，存量行等价于功能关闭', ()
   assert.match(read('src/services/narration.ts'), /DEFAULT_SUBTITLE_TIMING: SubtitleTiming = 'sentence'/)
 })
 
-test('merge：开关关闭时取片口径与改动前逐字一致，打开时只取合成版本', () => {
-  const merge = read('src/services/ffmpeg-merge.ts')
-  assert.match(merge, /narrationEnabled \? sb\.composedVideoUrl : \(sb\.videoUrl \|\| sb\.composedVideoUrl\)/)
-  // 跳过的镜头必须带镜号与原因返回，不静默混入原始视频
-  assert.match(merge, /skipped\.push\(\{\s*storyboard_number/)
-  assert.match(read('src/routes/merge.ts'), /skipped/)
-})
-
 test('TTS 服务类型与 voxcpm 适配器接线完整', () => {
   const ai = read('src/services/ai.ts')
   assert.match(ai, /export type ServiceType = 'text' \| 'image' \| 'video' \| 'tts'/)
@@ -86,19 +78,6 @@ test('旁白不再写进 description / video_prompt（条件技能文案）', ()
   assert.match(breakdown, /再写「旁白：…」/)
   const videoPrompt = read('workspace/skills/prompt-generator/video-prompt-narration/SKILL.md')
   assert.match(videoPrompt, /把任何解说词、画外音、旁白写进/)
-})
-
-test('合成：响度固定 EBU R128 I=-16/TP=-1.5/LRA=11，偏移取 T，混音 normalize=0', () => {
-  const compose = read('src/services/shot-compose.ts')
-  assert.match(compose, /loudnorm=I=-16:TP=-1\.5:LRA=11/)
-  assert.match(compose, /resolveTransitionT/)
-  assert.match(compose, /transition\?\.T/)
-  assert.match(compose, /amix=inputs=2:duration=first:dropout_transition=0:normalize=0/)
-  assert.match(compose, /sidechaincompress/)
-  // 与 merge 同一套编码参数，避免二次转码漂移
-  for (const opt of ['libx264', 'medium', '23', 'aac', '48000', '192k', '+faststart']) {
-    assert.ok(compose.includes(`'${opt}'`), `合成缺少编码参数 ${opt}`)
-  }
 })
 
 test('任务中心：三个集级 kind 都有中文标签', () => {

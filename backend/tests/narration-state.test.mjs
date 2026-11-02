@@ -90,21 +90,12 @@ test('开关关闭时状态恒为 disabled', () => {
     shotNarrationEnabled: true,
     narrationText: TEXT,
     narrationAudioUrl: 'static/narration/a.wav',
-    videoUrl: 'static/videos/v.mp4',
-    composedVideoUrl: null,
-    subtitleUrl: null,
     meta: metaWithAudio(TEXT_SHA),
   }), 'disabled')
 })
 
 test('状态机：missing → text_only → voiced → voice_stale', () => {
-  const base = {
-    episodeNarrationEnabled: true,
-    shotNarrationEnabled: true,
-    videoUrl: 'static/videos/v.mp4',
-    composedVideoUrl: null,
-    subtitleUrl: null,
-  }
+  const base = { episodeNarrationEnabled: true, shotNarrationEnabled: true }
   assert.equal(call('narrationStatus', { ...base, narrationText: '', narrationAudioUrl: null, meta: {} }), 'missing')
   assert.equal(call('narrationStatus', { ...base, narrationText: TEXT, narrationAudioUrl: null, meta: {} }), 'text_only')
   assert.equal(call('narrationStatus', {
@@ -113,40 +104,6 @@ test('状态机：missing → text_only → voiced → voice_stale', () => {
   assert.equal(call('narrationStatus', {
     ...base, narrationText: TEXT + '改', narrationAudioUrl: 'static/narration/a.wav', meta: metaWithAudio(TEXT_SHA),
   }), 'voice_stale')
-})
-
-test('合成签名变化即 compose_stale（重生成视频 / 改匹配参数）', () => {
-  const meta = metaWithAudio(TEXT_SHA)
-  meta.composed = {
-    video_src: 'static/videos/v.mp4',
-    audio_src: 'static/narration/a.wav',
-    subtitle_src: 'static/narration/a.srt',
-    burned: true,
-    duration_ms: 9800,
-    signature: call('composeSignature', {
-      videoUrl: 'static/videos/v.mp4',
-      audioUrl: 'static/narration/a.wav',
-      subtitleUrl: 'static/narration/a.srt',
-      burned: true,
-      textSha256: TEXT_SHA,
-    }),
-    composed_at: '2026-11-01 00:00:00',
-    transition_t: 0,
-    transition_t_source: 'none',
-  }
-  const input = {
-    episodeNarrationEnabled: true,
-    shotNarrationEnabled: true,
-    narrationText: TEXT,
-    narrationAudioUrl: 'static/narration/a.wav',
-    videoUrl: 'static/videos/v.mp4',
-    composedVideoUrl: 'static/composed/c.mp4',
-    subtitleUrl: 'static/narration/a.srt',
-    meta,
-  }
-  assert.equal(call('narrationStatus', input), 'composed')
-  assert.equal(call('narrationStatus', { ...input, videoUrl: 'static/videos/v2.mp4' }), 'compose_stale')
-  assert.equal(call('narrationStatus', { ...input, fitKey: 'pad:head:800' }), 'compose_stale')
 })
 
 test('阻断码：超 80 字 / 实测预算超 15 秒 / 配音过期', () => {

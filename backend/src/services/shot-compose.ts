@@ -1,119 +1,57 @@
 /**
- * 每镜合成（Issue #30）：生成视频 + 旁白音轨 + 烧录字幕 → 该镜成片版本。
+ * 每镜合成（Issue #30 / #31 / #42）：生成视频 + 旁白音轨 + 烧录字幕 → 该镜成片版本。
  *
  * 口径要点：
- * - 转场偏移一律取 **T**（`transition.seconds`，画面上转场固定占 0–T 秒），不是 E。
- *   来源优先该镜视频任务落盘的 `params.transition.T`，其次 `transition_review.seconds`，再次 0。
+ * - 输入组装、依赖校验、签名快照全部来自 `compose-state.ts`，与状态/预览/导出校验同源；
+ *   这里只负责「真的跑 ffmpeg」和把产物写回。
+ * - 转场偏移一律取 **T**（画面上转场固定占 0–T 秒），由当前采用的那条视频任务决定。
  * - 目标时长 `D = min(T + max(Da + pad, 4), 15)`；无旁白镜头 `D = Dv`，不做偏移。
  * - 画面不足冻结末帧（`tpad`），超出裁尾（`-t`）；**旁白音轨永不被裁剪**。
  * - 响度统一 `loudnorm I=-16:TP=-1.5:LRA=11`（EBU R128，用户确认 Q8）。
  * - 编码参数与 `ffmpeg-merge.ts` 完全一致，避免拼接时二次转码漂移。
- *
- * 留白长度/位置、倍速匹配、混音模式是 #31 的用户可选项，这里以 `ComposeFit` 入参承接，
- * 本 Issue 的默认值 = 替代模式 + 尾部留白 0.8 s。
+ * - 产物落库时只合并 `narration_meta.composed` 这一个键，并用合成**开始时**签好的
+ *   不可变快照：ffmpeg 期间用户若改了文本/配音/匹配参数，产物不会冒充新输入的最新成片，
+ *   也不会把这期间的配音/字幕元数据覆盖掉。
  */
 import fs from 'fs'
 import path from 'path'
-import { and, desc, eq } from 'drizzle-orm'
+import { and, asc, eq, isNull } from 'drizzle-orm'
 import { v4 as uuid } from 'uuid'
 import { db, schema } from '../db/index.js'
 import { now } from '../utils/response.js'
-import { DATA_ROOT, STORAGE_ROOT } from '../utils/paths.js'
-import { ffmpeg, checkFfmpegSuite } from '../utils/ffmpeg.js'
+import { STORAGE_ROOT } from '../utils/paths.js'
+import { ffmpeg, checkFfmpegSuite, writeSilentWav } from '../utils/ffmpeg.js'
 import { logTaskError, logTaskProgress, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
-import { probeDurationMs } from './tts.js'
-import { parseTransitionReview } from './transition.js'
-import { renderSrt, transformCues, type SubtitleCue } from './subtitle.js'
+import { renderSrt, parseSrt, transformCues } from './subtitle.js'
+import { mediaFacts } from './media-probe.js'
+import type { ComposeFit, ComposePlan } from './narration-fit.js'
+import { parseNarrationMeta, type NarrationMeta } from './narration.js'
 import {
-  DEFAULT_COMPOSE_FIT,
-  planCompose,
-  resolveComposeFit,
-  suggestedCharsForAvail,
-  type ComposeFit,
-  type ComposePlan,
-} from './narration-fit.js'
-import {
-  MAX_SHOT_SECONDS,
-  composeSignature,
-  parseNarrationMeta,
-  sha256,
-  type NarrationMeta,
-} from './narration.js'
+  persistedComposeReservations,
+  assembleComposeInput,
+  composeStatesForEpisode,
+  COMPOSE_SIGNATURE_VERSION,
+  inspectComposeInputs,
+  isComposing,
+  releaseComposeLock,
+  resolveTransitionT,
+  tryAcquireComposeLock,
+  type ComposeStateItem,
+} from './compose-state.js'
 import {
   createTextTask,
   findActiveTextTask,
   findLatestTextTask,
   finishTextTask,
-  promptBatchStatusFrom,
+  parseTextTaskParams,
+  textTaskOutcome,
   updateTextTaskProgress,
-  type PromptBatchStatus,
   type TextTaskProgress,
+  type TextTaskProgressItem,
 } from './text-task.js'
-
-/**
- * 合成被阻断（#31）：带结构化字段，路由原样返回给前端渲染
- * 「当前 X.X 秒 / 可用 Y.Y 秒 / 超出 Z% / 建议 ≤N 字」，前端不解析中文文案。
- */
-export class ComposeBlockedError extends Error {
-  readonly blockReason: NonNullable<ComposePlan['blockReason']>
-  readonly gapRatio: number
-  readonly currentSec: number
-  readonly availSec: number
-  readonly suggestedChars: number
-
-  constructor(plan: ComposePlan, shotNumber: number) {
-    const gapPercent = Math.round(Math.abs(plan.gapRatio) * 100)
-    const suggested = suggestedCharsForAvail(plan.availSeconds)
-    super(plan.blockReason === 'narration_gap_too_large'
-      ? `分镜 #${shotNumber} 的旁白比画面可用时长${plan.gapRatio > 0 ? '长' : '短'} ${gapPercent}%，超过 30% 的调速上限：请改写旁白文本（建议 ≤${suggested} 字）`
-      : `分镜 #${shotNumber} 的旁白（${plan.daScaled.toFixed(1)} 秒）放不进 ${plan.availSeconds.toFixed(1)} 秒可用时长（转场 ${plan.t} 秒）：请改写旁白文本（建议 ≤${suggested} 字）或提高倍速匹配`)
-    this.name = 'ComposeBlockedError'
-    this.blockReason = plan.blockReason ?? 'narration_too_long'
-    this.gapRatio = plan.gapRatio
-    this.currentSec = plan.daScaled
-    this.availSec = plan.availSeconds
-    this.suggestedChars = suggested
-  }
-}
 
 /** 旁白响度标准（EBU R128，用户确认 Q8） */
 export const LOUDNORM_FILTER = 'loudnorm=I=-16:TP=-1.5:LRA=11'
-
-function toAbsPath(relativePath: string): string {
-  if (path.isAbsolute(relativePath)) return relativePath
-  if (relativePath.startsWith('static/')) return path.join(DATA_ROOT, relativePath)
-  return path.join(STORAGE_ROOT, relativePath)
-}
-
-/** 源视频是否带音轨：H3 产出带 VAEDecodeAudio 音轨，但上传/历史视频可能没有 */
-function hasAudioStream(absPath: string): Promise<boolean> {
-  // 本仓 tsconfig 的 lib 低于 es2024，没有 Promise.withResolvers
-  return new Promise<boolean>((resolve) => {
-    ffmpeg.ffprobe(absPath, (err, data) => {
-      if (err) return resolve(false)
-      resolve((data?.streams || []).some(s => s.codec_type === 'audio'))
-    })
-  })
-}
-
-/** 本镜生效的转场偏移量 T（秒）与它的来源 */
-export async function resolveTransitionT(storyboardId: number, transitionReviewRaw: string | null | undefined): Promise<{ t: number; source: 'task' | 'review' | 'none' }> {
-  const [task] = await db.select().from(schema.sysTask)
-    .where(and(eq(schema.sysTask.storyboardId, storyboardId), eq(schema.sysTask.type, 'video')))
-    .orderBy(desc(schema.sysTask.id))
-    .limit(1)
-  if (task?.params) {
-    try {
-      const t = JSON.parse(task.params)?.transition?.T
-      if (Number.isFinite(t) && Number(t) > 0) return { t: Number(t), source: 'task' }
-    } catch { /* 任务参数损坏时继续回落 */ }
-  }
-  const review = parseTransitionReview(transitionReviewRaw)
-  if (review && Number.isFinite(review.seconds) && Number(review.seconds) > 0) {
-    return { t: Number(review.seconds), source: 'review' }
-  }
-  return { t: 0, source: 'none' }
-}
 
 export interface ComposeResult {
   storyboardId: number
@@ -126,82 +64,52 @@ export interface ComposeResult {
 /**
  * 合成一个镜头。开关打开时每一个参与拼接的镜头都要走这里：
  * 有旁白的镜头混入旁白 + 烧录字幕，纯画面镜头只做「去掉模型音轨 / 换成底音」。
+ *
+ * 同镜互斥两层：进程内单镜锁（正在跑 ffmpeg）+ 运行中批量任务里的 pending/processing 行。
+ * 批量自己调用时传 `batchTaskId`，这样它不会把自己刚写下的 processing 行当成冲突。
  */
-export async function composeShot(storyboardId: number, fitOverride?: Partial<ComposeFit>): Promise<ComposeResult> {
-  const [sb] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, storyboardId))
-  if (!sb) throw new Error('镜头不存在')
-  const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, sb.episodeId))
-  if (!ep) throw new Error('剧集不存在')
-  if (ep.narrationEnabled !== true) throw new Error('本集未开启旁白，无需合成')
-  if (!sb.videoUrl) throw new Error(`分镜 #${sb.storyboardNumber} 还没有生成视频`)
+export async function composeShot(
+  storyboardId: number,
+  opts: { batchTaskId?: number } = {},
+): Promise<ComposeResult> {
+  if (!tryAcquireComposeLock(storyboardId)) {
+    throw new Error('该镜头正在合成中，请等待本次合成结束')
+  }
+  try {
+    return await runComposeShot(storyboardId, opts.batchTaskId)
+  } finally {
+    releaseComposeLock(storyboardId)
+  }
+}
 
+async function runComposeShot(storyboardId: number, batchTaskId?: number): Promise<ComposeResult> {
   const suite = await checkFfmpegSuite()
   if (!suite.ffmpeg || !suite.ffprobe) {
     throw new Error('本机 ffmpeg 不可用，无法合成分镜视频。请删除 node_modules 后在本机重新安装依赖，或设置 FFMPEG_BIN/FFPROBE_BIN 后重启服务')
   }
 
-  const wantsNarration = sb.narrationEnabled !== false && Boolean(sb.narrationAudioUrl)
-  const meta: NarrationMeta = parseNarrationMeta(sb.narrationMeta)
-  const text = (sb.narrationText || '').trim()
+  const input = await assembleComposeInput(storyboardId)
+  const { sb, plan, fit } = input
 
-  if (sb.narrationEnabled !== false) {
-    if (!sb.narrationAudioUrl || !meta.audio) {
-      throw new Error(`分镜 #${sb.storyboardNumber} 还没有生成配音，无法合成`)
-    }
-    if (meta.audio.text_sha256 !== sha256(text)) {
-      throw new Error(`分镜 #${sb.storyboardNumber} 的旁白文本已修改，请先重新生成配音`)
-    }
-  }
-
-  const videoAbs = toAbsPath(sb.videoUrl)
-  if (!fs.existsSync(videoAbs)) throw new Error(`分镜 #${sb.storyboardNumber} 的视频文件不存在：${sb.videoUrl}`)
-  const audioAbs = wantsNarration ? toAbsPath(sb.narrationAudioUrl!) : null
-  if (audioAbs && !fs.existsSync(audioAbs)) {
-    throw new Error(`分镜 #${sb.storyboardNumber} 的配音文件不存在：${sb.narrationAudioUrl}`)
-  }
-
-  const dv = (await probeDurationMs(videoAbs)) / 1000
-  const da = audioAbs ? (await probeDurationMs(audioAbs)) / 1000 : null
-  const { t, source: tSource } = await resolveTransitionT(storyboardId, sb.transitionReview)
-
-  // 匹配参数（#31）：镜级覆盖 > 集级默认 > 内置默认（替代 + 尾部留白 0.8 s）。
-  // Dv/Da 一律取实测值：生成引擎的产出时长与请求时长有偏差，用请求时长会把误差灌进贴合结果。
-  const fit: ComposeFit = {
-    ...resolveComposeFit({
-      episodeDefault: ep.narrationFitDefault,
-      shotFit: sb.narrationFit,
-      episodeMixMode: ep.audioMixMode,
-      episodeBedGainDb: ep.audioBedGainDb,
-      da,
-      availSeconds: Math.max(0, Math.min(dv, MAX_SHOT_SECONDS) - t),
-    }),
-    ...fitOverride,
-  }
-
-  // 源视频没有音轨时混音模式无底音可混，自动降级为替代（不报错，产出等价）
-  if (fit.audioMixMode === 'mix' && !await hasAudioStream(videoAbs)) {
-    logTaskProgress('ShotCompose', 'mix-downgraded', { storyboardId, reason: '源视频无音轨' })
-    fit.audioMixMode = 'replace'
-  }
-
-  const plan = planCompose({ dv, da, t, fit })
-  if (plan.blocked) {
-    throw new ComposeBlockedError(plan, sb.storyboardNumber)
-  }
+  // 落盘预约优先于进程内锁：批量里还没轮到的镜头也不允许被单镜提交插队重复合成
+  const reserved = (await persistedComposeReservations(sb.episodeId, batchTaskId)).get(storyboardId)
+  if (reserved) throw new Error(`该镜头${reserved}，不能重复提交`)
 
   // 字幕：时间码按 tempo 缩放、按旁白起播点平移，写成临时 SRT 供 ffmpeg 烧录
+  const tempDir = path.join(STORAGE_ROOT, 'temp')
+  fs.mkdirSync(tempDir, { recursive: true })
   let burnSrtAbs: string | null = null
-  if (wantsNarration && sb.subtitleUrl) {
-    const srcSrt = toAbsPath(sb.subtitleUrl)
-    if (fs.existsSync(srcSrt)) {
-      const cues = parseSrt(fs.readFileSync(srcSrt, 'utf8'))
-      const shifted = transformCues(cues, { shiftMs: Math.round(plan.narrationStart * 1000), tempo: fit.tempo })
-      const tempDir = path.join(STORAGE_ROOT, 'temp')
-      fs.mkdirSync(tempDir, { recursive: true })
-      burnSrtAbs = path.join(tempDir, `${uuid()}.srt`)
-      fs.writeFileSync(burnSrtAbs, renderSrt(shifted), 'utf8')
-    }
+  if (input.subtitleAbs) {
+    const cues = parseSrt(fs.readFileSync(input.subtitleAbs, 'utf8'))
+    const shifted = transformCues(cues, { shiftMs: Math.round(plan.narrationStart * 1000), tempo: fit.tempo })
+    burnSrtAbs = path.join(tempDir, `${uuid()}.srt`)
+    fs.writeFileSync(burnSrtAbs, renderSrt(shifted), 'utf8')
   }
+  // 无旁白且不混底音时仍要有一条等长静音轨，保证 concat 时音轨布局一致
+  const silenceAbs = !input.audioAbs && fit.audioMixMode !== 'mix'
+    ? path.join(tempDir, `${uuid()}-silence.wav`)
+    : null
+  if (silenceAbs) writeSilentWav(silenceAbs, 48000, 2, plan.d)
 
   const outputDir = path.join(STORAGE_ROOT, 'composed')
   fs.mkdirSync(outputDir, { recursive: true })
@@ -211,38 +119,43 @@ export async function composeShot(storyboardId: number, fitOverride?: Partial<Co
   logTaskStart('ShotCompose', 'compose', {
     storyboardId,
     episodeId: sb.episodeId,
-    dv: dv.toFixed(2),
-    da: da === null ? 'none' : da.toFixed(2),
-    t: String(t),
+    dv: input.dv.toFixed(2),
+    da: input.da === null ? 'none' : input.da.toFixed(2),
+    t: String(input.t),
     d: plan.d.toFixed(2),
     mixMode: fit.audioMixMode,
     burned: burnSrtAbs ? 'yes' : 'no',
   })
 
-  await runCompose({ videoAbs, audioAbs, burnSrtAbs, plan, fit, outputPath })
+  try {
+    await runCompose({ videoAbs: input.videoAbs, audioAbs: input.audioAbs, silenceAbs, burnSrtAbs, plan, fit, outputPath })
+  } finally {
+    if (burnSrtAbs) fs.rmSync(burnSrtAbs, { force: true })
+    if (silenceAbs) fs.rmSync(silenceAbs, { force: true })
+  }
 
-  if (burnSrtAbs) fs.unlinkSync(burnSrtAbs)
-
-  const durationMs = await probeDurationMs(outputPath)
+  const produced = await mediaFacts(outputPath)
+  if (!produced) throw new Error('合成产物无法读取时长，可能写盘失败')
   const composedVideoUrl = `static/composed/${outputName}`
   const ts = now()
+
+  // 合成期间用户可能改了旁白/配音/匹配参数：重新读当前行，只写 composed 这一个键，
+  // 其它元数据保持数据库里的最新值（不拿合成开始时的快照覆盖）。
+  const [latest] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, storyboardId))
+  const meta: NarrationMeta = parseNarrationMeta(latest?.narrationMeta ?? sb.narrationMeta)
   meta.composed = {
-    video_src: sb.videoUrl,
-    audio_src: wantsNarration ? sb.narrationAudioUrl! : null,
-    subtitle_src: wantsNarration ? (sb.subtitleUrl || null) : null,
+    video_src: input.parts.video_src,
+    audio_src: input.parts.audio_src,
+    subtitle_src: input.parts.subtitle_src,
     burned: Boolean(burnSrtAbs),
-    duration_ms: durationMs,
-    signature: composeSignature({
-      videoUrl: sb.videoUrl,
-      audioUrl: wantsNarration ? sb.narrationAudioUrl! : null,
-      subtitleUrl: wantsNarration ? (sb.subtitleUrl || null) : null,
-      burned: wantsNarration,
-      textSha256: sha256(wantsNarration ? text : ''),
-      fitKey: fit.key,
-    }),
+    duration_ms: produced.durationMs,
+    // 签名来自合成开始时签好的不可变快照：输入在 ffmpeg 期间变过，这条成片就会被判 changed
+    signature: input.signature,
+    signature_version: COMPOSE_SIGNATURE_VERSION,
+    inputs: input.parts,
     composed_at: ts,
-    transition_t: t,
-    transition_t_source: tSource,
+    transition_t: input.t,
+    transition_t_source: input.tSource,
   }
 
   await db.update(schema.storyboards).set({
@@ -251,30 +164,8 @@ export async function composeShot(storyboardId: number, fitOverride?: Partial<Co
     updatedAt: ts,
   }).where(eq(schema.storyboards.id, storyboardId))
 
-  logTaskSuccess('ShotCompose', 'compose', { storyboardId, composedVideoUrl, durationMs })
-  return { storyboardId, composedVideoUrl, durationMs, plan, burned: Boolean(burnSrtAbs) }
-}
-
-/** 解析 SRT（只需要时间码与文本，用于平移/缩放后重写） */
-export function parseSrt(raw: string): SubtitleCue[] {
-  const cues: SubtitleCue[] = []
-  const blocks = raw.replace(/\r\n/g, '\n').split(/\n{2,}/)
-  for (const block of blocks) {
-    const lines = block.split('\n').filter(l => l.trim())
-    if (lines.length < 2) continue
-    const timeLine = lines.find(l => l.includes('-->'))
-    if (!timeLine) continue
-    const [startRaw, endRaw] = timeLine.split('-->').map(s => s.trim())
-    const toMs = (v: string) => {
-      const m = v.match(/(\d+):(\d+):(\d+)[,.](\d+)/)
-      if (!m) return 0
-      return Number(m[1]) * 3_600_000 + Number(m[2]) * 60_000 + Number(m[3]) * 1000 + Number(m[4])
-    }
-    const textLines = lines.slice(lines.indexOf(timeLine) + 1)
-    if (!textLines.length) continue
-    cues.push({ startMs: toMs(startRaw), endMs: toMs(endRaw), text: textLines.join('\n') })
-  }
-  return cues
+  logTaskSuccess('ShotCompose', 'compose', { storyboardId, composedVideoUrl, durationMs: produced.durationMs })
+  return { storyboardId, composedVideoUrl, durationMs: produced.durationMs, plan, burned: Boolean(burnSrtAbs) }
 }
 
 /** ffmpeg 的字幕滤镜路径转义（Windows 盘符冒号与单引号） */
@@ -285,6 +176,8 @@ function escapeFilterPath(p: string): string {
 interface RunComposeInput {
   videoAbs: string
   audioAbs: string | null
+  /** 无旁白且不混底音时的静音轨（真实 WAV 文件，不用 lavfi） */
+  silenceAbs: string | null
   burnSrtAbs: string | null
   plan: ComposePlan
   fit: ComposeFit
@@ -298,8 +191,7 @@ function runCompose(input: RunComposeInput): Promise<void> {
 
   const command = ffmpeg().input(input.videoAbs)
   if (input.audioAbs) command.input(input.audioAbs)
-  // 无旁白（或替代模式下不混底音）时仍要有一条等长静音轨，保证 concat 时音轨布局一致
-  if (!hasNarration) command.input('anullsrc=channel_layout=stereo:sample_rate=48000').inputOptions(['-f', 'lavfi'])
+  if (input.silenceAbs) command.input(input.silenceAbs)
 
   const filters: string[] = []
 
@@ -382,68 +274,167 @@ function runCompose(input: RunComposeInput): Promise<void> {
   })
 }
 
-/** 批量合成：sys_task(type='text', kind='shot_compose') */
+// ─── 批量融合 ────────────────────────────────────────────────
+
+/** 批量预览：逐镜分类（未合成 / 已变化 / 未变化 / 无法比较 / 阻断 / 进行中）与原因 */
+export async function previewComposeBatch(
+  episodeId: number,
+  storyboardIds?: number[],
+): Promise<ComposeStateItem[]> {
+  return composeStatesForEpisode(episodeId, { storyboardIds })
+}
+
+export interface ComposeBatchStatus {
+  status: 'running' | 'done' | 'error'
+  total: number
+  completed: number
+  failed: number
+  skipped: number
+  current_storyboard_id?: number
+  started_at: string
+  finished_at?: string
+  error?: string
+  items: TextTaskProgressItem[]
+}
+
+export async function getComposeBatchStatus(episodeId: number): Promise<ComposeBatchStatus | null> {
+  const row = await findLatestTextTask(episodeId, 'shot_compose')
+  if (!row) return null
+  const progress = parseTextTaskParams(row.params)?.progress
+  return {
+    status: textTaskOutcome(row.status),
+    total: progress?.total ?? 0,
+    completed: progress?.completed ?? 0,
+    failed: progress?.failed ?? 0,
+    skipped: progress?.skipped ?? 0,
+    current_storyboard_id: progress?.current_storyboard_id,
+    started_at: row.createdAt,
+    finished_at: row.completedAt || undefined,
+    error: row.errorMsg || undefined,
+    items: progress?.items ?? [],
+  }
+}
+
+const startingBatches = new Set<number>()
+
+/**
+ * 启动批量融合：目标必须是预览里明确勾选的分镜 id（显式空选一律拒绝，绝不扩大成整集）。
+ * 勾选「未变化」的镜头视为强制重做；执行时逐镜复查依赖与签名，
+ * 阻断/正在跑的镜头标记 skipped 并写明原因，不静默吞掉。
+ */
 export async function startComposeBatch(
   episodeId: number,
   dramaId: number,
-  storyboardIds?: number[],
+  storyboardIds: number[],
 ): Promise<{ started: boolean; total: number }> {
+  if (startingBatches.has(episodeId)) throw new Error('正在创建本集的批量融合任务，请稍后查看状态')
+  startingBatches.add(episodeId)
+  try {
+    return await createComposeBatch(episodeId, dramaId, storyboardIds)
+  } finally {
+    startingBatches.delete(episodeId)
+  }
+}
+
+async function createComposeBatch(
+  episodeId: number,
+  dramaId: number,
+  storyboardIds: number[],
+): Promise<{ started: boolean; total: number }> {
+  const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId))
+  if (!ep) throw new Error('剧集不存在')
+  if (ep.narrationEnabled !== true) throw new Error('本集未开启旁白，无需合成')
+  if (!storyboardIds.length) throw new Error('请先在预览清单里勾选要融合的镜头')
+
+  const live = await db.select().from(schema.storyboards)
+    .where(and(eq(schema.storyboards.episodeId, episodeId), isNull(schema.storyboards.deletedAt)))
+    .orderBy(asc(schema.storyboards.storyboardNumber))
+  const selected = live.filter(sb => storyboardIds.includes(sb.id))
+  const unknownIds = storyboardIds.filter(id => !selected.some(sb => sb.id === id))
+  if (unknownIds.length) {
+    throw new Error(`以下镜头不属于本集或已删除，无法融合：${unknownIds.join('、')}`)
+  }
   if (await findActiveTextTask(episodeId, 'shot_compose')) return { started: false, total: -1 }
 
-  const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId))
-  if (!ep || ep.narrationEnabled !== true) throw new Error('本集未开启旁白，无需合成')
-
-  const sbs = (await db.select().from(schema.storyboards)
-    .where(eq(schema.storyboards.episodeId, episodeId))
-    .orderBy(schema.storyboards.storyboardNumber))
-    .filter(sb => !sb.deletedAt && sb.videoUrl)
-
-  const pending = storyboardIds?.length ? sbs.filter(sb => storyboardIds.includes(sb.id)) : sbs
-  if (!pending.length) return { started: false, total: 0 }
-
-  const progress: TextTaskProgress = { completed: 0, failed: 0, total: pending.length }
+  const items: TextTaskProgressItem[] = selected.map(sb => ({
+    storyboard_id: sb.id,
+    storyboard_number: sb.storyboardNumber,
+    state: 'pending',
+    reason: null,
+  }))
+  const progress: TextTaskProgress = { completed: 0, failed: 0, skipped: 0, total: items.length, items }
   const taskId = await createTextTask({
     kind: 'shot_compose',
     episodeId,
     dramaId,
-    prompt: `合成 ${pending.length} 个分镜`,
+    prompt: `合成 ${items.length} 个分镜`,
     progress,
-    storyboardIds: pending.map(sb => sb.id),
+    storyboardIds: selected.map(sb => sb.id),
   })
 
-  logTaskStart('ShotCompose', 'batch', { episodeId, total: pending.length })
+  logTaskStart('ShotCompose', 'batch', { episodeId, total: items.length })
 
-  ;(async () => {
-    for (const sb of pending) {
-      progress.current_storyboard_id = sb.id
+  void (async () => {
+    for (const item of items) {
+      progress.current_storyboard_id = item.storyboard_id
+      item.state = 'processing'
       await updateTextTaskProgress(taskId, progress)
+
+      // 预览之后输入可能又变了：执行前按当前库里的事实复查，变成阻断的不硬跑
+      const recheck = await recheckBeforeCompose(item.storyboard_id)
+      if (recheck) {
+        item.state = 'skipped'
+        item.reason = recheck
+        progress.skipped = (progress.skipped ?? 0) + 1
+        await updateTextTaskProgress(taskId, progress)
+        continue
+      }
+
       try {
-        await composeShot(sb.id)
+        await composeShot(item.storyboard_id, { batchTaskId: taskId })
+        item.state = 'completed'
+        item.reason = null
         progress.completed++
       } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        item.state = 'failed'
+        item.reason = message
         progress.failed++
-        logTaskError('ShotCompose', 'batch-shot', {
-          storyboardId: sb.id,
-          error: err instanceof Error ? err.message : String(err),
-        })
+        logTaskError('ShotCompose', 'batch-shot', { storyboardId: item.storyboard_id, error: message })
       }
+      await updateTextTaskProgress(taskId, progress)
     }
-    await updateTextTaskProgress(taskId, progress)
+    progress.current_storyboard_id = undefined
   })()
     .then(async () => {
       await finishTextTask(taskId, progress.failed && !progress.completed ? 'failed' : 'completed', {
         progress,
         errorMsg: progress.failed ? `${progress.failed} 个镜头合成失败` : null,
       })
-      logTaskProgress('ShotCompose', 'batch-done', { episodeId, completed: progress.completed, failed: progress.failed })
+      logTaskProgress('ShotCompose', 'batch-done', {
+        episodeId,
+        completed: progress.completed,
+        failed: progress.failed,
+        skipped: progress.skipped ?? 0,
+      })
     })
     .catch(async (err: unknown) => {
       await finishTextTask(taskId, 'failed', { progress, errorMsg: err instanceof Error ? err.message : String(err) })
     })
 
-  return { started: true, total: pending.length }
+  return { started: true, total: items.length }
 }
 
-export async function getComposeBatchStatus(episodeId: number): Promise<PromptBatchStatus | null> {
-  return promptBatchStatusFrom(await findLatestTextTask(episodeId, 'shot_compose'))
+/** 执行前复查：返回跳过原因，可以合成时返回 null */
+async function recheckBeforeCompose(storyboardId: number): Promise<string | null> {
+  const [sb] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, storyboardId))
+  if (!sb || sb.deletedAt) return '镜头已删除'
+  const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, sb.episodeId))
+  if (!ep || ep.narrationEnabled !== true) return '本集已关闭旁白，无需合成'
+  // 本批次刚把自己标成 processing，所以这里只看进程内的单镜锁（别的批次/单镜正在跑）
+  if (isComposing(storyboardId)) return '该镜头正在被另一次合成占用'
+
+  const transition = await resolveTransitionT(storyboardId, sb.transitionReview, sb.videoUrl)
+  const inspection = await inspectComposeInputs(sb, ep, transition)
+  return inspection.ok ? null : inspection.reason
 }
