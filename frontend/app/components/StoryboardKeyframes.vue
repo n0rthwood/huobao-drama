@@ -162,10 +162,10 @@
                 v-for="slot in SLOT_KEYS"
                 :key="slot"
                 :class="['kf-thumb', { empty: !slotImage(sb, slot), pending: isSlotPending(sb, slot) }]"
-                :title="slotLabel(slot)"
+                :title="slot === 'mid' && midSlotState(sb) === 'optional' ? t('episode.kf.midOptionalHint') : slotLabel(slot)"
               >
                 <img v-if="slotImage(sb, slot)" :src="thumbOf(imgSrc(slotImage(sb, slot)))" loading="lazy" @error="onThumbError($event, slotImage(sb, slot))" />
-                <span v-else-if="!slotRing(sb, slot)" class="kf-thumb-empty">{{ slotShort(slot) }}</span>
+                <span v-else-if="!slotRing(sb, slot)" class="kf-thumb-empty">{{ slot === 'mid' && midSlotState(sb) ? t(`episode.kf.mid${midSlotState(sb) === 'optional' ? 'UnsetShort' : 'RequiredShort'}`) : slotShort(slot) }}</span>
                 <!-- 重生成时旧图还在，进度环叠在图上 -->
                 <ProgressRing v-if="slotRing(sb, slot)" v-bind="slotRing(sb, slot)" compact :size="22" class="kf-thumb-ring" />
                 <span class="kf-thumb-tag">{{ slotShort(slot) }}</span>
@@ -333,7 +333,7 @@
             <div class="kf-section-head">
               <span class="kf-section-label">{{ slotLabel(slot) }}</span>
               <span v-if="slot === 'first' && kf(selected).inheritsFirst" class="kf-inherit-tag">{{ t('episode.kf.inheritedFirst', { n: shotNumberOf(previousOf(selected)) }) }}</span>
-              <span v-if="slot === 'mid' && !slotPrompt(selected, 'mid').trim()" class="dim" style="font-size:11px">{{ t('episode.kf.midOptional') }}</span>
+              <span v-if="slot === 'mid' && midSlotState(selected)" class="dim" style="font-size:11px" :title="midSlotState(selected) === 'optional' ? t('episode.kf.midOptionalHint') : undefined">{{ t(midSlotState(selected) === 'optional' ? 'episode.kf.midOptional' : 'episode.kf.midRequired') }}</span>
               <span class="ml-auto" />
               <button
                 type="button"
@@ -362,6 +362,9 @@
                   <img v-if="slotImage(selected, slot)" :src="thumbOf(imgSrc(slotImage(selected, slot)))" loading="lazy" @error="onThumbError($event, slotImage(selected, slot))" />
                   <span v-else class="kf-preview-empty">
                     <template v-if="isSlotPending(selected, slot)">{{ t('episode.kf.generating') }}</template>
+                    <template v-else-if="slot === 'mid' && midSlotState(selected)">
+                      {{ t(midSlotState(selected) === 'optional' ? 'episode.kf.midOptional' : 'episode.kf.midRequired') }}
+                    </template>
                     <template v-else>{{ t('episode.kf.slotEmpty') }}</template>
                   </span>
                 </button>
@@ -878,6 +881,12 @@ function slotRing(sb, slot) {
     if (ring.status) return ring
   }
   return null
+}
+
+// 空提示词只表示确认闸门不要求中间帧，不能冒充内容审核结论；图片与任务状态优先。
+function midSlotState(sb) {
+  if (slotImage(sb, 'mid') || isSlotPending(sb, 'mid') || slotRing(sb, 'mid')) return null
+  return slotPrompt(sb, 'mid').trim() ? 'required' : 'optional'
 }
 function slotCancellable(sb, slot) {
   const task = slotTaskOf(sb, slot)
