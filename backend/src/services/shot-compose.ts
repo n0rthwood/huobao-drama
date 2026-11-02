@@ -27,6 +27,8 @@ import { renderSrt, transformCues, type SubtitleCue } from './subtitle.js'
 import {
   DEFAULT_COMPOSE_FIT,
   planCompose,
+  resolveComposeFit,
+  suggestedCharsForAvail,
   type ComposeFit,
   type ComposePlan,
 } from './narration-fit.js'
@@ -47,6 +49,32 @@ import {
   type PromptBatchStatus,
   type TextTaskProgress,
 } from './text-task.js'
+
+/**
+ * 合成被阻断（#31）：带结构化字段，路由原样返回给前端渲染
+ * 「当前 X.X 秒 / 可用 Y.Y 秒 / 超出 Z% / 建议 ≤N 字」，前端不解析中文文案。
+ */
+export class ComposeBlockedError extends Error {
+  readonly blockReason: NonNullable<ComposePlan['blockReason']>
+  readonly gapRatio: number
+  readonly currentSec: number
+  readonly availSec: number
+  readonly suggestedChars: number
+
+  constructor(plan: ComposePlan, shotNumber: number) {
+    const gapPercent = Math.round(Math.abs(plan.gapRatio) * 100)
+    const suggested = suggestedCharsForAvail(plan.availSeconds)
+    super(plan.blockReason === 'narration_gap_too_large'
+      ? `分镜 #${shotNumber} 的旁白比画面可用时长${plan.gapRatio > 0 ? '长' : '短'} ${gapPercent}%，超过 30% 的调速上限：请改写旁白文本（建议 ≤${suggested} 字）`
+      : `分镜 #${shotNumber} 的旁白（${plan.daScaled.toFixed(1)} 秒）放不进 ${plan.availSeconds.toFixed(1)} 秒可用时长（转场 ${plan.t} 秒）：请改写旁白文本（建议 ≤${suggested} 字）或提高倍速匹配`)
+    this.name = 'ComposeBlockedError'
+    this.blockReason = plan.blockReason ?? 'narration_too_long'
+    this.gapRatio = plan.gapRatio
+    this.currentSec = plan.daScaled
+    this.availSec = plan.availSeconds
+    this.suggestedChars = suggested
+  }
+}
 
 /** 旁白响度标准（EBU R128，用户确认 Q8） */
 export const LOUDNORM_FILTER = 'loudnorm=I=-16:TP=-1.5:LRA=11'
@@ -112,7 +140,6 @@ export async function composeShot(storyboardId: number, fitOverride?: Partial<Co
     throw new Error('本机 ffmpeg 不可用，无法合成分镜视频。请删除 node_modules 后在本机重新安装依赖，或设置 FFMPEG_BIN/FFPROBE_BIN 后重启服务')
   }
 
-  const fit: ComposeFit = { ...DEFAULT_COMPOSE_FIT, ...fitOverride }
   const wantsNarration = sb.narrationEnabled !== false && Boolean(sb.narrationAudioUrl)
   const meta: NarrationMeta = parseNarrationMeta(sb.narrationMeta)
   const text = (sb.narrationText || '').trim()
@@ -133,19 +160,33 @@ export async function composeShot(storyboardId: number, fitOverride?: Partial<Co
     throw new Error(`分镜 #${sb.storyboardNumber} 的配音文件不存在：${sb.narrationAudioUrl}`)
   }
 
+  const dv = (await probeDurationMs(videoAbs)) / 1000
+  const da = audioAbs ? (await probeDurationMs(audioAbs)) / 1000 : null
+  const { t, source: tSource } = await resolveTransitionT(storyboardId, sb.transitionReview)
+
+  // 匹配参数（#31）：镜级覆盖 > 集级默认 > 内置默认（替代 + 尾部留白 0.8 s）。
+  // Dv/Da 一律取实测值：生成引擎的产出时长与请求时长有偏差，用请求时长会把误差灌进贴合结果。
+  const fit: ComposeFit = {
+    ...resolveComposeFit({
+      episodeDefault: ep.narrationFitDefault,
+      shotFit: sb.narrationFit,
+      episodeMixMode: ep.audioMixMode,
+      episodeBedGainDb: ep.audioBedGainDb,
+      da,
+      availSeconds: Math.max(0, Math.min(dv, MAX_SHOT_SECONDS) - t),
+    }),
+    ...fitOverride,
+  }
+
   // 源视频没有音轨时混音模式无底音可混，自动降级为替代（不报错，产出等价）
   if (fit.audioMixMode === 'mix' && !await hasAudioStream(videoAbs)) {
     logTaskProgress('ShotCompose', 'mix-downgraded', { storyboardId, reason: '源视频无音轨' })
     fit.audioMixMode = 'replace'
   }
 
-  const dv = (await probeDurationMs(videoAbs)) / 1000
-  const da = audioAbs ? (await probeDurationMs(audioAbs)) / 1000 : null
-  const { t, source: tSource } = await resolveTransitionT(storyboardId, sb.transitionReview)
   const plan = planCompose({ dv, da, t, fit })
-
-  if (da !== null && plan.t + plan.daScaled + fit.padHeadSeconds > MAX_SHOT_SECONDS + 1e-6) {
-    throw new Error(`分镜 #${sb.storyboardNumber} 的旁白（${plan.daScaled.toFixed(1)} 秒）加上转场 ${plan.t} 秒后超过 ${MAX_SHOT_SECONDS} 秒上限：请改写旁白文本或提高倍速匹配`)
+  if (plan.blocked) {
+    throw new ComposeBlockedError(plan, sb.storyboardNumber)
   }
 
   // 字幕：时间码按 tempo 缩放、按旁白起播点平移，写成临时 SRT 供 ffmpeg 烧录

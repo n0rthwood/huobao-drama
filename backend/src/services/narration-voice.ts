@@ -15,6 +15,7 @@ import { logTaskError, logTaskProgress, logTaskStart, logTaskSuccess } from '../
 import { getActiveConfig, getConfigById, type AIConfig } from './ai.js'
 import { NARRATION_SUBDIR, fetchCharAlign, synthesizeNarration } from './tts.js'
 import { buildSubtitleCues, renderSrt } from './subtitle.js'
+import { parseFitRecord } from './narration-fit.js'
 import {
   DEFAULT_SUBTITLE_TIMING,
   DEFAULT_TAIL_PAD_SECONDS,
@@ -132,11 +133,18 @@ export async function generateShotVoice(storyboardId: number): Promise<VoiceResu
   // 内容段时长（不含转场）：提交视频时 planTransitionTiming() 才会加一次 T
   const duration = durationFromAudio(synthesis.durationMs, DEFAULT_TAIL_PAD_SECONDS)
 
+  // 重新配音后手调的倍率失效（#31 Q3：倍率默认不持久化，重配即按新时长重算）
+  const fitRecord = parseFitRecord(sb.narrationFit)
+  const clearedFit = fitRecord?.tempo_override !== undefined
+    ? JSON.stringify({ ...fitRecord, tempo_override: undefined, updated_at: ts })
+    : undefined
+
   await db.update(schema.storyboards).set({
     narrationAudioUrl: synthesis.wavPath,
     subtitleUrl,
     narrationMeta: JSON.stringify(meta),
     duration,
+    ...(clearedFit ? { narrationFit: clearedFit } : {}),
     updatedAt: ts,
   }).where(eq(schema.storyboards.id, storyboardId))
 

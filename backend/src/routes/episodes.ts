@@ -44,6 +44,7 @@ import {
 import { getNarrationScriptStatus, startNarrationScript } from '../services/narration-script.js'
 import { getVoiceBatchStatus, resolveSubtitleTiming, startVoiceBatch } from '../services/narration-voice.js'
 import { getComposeBatchStatus, startComposeBatch } from '../services/shot-compose.js'
+import { DEFAULT_FIT_RECORD, parseFitRecord, validateFitRecord } from '../services/narration-fit.js'
 import type { AssetKind } from '../services/reference-images.js'
 
 const app = new Hono()
@@ -117,6 +118,7 @@ app.put('/:id', async (c) => {
   const allowed = [
     'content', 'script_content', 'title', 'description', 'status', 'resolution',
     'narration_enabled', 'tts_config_id', 'subtitle_timing',
+    'audio_mix_mode', 'audio_bed_gain_db', 'narration_fit_default',
   ]
   const updates: Record<string, any> = {}
   for (const key of allowed) {
@@ -130,6 +132,19 @@ app.put('/:id', async (c) => {
     return badRequest(c, 'subtitle_timing 只支持 sentence / char')
   }
 
+  if ('audio_mix_mode' in updates && !['replace', 'mix'].includes(updates.audio_mix_mode)) {
+    return badRequest(c, 'audio_mix_mode 只支持 replace / mix')
+  }
+  if ('narration_fit_default' in updates && updates.narration_fit_default != null) {
+    const raw = typeof updates.narration_fit_default === 'string'
+      ? updates.narration_fit_default
+      : JSON.stringify(updates.narration_fit_default)
+    const record = parseFitRecord(raw)
+    if (!record) return badRequest(c, 'narration_fit_default 不是合法的匹配参数')
+    const error = validateFitRecord(record)
+    if (error) return badRequest(c, error)
+    updates.narration_fit_default = JSON.stringify({ ...record, updated_at: now() })
+  }
   // Map snake_case to camelCase for drizzle
   const drizzleUpdates: Record<string, any> = { updatedAt: now() }
   if ('content' in updates) drizzleUpdates.content = updates.content
@@ -142,6 +157,11 @@ app.put('/:id', async (c) => {
   if ('tts_config_id' in updates) drizzleUpdates.ttsConfigId = updates.tts_config_id ?? null
   if ('subtitle_timing' in updates) drizzleUpdates.subtitleTiming = updates.subtitle_timing
 
+  if ('audio_mix_mode' in updates) drizzleUpdates.audioMixMode = updates.audio_mix_mode
+  if ('audio_bed_gain_db' in updates) {
+    drizzleUpdates.audioBedGainDb = updates.audio_bed_gain_db == null ? null : Number(updates.audio_bed_gain_db)
+  }
+  if ('narration_fit_default' in updates) drizzleUpdates.narrationFitDefault = updates.narration_fit_default ?? null
   await db.update(schema.episodes).set(drizzleUpdates).where(eq(schema.episodes.id, id))
   return success(c)
 })
@@ -594,6 +614,13 @@ app.get('/:episode_id/storyboards', async (c) => {
       narration_chars: narrationCharCount(row.narrationText),
       narration_estimate_seconds: estimateNarrationSeconds(row.narrationText),
       subtitle_timing_effective: resolveSubtitleTiming(narrationEpisode?.subtitleTiming, row.subtitleTiming),
+      // 本镜生效的匹配参数（#31）：镜级覆盖 > 集级默认 > 内置默认；inherited=true 表示没有镜级覆盖
+      narration_fit_effective: {
+        ...(parseFitRecord(row.narrationFit) || parseFitRecord(narrationEpisode?.narrationFitDefault) || DEFAULT_FIT_RECORD),
+        inherited: !parseFitRecord(row.narrationFit),
+        audio_mix_mode: parseFitRecord(row.narrationFit)?.audio_mix_mode
+          ?? (narrationEpisode?.audioMixMode === 'mix' ? 'mix' : 'replace'),
+      },
       keyframes: keyframesJson(keyframes.get(row.id)),
       video_versions: videoVersions,
       transition_review: parseTransitionReview(row.transitionReview),

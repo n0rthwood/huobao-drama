@@ -43,6 +43,12 @@ export const episodes = sqliteTable('episodes', {
   narrationEnabled: integer('narration_enabled', { mode: 'boolean' }).notNull().default(false),
   // 本集字幕时间码模式（#30 Q10）：sentence = 分句边界（默认），char = 逐字时间戳
   subtitleTiming: text('subtitle_timing').notNull().default('sentence'),
+  // 模型自带音轨的处理（#31）：replace = 丢弃，mix = 压到低电平作底音
+  audioMixMode: text('audio_mix_mode').notNull().default('replace'),
+  // 混音模式下模型音轨的增益（dB，负值）；NULL = 取默认 -18
+  audioBedGainDb: real('audio_bed_gain_db'),
+  // 本集默认的旁白/画面匹配方式 JSON（#31），新镜头继承
+  narrationFitDefault: text('narration_fit_default'),
   resolution: text('resolution').default('720p'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
@@ -164,6 +170,8 @@ export const storyboards = sqliteTable('storyboards', {
   narrationMeta: text('narration_meta'),
   // 本镜字幕时间码模式覆盖（#30 Q10）；NULL = 继承剧集级 subtitle_timing
   subtitleTiming: text('subtitle_timing'),
+  // 本镜的旁白/画面匹配参数 JSON（#31）；NULL = 继承剧集级 narration_fit_default
+  narrationFit: text('narration_fit'),
   videoUrl: text('video_url'),
   subtitleUrl: text('subtitle_url'),
   composedVideoUrl: text('composed_video_url'),

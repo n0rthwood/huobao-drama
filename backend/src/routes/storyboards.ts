@@ -25,7 +25,8 @@ import {
 } from '../services/transition.js'
 import { runTransitionReview } from '../services/transition-agent.js'
 import { generateShotVoice, regenerateShotSubtitle } from '../services/narration-voice.js'
-import { composeShot } from '../services/shot-compose.js'
+import { ComposeBlockedError, composeShot } from '../services/shot-compose.js'
+import { clearNarrationFit, previewNarrationFit, saveNarrationFit } from '../services/narration-fit-service.js'
 import { serializeTask } from '../services/sys-task.js'
 import {
   SLOT_LABEL,
@@ -482,7 +483,64 @@ app.post('/:id/compose', async (c) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : '合成失败'
     logTaskError('StoryboardAPI', 'compose', { storyboardId: id, error: message })
+    // 阻断时返回结构化错误体，前端直接渲染字段，不解析中文文案（#31）
+    if (err instanceof ComposeBlockedError) {
+      return c.json({
+        success: false,
+        message,
+        block_reason: err.blockReason,
+        gap_ratio: err.gapRatio,
+        current_sec: err.currentSec,
+        avail_sec: err.availSec,
+        suggested_chars: err.suggestedChars,
+      }, 400)
+    }
     return badRequest(c, message)
+  }
+})
+
+// ─── 旁白与画面的时长/音轨匹配（Issue #31）────────────────────────
+
+// GET /storyboards/:id/narration-fit/preview — 纯函数计算结果，不跑 ffmpeg
+app.get('/:id/narration-fit/preview', async (c) => {
+  const id = Number(c.req.param('id'))
+  try {
+    return success(c, await previewNarrationFit(id))
+  } catch (err) {
+    return badRequest(c, err instanceof Error ? err.message : '匹配预览失败')
+  }
+})
+
+// PUT /storyboards/:id/narration-fit — 保存本镜匹配参数（服务端校验 30% 与 15 秒上限）
+app.put('/:id/narration-fit', async (c) => {
+  const id = Number(c.req.param('id'))
+  const body = await c.req.json().catch(() => ({} as Record<string, unknown>))
+  try {
+    return success(c, await saveNarrationFit(id, body))
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '保存匹配参数失败'
+    if (err instanceof ComposeBlockedError) {
+      return c.json({
+        success: false,
+        message,
+        block_reason: err.blockReason,
+        gap_ratio: err.gapRatio,
+        current_sec: err.currentSec,
+        avail_sec: err.availSec,
+        suggested_chars: err.suggestedChars,
+      }, 400)
+    }
+    return badRequest(c, message)
+  }
+})
+
+// DELETE /storyboards/:id/narration-fit — 清除本镜覆盖，回到继承剧集默认
+app.delete('/:id/narration-fit', async (c) => {
+  const id = Number(c.req.param('id'))
+  try {
+    return success(c, await clearNarrationFit(id))
+  } catch (err) {
+    return badRequest(c, err instanceof Error ? err.message : '清除匹配参数失败')
   }
 })
 

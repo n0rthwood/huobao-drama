@@ -66,7 +66,14 @@
       <div v-if="subtitleDirty" class="narration-hint">{{ t('episode.narration.timingChangedHint') }}</div>
 
       <audio v-if="audioUrl" :key="audioUrl" class="narration-audio" :src="mediaUrl(audioUrl)" controls preload="metadata" />
-      <div v-else class="narration-hint">{{ t('episode.narration.noAudio') }}</div>
+      <NarrationFitPanel
+        v-if="audioUrl"
+        :storyboard="storyboard"
+        :episode-fit-default="episodeFitDefault"
+        :episode-mix-mode="episodeMixMode"
+        @refresh="emit('refresh')"
+      />
+      <div v-if="!audioUrl" class="narration-hint">{{ t('episode.narration.noAudio') }}</div>
     </template>
     <div v-else class="narration-hint">{{ t('episode.narration.pureVisualHint') }}</div>
 
@@ -107,6 +114,7 @@ import { toastError } from '~/composables/useToast'
 import { toast } from 'vue-sonner'
 import BaseSelect from '~/components/BaseSelect.vue'
 import FieldSaveStatus from '~/components/FieldSaveStatus.vue'
+import NarrationFitPanel from '~/components/NarrationFitPanel.vue'
 
 const props = defineProps({
   storyboard: { type: Object, default: null },
@@ -116,6 +124,9 @@ const props = defineProps({
   episodeTiming: { type: String, default: 'sentence' },
   // 视频页额外显示「合成本镜」与合成结果
   showCompose: { type: Boolean, default: false },
+  // 剧集级音轨模式与默认匹配（#31），用于「继承」展示
+  episodeMixMode: { type: String, default: 'replace' },
+  episodeFitDefault: { type: Object, default: null },
 })
 const emit = defineEmits(['update-field', 'field-dirty', 'refresh'])
 
