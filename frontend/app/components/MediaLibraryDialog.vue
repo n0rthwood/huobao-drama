@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div v-if="open" class="overlay" @click.self="close">
+    <div v-if="open" class="overlay lib-overlay" @click.self="close">
       <div class="dialog lib-dialog" role="dialog" aria-modal="true" :aria-label="t('components.mediaLibrary.title')">
         <header class="lib-head">
           <h2 class="lib-title">{{ title || t('components.mediaLibrary.title') }}</h2>
@@ -311,6 +311,8 @@ watch(() => props.open, async (isOpen) => {
 </script>
 
 <style scoped>
+/* 二级弹窗：常从资产详情弹窗（z 118）里打开，必须盖住它；仍低于图片查看器（120） */
+.lib-overlay { z-index: 119; }
 .lib-dialog {
   width: 1020px;
   max-width: calc(100vw - 48px);
