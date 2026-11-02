@@ -14,13 +14,12 @@
     </div>
 
     <template v-if="enabled">
-      <textarea
-        :value="narrationText"
-        class="textarea narration-textarea"
-        rows="4"
+      <NarrationEditor
+        :model-value="narrationText"
+        :episode-id="Number(storyboard.episode_id ?? storyboard.episodeId)"
         :placeholder="t('episode.narration.placeholder')"
-        @input="emit('field-dirty', storyboard, 'narration_text', $event.target.value)"
-        @blur="emit('update-field', storyboard, 'narration_text', $event.target.value)"
+        @input="emit('field-dirty', storyboard, 'narration_text', $event)"
+        @commit="emit('update-field', storyboard, 'narration_text', $event)"
       />
       <div class="narration-meta">
         <span>{{ t('episode.narration.charCount', { n: chars, sec: estimateSeconds }) }}</span>
@@ -32,6 +31,7 @@
         <div class="narration-issue-msg">{{ tooLongIssue.message }}</div>
         <div class="narration-issue-ways">{{ t('episode.narration.tooLongWays') }}</div>
       </div>
+      <div v-if="phonemeWarning" class="narration-hint narration-warn">{{ phonemeWarning.message }}</div>
 
       <div class="narration-actions">
         <button
@@ -68,8 +68,8 @@
         <button
           type="button"
           class="btn btn-sm"
-          :disabled="busy || blocked || !narrationText.trim()"
-          :title="blocked ? blockReason : undefined"
+          :disabled="busy || !!voiceBlockReason || !narrationText.trim()"
+          :title="voiceBlockReason || undefined"
           @click="voiceDialogOpen = true"
         >
           <Loader2 v-if="voicing" :size="11" class="animate-spin" />
@@ -152,6 +152,11 @@ import BaseSelect from '~/components/BaseSelect.vue'
 import FieldSaveStatus from '~/components/FieldSaveStatus.vue'
 import NarrationFitPanel from '~/components/NarrationFitPanel.vue'
 import NarrationVoiceDialog from '~/components/NarrationVoiceDialog.vue'
+import NarrationEditor from '~/components/NarrationEditor.vue'
+import { spokenText } from '~/utils/narrationMarkup'
+
+// 与后端 MAX_NARRATION_CHARS 一致：TTS 单段字数上限（按念出来的纯文字算）
+const MAX_NARRATION_CHARS = 80
 
 const props = defineProps({
   storyboard: { type: Object, default: null },
@@ -195,7 +200,7 @@ const meta = computed(() => sb.value.narration_meta || sb.value.narrationMeta ||
 const audioUrl = computed(() => sb.value.narration_audio_url || sb.value.narrationAudioUrl || '')
 const composedUrl = computed(() => sb.value.composed_video_url || sb.value.composedVideoUrl || '')
 const hasVideo = computed(() => Boolean(sb.value.video_url || sb.value.videoUrl))
-const chars = computed(() => Number(sb.value.narration_chars ?? sb.value.narrationChars ?? narrationText.value.length))
+const chars = computed(() => Number(sb.value.narration_chars ?? sb.value.narrationChars ?? spokenText(narrationText.value).replace(/\s+/g, '').length))
 const estimateSeconds = computed(() => {
   const v = Number(sb.value.narration_estimate_seconds ?? sb.value.narrationEstimateSeconds ?? 0)
   return v ? v.toFixed(1) : '0.0'
@@ -211,15 +216,24 @@ const composedSeconds = computed(() => {
 const cueCount = computed(() => Number(meta.value?.subtitle?.cues || 0))
 const subtitleEstimated = computed(() => meta.value?.subtitle?.source === 'proportional_fallback')
 
-// 阻断（后端 ref_issues）：旁白过长 / 配音过期，阻断期间禁用配音与合成
+// 阻断（后端 ref_issues）：旁白过长 / 配音过期 / 发音标记写错（#38）
 function issuesOf() {
   const list = sb.value.ref_issues || sb.value.refIssues
   return Array.isArray(list) ? list : []
 }
 const narrationIssues = computed(() => issuesOf().filter(i => i.code === 'narration_too_long' || i.code === 'narration_voice_stale'))
 const tooLongIssue = computed(() => narrationIssues.value.find(i => i.code === 'narration_too_long') || null)
-const blocked = computed(() => Boolean(tooLongIssue.value))
-const blockReason = computed(() => tooLongIssue.value?.message || '')
+const markupIssue = computed(() => issuesOf().find(i => i.code === 'narration_markup_invalid') || null)
+const phonemeWarning = computed(() => issuesOf().find(i => i.code === 'narration_phoneme_no_normalize') || null)
+// 合成：任何阻断都不行；配音：只有「字数超单段上限」或标记写错才挡——
+// 实测配音偏长时恰恰需要换音色/参数重配（#37），不能连重配也挡掉
+const blocked = computed(() => Boolean(tooLongIssue.value || markupIssue.value))
+const blockReason = computed(() => markupIssue.value?.message || tooLongIssue.value?.message || '')
+const voiceBlockReason = computed(() => {
+  if (markupIssue.value) return markupIssue.value.message
+  if (chars.value > MAX_NARRATION_CHARS) return tooLongIssue.value?.message || ''
+  return ''
+})
 const composeDisabledReason = computed(() => {
   if (blocked.value) return blockReason.value
   if (!hasVideo.value) return t('episode.compose.needVideo')
@@ -404,6 +418,9 @@ async function compose() {
   flex-wrap: wrap;
   font-size: 11px;
   color: var(--text-3);
+}
+.narration-warn {
+  color: var(--action-danger);
 }
 .narration-issue {
   border: 1px solid var(--action-danger);

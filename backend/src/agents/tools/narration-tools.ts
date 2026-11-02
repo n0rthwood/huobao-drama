@@ -23,6 +23,7 @@ import {
   parseNarrationMeta,
   sha256,
 } from '../../services/narration.js'
+import { parseNarrationMarkup } from '../../services/narration-markup.js'
 import { stampFieldSavedAt } from '../../services/storyboard-fields.js'
 
 const saveNarrations = createTool({
@@ -31,7 +32,7 @@ const saveNarrations = createTool({
   inputSchema: z.object({
     narrations: z.array(z.object({
       shot_number: z.number().describe('Shot number of the storyboard in this episode.'),
-      narration: z.string().describe(`Narration script for this shot, in the target content language. Must be at most ${MAX_NARRATION_CHARS} characters (TTS hard limit per segment) and should fit the shot duration at 3.8–5.1 characters per second.`),
+      narration: z.string().describe(`Narration script for this shot, in the target content language. Must be at most ${MAX_NARRATION_CHARS} spoken characters (TTS hard limit per segment; pronunciation markers do not count) and should fit the shot duration at 3.8–5.1 characters per second. Pronunciation markers use [[原文|pinyin with tones 1-4]] or [[原文|same-length homophone characters]].`),
       narration_enabled: z.boolean().optional().describe('false means this shot is deliberately left as pure visuals with no narration; narration must then be an empty string.'),
     })),
   }),
@@ -76,6 +77,15 @@ const saveNarrations = createTool({
         rejected.push({
           shot_number: item.shot_number,
           reason: `narration is ${chars} characters, exceeding the hard limit of ${MAX_NARRATION_CHARS}; shorten it and save again`,
+        })
+        continue
+      }
+      // 发音标记（#38）写错就退回，让模型按报错改正后重存
+      const markupErrors = parseNarrationMarkup(text).errors
+      if (markupErrors.length) {
+        rejected.push({
+          shot_number: item.shot_number,
+          reason: `pronunciation marker error: ${markupErrors.map(e => e.message).join('; ')}. Use [[原文|pinyin with tones 1-4, one syllable per character]] or [[原文|homophone characters of the same length]]; fix and save again`,
         })
         continue
       }

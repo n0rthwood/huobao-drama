@@ -13,7 +13,7 @@ import { now } from '../utils/response.js'
 import { STORAGE_ROOT } from '../utils/paths.js'
 import { logTaskError, logTaskProgress, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
 import { getActiveConfig, getConfigById, type AIConfig } from './ai.js'
-import { NARRATION_SUBDIR, fetchCharAlign, fetchVoiceItems, parseTtsSettings, synthesizeNarration } from './tts.js'
+import { NARRATION_SUBDIR, fetchCharAlign, fetchMarkupCatalog, fetchVoiceItems, parseTtsSettings, previewMarkup, synthesizeNarration } from './tts.js'
 import {
   VOXCPM_CFG,
   VOXCPM_STEPS,
@@ -29,6 +29,15 @@ import {
   type VoicePlanStatus,
 } from './narration-voice-params.js'
 import { buildSubtitleCues, renderSrt } from './subtitle.js'
+import {
+  PAUSE_MAX_SECONDS,
+  PAUSE_MIN_SECONDS,
+  TONE_TAGS,
+  engineSpokenText,
+  parseNarrationMarkup,
+  spokenText,
+  toVoxcpmText,
+} from './narration-markup.js'
 import { parseFitRecord } from './narration-fit.js'
 import {
   DEFAULT_SUBTITLE_TIMING,
@@ -131,6 +140,26 @@ export interface TtsOptions {
   current: VoiceParams
 }
 
+/**
+ * 旁白编辑器的标记目录（#38）：语气只给火宝支持的那 11 个（名称/分组以 Studio 为准，取不到就用内置名），
+ * 多音字候选取 Studio 的常见多音字表；停顿范围与解析器一致。
+ */
+export async function getMarkupCatalog(episodeId: number) {
+  const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId))
+  if (!ep) throw new Error('剧集不存在')
+  const config = await resolveTtsConfig(ep)
+  requireVoxcpm(config)
+  const studio = await fetchMarkupCatalog(config)
+  return {
+    tones: TONE_TAGS.map((t) => {
+      const s = studio.tags.find(x => x.tag === t.tag)
+      return { tag: t.tag, label: s?.label || t.label, group: s?.group || '' }
+    }),
+    polyphones: studio.polyphones,
+    pause: { min: PAUSE_MIN_SECONDS, max: PAUSE_MAX_SECONDS, presets: [0.3, 0.5, 1, 2] },
+  }
+}
+
 /** 配音弹窗的选项与预填值（#37）：选项实时取自本集生效的 VoxCPM 服务 */
 export async function getTtsOptions(episodeId: number, storyboardId?: number): Promise<TtsOptions> {
   const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId))
@@ -190,6 +219,10 @@ export async function generateShotVoice(
   if (chars > MAX_NARRATION_CHARS) {
     throw new Error(`分镜 #${sb.storyboardNumber} 的旁白 ${chars} 字，超过语音合成单段上限 ${MAX_NARRATION_CHARS} 字：请先改写精简`)
   }
+  const markupErrors = parseNarrationMarkup(text).errors
+  if (markupErrors.length) {
+    throw new Error(`分镜 #${sb.storyboardNumber} 的发音标记有误：${markupErrors.map(e => e.message).join('；')}`)
+  }
 
   const config = await resolveTtsConfig(ep)
   let params = presetParams
@@ -200,15 +233,25 @@ export async function generateShotVoice(
   params ??= effectiveVoiceParams(ep, sb.narrationNormalize, config)
   logTaskStart('Narration', 'voice', { storyboardId, episodeId: sb.episodeId, chars })
 
-  // 字幕仍然只用 narration_text，不产生第二份措辞
-  const synthesis = await synthesizeNarration(config, text, params)
+  // 发音标记（#38）：源文本 → VoxCPM 语法；先让 Studio 按它自己的规则解析一遍，
+  // 它认出的「念出来的字」必须与我们的 engineSpokenText 一致，否则不合成（字幕对不上）
+  const engineText = toVoxcpmText(text)
+  const expectedSpoken = engineSpokenText(text)
+  const preview = await previewMarkup(config, engineText)
+  if (preview.errors.length) throw new Error(`语音服务无法解析本镜的发音标记：${preview.errors.join('；')}`)
+  if (preview.spoken.replace(/\s+/g, '') !== expectedSpoken.replace(/\s+/g, '')) {
+    throw new Error(`语音服务解析出的朗读文字与旁白不一致，已停止合成：服务端「${preview.spoken}」/ 期望「${expectedSpoken}」`)
+  }
+  const synthesis = await synthesizeNarration(config, engineText, params)
 
   // 字幕：两种时间码模式都基于这一次整镜合成的音频，对齐数据统一取逐字时间戳
-  // （TTS 服务只支持 level=word|char，sentence 模式由 buildSubtitleCues 按句聚合）
+  // （TTS 服务只支持 level=word|char，sentence 模式由 buildSubtitleCues 按句聚合）。
+  // 字幕文字只用去掉标记的纯旁白；对齐用 VoxCPM 实际念的字（同音字等长替换）
   const timing = resolveSubtitleTiming(ep.subtitleTiming, sb.subtitleTiming)
   const charItems = synthesis.jobId ? await fetchCharAlign(config, synthesis.jobId) : null
   const subtitle = buildSubtitleCues({
-    text,
+    text: spokenText(text),
+    alignText: expectedSpoken,
     durationMs: synthesis.durationMs,
     timing,
     charItems,
@@ -303,13 +346,9 @@ async function planVoiceBatch(ep: EpisodeRow, desired: VoiceParams, config: AICo
     const status = classifyVoiceShot({
       narrationEnabled: sb.narrationEnabled !== false,
       text,
-      // 超长镜头不浪费一次 GPU 合成
-      blocked: narrationIssues({
-        episodeNarrationEnabled: true,
-        shotNarrationEnabled: sb.narrationEnabled !== false,
-        narrationText: sb.narrationText,
-        meta,
-      }).some(issue => issue.code === 'narration_too_long'),
+      // 字数超单段上限、发音标记写错的镜头不浪费一次 GPU 合成；
+      // 「实测配音 + 留白超 15 秒」不挡——换音色/参数重配正是解决它的办法之一
+      blocked: narrationCharCount(text) > MAX_NARRATION_CHARS || parseNarrationMarkup(text).errors.length > 0,
       audio: meta.audio,
       desired: shotParams,
       configSettings,
@@ -422,7 +461,13 @@ export async function regenerateShotSubtitle(storyboardId: number): Promise<{ su
   const timing = resolveSubtitleTiming(ep.subtitleTiming, sb.subtitleTiming)
 
   const charItems = meta.audio.job_id ? await fetchCharAlign(config, meta.audio.job_id) : null
-  const subtitle = buildSubtitleCues({ text, durationMs: meta.audio.duration_ms, timing, charItems })
+  const subtitle = buildSubtitleCues({
+    text: spokenText(text),
+    alignText: engineSpokenText(text),
+    durationMs: meta.audio.duration_ms,
+    timing,
+    charItems,
+  })
 
   const srtDir = path.join(STORAGE_ROOT, NARRATION_SUBDIR)
   fs.mkdirSync(srtDir, { recursive: true })

@@ -8,6 +8,7 @@
  */
 import crypto from 'crypto'
 import type { VoiceParams } from './narration-voice-params.js'
+import { parseNarrationMarkup, pauseSeconds, phonemeDisablesNormalize, spokenText } from './narration-markup.js'
 
 /** TTS 服务实测的单段字数硬上限（VoxCPM2 `limits.max_segment_chars`） */
 export const MAX_NARRATION_CHARS = 80
@@ -93,16 +94,16 @@ export function parseNarrationMeta(raw: string | null | undefined): NarrationMet
   }
 }
 
-/** 有效字数：忽略空白，标点计入（TTS 的 max_segment_chars 按原文字符数算） */
+/** 有效字数：按念出来的纯文字算（发音标记不计，#38），忽略空白，标点计入 */
 export function narrationCharCount(text: string | null | undefined): number {
-  return (text || '').replace(/\s+/g, '').length
+  return spokenText(text).replace(/\s+/g, '').length
 }
 
-/** 按 4.5 字/秒估算的预计配音时长（秒），用于还没配音时的 UI 展示与拆分镜时的时长估算 */
+/** 按 4.5 字/秒估算的预计配音时长（秒）+ 精确停顿（#38），用于还没配音时的 UI 展示与拆分镜时的时长估算 */
 export function estimateNarrationSeconds(text: string | null | undefined): number {
   const chars = narrationCharCount(text)
   if (!chars) return 0
-  return Math.round((chars / NARRATION_CHARS_PER_SECOND) * 10) / 10
+  return Math.round((chars / NARRATION_CHARS_PER_SECOND + pauseSeconds(text)) * 10) / 10
 }
 
 /** 某段时长下建议的旁白字数上限（取语速上限，再受 TTS 单段 80 字约束） */
@@ -180,16 +181,18 @@ export function narrationStatus(input: NarrationStatusInput): NarrationStatus {
 }
 
 export interface NarrationBlockIssue {
-  code: 'narration_too_long' | 'narration_voice_stale'
-  severity: 'block'
+  code: 'narration_too_long' | 'narration_voice_stale' | 'narration_markup_invalid' | 'narration_phoneme_no_normalize'
+  severity: 'block' | 'warn'
   message: string
   fields: string[]
 }
 
 /**
- * 旁白侧的阻断问题（与 storyboard-assets 的 ref_issues 同形状，直接并进那条展示链路）。
+ * 旁白侧的问题（与 storyboard-assets 的 ref_issues 同形状，直接并进那条展示链路）。
  * - `narration_too_long`：字数超 TTS 单段上限，或「实测配音 + 尾部留白」超过 15 秒内容段预算
  * - `narration_voice_stale`：文本改过、配音未重生成
+ * - `narration_markup_invalid`（#38）：发音标记写错，阻断配音
+ * - `narration_phoneme_no_normalize`（#38，警告）：有拼音注音 + 阿拉伯数字 + 规范化开，VoxCPM 会关掉规范化
  */
 export function narrationIssues(input: {
   episodeNarrationEnabled: boolean
@@ -197,11 +200,24 @@ export function narrationIssues(input: {
   narrationText: string | null | undefined
   meta: NarrationMeta
   tailPadSeconds?: number
+  /** 本镜生效的文本规范化（#35）；不传则不检查规范化相关警告 */
+  normalize?: boolean
 }): NarrationBlockIssue[] {
   if (!input.episodeNarrationEnabled || !input.shotNarrationEnabled) return []
   const issues: NarrationBlockIssue[] = []
   const text = (input.narrationText || '').trim()
   if (!text) return issues
+  for (const err of parseNarrationMarkup(text).errors) {
+    issues.push({ code: 'narration_markup_invalid', severity: 'block', message: `发音标记有误：${err.message}`, fields: ['narration_text'] })
+  }
+  if (input.normalize && phonemeDisablesNormalize(text)) {
+    issues.push({
+      code: 'narration_phoneme_no_normalize',
+      severity: 'warn',
+      message: '本镜有拼音注音，语音服务会因此关闭文本规范化，阿拉伯数字将按字面念：数字处的多音字请改用同音字注音',
+      fields: ['narration_text'],
+    })
+  }
   const chars = narrationCharCount(text)
   const tailPad = input.tailPadSeconds ?? DEFAULT_TAIL_PAD_SECONDS
 

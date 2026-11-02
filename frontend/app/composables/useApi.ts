@@ -122,6 +122,13 @@ export const episodeAPI = {
       config_id: data.config_id || undefined,
     }),
   narrationStatus: (id: number) => api.get(`/episodes/${id}/narration-status`),
+  // 旁白编辑器的语气 / 多音字 / 停顿选项（#38）
+  narrationMarkupCatalog: (id: number) =>
+    api.get<{
+      tones: { tag: string; label: string; group: string }[]
+      polyphones: Record<string, [string, string][]>
+      pause: { min: number; max: number; presets: number[] }
+    }>(`/episodes/${id}/narration-markup-catalog`),
   // 配音弹窗（#37）：选项与预填值 / 批量预览 / 批量执行（settings = 弹窗参数，保存为本集默认）
   ttsOptions: (id: number, storyboardId?: number) =>
     api.get<TtsOptions>(`/episodes/${id}/tts-options${storyboardId ? `?storyboard_id=${storyboardId}` : ''}`),
