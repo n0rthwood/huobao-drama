@@ -253,6 +253,11 @@ Issue 整理完成后、实施前，必须让 **Fabel（Anthropic）或 Astra（
 - **改风格（新值 ≠ 原值）时后端清空本项目三类资产的全部 `final_prompt`**（含手工修改过的），下次生图由 `services/final-prompt.ts ensure*FinalPrompt` 按新风格重写；同值保存不清空。已生成的图片/视频不自动重做：关键帧与视频签名都对**含风格词的最终提示词**和尺寸/画幅取哈希，改动后批量预览自动把旧镜头标「已变化」。
 - 角色定妆照固定 1920x1080（`routes/characters.ts CHARACTER_IMAGE_SIZE`），不随项目画幅变化。
 
+### 旁白配音参数（Issue #37）
+- 唯一实现 `services/narration-voice-params.ts`（纯函数，行为测试 `backend/tests/narration-voice-params.test.mjs`）。生效参数 = 集级 `episodes.tts_settings`（JSON `{voice, inference_timesteps, cfg_value, seed|null, instructions}`）→ TTS 配置行 settings → VoxCPM 默认（10 步 / cfg 2.0 / seed 随机）；规范化沿用 #35：镜级 `storyboards.narration_normalize` → 集级 `episodes.narration_normalize`。
+- 单镜「生成/重新生成配音」与「批量生成配音」都先弹 `components/NarrationVoiceDialog.vue`：选项来自 `GET /episodes/:id/tts-options?storyboard_id=`（实时读 VoxCPM Studio `GET /api/voices`，分组同 Studio「我的音色」+「预置 · 分类」；步数 2–30 + 预设 4/10/30 及 RTF 0.35/0.49/0.93；cfg 1.0–3.0），预填当前生效值。确定 = `settings` 随 `POST /storyboards/:id/narration/voice` 或 `POST /episodes/:id/narration/voice-batch` 提交，服务端校验（音色必须在列表里）并**保存为本集默认**（规范化写当前生效那一层：单镜有镜级覆盖则写镜级）。
+- 批量统一口径：只配 `missing`（无配音）+ `changed`（`text_sha256` 变了，或 `meta.audio.params` 与本次参数逐项不同）；手动选镜只缩小范围。`POST /episodes/:id/narration/voice-batch/preview` 与执行共用 `classifyVoiceShot`。seed 比较的是**所选值**（随机 = null）。`meta.audio.params` 记录实际请求参数；#37 之前的存量音频按当时事实重建（`normalize=false`），所以开规范化后存量配音会显示为「已变化」。
+
 ### 全局任务中心
 - `sys_task` 多了 `episode_id`（分镜任务由分镜反查、资产出图取发起时所在集、文本任务必填；启动时 `backfillTaskEpisodeIds()` 按 `storyboard_id` 回填存量行）与 `type='text'`。**文本任务不再存进程内存**：提取（`services/extraction.ts`）、关键帧/视频提示词批量（`keyframe-prompts.ts`/`video-prompts.ts`）、同步 chat 的剧本改写与拆分分镜（`routes/agent.ts`）都在开始时建 `sys_task(type='text')`，`params.kind` ∈ `extract_characters|extract_scenes|extract_props|keyframe_prompts|video_prompts|script_rewrite|storyboard_breaker`，进度写 `params.progress`（`{completed,total,failed,current_storyboard_id}`，**不复用 `remote_state`**，那是 qwen-jobs 追踪器的）。`/extract-status`、`/keyframe-prompts-status`、`/video-prompts-status` 响应结构不变，只是改成从库里读（函数变成 async）。
 - 重启：启动清理对 `type='text'` 的活跃任务一律标 `failed`（`error_msg='后端重启中断'`，`failInterruptedTextTasks()`），不自动重跑；图像/视频规则不变（qwen-jobs 交追踪器、其它 provider 标失败、批次照旧恢复）。

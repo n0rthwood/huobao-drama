@@ -13,14 +13,30 @@ import { now } from '../utils/response.js'
 import { STORAGE_ROOT } from '../utils/paths.js'
 import { logTaskError, logTaskProgress, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
 import { getActiveConfig, getConfigById, type AIConfig } from './ai.js'
-import { NARRATION_SUBDIR, fetchCharAlign, synthesizeNarration } from './tts.js'
+import { NARRATION_SUBDIR, fetchCharAlign, fetchVoiceItems, parseTtsSettings, synthesizeNarration } from './tts.js'
+import {
+  VOXCPM_CFG,
+  VOXCPM_STEPS,
+  VOXCPM_STEP_PRESETS,
+  classifyVoiceShot,
+  episodeSettingsOf,
+  groupVoices,
+  parseEpisodeVoiceSettings,
+  resolveVoiceParams,
+  sanitizeVoiceSettings,
+  type VoiceOption,
+  type VoiceParams,
+  type VoicePlanStatus,
+} from './narration-voice-params.js'
 import { buildSubtitleCues, renderSrt } from './subtitle.js'
 import { parseFitRecord } from './narration-fit.js'
 import {
   DEFAULT_SUBTITLE_TIMING,
   DEFAULT_TAIL_PAD_SECONDS,
   MAX_NARRATION_CHARS,
+  NARRATION_CHARS_PER_SECOND,
   durationFromAudio,
+  estimateNarrationSeconds,
   narrationCharCount,
   narrationIssues,
   parseNarrationMeta,
@@ -59,6 +75,87 @@ export function resolveSubtitleTiming(
   return candidate === 'char' || candidate === 'sentence' ? candidate : DEFAULT_SUBTITLE_TIMING
 }
 
+type EpisodeRow = typeof schema.episodes.$inferSelect
+type StoryboardRow = typeof schema.storyboards.$inferSelect
+
+/** 本镜生效的配音参数：集级 tts_settings → TTS 配置 → VoxCPM 默认；normalize 镜级覆盖 → 集级（#37） */
+function effectiveVoiceParams(ep: EpisodeRow, shotNormalize: boolean | null | undefined, config: AIConfig): VoiceParams {
+  return resolveVoiceParams({
+    episodeSettings: parseEpisodeVoiceSettings(ep.ttsSettings),
+    configSettings: parseTtsSettings(config.settings),
+    episodeNormalize: ep.narrationNormalize,
+    shotNormalize,
+  })
+}
+
+function requireVoxcpm(config: AIConfig) {
+  if ((config.provider || '').toLowerCase() !== 'voxcpm') {
+    throw new Error(`不支持的语音合成服务：${config.provider || '(未配置)'}（配音参数弹窗只支持 voxcpm）`)
+  }
+}
+
+/** 弹窗提交的参数 → 校验（音色必须在服务当前列表里）后的完整参数 */
+async function validatedVoiceParams(raw: unknown, config: AIConfig): Promise<VoiceParams> {
+  requireVoxcpm(config)
+  const items = await fetchVoiceItems(config.baseUrl, config.apiKey)
+  return sanitizeVoiceSettings(raw, items.map(v => v.name))
+}
+
+/**
+ * 弹窗确定 = 保存为本集默认（#37 Q2=B）。规范化写到当前生效的那一层：
+ * 单镜且该镜有镜级覆盖 → 改镜级；否则改集级（批量一律改集级，带镜级覆盖的镜头仍按各自设置）。
+ */
+async function saveVoiceDefaults(ep: EpisodeRow, params: VoiceParams, shot?: StoryboardRow) {
+  const ts = now()
+  const shotOverride = shot && (shot.narrationNormalize === true || shot.narrationNormalize === false)
+  await db.update(schema.episodes).set({
+    ttsSettings: JSON.stringify(episodeSettingsOf(params)),
+    ...(shotOverride ? {} : { narrationNormalize: params.normalize }),
+    updatedAt: ts,
+  }).where(eq(schema.episodes.id, ep.id))
+  if (shot && shotOverride) {
+    await db.update(schema.storyboards).set({ narrationNormalize: params.normalize, updatedAt: ts })
+      .where(eq(schema.storyboards.id, shot.id))
+  }
+}
+
+export interface TtsOptions {
+  config_id: number | null
+  config_name: string
+  voices: VoiceOption[]
+  steps: { min: number; max: number; default: number; presets: { steps: number; rtf: number }[] }
+  cfg: { min: number; max: number; default: number }
+  /** 预计音频时长用的语速（字/秒），与 estimateNarrationSeconds 同口径 */
+  chars_per_second: number
+  /** 弹窗预填值 = 本集（或本镜）当前生效参数 */
+  current: VoiceParams
+}
+
+/** 配音弹窗的选项与预填值（#37）：选项实时取自本集生效的 VoxCPM 服务 */
+export async function getTtsOptions(episodeId: number, storyboardId?: number): Promise<TtsOptions> {
+  const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId))
+  if (!ep) throw new Error('剧集不存在')
+  let shotNormalize: boolean | null = null
+  if (storyboardId) {
+    const [sb] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, storyboardId))
+    if (!sb || sb.episodeId !== episodeId) throw new Error('镜头不存在')
+    shotNormalize = sb.narrationNormalize ?? null
+  }
+  const config = await resolveTtsConfig(ep)
+  requireVoxcpm(config)
+  const items = await fetchVoiceItems(config.baseUrl, config.apiKey)
+  const [row] = config.id ? await db.select().from(schema.aiServiceConfigs).where(eq(schema.aiServiceConfigs.id, config.id)) : []
+  return {
+    config_id: config.id ?? null,
+    config_name: row?.name || config.provider,
+    voices: groupVoices(items),
+    steps: { ...VOXCPM_STEPS, presets: VOXCPM_STEP_PRESETS.map(p => ({ ...p })) },
+    cfg: { ...VOXCPM_CFG },
+    chars_per_second: NARRATION_CHARS_PER_SECOND,
+    current: effectiveVoiceParams(ep, shotNormalize, config),
+  }
+}
+
 export interface VoiceResult {
   storyboardId: number
   audioUrl: string
@@ -73,7 +170,13 @@ export interface VoiceResult {
 /**
  * 为一个镜头生成配音 + 字幕。整镜一次合成（不按句分段）。
  */
-export async function generateShotVoice(storyboardId: number): Promise<VoiceResult> {
+export async function generateShotVoice(
+  storyboardId: number,
+  /** 弹窗提交的原始参数（#37）：校验后保存为本集默认再合成；不传 = 用当前生效参数 */
+  rawSettings?: unknown,
+  /** 批量已解析好的参数（跳过校验与保存） */
+  presetParams?: VoiceParams,
+): Promise<VoiceResult> {
   const [sb] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, storyboardId))
   if (!sb) throw new Error('镜头不存在')
   const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, sb.episodeId))
@@ -89,11 +192,16 @@ export async function generateShotVoice(storyboardId: number): Promise<VoiceResu
   }
 
   const config = await resolveTtsConfig(ep)
+  let params = presetParams
+  if (!params && rawSettings !== undefined) {
+    params = await validatedVoiceParams(rawSettings, config)
+    await saveVoiceDefaults(ep, params, sb)
+  }
+  params ??= effectiveVoiceParams(ep, sb.narrationNormalize, config)
   logTaskStart('Narration', 'voice', { storyboardId, episodeId: sb.episodeId, chars })
 
-  // 文本规范化（#35）：镜级覆盖 > 集级默认（默认开）。字幕仍然只用 narration_text，不产生第二份措辞。
-  const normalize = resolveNarrationNormalize(ep.narrationNormalize, sb.narrationNormalize)
-  const synthesis = await synthesizeNarration(config, text, normalize)
+  // 字幕仍然只用 narration_text，不产生第二份措辞
+  const synthesis = await synthesizeNarration(config, text, params)
 
   // 字幕：两种时间码模式都基于这一次整镜合成的音频，对齐数据统一取逐字时间戳
   // （TTS 服务只支持 level=word|char，sentence 模式由 buildSubtitleCues 按句聚合）
@@ -125,6 +233,7 @@ export async function generateShotVoice(storyboardId: number): Promise<VoiceResu
     config_id: config.id ?? null,
     generated_at: ts,
     text_sha256: meta.text_sha256,
+    params,
   }
   meta.subtitle = {
     cues: subtitle.cues.length,
@@ -171,37 +280,84 @@ export async function generateShotVoice(storyboardId: number): Promise<VoiceResu
   }
 }
 
-/** 批量配音：sys_task(type='text', kind='narration_tts')，串行（TTS 服务是单 GPU 队列） */
+export interface VoicePlanItem {
+  storyboard_id: number
+  storyboard_number: number
+  status: VoicePlanStatus
+  /** 预计音频秒数（未配音按字数估算，已配音取实测） */
+  audio_seconds: number
+}
+
+/** 批量配音的逐镜分类（preview 与执行共用，#37）：本次参数 = desired，镜级规范化覆盖仍然生效 */
+async function planVoiceBatch(ep: EpisodeRow, desired: VoiceParams, config: AIConfig, storyboardIds?: number[]) {
+  const configSettings = parseTtsSettings(config.settings)
+  const sbs = (await db.select().from(schema.storyboards)
+    .where(eq(schema.storyboards.episodeId, ep.id))
+    .orderBy(schema.storyboards.storyboardNumber))
+    .filter(sb => !sb.deletedAt)
+    .filter(sb => !storyboardIds?.length || storyboardIds.includes(sb.id))
+  return sbs.map((sb) => {
+    const meta = parseNarrationMeta(sb.narrationMeta)
+    const text = sb.narrationText || ''
+    const shotParams: VoiceParams = { ...desired, normalize: resolveNarrationNormalize(desired.normalize, sb.narrationNormalize) }
+    const status = classifyVoiceShot({
+      narrationEnabled: sb.narrationEnabled !== false,
+      text,
+      // 超长镜头不浪费一次 GPU 合成
+      blocked: narrationIssues({
+        episodeNarrationEnabled: true,
+        shotNarrationEnabled: sb.narrationEnabled !== false,
+        narrationText: sb.narrationText,
+        meta,
+      }).some(issue => issue.code === 'narration_too_long'),
+      audio: meta.audio,
+      desired: shotParams,
+      configSettings,
+    })
+    const item: VoicePlanItem = {
+      storyboard_id: sb.id,
+      storyboard_number: sb.storyboardNumber,
+      status,
+      audio_seconds: meta.audio?.duration_ms ? meta.audio.duration_ms / 1000 : estimateNarrationSeconds(text),
+    }
+    return { item, params: shotParams }
+  })
+}
+
+/** 批量配音预览：按弹窗参数把镜头分成缺失 / 已变化 / 未变化 / 跳过 */
+export async function previewVoiceBatch(episodeId: number, rawSettings: unknown, storyboardIds?: number[]): Promise<VoicePlanItem[]> {
+  const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId))
+  if (!ep) throw new Error('剧集不存在')
+  const config = await resolveTtsConfig(ep)
+  const desired = await validatedVoiceParams(rawSettings, config)
+  return (await planVoiceBatch(ep, desired, config, storyboardIds)).map(p => p.item)
+}
+
+/**
+ * 批量配音：sys_task(type='text', kind='narration_tts')，串行（TTS 服务是单 GPU 队列）。
+ * 只配「缺失 + 已变化」（#37 统一口径）；手动选镜只缩小范围。传了弹窗参数就先保存为本集默认。
+ */
 export async function startVoiceBatch(
   episodeId: number,
   dramaId: number,
   storyboardIds?: number[],
+  rawSettings?: unknown,
 ): Promise<{ started: boolean; total: number }> {
   if (await findActiveTextTask(episodeId, 'narration_tts')) return { started: false, total: -1 }
 
   const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId))
   if (!ep || ep.narrationEnabled !== true) throw new Error('本集未开启旁白，无法生成配音')
 
-  const sbs = (await db.select().from(schema.storyboards)
-    .where(eq(schema.storyboards.episodeId, episodeId))
-    .orderBy(schema.storyboards.storyboardNumber))
-    .filter(sb => !sb.deletedAt)
-
-  const pending = (storyboardIds?.length ? sbs.filter(sb => storyboardIds.includes(sb.id)) : sbs)
-    .filter(sb => sb.narrationEnabled !== false && (sb.narrationText || '').trim())
-    .filter((sb) => {
-      // 已配音且文本没改过的镜头跳过（显式指定镜头时强制重配）
-      if (storyboardIds?.length) return true
-      const meta = parseNarrationMeta(sb.narrationMeta)
-      return !meta.audio || meta.audio.text_sha256 !== sha256((sb.narrationText || '').trim())
-    })
-    // 超长镜头不浪费一次 GPU 合成，直接排除并计入失败
-    .filter(sb => !narrationIssues({
-      episodeNarrationEnabled: true,
-      shotNarrationEnabled: sb.narrationEnabled !== false,
-      narrationText: sb.narrationText,
-      meta: parseNarrationMeta(sb.narrationMeta),
-    }).some(issue => issue.code === 'narration_too_long'))
+  const config = await resolveTtsConfig(ep)
+  let desired: VoiceParams
+  if (rawSettings !== undefined) {
+    desired = await validatedVoiceParams(rawSettings, config)
+    await saveVoiceDefaults(ep, desired)
+  } else {
+    desired = effectiveVoiceParams(ep, null, config)
+  }
+  const pending = (await planVoiceBatch(ep, desired, config, storyboardIds))
+    .filter(p => p.item.status === 'missing' || p.item.status === 'changed')
 
   if (!pending.length) return { started: false, total: 0 }
 
@@ -212,22 +368,22 @@ export async function startVoiceBatch(
     dramaId,
     prompt: `为 ${pending.length} 个分镜生成旁白配音`,
     progress,
-    storyboardIds: pending.map(sb => sb.id),
+    storyboardIds: pending.map(p => p.item.storyboard_id),
   })
 
-  logTaskStart('Narration', 'voice-batch', { episodeId, total: pending.length })
+  logTaskStart('Narration', 'voice-batch', { episodeId, total: pending.length, voice: desired.voice })
 
   ;(async () => {
-    for (const sb of pending) {
-      progress.current_storyboard_id = sb.id
+    for (const p of pending) {
+      progress.current_storyboard_id = p.item.storyboard_id
       await updateTextTaskProgress(taskId, progress)
       try {
-        await generateShotVoice(sb.id)
+        await generateShotVoice(p.item.storyboard_id, undefined, p.params)
         progress.completed++
       } catch (err) {
         progress.failed++
         logTaskError('Narration', 'voice-batch-shot', {
-          storyboardId: sb.id,
+          storyboardId: p.item.storyboard_id,
           error: err instanceof Error ? err.message : String(err),
         })
       }

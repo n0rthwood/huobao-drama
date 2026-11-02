@@ -473,11 +473,13 @@ app.post('/:id/narration/write', async (c) => {
   }
 })
 
-// POST /storyboards/:id/narration/voice — 单镜配音（同步返回，整镜一次合成）
+// POST /storyboards/:id/narration/voice {settings?} — 单镜配音（同步返回，整镜一次合成）；
+// 带弹窗参数时先校验并保存为本集默认（#37）
 app.post('/:id/narration/voice', async (c) => {
   const id = Number(c.req.param('id'))
+  const body = await c.req.json().catch(() => ({} as Record<string, any>))
   try {
-    return success(c, await generateShotVoice(id))
+    return success(c, await generateShotVoice(id, body.settings))
   } catch (err) {
     const message = err instanceof Error ? err.message : '生成配音失败'
     logTaskError('StoryboardAPI', 'narration-voice', { storyboardId: id, error: message })

@@ -42,7 +42,7 @@ import {
   parseNarrationMeta,
 } from '../services/narration.js'
 import { getNarrationScriptStatus, startNarrationScript } from '../services/narration-script.js'
-import { getVoiceBatchStatus, resolveSubtitleTiming, startVoiceBatch } from '../services/narration-voice.js'
+import { getTtsOptions, getVoiceBatchStatus, previewVoiceBatch, resolveSubtitleTiming, startVoiceBatch } from '../services/narration-voice.js'
 import { getComposeBatchStatus, startComposeBatch } from '../services/shot-compose.js'
 import { DEFAULT_FIT_RECORD, parseFitRecord, validateFitRecord } from '../services/narration-fit.js'
 import type { AssetKind } from '../services/reference-images.js'
@@ -388,18 +388,45 @@ app.get('/:id/narration-status', async (c) => {
   return success(c, await getNarrationScriptStatus(Number(c.req.param('id'))))
 })
 
-// POST /episodes/:id/narration/voice-batch — 批量旁白配音
+// GET /episodes/:id/tts-options?storyboard_id= — 配音弹窗的选项与预填值（#37）
+app.get('/:id/tts-options', async (c) => {
+  const storyboardId = Number(c.req.query('storyboard_id') || 0) || undefined
+  try {
+    return success(c, await getTtsOptions(Number(c.req.param('id')), storyboardId))
+  } catch (err) {
+    return badRequest(c, err instanceof Error ? err.message : '读取配音选项失败')
+  }
+})
+
+function voiceBatchIds(body: Record<string, any>): number[] | undefined {
+  return Array.isArray(body.storyboard_ids)
+    ? body.storyboard_ids.map(Number).filter((n: number) => Number.isInteger(n) && n > 0)
+    : undefined
+}
+
+// POST /episodes/:id/narration/voice-batch/preview {settings, storyboard_ids?} — 按弹窗参数逐镜分类（#37）
+app.post('/:id/narration/voice-batch/preview', async (c) => {
+  const body = await c.req.json().catch(() => ({} as Record<string, any>))
+  try {
+    const items = await previewVoiceBatch(Number(c.req.param('id')), body.settings, voiceBatchIds(body))
+    return success(c, { items })
+  } catch (err) {
+    return badRequest(c, err instanceof Error ? err.message : '配音预览失败')
+  }
+})
+
+// POST /episodes/:id/narration/voice-batch {settings?, storyboard_ids?} — 批量旁白配音（只配缺失 + 已变化）
 app.post('/:id/narration/voice-batch', async (c) => {
   const id = Number(c.req.param('id'))
   const body = await c.req.json().catch(() => ({} as Record<string, any>))
   const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, id))
   if (!ep) return notFound(c, '剧集不存在')
-  const storyboardIds = Array.isArray(body.storyboard_ids)
-    ? body.storyboard_ids.map(Number).filter((n: number) => Number.isInteger(n) && n > 0)
-    : undefined
   try {
-    const result = await startVoiceBatch(ep.id, ep.dramaId, storyboardIds)
-    if (result.total === -1) return success(c, { status: 'running', already_running: true })
+    const result = await startVoiceBatch(ep.id, ep.dramaId, voiceBatchIds(body), body.settings)
+    if (result.total === -1) {
+      const running = await getVoiceBatchStatus(ep.id)
+      return success(c, { status: 'running', already_running: true, total: running?.total ?? 0, completed: running?.completed ?? 0 })
+    }
     if (!result.started) return success(c, { status: 'idle', total: 0 })
     return success(c, { status: 'running', total: result.total })
   } catch (err) {

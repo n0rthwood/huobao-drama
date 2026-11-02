@@ -47,6 +47,8 @@ export const episodes = sqliteTable('episodes', {
   narrationSpine: text('narration_spine'),
   // 文本规范化（#35）：1 = 把数字/日期按读法展开后再送 TTS（normalize），默认开
   narrationNormalize: integer('narration_normalize', { mode: 'boolean' }).notNull().default(true),
+  // 本集配音参数（#37）：配音弹窗确定后保存的 {voice, inference_timesteps, cfg_value, seed, instructions}；NULL = 沿用 TTS 配置
+  ttsSettings: text('tts_settings'),
   // 本集字幕时间码模式（#30 Q10）：sentence = 分句边界（默认），char = 逐字时间戳
   subtitleTiming: text('subtitle_timing').notNull().default('sentence'),
   // 模型自带音轨的处理（#31）：replace = 丢弃，mix = 压到低电平作底音

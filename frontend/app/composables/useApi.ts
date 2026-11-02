@@ -122,8 +122,16 @@ export const episodeAPI = {
       config_id: data.config_id || undefined,
     }),
   narrationStatus: (id: number) => api.get(`/episodes/${id}/narration-status`),
-  narrationVoiceBatch: (id: number, storyboardIds?: number[]) =>
-    api.post(`/episodes/${id}/narration/voice-batch`, { storyboard_ids: storyboardIds?.length ? storyboardIds : undefined }),
+  // 配音弹窗（#37）：选项与预填值 / 批量预览 / 批量执行（settings = 弹窗参数，保存为本集默认）
+  ttsOptions: (id: number, storyboardId?: number) =>
+    api.get<TtsOptions>(`/episodes/${id}/tts-options${storyboardId ? `?storyboard_id=${storyboardId}` : ''}`),
+  narrationVoicePreview: (id: number, settings: VoiceSettings, storyboardIds?: number[]) =>
+    api.post<{ items: VoicePlanItem[] }>(`/episodes/${id}/narration/voice-batch/preview`, {
+      settings,
+      storyboard_ids: storyboardIds?.length ? storyboardIds : undefined,
+    }),
+  narrationVoiceBatch: (id: number, settings: VoiceSettings, storyboardIds?: number[]) =>
+    api.post(`/episodes/${id}/narration/voice-batch`, { settings, storyboard_ids: storyboardIds?.length ? storyboardIds : undefined }),
   narrationVoiceBatchStatus: (id: number) => api.get(`/episodes/${id}/narration/voice-batch-status`),
   composeBatch: (id: number, storyboardIds?: number[]) =>
     api.post(`/episodes/${id}/compose-batch`, { storyboard_ids: storyboardIds?.length ? storyboardIds : undefined }),
@@ -172,6 +180,33 @@ export const assetLibraryAPI = {
   // 跨项目全量复制：文本 + 当前图 + 全部历史版本 + 参考图都复制一份，源与副本互不影响
   import: (dramaId: number, data: { kind: AssetKindName; source_id: number; name?: string; episode_id?: number | null }) =>
     api.post(`/dramas/${dramaId}/assets/import`, data),
+}
+
+/** 配音参数（#37）：seed 为 null = 随机 */
+export interface VoiceSettings {
+  voice: string
+  inference_timesteps: number
+  cfg_value: number
+  seed: number | null
+  instructions: string
+  normalize: boolean
+}
+
+export interface TtsOptions {
+  config_id: number | null
+  config_name: string
+  voices: { name: string; group: string }[]
+  steps: { min: number; max: number; default: number; presets: { steps: number; rtf: number }[] }
+  cfg: { min: number; max: number; default: number }
+  chars_per_second: number
+  current: VoiceSettings
+}
+
+export interface VoicePlanItem {
+  storyboard_id: number
+  storyboard_number: number
+  status: 'missing' | 'changed' | 'unchanged' | 'skipped'
+  audio_seconds: number
 }
 
 /** 单镜合成计划（#30）：合成服务按实测配音时长与转场偏移算出的时间预算，单位秒 */
@@ -324,9 +359,9 @@ export const storyboardAPI = {
       { model: data.model || undefined, config_id: data.config_id || undefined },
     ),
   // 旁白配音（#30，同步返回音频与字幕）/ 仅重出字幕（切换时间码模式后不重跑 TTS）/ 本镜合成
-  generateNarrationVoice: (id: number) =>
+  generateNarrationVoice: (id: number, settings: VoiceSettings) =>
     api.post<{ audio_url: string; subtitle_url: string; duration_ms: number; duration: number; cues: number; subtitle_source: string }>(
-      `/storyboards/${id}/narration/voice`, {}),
+      `/storyboards/${id}/narration/voice`, { settings }),
   regenerateSubtitle: (id: number) => api.post(`/storyboards/${id}/narration/subtitle`, {}),
   compose: (id: number) =>
     api.post<{ composed_video_url: string; duration_ms: number; plan: ComposePlan; burned: boolean }>(`/storyboards/${id}/compose`, {}),
