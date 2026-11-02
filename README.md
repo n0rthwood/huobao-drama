@@ -69,6 +69,8 @@ data/       — Generated assets and the SQLite database
 - ✅ FFmpeg per-shot compositing and subtitle handling
 - ✅ Full-episode stitching and export
 
+The middle keyframe is optional. An empty slot without a prompt, image, or task is labeled “Not set · Not required for approval”; this is not a content-review decision that no middle anchor is needed. Add a prompt and time when needed. A prompt without an image is labeled “Mid frame required · Awaiting generation”. Existing images, active progress, and failures take precedence. Approval still requires first/last frames and any configured middle frame.
+
 ### 📦 Asset Management
 
 - ✅ Unified asset library
