@@ -12,6 +12,8 @@ export interface AgentRequestContextValues {
   dramaId: number
   /** 单镜任务（转场设计）作用的分镜 */
   storyboardId?: number
+  /** 提示词批次的写入边界；工具 schema 与执行层共同限制。 */
+  storyboardPromptScope?: 'video' | 'keyframes'
   modelOverride?: string
   textConfigId?: number
   /** AI 内容语言；缺省时读全局设置（app_settings.content_language） */
@@ -35,6 +37,7 @@ export function buildAgentRequestContext(values: AgentRequestContextValues): Req
   if (values.modelOverride) rc.set('modelOverride', values.modelOverride)
   if (values.textConfigId) rc.set('textConfigId', values.textConfigId)
   if (values.storyboardId) rc.set('storyboardId', values.storyboardId)
+  if (values.storyboardPromptScope) rc.set('storyboardPromptScope', values.storyboardPromptScope)
   if (values.narrationEnabled) rc.set('narrationEnabled', true)
   if (values.narrationShotNumbers !== undefined) rc.set('narrationShotNumbers', values.narrationShotNumbers)
   if (values.singleAssetName) rc.set('singleAssetName', values.singleAssetName)

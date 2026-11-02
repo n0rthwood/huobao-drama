@@ -14,7 +14,7 @@ import { getTextConfig, getTextProviderBaseUrl, getConfigById } from '../service
 import { logTaskProgress } from '../utils/task-logger.js'
 import { scriptTools } from './tools/script-tools.js'
 import { extractTools } from './tools/extract-tools.js'
-import { storyboardTools } from './tools/storyboard-tools.js'
+import { storyboardTools, promptStoryboardUpdaters } from './tools/storyboard-tools.js'
 import { imagePromptTools } from './tools/image-prompt-tools.js'
 import { researchTools } from './tools/research-tools.js'
 import { loadAgentSkills, skillWorkspaces } from './skills.js'
@@ -431,7 +431,7 @@ const AGENT_TOOLS: Record<string, Record<string, any>> = {
   prompt_generator: {
     ...imagePromptTools,
     readStoryboardContext: storyboardTools.readStoryboardContext,
-    updateStoryboard: storyboardTools.updateStoryboard,
+    updateStoryboard: promptStoryboardUpdaters.all,
   },
   // 转场设计：提示词里的 update_storyboard 指向只写转场字段的实现
   transition_writer: transitionTools,
@@ -477,7 +477,16 @@ export const agentRegistry: Record<string, Agent> = Object.fromEntries(
       name: DEFAULT_PROMPTS[type].name,
       instructions: buildInstructions(type),
       model: buildModel(type),
-      tools: AGENT_TOOLS[type],
+      tools: type === 'prompt_generator'
+        ? ({ requestContext }) => {
+            const scope = requestContext?.get('storyboardPromptScope' as never)
+            return {
+              ...AGENT_TOOLS.prompt_generator,
+              updateStoryboard: scope === 'video' ? promptStoryboardUpdaters.video
+                : scope === 'keyframes' ? promptStoryboardUpdaters.keyframes : promptStoryboardUpdaters.all,
+            }
+          }
+        : AGENT_TOOLS[type],
       workspace: skillWorkspaces[type],
       skillsFormat: 'markdown',
     }),

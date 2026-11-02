@@ -88,6 +88,7 @@ export async function startVideoPromptBatch(
     const requestContext = buildAgentRequestContext({
       episodeId,
       dramaId,
+      storyboardPromptScope: 'video',
       modelOverride: opts.model || undefined,
       textConfigId: opts.configId || undefined,
       // 开了旁白的集：条件技能要求视频提示词里不得出现旁白台词（旁白走独立音轨）
@@ -95,6 +96,7 @@ export async function startVideoPromptBatch(
     })
     const sink = createReasoningSink(taskId)
     for (const sb of pending) {
+      requestContext.set('storyboardId', sb.id)
       progress.current_storyboard_id = sb.id
       await updateTextTaskProgress(taskId, progress)
       logTaskProgress('VideoPrompt', 'batch-shot', { episodeId, storyboardId: sb.id, index: progress.completed + progress.failed + 1, total: progress.total })
