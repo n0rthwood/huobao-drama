@@ -40,6 +40,9 @@ interface StoredParams {
   referenceImages?: string[]
   sourcePrompt?: string
   refNameIndex?: Record<string, number>
+  posterId?: number
+  posterGenMode?: 'initial' | 'composite' | 'layers'
+  text_prompt?: string
   referenceMode?: string
   imageUrl?: string
   firstFrameUrl?: string
@@ -107,6 +110,9 @@ async function retryImage(row: SysTaskRow, opts: RetryOptions): Promise<number> 
     sourcePrompt: params.sourcePrompt,
     refNameIndex: params.refNameIndex,
     retryOf: row.id,
+    posterId: params.posterId,
+    posterGenMode: params.posterGenMode,
+    posterTextPrompt: params.text_prompt,
   })
 }
 

@@ -28,6 +28,7 @@ import serverUpdate from './routes/serverUpdate.js'
 import assetLibrary from './routes/asset-library.js'
 import mediaLibrary from './routes/media-library.js'
 import research from './routes/research.js'
+import posters from './routes/posters.js'
 import { requestLogger, errorHandler } from './middleware/logger.js'
 import { db, schema } from './db/index.js'
 import { and, eq, isNull, ne, or } from 'drizzle-orm'
@@ -66,6 +67,7 @@ app.get('/api/v1/health', (c) => c.json({
 const api = new Hono()
 api.route('/dramas', dramas)
 api.route('/episodes', episodes)
+api.route('/episodes', posters)
 api.route('/storyboards', storyboards)
 api.route('/scenes', scenes)
 api.route('/characters', characters)

@@ -302,6 +302,42 @@ export const sqliteSchemaStatements = [
     deleted_at TEXT
   )`,
 
+  // 剧集 Poster（Issue #39）：每集一份编辑工程 + 生图/排版版本
+  `CREATE TABLE IF NOT EXISTS episode_posters (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    drama_id INTEGER NOT NULL,
+    episode_id INTEGER NOT NULL UNIQUE,
+    prompt TEXT,
+    text_prompt TEXT,
+    reference_images TEXT,
+    base_image TEXT,
+    layout TEXT,
+    selected_version_id INTEGER,
+    final_image TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS poster_versions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    poster_id INTEGER NOT NULL,
+    episode_id INTEGER NOT NULL,
+    drama_id INTEGER NOT NULL,
+    kind TEXT NOT NULL,
+    image TEXT,
+    base_image TEXT,
+    layout TEXT,
+    prompt TEXT,
+    text_prompt TEXT,
+    mode TEXT,
+    reference_images TEXT,
+    provider TEXT,
+    model TEXT,
+    sys_task_id INTEGER,
+    created_at TEXT NOT NULL,
+    generated_at INTEGER
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_poster_versions_poster ON poster_versions (poster_id)`,
+
   `CREATE TABLE IF NOT EXISTS props (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     drama_id INTEGER NOT NULL,
@@ -425,6 +461,9 @@ const columnAdditions: { table: string; column: string; type: string }[] = [
   // 媒体生成时间（unix 秒）：完成时写入，启动时按 completed_at || created_at 回填存量行
   { table: 'sys_task', column: 'generated_at', type: 'INTEGER' },
   { table: 'video_merges', column: 'generated_at', type: 'INTEGER' },
+  // Poster 片头（Issue #39）：与成片封面 *_poster.jpg 无关，记录实际插入的静态片头
+  { table: 'video_merges', column: 'intro_image', type: 'TEXT' },
+  { table: 'video_merges', column: 'intro_duration', type: 'REAL' },
   // 本集角色造型版本（Issue #15，JSON {name, description, image_path}）
   { table: 'episode_characters', column: 'styling_version', type: 'TEXT' },
   // 旁白 / 字幕 / 配音（#30）：剧集级开关与 TTS 配置，每镜文稿 / 开关 / 配音 / 状态 blob

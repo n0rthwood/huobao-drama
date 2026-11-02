@@ -627,6 +627,16 @@
             </template>
           </div>
 
+          <!-- Sub: Poster（资产后独立一步，可跳过；Issue #39） -->
+          <div v-if="prodTab === 'poster'" class="prod-content">
+            <PosterPanel
+              :episode-id="epId"
+              :aspect-ratio="drama?.aspect_ratio || '16:9'"
+              :model="bareModelName(imageModel)"
+              :config-id="ownerConfigId(imageModelOptions, imageModel)"
+            />
+          </div>
+
           <!-- Sub: Storyboard Keyframes（拆分分镜 + 首/中/尾关键帧生成与人工确认） -->
           <StoryboardKeyframes
             v-if="prodTab === 'keyframes'"
@@ -1229,6 +1239,40 @@
                 </div>
               </div>
               <div v-else class="export-merge-empty">{{ t('episode.export.empty') }}</div>
+            </div>
+
+            <!-- Poster 片头（Issue #39，可选）：静态海报 + 展示秒数，插在所选镜头之前 -->
+            <div class="export-section export-poster-section">
+              <div class="export-section-head">
+                <span class="export-section-title">{{ t('episode.export.posterTitle') }}</span>
+                <span class="dim" style="font-size:11px">{{ t('episode.export.posterHint') }}</span>
+              </div>
+              <div v-if="posterVersionOptions.length" class="export-poster-row">
+                <label class="export-poster-check">
+                  <input type="checkbox" v-model="exportPosterEnabled" />
+                  {{ t('episode.export.posterEnable') }}
+                </label>
+                <select v-model="exportPosterVersionId" class="input export-poster-select" :disabled="!exportPosterEnabled">
+                  <option v-for="version in posterVersionOptions" :key="version.id" :value="version.id">
+                    {{ t('episode.export.posterVersion', { n: version.id }) }}
+                  </option>
+                </select>
+                <label class="export-poster-duration">
+                  {{ t('episode.export.posterDuration') }}
+                  <input
+                    v-model.number="exportPosterDuration"
+                    type="number"
+                    min="0.5"
+                    max="10"
+                    step="0.5"
+                    class="input export-poster-seconds"
+                    :disabled="!exportPosterEnabled"
+                  />
+                  {{ t('episode.export.posterSeconds') }}
+                </label>
+                <img v-if="exportPosterEnabled && posterPreviewUrl" :src="posterPreviewUrl" alt="" class="export-poster-preview" />
+              </div>
+              <div v-else class="export-merge-empty">{{ t('episode.export.posterNone') }}</div>
             </div>
 
             <!-- 下方:镜头素材(可勾选) -->
@@ -1972,9 +2016,9 @@ import { toast } from 'vue-sonner'
 import { useI18n } from 'vue-i18n'
 import {
   Users, FileText, FolderKanban, Clapperboard, Download, Loader2, Images,
-  Plus, X, Trash2, CircleHelp,
+  Image as ImageIcon, Plus, X, Trash2, CircleHelp,
 } from 'lucide-vue-next'
-import { api, dramaAPI, episodeAPI, storyboardAPI, characterAPI, sceneAPI, propAPI, taskAPI, mergeAPI, aiConfigAPI, uploadAPI, mediaLibraryAPI, videoQueueAPI, assetBatchAPI } from '~/composables/useApi'
+import { api, dramaAPI, episodeAPI, storyboardAPI, characterAPI, sceneAPI, propAPI, taskAPI, mergeAPI, posterAPI, aiConfigAPI, uploadAPI, mediaLibraryAPI, videoQueueAPI, assetBatchAPI } from '~/composables/useApi'
 import { startTour, autoTour } from '~/composables/useTour'
 import { useAgent } from '~/composables/useAgent'
 import { toastError, mapError, toastServerMessage, MODERATION_RE } from '~/composables/useToast'
@@ -1984,6 +2028,7 @@ import ArchivalImagePanel from '~/components/ArchivalImagePanel.vue'
 import ResearchCitationList from '~/components/ResearchCitationList.vue'
 import FinalPromptSourceBadge from '~/components/FinalPromptSourceBadge.vue'
 import MediaLibraryDialog from '~/components/MediaLibraryDialog.vue'
+import PosterPanel from '~/components/PosterPanel.vue'
 import StoryboardKeyframes from '~/components/StoryboardKeyframes.vue'
 import ProgressRing from '~/components/ProgressRing.vue'
 import FieldSaveStatus from '~/components/FieldSaveStatus.vue'
@@ -2075,7 +2120,7 @@ const storedPanel = (() => {
 const { replaceQuery } = useQuerySync()
 const urlPanel = queryEnum(route.query.panel, ['script', 'production', 'export'])
 const urlStep = queryEnum(route.query.step, ['0', '1'])
-const urlProdTab = queryEnum(route.query.tab, ['assets', 'keyframes', 'videos'])
+const urlProdTab = queryEnum(route.query.tab, ['assets', 'poster', 'keyframes', 'videos'])
 // extract：资产面板的类型筛选页签（null = 全部），与左侧 EXTRACT_TARGETS 三类一致
 const urlExtract = queryEnum(route.query.extract, ['characters', 'scenes', 'props'])
 const pendingAssetLink = queryTypedId(route.query.asset, ['character', 'scene', 'prop'])
@@ -2099,6 +2144,16 @@ const scriptLen = computed(() => localScript.value.replace(/\s/g, '').length || 
 const exportSelectedIds = ref([]) // 勾选的镜头 id
 const exportMerges = ref([])      // 成片(拼接记录)列表
 let exportSelTouched = false      // 用户手动操作过选择后,不再自动全选
+// Poster 片头（Issue #39）：可选静态海报 + 展示秒数
+const posterData = ref(null)
+const exportPosterEnabled = ref(false)
+const exportPosterVersionId = ref(null)
+const exportPosterDuration = ref(3)
+const posterVersionOptions = computed(() => posterData.value?.versions || [])
+const posterPreviewUrl = computed(() => {
+  const version = posterVersionOptions.value.find(item => item.id === exportPosterVersionId.value)
+  return version?.image ? thumbOf(mediaUrl(version.image)) : ''
+})
 
 const exportReadyIds = computed(() => sbs.value.filter(s => hasVid(s)).map(s => s.id))
 const exportSelectedReadyIds = computed(() => exportSelectedIds.value.filter(id => exportReadyIds.value.includes(id)))
@@ -2168,12 +2223,31 @@ async function confirmDeleteMerge() {
 const scriptStep = ref(urlStep !== null ? Number(urlStep) : (urlPanelGiven ? 0 : (storedPanel ? (storedPanel.scriptStep === 0 ? 0 : 1) : 0)))
 // 旧版本地存储的 'storyboard' 子步骤已并入 'videos'（视频制作）
 const storedProdTab = storedPanel?.prodTab === 'storyboard' ? 'videos' : storedPanel?.prodTab
-const prodTab = ref(urlProdTab || (urlPanelGiven ? 'assets' : (['assets', 'keyframes', 'videos'].includes(storedProdTab) ? storedProdTab : 'assets')))
+const prodTab = ref(urlProdTab || (urlPanelGiven ? 'assets' : (['assets', 'poster', 'keyframes', 'videos'].includes(storedProdTab) ? storedProdTab : 'assets')))
 // 资产类型筛选页签：null=全部（三段平铺）| characters|scenes|props（只看该类），deeplink ?extract=
 const extractTab = ref(urlExtract)
 // 面板位置变化即持久化
 watch([panel, scriptStep, prodTab], ([p, s, pt]) => {
   try { localStorage.setItem(PANEL_STORE_KEY, JSON.stringify({ panel: p, scriptStep: s, prodTab: pt })) } catch { /* 静默 */ }
+})
+
+async function loadPosterData() {
+  if (!epId.value) return
+  try {
+    posterData.value = await posterAPI.get(epId.value)
+  } catch { /* Poster 可选，加载失败不阻断工作台 */ }
+}
+
+watch([panel, prodTab], ([currentPanel, currentTab]) => {
+  if ((currentPanel === 'production' && currentTab === 'poster') || currentPanel === 'export') void loadPosterData()
+}, { immediate: true })
+
+watch(posterData, data => {
+  if (!data) return
+  const ids = (data.versions || []).map(version => version.id)
+  if (!exportPosterVersionId.value || !ids.includes(exportPosterVersionId.value)) {
+    exportPosterVersionId.value = data.selected_version_id || ids[0] || null
+  }
 })
 // ===== 视频制作三栏宽度：拖拽调节 + 全局持久化（双击分隔条恢复默认） =====
 const VIDEO_COL_STORE_KEY = 'huobao:workbench:video-cols'
@@ -3320,6 +3394,7 @@ const assetReadyCount = computed(() => charImgCount.value + sceneImgCount.value 
 
 const prodTabDefs = computed(() => [
   { id: 'assets', label: t('episode.prod.assets'), icon: FolderKanban, badge: assetTotalCount.value ? `${assetReadyCount.value}/${assetTotalCount.value}` : '' },
+  { id: 'poster', label: t('episode.prod.poster'), icon: ImageIcon, badge: posterData.value?.final_image ? '✓' : '' },
   { id: 'keyframes', label: t('episode.prod.keyframes'), icon: Images, badge: sbs.value.length ? `${keyframesConfirmedCount.value}/${sbs.value.length}` : '' },
   { id: 'videos', label: t('episode.prod.videos'), icon: Clapperboard, badge: sbs.value.length ? `${shotVidCount.value}/${sbs.value.length}` : '' },
 ])
@@ -3327,6 +3402,7 @@ const prodTabDefs = computed(() => [
 const mainStageDefs = computed(() => ([
   { id: 'script', label: t('episode.stage.script'), desc: t('episode.stage.scriptDesc'), icon: FileText },
   { id: 'assets', label: t('episode.prod.assets'), desc: t('episode.stage.assetsDesc'), icon: FolderKanban },
+  { id: 'poster', label: t('episode.prod.poster'), desc: t('episode.stage.posterDesc'), icon: ImageIcon },
   { id: 'keyframes', label: t('episode.prod.keyframes'), desc: t('episode.stage.keyframesDesc'), icon: Images },
   { id: 'videos', label: t('episode.stage.videos'), desc: t('episode.stage.videosDesc'), icon: Clapperboard },
   { id: 'export', label: t('episode.stage.export'), desc: t('episode.stage.exportDesc'), icon: Download },
@@ -3346,6 +3422,7 @@ const sidebarSections = computed(() => ([
     label: t('episode.stage.production'),
     items: [
       { key: 'prod:assets', label: t('episode.prod.assets'), desc: '', icon: Users },
+      { key: 'prod:poster', label: t('episode.prod.poster'), desc: '', icon: ImageIcon },
       { key: 'prod:keyframes', label: t('episode.prod.keyframes'), desc: '', icon: Images },
       { key: 'prod:videos', label: t('episode.prod.videos'), desc: '', icon: Clapperboard },
     ],
@@ -3380,7 +3457,10 @@ function sectionState(sectionId) {
 const activeMainStage = computed(() => {
   if (panel.value === 'export') return 'export'
   if (panel.value === 'production') {
-    return prodTab.value === 'assets' ? 'assets' : prodTab.value === 'keyframes' ? 'keyframes' : 'videos'
+    if (prodTab.value === 'assets') return 'assets'
+    if (prodTab.value === 'poster') return 'poster'
+    if (prodTab.value === 'keyframes') return 'keyframes'
+    return 'videos'
   }
   return 'script'
 })
@@ -3388,6 +3468,8 @@ const activeMainStage = computed(() => {
 function mainStageDone(stageId) {
   if (stageId === 'script') return !!scriptContent.value
   if (stageId === 'assets') return assetTotalCount.value > 0 && assetReadyCount.value === assetTotalCount.value
+  // Poster 可选：有最终版本即视为完成，不参与制作分组 done 判定
+  if (stageId === 'poster') return !!posterData.value?.final_image
   // 关键帧步骤完成 = 本集每个分镜的关键帧都已人工确认
   if (stageId === 'keyframes') return allKeyframesConfirmed.value
   if (stageId === 'videos') {
@@ -3406,6 +3488,11 @@ function goMainStage(stageId) {
   if (stageId === 'assets') {
     panel.value = 'production'
     prodTab.value = 'assets'
+    return
+  }
+  if (stageId === 'poster') {
+    panel.value = 'production'
+    prodTab.value = 'poster'
     return
   }
   if (stageId === 'keyframes') {
@@ -3434,6 +3521,7 @@ const activeSubStepKey = computed(() => {
 const mainProgressSteps = computed(() => [
   { id: 'script', label: t('episode.stage.script') },
   { id: 'assets', label: t('episode.prod.assets') },
+  { id: 'poster', label: t('episode.prod.poster') },
   { id: 'keyframes', label: t('episode.prod.keyframes') },
   { id: 'videos', label: t('episode.stage.videos') },
   { id: 'export', label: t('episode.stage.export') },
@@ -3704,6 +3792,7 @@ async function refresh() {
   }
   try { mergeData.value = await mergeAPI.status(epId.value) } catch {}
   await Promise.all([loadEpisodeTasks(epId.value), loadExportMerges()])
+  if ((panel.value === 'production' && prodTab.value === 'poster') || panel.value === 'export') await loadPosterData()
 }
 
 function saveRaw() { episodeAPI.update(epId.value, { content: localRaw.value }); episode.value.content = localRaw.value }
@@ -5036,8 +5125,14 @@ async function doMerge(ids) {
     return
   }
   mergeSkipped.value = []
+  const poster = exportPosterEnabled.value && exportPosterVersionId.value
+    ? {
+        versionId: Number(exportPosterVersionId.value),
+        duration: Math.min(10, Math.max(0.5, Number(exportPosterDuration.value) || 3)),
+      }
+    : undefined
   try {
-    const res = await mergeAPI.merge(epId.value, storyboardIds)
+    const res = await mergeAPI.merge(epId.value, storyboardIds, poster)
     // 开关打开时没有合成版本的镜头会被跳过，接口逐条返回镜号与原因（#30 B.8）
     mergeSkipped.value = Array.isArray(res?.skipped) ? res.skipped : []
     toast.success(t('episode.export.mergingToast'))
@@ -7570,6 +7665,12 @@ button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
 .export-section-grow { flex: 1; }
 .export-section-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
 .export-section-title { font-size: 13px; font-weight: 800; color: var(--text-0); }
+.export-poster-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.export-poster-check { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-1); }
+.export-poster-select { min-width: 160px; }
+.export-poster-duration { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-2); }
+.export-poster-seconds { width: 68px; }
+.export-poster-preview { width: 96px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); }
 .export-merge-strip { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 4px; }
 .merge-card {
   flex: 0 0 auto;

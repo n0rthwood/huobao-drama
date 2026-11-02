@@ -46,6 +46,8 @@ export interface TaskLabelInput {
   kind?: string | null
   targetKind?: TaskTargetKind | null
   targetName?: string | null
+  /** Poster 生图任务（Issue #39） */
+  poster?: boolean
 }
 
 /**
@@ -75,6 +77,8 @@ export function composeTaskLabel(input: TaskLabelInput): string {
   if (input.type === 'text') {
     return composeEpisodeLabel(input.dramaTitle, input.episodeNumber, TEXT_KIND_LABEL[input.kind as TextTaskKind] || '文本任务')
   }
+
+  if (input.poster) return `${drama}${episode ? `${episode} ` : ''}· Poster`
 
   const assetLabel = ASSET_KIND_LABEL[input.targetKind || '']
   if (assetLabel) return `${drama}· ${assetLabel} · ${(input.targetName || '').trim() || '未命名'}`

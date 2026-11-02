@@ -3,6 +3,8 @@
  */
 import fs from 'fs'
 import path from 'path'
+import { once } from 'node:events'
+import { promisify } from 'node:util'
 import { v4 as uuid } from 'uuid'
 import { db, getInsertId, schema } from '../db/index.js'
 import { eq } from 'drizzle-orm'
@@ -12,6 +14,10 @@ import { completionStamp } from './media-time.js'
 import { extractVideoPoster } from '../utils/video-poster.js'
 import { ffmpeg, checkFfmpegSuite } from '../utils/ffmpeg.js'
 import { DATA_ROOT, STORAGE_ROOT } from '../utils/paths.js'
+import type { FfprobeData } from 'fluent-ffmpeg'
+
+// promisify loses the result type of fluent-ffmpeg's overloaded callback API.
+const probeFile = promisify(ffmpeg.ffprobe) as (file: string) => Promise<FfprobeData>
 
 function toAbsPath(relativePath: string): string {
   if (path.isAbsolute(relativePath)) return relativePath
@@ -25,10 +31,17 @@ function toAbsPath(relativePath: string): string {
  * 开关打开时只取合成版本（带旁白与字幕的成片），没有合成版本的镜头跳过并列出原因。
  * 传入 storyboardIds 时只拼接所选镜头（仍按镜号顺序）。
  */
+export interface MergeIntro {
+  /** static/ 相对路径 */
+  imagePath: string
+  duration: number
+}
+
 export async function mergeEpisodeVideos(
   episodeId: number,
   dramaId: number,
   storyboardIds?: number[],
+  intro?: MergeIntro,
 ): Promise<{ mergeId: number; skipped: { storyboard_number: number; reason: string }[] }> {
   let storyboards = await db.select().from(schema.storyboards)
     .where(eq(schema.storyboards.episodeId, episodeId))
@@ -90,12 +103,14 @@ export async function mergeEpisodeVideos(
     model: 'ffmpeg-concat-h264-aac',
     status: 'processing',
     scenes: JSON.stringify(videos),
+    introImage: intro?.imagePath ?? null,
+    introDuration: intro?.duration ?? null,
     createdAt: ts,
   })
   const mergeId = getInsertId(res)
 
   // 异步执行
-  doMerge(mergeId, episodeId, videos).catch(async err => {
+  doMerge(mergeId, episodeId, videos, intro).catch(async err => {
     logTaskError('MergeTask', 'episode-merge', { mergeId, episodeId, error: err.message })
     console.error(`[Merge] Failed:`, err)
     await db.update(schema.videoMerges)
@@ -106,15 +121,110 @@ export async function mergeEpisodeVideos(
   return { mergeId, skipped }
 }
 
-async function doMerge(mergeId: number, episodeId: number, videos: string[]) {
+interface IntroSpec {
+  width: number
+  height: number
+  fps: number
+  sampleRate: number
+  channels: number
+}
+
+/** 按首个片段探测片头需要匹配的流参数；尺寸不可读时直接报错，不猜测画幅。 */
+async function probeIntroSpec(firstClip: string): Promise<IntroSpec> {
+  const metadata = await probeFile(toAbsPath(firstClip))
+  const video = metadata.streams.find(stream => stream.codec_type === 'video')
+  if (!video?.width || !video?.height) throw new Error('首个视频片段没有有效的画面尺寸')
+  const audio = metadata.streams.find(stream => stream.codec_type === 'audio')
+  const fpsRaw = String(video.avg_frame_rate || video.r_frame_rate || '30/1')
+  const [num, den] = fpsRaw.split('/').map(Number)
+  const fps = den ? num / den : Number(fpsRaw)
+  return {
+    width: video.width,
+    height: video.height,
+    fps: Number.isFinite(fps) && fps > 0 ? fps : 30,
+    sampleRate: Number(audio?.sample_rate) || 48000,
+    channels: Number(audio?.channels) === 1 ? 1 : 2,
+  }
+}
+
+/** 生成静音 WAV：fluent-ffmpeg 的格式解析器不认 lavfi 设备，因此用真实 WAV 文件作音轨输入。 */
+function writeSilentWav(filePath: string, sampleRate: number, channels: number, duration: number) {
+  const dataSize = Math.max(0, Math.round(sampleRate * channels * 2 * duration))
+  const header = Buffer.alloc(44)
+  header.write('RIFF', 0, 'ascii')
+  header.writeUInt32LE(36 + dataSize, 4)
+  header.write('WAVE', 8, 'ascii')
+  header.write('fmt ', 12, 'ascii')
+  header.writeUInt32LE(16, 16)
+  header.writeUInt16LE(1, 20)
+  header.writeUInt16LE(channels, 22)
+  header.writeUInt32LE(sampleRate, 24)
+  header.writeUInt32LE(sampleRate * channels * 2, 28)
+  header.writeUInt16LE(channels * 2, 32)
+  header.writeUInt16LE(16, 34)
+  header.write('data', 36, 'ascii')
+  header.writeUInt32LE(dataSize, 40)
+  fs.writeFileSync(filePath, Buffer.concat([header, Buffer.alloc(dataSize)]))
+}
+
+/**
+ * 静态 Poster 片头：循环图片 + 静音音轨，缩放到片段分辨率（保持比例、居中留边），
+ * 帧率/采样率/声道与首个片段一致，保证 concat demuxer 不因参数不一致花屏。
+ */
+async function createIntroSegment(imagePath: string, duration: number, spec: IntroSpec, dir: string): Promise<string> {
+  const segmentPath = path.join(dir, `${uuid()}-intro.mp4`)
+  const silentPath = path.join(dir, `${uuid()}-silence.wav`)
+  writeSilentWav(silentPath, spec.sampleRate, spec.channels, duration)
+  const filter = [
+    `scale=${spec.width}:${spec.height}:force_original_aspect_ratio=decrease`,
+    `pad=${spec.width}:${spec.height}:(ow-iw)/2:(oh-ih)/2`,
+    'setsar=1',
+    `fps=${spec.fps}`,
+    'format=yuv420p',
+  ].join(',')
+  const command = ffmpeg()
+    .input(toAbsPath(imagePath))
+    .inputOptions(['-loop', '1', '-framerate', String(spec.fps), '-t', String(duration)])
+    .input(silentPath)
+    .outputOptions([
+      '-vf', filter,
+      '-c:v', 'libx264',
+      '-preset', 'medium',
+      '-crf', '23',
+      '-pix_fmt', 'yuv420p',
+      '-c:a', 'aac',
+      '-ar', String(spec.sampleRate),
+      '-ac', String(spec.channels),
+      '-b:a', '192k',
+      '-t', String(duration),
+      '-shortest',
+      '-movflags', '+faststart',
+    ])
+    .output(segmentPath)
+  const finished = once(command, 'end')
+  try {
+    command.run()
+    await finished
+    return segmentPath
+  } finally {
+    fs.rmSync(silentPath, { force: true })
+  }
+}
+
+async function doMerge(mergeId: number, episodeId: number, videos: string[], intro?: MergeIntro) {
   // 生成 concat 列表文件
   const listDir = path.join(STORAGE_ROOT, 'temp')
   fs.mkdirSync(listDir, { recursive: true })
   const listPath = path.join(listDir, `${uuid()}.txt`)
 
-  const listContent = videos
-    .map(v => `file '${toAbsPath(v)}'`)
-    .join('\n')
+  const introPath = intro
+    ? await createIntroSegment(intro.imagePath, intro.duration, await probeIntroSpec(videos[0]!), listDir)
+    : null
+
+  const listContent = [
+    ...(introPath ? [`file '${introPath}'`] : []),
+    ...videos.map(v => `file '${toAbsPath(v)}'`),
+  ].join('\n')
   fs.writeFileSync(listPath, listContent, 'utf-8')
 
   // 输出文件
@@ -123,8 +233,8 @@ async function doMerge(mergeId: number, episodeId: number, videos: string[]) {
   const outputFilename = `${uuid()}.mp4`
   const outputPath = path.join(outputDir, outputFilename)
 
-  await new Promise<void>((resolve, reject) => {
-    ffmpeg()
+  try {
+    const command = ffmpeg()
       .input(listPath)
       .inputOptions(['-f', 'concat', '-safe', '0'])
       .outputOptions([
@@ -138,14 +248,13 @@ async function doMerge(mergeId: number, episodeId: number, videos: string[]) {
         '-movflags', '+faststart',
       ])
       .output(outputPath)
-      .on('end', () => resolve())
-      .on('error', (err) => reject(err))
-      .run()
-
-  })
-
-  // 清理临时文件
-  fs.unlinkSync(listPath)
+    const finished = once(command, 'end')
+    command.run()
+    await finished
+  } finally {
+    fs.rmSync(listPath, { force: true })
+    if (introPath) fs.rmSync(introPath, { force: true })
+  }
 
   // 获取时长
   const duration = await getVideoDuration(outputPath)
@@ -165,7 +274,14 @@ async function doMerge(mergeId: number, episodeId: number, videos: string[]) {
     .set({ videoUrl: mergedRelative, updatedAt: now() })
     .where(eq(schema.episodes.id, episodeId))
 
-  logTaskSuccess('MergeTask', 'episode-merge', { mergeId, episodeId, output: mergedRelative, duration, clips: videos.length })
+  logTaskSuccess('MergeTask', 'episode-merge', {
+    mergeId,
+    episodeId,
+    output: mergedRelative,
+    duration,
+    clips: videos.length,
+    intro: intro ? { image: intro.imagePath, duration: intro.duration } : null,
+  })
 }
 
 function getVideoDuration(filePath: string): Promise<number> {

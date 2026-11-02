@@ -75,6 +75,19 @@ data/       — Generated assets and the SQLite database
 - ✅ Local storage support
 - ✅ Task progress tracking
 
+### Episode Posters
+
+The optional **Poster** step follows asset production and does not block keyframes, videos, or export.
+
+- Select up to nine images from this episode's character, scene, and prop library, then generate a poster base with a visual prompt and the project's aspect ratio.
+- Drag ordinary text boxes or read-only project-title, episode-title, and episode-number (`EP01`) variables. Style them with system fonts, size, color, bold, italic, outline, shadow, and alignment. Preview and PNG export share the same canvas renderer.
+- Each episode has one editing project with generated candidates and saved composite versions. Saving a composite selects it as final and updates the episode-card thumbnail; another final version can be selected explicitly.
+- Regenerate explicitly from either a complete composite or two images: the base and a transparent text layer. A separate text description guides lettering. FLUX supports only the composite route. AI results remain candidates without changing the editing project until explicitly loaded as a new base.
+- Export can prepend a selected poster version as a silent still-image intro lasting 0.5–10 seconds. Existing narration and subtitles remain inside their clips and move with them.
+
+Startup creates the poster tables and intro metadata columns automatically. Existing image-service configuration is reused; no additional credentials are required.
+
+
 ### 🤖 AI Agents
 
 Four built-in Mastra agents with database-backed configuration and Skill extensions:

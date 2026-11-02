@@ -3,7 +3,7 @@ import fs from 'fs'
 import { and, eq, isNull } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
 import { success, badRequest, notFound, now } from '../utils/response.js'
-import { mergeEpisodeVideos } from '../services/ffmpeg-merge.js'
+import { mergeEpisodeVideos, type MergeIntro } from '../services/ffmpeg-merge.js'
 import { toSnakeCase } from '../utils/transform.js'
 import { getAbsolutePath, thumbPathFor } from '../utils/storage.js'
 import { posterPathFor } from '../utils/video-poster.js'
@@ -19,16 +19,30 @@ app.post('/episodes/:id/merge', async (c) => {
   if (!ep) return badRequest(c, '剧集不存在')
 
   let storyboardIds: number[] | undefined
-  try {
-    const body = await c.req.json()
-    if (Array.isArray(body?.storyboard_ids)) {
-      storyboardIds = body.storyboard_ids.map(Number).filter(Boolean)
+  let intro: MergeIntro | undefined
+  const body: Record<string, unknown> = await c.req.json().catch(() => ({}))
+  if (Array.isArray(body.storyboard_ids)) {
+    storyboardIds = body.storyboard_ids.map(Number).filter(Boolean)
+  }
+  if (body.poster_version_id) {
+    const versionId = Number(body.poster_version_id)
+    const durationRaw = Number(body.poster_duration ?? 3)
+    if (!Number.isFinite(durationRaw)) return badRequest(c, 'Poster 片头时长无效')
+    const [version] = await db.select().from(schema.posterVersions).where(and(
+      eq(schema.posterVersions.id, versionId),
+      eq(schema.posterVersions.episodeId, episodeId),
+    ))
+    if (!version?.image) return badRequest(c, 'Poster 版本不存在')
+    if (!fs.existsSync(getAbsolutePath(version.image))) return badRequest(c, 'Poster 图片文件已丢失')
+    intro = {
+      imagePath: version.image,
+      duration: Math.min(10, Math.max(0.5, durationRaw)),
     }
-  } catch { /* 无 body 时拼接全部 */ }
+  }
 
   try {
-    logTaskStart('MergeAPI', 'episode-merge', { episodeId, dramaId: ep.dramaId, storyboardIds })
-    const { mergeId, skipped } = await mergeEpisodeVideos(episodeId, ep.dramaId, storyboardIds)
+    logTaskStart('MergeAPI', 'episode-merge', { episodeId, dramaId: ep.dramaId, storyboardIds, intro })
+    const { mergeId, skipped } = await mergeEpisodeVideos(episodeId, ep.dramaId, storyboardIds, intro)
     logTaskSuccess('MergeAPI', 'episode-merge', { episodeId, mergeId, skipped: skipped.length })
     return success(c, { merge_id: mergeId, status: 'processing', skipped })
   } catch (err: any) {
