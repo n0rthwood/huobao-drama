@@ -1,0 +1,55 @@
+批次 567（全部资产 + 覆盖已有图片 + 重写提示词）的图像 sys_task 创建时间
+提示词阶段 20:30:00–20:43 左右持续进行（39 项，并发 3），图像任务在提示词阶段中持续被提交：
+
+(568, 14, None, None, '2026-11-01T20:30:25.967Z', 'completed')
+(569, 13, None, None, '2026-11-01T20:30:31.433Z', 'completed')
+(570, 15, None, None, '2026-11-01T20:30:41.100Z', 'completed')
+(571, 16, None, None, '2026-11-01T20:31:10.567Z', 'completed')
+(572, 17, None, None, '2026-11-01T20:31:13.180Z', 'completed')
+(573, 18, None, None, '2026-11-01T20:31:27.700Z', 'completed')
+(574, 19, None, None, '2026-11-01T20:31:49.707Z', 'processing')
+(575, 21, None, None, '2026-11-01T20:31:56.227Z', 'processing')
+(576, 20, None, None, '2026-11-01T20:32:10.508Z', 'queued')
+(577, 22, None, None, '2026-11-01T20:32:27.874Z', 'queued')
+(578, 23, None, None, '2026-11-01T20:32:29.675Z', 'queued')
+(579, None, 16, None, '2026-11-01T20:33:03.159Z', 'queued')
+(580, 24, None, None, '2026-11-01T20:33:05.135Z', 'queued')
+(581, None, 15, None, '2026-11-01T20:33:07.464Z', 'queued')
+(582, None, 18, None, '2026-11-01T20:33:34.451Z', 'queued')
+(583, None, 17, None, '2026-11-01T20:33:43.206Z', 'queued')
+(584, None, 19, None, '2026-11-01T20:33:43.601Z', 'queued')
+(585, None, 20, None, '2026-11-01T20:34:00.986Z', 'queued')
+(586, None, 21, None, '2026-11-01T20:34:11.918Z', 'queued')
+(587, None, 22, None, '2026-11-01T20:34:13.583Z', 'queued')
+(588, None, 23, None, '2026-11-01T20:34:38.501Z', 'queued')
+(589, None, 24, None, '2026-11-01T20:34:41.298Z', 'queued')
+(590, None, 25, None, '2026-11-01T20:34:44.067Z', 'queued')
+(591, None, 26, None, '2026-11-01T20:35:08.923Z', 'queued')
+(592, None, 27, None, '2026-11-01T20:35:15.361Z', 'queued')
+(593, None, 28, None, '2026-11-01T20:35:29.515Z', 'queued')
+(594, None, None, 27, '2026-11-01T20:35:48.098Z', 'queued')
+(595, None, None, 28, '2026-11-01T20:35:50.242Z', 'queued')
+(596, None, None, 29, '2026-11-01T20:36:12.123Z', 'queued')
+(597, None, None, 30, '2026-11-01T20:36:14.385Z', 'queued')
+(598, None, None, 31, '2026-11-01T20:36:22.730Z', 'queued')
+(599, None, None, 33, '2026-11-01T20:36:38.299Z', 'queued')
+(600, None, None, 32, '2026-11-01T20:36:42.227Z', 'queued')
+(601, None, None, 34, '2026-11-01T20:36:45.016Z', 'queued')
+(602, None, None, 35, '2026-11-01T20:37:06.743Z', 'queued')
+(603, None, None, 37, '2026-11-01T20:37:20.808Z', 'queued')
+(604, None, None, 38, '2026-11-01T20:37:33.742Z', 'queued')
+(605, None, None, 36, '2026-11-01T20:37:39.258Z', 'queued')
+(606, None, None, 42, '2026-11-01T20:37:53.804Z', 'queued')
+
+后端日志片段（图像提交与下一批提示词交错，不是「一个提示词一张图」的串行）：
+20:35:08 [AssetBatch] image submitted | batch=567 kind=scene assetId=26 taskId=591
+20:35:08 [FinalPrompt] prop-generate | propId=27 episodeId=5
+20:35:15 [AssetBatch] image submitted | batch=567 kind=scene assetId=27 taskId=592
+20:35:15 [FinalPrompt] prop-generate | propId=28 episodeId=5
+20:36:12 [AssetBatch] image submitted | batch=567 kind=prop assetId=29 taskId=596
+20:36:12 [FinalPrompt] prop-generate | propId=32 episodeId=5
+20:36:28 [ImageTask] DONE qwen-jobs completed | id=570  ← 第 3 张图已出图，而提示词仍在生成
+
+并发证据（同一时刻恰好 3 条提示词在跑，等于 ASSET_PROMPT_CONCURRENCY=3）：
+20:19:27 [FinalPrompt] character-generate | characterId=13 / 14 / 15（同一秒三条）
+状态接口 items 中 state='prompting' 的数量在整个文本阶段恒为 3。

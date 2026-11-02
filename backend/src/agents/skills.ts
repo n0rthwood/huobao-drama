@@ -181,11 +181,12 @@ export async function loadAgentSkills(
 
   const allPaths = scanSkillPaths().map(p => p.replace(/^skills\//, ''))
   // 按 prefixes 顺序分组：基础技能在前，题材 addendum（#32）在后；条件技能（#30）仅在条件为真时注入
+  const conditions: SkillConditions = opts
   const relPaths = prefixes.flatMap(prefix =>
     allPaths.filter(p => p === prefix || p.startsWith(prefix + '/')))
     .filter((p) => {
       for (const [condPath, flag] of Object.entries(CONDITIONAL_SKILLS)) {
-        if ((p === condPath || p.startsWith(condPath + '/')) && opts[flag] !== true) return false
+        if ((p === condPath || p.startsWith(condPath + '/')) && conditions[flag] !== true) return false
       }
       return true
     })

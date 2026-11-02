@@ -338,19 +338,41 @@
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 6h-8l-2-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2z"/></svg>
                   {{ t('components.assetBrowser.openEpisode') }}
                 </button>
-                <button class="btn btn-sm asset-btn-batch" @click="batchCharImages">
+                <button
+                  v-for="scope in ASSET_BATCH_SCOPES"
+                  :key="scope"
+                  class="btn btn-sm asset-btn-batch"
+                  :disabled="assetBatchRunning"
+                  :title="assetBatchRunning ? t('episode.assetBatch.alreadyRunning') : undefined"
+                  @click="openAssetBatch(scope)"
+                >
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                  {{ t('episode.prod.batchChar') }}
-                </button>
-                <button class="btn btn-sm asset-btn-batch" @click="batchSceneImages">
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                  {{ t('episode.prod.batchScene') }}
-                </button>
-                <button class="btn btn-sm asset-btn-batch" @click="batchPropImages">
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                  {{ t('episode.prod.batchProp') }}
+                  {{ t(`episode.prod.batch.${scope}`) }}
                 </button>
               </div>
+            </div>
+            <div v-if="assetBatch.status" class="asset-batch-banner" :class="{ 'is-running': assetBatchRunning }">
+              <span class="asset-batch-state">{{ t(`episode.prod.batch.${assetBatch.status.scope}`) }} · {{ t(`episode.assetBatch.status.${assetBatch.status.status}`) }}</span>
+              <span class="asset-batch-sep">·</span>
+              <span>{{ t('episode.assetBatch.progress', { done: assetBatchDone, total: assetBatchCounts?.total || 0 }) }}</span>
+              <span class="asset-batch-sep">·</span>
+              <span>{{ t('episode.assetBatch.promptProgress', {
+                done: assetBatchCounts?.prompt.done || 0,
+                failed: assetBatchCounts?.prompt.failed || 0,
+              }) }}</span>
+              <span class="asset-batch-sep">·</span>
+              <span>{{ t('episode.assetBatch.imageProgress', {
+                submitted: assetBatchCounts?.image.submitted || 0,
+                done: assetBatchCounts?.image.done || 0,
+                failed: assetBatchCounts?.image.failed || 0,
+              }) }}</span>
+              <template v-if="assetBatchCounts?.prompt.unchanged_after_rewrite">
+                <span class="asset-batch-sep">·</span>
+                <span>{{ t('episode.assetBatch.unchangedCount', { n: assetBatchCounts.prompt.unchanged_after_rewrite }) }}</span>
+              </template>
+              <button v-if="assetBatchRunning" class="btn btn-sm ml-auto" :disabled="assetBatch.stopping" @click="stopAssetBatch">
+                {{ t('episode.assetBatch.stop') }}
+              </button>
             </div>
             <div v-if="extractingTargets.length && !chars.length && !scenes.length && !propItems.length" class="step-loading">
               <Loader2 :size="24" class="animate-spin" style="color:var(--accent)" />
@@ -1928,6 +1950,19 @@
         @done="refresh"
       />
 
+      <AssetBatchDialog
+        :open="assetBatch.open"
+        :drama-id="dramaId"
+        :episode-id="epId || 0"
+        :scope="assetBatch.scope"
+        :image-model="bareModelName(imageModel) || ''"
+        :image-config-id="ownerConfigId(imageModelOptions, imageModel) || 0"
+        :text-model="chatModelOverride() || ''"
+        :text-config-id="chatConfigId() || 0"
+        @close="assetBatch.open = false"
+        @started="onAssetBatchStarted"
+      />
+
       <MediaLibraryDialog
         :open="assetLibrary.open"
         :drama-id="dramaId"
@@ -1948,7 +1983,7 @@ import {
   Users, FileText, FolderKanban, Clapperboard, Download, Loader2, Images,
   Plus, X, Trash2, CircleHelp,
 } from 'lucide-vue-next'
-import { api, dramaAPI, episodeAPI, storyboardAPI, characterAPI, sceneAPI, propAPI, taskAPI, mergeAPI, aiConfigAPI, uploadAPI, mediaLibraryAPI, videoQueueAPI } from '~/composables/useApi'
+import { api, dramaAPI, episodeAPI, storyboardAPI, characterAPI, sceneAPI, propAPI, taskAPI, mergeAPI, aiConfigAPI, uploadAPI, mediaLibraryAPI, videoQueueAPI, assetBatchAPI } from '~/composables/useApi'
 import { startTour, autoTour } from '~/composables/useTour'
 import { useAgent } from '~/composables/useAgent'
 import { toastError, mapError, toastServerMessage, MODERATION_RE } from '~/composables/useToast'
@@ -1968,6 +2003,7 @@ import TargetAssetList from '~/components/TargetAssetList.vue'
 import AssetBrowserDialog from '~/components/AssetBrowserDialog.vue'
 import NarrationBlock from '~/components/NarrationBlock.vue'
 import BreakdownNarrationDialog from '~/components/BreakdownNarrationDialog.vue'
+import AssetBatchDialog from '~/components/AssetBatchDialog.vue'
 import { mediaTimeOfPath } from '~/utils/mediaTime'
 import {
   useNowTicker,
@@ -4325,41 +4361,65 @@ function genPropImg(id) {
     () => propAPI.generateImage(id, epId.value, bareModelName(imageModel.value) || undefined, ownerConfigId(imageModelOptions.value, imageModel.value), chatModelOverride(), chatConfigId()),
     'episode.image.generatingProp')
 }
-// 批量：一次性全部提交，服务端排队，返回的任务直接进全局 store
-async function submitAssetImageBatch(type, ids, submit, startedToastKey) {
-  const keys = ids.map(id => `${type}:${id}`)
-  submittingAssetImages.value = [...new Set([...submittingAssetImages.value, ...keys])]
+
+// ===== 资产批量生成（#33）=====
+// 四个入口（角色 / 场景 / 道具 / 全部资产）都走同一个服务端批次：
+// 提示词在服务端按并发池跑，一好就提交图像任务，前端只负责确认框与进度展示。
+const ASSET_BATCH_SCOPES = ['characters', 'scenes', 'props', 'all']
+const assetBatch = reactive({ open: false, scope: 'all', status: null, stopping: false })
+let assetBatchTimer = null
+
+const assetBatchRunning = computed(() => assetBatch.status?.status === 'running')
+const assetBatchCounts = computed(() => assetBatch.status?.counts || null)
+const assetBatchDone = computed(() => {
+  const c = assetBatchCounts.value
+  if (!c) return 0
+  return c.image.done + c.image.failed + c.skipped.has_image + c.skipped.running + c.skipped.faithful
+})
+
+function openAssetBatch(scope) {
+  assetBatch.scope = scope
+  assetBatch.open = true
+}
+
+function scheduleAssetBatchPoll() {
+  if (assetBatchTimer) { clearTimeout(assetBatchTimer); assetBatchTimer = null }
+  if (!assetBatchRunning.value) return
+  assetBatchTimer = setTimeout(() => { void loadAssetBatch() }, 3000)
+}
+
+async function loadAssetBatch() {
+  const wasRunning = assetBatchRunning.value
   try {
-    registerCreatedTasks(await submit())
-    toast.success(t(startedToastKey))
-    await refresh()
+    assetBatch.status = await assetBatchAPI.status(dramaId)
+  } catch {} // 批次状态拿不到不影响页面其它部分
+  // 批次刚结束：重新载入资产，让新图与新提示词立刻显示
+  if (wasRunning && !assetBatchRunning.value) await refresh()
+  scheduleAssetBatchPoll()
+}
+
+function onAssetBatchStarted(status) {
+  assetBatch.status = status
+  toast.success(t('episode.assetBatch.started'))
+  scheduleAssetBatchPoll()
+  void refresh()
+}
+
+async function stopAssetBatch() {
+  assetBatch.stopping = true
+  try {
+    assetBatch.status = await assetBatchAPI.cancel(dramaId)
+    toast.success(t('episode.assetBatch.stopped'))
   } catch (e) {
     toastError(e)
   } finally {
-    submittingAssetImages.value = submittingAssetImages.value.filter(k => !keys.includes(k))
+    assetBatch.stopping = false
   }
+  scheduleAssetBatchPoll()
 }
-function batchCharImages() {
-  const ids = visualChars.value.filter(c => !(c.image_url || c.imageUrl)).map(c => c.id)
-  if (!ids.length) { toast.info(t('episode.image.allCharsDone')); return }
-  void submitAssetImageBatch('character', ids,
-    () => characterAPI.batchImages(ids, epId.value, bareModelName(imageModel.value) || undefined, ownerConfigId(imageModelOptions.value, imageModel.value), chatModelOverride(), chatConfigId()),
-    'episode.image.batchGeneratingChar')
-}
-function batchSceneImages() {
-  const ids = scenes.value.filter(s => !(s.image_url || s.imageUrl)).map(s => s.id)
-  if (!ids.length) { toast.info(t('episode.image.allScenesDone')); return }
-  void submitAssetImageBatch('scene', ids,
-    () => Promise.all(ids.map(id => sceneAPI.generateImage(id, epId.value, bareModelName(imageModel.value) || undefined, ownerConfigId(imageModelOptions.value, imageModel.value), chatModelOverride(), chatConfigId()))),
-    'episode.image.batchGeneratingScene')
-}
-function batchPropImages() {
-  const ids = propItems.value.filter(p => !(p.image_url || p.imageUrl)).map(p => p.id)
-  if (!ids.length) { toast.info(t('episode.image.allPropsDone')); return }
-  void submitAssetImageBatch('prop', ids,
-    () => Promise.all(ids.map(id => propAPI.generateImage(id, epId.value, bareModelName(imageModel.value) || undefined, ownerConfigId(imageModelOptions.value, imageModel.value), chatModelOverride(), chatConfigId()))),
-    'episode.image.batchGeneratingProp')
-}
+
+onMounted(() => { void loadAssetBatch() })
+onBeforeUnmount(() => { if (assetBatchTimer) clearTimeout(assetBatchTimer) })
 function getVideoUrl(s) { return s?.video_url || s?.videoUrl || s?.composed_video_url || s?.composedVideoUrl || null }
 function hasVid(s) { return !!getVideoUrl(s) }
 
@@ -6888,6 +6948,23 @@ button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
 .video-batch-issue { color: var(--text-2); }
 .video-batch-issues { flex-basis: 100%; display: flex; flex-direction: column; gap: 2px; color: var(--text-3); font-size: 9.5px; line-height: 1.4; }
 .video-duration-input { width: 56px; height: 24px; padding: 2px 6px; font-size: 12px; font-weight: 700; font-family: var(--font-mono); text-align: center; }
+
+/* 资产批量生成（#33）横幅：与视频批量横幅同一套外观 */
+.asset-batch-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--surface-outline);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  font-size: 11px;
+}
+.asset-batch-banner.is-running { border-color: var(--accent-glow); }
+.asset-batch-state { font-weight: 700; }
+.asset-batch-sep { color: var(--text-3); }
 
 /* Prod grid */
 .prod-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }

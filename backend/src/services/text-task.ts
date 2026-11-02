@@ -26,12 +26,15 @@ export type TextTaskKind =
   | 'shot_compose'
   // 按史料画像补充角色外貌（Issue #32）：按「集 × 类型」判重，与提取任务互不阻塞
   | 'portrait_appearance'
+  /** 资产批量生成的父任务（Issue #33）：详细进度在 params.asset_batch */
+  | 'asset_batch'
 
 export const TEXT_TASK_KINDS: TextTaskKind[] = [
   'extract_characters', 'extract_scenes', 'extract_props',
   'keyframe_prompts', 'video_prompts', 'script_rewrite', 'storyboard_breaker',
   'narration_script', 'narration_tts', 'shot_compose',
   'portrait_appearance',
+  'asset_batch',
 ]
 
 export interface TextTaskProgress {

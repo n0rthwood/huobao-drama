@@ -84,9 +84,11 @@ test('scene and prop visual fields invalidate their prompts; the scene time rule
 })
 
 test('a forced rewrite fails when the agent does not save a new prompt, and succeeds when it does', () => {
+  // Issue #33：ensure* 返回 { prompt, outcome }。force 重写后读回与运行前逐字相同记
+  // unchanged_after_rewrite（批量按 Q12 放行出图），单发入口的 savedPromptOf() 仍判空回退。
   const result = run(`${seed}
     const { mastra } = await import('./src/mastra/index.ts')
-    const { ensureCharacterFinalPrompt } = await import('./src/services/final-prompt.ts')
+    const { ensureCharacterFinalPrompt, savedPromptOf } = await import('./src/services/final-prompt.ts')
     let agentSaves = false
     mastra.getAgent = () => ({
       stream: async () => ({
@@ -101,8 +103,10 @@ test('a forced rewrite fails when the agent does not save a new prompt, and succ
     const notSaved = await ensureCharacterFinalPrompt(await load(), 2, true)
     agentSaves = true
     const saved = await ensureCharacterFinalPrompt(await load(), 2, true)
-    process.stdout.write('@@' + JSON.stringify({ notSaved, saved }))
+    process.stdout.write('@@' + JSON.stringify({ notSaved, saved, notSavedPrompt: savedPromptOf(notSaved), savedPrompt: savedPromptOf(saved) }))
   `)
-  assert.equal(result.notSaved, '')
-  assert.equal(result.saved, '新稿：白羽老公鸡')
+  assert.equal(result.notSaved.outcome, 'unchanged_after_rewrite')
+  assert.equal(result.notSavedPrompt, '')
+  assert.equal(result.saved.outcome, 'regenerated')
+  assert.equal(result.savedPrompt, '新稿：白羽老公鸡')
 })

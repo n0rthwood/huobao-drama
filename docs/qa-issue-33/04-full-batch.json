@@ -1,0 +1,487 @@
+{
+  "id": 567,
+  "drama_id": 3,
+  "episode_id": 5,
+  "scope": "all",
+  "status": "cancelled",
+  "cancel_requested": true,
+  "options": {
+    "rewrite_prompts": true,
+    "overwrite_images": true
+  },
+  "counts": {
+    "total": 45,
+    "skipped": {
+      "has_image": 0,
+      "running": 0,
+      "faithful": 6
+    },
+    "prompt": {
+      "done": 39,
+      "failed": 0,
+      "reused": 0,
+      "regenerated": 39,
+      "unchanged_after_rewrite": 0
+    },
+    "image": {
+      "submitted": 39,
+      "done": 10,
+      "failed": 0
+    }
+  },
+  "items": [
+    {
+      "kind": "character",
+      "asset_id": 13,
+      "name": "利哈列夫",
+      "selection": "need_prompt",
+      "state": "completed",
+      "prompt_outcome": "regenerated",
+      "task_id": 569,
+      "error": null
+    },
+    {
+      "kind": "character",
+      "asset_id": 14,
+      "name": "彼得一世",
+      "selection": "need_prompt",
+      "state": "completed",
+      "prompt_outcome": "regenerated",
+      "task_id": 568,
+      "error": null
+    },
+    {
+      "kind": "character",
+      "asset_id": 15,
+      "name": "康熙帝",
+      "selection": "need_prompt",
+      "state": "completed",
+      "prompt_outcome": "regenerated",
+      "task_id": 570,
+      "error": null
+    },
+    {
+      "kind": "character",
+      "asset_id": 16,
+      "name": "策妄阿拉布坦",
+      "selection": "need_prompt",
+      "state": "completed",
+      "prompt_outcome": "regenerated",
+      "task_id": 571,
+      "error": null
+    },
+    {
+      "kind": "character",
+      "asset_id": 17,
+      "name": "噶尔丹策零",
+      "selection": "need_prompt",
+      "state": "completed",
+      "prompt_outcome": "regenerated",
+      "task_id": 572,
+      "error": null
+    },
+    {
+      "kind": "character",
+      "asset_id": 18,
+      "name": "大策零敦多布",
+      "selection": "need_prompt",
+      "state": "completed",
+      "prompt_outcome": "regenerated",
+      "task_id": 573,
+      "error": null
+    },
+    {
+      "kind": "character",
+      "asset_id": 19,
+      "name": "缅希科夫",
+      "selection": "need_prompt",
+      "state": "completed",
+      "prompt_outcome": "regenerated",
+      "task_id": 574,
+      "error": null
+    },
+    {
+      "kind": "character",
+      "asset_id": 20,
+      "name": "加加林",
+      "selection": "need_prompt",
+      "state": "completed",
+      "prompt_outcome": "regenerated",
+      "task_id": 576,
+      "error": null
+    },
+    {
+      "kind": "character",
+      "asset_id": 21,
+      "name": "布赫戈尔",
+      "selection": "need_prompt",
+      "state": "completed",
+      "prompt_outcome": "regenerated",
+      "task_id": 575,
+      "error": null
+    },
+    {
+      "kind": "character",
+      "asset_id": 22,
+      "name": "切列多夫",
+      "selection": "need_prompt",
+      "state": "completed",
+      "prompt_outcome": "regenerated",
+      "task_id": 577,
+      "error": null
+    },
+    {
+      "kind": "character",
+      "asset_id": 23,
+      "name": "阿列克谢皇太子",
+      "selection": "need_prompt",
+      "state": "cancelled",
+      "prompt_outcome": "regenerated",
+      "task_id": 578,
+      "error": null
+    },
+    {
+      "kind": "character",
+      "asset_id": 24,
+      "name": "测绘员扎哈罗夫",
+      "selection": "need_prompt",
+      "state": "cancelled",
+      "prompt_outcome": "regenerated",
+      "task_id": 580,
+      "error": null
+    },
+    {
+      "kind": "scene",
+      "asset_id": 15,
+      "name": "圣彼得堡 冬宫走廊",
+      "selection": "need_prompt",
+      "state": "cancelled",
+      "prompt_outcome": "regenerated",
+      "task_id": 581,
+      "error": null
+    },
+    {
+      "kind": "scene",
+      "asset_id": 16,
+      "name": "莫斯科 谢苗诺夫近卫团操场",
+      "selection": "need_prompt",
+      "state": "cancelled",
+      "prompt_outcome": "regenerated",
+      "task_id": 579,
+      "error": null
+    },
+    {
+      "kind": "scene",
+      "asset_id": 17,
+      "name": "乌克兰 波尔塔瓦战场",
+      "selection": "need_prompt",
+      "state": "cancelled",
+      "prompt_outcome": "regenerated",
+      "task_id": 583,
+      "error": null
+    },
+    {
+      "kind": "scene",
+      "asset_id": 18,
+      "name": "圣彼得堡 军事法庭密室",
+      "selection": "need_prompt",
+      "state": "cancelled",
+      "prompt_outcome": "regenerated",
+      "task_id": 582,
+      "error": null
+    },
+    {
+      "kind": "scene",
+      "asset_id": 19,
+      "name": "圣彼得堡 调查衙门",
+      "selection": "need_prompt",
+      "state": "cancelled",
+      "prompt_outcome": "regenerated",
+      "task_id": 584,
+      "error": null
+    },
+    {
+      "kind": "scene",
+      "asset_id": 20,
+      "name": "托波尔斯克 督军府庭院",
+      "selection": "need_prompt",
+      "state": "cancelled",
+      "prompt_outcome": "regenerated",
+      "task_id": 585,
+      "error": null
+    },
+    {
+      "kind": "scene",
+      "asset_id": 21,
+      "name": "额尔齐斯河 中游河段",
+      "selection": "need_prompt",
+      "state": "cancelled",
+      "prompt_outcome": "regenerated",
+      "task_id": 586,
+      "error": null
+    },
+    {
+      "kind": "scene",
+      "asset_id": 22,
+      "name": "亚梅什盐湖 木堡",
+      "selection": "need_prompt",
+      "state": "cancelled",
+      "prompt_outcome": "regenerated",
+      "task_id": 587,
+      "error": null
+    },
+    {
+      "kind": "scene",
+      "asset_id": 23,
+      "name": "塞米巴拉金斯克 木堡",
+      "selection": "need_prompt",
+      "state": "cancelled",
+      "prompt_outcome": "regenerated",
+      "task_id": 588,
+      "error": null
+    },
+    {
+      "kind": "scene",
+      "asset_id": 24,
+      "name": "斋桑湖 北岸",
+      "selection": "need_prompt",
+      "state": "cancelled",
+      "prompt_outcome": "regenerated",
+      "task_id": 589,
+      "error": null
+    },
+    {
+      "kind": "scene",
+      "asset_id": 25,
+      "name": "黑额尔齐斯河 河道狭窄处",
+      "selection": "need_prompt",
+      "state": "cancelled",
+      "prompt_outcome": "regenerated",
+      "task_id": 590,
+      "error": null
+    },
+    {
+      "kind": "scene",
+      "asset_id": 26,
+      "name": "额尔齐斯河 离开山区处",
+      "selection": "need_prompt",
+      "state": "cancelled",
+      "prompt_outcome": "regenerated",
+      "task_id": 591,
+      "error": null
+    },
+    {
+      "kind": "scene",
+      "asset_id": 27,
+      "name": "伊犁河谷 准噶尔牙帐外围",
+      "selection": "need_prompt",
+      "state": "cancelled",
+      "prompt_outcome": "regenerated",
+      "task_id": 592,
+      "error": null
+    },
+    {
+      "kind": "scene",
+      "asset_id": 28,
+      "name": "托波尔斯克 测绘室",
+      "selection": "need_prompt",
+      "state": "cancelled",
+      "prompt_outcome": "regenerated",
+      "task_id": 593,
+      "error": null
+    },
+    {
+      "kind": "scene",
+      "asset_id": 29,
+      "name": "塞梅伊 城市航拍",
+      "selection": "skip_faithful",
+      "state": "skip_faithful",
+      "prompt_outcome": null,
+      "task_id": null,
+      "error": null
+    },
+    {
+      "kind": "prop",
+      "asset_id": 25,
+      "name": "近卫团军官外套与三角帽",
+      "selection": "skip_faithful",
+      "state": "skip_faithful",
+      "prompt_outcome": null,
+      "task_id": null,
+      "error": null
+    },
+    {
+      "kind": "prop",
+      "asset_id": 26,
+      "name": "近卫团军鼓",
+      "selection": "skip_faithful",
+      "state": "skip_faithful",
+      "prompt_outcome": null,
+      "task_id": null,
+      "error": null
+    },
+    {
+      "kind": "prop",
+      "asset_id": 27,
+      "name": "军官佩剑",
+      "selection": "need_prompt",
+      "state": "cancelled",
+      "prompt_outcome": "regenerated",
+      "task_id": 594,
+      "error": null
+    },
+    {
+      "kind": "prop",
+      "asset_id": 28,
+      "name": "1719 年沙皇谕令（仿件）",
+      "selection": "need_prompt",
+      "state": "cancelled",
+      "prompt_outcome": "regenerated",
+      "task_id": 595,
+      "error": null
+    },
+    {
+      "kind": "prop",
+      "asset_id": 29,
+      "name": "阿列克谢判决书（仿件）",
+      "selection": "need_prompt",
+      "state": "cancelled",
+      "prompt_outcome": "regenerated",
+      "task_id": 596,
+      "error": null
+    },
+    {
+      "kind": "prop",
+      "asset_id": 30,
+      "name": "航海象限仪",
+      "selection": "need_prompt",
+      "state": "cancelled",
+      "prompt_outcome": "regenerated",
+      "task_id": 597,
+      "error": null
+    },
+    {
+      "kind": "prop",
+      "asset_id": 31,
+      "name": "测链与圆规",
+      "selection": "need_prompt",
+      "state": "cancelled",
+      "prompt_outcome": "regenerated",
+      "task_id": 598,
+      "error": null
+    },
+    {
+      "kind": "prop",
+      "asset_id": 32,
+      "name": "平底船（допщчаник）",
+      "selection": "need_prompt",
+      "state": "cancelled",
+      "prompt_outcome": "regenerated",
+      "task_id": 600,
+      "error": null
+    },
+    {
+      "kind": "prop",
+      "asset_id": 33,
+      "name": "手划船",
+      "selection": "need_prompt",
+      "state": "cancelled",
+      "prompt_outcome": "regenerated",
+      "task_id": 599,
+      "error": null
+    },
+    {
+      "kind": "prop",
+      "asset_id": 34,
+      "name": "木堡构造",
+      "selection": "need_prompt",
+      "state": "cancelled",
+      "prompt_outcome": "regenerated",
+      "task_id": 601,
+      "error": null
+    },
+    {
+      "kind": "prop",
+      "asset_id": 35,
+      "name": "燧发枪",
+      "selection": "need_prompt",
+      "state": "cancelled",
+      "prompt_outcome": "regenerated",
+      "task_id": 602,
+      "error": null
+    },
+    {
+      "kind": "prop",
+      "asset_id": 36,
+      "name": "哥萨克马队",
+      "selection": "need_prompt",
+      "state": "cancelled",
+      "prompt_outcome": "regenerated",
+      "task_id": 605,
+      "error": null
+    },
+    {
+      "kind": "prop",
+      "asset_id": 37,
+      "name": "准噶尔骑兵装备",
+      "selection": "need_prompt",
+      "state": "cancelled",
+      "prompt_outcome": "regenerated",
+      "task_id": 603,
+      "error": null
+    },
+    {
+      "kind": "prop",
+      "asset_id": 38,
+      "name": "商队骆驼",
+      "selection": "need_prompt",
+      "state": "cancelled",
+      "prompt_outcome": "regenerated",
+      "task_id": 604,
+      "error": null
+    },
+    {
+      "kind": "prop",
+      "asset_id": 39,
+      "name": "1720 年初三方局势图（原文 p1）",
+      "selection": "skip_faithful",
+      "state": "skip_faithful",
+      "prompt_outcome": null,
+      "task_id": null,
+      "error": null
+    },
+    {
+      "kind": "prop",
+      "asset_id": 40,
+      "name": "1720 年远征路线图（原文 p7）",
+      "selection": "skip_faithful",
+      "state": "skip_faithful",
+      "prompt_outcome": null,
+      "task_id": null,
+      "error": null
+    },
+    {
+      "kind": "prop",
+      "asset_id": 41,
+      "name": "清军驱准保藏进军路线（原文 p8）",
+      "selection": "skip_faithful",
+      "state": "skip_faithful",
+      "prompt_outcome": null,
+      "task_id": null,
+      "error": null
+    },
+    {
+      "kind": "prop",
+      "asset_id": 42,
+      "name": "两幅额尔齐斯河上游地图（仿件）",
+      "selection": "need_prompt",
+      "state": "cancelled",
+      "prompt_outcome": "regenerated",
+      "task_id": 606,
+      "error": null
+    }
+  ],
+  "created_at": "2026-11-01T20:29:58.828Z",
+  "updated_at": "2026-11-01T20:46:28.918Z",
+  "error": null
+}

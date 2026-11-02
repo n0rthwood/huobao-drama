@@ -8,6 +8,8 @@ import { lookupGeneratedAt } from '../services/media-time.js'
 import { logTaskError } from '../utils/task-logger.js'
 import { AssetLibraryError, importAsset, isAssetKind } from '../services/asset-library.js'
 import { isDocumentaryRuleMode, resolveRulesetWithMode } from '../services/genre-ruleset.js'
+import { cancelAssetBatch, getAssetBatch, previewAssetBatch, startAssetBatch } from '../services/asset-batch.js'
+import { isAssetBatchScope, type AssetBatchScope } from '../services/asset-batch-select.js'
 
 const app = new Hono()
 
@@ -205,6 +207,84 @@ app.post('/:id/assets/import', async (c) => {
     const message = err instanceof Error ? err.message : String(err)
     logTaskError('AssetImport', 'import-failed', { dramaId: targetDramaId, kind, sourceId, error: message })
     return serverError(c, '导入失败，已回滚本次复制的数据与文件，请重试或联系管理员')
+  }
+})
+
+// ─── 资产批量生成（Issue #33）──────────────────────────────────
+// 四个入口（角色 / 场景 / 道具 / 全部资产）映射到同一端点，只是 scope 不同。
+
+/** 批量请求的公共参数：scope 必填，两个勾选默认关 */
+function parseBatchBody(body: Record<string, unknown>): {
+  scope: AssetBatchScope
+  episodeId: number
+  rewritePrompts: boolean
+  overwriteImages: boolean
+  textModel?: string
+  textConfigId?: number
+  imageModel?: string
+  imageConfigId?: number
+} | { error: string } {
+  if (!isAssetBatchScope(body.scope)) return { error: 'scope 必须是 characters / scenes / props / all' }
+  const episodeId = Number(body.episode_id)
+  // episode_id 是提示词生成的上下文（ensure*FinalPrompt 需要），资产本身仍挂在项目上
+  if (!Number.isInteger(episodeId) || episodeId <= 0) return { error: 'episode_id 必填' }
+  return {
+    scope: body.scope,
+    episodeId,
+    rewritePrompts: !!body.rewrite_prompts,
+    overwriteImages: !!body.overwrite_images,
+    textModel: typeof body.text_model === 'string' ? body.text_model : undefined,
+    textConfigId: body.text_config_id == null ? undefined : Number(body.text_config_id),
+    imageModel: typeof body.model === 'string' ? body.model : undefined,
+    imageConfigId: body.config_id == null ? undefined : Number(body.config_id),
+  }
+}
+
+// POST /dramas/:id/assets/batch-generate/preview — 分类统计（勾选项参与重算），不落库
+app.post('/:id/assets/batch-generate/preview', async (c) => {
+  const dramaId = Number(c.req.param('id'))
+  const body = await c.req.json().catch(() => ({}))
+  const parsed = parseBatchBody(body)
+  if ('error' in parsed) return badRequest(c, parsed.error)
+  try {
+    const counts = await previewAssetBatch(dramaId, {
+      scope: parsed.scope,
+      rewritePrompts: parsed.rewritePrompts,
+      overwriteImages: parsed.overwriteImages,
+    })
+    const running = await getAssetBatch(dramaId)
+    return success(c, { ...counts, running: running?.status === 'running' ? running : null })
+  } catch (err) {
+    return badRequest(c, err instanceof Error ? err.message : '资产批量预览失败')
+  }
+})
+
+// POST /dramas/:id/assets/batch-generate — 启动批量（同项目同时只允许一个）
+app.post('/:id/assets/batch-generate', async (c) => {
+  const dramaId = Number(c.req.param('id'))
+  const body = await c.req.json().catch(() => ({}))
+  const parsed = parseBatchBody(body)
+  if ('error' in parsed) return badRequest(c, parsed.error)
+  try {
+    return success(c, await startAssetBatch(dramaId, parsed))
+  } catch (err) {
+    return badRequest(c, err instanceof Error ? err.message : '资产批量启动失败')
+  }
+})
+
+// GET /dramas/:id/assets/batch-generate — 最近一次资产批量的状态（刷新页面后仍可查看）
+app.get('/:id/assets/batch-generate', async (c) => {
+  const dramaId = Number(c.req.param('id'))
+  return success(c, await getAssetBatch(dramaId))
+})
+
+// POST /dramas/:id/assets/batch-generate/cancel — 停止派发并撤销已提交的图像任务
+app.post('/:id/assets/batch-generate/cancel', async (c) => {
+  const dramaId = Number(c.req.param('id'))
+  try {
+    return success(c, await cancelAssetBatch(dramaId))
+  } catch (err) {
+    return badRequest(c, err instanceof Error ? err.message : '停止资产批量失败')
   }
 })
 

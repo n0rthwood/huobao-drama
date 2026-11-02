@@ -5,7 +5,7 @@ import { success, created, badRequest, now } from '../utils/response.js'
 import { toSnakeCase } from '../utils/transform.js'
 import { generateImage } from '../services/generation.js'
 import { getDramaStylePrompt } from '../services/style-preset.js'
-import { ensurePropFinalPrompt } from '../services/final-prompt.js'
+import { ensurePropFinalPrompt, savedPromptOf } from '../services/final-prompt.js'
 import { logTaskError, logTaskStart, logTaskSuccess, logTaskWarn } from '../utils/task-logger.js'
 import { deleteAllReferenceImages, partitionMissingReferences, resolveReferenceImages } from '../services/reference-images.js'
 import { deleteAssetLinks } from '../services/asset-links.js'
@@ -117,7 +117,7 @@ app.post('/:id/generate-prompt', async (c) => {
   if (!ep) return badRequest(c, '剧集不存在')
 
   logTaskStart('FinalPrompt', 'prop-generate', { propId: id, episodeId: ep.id, force: !!body.force })
-  const finalPrompt = await ensurePropFinalPrompt(prop, ep.id, !!body.force, { model: body.text_model, configId: body.text_config_id ?? undefined })
+  const finalPrompt = savedPromptOf(await ensurePropFinalPrompt(prop, ep.id, !!body.force, { model: body.text_model, configId: body.text_config_id ?? undefined }))
   if (!finalPrompt) {
     logTaskError('FinalPrompt', 'prop-generate', { propId: id, error: 'agent returned empty prompt' })
     return badRequest(c, '最终提示词生成失败，请重试')
@@ -138,7 +138,7 @@ app.post('/:id/generate-image', async (c) => {
   if (!ep) return badRequest(c, '剧集不存在')
 
   const stylePrompt = await getDramaStylePrompt(prop.dramaId)
-  const finalPrompt = await ensurePropFinalPrompt(prop, ep.id, false, { model: body.text_model, configId: body.text_config_id ?? undefined })
+  const finalPrompt = savedPromptOf(await ensurePropFinalPrompt(prop, ep.id, false, { model: body.text_model, configId: body.text_config_id ?? undefined }))
   const prompt = finalPrompt || propImagePrompt(prop, stylePrompt)
   // 默认用道具自己保存的参考图；请求显式传 reference_images（含空数组）时以请求为准
   const resolved = resolveReferenceImages(prop.referenceImages, body.reference_images)
