@@ -970,7 +970,7 @@
                           type="button"
                           class="video-keyframe-thumb"
                           :disabled="!shotKeyframeImage(selectedSb, slot.slot)"
-                          :title="slot.label"
+                          :title="shotKeyframeImage(selectedSb, slot.slot) ? slot.label : shotKeyframePlaceholder(selectedSb, slot.slot)"
                           @click="openImageViewer(assetImageSrc({ imageUrl: shotKeyframeImage(selectedSb, slot.slot) }), slot.label)"
                         >
                           <img
@@ -980,7 +980,7 @@
                             loading="lazy"
                             @error="thumbFallback($event, assetImageSrc({ imageUrl: shotKeyframeImage(selectedSb, slot.slot) }))"
                           />
-                          <span v-else class="video-keyframe-thumb-empty">{{ t('episode.kf.slotEmpty') }}</span>
+                          <span v-else class="video-keyframe-thumb-empty">{{ shotKeyframePlaceholder(selectedSb, slot.slot) }}</span>
                           <small>{{ slot.label }}</small>
                           <MediaTime :at="mediaTimeOf(selectedSb, shotKeyframeImage(selectedSb, slot.slot))" />
                         </button>
@@ -2334,7 +2334,7 @@ function chatConfigId() { return ownerConfigId(textModelOptions.value, chatModel
 // 切页/刷新后自动恢复，页面不再自己轮询任务列表
 const now = useNowTicker()
 const {
-  episodeTasks, latestAssetTask, registerTask, refreshTasks, loadEpisodeTasks, onTaskFinished,
+  episodeTasks, latestAssetTask, latestKeyframeTask, registerTask, refreshTasks, loadEpisodeTasks, onTaskFinished,
 } = useTasks()
 // 任务转为终态：素材图/分镜视频需要重新拉数据（关键帧槽位由 StoryboardKeyframes 自己处理）
 onTaskFinished((task) => {
@@ -4842,6 +4842,14 @@ function shotKeyframeImage(sb, slot) {
   if (slot === 'first') return k.first_image ?? k.firstImage ?? ''
   if (slot === 'mid') return k.mid_image ?? k.midImage ?? ''
   return k.last_image ?? k.lastImage ?? ''
+}
+function shotKeyframePlaceholder(sb, slot) {
+  if (slot !== 'mid') return t('episode.kf.slotEmpty')
+  const task = latestKeyframeTask(sb?.id, 'mid_frame')
+  if (isActiveTaskStatus(task?.status)) return t('episode.kf.generating')
+  if (task?.status === 'failed') return t('episode.kf.genFailed')
+  if (task?.status === 'cancelled') return t('episode.kf.batchItemCancelled')
+  return t((sb?.mid_frame_prompt || '').trim() ? 'episode.kf.midRequired' : 'episode.kf.midOptional')
 }
 function isShotConfirmed(sb) {
   return Boolean(sb?.keyframes?.confirmed)

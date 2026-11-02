@@ -70,6 +70,7 @@ data/       — Generated assets and the SQLite database
 - ✅ Full-episode stitching and export
 
 The middle keyframe is optional. An empty slot without a prompt, image, or task is labeled “Not set · Not required for approval”; this is not a content-review decision that no middle anchor is needed. Add a prompt and time when needed. A prompt without an image is labeled “Mid frame required · Awaiting generation”. Existing images, active progress, and failures take precedence. Approval still requires first/last frames and any configured middle frame.
+The keyframe editor and video reference-frame thumbnails use the same status semantics: an unset middle frame is not mislabeled as an image still awaiting generation on the video page.
 
 ### 📦 Asset Management
 
