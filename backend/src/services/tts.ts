@@ -178,6 +178,51 @@ export async function synthesizeNarration(
   return { wavPath, durationMs, jobId, voice: params.voice, seed: params.seed, provider }
 }
 
+/**
+ * 让 VoxCPM Studio 按它自己的规则解析一段文本（`POST /api/markup/preview`，#38）：
+ * 返回它认出的「念出来的字」与解析错误，合成前用来确认标记转换没有歧义。
+ */
+export async function previewMarkup(config: AIConfig, text: string): Promise<{ spoken: string; errors: string[] }> {
+  const resp = await fetch(joinProviderUrl(config.baseUrl, '', '/api/markup/preview'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {}) },
+    body: JSON.stringify({ text }),
+    signal: AbortSignal.timeout(15_000),
+  })
+  if (!resp.ok) throw new Error(`语音服务标记预检失败：HTTP ${resp.status}`)
+  const data: unknown = await resp.json()
+  if (!data || typeof data !== 'object' || !('spoken' in data) || typeof data.spoken !== 'string') {
+    throw new Error('语音服务标记预检返回格式异常')
+  }
+  const errors = 'errors' in data && Array.isArray(data.errors) ? data.errors.map(String) : []
+  return { spoken: data.spoken, errors }
+}
+
+/**
+ * VoxCPM Studio 的标记目录（`GET /api/markup/catalog`）：语气标签（含中文名与分组）与常见多音字候选，
+ * 供旁白编辑器的「语气」「注音」弹窗使用（#38）。
+ */
+export async function fetchMarkupCatalog(config: AIConfig): Promise<{
+  tags: { tag: string; label: string; group: string }[]
+  polyphones: Record<string, [string, string][]>
+}> {
+  const resp = await fetch(joinProviderUrl(config.baseUrl, '', '/api/markup/catalog'), {
+    headers: config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {},
+    signal: AbortSignal.timeout(15_000),
+  })
+  if (!resp.ok) throw new Error(`读取语音服务的标记目录失败：HTTP ${resp.status}`)
+  const data: unknown = await resp.json()
+  const tags = data && typeof data === 'object' && 'tags' in data && Array.isArray(data.tags) ? data.tags : []
+  const polyphones = data && typeof data === 'object' && 'polyphones' in data && data.polyphones && typeof data.polyphones === 'object'
+    ? data.polyphones as Record<string, [string, string][]> // Studio presets/polyphones.json：{字: [[拼音, 例词]]}
+    : {}
+  return {
+    tags: tags.filter((t): t is { tag: string; label: string; group: string } =>
+      !!t && typeof t === 'object' && 'tag' in t && typeof t.tag === 'string' && 'label' in t && typeof t.label === 'string'),
+    polyphones,
+  }
+}
+
 export interface AlignItem {
   start: number
   end: number

@@ -42,7 +42,7 @@ import {
   parseNarrationMeta,
 } from '../services/narration.js'
 import { getNarrationScriptStatus, startNarrationScript } from '../services/narration-script.js'
-import { getTtsOptions, getVoiceBatchStatus, previewVoiceBatch, resolveSubtitleTiming, startVoiceBatch } from '../services/narration-voice.js'
+import { getMarkupCatalog, getTtsOptions, getVoiceBatchStatus, previewVoiceBatch, resolveSubtitleTiming, startVoiceBatch } from '../services/narration-voice.js'
 import { getComposeBatchStatus, startComposeBatch } from '../services/shot-compose.js'
 import { DEFAULT_FIT_RECORD, parseFitRecord, validateFitRecord } from '../services/narration-fit.js'
 import type { AssetKind } from '../services/reference-images.js'
@@ -388,6 +388,15 @@ app.get('/:id/narration-status', async (c) => {
   return success(c, await getNarrationScriptStatus(Number(c.req.param('id'))))
 })
 
+// GET /episodes/:id/narration-markup-catalog — 旁白编辑器的语气 / 多音字 / 停顿选项（#38）
+app.get('/:id/narration-markup-catalog', async (c) => {
+  try {
+    return success(c, await getMarkupCatalog(Number(c.req.param('id'))))
+  } catch (err) {
+    return badRequest(c, err instanceof Error ? err.message : '读取标记目录失败')
+  }
+})
+
 // GET /episodes/:id/tts-options?storyboard_id= — 配音弹窗的选项与预填值（#37）
 app.get('/:id/tts-options', async (c) => {
   const storyboardId = Number(c.req.query('storyboard_id') || 0) || undefined
@@ -699,6 +708,7 @@ app.get('/:episode_id/storyboards', async (c) => {
           shotNarrationEnabled: row.narrationEnabled !== false,
           narrationText: row.narrationText,
           meta: parseNarrationMeta(row.narrationMeta),
+          normalize: row.narrationNormalize ?? (narrationEpisode?.narrationNormalize !== false),
         }),
       ],
       narration_meta: parseNarrationMeta(row.narrationMeta),

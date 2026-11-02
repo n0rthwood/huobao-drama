@@ -50,7 +50,15 @@ After reading the script and all shots, settle three things in your head before 
 - **Never write years or dates with Chinese digits**, and never use 〇 (U+3007): measured, 一七二〇年 is spoken as 一七两年, and normalization is a no-op on Chinese digits, so it cannot rescue it.
 - Idiomatic Chinese number words stay in Chinese: 三十八年, 三方, 两路大军, 第二次 and fixed names such as 十三行 / 九边 are not converted to Arabic numerals.
 
-## 6. Self-Check (run every item before saving)
+## 6. Polyphonic Characters and Pronunciation Markers
+
+- **Check every polyphonic character and proper noun** whose default TTS reading is likely wrong — ancient titles, ethnonyms, place names, personal names: 可汗 (kè hán), 单于 (chán yú), 吐蕃 (tǔ bō), 龟兹 (qiū cí), 月氏 (ròu zhī), 大宛 (dà yuān), and 重 in 重庆/重复, 行 in 行伍/银行, 长 in 长官 — and annotate it with `[[原文|拼音]]`. Pinyin is given one syllable per character, tone numbers 1–4 only, e.g. `[[可汗|ke4 han2]]`.
+- **Annotate only when the default reading is genuinely at risk**: never annotate common unambiguous words, and never annotate neutral-tone particles (的/了/着) — the engine rejects the neutral tone.
+- **If the same shot contains Arabic numerals, use the homophone form** `[[原文|同音字]]` instead: the same number of characters as the original, each read unambiguously, e.g. `[[可汗|克寒]]`. Reason: a single pinyin marker disables text normalization for the whole shot, so 1720年 would be read digit by digit. The Arabic-numeral rule in section 5 still stands; only the pronunciation marker switches to the homophone form in that shot.
+- **Never write pause markers `[[停顿|…]]` or tone markers `[[语气|…]]`**: rhythm comes from normal punctuation (，。……); pauses and tone tags are added by humans only.
+- Markers do not count toward the 80-character per-shot limit, and the subtitle shows only the original text. The save tool validates marker syntax; on rejection, fix per `reason` and save again.
+
+## 7. Self-Check (run every item before saving)
 
 1. Stitch the whole episode's narration in shot order and read it once: is it a coherent commentary piece? Any break, repetition or self-contradiction?
 2. Does each shot's narration talk about the same thing as that shot's `description`?

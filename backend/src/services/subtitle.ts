@@ -159,6 +159,11 @@ export interface BuildSubtitleInput {
   timing: SubtitleTiming
   /** 逐字对齐数据（两种模式唯一的对齐数据源；TTS 服务不支持 level=sentence） */
   charItems?: AlignItem[] | null
+  /**
+   * TTS 实际念的文字（#38：同音字替换后），与 text 去空白后逐字等长；对齐时间戳用它、字幕文字仍用 text。
+   * 不传或长度不等时直接用 text 对齐。
+   */
+  alignText?: string
 }
 
 /**
@@ -169,12 +174,14 @@ export interface BuildSubtitleInput {
 export function buildSubtitleCues(input: BuildSubtitleInput): SubtitleResult {
   const normalized = (input.text || '').replace(/\s+/g, '')
   if (!normalized) return { cues: [], source: 'proportional_fallback', timing: input.timing }
+  const alignNormalized = (input.alignText || '').replace(/\s+/g, '')
+  const alignBase = alignNormalized.length === normalized.length ? alignNormalized : normalized
 
   const sentences = splitSentences(normalized)
 
   if (input.timing === 'sentence') {
     // 逐字对齐按句聚合（服务端 level=sentence 返回 400，没有句级对齐可用）
-    const spans = input.charItems?.length ? charSpansFrom(input.charItems, normalized) : null
+    const spans = input.charItems?.length ? charSpansFrom(input.charItems, alignBase) : null
     if (spans) {
       const cues: SubtitleCue[] = []
       let offset = 0
@@ -190,7 +197,7 @@ export function buildSubtitleCues(input: BuildSubtitleInput): SubtitleResult {
   }
 
   // char 模式：逐字时间戳，按标点切条
-  const spans = input.charItems?.length ? charSpansFrom(input.charItems, normalized) : null
+  const spans = input.charItems?.length ? charSpansFrom(input.charItems, alignBase) : null
   if (!spans) {
     return { cues: proportionalCues(normalized, input.durationMs), source: 'proportional_fallback', timing: 'char' }
   }
