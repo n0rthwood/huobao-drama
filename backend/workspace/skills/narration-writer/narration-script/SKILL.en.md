@@ -44,7 +44,9 @@ After reading the script and all shots, settle three things in your head before 
 - On a proper noun's first appearance, give the minimum identification needed (who, which side, what it is); afterwards use it bare.
 - **No picture-direction language**: "in the frame", "the camera", "we see", "at this moment" are all forbidden.
 - **Restraint**: no lyricism, no sentimentality, no verdicts handed to the audience. Delete every adjective you can. Emotion is carried by the facts and the picture.
-- Write numbers the way they are spoken ("seventeen twenty" rather than "1720"), so synthesis and subtitles agree.
+- **Write years, dates, counts and article numbers as Arabic numerals**: 1720年5月8日, 8月1日, 189人, 6300人, 第3条, 1689年到1727年. With text normalization on, the TTS reads them out correctly while the burned-in subtitle shows the very same text.
+- **Never write years or dates with Chinese digits**, and never use 〇 (U+3007): measured, 一七二〇年 is spoken as 一七两年, and normalization is a no-op on Chinese digits, so it cannot rescue it.
+- Idiomatic Chinese number words stay in Chinese: 三十八年, 三方, 两路大军, 第二次 and fixed names such as 十三行 / 九边 are not converted to Arabic numerals.
 
 ## 6. Self-Check (run every item before saving)
 

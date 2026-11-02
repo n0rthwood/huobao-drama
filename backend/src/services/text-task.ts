@@ -42,6 +42,8 @@ export interface TextTaskProgress {
   total: number
   failed: number
   current_storyboard_id?: number
+  /** 分阶段任务的当前阶段（#35 旁白写作：spine = 规划主线，shots = 分块写镜） */
+  phase?: 'spine' | 'shots'
 }
 
 export interface TextTaskParams {
@@ -189,6 +191,7 @@ export interface PromptBatchStatus {
   completed: number
   failed: number
   current_storyboard_id?: number
+  phase?: 'spine' | 'shots'
   started_at: string
   finished_at?: string
   error?: string
@@ -203,6 +206,7 @@ export function promptBatchStatusFrom(row: SysTaskRow | null): PromptBatchStatus
     completed: progress?.completed ?? 0,
     failed: progress?.failed ?? 0,
     current_storyboard_id: progress?.current_storyboard_id,
+    phase: progress?.phase,
     started_at: row.createdAt,
     finished_at: row.completedAt || undefined,
     error: row.errorMsg || undefined,

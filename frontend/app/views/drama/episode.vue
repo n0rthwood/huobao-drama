@@ -51,59 +51,6 @@
             :options="resolutionOptions"
             hide-default
           />
-          <ModelSelect
-            v-if="narrationEnabledOf"
-            v-model="episodeSubtitleTiming"
-            :label="t('episode.narration.episodeTimingLabel')"
-            :options="subtitleTimingOptions"
-            hide-default
-          />
-          <!-- 旁白音轨与默认时长匹配（#31）：集级默认，镜级可覆盖 -->
-          <ModelSelect
-            v-if="narrationEnabledOf"
-            v-model="episodeAudioMixMode"
-            :label="t('episode.fit.episodeMixLabel')"
-            :options="audioMixModeOptions"
-            hide-default
-          />
-          <label v-if="narrationEnabledOf && episodeAudioMixMode === 'mix'" class="studio-num">
-            {{ t('episode.fit.episodeBedGain') }}
-            <input
-              class="input studio-num-input"
-              type="number"
-              max="0"
-              step="1"
-              :value="episodeBedGainDb"
-              @change="episodeBedGainDb = $event.target.value"
-            />
-          </label>
-          <ModelSelect
-            v-if="narrationEnabledOf"
-            v-model="episodeFitMode"
-            :label="t('episode.fit.episodeFitLabel')"
-            :options="fitModeOptions"
-            hide-default
-          />
-          <template v-if="narrationEnabledOf && episodeFitMode === 'pad'">
-            <label class="studio-num">
-              {{ t('episode.fit.episodeFitPad') }}
-              <input
-                class="input studio-num-input"
-                type="number"
-                min="0"
-                :max="MAX_PAD_SECONDS"
-                step="0.1"
-                :value="episodeFitPadSeconds"
-                @change="episodeFitPadSeconds = $event.target.value"
-              />
-            </label>
-            <ModelSelect
-              v-model="episodeFitPadPosition"
-              :label="t('episode.fit.episodeFitPosition')"
-              :options="fitPositionOptions"
-              hide-default
-            />
-          </template>
         </div>
         <div class="studio-actions">
           <LocaleSwitcher />
@@ -704,6 +651,7 @@
             :episode-timing="episodeSubtitleTiming"
             :episode-mix-mode="episodeAudioMixMode"
             :episode-fit-default="episodeFitDefault"
+            :episode-normalize="episodeNarrationNormalize"
             :narration-batch="narrationBatch"
             :narration-voice-batch="narrationVoiceBatch"
             @break="doBreakdown"
@@ -716,6 +664,7 @@
             @field-dirty="markFieldDirty"
             @batch-narration="batchNarration"
             @batch-narration-voice="batchNarrationVoice"
+            @open-narration-settings="narrationSettingsOpen = true"
           />
 
           <!-- Sub: Video Production（视频提示词 + 视频生成，关键帧确认后可用） -->
@@ -1093,6 +1042,8 @@
                         :episode-timing="episodeSubtitleTiming"
                         :episode-mix-mode="episodeAudioMixMode"
                         :episode-fit-default="episodeFitDefault"
+                        :episode-normalize="episodeNarrationNormalize"
+                        :narration-batch="narrationBatch"
                         show-compose
                         @update-field="updateField"
                         @field-dirty="markFieldDirty"
@@ -1932,6 +1883,35 @@
         @confirm="confirmBreakdown"
       />
 
+      <!-- 音频旁白设置（#35）：入口在分镜拆分区，顶栏不再放这些设置 -->
+      <NarrationSettingsPanel
+        :open="narrationSettingsOpen"
+        :narration-enabled="narrationEnabledOf"
+        :narration-normalize="episodeNarrationNormalize"
+        :spine="episodeNarrationSpine"
+        :subtitle-timing="episodeSubtitleTiming"
+        :timing-options="subtitleTimingOptions"
+        :audio-mix-mode="episodeAudioMixMode"
+        :mix-mode-options="audioMixModeOptions"
+        :bed-gain-db="episodeBedGainDb"
+        :fit-mode="episodeFitMode"
+        :fit-mode-options="fitModeOptions"
+        :fit-pad-seconds="episodeFitPadSeconds"
+        :fit-pad-position="episodeFitPadPosition"
+        :fit-position-options="fitPositionOptions"
+        :max-pad-seconds="MAX_PAD_SECONDS"
+        @close="narrationSettingsOpen = false"
+        @update:narration-enabled="setNarrationEnabled"
+        @update:narration-normalize="setNarrationNormalize"
+        @update:spine="setNarrationSpine"
+        @update:subtitle-timing="v => { episodeSubtitleTiming = v }"
+        @update:audio-mix-mode="v => { episodeAudioMixMode = v }"
+        @update:bed-gain-db="v => { episodeBedGainDb = v }"
+        @update:fit-mode="v => { episodeFitMode = v }"
+        @update:fit-pad-seconds="v => { episodeFitPadSeconds = v }"
+        @update:fit-pad-position="v => { episodeFitPadPosition = v }"
+      />
+
       <ConfirmDialog
         :open="subtitleRegenConfirm"
         :title="t('episode.narration.regenAllTitle')"
@@ -2003,6 +1983,7 @@ import TargetAssetList from '~/components/TargetAssetList.vue'
 import AssetBrowserDialog from '~/components/AssetBrowserDialog.vue'
 import NarrationBlock from '~/components/NarrationBlock.vue'
 import BreakdownNarrationDialog from '~/components/BreakdownNarrationDialog.vue'
+import NarrationSettingsPanel from '~/components/NarrationSettingsPanel.vue'
 import AssetBatchDialog from '~/components/AssetBatchDialog.vue'
 import { mediaTimeOfPath } from '~/utils/mediaTime'
 import {
@@ -4020,6 +4001,39 @@ async function onBreakdownDone() {
 
 // ===== 旁白（#30）：集级开关 / 字幕时间码 / 三个集级批量任务 =====
 const narrationEnabledOf = computed(() => Boolean(episode.value?.narration_enabled ?? episode.value?.narrationEnabled))
+// 音频旁白设置面板（#35）：集级开关 / 文本规范化 / 整集主线都在面板里改
+const narrationSettingsOpen = ref(false)
+const episodeNarrationNormalize = computed(() =>
+  (episode.value?.narration_normalize ?? episode.value?.narrationNormalize) !== false)
+const episodeNarrationSpine = computed(() =>
+  String(episode.value?.narration_spine ?? episode.value?.narrationSpine ?? ''))
+
+/** 已拆过分镜的剧集也能在界面上开/关旁白，语义与拆分前对话框一致 */
+async function setNarrationEnabled(enabled) {
+  if (!episode.value || enabled === narrationEnabledOf.value) return
+  const prev = episode.value.narration_enabled
+  await updateEpisodeFields(
+    { narration_enabled: enabled, narrationEnabled: enabled },
+    { narration_enabled: prev, narrationEnabled: prev },
+  )
+}
+async function setNarrationNormalize(value) {
+  if (!episode.value || value === episodeNarrationNormalize.value) return
+  const prev = episode.value.narration_normalize
+  await updateEpisodeFields(
+    { narration_normalize: value, narrationNormalize: value },
+    { narration_normalize: prev, narrationNormalize: prev },
+  )
+}
+async function setNarrationSpine(text) {
+  if (!episode.value || text === episodeNarrationSpine.value) return
+  const prev = episode.value.narration_spine
+  await updateEpisodeFields(
+    { narration_spine: text, narrationSpine: text },
+    { narration_spine: prev, narrationSpine: prev },
+  )
+  toast.success(t('episode.narration.spineSaved'))
+}
 const SUBTITLE_TIMINGS = ['sentence', 'char']
 const subtitleTimingOptions = computed(() => [
   { key: 'sentence', model: t('episode.narration.timingSentence') },
@@ -4182,7 +4196,7 @@ function pollTextBatch(stateRef, statusFn, doneKey, attempts = 240) {
       }
       if (st) {
         const prev = stateRef.value.completed
-        stateRef.value = { running: true, total: st.total || 0, completed: st.completed || 0 }
+        stateRef.value = { running: true, total: st.total || 0, completed: st.completed || 0, phase: st.phase }
         if ((st.completed || 0) !== prev) await refresh()
       }
     } catch {}
@@ -4192,21 +4206,54 @@ function pollTextBatch(stateRef, statusFn, doneKey, attempts = 240) {
   setTimeout(() => tick(attempts), 2500)
 }
 
+/**
+ * 整集/选中镜头的旁白写作（#35）。
+ * 后端已在运行时返回 already_running + 当前进度：进入运行态继续轮询，
+ * 绝不再弹「没有需要处理的镜头」—— 那句话会把「正在跑」说成「没活干」。
+ */
 async function batchNarration(storyboardIds) {
-  if (narrationBatch.value.running) return
+  if (narrationBatch.value.running) {
+    toast.info(t('episode.narration.batchAlreadyRunning', {
+      done: narrationBatch.value.completed,
+      total: narrationBatch.value.total,
+    }))
+    return
+  }
   try {
     const res = await episodeAPI.generateNarration(epId.value, {
       storyboard_ids: storyboardIds,
       model: chatModelOverride() || undefined,
       config_id: chatConfigId() || undefined,
     })
+    if (res?.already_running) {
+      narrationBatch.value = {
+        running: true,
+        total: res.total || 0,
+        completed: res.completed || 0,
+        phase: res.phase,
+      }
+      toast.info(t('episode.narration.batchAlreadyRunning', { done: res.completed || 0, total: res.total || 0 }))
+      pollTextBatch(narrationBatch, () => episodeAPI.narrationStatus(epId.value), 'episode.narration.batchDone')
+      return
+    }
     if (!res?.total) { toast.info(t('episode.narration.batchNothing')); return }
-    narrationBatch.value = { running: true, total: res.total, completed: 0 }
+    narrationBatch.value = { running: true, total: res.total, completed: 0, phase: 'spine' }
     toast.info(t('episode.narration.batchStarted', { n: res.total }))
     pollTextBatch(narrationBatch, () => episodeAPI.narrationStatus(epId.value), 'episode.narration.batchDone')
   } catch (e) {
     toastError(e)
   }
+}
+
+/** 打开页面时若批量还在跑，直接显示运行态并接着轮询（刷新后按钮不会变回「批量生成旁白」） */
+async function resumeNarrationBatch() {
+  if (narrationBatch.value.running) return
+  try {
+    const st = await episodeAPI.narrationStatus(epId.value)
+    if (st?.status !== 'running') return
+    narrationBatch.value = { running: true, total: st.total || 0, completed: st.completed || 0, phase: st.phase }
+    pollTextBatch(narrationBatch, () => episodeAPI.narrationStatus(epId.value), 'episode.narration.batchDone')
+  } catch {}
 }
 
 async function batchNarrationVoice(storyboardIds) {
@@ -5018,6 +5065,7 @@ onMounted(async () => {
   loadConfigs()
   syncExtractStatus()
   loadVideoBatch() // 批量进度在服务端，刷新页面后继续展示
+  resumeNarrationBatch() // 旁白批量同理：刷新后按钮仍显示运行态与进度
 })
 
 // ===== 应用内引导（工作台）：沿左侧进度栏走 6 步流水线 =====

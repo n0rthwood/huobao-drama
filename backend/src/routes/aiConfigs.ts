@@ -5,7 +5,7 @@ import { success, notFound, created, badRequest, now } from '../utils/response.j
 import { toSnakeCase } from '../utils/transform.js'
 import { joinProviderUrl } from '../services/adapters/url.js'
 import { hasVersionedPath, isOfficialProvider, parseConfigTemperature, validateConfigModels } from '../services/ai.js'
-import { fetchDefaultVoice } from '../services/tts.js'
+import { fetchVoices } from '../services/tts.js'
 import { redactUrl, logTaskError, logTaskProgress, logTaskSuccess } from '../utils/task-logger.js'
 
 const app = new Hono()
@@ -155,45 +155,28 @@ app.get('/', async (c) => {
 })
 
 /**
- * TTS 可选参数（#30）：instructions / cfg_value / inference_timesteps / seed。
- * 合并进 settings JSON，省略/置空的键视为清除；`voice` 由 pinDefaultVoice 固定，不在这里改。
+ * TTS 可选参数：voice / instructions / cfg_value / inference_timesteps / seed。
+ * 合并进 settings JSON，省略/置空的键视为清除。
+ * voice（#35）由人在设置页从服务的音色列表里选定 —— 程序绝不替用户挑「第一个」。
  */
 function mergeTtsSettings(settings: Record<string, any>, raw: unknown): Record<string, any> {
   const input = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
-  for (const key of ['instructions', 'cfg_value', 'inference_timesteps', 'seed'] as const) {
+  for (const key of ['voice', 'instructions', 'cfg_value', 'inference_timesteps', 'seed'] as const) {
     const value = input[key]
     if (value === undefined || value === null || value === '') {
       delete settings[key]
       continue
     }
-    settings[key] = key === 'instructions' ? String(value) : Number(value)
+    settings[key] = key === 'voice' || key === 'instructions' ? String(value) : Number(value)
   }
   return settings
 }
 
-/**
- * TTS 配置保存后固定默认音色（#30 Q11：火宝不做音色挑选 UI）。
- * `/v1/audio/speech` 不带 voice 会用随机音色，整集听感会漂，所以保存时向服务取一次
- * 列表首项写进 settings.voice，之后不随服务端列表变化而漂移。失败不阻断保存。
- */
-async function pinDefaultVoice(configId: number): Promise<void> {
-  const [row] = await db.select().from(schema.aiServiceConfigs)
-    .where(eq(schema.aiServiceConfigs.id, configId))
-  if (!row || row.serviceType !== 'tts') return
-  let settings: Record<string, any> = {}
-  try { settings = row.settings ? JSON.parse(row.settings) : {} } catch { settings = {} }
-  if (typeof settings.voice === 'string' && settings.voice.trim()) return
-  try {
-    const voice = await fetchDefaultVoice(row.baseUrl, row.apiKey)
-    if (!voice) return
-    settings.voice = voice
-    await db.update(schema.aiServiceConfigs)
-      .set({ settings: JSON.stringify(settings), updatedAt: now() })
-      .where(eq(schema.aiServiceConfigs.id, configId))
-    logTaskSuccess('AIConfig', 'tts-default-voice-pinned', { configId, voice })
-  } catch (err) {
-    logTaskError('AIConfig', 'tts-default-voice', { configId, error: err instanceof Error ? err.message : String(err) })
-  }
+/** TTS 配置必须带音色：没有音色合成出来的整集听感会漂（#35） */
+function ttsVoiceError(serviceType: string, settings: Record<string, any>): string | null {
+  if (serviceType !== 'tts') return null
+  const voice = typeof settings.voice === 'string' ? settings.voice.trim() : ''
+  return voice ? null : 'TTS 配置必须选定音色：请先点「刷新音色列表」，再从列表里选一个音色'
 }
 
 // POST /ai-configs
@@ -221,6 +204,11 @@ app.post('/', async (c) => {
     }
   }
 
+  const settings: Record<string, any> = temperature !== null ? { temperature } : {}
+  if ('tts_settings' in body) mergeTtsSettings(settings, body.tts_settings)
+  const voiceError = ttsVoiceError(body.service_type, settings)
+  if (voiceError) return badRequest(c, voiceError)
+
   const res = await db.insert(schema.aiServiceConfigs).values({
     serviceType: body.service_type,
     provider: body.provider,
@@ -230,17 +218,12 @@ app.post('/', async (c) => {
     model: JSON.stringify(body.model || []),
     priority: body.priority || 0,
     isActive: true,
-    settings: (() => {
-      const settings: Record<string, any> = temperature !== null ? { temperature } : {}
-      if ('tts_settings' in body) mergeTtsSettings(settings, body.tts_settings)
-      return Object.keys(settings).length ? JSON.stringify(settings) : null
-    })(),
+    settings: Object.keys(settings).length ? JSON.stringify(settings) : null,
     createdAt: ts,
     updatedAt: ts,
   })
 
   const configId = getInsertId(res)
-  if (body.service_type === 'tts') await pinDefaultVoice(configId)
   const [row] = await db.select().from(schema.aiServiceConfigs)
     .where(eq(schema.aiServiceConfigs.id, configId))
 
@@ -322,6 +305,32 @@ app.post('/test', async (c) => {
   }
 })
 
+/**
+ * GET /ai-configs/tts-voices?base_url=&api_key=&config_id= — 列出 TTS 服务的音色（#35）。
+ * 设置页据此让人选音色；程序不再自动取第一个。
+ */
+app.get('/tts-voices', async (c) => {
+  const configId = Number(c.req.query('config_id') || 0)
+  let baseUrl = c.req.query('base_url') || ''
+  let apiKey = c.req.query('api_key') || ''
+  if (configId) {
+    const [row] = await db.select().from(schema.aiServiceConfigs)
+      .where(eq(schema.aiServiceConfigs.id, configId))
+    if (!row) return badRequest(c, '配置不存在')
+    if (row.serviceType !== 'tts') return badRequest(c, '该配置不是 TTS 配置')
+    baseUrl = baseUrl || row.baseUrl
+    apiKey = apiKey || row.apiKey || ''
+  }
+  if (!baseUrl) return badRequest(c, '需要 base_url 或 config_id')
+  try {
+    return success(c, { voices: await fetchVoices(baseUrl, apiKey || undefined) })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '读取音色列表失败'
+    logTaskError('AIConfig', 'tts-voices', { baseUrl, error: message })
+    return badRequest(c, `读取音色列表失败：${message}`)
+  }
+})
+
 // GET /ai-configs/:id
 app.get('/:id', async (c) => {
   const id = Number(c.req.param('id'))
@@ -375,11 +384,12 @@ app.put('/:id', async (c) => {
       else settings.temperature = temperature
     }
     if ('tts_settings' in body) mergeTtsSettings(settings, body.tts_settings)
+    const voiceError = ttsVoiceError(serviceType, settings)
+    if (voiceError) return badRequest(c, voiceError)
     updates.settings = Object.keys(settings).length ? JSON.stringify(settings) : null
   }
 
   await db.update(schema.aiServiceConfigs).set(updates).where(eq(schema.aiServiceConfigs.id, id))
-  if (serviceType === 'tts') await pinDefaultVoice(id)
   return success(c)
 })
 

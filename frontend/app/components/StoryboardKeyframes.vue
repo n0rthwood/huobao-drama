@@ -16,15 +16,24 @@
             ? t('episode.kf.promptProgress', { done: promptBatch.completed, total: promptBatch.total })
             : (selectMode && selectedIds.length ? t('episode.kf.promptSelected', { n: selectedIds.length }) : t('episode.kf.batchPrompts')) }}
         </button>
+        <!-- 音频旁白设置（#35）：开关 + 字幕/音轨/匹配都在面板里；没开旁白时这里是唯一的开启入口 -->
+        <button class="btn btn-sm" :class="{ 'is-on': narrationEnabled }" @click="emit('open-narration-settings')">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 10v4h4l5 4V6l-5 4H3z"/><path d="M16 8a5 5 0 0 1 0 8"/></svg>
+          {{ t('episode.narration.settingsEntry') }}
+        </button>
         <button
           v-if="narrationEnabled"
           class="btn btn-sm"
-          :disabled="narrationBatch.running || !storyboards.length"
+          :class="{ 'is-on': narrationBatch.running }"
+          :disabled="!storyboards.length"
+          :title="narrationBatch.running ? t('episode.narration.batchAlreadyRunning', { done: narrationBatch.completed, total: narrationBatch.total }) : undefined"
           @click="emit('batch-narration', selectMode && selectedIds.length ? selectedIds : undefined)"
         >
           <Loader2 v-if="narrationBatch.running" :size="11" class="animate-spin" />
           {{ narrationBatch.running
-            ? t('episode.narration.batchProgress', { done: narrationBatch.completed, total: narrationBatch.total })
+            ? (narrationBatch.phase === 'spine'
+              ? t('episode.narration.batchProgressSpine')
+              : t('episode.narration.batchProgress', { done: narrationBatch.completed, total: narrationBatch.total }))
             : t('episode.narration.batchScript') }}
         </button>
         <button
@@ -223,6 +232,8 @@
               :episode-timing="episodeTiming"
               :episode-mix-mode="episodeMixMode"
               :episode-fit-default="episodeFitDefault"
+              :episode-normalize="episodeNormalize"
+              :narration-batch="narrationBatch"
               @update-field="(sb, field, value) => emit('update-field', sb, field, value)"
               @field-dirty="(sb, field, value) => emit('field-dirty', sb, field, value)"
               @refresh="emit('refresh')"
@@ -583,12 +594,14 @@ const props = defineProps({
   // 旁白音轨与默认时长匹配（#31）：透传给每镜匹配面板做「继承」展示
   episodeMixMode: { type: String, default: 'replace' },
   episodeFitDefault: { type: Object, default: null },
+  // 剧集级文本规范化（#35）：透传给每镜「继承」展示
+  episodeNormalize: { type: Boolean, default: true },
   narrationBatch: { type: Object, default: () => ({ running: false, total: 0, completed: 0 }) },
   narrationVoiceBatch: { type: Object, default: () => ({ running: false, total: 0, completed: 0 }) },
 })
 const emit = defineEmits([
   'break', 'refresh', 'preview', 'goto-assets', 'toggle-bind', 'open-asset', 'update-field', 'field-dirty',
-  'batch-narration', 'batch-narration-voice',
+  'batch-narration', 'batch-narration-voice', 'open-narration-settings',
 ])
 
 // 槽位预览图按剧集画幅完整显示（CSS aspect-ratio 语法用 /）

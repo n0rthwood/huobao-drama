@@ -42,6 +42,8 @@ export const sqliteSchemaStatements = [
     video_config_id INTEGER,
     tts_config_id INTEGER,
     narration_enabled INTEGER NOT NULL DEFAULT 0,
+    narration_spine TEXT,
+    narration_normalize INTEGER NOT NULL DEFAULT 1,
     subtitle_timing TEXT NOT NULL DEFAULT 'sentence',
     audio_mix_mode TEXT NOT NULL DEFAULT 'replace',
     audio_bed_gain_db REAL,
@@ -139,6 +141,7 @@ export const sqliteSchemaStatements = [
     narration_audio_url TEXT,
     narration_meta TEXT,
     subtitle_timing TEXT,
+    narration_normalize INTEGER,
     narration_fit TEXT,
     video_url TEXT,
     subtitle_url TEXT,
@@ -438,6 +441,10 @@ const columnAdditions: { table: string; column: string; type: string }[] = [
   { table: 'episodes', column: 'audio_bed_gain_db', type: 'REAL' },
   { table: 'episodes', column: 'narration_fit_default', type: 'TEXT' },
   { table: 'storyboards', column: 'narration_fit', type: 'TEXT' },
+  // 旁白主线与文本规范化（#35）：存量集补 narration_normalize=1（数字/日期展开读法默认开）
+  { table: 'episodes', column: 'narration_spine', type: 'TEXT' },
+  { table: 'episodes', column: 'narration_normalize', type: 'INTEGER NOT NULL DEFAULT 1' },
+  { table: 'storyboards', column: 'narration_normalize', type: 'INTEGER' },
   // 纪录片规则显式开关（Issue #32）：'auto' | 'on' | 'off'；NULL 等价 'auto'（按 genre 关键字判定）
   { table: 'dramas', column: 'documentary_rules', type: 'TEXT' },
   // 最终提示词来源标记（Issue #32）：'agent' = 提示词 Agent 保存，'external' = 外部直写

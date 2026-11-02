@@ -24,6 +24,7 @@ import {
   narrationCharCount,
   narrationIssues,
   parseNarrationMeta,
+  resolveNarrationNormalize,
   sha256,
   type NarrationMeta,
   type SubtitleTiming,
@@ -90,7 +91,9 @@ export async function generateShotVoice(storyboardId: number): Promise<VoiceResu
   const config = await resolveTtsConfig(ep)
   logTaskStart('Narration', 'voice', { storyboardId, episodeId: sb.episodeId, chars })
 
-  const synthesis = await synthesizeNarration(config, text)
+  // 文本规范化（#35）：镜级覆盖 > 集级默认（默认开）。字幕仍然只用 narration_text，不产生第二份措辞。
+  const normalize = resolveNarrationNormalize(ep.narrationNormalize, sb.narrationNormalize)
+  const synthesis = await synthesizeNarration(config, text, normalize)
 
   // 字幕：两种时间码模式都基于这一次整镜合成的音频，对齐数据统一取逐字时间戳
   // （TTS 服务只支持 level=word|char，sentence 模式由 buildSubtitleCues 按句聚合）
