@@ -37,13 +37,27 @@ export const TEXT_TASK_KINDS: TextTaskKind[] = [
   'asset_batch',
 ]
 
+/**
+ * 批量任务的逐项结果（#42）：落在 sys_task.params.progress 里，
+ * 浏览器刷新后重新读取即可恢复「哪几镜成功 / 失败 / 被跳过以及为什么」。
+ */
+export interface TextTaskProgressItem {
+  storyboard_id: number
+  storyboard_number: number
+  state: 'pending' | 'processing' | 'completed' | 'failed' | 'skipped'
+  reason: string | null
+}
+
 export interface TextTaskProgress {
   completed: number
   total: number
   failed: number
+  /** 执行时依赖已变化而未执行的镜头数（不计失败） */
+  skipped?: number
   current_storyboard_id?: number
   /** 分阶段任务的当前阶段（#35 旁白写作：spine = 规划主线，shots = 分块写镜） */
   phase?: 'spine' | 'shots'
+  items?: TextTaskProgressItem[]
 }
 
 export interface TextTaskParams {

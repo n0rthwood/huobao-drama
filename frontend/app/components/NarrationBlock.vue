@@ -5,7 +5,6 @@
       <FieldSaveStatus :status="fieldSave.status" :at="fieldSave.at" />
       <span v-if="status === 'voice_stale'" class="narration-badge is-stale">{{ t('episode.narration.stale') }}</span>
       <span v-if="subtitleEstimated" class="narration-badge is-warn">{{ t('episode.narration.estimated') }}</span>
-      <span v-if="showCompose && status === 'compose_stale'" class="narration-badge is-stale">{{ t('episode.compose.stale') }}</span>
       <span class="ml-auto" />
       <label class="narration-toggle">
         <input type="checkbox" :checked="!enabled" :disabled="busy" @change="setPureVisual($event.target.checked)" />
@@ -90,36 +89,16 @@
 
       <audio v-if="audioUrl" :key="audioUrl" class="narration-audio" :src="mediaUrl(audioUrl)" controls preload="metadata" />
       <NarrationFitPanel
-        v-if="audioUrl"
+        v-if="audioUrl && showFit"
         :storyboard="storyboard"
         :episode-fit-default="episodeFitDefault"
         :episode-mix-mode="episodeMixMode"
-        @refresh="emit('refresh')"
+        @applied="emit('refresh')"
       />
       <div v-if="!audioUrl" class="narration-hint">{{ t('episode.narration.noAudio') }}</div>
     </template>
     <div v-else class="narration-hint">{{ t('episode.narration.pureVisualHint') }}</div>
 
-    <template v-if="showCompose">
-      <div class="narration-compose">
-        <span class="narration-label">{{ t('episode.compose.section') }}</span>
-        <span v-if="composedUrl" class="narration-meta">{{ t('episode.compose.duration', { sec: composedSeconds }) }}</span>
-        <span class="ml-auto" />
-        <button
-          type="button"
-          class="btn btn-sm"
-          :disabled="busy || blocked || !hasVideo"
-          :title="composeDisabledReason || undefined"
-          @click="compose"
-        >
-          <Loader2 v-if="composing" :size="11" class="animate-spin" />
-          {{ composedUrl ? t('episode.compose.recompose') : t('episode.compose.composeShot') }}
-        </button>
-      </div>
-      <video v-if="composedUrl" :key="composedUrl" class="narration-composed-video" :src="mediaUrl(composedUrl)" controls preload="metadata" playsinline />
-      <div v-else class="narration-hint">{{ t('episode.compose.none') }}</div>
-      <div class="narration-hint">{{ t('episode.compose.durationNote') }}</div>
-    </template>
 
     <NarrationVoiceDialog
       v-if="storyboard"
@@ -140,7 +119,8 @@
 /**
  * 每镜旁白审核区（#30）：分镜（关键帧）页与视频页共用。
  * 文本走父级的 update-field / field-dirty（与 description 同一条自动保存链路），
- * 配音 / 字幕 / 合成是本镜级同步接口，完成后 emit('refresh') 由工作台重新拉分镜。
+ * 配音 / 字幕是本镜级同步接口，完成后 emit('refresh') 由工作台重新拉分镜。
+ * 融合（合成本镜）不在这里：视频页由右栏首屏的 ShotFusionPanel 统一承担（#42）。
  */
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -164,8 +144,8 @@ const props = defineProps({
   fieldSave: { type: Object, default: () => ({ status: 'idle', at: 0 }) },
   // 剧集级字幕时间码，用于「继承」选项的显示
   episodeTiming: { type: String, default: 'sentence' },
-  // 视频页额外显示「合成本镜」与合成结果
-  showCompose: { type: Boolean, default: false },
+  // 视频页由 ShotFusionPanel 承担匹配参数，这里关掉避免两处同一面板
+  showFit: { type: Boolean, default: true },
   // 剧集级音轨模式与默认匹配（#31），用于「继承」展示
   episodeMixMode: { type: String, default: 'replace' },
   episodeFitDefault: { type: Object, default: null },
@@ -181,10 +161,9 @@ const { t } = useI18n()
 const voicing = ref(false)
 const writing = ref(false)
 const subtitling = ref(false)
-const composing = ref(false)
 const subtitleDirty = ref(false)
 const voiceDialogOpen = ref(false)
-const busy = computed(() => voicing.value || writing.value || subtitling.value || composing.value)
+const busy = computed(() => voicing.value || writing.value || subtitling.value)
 const batchRunning = computed(() => Boolean(props.narrationBatch?.running))
 
 watch(() => props.storyboard?.id, () => { subtitleDirty.value = false })
@@ -198,8 +177,6 @@ const enabled = computed(() => {
 const status = computed(() => sb.value.narration_status || sb.value.narrationStatus || 'missing')
 const meta = computed(() => sb.value.narration_meta || sb.value.narrationMeta || {})
 const audioUrl = computed(() => sb.value.narration_audio_url || sb.value.narrationAudioUrl || '')
-const composedUrl = computed(() => sb.value.composed_video_url || sb.value.composedVideoUrl || '')
-const hasVideo = computed(() => Boolean(sb.value.video_url || sb.value.videoUrl))
 const chars = computed(() => Number(sb.value.narration_chars ?? sb.value.narrationChars ?? spokenText(narrationText.value).replace(/\s+/g, '').length))
 const estimateSeconds = computed(() => {
   const v = Number(sb.value.narration_estimate_seconds ?? sb.value.narrationEstimateSeconds ?? 0)
@@ -208,10 +185,6 @@ const estimateSeconds = computed(() => {
 const measuredSeconds = computed(() => {
   const ms = Number(meta.value?.audio?.duration_ms || 0)
   return ms > 0 ? (ms / 1000).toFixed(1) : ''
-})
-const composedSeconds = computed(() => {
-  const ms = Number(meta.value?.composed?.duration_ms || 0)
-  return ms > 0 ? (ms / 1000).toFixed(1) : '—'
 })
 const cueCount = computed(() => Number(meta.value?.subtitle?.cues || 0))
 const subtitleEstimated = computed(() => meta.value?.subtitle?.source === 'proportional_fallback')
@@ -225,18 +198,11 @@ const narrationIssues = computed(() => issuesOf().filter(i => i.code === 'narrat
 const tooLongIssue = computed(() => narrationIssues.value.find(i => i.code === 'narration_too_long') || null)
 const markupIssue = computed(() => issuesOf().find(i => i.code === 'narration_markup_invalid') || null)
 const phonemeWarning = computed(() => issuesOf().find(i => i.code === 'narration_phoneme_no_normalize') || null)
-// 合成：任何阻断都不行；配音：只有「字数超单段上限」或标记写错才挡——
+// 配音阻断：只有「字数超单段上限」或标记写错才挡——
 // 实测配音偏长时恰恰需要换音色/参数重配（#37），不能连重配也挡掉
-const blocked = computed(() => Boolean(tooLongIssue.value || markupIssue.value))
-const blockReason = computed(() => markupIssue.value?.message || tooLongIssue.value?.message || '')
 const voiceBlockReason = computed(() => {
   if (markupIssue.value) return markupIssue.value.message
   if (chars.value > MAX_NARRATION_CHARS) return tooLongIssue.value?.message || ''
-  return ''
-})
-const composeDisabledReason = computed(() => {
-  if (blocked.value) return blockReason.value
-  if (!hasVideo.value) return t('episode.compose.needVideo')
   return ''
 })
 
@@ -348,20 +314,6 @@ async function regenerateSubtitle() {
     subtitling.value = false
   }
 }
-
-async function compose() {
-  if (!props.storyboard || busy.value) return
-  composing.value = true
-  try {
-    await storyboardAPI.compose(props.storyboard.id)
-    toast.success(t('episode.compose.done'))
-    emit('refresh')
-  } catch (e) {
-    toastError(e)
-  } finally {
-    composing.value = false
-  }
-}
 </script>
 
 <style scoped>
@@ -375,7 +327,6 @@ async function compose() {
   background: var(--surface-soft);
 }
 .narration-head,
-.narration-compose,
 .narration-actions {
   display: flex;
   align-items: center;
@@ -443,10 +394,5 @@ async function compose() {
 .narration-audio {
   width: 100%;
   height: 32px;
-}
-.narration-composed-video {
-  width: 100%;
-  border-radius: 6px;
-  background: var(--surface-muted);
 }
 </style>

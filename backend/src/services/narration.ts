@@ -49,6 +49,11 @@ export interface NarrationSubtitleMeta {
   generated_at: string
 }
 
+/**
+ * 合成产物记录。`inputs` 是合成当时真正生效的输入分项快照（#42），
+ * `signature_version` 标出快照格式：版本不一致的旧记录只能判「无法比较」，
+ * 绝不能当成「最新」回填。
+ */
 export interface NarrationComposedMeta {
   video_src: string
   audio_src: string | null
@@ -56,10 +61,30 @@ export interface NarrationComposedMeta {
   burned: boolean
   duration_ms: number
   signature: string
+  signature_version?: number
+  inputs?: ComposeInputParts
   composed_at: string
   /** 合成采用的转场偏移量 T（秒）与它的来源 */
   transition_t: number
   transition_t_source: 'task' | 'review' | 'none'
+}
+
+/** 影响本镜产出的输入分项（#42）：合成、状态计算、批量预览、导出校验共用同一份口径 */
+export interface ComposeInputParts {
+  /** 当前采用的画面文件（uuid 文件名，重生成必然换路径） */
+  video_src: string
+  /** 参与合成的旁白音频；纯画面镜头为 null */
+  audio_src: string | null
+  /** 参与烧录的字幕文件；不烧录为 null */
+  subtitle_src: string | null
+  /** 字幕是否真的被烧进画面 */
+  burned: boolean
+  /** 旁白文本哈希；纯画面镜头为空串的哈希 */
+  text_sha256: string
+  /** 生效的匹配参数键（留白/倍速/音轨模式/底音增益中真正生效的部分） */
+  fit_key: string
+  /** 生效的转场偏移 T（秒）；纯画面镜头不做偏移，恒为 0 */
+  transition_t: number
 }
 
 export interface NarrationMeta {
@@ -69,15 +94,16 @@ export interface NarrationMeta {
   composed?: NarrationComposedMeta
 }
 
-/** 旁白链路对外状态（服务端算好，前端不自己推） */
-export type NarrationStatus =
+/** 配音侧状态：文本写了没、配音生成了没、是否被文本改动作废 */
+export type NarrationVoiceStatus =
   | 'disabled'
   | 'missing'
   | 'text_only'
   | 'voiced'
   | 'voice_stale'
-  | 'composed'
-  | 'compose_stale'
+
+/** 对外的旁白链路状态（服务端算好，前端不自己推）：配音侧状态 + 合成是否最新 */
+export type NarrationStatus = NarrationVoiceStatus | 'composed' | 'compose_stale'
 
 export function sha256(value: string): string {
   return crypto.createHash('sha256').update(value, 'utf8').digest('hex')
@@ -119,61 +145,23 @@ export function isVoiceStale(text: string | null | undefined, meta: NarrationMet
 }
 
 /**
- * 合成签名：画面 + 旁白音频 + 字幕 + 是否烧录 + 旁白文本 + 匹配参数（#31）。
- * 所有落盘媒体文件名都是 uuid（utils/storage.ts），重生成必然换路径，所以 URL 入签可靠。
+ * 旁白**配音侧**的状态（#42 起只管文本/配音，不再自行推断合成新鲜度）。
+ * 合成是否最新由 compose-state 的输入快照比较得出，再由它合成最终对外状态，
+ * 避免同一个判断在两处用不同的输入各算一遍。
  */
-export function composeSignature(input: {
-  videoUrl: string
-  audioUrl: string | null
-  subtitleUrl: string | null
-  burned: boolean
-  textSha256: string
-  /** #31 的生效匹配参数（留白/倍速/音轨模式）序列化后的稳定字符串，无则空串 */
-  fitKey?: string
-}): string {
-  return sha256([
-    input.videoUrl,
-    input.audioUrl || '',
-    input.subtitleUrl || '',
-    input.burned ? '1' : '0',
-    input.textSha256,
-    input.fitKey || '',
-  ].join('\u0000'))
-}
-
 export interface NarrationStatusInput {
   episodeNarrationEnabled: boolean
   shotNarrationEnabled: boolean
   narrationText: string | null | undefined
   narrationAudioUrl: string | null | undefined
-  videoUrl: string | null | undefined
-  composedVideoUrl: string | null | undefined
-  subtitleUrl: string | null | undefined
   meta: NarrationMeta
-  /** #31 的生效匹配参数键，参与合成过期判定 */
-  fitKey?: string
 }
 
-export function narrationStatus(input: NarrationStatusInput): NarrationStatus {
+export function narrationStatus(input: NarrationStatusInput): NarrationVoiceStatus {
   if (!input.episodeNarrationEnabled) return 'disabled'
-  // 纯画面镜头：仍要走合成（去掉模型音轨），所以合成状态照常判定
-  const wantsVoice = input.shotNarrationEnabled
   const text = (input.narrationText || '').trim()
-
-  if (input.composedVideoUrl && input.meta.composed) {
-    const expected = composeSignature({
-      videoUrl: input.videoUrl || '',
-      audioUrl: wantsVoice ? (input.narrationAudioUrl || null) : null,
-      subtitleUrl: wantsVoice ? (input.subtitleUrl || null) : null,
-      burned: wantsVoice,
-      textSha256: sha256(wantsVoice ? text : ''),
-      fitKey: input.fitKey,
-    })
-    if (expected === input.meta.composed.signature) return 'composed'
-    return 'compose_stale'
-  }
-
-  if (!wantsVoice) return text ? 'text_only' : 'missing'
+  // 纯画面镜头：没有配音链路，有没有文本只决定展示，不影响合成
+  if (!input.shotNarrationEnabled) return text ? 'text_only' : 'missing'
   if (!text) return 'missing'
   if (!input.narrationAudioUrl || !input.meta.audio) return 'text_only'
   if (isVoiceStale(text, input.meta)) return 'voice_stale'

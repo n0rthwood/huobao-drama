@@ -41,7 +41,7 @@ function call(name, ...args) {
 const C = call('constants')
 const resolve = (over = {}) => call('resolveComposeFit', {
   episodeDefault: null, shotFit: null, episodeMixMode: null, episodeBedGainDb: null,
-  da: null, availSeconds: 10, ...over,
+  da: null, availSeconds: 10, videoHasAudio: true, ...over,
 })
 
 test('默认等价于 #30：替代模式 + 尾部留白 0.8 秒 + 不变速', () => {
@@ -133,10 +133,26 @@ test('继承：镜级为空时取集级默认', () => {
   assert.equal(fit.padTailSeconds, 0)
 })
 
-test('生效参数变化会改变合成签名的 fitKey', () => {
-  const a = resolve()
-  const b = resolve({ shotFit: JSON.stringify({ mode: 'pad', pad_ms: 1200, pad_position: 'tail' }) })
+test('签名键只收录真正影响产出的参数：有旁白时留白变化即失效', () => {
+  const a = resolve({ da: 8 })
+  const b = resolve({ da: 8, shotFit: JSON.stringify({ mode: 'pad', pad_ms: 1200, pad_position: 'tail' }) })
   assert.notEqual(a.key, b.key)
+})
+
+test('纯画面镜头的留白/倍速不进签名键，改它们不该让成片过期', () => {
+  const a = resolve({ da: null })
+  const b = resolve({ da: null, shotFit: JSON.stringify({ mode: 'tempo', pad_ms: 2500, pad_position: 'head' }) })
+  assert.equal(a.key, b.key)
+})
+
+test('源视频没有音轨时混音降级为替代，签名键与替代模式一致', () => {
+  const downgraded = resolve({ da: 8, episodeMixMode: 'mix', videoHasAudio: false })
+  assert.equal(downgraded.audioMixMode, 'replace')
+  assert.equal(downgraded.key, resolve({ da: 8 }).key)
+  // 有音轨时混音照常生效，且与替代模式签名不同
+  const mixed = resolve({ da: 8, episodeMixMode: 'mix', videoHasAudio: true })
+  assert.equal(mixed.audioMixMode, 'mix')
+  assert.notEqual(mixed.key, downgraded.key)
 })
 
 test('建议字数按可用时长算，受 TTS 单段 80 字上限约束', () => {

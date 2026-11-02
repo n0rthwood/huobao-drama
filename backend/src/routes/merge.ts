@@ -3,7 +3,7 @@ import fs from 'fs'
 import { and, eq, isNull } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
 import { success, badRequest, notFound, now } from '../utils/response.js'
-import { mergeEpisodeVideos, type MergeIntro } from '../services/ffmpeg-merge.js'
+import { mergeEpisodeVideos, MergeBlockedError, type MergeIntro } from '../services/ffmpeg-merge.js'
 import { toSnakeCase } from '../utils/transform.js'
 import { getAbsolutePath, thumbPathFor } from '../utils/storage.js'
 import { posterPathFor } from '../utils/video-poster.js'
@@ -18,11 +18,13 @@ app.post('/episodes/:id/merge', async (c) => {
   const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId))
   if (!ep) return badRequest(c, '剧集不存在')
 
+  // storyboard_ids 省略 = 整集范围；显式传数组 = 用户明确选镜，原样交给服务层校验
+  // （空数组、非本集 id 都会被拒绝，绝不静默扩大或缩小选择）
   let storyboardIds: number[] | undefined
   let intro: MergeIntro | undefined
   const body: Record<string, unknown> = await c.req.json().catch(() => ({}))
   if (Array.isArray(body.storyboard_ids)) {
-    storyboardIds = body.storyboard_ids.map(Number).filter(Boolean)
+    storyboardIds = body.storyboard_ids.map(Number).filter(n => Number.isInteger(n) && n > 0)
   }
   if (body.poster_version_id) {
     const versionId = Number(body.poster_version_id)
@@ -45,9 +47,14 @@ app.post('/episodes/:id/merge', async (c) => {
     const { mergeId, skipped } = await mergeEpisodeVideos(episodeId, ep.dramaId, storyboardIds, intro)
     logTaskSuccess('MergeAPI', 'episode-merge', { episodeId, mergeId, skipped: skipped.length })
     return success(c, { merge_id: mergeId, status: 'processing', skipped })
-  } catch (err: any) {
-    logTaskError('MergeAPI', 'episode-merge', { episodeId, error: err.message })
-    return badRequest(c, err.message)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '拼接失败'
+    logTaskError('MergeAPI', 'episode-merge', { episodeId, error: message })
+    // 所选镜头里有不可用的：返回逐镜原因，前端据此进入同一套批量融合修复入口
+    if (err instanceof MergeBlockedError) {
+      return c.json({ success: false, message, blocked: err.blocked }, 400)
+    }
+    return badRequest(c, message)
   }
 })
 

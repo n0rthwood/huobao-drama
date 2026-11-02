@@ -140,9 +140,20 @@ export const episodeAPI = {
   narrationVoiceBatch: (id: number, settings: VoiceSettings, storyboardIds?: number[]) =>
     api.post(`/episodes/${id}/narration/voice-batch`, { settings, storyboard_ids: storyboardIds?.length ? storyboardIds : undefined }),
   narrationVoiceBatchStatus: (id: number) => api.get(`/episodes/${id}/narration/voice-batch-status`),
-  composeBatch: (id: number, storyboardIds?: number[]) =>
-    api.post(`/episodes/${id}/compose-batch`, { storyboard_ids: storyboardIds?.length ? storyboardIds : undefined }),
-  composeBatchStatus: (id: number) => api.get(`/episodes/${id}/compose-batch-status`),
+  /**
+   * 批量融合（#42）：先预览分类，再按显式勾选的 id 执行。
+   * 预览省略 storyboard_ids = 整集范围；执行必须传非空数组（显式勾选过的那批），
+   * 空数组绝不等于全选。
+   */
+  composePreview: (id: number, storyboardIds?: number[]) =>
+    api.post<{ items: ComposeState[] }>(
+      `/episodes/${id}/compose-batch/preview`,
+      storyboardIds === undefined ? {} : { storyboard_ids: storyboardIds },
+    ),
+  composeBatch: (id: number, storyboardIds: number[]) =>
+    api.post<{ status: 'running' | 'idle'; total: number; already_running?: boolean }>(
+      `/episodes/${id}/compose-batch`, { storyboard_ids: storyboardIds }),
+  composeBatchStatus: (id: number) => api.get<ComposeBatchStatus | null>(`/episodes/${id}/compose-batch-status`),
   // 资产管理器（#9）：本项目已有资产关联到本集 / 取消关联（不删资产）
   linkAsset: (id: number, kind: AssetKindName, assetId: number) =>
     api.post(`/episodes/${id}/assets/link`, { kind, asset_id: assetId }),
@@ -216,13 +227,70 @@ export interface VoicePlanItem {
   audio_seconds: number
 }
 
-/** 单镜合成计划（#30）：合成服务按实测配音时长与转场偏移算出的时间预算，单位秒 */
-export interface ComposePlan {
-  video_duration?: number
-  audio_duration?: number
-  target_duration?: number
-  transition_t?: number
-  tail_pad?: number
+/** 单镜合成结果（#30，后端 ComposeResult 原样返回：camelCase） */
+export interface ComposeResult {
+  storyboardId: number
+  composedVideoUrl: string
+  durationMs: number
+  plan: NarrationFitPlan
+  burned: boolean
+}
+
+/**
+ * 融合状态（#42）：分镜列表、批量预览、导出就绪三处同一份服务端口径。
+ * unchanged + exportable = 当前融合片可直接拼接；missing/changed/unknown 可执行；
+ * blocked（依赖缺失/文件丢失/配音过期/计划失败）与 skipped（排队或进行中）不可勾选；
+ * disabled = 本集旁白关闭，走原视频拼接。
+ */
+export type ComposeStateStatus =
+  | 'disabled' | 'missing' | 'changed' | 'unchanged' | 'unknown' | 'blocked' | 'skipped'
+
+export interface ComposeState {
+  storyboard_id: number
+  storyboard_number: number
+  title: string
+  status: ComposeStateStatus
+  selectable: boolean
+  /** 预览默认勾选：缺失 / 已变化 */
+  checked: boolean
+  /** 可直接用于最终拼接 */
+  exportable: boolean
+  reason: string | null
+  change_reasons: string[]
+  signature: string | null
+  plan: NarrationFitPlan | null
+  /** 真实可用性（文件存在 / 可解析），不是 URL 是否非空 */
+  inputs: { video: boolean; audio: boolean; subtitle: boolean; pure_visual: boolean }
+  composed_video_url: string | null
+}
+
+export type ComposeBatchItemState = 'pending' | 'processing' | 'completed' | 'failed' | 'skipped'
+
+/** 批量融合任务态（落在 sys_task.params.progress，刷新浏览器可重连） */
+export interface ComposeBatchStatus {
+  status: 'running' | 'done' | 'error'
+  total: number
+  completed: number
+  failed: number
+  skipped: number
+  current_storyboard_id?: number
+  started_at?: number
+  finished_at?: number
+  error?: string
+  items: {
+    storyboard_id: number
+    storyboard_number: number
+    state: ComposeBatchItemState
+    reason: string | null
+  }[]
+}
+
+/** 拼接被拒时 400 响应体里的逐镜原因（err.body.blocked） */
+export interface MergeBlockedItem {
+  storyboard_id: number
+  storyboard_number: number
+  status: ComposeStateStatus
+  reason: string
 }
 
 /** 匹配预览里的合成计划（#31，后端 narration-fit.ts 的 ComposePlan，单位秒） */
@@ -370,8 +438,7 @@ export const storyboardAPI = {
     api.post<{ audio_url: string; subtitle_url: string; duration_ms: number; duration: number; cues: number; subtitle_source: string }>(
       `/storyboards/${id}/narration/voice`, { settings }),
   regenerateSubtitle: (id: number) => api.post(`/storyboards/${id}/narration/subtitle`, {}),
-  compose: (id: number) =>
-    api.post<{ composed_video_url: string; duration_ms: number; plan: ComposePlan; burned: boolean }>(`/storyboards/${id}/compose`, {}),
+  compose: (id: number) => api.post<ComposeResult>(`/storyboards/${id}/compose`, {}),
   // 旁白/画面时长与音轨匹配（#31）：预览是纯计算（不跑 ffmpeg），保存越界时抛带 body 的 400
   narrationFitPreview: (id: number) =>
     api.get<NarrationFitPreview>(`/storyboards/${id}/narration-fit/preview`),
