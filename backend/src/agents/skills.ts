@@ -39,15 +39,36 @@ try {
 const AGENT_SKILL_MAP: Record<string, string[]> = {
   script_rewriter: ['script-rewriter'],
   extractor: ['extractor'],
-  storyboard_breaker: ['storyboard-breaker', 'prompt-generator/keyframe-prompt'],
+  storyboard_breaker: [
+    'storyboard-breaker',
+    'prompt-generator/keyframe-prompt',
+    'prompt-generator/video-prompt-narration',
+  ],
   prompt_generator: [
     'prompt-generator/character-prompt',
     'prompt-generator/scene-prompt',
     'prompt-generator/prop-prompt',
     'prompt-generator/video-prompt',
+    'prompt-generator/video-prompt-narration',
     'prompt-generator/keyframe-prompt',
   ],
   transition_writer: ['prompt-generator/transition-prompt'],
+  narration_writer: ['narration-writer/narration-script'],
+}
+
+/**
+ * 条件注入的技能（#30）：只在满足条件时才拼进 instructions。
+ * 它们仍在 AGENT_SKILL_MAP 的前缀范围内（Workspace 能发现、设置页能编辑），
+ * 但 loadAgentSkills 会按 requestContext 的标志过滤——开关关闭时注入内容与改动前逐字相同。
+ */
+const CONDITIONAL_SKILLS: Record<string, keyof SkillConditions> = {
+  'storyboard-breaker/narration': 'narrationEnabled',
+  'prompt-generator/video-prompt-narration': 'narrationEnabled',
+}
+
+export interface SkillConditions {
+  /** 本集是否启用旁白（剧集级开关） */
+  narrationEnabled?: boolean
 }
 
 /** 每个 Agent 的 Workspace（filesystem 工作目录 + 原生技能注册）
@@ -119,15 +140,25 @@ async function readLocalizedSkill(relPath: string, lang: string): Promise<string
 /** 读取 Agent 专属技能全文（经 workspace.skills API，保持原注入格式）
  *  AGENT_SKILL_MAP 的目录按前缀匹配：目录自身及其子目录下所有 SKILL.md 都会注入，
  *  因此设置页新建的子技能（如 storyboard-breaker/xxx）无需改代码即可生效。
+ *  CONDITIONAL_SKILLS 里的目录只在对应条件为真时注入（#30 的旁白规范）。
  *  lang 非 zh 时逐技能优先 SKILL.<lang>.md，缺失回退基础版（中文） */
-export async function loadAgentSkills(agentType: string, lang?: string | null): Promise<string> {
+export async function loadAgentSkills(
+  agentType: string,
+  lang?: string | null,
+  conditions: SkillConditions = {},
+): Promise<string> {
   const workspace = skillWorkspaces[agentType]
   const prefixes = AGENT_SKILL_MAP[agentType] || []
   if (!workspace || !prefixes.length) return ''
 
   const allPaths = scanSkillPaths().map(p => p.replace(/^skills\//, ''))
-  const relPaths = allPaths.filter(p =>
-    prefixes.some(prefix => p === prefix || p.startsWith(prefix + '/')))
+  const relPaths = allPaths.filter((p) => {
+    if (!prefixes.some(prefix => p === prefix || p.startsWith(prefix + '/'))) return false
+    for (const [condPath, flag] of Object.entries(CONDITIONAL_SKILLS)) {
+      if ((p === condPath || p.startsWith(condPath + '/')) && conditions[flag] !== true) return false
+    }
+    return true
+  })
 
   const useLocalized = Boolean(lang && lang !== 'zh')
   const contents: string[] = []

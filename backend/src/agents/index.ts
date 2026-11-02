@@ -22,6 +22,8 @@ import { buildLanguageDirective } from './language.js'
 import { getContentLanguageFromRC } from './context.js'
 import { TRANSITION_WRITER_PROMPT } from './default-prompts/transition-writer.js'
 import { transitionTools } from './tools/transition-tools.js'
+import { NARRATION_WRITER_PROMPT } from './default-prompts/narration-writer.js'
+import { narrationTools } from './tools/narration-tools.js'
 
 // Default prompts (used when workspace/prompts/<type>.md 文件缺失时兜底)
 export const DEFAULT_PROMPTS: Record<string, { name: string; instructions: string }> = {
@@ -186,6 +188,10 @@ video_prompt 规则（硬约束）：
   transition_writer: {
     name: '转场设计',
     instructions: TRANSITION_WRITER_PROMPT,
+  },
+  narration_writer: {
+    name: '旁白写作',
+    instructions: NARRATION_WRITER_PROMPT,
   },
 }
 
@@ -427,6 +433,8 @@ const AGENT_TOOLS: Record<string, Record<string, any>> = {
   },
   // 转场设计：提示词里的 update_storyboard 指向只写转场字段的实现
   transition_writer: transitionTools,
+  // 旁白写作：只读整集上下文 + 只写旁白三字段的 save_narrations
+  narration_writer: narrationTools,
 }
 
 /** instructions 按请求解析：prompt 文件（或默认）+ 技能全文拼接 + 目标语言指令块
@@ -437,7 +445,9 @@ function buildInstructions(type: string) {
     const lang = getContentLanguageFromRC(requestContext)
     const promptFile = await loadAgentPromptFile(type, lang)
     const baseInstructions = promptFile?.instructions || defaults.instructions
-    const skillInstructions = await loadAgentSkills(type, lang)
+    // 条件技能（#30）：本集开了旁白开关时才注入「分镜侧配合旁白」的规范
+    const narrationEnabled = requestContext?.get('narrationEnabled' as never) === true
+    const skillInstructions = await loadAgentSkills(type, lang, { narrationEnabled })
     const languageDirective = buildLanguageDirective(lang)
     return [baseInstructions, skillInstructions, languageDirective]
       .filter(Boolean)

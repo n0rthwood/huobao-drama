@@ -33,6 +33,8 @@ interface LocalConfigEntry {
   model?: string[]
   priority?: number
   temperature?: number
+  /** 服务级参数（TTS 的 voice/seed/instructions/cfg_value/inference_timesteps 等）；留空的键沿用库里已有值 */
+  settings?: Record<string, unknown>
 }
 
 const parsed: unknown = JSON.parse(fs.readFileSync(file, 'utf8'))
@@ -60,21 +62,32 @@ for (const [i, e] of entries.entries()) {
     process.exit(1)
   }
   const model = Array.isArray(e.model) ? e.model : []
-  const values = {
-    baseUrl: e.base_url || '',
-    apiKey: e.api_key || '',
-    model: JSON.stringify(model),
-    priority: Number(e.priority) || 0,
-    isActive: true,
-    settings: typeof e.temperature === 'number' ? JSON.stringify({ temperature: e.temperature }) : null,
-    updatedAt: now(),
-  }
   const where = and(
     eq(schema.aiServiceConfigs.serviceType, e.service_type),
     eq(schema.aiServiceConfigs.provider, e.provider),
     eq(schema.aiServiceConfigs.name, e.name),
   )
   const [existing] = await db.select().from(schema.aiServiceConfigs).where(where)
+  // settings 合并：temperature 来自顶层字段，其余（TTS 的 voice/seed/instructions…）来自 settings 对象，
+  // 已固定的音色不会被重复 apply 冲掉——留空的键沿用库里的值
+  let settings: Record<string, unknown> = {}
+  try { settings = existing?.settings ? JSON.parse(existing.settings) : {} } catch { settings = {} }
+  if (typeof e.temperature === 'number') settings.temperature = e.temperature
+  if (e.settings && typeof e.settings === 'object') {
+    for (const [key, value] of Object.entries(e.settings as Record<string, unknown>)) {
+      if (value === null || value === undefined || value === '') continue
+      settings[key] = value
+    }
+  }
+  const values = {
+    baseUrl: e.base_url || '',
+    apiKey: e.api_key || '',
+    model: JSON.stringify(model),
+    priority: Number(e.priority) || 0,
+    isActive: true,
+    settings: Object.keys(settings).length ? JSON.stringify(settings) : null,
+    updatedAt: now(),
+  }
   if (existing) {
     await db.update(schema.aiServiceConfigs).set(values).where(where)
     console.log(`updated  ${e.service_type}/${e.provider}/${e.name}`)

@@ -21,10 +21,15 @@ function toAbsPath(relativePath: string): string {
 
 /**
  * 拼接一集的镜头视频。
- * 优先使用视频生成产物，兼容历史的 composedVideoUrl 数据。
+ * 旁白开关关闭时沿用既有口径（视频生成产物优先，兼容历史 composedVideoUrl）。
+ * 开关打开时只取合成版本（带旁白与字幕的成片），没有合成版本的镜头跳过并列出原因。
  * 传入 storyboardIds 时只拼接所选镜头（仍按镜号顺序）。
  */
-export async function mergeEpisodeVideos(episodeId: number, dramaId: number, storyboardIds?: number[]): Promise<number> {
+export async function mergeEpisodeVideos(
+  episodeId: number,
+  dramaId: number,
+  storyboardIds?: number[],
+): Promise<{ mergeId: number; skipped: { storyboard_number: number; reason: string }[] }> {
   let storyboards = await db.select().from(schema.storyboards)
     .where(eq(schema.storyboards.episodeId, episodeId))
     .orderBy(schema.storyboards.storyboardNumber)
@@ -34,10 +39,25 @@ export async function mergeEpisodeVideos(episodeId: number, dramaId: number, sto
     storyboards = storyboards.filter(sb => allow.has(sb.id))
   }
 
-  // 允许部分拼接:按镜号顺序拼接已生成的镜头,未生成的跳过
-  const clips = storyboards
-    .map(sb => ({ sb, url: sb.videoUrl || sb.composedVideoUrl }))
-    .filter(c => Boolean(c.url)) as { sb: typeof storyboards[number]; url: string }[]
+  const [episode] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId))
+  const narrationEnabled = episode?.narrationEnabled === true
+
+  // 开关打开时只认合成版本，不静默混入带模型声音的原始视频
+  const skipped: { storyboard_number: number; reason: string }[] = []
+  const clips: { sb: typeof storyboards[number]; url: string }[] = []
+  for (const sb of storyboards) {
+    const url = narrationEnabled ? sb.composedVideoUrl : (sb.videoUrl || sb.composedVideoUrl)
+    if (url) {
+      clips.push({ sb, url })
+      continue
+    }
+    if (narrationEnabled) {
+      skipped.push({
+        storyboard_number: sb.storyboardNumber,
+        reason: sb.videoUrl ? '尚未合成带旁白字幕的版本' : '尚未生成视频',
+      })
+    }
+  }
 
   if (clips.length === 0) throw new Error('所选镜头还没有可拼接的视频')
 
@@ -83,7 +103,7 @@ export async function mergeEpisodeVideos(episodeId: number, dramaId: number, sto
       .where(eq(schema.videoMerges.id, mergeId))
   })
 
-  return mergeId
+  return { mergeId, skipped }
 }
 
 async function doMerge(mergeId: number, episodeId: number, videos: string[]) {

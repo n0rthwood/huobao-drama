@@ -547,6 +547,30 @@
             <input v-model="cfgForm.temperature" class="input" type="number" step="0.1" min="0" max="2" :placeholder="t('settings.cfg.tempPlaceholder')" />
             <span class="field-hint">{{ t('settings.cfg.tempNote') }}</span>
           </label>
+          <template v-if="cfgForm.service_type === 'tts'">
+            <label class="field">
+              <span class="field-label">{{ t('settings.cfg.ttsInstructions') }}</span>
+              <textarea v-model="cfgForm.tts_instructions" class="textarea" rows="2" :placeholder="t('settings.cfg.ttsInstructionsPlaceholder')" />
+              <span class="field-hint">{{ t('settings.cfg.ttsInstructionsHint') }}</span>
+            </label>
+            <label class="field">
+              <span class="field-label">{{ t('settings.cfg.ttsCfgValue') }}</span>
+              <input v-model="cfgForm.tts_cfg_value" class="input" type="number" step="0.1" :placeholder="t('settings.cfg.ttsOptional')" />
+            </label>
+            <label class="field">
+              <span class="field-label">{{ t('settings.cfg.ttsTimesteps') }}</span>
+              <input v-model="cfgForm.tts_inference_timesteps" class="input" type="number" step="1" :placeholder="t('settings.cfg.ttsOptional')" />
+            </label>
+            <label class="field">
+              <span class="field-label">{{ t('settings.cfg.ttsSeed') }}</span>
+              <input v-model="cfgForm.tts_seed" class="input" type="number" step="1" :placeholder="t('settings.cfg.ttsOptional')" />
+            </label>
+            <label v-if="cfgForm.tts_voice" class="field">
+              <span class="field-label">{{ t('settings.cfg.ttsVoice') }}</span>
+              <input :value="cfgForm.tts_voice" class="input" readonly />
+            </label>
+            <p class="field-hint">{{ t('settings.cfg.ttsVoiceNote') }}</p>
+          </template>
           <div v-if="cfgTestResult" class="test-result" :class="{ ok: cfgTestResult.reachable, bad: !cfgTestResult.reachable }">
             <div class="test-result-head">
               <span class="tag" :class="cfgTestResult.reachable ? 'tag-success' : 'tag-error'">{{ cfgTestResult.status || 'ERROR' }}</span>
@@ -725,7 +749,18 @@ const huobaoSaving = ref(false)
 // 火宝节点选择：默认跟随界面语言（中文→国内 .cn，其他→国外 .com），一键配置与取 Key 链接共用
 const huobaoRegion = ref(locale.value?.startsWith('zh') ? 'cn' : 'com')
 const huobaoSiteUrl = computed(() => `https://api.firemux.${huobaoRegion.value}`)
-const cfgForm = reactive({ name: '', provider: '', api_key: '', base_url: '', models: [], service_type: 'text', priority: 0, temperature: '' })
+// tts_* 四个可选参数只对 service_type='tts' 生效，存进配置的 settings JSON（音色由后端固定，不在 UI 里选）
+const cfgForm = reactive({
+  name: '', provider: '', api_key: '', base_url: '', models: [], service_type: 'text', priority: 0, temperature: '',
+  tts_instructions: '', tts_cfg_value: '', tts_inference_timesteps: '', tts_seed: '', tts_voice: '',
+})
+const TTS_FORM_RESET = { tts_instructions: '', tts_cfg_value: '', tts_inference_timesteps: '', tts_seed: '', tts_voice: '' }
+/** TTS 配置的 settings（后端对 service_type='tts' 的行透出 tts_settings，含后端固定下来的 voice） */
+function ttsSettingsOf(cfg) {
+  const raw = cfg?.tts_settings
+  if (raw && typeof raw === 'object') return raw
+  try { return raw ? JSON.parse(raw) : {} } catch { return {} }
+}
 // 模型标签编辑器：首位即默认模型；输入框支持回车添加、逗号/换行批量粘贴
 const modelInput = ref('')
 function addModel() {
@@ -752,10 +787,16 @@ const serviceTypes = computed(() => [
   { type: 'text', label: t('common.serviceType.text') },
   { type: 'image', label: t('common.serviceType.image') },
   { type: 'video', label: t('common.serviceType.video') },
+  { type: 'tts', label: t('common.serviceType.tts') },
 ])
-const providers = ['gemini', 'openai', 'volcengine', 'minimax', 'comfyui', 'qwen-jobs']
-// qwen-jobs 只服务图片；comfyui 的图片路径已下线（图片走 qwen-jobs 任务 API），只保留视频（H3）
-const PROVIDER_EXCLUDE = { text: ['qwen-jobs', 'comfyui'], image: ['comfyui'], video: ['qwen-jobs'] }
+const providers = ['gemini', 'openai', 'volcengine', 'minimax', 'comfyui', 'qwen-jobs', 'voxcpm']
+// qwen-jobs 只服务图片；comfyui 的图片路径已下线（图片走 qwen-jobs 任务 API），只保留视频（H3）；voxcpm 只服务旁白配音
+const PROVIDER_EXCLUDE = {
+  text: ['qwen-jobs', 'comfyui', 'voxcpm'],
+  image: ['comfyui', 'voxcpm'],
+  video: ['qwen-jobs', 'voxcpm'],
+  tts: ['gemini', 'openai', 'volcengine', 'minimax', 'comfyui', 'qwen-jobs'],
+}
 const providerSelectOptions = computed(() => providers
   .filter(p => !(PROVIDER_EXCLUDE[cfgForm.service_type] || []).includes(p))
   .map(p => ({ label: p, value: p })))
@@ -763,6 +804,7 @@ const serviceMeta = computed(() => ({
   text: { label: t('common.serviceType.text'), desc: t('settings.ai.meta.text') },
   image: { label: t('common.serviceType.image'), desc: t('settings.ai.meta.image') },
   video: { label: t('common.serviceType.video'), desc: t('settings.ai.meta.video') },
+  tts: { label: t('common.serviceType.tts'), desc: t('settings.ai.meta.tts') },
 }))
 const providerPresets = {
   text: {
@@ -778,6 +820,9 @@ const providerPresets = {
     volcengine: { label: 'Seedance 2.0 官方', baseUrl: 'https://ark.cn-beijing.volces.com', models: ['doubao-seedance-2-0-mini-260615', 'doubao-seedance-2-0-fast-260128', 'doubao-seedance-2-0-260128'] },
     minimax: { label: 'MiniMax H3 官方', baseUrl: 'https://api.minimaxi.com', models: ['MiniMax-H3'] },
     comfyui: { label: 'ComfyUI · MiniMax H3 本地', baseUrl: 'http://127.0.0.1:8188', models: ['MiniMax-H3-ComfyUI'] },
+  },
+  tts: {
+    voxcpm: { label: 'VoxCPM2 · 本地旁白配音', baseUrl: 'http://127.0.0.1:8200', models: [] },
   },
 }
 const huobaoQuickConfigs = computed(() => {
@@ -868,7 +913,7 @@ async function applyHuobaoQuickConfig() {
 function startAddCfg(t) {
   cfgEditId.value = null
   cfgTestResult.value = null
-  Object.assign(cfgForm, { name: '', provider: '', api_key: '', base_url: '', models: [], service_type: t, priority: 0, temperature: '' })
+  Object.assign(cfgForm, { name: '', provider: '', api_key: '', base_url: '', models: [], service_type: t, priority: 0, temperature: '', ...TTS_FORM_RESET })
   const firstPreset = presetsByType(t)[0]
   if (firstPreset) applyProviderPreset(t, firstPreset.provider)
   cfgDialog.value = true
@@ -885,6 +930,11 @@ function startEditCfg(c) {
     service_type: c.service_type,
     priority: c.priority ?? 0,
     temperature: c.temperature ?? '',
+    tts_instructions: ttsSettingsOf(c).instructions ?? '',
+    tts_cfg_value: ttsSettingsOf(c).cfg_value ?? '',
+    tts_inference_timesteps: ttsSettingsOf(c).inference_timesteps ?? '',
+    tts_seed: ttsSettingsOf(c).seed ?? '',
+    tts_voice: ttsSettingsOf(c).voice ?? '',
   })
   cfgDialog.value = true
 }
@@ -926,11 +976,28 @@ async function saveCfg() {
   if (temperature !== null && (!Number.isFinite(temperature) || temperature < 0 || temperature > 2)) {
     toast.warning(t('settings.cfg.tempInvalid')); return
   }
+  const ttsSettings = cfgForm.service_type === 'tts' ? collectTtsSettings() : undefined
+  if (ttsSettings === null) return
   try {
-    if (cfgEditId.value) await aiConfigAPI.update(cfgEditId.value, { name: cfgForm.name, provider: cfgForm.provider, api_key: cfgForm.api_key, base_url: cfgForm.base_url, model: models, priority: cfgForm.priority, temperature })
-    else await aiConfigAPI.create({ service_type: cfgForm.service_type, provider: cfgForm.provider, name: cfgForm.name || `${cfgForm.provider}-${cfgForm.service_type}`, api_key: cfgForm.api_key, base_url: cfgForm.base_url, model: models, priority: cfgForm.priority, temperature })
+    if (cfgEditId.value) await aiConfigAPI.update(cfgEditId.value, { name: cfgForm.name, provider: cfgForm.provider, api_key: cfgForm.api_key, base_url: cfgForm.base_url, model: models, priority: cfgForm.priority, temperature, tts_settings: ttsSettings })
+    else await aiConfigAPI.create({ service_type: cfgForm.service_type, provider: cfgForm.provider, name: cfgForm.name || `${cfgForm.provider}-${cfgForm.service_type}`, api_key: cfgForm.api_key, base_url: cfgForm.base_url, model: models, priority: cfgForm.priority, temperature, tts_settings: ttsSettings })
     cfgDialog.value = false; toast.success(t('common.saved')); loadCfgs()
   } catch (e) { toastError(e) }
+}
+
+/** 收集 TTS 可选参数；留空 = 不设置。数字字段非法时提示并返回 null（阻止保存） */
+function collectTtsSettings() {
+  const out = {}
+  const text = String(cfgForm.tts_instructions || '').trim()
+  if (text) out.instructions = text
+  for (const [formKey, settingKey] of [['tts_cfg_value', 'cfg_value'], ['tts_inference_timesteps', 'inference_timesteps'], ['tts_seed', 'seed']]) {
+    const raw = cfgForm[formKey]
+    if (raw === '' || raw === null || raw === undefined) continue
+    const n = Number(raw)
+    if (!Number.isFinite(n)) { toast.warning(t('settings.cfg.ttsNumberInvalid')); return null }
+    out[settingKey] = n
+  }
+  return out
 }
 
 // ===== Agent Configs =====

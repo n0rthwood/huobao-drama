@@ -28,9 +28,9 @@ app.post('/episodes/:id/merge', async (c) => {
 
   try {
     logTaskStart('MergeAPI', 'episode-merge', { episodeId, dramaId: ep.dramaId, storyboardIds })
-    const mergeId = await mergeEpisodeVideos(episodeId, ep.dramaId, storyboardIds)
-    logTaskSuccess('MergeAPI', 'episode-merge', { episodeId, mergeId })
-    return success(c, { merge_id: mergeId, status: 'processing' })
+    const { mergeId, skipped } = await mergeEpisodeVideos(episodeId, ep.dramaId, storyboardIds)
+    logTaskSuccess('MergeAPI', 'episode-merge', { episodeId, mergeId, skipped: skipped.length })
+    return success(c, { merge_id: mergeId, status: 'processing', skipped })
   } catch (err: any) {
     logTaskError('MergeAPI', 'episode-merge', { episodeId, error: err.message })
     return badRequest(c, err.message)

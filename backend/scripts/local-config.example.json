@@ -26,6 +26,20 @@
       "api_key": "",
       "model": ["MiniMax-H3-ComfyUI"],
       "priority": 100
+    },
+    {
+      "service_type": "tts",
+      "provider": "voxcpm",
+      "name": "VoxCPM Studio (local)",
+      "base_url": "http://<voxcpm-studio-host>:<port>",
+      "api_key": "",
+      "model": [],
+      "priority": 100,
+      "settings": {
+        "voice": "",
+        "instructions": "",
+        "seed": null
+      }
     }
   ]
 }

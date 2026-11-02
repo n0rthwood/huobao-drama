@@ -10,6 +10,8 @@ import { mastra } from '../mastra/index.js'
 import { success, badRequest } from '../utils/response.js'
 import { logTaskError, logTaskPayload, logTaskProgress, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
 import { createTextTask, finishTextTask, resolveTextModel, type TextTaskKind } from '../services/text-task.js'
+import { db, schema } from '../db/index.js'
+import { eq } from 'drizzle-orm'
 
 const app = new Hono()
 
@@ -65,11 +67,14 @@ app.post('/:type/chat', async (c) => {
     return badRequest(c, 'Agent 不存在')
   }
 
+  // 旁白开关（#30）：拆分分镜的条件技能据此注入；关闭时注入内容与改动前逐字相同
+  const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, Number(episode_id)))
   const requestContext = buildAgentRequestContext({
     episodeId: episode_id,
     dramaId: drama_id,
     modelOverride: body.model || undefined,
     textConfigId: body.config_id || undefined,
+    narrationEnabled: ep?.narrationEnabled === true,
   })
 
   // 同步 chat 也进任务中心：开始建 text 任务，结束写 completed/failed（HTTP 交互不变）

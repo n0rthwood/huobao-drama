@@ -6,7 +6,7 @@ import { eq } from 'drizzle-orm'
 import { logTaskProgress, logTaskWarn } from '../utils/task-logger.js'
 import { joinProviderUrl } from './adapters/url.js'
 
-export type ServiceType = 'text' | 'image' | 'video'
+export type ServiceType = 'text' | 'image' | 'video' | 'tts'
 
 export interface AIConfig {
   /** ai_service_configs 行 id —— 异步任务重启后据此找回同一网关与凭据 */
@@ -17,6 +17,8 @@ export interface AIConfig {
   model: string
   /** 采样温度，null 表示不设置（跟随服务商默认）。存于 ai_service_configs.settings JSON */
   temperature?: number | null
+  /** 该配置的 settings JSON 原文（TTS 的音色/种子等参数由 services/tts.ts 解析） */
+  settings?: string | null
 }
 
 /** 从 settings JSON 解析 temperature；非法值一律视为未设置 */
@@ -34,6 +36,7 @@ export const officialProviders: Record<ServiceType, readonly string[]> = {
   text: ['openai', 'gemini', 'volcengine'],
   image: ['openai', 'gemini', 'volcengine', 'qwen-jobs'],
   video: ['volcengine', 'minimax', 'comfyui'],
+  tts: ['voxcpm'],
 }
 
 export function isOfficialProvider(serviceType?: string | null, provider?: string | null): boolean {
@@ -128,6 +131,7 @@ export async function getActiveConfig(serviceType: ServiceType): Promise<AIConfi
     apiKey: active.apiKey,
     model: models[0] || '',
     temperature: parseConfigTemperature(active.settings),
+    settings: active.settings ?? null,
   }
 }
 
@@ -182,5 +186,6 @@ export async function getConfigById(id: number): Promise<AIConfig | null> {
     apiKey: row.apiKey,
     model: models[0] || '',
     temperature: parseConfigTemperature(row.settings),
+    settings: row.settings ?? null,
   }
 }

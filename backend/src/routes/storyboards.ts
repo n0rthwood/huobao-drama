@@ -24,6 +24,8 @@ import {
   parseTransitionReview,
 } from '../services/transition.js'
 import { runTransitionReview } from '../services/transition-agent.js'
+import { generateShotVoice, regenerateShotSubtitle } from '../services/narration-voice.js'
+import { composeShot } from '../services/shot-compose.js'
 import { serializeTask } from '../services/sys-task.js'
 import {
   SLOT_LABEL,
@@ -175,6 +177,8 @@ app.put('/:id', async (c) => {
     mid_frame_time: 'midFrameTime',
     continuity_boundary: 'continuityBoundary',
     transition_prompt: 'transitionPrompt',
+    // 旁白文稿（#30）；narration_enabled / subtitle_timing 在下方特判
+    narration_text: 'narrationText',
   }
 
   const updates: Record<string, any> = { updatedAt: now() }
@@ -187,6 +191,16 @@ app.put('/:id', async (c) => {
   if ('continuity_boundary' in body && body.continuity_boundary != null
     && !['continue', 'cut'].includes(body.continuity_boundary)) {
     return badRequest(c, 'continuity_boundary 只支持 continue / cut 或留空')
+  }
+  // 「本镜留作纯画面（无旁白）」勾选
+  if ('narration_enabled' in body) updates.narrationEnabled = body.narration_enabled === true
+  // 本镜字幕时间码模式覆盖：null/'' = 继承剧集级
+  if ('subtitle_timing' in body) {
+    const timing = body.subtitle_timing
+    if (timing != null && timing !== '' && !['sentence', 'char'].includes(timing)) {
+      return badRequest(c, 'subtitle_timing 只支持 sentence / char 或留空')
+    }
+    updates.subtitleTiming = timing === '' ? null : timing
   }
   // 中间关键帧时间点：首尾各留 0.5 秒，否则引导帧会和首/尾帧挤在一起
   if ('mid_frame_time' in body && body.mid_frame_time != null) {
@@ -430,6 +444,44 @@ app.post('/:id/transition', async (c) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : '转场生成失败'
     logTaskError('StoryboardAPI', 'transition', { storyboardId: id, error: message })
+    return badRequest(c, message)
+  }
+})
+
+// ─── 旁白配音 / 字幕 / 合成（Issue #30）────────────────────────────
+
+// POST /storyboards/:id/narration/voice — 单镜配音（同步返回，整镜一次合成）
+app.post('/:id/narration/voice', async (c) => {
+  const id = Number(c.req.param('id'))
+  try {
+    return success(c, await generateShotVoice(id))
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '生成配音失败'
+    logTaskError('StoryboardAPI', 'narration-voice', { storyboardId: id, error: message })
+    return badRequest(c, message)
+  }
+})
+
+// POST /storyboards/:id/narration/subtitle — 按当前时间码模式重生成字幕（不重跑 TTS）
+app.post('/:id/narration/subtitle', async (c) => {
+  const id = Number(c.req.param('id'))
+  try {
+    return success(c, await regenerateShotSubtitle(id))
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '生成字幕失败'
+    logTaskError('StoryboardAPI', 'narration-subtitle', { storyboardId: id, error: message })
+    return badRequest(c, message)
+  }
+})
+
+// POST /storyboards/:id/compose — 单镜合成（视频 + 旁白音轨 + 烧录字幕）
+app.post('/:id/compose', async (c) => {
+  const id = Number(c.req.param('id'))
+  try {
+    return success(c, await composeShot(id))
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '合成失败'
+    logTaskError('StoryboardAPI', 'compose', { storyboardId: id, error: message })
     return badRequest(c, message)
   }
 })
