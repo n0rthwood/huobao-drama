@@ -9,7 +9,7 @@ import { db, getInsertId, schema } from '../../db/index.js'
 import { eq } from 'drizzle-orm'
 import { now } from '../../utils/response.js'
 import { logTaskProgress, logTaskSuccess } from '../../utils/task-logger.js'
-import { getDramaId, getEpisodeId } from '../context.js'
+import { getDramaId, getEpisodeId, getStoryboardId } from '../context.js'
 import { loadEpisodeKeyframes } from '../../services/keyframes.js'
 import { PROMPT_FIELDS, deleteTargetBindings, syncStoryboardBindingsFromPrompts } from '../../services/storyboard-assets.js'
 import { parseReferenceImages, referenceImagePaths } from '../../services/reference-images.js'
@@ -388,10 +388,7 @@ const saveStoryboards = createTool({
   },
 })
 
-const updateStoryboard = createTool({
-  id: 'update_storyboard',
-  description: 'Update a specific storyboard shot.',
-  inputSchema: z.object({
+const storyboardUpdateSchema = z.object({
     storyboard_id: z.number(),
     title: z.string().optional(),
     shot_type: z.string().optional(),
@@ -414,7 +411,11 @@ const updateStoryboard = createTool({
     prop_ids: z.array(z.number()).optional(),
     duration: z.number().optional(),
     continuity: z.enum(['continue', 'cut']).optional().describe("Transition from the previous shot: 'continue' means this shot starts exactly where the previous shot ended and inherits the previous shot's LAST keyframe image as its first keyframe (first_frame_prompt stays empty); 'cut' means a hard cut and needs its own first_frame_prompt."),
-  }),
+})
+const updateStoryboard = createTool({
+  id: 'update_storyboard',
+  description: 'Update a specific storyboard shot.',
+  inputSchema: storyboardUpdateSchema,
   execute: async ({ storyboard_id, ...fields }, context) => {
     const ids = requireIds(context)
     if ('error' in ids) return ids
@@ -498,3 +499,48 @@ const updateStoryboard = createTool({
 })
 
 export const storyboardTools = { readStoryboardContext, saveStoryboards, updateStoryboard }
+
+const promptSchema = storyboardUpdateSchema.pick({
+  storyboard_id: true,
+  first_frame_prompt: true,
+  mid_frame_prompt: true,
+  mid_frame_time: true,
+  last_frame_prompt: true,
+  video_prompt: true,
+})
+const videoPromptSchema = promptSchema.pick({ storyboard_id: true, video_prompt: true })
+const keyframePromptSchema = promptSchema.omit({ video_prompt: true })
+
+function promptUpdater(inputSchema: typeof promptSchema | typeof videoPromptSchema | typeof keyframePromptSchema) {
+  return createTool({
+    id: 'update_storyboard',
+    description: 'Save only the requested storyboard prompts. Other storyboard fields are never writable with this tool.',
+    inputSchema,
+    execute: async (input, context) => {
+      const ids = requireIds(context)
+      if ('error' in ids) return ids
+      const expectedId = getStoryboardId(context?.requestContext)
+      if (expectedId !== null && input.storyboard_id !== expectedId) {
+        return { error: `Only storyboard ${expectedId} may be updated in this request` }
+      }
+      const [row] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, input.storyboard_id))
+      if (!row || row.deletedAt || row.episodeId !== ids.episodeId) {
+        return { error: 'Storyboard does not belong to the current episode' }
+      }
+      // 再按可信上下文收窄，直接调用 execute 也不能绕过模型侧 schema。
+      const scope = context?.requestContext?.get('storyboardPromptScope' as never)
+      const allowed = scope === 'video' ? videoPromptSchema : scope === 'keyframes' ? keyframePromptSchema : inputSchema
+      const safe = allowed.parse(input)
+      if (!Object.keys(safe).some(key => key !== 'storyboard_id')) return { error: 'No permitted prompt fields supplied' }
+      const ignored = Object.keys(input).filter(key => !(key in safe))
+      const result = await updateStoryboard.execute!(safe, context)
+      return ignored.length && result && typeof result === 'object' ? { ...result, ignored_fields: ignored } : result
+    },
+  })
+}
+
+export const promptStoryboardUpdaters = {
+  all: promptUpdater(promptSchema),
+  video: promptUpdater(videoPromptSchema),
+  keyframes: promptUpdater(keyframePromptSchema),
+}

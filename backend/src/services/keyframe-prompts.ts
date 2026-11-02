@@ -71,11 +71,13 @@ export async function startKeyframePromptBatch(
     const requestContext = buildAgentRequestContext({
       episodeId,
       dramaId,
+      storyboardPromptScope: 'keyframes',
       modelOverride: opts.model || undefined,
       textConfigId: opts.configId || undefined,
     })
     const sink = createReasoningSink(taskId)
     for (const sb of pending) {
+      requestContext.set('storyboardId', sb.id)
       progress.current_storyboard_id = sb.id
       await updateTextTaskProgress(taskId, progress)
       logTaskProgress('KeyframePrompt', 'batch-shot', { episodeId, storyboardId: sb.id, index: progress.completed + progress.failed + 1, total: progress.total })

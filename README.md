@@ -101,6 +101,8 @@ Four built-in Mastra agents with database-backed configuration and Skill extensi
 | `storyboard_breaker` | Script → storyboard sequence breakdown |
 | `prompt_generator` | Image prompts for characters/scenes/props + storyboard video prompts |
 
+The prompt agent's `update_storyboard` can only save prompts, never approved shot descriptions, duration, or explicit asset links. Video-prompt and keyframe-prompt batches expose separate narrow schemas and enforce the current shot and prompt scope at execution time. The storyboard-breaker retains full editing capability. This boundary is enforced in code rather than relying on model instructions. A safe backend restart activates the new tools; no local configuration changes are needed.
+
 ### 🌐 Multi-Language UI
 
 The interface ships in **中文 / English / 日本語 / 한국어**, with a global setting for AI-generated content language.
