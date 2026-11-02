@@ -44,6 +44,7 @@ export const sqliteSchemaStatements = [
     narration_enabled INTEGER NOT NULL DEFAULT 0,
     narration_spine TEXT,
     narration_normalize INTEGER NOT NULL DEFAULT 1,
+    tts_settings TEXT,
     subtitle_timing TEXT NOT NULL DEFAULT 'sentence',
     audio_mix_mode TEXT NOT NULL DEFAULT 'replace',
     audio_bed_gain_db REAL,
@@ -445,6 +446,8 @@ const columnAdditions: { table: string; column: string; type: string }[] = [
   { table: 'episodes', column: 'narration_spine', type: 'TEXT' },
   { table: 'episodes', column: 'narration_normalize', type: 'INTEGER NOT NULL DEFAULT 1' },
   { table: 'storyboards', column: 'narration_normalize', type: 'INTEGER' },
+  // 本集配音参数（#37）：NULL = 沿用 TTS 配置
+  { table: 'episodes', column: 'tts_settings', type: 'TEXT' },
   // 纪录片规则显式开关（Issue #32）：'auto' | 'on' | 'off'；NULL 等价 'auto'（按 genre 关键字判定）
   { table: 'dramas', column: 'documentary_rules', type: 'TEXT' },
   // 最终提示词来源标记（Issue #32）：'agent' = 提示词 Agent 保存，'external' = 外部直写

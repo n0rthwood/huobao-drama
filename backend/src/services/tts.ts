@@ -14,6 +14,7 @@ import { STORAGE_ROOT } from '../utils/paths.js'
 import { joinProviderUrl } from './adapters/url.js'
 import { logTaskError, logTaskProgress, logTaskSuccess } from '../utils/task-logger.js'
 import type { AIConfig } from './ai.js'
+import type { VoiceParams } from './narration-voice-params.js'
 
 /** 旁白音频/字幕的落盘子目录 */
 export const NARRATION_SUBDIR = 'narration'
@@ -85,18 +86,39 @@ export async function fetchVoices(baseUrl: string, apiKey?: string): Promise<str
 }
 
 /**
- * 配音请求体。
- * - 绝不含 speed —— VoxCPM2 实测拒绝变速，倍速匹配在合成阶段用 atempo 做。
- * - normalize（#35）：服务端的文本规范化，把 1720 年 / 5月8日 / 189人 展开成读法。
- *   不传时服务端默认 false，1720 会被念错，所以这里总是显式传。
+ * VoxCPM Studio 的完整音色条目（`GET /api/voices`，带分类标签），供配音弹窗分组展示（#37）。
+ * 这是 Studio 自有接口（非 OpenAI 兼容），TTS 目前只有 voxcpm 一个 provider。
  */
-export function buildSpeechBody(text: string, settings: TtsSettings, normalize: boolean): Record<string, unknown> {
-  const body: Record<string, unknown> = { input: text, response_format: 'wav', normalize }
-  if (settings.voice) body.voice = settings.voice
-  if (settings.seed !== null) body.seed = settings.seed
-  if (settings.instructions) body.instructions = settings.instructions
-  if (settings.cfgValue !== null) body.cfg_value = settings.cfgValue
-  if (settings.inferenceTimesteps !== null) body.inference_timesteps = settings.inferenceTimesteps
+export async function fetchVoiceItems(baseUrl: string, apiKey?: string): Promise<{ name: string; tags?: unknown; created_at?: string }[]> {
+  const url = joinProviderUrl(baseUrl, '', '/api/voices')
+  const resp = await fetch(url, {
+    headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
+    signal: AbortSignal.timeout(15_000),
+  })
+  if (!resp.ok) throw new Error(`读取音色列表失败：HTTP ${resp.status}`)
+  const data: unknown = await resp.json()
+  const items = data && typeof data === 'object' && 'items' in data && Array.isArray(data.items) ? data.items : []
+  return items.filter((v): v is { name: string; tags?: unknown; created_at?: string } =>
+    !!v && typeof v === 'object' && 'name' in v && typeof v.name === 'string')
+}
+
+/**
+ * 配音请求体（#37：参数全部显式传，取值由 narration-voice-params.ts 解析）。
+ * - 绝不含 speed —— VoxCPM2 实测拒绝变速，倍速匹配在合成阶段用 atempo 做。
+ * - normalize（#35）：服务端的文本规范化，把 1720 年 / 5月8日 / 189人 展开成读法；服务端默认 false。
+ * - seed 为 null 时不传 = 服务端随机。
+ */
+export function buildSpeechBody(text: string, params: VoiceParams): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    input: text,
+    response_format: 'wav',
+    voice: params.voice,
+    normalize: params.normalize,
+    cfg_value: params.cfg_value,
+    inference_timesteps: params.inference_timesteps,
+  }
+  if (params.seed !== null) body.seed = params.seed
+  if (params.instructions) body.instructions = params.instructions
   return body
 }
 
@@ -105,21 +127,19 @@ export function buildSpeechBody(text: string, settings: TtsSettings, normalize: 
  * 整镜一次合成（不按句分段），所以单镜文本必须在服务端单段上限内，超限由调用方提前阻断。
  */
 export async function synthesizeNarration(
-  config: AIConfig & { settings?: string | null },
+  config: AIConfig,
   text: string,
-  /** 文本规范化（#35）：把 1720年 / 5月8日 / 189人 展开成读法；集级默认开，镜级可覆盖 */
-  normalize: boolean,
+  params: VoiceParams,
 ): Promise<SynthesisResult> {
   const provider = (config.provider || '').toLowerCase()
   if (provider !== 'voxcpm') throw new Error(`不支持的语音合成服务：${config.provider || '(未配置)'}`)
 
-  const settings = parseTtsSettings(config.settings)
-  // 不带 voice 时服务端会用随机音色，整集听感会漂；音色必须由人在设置页选定（#35）
-  if (!settings.voice) {
-    throw new Error('该语音合成配置还没有选定音色：请到「设置 → AI 服务」编辑这条 TTS 配置，在「音色」里选一个再保存')
+  // 不带 voice 时服务端会用随机音色，整集听感会漂；音色必须由人选定（#35）
+  if (!params.voice) {
+    throw new Error('还没有选定音色：请在配音弹窗里选一个音色，或到「设置 → AI 服务」给这条 TTS 配置选定音色')
   }
   const url = joinProviderUrl(config.baseUrl, '', '/v1/audio/speech')
-  logTaskProgress('TTS', 'synthesize-begin', { provider, chars: text.length, voice: settings.voice, normalize })
+  logTaskProgress('TTS', 'synthesize-begin', { provider, chars: text.length, ...params })
 
   let resp: Response
   try {
@@ -129,7 +149,7 @@ export async function synthesizeNarration(
         'Content-Type': 'application/json',
         ...(config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {}),
       },
-      body: JSON.stringify(buildSpeechBody(text, settings, normalize)),
+      body: JSON.stringify(buildSpeechBody(text, params)),
       signal: AbortSignal.timeout(600_000),
     })
   } catch (err) {
@@ -155,7 +175,7 @@ export async function synthesizeNarration(
   const jobId = resp.headers.get('x-job-id')
   logTaskSuccess('TTS', 'synthesize', { wavPath, durationMs, jobId: jobId || undefined })
 
-  return { wavPath, durationMs, jobId, voice: settings.voice, seed: settings.seed, provider }
+  return { wavPath, durationMs, jobId, voice: params.voice, seed: params.seed, provider }
 }
 
 export interface AlignItem {

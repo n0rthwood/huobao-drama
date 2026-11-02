@@ -1883,6 +1883,17 @@
         @confirm="confirmBreakdown"
       />
 
+      <!-- 批量配音参数（#37）：确定后只配「缺失 + 已变化」 -->
+      <NarrationVoiceDialog
+        :open="voiceBatchDialog.open"
+        mode="batch"
+        :episode-id="Number(epId)"
+        :storyboard-ids="voiceBatchDialog.storyboardIds"
+        :submitting="voiceBatchDialog.submitting"
+        @cancel="voiceBatchDialog.open = false"
+        @confirm="confirmNarrationVoiceBatch"
+      />
+
       <!-- 音频旁白设置（#35）：入口在分镜拆分区，顶栏不再放这些设置 -->
       <NarrationSettingsPanel
         :open="narrationSettingsOpen"
@@ -1984,6 +1995,7 @@ import AssetBrowserDialog from '~/components/AssetBrowserDialog.vue'
 import NarrationBlock from '~/components/NarrationBlock.vue'
 import BreakdownNarrationDialog from '~/components/BreakdownNarrationDialog.vue'
 import NarrationSettingsPanel from '~/components/NarrationSettingsPanel.vue'
+import NarrationVoiceDialog from '~/components/NarrationVoiceDialog.vue'
 import AssetBatchDialog from '~/components/AssetBatchDialog.vue'
 import { mediaTimeOfPath } from '~/utils/mediaTime'
 import {
@@ -4256,16 +4268,34 @@ async function resumeNarrationBatch() {
   } catch {}
 }
 
-async function batchNarrationVoice(storyboardIds) {
+const voiceBatchDialog = ref({ open: false, storyboardIds: undefined, submitting: false })
+
+// 批量配音先弹参数弹窗（#37），手动选镜只缩小检查范围
+function batchNarrationVoice(storyboardIds) {
   if (narrationVoiceBatch.value.running) return
+  voiceBatchDialog.value = { open: true, storyboardIds, submitting: false }
+}
+
+async function confirmNarrationVoiceBatch(settings) {
+  voiceBatchDialog.value.submitting = true
   try {
-    const res = await episodeAPI.narrationVoiceBatch(epId.value, storyboardIds)
-    if (!res?.total) { toast.info(t('episode.narration.batchNothing')); return }
-    narrationVoiceBatch.value = { running: true, total: res.total, completed: 0 }
-    toast.info(t('episode.narration.voiceBatchStarted', { n: res.total }))
+    const res = await episodeAPI.narrationVoiceBatch(epId.value, settings, voiceBatchDialog.value.storyboardIds)
+    voiceBatchDialog.value.open = false
+    if (res?.already_running) {
+      narrationVoiceBatch.value = { running: true, total: res.total || 0, completed: res.completed || 0 }
+      toast.info(t('episode.narration.voiceBatchRunning'))
+    } else if (!res?.total) {
+      toast.info(t('episode.narration.batchNothing'))
+      return
+    } else {
+      narrationVoiceBatch.value = { running: true, total: res.total, completed: 0 }
+      toast.info(t('episode.narration.voiceBatchStarted', { n: res.total }))
+    }
     pollTextBatch(narrationVoiceBatch, () => episodeAPI.narrationVoiceBatchStatus(epId.value), 'episode.narration.voiceBatchDone')
   } catch (e) {
     toastError(e)
+  } finally {
+    voiceBatchDialog.value.submitting = false
   }
 }
 

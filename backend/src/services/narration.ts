@@ -7,6 +7,7 @@
  * 本文件只做纯函数 + blob 解析，不碰 ffmpeg、不发网络请求，便于单测。
  */
 import crypto from 'crypto'
+import type { VoiceParams } from './narration-voice-params.js'
 
 /** TTS 服务实测的单段字数硬上限（VoxCPM2 `limits.max_segment_chars`） */
 export const MAX_NARRATION_CHARS = 80
@@ -30,6 +31,8 @@ export interface NarrationAudioMeta {
   config_id: number | null
   generated_at: string
   text_sha256: string
+  /** 本次合成实际请求的参数（#37）；更早的音频没有，比较时按当时事实重建（narration-voice-params.ts） */
+  params?: VoiceParams
 }
 
 /** 字幕时间码模式（#30 Q10）：sentence = 分句边界（默认），char = 逐字时间戳 */

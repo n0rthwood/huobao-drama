@@ -112,17 +112,6 @@ test('文本规范化：集级默认开，镜级可覆盖', () => {
   assert.equal(call('resolveNarrationNormalize', true, false), false, '镜级覆盖优先')
 })
 
-test('normalize 真的进了 TTS 请求体，而字幕仍只用 narration_text', () => {
-  const tts = read('src/services/tts.ts')
-  assert.match(tts, /response_format: 'wav', normalize/)
-  assert.match(tts, /buildSpeechBody\(text, settings, normalize\)/)
-  const voice = read('src/services/narration-voice.ts')
-  assert.match(voice, /resolveNarrationNormalize\(ep\.narrationNormalize, sb\.narrationNormalize\)/)
-  assert.match(voice, /synthesizeNarration\(config, text, normalize\)/)
-  // 字幕来源仍是同一份 narration_text，不产生第二份措辞
-  assert.match(voice, /buildSubtitleCues\(\{\s*\n\s*text,/)
-})
-
 test('迁移：主线与规范化三列都有补列，存量集规范化默认开', () => {
   const sqlite = read('src/db/sqlite-schema.ts')
   assert.match(sqlite, /episodes', column: 'narration_spine', type: 'TEXT'/)

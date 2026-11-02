@@ -70,7 +70,7 @@
           class="btn btn-sm"
           :disabled="busy || blocked || !narrationText.trim()"
           :title="blocked ? blockReason : undefined"
-          @click="generateVoice"
+          @click="voiceDialogOpen = true"
         >
           <Loader2 v-if="voicing" :size="11" class="animate-spin" />
           {{ audioUrl ? t('episode.narration.regenerateVoice') : t('episode.narration.generateVoice') }}
@@ -120,6 +120,19 @@
       <div v-else class="narration-hint">{{ t('episode.compose.none') }}</div>
       <div class="narration-hint">{{ t('episode.compose.durationNote') }}</div>
     </template>
+
+    <NarrationVoiceDialog
+      v-if="storyboard"
+      :open="voiceDialogOpen"
+      mode="single"
+      :episode-id="Number(storyboard.episode_id ?? storyboard.episodeId)"
+      :storyboard-id="storyboard.id"
+      :text="narrationText"
+      :has-audio="!!audioUrl"
+      :submitting="voicing"
+      @cancel="voiceDialogOpen = false"
+      @confirm="generateVoice"
+    />
   </section>
 </template>
 
@@ -138,6 +151,7 @@ import { toast } from 'vue-sonner'
 import BaseSelect from '~/components/BaseSelect.vue'
 import FieldSaveStatus from '~/components/FieldSaveStatus.vue'
 import NarrationFitPanel from '~/components/NarrationFitPanel.vue'
+import NarrationVoiceDialog from '~/components/NarrationVoiceDialog.vue'
 
 const props = defineProps({
   storyboard: { type: Object, default: null },
@@ -164,6 +178,7 @@ const writing = ref(false)
 const subtitling = ref(false)
 const composing = ref(false)
 const subtitleDirty = ref(false)
+const voiceDialogOpen = ref(false)
 const busy = computed(() => voicing.value || writing.value || subtitling.value || composing.value)
 const batchRunning = computed(() => Boolean(props.narrationBatch?.running))
 
@@ -288,13 +303,15 @@ async function writeNarration() {
   }
 }
 
-async function generateVoice() {
+// 配音参数来自弹窗（#37）：服务端校验并保存为本集默认，再合成
+async function generateVoice(settings) {
   if (!props.storyboard || busy.value) return
   voicing.value = true
   try {
-    const res = await storyboardAPI.generateNarrationVoice(props.storyboard.id)
+    const res = await storyboardAPI.generateNarrationVoice(props.storyboard.id, settings)
+    voiceDialogOpen.value = false
     subtitleDirty.value = false
-    toast.success(t('episode.narration.voiceDone', { sec: (Number(res?.duration_ms || 0) / 1000).toFixed(1) }))
+    toast.success(t('episode.narration.voiceDone', { sec: (Number(res?.duration_ms ?? res?.durationMs ?? 0) / 1000).toFixed(1) }))
     emit('refresh')
   } catch (e) {
     toastError(e)
