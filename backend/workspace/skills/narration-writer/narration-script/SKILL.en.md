@@ -22,6 +22,8 @@ After reading the script and all shots, settle three things in your head before 
 - **1–2 sentences per shot**, usually no more than 2. At a key turn a single short sentence is enough; let the picture hold a beat by itself.
 - **Match this shot's picture**: what a shot says must be what it shows. March on screen → do not discuss a treaty; a map → talk bearings and distances; a face → talk about that person's situation and choice.
 - **Shot-to-shot linkage**: a shot must pick up the question, turn or suspense left by the previous one; they must not talk past each other. Where `continuity_boundary` is `continue`, the narration continues the previous line (the second half of the same sentence, or the same thought pushed forward) — do not start over, do not repeat what was already said.
+- **Never fold the timeline**: events follow the script's chronology; a later event must not precede an earlier one and a cause must not land after its effect. Stretch seams are where inversions creep in when stretches are written in parallel.
+- **A rhetorical question appears once per episode** and is answered on the spot.
 - **Opening shot**: establish time, place and the stakes within one sentence. Do not lay out background first and ease in.
 - **Closing shot**: return to the spine, give the result or an aftertaste. Do not cut off abruptly, and no "and that is the story of …" style summation.
 

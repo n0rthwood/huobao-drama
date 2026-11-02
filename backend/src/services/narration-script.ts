@@ -45,8 +45,12 @@ import {
 export type NarrationScriptStatus = PromptBatchStatus
 
 export { NARRATION_CHUNK_SIZE }
-/** 波次并发：同一波的块同时跑，波与波顺序推进 */
-export const NARRATION_CHUNK_CONCURRENCY = 3
+/**
+ * 波次并发：同一波的块同时跑，波与波顺序推进。
+ * 实测（74 镜 / 13 块 / glm-5.3）：单块耗时 2–5 分钟，几乎与块内镜头数无关 —— 时间都花在一次推理上。
+ * 所以并发是唯一有效的提速杠杆：并发 3 要跑 5 波（整集 27 分钟），并发 10 时 13 块只需 2 波。
+ */
+export const NARRATION_CHUNK_CONCURRENCY = 10
 /** 单镜写作的硬超时（毫秒）：慢模型卡死时给界面一个明确失败，而不是一直转圈 */
 export const SHOT_NARRATION_TIMEOUT_MS = 180_000
 
