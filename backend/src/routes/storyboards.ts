@@ -25,6 +25,7 @@ import {
 } from '../services/transition.js'
 import { runTransitionReview } from '../services/transition-agent.js'
 import { generateShotVoice, regenerateShotSubtitle } from '../services/narration-voice.js'
+import { writeShotNarration } from '../services/narration-script.js'
 import { ComposeBlockedError, composeShot } from '../services/shot-compose.js'
 import { clearNarrationFit, previewNarrationFit, saveNarrationFit } from '../services/narration-fit-service.js'
 import { serializeTask } from '../services/sys-task.js'
@@ -202,6 +203,11 @@ app.put('/:id', async (c) => {
       return badRequest(c, 'subtitle_timing 只支持 sentence / char 或留空')
     }
     updates.subtitleTiming = timing === '' ? null : timing
+  }
+  // 本镜文本规范化覆盖（#35）：null/'' = 继承剧集级 narration_normalize
+  if ('narration_normalize' in body) {
+    const value = body.narration_normalize
+    updates.narrationNormalize = value == null || value === '' ? null : value === true
   }
   // 中间关键帧时间点：首尾各留 0.5 秒，否则引导帧会和首/尾帧挤在一起
   if ('mid_frame_time' in body && body.mid_frame_time != null) {
@@ -450,6 +456,22 @@ app.post('/:id/transition', async (c) => {
 })
 
 // ─── 旁白配音 / 字幕 / 合成（Issue #30）────────────────────────────
+
+// POST /storyboards/:id/narration/write — 单镜旁白写作/重写（#35，同步返回）
+app.post('/:id/narration/write', async (c) => {
+  const id = Number(c.req.param('id'))
+  const body = await c.req.json().catch(() => ({} as Record<string, any>))
+  try {
+    return success(c, await writeShotNarration(id, {
+      model: body.model || undefined,
+      configId: body.config_id ?? undefined,
+    }))
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '写旁白失败'
+    logTaskError('StoryboardAPI', 'narration-write', { storyboardId: id, error: message })
+    return badRequest(c, message)
+  }
+})
 
 // POST /storyboards/:id/narration/voice — 单镜配音（同步返回，整镜一次合成）
 app.post('/:id/narration/voice', async (c) => {

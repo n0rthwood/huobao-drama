@@ -11,7 +11,7 @@ import { eq } from 'drizzle-orm'
 import { db, schema } from '../../db/index.js'
 import { now } from '../../utils/response.js'
 import { logTaskProgress, logTaskSuccess } from '../../utils/task-logger.js'
-import { getEpisodeId } from '../context.js'
+import { getEpisodeId, getNarrationShotNumbers } from '../context.js'
 import { storyboardTools } from './storyboard-tools.js'
 import {
   DEFAULT_TAIL_PAD_SECONDS,
@@ -38,6 +38,7 @@ const saveNarrations = createTool({
   execute: async ({ narrations }, context: ToolExecutionContext | undefined) => {
     const episodeId = getEpisodeId(context?.requestContext)
     if (!episodeId) return { error: 'Missing episode context' }
+    const allowed = getNarrationShotNumbers(context?.requestContext)
 
     const rows = await db.select().from(schema.storyboards)
       .where(eq(schema.storyboards.episodeId, episodeId))
@@ -57,6 +58,11 @@ const saveNarrations = createTool({
       const sb = byShot.get(item.shot_number)
       if (!sb) {
         rejected.push({ shot_number: item.shot_number, reason: 'shot_number not found in this episode' })
+        continue
+      }
+      // 分块/单镜运行只能写自己那一段（#35）：越界的镜头一律拒绝，防止并行的块互相覆盖
+      if (allowed && !allowed.includes(item.shot_number)) {
+        rejected.push({ shot_number: item.shot_number, reason: `out of scope for this run; only shots ${allowed.join(',')} may be written` })
         continue
       }
       const enabled = item.narration_enabled !== false
@@ -104,7 +110,31 @@ const saveNarrations = createTool({
   },
 })
 
+/**
+ * 整集旁白主线（#35 阶段 A）。唯一写 episodes.narration_spine 的地方。
+ * 主线只决定「每一段讲什么、承什么、留什么」，不写具体旁白句子。
+ */
+const saveNarrationSpine = createTool({
+  id: 'save_narration_spine',
+  description: 'Save the narration spine (through-line + per-chunk beats) for this episode. Call exactly once.',
+  inputSchema: z.object({
+    spine: z.string().describe('The whole-episode narration spine: the through-line in a few sentences, then one line per shot range describing what that stretch tells, what it picks up from the previous stretch and what it hands to the next one.'),
+  }),
+  execute: async ({ spine }, context: ToolExecutionContext | undefined) => {
+    const episodeId = getEpisodeId(context?.requestContext)
+    if (!episodeId) return { error: 'Missing episode context' }
+    const text = (spine || '').trim()
+    if (!text) return { error: 'spine is empty' }
+    await db.update(schema.episodes)
+      .set({ narrationSpine: text, updatedAt: now() })
+      .where(eq(schema.episodes.id, episodeId))
+    logTaskSuccess('NarrationTool', 'save-spine', { episodeId, chars: text.length })
+    return { saved: true, chars: text.length }
+  },
+})
+
 export const narrationTools = {
   readStoryboardContext: storyboardTools.readStoryboardContext,
   saveNarrations,
+  saveNarrationSpine,
 }

@@ -43,6 +43,10 @@ export const episodes = sqliteTable('episodes', {
   ttsConfigId: integer('tts_config_id'),
   // 剧集级旁白开关（#30）：1 = 产出旁白文本 + 配音 + 合成时烧录字幕；0 = 现有流程完全不变
   narrationEnabled: integer('narration_enabled', { mode: 'boolean' }).notNull().default(false),
+  // 整集旁白主线/分段大纲（#35）：旁白写作阶段 A 的产物，用户可在「音频旁白设置」里改
+  narrationSpine: text('narration_spine'),
+  // 文本规范化（#35）：1 = 把数字/日期按读法展开后再送 TTS（normalize），默认开
+  narrationNormalize: integer('narration_normalize', { mode: 'boolean' }).notNull().default(true),
   // 本集字幕时间码模式（#30 Q10）：sentence = 分句边界（默认），char = 逐字时间戳
   subtitleTiming: text('subtitle_timing').notNull().default('sentence'),
   // 模型自带音轨的处理（#31）：replace = 丢弃，mix = 压到低电平作底音
@@ -186,6 +190,8 @@ export const storyboards = sqliteTable('storyboards', {
   narrationMeta: text('narration_meta'),
   // 本镜字幕时间码模式覆盖（#30 Q10）；NULL = 继承剧集级 subtitle_timing
   subtitleTiming: text('subtitle_timing'),
+  // 本镜文本规范化覆盖（#35）；NULL = 继承剧集级 narration_normalize
+  narrationNormalize: integer('narration_normalize', { mode: 'boolean' }),
   // 本镜的旁白/画面匹配参数 JSON（#31）；NULL = 继承剧集级 narration_fit_default
   narrationFit: text('narration_fit'),
   videoUrl: text('video_url'),

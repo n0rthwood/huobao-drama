@@ -34,6 +34,29 @@
       </div>
 
       <div class="narration-actions">
+        <button
+          type="button"
+          class="btn btn-sm"
+          :disabled="busy || batchRunning"
+          :title="batchRunning ? t('episode.narration.batchAlreadyRunning', { done: narrationBatch.completed, total: narrationBatch.total }) : undefined"
+          @click="writeNarration"
+        >
+          <Loader2 v-if="writing" :size="11" class="animate-spin" />
+          {{ narrationText.trim() ? t('episode.narration.rewriteShot') : t('episode.narration.writeShot') }}
+        </button>
+        <span v-if="writing" class="narration-hint">{{ t('episode.narration.writing') }}</span>
+        <span class="ml-auto" />
+        <span class="narration-timing-label">{{ t('episode.narration.shotNormalizeLabel') }}</span>
+        <BaseSelect
+          class="narration-timing"
+          :model-value="normalizeValue"
+          :options="normalizeOptions"
+          :searchable="false"
+          @update:model-value="setNormalize"
+        />
+      </div>
+
+      <div class="narration-actions">
         <span class="narration-timing-label">{{ t('episode.narration.timingLabel') }}</span>
         <BaseSelect
           class="narration-timing"
@@ -127,16 +150,22 @@ const props = defineProps({
   // 剧集级音轨模式与默认匹配（#31），用于「继承」展示
   episodeMixMode: { type: String, default: 'replace' },
   episodeFitDefault: { type: Object, default: null },
+  // 批量旁白在跑时禁用单镜写作（后端也会拒绝）：两边同时写同一镜会互相覆盖
+  narrationBatch: { type: Object, default: () => ({ running: false, total: 0, completed: 0 }) },
+  // 剧集级文本规范化（#35），用于「继承」选项的显示
+  episodeNormalize: { type: Boolean, default: true },
 })
 const emit = defineEmits(['update-field', 'field-dirty', 'refresh'])
 
 const { t } = useI18n()
 
 const voicing = ref(false)
+const writing = ref(false)
 const subtitling = ref(false)
 const composing = ref(false)
 const subtitleDirty = ref(false)
-const busy = computed(() => voicing.value || subtitling.value || composing.value)
+const busy = computed(() => voicing.value || writing.value || subtitling.value || composing.value)
+const batchRunning = computed(() => Boolean(props.narrationBatch?.running))
 
 watch(() => props.storyboard?.id, () => { subtitleDirty.value = false })
 
@@ -213,6 +242,49 @@ async function setTiming(value) {
     if (audioUrl.value) subtitleDirty.value = true
   } catch (e) {
     toastError(e)
+  }
+}
+
+// 本镜文本规范化（#35）：''=继承剧集，'on'/'off'=镜级覆盖
+const normalizeValue = computed(() => {
+  const v = sb.value.narration_normalize ?? sb.value.narrationNormalize
+  if (v === null || v === undefined) return ''
+  return v ? 'on' : 'off'
+})
+const normalizeOptions = computed(() => [
+  { label: t('episode.narration.normalizeInherit', { mode: props.episodeNormalize ? t('episode.narration.normalizeOn') : t('episode.narration.normalizeOff') }), value: '' },
+  { label: t('episode.narration.normalizeOn'), value: 'on' },
+  { label: t('episode.narration.normalizeOff'), value: 'off' },
+])
+
+async function setNormalize(value) {
+  if (!props.storyboard || value === normalizeValue.value) return
+  const next = value === '' ? null : value === 'on'
+  try {
+    await storyboardAPI.update(props.storyboard.id, { narration_normalize: next })
+    props.storyboard.narration_normalize = next
+    props.storyboard.narrationNormalize = next
+    emit('refresh')
+  } catch (e) {
+    toastError(e)
+  }
+}
+
+// 单镜旁白写作/重写（#35）：后端用剧本全文 + 整集主线 + 前后镜旁白做上下文，只写这一镜
+async function writeNarration() {
+  if (!props.storyboard || busy.value || batchRunning.value) return
+  writing.value = true
+  try {
+    const res = await storyboardAPI.writeNarration(props.storyboard.id)
+    const text = res?.narration_text || ''
+    props.storyboard.narration_text = text
+    props.storyboard.narrationText = text
+    toast.success(t('episode.narration.writeDone', { n: text.length }))
+    emit('refresh')
+  } catch (e) {
+    toastError(e)
+  } finally {
+    writing.value = false
   }
 }
 

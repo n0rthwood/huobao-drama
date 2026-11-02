@@ -237,3 +237,15 @@ export function durationFromAudio(durationMs: number, tailPadSeconds = DEFAULT_T
   const seconds = Math.ceil(durationMs / 1000 + tailPadSeconds)
   return Math.max(MIN_SHOT_SECONDS, Math.min(MAX_SHOT_SECONDS, seconds))
 }
+
+/**
+ * 生效的文本规范化（#35）：镜级覆盖（null = 继承）> 集级默认（默认开）。
+ * 开启后 TTS 会把 1720年 / 5月8日 / 189人 展开成读法；关闭则按字面念。
+ */
+export function resolveNarrationNormalize(
+  episodeNormalize: boolean | null | undefined,
+  shotNormalize: boolean | null | undefined,
+): boolean {
+  if (shotNormalize === true || shotNormalize === false) return shotNormalize
+  return episodeNormalize !== false
+}

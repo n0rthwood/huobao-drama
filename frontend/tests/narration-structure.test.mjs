@@ -45,7 +45,7 @@ test('narration review block is shared by the keyframe and video surfaces', () =
   assert.match(keyframes, /v-if="narrationEnabled"/)
   assert.match(keyframes, /episode\.narration\.batchScript/)
   assert.match(keyframes, /episode\.narration\.batchVoice/)
-  assert.match(episodeView, /<NarrationBlock[\s\S]{0,400}show-compose/)
+  assert.match(episodeView, /<NarrationBlock[\s\S]{0,600}show-compose/)
   assert.match(episodeView, /episode\.compose\.batch/)
   assert.match(episodeView, /SAVE_STATUS_FIELDS = \[[^\]]*'narration_text'/)
 })
@@ -96,8 +96,10 @@ test('settings page offers the tts service type with the voxcpm provider only', 
   assert.match(settingsPage, /settings\.cfg\.ttsTimesteps/)
   assert.match(settingsPage, /settings\.cfg\.ttsSeed/)
   assert.match(settingsPage, /tts_settings/)
-  // 音色不做挑选 UI：只读回显后端固定下来的值
-  assert.doesNotMatch(settingsPage, /v-model="cfgForm\.tts_voice"/)
+  // 音色必须由人在设置页选定（#35）：程序不再自动取服务列表第一个
+  assert.match(settingsPage, /v-model="cfgForm\.tts_voice"/)
+  assert.match(settingsPage, /settings\.cfg\.ttsVoiceRefresh/)
+  assert.match(settingsPage, /settings\.cfg\.ttsVoiceRequired/)
 })
 
 test('all four locales carry identical narration key sets', () => {
@@ -139,11 +141,19 @@ test('narration block mounts the fit panel next to the voice audio', () => {
   assert.match(narrationBlock, /:episode-mix-mode="episodeMixMode"/)
 })
 
-test('episode topbar carries the episode-level audio mix and default fit', () => {
+// #35：这些集级设置从全局顶栏搬进了分镜拆分区的「音频旁白设置」面板
+test('episode-level audio mix and default fit live in the narration settings panel', () => {
+  const topbar = episodeView.slice(0, episodeView.indexOf('<div class="studio-actions">'))
+  assert.doesNotMatch(topbar, /episode\.fit\.episodeMixLabel/)
+  assert.doesNotMatch(topbar, /episodeAudioMixMode/)
+  assert.match(episodeView, /<NarrationSettingsPanel/)
   assert.match(episodeView, /episodeAudioMixMode/)
   assert.match(episodeView, /audio_bed_gain_db/)
   assert.match(episodeView, /narration_fit_default/)
-  assert.match(episodeView, /episode\.fit\.episodeMixLabel/)
+  const panel = readFileSync(new URL('../app/components/NarrationSettingsPanel.vue', import.meta.url), 'utf8')
+  assert.match(panel, /episode\.fit\.episodeMixLabel/)
+  assert.match(panel, /episode\.narration\.normalizeLabel/)
+  assert.match(panel, /episode\.narration\.enableNarration/)
 })
 
 test('api client exposes the three narration-fit endpoints', () => {

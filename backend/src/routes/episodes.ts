@@ -122,6 +122,7 @@ app.put('/:id', async (c) => {
     'content', 'script_content', 'title', 'description', 'status', 'resolution',
     'narration_enabled', 'tts_config_id', 'subtitle_timing',
     'audio_mix_mode', 'audio_bed_gain_db', 'narration_fit_default',
+    'narration_spine', 'narration_normalize',
   ]
   const updates: Record<string, any> = {}
   for (const key of allowed) {
@@ -165,6 +166,11 @@ app.put('/:id', async (c) => {
     drizzleUpdates.audioBedGainDb = updates.audio_bed_gain_db == null ? null : Number(updates.audio_bed_gain_db)
   }
   if ('narration_fit_default' in updates) drizzleUpdates.narrationFitDefault = updates.narration_fit_default ?? null
+  if ('narration_spine' in updates) {
+    const spine = typeof updates.narration_spine === 'string' ? updates.narration_spine.trim() : ''
+    drizzleUpdates.narrationSpine = spine || null
+  }
+  if ('narration_normalize' in updates) drizzleUpdates.narrationNormalize = updates.narration_normalize === true
   await db.update(schema.episodes).set(drizzleUpdates).where(eq(schema.episodes.id, id))
   return success(c)
 })
@@ -351,7 +357,7 @@ app.post('/:id/generate-narration', async (c) => {
   const body = await c.req.json().catch(() => ({} as Record<string, any>))
   const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, id))
   if (!ep) return notFound(c, '剧集不存在')
-  if (ep.narrationEnabled !== true) return badRequest(c, '本集未开启旁白，请先在拆分分镜前的选项里开启')
+  if (ep.narrationEnabled !== true) return badRequest(c, '本集未开启旁白，请先在「音频旁白设置」里开启')
   const storyboardIds = Array.isArray(body.storyboard_ids)
     ? body.storyboard_ids.map(Number).filter((n: number) => Number.isInteger(n) && n > 0)
     : undefined
@@ -361,7 +367,18 @@ app.post('/:id/generate-narration', async (c) => {
     { model: body.model || undefined, configId: body.config_id ?? undefined },
     storyboardIds,
   )
-  if (result.total === -1) return success(c, { status: 'running', already_running: true })
+  // 已在运行时把当前进度一起带回去（#35）：前端据此显示运行态，而不是误报「没有需要处理的镜头」
+  if (result.total === -1) {
+    const running = await getNarrationScriptStatus(ep.id)
+    return success(c, {
+      status: 'running',
+      already_running: true,
+      total: running?.total ?? 0,
+      completed: running?.completed ?? 0,
+      failed: running?.failed ?? 0,
+      phase: running?.phase,
+    })
+  }
   if (!result.started) return success(c, { status: 'idle', total: 0 })
   return success(c, { status: 'running', total: result.total })
 })
@@ -670,6 +687,8 @@ app.get('/:episode_id/storyboards', async (c) => {
       }),
       narration_chars: narrationCharCount(row.narrationText),
       narration_estimate_seconds: estimateNarrationSeconds(row.narrationText),
+      // 本镜生效的文本规范化（#35）：镜级覆盖 > 集级默认（默认开）
+      narration_normalize_effective: row.narrationNormalize ?? (narrationEpisode?.narrationNormalize !== false),
       subtitle_timing_effective: resolveSubtitleTiming(narrationEpisode?.subtitleTiming, row.subtitleTiming),
       // 本镜生效的匹配参数（#31）：镜级覆盖 > 集级默认 > 内置默认；inherited=true 表示没有镜级覆盖
       narration_fit_effective: {

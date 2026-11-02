@@ -548,6 +548,21 @@
             <span class="field-hint">{{ t('settings.cfg.tempNote') }}</span>
           </label>
           <template v-if="cfgForm.service_type === 'tts'">
+            <!-- 音色必选（#35）：从服务读列表让人选，程序不自动取第一个 -->
+            <div class="field">
+              <span class="field-label">{{ t('settings.cfg.ttsVoice') }}</span>
+              <div class="flex gap-1">
+                <select v-model="cfgForm.tts_voice" class="input">
+                  <option value="">{{ t('settings.cfg.ttsVoicePlaceholder') }}</option>
+                  <option v-for="v in ttsVoiceOptions" :key="v" :value="v">{{ v }}</option>
+                </select>
+                <button class="btn" :disabled="ttsVoicesLoading" @click="loadTtsVoices">
+                  {{ ttsVoicesLoading ? t('settings.cfg.ttsVoiceLoading') : t('settings.cfg.ttsVoiceRefresh') }}
+                </button>
+              </div>
+              <span class="field-hint">{{ t('settings.cfg.ttsVoiceNote') }}</span>
+              <span v-if="ttsVoicesError" class="field-hint test-result bad">{{ ttsVoicesError }}</span>
+            </div>
             <label class="field">
               <span class="field-label">{{ t('settings.cfg.ttsInstructions') }}</span>
               <textarea v-model="cfgForm.tts_instructions" class="textarea" rows="2" :placeholder="t('settings.cfg.ttsInstructionsPlaceholder')" />
@@ -565,11 +580,6 @@
               <span class="field-label">{{ t('settings.cfg.ttsSeed') }}</span>
               <input v-model="cfgForm.tts_seed" class="input" type="number" step="1" :placeholder="t('settings.cfg.ttsOptional')" />
             </label>
-            <label v-if="cfgForm.tts_voice" class="field">
-              <span class="field-label">{{ t('settings.cfg.ttsVoice') }}</span>
-              <input :value="cfgForm.tts_voice" class="input" readonly />
-            </label>
-            <p class="field-hint">{{ t('settings.cfg.ttsVoiceNote') }}</p>
           </template>
           <div v-if="cfgTestResult" class="test-result" :class="{ ok: cfgTestResult.reachable, bad: !cfgTestResult.reachable }">
             <div class="test-result-head">
@@ -749,13 +759,13 @@ const huobaoSaving = ref(false)
 // 火宝节点选择：默认跟随界面语言（中文→国内 .cn，其他→国外 .com），一键配置与取 Key 链接共用
 const huobaoRegion = ref(locale.value?.startsWith('zh') ? 'cn' : 'com')
 const huobaoSiteUrl = computed(() => `https://api.firemux.${huobaoRegion.value}`)
-// tts_* 四个可选参数只对 service_type='tts' 生效，存进配置的 settings JSON（音色由后端固定，不在 UI 里选）
+// tts_* 参数只对 service_type='tts' 生效，存进配置的 settings JSON（音色在这里必选，#35）
 const cfgForm = reactive({
   name: '', provider: '', api_key: '', base_url: '', models: [], service_type: 'text', priority: 0, temperature: '',
   tts_instructions: '', tts_cfg_value: '', tts_inference_timesteps: '', tts_seed: '', tts_voice: '',
 })
 const TTS_FORM_RESET = { tts_instructions: '', tts_cfg_value: '', tts_inference_timesteps: '', tts_seed: '', tts_voice: '' }
-/** TTS 配置的 settings（后端对 service_type='tts' 的行透出 tts_settings，含后端固定下来的 voice） */
+/** TTS 配置的 settings（后端对 service_type='tts' 的行透出 tts_settings，含已选定的 voice） */
 function ttsSettingsOf(cfg) {
   const raw = cfg?.tts_settings
   if (raw && typeof raw === 'object') return raw
@@ -914,6 +924,8 @@ function startAddCfg(t) {
   cfgEditId.value = null
   cfgTestResult.value = null
   Object.assign(cfgForm, { name: '', provider: '', api_key: '', base_url: '', models: [], service_type: t, priority: 0, temperature: '', ...TTS_FORM_RESET })
+  ttsVoiceOptions.value = []
+  ttsVoicesError.value = ''
   const firstPreset = presetsByType(t)[0]
   if (firstPreset) applyProviderPreset(t, firstPreset.provider)
   cfgDialog.value = true
@@ -936,6 +948,9 @@ function startEditCfg(c) {
     tts_seed: ttsSettingsOf(c).seed ?? '',
     tts_voice: ttsSettingsOf(c).voice ?? '',
   })
+  // 已选音色先放进选项里，刷新列表前下拉也能显示当前值
+  ttsVoiceOptions.value = ttsSettingsOf(c).voice ? [ttsSettingsOf(c).voice] : []
+  ttsVoicesError.value = ''
   cfgDialog.value = true
 }
 async function testCfgPayload(payload) {
@@ -985,9 +1000,12 @@ async function saveCfg() {
   } catch (e) { toastError(e) }
 }
 
-/** 收集 TTS 可选参数；留空 = 不设置。数字字段非法时提示并返回 null（阻止保存） */
+/** 收集 TTS 参数；音色必选（#35），数字字段非法时提示并返回 null（阻止保存） */
 function collectTtsSettings() {
   const out = {}
+  const voice = String(cfgForm.tts_voice || '').trim()
+  if (!voice) { toast.warning(t('settings.cfg.ttsVoiceRequired')); return null }
+  out.voice = voice
   const text = String(cfgForm.tts_instructions || '').trim()
   if (text) out.instructions = text
   for (const [formKey, settingKey] of [['tts_cfg_value', 'cfg_value'], ['tts_inference_timesteps', 'inference_timesteps'], ['tts_seed', 'seed']]) {
@@ -998,6 +1016,29 @@ function collectTtsSettings() {
     out[settingKey] = n
   }
   return out
+}
+
+// 音色列表（#35）：按当前表单里的 base_url 向服务取；取不到就把错误显示出来，不静默回退
+const ttsVoiceOptions = ref([])
+const ttsVoicesLoading = ref(false)
+const ttsVoicesError = ref('')
+async function loadTtsVoices() {
+  if (ttsVoicesLoading.value) return
+  ttsVoicesLoading.value = true
+  ttsVoicesError.value = ''
+  try {
+    const res = await aiConfigAPI.ttsVoices({
+      config_id: cfgEditId.value || undefined,
+      base_url: cfgForm.base_url || undefined,
+      api_key: cfgForm.api_key || undefined,
+    })
+    ttsVoiceOptions.value = res?.voices || []
+    if (!ttsVoiceOptions.value.length) ttsVoicesError.value = t('settings.cfg.ttsVoiceEmpty')
+  } catch (e) {
+    ttsVoicesError.value = e?.message || String(e)
+  } finally {
+    ttsVoicesLoading.value = false
+  }
 }
 
 // ===== Agent Configs =====

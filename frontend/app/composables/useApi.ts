@@ -317,6 +317,12 @@ export const storyboardAPI = {
     target: 'first' | 'mid' | 'last' | 'video',
     data: { kind: 'scene' | 'character' | 'prop'; asset_id: number; image: string | null },
   ) => api.put(`/storyboards/${id}/target-assets/${target}`, data),
+  // 单镜旁白写作/重写（#35，同步返回；上下文 = 剧本全文 + 主线 + 前后镜旁白）
+  writeNarration: (id: number, data: { model?: string; config_id?: number } = {}) =>
+    api.post<{ narration_text: string; narration_enabled: boolean; duration: number }>(
+      `/storyboards/${id}/narration/write`,
+      { model: data.model || undefined, config_id: data.config_id || undefined },
+    ),
   // 旁白配音（#30，同步返回音频与字幕）/ 仅重出字幕（切换时间码模式后不重跑 TTS）/ 本镜合成
   generateNarrationVoice: (id: number) =>
     api.post<{ audio_url: string; subtitle_url: string; duration_ms: number; duration: number; cues: number; subtitle_source: string }>(
@@ -662,6 +668,14 @@ export const aiConfigAPI = {
   update: (id: number, d: any) => api.put(`/ai-configs/${id}`, d),
   del: (id: number) => api.del(`/ai-configs/${id}`),
   test: (d: any) => api.post('/ai-configs/test', d),
+  // TTS 音色列表（#35）：设置页据此让人选音色，程序不自动取第一个
+  ttsVoices: (params: { config_id?: number; base_url?: string; api_key?: string }) => {
+    const q = new URLSearchParams()
+    if (params.config_id) q.set('config_id', String(params.config_id))
+    if (params.base_url) q.set('base_url', params.base_url)
+    if (params.api_key) q.set('api_key', params.api_key)
+    return api.get<{ voices: string[] }>(`/ai-configs/tts-voices?${q.toString()}`)
+  },
 }
 
 // lang 缺省/为 zh 时读写基础版（不带 query，保持原请求形态）

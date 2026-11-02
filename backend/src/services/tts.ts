@@ -68,11 +68,12 @@ export function probeDurationMs(absPath: string): Promise<number> {
 }
 
 /**
- * 取该 TTS 服务的默认音色（Q11）。
+ * 列出该 TTS 服务可用的音色（#35）。
  * VoxCPM Studio 的 `GET /v1/audio/voices` 返回 `{voices: string[]}`（按创建时间倒序），
- * 没有显式默认项，因此取列表首项并由调用方固定进配置的 settings.voice，之后不再漂移。
+ * 没有「默认项」概念 —— 列表首项曾经是英文女声，拿它当默认会把整集中文纪录片配错音色，
+ * 所以这里只负责把完整列表交给设置页，由人明确选定。
  */
-export async function fetchDefaultVoice(baseUrl: string, apiKey?: string): Promise<string | null> {
+export async function fetchVoices(baseUrl: string, apiKey?: string): Promise<string[]> {
   const url = joinProviderUrl(baseUrl, '', '/v1/audio/voices')
   const resp = await fetch(url, {
     headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
@@ -80,13 +81,17 @@ export async function fetchDefaultVoice(baseUrl: string, apiKey?: string): Promi
   })
   if (!resp.ok) throw new Error(`读取音色列表失败：HTTP ${resp.status}`)
   const data = await resp.json() as { voices?: unknown }
-  const voices = Array.isArray(data?.voices) ? data.voices.filter(v => typeof v === 'string') as string[] : []
-  return voices[0] ?? null
+  return Array.isArray(data?.voices) ? data.voices.filter(v => typeof v === 'string') as string[] : []
 }
 
-/** 配音请求体（绝不含 speed —— VoxCPM2 实测拒绝变速，倍速匹配在合成阶段用 atempo 做） */
-function buildSpeechBody(text: string, settings: TtsSettings): Record<string, unknown> {
-  const body: Record<string, unknown> = { input: text, response_format: 'wav' }
+/**
+ * 配音请求体。
+ * - 绝不含 speed —— VoxCPM2 实测拒绝变速，倍速匹配在合成阶段用 atempo 做。
+ * - normalize（#35）：服务端的文本规范化，把 1720 年 / 5月8日 / 189人 展开成读法。
+ *   不传时服务端默认 false，1720 会被念错，所以这里总是显式传。
+ */
+export function buildSpeechBody(text: string, settings: TtsSettings, normalize: boolean): Record<string, unknown> {
+  const body: Record<string, unknown> = { input: text, response_format: 'wav', normalize }
   if (settings.voice) body.voice = settings.voice
   if (settings.seed !== null) body.seed = settings.seed
   if (settings.instructions) body.instructions = settings.instructions
@@ -102,17 +107,19 @@ function buildSpeechBody(text: string, settings: TtsSettings): Record<string, un
 export async function synthesizeNarration(
   config: AIConfig & { settings?: string | null },
   text: string,
+  /** 文本规范化（#35）：把 1720年 / 5月8日 / 189人 展开成读法；集级默认开，镜级可覆盖 */
+  normalize: boolean,
 ): Promise<SynthesisResult> {
   const provider = (config.provider || '').toLowerCase()
   if (provider !== 'voxcpm') throw new Error(`不支持的语音合成服务：${config.provider || '(未配置)'}`)
 
   const settings = parseTtsSettings(config.settings)
-  // 不带 voice 时服务端会用随机音色，整集听感会漂；音色在配置保存时固定（#30 Q11）
+  // 不带 voice 时服务端会用随机音色，整集听感会漂；音色必须由人在设置页选定（#35）
   if (!settings.voice) {
-    throw new Error('语音合成配置尚未固定音色：请在设置页重新保存该 TTS 配置（保存时会向服务取一次默认音色），确保服务可达')
+    throw new Error('该语音合成配置还没有选定音色：请到「设置 → AI 服务」编辑这条 TTS 配置，在「音色」里选一个再保存')
   }
   const url = joinProviderUrl(config.baseUrl, '', '/v1/audio/speech')
-  logTaskProgress('TTS', 'synthesize-begin', { provider, chars: text.length, voice: settings.voice })
+  logTaskProgress('TTS', 'synthesize-begin', { provider, chars: text.length, voice: settings.voice, normalize })
 
   let resp: Response
   try {
@@ -122,7 +129,7 @@ export async function synthesizeNarration(
         'Content-Type': 'application/json',
         ...(config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {}),
       },
-      body: JSON.stringify(buildSpeechBody(text, settings)),
+      body: JSON.stringify(buildSpeechBody(text, settings, normalize)),
       signal: AbortSignal.timeout(600_000),
     })
   } catch (err) {

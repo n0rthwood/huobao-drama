@@ -18,6 +18,8 @@ export interface AgentRequestContextValues {
   language?: ContentLanguage
   /** 本集是否启用旁白（#30）：决定条件技能是否注入 */
   narrationEnabled?: boolean
+  /** 本次旁白写作允许落库的镜号（#35）：分块/单镜运行只能写自己这一段 */
+  narrationShotNumbers?: number[]
   /** 单资产重提取作用的资产名（Issue #32）：名册完整性只对这一个人要求，不牵连其它成员 */
   singleAssetName?: string
   /** 题材规则集（Issue #32）；缺省时按项目的 genre + 纪录片开关解析 */
@@ -34,6 +36,7 @@ export function buildAgentRequestContext(values: AgentRequestContextValues): Req
   if (values.textConfigId) rc.set('textConfigId', values.textConfigId)
   if (values.storyboardId) rc.set('storyboardId', values.storyboardId)
   if (values.narrationEnabled) rc.set('narrationEnabled', true)
+  if (values.narrationShotNumbers !== undefined) rc.set('narrationShotNumbers', values.narrationShotNumbers)
   if (values.singleAssetName) rc.set('singleAssetName', values.singleAssetName)
   // 语言在构建处统一解析：4 条链路（chat/提取/图片提示词/视频提示词）都经过这里，
   // 全局设置一处生效；显式传入 values.language 可按请求覆盖
@@ -62,6 +65,15 @@ export function getDramaId(requestContext: RequestContext | undefined): number |
 export function getStoryboardId(requestContext: RequestContext | undefined): number | null {
   const v = requestContext?.get('storyboardId' as never)
   return typeof v === 'number' ? v : null
+}
+
+/**
+ * 本次旁白写作允许落库的镜号（#35）。
+ * null = 不限制（整集一次运行）；空数组 = 一个镜头都不许写（阶段 A 只规划主线）。
+ */
+export function getNarrationShotNumbers(requestContext: RequestContext | undefined): number[] | null {
+  const v = requestContext?.get('narrationShotNumbers' as never)
+  return Array.isArray(v) ? v as number[] : null
 }
 
 /** 读取请求上下文中的内容语言；未设置返回 null（调用方按 zh 处理） */
