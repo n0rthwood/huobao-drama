@@ -278,6 +278,8 @@ On the "Video Production" page, first run **storyboard breakdown** (AI splits sh
 - Pick the **video model** in the top bar (Seedance / MiniMax…); resolution and duration tiers follow the model
 - Review and tweak each shot's prompt on the right (`@character` references map to reference images automatically)
 - Click "Batch Generate Videos"; failed tasks can be retried in one click
+- For episodes with narration enabled, check video, narration audio, and subtitles in the right-hand fusion panel, then compose the shot. The main player switches between the original video and the fused clip. Fit settings are staged as a draft; apply them separately or apply and compose together.
+- Batch fusion always opens a preview. Only executable missing or changed clips are selected by default; current clips require an explicit force-remake selection. Legacy signatures are marked for verification rather than assumed current. Blocked rows show their reasons, batch progress reconnects after a page refresh, and failed shots can be retried separately.
 
 <p align="center">
   <img src="docs/screenshots/07-storyboard.png" alt="Storyboard breakdown" width="800">
@@ -289,7 +291,7 @@ On the "Video Production" page, first run **storyboard breakdown** (AI splits sh
 
 ### Step 6 · Merge & Export
 
-Select shots (hover to preview each clip), click "Start Merging" and FFmpeg assembles the full episode — play online or download. Click "Mark Done" when finished to light up the progress rail.
+Select the shots to export. With narration enabled, every selected shot must have a current fused clip with valid inputs. Repair missing or outdated fusion through the same batch preview on the export page, or explicitly narrow the selection to ready shots for a sample. The confirmation lists included and excluded shot numbers; the server rechecks readiness and never silently drops selected shots or uses stale clips. Narration-off episodes continue to use original videos. Play or download the result, and mark the episode done only when production is complete.
 
 <p align="center">
   <img src="docs/screenshots/09-export.png" alt="Merge & export" width="800">
@@ -531,6 +533,8 @@ A: The backend creates all tables automatically on first launch — check the lo
 ### Unreleased
 
 - Retired Wan video generation, including its local workflows and provider configuration.
+- Closed the narration/subtitle/video fusion-to-export workflow (#42): one versioned input snapshot fixes immediate false staleness and drives incremental batch previews, durable per-shot failure reasons, refresh reconnection, and strict export readiness checks.
+- Added original/fused main-player switching, a visible fusion summary, draft fit settings, and collapsible generation controls. No new configuration is required; legacy composites need explicit recomposition before export.
 
 ### v4.0.0 (2026-08)
 
