@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div v-if="open" class="overlay" @click.self="emit('cancel')">
+    <div v-if="open" class="overlay confirm-overlay" @click.self="emit('cancel')">
       <div class="dialog confirm-dialog" role="alertdialog" aria-modal="true" :aria-label="effectiveTitle">
         <div class="confirm-icon">
           <Trash2 :size="20" :stroke-width="1.8" />
@@ -55,6 +55,8 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
 <style scoped>
+/* 二级弹窗：常从资产详情弹窗（z 118）里打开，必须盖住它；仍低于图片查看器（120） */
+.confirm-overlay { z-index: 119; }
 .confirm-dialog {
   width: 400px;
   max-width: calc(100vw - 48px);
