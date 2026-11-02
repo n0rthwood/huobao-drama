@@ -13,12 +13,78 @@ import { getStylingVersion, saveStylingVersion } from '../services/styling-versi
 import { EMPTY_ASSET_NAME_MESSAGE, normalizeAssetName } from '../services/asset-name.js'
 import { mountReferenceImageRoutes } from './reference-images.js'
 import { planFinalPromptWrite, promptSourceChanged } from '../services/asset-prompt-invalidation.js'
+import { mountReExtractRoute } from './asset-reextract.js'
+import { addArchivalImage, removeArchivalImage } from '../services/archival-images.js'
+import { getPortraitAppearanceStatus, startPortraitAppearance } from '../services/portrait-appearance.js'
 
 const app = new Hono()
 const CHARACTER_IMAGE_SIZE = '1920x1080'
 
 // POST/DELETE /characters/:id/reference-images — 角色参考图（生图输入，与成片图互不影响）
 mountReferenceImageRoutes(app, 'character')
+// POST /characters/:id/re-extract — 单资产重新提取（Issue #32）
+mountReExtractRoute(app, 'character')
+
+// POST /characters/:id/archival-images — 从 Commons 入库史料画像（不进生图链路）
+app.post('/:id/archival-images', async (c) => {
+  const id = Number(c.req.param('id'))
+  const body = await c.req.json()
+  const fileTitle = String(body.file_title || '').trim()
+  if (!fileTitle) return badRequest(c, 'file_title 必填（Commons 的 File: 标题）')
+  try {
+    const entries = await addArchivalImage(id, fileTitle)
+    logTaskSuccess('ArchivalImage', 'add', { characterId: id, fileTitle })
+    return success(c, entries)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '入库失败'
+    logTaskError('ArchivalImage', 'add', { characterId: id, error: message })
+    return badRequest(c, message)
+  }
+})
+
+// DELETE /characters/:id/archival-images?path=<已保存的相对路径>
+app.delete('/:id/archival-images', async (c) => {
+  const id = Number(c.req.param('id'))
+  const target = c.req.query('path') || ''
+  try {
+    return success(c, await removeArchivalImage(id, target))
+  } catch (err) {
+    return badRequest(c, err instanceof Error ? err.message : '删除失败')
+  }
+})
+
+// POST /characters/:id/appearance-from-portrait — 按史料画像补充外貌（Issue #32）
+// 只写 appearance（并作废旧的最终提示词），绝不写 reference_images：角色一旦有参考图就走 image_edit，三视图定妆会被画像构图顶掉
+app.post('/:id/appearance-from-portrait', async (c) => {
+  const id = Number(c.req.param('id'))
+  const body = await c.req.json()
+  const episodeId = Number(body.episode_id)
+  if (!episodeId) return badRequest(c, 'episode_id 必填')
+
+  const result = await startPortraitAppearance(id, {
+    episodeId,
+    configId: body.text_config_id ?? undefined,
+  })
+  if (!result.started) {
+    return badRequest(c, result.reason === 'running'
+      ? '该集的同类任务正在运行，请等它结束'
+      : '该角色还没有史料画像')
+  }
+  return success(c, {
+    started: true,
+    task_id: result.taskId,
+    vision: result.vision,
+    portraits: result.portraits,
+  })
+})
+
+// GET /characters/:id/appearance-from-portrait[?episode_id=N] — 任务状态与本次产出
+// episode_id 可选：状态查询是只读的，缺它就按角色找最近一次任务，不该因为少一个参数就 400
+app.get('/:id/appearance-from-portrait', async (c) => {
+  const id = Number(c.req.param('id'))
+  const episodeId = Number(c.req.query('episode_id')) || null
+  return success(c, await getPortraitAppearanceStatus(id, episodeId))
+})
 
 // POST /characters — 手动新增角色（传入 episode_id 时关联到该集）
 app.post('/', async (c) => {
@@ -84,6 +150,7 @@ app.put('/:id', async (c) => {
     currentFinalPrompt: char.finalPrompt,
     finalPrompt: body.final_prompt !== undefined ? body.final_prompt : body.finalPrompt,
     sourceChanged: promptSourceChanged('character', char, updates),
+    at: updates.updatedAt,
   }))
   await db.update(schema.characters).set(updates).where(eq(schema.characters.id, id))
   const [updated] = await db.select().from(schema.characters).where(eq(schema.characters.id, id))

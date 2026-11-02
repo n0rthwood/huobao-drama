@@ -330,6 +330,10 @@
                   {{ (et.key === 'characters' ? chars.length : et.key === 'scenes' ? scenes.length : propItems.length) ? t('episode.prod.reextract', { type: et.label }) : t('episode.prod.extract', { type: et.label }) }}
                 </button>
                 <span class="asset-bar-divider" />
+                <button v-if="isDocumentary" class="btn btn-sm asset-btn-extract" @click="openRosterDialog">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M16 11a4 4 0 1 0-8 0"/><path d="M3 21v-2a5 5 0 0 1 5-5h8a5 5 0 0 1 5 5v2"/></svg>
+                  {{ t('episode.roster.open') }}
+                </button>
                 <button class="btn btn-sm asset-btn-extract" @click="assetBrowserOpen = true">
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 6h-8l-2-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2z"/></svg>
                   {{ t('components.assetBrowser.openEpisode') }}
@@ -454,6 +458,7 @@
                   <div class="asset-final-prompt" :title="c.final_prompt || c.finalPrompt || ''">
                     <span class="afp-label">{{ t('episode.asset.finalPromptTurnaround') }}</span>
                     <span :class="['afp-text', !(c.final_prompt || c.finalPrompt) && 'dim']">{{ c.final_prompt || c.finalPrompt || t('episode.asset.finalPromptAutoTurnaround') }}</span>
+                    <FinalPromptSourceBadge :source="c.final_prompt_source || ''" :final-prompt="c.final_prompt || c.finalPrompt || ''" :updated-at="c.final_prompt_updated_at || ''" rewritable :busy="isGeneratingPrompt('character', c.id)" @rewrite="rewriteAssetPrompt('character', c.id)" />
                   </div>
                   <div v-if="c.styling_version" class="asset-styling-version">
                     <img
@@ -526,6 +531,7 @@
                   <div class="asset-meta asset-final" :class="{ dim: !(s.final_prompt || s.finalPrompt) }" :title="s.final_prompt || s.finalPrompt || ''">
                     <span class="afp-label">{{ t('episode.asset.finalPromptFixed') }}</span>
                     {{ s.final_prompt || s.finalPrompt || t('episode.asset.finalPromptAutoFixed') }}
+                    <FinalPromptSourceBadge :source="s.final_prompt_source || ''" :final-prompt="s.final_prompt || s.finalPrompt || ''" :updated-at="s.final_prompt_updated_at || ''" rewritable :busy="isGeneratingPrompt('scene', s.id)" @rewrite="rewriteAssetPrompt('scene', s.id)" />
                   </div>
                   <ReferenceImageManager
                     asset-type="scene"
@@ -608,6 +614,7 @@
                   <div class="asset-meta asset-final" :class="{ dim: !(p.final_prompt || p.finalPrompt) }" :title="p.final_prompt || p.finalPrompt || ''">
                     <span class="afp-label">{{ t('episode.asset.finalPromptWhiteBg') }}</span>
                     {{ p.final_prompt || p.finalPrompt || t('episode.asset.finalPromptAutoWhiteBg') }}
+                    <FinalPromptSourceBadge :source="p.final_prompt_source || ''" :final-prompt="p.final_prompt || p.finalPrompt || ''" :updated-at="p.final_prompt_updated_at || ''" rewritable :busy="isGeneratingPrompt('prop', p.id)" @rewrite="rewriteAssetPrompt('prop', p.id)" />
                   </div>
                   <ReferenceImageManager
                     asset-type="prop"
@@ -1516,6 +1523,34 @@
               />
             </section>
 
+            <section v-if="assetDetail.type === 'character'" class="asset-detail-ref-panel">
+              <div class="asset-detail-section-title">
+                <span>{{ t('episode.documentary.archivalSectionTitle') }}</span>
+                <span class="dim">{{ t('episode.documentary.archivalSectionHint') }}</span>
+              </div>
+              <ArchivalImagePanel
+                :key="`archival-${assetDetail.item.id}`"
+                :character-id="assetDetail.item.id"
+                :archival-images="assetDetail.item.archival_images ?? assetDetail.item.archivalImages"
+                :episode-id="epId"
+                @update="onAssetArchivalUpdate(assetDetail.item, $event)"
+                @appearance="onAssetAppearanceFromPortrait(assetDetail.item, $event)"
+                @preview="openImageViewer"
+              />
+            </section>
+
+            <section class="asset-detail-ref-panel">
+              <div class="asset-detail-section-title">
+                <span>{{ t('episode.documentary.citationsSectionTitle') }}</span>
+                <span class="dim">{{ t('episode.documentary.citationsSectionHint') }}</span>
+              </div>
+              <ResearchCitationList
+                :key="`cite-${assetDetail.type}-${assetDetail.item.id}`"
+                :asset-kind="assetDetail.type"
+                :asset-id="assetDetail.item.id"
+              />
+            </section>
+
             <section class="asset-detail-prompt-panel">
               <div class="asset-detail-section-title">
                 <span>{{ assetDetail.type === 'character' ? t('episode.asset.finalPromptTurnaround') : assetDetail.type === 'scene' ? t('episode.asset.finalPromptFixed') : t('episode.asset.finalPromptWhiteBg') }}</span>
@@ -1531,6 +1566,15 @@
                   <span :class="['asset-detail-state', assetFinalPrompt && 'is-ready']">
                     {{ assetFinalPrompt ? t('episode.asset.ready') : t('episode.asset.todo') }}
                   </span>
+                  <FinalPromptSourceBadge
+                    :source="assetDetail.item.final_prompt_source || ''"
+                    :final-prompt="assetFinalPrompt"
+                    :updated-at="assetDetail.item.final_prompt_updated_at || ''"
+                    rewritable
+                    show-time
+                    :busy="isGeneratingPrompt(assetDetail.type, assetDetail.item.id)"
+                    @rewrite="genAssetFinalPrompt"
+                  />
                   <button
                     v-if="assetPromptDraft"
                     class="btn btn-ghost btn-sm asset-detail-copy-btn"
@@ -1565,6 +1609,15 @@
           <footer class="dialog-foot asset-detail-foot">
             <div class="asset-detail-secondary-actions">
               <button class="btn btn-danger" @click="askDeleteAsset(assetDetail.type, assetDetail.item)">{{ t('common.delete') }}</button>
+              <button
+                class="btn"
+                :disabled="isReExtracting(assetDetail.type, assetDetail.item.id) || isExtracting(extractTargetOf(assetDetail.type))"
+                :title="t('episode.documentary.reExtractHint')"
+                @click="askReExtract"
+              >
+                <Loader2 v-if="isReExtracting(assetDetail.type, assetDetail.item.id) || isExtracting(extractTargetOf(assetDetail.type))" :size="11" class="animate-spin" />
+                {{ t('episode.documentary.reExtract') }}
+              </button>
               <button class="btn" @click="closeAssetDetail">{{ t('common.close') }}</button>
             </div>
             <div class="asset-detail-primary-actions">
@@ -1684,6 +1737,55 @@
         </div>
       </div>
 
+      <div v-if="roster.open" class="overlay" @click.self="roster.open = false">
+        <div class="dialog roster-dialog">
+          <header class="dialog-head">
+            <h2 class="dialog-title">{{ t('episode.roster.title') }}</h2>
+            <button class="btn btn-ghost btn-icon" @click="roster.open = false">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </header>
+          <div class="dialog-body roster-body">
+            <div class="roster-status">
+              <span v-if="!roster.exists" class="roster-badge roster-badge-none">{{ t('episode.roster.statusNone') }}</span>
+              <span v-else-if="roster.status === 'approved'" class="roster-badge roster-badge-approved">{{ t('episode.roster.statusApproved') }}</span>
+              <span v-else class="roster-badge roster-badge-draft">{{ t('episode.roster.statusDraft') }}</span>
+              <span v-if="roster.stale" class="roster-badge roster-badge-stale">{{ t('episode.roster.statusStale') }}</span>
+              <span v-if="roster.updated_at" class="dim roster-updated">{{ roster.updated_at }}</span>
+            </div>
+            <div class="roster-hint dim">{{ t('episode.roster.hint') }}</div>
+            <div v-if="roster.loading" class="roster-empty">{{ t('common.loading') }}</div>
+            <template v-else>
+              <div v-if="!roster.cast.length" class="roster-empty">{{ t('episode.roster.empty') }}</div>
+              <div v-for="(member, idx) in roster.cast" :key="idx" class="roster-row">
+                <div class="roster-row-head">
+                  <input v-model="member.name" class="input roster-name" :placeholder="t('episode.roster.namePlaceholder')" />
+                  <span class="roster-source" :class="member.source === 'human' ? 'roster-source-human' : 'roster-source-agent'">
+                    {{ member.source === 'human' ? t('episode.roster.sourceHuman') : t('episode.roster.sourceAgent') }}
+                  </span>
+                  <button class="btn btn-ghost btn-icon" :title="t('common.delete')" @click="roster.cast.splice(idx, 1)">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  </button>
+                </div>
+                <input v-model="member.reason" class="input roster-reason" :placeholder="t('episode.roster.reasonPlaceholder')" />
+                <textarea v-model="member.basis" class="textarea roster-basis" rows="2" :placeholder="t('episode.roster.basisPlaceholder')" />
+              </div>
+              <button class="btn btn-sm roster-add" @click="roster.cast.push({ name: '', basis: '', reason: '', source: 'human' })">
+                <Plus :size="11" /> {{ t('episode.roster.add') }}
+              </button>
+            </template>
+          </div>
+          <footer class="dialog-foot">
+            <button class="btn" @click="roster.open = false">{{ t('common.cancel') }}</button>
+            <button class="btn" :disabled="roster.saving" @click="saveRoster('draft')">{{ t('episode.roster.saveDraft') }}</button>
+            <button class="btn btn-primary" :disabled="roster.saving" @click="saveRoster('approved')">
+              <Loader2 v-if="roster.saving" :size="12" class="animate-spin" />
+              {{ t('episode.roster.confirm') }}
+            </button>
+          </footer>
+        </div>
+      </div>
+
       <div v-if="assetCreate.open" class="overlay" @click.self="assetCreate.open = false">
         <div class="dialog asset-create-dialog">
           <header class="dialog-head">
@@ -1781,6 +1883,16 @@
       />
 
       <ConfirmDialog
+        :open="reExtract.open"
+        :title="t('episode.documentary.reExtractTitle')"
+        :message="t('episode.documentary.reExtractMessage', { type: assetTypeLabel(reExtract.type), name: reExtract.name, fields: reExtractFieldsLabel })"
+        :confirm-text="t('episode.documentary.reExtract')"
+        :loading="reExtract.loading"
+        @confirm="confirmReExtract"
+        @cancel="reExtract.open = false"
+      />
+
+      <ConfirmDialog
         :open="mergeDelete.open"
         :title="t('episode.export.deleteMergeTitle')"
         :message="t('episode.export.deleteMergeMessage')"
@@ -1842,6 +1954,9 @@ import { useAgent } from '~/composables/useAgent'
 import { toastError, mapError, toastServerMessage, MODERATION_RE } from '~/composables/useToast'
 import LocaleSwitcher from '~/components/LocaleSwitcher.vue'
 import ReferenceImageManager from '~/components/ReferenceImageManager.vue'
+import ArchivalImagePanel from '~/components/ArchivalImagePanel.vue'
+import ResearchCitationList from '~/components/ResearchCitationList.vue'
+import FinalPromptSourceBadge from '~/components/FinalPromptSourceBadge.vue'
 import MediaLibraryDialog from '~/components/MediaLibraryDialog.vue'
 import StoryboardKeyframes from '~/components/StoryboardKeyframes.vue'
 import ProgressRing from '~/components/ProgressRing.vue'
@@ -1874,6 +1989,49 @@ const episodeNumber = Number(route.params.episodeNumber)
 const drama = ref(null), episode = ref(null), chars = ref([]), scenes = ref([]), propItems = ref([]), sbs = ref([]), mergeData = ref(null)
 // 资产管理器（#9）：本项目资产关联到本集 / 其他项目资产全量复制导入并关联
 const assetBrowserOpen = ref(false)
+// 纪录片选角名册（Issue #32）：谁该建卡的契约。首轮由提取 Agent 生成草稿（待复核），
+// 人在这里增删后点「确认名册」锁定；之后每次提取都照同一份名册执行，剧本改动则标记过期。
+const isDocumentary = computed(() => drama.value?.genre_ruleset === 'documentary')
+const roster = ref({ open: false, loading: false, saving: false, exists: false, status: null, stale: false, updated_at: null, current_hash: '', cast: [] })
+
+async function openRosterDialog() {
+  roster.value.open = true
+  roster.value.loading = true
+  try {
+    const data = await episodeAPI.characterRoster(epId.value)
+    roster.value.exists = !!data?.exists
+    roster.value.status = data?.status || null
+    roster.value.stale = !!data?.stale
+    roster.value.updated_at = data?.updated_at || null
+    // 打开时的剧本指纹随保存回传：中途有人改了剧本就拒绝保存，不让人为旧正文签字
+    roster.value.current_hash = data?.current_hash || ''
+    roster.value.cast = (data?.cast || []).map(m => ({ name: m.name || '', basis: m.basis || '', reason: m.reason || '', source: m.source || 'agent' }))
+  } catch (e) {
+    toastError(e)
+  } finally {
+    roster.value.loading = false
+  }
+}
+
+async function saveRoster(status) {
+  const cast = roster.value.cast.filter(m => (m.name || '').trim())
+  roster.value.saving = true
+  try {
+    const data = await episodeAPI.saveCharacterRoster(epId.value, cast, status, roster.value.current_hash)
+    roster.value.exists = !!data?.exists
+    roster.value.status = data?.status || null
+    roster.value.stale = !!data?.stale
+    roster.value.updated_at = data?.updated_at || null
+    roster.value.current_hash = data?.current_hash || ''
+    roster.value.cast = (data?.cast || []).map(m => ({ name: m.name || '', basis: m.basis || '', reason: m.reason || '', source: m.source || 'human' }))
+    toast.success(status === 'approved' ? t('episode.roster.confirmed') : t('episode.roster.draftSaved'))
+    if (status === 'approved') roster.value.open = false
+  } catch (e) {
+    toastError(e)
+  } finally {
+    roster.value.saving = false
+  }
+}
 // 工作台面板位置记忆（按剧集隔离）：仅页面刷新(reload)时恢复到上次所在步骤；
 // 从列表/详情页点击进入时始终默认「剧本」面板；URL query 显式携带子状态时优先于本地记忆
 const PANEL_STORE_KEY = `huobao:workbench:panel:${dramaId}:${episodeNumber}`
@@ -2329,7 +2487,8 @@ function isAssetDialogOn(type, id) {
 
 /** 把生成好的最终提示词同步到列表项与弹窗项 */
 function applyFinalPrompt(type, id, fp) {
-  const patch = { final_prompt: fp, finalPrompt: fp }
+  // 后端 generate-prompt 把来源标记写成 agent（Issue #32），本地同步让来源徽标立刻翻转
+  const patch = { final_prompt: fp, finalPrompt: fp, final_prompt_source: 'agent', final_prompt_updated_at: new Date().toISOString() }
   const list = type === 'character' ? chars.value : type === 'scene' ? scenes.value : propItems.value
   const target = list.find(x => x.id === id)
   if (target) Object.assign(target, patch)
@@ -2362,6 +2521,18 @@ async function ensureAssetPrompt(type, id, force = false) {
     return fp
   } finally {
     generatingPromptKeys.value = generatingPromptKeys.value.filter(k => k !== key)
+  }
+}
+
+/** 卡片上的「交给 Agent 重写」（Issue #32）：外部写入的最终提示词直接强制重生成 */
+async function rewriteAssetPrompt(type, id) {
+  if (isGeneratingPrompt(type, id)) return
+  try {
+    const fp = await ensureAssetPrompt(type, id, true)
+    if (!fp) throw new Error(t('episode.asset.promptGenFailedRetry'))
+    toast.success(t('episode.asset.promptRegenerated'))
+  } catch (e) {
+    toastServerMessage(e, { fallback: 'episode.asset.promptGenFailedRetry' })
   }
 }
 
@@ -3547,6 +3718,94 @@ function doExtract(target) {
 }
 function doExtractAll() { EXTRACT_TARGETS.value.forEach(x => doExtract(x.key)) }
 
+// ─── 单资产「重新提取本资产信息」（Issue #32）────────────────
+// 后端先清空该资产的提取字段再跑提取 Agent（save_dedup_* 只补空白，不清就测不出规则改动），
+// 进度沿用本集的提取任务状态：POST 成功后按同一个 target 轮询，完成时 refresh() 拉回新内容。
+const EXTRACT_TARGET_OF = { character: 'characters', scene: 'scenes', prop: 'props' }
+// 与后端 asset-reextract.ts 的 CLEARED_FIELDS 一一对应，确认框里要如实列出被清空的字段
+const REEXTRACT_FIELD_KEYS = {
+  character: ['role', 'description', 'appearance', 'styling'],
+  scene: ['prompt', 'lighting'],
+  prop: ['type', 'description'],
+}
+const reExtract = ref({ open: false, type: '', id: 0, name: '', loading: false })
+const reExtractStarting = ref('')
+
+function extractTargetOf(type) { return EXTRACT_TARGET_OF[type] || '' }
+function isReExtracting(type, id) { return reExtractStarting.value === `${type}:${id}` }
+
+const reExtractFieldsLabel = computed(() => {
+  const keys = REEXTRACT_FIELD_KEYS[reExtract.value.type] || []
+  return keys.map(key => t(`episode.documentary.fields.${key}`)).join(t('common.listJoin'))
+})
+
+function askReExtract() {
+  const { open, type, item } = assetDetail.value
+  if (!open || !item?.id) return
+  reExtract.value = { open: true, type, id: item.id, name: item.name || item.location || '', loading: false }
+}
+
+async function confirmReExtract() {
+  const { type, id } = reExtract.value
+  const target = extractTargetOf(type)
+  if (!type || !id || !epId.value || reExtract.value.loading) return
+  const assetApi = type === 'character' ? characterAPI : type === 'scene' ? sceneAPI : propAPI
+  reExtract.value.loading = true
+  reExtractStarting.value = `${type}:${id}`
+  try {
+    await assetApi.reExtract(id, epId.value, chatModelOverride(), chatConfigId())
+    // 提取字段已被清空：先把本地行同步成空值，等轮询完成再用服务端内容覆盖
+    applyReExtractCleared(type, id)
+    reExtractPending.value = `${type}:${id}`
+    if (!isExtracting(target)) {
+      extractingTargets.value.push(target)
+      pollExtractStatus(target)
+    }
+    reExtract.value.open = false
+    toast.success(t('episode.documentary.reExtractStarted'))
+  } catch (e) {
+    toastError(e)
+  } finally {
+    reExtract.value.loading = false
+    reExtractStarting.value = ''
+  }
+}
+
+/**
+ * 清空本地行的提取字段与最终提示词来源标记，与后端 re-extract 的清空范围一致。
+ * keys 可收窄：按史料画像补充外貌时只有 appearance 会被后端改写，其它提取字段仍然有效。
+ */
+function applyReExtractCleared(type, id, keys = REEXTRACT_FIELD_KEYS[type] || []) {
+  const patch = { final_prompt: '', finalPrompt: '', final_prompt_source: null, final_prompt_updated_at: null }
+  for (const key of keys) patch[key] = ''
+  const list = type === 'character' ? chars.value : type === 'scene' ? scenes.value : propItems.value
+  const target = list.find(x => x.id === id)
+  if (target) Object.assign(target, patch)
+  if (isAssetDialogOn(type, id)) {
+    Object.assign(assetDetail.value.item, patch)
+    assetPromptDraft.value = ''
+    assetPromptDirty.value = false
+    for (const key of keys) {
+      if (key in assetDetailDraft.value) assetDetailDraft.value[key] = ''
+    }
+  }
+}
+
+// 轮询完成时 pollExtractStatus 会 refresh()，整份资产列表被替换；弹窗里握的是旧对象，
+// 只有「我们刚发起的这次重新提取」才把弹窗重新指向新行并重置草稿（不干扰其它刷新场景）
+const reExtractPending = ref('')
+watch([chars, scenes, propItems], () => {
+  const key = reExtractPending.value
+  if (!key) return
+  const [type, rawId] = key.split(':')
+  const id = Number(rawId)
+  const list = type === 'character' ? chars.value : type === 'scene' ? scenes.value : propItems.value
+  const fresh = list.find(x => x.id === id)
+  if (!fresh) { reExtractPending.value = ''; return }
+  if (isAssetDialogOn(type, id) && assetDetail.value.item !== fresh) openAssetDetail(type, fresh)
+  reExtractPending.value = ''
+})
+
 function pollExtractStatus(target, attempts = 150) {
   const label = EXTRACT_TARGETS.value.find(x => x.key === target)?.label || target
   const tick = async (left) => {
@@ -4431,6 +4690,23 @@ async function applyAssetImageFromLibrary(urls) {
 // 以响应返回的数组为准覆盖本地值，不做乐观更新；成片图 image_url 不受影响
 function onAssetRefsUpdate(item, refs) {
   item.reference_images = refs
+}
+
+// 史料参考（Issue #32）：只做出处留档，不进生图；同样以服务端返回的数组为准
+function onAssetArchivalUpdate(item, entries) {
+  item.archival_images = entries
+}
+
+// 按史料画像补充外貌（Issue #32）：后端只改写 appearance，所以走同一套清空路径但只收窄到该字段，
+// 最终提示词与来源徽标照常清空（外貌变了提示词就作废），再把新外貌写回行与弹窗草稿
+function onAssetAppearanceFromPortrait(item, appearance) {
+  const id = item?.id
+  if (!id) return
+  applyReExtractCleared('character', id, ['appearance'])
+  const target = chars.value.find(x => x.id === id)
+  if (target) target.appearance = appearance
+  item.appearance = appearance
+  if (isAssetDialogOn('character', id)) assetDetailDraft.value.appearance = appearance
 }
 
 // 视频提示词的一致性问题：槽位字段为 video_prompt 的问题 + 绑定级问题（fields 为空）
@@ -5503,6 +5779,26 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
 /* 新增资产弹窗 */
 .asset-create-dialog { width: 440px; max-width: calc(100vw - 48px); }
 .asset-create-body { display: flex; flex-direction: column; gap: 10px; }
+
+/* 选角名册弹窗（纪录片）：草稿 / 已确认 / 过期三态一眼可辨 */
+.roster-dialog { width: 560px; max-width: calc(100vw - 48px); }
+.roster-body { display: flex; flex-direction: column; gap: 10px; max-height: 60vh; overflow-y: auto; }
+.roster-status { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.roster-badge { font-size: 11px; padding: 1px 7px; border-radius: 10px; border: 1px solid var(--border); }
+.roster-badge-draft { color: #b45309; border-color: #b45309; }
+.roster-badge-approved { color: var(--accent); border-color: var(--accent); }
+.roster-badge-stale { color: #b91c1c; border-color: #b91c1c; }
+.roster-badge-none { color: var(--text-dim); }
+.roster-updated { font-size: 11px; }
+.roster-hint { font-size: 11px; line-height: 1.5; }
+.roster-empty { font-size: 12px; color: var(--text-dim); padding: 10px 0; }
+.roster-row { display: flex; flex-direction: column; gap: 5px; padding: 8px; border: 1px solid var(--border); border-radius: 8px; }
+.roster-row-head { display: flex; align-items: center; gap: 6px; }
+.roster-name { flex: 1; }
+.roster-source { font-size: 10px; padding: 1px 6px; border-radius: 8px; border: 1px solid var(--border); white-space: nowrap; }
+.roster-source-human { color: var(--accent); border-color: var(--accent); }
+.roster-source-agent { color: var(--text-dim); }
+.roster-add { align-self: flex-start; }
 
 /* Asset grid */
 .asset-section-title {

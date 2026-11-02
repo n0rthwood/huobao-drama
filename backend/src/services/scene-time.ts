@@ -19,7 +19,7 @@ export function sceneTimeMissingMessage(time: string): string {
 
 export type SceneTimePatch =
   | { error: string }
-  | { time?: string; finalPrompt?: string | null }
+  | { time?: string; finalPrompt?: string | null; finalPromptSource?: string | null; finalPromptUpdatedAt?: string | null }
 
 /**
  * PUT /scenes/:id 的时间 / 最终提示词写入规则（纯函数）：
@@ -37,6 +37,8 @@ export function planSceneTimePatch(input: {
   finalPrompt?: string | null
   /** location / prompt / lighting 是否改了值（asset-prompt-invalidation.ts） */
   sourceChanged?: boolean
+  /** 写入时间戳（ISO），用于最终提示词来源标记（Issue #32） */
+  at: string
 }): SceneTimePatch {
   const currentTime = (input.currentTime || '').trim()
   const nextTime = input.time === undefined ? currentTime : (input.time || '').trim()
@@ -46,10 +48,11 @@ export function planSceneTimePatch(input: {
     currentFinalPrompt: input.currentFinalPrompt,
     finalPrompt: input.finalPrompt,
     sourceChanged: nextTime !== currentTime || !!input.sourceChanged,
+    at: input.at,
   })
   if (promptPlan.finalPrompt && !sceneFinalPromptCoversTime(promptPlan.finalPrompt, nextTime)) return { error: sceneTimeMissingMessage(nextTime) }
 
-  const patch: { time?: string; finalPrompt?: string | null } = { ...promptPlan }
+  const patch: { time?: string; finalPrompt?: string | null; finalPromptSource?: string | null; finalPromptUpdatedAt?: string | null } = { ...promptPlan }
   if (input.time !== undefined) patch.time = nextTime
   return patch
 }

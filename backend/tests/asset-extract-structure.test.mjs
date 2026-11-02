@@ -32,24 +32,26 @@ test('extraction service runs per-target async tasks', () => {
 
 test('extraction tools dedupe by normalized name so near-names reuse existing assets', () => {
   const tools = read('src/agents/tools/extract-tools.ts')
+  const names = read('src/services/asset-name.ts')
 
-  // 归一化：括号定位/别名后缀去除 + 空白/大小写统一
-  assert.match(tools, /normalizeName\(name: string\)/)
-  assert.match(tools, /replace\(\/\[（\(]/) // 中/英文括号字符类
-  assert.match(tools, /replace\(\/\[\\s/) // 空白字符类
-  assert.match(tools, /\.toLowerCase\(\)/)
+  // 名册与保存共用归一化：括号定位/别名后缀去除 + 空白/大小写统一
+  assert.match(tools, /import \{ normalizeAssetName, normalizeNearName \}/)
+  assert.match(names, /normalizeNearName\(name: string\)/)
+  assert.match(names, /replace\(\/\[（\(]/) // 中/英文括号字符类
+  assert.match(names, /replace\(\/\[\\s/) // 空白字符类
+  assert.match(names, /\.toLowerCase\(\)/)
   // 角色保存：精确匹配优先，归一化近名兜底，命中即复用不重复创建
-  assert.match(tools, /normalizeName\(c\.name\) === normName/)
+  assert.match(tools, /normalizeNearName\(c\.name\) === normName/)
   assert.match(tools, /matchedViaNorm/)
   assert.match(tools, /save-characters-reuse/)
   // 道具同样按归一化名字复用
-  assert.match(tools, /normalizeName\(p\.name\) === normName/)
+  assert.match(tools, /normalizeNearName\(p\.name\) === normName/)
   assert.match(tools, /save-props-reuse/)
   // 场景按 地点+时间 匹配，地点仅做空白/大小写归一化（不删括号）
   assert.match(tools, /normalizeLocation\(loc: string\)/)
   assert.match(tools, /normalizeLocation\(s\.location\) === normLocation/)
   // read_existing_* 返回归一化字段供 Agent 判断复用
-  assert.match(tools, /normalized_name: normalizeName/)
+  assert.match(tools, /normalized_name: normalizeNearName/)
   assert.match(tools, /normalized_location: normalizeLocation/)
 })
 

@@ -278,9 +278,10 @@
                       </button>
                     </div>
                   </div>
-                  <div class="asset-final-prompt" :title="m.finalPrompt || ''">
+                  <div class="asset-final-prompt" :title="m.final_prompt || m.finalPrompt || ''">
                     <span class="afp-label">{{ t('episode.asset.finalPromptTurnaround') }}</span>
-                    <span :class="['afp-text', !m.finalPrompt && 'dim']">{{ m.finalPrompt || t('episode.asset.finalPromptAutoTurnaround') }}</span>
+                    <span :class="['afp-text', !(m.final_prompt || m.finalPrompt) && 'dim']">{{ m.final_prompt || m.finalPrompt || t('episode.asset.finalPromptAutoTurnaround') }}</span>
+                    <FinalPromptSourceBadge :source="m.final_prompt_source || ''" :final-prompt="m.final_prompt || m.finalPrompt || ''" :updated-at="m.final_prompt_updated_at || ''" rewritable :busy="generatingPromptKeys.includes(pendingKey(m))" @rewrite="rewriteCardPrompt(m)" />
                   </div>
                   <div v-if="materialRing(m)" class="asset-task-ring" @click.stop>
                     <ProgressRing
@@ -332,9 +333,10 @@
                     </div>
                     <div class="asset-meta asset-desc dim" :title="m.description || ''">{{ m.description || t('episode.asset.noDescription') }}</div>
                   </template>
-                  <div class="asset-meta asset-final" :class="{ dim: !m.finalPrompt }" :title="m.finalPrompt || ''">
+                  <div class="asset-meta asset-final" :class="{ dim: !(m.final_prompt || m.finalPrompt) }" :title="m.final_prompt || m.finalPrompt || ''">
                     <span class="afp-label">{{ g.kindKey === 'scene' ? t('episode.asset.finalPromptFixed') : t('episode.asset.finalPromptWhiteBg') }}</span>
-                    {{ m.finalPrompt || (g.kindKey === 'scene' ? t('episode.asset.finalPromptAutoFixed') : t('episode.asset.finalPromptAutoWhiteBg')) }}
+                    {{ m.final_prompt || m.finalPrompt || (g.kindKey === 'scene' ? t('episode.asset.finalPromptAutoFixed') : t('episode.asset.finalPromptAutoWhiteBg')) }}
+                    <FinalPromptSourceBadge :source="m.final_prompt_source || ''" :final-prompt="m.final_prompt || m.finalPrompt || ''" :updated-at="m.final_prompt_updated_at || ''" rewritable :busy="generatingPromptKeys.includes(pendingKey(m))" @rewrite="rewriteCardPrompt(m)" />
                   </div>
                 </div>
                 <div v-if="materialRing(m)" class="asset-task-ring" @click.stop>
@@ -512,6 +514,15 @@
               <div class="mat-detail-section-title">
                 <span>{{ t('detail.mat.finalPromptLabel') }}</span>
                 <span class="dim">{{ t('detail.mat.finalPromptSub') }}</span>
+                <FinalPromptSourceBadge
+                  :source="editTarget.final_prompt_source || ''"
+                  :final-prompt="editDraft.finalPrompt || ''"
+                  :updated-at="editTarget.final_prompt_updated_at || ''"
+                  rewritable
+                  show-time
+                  :busy="generatingPromptKeys.includes(pendingKey(editTarget))"
+                  @rewrite="generateFinalPrompt(editTarget)"
+                />
                 <button
                   class="btn btn-sm mat-detail-prompt-gen"
                   :disabled="generatingPromptKeys.includes(pendingKey(editTarget)) || !firstEpisodeId"
@@ -632,6 +643,12 @@
             <BaseSelect v-model="settingsForm.aspect_ratio" :options="settingsAspectOptions" :placeholder="t('detail.settings.aspectRatioPlaceholder')" />
             <span v-if="settingsForm.aspect_ratio !== drama.aspect_ratio" class="field-hint settings-warn">{{ t('detail.settings.aspectChangeHint') }}</span>
           </label>
+          <label class="field">
+            <span class="field-label">{{ t('detail.documentary.label') }}</span>
+            <BaseSelect v-model="settingsForm.documentary_rules" :options="documentaryRuleOptions" :placeholder="t('detail.documentary.placeholder')" />
+            <span class="field-hint">{{ t('detail.documentary.effective', { value: effectiveRulesetLabel }) }}</span>
+            <span class="field-hint dim">{{ t('detail.documentary.hint') }}</span>
+          </label>
         </div>
         <div class="dialog-foot">
           <button class="btn" @click="showSettings = false">{{ t('common.cancel') }}</button>
@@ -679,6 +696,7 @@ import ProgressRing from '~/components/ProgressRing.vue'
 import MediaTime from '~/components/MediaTime.vue'
 import AssetBrowserDialog from '~/components/AssetBrowserDialog.vue'
 import MediaLibraryDialog from '~/components/MediaLibraryDialog.vue'
+import FinalPromptSourceBadge from '~/components/FinalPromptSourceBadge.vue'
 import { useNowTicker, ringPropsFromTask, isActiveTaskStatus } from '~/composables/useTaskProgress'
 
 const { t, locale } = useI18n()
@@ -762,25 +780,43 @@ async function load() {
   }
 }
 
-// ===== 项目设置（风格 / 画幅） =====
+// ===== 项目设置（风格 / 画幅 / 纪录片规则） =====
 const { presets: stylePresets, load: loadStylePresets, label: styleLabel } = useStylePresets()
 const showSettings = ref(false)
 const settingsSaving = ref(false)
-const settingsForm = ref({ style: '', aspect_ratio: '' })
+const settingsForm = ref({ style: '', aspect_ratio: '', documentary_rules: 'auto' })
 const settingsStyleOptions = computed(() => stylePresets.value.map(p => ({ label: p.name, value: p.value })))
 // 只有白名单画幅可选；legacy 值（如 adaptive）不在选项内，需选一个合法值才能保存
 const settingsAspectOptions = computed(() => ASPECT_RATIO_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value })))
+// 纪录片规则（Issue #32）：开关优先于题材关键字；'auto' = 跟随题材（后端按 genre 归一）
+const documentaryRuleOptions = computed(() => [
+  { label: t('detail.documentary.auto'), value: 'auto' },
+  { label: t('detail.documentary.on'), value: 'on' },
+  { label: t('detail.documentary.off'), value: 'off' },
+])
+// 归一化结果由后端算（GET /dramas/:id 的 genre_ruleset），保存后 load() 刷新这行
+const effectiveRulesetLabel = computed(() =>
+  drama.value?.genre_ruleset === 'documentary' ? t('detail.documentary.rulesetDocumentary') : t('detail.documentary.rulesetNone'),
+)
 
 function openSettings() {
   const validRatio = ASPECT_RATIO_OPTIONS.some(o => o.value === drama.value.aspect_ratio)
-  settingsForm.value = { style: drama.value.style || '', aspect_ratio: validRatio ? drama.value.aspect_ratio : '' }
+  settingsForm.value = {
+    style: drama.value.style || '',
+    aspect_ratio: validRatio ? drama.value.aspect_ratio : '',
+    documentary_rules: drama.value.documentary_rules || 'auto',
+  }
   showSettings.value = true
 }
 
 async function saveSettings() {
   settingsSaving.value = true
   try {
-    await dramaAPI.update(dramaId, { style: settingsForm.value.style, aspect_ratio: settingsForm.value.aspect_ratio })
+    await dramaAPI.update(dramaId, {
+      style: settingsForm.value.style,
+      aspect_ratio: settingsForm.value.aspect_ratio,
+      documentary_rules: settingsForm.value.documentary_rules,
+    })
     await load()
     toast.success(t('detail.settings.saved'))
     showSettings.value = false
@@ -1156,7 +1192,8 @@ async function generateFinalPrompt(m) {
     const fp = res?.final_prompt || res?.finalPrompt
     if (!fp) throw new Error(t('episode.asset.promptGenFailedRetry'))
     if (isEditing(m)) {
-      editTarget.value = { ...editTarget.value, finalPrompt: fp }
+      // 后端 generate-prompt 把来源标记写成 agent（image-prompt-tools），本地同步让徽标立刻翻转
+      editTarget.value = { ...editTarget.value, finalPrompt: fp, final_prompt_source: 'agent', final_prompt_updated_at: new Date().toISOString() }
       editDraft.finalPrompt = fp
       toast.success(t('episode.asset.promptGenerated'))
     } else {
@@ -1166,6 +1203,34 @@ async function generateFinalPrompt(m) {
     toastError(e)
   } finally {
     generatingPromptKeys.value = generatingPromptKeys.value.filter(k => k !== key)
+    load()
+  }
+}
+
+/**
+ * 素材卡片上的「交给 Agent 重写」（Issue #32）：强制重新生成最终提示词。
+ * 不走 generateFinalPrompt —— 那条路会拿弹窗里的 editDraft 当「未保存的信息改动」，
+ * 卡片场景下 editDraft 为空，会把素材的信息字段写成空值。
+ */
+async function rewriteCardPrompt(m) {
+  const epId = firstEpisodeId.value
+  if (!epId) { toast.error(t('detail.mat.needEpisodeForPrompt')); return }
+  const key = pendingKey(m)
+  if (generatingPromptKeys.value.includes(key)) return
+  generatingPromptKeys.value = [...generatingPromptKeys.value, key]
+  try {
+    const res = m.kindKey === 'character'
+      ? await characterAPI.generatePrompt(m.id, epId, true)
+      : m.kindKey === 'scene'
+        ? await sceneAPI.generatePrompt(m.id, epId, true)
+        : await propAPI.generatePrompt(m.id, epId, true)
+    if (!(res?.final_prompt || res?.finalPrompt)) throw new Error(t('episode.asset.promptGenFailedRetry'))
+    toast.success(t('episode.asset.promptGenerated'))
+  } catch (e) {
+    toastError(e)
+  } finally {
+    generatingPromptKeys.value = generatingPromptKeys.value.filter(k => k !== key)
+    // 重新拉项目：卡片行（含来源徽标与时间）按服务端最新值重绘
     load()
   }
 }

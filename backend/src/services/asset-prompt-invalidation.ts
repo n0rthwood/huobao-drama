@@ -23,16 +23,26 @@ export function promptSourceChanged(kind: PromptAssetKind, current: Record<strin
  * - 请求写入了提示词且与已存值不同 → 以写入为准（'' / null = 清空）；
  * - 否则来源字段变化 → 置空；
  * - 否则不动（返回 {}）。
+ *
+ * 同时写来源标记（Issue #32）：外部直写一律记 'external'，UI 据此显示「非 Agent 生成」
+ * 徽标并提供「交给 Agent 重写」；清空时把标记一并清掉。
+ * Agent 自己保存走 save_*_final_prompt，在那里记 'agent'。
  */
 export function planFinalPromptWrite(input: {
   currentFinalPrompt: string | null
   /** 请求体里的 final_prompt；undefined = 未传 */
   finalPrompt?: string | null
   sourceChanged: boolean
-}): { finalPrompt?: string | null } {
+  /** 写入时间戳（ISO）；由调用方传入，保持本模块是纯函数 */
+  at: string
+}): { finalPrompt?: string | null; finalPromptSource?: string | null; finalPromptUpdatedAt?: string | null } {
   const current = input.currentFinalPrompt || null
   const next = input.finalPrompt === undefined ? undefined : (input.finalPrompt || null)
-  if (next !== undefined && next !== current) return { finalPrompt: next }
-  if (input.sourceChanged && current) return { finalPrompt: null }
+  if (next !== undefined && next !== current) {
+    return next
+      ? { finalPrompt: next, finalPromptSource: 'external', finalPromptUpdatedAt: input.at }
+      : { finalPrompt: null, finalPromptSource: null, finalPromptUpdatedAt: null }
+  }
+  if (input.sourceChanged && current) return { finalPrompt: null, finalPromptSource: null, finalPromptUpdatedAt: null }
   return {}
 }

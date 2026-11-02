@@ -1,0 +1,54 @@
+{
+  "backend": {
+    "branch_tests": 147,
+    "branch_pass": 136,
+    "branch_fail": 11,
+    "main_tests": 130,
+    "main_pass": 119,
+    "main_fail": 11,
+    "not_ok_equal": true,
+    "not_ok": [
+      "MiniMax image and video provider surfaces are removed",
+      "MySQL startup removes all saved MiniMax configurations including audio",
+      "backend removes TTS endpoints and audio-specific schema fields",
+      "characters and scenes tables store the agent-written final prompt",
+      "characters route supports manual create and soft delete",
+      "episode merge uses generated videos directly without requiring compose output",
+      "image/video generation tasks are unified into a single sys_task table",
+      "prompt agent instructions reference per-asset skills; skill files define the specs",
+      "prompt_generator video prompt format uses @name references instead of XML tags",
+      "props route supports manual create and soft delete",
+      "scenes route links new scenes to episode and soft deletes"
+    ],
+    "tsc_exit": 0
+  },
+  "frontend": {
+    "branch_tests": 23,
+    "branch_pass": 5,
+    "branch_fail": 18,
+    "main_tests": 23,
+    "main_pass": 5,
+    "main_fail": 18,
+    "not_ok_equal": true,
+    "not_ok": [
+      "add episode dialog asks for a title and a fixed video resolution",
+      "add episode dialog does not preload config lists",
+      "addEpisode posts drama_id, title and resolution",
+      "asset library page lists character and scene images",
+      "drama detail header links to the asset library page",
+      "episode card exposes a delete action",
+      "episode card resolution is editable via a dropdown persisted to episodes.resolution",
+      "episode status is manually marked, not derived from script content",
+      "project creation dialog only asks for title and visual style",
+      "settings page exposes official provider templates only",
+      "settings page manages style presets in a base tab",
+      "settings page offers official default model IDs",
+      "tests/apple-light-theme-structure.test.mjs",
+      "tests/button-system-structure.test.mjs",
+      "tests/model-selection-structure.test.mjs",
+      "tests/professional-redesign-surface.test.mjs",
+      "tests/remove-audio-voice-structure.test.mjs",
+      "tests/remove-grid-feature-structure.test.mjs"
+    ]
+  }
+}

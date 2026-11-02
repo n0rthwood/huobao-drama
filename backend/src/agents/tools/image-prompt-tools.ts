@@ -38,6 +38,9 @@ const readCharacters = createTool({
         description: c.description || '',
         appearance: c.appearance || '',
         styling: c.styling || '',
+        // 该角色是否已入库史料画像（Issue #32）：画像本身不进生图链路，
+        // 但提示词要忠实于 appearance/styling 里已文本化的画像特征，不得自行发挥
+        has_archival_reference: !!c.archivalImages && c.archivalImages !== '[]',
       })),
     }
   },
@@ -59,8 +62,10 @@ const saveCharacterFinalPrompt = createTool({
 
     const stylePrompt = await getDramaStylePrompt(dramaId)
     const finalPrompt = stylePrompt ? `${stylePrompt}, ${prompt}` : prompt
+    const ts = now()
     await db.update(schema.characters)
-      .set({ finalPrompt, updatedAt: now() })
+      // 来源标记（Issue #32）：UI 据此显示「Agent 生成」徽标，与外部直写区分
+      .set({ finalPrompt, finalPromptSource: 'agent', finalPromptUpdatedAt: ts, updatedAt: ts })
       .where(eq(schema.characters.id, character_id))
 
     return {
@@ -116,8 +121,9 @@ const saveSceneFinalPrompt = createTool({
 
     const stylePrompt = await getDramaStylePrompt(dramaId)
     const finalPrompt = stylePrompt ? `${stylePrompt}, ${prompt}` : prompt
+    const sceneTs = now()
     await db.update(schema.scenes)
-      .set({ finalPrompt, updatedAt: now() })
+      .set({ finalPrompt, finalPromptSource: 'agent', finalPromptUpdatedAt: sceneTs, updatedAt: sceneTs })
       .where(eq(schema.scenes.id, scene_id))
 
     return {
@@ -168,8 +174,9 @@ const savePropFinalPrompt = createTool({
 
     const stylePrompt = await getDramaStylePrompt(dramaId)
     const finalPrompt = stylePrompt ? `${stylePrompt}, ${prompt}` : prompt
+    const propTs = now()
     await db.update(schema.props)
-      .set({ finalPrompt, updatedAt: now() })
+      .set({ finalPrompt, finalPromptSource: 'agent', finalPromptUpdatedAt: propTs, updatedAt: propTs })
       .where(eq(schema.props.id, prop_id))
 
     return {

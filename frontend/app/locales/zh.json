@@ -64,7 +64,8 @@
       "keyframe_prompts": "关键帧提示词",
       "video_prompts": "视频提示词",
       "script_rewrite": "剧本改写",
-      "storyboard_breaker": "拆分分镜"
+      "storyboard_breaker": "拆分分镜",
+      "portrait_appearance": "按史料画像补充外貌"
     },
     "detail": {
       "title": "任务详情",
@@ -290,6 +291,61 @@
       "effectRefresh": "确认后界面会自动刷新",
       "confirm": "切换并刷新",
       "refreshing": "语言已切换，正在刷新…"
+    },
+    "promptSource": {
+      "agent": "Agent 生成",
+      "external": "非 Agent 生成（外部写入）",
+      "empty": "未生成（出图走兜底提示词）",
+      "agentHint": "由 Agent 按本项目规则生成",
+      "externalHint": "外部写入（手工编辑或接口直写），不受 Agent 规则约束",
+      "emptyHint": "尚未生成最终提示词，出图时使用兜底提示词",
+      "updatedAt": "更新时间：{time}",
+      "rewrite": "交给 Agent 重写",
+      "rewriting": "重写中…",
+      "rewriteHint": "按当前题材规则重新生成最终提示词，会覆盖现有内容",
+      "unknown": "来源未知（旧版本生成）",
+      "unknownHint": "这条最终提示词写入时还没有来源标记（旧版本生成），可交给 Agent 按当前规则重写"
+    },
+    "archival": {
+      "label": "史料参考",
+      "add": "检索添加",
+      "searchPlaceholder": "搜索 Wikimedia Commons（如：彼得一世 肖像）",
+      "search": "检索",
+      "searching": "检索中…",
+      "searchFailed": "检索失败",
+      "noResults": "没有检索到结果，换个关键词试试",
+      "addThis": "收录「{title}」",
+      "added": "史料参考已添加",
+      "removed": "史料参考已删除",
+      "remove": "删除这条史料参考",
+      "empty": "暂无史料参考",
+      "artist": "作者",
+      "workDate": "年代",
+      "license": "许可证",
+      "sourcePage": "来源页",
+      "retrievedAt": "取用时间",
+      "unknown": "未知",
+      "notUsedForGeneration": "史料参考不参与生图（与参考图严格分离）",
+      "confirmTitle": "删除史料参考",
+      "confirmMessage": "删除后这条史料参考及其出处信息会被移除。参考图与成片图不受影响。",
+      "portraitAction": "按史料画像补充外貌",
+      "portraitRunning": "正在读画像…",
+      "portraitHint": "让模型读这些史料画像，把具体长相写进角色外貌",
+      "portraitNeedImages": "请先入库史料画像",
+      "portraitNeedEpisode": "请先打开具体某一集",
+      "portraitVisionUsed": "本次用 {model} 读画像",
+      "portraitVisionMissing": "未找到可读图的文本模型，仅用文字资料",
+      "portraitDone": "已更新外貌，最终提示词已失效，请重新生成提示词",
+      "portraitFailed": "补充外貌失败"
+    },
+    "citations": {
+      "label": "资料来源",
+      "refresh": "刷新",
+      "loading": "加载中…",
+      "loadFailed": "资料来源加载失败",
+      "unavailable": "未检索，仅用剧本原文",
+      "empty": "暂无资料来源记录",
+      "untitled": "无标题"
     }
   },
   "composables": {
@@ -443,6 +499,17 @@
       "needEpisodeForImage": "请先在「剧集列表」创建至少一集，才能生成素材图",
       "needEpisodeForPrompt": "请先在「剧集列表」创建至少一集，才能生成最终提示词",
       "locationRequired": "请填写地点"
+    },
+    "documentary": {
+      "label": "纪录片规则",
+      "placeholder": "选择纪录片规则",
+      "auto": "自动（跟随题材）",
+      "on": "强制开启",
+      "off": "强制关闭",
+      "effective": "当前生效：{value}",
+      "hint": "开关优先于题材关键字；生效后提取与提示词按纪录片/历史题材规则生成。",
+      "rulesetDocumentary": "纪录片规则",
+      "rulesetNone": "无题材规则"
     }
   },
   "settings": {
@@ -1433,6 +1500,46 @@
       "smooth": "流畅",
       "hd": "高清",
       "uhd": "超清"
+    },
+    "documentary": {
+      "archivalSectionTitle": "史料参考",
+      "archivalSectionHint": "只做出处留档，不参与生图",
+      "citationsSectionTitle": "资料来源",
+      "citationsSectionHint": "Agent 检索过的条目与出处",
+      "reExtract": "重新提取本资产信息",
+      "reExtractHint": "清空该资产的提取字段后重跑提取 Agent",
+      "reExtractTitle": "重新提取本资产信息",
+      "reExtractMessage": "将清空该{type}「{name}」的提取字段（{fields}）与最终提示词，然后重新运行提取 Agent。已生成的图片与参考图不受影响。",
+      "reExtractStarted": "已开始重新提取，完成后自动刷新",
+      "fields": {
+        "role": "角色定位",
+        "description": "简介",
+        "appearance": "外貌",
+        "styling": "造型",
+        "prompt": "画面描述",
+        "lighting": "光线",
+        "type": "类型"
+      }
+    },
+    "roster": {
+      "open": "选角名册",
+      "title": "选角名册（谁该建卡）",
+      "hint": "名册是提取的契约：名册上的每一个人都会建卡，名册之外的人不会。首轮由提取 Agent 生成草稿，确认后每次提取都照同一份名册执行；剧本改动后名册会标记为过期，需要重新复核。",
+      "statusNone": "尚未生成",
+      "statusDraft": "待复核（AI 草稿）",
+      "statusApproved": "已确认",
+      "statusStale": "剧本已改动，需重新复核",
+      "empty": "名册为空：运行一次角色提取生成草稿，或在这里手动添加。",
+      "add": "添加成员",
+      "namePlaceholder": "角色卡名字（与剧本原文一致）",
+      "reasonPlaceholder": "入选理由：决策 / 行动 / 亲历 + 具体动作",
+      "basisPlaceholder": "剧本依据：点到此人的那句原文",
+      "sourceAgent": "AI 草稿",
+      "sourceHuman": "人工",
+      "saveDraft": "存为草稿",
+      "confirm": "确认名册",
+      "confirmed": "名册已确认，之后的提取将照此执行",
+      "draftSaved": "草稿已保存（仍待复核）"
     }
   },
   "errors": {

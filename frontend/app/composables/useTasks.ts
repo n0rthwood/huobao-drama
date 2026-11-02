@@ -18,6 +18,7 @@ export type TaskType = 'image' | 'video' | 'text'
 export type TextKind =
   | 'extract_characters' | 'extract_scenes' | 'extract_props'
   | 'keyframe_prompts' | 'video_prompts' | 'script_rewrite' | 'storyboard_breaker'
+  | 'portrait_appearance'
 
 export interface TaskParams {
   frameType?: string

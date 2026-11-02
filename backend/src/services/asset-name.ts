@@ -15,6 +15,22 @@ export function normalizeAssetName(raw: unknown): string {
 /** 规范化后为空时 HTTP 入口返回的 400 文案 */
 export const EMPTY_ASSET_NAME_MESSAGE = '名称不能为空（空白与 \\ / : * ? " < > | @ 会自动替换为 _）'
 
+/**
+ * 近名归一化（提取去重用）：同一角色/道具在剧本里可能写成「林小雨」「林小雨（主角）」
+ * 「林小雨(女主)」「林小雨 」。去掉括号内的定位/别名、去掉空白与 `_` 后做精确比较，
+ * 命中即视为同一个人，不重复建卡。
+ * 空白与 `_` 一并去掉：资产名里的空白会被规范化成 `_`（上面的 normalizeAssetName），
+ * 「斋桑湖北岸」仍要命中「斋桑湖_北岸」。
+ */
+export function normalizeNearName(name: string): string {
+  return (name || '')
+    .replace(/[（(][^（()）]*[）)]/g, '') // 去掉成对的中/英文括号内容（角色定位/别名）
+    .replace(/[（(].*$/, '')              // 兜底：未闭合括号从首个括号截断
+    .replace(/[\s　_]+/g, '')             // 去空白、全角空格与 _
+    .toLowerCase()
+    .trim()
+}
+
 export interface AssetRename {
   from: string
   to: string

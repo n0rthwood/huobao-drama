@@ -1,0 +1,173 @@
+[
+  {
+    "kind": "character",
+    "id": 51,
+    "name": "利哈列夫",
+    "task_id": 568,
+    "model": "qwen-image-2.1",
+    "status": "completed",
+    "file": "character-51.jpg",
+    "prompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark, 角色设定参考图，左侧为正脸特写，右侧并列展示正面、90度侧面、背面三张等高全身视图，特写与全身视图都是同一角色，全身入镜，中性A字站姿，三张全身视图等高并排、头顶与脚底对齐。男性，四十余岁，身高中等偏高，体格敦实，肩宽背直，军人姿态挺拔；长方脸，颧骨略高，下颌方正，额头较高，眉浓而直，眼神锐利沉静，面容少有笑意，神情威严审慎；深栗色头发向后梳拢，鬓角剪短，上唇与下颌蓄修剪齐整的深褐色唇髭与短须。身着十八世纪初彼得一世时代俄式谢苗诺夫近卫团军官常服：深绿色呢面立领长外套，单排黄铜纽扣，下摆及膝，袖口翻折同色包边，左襟别一枚铜制圆形近卫团徽章；内衬十八世纪初俄式米白麻布立领衬衣，颈系十八世纪初俄式深红色领巾；下着十八世纪初米白色呢料马裤，脚蹬十八世纪初俄军黑色过膝长靴，靴口外翻；腰束黑色皮革武装带，左侧剑带悬挂十八世纪初俄式黄铜柄直剑，剑鞘垂于体侧；头戴十八世纪初俄式黑色三角毡帽，帽缘绕黄铜丝绦，帽下后梳发与短鬓角清晰可见。正脸特写与三个视图的脸、发型和服装完全一致。纯白背景，柔和均匀的光线，电影质感。",
+    "appearance": "男性，四十余岁，身高中等偏高，体格敦实，肩宽背直，军人姿态挺拔。长方脸，颧骨略高，下颌方正，额头较高；深栗色头发向后梳拢，鬓角剪短；上唇与下颌蓄修剪齐整的深褐色唇髭与短须。眉浓而直，眼神锐利沉静，少有笑意，常驻威严审慎的军人气质。",
+    "description": "俄国谢苗诺夫近卫团少校伊万·米哈伊洛维奇·利哈列夫，1676年生，家族古老而不显赫，谱系称先祖为金帐汗国鞑靼贵族。1719年1月奉彼得一世谕令单独赴西伯利亚查办加加林案，1720年5月率四百人船队溯额尔齐斯河远征斋桑湖，是本集主角，调查官转变为远征队长。",
+    "styling": "深绿色谢苗诺夫近卫团军官常服（呢面立领长外套，单排黄铜纽扣，下摆及膝，袖口翻折同色包边）；内衬米白麻布立领衬衣，颈系深红色领巾；下着米白色呢料马裤，脚蹬黑色过膝长靴，靴口外翻；腰束黑色皮革武装带，佩黄铜柄直剑；头戴黑色三角毡帽，帽缘绕黄铜丝绦，左襟别一枚铜制圆形近卫团徽章。",
+    "reference_images": [],
+    "archival_images": []
+  },
+  {
+    "kind": "character",
+    "id": 52,
+    "name": "彼得一世",
+    "task_id": 569,
+    "model": "qwen-image-2.1",
+    "status": "completed",
+    "file": "character-52.jpg",
+    "prompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark, 角色设定参考图，左侧为正脸特写，右侧并列展示正面、90 度侧面、背面三张等高全身视图，特写与全身视图都是同一角色，全身入镜，中性 A 字站姿，三张全身视图等高并排、头顶脚底对齐，四十六岁男性，站姿挺拔沉稳，长脸、下颌略方，鼻梁挺直，左眼下方有一颗痣，眉浓目锐，唇上蓄浓密微翘的短髭，神情威严沉静；深色卷发，齐耳长度，前额无刘海，头发自然拢向脑后；身穿十八世纪初彼得大帝时代俄式深绿色呢面军装外套，外套之外罩着缘口包黄铜条、铆钉成排的十八世纪初俄式抛光钢制胸甲，胸前斜挎十八世纪初圣安德烈深蓝色绶带，左胸绶带下方佩白色珐琅八角星章，下着十八世纪初米白色呢料马裤、黑色长袜与方头黑扣皮鞋，腰束黑色皮革武装带，左侧佩十八世纪初黄铜护手直剑，头戴十八世纪初黑色三角毡帽，帽缘绕金线绦带、帽左插白色鸵鸟翎，右手执一纸鹅毛笔书写的沙皇谕令文书，左手自然垂于体侧；正脸特写与三张全身视图的脸、发型和服装完全一致，纯白背景，柔和均匀的光线，电影质感。",
+    "appearance": "长脸，下颌略方，深色卷发，齐耳长度，前额无刘海，唇上短髭，浓密微翘，46 岁，左眼下方有痣，鼻梁挺直。",
+    "description": "俄国罗曼诺夫王朝沙皇彼得·阿列克谢耶维奇，1682—1725年在位，力行欧式集权改革，亲手筹建谢苗诺夫近卫团与马莫诺夫调查衙门体系。本集1719年1月18日签发七条谕令派利哈列夫赴西伯利亚，又因地图粗疏亲自回信，促成1720年再度远征。",
+    "styling": "抛光钢制胸甲，缘口包黄铜条、铆钉成排，罩于深绿色呢面军装外套之外；胸前斜挎圣安德烈深蓝色绶带，左胸绶带下佩白色珐琅八角星章；下着米白色呢料马裤、黑色长袜与方头黑扣皮鞋；腰束黑色皮革武装带，佩黄铜护手直剑；头戴黑色三角毡帽，帽缘绕金线绦带，帽左插白色鸵鸟翎，右手执一纸鹅毛笔书写的沙皇谕令。",
+    "reference_images": [],
+    "archival_images": [
+      {
+        "path": "static/uploads/archival_images/character/52/e6ac842d-1047-44d8-8bb3-92be1dc6c6ff.jpg",
+        "file_title": "File:Unknown artist after J.-M. Nattier, Portrait of Peter the Great.jpg",
+        "source_page_url": "https://commons.wikimedia.org/wiki/File:Unknown_artist_after_J.-M._Nattier,_Portrait_of_Peter_the_Great.jpg",
+        "file_url": "https://upload.wikimedia.org/wikipedia/commons/6/61/Unknown_artist_after_J.-M._Nattier%2C_Portrait_of_Peter_the_Great.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+        "artist": "After Jean-Marc Nattier",
+        "work_date": "between 1775 and 1800",
+        "license": "Public domain",
+        "license_url": "",
+        "retrieved_at": "2026-11-01T21:56:56.503Z"
+      }
+    ]
+  },
+  {
+    "kind": "character",
+    "id": 54,
+    "name": "康熙",
+    "task_id": 570,
+    "model": "qwen-image-2.1",
+    "status": "completed",
+    "file": "character-54.jpg",
+    "prompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark, 角色设定参考图，左侧为正脸特写，右侧并列展示正面、90 度侧面、背面三张等高全身视图，特写与全身视图都是同一角色，全身入镜，中性 A 字站姿，三张全身视图等高并排、头顶脚底对齐，六十六岁上下的清代老年男性皇帝，长脸，面颊清瘦，颧骨微高，鼻梁挺直，眼睑下垂，神情沉静威严，清代男子剃发，前额及两鬓剃光，脑后蓄发编成一条长辫垂于背心，上唇蓄稀疏八字髭，下颏蓄细长须，身着清康熙朝明黄色缂丝朝袍，圆领、马蹄袖、披领，肩胸织金龙纹，下摆织海水江崖纹，外罩清康熙朝石青缎面衮服，前后织团龙纹，胸前垂挂一盘清代东珠朝珠，腰系清代明黄丝板带，带扣鎏金錾花，左侧佩荷包、右侧佩解手刀，头戴清康熙朝熏貂皮尖顶朝冠，冠顶累三层金座、顶衔大东珠，足蹬清康熙朝明黄色缎面朝靴，正脸特写与三张全身视图的脸、发型和服装完全一致，纯白背景，柔和均匀的光线，电影质感",
+    "appearance": "长脸，面颊清瘦，清代男子剃发，前额及两鬓剃光，脑后留辫，上唇有稀疏八字髭，下颏有细长须，66 岁，眼睑下垂，颧骨微高，鼻梁挺直。",
+    "description": "清朝皇帝爱新觉罗·玄烨，1654—1722年在位，年号康熙。本集1720年五月下旬发动青海、川滇两路大军进兵拉萨，第二次驱准保藏，与北线俄军的额尔齐斯河远征同年展开、两线牵动。",
+    "styling": "明黄色缂丝朝袍（圆领、马蹄袖、披领，肩胸织金龙纹，下摆织海水江崖纹）；外罩石青缎面衮服，前后织团龙纹；胸前垂挂一盘东珠朝珠；腰系明黄丝板带，带扣鎏金錾花，左右佩荷包与解手刀；头戴熏貂皮尖顶朝冠，冠顶累三层金座、顶衔大东珠；足蹬明黄色缎面朝靴。",
+    "reference_images": [],
+    "archival_images": [
+      {
+        "path": "static/uploads/archival_images/character/54/e9aa5e07-406c-4037-a1cb-151441704547.jpg",
+        "file_title": "File:Portrait of the Kangxi Emperor in Court Dress.jpg",
+        "source_page_url": "https://commons.wikimedia.org/wiki/File:Portrait_of_the_Kangxi_Emperor_in_Court_Dress.jpg",
+        "file_url": "https://upload.wikimedia.org/wikipedia/commons/c/cf/Portrait_of_the_Kangxi_Emperor_in_Court_Dress.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+        "artist": "AnonymousUnknown author Qing Dynasty Court Painter",
+        "work_date": "late Kangxi period",
+        "license": "Public domain",
+        "license_url": "",
+        "retrieved_at": "2026-11-01T21:55:48.180Z"
+      }
+    ]
+  },
+  {
+    "kind": "character",
+    "id": 59,
+    "name": "阿列克谢",
+    "task_id": 578,
+    "model": "qwen-image-2.1",
+    "status": "completed",
+    "file": "character-59.jpg",
+    "prompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark, 角色设定参考图，左侧为正脸特写，右侧并列展示正面、90度侧面、背面三张等高全身视图，特写与全身视图都是同一角色，全身入镜，中性A字站姿，三张全身视图等高并排、头顶脚底对齐。男性，二十八岁上下的青年，身姿挺直；长脸，额头高而宽，眉骨突出，眼窝深，鼻梁长直，面部光洁无髭须，神情平和沉静；深色长卷发自然中分、垂至肩际，为本人真发，无假发。身穿十八世纪初俄式贵族常服：藏蓝色呢面立领长外套，前襟单排黄铜纽扣，下摆及膝，袖口翻折同色包边，前襟与立领缘镶银灰色绒绦；内衬十八世纪初米白麻布立领衬衣，颈前系黑色丝绒领带；下着十八世纪初俄式米白色呢料马裤，配黑色羊毛长袜与十八世纪初方头黑扣皮鞋；腰束黑色皮革剑带，左侧悬十八世纪初黄铜柄直剑，剑鞘垂直贴于体侧。正脸特写为头顶到肩部完整的正面近景，中性表情，正脸特写与三张全身视图的脸、发型和服装完全一致。纯白背景，柔和均匀的光线，电影质感。",
+    "appearance": "长脸，额头高而宽，深色长卷发，中分，垂至肩际，为本人真发，无髭须，28 岁，眉骨突出，眼窝深，鼻梁长直。",
+    "description": "俄国罗曼诺夫王朝皇太子阿列克谢·彼得罗维奇，彼得一世之子，1690年生，其子即后来的彼得二世。1718年6月，法庭判处他死刑，谢苗诺夫近卫团军官利哈列夫在这份判决书上按次序签名（列第五十一位）。本集以这份死刑判决书为利哈列夫跻身彼得一世高级圈层的关键注脚，阿列克谢作为该案当事人被提及。",
+    "styling": "藏蓝色呢面长外套，立领、单排黄铜纽扣、下摆及膝，袖口翻折同色包边，前襟与立领缘银灰色绒绦；内衬米白麻布立领衬衣，颈前系黑色丝绒领带；下着米白色呢料马裤、黑色羊毛长袜、方头黑扣皮鞋；腰束黑色皮革剑带，左侧悬黄铜柄直剑。",
+    "reference_images": [],
+    "archival_images": [
+      {
+        "path": "static/uploads/archival_images/character/59/ad222c5f-cfe2-4797-a461-9b8978eed5da.jpg",
+        "file_title": "File:Tsarevich Alexei (Hermitage).jpeg",
+        "source_page_url": "https://commons.wikimedia.org/wiki/File:Tsarevich_Alexei_(Hermitage).jpeg",
+        "file_url": "https://upload.wikimedia.org/wikipedia/commons/2/22/Tsarevich_Alexei_%28Hermitage%29.jpeg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+        "artist": "After Johann Gottfried Tannauer",
+        "work_date": "18th century",
+        "license": "Public domain",
+        "license_url": "",
+        "retrieved_at": "2026-11-01T22:12:52.165Z"
+      }
+    ]
+  },
+  {
+    "kind": "scene",
+    "id": 59,
+    "name": "沙皇书房",
+    "task_id": 571,
+    "model": "qwen-image-2.1",
+    "status": "completed",
+    "file": "scene-59.jpg",
+    "prompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark, 固定机位广角镜头，清晰的建立镜头，1719年圣彼得堡沙皇书房，深胡桃木护壁的早期巴洛克小厅，夜晚。前景为画面左前方斜面制图桌的深色桌角与铜座地球仪的球缘入画、右前方是橡木写字台的皮质包角局部，中景为房间正中带皮质包角的厚重橡木写字台，台后紧随一把朝向台面的高背扶手椅，写字台上银质多枝烛台插着数支点燃的牛油烛，烛旁摊开旧纸质文书、墨水瓶、鹅毛笔与火漆封印，后景为扶手椅身后主墙嵌满通高胡桃木书架与卷宗格、格中塞满卷宗函册，右侧墙一扇高窗垂深红呢帘，画面右侧护壁间嵌一扇与护壁同色、带线脚的橡木平开门；地面为深色橡木拼花地板、被磨出从门口通向写字台的浅色踩踏路径，墙面为深胡桃木护壁、木料磨暗发乌、边棱被磨得发亮、护壁上方带经年烛烟熏出的淡褐色烟痕；写字台居房间正中、高背扶手椅紧随台后、书架卷宗格沿主墙排开、地球仪座与斜面制图桌立于左侧墙、高窗呢帘位于右侧墙，空间结构连续、自洽。光源为写字台上数支牛油烛的暖黄烛光，光晕笼罩整张桌面并照亮近处木纹，四壁护壁与书架沉入深棕暗影，仅窗帘缝隙透进一线冷蓝夜色，暖黄与冷蓝对比强烈，气氛沉静威严。画面中没有任何人物，空场景，电影质感。",
+    "reference_images": [],
+    "archival_images": []
+  },
+  {
+    "kind": "scene",
+    "id": 66,
+    "name": "亚梅什堡",
+    "task_id": 572,
+    "model": "qwen-image-2.1",
+    "status": "completed",
+    "file": "scene-66.jpg",
+    "prompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark, 固定机位广角镜头，清晰的建立镜头，1716年（18世纪初）所建亚梅什盐湖驻防木堡，俄式原木堡垒形制，坐落额尔齐斯河中上游盐湖岸、准噶尔汗国北缘的干草原上，上午，前景（画面下方为泛起细碎盐晶反光的白色盐壳滩地，滩缘生着稀疏耐盐蒿草与灰黄干草丛）、中景（方形单层原木城墙堡垒，四角各立一座方形原木箭楼，箭楼高出一截城墙、彼此等距）、后景（堡后开阔的浅盐湖水面泛蓝白色，更远处干草原地平线平直低伏）三层分层构图，出入口（面向盐湖一侧城墙正中开一扇厚原木大门，门板以手工锻铁条十字加固，门楣上架简朴原木门楼），地面（盐滩为坚硬白色盐壳地，堡墙外围转为灰黄干草原壤土，一条踩实发白的土路从盐滩通向大门），墙面（单层原木城墙层层横垒，木料灰白开裂，表面被盐风蚀出纵向裂纹与灰化斑驳，墙脚凝着一圈白色盐霜，垛口原木边缘磨蚀圆钝，铁皮包角锈迹斑驳），堡内露出低矮的原木屋脊轮廓，空间结构连续、自洽，上午阳光自侧上方直射，天空无云干燥，盐滩反白刺目，浅湖面泛蓝白反光，堡体木色灰黄、向阳面明亮而背阴面沉入冷灰，空气干燥通透，画面中没有任何人物，空场景，电影质感",
+    "reference_images": [],
+    "archival_images": []
+  },
+  {
+    "kind": "scene",
+    "id": 68,
+    "name": "准噶尔牙帐",
+    "task_id": 573,
+    "model": "qwen-image-2.1",
+    "status": "completed",
+    "file": "scene-68.jpg",
+    "prompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark, 固定机位广角镜头，清晰的建立镜头，18世纪初准噶尔汗国伊犁河谷草原牧地上的汗王牙帐营地，上午，阳光洒满草甸，色调明净辽阔。前景为画面下方近侧一排去皮原木拴马桩，桩身留有缰绳长年磨出的浅色磨痕，桩根草地被踩踏成裸露的浅黄土面，草甸向画面深处延展；中景为草甸中央一座包黄铜顶饰的白毡大帐，白色毛毡面经风霜日晒微泛灰黄、带细密捆扎压痕，帐顶正中的黄铜顶饰反射上午阳光，大帐正面设木质门框与双幅毡帘门，半幅门帘掀起露出帐内暗色空间，帐前一条被踩踏发白的浅土径横向贯通、串起帐前的两排拴马桩，大帐左右两侧各立一座原木旗杆座，杆上悬素色三角旗，旗影短促；后景为大帐之后成排错落的白色小毡帐与原木围栏牲畜圈，圈栏木料灰白开裂，再往后草甸地平线上天山雪峰连绵、雪峰反光强烈。地面为起伏草甸，针茅与蒿草连绵，毡帐之间小径发白；墙体以大帐厚实的白毡墙为主，毡面被纵横捆绳勒出整齐横纹。空间结构连续、自洽，各陈设固定相对位置明确，无任何现代物件。光线为上午自然日光直射，白毡帐面亮泽，各物投影短促平直，明暗对比柔和，空气清朗通透。画面中没有任何人物，空场景，电影质感。",
+    "reference_images": [],
+    "archival_images": []
+  },
+  {
+    "kind": "prop",
+    "id": 58,
+    "name": "军鼓",
+    "task_id": 574,
+    "model": "qwen-image-2.1",
+    "status": "completed",
+    "file": "prop-58.jpg",
+    "prompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark, 单品产品图，标准产品摄影视角，微俯3/4视角同时呈现顶面鼓皮与圆柱形鼓身侧面。18世纪初俄国近卫团军鼓，用于行军与队列行进中击奏节拍的军乐器：圆柱形木质鼓框外漆深红色，上下框口各箍一道手工锻造黄铜鼓圈，双面绷紧白色皮革鼓皮，鼓身沿框以麻绳与皮扣十字交叉拉紧调音、绳扣排列均匀，白色织物斜挎背带固定在鼓框两侧的铜环上、自然垂落于鼓身一侧并完整可见；鼓体直径约等于成年人肩宽的一半，鼓身高度约等于成年人小臂长度，物品各部分比例准确；黄铜鼓圈氧化暗沉并带磕碰痕迹，深红漆面有细小磨痕，鼓皮边缘微微泛黄，背带织物有使用磨损，整体呈久经使用的旧物状态。孤立放置，居中完整入镜，边缘完整无裁切，纯白无影背景、无渐变、无投影，背景纯净不承载任何叙事内容，无其他物品、无人物、无场景，柔和均匀的影棚光，高细节。",
+    "description": "18世纪初俄国近卫团军鼓，圆柱形木质鼓框漆深红色，框口箍两道黄铜鼓圈，双面绷白色皮革鼓皮，麻绳与皮扣十字交叉调音，配白色织物斜挎背带；鼓体直径约等于成年人肩宽的一半，鼓身高度约等于成年人小臂长度。",
+    "reference_images": [],
+    "archival_images": []
+  },
+  {
+    "kind": "prop",
+    "id": 60,
+    "name": "谕令文书",
+    "task_id": 575,
+    "model": "qwen-image-2.1",
+    "status": "completed",
+    "file": "prop-60.jpg",
+    "prompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark, 单品产品图，纸张类文书采用正俯视平铺视角，1719年俄国宫廷手写派遣谕令文书，用于派遣远征调查任务，泛黄厚纸单页，俄文鹅毛笔手写、墨色正文按七条条文分列排布，卷首为花体标题，页底花体签署旁钤一方红色印玺、其上覆一枚暗红色圆形火漆封印，火漆受压平整、边缘留有溢痕，纸缘四边轻微磨损起毛，纸面留有鹅毛笔笔锋的浓淡变化与手工抄写的年代墨迹，器物各部分比例准确，孤立放置于纯白无影背景上，无渐变、无投影，居中完整入镜，四周留白、边缘完整无裁切，背景纯净不承载任何叙事内容，无其他物品、无人物、无场景，柔和均匀的影棚光，高细节。",
+    "description": "1719年俄国宫廷手写派遣谕令，用于派遣远征调查任务；俄文鹅毛笔书写于泛黄厚纸，正文分列七条条文，卷首花体标题，页底花体签署钤红色印玺、覆暗红色火漆封印，纸缘轻微磨损。",
+    "reference_images": [],
+    "archival_images": []
+  },
+  {
+    "kind": "prop",
+    "id": 64,
+    "name": "燧发火枪",
+    "task_id": 576,
+    "model": "qwen-image-2.1",
+    "status": "completed",
+    "file": "prop-64.jpg",
+    "prompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark, 单品产品图，标准产品摄影视角，微俯视3/4角度，18世纪初欧洲步兵制式燧发火枪横向平置完整呈现：手工锻打的滑膛铁枪管呈深灰黑色，管面留锻打纹理与轻微氧化锈斑，枪口完好无变形；深褐色胡桃木全式枪托木质油润，前托完整包覆枪管全长，枪管与前托由铁箍箍牢固定，前托下缘开有通条槽，槽内嵌放一根铁质通条；枪机为燧石击发式，击锤嘴以螺夹夹持黄褐色燧石，钢质击砧兼药池盖覆于火门药池上方、扣合严实，火门通向枪膛，扳机收在腕部下方的铁质扳机护弓内，枪托尾部为下弯抵肩形制；全枪通长约与一名成年士兵的肩高相当，物品各部分比例准确真实，木质边缘有使用磨损，击砧面与枪口留摩擦亮痕；孤立放置在纯白无影背景上，无渐变、无投影，居中完整入镜，枪身全长边缘完整无裁切，背景纯净不承载任何叙事内容，无其他物品、无人物、无场景、无文字无水印，柔和均匀的影棚光，高细节。",
+    "description": "18世纪初燧发火枪，滑膛铁枪管，深褐色胡桃木全式枪托，枪机为燧石击发式，枪托下方嵌铁质通条；全枪长度约与一名成年士兵的肩高相当。",
+    "reference_images": [],
+    "archival_images": []
+  }
+]

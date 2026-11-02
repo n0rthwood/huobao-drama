@@ -7,6 +7,7 @@ import { toSnakeCase, toSnakeCaseArray } from '../utils/transform.js'
 import { lookupGeneratedAt } from '../services/media-time.js'
 import { logTaskError } from '../utils/task-logger.js'
 import { AssetLibraryError, importAsset, isAssetKind } from '../services/asset-library.js'
+import { isDocumentaryRuleMode, resolveRulesetWithMode } from '../services/genre-ruleset.js'
 
 const app = new Hono()
 
@@ -121,6 +122,8 @@ app.get('/:id', async (c) => {
 
   return success(c, {
     ...toSnakeCase(drama),
+    // 题材规则集（Issue #32）：开关优先、否则按 genre 关键字归一，供项目设置显示归一化结果
+    genre_ruleset: resolveRulesetWithMode(drama.genre, drama.documentaryRules),
     tags: drama.tags ? JSON.parse(drama.tags) : [],
     episodes: toSnakeCaseArray(eps),
     characters: withTime(chars),
@@ -143,6 +146,12 @@ app.put('/:id', async (c) => {
   if (body.title !== undefined) updates.title = body.title
   if (body.description !== undefined) updates.description = body.description
   if (body.genre !== undefined) updates.genre = body.genre
+  if (body.documentary_rules !== undefined) {
+    if (body.documentary_rules !== null && !isDocumentaryRuleMode(body.documentary_rules)) {
+      return badRequest(c, '纪录片规则开关只能是 auto / on / off')
+    }
+    updates.documentaryRules = body.documentary_rules
+  }
   if (body.style !== undefined) updates.style = body.style
   if (body.aspect_ratio !== undefined) updates.aspectRatio = body.aspect_ratio
   if (body.status !== undefined) updates.status = body.status

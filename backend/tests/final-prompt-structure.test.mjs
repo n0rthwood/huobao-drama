@@ -24,9 +24,9 @@ test('grid prompt agent tools save agent-written final prompts with style inject
 
   assert.match(tools, /save_character_final_prompt/)
   assert.match(tools, /save_scene_final_prompt/)
-  // 保存时注入项目视觉风格并落库
+  // 保存时注入项目视觉风格并落库，同时记来源标记（Issue #32）
   assert.match(tools, /getDramaStylePrompt/)
-  assert.match(tools, /set\(\{ finalPrompt, updatedAt: now\(\) \}\)/)
+  assert.match(tools, /set\(\{ finalPrompt, finalPromptSource: 'agent', finalPromptUpdatedAt: \w+, updatedAt: \w+ \}\)/)
   // 提示词由 Agent 创作，不再由工具机械拼接
   assert.doesNotMatch(tools, /generate_character_prompt/)
   assert.doesNotMatch(tools, /generate_scene_prompt/)

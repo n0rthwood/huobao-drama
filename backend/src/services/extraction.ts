@@ -53,6 +53,35 @@ export async function startExtraction(
   target: ExtractTarget,
   opts: { model?: string; configId?: number; retryOf?: number } = {},
 ): Promise<boolean> {
+  return startExtractorRun(episodeId, dramaId, target, EXTRACT_MESSAGES[target], opts)
+}
+
+/**
+ * 单资产重新提取（Issue #32）：迭代规则时只想重跑一个人物（如彼得一世），
+ * 不必整集重跑。调用方先清空该资产的提取字段，再用指名道姓的指令跑同一个提取 Agent——
+ * save_dedup_* 的「只补空白」合并语义因此不用改（那是 Issue #15 的刻意设计）。
+ */
+export async function startSingleAssetExtraction(
+  episodeId: number,
+  dramaId: number,
+  target: ExtractTarget,
+  assetName: string,
+  opts: { model?: string; configId?: number } = {},
+): Promise<boolean> {
+  const label = { characters: '角色', scenes: '场景', props: '道具' }[target]
+  const message = `请只针对本集剧本中的${label}「${assetName}」重新提取信息并保存，不要处理其它${label}；`
+    + `提取与去重规范以系统提示词与技能为准。该${label}的既有字段已被清空，请完整重写。`
+  return startExtractorRun(episodeId, dramaId, target, message, { ...opts, singleAssetName: assetName })
+}
+
+/** 提取 Agent 的统一运行入口（整集提取与单资产重提取共用） */
+async function startExtractorRun(
+  episodeId: number,
+  dramaId: number,
+  target: ExtractTarget,
+  message: string,
+  opts: { model?: string; configId?: number; retryOf?: number; singleAssetName?: string } = {},
+): Promise<boolean> {
   const kind = EXTRACT_TASK_KINDS[target]
   if (await findActiveTextTask(episodeId, kind)) return false
 
@@ -61,7 +90,7 @@ export async function startExtraction(
     kind,
     episodeId,
     dramaId,
-    prompt: EXTRACT_MESSAGES[target],
+    prompt: message,
     provider: resolved.provider,
     model: resolved.model,
     configId: opts.configId ?? resolved.configId ?? undefined,
@@ -77,8 +106,9 @@ export async function startExtraction(
       dramaId,
       modelOverride: opts.model || undefined,
       textConfigId: opts.configId || undefined,
+      singleAssetName: opts.singleAssetName,
     })
-    return runAgent(agent, [{ role: 'user', content: EXTRACT_MESSAGES[target] }], {
+    return runAgent(agent, [{ role: 'user', content: message }], {
       maxSteps: 20,
       requestContext,
       // 逐步打印 Agent 进展：调用了哪些工具、输出了什么
