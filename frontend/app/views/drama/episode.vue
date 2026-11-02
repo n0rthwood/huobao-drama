@@ -708,12 +708,13 @@
                 <button
                   v-if="narrationEnabledOf"
                   class="btn btn-sm"
-                  :disabled="!sbs.length || shotComposeBatch.running"
-                  @click="batchCompose(videoSelectMode && selectedVideoSbIds.length ? selectedVideoSbIds : undefined)"
+                  :disabled="!sbs.length"
+                  :title="composeBatchRunning ? t('episode.composeBatch.runningHint') : undefined"
+                  @click="openComposeDialog(videoSelectMode && selectedVideoSbIds.length ? selectedVideoSbIds : undefined)"
                 >
-                  <Loader2 v-if="shotComposeBatch.running" :size="11" class="animate-spin" />
-                  {{ shotComposeBatch.running
-                    ? t('episode.compose.batchProgress', { done: shotComposeBatch.completed, total: shotComposeBatch.total })
+                  <Loader2 v-if="composeBatchRunning" :size="11" class="animate-spin" />
+                  {{ composeBatchRunning
+                    ? t('episode.compose.batchProgress', { done: composeTask?.completed || 0, total: composeTask?.total || 0 })
                     : (videoSelectMode && selectedVideoSbIds.length ? t('episode.compose.batchSelected', { n: selectedVideoSbIds.length }) : t('episode.compose.batch')) }}
                 </button>
               </div>
@@ -833,6 +834,14 @@
                         <span class="video-task-unconfirmed" :title="videoBlockReason(task.storyboard)">{{ t('episode.ref.issueCount', { n: videoBlockIssues(task.storyboard).length }) }}</span>
                       </template>
                     </div>
+                    <!-- 视频状态与融合状态是两件事：融合独占一行，窄列表也不会被截成半个词 -->
+                    <div
+                      v-if="narrationEnabledOf"
+                      :class="['video-task-fusion', 'is-' + composeStatusOf(task.storyboard)]"
+                      :title="composeReasonOf(task.storyboard) || composeStatusLabel(task.storyboard)"
+                    >
+                      {{ t('episode.compose.listPrefix') }}{{ composeStatusLabel(task.storyboard) }}
+                    </div>
                     <div v-if="task.error" class="video-task-error" :title="task.error">
                       {{ mapError(task.error) }}
                       <div v-if="videoModerationHint(task.error)" class="video-task-error-hint">{{ videoModerationHint(task.error) }}</div>
@@ -864,7 +873,30 @@
                           {{ videoTaskStatusLabel(selectedSb) }}
                         </span>
                         <span v-if="selectedSb.duration" class="video-player-sub">{{ selectedSb.duration }}s</span>
-                        <MediaTime :at="mediaTimeOf(selectedSb, previewVideoUrl || getVideoUrl(selectedSb))" />
+                        <MediaTime :at="mediaTimeOf(selectedSb, mainPlayerUrl)" />
+                      </div>
+                      <!-- 原片 / 融合成片两个页签（#42）：成片不是「另一个小播放器」，就在主播放器里 -->
+                      <div v-if="narrationEnabledOf" class="video-source-tabs" role="tablist">
+                        <button
+                          type="button"
+                          role="tab"
+                          :aria-selected="playerSource === 'original' || !!previewVideoUrl"
+                          :class="['video-source-tab', { on: playerSource === 'original' || !!previewVideoUrl }]"
+                          @click="setPlayerSource('original')"
+                        >
+                          {{ t('episode.compose.sourceOriginal') }}
+                        </button>
+                        <button
+                          type="button"
+                          role="tab"
+                          :aria-selected="playerSource === 'fusion' && !previewVideoUrl"
+                          :class="['video-source-tab', { on: playerSource === 'fusion' && !previewVideoUrl }]"
+                          :disabled="!selectedFusionUrl"
+                          :title="selectedFusionUrl ? undefined : t('episode.compose.none')"
+                          @click="setPlayerSource('fusion')"
+                        >
+                          {{ t('episode.compose.sourceFusion') }}
+                        </button>
                       </div>
                       <button
                         v-if="previewVideoUrl"
@@ -874,21 +906,27 @@
                         {{ t('episode.vid.setMain') }}
                       </button>
                       <a
-                        v-if="previewVideoUrl || hasVid(selectedSb)"
-                        :href="mediaUrl(previewVideoUrl || getVideoUrl(selectedSb))"
+                        v-if="mainPlayerUrl"
+                        :href="mediaUrl(mainPlayerUrl)"
                         download
                         class="btn btn-sm"
                       >
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 2 0 0 1-2 2H5a2 2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                         {{ t('common.download') }}
                       </a>
                     </div>
+                    <div
+                      v-if="playerSource === 'fusion' && !previewVideoUrl && selectedFusionStale"
+                      class="video-fusion-warn"
+                    >
+                      {{ t('episode.compose.staleWarn', { reason: composeReasonOf(selectedSb) || composeStatusLabel(selectedSb) }) }}
+                    </div>
                     <div class="video-player-stage">
                       <video
-                        v-if="previewVideoUrl || hasVid(selectedSb)"
-                        :key="previewVideoUrl || getVideoUrl(selectedSb)"
-                        :src="mediaUrl(previewVideoUrl || getVideoUrl(selectedSb))"
-                        :poster="posterOf(mediaUrl(previewVideoUrl || getVideoUrl(selectedSb))) || undefined"
+                        v-if="mainPlayerUrl"
+                        :key="mainPlayerUrl"
+                        :src="mediaUrl(mainPlayerUrl)"
+                        :poster="posterOf(mediaUrl(mainPlayerUrl)) || undefined"
                         controls
                         preload="metadata"
                         playsinline
@@ -993,9 +1031,31 @@
                 <!-- 右栏检查器（#28 Q1）：转场 + 视频提示词编辑，时长/生效配置/生成常驻底部 -->
                 <aside class="video-task-inspector">
                   <div class="video-inspector-body video-inspector-prompts">
+                    <!-- 融合首屏（#42）：状态 / 输入就绪 / 唯一的融合 CTA，不用滚到底才看得见 -->
+                    <ShotFusionPanel
+                      :storyboard="selectedSb"
+                      :compose-state="composeStateOf(selectedSb)"
+                      :narration-enabled="narrationEnabledOf"
+                      :narration-save="fieldSaveInfo(selectedSb, 'narration_text')"
+                      :episode-fit-default="episodeFitDefault"
+                      :episode-mix-mode="episodeAudioMixMode"
+                      :batch-running="composeBatchRunning"
+                      @composed="onShotComposed"
+                      @refresh="refresh"
+                      @open-batch="openComposeDialog()"
+                      @preview-fusion="setPlayerSource('fusion')"
+                    />
                     <section v-if="shotInheritsFirst(selectedSb)" class="video-inspector-section transition-section">
                       <div class="video-inspector-prompt-head">
-                        <span class="video-inspector-label video-inspector-label-hero">{{ t('episode.trans.section') }}</span>
+                        <button
+                          type="button"
+                          class="video-section-toggle"
+                          :aria-expanded="inspectorOpen.transition"
+                          @click="inspectorOpen.transition = !inspectorOpen.transition"
+                        >
+                          <ChevronRight :size="12" :class="['video-section-caret', { open: inspectorOpen.transition }]" />
+                          <span class="video-inspector-label video-inspector-label-hero">{{ t('episode.trans.section') }}</span>
+                        </button>
                         <FieldSaveStatus
                           :status="fieldSaveInfo(selectedSb, 'transition_prompt').status"
                           :at="fieldSaveInfo(selectedSb, 'transition_prompt').at"
@@ -1019,6 +1079,7 @@
                           {{ t('episode.trans.generate') }}
                         </button>
                       </div>
+                      <template v-if="inspectorOpen.transition">
                       <div class="transition-summary">
                         <span>{{ t('episode.trans.summary', {
                           n: prevShotOf(selectedSb) ? sbs.indexOf(prevShotOf(selectedSb)) + 1 : '-',
@@ -1043,10 +1104,23 @@
                       />
                       <RefIssueList :issues="transitionIssues(selectedSb)" />
                       <div class="transition-duration">{{ transitionDurationHint(selectedSb) }}</div>
+                      </template>
                     </section>
-                    <!-- 旁白 + 本镜合成（#30 C.3）：在转场与视频提示词之间 -->
+                    <!-- 旁白编辑（#30 C.3）：融合参数与 CTA 已上移到首屏，这里只留文本/配音/字幕 -->
                     <section v-if="narrationEnabledOf" class="video-inspector-section">
+                      <div class="video-inspector-prompt-head">
+                        <button
+                          type="button"
+                          class="video-section-toggle"
+                          :aria-expanded="inspectorOpen.narration"
+                          @click="inspectorOpen.narration = !inspectorOpen.narration"
+                        >
+                          <ChevronRight :size="12" :class="['video-section-caret', { open: inspectorOpen.narration }]" />
+                          <span class="video-inspector-label video-inspector-label-hero">{{ t('episode.narration.section') }}</span>
+                        </button>
+                      </div>
                       <NarrationBlock
+                        v-show="inspectorOpen.narration"
                         :storyboard="selectedSb"
                         :field-save="fieldSaveInfo(selectedSb, 'narration_text')"
                         :episode-timing="episodeSubtitleTiming"
@@ -1054,7 +1128,7 @@
                         :episode-fit-default="episodeFitDefault"
                         :episode-normalize="episodeNarrationNormalize"
                         :narration-batch="narrationBatch"
-                        show-compose
+                        :show-fit="false"
                         @update-field="updateField"
                         @field-dirty="markFieldDirty"
                         @refresh="refresh"
@@ -1062,7 +1136,15 @@
                     </section>
                     <section class="video-inspector-section">
                       <div class="video-inspector-prompt-head">
-                        <span class="video-inspector-label video-inspector-label-hero">{{ t('episode.sb.videoPromptSection') }}</span>
+                        <button
+                          type="button"
+                          class="video-section-toggle"
+                          :aria-expanded="inspectorOpen.prompt"
+                          @click="inspectorOpen.prompt = !inspectorOpen.prompt"
+                        >
+                          <ChevronRight :size="12" :class="['video-section-caret', { open: inspectorOpen.prompt }]" />
+                          <span class="video-inspector-label video-inspector-label-hero">{{ t('episode.sb.videoPromptSection') }}</span>
+                        </button>
                         <FieldSaveStatus
                           :status="fieldSaveInfo(selectedSb, 'video_prompt').status"
                           :at="fieldSaveInfo(selectedSb, 'video_prompt').at"
@@ -1087,43 +1169,58 @@
                           {{ promptHeadVideoActionLabel(selectedSb) }}
                         </button>
                       </div>
-                      <MentionTextarea
-                        :model-value="selectedSb.video_prompt || selectedSb.videoPrompt || ''"
-                        :options="mentionOptions"
-                        :rows="14"
-                        input-class="textarea video-inspector-prompt"
-                        :placeholder="t('episode.inspector.videoPromptPlaceholder')"
-                        @update:model-value="v => markFieldDirty(selectedSb, 'video_prompt', v)"
-                        @commit="v => updateField(selectedSb, 'video_prompt', v)"
-                      />
-                      <RefIssueList :issues="videoPromptIssues(selectedSb)" />
+                      <template v-if="inspectorOpen.prompt">
+                        <MentionTextarea
+                          :model-value="selectedSb.video_prompt || selectedSb.videoPrompt || ''"
+                          :options="mentionOptions"
+                          :rows="14"
+                          input-class="textarea video-inspector-prompt"
+                          :placeholder="t('episode.inspector.videoPromptPlaceholder')"
+                          @update:model-value="v => markFieldDirty(selectedSb, 'video_prompt', v)"
+                          @commit="v => updateField(selectedSb, 'video_prompt', v)"
+                        />
+                        <RefIssueList :issues="videoPromptIssues(selectedSb)" />
+                      </template>
                     </section>
                   </div>
 
-                  <!-- 分镜时长 + 生成操作常驻底部：不随提示词区滚动 -->
-                  <div class="video-inspector-footer">
-                    <section class="video-inspector-section video-params-card">
-                      <div class="video-param-row">
-                        <span class="video-param-name">{{ t('episode.inspector.duration') }}</span>
-                        <span class="video-param-control">
-                          <input
-                            :value="selectedSb.duration || 10"
-                            type="number"
-                            min="2"
-                            max="30"
-                            class="input video-duration-input"
-                            @change="onVideoDurationChange"
-                          />
-                          <span class="video-param-unit">{{ t('episode.inspector.durationUnit') }}</span>
-                        </span>
-                      </div>
-                      <div class="video-param-hint">{{ t('episode.inspector.durationHint') }}</div>
-                      <div v-if="narrationEnabledOf" class="video-param-hint">{{ t('episode.compose.durationNote') }}</div>
-                    </section>
-                    <div class="video-inspector-effective">
-                      {{ t('episode.inspector.effective', { model: effectiveVideoModelLabel || t('episode.vid.defaultModel'), res: episodeResolutionShort, dur: effectiveVideoDuration }) }}
+                  <!-- 视频重绘参数常驻底部：可折叠成一行，长内容仍能滚动到底不被遮挡（#42） -->
+                  <div :class="['video-inspector-footer', { 'is-collapsed': !footerOpen }]">
+                    <div class="video-footer-bar">
+                      <button
+                        type="button"
+                        class="video-section-toggle"
+                        :aria-expanded="footerOpen"
+                        @click="footerOpen = !footerOpen"
+                      >
+                        <ChevronRight :size="12" :class="['video-section-caret', { open: footerOpen }]" />
+                        <span class="video-inspector-label">{{ t('episode.inspector.videoFooterTitle') }}</span>
+                      </button>
+                      <span class="ml-auto video-footer-summary">
+                        {{ t('episode.inspector.effective', { model: effectiveVideoModelLabel || t('episode.vid.defaultModel'), res: episodeResolutionShort, dur: effectiveVideoDuration }) }}
+                      </span>
                     </div>
-                    <div class="video-eta-line" :title="videoEtaLine">{{ videoEtaLine }}</div>
+                    <template v-if="footerOpen">
+                      <section class="video-inspector-section video-params-card">
+                        <div class="video-param-row">
+                          <span class="video-param-name">{{ t('episode.inspector.duration') }}</span>
+                          <span class="video-param-control">
+                            <input
+                              :value="selectedSb.duration || 10"
+                              type="number"
+                              min="2"
+                              max="30"
+                              class="input video-duration-input"
+                              @change="onVideoDurationChange"
+                            />
+                            <span class="video-param-unit">{{ t('episode.inspector.durationUnit') }}</span>
+                          </span>
+                        </div>
+                        <div class="video-param-hint">{{ t('episode.inspector.durationHint') }}</div>
+                        <div v-if="narrationEnabledOf" class="video-param-hint">{{ t('episode.compose.durationNote') }}</div>
+                      </section>
+                      <div class="video-eta-line" :title="videoEtaLine">{{ videoEtaLine }}</div>
+                    </template>
                     <button
                       class="btn btn-primary video-inspector-action"
                       :disabled="videoTaskState(selectedSb) === 'pending' || !isShotConfirmed(selectedSb)"
@@ -1285,17 +1382,49 @@
                     {{ exportSelectedReadyIds.length === exportReadyIds.length && exportReadyIds.length ? t('episode.export.clearSelection') : t('episode.export.selectAllReady') }}
                   </button>
                   <button
+                    class="btn btn-sm"
+                    :disabled="!exportComposeReadyIds.length || exportComposeReadyIds.length === exportSelectedReadyIds.length"
+                    :title="t('episode.export.selectReadyOnlyTitle')"
+                    @click="selectExportReadyOnly"
+                  >
+                    {{ t('episode.export.selectReadyOnly', { n: exportComposeReadyIds.length }) }}
+                  </button>
+                  <button
+                    v-if="narrationEnabledOf && exportRepairIds.length"
+                    class="btn btn-sm"
+                    @click="openComposeDialog(exportRepairIds)"
+                  >
+                    {{ t('episode.export.repairFusion', { n: exportRepairIds.length }) }}
+                  </button>
+                  <button
                     class="btn btn-sm btn-primary"
                     :disabled="!exportSelectedReadyIds.length"
-                    @click="doMerge(exportSelectedReadyIds)"
+                    @click="askMerge"
                   >
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
                     {{ t('episode.export.mergeSelected', { n: exportSelectedReadyIds.length }) }}
                   </button>
                 </div>
               </div>
-              <div v-if="narrationEnabledOf && uncomposedSelectedCount" class="export-compose-warn">
-                {{ t('episode.compose.mergeWarnUncomposed', { n: uncomposedSelectedCount }) }}
+              <!-- 拼接来源与就绪情况：先说清用的是融合成片还是原视频，再说差多少（#42） -->
+              <div class="export-ready-bar">
+                <span class="export-ready-source">{{ t('episode.export.sourceLine', { source: exportSourceLabel }) }}</span>
+                <span class="export-ready-ok">{{ t('episode.export.readyCount', { n: exportComposeReadyIds.length, total: exportSelectedReadyIds.length }) }}</span>
+                <span v-if="exportBlockedSelected.length" class="export-ready-bad">
+                  {{ t('episode.export.notReadyCount', { n: exportBlockedSelected.length }) }}
+                </span>
+              </div>
+              <div v-if="exportBlockedSelected.length" class="export-compose-warn">
+                <div class="export-compose-skipped-title">{{ t('episode.export.notReadyTitle') }}</div>
+                <span v-for="item in exportBlockedSelected" :key="item.id">
+                  {{ t('episode.compose.skippedItem', { n: item.number, reason: item.reason || item.label }) }}
+                </span>
+              </div>
+              <div v-if="mergeBlocked.length" class="export-compose-skipped">
+                <div class="export-compose-skipped-title">{{ t('episode.export.blockedTitle') }}</div>
+                <span v-for="item in mergeBlocked" :key="item.storyboard_id">
+                  {{ t('episode.compose.skippedItem', { n: item.storyboard_number, reason: item.reason }) }}
+                </span>
               </div>
               <div v-if="mergeSkipped.length" class="export-compose-skipped">
                 <div class="export-compose-skipped-title">{{ t('episode.compose.skippedTitle') }}</div>
@@ -1307,11 +1436,13 @@
                 <div
                   v-for="(sb, i) in sbs"
                   :key="sb.id"
-                  :class="['exp-card', { selected: isExportSelected(sb.id), playable: hasVid(sb) }]"
-                  :role="hasVid(sb) ? 'button' : undefined"
-                  :tabindex="hasVid(sb) ? 0 : undefined"
+                  :class="['exp-card', { selected: isExportSelected(sb.id), playable: hasUsableVideo(sb) }]"
+                  :role="hasUsableVideo(sb) ? 'button' : undefined"
+                  :tabindex="hasUsableVideo(sb) ? 0 : undefined"
+                  :aria-pressed="hasUsableVideo(sb) ? isExportSelected(sb.id) : undefined"
                   @click="toggleExportSelect(sb)"
                   @keydown.enter.prevent="toggleExportSelect(sb)"
+                  @keydown.space.prevent="toggleExportSelect(sb)"
                 >
                   <div class="exp-thumb">
                     <video
@@ -1336,7 +1467,7 @@
                     >
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="6 3 20 12 6 21 6 3"/></svg>
                     </span>
-                    <span v-if="hasVid(sb)" :class="['exp-check', isExportSelected(sb.id) && 'on']">
+                    <span v-if="hasUsableVideo(sb)" :class="['exp-check', isExportSelected(sb.id) && 'on']">
                       <svg v-if="isExportSelected(sb.id)" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                     </span>
                   </div>
@@ -1344,8 +1475,12 @@
                     <span class="truncate" style="flex:1;font-size:11px">{{ sb.description || sb.title || '—' }}</span>
                     <MediaTime v-if="hasVid(sb)" :at="mediaTimeOf(sb, getVideoUrl(sb))" />
                     <span :class="['dot', hasVid(sb) && 'ok']" />
-                    <span v-if="narrationEnabledOf" :class="['exp-compose-state', isComposed(sb) ? 'is-done' : 'is-todo']">
-                      {{ isComposed(sb) ? t('episode.compose.composed') : t('episode.compose.notComposed') }}
+                    <span
+                      v-if="narrationEnabledOf"
+                      :class="['exp-compose-state', 'is-' + composeStatusOf(sb)]"
+                      :title="composeReasonOf(sb) || composeStatusLabel(sb)"
+                    >
+                      {{ composeStatusLabel(sb) }}
                     </span>
                   </div>
                 </div>
@@ -1890,6 +2025,58 @@
         </div>
       </div>
 
+      <!-- 批量融合（#42）：视频制作页与导出页共用，先预览分类再按显式勾选执行 -->
+      <ComposeBatchDialog
+        :open="composeDialog.open"
+        :episode-id="Number(epId)"
+        :scope-ids="composeDialog.scopeIds"
+        :status="composeTask"
+        :submitting="composeDialog.submitting"
+        @cancel="composeDialog.open = false"
+        @submit="submitComposeBatch"
+        @update:scope-ids="ids => { composeDialog.scopeIds = ids }"
+      />
+
+      <!-- 拼接确认（#42）：纳入/排除镜号与数量必须在确认前看得见 -->
+      <div v-if="mergeConfirm.open" class="overlay" @click.self="closeMergeConfirm">
+        <div
+          ref="mergeConfirmEl"
+          class="dialog merge-confirm-dialog"
+          role="dialog"
+          aria-modal="true"
+          tabindex="-1"
+          :aria-label="t('episode.export.confirmTitle')"
+          @keydown.esc.stop.prevent="closeMergeConfirm"
+          @keydown.tab="onMergeConfirmTab"
+        >
+          <header class="dialog-head">
+            <h2 class="dialog-title">{{ t('episode.export.confirmTitle') }}</h2>
+            <button class="btn btn-ghost btn-icon" :aria-label="t('common.cancel')" @click="closeMergeConfirm">
+              <X :size="14" />
+            </button>
+          </header>
+          <div class="dialog-body merge-confirm-body">
+            <p class="merge-confirm-line">{{ t('episode.export.sourceLine', { source: exportSourceLabel }) }}</p>
+            <div class="merge-confirm-group">
+              <span class="merge-confirm-label">{{ t('episode.export.confirmIncluded', { n: mergeConfirm.included.length }) }}</span>
+              <span class="merge-confirm-shots">{{ mergeConfirm.included.map(shotNumberLabel).join(t('common.listJoin')) || t('episode.export.confirmNone') }}</span>
+            </div>
+            <div class="merge-confirm-group">
+              <span class="merge-confirm-label">{{ t('episode.export.confirmExcluded', { n: mergeConfirm.excluded.length }) }}</span>
+              <span class="merge-confirm-shots">{{ mergeConfirm.excluded.map(shotNumberLabel).join(t('common.listJoin')) || t('episode.export.confirmNone') }}</span>
+            </div>
+            <p class="merge-confirm-note">{{ t('episode.export.confirmNote') }}</p>
+          </div>
+          <footer class="dialog-foot">
+            <button class="btn" :disabled="mergeConfirm.loading" @click="closeMergeConfirm">{{ t('common.cancel') }}</button>
+            <button class="btn btn-primary" :disabled="mergeConfirm.loading || !mergeConfirm.ids.length" @click="confirmMerge">
+              <Loader2 v-if="mergeConfirm.loading" :size="12" class="animate-spin" />
+              {{ t('episode.export.confirmStart', { n: mergeConfirm.included.length }) }}
+            </button>
+          </footer>
+        </div>
+      </div>
+
       <ConfirmDialog
         :open="assetDelete.open"
         :title="t('episode.delete.title', { type: assetDeleteTypeLabel })"
@@ -2016,7 +2203,7 @@ import { toast } from 'vue-sonner'
 import { useI18n } from 'vue-i18n'
 import {
   Users, FileText, FolderKanban, Clapperboard, Download, Loader2, Images,
-  Image as ImageIcon, Plus, X, Trash2, CircleHelp,
+  Image as ImageIcon, Plus, X, Trash2, CircleHelp, ChevronRight,
 } from 'lucide-vue-next'
 import { api, dramaAPI, episodeAPI, storyboardAPI, characterAPI, sceneAPI, propAPI, taskAPI, mergeAPI, posterAPI, aiConfigAPI, uploadAPI, mediaLibraryAPI, videoQueueAPI, assetBatchAPI } from '~/composables/useApi'
 import { startTour, autoTour } from '~/composables/useTour'
@@ -2042,6 +2229,8 @@ import BreakdownNarrationDialog from '~/components/BreakdownNarrationDialog.vue'
 import NarrationSettingsPanel from '~/components/NarrationSettingsPanel.vue'
 import NarrationVoiceDialog from '~/components/NarrationVoiceDialog.vue'
 import AssetBatchDialog from '~/components/AssetBatchDialog.vue'
+import ShotFusionPanel from '~/components/ShotFusionPanel.vue'
+import ComposeBatchDialog from '~/components/ComposeBatchDialog.vue'
 import { mediaTimeOfPath } from '~/utils/mediaTime'
 import {
   useNowTicker,
@@ -2155,7 +2344,9 @@ const posterPreviewUrl = computed(() => {
   return version?.image ? thumbOf(mediaUrl(version.image)) : ''
 })
 
-const exportReadyIds = computed(() => sbs.value.filter(s => hasVid(s)).map(s => s.id))
+// 导出可选 = 本镜原始视频真实可用（以后端文件判定为准）：合成片是派生产物，
+// 「只剩成片」或源文件已丢的镜头都不能冒充有素材
+const exportReadyIds = computed(() => sbs.value.filter(s => hasUsableVideo(s)).map(s => s.id))
 const exportSelectedReadyIds = computed(() => exportSelectedIds.value.filter(id => exportReadyIds.value.includes(id)))
 
 watch(exportReadyIds, (ids) => {
@@ -2168,7 +2359,7 @@ watch(exportReadyIds, (ids) => {
 
 function isExportSelected(id) { return exportSelectedIds.value.includes(id) }
 function toggleExportSelect(sb) {
-  if (!hasVid(sb)) return
+  if (!hasUsableVideo(sb)) return
   exportSelTouched = true
   exportSelectedIds.value = isExportSelected(sb.id)
     ? exportSelectedIds.value.filter(x => x !== sb.id)
@@ -2177,6 +2368,35 @@ function toggleExportSelect(sb) {
 function toggleSelectAllExport() {
   exportSelTouched = true
   exportSelectedIds.value = exportSelectedReadyIds.value.length === exportReadyIds.value.length ? [] : [...exportReadyIds.value]
+}
+
+// ===== 导出就绪（#42）：集级旁白开启时只认签名匹配的融合片，关闭时维持原视频拼接 =====
+/** 当前所选里真正可拼接的镜头（融合最新 / 旁白关闭时有视频） */
+const exportComposeReadyIds = computed(() =>
+  exportSelectedReadyIds.value.filter(id => composeExportable(sbs.value.find(sb => sb.id === id))))
+/** 已选但不可拼接：逐镜给出状态与原因，不静默少镜 */
+const exportBlockedSelected = computed(() => exportSelectedReadyIds.value
+  .map(id => sbs.value.find(sb => sb.id === id))
+  .filter(sb => sb && !composeExportable(sb))
+  .map(sb => ({
+    id: sb.id,
+    number: sbs.value.indexOf(sb) + 1,
+    status: composeStatusOf(sb),
+    label: composeStatusLabel(sb),
+    reason: composeReasonOf(sb),
+  })))
+/** 已选、需要先补融合（缺失 / 已变化 / 待核验）的镜头：同一批量预览可直接修复 */
+const exportRepairIds = computed(() => exportBlockedSelected.value
+  .filter(item => ['missing', 'changed', 'unknown', 'skipped'].includes(item.status))
+  .map(item => item.id))
+const exportSourceLabel = computed(() => (narrationEnabledOf.value
+  ? t('episode.export.sourceComposed')
+  : t('episode.export.sourceRaw')))
+
+/** 「仅选就绪镜头」：把选择显式缩小到可拼接的那批，而不是让后端悄悄跳过 */
+function selectExportReadyOnly() {
+  exportSelTouched = true
+  exportSelectedIds.value = [...exportComposeReadyIds.value]
 }
 
 async function loadExportMerges() {
@@ -4278,9 +4498,8 @@ async function regenerateAllSubtitles() {
 
 const narrationBatch = ref({ running: false, total: 0, completed: 0 })
 const narrationVoiceBatch = ref({ running: false, total: 0, completed: 0 })
-const shotComposeBatch = ref({ running: false, total: 0, completed: 0 })
 
-/** 集级文本批量（旁白写作 / 旁白配音 / 分镜合成）共用的轮询：与视频提示词批量同一套状态模型 */
+/** 集级文本批量（旁白写作 / 旁白配音）共用的轮询：与视频提示词批量同一套状态模型 */
 function pollTextBatch(stateRef, statusFn, doneKey, attempts = 240) {
   const tick = async (left) => {
     try {
@@ -4388,35 +4607,122 @@ async function confirmNarrationVoiceBatch(settings) {
   }
 }
 
-async function batchCompose(storyboardIds) {
-  if (shotComposeBatch.value.running) return
+// ===== 融合（#42）：状态口径一律来自后端 compose_state，前端不自推「有 URL = 已就绪」 =====
+function composeStateOf(sb) {
+  return sb?.compose_state || sb?.composeState || null
+}
+/** 没有服务端状态时按本集旁白开关兜底：开 = 待核验，关 = 不适用 */
+function composeStatusOf(sb) {
+  return composeStateOf(sb)?.status || (narrationEnabledOf.value ? 'unknown' : 'disabled')
+}
+function composeStatusLabel(sb) {
+  const status = composeStatusOf(sb)
+  return t(`episode.compose.status${status.charAt(0).toUpperCase()}${status.slice(1)}`)
+}
+/**
+ * 本镜视频是否真正可用：以后端的文件级判定为准（URL 非空不等于文件还在）。
+ * 服务端还没给出状态时退回 URL，避免界面整体不可用。
+ */
+function hasUsableVideo(sb) {
+  const inputs = composeStateOf(sb)?.inputs
+  if (inputs && typeof inputs.video === 'boolean') return inputs.video
+  return Boolean(rawVideoUrl(sb))
+}
+/** 可直接用于最终拼接：旁白开启看融合签名，关闭看原视频文件是否还在 */
+function composeExportable(sb) {
+  if (!narrationEnabledOf.value) return hasUsableVideo(sb)
+  return Boolean(composeStateOf(sb)?.exportable)
+}
+function composeReasonOf(sb) {
+  const state = composeStateOf(sb)
+  if (!state) return ''
+  return [state.reason, ...(state.change_reasons || [])].filter(Boolean).join(t('common.listJoin'))
+}
+function fusionUrlOf(sb) {
+  return composeStateOf(sb)?.composed_video_url || sb?.composed_video_url || sb?.composedVideoUrl || ''
+}
+
+// 批量融合任务：状态持久化在 sys_task，进页/刷新后重连，不重复提交
+const composeDialog = ref({ open: false, scopeIds: undefined, submitting: false })
+const composeTask = ref(null)
+const composeBatchRunning = computed(() => composeTask.value?.status === 'running')
+let composePollTimer = null
+// 页面存活标志：融合批量与拼接进度共用，卸载后所有轮询立即停止
+let pollAlive = true
+
+function stopComposePolling() {
+  if (composePollTimer) { clearTimeout(composePollTimer); composePollTimer = null }
+}
+
+/** 轮询批量任务：完成数变化就重拉分镜，让列表/导出的融合状态跟着动 */
+function startComposePolling() {
+  stopComposePolling()
+  const tick = async () => {
+    composePollTimer = null
+    if (!pollAlive) return
+    let st = null
+    try { st = await episodeAPI.composeBatchStatus(epId.value) } catch { /* 网络抖动：下一轮再试 */ }
+    if (!pollAlive) return
+    const before = composeTask.value
+    if (st) composeTask.value = st
+    if (!st || st.status !== 'running') {
+      await refresh()
+      if (st?.status === 'done') {
+        toast.success(st.failed
+          ? t('episode.compose.batchDoneFailed', { n: st.failed })
+          : t('episode.compose.batchDone'))
+      } else if (st?.status === 'error') {
+        toastError(st.error, { fallback: 'episode.composeBatch.taskFailed' })
+      }
+      return
+    }
+    if ((st.completed || 0) !== (before?.completed || 0)) await refresh()
+    if (pollAlive) composePollTimer = setTimeout(tick, 2500)
+  }
+  composePollTimer = setTimeout(tick, 2500)
+}
+
+/** 进页/刷新后重连既有批量任务（后端重启后的失败任务沿用既有「重试」约定） */
+async function resumeComposeBatch() {
   try {
-    const res = await episodeAPI.composeBatch(epId.value, storyboardIds)
-    if (!res?.total) { toast.info(t('episode.compose.batchNothing')); return }
-    shotComposeBatch.value = { running: true, total: res.total, completed: 0 }
-    toast.info(t('episode.compose.batchStarted', { n: res.total }))
-    pollTextBatch(shotComposeBatch, () => episodeAPI.composeBatchStatus(epId.value), 'episode.compose.batchDone')
+    const st = await episodeAPI.composeBatchStatus(epId.value)
+    composeTask.value = st || null
+    if (st?.status === 'running') startComposePolling()
+  } catch { /* 静默：状态接口不可用时按无任务处理 */ }
+}
+
+/** 批量融合入口：先预览分类（范围可为整集或手动选镜），进行中则展示当前任务 */
+function openComposeDialog(storyboardIds) {
+  const scope = Array.isArray(storyboardIds) && storyboardIds.length ? [...storyboardIds] : undefined
+  composeDialog.value = { open: true, scopeIds: scope, submitting: false }
+  void resumeComposeBatch()
+}
+
+async function submitComposeBatch(ids) {
+  if (!Array.isArray(ids) || !ids.length || composeDialog.value.submitting) return
+  composeDialog.value.submitting = true
+  try {
+    const res = await episodeAPI.composeBatch(epId.value, ids)
+    if (res?.already_running) toast.info(t('episode.compose.batchAlreadyRunning'))
+    else toast.info(t('episode.compose.batchStarted', { n: res?.total ?? ids.length }))
+    await resumeComposeBatch()
   } catch (e) {
     toastError(e)
+  } finally {
+    composeDialog.value.submitting = false
   }
 }
 
 function narrationStatusOf(sb) {
   return sb?.narration_status || sb?.narrationStatus || 'missing'
 }
-function isComposed(sb) {
-  return Boolean(sb?.composed_video_url || sb?.composedVideoUrl)
-}
 function narrationIssuesOf(sb) {
   return refIssuesOf(sb).filter(i => i.code === 'narration_too_long' || i.code === 'narration_voice_stale')
 }
 
-// 导出页：上一次拼接被跳过的镜头（镜号 + 原因），以及选中但未合成的镜头数
+// 导出页：上一次拼接被跳过的镜头（镜号 + 原因）；被拒时后端逐镜给出原因
 const mergeSkipped = ref([])
-const uncomposedSelectedCount = computed(() => {
-  if (!narrationEnabledOf.value) return 0
-  return sbs.value.filter(sb => exportSelectedReadyIds.value.includes(sb.id) && !isComposed(sb)).length
-})
+const mergeBlocked = ref([])
 
 // 按需为单个分镜生成视频提示词：由 prompt_generator 读取分镜字段生成并保存到 video_prompt
 async function genVideoPrompt(sb) {
@@ -4588,10 +4894,45 @@ onMounted(() => { void loadAssetBatch() })
 onBeforeUnmount(() => { if (assetBatchTimer) clearTimeout(assetBatchTimer) })
 function getVideoUrl(s) { return s?.video_url || s?.videoUrl || s?.composed_video_url || s?.composedVideoUrl || null }
 function hasVid(s) { return !!getVideoUrl(s) }
+/** 本镜的原始视频（不回落到合成片）：导出选镜与原片播放按它判断 */
+function rawVideoUrl(s) { return s?.video_url || s?.videoUrl || '' }
 
 // ===== 分镜视频历史（一个分镜可能生成多个视频,sys_task 留存全部记录）=====
 const sbVideoHistory = ref([])
 const previewVideoUrl = ref('') // 正在预览的历史视频(相对路径);空 = 预览当前主视频
+
+// 右栏长分区可折叠（#42）：折叠偏好跨镜头保持，底部重绘参数也能收成一行，内容不被遮挡
+const inspectorOpen = ref({ transition: true, narration: true, prompt: true })
+const footerOpen = ref(false)
+
+// ===== 主播放器源（#42）：原始视频 / 融合成片两个页签，切镜回到原片 =====
+const playerSource = ref('original')
+const selectedFusionUrl = computed(() => fusionUrlOf(selectedSb.value))
+/** 融合片存在但不是最新签名：可预览，但明确标过期，不能当可导出成片 */
+const selectedFusionStale = computed(() =>
+  Boolean(selectedFusionUrl.value) && composeStatusOf(selectedSb.value) !== 'unchanged')
+const mainPlayerUrl = computed(() => {
+  if (previewVideoUrl.value) return previewVideoUrl.value
+  if (playerSource.value === 'fusion' && selectedFusionUrl.value) return selectedFusionUrl.value
+  return rawVideoUrl(selectedSb.value)
+})
+function setPlayerSource(source) {
+  if (source === 'fusion' && !selectedFusionUrl.value) return
+  previewVideoUrl.value = ''
+  playerSource.value = source
+}
+watch(() => selectedSb.value?.id, () => { playerSource.value = 'original' })
+// 融合片被删/重算掉后不能停留在空的融合页签
+watch(selectedFusionUrl, (url) => { if (!url) playerSource.value = 'original' })
+
+/** 单镜融合完成：只有发起的那一镜仍选中时才切到成片，异步结果不抢当前预览 */
+async function onShotComposed(storyboardId) {
+  await refresh()
+  if (selectedSb.value?.id === storyboardId) {
+    previewVideoUrl.value = ''
+    playerSource.value = 'fusion'
+  }
+}
 
 // 注意:扁平 /tasks 返回原始行(camelCase),任务中心接口返回 snake_case,两种命名都兼容
 function taskVideoPath(t) { return t?.local_path || t?.localPath || t?.result_url || t?.resultUrl || '' }
@@ -4621,6 +4962,8 @@ async function loadSbVideoHistory() {
 watch(() => [selectedSb.value?.id, getVideoUrl(selectedSb.value)], () => { loadSbVideoHistory() })
 
 function previewHistoryVideo(t) {
+  // 历史视频属于原片一侧：看历史时页签回到原始视频
+  playerSource.value = 'original'
   previewVideoUrl.value = isCurrentVideo(t) ? '' : taskVideoPath(t)
 }
 
@@ -5126,13 +5469,88 @@ async function pollVideoGeneration(generationId, storyboardId) {
   toast.error(t('episode.vid.genTimeout'))
   return false
 }
+// 拼接前确认（#42）：纳入/排除镜号必须在确认时看得见，不可静默少镜
+const mergeConfirm = ref({ open: false, ids: [], included: [], excluded: [], loading: false })
+
+function shotNumberLabel(n) { return `#${String(n).padStart(2, '0')}` }
+
+/** 发起拼接：先按服务端就绪口径校验所选，再确认纳入/排除 */
+function askMerge() {
+  mergeBlocked.value = []
+  const selected = exportSelectedReadyIds.value
+  if (!selected.length) {
+    toast.error(t('episode.export.selectFirst'))
+    return
+  }
+  if (exportBlockedSelected.value.length) {
+    mergeBlocked.value = exportBlockedSelected.value.map(item => ({
+      storyboard_id: item.id,
+      storyboard_number: item.number,
+      status: item.status,
+      reason: item.reason || item.label,
+    }))
+    toast.error(t('episode.export.blockedToast', { n: exportBlockedSelected.value.length }))
+    return
+  }
+  const included = selected
+    .map(id => sbs.value.findIndex(sb => sb.id === id) + 1)
+    .filter(n => n > 0)
+    .sort((a, b) => a - b)
+  const excluded = sbs.value
+    .map((sb, index) => ({ sb, number: index + 1 }))
+    .filter(item => !selected.includes(item.sb.id))
+    .map(item => item.number)
+  mergeConfirm.value = { open: true, ids: [...selected], included, excluded, loading: false }
+}
+
+// 确认弹窗的键盘与焦点：Esc 关闭（执行中不关），打开聚焦弹窗，关闭把焦点还给触发按钮
+const mergeConfirmEl = ref(null)
+let mergeConfirmReturnFocus = null
+function closeMergeConfirm() {
+  if (mergeConfirm.value.loading) return
+  mergeConfirm.value.open = false
+}
+function onMergeConfirmTab(event) {
+  const buttons = [...event.currentTarget.querySelectorAll('button')]
+    .filter(button => !button.disabled && button.offsetParent !== null)
+  if (!buttons.length) return
+  const first = buttons[0]
+  const last = buttons[buttons.length - 1]
+  if (event.shiftKey && (document.activeElement === first || document.activeElement === event.currentTarget)) {
+    event.preventDefault()
+    last.focus()
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault()
+    first.focus()
+  }
+}
+watch(() => mergeConfirm.value.open, async (open) => {
+  if (open) {
+    mergeConfirmReturnFocus = document.activeElement
+    await nextTick()
+    mergeConfirmEl.value?.focus()
+  } else if (mergeConfirmReturnFocus?.isConnected) {
+    mergeConfirmReturnFocus.focus()
+    mergeConfirmReturnFocus = null
+  }
+})
+
+async function confirmMerge() {
+  if (mergeConfirm.value.loading) return
+  mergeConfirm.value.loading = true
+  const ok = await doMerge(mergeConfirm.value.ids)
+  mergeConfirm.value.loading = false
+  if (ok) mergeConfirm.value.open = false
+}
+
 async function doMerge(ids) {
   const storyboardIds = Array.isArray(ids) ? ids : undefined
   if (storyboardIds && !storyboardIds.length) {
     toast.error(t('episode.export.selectFirst'))
-    return
+    return false
   }
   mergeSkipped.value = []
+  mergeBlocked.value = []
   const poster = exportPosterEnabled.value && exportPosterVersionId.value
     ? {
         versionId: Number(exportPosterVersionId.value),
@@ -5141,26 +5559,51 @@ async function doMerge(ids) {
     : undefined
   try {
     const res = await mergeAPI.merge(epId.value, storyboardIds, poster)
-    // 开关打开时没有合成版本的镜头会被跳过，接口逐条返回镜号与原因（#30 B.8）
+    // 旁白关闭时没有融合要求；被跳过的镜头接口仍逐条返回镜号与原因（#30 B.8）
     mergeSkipped.value = Array.isArray(res?.skipped) ? res.skipped : []
     toast.success(t('episode.export.mergingToast'))
     if (mergeSkipped.value.length) toast.warning(t('episode.compose.mergeSkippedToast', { n: mergeSkipped.value.length }))
   } catch (e) {
-    toastError(e, { fallback: 'episode.export.mergeFailed' })
-    return
-  }
-  const poll = setInterval(async () => {
-    try { mergeData.value = await mergeAPI.status(epId.value) } catch {}
-    if (mergeData.value?.status === 'completed' || mergeData.value?.status === 'failed') {
-      clearInterval(poll)
-      if (mergeData.value.status === 'completed') {
-        toast.success(t('episode.export.mergeDone'))
-        loadExportMerges()
-      } else {
-        toastError(mergeData.value?.error_msg || mergeData.value?.errorMsg, { fallback: 'episode.export.mergeFailed' })
-      }
+    // 依赖/新鲜度不满足时后端 400 带逐镜原因：就地展示，不泛化成「拼接失败」
+    const blocked = Array.isArray(e?.body?.blocked) ? e.body.blocked : []
+    if (blocked.length) {
+      mergeBlocked.value = blocked
+      toast.error(t('episode.export.blockedToast', { n: blocked.length }))
+    } else {
+      toastError(e, { fallback: 'episode.export.mergeFailed' })
     }
-  }, 3000)
+    await refresh()
+    return false
+  }
+  startMergePolling()
+  return true
+}
+
+// 拼接进度轮询：离开页面即停，不在已销毁的组件上继续发请求
+let mergePollTimer = null
+function stopMergePolling() {
+  if (mergePollTimer) { clearTimeout(mergePollTimer); mergePollTimer = null }
+}
+function startMergePolling() {
+  stopMergePolling()
+  const tick = async () => {
+    mergePollTimer = null
+    if (!pollAlive) return
+    try { mergeData.value = await mergeAPI.status(epId.value) } catch { /* 下一轮再试 */ }
+    if (!pollAlive) return
+    const status = mergeData.value?.status
+    if (status === 'completed') {
+      toast.success(t('episode.export.mergeDone'))
+      await loadExportMerges()
+      return
+    }
+    if (status === 'failed') {
+      toastError(mergeData.value?.error_msg || mergeData.value?.errorMsg, { fallback: 'episode.export.mergeFailed' })
+      return
+    }
+    mergePollTimer = setTimeout(tick, 3000)
+  }
+  mergePollTimer = setTimeout(tick, 3000)
 }
 async function loadConfigs() {
   try {
@@ -5199,6 +5642,14 @@ onMounted(async () => {
   syncExtractStatus()
   loadVideoBatch() // 批量进度在服务端，刷新页面后继续展示
   resumeNarrationBatch() // 旁白批量同理：刷新后按钮仍显示运行态与进度
+  resumeComposeBatch() // 批量融合：浏览器刷新后从持久化任务恢复进度展示
+})
+
+// 离开页面停止融合 / 拼接轮询：组件卸载后不再发请求、不再写已销毁的状态
+onBeforeUnmount(() => {
+  pollAlive = false
+  stopComposePolling()
+  stopMergePolling()
 })
 
 // ===== 应用内引导（工作台）：沿左侧进度栏走 6 步流水线 =====
@@ -6973,6 +7424,68 @@ button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
 .video-task-state.is-done { color: var(--success); }
 .video-task-state.is-pending { color: var(--accent-text); }
 .video-task-state.is-failed { color: var(--warning); }
+/* 融合状态（#42）：与视频状态并列显示，二者含义不同不能混用一个标记 */
+.video-task-fusion {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+.video-task-fusion.is-unchanged { color: var(--tag-success-text); }
+.video-task-fusion.is-missing,
+.video-task-fusion.is-changed { color: var(--accent-text); }
+.video-task-fusion.is-unknown,
+.video-task-fusion.is-skipped { color: var(--tag-warning-text); }
+.video-task-fusion.is-blocked { color: var(--action-danger); }
+/* 主播放器的原片 / 成片页签 */
+.video-source-tabs {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 999px;
+  background: var(--surface-muted);
+}
+.video-source-tab {
+  border: none;
+  background: none;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-3);
+  cursor: pointer;
+}
+.video-source-tab.on { background: var(--surface-raised); color: var(--accent); }
+.video-source-tab:disabled { opacity: 0.5; cursor: not-allowed; }
+.video-fusion-warn {
+  padding: 5px 12px;
+  font-size: 11px;
+  color: var(--tag-warning-text);
+  background: var(--surface-muted);
+  border-bottom: 1px solid var(--border);
+}
+/* 右栏分区折叠头 */
+.video-section-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--text-1);
+}
+.video-section-caret { transition: transform 0.15s; color: var(--text-3); }
+.video-section-caret.open { transform: rotate(90deg); }
+.video-footer-bar { display: flex; align-items: center; gap: 6px; }
+.video-footer-summary {
+  font-size: 11px;
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.video-inspector-footer.is-collapsed { gap: 6px; }
 .video-task-action {
   justify-self: end;
   align-self: center;
@@ -7847,8 +8360,11 @@ button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
 }
 .exp-row-line { display: flex; align-items: center; gap: 8px; min-width: 0; }
 
-/* 旁白开关打开时的导出页提示（#30 C.5） */
+/* 旁白开关打开时的导出页提示（#30 C.5），#42 起也承载「所选未就绪」逐镜原因 */
 .export-compose-warn {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
   padding: 6px 10px;
   border: 1px solid var(--tag-warning-text);
   border-radius: 6px;
@@ -7870,12 +8386,44 @@ button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
   font-weight: 600;
   color: var(--text-1);
 }
+/* 导出就绪条（#42）：来源 + 可拼接/未就绪计数 */
+.export-ready-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: var(--text-2);
+}
+.export-ready-source { font-weight: 600; color: var(--text-1); }
+.export-ready-ok { color: var(--tag-success-text); }
+.export-ready-bad { color: var(--action-danger); }
 .exp-compose-state {
   font-size: 11px;
   white-space: nowrap;
 }
-.exp-compose-state.is-done { color: var(--tag-success-text); }
-.exp-compose-state.is-todo { color: var(--text-3); }
+.exp-compose-state.is-unchanged { color: var(--tag-success-text); }
+.exp-compose-state.is-missing,
+.exp-compose-state.is-changed { color: var(--accent-text); }
+.exp-compose-state.is-unknown,
+.exp-compose-state.is-skipped { color: var(--tag-warning-text); }
+.exp-compose-state.is-blocked { color: var(--action-danger); }
+.exp-compose-state.is-disabled { color: var(--text-3); }
+/* 拼接确认弹窗（#42） */
+.merge-confirm-dialog { width: 520px; max-width: calc(100vw - 48px); }
+.merge-confirm-body { display: flex; flex-direction: column; gap: 10px; }
+.merge-confirm-line { margin: 0; font-size: 12px; color: var(--text-1); }
+.merge-confirm-group { display: flex; flex-direction: column; gap: 3px; }
+.merge-confirm-label { font-size: 12px; font-weight: 600; color: var(--text-1); }
+.merge-confirm-shots {
+  font-size: 11px;
+  color: var(--text-2);
+  max-height: 110px;
+  overflow-y: auto;
+  font-variant-numeric: tabular-nums;
+  word-break: break-word;
+}
+.merge-confirm-note { margin: 0; font-size: 11px; color: var(--text-3); }
 
 /* Shared */
 .dim { color: var(--text-3); }
