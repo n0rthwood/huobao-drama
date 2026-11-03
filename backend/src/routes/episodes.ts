@@ -66,6 +66,7 @@ import type { AssetKind } from '../services/reference-images.js'
 import { loadEpisodeRosterRecord, saveEpisodeRosterRecord } from '../services/character-roster.js'
 import type { RosterEntryInput } from '../services/character-roster.js'
 import { normalizeAssetName } from '../services/asset-name.js'
+import { episodeNarrationCoverage, startFillGapsTask } from '../services/storyboard-fill-gaps.js'
 
 const app = new Hono()
 
@@ -628,6 +629,28 @@ app.get('/:id/intent-status', async (c) => {
   return success(c, await getShotIntentBatchStatus(id))
 })
 
+// GET /episodes/:id/narration-coverage — 旁白覆盖状态（#52）：已覆盖字数与未被任何分镜领走的缺口
+app.get('/:id/narration-coverage', async (c) => {
+  const id = Number(c.req.param('id'))
+  const coverage = await episodeNarrationCoverage(id)
+  if (!coverage) return notFound(c, '剧集不存在')
+  return success(c, coverage)
+})
+
+// POST /episodes/:id/storyboards/fill-gaps — 补全剩余（#52）：保留已拆分镜，只补旁白覆盖缺口
+app.post('/:id/storyboards/fill-gaps', async (c) => {
+  const id = Number(c.req.param('id'))
+  const body = await c.req.json().catch(() => ({}))
+  const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, id))
+  if (!ep) return notFound(c, '剧集不存在')
+  if (resolveDramaProjectType(ep.dramaId) !== 'documentary') return badRequest(c, '只有纪录片项目才有补镜')
+  const result = await startFillGapsTask(id, { model: body.model || undefined, configId: body.config_id ?? undefined })
+  // 同一集已有拆分/补镜任务在跑：拒绝而不是再起一个（两个任务会互相覆盖缺口判定）
+  if (result.reason === 'running') return c.json({ code: 409, message: '该集的拆分/补镜任务正在运行，请等它结束' }, 409)
+  if (!result.started) return success(c, { status: 'idle', gaps: 0 })
+  return success(c, { status: 'running', gaps: result.gaps, task_id: result.taskId })
+})
+
 // POST /episodes/:id/keyframe-batch/preview — 逐个“分镜 × 槽位”列出 缺图/已变化/未变化(同第N版)/阻断/跳过
 app.post('/:id/keyframe-batch/preview', async (c) => {
   const id = Number(c.req.param('id'))
@@ -698,8 +721,10 @@ app.post('/:id/keyframe-batch/retry-failed', async (c) => {
 // GET /episodes/:episode_id/storyboards
 app.get('/:episode_id/storyboards', async (c) => {
   const episodeId = Number(c.req.param('episode_id'))
+  // 已删分镜不进列表：补镜后的整集重编号只排存活分镜（#52），
+  // 带上软删行会出现重号的幽灵卡片
   const rows = await db.select().from(schema.storyboards)
-    .where(eq(schema.storyboards.episodeId, episodeId))
+    .where(and(eq(schema.storyboards.episodeId, episodeId), isNull(schema.storyboards.deletedAt)))
     .orderBy(schema.storyboards.storyboardNumber)
 
   const links = await db.select().from(schema.storyboardCharacters)

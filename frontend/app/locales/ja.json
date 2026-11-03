@@ -66,7 +66,8 @@
       "script_rewrite": "脚本リライト",
       "storyboard_breaker": "分镜の分割",
       "portrait_appearance": "史料画像から容姿を補完",
-      "asset_semantics": "セマンティック注記"
+      "asset_semantics": "セマンティック注記",
+      "storyboard_fill_gaps": "残りのカット補完"
     },
     "detail": {
       "title": "タスク詳細",
@@ -2057,6 +2058,17 @@
       "confirm": "名簿を確認",
       "confirmed": "名簿を確認しました。以後の抽出はこれに従います",
       "draftSaved": "草案を保存しました（未確認のまま）"
+    },
+    "coverage": {
+      "summary": "ナレーション網羅 {covered} / {total} 文字",
+      "gaps": "欠落 {n} 箇所・計 {chars} 文字",
+      "gapItem": "{start}–{end} 文字（{chars} 文字）：{excerpt}",
+      "complete": "脚本はすべてカットに割り当て済み",
+      "fill": "残りを補完",
+      "filling": "補完中…",
+      "running": "このエピソードの分割/補完タスクが実行中です",
+      "started": "残り {n} 箇所の補完を開始しました。進捗はタスクセンターへ",
+      "failed": "残りの補完に失敗しました"
     }
   },
   "poster": {

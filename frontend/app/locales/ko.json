@@ -66,7 +66,8 @@
       "script_rewrite": "대본 리라이팅",
       "storyboard_breaker": "스토리보드 분할",
       "portrait_appearance": "사료 초상으로 외모 보완",
-      "asset_semantics": "시맨틱 주석"
+      "asset_semantics": "시맨틱 주석",
+      "storyboard_fill_gaps": "남은 스토리보드 보완"
     },
     "detail": {
       "title": "작업 상세",
@@ -2057,6 +2058,17 @@
       "confirm": "명단 확정",
       "confirmed": "명단을 확정했습니다. 이후 추출은 이 명단을 따릅니다",
       "draftSaved": "초안을 저장했습니다(검토 대기 상태)"
+    },
+    "coverage": {
+      "summary": "내레이션 커버 {covered} / {total}자",
+      "gaps": "누락 {n}곳, 총 {chars}자",
+      "gapItem": "{start}–{end}자({chars}자): {excerpt}",
+      "complete": "대본이 모두 스토리보드에 배정됨",
+      "fill": "남은 부분 보완",
+      "filling": "보완 중…",
+      "running": "이 에피소드의 분할/보완 작업이 실행 중입니다",
+      "started": "남은 {n}곳 보완을 시작했습니다. 작업 센터에서 확인하세요",
+      "failed": "남은 부분 보완에 실패했습니다"
     }
   },
   "poster": {

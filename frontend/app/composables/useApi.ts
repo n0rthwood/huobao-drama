@@ -147,6 +147,24 @@ export const episodeAPI = {
       config_id: data.config_id || undefined,
     }),
   intentStatus: (id: number) => api.get(`/episodes/${id}/intent-status`),
+  // 旁白覆盖与补全剩余（Issue #52）
+  narrationCoverage: (id: number) =>
+    api.get<{
+      episode_id: number
+      project_type: 'drama' | 'documentary'
+      script_chars: number
+      covered_chars: number
+      uncovered_chars: number
+      gaps: Array<{ start: number; end: number; chars: number; excerpt: string }>
+      gap_count: number
+      shots: number
+      running: boolean
+    }>(`/episodes/${id}/narration-coverage`),
+  fillStoryboardGaps: (id: number, data: { model?: string; config_id?: number } = {}) =>
+    api.post<{ status: 'running' | 'idle'; gaps: number; task_id?: number }>(`/episodes/${id}/storyboards/fill-gaps`, {
+      model: data.model || undefined,
+      config_id: data.config_id || undefined,
+    }),
   // 旁白编辑器的语气 / 多音字 / 停顿选项（#38）
   narrationMarkupCatalog: (id: number) =>
     api.get<{

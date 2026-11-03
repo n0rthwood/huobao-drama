@@ -31,6 +31,7 @@ const TEXT_KIND_LABEL: Record<TextTaskKind, string> = {
   asset_batch: '资产批量',
   asset_semantics: '语义标注',
   shot_intent: '表达设计',
+  storyboard_fill_gaps: '补全剩余分镜',
 }
 
 const ASSET_KIND_LABEL: Record<string, string> = {

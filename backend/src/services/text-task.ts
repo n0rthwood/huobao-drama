@@ -32,6 +32,8 @@ export type TextTaskKind =
   | 'asset_semantics'
   /** 表达设计重算（Issue #49）：按镜产出 intent（信息点/device/must_show/overlay_plan） */
   | 'shot_intent'
+  /** 补全剩余（Issue #52）：只把旁白覆盖缺口补成新分镜，既有分镜原样保留 */
+  | 'storyboard_fill_gaps'
 
 export const TEXT_TASK_KINDS: TextTaskKind[] = [
   'extract_characters', 'extract_scenes', 'extract_props',
@@ -41,6 +43,7 @@ export const TEXT_TASK_KINDS: TextTaskKind[] = [
   'asset_batch',
   'asset_semantics',
   'shot_intent',
+  'storyboard_fill_gaps',
 ]
 
 /**

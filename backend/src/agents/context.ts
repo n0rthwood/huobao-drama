@@ -33,6 +33,8 @@ export interface AgentRequestContextValues {
   researchRunId?: string
   /** 本次运行所属的文本任务 id（Issue #46）：工具的计量写进该任务的 params.vision_calls */
   textTaskId?: number
+  /** 补镜模式（Issue #52）：save_storyboards 改为纯插入，旁白必须落在未覆盖的缺口内 */
+  storyboardFillGaps?: boolean
 }
 
 export function buildAgentRequestContext(values: AgentRequestContextValues): RequestContext<AgentRequestContextValues> {
@@ -47,6 +49,7 @@ export function buildAgentRequestContext(values: AgentRequestContextValues): Req
   if (values.narrationShotNumbers !== undefined) rc.set('narrationShotNumbers', values.narrationShotNumbers)
   if (values.singleAssetName) rc.set('singleAssetName', values.singleAssetName)
   if (values.textTaskId) rc.set('textTaskId', values.textTaskId)
+  if (values.storyboardFillGaps) rc.set('storyboardFillGaps', true)
   // 语言在构建处统一解析：4 条链路（chat/提取/图片提示词/视频提示词）都经过这里，
   // 全局设置一处生效；显式传入 values.language 可按请求覆盖
   rc.set('language', values.language ?? getContentLanguage())
@@ -121,4 +124,9 @@ export function getSingleAssetName(requestContext: RequestContext | undefined): 
 export function getResearchRunId(requestContext: RequestContext | undefined): string | null {
   const v = requestContext?.get('researchRunId' as never)
   return typeof v === 'string' && v ? v : null
+}
+
+/** 本次运行是不是补镜模式（Issue #52）：save_storyboards 纯插入、旁白必须落在缺口内 */
+export function isStoryboardFillGaps(requestContext: RequestContext | undefined): boolean {
+  return requestContext?.get('storyboardFillGaps' as never) === true
 }
