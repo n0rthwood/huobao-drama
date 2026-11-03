@@ -161,6 +161,14 @@ Issue 整理完成后、实施前，必须让 **Fabel（Anthropic）或 Astra（
 - 旧 Qwen3.6 端口（`.175:8300`）现在转发到同一个 DeepSeek 引擎，**只为让其它旧应用的配置不挂**；火宝的「Qwen3.6 (175)」配置已停用（`is_active=0`），并已从 `providers.json` 删除——`apply-local-config` 对文件内条目一律写 `is_active=true`，留着会被重新启用。不要再给火宝配置该端口。
 - 实测（2026-10-28）：tool call 正常；第 1 集「拆分分镜」117 s，`readStoryboardContext` → `saveStoryboards` 存下 4 镜，角色/道具绑定正确。
 
+### Agent 读图工具 `read_image`（Issue #46）
+- `backend/src/agents/tools/vision-tools.ts`，挂在 `extractor` / `storyboard_breaker` / `prompt_generator`。入参 `{ path, question, max_side?=1600, expect_json?=false }`，返回 `{ text|json, model, image } | { unsupported:true, reason } | { error }`，**任何错误都返回对象、不抛**（抛错会打断整次 Agent 运行）。
+- 它**不走当前 Agent 的主模型**：用 `services/vision-capability.ts resolveVisionTextConfig()` 探测出的那条文本配置（本机是 DeepSeek V4.1 Flash）单独发一次 `/chat/completions`。只有 GLM 活跃时返回 `unsupported`，技能按「按文字推断 / 人工填写」降级，任务照常完成。
+- `path` 必须是 `static/` 下的现存 jpg/png/webp（允许 `/static/...` 写法）；越界、目录、不存在、非图片一律报错。
+- 请求组装与档案画像共用 `services/vision-chat.ts`（缩放 JPEG → data URL → 单次请求，`temperature=0.1`，120 s 超时）。工具会在问题前自动写明「这是一张 W×H 像素的图片」——实测不给尺寸口径时模型返回的像素框会整体偏移；返回的 `image.{width,height,source_width,source_height}` 用于把坐标换算回原图。
+- 实测口径（资产 39 原图）：**问一批点名的文字**（10 个地名）像素框可用，开图核对命中；一次要「图上所有地名」（37 条）时定位质量明显下降。折线/多边形描摹不可用——几何交给 CV。
+- 计量：每次调用累加到当前文本任务 `params.vision_calls {count,prompt_tokens,completion_tokens,model}`（`RequestContext.textTaskId` 注入，chat 路由/提取/关键帧·视频提示词批量/换模型重试都带），任务详情弹窗显示「读图调用」。没有任务上下文时只记日志。
+
 ### 文本 Agent 调用：一律流式（Issue #17）
 - 所有 Agent 执行都走 `agents/run.ts runAgent()`（`agent.stream()` → `getFullOutput()` → 有 `error` 即抛），返回结构与 `generate()` 相同；**不要再直接调用 `agent.generate()`**。原因：非流式请求要等模型把推理 + 全部输出生成完才回响应头，长输出（拆分分镜）超过 undici 默认 `headersTimeout=300s`，AI SDK 再重试 2 次 → 约 900 s 后 `Headers Timeout Error`（任务 #281）。HTTP 接口仍是非流式，前端不变。
 - GLM 与 DeepSeek 流式下都会把**工具调用参数生成完再一次性下发**（实测 DeepSeek 1817 字参数前约 22 s 无数据，GLM 约 10 s），一次 `saveStoryboards` 参数可达上万 token。所以 `agents/index.ts getModel` 的 fetch 底层用 npm `undici` 的专用 dispatcher（`bodyTimeout` 15 分钟，`TEXT_MODEL_BODY_TIMEOUT_MS`），fetch 与 dispatcher 必须同源自 npm undici，只作用于文本模型请求。
