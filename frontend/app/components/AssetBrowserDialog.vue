@@ -74,6 +74,8 @@
                   <img v-if="item.image_url" :src="thumbOf(srcOf(item.image_url))" loading="lazy" @error="thumbFallback($event, srcOf(item.image_url))" />
                   <div v-else class="asset-browser-thumb-empty"><ImageOff :size="14" /></div>
                   <span class="asset-browser-kind" :class="'is-' + item.kind">{{ kindLabel(item.kind) }}</span>
+                  <!-- 证据素材（Issue #47）：忠实素材不参与生图，挑素材时要一眼看出来 -->
+                  <span v-if="item.faithful" class="asset-browser-faithful">{{ t('components.assetBrowser.faithful') }}</span>
                 </div>
                 <div class="asset-browser-info">
                   <strong class="asset-browser-name">{{ item.name }}</strong>
@@ -347,6 +349,7 @@ onMounted(load)
 .asset-browser-thumb img { width: 100%; height: 100%; object-fit: cover; }
 .asset-browser-thumb-empty { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: var(--text-3); }
 .asset-browser-kind { position: absolute; left: 2px; bottom: 2px; font-size: 10px; padding: 0 4px; border-radius: 4px; background: var(--overlay-track); }
+.asset-browser-faithful { position: absolute; right: 2px; bottom: 2px; font: 600 10px var(--font-body); padding: 0 4px; border-radius: 4px; background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--warn-text); }
 .asset-browser-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
 .asset-browser-name { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .asset-browser-sub, .asset-browser-meta { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

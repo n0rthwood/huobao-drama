@@ -54,6 +54,8 @@ const submitCases = [
   ['unchanged_after_rewrite', true],
   // Q4：提示词失败不出图（库里残留的旧提示词也不许用——prompt 恒为空串）
   ['failed', false],
+  // Issue #47：证据素材不走提示词阶段，更不出图
+  ['skipped', false],
 ]
 
 const plan = [
@@ -85,6 +87,14 @@ const faithfulCases = [
     [{ provider: 'upload', resultUrl: null, localPath: 'static/uploads/other.png' }], false],
   // 没有当前图 → 谈不上忠实素材
   [{ imageUrl: '', localPath: null }, [{ provider: 'upload', resultUrl: null, localPath: '' }], false],
+  // Issue #47 持久标记：当前图是生成版本，但资产被标成证据素材 → 仍然保护
+  [{ imageUrl: 'static/images/f.png', localPath: 'static/images/f.png', faithful: 1 },
+    [{ provider: 'qwen-jobs', resultUrl: null, localPath: 'static/images/f.png' }], true],
+  // 持久标记为 0 时行为与改造前逐字一致（仍按当前版本的 provider 判）
+  [{ imageUrl: 'static/images/g.png', localPath: 'static/images/g.png', faithful: 0 },
+    [{ provider: 'qwen-jobs', resultUrl: null, localPath: 'static/images/g.png' }], false],
+  // 标记为 1 但还没有任何图 → 也算证据素材（标记一票定案，与有没有图无关）
+  [{ imageUrl: '', localPath: null, faithful: 1 }, [], true],
 ]
 
 const out = execFileSync('npx', ['tsx', '--eval', script], {
@@ -109,7 +119,7 @@ test('选集判定：need_prompt 排在 skip_has_image 之前，忠实素材与�
   })
 })
 
-test('提示词阶段结论 → 是否出图：只有 failed 不出图', () => {
+test('提示词阶段结论 → 是否出图：failed 与 skipped 不出图', () => {
   submitCases.forEach(([outcome, expected], i) => {
     assert.equal(result.submit[i], expected, outcome)
   })
@@ -123,7 +133,7 @@ test('分类统计：缺提示词/重写/复用三类进 will_generate，三类�
   })
 })
 
-test('忠实素材：当前图对应的版本行 provider ∈ {upload, import} 才算', () => {
+test('忠实素材：持久标记一票定案，否则看当前图对应的版本行 provider ∈ {upload, import}', () => {
   faithfulCases.forEach(([, , expected], i) => {
     assert.equal(result.faithful[i], expected, `case ${i}`)
   })

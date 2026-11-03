@@ -65,7 +65,8 @@
       "video_prompts": "動画プロンプト",
       "script_rewrite": "脚本リライト",
       "storyboard_breaker": "分镜の分割",
-      "portrait_appearance": "史料画像から容姿を補完"
+      "portrait_appearance": "史料画像から容姿を補完",
+      "asset_semantics": "セマンティック注記"
     },
     "detail": {
       "title": "タスク詳細",
@@ -226,6 +227,7 @@
       "copiedFromTitle": "素材ライブラリから：{src}"
     },
     "assetBrowser": {
+      "faithful": "忠実素材",
       "title": "アセットマネージャー",
       "subtitleEpisode": "アセットを選択：本プロジェクトのものは本話に紐付け、他プロジェクトのものは全量コピー",
       "subtitleDrama": "他プロジェクトのアセットを本プロジェクトへ全量コピー",
@@ -980,6 +982,15 @@
       "timeRequired": "シーンの時間は空にできません",
       "refSectionTitle": "参考画像",
       "refSectionHint": "生成のガイドで完成画像ではありません。追加・削除・ライブラリから選択できます",
+      "faithfulBadge": "忠実素材",
+      "faithfulHint": "証拠素材（地図・版画・文書）は原本のまま保ち、画像生成やプロンプト書き直しには使いません",
+      "faithfulToggle": "忠実素材として扱う（証拠アセット、再描画しない）",
+      "faithfulNoGen": "忠実素材は生成しません：原本のアップロードか素材ライブラリからの差し替えのみです",
+      "faithfulOffTitle": "忠実素材を解除",
+      "faithfulOffMessage": "解除すると「{name}」は画像生成と一括再描画の対象に戻ります。既存の意味注釈はそのまま残ります。解除しますか？",
+      "faithfulOn": "忠実素材に設定しました",
+      "faithfulOff": "忠実素材を解除しました",
+      "faithfulFailed": "忠実素材の設定に失敗しました",
       "timePeriods": {
         "dawn": "早朝",
         "morning": "午前",
@@ -1770,6 +1781,54 @@
     "documentary": {
       "archivalSectionTitle": "史料リファレンス",
       "archivalSectionHint": "出典の記録のみ。生成には使いません",
+      "semantics": {
+        "sectionTitle": "意味注釈",
+        "sectionHint": "証拠素材の地理・図版の意味。座標は忠実原本に対応します",
+        "title": "意味注釈",
+        "hint": "座標は忠実原本の画像に対応します。ここでは一覧と重ね表示のみ行います",
+        "legend": "出所",
+        "auto": "自動注釈",
+        "autoRunning": "注釈中…",
+        "autoStarted": "自動注釈を開始しました。タスクセンターで確認できます",
+        "autoDone": "自動注釈が完了しました",
+        "autoFailed": "自動注釈に失敗しました",
+        "beautify": "美化生成",
+        "beautifying": "送信中…",
+        "beautifyHint": "美化は派生バージョンを作るだけで原本は変わりません。派生バージョンは忠実度検証に通って初めてベース画像として使えます。",
+        "beautifyStarted": "美化タスクを送信しました",
+        "loading": "注釈を読み込み中…",
+        "loadFailed": "注釈の読み込みに失敗しました",
+        "noBase": "使用できるベース画像がありません。先に原本をアップロードしてください",
+        "empty": "注釈はまだありません",
+        "save": "注釈を保存",
+        "saving": "保存中…",
+        "saved": "注釈を保存しました",
+        "saveFailed": "注釈の保存に失敗しました",
+        "namePlaceholder": "名称",
+        "confidence": "信頼度 {v}",
+        "groupCount": "{n} 件",
+        "noEditorHint": "ここでは名称変更と削除のみできます。点・折れ線・多角形の形状編集はレイヤーエディタで行います。",
+        "group": {
+          "labels": "ラベル",
+          "points": "ポイント",
+          "regions": "領域",
+          "lines": "ライン"
+        },
+        "source": {
+          "vlm": "モデル判定",
+          "cv": "画像解析",
+          "manual": "手動"
+        },
+        "sourceTitle": "忠実原本",
+        "sourceHint": "意味座標はこの画像に対応します。アップロードまたは取り込んだ原本バージョンのみ選べます",
+        "sourceEmpty": "この小道具にはアップロード／取り込みの原本バージョンがありません",
+        "sourceCurrent": "現在の原本",
+        "sourceUse": "忠実原本として使う",
+        "sourceSwitched": "忠実原本を切り替えました",
+        "sourceFailed": "忠実原本の切り替えに失敗しました",
+        "fidelityFailed": "忠実度検証に不合格",
+        "fidelityVerified": "忠実度検証済み"
+      },
       "citationsSectionTitle": "資料出典",
       "citationsSectionHint": "Agent が実際に参照した項目",
       "reExtract": "この素材を再抽出",

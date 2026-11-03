@@ -65,7 +65,8 @@
       "video_prompts": "视频提示词",
       "script_rewrite": "剧本改写",
       "storyboard_breaker": "拆分分镜",
-      "portrait_appearance": "按史料画像补充外貌"
+      "portrait_appearance": "按史料画像补充外貌",
+      "asset_semantics": "语义标注"
     },
     "detail": {
       "title": "任务详情",
@@ -226,6 +227,7 @@
       "copiedFromTitle": "来自素材库：{src}"
     },
     "assetBrowser": {
+      "faithful": "忠实素材",
       "title": "资产管理器",
       "subtitleEpisode": "从资产库选资产：本项目的关联到本集，其他项目的全量复制导入",
       "subtitleDrama": "从其他项目全量复制导入资产到本项目",
@@ -980,6 +982,15 @@
       "timeRequired": "场景时间不能为空",
       "refSectionTitle": "参考图",
       "refSectionHint": "引导生成，不是成片图；可添加、删除或从素材库选择",
+      "faithfulBadge": "忠实素材",
+      "faithfulHint": "证据素材（地图、版画、文书）保持原件，不参与生图与提示词改写",
+      "faithfulToggle": "标记为忠实素材（证据资产，永不重绘）",
+      "faithfulNoGen": "忠实素材不出图：只能上传原件或从素材库替换",
+      "faithfulOffTitle": "取消忠实素材",
+      "faithfulOffMessage": "取消后「{name}」会重新进入生图与批量重绘流程；已有的语义标注仍然保留。确认取消吗？",
+      "faithfulOn": "已标记为忠实素材",
+      "faithfulOff": "已取消忠实素材",
+      "faithfulFailed": "忠实素材设置失败",
       "timePeriods": {
         "dawn": "清晨",
         "morning": "上午",
@@ -1770,6 +1781,54 @@
     "documentary": {
       "archivalSectionTitle": "史料参考",
       "archivalSectionHint": "只做出处留档，不参与生图",
+      "semantics": {
+        "sectionTitle": "语义标注",
+        "sectionHint": "证据素材的地理与图面语义，坐标相对忠实原件",
+        "title": "语义标注",
+        "hint": "坐标相对忠实原件那张原图；此处只做清单与叠加预览",
+        "legend": "来源",
+        "auto": "自动标注",
+        "autoRunning": "标注中…",
+        "autoStarted": "已开始自动标注，可在任务中心查看",
+        "autoDone": "自动标注完成",
+        "autoFailed": "自动标注失败",
+        "beautify": "美化出图",
+        "beautifying": "提交中…",
+        "beautifyHint": "美化只产出派生版本，原件不变；派生版本必须通过忠实度校验后才能当底图。",
+        "beautifyStarted": "已提交美化任务",
+        "loading": "正在加载标注…",
+        "loadFailed": "标注加载失败",
+        "noBase": "还没有可用的底图，请先上传原件",
+        "empty": "还没有任何标注",
+        "save": "保存标注",
+        "saving": "保存中…",
+        "saved": "标注已保存",
+        "saveFailed": "标注保存失败",
+        "namePlaceholder": "名称",
+        "confidence": "置信度 {v}",
+        "groupCount": "{n} 项",
+        "noEditorHint": "这里只能改名和删除；点位、折线与多边形的几何编辑在图层编辑器里完成。",
+        "group": {
+          "labels": "标签",
+          "points": "点位",
+          "regions": "区域",
+          "lines": "线"
+        },
+        "source": {
+          "vlm": "模型识别",
+          "cv": "图像算法",
+          "manual": "人工"
+        },
+        "sourceTitle": "忠实原件",
+        "sourceHint": "语义坐标相对这张原图，只能选上传或导入的原件版本",
+        "sourceEmpty": "该道具还没有上传或导入的原件版本",
+        "sourceCurrent": "当前原件",
+        "sourceUse": "用作忠实原件",
+        "sourceSwitched": "已切换忠实原件",
+        "sourceFailed": "切换忠实原件失败",
+        "fidelityFailed": "忠实度校验未通过",
+        "fidelityVerified": "忠实度已校验"
+      },
       "citationsSectionTitle": "资料来源",
       "citationsSectionHint": "Agent 检索过的条目与出处",
       "reExtract": "重新提取本资产信息",

@@ -65,7 +65,8 @@
       "video_prompts": "Video prompts",
       "script_rewrite": "Script rewrite",
       "storyboard_breaker": "Storyboard breakdown",
-      "portrait_appearance": "Appearance from archival portraits"
+      "portrait_appearance": "Appearance from archival portraits",
+      "asset_semantics": "Semantic annotation"
     },
     "detail": {
       "title": "Task detail",
@@ -226,6 +227,7 @@
       "copiedFromTitle": "From media library: {src}"
     },
     "assetBrowser": {
+      "faithful": "Faithful material",
       "title": "Asset manager",
       "subtitleEpisode": "Pick assets: assets of this project are linked to this episode, assets of other projects are fully copied",
       "subtitleDrama": "Import assets from other projects into this project (full copy)",
@@ -980,6 +982,15 @@
       "timeRequired": "Scene time cannot be empty",
       "refSectionTitle": "Reference images",
       "refSectionHint": "Guides generation, not the final image; add, remove or pick from the library",
+      "faithfulBadge": "Faithful material",
+      "faithfulHint": "Evidence assets (maps, engravings, documents) stay as the original and never take part in image generation or prompt rewriting",
+      "faithfulToggle": "Mark as faithful material (evidence asset, never repainted)",
+      "faithfulNoGen": "Faithful material is never generated: replace it by uploading the original or picking from the library",
+      "faithfulOffTitle": "Unmark faithful material",
+      "faithfulOffMessage": "Once unmarked, “{name}” goes back into image generation and batch repainting; existing semantic annotations are kept. Unmark it?",
+      "faithfulOn": "Marked as faithful material",
+      "faithfulOff": "Faithful material unmarked",
+      "faithfulFailed": "Failed to change the faithful-material flag",
       "timePeriods": {
         "dawn": "Dawn",
         "morning": "Morning",
@@ -1770,6 +1781,54 @@
     "documentary": {
       "archivalSectionTitle": "Archival references",
       "archivalSectionHint": "Provenance record only, never used for generation",
+      "semantics": {
+        "sectionTitle": "Semantic annotation",
+        "sectionHint": "Geographic and pictorial semantics of the evidence asset; coordinates belong to the faithful original",
+        "title": "Semantic annotation",
+        "hint": "Coordinates belong to the faithful original image; this panel only lists them and draws the overlay",
+        "legend": "Source",
+        "auto": "Auto-annotate",
+        "autoRunning": "Annotating…",
+        "autoStarted": "Auto-annotation started, follow it in the task center",
+        "autoDone": "Auto-annotation finished",
+        "autoFailed": "Auto-annotation failed",
+        "beautify": "Beautify",
+        "beautifying": "Submitting…",
+        "beautifyHint": "Beautifying only produces a derived version; the original is untouched, and the derived version must pass fidelity verification before it can serve as a base image.",
+        "beautifyStarted": "Beautify task submitted",
+        "loading": "Loading annotations…",
+        "loadFailed": "Failed to load annotations",
+        "noBase": "No usable base image yet — upload the original first",
+        "empty": "No annotations yet",
+        "save": "Save annotations",
+        "saving": "Saving…",
+        "saved": "Annotations saved",
+        "saveFailed": "Failed to save annotations",
+        "namePlaceholder": "Name",
+        "confidence": "Confidence {v}",
+        "groupCount": "{n} items",
+        "noEditorHint": "Only renaming and deleting happen here; point, polyline and polygon geometry is edited in the layer editor.",
+        "group": {
+          "labels": "Labels",
+          "points": "Points",
+          "regions": "Regions",
+          "lines": "Lines"
+        },
+        "source": {
+          "vlm": "Model",
+          "cv": "Image algorithm",
+          "manual": "Manual"
+        },
+        "sourceTitle": "Faithful original",
+        "sourceHint": "Coordinates belong to this image; only uploaded or imported original versions can be chosen",
+        "sourceEmpty": "This prop has no uploaded or imported original version",
+        "sourceCurrent": "Current original",
+        "sourceUse": "Use as faithful original",
+        "sourceSwitched": "Faithful original switched",
+        "sourceFailed": "Failed to switch the faithful original",
+        "fidelityFailed": "Fidelity check failed",
+        "fidelityVerified": "Fidelity verified"
+      },
       "citationsSectionTitle": "Sources",
       "citationsSectionHint": "Entries the agent actually looked up",
       "reExtract": "Re-extract this asset",

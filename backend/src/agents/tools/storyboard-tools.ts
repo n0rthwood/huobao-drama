@@ -156,6 +156,21 @@ const readStoryboardContext = createTool({
         image_url: p.imageUrl || '',
       }))
 
+    /**
+     * 背景信息载体（Issue #47）：旁白提到但本集不出场的实体（组织/异地人物/异地事件），
+     * 仍然按角色/场景/道具三类落库，这里**单列一份**，让分镜与表达设计知道
+     * 「S13 要同时表达近卫团与彼得一世」时有哪些现成的视觉载体可以 @。
+     * 它们同时留在上面的 characters/scenes/props 里，不改变既有字段语义。
+     */
+    const expositionAssets = [
+      ...characters.filter(item => chars.find(c => c.id === item.id && Number(c.exposition) === 1))
+        .map(item => ({ kind: 'character' as const, id: item.id, name: item.name, note: item.role, image_url: item.image_url })),
+      ...scenes.filter(item => scns.find(s => s.id === item.id && Number(s.exposition) === 1))
+        .map(item => ({ kind: 'scene' as const, id: item.id, name: item.location, note: item.prompt, image_url: item.image_url })),
+      ...props.filter(item => prps.find(p => p.id === item.id && Number(p.exposition) === 1))
+        .map(item => ({ kind: 'prop' as const, id: item.id, name: item.name, note: item.type, image_url: item.image_url })),
+    ]
+
     // 关键帧状态：inherits_first 表示该分镜首帧承接上一分镜的尾关键帧（continue 边界且自身未选首帧）
     const keyframeMap = await loadEpisodeKeyframes(episodeId)
     const aliveStoryboards = existingStoryboards
@@ -206,6 +221,7 @@ const readStoryboardContext = createTool({
       characters,
       scenes,
       props,
+      exposition_assets: expositionAssets,
       existing_storyboards: existingStoryboardPayload,
     }
     logTaskSuccess('StoryboardTool', 'read-context', {
@@ -214,6 +230,7 @@ const readStoryboardContext = createTool({
       characters: characters.length,
       scenes: scenes.length,
       props: props.length,
+      expositionAssets: expositionAssets.length,
       existingStoryboards: payload.existing_storyboards.length,
       scriptLength: script.length,
     })

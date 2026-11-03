@@ -58,9 +58,9 @@ export function classifyAsset(input: AssetSelectionInput, opts: AssetBatchOption
   return 'ready'
 }
 
-/** 提示词阶段结论 → 是否出图：只有 failed 不出图，也不拿库里残留的旧提示词兜底（Q4 / Q12） */
+/** 提示词阶段结论 → 是否出图：failed 不出图，skipped（证据素材）更不出图，也不拿库里残留的旧提示词兜底（Q4 / Q12） */
 export function shouldSubmitImage(outcome: FinalPromptOutcome): boolean {
-  return outcome !== 'failed'
+  return outcome !== 'failed' && outcome !== 'skipped'
 }
 
 export interface AssetBatchPlanItem {
@@ -123,15 +123,19 @@ export interface AssetVersionRow {
 }
 
 /**
- * 忠实素材判定（Q5，本期不加 schema 字段）：当前图对应的版本行里有 provider ∈ {upload, import} 就算。
- * 同一张图可能同时被生成行和上传行引用（上传注册会复用已有文件路径），按 Q5「宁可多跳过」取任一命中。
- * 当前图找不到任何对应版本行（例如直接 PUT 写进来的地址）时不算忠实素材——用户把当前版本切回
- * 生成版本即解除保护，这与「当前版本决定保护」的语义一致。
+ * 忠实素材判定：**先看持久标记，再看当前版本的 provider**（Issue #47）。
+ *
+ * 原来的判据只看当前图所属版本行的 provider ∈ {upload, import}（#33 Q5）。
+ * 事故证明这不够：用户一旦在版本历史里选了生成版本（资产 39 选了 gpt-image-2 版），
+ * 保护立刻失效，批量重绘就会把证据素材再烧一次。所以 `props.faithful=1` 一票定案，
+ * 与当前选哪个版本无关；没有持久标记时仍沿用原来的「当前版本是原件」判据，
+ * 这样角色/场景以及还没被标记过的道具行为完全不变。
  */
 export function isFaithfulCurrentImage(
-  asset: { imageUrl: string | null; localPath: string | null },
+  asset: { imageUrl: string | null; localPath: string | null; faithful?: number | null },
   versions: AssetVersionRow[],
 ): boolean {
+  if (Number(asset.faithful) === 1) return true
   const current = (asset.imageUrl || asset.localPath || '').trim()
   if (!current) return false
   return versions.some(v =>

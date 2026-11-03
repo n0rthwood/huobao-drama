@@ -43,8 +43,11 @@ async function runPromptAgent(episodeId: number, dramaId: number, message: strin
   await runAgent(agent, [{ role: 'user', content: message }], { maxSteps: 12, requestContext })
 }
 
-/** 提示词阶段逐项结论：只有 failed 禁止出图（Issue #33 Q4/Q12） */
-export type FinalPromptOutcome = 'reused' | 'regenerated' | 'unchanged_after_rewrite' | 'failed'
+/**
+ * 提示词阶段逐项结论：`failed` 与 `skipped` 都禁止出图（Issue #33 Q4/Q12、Issue #47）。
+ * `skipped` 专指证据素材——不是生成失败，而是这类资产根本不该有生图提示词。
+ */
+export type FinalPromptOutcome = 'reused' | 'regenerated' | 'unchanged_after_rewrite' | 'failed' | 'skipped'
 
 export interface FinalPromptResult {
   /** 可用于出图的提示词；outcome='failed' 时恒为空串 */
@@ -114,8 +117,15 @@ export async function ensureSceneFinalPrompt(scene: SceneRow, episodeId: number,
   }
 }
 
-/** 确保道具拥有白底单品最终提示词；force 时忽略已有提示词强制重新生成 */
+/**
+ * 确保道具拥有白底单品最终提示词；force 时忽略已有提示词强制重新生成。
+ *
+ * 证据素材（`faithful=1`，Issue #47）直接返回 `skipped`：白底单品提示词是给扩散模型
+ * 重画用的，而证据素材只能作为原图 + 叠加层使用，给它写风格词没有任何下游会读，
+ * 反而会让批量界面显示「已就绪」误导人去出图。
+ */
 export async function ensurePropFinalPrompt(prop: PropRow, episodeId: number, force = false, opts?: PromptAgentOptions): Promise<FinalPromptResult> {
+  if (Number(prop.faithful) === 1) return { prompt: prop.finalPrompt ?? '', outcome: 'skipped' }
   if (prop.finalPrompt && !force) return { prompt: prop.finalPrompt, outcome: 'reused' }
   try {
     logTaskProgress('FinalPrompt', 'prop-generate', { propId: prop.id, episodeId })

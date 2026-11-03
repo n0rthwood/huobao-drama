@@ -141,6 +141,8 @@ interface LoadedAsset {
   finalPrompt: string | null
   /** 有可直接复用的提示词（场景还要求写到了场景时间，Issue #21） */
   hasPrompt: boolean
+  /** 持久的证据素材标记（Issue #47，只有道具会是 1）：一票判定 skip_faithful */
+  faithful: number
 }
 
 const SCOPE_KINDS: Record<AssetBatchScope, AssetKind[]> = {
@@ -163,7 +165,7 @@ async function loadScopeAssets(dramaId: number, scope: AssetBatchScope): Promise
         assets.push({
           kind, id: row.id, name: row.name, dramaId: row.dramaId,
           imageUrl: row.imageUrl, localPath: row.localPath, referenceImages: row.referenceImages,
-          finalPrompt: row.finalPrompt, hasPrompt: !!row.finalPrompt,
+          finalPrompt: row.finalPrompt, hasPrompt: !!row.finalPrompt, faithful: 0,
         })
       }
     } else if (kind === 'scene') {
@@ -176,6 +178,7 @@ async function loadScopeAssets(dramaId: number, scope: AssetBatchScope): Promise
           imageUrl: row.imageUrl, localPath: row.localPath, referenceImages: row.referenceImages,
           finalPrompt: row.finalPrompt,
           hasPrompt: !!row.finalPrompt && sceneFinalPromptCoversTime(row.finalPrompt, row.time),
+          faithful: 0,
         })
       }
     } else {
@@ -186,7 +189,7 @@ async function loadScopeAssets(dramaId: number, scope: AssetBatchScope): Promise
         assets.push({
           kind, id: row.id, name: row.name, dramaId: row.dramaId,
           imageUrl: row.imageUrl, localPath: row.localPath, referenceImages: row.referenceImages,
-          finalPrompt: row.finalPrompt, hasPrompt: !!row.finalPrompt,
+          finalPrompt: row.finalPrompt, hasPrompt: !!row.finalPrompt, faithful: row.faithful ?? 0,
         })
       }
     }

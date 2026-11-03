@@ -28,6 +28,8 @@ export type TextTaskKind =
   | 'portrait_appearance'
   /** 资产批量生成的父任务（Issue #33）：详细进度在 params.asset_batch */
   | 'asset_batch'
+  /** 证据素材的语义自动标注（Issue #47）：VLM 锚点 + CV 几何，结果写 props.semantics */
+  | 'asset_semantics'
 
 export const TEXT_TASK_KINDS: TextTaskKind[] = [
   'extract_characters', 'extract_scenes', 'extract_props',
@@ -35,6 +37,7 @@ export const TEXT_TASK_KINDS: TextTaskKind[] = [
   'narration_script', 'narration_tts', 'shot_compose',
   'portrait_appearance',
   'asset_batch',
+  'asset_semantics',
 ]
 
 /**

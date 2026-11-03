@@ -77,6 +77,7 @@ export const sqliteSchemaStatements = [
     seed_value TEXT,
     sort_order INTEGER,
     local_path TEXT,
+    exposition INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     deleted_at TEXT
@@ -98,6 +99,7 @@ export const sqliteSchemaStatements = [
     reference_images TEXT,
     status TEXT DEFAULT 'pending',
     local_path TEXT,
+    exposition INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     deleted_at TEXT
@@ -361,6 +363,10 @@ export const sqliteSchemaStatements = [
     image_url TEXT,
     reference_images TEXT,
     local_path TEXT,
+    faithful INTEGER NOT NULL DEFAULT 0,
+    faithful_source INTEGER,
+    semantics TEXT,
+    exposition INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     deleted_at TEXT
@@ -513,6 +519,17 @@ const columnAdditions: { table: string; column: string; type: string }[] = [
   { table: 'episodes', column: 'character_roster_hash', type: 'TEXT' },
   { table: 'episodes', column: 'character_roster_status', type: 'TEXT' },
   { table: 'episodes', column: 'character_roster_updated_at', type: 'TEXT' },
+  // 证据素材与语义标注（Issue #47）：faithful 是持久资产属性（不再按当前版本 provider 推断），
+  // faithful_source 指向语义坐标所针对的那张上传原图，semantics 存标注 JSON
+  { table: 'props', column: 'faithful', type: 'INTEGER NOT NULL DEFAULT 0' },
+  { table: 'props', column: 'faithful_source', type: 'INTEGER' },
+  { table: 'props', column: 'semantics', type: 'TEXT' },
+  // 背景信息载体（Issue #47）：旁白提到但不出场、需要视觉承载的实体（近卫团、彼得一世、波尔塔瓦）。
+  // 不新增第 4 类资产：仍按角色/场景/道具三类落库，这一列只回答「它是不是背景信息载体」，
+  // 供表达设计（#49）的 exposition_assets 单列引用。
+  { table: 'characters', column: 'exposition', type: 'INTEGER NOT NULL DEFAULT 0' },
+  { table: 'scenes', column: 'exposition', type: 'INTEGER NOT NULL DEFAULT 0' },
+  { table: 'props', column: 'exposition', type: 'INTEGER NOT NULL DEFAULT 0' },
 ]
 
 /**
@@ -676,6 +693,48 @@ function migrateStoryboardPoolSelections(sqlite: Database.Database): void {
   console.log(`🧩 本镜资产池手选迁移：${count} 个分镜，写入 ${rows} 条（历史关联与主场景保留为手选）`)
 }
 
+/** 证据素材迁移命中的道具子类型（Issue #47）：地图是事故现场，也是唯一能机械判定的一类 */
+const FAITHFUL_PROP_TYPES = ['地图']
+/**
+ * 版本历史里算「原件」的 provider。这里**只认 `upload`**（人工上传的原件），
+ * 不含跨项目导入的 `import`：导入复制出的版本可能本身就是别处的生成图，
+ * 一次性迁移不该替人断定它是原件。导入资产的 faithful 由 asset-library 的复制逻辑
+ * 从源资产带过来，人也可以在界面上随时补标。
+ */
+const FAITHFUL_MIGRATION_PROVIDERS = ['upload']
+
+/**
+ * 存量迁移（Issue #47）— 只在 props.faithful 列首次补上时执行一次：
+ * `type='地图'` 且版本历史里存在 `provider='upload'` 版本的道具标成证据素材，
+ * faithful_source 取最早的那条原件版本（后来的上传多半是美化/替换，原件是第一张）。
+ *
+ * **只打标记，不动 image_url**（用户确认 Q1）：回退底图由人在界面上显式执行
+ * `PUT /props/:id/faithful-source`，迁移本身不改变任何已生成的关键帧签名。
+ */
+function migrateFaithfulProps(sqlite: Database.Database): void {
+  const placeholders = FAITHFUL_PROP_TYPES.map(() => '?').join(', ')
+  const providers = FAITHFUL_MIGRATION_PROVIDERS.map(() => '?').join(', ')
+  const candidates = sqlite.prepare(
+    `SELECT id FROM props WHERE deleted_at IS NULL AND type IN (${placeholders})`,
+  ).all(...FAITHFUL_PROP_TYPES) as Array<{ id: number }>
+  const originalOf = sqlite.prepare(
+    `SELECT id FROM sys_task
+     WHERE type = 'image' AND status = 'completed' AND prop_id = ?
+       AND provider IN (${providers})
+     ORDER BY created_at ASC, id ASC LIMIT 1`,
+  )
+  const mark = sqlite.prepare('UPDATE props SET faithful = 1, faithful_source = ? WHERE id = ?')
+  let marked = 0
+  sqlite.transaction(() => {
+    for (const prop of candidates) {
+      const original = originalOf.get(prop.id, ...FAITHFUL_MIGRATION_PROVIDERS) as { id: number } | undefined
+      if (!original) continue
+      marked += mark.run(original.id, prop.id).changes
+    }
+  })()
+  console.log(`🗺️ 证据素材迁移：${candidates.length} 个地图道具，标记 ${marked} 个为忠实素材（只打标记，不改当前图）`)
+}
+
 /**
  * 风格预设种子数据 — value 存入 dramas.style，prompt 注入生图提示词（作为前缀拼接）
  *
@@ -769,6 +828,9 @@ export function initSqliteSchema(sqlite: Database.Database) {
   const hadPoolSelections = !!sqlite.prepare(
     "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'storyboard_pool_selections'",
   ).get()
+  // props.faithful 是否已存在：不存在说明是首次升级到 #47，需要一次性把地图原件标成证据素材
+  const hadFaithful = (sqlite.prepare('PRAGMA table_info(props)').all() as { name: string }[])
+    .some(col => col.name === 'faithful')
   for (const statement of sqliteSchemaStatements) {
     sqlite.exec(statement)
   }
@@ -778,6 +840,7 @@ export function initSqliteSchema(sqlite: Database.Database) {
   // 先迁移（要读 asset_version_selection）再删列
   if (!hadTargetAssets) migrateStoryboardTargetAssets(sqlite)
   if (!hadPoolSelections) migrateStoryboardPoolSelections(sqlite)
+  if (!hadFaithful) migrateFaithfulProps(sqlite)
   applyColumnRemovals(sqlite)
   cleanupStaleAssetLinks(sqlite)
   const insertSeed = sqlite.prepare(SEED_SQL)
