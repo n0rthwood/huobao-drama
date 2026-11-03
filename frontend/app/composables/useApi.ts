@@ -122,6 +122,31 @@ export const episodeAPI = {
       config_id: data.config_id || undefined,
     }),
   narrationStatus: (id: number) => api.get(`/episodes/${id}/narration-status`),
+  // 表达设计（#49，纪录片）：候选上下文（资产 + 语义条目 + device/片段位置表）、
+  // 异步重算（不带 storyboard_ids = 只补齐缺失的）、批量状态（与提示词批量同一套状态模型）
+  intentContext: (id: number) =>
+    api.get<{
+      assets: Array<{
+        kind: 'character' | 'scene' | 'prop'
+        id: number
+        name: string
+        exposition?: boolean
+        faithful?: boolean
+        semantics?: Array<{ id: string; name: string; group: 'label' | 'point' | 'region' | 'line' }>
+      }>
+      devices: string[]
+      device_default_clip: Record<string, string>
+      device_allowed_clip: Record<string, string[]>
+      must_show_kinds: string[]
+      overlay_layer_types: string[]
+    }>(`/episodes/${id}/intent-context`),
+  generateIntents: (id: number, data: { storyboard_ids?: number[]; model?: string; config_id?: number } = {}) =>
+    api.post(`/episodes/${id}/generate-intents`, {
+      storyboard_ids: data.storyboard_ids?.length ? data.storyboard_ids : undefined,
+      model: data.model || undefined,
+      config_id: data.config_id || undefined,
+    }),
+  intentStatus: (id: number) => api.get(`/episodes/${id}/intent-status`),
   // 旁白编辑器的语气 / 多音字 / 停顿选项（#38）
   narrationMarkupCatalog: (id: number) =>
     api.get<{
@@ -399,10 +424,75 @@ export const assetBatchAPI = {
   cancel: (dramaId: number) => api.post<AssetBatchStatus>(`/dramas/${dramaId}/assets/batch-generate/cancel`),
 }
 
+/** 表达设计文档（#49）：与后端 services/shot-intent.ts 的 ShotIntent 同形 */
+export type ShotDevice = 'map_anim' | 'archival' | 'card' | 'reenact_still' | 'reenact_video'
+export type ClipPosition = 'replace' | 'pre' | 'post' | 'none'
+export type MustShowKind = 'region' | 'line' | 'point' | 'label' | 'route' | 'portrait' | 'exposition'
+export type OverlayLayerType = 'polygon' | 'polyline' | 'marker' | 'label' | 'card' | 'image'
+
+export interface MustShowItem {
+  kind: MustShowKind
+  asset_id?: number
+  asset_kind?: AssetKindName
+  semantic?: string
+  semantic_id?: string
+  semantic_name?: string
+  from?: string
+  to?: string
+  note?: string
+  unresolved?: boolean
+  unresolved_reason?: string
+}
+
+export interface OverlayPlanItem {
+  layer: OverlayLayerType
+  anchor?: { asset_id?: number; asset_kind?: AssetKindName; semantic_id?: string; semantic?: string }
+  reveal_at?: number
+  viewport?: [number, number, number, number]
+  template?: string
+  fields?: Record<string, string>
+  text?: string
+  note?: string
+  unresolved?: boolean
+  unresolved_reason?: string
+}
+
+export interface ShotIntentDoc {
+  info_point: string
+  device: ShotDevice
+  must_show: MustShowItem[]
+  overlay_plan: OverlayPlanItem[]
+  deterministic: ClipPosition
+  rationale: string
+  source?: 'agent' | 'manual' | 'import'
+}
+
+export interface IntentIssue {
+  code: 'empty_info_point' | 'unresolved_must_show' | 'unresolved_overlay_anchor' | 'empty_overlay_plan' | 'clip_position_out_of_range'
+  severity: 'block' | 'warn'
+  message: string
+  index?: number
+}
+
+/** PUT /storyboards/:id 带 intent / intent_reviewed 时的相关返回字段 */
+export interface ShotIntentResult {
+  intent: ShotIntentDoc | null
+  intent_issues: IntentIssue[]
+  intent_reviewed: boolean
+  saved_at: number
+  ref_issues: Array<{ code: string; severity: 'block' | 'warn'; message: string; fields?: string[]; name?: string }>
+}
+
 export const storyboardAPI = {
   create: (data: any) => api.post('/storyboards', data),
   update: (id: number, data: any) => api.put(`/storyboards/${id}`, data),
   del: (id: number) => api.del(`/storyboards/${id}`),
+  // 表达设计（#49）：整份 intent 文档覆盖写（后端整份替换，不做字段级合并），
+  // 写入内容即撤销人工确认；intent_reviewed 单独打勾（结构不合格时后端 400）
+  setIntent: (id: number, intent: ShotIntentDoc | null) =>
+    api.put<ShotIntentResult>(`/storyboards/${id}`, { intent }),
+  setIntentReviewed: (id: number, reviewed: boolean) =>
+    api.put<ShotIntentResult>(`/storyboards/${id}`, { intent_reviewed: reviewed }),
   // 视频生成参数（关键帧引导、参考图 / @图片N 映射 / 分辨率）全部由后端组装
   generateVideo: (id: number, data: { model?: string; config_id?: number }) =>
     api.post(`/storyboards/${id}/generate-video`, { model: data.model || undefined, config_id: data.config_id || undefined }),

@@ -11,6 +11,8 @@ import { runAgent } from '../agents/run.js'
 import { createReasoningSink } from '../agents/reasoning-sink.js'
 import { logTaskError, logTaskProgress, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
 import { loadEpisodeKeyframes } from './keyframes.js'
+import { buildIntentBriefs, loadIntentContext, resolveStoryboardIntent } from './shot-intent-context.js'
+import { CLIP_RENDERED_DEVICES } from './shot-intent.js'
 import {
   createTextTask,
   findActiveTextTask,
@@ -41,12 +43,24 @@ export async function startKeyframePromptBatch(
     .orderBy(schema.storyboards.storyboardNumber)
   const sbs = rows.filter(sb => !sb.deletedAt)
   const keyframeMap = await loadEpisodeKeyframes(episodeId)
-  const pending = storyboardIds?.length
+  // 表达设计（#49）：map_anim / archival 的整镜由确定性片段渲染，三槽位不出扩散图，
+  // 给它们写关键帧提示词只会生成一批永远不会被用到的文本
+  const intentCtx = loadIntentContext(episodeId)
+  const clipRendered = new Set(sbs
+    .filter((sb) => {
+      const intent = resolveStoryboardIntent(sb.intent, intentCtx).intent
+      return !!intent && CLIP_RENDERED_DEVICES.includes(intent.device)
+    })
+    .map(sb => sb.id))
+  const pending = (storyboardIds?.length
     ? sbs.filter(sb => storyboardIds.includes(sb.id))
     // 承接首帧的分镜不需要自己的 first_frame_prompt（首帧沿用上一镜尾关键帧）
     : sbs.filter(sb => !(sb.lastFramePrompt || '').trim()
       || (!(sb.firstFramePrompt || '').trim() && keyframeMap.get(sb.id)?.inheritsFirst !== true))
+  ).filter(sb => !clipRendered.has(sb.id))
   if (!pending.length) return { started: false, total: 0 }
+  // 前后镜的表达设计（#49）：message 里带上，再现类镜头才能承接上一镜而不是各写各的
+  const briefs = buildIntentBriefs(sbs, intentCtx)
 
   const resolved = await resolveTextModel(opts)
   const progress: TextTaskProgress = { completed: 0, failed: 0, total: pending.length }
@@ -93,7 +107,7 @@ export async function startKeyframePromptBatch(
 - first_frame_prompt = 【镜头1】开场瞬间；若该分镜 inherits_first 为 true（continuity 为 'continue'），first_frame_prompt 必须留空（首帧沿用上一镜的尾关键帧）
 - mid_frame_prompt + mid_frame_time = 除第一个子镜头外最重要的那个子镜头的起始瞬间，mid_frame_time 以秒为单位、必须落在 0.5 秒与 duration-0.5 秒之间；该分镜只有一个子镜头时两者都不要写
 - last_frame_prompt = 段落结尾瞬间，与 result 一致，必须是稳定清晰、可被下一镜当作开场的画面
-最后调用 update_storyboard 保存到分镜 ID:${sb.id}。update_storyboard 参数只传 storyboard_id 以及上述关键帧字段,不要回传该分镜的其他任何字段(title、description、video_prompt、scene_id 等一律不传),不要重新拆分整集。`,
+${briefs.get(sb.id)?.text || ''}最后调用 update_storyboard 保存到分镜 ID:${sb.id}。update_storyboard 参数只传 storyboard_id 以及上述关键帧字段,不要回传该分镜的其他任何字段(title、description、video_prompt、scene_id 等一律不传),不要重新拆分整集。`,
         }], { maxSteps: 8, requestContext }, sink)
         outputs.push(`分镜 #${sb.storyboardNumber}：${result.text || ''}`)
         // 以实际落库为准判定成败：尾关键帧提示词是必选项

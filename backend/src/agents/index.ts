@@ -495,9 +495,19 @@ export const agentRegistry: Record<string, Agent> = Object.fromEntries(
         // narration-first（Issue #45）：纪录片项目换成校验「旁白逐字来自剧本」的工具变体，
         // 其余工具（#46 的 read_image 等）照 AGENT_TOOLS 保留
         : type === 'storyboard_breaker'
-          ? ({ requestContext }) => (getProjectType(requestContext) === 'documentary'
-            ? { ...AGENT_TOOLS.storyboard_breaker, ...documentaryStoryboardTools }
-            : AGENT_TOOLS.storyboard_breaker)
+          ? ({ requestContext }) => {
+            const base = getProjectType(requestContext) === 'documentary'
+              ? { ...AGENT_TOOLS.storyboard_breaker, ...documentaryStoryboardTools }
+              : AGENT_TOOLS.storyboard_breaker
+            // 表达设计重算（#49）是单镜任务：只给「读上下文 / 读图 / 只写 intent」，
+            // 不给 save_storyboards——重算一镜顺手重拆整集会把旁白分配全冲掉
+            if (requestContext?.get('storyboardPromptScope' as never) !== 'intent') return base
+            return {
+              readStoryboardContext: base.readStoryboardContext,
+              ...visionTools,
+              updateStoryboard: promptStoryboardUpdaters.intent,
+            }
+          }
         : type === 'narration_writer'
           ? ({ requestContext }) => (getProjectType(requestContext) === 'documentary'
             ? { ...AGENT_TOOLS.narration_writer, ...documentaryNarrationTools }

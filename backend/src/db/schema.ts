@@ -202,6 +202,10 @@ export const storyboards = sqliteTable('storyboards', {
   narrationNormalize: integer('narration_normalize', { mode: 'boolean' }),
   // 本镜的旁白/画面匹配参数 JSON（#31）；NULL = 继承剧集级 narration_fit_default
   narrationFit: text('narration_fit'),
+  // 表达设计（#49）：信息点 / device / must_show / overlay_plan / deterministic / rationale（JSON）
+  // 与人工确认位。非纪录片项目恒为 NULL。
+  intent: text('intent'),
+  intentReviewed: integer('intent_reviewed', { mode: 'boolean' }).notNull().default(false),
   videoUrl: text('video_url'),
   subtitleUrl: text('subtitle_url'),
   composedVideoUrl: text('composed_video_url'),

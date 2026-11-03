@@ -11,6 +11,8 @@ export const TRACKED_SAVE_FIELDS = [
   'first_frame_prompt', 'mid_frame_prompt', 'mid_frame_time', 'last_frame_prompt',
   'video_prompt',
   'narration_text',
+  // 表达设计（#49）：整份 intent 当一个字段打点，表达设计页显示「上次保存 · N 分钟前」
+  'intent',
 ] as const
 
 export type TrackedSaveField = typeof TRACKED_SAVE_FIELDS[number]

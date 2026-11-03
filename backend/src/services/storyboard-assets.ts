@@ -14,6 +14,8 @@
 import { and, eq, inArray, isNull } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
 import { parseStylingVersion } from './styling-version.js'
+import { loadIntentContext, resolveStoryboardIntent } from './shot-intent-context.js'
+import { mustShowAssetRefs, NO_VIDEO_PROMPT_DEVICES, type ShotIntent } from './shot-intent.js'
 
 /** 参考图上限（与前端面板、Seedance 多模态上限一致） */
 const REF_IMAGE_LIMIT = 9
@@ -132,6 +134,8 @@ export type RefIssueCode =
   | 'unmentioned_binding' | 'over_capacity'
   // Issue #15：视频提示词为空（阻断生成）与肢体风险（仅警告，不阻断）
   | 'empty_video_prompt' | 'limb_risk'
+  // Issue #49：表达设计里的「必须可见要素」没有被该提示词 @ 到（阻断生成）
+  | 'intent_unmet'
 
 export interface RefIssue {
   code: RefIssueCode
@@ -553,11 +557,13 @@ export interface RefCheckInput {
   prompts: Record<PromptField, string>
   assets: EpisodeAssetEntry[]
   bindings: TargetBindings
+  /** 表达设计（#49）；非纪录片项目恒为 null，判定与改动前逐字一致 */
+  intent?: ShotIntent | null
 }
 
 /**
  * 一致性问题（纯函数，按生成目标判定）：
- * 阻断 = unknown_mention / unbound_mention / missing_image / empty_video_prompt；
+ * 阻断 = unknown_mention / unbound_mention / missing_image / empty_video_prompt / intent_unmet；
  * 警告 = unmentioned_binding / over_capacity / limb_risk。
  */
 export function computeRefIssues(input: RefCheckInput): RefIssue[] {
@@ -636,11 +642,34 @@ export function computeRefIssues(input: RefCheckInput): RefIssue[] {
 
   // 分镜完整性（Issue #15）：video_prompt 为空直接阻断视频生成——线上 E3#5 就是空提示词
   // 却仍可提交，结果画面完全由参考图随机决定。
-  if (!(input.prompts.video_prompt || '').trim()) {
+  // 表达设计里整镜由确定性片段替代的镜头（#49 的 deterministic='replace'）根本不出模型视频，
+  // 对它们要求视频提示词只会让每个地图镜头永久挂着一条阻断。
+  const noModelVideo = !!input.intent
+    && (input.intent.deterministic === 'replace' || NO_VIDEO_PROMPT_DEVICES.includes(input.intent.device))
+  if (!noModelVideo && !(input.prompts.video_prompt || '').trim()) {
     add('empty_video_prompt', {
       code: 'empty_video_prompt', severity: 'block', fields: ['video_prompt'],
       message: '视频提示词为空，请先生成或填写 video_prompt 再生成视频',
     })
+  }
+
+  // 表达设计闸门（Issue #49）：再现类镜头的每一条「必须可见要素」都要在提示词里被 @ 到，
+  // 否则参考图根本不会被发送——这正是「文不对图」的那一步。只检查**写了内容**的提示词字段。
+  for (const ref of mustShowAssetRefs(input.intent ?? null)) {
+    const asset = byKey.get(assetKey(ref.kind, ref.id))
+    if (!asset) continue
+    const checkFields: PromptField[] = input.intent?.device === 'reenact_video'
+      ? ['first_frame_prompt', 'mid_frame_prompt', 'last_frame_prompt', 'video_prompt']
+      : ['first_frame_prompt', 'mid_frame_prompt', 'last_frame_prompt']
+    for (const field of checkFields) {
+      if (!(input.prompts[field] || '').trim()) continue
+      if (mentions[field].matched.some(item => item.kind === asset.kind && item.id === asset.id)) continue
+      add(`intent_unmet:${field}:${assetKey(asset.kind, asset.id)}`, {
+        code: 'intent_unmet', severity: 'block', fields: [field],
+        kind: asset.kind, asset_id: asset.id, name: asset.name,
+        message: `表达设计要求本镜必须看到「${asset.name}」，但${PROMPT_FIELD_LABEL[field]}没有 @${asset.name}；补上 @ 或在表达设计页去掉这一条`,
+      })
+    }
   }
 
   // 肢体风险：只警告，不进 blockingIssuesFor
@@ -660,6 +689,7 @@ export async function checkStoryboardRefs(
     prompts: promptFieldsOf(storyboard),
     assets: assets ?? await loadEpisodeAssets(storyboard.episodeId),
     bindings: await loadTargetBindings(storyboard.id),
+    intent: resolveStoryboardIntent(storyboard.intent, loadIntentContext(storyboard.episodeId)).intent,
   })
 }
 
@@ -947,7 +977,10 @@ export async function syncStoryboardBindingsFromPrompts(
     const bindings = loadTargetBindingsSync(storyboardId)
     return {
       sync, targetSync,
-      issues: computeRefIssues({ prompts, assets, bindings }),
+      issues: computeRefIssues({
+        prompts, assets, bindings,
+        intent: resolveStoryboardIntent(storyboard.intent, loadIntentContext(storyboard.episodeId)).intent,
+      }),
       characterIds: sync.characterIds,
       propIds: sync.propIds,
       targetAssets: targetAssetsJson(assets, bindings),

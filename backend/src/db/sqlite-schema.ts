@@ -147,6 +147,8 @@ export const sqliteSchemaStatements = [
     subtitle_timing TEXT,
     narration_normalize INTEGER,
     narration_fit TEXT,
+    intent TEXT,
+    intent_reviewed INTEGER NOT NULL DEFAULT 0,
     video_url TEXT,
     subtitle_url TEXT,
     composed_video_url TEXT,
@@ -533,6 +535,10 @@ const columnAdditions: { table: string; column: string; type: string }[] = [
   { table: 'characters', column: 'exposition', type: 'INTEGER NOT NULL DEFAULT 0' },
   { table: 'scenes', column: 'exposition', type: 'INTEGER NOT NULL DEFAULT 0' },
   { table: 'props', column: 'exposition', type: 'INTEGER NOT NULL DEFAULT 0' },
+  // 表达设计（Issue #49）：纪录片每镜的信息点/表达手段/必须可见要素/叠加层计划（JSON）
+  // 与人工确认位；非纪录片项目恒为 NULL / 0。
+  { table: 'storyboards', column: 'intent', type: 'TEXT' },
+  { table: 'storyboards', column: 'intent_reviewed', type: 'INTEGER NOT NULL DEFAULT 0' },
 ]
 
 /**

@@ -30,6 +30,8 @@ export type TextTaskKind =
   | 'asset_batch'
   /** 证据素材的语义自动标注（Issue #47）：VLM 锚点 + CV 几何，结果写 props.semantics */
   | 'asset_semantics'
+  /** 表达设计重算（Issue #49）：按镜产出 intent（信息点/device/must_show/overlay_plan） */
+  | 'shot_intent'
 
 export const TEXT_TASK_KINDS: TextTaskKind[] = [
   'extract_characters', 'extract_scenes', 'extract_props',
@@ -38,6 +40,7 @@ export const TEXT_TASK_KINDS: TextTaskKind[] = [
   'portrait_appearance',
   'asset_batch',
   'asset_semantics',
+  'shot_intent',
 ]
 
 /**
