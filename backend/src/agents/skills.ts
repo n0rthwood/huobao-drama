@@ -77,7 +77,11 @@ export interface SkillConditions {
  */
 const GENRE_SKILL_MAP: Record<string, Record<string, string[]>> = {
   documentary: {
+    // 旁白优先的剧本整理（Issue #45）：剧本正文就是旁白稿，不做对白化改写
+    script_rewriter: ['documentary/documentary-script'],
     extractor: ['documentary/documentary-extraction'],
+    // 两栏脚本纪律的骨架（Issue #45；完整表达设计规则在 #49）
+    storyboard_breaker: ['documentary/documentary-storyboard'],
     prompt_generator: [
       'documentary/documentary-character-prompt',
       'documentary/documentary-scene-prompt',

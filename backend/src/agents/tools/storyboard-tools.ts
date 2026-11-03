@@ -9,7 +9,7 @@ import { db, getInsertId, schema } from '../../db/index.js'
 import { eq } from 'drizzle-orm'
 import { now } from '../../utils/response.js'
 import { logTaskProgress, logTaskSuccess } from '../../utils/task-logger.js'
-import { getDramaId, getEpisodeId, getStoryboardId } from '../context.js'
+import { getDramaId, getEpisodeId, getResearchRunId, getStoryboardId } from '../context.js'
 import { loadEpisodeKeyframes } from '../../services/keyframes.js'
 import {
   PROMPT_FIELDS,
@@ -20,6 +20,8 @@ import {
 } from '../../services/storyboard-assets.js'
 import { parseReferenceImages, referenceImagePaths } from '../../services/reference-images.js'
 import { stampFieldSavedAt } from '../../services/storyboard-fields.js'
+import { MAX_NARRATION_CHARS, narrationCharCount, parseNarrationMeta, sha256 } from '../../services/narration.js'
+import { locateNarrationInScript, narrationCoverage, scriptMatchKey } from '../../services/narration-first.js'
 
 async function getEpisodeSceneIds(episodeId: number) {
   const links = await db.select().from(schema.episodeScenes)
@@ -246,12 +248,24 @@ const storyboardFields = z.object({
   continuity: z.enum(['continue', 'cut']).optional().describe("Transition from the previous shot: 'continue' means this shot starts exactly where the previous shot ended (same scene, immediately following moment, characters carried over) and this shot inherits the previous shot's LAST keyframe image as its own first keyframe, so first_frame_prompt must be left empty; 'cut' means a hard cut (scene change, time jump, flashback, or the first shot of the episode) and needs its own first_frame_prompt. Omit when unsure."),
 })
 
-const saveStoryboards = createTool({
+/** 纪录片项目（Issue #45）：多一个 narration_text 字段，内容必须逐字取自剧本正文 */
+const documentaryStoryboardFields = storyboardFields.extend({
+  narration_text: z.string().optional().describe(`Narration for this shot, copied VERBATIM from a consecutive stretch of the episode script (this project's script IS the narration script). Never rewrite, shorten, merge or invent text: the tool checks that the whitespace-stripped text occurs literally in the script and rejects anything else. Cut only at sentence boundaries, at most ${MAX_NARRATION_CHARS} spoken characters per shot. Leave it out for a deliberately silent visual shot.`),
+})
+
+/** 已经执行过整集清空的运行 id（纪录片变体）：同一次运行的后续批次不再清空 */
+const replacedRuns = new Set<string>()
+
+/** drama 与 documentary 两个变体：drama 变体的 schema / description / 行为与 #45 之前逐字一致 */
+function buildSaveStoryboards(documentary: boolean) {
+  return createTool({
   id: 'save_storyboards',
-  description: 'Save storyboards for this episode. Call in batches of at most 8 storyboards: the first batch must set replace_existing: true (clears all old storyboards for the episode, then writes), every following batch omits replace_existing (appends). Rows are upserted by shot_number, so overlapping batches and retries never create duplicates.',
+  description: documentary
+    ? 'Save storyboards for this episode. Call in batches of at most 8 storyboards: the first batch must set replace_existing: true (clears all old storyboards for the episode, then writes), every following batch omits replace_existing (appends). Rows are upserted by shot_number, so overlapping batches and retries never create duplicates. This is a documentary project: every shot also carries narration_text copied verbatim from the script, in script order, and the result reports how much of the script is still uncovered.'
+    : 'Save storyboards for this episode. Call in batches of at most 8 storyboards: the first batch must set replace_existing: true (clears all old storyboards for the episode, then writes), every following batch omits replace_existing (appends). Rows are upserted by shot_number, so overlapping batches and retries never create duplicates.',
   inputSchema: z.object({
     replace_existing: z.boolean().optional(),
-    storyboards: z.array(storyboardFields),
+    storyboards: z.array(documentary ? documentaryStoryboardFields : storyboardFields),
   }),
   execute: async ({ storyboards, replace_existing }, context) => {
     const ids = requireIds(context)
@@ -265,7 +279,11 @@ const saveStoryboards = createTool({
       count: storyboards.length,
       shotNumbers: storyboards.map(sb => sb.shot_number).join(','),
     })
-    if (replace_existing === true) {
+    // 纪录片（Issue #45）：一次运行只允许第一批清空。模型在后续批次重复传 replace_existing
+    // 会把前面已切好的镜头连同旁白一起删掉，整集覆盖就断了（实测 GLM 第二批重复传过）。
+    const runId = documentary ? getResearchRunId(context?.requestContext) : null
+    const replaceIgnored = replace_existing === true && runId !== null && replacedRuns.has(runId)
+    if (replace_existing === true && !replaceIgnored) {
       const existingStoryboardRows = await db.select().from(schema.storyboards)
         .where(eq(schema.storyboards.episodeId, episodeId))
       for (const storyboardId of existingStoryboardRows.map(sb => sb.id)) {
@@ -273,6 +291,11 @@ const saveStoryboards = createTool({
         await deletePoolSelections({ storyboardId })
       }
       await db.delete(schema.storyboards).where(eq(schema.storyboards.episodeId, episodeId))
+      if (runId) {
+        // 运行 id 唯一且只增，集合按容量截断（长期运行的进程不无限增长）
+        if (replacedRuns.size > 500) replacedRuns.clear()
+        replacedRuns.add(runId)
+      }
     }
 
     // shot_number → id 索引（含本次调用内新增的行），保证按分镜号幂等 upsert
@@ -281,6 +304,21 @@ const saveStoryboards = createTool({
     const shotToId = new Map<number, number>(
       existingRows.filter(sb => !sb.deletedAt).map(sb => [sb.storyboardNumber, sb.id]),
     )
+
+    // narration-first（Issue #45）：剧本正文就是旁白稿，逐镜核对「这段话确实出自剧本」
+    const [episodeRow] = documentary
+      ? await db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId))
+      : [undefined]
+    const scriptKey = documentary ? scriptMatchKey(episodeRow?.scriptContent || episodeRow?.content) : ''
+    const batchShots = new Set(storyboards.map(sb => sb.shot_number))
+    // 游标从「本批之前的镜头已取用到哪里」起算，保证分批保存时顺序仍然成立
+    let scriptCursor = documentary
+      ? narrationCoverage(scriptKey, existingRows
+        .filter(sb => !sb.deletedAt && sb.storyboardNumber < Math.min(...batchShots) && !batchShots.has(sb.storyboardNumber))
+        .sort((a, b) => a.storyboardNumber - b.storyboardNumber)
+        .map(sb => sb.narrationText)).cursor
+      : 0
+    const narrationRejected: { shot_number: number; reason: string }[] = []
 
     for (const sb of storyboards) {
       await validateStoryboardBindings(episodeId, dramaId, sb.scene_id, sb.character_ids, sb.prop_ids)
@@ -345,6 +383,34 @@ const saveStoryboards = createTool({
           .where(eq(schema.storyboards.id, savedId))
       }
       await syncStoryboardBindingsFromPrompts(savedId, writtenFields)
+      // narration-first：逐字取自剧本才写库；改写过的文本不写旁白字段，画面字段照常保存
+      if (documentary && 'narration_text' in sb) {
+        const text = typeof sb.narration_text === 'string' ? sb.narration_text.trim() : ''
+        const chars = narrationCharCount(text)
+        const found = text ? locateNarrationInScript(scriptKey, text, scriptCursor) : { index: -1, chars: 0 }
+        if (!text) {
+          // 刻意留白的纯画面镜头：关掉该镜旁白
+          await db.update(schema.storyboards)
+            .set({ narrationText: '', narrationEnabled: false, updatedAt: ts })
+            .where(eq(schema.storyboards.id, savedId))
+        } else if (chars > MAX_NARRATION_CHARS) {
+          narrationRejected.push({ shot_number: sb.shot_number, reason: `narration is ${chars} characters, exceeding the per-shot limit of ${MAX_NARRATION_CHARS}; split the script passage at a sentence boundary into two shots` })
+        } else if (found.index < 0) {
+          narrationRejected.push({ shot_number: sb.shot_number, reason: 'narration is not a verbatim stretch of the episode script; copy the script text exactly (whitespace aside) instead of rewriting it' })
+        } else {
+          scriptCursor = Math.max(scriptCursor, found.index + found.chars)
+          const meta = parseNarrationMeta(savedRow?.narrationMeta)
+          meta.text_sha256 = sha256(text)
+          const narrationStamp = stampFieldSavedAt(savedRow?.fieldSavedAt, ['narration_text'])
+          await db.update(schema.storyboards).set({
+            narrationText: text,
+            narrationEnabled: true,
+            narrationMeta: JSON.stringify(meta),
+            ...(narrationStamp.json ? { fieldSavedAt: narrationStamp.json } : {}),
+            updatedAt: ts,
+          }).where(eq(schema.storyboards.id, savedId))
+        }
+      }
     }
 
     // 整集时长 = 当前全部存活分镜时长之和（分批保存时不能再按单批累加）
@@ -363,9 +429,28 @@ const saveStoryboards = createTool({
       count: storyboards.length,
       totalDuration,
     })
-    return { message: `Saved ${storyboards.length} storyboards`, count: storyboards.length, total_duration: totalDuration }
+    if (!documentary) {
+      return { message: `Saved ${storyboards.length} storyboards`, count: storyboards.length, total_duration: totalDuration }
+    }
+    // 纪录片：回报剧本覆盖进度，模型据此继续切下一段（全部切完时 covered_chars = script_chars）
+    const coverage = narrationCoverage(scriptKey, allRows
+      .filter(sb => !sb.deletedAt)
+      .sort((a, b) => a.storyboardNumber - b.storyboardNumber)
+      .map(sb => sb.narrationText))
+    return {
+      message: `Saved ${storyboards.length} storyboards`,
+      count: storyboards.length,
+      total_duration: totalDuration,
+      narration_rejected: narrationRejected,
+      replace_existing_ignored: replaceIgnored,
+      script_coverage: coverage,
+    }
   },
-})
+  })
+}
+
+export const saveStoryboards = buildSaveStoryboards(false)
+const saveDocumentaryStoryboards = buildSaveStoryboards(true)
 
 const storyboardUpdateSchema = z.object({
     storyboard_id: z.number(),
@@ -484,6 +569,8 @@ const updateStoryboard = createTool({
 })
 
 export const storyboardTools = { readStoryboardContext, saveStoryboards, updateStoryboard }
+/** 纪录片项目（Issue #45）：save_storyboards 换成带 narration_text 校验的变体，其余工具相同 */
+export const documentaryStoryboardTools = { readStoryboardContext, saveStoryboards: saveDocumentaryStoryboards, updateStoryboard }
 
 const promptSchema = storyboardUpdateSchema.pick({
   storyboard_id: true,

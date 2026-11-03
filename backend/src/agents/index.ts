@@ -14,18 +14,18 @@ import { getTextConfig, getTextProviderBaseUrl, getConfigById } from '../service
 import { logTaskProgress } from '../utils/task-logger.js'
 import { scriptTools } from './tools/script-tools.js'
 import { extractTools } from './tools/extract-tools.js'
-import { storyboardTools, promptStoryboardUpdaters } from './tools/storyboard-tools.js'
+import { storyboardTools, documentaryStoryboardTools, promptStoryboardUpdaters } from './tools/storyboard-tools.js'
 import { imagePromptTools } from './tools/image-prompt-tools.js'
 import { researchTools } from './tools/research-tools.js'
 import { visionTools } from './tools/vision-tools.js'
 import { loadAgentSkills, skillWorkspaces } from './skills.js'
 import { loadAgentPromptFile, loadBasePromptFile } from './prompts.js'
 import { buildLanguageDirective } from './language.js'
-import { getContentLanguageFromRC, getGenreRuleset } from './context.js'
+import { getContentLanguageFromRC, getGenreRuleset, getProjectType } from './context.js'
 import { TRANSITION_WRITER_PROMPT } from './default-prompts/transition-writer.js'
 import { transitionTools } from './tools/transition-tools.js'
 import { NARRATION_WRITER_PROMPT } from './default-prompts/narration-writer.js'
-import { narrationTools } from './tools/narration-tools.js'
+import { narrationTools, documentaryNarrationTools } from './tools/narration-tools.js'
 
 // Default prompts (used when workspace/prompts/<type>.md 文件缺失时兜底)
 export const DEFAULT_PROMPTS: Record<string, { name: string; instructions: string }> = {
@@ -488,6 +488,11 @@ export const agentRegistry: Record<string, Agent> = Object.fromEntries(
                 : scope === 'keyframes' ? promptStoryboardUpdaters.keyframes : promptStoryboardUpdaters.all,
             }
           }
+        // narration-first（Issue #45）：纪录片项目换成校验「旁白逐字来自剧本」的工具变体
+        : type === 'storyboard_breaker'
+          ? ({ requestContext }) => (getProjectType(requestContext) === 'documentary' ? documentaryStoryboardTools : storyboardTools)
+        : type === 'narration_writer'
+          ? ({ requestContext }) => (getProjectType(requestContext) === 'documentary' ? documentaryNarrationTools : narrationTools)
         : AGENT_TOOLS[type],
       workspace: skillWorkspaces[type],
       skillsFormat: 'markdown',
