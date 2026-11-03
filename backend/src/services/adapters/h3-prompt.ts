@@ -13,7 +13,8 @@
  *
  *   non_diegetic_music: ...
  */
-import { getTextConfig, getTextProviderBaseUrl } from '../ai.js'
+import { getTextProviderBaseUrl, type AIConfig } from '../ai.js'
+import { resolveStageModel } from '../ai-stages.js'
 
 export type H3Mode = 't2v' | 'firstlast' | 'reference'
 
@@ -194,11 +195,12 @@ async function expandWithTextModel(
   effDuration: number,
   anchors: H3FrameAnchors,
 ): Promise<H3PromptObject> {
-  const text = await getTextConfig()
-  if (text.provider.toLowerCase() === 'gemini') {
+  // 按环节选模型（#51）：H3 扩写是纯文本环节，跟随默认文本配置
+  const text = await resolveStageModel('h3_prompt')
+  if ((text.provider || '').toLowerCase() === 'gemini') {
     throw new Error('H3 提示词扩写需要 OpenAI 兼容的文本服务（当前启用的是 gemini）')
   }
-  const url = `${getTextProviderBaseUrl(text)}/chat/completions`
+  const url = `${getTextProviderBaseUrl(text as unknown as AIConfig)}/chat/completions`
   const anchorExtra = mode === 'reference'
     ? keyframeExtra(anchors.hasFirst, anchors.midTime, anchors.hasLast)
     : ''

@@ -9,7 +9,7 @@
 import { and, desc, eq, inArray } from 'drizzle-orm'
 import { db, getInsertId, schema } from '../db/index.js'
 import { now } from '../utils/response.js'
-import { getActiveConfig, getConfigById } from './ai.js'
+import { stageModelUsed, type AiStage, type StageModel, type StageModelUsed } from './ai-stages.js'
 import { completionStamp } from './media-time.js'
 import { ACTIVE_TASK_STATUSES, type SysTaskRow } from './sys-task.js'
 
@@ -73,6 +73,10 @@ export interface TextTaskParams {
   storyboardIds?: number[]
   configId?: number
   retry_of?: number
+  /** 本次用的 AI 环节（Issue #51，AI_STAGES 的键）；任务详情据此显示「是否需要视觉」 */
+  stage?: AiStage
+  /** 本次实际落到哪条配置/模型上（顶栏选非视觉模型时，视觉环节会被换成视觉配置） */
+  model_used?: StageModelUsed
   /** 纪录片角色花名册（Issue #32）：先定人再提取，保证多次运行的角色覆盖一致 */
   roster?: { name: string; basis?: string; reason?: string }[]
   [key: string]: unknown
@@ -94,24 +98,14 @@ export function textTaskKindOf(row: Pick<SysTaskRow, 'type' | 'params'>): TextTa
   return kind && TEXT_TASK_KINDS.includes(kind) ? kind : null
 }
 
-/** 解析本次实际使用的文本模型（指定配置优先，失效回退当前启用配置），只用于记录 */
-export async function resolveTextModel(opts: { model?: string; configId?: number } = {}): Promise<{ provider: string | null; model: string | null; configId: number | null }> {
-  const config = opts.configId
-    ? (await getConfigById(opts.configId)) ?? await getActiveConfig('text')
-    : await getActiveConfig('text')
-  return {
-    provider: config?.provider ?? null,
-    model: opts.model || config?.model || null,
-    configId: config?.id ?? opts.configId ?? null,
-  }
-}
-
 export async function createTextTask(input: {
   kind: TextTaskKind
   episodeId: number
   dramaId?: number | null
   storyboardId?: number | null
   prompt?: string | null
+  /** 本次解析出来的环节模型（Issue #51）：provider/model/configId 与 params.stage/model_used 都由它来 */
+  stageModel?: StageModel
   provider?: string | null
   model?: string | null
   configId?: number | null
@@ -120,10 +114,16 @@ export async function createTextTask(input: {
   retryOf?: number
 }): Promise<number> {
   const ts = now()
+  const stage = input.stageModel
   const params: TextTaskParams = { kind: input.kind }
   if (input.progress) params.progress = input.progress
   if (input.storyboardIds?.length) params.storyboardIds = input.storyboardIds
-  if (input.configId) params.configId = input.configId
+  const configId = stage ? stage.configId : input.configId
+  if (configId) params.configId = configId
+  if (stage) {
+    params.stage = stage.stage
+    params.model_used = stageModelUsed(stage)
+  }
   if (input.retryOf) params.retry_of = input.retryOf
 
   const res = await db.insert(schema.sysTask).values({
@@ -131,8 +131,8 @@ export async function createTextTask(input: {
     episodeId: input.episodeId,
     dramaId: input.dramaId ?? null,
     storyboardId: input.storyboardId ?? null,
-    provider: input.provider ?? null,
-    model: input.model ?? null,
+    provider: stage ? stage.provider : (input.provider ?? null),
+    model: stage ? stage.model : (input.model ?? null),
     prompt: input.prompt ?? null,
     params: JSON.stringify(params),
     status: 'processing',

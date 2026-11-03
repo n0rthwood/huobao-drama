@@ -79,6 +79,9 @@
       "createdAt": "作成日時",
       "completedAt": "完了日時",
       "elapsed": "所要時間",
+      "stage": "AI 工程",
+      "stageVision": "ビジョン必須",
+      "modelUsed": "実際に使用したモデル",
       "visionCalls": "画像読み取り",
       "visionCallsValue": "{n} 回 · {model} · {pt}/{ct} トークン",
       "prompt": "プロンプト（読み取り専用）",
@@ -721,7 +724,11 @@
       "ttsVoiceLoading": "音色一覧を読み込み中…",
       "ttsVoicePlaceholder": "「音色一覧を更新」してから選択",
       "ttsVoiceEmpty": "このサービスは音色を返しませんでした",
-      "ttsVoiceRequired": "保存前に音色を選択してください"
+      "ttsVoiceRequired": "保存前に音色を選択してください",
+      "vision": "ビジョンモデル",
+      "visionHint": "このテキストサービスは画像を実際に読めます（例：DeepSeek V4.1 Flash）。画像を見る必要がある工程（ドキュメンタリーの絵コンテ分割、表現設計、セマンティック注釈、美化の忠実性確認、史料肖像）はビジョン指定の設定のみを使用します。",
+      "visionTag": "ビジョン",
+      "visionProbeTitle": "画像読み取り検証"
     },
     "styleDialog": {
       "editTitle": "スタイルプリセットを編集",

@@ -79,6 +79,9 @@
       "createdAt": "생성 시각",
       "completedAt": "완료 시각",
       "elapsed": "소요 시간",
+      "stage": "AI 단계",
+      "stageVision": "비전 필요",
+      "modelUsed": "실제 사용 모델",
       "visionCalls": "이미지 판독",
       "visionCallsValue": "{n}회 · {model} · {pt}/{ct} 토큰",
       "prompt": "프롬프트(읽기 전용)",
@@ -721,7 +724,11 @@
       "ttsVoiceLoading": "음색 목록을 불러오는 중…",
       "ttsVoicePlaceholder": "「음색 목록 새로고침」 후 선택",
       "ttsVoiceEmpty": "이 서비스가 음색을 반환하지 않았습니다",
-      "ttsVoiceRequired": "저장하기 전에 음색을 선택하십시오"
+      "ttsVoiceRequired": "저장하기 전에 음색을 선택하십시오",
+      "vision": "비전 모델",
+      "visionHint": "이 텍스트 서비스는 이미지를 실제로 읽을 수 있습니다(예: DeepSeek V4.1 Flash). 이미지를 봐야 하는 단계(다큐멘터리 콘티 분할, 표현 설계, 의미 주석, 보정 충실도 검증, 사료 초상)는 비전으로 표시된 설정만 사용합니다.",
+      "visionTag": "비전",
+      "visionProbeTitle": "이미지 판독 검증"
     },
     "styleDialog": {
       "editTitle": "스타일 프리셋 편집",

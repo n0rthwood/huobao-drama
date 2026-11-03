@@ -9,7 +9,9 @@ import { createReasoningSink } from '../agents/reasoning-sink.js'
 import { mastra } from '../mastra/index.js'
 import { success, badRequest } from '../utils/response.js'
 import { logTaskError, logTaskPayload, logTaskProgress, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
-import { createTextTask, finishTextTask, resolveTextModel, type TextTaskKind } from '../services/text-task.js'
+import { createTextTask, finishTextTask, patchTextTaskParams, type TextTaskKind } from '../services/text-task.js'
+import { buildEvidenceImages, evidenceMessageParts } from '../services/evidence-images.js'
+import { agentChatStage, resolveStageModel, StageVisionUnavailableError, type StageModel } from '../services/ai-stages.js'
 import { db, schema } from '../db/index.js'
 import { eq } from 'drizzle-orm'
 import { describeNarrationGaps, narrationCoverage, type NarrationGap } from '../services/narration-first.js'
@@ -83,11 +85,26 @@ app.post('/:type/chat', async (c) => {
 
   // 旁白开关（#30）：拆分分镜的条件技能据此注入；关闭时注入内容与改动前逐字相同
   const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, Number(episode_id)))
+
+  // 按环节选模型（#51）：纪录片拆分分镜要看证据素材，顶栏即使选了 GLM 也会被换成视觉配置
+  const projectType = resolveDramaProjectType(Number(drama_id))
+  const stage = agentChatStage(agentType, projectType)
+  let resolved: StageModel
+  try {
+    resolved = await resolveStageModel(stage, { model: body.model || undefined, configId: body.config_id || undefined })
+  } catch (err) {
+    if (err instanceof StageVisionUnavailableError) {
+      logTaskError('Agent', agentType, { stage, error: err.message })
+      return badRequest(c, err.message)
+    }
+    throw err
+  }
+
   const requestContext = buildAgentRequestContext({
     episodeId: episode_id,
     dramaId: drama_id,
-    modelOverride: body.model || undefined,
-    textConfigId: body.config_id || undefined,
+    modelOverride: resolved.model,
+    textConfigId: resolved.configId ?? undefined,
     narrationEnabled: ep?.narrationEnabled === true,
   })
 
@@ -95,15 +112,12 @@ app.post('/:type/chat', async (c) => {
   const kind = CHAT_TASK_KINDS[agentType]
   let taskId: number | null = null
   if (kind) {
-    const resolved = await resolveTextModel({ model: body.model || undefined, configId: body.config_id || undefined })
     taskId = await createTextTask({
       kind,
       episodeId: Number(episode_id),
       dramaId: Number(drama_id),
       prompt: typeof message === 'string' ? message : null,
-      provider: resolved.provider,
-      model: resolved.model,
-      configId: body.config_id || resolved.configId || undefined,
+      stageModel: resolved,
     })
   }
   // 工具计量（#46 read_image）要知道写进哪条任务：任务行建在 rc 之后，这里补注入
@@ -112,10 +126,20 @@ app.post('/:type/chat', async (c) => {
   const sink = taskId ? createReasoningSink(taskId) : undefined
   const startTime = performance.now()
 
+  // 纪录片拆分分镜直接附证据图（#51）：只靠 read_image 工具提示，模型实测一次都不调用
+  const evidence = stage === 'storyboard_breaker_documentary'
+    ? await buildEvidenceImages(Number(episode_id))
+    : []
+  if (evidence.length && taskId) {
+    await patchTextTaskParams(taskId, {
+      evidence_images: evidence.map(image => ({ prop_id: image.propId, name: image.name, kind: image.kind, marks: image.legend.length })),
+    })
+  }
+
   try {
     const result = await runAgent(
       agent,
-      [{ role: 'user', content: message }],
+      [{ role: 'user', content: evidenceMessageParts(String(message), evidence) }],
       { maxSteps: 20, requestContext },
       sink,
     )

@@ -33,6 +33,8 @@ interface LocalConfigEntry {
   model?: string[]
   priority?: number
   temperature?: number
+  /** 文本配置是否能看图（Issue #51）：需要视觉的 AI 环节只会选 true 的配置 */
+  vision?: boolean
   /** 服务级参数（TTS 的 voice/seed/instructions/cfg_value/inference_timesteps 等）；留空的键沿用库里已有值 */
   settings?: Record<string, unknown>
 }
@@ -85,6 +87,8 @@ for (const [i, e] of entries.entries()) {
     model: JSON.stringify(model),
     priority: Number(e.priority) || 0,
     isActive: true,
+    // 文本配置的视觉标定（#51）：没写就沿用库里已有标记（新行默认 false），避免 apply 一次把人工标定冲掉
+    vision: typeof e.vision === 'boolean' ? e.vision : existing?.vision === true,
     settings: Object.keys(settings).length ? JSON.stringify(settings) : null,
     updatedAt: now(),
   }

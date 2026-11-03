@@ -294,6 +294,8 @@ export const aiServiceConfigs = sqliteTable('ai_service_configs', {
   priority: integer('priority').default(0),
   isDefault: integer('is_default', { mode: 'boolean' }).default(false),
   isActive: integer('is_active', { mode: 'boolean' }).default(true),
+  /** 文本配置能否接收图片消息（Issue #51）：人工标定，不做运行时探测 */
+  vision: integer('vision', { mode: 'boolean' }).notNull().default(false),
   settings: text('settings'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),

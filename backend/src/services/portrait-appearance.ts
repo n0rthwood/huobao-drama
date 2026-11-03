@@ -20,12 +20,11 @@ import { and, desc, eq } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
 import { now } from '../utils/response.js'
 import { logTaskError, logTaskProgress, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
-import { getConfigById, getTextConfig, type AIConfig } from './ai.js'
+import { resolveStageModel, type StageModel } from './ai-stages.js'
 import { callTextChat, imageContentPart, type ChatContent, type ChatEndpointConfig } from './vision-chat.js'
 import { listArchivalImages, type ArchivalImageEntry } from './archival-images.js'
 import { linkCitationsToAsset, recordCitation } from './research-citations.js'
 import { wikiExtract, wikiSearch } from './wiki-research.js'
-import { resolveVisionTextConfig, type VisionTextConfig } from './vision-capability.js'
 import {
   createTextTask,
   findActiveTextTask,
@@ -284,43 +283,33 @@ export async function startPortraitAppearance(
     return { started: false, reason: 'running', vision: { used: false }, portraits: portraits.length }
   }
 
-  const vision = await resolveVisionTextConfig(opts.configId)
-  // 没有能看图的配置时才退回纯文本：指定配置优先，否则用当前启用的文本模型
-  const fallback = vision ? null : (opts.configId ? await getConfigById(opts.configId) : null) ?? await getTextConfig()
-  const used: { provider: string; model: string } = vision ?? (fallback as AIConfig)
+  // 视觉环节（#51）：读画像是这件事的全部意义，没有视觉配置就 400，不再退化成「照着维基编外貌」
+  const vision = await resolveStageModel('portrait_appearance', { configId: opts.configId })
 
   const taskId = await createTextTask({
     kind: 'portrait_appearance',
     episodeId,
     dramaId: character.dramaId,
     prompt: `按史料画像补充「${character.name}」的外貌`,
-    provider: used.provider || null,
-    model: used.model || null,
-    configId: vision ? vision.configId : (fallback?.id ?? opts.configId ?? undefined),
+    stageModel: vision,
   })
   // 任务行按「集」落库，角色 id 必须进 params：状态接口要据此只回本角色的那次任务
   await patchTextTaskParams(taskId, {
     character_id: characterId,
-    portrait_source: vision ? 'vision' : 'text',
+    portrait_source: 'vision',
   })
 
   logTaskStart('Portrait', 'appearance-from-portrait', {
     characterId, episodeId, name: character.name,
-    portraits: portraits.length, vision: !!vision, model: used.model,
+    portraits: portraits.length, model: vision.model,
   })
 
-  void runPortraitAppearance(taskId, {
-    character,
-    episodeId,
-    portraits,
-    vision,
-    textConfig: vision ? null : (fallback as AIConfig),
-  })
+  void runPortraitAppearance(taskId, { character, episodeId, portraits, vision })
 
   return {
     started: true,
     taskId,
-    vision: vision ? { used: true, config_name: vision.name, model: vision.model } : { used: false },
+    vision: { used: true, config_name: vision.name || '', model: vision.model },
     portraits: portraits.length,
   }
 }
@@ -329,8 +318,7 @@ async function runPortraitAppearance(taskId: number, ctx: {
   character: typeof schema.characters.$inferSelect
   episodeId: number
   portraits: ArchivalImageEntry[]
-  vision: VisionTextConfig | null
-  textConfig: AIConfig | null
+  vision: StageModel
 }): Promise<void> {
   const { character, episodeId, portraits, vision } = ctx
   try {
@@ -352,34 +340,29 @@ async function runPortraitAppearance(taskId: number, ctx: {
       scriptExcerpt: (episode?.scriptContent || episode?.content || '').slice(0, SCRIPT_EXCERPT_MAX_CHARS),
       portraitMeta: portraitMetaText(portraits),
       wikiText: wiki.text,
-      withImages: !!vision,
+      withImages: true,
     })
 
-    let content: ChatContent = userText
-    if (vision) {
-      const images: Array<Record<string, unknown>> = []
-      for (const entry of portraits.slice(0, MAX_VISION_PORTRAITS)) {
-        try {
-          const prepared = await imageContentPart(entry.path, {
-            maxSide: PORTRAIT_IMAGE_MAX_EDGE,
-            quality: PORTRAIT_IMAGE_QUALITY,
-          })
-          images.push(prepared.part)
-        } catch (err) {
-          // 文件丢了就少读一张，不整单失败
-          logTaskProgress('Portrait', 'portrait-unreadable', {
-            characterId: character.id, path: entry.path,
-            error: err instanceof Error ? err.message : String(err),
-          })
-        }
+    const images: Array<Record<string, unknown>> = []
+    for (const entry of portraits.slice(0, MAX_VISION_PORTRAITS)) {
+      try {
+        const prepared = await imageContentPart(entry.path, {
+          maxSide: PORTRAIT_IMAGE_MAX_EDGE,
+          quality: PORTRAIT_IMAGE_QUALITY,
+        })
+        images.push(prepared.part)
+      } catch (err) {
+        // 文件丢了就少读一张，不整单失败
+        logTaskProgress('Portrait', 'portrait-unreadable', {
+          characterId: character.id, path: entry.path,
+          error: err instanceof Error ? err.message : String(err),
+        })
       }
-      content = [{ type: 'text', text: userText }, ...images]
     }
+    const content: ChatContent = [{ type: 'text', text: userText }, ...images]
 
-    const config = vision ?? ctx.textConfig
-    if (!config) throw new Error('未配置可用的文本模型')
     const raw = await callChat({
-      baseUrl: config.baseUrl, apiKey: config.apiKey, model: config.model, provider: config.provider,
+      baseUrl: vision.baseUrl, apiKey: vision.apiKey, model: vision.model, provider: vision.provider || '',
     }, content)
     const appearance = composeAppearance(parseTraitJson(raw))
     if (!appearance) throw new Error('模型没有给出可用的外貌特征')
@@ -395,11 +378,11 @@ async function runPortraitAppearance(taskId: number, ctx: {
       })
       .where(eq(schema.characters.id, character.id))
 
-    await recordProvenance(character, episodeId, portraits, wiki, !!vision)
-    await patchTextTaskParams(taskId, { portrait_source: vision ? 'vision' : 'text', portrait_appearance: appearance })
+    await recordProvenance(character, episodeId, portraits, wiki, true)
+    await patchTextTaskParams(taskId, { portrait_source: 'vision', portrait_appearance: appearance })
     await finishTextTask(taskId, 'completed', { outputText: appearance })
     logTaskSuccess('Portrait', 'appearance-from-portrait', {
-      characterId: character.id, source: vision ? 'vision' : 'text', chars: appearance.length,
+      characterId: character.id, source: 'vision', chars: appearance.length,
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)

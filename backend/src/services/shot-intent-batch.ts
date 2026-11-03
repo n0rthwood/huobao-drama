@@ -20,11 +20,12 @@ import {
   findLatestTextTask,
   finishTextTask,
   promptBatchStatusFrom,
-  resolveTextModel,
   updateTextTaskProgress,
   type PromptBatchStatus,
   type TextTaskProgress,
 } from './text-task.js'
+import { resolveStageModel } from './ai-stages.js'
+import { buildEvidenceImages, evidenceMessageParts } from './evidence-images.js'
 
 export type ShotIntentBatchStatus = PromptBatchStatus
 
@@ -46,15 +47,13 @@ export async function startShotIntentBatch(
     : alive.filter(sb => !(sb.intent || '').trim())
   if (!pending.length) return { started: false, total: 0 }
 
-  const resolved = await resolveTextModel(opts)
+  const resolved = await resolveStageModel('shot_intent', opts)
   const progress: TextTaskProgress = { completed: 0, failed: 0, total: pending.length }
   const taskId = await createTextTask({
     kind: 'shot_intent',
     episodeId,
     dramaId,
-    provider: resolved.provider,
-    model: resolved.model,
-    configId: opts.configId ?? resolved.configId ?? undefined,
+    stageModel: resolved,
     storyboardIds: pending.map(sb => sb.id),
     progress,
     retryOf: opts.retryOf,
@@ -70,8 +69,8 @@ export async function startShotIntentBatch(
       dramaId,
       textTaskId: taskId,
       storyboardPromptScope: 'intent',
-      modelOverride: opts.model || undefined,
-      textConfigId: opts.configId || undefined,
+      modelOverride: resolved.model,
+      textConfigId: resolved.configId ?? undefined,
     })
     const sink = createReasoningSink(taskId)
     for (const sb of pending) {
@@ -84,13 +83,15 @@ export async function startShotIntentBatch(
       })
       sink.heading(`分镜 #${sb.storyboardNumber}`)
       try {
+        // 逐镜附该镜候选证据图（#51）：只提示「必要时 read_image」实测模型从不调用
+        const evidence = await buildEvidenceImages(episodeId, { storyboardIds: [sb.id] })
         const result = await runAgent(agent, [{
           role: 'user',
-          content: `请为分镜 #${sb.storyboardNumber}(ID:${sb.id}) 做表达设计（intent），严格遵循 documentary-storyboard 技能里「表达设计」一节。
+          content: evidenceMessageParts(`请为分镜 #${sb.storyboardNumber}(ID:${sb.id}) 做表达设计（intent），严格遵循 documentary-storyboard 技能里「表达设计」一节。
 先调用 read_storyboard_context：读本镜的 narration_text（旁白原文）、description、duration，读前后镜的 intent（同一段落要共用底图与图层状态，不要各写各的），读 props 里每张证据素材的 semantics（只有名称与 id，没有坐标）与 exposition_assets。
 然后按这个顺序想：这一镜要让观众理解的**唯一**信息点是什么 → 用哪种 device → 为了让这个信息点成立，画面上**必须看到**哪些具体东西（旁白里出现的每一个地名/路线/范围都要在某张图的 semantics 里找到对应项并写进 must_show；人物首次出现用 card + 肖像；旁白提到但不出场的组织/人物/事件引用 exposition 资产）→ 这些东西用哪些图层画出来、按什么顺序显现（overlay_plan）。
-必要时用 read_image 打开证据素材核对：旁白说的东西图上到底有没有。图上没有就在 rationale 里写明并降级，不要凭空写一个不存在的要素。
-最后调用 update_storyboard 保存，参数只传 storyboard_id 和 intent 两个键。`,
+必要时用 read_image 打开证据素材的局部细节；图上没有的东西就在 rationale 里写明并降级，不要凭空写一个不存在的要素。
+最后调用 update_storyboard 保存，参数只传 storyboard_id 和 intent 两个键。`, evidence),
         }], { maxSteps: 10, requestContext }, sink)
         outputs.push(`分镜 #${sb.storyboardNumber}：${result.text || ''}`)
         // 以实际落库为准判定成败

@@ -21,7 +21,7 @@ test('video prompt batch service runs per-shot async agent loop', () => {
   assert.match(svc, /fresh\?\.videoPrompt/)
   // 进度跟踪与文本模型覆盖
   assert.match(svc, /current_storyboard_id/)
-  assert.match(svc, /modelOverride: opts\.model/)
+  assert.match(svc, /resolveStageModel\('video_prompts', opts\)/)
 })
 
 test('episodes route exposes video prompt batch endpoints', () => {

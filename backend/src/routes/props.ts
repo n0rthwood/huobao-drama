@@ -23,6 +23,7 @@ import {
   SemanticsValidationError,
 } from '../services/asset-semantics.js'
 import { getSemanticsAutoStatus, startSemanticsAuto } from '../services/asset-semantics-auto.js'
+import { StageVisionUnavailableError } from '../services/ai-stages.js'
 import { beautifyPrompt, sizeBucketFor, watchBeautifyTask } from '../services/prop-beautify.js'
 import { getAbsolutePath } from '../utils/storage.js'
 import sharp from 'sharp'
@@ -263,16 +264,22 @@ app.post('/:id/semantics/auto', async (c) => {
   const base = await resolveSemanticsBase(prop)
   if (!base.path) return badRequest(c, '该素材还没有图片，无法标注；请先上传原件')
 
-  const result = await startSemanticsAuto({
-    propId: id,
-    episodeId: Number(body.episode_id),
-    dramaId: prop.dramaId,
-    propName: prop.name,
-    absPath: getAbsolutePath(base.path),
-    sourceTaskId: base.taskId,
-    configId: body.config_id ?? undefined,
-  })
-  return success(c, { started: result.started, task_id: result.taskId })
+  try {
+    const result = await startSemanticsAuto({
+      propId: id,
+      episodeId: Number(body.episode_id),
+      dramaId: prop.dramaId,
+      propName: prop.name,
+      absPath: getAbsolutePath(base.path),
+      sourceTaskId: base.taskId,
+      configId: body.config_id ?? undefined,
+    })
+    return success(c, { started: result.started, task_id: result.taskId })
+  } catch (err) {
+    // 视觉环节无可用视觉配置（#51）：明确 400，不建一条注定失败的任务
+    if (err instanceof StageVisionUnavailableError) return badRequest(c, err.message)
+    throw err
+  }
 })
 
 // GET /props/:id/semantics/auto/status — 最近一次自动标注的状态与告警

@@ -19,11 +19,11 @@ import {
   findLatestTextTask,
   finishTextTask,
   promptBatchStatusFrom,
-  resolveTextModel,
   updateTextTaskProgress,
   type PromptBatchStatus,
   type TextTaskProgress,
 } from './text-task.js'
+import { resolveStageModel } from './ai-stages.js'
 
 export type KeyframePromptBatchStatus = PromptBatchStatus
 
@@ -62,15 +62,13 @@ export async function startKeyframePromptBatch(
   // 前后镜的表达设计（#49）：message 里带上，再现类镜头才能承接上一镜而不是各写各的
   const briefs = buildIntentBriefs(sbs, intentCtx)
 
-  const resolved = await resolveTextModel(opts)
+  const resolved = await resolveStageModel('keyframe_prompts', opts)
   const progress: TextTaskProgress = { completed: 0, failed: 0, total: pending.length }
   const taskId = await createTextTask({
     kind: 'keyframe_prompts',
     episodeId,
     dramaId,
-    provider: resolved.provider,
-    model: resolved.model,
-    configId: opts.configId ?? resolved.configId ?? undefined,
+    stageModel: resolved,
     // 落盘实际处理范围（而非调用方传入的可选列表），重试时按同一批分镜重跑
     storyboardIds: pending.map(sb => sb.id),
     progress,
@@ -87,8 +85,8 @@ export async function startKeyframePromptBatch(
       dramaId,
       textTaskId: taskId,
       storyboardPromptScope: 'keyframes',
-      modelOverride: opts.model || undefined,
-      textConfigId: opts.configId || undefined,
+      modelOverride: resolved.model,
+      textConfigId: resolved.configId ?? undefined,
     })
     const sink = createReasoningSink(taskId)
     for (const sb of pending) {

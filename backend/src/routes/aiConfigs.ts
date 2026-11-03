@@ -6,6 +6,8 @@ import { toSnakeCase } from '../utils/transform.js'
 import { joinProviderUrl } from '../services/adapters/url.js'
 import { hasVersionedPath, isOfficialProvider, parseConfigTemperature, validateConfigModels } from '../services/ai.js'
 import { fetchVoices } from '../services/tts.js'
+import { probeVision, resolveVisionTextConfig } from '../services/vision-capability.js'
+import { AI_STAGES } from '../services/ai-stages.js'
 import { redactUrl, logTaskError, logTaskProgress, logTaskSuccess } from '../utils/task-logger.js'
 
 const app = new Hono()
@@ -155,6 +157,18 @@ app.get('/', async (c) => {
 })
 
 /**
+ * GET /ai-configs/ai-stages — AI 环节的视觉标定表 + 当前会被选中的视觉配置（#51）。
+ * 前端据此在需要视觉的按钮旁显示「此操作将使用视觉模型 X」，没有视觉配置时提示去设置页标定。
+ */
+app.get('/ai-stages', async (c) => {
+  const vision = await resolveVisionTextConfig()
+  return success(c, {
+    stages: Object.entries(AI_STAGES).map(([stage, spec]) => ({ stage, label: spec.label, vision: spec.vision })),
+    vision_config: vision ? { id: vision.configId, name: vision.name, model: vision.model } : null,
+  })
+})
+
+/**
  * TTS 可选参数：voice / instructions / cfg_value / inference_timesteps / seed。
  * 合并进 settings JSON，省略/置空的键视为清除。
  * voice（#35）由人在设置页从服务的音色列表里选定 —— 程序绝不替用户挑「第一个」。
@@ -218,6 +232,8 @@ app.post('/', async (c) => {
     model: JSON.stringify(body.model || []),
     priority: body.priority || 0,
     isActive: true,
+    // 视觉标定（#51）：只有文本配置有意义，人工标定，不做探测初值
+    vision: body.service_type === 'text' && body.vision === true,
     settings: Object.keys(settings).length ? JSON.stringify(settings) : null,
     createdAt: ts,
     updatedAt: ts,
@@ -274,6 +290,30 @@ app.post('/test', async (c) => {
         : '端点未按预期响应，请检查 Base URL 和代理前缀',
       response_preview: text.slice(0, 240),
     }
+    // 文本配置附带一次真实读图校验（#51）：只显示结果，绝不回写 vision 标记
+    let visionProbe: Record<string, unknown> | undefined
+    if (body.service_type === 'text' && model) {
+      const result = await probeVision({
+        configId: Number(body.config_id) || 0,
+        name: String(body.name || ''),
+        provider: String(body.provider),
+        baseUrl: String(body.base_url),
+        apiKey: String(body.api_key || ''),
+        model: String(model),
+      })
+      const declared = body.vision === true
+      visionProbe = {
+        ok: result.ok,
+        detail: result.detail,
+        declared,
+        mismatch: result.ok !== declared,
+        message: result.ok === declared
+          ? (result.ok ? '读图校验通过，与「视觉模型」标记一致' : '该服务不收图片消息，与「非视觉模型」标记一致')
+          : (result.ok
+            ? '该服务接受了图片消息，但当前标记为「非视觉模型」；如确认它能读图，请手动打开开关'
+            : '当前标记为「视觉模型」，但该服务拒绝了图片消息；请确认标记是否正确'),
+      }
+    }
     if (reachable) {
       logTaskSuccess('AIConfig', 'probe-done', {
         provider: body.provider,
@@ -287,7 +327,7 @@ app.post('/test', async (c) => {
         url: probeUrl,
       })
     }
-    return success(c, payload)
+    return success(c, visionProbe ? { ...payload, vision_probe: visionProbe } : payload)
   } catch (error: any) {
     logTaskError('AIConfig', 'probe-failed', {
       provider: body.provider,
@@ -369,6 +409,8 @@ app.put('/:id', async (c) => {
   if ('model' in body) updates.model = JSON.stringify(body.model)
   if ('priority' in body) updates.priority = body.priority
   if ('is_active' in body) updates.isActive = body.is_active
+  // 视觉标定（#51）：非文本配置一律视为非视觉
+  if ('vision' in body) updates.vision = serviceType === 'text' && body.vision === true
   if ('temperature' in body || 'tts_settings' in body) {
     // 与已有 settings 合并：清空的 temperature 从 JSON 中移除，已固定的 voice 保留不动
     let settings: Record<string, any> = {}
