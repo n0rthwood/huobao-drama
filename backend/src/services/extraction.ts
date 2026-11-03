@@ -104,6 +104,7 @@ async function startExtractorRun(
     const requestContext = buildAgentRequestContext({
       episodeId,
       dramaId,
+      textTaskId: taskId,
       modelOverride: opts.model || undefined,
       textConfigId: opts.configId || undefined,
       singleAssetName: opts.singleAssetName,

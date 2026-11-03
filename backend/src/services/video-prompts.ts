@@ -88,6 +88,7 @@ export async function startVideoPromptBatch(
     const requestContext = buildAgentRequestContext({
       episodeId,
       dramaId,
+      textTaskId: taskId,
       storyboardPromptScope: 'video',
       modelOverride: opts.model || undefined,
       textConfigId: opts.configId || undefined,

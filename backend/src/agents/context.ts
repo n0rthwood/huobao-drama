@@ -28,6 +28,8 @@ export interface AgentRequestContextValues {
   genreRuleset?: GenreRuleset | null
   /** 本次运行的检索预算作用域（构建处生成，调用方不传） */
   researchRunId?: string
+  /** 本次运行所属的文本任务 id（Issue #46）：工具的计量写进该任务的 params.vision_calls */
+  textTaskId?: number
 }
 
 export function buildAgentRequestContext(values: AgentRequestContextValues): RequestContext<AgentRequestContextValues> {
@@ -41,6 +43,7 @@ export function buildAgentRequestContext(values: AgentRequestContextValues): Req
   if (values.narrationEnabled) rc.set('narrationEnabled', true)
   if (values.narrationShotNumbers !== undefined) rc.set('narrationShotNumbers', values.narrationShotNumbers)
   if (values.singleAssetName) rc.set('singleAssetName', values.singleAssetName)
+  if (values.textTaskId) rc.set('textTaskId', values.textTaskId)
   // 语言在构建处统一解析：4 条链路（chat/提取/图片提示词/视频提示词）都经过这里，
   // 全局设置一处生效；显式传入 values.language 可按请求覆盖
   rc.set('language', values.language ?? getContentLanguage())
@@ -57,6 +60,12 @@ export function buildAgentRequestContext(values: AgentRequestContextValues): Req
 
 export function getEpisodeId(requestContext: RequestContext | undefined): number | null {
   const v = requestContext?.get('episodeId' as never)
+  return typeof v === 'number' ? v : null
+}
+
+/** 本次运行所属的文本任务 id（#46）；没有任务上下文时返回 null，工具只记日志 */
+export function getTextTaskId(requestContext: RequestContext | undefined): number | null {
+  const v = requestContext?.get('textTaskId' as never)
   return typeof v === 'number' ? v : null
 }
 

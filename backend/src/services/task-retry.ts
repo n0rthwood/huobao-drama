@@ -196,6 +196,7 @@ async function retryChatText(row: SysTaskRow, kind: TextTaskKind, episodeId: num
   const requestContext = buildAgentRequestContext({
     episodeId,
     dramaId: row.dramaId ?? 0,
+    textTaskId: taskId,
     modelOverride: opts.model || undefined,
     textConfigId: opts.configId || undefined,
   })
