@@ -78,6 +78,8 @@
       "createdAt": "作成日時",
       "completedAt": "完了日時",
       "elapsed": "所要時間",
+      "visionCalls": "画像読み取り",
+      "visionCallsValue": "{n} 回 · {model} · {pt}/{ct} トークン",
       "prompt": "プロンプト（読み取り専用）",
       "noPrompt": "プロンプトなし",
       "references": "参照画像（{n} 枚）",
