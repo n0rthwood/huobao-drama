@@ -21,7 +21,7 @@ function run(body, env = {}) {
     import { draftClip, CLIP_PRE_POST_DEFAULT_SECONDS } from './src/services/clip-draft.ts'
     import { normalizeLayerDoc } from './src/services/layer-doc.ts'
     import { clipSignatureOf } from './src/services/storyboard-clips.ts'
-    import { composeSignatureOf, describeComposeDiff, COMPOSE_SIGNATURE_VERSION } from './src/services/compose-state.ts'
+    import { composeSignatureOf, composeSignatureVersionOf, describeComposeDiff, COMPOSE_SIGNATURE_VERSION } from './src/services/compose-state.ts'
     const out = (value) => console.log('@@' + JSON.stringify(value))
     ${body}
   `
@@ -208,6 +208,33 @@ test('渲染签名：图层/时间线/时长/画幅/底图字节任一变化都�
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
+})
+
+test('compose 快照：无片段的镜头保持 v2 摘要（存量项目不被整集判已变化）', () => {
+  const got = run(`
+    const clipless = {
+      video_src: 'static/videos/a.mp4', audio_src: 'static/narration/a.mp3',
+      subtitle_src: 'static/narration/a.srt', burned: true,
+      text_sha256: 'abc', fit_key: 'pad:800', transition_t: 0,
+      replace_clip: null, pre_clip: null, post_clip: null,
+    }
+    const legacyV2 = { video_src: clipless.video_src, audio_src: clipless.audio_src, subtitle_src: clipless.subtitle_src, burned: true, text_sha256: 'abc', fit_key: 'pad:800', transition_t: 0 }
+    const withClip = { ...clipless, video_src: 'static/clips/r.mp4', replace_clip: { src: 'static/clips/r.mp4', signature: 'sig1' } }
+    out({
+      cliplessVersion: composeSignatureVersionOf(clipless),
+      clipVersion: composeSignatureVersionOf(withClip),
+      cliplessSig: composeSignatureOf(clipless),
+      legacySig: composeSignatureOf(legacyV2),
+      clipSig: composeSignatureOf(withClip),
+    })
+  `)
+  // #50 之前的公式：sha256(['v2', video, audio, subtitle, '1', text, fit, t.toFixed(3)].join('\\u0000'))
+  const V2_DIGEST = 'a77ed49e620bb74708ed1711b9f52b1072edafdcb7425d8e1e52a4690d6aa8a7'
+  assert.equal(got.cliplessVersion, 2, '无片段的镜头生效版本仍是 2')
+  assert.equal(got.clipVersion, 3)
+  assert.equal(got.cliplessSig, V2_DIGEST, '无片段镜头的摘要必须与 #50 之前逐字节一致')
+  assert.equal(got.legacySig, V2_DIGEST, '旧快照（根本没有片段字段）同摘要')
+  assert.notEqual(got.clipSig, V2_DIGEST, '挂了片段的镜头才升到 v3 摘要')
 })
 
 test('compose 快照 v3：片段参与签名，差异分项报「确定性片段」', () => {

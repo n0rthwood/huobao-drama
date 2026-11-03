@@ -123,9 +123,19 @@ function clipKey(part: ComposeClipPart | null | undefined): string {
   return part ? `${part.src}@${part.signature}` : ''
 }
 
+/**
+ * 本镜快照的**生效版本**：没有任何确定性片段的镜头仍然按 v2 口径签名，
+ * 这样 #50 上线不会把所有存量项目的成片一次性判成「已变化」。
+ * 只有真的挂了片段的镜头才升到 v3（版本号 + 三个片段分项一起进摘要）。
+ */
+export function composeSignatureVersionOf(parts: ComposeInputParts): number {
+  return parts.replace_clip || parts.pre_clip || parts.post_clip ? COMPOSE_SIGNATURE_VERSION : 2
+}
+
 export function composeSignatureOf(parts: ComposeInputParts): string {
-  return sha256([
-    `v${COMPOSE_SIGNATURE_VERSION}`,
+  const version = composeSignatureVersionOf(parts)
+  const fields = [
+    `v${version}`,
     parts.video_src,
     parts.audio_src || '',
     parts.subtitle_src || '',
@@ -133,10 +143,10 @@ export function composeSignatureOf(parts: ComposeInputParts): string {
     parts.text_sha256,
     parts.fit_key,
     parts.transition_t.toFixed(3),
-    clipKey(parts.replace_clip),
-    clipKey(parts.pre_clip),
-    clipKey(parts.post_clip),
-  ].join('\u0000'))
+  ]
+  // v2 的摘要输入必须一个字节都不变：多拼三个空串也会换摘要
+  if (version >= 3) fields.push(clipKey(parts.replace_clip), clipKey(parts.pre_clip), clipKey(parts.post_clip))
+  return sha256(fields.join('\u0000'))
 }
 
 /** 逐项对比两份快照，给出人能看懂的变化原因 */
@@ -603,19 +613,17 @@ function deriveComposeState(
       change_reasons: [],
     }
   }
-  if (composed.signature_version !== COMPOSE_SIGNATURE_VERSION) {
-    // v2 → v3（#50 追加确定性片段分项）：分项仍然逐条可比，只是签名口径换了版本。
-    // 按 Issue #50 的口径显示「已变化·签名版本」，不自动重合成。
+  // 版本号不再单独做闸门：签名本身已经带 `v<生效版本>`，而生效版本随「本镜有没有片段」
+  // 变化（无片段恒为 v2）。所以无片段的存量成片升级到 #50 之后签名完全不变，仍判 unchanged；
+  // 真的挂上片段的那一镜才会因为版本与片段分项一起变而判 changed。
+  if (composed.signature_version !== undefined && composed.signature_version < 2) {
     return {
       ...ready,
-      status: 'changed',
-      checked: true,
+      status: 'unknown',
+      checked: false,
       exportable: false,
-      reason: null,
-      change_reasons: [
-        `合成输入快照版本已升级（v${composed.signature_version ?? 1} → v${COMPOSE_SIGNATURE_VERSION}）`,
-        ...describeComposeDiff(parts, composed.inputs).filter(reason => reason !== '输入快照与上次合成不一致'),
-      ],
+      reason: '这条成片由旧版本合成（输入快照格式已升级），无法与当前输入逐项比较：请重新合成以确认最新',
+      change_reasons: [],
     }
   }
   if (composed.signature === signature) {

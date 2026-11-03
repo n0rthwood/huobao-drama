@@ -30,7 +30,7 @@ import {
   persistedComposeReservations,
   assembleComposeInput,
   composeStatesForEpisode,
-  COMPOSE_SIGNATURE_VERSION,
+  composeSignatureVersionOf,
   inspectComposeInputs,
   isComposing,
   releaseComposeLock,
@@ -171,7 +171,8 @@ async function runComposeShot(storyboardId: number, batchTaskId?: number): Promi
     duration_ms: produced.durationMs,
     // 签名来自合成开始时签好的不可变快照：输入在 ffmpeg 期间变过，这条成片就会被判 changed
     signature: input.signature,
-    signature_version: COMPOSE_SIGNATURE_VERSION,
+    // 生效版本随「本镜有没有确定性片段」变化：无片段仍写 2，签名与 #50 之前一致
+    signature_version: composeSignatureVersionOf(input.parts),
     inputs: input.parts,
     composed_at: ts,
     transition_t: input.t,
