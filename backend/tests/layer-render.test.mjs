@@ -146,6 +146,32 @@ const script = `
   out.vignette_center = vignetteAt(672, 384)
   out.vignette_corner = vignetteAt(1, 1)
 
+  // FONT_CHAR_RANGES 必须是字体**真实**覆盖的码位：逐段抽样真渲染，和缺字占位图比
+  const { FONT_CHAR_RANGES } = await import('./src/services/layer-svg.ts')
+  const inkOf = async (text, family) => {
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120">'
+      + '<rect width="120" height="120" fill="#ffffff"/>'
+      + '<text x="8" y="90" font-family="' + family + '" font-size="72" fill="#000000">' + text + '</text></svg>'
+    return sharp(Buffer.from(svg)).greyscale().raw().toBuffer()
+  }
+  const tofuSans = await inkOf('\\uE000', "'Noto Sans SC'")
+  const tofuSerif = await inkOf('\\uE000', "'Noto Serif SC'")
+  out.coverage_ranges = FONT_CHAR_RANGES.length
+  out.coverage_tofu = []
+  for (const [lo, hi] of FONT_CHAR_RANGES) {
+    for (const code of new Set([lo, hi])) {
+      const ch = String.fromCodePoint(code).replace(/[<>&]/g, '')
+      if (!ch) continue
+      for (const [family, tofu] of [["'Noto Sans SC'", tofuSans], ["'Noto Serif SC'", tofuSerif]]) {
+        const mask = await inkOf(ch, family)
+        let diff = 0
+        for (let i = 0; i < mask.length; i++) {
+          if (Math.abs(mask[i] - tofu[i]) > 32) diff++
+        }
+        if (diff < mask.length * 0.002) out.coverage_tofu.push([code.toString(16), family])
+      }
+    }
+  }
   process.stdout.write('@@' + JSON.stringify(out))
 `
 
@@ -276,4 +302,9 @@ test('底图缺失与越界路径给出明确原因', () => {
 test('1344x768 单帧渲染耗时（#50 片段 spike 依据）', () => {
   console.log(`[layer-render] 1344x768 单帧：中位 ${result.frame_ms_median}ms（${result.frame_ms_min}–${result.frame_ms_max}ms）`)
   assert.ok(result.frame_ms_median < 2000, `单帧耗时异常：${result.frame_ms_median}ms`)
+})
+
+test('FONT_CHAR_RANGES 是字体真实覆盖：逐段抽样渲染都不是豆腐块', () => {
+  assert.ok(result.coverage_ranges >= 40, `覆盖段数异常：${result.coverage_ranges}`)
+  assert.deepEqual(result.coverage_tofu, [], `这些码位声明覆盖但渲染成豆腐块：${JSON.stringify(result.coverage_tofu)}`)
 })

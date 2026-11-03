@@ -137,10 +137,20 @@ export function useLayerDoc(onSave?: (doc: LayerDocument) => void) {
     selectedIds.value = selectedIds.value.filter(id => doc.value.layers.some(layer => layer.id === id))
   }
 
+  /** 坐标归一化 0–1（跨 Issue 契约）：编辑器里就钳住，避免服务端规范化后位置和画布对不上。 */
+  function clampGeometry(patch: Partial<LayerRecord>): Partial<LayerRecord> {
+    const unit = (value: number) => Math.min(1, Math.max(0, value))
+    const out: Partial<LayerRecord> = { ...patch }
+    if (out.points) out.points = out.points.map(([x, y]) => [unit(x), unit(y)] as [number, number])
+    if (out.at) out.at = [unit(out.at[0]), unit(out.at[1])]
+    if (out.box) out.box = { ...out.box, x: unit(out.box.x), y: unit(out.box.y) }
+    return out
+  }
+
   function patchLayer(id: string, patch: Partial<LayerRecord>) {
     const layer = doc.value.layers.find(item => item.id === id)
     if (!layer) return
-    Object.assign(layer, patch)
+    Object.assign(layer, clampGeometry(patch))
     // 人工移动过的图层与语义标注脱钩（#47 锚点语义）
     if (layer.anchor && ('points' in patch || 'at' in patch || 'box' in patch)) layer.anchor.detached = true
   }
@@ -174,7 +184,7 @@ export function useLayerDoc(onSave?: (doc: LayerDocument) => void) {
       const copy: LayerRecord = JSON.parse(JSON.stringify(layer))
       copy.id = `${layer.type}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}-${index}`
       copy.name = `${layer.name} 副本`
-      copy.z = doc.value.layers.length + index
+      copy.z = maxZ + 1 + index
       if (copy.points) copy.points = copy.points.map(([x, y]) => [x + 0.02, y + 0.02])
       if (copy.at) copy.at = [copy.at[0] + 0.02, copy.at[1] + 0.02]
       if (copy.box) copy.box = { ...copy.box, x: copy.box.x + 0.02, y: copy.box.y + 0.02 }

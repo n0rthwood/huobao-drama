@@ -23,25 +23,42 @@
   （噶尔丹策零、额尔齐斯、塞米巴拉金斯克…），少一个字就是一个豆腐块，而渲染端已经约定
   「宁可报错也不出豆腐块」，字表越小越容易把正常文案判成不可渲染。
 
-## 覆盖的码位区间
+## 覆盖的码位
 
-与 `services/layer-svg.ts` 的 `FONT_CHAR_RANGES` 必须保持一致（渲染前用它判断文字是否可渲染）：
+子集化时**申请**的区间是：
 
 ```
-U+0020-007E  基本拉丁
-U+00A0-00FF  拉丁补充
-U+2000-206F  常用标点（——、……、“”）
-U+2190-21FF  箭头
-U+2460-24FF  带圈数字
-U+25A0-25FF  几何图形
-U+3000-30FF  中日标点、假名
-U+4E00-9FFF  CJK 统一汉字基本区
-U+FF00-FFEF  全角字符
+U+0020-007E 基本拉丁 / U+00A0-00FF 拉丁补充 / U+2000-206F 常用标点 / U+2190-21FF 箭头
+U+2460-24FF 带圈数字 / U+25A0-25FF 几何图形 / U+3000-30FF 中日标点与假名
+U+4E00-9FFF CJK 统一汉字基本区 / U+FF00-FFEF 全角字符
 ```
 
-超出范围的字符（扩展 B 的生僻字、韩文、emoji 等）会让 `POST /layer-docs/render` 返回
-400 并列出具体字符，不会渲染成豆腐块。需要扩大范围时改上面的区间、重新子集化、同步
-`FONT_CHAR_RANGES`，并更新本文件的大小表。
+但 `pyftsubset` 只保留源字体里**本来就有**的字形：这几个区间里有 78 个标点、87 个箭头、
+57 个几何图形、以及 U+9FF0–9FFF 等共计 ~250 个码位在 Noto CJK 里根本不存在。所以
+`services/layer-svg.ts` 的 `FONT_CHAR_RANGES` **不是**上面的申请区间，而是四件字体
+cmap 的**交集**（21902 个码位、47 段），由下面的命令生成后粘贴进 TS 与
+`frontend/app/utils/layerSvg.js`（两端必须一致，`backend/tests/layer-render.test.mjs`
+会用真实渲染抽查每一段）：
+
+```bash
+/tmp/fontsub/bin/python -c "
+from fontTools.ttLib import TTFont
+names=['NotoSansSC-Regular','NotoSansSC-Bold','NotoSerifSC-Regular','NotoSerifSC-Bold']
+declared=[(0x20,0x7e),(0xa0,0xff),(0x2000,0x206f),(0x2190,0x21ff),(0x2460,0x24ff),
+          (0x25a0,0x25ff),(0x3000,0x30ff),(0x4e00,0x9fff),(0xff00,0xffef)]
+inter=set.intersection(*[set(TTFont(n+'.otf').getBestCmap()) for n in names])
+have=sorted(c for lo,hi in declared for c in range(lo,hi+1) if c in inter)
+out=[]
+for c in have:
+    if out and c==out[-1][1]+1: out[-1][1]=c
+    else: out.append([c,c])
+print('\n'.join('  [0x%04x, 0x%04x],'%(a,b) for a,b in out))
+"
+```
+
+覆盖之外的字符（扩展 B 生僻字、韩文、emoji、未收录的箭头/符号等）会让
+`POST /layer-docs/render` 返回 400 并列出具体字符，不会渲染成豆腐块。扩大覆盖要同时改
+申请区间、重新子集化、重新生成 `FONT_CHAR_RANGES`，并更新本文件的大小表。
 
 ## 重新生成（需要 fonttools，装在仓库外的临时环境里）
 
