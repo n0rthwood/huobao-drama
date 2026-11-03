@@ -28,6 +28,7 @@ const script = `
     merge: run(() => mergeSemantics(
       normalizeSemantics(input.merge.existing), normalizeSemantics(input.merge.fresh))),
     counts: countSemantics(normalizeSemantics(input.counts)),
+    review: Object.fromEntries(Object.entries(input.review).map(([k, v]) => [k, run(() => normalizeSemantics(v))])),
   }))
 `
 
@@ -99,6 +100,36 @@ const counts = {
   lines: [],
 }
 
+/** 审阅标记（Issue #47 评审决议）：低置信 / 显式标记 / 只有 warnings 三种触发路径 */
+const review = {
+  // 0 低置信自动条目 → 条目标 needs_review，根级汇总 true/1
+  lowConfidence: {
+    image,
+    lines: [{ id: 'ln-1', name: '模糊路线', points: [[1, 1], [2, 2]], source: 'cv', confidence: 0.4 }],
+  },
+  // 1 管线显式标记（质量启发式不达标，但置信度不低）
+  explicit: {
+    image,
+    regions: [{ id: 'rg-1', name: '漏出去的范围', points: [[1, 1], [2, 2], [3, 3]], source: 'cv', confidence: 0.9, needs_review: true }],
+  },
+  // 2 人工条目永不标记，哪怕置信度写得很低
+  manual: {
+    image,
+    points: [{ id: 'pt-1', name: '人改过的', at: [5, 5], source: 'manual', confidence: 0.1 }],
+  },
+  // 3 条目全都合格、但有 warnings（被判掉的线条没有条目可标）→ 根级仍须提醒
+  warningsOnly: {
+    image,
+    lines: [{ id: 'ln-1', name: '好线', points: [[1, 1], [2, 2]], source: 'cv', confidence: 0.95 }],
+    warnings: ['「某条边界」的颜色 #000000 是黑/白/灰，未写入 lines'],
+  },
+  // 4 全部合格且无 warnings → 根级不设标记
+  clean: {
+    image,
+    labels: [{ id: 'lbl-1', text: '好标签', bbox: [1, 1, 9, 9], source: 'cv', confidence: 0.95 }],
+  },
+}
+
 const tmpDir = mkdtempSync(path.join(tmpdir(), 'asset-semantics-'))
 let out
 try {
@@ -108,7 +139,7 @@ try {
     env: {
       ...process.env,
       SQLITE_PATH: path.join(tmpDir, 'test.sqlite3'),
-      SEMANTICS_INPUT: JSON.stringify({ normalize: normalizeCases, parse: parseCases, merge, counts }),
+      SEMANTICS_INPUT: JSON.stringify({ normalize: normalizeCases, parse: parseCases, merge, counts, review }),
     },
   })
 } finally {
@@ -173,4 +204,30 @@ test('合并：人工改过的条目永远保留，同 id 的自动结果让位'
 
 test('计数：四组各自统计', () => {
   assert.deepEqual(result.counts, { labels: 2, points: 1, regions: 1, lines: 0 })
+})
+
+test('审阅标记：低置信与显式标记的条目标 needs_review，人工条目永不标', () => {
+  const low = result.review.lowConfidence.ok
+  assert.equal(low.lines[0].needs_review, true, '置信度 0.4 < 0.6 必须标')
+  assert.equal(low.needs_review, true)
+  assert.equal(low.needs_review_count, 1)
+
+  const explicit = result.review.explicit.ok
+  assert.equal(explicit.regions[0].needs_review, true, '管线显式标记必须保留')
+  assert.equal(explicit.needs_review_count, 1)
+
+  const manual = result.review.manual.ok
+  assert.equal(manual.points[0].needs_review, undefined, '人工条目不标')
+  assert.equal(manual.needs_review, undefined)
+})
+
+test('审阅标记：只有 warnings（被判掉的几何没有条目）时根级仍然提醒', () => {
+  const only = result.review.warningsOnly.ok
+  assert.equal(only.lines[0].needs_review, undefined, '合格条目本身不标')
+  assert.equal(only.needs_review, true, 'warnings 非空时根级必须提醒')
+  assert.equal(only.needs_review_count, undefined, '没有待改条目就不给计数')
+
+  const clean = result.review.clean.ok
+  assert.equal(clean.needs_review, undefined)
+  assert.equal(clean.needs_review_count, undefined)
 })

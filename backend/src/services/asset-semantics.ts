@@ -30,7 +30,21 @@ export type SemanticLineKind = 'river' | 'route' | 'border'
 export const SEMANTIC_SOURCES: SemanticSource[] = ['vlm', 'cv', 'manual']
 export const SEMANTIC_LINE_KINDS: SemanticLineKind[] = ['river', 'route', 'border']
 
-export interface SemanticLabel {
+/**
+ * 自动结果的置信门槛（Issue #47 评审决议）：低于此值的条目一律标 `needs_review`。
+ * 用户确认的方案是「VLM 锚点 + CV 几何 + **人工修正**」，所以质量不达标的几何
+ * 不是删掉而是**留作草稿并显式标记**，由人在语义面板里改——但绝不能悄悄混进
+ * 看起来已经标好的结果里。
+ */
+export const NEEDS_REVIEW_CONFIDENCE = 0.6
+
+/** 四类条目共有的审阅标记字段 */
+export interface SemanticReviewable {
+  /** true = 自动产出的质量存疑，界面标「待人工修正」，`warnings` 里有对应说明 */
+  needs_review?: boolean
+}
+
+export interface SemanticLabel extends SemanticReviewable {
   id: string
   text: string
   /** [x1, y1, x2, y2]，原图像素，左上 → 右下 */
@@ -39,7 +53,7 @@ export interface SemanticLabel {
   confidence: number
 }
 
-export interface SemanticPoint {
+export interface SemanticPoint extends SemanticReviewable {
   id: string
   name: string
   at: [number, number]
@@ -47,7 +61,7 @@ export interface SemanticPoint {
   confidence: number
 }
 
-export interface SemanticRegion {
+export interface SemanticRegion extends SemanticReviewable {
   id: string
   name: string
   points: Array<[number, number]>
@@ -55,7 +69,7 @@ export interface SemanticRegion {
   confidence: number
 }
 
-export interface SemanticLine {
+export interface SemanticLine extends SemanticReviewable {
   id: string
   name: string
   points: Array<[number, number]>
@@ -81,6 +95,12 @@ export interface AssetSemantics {
   lines: SemanticLine[]
   /** 自动标注没做成的部分（例如抽线失败）：必须留痕，不许伪造几何（附加字段） */
   warnings?: string[]
+  /**
+   * 整张图是否还有待人工修正的条目（派生字段，由规范化统一算出）。
+   * 界面与下游（#48/#49）绑这一个布尔值即可；`needs_review_count` 只补充「还有几项」。
+   */
+  needs_review?: boolean
+  needs_review_count?: number
   /** 最近一次自动标注的时间与模型（附加字段，纯展示） */
   generated_at?: string
   model?: string
@@ -105,6 +125,7 @@ const semanticsSchema = z.object({
     bbox: z.tuple([coordSchema, coordSchema, coordSchema, coordSchema]),
     source: sourceSchema.optional(),
     confidence: confidenceSchema.optional(),
+    needs_review: z.boolean().optional(),
   })).max(MAX_ITEMS_PER_GROUP).optional(),
   points: z.array(z.object({
     id: z.string().optional(),
@@ -112,6 +133,7 @@ const semanticsSchema = z.object({
     at: pointSchema,
     source: sourceSchema.optional(),
     confidence: confidenceSchema.optional(),
+    needs_review: z.boolean().optional(),
   })).max(MAX_ITEMS_PER_GROUP).optional(),
   regions: z.array(z.object({
     id: z.string().optional(),
@@ -119,6 +141,7 @@ const semanticsSchema = z.object({
     points: z.array(pointSchema).min(3).max(MAX_GEOMETRY_POINTS),
     source: sourceSchema.optional(),
     confidence: confidenceSchema.optional(),
+    needs_review: z.boolean().optional(),
   })).max(MAX_ITEMS_PER_GROUP).optional(),
   lines: z.array(z.object({
     id: z.string().optional(),
@@ -127,9 +150,13 @@ const semanticsSchema = z.object({
     kind: z.enum(['river', 'route', 'border']).optional(),
     source: sourceSchema.optional(),
     confidence: confidenceSchema.optional(),
+    needs_review: z.boolean().optional(),
     color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   })).max(MAX_ITEMS_PER_GROUP).optional(),
   warnings: z.array(z.string()).optional(),
+  // 根级审阅标记是派生字段：接受传入（库里存的就带着），但一律按条目与 warnings 重算
+  needs_review: z.boolean().optional(),
+  needs_review_count: z.number().int().min(0).optional(),
   generated_at: z.string().optional(),
   model: z.string().optional(),
 })
@@ -182,6 +209,15 @@ export function normalizeSemantics(raw: unknown): AssetSemantics {
   const w = doc.image.width
   const h = doc.image.height
 
+  /**
+   * 审阅标记：显式传了就以传入为准（自动管线据质量启发式标记），
+   * 否则按置信度兜底——`manual` 条目是人自己填/改的，永远不标。
+   */
+  const reviewOf = (item: { source?: SemanticSource; confidence?: number; needs_review?: boolean }): boolean => {
+    if (item.source === 'manual') return false
+    if (item.needs_review !== undefined) return item.needs_review
+    return (item.confidence ?? 1) < NEEDS_REVIEW_CONFIDENCE
+  }
   const labels: SemanticLabel[] = (doc.labels ?? []).map((item) => {
     assertInFrame([item.bbox[0], item.bbox[2]], w, `标签「${item.text}」`)
     assertInFrame([item.bbox[1], item.bbox[3]], h, `标签「${item.text}」`)
@@ -195,6 +231,7 @@ export function normalizeSemantics(raw: unknown): AssetSemantics {
       bbox: [x1, y1, x2, y2],
       source: item.source ?? 'manual',
       confidence: item.confidence ?? 1,
+      ...(reviewOf(item) ? { needs_review: true } : {}),
     }
   })
 
@@ -207,6 +244,7 @@ export function normalizeSemantics(raw: unknown): AssetSemantics {
       at: clampPoint(item.at, w, h),
       source: item.source ?? 'manual',
       confidence: item.confidence ?? 1,
+      ...(reviewOf(item) ? { needs_review: true } : {}),
     }
   })
 
@@ -219,6 +257,7 @@ export function normalizeSemantics(raw: unknown): AssetSemantics {
       points: item.points.map(p => clampPoint(p, w, h)),
       source: item.source ?? 'manual',
       confidence: item.confidence ?? 1,
+      ...(reviewOf(item) ? { needs_review: true } : {}),
     }
   })
 
@@ -232,6 +271,7 @@ export function normalizeSemantics(raw: unknown): AssetSemantics {
       kind: item.kind ?? 'route',
       source: item.source ?? 'manual',
       confidence: item.confidence ?? 1,
+      ...(reviewOf(item) ? { needs_review: true } : {}),
     }
     if (item.color) line.color = item.color.toLowerCase()
     return line
@@ -248,6 +288,12 @@ export function normalizeSemantics(raw: unknown): AssetSemantics {
     regions,
     lines,
   }
+  // 派生字段统一在这里算，保证自动管线、人工 PUT、库里读回三条路径口径一致。
+  // 注意 warnings 也算「需要人看」：被判掉的线条/填充失败的区域没有条目可标，
+  // 只有 warning 文本，漏掉它们会让面板在恰恰最该提醒的时候不提醒。
+  const pending = [...labels, ...points, ...regions, ...lines].filter(item => item.needs_review).length
+  if (pending || doc.warnings?.length) out.needs_review = true
+  if (pending) out.needs_review_count = pending
   if (doc.warnings?.length) out.warnings = doc.warnings
   if (doc.generated_at) out.generated_at = doc.generated_at
   if (doc.model) out.model = doc.model
@@ -268,15 +314,18 @@ export function parseSemantics(raw: string | null | undefined): AssetSemantics |
  * 自动标注结果与既有标注合并：**人工改过的项（source='manual'）永远保留**，
  * 自动结果里同 id 的条目让位。这是「自动标注不保证一次正确，人工修正是流程的一部分」
  * 的落地——重跑自动标注不能抹掉人刚修好的那条线。
+ *
+ * 合并结果再过一次 `normalizeSemantics`：`needs_review` / `needs_review_count`
+ * 是派生字段，必须按**合并后**的条目重算，否则人工改掉一半后徽标还停在旧数字。
  */
 export function mergeSemantics(existing: AssetSemantics | null, fresh: AssetSemantics): AssetSemantics {
-  if (!existing) return fresh
+  if (!existing) return normalizeSemantics(fresh)
   const keepManual = <T extends { id: string; source: SemanticSource }>(prev: T[], next: T[]): T[] => {
     const manual = prev.filter(item => item.source === 'manual')
     const manualIds = new Set(manual.map(item => item.id))
     return [...manual, ...next.filter(item => !manualIds.has(item.id))]
   }
-  return {
+  return normalizeSemantics({
     image: fresh.image,
     labels: keepManual(existing.labels, fresh.labels),
     points: keepManual(existing.points, fresh.points),
@@ -285,7 +334,7 @@ export function mergeSemantics(existing: AssetSemantics | null, fresh: AssetSema
     ...(fresh.warnings?.length ? { warnings: fresh.warnings } : {}),
     ...(fresh.generated_at ? { generated_at: fresh.generated_at } : {}),
     ...(fresh.model ? { model: fresh.model } : {}),
-  }
+  })
 }
 
 /** 条目计数（状态接口与界面统计共用） */

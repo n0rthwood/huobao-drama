@@ -1808,6 +1808,10 @@
         "confidence": "Confidence {v}",
         "groupCount": "{n} items",
         "noEditorHint": "Only renaming and deleting happen here; point, polyline and polygon geometry is edited in the layer editor.",
+        "needsReview": "Needs review",
+        "needsReviewHint": "The automatic annotation did not meet the quality bar (low confidence, or suspicious geometry). Treat the coordinates as a draft and correct them.",
+        "needsReviewSummary": "{n} automatic annotation(s) need manual review: check every entry marked as needing review.",
+        "needsReviewWarningsOnly": "Some features could not be annotated automatically (see the warnings below) and must be added by hand.",
         "group": {
           "labels": "Labels",
           "points": "Points",

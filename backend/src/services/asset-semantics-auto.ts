@@ -28,6 +28,7 @@ import {
 } from './text-task.js'
 import {
   countSemantics,
+  NEEDS_REVIEW_CONFIDENCE,
   loadPropSemantics,
   mergeSemantics,
   normalizeSemantics,
@@ -284,6 +285,12 @@ export async function runSemanticsPipeline(input: {
     }
     const snapped = snapBoxToInk(raster, box.bbox)
     const bbox = snapped ?? box.bbox
+    // 没吸附成功的条目坐标还是 VLM 原框，实测小字号会整体偏上一个字高：
+    // 不丢弃（位置大致可用），但标成待人工修正
+    const needsReview = !snapped || box.confidence < NEEDS_REVIEW_CONFIDENCE
+    if (needsReview) {
+      warnings.push(`「${name.text}」的框没能吸附到墨迹（置信度 ${box.confidence}），坐标仍是视觉模型原框，已标为待人工修正`)
+    }
     if (name.kind === 'point') {
       points.push({
         id: `pt-${points.length + 1}`,
@@ -291,6 +298,7 @@ export async function runSemanticsPipeline(input: {
         at: [(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2],
         source: snapped ? 'cv' : 'vlm',
         confidence: box.confidence,
+        ...(needsReview ? { needs_review: true } : {}),
       })
     } else {
       labels.push({
@@ -299,6 +307,7 @@ export async function runSemanticsPipeline(input: {
         bbox,
         source: snapped ? 'cv' : 'vlm',
         confidence: box.confidence,
+        ...(needsReview ? { needs_review: true } : {}),
       })
     }
   }
@@ -328,6 +337,14 @@ export async function runSemanticsPipeline(input: {
       warnings.push(`「${seed.name}」按颜色 ${seed.color} 抽线失败：${extracted.reason}；未写入 lines，请人工标注`)
       continue
     }
+    // 勉强过关的几何仍然留作草稿，但必须显式标出来（评审决议）：
+    // 用户确认的方案是「VLM + CV + 人工修正」，所以不删，只标 needs_review 并进 warnings
+    const shaky = extracted.quality.thickness > MAX_LINE_THICKNESS / 2
+      || extracted.quality.jump > MAX_LINE_JUMP / 2
+    const needsReview = shaky || seed.confidence < NEEDS_REVIEW_CONFIDENCE
+    if (needsReview) {
+      warnings.push(`线条「${seed.name}」的自动结果质量存疑（粗细 ${(extracted.quality.thickness * 100).toFixed(1)}%、跳变 ${(extracted.quality.jump * 100).toFixed(1)}%、置信度 ${seed.confidence}），已标为待人工修正`)
+    }
     lines.push({
       id: `ln-${lines.length + 1}`,
       name: seed.name,
@@ -336,6 +353,7 @@ export async function runSemanticsPipeline(input: {
       source: 'cv',
       confidence: seed.confidence,
       color: seed.color.toLowerCase().startsWith('#') ? seed.color.toLowerCase() : `#${seed.color.toLowerCase()}`,
+      ...(needsReview ? { needs_review: true } : {}),
     })
   }
 
@@ -354,15 +372,21 @@ export async function runSemanticsPipeline(input: {
     const label = labels.find(item => item.text === seed.name)
     if (label) candidates.push([(label.bbox[0] + label.bbox[2]) / 2, label.bbox[3] + (label.bbox[3] - label.bbox[1]) + 10])
     let polygon: Point[] | null = null
+    let ratio = 0
     let reason = '模型没有给种子点'
     for (const candidate of candidates) {
       const result = floodRegion(raster, candidate)
-      if (result.polygon) { polygon = result.polygon; break }
+      if (result.polygon) { polygon = result.polygon; ratio = result.ratio; break }
       reason = result.reason ?? '填充失败'
     }
     if (!polygon) {
       warnings.push(`「${seed.name}」区域填充失败（${reason}），未写入 regions，请人工标注`)
       continue
+    }
+    // 占掉三成以上画幅的「某一国范围」多半是从缺口漏出去的，留作草稿但标出来
+    const needsReview = ratio > 0.3 || seed.confidence < NEEDS_REVIEW_CONFIDENCE
+    if (needsReview) {
+      warnings.push(`区域「${seed.name}」的自动结果质量存疑（占画幅 ${(ratio * 100).toFixed(1)}%、置信度 ${seed.confidence}），已标为待人工修正`)
     }
     regions.push({
       id: `rg-${regions.length + 1}`,
@@ -370,6 +394,7 @@ export async function runSemanticsPipeline(input: {
       points: polygon,
       source: 'cv',
       confidence: seed.confidence,
+      ...(needsReview ? { needs_review: true } : {}),
     })
   }
 
@@ -404,7 +429,7 @@ function extractLine(
   raster: RgbRaster,
   color: { r: number; g: number; b: number },
   endpoints: Point[],
-): { points: Point[] } | { reason: string } {
+): { points: Point[]; quality: { thickness: number; jump: number } } | { reason: string } {
   const mask = colorMask(raster, color)
   if (endpoints.length >= 2) {
     const pad = Math.round(Math.max(raster.width, raster.height) * 0.08)
@@ -431,7 +456,7 @@ function extractLine(
   if (quality.jump > MAX_LINE_JUMP) {
     return { reason: `同色像素分散在互不相连的区域，采样点出现 ${(quality.jump * 100).toFixed(1)}% 图幅的跳变` }
   }
-  return { points: polyline }
+  return { points: polyline, quality }
 }
 
 /** static/ 绝对路径 → 相对路径（imageContentPart 只收相对路径） */

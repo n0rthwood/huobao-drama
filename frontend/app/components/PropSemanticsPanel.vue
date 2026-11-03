@@ -99,6 +99,13 @@
       </span>
     </div>
 
+    <!-- 自动标注的质量提醒（Issue #47）：条目级标记的汇总，人按这个找要改的地方 -->
+    <p v-if="doc.needs_review" class="sem-review-banner">
+      {{ doc.needs_review_count
+        ? t('episode.documentary.semantics.needsReviewSummary', { n: doc.needs_review_count })
+        : t('episode.documentary.semantics.needsReviewWarningsOnly') }}
+    </p>
+
     <div v-if="totalCount" class="sem-groups">
       <section v-for="group in GROUPS" :key="group" class="sem-group">
         <div class="sem-group-head">
@@ -106,7 +113,7 @@
           <span class="dim">{{ t('episode.documentary.semantics.groupCount', { n: doc[group].length }) }}</span>
         </div>
         <ul v-if="doc[group].length" class="sem-list">
-          <li v-for="(entry, index) in doc[group]" :key="entry.id || `${group}-${index}`" class="sem-item">
+          <li v-for="(entry, index) in doc[group]" :key="entry.id || `${group}-${index}`" :class="['sem-item', entry.needs_review && 'is-review']">
             <input
               class="input sem-item-input"
               :value="group === 'labels' ? entry.text : entry.name"
@@ -117,6 +124,9 @@
               {{ t(`episode.documentary.semantics.source.${entry.source}`) }}
             </span>
             <span class="dim sem-conf">{{ t('episode.documentary.semantics.confidence', { v: confText(entry.confidence) }) }}</span>
+            <span v-if="entry.needs_review" class="sem-badge sem-review" :title="t('episode.documentary.semantics.needsReviewHint')">
+              {{ t('episode.documentary.semantics.needsReview') }}
+            </span>
             <button
               class="sem-del"
               type="button"
@@ -270,6 +280,7 @@ function normalizeDoc(raw) {
         bbox: [num(item.bbox[0]), num(item.bbox[1]), num(item.bbox[2]), num(item.bbox[3])],
         source: source(item.source),
         confidence: num(item.confidence),
+        ...(item.needs_review ? { needs_review: true } : {}),
       })),
     points: (Array.isArray(value.points) ? value.points : [])
       .filter(item => item && Array.isArray(item.at) && item.at.length >= 2)
@@ -279,6 +290,7 @@ function normalizeDoc(raw) {
         at: [num(item.at[0]), num(item.at[1])],
         source: source(item.source),
         confidence: num(item.confidence),
+        ...(item.needs_review ? { needs_review: true } : {}),
       })),
     regions: (Array.isArray(value.regions) ? value.regions : [])
       .map((item, i) => ({
@@ -287,6 +299,7 @@ function normalizeDoc(raw) {
         points: coordPairs(item?.points),
         source: source(item?.source),
         confidence: num(item?.confidence),
+        ...(item?.needs_review ? { needs_review: true } : {}),
       }))
       .filter(item => item.points.length >= 3),
     lines: (Array.isArray(value.lines) ? value.lines : [])
@@ -297,10 +310,13 @@ function normalizeDoc(raw) {
         kind: ['river', 'route', 'border'].includes(item?.kind) ? item.kind : 'route',
         source: source(item?.source),
         confidence: num(item?.confidence),
+        ...(item?.needs_review ? { needs_review: true } : {}),
         ...(item?.color ? { color: String(item.color) } : {}),
       }))
       .filter(item => item.points.length >= 2),
     ...(Array.isArray(value.warnings) ? { warnings: value.warnings.map(String) } : {}),
+    ...(value.needs_review ? { needs_review: true } : {}),
+    ...(Number.isFinite(Number(value.needs_review_count)) ? { needs_review_count: Number(value.needs_review_count) } : {}),
     ...(value.generated_at ? { generated_at: String(value.generated_at) } : {}),
     ...(value.model ? { model: String(value.model) } : {}),
   }
@@ -620,6 +636,18 @@ onBeforeUnmount(() => { stopped = true; stopAutoPoll() })
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--surface-soft);
+}
+/* 待人工修正：整行描边提醒 + 文字徽标（Issue #47） */
+.sem-item.is-review { border-color: #d98324; background: color-mix(in srgb, #d98324 8%, var(--surface-soft)); }
+.sem-review { border: 1px solid #d98324; color: #d98324; }
+.sem-review-banner {
+  margin: 6px 0 0;
+  padding: 6px 8px;
+  border: 1px solid #d98324;
+  border-radius: 6px;
+  color: #a35c0f;
+  background: color-mix(in srgb, #d98324 10%, transparent);
+  font-size: 12px;
 }
 .sem-item-input { flex: 1 1 auto; min-width: 0; }
 .sem-badge {
