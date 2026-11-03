@@ -60,9 +60,12 @@ What must the viewer understand from this shot (info_point, exactly one)
 | `reenact_still` | static states, portraits, objects, situations with no action | generated reenactment still + slow push-in |
 | `reenact_video` | **events with process, with motion** (setting out, marching, sailing upstream, exchanging fire, laying siege, boarding, building, an audience, escorting prisoners) | generated model video |
 
-Criterion: **does the narration say "where", "what it is", or "what was done"**.
-Anything saying "where / how wide a range / which route" is always `map_anim`; identity, origins, years, or numbers alone use `card` or `archival`;
-**if the sentence contains a verb describing an action or process in progress, use `reenact_video` — do not downgrade it to `reenact_still`**.
+The criteria are applied **in priority order**; once an earlier rule matches, stop and do not evaluate the rest:
+1. **A character appears for the first time in this episode** → `card` (portrait / still frame + name bar), even if the narration also contains an action.
+   Hold the person up before that person has been clearly introduced; leave the action to the shot that follows immediately.
+2. Saying "where / how wide a range / which route" → `map_anim`.
+3. The sentence has a verb describing an **action or process in progress** → `reenact_video`; do not downgrade it to `reenact_still`.
+4. Only identity, origins, years, or numbers → `card` or `archival`.
 
 `reenact_still` is only for shots where **there really is no action in the picture** (portraits, objects, empty scenes, static situations).
 Sentences like "the fleet sails upstream", "the great army advances on Lhasa (拉萨)", "the reconnaissance party sets out by boat", "the two sides exchange fire" belong to `reenact_video`;
