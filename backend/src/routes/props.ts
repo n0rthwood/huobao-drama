@@ -18,6 +18,7 @@ import {
   countSemantics,
   normalizeSemantics,
   parseSemantics,
+  resolveSemanticsBase,
   savePropSemantics,
   SemanticsValidationError,
 } from '../services/asset-semantics.js'
@@ -36,25 +37,6 @@ const FAITHFUL_BLOCKED_MESSAGE = '该素材已标记为证据素材（忠实素�
 mountReferenceImageRoutes(app, 'prop')
 // POST /props/:id/re-extract — 单资产重新提取（Issue #32）
 mountReExtractRoute(app, 'prop')
-
-/**
- * 语义标注的底图：优先 `faithful_source` 指向的那条原件版本，否则退当前图。
- * 坐标永远针对这张图，界面预览与 CV 都用它。
- */
-async function resolveSemanticsBase(prop: typeof schema.props.$inferSelect): Promise<{ path: string | null; taskId: number | null }> {
-  if (prop.faithfulSource) {
-    const [task] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, prop.faithfulSource))
-    const path = task?.localPath || task?.resultUrl || null
-    if (path) return { path, taskId: task!.id }
-  }
-  const current = prop.localPath || prop.imageUrl || null
-  if (!current) return { path: null, taskId: null }
-  // 当前图如果本身就是某条版本行，把那条行的 id 记进 semantics.image.source_task_id
-  const tasks = await db.select().from(schema.sysTask)
-    .where(and(eq(schema.sysTask.type, 'image'), eq(schema.sysTask.propId, prop.id)))
-  const match = tasks.find(task => (task.localPath || task.resultUrl || '') === current)
-  return { path: current, taskId: match?.id ?? null }
-}
 
 // POST /props — 手动新增道具（传入 episode_id 时关联到该集）
 app.post('/', async (c) => {

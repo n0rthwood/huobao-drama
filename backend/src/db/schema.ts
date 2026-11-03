@@ -3,7 +3,7 @@
  * 自 MySQL 迁移：varchar(x)→text（SQLite 不校验长度）、int→integer、
  * boolean→integer boolean mode、时间戳仍为 text 存 ISO 字符串，表/列名不变。
  */
-import { sqliteTable, text, integer, real, primaryKey } from 'drizzle-orm/sqlite-core'
+import { sqliteTable, text, integer, real, primaryKey, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
 export const dramas = sqliteTable('dramas', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -257,6 +257,29 @@ export const storyboardTargetAssets = sqliteTable('storyboard_target_assets', {
   selectedImage: text('selected_image'),
   createdAt: text('created_at').notNull(),
 })
+
+/**
+ * 确定性片段（Issue #50）：由「底图 + 图层文档 + 时间线」渲染出的一段 mp4。
+ * `position` ∈ replace（整镜替代模型视频）| pre（模型视频之前）| post（之后）；
+ * 每镜每个 position 至多一条（UNIQUE）。`render_signature` 是渲染时输入的快照，
+ * 与合成签名 v3 串联：改了图层/时间线而没重渲染，合成就会判「已变化」。
+ */
+export const storyboardClips = sqliteTable('storyboard_clips', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  storyboardId: integer('storyboard_id').notNull(),
+  position: text('position').notNull(),
+  layerDoc: text('layer_doc').notNull(),
+  timeline: text('timeline').notNull(),
+  duration: real('duration').notNull(),
+  renderPath: text('render_path'),
+  renderSignature: text('render_signature'),
+  renderedAt: text('rendered_at'),
+  status: text('status').notNull().default('draft'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+}, (table) => [
+  uniqueIndex('idx_storyboard_clips_unique').on(table.storyboardId, table.position),
+])
 
 export const aiServiceConfigs = sqliteTable('ai_service_configs', {
   id: integer('id').primaryKey({ autoIncrement: true }),

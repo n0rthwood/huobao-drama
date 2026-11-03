@@ -14,7 +14,7 @@
  * `cv` = 程序从像素里算出来的、`manual` = 人工改过的。人改过的项目在重跑自动标注时
  * 不会被覆盖（见 mergeSemantics）。
  */
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { db, schema } from '../db/index.js'
 import { now } from '../utils/response.js'
@@ -359,4 +359,26 @@ export async function savePropSemantics(propId: number, doc: AssetSemantics): Pr
   await db.update(schema.props)
     .set({ semantics: JSON.stringify(doc), updatedAt: now() })
     .where(eq(schema.props.id, propId))
+}
+
+/**
+ * 语义标注 / 确定性片段的底图：优先 `faithful_source` 指向的那条原件版本，否则退当前图。
+ * 坐标永远针对这张图——界面预览、CV 抽线（#47）与片段底图（#50）必须用同一张，
+ * 否则像素坐标会落在被美化版改过的画面上。
+ */
+export async function resolveSemanticsBase(
+  prop: typeof schema.props.$inferSelect,
+): Promise<{ path: string | null; taskId: number | null }> {
+  if (prop.faithfulSource) {
+    const [task] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, prop.faithfulSource))
+    const path = task?.localPath || task?.resultUrl || null
+    if (path) return { path, taskId: task!.id }
+  }
+  const current = prop.localPath || prop.imageUrl || null
+  if (!current) return { path: null, taskId: null }
+  // 当前图如果本身就是某条版本行，把那条行的 id 记进 semantics.image.source_task_id
+  const tasks = await db.select().from(schema.sysTask)
+    .where(and(eq(schema.sysTask.type, 'image'), eq(schema.sysTask.propId, prop.id)))
+  const match = tasks.find(task => (task.localPath || task.resultUrl || '') === current)
+  return { path: current, taskId: match?.id ?? null }
 }
