@@ -9,6 +9,7 @@
       </button>
       <div class="head-info">
         <h1 class="page-title">{{ drama.title }}</h1>
+        <span class="tag" :class="isDocumentaryProject ? 'tag-accent' : ''">{{ projectTypeLabel }}</span>
         <span v-if="drama.style" class="tag tag-accent">{{ styleLabel(drama.style) }}</span>
         <span v-if="drama.aspect_ratio" class="tag mono">{{ drama.aspect_ratio }}</span>
         <div class="page-meta">
@@ -655,9 +656,16 @@
           </label>
           <label class="field">
             <span class="field-label">{{ t('detail.documentary.label') }}</span>
-            <BaseSelect v-model="settingsForm.documentary_rules" :options="documentaryRuleOptions" :placeholder="t('detail.documentary.placeholder')" />
+            <!-- 纪录片项目固定 on（Issue #45）：不给选择，只说明 -->
+            <BaseSelect
+              v-if="!isDocumentaryProject"
+              v-model="settingsForm.documentary_rules"
+              :options="documentaryRuleOptions"
+              :placeholder="t('detail.documentary.placeholder')"
+            />
+            <span v-else class="field-locked">{{ t('detail.documentary.on') }}</span>
             <span class="field-hint">{{ t('detail.documentary.effective', { value: effectiveRulesetLabel }) }}</span>
-            <span class="field-hint dim">{{ t('detail.documentary.hint') }}</span>
+            <span class="field-hint dim">{{ isDocumentaryProject ? t('detail.documentary.lockedHint') : t('detail.documentary.hint') }}</span>
           </label>
         </div>
         <div class="dialog-foot">
@@ -795,6 +803,11 @@ const { presets: stylePresets, load: loadStylePresets, label: styleLabel } = use
 const showSettings = ref(false)
 const settingsSaving = ref(false)
 const settingsForm = ref({ style: '', aspect_ratio: '', documentary_rules: 'auto' })
+// 项目类型（Issue #45）：创建后不可切换，纪录片项目的纪录片规则锁死在 on
+const isDocumentaryProject = computed(() => drama.value?.project_type === 'documentary')
+const projectTypeLabel = computed(() => (isDocumentaryProject.value
+  ? t('detail.projectType.documentary')
+  : t('detail.projectType.drama')))
 const settingsStyleOptions = computed(() => stylePresets.value.map(p => ({ label: p.name, value: p.value })))
 // 只有白名单画幅可选；legacy 值（如 adaptive）不在选项内，需选一个合法值才能保存
 const settingsAspectOptions = computed(() => ASPECT_RATIO_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value })))
@@ -825,7 +838,7 @@ async function saveSettings() {
     await dramaAPI.update(dramaId, {
       style: settingsForm.value.style,
       aspect_ratio: settingsForm.value.aspect_ratio,
-      documentary_rules: settingsForm.value.documentary_rules,
+      documentary_rules: isDocumentaryProject.value ? 'on' : settingsForm.value.documentary_rules,
     })
     await load()
     toast.success(t('detail.settings.saved'))
@@ -1577,6 +1590,11 @@ onUnmounted(() => {
 .field { display: flex; flex-direction: column; gap: 8px; }
 .field-label { font-size: 12.5px; font-weight: 600; color: var(--text-1); }
 .field-hint { font-size: 12px; color: var(--text-3); }
+/* 纪录片项目锁定的只读取值（Issue #45） */
+.field-locked {
+  padding: 7px 10px; border: 1px dashed var(--border); border-radius: 6px;
+  background: var(--surface-soft); color: var(--text-2); font-size: 12px;
+}
 .settings-warn { color: var(--warn-text); line-height: 1.6; }
 
 .dialog-foot-copy {

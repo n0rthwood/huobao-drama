@@ -12,6 +12,7 @@ export const sqliteSchemaStatements = [
     title TEXT NOT NULL,
     description TEXT,
     genre TEXT,
+    project_type TEXT NOT NULL DEFAULT 'drama',
     documentary_rules TEXT,
     style TEXT DEFAULT '3d',
     aspect_ratio TEXT DEFAULT '16:9',
@@ -513,6 +514,8 @@ const columnAdditions: { table: string; column: string; type: string }[] = [
   { table: 'episodes', column: 'character_roster_hash', type: 'TEXT' },
   { table: 'episodes', column: 'character_roster_status', type: 'TEXT' },
   { table: 'episodes', column: 'character_roster_updated_at', type: 'TEXT' },
+  // 项目类型（Issue #45）：'drama' | 'documentary'；存量项目一律 drama，创建后不可切换
+  { table: 'dramas', column: 'project_type', type: "TEXT NOT NULL DEFAULT 'drama'" },
 ]
 
 /**

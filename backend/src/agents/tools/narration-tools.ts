@@ -24,11 +24,16 @@ import {
   sha256,
 } from '../../services/narration.js'
 import { parseNarrationMarkup } from '../../services/narration-markup.js'
+import { isMarkupOnlyEdit } from '../../services/narration-first.js'
 import { stampFieldSavedAt } from '../../services/storyboard-fields.js'
 
-const saveNarrations = createTool({
+/** drama 与 documentary 两个变体：drama 变体的 schema / description / 行为与 #45 之前逐字一致 */
+function buildSaveNarrations(documentary: boolean) {
+  return createTool({
   id: 'save_narrations',
-  description: 'Save the narration script for shots of this episode. Call in batches of at most 8 shots, upserted by shot_number. Only narration text / narration flag / duration are written — no other storyboard field is touched.',
+  description: documentary
+    ? 'Save the narration script for shots of this episode. Call in batches of at most 8 shots, upserted by shot_number. Only narration text / narration flag / duration are written — no other storyboard field is touched. This is a documentary project (narration-first): the shot narration already comes verbatim from the episode script, so you may ONLY add pronunciation markers — with the markers stripped the text must still be identical to the stored narration, otherwise the shot is rejected.'
+    : 'Save the narration script for shots of this episode. Call in batches of at most 8 shots, upserted by shot_number. Only narration text / narration flag / duration are written — no other storyboard field is touched.',
   inputSchema: z.object({
     narrations: z.array(z.object({
       shot_number: z.number().describe('Shot number of the storyboard in this episode.'),
@@ -89,6 +94,14 @@ const saveNarrations = createTool({
         })
         continue
       }
+      // narration-first（Issue #45）：纪录片项目的旁白只许注音，不许改字
+      if (documentary && !isMarkupOnlyEdit(sb.narrationText, text)) {
+        rejected.push({
+          shot_number: item.shot_number,
+          reason: 'this documentary project is narration-first: the shot narration is taken verbatim from the episode script and must not be rewritten. Re-send the stored narration unchanged, adding only [[原文|读音]] pronunciation markers',
+        })
+        continue
+      }
 
       // 时长按旁白字数估算（内容段，不含转场）：字数 ÷ 4.5 字/秒 + 尾部留白，钳到 4–15 秒
       const duration = enabled
@@ -118,7 +131,11 @@ const saveNarrations = createTool({
     })
     return { saved_shot_numbers: saved, rejected }
   },
-})
+  })
+}
+
+const saveNarrations = buildSaveNarrations(false)
+const saveDocumentaryNarrations = buildSaveNarrations(true)
 
 /**
  * 整集旁白主线（#35 阶段 A）。唯一写 episodes.narration_spine 的地方。
@@ -146,5 +163,12 @@ const saveNarrationSpine = createTool({
 export const narrationTools = {
   readStoryboardContext: storyboardTools.readStoryboardContext,
   saveNarrations,
+  saveNarrationSpine,
+}
+
+/** 纪录片项目（Issue #45）：save_narrations 换成只许注音的变体，其余工具相同 */
+export const documentaryNarrationTools = {
+  readStoryboardContext: storyboardTools.readStoryboardContext,
+  saveNarrations: saveDocumentaryNarrations,
   saveNarrationSpine,
 }

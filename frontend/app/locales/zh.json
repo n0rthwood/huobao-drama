@@ -405,6 +405,12 @@
       "aspectRatioPlaceholder": "选择画面比例",
       "aspectRatioHint": "决定关键帧与视频的出图比例；创建后可在「项目设置」中修改",
       "aspectRatioRequired": "请选择画面比例",
+      "projectType": "项目类型",
+      "projectTypeHint": "类型创建后不可切换：纪录片项目有专属的旁白优先流程与表达设计步骤",
+      "projectTypeDrama": "短剧",
+      "projectTypeDramaDesc": "剧情短剧：剧本改写 → 角色/场景 → 关键帧 → 视频",
+      "projectTypeDocumentary": "纪录片",
+      "projectTypeDocumentaryDesc": "旁白优先：旁白稿 → 证据素材 → 表达设计 → 关键帧/图层 → 视频",
       "submit": "创建项目"
     },
     "deleteDialog": {
@@ -511,7 +517,12 @@
       "effective": "当前生效：{value}",
       "hint": "开关优先于题材关键字；生效后提取与提示词按纪录片/历史题材规则生成。",
       "rulesetDocumentary": "纪录片规则",
-      "rulesetNone": "无题材规则"
+      "rulesetNone": "无题材规则",
+      "lockedHint": "纪录片项目固定按纪录片规则生成，不可关闭。"
+    },
+    "projectType": {
+      "drama": "短剧",
+      "documentary": "纪录片"
     }
   },
   "settings": {
@@ -792,7 +803,12 @@
       "prodStage": "制作阶段 · {step}",
       "exportDone": "导出阶段 · 已完成",
       "exportWaiting": "导出阶段 · 等待拼接",
-      "workbench": "工作台"
+      "workbench": "工作台",
+      "narrationScript": "旁白稿",
+      "narrationScriptDesc": "纪录片解说词整理（剧本正文即旁白）",
+      "evidenceAssetsDesc": "角色 / 场景 / 证据素材",
+      "expressionDesc": "每镜讲什么、用什么手段表现",
+      "layersDesc": "地图标注与图形叠加层"
     },
     "script": {
       "raw": "原始内容",
@@ -869,7 +885,11 @@
       "emptyDesc": "角色、场景和道具会在提取后显示在这里，可分别单独提取，也可一键并行提取全部。",
       "startExtract": "开始提取",
       "scriptFirst": "请先完成剧本编写",
-      "goBack": "返回处理"
+      "goBack": "返回处理",
+      "expression": "表达设计",
+      "expressionPlaceholder": "表达设计即将上线：届时可为每一镜写明信息点、表现手段与必须显示的内容，并校验画面是否对得上解说。",
+      "layers": "图层",
+      "layersPlaceholder": "图层编辑即将上线：届时可在底图上叠加区域、路线、标记、文字卡片等图层，用于地图标注与信息图。"
     },
     "asset": {
       "fallbackType": "资产",

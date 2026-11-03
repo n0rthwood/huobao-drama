@@ -6,6 +6,7 @@ import { RequestContext } from '@mastra/core/request-context'
 import { randomUUID } from 'crypto'
 import { getContentLanguage, type ContentLanguage } from '../services/app-settings.js'
 import { resolveDramaGenreRuleset, type GenreRuleset } from '../services/genre-ruleset.js'
+import { resolveDramaProjectType, type ProjectType } from '../services/project-type.js'
 
 export interface AgentRequestContextValues {
   episodeId: number
@@ -26,6 +27,8 @@ export interface AgentRequestContextValues {
   singleAssetName?: string
   /** 题材规则集（Issue #32）；缺省时按项目的 genre + 纪录片开关解析 */
   genreRuleset?: GenreRuleset | null
+  /** 项目类型（Issue #45）；缺省时按 dramas.project_type 解析，决定 narration-first 工具变体 */
+  projectType?: ProjectType
   /** 本次运行的检索预算作用域（构建处生成，调用方不传） */
   researchRunId?: string
   /** 本次运行所属的文本任务 id（Issue #46）：工具的计量写进该任务的 params.vision_calls */
@@ -53,6 +56,9 @@ export function buildAgentRequestContext(values: AgentRequestContextValues): Req
     ? resolveDramaGenreRuleset(values.dramaId)
     : values.genreRuleset
   if (genreRuleset) rc.set('genreRuleset', genreRuleset)
+  // 项目类型（Issue #45）：纪录片项目的分镜/旁白工具换成 narration-first 变体
+  const projectType = values.projectType ?? resolveDramaProjectType(values.dramaId)
+  rc.set('projectType', projectType)
   // 每次运行一个检索预算作用域：联网工具按它限次（agents/tools/research-tools.ts）
   rc.set('researchRunId', randomUUID())
   return rc
@@ -98,6 +104,11 @@ export function getContentLanguageFromRC(requestContext: RequestContext | undefi
 export function getGenreRuleset(requestContext: RequestContext | undefined): GenreRuleset | null {
   const v = requestContext?.get('genreRuleset' as never)
   return v === 'documentary' ? 'documentary' : null
+}
+
+/** 读取请求上下文中的项目类型；未设置按 drama 处理（Issue #45） */
+export function getProjectType(requestContext: RequestContext | undefined): ProjectType {
+  return requestContext?.get('projectType' as never) === 'documentary' ? 'documentary' : 'drama'
 }
 
 /** 读取单资产重提取的目标资产名；整集提取为 null */

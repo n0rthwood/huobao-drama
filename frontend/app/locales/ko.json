@@ -405,6 +405,12 @@
       "aspectRatioPlaceholder": "화면 비율 선택",
       "aspectRatioHint": "키프레임과 영상의 출력 비율을 결정합니다. 생성 후에도 「프로젝트 설정」에서 변경할 수 있습니다",
       "aspectRatioRequired": "화면 비율을 선택해 주세요",
+      "projectType": "프로젝트 유형",
+      "projectTypeHint": "유형은 생성 후 변경할 수 없습니다. 다큐멘터리 프로젝트는 내레이션 우선 워크플로와 전용 표현 설계 단계를 사용합니다",
+      "projectTypeDrama": "숏드라마",
+      "projectTypeDramaDesc": "극 드라마: 대본 리라이트 → 캐릭터/장면 → 키프레임 → 영상",
+      "projectTypeDocumentary": "다큐멘터리",
+      "projectTypeDocumentaryDesc": "내레이션 우선: 내레이션 원고 → 증거 자료 → 표현 설계 → 키프레임/레이어 → 영상",
       "submit": "프로젝트 생성"
     },
     "deleteDialog": {
@@ -511,7 +517,12 @@
       "effective": "현재 적용: {value}",
       "hint": "스위치가 장르 키워드보다 우선합니다. 적용되면 추출과 프롬프트가 다큐멘터리/역사 규칙을 따릅니다.",
       "rulesetDocumentary": "다큐멘터리 규칙",
-      "rulesetNone": "장르 규칙 없음"
+      "rulesetNone": "장르 규칙 없음",
+      "lockedHint": "다큐멘터리 프로젝트는 항상 다큐멘터리 규칙으로 생성되며 끌 수 없습니다."
+    },
+    "projectType": {
+      "drama": "숏드라마",
+      "documentary": "다큐멘터리"
     }
   },
   "settings": {
@@ -792,7 +803,12 @@
       "prodStage": "제작 단계 · {step}",
       "exportDone": "납출 단계 · 완료",
       "exportWaiting": "납출 단계 · 병합 대기",
-      "workbench": "워크벤치"
+      "workbench": "워크벤치",
+      "narrationScript": "내레이션 원고",
+      "narrationScriptDesc": "다큐멘터리 해설 정리(대본 본문이 곧 내레이션)",
+      "evidenceAssetsDesc": "캐릭터 / 장면 / 증거 자료",
+      "expressionDesc": "각 숏에서 무엇을 전달하고 어떤 수단으로 보여줄지",
+      "layersDesc": "지도 주석과 그래픽 오버레이 레이어"
     },
     "script": {
       "raw": "원문",
@@ -869,7 +885,11 @@
       "emptyDesc": "캐릭터, 장면, 소품은 추출 후 이곳에 표시됩니다. 개별로 추출하거나 일괄 병렬 추출할 수 있습니다.",
       "startExtract": "추출 시작",
       "scriptFirst": "먼저 대본을 완성하세요",
-      "goBack": "처리로 돌아가기"
+      "goBack": "처리로 돌아가기",
+      "expression": "표현 설계",
+      "expressionPlaceholder": "표현 설계는 곧 제공됩니다. 각 숏의 정보 포인트, 표현 수단, 반드시 보여야 할 내용을 명시하고 화면이 해설과 맞는지 검증할 수 있게 됩니다.",
+      "layers": "레이어",
+      "layersPlaceholder": "레이어 편집은 곧 제공됩니다. 베이스 이미지 위에 영역·경로·마커·텍스트 카드 등의 레이어를 겹쳐 지도 주석과 정보 그래픽을 만들 수 있게 됩니다."
     },
     "asset": {
       "fallbackType": "에셋",

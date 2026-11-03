@@ -7,7 +7,8 @@ import { toSnakeCase, toSnakeCaseArray } from '../utils/transform.js'
 import { lookupGeneratedAt } from '../services/media-time.js'
 import { logTaskError } from '../utils/task-logger.js'
 import { AssetLibraryError, importAsset, isAssetKind } from '../services/asset-library.js'
-import { isDocumentaryRuleMode, resolveRulesetWithMode } from '../services/genre-ruleset.js'
+import { isDocumentaryRuleMode, resolveProjectRuleset } from '../services/genre-ruleset.js'
+import { DOCUMENTARY_DEFAULT_STYLE, isProjectType, normalizeProjectType } from '../services/project-type.js'
 import { cancelAssetBatch, getAssetBatch, previewAssetBatch, startAssetBatch } from '../services/asset-batch.js'
 import { isAssetBatchScope, type AssetBatchScope } from '../services/asset-batch-select.js'
 
@@ -16,6 +17,10 @@ const app = new Hono()
 /** 项目画幅白名单：与关键帧 KEYFRAME_SIZES / H3 pickResolution 支持的档位一致 */
 const ASPECT_RATIOS: Record<string, true> = { '16:9': true, '9:16': true, '4:3': true, '3:4': true, '1:1': true }
 const ASPECT_RATIO_MESSAGE = '请选择画面比例（16:9 / 9:16 / 4:3 / 3:4 / 1:1）'
+/** 项目类型（Issue #45）：创建时必须是 drama / documentary，创建后不可切换 */
+const PROJECT_TYPE_MESSAGE = '项目类型只能是 drama（短剧）或 documentary（纪录片）'
+const PROJECT_TYPE_LOCKED_MESSAGE = '项目类型创建后不可切换；请新建一个该类型的项目'
+const DOCUMENTARY_RULES_LOCKED_MESSAGE = '纪录片项目的纪录片规则固定为开启（on），不可关闭'
 
 // GET /dramas - List dramas
 app.get('/', async (c) => {
@@ -63,12 +68,18 @@ app.get('/', async (c) => {
 app.post('/', async (c) => {
   const body = await c.req.json()
   if (ASPECT_RATIOS[body.aspect_ratio] !== true) return badRequest(c, ASPECT_RATIO_MESSAGE)
+  // 项目类型（Issue #45）：缺省 drama；纪录片由服务端写死规则开关与默认风格，创建后不可切换
+  const projectType = body.project_type === undefined || body.project_type === null ? 'drama' : body.project_type
+  if (!isProjectType(projectType)) return badRequest(c, PROJECT_TYPE_MESSAGE)
+  const isDocumentary = projectType === 'documentary'
   const ts = now()
   const res = await db.insert(schema.dramas).values({
     title: body.title,
     description: body.description,
     genre: body.genre,
-    style: body.style,
+    projectType,
+    documentaryRules: isDocumentary ? 'on' : undefined,
+    style: isDocumentary ? (body.style || DOCUMENTARY_DEFAULT_STYLE) : body.style,
     aspectRatio: body.aspect_ratio,
     tags: body.tags ? JSON.stringify(body.tags) : null,
     metadata: body.metadata,
@@ -125,7 +136,7 @@ app.get('/:id', async (c) => {
   return success(c, {
     ...toSnakeCase(drama),
     // 题材规则集（Issue #32）：开关优先、否则按 genre 关键字归一，供项目设置显示归一化结果
-    genre_ruleset: resolveRulesetWithMode(drama.genre, drama.documentaryRules),
+    genre_ruleset: resolveProjectRuleset(drama.projectType, drama.genre, drama.documentaryRules),
     tags: drama.tags ? JSON.parse(drama.tags) : [],
     episodes: toSnakeCaseArray(eps),
     characters: withTime(chars),
@@ -143,6 +154,13 @@ app.put('/:id', async (c) => {
   if (body.aspect_ratio !== undefined && ASPECT_RATIOS[body.aspect_ratio] !== true) {
     return badRequest(c, ASPECT_RATIO_MESSAGE)
   }
+  // 类型不可切换（父 Issue #44 Q6）：同值的幂等写入放行，改值或非法值一律 400
+  if (body.project_type !== undefined && body.project_type !== null) {
+    if (!isProjectType(body.project_type)) return badRequest(c, PROJECT_TYPE_MESSAGE)
+    if (body.project_type !== normalizeProjectType(current.projectType)) {
+      return badRequest(c, PROJECT_TYPE_LOCKED_MESSAGE)
+    }
+  }
   const ts = now()
   const updates: Record<string, any> = { updatedAt: ts }
   if (body.title !== undefined) updates.title = body.title
@@ -151,6 +169,10 @@ app.put('/:id', async (c) => {
   if (body.documentary_rules !== undefined) {
     if (body.documentary_rules !== null && !isDocumentaryRuleMode(body.documentary_rules)) {
       return badRequest(c, '纪录片规则开关只能是 auto / on / off')
+    }
+    // 纪录片项目的规则开关锁死在 on（Issue #45）
+    if (normalizeProjectType(current.projectType) === 'documentary' && body.documentary_rules !== 'on') {
+      return badRequest(c, DOCUMENTARY_RULES_LOCKED_MESSAGE)
     }
     updates.documentaryRules = body.documentary_rules
   }

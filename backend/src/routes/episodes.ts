@@ -9,6 +9,7 @@ import { getVideoPromptBatchStatus, startVideoPromptBatch } from '../services/vi
 import { getKeyframePromptBatchStatus, startKeyframePromptBatch } from '../services/keyframe-prompts.js'
 import { isKeyframeSlot, keyframesJson, loadEpisodeKeyframes, type KeyframeSlot } from '../services/keyframes.js'
 import { parseStylingVersion } from '../services/styling-version.js'
+import { resolveDramaProjectType } from '../services/project-type.js'
 import {
   cancelEpisodeVideoBatch,
   getEpisodeVideoBatch,
@@ -93,12 +94,16 @@ app.post('/', async (c) => {
     .orderBy(schema.episodes.episodeNumber)
   const nextNum = existing.length ? Math.max(...existing.map(e => e.episodeNumber)) + 1 : 1
 
+  // 纪录片项目（Issue #45）：剧本正文即旁白稿，新建剧集默认开旁白
+  const narrationEnabled = resolveDramaProjectType(body.drama_id) === 'documentary'
+
   const res = await db.insert(schema.episodes).values({
     dramaId: body.drama_id,
     episodeNumber: nextNum,
     title: body.title || `第${nextNum}集`,
     imageConfigId,
     videoConfigId,
+    narrationEnabled,
     // 语音合成配置：没有启用的 TTS 配置时留空，不挡住未用旁白功能的用户建集
     ttsConfigId: body.tts_config_id ?? await getActiveConfigId('tts'),
     subtitleTiming: DEFAULT_SUBTITLE_TIMING,

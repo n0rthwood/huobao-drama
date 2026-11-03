@@ -405,6 +405,12 @@
       "aspectRatioPlaceholder": "アスペクト比を選択",
       "aspectRatioHint": "キーフレームと動画の出力比率を決めます。作成後も「プロジェクト設定」で変更できます",
       "aspectRatioRequired": "画面比率を選択してください",
+      "projectType": "プロジェクト種別",
+      "projectTypeHint": "種別は作成後に変更できません。ドキュメンタリーはナレーション優先のワークフローと専用の「表現設計」ステップを使います",
+      "projectTypeDrama": "ショートドラマ",
+      "projectTypeDramaDesc": "脚本ドラマ：脚本リライト → キャラクター／シーン → キーフレーム → 動画",
+      "projectTypeDocumentary": "ドキュメンタリー",
+      "projectTypeDocumentaryDesc": "ナレーション優先：ナレーション原稿 → 証拠素材 → 表現設計 → キーフレーム／レイヤー → 動画",
       "submit": "プロジェクトを作成"
     },
     "deleteDialog": {
@@ -511,7 +517,12 @@
       "effective": "現在の適用：{value}",
       "hint": "スイッチはジャンルのキーワードより優先されます。有効時は抽出とプロンプトがドキュメンタリー/歴史ルールに従います。",
       "rulesetDocumentary": "ドキュメンタリールール",
-      "rulesetNone": "ジャンルルールなし"
+      "rulesetNone": "ジャンルルールなし",
+      "lockedHint": "ドキュメンタリープロジェクトは常にドキュメンタリールールで生成され、無効にできません。"
+    },
+    "projectType": {
+      "drama": "ショートドラマ",
+      "documentary": "ドキュメンタリー"
     }
   },
   "settings": {
@@ -792,7 +803,12 @@
       "prodStage": "制作段階 · {step}",
       "exportDone": "書き出し段階 · 完了",
       "exportWaiting": "書き出し段階 · 結合待ち",
-      "workbench": "ワークベンチ"
+      "workbench": "ワークベンチ",
+      "narrationScript": "ナレーション原稿",
+      "narrationScriptDesc": "ドキュメンタリーの解説文整理（脚本本文がそのままナレーション）",
+      "evidenceAssetsDesc": "キャラクター / シーン / 証拠素材",
+      "expressionDesc": "各ショットで何を伝え、どの手段で見せるか",
+      "layersDesc": "地図注記とグラフィックの重ねレイヤー"
     },
     "script": {
       "raw": "原文",
@@ -869,7 +885,11 @@
       "emptyDesc": "キャラクター、シーン、小道具は抽出後ここに表示されます。個別に抽出するか、一括で並行抽出できます。",
       "startExtract": "抽出を開始",
       "scriptFirst": "先に脚本を完成させてください",
-      "goBack": "処理に戻る"
+      "goBack": "処理に戻る",
+      "expression": "表現設計",
+      "expressionPlaceholder": "表現設計は近日公開。各ショットの情報ポイント、表現手段、必ず映すべき内容を明記し、画面がナレーションと一致しているかを検証できるようになります。",
+      "layers": "レイヤー",
+      "layersPlaceholder": "レイヤー編集は近日公開。ベース画像の上に領域・ルート・マーカー・テキストカードなどのレイヤーを重ね、地図注記や情報図を作れるようになります。"
     },
     "asset": {
       "fallbackType": "資産",

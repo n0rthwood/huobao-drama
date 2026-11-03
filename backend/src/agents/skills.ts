@@ -86,9 +86,26 @@ const GENRE_SKILL_MAP: Record<string, Record<string, string[]>> = {
   },
 }
 
-/** 某 Agent 在所有题材下可能用到的附加目录（Workspace 的 skills 解析器要能发现它们） */
+/**
+ * 项目类型的附加技能目录（Issue #45）— 只对 `project_type='documentary'` 的项目注入。
+ * 这两份技能描述的是 narration-first 工作流（旁白逐字取自剧本、两栏脚本），
+ * 与之配套的是按 project_type 切换的工具变体；靠 `documentary_rules` 打开纪录片规则的
+ * drama 项目（如 drama 3）工具里没有 narration_text 字段，注入这两份技能会前后矛盾，
+ * 所以**不能**挂在 GENRE_SKILL_MAP 上。
+ */
+const PROJECT_TYPE_SKILL_MAP: Record<string, Record<string, string[]>> = {
+  documentary: {
+    // 旁白优先的剧本整理：剧本正文就是旁白稿，不做对白化改写
+    script_rewriter: ['documentary/documentary-script'],
+    // 两栏脚本纪律的骨架（完整表达设计规则在 #49）
+    storyboard_breaker: ['documentary/documentary-storyboard'],
+  },
+}
+
+/** 某 Agent 在所有题材 / 项目类型下可能用到的附加目录（Workspace 的 skills 解析器要能发现它们） */
 function genrePrefixes(agentType: string): string[] {
-  return Object.values(GENRE_SKILL_MAP).flatMap(byAgent => byAgent[agentType] || [])
+  return [...Object.values(GENRE_SKILL_MAP), ...Object.values(PROJECT_TYPE_SKILL_MAP)]
+    .flatMap(byAgent => byAgent[agentType] || [])
 }
 
 /** 每个 Agent 的 Workspace（filesystem 工作目录 + 原生技能注册）
@@ -171,12 +188,13 @@ async function readLocalizedSkill(relPath: string, lang: string): Promise<string
 export async function loadAgentSkills(
   agentType: string,
   lang?: string | null,
-  opts: SkillConditions & { genreRuleset?: string | null } = {},
+  opts: SkillConditions & { genreRuleset?: string | null; projectType?: string | null } = {},
 ): Promise<string> {
   const workspace = skillWorkspaces[agentType]
   const basePrefixes = AGENT_SKILL_MAP[agentType] || []
   const addendumPrefixes = opts.genreRuleset ? (GENRE_SKILL_MAP[opts.genreRuleset]?.[agentType] || []) : []
-  const prefixes = [...basePrefixes, ...addendumPrefixes]
+  const projectPrefixes = opts.projectType ? (PROJECT_TYPE_SKILL_MAP[opts.projectType]?.[agentType] || []) : []
+  const prefixes = [...basePrefixes, ...addendumPrefixes, ...projectPrefixes]
   if (!workspace || !prefixes.length) return ''
 
   const allPaths = scanSkillPaths().map(p => p.replace(/^skills\//, ''))
