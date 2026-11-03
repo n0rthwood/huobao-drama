@@ -42,6 +42,7 @@ import { backfillTaskEpisodeIds, failInterruptedTextTasks } from './services/tas
 import { backfillGeneratedAt } from './services/media-time.js'
 import { migrateReferenceImages } from './services/reference-images.js'
 import { migrateAssetNames } from './services/asset-name-migration.js'
+import { backfillPoolProjection } from './services/storyboard-assets.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(__dirname, '../..')
@@ -141,6 +142,8 @@ db.update(schema.sysTask)
   .then(() => migrateReferenceImages())
   // 资产名规范化迁移（Issue #34）：非法名改成合法名并重写分镜 @引用，幂等
   .then(() => migrateAssetNames())
+  // 本镜资产池投影补齐（Issue #43）：角色/道具关联 = 手选 ∪ 当前 @，幂等
+  .then(() => backfillPoolProjection())
   // 清理完成后再恢复批量任务：被重启打断的那一张/那一镜此时已是 failed，由批次重新提交
   .then(() => startQwenJobsTracker())
   .then(() => resumeKeyframeBatches())

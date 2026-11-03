@@ -78,6 +78,12 @@ The keyframe editor and video reference-frame thumbnails use the same status sem
 - ✅ Local storage support
 - ✅ Task progress tracking
 
+The keyframe **Shot asset pool** shows only selected assets. **Choose assets** opens a searchable character / scene / prop picker; each change is saved immediately. Multiple scenes can be selected without changing the shot's primary scene.
+
+The effective pool is the union of manual selections and assets mentioned with `@` in the first/middle/last-frame, video, and transition prompts. Both manual and AI prompt saves update this state on the backend. Manual selections survive prompt edits. Referenced assets cannot be deselected until every reference is removed; automatic-only selections then leave the pool. **Keep as manual** retains them independently. Pool membership does not send extra reference images: each generation target still uses its own prompt bindings.
+
+Startup creates `storyboard_pool_selections` without additional local configuration. Existing links are conservatively retained as manual selections because their original source is unknown; remove these explicitly after deleting references. Migration preserves prompts, the primary scene, target image selections, generated media, and keyframe approval.
+
 ### Episode Posters
 
 The optional **Poster** step follows asset production and does not block keyframes, videos, or export.

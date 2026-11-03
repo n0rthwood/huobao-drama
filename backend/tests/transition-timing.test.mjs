@@ -20,7 +20,7 @@ const [kind, payload] = JSON.parse(process.env.TRANSITION_INPUT!)
 const out = kind === 'plan'
   ? planTransitionTiming(payload[0], payload[1], payload[2])
   : composeTransitionPrompt(payload[0], payload[1], payload[2], payload[3])
-process.stdout.write(JSON.stringify(out))
+process.stdout.write('@@' + JSON.stringify(out))
 `)
 
 // 直接用本地 tsx 二进制：npx 每次调用都要解析一次包，整套测试并发跑时会互相拖慢甚至超时
@@ -32,7 +32,7 @@ function run(kind, payload) {
     encoding: 'utf8',
     env: { ...process.env, TRANSITION_INPUT: JSON.stringify([kind, payload]) },
   })
-  return JSON.parse(out)
+  return JSON.parse(out.slice(out.lastIndexOf('@@') + 2))
 }
 
 test('submitted duration is min(content + T, 15) and the mid guide shifts by E', () => {

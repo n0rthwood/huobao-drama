@@ -11,7 +11,7 @@
  * 装配顺序：场景 → 角色（本集角色、排除旁白、按角色列表顺序）→ 道具；按图片去重后最多 9 张，
  * 提示词里的 @名字 按同一顺序替换为各模型的图片引用写法。
  */
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray, isNull } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
 import { parseStylingVersion } from './styling-version.js'
 
@@ -73,6 +73,15 @@ export type PromptField = 'first_frame_prompt' | 'mid_frame_prompt' | 'last_fram
 export const PROMPT_FIELDS: PromptField[] = [
   'first_frame_prompt', 'mid_frame_prompt', 'last_frame_prompt', 'video_prompt', 'transition_prompt',
 ]
+
+/** 提示词字段的中文名（资产池引用锁定提示与 400 文案复用） */
+export const PROMPT_FIELD_LABEL: Record<PromptField, string> = {
+  first_frame_prompt: '首帧提示词',
+  mid_frame_prompt: '中间帧提示词',
+  last_frame_prompt: '尾帧提示词',
+  video_prompt: '视频提示词',
+  transition_prompt: '转场提示词',
+}
 
 /** 关键帧槽位 → 对应提示词字段（槽位级问题过滤用） */
 export const SLOT_PROMPT_FIELD: Record<'first' | 'mid' | 'last', PromptField> = {
@@ -149,14 +158,19 @@ export interface EpisodeAssetEntry {
 
 /** 本集全部可被 @ 的资产（场景 → 角色 → 道具，顺序即参考图装配顺序） */
 export async function loadEpisodeAssets(episodeId: number): Promise<EpisodeAssetEntry[]> {
-  const sceneLinks = await db.select().from(schema.episodeScenes)
-    .where(eq(schema.episodeScenes.episodeId, episodeId))
+  return loadEpisodeAssetsSync(episodeId)
+}
+
+// 资产池写事务内使用同步读取，不能在读手选到写投影之间让出执行权。
+function loadEpisodeAssetsSync(episodeId: number): EpisodeAssetEntry[] {
+  const sceneLinks = db.select().from(schema.episodeScenes)
+    .where(eq(schema.episodeScenes.episodeId, episodeId)).all()
   const episodeSceneIds = sceneLinks.map(link => link.sceneId)
-  const scenes = (await db.select().from(schema.scenes))
+  const scenes = db.select().from(schema.scenes).all()
     .filter(row => episodeSceneIds.includes(row.id) && !row.deletedAt)
 
-  const episodeCharLinks = await db.select().from(schema.episodeCharacters)
-    .where(eq(schema.episodeCharacters.episodeId, episodeId))
+  const episodeCharLinks = db.select().from(schema.episodeCharacters)
+    .where(eq(schema.episodeCharacters.episodeId, episodeId)).all()
   const episodeCharIds = episodeCharLinks.map(link => link.characterId)
   // 本集造型版本（Issue #15）：没有人工选版时默认用造型图
   const costumeImages = new Map<number, string>()
@@ -164,13 +178,13 @@ export async function loadEpisodeAssets(episodeId: number): Promise<EpisodeAsset
     const image = parseStylingVersion(link.stylingVersion)?.image_path
     if (image) costumeImages.set(link.characterId, image)
   }
-  const characters = (await db.select().from(schema.characters))
+  const characters = db.select().from(schema.characters).all()
     .filter(ch => episodeCharIds.includes(ch.id) && !ch.deletedAt)
     .filter(ch => !NARRATOR_KEYWORDS.some(keyword => `${ch.name || ''} ${ch.role || ''}`.toLowerCase().includes(keyword)))
 
-  const episodePropIds = (await db.select().from(schema.episodeProps)
-    .where(eq(schema.episodeProps.episodeId, episodeId))).map(link => link.propId)
-  const props = (await db.select().from(schema.props))
+  const episodePropIds = db.select().from(schema.episodeProps)
+    .where(eq(schema.episodeProps.episodeId, episodeId)).all().map(link => link.propId)
+  const props = db.select().from(schema.props).all()
     .filter(p => episodePropIds.includes(p.id) && !p.deletedAt)
 
   const entries: EpisodeAssetEntry[] = []
@@ -240,6 +254,30 @@ function mentionsByField(
     }
   }
   return result
+}
+
+/** 每个提示词字段 @ 到的本集资产（资产池锁定提示与绑定重算共用同一解析口径） */
+export function mentionedAssetsByField(
+  prompts: Record<PromptField, string>,
+  assets: EpisodeAssetEntry[],
+): Record<PromptField, EpisodeAssetEntry[]> {
+  const byField = mentionsByField(prompts, assets)
+  const result = {} as Record<PromptField, EpisodeAssetEntry[]>
+  for (const field of PROMPT_FIELDS) result[field] = byField[field].matched
+  return result
+}
+
+/** 5 个提示词 @ 到的本集资产并集（按本集资产顺序：场景 → 角色 → 道具） */
+export function mentionedAssets(
+  prompts: Record<PromptField, string>,
+  assets: EpisodeAssetEntry[],
+): EpisodeAssetEntry[] {
+  const byField = mentionsByField(prompts, assets)
+  const keys = new Set<string>()
+  for (const field of PROMPT_FIELDS) {
+    for (const asset of byField[field].matched) keys.add(assetKey(asset.kind, asset.id))
+  }
+  return assets.filter(asset => keys.has(assetKey(asset.kind, asset.id)))
 }
 
 const assetKey = (kind: string, id: number) => `${kind}:${id}`
@@ -313,8 +351,12 @@ export function targetAssetsJson(assets: EpisodeAssetEntry[], bindings: TargetBi
 }
 
 export async function loadTargetBindings(storyboardId: number): Promise<TargetBindings> {
-  const rows = await db.select().from(schema.storyboardTargetAssets)
-    .where(eq(schema.storyboardTargetAssets.storyboardId, storyboardId))
+  return loadTargetBindingsSync(storyboardId)
+}
+
+function loadTargetBindingsSync(storyboardId: number): TargetBindings {
+  const rows = db.select().from(schema.storyboardTargetAssets)
+    .where(eq(schema.storyboardTargetAssets.storyboardId, storyboardId)).all()
   const result: TargetBindings = { first: [], mid: [], last: [], video: [] }
   for (const row of rows) {
     if (!isBindingTarget(row.target)) continue
@@ -374,9 +416,49 @@ export function computeTargetSync(
 
 // ─── 本镜资产池（分镜级） ────────────────────────────────────────────
 
+/** 对外的资产池条目（Issue #43）：manual = 人工手选，mentioned = 当前提示词 @ 到 */
+export interface PoolAssetJson {
+  kind: AssetKind
+  asset_id: number
+  manual: boolean
+  mentioned: boolean
+}
+
+/** 资产池的对外状态：pool_assets + 老关联表投影 + 分镜主场景（主场景不受池选择影响） */
+export interface PoolState {
+  pool_assets: PoolAssetJson[]
+  character_ids: number[]
+  prop_ids: number[]
+  scene_id: number | null
+}
+
+/**
+ * 有效池（纯函数，Issue #43）= 人工手选 ∪ 5 个提示词当前 @ 到的本集资产。
+ * 两者可同时为真；只靠 @ 进池的资产在最后一处引用被删掉后自动退出，手选始终保留。
+ * 不在本集可用资产里的手选（跨集/已删/旁白）不出现在池里。
+ */
+export function computePoolAssets(
+  assets: EpisodeAssetEntry[],
+  manual: Array<{ kind: AssetKind; assetId: number }>,
+  prompts: Record<PromptField, string>,
+): PoolAssetJson[] {
+  const manualKeys = new Set(manual.map(pick => assetKey(pick.kind, pick.assetId)))
+  const mentionedKeys = new Set(mentionedAssets(prompts, assets).map(asset => assetKey(asset.kind, asset.id)))
+  return assets
+    .filter(asset => manualKeys.has(assetKey(asset.kind, asset.id)) || mentionedKeys.has(assetKey(asset.kind, asset.id)))
+    .map(asset => ({
+      kind: asset.kind,
+      asset_id: asset.id,
+      manual: manualKeys.has(assetKey(asset.kind, asset.id)),
+      mentioned: mentionedKeys.has(assetKey(asset.kind, asset.id)),
+    }))
+}
+
 export interface PoolSyncInput {
   prompts: Record<PromptField, string>
   assets: EpisodeAssetEntry[]
+  /** 人工手选；只靠 @ 自动进池的资产不在其中 */
+  manual: Array<{ kind: AssetKind; assetId: number }>
   characterIds: number[]
   propIds: number[]
 }
@@ -386,48 +468,31 @@ export interface BindingSyncResult {
   propIds: number[]
   bound: Array<{ kind: AssetKind; id: number; name: string }>
   unbound: Array<{ kind: AssetKind; id: number; name: string }>
-  /** 5 个提示词全空时不动资产池 */
+  /** 老关联表是否需要改写 */
   changed: boolean
 }
 
 /**
- * 资产池 = 5 个提示词里 @ 到的本集角色/道具的并集（场景不自动修改）。
- * 提示词全空时保留现有资产池（拆分分镜产生的初始绑定供提示词生成参考）。
+ * 角色/道具老关联表 = 有效池的投影（Issue #43）：按 computePoolAssets 的同一口径重算，
+ * 手选不会被提示词抹掉，提示词全空时池 = 手选。场景只进 pool_assets，
+ * 既不写老关联表也不改分镜主场景 scene_id。实际发送的参考图仍只由目标级绑定决定。
  */
 export function computeBindingSync(input: PoolSyncInput): BindingSyncResult {
-  const unchanged: BindingSyncResult = {
-    characterIds: [...input.characterIds], propIds: [...input.propIds], bound: [], unbound: [], changed: false,
-  }
-  if (!PROMPT_FIELDS.some(field => (input.prompts[field] || '').trim())) return unchanged
-
-  const mentions = mentionsByField(input.prompts, input.assets)
-  const mentioned = new Map<string, EpisodeAssetEntry>()
-  for (const field of PROMPT_FIELDS) {
-    for (const asset of mentions[field].matched) mentioned.set(assetKey(asset.kind, asset.id), asset)
-  }
-  const wantedChars = [...mentioned.values()].filter(a => a.kind === 'character')
-  const wantedProps = [...mentioned.values()].filter(a => a.kind === 'prop')
+  const pool = computePoolAssets(input.assets, input.manual, input.prompts)
+  const byKey = new Map(input.assets.map(asset => [assetKey(asset.kind, asset.id), asset]))
+  const wantedChars = pool.filter(item => item.kind === 'character').map(item => item.asset_id)
+  const wantedProps = pool.filter(item => item.kind === 'prop').map(item => item.asset_id)
 
   const bound: BindingSyncResult['bound'] = []
   const unbound: BindingSyncResult['unbound'] = []
-  for (const asset of [...wantedChars, ...wantedProps]) {
-    const current = asset.kind === 'character' ? input.characterIds : input.propIds
-    if (!current.includes(asset.id)) bound.push({ kind: asset.kind, id: asset.id, name: asset.name })
-  }
-  const byId = new Map(input.assets.map(asset => [assetKey(asset.kind, asset.id), asset]))
-  for (const id of input.characterIds) {
-    if (!wantedChars.some(asset => asset.id === id)) {
-      unbound.push({ kind: 'character', id, name: byId.get(assetKey('character', id))?.name || `#${id}` })
-    }
-  }
-  for (const id of input.propIds) {
-    if (!wantedProps.some(asset => asset.id === id)) {
-      unbound.push({ kind: 'prop', id, name: byId.get(assetKey('prop', id))?.name || `#${id}` })
-    }
-  }
+  const name = (kind: AssetKind, id: number) => byKey.get(assetKey(kind, id))?.name || `#${id}`
+  for (const id of wantedChars) if (!input.characterIds.includes(id)) bound.push({ kind: 'character', id, name: name('character', id) })
+  for (const id of wantedProps) if (!input.propIds.includes(id)) bound.push({ kind: 'prop', id, name: name('prop', id) })
+  for (const id of input.characterIds) if (!wantedChars.includes(id)) unbound.push({ kind: 'character', id, name: name('character', id) })
+  for (const id of input.propIds) if (!wantedProps.includes(id)) unbound.push({ kind: 'prop', id, name: name('prop', id) })
   return {
-    characterIds: wantedChars.map(asset => asset.id),
-    propIds: wantedProps.map(asset => asset.id),
+    characterIds: wantedChars,
+    propIds: wantedProps,
     bound,
     unbound,
     changed: bound.length > 0 || unbound.length > 0,
@@ -617,16 +682,225 @@ export async function collectTargetAssetRefs(
 
 // ─── 写库 ────────────────────────────────────────────────────────────
 
-async function loadPool(storyboardId: number): Promise<{ characterIds: number[]; propIds: number[] }> {
-  const charLinks = await db.select().from(schema.storyboardCharacters)
-    .where(eq(schema.storyboardCharacters.storyboardId, storyboardId))
-  const propLinks = await db.select().from(schema.storyboardProps)
-    .where(eq(schema.storyboardProps.storyboardId, storyboardId))
+/** 本镜手选的一行（Issue #43）；只靠 @ 自动进池的资产不写表 */
+interface ManualPick {
+  kind: AssetKind
+  assetId: number
+  createdAt: string
+}
+
+/** 老关联表当前内容 = 有效池在角色/道具上的投影 */
+function loadPool(storyboardId: number): { characterIds: number[]; propIds: number[] } {
+  const charLinks = db.select().from(schema.storyboardCharacters)
+    .where(eq(schema.storyboardCharacters.storyboardId, storyboardId)).all()
+  const propLinks = db.select().from(schema.storyboardProps)
+    .where(eq(schema.storyboardProps.storyboardId, storyboardId)).all()
   return { characterIds: charLinks.map(l => l.characterId), propIds: propLinks.map(l => l.propId) }
 }
 
+/** 本镜的人工手选 */
+function loadManual(storyboardId: number): ManualPick[] {
+  const rows = db.select().from(schema.storyboardPoolSelections)
+    .where(eq(schema.storyboardPoolSelections.storyboardId, storyboardId)).all()
+  return rows.map(row => ({ kind: row.kind as AssetKind, assetId: row.assetId, createdAt: row.createdAt }))
+}
+
+/** 整集手选（分镜列表接口一次查完，避免每镜一次往返） */
+export async function loadEpisodeManualSelections(storyboardIds: number[]): Promise<Map<number, ManualPick[]>> {
+  const byStoryboard = new Map<number, ManualPick[]>()
+  if (!storyboardIds.length) return byStoryboard
+  const rows = await db.select().from(schema.storyboardPoolSelections)
+    .where(inArray(schema.storyboardPoolSelections.storyboardId, storyboardIds))
+  for (const row of rows) {
+    const list = byStoryboard.get(row.storyboardId) || []
+    list.push({ kind: row.kind as AssetKind, assetId: row.assetId, createdAt: row.createdAt })
+    byStoryboard.set(row.storyboardId, list)
+  }
+  return byStoryboard
+}
+
 /**
- * 提示词写入后的同步（写库）：资产池跟随 5 个提示词的 @ 并集；
+ * 调用方的同步事务已覆盖读取、合并与写回；这里不另开嵌套事务，也不 await。
+ * manual 是本镜手选的完整集合，characterIds/propIds 是有效池的投影。
+ */
+function writePoolSync(
+  storyboardId: number,
+  manual: ManualPick[],
+  characterIds: number[],
+  propIds: number[],
+): void {
+  db.delete(schema.storyboardPoolSelections)
+    .where(eq(schema.storyboardPoolSelections.storyboardId, storyboardId)).run()
+  for (const pick of manual) {
+    db.insert(schema.storyboardPoolSelections)
+      .values({ storyboardId, kind: pick.kind, assetId: pick.assetId, createdAt: pick.createdAt })
+      .onConflictDoNothing().run()
+  }
+  db.delete(schema.storyboardCharacters)
+    .where(eq(schema.storyboardCharacters.storyboardId, storyboardId)).run()
+  for (const characterId of characterIds) {
+    db.insert(schema.storyboardCharacters).values({ storyboardId, characterId }).onConflictDoNothing().run()
+  }
+  db.delete(schema.storyboardProps)
+    .where(eq(schema.storyboardProps.storyboardId, storyboardId)).run()
+  for (const propId of propIds) {
+    db.insert(schema.storyboardProps).values({ storyboardId, propId }).onConflictDoNothing().run()
+  }
+}
+
+function poolState(storyboard: typeof schema.storyboards.$inferSelect, poolAssets: PoolAssetJson[]): PoolState {
+  return {
+    pool_assets: poolAssets,
+    character_ids: poolAssets.filter(item => item.kind === 'character').map(item => item.asset_id),
+    prop_ids: poolAssets.filter(item => item.kind === 'prop').map(item => item.asset_id),
+    scene_id: storyboard.sceneId ?? null,
+  }
+}
+
+/** 分镜当前的资产池（读库版本，API 输出用） */
+export async function loadPoolState(
+  storyboard: typeof schema.storyboards.$inferSelect,
+  assets?: EpisodeAssetEntry[],
+  manual?: ManualPick[],
+): Promise<PoolState> {
+  const episodeAssets = assets ?? await loadEpisodeAssets(storyboard.episodeId)
+  const picks = manual ?? await loadManual(storyboard.id)
+  return poolState(storyboard, computePoolAssets(episodeAssets, picks, promptFieldsOf(storyboard)))
+}
+
+/**
+ * 显式写入的分镜绑定（人工 PUT 的 ids / 新建分镜 / 拆镜 AI）→ 记为手选，并刷新有效池投影。
+ * 只替换传入类别的手选；主场景只增不减（切换 scene_id 不会删掉用户已选的其它场景），
+ * 本函数不写 storyboards.scene_id，主场景仍由调用方自己写。
+ */
+export async function applyExplicitBindings(storyboardId: number, input: {
+  characterIds?: number[] | null
+  propIds?: number[] | null
+  sceneId?: number | null
+}): Promise<PoolState> {
+  return db.transaction(() => {
+    const storyboard = db.select().from(schema.storyboards)
+      .where(eq(schema.storyboards.id, storyboardId)).get()
+    if (!storyboard || storyboard.deletedAt) throw new Error('镜头不存在')
+    const assets = loadEpisodeAssetsSync(storyboard.episodeId)
+    const prompts = promptFieldsOf(storyboard)
+    const createdAt = new Date().toISOString()
+    const current = loadManual(storyboardId)
+    const replaceKind = (picks: ManualPick[], kind: AssetKind, ids: number[]): ManualPick[] => {
+      const wanted = [...new Set(ids.filter(id => Number.isInteger(id) && id > 0))]
+      return [
+        ...picks.filter(pick => pick.kind !== kind),
+        ...wanted.map(assetId => ({
+          kind,
+          assetId,
+          createdAt: picks.find(pick => pick.kind === kind && pick.assetId === assetId)?.createdAt || createdAt,
+        })),
+      ]
+    }
+    let manual = current
+    if (input.characterIds !== undefined) manual = replaceKind(manual, 'character', input.characterIds || [])
+    if (input.propIds !== undefined) manual = replaceKind(manual, 'prop', input.propIds || [])
+    if (input.sceneId != null && !manual.some(pick => pick.kind === 'scene' && pick.assetId === input.sceneId)) {
+      manual = [...manual, { kind: 'scene', assetId: input.sceneId, createdAt }]
+    }
+    const pool = computePoolAssets(assets, manual, prompts)
+    writePoolSync(storyboardId, manual,
+      pool.filter(item => item.kind === 'character').map(item => item.asset_id),
+      pool.filter(item => item.kind === 'prop').map(item => item.asset_id))
+    return poolState(storyboard, pool)
+  })
+}
+
+/**
+ * 资产池手选的单项增删（Issue #43）：
+ * selected=true 记手选（已被 @ 的也可以，之后删掉 @ 仍留在池里）；
+ * selected=false 只撤手选 —— 仍被任一提示词 @ 的资产拒绝（必须先删引用），**绝不改写提示词**。
+ * 场景可多选，且不改写分镜主场景 scene_id。
+ */
+export async function setPoolSelection(
+  storyboardId: number,
+  kind: AssetKind,
+  assetId: number,
+  selected: boolean,
+): Promise<PoolState> {
+  return db.transaction(() => {
+    const storyboard = db.select().from(schema.storyboards)
+      .where(eq(schema.storyboards.id, storyboardId)).get()
+    if (!storyboard || storyboard.deletedAt) throw new Error('镜头不存在')
+    const assets = loadEpisodeAssetsSync(storyboard.episodeId)
+    const asset = assets.find(item => item.kind === kind && item.id === assetId)
+    if (!asset) {
+      throw new Error(`该${KIND_LABEL[kind]}不在本集可选资产里（跨集、已删除或旁白角色不能加入资产池）`)
+    }
+    const prompts = promptFieldsOf(storyboard)
+    const byField = mentionedAssetsByField(prompts, assets)
+    const mentionedIn = PROMPT_FIELDS.filter(field =>
+      byField[field].some(item => item.kind === kind && item.id === assetId))
+    if (!selected && mentionedIn.length) {
+      const fields = mentionedIn.map(field => PROMPT_FIELD_LABEL[field]).join('、')
+      throw new Error(`「${asset.name}」正被${fields}里的 @${asset.name} 引用，不能直接取消；请先删掉这些引用`)
+    }
+    const manual = loadManual(storyboardId)
+    const has = manual.some(pick => pick.kind === kind && pick.assetId === assetId)
+    const next = selected
+      ? (has ? manual : [...manual, { kind, assetId, createdAt: new Date().toISOString() }])
+      : manual.filter(pick => !(pick.kind === kind && pick.assetId === assetId))
+    const pool = computePoolAssets(assets, next, prompts)
+    writePoolSync(storyboardId, next,
+      pool.filter(item => item.kind === 'character').map(item => item.asset_id),
+      pool.filter(item => item.kind === 'prop').map(item => item.asset_id))
+    return poolState(storyboard, pool)
+  })
+}
+
+/** 删除分镜 / 资产时清理手选（与 deleteTargetBindings 同口径） */
+export async function deletePoolSelections(
+  filter: { storyboardId: number } | { kind: AssetKind; assetIds: number[] },
+): Promise<void> {
+  if ('storyboardId' in filter) {
+    await db.delete(schema.storyboardPoolSelections)
+      .where(eq(schema.storyboardPoolSelections.storyboardId, filter.storyboardId))
+    return
+  }
+  if (!filter.assetIds.length) return
+  await db.delete(schema.storyboardPoolSelections).where(and(
+    eq(schema.storyboardPoolSelections.kind, filter.kind),
+    inArray(schema.storyboardPoolSelections.assetId, filter.assetIds),
+  ))
+}
+
+/**
+ * 启动时的资产池投影收敛（Issue #43，幂等）：把每个未删除分镜的 storyboard_characters/props
+ * 对齐到「手选 ∪ 当前 @」。历史手选由 db/sqlite-schema.ts 的一次性迁移写入（老关联 + 主场景），
+ * 这里只补齐提示词里已有的 @（多选场景只进 pool_assets，不写老表）；
+ * 不改提示词、不动目标级绑定/选版、不改主场景。
+ */
+export async function backfillPoolProjection(): Promise<void> {
+  const storyboards = db.select().from(schema.storyboards).where(isNull(schema.storyboards.deletedAt)).all()
+  const assetsByEpisode = new Map<number, EpisodeAssetEntry[]>()
+  let changed = 0
+  for (const storyboard of storyboards) {
+    db.transaction(() => {
+      let assets = assetsByEpisode.get(storyboard.episodeId)
+      if (!assets) {
+        assets = loadEpisodeAssetsSync(storyboard.episodeId)
+        assetsByEpisode.set(storyboard.episodeId, assets)
+      }
+      const manual = loadManual(storyboard.id)
+      const sync = computeBindingSync({
+        assets, manual, prompts: promptFieldsOf(storyboard), ...loadPool(storyboard.id),
+      })
+      if (sync.changed) {
+        writePoolSync(storyboard.id, manual, sync.characterIds, sync.propIds)
+        changed++
+      }
+    })
+  }
+  if (changed > 0) console.log(`🧩 本镜资产池投影补齐：${changed} 个分镜按「手选 ∪ @引用」重算角色/道具关联`)
+}
+
+/**
+ * 提示词写入后的同步（写库）：有效池 = 手选 ∪ 5 个提示词的 @ 并集（手选不被抹掉）；
  * `fields` 对应的生成目标按各自提示词的 @ 重算绑定（其他目标不动）。
  * 调用方必须在提示词已落库之后调用，并传入本次写入的提示词字段。
  */
@@ -640,61 +914,46 @@ export async function syncStoryboardBindingsFromPrompts(
   characterIds: number[]
   propIds: number[]
   targetAssets: Record<BindingTarget, TargetAssetJson[]>
+  poolAssets: PoolAssetJson[]
 }> {
-  const [storyboard] = await db.select().from(schema.storyboards)
-    .where(eq(schema.storyboards.id, storyboardId))
-  if (!storyboard) throw new Error('镜头不存在')
-  const assets = await loadEpisodeAssets(storyboard.episodeId)
-  const prompts = promptFieldsOf(storyboard)
-
-  const pool = await loadPool(storyboardId)
-  const sync = computeBindingSync({ prompts, assets, ...pool })
-  if (sync.changed) {
-    for (const item of sync.bound) {
-      if (item.kind === 'character') {
-        await db.insert(schema.storyboardCharacters).values({ storyboardId, characterId: item.id })
-      } else {
-        await db.insert(schema.storyboardProps).values({ storyboardId, propId: item.id })
+  // 读取当前提示词、手选、目标选版与写回之间不 await，避免并发选择/AI 保存丢更新。
+  return db.transaction(() => {
+    const storyboard = db.select().from(schema.storyboards)
+      .where(eq(schema.storyboards.id, storyboardId)).get()
+    if (!storyboard || storyboard.deletedAt) throw new Error('镜头不存在')
+    const assets = loadEpisodeAssetsSync(storyboard.episodeId)
+    const prompts = promptFieldsOf(storyboard)
+    const manual = loadManual(storyboardId)
+    const sync = computeBindingSync({ prompts, assets, manual, ...loadPool(storyboardId) })
+    const poolAssets = computePoolAssets(assets, manual, prompts)
+    if (sync.changed) writePoolSync(storyboardId, manual, sync.characterIds, sync.propIds)
+    const targetSync = computeTargetSync(prompts, assets, loadTargetBindingsSync(storyboardId), targetsOfFields(fields))
+    const ts = new Date().toISOString()
+    for (const plan of targetSync) {
+      for (const item of plan.add) {
+        db.insert(schema.storyboardTargetAssets).values({
+          storyboardId, target: plan.target, kind: item.kind, assetId: item.id, selectedImage: null, createdAt: ts,
+        }).onConflictDoNothing().run()
+      }
+      for (const item of plan.remove) {
+        db.delete(schema.storyboardTargetAssets).where(and(
+          eq(schema.storyboardTargetAssets.storyboardId, storyboardId),
+          eq(schema.storyboardTargetAssets.target, plan.target),
+          eq(schema.storyboardTargetAssets.kind, item.kind),
+          eq(schema.storyboardTargetAssets.assetId, item.id),
+        )).run()
       }
     }
-    for (const item of sync.unbound) {
-      if (item.kind === 'character') {
-        await db.delete(schema.storyboardCharacters)
-          .where(and(eq(schema.storyboardCharacters.storyboardId, storyboardId), eq(schema.storyboardCharacters.characterId, item.id)))
-      } else {
-        await db.delete(schema.storyboardProps)
-          .where(and(eq(schema.storyboardProps.storyboardId, storyboardId), eq(schema.storyboardProps.propId, item.id)))
-      }
+    const bindings = loadTargetBindingsSync(storyboardId)
+    return {
+      sync, targetSync,
+      issues: computeRefIssues({ prompts, assets, bindings }),
+      characterIds: sync.characterIds,
+      propIds: sync.propIds,
+      targetAssets: targetAssetsJson(assets, bindings),
+      poolAssets,
     }
-  }
-
-  const targetSync = computeTargetSync(prompts, assets, await loadTargetBindings(storyboardId), targetsOfFields(fields))
-  const ts = new Date().toISOString()
-  for (const plan of targetSync) {
-    for (const item of plan.add) {
-      await db.insert(schema.storyboardTargetAssets).values({
-        storyboardId, target: plan.target, kind: item.kind, assetId: item.id, selectedImage: null, createdAt: ts,
-      }).onConflictDoNothing()
-    }
-    for (const item of plan.remove) {
-      await db.delete(schema.storyboardTargetAssets).where(and(
-        eq(schema.storyboardTargetAssets.storyboardId, storyboardId),
-        eq(schema.storyboardTargetAssets.target, plan.target),
-        eq(schema.storyboardTargetAssets.kind, item.kind),
-        eq(schema.storyboardTargetAssets.assetId, item.id),
-      ))
-    }
-  }
-
-  const bindings = await loadTargetBindings(storyboardId)
-  return {
-    sync,
-    targetSync,
-    issues: computeRefIssues({ prompts, assets, bindings }),
-    characterIds: sync.characterIds,
-    propIds: sync.propIds,
-    targetAssets: targetAssetsJson(assets, bindings),
-  }
+  })
 }
 
 /** 给某个目标上已绑定的资产选版（image=null 恢复默认）；未绑定时抛错 */

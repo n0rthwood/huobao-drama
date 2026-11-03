@@ -22,7 +22,14 @@ import {
   startEpisodeKeyframeBatch,
   previewEpisodeKeyframeBatch,
 } from '../services/keyframe-batch.js'
-import { checkStoryboardRefs, loadEpisodeAssets, loadStoryboardTargetAssets } from '../services/storyboard-assets.js'
+import {
+  checkStoryboardRefs,
+  computePoolAssets,
+  loadEpisodeAssets,
+  loadEpisodeManualSelections,
+  loadStoryboardTargetAssets,
+  promptFieldsOf,
+} from '../services/storyboard-assets.js'
 import { parseFieldSavedAt } from '../services/storyboard-fields.js'
 import { lookupGeneratedAt } from '../services/media-time.js'
 import { parseTransitionReview, transitionInputSignature } from '../services/transition.js'
@@ -662,6 +669,8 @@ app.get('/:episode_id/storyboards', async (c) => {
   }
   const mediaGeneratedAt = await lookupGeneratedAt(mediaPaths)
   const episodeAssets = await loadEpisodeAssets(episodeId)
+  // 本镜资产池（Issue #43）：有效池 = 手选 ∪ 5 个提示词当前 @；整集手选一次查完
+  const manualSelections = await loadEpisodeManualSelections(rows.map(row => row.id))
   // 旁白状态由服务端算好（前端不自己推）：开关 + 文本 + 配音 + 合成签名
   const [narrationEpisode] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId))
   const episodeNarrationEnabled = narrationEpisode?.narrationEnabled === true
@@ -700,6 +709,7 @@ app.get('/:episode_id/storyboards', async (c) => {
     return {
       ...toSnakeCase(row),
       target_assets: await loadStoryboardTargetAssets(row, episodeAssets),
+      pool_assets: computePoolAssets(episodeAssets, manualSelections.get(row.id) || [], promptFieldsOf(row)),
       field_saved_at: parseFieldSavedAt(row.fieldSavedAt),
       ref_issues: [
         ...await checkStoryboardRefs(row, episodeAssets),

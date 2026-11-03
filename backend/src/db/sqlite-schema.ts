@@ -195,6 +195,16 @@ export const sqliteSchemaStatements = [
   )`,
   `CREATE INDEX IF NOT EXISTS idx_storyboard_props_prop_id ON storyboard_props (prop_id)`,
 
+  // 本镜资产池的人工手选（Issue #43）：kind ∈ scene|character|prop；@ 自动加入的资产不写表
+  `CREATE TABLE IF NOT EXISTS storyboard_pool_selections (
+    storyboard_id INTEGER NOT NULL,
+    kind TEXT NOT NULL,
+    asset_id INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (storyboard_id, kind, asset_id)
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_storyboard_pool_selections_asset ON storyboard_pool_selections (kind, asset_id)`,
+
   // 生成目标级素材绑定（Issue #18）：target ∈ first|mid|last|video，kind ∈ scene|character|prop
   `CREATE TABLE IF NOT EXISTS storyboard_target_assets (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -563,6 +573,14 @@ function cleanupStaleAssetLinks(sqlite: Database.Database): void {
       OR (kind = 'prop' AND asset_id NOT IN (SELECT id FROM props WHERE deleted_at IS NULL))`,
   ).run()
   if (targetRes.changes > 0) console.log(`🧹 清理 storyboard_target_assets 中失效的绑定 ${targetRes.changes} 条`)
+  // 资产池手选（Issue #43）：分镜被删或资产被删后，手选行不能继续让已删资产留在池里
+  const poolRes = sqlite.prepare(
+    `DELETE FROM storyboard_pool_selections WHERE storyboard_id NOT IN (SELECT id FROM storyboards WHERE deleted_at IS NULL)
+      OR (kind = 'scene' AND asset_id NOT IN (SELECT id FROM scenes WHERE deleted_at IS NULL))
+      OR (kind = 'character' AND asset_id NOT IN (SELECT id FROM characters WHERE deleted_at IS NULL))
+      OR (kind = 'prop' AND asset_id NOT IN (SELECT id FROM props WHERE deleted_at IS NULL))`,
+  ).run()
+  if (poolRes.changes > 0) console.log(`🧹 清理 storyboard_pool_selections 中失效的手选 ${poolRes.changes} 条`)
 }
 
 /** 生成目标 → 决定其绑定的提示词列（与 services/storyboard-assets.ts TARGET_PROMPT_FIELDS 同口径） */
@@ -625,6 +643,37 @@ function migrateStoryboardTargetAssets(sqlite: Database.Database): void {
     }
   })()
   console.log(`🧩 生成目标级素材绑定迁移：${storyboards.length} 个分镜，写入 ${rows} 条（继承分镜绑定）`)
+}
+
+/**
+ * 存量迁移（Issue #43）— 只在 storyboard_pool_selections 表首次创建时执行一次：
+ * 历史数据分不出哪条是手选、哪条是 @ 自动加入的，为了不丢用户已选内容，
+ * 保守地把每个未删除分镜现有的角色/道具关联与**主场景**都记为手选。
+ * 提示词里已有的 @ 不写进本表（随提示词实时推导），由启动时的
+ * `backfillPoolProjection()`（services/storyboard-assets.ts）补齐到角色/道具投影。
+ * 迁移不改提示词、不改主场景 scene_id、不动目标级绑定与选版、不碰关键帧/视频与确认状态。
+ */
+function migrateStoryboardPoolSelections(sqlite: Database.Database): void {
+  const ts = new Date().toISOString()
+  const insert = sqlite.prepare(
+    'INSERT OR IGNORE INTO storyboard_pool_selections (storyboard_id, kind, asset_id, created_at) VALUES (?, ?, ?, ?)',
+  )
+  let rows = 0
+  const migrate = sqlite.transaction(() => {
+    const storyboards = sqlite.prepare(
+      'SELECT id, scene_id FROM storyboards WHERE deleted_at IS NULL',
+    ).all() as Array<{ id: number; scene_id: number | null }>
+    const charsOf = sqlite.prepare('SELECT character_id AS id FROM storyboard_characters WHERE storyboard_id = ?')
+    const propsOf = sqlite.prepare('SELECT prop_id AS id FROM storyboard_props WHERE storyboard_id = ?')
+    for (const sb of storyboards) {
+      if (sb.scene_id != null) rows += insert.run(sb.id, 'scene', sb.scene_id, ts).changes
+      for (const row of charsOf.all(sb.id) as { id: number }[]) rows += insert.run(sb.id, 'character', row.id, ts).changes
+      for (const row of propsOf.all(sb.id) as { id: number }[]) rows += insert.run(sb.id, 'prop', row.id, ts).changes
+    }
+    return storyboards.length
+  })
+  const count = migrate()
+  console.log(`🧩 本镜资产池手选迁移：${count} 个分镜，写入 ${rows} 条（历史关联与主场景保留为手选）`)
 }
 
 /**
@@ -716,6 +765,10 @@ export function initSqliteSchema(sqlite: Database.Database) {
   const hadTargetAssets = !!sqlite.prepare(
     "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'storyboard_target_assets'",
   ).get()
+  // 资产池手选表是否已存在：不存在说明是首次升级到 #43，需要一次性把历史关联与主场景记为手选
+  const hadPoolSelections = !!sqlite.prepare(
+    "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'storyboard_pool_selections'",
+  ).get()
   for (const statement of sqliteSchemaStatements) {
     sqlite.exec(statement)
   }
@@ -724,6 +777,7 @@ export function initSqliteSchema(sqlite: Database.Database) {
   sqlite.exec('CREATE INDEX IF NOT EXISTS idx_sys_task_episode_id ON sys_task (episode_id)')
   // 先迁移（要读 asset_version_selection）再删列
   if (!hadTargetAssets) migrateStoryboardTargetAssets(sqlite)
+  if (!hadPoolSelections) migrateStoryboardPoolSelections(sqlite)
   applyColumnRemovals(sqlite)
   cleanupStaleAssetLinks(sqlite)
   const insertSeed = sqlite.prepare(SEED_SQL)

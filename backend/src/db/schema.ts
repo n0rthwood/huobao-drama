@@ -220,6 +220,20 @@ export const storyboardProps = sqliteTable('storyboard_props', {
 ])
 
 /**
+ * 本镜资产池的人工手选（Issue #43）：只记录用户手选与拆镜/人工显式绑定的资产。
+ * 有效池 = 本表 ∪ 5 个提示词当前 @ 到的本集资产；@ 自动加入的资产不写表，
+ * 删掉最后一处引用即自动退出，手选始终保留。场景可多选，且不改写 storyboards.scene_id。
+ */
+export const storyboardPoolSelections = sqliteTable('storyboard_pool_selections', {
+  storyboardId: integer('storyboard_id').notNull(),
+  kind: text('kind').notNull(),
+  assetId: integer('asset_id').notNull(),
+  createdAt: text('created_at').notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.storyboardId, table.kind, table.assetId] }),
+])
+
+/**
  * 生成目标级素材绑定（Issue #18）：每张关键帧（first/mid/last）与视频（video）各自的参考素材。
  * 绑定 = 该目标提示词里 @ 到的本集场景/角色/道具，提示词写入后自动重算；
  * selected_image 为该目标上的人工选版，NULL = 默认（本集造型图 > 资产当前图）。

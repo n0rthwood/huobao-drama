@@ -11,40 +11,15 @@ import { now } from '../../utils/response.js'
 import { logTaskProgress, logTaskSuccess } from '../../utils/task-logger.js'
 import { getDramaId, getEpisodeId, getStoryboardId } from '../context.js'
 import { loadEpisodeKeyframes } from '../../services/keyframes.js'
-import { PROMPT_FIELDS, deleteTargetBindings, syncStoryboardBindingsFromPrompts } from '../../services/storyboard-assets.js'
+import {
+  PROMPT_FIELDS,
+  applyExplicitBindings,
+  deletePoolSelections,
+  deleteTargetBindings,
+  syncStoryboardBindingsFromPrompts,
+} from '../../services/storyboard-assets.js'
 import { parseReferenceImages, referenceImagePaths } from '../../services/reference-images.js'
 import { stampFieldSavedAt } from '../../services/storyboard-fields.js'
-
-async function syncStoryboardCharacters(storyboardId: number, characterIds: number[]) {
-  await db.delete(schema.storyboardCharacters)
-    .where(eq(schema.storyboardCharacters.storyboardId, storyboardId))
-
-
-  const uniqueIds = [...new Set(characterIds.filter(Boolean))]
-  if (!uniqueIds.length) return
-
-  for (const characterId of uniqueIds) {
-    await db.insert(schema.storyboardCharacters).values({
-      storyboardId,
-      characterId,
-    })
-  }
-}
-
-async function syncStoryboardProps(storyboardId: number, propIds: number[]) {
-  await db.delete(schema.storyboardProps)
-    .where(eq(schema.storyboardProps.storyboardId, storyboardId))
-
-  const uniqueIds = [...new Set(propIds.filter(Boolean))]
-  if (!uniqueIds.length) return
-
-  for (const propId of uniqueIds) {
-    await db.insert(schema.storyboardProps).values({
-      storyboardId,
-      propId,
-    })
-  }
-}
 
 async function getEpisodeSceneIds(episodeId: number) {
   const links = await db.select().from(schema.episodeScenes)
@@ -294,11 +269,8 @@ const saveStoryboards = createTool({
       const existingStoryboardRows = await db.select().from(schema.storyboards)
         .where(eq(schema.storyboards.episodeId, episodeId))
       for (const storyboardId of existingStoryboardRows.map(sb => sb.id)) {
-        await db.delete(schema.storyboardCharacters)
-          .where(eq(schema.storyboardCharacters.storyboardId, storyboardId))
-        await db.delete(schema.storyboardProps)
-          .where(eq(schema.storyboardProps.storyboardId, storyboardId))
         await deleteTargetBindings({ storyboardId })
+        await deletePoolSelections({ storyboardId })
       }
       await db.delete(schema.storyboards).where(eq(schema.storyboards.episodeId, episodeId))
     }
@@ -330,8 +302,12 @@ const saveStoryboards = createTool({
           continuityBoundary: sb.continuity,
           updatedAt: ts,
         }).where(eq(schema.storyboards.id, existingId))
-        await syncStoryboardCharacters(existingId, sb.character_ids || [])
-        await syncStoryboardProps(existingId, sb.prop_ids || [])
+        // 拆镜显式传入的绑定 = 手选；提示词里的 @ 另由 syncStoryboardBindingsFromPrompts 自动进池
+        await applyExplicitBindings(existingId, {
+          characterIds: sb.character_ids || [],
+          propIds: sb.prop_ids || [],
+          sceneId: sb.scene_id ?? null,
+        })
       } else {
         const res = await db.insert(schema.storyboards).values({
           episodeId,
@@ -353,8 +329,11 @@ const saveStoryboards = createTool({
         })
         const newId = getInsertId(res)
         shotToId.set(sb.shot_number, newId)
-        await syncStoryboardCharacters(newId, sb.character_ids || [])
-        await syncStoryboardProps(newId, sb.prop_ids || [])
+        await applyExplicitBindings(newId, {
+          characterIds: sb.character_ids || [],
+          propIds: sb.prop_ids || [],
+          sceneId: sb.scene_id ?? null,
+        })
       }
       // 关键帧/视频提示词写入后：打字段保存时间 + 绑定跟随 @引用（LLM 不必自己传 ids）
       const savedId = existingId ?? shotToId.get(sb.shot_number)!
@@ -481,9 +460,15 @@ const updateStoryboard = createTool({
     const stamp = stampFieldSavedAt(storyboard.fieldSavedAt, Object.keys(fields))
     if (stamp.json) updates.fieldSavedAt = stamp.json
     await db.update(schema.storyboards).set(updates).where(eq(schema.storyboards.id, storyboard_id))
-    if ('character_ids' in fields) await syncStoryboardCharacters(storyboard_id, fields.character_ids || [])
-    if ('prop_ids' in fields) await syncStoryboardProps(storyboard_id, fields.prop_ids || [])
-    // 提示词被写入时：资产池跟随 @ 并集（显式传入的 ids 以提示词为准被覆盖），写入的目标按各自 @ 重算
+    if ('character_ids' in fields || 'prop_ids' in fields || ('scene_id' in fields && fields.scene_id != null)) {
+      // 显式传入的绑定 = 手选（Issue #43）；只替换传入类别，主场景只增不减
+      await applyExplicitBindings(storyboard_id, {
+        characterIds: 'character_ids' in fields ? fields.character_ids || [] : undefined,
+        propIds: 'prop_ids' in fields ? fields.prop_ids || [] : undefined,
+        sceneId: 'scene_id' in fields ? fields.scene_id ?? null : null,
+      })
+    }
+    // 提示词被写入时：有效池 = 手选 ∪ 5 个提示词的 @，写入的目标按各自 @ 重算
     if (PROMPT_FIELDS.some(field => field in fields)) {
       await syncStoryboardBindingsFromPrompts(storyboard_id, Object.keys(fields))
     }
