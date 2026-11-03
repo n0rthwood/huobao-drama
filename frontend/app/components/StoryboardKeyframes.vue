@@ -339,7 +339,27 @@
             </div>
           </section>
 
-          <section v-for="slot in SLOT_KEYS" :key="slot" class="kf-section kf-slot-card">
+          <!-- 由片段渲染（#50）：map_anim / archival 且本镜有整镜替代片段时，三槽位不出图 -->
+          <section v-if="clipPlaceholder(selected)" class="kf-section kf-clip-placeholder">
+            <div class="kf-section-head">
+              <span class="kf-section-label">{{ t('episode.intent.clipRendered') }}</span>
+              <span class="dim" style="font-size:11px">{{ t('episode.clip.keyframeReplaced') }}</span>
+              <span class="ml-auto" />
+              <button type="button" class="btn btn-sm" @click="emit('goto-clip', selected)">{{ t('episode.clip.gotoEditor') }}</button>
+            </div>
+            <div class="kf-clip-thumbs">
+              <button
+                v-for="which in ['first', 'last']" :key="which"
+                type="button" class="kf-clip-thumb" :style="{ aspectRatio: previewAspect }"
+                @click="emit('goto-clip', selected)"
+              >
+                <img v-if="clipThumbUrl(selected, which)" :src="clipThumbUrl(selected, which)" loading="lazy" :alt="t(`episode.clip.thumb.${which}`)">
+                <span class="kf-clip-thumb-tag">{{ t(`episode.clip.thumb.${which}`) }}</span>
+              </button>
+            </div>
+          </section>
+
+          <section v-for="slot in (clipPlaceholder(selected) ? [] : SLOT_KEYS)" :key="slot" class="kf-section kf-slot-card">
             <div class="kf-section-head">
               <span class="kf-section-label">{{ slotLabel(slot) }}</span>
               <span v-if="slot === 'first' && kf(selected).inheritsFirst" class="kf-inherit-tag">{{ t('episode.kf.inheritedFirst', { n: shotNumberOf(previousOf(selected)) }) }}</span>
@@ -635,10 +655,13 @@ const props = defineProps({
   episodeNormalize: { type: Boolean, default: true },
   narrationBatch: { type: Object, default: () => ({ running: false, total: 0, completed: 0 }) },
   narrationVoiceBatch: { type: Object, default: () => ({ running: false, total: 0, completed: 0 }) },
+  // 确定性片段（#50）：(sb) => 本镜片段或 null；(sb, 'first'|'last') => 首/末帧缩略图 URL
+  clipOf: { type: Function, default: () => null },
+  clipThumbnail: { type: Function, default: () => '' },
 })
 const emit = defineEmits([
   'break', 'refresh', 'preview', 'goto-assets', 'open-asset', 'update-field', 'field-dirty',
-  'batch-narration', 'batch-narration-voice', 'open-narration-settings',
+  'batch-narration', 'batch-narration-voice', 'open-narration-settings', 'goto-clip',
 ])
 
 // 槽位预览图按剧集画幅完整显示（CSS aspect-ratio 语法用 /）
@@ -737,6 +760,13 @@ function deviceLabelOf(sb) {
 }
 function clipRendered(sb) {
   return CLIP_RENDERED_DEVICES.includes(intentOf(sb)?.device)
+}
+/** 整镜由确定性片段替代（#50）：三槽位改为「由片段渲染」占位，不出生图入口 */
+function clipPlaceholder(sb) {
+  return clipRendered(sb) && props.clipOf(sb)?.position === 'replace'
+}
+function clipThumbUrl(sb, which) {
+  return props.clipThumbnail(sb, which) || ''
 }
 /** 有表达设计但人还没确认：表达设计页去确认（生成不拦截） */
 function intentUnreviewed(sb) {
@@ -1759,4 +1789,9 @@ onBeforeUnmount(() => {
 }
 .kf-intent-warn { font-size: 11px; color: var(--tag-warning-text); }
 .kf-clip-rendered { font-size: 11px; color: var(--text-3); }
+.kf-clip-placeholder { display: flex; flex-direction: column; gap: 8px; }
+.kf-clip-thumbs { display: flex; gap: 10px; flex-wrap: wrap; }
+.kf-clip-thumb { position: relative; flex: 1; min-width: 160px; max-width: 280px; padding: 0; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; background: var(--bg-3); cursor: pointer; }
+.kf-clip-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.kf-clip-thumb-tag { position: absolute; left: 4px; bottom: 4px; font-size: 10px; padding: 1px 4px; border-radius: 4px; background: rgba(0, 0, 0, 0.55); color: #fff; }
 </style>

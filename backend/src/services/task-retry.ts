@@ -16,6 +16,7 @@ import { getActiveConfig, getConfigById, validateVideoModel, type AIConfig } fro
 import { getVideoAdapter } from './adapters/registry.js'
 import { generateImage, generateVideo } from './generation.js'
 import { renderRefPrompt } from './task-center.js'
+import { CLIP_PROVIDER, clipPositionOfTask, startClipRenderTask } from './clip-task.js'
 import {
   createTextTask,
   findLatestTextTask,
@@ -240,6 +241,12 @@ export async function retryTask(taskId: number, opts: RetryOptions): Promise<num
   const [row] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, taskId))
   if (!row) throw new Error('任务不存在')
   if (row.type === 'image') return retryImage(row, opts)
+  // 确定性片段（#50）不是模型任务：重试 = 用库里当前的图层/时间线重渲染，
+  // 绝不进视频 provider/模型校验，也不需要 config_id
+  if (row.type === 'video' && row.provider === CLIP_PROVIDER) {
+    if (!row.storyboardId) throw new Error('片段任务缺少分镜 id，无法重渲染')
+    return startClipRenderTask(row.storyboardId, clipPositionOfTask(row.params))
+  }
   if (row.type === 'video') return retryVideo(row, opts)
   if (row.type === 'text') return retryText(row, opts)
   throw new Error(`不支持重试的任务类型：${row.type}`)

@@ -39,10 +39,21 @@ import {
   narrationStatus,
   parseNarrationMeta,
   sha256,
+  type ComposeClipPart,
   type ComposeInputParts,
   type NarrationMeta,
   type NarrationStatus,
 } from './narration.js'
+import {
+  PERSISTED_CLIP_POSITIONS,
+  clipIsFresh,
+  clipsByStoryboard,
+  listStoryboardClips,
+  resolveEpisodeClipSpec,
+  type ClipSpec,
+  type StoryboardClip,
+} from './storyboard-clips.js'
+import { MAX_CLIP_SECONDS } from './clip-timeline.js'
 import { findActiveTextTask, parseTextTaskParams } from './text-task.js'
 
 export type StoryboardRow = typeof schema.storyboards.$inferSelect
@@ -51,8 +62,11 @@ export type EpisodeRow = typeof schema.episodes.$inferSelect
 /**
  * 输入快照格式版本。
  * 1 = #30/#31 的无版本签名（不含生效 T，匹配参数键口径也不同）→ 一律判 unknown。
+ * 2 = #42：video/audio/subtitle/burned/text/fit/T。
+ * 3 = #50：追加三个确定性片段（replace/pre/post 的路径 + 渲染签名）。
+ *     存量 v2 成片在预览里显示「已变化·签名版本」，与 #42 升级时的处理一致，不自动重合成。
  */
-export const COMPOSE_SIGNATURE_VERSION = 2
+export const COMPOSE_SIGNATURE_VERSION = 3
 
 export type ComposeStateStatus =
   | 'disabled'
@@ -97,9 +111,31 @@ export function toAbsPath(relativePath: string): string {
   return path.join(STORAGE_ROOT, relativePath)
 }
 
+/** 快照里的三个片段分项与界面文案（顺序即展示顺序） */
+const CLIP_PART_LABELS: Array<['replace_clip' | 'pre_clip' | 'post_clip', string]> = [
+  ['replace_clip', '整镜替代'],
+  ['pre_clip', '片头'],
+  ['post_clip', '片尾'],
+]
+
+/** 片段分项的稳定串：没有片段为空串，有片段时路径与渲染签名都参与 */
+function clipKey(part: ComposeClipPart | null | undefined): string {
+  return part ? `${part.src}@${part.signature}` : ''
+}
+
+/**
+ * 本镜快照的**生效版本**：没有任何确定性片段的镜头仍然按 v2 口径签名，
+ * 这样 #50 上线不会把所有存量项目的成片一次性判成「已变化」。
+ * 只有真的挂了片段的镜头才升到 v3（版本号 + 三个片段分项一起进摘要）。
+ */
+export function composeSignatureVersionOf(parts: ComposeInputParts): number {
+  return parts.replace_clip || parts.pre_clip || parts.post_clip ? COMPOSE_SIGNATURE_VERSION : 2
+}
+
 export function composeSignatureOf(parts: ComposeInputParts): string {
-  return sha256([
-    `v${COMPOSE_SIGNATURE_VERSION}`,
+  const version = composeSignatureVersionOf(parts)
+  const fields = [
+    `v${version}`,
     parts.video_src,
     parts.audio_src || '',
     parts.subtitle_src || '',
@@ -107,7 +143,10 @@ export function composeSignatureOf(parts: ComposeInputParts): string {
     parts.text_sha256,
     parts.fit_key,
     parts.transition_t.toFixed(3),
-  ].join('\u0000'))
+  ]
+  // v2 的摘要输入必须一个字节都不变：多拼三个空串也会换摘要
+  if (version >= 3) fields.push(clipKey(parts.replace_clip), clipKey(parts.pre_clip), clipKey(parts.post_clip))
+  return sha256(fields.join('\u0000'))
 }
 
 /** 逐项对比两份快照，给出人能看懂的变化原因 */
@@ -126,6 +165,11 @@ export function describeComposeDiff(current: ComposeInputParts, previous: Compos
   if (Math.abs(current.transition_t - previous.transition_t) > 1e-3) {
     reasons.push(`生效的转场偏移已变化（${previous.transition_t} 秒 → ${current.transition_t} 秒）`)
   }
+  const clipChanges: string[] = []
+  for (const [position, label] of CLIP_PART_LABELS) {
+    if (clipKey(current[position]) !== clipKey(previous[position])) clipChanges.push(label)
+  }
+  if (clipChanges.length) reasons.push(`确定性片段已变化（${clipChanges.join('、')}）`)
   if (!reasons.length) reasons.push('输入快照与上次合成不一致')
   return reasons
 }
@@ -238,7 +282,14 @@ export interface ComposeAssembly {
   ep: EpisodeRow
   /** 本镜是否混入旁白（纯画面镜头为 false） */
   wantsNarration: boolean
+  /**
+   * 真正进滤镜链的画面：`replace` 镜头是片段文件，其余是模型视频。
+   * 有 pre/post 片段时 `shot-compose` 会先把三段 concat 成「全镜视频」再走滤镜链。
+   */
   videoAbs: string
+  /** 模型视频之前 / 之后的确定性片段（绝对路径）；没有为 null */
+  preClipAbs: string | null
+  postClipAbs: string | null
   audioAbs: string | null
   subtitleAbs: string | null
   dv: number
@@ -264,29 +315,93 @@ function subtitleCueCount(absPath: string): number | null {
   }
 }
 
+/** 一镜的确定性片段现状：三个位置各一条 + 各自「渲染产物是否仍对得上当前输入」 */
+export interface ClipComposeContext {
+  clips: { replace: StoryboardClip | null; pre: StoryboardClip | null; post: StoryboardClip | null }
+  fresh: { replace: boolean; pre: boolean; post: boolean }
+}
+
+const EMPTY_CLIP_CONTEXT: ClipComposeContext = {
+  clips: { replace: null, pre: null, post: null },
+  fresh: { replace: false, pre: false, post: false },
+}
+
+function clipContextOf(clips: StoryboardClip[], spec: ClipSpec): ClipComposeContext {
+  const context: ClipComposeContext = {
+    clips: {
+      replace: clips.find(clip => clip.position === 'replace') ?? null,
+      pre: clips.find(clip => clip.position === 'pre') ?? null,
+      post: clips.find(clip => clip.position === 'post') ?? null,
+    },
+    fresh: { replace: false, pre: false, post: false },
+  }
+  for (const position of PERSISTED_CLIP_POSITIONS) {
+    const clip = context.clips[position]
+    context.fresh[position] = clip ? clipIsFresh(clip, spec) : false
+  }
+  return context
+}
+
+/** 单镜（单镜合成/提交走这条） */
+export async function loadClipComposeContext(sb: StoryboardRow): Promise<ClipComposeContext> {
+  const clips = await listStoryboardClips(sb.id)
+  if (!clips.length) return EMPTY_CLIP_CONTEXT
+  return clipContextOf(clips, await resolveEpisodeClipSpec(sb.episodeId))
+}
+
+/** 整集一次查完：批量预览不能每镜各发一次查询 */
+export async function loadClipComposeContexts(
+  episodeId: number,
+  rows: StoryboardRow[],
+): Promise<Map<number, ClipComposeContext>> {
+  const byStoryboard = await clipsByStoryboard(rows.map(row => row.id))
+  const out = new Map<number, ClipComposeContext>()
+  if (!byStoryboard.size) return out
+  const spec = await resolveEpisodeClipSpec(episodeId)
+  for (const [storyboardId, clips] of byStoryboard) out.set(storyboardId, clipContextOf(clips, spec))
+  return out
+}
+
 /**
  * 组装一镜的合成输入并逐项校验依赖。失败时返回可直接展示的中文原因，
  * 时长规则不满足时额外带上结构化的 ComposeBlockedError（路由原样透出字段）。
+ *
+ * 确定性片段（#50）：`replace` 的片段**取代**模型视频（本镜可以根本没有模型视频），
+ * `pre`/`post` 夹在模型视频前后、`dv` = 三段之和。片段必须已渲染且渲染签名与当前
+ * 图层/时间线一致，否则阻断并提示重渲染——绝不拿过期的片段去合成。
  */
 export async function inspectComposeInputs(
   sb: StoryboardRow,
   ep: EpisodeRow,
   transition: TransitionT,
+  clipContext?: ClipComposeContext,
 ): Promise<ComposeInspection> {
   const shot = `分镜 #${sb.storyboardNumber}`
   const wantsNarration = sb.narrationEnabled !== false
   const text = (sb.narrationText || '').trim()
   const meta: NarrationMeta = parseNarrationMeta(sb.narrationMeta)
 
-  const videoAbs = sb.videoUrl ? toAbsPath(sb.videoUrl) : null
-  const videoFacts = videoAbs ? await mediaFacts(videoAbs) : null
+  const context = clipContext ?? await loadClipComposeContext(sb)
+  const replaceClip = context.clips.replace
+  const preClip = context.clips.pre
+  const postClip = context.clips.post
+
+  const modelVideoAbs = sb.videoUrl ? toAbsPath(sb.videoUrl) : null
+  const modelFacts = modelVideoAbs ? await mediaFacts(modelVideoAbs) : null
+  const replaceAbs = replaceClip?.render_path ? toAbsPath(replaceClip.render_path) : null
+  const replaceFacts = replaceAbs ? await mediaFacts(replaceAbs) : null
+  const preAbs = preClip?.render_path ? toAbsPath(preClip.render_path) : null
+  const preFacts = preAbs ? await mediaFacts(preAbs) : null
+  const postAbs = postClip?.render_path ? toAbsPath(postClip.render_path) : null
+  const postFacts = postAbs ? await mediaFacts(postAbs) : null
+
   const audioAbs = wantsNarration && sb.narrationAudioUrl ? toAbsPath(sb.narrationAudioUrl) : null
   const audioFacts = audioAbs ? await mediaFacts(audioAbs) : null
   const subtitleAbs = wantsNarration && sb.subtitleUrl ? toAbsPath(sb.subtitleUrl) : null
   const cues = subtitleAbs ? subtitleCueCount(subtitleAbs) : null
 
   const inputs: ComposeInputAvailability = {
-    video: Boolean(videoFacts),
+    video: Boolean(replaceClip ? replaceFacts : modelFacts),
     audio: Boolean(audioFacts),
     subtitle: Boolean(cues),
     pure_visual: !wantsNarration,
@@ -294,8 +409,23 @@ export async function inspectComposeInputs(
   const fail = (reason: string, blocked: ComposeBlockedError | null = null): ComposeInspection =>
     ({ ok: false, reason, blocked, inputs })
 
-  if (!sb.videoUrl) return fail(`${shot} 还没有生成视频`)
-  if (!videoFacts) return fail(`${shot} 的视频文件不存在或无法读取：${sb.videoUrl}`)
+  if (replaceClip) {
+    if (!replaceClip.render_path) return fail(`${shot} 的确定性片段还没有渲染，请先渲染片段`)
+    if (!replaceFacts) return fail(`${shot} 的片段文件不存在或无法读取：${replaceClip.render_path}`)
+    if (!context.fresh.replace) return fail(`${shot} 的图层或时间线改过了，请重新渲染片段`)
+  } else {
+    if (!sb.videoUrl) return fail(`${shot} 还没有生成视频`)
+    if (!modelFacts) return fail(`${shot} 的视频文件不存在或无法读取：${sb.videoUrl}`)
+  }
+  for (const [clip, facts, fresh, label] of [
+    [preClip, preFacts, context.fresh.pre, '片头'] as const,
+    [postClip, postFacts, context.fresh.post, '片尾'] as const,
+  ]) {
+    if (!clip) continue
+    if (!clip.render_path) return fail(`${shot} 的${label}确定性片段还没有渲染，请先渲染片段`)
+    if (!facts) return fail(`${shot} 的${label}片段文件不存在或无法读取：${clip.render_path}`)
+    if (!fresh) return fail(`${shot} 的${label}片段图层或时间线改过了，请重新渲染片段`)
+  }
 
   if (wantsNarration) {
     if (!text) return fail(`${shot} 还没有写旁白：请先写旁白，或把本镜明确标记为纯画面`)
@@ -307,33 +437,44 @@ export async function inspectComposeInputs(
     if (cues === 0) return fail(`${shot} 的字幕文件里没有任何字幕行：请重新生成字幕`)
   }
 
-  const dv = videoFacts.durationMs / 1000
+  // dv：replace = 片段时长；否则 = 片头 + 模型视频 + 片尾（实测相加，concat 后与此一致）
+  const mainFacts = replaceClip ? replaceFacts! : modelFacts!
+  const dv = (mainFacts.durationMs + (preFacts?.durationMs ?? 0) + (postFacts?.durationMs ?? 0)) / 1000
   const da = audioFacts ? audioFacts.durationMs / 1000 : null
   // 纯画面镜头不做偏移（planCompose 的无旁白分支原样输出画面），T 对产出无影响
   const t = wantsNarration ? transition.t : 0
+  // 用户确认 Q5：整镜替代的确定性片段上限 30 秒，含模型视频的镜头仍是 15 秒
+  const maxSeconds = replaceClip ? MAX_CLIP_SECONDS : MAX_SHOT_SECONDS
   const fit = resolveComposeFit({
     episodeDefault: ep.narrationFitDefault,
     shotFit: sb.narrationFit,
     episodeMixMode: ep.audioMixMode,
     episodeBedGainDb: ep.audioBedGainDb,
     da,
-    availSeconds: Math.max(0, Math.min(dv, MAX_SHOT_SECONDS) - t),
-    videoHasAudio: videoFacts.hasAudio,
+    availSeconds: Math.max(0, Math.min(dv, maxSeconds) - t),
+    videoHasAudio: Boolean(mainFacts.hasAudio),
   })
-  const plan = planCompose({ dv, da, t, fit })
+  const plan = planCompose({ dv, da, t, fit, maxSeconds })
   if (plan.blocked) {
     const blocked = new ComposeBlockedError(plan, sb.storyboardNumber)
     return fail(blocked.message, blocked)
   }
 
+  const clipPart = (clip: StoryboardClip | null): ComposeClipPart | null =>
+    (clip?.render_path && clip.render_signature
+      ? { src: clip.render_path, signature: clip.render_signature }
+      : null)
   const parts: ComposeInputParts = {
-    video_src: sb.videoUrl,
+    video_src: replaceClip?.render_path ?? sb.videoUrl!,
     audio_src: audioAbs ? sb.narrationAudioUrl : null,
     subtitle_src: wantsNarration ? sb.subtitleUrl : null,
     burned: wantsNarration,
     text_sha256: sha256(wantsNarration ? text : ''),
     fit_key: fit.key,
     transition_t: Math.round(t * 1000) / 1000,
+    replace_clip: clipPart(replaceClip),
+    pre_clip: clipPart(preClip),
+    post_clip: clipPart(postClip),
   }
 
   return {
@@ -343,7 +484,9 @@ export async function inspectComposeInputs(
       sb,
       ep,
       wantsNarration,
-      videoAbs: videoAbs!,
+      videoAbs: replaceClip ? replaceAbs! : modelVideoAbs!,
+      preClipAbs: preAbs,
+      postClipAbs: postAbs,
       audioAbs,
       subtitleAbs,
       dv,
@@ -459,7 +602,21 @@ function deriveComposeState(
       change_reasons: [],
     }
   }
-  if (composed.signature_version !== COMPOSE_SIGNATURE_VERSION || !composed.inputs) {
+  if (!composed.inputs) {
+    // v1（#30/#31）根本没存分项，无从比较
+    return {
+      ...ready,
+      status: 'unknown',
+      checked: false,
+      exportable: false,
+      reason: '这条成片由旧版本合成（没有输入快照），无法与当前输入逐项比较：请重新合成以确认最新',
+      change_reasons: [],
+    }
+  }
+  // 版本号不再单独做闸门：签名本身已经带 `v<生效版本>`，而生效版本随「本镜有没有片段」
+  // 变化（无片段恒为 v2）。所以无片段的存量成片升级到 #50 之后签名完全不变，仍判 unchanged；
+  // 真的挂上片段的那一镜才会因为版本与片段分项一起变而判 changed。
+  if (composed.signature_version !== undefined && composed.signature_version < 2) {
     return {
       ...ready,
       status: 'unknown',
@@ -520,10 +677,16 @@ export async function composeStatesForEpisode(
 
   const transitions = await resolveTransitionTs(rows)
   const active = await activeComposeStoryboardIds(episodeId)
+  const clipContexts = await loadClipComposeContexts(episodeId, rows)
 
   const items: ComposeStateItem[] = []
   for (const sb of rows) {
-    const inspection = await inspectComposeInputs(sb, episode, transitions.get(sb.id) ?? { t: 0, source: 'none' })
+    const inspection = await inspectComposeInputs(
+      sb,
+      episode,
+      transitions.get(sb.id) ?? { t: 0, source: 'none' },
+      clipContexts.get(sb.id) ?? EMPTY_CLIP_CONTEXT,
+    )
     items.push(deriveComposeState(sb, inspection, active.get(sb.id) ?? null))
   }
   return items

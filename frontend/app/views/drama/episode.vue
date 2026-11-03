@@ -648,15 +648,13 @@
             @refresh="refresh"
           />
 
-          <!-- Sub: 图层（纪录片，Issue #48 落地前的占位说明） -->
+          <!-- Sub: 片段工作台（纪录片，Issue #50 确定性片段：图层 + 时间线 + 渲染） -->
           <div v-if="prodTab === 'layers'" class="prod-content">
-            <div class="step-empty" style="flex:1">
-              <div class="empty-visual">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
-              </div>
-              <div class="empty-title">{{ t('episode.prod.layers') }}</div>
-              <div class="empty-desc">{{ t('episode.prod.layersPlaceholder') }}</div>
-            </div>
+            <ClipWorkspace
+              :storyboards="sbs"
+              :focus-storyboard-id="clipFocusSbId"
+              @changed="loadEpisodeClips"
+            />
           </div>
 
           <!-- Sub: Storyboard Keyframes（拆分分镜 + 首/中/尾关键帧生成与人工确认） -->
@@ -687,10 +685,13 @@
             :episode-normalize="episodeNarrationNormalize"
             :narration-batch="narrationBatch"
             :narration-voice-batch="narrationVoiceBatch"
+            :clip-of="clipOfShot"
+            :clip-thumbnail="clipThumbnailUrl"
             @break="doBreakdown"
             @refresh="refresh"
             @preview="openImageViewer"
             @goto-assets="prodTab = 'assets'"
+            @goto-clip="gotoClipWorkspace"
             @open-asset="openPoolAssetDetail"
             @update-field="updateField"
             @field-dirty="markFieldDirty"
@@ -870,6 +871,16 @@
                     </div>
                   </div>
                   <button
+                    v-if="isDeterministicShot(task.storyboard)"
+                    class="btn btn-icon btn-sm video-task-action"
+                    :title="t('episode.clip.render')"
+                    :disabled="clipRenderingIds.includes(task.storyboard.id) || !clipOfShot(task.storyboard)"
+                    @click.stop="renderShotClip(task.storyboard)"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/></svg>
+                  </button>
+                  <button
+                    v-else
                     class="btn btn-icon btn-sm video-task-action"
                     :title="videoBlockIssues(task.storyboard).length
                       ? t('episode.ref.videoBlocked', { reason: videoBlockReason(task.storyboard) })
@@ -962,7 +973,16 @@
                           <div class="video-player-empty-desc">{{ videoTaskState(selectedSb) === 'pending' ? t('episode.vid.emptyGeneratingDesc') : t('episode.vid.emptyNoVideoDesc') }}</div>
                         </div>
                         <button
-                          v-if="videoTaskState(selectedSb) !== 'pending'"
+                          v-if="isDeterministicShot(selectedSb)"
+                          class="btn btn-primary btn-sm video-player-empty-action"
+                          :disabled="clipRenderingIds.includes(selectedSb.id) || !clipOfShot(selectedSb)"
+                          :title="clipOfShot(selectedSb) ? undefined : t('episode.clip.cardNoClip')"
+                          @click="renderShotClip(selectedSb)"
+                        >
+                          {{ clipRenderingIds.includes(selectedSb.id) ? t('episode.clip.rendering') : t('episode.clip.render') }}
+                        </button>
+                        <button
+                          v-else-if="videoTaskState(selectedSb) !== 'pending'"
                           class="btn btn-primary btn-sm video-player-empty-action"
                           :disabled="!isShotConfirmed(selectedSb) || videoBlockIssues(selectedSb).length > 0"
                           :title="videoBlockIssues(selectedSb).length
@@ -975,6 +995,16 @@
                       </div>
                     </div>
                   </aside>
+
+                  <!-- 确定性片段（#50）：本镜成片来自片段渲染，不是模型生成 -->
+                  <ClipCard
+                    v-if="isDeterministicShot(selectedSb)"
+                    :clip="clipOfShot(selectedSb)"
+                    :position="clipPositionOf(selectedSb)"
+                    :rendering="clipRenderingIds.includes(selectedSb.id)"
+                    @edit="gotoClipWorkspace(selectedSb)"
+                    @render="renderShotClip(selectedSb)"
+                  />
 
                   <div v-if="sbVideoHistory.length" class="video-player-history">
                     <div class="video-player-history-head">
@@ -2268,7 +2298,7 @@ import {
   Users, FileText, FolderKanban, Clapperboard, Download, Loader2, Images,
   Image as ImageIcon, Plus, X, Trash2, CircleHelp, ChevronRight, Layers, Lightbulb,
 } from 'lucide-vue-next'
-import { api, dramaAPI, episodeAPI, storyboardAPI, characterAPI, sceneAPI, propAPI, taskAPI, mergeAPI, posterAPI, aiConfigAPI, uploadAPI, mediaLibraryAPI, videoQueueAPI, assetBatchAPI } from '~/composables/useApi'
+import { api, dramaAPI, episodeAPI, storyboardAPI, characterAPI, sceneAPI, propAPI, taskAPI, mergeAPI, posterAPI, aiConfigAPI, uploadAPI, mediaLibraryAPI, videoQueueAPI, assetBatchAPI, clipAPI } from '~/composables/useApi'
 import { startTour, autoTour } from '~/composables/useTour'
 import { useAgent } from '~/composables/useAgent'
 import { toastError, mapError, toastServerMessage, MODERATION_RE } from '~/composables/useToast'
@@ -2296,6 +2326,8 @@ import NarrationVoiceDialog from '~/components/NarrationVoiceDialog.vue'
 import AssetBatchDialog from '~/components/AssetBatchDialog.vue'
 import ShotFusionPanel from '~/components/ShotFusionPanel.vue'
 import ComposeBatchDialog from '~/components/ComposeBatchDialog.vue'
+import ClipWorkspace from '~/components/ClipWorkspace/ClipWorkspace.vue'
+import ClipCard from '~/components/ClipWorkspace/ClipCard.vue'
 import { mediaTimeOfPath } from '~/utils/mediaTime'
 import {
   useNowTicker,
@@ -3463,6 +3495,8 @@ function videoPreviewStatusLabel(item) {
   if (item.status === 'unchanged') return t('episode.vid.previewUnchanged', { n: Number(item.matched_version_no) || 0 })
   if (item.status === 'unknown') return t('episode.vid.previewUnknown')
   if (item.status === 'blocked') return t('episode.vid.previewBlocked')
+  // 确定性片段镜头（#50）：不走模型生成，这一档不可勾选，也不能落进「跳过」分支
+  if (item.status === 'deterministic') return t('episode.vid.previewDeterministic')
   return t('episode.vid.previewSkipped')
 }
 function videoPreviewReason(item) {
@@ -3471,6 +3505,72 @@ function videoPreviewReason(item) {
   }
   return item.reason || ''
 }
+
+// ===== 确定性片段（#50）：关键帧页占位与视频页片段卡共用的集级片段表 =====
+const episodeClips = ref({})
+const clipRenderingIds = ref([])
+const clipThumbStamp = ref(0)
+// 片段工作台要聚焦的镜头（由关键帧页 / 视频页的「编辑图层/时间线」跳转设置）
+const clipFocusSbId = ref(0)
+
+/** 本镜表达设计里的确定性片段位置；'none' 或无表达设计 = 本镜不走片段 */
+function clipPositionOf(sb) {
+  const position = sb?.intent?.deterministic || 'none'
+  return position === 'none' ? '' : position
+}
+function isDeterministicShot(sb) {
+  return Boolean(clipPositionOf(sb))
+}
+function clipOfShot(sb) {
+  return episodeClips.value[sb?.id] || null
+}
+function clipThumbnailUrl(sb, which) {
+  const position = clipPositionOf(sb)
+  if (!position || !sb?.id) return ''
+  return clipAPI.thumbnailUrl(sb.id, position, which, clipThumbStamp.value)
+}
+function gotoClipWorkspace(sb) {
+  clipFocusSbId.value = sb?.id || 0
+  panel.value = 'production'
+  prodTab.value = 'layers'
+}
+
+/** 逐镜取片段（确定性镜头数量有限）；工作台改动后由 @changed 重新拉 */
+async function loadEpisodeClips() {
+  const shots = sbs.value.filter(isDeterministicShot)
+  if (!shots.length) { episodeClips.value = {}; return }
+  const next = {}
+  for (const sb of shots) {
+    try {
+      const data = await clipAPI.list(sb.id)
+      const position = clipPositionOf(sb)
+      next[sb.id] = (data.clips || []).find(c => c.position === position) || (data.clips || [])[0] || null
+    } catch { /* 单镜失败不影响其余镜头 */ }
+  }
+  episodeClips.value = next
+  clipThumbStamp.value = Date.now()
+}
+
+/** 视频页「渲染片段」：同步渲染（十几秒片段几秒返回），完成后就地刷新卡片与缩略图 */
+async function renderShotClip(sb) {
+  const position = clipPositionOf(sb)
+  if (!position || clipRenderingIds.value.includes(sb.id)) return
+  clipRenderingIds.value = [...clipRenderingIds.value, sb.id]
+  try {
+    const data = await clipAPI.render(sb.id, position)
+    if (data.clip) episodeClips.value = { ...episodeClips.value, [sb.id]: data.clip }
+    clipThumbStamp.value = Date.now()
+    toast.success(t('episode.clip.renderDone'))
+  } catch (e) {
+    toastServerMessage(e, { fallback: 'episode.clip.renderFailed' })
+  } finally {
+    clipRenderingIds.value = clipRenderingIds.value.filter(id => id !== sb.id)
+  }
+}
+
+watch([() => sbs.value.length, prodTab], ([, tab]) => {
+  if (tab === 'keyframes' || tab === 'videos' || tab === 'layers') void loadEpisodeClips()
+}, { immediate: true })
 
 /** 批量视频确认框 = 服务端预览清单（逐镜按输入签名比较）+ 勾选；选择模式只缩小预览范围 */
 async function openBatchVideoConfirm(storyboardIds) {
@@ -7397,6 +7497,7 @@ button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
 .batch-video-item-status { color: var(--text-2); white-space: nowrap; }
 .batch-video-item.is-blocked .batch-video-item-status { color: var(--action-danger); }
 .batch-video-item.is-unchanged .batch-video-item-status,
+.batch-video-item.is-deterministic .batch-video-item-status,
 .batch-video-item.is-unknown .batch-video-item-status { color: var(--text-3); }
 .batch-video-item-reason { flex: 1; min-width: 0; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .batch-video-empty { font-size: 12px; color: var(--text-3); text-align: center; padding: 12px 0; }

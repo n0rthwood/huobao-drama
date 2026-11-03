@@ -104,15 +104,21 @@ export interface ComposePlan {
  * 由实测时长与匹配参数算出合成计划。
  * 总则：**阻断优先于裁剪** —— 画面不够长就冻结末帧，旁白不够短就让用户提速或改文本，
  * 任何分支都不得为了凑时长截断旁白音频。
+ *
+ * `maxSeconds` 默认 `MAX_SHOT_SECONDS=15`（模型视频镜头）；整镜由确定性片段替代的
+ * 镜头传 `MAX_CLIP_SECONDS=30`（用户确认 #44 Q5）——15 秒是生成模型的约束，
+ * 确定性渲染没有这个限制。
  */
 export function planCompose(input: {
   dv: number
   da: number | null
   t: number
   fit: ComposeFit
+  maxSeconds?: number
 }): ComposePlan {
   const { dv, t, fit } = input
-  const availSeconds = Math.max(0, Math.min(dv, MAX_SHOT_SECONDS) - t)
+  const maxSeconds = input.maxSeconds ?? MAX_SHOT_SECONDS
+  const availSeconds = Math.max(0, Math.min(dv, maxSeconds) - t)
 
   if (input.da === null) {
     // 无旁白镜头：画面原样输出，只替换音轨
@@ -127,11 +133,11 @@ export function planCompose(input: {
   const daScaled = input.da / tempo
   const gapRatio = availSeconds > 0 ? (input.da - availSeconds) / availSeconds : 1
   const content = Math.max(fit.padHeadSeconds + daScaled + fit.padTailSeconds, MIN_SHOT_SECONDS)
-  const d = Math.min(t + content, MAX_SHOT_SECONDS)
+  const d = Math.min(t + content, maxSeconds)
 
-  // 旁白说完的时间点必须落在 15 秒内（尾部留白可以被压缩，语音不可以）
+  // 旁白说完的时间点必须落在上限内（尾部留白可以被压缩，语音不可以）
   const speechEnd = t + fit.padHeadSeconds + daScaled
-  let blocked = speechEnd > MAX_SHOT_SECONDS + 1e-6
+  let blocked = speechEnd > maxSeconds + 1e-6
   let blockReason: ComposePlan['blockReason'] = blocked ? 'narration_too_long' : null
   // 30% 规则的唯一实现点：倍速模式下旁白比可用时长长出 >30% 时只能改文本
   // （偏短方向是常态，用户确认 Q5：不拦，钳到 1/1.3 后余量走留白）

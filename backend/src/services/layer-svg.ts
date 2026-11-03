@@ -538,12 +538,19 @@ export function baseFilterLayers(
 
 /**
  * 文档 → 叠加层 SVG（不含底图；底图由服务端 sharp 或编辑器的 <img> 承载）。
- * `visibleIds` 只渲染给定图层（确定性片段逐层显现用，#50）。
+ * `visibleIds` 只渲染给定图层；`opacity` 按图层 id 叠乘不透明度（淡入淡出）；
+ * `viewport`（归一化 0–1）把取景框搬进 viewBox——Ken Burns 推近时图层与底图同步放大，
+ * 描边与字号也跟着放大，这正是「镜头推近」应有的样子（#50）。
  */
 export function layerDocToSvg(
   doc: LayerDoc,
   size: { width: number; height: number },
-  options: { visibleIds?: string[]; resolveImage?: (path: string) => string } = {},
+  options: {
+    visibleIds?: string[]
+    resolveImage?: (path: string) => string
+    opacity?: Record<string, number>
+    viewport?: { x: number; y: number; w: number; h: number }
+  } = {},
 ): string {
   const ctx: SvgContext = {
     width: size.width,
@@ -557,6 +564,9 @@ export function layerDocToSvg(
   for (const layer of doc.layers) {
     if (!layer.visible) continue
     if (options.visibleIds && options.visibleIds.indexOf(layer.id) === -1) continue
+    const override = options.opacity ? options.opacity[layer.id] : undefined
+    const alpha = layer.opacity * (override === undefined ? 1 : Math.min(1, Math.max(0, override)))
+    if (alpha <= 0) continue
     let inner = ''
     if (layer.type === 'polygon') inner = emitPolygon(layer, ctx)
     else if (layer.type === 'polyline') inner = emitPolyline(layer, ctx)
@@ -569,10 +579,14 @@ export function layerDocToSvg(
     const cx = (bounds.x + bounds.w / 2) * size.width
     const cy = (bounds.y + bounds.h / 2) * size.height
     const transform = layer.rotation ? ` transform="rotate(${fmt(layer.rotation)} ${fmt(cx)} ${fmt(cy)})"` : ''
-    const opacity = layer.opacity < 1 ? ` opacity="${fmt(layer.opacity)}"` : ''
+    const opacity = alpha < 1 ? ` opacity="${fmt(alpha)}"` : ''
     body.push(`<g data-layer="${esc(layer.id)}"${opacity}${transform}>${inner}</g>`)
   }
   const defs = ctx.defs.length ? `<defs>${ctx.defs.join('')}</defs>` : ''
+  const view = options.viewport
+  const viewBox = view
+    ? `${fmt(view.x * size.width)} ${fmt(view.y * size.height)} ${fmt(view.w * size.width)} ${fmt(view.h * size.height)}`
+    : `0 0 ${size.width} ${size.height}`
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size.width}" height="${size.height}"`
-    + ` viewBox="0 0 ${size.width} ${size.height}">${defs}${body.join('')}</svg>`
+    + ` viewBox="${viewBox}">${defs}${body.join('')}</svg>`
 }

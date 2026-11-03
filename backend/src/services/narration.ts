@@ -69,6 +69,12 @@ export interface NarrationComposedMeta {
   transition_t_source: 'task' | 'review' | 'none'
 }
 
+/** 一段确定性片段在快照里的身份：渲染产物路径 + 渲染签名（#50） */
+export interface ComposeClipPart {
+  src: string
+  signature: string
+}
+
 /** 影响本镜产出的输入分项（#42）：合成、状态计算、批量预览、导出校验共用同一份口径 */
 export interface ComposeInputParts {
   /** 当前采用的画面文件（uuid 文件名，重生成必然换路径） */
@@ -85,6 +91,15 @@ export interface ComposeInputParts {
   fit_key: string
   /** 生效的转场偏移 T（秒）；纯画面镜头不做偏移，恒为 0 */
   transition_t: number
+  /**
+   * 确定性片段（#50）：三个位置各一项，`{ src, signature }`，没有片段为 null。
+   * `replace` 时 `video_src` 指向片段文件本身；`pre`/`post` 时 `video_src` 仍是模型视频，
+   * 所以**必须**把片段单独记进快照——否则只换片段不换模型视频就看不出变化。
+   * v2 快照没有这三项（读出来是 undefined），按 null 比较。
+   */
+  replace_clip?: ComposeClipPart | null
+  pre_clip?: ComposeClipPart | null
+  post_clip?: ComposeClipPart | null
 }
 
 export interface NarrationMeta {

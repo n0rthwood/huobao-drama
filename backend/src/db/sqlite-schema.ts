@@ -449,6 +449,24 @@ export const sqliteSchemaStatements = [
     status TEXT NOT NULL DEFAULT 'ok',
     retrieved_at TEXT NOT NULL
   )`,
+
+  // 确定性片段（Issue #50）：底图 + 图层文档 + 时间线渲染出的 mp4
+  // position ∈ replace|pre|post；每镜每个 position 至多一条
+  `CREATE TABLE IF NOT EXISTS storyboard_clips (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    storyboard_id INTEGER NOT NULL,
+    position TEXT NOT NULL,
+    layer_doc TEXT NOT NULL,
+    timeline TEXT NOT NULL,
+    duration REAL NOT NULL,
+    render_path TEXT,
+    render_signature TEXT,
+    rendered_at TEXT,
+    status TEXT NOT NULL DEFAULT 'draft',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_storyboard_clips_unique ON storyboard_clips (storyboard_id, position)`,
 ]
 
 /**

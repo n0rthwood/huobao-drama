@@ -24,6 +24,7 @@ import { blockingIssuesFor, checkStoryboardRefs, describeIssues } from './storyb
 import { isActiveTaskStatus } from './sys-task.js'
 import { logTaskError, logTaskProgress, logTaskStart, logTaskSuccess, logTaskWarn } from '../utils/task-logger.js'
 import { transitionStatus } from './transition.js'
+import { clipPositionOfIntent } from './storyboard-clips.js'
 
 export type BatchStatus = 'running' | 'done' | 'cancelled'
 export type BatchItemState = 'pending' | 'running' | 'completed' | 'failed' | 'skipped'
@@ -161,8 +162,13 @@ export async function cancelEpisodeVideoBatch(episodeId: number): Promise<VideoB
 export interface VideoPreviewItem {
   storyboard_id: number
   storyboard_number: number
-  /** missing=无视频 changed=与所有可比较版本不同 unchanged=命中历史签名 unknown=历史版本缺字段 blocked=阻断 skipped=不可生成 */
-  status: 'missing' | 'changed' | 'unchanged' | 'unknown' | 'blocked' | 'skipped'
+  /**
+   * missing=无视频 changed=与所有可比较版本不同 unchanged=命中历史签名 unknown=历史版本缺字段
+   * blocked=阻断 skipped=不可生成
+   * deterministic=整镜由确定性片段渲染（#50）：没有模型视频可生成，**永不可勾**，
+   * 也不要求关键帧确认——这类镜头走分镜视频页的「渲染片段」。
+   */
+  status: 'missing' | 'changed' | 'unchanged' | 'unknown' | 'blocked' | 'skipped' | 'deterministic'
   /** 默认勾选（missing / changed） */
   checked: boolean
   /** 可勾选（blocked / skipped 不可勾） */
@@ -218,6 +224,18 @@ export async function previewEpisodeVideoBatch(
   const result: VideoPreviewItem[] = []
   for (const sb of targets) {
     const base = { storyboard_id: sb.id, storyboard_number: sb.storyboardNumber }
+    // 整镜替代的确定性片段（#50）必须在关键帧闸门与适配器校验**之前**分流：
+    // 这类镜头根本没有模型视频可生成，既不该被「关键帧尚未确认」挡住，也不该被提交到远端。
+    if (clipPositionOfIntent(sb.intent) === 'replace') {
+      result.push({
+        ...base,
+        status: 'deterministic',
+        checked: false,
+        selectable: false,
+        reason: '本镜整镜由确定性片段渲染，请在分镜视频页点「渲染片段」',
+      })
+      continue
+    }
     if (active.has(sb.id)) {
       result.push({ ...base, status: 'skipped', checked: false, selectable: false, reason: '该镜头正在生成中' })
       continue
@@ -321,10 +339,12 @@ export async function startEpisodeVideoBatch(
   if (!storyboards.length) throw new Error('本集还没有分镜')
   if (!opts.storyboardIds?.length) throw new Error('没有需要生成的分镜')
 
-  // 正在生成中的分镜不纳入批量，避免同一镜被重复提交
+  // 正在生成中的分镜不纳入批量，避免同一镜被重复提交；
+  // 整镜由确定性片段替代的镜头（#50）也一并剔除——它们在预览里就不可勾，
+  // 这里兜底防止通过接口直接传 id 把它们提交到远端模型。
   const processingIds = await loadActiveStoryboardIds()
   const selected = storyboards.filter(sb => opts.storyboardIds.includes(sb.id))
-  const targets = selected.filter(sb => !processingIds.has(sb.id))
+  const targets = selected.filter(sb => !processingIds.has(sb.id) && clipPositionOfIntent(sb.intent) !== 'replace')
   if (!targets.length) throw new Error('没有需要生成的分镜')
 
   // 预检：关键帧驱动视频必须由支持关键帧引导的模型生成（整批共用同一配置）

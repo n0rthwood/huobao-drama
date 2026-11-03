@@ -23,14 +23,14 @@ import { STORAGE_ROOT } from '../utils/paths.js'
 import { ffmpeg, checkFfmpegSuite, writeSilentWav } from '../utils/ffmpeg.js'
 import { logTaskError, logTaskProgress, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
 import { renderSrt, parseSrt, transformCues } from './subtitle.js'
-import { mediaFacts } from './media-probe.js'
+import { mediaFacts, probeVideoSpec } from './media-probe.js'
 import type { ComposeFit, ComposePlan } from './narration-fit.js'
 import { parseNarrationMeta, type NarrationMeta } from './narration.js'
 import {
   persistedComposeReservations,
   assembleComposeInput,
   composeStatesForEpisode,
-  COMPOSE_SIGNATURE_VERSION,
+  composeSignatureVersionOf,
   inspectComposeInputs,
   isComposing,
   releaseComposeLock,
@@ -127,11 +127,31 @@ async function runComposeShot(storyboardId: number, batchTaskId?: number): Promi
     burned: burnSrtAbs ? 'yes' : 'no',
   })
 
+  // 有片头/片尾确定性片段时先拼成「全镜视频」，再原样走既有滤镜链：
+  // 这样冻结末帧 / 裁尾 / 字幕烧录 / 混音的口径与纯模型视频镜头完全一致。
+  let fullShotAbs: string | null = null
   try {
-    await runCompose({ videoAbs: input.videoAbs, audioAbs: input.audioAbs, silenceAbs, burnSrtAbs, plan, fit, outputPath })
+    if (input.preClipAbs || input.postClipAbs) {
+      fullShotAbs = path.join(tempDir, `${uuid()}-fullshot.mp4`)
+      await concatShotSegments(
+        [input.preClipAbs, input.videoAbs, input.postClipAbs].filter((p): p is string => Boolean(p)),
+        fullShotAbs,
+        tempDir,
+      )
+    }
+    await runCompose({
+      videoAbs: fullShotAbs ?? input.videoAbs,
+      audioAbs: input.audioAbs,
+      silenceAbs,
+      burnSrtAbs,
+      plan,
+      fit,
+      outputPath,
+    })
   } finally {
     if (burnSrtAbs) fs.rmSync(burnSrtAbs, { force: true })
     if (silenceAbs) fs.rmSync(silenceAbs, { force: true })
+    if (fullShotAbs) fs.rmSync(fullShotAbs, { force: true })
   }
 
   const produced = await mediaFacts(outputPath)
@@ -151,7 +171,8 @@ async function runComposeShot(storyboardId: number, batchTaskId?: number): Promi
     duration_ms: produced.durationMs,
     // 签名来自合成开始时签好的不可变快照：输入在 ffmpeg 期间变过，这条成片就会被判 changed
     signature: input.signature,
-    signature_version: COMPOSE_SIGNATURE_VERSION,
+    // 生效版本随「本镜有没有确定性片段」变化：无片段仍写 2，签名与 #50 之前一致
+    signature_version: composeSignatureVersionOf(input.parts),
     inputs: input.parts,
     composed_at: ts,
     transition_t: input.t,
@@ -166,6 +187,73 @@ async function runComposeShot(storyboardId: number, batchTaskId?: number): Promi
 
   logTaskSuccess('ShotCompose', 'compose', { storyboardId, composedVideoUrl, durationMs: produced.durationMs })
   return { storyboardId, composedVideoUrl, durationMs: produced.durationMs, plan, burned: Boolean(burnSrtAbs) }
+}
+
+/**
+ * 把片头/模型视频/片尾拼成一段「全镜视频」（Issue #50）。
+ *
+ * 不用 concat demuxer：确定性片段是 25 fps，H3 模型视频是 24 fps，直接 demuxer 拼接
+ * 会得到时间基混乱的 VFR 流。这里用 concat **滤镜**，先把每段统一到首段的画幅/帧率/
+ * 采样率再拼，输出编码参数与 `runCompose` 完全一致，后续滤镜链感知不到它是拼出来的。
+ */
+async function concatShotSegments(segments: string[], outputPath: string, tempDir: string): Promise<void> {
+  if (segments.length < 2) throw new Error('拼接全镜视频至少需要两段')
+  const probed = await probeVideoSpec(segments[0])
+  if (!probed) throw new Error(`无法读取片段规格：${segments[0]}`)
+  const { width, height, fps } = probed
+  const command = ffmpeg()
+  const filters: string[] = []
+  const audioLabels: string[] = []
+  const silences: string[] = []
+  for (const [index, segment] of segments.entries()) {
+    command.input(segment)
+    filters.push(
+      `[${index}:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,`
+      + `pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps.toFixed(5)},format=yuv420p,setpts=PTS-STARTPTS[v${index}]`,
+    )
+    const facts = await mediaFacts(segment)
+    if (facts?.hasAudio) {
+      audioLabels.push(`${index}:a`)
+    } else {
+      // 没有音轨的段落补一条等长静音：少一路音频 concat 会直接报错
+      const silence = path.join(tempDir, `${uuid()}-concat-silence.wav`)
+      writeSilentWav(silence, 48000, 2, (facts?.durationMs ?? 0) / 1000 || 0.04)
+      silences.push(silence)
+      audioLabels.push(`${segments.length + silences.length - 1}:a`)
+    }
+  }
+  for (const silence of silences) command.input(silence)
+  for (const [index, label] of audioLabels.entries()) {
+    filters.push(`[${label}]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,asetpts=PTS-STARTPTS[a${index}]`)
+  }
+  const pairs = segments.map((_, index) => `[v${index}][a${index}]`).join('')
+  filters.push(`${pairs}concat=n=${segments.length}:v=1:a=1[vout][aout]`)
+
+  // 本仓 tsconfig 的 lib 低于 es2024，没有 Promise.withResolvers
+  try {
+    await new Promise<void>((resolve, reject) => {
+      command
+        .complexFilter(filters)
+        .outputOptions([
+          '-map', '[vout]',
+          '-map', '[aout]',
+          '-c:v', 'libx264',
+          '-preset', 'medium',
+          '-crf', '23',
+          '-pix_fmt', 'yuv420p',
+          '-c:a', 'aac',
+          '-ar', '48000',
+          '-b:a', '192k',
+          '-movflags', '+faststart',
+        ])
+        .output(outputPath)
+        .on('end', () => resolve())
+        .on('error', (err: Error) => reject(new Error(`确定性片段与模型视频拼接失败：${err.message}`)))
+        .run()
+    })
+  } finally {
+    for (const silence of silences) fs.rmSync(silence, { force: true })
+  }
 }
 
 /** ffmpeg 的字幕滤镜路径转义（Windows 盘符冒号与单引号） */

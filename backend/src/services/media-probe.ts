@@ -96,3 +96,29 @@ export async function mediaFactsAll(absPaths: string[], concurrency = 8): Promis
   await Promise.all(workers)
   return out
 }
+
+/** 画面规格（Issue #50 的确定性片段要与成片同规格） */
+export interface VideoSpec {
+  width: number
+  height: number
+  fps: number
+}
+
+/**
+ * 读取视频的画幅与帧率；文件不存在、不是视频或尺寸缺失时返回 null
+ * （调用方按画幅默认兜底，绝不猜尺寸）。
+ */
+export async function probeVideoSpec(absPath: string): Promise<VideoSpec | null> {
+  if (!statMedia(absPath)) return null
+  return new Promise<VideoSpec | null>((resolve) => {
+    ffmpeg.ffprobe(absPath, (err, data) => {
+      if (err) return resolve(null)
+      const video = (data?.streams || []).find(stream => stream.codec_type === 'video')
+      if (!video?.width || !video?.height) return resolve(null)
+      const raw = String(video.avg_frame_rate || video.r_frame_rate || '')
+      const [num, den] = raw.split('/').map(Number)
+      const fps = den ? num / den : Number(raw)
+      resolve({ width: video.width, height: video.height, fps: Number.isFinite(fps) && fps > 0 ? fps : 25 })
+    })
+  })
+}
