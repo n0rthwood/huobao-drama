@@ -19,9 +19,9 @@
 import { and, desc, eq } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
 import { now } from '../utils/response.js'
-import { readImageAsCompressedDataUrl } from '../utils/storage.js'
 import { logTaskError, logTaskProgress, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
-import { getConfigById, getTextConfig, getTextProviderBaseUrl, type AIConfig } from './ai.js'
+import { getConfigById, getTextConfig, type AIConfig } from './ai.js'
+import { callTextChat, imageContentPart, type ChatContent, type ChatEndpointConfig } from './vision-chat.js'
 import { listArchivalImages, type ArchivalImageEntry } from './archival-images.js'
 import { linkCitationsToAsset, recordCitation } from './research-citations.js'
 import { wikiExtract, wikiSearch } from './wiki-research.js'
@@ -213,34 +213,18 @@ const SYSTEM_PROMPT = [
   '{"face_shape":"","hair":"","facial_hair":"","build":"","age_at_story":"","distinguishing":"","confidence_notes":""}',
 ].join('\n')
 
-interface ChatCompletionResponse {
-  choices?: Array<{ message?: { content?: string | null } }>
-}
-
-type ChatContent = string | Array<Record<string, unknown>>
-
+/** 请求组装与发送已抽到 services/vision-chat.ts（#46），这里只保留本任务的参数口径 */
 async function callChat(
-  config: { baseUrl: string; apiKey: string; model: string; provider: string },
+  config: ChatEndpointConfig,
   content: ChatContent,
 ): Promise<string> {
-  const url = `${getTextProviderBaseUrl(config as unknown as AIConfig)}/chat/completions`
-  const resp = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.apiKey}` },
-    body: JSON.stringify({
-      model: config.model,
-      temperature: 0.2,
-      max_tokens: 1024,
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content },
-      ],
-    }),
-    signal: AbortSignal.timeout(PORTRAIT_REQUEST_TIMEOUT_MS),
+  const { text } = await callTextChat(config, content, {
+    systemPrompt: SYSTEM_PROMPT,
+    temperature: 0.2,
+    maxTokens: 1024,
+    timeoutMs: PORTRAIT_REQUEST_TIMEOUT_MS,
   })
-  if (!resp.ok) throw new Error(`文本服务 ${resp.status}: ${(await resp.text()).slice(0, 300)}`)
-  const data = (await resp.json()) as ChatCompletionResponse
-  return data.choices?.[0]?.message?.content ?? ''
+  return text
 }
 
 /** 用户消息正文：人物设定 + 本集剧本节选（故事年份线索） + 画像元数据 + 维基正文 */
@@ -376,12 +360,11 @@ async function runPortraitAppearance(taskId: number, ctx: {
       const images: Array<Record<string, unknown>> = []
       for (const entry of portraits.slice(0, MAX_VISION_PORTRAITS)) {
         try {
-          const dataUrl = await readImageAsCompressedDataUrl(entry.path, {
-            maxWidth: PORTRAIT_IMAGE_MAX_EDGE,
-            maxHeight: PORTRAIT_IMAGE_MAX_EDGE,
+          const prepared = await imageContentPart(entry.path, {
+            maxSide: PORTRAIT_IMAGE_MAX_EDGE,
             quality: PORTRAIT_IMAGE_QUALITY,
           })
-          images.push({ type: 'image_url', image_url: { url: dataUrl } })
+          images.push(prepared.part)
         } catch (err) {
           // 文件丢了就少读一张，不整单失败
           logTaskProgress('Portrait', 'portrait-unreadable', {
