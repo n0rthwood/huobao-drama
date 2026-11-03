@@ -7,11 +7,13 @@
  */
 import { eq } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
-import { deleteTargetBindings, type AssetKind } from './storyboard-assets.js'
+import { deletePoolSelections, deleteTargetBindings, type AssetKind } from './storyboard-assets.js'
 
 /** 删除某资产的全部集关联与分镜绑定（幂等） */
 export async function deleteAssetLinks(kind: AssetKind, assetId: number): Promise<void> {
   await deleteTargetBindings({ kind, assetIds: [assetId] })
+  // 资产池手选（Issue #43）：已删资产不能继续留在本镜资产池里
+  await deletePoolSelections({ kind, assetIds: [assetId] })
   if (kind === 'character') {
     await db.delete(schema.episodeCharacters).where(eq(schema.episodeCharacters.characterId, assetId))
     await db.delete(schema.storyboardCharacters).where(eq(schema.storyboardCharacters.characterId, assetId))

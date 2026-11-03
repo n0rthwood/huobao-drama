@@ -266,14 +266,18 @@
           <section class="kf-section">
             <div class="kf-section-head">
               <span class="kf-section-label">{{ t('episode.ref.poolTitle') }}</span>
-              <span class="tag mono">{{ t('episode.ref.boundCount', { bound: assets.filter(a => a.bound).length, total: assets.length }) }}</span>
+              <span class="tag mono">{{ t('episode.pool.selectedCount', { n: assets.length }) }}</span>
               <span v-if="refIssues.length" :class="['kf-ref-issue-count', hasBlockingIssue ? 'is-block' : 'is-warn']">
                 {{ t('episode.ref.issueCount', { n: refIssues.length }) }}
               </span>
+              <span class="ml-auto" />
+              <button type="button" class="btn btn-sm" @click="poolPickerOpen = true">
+                {{ t('episode.pool.choose') }}
+              </button>
             </div>
             <p class="kf-ref-pool-hint">{{ t('episode.ref.poolCopy') }}</p>
             <RefIssueList :issues="refIssues" />
-            <div class="kf-ref-list">
+            <div v-if="assets.length" class="kf-ref-list">
               <template v-for="g in refKinds" :key="g.kind">
                 <div v-if="assets.filter(a => a.kind === g.kind).length" class="kf-ref-group">
                   <div class="kf-ref-group-label">{{ g.label }}</div>
@@ -281,7 +285,7 @@
                     <div
                       v-for="asset in assets.filter(a => a.kind === g.kind)"
                       :key="asset.key"
-                      :class="['kf-pool-card', { bound: asset.bound }]"
+                      class="kf-pool-card bound"
                       role="button"
                       tabindex="0"
                       :title="t('episode.ref.cardOpenDetail')"
@@ -300,32 +304,26 @@
                         <span v-else class="kf-pool-media-empty">
                           {{ asset.kind === 'scene' ? t('episode.ref.shortScene') : asset.kind === 'prop' ? t('episode.ref.shortProp') : t('episode.ref.shortChar') }}
                         </span>
-                        <button
-                          type="button"
-                          class="kf-pool-check"
-                          :aria-pressed="asset.bound ? 'true' : 'false'"
-                          :aria-label="asset.bound ? t('episode.ref.clickRemove') : t('episode.ref.clickAdd')"
-                          :title="asset.bound ? t('episode.ref.clickRemove') : t('episode.ref.clickAdd')"
-                          @click.stop="emit('toggle-bind', selected, asset)"
-                        >
-                          <svg v-if="asset.bound" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                        </button>
                       </div>
                       <div class="kf-pool-body">
                         <span class="kf-pool-name" :title="asset.name">{{ asset.name }}</span>
                         <span class="kf-pool-meta">{{ asset.typeLabel }} · {{ asset.meta }}</span>
                         <span class="kf-pool-foot">
-                          <span :class="['kf-ref-state', asset.bound && asset.ready ? 'is-ready' : '']">
-                            {{ asset.bound ? (asset.ready ? t('episode.ref.usable') : t('episode.ref.notReady')) : t('episode.ref.unbound') }}
+                          <span v-if="asset.manual" class="tag kf-pool-tag">{{ t('episode.pool.sourceManual') }}</span>
+                          <span v-if="asset.mentioned" class="tag kf-pool-tag is-mention">{{ t('episode.pool.sourceMentioned') }}</span>
+                          <span :class="['kf-ref-state', asset.ready ? 'is-ready' : '']">
+                            {{ asset.ready ? t('episode.ref.usable') : t('episode.ref.notReady') }}
                           </span>
-                          <button v-if="asset.bound && !asset.ready" type="button" class="kf-ref-goto" @click.stop="emit('goto-assets')">{{ t('episode.ref.gotoGenerate') }}</button>
+                          <button v-if="!asset.ready" type="button" class="kf-ref-goto" @click.stop="emit('goto-assets')">{{ t('episode.ref.gotoGenerate') }}</button>
                         </span>
                       </div>
                     </div>
                   </div>
                 </div>
               </template>
-              <div v-if="!assets.length" class="kf-ref-empty">{{ t('episode.ref.empty') }}</div>
+            </div>
+            <div v-else class="kf-pool-empty">
+              <span class="kf-ref-empty">{{ t('episode.pool.empty') }}</span>
             </div>
           </section>
 
@@ -533,6 +531,15 @@
       @cancel="cancelConfirm = false"
       @confirm="cancelBatch"
     />
+
+    <StoryboardPoolDialog
+      v-if="poolPickerOpen && selected"
+      :storyboard-id="selected.id"
+      :shot-number="selectedIndex + 1"
+      :items="poolItems"
+      :submit="submitPoolAsset"
+      @close="poolPickerOpen = false"
+    />
   </div>
 </template>
 
@@ -551,6 +558,7 @@ import RefIssueList from '~/components/RefIssueList.vue'
 import MediaTime from '~/components/MediaTime.vue'
 import TargetAssetList from '~/components/TargetAssetList.vue'
 import NarrationBlock from '~/components/NarrationBlock.vue'
+import StoryboardPoolDialog from '~/components/StoryboardPoolDialog.vue'
 import { mediaTimeLabel, mediaTimeOfPath } from '~/utils/mediaTime'
 import {
   useNowTicker,
@@ -568,9 +576,12 @@ const props = defineProps({
   episodeId: { type: Number, default: 0 },
   // 本集分镜（按分镜号升序），字段与 /episodes/:id/storyboards 返回一致
   storyboards: { type: Array, default: () => [] },
-  // (sb) => 可绑定资产列表；由工作台提供，避免资产状态在两处各算一遍
+  // (sb) => 本镜资产池候选（本集全部可视资产 + selected/manual/mentioned 来源标记）；
+  // 由工作台提供，避免资产状态在两处各算一遍
   // Function 类型的 default 就是默认值本身（不会被当作工厂调用）
-  bindableAssets: { type: Function, default: () => [] },
+  poolCandidates: { type: Function, default: () => [] },
+  // (sb, asset, selected) => Promise：资产池单项手选/取消（失败时抛错，由选择器就地展示）
+  setPoolAsset: { type: Function, default: async () => {} },
   // (sb, target) => 该目标（first|mid|last|video）实际发送的参考图（后端 target_assets）
   targetAssetsFor: { type: Function, default: () => [] },
   // (targetAsset) => 该资产的候选图版本列表
@@ -603,7 +614,7 @@ const props = defineProps({
   narrationVoiceBatch: { type: Object, default: () => ({ running: false, total: 0, completed: 0 }) },
 })
 const emit = defineEmits([
-  'break', 'refresh', 'preview', 'goto-assets', 'toggle-bind', 'open-asset', 'update-field', 'field-dirty',
+  'break', 'refresh', 'preview', 'goto-assets', 'open-asset', 'update-field', 'field-dirty',
   'batch-narration', 'batch-narration-voice', 'open-narration-settings',
 ])
 
@@ -770,7 +781,12 @@ const confirmedCount = computed(() => props.storyboards.filter(sb => kf(sb).conf
 const selectedId = ref(0)
 const selected = computed(() => props.storyboards.find(sb => sb.id === selectedId.value) || null)
 const selectedIndex = computed(() => props.storyboards.findIndex(sb => sb.id === selectedId.value))
-const assets = computed(() => (selected.value ? props.bindableAssets(selected.value) : []))
+// 本镜资产池（#43）：候选 = 本集全部可视资产（含 selected/manual/mentioned），主面板只显示已选
+const poolItems = computed(() => {
+  const list = selected.value ? props.poolCandidates(selected.value) : []
+  return Array.isArray(list) ? list : []
+})
+const assets = computed(() => poolItems.value.filter(item => item.selected))
 const mentions = computed(() => (selected.value ? props.mentionOptionsFor(selected.value) : []))
 const refIssues = computed(() => (selected.value ? issuesOf(selected.value) : []))
 const hasBlockingIssue = computed(() => refIssues.value.some(issue => issue.severity === 'block'))
@@ -779,6 +795,16 @@ watch(() => props.storyboards, (list) => {
   if (!list.length) { selectedId.value = 0; return }
   if (!list.some(sb => sb.id === selectedId.value)) selectedId.value = list[0].id
 }, { immediate: true, deep: false })
+
+// 资产池选择器：切镜时关闭，避免上一镜的选择结果被当成新镜的操作
+const poolPickerOpen = ref(false)
+watch(selectedId, () => { poolPickerOpen.value = false })
+/** 选择器单项持久化：把发起操作时的分镜对象固定下来，异步结果只写回它 */
+async function submitPoolAsset(asset, nextSelected) {
+  const sb = selected.value
+  if (!sb) return
+  await props.setPoolAsset(sb, asset, nextSelected)
+}
 
 // ===== 关键帧版本：选中分镜的三个槽位各自列出历史生成（最新在前） =====
 const versions = ref({ first: [], mid: [], last: [] })
@@ -1603,17 +1629,10 @@ onBeforeUnmount(() => {
 }
 .kf-pool-media img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .kf-pool-media-empty { font-size: 12px; }
-.kf-pool-check {
-  position: absolute; top: 6px; right: 6px;
-  width: 22px; height: 22px; padding: 0;
-  display: inline-flex; align-items: center; justify-content: center;
-  border: 1px solid var(--border-strong); border-radius: 6px;
-  background: var(--surface-raised); color: var(--text-3); cursor: pointer;
-}
-.kf-pool-check[aria-pressed='true'] {
-  border-color: var(--accent); background: var(--accent); color: var(--surface-raised);
-}
-.kf-pool-check:hover { border-color: var(--accent); }
+.kf-pool-tag { font-size: 10px; }
+.kf-pool-tag.is-mention { border-color: var(--accent); color: var(--accent-text); }
+/* 空池：一行紧凑提示 + 选择入口，不占满整块 */
+.kf-pool-empty { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .kf-pool-body { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px 7px; min-width: 0; }
 .kf-pool-name { font-size: 12px; font-weight: 600; color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .kf-pool-meta { font-size: 11px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

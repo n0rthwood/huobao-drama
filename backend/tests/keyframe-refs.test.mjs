@@ -16,9 +16,9 @@ const sqlitePath = path.join(mkdtempSync(path.join(tmpdir(), 'kf-refs-')), 'test
 
 function call(fn, args) {
   const script = `
-    import { computeRefIssues, computeBindingSync, computeTargetSync, parseMentions, limbRiskIssues, targetAssetRefs, targetAssetsJson } from './src/services/storyboard-assets.ts'
+    import { computeRefIssues, computeBindingSync, computePoolAssets, computeTargetSync, parseMentions, limbRiskIssues, targetAssetRefs, targetAssetsJson } from './src/services/storyboard-assets.ts'
     import { computeKeyframeSignature, signatureFromTask } from './src/services/storyboard-keyframes.ts'
-    const api = { computeRefIssues, computeBindingSync, computeTargetSync, parseMentions, limbRiskIssues, targetAssetRefs, targetAssetsJson, computeKeyframeSignature, signatureFromTask }
+    const api = { computeRefIssues, computeBindingSync, computePoolAssets, computeTargetSync, parseMentions, limbRiskIssues, targetAssetRefs, targetAssetsJson, computeKeyframeSignature, signatureFromTask }
     const [fn, args] = JSON.parse(process.env.REFS_INPUT)
     process.stdout.write('@@' + JSON.stringify(api[fn](...args)))
   `
@@ -54,29 +54,36 @@ test('mentions match the longest asset name first', () => {
   assert.deepEqual(result.unknown, ['路人甲'])
 })
 
-test('asset pool: all prompts empty keeps the existing pool', () => {
-  const result = call('computeBindingSync', [{
-    prompts: prompts(),
-    assets: [asset('character', 1, '小明'), asset('character', 2, '小红')],
-    characterIds: [1, 2],
-    propIds: [],
-  }])
-  assert.equal(result.changed, false)
-  assert.deepEqual(result.characterIds, [1, 2])
-  assert.deepEqual(result.unbound, [])
-})
-
-test('asset pool: prompt mentions override explicitly supplied ids', () => {
+test('asset pool: manual picks survive prompts that do not mention them (Issue #43)', () => {
+  const assets = [asset('character', 1, '小明'), asset('character', 2, '小红'), asset('prop', 5, '钥匙')]
   const result = call('computeBindingSync', [{
     prompts: prompts({ first_frame_prompt: '@小红 站在门口' }),
-    assets: [asset('character', 1, '小明'), asset('character', 2, '小红'), asset('prop', 5, '钥匙')],
+    assets,
+    manual: [{ kind: 'character', assetId: 1 }],
     characterIds: [1],
     propIds: [5],
   }])
-  assert.deepEqual(result.characterIds, [2])
-  assert.deepEqual(result.propIds, [])
+  // 手选的小明留在池里，@ 到的小红加入，既非手选也不再被 @ 的钥匙退出
+  assert.deepEqual(result.characterIds, [1, 2])
   assert.deepEqual(result.bound.map(item => item.name), ['小红'])
-  assert.deepEqual(result.unbound.map(item => item.name), ['小明', '钥匙'])
+  assert.deepEqual(result.unbound.map(item => item.name), ['钥匙'])
+  const pool = call('computePoolAssets', [assets, [{ kind: 'character', assetId: 1 }], prompts({ first_frame_prompt: '@小红 站在门口' })])
+  assert.deepEqual(pool, [
+    { kind: 'character', asset_id: 1, manual: true, mentioned: false },
+    { kind: 'character', asset_id: 2, manual: false, mentioned: true },
+  ])
+})
+
+test('asset pool: the last mention removed drops the auto-added asset only (Issue #43)', () => {
+  const assets = [asset('character', 1, '小明'), asset('character', 2, '小红')]
+  const manual = [{ kind: 'character', assetId: 1 }]
+  const result = call('computeBindingSync', [{ prompts: prompts(), assets, manual, characterIds: [1, 2], propIds: [] }])
+  assert.deepEqual(result.characterIds, [1])
+  assert.deepEqual(result.unbound.map(item => item.name), ['小红'])
+  assert.equal(result.changed, true)
+  // 手选同时被 @ 时两个标记都为真
+  const pool = call('computePoolAssets', [assets, manual, prompts({ video_prompt: '@小明 转身' })])
+  assert.deepEqual(pool, [{ kind: 'character', asset_id: 1, manual: true, mentioned: true }])
 })
 
 test('saving the E3 #2 mid-frame prompt drops the unrelated inherited refs (Issue #18)', () => {

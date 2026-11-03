@@ -427,6 +427,11 @@ export const storyboardAPI = {
     target: 'first' | 'mid' | 'last' | 'video',
     data: { kind: 'scene' | 'character' | 'prop'; asset_id: number; image: string | null },
   ) => api.put(`/storyboards/${id}/target-assets/${target}`, data),
+  // 本镜资产池（#43）：单项手选/取消手选。被首/中/尾/视频/转场提示词 @ 引用的资产不可取消（后端 400）
+  setPoolAsset: (
+    id: number,
+    data: { kind: 'character' | 'scene' | 'prop'; asset_id: number; selected: boolean },
+  ) => api.put(`/storyboards/${id}/pool-assets`, data),
   // 单镜旁白写作/重写（#35，同步返回；上下文 = 剧本全文 + 主线 + 前后镜旁白）
   writeNarration: (id: number, data: { model?: string; config_id?: number } = {}) =>
     api.post<{ narration_text: string; narration_enabled: boolean; duration: number }>(

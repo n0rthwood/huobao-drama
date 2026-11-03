@@ -642,7 +642,8 @@
             v-if="prodTab === 'keyframes'"
             :episode-id="epId"
             :storyboards="sbs"
-            :bindable-assets="shotBindableAssets"
+            :pool-candidates="shotPoolCandidates"
+            :set-pool-asset="setShotPoolAsset"
             :target-assets-for="shotTargetAssets"
             :asset-versions-for="targetAssetVersions"
             :set-target-version="setTargetAssetVersion"
@@ -668,7 +669,6 @@
             @refresh="refresh"
             @preview="openImageViewer"
             @goto-assets="prodTab = 'assets'"
-            @toggle-bind="toggleShotBind"
             @open-asset="openPoolAssetDetail"
             @update-field="updateField"
             @field-dirty="markFieldDirty"
@@ -3868,6 +3868,8 @@ function applyStoryboardUpdate(sb, res, before, field) {
   if (Array.isArray(res.character_ids)) assign('character_ids', res.character_ids)
   if (Array.isArray(res.prop_ids)) assign('prop_ids', res.prop_ids)
   if ('scene_id' in res) assign('scene_id', res.scene_id ?? null)
+  // 本镜资产池（#43）：人工保存 / 池选择后，后端回包带回重算后的有效池（手选 ∪ 提示词 @）
+  if (Array.isArray(res.pool_assets)) assign('pool_assets', res.pool_assets)
   // 手动保存转场描述后后端会把 edited_manually 置 true，这里同步回本地（#11）
   if ('transition_review' in res) assign('transition_review', res.transition_review ?? null)
   // 目标级参考图（#18）：提示词保存 / 目标选版后后端返回最新装配结果
@@ -3932,14 +3934,6 @@ function isStoryboardCharacterSelected(sb, charId) {
   return getStoryboardCharacterIds(sb).includes(charId)
 }
 
-function toggleStoryboardCharacter(sb, charId) {
-  const currentIds = getStoryboardCharacterIds(sb)
-  const nextIds = currentIds.includes(charId)
-    ? currentIds.filter(id => id !== charId)
-    : [...currentIds, charId]
-  updateField(sb, 'character_ids', nextIds)
-}
-
 function getStoryboardPropIds(sb) {
   return sb?.prop_ids || sb?.propIds || []
 }
@@ -3951,14 +3945,6 @@ function getStoryboardProps(sb) {
 
 function isStoryboardPropSelected(sb, propId) {
   return getStoryboardPropIds(sb).includes(propId)
-}
-
-function toggleStoryboardProp(sb, propId) {
-  const currentIds = getStoryboardPropIds(sb)
-  const nextIds = currentIds.includes(propId)
-    ? currentIds.filter(id => id !== propId)
-    : [...currentIds, propId]
-  updateField(sb, 'prop_ids', nextIds)
 }
 
 function getSceneName(sb) {
@@ -5053,53 +5039,61 @@ function shotVideoRefCount(sb) {
   return max
 }
 
-// 右侧参考素材面板：本集全部可绑定素材（场景单选、角色/道具多选），bound 标记是否已绑定
+// 本镜资产池（#43）：候选 = 本集全部可视角色 / 场景 / 道具；
+// selected = 后端有效池（手选 ∪ 五个提示词的 @），manual / mentioned 标明来源。
 // kind 为英文 code（逻辑值）；typeLabel 为显示名（渲染时求值）
-function shotBindableAssets(sb) {
+function shotPoolAssets(sb) {
+  const list = sb?.pool_assets || sb?.poolAssets
+  return Array.isArray(list) ? list : []
+}
+function poolEntryOf(sb, kind, assetId) {
+  return shotPoolAssets(sb).find(item => item?.kind === kind && Number(item?.asset_id ?? item?.assetId) === assetId) || null
+}
+function shotPoolCandidates(sb) {
   const out = []
+  const push = (kind, id, fields) => {
+    const entry = poolEntryOf(sb, kind, id)
+    out.push({
+      key: `${kind}-${id}`,
+      id,
+      kind,
+      ...fields,
+      selected: !!entry,
+      manual: !!entry?.manual,
+      mentioned: !!entry?.mentioned,
+    })
+  }
   for (const char of visualChars.value) {
     const imageUrl = char.image_url || char.imageUrl || ''
-    out.push({
-      key: `character-${char.id}`,
-      id: char.id,
-      kind: 'character',
+    push('character', char.id, {
       typeLabel: t('common.role'),
       name: char.name || t('episode.asset.unnamedChar'),
       meta: char.role || t('episode.asset.charPortrait'),
       imageUrl,
       ready: !!imageUrl,
-      bound: getStoryboardCharacterIds(sb).includes(char.id),
     })
   }
   for (const scene of scenes.value) {
     const imageUrl = scene.image_url || scene.imageUrl || ''
-    out.push({
-      key: `scene-${scene.id}`,
-      id: scene.id,
-      kind: 'scene',
+    push('scene', scene.id, {
       typeLabel: t('common.scene'),
       name: `${scene.location} · ${scene.time || t('episode.asset.noTime')}`,
       meta: scene.time || t('episode.asset.sceneImage'),
       imageUrl,
       ready: !!imageUrl,
-      bound: (sb?.scene_id || sb?.sceneId) === scene.id,
     })
   }
   for (const prop of propItems.value) {
     const imageUrl = prop.image_url || prop.imageUrl || ''
-    out.push({
-      key: `prop-${prop.id}`,
-      id: prop.id,
-      kind: 'prop',
+    push('prop', prop.id, {
       typeLabel: t('common.prop'),
       name: prop.name || t('episode.asset.unnamedProp'),
       meta: prop.type || t('episode.asset.propSingleImage'),
       imageUrl,
       ready: !!imageUrl,
-      bound: getStoryboardPropIds(sb).includes(prop.id),
     })
   }
-  // 固定顺序（角色→场景→道具，按资产原顺序）：点击绑定/解绑不重排，避免跳动
+  // 固定顺序（角色→场景→道具，按资产原顺序）：选中/取消不重排，避免跳动
   return out
 }
 
@@ -5111,27 +5105,29 @@ const REF_KINDS = computed(() => ([
   { kind: 'prop', label: t('common.prop') },
 ]))
 
-// 右侧面板切换绑定：场景单选（切换/解绑），角色/道具多选（kind code 判断，不依赖显示文案）
-function toggleShotBind(sb, asset) {
-  if (asset.kind === 'scene') {
-    const current = sb?.scene_id || sb?.sceneId
-    updateField(sb, 'scene_id', current === asset.id ? null : asset.id)
-    return
-  }
-  if (asset.kind === 'character') {
-    toggleStoryboardCharacter(sb, asset.id)
-    return
-  }
-  toggleStoryboardProp(sb, asset.id)
+// 资产池单项手选 / 取消（#43）：后端是唯一真相，被提示词 @ 引用的资产取消会返回 400（原因就地展示）。
+// 异步结果只写回发起时的分镜对象，切镜不会串状态；主场景 scene_id 不受此入口影响。
+const poolSaveQueues = new Map()
+function setShotPoolAsset(sb, asset, selected) {
+  if (!sb?.id || !asset?.kind || !asset?.id) return Promise.resolve()
+  // 同镜不同卡片可连续点击，但请求按顺序提交，防止较早的整池回包覆盖较新的选择。
+  const previous = poolSaveQueues.get(sb.id) || Promise.resolve()
+  const pending = previous.catch(() => {}).then(() => storyboardAPI
+    .setPoolAsset(sb.id, { kind: asset.kind, asset_id: asset.id, selected: !!selected })
+    .then((res) => { applyStoryboardUpdate(sb, res, refIssuesOf(sb)) }))
+  poolSaveQueues.set(sb.id, pending)
+  return pending.finally(() => {
+    if (poolSaveQueues.get(sb.id) === pending) poolSaveQueues.delete(sb.id)
+  })
 }
 
-// 提示词 @ 引用候选：场景取本集全部场景（关键帧级场景由 @ 决定，不限于本镜池），
-// 角色 / 道具仍来自本镜资产池。展示顺序：角色 → 场景 → 道具
+// 提示词 @ 引用候选：本集全部可视角色 / 场景 / 道具（未预选也能搜到并引用，引用后后端自动入池）。
+// 展示顺序：角色 → 场景 → 道具
 // kind 为逻辑值（MentionTextarea 按 kind 着色/选图标），group 为显示文案
 function shotMentionOptions(sb) {
   if (!sb) return []
   return [
-    ...getStoryboardCharacters(sb).map(c => ({
+    ...visualChars.value.map(c => ({
       label: c.name,
       value: c.name,
       kind: 'character',
@@ -5145,7 +5141,7 @@ function shotMentionOptions(sb) {
       group: t('common.scene'),
       image: thumbOf(assetImageSrc(scene)),
     })),
-    ...getStoryboardProps(sb).map(p => ({
+    ...propItems.value.map(p => ({
       label: p.name,
       value: p.name,
       kind: 'prop',

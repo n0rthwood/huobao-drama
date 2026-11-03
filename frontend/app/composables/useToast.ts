@@ -63,13 +63,20 @@ export function toastError(err: unknown, opts?: { fallback?: string; duration?: 
 }
 
 /**
- * 服务端拦截类错误（一致性问题列表等）：message 是后端拼好的中文长句，
- * mapError 会因长度/技术特征回退成泛化文案，这里原样展示，其余情况仍走 mapError。
+ * 服务端拦截类错误（一致性问题列表、资产池引用锁定等）：message 是后端拼好的中文长句，
+ * mapError 会因长度/技术特征回退成泛化文案，这里原样返回，其余情况仍走 mapError。
  */
-export function toastServerMessage(err: unknown, opts?: { fallback?: string; duration?: number }): void {
+export function serverMessage(err: unknown, opts?: { fallback?: string }): string {
   const msg = messageOf(err).trim()
-  if (msg && CJK_RE.test(msg) && !/https?:\/\/|\{|\}/.test(msg)) {
-    toast.error(msg, { duration: opts?.duration ?? 7000 })
+  if (msg && CJK_RE.test(msg) && !/https?:\/\/|\{|\}/.test(msg)) return msg
+  return mapError(err, opts)
+}
+
+/** serverMessage 的 toast 形式（服务端中文原文 7s，回退文案走 toastError 的 5s） */
+export function toastServerMessage(err: unknown, opts?: { fallback?: string; duration?: number }): void {
+  const text = serverMessage(err, opts)
+  if (text === messageOf(err).trim()) {
+    toast.error(text, { duration: opts?.duration ?? 7000 })
     return
   }
   toastError(err, opts)
