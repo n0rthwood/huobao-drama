@@ -42,6 +42,20 @@ export function resolveRulesetWithMode(genre: string | null | undefined, mode: s
 }
 
 /**
+ * 纯函数：项目类型 + 显式开关 + 题材关键字 → 最终规则集（Issue #45）。
+ * `project_type='documentary'` 强制纪录片规则集，优先级高于开关与关键字；
+ * `drama` 项目的解析与 #45 之前逐字一致。
+ */
+export function resolveProjectRuleset(
+  projectType: string | null | undefined,
+  genre: string | null | undefined,
+  mode: string | null | undefined,
+): GenreRuleset | null {
+  if (projectType === 'documentary') return 'documentary'
+  return resolveRulesetWithMode(genre, mode)
+}
+
+/**
  * 同步读取项目的规则集（better-sqlite3 的 .get()）。
  * 供 buildAgentRequestContext 在构建上下文时一次性解析：所有 Agent 链路
  * （提取 / 图片提示词 / 关键帧 / 视频提示词 / chat / 重试）都经过那一个入口，
@@ -51,5 +65,5 @@ export function resolveDramaGenreRuleset(dramaId: number | null | undefined): Ge
   if (!dramaId) return null
   const row = db.select().from(schema.dramas).where(eq(schema.dramas.id, dramaId)).get()
   if (!row) return null
-  return resolveRulesetWithMode(row.genre, row.documentaryRules)
+  return resolveProjectRuleset(row.projectType, row.genre, row.documentaryRules)
 }

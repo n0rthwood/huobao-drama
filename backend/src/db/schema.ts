@@ -10,6 +10,8 @@ export const dramas = sqliteTable('dramas', {
   title: text('title').notNull(),
   description: text('description'),
   genre: text('genre'),
+  // 项目类型（Issue #45）：'drama'（短剧，默认）| 'documentary'（纪录片）；创建后不可切换
+  projectType: text('project_type').notNull().default('drama'),
   // 纪录片规则显式开关（Issue #32）：'auto'（跟随 genre 关键字）| 'on' | 'off'；NULL 等价 'auto'
   documentaryRules: text('documentary_rules'),
   style: text('style').default('3d'),
