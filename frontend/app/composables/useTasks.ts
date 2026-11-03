@@ -20,6 +20,7 @@ export type TextKind =
   | 'keyframe_prompts' | 'video_prompts' | 'script_rewrite' | 'storyboard_breaker'
   | 'portrait_appearance'
   | 'asset_semantics'
+  | 'storyboard_fill_gaps'
 
 export interface TaskParams {
   frameType?: string

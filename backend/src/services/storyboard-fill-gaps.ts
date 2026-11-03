@@ -32,11 +32,13 @@ import {
 import { parseShotIntent } from './shot-intent.js'
 import { slotOwnImage } from './keyframes.js'
 import { startShotIntentBatch } from './shot-intent-batch.js'
+import { resolveStageModel } from './ai-stages.js'
+import { buildEvidenceImages, evidenceMessageParts } from './evidence-images.js'
 import {
   createTextTask,
   findActiveTextTask,
   finishTextTask,
-  resolveTextModel,
+  patchTextTaskParams,
 } from './text-task.js'
 
 export interface StoryboardNarrationRow {
@@ -259,30 +261,35 @@ export async function startFillGapsTask(
   const agent = mastra.getAgent('storyboard_breaker')
   if (!agent) throw new Error('分镜 Agent 不可用')
   const message = buildFillMessage(gaps, scriptKey, rows)
-  const resolved = await resolveTextModel(opts)
+  // 补镜就是「纪录片拆分分镜」的续跑：同一个视觉环节、同一套证据图（#51）
+  const resolved = await resolveStageModel('storyboard_breaker_documentary', opts)
   const taskId = await createTextTask({
     kind: 'storyboard_fill_gaps',
     episodeId,
     dramaId,
     prompt: message,
-    provider: resolved.provider,
-    model: resolved.model,
-    configId: opts.configId ?? resolved.configId ?? undefined,
+    stageModel: resolved,
     retryOf: opts.retryOf,
   })
+  const evidence = await buildEvidenceImages(episodeId)
+  if (evidence.length) {
+    await patchTextTaskParams(taskId, {
+      evidence_images: evidence.map(image => ({ prop_id: image.propId, name: image.name, kind: image.kind, marks: image.legend.length })),
+    })
+  }
   const requestContext = buildAgentRequestContext({
     episodeId,
     dramaId,
     textTaskId: taskId,
     storyboardFillGaps: true,
-    modelOverride: opts.model || undefined,
-    textConfigId: opts.configId || undefined,
+    modelOverride: resolved.model,
+    textConfigId: resolved.configId ?? undefined,
   })
   const sink = createReasoningSink(taskId)
   const knownIds = new Set(rows.map(sb => sb.id))
   logTaskStart('FillGaps', 'run', { episodeId, dramaId, gaps: gaps.length, taskId })
 
-  runAgent(agent, [{ role: 'user', content: message }], { maxSteps: 20, requestContext }, sink)
+  runAgent(agent, [{ role: 'user', content: evidenceMessageParts(message, evidence) }], { maxSteps: 20, requestContext }, sink)
     .then(async result => {
       // 先按剧本位置归位编号，再按覆盖结果判定成败
       const renumber = await renumberStoryboardsByScript(episodeId)
