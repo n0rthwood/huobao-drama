@@ -29,6 +29,7 @@ import assetLibrary from './routes/asset-library.js'
 import mediaLibrary from './routes/media-library.js'
 import research from './routes/research.js'
 import posters from './routes/posters.js'
+import layerDocs from './routes/layer-docs.js'
 import { requestLogger, errorHandler } from './middleware/logger.js'
 import { db, schema } from './db/index.js'
 import { and, eq, isNull, ne, or } from 'drizzle-orm'
@@ -43,6 +44,7 @@ import { backfillGeneratedAt } from './services/media-time.js'
 import { migrateReferenceImages } from './services/reference-images.js'
 import { migrateAssetNames } from './services/asset-name-migration.js'
 import { backfillPoolProjection } from './services/storyboard-assets.js'
+import { logLayerFontStatus } from './services/layer-fonts.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(__dirname, '../..')
@@ -90,6 +92,7 @@ api.route('/server-update', serverUpdate)
 api.route('/asset-library', assetLibrary)
 api.route('/media-library', mediaLibrary)
 api.route('/research', research)
+api.route('/layer-docs', layerDocs)
 
 app.route('/api/v1', api)
 
@@ -148,5 +151,7 @@ db.update(schema.sysTask)
   .then(() => startQwenJobsTracker())
   .then(() => resumeKeyframeBatches())
   .then(() => resumeVideoBatches())
+  // 叠加图层渲染字体自检（Issue #48）：失败只告警，渲染时才阻断（绝不出豆腐块）
+  .then(() => logLayerFontStatus())
 
 serve({ fetch: app.fetch, port })
