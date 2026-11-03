@@ -7,13 +7,14 @@ import { once } from 'node:events'
 import { promisify } from 'node:util'
 import { v4 as uuid } from 'uuid'
 import { db, getInsertId, schema } from '../db/index.js'
-import { eq } from 'drizzle-orm'
+import { and, asc, eq, isNull } from 'drizzle-orm'
 import { now } from '../utils/response.js'
 import { logTaskError, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
 import { completionStamp } from './media-time.js'
 import { extractVideoPoster } from '../utils/video-poster.js'
-import { ffmpeg, checkFfmpegSuite } from '../utils/ffmpeg.js'
+import { ffmpeg, checkFfmpegSuite, writeSilentWav } from '../utils/ffmpeg.js'
 import { DATA_ROOT, STORAGE_ROOT } from '../utils/paths.js'
+import { composeStatesForEpisode, type ComposeStateItem } from './compose-state.js'
 import type { FfprobeData } from 'fluent-ffmpeg'
 
 // promisify loses the result type of fluent-ffmpeg's overloaded callback API.
@@ -26,10 +27,40 @@ function toAbsPath(relativePath: string): string {
 }
 
 /**
+ * 导出被阻断：带逐镜原因，路由渲染成 400 + `blocked` 数组。
+ * 「所选镜头里只要有一条不可用就拒绝」——不静默少镜，也不拿过期成片凑成功。
+ */
+export class MergeBlockedError extends Error {
+  readonly blocked: { storyboard_id: number; storyboard_number: number; status: string; reason: string }[]
+
+  constructor(blocked: MergeBlockedError['blocked']) {
+    super(`以下镜头还不能拼接：${blocked.map(b => `#${b.storyboard_number}（${b.reason}）`).join('；')}`)
+    this.name = 'MergeBlockedError'
+    this.blocked = blocked
+  }
+}
+
+/** 融合状态 → 导出时的阻断原因（状态自带原因就用它，保证两处口径一致） */
+function exportBlockReason(state: ComposeStateItem): string {
+  if (state.reason) return state.reason
+  if (state.status === 'missing') return '尚未合成带旁白字幕的版本'
+  if (state.status === 'changed') {
+    return `融合成片已过期：${state.change_reasons.join('、') || '输入已变化'}，请重新融合后再导出`
+  }
+  if (state.status === 'unknown') return '旧版合成记录无法核验，请重新融合后再导出'
+  return '当前不可用于导出'
+}
+
+/**
  * 拼接一集的镜头视频。
- * 旁白开关关闭时沿用既有口径（视频生成产物优先，兼容历史 composedVideoUrl）。
- * 开关打开时只取合成版本（带旁白与字幕的成片），没有合成版本的镜头跳过并列出原因。
- * 传入 storyboardIds 时只拼接所选镜头（仍按镜号顺序）。
+ *
+ * - 旁白开关关闭：沿用既有口径（视频生成产物优先，兼容历史 composedVideoUrl）。
+ * - 旁白开关打开：只取**签名匹配且依赖就绪**的融合成片（compose_state.exportable），
+ *   过期/未融合/文件丢失一律不进成片。
+ * - 未传 storyboard_ids 表示选择整集；显式数组表示用户所选范围。
+ *   该范围只要有一条不可用就整单拒绝（400 + 逐镜原因），不静默少镜；
+ *   用户要做部分导出必须明确缩小选择。
+ * - 软删除的镜头一律不参与。
  */
 export interface MergeIntro {
   /** static/ 相对路径 */
@@ -43,35 +74,67 @@ export async function mergeEpisodeVideos(
   storyboardIds?: number[],
   intro?: MergeIntro,
 ): Promise<{ mergeId: number; skipped: { storyboard_number: number; reason: string }[] }> {
-  let storyboards = await db.select().from(schema.storyboards)
-    .where(eq(schema.storyboards.episodeId, episodeId))
-    .orderBy(schema.storyboards.storyboardNumber)
+  const live = await db.select().from(schema.storyboards)
+    .where(and(eq(schema.storyboards.episodeId, episodeId), isNull(schema.storyboards.deletedAt)))
+    .orderBy(asc(schema.storyboards.storyboardNumber))
 
-  if (storyboardIds?.length) {
-    const allow = new Set(storyboardIds.map(Number))
-    storyboards = storyboards.filter(sb => allow.has(sb.id))
+  // undefined = 整集范围；显式数组（含空数组）= 用户明确选择，不得扩大
+  const explicit = storyboardIds !== undefined
+  if (explicit && !storyboardIds.length) throw new Error('没有选择任何镜头，无法拼接')
+  const storyboards = explicit
+    ? live.filter(sb => storyboardIds.includes(sb.id))
+    : live
+  if (explicit) {
+    const unknownIds = storyboardIds.filter(id => !storyboards.some(sb => sb.id === id))
+    if (unknownIds.length) throw new Error(`以下镜头不属于本集或已删除，无法拼接：${unknownIds.join('、')}`)
   }
 
   const [episode] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId))
   const narrationEnabled = episode?.narrationEnabled === true
 
-  // 开关打开时只认合成版本，不静默混入带模型声音的原始视频
   const skipped: { storyboard_number: number; reason: string }[] = []
-  const clips: { sb: typeof storyboards[number]; url: string }[] = []
-  for (const sb of storyboards) {
-    const url = narrationEnabled ? sb.composedVideoUrl : (sb.videoUrl || sb.composedVideoUrl)
-    if (url) {
-      clips.push({ sb, url })
-      continue
-    }
-    if (narrationEnabled) {
-      skipped.push({
+  const blocked: MergeBlockedError['blocked'] = []
+  const clips: { sb: typeof live[number]; url: string }[] = []
+
+  if (narrationEnabled) {
+    // 开关打开时只认「与当前输入一致」的融合成片：不静默混入原始视频，也不用过期成片
+    const states = await composeStatesForEpisode(episodeId, {
+      storyboardIds: storyboards.map(sb => sb.id),
+      rows: live,
+      episode,
+    })
+    const stateById = new Map(states.map(state => [state.storyboard_id, state]))
+    for (const sb of storyboards) {
+      const state = stateById.get(sb.id)
+      if (state?.exportable && sb.composedVideoUrl) {
+        clips.push({ sb, url: sb.composedVideoUrl })
+        continue
+      }
+      const reason = state ? exportBlockReason(state) : '无法判断融合状态'
+      blocked.push({
+        storyboard_id: sb.id,
         storyboard_number: sb.storyboardNumber,
-        reason: sb.videoUrl ? '尚未合成带旁白字幕的版本' : '尚未生成视频',
+        status: state?.status ?? 'blocked',
+        reason,
+      })
+    }
+  } else {
+    for (const sb of storyboards) {
+      const url = sb.videoUrl || sb.composedVideoUrl
+      if (url) {
+        clips.push({ sb, url })
+        continue
+      }
+      blocked.push({
+        storyboard_id: sb.id,
+        storyboard_number: sb.storyboardNumber,
+        status: 'missing',
+        reason: '尚未生成视频',
       })
     }
   }
 
+  if (blocked.length) throw new MergeBlockedError(blocked)
   if (clips.length === 0) throw new Error('所选镜头还没有可拼接的视频')
 
   // 拼接前探测 ffmpeg：二进制损坏时 fluent-ffmpeg 的同步 EFTYPE 会崩掉整个进程，
@@ -145,26 +208,6 @@ async function probeIntroSpec(firstClip: string): Promise<IntroSpec> {
     sampleRate: Number(audio?.sample_rate) || 48000,
     channels: Number(audio?.channels) === 1 ? 1 : 2,
   }
-}
-
-/** 生成静音 WAV：fluent-ffmpeg 的格式解析器不认 lavfi 设备，因此用真实 WAV 文件作音轨输入。 */
-function writeSilentWav(filePath: string, sampleRate: number, channels: number, duration: number) {
-  const dataSize = Math.max(0, Math.round(sampleRate * channels * 2 * duration))
-  const header = Buffer.alloc(44)
-  header.write('RIFF', 0, 'ascii')
-  header.writeUInt32LE(36 + dataSize, 4)
-  header.write('WAVE', 8, 'ascii')
-  header.write('fmt ', 12, 'ascii')
-  header.writeUInt32LE(16, 16)
-  header.writeUInt16LE(1, 20)
-  header.writeUInt16LE(channels, 22)
-  header.writeUInt32LE(sampleRate, 24)
-  header.writeUInt32LE(sampleRate * channels * 2, 28)
-  header.writeUInt16LE(channels * 2, 32)
-  header.writeUInt16LE(16, 34)
-  header.write('data', 36, 'ascii')
-  header.writeUInt32LE(dataSize, 40)
-  fs.writeFileSync(filePath, Buffer.concat([header, Buffer.alloc(dataSize)]))
 }
 
 /**

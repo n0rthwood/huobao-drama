@@ -59,3 +59,19 @@ desktop/release/
 desktop/resources/
 frontend/dist
 data/text-tasks/
+
+# Local director smoke requests, responses, and one-off polling artifacts
+/create_drama.json
+/create_ep.json
+/drama5.json
+/extract-scenes2.json
+/poll_extract.py
+/poll_tasks.py
+/prop43-after.json
+/prop43_put.json
+/prop44-after.json
+/prop44_put.json
+/put_content.json
+/put_rules.json
+/requests.jsonl
+/skill-consumption.md

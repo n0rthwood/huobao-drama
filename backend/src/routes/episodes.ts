@@ -45,12 +45,12 @@ import {
   estimateNarrationSeconds,
   narrationCharCount,
   narrationIssues,
-  narrationStatus,
   parseNarrationMeta,
 } from '../services/narration.js'
+import { composeStateMap, narrationStatusFor, type ComposeStateItem } from '../services/compose-state.js'
 import { getNarrationScriptStatus, startNarrationScript } from '../services/narration-script.js'
 import { getMarkupCatalog, getTtsOptions, getVoiceBatchStatus, previewVoiceBatch, resolveSubtitleTiming, startVoiceBatch } from '../services/narration-voice.js'
-import { getComposeBatchStatus, startComposeBatch } from '../services/shot-compose.js'
+import { getComposeBatchStatus, previewComposeBatch, startComposeBatch } from '../services/shot-compose.js'
 import { DEFAULT_FIT_RECORD, parseFitRecord, validateFitRecord } from '../services/narration-fit.js'
 import type { AssetKind } from '../services/reference-images.js'
 import { loadEpisodeRosterRecord, saveEpisodeRosterRecord } from '../services/character-roster.js'
@@ -455,7 +455,23 @@ app.get('/:id/narration/voice-batch-status', async (c) => {
   return success(c, await getVoiceBatchStatus(Number(c.req.param('id'))))
 })
 
+// POST /episodes/:id/compose-batch/preview — 逐镜列出 未合成/已变化/未变化/无法比较/阻断/进行中
+// body.storyboard_ids 省略 = 整集范围；显式传数组（含空数组）= 只看这些镜头，不扩大
+app.post('/:id/compose-batch/preview', async (c) => {
+  const id = Number(c.req.param('id'))
+  const body = await c.req.json().catch(() => ({} as Record<string, any>))
+  const storyboardIds = Array.isArray(body.storyboard_ids)
+    ? body.storyboard_ids.map(Number).filter((n: number) => Number.isInteger(n) && n > 0)
+    : undefined
+  try {
+    return success(c, { items: await previewComposeBatch(id, storyboardIds) })
+  } catch (err) {
+    return badRequest(c, err instanceof Error ? err.message : '批量融合预览失败')
+  }
+})
+
 // POST /episodes/:id/compose-batch — 批量合成分镜成片（视频 + 旁白 + 字幕）
+// 必须带预览里明确勾选的 storyboard_ids，空选直接拒绝（不会退化成整集重做）
 app.post('/:id/compose-batch', async (c) => {
   const id = Number(c.req.param('id'))
   const body = await c.req.json().catch(() => ({} as Record<string, any>))
@@ -463,11 +479,11 @@ app.post('/:id/compose-batch', async (c) => {
   if (!ep) return notFound(c, '剧集不存在')
   const storyboardIds = Array.isArray(body.storyboard_ids)
     ? body.storyboard_ids.map(Number).filter((n: number) => Number.isInteger(n) && n > 0)
-    : undefined
+    : []
+  if (!storyboardIds.length) return badRequest(c, '请先在预览清单里勾选要融合的镜头')
   try {
     const result = await startComposeBatch(ep.id, ep.dramaId, storyboardIds)
-    if (result.total === -1) return success(c, { status: 'running', already_running: true })
-    if (!result.started) return success(c, { status: 'idle', total: 0 })
+    if (result.total === -1) return success(c, { status: 'running', already_running: true, total: 0 })
     return success(c, { status: 'running', total: result.total })
   } catch (err) {
     return badRequest(c, err instanceof Error ? err.message : '批量合成启动失败')
@@ -671,9 +687,13 @@ app.get('/:episode_id/storyboards', async (c) => {
   const episodeAssets = await loadEpisodeAssets(episodeId)
   // 本镜资产池（Issue #43）：有效池 = 手选 ∪ 5 个提示词当前 @；整集手选一次查完
   const manualSelections = await loadEpisodeManualSelections(rows.map(row => row.id))
-  // 旁白状态由服务端算好（前端不自己推）：开关 + 文本 + 配音 + 合成签名
+  // 旁白与融合状态一律由服务端算好（前端不自己推 URL 布尔）：
+  // compose_state 与批量预览、导出校验是同一份输入事实，所以不会出现「刚合成就过期」
   const [narrationEpisode] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId))
   const episodeNarrationEnabled = narrationEpisode?.narrationEnabled === true
+  const composeStates: Map<number, ComposeStateItem> = narrationEpisode
+    ? await composeStateMap(episodeId, { rows, episode: narrationEpisode })
+    : new Map()
   return success(c, await Promise.all(rows.map(async (row) => {
     const videoVersions: Array<{
       id: number | null
@@ -722,16 +742,9 @@ app.get('/:episode_id/storyboards', async (c) => {
         }),
       ],
       narration_meta: parseNarrationMeta(row.narrationMeta),
-      narration_status: narrationStatus({
-        episodeNarrationEnabled,
-        shotNarrationEnabled: row.narrationEnabled !== false,
-        narrationText: row.narrationText,
-        narrationAudioUrl: row.narrationAudioUrl,
-        videoUrl: row.videoUrl,
-        composedVideoUrl: row.composedVideoUrl,
-        subtitleUrl: row.subtitleUrl,
-        meta: parseNarrationMeta(row.narrationMeta),
-      }),
+      // 本镜融合状态：与批量预览、导出校验同形同源（软删行没有状态）
+      compose_state: composeStates.get(row.id) ?? null,
+      narration_status: narrationStatusFor(row, episodeNarrationEnabled, composeStates.get(row.id)),
       narration_chars: narrationCharCount(row.narrationText),
       narration_estimate_seconds: estimateNarrationSeconds(row.narrationText),
       // 本镜生效的文本规范化（#35）：镜级覆盖 > 集级默认（默认开）
