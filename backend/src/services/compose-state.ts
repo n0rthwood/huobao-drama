@@ -592,14 +592,30 @@ function deriveComposeState(
       change_reasons: [],
     }
   }
-  if (composed.signature_version !== COMPOSE_SIGNATURE_VERSION || !composed.inputs) {
+  if (!composed.inputs) {
+    // v1（#30/#31）根本没存分项，无从比较
     return {
       ...ready,
       status: 'unknown',
       checked: false,
       exportable: false,
-      reason: '这条成片由旧版本合成（输入快照格式已升级），无法与当前输入逐项比较：请重新合成以确认最新',
+      reason: '这条成片由旧版本合成（没有输入快照），无法与当前输入逐项比较：请重新合成以确认最新',
       change_reasons: [],
+    }
+  }
+  if (composed.signature_version !== COMPOSE_SIGNATURE_VERSION) {
+    // v2 → v3（#50 追加确定性片段分项）：分项仍然逐条可比，只是签名口径换了版本。
+    // 按 Issue #50 的口径显示「已变化·签名版本」，不自动重合成。
+    return {
+      ...ready,
+      status: 'changed',
+      checked: true,
+      exportable: false,
+      reason: null,
+      change_reasons: [
+        `合成输入快照版本已升级（v${composed.signature_version ?? 1} → v${COMPOSE_SIGNATURE_VERSION}）`,
+        ...describeComposeDiff(parts, composed.inputs).filter(reason => reason !== '输入快照与上次合成不一致'),
+      ],
     }
   }
   if (composed.signature === signature) {

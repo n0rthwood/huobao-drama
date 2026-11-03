@@ -283,7 +283,9 @@ export async function resolveEpisodeClipSpec(episodeId: number): Promise<ClipSpe
   if (cached) return cached
   const rows = await db.select().from(schema.storyboards).where(eq(schema.storyboards.episodeId, episodeId))
   for (const row of rows.sort((a, b) => a.storyboardNumber - b.storyboardNumber)) {
-    const candidate = row.videoUrl || row.composedVideoUrl
+    // 只看模型视频：成片（composed）是由片段**产出**的，拿它定规格会形成
+    // 「渲染→合成→规格变→签名变→片段被判过期」的循环（merge 阻断实测踩到过）
+    const candidate = row.videoUrl
     if (!candidate) continue
     const probed = await probeVideoSpec(getAbsolutePath(candidate))
     if (!probed) continue
