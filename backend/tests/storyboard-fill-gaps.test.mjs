@@ -235,3 +235,28 @@ test('fill-gaps entry is documentary-only, idempotent without gaps and refuses a
   // 三次调用都没有建补镜任务（只有测试自己建的那条拆分任务）
   assert.deepEqual(result.taskKinds, ['storyboard_breaker'])
 })
+
+
+test('fill-gaps returns 400 (not 500) when the documentary vision stage has no vision config', () => {
+  const result = run(`
+    ${FIXTURE(`[
+      { id: 11, episodeId: 1, storyboardNumber: 1, title: 'S1', narrationText: ${JSON.stringify(S1)}, duration: 8, continuityBoundary: 'cut', createdAt: at, updatedAt: at },
+    ]`)}
+    // 只有一条非视觉文本配置：补镜是视觉环节（#51），必须给中文原因而不是 500
+    await db.insert(schema.aiServiceConfigs).values({
+      id: 1, serviceType: 'text', provider: 'openai', name: 'GLM', baseUrl: 'http://127.0.0.1:9/v1',
+      apiKey: 'k', model: JSON.stringify(['glm-5.3']), isActive: true, vision: false, createdAt: at, updatedAt: at,
+    })
+    const app = (await import('./src/routes/episodes.ts')).default
+    const res = await app.request('/1/storyboards/fill-gaps', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}',
+    })
+    const body = await res.json()
+    const tasks = await db.select().from(schema.sysTask)
+    console.log('@@' + JSON.stringify({ status: res.status, message: body.message, tasks: tasks.length }))
+  `)
+  assert.equal(result.status, 400)
+  assert.match(result.message, /需要视觉模型/)
+  // 解析失败发生在建任务之前：不留半条任务
+  assert.equal(result.tasks, 0)
+})

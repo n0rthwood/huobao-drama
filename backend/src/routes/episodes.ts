@@ -67,6 +67,7 @@ import { loadEpisodeRosterRecord, saveEpisodeRosterRecord } from '../services/ch
 import type { RosterEntryInput } from '../services/character-roster.js'
 import { normalizeAssetName } from '../services/asset-name.js'
 import { episodeNarrationCoverage, startFillGapsTask } from '../services/storyboard-fill-gaps.js'
+import { StageVisionUnavailableError } from '../services/ai-stages.js'
 
 const app = new Hono()
 
@@ -644,11 +645,17 @@ app.post('/:id/storyboards/fill-gaps', async (c) => {
   const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, id))
   if (!ep) return notFound(c, '剧集不存在')
   if (resolveDramaProjectType(ep.dramaId) !== 'documentary') return badRequest(c, '只有纪录片项目才有补镜')
-  const result = await startFillGapsTask(id, { model: body.model || undefined, configId: body.config_id ?? undefined })
-  // 同一集已有拆分/补镜任务在跑：拒绝而不是再起一个（两个任务会互相覆盖缺口判定）
-  if (result.reason === 'running') return c.json({ code: 409, message: '该集的拆分/补镜任务正在运行，请等它结束' }, 409)
-  if (!result.started) return success(c, { status: 'idle', gaps: 0 })
-  return success(c, { status: 'running', gaps: result.gaps, task_id: result.taskId })
+  try {
+    const result = await startFillGapsTask(id, { model: body.model || undefined, configId: body.config_id ?? undefined })
+    // 同一集已有拆分/补镜任务在跑：拒绝而不是再起一个（两个任务会互相覆盖缺口判定）
+    if (result.reason === 'running') return c.json({ code: 409, message: '该集的拆分/补镜任务正在运行，请等它结束' }, 409)
+    if (!result.started) return success(c, { status: 'idle', gaps: 0 })
+    return success(c, { status: 'running', gaps: result.gaps, task_id: result.taskId })
+  } catch (err) {
+    // 补镜是视觉环节（#51）：没有可用视觉配置时给中文原因，不要 500
+    if (err instanceof StageVisionUnavailableError) return badRequest(c, err.message)
+    return badRequest(c, err instanceof Error ? err.message : '补全剩余失败')
+  }
 })
 
 // POST /episodes/:id/keyframe-batch/preview — 逐个“分镜 × 槽位”列出 缺图/已变化/未变化(同第N版)/阻断/跳过
