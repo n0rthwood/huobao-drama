@@ -191,9 +191,15 @@ const baseSrc = computed(() => mediaUrl(doc.value.base.path))
 
 /** 某一时刻：取景框 + 图层不透明度都由时间线插值得出（口径同后端 frameStateAt） */
 const frame = computed(() => frameStateAt(timeline.value, time.value))
-/** 叠加层按整幅画出，裁切交给外层 DOM，这样底图/滤镜/图层共用同一个取景框 */
+/**
+ * 叠加层按整幅画出，裁切交给外层 DOM，这样底图/滤镜/图层共用同一个取景框。
+ * `visibleIds` 必须显式给：`opacity` 只覆盖时间线提到过的图层，缺省 key 在
+ * layerDocToSvg 里按 alpha=1 画，没被任何状态勾选的图层会全程常显（后端
+ * clip-render.ts 同样用 visibleIds 排除它们）。
+ */
 const frameSvg = computed(() => layerDocToSvg(doc.value, { width: specW.value, height: specH.value }, {
   opacity: frame.value.opacity,
+  visibleIds: Object.keys(frame.value.opacity).filter(id => frame.value.opacity[id] > 0),
   resolveImage: path => mediaUrl(path),
 }))
 const baseFilters = computed(() => baseFilterLayers(doc.value.base.filter, { width: specW.value, height: specH.value }))
