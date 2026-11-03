@@ -79,11 +79,9 @@ export function narrationCoverage(script: string | null | undefined, narrations:
 }
 
 /**
- * 旁白写作是否只加了发音标记：去标记后的文本与原文逐字相同（去空白后比对）。
- * 原文为空（该镜还没有分配旁白）时返回 true —— 没有可保护的原文。
+ * 旁白写作是否只加了发音标记：去标记后的文本与原文逐字相同（含空白，只忽略首尾空白）。
+ * 原文为空（该镜是刻意留白的纯画面镜头）时只接受同样为空的文本——不许凭空写旁白。
  */
 export function isMarkupOnlyEdit(original: string | null | undefined, next: string | null | undefined): boolean {
-  const base = narrationMatchKey(spokenText(original))
-  if (!base) return true
-  return narrationMatchKey(spokenText(next)) === base
+  return spokenText(next).trim() === spokenText(original).trim()
 }

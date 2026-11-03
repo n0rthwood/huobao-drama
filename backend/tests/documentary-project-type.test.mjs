@@ -125,17 +125,22 @@ test('new episodes of a documentary project default to narration enabled', () =>
   assert.equal(result.drama, false)
 })
 
-test('documentary skills are injected into script_rewriter and storyboard_breaker only for documentary projects', () => {
+test('narration-first skills follow project_type, not the documentary ruleset', () => {
   const result = run(`
     import { loadAgentSkills } from './src/agents/skills.ts'
     const plainScript = await loadAgentSkills('script_rewriter', null, {})
-    const docScript = await loadAgentSkills('script_rewriter', null, { genreRuleset: 'documentary' })
+    const docScript = await loadAgentSkills('script_rewriter', null, { projectType: 'documentary' })
     const plainBreaker = await loadAgentSkills('storyboard_breaker', null, {})
-    const docBreaker = await loadAgentSkills('storyboard_breaker', null, { genreRuleset: 'documentary' })
-    const docBreakerEn = await loadAgentSkills('storyboard_breaker', 'en', { genreRuleset: 'documentary' })
-    console.log('@@' + JSON.stringify({ plainScript, docScript, plainBreaker, docBreaker, docBreakerEn }))
+    const docBreaker = await loadAgentSkills('storyboard_breaker', null, { projectType: 'documentary' })
+    const docBreakerEn = await loadAgentSkills('storyboard_breaker', 'en', { projectType: 'documentary' })
+    // drama 项目靠 documentary_rules 打开纪录片规则（如 drama 3）：题材 addendum 照旧，
+    // narration-first 的两份技能不能注入（它们的工具变体只在 documentary 项目里）
+    const rulesOnlyScript = await loadAgentSkills('script_rewriter', null, { genreRuleset: 'documentary' })
+    const rulesOnlyBreaker = await loadAgentSkills('storyboard_breaker', null, { genreRuleset: 'documentary' })
+    const rulesOnlyExtractor = await loadAgentSkills('extractor', null, { genreRuleset: 'documentary' })
+    console.log('@@' + JSON.stringify({ plainScript, docScript, plainBreaker, docBreaker, docBreakerEn, rulesOnlyScript, rulesOnlyBreaker, rulesOnlyExtractor }))
   `)
-  // 未命中项目类型 / 题材：基础技能文本里没有纪录片段落
+  // 未命中项目类型：基础技能文本里没有纪录片段落
   assert.ok(!result.plainScript.includes('documentary-script'))
   assert.ok(!result.plainBreaker.includes('documentary-storyboard'))
   // 命中：addendum 追加在基础技能之后，基础技能文本原样保留
@@ -149,6 +154,10 @@ test('documentary skills are injected into script_rewriter and storyboard_breake
   assert.ok(result.docBreaker.includes('每镜一个信息点'))
   // 四语：英文变体走 SKILL.en.md
   assert.ok(result.docBreakerEn.includes('One information point per shot'))
+  // documentary_rules='on' 的 drama 项目：技能文本与改动前逐字一致
+  assert.equal(result.rulesOnlyScript, result.plainScript)
+  assert.equal(result.rulesOnlyBreaker, result.plainBreaker)
+  assert.ok(result.rulesOnlyExtractor.includes('## Skill: documentary/documentary-extraction'))
 })
 
 test('documentary agents get the narration-first tool variants and drama agents do not', () => {
@@ -301,6 +310,11 @@ test('documentary narration writing may only add pronunciation markers', () => {
         narrationText: original, narrationEnabled: true, createdAt: at, updatedAt: at,
       })
     }
+    // 纪录片项目里刻意留白的纯画面镜头（拆镜没有分配旁白）
+    await db.insert(schema.storyboards).values({
+      id: 3, episodeId: 1, storyboardNumber: 2, title: 'silent', duration: 6,
+      narrationText: '', narrationEnabled: false, createdAt: at, updatedAt: at,
+    })
     const ctx = (episodeId, dramaId) => ({ requestContext: buildAgentRequestContext({ episodeId, dramaId }) })
     const docSave = documentaryNarrationTools.saveNarrations.execute
     const text = async id => (await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, id)))[0].narrationText
@@ -314,10 +328,17 @@ test('documentary narration writing may only add pronunciation markers', () => {
     const disable = await docSave({ narrations: [{ shot_number: 1, narration: '', narration_enabled: false }] }, ctx(1, 1))
     const afterDisable = await text(1)
     // drama 项目：改写照常保存
+    // 原文为空的纯画面镜头：不许凭空写旁白
+    const invented = await docSave({ narrations: [{ shot_number: 2, narration: '这里本来没有旁白。' }] }, ctx(1, 1))
+    const afterInvented = await text(3)
+    // 只改空白（把词粘起来）也算改字
+    const spaced = await docSave({ narrations: [{ shot_number: 1, narration: '额尔齐斯河是唯一一条能把军 队送进腹地的水道。' }] }, ctx(1, 1))
+    const afterSpaced = await text(1)
     const dramaWrite = await narrationTools.saveNarrations.execute({ narrations: [{ shot_number: 1, narration: '完全不同的新旁白。' }] }, ctx(2, 2))
     const afterDrama = await text(2)
     console.log('@@' + JSON.stringify({
       marked, afterMarked, rewrite, afterRewrite, disable, afterDisable, dramaWrite, afterDrama, original,
+      invented, afterInvented, spaced, afterSpaced,
     }))
   `)
   assert.deepEqual(result.marked.saved_shot_numbers, [1])
@@ -327,6 +348,11 @@ test('documentary narration writing may only add pronunciation markers', () => {
   assert.equal(result.afterRewrite, result.afterMarked)
   assert.deepEqual(result.disable.saved_shot_numbers, [])
   assert.equal(result.afterDisable, result.afterMarked)
+  assert.deepEqual(result.invented.saved_shot_numbers, [])
+  assert.match(result.invented.rejected[0].reason, /narration-first/)
+  assert.equal(result.afterInvented, '')
+  assert.deepEqual(result.spaced.saved_shot_numbers, [])
+  assert.equal(result.afterSpaced, result.afterMarked)
   // drama 项目完全不受影响
   assert.deepEqual(result.dramaWrite.saved_shot_numbers, [1])
   assert.equal(result.afterDrama, '完全不同的新旁白。')

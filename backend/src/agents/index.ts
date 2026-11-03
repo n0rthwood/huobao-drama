@@ -451,7 +451,11 @@ function buildInstructions(type: string) {
     const baseInstructions = promptFile?.instructions || defaults.instructions
     // 条件技能（#30）：本集开了旁白开关时才注入「分镜侧配合旁白」的规范；题材 addendum（#32）
     const narrationEnabled = requestContext?.get('narrationEnabled' as never) === true
-    const skillInstructions = await loadAgentSkills(type, lang, { narrationEnabled, genreRuleset: getGenreRuleset(requestContext) })
+    const skillInstructions = await loadAgentSkills(type, lang, {
+      narrationEnabled,
+      genreRuleset: getGenreRuleset(requestContext),
+      projectType: getProjectType(requestContext),
+    })
     const languageDirective = buildLanguageDirective(lang)
     return [baseInstructions, skillInstructions, languageDirective]
       .filter(Boolean)
