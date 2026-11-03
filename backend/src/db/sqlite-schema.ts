@@ -236,6 +236,7 @@ export const sqliteSchemaStatements = [
     priority INTEGER DEFAULT 0,
     is_default INTEGER DEFAULT 0,
     is_active INTEGER DEFAULT 1,
+    vision INTEGER NOT NULL DEFAULT 0,
     settings TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
@@ -557,6 +558,9 @@ const columnAdditions: { table: string; column: string; type: string }[] = [
   // 与人工确认位；非纪录片项目恒为 NULL / 0。
   { table: 'storyboards', column: 'intent', type: 'TEXT' },
   { table: 'storyboards', column: 'intent_reviewed', type: 'INTEGER NOT NULL DEFAULT 0' },
+  // 文本配置的视觉能力标定（Issue #51）：存量行默认 0（不做一次性探测初值——HTTP 200 不等于真能看图），
+  // 由 providers.json / 设置页人工标定。需要视觉的 AI 环节只会选 vision=1 的配置。
+  { table: 'ai_service_configs', column: 'vision', type: 'INTEGER NOT NULL DEFAULT 0' },
 ]
 
 /**

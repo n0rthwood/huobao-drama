@@ -109,6 +109,15 @@
               <dt>{{ t('taskCenter.detail.elapsed') }}</dt>
               <dd>{{ elapsedText }}</dd>
             </div>
+            <!-- AI 环节与实际使用的模型（#51）：视觉环节会把顶栏选的非视觉模型换掉 -->
+            <div v-if="stageInfo" class="task-detail-cell">
+              <dt>{{ t('taskCenter.detail.stage') }}</dt>
+              <dd>{{ stageInfo }}</dd>
+            </div>
+            <div v-if="modelUsed" class="task-detail-cell">
+              <dt>{{ t('taskCenter.detail.modelUsed') }}</dt>
+              <dd>{{ modelUsed }}</dd>
+            </div>
             <!-- 读图调用计量（#46）：文本任务里 read_image 用了几次、哪个模型、多少 token -->
             <div v-if="visionCalls" class="task-detail-cell">
               <dt>{{ t('taskCenter.detail.visionCalls') }}</dt>
@@ -231,6 +240,20 @@ const referenceImages = computed(() => (Array.isArray(params.value.referenceImag
 const visionCalls = computed(() => {
   const v = params.value.vision_calls
   return v && typeof v === 'object' && Number(v.count) > 0 ? v : null
+})
+/** AI 环节标记（#51）：stage + 是否视觉环节 */
+const stageInfo = computed(() => {
+  const stage = params.value.stage
+  if (!stage) return ''
+  return params.value.model_used?.vision === true
+    ? `${stage}（${t('taskCenter.detail.stageVision')}）`
+    : String(stage)
+})
+/** 本次实际落到哪条配置/模型（顶栏选 GLM 的视觉环节会显示 DeepSeek） */
+const modelUsed = computed(() => {
+  const m = params.value.model_used
+  if (!m || typeof m !== 'object') return ''
+  return [m.name, m.model].filter(Boolean).join(' · ')
 })
 const resultUrl = computed(() => live.value.local_path || live.value.result_url || '')
 const ring = computed(() => ringPropsFromTask(live.value, now.value))

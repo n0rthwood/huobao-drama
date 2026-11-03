@@ -79,6 +79,9 @@
       "createdAt": "Created",
       "completedAt": "Completed",
       "elapsed": "Elapsed",
+      "stage": "AI stage",
+      "stageVision": "vision required",
+      "modelUsed": "Model actually used",
       "visionCalls": "Vision calls",
       "visionCallsValue": "{n}× · {model} · {pt}/{ct} tokens",
       "prompt": "Prompt (read-only)",
@@ -721,7 +724,11 @@
       "ttsVoiceLoading": "Loading voices…",
       "ttsVoicePlaceholder": "Refresh the voice list, then pick one",
       "ttsVoiceEmpty": "The service returned no voices",
-      "ttsVoiceRequired": "Pick a voice before saving"
+      "ttsVoiceRequired": "Pick a voice before saving",
+      "vision": "Vision model",
+      "visionHint": "This text service can actually read images (e.g. DeepSeek V4.1 Flash). Stages that must look at pictures (documentary shot breakdown, shot intent, semantics annotation, beautify fidelity check, portrait appearance) only use configs marked as vision.",
+      "visionTag": "vision",
+      "visionProbeTitle": "Image-reading check"
     },
     "styleDialog": {
       "editTitle": "Edit Style Preset",

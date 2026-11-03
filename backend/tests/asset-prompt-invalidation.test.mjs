@@ -30,6 +30,8 @@ const seed = `
   const ts = new Date().toISOString()
   await db.insert(schema.dramas).values({ id: 1, title: 't', createdAt: ts, updatedAt: ts })
   await db.insert(schema.episodes).values({ id: 2, dramaId: 1, episodeNumber: 1, title: 'e', createdAt: ts, updatedAt: ts })
+  // 提示词环节按 AI_STAGES 解析模型（#51）：没有启用的文本配置会直接失败
+  await db.insert(schema.aiServiceConfigs).values({ id: 1, serviceType: 'text', provider: 'openai', name: 'stub', baseUrl: 'http://127.0.0.1:9/v1', apiKey: 'k', model: JSON.stringify(['stub-model']), priority: 100, isActive: true, vision: false, createdAt: ts, updatedAt: ts })
   const resetChar = () => db.insert(schema.characters).values({ id: 3, dramaId: 1, name: '公鸡爷爷', role: '配角', appearance: '红冠公鸡', styling: '', description: '', finalPrompt: '旧稿：红冠公鸡', createdAt: ts, updatedAt: ts })
     .onConflictDoUpdate({ target: schema.characters.id, set: { name: '公鸡爷爷', role: '配角', appearance: '红冠公鸡', finalPrompt: '旧稿：红冠公鸡' } })
 `

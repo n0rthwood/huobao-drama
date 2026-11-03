@@ -79,6 +79,9 @@
       "createdAt": "创建时间",
       "completedAt": "完成时间",
       "elapsed": "耗时",
+      "stage": "AI 环节",
+      "stageVision": "需要视觉",
+      "modelUsed": "实际使用模型",
       "visionCalls": "读图调用",
       "visionCallsValue": "{n} 次 · {model} · {pt}/{ct} token",
       "prompt": "提示词（只读）",
@@ -721,7 +724,11 @@
       "ttsVoiceLoading": "正在读取音色列表…",
       "ttsVoicePlaceholder": "先点「刷新音色列表」再选",
       "ttsVoiceEmpty": "该服务没有返回任何音色",
-      "ttsVoiceRequired": "请先选定音色再保存"
+      "ttsVoiceRequired": "请先选定音色再保存",
+      "vision": "视觉模型",
+      "visionHint": "该文本服务能读懂图片内容（如 DeepSeek V4.1 Flash）。需要看图的环节（纪录片拆分分镜、表达设计、语义标注、美化核验、史料画像）只会使用标记为视觉的配置。",
+      "visionTag": "视觉",
+      "visionProbeTitle": "读图校验"
     },
     "styleDialog": {
       "editTitle": "编辑风格预设",

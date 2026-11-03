@@ -27,6 +27,7 @@ import {
   type FinalPromptResult,
 } from './final-prompt.js'
 import { sceneFinalPromptCoversTime } from './scene-time.js'
+import { resolveStageModel } from './ai-stages.js'
 import { partitionMissingReferences, resolveReferenceImages } from './reference-images.js'
 import { ACTIVE_TASK_STATUSES, isActiveTaskStatus, isQwenJobsTask, type SysTaskRow } from './sys-task.js'
 import { cancelImageTask } from './qwen-jobs.js'
@@ -570,13 +571,14 @@ export async function startAssetBatch(dramaId: number, req: AssetBatchRequest): 
   }
   const counts = countItems(items)
   const pending = items.filter(i => i.state === 'pending').length
+  // 父任务也记环节（#51）：实际提示词改写由 final-prompt.ts 按同一环节解析
+  const stageModel = await resolveStageModel('final_prompt', { model: req.textModel, configId: req.textConfigId })
   const taskId = await createTextTask({
     kind: 'asset_batch',
     episodeId: req.episodeId,
     dramaId,
     prompt: `资产批量生成（${req.scope}）：${pending} 个待处理 / 共 ${counts.total} 个`,
-    model: req.textModel ?? null,
-    configId: req.textConfigId ?? null,
+    stageModel,
   })
   await persist(taskId, batch)
   logTaskStart('AssetBatch', 'start', {

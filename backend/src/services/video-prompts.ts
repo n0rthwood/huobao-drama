@@ -16,11 +16,11 @@ import {
   findLatestTextTask,
   finishTextTask,
   promptBatchStatusFrom,
-  resolveTextModel,
   updateTextTaskProgress,
   type PromptBatchStatus,
   type TextTaskProgress,
 } from './text-task.js'
+import { resolveStageModel } from './ai-stages.js'
 import { loadEpisodeKeyframes } from './keyframes.js'
 import { parseTransitionReview, transitionStatus } from './transition.js'
 import { runTransitionReview } from './transition-agent.js'
@@ -78,15 +78,13 @@ export async function startVideoPromptBatch(
     if (cfg) videoLabel = `${cfg.name} (${cfg.provider})`
   }
 
-  const resolved = await resolveTextModel(opts)
+  const resolved = await resolveStageModel('video_prompts', opts)
   const progress: TextTaskProgress = { completed: 0, failed: 0, total: pending.length }
   const taskId = await createTextTask({
     kind: 'video_prompts',
     episodeId,
     dramaId,
-    provider: resolved.provider,
-    model: resolved.model,
-    configId: opts.configId ?? resolved.configId ?? undefined,
+    stageModel: resolved,
     // 落盘实际处理范围（而非调用方传入的可选列表），重试时按同一批分镜重跑
     storyboardIds: pending.map(sb => sb.id),
     progress,
@@ -103,8 +101,8 @@ export async function startVideoPromptBatch(
       dramaId,
       textTaskId: taskId,
       storyboardPromptScope: 'video',
-      modelOverride: opts.model || undefined,
-      textConfigId: opts.configId || undefined,
+      modelOverride: resolved.model,
+      textConfigId: resolved.configId ?? undefined,
       // 开了旁白的集：条件技能要求视频提示词里不得出现旁白台词（旁白走独立音轨）
       narrationEnabled: ep?.narrationEnabled === true,
     })

@@ -13,10 +13,10 @@ import {
   findActiveTextTask,
   findLatestTextTask,
   finishTextTask,
-  resolveTextModel,
   textTaskOutcome,
   type TextTaskKind,
 } from './text-task.js'
+import { resolveStageModel } from './ai-stages.js'
 
 export type ExtractTarget = 'characters' | 'scenes' | 'props'
 export const EXTRACT_TARGETS: ExtractTarget[] = ['characters', 'scenes', 'props']
@@ -85,15 +85,13 @@ async function startExtractorRun(
   const kind = EXTRACT_TASK_KINDS[target]
   if (await findActiveTextTask(episodeId, kind)) return false
 
-  const resolved = await resolveTextModel(opts)
+  const resolved = await resolveStageModel('extractor', opts)
   const taskId = await createTextTask({
     kind,
     episodeId,
     dramaId,
     prompt: message,
-    provider: resolved.provider,
-    model: resolved.model,
-    configId: opts.configId ?? resolved.configId ?? undefined,
+    stageModel: resolved,
     retryOf: opts.retryOf,
   })
 
@@ -105,8 +103,8 @@ async function startExtractorRun(
       episodeId,
       dramaId,
       textTaskId: taskId,
-      modelOverride: opts.model || undefined,
-      textConfigId: opts.configId || undefined,
+      modelOverride: resolved.model,
+      textConfigId: resolved.configId ?? undefined,
       singleAssetName: opts.singleAssetName,
     })
     return runAgent(agent, [{ role: 'user', content: message }], {

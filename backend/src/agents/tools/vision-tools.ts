@@ -19,7 +19,7 @@ import { z } from 'zod'
 import { getAbsolutePath } from '../../utils/storage.js'
 import { STORAGE_ROOT } from '../../utils/paths.js'
 import { logTaskError, logTaskProgress, logTaskSuccess } from '../../utils/task-logger.js'
-import { resolveVisionTextConfig } from '../../services/vision-capability.js'
+import { resolveStageModel, StageVisionUnavailableError, type StageModel } from '../../services/ai-stages.js'
 import { callTextChat, imageContentPart } from '../../services/vision-chat.js'
 import { parseTextTaskParams, patchTextTaskParams } from '../../services/text-task.js'
 import { getTextTaskId } from '../context.js'
@@ -153,13 +153,14 @@ export const readImage = createTool({
       return { error: resolved.error }
     }
 
-    const config = await resolveVisionTextConfig()
-    if (!config) {
+    // 工具契约（#46）是返回 unsupported 而不是抛错：Agent 据此降级，不中断整段推理
+    let config: StageModel
+    try {
+      config = await resolveStageModel('read_image')
+    } catch (err) {
+      if (!(err instanceof StageVisionUnavailableError)) throw err
       logTaskProgress('VisionTool', 'read-image-unsupported', { path: resolved.relative })
-      return {
-        unsupported: true as const,
-        reason: '当前没有任何能看图的文本配置，无法读图；请改为按文字推断，或请人工填写。',
-      }
+      return { unsupported: true as const, reason: err.message }
     }
 
     const maxSide = input.max_side ?? READ_IMAGE_DEFAULT_MAX_SIDE

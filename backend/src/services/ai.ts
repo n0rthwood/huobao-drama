@@ -19,6 +19,10 @@ export interface AIConfig {
   temperature?: number | null
   /** 该配置的 settings JSON 原文（TTS 的音色/种子等参数由 services/tts.ts 解析） */
   settings?: string | null
+  /** 配置名（设置页显示名）：任务里记录「实际用了哪条配置」时要用 */
+  name?: string
+  /** 该文本配置是否被标定为视觉模型（Issue #51）；非文本服务恒为 false */
+  vision?: boolean
 }
 
 /** 从 settings JSON 解析 temperature；非法值一律视为未设置 */
@@ -132,6 +136,8 @@ export async function getActiveConfig(serviceType: ServiceType): Promise<AIConfi
     model: models[0] || '',
     temperature: parseConfigTemperature(active.settings),
     settings: active.settings ?? null,
+    name: active.name,
+    vision: active.vision === true,
   }
 }
 
@@ -139,6 +145,39 @@ export async function getTextConfig(): Promise<AIConfig> {
   const config = await getActiveConfig('text')
   if (!config) throw new Error('未配置文本模型，请先到「设置」页添加并启用 AI 服务')
   return config
+}
+
+/**
+ * 启用中的文本配置，按 priority 从高到低（Issue #51）。
+ * 「哪条配置能看图」由 vision 列人工标定——不按厂商名预判，也不再运行时探测。
+ */
+export async function listActiveTextConfigs(): Promise<AIConfig[]> {
+  const rows = (await db.select().from(schema.aiServiceConfigs)
+    .where(eq(schema.aiServiceConfigs.serviceType, 'text'))
+  )
+    .filter(r => r.isActive)
+    .sort((a, b) => (b.priority || 0) - (a.priority || 0))
+  return rows.flatMap(row => {
+    let models: unknown
+    try {
+      models = row.model ? JSON.parse(row.model) : []
+    } catch {
+      return []
+    }
+    const model = Array.isArray(models) ? String(models[0] || '') : String(models || '')
+    if (!model) return []
+    return [{
+      id: row.id,
+      provider: row.provider || '',
+      baseUrl: row.baseUrl,
+      apiKey: row.apiKey,
+      model,
+      temperature: parseConfigTemperature(row.settings),
+      settings: row.settings ?? null,
+      name: row.name,
+      vision: row.vision === true,
+    }]
+  })
 }
 
 /**

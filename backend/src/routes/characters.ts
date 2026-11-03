@@ -15,7 +15,8 @@ import { mountReferenceImageRoutes } from './reference-images.js'
 import { planFinalPromptWrite, promptSourceChanged } from '../services/asset-prompt-invalidation.js'
 import { mountReExtractRoute } from './asset-reextract.js'
 import { addArchivalImage, removeArchivalImage } from '../services/archival-images.js'
-import { getPortraitAppearanceStatus, startPortraitAppearance } from '../services/portrait-appearance.js'
+import { getPortraitAppearanceStatus, startPortraitAppearance, type StartPortraitAppearanceResult } from '../services/portrait-appearance.js'
+import { StageVisionUnavailableError } from '../services/ai-stages.js'
 
 const app = new Hono()
 const CHARACTER_IMAGE_SIZE = '1920x1080'
@@ -61,10 +62,14 @@ app.post('/:id/appearance-from-portrait', async (c) => {
   const episodeId = Number(body.episode_id)
   if (!episodeId) return badRequest(c, 'episode_id 必填')
 
-  const result = await startPortraitAppearance(id, {
-    episodeId,
-    configId: body.text_config_id ?? undefined,
-  })
+  let result: StartPortraitAppearanceResult
+  try {
+    result = await startPortraitAppearance(id, { episodeId, configId: body.text_config_id ?? undefined })
+  } catch (err) {
+    // 视觉环节无可用视觉配置（#51）
+    if (err instanceof StageVisionUnavailableError) return badRequest(c, err.message)
+    throw err
+  }
   if (!result.started) {
     return badRequest(c, result.reason === 'running'
       ? '该集的同类任务正在运行，请等它结束'

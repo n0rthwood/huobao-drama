@@ -15,7 +15,7 @@ import { and, desc, eq } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
 import { getAbsolutePath } from '../utils/storage.js'
 import { logTaskError, logTaskProgress, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
-import { resolveVisionTextConfig, type VisionTextConfig } from './vision-capability.js'
+import { resolveStageModel, type StageModel } from './ai-stages.js'
 import { callTextChat, imageContentPart } from './vision-chat.js'
 import { extractFirstJson } from '../agents/tools/vision-tools.js'
 import {
@@ -77,7 +77,7 @@ export interface SemanticsAutoStatus {
 // ─── 模型问答（每一步都只问「是什么/在哪」） ──────────────────
 
 interface VisionAsk {
-  config: VisionTextConfig
+  config: StageModel
   part: Record<string, unknown>
   framing: string
 }
@@ -246,7 +246,7 @@ export interface SemanticsAutoResult {
  */
 export async function runSemanticsPipeline(input: {
   absPath: string
-  config: VisionTextConfig
+  config: StageModel
   sourceTaskId: number | null
   onProgress?: (phase: string) => void
 }): Promise<SemanticsAutoResult> {
@@ -489,26 +489,18 @@ export async function startSemanticsAuto(input: {
   sourceTaskId: number | null
   configId?: number
 }): Promise<StartSemanticsAutoResult> {
-  const config = await resolveVisionTextConfig(input.configId)
+  // 视觉环节（#51）：没有标定为视觉的配置就直接 400，不建一条注定失败的任务，
+  // 更不拿纯文本模型硬编坐标。错误由路由层转成 400。
+  const config = await resolveStageModel('asset_semantics', { configId: input.configId })
   const taskId = await createTextTask({
     kind: 'asset_semantics',
     episodeId: input.episodeId,
     dramaId: input.dramaId,
     prompt: `为证据素材「${input.propName}」自动标注语义`,
-    provider: config?.provider ?? null,
-    model: config?.model ?? null,
-    configId: config?.configId ?? input.configId ?? undefined,
+    stageModel: config,
   })
   // 任务行按「集」落库；状态接口要据此只回本道具的那次任务
   await patchTextTaskParams(taskId, { prop_id: input.propId, semantics_phase: 'start' })
-
-  if (!config) {
-    logTaskError('Semantics', 'no-vision-config', { propId: input.propId })
-    await finishTextTask(taskId, 'failed', {
-      errorMsg: '当前没有任何能看图的文本配置，无法自动标注；请在设置页配置可看图的文本服务，或在语义标注面板里手工标注。',
-    })
-    return { started: true, taskId }
-  }
 
   logTaskStart('Semantics', 'auto', { propId: input.propId, model: config.model, path: input.absPath })
   void runSemanticsTask(taskId, { ...input, config })
@@ -519,7 +511,7 @@ async function runSemanticsTask(taskId: number, ctx: {
   propId: number
   absPath: string
   sourceTaskId: number | null
-  config: VisionTextConfig
+  config: StageModel
 }): Promise<void> {
   try {
     const { semantics, warnings } = await runSemanticsPipeline({

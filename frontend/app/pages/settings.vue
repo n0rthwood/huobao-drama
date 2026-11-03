@@ -163,6 +163,7 @@
                     <span class="config-name">{{ c.name || `${c.provider}-${c.service_type}` }}</span>
                     <span :class="['tag', c.api_key ? 'tag-success' : 'tag-error']">{{ c.api_key ? t('settings.ai.hasKey') : t('settings.ai.noKey') }}</span>
                     <span v-if="!c.is_active" class="tag">{{ t('settings.common.disabled') }}</span>
+                    <span v-if="c.service_type === 'text' && c.vision" class="tag tag-accent">{{ t('settings.cfg.visionTag') }}</span>
                   </div>
                   <div class="config-models">
                     <button
@@ -547,6 +548,15 @@
             <input v-model="cfgForm.temperature" class="input" type="number" step="0.1" min="0" max="2" :placeholder="t('settings.cfg.tempPlaceholder')" />
             <span class="field-hint">{{ t('settings.cfg.tempNote') }}</span>
           </label>
+          <!-- 视觉标定（#51）：人工标记，不做运行时探测 -->
+          <label v-if="cfgForm.service_type === 'text'" class="field">
+            <span class="field-label">{{ t('settings.cfg.vision') }}</span>
+            <span class="flex gap-1" style="align-items:center">
+              <input v-model="cfgForm.vision" type="checkbox" />
+              <span class="dim">{{ t('settings.cfg.visionTag') }}</span>
+            </span>
+            <span class="field-hint">{{ t('settings.cfg.visionHint') }}</span>
+          </label>
           <template v-if="cfgForm.service_type === 'tts'">
             <!-- 音色必选（#35）：从服务读列表让人选，程序不自动取第一个 -->
             <div class="field">
@@ -588,6 +598,12 @@
             </div>
             <div class="mono test-result-url">{{ cfgTestResult.method }} {{ cfgTestResult.url }}</div>
             <div v-if="cfgTestResult.response_preview" class="mono test-result-preview">{{ cfgTestResult.response_preview }}</div>
+            <!-- 读图校验（#51）：只显示结果，不改标记 -->
+            <div v-if="cfgTestResult.vision_probe" class="test-result-head" :class="{ 'test-result bad': cfgTestResult.vision_probe.mismatch }">
+              <span class="tag" :class="cfgTestResult.vision_probe.ok ? 'tag-success' : 'tag-error'">{{ t('settings.cfg.visionProbeTitle') }}</span>
+              <span>{{ cfgTestResult.vision_probe.message }}</span>
+            </div>
+            <div v-if="cfgTestResult.vision_probe" class="mono test-result-preview">{{ cfgTestResult.vision_probe.detail }}</div>
           </div>
         </div>
         <div class="dialog-foot">
@@ -761,7 +777,7 @@ const huobaoRegion = ref(locale.value?.startsWith('zh') ? 'cn' : 'com')
 const huobaoSiteUrl = computed(() => `https://api.firemux.${huobaoRegion.value}`)
 // tts_* 参数只对 service_type='tts' 生效，存进配置的 settings JSON（音色在这里必选，#35）
 const cfgForm = reactive({
-  name: '', provider: '', api_key: '', base_url: '', models: [], service_type: 'text', priority: 0, temperature: '',
+  name: '', provider: '', api_key: '', base_url: '', models: [], service_type: 'text', priority: 0, temperature: '', vision: false,
   tts_instructions: '', tts_cfg_value: '', tts_inference_timesteps: '', tts_seed: '', tts_voice: '',
 })
 const TTS_FORM_RESET = { tts_instructions: '', tts_cfg_value: '', tts_inference_timesteps: '', tts_seed: '', tts_voice: '' }
@@ -923,7 +939,7 @@ async function applyHuobaoQuickConfig() {
 function startAddCfg(t) {
   cfgEditId.value = null
   cfgTestResult.value = null
-  Object.assign(cfgForm, { name: '', provider: '', api_key: '', base_url: '', models: [], service_type: t, priority: 0, temperature: '', ...TTS_FORM_RESET })
+  Object.assign(cfgForm, { name: '', provider: '', api_key: '', base_url: '', models: [], service_type: t, priority: 0, temperature: '', vision: false, ...TTS_FORM_RESET })
   ttsVoiceOptions.value = []
   ttsVoicesError.value = ''
   const firstPreset = presetsByType(t)[0]
@@ -942,6 +958,7 @@ function startEditCfg(c) {
     service_type: c.service_type,
     priority: c.priority ?? 0,
     temperature: c.temperature ?? '',
+    vision: c.vision === true,
     tts_instructions: ttsSettingsOf(c).instructions ?? '',
     tts_cfg_value: ttsSettingsOf(c).cfg_value ?? '',
     tts_inference_timesteps: ttsSettingsOf(c).inference_timesteps ?? '',
@@ -972,6 +989,9 @@ async function testDraftCfg() {
     api_key: cfgForm.api_key,
     base_url: cfgForm.base_url,
     model: [...cfgForm.models],
+    vision: cfgForm.vision === true,
+    name: cfgForm.name,
+    config_id: cfgEditId.value || undefined,
   })
 }
 async function testExistingCfg(c) {
@@ -982,6 +1002,9 @@ async function testExistingCfg(c) {
     api_key: c.api_key || '',
     base_url: c.base_url || '',
     model: Array.isArray(c.model) ? c.model : [],
+    vision: c.vision === true,
+    name: c.name || '',
+    config_id: c.id,
   })
 }
 async function saveCfg() {
@@ -994,8 +1017,8 @@ async function saveCfg() {
   const ttsSettings = cfgForm.service_type === 'tts' ? collectTtsSettings() : undefined
   if (ttsSettings === null) return
   try {
-    if (cfgEditId.value) await aiConfigAPI.update(cfgEditId.value, { name: cfgForm.name, provider: cfgForm.provider, api_key: cfgForm.api_key, base_url: cfgForm.base_url, model: models, priority: cfgForm.priority, temperature, tts_settings: ttsSettings })
-    else await aiConfigAPI.create({ service_type: cfgForm.service_type, provider: cfgForm.provider, name: cfgForm.name || `${cfgForm.provider}-${cfgForm.service_type}`, api_key: cfgForm.api_key, base_url: cfgForm.base_url, model: models, priority: cfgForm.priority, temperature, tts_settings: ttsSettings })
+    if (cfgEditId.value) await aiConfigAPI.update(cfgEditId.value, { name: cfgForm.name, provider: cfgForm.provider, api_key: cfgForm.api_key, base_url: cfgForm.base_url, model: models, priority: cfgForm.priority, temperature, vision: cfgForm.vision === true, tts_settings: ttsSettings })
+    else await aiConfigAPI.create({ service_type: cfgForm.service_type, provider: cfgForm.provider, name: cfgForm.name || `${cfgForm.provider}-${cfgForm.service_type}`, api_key: cfgForm.api_key, base_url: cfgForm.base_url, model: models, priority: cfgForm.priority, temperature, vision: cfgForm.vision === true, tts_settings: ttsSettings })
     cfgDialog.value = false; toast.success(t('common.saved')); loadCfgs()
   } catch (e) { toastError(e) }
 }

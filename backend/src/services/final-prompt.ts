@@ -23,6 +23,7 @@ import { buildAgentRequestContext } from '../agents/context.js'
 import { runAgent } from '../agents/run.js'
 import { logTaskError, logTaskProgress } from '../utils/task-logger.js'
 import { sceneFinalPromptCoversTime } from './scene-time.js'
+import { resolveStageModel } from './ai-stages.js'
 
 type CharacterRow = typeof schema.characters.$inferSelect
 type SceneRow = typeof schema.scenes.$inferSelect
@@ -34,11 +35,12 @@ export interface PromptAgentOptions { model?: string; configId?: number }
 async function runPromptAgent(episodeId: number, dramaId: number, message: string, opts?: PromptAgentOptions) {
   const agent = mastra.getAgent('prompt_generator')
   if (!agent) throw new Error('图片提示词 Agent 不可用')
+  const resolved = await resolveStageModel('final_prompt', opts || {})
   const requestContext = buildAgentRequestContext({
     episodeId,
     dramaId,
-    modelOverride: opts?.model || undefined,
-    textConfigId: opts?.configId || undefined,
+    modelOverride: resolved.model,
+    textConfigId: resolved.configId ?? undefined,
   })
   await runAgent(agent, [{ role: 'user', content: message }], { maxSteps: 12, requestContext })
 }

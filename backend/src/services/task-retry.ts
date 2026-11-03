@@ -21,10 +21,11 @@ import {
   createTextTask,
   findLatestTextTask,
   finishTextTask,
-  resolveTextModel,
   parseTextTaskParams,
   type TextTaskKind,
 } from './text-task.js'
+import { agentChatStage, resolveStageModel } from './ai-stages.js'
+import { resolveDramaProjectType } from './project-type.js'
 import { startExtraction, type ExtractTarget } from './extraction.js'
 import { startKeyframePromptBatch } from './keyframe-prompts.js'
 import { startVideoPromptBatch } from './video-prompts.js'
@@ -183,23 +184,24 @@ async function retryChatText(row: SysTaskRow, kind: TextTaskKind, episodeId: num
   const agent = mastra.getAgent(agentType)
   if (!agent) throw new Error('Agent 不存在')
 
-  const resolved = await resolveTextModel(opts)
+  const resolved = await resolveStageModel(
+    agentChatStage(agentType, resolveDramaProjectType(row.dramaId ?? 0)),
+    opts,
+  )
   const taskId = await createTextTask({
     kind,
     episodeId,
     dramaId: row.dramaId,
     prompt: message,
-    provider: resolved.provider,
-    model: resolved.model,
-    configId: opts.configId ?? resolved.configId ?? undefined,
+    stageModel: resolved,
     retryOf: row.id,
   })
   const requestContext = buildAgentRequestContext({
     episodeId,
     dramaId: row.dramaId ?? 0,
     textTaskId: taskId,
-    modelOverride: opts.model || undefined,
-    textConfigId: opts.configId || undefined,
+    modelOverride: resolved.model,
+    textConfigId: resolved.configId ?? undefined,
   })
   runAgent(agent, [{ role: 'user', content: message }], { maxSteps: 20, requestContext }, createReasoningSink(taskId))
     .then(result => finishTextTask(taskId, 'completed', { outputText: result.text || '' }))

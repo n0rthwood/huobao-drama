@@ -8,6 +8,7 @@ import { mastra } from '../mastra/index.js'
 import { buildAgentRequestContext } from '../agents/context.js'
 import { runAgent } from '../agents/run.js'
 import { logTaskError, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
+import { resolveStageModel } from './ai-stages.js'
 import {
   legalTechniqueIds,
   loadTransitionPair,
@@ -44,12 +45,13 @@ export async function runTransitionReview(
     shotNumber: pair.current.storyboardNumber,
   })
 
+  const resolved = await resolveStageModel('transition_writer', opts)
   const requestContext = buildAgentRequestContext({
     episodeId: pair.episodeId,
     dramaId: pair.dramaId,
     storyboardId,
-    modelOverride: opts.model || undefined,
-    textConfigId: opts.configId || undefined,
+    modelOverride: resolved.model,
+    textConfigId: resolved.configId ?? undefined,
   })
 
   const errors: string[] = []

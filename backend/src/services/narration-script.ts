@@ -36,11 +36,11 @@ import {
   findLatestTextTask,
   finishTextTask,
   promptBatchStatusFrom,
-  resolveTextModel,
   updateTextTaskProgress,
   type PromptBatchStatus,
   type TextTaskProgress,
 } from './text-task.js'
+import { resolveStageModel } from './ai-stages.js'
 
 export type NarrationScriptStatus = PromptBatchStatus
 
@@ -120,16 +120,14 @@ export async function startNarrationScript(
   const targets = partial ? rows.filter(sb => storyboardIds!.includes(sb.id)) : rows
   if (!targets.length) return { started: false, total: 0 }
 
-  const resolved = await resolveTextModel(opts)
+  const resolved = await resolveStageModel('narration_writer', opts)
   const progress: TextTaskProgress = { completed: 0, failed: 0, total: targets.length, phase: 'spine' }
   const taskId = await createTextTask({
     kind: 'narration_script',
     episodeId,
     dramaId,
     prompt: `为本集 ${targets.length} 个分镜撰写旁白`,
-    provider: resolved.provider,
-    model: resolved.model,
-    configId: opts.configId || resolved.configId || undefined,
+    stageModel: resolved,
     progress,
     storyboardIds: targets.map(sb => sb.id),
     retryOf: opts.retryOf,
@@ -143,8 +141,8 @@ export async function startNarrationScript(
     const contextFor = (shotNumbers?: number[]) => buildAgentRequestContext({
       episodeId,
       dramaId,
-      modelOverride: opts.model || undefined,
-      textConfigId: opts.configId || undefined,
+      modelOverride: resolved.model,
+      textConfigId: resolved.configId ?? undefined,
       narrationEnabled: true,
       narrationShotNumbers: shotNumbers,
     })
@@ -267,11 +265,12 @@ export async function writeShotNarration(
   if (!shot) throw new Error('分镜不存在')
 
   const agent = narrationWriter()
+  const shotModel = await resolveStageModel('narration_writer', opts)
   const requestContext = buildAgentRequestContext({
     episodeId,
     dramaId: ep.dramaId,
-    modelOverride: opts.model || undefined,
-    textConfigId: opts.configId || undefined,
+    modelOverride: shotModel.model,
+    textConfigId: shotModel.configId ?? undefined,
     narrationEnabled: true,
     narrationShotNumbers: [sb.storyboardNumber],
   })

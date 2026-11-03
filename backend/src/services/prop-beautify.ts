@@ -21,7 +21,7 @@ import { db, schema } from '../db/index.js'
 import { now } from '../utils/response.js'
 import { getAbsolutePath } from '../utils/storage.js'
 import { logTaskError, logTaskProgress, logTaskSuccess } from '../utils/task-logger.js'
-import { resolveVisionTextConfig } from './vision-capability.js'
+import { resolveStageModel } from './ai-stages.js'
 import { callTextChat, imageContentPart } from './vision-chat.js'
 import { extractFirstJson } from '../agents/tools/vision-tools.js'
 import { parseSemantics, type AssetSemantics } from './asset-semantics.js'
@@ -101,8 +101,8 @@ export function judgeFidelity(input: {
 /** 视觉模型复查：这些文字在新图上还读得到吗 */
 async function checkLabelsReadable(relativePath: string, labels: string[]): Promise<{ missing: string[]; skipped: string | null }> {
   if (!labels.length) return { missing: [], skipped: '语义标注里没有 labels' }
-  const config = await resolveVisionTextConfig()
-  if (!config) return { missing: [], skipped: '没有能看图的文本配置' }
+  // 视觉环节（#51）：没有视觉配置时直接抛错，核验结论宁可缺失也不能是纯文本模型猜的
+  const config = await resolveStageModel('prop_beautify')
   const prepared = await imageContentPart(relativePath, { maxSide: GEOMETRY_MAX_SIDE, quality: 85 })
   const question = [
     `这是一张 ${prepared.width}×${prepared.height} 像素的图片。`,
