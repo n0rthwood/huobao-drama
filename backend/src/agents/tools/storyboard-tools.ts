@@ -9,7 +9,7 @@ import { db, getInsertId, schema } from '../../db/index.js'
 import { eq } from 'drizzle-orm'
 import { now } from '../../utils/response.js'
 import { logTaskProgress, logTaskSuccess } from '../../utils/task-logger.js'
-import { getDramaId, getEpisodeId, getResearchRunId, getStoryboardId } from '../context.js'
+import { getDramaId, getEpisodeId, getResearchRunId, getStoryboardId, isStoryboardFillGaps } from '../context.js'
 import { loadEpisodeKeyframes } from '../../services/keyframes.js'
 import {
   PROMPT_FIELDS,
@@ -21,7 +21,7 @@ import {
 import { parseReferenceImages, referenceImagePaths } from '../../services/reference-images.js'
 import { stampFieldSavedAt } from '../../services/storyboard-fields.js'
 import { MAX_NARRATION_CHARS, narrationCharCount, parseNarrationMeta, sha256 } from '../../services/narration.js'
-import { describeNarrationGaps, locateNarrationInScript, narrationCoverage, scriptMatchKey } from '../../services/narration-first.js'
+import { describeNarrationGaps, fitNarrationToGaps, locateNarrationInScript, narrationCoverage, scriptMatchKey } from '../../services/narration-first.js'
 import { loadIntentContext, semanticEntries } from '../../services/shot-intent-context.js'
 import {
   CLIP_POSITIONS,
@@ -336,7 +336,7 @@ function buildSaveStoryboards(documentary: boolean) {
   return createTool({
   id: 'save_storyboards',
   description: documentary
-    ? 'Save storyboards for this episode. Call in batches of at most 8 storyboards: the first batch must set replace_existing: true (clears all old storyboards for the episode, then writes), every following batch omits replace_existing (appends). Rows are upserted by shot_number, so overlapping batches and retries never create duplicates. This is a documentary project: every shot also carries narration_text copied verbatim from the script, in script order, and the result reports how much of the script is still uncovered.'
+    ? 'Save storyboards for this episode. Call in batches of at most 8 storyboards: the first batch must set replace_existing: true (clears all old storyboards for the episode, then writes), every following batch omits replace_existing (appends). Rows are upserted by shot_number, so overlapping batches and retries never create duplicates. This is a documentary project: every shot also carries narration_text copied verbatim from the script, in script order, and the result reports how much of the script is still uncovered. In fill-gap mode (the user message says 补镜模式) replace_existing is forbidden and shot_number is ignored: every shot is inserted with a server-assigned number and its narration must fall inside one of the uncovered passages.'
     : 'Save storyboards for this episode. Call in batches of at most 8 storyboards: the first batch must set replace_existing: true (clears all old storyboards for the episode, then writes), every following batch omits replace_existing (appends). Rows are upserted by shot_number, so overlapping batches and retries never create duplicates.',
   inputSchema: z.object({
     replace_existing: z.boolean().optional(),
@@ -354,6 +354,16 @@ function buildSaveStoryboards(documentary: boolean) {
       count: storyboards.length,
       shotNumbers: storyboards.map(sb => sb.shot_number).join(','),
     })
+    // 补镜模式（Issue #52）：既有分镜一条都不动，只把旁白覆盖缺口补成新镜头。
+    // 纯插入——忽略模型给的 shot_number（服务端从 max+1 起分配临时编号），跑完由
+    // renumberStoryboardsByScript 按旁白在剧本中的位置整集归位，绝不 upsert 到已有镜。
+    const fillGaps = documentary && isStoryboardFillGaps(context?.requestContext)
+    if (fillGaps && replace_existing === true) {
+      return {
+        error: 'replace_existing is forbidden in fill-gap mode: the storyboards already broken down for this episode must be kept. Call again without replace_existing.',
+        count: 0,
+      }
+    }
     // 纪录片（Issue #45）：一次运行只允许第一批清空。模型在后续批次重复传 replace_existing
     // 会把前面已切好的镜头连同旁白一起删掉，整集覆盖就断了（实测 GLM 第二批重复传过）。
     const runId = documentary ? getResearchRunId(context?.requestContext) : null
@@ -397,9 +407,48 @@ function buildSaveStoryboards(documentary: boolean) {
     // 表达设计解析出的问题（#49）汇总回传，让模型在同一次运行里改引用
     const intentIssues: { shot_number: number; code: string; message: string }[] = []
 
+    // 补镜模式的编号与旁白校验在写库之前一次算完：落在缺口外的镜头直接拒存，不留半条记录
+    const fillGapList = fillGaps
+      ? narrationCoverage(scriptKey, existingRows.filter(sb => !sb.deletedAt)
+        .sort((a, b) => a.storyboardNumber - b.storyboardNumber)
+        .map(sb => sb.narrationText)).gaps
+      : []
+    let nextShotNumber = existingRows.reduce((max, sb) => Math.max(max, sb.storyboardNumber), 0) + 1
+    // 本批内已经被领走的剧本区间：同一批里两镜抄同一段时后者拒存
+    const takenSpans: Array<[number, number]> = []
+    const narrationTrimmed: { shot_number: number; head: number; tail: number }[] = []
+    const queue: Array<{ sb: typeof storyboards[number]; shotNumber: number; fillText: string }> = []
     for (const sb of storyboards) {
+      if (!fillGaps) {
+        queue.push({ sb, shotNumber: sb.shot_number, fillText: '' })
+        continue
+      }
+      const raw = 'narration_text' in sb && typeof sb.narration_text === 'string' ? sb.narration_text : ''
+      const fit = fitNarrationToGaps(scriptKey, fillGapList, raw)
+      if (fit.status === 'rejected') {
+        narrationRejected.push({ shot_number: sb.shot_number, reason: fit.reason || 'narration does not fall inside an uncovered passage' })
+        continue
+      }
+      const chars = narrationCharCount(fit.text)
+      if (chars > MAX_NARRATION_CHARS) {
+        narrationRejected.push({ shot_number: sb.shot_number, reason: `narration is ${chars} characters, exceeding the per-shot limit of ${MAX_NARRATION_CHARS}; split the uncovered passage at a sentence boundary into two shots` })
+        continue
+      }
+      if (takenSpans.some(([start, end]) => fit.start < end && start < fit.end)) {
+        narrationRejected.push({ shot_number: sb.shot_number, reason: `narration at characters ${fit.start}–${fit.end} overlaps text another shot in this same batch already took; each shot must take a different stretch of the uncovered passage` })
+        continue
+      }
+      takenSpans.push([fit.start, fit.end])
+      if (fit.trimmedHead || fit.trimmedTail) {
+        narrationTrimmed.push({ shot_number: sb.shot_number, head: fit.trimmedHead, tail: fit.trimmedTail })
+      }
+      queue.push({ sb, shotNumber: nextShotNumber++, fillText: fit.text })
+    }
+
+    for (const { sb, shotNumber, fillText } of queue) {
       await validateStoryboardBindings(episodeId, dramaId, sb.scene_id, sb.character_ids, sb.prop_ids)
-      const existingId = shotToId.get(sb.shot_number)
+      // 补镜模式永不 upsert：即使模型给的编号撞上已有镜，也只插入新行
+      const existingId = fillGaps ? undefined : shotToId.get(shotNumber)
       if (existingId !== undefined) {
         await db.update(schema.storyboards).set({
           title: sb.title, shotType: sb.shot_type,
@@ -426,7 +475,7 @@ function buildSaveStoryboards(documentary: boolean) {
       } else {
         const res = await db.insert(schema.storyboards).values({
           episodeId,
-          storyboardNumber: sb.shot_number,
+          storyboardNumber: shotNumber,
           title: sb.title, shotType: sb.shot_type,
           angle: sb.angle, movement: sb.movement,
           location: sb.location, time: sb.time,
@@ -438,12 +487,12 @@ function buildSaveStoryboards(documentary: boolean) {
           lastFramePrompt: sb.last_frame_prompt,
           videoPrompt: sb.video_prompt, bgmPrompt: sb.bgm_prompt,
           soundEffect: sb.sound_effect,
-          continuityBoundary: sb.continuity,
+          continuityBoundary: fillGaps ? (sb.continuity ?? 'cut') : sb.continuity,
           sceneId: sb.scene_id, duration: sb.duration || 10,
           createdAt: ts, updatedAt: ts,
         })
         const newId = getInsertId(res)
-        shotToId.set(sb.shot_number, newId)
+        shotToId.set(shotNumber, newId)
         await applyExplicitBindings(newId, {
           characterIds: sb.character_ids || [],
           propIds: sb.prop_ids || [],
@@ -451,7 +500,7 @@ function buildSaveStoryboards(documentary: boolean) {
         })
       }
       // 关键帧/视频提示词写入后：打字段保存时间 + 绑定跟随 @引用（LLM 不必自己传 ids）
-      const savedId = existingId ?? shotToId.get(sb.shot_number)!
+      const savedId = existingId ?? shotToId.get(shotNumber)!
       const writtenFields = Object.entries(sb).filter(([, value]) => value !== undefined).map(([key]) => key)
       const [savedRow] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, savedId))
       const stamp = stampFieldSavedAt(savedRow?.fieldSavedAt, writtenFields)
@@ -475,23 +524,26 @@ function buildSaveStoryboards(documentary: boolean) {
           }).where(eq(schema.storyboards.id, savedId))
         }
         for (const issue of normalized.issues) {
-          intentIssues.push({ shot_number: sb.shot_number, code: issue.code, message: issue.message })
+          intentIssues.push({ shot_number: shotNumber, code: issue.code, message: issue.message })
         }
       }
       // narration-first：逐字取自剧本才写库；改写过的文本不写旁白字段，画面字段照常保存
-      if (documentary && 'narration_text' in sb) {
-        const text = typeof sb.narration_text === 'string' ? sb.narration_text.trim() : ''
+      if (documentary && (fillGaps || 'narration_text' in sb)) {
+        // 补镜模式的文本在入队前已校验（逐字出自剧本 + 落在缺口内，必要时裁到边界）
+        const text = fillGaps ? fillText : ('narration_text' in sb && typeof sb.narration_text === 'string' ? sb.narration_text.trim() : '')
         const chars = narrationCharCount(text)
-        const found = text ? locateNarrationInScript(scriptKey, text, scriptCursor) : { index: -1, chars: 0 }
+        const found = !text ? { index: -1, chars: 0 }
+          : fillGaps ? { index: scriptCursor, chars }
+          : locateNarrationInScript(scriptKey, text, scriptCursor)
         if (!text) {
           // 刻意留白的纯画面镜头：关掉该镜旁白
           await db.update(schema.storyboards)
             .set({ narrationText: '', narrationEnabled: false, updatedAt: ts })
             .where(eq(schema.storyboards.id, savedId))
         } else if (chars > MAX_NARRATION_CHARS) {
-          narrationRejected.push({ shot_number: sb.shot_number, reason: `narration is ${chars} characters, exceeding the per-shot limit of ${MAX_NARRATION_CHARS}; split the script passage at a sentence boundary into two shots` })
+          narrationRejected.push({ shot_number: shotNumber, reason: `narration is ${chars} characters, exceeding the per-shot limit of ${MAX_NARRATION_CHARS}; split the script passage at a sentence boundary into two shots` })
         } else if (found.index < 0) {
-          narrationRejected.push({ shot_number: sb.shot_number, reason: 'narration is not a verbatim stretch of the episode script; copy the script text exactly (whitespace aside) instead of rewriting it' })
+          narrationRejected.push({ shot_number: shotNumber, reason: 'narration is not a verbatim stretch of the episode script; copy the script text exactly (whitespace aside) instead of rewriting it' })
         } else {
           scriptCursor = Math.max(scriptCursor, found.index + found.chars)
           const meta = parseNarrationMeta(savedRow?.narrationMeta)
@@ -521,7 +573,7 @@ function buildSaveStoryboards(documentary: boolean) {
 
     logTaskSuccess('StoryboardTool', 'save-complete', {
       episodeId,
-      count: storyboards.length,
+      count: queue.length,
       totalDuration,
     })
     if (!documentary) {
@@ -535,17 +587,19 @@ function buildSaveStoryboards(documentary: boolean) {
     // 覆盖缺口（#49）：中间整段被跳过时必须当场回报，否则模型会以为切完了就收工
     // ——实测 93 镜漏掉 746 字，连「彼得一世亲自筹建近卫团」那句都没有对应镜头。
     const mustFix = coverage.gaps.length
-      ? `旁白覆盖缺口：剧本有 ${coverage.gaps.length} 段（共 ${coverage.uncovered_chars} 字）还没有被任何一镜领走，必须继续补镜把它们逐字切进 narration_text（在句界处插入新的 shot_number，不要改写原文）：${describeNarrationGaps(coverage.gaps)}`
+      ? `旁白覆盖缺口：剧本有 ${coverage.gaps.length} 段（共 ${coverage.uncovered_chars} 字）还没有被任何一镜领走，必须继续补镜把它们逐字切进 narration_text（${fillGaps ? '继续新增镜头，shot_number 由服务端分配' : '在句界处插入新的 shot_number'}，不要改写原文）：${describeNarrationGaps(coverage.gaps)}`
       : null
     return {
-      message: mustFix || `Saved ${storyboards.length} storyboards`,
-      count: storyboards.length,
+      message: mustFix || `Saved ${queue.length} storyboards`,
+      count: queue.length,
       total_duration: totalDuration,
       narration_rejected: narrationRejected,
       intent_issues: intentIssues,
       replace_existing_ignored: replaceIgnored,
       script_coverage: coverage,
       must_fix: mustFix,
+      fill_gaps_mode: fillGaps,
+      narration_trimmed: narrationTrimmed,
     }
   },
   })

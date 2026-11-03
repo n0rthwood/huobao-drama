@@ -121,6 +121,71 @@ export function describeNarrationGaps(gaps: NarrationGap[], limit = 5): string {
   return gaps.length > limit ? `${head}；另有 ${gaps.length - limit} 处` : head
 }
 
+/** 补镜（Issue #52）：旁白越过缺口边界时允许自动裁掉的字数上限（去空白计） */
+export const GAP_TRIM_TOLERANCE = 40
+/** 裁剪后至少要留下的字数，否则这一镜等于没写 */
+const MIN_KEPT_CHARS = 8
+
+export interface GapFit {
+  status: 'ok' | 'rejected'
+  /** 采纳（可能被裁剪过）的旁白原文；rejected 时为空 */
+  text: string
+  /** 采纳文本在去空白剧本里的起止下标 */
+  start: number
+  end: number
+  /** 头尾各裁掉多少字（去空白计） */
+  trimmedHead: number
+  trimmedTail: number
+  /** 命中的缺口（rejected 时是重叠最多的那个，用来报精确边界） */
+  gap: NarrationGap | null
+  reason?: string
+}
+
+/**
+ * 补镜模式的旁白校验（Issue #52）：必须逐字出自剧本，且落在某一段**还没被领走**的缺口内。
+ * 越界不多（头尾各 ≤ GAP_TRIM_TOLERANCE 字，模型常多带一两句）时自动裁到缺口边界并在结果里
+ * 说明裁了多少；越界过多或根本不在任何缺口里就拒存，并把该缺口的精确边界写进 reason，
+ * 避免模型在「补→拒→再补」之间空转。
+ */
+export function fitNarrationToGaps(scriptKey: string, gaps: NarrationGap[], raw: string): GapFit {
+  const text = (raw || '').trim()
+  const key = narrationMatchKey(spokenText(text))
+  const reject = (reason: string, gap: NarrationGap | null = null): GapFit =>
+    ({ status: 'rejected', text: '', start: -1, end: -1, trimmedHead: 0, trimmedTail: 0, gap, reason })
+  if (!key) return reject('narration_text is empty; a fill-gap shot must carry narration copied from the uncovered passage')
+  const start = scriptKey.indexOf(key)
+  if (start < 0) {
+    return reject('narration is not a verbatim stretch of the episode script; copy the uncovered passage exactly (whitespace aside) instead of rewriting it')
+  }
+  const end = start + key.length
+  if (!gaps.length) return reject('the script is already fully covered; do not add more shots')
+
+  const overlapOf = (gap: NarrationGap) => Math.min(end, gap.end) - Math.max(start, gap.start)
+  const best = gaps.reduce((a, b) => (overlapOf(b) > overlapOf(a) ? b : a))
+  const bounds = `the uncovered passage runs from character ${best.start} to ${best.end} of the script`
+  if (overlapOf(best) <= 0) {
+    return reject(`narration at characters ${start}–${end} is already covered by an existing shot; ${bounds} — only write shots for text inside the uncovered passages`, best)
+  }
+  const head = Math.max(0, best.start - start)
+  const tail = Math.max(0, end - best.end)
+  if (!head && !tail) {
+    return { status: 'ok', text, start, end, trimmedHead: 0, trimmedTail: 0, gap: best }
+  }
+  if (head > GAP_TRIM_TOLERANCE || tail > GAP_TRIM_TOLERANCE) {
+    return reject(`narration at characters ${start}–${end} reaches ${head + tail} characters outside the uncovered passage; ${bounds} — cut at a sentence boundary inside it`, best)
+  }
+  if (key.length - head - tail < MIN_KEPT_CHARS) {
+    return reject(`after trimming to the uncovered passage only ${key.length - head - tail} characters would be left; ${bounds}`, best)
+  }
+  // key 坐标 → 原文坐标：逐字记下每个非空白字符在原文里的位置，再按裁剪量切原文
+  const atRaw: number[] = []
+  for (let i = 0; i < text.length; i++) {
+    if (!/[\s\u3000]/.test(text[i]!)) atRaw.push(i)
+  }
+  const trimmed = text.slice(atRaw[head]!, atRaw[key.length - tail - 1]! + 1).trim()
+  return { status: 'ok', text: trimmed, start: start + head, end: end - tail, trimmedHead: head, trimmedTail: tail, gap: best }
+}
+
 /**
  * 旁白写作是否只加了发音标记：去标记后的文本与原文逐字相同（含空白，只忽略首尾空白）。
  * 原文为空（该镜是刻意留白的纯画面镜头）时只接受同样为空的文本——不许凭空写旁白。

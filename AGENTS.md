@@ -312,6 +312,16 @@ Issue 整理完成后、实施前，必须让 **Fabel（Anthropic）或 Astra（
 - 视频批量：`intent.deterministic === 'replace'` 的镜头在预览里是 `status='deterministic'`、**不可勾、不要求关键帧确认**，`startEpisodeVideoBatch` 也会把它们从 targets 里剔除（兜底防止直接传 id 提交到远端模型）。
 - 接口挂在 `/api/v1/clips`：`GET /storyboards/:id`（列表 + 规格 + `fresh`）、`POST /storyboards/:id/draft`、`PUT|DELETE /storyboards/:id/:position`、`POST /storyboards/:id/:position/render`、`GET /storyboards/:id/:position/thumbnail/first|last`（关键帧页「由片段渲染」占位用，不落盘）。
 
+### 旁白覆盖缺口与「补全剩余」（纪录片专属，Issue #52）
+- 拆分分镜被覆盖闸门中断（`routes/agent.ts` 的 narration-first 闸门把任务标 `failed`）之后**不必整集重拆**：`GET /episodes/:id/narration-coverage` 给出 `{script_chars, covered_chars, uncovered_chars, gaps[], gap_count, shots, running}`（口径就是 `narrationCoverage()`，非纪录片项目恒为 0 缺口），`POST /episodes/:id/storyboards/fill-gaps` 只补缺口。该集已有 `storyboard_breaker` 或 `storyboard_fill_gaps` 任务在跑 → **409**；一个缺口都没有 → 200 `{status:'idle'}` **不建任务**。
+- 补镜任务 `sys_task(type='text', params.kind='storyboard_fill_gaps')`，实现在 `services/storyboard-fill-gaps.ts`。message 只给**缺口原文**（去空白剧本的切片）+ 缺口两侧相邻镜的旁白尾/首句与 intent，不重复整集剧本。
+- 「补镜模式」由 `requestContext.storyboardFillGaps` 打开（`isStoryboardFillGaps()`），`save_storyboards`（纪录片变体）因此变成**纯插入**：`replace_existing` 直接拒绝（返回 `error`，一条分镜都不删）、**忽略模型给的 `shot_number`**（服务端从 `max+1` 起分配临时编号，绝不 upsert 到已有镜）、新镜 `continuity` 缺省为 `cut`。旁白必须落在某段缺口内：`fitNarrationToGaps()`（`services/narration-first.ts`，纯函数）头尾各允许 `GAP_TRIM_TOLERANCE=40` 字的越界并**自动裁到缺口边界**（裁了多少回报在 `narration_trimmed`），越界过多 / 已被既有镜领走 / 同批重复领同一段 → 拒存并在 `narration_rejected[].reason` 里给出**精确缺口边界**（避免「补→拒→再补」空转）。
+- 跑完先 `renumberStoryboardsByScript(episodeId)`：按每镜旁白在剧本中的起始位置整集重编号，**只改 `storyboard_number`，id / intent / 选版 / 子数据一律不动**；同一个同步事务里两阶段写（先写唯一负号再写最终号，规避将来可能加的唯一约束），编号没变化时一行都不写。旁白定位不到（被人改过或刻意留白）时沿用「上一镜」的位置，位置相同按旧编号稳定排序。重编号后「上一镜」变了且**继承首帧**（`continue` 且自己没有首帧图）的镜头按 #keyframes 既有规则取消关键帧确认（`reconfirm` 列表）。
+- 收尾：新插入镜用 `startShotIntentBatch` 补齐缺失的表达设计；仍有缺口 → 任务 `failed` 并列出剩余缺口（可再点一次「补全剩余」）。
+- 任务中心：**覆盖缺口失败的纪录片拆分任务重试 = 补镜**（`task-retry.ts` 按 `isCoverageGapFailure(error_msg)` 判定，不再整集重拆——这改变了「重试 = 覆盖本集分镜」的旧口径，仅限这一种失败）；`storyboard_fill_gaps` 的重试同样走补镜。显式整集重拆仍走分镜页的「拆分分镜」按钮，语义不变。
+- 前端：`components/NarrationCoverageBar.vue` 挂在分镜关键帧页与表达设计页顶部（`isDocumentaryProject` 才渲染），显示「旁白覆盖 X / Y 字 + 百分比 + 缺口 N 段」，有缺口时给「补全剩余」按钮（任务进任务中心，5 s 轮询覆盖接口，任务结束自动 `refresh`）。文案 `episode.coverage.*`（四语）。
+- 相关修正：`GET /episodes/:id/storyboards` 现在过滤 `deleted_at IS NULL`——重编号只排存活分镜，带上软删行会出现重号的幽灵卡片。
+
 ### 全局任务中心
 - `sys_task` 多了 `episode_id`（分镜任务由分镜反查、资产出图取发起时所在集、文本任务必填；启动时 `backfillTaskEpisodeIds()` 按 `storyboard_id` 回填存量行）与 `type='text'`。**文本任务不再存进程内存**：提取（`services/extraction.ts`）、关键帧/视频提示词批量（`keyframe-prompts.ts`/`video-prompts.ts`）、同步 chat 的剧本改写与拆分分镜（`routes/agent.ts`）都在开始时建 `sys_task(type='text')`，`params.kind` ∈ `extract_characters|extract_scenes|extract_props|keyframe_prompts|video_prompts|script_rewrite|storyboard_breaker`，进度写 `params.progress`（`{completed,total,failed,current_storyboard_id}`，**不复用 `remote_state`**，那是 qwen-jobs 追踪器的）。`/extract-status`、`/keyframe-prompts-status`、`/video-prompts-status` 响应结构不变，只是改成从库里读（函数变成 async）。
 - 重启：启动清理对 `type='text'` 的活跃任务一律标 `failed`（`error_msg='后端重启中断'`，`failInterruptedTextTasks()`），不自动重跑；图像/视频规则不变（qwen-jobs 交追踪器、其它 provider 标失败、批次照旧恢复）。

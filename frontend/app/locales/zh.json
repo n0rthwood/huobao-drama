@@ -66,7 +66,8 @@
       "script_rewrite": "剧本改写",
       "storyboard_breaker": "拆分分镜",
       "portrait_appearance": "按史料画像补充外貌",
-      "asset_semantics": "语义标注"
+      "asset_semantics": "语义标注",
+      "storyboard_fill_gaps": "补全剩余分镜"
     },
     "detail": {
       "title": "任务详情",
@@ -2057,6 +2058,17 @@
       "confirm": "确认名册",
       "confirmed": "名册已确认，之后的提取将照此执行",
       "draftSaved": "草稿已保存（仍待复核）"
+    },
+    "coverage": {
+      "summary": "旁白覆盖 {covered} / {total} 字",
+      "gaps": "缺口 {n} 段，共 {chars} 字",
+      "gapItem": "第 {start}–{end} 字（{chars} 字）：{excerpt}",
+      "complete": "旁白已全部拆进分镜",
+      "fill": "补全剩余",
+      "filling": "补全中…",
+      "running": "该集的拆分/补镜任务正在运行，请等它结束",
+      "started": "已开始补全剩余 {n} 段缺口，进度见任务中心",
+      "failed": "补全剩余失败"
     }
   },
   "poster": {

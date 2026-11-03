@@ -66,7 +66,8 @@
       "script_rewrite": "Script rewrite",
       "storyboard_breaker": "Storyboard breakdown",
       "portrait_appearance": "Appearance from archival portraits",
-      "asset_semantics": "Semantic annotation"
+      "asset_semantics": "Semantic annotation",
+      "storyboard_fill_gaps": "Fill remaining storyboards"
     },
     "detail": {
       "title": "Task detail",
@@ -2057,6 +2058,17 @@
       "confirm": "Confirm roster",
       "confirmed": "Roster confirmed — later extractions will follow it",
       "draftSaved": "Draft saved (still awaiting review)"
+    },
+    "coverage": {
+      "summary": "Narration coverage {covered} / {total} chars",
+      "gaps": "{n} gap(s), {chars} chars",
+      "gapItem": "chars {start}–{end} ({chars}): {excerpt}",
+      "complete": "Every line of the script is taken by a shot",
+      "fill": "Fill remaining",
+      "filling": "Filling…",
+      "running": "A breakdown/fill task is already running for this episode",
+      "started": "Filling {n} remaining gap(s); follow it in the task center",
+      "failed": "Failed to fill the remaining gaps"
     }
   },
   "poster": {

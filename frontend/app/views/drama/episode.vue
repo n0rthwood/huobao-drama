@@ -638,6 +638,15 @@
             />
           </div>
 
+          <!-- 旁白覆盖与「补全剩余」（纪录片 #52）：分镜页与表达设计页顶部共用 -->
+          <NarrationCoverageBar
+            v-if="isDocumentaryProject && (prodTab === 'expression' || prodTab === 'keyframes')"
+            :episode-id="epId"
+            :chat-model="chatModelOverride() || ''"
+            :chat-config-id="chatConfigId() || 0"
+            @refresh="refresh"
+          />
+
           <!-- Sub: 表达设计（纪录片 #49）：逐镜信息点 / 表现手段 / 必须可见要素 / 图层计划 -->
           <ShotIntentPanel
             v-if="prodTab === 'expression'"

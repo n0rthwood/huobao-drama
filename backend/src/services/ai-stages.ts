@@ -84,6 +84,8 @@ export const AI_CALL_SITES: Record<string, AiStage[]> = {
   'services/adapters/h3-prompt.ts': ['h3_prompt'],
   'services/asset-semantics-auto.ts': ['asset_semantics'],
   'services/prop-beautify.ts': ['prop_beautify'],
+  // 补全剩余（#52）：纪录片拆分分镜的续跑，复用同一视觉环节
+  'services/storyboard-fill-gaps.ts': ['storyboard_breaker_documentary'],
   'services/portrait-appearance.ts': ['portrait_appearance'],
   'agents/tools/vision-tools.ts': ['read_image'],
 }

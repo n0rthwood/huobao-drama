@@ -29,6 +29,7 @@ import { resolveDramaProjectType } from './project-type.js'
 import { startExtraction, type ExtractTarget } from './extraction.js'
 import { startKeyframePromptBatch } from './keyframe-prompts.js'
 import { startVideoPromptBatch } from './video-prompts.js'
+import { isCoverageGapFailure, startFillGapsTask } from './storyboard-fill-gaps.js'
 import type { SysTaskRow } from './sys-task.js'
 
 export interface RetryOptions {
@@ -214,6 +215,16 @@ async function retryText(row: SysTaskRow, opts: RetryOptions): Promise<number> {
   const episodeId = row.episodeId
   if (!kind || !episodeId) throw new Error('该文本任务缺少重试所需的信息')
   const dramaId = row.dramaId ?? 0
+
+  // 覆盖缺口失败的纪录片拆分任务（#52）：重试 = 补镜，保留已拆分镜只补剩余；
+  // 整集重拆仍由分镜页的「拆分分镜」按钮显式发起（语义不变）。
+  if (kind === 'storyboard_fill_gaps' || (kind === 'storyboard_breaker' && isCoverageGapFailure(row.errorMsg))) {
+    const fill = await startFillGapsTask(episodeId, { model: opts.model, configId: opts.configId, retryOf: row.id })
+    if (fill.reason === 'running') throw new Error('该集的拆分/补镜任务正在运行，请等它结束')
+    if (fill.reason === 'not_documentary') throw new Error('只有纪录片项目才有补镜')
+    if (!fill.started) throw new Error('本集旁白已被分镜全部领走，没有需要补的缺口')
+    return fill.taskId!
+  }
 
   const extractTarget = EXTRACT_TARGET_OF[kind]
   if (extractTarget) {
