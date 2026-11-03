@@ -172,6 +172,8 @@ app.post('/register-upload', async (c) => {
 
   const ownerFields: { characterId?: number; sceneId?: number; propId?: number } = {}
   let dramaId: number | null = null
+  // 上传注册为证据素材（Issue #47）：标记要等版本行写进去拿到 id 后再落库
+  let markFaithfulProp = false
   if (kind === 'character') {
     const [asset] = await db.select().from(schema.characters).where(eq(schema.characters.id, assetId))
     if (!asset || asset.deletedAt) return badRequest(c, '角色不存在')
@@ -190,6 +192,8 @@ app.post('/register-upload', async (c) => {
     ownerFields.propId = assetId
     dramaId = asset.dramaId
     await db.update(schema.props).set({ imageUrl: localPath, localPath, updatedAt: now() }).where(eq(schema.props.id, assetId))
+    // 上传的就是原件：请求显式带 faithful 时同时打标记（Issue #47），版本行 id 在下面写回 faithful_source
+    markFaithfulProp = body.faithful === true || body.faithful === 1
   }
 
   const ts = now()
@@ -209,7 +213,13 @@ app.post('/register-upload', async (c) => {
     updatedAt: ts,
     ...completionStamp(ts),
   })
-  return created(c, { id: getInsertId(result), local_path: localPath })
+  const taskId = getInsertId(result)
+  if (markFaithfulProp) {
+    await db.update(schema.props)
+      .set({ faithful: 1, faithfulSource: taskId, updatedAt: now() })
+      .where(eq(schema.props.id, assetId))
+  }
+  return created(c, { id: taskId, local_path: localPath })
 })
 
 // GET /tasks/center — 全局任务中心列表（含批次父行与导出行，分页）

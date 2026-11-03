@@ -19,6 +19,7 @@ export type TextKind =
   | 'extract_characters' | 'extract_scenes' | 'extract_props'
   | 'keyframe_prompts' | 'video_prompts' | 'script_rewrite' | 'storyboard_breaker'
   | 'portrait_appearance'
+  | 'asset_semantics'
 
 export interface TaskParams {
   frameType?: string

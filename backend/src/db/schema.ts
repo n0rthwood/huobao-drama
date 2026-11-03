@@ -92,6 +92,8 @@ export const characters = sqliteTable('characters', {
   seedValue: text('seed_value'),
   sortOrder: integer('sort_order'),
   localPath: text('local_path'),
+  // 背景信息载体（Issue #47）：旁白提到但不出场、只作视觉承载的实体
+  exposition: integer('exposition').notNull().default(0),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
   deletedAt: text('deleted_at'),
@@ -140,6 +142,8 @@ export const scenes = sqliteTable('scenes', {
   referenceImages: text('reference_images'),
   status: text('status').default('pending'),
   localPath: text('local_path'),
+  // 背景信息载体（Issue #47）：旁白提到但不出场、只作视觉承载的实体（如波尔塔瓦战场）
+  exposition: integer('exposition').notNull().default(0),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
   deletedAt: text('deleted_at'),
@@ -428,6 +432,14 @@ export const props = sqliteTable('props', {
   imageUrl: text('image_url'),
   referenceImages: text('reference_images'),
   localPath: text('local_path'),
+  // 证据素材（Issue #47）：faithful=1 的道具（地图/版画/文书）永不进入资产生图/批量重绘
+  faithful: integer('faithful').notNull().default(0),
+  // 语义标注坐标所针对的那张原图 = 该上传版本的 sys_task id
+  faithfulSource: integer('faithful_source'),
+  // 语义标注 JSON（labels/points/regions/lines，坐标为原图像素）；唯一读写口在 services/asset-semantics.ts
+  semantics: text('semantics'),
+  // 背景信息载体（Issue #47）：旁白提到但不出场、只作视觉承载的实体
+  exposition: integer('exposition').notNull().default(0),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
   deletedAt: text('deleted_at'),

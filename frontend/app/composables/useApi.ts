@@ -611,6 +611,44 @@ export const sceneAPI = {
   reExtract: (id: number, episodeId: number, textModel?: string, textConfigId?: number) => api.post<ReExtractResp>(`/scenes/${id}/re-extract`, { episode_id: episodeId, text_model: textModel || undefined, text_config_id: textConfigId || undefined }),
 }
 
+/**
+ * 证据素材语义标注（Issue #47）。坐标一律是 `faithful_source` 那张原图的像素坐标，
+ * 前端只按 `image.width/height` 做 viewBox 缩放，不另存一套渲染尺寸。
+ */
+export type SemanticsSource = 'vlm' | 'cv' | 'manual'
+export type SemanticsLineKind = 'river' | 'route' | 'border'
+export interface SemanticsLabel { id: string; text: string; bbox: [number, number, number, number]; source: SemanticsSource; confidence: number }
+export interface SemanticsPoint { id: string; name: string; at: [number, number]; source: SemanticsSource; confidence: number }
+export interface SemanticsRegion { id: string; name: string; points: Array<[number, number]>; source: SemanticsSource; confidence: number }
+export interface SemanticsLine { id: string; name: string; points: Array<[number, number]>; kind: SemanticsLineKind; source: SemanticsSource; confidence: number; color?: string }
+export interface AssetSemanticsDoc {
+  image: { width: number; height: number; source_task_id: number | null }
+  labels: SemanticsLabel[]
+  points: SemanticsPoint[]
+  regions: SemanticsRegion[]
+  lines: SemanticsLine[]
+  warnings?: string[]
+  generated_at?: string
+  model?: string
+}
+export interface PropSemanticsResp {
+  faithful: 0 | 1
+  faithful_source: number | null
+  /** 坐标所针对的底图（设了忠实原件就是那一版，否则是当前图） */
+  base_image_url: string | null
+  semantics: AssetSemanticsDoc | null
+}
+export interface PropSemanticsAutoResp { started: boolean; task_id: number }
+export interface PropSemanticsAutoStatus {
+  status: 'running' | 'done' | 'error' | 'none'
+  task_id: number | null
+  error: string | null
+  warnings: string[]
+  counts: { labels: number; points: number; regions: number; lines: number }
+}
+/** 资产行（道具）：接口按需返回，组件只读取自己关心的字段 */
+export type PropRow = Record<string, unknown>
+
 export const propAPI = {
   create: (data: any) => api.post('/props', data),
   update: (id: number, data: any) => api.put(`/props/${id}`, data),
@@ -621,6 +659,15 @@ export const propAPI = {
   delReference: (id: number, url: string) => api.del<ReferenceImagesResp>(`/props/${id}/reference-images?url=${encodeURIComponent(url)}`),
   addRefsFromLibrary: (id: number, urls: string[]) => api.post<LibraryRefsResp>(`/props/${id}/reference-images/from-library`, { urls }),
   reExtract: (id: number, episodeId: number, textModel?: string, textConfigId?: number) => api.post<ReExtractResp>(`/props/${id}/re-extract`, { episode_id: episodeId, text_model: textModel || undefined, text_config_id: textConfigId || undefined }),
+  // 证据素材与语义标注（Issue #47）：faithful=1 的道具永不进生图；语义坐标永远相对 faithful_source 那张原图
+  setFaithful: (id: number, faithful: boolean) => api.put<PropRow>(`/props/${id}`, faithful ? { faithful: true } : { faithful: false, confirm_unfaithful: true }),
+  setFaithfulSource: (id: number, versionTaskId: number) => api.put<PropRow>(`/props/${id}/faithful-source`, { version_task_id: versionTaskId }),
+  semantics: (id: number) => api.get<PropSemanticsResp>(`/props/${id}/semantics`),
+  saveSemantics: (id: number, semantics: AssetSemanticsDoc) => api.put<{ semantics: AssetSemanticsDoc }>(`/props/${id}/semantics`, { semantics }),
+  autoSemantics: (id: number, episodeId: number, configId?: number) => api.post<PropSemanticsAutoResp>(`/props/${id}/semantics/auto`, { episode_id: episodeId, config_id: configId || undefined }),
+  autoSemanticsStatus: (id: number) => api.get<PropSemanticsAutoStatus>(`/props/${id}/semantics/auto/status`),
+  beautify: (id: number, episodeId: number, opts: { prompt?: string; model?: string; configId?: number } = {}) =>
+    api.post<{ image_generation_id: number }>(`/props/${id}/beautify`, { episode_id: episodeId, prompt: opts.prompt || undefined, model: opts.model || undefined, config_id: opts.configId || undefined }),
 }
 
 // 生成任务列表/详情（图片生成走各资产 API，视频生成走 storyboardAPI.generateVideo 与集级批量）

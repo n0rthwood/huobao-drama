@@ -13,15 +13,48 @@ import { mountReferenceImageRoutes } from './reference-images.js'
 import { EMPTY_ASSET_NAME_MESSAGE, normalizeAssetName } from '../services/asset-name.js'
 import { planFinalPromptWrite, promptSourceChanged } from '../services/asset-prompt-invalidation.js'
 import { mountReExtractRoute } from './asset-reextract.js'
+import { FAITHFUL_PROVIDERS } from '../services/asset-batch-select.js'
+import {
+  countSemantics,
+  normalizeSemantics,
+  parseSemantics,
+  savePropSemantics,
+  SemanticsValidationError,
+} from '../services/asset-semantics.js'
+import { getSemanticsAutoStatus, startSemanticsAuto } from '../services/asset-semantics-auto.js'
+import { beautifyPrompt, sizeBucketFor, watchBeautifyTask } from '../services/prop-beautify.js'
+import { getAbsolutePath } from '../utils/storage.js'
+import sharp from 'sharp'
 
 const app = new Hono()
 // 道具图：白底单品静物，方形画布
 const PROP_IMAGE_SIZE = '1024x1024'
+/** 证据素材不进生图链路时的统一口径（路由 400 与批量 skip_faithful 同义） */
+const FAITHFUL_BLOCKED_MESSAGE = '该素材已标记为证据素材（忠实素材），不能重绘；如需风格化请用「美化」生成派生版本，或先关闭忠实标记'
 
 // POST/DELETE /props/:id/reference-images — 道具参考图（生图输入，与成片图互不影响）
 mountReferenceImageRoutes(app, 'prop')
 // POST /props/:id/re-extract — 单资产重新提取（Issue #32）
 mountReExtractRoute(app, 'prop')
+
+/**
+ * 语义标注的底图：优先 `faithful_source` 指向的那条原件版本，否则退当前图。
+ * 坐标永远针对这张图，界面预览与 CV 都用它。
+ */
+async function resolveSemanticsBase(prop: typeof schema.props.$inferSelect): Promise<{ path: string | null; taskId: number | null }> {
+  if (prop.faithfulSource) {
+    const [task] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, prop.faithfulSource))
+    const path = task?.localPath || task?.resultUrl || null
+    if (path) return { path, taskId: task!.id }
+  }
+  const current = prop.localPath || prop.imageUrl || null
+  if (!current) return { path: null, taskId: null }
+  // 当前图如果本身就是某条版本行，把那条行的 id 记进 semantics.image.source_task_id
+  const tasks = await db.select().from(schema.sysTask)
+    .where(and(eq(schema.sysTask.type, 'image'), eq(schema.sysTask.propId, prop.id)))
+  const match = tasks.find(task => (task.localPath || task.resultUrl || '') === current)
+  return { path: current, taskId: match?.id ?? null }
+}
 
 // POST /props — 手动新增道具（传入 episode_id 时关联到该集）
 app.post('/', async (c) => {
@@ -35,6 +68,8 @@ app.post('/', async (c) => {
     type: body.type || '',
     description: body.description || '',
     dramaId: body.drama_id,
+    // 证据素材可以在建卡时就标好（Issue #47）；默认 0，与既有行为一致
+    faithful: body.faithful === true || body.faithful === 1 ? 1 : 0,
     createdAt: ts,
     updatedAt: ts,
   })
@@ -74,6 +109,15 @@ app.put('/:id', async (c) => {
   }
   if (body.type !== undefined) updates.type = body.type
   if (body.description !== undefined) updates.description = body.description
+  // 忠实标记（Issue #47）：打开随手可做，关掉必须显式确认——关掉就等于把证据素材
+  // 重新放回扩散模型的射程里，事故正是这样发生的
+  if (body.faithful !== undefined) {
+    const next = body.faithful === true || body.faithful === 1 ? 1 : 0
+    if (next === 0 && Number(prop.faithful) === 1 && body.confirm_unfaithful !== true) {
+      return badRequest(c, '关闭忠实标记会让该素材重新进入生图/批量重绘，请传 confirm_unfaithful=true 显式确认')
+    }
+    updates.faithful = next
+  }
   // 用户上传道具图：直接写入图片地址与本地路径
   if (body.image_url !== undefined) updates.imageUrl = body.image_url
   else if (body.imageUrl !== undefined) updates.imageUrl = body.imageUrl
@@ -111,6 +155,7 @@ app.post('/:id/generate-prompt', async (c) => {
   const body = await c.req.json()
   const [prop] = await db.select().from(schema.props).where(eq(schema.props.id, id))
   if (!prop) return badRequest(c, '道具不存在')
+  if (Number(prop.faithful) === 1) return badRequest(c, FAITHFUL_BLOCKED_MESSAGE)
   if (!body.episode_id) return badRequest(c, 'episode_id 必填')
 
   const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, Number(body.episode_id)))
@@ -132,6 +177,7 @@ app.post('/:id/generate-image', async (c) => {
   const body = await c.req.json()
   const [prop] = await db.select().from(schema.props).where(eq(schema.props.id, id))
   if (!prop) return badRequest(c, '道具不存在')
+  if (Number(prop.faithful) === 1) return badRequest(c, FAITHFUL_BLOCKED_MESSAGE)
   if (!body.episode_id) return badRequest(c, 'episode_id 必填')
 
   const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, Number(body.episode_id)))
@@ -152,6 +198,145 @@ app.post('/:id/generate-image', async (c) => {
   } catch (err: any) {
     logTaskError('PropImage', 'generate', { propId: id, error: err.message })
     return badRequest(c, err.message)
+  }
+})
+
+// ─── 证据素材（Issue #47） ──────────────────────────────────────
+
+/**
+ * PUT /props/:id/faithful-source — 显式把当前图切回某条原件版本。
+ *
+ * 迁移只打 `faithful` 标记、不动 `image_url`（用户确认 Q1），回退由人在这里执行：
+ * 切回原图会让引用该素材的关键帧签名标「已变化」，这是人的决定，不能由升级代劳。
+ */
+app.put('/:id/faithful-source', async (c) => {
+  const id = Number(c.req.param('id'))
+  const body = await c.req.json()
+  const versionTaskId = Number(body.version_task_id)
+  if (!versionTaskId) return badRequest(c, 'version_task_id 必填')
+  const [prop] = await db.select().from(schema.props).where(eq(schema.props.id, id))
+  if (!prop) return badRequest(c, '道具不存在')
+
+  const [task] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, versionTaskId))
+  if (!task || task.propId !== id || task.type !== 'image' || task.status !== 'completed') {
+    return badRequest(c, '指定的版本不属于该道具，或还没有完成')
+  }
+  if (!FAITHFUL_PROVIDERS.includes(task.provider || '')) {
+    return badRequest(c, `只能把上传/导入的原件设为忠实底图（该版本来自 ${task.provider || '未知来源'}）`)
+  }
+  const path = task.localPath || task.resultUrl
+  if (!path) return badRequest(c, '该版本没有可用的图片地址')
+
+  await db.update(schema.props).set({
+    imageUrl: path,
+    localPath: task.localPath || null,
+    faithful: 1,
+    faithfulSource: versionTaskId,
+    updatedAt: now(),
+  }).where(eq(schema.props.id, id))
+  logTaskSuccess('Faithful', 'source-selected', { propId: id, versionTaskId, path })
+  const [updated] = await db.select().from(schema.props).where(eq(schema.props.id, id))
+  return success(c, toSnakeCase(updated))
+})
+
+// GET /props/:id/semantics — 语义标注 + 坐标所针对的底图
+app.get('/:id/semantics', async (c) => {
+  const id = Number(c.req.param('id'))
+  const [prop] = await db.select().from(schema.props).where(eq(schema.props.id, id))
+  if (!prop) return badRequest(c, '道具不存在')
+  const base = await resolveSemanticsBase(prop)
+  return success(c, {
+    faithful: Number(prop.faithful) === 1 ? 1 : 0,
+    faithful_source: prop.faithfulSource ?? null,
+    base_image_url: base.path,
+    semantics: parseSemantics(prop.semantics),
+  })
+})
+
+// PUT /props/:id/semantics — 人工全量覆盖（服务端校验坐标与形状）
+app.put('/:id/semantics', async (c) => {
+  const id = Number(c.req.param('id'))
+  const body = await c.req.json()
+  const [prop] = await db.select().from(schema.props).where(eq(schema.props.id, id))
+  if (!prop) return badRequest(c, '道具不存在')
+  const raw = body.semantics ?? body
+  try {
+    const doc = normalizeSemantics(raw)
+    await savePropSemantics(id, doc)
+    logTaskSuccess('Semantics', 'manual-save', { propId: id, ...countSemantics(doc) })
+    return success(c, { semantics: doc })
+  } catch (err) {
+    if (err instanceof SemanticsValidationError) return badRequest(c, err.message)
+    throw err
+  }
+})
+
+// POST /props/:id/semantics/auto — VLM 锚点 + CV 几何的自动标注（文本任务，进任务中心）
+app.post('/:id/semantics/auto', async (c) => {
+  const id = Number(c.req.param('id'))
+  const body = await c.req.json()
+  const [prop] = await db.select().from(schema.props).where(eq(schema.props.id, id))
+  if (!prop) return badRequest(c, '道具不存在')
+  if (!body.episode_id) return badRequest(c, 'episode_id 必填')
+  const base = await resolveSemanticsBase(prop)
+  if (!base.path) return badRequest(c, '该素材还没有图片，无法标注；请先上传原件')
+
+  const result = await startSemanticsAuto({
+    propId: id,
+    episodeId: Number(body.episode_id),
+    dramaId: prop.dramaId,
+    propName: prop.name,
+    absPath: getAbsolutePath(base.path),
+    sourceTaskId: base.taskId,
+    configId: body.config_id ?? undefined,
+  })
+  return success(c, { started: result.started, task_id: result.taskId })
+})
+
+// GET /props/:id/semantics/auto/status — 最近一次自动标注的状态与告警
+app.get('/:id/semantics/auto/status', async (c) => {
+  const id = Number(c.req.param('id'))
+  return success(c, await getSemanticsAutoStatus(id))
+})
+
+/**
+ * POST /props/:id/beautify — 以原图为第 1 参考图走 image_edit，产出**派生版本**。
+ * 原图与语义标注都不动；落地后自动做保真核验，结论写进该版本行的 params.fidelity。
+ */
+app.post('/:id/beautify', async (c) => {
+  const id = Number(c.req.param('id'))
+  const body = await c.req.json()
+  const [prop] = await db.select().from(schema.props).where(eq(schema.props.id, id))
+  if (!prop) return badRequest(c, '道具不存在')
+  if (!body.episode_id) return badRequest(c, 'episode_id 必填')
+  const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, Number(body.episode_id)))
+  if (!ep) return badRequest(c, '剧集不存在')
+  const base = await resolveSemanticsBase(prop)
+  if (!base.path) return badRequest(c, '该素材还没有原图，无法美化')
+
+  // 派生图必须与原图同画幅，否则语义坐标换算会错位
+  const meta = await sharp(getAbsolutePath(base.path)).metadata()
+  const size = meta.width && meta.height ? sizeBucketFor(meta.width, meta.height) : PROP_IMAGE_SIZE
+  // 不拼项目风格预设：documentary-archival 的 `no lettering` 会让模型抹掉地名
+  const prompt = String(body.prompt || '').trim() || beautifyPrompt(prop.name, prop.description)
+  try {
+    logTaskStart('Beautify', 'generate', { propId: id, episodeId: ep.id, size, base: base.path })
+    const genId = await generateImage({
+      propId: id,
+      episodeId: ep.id,
+      dramaId: prop.dramaId,
+      prompt,
+      model: body.model,
+      size,
+      referenceImages: [base.path],
+      configId: body.config_id ?? ep.imageConfigId ?? undefined,
+    })
+    void watchBeautifyTask(genId)
+    return success(c, { image_generation_id: genId, base_image_url: base.path, size })
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err)
+    logTaskError('Beautify', 'generate', { propId: id, error: message })
+    return badRequest(c, message)
   }
 })
 

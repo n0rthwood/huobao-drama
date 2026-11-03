@@ -578,12 +578,13 @@
                   <div class="prop-name-row">
                     <span class="asset-name" :title="p.name">{{ p.name }}</span>
                     <span class="tag">{{ p.type || t('common.prop') }}</span>
+                    <span v-if="p.faithful" class="tag asset-faithful-tag" :title="t('episode.asset.faithfulHint')">{{ t('episode.asset.faithfulBadge') }}</span>
                   </div>
                   <div class="asset-meta asset-desc dim" :title="p.description || ''">{{ p.description || t('episode.asset.noDescription') }}</div>
                   <div class="asset-meta asset-final" :class="{ dim: !(p.final_prompt || p.finalPrompt) }" :title="p.final_prompt || p.finalPrompt || ''">
                     <span class="afp-label">{{ t('episode.asset.finalPromptWhiteBg') }}</span>
                     {{ p.final_prompt || p.finalPrompt || t('episode.asset.finalPromptAutoWhiteBg') }}
-                    <FinalPromptSourceBadge :source="p.final_prompt_source || ''" :final-prompt="p.final_prompt || p.finalPrompt || ''" :updated-at="p.final_prompt_updated_at || ''" rewritable :busy="isGeneratingPrompt('prop', p.id)" @rewrite="rewriteAssetPrompt('prop', p.id)" />
+                    <FinalPromptSourceBadge :source="p.final_prompt_source || ''" :final-prompt="p.final_prompt || p.finalPrompt || ''" :updated-at="p.final_prompt_updated_at || ''" :rewritable="!p.faithful" :busy="isGeneratingPrompt('prop', p.id)" @rewrite="rewriteAssetPrompt('prop', p.id)" />
                   </div>
                   <ReferenceImageManager
                     asset-type="prop"
@@ -615,7 +616,7 @@
                     <Images :size="11" />
                     {{ t('components.mediaLibrary.pick') }}
                   </button>
-                  <button class="btn btn-sm" :disabled="isPendingPropImage(p.id)" @click.stop="genPropImg(p.id)">
+                  <button v-if="!p.faithful" class="btn btn-sm" :disabled="isPendingPropImage(p.id)" @click.stop="genPropImg(p.id)">
                     <Loader2 v-if="isPendingPropImage(p.id)" :size="11" class="animate-spin" />
                     {{ (p.image_url || p.imageUrl) ? t('episode.asset.regen') : (isPendingPropImage(p.id) ? t('episode.asset.generating') : t('episode.asset.generate')) }}
                   </button>
@@ -1528,6 +1529,7 @@
               <span class="tag" v-if="assetDetail.type === 'character'">{{ assetDetail.item.role || t('common.role') }}</span>
               <span class="tag" v-else-if="assetDetail.type === 'prop'">{{ assetDetail.item.type || t('common.prop') }}</span>
               <span class="tag" v-else>{{ assetDetail.item.time || t('episode.asset.noTime') }}</span>
+              <span v-if="assetDetailFaithful" class="tag asset-faithful-tag" :title="t('episode.asset.faithfulHint')">{{ t('episode.asset.faithfulBadge') }}</span>
               <button class="btn btn-ghost btn-icon" @click="closeAssetDetail">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
@@ -1713,6 +1715,35 @@
               />
             </section>
 
+            <!-- 证据素材与语义标注（Issue #47）：忠实素材只做标注与底图切换，不走生图 -->
+            <section v-if="assetDetail.type === 'prop'" class="asset-detail-ref-panel">
+              <div class="asset-detail-section-title">
+                <span>{{ t('episode.documentary.semantics.sectionTitle') }}</span>
+                <span class="dim">{{ t('episode.documentary.semantics.sectionHint') }}</span>
+              </div>
+              <label class="asset-faithful-toggle">
+                <input
+                  type="checkbox"
+                  :checked="!!assetDetail.item.faithful"
+                  :disabled="faithfulSaving"
+                  @change="onFaithfulToggle($event.target.checked)"
+                />
+                <span>{{ t('episode.asset.faithfulToggle') }}</span>
+              </label>
+              <p class="asset-faithful-hint dim">{{ t('episode.asset.faithfulHint') }}</p>
+              <PropSemanticsPanel
+                :key="`semantics-${assetDetail.item.id}`"
+                :prop-id="assetDetail.item.id"
+                :episode-id="epId"
+                :faithful="assetDetail.item.faithful || 0"
+                :faithful-source="assetDetail.item.faithful_source ?? null"
+                :semantics="assetDetail.item.semantics ?? null"
+                :image-versions="assetVersions(assetDetail.item)"
+                @update="onAssetSemanticsUpdate(assetDetail.item, $event)"
+                @preview="openImageViewer"
+              />
+            </section>
+
             <section class="asset-detail-ref-panel">
               <div class="asset-detail-section-title">
                 <span>{{ t('episode.documentary.citationsSectionTitle') }}</span>
@@ -1730,6 +1761,7 @@
                 <span>{{ assetDetail.type === 'character' ? t('episode.asset.finalPromptTurnaround') : assetDetail.type === 'scene' ? t('episode.asset.finalPromptFixed') : t('episode.asset.finalPromptWhiteBg') }}</span>
                 <div class="asset-detail-prompt-head-actions">
                   <button
+                    v-if="!assetDetailFaithful"
                     class="btn btn-sm"
                     :disabled="isGeneratingPrompt(assetDetail.type, assetDetail.item.id) || isAssetImagePending(assetDetail.type, assetDetail.item.id)"
                     @click="genAssetFinalPrompt"
@@ -1740,11 +1772,12 @@
                   <span :class="['asset-detail-state', assetFinalPrompt && 'is-ready']">
                     {{ assetFinalPrompt ? t('episode.asset.ready') : t('episode.asset.todo') }}
                   </span>
+                  <span v-if="assetDetailFaithful" class="dim asset-faithful-hint">{{ t('episode.asset.faithfulNoGen') }}</span>
                   <FinalPromptSourceBadge
                     :source="assetDetail.item.final_prompt_source || ''"
                     :final-prompt="assetFinalPrompt"
                     :updated-at="assetDetail.item.final_prompt_updated_at || ''"
-                    rewritable
+                    :rewritable="!assetDetailFaithful"
                     show-time
                     :busy="isGeneratingPrompt(assetDetail.type, assetDetail.item.id)"
                     @rewrite="genAssetFinalPrompt"
@@ -1829,7 +1862,7 @@
                 {{ assetImageSrc(assetDetail.item) ? t('episode.asset.regenScene') : (isPendingSceneImage(assetDetail.item.id) ? t('episode.asset.generating') : t('episode.asset.genScene')) }}
               </button>
               <button
-                v-else-if="assetDetail.type === 'prop'"
+                v-else-if="assetDetail.type === 'prop' && !assetDetailFaithful"
                 class="btn"
                 :disabled="isPendingPropImage(assetDetail.item.id)"
                 @click="genPropImg(assetDetail.item.id)"
@@ -2109,6 +2142,15 @@
       />
 
       <ConfirmDialog
+        :open="faithfulConfirm.open"
+        :title="t('episode.asset.faithfulOffTitle')"
+        :message="t('episode.asset.faithfulOffMessage', { name: faithfulConfirm.name })"
+        :loading="faithfulSaving"
+        @confirm="confirmUnfaithful"
+        @cancel="faithfulConfirm.open = false"
+      />
+
+      <ConfirmDialog
         :open="reExtract.open"
         :title="t('episode.documentary.reExtractTitle')"
         :message="t('episode.documentary.reExtractMessage', { type: assetTypeLabel(reExtract.type), name: reExtract.name, fields: reExtractFieldsLabel })"
@@ -2234,6 +2276,7 @@ import { toastError, mapError, toastServerMessage, MODERATION_RE } from '~/compo
 import LocaleSwitcher from '~/components/LocaleSwitcher.vue'
 import ReferenceImageManager from '~/components/ReferenceImageManager.vue'
 import ArchivalImagePanel from '~/components/ArchivalImagePanel.vue'
+import PropSemanticsPanel from '~/components/PropSemanticsPanel.vue'
 import ResearchCitationList from '~/components/ResearchCitationList.vue'
 import FinalPromptSourceBadge from '~/components/FinalPromptSourceBadge.vue'
 import MediaLibraryDialog from '~/components/MediaLibraryDialog.vue'
@@ -5297,6 +5340,51 @@ function onAssetArchivalUpdate(item, entries) {
   item.archival_images = entries
 }
 
+/**
+ * 证据素材（Issue #47）：PropSemanticsPanel 的 update 事件给的是道具行的局部字段
+ * （保存标注给 { semantics }，切换忠实原件给整行），一律按服务端返回值覆盖本地行。
+ */
+function onAssetSemanticsUpdate(item, patch) {
+  if (!patch || typeof patch !== 'object') return
+  Object.assign(item, patch)
+  const target = propItems.value.find(p => p.id === item.id)
+  if (target && target !== item) Object.assign(target, patch)
+}
+
+// 忠实素材开关：打开直接写；关闭要人确认（关掉后这张图会重新进入生图与批量重绘）
+const faithfulSaving = ref(false)
+const faithfulConfirm = ref({ open: false, name: '' })
+const assetDetailFaithful = computed(() => assetDetail.value.type === 'prop' && !!assetDetail.value.item?.faithful)
+
+function onFaithfulToggle(checked) {
+  if (faithfulSaving.value) return
+  if (!checked) {
+    faithfulConfirm.value = { open: true, name: assetDetail.value.item?.name || '' }
+    return
+  }
+  applyFaithful(true)
+}
+
+function confirmUnfaithful() {
+  applyFaithful(false)
+}
+
+async function applyFaithful(faithful) {
+  const item = assetDetail.value.item
+  if (!item?.id || faithfulSaving.value) return
+  faithfulSaving.value = true
+  try {
+    const row = await propAPI.setFaithful(item.id, faithful)
+    onAssetSemanticsUpdate(item, row && typeof row === 'object' ? row : { faithful: faithful ? 1 : 0 })
+    faithfulConfirm.value = { open: false, name: '' }
+    toast.success(faithful ? t('episode.asset.faithfulOn') : t('episode.asset.faithfulOff'))
+  } catch (e) {
+    toastServerMessage(e, { fallback: 'episode.asset.faithfulFailed' })
+  } finally {
+    faithfulSaving.value = false
+  }
+}
+
 // 按史料画像补充外貌（Issue #32）：后端只改写 appearance，所以走同一套清空路径但只收窄到该字段，
 // 最终提示词与来源徽标照常清空（外貌变了提示词就作废），再把新外貌写回行与弹窗草稿
 function onAssetAppearanceFromPortrait(item, appearance) {
@@ -8097,6 +8185,24 @@ button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
   gap: 8px;
 }
 .asset-detail-ref-panel :deep(.ref-images) { border-top: 0; padding-top: 0; }
+/* 证据素材（Issue #47）：卡片徽标与弹窗开关 */
+.asset-faithful-tag {
+  background: var(--warn-bg);
+  border-color: var(--warn-border);
+  color: var(--warn-text);
+}
+.asset-faithful-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--text-1);
+  cursor: pointer;
+}
+.asset-faithful-hint {
+  margin: 0;
+  font-size: 10.5px;
+}
 .asset-detail-prompt-head-actions {
   display: flex;
   align-items: center;

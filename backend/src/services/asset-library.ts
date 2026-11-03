@@ -34,6 +34,7 @@ import {
   type ReferenceImageEntry,
 } from './reference-images.js'
 import { EMPTY_ASSET_NAME_MESSAGE, normalizeAssetName } from './asset-name.js'
+import { fidelityOf } from './prop-beautify.js'
 
 export const ASSET_KINDS: AssetKind[] = ['character', 'scene', 'prop']
 
@@ -88,6 +89,9 @@ interface AssetRow {
   finalPrompt?: string | null
   seedValue?: string | null
   sortOrder?: number | null
+  /** 道具独有：证据素材标记（Issue #47） */
+  faithful?: number | null
+  semantics?: string | null
 }
 
 /** 关联表行的并集视图（episode_characters / episode_scenes / episode_props） */
@@ -187,6 +191,12 @@ export interface ImageVersion {
   created_at: string | null
   generated_at: number | null
   is_current: boolean
+  /**
+   * 证据素材美化版的保真核验结论（Issue #47）：`verified` 可被选为底图，
+   * `failed` 在界面上标红且不可选，`null` 表示不是美化版或还没核验完。
+   */
+  fidelity: 'verified' | 'failed' | null
+  fidelity_reason: string | null
 }
 
 /** 复制出的版本卡片要显示源模型：取 params.imported_from.model */
@@ -225,6 +235,7 @@ export async function loadImageVersions(
       .filter(task => taskOwnerId(kind, task) === row.id)
       .map((task) => {
         const url = task.localPath || task.resultUrl
+        const { fidelity, reason } = fidelityOf(task.params)
         return {
           id: task.id,
           url,
@@ -234,6 +245,8 @@ export async function loadImageVersions(
           created_at: task.createdAt,
           generated_at: task.generatedAt ?? null,
           is_current: Boolean(url && url === row.imageUrl),
+          fidelity,
+          fidelity_reason: reason,
         }
       })
       .filter(version => Boolean(version.url))
@@ -248,6 +261,8 @@ export async function loadImageVersions(
         created_at: null,
         generated_at: null,
         is_current: true,
+        fidelity: null,
+        fidelity_reason: null,
       })
     }
     result.set(row.id, versions)
@@ -267,6 +282,8 @@ export interface LibraryAsset {
   image_url: string | null
   version_count: number
   reference_count: number
+  /** 证据素材标记（Issue #47）：只有道具会为 1，角色/场景恒为 0 */
+  faithful: 0 | 1
   episodes: Array<{ id: number; episode_number: number; title: string }>
 }
 
@@ -320,6 +337,7 @@ export async function listAssetLibrary(filters: {
         image_url: row.imageUrl ?? null,
         version_count: (versions.get(row.id) ?? []).length,
         reference_count: parseReferenceImages(row.referenceImages).length,
+        faithful: kind === 'prop' && Number(row.faithful) === 1 ? 1 : 0,
         episodes: (linkedEpisodes.get(row.id) ?? []).sort((a, b) => a.episode_number - b.episode_number),
       })
     }
@@ -357,6 +375,7 @@ export async function getLibraryAsset(kind: AssetKind, id: number) {
     name: assetDisplayName(kind, row),
     fields: textFieldsOf(kind, row),
     image_url: row.imageUrl ?? null,
+    faithful: kind === 'prop' && Number(row.faithful) === 1 ? 1 : 0,
     image_versions: versions,
     reference_images: parseReferenceImages(row.referenceImages),
     episodes,
@@ -704,6 +723,11 @@ async function insertAssetRow(
     description: source.description ?? null,
     prompt: source.prompt ?? null,
     finalPrompt: source.finalPrompt ?? null,
+    // 证据素材属性随资产走（Issue #47）：是不是原件不因换项目而改变，语义标注的坐标
+    // 也仍然对得上复制过去的那张图；faithful_source 不复制——版本行在目标项目是新 id，
+    // 人在目标项目里重新选一次原件即可。
+    faithful: Number(source.faithful) === 1 ? 1 : 0,
+    semantics: source.semantics ?? null,
     createdAt: ts,
     updatedAt: ts,
   }))

@@ -19,6 +19,7 @@ import { getDramaId, getEpisodeId, getGenreRuleset, getSingleAssetName } from '.
 import { parseStylingVersion, saveStylingVersion } from '../../services/styling-version.js'
 import { normalizeAssetName, normalizeNearName } from '../../services/asset-name.js'
 import { linkCitationsToAsset } from '../../services/research-citations.js'
+import { markExposition } from '../../services/exposition.js'
 import {
   ROSTER_REQUIRED_MESSAGE,
   ROSTER_STALE_MESSAGE,
@@ -377,6 +378,9 @@ const saveDedupCharacters = createTool({
         name: z.string(),
         description: z.string().optional(),
       }).optional(),
+      // 背景信息载体（Issue #47）：旁白提到但本集不出场的人物（如远在彼得堡的彼得一世）
+      exposition: z.boolean().optional()
+        .describe('true = 背景信息载体：旁白提到、本集不出场、只需要一个视觉载体（肖像/版画/再现镜头）的人物或组织。会标在 role 前缀上，不占选角名册'),
     })),
   }),
   execute: async ({ characters }, context) => {
@@ -422,7 +426,10 @@ const saveDedupCharacters = createTool({
       // 名册之外的人**不写库**——要不要补进名册由人在集页面复核，系统不自动采纳。
       // 例外：单资产重提取点名的那一个人（字段已被清空，必须能写回）。
       const isFocus = !!focusName && rosterKey(char.name) === rosterKey(focusName)
-      if (roster && !isFocus) {
+      // 背景信息载体不占选角名册（Issue #47）：名册回答的是「谁该建**出场**角色卡」，
+      // 而近卫团、不在场的彼得一世这类实体本来就不在名册的判定程序里（组织不是人、
+      // 不在场的人没有决策/行动/亲历），卡在名册门口等于让它们永远建不出来。
+      if (roster && !isFocus && !char.exposition) {
         const canonical = canonicalizeToRoster(char.name, roster)
         if (!canonical) {
           outsideRoster.push(char.name)
@@ -450,11 +457,15 @@ const saveDedupCharacters = createTool({
         // 旧实现用本集文本直接覆盖 styling/appearance，导致 E3 的度假造型污染了全剧的基础形象。
         if (char.styling && existing.styling && char.styling !== existing.styling) ignored.push(`${existing.name}.styling`)
         if (char.appearance && existing.appearance && char.appearance !== existing.appearance) ignored.push(`${existing.name}.appearance`)
+        // 背景信息载体标记只会被「加上」不会被抹掉：已有的出场角色（彼得一世已在项目里）
+        // 再次被当作背景信息载体提到时不重复建卡，但也不该因此降级成非载体
+        const expositionNow = char.exposition === true || Number(existing.exposition) === 1
         await db.update(schema.characters).set({
-          role: existing.role || char.role || '',
+          role: expositionNow ? markExposition(existing.role || char.role || '') : (existing.role || char.role || ''),
           description: existing.description || char.description || '',
           appearance: existing.appearance || char.appearance || '',
           styling: existing.styling || char.styling || char.description || '',
+          exposition: expositionNow ? 1 : 0,
           updatedAt: ts,
         }).where(eq(schema.characters.id, existing.id))
         await linkCharToEpisode(episodeId, existing.id)
@@ -464,11 +475,12 @@ const saveDedupCharacters = createTool({
         // 新增角色
         const res = await db.insert(schema.characters).values({
           name: char.name,
-          role: char.role || '',
+          role: char.exposition ? markExposition(char.role) : (char.role || ''),
           description: char.description || '',
           appearance: char.appearance || '',
           styling: char.styling || char.description || '',
           dramaId,
+          exposition: char.exposition ? 1 : 0,
           createdAt: ts,
           updatedAt: ts,
         })
@@ -518,6 +530,9 @@ const saveDedupScenes = createTool({
       prompt: z.string().optional(),
       description: z.string().optional(),
       lighting: z.string().optional(),
+      // 背景信息载体（Issue #47）：旁白提到的异地事件/战场（如波尔塔瓦），本集不在那里拍
+      exposition: z.boolean().optional()
+        .describe('true = 背景信息载体：旁白提到但本集不在此处发生的地点/事件现场（如波尔塔瓦战场），只用来承载背景信息'),
     })),
   }),
   execute: async ({ scenes }, context) => {
@@ -550,6 +565,8 @@ const saveDedupScenes = createTool({
         await db.update(schema.scenes).set({
           prompt: scene.prompt || scene.description || existing.prompt,
           lighting: scene.lighting || existing.lighting,
+          // 标记只加不减：已是背景信息载体的场景不会因为再次被普通提取碰到就降级
+          exposition: scene.exposition === true || Number(existing.exposition) === 1 ? 1 : 0,
           updatedAt: ts,
         }).where(eq(schema.scenes.id, existing.id))
         await linkSceneToEpisode(episodeId, existing.id)
@@ -562,6 +579,7 @@ const saveDedupScenes = createTool({
           time: scene.time || '',
           prompt: scene.prompt || scene.description || scene.location,
           lighting: scene.lighting || '',
+          exposition: scene.exposition ? 1 : 0,
           createdAt: ts,
           updatedAt: ts,
         })
@@ -647,6 +665,9 @@ const saveDedupProps = createTool({
       name: z.string(),
       type: z.string().optional(),
       description: z.string().optional(),
+      // 背景信息载体（Issue #47）：旁白提到的组织/事件的视觉载体（近卫团旗、勋章、版画、文书）
+      exposition: z.boolean().optional()
+        .describe('true = 背景信息载体：旁白提到但本集不出场的组织/事件，用一件可画的器物或版画承载（会标在 type 上）'),
     })),
   }),
   execute: async ({ props }, context) => {
@@ -679,10 +700,13 @@ const saveDedupProps = createTool({
         // 归一化命中：括号定位/别名等近名视作同一道具复用
         if (matchedViaNorm) logTaskProgress('ExtractTool', 'save-props-reuse', { episodeId, dramaId, extracted: prop.name, reused: existing.name })
         // 已存在：合并信息，保留 ID；物品外貌变更后旧的最终提示词失效
+        const expositionNow = prop.exposition === true || Number(existing.exposition) === 1
         await db.update(schema.props).set({
-          type: prop.type || existing.type,
+          type: expositionNow ? markExposition(prop.type || existing.type) : (prop.type || existing.type),
           description: prop.description || existing.description,
           finalPrompt: prop.description ? null : existing.finalPrompt,
+          // 标记只加不减
+          exposition: expositionNow ? 1 : 0,
           updatedAt: ts,
         }).where(eq(schema.props.id, existing.id))
         await linkPropToEpisode(episodeId, existing.id)
@@ -691,9 +715,10 @@ const saveDedupProps = createTool({
       } else {
         const res = await db.insert(schema.props).values({
           name: prop.name,
-          type: prop.type || '',
+          type: prop.exposition ? markExposition(prop.type) : (prop.type || ''),
           description: prop.description || '',
           dramaId,
+          exposition: prop.exposition ? 1 : 0,
           createdAt: ts,
           updatedAt: ts,
         })
