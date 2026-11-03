@@ -36,6 +36,12 @@ export default defineNuxtConfig({
           file: fileURLToPath(new URL('./app/views/drama/episode.vue', import.meta.url)),
         },
       )
+      // 开发用演示页（app/pages/dev/**，如 Issue #48 的图层编辑器）不进生产构建
+      if (!process.env.HUOBAO_DEV_PAGES && process.env.NODE_ENV === 'production') {
+        for (let index = pages.length - 1; index >= 0; index--) {
+          if (pages[index].path.startsWith('/dev/')) pages.splice(index, 1)
+        }
+      }
     },
   },
   app: {

@@ -1950,5 +1950,117 @@
         "desc": "Click this \"?\" button to replay this page's guide. Happy creating!"
       }
     }
+  },
+  "layerCanvas": {
+    "type": {
+      "polygon": "Area",
+      "polyline": "Route",
+      "marker": "Place",
+      "label": "Text",
+      "card": "Card",
+      "image": "Image"
+    },
+    "theme": {
+      "archival": "Archival",
+      "clean": "Clean",
+      "ink": "Ink"
+    },
+    "tint": {
+      "none": "None",
+      "sepia": "Sepia",
+      "cool": "Cool",
+      "warm": "Warm"
+    },
+    "dash": {
+      "none": "Solid",
+      "dash": "Dashed",
+      "dot": "Dotted"
+    },
+    "font": {
+      "sans": "Sans",
+      "serif": "Serif"
+    },
+    "align": {
+      "left": "Left",
+      "center": "Center",
+      "right": "Right"
+    },
+    "template": {
+      "name": "Name bar",
+      "year": "Year card",
+      "chapter": "Chapter card"
+    },
+    "canvas": {
+      "hint": "Drag to move · handles to scale/rotate · Shift to multi-select · arrows to nudge · Delete to remove · Ctrl+Z to undo",
+      "snap": "Snap",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out"
+    },
+    "list": {
+      "title": "Layers",
+      "visible": "Show / hide",
+      "locked": "Lock / unlock",
+      "duplicate": "Duplicate",
+      "remove": "Delete",
+      "anchored": "Anchored to semantics",
+      "detached": "Detached from anchor"
+    },
+    "style": {
+      "docTitle": "Canvas & base image",
+      "theme": "Theme",
+      "tint": "Tint",
+      "tintStrength": "Tint strength",
+      "paper": "Paper grain",
+      "vignette": "Vignette",
+      "empty": "Select a layer to edit its style",
+      "opacity": "Opacity",
+      "rotation": "Rotation",
+      "fill": "Fill",
+      "fillOpacity": "Fill opacity",
+      "stroke": "Stroke",
+      "strokeWidth": "Stroke width",
+      "dash": "Line style",
+      "width": "Line width",
+      "arrowStart": "Start arrow",
+      "arrowEnd": "End arrow",
+      "text": "Text",
+      "dotColor": "Dot color",
+      "textColor": "Text color",
+      "dotRadius": "Dot radius",
+      "size": "Font size",
+      "font": "Font",
+      "bold": "Bold",
+      "labelOffset": "Label offset",
+      "color": "Text color",
+      "bg": "Background",
+      "bgOpacity": "Background opacity",
+      "align": "Align",
+      "template": "Template",
+      "title": "Title",
+      "sub": "Subtitle",
+      "meta": "Meta",
+      "accent": "Accent",
+      "src": "Image path",
+      "fit": "Fit",
+      "border": "Border color",
+      "borderWidth": "Border width",
+      "radius": "Corner radius",
+      "shadow": "Shadow",
+      "missingChars": "The bundled fonts do not cover these characters; server rendering will fail: {chars}"
+    },
+    "dev": {
+      "title": "Layer editor demo",
+      "desc": "Standalone check for overlay layers: editor interaction side by side with the server render (dev build only).",
+      "undo": "Undo",
+      "redo": "Redo",
+      "reset": "Reset sample",
+      "render": "Server render",
+      "rendering": "Rendering…",
+      "renderMs": "{ms} ms",
+      "basePath": "Base image path",
+      "portraitPath": "Portrait path",
+      "saved": "Saved · {n} layers",
+      "serverRender": "Server render"
+    }
   }
 }
