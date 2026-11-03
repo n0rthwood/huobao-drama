@@ -62,10 +62,12 @@ import { useLayerDoc } from '~/composables/useLayerDoc'
 import { apiBase, mediaUrl } from '~/utils/url'
 
 const { t } = useI18n()
-// 默认底图 = 资产 39 的原始上传图（1720 年初三方局势图），演示页可改成任意素材路径
+// 默认底图 = 资产 39 的原始上传图（1720 年初三方局势图）、默认肖像 = 利哈列夫角色图；
+// 演示页可改成素材库里的任意路径
 const DEFAULT_BASE = 'static/uploads/2988b746-e035-4ab4-905e-3abe19ebc145.png'
+const DEFAULT_PORTRAIT = 'static/images/7e842ed1-33b5-4762-bf17-50583532ffdd.png'
 const basePath = ref(DEFAULT_BASE)
-const portraitPath = ref('')
+const portraitPath = ref(DEFAULT_PORTRAIT)
 const saveState = ref('')
 const serverImage = ref('')
 const renderError = ref('')

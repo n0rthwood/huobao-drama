@@ -61,15 +61,29 @@ test('normalizeLayerDoc: invalid layers are dropped, not repaired', () => {
   assert.equal(doc.layers[0].text, '保留')
 })
 
-test('normalizeLayerDoc: coordinates allow a small bleed and are clamped, boxes keep a minimum size', () => {
+test('normalizeLayerDoc: coordinates are clamped to the 0–1 contract, boxes keep a minimum size', () => {
   const [doc] = normalize([{
     layers: [
       { type: 'polygon', points: [[-9, 0.2], [0.5, 9], [0.8, 0.8], 'nope'] },
       { type: 'label', box: { x: 3, y: -3, w: 0, h: 99 }, text: 'x' },
     ],
   }])
-  assert.deepEqual(doc.layers[0].points, [[-0.25, 0.2], [0.5, 1.25], [0.8, 0.8]])
-  assert.deepEqual(doc.layers[1].box, { x: 1.25, y: -0.25, w: 0.005, h: 2 })
+  assert.deepEqual(doc.layers[0].points, [[0, 0.2], [0.5, 1], [0.8, 0.8]])
+  assert.deepEqual(doc.layers[1].box, { x: 1, y: 0, w: 0.005, h: 2 })
+})
+
+test('normalizeLayerDoc: id dedup never lands on an id that already exists', () => {
+  const [doc] = normalize([{
+    layers: [
+      { id: 'a', type: 'marker', at: [0.1, 0.1] },
+      { id: 'a-3', type: 'marker', at: [0.2, 0.2] },
+      { id: 'a', type: 'marker', at: [0.3, 0.3] },
+      { id: 'a', type: 'marker', at: [0.4, 0.4] },
+    ],
+  }])
+  const ids = doc.layers.map(l => l.id)
+  assert.equal(new Set(ids).size, ids.length, `重复 id：${ids.join(',')}`)
+  assert.deepEqual(ids, ['a', 'a-3', 'a-4', 'a-5'])
 })
 
 test('normalizeLayerDoc: style keys outside the per-type whitelist are dropped and ranges clamped', () => {

@@ -40,8 +40,9 @@ const TEXT_MAX = 400
 const NAME_MAX = 60
 const COLOR_MAX = 32
 const PATH_MAX = 512
-const COORD_MIN = -0.25
-const COORD_MAX = 1.25
+// 跨 Issue 契约（#44 handoff §3）：坐标归一化 0–1，越界一律钳回画面内
+const COORD_MIN = 0
+const COORD_MAX = 1
 
 export interface LayerAnchor {
   asset_id?: number
@@ -393,8 +394,15 @@ export function normalizeLayerDoc(raw: unknown): LayerDoc {
 
   const seen = new Set<string>()
   layers.forEach((layer, index) => {
-    if (seen.has(layer.id)) layer.id = `${layer.id}-${index + 1}`
-    seen.add(layer.id)
+    if (!seen.has(layer.id)) {
+      seen.add(layer.id)
+      return
+    }
+    let suffix = index + 1
+    let candidate = `${layer.id}-${suffix}`
+    while (seen.has(candidate)) candidate = `${layer.id}-${++suffix}`
+    layer.id = candidate
+    seen.add(candidate)
   })
 
   return {
