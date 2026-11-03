@@ -968,6 +968,48 @@ export const storageAPI = {
   info: () => api.get('/storage'),
 }
 
+// ===== 确定性片段（#50）：图层文档 + 时间线 → 同步渲染出 mp4 =====
+export type ClipPositionPersisted = 'replace' | 'pre' | 'post'
+export interface ClipSpec { width: number; height: number; fps: number; source: 'video' | 'default' }
+export interface ClipViewport { x: number; y: number; w: number; h: number }
+export interface ClipState { t: number; viewport: ClipViewport; visible: string[] }
+export interface ClipTimeline { fps: number; ease: 'linear' | 'inout'; fade_ms: number; states: ClipState[] }
+export interface StoryboardClip {
+  id: number
+  storyboard_id: number
+  position: ClipPositionPersisted
+  layer_doc: Record<string, any>
+  timeline: ClipTimeline
+  duration: number
+  render_path: string | null
+  render_signature: string | null
+  rendered_at: string | null
+  status: 'draft' | 'rendering' | 'ready' | 'failed'
+  /** 已渲染且仍对得上当前图层/时间线/规格；false = 需要重新渲染 */
+  fresh: boolean
+}
+
+export const clipAPI = {
+  list: (storyboardId: number) =>
+    api.get<{ spec: ClipSpec; clips: StoryboardClip[] }>(`/clips/storyboards/${storyboardId}`),
+  draft: (storyboardId: number) =>
+    api.post<{ spec: ClipSpec; clip: StoryboardClip }>(`/clips/storyboards/${storyboardId}/draft`),
+  save: (
+    storyboardId: number,
+    position: ClipPositionPersisted,
+    data: { layer_doc?: unknown; timeline?: unknown; duration?: number },
+  ) => api.put<{ spec: ClipSpec; clip: StoryboardClip }>(`/clips/storyboards/${storyboardId}/${position}`, data),
+  del: (storyboardId: number, position: ClipPositionPersisted) =>
+    api.del(`/clips/storyboards/${storyboardId}/${position}`),
+  // 同步渲染：15 秒片段约 3–5 秒返回
+  render: (storyboardId: number, position: ClipPositionPersisted) =>
+    api.post<{ task_id: number; spec: ClipSpec; clip: StoryboardClip | null }>(
+      `/clips/storyboards/${storyboardId}/${position}/render`),
+  // 首/末帧缩略图是 PNG 字节流，直接当 <img src> 用（后端 no-store，带 cache buster 以便渲染后刷新）
+  thumbnailUrl: (storyboardId: number, position: ClipPositionPersisted, which: 'first' | 'last', bust = 0) =>
+    `${apiBase()}/clips/storyboards/${storyboardId}/${position}/thumbnail/${which}${bust ? `?v=${bust}` : ''}`,
+}
+
 export const settingsAPI = {
   contentLanguage: () => api.get<{ language: string }>('/settings/content-language'),
   setContentLanguage: (language: string) => api.put('/settings/content-language', { language }),
