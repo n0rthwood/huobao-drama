@@ -33,6 +33,7 @@ import {
   transitionStatus,
 } from './transition.js'
 import { runTransitionReview } from './transition-agent.js'
+import { loadIntentContext, resolveStoryboardIntent } from './shot-intent-context.js'
 
 export interface StoryboardVideoOptions {
   model?: string
@@ -193,7 +194,10 @@ export async function buildStoryboardVideoRequest(
   // 带转场提交时，转场段里的 @引用 同样参与检查（转场写入时已同步到视频绑定）
   const assets = await loadEpisodeAssets(episode.id)
   const bindings = await loadTargetBindings(storyboardId)
-  const refIssues = computeRefIssues({ prompts: promptFieldsOf(sb), assets, bindings })
+  const refIssues = computeRefIssues({
+    prompts: promptFieldsOf(sb), assets, bindings,
+    intent: resolveStoryboardIntent(sb.intent, loadIntentContext(episode.id)).intent,
+  })
   const blocking = [
     ...blockingIssuesFor(refIssues, 'video_prompt'),
     ...(transition ? blockingIssuesFor(refIssues, 'transition_prompt') : []),

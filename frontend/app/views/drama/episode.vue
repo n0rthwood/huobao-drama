@@ -638,16 +638,15 @@
             />
           </div>
 
-          <!-- Sub: 表达设计（纪录片，Issue #49 落地前的占位说明） -->
-          <div v-if="prodTab === 'expression'" class="prod-content">
-            <div class="step-empty" style="flex:1">
-              <div class="empty-visual">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg>
-              </div>
-              <div class="empty-title">{{ t('episode.prod.expression') }}</div>
-              <div class="empty-desc">{{ t('episode.prod.expressionPlaceholder') }}</div>
-            </div>
-          </div>
+          <!-- Sub: 表达设计（纪录片 #49）：逐镜信息点 / 表现手段 / 必须可见要素 / 图层计划 -->
+          <ShotIntentPanel
+            v-if="prodTab === 'expression'"
+            :episode-id="epId"
+            :storyboards="sbs"
+            :chat-model="chatModelOverride() || ''"
+            :chat-config-id="chatConfigId() || 0"
+            @refresh="refresh"
+          />
 
           <!-- Sub: 图层（纪录片，Issue #48 落地前的占位说明） -->
           <div v-if="prodTab === 'layers'" class="prod-content">
@@ -2282,6 +2281,7 @@ import FinalPromptSourceBadge from '~/components/FinalPromptSourceBadge.vue'
 import MediaLibraryDialog from '~/components/MediaLibraryDialog.vue'
 import PosterPanel from '~/components/PosterPanel.vue'
 import StoryboardKeyframes from '~/components/StoryboardKeyframes.vue'
+import ShotIntentPanel from '~/components/ShotIntentPanel.vue'
 import ProgressRing from '~/components/ProgressRing.vue'
 import FieldSaveStatus from '~/components/FieldSaveStatus.vue'
 import RefIssueList from '~/components/RefIssueList.vue'

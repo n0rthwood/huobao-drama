@@ -13,8 +13,8 @@ export interface AgentRequestContextValues {
   dramaId: number
   /** 单镜任务（转场设计）作用的分镜 */
   storyboardId?: number
-  /** 提示词批次的写入边界；工具 schema 与执行层共同限制。 */
-  storyboardPromptScope?: 'video' | 'keyframes'
+  /** 提示词批次的写入边界；工具 schema 与执行层共同限制。'intent' = 表达设计重算（#49） */
+  storyboardPromptScope?: 'video' | 'keyframes' | 'intent'
   modelOverride?: string
   textConfigId?: number
   /** AI 内容语言；缺省时读全局设置（app_settings.content_language） */

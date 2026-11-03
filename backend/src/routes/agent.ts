@@ -12,6 +12,8 @@ import { logTaskError, logTaskPayload, logTaskProgress, logTaskStart, logTaskSuc
 import { createTextTask, finishTextTask, resolveTextModel, type TextTaskKind } from '../services/text-task.js'
 import { db, schema } from '../db/index.js'
 import { eq } from 'drizzle-orm'
+import { describeNarrationGaps, narrationCoverage, type NarrationGap } from '../services/narration-first.js'
+import { resolveDramaProjectType } from '../services/project-type.js'
 
 const app = new Hono()
 
@@ -19,6 +21,18 @@ const app = new Hono()
 const CHAT_TASK_KINDS: Record<string, TextTaskKind> = {
   script_rewriter: 'script_rewrite',
   storyboard_breaker: 'storyboard_breaker',
+}
+
+/** 纪录片项目本集剧本还没有被任何分镜领走的片段；非纪录片项目恒为空 */
+async function narrationCoverageGaps(episodeId: number): Promise<NarrationGap[]> {
+  const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId))
+  if (!ep || resolveDramaProjectType(ep.dramaId) !== 'documentary') return []
+  const rows = await db.select().from(schema.storyboards)
+    .where(eq(schema.storyboards.episodeId, episodeId))
+  const narrations = rows.filter(sb => !sb.deletedAt)
+    .sort((a, b) => a.storyboardNumber - b.storyboardNumber)
+    .map(sb => sb.narrationText)
+  return narrationCoverage(ep.scriptContent || ep.content, narrations).gaps
 }
 
 // Mastra v1.17 的 ToolCallChunk / ToolResultChunk 结构：
@@ -106,6 +120,18 @@ app.post('/:type/chat', async (c) => {
       sink,
     )
 
+    // narration-first 闸门（#49）：纪录片拆分分镜必须把剧本正文**整篇**切进各镜旁白。
+    // 只看「写下来的话是否出自剧本」挡不住整段被跳过——实测 93 镜漏 746 字，S13 的句子
+    // 连镜头都没有。有缺口就把任务标失败并列出前几处，绝不静默成功。
+    if (agentType === 'storyboard_breaker' && kind) {
+      const gaps = await narrationCoverageGaps(Number(episode_id))
+      if (gaps.length) {
+        const detail = `旁白覆盖缺口：剧本有 ${gaps.length} 段未被任何分镜领走（${describeNarrationGaps(gaps)}）。请重新拆分或补镜。`
+        if (taskId) await finishTextTask(taskId, 'failed', { errorMsg: detail, outputText: result.text || '' })
+        logTaskError('Agent', agentType, { episodeId: episode_id, error: detail })
+        return badRequest(c, detail)
+      }
+    }
     if (taskId) await finishTextTask(taskId, 'completed', { outputText: result.text || '' })
 
     const elapsed = ((performance.now() - startTime) / 1000).toFixed(1)
