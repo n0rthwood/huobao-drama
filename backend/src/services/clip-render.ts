@@ -120,14 +120,14 @@ interface RenderPlan {
   canvasHeight: number
 }
 
-function planOf(timeline: ClipTimeline, duration: number, spec: Pick<ClipSpec, 'width' | 'height'>): RenderPlan {
+function planOf(timeline: ClipTimeline, duration: number, spec: Pick<ClipSpec, 'width' | 'height' | 'fps'>): RenderPlan {
   // 推得最近的那一帧决定底图要预放大到多少，才不会在推近时糊掉
   const scale = Math.min(MAX_CANVAS_SCALE, Math.max(1, 1 / minViewportSize(timeline)))
   return {
     width: spec.width,
     height: spec.height,
-    fps: timeline.fps,
-    frames: frameCount(timeline, duration),
+    fps: spec.fps,
+    frames: frameCount(spec.fps, duration),
     canvasWidth: Math.round(spec.width * scale),
     canvasHeight: Math.round(spec.height * scale),
   }
@@ -303,7 +303,7 @@ export async function renderClip(
 /** 片段首/末帧缩略图（关键帧页「由片段渲染」占位展示用） */
 export async function renderClipThumbnails(
   clip: Pick<StoryboardClip, 'layer_doc' | 'timeline' | 'duration'>,
-  spec: Pick<ClipSpec, 'width' | 'height'>,
+  spec: Pick<ClipSpec, 'width' | 'height' | 'fps'>,
 ): Promise<{ first: Buffer; last: Buffer }> {
   await ensureLayerFonts()
   const doc = clip.layer_doc

@@ -245,9 +245,13 @@ export function frameStateAt(timeline: ClipTimeline, t: number): FrameState {
   return { viewport, opacity }
 }
 
-/** 帧数：按 fps 与时长取整，至少 1 帧 */
-export function frameCount(timeline: ClipTimeline, duration: number): number {
-  return Math.max(1, Math.round(Math.max(CLIP_MIN_SECONDS, duration) * timeline.fps))
+/**
+ * 帧数：按 fps 与时长取整，至少 1 帧。
+ * fps 由**本集成片规格**决定（协调者裁决：与 probeIntroSpec 同口径），不是时间线里的用户选项；
+ * `timeline.fps` 只是保存时同步下来的派生值。
+ */
+export function frameCount(fps: number, duration: number): number {
+  return Math.max(1, Math.round(Math.max(CLIP_MIN_SECONDS, duration) * fps))
 }
 
 /**

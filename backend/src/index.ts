@@ -30,6 +30,7 @@ import mediaLibrary from './routes/media-library.js'
 import research from './routes/research.js'
 import posters from './routes/posters.js'
 import layerDocs from './routes/layer-docs.js'
+import clips from './routes/clips.js'
 import { requestLogger, errorHandler } from './middleware/logger.js'
 import { db, schema } from './db/index.js'
 import { and, eq, isNull, ne, or } from 'drizzle-orm'
@@ -93,6 +94,7 @@ api.route('/asset-library', assetLibrary)
 api.route('/media-library', mediaLibrary)
 api.route('/research', research)
 api.route('/layer-docs', layerDocs)
+api.route('/clips', clips)
 
 app.route('/api/v1', api)
 

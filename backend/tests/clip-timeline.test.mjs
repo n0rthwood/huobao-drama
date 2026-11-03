@@ -102,7 +102,7 @@ test('S01 逐层显现：0/3/6/9 秒各多一层，fade 结束后是整数不透
       t3_4: at(3.4).opacity,
       t6_4: at(6.4).opacity,
       t9_4: at(9.4).opacity,
-      frames: frameCount(timeline, 15),
+      frames: frameCount(timeline.fps, 15),
     })
   `)
   assert.deepEqual(got.ids, ['rg', 'south', 'north'], '图层按首次出现排序')

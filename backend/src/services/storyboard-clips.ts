@@ -17,7 +17,13 @@ import { now } from '../utils/response.js'
 import { getAbsolutePath } from '../utils/storage.js'
 import { probeVideoSpec } from './media-probe.js'
 import { normalizeLayerDoc, type LayerDoc } from './layer-doc.js'
-import { normalizeTimeline, clampClipDuration, MAX_CLIP_SECONDS, type ClipTimeline } from './clip-timeline.js'
+import {
+  CLIP_DEFAULT_FPS,
+  MAX_CLIP_SECONDS,
+  clampClipDuration,
+  normalizeTimeline,
+  type ClipTimeline,
+} from './clip-timeline.js'
 import { draftClip, type ClipDraft, type ClipDraftAsset } from './clip-draft.js'
 import { parseSemantics, resolveSemanticsBase } from './asset-semantics.js'
 import { parseShotIntent, type ClipPosition, type ShotIntent } from './shot-intent.js'
@@ -42,14 +48,21 @@ export interface StoryboardClip {
   status: ClipStatus
 }
 
-/** 本集成片画幅：片段必须与模型视频同规格，否则拼接会花屏 */
+/**
+ * 本集成片规格：片段必须与模型视频**同画幅同帧率**，否则拼接与最终 merge 会花屏/时基错乱。
+ * 协调者裁决（2026-11-03）：fps 与画幅都实测自本集首条已有视频（与 `probeIntroSpec` 同口径），
+ * 本集还没有任何视频时才回落 25 fps + 按画幅比例的内置默认尺寸。
+ * 因此 `timeline.fps` 是**派生值**（保存片段时同步写入），不是用户可选项。
+ */
 export interface ClipSpec {
   width: number
   height: number
-  /** 画幅来源：`video` = 实测本集已有视频，`default` = 按画幅比例的内置默认 */
+  fps: number
+  /** 规格来源：`video` = 实测本集已有视频，`default` = 内置默认 */
   source: 'video' | 'default'
 }
 
+/** 本集还没有任何视频时的兜底画幅 */
 const DEFAULT_SPEC_BY_ASPECT: Record<string, { width: number; height: number }> = {
   '16:9': { width: 960, height: 544 },
   '9:16': { width: 544, height: 960 },
@@ -136,7 +149,13 @@ export async function saveStoryboardClip(
 ): Promise<StoryboardClip> {
   const existing = await getStoryboardClip(storyboardId, position)
   const layerDoc = normalizeLayerDoc('layer_doc' in input ? input.layer_doc : existing?.layer_doc)
-  const timeline = normalizeTimeline('timeline' in input ? input.timeline : existing?.timeline)
+  // fps 是派生值：始终跟随本集成片规格，用户在时间线里改不了
+  const [row] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, storyboardId))
+  const spec = await resolveEpisodeClipSpec(row?.episodeId ?? 0)
+  const timeline = normalizeTimeline({
+    ...normalizeTimeline('timeline' in input ? input.timeline : existing?.timeline),
+    fps: spec.fps,
+  })
   const maxSeconds = position === 'replace' ? MAX_CLIP_SECONDS : MAX_SHOT_SECONDS
   const duration = clampClipDuration(
     input.duration !== undefined ? Number(input.duration) : (existing?.duration ?? 0),
@@ -226,7 +245,7 @@ export function fileSha256(relativePath: string): string {
 /** 片段渲染签名：输入任何一处变化（含底图文件本身被换掉）都要重渲染 */
 export function clipSignatureOf(
   clip: Pick<StoryboardClip, 'layer_doc' | 'timeline' | 'duration' | 'position'>,
-  spec: Pick<ClipSpec, 'width' | 'height'>,
+  spec: Pick<ClipSpec, 'width' | 'height' | 'fps'>,
 ): string {
   const images = [clip.layer_doc.base.path]
   for (const layer of clip.layer_doc.layers) {
@@ -238,13 +257,13 @@ export function clipSignatureOf(
     JSON.stringify(clip.layer_doc),
     JSON.stringify(clip.timeline),
     clip.duration.toFixed(3),
-    `${spec.width}x${spec.height}`,
+    `${spec.width}x${spec.height}@${spec.fps}`,
     ...images.map(path => `${path}@${fileSha256(path)}`),
   ].join('\u0000'), 'utf8').digest('hex')
 }
 
 /** 已渲染的成品是否仍对得上当前输入（文件在 + 签名一致） */
-export function clipIsFresh(clip: StoryboardClip, spec: Pick<ClipSpec, 'width' | 'height'>): boolean {
+export function clipIsFresh(clip: StoryboardClip, spec: Pick<ClipSpec, 'width' | 'height' | 'fps'>): boolean {
   if (!clip.render_path || !clip.render_signature) return false
   if (!fs.existsSync(getAbsolutePath(clip.render_path))) return false
   return clip.render_signature === clipSignatureOf(clip, spec)
@@ -255,8 +274,9 @@ export function clipIsFresh(clip: StoryboardClip, spec: Pick<ClipSpec, 'width' |
 const specCache = new Map<number, ClipSpec>()
 
 /**
- * 本集片段画幅：优先实测本集已有的模型视频 / 成片（与 `probeIntroSpec` 同口径），
- * 都没有时按剧目画幅比例取内置默认。帧率不在这里定——由时间线的 `fps` 决定（默认 25）。
+ * 本集片段规格：优先实测本集已有的模型视频 / 成片（与 `probeIntroSpec` 同口径），
+ * 画幅与帧率都取它；本集一条视频都没有时回落 25 fps + 按画幅比例的内置默认尺寸。
+ * 这样 pre/post 拼接不必重采样模型视频，整集 merge 的帧率也是同质的。
  */
 export async function resolveEpisodeClipSpec(episodeId: number): Promise<ClipSpec> {
   const cached = specCache.get(episodeId)
@@ -267,7 +287,12 @@ export async function resolveEpisodeClipSpec(episodeId: number): Promise<ClipSpe
     if (!candidate) continue
     const probed = await probeVideoSpec(getAbsolutePath(candidate))
     if (!probed) continue
-    const spec: ClipSpec = { width: probed.width, height: probed.height, source: 'video' }
+    const spec: ClipSpec = {
+      width: probed.width,
+      height: probed.height,
+      fps: Math.round(probed.fps * 1000) / 1000,
+      source: 'video',
+    }
     specCache.set(episodeId, spec)
     return spec
   }
@@ -276,7 +301,7 @@ export async function resolveEpisodeClipSpec(episodeId: number): Promise<ClipSpe
     ? await db.select().from(schema.dramas).where(eq(schema.dramas.id, episode.dramaId))
     : []
   const fallback = DEFAULT_SPEC_BY_ASPECT[drama?.aspectRatio || '16:9'] || DEFAULT_SPEC_BY_ASPECT['16:9']
-  return { ...fallback, source: 'default' }
+  return { ...fallback, fps: CLIP_DEFAULT_FPS, source: 'default' }
 }
 
 /** 片段文件换过/新建过之后让画幅缓存失效（新建首条视频会改变本集画幅来源） */
