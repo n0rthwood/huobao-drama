@@ -887,9 +887,9 @@
       "scriptFirst": "Please finish the script first",
       "goBack": "Go back",
       "expression": "Expression design",
-      "expressionPlaceholder": "Expression design ships in a later version (Issue #49): it will let you state each shot's information point, the device used to show it and what must be visible, and check that the picture matches the narration.",
+      "expressionPlaceholder": "Expression design is coming soon: it will let you state each shot's information point, the device used to show it and what must be visible, and check that the picture matches the narration.",
       "layers": "Layers",
-      "layersPlaceholder": "Layer editing ships in a later version (Issue #48): it will let you stack regions, routes, markers and text cards on top of a base image for map annotation and information graphics."
+      "layersPlaceholder": "Layer editing is coming soon: it will let you stack regions, routes, markers and text cards on top of a base image for map annotation and information graphics."
     },
     "asset": {
       "fallbackType": "Asset",

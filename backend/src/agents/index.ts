@@ -492,11 +492,16 @@ export const agentRegistry: Record<string, Agent> = Object.fromEntries(
                 : scope === 'keyframes' ? promptStoryboardUpdaters.keyframes : promptStoryboardUpdaters.all,
             }
           }
-        // narration-first（Issue #45）：纪录片项目换成校验「旁白逐字来自剧本」的工具变体
+        // narration-first（Issue #45）：纪录片项目换成校验「旁白逐字来自剧本」的工具变体，
+        // 其余工具（#46 的 read_image 等）照 AGENT_TOOLS 保留
         : type === 'storyboard_breaker'
-          ? ({ requestContext }) => (getProjectType(requestContext) === 'documentary' ? documentaryStoryboardTools : storyboardTools)
+          ? ({ requestContext }) => (getProjectType(requestContext) === 'documentary'
+            ? { ...AGENT_TOOLS.storyboard_breaker, ...documentaryStoryboardTools }
+            : AGENT_TOOLS.storyboard_breaker)
         : type === 'narration_writer'
-          ? ({ requestContext }) => (getProjectType(requestContext) === 'documentary' ? documentaryNarrationTools : narrationTools)
+          ? ({ requestContext }) => (getProjectType(requestContext) === 'documentary'
+            ? { ...AGENT_TOOLS.narration_writer, ...documentaryNarrationTools }
+            : AGENT_TOOLS.narration_writer)
         : AGENT_TOOLS[type],
       workspace: skillWorkspaces[type],
       skillsFormat: 'markdown',

@@ -185,12 +185,17 @@ test('documentary agents get the narration-first tool variants and drama agents 
       dramaBreaker: dramaBreaker.saveStoryboards,
       docNarration: docNarration.saveNarrations,
       dramaNarration: dramaNarration.saveNarrations,
+      docBreakerKeys: Object.keys(docBreaker).sort(),
+      dramaBreakerKeys: Object.keys(dramaBreaker).sort(),
     }))
   `)
   assert.ok(result.docBreaker.includes('narration_text copied verbatim'))
   assert.ok(!result.dramaBreaker.includes('narration_text copied verbatim'))
   assert.ok(result.docNarration.includes('ONLY add pronunciation markers'))
   assert.ok(!result.dramaNarration.includes('ONLY add pronunciation markers'))
+  // 变体只换 save_storyboards：#46 的 read_image 等其它工具两类项目都在
+  assert.deepEqual(result.docBreakerKeys, result.dramaBreakerKeys)
+  assert.ok(result.docBreakerKeys.includes('readImage'))
 })
 
 test('the documentary split assigns narration verbatim and rejects rewritten or oversized passages', () => {

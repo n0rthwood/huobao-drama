@@ -887,9 +887,9 @@
       "scriptFirst": "请先完成剧本编写",
       "goBack": "返回处理",
       "expression": "表达设计",
-      "expressionPlaceholder": "表达设计在后续版本提供（Issue #49）：届时可为每一镜写明信息点、表现手段与必须显示的内容，并校验画面是否对得上解说。",
+      "expressionPlaceholder": "表达设计即将上线：届时可为每一镜写明信息点、表现手段与必须显示的内容，并校验画面是否对得上解说。",
       "layers": "图层",
-      "layersPlaceholder": "图层编辑在后续版本提供（Issue #48）：届时可在底图上叠加区域、路线、标记、文字卡片等图层，用于地图标注与信息图。"
+      "layersPlaceholder": "图层编辑即将上线：届时可在底图上叠加区域、路线、标记、文字卡片等图层，用于地图标注与信息图。"
     },
     "asset": {
       "fallbackType": "资产",
