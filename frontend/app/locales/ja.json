@@ -1952,5 +1952,117 @@
         "desc": "この「?」ボタンでこのページのガイドを再表示できます。良い制作を！"
       }
     }
+  },
+  "layerCanvas": {
+    "type": {
+      "polygon": "領域",
+      "polyline": "経路",
+      "marker": "地点",
+      "label": "文字",
+      "card": "カード",
+      "image": "画像"
+    },
+    "theme": {
+      "archival": "アーカイブ風",
+      "clean": "クリーン",
+      "ink": "水墨"
+    },
+    "tint": {
+      "none": "色調なし",
+      "sepia": "セピア",
+      "cool": "クール",
+      "warm": "ウォーム"
+    },
+    "dash": {
+      "none": "実線",
+      "dash": "破線",
+      "dot": "点線"
+    },
+    "font": {
+      "sans": "ゴシック体",
+      "serif": "明朝体"
+    },
+    "align": {
+      "left": "左揃え",
+      "center": "中央",
+      "right": "右揃え"
+    },
+    "template": {
+      "name": "名前札",
+      "year": "年号カード",
+      "chapter": "章カード"
+    },
+    "canvas": {
+      "hint": "ドラッグで移動 · ハンドルで拡大縮小/回転 · Shift で複数選択 · 矢印キーで微調整 · Delete で削除 · Ctrl+Z で元に戻す",
+      "snap": "スナップ",
+      "zoomIn": "拡大",
+      "zoomOut": "縮小"
+    },
+    "list": {
+      "title": "レイヤー",
+      "visible": "表示/非表示",
+      "locked": "ロック/解除",
+      "duplicate": "複製",
+      "remove": "削除",
+      "anchored": "アンカー付き意味注釈",
+      "detached": "アンカーから外れています"
+    },
+    "style": {
+      "docTitle": "画面とベースマップ",
+      "theme": "テーマ",
+      "tint": "色調",
+      "tintStrength": "色調の強さ",
+      "paper": "紙質感",
+      "vignette": "周辺減光",
+      "empty": "レイヤーを選択するとスタイルを編集できます",
+      "opacity": "不透明度",
+      "rotation": "回転",
+      "fill": "塗りつぶし色",
+      "fillOpacity": "塗りの不透明度",
+      "stroke": "輪郭色",
+      "strokeWidth": "輪郭の太さ",
+      "dash": "線種",
+      "width": "線幅",
+      "arrowStart": "始点矢印",
+      "arrowEnd": "終点矢印",
+      "text": "文字",
+      "dotColor": "ドットの色",
+      "textColor": "文字色",
+      "dotRadius": "ドットの半径",
+      "size": "文字サイズ",
+      "font": "フォント",
+      "bold": "太字",
+      "labelOffset": "ラベルのオフセット",
+      "color": "文字色",
+      "bg": "背景色",
+      "bgOpacity": "背景の不透明度",
+      "align": "揃え",
+      "template": "テンプレート",
+      "title": "メインタイトル",
+      "sub": "サブタイトル",
+      "meta": "備考",
+      "accent": "アクセントカラー",
+      "src": "画像パス",
+      "fit": "フィット方式",
+      "border": "枠線の色",
+      "borderWidth": "枠線の太さ",
+      "radius": "角丸",
+      "shadow": "影",
+      "missingChars": "同梱フォントがこれらの文字をカバーしていないため、サーバーレンダリングでエラーになります：{chars}"
+    },
+    "dev": {
+      "title": "レイヤーエディターデモ",
+      "desc": "重ね合わせレイヤーを単体で検証：エディター操作とサーバーレンダリングを並べて比較（開発ビルドのみ）。",
+      "undo": "元に戻す",
+      "redo": "やり直す",
+      "reset": "サンプルをリセット",
+      "render": "サーバーレンダリング",
+      "rendering": "レンダリング中…",
+      "renderMs": "{ms} ms",
+      "basePath": "ベースマップのパス",
+      "portraitPath": "ポートレートのパス",
+      "saved": "保存済み · {n} レイヤー",
+      "serverRender": "サーバーレンダリング結果"
+    }
   }
 }
