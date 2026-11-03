@@ -71,6 +71,7 @@ export async function startKeyframePromptBatch(
     const requestContext = buildAgentRequestContext({
       episodeId,
       dramaId,
+      textTaskId: taskId,
       storyboardPromptScope: 'keyframes',
       modelOverride: opts.model || undefined,
       textConfigId: opts.configId || undefined,

@@ -109,6 +109,16 @@
               <dt>{{ t('taskCenter.detail.elapsed') }}</dt>
               <dd>{{ elapsedText }}</dd>
             </div>
+            <!-- 读图调用计量（#46）：文本任务里 read_image 用了几次、哪个模型、多少 token -->
+            <div v-if="visionCalls" class="task-detail-cell">
+              <dt>{{ t('taskCenter.detail.visionCalls') }}</dt>
+              <dd>{{ t('taskCenter.detail.visionCallsValue', {
+                n: visionCalls.count,
+                model: visionCalls.model,
+                pt: visionCalls.prompt_tokens,
+                ct: visionCalls.completion_tokens,
+              }) }}</dd>
+            </div>
           </dl>
 
           <!-- 只读提示词 -->
@@ -217,6 +227,11 @@ const live = computed(() => ({ ...props.task, ...(tasksById.value[props.task.id]
 const params = computed(() => live.value.params || {})
 const retryOf = computed(() => live.value.retry_of || params.value.retry_of || null)
 const referenceImages = computed(() => (Array.isArray(params.value.referenceImages) ? params.value.referenceImages : []))
+// 读图调用计量（#46）：只有 read_image 真的跑过的文本任务才有这段
+const visionCalls = computed(() => {
+  const v = params.value.vision_calls
+  return v && typeof v === 'object' && Number(v.count) > 0 ? v : null
+})
 const resultUrl = computed(() => live.value.local_path || live.value.result_url || '')
 const ring = computed(() => ringPropsFromTask(live.value, now.value))
 const taskActive = computed(() => isActiveTaskStatus(live.value.status))

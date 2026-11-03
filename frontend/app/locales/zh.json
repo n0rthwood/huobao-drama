@@ -78,6 +78,8 @@
       "createdAt": "创建时间",
       "completedAt": "完成时间",
       "elapsed": "耗时",
+      "visionCalls": "读图调用",
+      "visionCallsValue": "{n} 次 · {model} · {pt}/{ct} token",
       "prompt": "提示词（只读）",
       "noPrompt": "无提示词",
       "references": "参考图（{n} 张）",

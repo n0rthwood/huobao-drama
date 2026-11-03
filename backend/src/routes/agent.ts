@@ -92,6 +92,8 @@ app.post('/:type/chat', async (c) => {
       configId: body.config_id || resolved.configId || undefined,
     })
   }
+  // 工具计量（#46 read_image）要知道写进哪条任务：任务行建在 rc 之后，这里补注入
+  if (taskId) requestContext.set('textTaskId' as never, taskId as never)
 
   const sink = taskId ? createReasoningSink(taskId) : undefined
   const startTime = performance.now()

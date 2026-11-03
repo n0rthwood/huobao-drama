@@ -17,6 +17,7 @@ import { extractTools } from './tools/extract-tools.js'
 import { storyboardTools, promptStoryboardUpdaters } from './tools/storyboard-tools.js'
 import { imagePromptTools } from './tools/image-prompt-tools.js'
 import { researchTools } from './tools/research-tools.js'
+import { visionTools } from './tools/vision-tools.js'
 import { loadAgentSkills, skillWorkspaces } from './skills.js'
 import { loadAgentPromptFile, loadBasePromptFile } from './prompts.js'
 import { buildLanguageDirective } from './language.js'
@@ -425,11 +426,12 @@ async function getModel(fileModel: string | undefined, modelOverride?: string, t
 
 const AGENT_TOOLS: Record<string, Record<string, any>> = {
   script_rewriter: scriptTools,
-  // 提取 Agent 自带维基系检索（Issue #32，v1 只挂这一个 Agent）
-  extractor: { ...extractTools, ...researchTools },
-  storyboard_breaker: storyboardTools,
+  // 提取 Agent 自带维基系检索（Issue #32，v1 只挂这一个 Agent）；read_image（#46）让它能读资产原图
+  extractor: { ...extractTools, ...researchTools, ...visionTools },
+  storyboard_breaker: { ...storyboardTools, ...visionTools },
   prompt_generator: {
     ...imagePromptTools,
+    ...visionTools,
     readStoryboardContext: storyboardTools.readStoryboardContext,
     updateStoryboard: promptStoryboardUpdaters.all,
   },

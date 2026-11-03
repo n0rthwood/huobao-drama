@@ -78,6 +78,8 @@
       "createdAt": "Created",
       "completedAt": "Completed",
       "elapsed": "Elapsed",
+      "visionCalls": "Vision calls",
+      "visionCallsValue": "{n}× · {model} · {pt}/{ct} tokens",
       "prompt": "Prompt (read-only)",
       "noPrompt": "No prompt",
       "references": "References ({n})",
