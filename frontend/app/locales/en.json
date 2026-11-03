@@ -405,6 +405,12 @@
       "aspectRatioPlaceholder": "Select aspect ratio",
       "aspectRatioHint": "Sets the output ratio for keyframes and videos; can be changed later in Project Settings",
       "aspectRatioRequired": "Please choose an aspect ratio",
+      "projectType": "Project type",
+      "projectTypeHint": "The type cannot be changed after creation: documentary projects use a narration-first workflow with their own expression-design step",
+      "projectTypeDrama": "Short drama",
+      "projectTypeDramaDesc": "Scripted drama: screenplay rewrite → characters/scenes → keyframes → video",
+      "projectTypeDocumentary": "Documentary",
+      "projectTypeDocumentaryDesc": "Narration-first: narration script → evidence assets → expression design → keyframes/layers → video",
       "submit": "Create project"
     },
     "deleteDialog": {
@@ -511,7 +517,12 @@
       "effective": "Currently effective: {value}",
       "hint": "The switch overrides genre keywords; when active, extraction and prompts follow the documentary/history ruleset.",
       "rulesetDocumentary": "Documentary ruleset",
-      "rulesetNone": "No genre ruleset"
+      "rulesetNone": "No genre ruleset",
+      "lockedHint": "Documentary projects always generate under the documentary ruleset; it cannot be turned off."
+    },
+    "projectType": {
+      "drama": "Short drama",
+      "documentary": "Documentary"
     }
   },
   "settings": {
@@ -792,7 +803,12 @@
       "prodStage": "Production · {step}",
       "exportDone": "Export · done",
       "exportWaiting": "Export · waiting to merge",
-      "workbench": "Workbench"
+      "workbench": "Workbench",
+      "narrationScript": "Narration script",
+      "narrationScriptDesc": "Documentary narration editing (the script IS the narration)",
+      "evidenceAssetsDesc": "Characters / scenes / evidence assets",
+      "expressionDesc": "What each shot tells and how it is shown",
+      "layersDesc": "Map annotations and graphic overlay layers"
     },
     "script": {
       "raw": "Raw Content",
@@ -869,7 +885,11 @@
       "emptyDesc": "Characters, scenes and props will appear here after extraction. Extract each type separately or all at once in parallel.",
       "startExtract": "Start Extraction",
       "scriptFirst": "Please finish the script first",
-      "goBack": "Go back"
+      "goBack": "Go back",
+      "expression": "Expression design",
+      "expressionPlaceholder": "Expression design ships in a later version (Issue #49): it will let you state each shot's information point, the device used to show it and what must be visible, and check that the picture matches the narration.",
+      "layers": "Layers",
+      "layersPlaceholder": "Layer editing ships in a later version (Issue #48): it will let you stack regions, routes, markers and text cards on top of a base image for map annotation and information graphics."
     },
     "asset": {
       "fallbackType": "Asset",

@@ -637,6 +637,28 @@
             />
           </div>
 
+          <!-- Sub: 表达设计（纪录片，Issue #49 落地前的占位说明） -->
+          <div v-if="prodTab === 'expression'" class="prod-content">
+            <div class="step-empty" style="flex:1">
+              <div class="empty-visual">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg>
+              </div>
+              <div class="empty-title">{{ t('episode.prod.expression') }}</div>
+              <div class="empty-desc">{{ t('episode.prod.expressionPlaceholder') }}</div>
+            </div>
+          </div>
+
+          <!-- Sub: 图层（纪录片，Issue #48 落地前的占位说明） -->
+          <div v-if="prodTab === 'layers'" class="prod-content">
+            <div class="step-empty" style="flex:1">
+              <div class="empty-visual">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+              </div>
+              <div class="empty-title">{{ t('episode.prod.layers') }}</div>
+              <div class="empty-desc">{{ t('episode.prod.layersPlaceholder') }}</div>
+            </div>
+          </div>
+
           <!-- Sub: Storyboard Keyframes（拆分分镜 + 首/中/尾关键帧生成与人工确认） -->
           <StoryboardKeyframes
             v-if="prodTab === 'keyframes'"
@@ -2203,7 +2225,7 @@ import { toast } from 'vue-sonner'
 import { useI18n } from 'vue-i18n'
 import {
   Users, FileText, FolderKanban, Clapperboard, Download, Loader2, Images,
-  Image as ImageIcon, Plus, X, Trash2, CircleHelp, ChevronRight,
+  Image as ImageIcon, Plus, X, Trash2, CircleHelp, ChevronRight, Layers, Lightbulb,
 } from 'lucide-vue-next'
 import { api, dramaAPI, episodeAPI, storyboardAPI, characterAPI, sceneAPI, propAPI, taskAPI, mergeAPI, posterAPI, aiConfigAPI, uploadAPI, mediaLibraryAPI, videoQueueAPI, assetBatchAPI } from '~/composables/useApi'
 import { startTour, autoTour } from '~/composables/useTour'
@@ -2255,6 +2277,8 @@ const assetBrowserOpen = ref(false)
 // 纪录片选角名册（Issue #32）：谁该建卡的契约。首轮由提取 Agent 生成草稿（待复核），
 // 人在这里增删后点「确认名册」锁定；之后每次提取都照同一份名册执行，剧本改动则标记过期。
 const isDocumentary = computed(() => drama.value?.genre_ruleset === 'documentary')
+// 项目类型（Issue #45）：决定工作台步骤序列（旁白稿 → 资产 → 表达设计 → 关键帧/图层 → 视频 → 导出）
+const isDocumentaryProject = computed(() => drama.value?.project_type === 'documentary')
 const roster = ref({ open: false, loading: false, saving: false, exists: false, status: null, stale: false, updated_at: null, current_hash: '', cast: [] })
 
 async function openRosterDialog() {
@@ -2305,11 +2329,15 @@ const storedPanel = (() => {
   if (!isPageReload) return null
   try { return JSON.parse(localStorage.getItem(PANEL_STORE_KEY) || 'null') } catch { return null }
 })()
-// ===== 子状态 deeplink：?panel=script|production|export &step=0|1 &tab=assets|keyframes|videos &extract=characters|scenes|props &asset=类型-id =====
+// ===== 子状态 deeplink：?panel=script|production|export &step=0|1
+//      &tab=assets|poster|keyframes|videos（纪录片项目另有 expression|layers）
+//      &extract=characters|scenes|props &asset=类型-id =====
 const { replaceQuery } = useQuerySync()
 const urlPanel = queryEnum(route.query.panel, ['script', 'production', 'export'])
 const urlStep = queryEnum(route.query.step, ['0', '1'])
-const urlProdTab = queryEnum(route.query.tab, ['assets', 'poster', 'keyframes', 'videos'])
+// 两类项目的页签并集；与项目类型不符的页签在定义就绪后由下面的守卫落回「资产」
+const PROD_TAB_KEYS = ['assets', 'poster', 'keyframes', 'videos', 'expression', 'layers']
+const urlProdTab = queryEnum(route.query.tab, PROD_TAB_KEYS)
 // extract：资产面板的类型筛选页签（null = 全部），与左侧 EXTRACT_TARGETS 三类一致
 const urlExtract = queryEnum(route.query.extract, ['characters', 'scenes', 'props'])
 const pendingAssetLink = queryTypedId(route.query.asset, ['character', 'scene', 'prop'])
@@ -2443,7 +2471,7 @@ async function confirmDeleteMerge() {
 const scriptStep = ref(urlStep !== null ? Number(urlStep) : (urlPanelGiven ? 0 : (storedPanel ? (storedPanel.scriptStep === 0 ? 0 : 1) : 0)))
 // 旧版本地存储的 'storyboard' 子步骤已并入 'videos'（视频制作）
 const storedProdTab = storedPanel?.prodTab === 'storyboard' ? 'videos' : storedPanel?.prodTab
-const prodTab = ref(urlProdTab || (urlPanelGiven ? 'assets' : (['assets', 'poster', 'keyframes', 'videos'].includes(storedProdTab) ? storedProdTab : 'assets')))
+const prodTab = ref(urlProdTab || (urlPanelGiven ? 'assets' : (PROD_TAB_KEYS.includes(storedProdTab) ? storedProdTab : 'assets')))
 // 资产类型筛选页签：null=全部（三段平铺）| characters|scenes|props（只看该类），deeplink ?extract=
 const extractTab = ref(urlExtract)
 // 面板位置变化即持久化
@@ -3612,26 +3640,53 @@ const pendingAssetImageCount = computed(() => pendingCharacterImageCount.value +
 const assetTotalCount = computed(() => visualCharTotal.value + scenes.value.length + propItems.value.length)
 const assetReadyCount = computed(() => charImgCount.value + sceneImgCount.value + propImgCount.value)
 
-const prodTabDefs = computed(() => [
-  { id: 'assets', label: t('episode.prod.assets'), icon: FolderKanban, badge: assetTotalCount.value ? `${assetReadyCount.value}/${assetTotalCount.value}` : '' },
-  { id: 'poster', label: t('episode.prod.poster'), icon: ImageIcon, badge: posterData.value?.final_image ? '✓' : '' },
-  { id: 'keyframes', label: t('episode.prod.keyframes'), icon: Images, badge: sbs.value.length ? `${keyframesConfirmedCount.value}/${sbs.value.length}` : '' },
-  { id: 'videos', label: t('episode.prod.videos'), icon: Clapperboard, badge: sbs.value.length ? `${shotVidCount.value}/${sbs.value.length}` : '' },
-])
+// 纪录片项目（Issue #45）：步骤序列 = 旁白稿 → 资产（含证据素材）→ 表达设计 → 关键帧 → 图层 → 视频 → 导出
+// 「表达设计」（#49）与「图层」（#48）落地前显示占位说明；drama 项目的定义与 #45 之前逐项一致
+const prodTabDefs = computed(() => (isDocumentaryProject.value
+  ? [
+      { id: 'assets', label: t('episode.prod.assets'), icon: FolderKanban, badge: assetTotalCount.value ? `${assetReadyCount.value}/${assetTotalCount.value}` : '' },
+      { id: 'expression', label: t('episode.prod.expression'), icon: Lightbulb, badge: '' },
+      { id: 'keyframes', label: t('episode.prod.keyframes'), icon: Images, badge: sbs.value.length ? `${keyframesConfirmedCount.value}/${sbs.value.length}` : '' },
+      { id: 'layers', label: t('episode.prod.layers'), icon: Layers, badge: '' },
+      { id: 'videos', label: t('episode.prod.videos'), icon: Clapperboard, badge: sbs.value.length ? `${shotVidCount.value}/${sbs.value.length}` : '' },
+    ]
+  : [
+      { id: 'assets', label: t('episode.prod.assets'), icon: FolderKanban, badge: assetTotalCount.value ? `${assetReadyCount.value}/${assetTotalCount.value}` : '' },
+      { id: 'poster', label: t('episode.prod.poster'), icon: ImageIcon, badge: posterData.value?.final_image ? '✓' : '' },
+      { id: 'keyframes', label: t('episode.prod.keyframes'), icon: Images, badge: sbs.value.length ? `${keyframesConfirmedCount.value}/${sbs.value.length}` : '' },
+      { id: 'videos', label: t('episode.prod.videos'), icon: Clapperboard, badge: sbs.value.length ? `${shotVidCount.value}/${sbs.value.length}` : '' },
+    ]))
 
-const mainStageDefs = computed(() => ([
-  { id: 'script', label: t('episode.stage.script'), desc: t('episode.stage.scriptDesc'), icon: FileText },
-  { id: 'assets', label: t('episode.prod.assets'), desc: t('episode.stage.assetsDesc'), icon: FolderKanban },
-  { id: 'poster', label: t('episode.prod.poster'), desc: t('episode.stage.posterDesc'), icon: ImageIcon },
-  { id: 'keyframes', label: t('episode.prod.keyframes'), desc: t('episode.stage.keyframesDesc'), icon: Images },
-  { id: 'videos', label: t('episode.stage.videos'), desc: t('episode.stage.videosDesc'), icon: Clapperboard },
-  { id: 'export', label: t('episode.stage.export'), desc: t('episode.stage.exportDesc'), icon: Download },
-]))
+const mainStageDefs = computed(() => (isDocumentaryProject.value
+  ? [
+      { id: 'script', label: t('episode.stage.narrationScript'), desc: t('episode.stage.narrationScriptDesc'), icon: FileText },
+      { id: 'assets', label: t('episode.prod.assets'), desc: t('episode.stage.evidenceAssetsDesc'), icon: FolderKanban },
+      { id: 'expression', label: t('episode.prod.expression'), desc: t('episode.stage.expressionDesc'), icon: Lightbulb },
+      { id: 'keyframes', label: t('episode.prod.keyframes'), desc: t('episode.stage.keyframesDesc'), icon: Images },
+      { id: 'layers', label: t('episode.prod.layers'), desc: t('episode.stage.layersDesc'), icon: Layers },
+      { id: 'videos', label: t('episode.stage.videos'), desc: t('episode.stage.videosDesc'), icon: Clapperboard },
+      { id: 'export', label: t('episode.stage.export'), desc: t('episode.stage.exportDesc'), icon: Download },
+    ]
+  : [
+      { id: 'script', label: t('episode.stage.script'), desc: t('episode.stage.scriptDesc'), icon: FileText },
+      { id: 'assets', label: t('episode.prod.assets'), desc: t('episode.stage.assetsDesc'), icon: FolderKanban },
+      { id: 'poster', label: t('episode.prod.poster'), desc: t('episode.stage.posterDesc'), icon: ImageIcon },
+      { id: 'keyframes', label: t('episode.prod.keyframes'), desc: t('episode.stage.keyframesDesc'), icon: Images },
+      { id: 'videos', label: t('episode.stage.videos'), desc: t('episode.stage.videosDesc'), icon: Clapperboard },
+      { id: 'export', label: t('episode.stage.export'), desc: t('episode.stage.exportDesc'), icon: Download },
+    ]))
+
+// 项目类型决定页签集合：类型不匹配的页签（drama 项目的 expression/layers、纪录片项目的 poster）落回「资产」。
+// 项目尚未加载时不判定——此时类型未知，deeplink 的纪录片页签会被误判成非法值。
+watch([() => drama.value?.project_type, prodTabDefs], ([type, defs]) => {
+  if (!type || !defs.length) return
+  if (!defs.some(def => def.id === prodTab.value)) prodTab.value = 'assets'
+}, { immediate: true })
 
 const sidebarSections = computed(() => ([
   {
     id: 'script',
-    label: t('episode.stage.script'),
+    label: isDocumentaryProject.value ? t('episode.stage.narrationScript') : t('episode.stage.script'),
     items: [
       { key: 'script:raw', label: t('episode.script.raw'), desc: '', icon: FileText },
       { key: 'script:rewrite', label: t('episode.script.rewrite'), desc: '', icon: FileText },
@@ -3640,12 +3695,7 @@ const sidebarSections = computed(() => ([
   {
     id: 'production',
     label: t('episode.stage.production'),
-    items: [
-      { key: 'prod:assets', label: t('episode.prod.assets'), desc: '', icon: Users },
-      { key: 'prod:poster', label: t('episode.prod.poster'), desc: '', icon: ImageIcon },
-      { key: 'prod:keyframes', label: t('episode.prod.keyframes'), desc: '', icon: Images },
-      { key: 'prod:videos', label: t('episode.prod.videos'), desc: '', icon: Clapperboard },
-    ],
+    items: prodTabDefs.value.map(def => ({ key: `prod:${def.id}`, label: def.label, desc: '', icon: def.id === 'assets' ? Users : def.icon })),
   },
   {
     id: 'export',
@@ -3677,10 +3727,8 @@ function sectionState(sectionId) {
 const activeMainStage = computed(() => {
   if (panel.value === 'export') return 'export'
   if (panel.value === 'production') {
-    if (prodTab.value === 'assets') return 'assets'
-    if (prodTab.value === 'poster') return 'poster'
-    if (prodTab.value === 'keyframes') return 'keyframes'
-    return 'videos'
+    // 制作子页签与主环节同名（drama: assets/poster/keyframes/videos；documentary 另有 expression/layers）
+    return mainStageDefs.value.some(stage => stage.id === prodTab.value) ? prodTab.value : 'videos'
   }
   return 'script'
 })
@@ -3705,24 +3753,10 @@ function goMainStage(stageId) {
     scriptStep.value = Math.min(scriptStep.value, 1)
     return
   }
-  if (stageId === 'assets') {
+  // 制作环节与子页签同名：直接跳到对应页签（按项目类型的定义，未知 id 落回导出）
+  if (prodTabDefs.value.some(def => def.id === stageId)) {
     panel.value = 'production'
-    prodTab.value = 'assets'
-    return
-  }
-  if (stageId === 'poster') {
-    panel.value = 'production'
-    prodTab.value = 'poster'
-    return
-  }
-  if (stageId === 'keyframes') {
-    panel.value = 'production'
-    prodTab.value = 'keyframes'
-    return
-  }
-  if (stageId === 'videos') {
-    panel.value = 'production'
-    prodTab.value = 'videos'
+    prodTab.value = stageId
     return
   }
   panel.value = 'export'
@@ -3737,15 +3771,8 @@ const activeSubStepKey = computed(() => {
   return 'export:merge'
 })
 
-// 步骤跑马灯：五段主流程（剧本 → 资产制作 → 分镜关键帧 → 视频制作 → 导出），段点击跳转、当前段流动光效
-const mainProgressSteps = computed(() => [
-  { id: 'script', label: t('episode.stage.script') },
-  { id: 'assets', label: t('episode.prod.assets') },
-  { id: 'poster', label: t('episode.prod.poster') },
-  { id: 'keyframes', label: t('episode.prod.keyframes') },
-  { id: 'videos', label: t('episode.stage.videos') },
-  { id: 'export', label: t('episode.stage.export') },
-])
+// 步骤跑马灯：主流程各段（按项目类型取定义），段点击跳转、当前段流动光效
+const mainProgressSteps = computed(() => mainStageDefs.value.map(stage => ({ id: stage.id, label: stage.label })))
 const currentMainIdx = computed(() => {
   const i = mainProgressSteps.value.findIndex(s => s.id === activeMainStage.value)
   return i < 0 ? 0 : i

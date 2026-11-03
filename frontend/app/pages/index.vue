@@ -163,6 +163,23 @@
               <span class="field-label">{{ t('index.createDialog.name') }} <span class="required">*</span></span>
               <input v-model="form.title" class="input" :placeholder="t('index.createDialog.namePlaceholder')" required autofocus />
             </label>
+            <div class="field">
+              <span class="field-label">{{ t('index.createDialog.projectType') }} <span class="required">*</span></span>
+              <div class="type-options">
+                <label
+                  v-for="opt in projectTypeOptions"
+                  :key="opt.value"
+                  :class="['type-option', { selected: form.project_type === opt.value }]"
+                >
+                  <input type="radio" name="project-type" :value="opt.value" :checked="form.project_type === opt.value" @change="setProjectType(opt.value)" />
+                  <span class="type-option-text">
+                    <strong>{{ opt.label }}</strong>
+                    <span class="dim">{{ opt.desc }}</span>
+                  </span>
+                </label>
+              </div>
+              <span class="field-hint">{{ t('index.createDialog.projectTypeHint') }}</span>
+            </div>
             <label class="field">
               <span class="field-label">{{ t('index.createDialog.style') }}</span>
               <BaseSelect v-model="form.style" :options="styleSelectOptions" :placeholder="t('index.createDialog.stylePlaceholder')" searchable />
@@ -222,10 +239,22 @@ const sortOptions = computed(() => ([
 const activeMenuId = ref(null)
 const dramaToDelete = ref(null)
 const deletingDrama = ref(false)
-const form = ref({ title: '', style: '', aspect_ratio: '' })
+const form = ref({ title: '', project_type: 'drama', style: '', aspect_ratio: '' })
 const { presets: stylePresets, load: loadStylePresets, label: styleLabel } = useStylePresets()
 const styleSelectOptions = computed(() => stylePresets.value.map(p => ({ label: p.name, value: p.value })))
 const selectedStyleDesc = computed(() => stylePresets.value.find(p => p.value === form.value.style)?.description || '')
+// 项目类型（Issue #45）：创建后不可切换；选纪录片时预选纪实档案风格与 16:9
+const projectTypeOptions = computed(() => ([
+  { value: 'drama', label: t('index.createDialog.projectTypeDrama'), desc: t('index.createDialog.projectTypeDramaDesc') },
+  { value: 'documentary', label: t('index.createDialog.projectTypeDocumentary'), desc: t('index.createDialog.projectTypeDocumentaryDesc') },
+]))
+const DOCUMENTARY_STYLE = 'documentary-archival'
+function setProjectType(value) {
+  form.value.project_type = value
+  if (value !== 'documentary') return
+  if (stylePresets.value.some(p => p.value === DOCUMENTARY_STYLE)) form.value.style = DOCUMENTARY_STYLE
+  form.value.aspect_ratio = '16:9'
+}
 // label 渲染时求值（语言切换即时生效）；画幅不预选，创建时必须明确选择
 const aspectRatioOptions = computed(() => ASPECT_RATIO_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value })))
 const filters = computed(() => ([
@@ -634,6 +663,15 @@ onMounted(() => setTimeout(() => autoTour('index', INDEX_TOUR, t), 600))
 .field-label { font-size: 12px; font-weight: 600; color: var(--text-1); }
 .required { color: var(--error); }
 .field-hint { font-size: 11px; color: var(--text-3); line-height: 1.5; }
+/* 项目类型单选（Issue #45） */
+.type-options { display: flex; flex-direction: column; gap: 8px; }
+.type-option {
+  display: flex; align-items: flex-start; gap: 8px; padding: 10px;
+  border: 1px solid var(--border); border-radius: 8px; cursor: pointer; background: var(--surface-soft);
+}
+.type-option.selected { border-color: var(--action-primary); }
+.type-option-text { display: flex; flex-direction: column; gap: 2px; font-size: 12px; }
+.type-option-text .dim { font-size: 11px; color: var(--text-3); }
 .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 
 @media (max-width: 900px) {
