@@ -21,7 +21,7 @@ import {
 import { parseReferenceImages, referenceImagePaths } from '../../services/reference-images.js'
 import { stampFieldSavedAt } from '../../services/storyboard-fields.js'
 import { MAX_NARRATION_CHARS, narrationCharCount, parseNarrationMeta, sha256 } from '../../services/narration.js'
-import { locateNarrationInScript, narrationCoverage, scriptMatchKey } from '../../services/narration-first.js'
+import { describeNarrationGaps, locateNarrationInScript, narrationCoverage, scriptMatchKey } from '../../services/narration-first.js'
 import { loadIntentContext, semanticEntries } from '../../services/shot-intent-context.js'
 import {
   CLIP_POSITIONS,
@@ -532,14 +532,20 @@ function buildSaveStoryboards(documentary: boolean) {
       .filter(sb => !sb.deletedAt)
       .sort((a, b) => a.storyboardNumber - b.storyboardNumber)
       .map(sb => sb.narrationText))
+    // 覆盖缺口（#49）：中间整段被跳过时必须当场回报，否则模型会以为切完了就收工
+    // ——实测 93 镜漏掉 746 字，连「彼得一世亲自筹建近卫团」那句都没有对应镜头。
+    const mustFix = coverage.gaps.length
+      ? `旁白覆盖缺口：剧本有 ${coverage.gaps.length} 段（共 ${coverage.uncovered_chars} 字）还没有被任何一镜领走，必须继续补镜把它们逐字切进 narration_text（在句界处插入新的 shot_number，不要改写原文）：${describeNarrationGaps(coverage.gaps)}`
+      : null
     return {
-      message: `Saved ${storyboards.length} storyboards`,
+      message: mustFix || `Saved ${storyboards.length} storyboards`,
       count: storyboards.length,
       total_duration: totalDuration,
       narration_rejected: narrationRejected,
       intent_issues: intentIssues,
       replace_existing_ignored: replaceIgnored,
       script_coverage: coverage,
+      must_fix: mustFix,
     }
   },
   })

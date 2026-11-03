@@ -16,6 +16,8 @@ In this project the script body **is the narration draft**. When breaking down i
 - **Copy word for word**: punctuation, years, personal names, place names and numbers all match the source exactly. No rewriting, no polishing, no abbreviating, no added words.
 - **Cut at sentence boundaries**: you may cut only after a period / question mark / exclamation mark / semicolon; never break mid-sentence.
 - **Add nothing, drop nothing**: every paragraph of the body must land in some shot; the concatenation of all shots' `narration_text`, in order, must equal the script body.
+  `save_storyboards` returns `script_coverage.gaps` and `must_fix` each time: **as long as gaps remain, keep adding shots**,
+  inserting new `shot_number`s at sentence boundaries and cutting the missed sentences in verbatim. Finishing with gaps outstanding fails the entire break-down task.
 - Each shot is **≤80 characters** (a hard per-segment limit of the speech synthesizer). If a source paragraph exceeds 80 characters, split it into two adjacent shots at a sentence boundary.
 - Picture-only shots (empty scenes, transitions, map establishing shots) may have no narration: leave `narration_text` empty; do not invent a narration line for them.
 - The tool validates this: each `narration_text` must be found verbatim in the script body, in the same order as the body; rewritten text is **rejected on save**.
@@ -55,11 +57,20 @@ What must the viewer understand from this shot (info_point, exactly one)
 | `map_anim` | geography, routes, ranges, two simultaneous storylines | evidence map + highlights/arrows/labels appearing layer by layer |
 | `archival` | treaties, documents, prints, original artifacts | the archival original itself + slow push-in + labels |
 | `card` | a person's first appearance, years, chapter turns | portrait / still frame + name bar (name / title / years) |
-| `reenact_still` | static states, scenes, objects | generated reenactment still + slow push-in |
-| `reenact_video` | events with process, with motion | generated model video |
+| `reenact_still` | static states, portraits, objects, situations with no action | generated reenactment still + slow push-in |
+| `reenact_video` | **events with process, with motion** (setting out, marching, sailing upstream, exchanging fire, laying siege, boarding, building, an audience, escorting prisoners) | generated model video |
 
-Criterion: **does the narration say "where" or "what happened"**. Anything saying "where / how wide a range / which route" is always `map_anim`;
-"such-and-such a year such a person did such a thing" is `reenact_video` only when the action must actually be visible in the picture; identity, origins, or numbers alone use `card` or `archival`.
+Criterion: **does the narration say "where", "what it is", or "what was done"**.
+Anything saying "where / how wide a range / which route" is always `map_anim`; identity, origins, years, or numbers alone use `card` or `archival`;
+**if the sentence contains a verb describing an action or process in progress, use `reenact_video` — do not downgrade it to `reenact_still`**.
+
+`reenact_still` is only for shots where **there really is no action in the picture** (portraits, objects, empty scenes, static situations).
+Sentences like "the fleet sails upstream", "the great army advances on Lhasa (拉萨)", "the reconnaissance party sets out by boat", "the two sides exchange fire" belong to `reenact_video`;
+writing them as stills freezes the only moving part of the documentary — if an episode contains not a single `reenact_video`,
+it has almost certainly been misjudged; go back and recheck sentence by sentence the narration that carries actions.
+
+`reenact_video`'s `deterministic` defaults to `none` (the whole shot is the model video); suggest `pre` / `post` only when a short
+deterministic-layer clip must be appended before/after the model video (e.g. a year card first, or a small map inset at the end).
 
 Do not use `reenact_*` to act out geographic relationships: a man walking in an empty field cannot express "sailing up the 额尔齐斯河 (Irtysh) northward".
 

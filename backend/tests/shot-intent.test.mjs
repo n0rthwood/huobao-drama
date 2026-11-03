@@ -285,3 +285,48 @@ test('reenact shots block on intent_unmet and clip-replaced shots stop demanding
   assert.deepEqual(result.noIntentCodes, ['empty_video_prompt'])
   assert.deepEqual(result.clipCodes, [], '地图镜头整镜由确定性片段渲染，空视频提示词不是问题')
 })
+
+test('narration coverage reports skipped script segments, not just the tail cursor', () => {
+  const result = run(`
+    import { narrationCoverage, describeNarrationGaps } from './src/services/narration-first.ts'
+    const script = [
+      '【开场】',
+      '一支俄国远征队正沿额尔齐斯河逆流而上。',
+      '他以普通士兵身份加入谢苗诺夫近卫团，这是彼得一世亲自筹建的两支近卫军团之一。',
+      '利哈列夫刚入伍，长达二十年的大北方战争就打响了。',
+    ].join('\\n\\n')
+    // 中间整段被跳过：旧口径只看末尾游标，会把这次拆分判成「切完了」
+    const skipped = narrationCoverage(script, [
+      '一支俄国远征队正沿额尔齐斯河逆流而上。',
+      '利哈列夫刚入伍，长达二十年的大北方战争就打响了。',
+    ])
+    const full = narrationCoverage(script, [
+      '一支俄国远征队正沿额尔齐斯河逆流而上。',
+      '他以普通士兵身份加入谢苗诺夫近卫团，这是彼得一世亲自筹建的两支近卫军团之一。',
+      '利哈列夫刚入伍，长达二十年的大北方战争就打响了。',
+    ])
+    // 发音标记（#38）不算改写，也不算缺口
+    const markup = narrationCoverage(script, [
+      '一支俄国远征队正沿额尔齐斯河逆流而上。',
+      '他以普通士兵身份加入[[谢苗诺夫|谢苗诺夫]]近卫团，这是彼得一世亲自筹建的两支近卫军团之一。',
+      '利哈列夫刚入伍，长达二十年的大北方战争就打响了。',
+    ])
+    console.log('@@' + JSON.stringify({
+      skippedGaps: skipped.gaps.map(g => g.excerpt),
+      skippedUncovered: skipped.uncovered_chars,
+      skippedCursorLooksDone: skipped.cursor === skipped.script_chars,
+      skippedMessage: describeNarrationGaps(skipped.gaps),
+      fullGaps: full.gaps.length,
+      fullCovered: full.covered_chars === full.script_chars,
+      markupGaps: markup.gaps.length,
+    }))
+  `)
+  assert.equal(result.skippedGaps.length, 1)
+  assert.match(result.skippedGaps[0], /彼得一世亲自筹建/)
+  assert.ok(result.skippedUncovered > 30)
+  assert.equal(result.skippedCursorLooksDone, true, '末尾游标已到头，正是旧口径漏判的场景')
+  assert.match(result.skippedMessage, /字/)
+  assert.equal(result.fullGaps, 0)
+  assert.equal(result.fullCovered, true)
+  assert.equal(result.markupGaps, 0, '发音标记去掉后仍逐字覆盖，不应报缺口')
+})
