@@ -390,6 +390,7 @@ Issue 整理完成后、实施前，必须让 **Fabel（Anthropic）或 Astra（
 - `LayerRail.vue` 是底图/图层/样式手风琴；素材沿用 `AssetPicker`，图片 `src.path` 仍为渲染真源，资产 ID/版本为出处。旧路径明确标识；继承底图禁换图/裁切/语义锚定。
 - 所有已锚定几何修改必须先确认，`patchLayer` 本身也拒绝静默解绑；`detachAnchors` / `reanchorLayer` 是明确动作。`useLayerDoc` 历史可携带外部时间线快照；服务端保存回灌走 `acceptSaved`，防止归一化元数据触发二次脏标记。
 - 缺字单源 `useMissingGlyphs` → 同源 `unsupportedChars`；字段/图层/画布即时展示，整段有缺字时禁渲染。共享 `StoryboardKeyframes` 的设计卡提示只在 `projectType='documentary'` 展示，剧情含 documentary_rules 不受影响。
+- 集成 smoke 恢复两条原路径：`useApi.ts` 必须显式导入 `apiBase`（Nuxt auto-import 不替代同名工具函数）；剧情 `StoryboardKeyframes` 挂载必须传真实 `epId`，批量预览不能误请求 `/episodes/0/…`。图片选择器的上传/库中帧图登记为真实素材版本，保存后刷新资产上下文，避免登记时立即刷新吞掉未保存编辑。
 
 ### 全局任务中心
 - `sys_task` 多了 `episode_id`（分镜任务由分镜反查、资产出图取发起时所在集、文本任务必填；启动时 `backfillTaskEpisodeIds()` 按 `storyboard_id` 回填存量行）与 `type='text'`。**文本任务不再存进程内存**：提取（`services/extraction.ts`）、关键帧/视频提示词批量（`keyframe-prompts.ts`/`video-prompts.ts`）、同步 chat 的剧本改写与拆分分镜（`routes/agent.ts`）都在开始时建 `sys_task(type='text')`，`params.kind` ∈ `extract_characters|extract_scenes|extract_props|keyframe_prompts|video_prompts|script_rewrite|storyboard_breaker`，进度写 `params.progress`（`{completed,total,failed,current_storyboard_id}`，**不复用 `remote_state`**，那是 qwen-jobs 追踪器的）。`/extract-status`、`/keyframe-prompts-status`、`/video-prompts-status` 响应结构不变，只是改成从库里读（函数变成 async）。

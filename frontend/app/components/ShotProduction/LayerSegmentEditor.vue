@@ -396,7 +396,7 @@ async function createMarker(issue) {
 .ls-stale { font-size: 11px; color: #c0472e; }
 .ls-error { margin: 6px 8px; font-size: 12px; color: #c0472e; }
 .ls-placeholder { flex: 1; display: grid; place-items: center; font-size: 12.5px; color: var(--text-3); padding: 24px; }
-.ls-canvas { flex: 1; min-height: 320px; }
+.ls-main .ls-canvas { flex: none; height: clamp(360px, 44vh, 600px); min-height: 360px; }
 .ls-preview { flex: none; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px; }
 .ls-preview-stage { position: relative; flex-shrink: 0; width: 100%; max-width: 720px; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; background: var(--surface-base); }
 .ls-preview-crop { position: absolute; }
