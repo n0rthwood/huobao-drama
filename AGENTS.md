@@ -290,7 +290,7 @@ Issue 整理完成后、实施前，必须让 **Fabel（Anthropic）或 Astra（
 - Poster（#39）不迁移，两套编辑器并存。
 
 ### 纪录片 7 步工作流骨架与步骤门禁（Issue #54）
-- 纪录片项目（`project_type='documentary'`）的步骤是 **剧本 → 资产（资产卡 / 审核清单）→ 分镜设计 → 分镜制作 → 视频与成品 → Poster（可选·不入链）→ 导出**；剧情项目仍是 **剧本 → 资产 → Poster → 分镜关键帧 → 视频制作 → 导出**，行为与 #54 之前逐字一致。
+- 纪录片项目（`project_type='documentary'`）的步骤是 **剧本 → 资产（资产卡 / 审核清单）→ Poster（可选·不入链）→ 分镜设计 → 分镜制作 → 视频与成品 → 导出**（Issue #63，用户确认的 Poster 第 3 步覆盖初稿第 6 步）；剧情项目仍是 **剧本 → 资产 → Poster → 分镜关键帧 → 视频制作 → 导出**，行为与 #54 之前逐字一致。
 - **工作流结构的唯一口径是 `isDocumentaryProject`（`project_type`）**；`isDocumentaryRuleset`（`genre_ruleset`，#54 由 `isDocumentary` 改名）只驱动内容规则类能力（当前唯一用处 = 选角名册按钮）。drama 3（`project_type='drama'` + `documentary_rules=on`）因此仍走剧情 6 步并保留名册按钮。禁止互相顶替。
 - 服务端门禁的唯一实现 `backend/src/services/workflow-gates.ts`：纯函数 `computeGates(facts)` + `episodeGates(id)` + `assertGate(id, gate)`（`gate ∈ assets|design|production|final|poster|export`）。解锁规则**逐级传递**：资产 ← 剧本已确认；分镜设计 ← `episodes.asset_review_status='passed'`；分镜制作 ← 至少一镜设计已确认（**R4 落地前过渡读 `storyboards.intent_reviewed`**）；视频与成品 ← 至少一镜制作就绪（过渡读 `keyframes_confirmed`）；导出 ← 至少一镜成品 `exportable`（compose-state 同源）；Poster ← 跟随资产解锁，可选不入链。`reasons[step]` 永远写**最靠上**的未满足原因，`goto[step]` 指向真正阻塞的那一步。剧情项目恒全解锁、`reasons` 为空。
 - 对外接口：`GET /episodes/:id/gates`、`POST /episodes/:id/script/{confirm,unconfirm}`。门禁拦截点：`POST /agent/storyboard_breaker/chat`（纪录片）、`/episodes/:id/storyboards/fill-gaps`、`/episodes/:id/generate-intents`（R4 改名为 `/design-cards/fill` 时沿用同一个 `assertGate`）走 `design`；`/episodes/:id/extract` 与三类资产的 `/:id/re-extract` 走 `assets`（**必须在清空字段之前**）。资产生图 / 美化流水线**不拦**——资产是项目级、可跨集复用。

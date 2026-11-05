@@ -1608,7 +1608,7 @@ const storedPanel = (() => {
   try { return JSON.parse(localStorage.getItem(PANEL_STORE_KEY) || 'null') } catch { return null }
 })()
 // ===== 子状态 deeplink：?panel=script|production|export &step=0|1
-//      &tab=assets|poster|keyframes|videos（纪录片项目为 assets|design|production|final|poster）
+//      &tab=assets|poster|keyframes|videos（纪录片项目为 assets|poster|design|production|final）
 //      &sub=cards|review（资产步的子页签，纪录片才有审核清单）
 //      &extract=characters|scenes|props &asset=类型-id =====
 const { replaceQuery } = useQuerySync()
@@ -2972,15 +2972,15 @@ const pendingAssetImageCount = computed(() => pendingCharacterImageCount.value +
 const assetTotalCount = computed(() => visualCharTotal.value + scenes.value.length + propItems.value.length)
 const assetReadyCount = computed(() => charImgCount.value + sceneImgCount.value + propImgCount.value)
 
-// 纪录片 7 步（Issue #54）：剧本 → 资产 → 分镜设计 → 分镜制作 → 视频与成品 → Poster（可选）→ 导出；
+// 纪录片 7 步（Issue #63）：剧本 → 资产 → Poster（可选）→ 分镜设计 → 分镜制作 → 视频与成品 → 导出；
 // 剧情项目的页签与步骤定义与 #54 之前逐项一致。
 const prodTabDefs = computed(() => (isDocumentaryProject.value
   ? [
       { id: 'assets', label: t('episode.prod.assets'), icon: FolderKanban, badge: assetTotalCount.value ? `${assetReadyCount.value}/${assetTotalCount.value}` : '' },
+      { id: 'poster', label: t('episode.prod.poster'), icon: ImageIcon, badge: posterData.value?.final_image ? '✓' : '' },
       { id: 'design', label: t('episode.prod.design'), icon: Lightbulb, badge: sbs.value.length ? `${gateState.value.design.confirmed}/${sbs.value.length}` : '' },
       { id: 'production', label: t('episode.prod.production'), icon: Images, badge: sbs.value.length ? `${keyframesConfirmedCount.value}/${sbs.value.length}` : '' },
       { id: 'final', label: t('episode.prod.final'), icon: Clapperboard, badge: sbs.value.length ? `${shotVidCount.value}/${sbs.value.length}` : '' },
-      { id: 'poster', label: t('episode.prod.poster'), icon: ImageIcon, badge: posterData.value?.final_image ? '✓' : '' },
     ]
   : [
       { id: 'assets', label: t('episode.prod.assets'), icon: FolderKanban, badge: assetTotalCount.value ? `${assetReadyCount.value}/${assetTotalCount.value}` : '' },
@@ -2993,10 +2993,10 @@ const mainStageDefs = computed(() => (isDocumentaryProject.value
   ? [
       { id: 'script', label: t('episode.stage.narrationScript'), desc: t('episode.stage.narrationScriptDesc'), icon: FileText },
       { id: 'assets', label: t('episode.prod.assets'), desc: t('episode.stage.evidenceAssetsDesc'), icon: FolderKanban },
+      { id: 'poster', label: t('episode.prod.poster'), desc: t('episode.stage.posterDesc'), icon: ImageIcon, optional: true },
       { id: 'design', label: t('episode.prod.design'), desc: t('episode.stage.designDesc'), icon: Lightbulb },
       { id: 'production', label: t('episode.prod.production'), desc: t('episode.stage.productionDesc'), icon: Images },
       { id: 'final', label: t('episode.prod.final'), desc: t('episode.stage.finalDesc'), icon: Clapperboard },
-      { id: 'poster', label: t('episode.prod.poster'), desc: t('episode.stage.posterDesc'), icon: ImageIcon, optional: true },
       { id: 'export', label: t('episode.stage.export'), desc: t('episode.stage.exportDesc'), icon: Download },
     ]
   : [
@@ -3099,7 +3099,7 @@ function sectionState(sectionId) {
 const activeMainStage = computed(() => {
   if (panel.value === 'export') return 'export'
   if (panel.value === 'production') {
-    // 制作子页签与主环节同名（drama: assets/poster/keyframes/videos；documentary: assets/design/production/final/poster）
+    // 制作子页签与主环节同名（drama: assets/poster/keyframes/videos；documentary: assets/poster/design/production/final）
     if (mainStageDefs.value.some(stage => stage.id === prodTab.value)) return prodTab.value
     return isDocumentaryProject.value ? 'final' : 'videos'
   }
