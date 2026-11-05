@@ -1145,10 +1145,16 @@
         "budget_tight": "Duration headroom is tight",
         "unresolved_ref": "A reference cannot be resolved to an asset or entry"
       },
+      "migrationComboUnresolved": "The legacy segment combination has no defined mapping. Your recoverable content was kept; explicitly choose a combination and review this design card before confirming.",
       "budget": {
         "layerSegment": "▣ Layer segment",
         "genSegment": "▶ Generated segment",
         "total": "Total {n}s",
+        "totalMissing": "Total —",
+        "comboMissing": "No segment combination selected",
+        "valuesMissing": "Enter a budget for every enabled segment",
+        "invalid": "Each enabled segment budget must be greater than 0",
+        "headroomMissing": "Headroom —",
         "limitLayer": "Layer limit {n}s",
         "limitGen": "Generated limit {n}s",
         "estimate": "Est. {n}s",

@@ -211,14 +211,17 @@ test('预算与旁白：配音前用估算，配音后用实测，budget 本身�
   assert.deepEqual(got.budget, { layer_s: 6, gen_s: 5 }, '实测值只重算问题，不回写 budget')
 })
 
-test('镜头数硬上限：cap = min(ceil(段数×1.5), 段数+3)，段数按空行切分', () => {
+test('镜头数硬上限兼顾短稿防过拆与逐段旁白字数下限', () => {
   const got = run(`
     const script = '【开场】第一段。\\n\\n第二段。\\n\\n\\n第三段。\\n   \\n第四段。\\n\\n第五段。'
     out({
       paragraphs: scriptParagraphs(script).length,
-      caps: [1, 2, 3, 4, 5, 6, 10, 20, 40].map(storyboardCountCap),
-      empty: [storyboardCountCap(0), storyboardCountCap(-1), storyboardCountCap(NaN)],
-      yinxu: storyboardCountCap(scriptParagraphs(script).length),
+      caps: [1, 2, 3, 4, 5, 6, 10, 20, 40].map(n => storyboardCountCap(Array(n).fill('短段。'))),
+      empty: [storyboardCountCap([]), storyboardCountCap(scriptParagraphs('')), storyboardCountCap(scriptParagraphs('【开场】\\n\\n'))],
+      yinxu: storyboardCountCap(scriptParagraphs(script)),
+      long: storyboardCountCap(['甲'.repeat(900), '乙'.repeat(900)]),
+      mixed: storyboardCountCap(['甲'.repeat(900), ...Array(4).fill('短段。')]),
+      marked: storyboardCountCap(['[[重庆|chong2 qing4]][[停顿|1.5]][[语气|sigh]]'.repeat(40)]),
     })
   `)
   assert.equal(got.paragraphs, 5, '节拍标记不单独成段，空白段不计')
@@ -226,6 +229,9 @@ test('镜头数硬上限：cap = min(ceil(段数×1.5), 段数+3)，段数按空
   assert.deepEqual(got.caps, [2, 3, 5, 6, 8, 9, 13, 23, 43])
   assert.deepEqual(got.empty, [0, 0, 0], '没有剧本就不设限')
   assert.equal(got.yinxu, 8, '殷墟 5 段剧本最多 8 镜')
+  assert.equal(got.long, 24, '两段各900字，逐段ceil(900/80)后相加')
+  assert.equal(got.mixed, 16, '一段900字加四短段，不得先合并总字数再ceil')
+  assert.equal(got.marked, 2, '注音语法、停顿和语气不虚增朗读字数')
 })
 
 test('生成段参考素材：只有启用了生成段的镜头才要求提示词 @ 到，解析不到的条目不参与', () => {

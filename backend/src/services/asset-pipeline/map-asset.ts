@@ -21,6 +21,7 @@ import {
   MAP_ROUTE_COLOR,
   renderMapBase,
   type MapSpec,
+  type MapContextCoverage,
 } from '../map-base-render.js'
 
 /** 底图版本行的 provider：与 upload / qwen-jobs 区分开，版本卡片能一眼看出是程序渲染的 */
@@ -35,6 +36,7 @@ export interface MapRenderRegistration {
   task_id: number
   points: Array<{ id: string; name: string; at: [number, number] }>
   routes: Array<{ id: string; name: string; points: Array<[number, number]>; color: string }>
+  context: MapContextCoverage
 }
 
 export async function renderAndRegisterMapBase(input: {
@@ -56,7 +58,7 @@ export async function renderAndRegisterMapBase(input: {
     dramaId: prop.dramaId,
     provider: MAP_RENDER_PROVIDER,
     model: 'd3-geo+natural-earth-50m',
-    params: JSON.stringify({ source: 'map-render', map_signature: rendered.sha256, reused: rendered.reused }),
+    params: JSON.stringify({ source: 'map-render', map_signature: rendered.sha256, reused: rendered.reused, context: rendered.context }),
     resultUrl: rendered.path,
     localPath: rendered.path,
     status: 'completed',
@@ -120,6 +122,7 @@ export async function renderAndRegisterMapBase(input: {
     task_id: taskId,
     points: rendered.points,
     routes: rendered.routes,
+    context: rendered.context,
   }
 }
 

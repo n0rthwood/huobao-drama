@@ -440,9 +440,10 @@ function buildSaveStoryboards(documentary: boolean) {
     const narrationRejected: { shot_number: number; reason: string }[] = []
     // 设计卡解析出的问题（#57）汇总回传，让模型在同一次运行里改引用
     const designCardIssues: { shot_number: number; code: string; message: string }[] = []
-    // 镜头数硬上限（契约 §8 行 1）：纪录片一集最多 min(ceil(段数×1.5), 段数+3) 镜
-    const paragraphCount = documentary ? scriptParagraphs(episodeRow?.scriptContent || episodeRow?.content).length : 0
-    const shotCap = documentary ? storyboardCountCap(paragraphCount) : 0
+    // 普通拆镜与补镜共享上限：短稿防过拆，但不得低于逐段合法切分旁白所需镜数。
+    const paragraphs = documentary ? scriptParagraphs(episodeRow?.scriptContent || episodeRow?.content) : []
+    const paragraphCount = paragraphs.length
+    const shotCap = documentary ? storyboardCountCap(paragraphs) : 0
     let aliveCount = existingRows.filter(sb => !sb.deletedAt).length
     // 旁白去重：归一化文本 → 已经领走它的镜号（本集既有 + 本批）
     const narrationOwners: Record<string, number> = {}
