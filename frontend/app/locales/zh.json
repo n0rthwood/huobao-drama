@@ -412,11 +412,11 @@
       "aspectRatioHint": "决定关键帧与视频的出图比例；创建后可在「项目设置」中修改",
       "aspectRatioRequired": "请选择画面比例",
       "projectType": "项目类型",
-      "projectTypeHint": "类型创建后不可切换：纪录片项目有专属的旁白优先流程与表达设计步骤",
+      "projectTypeHint": "类型创建后不可切换：纪录片项目有专属的旁白优先流程与分镜设计步骤",
       "projectTypeDrama": "短剧",
       "projectTypeDramaDesc": "剧情短剧：剧本改写 → 角色/场景 → 关键帧 → 视频",
       "projectTypeDocumentary": "纪录片",
-      "projectTypeDocumentaryDesc": "旁白优先：旁白稿 → 证据素材 → 表达设计 → 关键帧/图层 → 视频",
+      "projectTypeDocumentaryDesc": "旁白优先：旁白稿 → 证据素材 → 分镜设计 → 关键帧/图层 → 视频",
       "submit": "创建项目"
     },
     "deleteDialog": {
@@ -727,7 +727,7 @@
       "ttsVoiceEmpty": "该服务没有返回任何音色",
       "ttsVoiceRequired": "请先选定音色再保存",
       "vision": "视觉模型",
-      "visionHint": "该文本服务能读懂图片内容（如 DeepSeek V4.1 Flash）。需要看图的环节（纪录片拆分分镜、表达设计、语义标注、资产 QC 清单核验、史料画像）只会使用标记为视觉的配置。",
+      "visionHint": "该文本服务能读懂图片内容（如 DeepSeek V4.1 Flash）。需要看图的环节（纪录片拆分分镜、分镜设计、语义标注、资产 QC 清单核验、史料画像）只会使用标记为视觉的配置。",
       "visionTag": "视觉",
       "visionProbeTitle": "读图校验"
     },

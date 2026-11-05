@@ -412,11 +412,11 @@
       "aspectRatioHint": "Sets the output ratio for keyframes and videos; can be changed later in Project Settings",
       "aspectRatioRequired": "Please choose an aspect ratio",
       "projectType": "Project type",
-      "projectTypeHint": "The type cannot be changed after creation: documentary projects use a narration-first workflow with their own expression-design step",
+      "projectTypeHint": "The type cannot be changed after creation: documentary projects use a narration-first workflow with their own shot-design step",
       "projectTypeDrama": "Short drama",
       "projectTypeDramaDesc": "Scripted drama: screenplay rewrite → characters/scenes → keyframes → video",
       "projectTypeDocumentary": "Documentary",
-      "projectTypeDocumentaryDesc": "Narration-first: narration script → evidence assets → expression design → keyframes/layers → video",
+      "projectTypeDocumentaryDesc": "Narration-first: narration script → evidence assets → shot design → keyframes/layers → video",
       "submit": "Create project"
     },
     "deleteDialog": {
@@ -727,7 +727,7 @@
       "ttsVoiceEmpty": "The service returned no voices",
       "ttsVoiceRequired": "Pick a voice before saving",
       "vision": "Vision model",
-      "visionHint": "This text service can actually read images (e.g. DeepSeek V4.1 Flash). Stages that must look at pictures (documentary shot breakdown, shot intent, semantics annotation, asset QC checklist verification, portrait appearance) only use configs marked as vision.",
+      "visionHint": "This text service can actually read images (e.g. DeepSeek V4.1 Flash). Stages that must look at pictures (documentary shot breakdown, shot design, semantics annotation, asset QC checklist verification, portrait appearance) only use configs marked as vision.",
       "visionTag": "vision",
       "visionProbeTitle": "Image-reading check"
     },
