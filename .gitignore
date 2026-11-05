@@ -76,3 +76,6 @@ data/text-tasks/
 /put_rules.json
 /requests.jsonl
 /skill-consumption.md
+
+# fontconfig cache marker generated at runtime
+backend/assets/fonts/.uuid
