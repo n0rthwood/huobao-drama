@@ -77,9 +77,9 @@ const PRE_MIGRATION = `
     db.run(sql\`INSERT INTO storyboards (id, episode_id, storyboard_number, duration, intent, intent_reviewed, deleted_at, created_at, updated_at)
       VALUES (\${row.id}, \${row.episodeId}, \${row.storyboardNumber}, \${row.duration}, \${row.intent}, 1, \${row.deletedAt ?? null}, \${at}, \${at})\`)
   }
-  // 孤儿 intent：指向一条根本不存在的分镜（生产库里确实有一条）
-  db.run(sql\`INSERT INTO storyboard_clips (storyboard_id, position, layer_doc, timeline, duration, render_path, render_signature, status, created_at, updated_at)
-    VALUES (125, 'replace', '{}', '{}', 10, 'static/clips/orphan.mp4', 'sig-orphan', 'ready', \${at}, \${at})\`)
+  // 孤儿图层段：指向一条根本不存在的分镜（生产库里确实有一条，见契约 §7）
+  db.run(sql\`INSERT INTO storyboard_layer_segments (storyboard_id, layer_doc, timeline, duration, render_path, render_signature, status, created_at, updated_at)
+    VALUES (125, '{}', '{}', 10, 'static/layer-segments/orphan.mp4', 'sig-orphan', 'ready', \${at}, \${at})\`)
 `
 
 const COLUMNS = `
@@ -159,19 +159,19 @@ test('没有 intent / 坏 JSON 的镜头置空白；drama 3 的存量镜不受�
   assert.equal(result.drama3Cards, 0, '存量集一张设计卡都没有')
 })
 
-test('软删行一并转换但不计数；孤儿片段行原样保留（迁移按分镜行驱动）', () => {
+test('软删行一并转换但不计数；孤儿图层段行原样保留（迁移按分镜行驱动）', () => {
   const result = run(`
     ${PRE_MIGRATION}
     const { migrateIntentToDesignCard } = await import('./src/services/design-card-migration.ts')
     const migrated = await migrateIntentToDesignCard()
     const soft = db.all(sql.raw('SELECT combo, design_card_status FROM storyboards WHERE id = 107'))[0]
-    const clips = db.all(sql.raw('SELECT count(*) AS n, count(DISTINCT render_signature) AS sigs FROM storyboard_clips'))[0]
+    const clips = db.all(sql.raw('SELECT count(*) AS n, count(DISTINCT render_signature) AS sigs FROM storyboard_layer_segments'))[0]
     console.log('@@' + JSON.stringify({ migrated, soft, clips }))
   `)
   assert.equal(result.migrated, 4, '只数存活行：101–104；软删的 107 与两个空白镜不计入')
   assert.equal(result.soft.combo, 'A', '软删行也转换，回收站恢复后设计卡还在')
   assert.equal(result.soft.design_card_status, 'pending')
-  assert.equal(result.clips.n, 1, '孤儿片段行原样保留')
+  assert.equal(result.clips.n, 1, '孤儿图层段行原样保留')
   assert.equal(result.clips.sigs, 1, '渲染签名没有被迁移改动')
 })
 

@@ -1,5 +1,6 @@
 /**
- * 确定性片段时间线（Issue #50）纯函数：规范化、取景框不变量、逐帧插值、帧缓存键。
+ * 图层段精确关键帧时间线（Issue #58，原 clip-timeline.test.mjs）纯函数：
+ * 规范化、取景框不变量、逐帧插值、帧缓存键、`keyframes[]` 改名、`end_hold` 派生、逐帧 ease/fade 覆盖。
  * 纯 TS 模块，用仓库自带 tsx 子进程跑并以 JSON 回传（与 layer-svg.test.mjs 同法）。
  */
 import { execFileSync } from 'node:child_process'
@@ -13,8 +14,9 @@ function run(body) {
   const script = `
     import {
       normalizeTimeline, normalizeViewport, viewportFromPoints, frameStateAt, frameCount,
-      frameKeyOf, minViewportSize, timelineLayerIds, clampClipDuration, MAX_CLIP_SECONDS,
-    } from './src/services/clip-timeline.ts'
+      frameKeyOf, minViewportSize, timelineLayerIds, clampSegmentDuration, MAX_LAYER_SEGMENT_SECONDS, endHoldOf,
+    } from './src/services/segment-timeline.ts'
+    const MAX_LAYER_SEGMENT_MAX = MAX_LAYER_SEGMENT_SECONDS
     const out = (value) => console.log('@@' + JSON.stringify(value))
     ${body}
   `
@@ -28,7 +30,7 @@ function run(body) {
 const S01 = `
   const timeline = normalizeTimeline({
     fps: 25, ease: 'linear', fade_ms: 400,
-    states: [
+    keyframes: [
       { t: 0, viewport: { x: 0, y: 0, w: 1, h: 1 }, visible: [] },
       { t: 3, viewport: { x: 0, y: 0, w: 1, h: 1 }, visible: ['rg'] },
       { t: 6, viewport: { x: 0, y: 0, w: 1, h: 1 }, visible: ['rg', 'south'] },
@@ -42,16 +44,16 @@ test('规范化：fps/fade 钳制、状态按时刻排序、同刻去重、空�
   const got = run(`
     const sorted = normalizeTimeline({
       fps: 999, fade_ms: -5, ease: 'nope',
-      states: [{ t: 5, visible: ['b'] }, { t: 1, visible: ['a'] }, { t: 5, visible: ['c'] }],
+      keyframes: [{ t: 5, visible: ['b'] }, { t: 1, visible: ['a'] }, { t: 5, visible: ['c'] }],
     })
     const empty = normalizeTimeline(null)
     out({
       fps: sorted.fps, fade: sorted.fade_ms, ease: sorted.ease,
-      times: sorted.states.map(s => s.t),
-      lastVisible: sorted.states[sorted.states.length - 1].visible,
-      emptyStates: empty.states.length,
-      emptyViewport: empty.states[0].viewport,
-      emptyVisible: empty.states[0].visible,
+      times: sorted.keyframes.map(s => s.t),
+      lastVisible: sorted.keyframes[sorted.keyframes.length - 1].visible,
+      emptyStates: empty.keyframes.length,
+      emptyViewport: empty.keyframes[0].viewport,
+      emptyVisible: empty.keyframes[0].visible,
     })
   `)
   assert.equal(got.fps, 60, 'fps 钳到上限 60')
@@ -151,17 +153,72 @@ test('帧缓存键：静止段相邻帧同键，推近段逐帧不同', () => {
   assert.equal(got.distinctPushIn, 5, '推近段每帧取景框都不同')
 })
 
-test('时长钳制：replace 上限 30 秒，含模型视频的镜头仍是 15 秒', () => {
+test('时长钳制：图层段上限恒为 30 秒（与组合无关）', () => {
   const got = run(`out({
-    max: MAX_CLIP_SECONDS,
-    replace: clampClipDuration(42, MAX_CLIP_SECONDS),
-    prePost: clampClipDuration(42, 15),
-    tooShort: clampClipDuration(0.1, MAX_CLIP_SECONDS),
-    nan: clampClipDuration(Number.NaN, MAX_CLIP_SECONDS),
+    max: MAX_LAYER_SEGMENT_MAX,
+    long: clampSegmentDuration(42),
+    short: clampSegmentDuration(0.1),
+    nan: clampSegmentDuration(Number.NaN),
+    rounded: clampSegmentDuration(6.4, MAX_LAYER_SEGMENT_MAX),
   })`)
   assert.equal(got.max, 30)
-  assert.equal(got.replace, 30)
-  assert.equal(got.prePost, 15)
-  assert.equal(got.tooShort, 1)
+  assert.equal(got.long, 30)
+  assert.equal(got.short, 1)
   assert.equal(got.nan, 1)
+  assert.equal(got.rounded, 6.4)
+})
+
+test('末尾停留 end_hold 是派生值：duration − 末个关键帧 t（不设列）', () => {
+  const got = run(`
+    const timeline = normalizeTimeline({
+      fps: 25,
+      keyframes: [
+        { t: 0, viewport: { x: 0, y: 0, w: 1, h: 1 }, visible: [] },
+        { t: 5.6, viewport: { x: 0, y: 0, w: 1, h: 1 }, visible: ['a'] },
+      ],
+    })
+    out({
+      hold: endHoldOf(timeline, 6),
+      zero: endHoldOf(timeline, 5.6),
+      beforeLast: endHoldOf(timeline, 4),
+      atDuration: frameStateAt(timeline, 6).opacity,
+      afterDuration: frameStateAt(timeline, 9).opacity,
+    })
+  `)
+  assert.equal(got.hold, 0.4)
+  assert.equal(got.zero, 0)
+  assert.equal(got.beforeLast, 0, 'duration 比末帧还短时钳到 0')
+  assert.deepEqual(got.atDuration, { a: 1 }, 'C 衔接帧取 t=duration 时是末尾停留的最终画面')
+  assert.deepEqual(got.afterDuration, { a: 1 }, '超出段尾仍保持最终画面')
+})
+
+test('旧键名 states 兼容读入（一次性迁移与存量 JSON 列）', () => {
+  const got = run(`
+    const legacy = normalizeTimeline({ fps: 25, ease: 'linear', fade_ms: 400,
+      states: [{ t: 0, visible: [] }, { t: 2, visible: ['x'] }] })
+    out({ times: legacy.keyframes.map(f => f.t), visible: legacy.keyframes[1].visible, hasStates: 'states' in legacy })
+  `)
+  assert.deepEqual(got.times, [0, 2])
+  assert.deepEqual(got.visible, ['x'])
+  assert.equal(got.hasStates, false, '规范化输出只有 keyframes')
+})
+
+test('逐帧 ease / fade_ms 覆盖时间线级默认（契约 §3.2 PreciseKeyframe）', () => {
+  const got = run(`
+    const timeline = normalizeTimeline({
+      fps: 25, ease: 'inout', fade_ms: 400,
+      keyframes: [
+        { t: 0, viewport: { x: 0, y: 0, w: 1, h: 1 }, visible: [] },
+        { t: 2, viewport: { x: 0.2, y: 0.2, w: 0.6, h: 0.6 }, visible: ['a'], ease: 'linear', fade_ms: 0 },
+      ],
+    })
+    out({
+      mid: frameStateAt(timeline, 1).viewport,
+      after: frameStateAt(timeline, 2).opacity,
+      kept: timeline.keyframes[1].ease,
+    })
+  `)
+  assert.deepEqual(got.mid, { x: 0.1, y: 0.1, w: 0.8, h: 0.8 }, '该帧 ease=linear → 中点即线性中点')
+  assert.deepEqual(got.after, { a: 1 }, 'fade_ms=0 → 到达时刻立刻全不透明')
+  assert.equal(got.kept, 'linear')
 })
