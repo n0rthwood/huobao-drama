@@ -101,6 +101,12 @@ export const episodeAPI = {
       config_id: data.config_id || undefined,
     }),
   keyframePromptsStatus: (id: number) => api.get(`/episodes/${id}/keyframe-prompts-status`),
+  // 「批量AI提示词」的范围清单（#58）：弹窗先拉这个，展示将处理/排除的镜与排除原因
+  keyframePromptsScope: (id: number) =>
+    api.get<{
+      included: Array<{ storyboard_id: number; storyboard_number: number }>
+      excluded: Array<{ storyboard_id: number; storyboard_number: number; reason: string }>
+    }>(`/episodes/${id}/keyframe-prompts/scope`),
   // 批量关键帧预览：逐「分镜 × 槽位」给出 缺图/已变化/未变化(同第 N 版)/被拦截/跳过 与默认勾选
   keyframeBatchPreview: (id: number, data: { storyboard_ids?: number[]; model?: string; config_id?: number } = {}) =>
     api.post(`/episodes/${id}/keyframe-batch/preview`, {
@@ -609,6 +615,17 @@ export const storyboardAPI = {
     api.post<DesignCardShotState>(`/storyboards/${id}/design-card/confirm`, acknowledge ? { acknowledge: true } : {}),
   unconfirmDesignCard: (id: number) =>
     api.post<DesignCardShotState>(`/storyboards/${id}/design-card/unconfirm`),
+  // 段组合切换（#58）：先问影响（保留 / 失效归档 / 需要新做），确认后切换（只归档不删除）
+  comboImpact: (id: number, to: 'A' | 'B' | 'C' | 'D') =>
+    api.get<{
+      from: 'A' | 'B' | 'C' | 'D' | null
+      to: 'A' | 'B' | 'C' | 'D'
+      keep: Array<{ code: string; text: string }>
+      archive: Array<{ code: string; text: string }>
+      redo: Array<{ code: string; text: string }>
+    }>(`/storyboards/${id}/combo/impact?to=${to}`),
+  setCombo: (id: number, combo: 'A' | 'B' | 'C' | 'D') =>
+    api.post(`/storyboards/${id}/combo`, { combo }),
   // 视频生成参数（关键帧引导、参考图 / @图片N 映射 / 分辨率）全部由后端组装
   generateVideo: (id: number, data: { model?: string; config_id?: number }) =>
     api.post(`/storyboards/${id}/generate-video`, { model: data.model || undefined, config_id: data.config_id || undefined }),
@@ -1344,46 +1361,88 @@ export const storageAPI = {
   info: () => api.get('/storage'),
 }
 
-// ===== 确定性片段（#50）：图层文档 + 时间线 → 同步渲染出 mp4 =====
-export type ClipPositionPersisted = 'replace' | 'pre' | 'post'
-export interface ClipSpec { width: number; height: number; fps: number; source: 'video' | 'default' }
-export interface ClipViewport { x: number; y: number; w: number; h: number }
-export interface ClipState { t: number; viewport: ClipViewport; visible: string[] }
-export interface ClipTimeline { fps: number; ease: 'linear' | 'inout'; fade_ms: number; states: ClipState[] }
-export interface StoryboardClip {
+// ===== 图层段（#58）：一镜至多一段图层文档 + 时间线 → 同步渲染出 mp4 =====
+export interface SegmentSpec { width: number; height: number; fps: number; source: 'video' | 'default' }
+export interface SegmentViewport { x: number; y: number; w: number; h: number }
+export interface SegmentKeyframe {
+  t: number
+  viewport: SegmentViewport
+  visible: string[]
+  /** 逐帧覆盖：本帧到下一帧的插值缓动 */
+  ease?: 'linear' | 'inout'
+  /** 逐帧覆盖：到达本帧时的淡入淡出时长 */
+  fade_ms?: number
+}
+export interface SegmentTimeline { fps: number; ease: 'linear' | 'inout'; fade_ms: number; keyframes: SegmentKeyframe[] }
+export interface LayerSegmentIssue {
+  code: 'missing_base' | 'card_subtitle_overlap' | 'must_mark_not_marked' | 'reference_not_mentioned' | 'budget_mismatch'
+  severity: 'warn' | 'block'
+  message: string
+  [key: string]: unknown
+}
+export interface LayerSegment {
   id: number
   storyboard_id: number
-  position: ClipPositionPersisted
   layer_doc: Record<string, any>
-  timeline: ClipTimeline
+  timeline: SegmentTimeline
   duration: number
+  /** 派生只读 = duration − 末帧 t */
+  end_hold: number
+  base_ref: Record<string, any> | null
+  quality_warnings: Array<Record<string, any>>
   render_path: string | null
   render_signature: string | null
   rendered_at: string | null
+  junction_path: string | null
+  junction_hash: string | null
   status: 'draft' | 'rendering' | 'ready' | 'failed'
+  stale_reasons: string[]
   /** 已渲染且仍对得上当前图层/时间线/规格；false = 需要重新渲染 */
   fresh: boolean
 }
+export interface LayerSegmentJunction {
+  source: 'layer_last' | 'layer_first' | null
+  t: number
+  path: string | null
+  hash: string | null
+  stale: boolean
+}
+export interface LayerSegmentState {
+  spec: SegmentSpec
+  combo: 'A' | 'B' | 'C' | 'D' | null
+  design_card_status: string
+  production_unlocked: boolean
+  gate_reason: string | null
+  segment: LayerSegment | null
+  junction: LayerSegmentJunction
+  issues: LayerSegmentIssue[]
+}
 
-export const clipAPI = {
-  list: (storyboardId: number) =>
-    api.get<{ spec: ClipSpec; clips: StoryboardClip[] }>(`/clips/storyboards/${storyboardId}`),
-  draft: (storyboardId: number) =>
-    api.post<{ spec: ClipSpec; clip: StoryboardClip }>(`/clips/storyboards/${storyboardId}/draft`),
+export const layerSegmentAPI = {
+  get: (storyboardId: number) =>
+    api.get<LayerSegmentState>(`/layer-segments/storyboards/${storyboardId}`),
   save: (
     storyboardId: number,
-    position: ClipPositionPersisted,
-    data: { layer_doc?: unknown; timeline?: unknown; duration?: number },
-  ) => api.put<{ spec: ClipSpec; clip: StoryboardClip }>(`/clips/storyboards/${storyboardId}/${position}`, data),
-  del: (storyboardId: number, position: ClipPositionPersisted) =>
-    api.del(`/clips/storyboards/${storyboardId}/${position}`),
-  // 同步渲染：15 秒片段约 3–5 秒返回
-  render: (storyboardId: number, position: ClipPositionPersisted) =>
-    api.post<{ task_id: number; spec: ClipSpec; clip: StoryboardClip | null }>(
-      `/clips/storyboards/${storyboardId}/${position}/render`),
-  // 首/末帧缩略图是 PNG 字节流，直接当 <img src> 用（后端 no-store，带 cache buster 以便渲染后刷新）
-  thumbnailUrl: (storyboardId: number, position: ClipPositionPersisted, which: 'first' | 'last', bust = 0) =>
-    `${apiBase()}/clips/storyboards/${storyboardId}/${position}/thumbnail/${which}${bust ? `?v=${bust}` : ''}`,
+    data: { layer_doc?: unknown; timeline?: unknown; duration?: number; base_ref?: unknown },
+  ) => api.put<LayerSegmentState>(`/layer-segments/storyboards/${storyboardId}`, data),
+  del: (storyboardId: number) => api.del<{ deleted: boolean }>(`/layer-segments/storyboards/${storyboardId}`),
+  // 由设计卡 layer_plan 生成草稿并落库
+  draft: (storyboardId: number) =>
+    api.post<LayerSegmentState>(`/layer-segments/storyboards/${storyboardId}/draft`),
+  // 同步渲染：30 秒段数秒返回；keyframes_invalidated = 衔接帧变了，本镜关键帧确认作废
+  render: (storyboardId: number) =>
+    api.post<{
+      task_id: number
+      spec: SegmentSpec
+      segment: LayerSegment | null
+      junction: LayerSegmentJunction
+      keyframes_invalidated: boolean
+    }>(`/layer-segments/storyboards/${storyboardId}/render`),
+  // 帧缩略图/衔接帧都是 PNG 字节流，直接当 <img src> 用（后端 no-store，带 cache buster）
+  thumbnailUrl: (storyboardId: number, which: 'first' | 'last' | `frame-${number}`, bust = 0) =>
+    `${apiBase()}/layer-segments/storyboards/${storyboardId}/thumbnail/${which}${bust ? `?v=${bust}` : ''}`,
+  junctionUrl: (storyboardId: number, bust: string | number = 0) =>
+    `${apiBase()}/layer-segments/storyboards/${storyboardId}/junction${bust ? `?v=${bust}` : ''}`,
 }
 
 export const settingsAPI = {

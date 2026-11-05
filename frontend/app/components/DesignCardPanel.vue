@@ -433,6 +433,17 @@
       </div>
     </Teleport>
 
+    <!-- 本镜已有制作产物时，改组合不再直接写设计卡，而是走「保留/归档/新做」的影响清单 -->
+    <ComboSwitchDialog
+      v-if="comboSwitch.open"
+      :storyboard-id="comboSwitch.sbId"
+      :shot-number="comboSwitch.shotNumber"
+      :from="comboSwitch.from"
+      :initial="comboSwitch.to"
+      @close="comboSwitch.open = false"
+      @switched="onComboSwitched"
+    />
+
     <AssetPicker
       :open="picker.open"
       :mode="picker.mode"
@@ -459,6 +470,7 @@ import { useI18n } from 'vue-i18n'
 import { ChevronDown, ChevronUp, Layers, Loader2, Lock, Sparkles } from 'lucide-vue-next'
 import NarrationCoverageBar from '~/components/NarrationCoverageBar.vue'
 import AssetPicker from '~/components/AssetPicker.vue'
+import ComboSwitchDialog from '~/components/ShotProduction/ComboSwitchDialog.vue'
 import { COMBOS, episodeAPI, storyboardAPI } from '~/composables/useApi'
 import { useWorkflowGates } from '~/composables/useWorkflowGates'
 import { toastError, toastServerMessage } from '~/composables/useToast'
@@ -496,6 +508,7 @@ const acknowledged = ref(false)
 const scope = ref(null)
 const batch = ref({ running: false, total: 0, completed: 0 })
 const picker = reactive({ open: false, mode: 'asset', field: '', selected: [] })
+const comboSwitch = ref({ open: false, sbId: 0, shotNumber: 0, from: '', to: '' })
 const barEl = ref(null)
 
 // ===== 门禁 =====
@@ -711,9 +724,35 @@ function saveNow() {
   flushPending()
 }
 
+/** 本镜是否已有制作产物：已出过任一关键帧图（图层段渲染与否由后端门禁兜底） */
+function hasProductionArtifacts(sb) {
+  const k = sb?.keyframes || {}
+  return Boolean(
+    k.first_image || k.firstImage ||
+    k.mid_image || k.midImage ||
+    k.last_image || k.lastImage ||
+    sb?.layer_segment || sb?.layerSegment,
+  )
+}
 function pickCombo(key) {
   if (draft.value.combo === key) return
+  const sb = selected.value
+  // 已有产物：先看影响清单再切换（只归档不删除），不再直接覆盖写设计卡
+  if (sb && draft.value.combo && hasProductionArtifacts(sb)) {
+    comboSwitch.value = {
+      open: true,
+      sbId: sb.id,
+      shotNumber: Number(stateOf(sb).shot_number) || 0,
+      from: draft.value.combo,
+      to: key,
+    }
+    return
+  }
   patchDraft({ combo: key })
+}
+function onComboSwitched() {
+  emit('refresh')
+  if (selected.value) syncDraft()
 }
 function setInfoVia(index, via) {
   const list = draft.value.info_points.map((item, i) => (i === index ? { ...item, via } : item))
@@ -872,7 +911,21 @@ function reportError(err, fallback) {
     blocked: 'episode.design.error.blocked',
     needs_acknowledge: 'episode.design.error.needsAcknowledge',
   }
-  if (body.gate === 'combo_switch') { toast.error(t('episode.design.error.comboSwitch')); return }
+  if (body.gate === 'combo_switch') {
+    // 后端判定已有制作产物：按影响清单走组合切换（不直接改写设计卡）
+    const sb = selected.value
+    if (sb && draft.value.combo) {
+      comboSwitch.value = {
+        open: true,
+        sbId: sb.id,
+        shotNumber: Number(stateOf(sb).shot_number) || 0,
+        from: draft.value.combo,
+        to: '',
+      }
+      syncDraft()
+    } else toast.error(t('episode.design.error.comboSwitch'))
+    return
+  }
   // 后端错误体是 { code: 400, error: 'budget_over_layer', ... }：错误码在 error 上，code 是 HTTP 状态
   const key = map[body.error]
   if (key) {
