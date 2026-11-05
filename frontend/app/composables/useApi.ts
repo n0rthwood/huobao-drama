@@ -799,8 +799,198 @@ export const propAPI = {
   saveSemantics: (id: number, semantics: AssetSemanticsDoc) => api.put<{ semantics: AssetSemanticsDoc }>(`/props/${id}/semantics`, { semantics }),
   autoSemantics: (id: number, episodeId: number, configId?: number) => api.post<PropSemanticsAutoResp>(`/props/${id}/semantics/auto`, { episode_id: episodeId, config_id: configId || undefined }),
   autoSemanticsStatus: (id: number) => api.get<PropSemanticsAutoStatus>(`/props/${id}/semantics/auto/status`),
-  beautify: (id: number, episodeId: number, opts: { prompt?: string; model?: string; configId?: number } = {}) =>
-    api.post<{ image_generation_id: number }>(`/props/${id}/beautify`, { episode_id: episodeId, prompt: opts.prompt || undefined, model: opts.model || undefined, config_id: opts.configId || undefined }),
+  // 地图确定性底图（Issue #56）：map_spec 只存人工确认过的点，AI 建议一律 proposed，由前端勾选后才写回
+  mapSpec: (id: number) => api.get<{ map_spec: MapSpec | null }>(`/props/${id}/map-spec`),
+  saveMapSpec: (id: number, mapSpec: MapSpec) => api.put<{ map_spec: MapSpec }>(`/props/${id}/map-spec`, { map_spec: mapSpec }),
+  renderMapBase: (id: number, episodeId: number, size?: { width?: number; height?: number }) =>
+    api.post<MapRenderResp>(`/props/${id}/map-render`, { episode_id: episodeId, width: size?.width || undefined, height: size?.height || undefined }),
+  suggestMapPlaces: (id: number, episodeId: number, names?: string[], textConfigId?: number) =>
+    api.post<{ places: MapProposedPlace[] }>(`/props/${id}/map-suggest`, { episode_id: episodeId, names: names?.length ? names : undefined, text_config_id: textConfigId || undefined }),
+}
+
+// 资产「精确→美化」流水线（Issue #56）。闸门结论由后端按清单计算，前端只渲染，不复算也不采信模型自判。
+export interface MapPlace { id: string; name: string; lon: number; lat: number; proposed?: boolean }
+export interface MapRoute { id: string; name: string; points: Array<[number, number]>; proposed?: boolean }
+export interface MapSpec {
+  version: 1
+  projection: { type: 'mercator' | 'equirectangular' }
+  /** [west, south, east, north] */
+  bbox: [number, number, number, number]
+  layers: { land: boolean; coastline: boolean; rivers: boolean; lakes: boolean; countries: boolean }
+  places: MapPlace[]
+  routes: MapRoute[]
+  style: { theme: 'archival' | 'clean' | 'ink' }
+}
+export interface MapRenderResp {
+  path: string
+  width: number
+  height: number
+  sha256: string
+  task_id: number
+  reused: boolean
+  points: Array<{ id: string; name: string; at: [number, number] }>
+  routes: Array<{ id: string; name: string; points: Array<[number, number]>; color: string }>
+}
+export interface MapProposedPlace { name: string; lon: number; lat: number; source: string; proposed: true }
+
+export type AssetPipelineKind = 'character' | 'scene' | 'prop'
+export type AssetSourceRole = 'generation_reference' | 'shape_only' | 'rejected'
+export interface AssetSourceRow {
+  id: number
+  asset_kind: string
+  asset_id: number
+  url: string | null
+  title: string | null
+  artist: string | null
+  license: string
+  sha256: string
+  local_path: string
+  role: AssetSourceRole
+  why_excluded: string | null
+  era: string | null
+  fetched_at: string | null
+  created_at: string
+}
+export interface AssetPipelineOpenedImage { path: string; sha256: string }
+export interface SpecSourceSnapshot {
+  source_id: number | null
+  kind: 'wikipedia' | 'commons' | 'web' | 'local'
+  url: string | null
+  license: string
+  artist: string | null
+  sha256: string
+  local_path: string
+  role: string
+  why_excluded?: string
+  era?: string
+}
+export interface AssetSpecRow {
+  id: number
+  asset_kind: string
+  asset_id: number
+  version: number
+  summary: string
+  must_have: Array<{ id: string; element: string; why: string; check: string; metric: 'count' | 'arrangement' | 'color' | 'shape' | 'other' }>
+  forbidden: Array<{ id: string; error: string; why: string }>
+  tolerances: string[]
+  uncertainties: string[]
+  palette: string | null
+  composition: string | null
+  locate_targets: Array<{ id: string; name: string }>
+  locate_anchors: Array<{ id: string; name: string }>
+  sources: SpecSourceSnapshot[]
+  created_by_stage: string
+  created_at: string
+}
+export interface LocateCheck { id: string; name: string; status: 'ok' | 'off' | 'not_comparable'; distance: number | null; detail: string }
+export interface GateResult {
+  pass: boolean
+  coverage: number
+  invalid: string[]
+  violations: Array<{ id: string; element: string; verdict: string; evidence: string }>
+  forbidden_hits: Array<{ id: string; error: string; evidence: string }>
+  text_in_image: { present: boolean | null; evidence: string }
+  locate_checks: LocateCheck[]
+  semantics_preserved: { status: 'pass' | 'fail' | 'not_applicable'; detail: string }
+}
+export interface QcRecordRow {
+  id: number
+  round_id: number
+  model_config_id: number | null
+  checklist_coverage: number
+  verdicts: {
+    must_have: Array<{ id: string; verdict: 'ok' | 'minor' | 'violation'; evidence: string }>
+    forbidden: Array<{ id: string; detected: boolean; evidence: string }>
+    text_in_image: { present: boolean | null; evidence: string }
+  }
+  locate_checks: LocateCheck[]
+  gate_pass: 0 | 1
+  gate_invalid: string[]
+  fidelity_score: number | null
+  beauty_score: number | null
+  suggestions: string[]
+  human_verdict: string | null
+  human_notes: string | null
+  human_opened: AssetPipelineOpenedImage[] | null
+  created_at: string
+}
+export interface AssetPipelineRound {
+  id: number
+  pipeline_task_id: number
+  asset_kind: string
+  asset_id: number
+  spec_id: number
+  round_no: number
+  purpose: 'precision' | 'beautify'
+  generator: string | null
+  config_id: number | null
+  prompt: string
+  negative_prompt: string | null
+  reference_ids: number[]
+  image_task_id: number | null
+  image_path: string | null
+  image_sha256: string | null
+  width: number | null
+  height: number | null
+  status: 'pending' | 'generating' | 'generated' | 'failed' | 'discarded'
+  error_msg: string | null
+  created_at: string
+  updated_at: string
+  qc: QcRecordRow | null
+  gate: GateResult | null
+  suggestion: { action: 'pass' | 'revise' | 'rollback' | 'abort'; target_round_no: number | null; reason: string } | null
+}
+export interface AssetPipelineRunSummary {
+  id: number
+  status: 'queued' | 'processing' | 'completed' | 'failed' | 'cancelled'
+  purpose: 'precision' | 'beautify'
+  step: string | null
+  asset_kind: string
+  asset_id: number
+  created_at: string
+  updated_at: string
+}
+export interface AssetPipelineRunDetail {
+  run: AssetPipelineRunSummary & {
+    episode_id: number
+    mastra_run_id: string | null
+    error: string | null
+    result: { rollback_to: number | null; final_round_no: number | null } | null
+  }
+  spec: AssetSpecRow | null
+  rounds: AssetPipelineRound[]
+  /** 正在等人工审批的轮次（null = 不在等） */
+  awaiting: { round_id: number; round_no: number } | null
+  sources: AssetSourceRow[]
+}
+export interface AssetBaseCandidate {
+  asset_kind: AssetPipelineKind
+  asset_id: number
+  asset_name: string
+  version_task_id: number
+  path: string
+  width: number | null
+  height: number | null
+  verified: 'faithful' | 'gate_passed' | 'generated'
+}
+
+export const assetPipelineAPI = {
+  start: (data: { asset_kind: AssetPipelineKind; asset_id: number; episode_id: number; purpose?: 'precision' | 'beautify'; config_id?: number; model?: string; text_config_id?: number }) =>
+    api.post<{ run_id: number; mastra_run_id: string }>('/asset-pipeline/runs', data),
+  list: (assetKind: AssetPipelineKind, assetId: number) =>
+    api.get<{ runs: AssetPipelineRunSummary[] }>(`/asset-pipeline/runs?asset_kind=${encodeURIComponent(assetKind)}&asset_id=${assetId}`),
+  detail: (runId: number) => api.get<AssetPipelineRunDetail>(`/asset-pipeline/runs/${runId}`),
+  approve: (runId: number, data: { round_id: number; verdict: 'approve' | 'revise' | 'rollback' | 'abort'; selected_violations?: string[]; notes?: string; opened: AssetPipelineOpenedImage[]; override_gate?: boolean }) =>
+    api.post<{ status: string }>(`/asset-pipeline/runs/${runId}/approve`, data),
+  cancel: (runId: number) => api.post<{ cancelled: boolean }>(`/asset-pipeline/runs/${runId}/cancel`),
+  baseCandidates: (episodeId: number) => api.get<{ candidates: AssetBaseCandidate[] }>(`/asset-pipeline/episodes/${episodeId}/base-candidates`),
+  listSources: (assetKind: AssetPipelineKind, assetId: number) =>
+    api.get<{ sources: AssetSourceRow[] }>(`/asset-pipeline/assets/${assetKind}/${assetId}/sources`),
+  addSource: (data: { asset_kind: AssetPipelineKind; asset_id: number; url?: string; local_path?: string; title?: string; artist?: string; license: string; role: AssetSourceRole; era?: string; why_excluded?: string }) =>
+    api.post<{ source: AssetSourceRow }>('/asset-pipeline/asset-sources', data),
+  /** multipart 上传：人工把本地原件直接入库，字段与 JSON 模式同名 */
+  uploadSource: (fd: FormData) => formDataReq<{ source: AssetSourceRow }>('/asset-pipeline/asset-sources', fd),
+  deleteSource: (sourceId: number) => api.del<{ deleted: boolean }>(`/asset-pipeline/asset-sources/${sourceId}`),
 }
 
 // 生成任务列表/详情（图片生成走各资产 API，视频生成走 storyboardAPI.generateVideo 与集级批量）
@@ -877,6 +1067,18 @@ async function uploadReq<T = any>(path: string, file: File): Promise<T> {
   const fd = new FormData()
   fd.append('file', file)
   console.log(`%c[API] %cPOST %c${path} %c${file.name}`, 'color:#888', 'color:#4fc3f7;font-weight:bold', 'color:#ccc', 'color:#888')
+  const resp = await fetch(`${apiBase()}${path}`, { method: 'POST', body: fd })
+  const json = await resp.json()
+  if (!resp.ok || (json.code && json.code >= 400)) {
+    console.log(`%c[API] %cPOST ${path} %c${resp.status}`, 'color:#888', 'color:#ef5350', 'color:#ef5350;font-weight:bold')
+    throw new Error(json.message || `${resp.status}`)
+  }
+  return json.data ?? json
+}
+
+/** multipart 自带 boundary：绝不能手工设 Content-Type，否则后端解析不出 field（见 uploadReq 同口径） */
+async function formDataReq<T>(path: string, fd: FormData): Promise<T> {
+  console.log(`%c[API] %cPOST %c${path} %cmultipart`, 'color:#888', 'color:#4fc3f7;font-weight:bold', 'color:#ccc', 'color:#888')
   const resp = await fetch(`${apiBase()}${path}`, { method: 'POST', body: fd })
   const json = await resp.json()
   if (!resp.ok || (json.code && json.code >= 400)) {
