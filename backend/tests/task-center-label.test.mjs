@@ -45,6 +45,13 @@ test('task labels follow 剧-集-分镜-槽位 numbering', () => {
   assert.equal(noDrama, '《未命名剧集》· 角色 · 未命名')
 })
 
+test('资产审核清单任务（#55）有自己的中文标签', () => {
+  const [review] = run([
+    ['composeTaskLabel', [{ type: 'text', targetKind: 'episode', dramaTitle: '殷墟', episodeNumber: 1, kind: 'asset_review' }]],
+  ])
+  assert.equal(review, '《殷墟》E01 · 资产审核清单')
+})
+
 test('episode-level labels are shared by batches and exports', () => {
   const [keyframeBatch, noEpisode] = run([
     ['composeEpisodeLabel', ['鼠妈妈', 12, '关键帧批量']],
