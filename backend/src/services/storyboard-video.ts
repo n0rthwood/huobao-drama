@@ -27,6 +27,7 @@ import {
   targetAssetRefs,
 } from './storyboard-assets.js'
 import { createHash } from 'node:crypto'
+import { videoTaskJunction } from './video-guide-snapshot.js'
 import { refBasename } from './storyboard-keyframes.js'
 import {
   composeTransitionPrompt,
@@ -288,7 +289,7 @@ export async function buildStoryboardVideoRequest(
     aspectRatio: drama?.aspectRatio || '16:9',
     resolution: episode.resolution || undefined,
     configId,
-    ...(keyframes.locked?.hash ? { junction_hash: keyframes.locked.hash, junction_slot: keyframes.locked.slot } : {}),
+    ...(keyframes.locked?.hash && keyframes.locked.slot !== 'mid' ? { junction_hash: keyframes.locked.hash, junction_slot: keyframes.locked.slot } : {}),
   }
 
   // 签名取请求的最终输出，与 sys_task 落库的 params 同一份口径
@@ -355,6 +356,8 @@ export function videoSignatureFromTask(task: {
   const aspectRatio = typeof params.aspectRatio === 'string' ? params.aspectRatio : null
   const duration = Number(params.duration)
   if (!firstFrameUrl || !aspectRatio || !Number.isFinite(duration) || duration <= 0) return null
+  const junction = videoTaskJunction(params)
+  if (!junction && (params.junction_hash !== undefined || params.junction_slot !== undefined || [params.firstFrameUrl, params.lastFrameUrl].some(source => typeof source === 'string' && source.replace(/\\/g, '/').includes('/layer-frames/')))) return null
   return computeVideoSignature({
     prompt: task.prompt,
     firstFrameUrl,
@@ -369,8 +372,7 @@ export function videoSignatureFromTask(task: {
     resolution: typeof params.resolution === 'string' ? params.resolution : null,
     provider: task.provider,
     model: task.model,
-    junction: typeof params.junction_hash === 'string' && typeof params.junction_slot === 'string'
-      ? { hash: params.junction_hash, slot: params.junction_slot } : null,
+    junction,
   })
 }
 

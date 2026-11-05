@@ -31,7 +31,7 @@ export interface BatchScopePreviewItem extends BatchScopeShot {
   status: string
   checked?: boolean
   selectable?: boolean
-  reason?: string
+  reason?: string | null
 }
 
 /** Build the exact execution snapshot from server preview rows, never client media or scope. */

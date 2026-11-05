@@ -102,7 +102,7 @@ export async function previewNarrationFit(storyboardId: number): Promise<Narrati
     availSeconds,
     videoHasAudio,
   })
-  const plan = planCompose({ dv, da, t, fit, maxSeconds })
+  const plan = planCompose({ dv, da, t, fit, maxSeconds, preserveVisualDuration: resolveDramaProjectType(ep.dramaId) === 'documentary' })
   const record = parseFitRecord(sb.narrationFit)
   const padMs = Math.round((fit.padHeadSeconds + fit.padTailSeconds) * 1000)
 
@@ -176,7 +176,7 @@ export async function saveNarrationFit(
     availSeconds,
     videoHasAudio,
   })
-  const plan = planCompose({ dv, da, t, fit, maxSeconds })
+  const plan = planCompose({ dv, da, t, fit, maxSeconds, preserveVisualDuration: resolveDramaProjectType(ep.dramaId) === 'documentary' })
   if (plan.blocked) throw new ComposeBlockedError(plan, sb.storyboardNumber)
 
   record.updated_at = now()

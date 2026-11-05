@@ -255,6 +255,9 @@ export async function saveLayerSegment(
   const baseRef = 'base_ref' in input ? input.base_ref ?? null : existing?.base_ref ?? null
   const warnings = await qualityWarningsOf(layerDoc, timeline, { width: spec.width, height: spec.height })
   const ts = now()
+  const staleReasons = (existing?.stale_reasons || []).filter(reason =>
+    !(reason === SEGMENT_STALE_REASONS.baseRefUnresolved && baseRef)
+    && !(reason === SEGMENT_STALE_REASONS.comboMissing && row.combo))
   if (existing) {
     // 输入变了：旧渲染的签名自然对不上，不需要在这里改 render_signature（新鲜度为读时现算）
     await db.update(schema.storyboardLayerSegments).set({
@@ -263,6 +266,7 @@ export async function saveLayerSegment(
       duration,
       baseRef: baseRef ? JSON.stringify(baseRef) : null,
       qualityWarnings: JSON.stringify(warnings),
+      staleReasons: JSON.stringify(staleReasons),
       updatedAt: ts,
     }).where(eq(schema.storyboardLayerSegments.id, existing.id))
     return {
@@ -273,6 +277,7 @@ export async function saveLayerSegment(
       end_hold: endHoldOf(timeline, duration),
       base_ref: baseRef,
       quality_warnings: warnings,
+      stale_reasons: staleReasons,
       updated_at: ts,
     }
   }
@@ -478,6 +483,8 @@ export function layerSegmentSignatureOf(
 
 /** 已渲染的成品是否仍对得上当前输入（文件在 + 签名一致） */
 export function layerSegmentIsFresh(segment: LayerSegment, spec: Pick<SegmentSpec, 'width' | 'height' | 'fps'>): boolean {
+  // quality_warnings are advisory; only the historical multi-clip migration note is nonblocking here.
+  if (segment.stale_reasons.some(reason => reason !== SEGMENT_STALE_REASONS.migratedMultiClip)) return false
   if (!segment.render_path || !segment.render_signature) return false
   if (!fs.existsSync(getAbsolutePath(segment.render_path))) return false
   return segment.render_signature === layerSegmentSignatureOf(segment, spec)
