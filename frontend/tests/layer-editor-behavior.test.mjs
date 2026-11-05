@@ -4,6 +4,7 @@ import { test } from 'node:test'
 import ts from 'typescript'
 import { nextTick } from 'vue'
 import { clampTimelineToCrop } from '../app/utils/layerQuality.js'
+import { semanticEntries, semanticLayerPatch, anchorState } from '../app/utils/semanticGeometry.js'
 
 // Resolve Nuxt's compile-time aliases while executing the real Vue composables.
 const app = new URL('../app/', import.meta.url)
@@ -80,4 +81,23 @@ test('unsupported glyph warning follows live text and clears on deletion', async
   assert.ok(editor.missingGlyphs.value.includes('≠'))
   editor.patchLayer('pin', {text: '测试'})
   assert.equal(editor.missingGlyphs.value.includes('≠'), false)
+})
+
+test('semantic quick-create and manual reanchor keep whole-image pixel coordinates and distinguish deletion from layer rename', async () => {
+  const entries = semanticEntries({image:{width:4000,height:3000},points:[{id:'p',name:'地点',at:[1000,1500]}]})
+  const patch = semanticLayerPatch(entries[0],1)
+  assert.deepEqual(patch.at,[.25,.5])
+  const editor=useLayerDoc()
+  editor.load(makeDoc())
+  await nextTick()
+  editor.detachAnchors(['pin'])
+  assert.equal(anchorState(editor.doc.value.layers[0],entries,true,1),'manual')
+  editor.reanchorLayer('pin',patch)
+  assert.equal(anchorState(editor.doc.value.layers[0],entries,true,1),'anchored')
+  editor.patchLayer('pin',{name:'Editable layer title'})
+  assert.equal(anchorState(editor.doc.value.layers[0],entries,true,1),'anchored')
+  assert.equal(anchorState(editor.doc.value.layers[0],[],true,1),'unlink')
+  assert.equal(anchorState(editor.doc.value.layers[0],[{...entries[0],name:'Renamed source'}],true,1),'unlink')
+  editor.undo()
+  assert.equal(anchorState(editor.doc.value.layers[0],entries,true,1),'manual')
 })
