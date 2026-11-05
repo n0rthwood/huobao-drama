@@ -13,7 +13,7 @@ export type GateKey = 'assets' | 'design' | 'production' | 'final' | 'poster' | 
 export interface EpisodeGates {
   project_type: 'drama' | 'documentary'
   script: { confirmed: boolean; confirmed_at: string | null }
-  assets: { review_status: 'none' | 'running' | 'pending' | 'passed'; stale_reasons: string[] }
+  assets: { review_status: 'none' | 'running' | 'pending' | 'passed'; stale_reasons: string[]; missing: number }
   design: { confirmed: number; total: number }
   production: { ready: number; total: number }
   final: { fresh: number; total: number }
@@ -1064,6 +1064,64 @@ export const assetPipelineAPI = {
   /** multipart 上传：人工把本地原件直接入库，字段与 JSON 模式同名 */
   uploadSource: (fd: FormData) => formDataReq<{ source: AssetSourceRow }>('/asset-pipeline/asset-sources', fd),
   deleteSource: (sourceId: number) => api.del<{ deleted: boolean }>(`/asset-pipeline/asset-sources/${sourceId}`),
+}
+
+/** 资产审核清单（Issue #55）：纪录片「资产 · 审核清单」页签的全部接口 */
+export type AssetReviewNeedKind = 'character' | 'scene' | 'prop' | 'prop_faithful' | 'exposition' | 'none'
+export type AssetReviewItemStatus = 'missing' | 'have' | 'added' | 'ignored' | 'not_needed'
+export interface AssetReviewItem {
+  id: number
+  segment_no: number
+  info_point: string
+  need_kind: AssetReviewNeedKind
+  need_desc: string
+  status: AssetReviewItemStatus
+  asset_kind: 'character' | 'scene' | 'prop' | null
+  asset_id: number | null
+  asset_name: string | null
+  semantic_id: string | null
+  semantic_name: string | null
+  semantics_needs_review: boolean
+  reason: string | null
+  decided_at: string | null
+}
+export interface AssetReviewSegment {
+  segment_no: number
+  narration_excerpt: string
+  counts: { total: number; missing: number; needs_review: number }
+  items: AssetReviewItem[]
+}
+export interface AssetReviewPayload {
+  status: 'none' | 'running' | 'pending' | 'passed'
+  auto_segmented: boolean
+  run: {
+    task_id: number
+    status: 'running' | 'done' | 'error'
+    progress: { completed: number; failed: number; total: number } | null
+    error: string | null
+    diff: { kept: number; added: number; removed: number; changed_item_ids: number[] } | null
+  } | null
+  counts: Record<AssetReviewItemStatus | 'total', number>
+  stale: { stale: boolean; reasons: string[] }
+  segments: AssetReviewSegment[]
+}
+export interface AssetReviewItemPatch {
+  status: AssetReviewItemStatus
+  asset_kind?: 'character' | 'scene' | 'prop' | null
+  asset_id?: number | null
+  semantic_id?: string | null
+  reason?: string | null
+}
+
+export const assetReviewAPI = {
+  get: (episodeId: number) => api.get<AssetReviewPayload>(`/episodes/${episodeId}/asset-review`),
+  run: (episodeId: number, opts: { model?: string; configId?: number } = {}) =>
+    api.post<{ started: boolean; task_id: number }>(`/episodes/${episodeId}/asset-review/run`, {
+      model: opts.model || undefined,
+      config_id: opts.configId || undefined,
+    }),
+  updateItem: (itemId: number, patch: AssetReviewItemPatch) => api.put<AssetReviewItem>(`/asset-review/items/${itemId}`, patch),
+  extract: (itemId: number) => api.post<{ task_id: number | null; asset_name: string }>(`/asset-review/items/${itemId}/extract`),
 }
 
 // 生成任务列表/详情（图片生成走各资产 API，视频生成走 storyboardAPI.generateVideo 与集级批量）

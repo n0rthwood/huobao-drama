@@ -2385,12 +2385,83 @@
       "emptyTitle": "照合はまだ開始していません",
       "emptyDesc": "審査リストは「情報ポイント → 必要な素材 → 有/無」を一件ずつ並べます。すべて処置するとショット設計が解除されます。",
       "start": "照合を開始",
-      "startDisabled": "アセット審査リストの実装後に利用できます",
       "statusLabel": "リスト状態：{status}",
       "statusNone": "未開始",
       "statusRunning": "照合中",
       "statusPending": "処置待ち",
-      "statusPassed": "通過"
+      "statusPassed": "通過",
+      "progress": "{decided}/{total} 処置済み",
+      "autoSegmented": "自動分段",
+      "rerun": "台本を再照合",
+      "runStarted": "台本との照合を開始しました",
+      "running": "台本を照合中…",
+      "runningProgress": "照合中 {completed}/{total} 段（失敗 {failed}）",
+      "staleBanner": "前回の照合後に素材ライブラリが変更されました（{reasons}）。再照合を推奨します",
+      "staleReason": {
+        "asset_linked": "素材を関連付け",
+        "asset_unlinked": "素材の関連付けを解除",
+        "version_registered": "新しいバージョンを登録",
+        "semantics_changed": "意味注釈を変更"
+      },
+      "segmentTitle": "第 {n} 段「{excerpt}」",
+      "segmentSummary": "{total} 件 · 欠落 {missing} · 要修正注釈 {review}",
+      "needLine": "必要：{kind}「{desc}」",
+      "needsReviewTag": "⚠ 注釈の修正待ち",
+      "notNeededReason": "レイヤーカードで表現",
+      "extractStarted": "再抽出を開始しました：{name}",
+      "needKind": {
+        "character": "キャラクター",
+        "scene": "シーン",
+        "prop": "小道具",
+        "prop_faithful": "証拠素材",
+        "exposition": "説明素材",
+        "none": "素材不要"
+      },
+      "itemStatus": {
+        "missing": "欠落",
+        "have": "保有",
+        "added": "補充済み",
+        "ignored": "無視",
+        "not_needed": "素材不要"
+      },
+      "filter": {
+        "all": "すべて（{n}）",
+        "missing": "欠落（{n}）",
+        "have": "保有（{n}）",
+        "added": "補充済み（{n}）",
+        "ignored": "無視（{n}）",
+        "not_needed": "素材不要（{n}）"
+      },
+      "action": {
+        "extract": "再抽出",
+        "create": "アップロード / AI 生成",
+        "bind": "既存素材を選ぶ",
+        "ignore": "理由を書いて無視…",
+        "notNeeded": "素材不要にする",
+        "undo": "処置を取り消す"
+      },
+      "ignoreDialog": {
+        "title": "この項目を無視する",
+        "hint": "無視するとこの情報点に対応する画がなくなります。どう代替するか（例：ナレーション＋黒画面）を書いてください。",
+        "placeholder": "例：ナレーション＋黒画面で表現し、素材は探さない",
+        "required": "理由は 5 文字以上必要です"
+      },
+      "bindDialog": {
+        "title": "既存素材を選ぶ",
+        "hint": "本話に関連付け済みの素材から、この情報点を満たすものを選びます。",
+        "placeholder": "選択してください…",
+        "empty": "この要求に合う素材が本話にありません。「アップロード / AI 生成」か「再抽出」を使ってください。"
+      },
+      "gate": {
+        "pending": "未処置の欠落が {n} 件あります —— すべて処置すると「ショット設計」が解除されます",
+        "passed": "審査通過 · ショット設計が解除されました",
+        "next": "次の欠落へ",
+        "locked": "ショット設計へ 🔒",
+        "lockedHint": "リストをすべて処置するとショット設計に進めます",
+        "goDesign": "ショット設計へ",
+        "running": "照合中 —— 今回の照合が終わってから残りを処理してください",
+        "incomplete": "リストが不完全です：前回の照合に失敗した段落があります。台本を再照合してください"
+      }
     },
     "finalStep": {
       "placeholderTitle": "このショットの完成フローはまだ準備できていません"

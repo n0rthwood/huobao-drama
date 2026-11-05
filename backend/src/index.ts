@@ -33,6 +33,7 @@ import layerDocs from './routes/layer-docs.js'
 import clips from './routes/clips.js'
 import assetPipeline from './routes/asset-pipeline.js'
 import designCards, { designCardShots } from './routes/design-cards.js'
+import { episodeAssetReview, assetReviewItems } from './routes/asset-review.js'
 import { requestLogger, errorHandler } from './middleware/logger.js'
 import { db, schema } from './db/index.js'
 import { and, eq, isNull, ne, or } from 'drizzle-orm'
@@ -88,6 +89,7 @@ api.route('/dramas', dramas)
 api.route('/episodes', episodes)
 api.route('/episodes', posters)
 api.route('/episodes', designCards)
+api.route('/episodes', episodeAssetReview)
 api.route('/storyboards', storyboards)
 api.route('/storyboards', designCardShots)
 api.route('/scenes', scenes)
@@ -113,6 +115,7 @@ api.route('/research', research)
 api.route('/layer-docs', layerDocs)
 api.route('/clips', clips)
 api.route('/asset-pipeline', assetPipeline)
+api.route('/asset-review', assetReviewItems)
 
 app.route('/api/v1', api)
 

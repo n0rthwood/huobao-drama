@@ -108,7 +108,12 @@
           <span class="dim">{{ t('episode.documentary.semantics.groupCount', { n: doc[group].length }) }}</span>
         </div>
         <ul v-if="doc[group].length" class="sem-list">
-          <li v-for="(entry, index) in doc[group]" :key="entry.id || `${group}-${index}`" :class="['sem-item', entry.needs_review && 'is-review']">
+          <li
+            v-for="(entry, index) in doc[group]"
+            :key="entry.id || `${group}-${index}`"
+            :data-semantic-id="entry.id || ''"
+            :class="['sem-item', entry.needs_review && 'is-review', entry.id && entry.id === props.focusSemanticId && 'is-focused']"
+          >
             <input
               class="input sem-item-input"
               :value="group === 'labels' ? entry.text : entry.name"
@@ -204,6 +209,8 @@ const props = defineProps({
   // 道具行里的 semantics 原值（JSON 字符串 / 对象 / null 都接受），接口返回值优先
   semantics: { type: [String, Object], default: null },
   imageVersions: { type: Array, default: () => [] },
+  /** 打开后要滚动并高亮的条目 id（#55 审核清单直达用）；为空时行为与改动前逐字一致 */
+  focusSemanticId: { type: String, default: '' },
 })
 
 const emit = defineEmits(['update', 'preview'])
@@ -479,7 +486,14 @@ watch(() => props.propId, () => {
   load()
 })
 
-onMounted(load)
+onMounted(async () => {
+  await load()
+  // 审核清单直达：等列表渲染出来再滚到那条
+  if (props.focusSemanticId) {
+    await nextTick()
+    document.querySelector(`[data-semantic-id="${props.focusSemanticId}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
+})
 onBeforeUnmount(() => { stopped = true; stopAutoPoll() })
 </script>
 
@@ -619,6 +633,7 @@ onBeforeUnmount(() => { stopped = true; stopAutoPoll() })
 }
 /* 待人工修正：整行描边提醒 + 文字徽标（Issue #47） */
 .sem-item.is-review { border-color: #d98324; background: color-mix(in srgb, #d98324 8%, var(--surface-soft)); }
+.sem-item.is-focused { outline: 2px solid var(--accent, #4fc3f7); outline-offset: 1px; }
 .sem-review { border: 1px solid #d98324; color: #d98324; }
 .sem-review-banner {
   margin: 6px 0 0;

@@ -2385,12 +2385,83 @@
       "emptyTitle": "尚未开始对照",
       "emptyDesc": "资产审核清单会逐条列出「信息点 → 需要的素材 → 有/缺」，全部处置后才解锁分镜设计。",
       "start": "开始对照",
-      "startDisabled": "对照功能将在资产审核清单上线后可用",
       "statusLabel": "清单状态：{status}",
       "statusNone": "未开始",
       "statusRunning": "对照中",
       "statusPending": "待处置",
-      "statusPassed": "已通过"
+      "statusPassed": "已通过",
+      "progress": "{decided}/{total} 已处置",
+      "autoSegmented": "自动分段",
+      "rerun": "重新对照剧本",
+      "runStarted": "已开始对照剧本",
+      "running": "正在对照剧本…",
+      "runningProgress": "对照中 {completed}/{total} 段（失败 {failed}）",
+      "staleBanner": "资产库在上次对照后有变更（{reasons}），建议重新对照",
+      "staleReason": {
+        "asset_linked": "新增关联资产",
+        "asset_unlinked": "取消关联资产",
+        "version_registered": "登记了新版本",
+        "semantics_changed": "语义标注有改动"
+      },
+      "segmentTitle": "第 {n} 段 「{excerpt}」",
+      "segmentSummary": "{total} 项 · {missing} 缺失 · {review} 待修正标注",
+      "needLine": "需要：{kind}「{desc}」",
+      "needsReviewTag": "⚠ 标注待修正",
+      "notNeededReason": "由图层卡片表达",
+      "extractStarted": "已发起补提取：{name}",
+      "needKind": {
+        "character": "角色",
+        "scene": "场景",
+        "prop": "道具",
+        "prop_faithful": "证据素材",
+        "exposition": "说明素材",
+        "none": "无需素材"
+      },
+      "itemStatus": {
+        "missing": "缺失",
+        "have": "已有",
+        "added": "已补",
+        "ignored": "已忽略",
+        "not_needed": "无需素材"
+      },
+      "filter": {
+        "all": "全部（{n}）",
+        "missing": "缺失（{n}）",
+        "have": "已有（{n}）",
+        "added": "已补（{n}）",
+        "ignored": "已忽略（{n}）",
+        "not_needed": "无需素材（{n}）"
+      },
+      "action": {
+        "extract": "补提取",
+        "create": "上传 / AI生成",
+        "bind": "选择已有资产",
+        "ignore": "忽略并说明…",
+        "notNeeded": "标为无需素材",
+        "undo": "撤销处置"
+      },
+      "ignoreDialog": {
+        "title": "忽略这条清单项",
+        "hint": "忽略意味着这条信息点不会有对应画面，请写明怎么替代（例如改用旁白 + 黑场）。",
+        "placeholder": "例：改用旁白 + 黑场表达，不另找素材",
+        "required": "理由至少 5 个字"
+      },
+      "bindDialog": {
+        "title": "选择已有资产",
+        "hint": "从本集已关联的资产里选一个来满足这条信息点。",
+        "placeholder": "请选择…",
+        "empty": "本集还没有符合这条需求的资产，请改用「上传 / AI生成」或「补提取」。"
+      },
+      "gate": {
+        "pending": "还有 {n} 项缺失未处置 —— 全部处置后解锁「分镜设计」",
+        "passed": "审核通过 · 已解锁分镜设计",
+        "next": "去处理下一条缺失",
+        "locked": "进入分镜设计 🔒",
+        "lockedHint": "清单全部处置后才能进入分镜设计",
+        "goDesign": "进入分镜设计",
+        "running": "对照进行中 —— 等本次对照跑完再处置剩余条目",
+        "incomplete": "清单不完整：上次对照有失败的段落，请重新对照剧本"
+      }
     },
     "finalStep": {
       "placeholderTitle": "该镜成品流程尚未就绪"

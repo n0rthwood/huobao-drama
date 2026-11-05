@@ -457,6 +457,32 @@ export const keyframeBatches = sqliteTable('keyframe_batches', {
   updatedAt: text('updated_at').notNull(),
 })
 
+// 资产审核清单条目（Issue #55）：一条 = 旁白里的一个信息点需要的一份素材。
+// 唯一键 (episode_id, fingerprint) 保证「重新对照」按指纹幂等 upsert 并保留处置结果。
+export const assetReviewItems = sqliteTable('asset_review_items', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  episodeId: integer('episode_id').notNull(),
+  /** 产生该条目的那次对照任务 sys_task.id */
+  runId: integer('run_id').notNull(),
+  /** 旁白稿第几段（1 起）；只用于展示与分组，不进指纹 */
+  segmentNo: integer('segment_no').notNull(),
+  narrationExcerpt: text('narration_excerpt').notNull(),
+  infoPoint: text('info_point').notNull(),
+  /** character | scene | prop | prop_faithful | exposition | none */
+  needKind: text('need_kind').notNull(),
+  needDesc: text('need_desc').notNull(),
+  /** missing | have | added | ignored | not_needed */
+  status: text('status').notNull().default('missing'),
+  assetKind: text('asset_kind'),
+  assetId: integer('asset_id'),
+  semanticId: text('semantic_id'),
+  reason: text('reason'),
+  decidedAt: text('decided_at'),
+  fingerprint: text('fingerprint').notNull(),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+})
+
 export const props = sqliteTable('props', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   dramaId: integer('drama_id').notNull(),

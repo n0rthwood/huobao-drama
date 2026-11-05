@@ -206,7 +206,12 @@
           </div>
           <AssetReviewPanel
             v-if="prodTab === 'assets' && assetTab === 'review' && isDocumentaryProject"
+            :episode-id="epId"
             :review="gateState.assets"
+            @update:status="refreshGates()"
+            @open-asset="openAssetFromReview"
+            @create-asset="openAssetCreateFromReview"
+            @goto-design="prodTab = 'design'"
           />
           <!-- Sub: Assets -->
           <div v-if="prodTab === 'assets' && !(isDocumentaryProject && assetTab === 'review')" class="prod-content">
@@ -942,6 +947,7 @@
                 :faithful-source="assetDetail.item.faithful_source ?? null"
                 :semantics="assetDetail.item.semantics ?? null"
                 :image-versions="assetVersions(assetDetail.item)"
+                :focus-semantic-id="focusSemanticId"
                 @update="onAssetSemanticsUpdate(assetDetail.item, $event)"
                 @preview="openImageViewer"
               />
@@ -1977,6 +1983,9 @@ function onSceneTimePreset(value) {
   assetDetailDraft.value.time = value
 }
 
+/** 语义面板要滚动并高亮的条目 id（审核清单的「标注待修正」直达用；为空与改动前逐字一致） */
+const focusSemanticId = ref('')
+
 function openAssetDetail(type, item) {
   if (!item) return
   assetDetail.value = { open: true, type, item }
@@ -2001,6 +2010,7 @@ function openPoolAssetDetail(asset) {
 }
 
 function closeAssetDetail() {
+  focusSemanticId.value = ''
   assetDetail.value = { open: false, type: '', item: null }
   assetDetailDraft.value = { appearance: '', styling: '', prompt: '', lighting: '', description: '', time: '' }
   assetPromptDraft.value = ''
@@ -2046,9 +2056,21 @@ const assetCreate = ref({ open: false, type: 'character', saving: false })
 const assetCreateDraft = ref({})
 const assetCreateTypeLabel = computed(() => assetKindLabel(assetCreate.value.type))
 
-function openAssetCreate(type) {
+function openAssetCreate(type, prefill = null) {
   assetCreateDraft.value = { name: '', role: '', appearance: '', styling: '', location: '', time: '', prompt: '', lighting: '', type: '', description: '' }
-  assetCreate.value = { open: true, type, saving: false }
+  // 审核清单（#55）的「上传 / AI 生成」带着条目预填进来：名称 = 需要的素材描述
+  if (prefill?.name) {
+    if (type === 'scene') assetCreateDraft.value.location = prefill.name
+    else assetCreateDraft.value.name = prefill.name
+    if (type === 'prop') assetCreateDraft.value.description = prefill.name
+  }
+  assetCreate.value = {
+    open: true,
+    type,
+    saving: false,
+    reviewItemId: prefill?.review_item_id || 0,
+    faithful: !!prefill?.faithful,
+  }
 }
 
 async function saveAssetCreate() {
@@ -2061,18 +2083,43 @@ async function saveAssetCreate() {
   }
   assetCreate.value.saving = true
   try {
-    const base = { drama_id: dramaId, episode_id: epId.value }
-    if (type === 'character') await characterAPI.create({ ...base, name: d.name, role: d.role, appearance: d.appearance, styling: d.styling })
-    else if (type === 'scene') await sceneAPI.create({ ...base, location: d.location, time: d.time, prompt: d.prompt, lighting: d.lighting })
-    else await propAPI.create({ ...base, name: d.name, type: d.type, description: d.description })
+    // 带 asset_review_item_id 时服务端保存后直接把那条缺失项置「已补」并绑定（#55）
+    const base = { drama_id: dramaId, episode_id: epId.value, asset_review_item_id: assetCreate.value.reviewItemId || undefined }
+    let createdRow = null
+    if (type === 'character') createdRow = await characterAPI.create({ ...base, name: d.name, role: d.role, appearance: d.appearance, styling: d.styling })
+    else if (type === 'scene') createdRow = await sceneAPI.create({ ...base, location: d.location, time: d.time, prompt: d.prompt, lighting: d.lighting })
+    else createdRow = await propAPI.create({ ...base, name: d.name, type: d.type, description: d.description, faithful: assetCreate.value.faithful || undefined })
     toast.success(t('episode.create.created', { type: assetCreateTypeLabel.value }))
+    const fromReview = !!assetCreate.value.reviewItemId
     assetCreate.value.open = false
     await refresh()
+    // 从审核清单来的：直接打开新资产详情，用户接着上传原件 / 生图
+    if (fromReview && createdRow?.id) openAssetDetailById(type, createdRow.id)
+    if (fromReview) refreshGates()
   } catch (e) {
     toastError(e)
   } finally {
     assetCreate.value.saving = false
   }
+}
+
+/** 审核清单 → 打开资产详情（可带语义条目聚焦） */
+function openAssetDetailById(type, id, semanticId = null) {
+  const list = type === 'character' ? chars.value : type === 'scene' ? scenes.value : propItems.value
+  const item = list.find(x => x.id === Number(id))
+  if (!item) return
+  focusSemanticId.value = semanticId || ''
+  openAssetDetail(type, item)
+}
+
+function openAssetFromReview(payload) {
+  if (!payload?.kind || !payload?.id) return
+  openAssetDetailById(payload.kind, payload.id, payload.semantic_id || null)
+}
+
+function openAssetCreateFromReview(payload) {
+  if (!payload?.kind) return
+  openAssetCreate(payload.kind, payload)
 }
 
 // ─── 删除资产 ────────────────────────────────────────────────

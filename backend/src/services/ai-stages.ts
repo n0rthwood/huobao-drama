@@ -62,6 +62,8 @@ export const AI_STAGES = {
   asset_research: { vision: false, label: '资产资料研究' },
   /** 资产事实表（Issue #56）：资料 → 可逐条机检的 must_have / forbidden / tolerances */
   asset_spec: { vision: false, label: '资产事实表' },
+  /** 资产审核清单（Issue #55）：输入是旁白稿文本 + 本集资产名/语义条目名清单，不读图 */
+  asset_review: { vision: false, label: '资产审核清单' },
 } as const satisfies Record<string, AiStageSpec>
 
 export type AiStage = keyof typeof AI_STAGES
@@ -85,6 +87,7 @@ export const AI_CALL_SITES: Record<string, AiStage[]> = {
   'services/transition-agent.ts': ['transition_writer'],
   'services/narration-script.ts': ['narration_writer'],
   'services/task-retry.ts': ['script_rewriter', 'storyboard_breaker', 'storyboard_breaker_documentary'],
+  'services/asset-review.ts': ['asset_review'],
   'services/adapters/h3-prompt.ts': ['h3_prompt'],
   'services/asset-semantics-auto.ts': ['asset_semantics'],
   // 资产流水线（#56）：资料研究 / 事实表（纯文本）+ QC 清单核验（视觉）

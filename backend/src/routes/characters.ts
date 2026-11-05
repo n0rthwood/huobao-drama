@@ -16,6 +16,7 @@ import { planFinalPromptWrite, promptSourceChanged } from '../services/asset-pro
 import { mountReExtractRoute } from './asset-reextract.js'
 import { addArchivalImage, removeArchivalImage } from '../services/archival-images.js'
 import { getPortraitAppearanceStatus, startPortraitAppearance, type StartPortraitAppearanceResult } from '../services/portrait-appearance.js'
+import { bindCreatedAssetToReviewItem, onAssetRemoved, onEpisodeAssetLinkChanged } from '../services/asset-review.js'
 import { StageVisionUnavailableError } from '../services/ai-stages.js'
 
 const app = new Hono()
@@ -116,6 +117,13 @@ app.post('/', async (c) => {
       await db.insert(schema.episodeCharacters).values({ episodeId: Number(body.episode_id), characterId: charId, createdAt: ts })
     }
   }
+  // 审核清单（#55）：带 asset_review_item_id 的新建 = 「上传 / AI 生成」补齐路径，
+  // 保存成功即把那条缺失项置 added 并绑定；否则只记一次资产库变更横幅。
+  if (body.episode_id) {
+    const itemId = Number(body.asset_review_item_id)
+    if (Number.isInteger(itemId) && itemId > 0) await bindCreatedAssetToReviewItem(itemId, 'character', charId)
+    else await onEpisodeAssetLinkChanged(Number(body.episode_id), 'asset_linked')
+  }
   const [row] = await db.select().from(schema.characters).where(eq(schema.characters.id, charId))
   return created(c, toSnakeCase(row))
 })
@@ -170,6 +178,8 @@ app.delete('/:id', async (c) => {
   deleteAllReferenceImages('character', id)
   // 集关联/分镜绑定不保留：残留行会让提取与 @引用 继续看到已删角色（Issue #15）
   await deleteAssetLinks('character', id)
+  // 审核清单（#55）：绑定目标消失 → 相关条目回 missing，门禁重新上锁
+  await onAssetRemoved('character', id)
   return success(c)
 })
 

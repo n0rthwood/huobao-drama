@@ -24,6 +24,7 @@ import {
 } from '../services/asset-semantics.js'
 import { getSemanticsAutoStatus, startSemanticsAuto } from '../services/asset-semantics-auto.js'
 import { resolveStageModel, StageVisionUnavailableError } from '../services/ai-stages.js'
+import { bindCreatedAssetToReviewItem, onAssetLibraryChanged, onAssetRemoved, onEpisodeAssetLinkChanged } from '../services/asset-review.js'
 import { MapSpecValidationError, normalizeMapSpec, parseMapSpec } from '../services/map-base-render.js'
 import { renderAndRegisterMapBase, suggestMapPlaces } from '../services/asset-pipeline/map-asset.js'
 import { getAbsolutePath } from '../utils/storage.js'
@@ -64,6 +65,13 @@ app.post('/', async (c) => {
       await db.insert(schema.episodeProps).values({ episodeId: Number(body.episode_id), propId, createdAt: ts })
     }
   }
+  // 审核清单（#55）：带 asset_review_item_id 的新建 = 「上传 / AI 生成」补齐路径，
+  // 保存成功即把那条缺失项置 added 并绑定；否则只记一次资产库变更横幅。
+  if (body.episode_id) {
+    const itemId = Number(body.asset_review_item_id)
+    if (Number.isInteger(itemId) && itemId > 0) await bindCreatedAssetToReviewItem(itemId, 'prop', propId)
+    else await onEpisodeAssetLinkChanged(Number(body.episode_id), 'asset_linked')
+  }
   const [row] = await db.select().from(schema.props).where(eq(schema.props.id, propId))
   return created(c, toSnakeCase(row))
 })
@@ -76,6 +84,8 @@ app.delete('/:id', async (c) => {
   deleteAllReferenceImages('prop', id)
   // 集关联/分镜绑定不保留：残留行会让提取与 @引用 继续看到已删道具（Issue #15）
   await deleteAssetLinks('prop', id)
+  // 审核清单（#55）：绑定目标消失 → 相关条目回 missing，门禁重新上锁
+  await onAssetRemoved('prop', id)
   return success(c)
 })
 
@@ -114,6 +124,8 @@ app.put('/:id', async (c) => {
     at: updates.updatedAt,
   }))
   await db.update(schema.props).set(updates).where(eq(schema.props.id, id))
+  // 审核清单（#55）：关掉忠实标记会让 prop_faithful 条目的绑定失效（硬退化）
+  if (updates.faithful === 0 && Number(prop.faithful) === 1) await onAssetRemoved('prop', id)
   const [updated] = await db.select().from(schema.props).where(eq(schema.props.id, id))
   return success(c, toSnakeCase(updated))
 })
@@ -247,6 +259,8 @@ app.put('/:id/semantics', async (c) => {
     const doc = normalizeSemantics(raw)
     await savePropSemantics(id, doc)
     logTaskSuccess('Semantics', 'manual-save', { propId: id, ...countSemantics(doc) })
+    // 审核清单（#55）：语义条目变了 → 相关条目重新校验 + 记横幅理由
+    await onAssetLibraryChanged('prop', id, 'semantics_changed')
     return success(c, { semantics: doc })
   } catch (err) {
     if (err instanceof SemanticsValidationError) return badRequest(c, err.message)

@@ -181,6 +181,26 @@ async function readLocalizedSkill(relPath: string, lang: string): Promise<string
   }
 }
 
+/**
+ * 单个技能目录的正文（Issue #55）：不属于任何 Agent 的技能（如 `documentary/asset-review`）
+ * 由服务直接读取拼进 system 消息，因此不进 AGENT_SKILL_MAP，也就不污染其它 Agent 的注入内容。
+ * lang 非 zh 时优先 `SKILL.<lang>.md`，缺失回退中文 `SKILL.md`；目录不存在返回空串。
+ */
+export async function loadSkillDoc(relPath: string, lang?: string | null): Promise<string> {
+  if (lang && lang !== 'zh') {
+    const localized = await readLocalizedSkill(relPath, lang)
+    if (localized) return localized
+  }
+  const fsm = skillsManagerWorkspace.filesystem!
+  const p = `skills/${relPath}/SKILL.md`
+  try {
+    if (!await fsm.exists(p)) return ''
+    return stripFrontmatter(String(await fsm.readFile(p, { encoding: 'utf-8' })))
+  } catch {
+    return ''
+  }
+}
+
 /** 读取 Agent 专属技能全文（经 workspace.skills API，保持原注入格式）
  *  AGENT_SKILL_MAP 的目录按前缀匹配：目录自身及其子目录下所有 SKILL.md 都会注入，
  *  因此设置页新建的子技能（如 storyboard-breaker/xxx）无需改代码即可生效。

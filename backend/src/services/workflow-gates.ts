@@ -18,6 +18,7 @@
 import { and, eq, isNull } from 'drizzle-orm'
 
 import { db, schema } from '../db/index.js'
+import { assetReviewCounts, assetReviewGateReason } from './asset-review.js'
 import { composeStatesForEpisode } from './compose-state.js'
 import { resolveDramaProjectType, type ProjectType } from './project-type.js'
 import { now } from '../utils/response.js'
@@ -33,7 +34,8 @@ export type AssetReviewStatus = typeof ASSET_REVIEW_STATUSES[number]
 export interface GateFacts {
   projectType: ProjectType
   script: { confirmed: boolean; confirmed_at: string | null }
-  assets: { review_status: AssetReviewStatus; stale_reasons: string[] }
+  /** `missing` = 还没处置的清单条目数（R2 的 `assetReviewGateReason` 用它组文案） */
+  assets: { review_status: AssetReviewStatus; stale_reasons: string[]; missing: number }
   design: { confirmed: number; total: number }
   production: { ready: number; total: number }
   final: { fresh: number; total: number }
@@ -50,7 +52,6 @@ export interface EpisodeGates extends Omit<GateFacts, 'projectType'> {
 
 const REASON = {
   script: '旁白稿尚未确认：请在「剧本」步骤点「确认旁白稿」',
-  review: '资产审核清单尚未通过：请在「资产 · 审核清单」里处置完所有条目',
   design: '还没有任何一镜的分镜设计被确认：请先在「分镜设计」确认至少一镜',
   production: '还没有任何一镜制作就绪：请先在「分镜制作」完成并确认至少一镜',
   final: '还没有任何一镜的成品是最新的：请先在「视频与成品」合成至少一镜',
@@ -76,7 +77,12 @@ export function computeGates(facts: GateFacts): EpisodeGates {
   // 链条上每一环：先看上游有没有解锁（原因与跳转直接继承上游），再看本环自身条件
   const chain: { key: Exclude<GateKey, 'poster'>; prev: GateKey | null; ok: boolean; reason: string; goto: EpisodeGates['goto'][GateKey] }[] = [
     { key: 'assets', prev: null, ok: facts.script.confirmed, reason: REASON.script, goto: 'script' },
-    { key: 'design', prev: 'assets', ok: facts.assets.review_status === 'passed', reason: REASON.review, goto: 'assets' },
+    {
+      key: 'design', prev: 'assets',
+      ok: facts.assets.review_status === 'passed',
+      reason: assetReviewGateReason(facts.assets.review_status, facts.assets.missing),
+      goto: 'assets',
+    },
     { key: 'production', prev: 'design', ok: facts.design.confirmed > 0, reason: REASON.design, goto: 'design' },
     { key: 'final', prev: 'production', ok: facts.production.ready > 0, reason: REASON.production, goto: 'production' },
     { key: 'export', prev: 'final', ok: facts.final.fresh > 0, reason: REASON.final, goto: 'final' },
@@ -139,6 +145,7 @@ export async function episodeGateFacts(episodeId: number): Promise<GateFacts | n
     assets: {
       review_status: normalizeAssetReviewStatus(ep.assetReviewStatus),
       stale_reasons: parseStaleReasons(ep.assetReviewStaleReasons),
+      missing: projectType === 'documentary' ? assetReviewCounts(episodeId).missing : 0,
     },
     design: { confirmed: rows.filter(sb => sb.designCardStatus === 'confirmed').length, total: rows.length },
     production: { ready: rows.filter(sb => sb.keyframesConfirmed === true).length, total: rows.length },

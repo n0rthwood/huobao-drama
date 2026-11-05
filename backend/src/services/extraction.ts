@@ -13,10 +13,12 @@ import {
   findActiveTextTask,
   findLatestTextTask,
   finishTextTask,
+  patchTextTaskParams,
   textTaskOutcome,
   type TextTaskKind,
 } from './text-task.js'
 import { resolveStageModel } from './ai-stages.js'
+import { onReviewExtractionFinished } from './asset-review.js'
 
 export type ExtractTarget = 'characters' | 'scenes' | 'props'
 export const EXTRACT_TARGETS: ExtractTarget[] = ['characters', 'scenes', 'props']
@@ -66,7 +68,7 @@ export async function startSingleAssetExtraction(
   dramaId: number,
   target: ExtractTarget,
   assetName: string,
-  opts: { model?: string; configId?: number } = {},
+  opts: { model?: string; configId?: number; assetReviewItemId?: number } = {},
 ): Promise<boolean> {
   const label = { characters: '角色', scenes: '场景', props: '道具' }[target]
   const message = `请只针对本集剧本中的${label}「${assetName}」重新提取信息并保存，不要处理其它${label}；`
@@ -80,7 +82,7 @@ async function startExtractorRun(
   dramaId: number,
   target: ExtractTarget,
   message: string,
-  opts: { model?: string; configId?: number; retryOf?: number; singleAssetName?: string } = {},
+  opts: { model?: string; configId?: number; retryOf?: number; singleAssetName?: string; assetReviewItemId?: number } = {},
 ): Promise<boolean> {
   const kind = EXTRACT_TASK_KINDS[target]
   if (await findActiveTextTask(episodeId, kind)) return false
@@ -94,6 +96,8 @@ async function startExtractorRun(
     stageModel: resolved,
     retryOf: opts.retryOf,
   })
+  // 补提取（Issue #55）：记住这次提取是为哪条审核清单条目发起的，完成后按它回链
+  if (opts.assetReviewItemId) await patchTextTaskParams(taskId, { assetReviewItemId: opts.assetReviewItemId })
 
   logTaskStart('Extract', target, { episodeId, dramaId, model: opts.model || undefined, configId: opts.configId || undefined })
   ;(async () => {
@@ -132,6 +136,8 @@ async function startExtractorRun(
         toolCalls: toolNames.join(',') || undefined,
         reply: (result?.text || '').slice(0, 300) || undefined,
       })
+      // 补提取（Issue #55）回链：新资产是否顶上了那条缺失项，由审核清单服务判定
+      if (opts.assetReviewItemId) await onReviewExtractionFinished(opts.assetReviewItemId)
     })
     .catch(async (err: unknown) => {
       const message = err instanceof Error ? err.message : '提取失败'
