@@ -9,6 +9,7 @@
 import crypto from 'crypto'
 import type { VoiceParams } from './narration-voice-params.js'
 import { parseNarrationMarkup, pauseSeconds, phonemeDisablesNormalize, spokenText } from './narration-markup.js'
+import { shotMaxSeconds } from './shot-duration.js'
 
 /** TTS 服务实测的单段字数硬上限（VoxCPM2 `limits.max_segment_chars`） */
 export const MAX_NARRATION_CHARS = 80
@@ -67,6 +68,9 @@ export interface NarrationComposedMeta {
   /** 合成采用的转场偏移量 T（秒）与它的来源 */
   transition_t: number
   transition_t_source: 'task' | 'review' | 'none'
+  layer_duration_s?: number
+  generated_duration_s?: number
+  junction_s?: number | null
 }
 
 /** 一段确定性片段在快照里的身份：渲染产物路径 + 渲染签名（#50） */
@@ -91,15 +95,11 @@ export interface ComposeInputParts {
   fit_key: string
   /** 生效的转场偏移 T（秒）；纯画面镜头不做偏移，恒为 0 */
   transition_t: number
-  /**
-   * 确定性片段（#50）：三个位置各一项，`{ src, signature }`，没有片段为 null。
-   * `replace` 时 `video_src` 指向片段文件本身；`pre`/`post` 时 `video_src` 仍是模型视频，
-   * 所以**必须**把片段单独记进快照——否则只换片段不换模型视频就看不出变化。
-   * v2 快照没有这三项（读出来是 undefined），按 null 比较。
-   */
-  replace_clip?: ComposeClipPart | null
-  pre_clip?: ComposeClipPart | null
-  post_clip?: ComposeClipPart | null
+  /** Documentary v4 only. Absent for legacy drama v2. */
+  combo?: 'A' | 'B' | 'C' | 'D'
+  layer_segment?: ComposeClipPart | null
+  junction_hash?: string | null
+  video_task_id?: number | null
 }
 
 export interface NarrationMeta {
@@ -203,6 +203,7 @@ export function narrationIssues(input: {
   narrationText: string | null | undefined
   meta: NarrationMeta
   tailPadSeconds?: number
+  combo?: string | null
   /** 本镜生效的文本规范化（#35）；不传则不检查规范化相关警告 */
   normalize?: boolean
 }): NarrationBlockIssue[] {
@@ -223,6 +224,7 @@ export function narrationIssues(input: {
   }
   const chars = narrationCharCount(text)
   const tailPad = input.tailPadSeconds ?? DEFAULT_TAIL_PAD_SECONDS
+  const maxSeconds = shotMaxSeconds(input.combo)
 
   if (chars > MAX_NARRATION_CHARS) {
     issues.push({
@@ -233,11 +235,11 @@ export function narrationIssues(input: {
     })
   } else if (input.meta.audio && !isVoiceStale(text, input.meta)) {
     const budget = input.meta.audio.duration_ms / 1000 + tailPad
-    if (budget > MAX_SHOT_SECONDS + 1e-6) {
+    if (budget > maxSeconds + 1e-6) {
       issues.push({
         code: 'narration_too_long',
         severity: 'block',
-        message: `实测配音 ${(input.meta.audio.duration_ms / 1000).toFixed(1)} 秒 + 尾部留白 ${tailPad} 秒 = ${budget.toFixed(1)} 秒，超过镜头上限 ${MAX_SHOT_SECONDS} 秒：请改写旁白文本（建议 ≤${suggestedCharsFor(MAX_SHOT_SECONDS - tailPad)} 字），或用倍速匹配贴合画面`,
+        message: `实测配音 ${(input.meta.audio.duration_ms / 1000).toFixed(1)} 秒 + 尾部留白 ${tailPad} 秒 = ${budget.toFixed(1)} 秒，超过镜头上限 ${maxSeconds} 秒：请改写旁白文本（建议 ≤${suggestedCharsFor(maxSeconds - tailPad)} 字），或用倍速匹配贴合画面`,
         fields: ['narration_text'],
       })
     }

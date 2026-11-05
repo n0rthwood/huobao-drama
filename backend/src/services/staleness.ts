@@ -12,7 +12,7 @@ import { now } from '../utils/response.js'
 import { parseDesignCard, toDesignCardStatus } from './design-card.js'
 
 /** 会被置为过期的对象类型；R5/R7 在此追加 `layer_segment` / `composite` 等 */
-export type StaleKind = 'design_card'
+export type StaleKind = 'design_card' | 'layer_segment'
 
 /**
  * 把若干分镜的设计卡置为 `stale` 并记下原因。
@@ -20,7 +20,25 @@ export type StaleKind = 'design_card'
  * 返回实际被置为过期的镜数。
  */
 export async function markStale(kind: StaleKind, storyboardIds: number[], reason: string): Promise<number> {
-  if (kind !== 'design_card' || !storyboardIds.length) return 0
+  if (!storyboardIds.length) return 0
+  if (kind === 'layer_segment') {
+    const segments = await db.select().from(schema.storyboardLayerSegments)
+      .where(inArray(schema.storyboardLayerSegments.storyboardId, storyboardIds))
+    for (const segment of segments) {
+      let reasons: string[] = []
+      try { reasons = JSON.parse(segment.staleReasons || '[]') } catch { /* Repair invalid stale metadata. */ }
+      if (!reasons.includes(reason)) reasons.push(reason)
+      await db.update(schema.storyboardLayerSegments).set({ staleReasons: JSON.stringify(reasons), updatedAt: now() })
+        .where(eq(schema.storyboardLayerSegments.id, segment.id))
+    }
+    const rows = await db.select().from(schema.storyboards).where(inArray(schema.storyboards.id, storyboardIds))
+    for (const row of rows) {
+      if (row.combo !== 'C' && row.combo !== 'D') continue
+      await db.update(schema.storyboards).set({ keyframesConfirmed: false, keyframesStaleReason: reason, updatedAt: now() })
+        .where(eq(schema.storyboards.id, row.id))
+    }
+    return segments.length
+  }
   const rows = await db.select().from(schema.storyboards)
     .where(inArray(schema.storyboards.id, storyboardIds))
   let marked = 0

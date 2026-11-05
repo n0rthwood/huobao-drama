@@ -24,7 +24,8 @@ import { blockingIssuesFor, checkStoryboardRefs, describeIssues } from './storyb
 import { isActiveTaskStatus } from './sys-task.js'
 import { logTaskError, logTaskProgress, logTaskStart, logTaskSuccess, logTaskWarn } from '../utils/task-logger.js'
 import { transitionStatus } from './transition.js'
-import { segmentPositionOfCombo } from './layer-segment.js'
+import { scopeFromPreview, type BatchScope } from './batch-scope.js'
+import { resolveDramaProjectType } from './project-type.js'
 
 export type BatchStatus = 'running' | 'done' | 'cancelled'
 export type BatchItemState = 'pending' | 'running' | 'completed' | 'failed' | 'skipped'
@@ -47,6 +48,7 @@ export interface VideoBatchStatus {
   /** 已请求停止：不再提交新的镜头，在跑的那一镜等它跑完后批次转为 cancelled */
   cancel_requested: boolean
   items: VideoBatchItem[]
+  scope: BatchScope
 }
 
 interface BatchOptions {
@@ -54,6 +56,7 @@ interface BatchOptions {
   configId?: number
   /** 停止请求随批次持久化：重启恢复后仍然生效 */
   cancelRequested?: boolean
+  scope?: BatchScope
 }
 
 /** 单镜等待上限：生成链路自身已有界（等待引擎 30 分钟 + 轮询 50 分钟），这里留出余量兜底 */
@@ -97,6 +100,7 @@ function toStatus(row: typeof schema.videoBatches.$inferSelect): VideoBatchStatu
     created_at: row.createdAt,
     updated_at: row.updatedAt,
     items,
+    scope: parseOptions(row.options).scope ?? { included: items.map(({ storyboard_id, storyboard_number }) => ({ storyboard_id, storyboard_number })), excluded: [] },
   }
 }
 
@@ -165,10 +169,9 @@ export interface VideoPreviewItem {
   /**
    * missing=无视频 changed=与所有可比较版本不同 unchanged=命中历史签名 unknown=历史版本缺字段
    * blocked=阻断 skipped=不可生成
-   * deterministic=整镜由确定性片段渲染（#50）：没有模型视频可生成，**永不可勾**，
-   * 也不要求关键帧确认——这类镜头走分镜视频页的「渲染片段」。
+   * excluded=未启用生成段
    */
-  status: 'missing' | 'changed' | 'unchanged' | 'unknown' | 'blocked' | 'skipped' | 'deterministic'
+  status: 'missing' | 'changed' | 'unchanged' | 'unknown' | 'blocked' | 'skipped' | 'excluded'
   /** 默认勾选（missing / changed） */
   checked: boolean
   /** 可勾选（blocked / skipped 不可勾） */
@@ -193,6 +196,12 @@ async function videoBlockReason(
   sb: typeof schema.storyboards.$inferSelect,
   keyframes: Map<number, StoryboardKeyframeState>,
 ): Promise<string | null> {
+  if (!sb || sb.deletedAt) return '镜头不存在'
+  const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, sb.episodeId))
+  if (resolveDramaProjectType(ep?.dramaId) === 'documentary') {
+    if (!sb.combo || sb.designCardStatus !== 'confirmed') return '设计卡未确认'
+    if (sb.combo === 'A') return '未启用生成段'
+  }
   if (!keyframes.get(sb.id)?.confirmed) return '关键帧尚未确认'
   const blocking = blockingIssuesFor(await checkStoryboardRefs(sb), 'video_prompt')
   if (blocking.length) return `视频提示词与参考图不一致：${describeIssues(blocking)}`
@@ -217,23 +226,15 @@ export async function previewEpisodeVideoBatch(
   const keyframes = await loadEpisodeKeyframes(episodeId)
   const active = await loadActiveStoryboardIds()
   // “选择”模式只缩小范围，勾选默认值仍按签名判断
-  const targets = opts.storyboardIds?.length
+  const targets = opts.storyboardIds !== undefined
     ? storyboards.filter(sb => opts.storyboardIds!.includes(sb.id))
     : storyboards
 
   const result: VideoPreviewItem[] = []
   for (const sb of targets) {
     const base = { storyboard_id: sb.id, storyboard_number: sb.storyboardNumber }
-    // 整镜替代的确定性片段（#50）必须在关键帧闸门与适配器校验**之前**分流：
-    // 这类镜头根本没有模型视频可生成，既不该被「关键帧尚未确认」挡住，也不该被提交到远端。
-    if (segmentPositionOfCombo(sb.combo) === 'replace') {
-      result.push({
-        ...base,
-        status: 'deterministic',
-        checked: false,
-        selectable: false,
-        reason: '本镜整镜由确定性片段渲染，请在分镜视频页点「渲染片段」',
-      })
+    if (sb.combo === 'A') {
+      result.push({ ...base, status: 'excluded', checked: false, selectable: false, reason: 'no_generated_segment' })
       continue
     }
     if (active.has(sb.id)) {
@@ -339,12 +340,10 @@ export async function startEpisodeVideoBatch(
   if (!storyboards.length) throw new Error('本集还没有分镜')
   if (!opts.storyboardIds?.length) throw new Error('没有需要生成的分镜')
 
-  // 正在生成中的分镜不纳入批量，避免同一镜被重复提交；
-  // 整镜由确定性片段替代的镜头（#50）也一并剔除——它们在预览里就不可勾，
-  // 这里兜底防止通过接口直接传 id 把它们提交到远端模型。
-  const processingIds = await loadActiveStoryboardIds()
-  const selected = storyboards.filter(sb => opts.storyboardIds.includes(sb.id))
-  const targets = selected.filter(sb => !processingIds.has(sb.id) && segmentPositionOfCombo(sb.combo) !== 'replace')
+  const preview = await previewEpisodeVideoBatch(episodeId, { model: opts.model, configId: opts.configId })
+  const scope = videoBatchScopeOf(preview, opts.storyboardIds)
+  const included = new Set(scope.included.map(item => item.storyboard_id))
+  const targets = storyboards.filter(sb => included.has(sb.id) && opts.storyboardIds.includes(sb.id))
   if (!targets.length) throw new Error('没有需要生成的分镜')
 
   // 预检：关键帧驱动视频必须由支持关键帧引导的模型生成（整批共用同一配置）
@@ -367,7 +366,7 @@ export async function startEpisodeVideoBatch(
   const res = await db.insert(schema.videoBatches).values({
     episodeId,
     status: 'running',
-    options: JSON.stringify({ model: opts.model, configId: opts.configId }),
+    options: JSON.stringify({ model: opts.model, configId: opts.configId, scope }),
     items: JSON.stringify(items),
     createdAt: ts,
     updatedAt: ts,
@@ -382,6 +381,37 @@ export async function startEpisodeVideoBatch(
   void runBatch(batchId)
   const row = await loadBatch(batchId)
   return toStatus(row!)
+}
+
+export function videoBatchScopeOf(items: VideoPreviewItem[], selectedIds?: number[]): BatchScope {
+  return scopeFromPreview(items.map(item => ({
+    ...item,
+    reason: item.status === 'unchanged' ? 'unchanged'
+      : item.status === 'skipped' ? 'generating'
+      : item.reason === '关键帧尚未确认' ? 'keyframes_unconfirmed' : item.reason,
+  })), selectedIds)
+}
+
+export async function retryFailedVideoBatch(episodeId: number): Promise<VideoBatchStatus> {
+  const latest = await getEpisodeVideoBatch(episodeId)
+  if (!latest) throw new Error('没有可重试的批次')
+  const ids = latest.items.filter(item => item.state === 'failed' || item.state === 'skipped').map(item => item.storyboard_id)
+  if (!ids.length) throw new Error('没有失败项可重试')
+  const row = await loadBatch(latest.id)
+  const options = parseOptions(row?.options)
+  return startEpisodeVideoBatch(episodeId, { storyboardIds: ids, model: options.model, configId: options.configId })
+}
+
+export async function previewFailedVideoBatch(episodeId: number) {
+  const previous = await getEpisodeVideoBatch(episodeId)
+  if (!previous) throw new Error('没有可重试的视频批次')
+  const row = await loadBatch(previous.id)
+  const options = parseOptions(row?.options)
+  const ids = previous.items.filter(item => item.state === 'failed' || item.state === 'skipped').map(item => item.storyboard_id)
+  const items = await previewEpisodeVideoBatch(episodeId, { model: options.model, configId: options.configId })
+  const scope = videoBatchScopeOf(items, ids)
+  const included = new Set(scope.included.map(item => item.storyboard_id))
+  return { items: items.map(item => ({ ...item, checked: included.has(item.storyboard_id) })), scope }
 }
 
 /** 等待单镜的 sys_task 到达终态 */

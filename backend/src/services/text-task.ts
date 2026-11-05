@@ -12,6 +12,8 @@ import { now } from '../utils/response.js'
 import { stageModelUsed, type AiStage, type StageModel, type StageModelUsed } from './ai-stages.js'
 import { completionStamp } from './media-time.js'
 import { ACTIVE_TASK_STATUSES, type SysTaskRow } from './sys-task.js'
+import type { BatchScope } from './batch-scope.js'
+import type { VoiceParams } from './narration-voice-params.js'
 
 export type TextTaskKind =
   | 'extract_characters'
@@ -24,6 +26,7 @@ export type TextTaskKind =
   | 'narration_script'
   | 'narration_tts'
   | 'shot_compose'
+  | 'layer_render_batch'
   // 按史料画像补充角色外貌（Issue #32）：按「集 × 类型」判重，与提取任务互不阻塞
   | 'portrait_appearance'
   /** 资产批量生成的父任务（Issue #33）：详细进度在 params.asset_batch */
@@ -47,6 +50,7 @@ export const TEXT_TASK_KINDS: TextTaskKind[] = [
   'extract_characters', 'extract_scenes', 'extract_props',
   'keyframe_prompts', 'video_prompts', 'script_rewrite', 'storyboard_breaker',
   'narration_script', 'narration_tts', 'shot_compose',
+  'layer_render_batch',
   'portrait_appearance',
   'asset_batch',
   'asset_semantics',
@@ -84,6 +88,8 @@ export interface TextTaskProgress {
 export interface TextTaskParams {
   kind: TextTaskKind
   progress?: TextTaskProgress
+  scope?: BatchScope
+  voice_settings?: VoiceParams
   /** 批量任务的处理范围（重试时按同一范围重跑；空表示按默认规则重新挑选） */
   storyboardIds?: number[]
   configId?: number
