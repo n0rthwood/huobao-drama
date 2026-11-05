@@ -1,7 +1,7 @@
 /**
  * 工作台步骤定义与页签重映射（Issue #54）—— URL deeplink 与本地面板记忆共用的唯一纯函数。
  *
- * 纪录片 7 步：剧本 → 资产 → 分镜设计 → 分镜制作 → 视频与成品 → Poster（可选）→ 导出
+ * 纪录片 7 步：剧本 → 资产 → Poster（可选）→ 分镜设计 → 分镜制作 → 视频与成品 → 导出
  * 剧情 6 步（与 #54 之前逐字一致）：剧本 → 资产 → Poster → 分镜关键帧 → 视频制作 → 导出
  */
 
@@ -12,7 +12,7 @@
  */
 export const WORKBENCH_CTX = Symbol('huobao:workbench')
 /** 纪录片的制作页签顺序（资产页另有 cards/review 两个子页签） */
-export const DOC_PROD_TABS = ['assets', 'design', 'production', 'final', 'poster']
+export const DOC_PROD_TABS = ['assets', 'poster', 'design', 'production', 'final']
 /** 剧情的制作页签顺序（改动前即如此） */
 export const DRAMA_PROD_TABS = ['assets', 'poster', 'keyframes', 'videos']
 /** 两类项目的页签并集：URL / localStorage 的合法取值 */
@@ -21,7 +21,7 @@ export const PROD_TAB_KEYS = ['assets', 'poster', 'keyframes', 'videos', 'design
 export const ASSET_SUB_TABS = ['cards', 'review']
 
 /** 纪录片 7 步 / 剧情 6 步的主步骤 id */
-export const DOC_STAGES = ['script', 'assets', 'design', 'production', 'final', 'poster', 'export']
+export const DOC_STAGES = ['script', 'assets', 'poster', 'design', 'production', 'final', 'export']
 export const DRAMA_STAGES = ['script', 'assets', 'poster', 'keyframes', 'videos', 'export']
 
 /** 旧步骤 id → 纪录片新步骤 id（#49/#50 的 expression/layers 与共用的 keyframes/videos） */
