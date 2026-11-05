@@ -51,6 +51,12 @@ export interface MapCanvasSize { width: number; height: number }
 
 export interface MapProjectedPoint { id: string; name: string; at: [number, number] }
 export interface MapProjectedRoute { id: string; name: string; points: Array<[number, number]>; color: string }
+export interface MapContextCoverage {
+  disclaimer: string
+  boundary_features: number
+  city_points: number
+  warnings: string[]
+}
 export interface MapRenderResult {
   /** `static/map-bases/<signature>.png`（STORAGE_ROOT 下的相对路径，getAbsolutePath 口径） */
   path: string
@@ -59,6 +65,8 @@ export interface MapRenderResult {
   sha256: string
   points: MapProjectedPoint[]
   routes: MapProjectedRoute[]
+  /** 现代定位背景，不进入用户审核的 places/routes 语义。 */
+  context: MapContextCoverage
   /** 该签名的文件此前已存在（本次未重新栅格化） */
   reused: boolean
 }
@@ -238,7 +246,7 @@ export function unprojectPixel(spec: MapSpec, size: MapCanvasSize, px: [number, 
 
 // ---------------------------------------------------------------- 数据
 
-type GeoLayerName = 'land' | 'coastline' | 'rivers' | 'lakes' | 'countries'
+type GeoLayerName = 'land' | 'coastline' | 'rivers' | 'lakes' | 'countries' | 'admin1' | 'cities'
 
 const GEO_FILES: Record<GeoLayerName, string> = {
   land: 'ne_50m_land.geojson',
@@ -246,6 +254,8 @@ const GEO_FILES: Record<GeoLayerName, string> = {
   rivers: 'ne_50m_rivers_lake_centerlines.geojson',
   lakes: 'ne_50m_lakes.geojson',
   countries: 'ne_50m_admin_0_countries.geojson',
+  admin1: 'ne_50m_admin_1_states_provinces_lines.geojson',
+  cities: 'ne_50m_populated_places.geojson',
 }
 
 /** geojson 单文件最大 3 MB 级别，解析一次常驻；绝不每次渲染都重读 */
@@ -281,6 +291,37 @@ function loadGeoLayer(name: GeoLayerName): unknown | null {
   const parsed = JSON.parse(fs.readFileSync(file, 'utf8'))
   geoCache.set(name, parsed)
   return parsed
+}
+
+/** 背景数据和语义目标使用相同投影；只裁背景，不修改用户指定的坐标或路线。 */
+function projectContext(spec: MapSpec, size: MapCanvasSize) {
+  const projection = buildProjection(spec, size)
+  const [west, south, east, north] = spec.bbox
+  const sw = projection([west, south])!
+  const ne = projection([east, north])!
+  projection.clipExtent([[sw[0], ne[1]], [ne[0], sw[1]]])
+  const pathGen = geoPath(projection).digits(3)
+  const boundaries = loadGeoLayer('admin1') as { features: Parameters<typeof pathGen>[0][] } | null
+  const boundaryPaths = (boundaries?.features ?? []).map(feature => pathGen(feature)).filter((d): d is string => Boolean(d))
+  const cities = loadGeoLayer('cities') as { features: Array<{ geometry: { type: string; coordinates: [number, number] } }> } | null
+  const cityPoints: Array<[number, number]> = []
+  for (const feature of cities?.features ?? []) {
+    if (feature.geometry.type !== 'Point') continue
+    const [lon, lat] = feature.geometry.coordinates
+    if (lon < west || lon > east || lat < south || lat > north) continue
+    const point = projection([lon, lat])
+    if (point) cityPoints.push([point[0], point[1]])
+  }
+  const warnings: string[] = []
+  if (!boundaryPaths.length) warnings.push('Natural Earth 50m 在当前范围未覆盖省界；不能提供该层地理上下文。')
+  if (!cityPoints.length) warnings.push('Natural Earth 50m 在当前范围未覆盖城市点；未补造城市细节。')
+  const coverage: MapContextCoverage = {
+    disclaimer: '省界与城市背景点仅为 Natural Earth 50m 现代定位参照，不表示古代疆界或已审核的历史地点。',
+    boundary_features: boundaryPaths.length,
+    city_points: cityPoints.length,
+    warnings,
+  }
+  return { boundaryPaths, cityPoints, coverage }
 }
 
 // ---------------------------------------------------------------- 配色与 SVG
@@ -338,6 +379,17 @@ export function buildMapSvg(spec: MapSpec, size: MapCanvasSize): string {
     draw('coastline', `fill="none" stroke="${theme.landStroke}" stroke-width="${round(hair * 2)}" stroke-linejoin="round"`)
   }
 
+  const context = projectContext(spec, size)
+  // 低对比、无文字；背景小点不同于蓝色已指定地点，不能混入 points 语义结果。
+  parts.push(`<g data-context="admin1" fill="none" stroke="${theme.countryStroke}" stroke-opacity="0.65" stroke-width="${round(hair)}">`)
+  for (const d of context.boundaryPaths) parts.push(`<path d="${d}"/>`)
+  parts.push('</g>')
+  parts.push(`<g data-context="cities" fill="${theme.landStroke}" fill-opacity="0.65">`)
+  for (const point of context.cityPoints) {
+    parts.push(`<circle cx="${round(point[0])}" cy="${round(point[1])}" r="${round(Math.max(1.5, hair * 2))}"/>`)
+  }
+  parts.push('</g>')
+
   for (const route of spec.routes) {
     const pts = route.points
       .map(point => projection(point))
@@ -371,6 +423,7 @@ export function mapBaseSignature(spec: MapSpec, size: MapCanvasSize): string {
   // 字段顺序固定，避免对象字面量书写顺序影响签名
   const canonical = JSON.stringify({
     v: spec.version,
+    renderer: 2,
     p: spec.projection.type,
     b: spec.bbox,
     l: [spec.layers.land, spec.layers.coastline, spec.layers.rivers, spec.layers.lakes, spec.layers.countries],
@@ -437,6 +490,7 @@ export async function renderMapBase(spec: MapSpec, opts?: Partial<MapCanvasSize>
     sha256: crypto.createHash('sha256').update(buffer).digest('hex'),
     points,
     routes,
+    context: projectContext(spec, size).coverage,
     reused,
   }
 }

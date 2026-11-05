@@ -1135,6 +1135,7 @@
       "issue": {
         "combo_missing": "还没有选择段组合",
         "budget_over_layer": "图层段超过 30 秒上限",
+        "budget_missing": "请填写每个启用段的时长预算",
         "budget_over_gen": "生成段超过 15 秒上限",
         "budget_under_narration": "总时长装不下旁白，需加长段或精简画面",
         "missing_base": "图层段还没有底图",
@@ -1145,10 +1146,18 @@
         "budget_tight": "时长余量偏紧",
         "unresolved_ref": "有引用解析不到对应素材或条目"
       },
+      "migrationComboUnresolved": "旧分镜的段组合没有已定义的迁移映射。可恢复内容已保留，请显式重选组合并审阅设计卡后确认。",
+      "migrationComboUnresolvedShort": "旧设计无法确定段组合，请重新选择",
+      "migratedFromIntent": "已迁移旧设计，请审阅后确认",
       "budget": {
         "layerSegment": "▣ 图层段",
         "genSegment": "▶ 生成段",
         "total": "合计 {n}s",
+        "totalMissing": "合计 —",
+        "comboMissing": "尚未选择段组合",
+        "valuesMissing": "请填写每个启用段的时长预算",
+        "invalid": "每个启用段的时长预算必须大于 0",
+        "headroomMissing": "余量 —",
         "limitLayer": "图层段上限 {n}s",
         "limitGen": "生成段上限 {n}s",
         "estimate": "估 {n}s",

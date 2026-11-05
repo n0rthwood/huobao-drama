@@ -1135,6 +1135,7 @@
       "issue": {
         "combo_missing": "セグメント構成が未選択です",
         "budget_over_layer": "レイヤーセグメントが 30 秒の上限を超えています",
+        "budget_missing": "有効な各セグメントの尺予算を入力してください",
         "budget_over_gen": "生成セグメントが 15 秒の上限を超えています",
         "budget_under_narration": "合計尺がナレーションに足りません。セグメントを伸ばすか画面を整理してください",
         "missing_base": "レイヤーセグメントにベース画像がありません",
@@ -1145,10 +1146,18 @@
         "budget_tight": "尺の余裕が少なめです",
         "unresolved_ref": "素材や項目に解決できない参照があります"
       },
+      "migrationComboUnresolved": "旧ショットのセグメント構成には移行先の定義がありません。復元可能な内容は保持されています。構成を明示的に選び直し、設計カードを確認してから確定してください。",
+      "migrationComboUnresolvedShort": "旧設計のセグメント構成を特定できません。選び直してください",
+      "migratedFromIntent": "旧設計から移行しました。内容を確認して確定してください",
       "budget": {
         "layerSegment": "▣ レイヤーセグメント",
         "genSegment": "▶ 生成セグメント",
         "total": "合計 {n}s",
+        "totalMissing": "合計 —",
+        "comboMissing": "セグメント構成が未選択です",
+        "valuesMissing": "有効な各セグメントの時間予算を入力してください",
+        "invalid": "有効な各セグメントの時間予算は 0 より大きい値が必要です",
+        "headroomMissing": "余裕 —",
         "limitLayer": "レイヤー上限 {n}s",
         "limitGen": "生成上限 {n}s",
         "estimate": "推定 {n}s",

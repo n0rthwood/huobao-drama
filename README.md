@@ -538,6 +538,7 @@ A: The backend creates all tables automatically on first launch — check the lo
 
 ### Unreleased
 
+- Closed documentary legacy gaps (#61): spoken-character-aware shot capacity, lossless pending migration for undefined segment combinations, honest missing-budget states and readable four-language layer selectors, plus offline Natural Earth 50m modern province/city context with explicit coverage warnings.
 - Retired Wan video generation, including its local workflows and provider configuration.
 - Closed the narration/subtitle/video fusion-to-export workflow (#42): one versioned input snapshot fixes immediate false staleness and drives incremental batch previews, durable per-shot failure reasons, refresh reconnection, and strict export readiness checks.
 - Added original/fused main-player switching, a visible fusion summary, draft fit settings, and collapsible generation controls. No new configuration is required; legacy composites need explicit recomposition before export.

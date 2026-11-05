@@ -88,7 +88,11 @@
               {{ t(`episode.design.status.${current.design_card_status}`) }}
             </span>
             <span v-if="current.design_card_stale_reason" class="dc-stale" :title="current.design_card_stale_reason">
-              {{ current.design_card_stale_reason }}
+              {{ current.design_card_stale_reason === 'migration_combo_unresolved'
+                ? t('episode.design.migrationComboUnresolvedShort')
+                : current.design_card_stale_reason === 'migrated_from_intent'
+                  ? t('episode.design.migratedFromIntent')
+                  : current.design_card_stale_reason }}
             </span>
             <span v-if="saveState" class="dim" style="font-size:11px">{{ saveState }}</span>
             <span class="ml-auto" />
@@ -200,7 +204,7 @@
 
             <div class="dc-field">
               <span class="dc-label">
-                {{ t('episode.design.budget.total', { n: totalSeconds.toFixed(1) }) }}
+                {{ totalSeconds === null ? t('episode.design.budget.totalMissing') : t('episode.design.budget.total', { n: totalSeconds.toFixed(1) }) }}
                 <span class="dc-affect" :title="t('episode.design.affectsTip.budget')">{{ t('episode.design.affects.budget') }}</span>
               </span>
               <div class="dc-budget">
@@ -226,7 +230,8 @@
                 </span>
               </div>
 
-              <div ref="barEl" class="dc-bar-track">
+              <p v-if="budgetMessage" class="dc-hint">{{ budgetMessage }}</p>
+              <div v-if="budgetPositive" ref="barEl" class="dc-bar-track">
                 <span v-if="hasLayer" class="dc-seg is-layer" :style="{ width: layerPct + '%' }">
                   <span v-if="layerOverPct > 0" class="dc-seg-over" :style="{ width: layerOverPct + '%' }" />
                   <span
@@ -257,12 +262,13 @@
               </div>
 
               <div class="dc-narr-line">
-                <span :class="['dc-narr-fill', narrationClass]" :style="{ width: narrationPct + '%' }" />
+                <span v-if="budgetPositive" :class="['dc-narr-fill', narrationClass]" :style="{ width: narrationPct + '%' }" />
                 <span class="dc-narr-text mono">
                   {{ current.narration_measured_s === null
                     ? t('episode.design.budget.estimate', { n: narrationSeconds.toFixed(1) })
                     : t('episode.design.budget.measured', { n: narrationSeconds.toFixed(1) }) }}
-                  <template v-if="narrationClass === 'is-over'"> · {{ t('episode.design.budget.over') }}</template>
+                  <template v-if="!budgetPositive"> · {{ t('episode.design.budget.headroomMissing') }}</template>
+                  <template v-else-if="narrationClass === 'is-over'"> · {{ t('episode.design.budget.over') }}</template>
                   <template v-else-if="narrationClass === 'is-tight'"> · {{ t('episode.design.budget.tight') }}</template>
                   <template v-else> · {{ t('episode.design.budget.remain', { n: headroom.toFixed(1) }) }}</template>
                 </span>
@@ -383,6 +389,9 @@
               <span class="dc-section-title">{{ t('episode.design.section.rationale') }}</span>
               <span class="dc-affect" :title="t('episode.design.affectsTip.rationale')">{{ t('episode.design.affects.rationale') }}</span>
             </div>
+            <p v-if="current.design_card_stale_reason === 'migration_combo_unresolved'" class="dc-read dc-stale">
+              {{ t('episode.design.migrationComboUnresolved') }}
+            </p>
             <textarea
               class="textarea"
               rows="3"
@@ -627,18 +636,32 @@ function syncDraft() {
 const layerPlan = computed(() => draft.value.layer_plan)
 const genPlan = computed(() => draft.value.gen_plan)
 const suggestedCombo = computed(() => draft.value.suggested_combo)
-const issues = computed(() => current.value.issues || [])
+const issues = computed(() => (current.value.issues || []).filter(issue => !budgetMissing.value
+  || !['budget_under_narration', 'budget_tight'].includes(issue.code)))
 const warnOnly = computed(() => issues.value.length > 0 && issues.value.every(issue => issue.severity !== 'block'))
 const junctionSlot = computed(() => (draft.value.combo === 'C' ? 'first' : (draft.value.combo === 'D' ? 'last' : '')))
 
 // ===== 时长预算 =====
 const hasLayer = computed(() => draft.value.combo !== 'B' && draft.value.combo !== null)
 const hasGen = computed(() => draft.value.combo !== 'A' && draft.value.combo !== null)
-const layerSeconds = computed(() => Number(draft.value.budget.layer_s || 0))
-const genSeconds = computed(() => Number(draft.value.budget.gen_s || 0))
-const totalSeconds = computed(() => (hasLayer.value ? layerSeconds.value : 0) + (hasGen.value ? genSeconds.value : 0))
-const layerPct = computed(() => (totalSeconds.value > 0 ? (layerSeconds.value / totalSeconds.value) * 100 : (hasLayer.value ? 100 : 0)))
-const genPct = computed(() => (totalSeconds.value > 0 ? (genSeconds.value / totalSeconds.value) * 100 : (hasGen.value ? 100 : 0)))
+const layerSeconds = computed(() => draft.value.budget.layer_s)
+const genSeconds = computed(() => draft.value.budget.gen_s)
+const budgetMissing = computed(() => !draft.value.combo
+  || (hasLayer.value && layerSeconds.value === null)
+  || (hasGen.value && genSeconds.value === null))
+const totalSeconds = computed(() => budgetMissing.value ? null
+  : (hasLayer.value ? layerSeconds.value : 0) + (hasGen.value ? genSeconds.value : 0))
+const budgetPositive = computed(() => !budgetMissing.value
+  && (!hasLayer.value || layerSeconds.value > 0)
+  && (!hasGen.value || genSeconds.value > 0))
+const budgetMessage = computed(() => {
+  if (!draft.value.combo) return t('episode.design.budget.comboMissing')
+  if (budgetMissing.value) return t('episode.design.budget.valuesMissing')
+  if (!budgetPositive.value) return t('episode.design.budget.invalid')
+  return ''
+})
+const layerPct = computed(() => (budgetPositive.value && hasLayer.value ? (layerSeconds.value / totalSeconds.value) * 100 : 0))
+const genPct = computed(() => (budgetPositive.value && hasGen.value ? (genSeconds.value / totalSeconds.value) * 100 : 0))
 /** 段内超出硬限的比例：刻度画在限额处，右侧溢出部分标红 */
 const layerOverPct = computed(() => (layerSeconds.value > ctx.value.limits.layer_s
   ? ((layerSeconds.value - ctx.value.limits.layer_s) / layerSeconds.value) * 100 : 0))
@@ -647,12 +670,12 @@ const genOverPct = computed(() => (genSeconds.value > ctx.value.limits.gen_s
 const overLimit = computed(() => layerOverPct.value > 0 || genOverPct.value > 0)
 
 const narrationSeconds = computed(() => Number(current.value.narration_measured_s ?? current.value.narration_estimate_s ?? 0))
-const headroom = computed(() => totalSeconds.value - narrationSeconds.value)
+const headroom = computed(() => budgetPositive.value ? totalSeconds.value - narrationSeconds.value : null)
 const narrationPct = computed(() => (totalSeconds.value > 0
   ? Math.min(100, (narrationSeconds.value / totalSeconds.value) * 100)
   : 100))
 const narrationClass = computed(() => {
-  if (!totalSeconds.value) return ''
+  if (!budgetPositive.value) return ''
   if (headroom.value < 0) return 'is-over'
   if (headroom.value < 0.5) return 'is-tight'
   return 'is-ok'
@@ -669,7 +692,7 @@ function tickLeft(seconds, limit) {
 }
 
 function setSeconds(field, value) {
-  const next = { ...draft.value.budget, [field]: toSeconds(value) }
+  const next = { ...draft.value.budget, [field]: value.trim() === '' ? null : toSeconds(value) }
   patchDraft({ budget: next })
 }
 
@@ -941,6 +964,7 @@ function reportError(err, fallback) {
 // ===== 确认 / 取消确认 =====
 const confirmBlockReason = computed(() => {
   if (!draft.value.combo) return t('episode.design.issue.combo_missing')
+  if (budgetMessage.value) return budgetMessage.value
   if (overLimit.value) {
     return layerOverPct.value > 0
       ? t('episode.design.issue.budget_over_layer')
@@ -1265,10 +1289,10 @@ onBeforeUnmount(() => {
 
 .dc-rows { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
 .dc-row { display: flex; align-items: center; gap: 4px; width: 100%; }
-.dc-row-type { width: 110px; }
+.dc-row-type { width: auto; min-width: max-content; flex: 0 0 auto; }
 .dc-row-text { flex: 1; min-width: 0; }
 .dc-row-at { width: 80px; }
-.dc-select { height: 26px; font-size: 12px; }
+.dc-select { height: 26px; padding: 2px 8px; font-size: 12px; line-height: normal; }
 .dc-num { width: 80px; height: 24px; font-size: 12px; }
 
 .dc-combos { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }

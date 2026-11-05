@@ -117,7 +117,7 @@ test('映射表逐行：device × deterministic → combo，计划与信息点�
   assert.equal(a.gen_plan, undefined, '组合 A 没有生成段计划')
   assert.equal(a.budget.layer_s, 12, '图层段预算 = 本镜时长（钳 4–30）')
   assert.equal(a.budget.gen_s, null)
-  assert.equal(a.suggested_combo, 'A')
+  assert.equal(a.suggested_combo, null, '迁移映射不是 AI 建议')
   assert.equal(a.rationale, '先交代地理')
 
   const b = byId[102].design_card
@@ -181,6 +181,7 @@ test('幂等：第二次执行直接返回 -1，intent / intent_reviewed 两列�
     const { migrateIntentToDesignCard } = await import('./src/services/design-card-migration.ts')
     const before = columnsOf()
     const first = await migrateIntentToDesignCard()
+    db.run(sql.raw("UPDATE storyboards SET design_card_status='confirmed', design_card_confirmed_at='user-approved', design_card_stale_reason=NULL WHERE id=101"))
     const afterFirst = columnsOf()
     const snapshot = db.all(sql.raw('SELECT id, combo, design_card, design_card_status FROM storyboards ORDER BY id'))
     const second = await migrateIntentToDesignCard()
@@ -199,4 +200,49 @@ test('幂等：第二次执行直接返回 -1，intent / intent_reviewed 两列�
   assert.equal(result.stillHasIntent, false, 'intent / intent_reviewed 已被 DROP COLUMN')
   assert.equal(result.hasNewColumns, true)
   assert.equal(result.unchanged, true, '第二次执行一行都不改')
+})
+
+test('仅批准的 device × deterministic pair 自动映射，未知 pair 保留内容并等待人工选择', () => {
+  const result = run(`
+    ${PRE_MIGRATION}
+    const { designCardFromIntent, migrateIntentToDesignCard } = await import('./src/services/design-card-migration.ts')
+    const devices = ['map_anim', 'archival', 'card', 'reenact_still', 'reenact_video', 'unknown', '']
+    const positions = ['replace', 'none', 'pre', 'post', 'unknown']
+    const matrix = devices.flatMap(device => positions.map(deterministic => ({
+      device, deterministic, ...designCardFromIntent(JSON.stringify({ ...mapAnim, device, deterministic }), 10),
+    })))
+    const rationale = '保留完整理由。'.repeat(120)
+    for (const [id, device, deterministic] of [[301, 'card', 'none'], [302, 'unknown', 'pre'], [303, 'unknown', 'post'], [304, 'reenact_video', 'replace']]) {
+      db.run(sql\`INSERT INTO storyboards (id, episode_id, storyboard_number, duration, intent, created_at, updated_at)
+        VALUES (\${id}, 7, \${id}, 10, \${JSON.stringify({ ...mapAnim, device, deterministic, rationale })}, \${at}, \${at})\`)
+    }
+    await migrateIntentToDesignCard()
+    const migratedRows = db.all(sql.raw('SELECT combo, design_card, design_card_status, design_card_stale_reason FROM storyboards WHERE id>=301'))
+      .map(row => ({ ...row, card: JSON.parse(row.design_card) }))
+    console.log('@@' + JSON.stringify({ matrix, rows: migratedRows, rationale }))
+  `)
+  const layerDevices = ['map_anim', 'archival', 'card', 'reenact_still']
+  for (const item of result.matrix) {
+    const known = layerDevices.includes(item.device) || item.device === 'reenact_video'
+    const expected = !known ? null
+      : item.deterministic === 'pre' ? 'C'
+        : item.deterministic === 'post' ? 'D'
+          : item.deterministic === 'replace' && layerDevices.includes(item.device) ? 'A'
+            : item.deterministic === 'none' && item.device === 'reenact_video' ? 'B' : null
+    assert.equal(item.combo, expected, item.device + '+' + item.deterministic)
+    assert.equal(item.card.suggested_combo, null)
+  }
+  assert.equal(result.rows.length, 4)
+  for (const row of result.rows) {
+    assert.equal(row.combo, null)
+    assert.equal(row.design_card_status, 'pending')
+    assert.equal(row.design_card_stale_reason, 'migration_combo_unresolved')
+    assert.equal(row.card.info_points[0].text, '清军两路进藏')
+    assert.equal(row.card.rationale, result.rationale, '理由不截断、不附加迁移提示')
+    assert.equal(row.card.suggested_combo, null)
+    assert.deepEqual(row.card.budget, { layer_s: null, gen_s: null })
+    assert.equal(row.card.layer_plan.planned_layers.length, 3)
+    assert.equal(row.card.layer_plan.must_mark[0].semantic_id, 'rg-1')
+    assert.equal(row.card.gen_plan.reference_assets[0].id, 25)
+  }
 })

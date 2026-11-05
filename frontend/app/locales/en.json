@@ -1135,6 +1135,7 @@
       "issue": {
         "combo_missing": "No segment combo selected yet",
         "budget_over_layer": "Layer segment exceeds the 30s limit",
+        "budget_missing": "Enter a duration budget for every enabled segment",
         "budget_over_gen": "Generated segment exceeds the 15s limit",
         "budget_under_narration": "Total duration cannot hold the narration; lengthen a segment or trim the visuals",
         "missing_base": "The layer segment has no base image",
@@ -1145,10 +1146,18 @@
         "budget_tight": "Duration headroom is tight",
         "unresolved_ref": "A reference cannot be resolved to an asset or entry"
       },
+      "migrationComboUnresolved": "The legacy segment combination has no defined mapping. Your recoverable content was kept; explicitly choose a combination and review this design card before confirming.",
+      "migrationComboUnresolvedShort": "Legacy segment combination unresolved; please choose again",
+      "migratedFromIntent": "Migrated legacy design; please review and confirm",
       "budget": {
         "layerSegment": "▣ Layer segment",
         "genSegment": "▶ Generated segment",
         "total": "Total {n}s",
+        "totalMissing": "Total —",
+        "comboMissing": "No segment combination selected",
+        "valuesMissing": "Enter a budget for every enabled segment",
+        "invalid": "Each enabled segment budget must be greater than 0",
+        "headroomMissing": "Headroom —",
         "limitLayer": "Layer limit {n}s",
         "limitGen": "Generated limit {n}s",
         "estimate": "Est. {n}s",

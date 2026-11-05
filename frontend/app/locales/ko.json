@@ -1135,6 +1135,7 @@
       "issue": {
         "combo_missing": "아직 세그먼트 조합을 선택하지 않았습니다",
         "budget_over_layer": "레이어 세그먼트가 30초 상한을 넘었습니다",
+        "budget_missing": "활성화된 각 세그먼트의 시간 예산을 입력하세요",
         "budget_over_gen": "생성 세그먼트가 15초 상한을 넘었습니다",
         "budget_under_narration": "전체 길이가 해설을 담지 못합니다. 세그먼트를 늘리거나 화면을 줄이세요",
         "missing_base": "레이어 세그먼트에 배경 이미지가 없습니다",
@@ -1145,10 +1146,18 @@
         "budget_tight": "길이 여유가 빠듯합니다",
         "unresolved_ref": "소재나 항목으로 해결되지 않는 참조가 있습니다"
       },
+      "migrationComboUnresolved": "기존 숏의 세그먼트 조합에는 정의된 이전 규칙이 없습니다. 복원 가능한 내용은 유지되었습니다. 조합을 명시적으로 다시 선택하고 설계 카드를 검토한 후 확정하세요.",
+      "migrationComboUnresolvedShort": "기존 세그먼트 조합을 확인할 수 없습니다. 다시 선택하세요",
+      "migratedFromIntent": "기존 설계를 이전했습니다. 검토 후 확인하세요",
       "budget": {
         "layerSegment": "▣ 레이어 세그먼트",
         "genSegment": "▶ 생성 세그먼트",
         "total": "합계 {n}s",
+        "totalMissing": "합계 —",
+        "comboMissing": "세그먼트 조합을 아직 선택하지 않았습니다",
+        "valuesMissing": "활성화된 각 세그먼트의 시간 예산을 입력하세요",
+        "invalid": "활성화된 각 세그먼트의 시간 예산은 0보다 커야 합니다",
+        "headroomMissing": "여유 —",
         "limitLayer": "레이어 상한 {n}s",
         "limitGen": "생성 상한 {n}s",
         "estimate": "추정 {n}s",

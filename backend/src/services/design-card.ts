@@ -9,7 +9,7 @@
  *
  * 纯函数模块：不读库、不读文件，解析上下文由调用方装配（`loadDesignCardContext`）。
  */
-import { estimateNarrationSeconds } from './narration.js'
+import { estimateNarrationSeconds, MAX_NARRATION_CHARS, narrationCharCount } from './narration.js'
 
 /** 段组合：A 只图层 / B 只生成 / C 图层→生成 / D 生成→图层 */
 export const COMBOS = ['A', 'B', 'C', 'D'] as const
@@ -116,6 +116,7 @@ export type CardIssueCode =
   // 阻断
   | 'combo_missing'
   | 'budget_over_layer'
+  | 'budget_missing'
   | 'budget_over_gen'
   | 'budget_under_narration'
   | 'missing_base'
@@ -448,10 +449,14 @@ export function validateDesignCard(input: CardValidateInput): CardIssue[] {
   if ((budget.gen_s ?? 0) > MAX_GEN_SEGMENT_SECONDS) {
     add('budget_over_gen', 'block', `生成段 ${budget.gen_s}s 超过硬上限 ${MAX_GEN_SEGMENT_SECONDS}s`)
   }
-  if (budget.narration_s > 0 && budget.total_s < budget.narration_s) {
+  const budgetMissing = !combo
+    || (hasLayerSegment(combo) && budget.layer_s === null)
+    || (hasGenSegment(combo) && budget.gen_s === null)
+  if (combo && budgetMissing) add('budget_missing', 'block', '请填写每个启用段的时长预算')
+  if (!budgetMissing && budget.narration_s > 0 && budget.total_s < budget.narration_s) {
     add('budget_under_narration', 'block',
       `总时长 ${budget.total_s}s 装不下旁白（${budget.measured ? '实测' : '估'} ${budget.narration_s}s），需加长段或精简画面`)
-  } else if (budget.narration_s > 0 && budget.remain_s < BUDGET_TIGHT_SECONDS) {
+  } else if (!budgetMissing && budget.narration_s > 0 && budget.remain_s < BUDGET_TIGHT_SECONDS) {
     add('budget_tight', 'warn', `余量只剩 ${budget.remain_s}s，偏紧`)
   }
 
@@ -543,10 +548,13 @@ export function referenceAssetRefs(card: DesignCard | null, combo: Combo | null)
 }
 
 /**
- * 本集镜头数硬上限（契约 §8 行 1）：`cap = min(ceil(段数 × 1.5), 段数 + 3)`。
- * 段数 = 剧本按空行切分后的非空段落数。剧本为空时不设限（返回 0 = 不启用）。
+ * 保留短稿防过拆上限，同时容纳每段按单镜旁白字数上限合法切分所需的镜数。
+ * 输入为去掉节拍标记、按空行切分的剧本段落；空稿返回 0（不启用）。
  */
-export function storyboardCountCap(paragraphs: number): number {
-  if (!Number.isFinite(paragraphs) || paragraphs <= 0) return 0
-  return Math.min(Math.ceil(paragraphs * 1.5), paragraphs + 3)
+export function storyboardCountCap(paragraphs: readonly string[]): number {
+  if (!paragraphs.length) return 0
+  const shortCap = Math.min(Math.ceil(paragraphs.length * 1.5), paragraphs.length + 3)
+  const narrationMinimum = paragraphs.reduce((sum, paragraph) =>
+    sum + Math.ceil(narrationCharCount(paragraph) / MAX_NARRATION_CHARS), 0)
+  return Math.max(shortCap, narrationMinimum)
 }
