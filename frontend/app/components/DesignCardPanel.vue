@@ -738,7 +738,12 @@ const baseValue = computed(() => {
   const base = layerPlan.value.base
   if (!base) return ''
   if (base.kind === 'inherit_prev') return 'inherit_prev'
-  return `asset:${base.asset_kind}:${base.asset_id}:${base.version_task_id ?? ''}`
+  const exact = `asset:${base.asset_kind}:${base.asset_id}:${base.version_task_id ?? ''}`
+  if (base.version_task_id != null) return exact
+  // 迁移与 AI 填卡只写到资产级（没有版本号）：落到该资产的候选版本上，
+  // 否则下拉匹配不到任何 option，明明选了底图却显示成「未选择底图」
+  const candidate = ctx.value.base_candidates.find(item => item.asset_kind === base.asset_kind && item.asset_id === base.asset_id)
+  return candidate ? baseKeyOf(candidate) : exact
 })
 function setBase(value) {
   let base = null
@@ -806,6 +811,16 @@ const saveQueues = new Map()
 /** 同一镜的写入串行化：整份替换的并发写会用各自的旧快照互相覆盖 */
 function save(sbId, card) {
   if (!sbId || !card) return Promise.resolve()
+  // 超硬上限的段条不往后端送：后端必定 400，回灌服务端事实会把用户刚输入的数字抹掉，
+  // 红色超限段与禁用的确认按钮就永远看不到。留在草稿里，改回上限内再接着存。
+  const overLayer = Number(card.budget?.layer_s || 0) > ctx.value.limits.layer_s
+  const overGen = Number(card.budget?.gen_s || 0) > ctx.value.limits.gen_s
+  if (overLayer || overGen) {
+    if (sbId === selectedId.value) {
+      saveState.value = t(overLayer ? 'episode.design.error.budgetOverLayer' : 'episode.design.error.budgetOverGen')
+    }
+    return Promise.resolve()
+  }
   const prev = saveQueues.get(sbId) || Promise.resolve()
   const next = prev.catch(() => {}).then(() => runSave(sbId, card))
   saveQueues.set(sbId, next)
@@ -858,7 +873,8 @@ function reportError(err, fallback) {
     needs_acknowledge: 'episode.design.error.needsAcknowledge',
   }
   if (body.gate === 'combo_switch') { toast.error(t('episode.design.error.comboSwitch')); return }
-  const key = map[body.code]
+  // 后端错误体是 { code: 400, error: 'budget_over_layer', ... }：错误码在 error 上，code 是 HTTP 状态
+  const key = map[body.error]
   if (key) {
     const detail = Array.isArray(body.issues) && body.issues.length
       ? body.issues.map(issue => t(`episode.design.issue.${issue.code}`)).join(t('common.listJoin'))

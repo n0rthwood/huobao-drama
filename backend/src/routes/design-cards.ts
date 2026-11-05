@@ -271,6 +271,7 @@ app.put('/:id/storyboards/order', async (c) => {
   if (!Array.isArray(body.ids) || !body.ids.length) return badRequest(c, 'ids 必须是分镜 id 数组')
   const ids = body.ids.map(Number)
   if (ids.some((value: number) => !Number.isInteger(value) || value <= 0)) return badRequest(c, 'ids 必须全是正整数')
+  if (new Set(ids).size !== ids.length) return badRequest(c, 'ids 里有重复的分镜')
   // 他集分镜混进来：按「不是本集全集」拒绝，避免跨集改号
   const owned = await db.select().from(schema.storyboards)
     .where(and(eq(schema.storyboards.episodeId, id), isNull(schema.storyboards.deletedAt), inArray(schema.storyboards.id, ids)))

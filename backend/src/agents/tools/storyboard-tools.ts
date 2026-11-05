@@ -337,7 +337,7 @@ const designCardSchema = z.object({
     last: z.string().optional().describe('One sentence for the last story keyframe. Omit when the junction frame locks it (combo D).'),
   }).optional().describe('Generated segment plan. Required when the shot has a generated segment (combos B, C, D).'),
   rationale: z.string().optional().describe('Why this plan expresses the narration; mention the neighbouring shots when this shot continues them.'),
-  suggested_combo: z.enum(COMBOS).optional().describe("Suggested segment combination ONLY: 'A' layer only, 'B' generated only, 'C' layer then generated, 'D' generated then layer. The human picks the real combo — never assume one."),
+  suggested_combo: z.enum(COMBOS).describe("REQUIRED. Suggested segment combination ONLY: 'A' layer only, 'B' generated only, 'C' layer then generated, 'D' generated then layer. Always give exactly one suggestion — the human picks the real combo, which the server never takes from you."),
 })
 
 /** 纪录片项目：多一个 narration_text（#45，逐字取自剧本）与一份 design_card（#57，设计卡） */
