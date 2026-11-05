@@ -510,7 +510,7 @@ export async function inspectComposeInputs(
     if ((combo === 'C' || combo === 'D') && adopted) {
       let snapshot: Record<string, unknown> = {}
       try { snapshot = JSON.parse(adopted.params || '{}') } catch { /* Invalid snapshot is stale. */ }
-      const savedJunction = videoTaskJunction(snapshot)
+      const savedJunction = await videoTaskJunction(snapshot)
       if (savedJunction?.hash !== junctionHash || savedJunction.slot !== (combo === 'C' ? 'first' : 'last')) return fail(`${shot} 的生成视频使用了旧衔接帧或缺少可核验的引导记录，请重新生成视频`)
     }
   }

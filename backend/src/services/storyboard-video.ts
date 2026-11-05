@@ -337,12 +337,12 @@ export interface VideoVersion {
  * 历史版本（sys_task）的签名。#5 之前的任务缺少引导帧/时长等字段时返回 null，
  * 作为 unknown 单列，不报错也不当成“已变化”。
  */
-export function videoSignatureFromTask(task: {
+export async function videoSignatureFromTask(task: {
   prompt: string | null
   provider: string | null
   model: string | null
   params: string | null
-}): { signature: string; parts: VideoSignatureParts } | null {
+}): Promise<{ signature: string; parts: VideoSignatureParts } | null> {
   if (!task.prompt || !task.provider || !task.model) return null
   let params: Record<string, unknown> = {}
   try {
@@ -356,7 +356,7 @@ export function videoSignatureFromTask(task: {
   const aspectRatio = typeof params.aspectRatio === 'string' ? params.aspectRatio : null
   const duration = Number(params.duration)
   if (!firstFrameUrl || !aspectRatio || !Number.isFinite(duration) || duration <= 0) return null
-  const junction = videoTaskJunction(params)
+  const junction = await videoTaskJunction(params)
   if (!junction && (params.junction_hash !== undefined || params.junction_slot !== undefined || [params.firstFrameUrl, params.lastFrameUrl].some(source => typeof source === 'string' && source.replace(/\\/g, '/').includes('/layer-frames/')))) return null
   return computeVideoSignature({
     prompt: task.prompt,
@@ -382,8 +382,8 @@ export async function loadVideoVersions(storyboardId: number): Promise<VideoVers
     .filter(task => task.type === 'video' && task.status === 'completed' && task.storyboardId === storyboardId)
     .filter(task => task.localPath || task.resultUrl)
     .sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')) || a.id - b.id)
-  return tasks.map((task, index) => {
-    const computed = videoSignatureFromTask(task)
+  return Promise.all(tasks.map(async (task, index) => {
+    const computed = await videoSignatureFromTask(task)
     return {
       id: task.id,
       video: (task.localPath || task.resultUrl)!,
@@ -392,7 +392,7 @@ export async function loadVideoVersions(storyboardId: number): Promise<VideoVers
       signature: computed?.signature ?? null,
       parts: computed?.parts ?? null,
     }
-  })
+  }))
 }
 
 /** 与某个历史版本逐分项比较，返回变化的分项中文名（用于预览的「变化原因」） */

@@ -25,7 +25,7 @@ const [kind, payload] = JSON.parse(process.env.SIG_INPUT!)
 const out = kind === 'request'
   ? computeVideoSignature(payload)
   : kind === 'task'
-    ? videoSignatureFromTask(payload)
+    ? await videoSignatureFromTask(payload)
     : kind === 'duration'
       ? (() => { try { assertGeneratedSegmentDuration(...payload); return { valid: true } } catch (error) { return { valid: false, error: error.message } } })()
       : describeSignatureDiff(payload[0], payload[1])
@@ -104,7 +104,7 @@ test('historical tasks missing comparison fields yield null (classified as unkno
 
 test('junction slot/hash changes only guides and survives exact persisted task fields', () => {
   const legacy = run('request', baseRequest)
-  const junction = { slot: 'first', hash: 'junction-sha256' }
+  const junction = { slot: 'first', hash: 'a'.repeat(64) }
   const current = run('request', { ...baseRequest, junction })
   assert.notEqual(current.signature, legacy.signature)
   assert.deepEqual(run('diff', [current.parts, legacy.parts]), ['关键帧'])
