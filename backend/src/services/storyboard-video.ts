@@ -37,7 +37,8 @@ import {
 } from './transition.js'
 import { runTransitionReview } from './transition-agent.js'
 import { loadDesignCardContext, resolveDesignCard } from './design-card-context.js'
-import { parseDesignCard, toCombo } from './design-card.js'
+import { toCombo } from './design-card.js'
+import { generatedSegmentSeconds } from './shot-duration.js'
 import { resolveDramaProjectType } from './project-type.js'
 
 export interface StoryboardVideoOptions {
@@ -187,7 +188,7 @@ export async function buildStoryboardVideoRequest(
   // ===== 开场转场（#11）：承接镜头提交前自动审核/生成，手动编辑过的不覆盖 =====
   let sb = storyboard
   const contentDuration = documentary
-    ? Number(parseDesignCard(sb.designCard)?.budget.gen_s ?? sb.duration ?? 10)
+    ? generatedSegmentSeconds(sb.designCard, sb.duration)
     : Number(sb.duration || 10)
   if (documentary) assertGeneratedSegmentDuration(contentDuration, contentDuration)
   let transition: { text: string; seconds: number; extra: number } | null = null
