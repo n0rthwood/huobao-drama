@@ -27,6 +27,7 @@ const TEXT_KIND_LABEL: Record<TextTaskKind, string> = {
   narration_script: '旁白写作',
   narration_tts: '旁白配音',
   shot_compose: '分镜合成',
+  layer_render_batch: '图层段批量渲染',
   portrait_appearance: '按史料画像补充外貌',
   asset_batch: '资产批量',
   asset_semantics: '语义标注',

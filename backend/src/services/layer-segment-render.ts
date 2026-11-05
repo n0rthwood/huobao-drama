@@ -212,7 +212,7 @@ function junctionMoment(combo: string | null, duration: number): { source: 'laye
 /**
  * 衔接帧 PNG：`label`/`card` 整层隐藏、`marker` 只画点不画文字（契约 §3.3）。
  * 只改传给 SVG 的可见集合与 marker 的文本，**不改**存档的图层文档——
- * 文字在图层段内部的淡出由时间线保证，这里只负责「继承给生成段的那张图不带字」。
+ * 图层段的实际编码边界也使用同一张去字画面；段内文字在边界前后淡出/淡入。
  */
 function withoutText(doc: LayerDoc): LayerDoc {
   const layers: Layer[] = []
@@ -221,6 +221,27 @@ function withoutText(doc: LayerDoc): LayerDoc {
     layers.push(layer.type === 'marker' ? { ...layer, text: '' } : layer)
   }
   return { ...doc, layers }
+}
+
+/** Encoded C/D endpoints sample the exact guide state, not duration - 1/fps. */
+export function junctionVideoSample(combo: string | null, index: number, frames: number, fps: number, duration: number, fadeMs: number): { t: number; textAlpha: number } {
+  const distance = combo === 'C' ? frames - 1 - index : combo === 'D' ? index : Infinity
+  const fadeFrames = Math.max(1, Math.round(Math.max(0, fadeMs) * fps / 1000))
+  return {
+    t: combo === 'C' && index === frames - 1 ? duration : index / fps,
+    textAlpha: Math.min(1, distance / fadeFrames),
+  }
+}
+
+async function composeVideoFrame(doc: LayerDoc, plan: RenderPlan, source: FrameSource, state: FrameState, textAlpha: number): Promise<Buffer> {
+  if (textAlpha >= 1) return composeFrame(doc, plan, source, state, 'raw')
+  const clean = await composeFrame(withoutText(doc), plan, source, state, 'raw')
+  if (textAlpha <= 0) return clean
+  const full = await composeFrame(doc, plan, source, state, 'raw')
+  // Blend complete opaque frames so non-text layers (including translucent
+  // geometry and marker dots) remain unchanged throughout the text fade.
+  for (let i = 0; i < clean.length; i++) clean[i] = Math.round(clean[i] + (full[i] - clean[i]) * textAlpha)
+  return clean
 }
 
 async function writeJunctionFrame(
@@ -323,11 +344,12 @@ export async function renderLayerSegment(
     let lastKey = ''
     let lastFrame: Buffer | null = null
     for (let index = 0; index < plan.frames; index++) {
-      const state = frameStateAt(timeline, index / plan.fps)
-      const key = frameKeyOf(state)
+      const sample = junctionVideoSample(combo, index, plan.frames, plan.fps, segment.duration, timeline.fade_ms)
+      const state = frameStateAt(timeline, sample.t)
+      const key = `${frameKeyOf(state)}:${sample.textAlpha}`
       // 静止段相邻帧的状态键完全相同，直接复用上一帧像素（15 s 片段里通常有七八成）
       if (key !== lastKey || !lastFrame) {
-        lastFrame = await composeFrame(doc, plan, source, state, 'raw')
+        lastFrame = await composeVideoFrame(doc, plan, source, state, sample.textAlpha)
         lastKey = key
         renderedFrames++
       }
@@ -359,7 +381,7 @@ export async function renderLayerSegment(
   })
   return {
     render_path: renderPath,
-    render_signature: layerSegmentSignatureOf(segment, spec),
+    render_signature: layerSegmentSignatureOf(segment, spec, combo),
     duration_ms: produced.durationMs,
     width: plan.width,
     height: plan.height,

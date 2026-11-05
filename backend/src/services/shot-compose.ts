@@ -21,6 +21,7 @@ import { db, schema } from '../db/index.js'
 import { now } from '../utils/response.js'
 import { STORAGE_ROOT } from '../utils/paths.js'
 import { ffmpeg, checkFfmpegSuite, writeSilentWav } from '../utils/ffmpeg.js'
+import { extractVideoPoster } from '../utils/video-poster.js'
 import { logTaskError, logTaskProgress, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
 import { renderSrt, parseSrt, transformCues } from './subtitle.js'
 import { mediaFacts, probeVideoSpec } from './media-probe.js'
@@ -49,6 +50,10 @@ import {
   type TextTaskProgress,
   type TextTaskProgressItem,
 } from './text-task.js'
+import { resolveEpisodeSegmentSpec, type SegmentSpec } from './layer-segment.js'
+import { resolveDramaProjectType } from './project-type.js'
+import { assertGate } from './workflow-gates.js'
+import { scopeFromPreview, type BatchScope } from './batch-scope.js'
 
 /** 旁白响度标准（EBU R128，用户确认 Q8） */
 export const LOUDNORM_FILTER = 'loudnorm=I=-16:TP=-1.5:LRA=11'
@@ -90,6 +95,8 @@ async function runComposeShot(storyboardId: number, batchTaskId?: number): Promi
 
   const input = await assembleComposeInput(storyboardId)
   const { sb, plan, fit } = input
+  await assertGate(sb.episodeId, 'final')
+  const spec = input.parts.combo ? await resolveEpisodeSegmentSpec(sb.episodeId) : undefined
 
   // 落盘预约优先于进程内锁：批量里还没轮到的镜头也不允许被单镜提交插队重复合成
   const reserved = (await persistedComposeReservations(sb.episodeId, batchTaskId)).get(storyboardId)
@@ -137,6 +144,7 @@ async function runComposeShot(storyboardId: number, batchTaskId?: number): Promi
         [input.preClipAbs, input.videoAbs, input.postClipAbs].filter((p): p is string => Boolean(p)),
         fullShotAbs,
         tempDir,
+        spec,
       )
     }
     await runCompose({
@@ -147,6 +155,7 @@ async function runComposeShot(storyboardId: number, batchTaskId?: number): Promi
       plan,
       fit,
       outputPath,
+      spec,
     })
   } finally {
     if (burnSrtAbs) fs.rmSync(burnSrtAbs, { force: true })
@@ -177,6 +186,7 @@ async function runComposeShot(storyboardId: number, batchTaskId?: number): Promi
     composed_at: ts,
     transition_t: input.t,
     transition_t_source: input.tSource,
+    ...(input.parts.combo ? { layer_duration_s: input.layerDuration, generated_duration_s: input.generatedDuration, junction_s: input.junctionSeconds } : {}),
   }
 
   await db.update(schema.storyboards).set({
@@ -184,6 +194,7 @@ async function runComposeShot(storyboardId: number, batchTaskId?: number): Promi
     narrationMeta: JSON.stringify(meta),
     updatedAt: ts,
   }).where(eq(schema.storyboards.id, storyboardId))
+  await extractVideoPoster(composedVideoUrl)
 
   logTaskSuccess('ShotCompose', 'compose', { storyboardId, composedVideoUrl, durationMs: produced.durationMs })
   return { storyboardId, composedVideoUrl, durationMs: produced.durationMs, plan, burned: Boolean(burnSrtAbs) }
@@ -196,9 +207,9 @@ async function runComposeShot(storyboardId: number, batchTaskId?: number): Promi
  * 会得到时间基混乱的 VFR 流。这里用 concat **滤镜**，先把每段统一到首段的画幅/帧率/
  * 采样率再拼，输出编码参数与 `runCompose` 完全一致，后续滤镜链感知不到它是拼出来的。
  */
-async function concatShotSegments(segments: string[], outputPath: string, tempDir: string): Promise<void> {
+export async function concatShotSegments(segments: string[], outputPath: string, tempDir: string, targetSpec?: SegmentSpec): Promise<void> {
   if (segments.length < 2) throw new Error('拼接全镜视频至少需要两段')
-  const probed = await probeVideoSpec(segments[0])
+  const probed = targetSpec ?? await probeVideoSpec(segments[0])
   if (!probed) throw new Error(`无法读取片段规格：${segments[0]}`)
   const { width, height, fps } = probed
   const command = ffmpeg()
@@ -270,6 +281,7 @@ interface RunComposeInput {
   plan: ComposePlan
   fit: ComposeFit
   outputPath: string
+  spec?: SegmentSpec
 }
 
 function runCompose(input: RunComposeInput): Promise<void> {
@@ -289,6 +301,9 @@ function runCompose(input: RunComposeInput): Promise<void> {
     videoSteps.push(`tpad=stop_mode=clone:stop_duration=${plan.freezeSeconds.toFixed(3)}`)
   }
   videoSteps.push(`trim=0:${plan.d.toFixed(3)}`, 'setpts=PTS-STARTPTS')
+  if (input.spec) {
+    videoSteps.push(`scale=${input.spec.width}:${input.spec.height}:force_original_aspect_ratio=decrease`, `pad=${input.spec.width}:${input.spec.height}:(ow-iw)/2:(oh-ih)/2`, 'setsar=1', `fps=${input.spec.fps}`)
+  }
   if (input.burnSrtAbs) {
     videoSteps.push(`subtitles='${escapeFilterPath(input.burnSrtAbs)}':force_style='FontSize=18,Outline=1,Shadow=0,MarginV=28'`)
   }
@@ -383,6 +398,7 @@ export interface ComposeBatchStatus {
   finished_at?: string
   error?: string
   items: TextTaskProgressItem[]
+  scope: BatchScope
 }
 
 export async function getComposeBatchStatus(episodeId: number): Promise<ComposeBatchStatus | null> {
@@ -400,6 +416,7 @@ export async function getComposeBatchStatus(episodeId: number): Promise<ComposeB
     finished_at: row.completedAt || undefined,
     error: row.errorMsg || undefined,
     items: progress?.items ?? [],
+    scope: parseTextTaskParams(row.params)?.scope ?? { included: [], excluded: [] },
   }
 }
 
@@ -414,11 +431,12 @@ export async function startComposeBatch(
   episodeId: number,
   dramaId: number,
   storyboardIds: number[],
-): Promise<{ started: boolean; total: number }> {
+  retryOf?: number,
+): Promise<{ started: boolean; total: number; scope: BatchScope }> {
   if (startingBatches.has(episodeId)) throw new Error('正在创建本集的批量融合任务，请稍后查看状态')
   startingBatches.add(episodeId)
   try {
-    return await createComposeBatch(episodeId, dramaId, storyboardIds)
+    return await createComposeBatch(episodeId, dramaId, storyboardIds, retryOf)
   } finally {
     startingBatches.delete(episodeId)
   }
@@ -428,10 +446,12 @@ async function createComposeBatch(
   episodeId: number,
   dramaId: number,
   storyboardIds: number[],
-): Promise<{ started: boolean; total: number }> {
+  retryOf?: number,
+): Promise<{ started: boolean; total: number; scope: BatchScope }> {
   const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId))
   if (!ep) throw new Error('剧集不存在')
-  if (ep.narrationEnabled !== true) throw new Error('本集未开启旁白，无需合成')
+  if (ep.narrationEnabled !== true && resolveDramaProjectType(ep.dramaId) !== 'documentary') throw new Error('本集未开启旁白，无需合成')
+  await assertGate(episodeId, 'final')
   if (!storyboardIds.length) throw new Error('请先在预览清单里勾选要融合的镜头')
 
   const live = await db.select().from(schema.storyboards)
@@ -442,9 +462,16 @@ async function createComposeBatch(
   if (unknownIds.length) {
     throw new Error(`以下镜头不属于本集或已删除，无法融合：${unknownIds.join('、')}`)
   }
-  if (await findActiveTextTask(episodeId, 'shot_compose')) return { started: false, total: -1 }
+  const activeTask = await findActiveTextTask(episodeId, 'shot_compose')
+  if (activeTask) {
+    const params = parseTextTaskParams(activeTask.params)
+    return { started: false, total: params?.progress?.total ?? -1, scope: params?.scope ?? { included: [], excluded: [] } }
+  }
+  const preview = await composeStatesForEpisode(episodeId)
+  const scope = scopeFromPreview(preview, storyboardIds)
+  if (!scope.included.length) throw new Error('所选镜头均不可合成：' + scope.excluded.map(item => item.reason).join('；'))
 
-  const items: TextTaskProgressItem[] = selected.map(sb => ({
+  const items: TextTaskProgressItem[] = selected.filter(sb => scope.included.some(item => item.storyboard_id === sb.id)).map(sb => ({
     storyboard_id: sb.id,
     storyboard_number: sb.storyboardNumber,
     state: 'pending',
@@ -457,7 +484,9 @@ async function createComposeBatch(
     dramaId,
     prompt: `合成 ${items.length} 个分镜`,
     progress,
-    storyboardIds: selected.map(sb => sb.id),
+    storyboardIds: scope.included.map(sb => sb.storyboard_id),
+    scope,
+    retryOf,
   })
 
   logTaskStart('ShotCompose', 'batch', { episodeId, total: items.length })
@@ -510,7 +539,19 @@ async function createComposeBatch(
       await finishTextTask(taskId, 'failed', { progress, errorMsg: err instanceof Error ? err.message : String(err) })
     })
 
-  return { started: true, total: items.length }
+  return { started: true, total: items.length, scope }
+}
+
+/** Retry only failed shots, recomputing eligibility before persisting the new immutable scope. */
+export async function retryFailedComposeBatch(episodeId: number, dramaId: number, sourceTaskId?: number): Promise<{ started: boolean; total: number; scope: BatchScope }> {
+  const source = sourceTaskId
+    ? (await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, sourceTaskId)))[0]
+    : await findLatestTextTask(episodeId, 'shot_compose')
+  const params = source ? parseTextTaskParams(source.params) : null
+  if (!source || source.episodeId !== episodeId || params?.kind !== 'shot_compose') throw new Error('找不到本集的合成批次')
+  const failed = params.progress?.items?.filter(item => item.state === 'failed').map(item => item.storyboard_id) ?? []
+  if (!failed.length) throw new Error('没有失败的合成镜头可重试')
+  return startComposeBatch(episodeId, dramaId, failed, source.id)
 }
 
 /** 执行前复查：返回跳过原因，可以合成时返回 null */
@@ -518,7 +559,7 @@ async function recheckBeforeCompose(storyboardId: number): Promise<string | null
   const [sb] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, storyboardId))
   if (!sb || sb.deletedAt) return '镜头已删除'
   const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, sb.episodeId))
-  if (!ep || ep.narrationEnabled !== true) return '本集已关闭旁白，无需合成'
+  if (!ep || (ep.narrationEnabled !== true && resolveDramaProjectType(ep.dramaId) !== 'documentary')) return '本集已关闭旁白，无需合成'
   // 本批次刚把自己标成 processing，所以这里只看进程内的单镜锁（别的批次/单镜正在跑）
   if (isComposing(storyboardId)) return '该镜头正在被另一次合成占用'
 

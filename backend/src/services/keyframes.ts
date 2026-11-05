@@ -135,7 +135,7 @@ function buildState(
   // 生效图一律过一道「文件还在吗」：列里残留的死路径不能算图（否则前端是破图、确认还放行）
   const ownFirst = usableImage(slotOwnImage(row, 'first'))
   // 第一镜没有上一镜，即使被标成 continue 也按硬切处理
-  const inheritsFirst = !ownFirst && !!previous && row.continuityBoundary === 'continue'
+  const inheritsFirst = !!previous && row.continuityBoundary === 'continue' && (combo === 'D' || !ownFirst)
   const lockedSlots = lockedSlotsOf(row, inheritsFirst)
   const junctionUsable = Boolean(junction && !junction.stale && junction.path)
   const lock = junction && junction.source
@@ -271,7 +271,7 @@ export async function invalidateKeyframeConfirmation(storyboardId: number, reaso
   const next = index >= 0 ? rows[index + 1] : undefined
   if (!next || !next.keyframesConfirmed) return
   // 下一镜继承本镜尾帧时，本镜任何关键帧变化都可能让它的首帧失效
-  const inheritsFirst = !slotOwnImage(next, 'first') && next.continuityBoundary === 'continue'
+  const inheritsFirst = next.continuityBoundary === 'continue' && (toCombo(next.combo) === 'D' || !slotOwnImage(next, 'first'))
   if (!inheritsFirst) return
   await db.update(schema.storyboards)
     .set({

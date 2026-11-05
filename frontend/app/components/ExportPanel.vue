@@ -6,7 +6,7 @@
  * 状态与方法通过 `provide/inject` 的工作台上下文取得——episode.vue 仍是单一数据源，
  * 后续 Issue 只改本文件内部，不再回 episode.vue 改 markup。
  */
-import { inject } from 'vue'
+import { computed, inject, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Trash2 } from 'lucide-vue-next'
 import MediaTime from '~/components/MediaTime.vue'
@@ -14,6 +14,8 @@ import { mapError } from '~/composables/useToast'
 import { mediaUrl } from '~/utils/url'
 import { posterOf } from '~/composables/useMedia'
 import { WORKBENCH_CTX } from '~/utils/workbenchSteps'
+import { posterAPI } from '~/composables/useApi'
+import { isFreshExport } from '~/utils/documentaryFinal'
 
 const { t } = useI18n()
 const ctx = inject(WORKBENCH_CTX)
@@ -60,6 +62,41 @@ const {
   toggleExportSelect,
   toggleSelectAllExport,
 } = ctx
+const documentary = computed(() => ctx.isDocumentaryProject.value)
+const staleShots = computed(() => documentary.value ? sbs.value.filter(sb => Boolean(ctx.composeStateOf(sb)?.composed_video_url) && !isFreshExport(sb)) : [])
+const posterFinal = ref(false)
+watch(() => episode.value?.id, async id => {
+  if (!id || !documentary.value) return
+  try { posterFinal.value = Boolean((await posterAPI.get(id))?.final_image) } catch { posterFinal.value = false }
+}, { immediate: true })
+watch(() => staleShots.value.map(sb => sb.id), () => {
+  for (const sb of staleShots.value) if (isExportSelected(sb.id)) toggleExportSelect(sb)
+}, { immediate: true, flush: 'post' })
+watch(posterFinal, ready => { if (documentary.value && !ready) exportPosterEnabled.value = false })
+function exportSeconds(sb) {
+  if (!documentary.value) return sb.duration
+  const meta = sb.narration_meta || sb.narrationMeta || {}
+  return meta.composed?.duration_ms ? Number((meta.composed.duration_ms / 1000).toFixed(2)) : null
+}
+function selectShot(sb) {
+  if (documentary.value && !isFreshExport(sb)) return
+  toggleExportSelect(sb)
+}
+function selectAll() {
+  if (!documentary.value) { toggleSelectAllExport(); return }
+  const fresh = sbs.value.filter(sb => isFreshExport(sb) && exportReadyIds.value.includes(sb.id))
+  const clear = fresh.length > 0 && fresh.every(sb => isExportSelected(sb.id))
+  for (const sb of sbs.value) {
+    const desired = !clear && fresh.some(item => item.id === sb.id)
+    if (isExportSelected(sb.id) !== desired) toggleExportSelect(sb)
+  }
+}
+function updateShot(sb) {
+  if (!sb) return
+  panel.value = 'production'
+  ctx.prodTab.value = 'final'
+  setTimeout(() => document.getElementById(`final-composite-${sb.id}`)?.scrollIntoView({ block: 'center' }), 0)
+}
 </script>
 
 <template>
@@ -154,9 +191,9 @@ const {
           <span class="export-section-title">{{ t('episode.export.posterTitle') }}</span>
           <span class="dim" style="font-size:11px">{{ t('episode.export.posterHint') }}</span>
         </div>
-        <div v-if="posterVersionOptions.length" class="export-poster-row">
+        <div v-if="posterVersionOptions.length || documentary" class="export-poster-row">
           <label class="export-poster-check">
-            <input type="checkbox" v-model="exportPosterEnabled" />
+            <input type="checkbox" v-model="exportPosterEnabled" :disabled="documentary && !posterFinal" />
             {{ t('episode.export.posterEnable') }}
           </label>
           <select v-model="exportPosterVersionId" class="input export-poster-select" :disabled="!exportPosterEnabled">
@@ -180,6 +217,7 @@ const {
           <img v-if="exportPosterEnabled && posterPreviewUrl" :src="posterPreviewUrl" alt="" class="export-poster-preview" />
         </div>
         <div v-else class="export-merge-empty">{{ t('episode.export.posterNone') }}</div>
+        <button v-if="documentary && !posterFinal" class="btn btn-sm" @click="ctx.prodTab.value = 'poster'; panel = 'production'">{{ t('episode.final.posterMissing') }} ↗</button>
       </div>
 
       <!-- 下方:镜头素材(可勾选) -->
@@ -188,8 +226,8 @@ const {
           <span class="export-section-title">{{ t('episode.export.shotAssets') }}</span>
           <span class="dim" style="font-size:11px">{{ t('episode.export.shotStat', { done: shotVidCount, total: sbs.length, selected: exportSelectedReadyIds.length }) }}</span>
           <div class="ml-auto flex gap-1">
-            <button class="btn btn-sm" :disabled="!exportReadyIds.length" @click="toggleSelectAllExport">
-              {{ exportSelectedReadyIds.length === exportReadyIds.length && exportReadyIds.length ? t('episode.export.clearSelection') : t('episode.export.selectAllReady') }}
+            <button class="btn btn-sm" :disabled="!exportReadyIds.length" @click="selectAll">
+              {{ documentary ? (exportSelectedReadyIds.length > 0 && exportComposeReadyIds.every(id => isExportSelected(id)) ? t('episode.export.clearSelection') : t('episode.export.selectAllReady')) : (exportSelectedReadyIds.length === exportReadyIds.length && exportReadyIds.length ? t('episode.export.clearSelection') : t('episode.export.selectAllReady')) }}
             </button>
             <button
               class="btn btn-sm"
@@ -224,6 +262,7 @@ const {
             {{ t('episode.export.notReadyCount', { n: exportBlockedSelected.length }) }}
           </span>
         </div>
+        <div v-if="staleShots.length" class="export-compose-warn">{{ t('episode.final.staleExport', { n: staleShots.length }) }}</div>
         <div v-if="exportBlockedSelected.length" class="export-compose-warn">
           <div class="export-compose-skipped-title">{{ t('episode.export.notReadyTitle') }}</div>
           <span v-for="item in exportBlockedSelected" :key="item.id">
@@ -234,6 +273,8 @@ const {
           <div class="export-compose-skipped-title">{{ t('episode.export.blockedTitle') }}</div>
           <span v-for="item in mergeBlocked" :key="item.storyboard_id">
             {{ t('episode.compose.skippedItem', { n: item.storyboard_number, reason: item.reason }) }}
+            <span v-for="reason in item.change_reasons || []" :key="reason"> · {{ reason }}</span>
+            <button v-if="documentary" class="btn btn-sm" @click="updateShot(sbs.find(sb => sb.id === item.storyboard_id))">{{ t('episode.final.update') }} ↗</button>
           </span>
         </div>
         <div v-if="mergeSkipped.length" class="export-compose-skipped">
@@ -250,9 +291,9 @@ const {
             :role="hasUsableVideo(sb) ? 'button' : undefined"
             :tabindex="hasUsableVideo(sb) ? 0 : undefined"
             :aria-pressed="hasUsableVideo(sb) ? isExportSelected(sb.id) : undefined"
-            @click="toggleExportSelect(sb)"
-            @keydown.enter.prevent="toggleExportSelect(sb)"
-            @keydown.space.prevent="toggleExportSelect(sb)"
+            @click="selectShot(sb)"
+            @keydown.enter.prevent="selectShot(sb)"
+            @keydown.space.prevent="selectShot(sb)"
           >
             <div class="exp-thumb">
               <video
@@ -268,7 +309,7 @@ const {
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
               </div>
               <span class="exp-thumb-index">#{{ String(i+1).padStart(2,'0') }}</span>
-              <span v-if="sb.duration" class="exp-thumb-duration">{{ sb.duration }}s</span>
+              <span v-if="exportSeconds(sb)" class="exp-thumb-duration">{{ exportSeconds(sb) }}s</span>
               <span
                 v-if="hasVid(sb)"
                 class="exp-play"
@@ -292,6 +333,7 @@ const {
               >
                 {{ composeStatusLabel(sb) }}
               </span>
+              <button v-if="documentary && !isFreshExport(sb)" class="btn btn-sm" :title="composeReasonOf(sb)" @click.stop="updateShot(sb)">{{ t('episode.final.update') }} · {{ composeReasonOf(sb) }} ↗</button>
             </div>
           </div>
         </div>

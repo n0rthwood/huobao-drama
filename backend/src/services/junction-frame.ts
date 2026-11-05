@@ -51,7 +51,7 @@ export async function junctionFrameOf(storyboardId: number): Promise<JunctionFra
   const segment = await getLayerSegment(storyboardId)
   if (!segment) return { ...EMPTY_JUNCTION, combo }
   const spec = await resolveEpisodeSegmentSpec(sb.episodeId)
-  const fresh = layerSegmentIsFresh(segment, spec)
+  const fresh = layerSegmentIsFresh(segment, spec, combo)
   const path = segment.junction_path
   const fileExists = Boolean(path && fs.existsSync(getAbsolutePath(path)))
   return {
@@ -86,7 +86,7 @@ export async function junctionFramesOfEpisode(episodeId: number): Promise<Map<nu
       out.set(row.id, { ...EMPTY_JUNCTION, combo })
       continue
     }
-    const fresh = layerSegmentIsFresh(segment, spec)
+    const fresh = layerSegmentIsFresh(segment, spec, combo)
     const fileExists = Boolean(segment.junction_path && fs.existsSync(getAbsolutePath(segment.junction_path)))
     out.set(row.id, {
       source: slot === 'first' ? 'layer_last' : 'layer_first',

@@ -24,6 +24,7 @@ import { resolveDramaProjectType, type ProjectType } from './project-type.js'
 import { now } from '../utils/response.js'
 import { markEpisodeDesignCardsStale } from './staleness.js'
 import { toDesignCardStatus, type DesignCardStatus } from './design-card.js'
+import { segmentsByStoryboard, resolveEpisodeSegmentSpec, layerSegmentIsFresh } from './layer-segment.js'
 
 export const GATE_KEYS = ['assets', 'design', 'production', 'final', 'poster', 'export'] as const
 
@@ -148,6 +149,19 @@ export async function episodeGateFacts(episodeId: number): Promise<GateFacts | n
     const states = await composeStatesForEpisode(episodeId, { rows, episode: ep })
     fresh = states.filter(item => item.exportable).length
   }
+  let productionReady = rows.filter(sb => sb.keyframesConfirmed === true).length
+  if (projectType === 'documentary') {
+    const segments = await segmentsByStoryboard(rows.map(sb => sb.id))
+    const spec = await resolveEpisodeSegmentSpec(episodeId)
+    productionReady = rows.filter(sb => {
+      if (sb.designCardStatus !== 'confirmed' || !sb.combo) return false
+      const segment = segments.get(sb.id)
+      const layerReady = Boolean(segment && layerSegmentIsFresh(segment, spec, sb.combo))
+      if (sb.combo === 'A') return layerReady
+      if (sb.combo === 'B') return sb.keyframesConfirmed === true
+      return layerReady && sb.keyframesConfirmed === true
+    }).length
+  }
 
   return {
     projectType,
@@ -158,7 +172,7 @@ export async function episodeGateFacts(episodeId: number): Promise<GateFacts | n
       missing: projectType === 'documentary' ? assetReviewCounts(episodeId).missing : 0,
     },
     design: { confirmed: rows.filter(sb => sb.designCardStatus === 'confirmed').length, total: rows.length },
-    production: { ready: rows.filter(sb => sb.keyframesConfirmed === true).length, total: rows.length },
+    production: { ready: productionReady, total: rows.length },
     final: { fresh, total: rows.length },
   }
 }

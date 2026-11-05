@@ -8,7 +8,9 @@ import { eq } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
 import { now } from '../utils/response.js'
 import { mediaFacts } from './media-probe.js'
-import { resolveTransitionT, toAbsPath } from './compose-state.js'
+import { resolveTransitionT, toAbsPath, loadClipComposeContext } from './compose-state.js'
+import { shotMaxSeconds } from './shot-duration.js'
+import { resolveDramaProjectType } from './project-type.js'
 import {
   ComposeBlockedError,
   MAX_PAD_SECONDS,
@@ -62,21 +64,35 @@ async function measure(storyboardId: number) {
       videoHasAudio = facts.hasAudio
     }
   }
+  const documentary = resolveDramaProjectType(ep.dramaId) === 'documentary'
+  if (documentary) {
+    const context = await loadClipComposeContext(sb)
+    const parts = [context.clips.replace, context.clips.pre, context.clips.post].filter(Boolean)
+    let layerSeconds = 0
+    for (const part of parts) {
+      const facts = part?.render_path ? await mediaFacts(toAbsPath(part.render_path)) : null
+      layerSeconds += facts ? facts.durationMs / 1000 : Number(part?.duration || 0)
+    }
+    if (sb.combo === 'A') dv = layerSeconds || dv
+    else dv += layerSeconds
+  }
 
   const meta = parseNarrationMeta(sb.narrationMeta)
   let da: number | null = null
-  if (sb.narrationEnabled !== false && sb.narrationAudioUrl) {
+  if (ep.narrationEnabled === true && sb.narrationEnabled !== false && sb.narrationAudioUrl) {
     const facts = await mediaFacts(toAbsPath(sb.narrationAudioUrl))
     da = facts ? facts.durationMs / 1000 : (meta.audio ? meta.audio.duration_ms / 1000 : null)
   }
 
-  const { t } = await resolveTransitionT(storyboardId, sb.transitionReview, sb.videoUrl)
-  return { sb, ep, dv, da, t, videoHasAudio }
+  const transition = await resolveTransitionT(storyboardId, sb.transitionReview, sb.videoUrl)
+  const t = sb.combo === 'A' || ep.narrationEnabled !== true || sb.narrationEnabled === false ? 0 : transition.t
+  const maxSeconds = shotMaxSeconds(documentary ? sb.combo : null)
+  return { sb, ep, dv, da, t, videoHasAudio, maxSeconds }
 }
 
 export async function previewNarrationFit(storyboardId: number): Promise<NarrationFitPreview> {
-  const { sb, ep, dv, da, t, videoHasAudio } = await measure(storyboardId)
-  const availSeconds = Math.max(0, Math.min(dv, 15) - t)
+  const { sb, ep, dv, da, t, videoHasAudio, maxSeconds } = await measure(storyboardId)
+  const availSeconds = Math.max(0, Math.min(dv, maxSeconds) - t)
   const fit = resolveComposeFit({
     episodeDefault: ep.narrationFitDefault,
     shotFit: sb.narrationFit,
@@ -86,7 +102,7 @@ export async function previewNarrationFit(storyboardId: number): Promise<Narrati
     availSeconds,
     videoHasAudio,
   })
-  const plan = planCompose({ dv, da, t, fit })
+  const plan = planCompose({ dv, da, t, fit, maxSeconds, preserveVisualDuration: resolveDramaProjectType(ep.dramaId) === 'documentary' })
   const record = parseFitRecord(sb.narrationFit)
   const padMs = Math.round((fit.padHeadSeconds + fit.padTailSeconds) * 1000)
 
@@ -116,7 +132,7 @@ export async function saveNarrationFit(
   storyboardId: number,
   body: Record<string, unknown>,
 ): Promise<NarrationFitPreview> {
-  const { sb, ep, dv, da, t, videoHasAudio } = await measure(storyboardId)
+  const { sb, ep, dv, da, t, videoHasAudio, maxSeconds } = await measure(storyboardId)
 
   // 枚举值一律显式校验：静默回落会让前端/脚本的拼写错误变成「保存成功但行为不同」
   if (body.mode !== 'pad' && body.mode !== 'tempo') {
@@ -150,7 +166,7 @@ export async function saveNarrationFit(
   if (error) throw new Error(error)
 
   // 用当时的实测时长预检：差距 >30% 的倍速模式、放不下的旁白一律拒绝保存
-  const availSeconds = Math.max(0, Math.min(dv, 15) - t)
+  const availSeconds = Math.max(0, Math.min(dv, maxSeconds) - t)
   const fit = resolveComposeFit({
     episodeDefault: ep.narrationFitDefault,
     shotFit: JSON.stringify(record),
@@ -160,7 +176,7 @@ export async function saveNarrationFit(
     availSeconds,
     videoHasAudio,
   })
-  const plan = planCompose({ dv, da, t, fit })
+  const plan = planCompose({ dv, da, t, fit, maxSeconds, preserveVisualDuration: resolveDramaProjectType(ep.dramaId) === 'documentary' })
   if (plan.blocked) throw new ComposeBlockedError(plan, sb.storyboardNumber)
 
   record.updated_at = now()

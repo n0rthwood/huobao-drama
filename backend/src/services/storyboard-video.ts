@@ -5,6 +5,8 @@
  * 中间帧/尾帧只作引导帧。参考图顺序 = 首帧关键帧 → 视频绑定素材（视频提示词 + 转场段 @ 到的
  * 场景 → 角色 → 道具，Issue #18；去重、最多 9 张），因此素材在提示词里的编号从 2 起。
  * 关键帧未经人工确认的分镜拒绝生成。
+ * 首/尾均消费 keyframes 的生效图（含 C/D 衔接锁与 D 承接双锁），不接收客户端媒体路径。
+ * 首帧恒占参考图 1 号位，因此 H3 走 reference + AddGuide，不走 firstlast 模板。
  */
 import { and, eq, isNull } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
@@ -25,6 +27,7 @@ import {
   targetAssetRefs,
 } from './storyboard-assets.js'
 import { createHash } from 'node:crypto'
+import { videoTaskJunction } from './video-guide-snapshot.js'
 import { refBasename } from './storyboard-keyframes.js'
 import {
   composeTransitionPrompt,
@@ -34,6 +37,8 @@ import {
 } from './transition.js'
 import { runTransitionReview } from './transition-agent.js'
 import { loadDesignCardContext, resolveDesignCard } from './design-card-context.js'
+import { parseDesignCard, toCombo } from './design-card.js'
+import { resolveDramaProjectType } from './project-type.js'
 
 export interface StoryboardVideoOptions {
   model?: string
@@ -83,6 +88,7 @@ export interface VideoSignatureInput {
   aspectRatio: string
   resolution?: string | null
   provider: string
+  junction?: { slot: string; hash: string } | null
   model: string
 }
 
@@ -117,12 +123,23 @@ export function computeVideoSignature(input: VideoSignatureInput): {
       refBasename(input.midFrameUrl || ''),
       input.midFrameUrl ? input.midFrameTime ?? null : null,
       refBasename(input.lastFrameUrl || ''),
+      ...(input.junction ? [input.junction.slot, input.junction.hash] : []),
     ]),
     refs: digest((input.referenceImageUrls || []).map(refBasename)),
     spec: digest([Math.round(Number(input.duration) || 0), input.aspectRatio || '', input.resolution || '']),
     engine: digest([input.provider || '', input.model || '']),
   }
   return { signature: digest(parts), parts }
+}
+
+/** The generated segment limit includes opening transition and preparation overhead. */
+export function assertGeneratedSegmentDuration(contentSeconds: number, submittedSeconds: number, transitionSeconds = 0): void {
+  if (!Number.isFinite(contentSeconds) || contentSeconds < 4 || contentSeconds > 15) {
+    throw new Error('生成段时长必须在 4–15 秒内')
+  }
+  if (!Number.isFinite(submittedSeconds) || submittedSeconds < contentSeconds + transitionSeconds || submittedSeconds > 15) {
+    throw new Error('生成段含开场转场与准备时间不能超过 15 秒，请缩短生成段预算或转场')
+  }
 }
 
 /** 组装分镜的视频生成请求（不提交） */
@@ -138,16 +155,25 @@ export async function buildStoryboardVideoRequest(
     .where(eq(schema.episodes.id, storyboard.episodeId))
   if (!episode) throw new Error('剧集不存在')
   const [drama] = await db.select().from(schema.dramas).where(eq(schema.dramas.id, episode.dramaId))
+  const documentary = resolveDramaProjectType(episode.dramaId) === 'documentary'
+  const combo = toCombo(storyboard.combo)
+  if (documentary && (!combo || storyboard.designCardStatus !== 'confirmed')) throw new Error('设计卡未确认')
+  if (documentary && combo === 'A') throw new Error('未启用生成段')
 
   // 关键帧闸门：就绪且人工确认过才允许生成视频
   const keyframes = (await loadEpisodeKeyframes(episode.id)).get(storyboardId)
   if (!keyframes?.confirmed) {
     throw new Error(`分镜 #${storyboard.storyboardNumber} 的关键帧尚未确认`)
   }
+  if (documentary && (combo === 'C' || combo === 'D') && (!keyframes.locked?.hash || keyframes.locked.stale)) {
+    throw new Error('衔接帧缺失或已过期，请先渲染图层段并重新确认关键帧')
+  }
 
   // 配置优先级与 POST /tasks 一致：请求显式指定 > 集锁定配置 > 当前启用配置
   const configId = opts.configId ?? episode.videoConfigId ?? undefined
-  const config = configId ? (await getConfigById(configId)) ?? await getActiveConfig('video') : await getActiveConfig('video')
+  const selectedConfig = configId ? await getConfigById(configId, documentary ? 'video' : undefined) : null
+  if (documentary && opts.configId !== undefined && !selectedConfig) throw new Error('指定的视频配置已停用或不存在，请重新选择；不会自动切换到其它服务')
+  const config = selectedConfig ?? await getActiveConfig('video')
   if (!config) throw new Error('未配置视频模型，请先到「设置」页添加并启用 AI 服务')
   const model = opts.model || undefined
   const modelError = validateVideoModel(config.provider, model || config.model)
@@ -160,7 +186,10 @@ export async function buildStoryboardVideoRequest(
 
   // ===== 开场转场（#11）：承接镜头提交前自动审核/生成，手动编辑过的不覆盖 =====
   let sb = storyboard
-  const contentDuration = Number(sb.duration || 10)
+  const contentDuration = documentary
+    ? Number(parseDesignCard(sb.designCard)?.budget.gen_s ?? sb.duration ?? 10)
+    : Number(sb.duration || 10)
+  if (documentary) assertGeneratedSegmentDuration(contentDuration, contentDuration)
   let transition: { text: string; seconds: number; extra: number } | null = null
   let submitDuration = contentDuration
   let midGuideTime = sb.midFrameTime ?? null
@@ -189,6 +218,10 @@ export async function buildStoryboardVideoRequest(
       }
     }
   }
+
+  // H3 silently clamps at 15s; reject before submission so guides, prompt and signature
+  // describe the actual generated segment, including transition preparation overhead.
+  if (documentary) assertGeneratedSegmentDuration(contentDuration, submitDuration, transition?.seconds ?? 0)
 
   // 视频提示词的 @引用 必须与视频绑定一致（Issue #7/#18），否则会出现“提到了却没带参考图”；
   // 带转场提交时，转场段里的 @引用 同样参与检查（转场写入时已同步到视频绑定）
@@ -257,7 +290,8 @@ export async function buildStoryboardVideoRequest(
     ...(transition ? { transition: { T: transition.seconds, E: transition.extra } } : {}),
     aspectRatio: drama?.aspectRatio || '16:9',
     resolution: episode.resolution || undefined,
-    configId,
+    configId: documentary ? config.id : configId,
+    ...(keyframes.locked?.hash && keyframes.locked.slot !== 'mid' ? { junction_hash: keyframes.locked.hash, junction_slot: keyframes.locked.slot } : {}),
   }
 
   // 签名取请求的最终输出，与 sys_task 落库的 params 同一份口径
@@ -274,6 +308,7 @@ export async function buildStoryboardVideoRequest(
     resolution: params.resolution,
     provider: config.provider,
     model: resolvedModel,
+    junction: keyframes.locked?.hash ? { slot: keyframes.locked.slot, hash: keyframes.locked.hash } : null,
   })
 
   return {
@@ -304,12 +339,12 @@ export interface VideoVersion {
  * 历史版本（sys_task）的签名。#5 之前的任务缺少引导帧/时长等字段时返回 null，
  * 作为 unknown 单列，不报错也不当成“已变化”。
  */
-export function videoSignatureFromTask(task: {
+export async function videoSignatureFromTask(task: {
   prompt: string | null
   provider: string | null
   model: string | null
   params: string | null
-}): { signature: string; parts: VideoSignatureParts } | null {
+}): Promise<{ signature: string; parts: VideoSignatureParts } | null> {
   if (!task.prompt || !task.provider || !task.model) return null
   let params: Record<string, unknown> = {}
   try {
@@ -323,6 +358,8 @@ export function videoSignatureFromTask(task: {
   const aspectRatio = typeof params.aspectRatio === 'string' ? params.aspectRatio : null
   const duration = Number(params.duration)
   if (!firstFrameUrl || !aspectRatio || !Number.isFinite(duration) || duration <= 0) return null
+  const junction = await videoTaskJunction(params)
+  if (!junction && (params.junction_hash !== undefined || params.junction_slot !== undefined || [params.firstFrameUrl, params.lastFrameUrl].some(source => typeof source === 'string' && source.replace(/\\/g, '/').includes('/layer-frames/')))) return null
   return computeVideoSignature({
     prompt: task.prompt,
     firstFrameUrl,
@@ -337,17 +374,18 @@ export function videoSignatureFromTask(task: {
     resolution: typeof params.resolution === 'string' ? params.resolution : null,
     provider: task.provider,
     model: task.model,
+    junction,
   })
 }
 
 /** 某分镜的历史视频版本（含版本号与签名），按创建时间正序 */
 export async function loadVideoVersions(storyboardId: number): Promise<VideoVersion[]> {
   const tasks = (await db.select().from(schema.sysTask))
-    .filter(task => task.type === 'video' && task.status === 'completed' && task.storyboardId === storyboardId)
+    .filter(task => task.type === 'video' && task.provider !== 'layer-segment' && task.status === 'completed' && task.storyboardId === storyboardId)
     .filter(task => task.localPath || task.resultUrl)
     .sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')) || a.id - b.id)
-  return tasks.map((task, index) => {
-    const computed = videoSignatureFromTask(task)
+  return Promise.all(tasks.map(async (task, index) => {
+    const computed = await videoSignatureFromTask(task)
     return {
       id: task.id,
       video: (task.localPath || task.resultUrl)!,
@@ -356,7 +394,7 @@ export async function loadVideoVersions(storyboardId: number): Promise<VideoVers
       signature: computed?.signature ?? null,
       parts: computed?.parts ?? null,
     }
-  })
+  }))
 }
 
 /** 与某个历史版本逐分项比较，返回变化的分项中文名（用于预览的「变化原因」） */

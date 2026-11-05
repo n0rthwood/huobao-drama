@@ -24,6 +24,7 @@ import { parseTextTaskParams } from './text-task.js'
 import { composeEpisodeLabel, composeTaskLabel, type TaskTargetKind } from './task-label.js'
 import { toUnixSeconds } from './media-time.js'
 import { IMPORTED_TASK_PROVIDER } from './asset-library.js'
+import type { BatchScope } from './batch-scope.js'
 
 export type { TaskLabelInput, TaskTargetKind } from './task-label.js'
 export { composeEpisodeLabel, composeTaskLabel, renderRefPrompt } from './task-label.js'
@@ -241,6 +242,8 @@ export interface ParentRow {
   updated_at: string
   updated_at_unix: number | null
   children: TaskRow[]
+  scope?: BatchScope
+  params?: { scope?: BatchScope }
 }
 
 export interface MergeRow {
@@ -369,7 +372,7 @@ export async function listTaskCenter(filters: CenterFilters): Promise<{
 
   const pushBatch = (
     rowType: 'keyframe_batch' | 'video_batch',
-    batch: { id: number; episodeId: number; status: string | null; items: string | null; createdAt: string; updatedAt: string },
+    batch: { id: number; episodeId: number; status: string | null; items: string | null; options?: string | null; createdAt: string; updatedAt: string },
     suffix: string,
   ) => {
     const items = parseBatchItems(batch.items)
@@ -384,6 +387,8 @@ export async function listTaskCenter(filters: CenterFilters): Promise<{
       if (task) remoteByTask[item.task_id] = parseRemoteState(task.remoteState)
     }
     const aggregate = aggregateBatchItems(items, remoteByTask)
+    let scope: BatchScope | undefined
+    try { scope = JSON.parse(batch.options || '{}').scope } catch { /* Historical batches may have no scope. */ }
     const dramaId = dramaOfEpisode(batch.episodeId)
     const status = batch.status || 'running'
     if (filters.episodeId && batch.episodeId !== filters.episodeId) return
@@ -404,6 +409,8 @@ export async function listTaskCenter(filters: CenterFilters): Promise<{
       updated_at: batch.updatedAt,
       updated_at_unix: toUnixSeconds(batch.updatedAt),
       children,
+      scope,
+      params: { scope },
     })
   }
 

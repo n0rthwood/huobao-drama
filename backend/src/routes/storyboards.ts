@@ -36,6 +36,7 @@ import { composeShot } from '../services/shot-compose.js'
 import { ComposeBlockedError } from '../services/narration-fit.js'
 import { clearNarrationFit, previewNarrationFit, saveNarrationFit } from '../services/narration-fit-service.js'
 import { serializeTask } from '../services/sys-task.js'
+import { GateBlockedError } from '../services/workflow-gates.js'
 import {
   SLOT_LABEL,
   SLOT_FRAME_TYPE,
@@ -595,6 +596,7 @@ app.post('/:id/compose', async (c) => {
   try {
     return success(c, await composeShot(id))
   } catch (err) {
+    if (err instanceof GateBlockedError) throw err
     const message = err instanceof Error ? err.message : '合成失败'
     logTaskError('StoryboardAPI', 'compose', { storyboardId: id, error: message })
     // 阻断时返回结构化错误体，前端直接渲染字段，不解析中文文案（#31）

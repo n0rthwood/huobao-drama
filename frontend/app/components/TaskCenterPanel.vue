@@ -67,6 +67,11 @@
                 @click.stop="copyRowError(row)"
               ><Copy :size="12" /></button>
             </div>
+            <details v-if="batchScopeOf(row)" class="tc-batch-scope" @click.stop>
+              <summary>{{ t('episode.final.scope', { included: batchScopeOf(row).included.length, excluded: batchScopeOf(row).excluded.length }) }}</summary>
+              <div v-for="id in batchScopeOf(row).included" :key="`in-${id}`">✓ #{{ id }}</div>
+              <div v-for="item in batchScopeOf(row).excluded" :key="`out-${item.storyboard_id}`">— #{{ item.storyboard_number || item.storyboard_id }} · {{ item.reason }}</div>
+            </details>
           </div>
           <ProgressRing
             v-if="rowRing(row).status && rowRing(row).status !== 'completed'"
@@ -141,6 +146,7 @@ import MediaTime from '~/components/MediaTime.vue'
 import { taskAPI, dramaAPI } from '~/composables/useApi'
 import { mapError } from '~/composables/useToast'
 import { useTasks, absorbRows, isParentRow } from '~/composables/useTasks'
+import { batchScopeOf } from '~/utils/documentaryFinal'
 import {
   useNowTicker, ringPropsFromTask, ringPropsFromBatchItem,
 } from '~/composables/useTaskProgress'

@@ -15,6 +15,9 @@ import { completionStamp } from '../services/media-time.js'
 import { readReasoningFile } from '../agents/reasoning-sink.js'
 import { parseTextTaskParams } from '../services/text-task.js'
 import { onAssetLibraryChanged } from '../services/asset-review.js'
+import { buildStoryboardVideoRequest } from '../services/storyboard-video.js'
+import { resolveDramaProjectType } from '../services/project-type.js'
+import { GateBlockedError } from '../services/workflow-gates.js'
 
 const app = new Hono()
 
@@ -61,12 +64,6 @@ app.post('/', async (c) => {
     if (!body.prompt) return badRequest(c, '提示词必填')
   }
 
-  const parsedVideoBody = type === 'video' ? videoRequestSchema.safeParse(body) : null
-  if (parsedVideoBody && !parsedVideoBody.success) {
-    return badRequest(c, parsedVideoBody.error.issues[0]?.message || '视频生成请求无效')
-  }
-  const videoBody: VideoRequest | null = parsedVideoBody?.success ? parsedVideoBody.data : null
-
   try {
     // 请求显式指定 config_id（工作台模型下拉跨厂商切换）时优先；
     // 未指定才回退到集锁定配置，避免锁定配置与所选模型错配（如锁定 Seedance 却传 MiniMax 模型名）
@@ -83,6 +80,17 @@ app.post('/', async (c) => {
         storyboardDramaId = ep?.dramaId ?? undefined
       }
     }
+    // 纪录片分镜的视频输入只认服务端设计卡、已确认关键帧和衔接锁。
+    // 客户端只可选模型/配置，不能用通用任务入口覆盖媒体路径或冒充任务归属。
+    const storyboardVideo = type === 'video' && body.storyboard_id
+      && resolveDramaProjectType(storyboardDramaId) === 'documentary'
+      ? await buildStoryboardVideoRequest(Number(body.storyboard_id), { model: body.model, configId })
+      : null
+    const parsedVideoBody = type === 'video' && !storyboardVideo ? videoRequestSchema.safeParse(body) : null
+    if (parsedVideoBody && !parsedVideoBody.success) {
+      return badRequest(c, parsedVideoBody.error.issues[0]?.message || '视频生成请求无效')
+    }
+    const videoBody: VideoRequest | null = parsedVideoBody?.success ? parsedVideoBody.data : null
 
     if (type === 'video' && videoBody) {
       const effectiveConfig = configId
@@ -123,7 +131,7 @@ app.post('/', async (c) => {
         frameType: body.frame_type,
         configId,
       })
-      : await generateVideo({
+      : storyboardVideo ? await generateVideo(storyboardVideo.params) : await generateVideo({
         storyboardId: body.storyboard_id,
         episodeId: body.episode_id ? Number(body.episode_id) : undefined,
         dramaId: body.drama_id,
@@ -153,6 +161,7 @@ app.post('/', async (c) => {
     logTaskSuccess('TaskAPI', 'generate', { taskId: id, type, provider: record?.provider })
     return created(c, record ? serializeTask(record) : null)
   } catch (err: unknown) {
+    if (err instanceof GateBlockedError) throw err
     const message = err instanceof Error ? err.message : '生成任务失败'
     logTaskError('TaskAPI', 'generate', { type, error: message })
     return badRequest(c, message)

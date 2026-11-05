@@ -8,7 +8,7 @@ import { EXTRACT_TARGETS, getExtractionStatus, startExtraction, type ExtractTarg
 import { getVideoPromptBatchStatus, startVideoPromptBatch } from '../services/video-prompts.js'
 import { getKeyframePromptBatchStatus, startKeyframePromptBatch } from '../services/keyframe-prompts.js'
 import { isKeyframeSlot, keyframesJson, loadEpisodeKeyframes, type KeyframeSlot } from '../services/keyframes.js'
-import { batchScopeOf } from '../services/batch-scope.js'
+import { batchScopeOf, scopeFromPreview } from '../services/batch-scope.js'
 import { parseStylingVersion } from '../services/styling-version.js'
 import { resolveDramaProjectType } from '../services/project-type.js'
 import {
@@ -23,6 +23,9 @@ import {
   getEpisodeVideoBatch,
   previewEpisodeVideoBatch,
   startEpisodeVideoBatch,
+  videoBatchScopeOf,
+  retryFailedVideoBatch,
+  previewFailedVideoBatch,
 } from '../services/video-batch.js'
 import {
   cancelEpisodeKeyframeBatch,
@@ -60,8 +63,9 @@ import {
 } from '../services/narration.js'
 import { composeStateMap, narrationStatusFor, type ComposeStateItem } from '../services/compose-state.js'
 import { getNarrationScriptStatus, startNarrationScript } from '../services/narration-script.js'
-import { getMarkupCatalog, getTtsOptions, getVoiceBatchStatus, previewVoiceBatch, resolveSubtitleTiming, startVoiceBatch } from '../services/narration-voice.js'
-import { getComposeBatchStatus, previewComposeBatch, startComposeBatch } from '../services/shot-compose.js'
+import { getMarkupCatalog, getTtsOptions, getVoiceBatchStatus, previewVoiceBatch, previewFailedVoiceBatch, resolveSubtitleTiming, startVoiceBatch, retryFailedVoiceBatch } from '../services/narration-voice.js'
+import { previewLayerRenderBatch, startLayerRenderBatch, getLayerRenderBatchStatus, retryFailedLayerRenderBatch } from '../services/layer-render-batch.js'
+import { getComposeBatchStatus, previewComposeBatch, startComposeBatch, retryFailedComposeBatch } from '../services/shot-compose.js'
 import { DEFAULT_FIT_RECORD, parseFitRecord, validateFitRecord } from '../services/narration-fit.js'
 import type { AssetKind } from '../services/reference-images.js'
 import { loadEpisodeRosterRecord, saveEpisodeRosterRecord } from '../services/character-roster.js'
@@ -460,8 +464,9 @@ function voiceBatchIds(body: Record<string, any>): number[] | undefined {
 app.post('/:id/narration/voice-batch/preview', async (c) => {
   const body = await c.req.json().catch(() => ({} as Record<string, any>))
   try {
-    const items = await previewVoiceBatch(Number(c.req.param('id')), body.settings, voiceBatchIds(body))
-    return success(c, { items })
+    if (body.retry_failed === true) return success(c, await previewFailedVoiceBatch(Number(c.req.param('id'))))
+    const items = await previewVoiceBatch(Number(c.req.param('id')), body.settings)
+    return success(c, { items, scope: scopeFromPreview(items, voiceBatchIds(body)) })
   } catch (err) {
     return badRequest(c, err instanceof Error ? err.message : '配音预览失败')
   }
@@ -477,10 +482,10 @@ app.post('/:id/narration/voice-batch', async (c) => {
     const result = await startVoiceBatch(ep.id, ep.dramaId, voiceBatchIds(body), body.settings)
     if (result.total === -1) {
       const running = await getVoiceBatchStatus(ep.id)
-      return success(c, { status: 'running', already_running: true, total: running?.total ?? 0, completed: running?.completed ?? 0 })
+      return success(c, { status: 'running', already_running: true, total: running?.total ?? 0, completed: running?.completed ?? 0, scope: running?.scope })
     }
-    if (!result.started) return success(c, { status: 'idle', total: 0 })
-    return success(c, { status: 'running', total: result.total })
+    if (!result.started) return success(c, { ...result, status: 'idle' })
+    return success(c, { ...result, status: 'running' })
   } catch (err) {
     return badRequest(c, err instanceof Error ? err.message : '批量配音启动失败')
   }
@@ -500,7 +505,15 @@ app.post('/:id/compose-batch/preview', async (c) => {
     ? body.storyboard_ids.map(Number).filter((n: number) => Number.isInteger(n) && n > 0)
     : undefined
   try {
-    return success(c, { items: await previewComposeBatch(id, storyboardIds) })
+    const items = await previewComposeBatch(id)
+    if (body.retry_failed === true) {
+      const previous = await getComposeBatchStatus(id)
+      if (!previous) return badRequest(c, '没有可重试的合成批次')
+      const failed = previous.items.filter(item => item.state === 'failed').map(item => item.storyboard_id)
+      const scope = scopeFromPreview(items, failed)
+      return success(c, { items: items.map(item => ({ ...item, checked: scope.included.some(shot => shot.storyboard_id === item.storyboard_id) })), scope })
+    }
+    return success(c, { items, scope: scopeFromPreview(items, storyboardIds) })
   } catch (err) {
     return badRequest(c, err instanceof Error ? err.message : '批量融合预览失败')
   }
@@ -520,7 +533,7 @@ app.post('/:id/compose-batch', async (c) => {
   try {
     const result = await startComposeBatch(ep.id, ep.dramaId, storyboardIds)
     if (result.total === -1) return success(c, { status: 'running', already_running: true, total: 0 })
-    return success(c, { status: 'running', total: result.total })
+    return success(c, { ...result, status: 'running' })
   } catch (err) {
     return badRequest(c, err instanceof Error ? err.message : '批量合成启动失败')
   }
@@ -531,17 +544,25 @@ app.get('/:id/compose-batch-status', async (c) => {
   return success(c, await getComposeBatchStatus(Number(c.req.param('id'))))
 })
 
+app.post('/:id/compose-batch/retry-failed', async (c) => {
+  const id = Number(c.req.param('id'))
+  const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, id))
+  if (!ep) return notFound(c, '剧集不存在')
+  try { return success(c, await retryFailedComposeBatch(id, ep.dramaId)) }
+  catch (err) { return badRequest(c, err instanceof Error ? err.message : '重试合成失败') }
+})
+
 // POST /episodes/:id/video-batch/preview — 逐镜列出 缺视频/已变化/未变化(同第N版)/无法判断/阻断/跳过
 app.post('/:id/video-batch/preview', async (c) => {
   const id = Number(c.req.param('id'))
   const body = await c.req.json().catch(() => ({} as Record<string, any>))
   try {
+    if (body.retry_failed === true) return success(c, await previewFailedVideoBatch(id))
     const items = await previewEpisodeVideoBatch(id, {
-      storyboardIds: Array.isArray(body.storyboard_ids) ? body.storyboard_ids.map(Number) : undefined,
       model: body.model,
       configId: body.config_id,
     })
-    return success(c, { items })
+    return success(c, { items, scope: videoBatchScopeOf(items, voiceBatchIds(body)) })
   } catch (err) {
     return badRequest(c, err instanceof Error ? err.message : '批量视频预览失败')
   }
@@ -566,6 +587,52 @@ app.post('/:id/video-batch', async (c) => {
     return badRequest(c, err instanceof Error ? err.message : '批量视频启动失败')
   }
 })
+
+app.post('/:id/video-batch/retry-failed', async (c) => {
+  try { return success(c, await retryFailedVideoBatch(Number(c.req.param('id')))) }
+  catch (err) { return badRequest(c, err instanceof Error ? err.message : '重试视频失败') }
+})
+
+app.post('/:id/narration/voice-batch/retry-failed', async (c) => {
+  const id = Number(c.req.param('id'))
+  const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, id))
+  if (!ep) return notFound(c, '剧集不存在')
+  try { return success(c, await retryFailedVoiceBatch(id, ep.dramaId)) }
+  catch (err) { return badRequest(c, err instanceof Error ? err.message : '重试配音失败') }
+})
+
+for (const route of ['/:id/layer-render-batch', '/:id/layer-segments/render-batch']) {
+  app.post(`${route}/preview`, async (c) => {
+    const body = await c.req.json().catch(() => ({} as Record<string, any>))
+    try {
+      const items = await previewLayerRenderBatch(Number(c.req.param('id')))
+      if (body.retry_failed === true) {
+        const previous = await getLayerRenderBatchStatus(Number(c.req.param('id')))
+        if (!previous?.scope) return badRequest(c, '没有可重试的图层段范围快照')
+        const failed = new Set(previous.items.filter(item => ['failed', 'pending', 'processing'].includes(item.state)).map(item => item.storyboard_id))
+        return success(c, { items: items.map(item => ({ ...item, checked: failed.has(item.storyboard_id) && item.selectable })), scope: scopeFromPreview(items, [...failed]) })
+      }
+      return success(c, { items, scope: scopeFromPreview(items, voiceBatchIds(body)) })
+    } catch (err) { return badRequest(c, err instanceof Error ? err.message : '图层段渲染预览失败') }
+  })
+  app.post(route, async (c) => {
+    const id = Number(c.req.param('id'))
+    const body = await c.req.json().catch(() => ({} as Record<string, any>))
+    const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, id))
+    if (!ep) return notFound(c, '剧集不存在')
+    try { return success(c, await startLayerRenderBatch(id, ep.dramaId, voiceBatchIds(body) ?? [])) }
+    catch (err) { return badRequest(c, err instanceof Error ? err.message : '图层段渲染启动失败') }
+  })
+  app.post(`${route}/retry-failed`, async (c) => {
+    const id = Number(c.req.param('id'))
+    const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, id))
+    if (!ep) return notFound(c, '剧集不存在')
+    try { return success(c, await retryFailedLayerRenderBatch(id, ep.dramaId)) }
+    catch (err) { return badRequest(c, err instanceof Error ? err.message : '重试图层段渲染失败') }
+  })
+}
+app.get('/:id/layer-render-batch-status', async (c) => success(c, await getLayerRenderBatchStatus(Number(c.req.param('id')))))
+app.get('/:id/layer-segments/render-batch-status', async (c) => success(c, await getLayerRenderBatchStatus(Number(c.req.param('id')))))
 
 // GET /episodes/:id/video-batch — 最近一次批量的进度（刷新页面后仍可查看）
 app.get('/:id/video-batch', async (c) => {
@@ -852,6 +919,7 @@ app.get('/:episode_id/storyboards', async (c) => {
           narrationText: row.narrationText,
           meta: parseNarrationMeta(row.narrationMeta),
           normalize: row.narrationNormalize ?? (narrationEpisode?.narrationNormalize !== false),
+          combo: resolveDramaProjectType(narrationEpisode?.dramaId) === 'documentary' ? row.combo : null,
         }),
       ],
       narration_meta: parseNarrationMeta(row.narrationMeta),

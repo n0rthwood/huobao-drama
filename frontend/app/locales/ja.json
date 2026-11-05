@@ -771,6 +771,23 @@
     }
   },
   "episode": {
+    "final": {
+      "layer": "レイヤー区間", "generated": "生成区間", "composite": "完成映像",
+      "budget": "予算 {seconds}s", "measured": "音声実測 {seconds}s",
+      "noCombo": "設計カードを確認し、区間の組合せを選択してください",
+      "fresh": "最新", "stale": "未レンダーまたは古い", "failed": "失敗", "rendering": "レンダー中", "render": "再レンダー",
+      "inherited": "継承ロック {seconds}s · 生成不要",
+      "junction": "接続点 {seconds}s · 接続フレーム固定（連続性目標）",
+      "overBudget": "音声実測が予算を超えています。生成前に確認してください", "confirmGenerate": "確認して生成",
+      "subtitle": "字幕は音声に自動整列 · 焼き込み",
+      "continuity": "接続設計（読取専用）", "continue": "継続", "cut": "カット",
+      "scope": "処理 {included}；除外 {excluded}", "start": "{n} カットを処理",
+      "notFailed": "失敗以外", "voice": "音声", "settings": "ナレーションと字幕設定",
+      "staleExport": "古い完成映像 {n} 件を選択解除しました", "update": "更新へ",
+      "posterMissing": "最終 Poster なし · Poster 作成へ",
+      "scopeReasons": { "no_generated_segment": "生成区間なし", "keyframes_unconfirmed": "キーフレーム未確認", "generating": "生成中", "unchanged": "最新", "not_selected": "未選択", "not_failed": "失敗対象外" },
+      "batch": { "voice": "一括音声", "layer": "レイヤー一括レンダー", "video": "動画一括生成", "compose": "完成映像一括合成" }
+    },
     "production": {
       "title": "カット制作",
       "shotCount": "全 {n} カット",
@@ -1586,7 +1603,6 @@
       "previewUnknown": "判定不可",
       "previewBlocked": "ブロック",
       "previewSkipped": "スキップ",
-      "previewDeterministic": "確定的クリップ",
       "batchStarted": "{n} 件の動画生成タスクを開始しました",
       "retryFailed": "失敗を再試行({n})",
       "select": "選択",
@@ -1949,6 +1965,7 @@
       "statusUnchanged": "最新",
       "statusUnknown": "要確認",
       "statusBlocked": "ブロック",
+      "statusExcluded": "未準備",
       "statusSkipped": "処理中",
       "disabledHint": "このエピソードはナレーションが無効です。結合では元動画をそのまま使います",
       "sourceOriginal": "元動画",

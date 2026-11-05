@@ -18,24 +18,27 @@ import {
   computeVideoSignature,
   describeSignatureDiff,
   videoSignatureFromTask,
+  assertGeneratedSegmentDuration,
 } from '${backendRoot}src/services/storyboard-video.ts'
 
 const [kind, payload] = JSON.parse(process.env.SIG_INPUT!)
 const out = kind === 'request'
   ? computeVideoSignature(payload)
   : kind === 'task'
-    ? videoSignatureFromTask(payload)
-    : describeSignatureDiff(payload[0], payload[1])
-process.stdout.write(JSON.stringify(out))
+    ? await videoSignatureFromTask(payload)
+    : kind === 'duration'
+      ? (() => { try { assertGeneratedSegmentDuration(...payload); return { valid: true } } catch (error) { return { valid: false, error: error.message } } })()
+      : describeSignatureDiff(payload[0], payload[1])
+process.stdout.write('@@' + JSON.stringify(out))
 `)
 
 function run(kind, payload) {
   const out = execFileSync('npx', ['tsx', entry], {
     cwd: backendRoot,
     encoding: 'utf8',
-    env: { ...process.env, SIG_INPUT: JSON.stringify([kind, payload]) },
+    env: { ...process.env, SQLITE_PATH: join(entry, '..', 'test.sqlite3'), SIG_INPUT: JSON.stringify([kind, payload]) },
   })
-  return JSON.parse(out)
+  return JSON.parse(out.slice(out.lastIndexOf('@@') + 2))
 }
 
 const baseRequest = {
@@ -97,4 +100,24 @@ test('historical tasks missing comparison fields yield null (classified as unkno
   // #5 之前的视频任务没有 firstFrameUrl
   assert.equal(run('task', { ...baseTask, params: JSON.stringify({ duration: 10, aspectRatio: '16:9' }) }), null)
   assert.equal(run('task', { ...baseTask, params: 'not json' }), null)
+})
+
+test('junction slot/hash changes only guides and survives exact persisted task fields', () => {
+  const legacy = run('request', baseRequest)
+  const junction = { slot: 'first', hash: 'a'.repeat(64) }
+  const current = run('request', { ...baseRequest, junction })
+  assert.notEqual(current.signature, legacy.signature)
+  assert.deepEqual(run('diff', [current.parts, legacy.parts]), ['关键帧'])
+  const task = { ...baseTask, params: JSON.stringify({ ...JSON.parse(baseTask.params), junction_hash: junction.hash, junction_slot: junction.slot }) }
+  assert.deepEqual(run('task', task), current)
+  assert.notEqual(run('request', { ...baseRequest, junction: { ...junction, hash: 'new' } }).signature, current.signature)
+  assert.equal(run('request', { ...baseRequest, junction: null }).signature, legacy.signature)
+})
+
+test('generated segment duration includes transition overhead rather than adapter clamping', () => {
+  assert.equal(run('duration', [12, 15, 3]).valid, true)
+  assert.equal(run('duration', [15, 15, 3]).valid, false)
+  assert.equal(run('duration', [15, 18, 3]).valid, false)
+  assert.equal(run('duration', [15, 15, 0]).valid, true)
+  assert.equal(run('duration', [16, 16, 0]).valid, false)
 })

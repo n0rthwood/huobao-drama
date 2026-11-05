@@ -5176,6 +5176,8 @@ const EPISODE_TOUR = [
 provide(WORKBENCH_CTX, {
   KEYFRAME_SLOTS,
   VIDEO_COL_DEFAULTS,
+  narrationSettingsOpen,
+  shotMentionOptions,
   activeMerge,
   allKeyframesConfirmed,
   allVideoTaskRows,

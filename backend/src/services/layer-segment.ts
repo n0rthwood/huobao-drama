@@ -259,6 +259,9 @@ export async function saveLayerSegment(
   const baseRef = 'base_ref' in input ? input.base_ref ?? null : existing?.base_ref ?? null
   const warnings = qualityWarningsOf(layerDoc, timeline.keyframes, spec)
   const ts = now()
+  const staleReasons = (existing?.stale_reasons || []).filter(reason =>
+    !(reason === SEGMENT_STALE_REASONS.baseRefUnresolved && baseRef)
+    && !(reason === SEGMENT_STALE_REASONS.comboMissing && row.combo))
   if (existing) {
     // 输入变了：旧渲染的签名自然对不上，不需要在这里改 render_signature（新鲜度为读时现算）
     await db.update(schema.storyboardLayerSegments).set({
@@ -267,6 +270,7 @@ export async function saveLayerSegment(
       duration,
       baseRef: baseRef ? JSON.stringify(baseRef) : null,
       qualityWarnings: JSON.stringify(warnings),
+      staleReasons: JSON.stringify(staleReasons),
       updatedAt: ts,
     }).where(eq(schema.storyboardLayerSegments.id, existing.id))
     return {
@@ -277,6 +281,7 @@ export async function saveLayerSegment(
       end_hold: endHoldOf(timeline, duration),
       base_ref: baseRef,
       quality_warnings: warnings,
+      stale_reasons: staleReasons,
       updated_at: ts,
     }
   }
@@ -430,17 +435,18 @@ function renderInputsOf(doc: LayerDoc): LayerDoc {
   }
 }
 
-/** 图层段渲染签名（`'seg-v1'`）：输入任何一处变化（含底图文件本身被换掉）都要重渲染 */
+/** C/D v2 includes the encoded text-free boundary profile; A/legacy retain v1. */
 export function layerSegmentSignatureOf(
   segment: Pick<LayerSegment, 'layer_doc' | 'timeline' | 'duration'>,
   spec: Pick<SegmentSpec, 'width' | 'height' | 'fps'>,
+  combo?: string | null,
 ): string {
   const images = [segment.layer_doc.base.path]
   for (const layer of segment.layer_doc.layers) {
     if (layer.type === 'image') images.push(layer.src.path)
   }
   return crypto.createHash('sha256').update([
-    'seg-v1',
+    combo === 'C' || combo === 'D' ? `seg-v2-${combo}` : 'seg-v1',
     JSON.stringify(renderInputsOf(segment.layer_doc)),
     JSON.stringify(segment.timeline),
     segment.duration.toFixed(3),
@@ -451,10 +457,12 @@ export function layerSegmentSignatureOf(
 }
 
 /** 已渲染的成品是否仍对得上当前输入（文件在 + 签名一致） */
-export function layerSegmentIsFresh(segment: LayerSegment, spec: Pick<SegmentSpec, 'width' | 'height' | 'fps'>): boolean {
+export function layerSegmentIsFresh(segment: LayerSegment, spec: Pick<SegmentSpec, 'width' | 'height' | 'fps'>, combo?: string | null): boolean {
+  // quality_warnings are advisory; only the historical multi-clip migration note is nonblocking here.
+  if (segment.stale_reasons.some(reason => reason !== SEGMENT_STALE_REASONS.migratedMultiClip)) return false
   if (!segment.render_path || !segment.render_signature) return false
   if (!fs.existsSync(getAbsolutePath(segment.render_path))) return false
-  return segment.render_signature === layerSegmentSignatureOf(segment, spec)
+  return segment.render_signature === layerSegmentSignatureOf(segment, spec, combo)
 }
 
 // ─── 画幅 ────────────────────────────────────────────────────
@@ -500,7 +508,7 @@ export function invalidateSegmentSpec(episodeId: number): void {
 // ─── 草稿 ────────────────────────────────────────────────────
 
 /** 装配草稿上下文：本镜设计卡引用到的资产 + 它们的忠实原图与语义标注 */
-async function loadDraftAssets(card: DesignCard): Promise<SegmentDraftAsset[]> {
+export async function loadDraftAssets(card: DesignCard): Promise<SegmentDraftAsset[]> {
   const propIds = new Set<number>()
   const characterIds = new Set<number>()
   const sceneIds = new Set<number>()

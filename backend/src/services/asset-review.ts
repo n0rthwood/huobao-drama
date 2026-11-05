@@ -27,6 +27,7 @@ import { parseSemantics, type AssetSemantics } from './asset-semantics.js'
 import type { ExtractTarget } from './extraction.js'
 import { resolveDramaProjectType } from './project-type.js'
 import { markDesignCardsStaleForReviewItems } from './staleness.js'
+import { onLayerSourceAssetChanged } from './segment-source-refresh.js'
 import {
   createTextTask,
   findActiveTextTask,
@@ -647,6 +648,7 @@ export async function onAssetLibraryChanged(kind: AssetKind, assetId: number, re
     if (!isDocumentaryEpisode(episodeId).ok) continue
     await revalidateAssetReviewBindings(episodeId)
     await markAssetReviewStale(episodeId, reason)
+    if (reason === 'version_registered' || reason === 'semantics_changed') await onLayerSourceAssetChanged(episodeId, kind, assetId, reason)
   }
 }
 

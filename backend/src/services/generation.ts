@@ -16,6 +16,7 @@ import { FRAME_TYPE_SLOT, invalidateKeyframeConfirmation } from './keyframes.js'
 import { completionStamp } from './media-time.js'
 import { saveStylingVersion } from './styling-version.js'
 import { onAssetLibraryChanged } from './asset-review.js'
+import { resolveDramaProjectType } from './project-type.js'
 import {
   buildImageJobBody,
   cancelQwenJob,
@@ -123,6 +124,8 @@ interface GenerateVideoParams extends TaskOriginParams {
   configId?: number
   /** #11 开场转场：T=转场秒数，E=本次实际加长的秒数（duration 已含 E） */
   transition?: { T: number; E: number }
+  junction_hash?: string
+  junction_slot?: 'first' | 'last'
 }
 
 export async function generateImage(params: GenerateImageParams): Promise<number> {
@@ -171,10 +174,13 @@ export async function generateImage(params: GenerateImageParams): Promise<number
 }
 
 export async function generateVideo(params: GenerateVideoParams): Promise<number> {
-  // 指定配置（集锁定）可能已停用/删除/厂商收敛，失效时回退到当前启用配置
-  const config = params.configId
-    ? (await getConfigById(params.configId)) ?? await getActiveConfig('video')
-    : await getActiveConfig('video')
+  const owner = params.storyboardId ? (await db.select({ dramaId: schema.episodes.dramaId }).from(schema.storyboards)
+    .innerJoin(schema.episodes, eq(schema.episodes.id, schema.storyboards.episodeId))
+    .where(eq(schema.storyboards.id, params.storyboardId)))[0] : undefined
+  const documentary = owner && resolveDramaProjectType(owner.dramaId) === 'documentary'
+  const selected = params.configId ? await getConfigById(params.configId, documentary ? 'video' : undefined) : null
+  if (documentary && params.configId !== undefined && !selected) throw new Error('指定的视频配置已停用或不存在，请重新选择；不会自动切换到其它服务')
+  const config = selected ?? await getActiveConfig('video')
   if (!config) throw new Error('未配置视频模型，请先到「设置」页添加并启用 AI 服务')
 
   const id = await createTask('video', config, {
@@ -202,6 +208,8 @@ export async function generateVideo(params: GenerateVideoParams): Promise<number
     promptExtend: params.promptExtend,
     watermark: params.watermark,
     transition: params.transition,
+    ...(documentary ? { config_id: config.id } : {}),
+    ...(params.junction_hash && params.junction_slot ? { junction_hash: params.junction_hash, junction_slot: params.junction_slot } : {}),
     ...originParams(params),
   })
 

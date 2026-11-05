@@ -17,6 +17,7 @@ import ProgressRing from '~/components/ProgressRing.vue'
 import RefIssueList from '~/components/RefIssueList.vue'
 import ShotFusionPanel from '~/components/ShotFusionPanel.vue'
 import TargetAssetList from '~/components/TargetAssetList.vue'
+import DocumentaryFinalPanel from '~/components/DocumentaryFinalPanel.vue'
 import { mediaUrl } from '~/utils/url'
 import { posterOf } from '~/composables/useMedia'
 import { WORKBENCH_CTX } from '~/utils/workbenchSteps'
@@ -157,7 +158,8 @@ function hasLayerSegment(sb) {
 </script>
 
 <template>
-<div class="prod-content">
+<DocumentaryFinalPanel v-if="isDocumentaryProject" />
+<div v-else class="prod-content">
   <div class="prod-section-bar">
     <span class="dim" style="font-size:12px">{{ t('episode.prod.videos') }}</span>
     <span class="tag mono">{{ t('episode.sb.segmentStat', { n: sbs.length, dur: totalDuration }) }}</span>

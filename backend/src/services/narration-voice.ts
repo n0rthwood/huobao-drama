@@ -64,6 +64,9 @@ import {
   type PromptBatchStatus,
   type TextTaskProgress,
 } from './text-task.js'
+import { scopeFromPreview, type BatchScope } from './batch-scope.js'
+import { resolveDramaProjectType } from './project-type.js'
+import { parseTextTaskParams, patchTextTaskParams } from './text-task.js'
 
 /** 本集生效的 TTS 配置：集锁定优先，其次当前启用的最高优先级配置 */
 export async function resolveTtsConfig(episode: { ttsConfigId?: number | null }): Promise<AIConfig> {
@@ -211,6 +214,8 @@ export async function generateShotVoice(
   const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, sb.episodeId))
   if (!ep) throw new Error('剧集不存在')
   if (ep.narrationEnabled !== true) throw new Error('本集未开启旁白，无法生成配音')
+  const documentary = resolveDramaProjectType(ep.dramaId) === 'documentary'
+  if (documentary && (!sb.combo || sb.designCardStatus !== 'confirmed')) throw new Error('设计卡未确认')
   if (sb.narrationEnabled === false) throw new Error(`分镜 #${sb.storyboardNumber} 已标记为纯画面镜头，没有旁白可配音`)
 
   const text = (sb.narrationText || '').trim()
@@ -298,7 +303,7 @@ export async function generateShotVoice(
     narrationAudioUrl: synthesis.wavPath,
     subtitleUrl,
     narrationMeta: JSON.stringify(meta),
-    duration,
+    ...(!documentary ? { duration } : {}),
     ...(clearedFit ? { narrationFit: clearedFit } : {}),
     updatedAt: ts,
   }).where(eq(schema.storyboards.id, storyboardId))
@@ -327,6 +332,9 @@ export interface VoicePlanItem {
   storyboard_id: number
   storyboard_number: number
   status: VoicePlanStatus
+  selectable: boolean
+  checked: boolean
+  reason?: string
   /** 预计音频秒数（未配音按字数估算，已配音取实测） */
   audio_seconds: number
 }
@@ -334,21 +342,24 @@ export interface VoicePlanItem {
 /** 批量配音的逐镜分类（preview 与执行共用，#37）：本次参数 = desired，镜级规范化覆盖仍然生效 */
 async function planVoiceBatch(ep: EpisodeRow, desired: VoiceParams, config: AIConfig, storyboardIds?: number[]) {
   const configSettings = parseTtsSettings(config.settings)
+  const documentary = resolveDramaProjectType(ep.dramaId) === 'documentary'
   const sbs = (await db.select().from(schema.storyboards)
     .where(eq(schema.storyboards.episodeId, ep.id))
     .orderBy(schema.storyboards.storyboardNumber))
     .filter(sb => !sb.deletedAt)
-    .filter(sb => !storyboardIds?.length || storyboardIds.includes(sb.id))
+    .filter(sb => storyboardIds === undefined || storyboardIds.includes(sb.id))
   return sbs.map((sb) => {
     const meta = parseNarrationMeta(sb.narrationMeta)
     const text = sb.narrationText || ''
     const shotParams: VoiceParams = { ...desired, normalize: resolveNarrationNormalize(desired.normalize, sb.narrationNormalize) }
+    const gate = ep.narrationEnabled !== true ? '本集未开启旁白，无法生成配音'
+      : documentary && (!sb.combo || sb.designCardStatus !== 'confirmed') ? '设计卡未确认' : null
     const status = classifyVoiceShot({
       narrationEnabled: sb.narrationEnabled !== false,
       text,
       // 字数超单段上限、发音标记写错的镜头不浪费一次 GPU 合成；
       // 「实测配音 + 留白超 15 秒」不挡——换音色/参数重配正是解决它的办法之一
-      blocked: narrationCharCount(text) > MAX_NARRATION_CHARS || parseNarrationMarkup(text).errors.length > 0,
+      blocked: !!gate || narrationCharCount(text) > MAX_NARRATION_CHARS || parseNarrationMarkup(text).errors.length > 0,
       audio: meta.audio,
       desired: shotParams,
       configSettings,
@@ -357,6 +368,9 @@ async function planVoiceBatch(ep: EpisodeRow, desired: VoiceParams, config: AICo
       storyboard_id: sb.id,
       storyboard_number: sb.storyboardNumber,
       status,
+      selectable: status === 'missing' || status === 'changed' || status === 'unchanged',
+      checked: status === 'missing' || status === 'changed',
+      reason: gate || (status === 'unchanged' ? 'unchanged' : status === 'skipped' ? '旁白已禁用、为空或格式不符合配音要求' : undefined),
       audio_seconds: meta.audio?.duration_ms ? meta.audio.duration_ms / 1000 : estimateNarrationSeconds(text),
     }
     return { item, params: shotParams }
@@ -381,7 +395,8 @@ export async function startVoiceBatch(
   dramaId: number,
   storyboardIds?: number[],
   rawSettings?: unknown,
-): Promise<{ started: boolean; total: number }> {
+  retry?: { desired: VoiceParams; retryOf: number },
+): Promise<{ started: boolean; total: number; task_id?: number; scope?: BatchScope }> {
   if (await findActiveTextTask(episodeId, 'narration_tts')) return { started: false, total: -1 }
 
   const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId))
@@ -389,18 +404,27 @@ export async function startVoiceBatch(
 
   const config = await resolveTtsConfig(ep)
   let desired: VoiceParams
-  if (rawSettings !== undefined) {
+  if (retry) {
+    desired = retry.desired
+  } else if (rawSettings !== undefined) {
     desired = await validatedVoiceParams(rawSettings, config)
     await saveVoiceDefaults(ep, desired)
   } else {
     desired = effectiveVoiceParams(ep, null, config)
   }
-  const pending = (await planVoiceBatch(ep, desired, config, storyboardIds))
-    .filter(p => p.item.status === 'missing' || p.item.status === 'changed')
+  const plan = await planVoiceBatch(ep, desired, config)
+  const scope = scopeFromPreview(plan.map(p => p.item), storyboardIds)
+  const included = new Set(scope.included.map(item => item.storyboard_id))
+  const pending = plan.filter(p => included.has(p.item.storyboard_id)
+    && (!retry || storyboardIds?.includes(p.item.storyboard_id))
+    && p.item.selectable)
 
-  if (!pending.length) return { started: false, total: 0 }
+  if (!pending.length) return { started: false, total: 0, scope }
 
-  const progress: TextTaskProgress = { completed: 0, failed: 0, total: pending.length }
+  const progress: TextTaskProgress = {
+    completed: 0, failed: 0, total: pending.length,
+    items: pending.map(p => ({ storyboard_id: p.item.storyboard_id, storyboard_number: p.item.storyboard_number, state: 'pending', reason: null })),
+  }
   const taskId = await createTextTask({
     kind: 'narration_tts',
     episodeId,
@@ -408,25 +432,35 @@ export async function startVoiceBatch(
     prompt: `为 ${pending.length} 个分镜生成旁白配音`,
     progress,
     storyboardIds: pending.map(p => p.item.storyboard_id),
+    scope,
+    retryOf: retry?.retryOf,
   })
+  await patchTextTaskParams(taskId, { voice_settings: desired })
 
   logTaskStart('Narration', 'voice-batch', { episodeId, total: pending.length, voice: desired.voice })
 
   ;(async () => {
     for (const p of pending) {
       progress.current_storyboard_id = p.item.storyboard_id
+      const item = progress.items!.find(item => item.storyboard_id === p.item.storyboard_id)!
+      item.state = 'processing'
       await updateTextTaskProgress(taskId, progress)
       try {
         await generateShotVoice(p.item.storyboard_id, undefined, p.params)
         progress.completed++
+        item.state = 'completed'
       } catch (err) {
         progress.failed++
+        item.state = 'failed'
+        item.reason = err instanceof Error ? err.message : String(err)
         logTaskError('Narration', 'voice-batch-shot', {
           storyboardId: p.item.storyboard_id,
           error: err instanceof Error ? err.message : String(err),
         })
       }
+      await updateTextTaskProgress(taskId, progress)
     }
+    delete progress.current_storyboard_id
     await updateTextTaskProgress(taskId, progress)
   })()
     .then(async () => {
@@ -440,11 +474,41 @@ export async function startVoiceBatch(
       await finishTextTask(taskId, 'failed', { progress, errorMsg: err instanceof Error ? err.message : String(err) })
     })
 
-  return { started: true, total: pending.length }
+  return { started: true, total: pending.length, task_id: taskId, scope }
 }
 
-export async function getVoiceBatchStatus(episodeId: number): Promise<PromptBatchStatus | null> {
-  return promptBatchStatusFrom(await findLatestTextTask(episodeId, 'narration_tts'))
+export async function getVoiceBatchStatus(episodeId: number) {
+  const row = await findLatestTextTask(episodeId, 'narration_tts')
+  const status = promptBatchStatusFrom(row)
+  const params = parseTextTaskParams(row?.params)
+  return status ? { ...status, task_id: row!.id, scope: params?.scope, items: params?.progress?.items ?? [] } : null
+}
+
+export async function retryFailedVoiceBatch(episodeId: number, dramaId: number, sourceTaskId?: number) {
+  const row = sourceTaskId
+    ? (await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, sourceTaskId)))[0]
+    : await findLatestTextTask(episodeId, 'narration_tts')
+  const params = parseTextTaskParams(row?.params)
+  if (!row || row.episodeId !== episodeId || params?.kind !== 'narration_tts' || !params.scope || !params.voice_settings) throw new Error('没有可重试的配音范围快照')
+  const ids = params.progress?.items?.filter(item => item.state === 'failed' || item.state === 'processing' || item.state === 'pending').map(item => item.storyboard_id) ?? []
+  if (!ids.length) throw new Error('没有失败项可重试')
+  return startVoiceBatch(episodeId, dramaId, ids, undefined, {
+    desired: params.voice_settings, retryOf: row.id,
+  })
+}
+
+/** Retry preview uses the original voice settings and current gates, exactly like execution. */
+export async function previewFailedVoiceBatch(episodeId: number) {
+  const row = await findLatestTextTask(episodeId, 'narration_tts')
+  const params = parseTextTaskParams(row?.params)
+  if (!params?.scope || !params.voice_settings) throw new Error('没有可重试的配音范围快照')
+  const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId))
+  if (!ep) throw new Error('剧集不存在')
+  const failed = params.progress?.items?.filter(item => ['failed', 'pending', 'processing'].includes(item.state)).map(item => item.storyboard_id) ?? []
+  const items = (await planVoiceBatch(ep, params.voice_settings, await resolveTtsConfig(ep))).map(p => p.item)
+  const scope = scopeFromPreview(items, failed)
+  const included = new Set(scope.included.map(item => item.storyboard_id))
+  return { items: items.map(item => ({ ...item, checked: included.has(item.storyboard_id) })), scope }
 }
 
 /** 重新生成某镜字幕（切换时间码模式后不必重跑 TTS） */

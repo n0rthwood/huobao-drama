@@ -400,6 +400,18 @@ Issue 整理完成后、实施前，必须让 **Fabel（Anthropic）或 Astra（
 - 前端只有一个任务状态源：`composables/useTasks.ts`（模块级 store + 单一轮询 `GET /tasks/active`，有活跃任务 3s、空闲 15s、页面不可见暂停）。任务离开活跃列表时补拉 `GET /tasks/:id` 并通过 `onTaskFinished()` 通知订阅者（关键帧组件重载版本、工作台 `refresh()`）；刚提交的任务用 `registerTask()` 立刻进 store，进度环不等下一轮。进页时 `loadEpisodeTasks(epId)` 用 `GET /tasks/center?episode_id=&page_size=200` 载入本集快照（父行 children 摊平），刷新后失败/生成中状态照旧恢复。**组件内不得再轮询单个任务**（旧的 `StoryboardKeyframes.slotTasks`/`pollKeyframeTask`、`episode.vue` 的 `loadGenTasks` 已删除），槽位环取 `latestKeyframeTask(storyboardId, frameType)`、素材环取 `latestAssetTask(kind, id)`。
 - 任务中心 UI：`components/TaskCenterButton.vue`（顶栏按钮 + 角标 + 抽屉，`layouts/default.vue` 头部与 `episode.vue` 顶栏各放一个）、`components/TaskCenterPanel.vue`（筛选/分页/父行展开，抽屉与 `pages/tasks.vue` 共用）、`components/TaskDetailDialog.vue`（详情 + 取消 + 换模型重试，`ModelSelect` 选项来自 `composables/useModelOptions.ts`；重试 `script_rewrite`/`storyboard_breaker` 前弹确认框）。文案在 `locales/*.json` 的 `taskCenter.*`（旧的 `episode.tasks.*`、`episode.topbar.tasks` 已删）。
 
+### 纪录片视频与成品（Issue #60）
+- `shot-duration.ts` 是整镜上限单源：A=30、B=15、C/D=45、剧情无 combo=15。生成段预算独立≤15，转场准备占用同一个生成段上限；配音实测只更新音频元数据/设计卡问题，不改纪录片设计预算。
+- 合成快照 v4 记录显式 `combo`、`layer_segment`、采用的视频任务与衔接帧 hash；无 combo 的剧情镜摘要保持 v2 字节不变。C/D 依次拼接图层/生成或生成/图层，统一到集级 `resolveEpisodeSegmentSpec`，保留完整两段后对齐配音、烧录字幕。
+- 纪录片即使关闭旁白，也必须先合成当前成品才能导出；设计卡、图层段、衔接帧或采用视频过期都阻断，返回逐镜 `blocked[].change_reasons`。部分导出必须显式选择，不能悄悄丢掉过期镜。
+- 所有视频/图层渲染/配音/合成批量使用 `batch-scope.ts` 的同源预览，执行写入不可变 `params.scope`（视频批次写 `options.scope`）；任务中心读这份快照，不重新推算范围。显式空选不能扩大为整集。
+- `backend/scripts/junction-diff.mjs` 用 sharp 比较实际抽帧的灰度平均绝对差，衔接帧锁定只保证输入来源，不声称模型输出逐像素连续。
+- 资产事件沿现有 `onAssetLibraryChanged` 的关联集范围传播：仅受影响图层段更新当前底图/未解除锚点几何，再经 `markStale('layer_segment')` 阻断旧衔接帧与下游。`asset_version_changed/semantic_changed/base_version_changed` 在当前输入成功渲染后才消化；找不到素材/条目保留 `source_unresolved`，恢复引用/解除锚点后可重渲。`quality_warnings` 与迁移历史提示不升级为硬门禁。
+- 通用 `POST /tasks` 一旦绑定纪录片分镜，必须走 `buildStoryboardVideoRequest`，只接受模型/配置覆盖，不能信任客户端首尾图/衔接 hash/时长/归属。单镜、重试、批量沿用同一 builder；显式指定的视频配置失效、停用或类型不符时返回 400，不静默切到另一个计费服务，生成持久化边界再校验一次。剧情/无分镜手动任务的旧默认语义不变。
+- C 最后一个实际编码帧采样精确 `duration`，D 第一个实际编码帧采样 `0`，与去字衔接 PNG 同源；文字在段内独立淡出/淡入，标点/几何不跟着淡出。C/D 渲染签名使用 `seg-v2-C/D`，旧渲染必须更新；A 保持原签名。压缩和模型输出仍可能有像素差异，不能把锁定来源写成“像素完全连续”。
+- 资产来源以 R6 的 `layer_doc.base.ref` / 图片 `src.asset_kind/asset_id/version_task_id` 为准；显式版本固定，不跟随当前版本，未固定的来源通过资产事件刷新；旧锚点只作存量回退。历史视频缺衔接快照时仅对实际保存、可完整解码的本地图层 PNG 字节算 hash；缺失、损坏、越界、两端歧义均为 unknown，不改写旧任务。
+- 新纪录片视频任务把实际采用的 `config_id` 一并保存；无覆盖的重试继续使用该目标，停用后拒绝而不是转到默认服务。旧记录没有该字段时按原有默认规则，不伪造或回填历史事实。
+
 ## 待办
 
 - 无。

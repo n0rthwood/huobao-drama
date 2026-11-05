@@ -9,6 +9,7 @@ import { getAbsolutePath, thumbPathFor } from '../utils/storage.js'
 import { posterPathFor } from '../utils/video-poster.js'
 import { logTaskError, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
 import { toUnixSeconds } from '../services/media-time.js'
+import { GateBlockedError } from '../services/workflow-gates.js'
 
 const app = new Hono()
 
@@ -48,6 +49,7 @@ app.post('/episodes/:id/merge', async (c) => {
     logTaskSuccess('MergeAPI', 'episode-merge', { episodeId, mergeId, skipped: skipped.length })
     return success(c, { merge_id: mergeId, status: 'processing', skipped })
   } catch (err) {
+    if (err instanceof GateBlockedError) throw err
     const message = err instanceof Error ? err.message : '拼接失败'
     logTaskError('MergeAPI', 'episode-merge', { episodeId, error: message })
     // 所选镜头里有不可用的：返回逐镜原因，前端据此进入同一套批量融合修复入口
