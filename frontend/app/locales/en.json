@@ -2458,7 +2458,9 @@
         "next": "Go to the next missing item",
         "locked": "Enter shot design 🔒",
         "lockedHint": "Shot design unlocks once every checklist item is resolved",
-        "goDesign": "Enter shot design"
+        "goDesign": "Enter shot design",
+        "running": "Review in progress — wait for this pass to finish before handling the rest",
+        "incomplete": "Checklist incomplete: the last pass had failed segments, please re-run the script review"
       }
     },
     "finalStep": {

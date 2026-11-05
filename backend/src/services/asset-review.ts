@@ -136,6 +136,35 @@ export function fingerprintOf(infoPoint: string, needKind: string): string {
   return createHash('sha256').update(`${infoPointKey(infoPoint)}${needKind}`).digest('hex')
 }
 
+/** 归一化信息点的二元字组集合（相似度用） */
+function bigrams(key: string): Set<string> {
+  const out = new Set<string>()
+  if (key.length === 1) out.add(key)
+  for (let i = 0; i + 1 < key.length; i++) out.add(key.slice(i, i + 2))
+  return out
+}
+
+/**
+ * 两个信息点的措辞相似度（Dice 系数，0–1）。
+ * 重跑时模型会把「河南安阳·地理区位」改写成「河南安阳的地理位置」：纯包含匹配认不出来，
+ * 旧行就会被删、用户的处置全丢。相似度兜底按同一 `need_kind` 找回最像的那一行。
+ */
+export function infoPointSimilarity(a: string, b: string): number {
+  const ka = infoPointKey(a)
+  const kb = infoPointKey(b)
+  if (!ka || !kb) return 0
+  if (ka === kb) return 1
+  if (ka.includes(kb) || kb.includes(ka)) return 1
+  const A = bigrams(ka)
+  const B = bigrams(kb)
+  let hit = 0
+  for (const g of A) if (B.has(g)) hit++
+  return (2 * hit) / (A.size + B.size)
+}
+
+/** 相似度兜底的下限：实测同一信息点的改写落在 0.53–0.9，不同信息点落在 0.0–0.35 */
+export const INFO_POINT_MATCH_MIN = 0.5
+
 /**
  * 处置状态机（Issue #55「状态机」节）：
  * - `missing` → 任意处置态；
@@ -178,7 +207,10 @@ export function assetReviewGateReason(status: AssetReviewStatus, missingCount: n
   switch (status) {
     case 'passed': return ''
     case 'running': return '资产审核清单正在对照中：等本次对照跑完再处置剩余条目'
-    case 'pending': return `资产审核清单还有 ${missingCount} 项缺失未处置：请在「资产 · 审核清单」里逐条处置`
+    // 缺失为 0 还停在 pending，只可能是上次对照有失败段（清单不完整），说「还有 0 项未处置」是假信息
+    case 'pending': return missingCount > 0
+      ? `资产审核清单还有 ${missingCount} 项缺失未处置：请在「资产 · 审核清单」里逐条处置`
+      : '资产审核清单不完整：上次对照有失败的段落，请重新对照剧本'
     default: return '资产审核清单尚未生成：请在「资产 · 审核清单」点「AI 对照剧本生成清单」'
   }
 }
@@ -425,12 +457,19 @@ export function mergeDraftItems(
       continue
     }
 
-    const key = infoPointKey(draft.infoPoint)
-    const fallback = existing.find(row => !claimed.has(row.id)
-      && !drafts.some(d => d.fingerprint === row.fingerprint)
-      && row.status !== 'missing'
-      && row.needKind === draft.needKind
-      && (infoPointKey(row.infoPoint).includes(key) || key.includes(infoPointKey(row.infoPoint))))
+    // 措辞漂移兜底：同一 need_kind 的旧「已处置」行里挑措辞最像的一条迁过来。
+    // 只比包含关系不够——重跑时模型常整句改写（「河南安阳·地理区位」→「河南安阳的地理位置」），
+    // 认不出来就会删旧行，用户上一轮的忽略/理由全部白做。
+    let fallback: typeof existing[number] | null = null
+    let best = INFO_POINT_MATCH_MIN
+    for (const row of existing) {
+      if (claimed.has(row.id)) continue
+      if (row.status === 'missing') continue
+      if (row.needKind !== draft.needKind) continue
+      if (drafts.some(d => d.fingerprint === row.fingerprint)) continue
+      const score = infoPointSimilarity(row.infoPoint, draft.infoPoint)
+      if (score >= best) { best = score; fallback = row }
+    }
     if (fallback) {
       claimed.add(fallback.id)
       diff.kept++
@@ -667,11 +706,15 @@ export async function startAssetReview(
   return { started: true, taskId }
 }
 
+/** 重跑时交给模型的旧条目（让它复用同一措辞，指纹才命中、处置才保得住） */
+interface PriorPoint { infoPoint: string; needKind: string }
+
 function buildSegmentPrompt(args: {
   segmentNo: number
   total: number
   text: string
   assets: ReviewAsset[]
+  prior: PriorPoint[]
 }): string {
   const kindLabel = { character: '角色', scene: '场景', prop: '道具' }
   const lines = args.assets.map((a) => {
@@ -682,10 +725,24 @@ function buildSegmentPrompt(args: {
     const semantics = entries.length ? `；语义条目：${entries.join('、')}` : ''
     return `- ${a.name}（${marks.join(' · ')}${semantics}）`
   })
+  // 上一轮清单：条目身份 = 归一化信息点 + need_kind，措辞一改旧行就被判成新条目，
+  // 用户上一轮的「已忽略 / 无需素材 / 已绑定」会全部丢失，所以这里要求逐字沿用。
+  const prior = args.prior.map(p => `- ${p.infoPoint}（${p.needKind}）`)
   return [
     `# 本集已有素材清单（${args.assets.length} 项，match_name 只能从这里逐字照抄）`,
     lines.length ? lines.join('\n') : '（本集目前没有任何素材）',
     '',
+    ...(prior.length
+      ? [
+        `# 上一轮清单的信息点（${prior.length} 条，全集范围）`,
+        prior.join('\n'),
+        '',
+        '本段如果仍然覆盖上表中的同一个信息点，`info_point` 必须逐字照抄上表的旧措辞'
+        + '（即使你认为可以写得更准确），`need_kind` 也保持一致；否则用户上一轮的处置会全部作废。'
+        + '只有上表没有的新信息点才写新措辞。',
+        '',
+      ]
+      : []),
     `# 第 ${args.segmentNo} 段旁白（共 ${args.total} 段）`,
     args.text,
     '',
@@ -700,13 +757,17 @@ async function runAssetReview(taskId: number, episodeId: number, texts: string[]
   try {
     const skill = await loadSkillDoc('documentary/asset-review', getContentLanguage())
     const assets = loadReviewAssets(episodeId)
+    // 合并发生在所有段跑完之后，这里读到的就是「上一轮」的清单
+    const prior: PriorPoint[] = db.select().from(schema.assetReviewItems)
+      .where(eq(schema.assetReviewItems.episodeId, episodeId)).all()
+      .map(row => ({ infoPoint: row.infoPoint, needKind: row.needKind }))
 
     for (let i = 0; i < texts.length; i++) {
       const segmentNo = i + 1
       const text = texts[i]!
       try {
         const { text: reply } = await callTextChat(stage, buildSegmentPrompt({
-          segmentNo, total: texts.length, text, assets,
+          segmentNo, total: texts.length, text, assets, prior,
         }), {
           systemPrompt: skill,
           temperature: 0.2,

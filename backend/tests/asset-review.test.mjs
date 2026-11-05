@@ -243,6 +243,49 @@ test('重新对照：指纹命中保留处置；中间插段不影响既有条�
   assert.equal(migrated.decided, decidedBefore.get('车马坑').decidedAt)
 })
 
+test('重新对照：整句改写的已处置条目按相似度迁移，不被当成新条目', () => {
+  const result = run(`
+    ${FIXTURE}
+    const { mergeDraftItems, infoPointSimilarity } = await import('./src/services/asset-review.ts')
+    const draft = (infoPoint, needKind, segmentNo) => ({
+      segmentNo, narrationExcerpt: '第 ' + segmentNo + ' 段',
+      infoPoint, needKind, needDesc: infoPoint + '的素材',
+      status: 'missing', assetKind: null, assetId: null, semanticId: null, reason: null,
+      fingerprint: fingerprintOf(infoPoint, needKind),
+    })
+
+    mergeDraftItems(1, 10, [draft('河南安阳·地理区位', 'prop_faithful', 1), draft('洹河自西向东穿流', 'prop_faithful', 1)])
+    const rows = await db.select().from(schema.assetReviewItems)
+    for (const row of rows) await updateAssetReviewItem(row.id, { status: 'ignored', reason: '本轮先用旁白交代' })
+    const before = (await db.select().from(schema.assetReviewItems)).map(r => [r.infoPoint, r.status, r.decidedAt])
+
+    // 二轮：模型整句改写了两条信息点（实测 GLM 重跑就是这样漂移的），包含匹配认不出来
+    const diff = mergeDraftItems(1, 11, [
+      draft('河南安阳的地理位置', 'prop_faithful', 1),
+      draft('洹河自西向东穿过安阳', 'prop_faithful', 1),
+    ])
+    const after = (await db.select().from(schema.assetReviewItems)).map(r => [r.infoPoint, r.status, r.decidedAt, r.reason])
+    console.log('@@' + JSON.stringify({
+      before, diff, after,
+      sim: infoPointSimilarity('河南安阳·地理区位', '河南安阳的地理位置'),
+      unrelated: infoPointSimilarity('河南安阳·地理区位', '加速器质谱数出碳十四'),
+    }))
+  `)
+  assert.equal(result.diff.kept, 2, '两条改写行都应迁移，不得新建')
+  assert.equal(result.diff.added, 0)
+  assert.equal(result.diff.removed, 0)
+  assert.ok(result.sim >= 0.5, `同一信息点的改写相似度应过阈值，实际 ${result.sim}`)
+  assert.ok(result.unrelated < 0.5, `不相干信息点不得误配，实际 ${result.unrelated}`)
+  const decidedBefore = new Map(result.before.map(([info, status, decidedAt]) => [info, decidedAt]))
+  const after = new Map(result.after.map(([info, status, decidedAt, reason]) => [info, { status, decidedAt, reason }]))
+  assert.equal(after.size, 2)
+  assert.equal(after.get('河南安阳的地理位置').status, 'ignored')
+  assert.equal(after.get('河南安阳的地理位置').reason, '本轮先用旁白交代')
+  assert.equal(after.get('河南安阳的地理位置').decidedAt, decidedBefore.get('河南安阳·地理区位'))
+  assert.equal(after.get('洹河自西向东穿过安阳').status, 'ignored')
+  assert.equal(after.get('洹河自西向东穿过安阳').decidedAt, decidedBefore.get('洹河自西向东穿流'))
+})
+
 test('对照有段落失败时：不删旧条目（强门禁不被残缺结果解锁）', () => {
   const result = run(`
     ${FIXTURE}

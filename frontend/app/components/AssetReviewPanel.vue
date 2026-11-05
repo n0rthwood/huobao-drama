@@ -387,7 +387,10 @@ onBeforeUnmount(() => { if (timer) clearTimeout(timer) })
           <button class="btn btn-sm btn-primary" @click="emit('goto-design')">{{ t('episode.assetReview.gate.goDesign') }}</button>
         </template>
         <template v-else>
-          <span>{{ t('episode.assetReview.gate.pending', { n: counts.missing }) }}</span>
+          <!-- 对照中 / 缺失为 0 仍 pending（上次有失败段）都不能说「还有 0 项未处置」，与后端 assetReviewGateReason 同口径 -->
+          <span v-if="status === 'running'">{{ t('episode.assetReview.gate.running') }}</span>
+          <span v-else-if="counts.missing === 0">{{ t('episode.assetReview.gate.incomplete') }}</span>
+          <span v-else>{{ t('episode.assetReview.gate.pending', { n: counts.missing }) }}</span>
           <button class="btn btn-sm" :disabled="!firstMissing" @click="scrollToFirstMissing()">{{ t('episode.assetReview.gate.next') }}</button>
           <button class="btn btn-sm" disabled :title="t('episode.assetReview.gate.lockedHint')">
             <Lock :size="11" /> {{ t('episode.assetReview.gate.locked') }}
