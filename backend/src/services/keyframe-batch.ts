@@ -398,6 +398,11 @@ export async function previewEpisodeKeyframeBatch(
       // 中间帧只在 LLM 给了提示词时才存在，不写进清单
       if (slot === 'mid' && !slotPrompt(sb, 'mid')) continue
       const base = { storyboard_id: sb.id, storyboard_number: sb.storyboardNumber, slot }
+      // 锁定槽（衔接帧继承 / 承接上一镜）不出图，批量里既不勾选也不报「提示词为空」
+      if (state?.lockedSlots?.includes(slot)) {
+        result.push({ ...base, status: 'skipped', checked: false, reason: '该槽位由衔接帧锁定继承，不单独出图' })
+        continue
+      }
       if (!slotPrompt(sb, slot)) {
         result.push({
           ...base,

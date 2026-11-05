@@ -1,6 +1,6 @@
 <template>
   <div class="prod-content kf-step">
-    <div class="kf-bar">
+    <div v-if="!embedded" class="kf-bar">
       <span class="dim" style="font-size:12px">{{ t('episode.prod.keyframes') }}</span>
       <span class="tag mono">{{ t('episode.kf.confirmedCount', { done: confirmedCount, total: storyboards.length }) }}</span>
       <div class="ml-auto flex gap-1">
@@ -62,7 +62,7 @@
       </div>
     </div>
 
-    <div v-if="batchVisible" :class="['kf-batch-banner', { 'is-running': batchRunning }]">
+    <div v-if="batchVisible && !embedded" :class="['kf-batch-banner', { 'is-running': batchRunning }]">
       <div class="kf-batch-line">
         <span class="kf-batch-state">{{ t('episode.kf.batchBannerTitle') }} · {{ batchStatusLabel }}</span>
         <span class="kf-batch-sep">·</span>
@@ -128,8 +128,8 @@
       </button>
     </div>
 
-    <div v-else class="kf-workbench">
-      <section class="kf-list">
+    <div v-else :class="['kf-workbench', { embedded }]">
+      <section v-if="!embedded" class="kf-list">
         <div class="kf-list-head">
           <div class="kf-list-title">{{ t('episode.kf.listTitle') }}</div>
           <div class="kf-list-meta">{{ t('episode.kf.listMeta', { n: storyboards.length }) }}</div>
@@ -161,10 +161,10 @@
               <div
                 v-for="slot in SLOT_KEYS"
                 :key="slot"
-                :class="['kf-thumb', { empty: !slotImage(sb, slot), pending: isSlotPending(sb, slot) }]"
+                :class="['kf-thumb', { empty: !slotSrc(sb, slot), pending: isSlotPending(sb, slot) }]"
                 :title="slot === 'mid' && midSlotState(sb) === 'optional' ? t('episode.kf.midOptionalHint') : slotLabel(slot)"
               >
-                <img v-if="slotImage(sb, slot)" :src="thumbOf(imgSrc(slotImage(sb, slot)))" loading="lazy" @error="onThumbError($event, slotImage(sb, slot))" />
+                <img v-if="slotSrc(sb, slot)" :src="thumbOf(slotSrc(sb, slot))" loading="lazy" @error="onThumbError($event, slotImage(sb, slot))" />
                 <span v-else-if="!slotRing(sb, slot)" class="kf-thumb-empty">{{ slot === 'mid' && midSlotState(sb) ? t(`episode.kf.mid${midSlotState(sb) === 'optional' ? 'UnsetShort' : 'RequiredShort'}`) : slotShort(slot) }}</span>
                 <!-- 重生成时旧图还在，进度环叠在图上 -->
                 <ProgressRing v-if="slotRing(sb, slot)" v-bind="slotRing(sb, slot)" compact :size="22" class="kf-thumb-ring" />
@@ -192,7 +192,7 @@
 
       <div v-if="selected" class="kf-editor">
         <div class="kf-editor-head">
-          <div class="kf-editor-title">{{ t('episode.kf.editorTitle', { n: String(selectedIndex + 1).padStart(2, '0') }) }}</div>
+          <div class="kf-editor-title">{{ t('episode.kf.editorTitle', { n: String(shotNumberOf(selected)).padStart(2, '0') }) }}</div>
           <span :class="['kf-state', 'is-' + shotState(selected)]">{{ shotStateLabel(selected) }}</span>
           <span
             v-if="designUnconfirmed(selected)"
@@ -305,7 +305,7 @@
                     >
                       <div class="kf-pool-media">
                         <img
-                          v-if="asset.ready"
+                          v-if="asset.ready && imageUsable(asset.imageUrl)"
                           :src="thumbOf(imgSrc(asset.imageUrl))"
                           loading="lazy"
                           :alt="asset.name"
@@ -338,7 +338,51 @@
           </section>
 
           <!-- 段组合 A（只用图层段）的镜头不渲染故事关键帧区 -->
-          <section v-for="slot in (comboOf(selected) === 'A' ? [] : SLOT_KEYS)" :key="slot" class="kf-section kf-slot-card">
+          <!-- 衔接帧锁定槽（#58）：不单独出图、无提示词、无版本，只展示继承来源与更新提示。
+               D + 承接时首尾双锁：首帧是衔接帧，尾帧承接下一镜。 -->
+          <section
+            v-for="slot in lockedSlotsOf(selected)"
+            :key="`locked-${slot}`"
+            class="kf-section kf-slot-card kf-slot-locked"
+          >
+            <div class="kf-section-head">
+              <span class="kf-section-label">{{ slotLabel(slot) }}</span>
+              <span class="kf-inherit-tag">🔒 {{ lockedTagOf(selected, slot) }}</span>
+              <span class="ml-auto" />
+              <button
+                v-if="lockedSlotSrc(selected, slot)"
+                type="button" class="btn btn-sm"
+                @click="emit('preview', lockedSlotSrc(selected, slot), t('episode.segment.junctionLockTag'))"
+              >{{ t('episode.segment.viewLarge') }}</button>
+            </div>
+            <div class="kf-slot-body kf-locked-body">
+              <div class="kf-slot-media">
+                <button
+                  type="button"
+                  :class="['kf-preview', { empty: !lockedSlotSrc(selected, slot) }]"
+                  :style="{ aspectRatio: previewAspect }"
+                  :disabled="!lockedSlotSrc(selected, slot)"
+                  @click="emit('preview', lockedSlotSrc(selected, slot), t('episode.segment.junctionLockTag'))"
+                >
+                  <img v-if="lockedSlotSrc(selected, slot)" :src="thumbOf(lockedSlotSrc(selected, slot))" loading="lazy" alt="" @error="onThumbError($event, lockedSlotSrc(selected, slot))">
+                  <span v-else class="kf-preview-empty">🔒</span>
+                </button>
+              </div>
+              <div class="kf-slot-main">
+                <p class="kf-locked-line">{{ lockedSourceText(selected, slot) }}</p>
+                <p class="kf-locked-line dim">{{ isJunctionSlot(selected, slot) ? t('episode.segment.junctionNotGenerated') : t('episode.segment.inheritNotGenerated') }}</p>
+                <button
+                  v-if="embedded && isJunctionSlot(selected, slot)"
+                  type="button"
+                  class="btn btn-sm kf-locked-goto"
+                  @click="emit('goto-layer')"
+                >{{ t('episode.segment.gotoLayerSegment') }} ↗</button>
+              </div>
+            </div>
+            <p v-if="lockedStale" class="kf-locked-stale">{{ t('episode.segment.junctionStaleHint') }}</p>
+          </section>
+
+          <section v-for="slot in (comboOf(selected) === 'A' ? [] : unlockedSlotsOf(selected))" :key="slot" class="kf-section kf-slot-card">
             <div class="kf-section-head">
               <span class="kf-section-label">{{ slotLabel(slot) }}</span>
               <span v-if="slot === 'first' && kf(selected).inheritsFirst" class="kf-inherit-tag">{{ t('episode.kf.inheritedFirst', { n: shotNumberOf(previousOf(selected)) }) }}</span>
@@ -363,12 +407,12 @@
               <div class="kf-slot-media">
                 <button
                   type="button"
-                  :class="['kf-preview', { empty: !slotImage(selected, slot) }]"
+                  :class="['kf-preview', { empty: !slotSrc(selected, slot) }]"
                   :style="{ aspectRatio: previewAspect }"
-                  :disabled="!slotImage(selected, slot)"
-                  @click="emit('preview', imgSrc(slotImage(selected, slot)), `${t('episode.kf.editorTitle', { n: String(selectedIndex + 1).padStart(2, '0') })} · ${slotLabel(slot)}`)"
+                  :disabled="!slotSrc(selected, slot)"
+                  @click="emit('preview', slotSrc(selected, slot), `${t('episode.kf.editorTitle', { n: String(selectedIndex + 1).padStart(2, '0') })} · ${slotLabel(slot)}`)"
                 >
-                  <img v-if="slotImage(selected, slot)" :src="thumbOf(imgSrc(slotImage(selected, slot)))" loading="lazy" @error="onThumbError($event, slotImage(selected, slot))" />
+                  <img v-if="slotSrc(selected, slot)" :src="thumbOf(slotSrc(selected, slot))" loading="lazy" @error="onThumbError($event, slotImage(selected, slot))" />
                   <span v-else class="kf-preview-empty">
                     <template v-if="isSlotPending(selected, slot)">{{ t('episode.kf.generating') }}</template>
                     <template v-else-if="slot === 'mid' && midSlotState(selected)">
@@ -555,7 +599,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { toast } from 'vue-sonner'
 import { useI18n } from 'vue-i18n'
 import { Loader2 } from 'lucide-vue-next'
@@ -623,13 +667,14 @@ const props = defineProps({
   episodeNormalize: { type: Boolean, default: true },
   narrationBatch: { type: Object, default: () => ({ running: false, total: 0, completed: 0 }) },
   narrationVoiceBatch: { type: Object, default: () => ({ running: false, total: 0, completed: 0 }) },
-  // 确定性片段（#50）：(sb) => 本镜片段或 null；(sb, 'first'|'last') => 首/末帧缩略图 URL
-  clipOf: { type: Function, default: () => null },
-  clipThumbnail: { type: Function, default: () => '' },
+  // 嵌入模式（#58）：只渲染选中镜，不渲染自身镜列表与整页批量条（批量入口搬到页根）
+  embedded: { type: Boolean, default: false },
+  // 衔接帧锁定槽（#58）：{ slot, source, t, path, hash, stale } | null；该槽位不出图、无提示词、无版本
+  lockedSlot: { type: Object, default: null },
 })
 const emit = defineEmits([
   'break', 'refresh', 'preview', 'goto-assets', 'open-asset', 'update-field', 'field-dirty',
-  'batch-narration', 'batch-narration-voice', 'open-narration-settings', 'goto-clip',
+  'batch-narration', 'batch-narration-voice', 'open-narration-settings', 'goto-layer',
 ])
 
 // 槽位预览图按剧集画幅完整显示（CSS aspect-ratio 语法用 /）
@@ -681,9 +726,21 @@ function slotShort(slot) {
 function imgSrc(raw) {
   return mediaUrl(raw)
 }
+/**
+ * 加载失败的图片地址（缩略图与原图都 404：文件丢失、缩略图未回填且原图已删）。
+ * 记下来后该槽位回退到空位占位，不给浏览器留破图图标（#58）。
+ */
+const brokenImages = reactive(new Set())
 function onThumbError(e, raw) {
   const full = imgSrc(raw)
-  if (full && e.target.src !== new URL(full, window.location.origin).href) e.target.src = full
+  // 第一次失败：缩略图没回填 → 回退原图；原图也失败 → 记为破图，模板改显占位
+  if (full && e.target.src !== new URL(full, window.location.origin).href) { e.target.src = full; return }
+  brokenImages.add(full || e.target.src)
+}
+/** 这张图现在能显示吗（有地址且没加载失败） */
+function imageUsable(raw) {
+  const full = imgSrc(raw)
+  return !!full && !brokenImages.has(full)
 }
 // 关键帧版本带版本号（按创建时间从 1 编号，服务端给出）；资产版本没有版本号，只显示引擎/模型/时间
 function versionLabel(version) {
@@ -744,9 +801,64 @@ function kf(sb) {
     confirmed: Boolean(k.confirmed),
   }
 }
+/**
+ * 锁定槽：衔接帧锁（keyframes.locked 指向的槽位）+ D + 承接时的首帧承接锁（locked_slots）。
+ * 两者重合时只算一槽。
+ */
+function lockedSlotsOf(sb) {
+  const slots = []
+  const locked = props.lockedSlot?.slot || sb?.keyframes?.locked?.slot
+  if (locked) slots.push(locked)
+  const list = sb?.keyframes?.locked_slots
+  if (Array.isArray(list)) for (const slot of list) if (!slots.includes(slot)) slots.push(slot)
+  return slots.filter(slot => SLOT_KEYS.includes(slot))
+}
+function unlockedSlotsOf(sb) {
+  const locked = lockedSlotsOf(sb)
+  return SLOT_KEYS.filter(slot => !locked.includes(slot))
+}
+/**
+ * 锁定槽的图：衔接帧槽用 lockedSlot.path；承接槽用该槽位生效图（继承来的上一镜末帧）。
+ * 图加载失败（衔接帧 PNG 被清理等）时返回空串，模板改显 🔒 占位。
+ */
+function lockedSlotSrc(sb, slot) {
+  const locked = props.lockedSlot
+  const raw = locked?.path && (!locked.slot || locked.slot === slot)
+    ? locked.path
+    : (slotImage(sb, slot) || '')
+  return imageUsable(raw) ? imgSrc(raw) : ''
+}
+/** 本槽是不是衔接帧槽（◆ 来自图层段）；否则是承接上一镜的继承槽 */
+function isJunctionSlot(sb, slot) {
+  const locked = props.lockedSlot || {}
+  return Boolean(locked.path) && (!locked.slot || locked.slot === slot)
+}
+/** 锁定槽的标签：衔接帧 / 承接 */
+function lockedTagOf(sb, slot) {
+  return isJunctionSlot(sb, slot)
+    ? t('episode.segment.junctionLockTag')
+    : t('episode.segment.inheritLockTag')
+}
+/** 锁定槽的来源说明：C = 图层段末帧@t；D = 图层段首帧@0s；承接 = 上一镜末帧 */
+function lockedSourceText(sb, slot) {
+  const locked = props.lockedSlot || {}
+  if (isJunctionSlot(sb, slot)) {
+    const at = Number(locked.t || 0).toFixed(1)
+    if (locked.source === 'layer_first') return t('episode.segment.junctionSourceFirst', { t: at })
+    return t('episode.segment.junctionSourceLast', { t: at })
+  }
+  return t('episode.segment.junctionInheritPrev')
+}
+const lockedStale = computed(() => Boolean(props.lockedSlot?.stale))
+
 function slotImage(sb, slot) {
   const k = kf(sb)
   return slot === 'first' ? k.first : slot === 'mid' ? k.mid : k.last
+}
+/** 槽位可显示的图片地址；没有图或图 404 → 空串 → 显示空位占位（#58） */
+function slotSrc(sb, slot) {
+  const raw = slotImage(sb, slot)
+  return imageUsable(raw) ? imgSrc(raw) : ''
 }
 /** 该槽位生效关键帧的生成时间（unix 秒）；反查不到 → null，不显示 */
 function slotTimeOf(sb, slot) {
@@ -774,6 +886,9 @@ function boundaryOf(sb) {
   return sb?.continuity_boundary ?? sb?.continuityBoundary ?? null
 }
 function shotNumberOf(sb) {
+  // 嵌入模式只收到当前这一镜，列表下标不是镜号；库里的 storyboard_number 才是
+  const num = Number(sb?.storyboard_number ?? sb?.storyboardNumber ?? 0)
+  if (num > 0) return num
   const i = props.storyboards.findIndex(s => s.id === sb?.id)
   return i >= 0 ? i + 1 : 0
 }
@@ -791,12 +906,18 @@ function shotStateLabel(sb) {
   if (state === 'confirmed') return t('episode.kf.stateConfirmed')
   return state === 'ready' ? t('episode.kf.stateReady') : t('episode.kf.stateMissing')
 }
+/**
+ * 还缺哪几个槽位（确认按钮的禁用原因）。锁定槽按来源报「衔接帧 / 承接」，
+ * 因为用户不能直接给这些槽出图，只能回图层段重渲染或改上一镜（#58）。
+ */
 function missingSlotLabels(sb) {
   const k = kf(sb)
+  const locked = lockedSlotsOf(sb)
+  const nameOf = slot => (locked.includes(slot) ? lockedTagOf(sb, slot) : slotLabel(slot))
   const missing = []
-  if (!k.first) missing.push(slotLabel('first'))
-  if (k.midRequired && !k.mid) missing.push(slotLabel('mid'))
-  if (!k.last) missing.push(slotLabel('last'))
+  if (!k.first) missing.push(nameOf('first'))
+  if (k.midRequired && !k.mid) missing.push(nameOf('mid'))
+  if (!k.last) missing.push(nameOf('last'))
   return missing.join(t('common.listJoin'))
 }
 const confirmedCount = computed(() => props.storyboards.filter(sb => kf(sb).confirmed).length)
@@ -1411,6 +1532,19 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .kf-step { min-height: 0; }
+/*
+ * 嵌入模式（#58）：只占所在容器（段编辑器警示条之下）的剩余高度。
+ * `prod-content` 是 block，必须显式改成纵向 flex，否则工作区按内容撑高，
+ * 被这里的 overflow:hidden 裁掉底部（槽位卡片与「确认关键帧」页脚都看不见）。
+ */
+.kf-step:has(.kf-workbench.embedded) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+}
+.kf-workbench.embedded { min-height: 0; height: 100%; }
 .kf-bar {
   display: flex;
   align-items: center;
@@ -1519,6 +1653,7 @@ onBeforeUnmount(() => {
   grid-template-columns: clamp(260px, 18vw, 340px) minmax(0, 1fr);
   gap: 10px;
 }
+.kf-workbench.embedded { grid-template-columns: minmax(0, 1fr); }
 .kf-list {
   display: flex;
   flex-direction: column;
@@ -1615,11 +1750,23 @@ onBeforeUnmount(() => {
 }
 .kf-editor-title { font-size: 13px; font-weight: 600; color: var(--text-0); }
 .kf-editor-body { flex: 1; overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 10px; }
+/* 嵌入模式（#58）：单镜编辑器铺满所在容器，由外层页面给高度 */
+.kf-workbench.embedded .kf-editor { height: 100%; }
+.kf-workbench.embedded .kf-editor-body { min-height: 0; }
+.kf-slot-card { min-width: 0; }
+@media (max-width: 1400px) {
+  .kf-slot-body { grid-template-columns: minmax(0, 1fr); }
+}
 .kf-section {
   display: flex; flex-direction: column; gap: 8px;
   padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-2);
 }
 .kf-section-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.kf-slot-locked { border-color: #d8a93a; }
+.kf-locked-body { align-items: flex-start; }
+.kf-locked-line { margin: 0; font-size: 12px; color: var(--text-1); }
+.kf-locked-goto { align-self: flex-start; }
+.kf-locked-stale { margin: 0; font-size: 12px; color: #8a6508; }
 .kf-section-label { font-size: 12px; font-weight: 600; color: var(--text-1); }
 .kf-field { display: flex; flex-direction: column; gap: 4px; }
 .kf-field-label { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-2); }
@@ -1670,6 +1817,7 @@ onBeforeUnmount(() => {
 .kf-slot-refs-head { display: flex; align-items: center; gap: 6px; }
 
 /* 三个槽位卡片：左图片列随空间伸缩（最小 320 / 最大 640），右提示词列占满剩余宽度 */
+.kf-locked-body { grid-template-columns: clamp(320px, 30%, 640px) minmax(0, 1fr); }
 .kf-slot-body { display: grid; grid-template-columns: clamp(320px, 30%, 640px) minmax(420px, 1fr); gap: 12px; align-items: start; }
 .kf-slot-media { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .kf-preview {

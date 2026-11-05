@@ -30,7 +30,7 @@ import mediaLibrary from './routes/media-library.js'
 import research from './routes/research.js'
 import posters from './routes/posters.js'
 import layerDocs from './routes/layer-docs.js'
-import clips from './routes/clips.js'
+import layerSegments from './routes/layer-segments.js'
 import assetPipeline from './routes/asset-pipeline.js'
 import designCards, { designCardShots } from './routes/design-cards.js'
 import { episodeAssetReview, assetReviewItems } from './routes/asset-review.js'
@@ -49,6 +49,7 @@ import { backfillGeneratedAt } from './services/media-time.js'
 import { migrateReferenceImages } from './services/reference-images.js'
 import { migrateAssetNames } from './services/asset-name-migration.js'
 import { migrateIntentToDesignCard } from './services/design-card-migration.js'
+import { migrateClipsToLayerSegments } from './services/layer-segment-migration.js'
 import { backfillPoolProjection } from './services/storyboard-assets.js'
 import { logLayerFontStatus } from './services/layer-fonts.js'
 import { backfillScriptConfirmation, GateBlockedError } from './services/workflow-gates.js'
@@ -113,7 +114,7 @@ api.route('/asset-library', assetLibrary)
 api.route('/media-library', mediaLibrary)
 api.route('/research', research)
 api.route('/layer-docs', layerDocs)
-api.route('/clips', clips)
+api.route('/layer-segments', layerSegments)
 api.route('/asset-pipeline', assetPipeline)
 api.route('/asset-review', assetReviewItems)
 
@@ -170,6 +171,9 @@ db.update(schema.sysTask)
   .then(() => migrateAssetNames())
   // 表达设计 → 分镜设计卡（Issue #57）：按行转换 combo/design_card 后自行 DROP COLUMN intent，幂等
   .then(() => migrateIntentToDesignCard())
+  // 图层段迁移（Issue #58）必须在 design-card 迁移之后：后者回填 storyboards.combo，
+  // 本迁移据此判断「有 clip 行但 combo 为空」→ stale_reasons=['combo_missing']
+  .then(() => migrateClipsToLayerSegments())
   // 本镜资产池投影补齐（Issue #43）：角色/道具关联 = 手选 ∪ 当前 @，幂等
   .then(() => backfillPoolProjection())
   // 存量纪录片集补剧本确认（Issue #54）：升级前已拆出分镜的集视为已确认，否则新门禁会把它们锁死，幂等

@@ -215,6 +215,9 @@ export const storyboards = sqliteTable('storyboards', {
   designCardStatus: text('design_card_status').notNull().default('blank'),
   designCardConfirmedAt: text('design_card_confirmed_at'),
   designCardStaleReason: text('design_card_stale_reason'),
+  // 衔接帧联动（#58）：确认关键帧时快照的衔接帧 hash，以及确认被自动作废的原因
+  keyframesJunctionHash: text('keyframes_junction_hash'),
+  keyframesStaleReason: text('keyframes_stale_reason'),
   videoUrl: text('video_url'),
   subtitleUrl: text('subtitle_url'),
   composedVideoUrl: text('composed_video_url'),
@@ -268,27 +271,43 @@ export const storyboardTargetAssets = sqliteTable('storyboard_target_assets', {
 })
 
 /**
- * 确定性片段（Issue #50）：由「底图 + 图层文档 + 时间线」渲染出的一段 mp4。
- * `position` ∈ replace（整镜替代模型视频）| pre（模型视频之前）| post（之后）；
- * 每镜每个 position 至多一条（UNIQUE）。`render_signature` 是渲染时输入的快照，
- * 与合成签名 v3 串联：改了图层/时间线而没重渲染，合成就会判「已变化」。
+ * 图层段（Issue #58，契约 §3.2）：由「底图 + 图层文档 + 精确关键帧时间线」渲染出的一段 mp4
+ * 与一张**衔接帧 PNG**。一镜至多一行（UNIQUE storyboard_id），是否参与由
+ * `storyboards.combo ∈ {A,C,D}` 决定；combo=B 时行保留但不参与，切回时恢复。
+ * `render_signature`（`'seg-v1'` 口径）是渲染时输入的快照：改了图层/时间线而没重渲染，
+ * 合成就会判「已变化」。`stale_reasons` 是 JSON 数组（迁移痕迹、底图未解析等）。
  */
-export const storyboardClips = sqliteTable('storyboard_clips', {
+export const storyboardLayerSegments = sqliteTable('storyboard_layer_segments', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   storyboardId: integer('storyboard_id').notNull(),
-  position: text('position').notNull(),
   layerDoc: text('layer_doc').notNull(),
   timeline: text('timeline').notNull(),
   duration: real('duration').notNull(),
+  baseRef: text('base_ref'),
+  qualityWarnings: text('quality_warnings'),
   renderPath: text('render_path'),
   renderSignature: text('render_signature'),
   renderedAt: text('rendered_at'),
+  junctionPath: text('junction_path'),
+  junctionHash: text('junction_hash'),
   status: text('status').notNull().default('draft'),
+  staleReasons: text('stale_reasons'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 }, (table) => [
-  uniqueIndex('idx_storyboard_clips_unique').on(table.storyboardId, table.position),
+  uniqueIndex('idx_storyboard_layer_segments_unique').on(table.storyboardId),
 ])
+
+/** 分镜变更日志（Issue #58，契约 §5）：本 Issue 只写 `kind='combo'` */
+export const storyboardChangeLog = sqliteTable('storyboard_change_log', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  storyboardId: integer('storyboard_id').notNull(),
+  kind: text('kind').notNull(),
+  fromValue: text('from_value'),
+  toValue: text('to_value'),
+  detail: text('detail'),
+  createdAt: text('created_at').notNull(),
+})
 
 export const aiServiceConfigs = sqliteTable('ai_service_configs', {
   id: integer('id').primaryKey({ autoIncrement: true }),

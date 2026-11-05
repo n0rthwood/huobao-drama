@@ -24,6 +24,7 @@ import {
   type TextTaskProgress,
 } from './text-task.js'
 import { resolveStageModel } from './ai-stages.js'
+import { batchScopeOf, type BatchScope } from './batch-scope.js'
 
 export type KeyframePromptBatchStatus = PromptBatchStatus
 
@@ -59,6 +60,8 @@ export async function startKeyframePromptBatch(
 
   const resolved = await resolveStageModel('keyframe_prompts', opts)
   const progress: TextTaskProgress = { completed: 0, failed: 0, total: pending.length }
+  // 范围快照（Issue #58）：同一份 {included, excluded} 随任务落 params.scope，界面与重试共用
+  const scope: BatchScope = await batchScopeOf(episodeId, 'keyframe_prompts', storyboardIds)
   const taskId = await createTextTask({
     kind: 'keyframe_prompts',
     episodeId,
@@ -66,6 +69,7 @@ export async function startKeyframePromptBatch(
     stageModel: resolved,
     // 落盘实际处理范围（而非调用方传入的可选列表），重试时按同一批分镜重跑
     storyboardIds: pending.map(sb => sb.id),
+    scope,
     progress,
     retryOf: opts.retryOf,
   })

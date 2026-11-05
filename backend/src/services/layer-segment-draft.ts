@@ -1,15 +1,14 @@
 /**
- * 分镜设计卡的图层段计划（#57 的 `design_card.layer_plan`）→ 图层文档 + 时间线草稿（Issue #50）。
+ * 设计卡 `layer_plan` → 图层段草稿（Issue #58，契约 §3.1/§3.2；由 #50 的 `clip-draft.ts` 改造）。
  *
- * 纯函数：不读库、不读文件。调用方（`storyboard-clips.ts`）负责把资产、语义标注、
- * 忠实原图路径装配成 `ClipDraftContext`，这里只做三件事：
- * 1. 选底图 —— `map_anim`/`archival` 用**忠实原件**（`faithful_source` 指向的上传原图，
- *    不是扩散美化版；父 Issue #44 诊断 2 就是美化版把额尔齐斯河画丢了）；
- *    `card` 用人物肖像 / 资产当前图。
- * 2. 语义标注（**原图像素坐标**，#47 契约）→ 归一化 0–1 的图层（#48 契约）。
- * 3. `reveal_at` → 关键状态；最后补一个「推近到已显现几何的外接框 ×1.3」的状态。
+ * 输入只认设计卡的 `layer_plan`（`base` / `must_mark` / `planned_layers`），
+ * **不再有「随便找一张资产图当底图」的回退**（契约 §8 第 6 行）：底图由调用方解析好传进来，
+ * 解析不到就是 `missing_base`，调用方不落行。
  *
- * 草稿是**可被人工覆盖**的起点：生成后存进 `storyboard_clips`，之后以库里的为准。
+ * 与 #50 的差异（本轮遗留缺陷修复，契约 §8 第 3/4 行）：
+ * - 卡片字段契约扩为 `{title, sub, meta, years}`：设计卡若在卡片文案里写了年代，落到 `fields.years`；
+ * - 卡片默认位置 `y=0.56, h=0.18`（底边 0.74），**不压字幕**；与字幕安全区重叠由调用方
+ *   算成非阻断警告 `card_subtitle_overlap`（底边 > 0.88）。
  */
 import type {
   AssetSemantics,
@@ -18,61 +17,68 @@ import type {
   SemanticPoint,
   SemanticRegion,
 } from './asset-semantics.js'
-import type { LayerDoc } from './layer-doc.js'
-import { normalizeLayerDoc } from './layer-doc.js'
-import type { Combo, DesignCard, PlannedLayer } from './design-card.js'
+import type { BaseRef, Combo, DesignCard, PlannedLayer } from './design-card.js'
 import { hasLayerSegment } from './design-card.js'
-import type { ClipPosition } from './storyboard-clips.js'
+import { normalizeLayerDoc, type LayerDoc } from './layer-doc.js'
 import {
-  CLIP_DEFAULT_FADE_MS,
-  CLIP_DEFAULT_FPS,
-  CLIP_MIN_SECONDS,
   FULL_VIEWPORT,
-  MAX_CLIP_SECONDS,
-  clampClipDuration,
+  MAX_LAYER_SEGMENT_SECONDS,
+  SEGMENT_DEFAULT_FADE_MS,
+  SEGMENT_DEFAULT_FPS,
+  SEGMENT_MIN_SECONDS,
+  clampSegmentDuration,
   normalizeTimeline,
   normalizeViewport,
   viewportFromPoints,
-  type ClipState,
-  type ClipTimeline,
-  type ClipViewport,
-} from './clip-timeline.js'
+  type PreciseKeyframe,
+  type SegmentTimeline,
+} from './segment-timeline.js'
 
-/** 夹在模型视频前后的片段默认时长（秒）：年份卡 / 地点卡这类过渡 */
-export const CLIP_PRE_POST_DEFAULT_SECONDS = 2
+/** 卡在模型视频前后的图层段默认时长（秒）：年份卡 / 地点卡这类过渡 */
+export const LAYER_SEGMENT_PRE_POST_DEFAULT_SECONDS = 2
 /** 推近取景框相对几何外接框的放大倍数（Issue #50「区域外接框 ×1.3」） */
-export const CLIP_PUSH_IN_PAD = 1.3
+export const LAYER_SEGMENT_PUSH_IN_PAD = 1.3
+/** 卡片默认位置（Issue #58 契约 §8 第 4 行 / 主进程裁决 6）：底边 0.74，避开底部约 8% 的字幕安全区 */
+export const CARD_DEFAULT_BOX = { x: 0.06, y: 0.56, w: 0.46, h: 0.18 }
+/** 字幕安全区上界（归一化）：1080p 下 MarginV=28px + 18pt×1.6 行高 ≈ 底部 8% → 0.88 起算 */
+export const SUBTITLE_SAFE_BOTTOM = 0.88
 
-export interface ClipDraftAsset {
-  kind: 'character' | 'scene' | 'prop'
+export interface SegmentDraftAsset {
+  kind: 'prop' | 'character' | 'scene'
   id: number
   name: string
-  /** 可作底图/图片图层的本地相对路径（忠实原件优先，由调用方决定） */
   image_path: string | null
-  /** 该图在磁盘上的像素尺寸，用来把语义坐标归一化；缺省回落到 semantics.image */
+  /** 语义坐标所针对的原图像素尺寸（有语义标注才填） */
   image_width?: number
   image_height?: number
-  semantics?: AssetSemantics | null
+  semantics: AssetSemantics | null
 }
 
-export interface ClipDraftContext {
-  assets: ClipDraftAsset[]
-  /** 本镜内容时长（秒），`replace` 片段默认取它 */
+export interface SegmentDraftContext {
+  /** 设计卡引用到的资产（含底图资产） */
+  assets: SegmentDraftAsset[]
+  /** 已解析好的底图资产（`null` = 继承上一镜尾帧这类无资产的底图） */
+  base: SegmentDraftAsset | null
+  /** 底图实际使用的图片路径（调用方已按 BaseRef 解析，可能是资产版本图） */
+  base_path: string
+  /** 底图引用原样带回，落库进 `base_ref` */
+  base_ref: BaseRef | null
+  /** 本镜旁白估算/分镜时长（秒），决定 A 组合草稿的最小长度 */
   duration: number
-  /** 成片画幅，写进 layer_doc.base */
   width: number
   height: number
   fps?: number
 }
 
-export interface ClipDraft {
-  position: ClipPosition
+export interface SegmentDraft {
   duration: number
   layer_doc: LayerDoc
-  timeline: ClipTimeline
-  /** 草稿生成过程中被跳过/降级的条目，原样展示给人修 */
+  timeline: SegmentTimeline
+  /** 非阻断提示（缺坐标的图层被跳过等），前端原样展示 */
   warnings: string[]
 }
+
+export type SegmentDraftIssue = 'missing_base' | 'no_layer_segment' | 'no_design_card'
 
 /** 命中的语义条目（判别联合：group 一确定，entry 的几何字段就是确定的） */
 type SemanticHit =
@@ -81,26 +87,26 @@ type SemanticHit =
   | { group: 'regions'; entry: SemanticRegion }
   | { group: 'lines'; entry: SemanticLine }
 
-function assetOf(ctx: ClipDraftContext, id: unknown): ClipDraftAsset | null {
-  if (typeof id !== 'number') return null
-  return ctx.assets.find(asset => asset.id === id) ?? null
+function assetOf(ctx: SegmentDraftContext, id: unknown): SegmentDraftAsset | null {
+  const key = Number(id)
+  if (!Number.isInteger(key)) return null
+  return ctx.assets.find(asset => asset.id === key) ?? null
 }
 
 /** 语义条目：按稳定 id 命中，命中不了按名称匹配（#49 写入时允许写名称而不是 id） */
-function findSemantic(asset: ClipDraftAsset | null, key: string | undefined): SemanticHit | null {
-  const semantics = asset?.semantics
-  if (!semantics || !key) return null
-  const needle = key.trim().toLowerCase()
-  if (!needle) return null
-  const hits: SemanticHit[] = [
-    ...semantics.regions.map((entry): SemanticHit => ({ group: 'regions', entry })),
-    ...semantics.lines.map((entry): SemanticHit => ({ group: 'lines', entry })),
-    ...semantics.points.map((entry): SemanticHit => ({ group: 'points', entry })),
-    ...semantics.labels.map((entry): SemanticHit => ({ group: 'labels', entry })),
-  ]
-  return hits.find(hit => hit.entry.id.toLowerCase() === needle)
-    ?? hits.find(hit => nameOfSemantic(hit).toLowerCase() === needle)
-    ?? null
+function findSemantic(asset: SegmentDraftAsset | null, key: string | undefined): SemanticHit | null {
+  if (!asset?.semantics || !key) return null
+  const wanted = key.trim()
+  const semantics = asset.semantics
+  const label = semantics.labels.find(item => item.id === wanted || item.text === wanted)
+  if (label) return { group: 'labels', entry: label }
+  const point = semantics.points.find(item => item.id === wanted || item.name === wanted)
+  if (point) return { group: 'points', entry: point }
+  const region = semantics.regions.find(item => item.id === wanted || item.name === wanted)
+  if (region) return { group: 'regions', entry: region }
+  const line = semantics.lines.find(item => item.id === wanted || item.name === wanted)
+  if (line) return { group: 'lines', entry: line }
+  return null
 }
 
 /** 条目的人类可读名：labels 用 `text`，其余用 `name` */
@@ -108,38 +114,10 @@ function nameOfSemantic(hit: SemanticHit): string {
   return (hit.group === 'labels' ? hit.entry.text : hit.entry.name).trim()
 }
 
-function imageSizeOf(asset: ClipDraftAsset): { width: number; height: number } {
+function imageSizeOf(asset: SegmentDraftAsset): { width: number; height: number } {
   const width = asset.image_width || asset.semantics?.image.width || 0
   const height = asset.image_height || asset.semantics?.image.height || 0
   return { width: width > 0 ? width : 1, height: height > 0 ? height : 1 }
-}
-
-/**
- * 底图：优先设计卡 `layer_plan.base` 指定的资产（忠实原件由调用方填 `image_path`），
- * 否则退到被计划图层/必须标注引用的那张图。找不到任何可用图时返回 null，由调用方报错。
- */
-function pickBaseAsset(card: DesignCard, ctx: ClipDraftContext): ClipDraftAsset | null {
-  const plan = card.layer_plan
-  const base = plan?.base
-  if (base && base.kind === 'asset') {
-    const chosen = assetOf(ctx, base.asset_id)
-    if (chosen?.image_path) return chosen
-  }
-  const anchors: unknown[] = [
-    ...(plan?.planned_layers || []).map(layer => layer.anchor?.asset_id),
-    ...(plan?.must_mark || []).map(ref => ref.asset_id),
-  ]
-  for (const id of anchors) {
-    const asset = assetOf(ctx, id)
-    if (asset?.image_path && (asset.semantics?.labels.length || asset.semantics?.regions.length || asset.semantics?.lines.length || asset.semantics?.points.length)) {
-      return asset
-    }
-  }
-  for (const id of anchors) {
-    const asset = assetOf(ctx, id)
-    if (asset?.image_path) return asset
-  }
-  return ctx.assets.find(asset => asset.image_path) ?? null
 }
 
 interface DraftedLayer {
@@ -148,15 +126,30 @@ interface DraftedLayer {
   points: Array<[number, number]>
 }
 
+/**
+ * 卡片字段（契约 §8 第 3 行：`{title, sub, meta, years}`）。
+ * 设计卡只带一句文案：文案里的年代（「1700」「1700–1721」「1700—1721年」）进 `years`，
+ * 其余作为标题；标题缺失时用锚点/底图资产名兜底——与 #50 的行为一致，只是多出一行年代。
+ */
+function cardFields(item: PlannedLayer, entryName: string, base: SegmentDraftAsset | null): { title: string; years: string } {
+  const raw = (item.text || entryName || '').trim()
+  const years = raw.match(/\d{3,4}\s*[–—\-~至]\s*\d{3,4}\s*年?|\d{3,4}\s*年|\b(1[0-9]{3}|20[0-9]{2})\b/)?.[0]?.trim() ?? ''
+  // 文案去掉年代后剩下的才是标题；只剩年代时标题留空（模板自动切 year，年代放大显示）
+  const title = years ? raw.replace(years, '').replace(/^[\s·、,，:：]+|[\s·、,，:：]+$/g, '') : raw
+  return {
+    title: (title || (!years ? base?.name || '' : '')).trim(),
+    years,
+  }
+}
+
 function layerFromPlannedLayer(
   item: PlannedLayer,
   index: number,
-  ctx: ClipDraftContext,
-  base: ClipDraftAsset | null,
+  ctx: SegmentDraftContext,
   warnings: string[],
 ): DraftedLayer | null {
   const id = `L${index + 1}`
-  const anchorAsset = assetOf(ctx, item.anchor?.asset_id) ?? base
+  const anchorAsset = assetOf(ctx, item.anchor?.asset_id) ?? ctx.base
   const semantic = findSemantic(anchorAsset, item.anchor?.semantic_id || item.anchor?.name)
   const size = anchorAsset ? imageSizeOf(anchorAsset) : { width: 1, height: 1 }
   // 语义坐标是**原图像素**（#47 契约），图层坐标是归一化 0–1（#48 契约）
@@ -234,18 +227,17 @@ function layerFromPlannedLayer(
   }
 
   if (item.type === 'card') {
-    // 卡片字段契约（{title, sub, meta, years}）归 R5：设计卡只带一句文案，先只填 title
-    const title = item.text || entryName || (anchorAsset?.name ?? '')
-    if (!title) {
-      warnings.push(`第 ${index + 1} 层（card）没有标题文字，已跳过`)
+    const fields = cardFields(item, entryName, ctx.base)
+    if (!fields.title && !fields.years) {
+      warnings.push(`第 ${index + 1} 层（card）没有可显示的标题或年代，已跳过`)
       return null
     }
-    const box = { x: 0.06, y: 0.72, w: 0.46, h: 0.18 }
     return {
       layer: {
-        id, type: 'card', name: title, z: index + 1, box,
-        template: 'name',
-        fields: { title, sub: '', meta: '' },
+        id, type: 'card', name: fields.title || fields.years, z: index + 1,
+        box: { ...CARD_DEFAULT_BOX },
+        template: fields.years && !fields.title ? 'year' : 'name',
+        fields: { title: fields.title, sub: '', meta: '', years: fields.years },
       },
       points: [],
     }
@@ -269,38 +261,34 @@ function layerFromPlannedLayer(
 }
 
 /**
- * 按设计卡的 `layer_plan` 生成片段草稿。`null` = 本镜没有图层段（combo = B 或未选）
- * 或找不到任何可用底图。
+ * 按设计卡的 `layer_plan` 生成图层段草稿。调用方必须先确保 combo 有图层段、底图已解析。
+ * 时长：优先设计卡 `budget.layer_s`；A 组合至少覆盖本镜时长；C/D 没有预算时用 2 秒过渡。
  */
-export function draftClip(card: DesignCard, combo: Combo | null, ctx: ClipDraftContext): ClipDraft | null {
-  if (!hasLayerSegment(combo)) return null
+export function draftSegment(card: DesignCard, combo: Combo | null, ctx: SegmentDraftContext): SegmentDraft {
+  if (!hasLayerSegment(combo)) throw new Error('该段组合没有图层段')
   const warnings: string[] = []
-  const base = pickBaseAsset(card, ctx)
-  if (!base?.image_path) return null
-
   const planned = card.layer_plan?.planned_layers || []
   const drafted: DraftedLayer[] = []
   for (const [index, item] of planned.entries()) {
-    const layer = layerFromPlannedLayer(item, index, ctx, base, warnings)
+    const layer = layerFromPlannedLayer(item, index, ctx, warnings)
     if (layer) drafted.push(layer)
   }
 
-  // 片段位置由段组合决定（A 整镜替代、C 在模型视频之前、D 在之后）
-  const position: ClipPosition = combo === 'A' ? 'replace' : combo === 'C' ? 'pre' : 'post'
-  // 时长优先用设计卡的图层段预算，没有就退回本镜时长
   const planSeconds = card.budget.layer_s
-  const duration = clampClipDuration(
-    planSeconds && planSeconds > 0 ? planSeconds
-      : position === 'replace' ? Math.max(ctx.duration, CLIP_MIN_SECONDS)
-      : CLIP_PRE_POST_DEFAULT_SECONDS,
-    MAX_CLIP_SECONDS,
+  const duration = clampSegmentDuration(
+    planSeconds && planSeconds > 0
+      ? planSeconds
+      : combo === 'A'
+        ? Math.max(ctx.duration, SEGMENT_MIN_SECONDS)
+        : LAYER_SEGMENT_PRE_POST_DEFAULT_SECONDS,
+    MAX_LAYER_SEGMENT_SECONDS,
   )
 
   const layerDoc = normalizeLayerDoc({
     version: 1,
     theme: 'archival',
     base: {
-      path: base.image_path,
+      path: ctx.base_path,
       width: ctx.width,
       height: ctx.height,
       filter: { paper: 0.16, tint: 'sepia', tint_strength: 0.18, vignette: 0.28 },
@@ -308,9 +296,9 @@ export function draftClip(card: DesignCard, combo: Combo | null, ctx: ClipDraftC
     layers: drafted.map(entry => entry.layer),
   })
 
-  // 关键状态：t=0 干净底图 → 按 at_s 逐层显现 → 推近到已显现几何的外接框
+  // 精确关键帧：t=0 干净底图 → 按 at_s 逐层显现 → 推近到已显现几何的外接框
   const revealed: string[] = []
-  const states: ClipState[] = [{ t: 0, viewport: { ...FULL_VIEWPORT }, visible: [] }]
+  const keyframes: PreciseKeyframe[] = [{ t: 0, viewport: { ...FULL_VIEWPORT }, visible: [] }]
   const slots = drafted.length || 1
   for (const [index, entry] of drafted.entries()) {
     const item = planned[Number(String(entry.layer.id).slice(1)) - 1]
@@ -321,27 +309,29 @@ export function draftClip(card: DesignCard, combo: Combo | null, ctx: ClipDraftC
     )
     revealed.push(String(entry.layer.id))
     // 设计卡不带视口（它是导演层的图纸）：草稿一律全幅，取景由图层编辑器（R6）定
-    states.push({ t: Math.round(t * 100) / 100, viewport: { ...FULL_VIEWPORT }, visible: [...revealed] })
+    keyframes.push({ t: Math.round(t * 100) / 100, viewport: { ...FULL_VIEWPORT }, visible: [...revealed] })
   }
-
   const geometry = drafted.flatMap(entry => entry.points)
   if (geometry.length >= 2 && duration > 2) {
-    states.push({
+    keyframes.push({
       t: Math.round(Math.max(0.6, duration * 0.8) * 100) / 100,
-      viewport: viewportFromPoints(geometry, CLIP_PUSH_IN_PAD),
+      viewport: normalizeViewport(viewportFromPoints(geometry, LAYER_SEGMENT_PUSH_IN_PAD)),
       visible: [...revealed],
     })
   }
+  // 末帧必须正好落在段尾：C 的衔接帧取 `t=duration`，没有这一帧就没有「末尾停留的最终画面」
+  if (keyframes[keyframes.length - 1].t < duration - 1e-6) {
+    keyframes.push({ t: duration, viewport: { ...keyframes[keyframes.length - 1].viewport }, visible: [...revealed] })
+  }
 
   return {
-    position,
     duration,
     layer_doc: layerDoc,
     timeline: normalizeTimeline({
-      fps: ctx.fps || CLIP_DEFAULT_FPS,
+      fps: ctx.fps || SEGMENT_DEFAULT_FPS,
       ease: 'inout',
-      fade_ms: CLIP_DEFAULT_FADE_MS,
-      states,
+      fade_ms: SEGMENT_DEFAULT_FADE_MS,
+      keyframes,
     }),
     warnings,
   }

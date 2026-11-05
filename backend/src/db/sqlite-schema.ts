@@ -457,23 +457,43 @@ export const sqliteSchemaStatements = [
     retrieved_at TEXT NOT NULL
   )`,
 
-  // 确定性片段（Issue #50）：底图 + 图层文档 + 时间线渲染出的 mp4
-  // position ∈ replace|pre|post；每镜每个 position 至多一条
-  `CREATE TABLE IF NOT EXISTS storyboard_clips (
+  // 图层段（Issue #58，契约 §3.2）：底图 + 图层文档 + 精确关键帧时间线渲染出的 mp4 + 衔接帧 PNG。
+  // **一镜至多一行**（UNIQUE storyboard_id）；是否参与由 storyboards.combo ∈ {A,C,D} 决定
+  // （combo=B 时行保留但不参与，切回时原样恢复）。裁切与底图真实分辨率只存在
+  // layer_doc.base（R6 定义），不另设列；end_hold 是派生值 = duration − 末个精确关键帧 t。
+  // 由 storyboard_clips 一次性迁移而来（services/layer-segment-migration.ts，迁完即 DROP 旧表）。
+  `CREATE TABLE IF NOT EXISTS storyboard_layer_segments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     storyboard_id INTEGER NOT NULL,
-    position TEXT NOT NULL,
     layer_doc TEXT NOT NULL,
     timeline TEXT NOT NULL,
     duration REAL NOT NULL,
+    base_ref TEXT,
+    quality_warnings TEXT,
     render_path TEXT,
     render_signature TEXT,
     rendered_at TEXT,
+    junction_path TEXT,
+    junction_hash TEXT,
     status TEXT NOT NULL DEFAULT 'draft',
+    stale_reasons TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   )`,
-  `CREATE UNIQUE INDEX IF NOT EXISTS idx_storyboard_clips_unique ON storyboard_clips (storyboard_id, position)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_storyboard_layer_segments_unique ON storyboard_layer_segments (storyboard_id)`,
+
+  // 分镜变更日志（Issue #58，契约 §5）：本 Issue 只写 kind='combo'（段组合切换）。
+  // 组合切换只归档不删除，这张表是「谁把本镜从 B 换成了 C」的唯一痕迹。
+  `CREATE TABLE IF NOT EXISTS storyboard_change_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    storyboard_id INTEGER NOT NULL,
+    kind TEXT NOT NULL,
+    from_value TEXT,
+    to_value TEXT,
+    detail TEXT,
+    created_at TEXT NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_storyboard_change_log_sb ON storyboard_change_log (storyboard_id)`,
 
   // ── 资产「精确 → 美化」流水线（Issue #56）────────────────────
   // run 容器是 sys_task(params.kind='asset_pipeline', provider='mastra')，这里只存事实表/轮次/QC。
@@ -686,6 +706,10 @@ const columnAdditions: { table: string; column: string; type: string }[] = [
   { table: 'storyboards', column: 'design_card_status', type: "TEXT NOT NULL DEFAULT 'blank'" },
   { table: 'storyboards', column: 'design_card_confirmed_at', type: 'TEXT' },
   { table: 'storyboards', column: 'design_card_stale_reason', type: 'TEXT' },
+  // 衔接帧与关键帧确认的联动（Issue #58，契约 §3.3）：确认关键帧时快照当时的衔接帧 hash；
+  // 图层段重渲染后 hash 变了就作废确认并记下原因（'junction_updated'）。
+  { table: 'storyboards', column: 'keyframes_junction_hash', type: 'TEXT' },
+  { table: 'storyboards', column: 'keyframes_stale_reason', type: 'TEXT' },
   // 文本配置的视觉能力标定（Issue #51）：存量行默认 0（不做一次性探测初值——HTTP 200 不等于真能看图），
   // 由 providers.json / 设置页人工标定。需要视觉的 AI 环节只会选 vision=1 的配置。
   { table: 'ai_service_configs', column: 'vision', type: 'INTEGER NOT NULL DEFAULT 0' },

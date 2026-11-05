@@ -641,13 +641,10 @@
             :episode-normalize="episodeNarrationNormalize"
             :narration-batch="narrationBatch"
             :narration-voice-batch="narrationVoiceBatch"
-            :clip-of="clipOfShot"
-            :clip-thumbnail="clipThumbnailUrl"
             @break="doBreakdown"
             @refresh="refresh"
             @preview="openImageViewer"
             @goto-assets="prodTab = 'assets'"
-            @goto-clip="gotoShotProduction"
             @open-asset="openPoolAssetDetail"
             @update-field="updateField"
             @field-dirty="markFieldDirty"
@@ -656,11 +653,11 @@
             @open-narration-settings="narrationSettingsOpen = true"
           />
 
-          <!-- Sub: 分镜制作（纪录片 #54）：图层段 + 关键帧在同一页；R5 重构为段合并工作区 -->
+          <!-- Sub: 分镜制作（#58）：一镜 = ▣ 图层段 + ▶ 生成段；剧情项目的 videos 页签走同一工作区 -->
           <ShotProductionPanel
             v-if="prodTab === 'production'"
-            :focus-clip-storyboard-id="clipFocusSbId"
-            @clips-changed="loadEpisodeClips"
+            :episode-id="Number(epId) || 0"
+            :focus-storyboard-id="productionFocusSbId"
             :storyboards="sbs"
             :pool-candidates="shotPoolCandidates"
             :set-pool-asset="setShotPoolAsset"
@@ -685,13 +682,11 @@
             :episode-normalize="episodeNarrationNormalize"
             :narration-batch="narrationBatch"
             :narration-voice-batch="narrationVoiceBatch"
-            :clip-of="clipOfShot"
-            :clip-thumbnail="clipThumbnailUrl"
             @break="doBreakdown"
             @refresh="refresh"
             @preview="openImageViewer"
             @goto-assets="prodTab = 'assets'"
-            @goto-clip="gotoShotProduction"
+            @goto-design="prodTab = 'design'"
             @open-asset="openPoolAssetDetail"
             @update-field="updateField"
             @field-dirty="markFieldDirty"
@@ -1500,7 +1495,7 @@ import {
   Users, FileText, FolderKanban, Clapperboard, Download, Loader2, Images,
   Image as ImageIcon, Plus, X, Trash2, CircleHelp, ChevronRight, Layers, Lightbulb, Lock,
 } from 'lucide-vue-next'
-import { api, dramaAPI, episodeAPI, storyboardAPI, characterAPI, sceneAPI, propAPI, taskAPI, mergeAPI, posterAPI, aiConfigAPI, uploadAPI, mediaLibraryAPI, videoQueueAPI, assetBatchAPI, clipAPI } from '~/composables/useApi'
+import { api, dramaAPI, episodeAPI, storyboardAPI, characterAPI, sceneAPI, propAPI, taskAPI, mergeAPI, posterAPI, aiConfigAPI, uploadAPI, mediaLibraryAPI, videoQueueAPI, assetBatchAPI } from '~/composables/useApi'
 import { startTour, autoTour } from '~/composables/useTour'
 import { useAgent } from '~/composables/useAgent'
 import { toastError, mapError, toastServerMessage, MODERATION_RE } from '~/composables/useToast'
@@ -1828,6 +1823,14 @@ const prodTabIdx = computed({
   get: () => prodTabDefs.value.findIndex(d => d.id === prodTab.value),
   set: (v) => { prodTab.value = prodTabDefs.value[v]?.id || 'assets' },
 })
+// 分镜制作页要聚焦的镜头（#58）：视频页「去分镜制作」跳转时设置，工作区据此选中该镜
+const productionFocusSbId = ref(0)
+// 「去分镜制作」（#58）：视频页不再就地渲染图层段，一律跳到制作页并聚焦该镜
+function gotoShotProduction(sb) {
+  productionFocusSbId.value = sb?.id || 0
+  panel.value = 'production'
+  prodTab.value = 'production'
+}
 const imageConfigs = ref([])
 const videoConfigs = ref([])
 const textConfigs = ref([])
@@ -2749,8 +2752,6 @@ function videoPreviewStatusLabel(item) {
   if (item.status === 'unchanged') return t('episode.vid.previewUnchanged', { n: Number(item.matched_version_no) || 0 })
   if (item.status === 'unknown') return t('episode.vid.previewUnknown')
   if (item.status === 'blocked') return t('episode.vid.previewBlocked')
-  // 确定性片段镜头（#50）：不走模型生成，这一档不可勾选，也不能落进「跳过」分支
-  if (item.status === 'deterministic') return t('episode.vid.previewDeterministic')
   return t('episode.vid.previewSkipped')
 }
 function videoPreviewReason(item) {
@@ -2759,74 +2760,6 @@ function videoPreviewReason(item) {
   }
   return item.reason || ''
 }
-
-// ===== 确定性片段（#50）：关键帧页占位与视频页片段卡共用的集级片段表 =====
-const episodeClips = ref({})
-const clipRenderingIds = ref([])
-const clipThumbStamp = ref(0)
-// 片段工作台要聚焦的镜头（由关键帧页 / 视频页的「编辑图层/时间线」跳转设置）
-const clipFocusSbId = ref(0)
-
-/** 本镜图层段的位置；'none' 或没选段组合 = 本镜不走图层段 */
-function clipPositionOf(sb) {
-  // 段组合（#57）决定图层段位置：A 整镜替代、C 在模型视频之前、D 在之后
-  const position = sb?.combo === 'A' ? 'replace' : sb?.combo === 'C' ? 'pre' : sb?.combo === 'D' ? 'post' : 'none'
-  return position === 'none' ? '' : position
-}
-function isDeterministicShot(sb) {
-  return Boolean(clipPositionOf(sb))
-}
-function clipOfShot(sb) {
-  return episodeClips.value[sb?.id] || null
-}
-function clipThumbnailUrl(sb, which) {
-  const position = clipPositionOf(sb)
-  if (!position || !sb?.id) return ''
-  return clipAPI.thumbnailUrl(sb.id, position, which, clipThumbStamp.value)
-}
-// 「去图层段」跳转（#54）：图层工作台现在在「分镜制作」步内（纪录片），剧情项目没有该入口
-function gotoShotProduction(sb) {
-  clipFocusSbId.value = sb?.id || 0
-  panel.value = 'production'
-  prodTab.value = 'production'
-}
-
-/** 逐镜取片段（确定性镜头数量有限）；工作台改动后由 @changed 重新拉 */
-async function loadEpisodeClips() {
-  const shots = sbs.value.filter(isDeterministicShot)
-  if (!shots.length) { episodeClips.value = {}; return }
-  const next = {}
-  for (const sb of shots) {
-    try {
-      const data = await clipAPI.list(sb.id)
-      const position = clipPositionOf(sb)
-      next[sb.id] = (data.clips || []).find(c => c.position === position) || (data.clips || [])[0] || null
-    } catch { /* 单镜失败不影响其余镜头 */ }
-  }
-  episodeClips.value = next
-  clipThumbStamp.value = Date.now()
-}
-
-/** 视频页「渲染片段」：同步渲染（十几秒片段几秒返回），完成后就地刷新卡片与缩略图 */
-async function renderShotClip(sb) {
-  const position = clipPositionOf(sb)
-  if (!position || clipRenderingIds.value.includes(sb.id)) return
-  clipRenderingIds.value = [...clipRenderingIds.value, sb.id]
-  try {
-    const data = await clipAPI.render(sb.id, position)
-    if (data.clip) episodeClips.value = { ...episodeClips.value, [sb.id]: data.clip }
-    clipThumbStamp.value = Date.now()
-    toast.success(t('episode.clip.renderDone'))
-  } catch (e) {
-    toastServerMessage(e, { fallback: 'episode.clip.renderFailed' })
-  } finally {
-    clipRenderingIds.value = clipRenderingIds.value.filter(id => id !== sb.id)
-  }
-}
-
-watch([() => sbs.value.length, prodTab], ([, tab]) => {
-  if (['keyframes', 'videos', 'production', 'final'].includes(tab)) void loadEpisodeClips()
-}, { immediate: true })
 
 /** 批量视频确认框 = 服务端预览清单（逐镜按输入签名比较）+ 勾选；选择模式只缩小预览范围 */
 async function openBatchVideoConfirm(storyboardIds) {
@@ -5250,9 +5183,6 @@ provide(WORKBENCH_CTX, {
   batchVideoPrompts,
   batchVideos,
   cancelVideoBatch,
-  clipOfShot,
-  clipPositionOf,
-  clipRenderingIds,
   composeBatchRunning,
   composeReasonOf,
   composeStateOf,
@@ -5295,7 +5225,6 @@ provide(WORKBENCH_CTX, {
   historyElapsedTook,
   inspectorOpen,
   isCurrentVideo,
-  isDeterministicShot,
   isDocumentaryProject,
   isExportSelected,
   isMergeInProgress,
@@ -5334,7 +5263,6 @@ provide(WORKBENCH_CTX, {
   rawLen,
   refresh,
   removeHistoryVideo,
-  renderShotClip,
   retryFailedVideos,
   rn,
   rt,

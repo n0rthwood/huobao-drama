@@ -9,7 +9,6 @@
 import { inject } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ChevronRight, Loader2 } from 'lucide-vue-next'
-import ClipCard from '~/components/ClipWorkspace/ClipCard.vue'
 import FieldSaveStatus from '~/components/FieldSaveStatus.vue'
 import MediaTime from '~/components/MediaTime.vue'
 import MentionTextarea from '~/components/MentionTextarea.vue'
@@ -33,9 +32,6 @@ const {
   batchVideoPrompts,
   batchVideos,
   cancelVideoBatch,
-  clipOfShot,
-  clipPositionOf,
-  clipRenderingIds,
   composeBatchRunning,
   composeReasonOf,
   composeStateOf,
@@ -62,7 +58,6 @@ const {
   historyElapsedTook,
   inspectorOpen,
   isCurrentVideo,
-  isDeterministicShot,
   isDocumentaryProject,
   isShotConfirmed,
   isVideoSbSelected,
@@ -87,7 +82,6 @@ const {
   promptHeadVideoActionLabel,
   refresh,
   removeHistoryVideo,
-  renderShotClip,
   retryFailedVideos,
   sbVideoHistory,
   sbs,
@@ -154,6 +148,12 @@ const {
   videoTaskState,
   videoTaskStatusLabel,
 } = ctx
+
+/** 本镜是否有图层段（A/C/D 组合）：视频页只给「去分镜制作」入口，不再在此渲染图层段 */
+function hasLayerSegment(sb) {
+  const combo = sb?.combo ?? null
+  return combo === 'A' || combo === 'C' || combo === 'D'
+}
 </script>
 
 <template>
@@ -327,13 +327,12 @@ const {
           </div>
         </div>
         <button
-          v-if="isDeterministicShot(task.storyboard)"
+          v-if="hasLayerSegment(task.storyboard)"
           class="btn btn-icon btn-sm video-task-action"
-          :title="t('episode.clip.render')"
-          :disabled="clipRenderingIds.includes(task.storyboard.id) || !clipOfShot(task.storyboard)"
-          @click.stop="renderShotClip(task.storyboard)"
+          :title="t('episode.production.gotoShotProduction')"
+          @click.stop="gotoShotProduction(task.storyboard)"
         >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/></svg>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
         </button>
         <button
           v-else
@@ -429,14 +428,10 @@ const {
                 <div class="video-player-empty-desc">{{ videoTaskState(selectedSb) === 'pending' ? t('episode.vid.emptyGeneratingDesc') : t('episode.vid.emptyNoVideoDesc') }}</div>
               </div>
               <button
-                v-if="isDeterministicShot(selectedSb)"
+                v-if="hasLayerSegment(selectedSb)"
                 class="btn btn-primary btn-sm video-player-empty-action"
-                :disabled="clipRenderingIds.includes(selectedSb.id) || !clipOfShot(selectedSb)"
-                :title="clipOfShot(selectedSb) ? undefined : t('episode.clip.cardNoClip')"
-                @click="renderShotClip(selectedSb)"
-              >
-                {{ clipRenderingIds.includes(selectedSb.id) ? t('episode.clip.rendering') : t('episode.clip.render') }}
-              </button>
+                @click="gotoShotProduction(selectedSb)"
+              >{{ t('episode.production.gotoShotProduction') }}</button>
               <button
                 v-else-if="videoTaskState(selectedSb) !== 'pending'"
                 class="btn btn-primary btn-sm video-player-empty-action"
@@ -451,16 +446,6 @@ const {
             </div>
           </div>
         </aside>
-
-        <!-- 确定性片段（#50）：本镜成片来自片段渲染，不是模型生成 -->
-        <ClipCard
-          v-if="isDeterministicShot(selectedSb)"
-          :clip="clipOfShot(selectedSb)"
-          :position="clipPositionOf(selectedSb)"
-          :rendering="clipRenderingIds.includes(selectedSb.id)"
-          @edit="gotoShotProduction(selectedSb)"
-          @render="renderShotClip(selectedSb)"
-        />
 
         <div v-if="sbVideoHistory.length" class="video-player-history">
           <div class="video-player-history-head">

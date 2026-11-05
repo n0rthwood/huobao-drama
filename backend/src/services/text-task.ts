@@ -127,6 +127,8 @@ export async function createTextTask(input: {
   model?: string | null
   configId?: number | null
   storyboardIds?: number[]
+  /** 批量范围快照（Issue #58）：`{included, excluded[{id, reason}]}`，重试/续跑按同一份口径 */
+  scope?: { included: Array<{ storyboard_id: number; storyboard_number: number }>; excluded: Array<{ storyboard_id: number; storyboard_number: number; reason: string }> }
   progress?: TextTaskProgress
   retryOf?: number
 }): Promise<number> {
@@ -135,6 +137,7 @@ export async function createTextTask(input: {
   const params: TextTaskParams = { kind: input.kind }
   if (input.progress) params.progress = input.progress
   if (input.storyboardIds?.length) params.storyboardIds = input.storyboardIds
+  if (input.scope) params.scope = input.scope
   const configId = stage ? stage.configId : input.configId
   if (configId) params.configId = configId
   if (stage) {

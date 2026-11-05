@@ -23,8 +23,18 @@ import { composeStatesForEpisode } from './compose-state.js'
 import { resolveDramaProjectType, type ProjectType } from './project-type.js'
 import { now } from '../utils/response.js'
 import { markEpisodeDesignCardsStale } from './staleness.js'
+import { toDesignCardStatus, type DesignCardStatus } from './design-card.js'
 
 export const GATE_KEYS = ['assets', 'design', 'production', 'final', 'poster', 'export'] as const
+
+/** 设计卡状态的中文名（逐镜门禁原因文案用） */
+export const DESIGN_CARD_STATUS_LABELS: Record<DesignCardStatus, string> = {
+  blank: '空白',
+  ai_filling: 'AI 填卡中',
+  pending: '待确认',
+  confirmed: '已确认',
+  stale: '已过期',
+}
 export type GateKey = typeof GATE_KEYS[number]
 
 /** 资产审核清单状态（R2 写值；R1 只读，非 passed 一律当未通过） */
@@ -177,6 +187,41 @@ export async function assertGate(episodeId: number, gate: GateKey): Promise<void
   if (gates.unlocked[gate]) return
   throw new GateBlockedError(gate, gates.reasons[gate] || '该步骤尚未解锁')
 }
+
+/**
+ * 逐镜的「分镜制作」解锁事实（Issue #58）：本镜设计卡已确认即可制作。
+ * 剧情项目恒解锁（它们没有设计卡）；页面级入口仍由 `episodeGates().unlocked.production` 决定。
+ * 与 `assertGate` 不同，这里**只回答本镜**，不因同集别的镜没确认而锁住。
+ */
+export async function productionGateReason(
+  episodeId: number,
+  shot: { storyboardId: number; status: DesignCardStatus; number?: number },
+): Promise<{ unlocked: boolean; reason: string | null }> {
+  const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId))
+  if (!ep) return { unlocked: false, reason: '剧集不存在' }
+  if (resolveDramaProjectType(ep.dramaId) !== 'documentary') return { unlocked: true, reason: null }
+  if (shot.status === 'confirmed') return { unlocked: true, reason: null }
+  const label = shot.number ? `#${String(shot.number).padStart(2, '0')}` : `#${shot.storyboardId}`
+  return {
+    unlocked: false,
+    reason: `先确认 ${label} 的设计卡：本镜的设计卡状态是「${DESIGN_CARD_STATUS_LABELS[shot.status]}」，未确认前不能保存/渲染图层段或生成关键帧`,
+  }
+}
+
+/** 逐镜「分镜制作」门禁：图层段保存/渲染、关键帧生成都要先过它（契约 §2） */
+export async function assertShotGate(storyboardId: number, gate: GateKey = 'production'): Promise<void> {
+  const [sb] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, storyboardId))
+  if (!sb) throw new GateBlockedError(gate, '分镜不存在')
+  const shot = {
+    storyboardId: sb.id,
+    status: toDesignCardStatus(sb.designCardStatus),
+    number: sb.storyboardNumber,
+  }
+  const result = await productionGateReason(sb.episodeId, shot)
+  if (result.unlocked) return
+  throw new GateBlockedError(gate, result.reason || '该步骤尚未解锁')
+}
+
 
 /**
  * 确认旁白稿；旁白稿为空返回 false（路由据此回 400）。

@@ -148,6 +148,8 @@ export interface KeyframeVersion {
   version_no: number
   /** 早期任务缺字段时为 null（与任何当前请求都不匹配） */
   signature: string | null
+  /** 组合切换把它归档时的原因（#58：`replaced_by_junction` / `combo_switch`）；未归档为 null */
+  archived_reason?: string | null
 }
 
 /** 某槽位的历史版本（含版本号与签名），按创建时间正序 */
@@ -170,6 +172,7 @@ export async function loadKeyframeVersions(
     .sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')) || a.id - b.id)
   return tasks.map((task, index) => ({
     id: task.id,
+    archived_reason: archivedReasonOf(task.params),
     image: (task.localPath || task.resultUrl)!,
     prompt: task.prompt,
     provider: task.provider,
@@ -179,6 +182,19 @@ export async function loadKeyframeVersions(
     version_no: index + 1,
     signature: signatureFromTask(task),
   }))
+}
+
+/** 任务 params 里的归档原因（#58 组合切换只归档不删除：被替换的版本仍列在这里，标上原因） */
+function archivedReasonOf(raw: string | null | undefined): string | null {
+  if (!raw) return null
+  try {
+    const params: unknown = JSON.parse(raw)
+    if (!params || typeof params !== 'object') return null
+    const reason = (params as Record<string, unknown>).archived_reason
+    return typeof reason === 'string' && reason ? reason : null
+  } catch {
+    return null
+  }
 }
 
 /** 整集共用的配置/风格/画幅（批量预览只取一次） */

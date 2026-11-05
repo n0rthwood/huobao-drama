@@ -426,7 +426,8 @@ function emitCard(layer: CardLayer, ctx: SvgContext): string {
   const accent = styleOf(layer, ctx.theme, 'accent') as string
   const bg = `<rect x="${fmt(x)}" y="${fmt(y)}" width="${fmt(w)}" height="${fmt(h)}"`
     + ` fill="${esc(styleOf(layer, ctx.theme, 'bg') as string)}" fill-opacity="${fmt(styleOf(layer, ctx.theme, 'bg_opacity') as number)}"/>`
-  const { title, sub, meta } = layer.fields
+  // `years`（#58 卡片字段契约）统一渲染为「标题下方的一行强调色年代」；为空时输出与 #48 逐字节相同
+  const { title, sub, meta, years } = layer.fields
 
   if (layer.template === 'year') {
     const titleSize = h * 0.5
@@ -434,6 +435,7 @@ function emitCard(layer: CardLayer, ctx: SvgContext): string {
     return bg
       + `<rect x="${fmt(x)}" y="${fmt(y + h - h * 0.06)}" width="${fmt(w)}" height="${fmt(h * 0.06)}" fill="${esc(accent)}"/>`
       + textBlock([title], { x: x + w / 2, top: y + h * 0.12, size: titleSize, font, bold: true, color, align: 'center' })
+      + (years ? textBlock([years], { x: x + w / 2, top: y + h * 0.62, size: subSize, font, bold: false, color: accent, align: 'center' }) : '')
       + (sub ? textBlock([sub], { x: x + w / 2, top: y + h * 0.72, size: subSize, font, bold: false, color, align: 'center' }) : '')
   }
   if (layer.template === 'chapter') {
@@ -441,6 +443,7 @@ function emitCard(layer: CardLayer, ctx: SvgContext): string {
     const subSize = h * 0.17
     return bg
       + textBlock([title], { x: x + w / 2, top: y + h * 0.14, size: titleSize, font, bold: true, color, align: 'center' })
+      + (years ? textBlock([years], { x: x + w / 2, top: y + h * 0.56, size: subSize, font, bold: false, color: accent, align: 'center' }) : '')
       + `<rect x="${fmt(x + w * 0.35)}" y="${fmt(y + h * 0.66)}" width="${fmt(w * 0.3)}" height="${fmt(Math.max(1, h * 0.02))}" fill="${esc(accent)}"/>`
       + (sub ? textBlock([sub], { x: x + w / 2, top: y + h * 0.74, size: subSize, font, bold: false, color, align: 'center' }) : '')
   }
@@ -449,10 +452,14 @@ function emitCard(layer: CardLayer, ctx: SvgContext): string {
   const titleSize = h * 0.38
   const subSize = h * 0.2
   const metaSize = h * 0.16
+  // 标题下方逐行往下排：先 years（强调色），再 sub
+  const yearsTop = y + pad + titleSize * LINE_HEIGHT_EM
+  const subTop = yearsTop + (years ? subSize * LINE_HEIGHT_EM : 0)
   return bg
     + `<rect x="${fmt(x)}" y="${fmt(y)}" width="${fmt(stripe)}" height="${fmt(h)}" fill="${esc(accent)}"/>`
     + textBlock([title], { x: x + stripe + pad, top: y + pad, size: titleSize, font, bold: true, color, align: 'left' })
-    + (sub ? textBlock([sub], { x: x + stripe + pad, top: y + pad + titleSize * LINE_HEIGHT_EM, size: subSize, font, bold: false, color, align: 'left' }) : '')
+    + (years ? textBlock([years], { x: x + stripe + pad, top: yearsTop, size: subSize, font, bold: false, color: accent, align: 'left' }) : '')
+    + (sub ? textBlock([sub], { x: x + stripe + pad, top: subTop, size: subSize, font, bold: false, color, align: 'left' }) : '')
     + (meta ? textBlock([meta], { x: x + w - pad, top: y + h - pad - metaSize * LINE_HEIGHT_EM, size: metaSize, font, bold: false, color, align: 'right' }) : '')
 }
 

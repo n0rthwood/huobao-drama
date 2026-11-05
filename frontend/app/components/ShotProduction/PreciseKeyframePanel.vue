@@ -3,7 +3,7 @@
     <!-- 时刻滑杆：拖动即驱动中栏预览（与后端 frameStateAt 同一口径） -->
     <div class="ct-block">
       <div class="ct-row">
-        <span class="ct-label">{{ t('episode.clip.time') }}</span>
+        <span class="ct-label">{{ t('episode.segment.time') }}</span>
         <span class="mono ct-time">{{ time.toFixed(2) }}s / {{ duration.toFixed(2) }}s</span>
       </div>
       <input
@@ -12,34 +12,34 @@
       >
       <div class="ct-ticks">
         <button
-          v-for="(state, index) in timeline.states" :key="`tick-${index}`"
+          v-for="(keyframe, index) in timeline.keyframes" :key="`tick-${index}`"
           type="button" class="ct-tick" :class="{ on: index === selectedIndex }"
-          :style="{ left: `${pct(state.t)}%` }"
-          :title="t('episode.clip.stateAt', { t: state.t.toFixed(2) })"
-          @click="pickState(index)"
+          :style="{ left: `${pct(keyframe.t)}%` }"
+          :title="t('episode.segment.keyframeAt', { t: keyframe.t.toFixed(2) })"
+          @click="pickKeyframe(index)"
         />
       </div>
     </div>
 
-    <!-- 片段参数：时长 / 缓动 / 淡入淡出；fps 是派生值，只读 -->
+    <!-- 段参数：时长 / 缓动 / 淡入淡出；fps 是派生值，只读 -->
     <div class="ct-block ct-params">
       <label class="ct-field">
-        <span class="ct-label">{{ t('episode.clip.duration') }}</span>
+        <span class="ct-label">{{ t('episode.segment.duration') }}</span>
         <input
           class="input ct-input" type="number" :min="minSeconds" :max="maxSeconds" step="0.5"
           :value="duration" @change="onDuration($event.target.value)"
         >
-        <span class="ct-unit">{{ t('episode.clip.seconds', { max: maxSeconds }) }}</span>
+        <span class="ct-unit">{{ t('episode.segment.seconds', { max: maxSeconds }) }}</span>
       </label>
       <label class="ct-field">
-        <span class="ct-label">{{ t('episode.clip.ease') }}</span>
+        <span class="ct-label">{{ t('episode.segment.ease') }}</span>
         <select class="input ct-input" :value="timeline.ease" @change="patchTimeline({ ease: $event.target.value })">
-          <option value="inout">{{ t('episode.clip.easeInout') }}</option>
-          <option value="linear">{{ t('episode.clip.easeLinear') }}</option>
+          <option value="inout">{{ t('episode.segment.easeInout') }}</option>
+          <option value="linear">{{ t('episode.segment.easeLinear') }}</option>
         </select>
       </label>
       <label class="ct-field">
-        <span class="ct-label">{{ t('episode.clip.fade') }}</span>
+        <span class="ct-label">{{ t('episode.segment.fade') }}</span>
         <input
           class="input ct-input" type="number" min="0" max="3000" step="50"
           :value="timeline.fade_ms" @change="patchTimeline({ fade_ms: Math.max(0, Math.min(3000, Number($event.target.value) || 0)) })"
@@ -47,54 +47,54 @@
         <span class="ct-unit">ms</span>
       </label>
       <div class="ct-field">
-        <span class="ct-label">{{ t('episode.clip.fps') }}</span>
-        <span class="mono ct-readonly">{{ timeline.fps }}</span>
-        <span class="ct-unit">{{ t('episode.clip.fpsDerived') }}</span>
+        <span class="ct-label">{{ t('episode.segment.endHold') }}</span>
+        <span class="mono ct-readonly">{{ endHold.toFixed(2) }}s</span>
+        <span class="ct-unit">{{ t('episode.segment.endHoldDerived') }}</span>
       </div>
     </div>
 
-    <!-- 关键状态列表 -->
+    <!-- 精确关键帧列表 -->
     <div class="ct-block">
       <div class="ct-row">
-        <span class="ct-label">{{ t('episode.clip.states') }}</span>
-        <span class="tag mono">{{ timeline.states.length }}</span>
+        <span class="ct-label">{{ t('episode.segment.keyframes') }}</span>
+        <span class="tag mono">{{ timeline.keyframes.length }}</span>
         <span class="ml-auto" />
-        <button type="button" class="btn btn-sm" :disabled="timeline.states.length >= maxStates" @click="addState">
-          {{ t('episode.clip.addState') }}
+        <button type="button" class="btn btn-sm" :disabled="timeline.keyframes.length >= maxKeyframes" @click="addKeyframe">
+          {{ t('episode.segment.addKeyframe') }}
         </button>
       </div>
       <div class="ct-state-list">
         <div
-          v-for="(state, index) in timeline.states" :key="`state-${index}`"
+          v-for="(keyframe, index) in timeline.keyframes" :key="`keyframe-${index}`"
           :class="['ct-state', { on: index === selectedIndex }]"
           role="button" tabindex="0"
-          @click="pickState(index)" @keydown.enter.prevent="pickState(index)"
+          @click="pickKeyframe(index)" @keydown.enter.prevent="pickKeyframe(index)"
         >
           <span class="ct-state-no">{{ index + 1 }}</span>
           <input
             class="input ct-state-time" type="number" min="0" :max="duration" step="0.1"
-            :value="state.t" @click.stop @change="setStateTime(index, $event.target.value)"
+            :value="keyframe.t" @click.stop @change="setKeyframeTime(index, $event.target.value)"
           >
-          <span class="ct-state-sum">{{ t('episode.clip.visibleCount', { n: state.visible.length }) }}</span>
+          <span class="ct-state-sum">{{ t('episode.segment.visibleCount', { n: keyframe.visible.length }) }}</span>
           <button
-            type="button" class="ct-state-del" :title="t('episode.clip.removeState')"
-            :disabled="timeline.states.length <= 1" @click.stop="removeState(index)"
+            type="button" class="ct-state-del" :title="t('episode.segment.removeKeyframe')"
+            :disabled="timeline.keyframes.length <= 1" @click.stop="removeKeyframe(index)"
           >×</button>
         </div>
       </div>
     </div>
 
-    <!-- 当前状态：取景框（正方形归一化框，可拖可缩）+ 图层可见勾选 -->
+    <!-- 当前关键帧：取景框（正方形归一化框，可拖可缩）+ 图层可见勾选 + 逐帧覆盖 -->
     <div v-if="current" class="ct-block">
       <div class="ct-row">
-        <span class="ct-label">{{ t('episode.clip.viewport') }}</span>
-        <span class="mono ct-time">{{ t('episode.clip.viewportValue', { x: current.viewport.x.toFixed(2), y: current.viewport.y.toFixed(2), s: current.viewport.w.toFixed(2) }) }}</span>
+        <span class="ct-label">{{ t('episode.segment.viewport') }}</span>
+        <span class="mono ct-time">{{ t('episode.segment.viewportValue', { x: current.viewport.x.toFixed(2), y: current.viewport.y.toFixed(2), s: current.viewport.w.toFixed(2) }) }}</span>
       </div>
       <div ref="stageEl" class="ct-stage" :style="{ aspectRatio: `${spec.width} / ${spec.height}` }">
         <img v-if="baseSrc" class="ct-stage-base" :src="baseSrc" alt="" draggable="false">
         <div v-for="filter in baseFilters" :key="filter.id" class="ct-stage-filter" :style="filterStyle(filter)" />
         <!-- eslint-disable-next-line vue/no-v-html -- 与后端同源的 layerDocToSvg 输出，内容已转义 -->
-        <div class="ct-stage-svg" v-html="stateSvg" />
+        <div class="ct-stage-svg" v-html="keyframeSvg" />
         <div class="ct-frame" :style="frameStyle" @pointerdown.prevent="startDrag($event, 'move')">
           <span class="ct-frame-handle" @pointerdown.stop.prevent="startDrag($event, 'size')" />
         </div>
@@ -109,22 +109,41 @@
           <input class="input ct-input" type="number" min="0" max="1" step="0.01" :value="current.viewport.y" @change="setViewport({ y: Number($event.target.value) })">
         </label>
         <label class="ct-field">
-          <span class="ct-label">{{ t('episode.clip.viewportSize') }}</span>
+          <span class="ct-label">{{ t('episode.segment.viewportSize') }}</span>
           <input class="input ct-input" type="number" :min="minViewport" max="1" step="0.01" :value="current.viewport.w" @change="setViewport({ w: Number($event.target.value), h: Number($event.target.value) })">
         </label>
       </div>
+      <div class="ct-params">
+        <label class="ct-field">
+          <span class="ct-label">{{ t('episode.segment.frameEase') }}</span>
+          <select class="input ct-input" :value="current.ease || ''" @change="setOverride({ ease: $event.target.value || undefined })">
+            <option value="">{{ t('episode.segment.inherit') }}</option>
+            <option value="inout">{{ t('episode.segment.easeInout') }}</option>
+            <option value="linear">{{ t('episode.segment.easeLinear') }}</option>
+          </select>
+        </label>
+        <label class="ct-field">
+          <span class="ct-label">{{ t('episode.segment.frameFade') }}</span>
+          <input
+            class="input ct-input" type="number" min="0" max="3000" step="50"
+            :value="current.fade_ms ?? ''" :placeholder="t('episode.segment.inherit')"
+            @change="setOverride({ fade_ms: $event.target.value === '' ? undefined : Math.max(0, Math.min(3000, Number($event.target.value) || 0)) })"
+          >
+          <span class="ct-unit">ms</span>
+        </label>
+      </div>
       <div class="ct-row ct-visible-head">
-        <span class="ct-label">{{ t('episode.clip.visibleLayers') }}</span>
+        <span class="ct-label">{{ t('episode.segment.visibleLayers') }}</span>
         <span class="ml-auto" />
-        <button type="button" class="btn btn-sm" @click="setAllVisible(true)">{{ t('episode.clip.showAll') }}</button>
-        <button type="button" class="btn btn-sm" @click="setAllVisible(false)">{{ t('episode.clip.hideAll') }}</button>
+        <button type="button" class="btn btn-sm" @click="setAllVisible(true)">{{ t('episode.segment.showAll') }}</button>
+        <button type="button" class="btn btn-sm" @click="setAllVisible(false)">{{ t('episode.segment.hideAll') }}</button>
       </div>
       <div class="ct-visible-list">
         <label v-for="layer in doc.layers" :key="layer.id" class="ct-visible-item">
           <input type="checkbox" :checked="current.visible.includes(layer.id)" @change="toggleVisible(layer.id, $event.target.checked)">
           <span class="truncate">{{ layer.name || layer.id }}</span>
         </label>
-        <div v-if="!doc.layers.length" class="ct-empty">{{ t('episode.clip.noLayers') }}</div>
+        <div v-if="!doc.layers.length" class="ct-empty">{{ t('episode.segment.noLayers') }}</div>
       </div>
     </div>
   </div>
@@ -132,24 +151,24 @@
 
 <script setup>
 /**
- * 片段时间线编辑（Issue #50）：关键状态增删改、取景框（正方形归一化框）拖拽、
- * 每状态图层可见勾选、时刻滑杆与片段参数。数值口径与 `utils/clipTimeline.js`
- * （= 后端 clip-timeline.ts）一致，fps 只读。
+ * 精确关键帧面板（Issue #58，由旧片段时间线面板迁入）：
+ * 关键帧增删改、取景框（正方形归一化框）拖拽、每帧图层可见勾选、时刻滑杆与段参数，
+ * 外加逐帧 ease / fade_ms 覆盖。数值口径与 `utils/segmentTimeline.js`
+ * （= 后端 segment-timeline.ts）一致，fps 由服务端派生，这里不暴露。
  */
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { baseFilterLayers, layerDocToSvg } from '~/utils/layerSvg'
 import { mediaUrl } from '~/utils/url'
 import {
-  CLIP_MAX_STATES, CLIP_MIN_SECONDS, CLIP_MIN_VIEWPORT,
-  clampClipDuration, maxClipSeconds, normalizeViewport,
-} from '~/utils/clipTimeline'
+  SEGMENT_MAX_KEYFRAMES, SEGMENT_MAX_SECONDS, SEGMENT_MIN_SECONDS, SEGMENT_MIN_VIEWPORT,
+  clampSegmentDuration, endHoldOf, normalizeViewport,
+} from '~/utils/segmentTimeline'
 
 const props = defineProps({
   doc: { type: Object, required: true },
   timeline: { type: Object, required: true },
   duration: { type: Number, default: 8 },
-  position: { type: String, default: 'replace' },
   spec: { type: Object, default: () => ({ width: 960, height: 544, fps: 25 }) },
   time: { type: Number, default: 0 },
   selectedIndex: { type: Number, default: 0 },
@@ -157,16 +176,17 @@ const props = defineProps({
 const emit = defineEmits(['update:timeline', 'update:duration', 'update:time', 'update:selectedIndex'])
 const { t } = useI18n()
 
-const minSeconds = CLIP_MIN_SECONDS
-const minViewport = CLIP_MIN_VIEWPORT
-const maxStates = CLIP_MAX_STATES
-const maxSeconds = computed(() => maxClipSeconds(props.position))
-const current = computed(() => props.timeline.states[props.selectedIndex] || null)
+const minSeconds = SEGMENT_MIN_SECONDS
+const minViewport = SEGMENT_MIN_VIEWPORT
+const maxKeyframes = SEGMENT_MAX_KEYFRAMES
+const maxSeconds = SEGMENT_MAX_SECONDS
+const current = computed(() => props.timeline.keyframes[props.selectedIndex] || null)
+const endHold = computed(() => endHoldOf(props.timeline, props.duration))
 
 const stageEl = ref(null)
 
-/** 小图只画「该状态可见的图层」，不套取景框——取景框要在整幅上拖 */
-const stateSvg = computed(() => {
+/** 小图只画「该帧可见的图层」，不套取景框——取景框要在整幅上拖 */
+const keyframeSvg = computed(() => {
   const visible = current.value?.visible || []
   const opacity = {}
   for (const layer of props.doc.layers) opacity[layer.id] = visible.includes(layer.id) ? 1 : 0.12
@@ -198,60 +218,75 @@ function pct(value) {
 function patchTimeline(patch) {
   emit('update:timeline', { ...props.timeline, ...patch })
 }
-function patchStates(states) {
-  patchTimeline({ states })
+function patchKeyframes(keyframes) {
+  patchTimeline({ keyframes })
 }
 
-function pickState(index) {
+function pickKeyframe(index) {
   emit('update:selectedIndex', index)
-  const state = props.timeline.states[index]
-  if (state) emit('update:time', state.t)
+  const keyframe = props.timeline.keyframes[index]
+  if (keyframe) emit('update:time', keyframe.t)
 }
 
-function sortStates(states, keepIndex) {
-  const marked = states.map((state, index) => ({ state, index }))
-  marked.sort((a, b) => (a.state.t - b.state.t) || (a.index - b.index))
-  const next = marked.map(item => item.state)
+function sortKeyframes(keyframes, keepIndex) {
+  const marked = keyframes.map((keyframe, index) => ({ keyframe, index }))
+  marked.sort((a, b) => (a.keyframe.t - b.keyframe.t) || (a.index - b.index))
+  const next = marked.map(item => item.keyframe)
   const moved = marked.findIndex(item => item.index === keepIndex)
-  return { states: next, index: moved < 0 ? 0 : moved }
+  return { keyframes: next, index: moved < 0 ? 0 : moved }
 }
 
-function addState() {
-  if (props.timeline.states.length >= CLIP_MAX_STATES) return
+function addKeyframe() {
+  if (props.timeline.keyframes.length >= SEGMENT_MAX_KEYFRAMES) return
   const base = current.value || { t: 0, viewport: { x: 0, y: 0, w: 1, h: 1 }, visible: [] }
   const at = Math.min(props.duration, Math.round((props.time + Number.EPSILON) * 100) / 100)
-  const states = [...props.timeline.states, {
+  const keyframes = [...props.timeline.keyframes, {
     t: at,
     viewport: { ...base.viewport },
     visible: [...base.visible],
   }]
-  const sorted = sortStates(states, states.length - 1)
-  patchStates(sorted.states)
+  const sorted = sortKeyframes(keyframes, keyframes.length - 1)
+  patchKeyframes(sorted.keyframes)
   emit('update:selectedIndex', sorted.index)
   emit('update:time', at)
 }
 
-function removeState(index) {
-  if (props.timeline.states.length <= 1) return
-  const states = props.timeline.states.filter((_, i) => i !== index)
-  patchStates(states)
-  emit('update:selectedIndex', Math.max(0, Math.min(index, states.length - 1)))
+function removeKeyframe(index) {
+  if (props.timeline.keyframes.length <= 1) return
+  const keyframes = props.timeline.keyframes.filter((_, i) => i !== index)
+  patchKeyframes(keyframes)
+  emit('update:selectedIndex', Math.max(0, Math.min(index, keyframes.length - 1)))
 }
 
-function setStateTime(index, raw) {
+function setKeyframeTime(index, raw) {
   const at = Math.max(0, Math.min(props.duration, Number(raw) || 0))
-  const states = props.timeline.states.map((state, i) => (i === index ? { ...state, t: Math.round(at * 100) / 100 } : state))
-  const sorted = sortStates(states, index)
-  patchStates(sorted.states)
+  const keyframes = props.timeline.keyframes.map((keyframe, i) => (i === index ? { ...keyframe, t: Math.round(at * 100) / 100 } : keyframe))
+  const sorted = sortKeyframes(keyframes, index)
+  patchKeyframes(sorted.keyframes)
   emit('update:selectedIndex', sorted.index)
   emit('update:time', at)
+}
+
+function patchCurrent(patch) {
+  if (!current.value) return
+  const keyframes = props.timeline.keyframes.map((keyframe, i) => (i === props.selectedIndex ? { ...keyframe, ...patch } : keyframe))
+  patchKeyframes(keyframes)
 }
 
 function setViewport(patch) {
   if (!current.value) return
-  const viewport = normalizeViewport({ ...current.value.viewport, ...patch })
-  const states = props.timeline.states.map((state, i) => (i === props.selectedIndex ? { ...state, viewport } : state))
-  patchStates(states)
+  patchCurrent({ viewport: normalizeViewport({ ...current.value.viewport, ...patch }) })
+}
+
+/** 逐帧覆盖：undefined = 跟随 timeline 级设置（键整个去掉，保持与后端一致） */
+function setOverride(patch) {
+  if (!current.value) return
+  const next = { ...current.value, ...patch }
+  for (const key of ['ease', 'fade_ms']) {
+    if (next[key] === undefined) delete next[key]
+  }
+  const keyframes = props.timeline.keyframes.map((keyframe, i) => (i === props.selectedIndex ? next : keyframe))
+  patchKeyframes(keyframes)
 }
 
 function toggleVisible(layerId, on) {
@@ -259,23 +294,20 @@ function toggleVisible(layerId, on) {
   const visible = on
     ? [...current.value.visible.filter(id => id !== layerId), layerId]
     : current.value.visible.filter(id => id !== layerId)
-  const states = props.timeline.states.map((state, i) => (i === props.selectedIndex ? { ...state, visible } : state))
-  patchStates(states)
+  patchCurrent({ visible })
 }
 
 function setAllVisible(on) {
   if (!current.value) return
-  const visible = on ? props.doc.layers.map(layer => layer.id) : []
-  const states = props.timeline.states.map((state, i) => (i === props.selectedIndex ? { ...state, visible } : state))
-  patchStates(states)
+  patchCurrent({ visible: on ? props.doc.layers.map(layer => layer.id) : [] })
 }
 
 function onDuration(raw) {
-  const next = clampClipDuration(raw, maxSeconds.value)
+  const next = clampSegmentDuration(raw, maxSeconds)
   emit('update:duration', next)
-  // 时长变短：越界的状态时刻一起收回，避免保存后状态落在片段之外
-  const states = props.timeline.states.map(state => (state.t > next ? { ...state, t: next } : state))
-  if (states.some((state, i) => state.t !== props.timeline.states[i].t)) patchStates(states)
+  // 时长变短：越界的关键帧时刻一起收回，避免保存后关键帧落在段之外
+  const keyframes = props.timeline.keyframes.map(keyframe => (keyframe.t > next ? { ...keyframe, t: next } : keyframe))
+  if (keyframes.some((keyframe, i) => keyframe.t !== props.timeline.keyframes[i].t)) patchKeyframes(keyframes)
   if (props.time > next) emit('update:time', next)
 }
 
