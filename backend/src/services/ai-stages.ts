@@ -89,6 +89,8 @@ export const AI_CALL_SITES: Record<string, AiStage[]> = {
   'services/asset-semantics-auto.ts': ['asset_semantics'],
   // 资产流水线（#56）：资料研究 / 事实表（纯文本）+ QC 清单核验（视觉）
   'services/asset-pipeline/steps.ts': ['asset_research', 'asset_spec', 'asset_qc'],
+  // 地图地点坐标建议复用资料研究环节（返回的坐标一律是候选，人工确认后才写库）
+  'services/asset-pipeline/map-asset.ts': ['asset_research'],
   // 补全剩余（#52）：纪录片拆分分镜的续跑，复用同一视觉环节
   'services/storyboard-fill-gaps.ts': ['storyboard_breaker_documentary'],
   'services/portrait-appearance.ts': ['portrait_appearance'],

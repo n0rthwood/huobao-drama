@@ -38,6 +38,20 @@ function asRecord(raw: unknown): Record<string, unknown> | null {
   return raw && typeof raw === 'object' ? raw as Record<string, unknown> : null
 }
 
+/** 工作流失败时 `result.error` 可能是 Error、字符串或 `{message}` 对象；三种都要能读出人话 */
+function describeError(raw: unknown): string | null {
+  if (!raw) return null
+  if (raw instanceof Error) return raw.message
+  if (typeof raw === 'string') return raw
+  const record = asRecord(raw)
+  if (typeof record?.message === 'string') return record.message
+  try {
+    return JSON.stringify(raw)
+  } catch {
+    return String(raw)
+  }
+}
+
 function readSuggestion(raw: unknown): SuspendedPayload['suggestion'] {
   const record = asRecord(raw)
   return {
@@ -152,8 +166,7 @@ async function driveRun(
       logTaskProgress('AssetPipeline', 'completed', { taskId, runId: mastraRunId })
       return
     }
-    const message = 'error' in result ? result.error : undefined
-    const text = message instanceof Error ? message.message : String(message ?? `工作流结束于 ${result.status}`)
+    const text = describeError('error' in result ? result.error : undefined) ?? `工作流结束于 ${result.status}`
     await finishTextTask(taskId, 'failed', { errorMsg: text })
     logTaskError('AssetPipeline', 'run', { taskId, runId: mastraRunId, error: text })
   } catch (err) {

@@ -47,6 +47,7 @@ import {
   maskToPolyline,
   isExtractableLineColor,
   lineMaskQuality,
+  largestComponent,
   MAX_LINE_JUMP,
   MAX_LINE_THICKNESS,
   parseHexColor,
@@ -338,8 +339,13 @@ export async function runSemanticsPipeline(input: {
     let extracted = extractLine(raster, color, seed.endpoints)
     let relaxed = false
     if ('reason' in extracted) {
+      const strictReason = extracted.reason
       const retry = extractLine(raster, color, seed.endpoints, { hueOnly: true })
-      if (!('reason' in retry)) {
+      if ('reason' in retry) {
+        // 两条判据都没抽出来：把**两个**理由都写出来，否则看到的永远是严格判据那一条，
+        // 排查时完全看不出放宽后卡在了哪一步
+        extracted = { reason: `严格色域「${strictReason}」；放宽后「${retry.reason}」` }
+      } else {
         extracted = retry
         relaxed = true
       }
@@ -445,7 +451,7 @@ function extractLine(
   endpoints: Point[],
   opts: { hueOnly?: boolean } = {},
 ): { points: Point[]; quality: { thickness: number; jump: number } } | { reason: string } {
-  const mask = colorMask(raster, color, 90, { hueOnly: opts.hueOnly })
+  let mask = colorMask(raster, color, 90, { hueOnly: opts.hueOnly })
   if (endpoints.length >= 2) {
     const pad = Math.round(Math.max(raster.width, raster.height) * 0.08)
     const x0 = Math.min(endpoints[0]![0], endpoints[1]![0]) - pad
@@ -459,6 +465,8 @@ function extractLine(
       if (x < x0 || x > x1 || y < y0 || y > y1) mask[i] = 0
     }
   }
+  // 放宽判据必然连带选中画面上其它同色水体：先只留最大连通块，再交给原来的质量判据
+  if (opts.hueOnly) mask = largestComponent(mask, raster.width, raster.height)
   const raw = maskToPolyline(mask, raster.width)
   const polyline = simplifyPolyline(raw, 3)
   if (polyline.length < 2) return { reason: '该色域下取不到足够的采样点' }

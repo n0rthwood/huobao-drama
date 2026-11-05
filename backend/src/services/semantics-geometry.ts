@@ -228,6 +228,59 @@ export function darkMask(raster: RgbRaster, threshold = DARK_LINE_GRAY): Uint8Ar
   return mask
 }
 
+/**
+ * 只保留掩膜里**最大的一个连通块**（8 邻域）。
+ *
+ * 截图路径的放宽判据按通道序选色，必然把画面上**其它**水体（水库、另一条河、湖面）
+ * 一起选中；分箱取中位数时就会在互不相连的块之间来回跳，`lineMaskQuality` 据此判掉
+ * （实测洹河那次跳变 14.2%）。正确做法不是放宽跳变阈值——那等于允许伪造几何——
+ * 而是先把不相干的块去掉，再让原来的质量判据照常把关。
+ */
+export function largestComponent(mask: Uint8Array, width: number, height: number): Uint8Array {
+  const labels = new Int32Array(mask.length).fill(-1)
+  const queue = new Int32Array(mask.length)
+  const out = new Uint8Array(mask.length)
+  let best = -1
+  let bestSize = 0
+  let bestStart = -1
+  for (let seed = 0; seed < mask.length; seed++) {
+    if (!mask[seed] || labels[seed] !== -1) continue
+    best++
+    let head = 0
+    let tail = 0
+    queue[tail++] = seed
+    labels[seed] = best
+    let size = 0
+    while (head < tail) {
+      const index = queue[head++]!
+      size++
+      const x = index % width
+      const y = (index - x) / width
+      for (let dy = -1; dy <= 1; dy++) {
+        const ny = y + dy
+        if (ny < 0 || ny >= height) continue
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx
+          if (nx < 0 || nx >= width) continue
+          const next = ny * width + nx
+          if (!mask[next] || labels[next] !== -1) continue
+          labels[next] = best
+          queue[tail++] = next
+        }
+      }
+    }
+    if (size > bestSize) {
+      bestSize = size
+      bestStart = best
+    }
+  }
+  if (bestStart < 0) return out
+  for (let i = 0; i < mask.length; i++) {
+    if (labels[i] === bestStart) out[i] = 1
+  }
+  return out
+}
+
 /** 方形最大值膨胀（可分离：先横后纵），diameter 为奇数直径 */
 export function dilateMask(mask: Uint8Array, width: number, height: number, diameter: number): Uint8Array {
   const radius = Math.max(0, Math.floor(diameter / 2))

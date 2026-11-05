@@ -13,6 +13,9 @@ import { now } from '../../utils/response.js'
 import { getAbsolutePath } from '../../utils/storage.js'
 import { completionStamp } from '../media-time.js'
 import { logTaskStart, logTaskSuccess } from '../../utils/task-logger.js'
+import { resolveStageModel } from '../ai-stages.js'
+import { callTextChat } from '../vision-chat.js'
+import { parseJsonReply } from './prompts.js'
 import { normalizeSemantics, savePropSemantics, type AssetSemantics } from '../asset-semantics.js'
 import {
   MAP_ROUTE_COLOR,
@@ -118,4 +121,38 @@ export async function renderAndRegisterMapBase(input: {
     points: rendered.points,
     routes: rendered.routes,
   }
+}
+
+/**
+ * AI 建议地点经纬度。返回的一律是**候选**（`proposed: true`）：面板上人工勾选确认后
+ * 才写进 `map_spec`。坐标是地图的几何真源，不允许模型直接落库。
+ */
+export async function suggestMapPlaces(input: {
+  name: string
+  description: string | null
+  names: string[]
+  textConfigId?: number
+}): Promise<Array<{ name: string; lon: number; lat: number; source: string; proposed: true }>> {
+  const stageModel = await resolveStageModel('asset_research', { configId: input.textConfigId })
+  const reply = await callTextChat(stageModel, [
+    `为下列历史地点给出现代经纬度（十进制度，WGS84）：${input.names.join('、')}`,
+    `上下文：${input.name}${input.description ? `（${input.description}）` : ''}`,
+    '只返回 JSON，不要 Markdown 代码块：{"places":[{"name":"","lon":0,"lat":0,"source":"依据说明"}]}',
+  ].join('\n'), {
+    temperature: 0.1,
+    maxTokens: Number(process.env.AI_MAX_TOKENS) || 32768,
+    timeoutMs: 180_000,
+  })
+  const parsed = parseJsonReply(reply.text)
+  const list = parsed && typeof parsed === 'object' && 'places' in parsed && Array.isArray(parsed.places)
+    ? parsed.places
+    : []
+  return list.flatMap((item: unknown) => {
+    if (!item || typeof item !== 'object') return []
+    const record = item as Record<string, unknown>
+    const lon = Number(record.lon)
+    const lat = Number(record.lat)
+    if (!Number.isFinite(lon) || !Number.isFinite(lat)) return []
+    return [{ name: String(record.name ?? ''), lon, lat, source: String(record.source ?? ''), proposed: true as const }]
+  })
 }

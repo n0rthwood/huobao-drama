@@ -50,7 +50,14 @@ import {
 } from './store.js'
 
 const TEXT_TIMEOUT_MS = 300_000
-const TEXT_MAX_TOKENS = 6000
+/**
+ * GLM-5.x 的推理与正文共享 `max_tokens`（AGENTS.md「本机后端 · 文本」）：给小了会先
+ * 把预算烧在思考上、正文一个字都不剩——实测 6000 时 research 步返回空串。
+ * 读 `AI_MAX_TOKENS` 但**封顶 32768**：本机 .env 给的是 131072（拆分分镜那种长输出需要），
+ * 流水线这几步的正文只有几千 token，预算给到十万只会让 GLM 在思考里兜圈子
+ * ——实测 131072 时 research 步 12 分钟没有返回，32768 时 130 秒完成。
+ */
+const TEXT_MAX_TOKENS = Math.min(Number(process.env.AI_MAX_TOKENS) || 32768, 32768)
 const TEXT_TEMPERATURE = 0.2
 const QC_MAX_SIDE = 1600
 const QC_JPEG_QUALITY = 85

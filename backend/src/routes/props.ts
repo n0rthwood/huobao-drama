@@ -25,9 +25,7 @@ import {
 import { getSemanticsAutoStatus, startSemanticsAuto } from '../services/asset-semantics-auto.js'
 import { resolveStageModel, StageVisionUnavailableError } from '../services/ai-stages.js'
 import { MapSpecValidationError, normalizeMapSpec, parseMapSpec } from '../services/map-base-render.js'
-import { renderAndRegisterMapBase } from '../services/asset-pipeline/map-asset.js'
-import { parseJsonReply } from '../services/asset-pipeline/prompts.js'
-import { callTextChat } from '../services/vision-chat.js'
+import { renderAndRegisterMapBase, suggestMapPlaces } from '../services/asset-pipeline/map-asset.js'
 import { getAbsolutePath } from '../utils/storage.js'
 
 const app = new Hono()
@@ -356,33 +354,11 @@ app.post('/:id/map-suggest', async (c) => {
   const names: string[] = Array.isArray(body.names) ? body.names.map(String).filter(Boolean) : []
   if (!names.length) return badRequest(c, '请先填写要定位的地名（names）')
   try {
-    const stageModel = await resolveStageModel('asset_research', { configId: body.text_config_id ?? undefined })
-    const reply = await callTextChat(stageModel, [
-      `为下列历史地点给出现代经纬度（十进制度，WGS84）：${names.join('、')}`,
-      `上下文：${prop.name}${prop.description ? `（${prop.description}）` : ''}`,
-      '只返回 JSON，不要 Markdown 代码块：{"places":[{"name":"","lon":0,"lat":0,"source":"依据说明"}]}',
-    ].join('\n'), {
-      temperature: 0.1,
-      maxTokens: 1500,
-      timeoutMs: 120_000,
-    })
-    const parsed = parseJsonReply(reply.text)
-    const list = parsed && typeof parsed === 'object' && 'places' in parsed && Array.isArray(parsed.places)
-      ? parsed.places
-      : []
-    const places = list.flatMap((item: unknown) => {
-      if (!item || typeof item !== 'object') return []
-      const record = item as Record<string, unknown>
-      const lon = Number(record.lon)
-      const lat = Number(record.lat)
-      if (!Number.isFinite(lon) || !Number.isFinite(lat)) return []
-      return [{
-        name: String(record.name ?? ''),
-        lon,
-        lat,
-        source: String(record.source ?? ''),
-        proposed: true as const,
-      }]
+    const places = await suggestMapPlaces({
+      name: prop.name,
+      description: prop.description,
+      names,
+      textConfigId: body.text_config_id ?? undefined,
     })
     return success(c, { places })
   } catch (err) {
