@@ -43,6 +43,7 @@ export interface RetryOptions {
 }
 
 interface StoredParams {
+  config_id?: number
   size?: string
   frameType?: string
   referenceImages?: string[]
@@ -128,7 +129,8 @@ async function retryVideo(row: SysTaskRow, opts: RetryOptions): Promise<number> 
   if (row.storyboardId && row.episodeId) {
     const [episode] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, row.episodeId))
     if (resolveDramaProjectType(episode?.dramaId) === 'documentary') {
-      const request = await buildStoryboardVideoRequest(row.storyboardId, { model: opts.model, configId: opts.configId })
+      const savedConfigId = storedParams(row.params).config_id
+      const request = await buildStoryboardVideoRequest(row.storyboardId, { model: opts.model, configId: opts.configId ?? (Number.isInteger(savedConfigId) ? savedConfigId : undefined) })
       return generateVideo({ ...request.params, retryOf: row.id })
     }
   }

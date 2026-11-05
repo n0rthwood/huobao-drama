@@ -221,6 +221,7 @@ test('documentary explicit config stays on its selected local HTTP target; inval
     const {generateVideo}=await import('./src/services/generation.ts')
     const responses=[]
     const jsonPost=async(target,route,body)=>{const res=await target.request(route,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});return {status:res.status,body:await res.json()}}
+    const retrySaved=await jsonPost(app,'/'+taskId+'/retry',{})
     for(const bad of [999999,alternateConfigId,wrongType]){
       responses.push(await post({storyboard_id:id,config_id:bad}))
       responses.push(await jsonPost(storyboardApp,'/'+id+'/generate-video',{config_id:bad}))
@@ -229,12 +230,13 @@ test('documentary explicit config stays on its selected local HTTP target; inval
       try{await generateVideo({storyboardId:id,prompt:'direct persistence boundary',configId:bad});throw new Error('invalid config accepted')}catch(error){if(!error.message.includes('不会自动切换'))throw error}
     }
     await new Promise(resolve=>server.close(resolve))
-    console.log('@@'+JSON.stringify({selected,selectedCalls,responses,rejectedCalls:calls,tasks:db.select().from(schema.sysTask).all()}))
+    console.log('@@'+JSON.stringify({selected,selectedCalls,retrySaved,responses,rejectedCalls:calls,tasks:db.select().from(schema.sysTask).all()}))
   `)
   assert.equal(result.selected.status,201)
   assert.ok(result.selectedCalls.length>0,JSON.stringify(result))
   assert.ok(result.selectedCalls.every(url=>url.startsWith('/selected/')),JSON.stringify(result.selectedCalls))
   assert.ok(result.responses.every(response=>response.status===400),JSON.stringify(result.responses))
+  assert.equal(result.retrySaved.status,400)
   assert.deepEqual(result.rejectedCalls,[])
   assert.equal(result.tasks.length,1)
 })

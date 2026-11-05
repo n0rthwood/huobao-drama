@@ -208,6 +208,7 @@ export async function generateVideo(params: GenerateVideoParams): Promise<number
     promptExtend: params.promptExtend,
     watermark: params.watermark,
     transition: params.transition,
+    ...(documentary ? { config_id: config.id } : {}),
     ...(params.junction_hash && params.junction_slot ? { junction_hash: params.junction_hash, junction_slot: params.junction_slot } : {}),
     ...originParams(params),
   })

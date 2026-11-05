@@ -63,7 +63,7 @@ const {
   toggleSelectAllExport,
 } = ctx
 const documentary = computed(() => ctx.isDocumentaryProject.value)
-const staleShots = computed(() => documentary.value ? sbs.value.filter(sb => !isFreshExport(sb)) : [])
+const staleShots = computed(() => documentary.value ? sbs.value.filter(sb => Boolean(ctx.composeStateOf(sb)?.composed_video_url) && !isFreshExport(sb)) : [])
 const posterFinal = ref(false)
 watch(() => episode.value?.id, async id => {
   if (!id || !documentary.value) return
