@@ -667,7 +667,7 @@ export function computeRefIssues(input: RefCheckInput): RefIssue[] {
       add(`intent_unmet:${field}:${assetKey(asset.kind, asset.id)}`, {
         code: 'intent_unmet', severity: 'block', fields: [field],
         kind: asset.kind, asset_id: asset.id, name: asset.name,
-        message: `表达设计要求本镜必须看到「${asset.name}」，但${PROMPT_FIELD_LABEL[field]}没有 @${asset.name}；补上 @ 或在表达设计页去掉这一条`,
+        message: `分镜设计要求本镜必须看到「${asset.name}」，但${PROMPT_FIELD_LABEL[field]}没有 @${asset.name}；补上 @ 或在分镜设计页去掉这一条`,
       })
     }
   }

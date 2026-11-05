@@ -16,6 +16,7 @@ import { logTaskStart } from '../utils/task-logger.js'
 import { EXTRACT_TASK_KINDS, startSingleAssetExtraction, type ExtractTarget } from '../services/extraction.js'
 import { findActiveTextTask } from '../services/text-task.js'
 import type { AssetKind } from '../services/reference-images.js'
+import { assertGate } from '../services/workflow-gates.js'
 
 const TARGET_OF: Record<AssetKind, ExtractTarget> = {
   character: 'characters',
@@ -44,6 +45,9 @@ export function mountReExtractRoute(app: Hono, kind: AssetKind) {
     const name = kind === 'scene'
       ? (row as typeof schema.scenes.$inferSelect).location
       : (row as typeof schema.characters.$inferSelect).name
+    // 门禁（#54）：重新提取属于「资产」步，纪录片剧本未确认时拒绝——必须在清字段之前拦，
+    // 否则被拦的请求会把资产清成空壳。资产生图/美化流水线不拦（资产是项目级、可跨集复用）。
+    await assertGate(episodeId, 'assets')
     // 先确认能起任务再清字段：清空后才发现同类任务在跑的话，这个资产会被清成空壳
     // （startSingleAssetExtraction 返回 false，字段已经没了）
     if (await findActiveTextTask(episodeId, EXTRACT_TASK_KINDS[TARGET_OF[kind]])) {

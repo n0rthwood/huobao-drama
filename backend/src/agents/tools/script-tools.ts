@@ -8,6 +8,7 @@ import { db, schema } from '../../db/index.js'
 import { eq } from 'drizzle-orm'
 import { now } from '../../utils/response.js'
 import { getEpisodeId } from '../context.js'
+import { onScriptChanged } from '../../services/workflow-gates.js'
 
 const readEpisodeScript = createTool({
   id: 'read_episode_script',
@@ -67,9 +68,12 @@ const saveScript = createTool({
   execute: async ({ content }, context) => {
     const episodeId = getEpisodeId(context?.requestContext)
     if (!episodeId) return { error: 'Missing episodeId in request context' }
+    const [before] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId))
     await db.update(schema.episodes)
       .set({ scriptContent: content, updatedAt: now() })
       .where(eq(schema.episodes.id, episodeId))
+    // 改稿自动取消剧本确认（#54）：Agent 改写路径与 PUT /episodes/:id 同一个写入口
+    if ((before?.scriptContent || '') !== content) await onScriptChanged(episodeId, 'save_script 工具写入旁白稿')
 
     return { message: `Script saved`, word_count: content.length }
   },

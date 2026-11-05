@@ -1,3 +1,4 @@
+import { GateBlockedError } from '../services/workflow-gates.js'
 import type { MiddlewareHandler } from 'hono'
 
 const colors = {
@@ -54,12 +55,14 @@ export const requestLogger: MiddlewareHandler = async (c, next) => {
 }
 
 /**
- * 全局错误处理 — 捕获未处理异常，打印完整堆栈
+ * 全局错误处理 — 捕获未处理异常，打印完整堆栈。
+ * 门禁拦截（#54）不是异常情况：原样抛给 `src/index.ts` 的 app.onError 统一转 400 {error, gate, reason}。
  */
 export const errorHandler: MiddlewareHandler = async (c, next) => {
   try {
     await next()
   } catch (err: any) {
+    if (err instanceof GateBlockedError) throw err
     const status = err.status || 500
     console.error(`${colors.red}[ERROR]${colors.reset} ${c.req.method} ${c.req.path}`)
     console.error(err.stack || err.message || err)

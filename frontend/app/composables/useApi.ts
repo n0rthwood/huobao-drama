@@ -8,6 +8,27 @@ export interface ApiError extends Error {
   body?: Record<string, unknown>
 }
 
+/** 纪录片步骤门禁（#54）：`GET /episodes/:id/gates`；剧情项目恒全解锁、reasons 为空 */
+export type GateKey = 'assets' | 'design' | 'production' | 'final' | 'poster' | 'export'
+export interface EpisodeGates {
+  project_type: 'drama' | 'documentary'
+  script: { confirmed: boolean; confirmed_at: string | null }
+  assets: { review_status: 'none' | 'running' | 'pending' | 'passed'; stale_reasons: string[] }
+  design: { confirmed: number; total: number }
+  production: { ready: number; total: number }
+  final: { fresh: number; total: number }
+  unlocked: Record<GateKey, boolean>
+  reasons: Partial<Record<GateKey, string>>
+  goto: Partial<Record<GateKey, 'script' | 'assets' | 'design' | 'production' | 'final'>>
+}
+
+/** 400 门禁拦截体：`{ error:'gate_blocked', gate, reason }`（由后端全局 onError 统一产出） */
+export function gateBlockedOf(err: unknown): { gate: GateKey; reason: string } | null {
+  const body = (err as ApiError)?.body
+  if (!body || body.error !== 'gate_blocked') return null
+  return { gate: body.gate as GateKey, reason: String(body.reason || '') }
+}
+
 async function req<T = any>(method: string, path: string, body?: any): Promise<T> {
   const opts: RequestInit = { method, headers: { 'Content-Type': 'application/json' } }
   if (body) opts.body = JSON.stringify(body)
@@ -165,6 +186,10 @@ export const episodeAPI = {
       model: data.model || undefined,
       config_id: data.config_id || undefined,
     }),
+  // 步骤门禁与剧本确认（Issue #54）
+  gates: (id: number) => api.get<EpisodeGates>(`/episodes/${id}/gates`),
+  confirmScript: (id: number) => api.post<EpisodeGates>(`/episodes/${id}/script/confirm`),
+  unconfirmScript: (id: number) => api.post<EpisodeGates>(`/episodes/${id}/script/unconfirm`),
   // 旁白编辑器的语气 / 多音字 / 停顿选项（#38）
   narrationMarkupCatalog: (id: number) =>
     api.get<{

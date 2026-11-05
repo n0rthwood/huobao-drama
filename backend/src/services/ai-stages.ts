@@ -29,7 +29,7 @@ export const AI_STAGES = {
   /** 纪录片拆分分镜（含表达设计初稿）：要看证据素材才能定 device / must_show / overlay_plan */
   storyboard_breaker_documentary: { vision: true, label: '拆分分镜（纪录片）' },
   /** 表达设计重算 / 补齐：逐镜核对证据图是否真能表达信息点 */
-  shot_intent: { vision: true, label: '表达设计' },
+  shot_intent: { vision: true, label: '分镜设计' },
   /** 证据素材语义自动标注：读地图像素 */
   asset_semantics: { vision: true, label: '语义自动标注' },
   /** 美化保真核验：核对美化图是否保留原件要素 */

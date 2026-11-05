@@ -46,6 +46,7 @@ import { migrateReferenceImages } from './services/reference-images.js'
 import { migrateAssetNames } from './services/asset-name-migration.js'
 import { backfillPoolProjection } from './services/storyboard-assets.js'
 import { logLayerFontStatus } from './services/layer-fonts.js'
+import { backfillScriptConfirmation, GateBlockedError } from './services/workflow-gates.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(__dirname, '../..')
@@ -59,6 +60,16 @@ app.use('*', cors({
 }))
 app.use('*', requestLogger)
 app.use('*', errorHandler)
+
+// 步骤门禁（#54）统一出口：任何路由里 assertGate 失败都在这里转成 400 {error, gate, reason}，
+// 各路由不自己 try/catch，避免响应形状漂移。其余异常仍由 errorHandler 处理。
+app.onError((err, c) => {
+  if (err instanceof GateBlockedError) {
+    return c.json({ code: 400, error: 'gate_blocked', gate: err.gate, reason: err.reason, message: err.reason }, 400)
+  }
+  console.error(err.stack || err.message || err)
+  return c.json({ code: 500, message: err.message || 'Internal Server Error' }, 500)
+})
 
 // Health check（version 供部署巡检/更新检查核对当前运行版本）
 app.get('/api/v1/health', (c) => c.json({
@@ -149,6 +160,8 @@ db.update(schema.sysTask)
   .then(() => migrateAssetNames())
   // 本镜资产池投影补齐（Issue #43）：角色/道具关联 = 手选 ∪ 当前 @，幂等
   .then(() => backfillPoolProjection())
+  // 存量纪录片集补剧本确认（Issue #54）：升级前已拆出分镜的集视为已确认，否则新门禁会把它们锁死，幂等
+  .then(() => backfillScriptConfirmation())
   // 清理完成后再恢复批量任务：被重启打断的那一张/那一镜此时已是 failed，由批次重新提交
   .then(() => startQwenJobsTracker())
   .then(() => resumeKeyframeBatches())

@@ -55,6 +55,9 @@ export const sqliteSchemaStatements = [
     character_roster_hash TEXT,
     character_roster_status TEXT,
     character_roster_updated_at TEXT,
+    script_confirmed_at TEXT,
+    asset_review_status TEXT NOT NULL DEFAULT 'none',
+    asset_review_stale_reasons TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     deleted_at TEXT
@@ -561,6 +564,12 @@ const columnAdditions: { table: string; column: string; type: string }[] = [
   // 文本配置的视觉能力标定（Issue #51）：存量行默认 0（不做一次性探测初值——HTTP 200 不等于真能看图），
   // 由 providers.json / 设置页人工标定。需要视觉的 AI 环节只会选 vision=1 的配置。
   { table: 'ai_service_configs', column: 'vision', type: 'INTEGER NOT NULL DEFAULT 0' },
+  // 纪录片工作流门禁（Issue #54）：旁白稿确认时间（NULL = 未确认，拆分/补镜/AI 填卡被拦）；
+  // 资产审核清单状态 none|running|pending|passed（R2 写值，R1 只建列并把非 passed 当未通过）；
+  // 审核通过后资产库再变更只写横幅原因（JSON 数组），不回退 passed。
+  { table: 'episodes', column: 'script_confirmed_at', type: 'TEXT' },
+  { table: 'episodes', column: 'asset_review_status', type: "TEXT NOT NULL DEFAULT 'none'" },
+  { table: 'episodes', column: 'asset_review_stale_reasons', type: 'TEXT' },
 ]
 
 /**

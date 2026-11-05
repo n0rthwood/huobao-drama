@@ -91,8 +91,11 @@
               active: activeSubStepKey === item.key,
               done: sectionState(section.id) === 'done',
               doing: sectionState(section.id) === 'active',
+              'is-locked': item.locked,
             }]"
-            :title="sidebarCollapsed ? item.label : undefined"
+            :title="item.locked
+              ? `${t('episode.gate.locked')} · ${item.lockReason} · ${t('episode.gate.goFix')}`
+              : (sidebarCollapsed ? item.label : undefined)"
             @click="goSubStep(item.key)"
           >
             <span class="pipe-icon" :class="sectionState(section.id) === 'done' ? 'icon-done' : activeSubStepKey === item.key ? 'icon-active' : ''">
@@ -106,7 +109,11 @@
               <component v-else :is="item.icon" :size="11" />
             </span>
             <span class="pipe-copy">
-              <span class="pipe-label">{{ item.label }}</span>
+              <span class="pipe-label">
+                <Lock v-if="item.locked" :size="10" class="pipe-lock" />
+                {{ item.label }}
+                <span v-if="item.optional" class="pipe-optional">{{ t('episode.gate.optional') }}</span>
+              </span>
               <span v-if="item.desc" class="pipe-sub">{{ item.desc }}</span>
             </span>
           </button>
@@ -135,17 +142,18 @@
               v-for="(s, i) in mainProgressSteps"
               :key="s.id"
               type="button"
-              :class="['sidebar-progress-seg', { done: i < currentMainIdx || mainStageDone(s.id), current: i === currentMainIdx }]"
-              :title="s.label"
-              @click="goMainStage(s.id)"
+              :class="['sidebar-progress-seg', { done: i < currentMainIdx || mainStageDone(s.id), current: i === currentMainIdx, locked: s.locked }]"
+              :title="s.locked ? `${s.label} · ${t('episode.gate.locked')}：${s.reason} · ${t('episode.gate.goFix')}` : s.label"
+              @click="s.locked ? goStageBlocker(s.id) : goMainStage(s.id)"
             ><span class="sidebar-progress-seg-fill" /></button>
           </div>
           <div class="sidebar-progress-labels">
             <span
               v-for="(s, i) in mainProgressSteps"
               :key="s.id"
-              :class="{ on: i === currentMainIdx, done: i < currentMainIdx || mainStageDone(s.id) }"
-            >{{ s.label }}</span>
+              :class="{ on: i === currentMainIdx, done: i < currentMainIdx || mainStageDone(s.id), locked: s.locked }"
+              :title="s.locked ? `${t('episode.gate.locked')}：${s.reason}` : undefined"
+            ><Lock v-if="s.locked" :size="9" class="progress-lock" />{{ s.label }}</span>
           </div>
         </div>
         <button class="refresh-btn" @click="refresh">
@@ -158,80 +166,7 @@
     <!-- ========== MAIN CONTENT ========== -->
     <main class="main">
       <!-- ===== SCRIPT PANEL ===== -->
-      <div v-if="panel === 'script'" class="content-panel">
-        <!-- Step 0: Raw Content -->
-        <div v-if="scriptStep === 0" class="step-editor">
-          <div class="step-toolbar">
-            <div class="toolbar-left">
-              <div class="step-indicator">
-                <span class="step-num">01</span>
-                <span class="step-name">{{ t('episode.script.raw') }}</span>
-              </div>
-            </div>
-            <div class="toolbar-right">
-              <span v-if="rawLen" class="char-count">{{ t('episode.script.charCount', { n: rawLen }) }}</span>
-              <button class="btn btn-sm" @click="saveRaw(); toast.success(t('episode.script.saved'))">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                {{ t('common.save') }}
-              </button>
-            </div>
-          </div>
-          <textarea
-            class="fill-textarea"
-            v-model="localRaw"
-            :placeholder="t('episode.script.rawPlaceholder')"
-          />
-        </div>
-
-        <!-- Step 1: Rewrite -->
-        <div v-else-if="scriptStep === 1" class="step-editor">
-          <div class="step-toolbar">
-            <div class="toolbar-left">
-              <div class="step-indicator">
-                <span class="step-num">02</span>
-                <span class="step-name">{{ t('episode.script.rewrite') }}</span>
-              </div>
-            </div>
-            <div class="toolbar-right">
-              <span v-if="scriptLen" class="char-count">{{ t('episode.script.charCount', { n: scriptLen }) }}</span>
-              <button v-if="rawContent" class="btn btn-sm" @click="skipRewrite">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/><path d="M13 18l6-6-6-6"/></svg>
-                {{ t('episode.script.skipRewrite') }}
-              </button>
-              <button v-if="scriptContent" class="btn btn-sm" @click="doRewrite" :disabled="rn">
-                <Loader2 v-if="rn && rt === 'script_rewriter'" :size="11" class="animate-spin" />
-                <svg v-else width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
-                {{ t('episode.script.rewriteAgain') }}
-              </button>
-            </div>
-          </div>
-
-          <div v-if="!scriptContent && !rn" class="step-empty">
-            <div class="empty-visual">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round">
-                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>
-              </svg>
-            </div>
-            <div class="empty-title">{{ t('episode.script.emptyTitle') }}</div>
-            <div class="empty-desc">{{ t('episode.script.emptyDesc') }}</div>
-            <div class="step-empty-actions">
-              <button class="btn btn-primary" @click="doRewrite">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                {{ t('episode.script.startRewrite') }}
-              </button>
-              <button class="btn" @click="skipRewrite">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14"/><path d="M13 18l6-6-6-6"/></svg>
-                {{ t('episode.script.skipRewrite') }}
-              </button>
-            </div>
-          </div>
-          <div v-else-if="rn && rt === 'script_rewriter'" class="step-loading">
-            <Loader2 :size="24" class="animate-spin" style="color:var(--accent)" />
-            <div class="loading-text">{{ t('episode.script.rewriting') }}</div>
-          </div>
-          <textarea v-else class="fill-textarea" v-model="localScript" :placeholder="t('episode.script.scriptPlaceholder')" />
-        </div>
-      </div>
+      <ScriptStepPanel v-if="panel === 'script'" />
 
       <!-- ===== PRODUCTION PANEL ===== -->
       <div v-else-if="panel === 'production'" class="content-panel">
@@ -245,10 +180,31 @@
           <button class="btn btn-primary" @click="goProductionBlockTarget">{{ productionBlockActionLabel }}</button>
         </div>
 
+        <!-- 门禁锁定（#54）：deeplink 直达锁定步骤同样只给原因与出路，不渲染内容；服务端另有同一道闸门 -->
+        <div v-else-if="stageLocked(prodTab)" class="step-empty" style="flex:1">
+          <div class="empty-visual"><Lock :size="32" /></div>
+          <div class="empty-title">{{ t('episode.gate.locked') }}</div>
+          <div class="empty-desc">{{ stageLockReason(prodTab) }}</div>
+          <button class="btn btn-primary" @click="goStageBlocker(prodTab)">{{ t('episode.gate.goFix') }}</button>
+        </div>
+
         <template v-else>
           <!-- 制作子步骤导航（资产/分镜拆分/视频生成）由左侧栏承担，顶部不再重复展示 -->
+          <!-- 资产步两个子页签（#54）：资产卡 / 审核清单；剧情项目不渲染该页签 -->
+          <div v-if="prodTab === 'assets' && isDocumentaryProject" class="asset-subtabs">
+            <button
+              v-for="sub in ASSET_SUB_TABS"
+              :key="sub"
+              :class="['btn btn-sm', { 'is-on': assetTab === sub }]"
+              @click="assetTab = sub"
+            >{{ sub === 'cards' ? t('episode.assets.tabCards') : t('episode.assets.tabReview') }}</button>
+          </div>
+          <AssetReviewPanel
+            v-if="prodTab === 'assets' && assetTab === 'review' && isDocumentaryProject"
+            :review="gateState.assets"
+          />
           <!-- Sub: Assets -->
-          <div v-if="prodTab === 'assets'" class="prod-content">
+          <div v-if="prodTab === 'assets' && !(isDocumentaryProject && assetTab === 'review')" class="prod-content">
             <div class="prod-section-bar">
               <span class="dim" style="font-size:12px">{{ t('episode.prod.assets') }}</span>
               <span class="tag mono">{{ t('episode.prod.readyCount', { ready: assetReadyCount, total: assetTotalCount }) }}</span>
@@ -277,7 +233,7 @@
                   {{ (et.key === 'characters' ? chars.length : et.key === 'scenes' ? scenes.length : propItems.length) ? t('episode.prod.reextract', { type: et.label }) : t('episode.prod.extract', { type: et.label }) }}
                 </button>
                 <span class="asset-bar-divider" />
-                <button v-if="isDocumentary" class="btn btn-sm asset-btn-extract" @click="openRosterDialog">
+                <button v-if="isDocumentaryRuleset" class="btn btn-sm asset-btn-extract" @click="openRosterDialog">
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M16 11a4 4 0 1 0-8 0"/><path d="M3 21v-2a5 5 0 0 1 5-5h8a5 5 0 0 1 5 5v2"/></svg>
                   {{ t('episode.roster.open') }}
                 </button>
@@ -638,18 +594,9 @@
             />
           </div>
 
-          <!-- 旁白覆盖与「补全剩余」（纪录片 #52）：分镜页与表达设计页顶部共用 -->
-          <NarrationCoverageBar
-            v-if="isDocumentaryProject && (prodTab === 'expression' || prodTab === 'keyframes')"
-            :episode-id="epId"
-            :chat-model="chatModelOverride() || ''"
-            :chat-config-id="chatConfigId() || 0"
-            @refresh="refresh"
-          />
-
-          <!-- Sub: 表达设计（纪录片 #49）：逐镜信息点 / 表现手段 / 必须可见要素 / 图层计划 -->
-          <ShotIntentPanel
-            v-if="prodTab === 'expression'"
+          <!-- Sub: 分镜设计（纪录片 #54 起由 DesignCardPanel 承载；R4 用设计卡替换其内部） -->
+          <DesignCardPanel
+            v-if="prodTab === 'design'"
             :episode-id="epId"
             :storyboards="sbs"
             :chat-model="chatModelOverride() || ''"
@@ -657,19 +604,9 @@
             @refresh="refresh"
           />
 
-          <!-- Sub: 片段工作台（纪录片，Issue #50 确定性片段：图层 + 时间线 + 渲染） -->
-          <div v-if="prodTab === 'layers'" class="prod-content">
-            <ClipWorkspace
-              :storyboards="sbs"
-              :focus-storyboard-id="clipFocusSbId"
-              @changed="loadEpisodeClips"
-            />
-          </div>
-
-          <!-- Sub: Storyboard Keyframes（拆分分镜 + 首/中/尾关键帧生成与人工确认） -->
+          <!-- Sub: 分镜关键帧（剧情专用；纪录片走「分镜制作」步） -->
           <StoryboardKeyframes
-            v-if="prodTab === 'keyframes'"
-            :episode-id="epId"
+            v-if="prodTab === 'keyframes' && !isDocumentaryProject"
             :storyboards="sbs"
             :pool-candidates="shotPoolCandidates"
             :set-pool-asset="setShotPoolAsset"
@@ -700,7 +637,51 @@
             @refresh="refresh"
             @preview="openImageViewer"
             @goto-assets="prodTab = 'assets'"
-            @goto-clip="gotoClipWorkspace"
+            @goto-clip="gotoShotProduction"
+            @open-asset="openPoolAssetDetail"
+            @update-field="updateField"
+            @field-dirty="markFieldDirty"
+            @batch-narration="batchNarration"
+            @batch-narration-voice="batchNarrationVoice"
+            @open-narration-settings="narrationSettingsOpen = true"
+          />
+
+          <!-- Sub: 分镜制作（纪录片 #54）：图层段 + 关键帧在同一页；R5 重构为段合并工作区 -->
+          <ShotProductionPanel
+            v-if="prodTab === 'production'"
+            :focus-clip-storyboard-id="clipFocusSbId"
+            @clips-changed="loadEpisodeClips"
+            :storyboards="sbs"
+            :pool-candidates="shotPoolCandidates"
+            :set-pool-asset="setShotPoolAsset"
+            :target-assets-for="shotTargetAssets"
+            :asset-versions-for="targetAssetVersions"
+            :set-target-version="setTargetAssetVersion"
+            :mention-options-for="shotMentionOptions"
+            :ref-kinds="REF_KINDS"
+            :image-model="bareModelName(imageModel)"
+            :image-config-id="ownerConfigId(imageModelOptions, imageModel) || 0"
+            :image-model-label="effectiveImageModelLabel"
+            :chat-model="chatModelOverride() || ''"
+            :chat-config-id="chatConfigId() || 0"
+            :aspect-ratio="dramaAspectRatio"
+            :breaking="rt === 'storyboard_breaker'"
+            :agent-busy="rn"
+            :field-save="fieldSaveInfo"
+            :narration-enabled="narrationEnabledOf"
+            :episode-timing="episodeSubtitleTiming"
+            :episode-mix-mode="episodeAudioMixMode"
+            :episode-fit-default="episodeFitDefault"
+            :episode-normalize="episodeNarrationNormalize"
+            :narration-batch="narrationBatch"
+            :narration-voice-batch="narrationVoiceBatch"
+            :clip-of="clipOfShot"
+            :clip-thumbnail="clipThumbnailUrl"
+            @break="doBreakdown"
+            @refresh="refresh"
+            @preview="openImageViewer"
+            @goto-assets="prodTab = 'assets'"
+            @goto-clip="gotoShotProduction"
             @open-asset="openPoolAssetDetail"
             @update-field="updateField"
             @field-dirty="markFieldDirty"
@@ -710,846 +691,24 @@
           />
 
           <!-- Sub: Video Production（视频提示词 + 视频生成，关键帧确认后可用） -->
-          <div v-if="prodTab === 'videos'" class="prod-content">
-            <div class="prod-section-bar">
-              <span class="dim" style="font-size:12px">{{ t('episode.prod.videos') }}</span>
-              <span class="tag mono">{{ t('episode.sb.segmentStat', { n: sbs.length, dur: totalDuration }) }}</span>
-              <span class="tag mono" :title="t('episode.vid.aspectRatio')">{{ dramaAspectRatio }}</span>
-              <div class="ml-auto flex gap-1">
-                <button class="btn btn-sm" :disabled="videoPromptBatch.running || !sbs.length" @click="batchVideoPrompts">
-                  <Loader2 v-if="videoPromptBatch.running" :size="11" class="animate-spin" />
-                  <svg v-else width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                  {{ videoPromptBatch.running ? t('episode.sb.promptProgress', { done: videoPromptBatch.completed, total: videoPromptBatch.total }) : (videoSelectMode && selectedVideoSbIds.length ? t('episode.sb.promptSelected', { n: selectedVideoSbIds.length }) : t('episode.sb.batchPrompts')) }}
-                </button>
-                <button v-if="videoTaskFailedCount" class="btn btn-sm video-retry-failed" :disabled="videoBatchRunning" @click="retryFailedVideos">
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-                  {{ t('episode.vid.retryFailed', { n: videoTaskFailedCount }) }}
-                </button>
-                <button class="btn btn-sm" :class="{ 'is-on': videoSelectMode }" @click="toggleVideoSelectMode">
-                  {{ videoSelectMode ? t('episode.vid.selectDone', { n: selectedVideoSbIds.length }) : t('episode.vid.select') }}
-                </button>
-                <button
-                  class="btn btn-sm"
-                  :disabled="!sbs.length || videoBatchRunning"
-                  :title="videoBatchRunning ? t('episode.vid.batchAlreadyRunning') : undefined"
-                  @click="batchVideos"
-                >
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
-                  {{ videoSelectMode && selectedVideoSbIds.length ? t('episode.vid.batchSelected', { n: selectedVideoSbIds.length }) : t('episode.vid.batchVideos') }}
-                </button>
-                <button
-                  v-if="narrationEnabledOf"
-                  class="btn btn-sm"
-                  :disabled="!sbs.length"
-                  :title="composeBatchRunning ? t('episode.composeBatch.runningHint') : undefined"
-                  @click="openComposeDialog(videoSelectMode && selectedVideoSbIds.length ? selectedVideoSbIds : undefined)"
-                >
-                  <Loader2 v-if="composeBatchRunning" :size="11" class="animate-spin" />
-                  {{ composeBatchRunning
-                    ? t('episode.compose.batchProgress', { done: composeTask?.completed || 0, total: composeTask?.total || 0 })
-                    : (videoSelectMode && selectedVideoSbIds.length ? t('episode.compose.batchSelected', { n: selectedVideoSbIds.length }) : t('episode.compose.batch')) }}
-                </button>
-              </div>
-            </div>
-            <div v-if="sbs.length && !allKeyframesConfirmed" class="video-keyframe-gate">
-              <span>{{ t('episode.kf.gateBanner', { done: keyframesConfirmedCount, total: sbs.length }) }}</span>
-              <button class="btn btn-sm ml-auto" @click="prodTab = 'keyframes'">{{ t('episode.kf.gateGoto') }}</button>
-            </div>
-            <div v-if="videoBatchVisible" :class="['video-batch-banner', { 'is-running': videoBatchRunning }]">
-              <span class="video-batch-state">{{ t('episode.vid.batchBannerTitle') }} · {{ videoBatchStatusLabel }}</span>
-              <span class="video-batch-sep">·</span>
-              <span>{{ t('episode.vid.batchProgress', { done: videoBatchDoneCount, total: videoBatchItems.length }) }}</span>
-              <template v-if="videoBatchRunning && videoBatchCurrentNumber">
-                <span class="video-batch-sep">·</span>
-                <span>{{ t('episode.vid.batchCurrent', { n: videoBatchCurrentNumber }) }}</span>
-              </template>
-              <template v-if="videoBatchFailedItems.length">
-                <span class="video-batch-sep">·</span>
-                <span class="video-batch-issue">{{ t('episode.vid.batchFailedCount', { n: videoBatchFailedItems.length }) }}</span>
-              </template>
-              <template v-if="videoBatchSkippedItems.length">
-                <span class="video-batch-sep">·</span>
-                <span class="video-batch-issue">{{ t('episode.vid.batchSkippedCount', { n: videoBatchSkippedItems.length }) }}</span>
-              </template>
-              <button v-if="videoBatchRunning" class="btn btn-sm ml-auto" :disabled="videoBatchStopping" @click="cancelVideoBatch">{{ t('episode.vid.batchStop') }}</button>
-              <div v-if="videoBatchIssues.length" class="video-batch-issues">
-                <span v-for="item in videoBatchIssues" :key="item.storyboard_id" :title="item.error || ''">
-                  {{ t('episode.vid.batchIssueItem', {
-                    n: item.storyboard_number,
-                    state: item.state === 'failed' ? t('episode.vid.batchItemFailed') : t('episode.vid.batchItemSkipped'),
-                    msg: mapError(item.error) || t('episode.vid.batchNoReason'),
-                  }) }}
-                </span>
-              </div>
-            </div>
-            <div v-if="!sbs.length" class="step-empty video-task-empty-state">
-              <div class="empty-visual">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><rect x="2" y="2" width="20" height="20" rx="2.5"/><line x1="7" y1="8" x2="7" y2="16"/><line x1="10" y1="8" x2="10" y2="16"/><line x1="13" y1="8" x2="13" y2="16"/></svg>
-              </div>
-              <div class="empty-title">{{ t('episode.vid.emptyTitle') }}</div>
-              <div class="empty-desc">{{ t('episode.vid.emptyDesc') }}</div>
-              <div class="locked-config-banner">{{ t('episode.vid.lockedModel') }}{{ effectiveVideoModelLabel }}</div>
-              <button class="btn btn-primary" @click="prodTab = 'keyframes'">{{ t('episode.kf.gateGoto') }}</button>
-            </div>
-            <div v-else class="video-task-workbench has-player" :style="{ '--vleft': videoLeftW + 'px', '--vright': videoRightW + 'px' }">
-              <section class="video-task-list">
-                <div class="video-task-head">
-                <div>
-                  <div class="video-task-title">{{ t('episode.vid.listTitle') }}</div>
-                  <div class="video-task-meta">{{ videoListFilter ? t('episode.vid.listMetaFiltered', { n: videoTaskRows.length, total: allVideoTaskRows.length }) : t('episode.vid.listMeta', { n: videoTaskRows.length }) }}</div>
-                </div>
-                <div class="video-task-metrics">
-                  <button type="button" class="video-task-metric is-pending" :class="{ on: videoListFilter === 'pending' }" @click="toggleVideoFilter('pending')">{{ t('episode.vid.metricPending', { n: pendingVideoIds.length }) }}</button>
-                  <button type="button" class="video-task-metric is-done" :class="{ on: videoListFilter === 'done' }" @click="toggleVideoFilter('done')">{{ t('episode.vid.metricDone', { n: videoTaskDoneCount }) }}</button>
-                  <button type="button" class="video-task-metric is-failed" :class="{ on: videoListFilter === 'failed' }" @click="toggleVideoFilter('failed')">{{ t('episode.vid.metricFailed', { n: videoTaskFailedCount }) }}</button>
-                </div>
-                </div>
-                <div v-if="videoSelectMode" class="shot-quick-actions video-quick-actions">
-                  <button class="shot-quick-btn" @click="toggleSelectAllVideos">{{ t('episode.sb.selectAll') }}</button>
-                  <button class="shot-quick-btn" @click="selectMissingVideos">{{ t('episode.vid.selectMissing') }}</button>
-                  <button class="shot-quick-btn" @click="selectedVideoSbIds = []">{{ t('episode.sb.clear') }}</button>
-                </div>
-                <div class="video-task-table">
-                <div
-                  v-for="task in videoTaskRows"
-                  :key="task.id"
-                  :class="['video-task-row', 'is-' + videoTaskState(task.storyboard), { active: !videoSelectMode && selectedSb?.id === task.storyboard.id, 'is-selected': videoSelectMode && isVideoSbSelected(task.id) }]"
-                  role="button"
-                  tabindex="0"
-                  @click="onVideoTaskRowClick(task.storyboard)"
-                  @keydown.enter.prevent="onVideoTaskRowClick(task.storyboard)"
-                  @keydown.space.prevent="onVideoTaskRowClick(task.storyboard)"
-                >
-                  <div class="video-task-preview">
-                    <span
-                      v-if="videoSelectMode"
-                      class="shot-check video-task-check"
-                      :class="{ on: isVideoSbSelected(task.id) }"
-                    >
-                      <svg v-if="isVideoSbSelected(task.id)" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                    </span>
-                    <video
-                      v-if="hasVid(task.storyboard)"
-                      :src="mediaUrl(getVideoUrl(task.storyboard))"
-                      :poster="posterOf(mediaUrl(getVideoUrl(task.storyboard))) || undefined"
-                      preload="none"
-                      playsinline
-                      muted
-                      tabindex="-1"
-                    />
-                    <div v-else class="video-task-empty">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
-                    </div>
-                    <ProgressRing v-if="videoRing(task.storyboard)" v-bind="videoRing(task.storyboard)" class="video-task-ring" compact :size="22" />
-                    <span class="video-task-index">#{{ String(task.index + 1).padStart(2, '0') }}</span>
-                  </div>
-                  <div class="video-task-main">
-                    <div class="video-task-line">
-                      <strong class="video-task-name">{{ task.title }}</strong>
-                    </div>
-                    <div class="video-task-meta-line">
-                      <span :class="['video-task-state', 'is-' + videoTaskState(task.storyboard)]">
-                        <i :class="['dot', videoTaskState(task.storyboard) === 'done' && 'ok', videoTaskState(task.storyboard) === 'pending' && 'pending']" />{{ videoTaskStatusLabel(task.storyboard) }}
-                      </span>
-                      <span class="video-task-sep">·</span>
-                      <span>{{ task.duration }}s</span>
-                      <template v-if="task.meta">
-                        <span class="video-task-sep">·</span>
-                        <span class="video-task-loc truncate">{{ task.meta }}</span>
-                      </template>
-                      <template v-if="!isShotConfirmed(task.storyboard)">
-                        <span class="video-task-sep">·</span>
-                        <span class="video-task-unconfirmed" :title="t('episode.kf.gateShotUnconfirmed')">{{ t('episode.kf.stateUnconfirmed') }}</span>
-                      </template>
-                      <template v-if="videoBlockIssues(task.storyboard).length">
-                        <span class="video-task-sep">·</span>
-                        <span class="video-task-unconfirmed" :title="videoBlockReason(task.storyboard)">{{ t('episode.ref.issueCount', { n: videoBlockIssues(task.storyboard).length }) }}</span>
-                      </template>
-                    </div>
-                    <!-- 视频状态与融合状态是两件事：融合独占一行，窄列表也不会被截成半个词 -->
-                    <div
-                      v-if="narrationEnabledOf"
-                      :class="['video-task-fusion', 'is-' + composeStatusOf(task.storyboard)]"
-                      :title="composeReasonOf(task.storyboard) || composeStatusLabel(task.storyboard)"
-                    >
-                      {{ t('episode.compose.listPrefix') }}{{ composeStatusLabel(task.storyboard) }}
-                    </div>
-                    <div v-if="task.error" class="video-task-error" :title="task.error">
-                      {{ mapError(task.error) }}
-                      <div v-if="videoModerationHint(task.error)" class="video-task-error-hint">{{ videoModerationHint(task.error) }}</div>
-                    </div>
-                  </div>
-                  <button
-                    v-if="isDeterministicShot(task.storyboard)"
-                    class="btn btn-icon btn-sm video-task-action"
-                    :title="t('episode.clip.render')"
-                    :disabled="clipRenderingIds.includes(task.storyboard.id) || !clipOfShot(task.storyboard)"
-                    @click.stop="renderShotClip(task.storyboard)"
-                  >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/></svg>
-                  </button>
-                  <button
-                    v-else
-                    class="btn btn-icon btn-sm video-task-action"
-                    :title="videoBlockIssues(task.storyboard).length
-                      ? t('episode.ref.videoBlocked', { reason: videoBlockReason(task.storyboard) })
-                      : (isShotConfirmed(task.storyboard) ? videoTaskActionLabel(task.storyboard) : t('episode.kf.gateShotUnconfirmed'))"
-                    :disabled="videoTaskState(task.storyboard) === 'pending' || videoBatchRunning || !isShotConfirmed(task.storyboard) || videoBlockIssues(task.storyboard).length > 0"
-                    @click.stop="genVid(task.storyboard)"
-                  >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
-                  </button>
-                </div>
-                </div>
-              </section>
-
-              <div v-if="selectedSb" class="video-task-side">
-                <!-- 中列（#28 Q1）：播放器 + 视频历史条 + 绑定素材 + 关键帧缩略图 -->
-                <div class="video-main-col">
-                  <aside class="video-task-player">
-                    <div class="video-player-head">
-                      <div class="video-player-head-info">
-                        <div class="video-player-title">{{ t('episode.vid.playerTitle', { n: String(selectedVideoTaskNumber).padStart(2, '0') }) }}</div>
-                        <span :class="['video-task-status', 'is-' + videoTaskState(selectedSb)]">
-                          <span :class="['dot', videoTaskState(selectedSb) === 'done' && 'ok', videoTaskState(selectedSb) === 'pending' && 'pending']" />
-                          {{ videoTaskStatusLabel(selectedSb) }}
-                        </span>
-                        <span v-if="selectedSb.duration" class="video-player-sub">{{ selectedSb.duration }}s</span>
-                        <MediaTime :at="mediaTimeOf(selectedSb, mainPlayerUrl)" />
-                      </div>
-                      <!-- 原片 / 融合成片两个页签（#42）：成片不是「另一个小播放器」，就在主播放器里 -->
-                      <div v-if="narrationEnabledOf" class="video-source-tabs" role="tablist">
-                        <button
-                          type="button"
-                          role="tab"
-                          :aria-selected="playerSource === 'original' || !!previewVideoUrl"
-                          :class="['video-source-tab', { on: playerSource === 'original' || !!previewVideoUrl }]"
-                          @click="setPlayerSource('original')"
-                        >
-                          {{ t('episode.compose.sourceOriginal') }}
-                        </button>
-                        <button
-                          type="button"
-                          role="tab"
-                          :aria-selected="playerSource === 'fusion' && !previewVideoUrl"
-                          :class="['video-source-tab', { on: playerSource === 'fusion' && !previewVideoUrl }]"
-                          :disabled="!selectedFusionUrl"
-                          :title="selectedFusionUrl ? undefined : t('episode.compose.none')"
-                          @click="setPlayerSource('fusion')"
-                        >
-                          {{ t('episode.compose.sourceFusion') }}
-                        </button>
-                      </div>
-                      <button
-                        v-if="previewVideoUrl"
-                        class="btn btn-sm btn-primary"
-                        @click="setAsMainVideo"
-                      >
-                        {{ t('episode.vid.setMain') }}
-                      </button>
-                      <a
-                        v-if="mainPlayerUrl"
-                        :href="mediaUrl(mainPlayerUrl)"
-                        download
-                        class="btn btn-sm"
-                      >
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                        {{ t('common.download') }}
-                      </a>
-                    </div>
-                    <div
-                      v-if="playerSource === 'fusion' && !previewVideoUrl && selectedFusionStale"
-                      class="video-fusion-warn"
-                    >
-                      {{ t('episode.compose.staleWarn', { reason: composeReasonOf(selectedSb) || composeStatusLabel(selectedSb) }) }}
-                    </div>
-                    <div class="video-player-stage">
-                      <video
-                        v-if="mainPlayerUrl"
-                        :key="mainPlayerUrl"
-                        :src="mediaUrl(mainPlayerUrl)"
-                        :poster="posterOf(mediaUrl(mainPlayerUrl)) || undefined"
-                        controls
-                        preload="metadata"
-                        playsinline
-                        class="video-player-video"
-                      />
-                      <div v-else class="video-player-empty">
-                        <ProgressRing v-if="videoRing(selectedSb)" v-bind="videoRing(selectedSb)" compact :size="42" />
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
-                        <div class="video-player-empty-copy">
-                          <div class="video-player-empty-title">{{ videoTaskState(selectedSb) === 'pending' ? t('episode.vid.emptyGenerating') : t('episode.vid.emptyNoVideo') }}</div>
-                          <div class="video-player-empty-desc">{{ videoTaskState(selectedSb) === 'pending' ? t('episode.vid.emptyGeneratingDesc') : t('episode.vid.emptyNoVideoDesc') }}</div>
-                        </div>
-                        <button
-                          v-if="isDeterministicShot(selectedSb)"
-                          class="btn btn-primary btn-sm video-player-empty-action"
-                          :disabled="clipRenderingIds.includes(selectedSb.id) || !clipOfShot(selectedSb)"
-                          :title="clipOfShot(selectedSb) ? undefined : t('episode.clip.cardNoClip')"
-                          @click="renderShotClip(selectedSb)"
-                        >
-                          {{ clipRenderingIds.includes(selectedSb.id) ? t('episode.clip.rendering') : t('episode.clip.render') }}
-                        </button>
-                        <button
-                          v-else-if="videoTaskState(selectedSb) !== 'pending'"
-                          class="btn btn-primary btn-sm video-player-empty-action"
-                          :disabled="!isShotConfirmed(selectedSb) || videoBlockIssues(selectedSb).length > 0"
-                          :title="videoBlockIssues(selectedSb).length
-                            ? t('episode.ref.videoBlocked', { reason: videoBlockReason(selectedSb) })
-                            : (isShotConfirmed(selectedSb) ? undefined : t('episode.kf.gateShotUnconfirmed'))"
-                          @click="genVid(selectedSb)"
-                        >
-                          {{ t('episode.vid.generateVideo') }}
-                        </button>
-                      </div>
-                    </div>
-                  </aside>
-
-                  <!-- 确定性片段（#50）：本镜成片来自片段渲染，不是模型生成 -->
-                  <ClipCard
-                    v-if="isDeterministicShot(selectedSb)"
-                    :clip="clipOfShot(selectedSb)"
-                    :position="clipPositionOf(selectedSb)"
-                    :rendering="clipRenderingIds.includes(selectedSb.id)"
-                    @edit="gotoClipWorkspace(selectedSb)"
-                    @render="renderShotClip(selectedSb)"
-                  />
-
-                  <div v-if="sbVideoHistory.length" class="video-player-history">
-                    <div class="video-player-history-head">
-                      <span>{{ t('episode.vid.history') }}</span>
-                      <span class="video-player-history-count">{{ sbVideoHistory.length }}</span>
-                    </div>
-                    <div class="video-player-history-list">
-                      <div
-                        v-for="h in sbVideoHistory"
-                        :key="h.id"
-                        :class="['video-history-item', { current: isCurrentVideo(h), viewing: !!previewVideoUrl && previewVideoUrl === taskVideoPath(h) }]"
-                        role="button"
-                        tabindex="0"
-                        @click="previewHistoryVideo(h)"
-                        @keydown.enter.prevent="previewHistoryVideo(h)"
-                      >
-                        <video :src="mediaUrl(taskVideoPath(h))" :poster="posterOf(mediaUrl(taskVideoPath(h))) || undefined" preload="none" muted playsinline tabindex="-1" />
-                        <MediaTime class="video-history-time" :at="taskGeneratedAt(h)" />
-                        <span v-if="historyElapsedTook(h)" class="video-history-took">{{ t('episode.vid.elapsedTook', { time: historyElapsedTook(h) }) }}</span>
-                        <span class="video-history-engine">{{ h.provider || t('episode.vid.unknownEngine') }}<template v-if="h.model"> · {{ h.model }}</template></span>
-                        <span v-if="isCurrentVideo(h)" class="video-history-badge">{{ t('episode.vid.current') }}</span>
-                        <button v-else type="button" class="video-history-del" :title="t('episode.vid.deleteRecord')" @click.stop="removeHistoryVideo(h)">×</button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="video-inspector-body">
-                    <section class="video-inspector-section">
-                      <div class="video-inspector-prompt-head">
-                        <span class="video-inspector-label">{{ t('episode.inspector.boundRefs') }}</span>
-                        <span class="tag mono">{{ shotVideoRefCount(selectedSb) }}</span>
-                      </div>
-                      <TargetAssetList
-                        :items="videoTargetAssets"
-                        :versions-for="targetAssetVersions"
-                        :lead="videoTargetLead"
-                        :busy="targetVersionSaving"
-                        @preview="openImageViewer"
-                        @select-version="(item, image) => setTargetAssetVersion(selectedSb, 'video', item, image)"
-                      />
-                    </section>
-                    <section class="video-inspector-section">
-                      <div class="video-inspector-prompt-head">
-                        <span class="video-inspector-label">{{ t('episode.kf.videoRefTitle') }}</span>
-                        <span :class="['video-keyframe-state', isShotConfirmed(selectedSb) ? 'is-confirmed' : 'is-unconfirmed']">
-                          {{ isShotConfirmed(selectedSb) ? t('episode.kf.stateConfirmed') : t('episode.kf.stateUnconfirmed') }}
-                        </span>
-                      </div>
-                      <div class="video-keyframe-thumbs">
-                        <button
-                          v-for="slot in KEYFRAME_SLOTS"
-                          :key="slot.slot"
-                          type="button"
-                          class="video-keyframe-thumb"
-                          :disabled="!shotKeyframeImage(selectedSb, slot.slot)"
-                          :title="shotKeyframeImage(selectedSb, slot.slot) ? slot.label : shotKeyframePlaceholder(selectedSb, slot.slot)"
-                          @click="openImageViewer(assetImageSrc({ imageUrl: shotKeyframeImage(selectedSb, slot.slot) }), slot.label)"
-                        >
-                          <img
-                            v-if="shotKeyframeImage(selectedSb, slot.slot)"
-                            :src="thumbOf(assetImageSrc({ imageUrl: shotKeyframeImage(selectedSb, slot.slot) }))"
-                            :alt="slot.label"
-                            loading="lazy"
-                            @error="thumbFallback($event, assetImageSrc({ imageUrl: shotKeyframeImage(selectedSb, slot.slot) }))"
-                          />
-                          <span v-else class="video-keyframe-thumb-empty">{{ shotKeyframePlaceholder(selectedSb, slot.slot) }}</span>
-                          <small>{{ slot.label }}</small>
-                          <MediaTime :at="mediaTimeOf(selectedSb, shotKeyframeImage(selectedSb, slot.slot))" />
-                        </button>
-                      </div>
-                      <div v-if="!isShotConfirmed(selectedSb)" class="video-keyframe-hint">{{ t('episode.kf.gateShotUnconfirmed') }}</div>
-                    </section>
-                  </div>
-                </div>
-
-                <!-- 右栏检查器（#28 Q1）：转场 + 视频提示词编辑，时长/生效配置/生成常驻底部 -->
-                <aside class="video-task-inspector">
-                  <div class="video-inspector-body video-inspector-prompts">
-                    <!-- 融合首屏（#42）：状态 / 输入就绪 / 唯一的融合 CTA，不用滚到底才看得见 -->
-                    <ShotFusionPanel
-                      :storyboard="selectedSb"
-                      :compose-state="composeStateOf(selectedSb)"
-                      :narration-enabled="narrationEnabledOf"
-                      :narration-save="fieldSaveInfo(selectedSb, 'narration_text')"
-                      :episode-fit-default="episodeFitDefault"
-                      :episode-mix-mode="episodeAudioMixMode"
-                      :batch-running="composeBatchRunning"
-                      @composed="onShotComposed"
-                      @refresh="refresh"
-                      @open-batch="openComposeDialog()"
-                      @preview-fusion="setPlayerSource('fusion')"
-                    />
-                    <section v-if="shotInheritsFirst(selectedSb)" class="video-inspector-section transition-section">
-                      <div class="video-inspector-prompt-head">
-                        <button
-                          type="button"
-                          class="video-section-toggle"
-                          :aria-expanded="inspectorOpen.transition"
-                          @click="inspectorOpen.transition = !inspectorOpen.transition"
-                        >
-                          <ChevronRight :size="12" :class="['video-section-caret', { open: inspectorOpen.transition }]" />
-                          <span class="video-inspector-label video-inspector-label-hero">{{ t('episode.trans.section') }}</span>
-                        </button>
-                        <FieldSaveStatus
-                          :status="fieldSaveInfo(selectedSb, 'transition_prompt').status"
-                          :at="fieldSaveInfo(selectedSb, 'transition_prompt').at"
-                        />
-                        <span class="ml-auto" />
-                        <label class="transition-send">
-                          <input
-                            type="checkbox"
-                            :checked="transitionEnabledOf(selectedSb)"
-                            @change="e => setTransitionEnabled(selectedSb, e.target.checked)"
-                          >
-                          {{ t('episode.trans.send') }}
-                        </label>
-                        <button
-                          type="button"
-                          class="btn btn-sm"
-                          :disabled="transitionGeneratingIds.includes(selectedSb?.id)"
-                          @click="genTransition(selectedSb)"
-                        >
-                          <Loader2 v-if="transitionGeneratingIds.includes(selectedSb?.id)" :size="11" class="animate-spin" />
-                          {{ t('episode.trans.generate') }}
-                        </button>
-                      </div>
-                      <template v-if="inspectorOpen.transition">
-                      <div class="transition-summary">
-                        <span>{{ t('episode.trans.summary', {
-                          n: prevShotOf(selectedSb) ? sbs.indexOf(prevShotOf(selectedSb)) + 1 : '-',
-                          from: prevShotOf(selectedSb) ? shotPlaceLabel(prevShotOf(selectedSb)) : '—',
-                          to: shotPlaceLabel(selectedSb),
-                        }) }}</span>
-                        <span class="transition-verdict">{{ transitionVerdictLabel(selectedSb) }}</span>
-                        <span v-if="transitionReviewOf(selectedSb)?.technique" class="tag mono">{{ transitionReviewOf(selectedSb).technique }}</span>
-                        <span v-if="transitionReviewOf(selectedSb)?.edited_manually" class="transition-manual">
-                          {{ t('episode.trans.manual', { verdict: transitionVerdictLabel(selectedSb) }) }}
-                        </span>
-                      </div>
-                      <div v-if="transitionStaleOf(selectedSb)" class="transition-stale">{{ t('episode.trans.stale') }}</div>
-                      <MentionTextarea
-                        :model-value="selectedSb.transition_prompt || selectedSb.transitionPrompt || ''"
-                        :options="mentionOptions"
-                        :rows="5"
-                        input-class="textarea video-inspector-prompt"
-                        :placeholder="t('episode.trans.placeholder')"
-                        @update:model-value="v => markFieldDirty(selectedSb, 'transition_prompt', v)"
-                        @commit="v => updateField(selectedSb, 'transition_prompt', v)"
-                      />
-                      <RefIssueList :issues="transitionIssues(selectedSb)" />
-                      <div class="transition-duration">{{ transitionDurationHint(selectedSb) }}</div>
-                      </template>
-                    </section>
-                    <!-- 旁白编辑（#30 C.3）：融合参数与 CTA 已上移到首屏，这里只留文本/配音/字幕 -->
-                    <section v-if="narrationEnabledOf" class="video-inspector-section">
-                      <div class="video-inspector-prompt-head">
-                        <button
-                          type="button"
-                          class="video-section-toggle"
-                          :aria-expanded="inspectorOpen.narration"
-                          @click="inspectorOpen.narration = !inspectorOpen.narration"
-                        >
-                          <ChevronRight :size="12" :class="['video-section-caret', { open: inspectorOpen.narration }]" />
-                          <span class="video-inspector-label video-inspector-label-hero">{{ t('episode.narration.section') }}</span>
-                        </button>
-                      </div>
-                      <NarrationBlock
-                        v-show="inspectorOpen.narration"
-                        :storyboard="selectedSb"
-                        :field-save="fieldSaveInfo(selectedSb, 'narration_text')"
-                        :episode-timing="episodeSubtitleTiming"
-                        :episode-mix-mode="episodeAudioMixMode"
-                        :episode-fit-default="episodeFitDefault"
-                        :episode-normalize="episodeNarrationNormalize"
-                        :narration-batch="narrationBatch"
-                        :show-fit="false"
-                        @update-field="updateField"
-                        @field-dirty="markFieldDirty"
-                        @refresh="refresh"
-                      />
-                    </section>
-                    <section class="video-inspector-section">
-                      <div class="video-inspector-prompt-head">
-                        <button
-                          type="button"
-                          class="video-section-toggle"
-                          :aria-expanded="inspectorOpen.prompt"
-                          @click="inspectorOpen.prompt = !inspectorOpen.prompt"
-                        >
-                          <ChevronRight :size="12" :class="['video-section-caret', { open: inspectorOpen.prompt }]" />
-                          <span class="video-inspector-label video-inspector-label-hero">{{ t('episode.sb.videoPromptSection') }}</span>
-                        </button>
-                        <FieldSaveStatus
-                          :status="fieldSaveInfo(selectedSb, 'video_prompt').status"
-                          :at="fieldSaveInfo(selectedSb, 'video_prompt').at"
-                        />
-                        <span class="ml-auto" />
-                        <button
-                          type="button"
-                          class="btn btn-sm"
-                          :disabled="videoPromptGeneratingIds.includes(selectedSb?.id) || videoPromptBatch.running"
-                          @click="genVideoPrompt(selectedSb)"
-                        >
-                          <Loader2 v-if="videoPromptGeneratingIds.includes(selectedSb?.id)" :size="11" class="animate-spin" />
-                          {{ (selectedSb.video_prompt || selectedSb.videoPrompt) ? t('episode.sb.regenVideoPrompt') : t('episode.sb.aiGenerateVideoPrompt') }}
-                        </button>
-                        <button
-                          type="button"
-                          class="btn btn-sm"
-                          :disabled="videoTaskState(selectedSb) === 'pending' || !isShotConfirmed(selectedSb)"
-                          :title="!isShotConfirmed(selectedSb) ? t('episode.kf.gateShotUnconfirmed') : undefined"
-                          @click="genVid(selectedSb)"
-                        >
-                          {{ promptHeadVideoActionLabel(selectedSb) }}
-                        </button>
-                      </div>
-                      <template v-if="inspectorOpen.prompt">
-                        <MentionTextarea
-                          :model-value="selectedSb.video_prompt || selectedSb.videoPrompt || ''"
-                          :options="mentionOptions"
-                          :rows="14"
-                          input-class="textarea video-inspector-prompt"
-                          :placeholder="t('episode.inspector.videoPromptPlaceholder')"
-                          @update:model-value="v => markFieldDirty(selectedSb, 'video_prompt', v)"
-                          @commit="v => updateField(selectedSb, 'video_prompt', v)"
-                        />
-                        <RefIssueList :issues="videoPromptIssues(selectedSb)" />
-                      </template>
-                    </section>
-                  </div>
-
-                  <!-- 视频重绘参数常驻底部：可折叠成一行，长内容仍能滚动到底不被遮挡（#42） -->
-                  <div :class="['video-inspector-footer', { 'is-collapsed': !footerOpen }]">
-                    <div class="video-footer-bar">
-                      <button
-                        type="button"
-                        class="video-section-toggle"
-                        :aria-expanded="footerOpen"
-                        @click="footerOpen = !footerOpen"
-                      >
-                        <ChevronRight :size="12" :class="['video-section-caret', { open: footerOpen }]" />
-                        <span class="video-inspector-label">{{ t('episode.inspector.videoFooterTitle') }}</span>
-                      </button>
-                      <span class="ml-auto video-footer-summary">
-                        {{ t('episode.inspector.effective', { model: effectiveVideoModelLabel || t('episode.vid.defaultModel'), res: episodeResolutionShort, dur: effectiveVideoDuration }) }}
-                      </span>
-                    </div>
-                    <template v-if="footerOpen">
-                      <section class="video-inspector-section video-params-card">
-                        <div class="video-param-row">
-                          <span class="video-param-name">{{ t('episode.inspector.duration') }}</span>
-                          <span class="video-param-control">
-                            <input
-                              :value="selectedSb.duration || 10"
-                              type="number"
-                              min="2"
-                              max="30"
-                              class="input video-duration-input"
-                              @change="onVideoDurationChange"
-                            />
-                            <span class="video-param-unit">{{ t('episode.inspector.durationUnit') }}</span>
-                          </span>
-                        </div>
-                        <div class="video-param-hint">{{ t('episode.inspector.durationHint') }}</div>
-                        <div v-if="narrationEnabledOf" class="video-param-hint">{{ t('episode.compose.durationNote') }}</div>
-                      </section>
-                      <div class="video-eta-line" :title="videoEtaLine">{{ videoEtaLine }}</div>
-                    </template>
-                    <button
-                      class="btn btn-primary video-inspector-action"
-                      :disabled="videoTaskState(selectedSb) === 'pending' || !isShotConfirmed(selectedSb)"
-                      @click="genVid(selectedSb)"
-                    >
-                      {{ videoTaskActionLabel(selectedSb) }}
-                    </button>
-                  </div>
-                </aside>
-              </div>
-              <div
-                class="video-col-divider is-left"
-                role="separator"
-                aria-orientation="vertical"
-                @pointerdown="startVideoColDrag('left', $event)"
-                @dblclick="videoLeftW = VIDEO_COL_DEFAULTS.left"
-              ></div>
-              <div
-                class="video-col-divider is-right"
-                role="separator"
-                aria-orientation="vertical"
-                @pointerdown="startVideoColDrag('right', $event)"
-                @dblclick="videoRightW = VIDEO_COL_DEFAULTS.right"
-              ></div>
-            </div>
-          </div>
+          <!-- Sub: 视频与成品（#54 起由 VideoShotPanel 承载；剧情 videos 页签与纪录片 final 步共用） -->
+          <VideoShotPanel v-if="prodTab === 'videos' || prodTab === 'final'" />
 
           <!-- Production Navigator -->
         </template>
       </div>
 
       <!-- ===== EXPORT PANEL ===== -->
-      <div v-else class="content-panel">
-        <div v-if="!sbs.length" class="step-empty" style="flex:1">
-          <div class="empty-visual">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          </div>
-          <div class="empty-title">{{ t('episode.prod.notReady') }}</div>
-          <div class="empty-desc">{{ t('episode.export.notReadyDesc') }}</div>
-          <button class="btn btn-primary" @click="panel = 'script'">{{ t('episode.export.gotoScript') }}</button>
-        </div>
-        <div v-else class="export-split">
-          <div class="export-main">
-            <!-- 上方:成片列表 -->
-            <div class="export-section">
-              <div class="export-section-head">
-                <span class="export-section-title">{{ t('episode.export.filmList') }}</span>
-                <span class="dim" style="font-size:11px">{{ t('episode.export.countN', { n: exportMerges.length }) }}</span>
-                <button
-                  :class="['btn btn-sm ml-auto export-done-btn', { on: exportDone }]"
-                  :title="t('episode.export.markDoneTitle')"
-                  @click="toggleExportDone"
-                >
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                  {{ exportDone ? t('episode.export.markedDone') : t('episode.export.markDone') }}
-                </button>
-                <button class="btn btn-sm" @click="loadExportMerges">
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-                  {{ t('common.refresh') }}
-                </button>
-              </div>
-              <div v-if="exportMerges.length" class="export-merge-strip">
-                <div
-                  v-for="m in exportMerges"
-                  :key="m.id"
-                  :class="['merge-card', m.status === 'completed' && m.merged_url && 'playable']"
-                  :role="m.status === 'completed' && m.merged_url ? 'button' : undefined"
-                  :tabindex="m.status === 'completed' && m.merged_url ? 0 : undefined"
-                  @click="m.status === 'completed' && m.merged_url && (activeMerge = m)"
-                  @keydown.enter.prevent="m.status === 'completed' && m.merged_url && (activeMerge = m)"
-                >
-                  <div class="merge-card-thumb">
-                    <video
-                      v-if="m.status === 'completed' && m.merged_url"
-                      :src="mediaUrl(m.merged_url)"
-                      :poster="posterOf(mediaUrl(m.merged_url)) || undefined"
-                      preload="none"
-                      muted
-                      playsinline
-                      tabindex="-1"
-                    />
-                    <div v-else :class="['merge-card-pending', m.status === 'failed' && 'is-failed']" :title="m.status === 'failed' ? m.error_msg : null">
-                      {{ m.status === 'failed' ? mapError(m.error_msg, { fallback: 'episode.export.mergeFailed' }) : t('episode.export.merging') }}
-                    </div>
-                    <span v-if="m.status === 'completed' && m.merged_url" class="merge-card-play">
-                      <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="6 3 20 12 6 21 6 3"/></svg>
-                    </span>
-                  </div>
-                  <div class="merge-card-meta">
-                    <MediaTime :at="m.generated_at || m.created_at_unix" />
-                    <span v-if="m.duration">· {{ m.duration }}s</span>
-                    <a
-                      v-if="m.status === 'completed' && m.merged_url"
-                      :href="mediaUrl(m.merged_url)"
-                      download
-                      class="btn btn-sm"
-                      @click.stop
-                    >
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                      {{ t('common.download') }}
-                    </a>
-                    <button
-                      type="button"
-                      class="btn btn-sm merge-card-del"
-                      :disabled="isMergeInProgress(m) || deletingMergeId === m.id"
-                      :title="isMergeInProgress(m) ? t('episode.export.deleteMergeBusy') : t('episode.export.deleteMerge')"
-                      @click.stop="askDeleteMerge(m)"
-                    >
-                      <Trash2 :size="11" />
-                      {{ t('common.delete') }}
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <div v-else class="export-merge-empty">{{ t('episode.export.empty') }}</div>
-            </div>
-
-            <!-- Poster 片头（Issue #39，可选）：静态海报 + 展示秒数，插在所选镜头之前 -->
-            <div class="export-section export-poster-section">
-              <div class="export-section-head">
-                <span class="export-section-title">{{ t('episode.export.posterTitle') }}</span>
-                <span class="dim" style="font-size:11px">{{ t('episode.export.posterHint') }}</span>
-              </div>
-              <div v-if="posterVersionOptions.length" class="export-poster-row">
-                <label class="export-poster-check">
-                  <input type="checkbox" v-model="exportPosterEnabled" />
-                  {{ t('episode.export.posterEnable') }}
-                </label>
-                <select v-model="exportPosterVersionId" class="input export-poster-select" :disabled="!exportPosterEnabled">
-                  <option v-for="version in posterVersionOptions" :key="version.id" :value="version.id">
-                    {{ t('episode.export.posterVersion', { n: version.id }) }}
-                  </option>
-                </select>
-                <label class="export-poster-duration">
-                  {{ t('episode.export.posterDuration') }}
-                  <input
-                    v-model.number="exportPosterDuration"
-                    type="number"
-                    min="0.5"
-                    max="10"
-                    step="0.5"
-                    class="input export-poster-seconds"
-                    :disabled="!exportPosterEnabled"
-                  />
-                  {{ t('episode.export.posterSeconds') }}
-                </label>
-                <img v-if="exportPosterEnabled && posterPreviewUrl" :src="posterPreviewUrl" alt="" class="export-poster-preview" />
-              </div>
-              <div v-else class="export-merge-empty">{{ t('episode.export.posterNone') }}</div>
-            </div>
-
-            <!-- 下方:镜头素材(可勾选) -->
-            <div class="export-section export-section-grow">
-              <div class="export-section-head">
-                <span class="export-section-title">{{ t('episode.export.shotAssets') }}</span>
-                <span class="dim" style="font-size:11px">{{ t('episode.export.shotStat', { done: shotVidCount, total: sbs.length, selected: exportSelectedReadyIds.length }) }}</span>
-                <div class="ml-auto flex gap-1">
-                  <button class="btn btn-sm" :disabled="!exportReadyIds.length" @click="toggleSelectAllExport">
-                    {{ exportSelectedReadyIds.length === exportReadyIds.length && exportReadyIds.length ? t('episode.export.clearSelection') : t('episode.export.selectAllReady') }}
-                  </button>
-                  <button
-                    class="btn btn-sm"
-                    :disabled="!exportComposeReadyIds.length || exportComposeReadyIds.length === exportSelectedReadyIds.length"
-                    :title="t('episode.export.selectReadyOnlyTitle')"
-                    @click="selectExportReadyOnly"
-                  >
-                    {{ t('episode.export.selectReadyOnly', { n: exportComposeReadyIds.length }) }}
-                  </button>
-                  <button
-                    v-if="narrationEnabledOf && exportRepairIds.length"
-                    class="btn btn-sm"
-                    @click="openComposeDialog(exportRepairIds)"
-                  >
-                    {{ t('episode.export.repairFusion', { n: exportRepairIds.length }) }}
-                  </button>
-                  <button
-                    class="btn btn-sm btn-primary"
-                    :disabled="!exportSelectedReadyIds.length"
-                    @click="askMerge"
-                  >
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-                    {{ t('episode.export.mergeSelected', { n: exportSelectedReadyIds.length }) }}
-                  </button>
-                </div>
-              </div>
-              <!-- 拼接来源与就绪情况：先说清用的是融合成片还是原视频，再说差多少（#42） -->
-              <div class="export-ready-bar">
-                <span class="export-ready-source">{{ t('episode.export.sourceLine', { source: exportSourceLabel }) }}</span>
-                <span class="export-ready-ok">{{ t('episode.export.readyCount', { n: exportComposeReadyIds.length, total: exportSelectedReadyIds.length }) }}</span>
-                <span v-if="exportBlockedSelected.length" class="export-ready-bad">
-                  {{ t('episode.export.notReadyCount', { n: exportBlockedSelected.length }) }}
-                </span>
-              </div>
-              <div v-if="exportBlockedSelected.length" class="export-compose-warn">
-                <div class="export-compose-skipped-title">{{ t('episode.export.notReadyTitle') }}</div>
-                <span v-for="item in exportBlockedSelected" :key="item.id">
-                  {{ t('episode.compose.skippedItem', { n: item.number, reason: item.reason || item.label }) }}
-                </span>
-              </div>
-              <div v-if="mergeBlocked.length" class="export-compose-skipped">
-                <div class="export-compose-skipped-title">{{ t('episode.export.blockedTitle') }}</div>
-                <span v-for="item in mergeBlocked" :key="item.storyboard_id">
-                  {{ t('episode.compose.skippedItem', { n: item.storyboard_number, reason: item.reason }) }}
-                </span>
-              </div>
-              <div v-if="mergeSkipped.length" class="export-compose-skipped">
-                <div class="export-compose-skipped-title">{{ t('episode.compose.skippedTitle') }}</div>
-                <span v-for="item in mergeSkipped" :key="item.storyboard_number">
-                  {{ t('episode.compose.skippedItem', { n: item.storyboard_number, reason: mapError(item.reason) || item.reason }) }}
-                </span>
-              </div>
-              <div class="export-grid">
-                <div
-                  v-for="(sb, i) in sbs"
-                  :key="sb.id"
-                  :class="['exp-card', { selected: isExportSelected(sb.id), playable: hasUsableVideo(sb) }]"
-                  :role="hasUsableVideo(sb) ? 'button' : undefined"
-                  :tabindex="hasUsableVideo(sb) ? 0 : undefined"
-                  :aria-pressed="hasUsableVideo(sb) ? isExportSelected(sb.id) : undefined"
-                  @click="toggleExportSelect(sb)"
-                  @keydown.enter.prevent="toggleExportSelect(sb)"
-                  @keydown.space.prevent="toggleExportSelect(sb)"
-                >
-                  <div class="exp-thumb">
-                    <video
-                      v-if="hasVid(sb)"
-                      :src="mediaUrl(getVideoUrl(sb))"
-                      :poster="posterOf(mediaUrl(getVideoUrl(sb))) || undefined"
-                      preload="none"
-                      muted
-                      playsinline
-                      tabindex="-1"
-                    />
-                    <div v-else class="exp-thumb-empty">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
-                    </div>
-                    <span class="exp-thumb-index">#{{ String(i+1).padStart(2,'0') }}</span>
-                    <span v-if="sb.duration" class="exp-thumb-duration">{{ sb.duration }}s</span>
-                    <span
-                      v-if="hasVid(sb)"
-                      class="exp-play"
-                      :title="t('episode.export.previewShot')"
-                      @click.stop="previewShot = sb"
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="6 3 20 12 6 21 6 3"/></svg>
-                    </span>
-                    <span v-if="hasUsableVideo(sb)" :class="['exp-check', isExportSelected(sb.id) && 'on']">
-                      <svg v-if="isExportSelected(sb.id)" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                    </span>
-                  </div>
-                  <div class="exp-row-line">
-                    <span class="truncate" style="flex:1;font-size:11px">{{ sb.description || sb.title || '—' }}</span>
-                    <MediaTime v-if="hasVid(sb)" :at="mediaTimeOf(sb, getVideoUrl(sb))" />
-                    <span :class="['dot', hasVid(sb) && 'ok']" />
-                    <span
-                      v-if="narrationEnabledOf"
-                      :class="['exp-compose-state', 'is-' + composeStatusOf(sb)]"
-                      :title="composeReasonOf(sb) || composeStatusLabel(sb)"
-                    >
-                      {{ composeStatusLabel(sb) }}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+      <!-- 门禁锁定（#54）：导出需要至少一镜成品最新；锁定时只给原因与出路 -->
+      <div v-else-if="stageLocked('export')" class="content-panel">
+        <div class="step-empty" style="flex:1">
+          <div class="empty-visual"><Lock :size="32" /></div>
+          <div class="empty-title">{{ t('episode.gate.locked') }}</div>
+          <div class="empty-desc">{{ stageLockReason('export') }}</div>
+          <button class="btn btn-primary" @click="goStageBlocker('export')">{{ t('episode.gate.goFix') }}</button>
         </div>
       </div>
+      <ExportPanel v-else />
 
       <div v-if="assetDetail.open && assetDetail.item" class="overlay asset-detail-overlay" @click.self="closeAssetDetail">
         <section
@@ -2305,7 +1464,7 @@ import { toast } from 'vue-sonner'
 import { useI18n } from 'vue-i18n'
 import {
   Users, FileText, FolderKanban, Clapperboard, Download, Loader2, Images,
-  Image as ImageIcon, Plus, X, Trash2, CircleHelp, ChevronRight, Layers, Lightbulb,
+  Image as ImageIcon, Plus, X, Trash2, CircleHelp, ChevronRight, Layers, Lightbulb, Lock,
 } from 'lucide-vue-next'
 import { api, dramaAPI, episodeAPI, storyboardAPI, characterAPI, sceneAPI, propAPI, taskAPI, mergeAPI, posterAPI, aiConfigAPI, uploadAPI, mediaLibraryAPI, videoQueueAPI, assetBatchAPI, clipAPI } from '~/composables/useApi'
 import { startTour, autoTour } from '~/composables/useTour'
@@ -2320,23 +1479,24 @@ import FinalPromptSourceBadge from '~/components/FinalPromptSourceBadge.vue'
 import MediaLibraryDialog from '~/components/MediaLibraryDialog.vue'
 import PosterPanel from '~/components/PosterPanel.vue'
 import StoryboardKeyframes from '~/components/StoryboardKeyframes.vue'
-import ShotIntentPanel from '~/components/ShotIntentPanel.vue'
 import ProgressRing from '~/components/ProgressRing.vue'
-import FieldSaveStatus from '~/components/FieldSaveStatus.vue'
-import RefIssueList from '~/components/RefIssueList.vue'
 import TaskCenterButton from '~/components/TaskCenterButton.vue'
 import MediaTime from '~/components/MediaTime.vue'
-import TargetAssetList from '~/components/TargetAssetList.vue'
 import AssetBrowserDialog from '~/components/AssetBrowserDialog.vue'
-import NarrationBlock from '~/components/NarrationBlock.vue'
 import BreakdownNarrationDialog from '~/components/BreakdownNarrationDialog.vue'
 import NarrationSettingsPanel from '~/components/NarrationSettingsPanel.vue'
 import NarrationVoiceDialog from '~/components/NarrationVoiceDialog.vue'
 import AssetBatchDialog from '~/components/AssetBatchDialog.vue'
-import ShotFusionPanel from '~/components/ShotFusionPanel.vue'
 import ComposeBatchDialog from '~/components/ComposeBatchDialog.vue'
-import ClipWorkspace from '~/components/ClipWorkspace/ClipWorkspace.vue'
-import ClipCard from '~/components/ClipWorkspace/ClipCard.vue'
+// 每步一个稳定挂载组件（Issue #54）：后续 Issue 只改这些组件内部，不再回 episode.vue 改 markup
+import ScriptStepPanel from '~/components/ScriptStepPanel.vue'
+import AssetReviewPanel from '~/components/AssetReviewPanel.vue'
+import DesignCardPanel from '~/components/DesignCardPanel.vue'
+import ShotProductionPanel from '~/components/ShotProductionPanel.vue'
+import VideoShotPanel from '~/components/VideoShotPanel.vue'
+import ExportPanel from '~/components/ExportPanel.vue'
+import { ASSET_SUB_TABS, PROD_TAB_KEYS, WORKBENCH_CTX, remapAssetTab, remapProdTab } from '~/utils/workbenchSteps'
+import { useWorkflowGates } from '~/composables/useWorkflowGates'
 import { mediaTimeOfPath } from '~/utils/mediaTime'
 import {
   useNowTicker,
@@ -2360,8 +1520,11 @@ const drama = ref(null), episode = ref(null), chars = ref([]), scenes = ref([]),
 const assetBrowserOpen = ref(false)
 // 纪录片选角名册（Issue #32）：谁该建卡的契约。首轮由提取 Agent 生成草稿（待复核），
 // 人在这里增删后点「确认名册」锁定；之后每次提取都照同一份名册执行，剧本改动则标记过期。
-const isDocumentary = computed(() => drama.value?.genre_ruleset === 'documentary')
-// 项目类型（Issue #45）：决定工作台步骤序列（旁白稿 → 资产 → 表达设计 → 关键帧/图层 → 视频 → 导出）
+// 内容规则集口径（#54 改名）：只驱动「内容规则」类能力（当前唯一用处 = 选角名册按钮），
+// 严禁用它判断工作流结构——drama 3 是 project_type='drama' + documentary_rules，仍走剧情 6 步。
+const isDocumentaryRuleset = computed(() => drama.value?.genre_ruleset === 'documentary')
+// 项目类型（Issue #45 / #54）：工作流结构的唯一口径——步骤集合、页签、侧栏、
+// 进度条、门禁、Poster 位置、挂载点选择全部只看它。
 const isDocumentaryProject = computed(() => drama.value?.project_type === 'documentary')
 const roster = ref({ open: false, loading: false, saving: false, exists: false, status: null, stale: false, updated_at: null, current_hash: '', cast: [] })
 
@@ -2414,14 +1577,15 @@ const storedPanel = (() => {
   try { return JSON.parse(localStorage.getItem(PANEL_STORE_KEY) || 'null') } catch { return null }
 })()
 // ===== 子状态 deeplink：?panel=script|production|export &step=0|1
-//      &tab=assets|poster|keyframes|videos（纪录片项目另有 expression|layers）
+//      &tab=assets|poster|keyframes|videos（纪录片项目为 assets|design|production|final|poster）
+//      &sub=cards|review（资产步的子页签，纪录片才有审核清单）
 //      &extract=characters|scenes|props &asset=类型-id =====
 const { replaceQuery } = useQuerySync()
 const urlPanel = queryEnum(route.query.panel, ['script', 'production', 'export'])
 const urlStep = queryEnum(route.query.step, ['0', '1'])
-// 两类项目的页签并集；与项目类型不符的页签在定义就绪后由下面的守卫落回「资产」
-const PROD_TAB_KEYS = ['assets', 'poster', 'keyframes', 'videos', 'expression', 'layers']
-const urlProdTab = queryEnum(route.query.tab, PROD_TAB_KEYS)
+// 两类项目的页签并集（含旧链接 expression/layers，由 remapProdTab 归一）
+const urlProdTab = queryEnum(route.query.tab, [...PROD_TAB_KEYS, 'expression', 'layers'])
+const urlAssetTab = queryEnum(route.query.sub, ASSET_SUB_TABS)
 // extract：资产面板的类型筛选页签（null = 全部），与左侧 EXTRACT_TARGETS 三类一致
 const urlExtract = queryEnum(route.query.extract, ['characters', 'scenes', 'props'])
 const pendingAssetLink = queryTypedId(route.query.asset, ['character', 'scene', 'prop'])
@@ -2553,14 +1717,17 @@ async function confirmDeleteMerge() {
 
 // URL 为面板来源时 step 缺失取默认 0（由 refresh 按内容自动推进），不继承本地记忆
 const scriptStep = ref(urlStep !== null ? Number(urlStep) : (urlPanelGiven ? 0 : (storedPanel ? (storedPanel.scriptStep === 0 ? 0 : 1) : 0)))
-// 旧版本地存储的 'storyboard' 子步骤已并入 'videos'（视频制作）
+// 旧版本地存储的 'storyboard' 子步骤已并入 'videos'（视频制作）；#49/#50 的 expression/layers
+// 由 remapProdTab 在项目类型就绪后统一归一（URL 与本地记忆共用同一个纯函数）
 const storedProdTab = storedPanel?.prodTab === 'storyboard' ? 'videos' : storedPanel?.prodTab
-const prodTab = ref(urlProdTab || (urlPanelGiven ? 'assets' : (PROD_TAB_KEYS.includes(storedProdTab) ? storedProdTab : 'assets')))
+const prodTab = ref(urlProdTab || (urlPanelGiven ? 'assets' : (storedProdTab || 'assets')))
+// 资产步子页签（#54）：资产卡 / 审核清单，审核清单只在纪录片出现
+const assetTab = ref(urlAssetTab || (urlPanelGiven ? 'cards' : (storedPanel?.assetTab || 'cards')))
 // 资产类型筛选页签：null=全部（三段平铺）| characters|scenes|props（只看该类），deeplink ?extract=
 const extractTab = ref(urlExtract)
 // 面板位置变化即持久化
-watch([panel, scriptStep, prodTab], ([p, s, pt]) => {
-  try { localStorage.setItem(PANEL_STORE_KEY, JSON.stringify({ panel: p, scriptStep: s, prodTab: pt })) } catch { /* 静默 */ }
+watch([panel, scriptStep, prodTab, assetTab], ([p, s, pt, at]) => {
+  try { localStorage.setItem(PANEL_STORE_KEY, JSON.stringify({ panel: p, scriptStep: s, prodTab: pt, assetTab: at })) } catch { /* 静默 */ }
 })
 
 async function loadPosterData() {
@@ -2824,6 +1991,7 @@ function syncWorkbenchQuery() {
   if (panel.value === 'script') query.step = String(scriptStep.value)
   if (panel.value === 'production') {
     query.tab = prodTab.value
+    if (prodTab.value === 'assets' && isDocumentaryProject.value) query.sub = assetTab.value
     if (prodTab.value === 'assets' && extractTab.value) query.extract = extractTab.value
   }
   if (assetDetail.value.open && assetDetail.value.item?.id) {
@@ -2831,7 +1999,7 @@ function syncWorkbenchQuery() {
   }
   replaceQuery(query)
 }
-watch([panel, scriptStep, prodTab, extractTab], syncWorkbenchQuery)
+watch([panel, scriptStep, prodTab, assetTab, extractTab], syncWorkbenchQuery)
 watch(assetDetail, syncWorkbenchQuery)
 
 // ─── 手动新增资产 ────────────────────────────────────────────
@@ -3538,10 +2706,11 @@ function clipThumbnailUrl(sb, which) {
   if (!position || !sb?.id) return ''
   return clipAPI.thumbnailUrl(sb.id, position, which, clipThumbStamp.value)
 }
-function gotoClipWorkspace(sb) {
+// 「去图层段」跳转（#54）：图层工作台现在在「分镜制作」步内（纪录片），剧情项目没有该入口
+function gotoShotProduction(sb) {
   clipFocusSbId.value = sb?.id || 0
   panel.value = 'production'
-  prodTab.value = 'layers'
+  prodTab.value = 'production'
 }
 
 /** 逐镜取片段（确定性镜头数量有限）；工作台改动后由 @changed 重新拉 */
@@ -3578,7 +2747,7 @@ async function renderShotClip(sb) {
 }
 
 watch([() => sbs.value.length, prodTab], ([, tab]) => {
-  if (tab === 'keyframes' || tab === 'videos' || tab === 'layers') void loadEpisodeClips()
+  if (['keyframes', 'videos', 'production', 'final'].includes(tab)) void loadEpisodeClips()
 }, { immediate: true })
 
 /** 批量视频确认框 = 服务端预览清单（逐镜按输入签名比较）+ 勾选；选择模式只缩小预览范围 */
@@ -3792,15 +2961,15 @@ const pendingAssetImageCount = computed(() => pendingCharacterImageCount.value +
 const assetTotalCount = computed(() => visualCharTotal.value + scenes.value.length + propItems.value.length)
 const assetReadyCount = computed(() => charImgCount.value + sceneImgCount.value + propImgCount.value)
 
-// 纪录片项目（Issue #45）：步骤序列 = 旁白稿 → 资产（含证据素材）→ 表达设计 → 关键帧 → 图层 → 视频 → 导出
-// 「表达设计」（#49）与「图层」（#48）落地前显示占位说明；drama 项目的定义与 #45 之前逐项一致
+// 纪录片 7 步（Issue #54）：剧本 → 资产 → 分镜设计 → 分镜制作 → 视频与成品 → Poster（可选）→ 导出；
+// 剧情项目的页签与步骤定义与 #54 之前逐项一致。
 const prodTabDefs = computed(() => (isDocumentaryProject.value
   ? [
       { id: 'assets', label: t('episode.prod.assets'), icon: FolderKanban, badge: assetTotalCount.value ? `${assetReadyCount.value}/${assetTotalCount.value}` : '' },
-      { id: 'expression', label: t('episode.prod.expression'), icon: Lightbulb, badge: '' },
-      { id: 'keyframes', label: t('episode.prod.keyframes'), icon: Images, badge: sbs.value.length ? `${keyframesConfirmedCount.value}/${sbs.value.length}` : '' },
-      { id: 'layers', label: t('episode.prod.layers'), icon: Layers, badge: '' },
-      { id: 'videos', label: t('episode.prod.videos'), icon: Clapperboard, badge: sbs.value.length ? `${shotVidCount.value}/${sbs.value.length}` : '' },
+      { id: 'design', label: t('episode.prod.design'), icon: Lightbulb, badge: sbs.value.length ? `${gateState.value.design.confirmed}/${sbs.value.length}` : '' },
+      { id: 'production', label: t('episode.prod.production'), icon: Images, badge: sbs.value.length ? `${keyframesConfirmedCount.value}/${sbs.value.length}` : '' },
+      { id: 'final', label: t('episode.prod.final'), icon: Clapperboard, badge: sbs.value.length ? `${shotVidCount.value}/${sbs.value.length}` : '' },
+      { id: 'poster', label: t('episode.prod.poster'), icon: ImageIcon, badge: posterData.value?.final_image ? '✓' : '' },
     ]
   : [
       { id: 'assets', label: t('episode.prod.assets'), icon: FolderKanban, badge: assetTotalCount.value ? `${assetReadyCount.value}/${assetTotalCount.value}` : '' },
@@ -3813,10 +2982,10 @@ const mainStageDefs = computed(() => (isDocumentaryProject.value
   ? [
       { id: 'script', label: t('episode.stage.narrationScript'), desc: t('episode.stage.narrationScriptDesc'), icon: FileText },
       { id: 'assets', label: t('episode.prod.assets'), desc: t('episode.stage.evidenceAssetsDesc'), icon: FolderKanban },
-      { id: 'expression', label: t('episode.prod.expression'), desc: t('episode.stage.expressionDesc'), icon: Lightbulb },
-      { id: 'keyframes', label: t('episode.prod.keyframes'), desc: t('episode.stage.keyframesDesc'), icon: Images },
-      { id: 'layers', label: t('episode.prod.layers'), desc: t('episode.stage.layersDesc'), icon: Layers },
-      { id: 'videos', label: t('episode.stage.videos'), desc: t('episode.stage.videosDesc'), icon: Clapperboard },
+      { id: 'design', label: t('episode.prod.design'), desc: t('episode.stage.designDesc'), icon: Lightbulb },
+      { id: 'production', label: t('episode.prod.production'), desc: t('episode.stage.productionDesc'), icon: Images },
+      { id: 'final', label: t('episode.prod.final'), desc: t('episode.stage.finalDesc'), icon: Clapperboard },
+      { id: 'poster', label: t('episode.prod.poster'), desc: t('episode.stage.posterDesc'), icon: ImageIcon, optional: true },
       { id: 'export', label: t('episode.stage.export'), desc: t('episode.stage.exportDesc'), icon: Download },
     ]
   : [
@@ -3828,12 +2997,31 @@ const mainStageDefs = computed(() => (isDocumentaryProject.value
       { id: 'export', label: t('episode.stage.export'), desc: t('episode.stage.exportDesc'), icon: Download },
     ]))
 
-// 项目类型决定页签集合：类型不匹配的页签（drama 项目的 expression/layers、纪录片项目的 poster）落回「资产」。
-// 项目尚未加载时不判定——此时类型未知，deeplink 的纪录片页签会被误判成非法值。
-watch([() => drama.value?.project_type, prodTabDefs], ([type, defs]) => {
-  if (!type || !defs.length) return
-  if (!defs.some(def => def.id === prodTab.value)) prodTab.value = 'assets'
+// 步骤门禁（#54）：服务端是唯一判定方，界面只渲染它给的解锁位 / 原因 / 跳转目标
+const { gates: gateState, refreshGates, reasonOf: gateReasonOf, gotoOf: gateGotoOf } = useWorkflowGates(() => epId.value)
+function stageLocked(stageId) {
+  if (!isDocumentaryProject.value || stageId === 'script') return false
+  return gateState.value.unlocked?.[stageId] === false
+}
+function stageLockReason(stageId) {
+  return stageLocked(stageId) ? gateReasonOf(stageId) : ''
+}
+/** 点锁定步骤时跳到真正阻塞它的那一步，而不是停在原地 */
+function goStageBlocker(stageId) {
+  const target = gateGotoOf(stageId)
+  goMainStage(target || stageId)
+}
+
+// 项目类型决定页签集合：旧链接（expression/layers 与纪录片下的 keyframes/videos）统一经
+// remapProdTab 归一，映射后仍非法才落回「资产」。项目尚未加载时不判定——此时类型未知。
+watch([() => drama.value?.project_type, prodTabDefs], ([type]) => {
+  if (!type) return
+  prodTab.value = remapProdTab(prodTab.value, type)
+  assetTab.value = remapAssetTab(assetTab.value, type)
 }, { immediate: true })
+
+// 切换制作页签时重算门禁（裁决：refresh / 剧本保存确认 / 任务结束 / 页签切换）
+watch([prodTab, panel], () => { if (epId.value) refreshGates() })
 
 const sidebarSections = computed(() => ([
   {
@@ -3847,7 +3035,15 @@ const sidebarSections = computed(() => ([
   {
     id: 'production',
     label: t('episode.stage.production'),
-    items: prodTabDefs.value.map(def => ({ key: `prod:${def.id}`, label: def.label, desc: '', icon: def.id === 'assets' ? Users : def.icon })),
+    items: prodTabDefs.value.map(def => ({
+      key: `prod:${def.id}`,
+      label: def.label,
+      desc: '',
+      icon: def.id === 'assets' ? Users : def.icon,
+      locked: stageLocked(def.id),
+      lockReason: stageLockReason(def.id),
+      optional: def.id === 'poster' && isDocumentaryProject.value,
+    })),
   },
   {
     id: 'export',
@@ -3862,9 +3058,11 @@ const sidebarSections = computed(() => ([
 // 进行中 = 环节内有任意进度但未全部完成,或当前正处于该环节
 function sectionState(sectionId) {
   if (sectionId === 'export') return 'none'
+  // 制作段完成 = 本项目类型下制作各步骤（Poster 可选除外）全部完成
+  const prodStages = prodTabDefs.value.map(def => def.id).filter(id => id !== 'poster')
   const done = sectionId === 'script'
     ? mainStageDone('script')
-    : mainStageDone('assets') && mainStageDone('keyframes') && mainStageDone('videos')
+    : prodStages.every(id => mainStageDone(id))
   if (done) return 'done'
 
   const hasProgress = sectionId === 'script'
@@ -3879,17 +3077,39 @@ function sectionState(sectionId) {
 const activeMainStage = computed(() => {
   if (panel.value === 'export') return 'export'
   if (panel.value === 'production') {
-    // 制作子页签与主环节同名（drama: assets/poster/keyframes/videos；documentary 另有 expression/layers）
-    return mainStageDefs.value.some(stage => stage.id === prodTab.value) ? prodTab.value : 'videos'
+    // 制作子页签与主环节同名（drama: assets/poster/keyframes/videos；documentary: assets/design/production/final/poster）
+    if (mainStageDefs.value.some(stage => stage.id === prodTab.value)) return prodTab.value
+    return isDocumentaryProject.value ? 'final' : 'videos'
   }
   return 'script'
 })
 
 function mainStageDone(stageId) {
-  if (stageId === 'script') return !!scriptContent.value
-  if (stageId === 'assets') return assetTotalCount.value > 0 && assetReadyCount.value === assetTotalCount.value
+  if (stageId === 'script') {
+    // 纪录片：旁白稿「定稿」= 已确认；剧情项目口径不变（有改写稿即完成）
+    return isDocumentaryProject.value ? !!gateState.value.script.confirmed : !!scriptContent.value
+  }
+  if (stageId === 'assets') {
+    if (isDocumentaryProject.value) return gateState.value.assets.review_status === 'passed'
+    return assetTotalCount.value > 0 && assetReadyCount.value === assetTotalCount.value
+  }
   // Poster 可选：有最终版本即视为完成，不参与制作分组 done 判定
   if (stageId === 'poster') return !!posterData.value?.final_image
+  // 分镜设计（纪录片）：每镜设计卡都已确认（R4 前过渡读 intent_reviewed）
+  if (stageId === 'design') {
+    const { confirmed, total } = gateState.value.design
+    return total > 0 && confirmed === total
+  }
+  // 分镜制作（纪录片）：每镜都制作就绪（R5 前过渡读 keyframes_confirmed）
+  if (stageId === 'production') {
+    const { ready, total } = gateState.value.production
+    return total > 0 && ready === total
+  }
+  // 视频与成品（纪录片）：每镜成品都是最新的
+  if (stageId === 'final') {
+    const { fresh, total } = gateState.value.final
+    return total > 0 && fresh === total
+  }
   // 关键帧步骤完成 = 本集每个分镜的关键帧都已人工确认
   if (stageId === 'keyframes') return allKeyframesConfirmed.value
   if (stageId === 'videos') {
@@ -3923,8 +3143,15 @@ const activeSubStepKey = computed(() => {
   return 'export:merge'
 })
 
-// 步骤跑马灯：主流程各段（按项目类型取定义），段点击跳转、当前段流动光效
-const mainProgressSteps = computed(() => mainStageDefs.value.map(stage => ({ id: stage.id, label: stage.label })))
+// 步骤跑马灯：主流程各段（按项目类型取定义），段点击跳转、当前段流动光效；
+// 锁定段渲染锁图标 + 灰态，tooltip 给原因，点击跳到真正阻塞它的那一步（#54）
+const mainProgressSteps = computed(() => mainStageDefs.value.map(stage => ({
+  id: stage.id,
+  label: stage.label,
+  locked: stageLocked(stage.id),
+  reason: stageLockReason(stage.id),
+  optional: !!stage.optional,
+})))
 const currentMainIdx = computed(() => {
   const i = mainProgressSteps.value.findIndex(s => s.id === activeMainStage.value)
   return i < 0 ? 0 : i
@@ -3941,8 +3168,14 @@ function goSubStep(key) {
     return
   }
   if (key.startsWith('prod:')) {
+    const stageId = key.replace('prod:', '')
+    // 锁定步骤点了就跳到真正阻塞它的那一步，而不是停在灰掉的页签上（#54）
+    if (stageLocked(stageId)) {
+      goStageBlocker(stageId)
+      return
+    }
     panel.value = 'production'
-    prodTab.value = key.replace('prod:', '')
+    prodTab.value = stageId
     return
   }
   panel.value = 'export'
@@ -4176,12 +3409,47 @@ async function refresh() {
     toastError(e)
   }
   try { mergeData.value = await mergeAPI.status(epId.value) } catch {}
-  await Promise.all([loadEpisodeTasks(epId.value), loadExportMerges()])
+  await Promise.all([loadEpisodeTasks(epId.value), loadExportMerges(), refreshGates()])
   if ((panel.value === 'production' && prodTab.value === 'poster') || panel.value === 'export') await loadPosterData()
 }
 
-function saveRaw() { episodeAPI.update(epId.value, { content: localRaw.value }); episode.value.content = localRaw.value }
-function saveScr() { episodeAPI.update(epId.value, { script_content: localScript.value }); episode.value.script_content = localScript.value }
+// ─── 旁白稿确认（Issue #54）：纪录片门禁链的第一环 ───────────────
+const confirmingScript = ref(false)
+const scriptConfirmed = computed(() => !!gateState.value.script.confirmed)
+const scriptConfirmedAt = computed(() => {
+  const at = gateState.value.script.confirmed_at
+  return at ? new Date(at).toLocaleString() : ''
+})
+async function confirmScript() {
+  confirmingScript.value = true
+  try {
+    gateState.value = await episodeAPI.confirmScript(epId.value)
+    toast.success(t('episode.script.confirmed'))
+  } catch (e) {
+    toastError(e)
+  } finally {
+    confirmingScript.value = false
+  }
+}
+async function unconfirmScript() {
+  confirmingScript.value = true
+  try {
+    gateState.value = await episodeAPI.unconfirmScript(epId.value)
+  } catch (e) {
+    toastError(e)
+  } finally {
+    confirmingScript.value = false
+  }
+}
+// 改稿会在服务端自动取消确认（onScriptChanged）：保存后立刻重算门禁，锁定态即时生效
+function saveRaw() {
+  episodeAPI.update(epId.value, { content: localRaw.value }).then(refreshGates)
+  episode.value.content = localRaw.value
+}
+function saveScr() {
+  episodeAPI.update(epId.value, { script_content: localScript.value }).then(refreshGates)
+  episode.value.script_content = localScript.value
+}
 // 发给 Agent 的 message 是功能性提示词而非 UI 文案：产出语言由后端全局「内容语言」指令控制，
 // 这里保持中文不随界面语言变化
 function doRewrite() { saveRaw(); runAgent('script_rewriter', '请读取剧本并改写为格式化剧本，然后保存', dramaId, epId.value, refresh, chatModelOverride(), chatConfigId()) }
@@ -5880,6 +5148,189 @@ const EPISODE_TOUR = [
   { element: '.pipe-section:nth-of-type(2) .pipe-item:last-child', titleKey: 'tour.episode.videos.title', descKey: 'tour.episode.videos.desc', popoverSide: 'right' },
   { element: '.studio-actions .tour-help-btn', titleKey: 'tour.episode.help.title', descKey: 'tour.episode.help.desc', popoverSide: 'bottom', popoverAlign: 'end' },
 ]
+// ===== 步骤面板上下文（Issue #54）=====
+// 各步骤的 markup 已搬进 components/*Panel.vue，状态与方法仍然只存在这里（单一数据源），
+// 经 provide 传给挂载组件；后续 Issue 只改面板组件内部，不再回本文件改 markup。
+provide(WORKBENCH_CTX, {
+  KEYFRAME_SLOTS,
+  VIDEO_COL_DEFAULTS,
+  activeMerge,
+  allKeyframesConfirmed,
+  allVideoTaskRows,
+  askDeleteMerge,
+  askMerge,
+  assetImageSrc,
+  batchVideoPrompts,
+  batchVideos,
+  cancelVideoBatch,
+  clipOfShot,
+  clipPositionOf,
+  clipRenderingIds,
+  composeBatchRunning,
+  composeReasonOf,
+  composeStateOf,
+  composeStatusLabel,
+  composeStatusOf,
+  composeTask,
+  confirmScript,
+  confirmingScript,
+  deletingMergeId,
+  doRewrite,
+  dramaAspectRatio,
+  effectiveVideoDuration,
+  effectiveVideoModelLabel,
+  episode,
+  episodeAudioMixMode,
+  episodeFitDefault,
+  episodeNarrationNormalize,
+  episodeResolutionShort,
+  episodeSubtitleTiming,
+  exportBlockedSelected,
+  exportComposeReadyIds,
+  exportDone,
+  exportMerges,
+  exportPosterDuration,
+  exportPosterEnabled,
+  exportPosterVersionId,
+  exportReadyIds,
+  exportRepairIds,
+  exportSelectedReadyIds,
+  exportSourceLabel,
+  fieldSaveInfo,
+  footerOpen,
+  genTransition,
+  genVid,
+  genVideoPrompt,
+  getVideoUrl,
+  gotoShotProduction,
+  hasUsableVideo,
+  hasVid,
+  historyElapsedTook,
+  inspectorOpen,
+  isCurrentVideo,
+  isDeterministicShot,
+  isDocumentaryProject,
+  isExportSelected,
+  isMergeInProgress,
+  isShotConfirmed,
+  isVideoSbSelected,
+  keyframesConfirmedCount,
+  loadExportMerges,
+  localRaw,
+  localScript,
+  mainPlayerUrl,
+  mapError,
+  markFieldDirty,
+  mediaTimeOf,
+  mentionOptions,
+  mergeBlocked,
+  mergeSkipped,
+  narrationBatch,
+  narrationEnabledOf,
+  onShotComposed,
+  onVideoDurationChange,
+  onVideoTaskRowClick,
+  openComposeDialog,
+  openImageViewer,
+  panel,
+  pendingVideoIds,
+  playerSource,
+  posterPreviewUrl,
+  posterVersionOptions,
+  prevShotOf,
+  previewHistoryVideo,
+  previewShot,
+  previewVideoUrl,
+  prodTab,
+  promptHeadVideoActionLabel,
+  rawContent,
+  rawLen,
+  refresh,
+  removeHistoryVideo,
+  renderShotClip,
+  retryFailedVideos,
+  rn,
+  rt,
+  saveRaw,
+  sbVideoHistory,
+  sbs,
+  scriptConfirmed,
+  scriptConfirmedAt,
+  scriptContent,
+  scriptLen,
+  scriptStep,
+  selectExportReadyOnly,
+  selectMissingVideos,
+  selectedFusionStale,
+  selectedFusionUrl,
+  selectedSb,
+  selectedVideoSbIds,
+  selectedVideoTaskNumber,
+  setAsMainVideo,
+  setPlayerSource,
+  setTargetAssetVersion,
+  setTransitionEnabled,
+  shotInheritsFirst,
+  shotKeyframeImage,
+  shotKeyframePlaceholder,
+  shotPlaceLabel,
+  shotVidCount,
+  shotVideoRefCount,
+  skipRewrite,
+  startVideoColDrag,
+  targetAssetVersions,
+  targetVersionSaving,
+  taskGeneratedAt,
+  taskVideoPath,
+  toast,
+  toggleExportDone,
+  toggleExportSelect,
+  toggleSelectAllExport,
+  toggleSelectAllVideos,
+  toggleVideoFilter,
+  toggleVideoSelectMode,
+  totalDuration,
+  transitionDurationHint,
+  transitionEnabledOf,
+  transitionGeneratingIds,
+  transitionIssues,
+  transitionReviewOf,
+  transitionStaleOf,
+  transitionVerdictLabel,
+  unconfirmScript,
+  updateField,
+  videoBatchCurrentNumber,
+  videoBatchDoneCount,
+  videoBatchFailedItems,
+  videoBatchIssues,
+  videoBatchItems,
+  videoBatchRunning,
+  videoBatchSkippedItems,
+  videoBatchStatusLabel,
+  videoBatchStopping,
+  videoBatchVisible,
+  videoBlockIssues,
+  videoBlockReason,
+  videoEtaLine,
+  videoLeftW,
+  videoListFilter,
+  videoModerationHint,
+  videoPromptBatch,
+  videoPromptGeneratingIds,
+  videoPromptIssues,
+  videoRightW,
+  videoRing,
+  videoSelectMode,
+  videoTargetAssets,
+  videoTargetLead,
+  videoTaskActionLabel,
+  videoTaskDoneCount,
+  videoTaskFailedCount,
+  videoTaskRows,
+  videoTaskState,
+  videoTaskStatusLabel,
+})
+
 onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
 </script>
 
@@ -6485,9 +5936,6 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
   flex: 1; gap: 12px;
 }
 .loading-text { font-size: 13px; color: var(--text-2); }
-
-/* 视频列表选择模式快捷操作：复用分段芯片样式，去掉顶部虚线分隔 */
-.video-quick-actions { margin: 0 12px 10px; padding-top: 0; border-top: none; }
 .detail-panel { flex: 1; display: flex; flex-direction: column; overflow-y: auto; min-width: 0; }
 .detail-head { display: flex; align-items: center; gap: 8px; padding: 9px 14px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .detail-head-copy { display: flex; flex-direction: column; gap: 2px; }
@@ -6546,11 +5994,6 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
   color: var(--text-1);
   font-size: 11px;
   font-weight: 600;
-}
-.locked-config-banner {
-  margin-bottom: 8px;
-  font-size: 12px;
-  color: var(--text-2);
 }
 
 /* Production tabs */
@@ -6636,57 +6079,7 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
 }
 .asset-del-btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
 .asset-del-btn:focus-visible { outline: none; box-shadow: 0 0 0 3.5px var(--button-focus); }
-
-/* 分镜勾选：选择后批量生成视频提示词 */
-.shot-check {
-  flex: none;
-  width: 14px;
-  height: 14px;
-  border-radius: 4px;
-  border: 1.5px solid var(--surface-outline-strong);
-  background: transparent;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--on-accent);
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
-}
-.shot-check:hover { border-color: var(--accent); }
 .shot-check.on { background: var(--accent); border-color: var(--accent); }
-.shot-quick-btn {
-  border: none;
-  background: transparent;
-  color: var(--accent-text);
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 0;
-  white-space: nowrap;
-}
-.shot-quick-btn:hover { text-decoration: underline; }
-/* 多选模式：头部快捷操作独立一行，分段芯片样式 */
-.shot-quick-actions {
-  display: flex;
-  gap: 6px;
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px dashed var(--surface-outline);
-}
-.shot-quick-actions .shot-quick-btn {
-  flex: 1;
-  padding: 5px 0;
-  border-radius: 6px;
-  background: var(--bg-2);
-  color: var(--text-2);
-  text-align: center;
-  transition: background 0.15s, color 0.15s;
-}
-.shot-quick-actions .shot-quick-btn:hover {
-  background: var(--accent-bg);
-  color: var(--accent-text);
-  text-decoration: none;
-}
 
 /* 新增资产弹窗 */
 .asset-create-dialog { width: 440px; max-width: calc(100vw - 48px); }
@@ -7090,304 +6483,9 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
   background: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-glow);
 }
-
-/* Video tasks */
-.video-task-workbench {
-  position: relative;
-  flex: 1;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(460px, 55%);
-  overflow: hidden;
-  border: 1px solid var(--surface-outline);
-  border-radius: var(--radius-lg);
-  background: var(--surface-raised);
-}
-.video-task-workbench.has-player {
-  grid-template-columns: var(--vleft, 236px) minmax(0, 1fr);
-}
-.video-task-side {
-  min-width: 0;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) var(--vright, 420px);
-  border-left: 1px solid var(--border);
-  background: var(--surface-muted);
-}
-/* 三栏拖拽分隔条：透明热区覆盖分界，悬停/拖动时亮起 */
-.video-col-divider {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 9px;
-  z-index: 6;
-  cursor: col-resize;
-  touch-action: none;
-}
-.video-col-divider.is-left { left: calc(var(--vleft, 236px) - 4px); }
-.video-col-divider.is-right { right: calc(var(--vright, 420px) - 4px); }
-.video-col-divider::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 4px;
-  width: 1px;
-  background: transparent;
-  transition: background 0.15s, box-shadow 0.15s;
-}
-.video-col-divider:hover::after,
-.video-col-divider:active::after {
-  background: var(--accent);
-  box-shadow: 0 0 6px var(--accent-glow);
-}
 :global(body.is-video-col-dragging) { cursor: col-resize; user-select: none; }
-/* 中列：播放器 + 历史条 + 绑定素材/关键帧（提示词移入右栏检查器），顶部媒体区固定、下方滚动 */
-.video-main-col {
-  min-width: 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  background: var(--surface-raised);
-}
-.video-player-history {
-  min-height: 0;
-  padding: 8px 12px 10px;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface-raised);
-}
-.video-player-history-head {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 7px;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-2);
-}
-.video-player-history-count {
-  padding: 0 6px;
-  border-radius: 999px;
-  background: var(--overlay-track);
-  color: var(--text-3);
-  font-size: 10px;
-  font-weight: 750;
-}
-.video-player-history-list {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  padding-bottom: 2px;
-}
-.video-history-item {
-  position: relative;
-  flex: 0 0 auto;
-  width: 96px;
-  aspect-ratio: 16 / 9;
-  overflow: hidden;
-  border: 1.5px solid var(--surface-outline);
-  border-radius: var(--radius);
-  background: var(--media-surface);
-  cursor: pointer;
-  transition: border-color 0.16s var(--ease-out), box-shadow 0.16s var(--ease-out);
-}
-.video-history-item:hover { border-color: var(--border-strong); }
-.video-history-item video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
 .video-history-item.current {
   border-color: var(--accent);
-}
-.video-history-item.viewing {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-glow);
-}
-.video-history-time {
-  position: absolute;
-  left: 4px;
-  bottom: 4px;
-  padding: 1px 4px;
-  border-radius: 3px;
-  background: rgba(0,0,0,0.6);
-  color: #fff;
-  font-family: var(--font-mono);
-  font-size: 9px;
-}
-/* 历史条每条的实测总耗时（elapsed_ms 缺失时隐藏） */
-.video-history-took {
-  position: absolute;
-  right: 4px;
-  bottom: 4px;
-  padding: 1px 4px;
-  border-radius: 3px;
-  background: rgba(0,0,0,0.6);
-  color: #fff;
-  font-family: var(--font-mono);
-  font-size: 9px;
-}
-.video-history-engine {
-  position: absolute;
-  left: 4px;
-  right: 4px;
-  top: 4px;
-  overflow: hidden;
-  padding: 1px 4px;
-  border-radius: 3px;
-  background: rgba(0,0,0,0.62);
-  color: #fff;
-  font-size: 8px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.video-history-badge {
-  position: absolute;
-  right: 4px;
-  top: 4px;
-  padding: 1px 5px;
-  border-radius: 999px;
-  background: var(--accent);
-  color: var(--on-accent);
-  font-size: 9px;
-  font-weight: 700;
-}
-.video-history-del {
-  position: absolute;
-  right: 3px;
-  top: 3px;
-  width: 16px;
-  height: 16px;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  border-radius: 50%;
-  background: rgba(0,0,0,0.62);
-  color: #fff;
-  font-size: 11px;
-  line-height: 1;
-  cursor: pointer;
-}
-.video-history-item:hover .video-history-del { display: flex; }
-.video-task-player {
-  min-width: 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface-raised);
-}
-.video-player-head {
-  min-height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 6px 12px;
-  padding: 8px 14px;
-  border-bottom: 1px solid var(--surface-outline);
-}
-.video-player-head-info {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.video-player-title { color: var(--text-0); font-size: 13px; font-weight: 700; white-space: nowrap; }
-.video-player-sub { color: var(--text-3); font-size: 11px; white-space: nowrap; }
-.video-player-stage {
-  flex: none;
-  aspect-ratio: 16 / 9;
-  max-height: 300px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--media-surface);
-}
-.video-player-video {
-  width: 100%;
-  height: 100%;
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  display: block;
-}
-/* 空态：保留 16:9 播放框，内容居中（图标 + 文案 + 生成按钮） */
-.video-player-empty {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  gap: 6px;
-  padding: 14px 16px;
-  color: var(--text-3);
-}
-.video-player-empty-copy { display: flex; flex-direction: column; align-items: center; }
-.video-player-empty-title { color: var(--text-1); font-size: 12.5px; font-weight: 700; }
-.video-player-empty-desc { margin-top: 2px; font-size: 11px; line-height: 1.5; }
-.video-player-empty-action { flex-shrink: 0; margin-top: 4px; }
-.video-task-list {
-  min-height: 0;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  border: 0;
-  border-radius: 0;
-  background: var(--surface-raised);
-}
-.video-task-head {
-  min-height: 48px;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 12px;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--surface-outline);
-}
-.video-task-title {
-  font-size: 13px;
-  line-height: 1.2;
-  font-weight: 850;
-  color: var(--text-0);
-}
-.video-task-meta {
-  margin-top: 3px;
-  font-size: 11px;
-  line-height: 1.35;
-  color: var(--text-3);
-}
-.video-task-metrics {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-.video-task-metric,
-.video-task-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  min-height: 22px;
-  padding: 0 8px;
-  border: 1px solid var(--surface-outline);
-  border-radius: 999px;
-  background: var(--overlay-track);
-  color: var(--text-2);
-  font-size: 11px;
-  font-weight: 750;
-  white-space: nowrap;
-}
-.video-task-metric.is-done,
-.video-task-status.is-done {
-  color: var(--success);
-  border-color: var(--success-bg);
-  background: var(--success-bg);
 }
 .video-task-metric.is-pending,
 .video-task-status.is-pending,
@@ -7396,36 +6494,9 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
   border-color: var(--accent-glow);
   background: var(--accent-bg);
 }
-.video-task-metric.is-failed,
-.video-task-status.is-failed,
-.video-task-status.is-blocked {
-  color: var(--warning);
-  border-color: var(--warning-bg);
-  background: var(--warning-bg);
-}
-.video-task-table {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-}
-/* 统计徽章兼作筛选器 */
-button.video-task-metric { cursor: pointer; font-family: inherit; transition: box-shadow 0.15s; }
-button.video-task-metric:hover { box-shadow: 0 0 0 2px var(--sel-glow); }
 button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
 /* 批量视频：选择模式 */
 .btn.is-on { border-color: var(--accent); color: var(--accent-text); background: var(--accent-bg); }
-.video-retry-failed { color: var(--warning); border-color: var(--warning-bg); }
-.video-task-row.is-selected { background: var(--sel-bg); box-shadow: inset 0 0 0 1.5px var(--sel); }
-.video-task-check {
-  position: absolute;
-  top: 5px;
-  right: 5px;
-  z-index: 2;
-  background: rgba(0,0,0,0.45);
-  border-color: rgba(255,255,255,0.55);
-}
 .video-task-check.on { background: var(--accent); border-color: var(--accent); }
 /* 生成前生效配置小结 */
 .video-inspector-effective {
@@ -7443,33 +6514,6 @@ button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-/* footer 预估/已用耗时行：与生效配置小结同款式 */
-.video-eta-line {
-  padding: 3px 8px;
-  border-radius: var(--radius);
-  background: var(--overlay-track);
-  color: var(--text-2);
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  line-height: 1.4;
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-/* 生成参数：强调卡片，时长是当前分镜生成的核心参数 */
-.video-params-card {
-  padding: 7px 10px;
-  border: 1px solid var(--accent-glow);
-  border-radius: var(--radius-lg);
-  background: var(--accent-bg);
-}
-/* 审核失败引导 */
-.video-task-error-hint {
-  margin-top: 3px;
-  color: var(--accent-text);
-  font-weight: 600;
 }
 /* 批量生成确认弹窗 */
 .batch-video-dialog { width: 520px; max-width: calc(100vw - 48px); }
@@ -7510,224 +6554,16 @@ button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
 .batch-video-item.is-unknown .batch-video-item-status { color: var(--text-3); }
 .batch-video-item-reason { flex: 1; min-width: 0; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .batch-video-empty { font-size: 12px; color: var(--text-3); text-align: center; padding: 12px 0; }
-.video-task-row {
-  display: grid;
-  grid-template-columns: 56px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  border-top: 1px solid var(--surface-outline);
-  transition: background 0.16s var(--ease-out), border-color 0.16s var(--ease-out);
-  cursor: pointer;
-}
-.video-task-row:first-child {
-  border-top: 0;
-}
 .video-task-row:hover,
 .video-task-row.is-pending {
   background: var(--bg-hover);
-}
-.video-task-row.is-failed {
-  background: var(--error-bg);
 }
 .video-task-row.active {
   background: var(--sel-bg);
   box-shadow: inset 0 0 0 1.5px var(--sel), 0 0 0 3px var(--sel-glow);
 }
-.video-task-row:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
-}
-.video-task-preview {
-  position: relative;
-  width: 56px;
-  aspect-ratio: 16 / 9;
-  overflow: hidden;
-  border: 1px solid var(--surface-outline);
-  border-radius: var(--radius-sm);
-  background: var(--bg-2);
-}
-.video-task-preview video,
-.video-task-preview img {
-  width: 100%;
-  height: 100%;
-  display: block;
-  object-fit: cover;
-}
-.video-task-empty {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-3);
-}
-/* 缩略图上的进行中进度环：旧视频/空态两种卡片都叠加 */
-.video-task-ring {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.38);
-}
-.video-task-index {
-  position: absolute;
-  left: 3px;
-  top: 3px;
-  padding: 0 4px;
-  border-radius: 3px;
-  background: rgba(0,0,0,0.56);
-  color: #fff;
-  font-family: var(--font-mono);
-  font-size: 9px;
-  font-weight: 800;
-}
-.video-task-main {
-  min-width: 0;
-}
-.video-task-line {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.video-task-name {
-  min-width: 0;
-  font-size: 12px;
-  line-height: 1.35;
-  color: var(--text-0);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.video-task-meta-line {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  margin-top: 2px;
-  font-size: 10.5px;
-  color: var(--text-3);
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-}
-.video-task-loc {
-  color: var(--text-2);
-}
-.video-task-sep { color: var(--text-3); opacity: 0.5; }
-.video-task-error {
-  margin-top: 5px;
-  font-size: 11px;
-  line-height: 1.45;
-  color: var(--error);
-}
-.video-task-error-hint {
-  margin-top: 3px;
-  color: var(--accent-text, var(--accent));
-  font-weight: 600;
-}
-.video-task-status {
-  justify-self: end;
-  align-self: center;
-}
-/* 行内紧凑状态（窄列表用）：小圆点 + 文字 */
-.video-task-state {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-3);
-  white-space: nowrap;
-}
-.video-task-state.is-done { color: var(--success); }
 .video-task-state.is-pending { color: var(--accent-text); }
-.video-task-state.is-failed { color: var(--warning); }
-/* 融合状态（#42）：与视频状态并列显示，二者含义不同不能混用一个标记 */
-.video-task-fusion {
-  margin-top: 2px;
-  font-size: 11px;
-  color: var(--text-3);
-  white-space: nowrap;
-}
-.video-task-fusion.is-unchanged { color: var(--tag-success-text); }
-.video-task-fusion.is-missing,
-.video-task-fusion.is-changed { color: var(--accent-text); }
-.video-task-fusion.is-unknown,
-.video-task-fusion.is-skipped { color: var(--tag-warning-text); }
-.video-task-fusion.is-blocked { color: var(--action-danger); }
-/* 主播放器的原片 / 成片页签 */
-.video-source-tabs {
-  display: inline-flex;
-  gap: 2px;
-  padding: 2px;
-  border-radius: 999px;
-  background: var(--surface-muted);
-}
-.video-source-tab {
-  border: none;
-  background: none;
-  padding: 3px 10px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-3);
-  cursor: pointer;
-}
 .video-source-tab.on { background: var(--surface-raised); color: var(--accent); }
-.video-source-tab:disabled { opacity: 0.5; cursor: not-allowed; }
-.video-fusion-warn {
-  padding: 5px 12px;
-  font-size: 11px;
-  color: var(--tag-warning-text);
-  background: var(--surface-muted);
-  border-bottom: 1px solid var(--border);
-}
-/* 右栏分区折叠头 */
-.video-section-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  border: none;
-  background: none;
-  padding: 0;
-  cursor: pointer;
-  color: var(--text-1);
-}
-.video-section-caret { transition: transform 0.15s; color: var(--text-3); }
-.video-section-caret.open { transform: rotate(90deg); }
-.video-footer-bar { display: flex; align-items: center; gap: 6px; }
-.video-footer-summary {
-  font-size: 11px;
-  color: var(--text-3);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.video-inspector-footer.is-collapsed { gap: 6px; }
-.video-task-action {
-  justify-self: end;
-  align-self: center;
-  min-width: 0;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-}
-.video-task-inspector {
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  border-left: 1px solid var(--border);
-  background: var(--surface-muted);
-}
-.video-main-col .video-task-player,
-.video-main-col .video-player-history {
-  flex: none;
-}
 .video-inspector-head {
   min-height: 56px;
   display: flex;
@@ -7739,130 +6575,12 @@ button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
 }
 .video-inspector-title { color: var(--text-0); font-size: 14px; font-weight: 700; }
 .video-inspector-sub { margin-top: 2px; color: var(--text-3); font-size: 11px; }
-.video-inspector-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; padding: 16px 18px 18px; }
-/* 时长参数 + 生成操作常驻底部：不随检查器滚动 */
-.video-inspector-footer {
-  flex: none;
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  padding: 9px 14px 11px;
-  border-top: 1px solid var(--border);
-  background: var(--surface-muted);
-}
-.video-inspector-section { display: flex; flex-direction: column; gap: 7px; }
-/* 中列素材卡：中列比旧检查器宽，卡片放宽到 160–240px */
-.video-inspector-section :deep(.target-assets) {
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-}
-.video-inspector-section :deep(.target-asset) { max-width: 240px; }
-.video-inspector-label { color: var(--text-0); font-size: 12px; font-weight: 700; }
-.video-inspector-label-hero {
-  color: var(--accent);
-  font-size: 13px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.video-inspector-label-hero::before {
-  content: '';
-  width: 3px;
-  height: 13px;
-  border-radius: 2px;
-  background: var(--accent);
-}
-.video-inspector-prompt-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-/* 开场转场区（承接镜头，#11） */
-.transition-section { padding-bottom: 10px; border-bottom: 1px solid var(--line-1); }
-.transition-section :deep(.video-inspector-prompt) { min-height: 88px; }
-.transition-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; color: var(--text-2); }
-.transition-verdict { color: var(--text-1); font-weight: 600; }
-.transition-manual { color: var(--text-3); }
-.transition-stale { font-size: 12px; color: var(--warning, #c58b1b); }
-.transition-duration { font-size: 12px; color: var(--text-3); }
-.transition-send { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-2); cursor: pointer; }
-/* MentionTextarea 内部元素需 :deep 穿透（scoped 样式默认到不了子组件内部） */
-:deep(.video-inspector-prompt) {
-  min-height: 176px;
-  font-size: 13px;
-  line-height: 1.6;
-}
 .video-inspector-params { display: grid; gap: 8px; }
 .video-inspector-params div { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; }
 .video-inspector-params dt { color: var(--text-3); }
 .video-inspector-params dd { margin: 0; color: var(--text-1); text-align: right; }
-.video-inspector-action { width: 100%; min-height: 32px; height: 32px; padding: 0 12px; font-size: 12.5px; }
-.video-param-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12px; white-space: nowrap; }
-.video-param-name { color: var(--text-1); font-weight: 600; flex-shrink: 0; }
 .video-param-value { color: var(--text-1); text-align: right; font-size: 11px; }
-.video-param-control { display: inline-flex; align-items: center; gap: 6px; }
-.video-param-unit { font-size: 11px; color: var(--text-2); }
-.video-task-unconfirmed {
-  padding: 0 5px;
-  border: 1px solid var(--surface-outline);
-  border-radius: 999px;
-  background: var(--warning-bg);
-  color: var(--tag-warning-text);
-  font-size: 9.5px;
-  line-height: 15px;
-}
-/* 关键帧门槛：本集分镜未全部确认时批量视频不可用 */
-.video-keyframe-gate {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-  padding: 8px 10px;
-  border: 1px solid var(--surface-outline);
-  border-radius: var(--radius);
-  background: var(--warning-bg);
-  color: var(--tag-warning-text);
-  font-size: 11px;
-}
-.video-keyframe-state { font-size: 10px; padding: 0 6px; border-radius: 999px; }
-.video-keyframe-state.is-confirmed { background: var(--success-bg); color: var(--tag-success-text); }
-.video-keyframe-state.is-unconfirmed { background: var(--warning-bg); color: var(--tag-warning-text); }
-.video-keyframe-thumbs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
-.video-keyframe-thumb {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  padding: 0;
-  border: 1px solid var(--surface-outline);
-  border-radius: var(--radius-sm);
-  background: var(--bg-2);
-  overflow: hidden;
-  color: var(--text-3);
-  cursor: zoom-in;
-}
-.video-keyframe-thumb:disabled { cursor: default; }
-.video-keyframe-thumb img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; display: block; }
-.video-keyframe-thumb-empty { display: flex; align-items: center; justify-content: center; aspect-ratio: 16 / 9; font-size: 10px; }
-.video-keyframe-thumb small { padding: 0 4px 3px; font-size: 10px; color: var(--text-2); }
-.video-keyframe-hint { font-size: 10.5px; color: var(--tag-warning-text); line-height: 1.5; }
-.video-batch-banner {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-  padding: 8px 10px;
-  border: 1px solid var(--surface-outline);
-  border-radius: var(--radius);
-  background: var(--surface-2);
-  font-size: 11px;
-}
 .video-batch-banner.is-running { border-color: var(--accent-glow); }
-.video-batch-state { font-weight: 700; }
-.video-batch-sep { color: var(--text-3); }
-.video-batch-issue { color: var(--text-2); }
-.video-batch-issues { flex-basis: 100%; display: flex; flex-direction: column; gap: 2px; color: var(--text-3); font-size: 9.5px; line-height: 1.4; }
-.video-duration-input { width: 56px; height: 24px; padding: 2px 6px; font-size: 12px; font-weight: 700; font-family: var(--font-mono); text-align: center; }
 
 /* 资产批量生成（#33）横幅：与视频批量横幅同一套外观 */
 .asset-batch-banner {
@@ -8417,74 +7135,8 @@ button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
   box-shadow: var(--shadow-xl);
   background: var(--surface-muted);
 }
-
-/* Export */
-.export-split { flex: 1; display: flex; min-height: 0; }
-.export-main { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; align-items: stretch; gap: 18px; padding: 16px 20px 24px; }
-.export-section { display: flex; flex-direction: column; min-height: 0; }
-.export-section-grow { flex: 1; }
-.export-section-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
-.export-section-title { font-size: 13px; font-weight: 800; color: var(--text-0); }
-.export-poster-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.export-poster-check { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-1); }
-.export-poster-select { min-width: 160px; }
-.export-poster-duration { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-2); }
-.export-poster-seconds { width: 68px; }
-.export-poster-preview { width: 96px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); }
-.export-merge-strip { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 4px; }
-.merge-card {
-  flex: 0 0 auto;
-  width: 260px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 8px;
-  border-radius: var(--radius);
-  background: var(--surface-raised);
-  border: 1px solid var(--border);
-}
-.merge-card video {
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  border-radius: 6px;
-  background: var(--media-surface);
-  display: block;
-}
-.merge-card-pending {
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 12px;
-  border-radius: 6px;
-  background: var(--surface-muted);
-  color: var(--text-3);
-  font-size: 11px;
-  text-align: center;
-}
-.merge-card-pending.is-failed { color: var(--error); background: var(--error-bg); }
-.merge-card-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; font-size: 11px; color: var(--text-3); min-width: 0; }
-.merge-card-meta > span { white-space: nowrap; }
 .merge-card-meta .btn { margin-left: auto; }
 .merge-card-meta .btn + .btn { margin-left: 0; }
-.merge-card.playable { cursor: pointer; }
-.merge-card.playable:hover { border-color: var(--border-strong); box-shadow: var(--shadow-card); }
-.merge-card-thumb { position: relative; }
-.merge-card-play {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-  background: rgba(0,0,0,0.28);
-  color: #fff;
-  opacity: 0;
-  transition: opacity 0.15s var(--ease-out);
-  pointer-events: none;
-}
-.merge-card.playable:hover .merge-card-play { opacity: 1; }
 .merge-viewer-dialog { width: min(1080px, calc(100vw - 56px)); }
 .merge-viewer-body {
   display: flex;
@@ -8500,96 +7152,7 @@ button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
   background: #000;
   display: block;
 }
-.export-merge-empty {
-  padding: 14px;
-  border: 1px dashed var(--border);
-  border-radius: var(--radius);
-  color: var(--text-3);
-  font-size: 12px;
-  text-align: center;
-}
-.export-grid {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  align-content: start;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 12px;
-}
-.exp-card { display: flex; flex-direction: column; align-items: stretch; gap: 6px; padding: 8px; border-radius: var(--radius); background: var(--surface-raised); border: 1px solid var(--border); }
-.exp-card:hover { border-color: var(--border-strong); box-shadow: var(--shadow-card); }
-.exp-card.playable { cursor: pointer; }
-.exp-card.selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow); }
-.exp-check {
-  position: absolute;
-  right: 6px;
-  top: 6px;
-  width: 18px;
-  height: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  border: 1.5px solid rgba(255,255,255,0.9);
-  background: rgba(0,0,0,0.35);
-  color: #fff;
-}
 .exp-check.on { background: var(--accent); border-color: var(--accent); }
-.exp-thumb {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  overflow: hidden;
-  border: 1px solid var(--surface-outline);
-  border-radius: 6px;
-  background: var(--media-surface);
-}
-.exp-thumb video { width: 100%; height: 100%; object-fit: cover; display: block; }
-.exp-thumb-empty { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: var(--text-3); }
-.exp-thumb-index {
-  position: absolute;
-  left: 5px;
-  top: 5px;
-  padding: 1px 5px;
-  border-radius: 4px;
-  background: rgba(0,0,0,0.56);
-  color: #fff;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 800;
-}
-.exp-thumb-duration {
-  position: absolute;
-  right: 5px;
-  bottom: 5px;
-  padding: 1px 4px;
-  border-radius: 3px;
-  background: rgba(0,0,0,0.6);
-  color: #fff;
-  font-family: var(--font-mono);
-  font-size: 9px;
-}
-/* 镜头预览：悬停浮现的居中播放钮，点击打开预览弹窗（不影响卡片勾选） */
-.exp-play {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%) scale(0.9);
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: rgba(0,0,0,0.62);
-  color: #fff;
-  opacity: 0;
-  cursor: pointer;
-  transition: opacity 0.15s, transform 0.15s, background 0.15s;
-}
-.exp-card:hover .exp-play { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-.exp-play:hover { background: var(--accent); }
 /* 导出完成手动标记按钮 */
 .export-done-btn.on {
   background: var(--success-bg, var(--accent-bg));
@@ -8597,57 +7160,6 @@ button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
   border-color: transparent;
   font-weight: 600;
 }
-.exp-row-line { display: flex; align-items: center; gap: 8px; min-width: 0; }
-
-/* 旁白开关打开时的导出页提示（#30 C.5），#42 起也承载「所选未就绪」逐镜原因 */
-.export-compose-warn {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 6px 10px;
-  border: 1px solid var(--tag-warning-text);
-  border-radius: 6px;
-  color: var(--tag-warning-text);
-  font-size: 11px;
-}
-.export-compose-skipped {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 6px 10px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  font-size: 11px;
-  color: var(--text-2);
-}
-.export-compose-skipped-title {
-  width: 100%;
-  font-weight: 600;
-  color: var(--text-1);
-}
-/* 导出就绪条（#42）：来源 + 可拼接/未就绪计数 */
-.export-ready-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  font-size: 11px;
-  color: var(--text-2);
-}
-.export-ready-source { font-weight: 600; color: var(--text-1); }
-.export-ready-ok { color: var(--tag-success-text); }
-.export-ready-bad { color: var(--action-danger); }
-.exp-compose-state {
-  font-size: 11px;
-  white-space: nowrap;
-}
-.exp-compose-state.is-unchanged { color: var(--tag-success-text); }
-.exp-compose-state.is-missing,
-.exp-compose-state.is-changed { color: var(--accent-text); }
-.exp-compose-state.is-unknown,
-.exp-compose-state.is-skipped { color: var(--tag-warning-text); }
-.exp-compose-state.is-blocked { color: var(--action-danger); }
-.exp-compose-state.is-disabled { color: var(--text-3); }
 /* 拼接确认弹窗（#42） */
 .merge-confirm-dialog { width: 520px; max-width: calc(100vw - 48px); }
 .merge-confirm-body { display: flex; flex-direction: column; gap: 10px; }
