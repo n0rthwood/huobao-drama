@@ -15,7 +15,7 @@ const GATE_TASK_KINDS = ['storyboard_breaker', 'storyboard_fill_gaps', 'extract_
 const ALL_UNLOCKED: EpisodeGates = {
   project_type: 'drama',
   script: { confirmed: true, confirmed_at: null },
-  assets: { review_status: 'passed', stale_reasons: [] },
+  assets: { review_status: 'passed', stale_reasons: [], missing: 0 },
   design: { confirmed: 0, total: 0 },
   production: { ready: 0, total: 0 },
   final: { fresh: 0, total: 0 },

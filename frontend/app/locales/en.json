@@ -2385,12 +2385,81 @@
       "emptyTitle": "Review has not started",
       "emptyDesc": "The checklist lists every info point → required asset → have/missing; shot design unlocks once all items are resolved.",
       "start": "Start review",
-      "startDisabled": "Available once the asset review checklist ships",
       "statusLabel": "Checklist status: {status}",
       "statusNone": "Not started",
       "statusRunning": "Running",
       "statusPending": "Pending decisions",
-      "statusPassed": "Passed"
+      "statusPassed": "Passed",
+      "progress": "{decided}/{total} resolved",
+      "autoSegmented": "auto-segmented",
+      "rerun": "Re-run review",
+      "runStarted": "Review against the script started",
+      "running": "Reviewing the script…",
+      "runningProgress": "Reviewing {completed}/{total} segments ({failed} failed)",
+      "staleBanner": "The asset library changed after the last review ({reasons}); re-running is recommended",
+      "staleReason": {
+        "asset_linked": "an asset was linked",
+        "asset_unlinked": "an asset was unlinked",
+        "version_registered": "a new version was registered",
+        "semantics_changed": "semantic annotations changed"
+      },
+      "segmentTitle": "Segment {n} “{excerpt}”",
+      "segmentSummary": "{total} items · {missing} missing · {review} annotations to fix",
+      "needLine": "Needs: {kind} “{desc}”",
+      "needsReviewTag": "⚠ annotation needs fixing",
+      "notNeededReason": "expressed by an overlay card",
+      "extractStarted": "Re-extraction started: {name}",
+      "needKind": {
+        "character": "character",
+        "scene": "scene",
+        "prop": "prop",
+        "prop_faithful": "evidence material",
+        "exposition": "explanatory material",
+        "none": "no asset needed"
+      },
+      "itemStatus": {
+        "missing": "Missing",
+        "have": "Have",
+        "added": "Added",
+        "ignored": "Ignored",
+        "not_needed": "No asset needed"
+      },
+      "filter": {
+        "all": "All ({n})",
+        "missing": "Missing ({n})",
+        "have": "Have ({n})",
+        "added": "Added ({n})",
+        "ignored": "Ignored ({n})",
+        "not_needed": "No asset needed ({n})"
+      },
+      "action": {
+        "extract": "Re-extract",
+        "create": "Upload / AI generate",
+        "bind": "Pick an existing asset",
+        "ignore": "Ignore with reason…",
+        "notNeeded": "Mark as no asset needed",
+        "undo": "Undo decision"
+      },
+      "ignoreDialog": {
+        "title": "Ignore this checklist item",
+        "hint": "Ignoring means this information point gets no picture; state how it is covered instead (e.g. narration over black).",
+        "placeholder": "e.g. covered by narration over black, no material needed",
+        "required": "The reason needs at least 5 characters"
+      },
+      "bindDialog": {
+        "title": "Pick an existing asset",
+        "hint": "Choose one of the assets already linked to this episode to cover this information point.",
+        "placeholder": "Select…",
+        "empty": "No asset in this episode matches this need; use “Upload / AI generate” or “Re-extract” instead."
+      },
+      "gate": {
+        "pending": "{n} items are still missing — shot design unlocks once all are resolved",
+        "passed": "Review passed · shot design unlocked",
+        "next": "Go to the next missing item",
+        "locked": "Enter shot design 🔒",
+        "lockedHint": "Shot design unlocks once every checklist item is resolved",
+        "goDesign": "Enter shot design"
+      }
     },
     "finalStep": {
       "placeholderTitle": "This shot is not ready for the final cut yet"
