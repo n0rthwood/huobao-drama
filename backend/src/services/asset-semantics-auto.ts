@@ -16,6 +16,7 @@ import { db, schema } from '../db/index.js'
 import { getAbsolutePath } from '../utils/storage.js'
 import { logTaskError, logTaskProgress, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
 import { resolveStageModel, type StageModel } from './ai-stages.js'
+import { onAssetLibraryChanged } from './asset-review.js'
 import { callTextChat, imageContentPart } from './vision-chat.js'
 import { extractFirstJson } from '../agents/tools/vision-tools.js'
 import {
@@ -548,6 +549,8 @@ async function runSemanticsTask(taskId: number, ctx: {
     })
     const merged = mergeSemantics(await loadPropSemantics(ctx.propId), semantics)
     await savePropSemantics(ctx.propId, merged)
+    // 审核清单（#55）：自动标注写回语义 = 资产库变更，逐集校验绑定并记横幅理由
+    await onAssetLibraryChanged('prop', ctx.propId, 'semantics_changed')
     const counts = countSemantics(merged)
     await patchTextTaskParams(taskId, { semantics_warnings: warnings, semantics_counts: counts, semantics_phase: 'done' })
     await finishTextTask(taskId, 'completed', {

@@ -14,6 +14,7 @@ import { retryTask } from '../services/task-retry.js'
 import { completionStamp } from '../services/media-time.js'
 import { readReasoningFile } from '../agents/reasoning-sink.js'
 import { parseTextTaskParams } from '../services/text-task.js'
+import { onAssetLibraryChanged } from '../services/asset-review.js'
 
 const app = new Hono()
 
@@ -219,6 +220,8 @@ app.post('/register-upload', async (c) => {
       .set({ faithful: 1, faithfulSource: taskId, updatedAt: now() })
       .where(eq(schema.props.id, assetId))
   }
+  // 审核清单（#55）：新版本登记属于资产库变更，按关联表反查逐集记横幅理由
+  await onAssetLibraryChanged(kind as 'character' | 'scene' | 'prop', assetId, 'version_registered')
   return created(c, { id: taskId, local_path: localPath })
 })
 

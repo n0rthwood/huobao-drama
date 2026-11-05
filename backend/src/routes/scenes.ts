@@ -14,6 +14,7 @@ import { EMPTY_ASSET_NAME_MESSAGE, normalizeAssetName } from '../services/asset-
 import { promptSourceChanged } from '../services/asset-prompt-invalidation.js'
 import { mountReExtractRoute } from './asset-reextract.js'
 import { toSnakeCase } from '../utils/transform.js'
+import { bindCreatedAssetToReviewItem, onAssetRemoved, onEpisodeAssetLinkChanged } from '../services/asset-review.js'
 
 const app = new Hono()
 
@@ -46,6 +47,13 @@ app.post('/', async (c) => {
     if (!existing.length) {
       await db.insert(schema.episodeScenes).values({ episodeId: Number(body.episode_id), sceneId, createdAt: ts })
     }
+  }
+  // 审核清单（#55）：带 asset_review_item_id 的新建 = 「上传 / AI 生成」补齐路径，
+  // 保存成功即把那条缺失项置 added 并绑定；否则只记一次资产库变更横幅。
+  if (body.episode_id) {
+    const itemId = Number(body.asset_review_item_id)
+    if (Number.isInteger(itemId) && itemId > 0) await bindCreatedAssetToReviewItem(itemId, 'scene', sceneId)
+    else await onEpisodeAssetLinkChanged(Number(body.episode_id), 'asset_linked')
   }
   const [result] = await db.select().from(schema.scenes)
     .where(eq(schema.scenes.id, sceneId))
@@ -162,6 +170,8 @@ app.delete('/:id', async (c) => {
   deleteAllReferenceImages('scene', id)
   // 集关联不保留：残留行会让提取与 @引用 继续看到已删场景（Issue #15）
   await deleteAssetLinks('scene', id)
+  // 审核清单（#55）：绑定目标消失 → 相关条目回 missing，门禁重新上锁
+  await onAssetRemoved('scene', id)
   return success(c)
 })
 

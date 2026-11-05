@@ -49,6 +49,7 @@ import {
   loadImageVersions,
   unlinkAssetFromEpisode,
 } from '../services/asset-library.js'
+import { onEpisodeAssetLinkChanged } from '../services/asset-review.js'
 import {
   DEFAULT_SUBTITLE_TIMING,
   estimateNarrationSeconds,
@@ -269,7 +270,10 @@ app.post('/:id/assets/link', async (c) => {
   const assetId = Number(assetIdRaw)
   if (!Number.isInteger(assetId) || assetId <= 0) return badRequest(c, 'asset_id 必填')
   try {
-    return success(c, await linkAssetToEpisode(episodeId, kind, assetId))
+    const linked = await linkAssetToEpisode(episodeId, kind, assetId)
+    // 审核清单（#55）：资产库变了 → 记横幅理由（不回退 passed）
+    await onEpisodeAssetLinkChanged(episodeId, 'asset_linked')
+    return success(c, linked)
   } catch (err) {
     if (err instanceof AssetLibraryError) {
       return err.status === 404 ? notFound(c, err.message) : badRequest(c, err.message)
@@ -285,7 +289,10 @@ app.delete('/:id/assets/link', async (c) => {
   if (!isAssetKind(kind)) return badRequest(c, 'kind 必须是 character / scene / prop')
   const assetId = Number(c.req.query('asset_id'))
   if (!Number.isInteger(assetId) || assetId <= 0) return badRequest(c, 'asset_id 必填')
-  return success(c, await unlinkAssetFromEpisode(episodeId, kind, assetId))
+  const result = await unlinkAssetFromEpisode(episodeId, kind, assetId)
+  // 审核清单（#55）：取消关联会让绑定失效 → 先硬退化相关条目，再记横幅理由
+  await onEpisodeAssetLinkChanged(episodeId, 'asset_unlinked')
+  return success(c, result)
 })
 
 // POST /episodes/:id/extract — 异步提取资产（target: characters | scenes | props），立即返回，前端轮询状态

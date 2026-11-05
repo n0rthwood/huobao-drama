@@ -15,6 +15,7 @@ import { logTaskError, logTaskPayload, logTaskProgress, logTaskStart, logTaskSuc
 import { FRAME_TYPE_SLOT, invalidateKeyframeConfirmation } from './keyframes.js'
 import { completionStamp } from './media-time.js'
 import { saveStylingVersion } from './styling-version.js'
+import { onAssetLibraryChanged } from './asset-review.js'
 import {
   buildImageJobBody,
   cancelQwenJob,
@@ -778,6 +779,10 @@ async function writeBackImageAssets(record: SysTaskRecord, localPath: string) {
   if (record.propId) {
     await db.update(schema.props).set({ imageUrl: localPath, updatedAt: now() }).where(eq(schema.props.id, record.propId))
   }
+  // 审核清单（#55）：资产当前版本被改写 = 资产库变更，按关联表反查逐集记横幅理由
+  if (record.characterId) await onAssetLibraryChanged('character', record.characterId, 'version_registered')
+  if (record.sceneId) await onAssetLibraryChanged('scene', record.sceneId, 'version_registered')
+  if (record.propId) await onAssetLibraryChanged('prop', record.propId, 'version_registered')
 }
 
 async function handleVideoComplete(record: SysTaskRecord, videoUrl: string, duration: number | null | undefined, headers?: Record<string, string>) {
