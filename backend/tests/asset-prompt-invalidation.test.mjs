@@ -112,3 +112,24 @@ test('a forced rewrite fails when the agent does not save a new prompt, and succ
   assert.equal(result.saved.outcome, 'regenerated')
   assert.equal(result.savedPrompt, '新稿：白羽老公鸡')
 })
+
+/**
+ * 事实表版本也是失效来源（Issue #56 验收 14）。
+ * 纯函数用例：字段没动、只有 `asset_spec` 出了新版本时，来源必须被判为 `spec_version`。
+ */
+test('事实表出新版本 → 失效来源为 spec_version（纯函数）', () => {
+  const out = execFileSync('npx', ['tsx', '--eval', `
+    import { classifyPromptInvalidation } from './src/services/asset-prompt-invalidation.ts'
+    const current = { name: '商代车马坑', type: '器物', description: '双轮单辕' }
+    process.stdout.write(JSON.stringify({
+      nothing: classifyPromptInvalidation({ kind: 'prop', current, updates: {} }),
+      specOnly: classifyPromptInvalidation({ kind: 'prop', current, updates: {}, specVersionChanged: true }),
+      fieldsWin: classifyPromptInvalidation({ kind: 'prop', current, updates: { description: '四轮' }, specVersionChanged: true }),
+    }))
+  `], { cwd: backendRoot, encoding: 'utf8' })
+  const r = JSON.parse(out)
+  assert.deepEqual(r.nothing, { changed: false, source: null })
+  assert.deepEqual(r.specOnly, { changed: true, source: 'spec_version' })
+  // 字段也改了时按字段来源记录（两者都会清空，但来源要如实）
+  assert.deepEqual(r.fieldsWin, { changed: true, source: 'fields' })
+})

@@ -162,3 +162,87 @@ test('颜色解析：非 #rrggbb 一律 null（不猜颜色，由调用方记 wa
   assert.equal(r.hexBad, null)
   assert.deepEqual(r.hexOk, { r: 0x3a, g: 0x6f, b: 0xb0 })
 })
+
+/**
+ * 上传截图的可抽色判据放宽（Issue #56 验收 10）。
+ *
+ * 实测依据：`~/projects/huobao-e2e-yinxu/maps/yinxu-region.png`（Google Earth 截图）上
+ * 同一条水体沿程从 rgb(80,144,224) 压到 rgb(16,48,96)——亮度 53 贴着原判据的 50 下限，
+ * 再深一点整条洹河一个像素都抽不出来；而欧氏距离 172、偏色幅度 48 又同时被
+ * `colorMask` 的两条判据判掉，所以命中率是 0。
+ *
+ * 放宽只针对这种**屏幕截图**：`isExtractableLineColor` 对强蓝跳过亮度下限，
+ * `colorMask({hueOnly:true})` 改按通道序 + 最小彩度判。扫描印刷图走原判据，不受影响。
+ */
+const relaxScript = `
+  import { colorMask, isExtractableLineColor, lineColorCoverage, HUE_ONLY_MIN_CHROMA } from './src/services/semantics-geometry.ts'
+
+  const W = 200, H = 200
+  const data = new Uint8Array(W * H * 3).fill(230)
+  const put = (x, y, r, g, b) => {
+    const p = (y * W + x) * 3
+    data[p] = r; data[p + 1] = g; data[p + 2] = b
+  }
+  // 一条竖直水体：y 从 0 到 199，颜色从亮蓝线性压到深蓝（截图里的水深/地形阴影梯度）
+  for (let y = 0; y < H; y++) {
+    const t = y / (H - 1)
+    const r = Math.round(80 - 64 * t)
+    const g = Math.round(144 - 96 * t)
+    const b = Math.round(224 - 128 * t)
+    for (let d = -1; d <= 1; d++) put(100 + d, y, r, g, b)
+  }
+  // 一片灰色陆地阴影（彩度不足，hueOnly 不许命中）
+  for (let y = 0; y < 40; y++) for (let x = 0; x < 40; x++) put(x, y, 120, 124, 128)
+  // 一片暖色（通道序 r>g>b，与蓝相反，hueOnly 不许命中）
+  for (let y = 160; y < 200; y++) for (let x = 0; x < 40; x++) put(x, y, 200, 150, 90)
+
+  const raster = { width: W, height: H, data }
+  const target = { r: 80, g: 144, b: 224 }
+  const line = []
+  for (let y = 0; y < H; y += 4) line.push([100, y])
+
+  const strictMask = colorMask(raster, target)
+  const hueMask = colorMask(raster, target, 90, { hueOnly: true })
+
+  process.stdout.write(JSON.stringify({
+    minChroma: HUE_ONLY_MIN_CHROMA,
+    extractable: {
+      black: isExtractableLineColor({ r: 0, g: 0, b: 0 }),
+      white: isExtractableLineColor({ r: 255, g: 255, b: 255 }),
+      gray: isExtractableLineColor({ r: 40, g: 45, b: 50 }),
+      darkBlue: isExtractableLineColor({ r: 16, g: 48, b: 96 }),
+      midBlue: isExtractableLineColor({ r: 80, g: 144, b: 224 }),
+      darkRed: isExtractableLineColor({ r: 96, g: 20, b: 16 }),
+    },
+    strictPixels: strictMask.reduce((s, v) => s + v, 0),
+    huePixels: hueMask.reduce((s, v) => s + v, 0),
+    grayHit: hueMask[10 * W + 10],
+    warmHit: hueMask[180 * W + 10],
+    strictCoverage: lineColorCoverage(raster, line, target),
+    hueCoverage: lineColorCoverage(raster, line, target, { hueOnly: true }),
+  }))
+`
+
+const relaxed = JSON.parse(execFileSync('npx', ['tsx', '--eval', relaxScript], { cwd: backendRoot, encoding: 'utf8' }))
+
+test('可抽色判据：纯黑/纯白/灰仍然 false，深蓝水体放行', () => {
+  assert.equal(relaxed.extractable.black, false)
+  assert.equal(relaxed.extractable.white, false)
+  assert.equal(relaxed.extractable.gray, false)
+  assert.equal(relaxed.extractable.darkBlue, true, 'b-r=80>60 且 b-g=48>20 的深蓝必须可抽')
+  assert.equal(relaxed.extractable.midBlue, true)
+  // 同样暗、但不是蓝：原判据的亮度下限仍然生效
+  assert.equal(relaxed.extractable.darkRed, false)
+})
+
+test('hueOnly 掩膜：覆盖整条明暗渐变水体，不吃灰色与暖色', () => {
+  assert.ok(relaxed.huePixels > relaxed.strictPixels * 1.5,
+    `放宽后命中应显著增加：strict=${relaxed.strictPixels} hue=${relaxed.huePixels}`)
+  assert.equal(relaxed.grayHit, 0, '灰色阴影彩度不足，不该命中')
+  assert.equal(relaxed.warmHit, 0, '暖色通道序相反，不该命中')
+})
+
+test('截图水体覆盖率：严格判据不达标，放宽后达标', () => {
+  assert.ok(relaxed.strictCoverage < 0.8, `严格判据本就该不达标：${relaxed.strictCoverage}`)
+  assert.ok(relaxed.hueCoverage > 0.95, `放宽后应当几乎全覆盖：${relaxed.hueCoverage}`)
+})
