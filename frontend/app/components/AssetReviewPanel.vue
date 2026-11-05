@@ -96,7 +96,9 @@ async function load(opts = {}) {
     payload.value = data
     running.value = data.run?.status === 'running'
     schedulePoll()
-    emit('update:status', data.status)
+    // 只在状态真的变了才通知父级重算门禁：每次轮询都 emit 会让门禁刷新把面板卸载重挂，
+    // 重挂又触发一次 load，形成无限循环
+    if (data.status !== props.review?.review_status) emit('update:status', data.status)
   } catch (err) {
     // 剧情项目（400 not_documentary）在这个面板下不会被挂载；其余错误照常提示
     toastError(err)
