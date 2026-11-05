@@ -67,6 +67,13 @@ test('规范化：fps/fade 钳制、状态按时刻排序、同刻去重、空�
   assert.deepEqual(got.emptyVisible, [])
 })
 
+test('FPS 保留分数计划与既有整数，仍沿用 1–60 的规范化边界', () => {
+  const got = run(`
+    out([0.5, 1, 24, 25, 29.97, 60, 120].map(fps => normalizeTimeline({ fps }).fps))
+  `)
+  assert.deepEqual(got, [1, 1, 24, 25, 29.97, 60, 60])
+})
+
 test('取景框不变量：归一化 w === h（像素比例才与整幅一致），越界钳回画面内', () => {
   const got = run(`
     out({

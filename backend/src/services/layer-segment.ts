@@ -9,8 +9,8 @@
  * - 草稿：把设计卡 `layer_plan` 与资产/语义标注装配成上下文，交给纯函数 `draftSegment()`。
  *
  * 图层段画幅 = 本集成片画幅（沿用 `probeIntroSpec` 的口径：按已有**模型视频**实测），
- * 帧率由时间线决定（默认 25）；两者都进签名，改了就要重渲染。
- * **绝不把图层段产物纳入规格探测**：否则会出现「渲染→合成→规格变→签名变→判过期」的回环。
+ * 帧率优先沿用本集最前有效图层计划；没有计划时才取视频/默认值。两者都进签名。
+ * **绝不探测图层段产物**：渲染文件的存在与新鲜度不参与计划选择，避免规格/签名回环。
  */
 import fs from 'fs'
 import crypto from 'crypto'
@@ -25,6 +25,8 @@ import { qualityWarningsOf } from './layer-quality.js'
 import {
   MAX_LAYER_SEGMENT_SECONDS,
   SEGMENT_DEFAULT_FPS,
+  SEGMENT_FPS_MIN,
+  SEGMENT_FPS_MAX,
   clampSegmentDuration,
   endHoldOf,
   normalizeTimeline,
@@ -95,16 +97,16 @@ export interface LayerSegmentSummary {
 }
 
 /**
- * 本集图层段规格：图层段必须与模型视频**同画幅同帧率**，否则拼接与最终 merge 会花屏/时基错乱。
- * 画幅与帧率都实测自本集首条已有**模型视频**（与 `probeIntroSpec` 同口径），
- * 本集还没有任何视频时才回落 25 fps + 按画幅比例的内置默认尺寸。
- * 因此 `timeline.fps` 是**派生值**（保存时同步写入），不是用户可选项。
+ * 画幅实测自本集首条已有**模型视频**，无视频时按画幅比例使用内置默认尺寸。
+ * 目标帧率优先取最前有效 stored 图层计划的 timeline.fps，无计划才取视频帧率/默认 25。
+ * 模型视频可与图层计划不同帧率，原生合成会用 fps 滤镜统一到此目标。
+ * `timeline.fps` 在保存时同步为本集目标，不是用户可选项。
  */
 export interface SegmentSpec {
   width: number
   height: number
   fps: number
-  /** 规格来源：`video` = 实测本集已有视频，`default` = 内置默认 */
+  /** 画幅来源：`video` = 实测本集已有视频，`default` = 内置默认；不表示帧率来源 */
   source: 'video' | 'default'
 }
 
@@ -170,6 +172,12 @@ function parseBaseRef(raw: string | null): BaseRef | null {
   return null
 }
 
+/** Stored plans retain their exact target, including fractional FPS; no normalized default. */
+function storedTimelineFps(timeline: unknown): number | undefined {
+  const fps = timeline && typeof timeline === 'object' ? (timeline as Record<string, unknown>).fps : undefined
+  return typeof fps === 'number' && Number.isFinite(fps) && fps >= SEGMENT_FPS_MIN && fps <= SEGMENT_FPS_MAX ? fps : undefined
+}
+
 function parseSegmentRow(row: SegmentRow): LayerSegment {
   let layerDoc: unknown = null
   let timeline: unknown = null
@@ -185,6 +193,7 @@ function parseSegmentRow(row: SegmentRow): LayerSegment {
   }
   const doc = normalizeLayerDoc(layerDoc)
   const normalized = normalizeTimeline(timeline, doc.base.crop)
+  normalized.fps = storedTimelineFps(timeline) ?? normalized.fps
   return {
     id: row.id,
     storyboard_id: row.storyboardId,
@@ -255,12 +264,12 @@ export async function saveLayerSegment(
   const [row] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, storyboardId))
   if (!row) throw new Error('分镜不存在')
   const layerDoc = await withBaseSourceSize(normalizeLayerDoc('layer_doc' in input ? input.layer_doc : existing?.layer_doc))
-  // fps 是派生值：始终跟随本集成片规格，用户在时间线里改不了
+  // fps 是派生值：跟随本集既存计划/回退目标，保存时不能把 29.97 取整为 30。
   const spec = await resolveEpisodeSegmentSpec(row.episodeId)
-  const timeline = normalizeTimeline({
+  const timeline = {
     ...normalizeTimeline('timeline' in input ? input.timeline : existing?.timeline, layerDoc.base.crop),
     fps: spec.fps,
-  }, layerDoc.base.crop)
+  }
   const duration = clampSegmentDuration(
     input.duration !== undefined ? Number(input.duration) : (existing?.duration ?? 0),
     MAX_LAYER_SEGMENT_SECONDS,
@@ -501,14 +510,34 @@ export async function loadLayerSegmentSummaries(
 const specCache = new Map<number, SegmentSpec>()
 
 /**
- * 本集图层段规格：优先实测本集已有的**模型视频**（与 `probeIntroSpec` 同口径），
- * 画幅与帧率都取它；本集一条视频都没有时回落 25 fps + 按画幅比例的内置默认尺寸。
+ * 先读原始持久化计划（不得经 normalizeTimeline 补默认值，或依赖 fresh/产物文件）。
+ * 计划按镜号、id 排序取最前合法 FPS，且优先于视频缓存；画幅与无计划回退保持原口径。
  */
 export async function resolveEpisodeSegmentSpec(episodeId: number): Promise<SegmentSpec> {
+  const rows = (await db.select().from(schema.storyboards)
+    .where(eq(schema.storyboards.episodeId, episodeId)))
+    .sort((a, b) => a.storyboardNumber - b.storyboardNumber || a.id - b.id)
+  const activeIds = rows.filter(row => !row.deletedAt && hasLayerSegment(toCombo(row.combo))).map(row => row.id)
+  const plans = activeIds.length
+    ? await db.select({ storyboardId: schema.storyboardLayerSegments.storyboardId, timeline: schema.storyboardLayerSegments.timeline })
+      .from(schema.storyboardLayerSegments).where(inArray(schema.storyboardLayerSegments.storyboardId, activeIds))
+    : []
+  const timelines = new Map(plans.map(plan => [plan.storyboardId, plan.timeline]))
+  let plannedFps: number | undefined
+  for (const id of activeIds) {
+    try {
+      const fps = storedTimelineFps(JSON.parse(timelines.get(id) || 'null'))
+      if (fps !== undefined) {
+        plannedFps = fps
+        break
+      }
+    } catch { /* 坏 JSON 不是有效计划，不从规范化默认值推断历史帧率 */ }
+  }
+  const withPlanFps = (spec: SegmentSpec): SegmentSpec =>
+    plannedFps === undefined ? spec : { ...spec, fps: plannedFps }
   const cached = specCache.get(episodeId)
-  if (cached) return cached
-  const rows = await db.select().from(schema.storyboards).where(eq(schema.storyboards.episodeId, episodeId))
-  for (const row of rows.sort((a, b) => a.storyboardNumber - b.storyboardNumber)) {
+  if (cached) return withPlanFps(cached)
+  for (const row of rows) {
     // 只看模型视频：图层段与成片是由它**产出**的，拿它们定规格会形成回环（契约 §3.2 风险 4）
     const candidate = row.videoUrl
     if (!candidate) continue
@@ -521,14 +550,14 @@ export async function resolveEpisodeSegmentSpec(episodeId: number): Promise<Segm
       source: 'video',
     }
     specCache.set(episodeId, spec)
-    return spec
+    return withPlanFps(spec)
   }
   const [episode] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId))
   const [drama] = episode
     ? await db.select().from(schema.dramas).where(eq(schema.dramas.id, episode.dramaId))
     : []
   const fallback = DEFAULT_SPEC_BY_ASPECT[drama?.aspectRatio || '16:9'] || DEFAULT_SPEC_BY_ASPECT['16:9']
-  return { ...fallback, fps: SEGMENT_DEFAULT_FPS, source: 'default' }
+  return withPlanFps({ ...fallback, fps: SEGMENT_DEFAULT_FPS, source: 'default' })
 }
 
 /** 视频文件换过/新建过之后让画幅缓存失效（新建首条视频会改变本集画幅来源） */
