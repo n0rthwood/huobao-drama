@@ -370,8 +370,15 @@ export interface ReviewRunDiff {
  *    命中就把那行改指纹迁过来，处置照样保留；
  * 3. 仍未命中 → 新建行；本次完全没认领的旧行删除。
  */
-export function mergeDraftItems(episodeId: number, runId: number, drafts: DraftItem[]): ReviewRunDiff {
+export function mergeDraftItems(episodeId: number, runId: number, rawDrafts: DraftItem[]): ReviewRunDiff {
   const ts = now()
+  // 全集去重：同一「信息点 + need_kind」跨段重复时只留第一条（指纹不含段号，
+  // 留两条会直接撞 UNIQUE(episode_id, fingerprint)）
+  const byDraftFingerprint = new Map<string, DraftItem>()
+  for (const draft of rawDrafts) {
+    if (!byDraftFingerprint.has(draft.fingerprint)) byDraftFingerprint.set(draft.fingerprint, draft)
+  }
+  const drafts = [...byDraftFingerprint.values()]
   const existing = db.select().from(schema.assetReviewItems)
     .where(eq(schema.assetReviewItems.episodeId, episodeId)).all()
   const byFingerprint = new Map(existing.map(row => [row.fingerprint, row]))

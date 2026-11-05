@@ -210,6 +210,8 @@ test('重新对照：指纹命中保留处置；中间插段不影响既有条�
       draft('商王盘庚', 'exposition', 1),
       draft('新插入的信息点', 'scene', 2),
       draft('车马坑遗迹', 'prop', 3),
+      // 跨段重复的同一信息点：只能留一条，否则撞 UNIQUE(episode_id, fingerprint)
+      draft('殷墟在哪里', 'prop_faithful', 3),
     ])
     const afterRows = await db.select().from(schema.assetReviewItems)
     console.log('@@' + JSON.stringify({
