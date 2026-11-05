@@ -26,8 +26,12 @@ import {
 } from './clip-timeline.js'
 import { draftClip, type ClipDraft, type ClipDraftAsset } from './clip-draft.js'
 import { parseSemantics, resolveSemanticsBase } from './asset-semantics.js'
-import { parseShotIntent, type ClipPosition, type ShotIntent } from './shot-intent.js'
+import { parseDesignCard, toCombo, type Combo, type DesignCard } from './design-card.js'
 import { MAX_SHOT_SECONDS } from './narration.js'
+
+/** 确定性片段相对模型视频的位置（`none` = 本镜没有图层段） */
+export const CLIP_POSITIONS = ['replace', 'pre', 'post', 'none'] as const
+export type ClipPosition = typeof CLIP_POSITIONS[number]
 
 /** 真正落库的位置（`none` 表示本镜没有确定性片段，不写行） */
 export const PERSISTED_CLIP_POSITIONS = ['replace', 'pre', 'post'] as const
@@ -313,9 +317,8 @@ export function invalidateClipSpec(episodeId: number): void {
 
 // ─── 草稿 ────────────────────────────────────────────────────
 
-/** 装配草稿上下文：本镜 intent 引用到的资产 + 它们的忠实原图与语义标注 */
-async function loadDraftAssets(episodeId: number, intent: ShotIntent): Promise<ClipDraftAsset[]> {
-  if (!intent) return []
+/** 装配草稿上下文：本镜设计卡引用到的资产 + 它们的忠实原图与语义标注 */
+async function loadDraftAssets(episodeId: number, card: DesignCard): Promise<ClipDraftAsset[]> {
   const propIds = new Set<number>()
   const characterIds = new Set<number>()
   const sceneIds = new Set<number>()
@@ -326,12 +329,13 @@ async function loadDraftAssets(episodeId: number, intent: ShotIntent): Promise<C
     else if (fallbackKind === 'character') characterIds.add(assetId)
     else propIds.add(assetId)
   }
-  for (const item of intent.must_show) {
-    collect(item.asset_id, item.asset_kind, item.kind === 'portrait' ? 'character' : 'prop')
+  const base = card.layer_plan?.base
+  if (base && base.kind === 'asset') collect(base.asset_id, base.asset_kind, 'prop')
+  for (const ref of card.layer_plan?.must_mark || []) collect(ref.asset_id, 'prop', 'prop')
+  for (const layer of card.layer_plan?.planned_layers || []) {
+    collect(layer.anchor?.asset_id, 'prop', layer.type === 'image' ? 'character' : 'prop')
   }
-  for (const item of intent.overlay_plan) {
-    collect(item.anchor?.asset_id, item.anchor?.asset_kind, item.layer === 'image' ? 'character' : 'prop')
-  }
+  for (const ref of card.gen_plan?.reference_assets || []) collect(ref.id, ref.kind, 'character')
 
   const assets: ClipDraftAsset[] = []
   if (propIds.size) {
@@ -386,17 +390,17 @@ export interface ClipDraftResult {
 }
 
 /**
- * 按表达设计生成片段草稿（不落库）。返回 null = 本镜 `deterministic=none`、
- * 没有表达设计，或找不到任何可用底图。
+ * 按设计卡生成片段草稿（不落库）。返回 null = 本镜没有图层段（combo = B 或未选）、
+ * 没有设计卡，或找不到任何可用底图。
  */
 export async function buildClipDraft(storyboardId: number): Promise<ClipDraftResult | null> {
   const [sb] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, storyboardId))
   if (!sb) throw new Error('分镜不存在')
-  const intent = parseShotIntent(sb.intent)
-  if (!intent) return null
+  const card = parseDesignCard(sb.designCard)
+  if (!card) return null
   const spec = await resolveEpisodeClipSpec(sb.episodeId)
-  const assets = await loadDraftAssets(sb.episodeId, intent)
-  const draft = draftClip(intent, {
+  const assets = await loadDraftAssets(sb.episodeId, card)
+  const draft = draftClip(card, toCombo(sb.combo), {
     assets,
     duration: sb.duration || 0,
     width: spec.width,
@@ -418,7 +422,12 @@ export async function saveClipDraft(storyboardId: number): Promise<StoryboardCli
   })
 }
 
-/** 本镜 intent 要求的片段位置；没有表达设计的镜头恒为 `none` */
-export function clipPositionOfIntent(intentRaw: string | null | undefined): ClipPosition {
-  return parseShotIntent(intentRaw)?.deterministic ?? 'none'
+/** 本镜段组合要求的片段位置：A 整镜替代、C 在模型视频之前、D 在之后、B/未选 = 没有图层段 */
+export function clipPositionOfCombo(combo: Combo | string | null | undefined): ClipPosition {
+  switch (toCombo(combo)) {
+    case 'A': return 'replace'
+    case 'C': return 'pre'
+    case 'D': return 'post'
+    default: return 'none'
+  }
 }

@@ -17,6 +17,7 @@ import { eq } from 'drizzle-orm'
 import { describeNarrationGaps, narrationCoverage, type NarrationGap } from '../services/narration-first.js'
 import { resolveDramaProjectType } from '../services/project-type.js'
 import { assertGate } from '../services/workflow-gates.js'
+import { consumeStoryboardStopReason } from '../agents/tools/storyboard-tools.js'
 
 const app = new Hono()
 
@@ -150,6 +151,16 @@ app.post('/:type/chat', async (c) => {
       { maxSteps: 20, requestContext },
       sink,
     )
+
+    // 镜头数硬上限的止损（#57）：连续两批整批被拒就不再让模型重试，把任务判失败并给出合并建议
+    if (agentType === 'storyboard_breaker' && kind) {
+      const stop = consumeStoryboardStopReason(Number(episode_id))
+      if (stop) {
+        if (taskId) await finishTextTask(taskId, 'failed', { errorMsg: stop, outputText: result.text || '' })
+        logTaskError('Agent', agentType, { episodeId: episode_id, error: stop })
+        return badRequest(c, stop)
+      }
+    }
 
     // narration-first 闸门（#49）：纪录片拆分分镜必须把剧本正文**整篇**切进各镜旁白。
     // 只看「写下来的话是否出自剧本」挡不住整段被跳过——实测 93 镜漏 746 字，S13 的句子

@@ -24,6 +24,18 @@ export function scriptMatchKey(script: string | null | undefined): string {
   return narrationMatchKey((script || '').replace(BEAT_MARKER, ''))
 }
 
+/**
+ * 剧本按空行切分出的非空段落（Issue #57）：镜头数硬上限 `storyboardCountCap` 的分母。
+ * 与 `scriptMatchKey` 同口径——先去掉节拍标记（它们只是锚点，不构成段落）。
+ */
+export function scriptParagraphs(script: string | null | undefined): string[] {
+  return (script || '')
+    .replace(BEAT_MARKER, '')
+    .split(/\n\s*\n+/)
+    .map(paragraph => paragraph.trim())
+    .filter(Boolean)
+}
+
 export interface NarrationSegmentCheck {
   /** 去空白后的旁白文本在剧本中的起始下标；未找到为 -1 */
   index: number

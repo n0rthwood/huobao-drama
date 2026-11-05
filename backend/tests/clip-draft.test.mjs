@@ -1,6 +1,6 @@
 /**
  * 确定性片段（Issue #50）：
- * - `overlay_plan → LayerDoc + timeline` 转换（语义原图像素 → 归一化、底图选择、reveal_at → 关键状态、推近）；
+ * - `design_card.layer_plan → LayerDoc + timeline` 转换（语义原图像素 → 归一化、底图选择、at_s → 关键状态、推近）；
  * - 转换结果必须经得起 #48 `normalizeLayerDoc` 的白名单（样式键写错会被静默丢弃）；
  * - 渲染签名纯函数：图层/时间线/时长/画幅/底图字节任一变化即换签名；
  * - compose 快照 v3：`ComposeInputParts` 的「确定性片段」分项差异。
@@ -51,23 +51,28 @@ const MAP_ASSET = `
   const ctx = { assets: [mapAsset, character], duration: 15, width: 960, height: 544 }
 `
 
-const MAP_INTENT = `
-  const intent = {
-    info_point: '清军两路进藏', device: 'map_anim',
-    must_show: [{ kind: 'region', asset_id: 39, semantic_id: 'rg-1' }],
-    overlay_plan: [
-      { layer: 'polygon', anchor: { asset_id: 39, semantic_id: 'rg-1' }, reveal_at: 3 },
-      { layer: 'polyline', anchor: { asset_id: 39, semantic_id: 'ln-1' }, reveal_at: 6 },
-      { layer: 'marker', anchor: { asset_id: 39, semantic_id: 'pt-1' }, reveal_at: 9 },
-      { layer: 'label', anchor: { asset_id: 39, semantic_id: 'lb-1' }, reveal_at: 11 },
-    ],
-    deterministic: 'replace', rationale: '',
+const MAP_CARD = `
+  const card = {
+    version: 2,
+    info_points: [{ id: 'ip1', text: '清军两路进藏', via: 'layer' }],
+    budget: { layer_s: 15, gen_s: null },
+    layer_plan: {
+      base: { kind: 'asset', asset_kind: 'prop', asset_id: 39, version_task_id: null },
+      must_mark: [{ asset_id: 39, semantic_id: 'rg-1', name: '准噶尔汗国' }],
+      planned_layers: [
+        { type: 'polygon', anchor: { asset_id: 39, semantic_id: 'rg-1', name: '准噶尔汗国' }, at_s: 3 },
+        { type: 'polyline', anchor: { asset_id: 39, semantic_id: 'ln-1', name: '额尔齐斯河' }, at_s: 6 },
+        { type: 'marker', anchor: { asset_id: 39, semantic_id: 'pt-1', name: '斋桑湖' }, at_s: 9 },
+        { type: 'label', anchor: { asset_id: 39, semantic_id: 'lb-1', name: '拉萨' }, at_s: 11 },
+      ],
+    },
+    rationale: '', suggested_combo: 'A', issues: [],
   }
 `
 
-test('map_anim 草稿：底图取忠实原图，语义像素按原图尺寸归一化，reveal_at 变成关键状态', () => {
-  const got = run(`${MAP_ASSET}${MAP_INTENT}
-    const draft = draftClip(intent, ctx)
+test('组合 A 草稿：底图取忠实原图，语义像素按原图尺寸归一化，at_s 变成关键状态', () => {
+  const got = run(`${MAP_ASSET}${MAP_CARD}
+    const draft = draftClip(card, 'A', ctx)
     out({
       position: draft.position,
       duration: draft.duration,
@@ -99,8 +104,8 @@ test('map_anim 草稿：底图取忠实原图，语义像素按原图尺寸归�
 })
 
 test('草稿必须经得起 #48 白名单：polyline 箭头与河线颜色不能被静默丢弃', () => {
-  const got = run(`${MAP_ASSET}${MAP_INTENT}
-    const draft = draftClip(intent, ctx)
+  const got = run(`${MAP_ASSET}${MAP_CARD}
+    const draft = draftClip(card, 'A', ctx)
     const normalized = normalizeLayerDoc(draft.layer_doc)
     out({
       polylineStyle: normalized.layers.find(l => l.type === 'polyline').style,
@@ -117,15 +122,19 @@ test('草稿必须经得起 #48 白名单：polyline 箭头与河线颜色不能
 
 test('锚点解析不到几何：不伪造坐标，整层跳过并留下警告', () => {
   const got = run(`${MAP_ASSET}
-    const intent = {
-      info_point: '', device: 'map_anim', must_show: [],
-      overlay_plan: [
-        { layer: 'polygon', anchor: { asset_id: 39, semantic_id: 'rg-不存在' }, reveal_at: 2 },
-        { layer: 'marker', anchor: { asset_id: 39, semantic_id: 'pt-1' }, reveal_at: 4 },
-      ],
-      deterministic: 'replace', rationale: '',
+    const card = {
+      version: 2, info_points: [], budget: { layer_s: 15, gen_s: null },
+      layer_plan: {
+        base: { kind: 'asset', asset_kind: 'prop', asset_id: 39, version_task_id: null },
+        must_mark: [],
+        planned_layers: [
+          { type: 'polygon', anchor: { asset_id: 39, semantic_id: 'rg-不存在', name: '' }, at_s: 2 },
+          { type: 'marker', anchor: { asset_id: 39, semantic_id: 'pt-1', name: '斋桑湖' }, at_s: 4 },
+        ],
+      },
+      rationale: '', suggested_combo: 'A', issues: [],
     }
-    const draft = draftClip(intent, ctx)
+    const draft = draftClip(card, 'A', ctx)
     out({ types: draft.layer_doc.layers.map(l => l.type), warnings: draft.warnings })
   `)
   assert.deepEqual(got.types, ['marker'], '缺几何的那层被跳过，不是画成空多边形')
@@ -133,30 +142,42 @@ test('锚点解析不到几何：不伪造坐标，整层跳过并留下警告',
   assert.match(got.warnings[0], /polygon/)
 })
 
-test('card 片段：底图取肖像，pre/post 默认 2 秒', () => {
+test('卡片图层：底图取设计卡指定的肖像，没有图层段预算时 pre/post 默认 2 秒', () => {
   const got = run(`${MAP_ASSET}
-    const intent = {
-      info_point: '利哈列夫其人', device: 'card',
-      must_show: [{ kind: 'portrait', asset_id: 25, asset_kind: 'character' }],
-      overlay_plan: [{ layer: 'card', template: 'name', fields: { title: '利哈列夫', sub: '俄国远征队指挥官' }, reveal_at: 1 }],
-      deterministic: 'replace', rationale: '',
+    const card = {
+      version: 2,
+      info_points: [{ id: 'ip1', text: '利哈列夫其人', via: 'layer' }],
+      budget: { layer_s: 15, gen_s: null },
+      layer_plan: {
+        base: { kind: 'asset', asset_kind: 'character', asset_id: 25, version_task_id: null },
+        must_mark: [],
+        planned_layers: [{ type: 'card', text: '利哈列夫', at_s: 1 }],
+      },
+      rationale: '', suggested_combo: 'A', issues: [],
     }
-    const replace = draftClip(intent, ctx)
-    const post = draftClip({ ...intent, device: 'reenact_video', deterministic: 'post' }, ctx)
-    const none = draftClip({ ...intent, deterministic: 'none' }, ctx)
+    const replace = draftClip(card, 'A', ctx)
+    const post = draftClip({ ...card, budget: { layer_s: null, gen_s: 5 } }, 'D', ctx)
+    const none = draftClip(card, 'B', ctx)
+    const unselected = draftClip(card, null, ctx)
     out({
       base: replace.layer_doc.base.path,
+      position: replace.position,
       card: replace.layer_doc.layers[0],
+      postPosition: post.position,
       postDuration: post.duration,
       defaultPrePost: CLIP_PRE_POST_DEFAULT_SECONDS,
       none,
+      unselected,
     })
   `)
-  assert.equal(got.base, 'static/images/portrait.png', 'card 底图是人物肖像')
+  assert.equal(got.base, 'static/images/portrait.png', '底图是设计卡 layer_plan.base 指定的肖像')
+  assert.equal(got.position, 'replace', '组合 A = 整镜由图层段替代')
   assert.equal(got.card.type, 'card')
   assert.equal(got.card.fields.title, '利哈列夫')
-  assert.equal(got.postDuration, got.defaultPrePost, 'pre/post 默认 2 秒')
-  assert.equal(got.none, null, 'deterministic=none 不产生片段')
+  assert.equal(got.postPosition, 'post', '组合 D = 图层段在模型视频之后')
+  assert.equal(got.postDuration, got.defaultPrePost, '没有图层段预算时 pre/post 默认 2 秒')
+  assert.equal(got.none, null, '组合 B 没有图层段')
+  assert.equal(got.unselected, null, '没选组合就没有图层段')
 })
 
 test('渲染签名：图层/时间线/时长/画幅/底图字节任一变化都换签名', () => {

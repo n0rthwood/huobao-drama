@@ -32,6 +32,7 @@ import posters from './routes/posters.js'
 import layerDocs from './routes/layer-docs.js'
 import clips from './routes/clips.js'
 import assetPipeline from './routes/asset-pipeline.js'
+import designCards, { designCardShots } from './routes/design-cards.js'
 import { requestLogger, errorHandler } from './middleware/logger.js'
 import { db, schema } from './db/index.js'
 import { and, eq, isNull, ne, or } from 'drizzle-orm'
@@ -46,6 +47,7 @@ import { backfillTaskEpisodeIds, failInterruptedTextTasks } from './services/tas
 import { backfillGeneratedAt } from './services/media-time.js'
 import { migrateReferenceImages } from './services/reference-images.js'
 import { migrateAssetNames } from './services/asset-name-migration.js'
+import { migrateIntentToDesignCard } from './services/design-card-migration.js'
 import { backfillPoolProjection } from './services/storyboard-assets.js'
 import { logLayerFontStatus } from './services/layer-fonts.js'
 import { backfillScriptConfirmation, GateBlockedError } from './services/workflow-gates.js'
@@ -85,7 +87,9 @@ const api = new Hono()
 api.route('/dramas', dramas)
 api.route('/episodes', episodes)
 api.route('/episodes', posters)
+api.route('/episodes', designCards)
 api.route('/storyboards', storyboards)
+api.route('/storyboards', designCardShots)
 api.route('/scenes', scenes)
 api.route('/characters', characters)
 api.route('/tasks', tasks)
@@ -161,6 +165,8 @@ db.update(schema.sysTask)
   .then(() => migrateReferenceImages())
   // 资产名规范化迁移（Issue #34）：非法名改成合法名并重写分镜 @引用，幂等
   .then(() => migrateAssetNames())
+  // 表达设计 → 分镜设计卡（Issue #57）：按行转换 combo/design_card 后自行 DROP COLUMN intent，幂等
+  .then(() => migrateIntentToDesignCard())
   // 本镜资产池投影补齐（Issue #43）：角色/道具关联 = 手选 ∪ 当前 @，幂等
   .then(() => backfillPoolProjection())
   // 存量纪录片集补剧本确认（Issue #54）：升级前已拆出分镜的集视为已确认，否则新门禁会把它们锁死，幂等

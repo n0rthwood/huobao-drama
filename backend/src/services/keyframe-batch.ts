@@ -42,7 +42,7 @@ import {
 } from './storyboard-assets.js'
 import { getActiveConfig, getConfigById } from './ai.js'
 import { cancelImageTask } from './qwen-jobs.js'
-import { loadIntentContext, resolveStoryboardIntent } from './shot-intent-context.js'
+import { loadDesignCardContext, resolveDesignCard } from './design-card-context.js'
 import { isActiveTaskStatus, isQwenJobsTask, parseRemoteState, type RemoteState } from './sys-task.js'
 import {
   aggregateBatchItems,
@@ -381,14 +381,17 @@ export async function previewEpisodeKeyframeBatch(
     : storyboards
 
   const assets = await loadEpisodeAssets(episodeId)
-  const intentCtx = loadIntentContext(episodeId)
+  const cardCtx = loadDesignCardContext(episodeId)
   const result: KeyframePreviewItem[] = []
   for (const sb of targets) {
     const state = keyframes.get(sb.id)
     const bindings = await loadTargetBindings(sb.id)
     const issues = computeRefIssues({
       prompts: promptFieldsOf(sb), assets, bindings,
-      intent: resolveStoryboardIntent(sb.intent, intentCtx).intent,
+      ...(() => {
+        const resolved = resolveDesignCard(sb, cardCtx)
+        return { card: resolved.card, combo: resolved.combo }
+      })(),
     })
 
     for (const slot of KEYFRAME_SLOTS) {

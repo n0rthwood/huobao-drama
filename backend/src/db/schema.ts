@@ -208,10 +208,13 @@ export const storyboards = sqliteTable('storyboards', {
   narrationNormalize: integer('narration_normalize', { mode: 'boolean' }),
   // 本镜的旁白/画面匹配参数 JSON（#31）；NULL = 继承剧集级 narration_fit_default
   narrationFit: text('narration_fit'),
-  // 表达设计（#49）：信息点 / device / must_show / overlay_plan / deterministic / rationale（JSON）
-  // 与人工确认位。非纪录片项目恒为 NULL。
-  intent: text('intent'),
-  intentReviewed: integer('intent_reviewed', { mode: 'boolean' }).notNull().default(false),
+  // 分镜设计卡（#57）：段组合 A/B/C/D（**无默认**，必须人工显式选）、设计卡 JSON、
+  // 状态机 blank|ai_filling|pending|confirmed|stale、确认时间与过期原因。非纪录片项目恒为 NULL。
+  combo: text('combo'),
+  designCard: text('design_card'),
+  designCardStatus: text('design_card_status').notNull().default('blank'),
+  designCardConfirmedAt: text('design_card_confirmed_at'),
+  designCardStaleReason: text('design_card_stale_reason'),
   videoUrl: text('video_url'),
   subtitleUrl: text('subtitle_url'),
   composedVideoUrl: text('composed_video_url'),

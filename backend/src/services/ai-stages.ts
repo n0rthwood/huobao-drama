@@ -26,10 +26,10 @@ export interface AiStageSpec {
 
 export const AI_STAGES = {
   // ── 需要视觉 ──────────────────────────────────────────────
-  /** 纪录片拆分分镜（含表达设计初稿）：要看证据素材才能定 device / must_show / overlay_plan */
+  /** 纪录片拆分分镜（含设计卡初稿）：要看证据素材才能定信息点 / 必须标注 / 计划图层 */
   storyboard_breaker_documentary: { vision: true, label: '拆分分镜（纪录片）' },
-  /** 表达设计重算 / 补齐：逐镜核对证据图是否真能表达信息点 */
-  shot_intent: { vision: true, label: '分镜设计' },
+  /** 设计卡填写 / 补齐：逐镜核对证据图是否真能表达信息点 */
+  design_card: { vision: true, label: '分镜设计' },
   /** 证据素材语义自动标注：读地图像素 */
   asset_semantics: { vision: true, label: '语义自动标注' },
   /** 资产 QC 清单核验（Issue #56）：逐条核对产出图是否满足事实表；结论由程序闸门算，不采信模型 overall */
@@ -77,7 +77,7 @@ export const AI_CALL_SITES: Record<string, AiStage[]> = {
     'script_rewriter', 'storyboard_breaker', 'storyboard_breaker_documentary',
     'extractor', 'final_prompt', 'transition_writer', 'narration_writer',
   ],
-  'services/shot-intent-batch.ts': ['shot_intent'],
+  'services/design-card-batch.ts': ['design_card'],
   'services/extraction.ts': ['extractor'],
   'services/final-prompt.ts': ['final_prompt'],
   'services/keyframe-prompts.ts': ['keyframe_prompts'],

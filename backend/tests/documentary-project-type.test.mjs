@@ -266,6 +266,7 @@ test('the documentary split assigns narration verbatim and rejects rewritten or 
       coverage,
       scriptChars: scriptMatchKey(script).length,
       midRunIgnored: midRunReplace.replace_existing_ignored,
+      midRunRejected: midRunReplace.rejected,
       afterMidRun,
       rerunIgnored: rerun.replace_existing_ignored,
       afterRerun,
@@ -287,9 +288,12 @@ test('the documentary split assigns narration verbatim and rejects rewritten or 
   assert.equal(result.coverage.covered_chars, result.scriptChars)
   assert.equal(result.coverage.in_order, true)
   assert.deepEqual(result.coverage.not_in_script, [])
-  // 同一次运行里重复清空被忽略：前三镜仍在，第四镜追加
+  // 同一次运行里重复清空被忽略：前三镜仍在。第四镜没有旁白 —— 纪录片每镜必须承载一段旁白（#57），拒存
   assert.equal(result.midRunIgnored, true)
-  assert.deepEqual(result.afterMidRun.map(r => r.n), [1, 2, 3, 4])
+  assert.equal(result.midRunRejected.length, 1)
+  assert.equal(result.midRunRejected[0].shot_number, 4)
+  assert.match(result.midRunRejected[0].reason, /每镜必须承载一段旁白/)
+  assert.deepEqual(result.afterMidRun.map(r => r.n), [1, 2, 3])
   // 新运行允许整集重切
   assert.equal(result.rerunIgnored, false)
   assert.deepEqual(result.afterRerun.map(r => r.n), [1])

@@ -2720,9 +2720,10 @@ const clipThumbStamp = ref(0)
 // 片段工作台要聚焦的镜头（由关键帧页 / 视频页的「编辑图层/时间线」跳转设置）
 const clipFocusSbId = ref(0)
 
-/** 本镜表达设计里的确定性片段位置；'none' 或无表达设计 = 本镜不走片段 */
+/** 本镜图层段的位置；'none' 或没选段组合 = 本镜不走图层段 */
 function clipPositionOf(sb) {
-  const position = sb?.intent?.deterministic || 'none'
+  // 段组合（#57）决定图层段位置：A 整镜替代、C 在模型视频之前、D 在之后
+  const position = sb?.combo === 'A' ? 'replace' : sb?.combo === 'C' ? 'pre' : sb?.combo === 'D' ? 'post' : 'none'
   return position === 'none' ? '' : position
 }
 function isDeterministicShot(sb) {
@@ -3136,7 +3137,7 @@ function mainStageDone(stageId) {
   }
   // Poster 可选：有最终版本即视为完成，不参与制作分组 done 判定
   if (stageId === 'poster') return !!posterData.value?.final_image
-  // 分镜设计（纪录片）：每镜设计卡都已确认（R4 前过渡读 intent_reviewed）
+  // 分镜设计（纪录片）：每镜设计卡都已确认
   if (stageId === 'design') {
     const { confirmed, total } = gateState.value.design
     return total > 0 && confirmed === total

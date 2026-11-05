@@ -24,8 +24,8 @@ import { resolveStageModel } from './ai-stages.js'
 import { loadEpisodeKeyframes } from './keyframes.js'
 import { parseTransitionReview, transitionStatus } from './transition.js'
 import { runTransitionReview } from './transition-agent.js'
-import { buildIntentBriefs, loadIntentContext } from './shot-intent-context.js'
-import { NO_VIDEO_PROMPT_DEVICES } from './shot-intent.js'
+import { buildDesignCardBriefs, loadDesignCardContext } from './design-card-context.js'
+import { toCombo } from './design-card.js'
 
 export type VideoPromptBatchStatus = PromptBatchStatus
 
@@ -54,16 +54,11 @@ export async function startVideoPromptBatch(
     const status = await transitionStatus(sb, keyframes.get(sb.id)?.inheritsFirst === true)
     if (status.needsReview) needTransition.add(sb.id)
   }
-  // 表达设计（#49）：map_anim / card / archival 的整镜由确定性片段替代，没有模型视频，
+  // 段组合 A（#57）：整镜由图层段渲染，没有模型视频，
   // 既不写视频提示词也不做转场审核
-  const intentCtx = loadIntentContext(episodeId)
-  const briefs = buildIntentBriefs(sbs.filter(sb => !sb.deletedAt), intentCtx)
-  const noVideo = new Set(sbs
-    .filter((sb) => {
-      const intent = briefs.get(sb.id)?.intent
-      return !!intent && NO_VIDEO_PROMPT_DEVICES.includes(intent.device)
-    })
-    .map(sb => sb.id))
+  const cardCtx = loadDesignCardContext(episodeId)
+  const briefs = buildDesignCardBriefs(sbs.filter(sb => !sb.deletedAt), cardCtx)
+  const noVideo = new Set(sbs.filter(sb => toCombo(sb.combo) === 'A').map(sb => sb.id))
   const pendingIds = new Set([...needPrompt.map(sb => sb.id), ...needTransition]
     .filter(id => !noVideo.has(id)))
   const pending = sbs.filter(sb => pendingIds.has(sb.id) && !sb.deletedAt)
