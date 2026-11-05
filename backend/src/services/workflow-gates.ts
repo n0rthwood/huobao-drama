@@ -199,12 +199,22 @@ export async function onScriptChanged(episodeId: number, reason: string): Promis
   console.log(`📝 script_changed(${episodeId})：${reason} → 旁白稿确认已自动取消`)
 }
 
+/** 一次性升级迁移的标记键（app_settings）：跑过之后永远不再回填 */
+const SCRIPT_CONFIRM_BACKFILL_KEY = 'workflow_gates.script_confirm_backfilled'
+
 /**
- * 存量纪录片集回填（契约 §2）：升级前就已经拆出分镜的纪录片集视为旁白稿已确认，
+ * 存量纪录片集的**一次性升级迁移**（契约 §2）：升级前就已经拆出分镜的纪录片集视为旁白稿已确认，
  * 否则新门禁会把第一轮产物整个锁死。没有分镜的集保持未确认；剧情集一律不动。
- * 幂等：只填 script_confirmed_at IS NULL 的行。
+ *
+ * 只在首次升级时跑一次，之后由 app_settings 的标记拦住：用户随后改稿/取消确认的集
+ * **绝不能**被下一次重启重新确认。
  */
 export async function backfillScriptConfirmation(): Promise<number> {
+  const marker = db.select().from(schema.appSettings)
+    .where(eq(schema.appSettings.key, SCRIPT_CONFIRM_BACKFILL_KEY))
+    .get()
+  if (marker) return 0
+
   const episodes = await db.select().from(schema.episodes).where(isNull(schema.episodes.deletedAt))
   let filled = 0
   for (const ep of episodes) {
@@ -218,6 +228,10 @@ export async function backfillScriptConfirmation(): Promise<number> {
       .where(eq(schema.episodes.id, ep.id))
     filled++
   }
-  if (filled > 0) console.log(`📝 已回填 ${filled} 个存量纪录片集的旁白稿确认（已有分镜）`)
+  db.insert(schema.appSettings)
+    .values({ key: SCRIPT_CONFIRM_BACKFILL_KEY, value: now(), updatedAt: now() })
+    .onConflictDoNothing()
+    .run()
+  if (filled > 0) console.log(`📝 已回填 ${filled} 个存量纪录片集的旁白稿确认（一次性升级迁移，已有分镜）`)
   return filled
 }

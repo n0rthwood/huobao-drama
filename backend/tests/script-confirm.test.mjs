@@ -115,7 +115,7 @@ test('Agent 改写路径（save_script 工具）同样触发自动取消', () =>
   assert.deepEqual(result, { start: true, sameValue: true, afterRewrite: false })
 })
 
-test('存量回填：纪录片已有分镜 → 已确认；无分镜 → 未确认；剧情集保持 NULL', () => {
+test('一次性升级迁移：已有分镜 → 已确认；重启重跑不会把用户取消的确认又填回来', () => {
   const result = run(`
     ${FIXTURE}
     await db.insert(schema.dramas).values({ id: 2, title: 'drama', projectType: 'drama', createdAt: at, updatedAt: at })
@@ -126,6 +126,9 @@ test('存量回填：纪录片已有分镜 → 已确认；无分镜 → 未确�
     ])
     import { backfillScriptConfirmation } from './src/services/workflow-gates.ts'
     const filled = await backfillScriptConfirmation()
+    // 用户随后取消确认 → 再次启动（再跑一次迁移）绝不能把它重新确认
+    const { unconfirmScript } = await import('./src/services/workflow-gates.ts')
+    await unconfirmScript(1)
     const again = await backfillScriptConfirmation()
     const rows = await db.select().from(schema.episodes)
     console.log('@@' + JSON.stringify({
@@ -137,7 +140,7 @@ test('存量回填：纪录片已有分镜 → 已确认；无分镜 → 未确�
   // 幂等：第二次什么都不做
   assert.equal(result.again, 0)
   assert.deepEqual(result.state, [
-    { id: 1, confirmed: true, review: 'none' },
+    { id: 1, confirmed: false, review: 'none' },
     { id: 2, confirmed: false, review: 'none' },
     { id: 3, confirmed: false, review: 'none' },
   ])
