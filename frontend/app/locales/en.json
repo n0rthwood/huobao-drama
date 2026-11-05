@@ -992,8 +992,8 @@
         "none": "—",
         "A": { "name": "A ▣ Layer only", "desc": "Annotate and move over a map or document: tells where, who and which year." },
         "B": { "name": "B ▶ Generated only", "desc": "AI generated shot: tells what happened (same as drama projects)." },
-        "C": { "name": "C ▣▶ Layer first", "desc": "Locate first, then step into the action; ◆ junction frame = last layer frame." },
-        "D": { "name": "D ▶▣ Generated first", "desc": "Step into the action, then land on the map or archive; ◆ junction frame = first layer frame." }
+        "C": { "name": "C ▣→▶ Layer first", "desc": "Locate first, then step into the action; ◆ junction frame = last layer frame." },
+        "D": { "name": "D ▶→▣ Generated first", "desc": "Step into the action, then land on the map/archive; ◆ junction frame = first layer frame." }
       },
       "section": {
         "narrative": "Narrative",

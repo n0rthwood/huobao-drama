@@ -229,7 +229,12 @@
               <div ref="barEl" class="dc-bar-track">
                 <span v-if="hasLayer" class="dc-seg is-layer" :style="{ width: layerPct + '%' }">
                   <span v-if="layerOverPct > 0" class="dc-seg-over" :style="{ width: layerOverPct + '%' }" />
-                  <span v-if="layerOverPct > 0" class="dc-seg-tick" :style="{ left: (100 - layerOverPct) + '%' }" />
+                  <span
+                    class="dc-seg-tick"
+                    :class="{ 'is-over': layerOverPct > 0 }"
+                    :style="{ left: tickLeft(layerSeconds, ctx.limits.layer_s) + '%' }"
+                    :title="t('episode.design.budget.limitLayer', { n: ctx.limits.layer_s })"
+                  />
                   <span class="dc-seg-text mono">{{ layerSeconds.toFixed(1) }}s</span>
                 </span>
                 <span
@@ -241,7 +246,12 @@
                 >◆</span>
                 <span v-if="hasGen" class="dc-seg is-gen" :style="{ width: genPct + '%' }">
                   <span v-if="genOverPct > 0" class="dc-seg-over" :style="{ width: genOverPct + '%' }" />
-                  <span v-if="genOverPct > 0" class="dc-seg-tick" :style="{ left: (100 - genOverPct) + '%' }" />
+                  <span
+                    class="dc-seg-tick"
+                    :class="{ 'is-over': genOverPct > 0 }"
+                    :style="{ left: tickLeft(genSeconds, ctx.limits.gen_s) + '%' }"
+                    :title="t('episode.design.budget.limitGen', { n: ctx.limits.gen_s })"
+                  />
                   <span class="dc-seg-text mono">{{ genSeconds.toFixed(1) }}s</span>
                 </span>
               </div>
@@ -490,8 +500,9 @@ const barEl = ref(null)
 
 // ===== 门禁 =====
 const { gates, ready: gatesReady, refreshGates, reasonOf, gotoOf } = useWorkflowGates(() => props.episodeId)
-const designLocked = computed(() => gatesReady.value && gates.value.unlocked?.design === false)
-const lockReason = computed(() => reasonOf('design'))
+// 门禁未判定（首屏未取到 /gates 或取数失败）时同样按锁定渲染，内容绝不先闪出来
+const designLocked = computed(() => !gatesReady.value || gates.value.unlocked?.design === false)
+const lockReason = computed(() => reasonOf('design') || t('episode.gate.checking'))
 function gotoBlocker() {
   const target = gotoOf('design') || 'assets'
   const url = new URL(window.location.href)
@@ -638,6 +649,10 @@ function toSeconds(value) {
   const n = Number(value)
   if (!Number.isFinite(n) || n < 0) return 0
   return Math.round(n * 2) / 2
+}
+/** 硬限刻度位置：段内超限时画在限额处，未超限时落在段的右端 */
+function tickLeft(seconds, limit) {
+  return seconds > limit ? (limit / seconds) * 100 : 100
 }
 
 function setSeconds(field, value) {
@@ -1210,7 +1225,8 @@ onBeforeUnmount(() => {
 .dc-seg.is-layer { background: color-mix(in srgb, var(--accent) 30%, transparent); }
 .dc-seg.is-gen { background: color-mix(in srgb, var(--accent) 14%, transparent); }
 .dc-seg-over { position: absolute; top: 0; right: 0; bottom: 0; background: color-mix(in srgb, #ef5350 45%, transparent); }
-.dc-seg-tick { position: absolute; top: 0; bottom: 0; width: 2px; background: #ef5350; }
+.dc-seg-tick { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--text-2); }
+.dc-seg-tick.is-over { background: #ef5350; }
 .dc-seg-text { position: relative; font-size: 11px; }
 .dc-divider { display: flex; align-items: center; padding: 0 2px; cursor: col-resize; color: var(--text-2); font-size: 11px; user-select: none; }
 
