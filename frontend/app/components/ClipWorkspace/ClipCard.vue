@@ -2,7 +2,7 @@
   <div class="cc-card">
     <div class="cc-head">
       <span class="cc-title">{{ t('episode.clip.cardTitle') }}</span>
-      <span class="tag">{{ t(`episode.intent.clipLabel.${position}`) }}</span>
+      <span class="tag">{{ t('episode.design.segment.layer') }}</span>
       <span v-if="clip" class="tag mono">{{ clip.duration }}s</span>
       <span :class="['cc-state', 'is-' + status]">{{ t(`episode.clip.status.${status}`) }}</span>
       <span class="ml-auto" />

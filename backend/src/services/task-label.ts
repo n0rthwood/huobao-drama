@@ -30,7 +30,7 @@ const TEXT_KIND_LABEL: Record<TextTaskKind, string> = {
   portrait_appearance: '按史料画像补充外貌',
   asset_batch: '资产批量',
   asset_semantics: '语义标注',
-  shot_intent: '分镜设计',
+  design_card: '分镜设计',
   storyboard_fill_gaps: '补全剩余分镜',
   asset_pipeline: '资产流水线',
 }

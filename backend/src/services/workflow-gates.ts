@@ -21,6 +21,7 @@ import { db, schema } from '../db/index.js'
 import { composeStatesForEpisode } from './compose-state.js'
 import { resolveDramaProjectType, type ProjectType } from './project-type.js'
 import { now } from '../utils/response.js'
+import { markEpisodeDesignCardsStale } from './staleness.js'
 
 export const GATE_KEYS = ['assets', 'design', 'production', 'final', 'poster', 'export'] as const
 export type GateKey = typeof GATE_KEYS[number]
@@ -139,7 +140,7 @@ export async function episodeGateFacts(episodeId: number): Promise<GateFacts | n
       review_status: normalizeAssetReviewStatus(ep.assetReviewStatus),
       stale_reasons: parseStaleReasons(ep.assetReviewStaleReasons),
     },
-    design: { confirmed: rows.filter(sb => sb.intentReviewed === true).length, total: rows.length },
+    design: { confirmed: rows.filter(sb => sb.designCardStatus === 'confirmed').length, total: rows.length },
     production: { ready: rows.filter(sb => sb.keyframesConfirmed === true).length, total: rows.length },
     final: { fresh, total: rows.length },
   }
@@ -194,13 +195,19 @@ export async function unconfirmScript(episodeId: number): Promise<void> {
 
 /**
  * 旁白稿/剧本正文发生实际变化时的唯一钩子（事件名 `script_changed`）：
- * 取消剧本确认。R4 在本函数内追加「设计卡置 stale」，不另开写入口。
+ * 取消剧本确认，并把本集设计卡全部置为 `stale`（#57）——旁白变了，每镜的信息点、
+ * 预算与段计划都要重审。过期写入走 `services/staleness.ts` 单入口。
  */
 export async function onScriptChanged(episodeId: number, reason: string): Promise<void> {
   const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId))
-  if (!ep || !ep.scriptConfirmedAt) return
+  if (!ep || resolveDramaProjectType(ep.dramaId) !== 'documentary') return
+  const staled = await markEpisodeDesignCardsStale(episodeId, 'script_changed')
+  if (!ep.scriptConfirmedAt) {
+    if (staled) console.log(`📝 script_changed(${episodeId})：${reason} → ${staled} 镜设计卡已置为过期`)
+    return
+  }
   await unconfirmScript(episodeId)
-  console.log(`📝 script_changed(${episodeId})：${reason} → 旁白稿确认已自动取消`)
+  console.log(`📝 script_changed(${episodeId})：${reason} → 旁白稿确认已自动取消${staled ? `，${staled} 镜设计卡已置为过期` : ''}`)
 }
 
 /** 一次性升级迁移的标记键（app_settings）：跑过之后永远不再回填 */

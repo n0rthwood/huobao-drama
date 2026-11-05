@@ -33,7 +33,7 @@ import {
   transitionStatus,
 } from './transition.js'
 import { runTransitionReview } from './transition-agent.js'
-import { loadIntentContext, resolveStoryboardIntent } from './shot-intent-context.js'
+import { loadDesignCardContext, resolveDesignCard } from './design-card-context.js'
 
 export interface StoryboardVideoOptions {
   model?: string
@@ -196,7 +196,10 @@ export async function buildStoryboardVideoRequest(
   const bindings = await loadTargetBindings(storyboardId)
   const refIssues = computeRefIssues({
     prompts: promptFieldsOf(sb), assets, bindings,
-    intent: resolveStoryboardIntent(sb.intent, loadIntentContext(episode.id)).intent,
+    ...(() => {
+      const resolved = resolveDesignCard(sb, loadDesignCardContext(episode.id))
+      return { card: resolved.card, combo: resolved.combo }
+    })(),
   })
   const blocking = [
     ...blockingIssuesFor(refIssues, 'video_prompt'),

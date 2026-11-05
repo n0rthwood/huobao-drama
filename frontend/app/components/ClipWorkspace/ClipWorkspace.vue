@@ -178,9 +178,14 @@ const {
   saveState.value = t('episode.clip.unsaved')
 })
 
-/** 列表：只列有表达设计且确定性位置不是 none 的镜头 */
+/** 段组合（#57）→ 图层段位置：A 整镜替代、C 在模型视频之前、D 在之后 */
+function comboPosition(combo) {
+  return combo === 'A' ? 'replace' : combo === 'C' ? 'pre' : combo === 'D' ? 'post' : 'none'
+}
+
+/** 列表：只列有图层段的镜头 */
 const shots = computed(() => props.storyboards
-  .map((sb, index) => ({ sb, index, device: sb?.intent?.device || '', position: sb?.intent?.deterministic || 'none' }))
+  .map((sb, index) => ({ sb, index, device: '', position: comboPosition(sb?.combo) }))
   .filter(item => item.position && item.position !== 'none')
   .map(item => ({ ...item, title: item.sb.title || item.sb.description || t('episode.clip.untitled') })))
 
@@ -218,8 +223,9 @@ const cropStyle = computed(() => {
   }
 })
 
-function deviceLabel(device) { return device ? t(`episode.intent.deviceLabel.${device}`) : '' }
-function clipLabel(position) { return position ? t(`episode.intent.clipLabel.${position}`) : '' }
+// 段标签（R5 会按段组合重构本组件，这里只做键名替换，口径统一为「图层段」）
+function deviceLabel() { return t('episode.design.segment.layer') }
+function clipLabel() { return t('episode.design.segment.layer') }
 
 function statusOf(sbId) {
   const item = clips.value[sbId]
@@ -236,7 +242,7 @@ async function loadShot(sbId, { silent = false } = {}) {
   try {
     const data = await clipAPI.list(sbId)
     spec.value = data.spec
-    const intentPosition = props.storyboards.find(sb => sb.id === sbId)?.intent?.deterministic
+    const intentPosition = comboPosition(props.storyboards.find(sb => sb.id === sbId)?.combo)
     const found = (data.clips || []).find(c => c.position === intentPosition) || (data.clips || [])[0] || null
     clips.value = { ...clips.value, [sbId]: found }
     // 本地有未保存改动时不回灌，避免分镜刷新把人正在编辑的图层/时间线冲掉

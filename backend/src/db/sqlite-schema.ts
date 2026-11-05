@@ -150,8 +150,11 @@ export const sqliteSchemaStatements = [
     subtitle_timing TEXT,
     narration_normalize INTEGER,
     narration_fit TEXT,
-    intent TEXT,
-    intent_reviewed INTEGER NOT NULL DEFAULT 0,
+    combo TEXT,
+    design_card TEXT,
+    design_card_status TEXT NOT NULL DEFAULT 'blank',
+    design_card_confirmed_at TEXT,
+    design_card_stale_reason TEXT,
     video_url TEXT,
     subtitle_url TEXT,
     composed_video_url TEXT,
@@ -651,10 +654,14 @@ const columnAdditions: { table: string; column: string; type: string }[] = [
   { table: 'characters', column: 'exposition', type: 'INTEGER NOT NULL DEFAULT 0' },
   { table: 'scenes', column: 'exposition', type: 'INTEGER NOT NULL DEFAULT 0' },
   { table: 'props', column: 'exposition', type: 'INTEGER NOT NULL DEFAULT 0' },
-  // 表达设计（Issue #49）：纪录片每镜的信息点/表达手段/必须可见要素/叠加层计划（JSON）
-  // 与人工确认位；非纪录片项目恒为 NULL / 0。
-  { table: 'storyboards', column: 'intent', type: 'TEXT' },
-  { table: 'storyboards', column: 'intent_reviewed', type: 'INTEGER NOT NULL DEFAULT 0' },
+  // 分镜设计卡（Issue #57）：段组合 A/B/C/D（无默认）、设计卡 JSON、状态机与确认/过期痕迹；
+  // 非纪录片项目恒为 NULL / 'blank'。旧的 intent / intent_reviewed 由
+  // services/design-card-migration.ts 转换后自行 DROP COLUMN（不能用 columnRemovals：它跑在数据迁移之前）。
+  { table: 'storyboards', column: 'combo', type: 'TEXT' },
+  { table: 'storyboards', column: 'design_card', type: 'TEXT' },
+  { table: 'storyboards', column: 'design_card_status', type: "TEXT NOT NULL DEFAULT 'blank'" },
+  { table: 'storyboards', column: 'design_card_confirmed_at', type: 'TEXT' },
+  { table: 'storyboards', column: 'design_card_stale_reason', type: 'TEXT' },
   // 文本配置的视觉能力标定（Issue #51）：存量行默认 0（不做一次性探测初值——HTTP 200 不等于真能看图），
   // 由 providers.json / 设置页人工标定。需要视觉的 AI 环节只会选 vision=1 的配置。
   { table: 'ai_service_configs', column: 'vision', type: 'INTEGER NOT NULL DEFAULT 0' },

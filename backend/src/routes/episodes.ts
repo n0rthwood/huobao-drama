@@ -39,15 +39,7 @@ import {
   promptFieldsOf,
 } from '../services/storyboard-assets.js'
 import { parseFieldSavedAt } from '../services/storyboard-fields.js'
-import { loadIntentContext, resolveStoryboardIntent } from '../services/shot-intent-context.js'
-import { auditEpisodeIntents, getShotIntentBatchStatus, startShotIntentBatch } from '../services/shot-intent-batch.js'
-import {
-  DEVICE_ALLOWED_CLIP,
-  DEVICE_DEFAULT_CLIP,
-  MUST_SHOW_KINDS,
-  OVERLAY_LAYER_TYPES,
-  SHOT_DEVICES,
-} from '../services/shot-intent.js'
+import { loadDesignCardContext, resolveDesignCard } from '../services/design-card-context.js'
 import { lookupGeneratedAt } from '../services/media-time.js'
 import { parseTransitionReview, transitionInputSignature } from '../services/transition.js'
 import {
@@ -604,54 +596,6 @@ app.get('/:id/keyframe-prompts-status', async (c) => {
   return success(c, await getKeyframePromptBatchStatus(id))
 })
 
-// GET /episodes/:id/intent-context — 表达设计页的候选项（#49）：
-// 本集资产 + 每张证据素材的语义条目（名称/ id/类别，不含坐标）
-app.get('/:id/intent-context', async (c) => {
-  const id = Number(c.req.param('id'))
-  const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, id))
-  if (!ep) return notFound(c, '剧集不存在')
-  return success(c, {
-    assets: loadIntentContext(id).assets,
-    devices: SHOT_DEVICES,
-    device_default_clip: DEVICE_DEFAULT_CLIP,
-    device_allowed_clip: DEVICE_ALLOWED_CLIP,
-    must_show_kinds: MUST_SHOW_KINDS,
-    overlay_layer_types: OVERLAY_LAYER_TYPES,
-  })
-})
-
-// GET /episodes/:id/intent-audit — 整集表达设计的结构机检（#49 验收 1）
-app.get('/:id/intent-audit', async (c) => {
-  const id = Number(c.req.param('id'))
-  const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, id))
-  if (!ep) return notFound(c, '剧集不存在')
-  return success(c, await auditEpisodeIntents(id))
-})
-
-// POST /episodes/:id/generate-intents — 异步重算表达设计（不带 storyboard_ids = 补齐缺失的）
-app.post('/:id/generate-intents', async (c) => {
-  const id = Number(c.req.param('id'))
-  const body = await c.req.json().catch(() => ({}))
-  const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, id))
-  if (!ep) return notFound(c, '剧集不存在')
-  if (resolveDramaProjectType(ep.dramaId) !== 'documentary') return badRequest(c, '只有纪录片项目才有表达设计')
-  // 门禁（#54）：清单未通过不得 AI 填卡；R4 把本路由改名为 /design-cards/fill 时沿用同一个 assertGate
-  await assertGate(id, 'design')
-  const storyboardIds = Array.isArray(body.storyboard_ids)
-    ? body.storyboard_ids.map(Number).filter((n: number) => Number.isInteger(n) && n > 0)
-    : undefined
-  const result = await startShotIntentBatch(ep.id, ep.dramaId, { model: body.model || undefined, configId: body.config_id ?? undefined }, storyboardIds)
-  if (result.total === -1) return success(c, { status: 'running', already_running: true })
-  if (!result.started) return success(c, { status: 'idle', total: 0 })
-  return success(c, { status: 'running', total: result.total })
-})
-
-// GET /episodes/:id/intent-status — 查询表达设计重算任务状态
-app.get('/:id/intent-status', async (c) => {
-  const id = Number(c.req.param('id'))
-  return success(c, await getShotIntentBatchStatus(id))
-})
-
 // GET /episodes/:id/narration-coverage — 旁白覆盖状态（#52）：已覆盖字数与未被任何分镜领走的缺口
 app.get('/:id/narration-coverage', async (c) => {
   const id = Number(c.req.param('id'))
@@ -827,8 +771,8 @@ app.get('/:episode_id/storyboards', async (c) => {
   }
   const mediaGeneratedAt = await lookupGeneratedAt(mediaPaths)
   const episodeAssets = await loadEpisodeAssets(episodeId)
-  // 表达设计的解析上下文（#49）：整集一次装配，逐镜重算 intent 的引用是否还成立
-  const intentContext = loadIntentContext(episodeId)
+  // 设计卡的解析上下文（#57）：整集一次装配，逐镜重算引用是否还成立、问题列表读时重算
+  const designCardContext = loadDesignCardContext(episodeId)
   // 本镜资产池（Issue #43）：有效池 = 手选 ∪ 5 个提示词当前 @；整集手选一次查完
   const manualSelections = await loadEpisodeManualSelections(rows.map(row => row.id))
   // 旁白与融合状态一律由服务端算好（前端不自己推 URL 布尔）：
@@ -875,10 +819,10 @@ app.get('/:episode_id/storyboards', async (c) => {
       target_assets: await loadStoryboardTargetAssets(row, episodeAssets),
       pool_assets: computePoolAssets(episodeAssets, manualSelections.get(row.id) || [], promptFieldsOf(row)),
       field_saved_at: parseFieldSavedAt(row.fieldSavedAt),
-      // 表达设计（#49）：列存 JSON 字符串，对外一律给按当前语义标注重算过的对象
+      // 分镜设计卡（#57）：列存 JSON 字符串，对外一律给按当前语义标注重算过的对象 + 问题列表
       ...(() => {
-        const resolved = resolveStoryboardIntent(row.intent, intentContext)
-        return { intent: resolved.intent, intent_issues: resolved.issues, intent_reviewed: row.intentReviewed === true }
+        const resolved = resolveDesignCard(row, designCardContext)
+        return { combo: resolved.combo, design_card: resolved.card, design_card_issues: resolved.issues }
       })(),
       ref_issues: [
         ...await checkStoryboardRefs(row, episodeAssets),

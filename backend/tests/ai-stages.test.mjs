@@ -86,9 +86,9 @@ test('every call site file resolves its model through resolveStageModel', () => 
   }
 })
 
-test('documentary storyboard_breaker and shot_intent are vision stages; drama breaker is not', () => {
+test('documentary storyboard_breaker and design_card are vision stages; drama breaker is not', () => {
   assert.equal(registry.stages.storyboard_breaker_documentary.vision, true)
-  assert.equal(registry.stages.shot_intent.vision, true)
+  assert.equal(registry.stages.design_card.vision, true)
   assert.equal(registry.stages.storyboard_breaker.vision, false)
   assert.equal(registry.stages.keyframe_prompts.vision, false)
   assert.equal(registry.stages.h3_prompt.vision, false)
@@ -113,11 +113,11 @@ test('resolveStageModel: vision stage forces a vision config and fails loudly wi
     const text = await resolveStageModel('keyframe_prompts', { configId: 1, model: 'glm-5.3' })
     out.text = { configId: text.configId, model: text.model, vision: text.vision }
     // 顶栏选了 GLM，视觉环节仍然换成 DeepSeek，且丢掉 GLM 的模型名
-    const vision = await resolveStageModel('shot_intent', { configId: 1, model: 'glm-5.3' })
+    const vision = await resolveStageModel('design_card', { configId: 1, model: 'glm-5.3' })
     out.vision = { configId: vision.configId, model: vision.model, vision: vision.vision, name: vision.name }
     visionConfig = null
     try {
-      await resolveStageModel('shot_intent', {})
+      await resolveStageModel('design_card', {})
       out.error = null
     } catch (err) {
       out.error = { name: err.name, isStageError: err instanceof StageVisionUnavailableError, message: err.message }

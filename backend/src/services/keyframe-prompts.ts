@@ -11,8 +11,8 @@ import { runAgent } from '../agents/run.js'
 import { createReasoningSink } from '../agents/reasoning-sink.js'
 import { logTaskError, logTaskProgress, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
 import { loadEpisodeKeyframes } from './keyframes.js'
-import { buildIntentBriefs, loadIntentContext, resolveStoryboardIntent } from './shot-intent-context.js'
-import { CLIP_RENDERED_DEVICES } from './shot-intent.js'
+import { buildDesignCardBriefs, loadDesignCardContext } from './design-card-context.js'
+import { toCombo } from './design-card.js'
 import {
   createTextTask,
   findActiveTextTask,
@@ -43,15 +43,10 @@ export async function startKeyframePromptBatch(
     .orderBy(schema.storyboards.storyboardNumber)
   const sbs = rows.filter(sb => !sb.deletedAt)
   const keyframeMap = await loadEpisodeKeyframes(episodeId)
-  // 表达设计（#49）：map_anim / archival 的整镜由确定性片段渲染，三槽位不出扩散图，
+  // 段组合 A（#57）：整镜由图层段渲染，三槽位不出扩散图，
   // 给它们写关键帧提示词只会生成一批永远不会被用到的文本
-  const intentCtx = loadIntentContext(episodeId)
-  const clipRendered = new Set(sbs
-    .filter((sb) => {
-      const intent = resolveStoryboardIntent(sb.intent, intentCtx).intent
-      return !!intent && CLIP_RENDERED_DEVICES.includes(intent.device)
-    })
-    .map(sb => sb.id))
+  const cardCtx = loadDesignCardContext(episodeId)
+  const clipRendered = new Set(sbs.filter(sb => toCombo(sb.combo) === 'A').map(sb => sb.id))
   const pending = (storyboardIds?.length
     ? sbs.filter(sb => storyboardIds.includes(sb.id))
     // 承接首帧的分镜不需要自己的 first_frame_prompt（首帧沿用上一镜尾关键帧）
@@ -59,8 +54,8 @@ export async function startKeyframePromptBatch(
       || (!(sb.firstFramePrompt || '').trim() && keyframeMap.get(sb.id)?.inheritsFirst !== true))
   ).filter(sb => !clipRendered.has(sb.id))
   if (!pending.length) return { started: false, total: 0 }
-  // 前后镜的表达设计（#49）：message 里带上，再现类镜头才能承接上一镜而不是各写各的
-  const briefs = buildIntentBriefs(sbs, intentCtx)
+  // 前后镜的设计卡（#57）：message 里带上，生成段镜头才能承接上一镜而不是各写各的
+  const briefs = buildDesignCardBriefs(sbs, cardCtx)
 
   const resolved = await resolveStageModel('keyframe_prompts', opts)
   const progress: TextTaskProgress = { completed: 0, failed: 0, total: pending.length }

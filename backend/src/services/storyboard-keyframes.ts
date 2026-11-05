@@ -29,7 +29,7 @@ import {
   type TargetBindings,
 } from './storyboard-assets.js'
 import { getDramaStylePrompt } from './style-preset.js'
-import { loadIntentContext, resolveStoryboardIntent } from './shot-intent-context.js'
+import { loadDesignCardContext, resolveDesignCard } from './design-card-context.js'
 import { isQwenJobsTask } from './sys-task.js'
 
 /** 剧集画幅 → 关键帧尺寸（与 H3 的 1080p 档位同画幅，生图侧统一按长边 1344）；Poster 复用同一档位 */
@@ -233,7 +233,10 @@ export async function buildKeyframeRequest(
 
   const issues = computeRefIssues({
     prompts: promptFieldsOf(storyboard), assets, bindings,
-    intent: resolveStoryboardIntent(storyboard.intent, loadIntentContext(storyboard.episodeId)).intent,
+    ...(() => {
+      const resolved = resolveDesignCard(storyboard, loadDesignCardContext(storyboard.episodeId))
+      return { card: resolved.card, combo: resolved.combo }
+    })(),
   })
   const blocking = blockingIssuesFor(issues, SLOT_PROMPT_FIELD[slot])
   if (blocking.length) {

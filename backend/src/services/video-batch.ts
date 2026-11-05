@@ -24,7 +24,7 @@ import { blockingIssuesFor, checkStoryboardRefs, describeIssues } from './storyb
 import { isActiveTaskStatus } from './sys-task.js'
 import { logTaskError, logTaskProgress, logTaskStart, logTaskSuccess, logTaskWarn } from '../utils/task-logger.js'
 import { transitionStatus } from './transition.js'
-import { clipPositionOfIntent } from './storyboard-clips.js'
+import { clipPositionOfCombo } from './storyboard-clips.js'
 
 export type BatchStatus = 'running' | 'done' | 'cancelled'
 export type BatchItemState = 'pending' | 'running' | 'completed' | 'failed' | 'skipped'
@@ -226,7 +226,7 @@ export async function previewEpisodeVideoBatch(
     const base = { storyboard_id: sb.id, storyboard_number: sb.storyboardNumber }
     // 整镜替代的确定性片段（#50）必须在关键帧闸门与适配器校验**之前**分流：
     // 这类镜头根本没有模型视频可生成，既不该被「关键帧尚未确认」挡住，也不该被提交到远端。
-    if (clipPositionOfIntent(sb.intent) === 'replace') {
+    if (clipPositionOfCombo(sb.combo) === 'replace') {
       result.push({
         ...base,
         status: 'deterministic',
@@ -344,7 +344,7 @@ export async function startEpisodeVideoBatch(
   // 这里兜底防止通过接口直接传 id 把它们提交到远端模型。
   const processingIds = await loadActiveStoryboardIds()
   const selected = storyboards.filter(sb => opts.storyboardIds.includes(sb.id))
-  const targets = selected.filter(sb => !processingIds.has(sb.id) && clipPositionOfIntent(sb.intent) !== 'replace')
+  const targets = selected.filter(sb => !processingIds.has(sb.id) && clipPositionOfCombo(sb.combo) !== 'replace')
   if (!targets.length) throw new Error('没有需要生成的分镜')
 
   // 预检：关键帧驱动视频必须由支持关键帧引导的模型生成（整批共用同一配置）

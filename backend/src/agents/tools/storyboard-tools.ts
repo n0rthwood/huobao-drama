@@ -21,17 +21,20 @@ import {
 import { parseReferenceImages, referenceImagePaths } from '../../services/reference-images.js'
 import { stampFieldSavedAt } from '../../services/storyboard-fields.js'
 import { MAX_NARRATION_CHARS, narrationCharCount, parseNarrationMeta, sha256 } from '../../services/narration.js'
-import { describeNarrationGaps, fitNarrationToGaps, locateNarrationInScript, narrationCoverage, scriptMatchKey } from '../../services/narration-first.js'
-import { loadIntentContext, semanticEntries } from '../../services/shot-intent-context.js'
+import { describeNarrationGaps, fitNarrationToGaps, locateNarrationInScript, narrationCoverage, narrationMatchKey, scriptMatchKey, scriptParagraphs } from '../../services/narration-first.js'
+import { loadDesignCardContext, semanticEntries } from '../../services/design-card-context.js'
 import {
-  CLIP_POSITIONS,
-  MUST_SHOW_KINDS,
-  OVERLAY_LAYER_TYPES,
-  SHOT_DEVICES,
-  normalizeShotIntent,
-  parseShotIntent,
-  serializeShotIntent,
-} from '../../services/shot-intent.js'
+  COMBOS,
+  INFO_POINT_VIAS,
+  PLANNED_LAYER_TYPES,
+  normalizeDesignCard,
+  parseDesignCard,
+  serializeDesignCard,
+  storyboardCountCap,
+  toCombo,
+  toDesignCardStatus,
+  validateDesignCard,
+} from '../../services/design-card.js'
 
 async function getEpisodeSceneIds(episodeId: number) {
   const links = await db.select().from(schema.episodeScenes)
@@ -227,10 +230,11 @@ const readStoryboardContext = createTool({
           inherits_first: kf?.inheritsFirst === true,
           previous_last_frame_prompt: prev?.lastFramePrompt || '',
           previous_result: prev?.result || '',
-          // 表达设计（#49）：前后镜的 intent 让模型知道「上一镜已经让观众看到什么」，
+          // 分镜设计卡（#57）：前后镜的设计卡让模型知道「上一镜已经让观众看到什么」，
           // 同一段落内的镜头才能共用底图与图层状态，而不是各写各的
-          intent: parseShotIntent(sb.intent),
-          intent_reviewed: sb.intentReviewed === true,
+          design_card: parseDesignCard(sb.designCard),
+          combo: toCombo(sb.combo),
+          design_card_status: toDesignCardStatus(sb.designCardStatus),
         }
       }))
 
@@ -287,49 +291,79 @@ const storyboardFields = z.object({
   continuity: z.enum(['continue', 'cut']).optional().describe("Transition from the previous shot: 'continue' means this shot starts exactly where the previous shot ended (same scene, immediately following moment, characters carried over) and this shot inherits the previous shot's LAST keyframe image as its own first keyframe, so first_frame_prompt must be left empty; 'cut' means a hard cut (scene change, time jump, flashback, or the first shot of the episode) and needs its own first_frame_prompt. Omit when unsure."),
 })
 
-/**
- * 表达设计（Issue #49）。纪录片项目每一镜都要先回答「这一镜要让观众理解什么、用什么手段、
- * 画面上必须看到哪些具体东西」，再去写画面描述与关键帧提示词。
- * `deterministic` 的默认值由服务端按 device 查表（DEVICE_DEFAULT_CLIP），越界的建议会被回落。
- */
-const intentSchema = z.object({
-  info_point: z.string().describe('The single piece of information this shot must make the viewer understand, in one sentence. Exactly one per shot.'),
-  device: z.enum(SHOT_DEVICES).describe("Expressive device: 'map_anim' animated map (region highlights, route arrows, place labels revealed over time) | 'archival' an archival document/engraving shown as-is with Ken Burns and labels | 'card' a name/year/chapter card over a portrait or still | 'reenact_still' a reenactment still image with Ken Burns | 'reenact_video' a reenactment clip from the video model."),
-  must_show: z.array(z.object({
-    kind: z.enum(MUST_SHOW_KINDS).describe("'region'/'line'/'point'/'label' refer to an entry in a faithful map asset's semantic annotation; 'route' is a from→to pair of annotated place names on one map; 'portrait' is a character asset; 'exposition' is a background-information carrier asset (an organisation/person/event mentioned in narration but not physically present in this shot)."),
-    asset_id: z.number().optional().describe('The asset id the element lives on (prop id for maps/documents, character id for portraits).'),
-    asset_kind: z.enum(['character', 'scene', 'prop']).optional().describe('Required when the id could belong to more than one asset type.'),
-    semantic: z.string().optional().describe('Name (or stable id) of the annotated element, copied exactly from the semantics list in read_storyboard_context.'),
-    from: z.string().optional().describe("Route start, an annotated place name on the same asset."),
-    to: z.string().optional().describe('Route end, an annotated place name on the same asset.'),
-    note: z.string().optional(),
-  })).optional().describe('Everything the viewer MUST be able to see for the info_point to land. Every geographic name, route or extent spoken in the narration must appear here and must exist in the asset semantics.'),
-  overlay_plan: z.array(z.object({
-    layer: z.enum(OVERLAY_LAYER_TYPES).describe('Overlay layer type to draw on top of the base image.'),
-    anchor: z.object({
-      asset_id: z.number().optional(),
-      asset_kind: z.enum(['character', 'scene', 'prop']).optional(),
-      semantic_id: z.string().optional().describe('Name or stable id of the annotated element this layer is drawn from.'),
-    }).optional(),
-    reveal_at: z.number().optional().describe('Seconds from the start of the shot when this layer appears (ordered reveal).'),
-    viewport: z.array(z.number()).length(4).optional().describe('[x, y, w, h] normalised 0–1 viewport for fly-to style map moves.'),
-    template: z.string().optional().describe("Card template name, e.g. 'name' for a name strip or 'year' for a year card."),
-    fields: z.record(z.string(), z.string()).optional().describe('Card template fields, e.g. {name, title, years}.'),
-    text: z.string().optional(),
-    note: z.string().optional(),
-  })).optional().describe('Layer plan. MUST be non-empty for device=map_anim — a map without overlays is just a prop being panned over.'),
-  deterministic: z.enum(CLIP_POSITIONS).optional().describe("Where the deterministic (programmatically rendered) clip sits relative to a model video: 'replace' whole shot, 'pre'/'post' around it, 'none' no clip. Only suggest a value for reenact_video; every other device is fixed to 'replace' by the server."),
-  rationale: z.string().optional().describe('Why this device and these elements express the narration; mention the neighbouring shots when this shot continues them.'),
+const semanticRefSchema = z.object({
+  asset_id: z.number().describe('Asset id the annotated element lives on (prop id for maps/documents).'),
+  semantic_id: z.string().describe('Stable id (or exact name) of the annotated element, copied verbatim from the semantics list in read_storyboard_context.'),
+  name: z.string().optional().describe('Human readable name of that element.'),
 })
 
-/** 纪录片项目：多一个 narration_text（#45，逐字取自剧本）与一份 intent（#49，表达设计） */
+/**
+ * 分镜设计卡（Issue #57）。纪录片每一镜都要先回答「这一镜要让观众 get 到哪几个信息点、
+ * 图层段画什么、生成段拍什么、两段各占多久」，再去写画面描述与关键帧提示词。
+ * **没有 `combo`**：段组合由人显式选，模型只写 `suggested_combo`（服务端忽略模型给的 combo）。
+ */
+const designCardSchema = z.object({
+  info_points: z.array(z.object({
+    id: z.string().optional().describe('Stable short id such as ip1.'),
+    text: z.string().describe('One piece of information the viewer must get from this shot.'),
+    via: z.enum(INFO_POINT_VIAS).describe("How this point is delivered: 'layer' drawn on the layer segment, 'generated' shown in the generated video segment, 'narration_only' carried by the narration alone."),
+  })).max(12).optional().describe('What the viewer must understand after this shot. At most 12.'),
+  budget: z.object({
+    layer_s: z.number().nullable().optional().describe('Planned length of the layer segment in seconds, at most 30. null when this shot has no layer segment.'),
+    gen_s: z.number().nullable().optional().describe('Planned length of the generated segment in seconds, at most 15. null when this shot has no generated segment.'),
+  }).optional().describe('Segment budget. layer_s + gen_s must be at least the estimated narration duration (4.5 spoken characters per second plus 0.8s tail).'),
+  layer_plan: z.object({
+    base: z.object({
+      kind: z.enum(['asset', 'inherit_prev']).describe("'asset' picks a verified faithful original / generated image; 'inherit_prev' continues the previous shot's base image."),
+      asset_kind: z.enum(['character', 'scene', 'prop']).optional(),
+      asset_id: z.number().optional(),
+    }).optional().describe('Base image of the layer segment.'),
+    must_mark: z.array(semanticRefSchema).max(20).optional().describe('Annotated elements this shot promises to mark on the base image. Every geographic name, route or extent spoken in the narration must appear here and must exist in the asset semantics.'),
+    planned_layers: z.array(z.object({
+      type: z.enum(PLANNED_LAYER_TYPES).describe('Layer type drawn on top of the base image.'),
+      text: z.string().optional().describe('Text shown by this layer (label/card content).'),
+      anchor: semanticRefSchema.optional().describe('Annotated element this layer is drawn from.'),
+      at_s: z.number().optional().describe('Seconds from the start of the layer segment when this layer appears.'),
+    })).max(40).optional().describe('Rough layer plan. A map without any layer is just a prop being panned over.'),
+  }).optional().describe('Layer segment plan. Required when the shot has a layer segment (combos A, C, D).'),
+  gen_plan: z.object({
+    reference_assets: z.array(z.object({
+      kind: z.enum(['character', 'scene', 'prop']),
+      id: z.number(),
+      name: z.string().optional(),
+    })).max(20).optional().describe('Assets the keyframe prompts must reference with @名字.'),
+    first: z.string().optional().describe('One sentence for the first story keyframe. Omit when the junction frame locks it (combo C).'),
+    mid: z.string().optional().describe('One sentence for the optional middle story keyframe.'),
+    last: z.string().optional().describe('One sentence for the last story keyframe. Omit when the junction frame locks it (combo D).'),
+  }).optional().describe('Generated segment plan. Required when the shot has a generated segment (combos B, C, D).'),
+  rationale: z.string().optional().describe('Why this plan expresses the narration; mention the neighbouring shots when this shot continues them.'),
+  suggested_combo: z.enum(COMBOS).describe("REQUIRED. Suggested segment combination ONLY: 'A' layer only, 'B' generated only, 'C' layer then generated, 'D' generated then layer. Always give exactly one suggestion — the human picks the real combo, which the server never takes from you."),
+})
+
+/** 纪录片项目：多一个 narration_text（#45，逐字取自剧本）与一份 design_card（#57，设计卡） */
 const documentaryStoryboardFields = storyboardFields.extend({
-  narration_text: z.string().optional().describe(`Narration for this shot, copied VERBATIM from a consecutive stretch of the episode script (this project's script IS the narration script). Never rewrite, shorten, merge or invent text: the tool checks that the whitespace-stripped text occurs literally in the script and rejects anything else. Cut only at sentence boundaries, at most ${MAX_NARRATION_CHARS} spoken characters per shot. Leave it out for a deliberately silent visual shot.`),
-  intent: intentSchema.optional().describe('Expression design for this shot: info point → device → must-show elements → overlay plan. Required for every documentary shot.'),
+  narration_text: z.string().optional().describe(`Narration for this shot, copied VERBATIM from a consecutive stretch of the episode script (this project's script IS the narration script). Never rewrite, shorten, merge or invent text: the tool checks that the whitespace-stripped text occurs literally in the script and rejects anything else. Cut only at sentence boundaries, at most ${MAX_NARRATION_CHARS} spoken characters per shot. Every documentary shot MUST carry narration: shots with empty narration_text are rejected and listed in rejected[], and two shots may never claim the same passage.`),
+  design_card: designCardSchema.optional().describe('Design card for this shot: info points → layer segment plan → generated segment plan → budget → rationale. Required for every documentary shot.'),
 })
 
 /** 已经执行过整集清空的运行 id（纪录片变体）：同一次运行的后续批次不再清空 */
 const replacedRuns = new Set<string>()
+
+/**
+ * 镜头数硬上限的止损（Issue #57，主进程裁决 S3）。
+ * `capStrikes` = 某集「连续整批被拒」的次数；连续 2 次就把合并建议写进 `storyboardStopReasons`，
+ * 由本次运行的调用方（chat 路由 / 补镜任务）取走并把任务判 failed，避免模型反复刷同一批。
+ */
+const capStrikes: Record<number, number> = {}
+const storyboardStopReasons: Record<number, string> = {}
+
+/** 取走本集的停机原因（取后即清）；没有则返回 null */
+export function consumeStoryboardStopReason(episodeId: number): string | null {
+  const reason = storyboardStopReasons[episodeId]
+  if (reason === undefined) return null
+  delete storyboardStopReasons[episodeId]
+  return reason
+}
 
 /** drama 与 documentary 两个变体：drama 变体的 schema / description / 行为与 #45 之前逐字一致 */
 function buildSaveStoryboards(documentary: boolean) {
@@ -404,8 +438,21 @@ function buildSaveStoryboards(documentary: boolean) {
         .map(sb => sb.narrationText)).cursor
       : 0
     const narrationRejected: { shot_number: number; reason: string }[] = []
-    // 表达设计解析出的问题（#49）汇总回传，让模型在同一次运行里改引用
-    const intentIssues: { shot_number: number; code: string; message: string }[] = []
+    // 设计卡解析出的问题（#57）汇总回传，让模型在同一次运行里改引用
+    const designCardIssues: { shot_number: number; code: string; message: string }[] = []
+    // 镜头数硬上限（契约 §8 行 1）：纪录片一集最多 min(ceil(段数×1.5), 段数+3) 镜
+    const paragraphCount = documentary ? scriptParagraphs(episodeRow?.scriptContent || episodeRow?.content).length : 0
+    const shotCap = documentary ? storyboardCountCap(paragraphCount) : 0
+    let aliveCount = existingRows.filter(sb => !sb.deletedAt).length
+    // 旁白去重：归一化文本 → 已经领走它的镜号（本集既有 + 本批）
+    const narrationOwners: Record<string, number> = {}
+    if (documentary) {
+      for (const sb of existingRows) {
+        if (sb.deletedAt) continue
+        const key = narrationMatchKey(sb.narrationText)
+        if (key) narrationOwners[key] = sb.storyboardNumber
+      }
+    }
 
     // 补镜模式的编号与旁白校验在写库之前一次算完：落在缺口外的镜头直接拒存，不留半条记录
     const fillGapList = fillGaps
@@ -419,8 +466,33 @@ function buildSaveStoryboards(documentary: boolean) {
     const narrationTrimmed: { shot_number: number; head: number; tail: number }[] = []
     const queue: Array<{ sb: typeof storyboards[number]; shotNumber: number; fillText: string }> = []
     for (const sb of storyboards) {
+      // 纪录片硬规则（契约 §8 行 1 + R8 遗留缺陷）：空旁白拒存、重复旁白拒存、超上限拒存。
+      // 这三条都在写库之前判完，被拒的镜一行都不落地。
       if (!fillGaps) {
+        if (documentary) {
+          const narration = 'narration_text' in sb && typeof sb.narration_text === 'string' ? sb.narration_text.trim() : ''
+          if (!narration) {
+            narrationRejected.push({ shot_number: sb.shot_number, reason: '纪录片每镜必须承载一段旁白：narration_text 为空的镜头不保存，请把这段画面并进相邻的有旁白镜头' })
+            continue
+          }
+          const key = narrationMatchKey(narration)
+          const owner = narrationOwners[key]
+          if (owner !== undefined && owner !== sb.shot_number) {
+            narrationRejected.push({ shot_number: sb.shot_number, reason: `这段旁白已经被分镜 #${owner} 领走了：每一段剧本原文只能属于一镜，请改切一段还没被领走的文字` })
+            continue
+          }
+          if (shotCap > 0 && !shotToId.has(sb.shot_number) && aliveCount >= shotCap) {
+            narrationRejected.push({ shot_number: sb.shot_number, reason: `本集最多 ${shotCap} 镜（旁白 ${paragraphCount} 段），已经有 ${aliveCount} 镜，请合并相邻的短句而不是继续加镜` })
+            continue
+          }
+          narrationOwners[key] = sb.shot_number
+          if (!shotToId.has(sb.shot_number)) aliveCount++
+        }
         queue.push({ sb, shotNumber: sb.shot_number, fillText: '' })
+        continue
+      }
+      if (shotCap > 0 && aliveCount >= shotCap) {
+        narrationRejected.push({ shot_number: sb.shot_number, reason: `本集最多 ${shotCap} 镜（旁白 ${paragraphCount} 段），已经有 ${aliveCount} 镜，请合并相邻的短句而不是继续补镜` })
         continue
       }
       const raw = 'narration_text' in sb && typeof sb.narration_text === 'string' ? sb.narration_text : ''
@@ -443,6 +515,7 @@ function buildSaveStoryboards(documentary: boolean) {
         narrationTrimmed.push({ shot_number: sb.shot_number, head: fit.trimmedHead, tail: fit.trimmedTail })
       }
       queue.push({ sb, shotNumber: nextShotNumber++, fillText: fit.text })
+      aliveCount++
     }
 
     for (const { sb, shotNumber, fillText } of queue) {
@@ -509,22 +582,28 @@ function buildSaveStoryboards(documentary: boolean) {
           .where(eq(schema.storyboards.id, savedId))
       }
       await syncStoryboardBindingsFromPrompts(savedId, writtenFields)
-      // 表达设计（#49）：按本集语义标注规范化后落库；解析不到的条目保留并标 unresolved，
-      // 问题汇总回传给模型，让它在同一次运行里改引用，而不是把条目删掉蒙混过关
-      if (documentary && 'intent' in sb && sb.intent) {
+      // 分镜设计卡（#57）：按本集语义标注规范化后落库；解析不到的条目保留并标 unresolved，
+      // 问题汇总回传给模型，让它在同一次运行里改引用，而不是把条目删掉蒙混过关。
+      // 模型给的 combo 一律忽略：段组合只能由人显式选，列保持 NULL。
+      if (documentary && 'design_card' in sb && sb.design_card) {
         // 上下文在这里才装配：validateStoryboardBindings 可能刚把新资产关联进本集
-        const normalized = normalizeShotIntent(sb.intent, loadIntentContext(episodeId))
-        if (normalized.intent) {
-          const intentStamp = stampFieldSavedAt(savedRow?.fieldSavedAt, ['intent'])
+        const ctx = loadDesignCardContext(episodeId)
+        const card = normalizeDesignCard(sb.design_card, ctx)
+        if (card) {
+          const cardStamp = stampFieldSavedAt(savedRow?.fieldSavedAt, ['design_card'])
           await db.update(schema.storyboards).set({
-            intent: serializeShotIntent(normalized.intent),
-            intentReviewed: false,
-            ...(intentStamp.json ? { fieldSavedAt: intentStamp.json } : {}),
+            designCard: serializeDesignCard(card),
+            designCardStatus: 'pending',
+            designCardConfirmedAt: null,
+            designCardStaleReason: null,
+            ...(cardStamp.json ? { fieldSavedAt: cardStamp.json } : {}),
             updatedAt: ts,
           }).where(eq(schema.storyboards.id, savedId))
-        }
-        for (const issue of normalized.issues) {
-          intentIssues.push({ shot_number: shotNumber, code: issue.code, message: issue.message })
+          const narrationText = 'narration_text' in sb && typeof sb.narration_text === 'string' ? sb.narration_text : ''
+          for (const issue of validateDesignCard({ card, combo: null, narrationText })) {
+            if (issue.code === 'combo_missing') continue
+            designCardIssues.push({ shot_number: shotNumber, code: issue.code, message: issue.message })
+          }
         }
       }
       // narration-first：逐字取自剧本才写库；改写过的文本不写旁白字段，画面字段照常保存
@@ -536,10 +615,8 @@ function buildSaveStoryboards(documentary: boolean) {
           : fillGaps ? { index: scriptCursor, chars }
           : locateNarrationInScript(scriptKey, text, scriptCursor)
         if (!text) {
-          // 刻意留白的纯画面镜头：关掉该镜旁白
-          await db.update(schema.storyboards)
-            .set({ narrationText: '', narrationEnabled: false, updatedAt: ts })
-            .where(eq(schema.storyboards.id, savedId))
+          // 纪录片每镜必须承载一段旁白：空文本在入队阶段就被拒了，这里只兜底不写库
+          narrationRejected.push({ shot_number: shotNumber, reason: '纪录片每镜必须承载一段旁白：narration_text 为空的镜头不保存' })
         } else if (chars > MAX_NARRATION_CHARS) {
           narrationRejected.push({ shot_number: shotNumber, reason: `narration is ${chars} characters, exceeding the per-shot limit of ${MAX_NARRATION_CHARS}; split the script passage at a sentence boundary into two shots` })
         } else if (found.index < 0) {
@@ -584,20 +661,38 @@ function buildSaveStoryboards(documentary: boolean) {
       .filter(sb => !sb.deletedAt)
       .sort((a, b) => a.storyboardNumber - b.storyboardNumber)
       .map(sb => sb.narrationText))
+    // 止损（主进程裁决 S3）：同一集连续 2 次整批被拒 → 记下停机原因，
+    // 调用方（chat 路由 / 补镜任务）在本次运行结束后把任务判 failed，避免模型无限重试同一批。
+    let capStop: string | null = null
+    if (storyboards.length > 0 && narrationRejected.length === storyboards.length) {
+      const strikes = (capStrikes[episodeId] || 0) + 1
+      capStrikes[episodeId] = strikes
+      if (strikes >= 2) {
+        capStop = `连续 ${strikes} 批分镜全部被拒。合并建议：本集旁白 ${paragraphCount} 段，最多 ${shotCap} 镜，当前已有 ${aliveCount} 镜，请把相邻短句合并成一镜再保存。`
+        storyboardStopReasons[episodeId] = capStop
+        delete capStrikes[episodeId]
+      }
+    } else {
+      delete capStrikes[episodeId]
+    }
     // 覆盖缺口（#49）：中间整段被跳过时必须当场回报，否则模型会以为切完了就收工
     // ——实测 93 镜漏掉 746 字，连「彼得一世亲自筹建近卫团」那句都没有对应镜头。
     const mustFix = coverage.gaps.length
       ? `旁白覆盖缺口：剧本有 ${coverage.gaps.length} 段（共 ${coverage.uncovered_chars} 字）还没有被任何一镜领走，必须继续补镜把它们逐字切进 narration_text（${fillGaps ? '继续新增镜头，shot_number 由服务端分配' : '在句界处插入新的 shot_number'}，不要改写原文）：${describeNarrationGaps(coverage.gaps)}`
       : null
     return {
-      message: mustFix || `Saved ${queue.length} storyboards`,
+      message: capStop || mustFix || `Saved ${queue.length} storyboards`,
       count: queue.length,
       total_duration: totalDuration,
+      rejected: narrationRejected,
       narration_rejected: narrationRejected,
-      intent_issues: intentIssues,
+      design_card_issues: designCardIssues,
+      shot_cap: shotCap || null,
+      narration_paragraphs: paragraphCount || null,
       replace_existing_ignored: replaceIgnored,
       script_coverage: coverage,
-      must_fix: mustFix,
+      must_fix: capStop || mustFix,
+      stop: capStop,
       fill_gaps_mode: fillGaps,
       narration_trimmed: narrationTrimmed,
     }
@@ -631,7 +726,7 @@ const storyboardUpdateSchema = z.object({
     prop_ids: z.array(z.number()).optional(),
     duration: z.number().optional(),
     continuity: z.enum(['continue', 'cut']).optional().describe("Transition from the previous shot: 'continue' means this shot starts exactly where the previous shot ended and inherits the previous shot's LAST keyframe image as its first keyframe (first_frame_prompt stays empty); 'cut' means a hard cut and needs its own first_frame_prompt."),
-    intent: intentSchema.optional().describe('Expression design for this shot (documentary projects only): info point → device → must-show elements → overlay plan.'),
+    design_card: designCardSchema.optional().describe('Design card for this shot (documentary projects only): info points → layer segment plan → generated segment plan → budget. Never contains combo — the human picks it.'),
 })
 const updateStoryboard = createTool({
   id: 'update_storyboard',
@@ -699,15 +794,20 @@ const updateStoryboard = createTool({
     if ('scene_id' in fields) updates.sceneId = fields.scene_id
     if ('continuity' in fields) updates.continuityBoundary = fields.continuity
     if ('duration' in fields) updates.duration = fields.duration
-    // 表达设计（#49）：写入即撤销人工确认；解析不到的引用保留并标 unresolved，回传给模型
-    const intentReport: { code: string; message: string }[] = []
-    if ('intent' in fields && fields.intent) {
-      const normalized = normalizeShotIntent(fields.intent, loadIntentContext(episodeId))
-      if (normalized.intent) {
-        updates.intent = serializeShotIntent(normalized.intent)
-        updates.intentReviewed = false
+    // 分镜设计卡（#57）：写入即回到「待审」；解析不到的引用保留并标 unresolved，回传给模型。
+    // 模型给的 combo 一律忽略（段组合只能人工选）。
+    const cardReport: { code: string; message: string }[] = []
+    if ('design_card' in fields && fields.design_card) {
+      const card = normalizeDesignCard(fields.design_card, loadDesignCardContext(episodeId))
+      if (card) {
+        updates.designCard = serializeDesignCard(card)
+        updates.designCardStatus = 'pending'
+        updates.designCardConfirmedAt = null
+        updates.designCardStaleReason = null
       }
-      for (const issue of normalized.issues) intentReport.push({ code: issue.code, message: issue.message })
+      for (const issue of validateDesignCard({ card, combo: toCombo(storyboard.combo), narrationText: storyboard.narrationText })) {
+        cardReport.push({ code: issue.code, message: issue.message })
+      }
     }
     const stamp = stampFieldSavedAt(storyboard.fieldSavedAt, Object.keys(fields))
     if (stamp.json) updates.fieldSavedAt = stamp.json
@@ -731,8 +831,8 @@ const updateStoryboard = createTool({
       characterIds: 'character_ids' in fields ? (fields.character_ids || []).join(',') : undefined,
       propIds: 'prop_ids' in fields ? (fields.prop_ids || []).join(',') : undefined,
     })
-    return intentReport.length
-      ? { message: `Storyboard ${storyboard_id} updated`, intent_issues: intentReport }
+    return cardReport.length
+      ? { message: `Storyboard ${storyboard_id} updated`, design_card_issues: cardReport }
       : { message: `Storyboard ${storyboard_id} updated` }
   },
 })
@@ -751,15 +851,15 @@ const promptSchema = storyboardUpdateSchema.pick({
 })
 const videoPromptSchema = promptSchema.pick({ storyboard_id: true, video_prompt: true })
 const keyframePromptSchema = promptSchema.omit({ video_prompt: true })
-/** 表达设计重算（#49）：单镜任务只允许写 intent，绝不能顺手重拆整集 */
-const intentOnlySchema = storyboardUpdateSchema.pick({ storyboard_id: true, intent: true })
+/** 设计卡填写（#57）：单镜任务只允许写 design_card，绝不能顺手重拆整集 */
+const designCardOnlySchema = storyboardUpdateSchema.pick({ storyboard_id: true, design_card: true })
 
 function promptUpdater(
-  inputSchema: typeof promptSchema | typeof videoPromptSchema | typeof keyframePromptSchema | typeof intentOnlySchema,
+  inputSchema: typeof promptSchema | typeof videoPromptSchema | typeof keyframePromptSchema | typeof designCardOnlySchema,
 ) {
   return createTool({
     id: 'update_storyboard',
-    description: 'Save only the fields this request permits (the requested storyboard prompts, or the shot intent). Other storyboard fields are never writable with this tool.',
+    description: 'Save only the fields this request permits (the requested storyboard prompts, or the shot design card). Other storyboard fields are never writable with this tool.',
     inputSchema,
     execute: async (input, context) => {
       const ids = requireIds(context)
@@ -776,7 +876,7 @@ function promptUpdater(
       const scope = context?.requestContext?.get('storyboardPromptScope' as never)
       const allowed = scope === 'video' ? videoPromptSchema
         : scope === 'keyframes' ? keyframePromptSchema
-        : scope === 'intent' ? intentOnlySchema
+        : scope === 'design_card' ? designCardOnlySchema
         : inputSchema
       const safe = allowed.parse(input)
       if (!Object.keys(safe).some(key => key !== 'storyboard_id')) return { error: 'No permitted fields supplied' }
@@ -791,5 +891,5 @@ export const promptStoryboardUpdaters = {
   all: promptUpdater(promptSchema),
   video: promptUpdater(videoPromptSchema),
   keyframes: promptUpdater(keyframePromptSchema),
-  intent: promptUpdater(intentOnlySchema),
+  designCard: promptUpdater(designCardOnlySchema),
 }

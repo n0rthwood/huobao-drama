@@ -29,11 +29,12 @@ import {
   scriptMatchKey,
   type NarrationGap,
 } from './narration-first.js'
-import { parseShotIntent } from './shot-intent.js'
+import { parseDesignCard } from './design-card.js'
 import { slotOwnImage } from './keyframes.js'
-import { startShotIntentBatch } from './shot-intent-batch.js'
+import { startDesignCardBatch } from './design-card-batch.js'
 import { resolveStageModel } from './ai-stages.js'
 import { buildEvidenceImages, evidenceMessageParts } from './evidence-images.js'
+import { consumeStoryboardStopReason } from '../agents/tools/storyboard-tools.js'
 import {
   createTextTask,
   findActiveTextTask,
@@ -138,6 +139,60 @@ export async function renumberStoryboardsByScript(episodeId: number): Promise<Re
   return { changed, entries, reconfirm }
 }
 
+/**
+ * 人工重排（Issue #57，契约 §8 行 2）：`ids` 必须是本集存活分镜的**全集**，
+ * 按数组顺序重写 `storyboard_number`。写法与 `renumberStoryboardsByScript` 完全一致
+ * （同一同步事务 + 两阶段负号 + 「上一镜变了就撤销关键帧确认」级联）。
+ * `ids` 不是全集时抛错，由路由转 400。
+ */
+export async function reorderStoryboards(episodeId: number, ids: number[]): Promise<RenumberResult> {
+  const { entries, reconfirm } = db.transaction(() => {
+    const rows = db.select().from(schema.storyboards)
+      .where(eq(schema.storyboards.episodeId, episodeId)).all()
+      .filter(sb => !sb.deletedAt)
+    const alive = new Set(rows.map(sb => sb.id))
+    const unique = new Set(ids)
+    if (unique.size !== ids.length) throw new Error('ids 里有重复的分镜')
+    if (ids.length !== alive.size || ids.some(id => !alive.has(id))) {
+      throw new Error(`ids 必须是本集全部 ${alive.size} 个存活分镜（收到 ${ids.length} 个）`)
+    }
+
+    const byId = new Map(rows.map(sb => [sb.id, sb]))
+    const order: RenumberEntry[] = ids.map((id, index) => ({ id, from: byId.get(id)!.storyboardNumber, to: index + 1 }))
+    const changedEntries = order.filter(entry => entry.from !== entry.to)
+    if (!changedEntries.length) return { entries: order, reconfirm: [] as number[] }
+
+    const before = previousMap([...rows].sort((a, b) => a.storyboardNumber - b.storyboardNumber))
+    const after = previousMap(order)
+    const ts = now()
+    // 第一阶段：要改号的行先写唯一负号，避开与尚未改号的行撞号
+    for (const entry of changedEntries) {
+      db.update(schema.storyboards).set({ storyboardNumber: -entry.to, updatedAt: ts })
+        .where(eq(schema.storyboards.id, entry.id)).run()
+    }
+    for (const entry of changedEntries) {
+      db.update(schema.storyboards).set({ storyboardNumber: entry.to, updatedAt: ts })
+        .where(eq(schema.storyboards.id, entry.id)).run()
+    }
+
+    const needReconfirm: number[] = []
+    for (const entry of order) {
+      if (before.get(entry.id) === after.get(entry.id)) continue
+      const row = byId.get(entry.id)!
+      if (!row.keyframesConfirmed) continue
+      if (slotOwnImage(row, 'first') || row.continuityBoundary !== 'continue') continue
+      db.update(schema.storyboards).set({ keyframesConfirmed: false, updatedAt: ts })
+        .where(eq(schema.storyboards.id, entry.id)).run()
+      needReconfirm.push(entry.id)
+    }
+    return { entries: order, reconfirm: needReconfirm }
+  })
+
+  const changed = entries.filter(entry => entry.from !== entry.to).length
+  if (changed) logTaskSuccess('Storyboard', 'reorder', { episodeId, changed, reconfirm: reconfirm.length })
+  return { changed, entries, reconfirm }
+}
+
 export interface EpisodeCoverage {
   episode_id: number
   project_type: 'drama' | 'documentary'
@@ -189,13 +244,15 @@ export async function episodeNarrationCoverage(episodeId: number): Promise<Episo
   }
 }
 
-/** 缺口两侧相邻镜的承接上下文：旁白尾/首句 + 表达设计的信息点与手段 */
+/** 缺口两侧相邻镜的承接上下文：旁白尾/首句 + 设计卡的信息点 */
 function neighbourBrief(row: typeof schema.storyboards.$inferSelect | undefined, side: 'before' | 'after'): string {
   if (!row) return side === 'before' ? '（缺口在全集开头，没有上一镜）' : '（缺口在全集结尾，没有下一镜）'
-  const intent = parseShotIntent(row.intent)
+  const card = parseDesignCard(row.designCard)
   const narration = (row.narrationText || '').trim()
   const excerpt = side === 'before' ? narration.slice(-40) : narration.slice(0, 40)
-  const design = intent ? `信息点「${intent.info_point || ''}」/ 手段 ${intent.device || ''}` : '（还没有表达设计）'
+  const design = card
+    ? `信息点「${card.info_points.map(point => point.text).join('；')}」/ 建议组合 ${card.suggested_combo || '未定'}`
+    : '（还没有设计卡）'
   return `分镜 #${row.storyboardNumber}（ID:${row.id}）：旁白…${excerpt} ｜ ${design}`
 }
 
@@ -297,12 +354,19 @@ export async function startFillGapsTask(
       const fresh = (await db.select().from(schema.storyboards)
         .where(eq(schema.storyboards.episodeId, episodeId)))
         .filter(sb => !sb.deletedAt && !knownIds.has(sb.id))
-      // 新镜的表达设计（#49）：补齐缺失的那几镜，不动既有镜
+      // 新镜的设计卡（#57）：补齐缺失的那几镜，不动既有镜
       if (fresh.length) {
-        await startShotIntentBatch(episodeId, dramaId, { model: opts.model, configId: opts.configId },
-          fresh.filter(sb => !(sb.intent || '').trim()).map(sb => sb.id))
+        await startDesignCardBatch(episodeId, dramaId, { model: opts.model, configId: opts.configId },
+          fresh.filter(sb => !(sb.designCard || '').trim()).map(sb => sb.id))
       }
       const summary = `补镜完成：新增 ${fresh.length} 镜，重编号 ${renumber.changed} 镜。\n${result.text || ''}`
+      // 镜头数硬上限的止损（#57）：连续两批整批被拒就不再让模型重试，直接给出合并建议
+      const stop = consumeStoryboardStopReason(episodeId)
+      if (stop) {
+        await finishTextTask(taskId, 'failed', { errorMsg: stop, outputText: summary })
+        logTaskError('FillGaps', 'run', { episodeId, taskId, error: stop })
+        return
+      }
       if (after && after.gap_count) {
         const detail = `旁白覆盖缺口：剧本仍有 ${after.gap_count} 段未被任何分镜领走（${describeNarrationGaps(after.gaps)}）。可以再次「补全剩余」。`
         await finishTextTask(taskId, 'failed', { errorMsg: detail, outputText: summary })

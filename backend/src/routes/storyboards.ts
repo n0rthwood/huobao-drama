@@ -22,14 +22,7 @@ import {
   syncStoryboardBindingsFromPrompts,
 } from '../services/storyboard-assets.js'
 import { parseFieldSavedAt, stampFieldSavedAt } from '../services/storyboard-fields.js'
-import { loadIntentContext, resolveStoryboardIntent } from '../services/shot-intent-context.js'
-import {
-  normalizeShotIntent,
-  parseShotIntent,
-  serializeShotIntent,
-  type IntentIssue,
-  type ShotIntent,
-} from '../services/shot-intent.js'
+import { loadDesignCardContext, resolveDesignCard } from '../services/design-card-context.js'
 import { resolveDramaProjectType } from '../services/project-type.js'
 import {
   currentTransitionSignature,
@@ -207,43 +200,6 @@ app.put('/:id', async (c) => {
     }
     updates.midFrameTime = midTime
   }
-  // 表达设计（#49）：只有纪录片项目有 intent；写入时按本集语义标注重新解析，
-  // 内容变化即撤销人工确认（除非本次请求同时显式给了 intent_reviewed）
-  let intentIssues: IntentIssue[] = []
-  let intentValue: ShotIntent | null = parseShotIntent(storyboard.intent)
-  if ('intent' in body || 'intent_reviewed' in body) {
-    const [episodeRow] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, storyboard.episodeId))
-    if (resolveDramaProjectType(episodeRow?.dramaId ?? 0) !== 'documentary') {
-      return badRequest(c, '只有纪录片项目的分镜才有表达设计')
-    }
-    // 确认与否都按**当前**语义标注重算：标注改过之后原本可解析的条目可能已经失效
-    const normalized = normalizeShotIntent('intent' in body ? body.intent : intentValue, loadIntentContext(storyboard.episodeId))
-    intentValue = normalized.intent
-    intentIssues = normalized.issues
-    if ('intent' in body) {
-      if (body.intent != null && !intentValue) {
-        return badRequest(c, 'intent 缺少合法的 device（map_anim / archival / card / reenact_still / reenact_video）')
-      }
-      updates.intent = serializeShotIntent(intentValue)
-      if (!('intent_reviewed' in body)) updates.intentReviewed = false
-    }
-  }
-  if ('intent_reviewed' in body) {
-    // 「确认」是人工背书，必须在结构机检通过、且没有悬空引用时才允许打勾
-    if (body.intent_reviewed === true) {
-      if (!intentValue) return badRequest(c, '本镜还没有表达设计，无法确认')
-      const blocking = intentIssues.filter(issue => issue.severity === 'block')
-      if (blocking.length) return badRequest(c, `表达设计未通过结构校验：${blocking.map(i => i.message).join('；')}`)
-      const unresolved = [
-        ...intentValue.must_show.filter(item => item.unresolved),
-        ...intentValue.overlay_plan.filter(item => item.unresolved),
-      ]
-      if (unresolved.length) {
-        return badRequest(c, `表达设计里还有 ${unresolved.length} 项引用解析不到（${unresolved[0]!.unresolved_reason}），请先修正`)
-      }
-    }
-    updates.intentReviewed = body.intent_reviewed === true
-  }
 
   await validateStoryboardBindings(
     storyboard.episodeId,
@@ -303,9 +259,10 @@ app.put('/:id', async (c) => {
     prop_ids: propIds,
     scene_id: updated?.sceneId ?? null,
     transition_review: parseTransitionReview(updated?.transitionReview),
-    intent: intentValue,
-    intent_issues: intentIssues,
-    intent_reviewed: updated?.intentReviewed === true,
+    ...(() => {
+      const resolved = resolveDesignCard(updated!, loadDesignCardContext(updated!.episodeId))
+      return { combo: resolved.combo, design_card: resolved.card, design_card_issues: resolved.issues }
+    })(),
     ref_issues: refIssues,
     target_assets: targetAssets,
     pool_assets: pool.pool_assets,
@@ -384,10 +341,10 @@ async function storyboardJson(id: number) {
       return !!signature && signature !== review.input_signature
     })(),
     ref_issues: await checkStoryboardRefs(row),
-    // intent 列存的是 JSON 字符串，这里换成按当前语义标注重算过的对象 + 问题列表
+    // design_card 列存的是 JSON 字符串，这里换成按当前语义标注重算过的对象 + 问题列表
     ...(() => {
-      const resolved = resolveStoryboardIntent(row.intent, loadIntentContext(row.episodeId))
-      return { intent: resolved.intent, intent_issues: resolved.issues, intent_reviewed: row.intentReviewed === true }
+      const resolved = resolveDesignCard(row, loadDesignCardContext(row.episodeId))
+      return { combo: resolved.combo, design_card: resolved.card, design_card_issues: resolved.issues }
     })(),
     keyframes: keyframesJson((await loadEpisodeKeyframes(row.episodeId)).get(row.id)),
     character_ids: await getStoryboardCharacterIds(row.id),

@@ -1,5 +1,5 @@
 /**
- * 表达设计（#49 的 `intent.overlay_plan`）→ 图层文档 + 时间线草稿（Issue #50）。
+ * 分镜设计卡的图层段计划（#57 的 `design_card.layer_plan`）→ 图层文档 + 时间线草稿（Issue #50）。
  *
  * 纯函数：不读库、不读文件。调用方（`storyboard-clips.ts`）负责把资产、语义标注、
  * 忠实原图路径装配成 `ClipDraftContext`，这里只做三件事：
@@ -20,7 +20,9 @@ import type {
 } from './asset-semantics.js'
 import type { LayerDoc } from './layer-doc.js'
 import { normalizeLayerDoc } from './layer-doc.js'
-import type { ClipPosition, OverlayPlanItem, ShotIntent } from './shot-intent.js'
+import type { Combo, DesignCard, PlannedLayer } from './design-card.js'
+import { hasLayerSegment } from './design-card.js'
+import type { ClipPosition } from './storyboard-clips.js'
 import {
   CLIP_DEFAULT_FADE_MS,
   CLIP_DEFAULT_FPS,
@@ -113,19 +115,20 @@ function imageSizeOf(asset: ClipDraftAsset): { width: number; height: number } {
 }
 
 /**
- * 底图：`map_anim`/`archival` 取被引用的那张图（必须是忠实原件，由调用方填 `image_path`），
- * `card`/再现类取肖像或资产当前图。找不到任何可用图时返回 null，由调用方报错。
+ * 底图：优先设计卡 `layer_plan.base` 指定的资产（忠实原件由调用方填 `image_path`），
+ * 否则退到被计划图层/必须标注引用的那张图。找不到任何可用图时返回 null，由调用方报错。
  */
-function pickBaseAsset(intent: ShotIntent, ctx: ClipDraftContext): ClipDraftAsset | null {
-  const anchors: unknown[] = [
-    ...intent.overlay_plan.map(item => item.anchor?.asset_id),
-    ...intent.must_show.map(item => item.asset_id),
-  ]
-  if (intent.device === 'card') {
-    const portrait = intent.must_show.find(item => item.kind === 'portrait')
-    const portraitAsset = assetOf(ctx, portrait?.asset_id)
-    if (portraitAsset?.image_path) return portraitAsset
+function pickBaseAsset(card: DesignCard, ctx: ClipDraftContext): ClipDraftAsset | null {
+  const plan = card.layer_plan
+  const base = plan?.base
+  if (base && base.kind === 'asset') {
+    const chosen = assetOf(ctx, base.asset_id)
+    if (chosen?.image_path) return chosen
   }
+  const anchors: unknown[] = [
+    ...(plan?.planned_layers || []).map(layer => layer.anchor?.asset_id),
+    ...(plan?.must_mark || []).map(ref => ref.asset_id),
+  ]
   for (const id of anchors) {
     const asset = assetOf(ctx, id)
     if (asset?.image_path && (asset.semantics?.labels.length || asset.semantics?.regions.length || asset.semantics?.lines.length || asset.semantics?.points.length)) {
@@ -145,8 +148,8 @@ interface DraftedLayer {
   points: Array<[number, number]>
 }
 
-function layerFromOverlayItem(
-  item: OverlayPlanItem,
+function layerFromPlannedLayer(
+  item: PlannedLayer,
   index: number,
   ctx: ClipDraftContext,
   base: ClipDraftAsset | null,
@@ -154,7 +157,7 @@ function layerFromOverlayItem(
 ): DraftedLayer | null {
   const id = `L${index + 1}`
   const anchorAsset = assetOf(ctx, item.anchor?.asset_id) ?? base
-  const semantic = findSemantic(anchorAsset, item.anchor?.semantic_id || item.anchor?.semantic)
+  const semantic = findSemantic(anchorAsset, item.anchor?.semantic_id || item.anchor?.name)
   const size = anchorAsset ? imageSizeOf(anchorAsset) : { width: 1, height: 1 }
   // 语义坐标是**原图像素**（#47 契约），图层坐标是归一化 0–1（#48 契约）
   const toNorm = (point: readonly number[]): [number, number] | null => {
@@ -165,35 +168,35 @@ function layerFromOverlayItem(
     return [Math.min(1, Math.max(0, x)), Math.min(1, Math.max(0, y))]
   }
   const entryName = semantic ? nameOfSemantic(semantic) : ''
-  const label = item.text || entryName || item.note || ''
+  const label = item.text || entryName || ''
   const semanticId = semantic?.entry.id || item.anchor?.semantic_id || ''
   const anchor = item.anchor?.asset_id
     ? { asset_id: item.anchor.asset_id, semantic_id: semanticId }
     : undefined
 
-  if (item.layer === 'polygon' || item.layer === 'polyline') {
+  if (item.type === 'polygon' || item.type === 'polyline') {
     const geometry = semantic && (semantic.group === 'regions' || semantic.group === 'lines')
       ? semantic.entry.points
       : []
     const points = geometry.map(toNorm).filter((point): point is [number, number] => point !== null)
     if (points.length < 2) {
-      warnings.push(`第 ${index + 1} 层（${item.layer}）缺少可用的几何坐标，已跳过：${label || '未命名'}`)
+      warnings.push(`第 ${index + 1} 层（${item.type}）缺少可用的几何坐标，已跳过：${label || '未命名'}`)
       return null
     }
     const style: Record<string, unknown> = {}
     // polyline 的箭头与描边色在 #48 白名单里分别叫 arrow_end / stroke，写错键会被静默丢弃
     if (semantic?.group === 'lines' && semantic.entry.color) style.stroke = semantic.entry.color
-    if (item.layer === 'polyline') style.arrow_end = true
+    if (item.type === 'polyline') style.arrow_end = true
     return {
       layer: {
-        id, type: item.layer, name: label || `图层 ${index + 1}`, z: index + 1,
+        id, type: item.type, name: label || `图层 ${index + 1}`, z: index + 1,
         points, style, anchor,
       },
       points,
     }
   }
 
-  if (item.layer === 'marker') {
+  if (item.type === 'marker') {
     const at = semantic?.group === 'points' ? toNorm(semantic.entry.at) : null
     if (!at) {
       warnings.push(`第 ${index + 1} 层（marker）缺少坐标，已跳过：${label || '未命名'}`)
@@ -205,7 +208,7 @@ function layerFromOverlayItem(
     }
   }
 
-  if (item.layer === 'label') {
+  if (item.type === 'label') {
     if (!label) {
       warnings.push(`第 ${index + 1} 层（label）没有文字，已跳过`)
       return null
@@ -230,9 +233,9 @@ function layerFromOverlayItem(
     }
   }
 
-  if (item.layer === 'card') {
-    const fields = item.fields || {}
-    const title = fields.title || item.text || entryName || (anchorAsset?.name ?? '')
+  if (item.type === 'card') {
+    // 卡片字段契约（{title, sub, meta, years}）归 R5：设计卡只带一句文案，先只填 title
+    const title = item.text || entryName || (anchorAsset?.name ?? '')
     if (!title) {
       warnings.push(`第 ${index + 1} 层（card）没有标题文字，已跳过`)
       return null
@@ -241,8 +244,8 @@ function layerFromOverlayItem(
     return {
       layer: {
         id, type: 'card', name: title, z: index + 1, box,
-        template: item.template || 'name',
-        fields: { title, sub: fields.sub || '', meta: fields.meta || '' },
+        template: 'name',
+        fields: { title, sub: '', meta: '' },
       },
       points: [],
     }
@@ -266,25 +269,31 @@ function layerFromOverlayItem(
 }
 
 /**
- * 按 `overlay_plan` 生成片段草稿。`null` = 本镜不该有确定性片段（`deterministic=none`）
+ * 按设计卡的 `layer_plan` 生成片段草稿。`null` = 本镜没有图层段（combo = B 或未选）
  * 或找不到任何可用底图。
  */
-export function draftClip(intent: ShotIntent, ctx: ClipDraftContext): ClipDraft | null {
-  if (intent.deterministic === 'none') return null
+export function draftClip(card: DesignCard, combo: Combo | null, ctx: ClipDraftContext): ClipDraft | null {
+  if (!hasLayerSegment(combo)) return null
   const warnings: string[] = []
-  const base = pickBaseAsset(intent, ctx)
+  const base = pickBaseAsset(card, ctx)
   if (!base?.image_path) return null
 
+  const planned = card.layer_plan?.planned_layers || []
   const drafted: DraftedLayer[] = []
-  for (const [index, item] of intent.overlay_plan.entries()) {
-    const layer = layerFromOverlayItem(item, index, ctx, base, warnings)
+  for (const [index, item] of planned.entries()) {
+    const layer = layerFromPlannedLayer(item, index, ctx, base, warnings)
     if (layer) drafted.push(layer)
   }
 
-  const position = intent.deterministic
+  // 片段位置由段组合决定（A 整镜替代、C 在模型视频之前、D 在之后）
+  const position: ClipPosition = combo === 'A' ? 'replace' : combo === 'C' ? 'pre' : 'post'
+  // 时长优先用设计卡的图层段预算，没有就退回本镜时长
+  const planSeconds = card.budget.layer_s
   const duration = clampClipDuration(
-    position === 'replace' ? Math.max(ctx.duration, CLIP_MIN_SECONDS) : CLIP_PRE_POST_DEFAULT_SECONDS,
-    position === 'replace' ? MAX_CLIP_SECONDS : 15,
+    planSeconds && planSeconds > 0 ? planSeconds
+      : position === 'replace' ? Math.max(ctx.duration, CLIP_MIN_SECONDS)
+      : CLIP_PRE_POST_DEFAULT_SECONDS,
+    MAX_CLIP_SECONDS,
   )
 
   const layerDoc = normalizeLayerDoc({
@@ -299,22 +308,20 @@ export function draftClip(intent: ShotIntent, ctx: ClipDraftContext): ClipDraft 
     layers: drafted.map(entry => entry.layer),
   })
 
-  // 关键状态：t=0 干净底图 → 按 reveal_at 逐层显现 → 推近到已显现几何的外接框
+  // 关键状态：t=0 干净底图 → 按 at_s 逐层显现 → 推近到已显现几何的外接框
   const revealed: string[] = []
   const states: ClipState[] = [{ t: 0, viewport: { ...FULL_VIEWPORT }, visible: [] }]
   const slots = drafted.length || 1
   for (const [index, entry] of drafted.entries()) {
-    const item = intent.overlay_plan[Number(String(entry.layer.id).slice(1)) - 1]
+    const item = planned[Number(String(entry.layer.id).slice(1)) - 1]
     const fallback = ((index + 1) / (slots + 1)) * duration
     const t = Math.min(
       duration - 0.4,
-      Math.max(0.2, Number.isFinite(item?.reveal_at) ? Number(item!.reveal_at) : fallback),
+      Math.max(0.2, Number.isFinite(item?.at_s) ? Number(item!.at_s) : fallback),
     )
     revealed.push(String(entry.layer.id))
-    const viewport: ClipViewport = item?.viewport
-      ? normalizeViewport(item.viewport)
-      : { ...FULL_VIEWPORT }
-    states.push({ t: Math.round(t * 100) / 100, viewport, visible: [...revealed] })
+    // 设计卡不带视口（它是导演层的图纸）：草稿一律全幅，取景由图层编辑器（R6）定
+    states.push({ t: Math.round(t * 100) / 100, viewport: { ...FULL_VIEWPORT }, visible: [...revealed] })
   }
 
   const geometry = drafted.flatMap(entry => entry.points)

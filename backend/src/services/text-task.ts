@@ -30,8 +30,8 @@ export type TextTaskKind =
   | 'asset_batch'
   /** 证据素材的语义自动标注（Issue #47）：VLM 锚点 + CV 几何，结果写 props.semantics */
   | 'asset_semantics'
-  /** 表达设计重算（Issue #49）：按镜产出 intent（信息点/device/must_show/overlay_plan） */
-  | 'shot_intent'
+  /** 设计卡填写（Issue #57）：按镜产出 design_card（信息点/图层段计划/生成段计划/预算） */
+  | 'design_card'
   /** 补全剩余（Issue #52）：只把旁白覆盖缺口补成新分镜，既有分镜原样保留 */
   | 'storyboard_fill_gaps'
   /**
@@ -48,7 +48,7 @@ export const TEXT_TASK_KINDS: TextTaskKind[] = [
   'portrait_appearance',
   'asset_batch',
   'asset_semantics',
-  'shot_intent',
+  'design_card',
   'storyboard_fill_gaps',
   'asset_pipeline',
 ]

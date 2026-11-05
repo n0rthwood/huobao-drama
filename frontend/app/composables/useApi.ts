@@ -143,31 +143,22 @@ export const episodeAPI = {
       config_id: data.config_id || undefined,
     }),
   narrationStatus: (id: number) => api.get(`/episodes/${id}/narration-status`),
-  // 表达设计（#49，纪录片）：候选上下文（资产 + 语义条目 + device/片段位置表）、
-  // 异步重算（不带 storyboard_ids = 只补齐缺失的）、批量状态（与提示词批量同一套状态模型）
-  intentContext: (id: number) =>
-    api.get<{
-      assets: Array<{
-        kind: 'character' | 'scene' | 'prop'
-        id: number
-        name: string
-        exposition?: boolean
-        faithful?: boolean
-        semantics?: Array<{ id: string; name: string; group: 'label' | 'point' | 'region' | 'line' }>
-      }>
-      devices: string[]
-      device_default_clip: Record<string, string>
-      device_allowed_clip: Record<string, string[]>
-      must_show_kinds: string[]
-      overlay_layer_types: string[]
-    }>(`/episodes/${id}/intent-context`),
-  generateIntents: (id: number, data: { storyboard_ids?: number[]; model?: string; config_id?: number } = {}) =>
-    api.post(`/episodes/${id}/generate-intents`, {
+  // 分镜设计卡（#57，纪录片）：选择器数据源（资产 + 语义条目 + 底图候选 + 上限）、
+  // 逐镜审计、批量填写（不带 storyboard_ids = 只补空白/过期）与批量状态、分镜重排。
+  designCardContext: (id: number) => api.get<DesignCardContext>(`/episodes/${id}/design-card-context`),
+  designCardAudit: (id: number) => api.get<DesignCardAuditItem[]>(`/episodes/${id}/design-cards/audit`),
+  designCardStatus: (id: number) => api.get(`/episodes/${id}/design-cards/status`),
+  fillDesignCards: (id: number, data: { storyboard_ids?: number[]; model?: string; config_id?: number } = {}) =>
+    api.post(`/episodes/${id}/design-cards/fill`, {
       storyboard_ids: data.storyboard_ids?.length ? data.storyboard_ids : undefined,
       model: data.model || undefined,
       config_id: data.config_id || undefined,
     }),
-  intentStatus: (id: number) => api.get(`/episodes/${id}/intent-status`),
+  reorderStoryboards: (id: number, ids: number[]) =>
+    api.put<{ changed: number; entries: Array<{ id: number; from: number; to: number }>; reconfirm: number[] }>(
+      `/episodes/${id}/storyboards/order`,
+      { ids },
+    ),
   // 旁白覆盖与补全剩余（Issue #52）
   narrationCoverage: (id: number) =>
     api.get<{
@@ -467,75 +458,157 @@ export const assetBatchAPI = {
   cancel: (dramaId: number) => api.post<AssetBatchStatus>(`/dramas/${dramaId}/assets/batch-generate/cancel`),
 }
 
-/** 表达设计文档（#49）：与后端 services/shot-intent.ts 的 ShotIntent 同形 */
-export type ShotDevice = 'map_anim' | 'archival' | 'card' | 'reenact_still' | 'reenact_video'
-export type ClipPosition = 'replace' | 'pre' | 'post' | 'none'
-export type MustShowKind = 'region' | 'line' | 'point' | 'label' | 'route' | 'portrait' | 'exposition'
-export type OverlayLayerType = 'polygon' | 'polyline' | 'marker' | 'label' | 'card' | 'image'
+/** 分镜设计卡（#57）：与后端 services/design-card.ts 同形 */
+export type Combo = 'A' | 'B' | 'C' | 'D'
+export const COMBOS: readonly Combo[] = ['A', 'B', 'C', 'D']
+export type DesignCardStatus = 'blank' | 'ai_filling' | 'pending' | 'confirmed' | 'stale'
+export type InfoPointVia = 'layer' | 'generated' | 'narration_only'
+export type PlannedLayerType = 'polygon' | 'polyline' | 'marker' | 'label' | 'card' | 'image'
 
-export interface MustShowItem {
-  kind: MustShowKind
-  asset_id?: number
-  asset_kind?: AssetKindName
-  semantic?: string
-  semantic_id?: string
-  semantic_name?: string
-  from?: string
-  to?: string
-  note?: string
+export interface InfoPoint {
+  id: string
+  text: string
+  via: InfoPointVia
+}
+
+export type BaseRef =
+  | {
+      kind: 'asset'
+      asset_kind: AssetKindName
+      asset_id: number
+      version_task_id: number | null
+      unresolved?: boolean
+      unresolved_reason?: string
+    }
+  | { kind: 'inherit_prev' }
+
+export interface SemanticRef {
+  asset_id: number
+  semantic_id: string
+  name: string
   unresolved?: boolean
   unresolved_reason?: string
 }
 
-export interface OverlayPlanItem {
-  layer: OverlayLayerType
-  anchor?: { asset_id?: number; asset_kind?: AssetKindName; semantic_id?: string; semantic?: string }
-  reveal_at?: number
-  viewport?: [number, number, number, number]
-  template?: string
-  fields?: Record<string, string>
+export interface AssetRef {
+  kind: AssetKindName
+  id: number
+  name: string
+  unresolved?: boolean
+  unresolved_reason?: string
+}
+
+export interface PlannedLayer {
+  type: PlannedLayerType
   text?: string
-  note?: string
-  unresolved?: boolean
-  unresolved_reason?: string
+  anchor?: SemanticRef
+  at_s: number
 }
 
-export interface ShotIntentDoc {
-  info_point: string
-  device: ShotDevice
-  must_show: MustShowItem[]
-  overlay_plan: OverlayPlanItem[]
-  deterministic: ClipPosition
-  rationale: string
-  source?: 'agent' | 'manual' | 'import'
-}
+export type CardIssueCode =
+  | 'combo_missing' | 'budget_over_layer' | 'budget_over_gen' | 'budget_under_narration'
+  | 'missing_base' | 'gen_slot_missing'
+  | 'info_point_unassigned' | 'must_mark_not_planned' | 'reference_not_mentioned'
+  | 'budget_tight' | 'unresolved_ref'
 
-export interface IntentIssue {
-  code: 'empty_info_point' | 'unresolved_must_show' | 'unresolved_overlay_anchor' | 'empty_overlay_plan' | 'clip_position_out_of_range'
+export interface CardIssue {
+  code: CardIssueCode
   severity: 'block' | 'warn'
   message: string
   index?: number
 }
 
-/** PUT /storyboards/:id 带 intent / intent_reviewed 时的相关返回字段 */
-export interface ShotIntentResult {
-  intent: ShotIntentDoc | null
-  intent_issues: IntentIssue[]
-  intent_reviewed: boolean
-  saved_at: number
-  ref_issues: Array<{ code: string; severity: 'block' | 'warn'; message: string; fields?: string[]; name?: string }>
+export interface DesignCard {
+  version: 2
+  info_points: InfoPoint[]
+  budget: { layer_s: number | null; gen_s: number | null }
+  layer_plan?: { base: BaseRef | null; must_mark: SemanticRef[]; planned_layers: PlannedLayer[] }
+  gen_plan?: { reference_assets: AssetRef[]; first?: string; mid?: string; last?: string }
+  rationale: string
+  suggested_combo: Combo | null
+  issues: CardIssue[]
+}
+
+/** 设计卡选择器数据源：GET /episodes/:id/design-card-context */
+export interface DesignCardContext {
+  assets: Array<{
+    kind: AssetKindName
+    id: number
+    name: string
+    exposition?: boolean
+    faithful?: boolean
+    image?: string | null
+    semantics?: Array<{ id: string; name: string; group: 'label' | 'point' | 'region' | 'line' }>
+  }>
+  base_candidates: Array<{
+    asset_kind: AssetKindName
+    asset_id: number
+    version_task_id: number | null
+    path: string
+    width: number
+    height: number
+    verified: boolean
+    name: string
+  }>
+  combos: Combo[]
+  info_point_vias: InfoPointVia[]
+  planned_layer_types: PlannedLayerType[]
+  limits: {
+    layer_s: number
+    gen_s: number
+    narration_cps: number
+    info_points: number
+    planned_layers: number
+    must_mark: number
+    rationale: number
+  }
+}
+
+/** 单镜写入 / 确认 / 取消确认的统一返回 */
+export interface DesignCardShotState {
+  storyboard_id: number
+  shot_number: number
+  narration_text: string
+  combo: Combo | null
+  design_card: DesignCard | null
+  design_card_status: DesignCardStatus
+  design_card_confirmed_at: string | null
+  design_card_stale_reason: string | null
+  issues: CardIssue[]
+  narration_estimate_s: number
+  narration_measured_s: number | null
+}
+
+/** GET /episodes/:id/design-cards/audit 的逐镜条目 */
+export interface DesignCardAuditItem {
+  storyboard_id: number
+  shot_number: number
+  narration_text: string
+  combo: Combo | null
+  suggested_combo: Combo | null
+  status: DesignCardStatus
+  confirmed_at: string | null
+  stale_reason: string | null
+  has_card: boolean
+  unresolved: number
+  issues: CardIssue[]
+  narration_estimate_s: number
+  narration_measured_s: number | null
+  budget: { layer_s: number | null; gen_s: number | null }
 }
 
 export const storyboardAPI = {
   create: (data: any) => api.post('/storyboards', data),
   update: (id: number, data: any) => api.put(`/storyboards/${id}`, data),
   del: (id: number) => api.del(`/storyboards/${id}`),
-  // 表达设计（#49）：整份 intent 文档覆盖写（后端整份替换，不做字段级合并），
-  // 写入内容即撤销人工确认；intent_reviewed 单独打勾（结构不合格时后端 400）
-  setIntent: (id: number, intent: ShotIntentDoc | null) =>
-    api.put<ShotIntentResult>(`/storyboards/${id}`, { intent }),
-  setIntentReviewed: (id: number, reviewed: boolean) =>
-    api.put<ShotIntentResult>(`/storyboards/${id}`, { intent_reviewed: reviewed }),
+  // 分镜设计卡（#57）：整份 design_card + combo 覆盖写（后端整份替换，不做字段级合并），
+  // 写入即回到「待审」；确认 / 取消确认各一个动作，三者返回同形 DesignCardShotState。
+  setDesignCard: (id: number, data: { combo?: Combo | null; design_card?: DesignCard | null }) =>
+    api.put<DesignCardShotState>(`/storyboards/${id}/design-card`, data),
+  confirmDesignCard: (id: number, acknowledge = false) =>
+    api.post<DesignCardShotState>(`/storyboards/${id}/design-card/confirm`, acknowledge ? { acknowledge: true } : {}),
+  unconfirmDesignCard: (id: number) =>
+    api.post<DesignCardShotState>(`/storyboards/${id}/design-card/unconfirm`),
   // 视频生成参数（关键帧引导、参考图 / @图片N 映射 / 分辨率）全部由后端组装
   generateVideo: (id: number, data: { model?: string; config_id?: number }) =>
     api.post(`/storyboards/${id}/generate-video`, { model: data.model || undefined, config_id: data.config_id || undefined }),
