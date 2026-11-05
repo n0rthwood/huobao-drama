@@ -21,6 +21,7 @@ import { now } from '../utils/response.js'
 import { getAbsolutePath } from '../utils/storage.js'
 import { toCombo } from './design-card.js'
 import { junctionFramesOfEpisode, type JunctionFrame } from './junction-frame.js'
+import { resolveDramaProjectType } from './project-type.js'
 
 export type KeyframeSlot = 'first' | 'mid' | 'last'
 
@@ -236,6 +237,65 @@ export class SlotLockedError extends Error {
     this.name = 'SlotLockedError'
     this.slot = slot
   }
+}
+
+export interface KeyframeIneligibility {
+  code: 'comboA' | 'lockedSlot' | 'emptyPrompt'
+  reason: string
+}
+
+/** 生成资格不参与内容签名；A 的优先级高于锁槽和空稿，已有稿件/图片保持原样。 */
+export function keyframeIneligibility(
+  row: StoryboardRow,
+  slot: KeyframeSlot,
+  documentary: boolean,
+  state?: StoryboardKeyframeState,
+): KeyframeIneligibility | null {
+  if (documentary && toCombo(row.combo) === 'A') {
+    return { code: 'comboA', reason: '组合 A 仅图层段，不单独生成故事关键帧' }
+  }
+  if (documentary && state?.lockedSlots.includes(slot)) {
+    return { code: 'lockedSlot', reason: '该槽位由衔接帧或承接上一镜尾帧锁定继承，不单独出图' }
+  }
+  if (!slotPrompt(row, slot)) {
+    return {
+      code: 'emptyPrompt',
+      reason: slot === 'first' && state?.inheritsFirst
+        ? '承接上一镜尾帧，没有自有首帧提示词'
+        : `${SLOT_LABEL[slot]}提示词为空`,
+    }
+  }
+  return null
+}
+
+export class KeyframeIneligibleError extends Error {
+  constructor(readonly eligibility: KeyframeIneligibility) {
+    super(eligibility.reason)
+    this.name = 'KeyframeIneligibleError'
+  }
+}
+
+/** 每次读当前库状态，覆盖直接提交、重试和重启恢复，不信任预览/任务快照。 */
+export async function loadKeyframeIneligibility(
+  storyboardId: number,
+  slot: KeyframeSlot,
+): Promise<KeyframeIneligibility | null> {
+  const row = db.select().from(schema.storyboards).where(eq(schema.storyboards.id, storyboardId)).get()
+  if (!row || row.deletedAt) throw new Error('镜头不存在')
+  const episode = db.select().from(schema.episodes).where(eq(schema.episodes.id, row.episodeId)).get()
+  const documentary = resolveDramaProjectType(episode?.dramaId) === 'documentary'
+  const state = documentary ? await loadStoryboardKeyframes(storyboardId) : undefined
+  return keyframeIneligibility(row, slot, documentary, state ?? undefined)
+}
+
+export async function assertKeyframeEligible(
+  storyboardId: number,
+  slot: KeyframeSlot,
+  storedPrompt = false,
+): Promise<void> {
+  const excluded = await loadKeyframeIneligibility(storyboardId, slot)
+  // 重试沿用原任务提示词，不要求当前草稿仍有文本。
+  if (excluded && !(storedPrompt && excluded.code === 'emptyPrompt')) throw new KeyframeIneligibleError(excluded)
 }
 
 /** 写锁定槽位前的唯一检查（PUT 选图继承 / POST 生成 共用） */

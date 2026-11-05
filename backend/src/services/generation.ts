@@ -12,7 +12,7 @@ import { authHeaders } from './adapters/comfyui-client'
 import { getImageAdapter, getVideoAdapter } from './adapters/registry'
 import type { AIConfig, ImageGenerationRecord, VideoGenerationRecord } from './adapters/types'
 import { logTaskError, logTaskPayload, logTaskProgress, logTaskStart, logTaskSuccess, logTaskWarn, redactUrl } from '../utils/task-logger.js'
-import { FRAME_TYPE_SLOT, invalidateKeyframeConfirmation } from './keyframes.js'
+import { assertKeyframeEligible, FRAME_TYPE_SLOT, invalidateKeyframeConfirmation, KeyframeIneligibleError } from './keyframes.js'
 import { completionStamp } from './media-time.js'
 import { saveStylingVersion } from './styling-version.js'
 import { onAssetLibraryChanged } from './asset-review.js'
@@ -141,9 +141,12 @@ export async function generateImage(params: GenerateImageParams): Promise<number
     throw new Error('FLUX 不支持底图＋文字图层的双参考图模式，请改用合成图再生成')
   }
 
+  const episodeId = await resolveEpisodeId(params)
+  const slot = FRAME_TYPE_SLOT[String(params.frameType || '')]
+  if (params.storyboardId && slot) await assertKeyframeEligible(params.storyboardId, slot, true)
   const id = await createTask('image', config, {
     storyboardId: params.storyboardId,
-    episodeId: await resolveEpisodeId(params),
+    episodeId,
     dramaId: params.dramaId,
     sceneId: params.sceneId,
     characterId: params.characterId,
@@ -298,6 +301,25 @@ function parseTaskParams(raw: string | null | undefined): Record<string, any> {
   }
 }
 
+/** 任务可能在上传/恢复期间改成 A 或锁槽；任何上游提交前都读当前资格。 */
+async function imageTaskEligible(record: SysTaskRecord, params = parseTaskParams(record.params)): Promise<boolean> {
+  const slot = FRAME_TYPE_SLOT[String(params.frameType || '')]
+  if (!record.storyboardId || !slot) return true
+  try {
+    await assertKeyframeEligible(record.storyboardId, slot, true)
+    return true
+  } catch (err) {
+    if (!(err instanceof KeyframeIneligibleError)) throw err
+    await db.update(schema.sysTask).set({
+      status: 'cancelled',
+      errorMsg: err.message,
+      params: JSON.stringify({ ...params, keyframe_skip_reason: err.eligibility }),
+      updatedAt: now(),
+    }).where(eq(schema.sysTask.id, record.id))
+    return false
+  }
+}
+
 async function processTask(id: number, config: AIConfig) {
   try {
     const [record] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, id))
@@ -316,6 +338,7 @@ async function processTask(id: number, config: AIConfig) {
     let url: string, method: string, headers: Record<string, string>, body: unknown
 
     if (type === 'image') {
+      if (!await imageTaskEligible(record, params)) return
       // qwen-jobs：服务端排队的任务 API，提交后由追踪器（services/qwen-jobs.ts）按远端 id 跟踪
       if (isQwenJobsTask(config.provider)) {
         // 追踪器可能已经抢先在恢复这一行（3 s 一拍）：同一任务只允许一个提交在途
@@ -393,6 +416,7 @@ async function processTask(id: number, config: AIConfig) {
       body: isMultipart ? `[multipart/form-data: ${[...(body as FormData).keys()].join(', ')}]` : body,
     })
 
+    if (type === 'image' && !await imageTaskEligible(record, params)) return
     const resp = await fetch(url, {
       method,
       headers,
@@ -472,6 +496,7 @@ const inFlightQwenSubmits = new Set<number>()
  * 参考图被服务端回收（422 unknown reference image）时清掉 file id 缓存并重传一次。
  */
 async function submitQwenJobsImage(record: SysTaskRecord, config: AIConfig, params: Record<string, any>) {
+  if (!await imageTaskEligible(record, params)) return
   const refs = params.posterId
     ? await normalizePosterReferenceImages(params.posterGenMode, params.referenceImages)
     : await normalizeReferenceImages(params.referenceImages)
@@ -539,6 +564,8 @@ async function sendQwenJob(
   idempotencyKey: string,
 ): Promise<SendResult> {
   try {
+    const record = db.select().from(schema.sysTask).where(eq(schema.sysTask.id, id)).get()
+    if (!record || !isActiveTaskStatus(record.status) || !await imageTaskEligible(record)) return 'failed'
     const job = await createQwenJob(config, body, idempotencyKey)
     const row = await patchTaskRemoteState(id, remoteSnapshot(job), {
       taskId: job.id,
@@ -586,6 +613,7 @@ export async function resumeQwenJobsTask(row: SysTaskRecord, config: AIConfig): 
   if (inFlightQwenSubmits.has(row.id)) return
   inFlightQwenSubmits.add(row.id)
   try {
+    if (!await imageTaskEligible(row)) return
     const state = parseRemoteState(row.remoteState)
     const idempotencyKey = state.idempotency_key || qwenIdempotencyKey(row.id)
     if (state.request) {

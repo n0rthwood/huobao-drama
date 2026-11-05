@@ -42,6 +42,7 @@ import {
   SLOT_FRAME_TYPE,
   SlotLockedError,
   assertSlotWritable,
+  loadKeyframeIneligibility,
   invalidateKeyframeConfirmation,
   isKeyframeSlot,
   keyframesJson,
@@ -374,6 +375,9 @@ app.post('/:id/keyframes/:slot/generate', async (c) => {
   await assertShotGate(id, 'production')
   try {
     await assertSlotWritable(id, slot)
+    const excluded = await loadKeyframeIneligibility(id, slot)
+    // 可在本次请求里补空稿；组合/锁槽拒绝必须在保存提示词之前。
+    if (excluded && excluded.code !== 'emptyPrompt') return badRequest(c, excluded.reason)
   } catch (err) {
     if (err instanceof SlotLockedError) return c.json({ code: err.code, message: err.message }, 400)
     throw err
