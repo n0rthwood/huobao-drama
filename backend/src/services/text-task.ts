@@ -40,6 +40,8 @@ export type TextTaskKind =
    * 它可以长时间停在「等待人工审批」上，因此被 `failInterruptedTextTasks()` 显式排除。
    */
   | 'asset_pipeline'
+  /** 资产审核清单（Issue #55）：逐段对照旁白稿列「信息点 → 需要的素材 → 有/缺」 */
+  | 'asset_review'
 
 export const TEXT_TASK_KINDS: TextTaskKind[] = [
   'extract_characters', 'extract_scenes', 'extract_props',
@@ -51,6 +53,7 @@ export const TEXT_TASK_KINDS: TextTaskKind[] = [
   'design_card',
   'storyboard_fill_gaps',
   'asset_pipeline',
+  'asset_review',
 ]
 
 /**
@@ -91,6 +94,8 @@ export interface TextTaskParams {
   model_used?: StageModelUsed
   /** 纪录片角色花名册（Issue #32）：先定人再提取，保证多次运行的角色覆盖一致 */
   roster?: { name: string; basis?: string; reason?: string }[]
+  /** 补提取（Issue #55）：该提取任务是为哪条审核清单条目发起的，完成后按它回链 */
+  assetReviewItemId?: number
   [key: string]: unknown
 }
 

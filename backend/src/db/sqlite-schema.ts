@@ -565,6 +565,30 @@ export const sqliteSchemaStatements = [
     created_at TEXT NOT NULL
   )`,
   `CREATE INDEX IF NOT EXISTS idx_asset_qc_round ON asset_qc_record (round_id)`,
+  // 资产审核清单（Issue #55）：AI 逐段对照旁白稿列「信息点 → 需要的素材 → 有/缺」，
+  // 每条必须被处置（have/added/ignored/not_needed）后「分镜设计」步才解锁。
+  // fingerprint = sha256(归一化信息点 + need_kind)，重新对照时同指纹保留处置结果。
+  `CREATE TABLE IF NOT EXISTS asset_review_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    episode_id INTEGER NOT NULL,
+    run_id INTEGER NOT NULL,
+    segment_no INTEGER NOT NULL,
+    narration_excerpt TEXT NOT NULL,
+    info_point TEXT NOT NULL,
+    need_kind TEXT NOT NULL,
+    need_desc TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'missing',
+    asset_kind TEXT,
+    asset_id INTEGER,
+    semantic_id TEXT,
+    reason TEXT,
+    decided_at TEXT,
+    fingerprint TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_asset_review_items_fp ON asset_review_items (episode_id, fingerprint)`,
+  `CREATE INDEX IF NOT EXISTS idx_asset_review_items_episode ON asset_review_items (episode_id, segment_no)`,
 ]
 
 /**
