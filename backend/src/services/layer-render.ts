@@ -58,7 +58,7 @@ function collectTexts(doc: LayerDoc): string[] {
   for (const layer of doc.layers) {
     if (!layer.visible) continue
     if (layer.type === 'label' || layer.type === 'marker') texts.push(layer.text)
-    if (layer.type === 'card') texts.push(layer.fields.title, layer.fields.sub, layer.fields.meta)
+    if (layer.type === 'card') texts.push(layer.fields.title, layer.fields.sub, layer.fields.meta, layer.fields.years)
   }
   return texts.filter(Boolean)
 }

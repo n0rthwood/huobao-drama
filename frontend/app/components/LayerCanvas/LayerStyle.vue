@@ -96,6 +96,7 @@
         <label class="ls-row ls-wide"><span>{{ t('layerCanvas.style.title') }}</span><input :value="layer.fields.title" @input="setField('title', $event.target.value)" @change="endEdit"></label>
         <label class="ls-row ls-wide"><span>{{ t('layerCanvas.style.sub') }}</span><input :value="layer.fields.sub" @input="setField('sub', $event.target.value)" @change="endEdit"></label>
         <label class="ls-row ls-wide"><span>{{ t('layerCanvas.style.meta') }}</span><input :value="layer.fields.meta" @input="setField('meta', $event.target.value)" @change="endEdit"></label>
+        <label class="ls-row ls-wide"><span>{{ t('layerCanvas.style.years') }}</span><input :value="layer.fields.years" @input="setField('years', $event.target.value)" @change="endEdit"></label>
         <label class="ls-row"><span>{{ t('layerCanvas.style.font') }}</span><select :value="value('font')" @change="setStyle('font', $event.target.value); endEdit()"><option v-for="font in FONTS" :key="font" :value="font">{{ t(`layerCanvas.font.${font}`) }}</option></select></label>
         <label class="ls-row"><span>{{ t('layerCanvas.style.bg') }}</span><input type="color" :value="value('bg')" @input="setStyle('bg', $event.target.value)" @change="endEdit"></label>
         <label class="ls-row"><span>{{ t('layerCanvas.style.bgOpacity') }}</span><input type="range" min="0" max="1" step="0.05" :value="value('bg_opacity')" @input="setStyle('bg_opacity', Number($event.target.value))" @change="endEdit"><em>{{ value('bg_opacity') }}</em></label>
