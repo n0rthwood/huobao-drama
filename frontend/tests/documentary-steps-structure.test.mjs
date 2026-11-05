@@ -114,7 +114,6 @@ test('每步一个稳定挂载组件，episode.vue 只剩挂载行', () => {
     assert.match(episodeView, new RegExp(`<${name}[\\s/>]`), `${name} 必须在 episode.vue 挂载`)
   }
   // 设计卡与图层工作台的内部实现已经搬进面板组件，episode.vue 不再直接渲染
-  assert.doesNotMatch(episodeView, /ShotIntentPanel/)
   assert.doesNotMatch(episodeView, /ClipWorkspace/)
   assert.doesNotMatch(episodeView, /ClipCard/)
 })

@@ -218,8 +218,9 @@ const cropStyle = computed(() => {
   }
 })
 
-function deviceLabel(device) { return device ? t(`episode.intent.deviceLabel.${device}`) : '' }
-function clipLabel(position) { return position ? t(`episode.intent.clipLabel.${position}`) : '' }
+// 段标签（R5 会按段组合重构本组件，这里只做键名替换，口径统一为「图层段」）
+function deviceLabel() { return t('episode.design.segment.layer') }
+function clipLabel() { return t('episode.design.segment.layer') }
 
 function statusOf(sbId) {
   const item = clips.value[sbId]

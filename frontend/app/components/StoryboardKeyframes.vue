@@ -173,12 +173,11 @@
             </div>
             <div class="kf-row-meta">
               <span :class="['kf-state', 'is-' + shotState(sb)]">{{ shotStateLabel(sb) }}</span>
-              <span v-if="deviceLabelOf(sb)" class="kf-device-badge">{{ deviceLabelOf(sb) }}</span>
               <span
-                v-if="intentUnreviewed(sb)"
+                v-if="designUnconfirmed(sb)"
                 class="kf-intent-warn"
-                :title="t('episode.intent.unreviewedHint')"
-              >{{ t('episode.intent.unreviewedShort') }}</span>
+                :title="t('episode.design.unconfirmedHint')"
+              >{{ t('episode.design.unconfirmedShort') }}</span>
               <span v-if="kf(sb).inheritsFirst" class="kf-inherit-tag" :title="t('episode.kf.inheritTip')">{{ t('episode.kf.inherit') }}</span>
               <span
                 v-if="issuesOf(sb).length"
@@ -195,12 +194,11 @@
         <div class="kf-editor-head">
           <div class="kf-editor-title">{{ t('episode.kf.editorTitle', { n: String(selectedIndex + 1).padStart(2, '0') }) }}</div>
           <span :class="['kf-state', 'is-' + shotState(selected)]">{{ shotStateLabel(selected) }}</span>
-          <span v-if="deviceLabelOf(selected)" class="kf-device-badge">{{ deviceLabelOf(selected) }}</span>
           <span
-            v-if="intentUnreviewed(selected)"
+            v-if="designUnconfirmed(selected)"
             class="kf-intent-warn"
-            :title="t('episode.intent.unreviewedHint')"
-          >{{ t('episode.intent.unreviewedHint') }}</span>
+            :title="t('episode.design.unconfirmedHint')"
+          >{{ t('episode.design.unconfirmedHint') }}</span>
         </div>
 
         <div class="kf-editor-body">
@@ -339,41 +337,12 @@
             </div>
           </section>
 
-          <!-- 由片段渲染（#50）：map_anim / archival 且本镜有整镜替代片段时，三槽位不出图 -->
-          <section v-if="clipPlaceholder(selected)" class="kf-section kf-clip-placeholder">
-            <div class="kf-section-head">
-              <span class="kf-section-label">{{ t('episode.intent.clipRendered') }}</span>
-              <span class="dim" style="font-size:11px">{{ t('episode.clip.keyframeReplaced') }}</span>
-              <span class="ml-auto" />
-              <button type="button" class="btn btn-sm" @click="emit('goto-clip', selected)">{{ t('episode.clip.gotoEditor') }}</button>
-            </div>
-            <div class="kf-clip-thumbs">
-              <button
-                v-for="which in ['first', 'last']" :key="which"
-                type="button" class="kf-clip-thumb" :style="{ aspectRatio: previewAspect }"
-                @click="emit('goto-clip', selected)"
-              >
-                <img v-if="clipThumbUrl(selected, which)" :src="clipThumbUrl(selected, which)" loading="lazy" :alt="t(`episode.clip.thumb.${which}`)">
-                <span class="kf-clip-thumb-tag">{{ t(`episode.clip.thumb.${which}`) }}</span>
-              </button>
-            </div>
-          </section>
-
-          <section v-for="slot in (clipPlaceholder(selected) ? [] : SLOT_KEYS)" :key="slot" class="kf-section kf-slot-card">
+          <!-- 段组合 A（只用图层段）的镜头不渲染故事关键帧区 -->
+          <section v-for="slot in (comboOf(selected) === 'A' ? [] : SLOT_KEYS)" :key="slot" class="kf-section kf-slot-card">
             <div class="kf-section-head">
               <span class="kf-section-label">{{ slotLabel(slot) }}</span>
               <span v-if="slot === 'first' && kf(selected).inheritsFirst" class="kf-inherit-tag">{{ t('episode.kf.inheritedFirst', { n: shotNumberOf(previousOf(selected)) }) }}</span>
               <span v-if="slot === 'mid' && midSlotState(selected)" class="dim" style="font-size:11px" :title="midSlotState(selected) === 'optional' ? t('episode.kf.midOptionalHint') : undefined">{{ t(midSlotState(selected) === 'optional' ? 'episode.kf.midOptional' : 'episode.kf.midRequired') }}</span>
-              <span
-                v-if="clipRendered(selected)"
-                class="kf-clip-rendered"
-                :title="t('episode.intent.clipRenderedHint')"
-              >{{ t('episode.intent.clipRendered') }}</span>
-              <span
-                v-if="slotIntentUnmet(selected, slot)"
-                class="kf-intent-warn"
-                :title="slotBlockReason(selected, slot)"
-              >{{ t('episode.intent.unmetSlotHint') }}</span>
               <span class="ml-auto" />
               <button
                 type="button"
@@ -402,7 +371,6 @@
                   <img v-if="slotImage(selected, slot)" :src="thumbOf(imgSrc(slotImage(selected, slot)))" loading="lazy" @error="onThumbError($event, slotImage(selected, slot))" />
                   <span v-else class="kf-preview-empty">
                     <template v-if="isSlotPending(selected, slot)">{{ t('episode.kf.generating') }}</template>
-                    <template v-else-if="clipRendered(selected)">{{ t('episode.intent.clipRendered') }}</template>
                     <template v-else-if="slot === 'mid' && midSlotState(selected)">
                       {{ t(midSlotState(selected) === 'optional' ? 'episode.kf.midOptional' : 'episode.kf.midRequired') }}
                     </template>
@@ -747,34 +715,14 @@ function slotBlockReason(sb, slot) {
   return slotIssues(sb, slot).filter(i => i.severity === 'block').map(i => i.message).join(t('common.listJoin'))
 }
 
-// ===== 表达设计（#49）：本页只读展示 device / 未确认提示 / 「由片段渲染」状态 =====
-// map_anim 与 archival 整镜由 #50 的确定性片段渲染，三槽位不走扩散出图（与后端
-// services/shot-intent.ts 的 CLIP_RENDERED_DEVICES 一致）
-const CLIP_RENDERED_DEVICES = ['map_anim', 'archival']
-function intentOf(sb) {
-  return sb?.intent || null
+// ===== 分镜设计卡（#57）：本页只读展示段组合与「设计卡未确认」提示 =====
+/** 段组合 A 只有图层段，本页的故事关键帧区整块不渲染 */
+function comboOf(sb) {
+  return sb?.combo ?? null
 }
-function deviceLabelOf(sb) {
-  const device = intentOf(sb)?.device
-  return device ? t(`episode.intent.deviceLabel.${device}`) : ''
-}
-function clipRendered(sb) {
-  return CLIP_RENDERED_DEVICES.includes(intentOf(sb)?.device)
-}
-/** 整镜由确定性片段替代（#50）：三槽位改为「由片段渲染」占位，不出生图入口 */
-function clipPlaceholder(sb) {
-  return clipRendered(sb) && props.clipOf(sb)?.position === 'replace'
-}
-function clipThumbUrl(sb, which) {
-  return props.clipThumbnail(sb, which) || ''
-}
-/** 有表达设计但人还没确认：表达设计页去确认（生成不拦截） */
-function intentUnreviewed(sb) {
-  return Boolean(intentOf(sb)) && (sb?.intent_reviewed ?? sb?.intentReviewed) !== true
-}
-/** 该槽位提示词没 @ 到表达设计要求的资产（后端 intent_unmet，已由 slotBlocked 拦住生成） */
-function slotIntentUnmet(sb, slot) {
-  return slotIssues(sb, slot).some(issue => issue.code === 'intent_unmet')
+/** 设计卡未确认：到分镜设计步骤确认（生成不拦截） */
+function designUnconfirmed(sb) {
+  return (sb?.design_card_status ?? sb?.designCardStatus ?? 'blank') !== 'confirmed'
 }
 
 /** 字段保存状态：由工作台按（分镜, 字段）维护 */
@@ -1782,16 +1730,6 @@ onBeforeUnmount(() => {
 .kf-ref-issue-count { font-size: 11px; }
 .kf-ref-issue-count.is-block { color: var(--action-danger); }
 .kf-ref-issue-count.is-warn { color: var(--tag-warning-text); }
-/* 表达设计（#49）：device 徽标 / 未确认提示 / 由片段渲染 */
-.kf-device-badge {
-  padding: 1px 6px; border-radius: 999px; font-size: 11px;
-  background: var(--bg-3); color: var(--text-2);
-}
+/* 分镜设计卡（#57）：未确认提示 */
 .kf-intent-warn { font-size: 11px; color: var(--tag-warning-text); }
-.kf-clip-rendered { font-size: 11px; color: var(--text-3); }
-.kf-clip-placeholder { display: flex; flex-direction: column; gap: 8px; }
-.kf-clip-thumbs { display: flex; gap: 10px; flex-wrap: wrap; }
-.kf-clip-thumb { position: relative; flex: 1; min-width: 160px; max-width: 280px; padding: 0; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; background: var(--bg-3); cursor: pointer; }
-.kf-clip-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.kf-clip-thumb-tag { position: absolute; left: 4px; bottom: 4px; font-size: 10px; padding: 1px 4px; border-radius: 4px; background: rgba(0, 0, 0, 0.55); color: #fff; }
 </style>
