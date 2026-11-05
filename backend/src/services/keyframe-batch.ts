@@ -15,6 +15,9 @@ import { db, getInsertId, schema } from '../db/index.js'
 import { now } from '../utils/response.js'
 import {
   KEYFRAME_SLOTS,
+  KeyframeIneligibleError,
+  keyframeIneligibility,
+  loadKeyframeIneligibility,
   SLOT_FRAME_TYPE,
   SLOT_LABEL,
   loadEpisodeKeyframes,
@@ -395,23 +398,12 @@ export async function previewEpisodeKeyframeBatch(
     })
 
     for (const slot of KEYFRAME_SLOTS) {
-      // 中间帧只在 LLM 给了提示词时才存在，不写进清单
-      if (slot === 'mid' && !slotPrompt(sb, 'mid')) continue
       const base = { storyboard_id: sb.id, storyboard_number: sb.storyboardNumber, slot }
-      // 锁定槽（衔接帧继承 / 承接上一镜）不出图，批量里既不勾选也不报「提示词为空」
-      if (state?.lockedSlots?.includes(slot)) {
-        result.push({ ...base, status: 'skipped', checked: false, reason: '该槽位由衔接帧锁定继承，不单独出图' })
-        continue
-      }
-      if (!slotPrompt(sb, slot)) {
-        result.push({
-          ...base,
-          status: 'skipped',
-          checked: false,
-          reason: slot === 'first' && state?.inheritsFirst
-            ? '承接上一镜尾帧，没有自有首帧提示词'
-            : `${SLOT_LABEL[slot]}提示词为空`,
-        })
+      const excluded = keyframeIneligibility(sb, slot, context.drama?.projectType === 'documentary', state)
+      // 普通镜头的空中间帧不列出；A 三槽始终明确显示组合排除原因。
+      if (slot === 'mid' && !slotPrompt(sb, slot) && excluded?.code !== 'comboA') continue
+      if (excluded) {
+        result.push({ ...base, status: 'skipped', checked: false, reason: excluded.reason })
         continue
       }
       if (active.includes(`${sb.id}:${SLOT_FRAME_TYPE[slot]}`)) {
@@ -492,9 +484,10 @@ export async function startEpisodeKeyframeBatch(
       task_id: null,
       error: null,
     }
-    if (!slotPrompt(sb, target.slot)) {
+    const excluded = await loadKeyframeIneligibility(sb.id, target.slot)
+    if (excluded) {
       item.state = 'skipped'
-      item.error = `${SLOT_LABEL[target.slot]}提示词为空，已跳过`
+      item.error = excluded.reason
     } else if (active.includes(`${sb.id}:${SLOT_FRAME_TYPE[target.slot]}`)) {
       item.state = 'skipped'
       item.error = '该槽位正在生成中，已跳过'
@@ -534,6 +527,11 @@ export async function startEpisodeKeyframeBatch(
   await startRunner(batchId, episodeId, options)
   const row = await loadBatch(batchId)
   return await toStatus(row!)
+}
+
+function taskSkippedForEligibility(task: typeof schema.sysTask.$inferSelect): boolean {
+  if (task.status !== 'cancelled') return false
+  try { return !!JSON.parse(task.params || '{}').keyframe_skip_reason } catch { return false }
 }
 
 /** sys_task 状态 → 批次项状态 */
@@ -591,9 +589,11 @@ async function runParallelBatch(batchId: number): Promise<void> {
 
         let taskId: number | null = null
         let error: string | null = null
+        let ineligible = false
         try {
           taskId = await submitStoryboardKeyframe(target.storyboard_id, target.slot, options)
         } catch (err) {
+          ineligible = err instanceof KeyframeIneligibleError
           error = err instanceof Error ? err.message : '生成失败'
           logTaskError('KeyframeBatch', 'keyframe', {
             batchId, storyboardId: target.storyboard_id, slot: target.slot, error,
@@ -612,7 +612,7 @@ async function runParallelBatch(batchId: number): Promise<void> {
             return
           }
           item.task_id = taskId
-          item.state = taskId != null ? 'queued' : 'failed'
+          item.state = taskId != null ? 'queued' : ineligible ? 'skipped' : 'failed'
           item.error = taskId != null ? null : error
         })
         if (cancelledDuringSubmit && taskId != null) {
@@ -643,10 +643,10 @@ async function runParallelBatch(batchId: number): Promise<void> {
           if (item.task_id == null || !UNFINISHED_STATES.includes(item.state)) continue
           const task = tasks.find(t => t.id === item.task_id)
           if (!task) continue
-          const next = itemStateFromTask(task.status)
+          const next = taskSkippedForEligibility(task) ? 'skipped' : itemStateFromTask(task.status)
           if (next === item.state) continue
           item.state = next
-          item.error = next === 'failed' ? (task.errorMsg || '生成失败') : item.error
+          item.error = next === 'failed' || next === 'skipped' ? (task.errorMsg || '生成失败') : item.error
           if (next === 'completed') completed.push(item)
         }
       })
@@ -683,7 +683,7 @@ async function runParallelBatch(batchId: number): Promise<void> {
 }
 
 /** 等待单张的 sys_task 到达终态（串行模式） */
-async function waitForTask(taskId: number): Promise<{ ok: boolean; error: string | null }> {
+async function waitForTask(taskId: number): Promise<{ ok: boolean; error: string | null; skipped?: boolean }> {
   const deadline = Date.now() + ITEM_WAIT_TIMEOUT_MS
   for (;;) {
     // 与 video-batch.ts/generation.ts 的轮询同一写法（tsconfig target ES2022 不含 Promise.withResolvers 的类型）
@@ -692,6 +692,7 @@ async function waitForTask(taskId: number): Promise<{ ok: boolean; error: string
     if (!task) return { ok: false, error: '生成任务记录丢失' }
     if (task.status === 'completed') return { ok: true, error: null }
     if (task.status === 'failed') return { ok: false, error: task.errorMsg || '生成失败' }
+    if (task.status === 'cancelled') return { ok: false, error: task.errorMsg || '已取消', skipped: taskSkippedForEligibility(task) }
     if (Date.now() > deadline) return { ok: false, error: '等待生成超时' }
   }
 }
@@ -764,12 +765,12 @@ async function runBatch(batchId: number): Promise<void> {
         item.task_id = taskId
         await saveItems(batchId, items)
         const result = await waitForTask(taskId)
-        item.state = result.ok ? 'completed' : 'failed'
+        item.state = result.ok ? 'completed' : result.skipped ? 'skipped' : 'failed'
         item.error = result.error
         // 下一镜可能要继承这一镜的尾帧：等写回分镜后再推进
         if (result.ok) await waitForSlotImage(item.storyboard_id, item.slot)
       } catch (err) {
-        item.state = 'failed'
+        item.state = err instanceof KeyframeIneligibleError ? 'skipped' : 'failed'
         item.error = err instanceof Error ? err.message : '生成失败'
       }
 

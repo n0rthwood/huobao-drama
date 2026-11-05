@@ -12,7 +12,7 @@ import { eq } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
 import { getActiveConfig, getConfigById } from './ai.js'
 import { generateImage } from './generation.js'
-import { SLOT_FRAME_TYPE, SLOT_LABEL, slotPrompt, type KeyframeSlot } from './keyframes.js'
+import { assertKeyframeEligible, SLOT_FRAME_TYPE, SLOT_LABEL, slotPrompt, type KeyframeSlot } from './keyframes.js'
 import {
   SLOT_PROMPT_FIELD,
   blockingIssuesFor,
@@ -238,10 +238,8 @@ export async function buildKeyframeRequest(
     .where(eq(schema.storyboards.id, storyboardId))
   if (!storyboard || storyboard.deletedAt) throw new Error('镜头不存在')
 
+  await assertKeyframeEligible(storyboardId, slot)
   const prompt = slotPrompt(storyboard, slot)
-  if (!prompt) {
-    throw new Error(`分镜 #${storyboard.storyboardNumber} 的${SLOT_LABEL[slot]}提示词为空，请先补齐关键帧提示词`)
-  }
 
   const context = opts.context ?? await loadKeyframeBuildContext(storyboard.episodeId, opts)
   const assets = opts.assets ?? await loadEpisodeAssets(storyboard.episodeId)

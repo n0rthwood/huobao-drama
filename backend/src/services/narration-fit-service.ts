@@ -9,7 +9,7 @@ import { db, schema } from '../db/index.js'
 import { now } from '../utils/response.js'
 import { mediaFacts } from './media-probe.js'
 import { resolveTransitionT, toAbsPath, loadClipComposeContext } from './compose-state.js'
-import { shotMaxSeconds } from './shot-duration.js'
+import { generatedSegmentSeconds, shotMaxSeconds } from './shot-duration.js'
 import { resolveDramaProjectType } from './project-type.js'
 import {
   ComposeBlockedError,
@@ -55,7 +55,10 @@ async function measure(storyboardId: number) {
   const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, sb.episodeId))
   if (!ep) throw new Error('剧集不存在')
 
-  let dv = Number(sb.duration || 0)
+  const documentary = resolveDramaProjectType(ep.dramaId) === 'documentary'
+  let dv = documentary && (sb.combo === 'B' || sb.combo === 'C' || sb.combo === 'D')
+    ? generatedSegmentSeconds(sb.designCard, sb.duration)
+    : Number(sb.duration || 0)
   let videoHasAudio = false
   if (sb.videoUrl) {
     const facts = await mediaFacts(toAbsPath(sb.videoUrl))
@@ -64,7 +67,6 @@ async function measure(storyboardId: number) {
       videoHasAudio = facts.hasAudio
     }
   }
-  const documentary = resolveDramaProjectType(ep.dramaId) === 'documentary'
   if (documentary) {
     const context = await loadClipComposeContext(sb)
     const parts = [context.clips.replace, context.clips.pre, context.clips.post].filter(Boolean)

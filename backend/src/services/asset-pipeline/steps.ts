@@ -24,6 +24,7 @@ import { classifyPromptInvalidation, planFinalPromptWrite } from '../asset-promp
 import { evaluateGate, normalizeScore, type GateMetric, type GateResult, type SpecForbidden, type SpecMustHave } from './gate.js'
 import { pickGenerator, sizeBucketFor } from './generator.js'
 import { abortableSleep } from './deadline.js'
+import { canonicalReferencePath, resolveReferenceOrigins, type ReferenceOrigin } from './references.js'
 import {
   buildImagePrompt,
   buildNegativePrompt,
@@ -42,6 +43,7 @@ import {
   insertQcRecord,
   insertSpec,
   listSources,
+  listAssetRounds,
   patchRound,
   type AssetKind,
   type AssetRoundRow,
@@ -361,6 +363,8 @@ export async function runGenerate(input: {
   reviseNotes: string[]
   /** 参考图（精确轮用素材，美化轮用上一轮产出图） */
   referenceImages: string[]
+  /** IDs carried forward from selection; omitted callers use unique path lookup only. */
+  referenceOrigins?: ReferenceOrigin[]
   configId?: number | null
   model?: string | null
   signal?: AbortSignal
@@ -380,6 +384,15 @@ export async function runGenerate(input: {
   })
   const negativePrompt = buildNegativePrompt(input.spec)
 
+  const referenceOrigins = resolveReferenceOrigins(
+    input.referenceImages,
+    await listSources(input.target.kind, input.target.id),
+    (await listAssetRounds(input.target.kind, input.target.id)).filter(round =>
+      round.pipeline_task_id !== input.pipelineTaskId || round.round_no < input.roundNo),
+    input.referenceOrigins,
+  )
+  const referenceIds = referenceOrigins.flatMap(item => item.type === 'source' ? [item.source_id] : [])
+
   const { round, created } = await ensureRound({
     pipelineTaskId: input.pipelineTaskId,
     assetKind: input.target.kind,
@@ -391,7 +404,7 @@ export async function runGenerate(input: {
     configId: generator.configId,
     prompt,
     negativePrompt,
-    referenceIds: [],
+    referenceIds,
   })
   if (!created && round.status === 'generated' && round.image_path) return round
 
@@ -408,10 +421,10 @@ export async function runGenerate(input: {
   if (!imageTaskId) {
     // 派生图必须与底图同画幅，否则既有语义坐标全部错位（prop-beautify.ts:62 的不变量）
     let size: string | undefined
-    const base = input.referenceImages[0]
+    const base = input.referenceImages[0] ? canonicalReferencePath(input.referenceImages[0]) : null
     if (base) {
       try {
-        const meta = await sharp(getAbsolutePath(base)).metadata()
+        const meta = await sharp(base).metadata()
         if (meta.width && meta.height) size = sizeBucketFor(meta.width, meta.height)
       } catch (err) {
         logTaskWarn('AssetPipeline', 'base-metadata-failed', { base, error: err instanceof Error ? err.message : String(err) })
@@ -428,6 +441,7 @@ export async function runGenerate(input: {
       model: generator.model,
       size,
       referenceImages: input.referenceImages.length ? input.referenceImages : undefined,
+      pipelineReferenceOrigins: referenceOrigins,
       configId: generator.configId ?? undefined,
       pipelineRound: true,
     })
@@ -461,7 +475,7 @@ export async function runGenerate(input: {
     configId: generator.configId,
     prompt,
     negativePrompt,
-    referenceIds: [],
+    referenceIds,
   })
   return updated.round
 }

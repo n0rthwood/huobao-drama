@@ -15,6 +15,7 @@ import { ACTIVE_TASK_STATUSES } from '../services/sys-task.js'
 import { parseTextTaskParams } from '../services/text-task.js'
 import { listBaseCandidates } from '../services/asset-pipeline/base-candidates.js'
 import { decideRound } from '../services/asset-pipeline/gate.js'
+import { roundReferenceImages } from '../services/asset-pipeline/references.js'
 import {
   approveRound,
   ASSET_PIPELINE_KIND,
@@ -196,10 +197,11 @@ app.get('/runs/:id', async (c) => {
     status: round.status,
   }))
 
-  const detail = rounds.map((round) => {
+  const detail = await Promise.all(rounds.map(async (round) => {
     const qc = qcByRound.get(round.id) ?? null
     return {
       ...round,
+      reference_images: await roundReferenceImages(round),
       qc,
       gate: qc
         ? {
@@ -227,7 +229,7 @@ app.get('/runs/:id', async (c) => {
         : null,
       suggestion: qc ? decideRound(history.filter(item => item.round_no <= round.round_no)) : null,
     }
-  })
+  }))
 
   const mastraRunId = String(params.mastra_run_id ?? '')
   const suspended = mastraRunId && ACTIVE_TASK_STATUSES.includes(row.status as typeof ACTIVE_TASK_STATUSES[number])
