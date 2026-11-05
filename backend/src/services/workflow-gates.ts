@@ -170,12 +170,16 @@ export async function assertGate(episodeId: number, gate: GateKey): Promise<void
   throw new GateBlockedError(gate, gates.reasons[gate] || '该步骤尚未解锁')
 }
 
-/** 确认旁白稿；旁白稿为空返回 false（路由据此回 400） */
+/**
+ * 确认旁白稿；旁白稿为空返回 false（路由据此回 400）。
+ * 剧情项目没有这一步：列值一律保持 NULL（它们恒全解锁，写了也只是脏数据），直接按成功返回。
+ */
 export async function confirmScript(episodeId: number): Promise<boolean> {
   const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId))
   if (!ep) return false
   const script = (ep.scriptContent || ep.content || '').trim()
   if (!script) return false
+  if (resolveDramaProjectType(ep.dramaId) !== 'documentary') return true
   await db.update(schema.episodes)
     .set({ scriptConfirmedAt: now(), updatedAt: now() })
     .where(eq(schema.episodes.id, episodeId))
