@@ -158,8 +158,11 @@ test('D + 承接：首尾双锁（首帧承接上一镜尾帧、尾帧衔接帧�
   const dir = mkdtempSync(path.join(tmpdir(), 'kf-lock-'))
   try {
     mkdirSync(path.join(dir, 'static', 'uploads'), { recursive: true })
+    mkdirSync(path.join(dir, 'static', 'images'), { recursive: true })
     const env = { SQLITE_PATH: path.join(dir, 'db.sqlite3'), HUOBAO_DATA_DIR: dir, STORAGE_PATH: path.join(dir, 'static') }
     writeFileSync(path.join(dir, 'static', 'uploads', 'base.png'), 'PNG')
+    // 上一镜尾帧文件必须真的在，否则按「没图」处理（生效图要求文件存在）
+    writeFileSync(path.join(dir, 'static', 'images', 'prev-last.png'), 'PNG')
     const seeded = run(SEED, env)
     run(`
       await db.update(schema.storyboards).set({ lastFrameImage: 'static/images/prev-last.png' })
@@ -199,8 +202,10 @@ test('衔接帧 hash 变化 → 关键帧确认作废并记 junction_updated；�
   const dir = mkdtempSync(path.join(tmpdir(), 'kf-lock-'))
   try {
     mkdirSync(path.join(dir, 'static', 'uploads'), { recursive: true })
+    mkdirSync(path.join(dir, 'static', 'images'), { recursive: true })
     const env = { SQLITE_PATH: path.join(dir, 'db.sqlite3'), HUOBAO_DATA_DIR: dir, STORAGE_PATH: path.join(dir, 'static') }
     writeFileSync(path.join(dir, 'static', 'uploads', 'base.png'), 'PNG')
+    writeFileSync(path.join(dir, 'static', 'images', 'last.png'), 'PNG')
     const seeded = run(SEED, env)
     run(`${renderedSegment(String(seeded.sbC), 'h-abc')}
       out({ ok: true })
@@ -238,8 +243,11 @@ test('衔接帧 stale（段未渲染 / 签名对不上）时锁定槽不就绪',
   const dir = mkdtempSync(path.join(tmpdir(), 'kf-lock-'))
   try {
     mkdirSync(path.join(dir, 'static', 'uploads'), { recursive: true })
+    mkdirSync(path.join(dir, 'static', 'images'), { recursive: true })
     const env = { SQLITE_PATH: path.join(dir, 'db.sqlite3'), HUOBAO_DATA_DIR: dir, STORAGE_PATH: path.join(dir, 'static') }
     writeFileSync(path.join(dir, 'static', 'uploads', 'base.png'), 'PNG')
+    // 尾帧文件真的在：这条用例要隔离「衔接帧 stale」这一个原因
+    writeFileSync(path.join(dir, 'static', 'images', 'last.png'), 'PNG')
     const seeded = run(SEED, env)
     const got = run(`
       // C 镜只有一段草稿（从未渲染）：衔接帧不存在 → stale
@@ -269,8 +277,11 @@ test('剧情镜头（combo=null）与 A/B 组合没有锁定槽，行为与 #58 
   const dir = mkdtempSync(path.join(tmpdir(), 'kf-lock-'))
   try {
     mkdirSync(path.join(dir, 'static', 'uploads'), { recursive: true })
+    mkdirSync(path.join(dir, 'static', 'images'), { recursive: true })
     const env = { SQLITE_PATH: path.join(dir, 'db.sqlite3'), HUOBAO_DATA_DIR: dir, STORAGE_PATH: path.join(dir, 'static') }
     writeFileSync(path.join(dir, 'static', 'uploads', 'base.png'), 'PNG')
+    writeFileSync(path.join(dir, 'static', 'images', 'f.png'), 'PNG')
+    writeFileSync(path.join(dir, 'static', 'images', 'l.png'), 'PNG')
     const seeded = run(SEED, env)
     const drama = run(`
       const dramaSb = Number(db.insert(schema.storyboards).values({
@@ -298,6 +309,78 @@ test('剧情镜头（combo=null）与 A/B 组合没有锁定槽，行为与 #58 
     assert.equal(got.drama.ready, true, '剧情项目的就绪口径不变（首尾都有图）')
     assert.equal(got.drama.json.stale_reason, null)
     void sharp
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+/**
+ * C 组合「首帧锁定 + 尾帧没图」必须是未就绪：页脚报「还缺：尾帧」、确认按钮禁用，
+ * 后端 `POST /storyboards/:id/confirm-keyframes` 直接 400。
+ * 列里残留一条文件已不在的死路径同样不算图（浏览器里那是破图，不是关键帧）。
+ */
+test('C 组合：首帧锁定 + 尾帧为空/文件丢失 → 未就绪且确认接口 400；补上尾帧才放行', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'kf-lock-'))
+  try {
+    mkdirSync(path.join(dir, 'static', 'uploads'), { recursive: true })
+    mkdirSync(path.join(dir, 'static', 'images'), { recursive: true })
+    const env = { SQLITE_PATH: path.join(dir, 'db.sqlite3'), HUOBAO_DATA_DIR: dir, STORAGE_PATH: path.join(dir, 'static') }
+    writeFileSync(path.join(dir, 'static', 'uploads', 'base.png'), 'PNG')
+    const seeded = run(SEED, env)
+    run(`${renderedSegment(String(seeded.sbC), 'h-ready')}
+      out({ ok: true })
+    `, env)
+
+    const confirmCall = `
+      const app = (await import('./src/routes/storyboards.ts')).default
+      const confirm = async () => {
+        const res = await app.request('/${seeded.sbC}/confirm-keyframes', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ confirmed: true }),
+        })
+        return { status: res.status, body: await res.json() }
+      }
+    `
+    // 1) 尾帧槽为空：衔接帧是新鲜的，但尾帧没出图
+    const empty = run(`${confirmCall}
+      const state = await loadStoryboardKeyframes(${seeded.sbC})
+      const res = await confirm()
+      const row = (await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, ${seeded.sbC})))[0]
+      out({ json: keyframesJson(state), res, confirmedColumn: row.keyframesConfirmed })
+    `, env)
+    assert.equal(empty.json.locked.stale, false, '衔接帧新鲜（锁定槽本身就绪）')
+    assert.equal(empty.json.first_image, empty.json.locked.path)
+    assert.equal(empty.json.last_image, null, '尾帧没有图')
+    assert.equal(empty.json.ready, false, '锁定槽就绪 ≠ 整镜就绪：尾帧仍然必填')
+    assert.equal(empty.res.status, 400, '未就绪时确认接口必须 400')
+    assert.match(empty.res.body.message, /未就绪/)
+    assert.equal(empty.confirmedColumn, false, '400 时不写确认位')
+
+    // 2) 尾帧列里有路径但文件不在：等同没图（否则前端是破图，确认却放行）
+    const dangling = run(`${confirmCall}
+      await db.update(schema.storyboards).set({ lastFrameImage: 'static/images/gone.png' }).where(eq(schema.storyboards.id, ${seeded.sbC}))
+      const state = await loadStoryboardKeyframes(${seeded.sbC})
+      const res = await confirm()
+      out({ json: keyframesJson(state), res })
+    `, env)
+    assert.equal(dangling.json.last_image, null, '文件不在 → 生效尾帧为 null')
+    assert.equal(dangling.json.ready, false)
+    assert.equal(dangling.res.status, 400)
+
+    // 3) 尾帧图真的落盘后才就绪，确认成功并快照衔接帧 hash
+    writeFileSync(path.join(dir, 'static', 'images', 'gone.png'), 'PNG')
+    const okRun = run(`${confirmCall}
+      const state = await loadStoryboardKeyframes(${seeded.sbC})
+      const res = await confirm()
+      const row = (await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, ${seeded.sbC})))[0]
+      out({ json: keyframesJson(state), res: { status: res.status }, confirmedColumn: row.keyframesConfirmed, hash: row.keyframesJunctionHash })
+    `, env)
+    assert.equal(okRun.json.last_image, 'static/images/gone.png')
+    assert.equal(okRun.json.ready, true, '首帧（衔接帧）+ 尾帧都有图 → 就绪')
+    assert.equal(okRun.res.status, 200)
+    assert.equal(okRun.confirmedColumn, true)
+    assert.equal(okRun.hash, 'h-ready', '确认时快照当前衔接帧 hash')
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }

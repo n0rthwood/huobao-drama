@@ -294,10 +294,9 @@ function segmentStatus(segment) {
 function genStatusOf(sb) {
   if (!segmentsOf(sb?.combo).gen) return ''
   const k = sb?.keyframes || {}
-  if (k.confirmed) return 'ready'
-  const hasAny = k.first_image || k.firstImage || k.mid_image || k.midImage || k.last_image || k.lastImage
+  if (k.ready) return 'ready'
   if (k.stale_reason || k.staleReason) return 'stale'
-  return hasAny ? 'ready' : 'draft'
+  return 'draft'
 }
 function lockedSlotOf(sb) {
   const locked = sb?.keyframes?.locked

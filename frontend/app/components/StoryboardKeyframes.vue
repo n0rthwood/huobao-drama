@@ -161,10 +161,10 @@
               <div
                 v-for="slot in SLOT_KEYS"
                 :key="slot"
-                :class="['kf-thumb', { empty: !slotImage(sb, slot), pending: isSlotPending(sb, slot) }]"
+                :class="['kf-thumb', { empty: !slotSrc(sb, slot), pending: isSlotPending(sb, slot) }]"
                 :title="slot === 'mid' && midSlotState(sb) === 'optional' ? t('episode.kf.midOptionalHint') : slotLabel(slot)"
               >
-                <img v-if="slotImage(sb, slot)" :src="thumbOf(imgSrc(slotImage(sb, slot)))" loading="lazy" @error="onThumbError($event, slotImage(sb, slot))" />
+                <img v-if="slotSrc(sb, slot)" :src="thumbOf(slotSrc(sb, slot))" loading="lazy" @error="onThumbError($event, slotImage(sb, slot))" />
                 <span v-else-if="!slotRing(sb, slot)" class="kf-thumb-empty">{{ slot === 'mid' && midSlotState(sb) ? t(`episode.kf.mid${midSlotState(sb) === 'optional' ? 'UnsetShort' : 'RequiredShort'}`) : slotShort(slot) }}</span>
                 <!-- 重生成时旧图还在，进度环叠在图上 -->
                 <ProgressRing v-if="slotRing(sb, slot)" v-bind="slotRing(sb, slot)" compact :size="22" class="kf-thumb-ring" />
@@ -305,7 +305,7 @@
                     >
                       <div class="kf-pool-media">
                         <img
-                          v-if="asset.ready"
+                          v-if="asset.ready && imageUsable(asset.imageUrl)"
                           :src="thumbOf(imgSrc(asset.imageUrl))"
                           loading="lazy"
                           :alt="asset.name"
@@ -407,12 +407,12 @@
               <div class="kf-slot-media">
                 <button
                   type="button"
-                  :class="['kf-preview', { empty: !slotImage(selected, slot) }]"
+                  :class="['kf-preview', { empty: !slotSrc(selected, slot) }]"
                   :style="{ aspectRatio: previewAspect }"
-                  :disabled="!slotImage(selected, slot)"
-                  @click="emit('preview', imgSrc(slotImage(selected, slot)), `${t('episode.kf.editorTitle', { n: String(selectedIndex + 1).padStart(2, '0') })} · ${slotLabel(slot)}`)"
+                  :disabled="!slotSrc(selected, slot)"
+                  @click="emit('preview', slotSrc(selected, slot), `${t('episode.kf.editorTitle', { n: String(selectedIndex + 1).padStart(2, '0') })} · ${slotLabel(slot)}`)"
                 >
-                  <img v-if="slotImage(selected, slot)" :src="thumbOf(imgSrc(slotImage(selected, slot)))" loading="lazy" @error="onThumbError($event, slotImage(selected, slot))" />
+                  <img v-if="slotSrc(selected, slot)" :src="thumbOf(slotSrc(selected, slot))" loading="lazy" @error="onThumbError($event, slotImage(selected, slot))" />
                   <span v-else class="kf-preview-empty">
                     <template v-if="isSlotPending(selected, slot)">{{ t('episode.kf.generating') }}</template>
                     <template v-else-if="slot === 'mid' && midSlotState(selected)">
@@ -599,7 +599,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { toast } from 'vue-sonner'
 import { useI18n } from 'vue-i18n'
 import { Loader2 } from 'lucide-vue-next'
@@ -726,9 +726,21 @@ function slotShort(slot) {
 function imgSrc(raw) {
   return mediaUrl(raw)
 }
+/**
+ * 加载失败的图片地址（缩略图与原图都 404：文件丢失、缩略图未回填且原图已删）。
+ * 记下来后该槽位回退到空位占位，不给浏览器留破图图标（#58）。
+ */
+const brokenImages = reactive(new Set())
 function onThumbError(e, raw) {
   const full = imgSrc(raw)
-  if (full && e.target.src !== new URL(full, window.location.origin).href) e.target.src = full
+  // 第一次失败：缩略图没回填 → 回退原图；原图也失败 → 记为破图，模板改显占位
+  if (full && e.target.src !== new URL(full, window.location.origin).href) { e.target.src = full; return }
+  brokenImages.add(full || e.target.src)
+}
+/** 这张图现在能显示吗（有地址且没加载失败） */
+function imageUsable(raw) {
+  const full = imgSrc(raw)
+  return !!full && !brokenImages.has(full)
 }
 // 关键帧版本带版本号（按创建时间从 1 编号，服务端给出）；资产版本没有版本号，只显示引擎/模型/时间
 function versionLabel(version) {
@@ -805,11 +817,16 @@ function unlockedSlotsOf(sb) {
   const locked = lockedSlotsOf(sb)
   return SLOT_KEYS.filter(slot => !locked.includes(slot))
 }
-/** 锁定槽的图：衔接帧槽用 lockedSlot.path；承接槽用该槽位生效图（继承来的上一镜末帧） */
+/**
+ * 锁定槽的图：衔接帧槽用 lockedSlot.path；承接槽用该槽位生效图（继承来的上一镜末帧）。
+ * 图加载失败（衔接帧 PNG 被清理等）时返回空串，模板改显 🔒 占位。
+ */
 function lockedSlotSrc(sb, slot) {
   const locked = props.lockedSlot
-  if (locked?.path && (!locked.slot || locked.slot === slot)) return imgSrc(locked.path)
-  return imgSrc(slotImage(sb, slot) || '')
+  const raw = locked?.path && (!locked.slot || locked.slot === slot)
+    ? locked.path
+    : (slotImage(sb, slot) || '')
+  return imageUsable(raw) ? imgSrc(raw) : ''
 }
 /** 本槽是不是衔接帧槽（◆ 来自图层段）；否则是承接上一镜的继承槽 */
 function isJunctionSlot(sb, slot) {
@@ -837,6 +854,11 @@ const lockedStale = computed(() => Boolean(props.lockedSlot?.stale))
 function slotImage(sb, slot) {
   const k = kf(sb)
   return slot === 'first' ? k.first : slot === 'mid' ? k.mid : k.last
+}
+/** 槽位可显示的图片地址；没有图或图 404 → 空串 → 显示空位占位（#58） */
+function slotSrc(sb, slot) {
+  const raw = slotImage(sb, slot)
+  return imageUsable(raw) ? imgSrc(raw) : ''
 }
 /** 该槽位生效关键帧的生成时间（unix 秒）；反查不到 → null，不显示 */
 function slotTimeOf(sb, slot) {
@@ -884,12 +906,18 @@ function shotStateLabel(sb) {
   if (state === 'confirmed') return t('episode.kf.stateConfirmed')
   return state === 'ready' ? t('episode.kf.stateReady') : t('episode.kf.stateMissing')
 }
+/**
+ * 还缺哪几个槽位（确认按钮的禁用原因）。锁定槽按来源报「衔接帧 / 承接」，
+ * 因为用户不能直接给这些槽出图，只能回图层段重渲染或改上一镜（#58）。
+ */
 function missingSlotLabels(sb) {
   const k = kf(sb)
+  const locked = lockedSlotsOf(sb)
+  const nameOf = slot => (locked.includes(slot) ? lockedTagOf(sb, slot) : slotLabel(slot))
   const missing = []
-  if (!k.first) missing.push(slotLabel('first'))
-  if (k.midRequired && !k.mid) missing.push(slotLabel('mid'))
-  if (!k.last) missing.push(slotLabel('last'))
+  if (!k.first) missing.push(nameOf('first'))
+  if (k.midRequired && !k.mid) missing.push(nameOf('mid'))
+  if (!k.last) missing.push(nameOf('last'))
   return missing.join(t('common.listJoin'))
 }
 const confirmedCount = computed(() => props.storyboards.filter(sb => kf(sb).confirmed).length)
@@ -1504,9 +1532,19 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .kf-step { min-height: 0; }
-/* 嵌入模式（#58）：只占所在容器的剩余高度，不再整页滚动 */
-.kf-step:has(.kf-workbench.embedded) { flex: 1; overflow: hidden; padding: 0; }
-.kf-workbench.embedded { min-height: 0; }
+/*
+ * 嵌入模式（#58）：只占所在容器（段编辑器警示条之下）的剩余高度。
+ * `prod-content` 是 block，必须显式改成纵向 flex，否则工作区按内容撑高，
+ * 被这里的 overflow:hidden 裁掉底部（槽位卡片与「确认关键帧」页脚都看不见）。
+ */
+.kf-step:has(.kf-workbench.embedded) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+}
+.kf-workbench.embedded { min-height: 0; height: 100%; }
 .kf-bar {
   display: flex;
   align-items: center;

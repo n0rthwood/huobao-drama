@@ -11,12 +11,14 @@
  * 由图层段渲染产出。锁定槽位的列保持 NULL，生效图一律取衔接帧：
  * - `locked`：本镜的衔接帧（`{slot, source, t, path, hash, stale}`），没有衔接帧时为 null；
  * - `locked_slots`：真正不可写/不可生成的槽位——衔接帧锁 + 「D + 承接」时的首帧承接锁；
- * - `ready`：锁定槽有**非 stale** 的衔接帧 + 其余槽按原规则；
+ * - `ready`：锁定槽有**非 stale** 的衔接帧 + 其余槽按原规则（槽位图还要**文件真的在**）；
  * - `stale_reason`：确认被自动作废的原因（目前只有 `junction_updated`），下次确认时清空。
  */
+import fs from 'fs'
 import { and, eq, isNull } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
 import { now } from '../utils/response.js'
+import { getAbsolutePath } from '../utils/storage.js'
 import { toCombo } from './design-card.js'
 import { junctionFramesOfEpisode, type JunctionFrame } from './junction-frame.js'
 
@@ -59,6 +61,16 @@ export function slotPrompt(sb: StoryboardRow, slot: KeyframeSlot): string {
 export function slotOwnImage(sb: StoryboardRow, slot: KeyframeSlot): string | null {
   const raw = slot === 'first' ? sb.firstFrameImage : slot === 'mid' ? sb.midFrameImage : sb.lastFrameImage
   return (raw || '').trim() || null
+}
+
+/**
+ * 槽位的**可用**图：列里有路径还不够，文件必须真的在（与衔接帧同口径，
+ * 见 junction-frame.ts 的 `fileExists`）。文件被清理后列里残留的死路径不算就绪，
+ * 前端据此显示空位占位而不是破图（#58）。
+ */
+function usableImage(raw: string | null): string | null {
+  if (!raw) return null
+  return fs.existsSync(getAbsolutePath(raw)) ? raw : null
 }
 
 export interface StoryboardKeyframeState {
@@ -120,7 +132,8 @@ function buildState(
   junction: JunctionFrame | undefined,
 ): StoryboardKeyframeState {
   const combo = toCombo(row.combo)
-  const ownFirst = slotOwnImage(row, 'first')
+  // 生效图一律过一道「文件还在吗」：列里残留的死路径不能算图（否则前端是破图、确认还放行）
+  const ownFirst = usableImage(slotOwnImage(row, 'first'))
   // 第一镜没有上一镜，即使被标成 continue 也按硬切处理
   const inheritsFirst = !ownFirst && !!previous && row.continuityBoundary === 'continue'
   const lockedSlots = lockedSlotsOf(row, inheritsFirst)
@@ -137,14 +150,14 @@ function buildState(
     : null
   const firstIsLocked = lockedSlots.includes('first')
   const lastIsLocked = lockedSlots.includes('last')
-  const previousLast = previous ? slotOwnImage(previous, 'last') : null
+  const previousLast = previous ? usableImage(slotOwnImage(previous, 'last')) : null
   // 每个锁定槽的生效图来源不同：C 首帧与 D 尾帧取衔接帧；D + 承接的首帧取**上一镜尾帧**。
   // 只有「D + 承接」的首帧锁取上一镜尾帧；C 的首帧锁永远是图层段末帧（与承接无关）
   const firstLockFromPrevious = combo === 'D' && inheritsFirst
   const lockedFirst = firstLockFromPrevious ? previousLast : (junctionUsable ? junction!.path : null)
   const first = firstIsLocked ? lockedFirst : ownFirst || (inheritsFirst ? previousLast : null)
-  const mid = slotOwnImage(row, 'mid')
-  const last = lastIsLocked ? (junctionUsable ? junction!.path : null) : slotOwnImage(row, 'last')
+  const mid = usableImage(slotOwnImage(row, 'mid'))
+  const last = lastIsLocked ? (junctionUsable ? junction!.path : null) : usableImage(slotOwnImage(row, 'last'))
   const midRequired = !!slotPrompt(row, 'mid')
   // 就绪：锁定槽各自的来源都要可用（承接首帧要有上一镜尾帧；衔接帧锁要有非 stale 的衔接帧）
   const lockedReady = lockedSlots.every((slot) => {

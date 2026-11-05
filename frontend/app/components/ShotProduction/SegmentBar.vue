@@ -27,7 +27,7 @@
         :title="junctionTip"
         @click="emit('open-junction')"
       >
-        <img v-if="junctionSrc" class="sb-junction-img" :src="junctionSrc" alt="">
+        <img v-if="junctionSrc" class="sb-junction-img" :src="junctionSrc" alt="" @error="junctionBroken = junctionSrc">
         <span v-else class="sb-junction-empty">◆</span>
         <span class="sb-junction-lock">🔒</span>
       </button>
@@ -64,7 +64,7 @@
  * 段结构条（Issue #58）：一镜的段组合一眼看全——按真实时长比例分宽的 ▣/▶ 段头、
  * 中间锁定的 ◆ 衔接帧，右侧「预演本镜 / 改组合」。点击段头切换下方编辑器。
  */
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { layerSegmentAPI } from '~/composables/useApi'
 
@@ -114,10 +114,13 @@ const layerStatus = computed(() => {
 })
 const genStatus = computed(() => props.generatedStatus)
 
+// 衔接帧缩略图 404（PNG 被清理、段已重渲染）→ 回退 ◆ 占位，不留破图图标（#58）
+const junctionBroken = ref('')
 const junctionSrc = computed(() => {
   const junction = props.junction
   if (!junction?.path) return ''
-  return layerSegmentAPI.junctionUrl(props.storyboardId, junction.hash || Date.now())
+  const url = layerSegmentAPI.junctionUrl(props.storyboardId, junction.hash || junction.path)
+  return url === junctionBroken.value ? '' : url
 })
 const junctionTip = computed(() => {
   const at = Number(props.junction?.t || 0).toFixed(1)
