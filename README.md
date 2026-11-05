@@ -72,6 +72,11 @@ data/       — Generated assets and the SQLite database
 The middle keyframe is optional. An empty slot without a prompt, image, or task is labeled “Not set · Not required for approval”; this is not a content-review decision that no middle anchor is needed. Add a prompt and time when needed. A prompt without an image is labeled “Mid frame required · Awaiting generation”. Existing images, active progress, and failures take precedence. Approval still requires first/last frames and any configured middle frame.
 The keyframe editor and video reference-frame thumbnails use the same status semantics: an unset middle frame is not mislabeled as an image still awaiting generation on the video page.
 
+For documentary projects, each shot explicitly selects A (layer only), B (generated only), C (layer → generated), or D (generated → layer). The final workspace shows only enabled segment zones, then the composite with narration, burned subtitles and a locked-junction marker. Layer segments allow up to 30 seconds, generated segments up to 15 seconds; narration fit uses measured full-shot media, so a 24-second A shot is not incorrectly capped at 15 seconds. C/D encoded junction endpoints omit text and fade text inside the layer segment; model output is not guaranteed to be pixel-identical to its guide.
+
+Every batch previews included/excluded shots and persists that scope for the task center. Source edits invalidate dependent renders and composites, even when narration is disabled; export never silently drops stale selected shots. Documentary composite signatures use v4, while drama shots retain the unchanged v2 digest. A documentary storyboard-owned task always uses server-built guides, and an explicitly selected invalid video configuration is rejected instead of silently charging another service.
+
+
 ### 📦 Asset Management
 
 - ✅ Unified asset library

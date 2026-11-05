@@ -5,10 +5,16 @@ const props = defineProps({ title: String, items: { type: Array, default: () => 
 const emit = defineEmits(['close', 'confirm'])
 const { t } = useI18n()
 const selected = ref([])
-const idOf = item => Number(item.storyboard_id ?? item.storyboardId ?? item.id)
+const idOf = item => Number(typeof item === 'object' ? item.storyboard_id ?? item.storyboardId ?? item.id : item)
 const selectable = item => item.selectable !== false && !['blocked', 'excluded', 'skipped', 'disabled'].includes(item.status)
-watch(() => props.items, items => { selected.value = props.retryMode ? items.filter(item => item.checked === true).map(idOf) : props.scope?.included ? [...props.scope.included] : items.filter(item => selectable(item) && item.checked !== false && item.status !== 'unchanged').map(idOf) }, { immediate: true })
+watch(() => props.items, items => { selected.value = props.retryMode ? items.filter(item => item.checked === true).map(idOf) : props.scope?.included ? props.scope.included.map(idOf) : items.filter(item => selectable(item) && item.checked !== false && item.status !== 'unchanged').map(idOf) }, { immediate: true })
 const excluded = computed(() => props.items.filter(item => !selected.value.includes(idOf(item))))
+function reasonLabel(item) {
+  const reason = item.reason || item.change_reasons?.join('；') || item.status
+  if (['no_generated_segment', 'keyframes_unconfirmed', 'generating', 'unchanged', 'not_selected', 'not_failed'].includes(reason)) return t(`episode.final.scopeReasons.${reason}`)
+  const status = { missing: 'Missing', changed: 'Changed', unknown: 'Unknown', blocked: 'Blocked', excluded: 'Excluded', skipped: 'Skipped', disabled: 'Disabled' }[reason]
+  return status ? t(`episode.compose.status${status}`) : reason
+}
 </script>
 <template>
   <div class="overlay" @click.self="!busy && emit('close')">
@@ -19,7 +25,7 @@ const excluded = computed(() => props.items.filter(item => !selected.value.inclu
         <p v-if="retryMode && scope">{{ t('episode.final.scope', { included: scope.included.length, excluded: scope.excluded.length }) }}</p>
         <label v-for="item in items" :key="idOf(item)" class="scope-row">
           <input v-model="selected" type="checkbox" :value="idOf(item)" :disabled="busy || retryMode || !selectable(item)" />
-          #{{ item.storyboard_number ?? item.storyboardNumber ?? idOf(item) }} · {{ item.reason || item.change_reasons?.join('；') || item.status }}
+          #{{ item.storyboard_number ?? item.storyboardNumber ?? idOf(item) }} · {{ reasonLabel(item) }}
         </label>
       </div>
       <footer class="dialog-foot"><button class="btn btn-primary" :disabled="busy || !selected.length" @click="emit('confirm', selected)">{{ t('episode.final.start', { n: selected.length }) }}</button></footer>

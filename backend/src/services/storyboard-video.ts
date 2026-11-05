@@ -171,7 +171,9 @@ export async function buildStoryboardVideoRequest(
 
   // 配置优先级与 POST /tasks 一致：请求显式指定 > 集锁定配置 > 当前启用配置
   const configId = opts.configId ?? episode.videoConfigId ?? undefined
-  const config = configId ? (await getConfigById(configId)) ?? await getActiveConfig('video') : await getActiveConfig('video')
+  const selectedConfig = configId ? await getConfigById(configId, documentary ? 'video' : undefined) : null
+  if (documentary && opts.configId !== undefined && !selectedConfig) throw new Error('指定的视频配置已停用或不存在，请重新选择；不会自动切换到其它服务')
+  const config = selectedConfig ?? await getActiveConfig('video')
   if (!config) throw new Error('未配置视频模型，请先到「设置」页添加并启用 AI 服务')
   const model = opts.model || undefined
   const modelError = validateVideoModel(config.provider, model || config.model)
@@ -288,7 +290,7 @@ export async function buildStoryboardVideoRequest(
     ...(transition ? { transition: { T: transition.seconds, E: transition.extra } } : {}),
     aspectRatio: drama?.aspectRatio || '16:9',
     resolution: episode.resolution || undefined,
-    configId,
+    configId: documentary ? config.id : configId,
     ...(keyframes.locked?.hash && keyframes.locked.slot !== 'mid' ? { junction_hash: keyframes.locked.hash, junction_slot: keyframes.locked.slot } : {}),
   }
 

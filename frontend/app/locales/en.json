@@ -785,6 +785,7 @@
       "notFailed": "Not failed", "voice": "Voice", "settings": "Narration and subtitle settings",
       "staleExport": "{n} outdated composites deselected by default", "update": "Update",
       "posterMissing": "No final Poster · Create Poster",
+      "scopeReasons": { "no_generated_segment": "Generated segment not enabled", "keyframes_unconfirmed": "Keyframes unconfirmed", "generating": "Generating", "unchanged": "Up to date", "not_selected": "Not selected", "not_failed": "Not failed" },
       "batch": { "voice": "Batch voice", "layer": "Render layer segments", "video": "Generate videos", "compose": "Compose final shots" }
     },
     "production": {
@@ -1964,6 +1965,7 @@
       "statusUnchanged": "Up to date",
       "statusUnknown": "Needs check",
       "statusBlocked": "Blocked",
+      "statusExcluded": "Not ready",
       "statusSkipped": "In progress",
       "disabledHint": "Episode narration is off — the merge uses the original videos",
       "sourceOriginal": "Original video",

@@ -192,7 +192,7 @@ await db.delete(schema.sysTask).where(eq(schema.sysTask.id, 103))
 out.batchNoIds = await post(episodesApp, '/1/compose-batch', {})
 out.batchEmptyIds = await post(episodesApp, '/1/compose-batch', { storyboard_ids: [] })
 out.batchForeignId = await post(episodesApp, '/1/compose-batch', { storyboard_ids: [999] })
-out.previewEmptyScope = (await post(episodesApp, '/1/compose-batch/preview', { storyboard_ids: [] })).body.data.items.length
+out.previewEmptyScope = (await post(episodesApp, '/1/compose-batch/preview', { storyboard_ids: [] })).body.data.scope.included.length
 out.previewEpisodeScope = (await post(episodesApp, '/1/compose-batch/preview', {})).body.data.items
   .map(i => ({ id: i.storyboard_id, status: i.status, checked: i.checked }))
 out.previewScoped = (await previewComposeBatch(1, [10])).map(i => i.storyboard_id)

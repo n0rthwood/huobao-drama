@@ -73,6 +73,11 @@ watch(() => staleShots.value.map(sb => sb.id), () => {
   for (const sb of staleShots.value) if (isExportSelected(sb.id)) toggleExportSelect(sb)
 }, { immediate: true, flush: 'post' })
 watch(posterFinal, ready => { if (documentary.value && !ready) exportPosterEnabled.value = false })
+function exportSeconds(sb) {
+  if (!documentary.value) return sb.duration
+  const meta = sb.narration_meta || sb.narrationMeta || {}
+  return meta.composed?.duration_ms ? Number((meta.composed.duration_ms / 1000).toFixed(2)) : null
+}
 function selectShot(sb) {
   if (documentary.value && !isFreshExport(sb)) return
   toggleExportSelect(sb)
@@ -304,7 +309,7 @@ function updateShot(sb) {
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
               </div>
               <span class="exp-thumb-index">#{{ String(i+1).padStart(2,'0') }}</span>
-              <span v-if="sb.duration" class="exp-thumb-duration">{{ sb.duration }}s</span>
+              <span v-if="exportSeconds(sb)" class="exp-thumb-duration">{{ exportSeconds(sb) }}s</span>
               <span
                 v-if="hasVid(sb)"
                 class="exp-play"

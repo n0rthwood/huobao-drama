@@ -785,6 +785,7 @@
       "notFailed": "失敗以外", "voice": "音声", "settings": "ナレーションと字幕設定",
       "staleExport": "古い完成映像 {n} 件を選択解除しました", "update": "更新へ",
       "posterMissing": "最終 Poster なし · Poster 作成へ",
+      "scopeReasons": { "no_generated_segment": "生成区間なし", "keyframes_unconfirmed": "キーフレーム未確認", "generating": "生成中", "unchanged": "最新", "not_selected": "未選択", "not_failed": "失敗対象外" },
       "batch": { "voice": "一括音声", "layer": "レイヤー一括レンダー", "video": "動画一括生成", "compose": "完成映像一括合成" }
     },
     "production": {
@@ -1964,6 +1965,7 @@
       "statusUnchanged": "最新",
       "statusUnknown": "要確認",
       "statusBlocked": "ブロック",
+      "statusExcluded": "未準備",
       "statusSkipped": "処理中",
       "disabledHint": "このエピソードはナレーションが無効です。結合では元動画をそのまま使います",
       "sourceOriginal": "元動画",

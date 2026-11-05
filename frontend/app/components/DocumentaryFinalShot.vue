@@ -11,6 +11,7 @@ import RehearsalDialog from '~/components/ShotProduction/RehearsalDialog.vue'
 import NarrationBlock from '~/components/NarrationBlock.vue'
 import ShotFusionPanel from '~/components/ShotFusionPanel.vue'
 import MentionTextarea from '~/components/MentionTextarea.vue'
+import FieldSaveStatus from '~/components/FieldSaveStatus.vue'
 const props = defineProps({ storyboard: { type: Object, required: true }, number: Number })
 const ctx = inject(WORKBENCH_CTX)
 const { t } = useI18n()
@@ -126,6 +127,7 @@ onBeforeUnmount(() => clearTimeout(flashTimer))
             </div>
           </div>
           <div>{{ t('episode.sb.videoPromptSection') }}
+            <FieldSaveStatus v-bind="ctx.fieldSaveInfo(sb, 'video_prompt')" />
             <MentionTextarea :model-value="sb.video_prompt || sb.videoPrompt || ''" :options="ctx.shotMentionOptions(sb)" :rows="8" @update:model-value="value => ctx.markFieldDirty(sb, 'video_prompt', value)" @commit="value => ctx.updateField(sb, 'video_prompt', value)" />
           </div>
           <button class="btn btn-sm" :disabled="ctx.videoPromptGeneratingIds.value.includes(sb.id)" @click="ctx.genVideoPrompt(sb)">{{ ctx.promptHeadVideoActionLabel(sb) }}</button>

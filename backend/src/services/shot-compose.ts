@@ -21,6 +21,7 @@ import { db, schema } from '../db/index.js'
 import { now } from '../utils/response.js'
 import { STORAGE_ROOT } from '../utils/paths.js'
 import { ffmpeg, checkFfmpegSuite, writeSilentWav } from '../utils/ffmpeg.js'
+import { extractVideoPoster } from '../utils/video-poster.js'
 import { logTaskError, logTaskProgress, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
 import { renderSrt, parseSrt, transformCues } from './subtitle.js'
 import { mediaFacts, probeVideoSpec } from './media-probe.js'
@@ -193,6 +194,7 @@ async function runComposeShot(storyboardId: number, batchTaskId?: number): Promi
     narrationMeta: JSON.stringify(meta),
     updatedAt: ts,
   }).where(eq(schema.storyboards.id, storyboardId))
+  await extractVideoPoster(composedVideoUrl)
 
   logTaskSuccess('ShotCompose', 'compose', { storyboardId, composedVideoUrl, durationMs: produced.durationMs })
   return { storyboardId, composedVideoUrl, durationMs: produced.durationMs, plan, burned: Boolean(burnSrtAbs) }

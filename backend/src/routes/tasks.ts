@@ -131,7 +131,7 @@ app.post('/', async (c) => {
         frameType: body.frame_type,
         configId,
       })
-      : await generateVideo(storyboardVideo?.params ?? {
+      : storyboardVideo ? await generateVideo(storyboardVideo.params) : await generateVideo({
         storyboardId: body.storyboard_id,
         episodeId: body.episode_id ? Number(body.episode_id) : undefined,
         dramaId: body.drama_id,

@@ -785,6 +785,7 @@
       "notFailed": "非失败项", "voice": "音色", "settings": "旁白与字幕设置",
       "staleExport": "{n} 个镜头成品过期，已默认取消勾选", "update": "去更新",
       "posterMissing": "尚无最终 Poster · 去制作 Poster",
+      "scopeReasons": { "no_generated_segment": "未启用生成段", "keyframes_unconfirmed": "关键帧未确认", "generating": "生成中", "unchanged": "已最新", "not_selected": "未选择", "not_failed": "非失败项" },
       "batch": { "voice": "批量配音", "layer": "批量渲染图层段", "video": "批量生成视频", "compose": "批量合成成品" }
     },
     "production": {
@@ -1964,6 +1965,7 @@
       "statusUnchanged": "最新",
       "statusUnknown": "待核验",
       "statusBlocked": "阻断",
+      "statusExcluded": "未就绪",
       "statusSkipped": "进行中",
       "disabledHint": "本集旁白已关闭，拼接直接使用原始视频",
       "sourceOriginal": "原始视频",

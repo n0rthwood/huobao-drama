@@ -407,6 +407,9 @@ Issue 整理完成后、实施前，必须让 **Fabel（Anthropic）或 Astra（
 - 所有视频/图层渲染/配音/合成批量使用 `batch-scope.ts` 的同源预览，执行写入不可变 `params.scope`（视频批次写 `options.scope`）；任务中心读这份快照，不重新推算范围。显式空选不能扩大为整集。
 - `backend/scripts/junction-diff.mjs` 用 sharp 比较实际抽帧的灰度平均绝对差，衔接帧锁定只保证输入来源，不声称模型输出逐像素连续。
 - 资产事件沿现有 `onAssetLibraryChanged` 的关联集范围传播：仅受影响图层段更新当前底图/未解除锚点几何，再经 `markStale('layer_segment')` 阻断旧衔接帧与下游。`asset_version_changed/semantic_changed/base_version_changed` 在当前输入成功渲染后才消化；找不到素材/条目保留 `source_unresolved`，恢复引用/解除锚点后可重渲。`quality_warnings` 与迁移历史提示不升级为硬门禁。
+- 通用 `POST /tasks` 一旦绑定纪录片分镜，必须走 `buildStoryboardVideoRequest`，只接受模型/配置覆盖，不能信任客户端首尾图/衔接 hash/时长/归属。单镜、重试、批量沿用同一 builder；显式指定的视频配置失效、停用或类型不符时返回 400，不静默切到另一个计费服务，生成持久化边界再校验一次。剧情/无分镜手动任务的旧默认语义不变。
+- C 最后一个实际编码帧采样精确 `duration`，D 第一个实际编码帧采样 `0`，与去字衔接 PNG 同源；文字在段内独立淡出/淡入，标点/几何不跟着淡出。C/D 渲染签名使用 `seg-v2-C/D`，旧渲染必须更新；A 保持原签名。压缩和模型输出仍可能有像素差异，不能把锁定来源写成“像素完全连续”。
+- 资产来源以 R6 的 `layer_doc.base.ref` / 图片 `src.asset_kind/asset_id/version_task_id` 为准；显式版本固定，不跟随当前版本，未固定的来源通过资产事件刷新；旧锚点只作存量回退。历史视频缺衔接快照时仅对实际保存、可完整解码的本地图层 PNG 字节算 hash；缺失、损坏、越界、两端歧义均为 unknown，不改写旧任务。
 
 ## 待办
 
