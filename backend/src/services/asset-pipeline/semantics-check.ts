@@ -8,6 +8,8 @@
  *
  * 几何是纯函数在跑，但要读库（取标注）与读盘（取像素），所以放在 gate.ts 之外。
  */
+import { eq } from 'drizzle-orm'
+import { db, schema } from '../../db/index.js'
 import { loadPropSemantics } from '../asset-semantics.js'
 import {
   GEOMETRY_MAX_SIDE,
@@ -38,11 +40,20 @@ export async function checkSemanticsPreserved(input: {
   const problems: string[] = []
   const skipped: string[] = []
 
-  const missing = (input.labelsReadable ?? []).filter(item => item.readable === false).map(item => item.text)
+  // 标注可读性是 QC 那次视觉调用顺带回答的：模型没答 / 答漏了，不能当「全都还在」
+  const answered = new Map((input.labelsReadable ?? []).map(item => [item.text, item.readable]))
+  const expectedLabels = [...semantics.labels.map(item => item.text), ...semantics.points.map(item => item.name)]
+    .filter(Boolean)
+  const missing = expectedLabels.filter(text => answered.get(text) === false)
+  const unanswered = expectedLabels.filter(text => !answered.has(text))
   if (missing.length) problems.push(`以下标注文字在新图上读不到：${missing.join('、')}`)
+  if (unanswered.length) skipped.push(`模型没有回答这些标注是否仍可读：${unanswered.join('、')}`)
 
   const colored = semantics.lines.filter(line => line.color)
   if (colored.length) {
+    // 放宽判据只用于**上传截图**路径（主进程裁决）：标注坐标所针对的那张图是
+    // `provider='upload'` 的版本行时才允许；程序渲染的底图与扫描印刷图一律走严格判据
+    const screenshot = await isUploadedScreenshot(semantics.image.source_task_id)
     const { raster } = await loadRaster(input.absPath, GEOMETRY_MAX_SIDE)
     // 标注坐标是**原图像素**；新图可能是另一个尺寸桶，按原图宽度换算到分析光栅
     const scale = raster.width / Math.max(semantics.image.width, 1)
@@ -54,8 +65,7 @@ export async function checkSemanticsPreserved(input: {
       }
       const points = line.points.map(([x, y]): [number, number] => [x * scale, y * scale])
       const strict = lineColorCoverage(raster, points, color)
-      // 截图路径的放宽判据：严格色域没达标时再按同通道序算一次（与自动标注同一口径）
-      const coverage = strict >= FIDELITY_LINE_COVERAGE
+      const coverage = strict >= FIDELITY_LINE_COVERAGE || !screenshot
         ? strict
         : Math.max(strict, lineColorCoverage(raster, points, color, { hueOnly: true }))
       if (coverage < FIDELITY_LINE_COVERAGE) {
@@ -69,12 +79,18 @@ export async function checkSemanticsPreserved(input: {
   return { status: 'pass', detail: `标注文字可读、线条色域覆盖率达标${note}` }
 }
 
-/** QC 提示词里要问的标注文字（最多 12 条，再多模型的定位质量会塌） */
+/** 标注坐标所针对的那张图是不是人工上传的截图 */
+async function isUploadedScreenshot(sourceTaskId: number | null): Promise<boolean> {
+  if (!sourceTaskId) return false
+  const [task] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, sourceTaskId))
+  return task?.provider === 'upload'
+}
+
+/** QC 提示词里要问的标注文字（全部问，按 12 条一批——一次问太多实测定位质量会塌） */
 export async function semanticsLabelsToCheck(assetKind: AssetKind, assetId: number): Promise<string[]> {
   if (assetKind !== 'prop') return []
   const semantics = await loadPropSemantics(assetId)
   if (!semantics) return []
   return [...semantics.labels.map(item => item.text), ...semantics.points.map(item => item.name)]
     .filter(Boolean)
-    .slice(0, 12)
 }

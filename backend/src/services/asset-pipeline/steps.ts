@@ -10,13 +10,13 @@
  */
 import crypto from 'crypto'
 import fs from 'fs'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import sharp from 'sharp'
 import { db, schema } from '../../db/index.js'
 import { getAbsolutePath } from '../../utils/storage.js'
 import { logTaskProgress, logTaskWarn } from '../../utils/task-logger.js'
 import { resolveStageModel, type StageModel } from '../ai-stages.js'
-import { callTextChat, imageContentPart } from '../vision-chat.js'
+import { callTextChat, imageContentPart, type ChatContent } from '../vision-chat.js'
 import { generateImage } from '../generation.js'
 import { getDramaStylePrompt } from '../style-preset.js'
 import { patchTextTaskParams, parseTextTaskParams } from '../text-task.js'
@@ -53,11 +53,9 @@ const TEXT_TIMEOUT_MS = 300_000
 /**
  * GLM-5.x 的推理与正文共享 `max_tokens`（AGENTS.md「本机后端 · 文本」）：给小了会先
  * 把预算烧在思考上、正文一个字都不剩——实测 6000 时 research 步返回空串。
- * 读 `AI_MAX_TOKENS` 但**封顶 32768**：本机 .env 给的是 131072（拆分分镜那种长输出需要），
- * 流水线这几步的正文只有几千 token，预算给到十万只会让 GLM 在思考里兜圈子
- * ——实测 131072 时 research 步 12 分钟没有返回，32768 时 130 秒完成。
+ * 与既有 Agent 链路同口径读 `AI_MAX_TOKENS`（本机 .env = 131072）。
  */
-const TEXT_MAX_TOKENS = Math.min(Number(process.env.AI_MAX_TOKENS) || 32768, 32768)
+const TEXT_MAX_TOKENS = Number(process.env.AI_MAX_TOKENS) || 32768
 const TEXT_TEMPERATURE = 0.2
 const QC_MAX_SIDE = 1600
 const QC_JPEG_QUALITY = 85
@@ -66,6 +64,40 @@ const IMAGE_WAIT_TIMEOUT_MS = 20 * 60_000
 const IMAGE_POLL_INTERVAL_MS = 5_000
 
 const METRICS: GateMetric[] = ['count', 'arrangement', 'color', 'shape', 'other']
+
+
+/**
+ * 要 JSON 的模型调用。GLM-5.3 偶发返回**半截合法**的 JSON（实测 spec 步在 position 986
+ * 处缺一个逗号，同一提示词下一次又完全正常），一次抖动就让整条 run 失败太脆。
+ * 失败时带上解析错误重问一次，仍然不合法才抛——不自己猜着补字符。
+ */
+async function callJsonChat(
+  stageModel: StageModel,
+  content: ChatContent,
+  opts: { systemPrompt: string; temperature: number },
+): Promise<Record<string, unknown>> {
+  const call = async (body: ChatContent): Promise<string> => {
+    const reply = await callTextChat(stageModel, body, {
+      systemPrompt: opts.systemPrompt,
+      temperature: opts.temperature,
+      maxTokens: TEXT_MAX_TOKENS,
+      timeoutMs: TEXT_TIMEOUT_MS,
+    })
+    return reply.text
+  }
+  const first = await call(content)
+  try {
+    return parseJsonReply(first) as Record<string, unknown>
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err)
+    logTaskWarn('AssetPipeline', 'json-retry', { stage: stageModel.stage, reason })
+    const retryText = `上一次的回答不是合法 JSON（解析报错：${reason}）。请**只**输出一个合法的 JSON 对象，不要任何解释、不要 Markdown 代码块、字符串内不要出现未转义的换行或引号。`
+    const retryContent: ChatContent = typeof content === 'string'
+      ? `${content}\n\n${retryText}`
+      : [...content, { type: 'text', text: retryText }]
+    return parseJsonReply(await call(retryContent)) as Record<string, unknown>
+  }
+}
 
 export interface AssetTarget {
   kind: AssetKind
@@ -140,19 +172,13 @@ export async function runResearch(input: {
   if (cached?.key_facts) return { result: cached, stageModel }
 
   const sources = await listSources(input.target.kind, input.target.id)
-  const reply = await callTextChat(stageModel, researchUserPrompt({
+  const parsed = await callJsonChat(stageModel, researchUserPrompt({
     assetKind: input.target.kind,
     name: input.target.name,
     description: input.target.description,
     era: null,
     existing: sources,
-  }), {
-    systemPrompt: RESEARCH_SYSTEM,
-    temperature: TEXT_TEMPERATURE,
-    maxTokens: TEXT_MAX_TOKENS,
-    timeoutMs: TEXT_TIMEOUT_MS,
-  })
-  const parsed = parseJsonReply(reply.text) as Partial<ResearchResult>
+  }), { systemPrompt: RESEARCH_SYSTEM, temperature: TEXT_TEMPERATURE }) as Partial<ResearchResult>
   const result: ResearchResult = {
     candidates: Array.isArray(parsed.candidates) ? parsed.candidates : [],
     key_facts: Array.isArray(parsed.key_facts) ? parsed.key_facts : [],
@@ -231,19 +257,13 @@ export async function runSpec(input: {
 
   const stageModel = await resolveStageModel('asset_spec', { configId: input.textConfigId })
   const sources = await listSources(input.target.kind, input.target.id)
-  const reply = await callTextChat(stageModel, specUserPrompt({
+  const parsed = await callJsonChat(stageModel, specUserPrompt({
     assetKind: input.target.kind,
     name: input.target.name,
     description: input.target.description,
     research: JSON.stringify(input.research),
     sources,
-  }), {
-    systemPrompt: SPEC_SYSTEM,
-    temperature: TEXT_TEMPERATURE,
-    maxTokens: TEXT_MAX_TOKENS,
-    timeoutMs: TEXT_TIMEOUT_MS,
-  })
-  const parsed = parseJsonReply(reply.text) as Record<string, unknown>
+  }), { systemPrompt: SPEC_SYSTEM, temperature: TEXT_TEMPERATURE })
   const mustHave = normalizeMustHave(parsed.must_have)
   if (!mustHave.length) throw new Error('事实表为空：模型没有给出任何 must_have 条目')
 
@@ -366,6 +386,15 @@ export async function runGenerate(input: {
   if (!created && round.status === 'generated' && round.image_path) return round
 
   let imageTaskId = round.image_task_id
+  if (!imageTaskId && round.status === 'generating') {
+    // 崩溃窗口（下单成功但 image_task_id 还没落库）：按 owner + 提示词 + 轮次创建时间
+    // 认领已经存在的那条生图任务，绝不重复下单
+    imageTaskId = await adoptOrphanImageTask(input.target, prompt, round.created_at)
+    if (imageTaskId) {
+      await patchRound(round.id, { imageTaskId })
+      logTaskProgress('AssetPipeline', 'adopted-orphan-image-task', { roundId: round.id, imageTaskId })
+    }
+  }
   if (!imageTaskId) {
     // 派生图必须与底图同画幅，否则既有语义坐标全部错位（prop-beautify.ts:62 的不变量）
     let size: string | undefined
@@ -390,6 +419,7 @@ export async function runGenerate(input: {
       size,
       referenceImages: input.referenceImages.length ? input.referenceImages : undefined,
       configId: generator.configId ?? undefined,
+      pipelineRound: true,
     })
     await patchRound(round.id, { imageTaskId })
   }
@@ -424,6 +454,25 @@ export async function runGenerate(input: {
     referenceIds: [],
   })
   return updated.round
+}
+
+/**
+ * 认领「已下单但没来得及记 id」的生图任务。
+ * `generateImage()` 返回之前进程被杀 → 轮次行停在 `generating` 且 `image_task_id` 为空；
+ * 重放时如果直接再下一单，就会白烧一张图。按 owner + 完全相同的提示词 + 时间窗认领。
+ */
+async function adoptOrphanImageTask(target: AssetTarget, prompt: string, since: string): Promise<number | null> {
+  const ownerColumn = target.kind === 'character'
+    ? schema.sysTask.characterId
+    : target.kind === 'scene' ? schema.sysTask.sceneId : schema.sysTask.propId
+  const rows = await db.select().from(schema.sysTask).where(and(
+    eq(schema.sysTask.type, 'image'),
+    eq(ownerColumn, target.id),
+  ))
+  const candidates = rows
+    .filter(row => row.prompt === prompt && row.createdAt >= since)
+    .sort((a, b) => a.id - b.id)
+  return candidates[0]?.id ?? null
 }
 
 // ─── qc + gate ───────────────────────────────────────────────
@@ -463,16 +512,10 @@ export async function runQc(input: {
     ? `\n另外回答 labels_readable：对下列文字逐条给 {"text":"","readable":true/false}，表示它在这张图上是否仍清晰可读：${labels.join('、')}`
     : ''
 
-  const reply = await callTextChat(stageModel, [
+  const parsed = await callJsonChat(stageModel, [
     { type: 'text', text: qcUserPrompt(input.spec, framing) + labelQuestion },
     prepared.part,
-  ], {
-    systemPrompt: QC_SYSTEM,
-    temperature: 0.1,
-    maxTokens: TEXT_MAX_TOKENS,
-    timeoutMs: TEXT_TIMEOUT_MS,
-  })
-  const parsed = parseJsonReply(reply.text) as Record<string, unknown>
+  ], { systemPrompt: QC_SYSTEM, temperature: 0.1 })
   const verdicts = normalizeQcVerdicts(parsed)
   const labelsReadable = Array.isArray(parsed.labels_readable)
     ? (parsed.labels_readable as Array<{ text: string; readable: boolean }>)

@@ -100,13 +100,19 @@ export async function listBaseCandidates(episodeId: number): Promise<BaseCandida
       }
     }
 
-    const rounds = (await listAssetRounds(asset.kind, asset.id))
-      .filter(round => round.status === 'generated' && round.image_path)
+    const allRounds = await listAssetRounds(asset.kind, asset.id)
+    // 任何流水线轮次产出的图都**只能**走闸门/人工这条判定，绝不能再从「资产当前图」
+    // 兜底混进候选——否则一张被打回的美化图只要碰巧是当前图就又回到候选里。
+    const pipelinePaths = new Set(allRounds.map(round => round.image_path).filter(Boolean) as string[])
+    const rounds = allRounds.filter(round => round.status === 'generated' && round.image_path)
     const qcByRound = await latestQcByRound(rounds.map(round => round.id))
     for (const round of rounds) {
       const qc = qcByRound.get(round.id)
-      // 闸门未通过 / 还没核验 → 不可选（人工覆盖闸门通过的轮也算通过）
-      const passed = qc?.gate_pass === 1 || qc?.human_verdict === 'approve'
+      // 人工裁决优先于程序闸门：打回 / 回退 / 终止一律不可选，哪怕闸门判过
+      const human = qc?.human_verdict ?? null
+      const passed = human
+        ? human === 'approve'
+        : qc?.gate_pass === 1
       if (!passed || seen.has(round.image_path!)) continue
       candidates.push({
         asset_kind: asset.kind, asset_id: asset.id, asset_name: asset.name,
@@ -119,7 +125,7 @@ export async function listBaseCandidates(episodeId: number): Promise<BaseCandida
       seen.add(round.image_path!)
     }
 
-    if (asset.imageUrl && !seen.has(asset.imageUrl)) {
+    if (asset.imageUrl && !seen.has(asset.imageUrl) && !pipelinePaths.has(asset.imageUrl)) {
       const size = await imageSize(asset.imageUrl)
       candidates.push({
         asset_kind: asset.kind, asset_id: asset.id, asset_name: asset.name,

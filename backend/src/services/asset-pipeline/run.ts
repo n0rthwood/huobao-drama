@@ -15,7 +15,8 @@ import { and, desc, eq, inArray } from 'drizzle-orm'
 import { db, schema } from '../../db/index.js'
 import { now } from '../../utils/response.js'
 import { logTaskError, logTaskProgress, logTaskStart, logTaskWarn } from '../../utils/task-logger.js'
-import { ACTIVE_TASK_STATUSES } from '../sys-task.js'
+import { ACTIVE_TASK_STATUSES, QWEN_JOBS_PROVIDER } from '../sys-task.js'
+import { cancelImageTask } from '../qwen-jobs.js'
 import { createTextTask, finishTextTask, parseTextTaskParams, patchTextTaskParams } from '../text-task.js'
 import { pipelineMastra } from './mastra.js'
 import { loadAssetTarget } from './steps.js'
@@ -101,6 +102,14 @@ export async function startAssetPipeline(input: {
 
   const target = await loadAssetTarget(input.assetKind, input.assetId)
   if (!target) throw new PipelineStateError('资产不存在')
+  // 地图/图示类资产的几何是程序投影出来的真源：让它进生图链路 = 让扩散模型重画海岸线
+  // 与河道（第一轮的事故形态）。服务端直接拒绝，UI 上也就没有误触的可能。
+  if (input.assetKind === 'prop') {
+    const [prop] = await db.select().from(schema.props).where(eq(schema.props.id, input.assetId))
+    if (prop?.mapSpec) {
+      throw new PipelineStateError('该道具是地图底图（已有 map_spec）：几何必须由投影确定性渲染，不能进出图流水线。请用「渲染底图」，文字与标注走叠加图层。')
+    }
+  }
 
   const taskId = await createTextTask({
     kind: ASSET_PIPELINE_KIND,
@@ -228,6 +237,11 @@ export async function approveRound(input: ApproveInput): Promise<void> {
 
   const suspended = await suspendedApproval(mastraRunId)
   if (!suspended) throw new PipelineStateError('该 run 当前不在等待人工审批')
+  // 页面可能停在旧轮次上：审批的轮次必须就是当前挂起的那一轮，否则一次「通过」会把
+  // 正在等审批的 FAIL 轮直接放行（而且绕过了 override_gate 的检查）
+  if (suspended.payload.round_id !== input.roundId) {
+    throw new PipelineStateError(`页面上的轮次已过期：当前等待审批的是第 ${suspended.payload.round_no} 轮（round_id=${suspended.payload.round_id}），请刷新后重试`)
+  }
 
   const payload: PipelineInput = {
     pipelineTaskId: input.runId,
@@ -269,9 +283,17 @@ export async function cancelRun(runId: number): Promise<void> {
     if (!round.image_task_id || round.status === 'generated') continue
     const [task] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, round.image_task_id))
     if (task && ACTIVE_TASK_STATUSES.includes(task.status as typeof ACTIVE_TASK_STATUSES[number])) {
-      await db.update(schema.sysTask)
-        .set({ status: 'cancelled', errorMsg: '流水线已取消', updatedAt: now() })
-        .where(eq(schema.sysTask.id, task.id))
+      // qwen-jobs 的在飞任务能真正取消（服务端撤单）；其它 provider 只能本地作废
+      try {
+        if (task.provider === QWEN_JOBS_PROVIDER) await cancelImageTask(task.id)
+        else {
+          await db.update(schema.sysTask)
+            .set({ status: 'cancelled', errorMsg: '流水线已取消', updatedAt: now() })
+            .where(eq(schema.sysTask.id, task.id))
+        }
+      } catch (err) {
+        logTaskWarn('AssetPipeline', 'cancel-image-task-failed', { taskId: task.id, error: err instanceof Error ? err.message : String(err) })
+      }
     }
     await db.update(schema.assetRound)
       .set({ status: 'discarded', updatedAt: now() })

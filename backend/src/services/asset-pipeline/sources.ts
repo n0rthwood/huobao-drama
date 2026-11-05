@@ -112,7 +112,12 @@ export async function addAssetSource(input: AddSourceInput): Promise<AssetSource
     ext = path.extname(input.file.filename).toLowerCase() || '.bin'
   } else if (input.localPath) {
     if (!input.localPath.startsWith('static/')) throw new AssetSourceError('local_path 必须是 static/ 下的路径')
-    const absolute = getAbsolutePath(input.localPath)
+    // 前缀检查挡不住 `static/../../etc/passwd`：解析成真实路径后必须仍在 static 根下
+    const absolute = path.resolve(getAbsolutePath(input.localPath))
+    const staticRoot = path.resolve(path.join(STORAGE_ROOT, '..', 'static'))
+    if (absolute !== staticRoot && !absolute.startsWith(staticRoot + path.sep)) {
+      throw new AssetSourceError('local_path 越出了 static 目录')
+    }
     if (!fs.existsSync(absolute)) throw new AssetSourceError('local_path 指向的文件不存在')
     bytes = fs.readFileSync(absolute)
     ext = path.extname(absolute).toLowerCase() || '.bin'

@@ -14,7 +14,15 @@
 import { createStep, createWorkflow } from '@mastra/core/workflows'
 import { z } from 'zod'
 import { decideRound, MAX_BEAUTIFY_ROUNDS, type RoundDecision } from './gate.js'
-import { getSpec, listSources, listRounds, latestQcByRound, recordHumanVerdict, type RoundPurpose } from './store.js'
+import {
+  getSpec,
+  latestQcByRound,
+  listAssetRounds,
+  listRounds,
+  listSources,
+  recordHumanVerdict,
+  type RoundPurpose,
+} from './store.js'
 import { loadAssetTarget, runCurate, runGenerate, runQc, runResearch, runSpec, writeStep } from './steps.js'
 
 export interface PipelineInput {
@@ -171,6 +179,23 @@ function makeRoundStep(index: number) {
   })
 }
 
+/**
+ * 「回退到最后一个通过的轮次」在**同一资产的全部 run** 范围内判定（主进程裁决「疑问 1」）：
+ * 允许对已有 PASS 轮的资产单独发起 beautify-only run，这种 run 自己这一条里可能一个
+ * PASS 轮都没有——只看本 run 会把人退到无处可退。返回的是那一轮的 `round_no`。
+ */
+async function lastPassingRound(state: PipelineState, excludeRoundId: number): Promise<number | null> {
+  const rounds = (await listAssetRounds(state.input.assetKind, state.input.assetId))
+    .filter(item => item.id !== excludeRoundId && item.status === 'generated')
+  const qcByRound = await latestQcByRound(rounds.map(item => item.id))
+  const passing = rounds.filter((item) => {
+    const qc = qcByRound.get(item.id)
+    const human = qc?.human_verdict ?? null
+    return human ? human === 'approve' : qc?.gate_pass === 1
+  })
+  return passing.length ? passing[passing.length - 1]!.round_no : null
+}
+
 function makeApprovalStep(index: number) {
   return createStep({
     id: APPROVAL_STEP_IDS[index]!,
@@ -224,18 +249,18 @@ function makeApprovalStep(index: number) {
         return { ...state, done: true, aborted: true, finalRoundNo: null }
       }
       if (resumeData.verdict === 'rollback') {
-        const lastPass = [...history].reverse().find(item => item.gate_pass === true && item.round_no !== index)
-        return { ...state, done: true, rollbackTo: lastPass?.round_no ?? null, finalRoundNo: lastPass?.round_no ?? null }
+        const target = await lastPassingRound(state, current.id)
+        return { ...state, done: true, rollbackTo: target, finalRoundNo: target }
       }
       // revise：进下一轮；用满美化轮上限就只能回退/终止
       const beautifyDone = history.filter(item => item.purpose === 'beautify').length
       if (beautifyDone >= MAX_BEAUTIFY_ROUNDS || index + 1 >= purposes.length) {
-        const lastPass = [...history].reverse().find(item => item.gate_pass === true)
+        const target = await lastPassingRound(state, current.id)
         return {
           ...state,
           done: true,
-          rollbackTo: lastPass?.round_no ?? null,
-          finalRoundNo: lastPass?.round_no ?? null,
+          rollbackTo: target,
+          finalRoundNo: target,
           warnings: [...state.warnings, `美化轮已用满 ${MAX_BEAUTIFY_ROUNDS} 轮，无法再打回重修`],
         }
       }

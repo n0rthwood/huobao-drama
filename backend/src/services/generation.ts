@@ -89,6 +89,12 @@ interface GenerateImageParams extends TaskOriginParams {
    * 但完成后只回写 episode_characters.styling_version.image_path，**不动**角色基础形象图。
    */
   characterVersion?: { episodeId: number; name: string }
+  /**
+   * 资产流水线的轮次出图（Issue #56）：只进版本历史，**绝不自动成为资产当前图**。
+   * 「采用」必须人工点（Issue「明确不做」第 7 条）——否则一张还没过闸门、甚至已被
+   * 打回的美化图会在落地瞬间顶掉原件。
+   */
+  pipelineRound?: boolean
 }
 
 interface GenerateVideoParams extends TaskOriginParams {
@@ -142,6 +148,7 @@ export async function generateImage(params: GenerateImageParams): Promise<number
     frameType: params.frameType,
     referenceImages: params.referenceImages,
     characterVersion: params.characterVersion,
+    ...(params.pipelineRound ? { pipeline_round: true } : {}),
     ...originParams(params),
   })
 
@@ -712,6 +719,8 @@ async function handleImageCompleteBase64(record: SysTaskRecord, base64Data: stri
 // 图片完成后回写业务表：分镜(按 frameType)、角色、场景、道具
 async function writeBackImageAssets(record: SysTaskRecord, localPath: string) {
   const params = parseTaskParams(record.params)
+  // 流水线轮次图只落版本行，不回写资产当前图（Issue #56）
+  if (params.pipeline_round === true) return
   const posterId = Number(params.posterId || 0)
   if (posterId) {
     // Poster 生图只新增候选版本，不改当前底图/排版，也不自动选中（用户显式选择）
