@@ -115,6 +115,8 @@ export function planCompose(input: {
   t: number
   fit: ComposeFit
   maxSeconds?: number
+  /** Documentary final products retain every enabled segment instead of trimming to narration length. */
+  preserveVisualDuration?: boolean
 }): ComposePlan {
   const { dv, t, fit } = input
   const maxSeconds = input.maxSeconds ?? MAX_SHOT_SECONDS
@@ -133,7 +135,8 @@ export function planCompose(input: {
   const daScaled = input.da / tempo
   const gapRatio = availSeconds > 0 ? (input.da - availSeconds) / availSeconds : 1
   const content = Math.max(fit.padHeadSeconds + daScaled + fit.padTailSeconds, MIN_SHOT_SECONDS)
-  const d = Math.min(t + content, maxSeconds)
+  const contentEnd = Math.min(t + content, maxSeconds)
+  const d = input.preserveVisualDuration ? Math.min(maxSeconds, Math.max(dv, contentEnd)) : contentEnd
 
   // 旁白说完的时间点必须落在上限内（尾部留白可以被压缩，语音不可以）
   const speechEnd = t + fit.padHeadSeconds + daScaled

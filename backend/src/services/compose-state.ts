@@ -58,6 +58,7 @@ import { resolveDramaProjectType } from './project-type.js'
 import { toCombo } from './design-card.js'
 import { junctionFrameOf } from './junction-frame.js'
 import { GateBlockedError } from './workflow-gates.js'
+import { videoTaskJunction } from './video-guide-snapshot.js'
 
 export type StoryboardRow = typeof schema.storyboards.$inferSelect
 export type EpisodeRow = typeof schema.episodes.$inferSelect
@@ -336,7 +337,7 @@ function clipContextOf(segment: LayerSegment | undefined, combo: string | null |
   const position = segmentPositionOfCombo(combo)
   if (position === 'none') return context
   context.clips[position] = segment
-  context.fresh[position] = !segment.stale_reasons.length && layerSegmentIsFresh(segment, spec)
+  context.fresh[position] = layerSegmentIsFresh(segment, spec)
   return context
 }
 
@@ -477,7 +478,7 @@ export async function inspectComposeInputs(
     availSeconds: Math.max(0, Math.min(dv, maxSeconds) - t),
     videoHasAudio: Boolean(mainFacts.hasAudio),
   })
-  const plan = planCompose({ dv, da, t, fit, maxSeconds })
+  const plan = planCompose({ dv, da, t, fit, maxSeconds, preserveVisualDuration: documentary })
   if (plan.blocked) {
     const blocked = new ComposeBlockedError(plan, sb.storyboardNumber)
     return fail(blocked.message, blocked)
@@ -509,12 +510,9 @@ export async function inspectComposeInputs(
     if ((combo === 'C' || combo === 'D') && adopted) {
       let snapshot: Record<string, unknown> = {}
       try { snapshot = JSON.parse(adopted.params || '{}') } catch { /* Invalid snapshot is stale. */ }
-      if (snapshot.junction_hash !== junctionHash) return fail(`${shot} 的生成视频使用了旧衔接帧，请重新生成视频`)
+      const savedJunction = videoTaskJunction(snapshot)
+      if (savedJunction?.hash !== junctionHash || savedJunction.slot !== (combo === 'C' ? 'first' : 'last')) return fail(`${shot} 的生成视频使用了旧衔接帧或缺少可核验的引导记录，请重新生成视频`)
     }
-    // Documentary composition preserves both complete segments; narration never truncates a segment.
-    plan.d = Math.max(plan.d, dv)
-    plan.trim = false
-    plan.freezeSeconds = Math.max(0, plan.d - dv)
   }
 
   return {

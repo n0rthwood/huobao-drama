@@ -12,7 +12,9 @@ const combos = ['A', 'B', 'C', 'D', null]
 const text = '历史旁白'
 const issues = combos.map(combo => narrationIssues({episodeNarrationEnabled:true,shotNarrationEnabled:true,narrationText:text,combo,meta:{audio:{duration_ms:20000,text_sha256:sha256(text)}}}))
 const plans = combos.map(combo => planCompose({dv:24,da:20,t:0,fit:DEFAULT_COMPOSE_FIT,maxSeconds:shotMaxSeconds(combo)}))
-console.log(JSON.stringify({limits:combos.map(shotMaxSeconds),issues,plans}))
+const retained = planCompose({dv:6,da:2,t:0,fit:DEFAULT_COMPOSE_FIT,maxSeconds:45,preserveVisualDuration:true})
+const legacy = planCompose({dv:6,da:2,t:0,fit:DEFAULT_COMPOSE_FIT,maxSeconds:15})
+console.log(JSON.stringify({limits:combos.map(shotMaxSeconds),issues,plans,retained,legacy}))
 `], { cwd, encoding: 'utf8' }))
 
 test('whole shot caps distinguish layer, generated, hybrid, and legacy drama', () => {
@@ -21,4 +23,10 @@ test('whole shot caps distinguish layer, generated, hybrid, and legacy drama', (
 test('20 second A narration is valid while B and legacy drama remain capped at 15', () => {
   assert.deepEqual(result.plans.map(plan => plan.blocked), [false, true, false, false, true])
   assert.deepEqual(result.issues.map(issues => issues.some(issue => issue.code === 'narration_too_long')), [false, true, false, false, true])
+})
+test('documentary previews and execution retain both segments while legacy narration-fit stays unchanged', () => {
+  assert.equal(result.retained.d, 6)
+  assert.equal(result.retained.trim, false)
+  assert.equal(result.legacy.d, 4)
+  assert.equal(result.legacy.trim, true)
 })

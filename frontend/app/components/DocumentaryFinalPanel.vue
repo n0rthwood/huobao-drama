@@ -52,7 +52,6 @@ async function updateStatuses() {
   await Promise.all(kinds.map(async kind => {
     try { statuses.value[kind] = await api.get(`/episodes/${episodeId.value}/${paths[kind]}${kind === 'video' ? '' : '-status'}`) } catch (e) { error.value = e.message }
   }))
-  await ctx.refresh()
 }
 async function loadCounts() {
   if (!episodeId.value) return
