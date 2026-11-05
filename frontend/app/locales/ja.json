@@ -2085,6 +2085,7 @@
     },
     "gate": {
       "locked": "ロック中",
+      "checking": "ステップゲートを確認中…",
       "lockedTooltip": "{reason}",
       "goFix": "解決しに行く",
       "needScript": "ナレーション原稿が未確定です",

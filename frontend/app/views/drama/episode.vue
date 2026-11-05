@@ -144,7 +144,7 @@
               type="button"
               :class="['sidebar-progress-seg', { done: i < currentMainIdx || mainStageDone(s.id), current: i === currentMainIdx, locked: s.locked }]"
               :title="s.locked ? `${s.label} · ${t('episode.gate.locked')}：${s.reason} · ${t('episode.gate.goFix')}` : s.label"
-              @click="s.locked ? goStageBlocker(s.id) : goMainStage(s.id)"
+              @click="goMainStage(s.id)"
             ><span class="sidebar-progress-seg-fill" /></button>
           </div>
           <div class="sidebar-progress-labels">
@@ -170,22 +170,27 @@
 
       <!-- ===== PRODUCTION PANEL ===== -->
       <div v-else-if="panel === 'production'" class="content-panel">
+        <!--
+          门禁锁定（#54）：侧栏点击与 deeplink 直达都只给原因与出路，绝不渲染内容；
+          门禁尚未判定（首屏未取到 /gates 或取数失败）时同样走这里，避免内容先闪一下。
+          这道闸门必须排在「剧本未就绪」提示之前，否则锁定步骤会显示错误的阻断原因。
+        -->
+        <div v-if="stageLocked(prodTab)" class="step-empty" style="flex:1">
+          <div class="empty-visual"><Lock :size="32" /></div>
+          <div class="empty-title">{{ stageGateUnknown(prodTab) ? t('episode.gate.checking') : t('episode.gate.locked') }}</div>
+          <div class="empty-desc">{{ stageLockReason(prodTab) }}</div>
+          <button v-if="stageGateUnknown(prodTab)" class="btn" @click="refreshGates()">{{ t('episode.sidebar.refreshData') }}</button>
+          <button v-else class="btn btn-primary" @click="goStageBlocker(prodTab)">{{ t('episode.gate.goFix') }}</button>
+        </div>
+
         <!-- Guard: current production step prerequisites -->
-        <div v-if="productionBlockMessage" class="step-empty" style="flex:1">
+        <div v-else-if="productionBlockMessage" class="step-empty" style="flex:1">
           <div class="empty-visual">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
           </div>
           <div class="empty-title">{{ t('episode.prod.notReady') }}</div>
           <div class="empty-desc">{{ productionBlockMessage }}</div>
           <button class="btn btn-primary" @click="goProductionBlockTarget">{{ productionBlockActionLabel }}</button>
-        </div>
-
-        <!-- 门禁锁定（#54）：deeplink 直达锁定步骤同样只给原因与出路，不渲染内容；服务端另有同一道闸门 -->
-        <div v-else-if="stageLocked(prodTab)" class="step-empty" style="flex:1">
-          <div class="empty-visual"><Lock :size="32" /></div>
-          <div class="empty-title">{{ t('episode.gate.locked') }}</div>
-          <div class="empty-desc">{{ stageLockReason(prodTab) }}</div>
-          <button class="btn btn-primary" @click="goStageBlocker(prodTab)">{{ t('episode.gate.goFix') }}</button>
         </div>
 
         <template v-else>
@@ -699,13 +704,14 @@
       </div>
 
       <!-- ===== EXPORT PANEL ===== -->
-      <!-- 门禁锁定（#54）：导出需要至少一镜成品最新；锁定时只给原因与出路 -->
+      <!-- 门禁锁定（#54）：导出需要至少一镜成品最新；锁定或门禁未判定时都只给原因与出路 -->
       <div v-else-if="stageLocked('export')" class="content-panel">
         <div class="step-empty" style="flex:1">
           <div class="empty-visual"><Lock :size="32" /></div>
-          <div class="empty-title">{{ t('episode.gate.locked') }}</div>
+          <div class="empty-title">{{ stageGateUnknown('export') ? t('episode.gate.checking') : t('episode.gate.locked') }}</div>
           <div class="empty-desc">{{ stageLockReason('export') }}</div>
-          <button class="btn btn-primary" @click="goStageBlocker('export')">{{ t('episode.gate.goFix') }}</button>
+          <button v-if="stageGateUnknown('export')" class="btn" @click="refreshGates()">{{ t('episode.sidebar.refreshData') }}</button>
+          <button v-else class="btn btn-primary" @click="goStageBlocker('export')">{{ t('episode.gate.goFix') }}</button>
         </div>
       </div>
       <ExportPanel v-else />
@@ -1495,7 +1501,7 @@ import DesignCardPanel from '~/components/DesignCardPanel.vue'
 import ShotProductionPanel from '~/components/ShotProductionPanel.vue'
 import VideoShotPanel from '~/components/VideoShotPanel.vue'
 import ExportPanel from '~/components/ExportPanel.vue'
-import { ASSET_SUB_TABS, PROD_TAB_KEYS, WORKBENCH_CTX, remapAssetTab, remapProdTab } from '~/utils/workbenchSteps'
+import { ASSET_SUB_TABS, PROD_TAB_KEYS, WORKBENCH_CTX, isStageGateUnknown, isStageLocked, remapAssetTab, remapProdTab } from '~/utils/workbenchSteps'
 import { useWorkflowGates } from '~/composables/useWorkflowGates'
 import { mediaTimeOfPath } from '~/utils/mediaTime'
 import {
@@ -2997,13 +3003,22 @@ const mainStageDefs = computed(() => (isDocumentaryProject.value
       { id: 'export', label: t('episode.stage.export'), desc: t('episode.stage.exportDesc'), icon: Download },
     ]))
 
-// 步骤门禁（#54）：服务端是唯一判定方，界面只渲染它给的解锁位 / 原因 / 跳转目标
-const { gates: gateState, refreshGates, reasonOf: gateReasonOf, gotoOf: gateGotoOf } = useWorkflowGates(() => epId.value)
+// 步骤门禁（#54）：服务端是唯一判定方，界面只渲染它给的解锁位 / 原因 / 跳转目标；
+// 门禁未判定（ready=false：首屏尚未取到 /gates，或取数失败）时按锁定渲染，内容绝不先闪出来
+const { gates: gateState, ready: gatesReady, applyGates, refreshGates, reasonOf: gateReasonOf, gotoOf: gateGotoOf } = useWorkflowGates(() => epId.value)
+function stageGateUnknown(stageId) {
+  return isStageGateUnknown({ documentary: isDocumentaryProject.value, stageId, gatesReady: gatesReady.value })
+}
 function stageLocked(stageId) {
-  if (!isDocumentaryProject.value || stageId === 'script') return false
-  return gateState.value.unlocked?.[stageId] === false
+  return isStageLocked({
+    documentary: isDocumentaryProject.value,
+    stageId,
+    gatesReady: gatesReady.value,
+    unlocked: gateState.value.unlocked,
+  })
 }
 function stageLockReason(stageId) {
+  if (stageGateUnknown(stageId)) return ''
   return stageLocked(stageId) ? gateReasonOf(stageId) : ''
 }
 /** 点锁定步骤时跳到真正阻塞它的那一步，而不是停在原地 */
@@ -3020,7 +3035,9 @@ watch([() => drama.value?.project_type, prodTabDefs], ([type]) => {
   assetTab.value = remapAssetTab(assetTab.value, type)
 }, { immediate: true })
 
-// 切换制作页签时重算门禁（裁决：refresh / 剧本保存确认 / 任务结束 / 页签切换）
+// 切换制作页签时重算门禁（裁决：refresh / 剧本保存确认 / 任务结束 / 页签切换）。
+// 导航类刷新是前台的：先作废上一次判定，拿到新结果前新步骤只渲染「校验中」，
+// 不拿上一轮的解锁缓存放行（任务结束 / 剧本保存走 background，不打断正在看的内容）。
 watch([prodTab, panel], () => { if (epId.value) refreshGates() })
 
 const sidebarSections = computed(() => ([
@@ -3169,11 +3186,8 @@ function goSubStep(key) {
   }
   if (key.startsWith('prod:')) {
     const stageId = key.replace('prod:', '')
-    // 锁定步骤点了就跳到真正阻塞它的那一步，而不是停在灰掉的页签上（#54）
-    if (stageLocked(stageId)) {
-      goStageBlocker(stageId)
-      return
-    }
+    // 锁定步骤照常进入：锁定空态会给出原因与「去解决」按钮（跳到真正阻塞它的那一步），
+    // 而不是悄悄把人甩到别的步骤上——侧栏点击与 deeplink 两条路径看到的东西必须一致
     panel.value = 'production'
     prodTab.value = stageId
     return
@@ -3423,7 +3437,7 @@ const scriptConfirmedAt = computed(() => {
 async function confirmScript() {
   confirmingScript.value = true
   try {
-    gateState.value = await episodeAPI.confirmScript(epId.value)
+    applyGates(await episodeAPI.confirmScript(epId.value))
     toast.success(t('episode.script.confirmed'))
   } catch (e) {
     toastError(e)
@@ -3434,20 +3448,21 @@ async function confirmScript() {
 async function unconfirmScript() {
   confirmingScript.value = true
   try {
-    gateState.value = await episodeAPI.unconfirmScript(epId.value)
+    applyGates(await episodeAPI.unconfirmScript(epId.value))
   } catch (e) {
     toastError(e)
   } finally {
     confirmingScript.value = false
   }
 }
-// 改稿会在服务端自动取消确认（onScriptChanged）：保存后立刻重算门禁，锁定态即时生效
+// 改稿会在服务端自动取消确认（onScriptChanged）：保存后前台重算门禁——先作废上一次判定，
+// 拿到新结果前不再按旧的解锁位渲染任何受管内容，锁定态即时生效
 function saveRaw() {
-  episodeAPI.update(epId.value, { content: localRaw.value }).then(refreshGates)
+  episodeAPI.update(epId.value, { content: localRaw.value }).then(() => refreshGates())
   episode.value.content = localRaw.value
 }
 function saveScr() {
-  episodeAPI.update(epId.value, { script_content: localScript.value }).then(refreshGates)
+  episodeAPI.update(epId.value, { script_content: localScript.value }).then(() => refreshGates())
   episode.value.script_content = localScript.value
 }
 // 发给 Agent 的 message 是功能性提示词而非 UI 文案：产出语言由后端全局「内容语言」指令控制，

@@ -2085,6 +2085,7 @@
     },
     "gate": {
       "locked": "未解锁",
+      "checking": "正在校验步骤门禁…",
       "lockedTooltip": "{reason}",
       "goFix": "去解决",
       "needScript": "旁白稿尚未确认",

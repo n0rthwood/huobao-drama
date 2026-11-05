@@ -2085,6 +2085,7 @@
     },
     "gate": {
       "locked": "Locked",
+      "checking": "Checking step gates…",
       "lockedTooltip": "{reason}",
       "goFix": "Go fix it",
       "needScript": "Narration script is not confirmed yet",

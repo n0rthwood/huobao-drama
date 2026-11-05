@@ -60,3 +60,18 @@ export function stepTargetOf(step) {
   if (step === 'script') return { panel: 'script', tab: null }
   return { panel: 'production', tab: step }
 }
+
+/**
+ * 门禁未判定（首屏尚未取到 `/gates`，或取数失败）时，纪录片的受管步骤一律按「锁定」渲染。
+ * 宁可先给空态，也不能先把内容闪出来再收回——服务端仍是唯一判定方，这里只决定渲染什么。
+ */
+export function isStageGateUnknown({ documentary, stageId, gatesReady }) {
+  return !!documentary && stageId !== 'script' && !gatesReady
+}
+
+/** 步骤是否锁定：剧情项目与剧本步恒不锁；门禁未判定按锁定处理 */
+export function isStageLocked({ documentary, stageId, gatesReady, unlocked }) {
+  if (!documentary || stageId === 'script') return false
+  if (!gatesReady) return true
+  return unlocked?.[stageId] === false
+}

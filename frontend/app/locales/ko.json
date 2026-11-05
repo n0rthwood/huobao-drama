@@ -2085,6 +2085,7 @@
     },
     "gate": {
       "locked": "잠김",
+      "checking": "단계 게이트 확인 중…",
       "lockedTooltip": "{reason}",
       "goFix": "해결하러 가기",
       "needScript": "내레이션 원고가 확정되지 않았습니다",
