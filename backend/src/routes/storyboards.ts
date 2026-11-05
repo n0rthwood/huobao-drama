@@ -39,6 +39,8 @@ import { serializeTask } from '../services/sys-task.js'
 import {
   SLOT_LABEL,
   SLOT_FRAME_TYPE,
+  SlotLockedError,
+  assertSlotWritable,
   invalidateKeyframeConfirmation,
   isKeyframeSlot,
   keyframesJson,
@@ -47,6 +49,9 @@ import {
   slotOwnImage,
   type KeyframeSlot,
 } from '../services/keyframes.js'
+import { assertShotGate } from '../services/workflow-gates.js'
+import { applyComboSwitch, comboChangeLogOf, comboImpactOf, ComboSwitchError } from '../services/combo-switch.js'
+import { junctionFrameOf } from '../services/junction-frame.js'
 import { findActiveBatchForStoryboard } from '../services/video-batch.js'
 import { findActiveKeyframeBatchForStoryboard } from '../services/keyframe-batch.js'
 
@@ -364,6 +369,14 @@ app.post('/:id/keyframes/:slot/generate', async (c) => {
   if (!slot) return badRequest(c, 'slot 只支持 first / mid / last')
   const body = await c.req.json().catch(() => ({} as Record<string, any>))
   logTaskStart('StoryboardAPI', 'generate-keyframe', { storyboardId: id, slot, model: body.model, configId: body.config_id })
+  // 逐镜制作门禁（#58）：设计卡未确认不能出图；锁定槽（衔接帧/承接尾帧）也不出图
+  await assertShotGate(id, 'production')
+  try {
+    await assertSlotWritable(id, slot)
+  } catch (err) {
+    if (err instanceof SlotLockedError) return c.json({ code: err.code, message: err.message }, 400)
+    throw err
+  }
   try {
     const batchId = await findActiveKeyframeBatchForStoryboard(id)
     if (batchId) return badRequest(c, '该镜头正排在批量关键帧队列中，请等待批量完成或先停止批量')
@@ -411,6 +424,13 @@ app.put('/:id/keyframes/:slot', async (c) => {
   const body = await c.req.json().catch(() => ({} as Record<string, any>))
   const [storyboard] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, id))
   if (!storyboard) return badRequest(c, '镜头不存在')
+  // 锁定槽位不可写（衔接帧继承 / D+承接的首帧继承），返回 400 code='slot_locked'
+  try {
+    await assertSlotWritable(id, slot)
+  } catch (err) {
+    if (err instanceof SlotLockedError) return c.json({ code: err.code, message: err.message }, 400)
+    throw err
+  }
 
   if (body.inherit === true) {
     if (slot !== 'first') return badRequest(c, '只有首帧可以继承上一镜的尾帧')
@@ -461,11 +481,52 @@ app.post('/:id/confirm-keyframes', async (c) => {
   if (confirmed && !state.ready) {
     return badRequest(c, '关键帧未就绪，首帧与尾帧必须都有图；写了中间帧提示词的分镜还需要中间帧图')
   }
+  // 确认时快照当前衔接帧 hash（#58 契约 §3.3）：图层段重渲染后 hash 变了就能判「确认作废」
+  const junction = await junctionFrameOf(id)
   await db.update(schema.storyboards)
-    .set({ keyframesConfirmed: confirmed, updatedAt: now() })
+    .set({
+      keyframesConfirmed: confirmed,
+      keyframesJunctionHash: confirmed ? junction.hash : null,
+      keyframesStaleReason: confirmed ? null : state.staleReason,
+      updatedAt: now(),
+    })
     .where(eq(schema.storyboards.id, id))
-  logTaskSuccess('StoryboardAPI', 'confirm-keyframes', { storyboardId: id, confirmed })
+  logTaskSuccess('StoryboardAPI', 'confirm-keyframes', { storyboardId: id, confirmed, junctionHash: junction.hash || '' })
   return success(c, await storyboardJson(id))
+})
+
+// GET /storyboards/:id/combo/impact?to=C — 组合切换的影响清单（保留 / 归档 / 需要新做）
+app.get('/:id/combo/impact', async (c) => {
+  const id = Number(c.req.param('id'))
+  try {
+    return success(c, await comboImpactOf(id, c.req.query('to')))
+  } catch (err) {
+    if (err instanceof ComboSwitchError) return c.json({ code: err.code, message: err.message }, 400)
+    throw err
+  }
+})
+
+// POST /storyboards/:id/combo {combo} — 执行切换：只归档不删除，写 storyboard_change_log
+app.post('/:id/combo', async (c) => {
+  const id = Number(c.req.param('id'))
+  const body = await c.req.json().catch(() => ({} as Record<string, any>))
+  try {
+    const result = await applyComboSwitch(id, body.combo)
+    logTaskSuccess('StoryboardAPI', 'combo-switch', { storyboardId: id, from: result.from || '', to: result.to })
+    // 返回整条 storyboard JSON（契约 §5：执行成功即可直接刷新界面）
+    return success(c, await storyboardJson(id))
+  } catch (err) {
+    if (err instanceof ComboSwitchError) return c.json({ code: err.code, message: err.message }, 400)
+    const message = err instanceof Error ? err.message : String(err)
+    logTaskError('StoryboardAPI', 'combo-switch', { storyboardId: id, error: message })
+    return badRequest(c, message)
+  }
+})
+
+// GET /storyboards/:id/combo/log — 组合切换历史（验收核对 + 界面展示）
+app.get('/:id/combo/log', async (c) => {
+  const id = Number(c.req.param('id'))
+  return success(c, await comboChangeLogOf(id))
 })
 
 // POST /storyboards/:id/transition — AI 审核并生成本镜的开场转场（承接镜头，#11）

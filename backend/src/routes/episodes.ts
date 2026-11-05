@@ -8,6 +8,7 @@ import { EXTRACT_TARGETS, getExtractionStatus, startExtraction, type ExtractTarg
 import { getVideoPromptBatchStatus, startVideoPromptBatch } from '../services/video-prompts.js'
 import { getKeyframePromptBatchStatus, startKeyframePromptBatch } from '../services/keyframe-prompts.js'
 import { isKeyframeSlot, keyframesJson, loadEpisodeKeyframes, type KeyframeSlot } from '../services/keyframes.js'
+import { batchScopeOf } from '../services/batch-scope.js'
 import { parseStylingVersion } from '../services/styling-version.js'
 import { resolveDramaProjectType } from '../services/project-type.js'
 import {
@@ -659,6 +660,16 @@ app.post('/:id/storyboards/fill-gaps', async (c) => {
   }
 })
 
+// GET /episodes/:id/keyframe-prompts/scope — 批量AI提示词的范围清单（#58：先看清单再提交）
+app.get('/:id/keyframe-prompts/scope', async (c) => {
+  const id = Number(c.req.param('id'))
+  const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, id))
+  if (!ep) return notFound(c, '剧集不存在')
+  const raw = c.req.query('storyboard_ids')
+  const ids = raw ? raw.split(',').map(Number).filter((n: number) => Number.isInteger(n) && n > 0) : undefined
+  return success(c, await batchScopeOf(id, 'keyframe_prompts', ids))
+})
+
 // POST /episodes/:id/keyframe-batch/preview — 逐个“分镜 × 槽位”列出 缺图/已变化/未变化(同第N版)/阻断/跳过
 app.post('/:id/keyframe-batch/preview', async (c) => {
   const id = Number(c.req.param('id'))
@@ -669,7 +680,9 @@ app.post('/:id/keyframe-batch/preview', async (c) => {
       model: body.model,
       configId: body.config_id,
     })
-    return success(c, { items })
+    // 范围快照（#58）：A 组合与未确认设计卡的镜在 items 里是 skipped，这里再按镜汇总一遍
+    const scope = await batchScopeOf(id, 'keyframes', Array.isArray(body.storyboard_ids) ? body.storyboard_ids.map(Number) : undefined)
+    return success(c, { items, scope })
   } catch (err) {
     return badRequest(c, err instanceof Error ? err.message : '批量关键帧预览失败')
   }

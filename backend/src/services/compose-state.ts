@@ -45,15 +45,15 @@ import {
   type NarrationStatus,
 } from './narration.js'
 import {
-  PERSISTED_CLIP_POSITIONS,
-  clipIsFresh,
-  clipsByStoryboard,
-  listStoryboardClips,
-  resolveEpisodeClipSpec,
-  type ClipSpec,
-  type StoryboardClip,
-} from './storyboard-clips.js'
-import { MAX_CLIP_SECONDS } from './clip-timeline.js'
+  getLayerSegment,
+  layerSegmentIsFresh,
+  resolveEpisodeSegmentSpec,
+  segmentPositionOfCombo,
+  segmentsByStoryboard,
+  type LayerSegment,
+  type SegmentSpec,
+} from './layer-segment.js'
+import { MAX_LAYER_SEGMENT_SECONDS } from './segment-timeline.js'
 import { findActiveTextTask, parseTextTaskParams } from './text-task.js'
 
 export type StoryboardRow = typeof schema.storyboards.$inferSelect
@@ -317,7 +317,7 @@ function subtitleCueCount(absPath: string): number | null {
 
 /** 一镜的确定性片段现状：三个位置各一条 + 各自「渲染产物是否仍对得上当前输入」 */
 export interface ClipComposeContext {
-  clips: { replace: StoryboardClip | null; pre: StoryboardClip | null; post: StoryboardClip | null }
+  clips: { replace: LayerSegment | null; pre: LayerSegment | null; post: LayerSegment | null }
   fresh: { replace: boolean; pre: boolean; post: boolean }
 }
 
@@ -326,27 +326,29 @@ const EMPTY_CLIP_CONTEXT: ClipComposeContext = {
   fresh: { replace: false, pre: false, post: false },
 }
 
-function clipContextOf(clips: StoryboardClip[], spec: ClipSpec): ClipComposeContext {
+/**
+ * 机械换源（#58）：`storyboard_layer_segments` 一镜一行，位置由 combo 决定
+ * （A→replace、C→pre、D→post、B/未选→不参与）。签名口径仍是 v3 的三个 clip 分项，
+ * 所以存量成片的签名逐字节不变；v4 与按 combo 的拼接顺序归 R7。
+ */
+function clipContextOf(segment: LayerSegment | undefined, combo: string | null | undefined, spec: SegmentSpec): ClipComposeContext {
   const context: ClipComposeContext = {
-    clips: {
-      replace: clips.find(clip => clip.position === 'replace') ?? null,
-      pre: clips.find(clip => clip.position === 'pre') ?? null,
-      post: clips.find(clip => clip.position === 'post') ?? null,
-    },
+    clips: { replace: null, pre: null, post: null },
     fresh: { replace: false, pre: false, post: false },
   }
-  for (const position of PERSISTED_CLIP_POSITIONS) {
-    const clip = context.clips[position]
-    context.fresh[position] = clip ? clipIsFresh(clip, spec) : false
-  }
+  if (!segment) return context
+  const position = segmentPositionOfCombo(combo)
+  if (position === 'none') return context
+  context.clips[position] = segment
+  context.fresh[position] = layerSegmentIsFresh(segment, spec)
   return context
 }
 
 /** 单镜（单镜合成/提交走这条） */
 export async function loadClipComposeContext(sb: StoryboardRow): Promise<ClipComposeContext> {
-  const clips = await listStoryboardClips(sb.id)
-  if (!clips.length) return EMPTY_CLIP_CONTEXT
-  return clipContextOf(clips, await resolveEpisodeClipSpec(sb.episodeId))
+  const segment = await getLayerSegment(sb.id)
+  if (!segment) return EMPTY_CLIP_CONTEXT
+  return clipContextOf(segment, sb.combo, await resolveEpisodeSegmentSpec(sb.episodeId))
 }
 
 /** 整集一次查完：批量预览不能每镜各发一次查询 */
@@ -354,11 +356,18 @@ export async function loadClipComposeContexts(
   episodeId: number,
   rows: StoryboardRow[],
 ): Promise<Map<number, ClipComposeContext>> {
-  const byStoryboard = await clipsByStoryboard(rows.map(row => row.id))
+  const byStoryboard = await segmentsByStoryboard(rows.map(row => row.id))
   const out = new Map<number, ClipComposeContext>()
   if (!byStoryboard.size) return out
-  const spec = await resolveEpisodeClipSpec(episodeId)
-  for (const [storyboardId, clips] of byStoryboard) out.set(storyboardId, clipContextOf(clips, spec))
+  const spec = await resolveEpisodeSegmentSpec(episodeId)
+  for (const row of rows) {
+    const segment = byStoryboard.get(row.id)
+    if (!segment) continue
+    const context = clipContextOf(segment, row.combo, spec)
+    // combo=B / 未选：段存在但不参与，与「没有段」等价
+    if (!context.clips.replace && !context.clips.pre && !context.clips.post) continue
+    out.set(row.id, context)
+  }
   return out
 }
 
@@ -444,7 +453,7 @@ export async function inspectComposeInputs(
   // 纯画面镜头不做偏移（planCompose 的无旁白分支原样输出画面），T 对产出无影响
   const t = wantsNarration ? transition.t : 0
   // 用户确认 Q5：整镜替代的确定性片段上限 30 秒，含模型视频的镜头仍是 15 秒
-  const maxSeconds = replaceClip ? MAX_CLIP_SECONDS : MAX_SHOT_SECONDS
+  const maxSeconds = replaceClip ? MAX_LAYER_SEGMENT_SECONDS : MAX_SHOT_SECONDS
   const fit = resolveComposeFit({
     episodeDefault: ep.narrationFitDefault,
     shotFit: sb.narrationFit,
@@ -460,7 +469,7 @@ export async function inspectComposeInputs(
     return fail(blocked.message, blocked)
   }
 
-  const clipPart = (clip: StoryboardClip | null): ComposeClipPart | null =>
+  const clipPart = (clip: LayerSegment | null): ComposeClipPart | null =>
     (clip?.render_path && clip.render_signature
       ? { src: clip.render_path, signature: clip.render_signature }
       : null)

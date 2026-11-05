@@ -85,9 +85,9 @@ async function hasProductionArtifacts(storyboardId: number): Promise<boolean> {
   const [row] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, storyboardId))
   if (!row) return false
   if (row.firstFrameImage || row.midFrameImage || row.lastFrameImage || row.videoUrl || row.composedVideoUrl) return true
-  const clips = await db.select().from(schema.storyboardClips)
-    .where(eq(schema.storyboardClips.storyboardId, storyboardId))
-  return clips.some(clip => !!clip.renderPath)
+  const [segment] = await db.select().from(schema.storyboardLayerSegments)
+    .where(eq(schema.storyboardLayerSegments.storyboardId, storyboardId))
+  return !!segment?.renderPath
 }
 
 async function loadDocumentaryShot(c: Ctx, storyboardId: number) {

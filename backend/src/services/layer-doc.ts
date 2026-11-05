@@ -96,7 +96,8 @@ export interface CardLayer extends LayerBase {
   type: 'card'
   box: LayerBox
   template: CardTemplate
-  fields: { title: string; sub: string; meta: string }
+  /** 卡片字段契约（Issue #58）：`years` = 年代/年份行（「1700–1721」），独立于副标题与右下角注 */
+  fields: { title: string; sub: string; meta: string; years: string }
   style: LayerStyle
 }
 export interface ImageLayer extends LayerBase {
@@ -121,6 +122,12 @@ export interface LayerDocBase {
   width: number
   height: number
   filter?: BaseFilter
+  /**
+   * 底图原件的真实像素（Issue #58，契约 §3.2 / §10 R6）：裁切与清晰度判定的真源。
+   * 旧文档没有这两个字段，读入时补探测，缺省即「未测量」。
+   */
+  source_width?: number
+  source_height?: number
 }
 
 export interface LayerDoc {
@@ -328,6 +335,7 @@ function normalizeLayer(raw: unknown, index: number): Layer | null {
         title: trimmedText(NAME_MAX).parse(fields.title),
         sub: trimmedText(NAME_MAX).parse(fields.sub),
         meta: trimmedText(NAME_MAX).parse(fields.meta),
+        years: trimmedText(NAME_MAX).parse(fields.years),
       },
       style,
     }
@@ -380,6 +388,13 @@ export function normalizeLayerDoc(raw: unknown): LayerDoc {
     path: trimmedText(PATH_MAX).parse(baseSource.path),
     width: Math.trunc(num(1, 16384, 1344).parse(baseSource.width)),
     height: Math.trunc(num(1, 16384, 768).parse(baseSource.height)),
+  }
+  // #58：底图真实像素（R6 的裁切真源）；旧文档没有就留空，由保存时补探测
+  const sourceWidth = Math.trunc(num(1, 16384, 0).parse(baseSource.source_width ?? baseSource.sourceWidth))
+  const sourceHeight = Math.trunc(num(1, 16384, 0).parse(baseSource.source_height ?? baseSource.sourceHeight))
+  if (sourceWidth > 0 && sourceHeight > 0) {
+    base.source_width = sourceWidth
+    base.source_height = sourceHeight
   }
   const filter = baseFilterSchema.safeParse(baseSource.filter)
   if (filter.success && filter.data) base.filter = filter.data as BaseFilter
