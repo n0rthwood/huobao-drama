@@ -21,10 +21,10 @@ import { now } from '../utils/response.js'
 import { getAbsolutePath } from '../utils/storage.js'
 import { probeVideoSpec } from './media-probe.js'
 import { normalizeLayerDoc, type LayerDoc } from './layer-doc.js'
+import { qualityWarningsOf } from './layer-quality.js'
 import {
   MAX_LAYER_SEGMENT_SECONDS,
   SEGMENT_DEFAULT_FPS,
-  SEGMENT_MIN_VIEWPORT,
   clampSegmentDuration,
   endHoldOf,
   normalizeTimeline,
@@ -60,6 +60,8 @@ export interface SegmentQualityWarning {
   effective_h: number
   output_w: number
   output_h: number
+  spec_w?: number
+  spec_h?: number
 }
 
 export interface LayerSegment {
@@ -131,6 +133,7 @@ function parseWarnings(raw: string | null): SegmentQualityWarning[] {
       return [{
         frame_index: nums[0], t: nums[1], effective_w: nums[2],
         effective_h: nums[3], output_w: nums[4], output_h: nums[5],
+        spec_w: nums[4], spec_h: nums[5],
       }]
     })
   } catch {
@@ -171,11 +174,12 @@ function parseSegmentRow(row: SegmentRow): LayerSegment {
   } catch {
     timeline = null
   }
-  const normalized = normalizeTimeline(timeline)
+  const doc = normalizeLayerDoc(layerDoc)
+  const normalized = normalizeTimeline(timeline, doc.base.crop)
   return {
     id: row.id,
     storyboard_id: row.storyboardId,
-    layer_doc: normalizeLayerDoc(layerDoc),
+    layer_doc: doc,
     timeline: normalized,
     duration: row.duration,
     end_hold: endHoldOf(normalized, row.duration),
@@ -245,15 +249,15 @@ export async function saveLayerSegment(
   // fps 是派生值：始终跟随本集成片规格，用户在时间线里改不了
   const spec = await resolveEpisodeSegmentSpec(row.episodeId)
   const timeline = normalizeTimeline({
-    ...normalizeTimeline('timeline' in input ? input.timeline : existing?.timeline),
+    ...normalizeTimeline('timeline' in input ? input.timeline : existing?.timeline, layerDoc.base.crop),
     fps: spec.fps,
-  })
+  }, layerDoc.base.crop)
   const duration = clampSegmentDuration(
     input.duration !== undefined ? Number(input.duration) : (existing?.duration ?? 0),
     MAX_LAYER_SEGMENT_SECONDS,
   )
   const baseRef = 'base_ref' in input ? input.base_ref ?? null : existing?.base_ref ?? null
-  const warnings = await qualityWarningsOf(layerDoc, timeline, { width: spec.width, height: spec.height })
+  const warnings = qualityWarningsOf(layerDoc, timeline.keyframes, spec)
   const ts = now()
   const staleReasons = (existing?.stale_reasons || []).filter(reason =>
     !(reason === SEGMENT_STALE_REASONS.baseRefUnresolved && baseRef)
@@ -375,50 +379,6 @@ export async function clearSegmentStaleReason(segmentId: number, reason: string)
     .where(eq(schema.storyboardLayerSegments.id, segmentId))
 }
 
-// ─── 清晰度警告 ──────────────────────────────────────────────
-
-/**
- * 逐精确关键帧的清晰度警告（契约 §3.2：R5 建列并在保存时计算）：
- * 「取景区有效像素 < 输出分辨率」就提示减小推近或换更清晰的底图。
- *
- * 底图真实像素优先读 `layer_doc.base.source_width/height`（R6 的裁切真源），
- * 没有就用 sharp 读文件真实像素（迁移来的老段没有这两个字段）。
- */
-async function qualityWarningsOf(
-  layerDoc: LayerDoc,
-  timeline: SegmentTimeline,
-  output: { width: number; height: number },
-): Promise<SegmentQualityWarning[]> {
-  if (!layerDoc.base.path) return []
-  const source = layerDoc.base.source_width && layerDoc.base.source_height
-    ? { width: layerDoc.base.source_width, height: layerDoc.base.source_height }
-    : await probeImageSize(layerDoc.base.path)
-  if (!source) return []
-  const warnings: SegmentQualityWarning[] = []
-  // 取景框 w/h 已按 normalizeViewport 对齐（正方形取景），但宽高各按自己的轴换算更稳妥
-  timeline.keyframes.forEach((frame, index) => {
-    const effectiveW = Math.round(source.width * viewportSpan(frame.viewport.w))
-    const effectiveH = Math.round(source.height * viewportSpan(frame.viewport.h))
-    if (effectiveW >= output.width && effectiveH >= output.height) return
-    warnings.push({
-      frame_index: index,
-      t: frame.t,
-      effective_w: effectiveW,
-      effective_h: effectiveH,
-      output_w: output.width,
-      output_h: output.height,
-    })
-  })
-  return warnings
-}
-
-/**
- * 取景框某一边相对画面的占比（归一化，钳进 [最小值, 1]）。
- * 注意不能用 `SEGMENT_MIN_VIEWPORT` 当上限来源：宽高各自钳制，宽幅取景时 h 可能小于 w。
- */
-function viewportSpan(value: number): number {
-  return Math.min(1, Math.max(0, Number.isFinite(value) ? value : 1))
-}
 
 async function probeImageSize(relativePath: string): Promise<{ width: number; height: number } | null> {
   const abs = getAbsolutePath(relativePath)
@@ -434,7 +394,6 @@ async function probeImageSize(relativePath: string): Promise<{ width: number; he
 
 /** 保存图层段时刷新「底图真实分辨率」：R6 的 `layer_doc.base.source_width/height` 是裁切真源 */
 export async function withBaseSourceSize(layerDoc: LayerDoc): Promise<LayerDoc> {
-  if (layerDoc.base.source_width && layerDoc.base.source_height) return layerDoc
   const size = await probeImageSize(layerDoc.base.path)
   if (!size) return layerDoc
   return { ...layerDoc, base: { ...layerDoc.base, source_width: size.width, source_height: size.height } }
@@ -461,6 +420,21 @@ export function fileSha256(relativePath: string): string {
   return sha
 }
 
+/** Informational provenance and measured dimensions do not alter rendered pixels. */
+function renderInputsOf(doc: LayerDoc): LayerDoc {
+  const { source_width, source_height, ref, ...base } = doc.base
+  return {
+    ...doc,
+    base,
+    layers: doc.layers.map(layer => {
+      const result = layer.type === 'image' ? { ...layer, src: { path: layer.src.path } } : layer
+      if (!result.anchor || !('semantic_name' in result.anchor)) return result
+      const { semantic_name, ...anchor } = result.anchor
+      return { ...result, anchor }
+    }),
+  }
+}
+
 /** C/D v2 includes the encoded text-free boundary profile; A/legacy retain v1. */
 export function layerSegmentSignatureOf(
   segment: Pick<LayerSegment, 'layer_doc' | 'timeline' | 'duration'>,
@@ -473,7 +447,7 @@ export function layerSegmentSignatureOf(
   }
   return crypto.createHash('sha256').update([
     combo === 'C' || combo === 'D' ? `seg-v2-${combo}` : 'seg-v1',
-    JSON.stringify(segment.layer_doc),
+    JSON.stringify(renderInputsOf(segment.layer_doc)),
     JSON.stringify(segment.timeline),
     segment.duration.toFixed(3),
     endHoldOf(segment.timeline, segment.duration).toFixed(3),

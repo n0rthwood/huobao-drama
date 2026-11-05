@@ -261,7 +261,8 @@ export function layerBounds(layer: Layer, theme: LayerTheme, aspect = 16 / 9): L
   if (layer.type === 'marker') {
     const radius = styleOf(layer, theme, 'dot_radius') as number
     const size = styleOf(layer, theme, 'size') as number
-    const offset = styleOf(layer, theme, 'label_offset') as number[]
+    const legacyOffset = styleOf(layer, theme, 'label_offset') as number[]
+    const offset = [Number(layer.style.label_dx ?? legacyOffset[0]), Number(layer.style.label_dy ?? legacyOffset[1])]
     const [cx, cy] = layer.at
     const textWidth = (measureTextEm(layer.text) * size) / aspect
     const textX = offset[0] >= 0 ? cx + offset[0] : cx + offset[0] - textWidth
@@ -368,7 +369,8 @@ function emitMarker(layer: MarkerLayer, ctx: SvgContext): string {
   const color = styleOf(layer, ctx.theme, 'color') as string
   const stroke = styleOf(layer, ctx.theme, 'stroke') as string
   const size = (styleOf(layer, ctx.theme, 'size') as number) * ctx.height
-  const offset = styleOf(layer, ctx.theme, 'label_offset') as number[]
+  const legacyOffset = styleOf(layer, ctx.theme, 'label_offset') as number[]
+  const offset = [Number(layer.style.label_dx ?? legacyOffset[0]), Number(layer.style.label_dy ?? legacyOffset[1])]
   let out = `<circle cx="${fmt(cx)}" cy="${fmt(cy)}" r="${fmt(radius)}" fill="${esc(color)}"`
     + ` stroke="${esc(stroke)}" stroke-width="${fmt(radius * 0.35)}"/>`
   if (layer.text) {
@@ -559,14 +561,17 @@ export function layerDocToSvg(
     viewport?: { x: number; y: number; w: number; h: number }
   } = {},
 ): string {
+  // Cropped documents live in native whole-image geometry; output size is only the SVG surface.
+  const worldWidth = doc.base.crop ? (doc.base.source_width || doc.base.width) : size.width
+  const worldHeight = doc.base.crop ? (doc.base.source_height || doc.base.height) : size.height
   const ctx: SvgContext = {
-    width: size.width,
-    height: size.height,
+    width: worldWidth,
+    height: worldHeight,
     theme: doc.theme,
     defs: [],
     resolveImage: options.resolveImage || ((path: string) => path),
   }
-  const aspect = size.width / size.height
+  const aspect = worldWidth / worldHeight
   const body: string[] = []
   for (const layer of doc.layers) {
     if (!layer.visible) continue
@@ -583,17 +588,17 @@ export function layerDocToSvg(
     else if (layer.type === 'image') inner = emitImage(layer, ctx)
     if (!inner) continue
     const bounds = layerBounds(layer, doc.theme, aspect)
-    const cx = (bounds.x + bounds.w / 2) * size.width
-    const cy = (bounds.y + bounds.h / 2) * size.height
+    const cx = (bounds.x + bounds.w / 2) * worldWidth
+    const cy = (bounds.y + bounds.h / 2) * worldHeight
     const transform = layer.rotation ? ` transform="rotate(${fmt(layer.rotation)} ${fmt(cx)} ${fmt(cy)})"` : ''
     const opacity = alpha < 1 ? ` opacity="${fmt(alpha)}"` : ''
     body.push(`<g data-layer="${esc(layer.id)}"${opacity}${transform}>${inner}</g>`)
   }
   const defs = ctx.defs.length ? `<defs>${ctx.defs.join('')}</defs>` : ''
-  const view = options.viewport
+  const view = options.viewport || doc.base.crop
   const viewBox = view
-    ? `${fmt(view.x * size.width)} ${fmt(view.y * size.height)} ${fmt(view.w * size.width)} ${fmt(view.h * size.height)}`
-    : `0 0 ${size.width} ${size.height}`
+    ? `${fmt(view.x * worldWidth)} ${fmt(view.y * worldHeight)} ${fmt(view.w * worldWidth)} ${fmt(view.h * worldHeight)}`
+    : `0 0 ${worldWidth} ${worldHeight}`
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size.width}" height="${size.height}"`
-    + ` viewBox="${viewBox}">${defs}${body.join('')}</svg>`
+    + ` viewBox="${viewBox}"${doc.base.crop || (view && view.w !== view.h) ? ' preserveAspectRatio="none"' : ''}>${defs}${body.join('')}</svg>`
 }

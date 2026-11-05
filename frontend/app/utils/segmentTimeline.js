@@ -1,13 +1,14 @@
 /**
  * 图层段时间线（Issue #58，前端同源实现）。
  * 与 `backend/src/services/segment-timeline.ts` 必须语义等价：取景框插值、图层淡入淡出、
- * 取景框归一化（w === h）、时长钳制。编辑器用 `frameStateAt` 的输出喂
+ * 取景框归一化（未裁切 w === h，裁切后保持整图坐标与 crop 比例）、时长钳制。编辑器用 `frameStateAt` 的输出喂
  * `layerDocToSvg(doc, size, { viewport, opacity })` 做「某一时刻画面」的所见即所得，
  * 服务端用同一套规则逐帧渲染，所以预览与成片是同一口径。
  *
  * 逐帧覆盖：某关键帧的 `ease` 覆盖「本帧 → 下一帧」这一区间的插值缓动；
  * 目标帧的 `fade_ms` 覆盖到达该帧时的淡入淡出时长。两者缺省时沿用 timeline 级的值。
  */
+import { clampViewportToCrop, normalizeCrop } from './layerQuality.js'
 
 export const SEGMENT_DEFAULT_FADE_MS = 400
 export const SEGMENT_MAX_KEYFRAMES = 60
@@ -38,15 +39,26 @@ export function clampSegmentDuration(seconds, maxSeconds = SEGMENT_MAX_SECONDS) 
 }
 
 /**
- * 取景框规范化：钳进画面内、保证最小边长，宽高按归一化等值对齐（w === h 才是与整幅同比例）。
- * 与后端 `normalizeViewport` 同口径：以较大的一边为准放大另一边，宁可多框一点也不变形。
+ * 未裁切沿用同比例方框；裁切时坐标仍相对整图，以 crop 的原图像素比例约束取景。
+ * 与后端 normalizeViewport(raw, crop?) 同口径，不把取景转换为 crop 相对坐标。
  */
-export function normalizeViewport(raw) {
-  const source = raw && typeof raw === 'object' ? raw : {}
-  const size = clamp(Math.max(num(source.w, 1), num(source.h, 1)), SEGMENT_MIN_VIEWPORT, 1)
-  const x = clamp(num(source.x, 0), 0, 1 - size)
-  const y = clamp(num(source.y, 0), 0, 1 - size)
-  return { x: round(x), y: round(y), w: round(size), h: round(size) }
+export function normalizeViewport(raw, crop) {
+  const bounds = normalizeCrop(crop)
+  if (bounds.x !== 0 || bounds.y !== 0 || bounds.w !== 1 || bounds.h !== 1) {
+    return clampViewportToCrop(raw, bounds).viewport
+  }
+  const source = Array.isArray(raw) && raw.length >= 4
+    ? { x: raw[0], y: raw[1], w: raw[2], h: raw[3] }
+    : raw && typeof raw === 'object' ? raw : {}
+  const numberOf = (value, fallback) => typeof value === 'number' || typeof value === 'string' ? num(value, fallback) : fallback
+  const x0 = numberOf(source.x, 0)
+  const y0 = numberOf(source.y, 0)
+  const w0 = numberOf(source.w, 1)
+  const h0 = numberOf(source.h, 1)
+  const size = clamp(Math.max(w0, h0), SEGMENT_MIN_VIEWPORT, 1)
+  const cx = clamp(x0 + w0 / 2, 0, 1)
+  const cy = clamp(y0 + h0 / 2, 0, 1)
+  return { x: round(clamp(cx - size / 2, 0, 1 - size)), y: round(clamp(cy - size / 2, 0, 1 - size)), w: round(size), h: round(size) }
 }
 
 /** 时间线里出现过的全部图层 id（按首次出现的时刻排序） */

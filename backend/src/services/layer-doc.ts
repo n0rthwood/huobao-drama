@@ -11,6 +11,7 @@
  *   `layer-svg.ts` 的 THEME_PRESETS 在渲染时兜底（前后端同源）。
  */
 import { z } from 'zod'
+import { normalizeCrop } from './layer-quality.js'
 
 export const LAYER_DOC_VERSION = 1
 
@@ -47,6 +48,8 @@ const COORD_MAX = 1
 export interface LayerAnchor {
   asset_id?: number
   semantic_id?: string
+  /** Source label snapshot, independent of editable layer.name; used to detect renamed semantic entries. */
+  semantic_name?: string
   detached?: boolean
 }
 
@@ -100,10 +103,23 @@ export interface CardLayer extends LayerBase {
   fields: { title: string; sub: string; meta: string; years: string }
   style: LayerStyle
 }
+export interface LayerAssetRef {
+  asset_kind: 'prop' | 'scene' | 'character'
+  asset_id: number
+  version_task_id: number | null
+}
+
+export interface ImageSrc {
+  path: string
+  asset_kind?: LayerAssetRef['asset_kind']
+  asset_id?: number
+  version_task_id?: number | null
+}
+
 export interface ImageLayer extends LayerBase {
   type: 'image'
   box: LayerBox
-  src: { path: string }
+  src: ImageSrc
   fit: (typeof IMAGE_FITS)[number]
   style: LayerStyle
 }
@@ -122,6 +138,9 @@ export interface LayerDocBase {
   width: number
   height: number
   filter?: BaseFilter
+  /** Non-destructive bounds, normalized to the whole source image. Full frame is omitted. */
+  crop?: LayerBox
+  ref?: LayerAssetRef
   /**
    * 底图原件的真实像素（Issue #58，契约 §3.2 / §10 R6）：裁切与清晰度判定的真源。
    * 旧文档没有这两个字段，读入时补探测，缺省即「未测量」。
@@ -200,6 +219,10 @@ const anchorSchema = z.preprocess(
         v => (typeof v === 'string' && v.trim() ? v.trim().slice(0, 64) : undefined),
         z.string().optional(),
       ),
+      semantic_name: z.preprocess(
+        v => (typeof v === 'string' && v.trim() ? v.trim().slice(0, NAME_MAX) : undefined),
+        z.string().optional(),
+      ),
       detached: z.preprocess(v => (v === true ? true : undefined), z.boolean().optional()),
     })
     .optional(),
@@ -229,6 +252,8 @@ const STYLE_FIELDS: Record<LayerType, Record<string, z.ZodTypeAny>> = {
     size: num(0.005, 0.5, 0.034),
     font: enumWith(LAYER_FONTS, 'sans'),
     bold: bool(false),
+    label_dx: num(-0.5, 0.5, 0.016),
+    label_dy: num(-0.5, 0.5, -0.012),
     label_offset: z.preprocess(value => {
       if (!Array.isArray(value) || value.length < 2) return [0.016, -0.012]
       const [dx, dy] = value.map(v =>
@@ -343,11 +368,14 @@ function normalizeLayer(raw: unknown, index: number): Layer | null {
   const src = source.src && typeof source.src === 'object' ? (source.src as Record<string, unknown>) : {}
   const path = trimmedText(PATH_MAX).parse(src.path)
   if (!path) return null
+  const imageSrc: ImageSrc = { path }
+  const ref = normalizeAssetRef(src)
+  if (ref) Object.assign(imageSrc, ref)
   return {
     ...base,
     type,
     box,
-    src: { path },
+    src: imageSrc,
     fit: enumWith(IMAGE_FITS, 'cover').parse(source.fit) as 'contain' | 'cover',
     style,
   }
@@ -377,6 +405,20 @@ const baseFilterSchema = z.preprocess(
     .optional(),
 )
 
+function normalizeAssetRef(raw: unknown): LayerAssetRef | undefined {
+  if (!raw || typeof raw !== 'object') return undefined
+  const value = raw as Record<string, unknown>
+  if (!['prop', 'scene', 'character'].includes(String(value.asset_kind))) return undefined
+  const id = Number(value.asset_id)
+  if (!Number.isSafeInteger(id) || id <= 0) return undefined
+  const task = Number(value.version_task_id)
+  return {
+    asset_kind: value.asset_kind as LayerAssetRef['asset_kind'],
+    asset_id: id,
+    version_task_id: value.version_task_id != null && Number.isSafeInteger(task) && task > 0 ? task : null,
+  }
+}
+
 /**
  * 解析并规范化图层文档：字段白名单 + 范围钳制 + 按 z 稳定排序（z 相同按原序）。
  * 非法图层单独丢弃；整体非法时退化为空文档（base.path 为空）。
@@ -390,12 +432,16 @@ export function normalizeLayerDoc(raw: unknown): LayerDoc {
     height: Math.trunc(num(1, 16384, 768).parse(baseSource.height)),
   }
   // #58：底图真实像素（R6 的裁切真源）；旧文档没有就留空，由保存时补探测
-  const sourceWidth = Math.trunc(num(1, 16384, 0).parse(baseSource.source_width ?? baseSource.sourceWidth))
-  const sourceHeight = Math.trunc(num(1, 16384, 0).parse(baseSource.source_height ?? baseSource.sourceHeight))
+  const sourceWidth = Math.trunc(num(1, Number.MAX_SAFE_INTEGER, 0).parse(baseSource.source_width ?? baseSource.sourceWidth))
+  const sourceHeight = Math.trunc(num(1, Number.MAX_SAFE_INTEGER, 0).parse(baseSource.source_height ?? baseSource.sourceHeight))
   if (sourceWidth > 0 && sourceHeight > 0) {
     base.source_width = sourceWidth
     base.source_height = sourceHeight
   }
+  const crop = normalizeCrop(baseSource.crop)
+  if (crop.x !== 0 || crop.y !== 0 || crop.w !== 1 || crop.h !== 1) base.crop = crop
+  const ref = normalizeAssetRef(baseSource.ref)
+  if (ref) base.ref = ref
   const filter = baseFilterSchema.safeParse(baseSource.filter)
   if (filter.success && filter.data) base.filter = filter.data as BaseFilter
 

@@ -18,6 +18,7 @@ import { junctionFrameOf } from '../services/junction-frame.js'
 import { assertShotGate, productionGateReason } from '../services/workflow-gates.js'
 import { parseDesignCard, toCombo, toDesignCardStatus } from '../services/design-card.js'
 import { segmentIssuesOf } from '../services/segment-issues.js'
+import { clampViewportToCrop } from '../services/layer-quality.js'
 import {
   deleteLayerSegment,
   getLayerSegment,
@@ -110,13 +111,18 @@ app.put('/storyboards/:id', async (c) => {
     body = {}
   }
   try {
-    await saveLayerSegment(storyboardId, {
+    const saved = await saveLayerSegment(storyboardId, {
       ...('layer_doc' in body ? { layer_doc: body.layer_doc } : {}),
       ...('timeline' in body ? { timeline: body.timeline } : {}),
       ...(body.duration !== undefined ? { duration: Number(body.duration) } : {}),
       ...('base_ref' in body ? { base_ref: body.base_ref as never } : {}),
     })
-    return success(c, await segmentPayload(storyboardId))
+    const submitted = body.timeline && typeof body.timeline === 'object' ? body.timeline as Record<string, unknown> : null
+    const frames = Array.isArray(submitted?.keyframes) ? submitted.keyframes : []
+    const viewportClamped = Boolean(saved.layer_doc.base.crop) && frames.some(frame =>
+      frame && typeof frame === 'object' && clampViewportToCrop(frame.viewport, saved.layer_doc.base.crop).changed,
+    )
+    return success(c, { ...await segmentPayload(storyboardId), viewport_clamped: viewportClamped })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     logTaskError('LayerSegmentAPI', 'save', { storyboardId, error: message })

@@ -8,7 +8,7 @@
       <button
         v-for="type in LAYER_TYPES" :key="type" type="button" class="btn-ghost ll-add-btn"
         :title="t(`layerCanvas.type.${type}`)" @click="emit('add', type)"
-      >+{{ t(`layerCanvas.type.${type}`) }}</button>
+      ><component :is="TYPE_ICONS[type]" :size="13" />{{ t(`layerCanvas.type.${type}`) }}</button>
     </div>
     <ul class="ll-items">
       <li
@@ -21,26 +21,27 @@
         @drop.prevent="onDrop(index)"
         @dragend="dragId = null"
       >
-        <button
-          type="button" class="ll-icon" :aria-pressed="layer.visible"
-          :title="t('layerCanvas.list.visible')" @click.stop="toggle(layer, 'visible')"
-        >{{ layer.visible ? '●' : '○' }}</button>
-        <button
-          type="button" class="ll-icon" :aria-pressed="layer.locked"
-          :title="t('layerCanvas.list.locked')" @click.stop="toggle(layer, 'locked')"
-        >{{ layer.locked ? '🔒' : '🔓' }}</button>
+        <GripVertical :size="12" class="ll-grip" />
+        <component :is="TYPE_ICONS[layer.type]" :size="14" />
         <input
           v-if="renaming === layer.id" ref="renameInput" class="ll-name-input" :value="layer.name"
           @click.stop @blur="commitRename(layer, $event)" @keydown.enter.prevent="$event.target.blur()"
         >
         <span v-else class="ll-name" @dblclick.stop="startRename(layer.id)">{{ layer.name }}</span>
-        <span class="ll-type">{{ t(`layerCanvas.type.${layer.type}`) }}</span>
-        <span v-if="layer.anchor" class="ll-anchor" :title="anchorTitle(layer)">{{ layer.anchor.detached ? '⚲' : '⚓' }}</span>
+        <span v-if="glyphs[layer.id]?.length" class="ll-warning" :title="t('layerCanvas.style.missingChars', { chars: glyphs[layer.id].join(' ') })"><TriangleAlert :size="13" /></span>
+        <button type="button" :class="['ll-icon', 'll-anchor', status(layer)]"
+          :title="t(`layerCanvas.anchor.${status(layer)}`)" :aria-label="t('layerCanvas.anchor.relink')"
+          @click.stop="emit('relink', layer.id)"><component :is="ANCHOR_ICONS[status(layer)]" :size="14" /></button>
+        <button type="button" class="ll-icon" :aria-pressed="layer.visible" :title="t('layerCanvas.list.visible')" :aria-label="t('layerCanvas.list.visible')" @click.stop="toggle(layer, 'visible')"><component :is="layer.visible ? Eye : EyeOff" :size="14" /></button>
+        <button type="button" class="ll-icon" :aria-pressed="layer.locked" :title="t('layerCanvas.list.locked')" :aria-label="t('layerCanvas.list.locked')" @click.stop="toggle(layer, 'locked')"><component :is="layer.locked ? Lock : LockOpen" :size="14" /></button>
+        <button v-if="layer.anchor && !layer.anchor.detached" type="button" class="ll-icon ll-hover" :title="t('layerCanvas.anchor.toManual')" :aria-label="t('layerCanvas.anchor.toManual')" @click.stop="manual(layer)"><Move :size="13" /></button>
+        <button type="button" class="ll-icon ll-hover" :title="t('layerCanvas.list.duplicate')" :aria-label="t('layerCanvas.list.duplicate')" @click.stop="emit('select', [layer.id]); emit('duplicate')"><Copy :size="13" /></button>
+        <button type="button" class="ll-icon ll-hover" :title="t('layerCanvas.list.remove')" :aria-label="t('layerCanvas.list.remove')" @click.stop="emit('select', [layer.id]); emit('remove')"><Trash2 :size="13" /></button>
       </li>
     </ul>
     <div class="ll-foot">
-      <button type="button" class="btn-ghost" :disabled="!selectedIds.length" @click="emit('duplicate')">{{ t('layerCanvas.list.duplicate') }}</button>
-      <button type="button" class="btn-ghost" :disabled="!selectedIds.length" @click="emit('remove')">{{ t('layerCanvas.list.remove') }}</button>
+      <button type="button" class="btn-ghost ll-icon" :title="t('layerCanvas.list.duplicate')" :aria-label="t('layerCanvas.list.duplicate')" :disabled="!selectedIds.length" @click="emit('duplicate')"><Copy :size="15" /></button>
+      <button type="button" class="btn-ghost ll-icon" :title="t('layerCanvas.list.remove')" :aria-label="t('layerCanvas.list.remove')" :disabled="!selectedIds.length" @click="emit('remove')"><Trash2 :size="15" /></button>
     </div>
   </div>
 </template>
@@ -52,15 +53,30 @@
  */
 import { nextTick, computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { Lasso, Route, MapPin, Type, IdCard, Image, GripVertical, Anchor, Move, Unlink, Eye, EyeOff, Lock, LockOpen, Copy, Trash2, TriangleAlert } from 'lucide-vue-next'
+import { useMissingGlyphs } from '~/composables/useMissingGlyphs'
 
 const props = defineProps({
   doc: { type: Object, required: true },
   selectedIds: { type: Array, default: () => [] },
+  anchorStates: { type: Object, default: () => ({}) },
 })
-const emit = defineEmits(['select', 'patch', 'history', 'reorder', 'add', 'remove', 'duplicate'])
+const emit = defineEmits(['select', 'patch', 'history', 'reorder', 'add', 'remove', 'duplicate', 'relink'])
 const { t } = useI18n()
 
 const LAYER_TYPES = ['polygon', 'polyline', 'marker', 'label', 'card', 'image']
+const TYPE_ICONS = { polygon: Lasso, polyline: Route, marker: MapPin, label: Type, card: IdCard, image: Image }
+const ANCHOR_ICONS = { anchored: Anchor, manual: Move, unlink: Unlink }
+const { missingGlyphsByLayer: glyphs } = useMissingGlyphs(() => props.doc)
+
+function status(layer) {
+  return props.anchorStates[layer.id] || (layer.anchor?.semantic_id && !layer.anchor.detached ? 'anchored' : 'manual')
+}
+
+function manual(layer) {
+  emit('history')
+  emit('patch', { id: layer.id, patch: { anchor: { ...layer.anchor, detached: true } } })
+}
 const dragId = ref(null)
 const renaming = ref(null)
 const renameInput = ref(null)
@@ -109,11 +125,6 @@ function onDrop(displayIndex) {
   emit('reorder', { id, toIndex: props.doc.layers.length - 1 - displayIndex })
 }
 
-function anchorTitle(layer) {
-  const anchor = layer.anchor || {}
-  const parts = [anchor.asset_id ? `#${anchor.asset_id}` : '', anchor.semantic_id || ''].filter(Boolean)
-  return `${anchor.detached ? t('layerCanvas.list.detached') : t('layerCanvas.list.anchored')} ${parts.join(' · ')}`.trim()
-}
 </script>
 
 <style scoped>
@@ -132,4 +143,12 @@ function anchorTitle(layer) {
 .ll-type { color: var(--text-2); font-size: 11px; }
 .ll-anchor { color: var(--text-2); font-size: 11px; }
 .ll-foot { display: flex; gap: 6px; padding: 6px; border-top: 1px solid var(--border); }
+.ll-add-btn, .ll-icon { display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
+.ll-grip { flex-shrink: 0; color: var(--text-3); cursor: grab; }
+.ll-anchor.anchored { color: var(--accent); }
+.ll-anchor.manual { color: var(--text-3); }
+.ll-anchor.unlink, .ll-warning { color: var(--danger, #c0472e); }
+.ll-hover { opacity: 0; }
+.ll-item:hover .ll-hover, .ll-item:focus-within .ll-hover { opacity: 1; }
+.ll-icon:disabled { opacity: .4; }
 </style>
