@@ -23,6 +23,7 @@ import {
   recordHumanVerdict,
   type RoundPurpose,
 } from './store.js'
+import { withStepDeadline } from './deadline.js'
 import { loadAssetTarget, runCurate, runGenerate, runQc, runResearch, runSpec, writeStep } from './steps.js'
 
 export interface PipelineInput {
@@ -86,22 +87,24 @@ const prepareStep = createStep({
     if (!target) throw new Error('资产不存在')
 
     await writeStep(inputData.pipelineTaskId, 'research')
-    const { result } = await runResearch({
+    const { result } = await withStepDeadline('research', signal => runResearch({
       pipelineTaskId: inputData.pipelineTaskId,
       target,
       textConfigId: inputData.textConfigId ?? undefined,
-    })
+      signal,
+    }))
 
     await writeStep(inputData.pipelineTaskId, 'curate')
-    const curated = await runCurate(target)
+    const curated = await withStepDeadline('curate', () => runCurate(target))
 
     await writeStep(inputData.pipelineTaskId, 'spec')
-    const spec = await runSpec({
+    const spec = await withStepDeadline('spec', signal => runSpec({
       pipelineTaskId: inputData.pipelineTaskId,
       target,
       research: result,
       textConfigId: inputData.textConfigId ?? undefined,
-    })
+      signal,
+    }))
 
     return {
       input: inputData,
@@ -153,7 +156,7 @@ function makeRoundStep(index: number) {
       const references = await referencesFor(state, index, purpose)
 
       await writeStep(state.input.pipelineTaskId, 'generate')
-      const round = await runGenerate({
+      const round = await withStepDeadline('generate', signal => runGenerate({
         pipelineTaskId: state.input.pipelineTaskId,
         episodeId: state.input.episodeId,
         target,
@@ -164,15 +167,17 @@ function makeRoundStep(index: number) {
         referenceImages: references,
         configId: state.input.configId,
         model: state.input.model,
-      })
+        signal,
+      }))
 
       await writeStep(state.input.pipelineTaskId, 'qc')
-      await runQc({
+      await withStepDeadline('qc', signal => runQc({
         target,
         spec,
         round,
         textConfigId: state.input.textConfigId ?? undefined,
-      })
+        signal,
+      }))
       await writeStep(state.input.pipelineTaskId, 'gate')
       return { ...state, lastRoundNo: index }
     },

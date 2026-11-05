@@ -21,8 +21,9 @@ import { generateImage } from '../generation.js'
 import { getDramaStylePrompt } from '../style-preset.js'
 import { patchTextTaskParams, parseTextTaskParams } from '../text-task.js'
 import { classifyPromptInvalidation, planFinalPromptWrite } from '../asset-prompt-invalidation.js'
-import { evaluateGate, type GateMetric, type GateResult, type SpecForbidden, type SpecMustHave } from './gate.js'
+import { evaluateGate, normalizeScore, type GateMetric, type GateResult, type SpecForbidden, type SpecMustHave } from './gate.js'
 import { pickGenerator, sizeBucketFor } from './generator.js'
+import { abortableSleep } from './deadline.js'
 import {
   buildImagePrompt,
   buildNegativePrompt,
@@ -74,7 +75,7 @@ const METRICS: GateMetric[] = ['count', 'arrangement', 'color', 'shape', 'other'
 async function callJsonChat(
   stageModel: StageModel,
   content: ChatContent,
-  opts: { systemPrompt: string; temperature: number },
+  opts: { systemPrompt: string; temperature: number; signal?: AbortSignal },
 ): Promise<Record<string, unknown>> {
   const call = async (body: ChatContent): Promise<string> => {
     const reply = await callTextChat(stageModel, body, {
@@ -82,6 +83,8 @@ async function callJsonChat(
       temperature: opts.temperature,
       maxTokens: TEXT_MAX_TOKENS,
       timeoutMs: TEXT_TIMEOUT_MS,
+      // 步骤时限到期 → 这条请求当场被 abort，而不是留在连接池里空转
+      signal: opts.signal,
     })
     return reply.text
   }
@@ -165,6 +168,7 @@ export async function runResearch(input: {
   pipelineTaskId: number
   target: AssetTarget
   textConfigId?: number
+  signal?: AbortSignal
 }): Promise<{ result: ResearchResult; stageModel: StageModel }> {
   const stageModel = await resolveStageModel('asset_research', { configId: input.textConfigId })
   const [row] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, input.pipelineTaskId))
@@ -178,7 +182,7 @@ export async function runResearch(input: {
     description: input.target.description,
     era: null,
     existing: sources,
-  }), { systemPrompt: RESEARCH_SYSTEM, temperature: TEXT_TEMPERATURE }) as Partial<ResearchResult>
+  }), { systemPrompt: RESEARCH_SYSTEM, temperature: TEXT_TEMPERATURE, signal: input.signal }) as Partial<ResearchResult>
   const result: ResearchResult = {
     candidates: Array.isArray(parsed.candidates) ? parsed.candidates : [],
     key_facts: Array.isArray(parsed.key_facts) ? parsed.key_facts : [],
@@ -247,6 +251,7 @@ export async function runSpec(input: {
   target: AssetTarget
   research: ResearchResult
   textConfigId?: number
+  signal?: AbortSignal
 }): Promise<AssetSpecRow> {
   const [row] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, input.pipelineTaskId))
   const specId = parseTextTaskParams(row?.params)?.asset_spec_id as number | undefined
@@ -263,7 +268,7 @@ export async function runSpec(input: {
     description: input.target.description,
     research: JSON.stringify(input.research),
     sources,
-  }), { systemPrompt: SPEC_SYSTEM, temperature: TEXT_TEMPERATURE })
+  }), { systemPrompt: SPEC_SYSTEM, temperature: TEXT_TEMPERATURE, signal: input.signal })
   const mustHave = normalizeMustHave(parsed.must_have)
   if (!mustHave.length) throw new Error('事实表为空：模型没有给出任何 must_have 条目')
 
@@ -322,7 +327,10 @@ async function invalidateFinalPromptForSpec(target: AssetTarget, version: number
 
 // ─── generate ────────────────────────────────────────────────
 
-async function waitForImageTask(taskId: number): Promise<{ ok: boolean; path: string | null; error: string | null }> {
+async function waitForImageTask(
+  taskId: number,
+  signal?: AbortSignal,
+): Promise<{ ok: boolean; path: string | null; error: string | null }> {
   const deadline = Date.now() + IMAGE_WAIT_TIMEOUT_MS
   for (;;) {
     const [task] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, taskId))
@@ -332,8 +340,9 @@ async function waitForImageTask(taskId: number): Promise<{ ok: boolean; path: st
       return { ok: false, path: null, error: task.errorMsg || '生成失败' }
     }
     if (Date.now() > deadline) return { ok: false, path: null, error: '等待生成超时' }
-    // 与 keyframe-batch.ts:681 同一写法（tsconfig target ES2022 不含 Promise.withResolvers 的类型）
-    await new Promise(resolve => setTimeout(resolve, IMAGE_POLL_INTERVAL_MS))
+    // 本步时限到期：停止轮询并说明原因（生图任务本身不作废，重跑时按幂等守卫认领）
+    if (signal?.aborted) return { ok: false, path: null, error: '已超出本步时限，停止等待生成' }
+    await abortableSleep(IMAGE_POLL_INTERVAL_MS, signal)
   }
 }
 
@@ -354,6 +363,7 @@ export async function runGenerate(input: {
   referenceImages: string[]
   configId?: number | null
   model?: string | null
+  signal?: AbortSignal
 }): Promise<AssetRoundRow> {
   const generator = await pickGenerator({
     assetKind: input.target.kind,
@@ -424,7 +434,7 @@ export async function runGenerate(input: {
     await patchRound(round.id, { imageTaskId })
   }
 
-  const waited = await waitForImageTask(imageTaskId)
+  const waited = await waitForImageTask(imageTaskId, input.signal)
   if (!waited.ok || !waited.path) {
     await patchRound(round.id, { status: 'failed', errorMsg: waited.error })
     throw new Error(`第 ${input.roundNo} 轮出图失败：${waited.error}`)
@@ -502,6 +512,7 @@ export async function runQc(input: {
   /** 位置一致性的期望坐标（地图来自投影；没有就不做定位核对） */
   expected?: Array<{ id: string; name: string; at: [number, number] }>
   textConfigId?: number
+  signal?: AbortSignal
 }): Promise<{ gate: GateResult; verdicts: QcVerdicts; qcId: number }> {
   if (!input.round.image_path) throw new Error('该轮没有产出图，无法质检')
   const stageModel = await resolveStageModel('asset_qc', { configId: input.textConfigId })
@@ -515,7 +526,7 @@ export async function runQc(input: {
   const parsed = await callJsonChat(stageModel, [
     { type: 'text', text: qcUserPrompt(input.spec, framing) + labelQuestion },
     prepared.part,
-  ], { systemPrompt: QC_SYSTEM, temperature: 0.1 })
+  ], { systemPrompt: QC_SYSTEM, temperature: 0.1, signal: input.signal })
   const verdicts = normalizeQcVerdicts(parsed)
   const labelsReadable = Array.isArray(parsed.labels_readable)
     ? (parsed.labels_readable as Array<{ text: string; readable: boolean }>)
@@ -553,8 +564,8 @@ export async function runQc(input: {
     modelConfigId: stageModel.configId,
     verdicts,
     gate,
-    fidelityScore: typeof parsed.fidelity_score === 'number' ? parsed.fidelity_score : null,
-    beautyScore: typeof parsed.beauty_score === 'number' ? parsed.beauty_score : null,
+    fidelityScore: normalizeScore(parsed.fidelity_score),
+    beautyScore: normalizeScore(parsed.beauty_score),
     suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions.map(String) : [],
   })
   logTaskProgress('AssetPipeline', 'gate', {

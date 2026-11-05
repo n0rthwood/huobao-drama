@@ -42,6 +42,7 @@ export const QC_SYSTEM = `你是图像质检员。你只负责**描述你在图�
 4. **不得自创容差**。若你认为某条应按容差放行，必须在该条上加 "tolerance" 字段并**原文照抄**给你的容差清单里的整句；抄不到就不要加。
 5. text_in_image 必须给 {present: true/false, evidence}：画面上只要有任何可辨认的文字、字母、数字、图例、水印，present 就是 true。
 6. locate 只在给了定位目标时回答：每个目标给 {id, name, at:[x,y]}，x/y 是**归一化到 0–1** 的画面坐标（左上角为原点）。看不到就给 at:null。
+7. fidelity_score / beauty_score 一律给 **0–100 的整数**（不要用 0–1 的小数）：前者是对事实表的还原度，后者是画面质感。
 只返回 JSON，不要 Markdown 代码块：
 {"must_have":[{"id":"","verdict":"ok","evidence":""}],"forbidden":[{"id":"","detected":false,"evidence":""}],"text_in_image":{"present":false,"evidence":""},"locate":[],"fidelity_score":0,"beauty_score":0,"suggestions":[""],"overall":"pass"}`
 

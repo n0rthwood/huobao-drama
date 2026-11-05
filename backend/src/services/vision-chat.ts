@@ -45,6 +45,11 @@ export interface ChatCallOptions {
   temperature: number
   maxTokens: number
   timeoutMs: number
+  /**
+   * 上层（如资产流水线的步骤时限）的中止信号：与 `timeoutMs` 取**先到者**。
+   * 不接这个 signal 的话，上层超时只是放弃等待，这条请求还挂在连接池里。
+   */
+  signal?: AbortSignal
 }
 
 export interface PreparedImage {
@@ -93,19 +98,34 @@ export async function callTextChat(
   if (opts.systemPrompt) messages.push({ role: 'system', content: opts.systemPrompt })
   messages.push({ role: 'user', content })
 
-  const resp = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.apiKey}` },
-    body: JSON.stringify({
-      model: config.model,
-      temperature: opts.temperature,
-      max_tokens: opts.maxTokens,
-      messages,
-    }),
-    signal: AbortSignal.timeout(opts.timeoutMs),
-  })
-  if (!resp.ok) throw new Error(`文本服务 ${resp.status}: ${(await resp.text()).slice(0, 300)}`)
-  const data = (await resp.json()) as ChatCompletionResponse
+  const signal = opts.signal
+    ? AbortSignal.any([opts.signal, AbortSignal.timeout(opts.timeoutMs)])
+    : AbortSignal.timeout(opts.timeoutMs)
+  let resp: Response
+  let data: ChatCompletionResponse
+  try {
+    resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.apiKey}` },
+      body: JSON.stringify({
+        model: config.model,
+        temperature: opts.temperature,
+        max_tokens: opts.maxTokens,
+        messages,
+      }),
+      signal,
+    })
+    if (!resp.ok) throw new Error(`文本服务 ${resp.status}: ${(await resp.text()).slice(0, 300)}`)
+    // 响应体同样受 signal 约束：模型「连上了但一直不吐字」时中止的就是这一段
+    data = (await resp.json()) as ChatCompletionResponse
+  } catch (err) {
+    const name = err instanceof Error ? err.name : ''
+    if (name === 'TimeoutError') {
+      throw new Error(`文本服务在 ${Math.round(opts.timeoutMs / 1000)} 秒内没有返回，请求已中止`)
+    }
+    if (name === 'AbortError') throw new Error('文本请求已被中止（上层时限到期）')
+    throw err
+  }
   const usage = data.usage
     ? {
         prompt_tokens: Number(data.usage.prompt_tokens) || 0,

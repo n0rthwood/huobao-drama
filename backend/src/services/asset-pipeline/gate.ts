@@ -386,3 +386,15 @@ export function decideRound(history: RoundHistoryItem[]): RoundDecision {
     reason: `美化轮已用满 ${MAX_BEAUTIFY_ROUNDS} 轮且没有任何通过的轮次，建议终止并人工处理`,
   }
 }
+
+/**
+ * 模型给的 `fidelity_score/beauty_score` 刻度不稳：同一条提示词下实测既出现过 `95`
+ * 也出现过 `0.95`（库里 `asset_qc_record` 已经两种都有），面板按同一列展示就会把
+ * 0.95 显示成「1 分」。这里统一归一到 0–100：≤1 的值按比例换算，其余夹到 0–100。
+ * 闸门结论不看这两个分数（分数只是展示），所以归一化不会动 PASS/FAIL。
+ */
+export function normalizeScore(raw: unknown): number | null {
+  if (typeof raw !== 'number' || !Number.isFinite(raw)) return null
+  const scaled = raw > 0 && raw <= 1 ? raw * 100 : raw
+  return Math.round(Math.min(100, Math.max(0, scaled)) * 10) / 10
+}
