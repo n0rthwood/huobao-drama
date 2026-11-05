@@ -47,6 +47,8 @@ desktop/    — Electron desktop app (main process + esbuild + electron-builder 
 data/       — Generated assets and the SQLite database
 ```
 
+The frontend API client unwraps responses by the presence of their own `data` field, not by its truthiness. An explicit `data: null` remains `null` (for example, when no asset batch exists), while bare JSON responses remain intact. The asset workspace therefore hides a nonexistent batch instead of displaying an undefined status.
+
 ---
 
 ## ✨ Features

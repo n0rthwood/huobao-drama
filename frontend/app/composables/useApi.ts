@@ -52,7 +52,7 @@ async function req<T = any>(method: string, path: string, body?: any): Promise<T
     }
 
     console.log(`%c[API] %c${method} ${path} %c${resp.status} %c${ms}ms`, 'color:#888', 'color:#66bb6a', 'color:#66bb6a;font-weight:bold', 'color:#888')
-    return json.data ?? json
+    return json !== null && typeof json === 'object' && Object.prototype.hasOwnProperty.call(json, 'data') ? json.data : json
   } catch (err: any) {
     if (!err.message?.match(/^\d{3}$/)) {
       const ms = Math.round(performance.now() - start)
