@@ -629,6 +629,7 @@ const { t } = useI18n()
 
 const props = defineProps({
   episodeId: { type: Number, default: 0 },
+  projectType: { type: String, default: 'drama' },
   // 本集分镜（按分镜号升序），字段与 /episodes/:id/storyboards 返回一致
   storyboards: { type: Array, default: () => [] },
   // (sb) => 本镜资产池候选（本集全部可视资产 + selected/manual/mentioned 来源标记）；
@@ -779,7 +780,7 @@ function comboOf(sb) {
 }
 /** 设计卡未确认：到分镜设计步骤确认（生成不拦截） */
 function designUnconfirmed(sb) {
-  return (sb?.design_card_status ?? sb?.designCardStatus ?? 'blank') !== 'confirmed'
+  return props.projectType === 'documentary' && (sb?.design_card_status ?? sb?.designCardStatus ?? 'blank') !== 'confirmed'
 }
 
 /** 字段保存状态：由工作台按（分镜, 字段）维护 */

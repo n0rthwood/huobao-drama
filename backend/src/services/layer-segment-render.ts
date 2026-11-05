@@ -43,6 +43,7 @@ import { mediaFacts } from './media-probe.js'
 import { assertRenderableText, ensureLayerFonts } from './layer-fonts.js'
 import { baseFilterLayers, layerDocToSvg } from './layer-svg.js'
 import type { Layer, LayerDoc } from './layer-doc.js'
+import { clampTimelineToCrop, clampViewportToCrop, cropRectOf } from './layer-quality.js'
 import {
   frameCount,
   frameKeyOf,
@@ -159,7 +160,10 @@ async function prepareFrameSource(doc: LayerDoc, plan: RenderPlan, timeline: Seg
     .removeAlpha()
     .raw()
     .toBuffer()
-  const inlined = await prescaleImageLayers(doc, size)
+  const imageCanvas = doc.base.crop
+    ? { width: size.width, height: Math.max(1, Math.round(size.width * (doc.base.source_height || doc.base.height) / (doc.base.source_width || doc.base.width))) }
+    : size
+  const inlined = await prescaleImageLayers(doc, imageCanvas)
   return {
     baseBuffer,
     resolveImage: (relativePath: string) => inlined[relativePath] || relativePath,
@@ -180,23 +184,19 @@ async function composeFrame(
   state: FrameState,
   format: 'raw' | 'png',
 ): Promise<Buffer> {
+  // Crop constrains a whole-image viewport. Never extract crop then extract viewport again.
+  const viewport = clampViewportToCrop(state.viewport, doc.base.crop).viewport
   const svg = layerDocToSvg(doc, { width: plan.width, height: plan.height }, {
     resolveImage: source.resolveImage,
-    viewport: state.viewport,
+    viewport,
     opacity: state.opacity,
     visibleIds: source.layerIds.filter(id => state.opacity[id] > 0),
   })
-  const left = Math.round(state.viewport.x * plan.canvasWidth)
-  const top = Math.round(state.viewport.y * plan.canvasHeight)
+  const rectangle = cropRectOf({ crop: viewport }, plan.canvasWidth, plan.canvasHeight)
   const pipeline = sharp(source.baseBuffer, {
     raw: { width: plan.canvasWidth, height: plan.canvasHeight, channels: 3 },
   })
-    .extract({
-      left,
-      top,
-      width: Math.max(2, Math.min(Math.round(state.viewport.w * plan.canvasWidth), plan.canvasWidth - left)),
-      height: Math.max(2, Math.min(Math.round(state.viewport.h * plan.canvasHeight), plan.canvasHeight - top)),
-    })
+    .extract(rectangle)
     .resize(plan.width, plan.height, { fit: 'fill' })
     .composite([{ input: Buffer.from(svg) }])
   return format === 'png' ? pipeline.png().toBuffer() : pipeline.removeAlpha().raw().toBuffer()
@@ -274,11 +274,12 @@ export async function renderLayerSegment(
   if (!doc.base.path) throw new Error('图层文档缺少底图路径 base.path')
   assertRenderableText(collectTexts(doc))
 
-  const plan = planOf(segment.timeline, segment.duration, spec)
-  const source = await prepareFrameSource(doc, plan, segment.timeline)
+  const timeline = clampTimelineToCrop(segment.timeline, doc.base.crop).timeline
+  const plan = planOf(timeline, segment.duration, spec)
+  const source = await prepareFrameSource(doc, plan, timeline)
   const moment = junctionMoment(combo, segment.duration)
   // 衔接帧先算：它失败时不要把 mp4 写出来（宁可整段渲染失败，也不要留下「有片无衔接帧」的段）
-  const junction = moment ? await writeJunctionFrame(doc, plan, source, segment.timeline, moment, segment.id) : null
+  const junction = moment ? await writeJunctionFrame(doc, plan, source, timeline, moment, segment.id) : null
 
   const tempDir = path.join(STORAGE_ROOT, 'temp')
   fs.mkdirSync(tempDir, { recursive: true })
@@ -322,7 +323,7 @@ export async function renderLayerSegment(
     let lastKey = ''
     let lastFrame: Buffer | null = null
     for (let index = 0; index < plan.frames; index++) {
-      const state = frameStateAt(segment.timeline, index / plan.fps)
+      const state = frameStateAt(timeline, index / plan.fps)
       const key = frameKeyOf(state)
       // 静止段相邻帧的状态键完全相同，直接复用上一帧像素（15 s 片段里通常有七八成）
       if (key !== lastKey || !lastFrame) {
@@ -380,8 +381,9 @@ export async function renderSegmentFrame(
   const doc = segment.layer_doc
   if (!doc.base.path) throw new Error('图层文档缺少底图路径 base.path')
   assertRenderableText(collectTexts(doc))
-  const plan = planOf(segment.timeline, segment.duration, spec)
-  const source = await prepareFrameSource(doc, plan, segment.timeline)
+  const timeline = clampTimelineToCrop(segment.timeline, doc.base.crop).timeline
+  const plan = planOf(timeline, segment.duration, spec)
+  const source = await prepareFrameSource(doc, plan, timeline)
   const time = Math.min(Math.max(0, t), Math.max(0, segment.duration - 1 / plan.fps))
-  return composeFrame(doc, plan, source, frameStateAt(segment.timeline, time), 'png')
+  return composeFrame(doc, plan, source, frameStateAt(timeline, time), 'png')
 }

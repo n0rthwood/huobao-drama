@@ -7,6 +7,7 @@ import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import * as frontTimeline from '../../frontend/app/utils/segmentTimeline.js'
 
 const backendRoot = fileURLToPath(new URL('..', import.meta.url))
 
@@ -221,4 +222,58 @@ test('逐帧 ease / fade_ms 覆盖时间线级默认（契约 §3.2 PreciseKeyfr
   assert.deepEqual(got.mid, { x: 0.1, y: 0.1, w: 0.8, h: 0.8 }, '该帧 ease=linear → 中点即线性中点')
   assert.deepEqual(got.after, { a: 1 }, 'fade_ms=0 → 到达时刻立刻全不透明')
   assert.equal(got.kept, 'linear')
+})
+
+test('cropped timelines keep rectangular WHOLE-image viewports while uncropped legacy frames remain square', () => {
+  const got = run(`
+    const crop = { x: 0, y: 0.125, w: 1, h: 0.75 }
+    const viewport = { x: 0.2, y: 0.2, w: 0.4, h: 0.3 }
+    const timeline = normalizeTimeline({ keyframes: [{ t: 0, viewport, visible: [] }, { t: 2, viewport: crop, visible: [] }] }, crop)
+    out({
+      rectangular: normalizeViewport(viewport, crop),
+      legacy: normalizeViewport(viewport),
+      frames: timeline.keyframes,
+      held: frameStateAt(timeline, 8).viewport,
+      hold: endHoldOf(timeline, 6),
+    })
+  `)
+  assert.deepEqual(got.rectangular, { x: 0.2, y: 0.2, w: 0.4, h: 0.3 })
+  assert.equal(got.legacy.w, got.legacy.h)
+  assert.deepEqual(got.held, { x: 0, y: 0.125, w: 1, h: 0.75 })
+  assert.equal(got.hold, 4)
+})
+
+test('frontend crop normalization and rectangular frame interpolation match backend', () => {
+  const crop = { x: 0, y: 0.125, w: 1, h: 0.75 }
+  const viewports = [
+    { x: 0, y: 0, w: 1, h: 1 },
+    { x: 0.2, y: 0.2, w: 0.4, h: 0.3 },
+    { x: 0.9, y: 0.9, w: 0.6, h: 0.45 },
+    { x: 0.1, y: 0.1, w: 0.8, h: 0.3 },
+    [0.2, 0.2, 0.6, 0.6],
+    null,
+  ]
+  const got = run(`
+    const crop = ${JSON.stringify(crop)}
+    const viewports = ${JSON.stringify(viewports)}
+    const timeline = normalizeTimeline({ fps: 25, ease: 'linear', fade_ms: 400, keyframes: [
+      { t: 0, viewport: crop, visible: ['a'] },
+      { t: 4, viewport: { x: 0.2, y: 0.275, w: 0.6, h: 0.45 }, visible: ['a', 'b'] },
+    ] }, crop)
+    out({
+      cropped: viewports.map(viewport => normalizeViewport(viewport, crop)),
+      legacy: viewports.map(viewport => normalizeViewport(viewport)),
+      timeline,
+      states: [-1, 0, 0.2, 2, 4, 4.2, 8].map(t => frameStateAt(timeline, t)),
+    })
+  `)
+  viewports.forEach((viewport, i) => {
+    assert.deepEqual(frontTimeline.normalizeViewport(viewport, crop), got.cropped[i], `cropped viewport ${i}`)
+    assert.deepEqual(frontTimeline.normalizeViewport(viewport), got.legacy[i], `legacy viewport ${i}`)
+  })
+  ;[-1, 0, 0.2, 2, 4, 4.2, 8].forEach((t, i) => {
+    assert.deepEqual(frontTimeline.frameStateAt(got.timeline, t), got.states[i], `rectangular interpolation at ${t}`)
+  })
+  assert.deepEqual(got.cropped[0], crop, 'full frame uses complete crop, not a centre square')
+  assert.notEqual(got.states[3].viewport.w, got.states[3].viewport.h, 'midpoint remains rectangular')
 })

@@ -14,6 +14,7 @@ import { getAbsolutePath } from '../utils/storage.js'
 import type { LayerDoc } from './layer-doc.js'
 import { baseFilterLayers, layerDocToSvg } from './layer-svg.js'
 import { assertRenderableText, ensureLayerFonts } from './layer-fonts.js'
+import { cropRectOf } from './layer-quality.js'
 
 export interface LayerRenderOptions {
   width?: number
@@ -76,9 +77,13 @@ export async function renderLayerDoc(doc: LayerDoc, options: LayerRenderOptions 
   const height = Math.max(16, Math.min(8192, Math.trunc(options.height || doc.base.height)))
   if (!doc.base.path) throw new Error('图层文档缺少底图路径 base.path')
   const basePath = resolveLocalImage(doc.base.path, '底图')
+  const metadata = doc.base.crop ? await sharp(basePath).metadata() : null
+  const renderDoc = metadata?.width && metadata.height
+    ? { ...doc, base: { ...doc.base, source_width: metadata.width, source_height: metadata.height } }
+    : doc
 
   const inlined: Record<string, string> = {}
-  const svg = layerDocToSvg(doc, { width, height }, {
+  const svg = layerDocToSvg(renderDoc, { width, height }, {
     visibleIds: options.visibleIds,
     resolveImage: (relativePath: string) => {
       if (!inlined[relativePath]) {
@@ -90,17 +95,32 @@ export async function renderLayerDoc(doc: LayerDoc, options: LayerRenderOptions 
     },
   })
 
-  // 风格化层与叠加层都用普通 alpha 合成（over），与编辑器的叠层口径一致
-  const composites: sharp.OverlayOptions[] = baseFilterLayers(doc.base.filter, { width, height }).map(layer => ({
-    input: Buffer.from(layer.svg),
-  }))
-  composites.push({ input: Buffer.from(svg) })
-
-  const buffer = await sharp(basePath)
-    .resize(width, height, { fit: 'fill' })
-    .composite(composites)
-    .png()
-    .toBuffer()
+  let buffer: Buffer
+  if (doc.base.crop) {
+    // Precompose filters on the WHOLE image, as the editor and segment renderer do.
+    // A single viewport extraction follows; crop is never a second coordinate system.
+    const scale = Math.min(2.5, Math.max(1, 1 / doc.base.crop.w, 1 / doc.base.crop.h))
+    const canvas = { width: Math.round(width * scale), height: Math.round(height * scale) }
+    const base = await sharp(basePath)
+      .resize(canvas.width, canvas.height, { fit: 'fill' })
+      .composite(baseFilterLayers(doc.base.filter, canvas).map(layer => ({ input: Buffer.from(layer.svg) })))
+      .removeAlpha().raw().toBuffer()
+    buffer = await sharp(base, { raw: { ...canvas, channels: 3 } })
+      .extract(cropRectOf(doc.base, canvas.width, canvas.height))
+      .resize(width, height, { fit: 'fill' })
+      .composite([{ input: Buffer.from(svg) }])
+      .png().toBuffer()
+  } else {
+    // Preserve the uncropped pipeline and its pixels exactly.
+    const composites: sharp.OverlayOptions[] = baseFilterLayers(doc.base.filter, { width, height }).map(layer => ({
+      input: Buffer.from(layer.svg),
+    }))
+    composites.push({ input: Buffer.from(svg) })
+    buffer = await sharp(basePath)
+      .resize(width, height, { fit: 'fill' })
+      .composite(composites)
+      .png().toBuffer()
+  }
 
   return { buffer, width, height, ms: Date.now() - started }
 }

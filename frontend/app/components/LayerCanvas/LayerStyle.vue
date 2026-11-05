@@ -1,6 +1,6 @@
 <template>
   <div class="layer-style">
-    <section class="ls-block">
+    <section v-if="!layerOnly" class="ls-block">
       <h4>{{ t('layerCanvas.style.docTitle') }}</h4>
       <label class="ls-row">
         <span>{{ t('layerCanvas.style.theme') }}</span>
@@ -31,9 +31,9 @@
       </label>
     </section>
 
-    <section v-if="!layer" class="ls-empty">{{ t('layerCanvas.style.empty') }}</section>
+    <section v-if="!layer && !documentOnly" class="ls-empty">{{ t('layerCanvas.style.empty') }}</section>
 
-    <template v-else>
+    <template v-else-if="layer && !documentOnly">
       <section class="ls-block">
         <h4>{{ t(`layerCanvas.type.${layer.type}`) }} · {{ layer.name }}</h4>
         <label class="ls-row">
@@ -66,20 +66,22 @@
 
       <section v-else-if="layer.type === 'marker'" class="ls-block">
         <label class="ls-row ls-wide"><span>{{ t('layerCanvas.style.text') }}</span><input :value="layer.text" @input="setLayer('text', $event.target.value)" @change="endEdit"></label>
+        <small v-if="fieldMissing(layer.text).length" class="ls-warn"><TriangleAlert :size="12" />{{ t('layerCanvas.style.missingChars', { chars: fieldMissing(layer.text).join(' ') }) }}</small>
         <label class="ls-row"><span>{{ t('layerCanvas.style.dotColor') }}</span><input type="color" :value="value('color')" @input="setStyle('color', $event.target.value)" @change="endEdit"></label>
         <label class="ls-row"><span>{{ t('layerCanvas.style.textColor') }}</span><input type="color" :value="value('text_color')" @input="setStyle('text_color', $event.target.value)" @change="endEdit"></label>
         <label class="ls-row"><span>{{ t('layerCanvas.style.dotRadius') }}</span><input type="range" min="0.004" max="0.05" step="0.001" :value="value('dot_radius')" @input="setStyle('dot_radius', Number($event.target.value))" @change="endEdit"><em>{{ value('dot_radius') }}</em></label>
         <label class="ls-row"><span>{{ t('layerCanvas.style.size') }}</span><input type="range" min="0.01" max="0.12" step="0.002" :value="value('size')" @input="setStyle('size', Number($event.target.value))" @change="endEdit"><em>{{ value('size') }}</em></label>
         <label class="ls-row"><span>{{ t('layerCanvas.style.font') }}</span><select :value="value('font')" @change="setStyle('font', $event.target.value); endEdit()"><option v-for="font in FONTS" :key="font" :value="font">{{ t(`layerCanvas.font.${font}`) }}</option></select></label>
         <label class="ls-row"><span>{{ t('layerCanvas.style.bold') }}</span><input type="checkbox" :checked="value('bold')" @change="setStyle('bold', $event.target.checked); endEdit()"></label>
-        <label class="ls-row"><span>{{ t('layerCanvas.style.labelOffset') }}</span>
-          <input type="number" step="0.005" :value="value('label_offset')[0]" @input="setOffset(0, $event.target.value)" @change="endEdit">
-          <input type="number" step="0.005" :value="value('label_offset')[1]" @input="setOffset(1, $event.target.value)" @change="endEdit">
+        <label class="ls-row"><span>{{ t('layerCanvas.anchor.labelOffset') }}</span>
+          <input type="number" step="0.005" :aria-label="`${t('layerCanvas.anchor.labelOffset')} X`" :value="value('label_dx') || 0" @input="setStyle('label_dx', Number($event.target.value));" @change="endEdit">
+          <input type="number" step="0.005" :aria-label="`${t('layerCanvas.anchor.labelOffset')} Y`" :value="value('label_dy') || 0" @input="setStyle('label_dy', Number($event.target.value));" @change="endEdit">
         </label>
       </section>
 
       <section v-else-if="layer.type === 'label'" class="ls-block">
         <label class="ls-row ls-wide"><span>{{ t('layerCanvas.style.text') }}</span><textarea rows="3" :value="layer.text" @input="setLayer('text', $event.target.value)" @change="endEdit" /></label>
+        <small v-if="fieldMissing(layer.text).length" class="ls-warn"><TriangleAlert :size="12" />{{ t('layerCanvas.style.missingChars', { chars: fieldMissing(layer.text).join(' ') }) }}</small>
         <label class="ls-row"><span>{{ t('layerCanvas.style.font') }}</span><select :value="value('font')" @change="setStyle('font', $event.target.value); endEdit()"><option v-for="font in FONTS" :key="font" :value="font">{{ t(`layerCanvas.font.${font}`) }}</option></select></label>
         <label class="ls-row"><span>{{ t('layerCanvas.style.size') }}</span><input type="range" min="0.015" max="0.2" step="0.002" :value="value('size')" @input="setStyle('size', Number($event.target.value))" @change="endEdit"><em>{{ value('size') }}</em></label>
         <label class="ls-row"><span>{{ t('layerCanvas.style.color') }}</span><input type="color" :value="value('color')" @input="setStyle('color', $event.target.value)" @change="endEdit"></label>
@@ -93,9 +95,10 @@
 
       <section v-else-if="layer.type === 'card'" class="ls-block">
         <label class="ls-row"><span>{{ t('layerCanvas.style.template') }}</span><select :value="layer.template" @change="setLayer('template', $event.target.value); endEdit()"><option v-for="tpl in TEMPLATES" :key="tpl" :value="tpl">{{ t(`layerCanvas.template.${tpl}`) }}</option></select></label>
-        <label class="ls-row ls-wide"><span>{{ t('layerCanvas.style.title') }}</span><input :value="layer.fields.title" @input="setField('title', $event.target.value)" @change="endEdit"></label>
-        <label class="ls-row ls-wide"><span>{{ t('layerCanvas.style.sub') }}</span><input :value="layer.fields.sub" @input="setField('sub', $event.target.value)" @change="endEdit"></label>
-        <label class="ls-row ls-wide"><span>{{ t('layerCanvas.style.meta') }}</span><input :value="layer.fields.meta" @input="setField('meta', $event.target.value)" @change="endEdit"></label>
+        <template v-for="key in ['title', 'sub', 'meta']" :key="key">
+          <label class="ls-row ls-wide"><span>{{ t(`layerCanvas.style.${key}`) }}</span><input :value="layer.fields[key]" @input="setField(key, $event.target.value)" @change="endEdit"></label>
+          <small v-if="fieldMissing(layer.fields[key]).length" class="ls-warn"><TriangleAlert :size="12" />{{ t('layerCanvas.style.missingChars', { chars: fieldMissing(layer.fields[key]).join(' ') }) }}</small>
+        </template>
         <label class="ls-row"><span>{{ t('layerCanvas.style.font') }}</span><select :value="value('font')" @change="setStyle('font', $event.target.value); endEdit()"><option v-for="font in FONTS" :key="font" :value="font">{{ t(`layerCanvas.font.${font}`) }}</option></select></label>
         <label class="ls-row"><span>{{ t('layerCanvas.style.bg') }}</span><input type="color" :value="value('bg')" @input="setStyle('bg', $event.target.value)" @change="endEdit"></label>
         <label class="ls-row"><span>{{ t('layerCanvas.style.bgOpacity') }}</span><input type="range" min="0" max="1" step="0.05" :value="value('bg_opacity')" @input="setStyle('bg_opacity', Number($event.target.value))" @change="endEdit"><em>{{ value('bg_opacity') }}</em></label>
@@ -104,16 +107,24 @@
       </section>
 
       <section v-else class="ls-block">
-        <label class="ls-row ls-wide"><span>{{ t('layerCanvas.style.src') }}</span><input :value="layer.src.path" @input="setLayer('src', { path: $event.target.value })" @change="endEdit"></label>
-        <label class="ls-row"><span>{{ t('layerCanvas.style.fit') }}</span><select :value="layer.fit" @change="setLayer('fit', $event.target.value); endEdit()"><option value="cover">cover</option><option value="contain">contain</option></select></label>
+        <div class="ls-image">
+          <img v-if="layer.src?.path && !imageError" :src="mediaUrl(layer.src.path)" alt="" @error="imageError = true">
+          <small v-if="imageError || !layer.src?.path" class="ls-warn"><TriangleAlert :size="12" />{{ t('layerCanvas.base.loadError') }}</small>
+          <span v-if="layer.src?.asset_id" class="ls-source">{{ t(`episode.design.assetKind.${layer.src.asset_kind}`) }} #{{ layer.src.asset_id }} · {{ t('layerCanvas.base.version', { version: layer.src.version_task_id ?? '—' }) }}</span>
+          <small v-else-if="layer.src?.path" class="ls-warn"><TriangleAlert :size="12" />{{ t('layerCanvas.image.legacyPath') }}</small>
+          <button type="button" class="btn-ghost ls-pick" @click="imagePicker = true"><ImagePlus :size="14" />{{ t('layerCanvas.image.pick') }}</button>
+        </div>
+        <label class="ls-row"><span>{{ t('layerCanvas.style.fit') }}</span><select :value="layer.fit" @change="setLayer('fit', $event.target.value); endEdit()"><option value="cover">{{ t('layerCanvas.image.cover') }}</option><option value="contain">{{ t('layerCanvas.image.contain') }}</option></select></label>
         <label class="ls-row"><span>{{ t('layerCanvas.style.border') }}</span><input type="color" :value="value('border')" @input="setStyle('border', $event.target.value)" @change="endEdit"></label>
         <label class="ls-row"><span>{{ t('layerCanvas.style.borderWidth') }}</span><input type="range" min="0" max="0.02" step="0.001" :value="value('border_width')" @input="setStyle('border_width', Number($event.target.value))" @change="endEdit"><em>{{ value('border_width') }}</em></label>
         <label class="ls-row"><span>{{ t('layerCanvas.style.radius') }}</span><input type="range" min="0" max="0.1" step="0.002" :value="value('radius')" @input="setStyle('radius', Number($event.target.value))" @change="endEdit"><em>{{ value('radius') }}</em></label>
         <label class="ls-row"><span>{{ t('layerCanvas.style.shadow') }}</span><input type="checkbox" :checked="value('shadow')" @change="setStyle('shadow', $event.target.checked); endEdit()"></label>
       </section>
 
-      <p v-if="missingChars.length" class="ls-warn">{{ t('layerCanvas.style.missingChars', { chars: missingChars.join(' ') }) }}</p>
+      <p v-if="missingChars.length" class="ls-warn"><TriangleAlert :size="13" />{{ t('layerCanvas.style.missingChars', { chars: missingChars.join(' ') }) }}</p>
     </template>
+    <LayerImagePicker :open="imagePicker" :assets="assets" :drama-id="dramaId" :episode-id="episodeId"
+      @close="imagePicker = false" @select="chooseImage" @registered="emit('registered', $event)" />
   </div>
 </template>
 
@@ -122,15 +133,24 @@
  * 图层样式面板（Issue #48）：按类型给出可编辑字段 + 主题预设 + 底图风格化。
  * 字段缺省值来自 layerSvg.js 的 THEME_PRESETS（与渲染同源），面板里改什么就写什么。
  */
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { THEME_PRESETS, unsupportedChars } from '~/utils/layerSvg'
+import { TriangleAlert, ImagePlus } from 'lucide-vue-next'
+import LayerImagePicker from './LayerImagePicker.vue'
+import { missingGlyphsOf } from '~/composables/useMissingGlyphs'
+import { mediaUrl } from '~/utils/url'
 
 const props = defineProps({
   doc: { type: Object, required: true },
   layer: { type: Object, default: null },
+  documentOnly: { type: Boolean, default: false },
+  layerOnly: { type: Boolean, default: false },
+  assets: { type: Array, default: () => [] },
+  dramaId: { type: Number, default: 0 },
+  episodeId: { type: Number, default: 0 },
 })
-const emit = defineEmits(['patch', 'style', 'history', 'theme', 'filter'])
+const emit = defineEmits(['patch', 'style', 'history', 'theme', 'filter', 'registered'])
 const { t } = useI18n()
 
 const THEMES = ['archival', 'clean', 'ink']
@@ -143,17 +163,17 @@ const TEMPLATES = ['name', 'year', 'chapter']
 const editingKey = ref(null)
 const filter = computed(() => ({ paper: 0, tint: 'none', tint_strength: 0.35, vignette: 0, ...(props.doc.base.filter || {}) }))
 
-const missingChars = computed(() => {
-  if (!props.layer) return []
-  const texts = [props.layer.text || '', ...(props.layer.fields ? Object.values(props.layer.fields) : [])]
-  const out = []
-  for (const text of texts) {
-    for (const ch of unsupportedChars(text)) {
-      if (!out.includes(ch)) out.push(ch)
-    }
-  }
-  return out
-})
+const missingChars = computed(() => missingGlyphsOf(props.layer))
+const fieldMissing = text => unsupportedChars(text)
+const imagePicker = ref(false)
+const imageError = ref(false)
+watch(() => [props.layer?.id, props.layer?.src?.path], () => { imageError.value = false })
+
+function chooseImage(src) {
+  setLayer('src', src)
+  endEdit()
+  imagePicker.value = false
+}
 
 /** 样式字段的当前值：图层自己没写就取主题预设（与渲染口径一致）。 */
 function value(key) {
@@ -174,7 +194,10 @@ function endEdit() {
 }
 
 function setLayer(key, value) {
+  const anchoredGeometry = ['rotation', 'points', 'box', 'at'].includes(key) && props.layer.anchor?.semantic_id && !props.layer.anchor.detached
+  if (anchoredGeometry && !window.confirm(t('layerCanvas.anchor.detachConfirm', { name: props.layer.name || props.layer.anchor.semantic_id }))) return
   beginEdit(`layer:${key}`)
+  if (anchoredGeometry) emit('patch', { id: props.layer.id, patch: { anchor: { ...props.layer.anchor, detached: true } } })
   emit('patch', { id: props.layer.id, patch: { [key]: value } })
 }
 
@@ -188,11 +211,6 @@ function setField(key, value) {
   emit('patch', { id: props.layer.id, patch: { fields: { ...props.layer.fields, [key]: value } } })
 }
 
-function setOffset(index, raw) {
-  const offset = [...value('label_offset')]
-  offset[index] = Number(raw) || 0
-  setStyle('label_offset', offset)
-}
 </script>
 
 <style scoped>
@@ -207,4 +225,9 @@ function setOffset(index, raw) {
 .ls-row input[type="number"], .ls-row input[type="text"], .ls-row input:not([type]), .ls-row textarea, .ls-row select { width: 100%; font-size: 12px; }
 .ls-empty { color: var(--text-2); padding: 8px 2px; }
 .ls-warn { margin: 0; color: #c0472e; line-height: 1.5; }
+.ls-warn { display: flex; align-items: center; gap: 4px; }
+.ls-image { display: flex; flex-direction: column; gap: 6px; }
+.ls-image img { width: 100%; max-height: 140px; object-fit: contain; background: var(--surface-base); }
+.ls-pick { display: inline-flex; align-items: center; gap: 5px; }
+.ls-source { font-size: 11px; color: var(--text-2); }
 </style>

@@ -657,6 +657,7 @@
           <ShotProductionPanel
             v-if="prodTab === 'production'"
             :episode-id="Number(epId) || 0"
+            :drama-id="Number(drama?.id) || 0"
             :focus-storyboard-id="productionFocusSbId"
             :storyboards="sbs"
             :pool-candidates="shotPoolCandidates"

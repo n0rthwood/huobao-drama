@@ -253,7 +253,8 @@ export function layerBounds(layer, theme, aspect = 16 / 9) {
   if (layer.type === 'marker') {
     const radius = styleOf(layer, theme, 'dot_radius')
     const size = styleOf(layer, theme, 'size')
-    const offset = styleOf(layer, theme, 'label_offset')
+    const legacyOffset = styleOf(layer, theme, 'label_offset')
+    const offset = [Number(layer.style.label_dx ?? legacyOffset[0]), Number(layer.style.label_dy ?? legacyOffset[1])]
     const [cx, cy] = layer.at
     const textWidth = (measureTextEm(layer.text) * size) / aspect
     const textX = offset[0] >= 0 ? cx + offset[0] : cx + offset[0] - textWidth
@@ -339,7 +340,8 @@ function emitMarker(layer, ctx) {
   const color = styleOf(layer, ctx.theme, 'color')
   const stroke = styleOf(layer, ctx.theme, 'stroke')
   const size = styleOf(layer, ctx.theme, 'size') * ctx.height
-  const offset = styleOf(layer, ctx.theme, 'label_offset')
+  const legacyOffset = styleOf(layer, ctx.theme, 'label_offset')
+  const offset = [Number(layer.style.label_dx ?? legacyOffset[0]), Number(layer.style.label_dy ?? legacyOffset[1])]
   let out = `<circle cx="${fmt(cx)}" cy="${fmt(cy)}" r="${fmt(radius)}" fill="${esc(color)}"`
     + ` stroke="${esc(stroke)}" stroke-width="${fmt(radius * 0.35)}"/>`
   if (layer.text) {
@@ -517,14 +519,17 @@ export function baseFilterLayers(filter, size) {
  * `viewport`（归一化 0–1）把取景框搬进 viewBox——Ken Burns 推近时图层与底图同步放大（#50）。
  */
 export function layerDocToSvg(doc, size, options = {}) {
+  // Cropped documents live in native whole-image geometry; output size is only the SVG surface.
+  const worldWidth = doc.base.crop ? (doc.base.source_width || doc.base.width) : size.width
+  const worldHeight = doc.base.crop ? (doc.base.source_height || doc.base.height) : size.height
   const ctx = {
-    width: size.width,
-    height: size.height,
+    width: worldWidth,
+    height: worldHeight,
     theme: doc.theme,
     defs: [],
     resolveImage: options.resolveImage || (path => path),
   }
-  const aspect = size.width / size.height
+  const aspect = worldWidth / worldHeight
   const body = []
   for (const layer of doc.layers) {
     if (!layer.visible) continue
@@ -541,17 +546,17 @@ export function layerDocToSvg(doc, size, options = {}) {
     else if (layer.type === 'image') inner = emitImage(layer, ctx)
     if (!inner) continue
     const bounds = layerBounds(layer, doc.theme, aspect)
-    const cx = (bounds.x + bounds.w / 2) * size.width
-    const cy = (bounds.y + bounds.h / 2) * size.height
+    const cx = (bounds.x + bounds.w / 2) * worldWidth
+    const cy = (bounds.y + bounds.h / 2) * worldHeight
     const transform = layer.rotation ? ` transform="rotate(${fmt(layer.rotation)} ${fmt(cx)} ${fmt(cy)})"` : ''
     const opacity = alpha < 1 ? ` opacity="${fmt(alpha)}"` : ''
     body.push(`<g data-layer="${esc(layer.id)}"${opacity}${transform}>${inner}</g>`)
   }
   const defs = ctx.defs.length ? `<defs>${ctx.defs.join('')}</defs>` : ''
-  const view = options.viewport
+  const view = options.viewport || doc.base.crop
   const viewBox = view
-    ? `${fmt(view.x * size.width)} ${fmt(view.y * size.height)} ${fmt(view.w * size.width)} ${fmt(view.h * size.height)}`
-    : `0 0 ${size.width} ${size.height}`
+    ? `${fmt(view.x * worldWidth)} ${fmt(view.y * worldHeight)} ${fmt(view.w * worldWidth)} ${fmt(view.h * worldHeight)}`
+    : `0 0 ${worldWidth} ${worldHeight}`
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size.width}" height="${size.height}"`
-    + ` viewBox="${viewBox}">${defs}${body.join('')}</svg>`
+    + ` viewBox="${viewBox}"${doc.base.crop || (view && view.w !== view.h) ? ' preserveAspectRatio="none"' : ''}>${defs}${body.join('')}</svg>`
 }
