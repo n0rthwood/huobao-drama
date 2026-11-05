@@ -3431,7 +3431,7 @@ async function refresh() {
     toastError(e)
   }
   try { mergeData.value = await mergeAPI.status(epId.value) } catch {}
-  await Promise.all([loadEpisodeTasks(epId.value), loadExportMerges(), refreshGates()])
+  await Promise.all([loadEpisodeTasks(epId.value), loadExportMerges(), refreshGates({ background: true })])
   if ((panel.value === 'production' && prodTab.value === 'poster') || panel.value === 'export') await loadPosterData()
 }
 

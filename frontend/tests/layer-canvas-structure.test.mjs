@@ -5,19 +5,33 @@
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { baseFilterLayers, layerDocToSvg } from '../app/utils/layerSvg.js'
 
 const root = new URL('..', import.meta.url)
 const read = path => readFileSync(new URL(path, root), 'utf8')
 
 test('画布用同源 layerDocToSvg 出画，不自己画一套', () => {
-  const canvas = read('app/components/LayerCanvas/LayerCanvas.vue')
-  assert.match(canvas, /import \{ baseFilterLayers, layerBounds, layerDocToSvg \} from '~\/utils\/layerSvg'/)
-  assert.match(canvas, /layerDocToSvg\(props\.doc, \{ width: docWidth\.value, height: docHeight\.value \}/)
-  assert.match(canvas, /v-html="svgMarkup"/)
-  // 底图地址必须过 mediaUrl（子路径部署），字体走后端打包字体
-  assert.match(canvas, /import \{ apiBase, mediaUrl \} from '~\/utils\/url'/)
-  assert.match(canvas, /layer-docs\/fonts\//)
-  assert.match(canvas, /font-family:'\$\{family\}'/)
+  // Canvas mounting and its SVG/interaction alignment are exercised in
+  // layer-editor-behavior.test.mjs; assert the shared renderer's actual output here.
+  const size = { width: 960, height: 544 }
+  const common = { visible: true, locked: false, opacity: 1, rotation: 0, style: {} }
+  const doc = {
+    theme: 'clean',
+    base: { path: 'static/base.png', ...size, source_width: 1024, source_height: 1024 },
+    layers: [
+      { ...common, id: 'image', type: 'image', box: { x: .25, y: .25, w: .5, h: .5 }, src: { path: 'static/image.png' }, fit: 'contain' },
+      { ...common, id: 'label', type: 'label', box: { x: .1, y: .1, w: .4, h: .2 }, text: '同源文字' },
+    ],
+  }
+  const svg = layerDocToSvg(doc, size, { resolveImage: path => `/huobao/${path}` })
+  assert.match(svg, /width="960" height="544" viewBox="0 0 960 544"/)
+  assert.match(svg, /<image x="240" y="136" width="480" height="272"/)
+  assert.match(svg, /href="\/huobao\/static\/image\.png"/)
+  assert.ok(svg.includes('Noto Sans SC'))
+  assert.ok(svg.includes('同源文字'))
+  const paper = baseFilterLayers({ paper: .2, tint: 'none', tint_strength: 0, vignette: 0 }, size).find(layer => layer.id === 'paper')
+  assert.ok(paper)
+  assert.match(paper.svg, /width="960" height="544" viewBox="0 0 960 544"/)
 })
 
 test('画布具备 Q3 确认的编辑能力：选择/框选、拖动、八向缩放、旋转、吸附、键盘', () => {
