@@ -10,11 +10,14 @@
           <span v-if="currentBase?.faithful" :title="t('layerCanvas.base.verified')"><ShieldCheck :size="13" />{{ t('layerCanvas.base.verified') }}</span>
         </span>
         <span v-if="inherited" class="lr-meta"><Link2 :size="13" /><Lock :size="13" />{{ t('layerCanvas.base.inherited') }}</span>
-        <span class="lr-meta">{{ t('layerCanvas.base.resolution', { w: sourceSize.width, h: sourceSize.height, times: outputRatio }) }}</span>
+        <span class="lr-meta">{{ t('layerCanvas.base.outputSize', { w: doc.base.width, h: doc.base.height }) }}</span>
+        <span v-if="sourceSize.width && sourceSize.height" class="lr-meta">{{ t('layerCanvas.base.sourceSize', { w: sourceSize.width, h: sourceSize.height }) }}</span>
+        <span v-else class="lr-meta">{{ t('layerCanvas.base.sourceUnknown') }}</span>
+        <span v-if="outputRatio !== null" class="lr-meta">{{ t('layerCanvas.base.resolution', { times: outputRatio, sw: finalSize.width, sh: finalSize.height }) }}</span>
         <small v-if="!doc.base.source_width">{{ t('layerCanvas.base.saveSize') }}</small>
         <div class="lr-actions">
           <button type="button" class="btn-ghost" :disabled="inherited" @click="pickerOpen = true"><ImagePlus :size="14" />{{ t('layerCanvas.base.replace') }}</button>
-          <button type="button" class="btn-ghost" :disabled="inherited" @click="emit('crop-request')"><Crop :size="14" />{{ t('layerCanvas.base.cropTo169') }}</button>
+          <button type="button" class="btn-ghost" :disabled="inherited || !sourceSize.width || !sourceSize.height" @click="emit('crop-request')"><Crop :size="14" />{{ t('layerCanvas.base.cropTo169') }}</button>
         </div>
         <small class="lr-guide"><Info :size="13" />{{ t('layerCanvas.base.guide') }}</small>
         <p v-if="loadError" class="lr-error">{{ t('layerCanvas.base.loadError') }}</p>
@@ -66,7 +69,7 @@
  * Existing document operations are forwarded unchanged; add(type,partial) supports semantic quick-create.
  * base(baseObject) replaces the whole base, crop-request starts the canvas crop UI, and
  * reanchor({id,patch}) requests an explicit history-backed rebind through useLayerDoc.reanchorLayer.
- * source-size is display metadata only until the parent/backend save probes the actual source file.
+ * Loaded source dimensions stay local; the parent/backend save probes the actual source file.
  */
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -76,6 +79,7 @@ import LayerList from './LayerList.vue'
 import LayerStyle from './LayerStyle.vue'
 import { assetPipelineAPI, propAPI } from '~/composables/useApi'
 import { semanticEntries, semanticLayerPatch, anchorState } from '~/utils/semanticGeometry'
+import { normalizeCrop } from '~/utils/layerQuality'
 import { mediaUrl } from '~/utils/url'
 
 const props = defineProps({
@@ -83,12 +87,12 @@ const props = defineProps({
   selectedIds: { type: Array, default: () => [] },
   episodeId: { type: Number, default: 0 },
   dramaId: { type: Number, default: 0 },
-  spec: { type: Object, default: () => ({ width: 1920, height: 1080 }) },
+  spec: { type: Object, default: () => ({}) },
   inherited: { type: Boolean, default: false },
   baseAsset: { type: Object, default: null },
   assets: { type: Array, default: () => [] },
 })
-const emit = defineEmits(['select', 'patch', 'style', 'history', 'reorder', 'add', 'remove', 'duplicate', 'theme', 'filter', 'base', 'crop-request', 'reanchor', 'source-size', 'assets-changed'])
+const emit = defineEmits(['select', 'patch', 'style', 'history', 'reorder', 'add', 'remove', 'duplicate', 'theme', 'filter', 'base', 'crop-request', 'reanchor', 'assets-changed'])
 const { t } = useI18n()
 const GROUPS = ['points', 'regions', 'lines', 'labels']
 const candidates = ref([])
@@ -117,10 +121,18 @@ const imageAssets = computed(() => [
 ])
 const currentBase = computed(() => baseChoices.value.find(item => item.image === props.doc.base.path))
 const sourceSize = computed(() => ({
-  width: props.doc.base.source_width || naturalSize.value.width || props.doc.base.width,
-  height: props.doc.base.source_height || naturalSize.value.height || props.doc.base.height,
+  width: props.doc.base.source_width || naturalSize.value.width || 0,
+  height: props.doc.base.source_height || naturalSize.value.height || 0,
 }))
-const outputRatio = computed(() => Math.min(sourceSize.value.width / (props.spec.width || 1920), sourceSize.value.height / (props.spec.height || 1080)).toFixed(1))
+const finalSize = computed(() => ({
+  width: props.spec.width || props.doc.base.width,
+  height: props.spec.height || props.doc.base.height,
+}))
+const outputRatio = computed(() => {
+  if (!sourceSize.value.width || !sourceSize.value.height) return null
+  const crop = normalizeCrop(props.doc.base.crop)
+  return Math.min(crop.w * sourceSize.value.width / finalSize.value.width, crop.h * sourceSize.value.height / finalSize.value.height).toFixed(1)
+})
 const selectedLayer = computed(() => props.doc.layers.find(layer => props.selectedIds.includes(layer.id)) || null)
 const anchorStates = computed(() => Object.fromEntries(props.doc.layers.map(layer => [layer.id,
   anchorState(layer, entries.value, semanticsLoaded.value, props.doc.base.ref?.asset_id ?? null),
@@ -155,13 +167,12 @@ async function refreshSemantics() {
 
 function readSourceSize(event) {
   naturalSize.value = { width: event.target.naturalWidth, height: event.target.naturalHeight }
-  emit('source-size', { ...naturalSize.value })
 }
 function chooseBase(selected) {
   if (selected.length !== 1) { pickerError.value = true; return }
   const candidate = baseChoices.value.find(item => item.id === selected[0].id && item.kind === selected[0].kind)?.candidate
   if (!candidate) return
-  const base = { path: candidate.path, width: candidate.width || props.doc.base.width, height: candidate.height || props.doc.base.height,
+  const base = { path: candidate.path, width: props.doc.base.width, height: props.doc.base.height,
     ...(props.doc.base.filter ? { filter: { ...props.doc.base.filter } } : {}),
     ref: { asset_kind: candidate.asset_kind, asset_id: candidate.asset_id, version_task_id: candidate.version_task_id } }
   // Source dimensions are only persisted when already supplied by the server candidate.

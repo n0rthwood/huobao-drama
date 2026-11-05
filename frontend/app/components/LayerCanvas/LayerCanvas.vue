@@ -3,7 +3,7 @@
     <div class="lc-toolbar">
       <button v-for="tool in tools" :key="tool.key" type="button" class="btn-ghost lc-icon"
         :title="t(`layerCanvas.toolbar.${tool.key}`)" :aria-label="t(`layerCanvas.toolbar.${tool.key}`)"
-        :aria-pressed="mode === tool.key" :disabled="tool.key === 'crop' && cropLocked || tool.key === 'frame' && !frameViewport"
+        :aria-pressed="mode === tool.key" :disabled="tool.key === 'crop' && (cropLocked || !sourceKnown) || tool.key === 'frame' && !frameViewport"
         @click="setMode(tool.key)"><component :is="tool.icon" :size="16" /></button>
       <span class="lc-divider" />
       <button type="button" class="btn-ghost lc-icon" :title="t('layerCanvas.toolbar.undo')" :aria-label="t('layerCanvas.toolbar.undo')" :disabled="!canUndo" @click="emit('undo')"><Undo2 :size="16" /></button>
@@ -18,7 +18,7 @@
     </div>
     <div v-if="aspectIssue" class="lc-banner">
       <TriangleAlert :size="14" />{{ t('layerCanvas.base.aspectBanner', { aspect: aspectIssue.aspect }) }}
-      <button type="button" class="btn-ghost" :disabled="cropLocked" @click="startCrop">{{ t('layerCanvas.base.cropTo169') }}</button>
+      <button type="button" class="btn-ghost" :disabled="cropLocked || !sourceKnown" @click="startCrop">{{ t('layerCanvas.base.cropTo169') }}</button>
     </div>
     <div v-if="mode === 'crop'" class="lc-banner">
       <Crop :size="14" />{{ t('layerCanvas.base.cropHelp') }}
@@ -28,11 +28,15 @@
     <div v-if="baseImageError || !baseSrc" class="lc-banner"><TriangleAlert :size="14" />{{ t('layerCanvas.base.loadError') }}</div>
     <div ref="viewportEl" class="lc-viewport" @wheel.prevent="onWheel" @pointerdown="onViewportDown">
       <div class="lc-stage" :style="stageStyle">
-        <img v-if="baseSrc && !baseImageError" class="lc-base" :src="baseSrc" alt="" draggable="false" @load="onBaseLoad" @error="baseImageError = true">
-        <div v-for="filter in filterLayers" :key="filter.id" class="lc-filter" :style="filterStyle(filter)" />
+        <div class="lc-base-surface">
+          <div class="lc-source" :style="sourceStyle">
+            <img v-if="baseSrc && !baseImageError" class="lc-base" :src="baseSrc" alt="" draggable="false" @load="onBaseLoad" @error="baseImageError = true">
+            <div v-for="filter in filterLayers" :key="filter.id" class="lc-filter" :style="filterStyle(filter)" />
+          </div>
+        </div>
         <!-- eslint-disable-next-line vue/no-v-html -- 与后端同源的 layerDocToSvg 输出，内容已转义 -->
         <div class="lc-overlay" v-html="svgMarkup" />
-        <svg class="lc-ui" :viewBox="`0 0 ${docWidth} ${docHeight}`" preserveAspectRatio="none">
+        <svg class="lc-ui" :viewBox="uiViewBox" preserveAspectRatio="none">
           <rect
             v-for="hit in hitShapes" :key="hit.id"
             class="lc-hit" :class="{ locked: hit.locked }"
@@ -100,6 +104,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { MousePointer2, Hand, Frame, Crop, Undo2, Redo2, Magnet, ZoomIn, ZoomOut, Maximize2, TriangleAlert } from 'lucide-vue-next'
 import { baseFilterLayers, layerBounds, layerDocToSvg } from '~/utils/layerSvg'
+import { normalizeCrop } from '~/utils/layerQuality'
 import { apiBase, mediaUrl } from '~/utils/url'
 
 const props = defineProps({
@@ -115,7 +120,7 @@ const props = defineProps({
   cropLocked: { type: Boolean, default: false },
   viewport: { type: Object, default: null },
 })
-const emit = defineEmits(['select', 'history', 'patch', 'delete', 'duplicate', 'undo', 'redo', 'crop', 'source-size', 'detach', 'viewport'])
+const emit = defineEmits(['select', 'history', 'patch', 'delete', 'duplicate', 'undo', 'redo', 'crop', 'detach', 'viewport'])
 const { t } = useI18n()
 
 const HANDLE_KEYS = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
@@ -151,8 +156,8 @@ function setMode(next) {
 }
 
 function startCrop() {
-  if (props.cropLocked) return
-  const ratio = (16 / 9) / aspect.value
+  if (props.cropLocked || !sourceKnown.value) return
+  const ratio = (16 / 9) / (sourceDimensions.value.width / sourceDimensions.value.height)
   const w = Math.min(1, ratio)
   const h = w / ratio
   cropDraft.value = props.doc.base.crop ? { ...props.doc.base.crop } : { x: (1 - w) / 2, y: (1 - h) / 2, w, h }
@@ -166,7 +171,6 @@ function applyCrop() {
 
 function onBaseLoad(event) {
   sourceSize.value = { width: event.target.naturalWidth, height: event.target.naturalHeight }
-  emit('source-size', { ...sourceSize.value })
   syncScale()
 }
 
@@ -187,16 +191,46 @@ function confirmGeometry(layers) {
   return true
 }
 
-const docWidth = computed(() => props.doc.base.source_width || sourceSize.value.width || props.doc.base.width || 1344)
-const docHeight = computed(() => props.doc.base.source_height || sourceSize.value.height || props.doc.base.height || 768)
+// Native rendering fills the output surface unless an explicit crop opts into source geometry.
+// Loading an image supplies local display metadata only; saving probes source pixels server-side.
+const outputDimensions = computed(() => ({
+  width: props.doc.base.width || 1344,
+  height: props.doc.base.height || 768,
+}))
+const sourceKnown = computed(() => !!((props.doc.base.source_width || sourceSize.value.width) && (props.doc.base.source_height || sourceSize.value.height)))
+const sourceDimensions = computed(() => ({
+  width: props.doc.base.source_width || sourceSize.value.width || outputDimensions.value.width,
+  height: props.doc.base.source_height || sourceSize.value.height || outputDimensions.value.height,
+}))
+const canvasDimensions = computed(() => mode.value === 'crop' ? sourceDimensions.value : outputDimensions.value)
+const sourceGeometry = computed(() => mode.value === 'crop' || !!props.doc.base.crop)
+const worldDimensions = computed(() => sourceGeometry.value ? sourceDimensions.value : outputDimensions.value)
+const docWidth = computed(() => worldDimensions.value.width)
+const docHeight = computed(() => worldDimensions.value.height)
 const aspect = computed(() => docWidth.value / docHeight.value)
-const uiScale = computed(() => docWidth.value / Math.max(1, stageWidth.value))
+const renderDoc = computed(() => sourceGeometry.value ? {
+  ...props.doc,
+  base: { ...props.doc.base, source_width: sourceDimensions.value.width, source_height: sourceDimensions.value.height,
+    crop: props.doc.base.crop || { x: 0, y: 0, w: 1, h: 1 } },
+} : props.doc)
+// Frame mode edits a rectangle on the crop surface; applying the rectangle itself here
+// would rebase pointer coordinates during its drag. Preview/render apply that viewport.
+const activeViewport = computed(() => normalizeCrop(mode.value === 'crop' ? null : props.doc.base.crop))
+const uiViewBox = computed(() => {
+  const view = activeViewport.value
+  return `${view.x * docWidth.value} ${view.y * docHeight.value} ${view.w * docWidth.value} ${view.h * docHeight.value}`
+})
+const sourceStyle = computed(() => {
+  const view = activeViewport.value
+  return { width: `${100 / view.w}%`, height: `${100 / view.h}%`, left: `${-100 * view.x / view.w}%`, top: `${-100 * view.y / view.h}%` }
+})
+const uiScale = computed(() => activeViewport.value.w * docWidth.value / Math.max(1, stageWidth.value))
 
-const svgMarkup = computed(() => layerDocToSvg(props.doc, { width: docWidth.value, height: docHeight.value }, {
-  viewport: { x: 0, y: 0, w: 1, h: 1 },
+const svgMarkup = computed(() => layerDocToSvg(renderDoc.value, canvasDimensions.value, {
+  viewport: activeViewport.value,
   resolveImage: path => mediaUrl(path),
 }))
-const filterLayers = computed(() => baseFilterLayers(props.doc.base.filter, { width: docWidth.value, height: docHeight.value }))
+const filterLayers = computed(() => baseFilterLayers(props.doc.base.filter, canvasDimensions.value))
 
 /**
  * 画布尺寸自己算，不交给 CSS：grid/flex 容器里 `aspect-ratio + max-width:100%`
@@ -205,11 +239,11 @@ const filterLayers = computed(() => baseFilterLayers(props.doc.base.filter, { wi
 const stageStyle = computed(() => {
   const fit = Math.max(
     0,
-    Math.min(viewport.value.width / docWidth.value, viewport.value.height / docHeight.value),
+    Math.min(viewport.value.width / canvasDimensions.value.width, viewport.value.height / canvasDimensions.value.height),
   )
   return {
-    width: `${Math.round(docWidth.value * fit)}px`,
-    height: `${Math.round(docHeight.value * fit)}px`,
+    width: `${Math.round(canvasDimensions.value.width * fit)}px`,
+    height: `${Math.round(canvasDimensions.value.height * fit)}px`,
     transform: `translate(${pan.value.x}px, ${pan.value.y}px) scale(${zoom.value})`,
   }
 })
@@ -291,7 +325,8 @@ function syncScale() {
 function pointFromEvent(event) {
   const rect = stageRect()
   if (!rect) return { x: 0, y: 0 }
-  return { x: (event.clientX - rect.left) / rect.width, y: (event.clientY - rect.top) / rect.height }
+  const view = activeViewport.value
+  return { x: view.x + (event.clientX - rect.left) / rect.width * view.w, y: view.y + (event.clientY - rect.top) / rect.height * view.h }
 }
 
 function geometryOf(layer) {
@@ -490,7 +525,8 @@ function onPointerMove(event) {
     const bounds = drag.crop ? { x: 0, y: 0, w: 1, h: 1 } : (props.doc.base.crop || { x: 0, y: 0, w: 1, h: 1 })
     let next
     if (drag.resize) {
-      const ratio = (16 / 9) / aspect.value
+      const targetAspect = drag.crop ? 16 / 9 : outputDimensions.value.width / outputDimensions.value.height
+      const ratio = targetAspect / aspect.value
       const w = Math.max(0.01, Math.min(point.x - origin.x, (point.y - origin.y) * ratio,
         bounds.x + bounds.w - origin.x, (bounds.y + bounds.h - origin.y) * ratio))
       next = { ...origin, w, h: w / ratio }
@@ -638,7 +674,7 @@ onBeforeUnmount(() => {
   observer?.disconnect()
   window.removeEventListener('pointermove', onPointerMove)
 })
-watch(() => [docWidth.value, docHeight.value], () => requestAnimationFrame(syncScale))
+watch(() => [canvasDimensions.value.width, canvasDimensions.value.height], () => requestAnimationFrame(syncScale))
 watch(() => props.baseSrc, () => { sourceSize.value = { width: 0, height: 0 }; baseImageError.value = false })
 
 defineExpose({
@@ -657,6 +693,8 @@ defineExpose({
 .lc-viewport { position: relative; flex: 1; min-height: 0; display: grid; place-items: center; overflow: hidden; background: var(--surface-base); padding: 12px; touch-action: none; }
 /* 尺寸由 stageStyle 按视口实测算出（见 script），这里只管定位与投影 */
 .lc-stage { position: relative; transform-origin: center center; box-shadow: 0 2px 18px rgba(0, 0, 0, 0.18); }
+.lc-base-surface { position: absolute; inset: 0; overflow: hidden; }
+.lc-source { position: absolute; }
 .lc-base { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; user-select: none; }
 .lc-filter { position: absolute; inset: 0; background-size: 100% 100%; pointer-events: none; }
 .lc-overlay { position: absolute; inset: 0; pointer-events: none; }

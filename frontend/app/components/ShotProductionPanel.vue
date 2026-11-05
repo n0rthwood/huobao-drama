@@ -281,12 +281,11 @@ function budgetOf(sb) {
   return sb?.design_card?.budget || sb?.designCard?.budget || {}
 }
 
-/** 列表上的段状态：优先用已加载的图层段状态（state），否则退回分镜行上的摘要字段 */
+/** Every row reads the episode summary, never the selected editor's transient response. */
 function layerStatusOf(sb) {
   if (!segmentsOf(sb?.combo).layer) return ''
-  if (selectedId.value === sb?.id && state.value?.segment) return segmentStatus(state.value.segment)
-  const segment = sb?.layer_segment || sb?.layerSegment || null
-  return segment ? segmentStatus(segment) : 'draft'
+  const segment = sb?.layer_segment ?? sb?.layerSegment
+  return segment && segment.exists !== false ? segmentStatus(segment) : 'unknown'
 }
 function segmentStatus(segment) {
   if (segment.status === 'failed') return 'failed'
@@ -329,22 +328,24 @@ const shots = computed(() => props.storyboards.map((sb, index) => {
 
 const selected = computed(() => shots.value.find(shot => shot.sb.id === selectedId.value) || null)
 
+let stateRequest = 0
 async function loadState(sbId) {
   if (!sbId) return
+  const request = ++stateRequest
+  state.value = null
   stateLoading.value = true
   try {
     const data = await layerSegmentAPI.get(sbId)
-    if (selectedId.value === sbId) {
+    if (selectedId.value === sbId && request === stateRequest) {
       state.value = data
       syncActiveSegment()
     }
   } catch (e) {
-    if (selectedId.value === sbId) {
-      state.value = null
+    if (selectedId.value === sbId && request === stateRequest) {
       toastServerMessage(e, { fallback: 'episode.production.loadFailed' })
     }
   } finally {
-    stateLoading.value = false
+    if (request === stateRequest) stateLoading.value = false
   }
 }
 
@@ -364,12 +365,13 @@ function selectShot(shot) {
   // 同一镜也重拉一次：列表刷新后设计卡/关键帧可能变了，段状态要跟上
   selectedId.value = shot.sb.id
   activeSegment.value = segmentsOf(shot.combo).layer ? 'layer' : 'gen'
-  if (!state.value || state.value.combo !== shot.combo) state.value = null
+  state.value = null
   void loadState(shot.sb.id)
 }
 
 /** 图层段编辑器的保存/草稿/渲染结果：保存返回 GET 同形，渲染只返回 segment/junction，缺 issues */
-function onLayerChanged(data) {
+function onLayerChanged(sbId, data) {
+  if (selectedId.value !== sbId) { emit('refresh'); return }
   if (data && !Array.isArray(data.issues)) {
     // 渲染结果：先合进本地状态（列表状态立刻更新），再重拉一次拿齐 issues
     state.value = { ...(state.value || {}), ...data }
@@ -635,6 +637,9 @@ watch(() => props.storyboards, () => {
       activeSegment.value = segmentsOf(first.combo).layer ? 'layer' : 'gen'
       void loadState(first.sb.id)
     }
+  } else {
+    syncActiveSegment()
+    void loadState(selectedId.value)
   }
   void loadBatch()
 }, { immediate: true })

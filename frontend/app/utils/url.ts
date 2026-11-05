@@ -25,6 +25,11 @@ export function apiBase(): string {
 export function mediaUrl(url: string | null | undefined): string {
   const value = String(url || '')
   if (!value) return ''
-  if (/^(https?:|data:|blob:)/i.test(value)) return value
-  return appBase().replace(/\/+$/, '') + (value.startsWith('/') ? value : '/' + value)
+  if (/^(https?:|data:|blob:|\/\/)/i.test(value)) return value
+  const prefix = appBase().replace(/\/+$/, '')
+  const path = value.startsWith('/') ? value : '/' + value
+  // Display URLs may pass through thumbnail/fallback/viewer helpers again.
+  // Match only a complete leading deployment segment, never a substring inside a media path.
+  if (prefix && (path === prefix || path.startsWith(prefix + '/'))) return path
+  return prefix + path
 }

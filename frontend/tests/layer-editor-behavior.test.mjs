@@ -2,8 +2,10 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import ts from 'typescript'
-import { nextTick } from 'vue'
-import { clampTimelineToCrop } from '../app/utils/layerQuality.js'
+import { createRenderer, h, nextTick, reactive, ref } from 'vue'
+import { parse, compileScript } from 'vue/compiler-sfc'
+import { createI18n } from 'vue-i18n'
+import { baseAspectIssue, clampTimelineToCrop, cropRectOf } from '../app/utils/layerQuality.js'
 import { semanticEntries, semanticLayerPatch, anchorState } from '../app/utils/semanticGeometry.js'
 
 // Resolve Nuxt's compile-time aliases while executing the real Vue composables.
@@ -100,4 +102,241 @@ test('semantic quick-create and manual reanchor keep whole-image pixel coordinat
   assert.equal(anchorState(editor.doc.value.layers[0],[{...entries[0],name:'Renamed source'}],true,1),'unlink')
   editor.undo()
   assert.equal(anchorState(editor.doc.value.layers[0],entries,true,1),'manual')
+})
+
+// Mount the actual SFCs with Vue's host-independent renderer. Only browser layout,
+// unrelated child panels, URL configuration and API transport are test seams.
+const dataModule = source => `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`
+const emptyPanel = dataModule('export default { render: () => null }')
+const pickerPanel = dataModule(`import {h} from '${import.meta.resolve('vue')}';
+export default {props:['assets','open'],emits:['confirm'],setup(props,{emit}) {
+  return () => h('asset-picker-test',{assets:props.assets,onChoose:items=>emit('confirm',items)})
+}}`)
+const testApi = dataModule(`export const assetPipelineAPI = {baseCandidates:async()=>({candidates:[
+  {asset_kind:'prop',asset_id:7,asset_name:'Replacement',version_task_id:9,path:'static/replacement.png',width:2048,height:2048}
+]})}; export const propAPI = {semantics:async()=>({semantics:{}})};`)
+const componentAliases = {
+  vue: import.meta.resolve('vue'),
+  'vue-i18n': import.meta.resolve('vue-i18n'),
+  'lucide-vue-next': import.meta.resolve('lucide-vue-next'),
+  '~/utils/layerSvg': new URL('utils/layerSvg.js', app).href,
+  '~/utils/layerQuality': new URL('utils/layerQuality.js', app).href,
+  '~/utils/semanticGeometry': new URL('utils/semanticGeometry.js', app).href,
+  '~/utils/url': dataModule("export const mediaUrl = path => path; export const apiBase = () => '/api/v1';"),
+  '~/composables/useApi': testApi,
+  '~/components/AssetPicker.vue': pickerPanel,
+  './LayerList.vue': emptyPanel,
+  './LayerStyle.vue': emptyPanel,
+}
+async function loadComponent(name) {
+  const { descriptor } = parse(readFileSync(new URL(`components/LayerCanvas/${name}.vue`, app), 'utf8'))
+  let source = compileScript(descriptor, { id: `test-${name}`, inlineTemplate: true }).content
+  for (const [alias, url] of Object.entries(componentAliases)) {
+    source = source.replaceAll(`from '${alias}'`, `from '${url}'`).replaceAll(`from "${alias}"`, `from "${url}"`)
+  }
+  return (await import(dataModule(source))).default
+}
+const Canvas = await loadComponent('LayerCanvas')
+const Rail = await loadComponent('LayerRail')
+const messages = JSON.parse(readFileSync(new URL('locales/en.json', app), 'utf8'))
+function allNodes(root) { return [root, ...root.children.flatMap(allNodes)] }
+function withClass(root, name) { return allNodes(root).find(node => String(node.props.class || '').split(' ').includes(name)) }
+function nodeText(root) { return root.text + root.children.map(nodeText).join('') }
+async function mountCanvasComponent(t, component, values) {
+  const originalWindow = globalThis.window
+  const originalRaf = globalThis.requestAnimationFrame
+  const listeners = new Map()
+  globalThis.window = {
+    addEventListener: (name, fn) => listeners.set(name, fn),
+    removeEventListener: name => listeners.delete(name),
+    confirm: () => true,
+  }
+  globalThis.requestAnimationFrame = fn => { fn(); return 1 }
+  function element(type, text = '') {
+    return { type, text, props: {}, children: [], parent: null, focus() {},
+      querySelector(selector) { return withClass(this, selector.slice(1)) },
+      getBoundingClientRect() {
+        return { left: 0, top: 0,
+          width: this.props.class === 'lc-viewport' ? 984 : Number.parseFloat(this.props.style?.width) || 960,
+          height: this.props.class === 'lc-viewport' ? 568 : Number.parseFloat(this.props.style?.height) || 544 }
+      },
+    }
+  }
+  function remove(node) {
+    if (node.parent) node.parent.children.splice(node.parent.children.indexOf(node), 1)
+    node.parent = null
+  }
+  const renderer = createRenderer({
+    createElement: type => element(type), createText: text => element('#text', text), createComment: () => element('#comment'),
+    setText: (node, text) => { node.text = text },
+    setElementText: (node, text) => { node.text = text; node.children = [] },
+    patchProp: (node, key, previous, value) => { node.props[key] = value },
+    insert(node, parent, anchor = null) {
+      remove(node)
+      const index = anchor ? parent.children.indexOf(anchor) : -1
+      parent.children.splice(index < 0 ? parent.children.length : index, 0, node)
+      node.parent = parent
+    },
+    remove, parentNode: node => node.parent,
+    nextSibling: node => node.parent?.children[node.parent.children.indexOf(node) + 1] || null,
+  })
+  const root = element('root')
+  const props = reactive(values)
+  const instance = ref(null)
+  const mounted = renderer.createApp({ render: () => h(component, { ...props, ref: instance }) })
+  mounted.use(createI18n({ legacy: false, locale: 'en', messages: { en: messages } }))
+  mounted.mount(root)
+  t.after(() => {
+    mounted.unmount()
+    globalThis.window = originalWindow
+    globalThis.requestAnimationFrame = originalRaf
+  })
+  await nextTick()
+  return { root, props, instance: instance.value, listeners }
+}
+const outputDoc = base => ({
+  ...emptyLayerDoc({ path: 'static/original.png', width: 960, height: 544 }),
+  base: { path: 'static/original.png', width: 960, height: 544, source_width: 1024, source_height: 1024, ...base },
+  layers: [{ id: 'image', type: 'image', name: 'Original layer', visible: true, locked: false, opacity: 1, z: 0, rotation: 0,
+    src: { path: 'static/layer.png' }, box: { x: .25, y: .25, w: .5, h: .5 }, fit: 'cover', style: {} }],
+})
+
+test('960×544 canvas, SVG, selection and frame overlays use output dimensions, not 1024² source', async t => {
+  const doc = outputDoc()
+  const mounted = await mountCanvasComponent(t, Canvas, {
+    doc, baseSrc: doc.base.path, selectedIds: ['image'], viewport: { x: .25, y: .25, w: .5, h: .5 },
+  })
+  const stage = withClass(mounted.root, 'lc-stage')
+  assert.deepEqual([stage.props.style.width, stage.props.style.height], ['960px', '544px'])
+  assert.equal(withClass(mounted.root, 'lc-ui').props.viewBox, '0 0 960 544')
+  const markup = withClass(mounted.root, 'lc-overlay').props.innerHTML
+  assert.match(markup, /width="960" height="544" viewBox="0 0 960 544"/)
+  const hit = withClass(mounted.root, 'lc-hit')
+  assert.deepEqual([hit.props.x, hit.props.y, hit.props.width, hit.props.height], [240, 136, 480, 272])
+  mounted.instance.startViewport()
+  await nextTick()
+  const frame = withClass(mounted.root, 'lc-frame')
+  assert.deepEqual([frame.props.x, frame.props.y, frame.props.width, frame.props.height], [240, 136, 480, 272])
+})
+
+test('explicit crop uses original-source aspect and emits whole-source crop coordinates without editing the doc', async t => {
+  const doc = outputDoc()
+  const before = JSON.stringify(doc)
+  let crop
+  const mounted = await mountCanvasComponent(t, Canvas, { doc, baseSrc: doc.base.path, onCrop: value => { crop = value } })
+  mounted.instance.startCrop()
+  await nextTick()
+  const stage = withClass(mounted.root, 'lc-stage')
+  assert.equal(stage.props.style.width, stage.props.style.height)
+  assert.equal(withClass(mounted.root, 'lc-ui').props.viewBox, '0 0 1024 1024')
+  const frame = withClass(mounted.root, 'lc-frame')
+  assert.deepEqual([frame.props.x, frame.props.y, frame.props.width, frame.props.height], [0, 224, 1024, 576])
+  const apply = allNodes(mounted.root).find(node => node.type === 'button' && nodeText(node) === 'Apply crop')
+  apply.props.onClick()
+  await nextTick()
+  assert.deepEqual(crop, { x: 0, y: .21875, w: 1, h: .5625 })
+  assert.deepEqual(cropRectOf({ crop }, 1024, 1024), { left: 0, top: 224, width: 1024, height: 576 })
+  assert.equal(JSON.stringify(doc), before)
+  assert.equal(withClass(mounted.root, 'lc-ui').props.viewBox, '0 0 960 544')
+})
+
+test('persisted crop projects the same source rectangle for image, SVG, hit testing and frame editing', async t => {
+  const doc = outputDoc({ crop: { x: 0, y: .25, w: 1, h: .5 } })
+  const patches = []
+  const mounted = await mountCanvasComponent(t, Canvas, {
+    doc, baseSrc: doc.base.path, selectedIds: ['image'], viewport: { ...doc.base.crop },
+    onPatch: patch => patches.push(patch),
+  })
+  assert.equal(withClass(mounted.root, 'lc-stage').props.style.height, '544px')
+  assert.equal(withClass(mounted.root, 'lc-ui').props.viewBox, '0 256 1024 512')
+  assert.match(withClass(mounted.root, 'lc-overlay').props.innerHTML, /viewBox="0 256 1024 512"/)
+  const sourceStyle = withClass(mounted.root, 'lc-source').props.style
+  assert.equal(sourceStyle.width, '100%')
+  assert.equal(sourceStyle.height, '200%')
+  assert.equal(sourceStyle.top, '-50%')
+  withClass(mounted.root, 'lc-hit').props.onPointerdown({
+    clientX: 480, clientY: 272, target: {}, pointerId: 1, stopPropagation() {},
+  })
+  mounted.listeners.get('pointermove')({ clientX: 480, clientY: 326.4 })
+  assert.ok(Math.abs(patches.at(-1).patch.box.y - (.25 + .1 * .5)) < 1e-9)
+  mounted.listeners.get('pointerup')()
+  mounted.instance.startViewport()
+  await nextTick()
+  const frame = withClass(mounted.root, 'lc-frame')
+  assert.deepEqual([frame.props.x, frame.props.y, frame.props.width, frame.props.height], [0, 256, 1024, 512])
+  mounted.instance.startCrop()
+  await nextTick()
+  assert.equal(withClass(mounted.root, 'lc-ui').props.viewBox, '0 0 1024 1024')
+})
+
+test('legacy source load is display-only and does not resize or save the output document', async t => {
+  const doc = outputDoc({ source_width: undefined, source_height: undefined })
+  const before = JSON.stringify(doc)
+  let sourceEvents = 0
+  const mounted = await mountCanvasComponent(t, Canvas, {
+    doc, baseSrc: doc.base.path, onSourceSize: () => { sourceEvents++ },
+  })
+  withClass(mounted.root, 'lc-base').props.onLoad({ target: { naturalWidth: 1024, naturalHeight: 1024 } })
+  await nextTick()
+  assert.equal(JSON.stringify(doc), before)
+  assert.equal(sourceEvents, 0)
+  assert.equal(withClass(mounted.root, 'lc-ui').props.viewBox, '0 0 960 544')
+  mounted.instance.startCrop()
+  await nextTick()
+  assert.equal(withClass(mounted.root, 'lc-ui').props.viewBox, '0 0 1024 1024')
+})
+
+test('same-size source/output canvas and legacy crop coordinates remain unchanged', async t => {
+  const doc = outputDoc({ width: 1920, height: 1080, source_width: 1920, source_height: 1080 })
+  const mounted = await mountCanvasComponent(t, Canvas, { doc, baseSrc: doc.base.path })
+  assert.equal(withClass(mounted.root, 'lc-ui').props.viewBox, '0 0 1920 1080')
+  mounted.instance.startCrop()
+  await nextTick()
+  const frame = withClass(mounted.root, 'lc-frame')
+  assert.deepEqual([frame.props.x, frame.props.y, frame.props.width, frame.props.height], [0, 0, 1920, 1080])
+})
+
+test('aspect diagnostics follow output-fill versus explicit source crop semantics, not blanket suppression', () => {
+  const spec = { width: 960, height: 544 }
+  assert.equal(baseAspectIssue(outputDoc().base, spec), null)
+  assert.deepEqual(baseAspectIssue(outputDoc({ width: 1024, height: 1024 }).base, spec), { aspect: '1:1' })
+  assert.deepEqual(baseAspectIssue(outputDoc({ crop: { x: .25, y: .25, w: .5, h: .5 } }).base, spec), { aspect: '1:1' })
+  assert.equal(baseAspectIssue(outputDoc({ crop: { x: 0, y: .21875, w: 1, h: .5625 } }).base, spec), null)
+  assert.equal(baseAspectIssue({ width: 1920, height: 1080, source_width: 1920, source_height: 1080 }, spec), null)
+  assert.equal(baseAspectIssue({ width: 960, height: 544 }, spec), null)
+  assert.deepEqual(baseAspectIssue({ width: 1024, height: 1024 }, spec), { aspect: '1:1' })
+  assert.equal(baseAspectIssue({}, spec), null)
+})
+
+test('rail distinguishes output, original source and crop-adjusted final-resolution ratio without mutating metadata', async t => {
+  const doc = outputDoc({ source_width: undefined, source_height: undefined, crop: { x: 0, y: .21875, w: 1, h: .5625 } })
+  const before = JSON.stringify(doc)
+  let sourceEvents = 0
+  const mounted = await mountCanvasComponent(t, Rail, {
+    doc, onSourceSize: () => { sourceEvents++ },
+  })
+  assert.ok(nodeText(mounted.root).includes(messages.layerCanvas.base.sourceUnknown))
+  assert.equal(nodeText(mounted.root).includes('Source 960×544'), false)
+  assert.equal(nodeText(mounted.root).includes('Cropped source pixels:'), false)
+  allNodes(mounted.root).find(node => node.type === 'img').props.onLoad({ target: { naturalWidth: 1024, naturalHeight: 1024 } })
+  await nextTick()
+  const text = nodeText(mounted.root)
+  assert.ok(text.includes('Output canvas 960×544'))
+  assert.ok(text.includes('Source 1024×1024 (original pixels)'))
+  assert.ok(text.includes('Cropped source pixels: 1.1× final 960×544 (limiting axis)'))
+  assert.equal(JSON.stringify(doc), before)
+  assert.equal(sourceEvents, 0)
+})
+
+test('replacing a base retains output dimensions and stores candidate dimensions only as source metadata', async t => {
+  let replacement
+  const mounted = await mountCanvasComponent(t, Rail, {
+    doc: outputDoc(), episodeId: 1, onBase: value => { replacement = value },
+  })
+  await nextTick()
+  const picker = allNodes(mounted.root).find(node => node.type === 'asset-picker-test')
+  picker.props.onChoose([picker.props.assets[0]])
+  assert.equal(replacement.path, 'static/replacement.png')
+  assert.deepEqual([replacement.width, replacement.height], [960, 544])
+  assert.deepEqual([replacement.source_width, replacement.source_height], [2048, 2048])
 })

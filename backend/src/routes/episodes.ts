@@ -11,6 +11,7 @@ import { isKeyframeSlot, keyframesJson, loadEpisodeKeyframes, type KeyframeSlot 
 import { batchScopeOf, scopeFromPreview } from '../services/batch-scope.js'
 import { parseStylingVersion } from '../services/styling-version.js'
 import { resolveDramaProjectType } from '../services/project-type.js'
+import { loadLayerSegmentSummaries } from '../services/layer-segment.js'
 import {
   assertGate,
   confirmScript,
@@ -869,6 +870,9 @@ app.get('/:episode_id/storyboards', async (c) => {
   const composeStates: Map<number, ComposeStateItem> = narrationEpisode
     ? await composeStateMap(episodeId, { rows, episode: narrationEpisode })
     : new Map()
+  const layerSegments = resolveDramaProjectType(narrationEpisode?.dramaId) === 'documentary'
+    ? await loadLayerSegmentSummaries(episodeId, rows)
+    : new Map()
   return success(c, await Promise.all(rows.map(async (row) => {
     const videoVersions: Array<{
       id: number | null
@@ -939,6 +943,7 @@ app.get('/:episode_id/storyboards', async (c) => {
           ?? (narrationEpisode?.audioMixMode === 'mix' ? 'mix' : 'replace'),
       },
       keyframes: keyframesJson(keyframes.get(row.id)),
+      layer_segment: layerSegments.get(row.id) ?? null,
       video_versions: videoVersions,
       transition_review: parseTransitionReview(row.transitionReview),
       // 上下镜输入变化后旧审核即失效，前端据此提示「建议重新审核」（#11）

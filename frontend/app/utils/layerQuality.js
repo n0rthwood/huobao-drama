@@ -1,4 +1,4 @@
-/** Pure mirror of backend/src/services/layer-quality.ts. Coordinates always refer to the WHOLE image. */
+/** Whole-image crop/quality math mirrors backend layer-quality; aspect diagnostics follow native layer rendering. */
 export const QUALITY_MIN_RATIO = 1.0
 const FULL = { x: 0, y: 0, w: 1, h: 1 }
 const round = n => Math.round(n * 10000) / 10000
@@ -75,12 +75,18 @@ export function qualityWarningsOf(doc, keyframes, spec) {
 }
 
 export function baseAspectIssue(base, spec) {
-  if (!base.source_width || !base.source_height) return null
+  // Native un-cropped renders stretch the source to the output canvas (fit: 'fill').
+  // Only an explicit crop opts layers into original-source geometry.
+  const sourceWidth = finite(base.source_width, 0) || finite(base.width, 0)
+  const sourceHeight = finite(base.source_height, 0) || finite(base.height, 0)
   const crop = normalizeCrop(base.crop)
-  const ratio = crop.w * base.source_width / (crop.h * base.source_height)
+  const worldWidth = base.crop ? sourceWidth : finite(base.width, 0) || sourceWidth
+  const worldHeight = base.crop ? sourceHeight : finite(base.height, 0) || sourceHeight
+  if (!worldWidth || !worldHeight || !spec.width || !spec.height) return null
+  const ratio = crop.w * worldWidth / (crop.h * worldHeight)
   if (Math.abs(ratio / (spec.width / spec.height) - 1) <= 0.01) return null
-  const width = Math.max(1, Math.round(crop.w * base.source_width))
-  const height = Math.max(1, Math.round(crop.h * base.source_height))
+  const width = Math.max(1, Math.round(crop.w * worldWidth))
+  const height = Math.max(1, Math.round(crop.h * worldHeight))
   let divisor = width
   let remainder = height
   while (remainder) {
