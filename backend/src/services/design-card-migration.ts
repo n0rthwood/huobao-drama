@@ -41,17 +41,16 @@ function columnExists(table: string, column: string): boolean {
   return columns.some(col => col.name === column)
 }
 
-/** §7 映射表：device × deterministic → combo。认不出的 intent 返回 null（镜头置空白） */
+/** §7 映射表：仅批准的 device × deterministic 可自动确定 combo。 */
 function comboOf(device: unknown, deterministic: unknown): Combo | null {
   const dev = typeof device === 'string' ? device.trim().toLowerCase() : ''
-  if (!dev) return null
+  const layerDevices = ['map_anim', 'archival', 'card', 'reenact_still']
+  if (!layerDevices.includes(dev) && dev !== 'reenact_video') return null
   const pos = typeof deterministic === 'string' ? deterministic.trim().toLowerCase() : ''
   if (pos === 'pre') return 'C'
   if (pos === 'post') return 'D'
-  if (pos === 'none') return 'B'
-  if (pos === 'replace') return 'A'
-  // 认不出的 deterministic（#49 的规范化一定会写一个合法值，这里只剩坏数据）：
-  // 按契约 §7 当「解析失败」处理，置空白而不是替用户猜一个组合
+  if (pos === 'none' && dev === 'reenact_video') return 'B'
+  if (pos === 'replace' && layerDevices.includes(dev)) return 'A'
   return null
 }
 
@@ -148,7 +147,7 @@ function baseRefOf(overlayPlan: unknown[], mustShow: unknown[]): BaseRef | null 
   return null
 }
 
-/** 一条 intent JSON → `{combo, card}`；认不出返回 `{combo:null, card:null}` */
+/** 一条 intent JSON → `{combo, card}`；仅无法解析对象时 card 为 null。 */
 export function designCardFromIntent(raw: string | null, duration: number | null): { combo: Combo | null; card: StoredCard | null } {
   if (!(raw || '').trim()) return { combo: null, card: null }
   let parsed: unknown
@@ -160,7 +159,6 @@ export function designCardFromIntent(raw: string | null, duration: number | null
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return { combo: null, card: null }
   const intent = parsed as Record<string, unknown>
   const combo = comboOf(intent.device, intent.deterministic)
-  if (!combo) return { combo: null, card: null }
 
   const mustShow = Array.isArray(intent.must_show) ? intent.must_show : []
   const overlayPlan = Array.isArray(intent.overlay_plan) ? intent.overlay_plan : []
@@ -170,23 +168,23 @@ export function designCardFromIntent(raw: string | null, duration: number | null
   const card: StoredCard = {
     version: 2,
     info_points: infoPointText
-      ? [{ id: 'ip1', text: infoPointText, via: combo === 'B' ? 'generated' : 'layer' }]
+      ? [{ id: 'ip1', text: infoPointText, via: combo === null ? 'narration_only' : combo === 'B' ? 'generated' : 'layer' }]
       : [],
     budget: {
       layer_s: hasLayerSegment(combo) ? clampSeconds(duration, MAX_LAYER_SEGMENT_SECONDS) : null,
       gen_s: hasGenSegment(combo) ? clampSeconds(duration, MAX_GEN_SEGMENT_SECONDS) : null,
     },
-    rationale: typeof intent.rationale === 'string' ? intent.rationale.slice(0, 600) : '',
-    suggested_combo: combo,
+    rationale: typeof intent.rationale === 'string' ? intent.rationale : '',
+    suggested_combo: null,
   }
-  if (hasLayerSegment(combo)) {
+  if (hasLayerSegment(combo) || combo === null) {
     card.layer_plan = {
       base: baseRefOf(overlayPlan, mustShow),
       must_mark: mustMark,
       planned_layers: plannedLayersOf(overlayPlan),
     }
   }
-  if (hasGenSegment(combo)) {
+  if (hasGenSegment(combo) || combo === null) {
     // C 的首帧 / D 的尾帧由衔接帧锁定继承，迁移时留空
     card.gen_plan = { reference_assets: references }
   }
@@ -202,10 +200,11 @@ export async function migrateIntentToDesignCard(): Promise<number> {
   const rows = db.all(sql.raw('SELECT id, duration, deleted_at, intent FROM storyboards')) as IntentRow[]
   const counts: Record<Combo, number> = { A: 0, B: 0, C: 0, D: 0 }
   let blanked = 0
+  let unresolved = 0
   for (const row of rows) {
     const { combo, card } = designCardFromIntent(row.intent, row.duration)
     const alive = !row.deleted_at
-    if (!combo || !card) {
+    if (!card) {
       db.run(sql`UPDATE storyboards
         SET combo = NULL, design_card = NULL, design_card_status = 'blank',
             design_card_confirmed_at = NULL, design_card_stale_reason = NULL
@@ -215,13 +214,16 @@ export async function migrateIntentToDesignCard(): Promise<number> {
     }
     db.run(sql`UPDATE storyboards
       SET combo = ${combo}, design_card = ${JSON.stringify(card)}, design_card_status = 'pending',
-          design_card_confirmed_at = NULL, design_card_stale_reason = ${MIGRATED_REASON}
+          design_card_confirmed_at = NULL, design_card_stale_reason = ${combo ? MIGRATED_REASON : 'migration_combo_unresolved'}
       WHERE id = ${row.id}`)
-    if (alive) counts[combo]++
+    if (alive) {
+      if (combo) counts[combo]++
+      else unresolved++
+    }
   }
 
-  const migrated = counts.A + counts.B + counts.C + counts.D
-  console.log(`🗂️ 设计卡迁移：转换 ${migrated} 镜（A ${counts.A} / B ${counts.B} / C ${counts.C} / D ${counts.D}），置空 ${blanked} 镜`)
+  const migrated = counts.A + counts.B + counts.C + counts.D + unresolved
+  console.log(`🗂️ 设计卡迁移：转换 ${migrated} 镜（A ${counts.A} / B ${counts.B} / C ${counts.C} / D ${counts.D} / 待选组合 ${unresolved}），置空 ${blanked} 镜`)
 
   // 删列必须在转换之后、同一函数内：columnRemovals 的执行时机早于数据迁移
   for (const column of ['intent', 'intent_reviewed']) {

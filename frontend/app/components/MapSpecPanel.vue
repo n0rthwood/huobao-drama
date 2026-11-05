@@ -162,6 +162,8 @@
         <span class="dim">{{ t('episode.documentary.map.renderSha', { sha: rendered.sha256.slice(0, 12) }) }}</span>
         <span v-if="rendered.reused" class="dim">{{ t('episode.documentary.map.renderReused') }}</span>
       </div>
+      <p class="map-notice">{{ rendered.context.disclaimer }}</p>
+      <p v-for="warning in rendered.context.warnings" :key="warning" class="map-notice" role="status">{{ warning }}</p>
       <div class="map-preview">
         <img :src="mediaUrl(rendered.path)" :alt="t('episode.documentary.map.sectionTitle')" />
       </div>

@@ -368,11 +368,17 @@ Issue 整理完成后、实施前，必须让 **Fabel（Anthropic）或 Astra（
 - 版本列表的 `fidelity/fidelity_reason`：存量派生版本仍读 `params.fidelity`，流水线轮次产出的版本改读闸门/人工结论（`asset-pipeline/fidelity.ts`，`asset-library.ts` 一次性批量预取，不在同步 map 里打库）。
 
 #### 地图底图：程序渲染，扩散不碰几何
-- `services/map-base-render.ts`：`d3-geo`（`geoMercator`/`geoEquirectangular` + `geoPath` + `fitExtent`）把 `backend/assets/geo/ne_50m_*.geojson`（Natural Earth 50m，公有领域，约 7.7 MB，`HUOBAO_GEO_DIR` 可覆盖）投影成 SVG，再按 `layer-render.ts` 的 `sharp().composite()` 栅格化成 **16:9 / 默认 3840×2160** 的 PNG，落 `static/map-bases/<signature>.png`。**底图上绝不渲染任何文字**（地名/图例一律走叠加图层）；同 spec 同尺寸字节级一致，已存在即复用。
+- `services/map-base-render.ts`：`d3-geo`（`geoMercator`/`geoEquirectangular` + `geoPath` + `fitExtent`）把 `backend/assets/geo/ne_50m_*.geojson`（Natural Earth 50m，公有领域，`HUOBAO_GEO_DIR` 可覆盖）投影成 SVG，再按 `layer-render.ts` 的 `sharp().composite()` 栅格化成 **16:9 / 默认 3840×2160** 的 PNG，落 `static/map-bases/<signature>.png`。**底图上绝不渲染任何文字**（地名/图例一律走叠加图层）；同 spec 同尺寸字节级一致，已存在即复用。
 - `props.map_spec`（`MapSpec`：`projection` 只有 mercator / equirectangular，`bbox`，`layers`，`places[]`，`routes[]`，`style.theme`）。接口在 `routes/props.ts`：`GET|PUT /props/:id/map-spec`、`POST /props/:id/map-render`、`POST /props/:id/map-suggest`（AI 建议坐标一律 `proposed`，人工勾选确认后前端才写进 `map_spec`）。
 - `POST /props/:id/map-render` 之后产物被登记成**原件版本**（`sys_task.provider='map-render'`，`props.faithful=1` + `faithful_source` 指向它），并把投影换算出的点/线像素坐标直接写进 `props.semantics`（`source='cv'`、`confidence=1`、`model='map-render'`）——**不经 VLM、不经色域抽线**，第一轮「扩散重画海岸线 / 殷墟点跑到燕山以北」那类事故在这条路径上结构性不可能。
 - 风格化（底图作参考图走 `image_edit`）**默认关闭**：`qwen-jobs` 的 `image_edit` 分支不传 `denoising_strength`（`qwen-jobs-client.ts:187` 只在 FLUX 分支用常量），没有可调低强度，开着等于让扩散重画几何。
 - **上传截图的语义阈值放宽**（契约 §8 的遗留缺陷）：Google Earth 截图上同一条水体沿程从 rgb(80,144,224) 压到 rgb(16,48,96)，欧氏距离 172、偏色幅度 48 同时被 `colorMask` 的两条判据判掉，命中率为 0。现在 `isExtractableLineColor()` 对强蓝（`b−r>60 且 b−g>20`）跳过亮度下限，`colorMask(..., { hueOnly: true })` 改按**通道序 + 最小彩度 `HUE_ONLY_MIN_CHROMA=24`** 判。放宽**只用于上传截图路径**：`asset-semantics-auto.ts` 的抽线先按严格判据试，失败才放宽重试（两条理由都写进 warnings），扫描印刷图走原判据不受影响。
+
+### 发布前遗留闭环（Issue #61）
+- 拆镜上限接收实际段落文本，取短稿防过拆上限与 `Σceil(narrationCharCount(段落)/MAX_NARRATION_CHARS)` 的较大值；普通拆分与补镜共用保存入口，不能再只传段数。两段各 900 字必须允许 24 镜，900 字加四个短段须按逐段取整得 16 镜。
+- 首次旧设计迁移只接受已定义的 device × deterministic 组合；未定义组合保留可恢复设计内容、`combo=NULL`、`suggested_combo=NULL`，一律待审，并以 `migration_combo_unresolved` 提示显式重选。已迁移后人工确认的卡不重复回填或降级。
+- 设计卡未选组合/启用段预算为 NULL 时显示缺失状态，不用 0 秒或负余量冒充预算；明确填写 0 仍是无效值。原生类型选择器按内容自适应且不可压缩，紧凑高度必须同步减小纵向 padding。
+- 地图离线数据补 Natural Earth 50m 现代省界与城市背景点（公有领域，来源与校验和见 `backend/assets/geo/LICENSE.md`）；仅作现代定位参照，不代表古代边界，背景点不进入已审核语义点。渲染结果与 UI 明示覆盖计数及缺层警告，城市尺度无数据时不可伪造细节或隐式升级精度。
 
 ### 全局任务中心
 - `sys_task` 多了 `episode_id`（分镜任务由分镜反查、资产出图取发起时所在集、文本任务必填；启动时 `backfillTaskEpisodeIds()` 按 `storyboard_id` 回填存量行）与 `type='text'`。**文本任务不再存进程内存**：提取（`services/extraction.ts`）、关键帧/视频提示词批量（`keyframe-prompts.ts`/`video-prompts.ts`）、同步 chat 的剧本改写与拆分分镜（`routes/agent.ts`）都在开始时建 `sys_task(type='text')`，`params.kind` ∈ `extract_characters|extract_scenes|extract_props|keyframe_prompts|video_prompts|script_rewrite|storyboard_breaker`，进度写 `params.progress`（`{completed,total,failed,current_storyboard_id}`，**不复用 `remote_state`**，那是 qwen-jobs 追踪器的）。`/extract-status`、`/keyframe-prompts-status`、`/video-prompts-status` 响应结构不变，只是改成从库里读（函数变成 async）。

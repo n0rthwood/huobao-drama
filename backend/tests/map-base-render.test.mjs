@@ -124,6 +124,52 @@ const script = `
   const svg = buildMapSvg(renderSpec, { width: 1280, height: 720 })
   out.svg = { has_text: svg.includes('<text'), length: svg.length, has_route_color: svg.includes(MAP_ROUTE_COLOR) }
 
+  // 6. 真实现代参照层：逐层移除后比较栅格像素，防止仅登记数据却没有画出来。
+  out.context = {}
+  for (const [name, bounds] of Object.entries({
+    close: [114.2, 36, 114.5, 36.2],
+    empty: [114.30, 36.11, 114.32, 36.13],
+    national: [73, 18, 135, 54],
+  })) {
+    const current = normalizeMapSpec({ bbox: bounds })
+    const canvas = { width: 1280, height: 720 }
+    const rendered = await renderMapBase(current, canvas)
+    const svg = buildMapSvg(current, canvas)
+    const pixels = await sharp(Buffer.from(svg)).raw().toBuffer()
+    const changes = {}
+    const groups = {}
+    for (const layer of ['admin1', 'cities']) {
+      const expression = new RegExp('<g data-context="' + layer + '"[^>]*>[\\\\s\\\\S]*?</g>')
+      const group = svg.match(expression)?.[0] ?? ''
+      groups[layer] = group
+      const without = await sharp(Buffer.from(svg.replace(expression, ''))).raw().toBuffer()
+      changes[layer] = pixels.reduce((sum, value, index) => sum + (value !== without[index] ? 1 : 0), 0)
+    }
+    const sw = projectLonLat(current, canvas, [bounds[0], bounds[1]])
+    const ne = projectLonLat(current, canvas, [bounds[2], bounds[3]])
+    const coordinates = [...groups.admin1.matchAll(/ d="([^"]+)"/g)]
+      .flatMap(match => [...match[1].matchAll(/-?\\d+(?:\\.\\d+)?/g)].map(value => Number(value[0])))
+    out.context[name] = {
+      coverage: rendered.context, changes,
+      boundary_clipped: coordinates.every((v, i) => i % 2 === 0
+        ? v >= sw[0] - 0.01 && v <= ne[0] + 0.01
+        : v >= ne[1] - 0.01 && v <= sw[1] + 0.01),
+      semantic_points: rendered.points.length,
+      semantic_routes: rendered.routes.length,
+      has_text: svg.includes('<text'),
+      city_projection_matches: (() => {
+        const data = JSON.parse(fs.readFileSync('./assets/geo/ne_50m_populated_places.geojson', 'utf8'))
+        const expected = data.features
+          .filter(f => f.geometry.coordinates[0] >= bounds[0] && f.geometry.coordinates[0] <= bounds[2]
+            && f.geometry.coordinates[1] >= bounds[1] && f.geometry.coordinates[1] <= bounds[3])
+          .map(f => projectLonLat(current, canvas, f.geometry.coordinates))
+        const actual = [...groups.cities.matchAll(/cx="([^"]+)" cy="([^"]+)"/g)]
+        return expected.length === actual.length && expected.every((p, i) =>
+          Math.hypot(p[0] - Number(actual[i][1]), p[1] - Number(actual[i][2])) < 0.008)
+      })(),
+    }
+  }
+
   console.log('@@' + JSON.stringify(out))
 `
 
@@ -226,4 +272,35 @@ test('底图 SVG 里没有任何 <text（地图文字一律交给叠加图层）
   assert.equal(result.svg.has_text, false)
   assert.ok(result.svg.length > 1000, '底图 SVG 应包含真实矢量路径')
   assert.equal(result.svg.has_route_color, true)
+})
+
+test('现代参照背景真正渲染：全国省界和城市点均改变栅格像素，且不污染语义目标', () => {
+  const national = result.context.national
+  assert.ok(national.coverage.boundary_features > 0)
+  assert.ok(national.coverage.city_points > 0)
+  assert.ok(national.changes.admin1 > 100)
+  assert.ok(national.changes.cities > 100)
+  assert.match(national.coverage.disclaimer, /现代.*不表示古代/)
+  for (const current of Object.values(result.context)) {
+    assert.equal(current.semantic_points, 0)
+    assert.equal(current.semantic_routes, 0)
+    assert.equal(current.has_text, false)
+    assert.equal(current.boundary_clipped, true)
+    assert.equal(current.city_projection_matches, true)
+  }
+})
+
+test('安阳近景仅有真实省界、无城市点时如实警告；两层均空仍明确覆盖不足', () => {
+  const close = result.context.close
+  assert.equal(close.coverage.boundary_features, 1)
+  assert.equal(close.coverage.city_points, 0)
+  assert.ok(close.changes.admin1 > 0)
+  assert.equal(close.changes.cities, 0)
+  assert.equal(close.coverage.warnings.length, 1)
+  assert.match(close.coverage.warnings[0], /城市点/)
+  const empty = result.context.empty
+  assert.equal(empty.coverage.boundary_features, 0)
+  assert.equal(empty.coverage.city_points, 0)
+  assert.equal(empty.coverage.warnings.length, 2)
+  assert.deepEqual(empty.changes, { admin1: 0, cities: 0 })
 })

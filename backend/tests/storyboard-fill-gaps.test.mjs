@@ -261,3 +261,49 @@ test('fill-gaps returns 400 (not 500) when the documentary vision stage has no v
   // 解析失败发生在建任务之前：不留半条任务
   assert.equal(result.tasks, 0)
 })
+
+for (const { lengths, cap } of [{ lengths: [900, 900], cap: 24 }, { lengths: [900, 20, 20, 20, 20], cap: 16 }]) {
+ for (const fill of [false, true]) {
+  test('long documentary persists all ' + cap + ' legal shots through ' + (fill ? 'fill-gap' : 'normal') + ' save pathway without accepting empty/duplicate narration', () => {
+    const result = run(`
+      import { initDb, db, schema } from './src/db/index.ts'
+      import { eq } from 'drizzle-orm'
+      initDb()
+      const at = '2026-01-01T00:00:00.000Z'
+      // Distinct CJK characters make every shot a unique, exact script substring.
+      const paragraphs = ${JSON.stringify(lengths)}.map((length, p) => Array.from({ length }, (_, i) => String.fromCharCode(0x4e00 + p * 900 + i)).join(''))
+      const script = paragraphs.join('\\n\\n')
+      const parts = paragraphs.flatMap(p => Array.from({ length: Math.ceil(p.length / 80) }, (_, i) => p.slice(i * 80, (i + 1) * 80)))
+      await db.insert(schema.dramas).values({ id: 1, title: 'long doc', projectType: 'documentary', createdAt: at, updatedAt: at })
+      await db.insert(schema.episodes).values({ id: 1, dramaId: 1, episodeNumber: 1, title: 'E1', scriptContent: script, narrationEnabled: true, scriptConfirmedAt: at, assetReviewStatus: 'passed', createdAt: at, updatedAt: at })
+      const { documentaryStoryboardTools } = await import('./src/agents/tools/storyboard-tools.ts')
+      const { buildAgentRequestContext } = await import('./src/agents/context.ts')
+      const save = documentaryStoryboardTools.saveStoryboards.execute
+      const normalCtx = { requestContext: buildAgentRequestContext({ episodeId: 1, dramaId: 1 }) }
+      const ctx = { requestContext: buildAgentRequestContext({ episodeId: 1, dramaId: 1, storyboardFillGaps: ${fill} }) }
+      const shot = (text, index) => ({ shot_number: index + 1, title: 'S' + (index + 1), description: '历史现场', duration: 15, narration_text: text })
+      const batches = []
+      batches.push(await save({ storyboards: parts.slice(0, 8).map((text, i) => shot(text, i)) }, normalCtx))
+      const rejected = await save({ storyboards: [shot('', 98), shot(parts[0], 99)] }, ctx)
+      for (let i = 8; i < parts.length; i += 8) {
+        batches.push(await save({ storyboards: parts.slice(i, i + 8).map((text, j) => shot(text, i + j)) }, ctx))
+      }
+      const rows = (await db.select().from(schema.storyboards).where(eq(schema.storyboards.episodeId, 1))).sort((a, b) => a.storyboardNumber - b.storyboardNumber)
+      console.log('@@' + JSON.stringify({
+        saved: batches.map(b => b.count), caps: batches.map(b => b.shot_cap),
+        rejectedSaved: rejected.count, rejected: rejected.narration_rejected,
+        texts: rows.map(row => row.narrationText), expected: parts,
+        gapCount: batches.at(-1).script_coverage.gaps.length,
+      }))
+    `)
+    assert.deepEqual(result.saved, Array(cap / 8).fill(8))
+    assert.deepEqual(result.caps, Array(cap / 8).fill(cap))
+    assert.equal(result.rejectedSaved, 0)
+    assert.equal(result.rejected.length, 2)
+    assert.match(result.rejected[0].reason, /empty|为空/)
+    assert.match(result.rejected[1].reason, /already covered|已经被/)
+    assert.deepEqual(result.texts, result.expected)
+    assert.equal(result.gapCount, 0)
+  })
+}
+}

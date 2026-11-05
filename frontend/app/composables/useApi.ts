@@ -920,6 +920,7 @@ export interface MapRenderResp {
   reused: boolean
   points: Array<{ id: string; name: string; at: [number, number] }>
   routes: Array<{ id: string; name: string; points: Array<[number, number]>; color: string }>
+  context: { disclaimer: string; boundary_features: number; city_points: number; warnings: string[] }
 }
 export interface MapProposedPlace { name: string; lon: number; lat: number; source: string; proposed: true }
 

@@ -1145,10 +1145,16 @@
         "budget_tight": "尺の余裕が少なめです",
         "unresolved_ref": "素材や項目に解決できない参照があります"
       },
+      "migrationComboUnresolved": "旧ショットのセグメント構成には移行先の定義がありません。復元可能な内容は保持されています。構成を明示的に選び直し、設計カードを確認してから確定してください。",
       "budget": {
         "layerSegment": "▣ レイヤーセグメント",
         "genSegment": "▶ 生成セグメント",
         "total": "合計 {n}s",
+        "totalMissing": "合計 —",
+        "comboMissing": "セグメント構成が未選択です",
+        "valuesMissing": "有効な各セグメントの時間予算を入力してください",
+        "invalid": "有効な各セグメントの時間予算は 0 より大きい値が必要です",
+        "headroomMissing": "余裕 —",
         "limitLayer": "レイヤー上限 {n}s",
         "limitGen": "生成上限 {n}s",
         "estimate": "推定 {n}s",
