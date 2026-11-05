@@ -1135,6 +1135,7 @@
       "issue": {
         "combo_missing": "아직 세그먼트 조합을 선택하지 않았습니다",
         "budget_over_layer": "레이어 세그먼트가 30초 상한을 넘었습니다",
+        "budget_missing": "활성화된 각 세그먼트의 시간 예산을 입력하세요",
         "budget_over_gen": "생성 세그먼트가 15초 상한을 넘었습니다",
         "budget_under_narration": "전체 길이가 해설을 담지 못합니다. 세그먼트를 늘리거나 화면을 줄이세요",
         "missing_base": "레이어 세그먼트에 배경 이미지가 없습니다",

@@ -1135,6 +1135,7 @@
       "issue": {
         "combo_missing": "No segment combo selected yet",
         "budget_over_layer": "Layer segment exceeds the 30s limit",
+        "budget_missing": "Enter a duration budget for every enabled segment",
         "budget_over_gen": "Generated segment exceeds the 15s limit",
         "budget_under_narration": "Total duration cannot hold the narration; lengthen a segment or trim the visuals",
         "missing_base": "The layer segment has no base image",

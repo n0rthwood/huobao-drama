@@ -1135,6 +1135,7 @@
       "issue": {
         "combo_missing": "还没有选择段组合",
         "budget_over_layer": "图层段超过 30 秒上限",
+        "budget_missing": "请填写每个启用段的时长预算",
         "budget_over_gen": "生成段超过 15 秒上限",
         "budget_under_narration": "总时长装不下旁白，需加长段或精简画面",
         "missing_base": "图层段还没有底图",

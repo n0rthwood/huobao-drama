@@ -116,6 +116,7 @@ export type CardIssueCode =
   // 阻断
   | 'combo_missing'
   | 'budget_over_layer'
+  | 'budget_missing'
   | 'budget_over_gen'
   | 'budget_under_narration'
   | 'missing_base'
@@ -448,10 +449,14 @@ export function validateDesignCard(input: CardValidateInput): CardIssue[] {
   if ((budget.gen_s ?? 0) > MAX_GEN_SEGMENT_SECONDS) {
     add('budget_over_gen', 'block', `生成段 ${budget.gen_s}s 超过硬上限 ${MAX_GEN_SEGMENT_SECONDS}s`)
   }
-  if (budget.narration_s > 0 && budget.total_s < budget.narration_s) {
+  const budgetMissing = !combo
+    || (hasLayerSegment(combo) && budget.layer_s === null)
+    || (hasGenSegment(combo) && budget.gen_s === null)
+  if (combo && budgetMissing) add('budget_missing', 'block', '请填写每个启用段的时长预算')
+  if (!budgetMissing && budget.narration_s > 0 && budget.total_s < budget.narration_s) {
     add('budget_under_narration', 'block',
       `总时长 ${budget.total_s}s 装不下旁白（${budget.measured ? '实测' : '估'} ${budget.narration_s}s），需加长段或精简画面`)
-  } else if (budget.narration_s > 0 && budget.remain_s < BUDGET_TIGHT_SECONDS) {
+  } else if (!budgetMissing && budget.narration_s > 0 && budget.remain_s < BUDGET_TIGHT_SECONDS) {
     add('budget_tight', 'warn', `余量只剩 ${budget.remain_s}s，偏紧`)
   }
 
