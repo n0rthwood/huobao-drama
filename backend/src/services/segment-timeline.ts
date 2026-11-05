@@ -203,7 +203,7 @@ export function normalizeTimeline(raw: unknown, crop?: unknown): SegmentTimeline
   }
   if (!deduped.length) deduped.push({ t: 0, viewport: normalizeViewport(undefined, crop), visible: [] })
   return {
-    fps: Math.round(clamp(data.fps ?? SEGMENT_DEFAULT_FPS, SEGMENT_FPS_MIN, SEGMENT_FPS_MAX)),
+    fps: clamp(data.fps ?? SEGMENT_DEFAULT_FPS, SEGMENT_FPS_MIN, SEGMENT_FPS_MAX),
     ease: data.ease,
     fade_ms: Math.round(clamp(data.fade_ms ?? SEGMENT_DEFAULT_FADE_MS, 0, 5000)),
     keyframes: deduped,

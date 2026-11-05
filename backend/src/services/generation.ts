@@ -17,6 +17,7 @@ import { completionStamp } from './media-time.js'
 import { saveStylingVersion } from './styling-version.js'
 import { onAssetLibraryChanged } from './asset-review.js'
 import { resolveDramaProjectType } from './project-type.js'
+import { invalidateSegmentSpec } from './layer-segment.js'
 import type { ReferenceOrigin } from './asset-pipeline/references.js'
 import {
   buildImageJobBody,
@@ -838,9 +839,11 @@ async function handleVideoComplete(record: SysTaskRecord, videoUrl: string, dura
   if (record.storyboardId) {
     // storyboards.duration 是「内容时长」：带转场提交时视频比它长 E 秒（#11），
     // 把返回时长写回会让下次生成再叠加一次转场，所以只写视频地址。
-    await db.update(schema.storyboards)
+    const [storyboard] = await db.update(schema.storyboards)
       .set({ videoUrl: localPath, updatedAt: now() })
       .where(eq(schema.storyboards.id, record.storyboardId))
+      .returning({ episodeId: schema.storyboards.episodeId })
+    if (storyboard) invalidateSegmentSpec(storyboard.episodeId)
   }
 }
 

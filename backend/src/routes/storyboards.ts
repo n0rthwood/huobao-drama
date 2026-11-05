@@ -54,6 +54,7 @@ import {
 import { assertShotGate } from '../services/workflow-gates.js'
 import { applyComboSwitch, comboChangeLogOf, comboImpactOf, ComboSwitchError } from '../services/combo-switch.js'
 import { junctionFrameOf } from '../services/junction-frame.js'
+import { invalidateSegmentSpec } from '../services/layer-segment.js'
 import { findActiveBatchForStoryboard } from '../services/video-batch.js'
 import { findActiveKeyframeBatchForStoryboard } from '../services/keyframe-batch.js'
 
@@ -220,6 +221,7 @@ app.put('/:id', async (c) => {
   if (stamp.json) updates.fieldSavedAt = stamp.json
 
   await db.update(schema.storyboards).set(updates).where(eq(schema.storyboards.id, id))
+  if ('video_url' in body && body.video_url !== storyboard.videoUrl) invalidateSegmentSpec(storyboard.episodeId)
   // 显式传入的绑定（含主场景）记为手选；提示词里的 @ 自动进池，但不会被记成手选
   const explicit = 'character_ids' in body || 'prop_ids' in body || ('scene_id' in body && body.scene_id != null)
     ? await applyExplicitBindings(id, {
