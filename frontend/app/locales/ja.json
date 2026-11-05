@@ -1148,6 +1148,7 @@
       },
       "migrationComboUnresolved": "旧ショットのセグメント構成には移行先の定義がありません。復元可能な内容は保持されています。構成を明示的に選び直し、設計カードを確認してから確定してください。",
       "migrationComboUnresolvedShort": "旧設計のセグメント構成を特定できません。選び直してください",
+      "migratedFromIntent": "旧設計から移行しました。内容を確認して確定してください",
       "budget": {
         "layerSegment": "▣ レイヤーセグメント",
         "genSegment": "▶ 生成セグメント",

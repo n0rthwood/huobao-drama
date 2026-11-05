@@ -1148,6 +1148,7 @@
       },
       "migrationComboUnresolved": "The legacy segment combination has no defined mapping. Your recoverable content was kept; explicitly choose a combination and review this design card before confirming.",
       "migrationComboUnresolvedShort": "Legacy segment combination unresolved; please choose again",
+      "migratedFromIntent": "Migrated legacy design; please review and confirm",
       "budget": {
         "layerSegment": "▣ Layer segment",
         "genSegment": "▶ Generated segment",

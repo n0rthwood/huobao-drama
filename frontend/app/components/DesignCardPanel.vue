@@ -90,7 +90,9 @@
             <span v-if="current.design_card_stale_reason" class="dc-stale" :title="current.design_card_stale_reason">
               {{ current.design_card_stale_reason === 'migration_combo_unresolved'
                 ? t('episode.design.migrationComboUnresolvedShort')
-                : current.design_card_stale_reason }}
+                : current.design_card_stale_reason === 'migrated_from_intent'
+                  ? t('episode.design.migratedFromIntent')
+                  : current.design_card_stale_reason }}
             </span>
             <span v-if="saveState" class="dim" style="font-size:11px">{{ saveState }}</span>
             <span class="ml-auto" />
