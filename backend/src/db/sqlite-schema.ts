@@ -471,6 +471,97 @@ export const sqliteSchemaStatements = [
     updated_at TEXT NOT NULL
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_storyboard_clips_unique ON storyboard_clips (storyboard_id, position)`,
+
+  // ── 资产「精确 → 美化」流水线（Issue #56）────────────────────
+  // run 容器是 sys_task(params.kind='asset_pipeline', provider='mastra')，这里只存事实表/轮次/QC。
+
+  // 外部素材的本地许可证缓存：同 (asset, sha256) 只存一份，不重抓
+  `CREATE TABLE IF NOT EXISTS asset_source (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    asset_kind TEXT NOT NULL,
+    asset_id INTEGER NOT NULL,
+    url TEXT,
+    title TEXT,
+    artist TEXT,
+    license TEXT NOT NULL,
+    sha256 TEXT NOT NULL,
+    local_path TEXT NOT NULL,
+    role TEXT NOT NULL,
+    why_excluded TEXT,
+    era TEXT,
+    fetched_at TEXT,
+    created_at TEXT NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_asset_source_unique ON asset_source (asset_kind, asset_id, sha256)`,
+
+  // 事实表（版本化）：sources 是该版本的素材快照（按值冻结，便于历史复核）
+  `CREATE TABLE IF NOT EXISTS asset_spec (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    asset_kind TEXT NOT NULL,
+    asset_id INTEGER NOT NULL,
+    version INTEGER NOT NULL,
+    summary TEXT,
+    must_have TEXT,
+    forbidden TEXT,
+    tolerances TEXT,
+    uncertainties TEXT,
+    palette TEXT,
+    composition TEXT,
+    locate_targets TEXT,
+    locate_anchors TEXT,
+    sources TEXT,
+    created_by_stage TEXT,
+    created_at TEXT NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_asset_spec_version ON asset_spec (asset_kind, asset_id, version)`,
+
+  // 一轮出图；(pipeline_task_id, round_no) 唯一 = 昂贵步幂等守卫的落点
+  `CREATE TABLE IF NOT EXISTS asset_round (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pipeline_task_id INTEGER NOT NULL,
+    asset_kind TEXT NOT NULL,
+    asset_id INTEGER NOT NULL,
+    spec_id INTEGER,
+    round_no INTEGER NOT NULL,
+    purpose TEXT NOT NULL,
+    generator TEXT,
+    config_id INTEGER,
+    prompt TEXT,
+    negative_prompt TEXT,
+    reference_ids TEXT,
+    image_task_id INTEGER,
+    image_path TEXT,
+    image_sha256 TEXT,
+    width INTEGER,
+    height INTEGER,
+    status TEXT NOT NULL DEFAULT 'pending',
+    error_msg TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_asset_round_unique ON asset_round (pipeline_task_id, round_no)`,
+
+  // QC + 闸门结论 + 人工裁决；同一轮可追加多条，闸门以最新一条为准
+  `CREATE TABLE IF NOT EXISTS asset_qc_record (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    round_id INTEGER NOT NULL,
+    asset_kind TEXT NOT NULL,
+    asset_id INTEGER NOT NULL,
+    model_config_id INTEGER,
+    checklist_coverage REAL,
+    verdicts TEXT,
+    locate_checks TEXT,
+    gate_pass INTEGER,
+    gate_invalid TEXT,
+    fidelity_score REAL,
+    beauty_score REAL,
+    suggestions TEXT,
+    human_verdict TEXT,
+    human_notes TEXT,
+    human_opened TEXT,
+    created_at TEXT NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_asset_qc_round ON asset_qc_record (round_id)`,
 ]
 
 /**
@@ -551,6 +642,9 @@ const columnAdditions: { table: string; column: string; type: string }[] = [
   { table: 'props', column: 'faithful', type: 'INTEGER NOT NULL DEFAULT 0' },
   { table: 'props', column: 'faithful_source', type: 'INTEGER' },
   { table: 'props', column: 'semantics', type: 'TEXT' },
+  // 地图底图规格（Issue #56）：地图类证据素材的几何由 d3-geo + Natural Earth 确定性渲染，
+  // 扩散模型只能做低强度风格化，绝不参与几何——第一轮事故就是扩散把河流海岸线重画了。
+  { table: 'props', column: 'map_spec', type: 'TEXT' },
   // 背景信息载体（Issue #47）：旁白提到但不出场、需要视觉承载的实体（近卫团、彼得一世、波尔塔瓦）。
   // 不新增第 4 类资产：仍按角色/场景/道具三类落库，这一列只回答「它是不是背景信息载体」，
   // 供表达设计（#49）的 exposition_assets 单列引用。

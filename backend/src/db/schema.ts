@@ -473,6 +473,8 @@ export const props = sqliteTable('props', {
   faithfulSource: integer('faithful_source'),
   // 语义标注 JSON（labels/points/regions/lines，坐标为原图像素）；唯一读写口在 services/asset-semantics.ts
   semantics: text('semantics'),
+  // 地图底图规格 JSON（Issue #56）：投影 + bbox + 地点 + 路线；几何由程序确定性渲染，不经扩散模型
+  mapSpec: text('map_spec'),
   // 背景信息载体（Issue #47）：旁白提到但不出场、只作视觉承载的实体
   exposition: integer('exposition').notNull().default(0),
   createdAt: text('created_at').notNull(),
@@ -534,4 +536,104 @@ export const researchCitations = sqliteTable('research_citations', {
   snippet: text('snippet'),
   status: text('status').notNull().default('ok'),
   retrievedAt: text('retrieved_at').notNull(),
+})
+
+/**
+ * 资产「精确 → 美化」流水线（Issue #56）
+ *
+ * run 容器不是独立表，而是 `sys_task(type='text', params.kind='asset_pipeline', provider='mastra')`：
+ * 文本任务已经有任务中心、进度、重试与错误展示，再建一张 run 表只会多一套要维护的状态机。
+ * 下面三张表都显式带 `asset_kind/asset_id`——按资产直查轮次与 QC 历史是面板和
+ * `listBaseCandidates()` 的主路径，不能靠 `round_id` 一级级反查。
+ */
+
+/** 外部素材的本地许可证缓存：同 sha256 复用，文件落 `static/asset-sources/<sha256>.<ext>` */
+export const assetSource = sqliteTable('asset_source', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  assetKind: text('asset_kind').notNull(),
+  assetId: integer('asset_id').notNull(),
+  url: text('url'),
+  title: text('title'),
+  artist: text('artist'),
+  license: text('license').notNull(),
+  sha256: text('sha256').notNull(),
+  localPath: text('local_path').notNull(),
+  /** generation_reference = 可作生图参考；shape_only = 只看形制不作风格；rejected = 不可用（必须写 why_excluded） */
+  role: text('role').notNull(),
+  whyExcluded: text('why_excluded'),
+  era: text('era'),
+  fetchedAt: text('fetched_at'),
+  createdAt: text('created_at').notNull(),
+})
+
+/**
+ * 事实表（版本化）。`sources` 不只存外键，而是把 `asset_source` 行按值冻结进来：
+ * 事实表改了以后，历史 QC 结论必须仍能按当时的素材与许可被复核。
+ */
+export const assetSpec = sqliteTable('asset_spec', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  assetKind: text('asset_kind').notNull(),
+  assetId: integer('asset_id').notNull(),
+  version: integer('version').notNull(),
+  summary: text('summary'),
+  /** JSON: {id, element, why, check, metric}[]；metric 是闸门禁用 minor 的依据 */
+  mustHave: text('must_have'),
+  forbidden: text('forbidden'),
+  tolerances: text('tolerances'),
+  uncertainties: text('uncertainties'),
+  palette: text('palette'),
+  composition: text('composition'),
+  locateTargets: text('locate_targets'),
+  locateAnchors: text('locate_anchors'),
+  sources: text('sources'),
+  createdByStage: text('created_by_stage'),
+  createdAt: text('created_at').notNull(),
+})
+
+/** 一轮出图。`pipeline_task_id` = 流水线 sys_task；`image_task_id` = 这一轮的生图 sys_task */
+export const assetRound = sqliteTable('asset_round', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  pipelineTaskId: integer('pipeline_task_id').notNull(),
+  assetKind: text('asset_kind').notNull(),
+  assetId: integer('asset_id').notNull(),
+  specId: integer('spec_id'),
+  roundNo: integer('round_no').notNull(),
+  purpose: text('purpose').notNull(),
+  generator: text('generator'),
+  configId: integer('config_id'),
+  prompt: text('prompt'),
+  negativePrompt: text('negative_prompt'),
+  referenceIds: text('reference_ids'),
+  imageTaskId: integer('image_task_id'),
+  imagePath: text('image_path'),
+  imageSha256: text('image_sha256'),
+  /** 落库时用 sharp 探测，listBaseCandidates 据此返回宽高，避免下游再读一次磁盘 */
+  width: integer('width'),
+  height: integer('height'),
+  status: text('status').notNull().default('pending'),
+  errorMsg: text('error_msg'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+})
+
+/** 一次 QC + 闸门结论 + 人工裁决。闸门结论由程序算（gate.ts），模型的 overall 不采信 */
+export const assetQcRecord = sqliteTable('asset_qc_record', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  roundId: integer('round_id').notNull(),
+  assetKind: text('asset_kind').notNull(),
+  assetId: integer('asset_id').notNull(),
+  modelConfigId: integer('model_config_id'),
+  checklistCoverage: real('checklist_coverage'),
+  verdicts: text('verdicts'),
+  locateChecks: text('locate_checks'),
+  gatePass: integer('gate_pass'),
+  gateInvalid: text('gate_invalid'),
+  fidelityScore: real('fidelity_score'),
+  beautyScore: real('beauty_score'),
+  suggestions: text('suggestions'),
+  humanVerdict: text('human_verdict'),
+  humanNotes: text('human_notes'),
+  /** 审批时人工确认「已打开看过」的图片 [{path, sha256}]；缺失则审批接口 400 */
+  humanOpened: text('human_opened'),
+  createdAt: text('created_at').notNull(),
 })

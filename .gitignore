@@ -79,3 +79,8 @@ data/text-tasks/
 
 # fontconfig cache marker generated at runtime
 backend/assets/fonts/.uuid
+
+# Mastra 工作流快照（资产流水线，Issue #56）：与业务库分开的 libSQL 文件
+data/mastra-workflows.db
+data/mastra-workflows.db-wal
+data/mastra-workflows.db-shm
