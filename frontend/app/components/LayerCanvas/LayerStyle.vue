@@ -95,7 +95,7 @@
 
       <section v-else-if="layer.type === 'card'" class="ls-block">
         <label class="ls-row"><span>{{ t('layerCanvas.style.template') }}</span><select :value="layer.template" @change="setLayer('template', $event.target.value); endEdit()"><option v-for="tpl in TEMPLATES" :key="tpl" :value="tpl">{{ t(`layerCanvas.template.${tpl}`) }}</option></select></label>
-        <template v-for="key in ['title', 'sub', 'meta']" :key="key">
+        <template v-for="key in ['title', 'sub', 'meta', 'years']" :key="key">
           <label class="ls-row ls-wide"><span>{{ t(`layerCanvas.style.${key}`) }}</span><input :value="layer.fields[key]" @input="setField(key, $event.target.value)" @change="endEdit"></label>
           <small v-if="fieldMissing(layer.fields[key]).length" class="ls-warn"><TriangleAlert :size="12" />{{ t('layerCanvas.style.missingChars', { chars: fieldMissing(layer.fields[key]).join(' ') }) }}</small>
         </template>
