@@ -208,7 +208,7 @@
             v-if="prodTab === 'assets' && assetTab === 'review' && isDocumentaryProject"
             :episode-id="epId"
             :review="gateState.assets"
-            @update:status="refreshGates({ background: true })"
+            @update:status="refreshGates()"
             @open-asset="openAssetFromReview"
             @create-asset="openAssetCreateFromReview"
             @goto-design="prodTab = 'design'"
@@ -2095,7 +2095,7 @@ async function saveAssetCreate() {
     await refresh()
     // 从审核清单来的：直接打开新资产详情，用户接着上传原件 / 生图
     if (fromReview && createdRow?.id) openAssetDetailById(type, createdRow.id)
-    if (fromReview) refreshGates({ background: true })
+    if (fromReview) refreshGates()
   } catch (e) {
     toastError(e)
   } finally {

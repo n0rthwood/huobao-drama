@@ -43,7 +43,7 @@ const bindDialog = ref({ open: false, item: null, kind: 'prop', assetId: 0, savi
 let timer = null
 
 const status = computed(() => payload.value?.status || props.review?.review_status || 'none')
-const statusLabel = computed(() => t(`episode.assetReview.status${status.value.replace(/^./, c => c.toUpperCase())}`))
+const reviewStatusLabel = computed(() => t(`episode.assetReview.status${status.value.replace(/^./, c => c.toUpperCase())}`))
 const counts = computed(() => payload.value?.counts || { total: 0, missing: 0, have: 0, added: 0, ignored: 0, not_needed: 0 })
 const decided = computed(() => counts.value.total - counts.value.missing)
 const staleReasons = computed(() => payload.value?.stale?.reasons || props.review?.stale_reasons || [])
@@ -273,7 +273,7 @@ onBeforeUnmount(() => { if (timer) clearTimeout(timer) })
   <div class="prod-content">
     <div class="prod-section-bar">
       <span class="dim" style="font-size:12px">{{ t('episode.assets.tabReview') }}</span>
-      <span class="tag mono">{{ t('episode.assetReview.statusLabel', { status: statusLabel }) }}</span>
+      <span class="tag mono">{{ t('episode.assetReview.statusLabel', { status: reviewStatusLabel }) }}</span>
       <span class="tag mono">{{ t('episode.assetReview.progress', { decided, total: counts.total }) }}</span>
       <span v-if="payload?.auto_segmented" class="tag">{{ t('episode.assetReview.autoSegmented') }}</span>
       <div class="ml-auto flex gap-1">

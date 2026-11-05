@@ -61,6 +61,14 @@ const MIN_REASON_CHARS = 5
 const EXCERPT_CHARS = 120
 /** 自动分段兜底时，一段最多多少字 */
 const AUTO_SEGMENT_CHARS = 200
+/**
+ * 单段对照的输出预算：GLM-5.x **始终思考**（`AI_DISABLE_THINKING` 对它无效，官方端点传
+ * disabled 直接 400），推理过程同样吃 `max_tokens`——给 4096 时实测 content 为空串。
+ * 与 Agent 侧 `AI_MAX_TOKENS` 同源，默认 16384（实测一段 ~3000 completion tokens）。
+ */
+const SEGMENT_MAX_TOKENS = Number(process.env.AI_MAX_TOKENS || 16384)
+/** 单段超时：含思考的一次调用实测 30–60 s */
+const SEGMENT_TIMEOUT_MS = 300_000
 
 export class AssetReviewError extends Error {
   constructor(public code: string, message: string, public status = 400) {
@@ -674,8 +682,8 @@ async function runAssetReview(taskId: number, episodeId: number, texts: string[]
         }), {
           systemPrompt: skill,
           temperature: 0.2,
-          maxTokens: 4096,
-          timeoutMs: 180_000,
+          maxTokens: SEGMENT_MAX_TOKENS,
+          timeoutMs: SEGMENT_TIMEOUT_MS,
         })
         const parsed = parseModelReply(reply)
         drafts.push(...toDraftItems(segmentNo, text.slice(0, EXCERPT_CHARS), parsed.items, assets))
