@@ -1147,6 +1147,7 @@
         "unresolved_ref": "소재나 항목으로 해결되지 않는 참조가 있습니다"
       },
       "migrationComboUnresolved": "기존 숏의 세그먼트 조합에는 정의된 이전 규칙이 없습니다. 복원 가능한 내용은 유지되었습니다. 조합을 명시적으로 다시 선택하고 설계 카드를 검토한 후 확정하세요.",
+      "migrationComboUnresolvedShort": "기존 세그먼트 조합을 확인할 수 없습니다. 다시 선택하세요",
       "budget": {
         "layerSegment": "▣ 레이어 세그먼트",
         "genSegment": "▶ 생성 세그먼트",

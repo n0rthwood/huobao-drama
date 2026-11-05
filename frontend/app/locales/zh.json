@@ -1147,6 +1147,7 @@
         "unresolved_ref": "有引用解析不到对应素材或条目"
       },
       "migrationComboUnresolved": "旧分镜的段组合没有已定义的迁移映射。可恢复内容已保留，请显式重选组合并审阅设计卡后确认。",
+      "migrationComboUnresolvedShort": "旧设计无法确定段组合，请重新选择",
       "budget": {
         "layerSegment": "▣ 图层段",
         "genSegment": "▶ 生成段",

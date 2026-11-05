@@ -1147,6 +1147,7 @@
         "unresolved_ref": "素材や項目に解決できない参照があります"
       },
       "migrationComboUnresolved": "旧ショットのセグメント構成には移行先の定義がありません。復元可能な内容は保持されています。構成を明示的に選び直し、設計カードを確認してから確定してください。",
+      "migrationComboUnresolvedShort": "旧設計のセグメント構成を特定できません。選び直してください",
       "budget": {
         "layerSegment": "▣ レイヤーセグメント",
         "genSegment": "▶ 生成セグメント",

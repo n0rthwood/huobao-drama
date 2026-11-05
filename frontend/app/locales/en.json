@@ -1147,6 +1147,7 @@
         "unresolved_ref": "A reference cannot be resolved to an asset or entry"
       },
       "migrationComboUnresolved": "The legacy segment combination has no defined mapping. Your recoverable content was kept; explicitly choose a combination and review this design card before confirming.",
+      "migrationComboUnresolvedShort": "Legacy segment combination unresolved; please choose again",
       "budget": {
         "layerSegment": "▣ Layer segment",
         "genSegment": "▶ Generated segment",
