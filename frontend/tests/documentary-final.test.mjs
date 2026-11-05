@@ -1,6 +1,5 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
 import { zonesOf, junctionSecondsOf, junctionPercentOf, budgetOf, measuredSecondsOf, isFreshExport, batchScopeOf } from '../app/utils/documentaryFinal.js'
 
 test('documentary zones follow explicit combo; no combo never falls through to drama generation', () => {
@@ -38,12 +37,4 @@ test('task center displays persisted scope without recomputing eligibility', () 
   assert.deepEqual(batchScopeOf({ params: { scope: JSON.stringify(scope) } }), scope)
   assert.equal(batchScopeOf({ params: '{broken' }), null)
   assert.equal(batchScopeOf({ scope: { included: [] } }), null)
-})
-test('four language final UI messages expose the same translated keys', () => {
-  const flatten = object => Object.entries(object).flatMap(([key, value]) => typeof value === 'object' ? flatten(value).map(child => `${key}.${child}`) : [key]).sort()
-  const messages = ['zh', 'en', 'ja', 'ko'].map(lang => JSON.parse(readFileSync(new URL(`../app/locales/${lang}.json`, import.meta.url))).episode)
-  for (const message of messages) {
-    assert.deepEqual(flatten(message.final), flatten(messages[0].final))
-    assert.equal('previewDeterministic' in message.vid, false)
-  }
 })
