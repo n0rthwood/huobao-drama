@@ -89,6 +89,8 @@ The effective pool is the union of manual selections and assets mentioned with `
 
 Startup creates `storyboard_pool_selections` without additional local configuration. Existing links are conservatively retained as manual selections because their original source is unknown; remove these explicitly after deleting references. Migration preserves prompts, the primary scene, target image selections, generated media, and keyframe approval.
 
+Asset precision → beautification runs retain auditable reference provenance. New round `reference_ids` contain only actually selected `asset_source` cache IDs, in input order; previous-round images never become source IDs. `GET /api/v1/asset-pipeline/runs/:id` exposes ordered `rounds[].reference_images` items `{type: 'source' | 'prev_round' | 'unknown', path, source_id?, round_id?}` from the image task's immutable `params.referenceImages`. Aligned identity metadata is saved with new tasks, not a second copy of their paths. Legacy identity lookup uses only that round's frozen spec and earlier round outputs, never today's source library or current spec. Ambiguous duplicates, unsafe or missing files remain `unknown`; missing historical inputs use `{type: 'unknown', path: ''}`. Historical rounds/tasks are not rewritten or backfilled. No schema, provider configuration, generation-mode, prompt, or gate changes are required; activate on a safe backend deployment after active pipelines finish.
+
 ### Episode Posters
 
 The optional **Poster** step follows asset production and does not block keyframes, videos, or export.

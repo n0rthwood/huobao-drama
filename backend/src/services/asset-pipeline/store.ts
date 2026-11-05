@@ -79,6 +79,7 @@ export interface AssetRoundRow {
   config_id: number | null
   prompt: string
   negative_prompt: string | null
+  /** Selected asset_source cache IDs only; never task IDs or previous-round IDs. */
   reference_ids: number[]
   image_task_id: number | null
   image_path: string | null

@@ -25,6 +25,7 @@ import {
 } from './store.js'
 import { withStepDeadline } from './deadline.js'
 import { loadAssetTarget, runCurate, runGenerate, runQc, runResearch, runSpec, writeStep } from './steps.js'
+import type { ReferenceOrigin } from './references.js'
 
 export interface PipelineInput {
   pipelineTaskId: number
@@ -121,19 +122,29 @@ const prepareStep = createStep({
 })
 
 /** 参考图：精确轮用已入库素材，美化轮用上一轮（或资产当前图） */
-async function referencesFor(state: PipelineState, roundNo: number, purpose: RoundPurpose): Promise<string[]> {
+export async function referencesFor(state: PipelineState, roundNo: number, purpose: RoundPurpose): Promise<{
+  referenceImages: string[]
+  referenceOrigins: ReferenceOrigin[]
+}> {
   if (purpose === 'precision') {
     const sources = await listSources(state.input.assetKind, state.input.assetId)
-    return sources
-      .filter(item => item.role === 'generation_reference')
-      .slice(0, 3)
-      .map(item => item.local_path)
+    const selected = sources.filter(item => item.role === 'generation_reference').slice(0, 3)
+    return {
+      referenceImages: selected.map(item => item.local_path),
+      referenceOrigins: selected.map(item => ({ type: 'source', source_id: item.id })),
+    }
   }
   const rounds = await listRounds(state.input.pipelineTaskId)
   const previous = rounds.filter(item => item.round_no < roundNo && item.image_path).pop()
-  if (previous?.image_path) return [previous.image_path]
+  if (previous?.image_path) return {
+    referenceImages: [previous.image_path],
+    referenceOrigins: [{ type: 'prev_round', round_id: previous.id }],
+  }
   const target = await loadAssetTarget(state.input.assetKind, state.input.assetId)
-  return target?.imageUrl ? [target.imageUrl] : []
+  return {
+    referenceImages: target?.imageUrl ? [target.imageUrl] : [],
+    referenceOrigins: target?.imageUrl ? [{ type: 'unknown' }] : [],
+  }
 }
 
 function makeRoundStep(index: number) {
@@ -164,7 +175,7 @@ function makeRoundStep(index: number) {
         roundNo: index,
         purpose,
         reviseNotes: state.reviseNotes,
-        referenceImages: references,
+        ...references,
         configId: state.input.configId,
         model: state.input.model,
         signal,
