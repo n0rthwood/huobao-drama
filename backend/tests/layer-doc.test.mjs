@@ -117,3 +117,34 @@ test('normalizeLayerDoc: layer count is capped', () => {
   const [doc] = normalize([{ layers }])
   assert.equal(doc.layers.length, 60)
 })
+
+test('R6 optional crop/source/provenance fields survive normalization, full crop stays omitted', () => {
+  const ref = { asset_kind: 'prop', asset_id: 39, version_task_id: 210 }
+  const [legacy, full, cropped] = normalize([
+    { base: { path: 'static/base.png', width: 320, height: 240 } },
+    { base: { path: 'static/base.png', width: 320, height: 240, crop: { x: 0, y: 0, w: 1, h: 1 } } },
+    {
+      base: { path: 'static/base.png', width: 320, height: 240, source_width: 32000, source_height: 24000, crop: { x: 0, y: 0.125, w: 1, h: 0.75 }, ref },
+      layers: [
+        { type: 'image', box: {}, src: { path: 'static/portrait.png', ...ref } },
+        { type: 'marker', at: [0.5, 0.5], style: { label_dx: 2, label_dy: -2 } },
+      ],
+    },
+  ])
+  assert.deepEqual(legacy, full, 'explicit full crop must not drift old JSON/signatures')
+  assert.equal('crop' in legacy.base, false)
+  assert.deepEqual(cropped.base.crop, { x: 0, y: 0.125, w: 1, h: 0.75 })
+  assert.deepEqual(cropped.base.ref, ref)
+  assert.equal(cropped.base.source_width, 32000, 'source metadata is not limited by editor output size')
+  assert.deepEqual(cropped.layers[0].src, { path: 'static/portrait.png', ...ref })
+  assert.deepEqual(cropped.layers[1].at, [0.5, 0.5], 'offsets do not move the anchored point')
+  assert.deepEqual(cropped.layers[1].style, { label_dx: 0.5, label_dy: -0.5 })
+})
+
+test('anchor source-name snapshot is optional and does not follow editable layer.name', () => {
+  const [doc] = normalize([{ layers: [
+    { type: 'marker', name: '自定义图层名', at: [0.5, 0.5], anchor: { asset_id: 39, semantic_id: 'lake', semantic_name: '  斋桑湖  ' } },
+  ] }])
+  assert.equal(doc.layers[0].name, '自定义图层名')
+  assert.equal(doc.layers[0].anchor.semantic_name, '斋桑湖')
+})

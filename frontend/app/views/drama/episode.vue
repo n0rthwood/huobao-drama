@@ -617,6 +617,7 @@
           <!-- Sub: 分镜关键帧（剧情专用；纪录片走「分镜制作」步） -->
           <StoryboardKeyframes
             v-if="prodTab === 'keyframes' && !isDocumentaryProject"
+            :episode-id="epId"
             :storyboards="sbs"
             :pool-candidates="shotPoolCandidates"
             :set-pool-asset="setShotPoolAsset"
@@ -657,6 +658,7 @@
           <ShotProductionPanel
             v-if="prodTab === 'production'"
             :episode-id="Number(epId) || 0"
+            :drama-id="Number(drama?.id) || 0"
             :focus-storyboard-id="productionFocusSbId"
             :storyboards="sbs"
             :pool-candidates="shotPoolCandidates"

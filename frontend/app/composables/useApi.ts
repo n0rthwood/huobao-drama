@@ -1,4 +1,5 @@
 import type { TaskRow, CenterRow } from '~/composables/useTasks'
+import { apiBase } from '~/utils/url'
 
 // 子路径部署：'/api/v1' 或 '/huobao/api/v1'（见 utils/url.ts）
 

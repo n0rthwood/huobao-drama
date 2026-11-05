@@ -1,20 +1,34 @@
 <template>
   <div ref="rootEl" class="layer-canvas" tabindex="0" @keydown="onKeydown">
     <div class="lc-toolbar">
-      <span class="lc-hint">{{ t('layerCanvas.canvas.hint') }}</span>
-      <label class="lc-check">
-        <input type="checkbox" :checked="snapOn" @change="snapOn = $event.target.checked">
-        {{ t('layerCanvas.canvas.snap') }}
-      </label>
-      <div class="lc-zoom">
-        <button type="button" class="btn-ghost" :title="t('layerCanvas.canvas.zoomOut')" @click="setZoom(zoom / 1.25)">−</button>
-        <button type="button" class="btn-ghost" @click="resetView">{{ Math.round(zoom * 100) }}%</button>
-        <button type="button" class="btn-ghost" :title="t('layerCanvas.canvas.zoomIn')" @click="setZoom(zoom * 1.25)">+</button>
-      </div>
+      <button v-for="tool in tools" :key="tool.key" type="button" class="btn-ghost lc-icon"
+        :title="t(`layerCanvas.toolbar.${tool.key}`)" :aria-label="t(`layerCanvas.toolbar.${tool.key}`)"
+        :aria-pressed="mode === tool.key" :disabled="tool.key === 'crop' && cropLocked || tool.key === 'frame' && !frameViewport"
+        @click="setMode(tool.key)"><component :is="tool.icon" :size="16" /></button>
+      <span class="lc-divider" />
+      <button type="button" class="btn-ghost lc-icon" :title="t('layerCanvas.toolbar.undo')" :aria-label="t('layerCanvas.toolbar.undo')" :disabled="!canUndo" @click="emit('undo')"><Undo2 :size="16" /></button>
+      <button type="button" class="btn-ghost lc-icon" :title="t('layerCanvas.toolbar.redo')" :aria-label="t('layerCanvas.toolbar.redo')" :disabled="!canRedo" @click="emit('redo')"><Redo2 :size="16" /></button>
+      <button type="button" class="btn-ghost lc-icon" :title="t('layerCanvas.toolbar.snap')" :aria-label="t('layerCanvas.toolbar.snap')" :aria-pressed="snapOn" @click="snapOn = !snapOn"><Magnet :size="16" /></button>
+      <span class="lc-spacer" />
+      <button type="button" class="btn-ghost lc-icon" :title="t('layerCanvas.toolbar.zoomOut')" :aria-label="t('layerCanvas.toolbar.zoomOut')" @click="setZoom(zoom / 1.25)"><ZoomOut :size="16" /></button>
+      <span class="lc-percent">{{ Math.round(zoom * 100) }}%</span>
+      <button type="button" class="btn-ghost lc-icon" :title="t('layerCanvas.toolbar.zoomIn')" :aria-label="t('layerCanvas.toolbar.zoomIn')" @click="setZoom(zoom * 1.25)"><ZoomIn :size="16" /></button>
+      <button type="button" class="btn-ghost lc-icon" :title="t('layerCanvas.toolbar.fit')" :aria-label="t('layerCanvas.toolbar.fit')" @click="resetView"><Maximize2 :size="16" /></button>
+      <slot name="toolbar-extra" :missing-glyphs="missingGlyphs" />
     </div>
+    <div v-if="aspectIssue" class="lc-banner">
+      <TriangleAlert :size="14" />{{ t('layerCanvas.base.aspectBanner', { aspect: aspectIssue.aspect }) }}
+      <button type="button" class="btn-ghost" :disabled="cropLocked" @click="startCrop">{{ t('layerCanvas.base.cropTo169') }}</button>
+    </div>
+    <div v-if="mode === 'crop'" class="lc-banner">
+      <Crop :size="14" />{{ t('layerCanvas.base.cropHelp') }}
+      <button type="button" class="btn-ghost" @click="applyCrop">{{ t('layerCanvas.base.applyCrop') }}</button>
+      <button type="button" class="btn-ghost" @click="mode = 'select'">{{ t('layerCanvas.base.cancelCrop') }}</button>
+    </div>
+    <div v-if="baseImageError || !baseSrc" class="lc-banner"><TriangleAlert :size="14" />{{ t('layerCanvas.base.loadError') }}</div>
     <div ref="viewportEl" class="lc-viewport" @wheel.prevent="onWheel" @pointerdown="onViewportDown">
       <div class="lc-stage" :style="stageStyle">
-        <img v-if="baseSrc" class="lc-base" :src="baseSrc" alt="" draggable="false" @load="syncScale">
+        <img v-if="baseSrc && !baseImageError" class="lc-base" :src="baseSrc" alt="" draggable="false" @load="onBaseLoad" @error="baseImageError = true">
         <div v-for="filter in filterLayers" :key="filter.id" class="lc-filter" :style="filterStyle(filter)" />
         <!-- eslint-disable-next-line vue/no-v-html -- 与后端同源的 layerDocToSvg 输出，内容已转义 -->
         <div class="lc-overlay" v-html="svgMarkup" />
@@ -30,7 +44,7 @@
             v-for="(guide, index) in guides" :key="`g${index}`" class="lc-guide"
             :x1="guide.x1" :y1="guide.y1" :x2="guide.x2" :y2="guide.y2" :stroke-width="uiScale"
           />
-          <g v-if="selectionBox" :transform="selectionTransform">
+          <g v-if="selectionBox && mode === 'select'" :transform="selectionTransform">
             <rect
               class="lc-select" :x="selectionBox.x" :y="selectionBox.y"
               :width="selectionBox.w" :height="selectionBox.h" :stroke-width="uiScale * 1.5"
@@ -58,8 +72,20 @@
             v-if="marquee" class="lc-marquee" :x="marquee.x" :y="marquee.y"
             :width="marquee.w" :height="marquee.h" :stroke-width="uiScale"
           />
+          <template v-if="editingRect">
+            <path v-if="mode === 'crop'" class="lc-crop-shade" fill-rule="evenodd"
+              :d="`M0 0H${docWidth}V${docHeight}H0Z M${editingRect.x * docWidth} ${editingRect.y * docHeight}h${editingRect.w * docWidth}v${editingRect.h * docHeight}h${-editingRect.w * docWidth}Z`" />
+            <rect class="lc-frame" :x="editingRect.x * docWidth" :y="editingRect.y * docHeight"
+              :width="editingRect.w * docWidth" :height="editingRect.h * docHeight" :stroke-width="uiScale * 2"
+              @pointerdown.stop="startRectDrag(false, $event)" />
+            <rect class="lc-handle" :x="(editingRect.x + editingRect.w) * docWidth - uiScale * 6"
+              :y="(editingRect.y + editingRect.h) * docHeight - uiScale * 6" :width="uiScale * 12" :height="uiScale * 12"
+              @pointerdown.stop="startRectDrag(true, $event)" />
+          </template>
         </svg>
       </div>
+      <span v-if="quality" class="lc-quality"><TriangleAlert :size="14" />{{ t('layerCanvas.quality.badge', { w: quality.effective_w, h: quality.effective_h, sw: quality.spec_w, sh: quality.spec_h }) }}</span>
+      <span v-if="missingGlyphs.length" class="lc-glyphs" :title="t('layerCanvas.style.missingChars', { chars: missingGlyphs.join(' ') })"><TriangleAlert :size="14" />{{ missingGlyphs.join(' ') }}</span>
     </div>
   </div>
 </template>
@@ -72,6 +98,7 @@
  */
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { MousePointer2, Hand, Frame, Crop, Undo2, Redo2, Magnet, ZoomIn, ZoomOut, Maximize2, TriangleAlert } from 'lucide-vue-next'
 import { baseFilterLayers, layerBounds, layerDocToSvg } from '~/utils/layerSvg'
 import { apiBase, mediaUrl } from '~/utils/url'
 
@@ -79,8 +106,16 @@ const props = defineProps({
   doc: { type: Object, required: true },
   selectedIds: { type: Array, default: () => [] },
   baseSrc: { type: String, default: '' },
+  quality: { type: Object, default: null },
+  aspectIssue: { type: Object, default: null },
+  missingGlyphs: { type: Array, default: () => [] },
+  anchorNames: { type: Object, default: () => ({}) },
+  canUndo: { type: Boolean, default: true },
+  canRedo: { type: Boolean, default: true },
+  cropLocked: { type: Boolean, default: false },
+  viewport: { type: Object, default: null },
 })
-const emit = defineEmits(['select', 'history', 'patch', 'delete', 'duplicate', 'undo', 'redo'])
+const emit = defineEmits(['select', 'history', 'patch', 'delete', 'duplicate', 'undo', 'redo', 'crop', 'source-size', 'detach', 'viewport'])
 const { t } = useI18n()
 
 const HANDLE_KEYS = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
@@ -97,13 +132,68 @@ const marquee = ref(null)
 const stageWidth = ref(1)
 const viewport = ref({ width: 1344, height: 768 })
 let drag = null
+const sourceSize = ref({ width: 0, height: 0 })
+const baseImageError = ref(false)
+// Public contract: crop/viewport emit whole-image normalized rectangles; parent owns compound history.
+// #toolbar-extra receives missingGlyphs so injected render controls can expose/disable unsupported text.
+const mode = ref('select')
+const cropDraft = ref(null)
+const tools = [
+  { key: 'select', icon: MousePointer2 }, { key: 'pan', icon: Hand },
+  { key: 'frame', icon: Frame }, { key: 'crop', icon: Crop },
+]
+const frameViewport = computed(() => props.viewport)
+const editingRect = computed(() => mode.value === 'crop' ? cropDraft.value : mode.value === 'frame' ? frameViewport.value : null)
 
-const docWidth = computed(() => props.doc.base.width || 1344)
-const docHeight = computed(() => props.doc.base.height || 768)
+function setMode(next) {
+  if (next === 'crop') { if (mode.value === 'crop') mode.value = 'select'; else startCrop(); return }
+  mode.value = next
+}
+
+function startCrop() {
+  if (props.cropLocked) return
+  const ratio = (16 / 9) / aspect.value
+  const w = Math.min(1, ratio)
+  const h = w / ratio
+  cropDraft.value = props.doc.base.crop ? { ...props.doc.base.crop } : { x: (1 - w) / 2, y: (1 - h) / 2, w, h }
+  mode.value = 'crop'
+}
+
+function applyCrop() {
+  if (cropDraft.value) emit('crop', { ...cropDraft.value })
+  mode.value = 'select'
+}
+
+function onBaseLoad(event) {
+  sourceSize.value = { width: event.target.naturalWidth, height: event.target.naturalHeight }
+  emit('source-size', { ...sourceSize.value })
+  syncScale()
+}
+
+function startRectDrag(resize, event) {
+  if (!editingRect.value) return
+  if (mode.value === 'frame') emit('history')
+  drag = { mode: 'rect', crop: mode.value === 'crop', resize, start: pointFromEvent(event), origin: { ...editingRect.value } }
+  bindPointer(event)
+}
+
+function confirmGeometry(layers) {
+  const anchored = layers.filter(layer => layer.anchor?.semantic_id && !layer.anchor.detached)
+  if (!anchored.length) { emit('history'); return true }
+  const name = anchored.map(layer => props.anchorNames[layer.id] || layer.name || layer.anchor.semantic_id).join(', ')
+  if (!window.confirm(t('layerCanvas.anchor.detachConfirm', { name }))) return false
+  emit('history')
+  emit('detach', anchored.map(layer => layer.id))
+  return true
+}
+
+const docWidth = computed(() => props.doc.base.source_width || sourceSize.value.width || props.doc.base.width || 1344)
+const docHeight = computed(() => props.doc.base.source_height || sourceSize.value.height || props.doc.base.height || 768)
 const aspect = computed(() => docWidth.value / docHeight.value)
 const uiScale = computed(() => docWidth.value / Math.max(1, stageWidth.value))
 
 const svgMarkup = computed(() => layerDocToSvg(props.doc, { width: docWidth.value, height: docHeight.value }, {
+  viewport: { x: 0, y: 0, w: 1, h: 1 },
   resolveImage: path => mediaUrl(path),
 }))
 const filterLayers = computed(() => baseFilterLayers(props.doc.base.filter, { width: docWidth.value, height: docHeight.value }))
@@ -242,6 +332,7 @@ function snapDelta(box, dx, dy) {
 }
 
 function onLayerDown(id, event) {
+  if (mode.value !== 'select') { onViewportDown(event); return }
   const layer = props.doc.layers.find(item => item.id === id)
   if (!layer) return
   if (event.shiftKey) {
@@ -252,7 +343,7 @@ function onLayerDown(id, event) {
   if (!props.selectedIds.includes(id)) emit('select', [id])
   if (layer.locked) return
   const targets = (props.selectedIds.includes(id) ? selected.value : [layer]).filter(item => !item.locked)
-  emit('history')
+  if (!confirmGeometry(targets)) return
   drag = {
     mode: 'move',
     start: pointFromEvent(event),
@@ -273,7 +364,7 @@ function unionBounds(layers) {
 function startResize(handle, event) {
   const layer = selected.value[0]
   if (!layer || layer.locked) return
-  emit('history')
+  if (!confirmGeometry([layer])) return
   drag = {
     mode: 'resize',
     handle,
@@ -291,7 +382,7 @@ function startRotate(event) {
   const box = layerBounds(layer, props.doc.theme, aspect.value)
   const center = { x: (box.x + box.w / 2) * docWidth.value, y: (box.y + box.h / 2) * docHeight.value }
   const start = pointFromEvent(event)
-  emit('history')
+  if (!confirmGeometry([layer])) return
   drag = {
     mode: 'rotate',
     layer: layer.id,
@@ -304,12 +395,13 @@ function startRotate(event) {
 
 function onViewportDown(event) {
   rootEl.value?.focus()
-  if (event.button === 1 || event.altKey) {
+  if (mode.value === 'pan' || event.button === 1 || event.altKey) {
     drag = { mode: 'pan', start: { x: event.clientX, y: event.clientY }, origin: { ...pan.value } }
     bindPointer(event)
     return
   }
   if (event.button !== 0) return
+  if (mode.value === 'crop' || mode.value === 'frame') return
   const start = pointFromEvent(event)
   if (!event.shiftKey) emit('select', [])
   drag = { mode: 'marquee', start, additive: event.shiftKey, base: [...props.selectedIds] }
@@ -393,6 +485,24 @@ function onPointerMove(event) {
     return
   }
   const point = pointFromEvent(event)
+  if (drag.mode === 'rect') {
+    const origin = drag.origin
+    const bounds = drag.crop ? { x: 0, y: 0, w: 1, h: 1 } : (props.doc.base.crop || { x: 0, y: 0, w: 1, h: 1 })
+    let next
+    if (drag.resize) {
+      const ratio = (16 / 9) / aspect.value
+      const w = Math.max(0.01, Math.min(point.x - origin.x, (point.y - origin.y) * ratio,
+        bounds.x + bounds.w - origin.x, (bounds.y + bounds.h - origin.y) * ratio))
+      next = { ...origin, w, h: w / ratio }
+    } else {
+      next = { ...origin,
+        x: Math.max(bounds.x, Math.min(bounds.x + bounds.w - origin.w, origin.x + point.x - drag.start.x)),
+        y: Math.max(bounds.y, Math.min(bounds.y + bounds.h - origin.h, origin.y + point.y - drag.start.y)) }
+    }
+    if (drag.crop) cropDraft.value = next
+    else emit('viewport', next)
+    return
+  }
   if (drag.mode === 'move') {
     const snapped = snapDelta(drag.box, point.x - drag.start.x, point.y - drag.start.y)
     guides.value = snapped.guides
@@ -444,6 +554,8 @@ function endPointer() {
 }
 
 function onKeydown(event) {
+  if (['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(event.target.tagName)) return
+  if (event.key === 'Escape') { mode.value = 'select'; endPointer(); return }
   const key = event.key.toLowerCase()
   if ((event.ctrlKey || event.metaKey) && key === 'z') {
     event.preventDefault()
@@ -470,8 +582,9 @@ function onKeydown(event) {
   const move = moves[key]
   if (!move || !selected.value.length) return
   event.preventDefault()
-  emit('history')
-  drag = { targets: selected.value.filter(layer => !layer.locked).map(layer => ({ id: layer.id, geometry: geometryOf(layer) })) }
+  const targets = selected.value.filter(layer => !layer.locked)
+  if (!confirmGeometry(targets)) return
+  drag = { targets: targets.map(layer => ({ id: layer.id, geometry: geometryOf(layer) })) }
   applyMove(move[0], move[1])
   drag = null
 }
@@ -526,8 +639,13 @@ onBeforeUnmount(() => {
   window.removeEventListener('pointermove', onPointerMove)
 })
 watch(() => [docWidth.value, docHeight.value], () => requestAnimationFrame(syncScale))
+watch(() => props.baseSrc, () => { sourceSize.value = { width: 0, height: 0 }; baseImageError.value = false })
 
-defineExpose({ focus: () => rootEl.value?.focus() })
+defineExpose({
+  focus: () => rootEl.value?.focus(),
+  startCrop,
+  startViewport: () => { if (props.viewport) mode.value = 'frame' },
+})
 </script>
 
 <style scoped>
@@ -551,4 +669,16 @@ defineExpose({ focus: () => rootEl.value?.focus() })
 .lc-rotate { cursor: grab; }
 .lc-guide { stroke: #e0467c; stroke-dasharray: 4 4; }
 .lc-marquee { fill: rgba(47, 123, 214, 0.12); stroke: var(--accent); stroke-dasharray: 4 3; }
+.lc-toolbar { gap: 3px; flex-wrap: wrap; }
+.lc-icon { display: inline-flex; align-items: center; justify-content: center; padding: 6px; border-radius: 4px; }
+.lc-icon[aria-pressed="true"] { background: var(--surface-active); color: var(--accent); outline: 1px solid var(--accent); }
+.lc-icon:disabled { opacity: .4; cursor: not-allowed; }
+.lc-spacer { flex: 1; }
+.lc-divider { height: 20px; border-left: 1px solid var(--border); margin: 0 4px; }
+.lc-percent { font-size: 11px; min-width: 36px; text-align: center; }
+.lc-banner { display: flex; align-items: center; gap: 6px; padding: 5px 8px; font-size: 12px; color: var(--warning, #b7791f); background: var(--surface-card); }
+.lc-crop-shade { fill: rgba(0, 0, 0, .5); pointer-events: none; }
+.lc-frame { fill: transparent; stroke: var(--accent); cursor: move; }
+.lc-quality, .lc-glyphs { position: absolute; bottom: 10px; left: 10px; display: flex; align-items: center; gap: 4px; padding: 5px 7px; font-size: 11px; background: var(--surface-card); color: var(--warning, #b7791f); border: 1px solid currentColor; border-radius: 4px; pointer-events: none; }
+.lc-glyphs { left: auto; right: 10px; color: var(--danger, #c0472e); }
 </style>

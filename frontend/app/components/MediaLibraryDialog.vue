@@ -153,6 +153,8 @@ const props = defineProps({
   dramaId: { type: [Number, String], default: 0 },
   title: { type: String, default: '' },
   submitting: { type: Boolean, default: false },
+  // Opt-in provenance for the layer editor; existing pick handlers still receive path strings.
+  detailed: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['close', 'pick'])
@@ -169,6 +171,7 @@ const imagesLoading = ref(false)
 const total = ref(0)
 const page = ref(1)
 const selected = ref([])
+const selectedDetails = ref({})
 const preview = ref(null)
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / PAGE_SIZE)))
@@ -268,6 +271,7 @@ function gotoPage(next) {
 }
 
 function togglePick(image) {
+  if (props.detailed) selectedDetails.value[image.path] = { ...image }
   if (!props.multi) {
     selected.value = selected.value[0] === image.path ? [] : [image.path]
     return
@@ -286,7 +290,7 @@ function close() {
 
 function confirm() {
   if (!selected.value.length) return
-  emit('pick', [...selected.value])
+  emit('pick', props.detailed ? selected.value.map(path => ({ ...selectedDetails.value[path] })) : [...selected.value])
 }
 
 watch(() => props.open, async (isOpen) => {
@@ -295,6 +299,7 @@ watch(() => props.open, async (isOpen) => {
     return
   }
   selected.value = []
+  selectedDetails.value = {}
   page.value = 1
   const focus = Number(props.dramaId) || 0
   await loadDramas()

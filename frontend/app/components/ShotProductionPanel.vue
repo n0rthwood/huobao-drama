@@ -83,6 +83,8 @@
             v-if="activeSegment === 'layer'"
             :key="`layer-${selected.sb.id}`"
             :storyboard-id="selected.sb.id"
+            :episode-id="episodeId"
+            :drama-id="dramaId"
             :state="state"
             @changed="onLayerChanged"
             @goto-design="emit('goto-design')"
@@ -223,6 +225,7 @@ import { isActiveBatchItemState } from '~/composables/useTaskProgress'
 
 const props = defineProps({
   episodeId: { type: Number, required: true },
+  dramaId: { type: Number, required: true },
   storyboards: { type: Array, default: () => [] },
   chatModel: { type: String, default: '' },
   chatConfigId: { type: Number, default: 0 },
