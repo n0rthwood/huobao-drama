@@ -82,7 +82,7 @@ function renderedSegment(sbId, hash) {
     fs.writeFileSync(nodePath.join(process.env.STORAGE_PATH, 'layer-segments', 'seg.mp4'), 'MP4')
     await markSegmentRendered(segment.id, {
       render_path: 'static/layer-segments/seg.mp4',
-      render_signature: layerSegmentSignatureOf(segment, spec),
+      render_signature: layerSegmentSignatureOf(segment, spec, sbRow.combo),
       status: 'ready', junction_path: junctionPath, junction_hash: junctionHash,
     })
   `
@@ -167,6 +167,9 @@ test('D + 承接：首尾双锁（首帧承接上一镜尾帧、尾帧衔接帧�
     run(`
       await db.update(schema.storyboards).set({ lastFrameImage: 'static/images/prev-last.png' })
         .where(eq(schema.storyboards.id, ${seeded.sbD}))
+      // A retained own-first slot must not defeat the explicit D + continue lock.
+      await db.update(schema.storyboards).set({ firstFrameImage: 'static/uploads/base.png' })
+        .where(eq(schema.storyboards.id, ${seeded.sbDC}))
       out({ ok: true })
     `, env)
     run(`${renderedSegment(String(seeded.sbDC), 'h-dc')}

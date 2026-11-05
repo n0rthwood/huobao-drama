@@ -48,7 +48,7 @@ async function load() {
   try {
     const [state, tasks] = await Promise.all([zones.value.layer ? layerSegmentAPI.get(sb.value.id) : Promise.resolve(null), zones.value.generated ? taskAPI.list({ type: 'video', storyboard_id: sb.value.id }) : Promise.resolve([])])
     segmentState.value = state
-    history.value = Array.isArray(tasks) ? tasks : tasks?.items || []
+    history.value = (Array.isArray(tasks) ? tasks : tasks?.items || []).filter(task => task.provider !== 'layer-segment')
   } catch (error) { toastError(error) }
 }
 watch(() => [sb.value.id, sb.value.updated_at, sb.value.updatedAt, sb.value.videoUrl, sb.value.video_url, sb.value.keyframes?.confirmed, ctx.videoTaskState(sb.value)], load, { immediate: true })

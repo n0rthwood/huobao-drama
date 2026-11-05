@@ -379,7 +379,7 @@ export async function videoSignatureFromTask(task: {
 /** 某分镜的历史视频版本（含版本号与签名），按创建时间正序 */
 export async function loadVideoVersions(storyboardId: number): Promise<VideoVersion[]> {
   const tasks = (await db.select().from(schema.sysTask))
-    .filter(task => task.type === 'video' && task.status === 'completed' && task.storyboardId === storyboardId)
+    .filter(task => task.type === 'video' && task.provider !== 'layer-segment' && task.status === 'completed' && task.storyboardId === storyboardId)
     .filter(task => task.localPath || task.resultUrl)
     .sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')) || a.id - b.id)
   return Promise.all(tasks.map(async (task, index) => {

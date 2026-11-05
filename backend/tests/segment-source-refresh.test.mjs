@@ -41,3 +41,20 @@ test('matching render bytes/signature cannot bypass upstream staleness; quality 
     assert.equal(result.migrationHistory, true)
   } finally { rmSync(root, { recursive: true, force: true }) }
 })
+
+test('explicit image source kind and version override legacy anchor inference without requiring an anchor', () => {
+  const root = mkdtempSync(join(tmpdir(), 'huobao-source-ref-'))
+  try {
+    const script = `
+      import { imageSourceReference } from './src/services/segment-source-refresh.ts'
+      const src={path:'static/image.png',asset_kind:'scene',asset_id:7,version_task_id:31}
+      const pinned=imageSourceReference({type:'image',src,anchor:{asset_id:7,detached:true}},null,{kind:'asset',asset_kind:'prop',asset_id:7,version_task_id:null})
+      const current=imageSourceReference({type:'image',src:{...src,version_task_id:null}},null,null)
+      console.log('@@'+JSON.stringify({pinned,current}))
+    `
+    const stdout=execFileSync(process.execPath,['--import','tsx','--input-type=module','--eval',script],{cwd:backendRoot,encoding:'utf8',env:{...process.env,SQLITE_PATH:join(root,'db.sqlite3'),HUOBAO_DATA_DIR:root}})
+    const result=JSON.parse(stdout.slice(stdout.lastIndexOf('@@')+2))
+    assert.deepEqual(result.pinned,{asset_kind:'scene',asset_id:7,version_task_id:31})
+    assert.deepEqual(result.current,{asset_kind:'scene',asset_id:7,version_task_id:null})
+  } finally { rmSync(root,{recursive:true,force:true}) }
+})
