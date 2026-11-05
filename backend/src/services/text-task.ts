@@ -34,6 +34,12 @@ export type TextTaskKind =
   | 'shot_intent'
   /** 补全剩余（Issue #52）：只把旁白覆盖缺口补成新分镜，既有分镜原样保留 */
   | 'storyboard_fill_gaps'
+  /**
+   * 资产「精确 → 美化」流水线（Issue #56）：run 容器就是这条任务行，
+   * `params.mastra_run_id` 指向 Mastra 工作流快照，`params.progress.step` 是当前步名。
+   * 它可以长时间停在「等待人工审批」上，因此被 `failInterruptedTextTasks()` 显式排除。
+   */
+  | 'asset_pipeline'
 
 export const TEXT_TASK_KINDS: TextTaskKind[] = [
   'extract_characters', 'extract_scenes', 'extract_props',
@@ -44,6 +50,7 @@ export const TEXT_TASK_KINDS: TextTaskKind[] = [
   'asset_semantics',
   'shot_intent',
   'storyboard_fill_gaps',
+  'asset_pipeline',
 ]
 
 /**
@@ -66,6 +73,8 @@ export interface TextTaskProgress {
   current_storyboard_id?: number
   /** 分阶段任务的当前阶段（#35 旁白写作：spine = 规划主线，shots = 分块写镜） */
   phase?: 'spine' | 'shots'
+  /** 资产流水线（#56）的当前步名：research/curate/spec/prompt/generate/qc/gate/approval/finalize */
+  step?: string
   items?: TextTaskProgressItem[]
 }
 

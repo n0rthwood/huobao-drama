@@ -1,0 +1,289 @@
+/**
+ * 资产流水线的 Mastra Workflow 图（Issue #56）
+ *
+ * 图形：research → curate → spec → [轮次 0 → 审批 0] → [轮次 1 → 审批 1] → [轮次 2 → 审批 2] → finalize
+ *
+ * 为什么轮次是**展开的三块**而不是 `dountil` 循环：轮次上限是产品约束（美化 ≤2 轮），
+ * 必须写死在图里而不是靠条件表达式；展开之后每个 `suspend()` 都落在固定的 step id
+ * （`approval_0/1/2`），重启后按 id 续跑是确定的，不依赖循环计数的快照语义。
+ * 已经结束的 run 流过后面的块时整块短路（`state.done`），不会再打一次模型。
+ *
+ * 每一轮 qc/gate 之后一律 `suspend()` 等人（主进程裁决「必须改 2」）：
+ * `decideRound()` 只给建议，不自动推进。
+ */
+import { createStep, createWorkflow } from '@mastra/core/workflows'
+import { z } from 'zod'
+import { decideRound, MAX_BEAUTIFY_ROUNDS, type RoundDecision } from './gate.js'
+import { getSpec, listSources, listRounds, latestQcByRound, recordHumanVerdict, type RoundPurpose } from './store.js'
+import { loadAssetTarget, runCurate, runGenerate, runQc, runResearch, runSpec, writeStep } from './steps.js'
+
+export interface PipelineInput {
+  pipelineTaskId: number
+  assetKind: 'character' | 'scene' | 'prop'
+  assetId: number
+  episodeId: number
+  purpose: RoundPurpose
+  configId?: number | null
+  model?: string | null
+  textConfigId?: number | null
+}
+
+export interface PipelineState {
+  input: PipelineInput
+  specId: number | null
+  done: boolean
+  aborted: boolean
+  reviseNotes: string[]
+  lastRoundNo: number | null
+  finalRoundNo: number | null
+  rollbackTo: number | null
+  warnings: string[]
+}
+
+export interface ApprovalResume {
+  verdict: 'approve' | 'revise' | 'rollback' | 'abort'
+  round_id: number
+  selected_violations?: string[]
+  notes?: string | null
+  opened: Array<{ path: string; sha256: string }>
+  override_gate?: boolean
+}
+
+/** 轮次 index → 用途。精确轮打头的 run 后面挂两轮美化；美化 run 两轮封顶 */
+export function roundPurposes(purpose: RoundPurpose): RoundPurpose[] {
+  return purpose === 'precision'
+    ? ['precision', 'beautify', 'beautify']
+    : ['beautify', 'beautify']
+}
+
+export const APPROVAL_STEP_IDS = ['approval_0', 'approval_1', 'approval_2'] as const
+
+// Mastra 的 schema 只用来传递内部状态，不做结构校验（状态是本模块自己的类型）
+const stateSchema = z.custom<PipelineState>(() => true)
+const inputSchema = z.custom<PipelineInput>(() => true)
+const resumeSchema = z.custom<ApprovalResume>(() => true)
+const suspendSchema = z.custom<{
+  round_id: number
+  round_no: number
+  gate_pass: boolean
+  suggestion: RoundDecision
+}>(() => true)
+
+const prepareStep = createStep({
+  id: 'prepare',
+  inputSchema,
+  outputSchema: stateSchema,
+  execute: async ({ inputData }) => {
+    const target = await loadAssetTarget(inputData.assetKind, inputData.assetId)
+    if (!target) throw new Error('资产不存在')
+
+    await writeStep(inputData.pipelineTaskId, 'research')
+    const { result } = await runResearch({
+      pipelineTaskId: inputData.pipelineTaskId,
+      target,
+      textConfigId: inputData.textConfigId ?? undefined,
+    })
+
+    await writeStep(inputData.pipelineTaskId, 'curate')
+    const curated = await runCurate(target)
+
+    await writeStep(inputData.pipelineTaskId, 'spec')
+    const spec = await runSpec({
+      pipelineTaskId: inputData.pipelineTaskId,
+      target,
+      research: result,
+      textConfigId: inputData.textConfigId ?? undefined,
+    })
+
+    return {
+      input: inputData,
+      specId: spec.id,
+      done: false,
+      aborted: false,
+      reviseNotes: [],
+      lastRoundNo: null,
+      finalRoundNo: null,
+      rollbackTo: null,
+      warnings: curated.warnings,
+    } satisfies PipelineState
+  },
+})
+
+/** 参考图：精确轮用已入库素材，美化轮用上一轮（或资产当前图） */
+async function referencesFor(state: PipelineState, roundNo: number, purpose: RoundPurpose): Promise<string[]> {
+  if (purpose === 'precision') {
+    const sources = await listSources(state.input.assetKind, state.input.assetId)
+    return sources
+      .filter(item => item.role === 'generation_reference')
+      .slice(0, 3)
+      .map(item => item.local_path)
+  }
+  const rounds = await listRounds(state.input.pipelineTaskId)
+  const previous = rounds.filter(item => item.round_no < roundNo && item.image_path).pop()
+  if (previous?.image_path) return [previous.image_path]
+  const target = await loadAssetTarget(state.input.assetKind, state.input.assetId)
+  return target?.imageUrl ? [target.imageUrl] : []
+}
+
+function makeRoundStep(index: number) {
+  return createStep({
+    id: `round_${index}`,
+    inputSchema: stateSchema,
+    outputSchema: stateSchema,
+    execute: async ({ inputData }): Promise<PipelineState> => {
+      const state = inputData
+      const purposes = roundPurposes(state.input.purpose)
+      if (state.done || index >= purposes.length) return state
+      const purpose = purposes[index]!
+      const target = await loadAssetTarget(state.input.assetKind, state.input.assetId)
+      if (!target) throw new Error('资产不存在')
+      // 快照里只存 specId，事实表按 id 重新读库（整张表进 workflow snapshot 没有必要）
+      const spec = state.specId ? await getSpec(state.specId) : null
+      if (!spec) throw new Error('事实表缺失，无法出图')
+
+      await writeStep(state.input.pipelineTaskId, 'prompt')
+      const references = await referencesFor(state, index, purpose)
+
+      await writeStep(state.input.pipelineTaskId, 'generate')
+      const round = await runGenerate({
+        pipelineTaskId: state.input.pipelineTaskId,
+        episodeId: state.input.episodeId,
+        target,
+        spec,
+        roundNo: index,
+        purpose,
+        reviseNotes: state.reviseNotes,
+        referenceImages: references,
+        configId: state.input.configId,
+        model: state.input.model,
+      })
+
+      await writeStep(state.input.pipelineTaskId, 'qc')
+      await runQc({
+        target,
+        spec,
+        round,
+        textConfigId: state.input.textConfigId ?? undefined,
+      })
+      await writeStep(state.input.pipelineTaskId, 'gate')
+      return { ...state, lastRoundNo: index }
+    },
+  })
+}
+
+function makeApprovalStep(index: number) {
+  return createStep({
+    id: APPROVAL_STEP_IDS[index]!,
+    inputSchema: stateSchema,
+    outputSchema: stateSchema,
+    resumeSchema,
+    suspendSchema,
+    execute: async ({ inputData, resumeData, suspend }): Promise<PipelineState> => {
+      const state = inputData
+      const purposes = roundPurposes(state.input.purpose)
+      if (state.done || index >= purposes.length) return state
+
+      const rounds = await listRounds(state.input.pipelineTaskId)
+      const current = rounds.find(item => item.round_no === index)
+      if (!current) throw new Error(`第 ${index} 轮不存在`)
+      const qcByRound = await latestQcByRound(rounds.map(item => item.id))
+      const history = rounds.map(item => ({
+        round_no: item.round_no,
+        purpose: item.purpose,
+        gate_pass: qcByRound.get(item.id) ? qcByRound.get(item.id)!.gate_pass === 1 : null,
+        human_verdict: qcByRound.get(item.id)?.human_verdict ?? null,
+        status: item.status,
+      }))
+      const suggestion = decideRound(history)
+      const qc = qcByRound.get(current.id)
+
+      if (!resumeData) {
+        await writeStep(state.input.pipelineTaskId, 'approval')
+        // suspend() 的返回类型是引擎内部的 InnerOutput（这一步不会真的继续往下走），
+        // 对外仍须满足 outputSchema：这里是库类型与实际语义的鸿沟，只能显式断言
+        return await suspend({
+          round_id: current.id,
+          round_no: index,
+          gate_pass: qc?.gate_pass === 1,
+          suggestion,
+        }) as unknown as PipelineState
+      }
+
+      if (qc) {
+        await recordHumanVerdict(qc.id, {
+          verdict: resumeData.verdict,
+          notes: resumeData.notes ?? null,
+          opened: resumeData.opened,
+        })
+      }
+
+      if (resumeData.verdict === 'approve') {
+        return { ...state, done: true, finalRoundNo: index }
+      }
+      if (resumeData.verdict === 'abort') {
+        return { ...state, done: true, aborted: true, finalRoundNo: null }
+      }
+      if (resumeData.verdict === 'rollback') {
+        const lastPass = [...history].reverse().find(item => item.gate_pass === true && item.round_no !== index)
+        return { ...state, done: true, rollbackTo: lastPass?.round_no ?? null, finalRoundNo: lastPass?.round_no ?? null }
+      }
+      // revise：进下一轮；用满美化轮上限就只能回退/终止
+      const beautifyDone = history.filter(item => item.purpose === 'beautify').length
+      if (beautifyDone >= MAX_BEAUTIFY_ROUNDS || index + 1 >= purposes.length) {
+        const lastPass = [...history].reverse().find(item => item.gate_pass === true)
+        return {
+          ...state,
+          done: true,
+          rollbackTo: lastPass?.round_no ?? null,
+          finalRoundNo: lastPass?.round_no ?? null,
+          warnings: [...state.warnings, `美化轮已用满 ${MAX_BEAUTIFY_ROUNDS} 轮，无法再打回重修`],
+        }
+      }
+      const violations = resumeData.selected_violations?.length
+        ? [`fix these problems from the previous round: ${resumeData.selected_violations.join('; ')}`]
+        : []
+      const notes = resumeData.notes ? [resumeData.notes] : []
+      return { ...state, reviseNotes: [...violations, ...notes] }
+    },
+  })
+}
+
+const finalizeStep = createStep({
+  id: 'finalize',
+  inputSchema: stateSchema,
+  outputSchema: z.custom<{
+    final_round_no: number | null
+    rollback_to: number | null
+    aborted: boolean
+    warnings: string[]
+  }>(() => true),
+  execute: async ({ inputData }) => {
+    await writeStep(inputData.input.pipelineTaskId, 'finalize')
+    return {
+      final_round_no: inputData.finalRoundNo,
+      rollback_to: inputData.rollbackTo,
+      aborted: inputData.aborted,
+      warnings: inputData.warnings,
+    }
+  },
+})
+
+export const assetPipelineWorkflow = createWorkflow({
+  id: 'asset-pipeline',
+  inputSchema,
+  outputSchema: z.custom<{
+    final_round_no: number | null
+    rollback_to: number | null
+    aborted: boolean
+    warnings: string[]
+  }>(() => true),
+})
+  .then(prepareStep)
+  .then(makeRoundStep(0))
+  .then(makeApprovalStep(0))
+  .then(makeRoundStep(1))
+  .then(makeApprovalStep(1))
+  .then(makeRoundStep(2))
+  .then(makeApprovalStep(2))
+  .then(finalizeStep)
+  .commit()

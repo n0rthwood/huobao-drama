@@ -32,8 +32,8 @@ export const AI_STAGES = {
   shot_intent: { vision: true, label: '分镜设计' },
   /** 证据素材语义自动标注：读地图像素 */
   asset_semantics: { vision: true, label: '语义自动标注' },
-  /** 美化保真核验：核对美化图是否保留原件要素 */
-  prop_beautify: { vision: true, label: '美化保真核验' },
+  /** 资产 QC 清单核验（Issue #56）：逐条核对产出图是否满足事实表；结论由程序闸门算，不采信模型 overall */
+  asset_qc: { vision: true, label: '资产 QC 清单核验' },
   /** 史料画像 → 外貌：读画像 */
   portrait_appearance: { vision: true, label: '史料画像补充外貌' },
   /** read_image 工具本身 */
@@ -58,6 +58,10 @@ export const AI_STAGES = {
   narration_writer: { vision: false, label: '旁白写作' },
   /** H3 视频提示词扩写 */
   h3_prompt: { vision: false, label: 'H3 提示词扩写' },
+  /** 资产资料研究（Issue #56）：只产出候选 URL 与许可提示，不抓取、不看图 */
+  asset_research: { vision: false, label: '资产资料研究' },
+  /** 资产事实表（Issue #56）：资料 → 可逐条机检的 must_have / forbidden / tolerances */
+  asset_spec: { vision: false, label: '资产事实表' },
 } as const satisfies Record<string, AiStageSpec>
 
 export type AiStage = keyof typeof AI_STAGES
@@ -83,7 +87,8 @@ export const AI_CALL_SITES: Record<string, AiStage[]> = {
   'services/task-retry.ts': ['script_rewriter', 'storyboard_breaker', 'storyboard_breaker_documentary'],
   'services/adapters/h3-prompt.ts': ['h3_prompt'],
   'services/asset-semantics-auto.ts': ['asset_semantics'],
-  'services/prop-beautify.ts': ['prop_beautify'],
+  // 资产流水线（#56）：资料研究 / 事实表（纯文本）+ QC 清单核验（视觉）
+  'services/asset-pipeline/steps.ts': ['asset_research', 'asset_spec', 'asset_qc'],
   // 补全剩余（#52）：纪录片拆分分镜的续跑，复用同一视觉环节
   'services/storyboard-fill-gaps.ts': ['storyboard_breaker_documentary'],
   'services/portrait-appearance.ts': ['portrait_appearance'],

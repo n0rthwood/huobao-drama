@@ -77,16 +77,32 @@ export function parseHexColor(hex: unknown): Rgb | null {
 
 // ─── 掩膜 ────────────────────────────────────────────────────
 
+/** hueOnly 下的最小彩度：低于此值是灰阶（道路、注记、阴影），通道序没有意义 */
+export const HUE_ONLY_MIN_CHROMA = 24
+
 /**
  * 色域掩膜。单纯的欧氏距离会把灰白纸底也算进浅蓝，所以再加一条**色相方向**判据：
  * 目标色有明显偏色时（最大通道 − 最小通道 ≥ 40），像素必须在同一个通道上同样偏色。
  * 这是实测里「蓝通道 > 150 且 b−r > 60 且 b−g > 30」那条规则的通用化写法。
+ *
+ * `hueOnly`（Issue #56，**只用于上传截图路径**）：Google Earth 这类屏幕截图上，同一条
+ * 水体沿程因地形阴影与水深会从 rgb(80,144,224) 一路压到 rgb(16,48,96)——欧氏距离 172、
+ * 偏色幅度 48，被上面两条判据同时判掉，实测命中率为 0（契约 §8 的遗留缺陷）。
+ * 这种图里真正稳定的是**通道序**（蓝 > 绿 > 红），不是绝对色值。所以 hueOnly 改判：
+ * 通道序与目标一致且本身有足够彩度即算命中，亮度差异一律放行。
+ * 扫描印刷图保持原判据不变——那里颜色是平涂的，放宽只会把别的墨色吃进来。
  */
-export function colorMask(raster: RgbRaster, target: Rgb, tolerance = 90): Uint8Array {
+export function colorMask(
+  raster: RgbRaster,
+  target: Rgb,
+  tolerance = 90,
+  opts: { hueOnly?: boolean } = {},
+): Uint8Array {
   const { width, height, data } = raster
   const mask = new Uint8Array(width * height)
   const channels = [target.r, target.g, target.b]
   const dominant = channels.indexOf(Math.max(...channels))
+  const weakest = channels.indexOf(Math.min(...channels))
   const chroma = Math.max(...channels) - Math.min(...channels)
   const chromatic = chroma >= 40
   // 偏色幅度放宽一半：原图的印刷色比模型报的「蓝」淡，卡得太死会抽不出线
@@ -95,6 +111,15 @@ export function colorMask(raster: RgbRaster, target: Rgb, tolerance = 90): Uint8
     const r = data[p]!
     const g = data[p + 1]!
     const b = data[p + 2]!
+    if (opts.hueOnly) {
+      // 逐像素判断，不分配任何临时数组（分析光栅有 200 万像素量级）
+      const pixelMax = r >= g ? (r >= b ? 0 : 2) : (g >= b ? 1 : 2)
+      const pixelMin = r <= g ? (r <= b ? 0 : 2) : (g <= b ? 1 : 2)
+      if (Math.max(r, g, b) - Math.min(r, g, b) < HUE_ONLY_MIN_CHROMA) continue
+      if (pixelMax !== dominant || pixelMin !== weakest) continue
+      mask[i] = 1
+      continue
+    }
     const dr = r - target.r
     const dg = g - target.g
     const db = b - target.b
@@ -118,6 +143,11 @@ export function colorMask(raster: RgbRaster, target: Rgb, tolerance = 90): Uint8
  *
  * 判据：色相要足够（chroma ≥ 40），且不能是接近纯黑/纯白的无彩色。
  * 不合格时调用方必须记 warning 并留空，交给人工标注。
+ *
+ * Issue #56 放宽（只影响上传截图）：Google Earth 的深水是 rgb(16,48,96) 这种
+ * **又暗又蓝**的色——亮度 53 贴着下限、稍深一点就被 `luma >= 50` 判掉，于是整条洹河
+ * 一个像素都抽不出来。深蓝本身是极可靠的水体标志，所以 `b−r>60 且 b−g>20` 时
+ * 跳过亮度下限。纯黑（b−r=0）与纯白仍然返回 false，既有用例不变。
  */
 export function isExtractableLineColor(color: Rgb): boolean {
   const channels = [color.r, color.g, color.b]
@@ -125,7 +155,9 @@ export function isExtractableLineColor(color: Rgb): boolean {
   const min = Math.min(...channels)
   if (max - min < 40) return false
   const luma = (color.r + color.g + color.b) / 3
-  return luma >= 50 && luma <= 235
+  if (luma > 235) return false
+  if (luma >= 50) return true
+  return color.b - color.r > 60 && color.b - color.g > 20
 }
 
 /**
@@ -322,12 +354,12 @@ export function lineColorCoverage(
   raster: RgbRaster,
   points: Point[],
   target: Rgb,
-  opts: { tolerance?: number; radius?: number } = {},
+  opts: { tolerance?: number; radius?: number; hueOnly?: boolean } = {},
 ): number {
   if (points.length < 2) return 0
   const tolerance = opts.tolerance ?? 110
   const radius = opts.radius ?? 6
-  const mask = colorMask(raster, target, tolerance)
+  const mask = colorMask(raster, target, tolerance, { hueOnly: opts.hueOnly })
   let samples = 0
   let hits = 0
   for (let i = 1; i < points.length; i++) {

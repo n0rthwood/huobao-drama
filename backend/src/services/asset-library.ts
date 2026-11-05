@@ -34,7 +34,7 @@ import {
   type ReferenceImageEntry,
 } from './reference-images.js'
 import { EMPTY_ASSET_NAME_MESSAGE, normalizeAssetName } from './asset-name.js'
-import { fidelityOf } from './prop-beautify.js'
+import { fidelityOf, loadPipelineFidelity } from './asset-pipeline/fidelity.js'
 
 export const ASSET_KINDS: AssetKind[] = ['character', 'scene', 'prop']
 
@@ -229,13 +229,16 @@ export async function loadImageVersions(
     eq(schema.sysTask.status, 'completed'),
     inArray(taskOwnerColumn(kind), rows.map(row => row.id)),
   ))).filter(task => taskOwnerId(kind, task) != null)
+  // 流水线轮次的闸门/人工结论一次性查出来：下面是同步 map，不能在循环里打库
+  const pipelineFidelity = await loadPipelineFidelity(tasks.map(task => task.id))
 
   for (const row of rows) {
     const versions: ImageVersion[] = tasks
       .filter(task => taskOwnerId(kind, task) === row.id)
       .map((task) => {
         const url = task.localPath || task.resultUrl
-        const { fidelity, reason } = fidelityOf(task.params)
+        // 存量版本读 params.fidelity；流水线轮次产出的版本改读闸门/人工结论（Issue #56）
+        const { fidelity, reason } = pipelineFidelity.get(task.id) ?? fidelityOf(task.params)
         return {
           id: task.id,
           url,

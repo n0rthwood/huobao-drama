@@ -18,6 +18,28 @@ export function promptSourceChanged(kind: PromptAssetKind, current: Record<strin
   return PROMPT_SOURCE_FIELDS[kind].some(field => field in updates && (updates[field] ?? '') !== (current[field] ?? ''))
 }
 
+/** 最终提示词的失效来源：字段改值，或资产事实表出了新版本（Issue #56） */
+export type PromptInvalidationSource = 'fields' | 'spec_version'
+
+/**
+ * 统一判定「这次变更要不要让最终提示词失效」，并说明是**哪一类**来源变了。
+ *
+ * 事实表（`asset_spec`）是出图提示词的事实依据：版本一变，旧提示词描述的就是上一版的
+ * 事实，必须重算。`faithful=1` 的证据素材不进生图链路（final-prompt.ts:130 返回 skipped），
+ * 调用方对它不触发失效——本函数只回答「来源变没变」，不做资产属性判断。
+ */
+export function classifyPromptInvalidation(input: {
+  kind: PromptAssetKind
+  current: Record<string, unknown>
+  updates: Record<string, unknown>
+  /** 本次是否产生了新的事实表版本 */
+  specVersionChanged?: boolean
+}): { changed: boolean; source: PromptInvalidationSource | null } {
+  if (promptSourceChanged(input.kind, input.current, input.updates)) return { changed: true, source: 'fields' }
+  if (input.specVersionChanged) return { changed: true, source: 'spec_version' }
+  return { changed: false, source: null }
+}
+
 /**
  * final_prompt 的落库决定：
  * - 请求写入了提示词且与已存值不同 → 以写入为准（'' / null = 清空）；
