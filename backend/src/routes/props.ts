@@ -23,10 +23,10 @@ import {
   SemanticsValidationError,
 } from '../services/asset-semantics.js'
 import { getSemanticsAutoStatus, startSemanticsAuto } from '../services/asset-semantics-auto.js'
-import { StageVisionUnavailableError } from '../services/ai-stages.js'
-import { beautifyPrompt, sizeBucketFor, watchBeautifyTask } from '../services/prop-beautify.js'
+import { resolveStageModel, StageVisionUnavailableError } from '../services/ai-stages.js'
+import { MapSpecValidationError, normalizeMapSpec, parseMapSpec } from '../services/map-base-render.js'
+import { renderAndRegisterMapBase, suggestMapPlaces } from '../services/asset-pipeline/map-asset.js'
 import { getAbsolutePath } from '../utils/storage.js'
-import sharp from 'sharp'
 
 const app = new Hono()
 // 道具图：白底单品静物，方形画布
@@ -288,44 +288,82 @@ app.get('/:id/semantics/auto/status', async (c) => {
   return success(c, await getSemanticsAutoStatus(id))
 })
 
-/**
- * POST /props/:id/beautify — 以原图为第 1 参考图走 image_edit，产出**派生版本**。
- * 原图与语义标注都不动；落地后自动做保真核验，结论写进该版本行的 params.fidelity。
- */
-app.post('/:id/beautify', async (c) => {
+// ─── 地图底图（Issue #56）────────────────────────────────────
+// 地图/图示类证据素材的几何由程序确定性渲染，扩散模型绝不参与；
+// 这里替换掉 #47 的一次性 `POST /props/:id/beautify`（美化改由资产流水线承担）。
+
+// GET /props/:id/map-spec
+app.get('/:id/map-spec', async (c) => {
+  const [prop] = await db.select().from(schema.props).where(eq(schema.props.id, Number(c.req.param('id'))))
+  if (!prop) return badRequest(c, '道具不存在')
+  return success(c, { map_spec: parseMapSpec(prop.mapSpec) })
+})
+
+// PUT /props/:id/map-spec
+app.put('/:id/map-spec', async (c) => {
   const id = Number(c.req.param('id'))
   const body = await c.req.json()
   const [prop] = await db.select().from(schema.props).where(eq(schema.props.id, id))
   if (!prop) return badRequest(c, '道具不存在')
-  if (!body.episode_id) return badRequest(c, 'episode_id 必填')
-  const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, Number(body.episode_id)))
-  if (!ep) return badRequest(c, '剧集不存在')
-  const base = await resolveSemanticsBase(prop)
-  if (!base.path) return badRequest(c, '该素材还没有原图，无法美化')
-
-  // 派生图必须与原图同画幅，否则语义坐标换算会错位
-  const meta = await sharp(getAbsolutePath(base.path)).metadata()
-  const size = meta.width && meta.height ? sizeBucketFor(meta.width, meta.height) : PROP_IMAGE_SIZE
-  // 不拼项目风格预设：documentary-archival 的 `no lettering` 会让模型抹掉地名
-  const prompt = String(body.prompt || '').trim() || beautifyPrompt(prop.name, prop.description)
   try {
-    logTaskStart('Beautify', 'generate', { propId: id, episodeId: ep.id, size, base: base.path })
-    const genId = await generateImage({
+    const spec = normalizeMapSpec(body.map_spec)
+    await db.update(schema.props)
+      .set({ mapSpec: JSON.stringify(spec), updatedAt: now() })
+      .where(eq(schema.props.id, id))
+    return success(c, { map_spec: spec })
+  } catch (err) {
+    if (err instanceof MapSpecValidationError) return badRequest(c, err.message)
+    throw err
+  }
+})
+
+// POST /props/:id/map-render — 渲染底图、登记成原件版本、按投影写语义
+app.post('/:id/map-render', async (c) => {
+  const id = Number(c.req.param('id'))
+  const body = await c.req.json()
+  const [prop] = await db.select().from(schema.props).where(eq(schema.props.id, id))
+  if (!prop) return badRequest(c, '道具不存在')
+  const raw = body.map_spec ?? prop.mapSpec
+  if (!raw) return badRequest(c, '该道具还没有地图规格（map_spec）')
+  try {
+    const spec = typeof raw === 'string' ? normalizeMapSpec(JSON.parse(raw)) : normalizeMapSpec(raw)
+    const result = await renderAndRegisterMapBase({
       propId: id,
-      episodeId: ep.id,
-      dramaId: prop.dramaId,
-      prompt,
-      model: body.model,
-      size,
-      referenceImages: [base.path],
-      configId: body.config_id ?? ep.imageConfigId ?? undefined,
+      spec,
+      width: body.width ? Number(body.width) : undefined,
     })
-    void watchBeautifyTask(genId)
-    return success(c, { image_generation_id: genId, base_image_url: base.path, size })
-  } catch (err: unknown) {
+    return success(c, result)
+  } catch (err) {
+    if (err instanceof MapSpecValidationError) return badRequest(c, err.message)
     const message = err instanceof Error ? err.message : String(err)
-    logTaskError('Beautify', 'generate', { propId: id, error: message })
-    return badRequest(c, message)
+    logTaskError('MapBase', 'render', { propId: id, error: message })
+    throw err
+  }
+})
+
+/**
+ * POST /props/:id/map-suggest — AI 建议地点经纬度。
+ * 返回的一律是**候选**（`proposed: true`）：人工勾选确认后前端才写进 map_spec。
+ * 坐标是关键选择，不允许模型直接落库（用户确认的「关键选择显式」）。
+ */
+app.post('/:id/map-suggest', async (c) => {
+  const id = Number(c.req.param('id'))
+  const body = await c.req.json()
+  const [prop] = await db.select().from(schema.props).where(eq(schema.props.id, id))
+  if (!prop) return badRequest(c, '道具不存在')
+  const names: string[] = Array.isArray(body.names) ? body.names.map(String).filter(Boolean) : []
+  if (!names.length) return badRequest(c, '请先填写要定位的地名（names）')
+  try {
+    const places = await suggestMapPlaces({
+      name: prop.name,
+      description: prop.description,
+      names,
+      textConfigId: body.text_config_id ?? undefined,
+    })
+    return success(c, { places })
+  } catch (err) {
+    if (err instanceof StageVisionUnavailableError) return badRequest(c, err.message)
+    return badRequest(c, err instanceof Error ? err.message : '建议坐标失败')
   }
 })
 

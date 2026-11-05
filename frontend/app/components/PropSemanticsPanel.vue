@@ -9,15 +9,10 @@
         <Wand2 v-else :size="11" />
         {{ autoRunning ? t('episode.documentary.semantics.autoRunning') : t('episode.documentary.semantics.auto') }}
       </button>
-      <button class="sem-toggle" type="button" :disabled="beautifying || !baseImageUrl" @click.stop="runBeautify">
-        <Loader2 v-if="beautifying" :size="11" class="animate-spin" />
-        <Sparkles v-else :size="11" />
-        {{ beautifying ? t('episode.documentary.semantics.beautifying') : t('episode.documentary.semantics.beautify') }}
-      </button>
     </div>
 
     <p class="sem-notice">{{ t('episode.documentary.semantics.hint') }}</p>
-    <p class="sem-note">{{ t('episode.documentary.semantics.beautifyHint') }}</p>
+    <p class="sem-note">{{ t('episode.documentary.pipeline.semanticsHint') }}</p>
     <p class="sem-note">{{ t('episode.documentary.semantics.noEditorHint') }}</p>
 
     <p v-if="loading" class="sem-note">{{ t('episode.documentary.semantics.loading') }}</p>
@@ -194,11 +189,10 @@
  * 美化版本只是派生物，必须通过忠实度校验才能当底图，所以校验失败的版本在这里不可选。
  * 面板只做「清单 + 叠加预览」：几何编辑（拖点/改线）属于图层编辑器（Issue #48），这里不做。
  */
-import { Loader2, Sparkles, Wand2, X } from 'lucide-vue-next'
+import { Loader2, Wand2, X } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { propAPI } from '~/composables/useApi'
-import { toastError } from '~/composables/useToast'
 
 const { t } = useI18n()
 
@@ -229,7 +223,6 @@ const saveError = ref('')
 const autoRunning = ref(false)
 const autoError = ref('')
 const warnings = ref([])
-const beautifying = ref(false)
 const switchingSource = ref(false)
 const sourceError = ref('')
 const naturalSize = ref({ width: 0, height: 0 })
@@ -459,19 +452,6 @@ function pollAuto(left = 200) {
       autoError.value = err?.message || t('episode.documentary.semantics.autoFailed')
     }
   }, 3000)
-}
-
-async function runBeautify() {
-  if (beautifying.value || !baseImageUrl.value) return
-  beautifying.value = true
-  try {
-    await propAPI.beautify(props.propId, Number(props.episodeId))
-    if (!stopped) toast.success(t('episode.documentary.semantics.beautifyStarted'))
-  } catch (err) {
-    toastError(err)
-  } finally {
-    if (!stopped) beautifying.value = false
-  }
 }
 
 async function pickSource(version) {

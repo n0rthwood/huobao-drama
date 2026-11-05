@@ -31,6 +31,7 @@ import research from './routes/research.js'
 import posters from './routes/posters.js'
 import layerDocs from './routes/layer-docs.js'
 import clips from './routes/clips.js'
+import assetPipeline from './routes/asset-pipeline.js'
 import { requestLogger, errorHandler } from './middleware/logger.js'
 import { db, schema } from './db/index.js'
 import { and, eq, isNull, ne, or } from 'drizzle-orm'
@@ -38,6 +39,7 @@ import { now } from './utils/response.js'
 import { DATA_ROOT } from './utils/paths.js'
 import { resumeVideoBatches } from './services/video-batch.js'
 import { resumeKeyframeBatches } from './services/keyframe-batch.js'
+import { resumeAssetPipelines } from './services/asset-pipeline/run.js'
 import { startQwenJobsTracker } from './services/qwen-jobs.js'
 import { QWEN_JOBS_PROVIDER } from './services/sys-task.js'
 import { backfillTaskEpisodeIds, failInterruptedTextTasks } from './services/task-center.js'
@@ -106,6 +108,7 @@ api.route('/media-library', mediaLibrary)
 api.route('/research', research)
 api.route('/layer-docs', layerDocs)
 api.route('/clips', clips)
+api.route('/asset-pipeline', assetPipeline)
 
 app.route('/api/v1', api)
 
@@ -166,6 +169,8 @@ db.update(schema.sysTask)
   .then(() => startQwenJobsTracker())
   .then(() => resumeKeyframeBatches())
   .then(() => resumeVideoBatches())
+  // 资产流水线恢复（Issue #56）：suspended 的 run 保持等待人工，running 的原地重放
+  .then(() => resumeAssetPipelines())
   // 叠加图层渲染字体自检（Issue #48）：失败只告警，渲染时才阻断（绝不出豆腐块）
   .then(() => logLayerFontStatus())
 

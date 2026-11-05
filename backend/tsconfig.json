@@ -1,6 +1,10 @@
 {
   "compilerOptions": {
     "target": "ES2022",
+    // 运行时是 Node 22：Promise.withResolvers 等 ES2024 内置可用，类型也按 ES2024 给。
+    // DOM 是默认 lib（lib.es2022.full）里本来就有的那一份，显式写 lib 后必须补回来，
+    // 否则 @types/node 依赖的 BodyInit/Response 等全局类型会消失。
+    "lib": ["ES2024", "DOM"],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "esModuleInterop": true,

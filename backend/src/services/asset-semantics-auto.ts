@@ -47,6 +47,7 @@ import {
   maskToPolyline,
   isExtractableLineColor,
   lineMaskQuality,
+  largestComponent,
   MAX_LINE_JUMP,
   MAX_LINE_THICKNESS,
   parseHexColor,
@@ -332,10 +333,29 @@ export async function runSemanticsPipeline(input: {
       warnings.push(`「${seed.name}」的颜色 ${seed.color} 是黑/白/灰，与图上的文字和其它墨迹无法区分，不能按色域抽线，未写入 lines，请人工标注`)
       continue
     }
-    const extracted = extractLine(raster, color, seed.endpoints)
+    // 上传截图（Google Earth 等屏幕捕获）里同一条水体沿程亮度跨度极大，严格色域判据
+    // 一个像素都命中不了（Issue #56 验收 10）。先按原判据抽，抽不出再按「同通道序」
+    // 的放宽判据重试一次——扫描印刷图通常第一次就成功，不受影响。
+    let extracted = extractLine(raster, color, seed.endpoints)
+    let relaxed = false
+    if ('reason' in extracted) {
+      const strictReason = extracted.reason
+      const retry = extractLine(raster, color, seed.endpoints, { hueOnly: true })
+      if ('reason' in retry) {
+        // 两条判据都没抽出来：把**两个**理由都写出来，否则看到的永远是严格判据那一条，
+        // 排查时完全看不出放宽后卡在了哪一步
+        extracted = { reason: `严格色域「${strictReason}」；放宽后「${retry.reason}」` }
+      } else {
+        extracted = retry
+        relaxed = true
+      }
+    }
     if ('reason' in extracted) {
       warnings.push(`「${seed.name}」按颜色 ${seed.color} 抽线失败：${extracted.reason}；未写入 lines，请人工标注`)
       continue
+    }
+    if (relaxed) {
+      warnings.push(`「${seed.name}」按严格色域抽不到线，已按截图放宽判据（同通道序 + 最小彩度）重新抽取，请人工核对走向`)
     }
     // 勉强过关的几何仍然留作草稿，但必须显式标出来（评审决议）：
     // 用户确认的方案是「VLM + CV + 人工修正」，所以不删，只标 needs_review 并进 warnings
@@ -429,8 +449,9 @@ function extractLine(
   raster: RgbRaster,
   color: { r: number; g: number; b: number },
   endpoints: Point[],
+  opts: { hueOnly?: boolean } = {},
 ): { points: Point[]; quality: { thickness: number; jump: number } } | { reason: string } {
-  const mask = colorMask(raster, color)
+  let mask = colorMask(raster, color, 90, { hueOnly: opts.hueOnly })
   if (endpoints.length >= 2) {
     const pad = Math.round(Math.max(raster.width, raster.height) * 0.08)
     const x0 = Math.min(endpoints[0]![0], endpoints[1]![0]) - pad
@@ -444,6 +465,8 @@ function extractLine(
       if (x < x0 || x > x1 || y < y0 || y > y1) mask[i] = 0
     }
   }
+  // 放宽判据必然连带选中画面上其它同色水体：先只留最大连通块，再交给原来的质量判据
+  if (opts.hueOnly) mask = largestComponent(mask, raster.width, raster.height)
   const raw = maskToPolyline(mask, raster.width)
   const polyline = simplifyPolyline(raw, 3)
   if (polyline.length < 2) return { reason: '该色域下取不到足够的采样点' }

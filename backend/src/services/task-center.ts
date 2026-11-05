@@ -31,15 +31,27 @@ export { composeEpisodeLabel, composeTaskLabel, renderRefPrompt } from './task-l
 
 // ─── 启动维护 ─────────────────────────────────────────────────
 
-/** 重启打断的文本任务：执行线程已丢失，统一标记为失败（不自动重跑） */
+/**
+ * 重启打断的文本任务：执行线程已丢失，统一标记为失败（不自动重跑）。
+ *
+ * **例外：`asset_pipeline`（Issue #56）**。它的 run 容器可以合法地长时间停在
+ * 「等待人工审批」上——执行线程本来就不在跑，快照在 `data/mastra-workflows.db` 里，
+ * 重启后由 `resumeAssetPipelines()` 接管。漏掉这个排除项，每次重启都会把
+ * 等待审批的 run 全判死（Issue #56 风险 2，验收 4 的必查项）。
+ */
 export async function failInterruptedTextTasks(): Promise<void> {
-  const res = await db.update(schema.sysTask)
+  const active = await db.select().from(schema.sysTask).where(and(
+    eq(schema.sysTask.type, 'text'),
+    inArray(schema.sysTask.status, ACTIVE_TASK_STATUSES),
+  ))
+  const ids = active
+    .filter(row => parseTextTaskParams(row.params)?.kind !== 'asset_pipeline')
+    .map(row => row.id)
+  if (!ids.length) return
+  await db.update(schema.sysTask)
     .set({ status: 'failed', errorMsg: '后端重启中断', updatedAt: now() })
-    .where(and(eq(schema.sysTask.type, 'text'), inArray(schema.sysTask.status, ACTIVE_TASK_STATUSES)))
-  const affected = typeof res === 'object' && res !== null && 'changes' in res && typeof res.changes === 'number'
-    ? res.changes
-    : 0
-  if (affected > 0) console.log(`🔁 已标记 ${affected} 个中断的文本任务为失败`)
+    .where(inArray(schema.sysTask.id, ids))
+  console.log(`🔁 已标记 ${ids.length} 个中断的文本任务为失败`)
 }
 
 /** 存量任务补归属集：分镜任务可由 storyboard_id 反查 */

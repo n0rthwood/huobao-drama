@@ -945,6 +945,28 @@
                 @update="onAssetSemanticsUpdate(assetDetail.item, $event)"
                 @preview="openImageViewer"
               />
+              <!-- 地图确定性底图（Issue #56）：几何由 d3-geo 渲染，扩散模型不得重画地理形状 -->
+              <MapSpecPanel
+                :key="`mapspec-${assetDetail.item.id}`"
+                :prop-id="assetDetail.item.id"
+                :episode-id="epId"
+              />
+            </section>
+
+            <!-- 资产「精确→美化」流水线（Issue #56）：三类资产通用，闸门结论由后端计算 -->
+            <section class="asset-detail-ref-panel">
+              <div class="asset-detail-section-title">
+                <span>{{ t('episode.documentary.pipeline.sectionTitle') }}</span>
+                <span class="dim">{{ t('episode.documentary.pipeline.sectionHint') }}</span>
+              </div>
+              <AssetPipelinePanel
+                :key="`pipeline-${assetDetail.type}-${assetDetail.item.id}`"
+                :asset-kind="assetDetail.type"
+                :asset-id="assetDetail.item.id"
+                :episode-id="epId"
+                :asset-name="assetDetail.item.name"
+                @preview="openImageViewer"
+              />
             </section>
 
             <section class="asset-detail-ref-panel">
@@ -1480,6 +1502,8 @@ import LocaleSwitcher from '~/components/LocaleSwitcher.vue'
 import ReferenceImageManager from '~/components/ReferenceImageManager.vue'
 import ArchivalImagePanel from '~/components/ArchivalImagePanel.vue'
 import PropSemanticsPanel from '~/components/PropSemanticsPanel.vue'
+import AssetPipelinePanel from '~/components/AssetPipelinePanel.vue'
+import MapSpecPanel from '~/components/MapSpecPanel.vue'
 import ResearchCitationList from '~/components/ResearchCitationList.vue'
 import FinalPromptSourceBadge from '~/components/FinalPromptSourceBadge.vue'
 import MediaLibraryDialog from '~/components/MediaLibraryDialog.vue'

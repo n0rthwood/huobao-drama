@@ -20,7 +20,9 @@
     "@ai-sdk/openai": "^3.0.48",
     "@hono/node-server": "^1.19.11",
     "@mastra/core": "^1.17.0",
+    "@mastra/libsql": "^1.29.0",
     "better-sqlite3": "^12.4.1",
+    "d3-geo": "^3.1.2",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.1",
     "ffmpeg-static": "^5.3.0",
@@ -35,6 +37,7 @@
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
+    "@types/d3-geo": "^3.1.1",
     "@types/fluent-ffmpeg": "^2.1.28",
     "@types/node": "^25.5.0",
     "@types/uuid": "^10.0.0",
