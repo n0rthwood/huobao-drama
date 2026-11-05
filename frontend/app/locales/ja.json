@@ -1135,6 +1135,7 @@
       "issue": {
         "combo_missing": "セグメント構成が未選択です",
         "budget_over_layer": "レイヤーセグメントが 30 秒の上限を超えています",
+        "budget_missing": "有効な各セグメントの尺予算を入力してください",
         "budget_over_gen": "生成セグメントが 15 秒の上限を超えています",
         "budget_under_narration": "合計尺がナレーションに足りません。セグメントを伸ばすか画面を整理してください",
         "missing_base": "レイヤーセグメントにベース画像がありません",

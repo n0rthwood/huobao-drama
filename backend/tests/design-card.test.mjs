@@ -130,6 +130,23 @@ test('规范化：非法组合与非法图层类型一律丢弃，绝不回落�
   assert.equal(got.parsed, null, '坏 JSON 不抛错')
 })
 
+test('缺失预算单独阻断，不把 null 当零秒超支；显式零仍按真实预算校验', () => {
+  const got = run(`${CTX}
+    const card = normalizeDesignCard({ budget: { layer_s: null, gen_s: null } }, ctx)
+    const codes = combo => validateDesignCard({ card, combo, narrationText: '旁白', measuredSeconds: 15.7 }).map(i => i.code)
+    const missing = codes('A')
+    const noCombo = codes(null)
+    card.budget.layer_s = 0
+    out({ missing, noCombo, zero: codes('A') })
+  `)
+  assert.ok(got.missing.includes('budget_missing'))
+  assert.ok(!got.missing.includes('budget_under_narration'))
+  assert.ok(!got.missing.includes('budget_tight'))
+  assert.ok(!got.noCombo.includes('budget_under_narration'))
+  assert.ok(got.zero.includes('budget_under_narration'))
+  assert.ok(!got.zero.includes('budget_missing'))
+})
+
 test('校验阻断码：未选组合 / 预算超限 / 装不下旁白 / 缺底图 / 缺生成段槽位', () => {
   const got = run(`${CTX}${FULL_CARD}
     const card = normalizeDesignCard(raw, ctx)
