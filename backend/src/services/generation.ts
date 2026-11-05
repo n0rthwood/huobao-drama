@@ -17,6 +17,7 @@ import { completionStamp } from './media-time.js'
 import { saveStylingVersion } from './styling-version.js'
 import { onAssetLibraryChanged } from './asset-review.js'
 import { resolveDramaProjectType } from './project-type.js'
+import type { ReferenceOrigin } from './asset-pipeline/references.js'
 import {
   buildImageJobBody,
   cancelQwenJob,
@@ -84,6 +85,8 @@ interface GenerateImageParams extends TaskOriginParams {
   model?: string
   size?: string
   referenceImages?: string[]
+  /** Audit-only identities aligned with referenceImages; not passed to the provider. */
+  pipelineReferenceOrigins?: ReferenceOrigin[]
   frameType?: string
   configId?: number
   /**
@@ -153,6 +156,7 @@ export async function generateImage(params: GenerateImageParams): Promise<number
     referenceImages: params.referenceImages,
     characterVersion: params.characterVersion,
     ...(params.pipelineRound ? { pipeline_round: true } : {}),
+    ...(params.pipelineReferenceOrigins ? { pipeline_reference_origins: params.pipelineReferenceOrigins } : {}),
     ...originParams(params),
   })
 
