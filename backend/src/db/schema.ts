@@ -67,6 +67,12 @@ export const episodes = sqliteTable('episodes', {
   // 'draft' = 提取 Agent 首轮生成、待人复核；'approved' = 人已复核保存
   characterRosterStatus: text('character_roster_status'),
   characterRosterUpdatedAt: text('character_roster_updated_at'),
+  // 纪录片工作流门禁（#54）：旁白稿确认时间；NULL = 未确认 → 拆分/补镜/AI 填卡被服务端拦截
+  scriptConfirmedAt: text('script_confirmed_at'),
+  // 资产审核清单状态：none|running|pending|passed（R2 写值）；只有 passed 解锁分镜设计
+  assetReviewStatus: text('asset_review_status').notNull().default('none'),
+  // 审核通过后资产库又变更的原因（JSON 数组）：只做横幅提示，不回退 passed
+  assetReviewStaleReasons: text('asset_review_stale_reasons'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
   deletedAt: text('deleted_at'),

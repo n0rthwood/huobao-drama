@@ -1,7 +1,7 @@
 <template>
   <div class="cw-root">
     <div class="prod-section-bar">
-      <span class="dim" style="font-size:12px">{{ t('episode.prod.layers') }}</span>
+      <span class="dim" style="font-size:12px">{{ t('episode.prod.production') }}</span>
       <span class="tag mono">{{ t('episode.clip.shotCount', { n: shots.length }) }}</span>
       <span v-if="spec" class="tag mono">{{ t('episode.clip.spec', { w: spec.width, h: spec.height, fps: spec.fps }) }}</span>
       <span v-if="spec && spec.source === 'default'" class="dim" style="font-size:11px">{{ t('episode.clip.specDefault') }}</span>

@@ -1,7 +1,7 @@
 <template>
   <div class="prod-content si-step">
     <div class="si-bar">
-      <span class="dim" style="font-size:12px">{{ t('episode.prod.expression') }}</span>
+      <span class="dim" style="font-size:12px">{{ t('episode.prod.design') }}</span>
       <span class="tag mono">{{ t('episode.intent.confirmedCount', { done: confirmedCount, total: storyboards.length }) }}</span>
       <span v-if="unresolvedCount" class="tag mono si-tag-warn">{{ t('episode.intent.unresolvedCount', { n: unresolvedCount }) }}</span>
       <div class="ml-auto flex gap-1">

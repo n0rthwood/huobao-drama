@@ -865,7 +865,7 @@
       "production": "Production",
       "assets": "Assets",
       "assetsDesc": "Characters / scenes / props",
-    "posterDesc": "Optional: poster base image and text layout",
+      "posterDesc": "Optional: poster base image and text layout",
       "keyframes": "Shot Keyframes",
       "keyframesDesc": "First / mid / last keyframes and confirmation",
       "videos": "Video Production",
@@ -881,8 +881,9 @@
       "narrationScript": "Narration script",
       "narrationScriptDesc": "Documentary narration editing (the script IS the narration)",
       "evidenceAssetsDesc": "Characters / scenes / evidence assets",
-      "expressionDesc": "What each shot tells and how it is shown",
-      "layersDesc": "Map annotations and graphic overlay layers"
+      "designDesc": "Director's shot sheet: what each shot tells, how it is made, which later step it drives",
+      "productionDesc": "Layer segment and generated segment are built on one page",
+      "finalDesc": "Per shot: layer segment / generated segment / composite"
     },
     "script": {
       "raw": "Raw Content",
@@ -898,7 +899,14 @@
       "rewriting": "Rewriting the script...",
       "scriptPlaceholder": "Formatted script content...",
       "rawRequired": "Please fill in the raw content first",
-      "skipDone": "AI rewrite skipped; the raw content will be used directly"
+      "skipDone": "AI rewrite skipped; the raw content will be used directly",
+      "confirm": "Confirm narration script",
+      "confirmed": "Narration script confirmed",
+      "unconfirm": "Unconfirm",
+      "confirmHint": "Splitting shots needs a confirmed script; editing it unconfirms automatically",
+      "confirmedAt": "Confirmed at {at}",
+      "autoUnconfirmed": "Script changed — confirmation was cleared automatically",
+      "emptyScript": "The narration script is empty and cannot be confirmed"
     },
     "assetBatch": {
       "title": {
@@ -940,7 +948,7 @@
     },
     "prod": {
       "assets": "Asset Production",
-    "poster": "Poster",
+      "poster": "Poster",
       "keyframes": "Shot Keyframes",
       "videos": "Video Production",
       "notReady": "Not ready yet",
@@ -960,8 +968,9 @@
       "startExtract": "Start Extraction",
       "scriptFirst": "Please finish the script first",
       "goBack": "Go back",
-      "expression": "Expression design",
-      "layers": "Layers"
+      "design": "Shot design",
+      "production": "Shot production",
+      "final": "Video & final cut"
     },
     "intent": {
       "confirmedCount": "{done}/{total} confirmed",
@@ -1723,17 +1732,17 @@
       "normalizeOff": "Off"
     },
     "compose": {
-      "section": "Shot fusion",
+      "section": "Shot composite",
       "composeShot": "Compose shot",
       "recompose": "Recompose",
       "applyCompose": "Apply settings and compose",
-      "doneSec": "Fusion done — {sec}s output",
-      "failed": "Fusion failed",
+      "doneSec": "Composite done — {sec}s output",
+      "failed": "Composite failed",
       "none": "Not composed yet",
       "needVideo": "This shot has no video yet",
       "duration": "Output length {sec}s",
       "durationNote": "Length follows the measured voice track (max 15s)",
-      "listPrefix": "Fusion: ",
+      "listPrefix": "Composite: ",
       "statusDisabled": "Not applicable",
       "statusMissing": "To compose",
       "statusChanged": "Inputs changed",
@@ -1758,20 +1767,20 @@
         "audioMissing": "No voice track",
         "subtitleMissing": "No subtitle"
       },
-      "batch": "Batch fusion",
-      "batchOpenRunning": "View fusion progress",
+      "batch": "Batch composite",
+      "batchOpenRunning": "View composite progress",
       "batchSelected": "Fuse {n} selected",
-      "batchProgress": "Fusion {done}/{total}",
+      "batchProgress": "Composite {done}/{total}",
       "batchStarted": "Fusing {n} shots",
-      "batchDone": "Batch fusion done",
-      "batchDoneFailed": "Batch fusion finished with {n} failures",
-      "batchAlreadyRunning": "A batch fusion is already running",
+      "batchDone": "Batch composite done",
+      "batchDoneFailed": "Batch composite finished with {n} failures",
+      "batchAlreadyRunning": "A batch composite is already running",
       "mergeSkippedToast": "{n} shots were skipped in this merge",
       "skippedTitle": "Shots skipped in this merge",
       "skippedItem": "#{n} · {reason}"
     },
     "composeBatch": {
-      "title": "Batch fusion",
+      "title": "Batch composite",
       "scopeEpisode": "Scope: whole episode",
       "scopeSelected": "Scope: {n} selected shots",
       "scopeWhole": "Use whole episode",
@@ -1784,11 +1793,11 @@
       "emptyScope": "No shots in this scope",
       "forceRemake": "Force remake",
       "rule": "Only shots that are not composed yet or whose inputs changed are checked by default. “Up to date” must be checked manually to force a remake, and blocked shots need their reason fixed first. Only checked shots are submitted, and the server re-validates before running.",
-      "start": "Start fusion ({n})",
-      "runningHint": "A batch fusion is already running",
-      "taskRunning": "Batch fusion running",
-      "taskDone": "Batch fusion finished",
-      "taskFailed": "Batch fusion failed",
+      "start": "Start composite ({n})",
+      "runningHint": "A batch composite is already running",
+      "taskRunning": "Batch composite running",
+      "taskDone": "Batch composite finished",
+      "taskFailed": "Batch composite failed",
       "progressCount": "{done}/{total}",
       "progressFailed": "{n} failed",
       "progressSkipped": "{n} skipped",
@@ -1887,7 +1896,7 @@
       "blockedToast": "{n} selected shots cannot be merged — fix them or change the selection",
       "selectReadyOnly": "Select ready only ({n})",
       "selectReadyOnlyTitle": "Narrow the selection to shots that can be merged right now",
-      "repairFusion": "Batch fusion ({n})",
+      "repairFusion": "Batch composite ({n})",
       "confirmTitle": "Confirm merge export",
       "confirmIncluded": "{n} shots included",
       "confirmExcluded": "{n} shots excluded",
@@ -1895,13 +1904,13 @@
       "confirmStart": "Merge {n} shots",
       "confirmNote": "Only the included shots are merged. If their state changed meanwhile the server refuses with a reason instead of silently dropping shots.",
       "empty": "No films yet. Select shots below and click “Merge Selected”.",
-    "posterTitle": "Poster Intro",
-    "posterHint": "Optional: prepend the poster as a static first frame",
-    "posterEnable": "Add poster intro",
-    "posterVersion": "Version {n}",
-    "posterDuration": "Duration",
-    "posterSeconds": "s",
-    "posterNone": "No poster for this episode yet; this step can be skipped",
+      "posterTitle": "Poster Intro",
+      "posterHint": "Optional: prepend the poster as a static first frame",
+      "posterEnable": "Add poster intro",
+      "posterVersion": "Version {n}",
+      "posterDuration": "Duration",
+      "posterSeconds": "s",
+      "posterNone": "No poster for this episode yet; this step can be skipped",
       "shotAssets": "Shot Assets",
       "shotStat": "{done}/{total} generated · {selected} selected",
       "clearSelection": "Clear Selection",
@@ -2069,6 +2078,36 @@
       "running": "A breakdown/fill task is already running for this episode",
       "started": "Filling {n} remaining gap(s); follow it in the task center",
       "failed": "Failed to fill the remaining gaps"
+    },
+    "assets": {
+      "tabCards": "Asset cards",
+      "tabReview": "Review checklist"
+    },
+    "gate": {
+      "locked": "Locked",
+      "checking": "Checking step gates…",
+      "lockedTooltip": "{reason}",
+      "goFix": "Go fix it",
+      "needScript": "Narration script is not confirmed yet",
+      "needAssetReview": "Asset review checklist has not passed",
+      "needDesign": "No confirmed shot design yet",
+      "needProduction": "No shot is production-ready yet",
+      "needFinal": "No up-to-date composite yet",
+      "optional": "Optional · not in the chain"
+    },
+    "assetReview": {
+      "emptyTitle": "Review has not started",
+      "emptyDesc": "The checklist lists every info point → required asset → have/missing; shot design unlocks once all items are resolved.",
+      "start": "Start review",
+      "startDisabled": "Available once the asset review checklist ships",
+      "statusLabel": "Checklist status: {status}",
+      "statusNone": "Not started",
+      "statusRunning": "Running",
+      "statusPending": "Pending decisions",
+      "statusPassed": "Passed"
+    },
+    "finalStep": {
+      "placeholderTitle": "This shot is not ready for the final cut yet"
     }
   },
   "poster": {
@@ -2077,7 +2116,9 @@
     "saving": "Saving…",
     "stageMeta": "{size} · {ratio}",
     "finalReady": "Final version set",
-    "stage": { "empty": "Pick or generate a base image to start layout" },
+    "stage": {
+      "empty": "Pick or generate a base image to start layout"
+    },
     "reference": {
       "title": "Pick asset images from this episode as references",
       "selected": "{n}/{max} selected",
@@ -2085,7 +2126,11 @@
       "empty": "No asset images for this episode yet",
       "orderHint": "Sent in selection order, up to 9 images",
       "confirm": "Use selected ({n})",
-      "kind": { "character": "Character", "scene": "Scene", "prop": "Prop" }
+      "kind": {
+        "character": "Character",
+        "scene": "Scene",
+        "prop": "Prop"
+      }
     },
     "tools": {
       "add": "Add text layer",
@@ -2111,8 +2156,17 @@
       "align": "Align",
       "newText": "Edit this text"
     },
-    "font": { "sans": "Sans", "serif": "Serif", "kai": "Kai", "hand": "Handwriting" },
-    "align": { "left": "Left", "center": "Center", "right": "Right" },
+    "font": {
+      "sans": "Sans",
+      "serif": "Serif",
+      "kai": "Kai",
+      "hand": "Handwriting"
+    },
+    "align": {
+      "left": "Left",
+      "center": "Center",
+      "right": "Right"
+    },
     "generate": {
       "title": "Generation and layout",
       "prompt": "Visual prompt",
@@ -2137,7 +2191,10 @@
     "versions": {
       "title": "Versions ({n})",
       "empty": "No versions yet",
-      "kind": { "generate": "Generated", "composite": "Composite" },
+      "kind": {
+        "generate": "Generated",
+        "composite": "Composite"
+      },
       "final": "Final",
       "select": "Set final",
       "useBase": "Use as editing base",
@@ -2145,7 +2202,11 @@
     },
     "toast": {
       "refsSaved": "References saved ({n})",
-      "started": { "initial": "Base image generation submitted", "composite": "Composite regeneration submitted", "layers": "Base + text layer regeneration submitted" },
+      "started": {
+        "initial": "Base image generation submitted",
+        "composite": "Composite regeneration submitted",
+        "layers": "Base + text layer regeneration submitted"
+      },
       "failed": "Poster operation failed",
       "compositeSaved": "Composite saved as final version; episode thumbnail updated",
       "selected": "Set as final version ({n}); episode thumbnail updated",

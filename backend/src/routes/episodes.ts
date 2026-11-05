@@ -11,6 +11,13 @@ import { isKeyframeSlot, keyframesJson, loadEpisodeKeyframes, type KeyframeSlot 
 import { parseStylingVersion } from '../services/styling-version.js'
 import { resolveDramaProjectType } from '../services/project-type.js'
 import {
+  assertGate,
+  confirmScript,
+  episodeGates,
+  onScriptChanged,
+  unconfirmScript,
+} from '../services/workflow-gates.js'
+import {
   cancelEpisodeVideoBatch,
   getEpisodeVideoBatch,
   previewEpisodeVideoBatch,
@@ -194,7 +201,17 @@ app.put('/:id', async (c) => {
     drizzleUpdates.narrationSpine = spine || null
   }
   if ('narration_normalize' in updates) drizzleUpdates.narrationNormalize = updates.narration_normalize === true
+  // 剧本正文/旁白稿真的变了才触发 script_changed（#54）：同值重存不取消确认
+  const scriptFields: ('content' | 'scriptContent')[] = []
+  if ('content' in drizzleUpdates) scriptFields.push('content')
+  if ('scriptContent' in drizzleUpdates) scriptFields.push('scriptContent')
+  let scriptChanged = false
+  if (scriptFields.length) {
+    const [before] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, id))
+    scriptChanged = !!before && scriptFields.some(f => (before[f] || '') !== (drizzleUpdates[f] || ''))
+  }
   await db.update(schema.episodes).set(drizzleUpdates).where(eq(schema.episodes.id, id))
+  if (scriptChanged) await onScriptChanged(id, 'PUT /episodes/:id 改写剧本正文或旁白稿')
   return success(c)
 })
 
@@ -287,6 +304,9 @@ app.post('/:id/extract', async (c) => {
   if (!EXTRACT_TARGETS.includes(target)) return badRequest(c, 'target 必须是 characters / scenes / props')
   const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, id))
   if (!ep) return notFound(c, '剧集不存在')
+  // 门禁（#54）：资产提取属于「资产」步，剧本未确认先拦；
+  // 资产生图/美化流水线不拦——资产是项目级、可跨集复用，不属于本集步骤链。
+  await assertGate(id, 'assets')
   const started = await startExtraction(ep.id, ep.dramaId, target, { model: body.model || undefined, configId: body.config_id ?? undefined })
   return success(c, { target, status: 'running', already_running: !started })
 })
@@ -615,6 +635,8 @@ app.post('/:id/generate-intents', async (c) => {
   const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, id))
   if (!ep) return notFound(c, '剧集不存在')
   if (resolveDramaProjectType(ep.dramaId) !== 'documentary') return badRequest(c, '只有纪录片项目才有表达设计')
+  // 门禁（#54）：清单未通过不得 AI 填卡；R4 把本路由改名为 /design-cards/fill 时沿用同一个 assertGate
+  await assertGate(id, 'design')
   const storyboardIds = Array.isArray(body.storyboard_ids)
     ? body.storyboard_ids.map(Number).filter((n: number) => Number.isInteger(n) && n > 0)
     : undefined
@@ -638,6 +660,32 @@ app.get('/:id/narration-coverage', async (c) => {
   return success(c, coverage)
 })
 
+// GET /episodes/:id/gates — 纪录片步骤门禁（#54）：解锁位 + 原因 + 跳转；剧情项目恒全解锁
+app.get('/:id/gates', async (c) => {
+  const id = Number(c.req.param('id'))
+  const gates = await episodeGates(id)
+  if (!gates) return notFound(c, '剧集不存在')
+  return success(c, gates)
+})
+
+// POST /episodes/:id/script/confirm — 确认旁白稿（#54）：确认后才允许拆分/补镜
+app.post('/:id/script/confirm', async (c) => {
+  const id = Number(c.req.param('id'))
+  const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, id))
+  if (!ep) return notFound(c, '剧集不存在')
+  if (!await confirmScript(id)) return badRequest(c, '旁白稿为空，不能确认')
+  return success(c, await episodeGates(id))
+})
+
+// POST /episodes/:id/script/unconfirm — 取消确认，回到可改稿状态
+app.post('/:id/script/unconfirm', async (c) => {
+  const id = Number(c.req.param('id'))
+  const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, id))
+  if (!ep) return notFound(c, '剧集不存在')
+  await unconfirmScript(id)
+  return success(c, await episodeGates(id))
+})
+
 // POST /episodes/:id/storyboards/fill-gaps — 补全剩余（#52）：保留已拆分镜，只补旁白覆盖缺口
 app.post('/:id/storyboards/fill-gaps', async (c) => {
   const id = Number(c.req.param('id'))
@@ -645,6 +693,8 @@ app.post('/:id/storyboards/fill-gaps', async (c) => {
   const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, id))
   if (!ep) return notFound(c, '剧集不存在')
   if (resolveDramaProjectType(ep.dramaId) !== 'documentary') return badRequest(c, '只有纪录片项目才有补镜')
+  // 门禁（#54）：剧本未确认 / 清单未通过时补镜一律拒绝（放在 try 外，GateBlockedError 走全局 onError）
+  await assertGate(id, 'design')
   try {
     const result = await startFillGapsTask(id, { model: body.model || undefined, configId: body.config_id ?? undefined })
     // 同一集已有拆分/补镜任务在跑：拒绝而不是再起一个（两个任务会互相覆盖缺口判定）

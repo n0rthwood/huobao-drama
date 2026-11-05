@@ -865,7 +865,7 @@
       "production": "制作",
       "assets": "資産",
       "assetsDesc": "キャラクター / シーン / 小道具",
-    "posterDesc": "任意：ポスターのベース画像と文字レイアウト",
+      "posterDesc": "任意：ポスターのベース画像と文字レイアウト",
       "keyframes": "分镜キーフレーム",
       "keyframesDesc": "先頭／中間／終端キーフレームと手動確認",
       "videos": "動画制作",
@@ -881,8 +881,9 @@
       "narrationScript": "ナレーション原稿",
       "narrationScriptDesc": "ドキュメンタリーの解説文整理（脚本本文がそのままナレーション）",
       "evidenceAssetsDesc": "キャラクター / シーン / 証拠素材",
-      "expressionDesc": "各ショットで何を伝え、どの手段で見せるか",
-      "layersDesc": "地図注記とグラフィックの重ねレイヤー"
+      "designDesc": "監督用ショットシート：各ショットで何を伝え、どう作り、どの工程に効くか",
+      "productionDesc": "レイヤー区間と生成区間を同じページで制作",
+      "finalDesc": "ショットごとにレイヤー区間 / 生成区間 / 合成成果物"
     },
     "script": {
       "raw": "原文",
@@ -898,7 +899,14 @@
       "rewriting": "脚本をリライト中...",
       "scriptPlaceholder": "書式付き脚本の内容...",
       "rawRequired": "先に原文を入力してください",
-      "skipDone": "AI リライトをスキップしました。原文をそのまま使用します"
+      "skipDone": "AI リライトをスキップしました。原文をそのまま使用します",
+      "confirm": "ナレーション原稿を確定",
+      "confirmed": "ナレーション原稿は確定済み",
+      "unconfirm": "確定を解除",
+      "confirmHint": "確定後にショット分割が可能です。原稿を直すと自動で解除されます",
+      "confirmedAt": "{at} に確定",
+      "autoUnconfirmed": "原稿が変更されたため確定を自動解除しました",
+      "emptyScript": "ナレーション原稿が空なので確定できません"
     },
     "assetBatch": {
       "title": {
@@ -940,7 +948,7 @@
     },
     "prod": {
       "assets": "アセット制作",
-    "poster": "Poster ポスター",
+      "poster": "Poster ポスター",
       "keyframes": "分镜キーフレーム",
       "videos": "動画制作",
       "notReady": "まだ準備ができていません",
@@ -960,8 +968,9 @@
       "startExtract": "抽出を開始",
       "scriptFirst": "先に脚本を完成させてください",
       "goBack": "処理に戻る",
-      "expression": "表現設計",
-      "layers": "レイヤー"
+      "design": "ショット設計",
+      "production": "ショット制作",
+      "final": "映像と完成尺"
     },
     "intent": {
       "confirmedCount": "確認済み {done}/{total}",
@@ -1723,19 +1732,19 @@
       "normalizeOff": "無効"
     },
     "compose": {
-      "section": "カット融合",
+      "section": "カット合成",
       "composeShot": "このカットを合成",
       "recompose": "再合成",
       "applyCompose": "設定を適用して合成",
-      "doneSec": "融合が完了しました（{sec} 秒）",
-      "failed": "融合に失敗しました",
+      "doneSec": "合成が完了しました（{sec} 秒）",
+      "failed": "合成に失敗しました",
       "none": "未合成",
       "needVideo": "このカットにはまだ動画がありません",
       "duration": "成果物の長さ {sec} 秒",
       "durationNote": "長さは実測音声に同期しています（上限 15 秒）",
-      "listPrefix": "融合：",
+      "listPrefix": "合成：",
       "statusDisabled": "対象外",
-      "statusMissing": "未融合",
+      "statusMissing": "未合成",
       "statusChanged": "入力が変更済み",
       "statusUnchanged": "最新",
       "statusUnknown": "要確認",
@@ -1743,9 +1752,9 @@
       "statusSkipped": "処理中",
       "disabledHint": "このエピソードはナレーションが無効です。結合では元動画をそのまま使います",
       "sourceOriginal": "元動画",
-      "sourceFusion": "融合済み",
-      "viewFusion": "融合結果を見る",
-      "staleWarn": "再生中は古い融合ファイルです。最新として書き出せません：{reason}",
+      "sourceFusion": "合成済み",
+      "viewFusion": "合成結果を見る",
+      "staleWarn": "再生中は古い合成ファイルです。最新として書き出せません：{reason}",
       "planLine": "映像 {dv}s · ナレーション {da}s · 成果物 {d}s · トランジション {tr}s",
       "draftSaving": "ナレーションの変更を保存中です。少し待ってから合成してください",
       "draftFailed": "ナレーションの変更が保存されていません。まず保存をやり直してください",
@@ -1758,20 +1767,20 @@
         "audioMissing": "音声なし",
         "subtitleMissing": "字幕なし"
       },
-      "batch": "一括融合",
-      "batchOpenRunning": "融合の進捗を見る",
-      "batchSelected": "選択した {n} 件を融合",
-      "batchProgress": "融合 {done}/{total}",
-      "batchStarted": "{n} カットの融合を開始しました",
-      "batchDone": "一括融合が完了しました",
-      "batchDoneFailed": "一括融合が終了しました（失敗 {n} 件）",
-      "batchAlreadyRunning": "一括融合がすでに実行中です",
+      "batch": "一括合成",
+      "batchOpenRunning": "合成の進捗を見る",
+      "batchSelected": "選択した {n} 件を合成",
+      "batchProgress": "合成 {done}/{total}",
+      "batchStarted": "{n} カットの合成を開始しました",
+      "batchDone": "一括合成が完了しました",
+      "batchDoneFailed": "一括合成が終了しました（失敗 {n} 件）",
+      "batchAlreadyRunning": "一括合成がすでに実行中です",
       "mergeSkippedToast": "今回の結合で {n} カットをスキップしました",
       "skippedTitle": "今回の結合でスキップしたカット",
       "skippedItem": "#{n} · {reason}"
     },
     "composeBatch": {
-      "title": "一括融合",
+      "title": "一括合成",
       "scopeEpisode": "範囲：エピソード全体",
       "scopeSelected": "範囲：選択した {n} カット",
       "scopeWhole": "エピソード全体にする",
@@ -1783,12 +1792,12 @@
       "selectedCount": "{n} 件選択中",
       "emptyScope": "この範囲にカットがありません",
       "forceRemake": "強制やり直し",
-      "rule": "既定では未融合と入力変更ありのみを選択します。「最新」は手動で選んだときだけ強制やり直しになり、「ブロック」は理由を解消してから実行します。開始時は選択したカットだけを送信し、実行前にサーバーが再検証します。",
-      "start": "融合を開始（{n}）",
-      "runningHint": "一括融合がすでに実行中です",
-      "taskRunning": "一括融合を実行中",
-      "taskDone": "今回の一括融合は終了しました",
-      "taskFailed": "一括融合に失敗しました",
+      "rule": "既定では未合成と入力変更ありのみを選択します。「最新」は手動で選んだときだけ強制やり直しになり、「ブロック」は理由を解消してから実行します。開始時は選択したカットだけを送信し、実行前にサーバーが再検証します。",
+      "start": "合成を開始（{n}）",
+      "runningHint": "一括合成がすでに実行中です",
+      "taskRunning": "一括合成を実行中",
+      "taskDone": "今回の一括合成は終了しました",
+      "taskFailed": "一括合成に失敗しました",
       "progressCount": "{done}/{total}",
       "progressFailed": "失敗 {n}",
       "progressSkipped": "スキップ {n}",
@@ -1877,7 +1886,7 @@
       "gotoScript": "脚本へ",
       "filmList": "完成映像一覧",
       "countN": "{n} 件",
-      "sourceComposed": "融合済み映像（ナレーション有効）",
+      "sourceComposed": "合成済み映像（ナレーション有効）",
       "sourceRaw": "元動画（ナレーション無効）",
       "sourceLine": "結合ソース：{source}",
       "readyCount": "結合可能 {n}/{total}",
@@ -1887,7 +1896,7 @@
       "blockedToast": "選択した {n} カットは結合できません。修復するか選択を変更してください",
       "selectReadyOnly": "準備済みのみ選択（{n}）",
       "selectReadyOnlyTitle": "いますぐ結合できるカットだけに選択を絞ります",
-      "repairFusion": "一括融合へ（{n}）",
+      "repairFusion": "一括合成へ（{n}）",
       "confirmTitle": "結合書き出しの確認",
       "confirmIncluded": "含めるカット {n} 件",
       "confirmExcluded": "除外するカット {n} 件",
@@ -1896,13 +1905,13 @@
       "confirmNote": "含めたカットだけを結合します。実行時に状態が変わっていればサーバーが理由付きで拒否し、黙ってカットを落とすことはありません。",
       "empty": "完成映像がまだありません。下でショットを選択して「選択分を結合」をクリックしてください",
       "shotAssets": "ショット素材",
-    "posterTitle": "Poster オープニング",
-    "posterHint": "任意：結合時にポスターを静止画の先頭フレームとして追加",
-    "posterEnable": "Poster オープニングを追加",
-    "posterVersion": "第 {n} 版",
-    "posterDuration": "表示時間",
-    "posterSeconds": "秒",
-    "posterNone": "この話にはまだ Poster がありません（スキップ可）",
+      "posterTitle": "Poster オープニング",
+      "posterHint": "任意：結合時にポスターを静止画の先頭フレームとして追加",
+      "posterEnable": "Poster オープニングを追加",
+      "posterVersion": "第 {n} 版",
+      "posterDuration": "表示時間",
+      "posterSeconds": "秒",
+      "posterNone": "この話にはまだ Poster がありません（スキップ可）",
       "shotStat": "{done}/{total} 生成済み · {selected} 選択中",
       "clearSelection": "選択をクリア",
       "selectAllReady": "生成済みをすべて選択",
@@ -2069,6 +2078,36 @@
       "running": "このエピソードの分割/補完タスクが実行中です",
       "started": "残り {n} 箇所の補完を開始しました。進捗はタスクセンターへ",
       "failed": "残りの補完に失敗しました"
+    },
+    "assets": {
+      "tabCards": "アセットカード",
+      "tabReview": "審査リスト"
+    },
+    "gate": {
+      "locked": "ロック中",
+      "checking": "ステップゲートを確認中…",
+      "lockedTooltip": "{reason}",
+      "goFix": "解決しに行く",
+      "needScript": "ナレーション原稿が未確定です",
+      "needAssetReview": "アセット審査リストが未通過です",
+      "needDesign": "確定済みのショット設計がありません",
+      "needProduction": "制作準備が整ったショットがありません",
+      "needFinal": "最新の合成成果物がありません",
+      "optional": "任意 · 連鎖外"
+    },
+    "assetReview": {
+      "emptyTitle": "照合はまだ開始していません",
+      "emptyDesc": "審査リストは「情報ポイント → 必要な素材 → 有/無」を一件ずつ並べます。すべて処置するとショット設計が解除されます。",
+      "start": "照合を開始",
+      "startDisabled": "アセット審査リストの実装後に利用できます",
+      "statusLabel": "リスト状態：{status}",
+      "statusNone": "未開始",
+      "statusRunning": "照合中",
+      "statusPending": "処置待ち",
+      "statusPassed": "通過"
+    },
+    "finalStep": {
+      "placeholderTitle": "このショットの完成フローはまだ準備できていません"
     }
   },
   "poster": {
@@ -2077,7 +2116,9 @@
     "saving": "保存中…",
     "stageMeta": "{size} · {ratio}",
     "finalReady": "最終版あり",
-    "stage": { "empty": "ベース画像を選択または生成してレイアウトを開始" },
+    "stage": {
+      "empty": "ベース画像を選択または生成してレイアウトを開始"
+    },
     "reference": {
       "title": "この話のアセット画像を参考画像として選択",
       "selected": "{n}/{max} 選択",
@@ -2085,7 +2126,11 @@
       "empty": "この話に利用できるアセット画像がありません",
       "orderHint": "選択順に送信、最大 9 枚",
       "confirm": "選択を使用 ({n})",
-      "kind": { "character": "キャラクター", "scene": "シーン", "prop": "小道具" }
+      "kind": {
+        "character": "キャラクター",
+        "scene": "シーン",
+        "prop": "小道具"
+      }
     },
     "tools": {
       "add": "文字レイヤーを追加",
@@ -2111,8 +2156,17 @@
       "align": "揃え",
       "newText": "テキストを編集"
     },
-    "font": { "sans": "ゴシック", "serif": "明朝", "kai": "楷書", "hand": "手書き" },
-    "align": { "left": "左", "center": "中央", "right": "右" },
+    "font": {
+      "sans": "ゴシック",
+      "serif": "明朝",
+      "kai": "楷書",
+      "hand": "手書き"
+    },
+    "align": {
+      "left": "左",
+      "center": "中央",
+      "right": "右"
+    },
     "generate": {
       "title": "生成とレイアウト",
       "prompt": "画面プロンプト",
@@ -2137,7 +2191,10 @@
     "versions": {
       "title": "バージョン ({n})",
       "empty": "まだバージョンがありません",
-      "kind": { "generate": "生成", "composite": "合成" },
+      "kind": {
+        "generate": "生成",
+        "composite": "合成"
+      },
       "final": "最終",
       "select": "最終に設定",
       "useBase": "編集ベースにする",
@@ -2145,7 +2202,11 @@
     },
     "toast": {
       "refsSaved": "参考画像を保存しました（{n} 枚）",
-      "started": { "initial": "ベース画像生成を送信しました", "composite": "合成画像からの再生成を送信しました", "layers": "ベース＋文字レイヤーの再生成を送信しました" },
+      "started": {
+        "initial": "ベース画像生成を送信しました",
+        "composite": "合成画像からの再生成を送信しました",
+        "layers": "ベース＋文字レイヤーの再生成を送信しました"
+      },
       "failed": "Poster 操作に失敗しました",
       "compositeSaved": "合成画像を最終版に設定し、エピソードのサムネイルを更新しました",
       "selected": "最終版に設定しました（第 {n} 版）、サムネイルを更新しました",

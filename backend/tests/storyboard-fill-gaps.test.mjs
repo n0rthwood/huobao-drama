@@ -44,7 +44,8 @@ const FIXTURE = (shots) => `
   const at = '2026-01-01T00:00:00.000Z'
   const script = ${JSON.stringify(SCRIPT)}
   await db.insert(schema.dramas).values({ id: 1, title: 'doc', projectType: 'documentary', createdAt: at, updatedAt: at })
-  await db.insert(schema.episodes).values({ id: 1, dramaId: 1, episodeNumber: 1, title: 'E1', scriptContent: script, narrationEnabled: true, createdAt: at, updatedAt: at })
+  // 补镜在 #54 之后要先过门禁（剧本已确认 + 审核清单已通过），否则路由在视觉检查前就 400
+  await db.insert(schema.episodes).values({ id: 1, dramaId: 1, episodeNumber: 1, title: 'E1', scriptContent: script, narrationEnabled: true, scriptConfirmedAt: at, assetReviewStatus: 'passed', createdAt: at, updatedAt: at })
   await db.insert(schema.storyboards).values(${shots})
 `
 

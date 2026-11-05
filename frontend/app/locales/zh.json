@@ -865,7 +865,7 @@
       "production": "制作",
       "assets": "资产",
       "assetsDesc": "角色 / 场景 / 道具",
-    "posterDesc": "可选：海报底图与文字排版",
+      "posterDesc": "可选：海报底图与文字排版",
       "keyframes": "分镜关键帧",
       "keyframesDesc": "首/中/尾关键帧与人工确认",
       "videos": "视频制作",
@@ -881,8 +881,9 @@
       "narrationScript": "旁白稿",
       "narrationScriptDesc": "纪录片解说词整理（剧本正文即旁白）",
       "evidenceAssetsDesc": "角色 / 场景 / 证据素材",
-      "expressionDesc": "每镜讲什么、用什么手段表现",
-      "layersDesc": "地图标注与图形叠加层"
+      "designDesc": "导演分镜单：每镜讲什么、怎么拍、影响后面哪一步",
+      "productionDesc": "图层段与生成段在同一页制作",
+      "finalDesc": "逐镜图层段 / 生成段 / 合成成品"
     },
     "script": {
       "raw": "原始内容",
@@ -898,7 +899,14 @@
       "rewriting": "正在改写剧本...",
       "scriptPlaceholder": "格式化剧本内容...",
       "rawRequired": "请先填写原始内容",
-      "skipDone": "已跳过 AI 改写，当前将直接使用原始内容"
+      "skipDone": "已跳过 AI 改写，当前将直接使用原始内容",
+      "confirm": "确认旁白稿",
+      "confirmed": "旁白稿已确认",
+      "unconfirm": "取消确认",
+      "confirmHint": "确认后才能拆分分镜；改稿会自动取消确认",
+      "confirmedAt": "确认于 {at}",
+      "autoUnconfirmed": "旁白稿已改动，确认已自动取消",
+      "emptyScript": "旁白稿为空，不能确认"
     },
     "assetBatch": {
       "title": {
@@ -940,7 +948,7 @@
     },
     "prod": {
       "assets": "资产制作",
-    "poster": "Poster 海报",
+      "poster": "Poster 海报",
       "keyframes": "分镜关键帧",
       "videos": "视频制作",
       "notReady": "尚未准备就绪",
@@ -960,8 +968,9 @@
       "startExtract": "开始提取",
       "scriptFirst": "请先完成剧本编写",
       "goBack": "返回处理",
-      "expression": "表达设计",
-      "layers": "图层"
+      "design": "分镜设计",
+      "production": "分镜制作",
+      "final": "视频与成品"
     },
     "intent": {
       "confirmedCount": "已确认 {done}/{total}",
@@ -1723,19 +1732,19 @@
       "normalizeOff": "关"
     },
     "compose": {
-      "section": "本镜融合",
+      "section": "本镜合成成品",
       "composeShot": "合成本镜",
       "recompose": "重新合成",
       "applyCompose": "应用参数并合成",
-      "doneSec": "融合完成，成片 {sec} 秒",
-      "failed": "融合失败",
-      "none": "尚未融合",
+      "doneSec": "合成成品完成，成片 {sec} 秒",
+      "failed": "合成成品失败",
+      "none": "尚未合成成品",
       "needVideo": "本镜还没有生成视频",
       "duration": "成片时长 {sec} 秒",
       "durationNote": "时长已按实测配音同步（上限 15 秒）",
-      "listPrefix": "融合：",
+      "listPrefix": "合成成品：",
       "statusDisabled": "不适用",
-      "statusMissing": "待融合",
+      "statusMissing": "待合成成品",
       "statusChanged": "输入已变化",
       "statusUnchanged": "最新",
       "statusUnknown": "待核验",
@@ -1743,8 +1752,8 @@
       "statusSkipped": "进行中",
       "disabledHint": "本集旁白已关闭，拼接直接使用原始视频",
       "sourceOriginal": "原始视频",
-      "sourceFusion": "融合成片",
-      "viewFusion": "查看融合成片",
+      "sourceFusion": "合成成品成片",
+      "viewFusion": "查看合成成品成片",
       "staleWarn": "当前播放的是旧成片，不能当作可导出的最新片：{reason}",
       "planLine": "画面 {dv}s · 旁白 {da}s · 成片 {d}s · 转场偏移 {tr}s",
       "draftSaving": "旁白修改还在保存，稍后再合成",
@@ -1758,20 +1767,20 @@
         "audioMissing": "缺配音",
         "subtitleMissing": "缺字幕"
       },
-      "batch": "批量融合",
-      "batchOpenRunning": "查看融合进度",
-      "batchSelected": "融合所选 {n} 个",
-      "batchProgress": "融合 {done}/{total}",
-      "batchStarted": "已开始融合 {n} 个镜头",
-      "batchDone": "批量融合完成",
-      "batchDoneFailed": "批量融合结束，{n} 个失败",
-      "batchAlreadyRunning": "已有批量融合在进行中",
+      "batch": "批量合成成品",
+      "batchOpenRunning": "查看合成成品进度",
+      "batchSelected": "合成成品所选 {n} 个",
+      "batchProgress": "合成成品 {done}/{total}",
+      "batchStarted": "已开始合成成品 {n} 个镜头",
+      "batchDone": "批量合成成品完成",
+      "batchDoneFailed": "批量合成成品结束，{n} 个失败",
+      "batchAlreadyRunning": "已有批量合成成品在进行中",
       "mergeSkippedToast": "本次拼接跳过了 {n} 个镜头",
       "skippedTitle": "本次拼接跳过的镜头",
       "skippedItem": "#{n} · {reason}"
     },
     "composeBatch": {
-      "title": "批量融合",
+      "title": "批量合成成品",
       "scopeEpisode": "范围：整集",
       "scopeSelected": "范围：已选 {n} 个镜头",
       "scopeWhole": "改为整集",
@@ -1783,12 +1792,12 @@
       "selectedCount": "已勾选 {n} 个",
       "emptyScope": "该范围内没有镜头",
       "forceRemake": "强制重做",
-      "rule": "默认只勾选未融合与输入已变化的镜头；「最新」需手动勾选才会强制重做，「阻断」要先按原因修复。启动时只提交勾选的镜头，执行前服务端会再校验一次。",
-      "start": "开始融合 ({n})",
-      "runningHint": "已有批量融合在进行中",
-      "taskRunning": "批量融合进行中",
-      "taskDone": "本次批量融合已结束",
-      "taskFailed": "批量融合失败",
+      "rule": "默认只勾选未合成成品与输入已变化的镜头；「最新」需手动勾选才会强制重做，「阻断」要先按原因修复。启动时只提交勾选的镜头，执行前服务端会再校验一次。",
+      "start": "开始合成成品 ({n})",
+      "runningHint": "已有批量合成成品在进行中",
+      "taskRunning": "批量合成成品进行中",
+      "taskDone": "本次批量合成成品已结束",
+      "taskFailed": "批量合成成品失败",
       "progressCount": "{done}/{total}",
       "progressFailed": "失败 {n}",
       "progressSkipped": "跳过 {n}",
@@ -1877,7 +1886,7 @@
       "gotoScript": "前往剧本",
       "filmList": "成片列表",
       "countN": "{n} 个",
-      "sourceComposed": "融合成片（本集旁白已开启）",
+      "sourceComposed": "合成成品成片（本集旁白已开启）",
       "sourceRaw": "原始视频（本集旁白已关闭）",
       "sourceLine": "拼接来源：{source}",
       "readyCount": "可拼接 {n}/{total}",
@@ -1887,7 +1896,7 @@
       "blockedToast": "{n} 个所选镜头不可拼接，请先修复或改选",
       "selectReadyOnly": "仅选就绪镜头 ({n})",
       "selectReadyOnlyTitle": "把选择缩小到可直接拼接的镜头",
-      "repairFusion": "去批量融合 ({n})",
+      "repairFusion": "去批量合成成品 ({n})",
       "confirmTitle": "确认拼接导出",
       "confirmIncluded": "纳入 {n} 个镜头",
       "confirmExcluded": "排除 {n} 个镜头",
@@ -1895,13 +1904,13 @@
       "confirmStart": "拼接 {n} 个镜头",
       "confirmNote": "只拼接上面纳入的镜头；执行时状态若已变化，服务端会拒绝并给出原因，不会静默少镜。",
       "empty": "暂无成片，在下方勾选镜头后点击「拼接所选」",
-    "posterTitle": "Poster 片头",
-    "posterHint": "可选：拼接时把海报作为静态第一帧",
-    "posterEnable": "加入 Poster 片头",
-    "posterVersion": "第 {n} 版",
-    "posterDuration": "展示时长",
-    "posterSeconds": "秒",
-    "posterNone": "本集还没有 Poster，可跳过此步",
+      "posterTitle": "Poster 片头",
+      "posterHint": "可选：拼接时把海报作为静态第一帧",
+      "posterEnable": "加入 Poster 片头",
+      "posterVersion": "第 {n} 版",
+      "posterDuration": "展示时长",
+      "posterSeconds": "秒",
+      "posterNone": "本集还没有 Poster，可跳过此步",
       "shotAssets": "镜头素材",
       "shotStat": "{done}/{total} 已生成 · 已选 {selected}",
       "clearSelection": "清空选择",
@@ -2069,6 +2078,36 @@
       "running": "该集的拆分/补镜任务正在运行，请等它结束",
       "started": "已开始补全剩余 {n} 段缺口，进度见任务中心",
       "failed": "补全剩余失败"
+    },
+    "assets": {
+      "tabCards": "资产卡",
+      "tabReview": "审核清单"
+    },
+    "gate": {
+      "locked": "未解锁",
+      "checking": "正在校验步骤门禁…",
+      "lockedTooltip": "{reason}",
+      "goFix": "去解决",
+      "needScript": "旁白稿尚未确认",
+      "needAssetReview": "资产审核清单尚未通过",
+      "needDesign": "还没有已确认的分镜设计",
+      "needProduction": "还没有制作就绪的分镜",
+      "needFinal": "还没有最新的成品",
+      "optional": "可选 · 不入链"
+    },
+    "assetReview": {
+      "emptyTitle": "尚未开始对照",
+      "emptyDesc": "资产审核清单会逐条列出「信息点 → 需要的素材 → 有/缺」，全部处置后才解锁分镜设计。",
+      "start": "开始对照",
+      "startDisabled": "对照功能将在资产审核清单上线后可用",
+      "statusLabel": "清单状态：{status}",
+      "statusNone": "未开始",
+      "statusRunning": "对照中",
+      "statusPending": "待处置",
+      "statusPassed": "已通过"
+    },
+    "finalStep": {
+      "placeholderTitle": "该镜成品流程尚未就绪"
     }
   },
   "poster": {
@@ -2077,7 +2116,9 @@
     "saving": "保存中…",
     "stageMeta": "{size} · {ratio}",
     "finalReady": "已有最终版本",
-    "stage": { "empty": "选择或生成一张底图后开始排版" },
+    "stage": {
+      "empty": "选择或生成一张底图后开始排版"
+    },
     "reference": {
       "title": "选择本集资产图片作为参考",
       "selected": "已选 {n}/{max}",
@@ -2085,7 +2126,11 @@
       "empty": "本集还没有可用的资产图片",
       "orderHint": "按选择顺序发送，最多 9 张",
       "confirm": "使用所选 ({n})",
-      "kind": { "character": "角色", "scene": "场景", "prop": "道具" }
+      "kind": {
+        "character": "角色",
+        "scene": "场景",
+        "prop": "道具"
+      }
     },
     "tools": {
       "add": "添加文字图层",
@@ -2111,8 +2156,17 @@
       "align": "对齐",
       "newText": "在内容栏编辑文字"
     },
-    "font": { "sans": "黑体", "serif": "宋体", "kai": "楷体", "hand": "手写/圆体" },
-    "align": { "left": "左对齐", "center": "居中", "right": "右对齐" },
+    "font": {
+      "sans": "黑体",
+      "serif": "宋体",
+      "kai": "楷体",
+      "hand": "手写/圆体"
+    },
+    "align": {
+      "left": "左对齐",
+      "center": "居中",
+      "right": "右对齐"
+    },
     "generate": {
       "title": "生图与排版",
       "prompt": "画面 Prompt",
@@ -2137,7 +2191,10 @@
     "versions": {
       "title": "版本 ({n})",
       "empty": "还没有版本",
-      "kind": { "generate": "生成", "composite": "合成" },
+      "kind": {
+        "generate": "生成",
+        "composite": "合成"
+      },
       "final": "最终",
       "select": "设为最终",
       "useBase": "作为编辑底图",
@@ -2145,7 +2202,11 @@
     },
     "toast": {
       "refsSaved": "参考图已保存（{n} 张）",
-      "started": { "initial": "底图生成已提交", "composite": "合成图再生成已提交", "layers": "底图＋文字图层再生成已提交" },
+      "started": {
+        "initial": "底图生成已提交",
+        "composite": "合成图再生成已提交",
+        "layers": "底图＋文字图层再生成已提交"
+      },
       "failed": "Poster 操作失败",
       "compositeSaved": "合成图已保存并设为最终版本，剧集缩略图已更新",
       "selected": "已设为最终版本（第 {n} 版），剧集缩略图已更新",

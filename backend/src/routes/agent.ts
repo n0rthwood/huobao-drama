@@ -16,6 +16,7 @@ import { db, schema } from '../db/index.js'
 import { eq } from 'drizzle-orm'
 import { describeNarrationGaps, narrationCoverage, type NarrationGap } from '../services/narration-first.js'
 import { resolveDramaProjectType } from '../services/project-type.js'
+import { assertGate } from '../services/workflow-gates.js'
 
 const app = new Hono()
 
@@ -89,6 +90,12 @@ app.post('/:type/chat', async (c) => {
   // 按环节选模型（#51）：纪录片拆分分镜要看证据素材，顶栏即使选了 GLM 也会被换成视觉配置
   const projectType = resolveDramaProjectType(Number(drama_id))
   const stage = agentChatStage(agentType, projectType)
+
+  // 门禁（#54）：纪录片拆分分镜要求剧本已确认 + 资产审核清单已通过。
+  // 放在建 sys_task 之前：被拦时不留任务行，GateBlockedError 由全局 onError 转 400 {gate, reason}。
+  if (agentType === 'storyboard_breaker' && projectType === 'documentary') {
+    await assertGate(Number(episode_id), 'design')
+  }
   let resolved: StageModel
   try {
     resolved = await resolveStageModel(stage, { model: body.model || undefined, configId: body.config_id || undefined })
