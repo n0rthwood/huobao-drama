@@ -16,6 +16,8 @@ import { ffmpeg, checkFfmpegSuite, writeSilentWav } from '../utils/ffmpeg.js'
 import { DATA_ROOT, STORAGE_ROOT } from '../utils/paths.js'
 import { composeStatesForEpisode, type ComposeStateItem } from './compose-state.js'
 import type { FfprobeData } from 'fluent-ffmpeg'
+import { resolveDramaProjectType } from './project-type.js'
+import { assertGate } from './workflow-gates.js'
 
 // promisify loses the result type of fluent-ffmpeg's overloaded callback API.
 const probeFile = promisify(ffmpeg.ffprobe) as (file: string) => Promise<FfprobeData>
@@ -31,12 +33,12 @@ function toAbsPath(relativePath: string): string {
  * 「所选镜头里只要有一条不可用就拒绝」——不静默少镜，也不拿过期成片凑成功。
  */
 export class MergeBlockedError extends Error {
-  readonly blocked: { storyboard_id: number; storyboard_number: number; status: string; reason: string }[]
+  readonly blocked: { storyboard_id: number; storyboard_number: number; status: string; reason: string; change_reasons?: string[] }[]
 
   constructor(blocked: MergeBlockedError['blocked']) {
     super(`以下镜头还不能拼接：${blocked.map(b => `#${b.storyboard_number}（${b.reason}）`).join('；')}`)
     this.name = 'MergeBlockedError'
-    this.blocked = blocked
+    this.blocked = blocked.map(item => ({ ...item, change_reasons: item.change_reasons ?? [] }))
   }
 }
 
@@ -45,7 +47,7 @@ function exportBlockReason(state: ComposeStateItem): string {
   if (state.reason) return state.reason
   if (state.status === 'missing') return '尚未合成带旁白字幕的版本'
   if (state.status === 'changed') {
-    return `融合成片已过期：${state.change_reasons.join('、') || '输入已变化'}，请重新融合后再导出`
+    return `成品已过期：${state.change_reasons.join('、') || '输入已变化'}，请重新合成后再导出`
   }
   if (state.status === 'unknown') return '旧版合成记录无法核验，请重新融合后再导出'
   return '当前不可用于导出'
@@ -91,12 +93,13 @@ export async function mergeEpisodeVideos(
 
   const [episode] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId))
   const narrationEnabled = episode?.narrationEnabled === true
+  const documentary = episode ? resolveDramaProjectType(episode.dramaId) === 'documentary' : false
 
   const skipped: { storyboard_number: number; reason: string }[] = []
   const blocked: MergeBlockedError['blocked'] = []
   const clips: { sb: typeof live[number]; url: string }[] = []
 
-  if (narrationEnabled) {
+  if (narrationEnabled || documentary) {
     // 开关打开时只认「与当前输入一致」的融合成片：不静默混入原始视频，也不用过期成片
     const states = await composeStatesForEpisode(episodeId, {
       storyboardIds: storyboards.map(sb => sb.id),
@@ -116,6 +119,7 @@ export async function mergeEpisodeVideos(
         storyboard_number: sb.storyboardNumber,
         status: state?.status ?? 'blocked',
         reason,
+        change_reasons: state?.change_reasons ?? [],
       })
     }
   } else {
@@ -135,6 +139,7 @@ export async function mergeEpisodeVideos(
   }
 
   if (blocked.length) throw new MergeBlockedError(blocked)
+  await assertGate(episodeId, 'export')
   if (clips.length === 0) throw new Error('所选镜头还没有可拼接的视频')
 
   // 拼接前探测 ffmpeg：二进制损坏时 fluent-ffmpeg 的同步 EFTYPE 会崩掉整个进程，

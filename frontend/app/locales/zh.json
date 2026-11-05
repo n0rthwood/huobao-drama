@@ -771,6 +771,22 @@
     }
   },
   "episode": {
+    "final": {
+      "layer": "图层段", "generated": "生成段", "composite": "成品",
+      "budget": "预算 {seconds}s", "measured": "配音实测 {seconds}s",
+      "noCombo": "设计卡未确认，请先选择段组合",
+      "fresh": "最新", "stale": "未渲染或已过期", "failed": "失败", "rendering": "渲染中", "render": "重新渲染",
+      "inherited": "锁定继承 {'@'}{seconds}s · 不出图",
+      "junction": "衔接点 {seconds}s · 像素连续（锁定继承）",
+      "overBudget": "配音实测超过预算，请确认后再生成视频", "confirmGenerate": "确认超预算并生成",
+      "subtitle": "字幕随配音自动对齐 · 烧录",
+      "continuity": "衔接设计（只读）", "continue": "承接", "cut": "切",
+      "scope": "将处理 {included}；排除 {excluded}", "start": "开始处理 {n} 镜",
+      "notFailed": "非失败项", "voice": "音色", "settings": "旁白与字幕设置",
+      "staleExport": "{n} 个镜头成品过期，已默认取消勾选", "update": "去更新",
+      "posterMissing": "尚无最终 Poster · 去制作 Poster",
+      "batch": { "voice": "批量配音", "layer": "批量渲染图层段", "video": "批量生成视频", "compose": "批量合成成品" }
+    },
     "production": {
       "title": "分镜制作",
       "shotCount": "共 {n} 镜",
@@ -1589,7 +1605,6 @@
       "previewUnknown": "无法判断",
       "previewBlocked": "被拦截",
       "previewSkipped": "跳过",
-      "previewDeterministic": "确定性片段",
       "batchStarted": "已发起 {n} 个视频生成任务",
       "retryFailed": "重试失败({n})",
       "select": "选择",

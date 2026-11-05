@@ -31,6 +31,11 @@ import { startKeyframePromptBatch } from './keyframe-prompts.js'
 import { startVideoPromptBatch } from './video-prompts.js'
 import { isCoverageGapFailure, startFillGapsTask } from './storyboard-fill-gaps.js'
 import type { SysTaskRow } from './sys-task.js'
+import { buildStoryboardVideoRequest } from './storyboard-video.js'
+import { retryFailedVoiceBatch } from './narration-voice.js'
+import { retryFailedLayerRenderBatch } from './layer-render-batch.js'
+import { assertShotGate } from './workflow-gates.js'
+import { retryFailedComposeBatch } from './shot-compose.js'
 
 export interface RetryOptions {
   configId?: number
@@ -120,6 +125,13 @@ async function retryImage(row: SysTaskRow, opts: RetryOptions): Promise<number> 
 }
 
 async function retryVideo(row: SysTaskRow, opts: RetryOptions): Promise<number> {
+  if (row.storyboardId && row.episodeId) {
+    const [episode] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, row.episodeId))
+    if (resolveDramaProjectType(episode?.dramaId) === 'documentary') {
+      const request = await buildStoryboardVideoRequest(row.storyboardId, { model: opts.model, configId: opts.configId })
+      return generateVideo({ ...request.params, retryOf: row.id })
+    }
+  }
   const params = storedParams(row.params)
   const config = await resolveConfig('video', opts.configId)
   const model = opts.model || (opts.configId ? undefined : row.model || undefined)
@@ -215,6 +227,20 @@ async function retryText(row: SysTaskRow, opts: RetryOptions): Promise<number> {
   const episodeId = row.episodeId
   if (!kind || !episodeId) throw new Error('该文本任务缺少重试所需的信息')
   const dramaId = row.dramaId ?? 0
+  if (kind === 'shot_compose') {
+    const result = await retryFailedComposeBatch(episodeId, dramaId, row.id)
+    if (!result.started) throw new Error('没有可重试的合成任务')
+    const fresh = await findLatestTextTask(episodeId, 'shot_compose')
+    if (!fresh) throw new Error('重试任务创建失败')
+    return fresh.id
+  }
+  if (kind === 'narration_tts' || kind === 'layer_render_batch') {
+    const result = kind === 'narration_tts'
+      ? await retryFailedVoiceBatch(episodeId, dramaId, row.id)
+      : await retryFailedLayerRenderBatch(episodeId, dramaId, row.id)
+    if (!result.task_id) throw new Error('重试任务未创建')
+    return result.task_id
+  }
 
   // 覆盖缺口失败的纪录片拆分任务（#52）：重试 = 补镜，保留已拆分镜只补剩余；
   // 整集重拆仍由分镜页的「拆分分镜」按钮显式发起（语义不变）。
@@ -259,6 +285,7 @@ export async function retryTask(taskId: number, opts: RetryOptions): Promise<num
   if (row.type === 'video' && row.provider === LAYER_SEGMENT_PROVIDER) {
     const storyboardId = storyboardIdOfSegmentTask(row.params) ?? row.storyboardId ?? null
     if (!storyboardId) throw new Error('图层段任务缺少分镜 id，无法重渲染')
+    await assertShotGate(storyboardId, 'production')
     const outcome = await startLayerSegmentRenderTask(storyboardId)
     return outcome.task_id
   }

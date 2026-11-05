@@ -27,6 +27,27 @@ export interface BatchScope {
   excluded: BatchScopeExcluded[]
 }
 
+export interface BatchScopePreviewItem extends BatchScopeShot {
+  status: string
+  checked?: boolean
+  selectable?: boolean
+  reason?: string
+}
+
+/** Build the exact execution snapshot from server preview rows, never client media or scope. */
+export function scopeFromPreview(items: BatchScopePreviewItem[], selectedIds?: number[]): BatchScope {
+  const selected = selectedIds === undefined ? null : new Set(selectedIds)
+  const scope: BatchScope = { included: [], excluded: [] }
+  for (const item of items) {
+    const shot = { storyboard_id: item.storyboard_id, storyboard_number: item.storyboard_number }
+    const eligible = item.selectable ?? ['missing', 'changed', 'unchanged', 'unknown'].includes(item.status)
+    const included = eligible && (selected ? selected.has(item.storyboard_id) : (item.checked ?? ['missing', 'changed'].includes(item.status)))
+    if (included) scope.included.push(shot)
+    else scope.excluded.push({ ...shot, reason: item.reason || (item.status === 'unchanged' ? 'unchanged' : eligible ? 'not_selected' : item.status) })
+  }
+  return scope
+}
+
 /** 批量类型：决定排除口径（本 Issue 只覆盖提示词/关键帧；图层渲染与视频批量归 R7） */
 export type BatchScopeKind = 'keyframe_prompts' | 'keyframes'
 

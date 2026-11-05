@@ -128,8 +128,8 @@ const composedUrl = computed(() => state.value?.composed_video_url
 const audioUrl = computed(() => sb.value.narration_audio_url || sb.value.narrationAudioUrl || '')
 const showFit = computed(() => props.narrationEnabled && !pureVisual.value && Boolean(audioUrl.value))
 
-const statusLabel = computed(() => t(`episode.compose.status${status.value.charAt(0).toUpperCase()}${status.value.slice(1)}`))
-const blocking = computed(() => status.value === 'blocked')
+const statusLabel = computed(() => status.value === 'excluded' ? t('episode.compose.statusBlocked') : t(`episode.compose.status${status.value.charAt(0).toUpperCase()}${status.value.slice(1)}`))
+const blocking = computed(() => status.value === 'blocked' || status.value === 'excluded')
 
 const composedSeconds = computed(() => {
   const meta = sb.value.narration_meta || sb.value.narrationMeta || {}

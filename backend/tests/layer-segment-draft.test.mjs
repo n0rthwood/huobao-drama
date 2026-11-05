@@ -296,10 +296,9 @@ test('compose 快照：无段的镜头保持 v2 摘要（存量项目不被整�
       video_src: 'static/videos/a.mp4', audio_src: 'static/narration/a.mp3',
       subtitle_src: 'static/narration/a.srt', burned: true,
       text_sha256: 'abc', fit_key: 'pad:800', transition_t: 0,
-      replace_clip: null, pre_clip: null, post_clip: null,
     }
     const legacyV2 = { video_src: clipless.video_src, audio_src: clipless.audio_src, subtitle_src: clipless.subtitle_src, burned: true, text_sha256: 'abc', fit_key: 'pad:800', transition_t: 0 }
-    const withClip = { ...clipless, video_src: 'static/layer-segments/r.mp4', replace_clip: { src: 'static/layer-segments/r.mp4', signature: 'sig1' } }
+    const withClip = { ...clipless, combo: 'A', video_src: 'static/layer-segments/r.mp4', layer_segment: { src: 'static/layer-segments/r.mp4', signature: 'sig1' } }
     out({
       cliplessVersion: composeSignatureVersionOf(clipless),
       clipVersion: composeSignatureVersionOf(withClip),
@@ -311,23 +310,22 @@ test('compose 快照：无段的镜头保持 v2 摘要（存量项目不被整�
   // #50 之前的公式：sha256(['v2', video, audio, subtitle, '1', text, fit, t.toFixed(3)].join('\\u0000'))
   const V2_DIGEST = 'a77ed49e620bb74708ed1711b9f52b1072edafdcb7425d8e1e52a4690d6aa8a7'
   assert.equal(got.cliplessVersion, 2, '无段的镜头生效版本仍是 2')
-  assert.equal(got.clipVersion, 3)
+  assert.equal(got.clipVersion, 4)
   assert.equal(got.cliplessSig, V2_DIGEST, '无段镜头的摘要必须与 #50 之前逐字节一致')
   assert.equal(got.legacySig, V2_DIGEST, '旧快照（根本没有段字段）同摘要')
-  assert.notEqual(got.clipSig, V2_DIGEST, '挂了图层段的镜头才升到 v3 摘要')
+  assert.notEqual(got.clipSig, V2_DIGEST, '显式纪录片组合使用 v4 摘要')
 })
 
-test('compose 快照 v3：图层段参与签名（机械换源后签名口径不变），差异分项报「确定性片段」', () => {
+test('compose 快照 v4：图层段重渲染与组合切换分别改变签名和差异原因', () => {
   const got = run(`
     const base = {
       video_src: 'static/videos/a.mp4', audio_src: 'static/narration/a.mp3',
       subtitle_src: 'static/narration/a.srt', burned: true,
       text_sha256: 'abc', fit_key: 'pad:800', transition_t: 0,
-      replace_clip: null, pre_clip: null, post_clip: null,
     }
-    const withReplace = { ...base, video_src: 'static/layer-segments/r.mp4', replace_clip: { src: 'static/layer-segments/r.mp4', signature: 'sig1' } }
-    const rerendered = { ...withReplace, replace_clip: { src: 'static/layer-segments/r2.mp4', signature: 'sig2' } }
-    const withPost = { ...base, post_clip: { src: 'static/layer-segments/p.mp4', signature: 'sigp' } }
+    const withReplace = { ...base, combo: 'A', video_src: 'static/layer-segments/r.mp4', layer_segment: { src: 'static/layer-segments/r.mp4', signature: 'sig1' } }
+    const rerendered = { ...withReplace, layer_segment: { src: 'static/layer-segments/r2.mp4', signature: 'sig2' } }
+    const withPost = { ...base, combo: 'D', layer_segment: { src: 'static/layer-segments/p.mp4', signature: 'sigp' } }
     const legacyV2 = { video_src: base.video_src, audio_src: base.audio_src, subtitle_src: base.subtitle_src, burned: true, text_sha256: 'abc', fit_key: 'pad:800', transition_t: 0 }
     out({
       version: COMPOSE_SIGNATURE_VERSION,
@@ -341,13 +339,30 @@ test('compose 快照 v3：图层段参与签名（机械换源后签名口径不
       diffNone: describeComposeDiff(base, base),
     })
   `)
-  assert.equal(got.version, 3, 'R5 只做数据源机械替换：签名版本仍是 3（v4 归 R7）')
+  assert.equal(got.version, 4, '显式组合升到 v4，剧情无组合仍为 v2')
   assert.equal(got.legacySig, got.baseSig, 'v2 旧快照缺字段按 null 比较，不会凭空报段变化')
   assert.notEqual(got.replaceSig, got.baseSig)
   assert.notEqual(got.rerenderedSig, got.replaceSig, '同一位置重渲染（签名变）必须换 compose 签名')
-  assert.equal(got.diffRerender.filter(r => r.includes('确定性片段')).length, 1)
-  assert.match(got.diffRerender.find(r => r.includes('确定性片段')), /整镜替代/)
-  assert.match(got.diffAddPost.find(r => r.includes('确定性片段')), /片尾/)
-  assert.equal(got.diffFromLegacy.filter(r => r.includes('确定性片段')).length, 1, '旧快照 → 新增片尾段，只报段一项')
+  assert.equal(got.diffRerender.filter(r => r.includes('图层段')).length, 1)
+  assert.ok(got.diffAddPost.some(r => r.includes('段组合')))
+  assert.ok(got.diffFromLegacy.some(r => r.includes('图层段')))
   assert.deepEqual(got.diffNone, ['输入快照与上次合成不一致'], '完全相同时保持既有兜底文案')
+})
+
+test('documentary v4 tracks junction hash and adopted generated version independently of legacy v2', () => {
+  const got = run(`
+    const base = { video_src: 'static/videos/a.mp4', audio_src: null, subtitle_src: null, burned: false, text_sha256: '', fit_key: '', transition_t: 0 }
+    const hybrid = { ...base, combo: 'C', layer_segment: { src: 'static/layer-segments/a.mp4', signature: 'layer-v1' }, junction_hash: 'frame-v1', video_task_id: 12 }
+    out({
+      bVersion: composeSignatureVersionOf({ ...base, combo: 'B' }),
+      base: composeSignatureOf(hybrid),
+      junction: composeSignatureOf({ ...hybrid, junction_hash: 'frame-v2' }),
+      video: composeSignatureOf({ ...hybrid, video_task_id: 13 }),
+      order: composeSignatureOf({ ...hybrid, combo: 'D' }),
+      junctionDiff: describeComposeDiff({ ...hybrid, junction_hash: 'frame-v2' }, hybrid),
+    })
+  `)
+  assert.equal(got.bVersion, 4)
+  for (const field of ['junction', 'video', 'order']) assert.notEqual(got[field], got.base)
+  assert.ok(got.junctionDiff.some(reason => reason.includes('衔接帧')))
 })

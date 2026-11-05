@@ -771,6 +771,22 @@
     }
   },
   "episode": {
+    "final": {
+      "layer": "Layer segment", "generated": "Generated segment", "composite": "Final composite",
+      "budget": "Budget {seconds}s", "measured": "Measured voice {seconds}s",
+      "noCombo": "Confirm the design card and select a segment combination",
+      "fresh": "Up to date", "stale": "Not rendered or outdated", "failed": "Failed", "rendering": "Rendering", "render": "Render again",
+      "inherited": "Locked inheritance at {seconds}s · no generation",
+      "junction": "Junction {seconds}s · pixel continuity (locked inheritance)",
+      "overBudget": "Measured narration exceeds the budget. Confirm before generating.", "confirmGenerate": "Confirm and generate",
+      "subtitle": "Subtitles align automatically with narration · burned in",
+      "continuity": "Continuity design (read only)", "continue": "Continue", "cut": "Cut",
+      "scope": "Included {included}; excluded {excluded}", "start": "Process {n} shots",
+      "notFailed": "Not failed", "voice": "Voice", "settings": "Narration and subtitle settings",
+      "staleExport": "{n} outdated composites deselected by default", "update": "Update",
+      "posterMissing": "No final Poster · Create Poster",
+      "batch": { "voice": "Batch voice", "layer": "Render layer segments", "video": "Generate videos", "compose": "Compose final shots" }
+    },
     "production": {
       "title": "Shot Production",
       "shotCount": "{n} shots",
@@ -1589,7 +1605,6 @@
       "previewUnknown": "Cannot tell",
       "previewBlocked": "Blocked",
       "previewSkipped": "Skipped",
-      "previewDeterministic": "Deterministic clip",
       "batchStarted": "Started {n} video generation tasks",
       "retryFailed": "Retry failed ({n})",
       "select": "Select",

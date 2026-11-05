@@ -526,7 +526,7 @@ export function invalidateSegmentSpec(episodeId: number): void {
 // ─── 草稿 ────────────────────────────────────────────────────
 
 /** 装配草稿上下文：本镜设计卡引用到的资产 + 它们的忠实原图与语义标注 */
-async function loadDraftAssets(card: DesignCard): Promise<SegmentDraftAsset[]> {
+export async function loadDraftAssets(card: DesignCard): Promise<SegmentDraftAsset[]> {
   const propIds = new Set<number>()
   const characterIds = new Set<number>()
   const sceneIds = new Set<number>()

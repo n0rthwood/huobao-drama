@@ -142,7 +142,7 @@ function cardFields(item: PlannedLayer, entryName: string, base: SegmentDraftAss
   }
 }
 
-function layerFromPlannedLayer(
+export function layerFromPlannedLayer(
   item: PlannedLayer,
   index: number,
   ctx: SegmentDraftContext,

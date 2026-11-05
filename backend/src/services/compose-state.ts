@@ -35,7 +35,6 @@ import {
   type FitMode,
 } from './narration-fit.js'
 import {
-  MAX_SHOT_SECONDS,
   narrationStatus,
   parseNarrationMeta,
   sha256,
@@ -53,8 +52,12 @@ import {
   type LayerSegment,
   type SegmentSpec,
 } from './layer-segment.js'
-import { MAX_LAYER_SEGMENT_SECONDS } from './segment-timeline.js'
 import { findActiveTextTask, parseTextTaskParams } from './text-task.js'
+import { shotMaxSeconds } from './shot-duration.js'
+import { resolveDramaProjectType } from './project-type.js'
+import { toCombo } from './design-card.js'
+import { junctionFrameOf } from './junction-frame.js'
+import { GateBlockedError } from './workflow-gates.js'
 
 export type StoryboardRow = typeof schema.storyboards.$inferSelect
 export type EpisodeRow = typeof schema.episodes.$inferSelect
@@ -63,10 +66,10 @@ export type EpisodeRow = typeof schema.episodes.$inferSelect
  * 输入快照格式版本。
  * 1 = #30/#31 的无版本签名（不含生效 T，匹配参数键口径也不同）→ 一律判 unknown。
  * 2 = #42：video/audio/subtitle/burned/text/fit/T。
- * 3 = #50：追加三个确定性片段（replace/pre/post 的路径 + 渲染签名）。
- *     存量 v2 成片在预览里显示「已变化·签名版本」，与 #42 升级时的处理一致，不自动重合成。
+ * 3 = #50：旧确定性片段快照（读取比较时自然判过期，不迁移/回填）。
+ * 4 = #60：显式段组合、图层段、生成版本、衔接帧；无 combo 的剧情镜仍为 v2。
  */
-export const COMPOSE_SIGNATURE_VERSION = 3
+export const COMPOSE_SIGNATURE_VERSION = 4
 
 export type ComposeStateStatus =
   | 'disabled'
@@ -76,6 +79,7 @@ export type ComposeStateStatus =
   | 'unknown'
   | 'blocked'
   | 'skipped'
+  | 'excluded'
 
 /** 依赖是否**真的可用**（文件在、字幕有内容），不是 URL 有没有值 */
 export interface ComposeInputAvailability {
@@ -106,30 +110,24 @@ export interface ComposeStateItem {
 }
 
 export function toAbsPath(relativePath: string): string {
-  if (path.isAbsolute(relativePath)) return relativePath
-  if (relativePath.startsWith('static/')) return path.join(DATA_ROOT, relativePath)
-  return path.join(STORAGE_ROOT, relativePath)
+  const resolved = path.resolve(path.isAbsolute(relativePath) ? relativePath : relativePath.startsWith('static/') ? path.join(DATA_ROOT, relativePath) : path.join(STORAGE_ROOT, relativePath))
+  const roots = [path.resolve(DATA_ROOT), path.resolve(STORAGE_ROOT)]
+  if (!roots.some(root => resolved.startsWith(root + path.sep))) throw new Error('媒体路径必须位于本项目数据目录内')
+  if (fs.existsSync(resolved)) {
+    const real = fs.realpathSync(resolved)
+    if (!roots.some(root => fs.existsSync(root) && real.startsWith(fs.realpathSync(root) + path.sep))) throw new Error('媒体路径不能指向项目数据目录之外')
+  }
+  return resolved
 }
-
-/** 快照里的三个片段分项与界面文案（顺序即展示顺序） */
-const CLIP_PART_LABELS: Array<['replace_clip' | 'pre_clip' | 'post_clip', string]> = [
-  ['replace_clip', '整镜替代'],
-  ['pre_clip', '片头'],
-  ['post_clip', '片尾'],
-]
 
 /** 片段分项的稳定串：没有片段为空串，有片段时路径与渲染签名都参与 */
 function clipKey(part: ComposeClipPart | null | undefined): string {
   return part ? `${part.src}@${part.signature}` : ''
 }
 
-/**
- * 本镜快照的**生效版本**：没有任何确定性片段的镜头仍然按 v2 口径签名，
- * 这样 #50 上线不会把所有存量项目的成片一次性判成「已变化」。
- * 只有真的挂了片段的镜头才升到 v3（版本号 + 三个片段分项一起进摘要）。
- */
+/** Documentary combos use v4; legacy drama keeps its byte-identical v2 digest. */
 export function composeSignatureVersionOf(parts: ComposeInputParts): number {
-  return parts.replace_clip || parts.pre_clip || parts.post_clip ? COMPOSE_SIGNATURE_VERSION : 2
+  return parts.combo ? COMPOSE_SIGNATURE_VERSION : 2
 }
 
 export function composeSignatureOf(parts: ComposeInputParts): string {
@@ -145,13 +143,17 @@ export function composeSignatureOf(parts: ComposeInputParts): string {
     parts.transition_t.toFixed(3),
   ]
   // v2 的摘要输入必须一个字节都不变：多拼三个空串也会换摘要
-  if (version >= 3) fields.push(clipKey(parts.replace_clip), clipKey(parts.pre_clip), clipKey(parts.post_clip))
+  if (version === 4) fields.push(parts.combo!, clipKey(parts.layer_segment), parts.junction_hash || '', String(parts.video_task_id ?? ''))
   return sha256(fields.join('\u0000'))
 }
 
 /** 逐项对比两份快照，给出人能看懂的变化原因 */
 export function describeComposeDiff(current: ComposeInputParts, previous: ComposeInputParts): string[] {
   const reasons: string[] = []
+  if (current.combo !== previous.combo) reasons.push('段组合已更改')
+  if (clipKey(current.layer_segment) !== clipKey(previous.layer_segment)) reasons.push('图层段已重新渲染')
+  if (current.junction_hash !== previous.junction_hash) reasons.push('衔接帧已变化')
+  if (current.video_task_id !== previous.video_task_id) reasons.push('生成视频版本已变化')
   if (current.video_src !== previous.video_src) reasons.push('画面视频已更换或重新生成')
   if (current.audio_src !== previous.audio_src) {
     if (!previous.audio_src) reasons.push('本镜新增了旁白配音')
@@ -165,11 +167,6 @@ export function describeComposeDiff(current: ComposeInputParts, previous: Compos
   if (Math.abs(current.transition_t - previous.transition_t) > 1e-3) {
     reasons.push(`生效的转场偏移已变化（${previous.transition_t} 秒 → ${current.transition_t} 秒）`)
   }
-  const clipChanges: string[] = []
-  for (const [position, label] of CLIP_PART_LABELS) {
-    if (clipKey(current[position]) !== clipKey(previous[position])) clipChanges.push(label)
-  }
-  if (clipChanges.length) reasons.push(`确定性片段已变化（${clipChanges.join('、')}）`)
   if (!reasons.length) reasons.push('输入快照与上次合成不一致')
   return reasons
 }
@@ -294,6 +291,9 @@ export interface ComposeAssembly {
   subtitleAbs: string | null
   dv: number
   da: number | null
+  layerDuration: number
+  generatedDuration: number
+  junctionSeconds: number | null
   t: number
   tSource: TransitionT['source']
   fit: ComposeFit & { mode: FitMode }
@@ -326,11 +326,7 @@ const EMPTY_CLIP_CONTEXT: ClipComposeContext = {
   fresh: { replace: false, pre: false, post: false },
 }
 
-/**
- * 机械换源（#58）：`storyboard_layer_segments` 一镜一行，位置由 combo 决定
- * （A→replace、C→pre、D→post、B/未选→不参与）。签名口径仍是 v3 的三个 clip 分项，
- * 所以存量成片的签名逐字节不变；v4 与按 combo 的拼接顺序归 R7。
- */
+/** Assembly positions are derived from the explicit combo; only one layer row may participate. */
 function clipContextOf(segment: LayerSegment | undefined, combo: string | null | undefined, spec: SegmentSpec): ClipComposeContext {
   const context: ClipComposeContext = {
     clips: { replace: null, pre: null, post: null },
@@ -340,7 +336,7 @@ function clipContextOf(segment: LayerSegment | undefined, combo: string | null |
   const position = segmentPositionOfCombo(combo)
   if (position === 'none') return context
   context.clips[position] = segment
-  context.fresh[position] = layerSegmentIsFresh(segment, spec)
+  context.fresh[position] = !segment.stale_reasons.length && layerSegmentIsFresh(segment, spec)
   return context
 }
 
@@ -386,7 +382,9 @@ export async function inspectComposeInputs(
   clipContext?: ClipComposeContext,
 ): Promise<ComposeInspection> {
   const shot = `分镜 #${sb.storyboardNumber}`
-  const wantsNarration = sb.narrationEnabled !== false
+  const documentary = resolveDramaProjectType(ep.dramaId) === 'documentary'
+  const combo = documentary ? toCombo(sb.combo) : null
+  const wantsNarration = ep.narrationEnabled === true && sb.narrationEnabled !== false
   const text = (sb.narrationText || '').trim()
   const meta: NarrationMeta = parseNarrationMeta(sb.narrationMeta)
 
@@ -417,6 +415,22 @@ export async function inspectComposeInputs(
   }
   const fail = (reason: string, blocked: ComposeBlockedError | null = null): ComposeInspection =>
     ({ ok: false, reason, blocked, inputs })
+  if (documentary && (!combo || sb.designCardStatus !== 'confirmed')) return fail('设计卡未确认')
+  if (documentary && (combo === 'A' || combo === 'C' || combo === 'D') && !replaceClip && !preClip && !postClip) {
+    return fail(`${shot} 的图层段尚未渲染`)
+  }
+  let junctionHash: string | null = null
+  if (documentary && (combo === 'C' || combo === 'D')) {
+    const junction = await junctionFrameOf(sb.id)
+    junctionHash = junction.hash
+    if (junction.stale || !junction.hash) return fail(`${shot} 的衔接帧已过期，请重新渲染图层段`)
+    if (sb.keyframesJunctionHash !== junction.hash || !sb.keyframesConfirmed) return fail(`${shot} 的衔接帧已变化，请重新确认故事关键帧并生成视频`)
+  }
+  if (documentary && combo !== 'A' && !sb.keyframesConfirmed) return fail(`${shot} 的故事关键帧未确认`)
+  if (documentary && combo !== 'A' && modelFacts && modelFacts.durationMs > 15000 + 1) return fail(`${shot} 的生成段实测超过 15 秒`)
+  for (const facts of [replaceFacts, preFacts, postFacts]) {
+    if (documentary && facts && facts.durationMs > 30000 + 1) return fail(`${shot} 的图层段实测超过 30 秒`)
+  }
 
   if (replaceClip) {
     if (!replaceClip.render_path) return fail(`${shot} 的确定性片段还没有渲染，请先渲染片段`)
@@ -451,9 +465,9 @@ export async function inspectComposeInputs(
   const dv = (mainFacts.durationMs + (preFacts?.durationMs ?? 0) + (postFacts?.durationMs ?? 0)) / 1000
   const da = audioFacts ? audioFacts.durationMs / 1000 : null
   // 纯画面镜头不做偏移（planCompose 的无旁白分支原样输出画面），T 对产出无影响
-  const t = wantsNarration ? transition.t : 0
-  // 用户确认 Q5：整镜替代的确定性片段上限 30 秒，含模型视频的镜头仍是 15 秒
-  const maxSeconds = replaceClip ? MAX_LAYER_SEGMENT_SECONDS : MAX_SHOT_SECONDS
+  const t = wantsNarration && combo !== 'A' ? transition.t : 0
+  const maxSeconds = shotMaxSeconds(combo)
+  if (documentary && dv > maxSeconds + 1e-3) return fail(`${shot} 的实测总时长 ${dv.toFixed(3)} 秒超过 ${maxSeconds} 秒上限`)
   const fit = resolveComposeFit({
     episodeDefault: ep.narrationFitDefault,
     shotFit: sb.narrationFit,
@@ -481,9 +495,26 @@ export async function inspectComposeInputs(
     text_sha256: sha256(wantsNarration ? text : ''),
     fit_key: fit.key,
     transition_t: Math.round(t * 1000) / 1000,
-    replace_clip: clipPart(replaceClip),
-    pre_clip: clipPart(preClip),
-    post_clip: clipPart(postClip),
+  }
+  if (documentary && combo) {
+    parts.combo = combo
+    parts.layer_segment = clipPart(replaceClip ?? preClip ?? postClip)
+    parts.junction_hash = junctionHash
+    const tasks = await db.select().from(schema.sysTask)
+      .where(and(eq(schema.sysTask.storyboardId, sb.id), eq(schema.sysTask.type, 'video')))
+      .orderBy(desc(schema.sysTask.id))
+    const adopted = tasks.find(task => task.status === 'completed' && (task.localPath || task.resultUrl) === sb.videoUrl)
+    parts.video_task_id = combo === 'A' ? null : adopted?.id ?? null
+    if ((combo === 'C' || combo === 'D') && !adopted) return fail(`${shot} 的生成视频没有可核验的衔接帧记录，请重新生成视频`)
+    if ((combo === 'C' || combo === 'D') && adopted) {
+      let snapshot: Record<string, unknown> = {}
+      try { snapshot = JSON.parse(adopted.params || '{}') } catch { /* Invalid snapshot is stale. */ }
+      if (snapshot.junction_hash !== junctionHash) return fail(`${shot} 的生成视频使用了旧衔接帧，请重新生成视频`)
+    }
+    // Documentary composition preserves both complete segments; narration never truncates a segment.
+    plan.d = Math.max(plan.d, dv)
+    plan.trim = false
+    plan.freezeSeconds = Math.max(0, plan.d - dv)
   }
 
   return {
@@ -500,6 +531,9 @@ export async function inspectComposeInputs(
       subtitleAbs,
       dv,
       da,
+      layerDuration: ((replaceFacts?.durationMs ?? 0) + (preFacts?.durationMs ?? 0) + (postFacts?.durationMs ?? 0)) / 1000,
+      generatedDuration: combo === 'A' ? 0 : (modelFacts?.durationMs ?? 0) / 1000,
+      junctionSeconds: combo === 'C' ? (preFacts?.durationMs ?? 0) / 1000 : combo === 'D' ? (modelFacts?.durationMs ?? 0) / 1000 : null,
       t,
       tSource: wantsNarration ? transition.source : 'none',
       fit,
@@ -517,7 +551,10 @@ export async function assembleComposeInput(storyboardId: number): Promise<Compos
   if (sb.deletedAt) throw new Error('镜头已删除')
   const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, sb.episodeId))
   if (!ep) throw new Error('剧集不存在')
-  if (ep.narrationEnabled !== true) throw new Error('本集未开启旁白，无需合成')
+  if (ep.narrationEnabled !== true && resolveDramaProjectType(ep.dramaId) !== 'documentary') throw new Error('本集未开启旁白，无需合成')
+  if (resolveDramaProjectType(ep.dramaId) === 'documentary' && (!toCombo(sb.combo) || sb.designCardStatus !== 'confirmed')) {
+    throw new GateBlockedError('final', '设计卡未确认')
+  }
 
   const transition = await resolveTransitionT(storyboardId, sb.transitionReview, sb.videoUrl)
   const inspection = await inspectComposeInputs(sb, ep, transition)
@@ -583,7 +620,7 @@ function deriveComposeState(
   if (!inspection.ok) {
     return {
       ...base,
-      status: 'blocked',
+      status: !inspection.blocked && (sb.combo || inspection.reason === '设计卡未确认') ? 'excluded' : 'blocked',
       selectable: false,
       checked: false,
       exportable: false,
@@ -676,7 +713,7 @@ export async function composeStatesForEpisode(
     ? live
     : live.filter(sb => opts.storyboardIds!.includes(sb.id))
 
-  if (episode.narrationEnabled !== true) return rows.map(disabledState)
+  if (episode.narrationEnabled !== true && resolveDramaProjectType(episode.dramaId) !== 'documentary') return rows.map(disabledState)
 
   // 冷缓存时一次性并发预热，避免逐镜串行 ffprobe
   await mediaFactsAll(rows.flatMap(sb => [

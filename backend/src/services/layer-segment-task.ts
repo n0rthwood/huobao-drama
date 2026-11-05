@@ -20,10 +20,13 @@ import {
   markSegmentRendered,
   markSegmentStatus,
   resolveEpisodeSegmentSpec,
+  clearSegmentStaleReason,
+  layerSegmentSignatureOf,
   type LayerSegmentStatus,
 } from './layer-segment.js'
 import { invalidateKeyframeConfirmation } from './keyframes.js'
 import { toCombo } from './design-card.js'
+import { refreshLayerSegmentSources, RENDER_CONSUMED_SOURCE_REASONS } from './segment-source-refresh.js'
 
 /** 图层段任务的 provider 常量：任务中心据此把它当普通行、可重试 */
 export const LAYER_SEGMENT_PROVIDER = 'layer-segment'
@@ -47,8 +50,12 @@ export interface LayerSegmentRenderOutcome {
  */
 export async function startLayerSegmentRenderTask(storyboardId: number): Promise<LayerSegmentRenderOutcome> {
   if (rendering.has(storyboardId)) throw new Error('该图层段正在渲染中，请等待本次渲染结束')
-  const segment = await getLayerSegment(storyboardId)
+  let segment = await getLayerSegment(storyboardId)
   if (!segment) throw new Error('本镜还没有图层段，请先生成草稿')
+  if (segment.stale_reasons.some(reason => reason === 'source_unresolved' || RENDER_CONSUMED_SOURCE_REASONS.some(source => source === reason))) {
+    if (!await refreshLayerSegmentSources(storyboardId)) throw new Error('图层段引用的底图或语义条目已不存在，请重新选择素材/条目或解除锚点后再渲染')
+    segment = (await getLayerSegment(storyboardId))!
+  }
   const [sb] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, storyboardId))
   if (!sb) throw new Error('分镜不存在')
   const combo = toCombo(sb.combo)
@@ -87,6 +94,11 @@ export async function startLayerSegmentRenderTask(storyboardId: number): Promise
       junction_path: result.junction?.path ?? null,
       junction_hash: result.junction?.hash ?? null,
     })
+    const latestSegment = await getLayerSegment(storyboardId)
+    // Do not consume a second source change that arrived while ffmpeg was rendering.
+    if (latestSegment && layerSegmentSignatureOf(latestSegment, spec) === result.render_signature) {
+      for (const reason of RENDER_CONSUMED_SOURCE_REASONS) await clearSegmentStaleReason(segment.id, reason)
+    }
 
     // 衔接帧变了：确认时快照的 hash 对不上 → 作废确认并记原因（只在**已确认**时才有意义）
     const previousHash = sb.keyframesJunctionHash

@@ -5,6 +5,8 @@
  * 中间帧/尾帧只作引导帧。参考图顺序 = 首帧关键帧 → 视频绑定素材（视频提示词 + 转场段 @ 到的
  * 场景 → 角色 → 道具，Issue #18；去重、最多 9 张），因此素材在提示词里的编号从 2 起。
  * 关键帧未经人工确认的分镜拒绝生成。
+ * 首/尾均消费 keyframes 的生效图（含 C/D 衔接锁与 D 承接双锁），不接收客户端媒体路径。
+ * 首帧恒占参考图 1 号位，因此 H3 走 reference + AddGuide，不走 firstlast 模板。
  */
 import { and, eq, isNull } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
@@ -34,6 +36,8 @@ import {
 } from './transition.js'
 import { runTransitionReview } from './transition-agent.js'
 import { loadDesignCardContext, resolveDesignCard } from './design-card-context.js'
+import { parseDesignCard, toCombo } from './design-card.js'
+import { resolveDramaProjectType } from './project-type.js'
 
 export interface StoryboardVideoOptions {
   model?: string
@@ -83,6 +87,7 @@ export interface VideoSignatureInput {
   aspectRatio: string
   resolution?: string | null
   provider: string
+  junction?: { slot: string; hash: string } | null
   model: string
 }
 
@@ -117,12 +122,23 @@ export function computeVideoSignature(input: VideoSignatureInput): {
       refBasename(input.midFrameUrl || ''),
       input.midFrameUrl ? input.midFrameTime ?? null : null,
       refBasename(input.lastFrameUrl || ''),
+      ...(input.junction ? [input.junction.slot, input.junction.hash] : []),
     ]),
     refs: digest((input.referenceImageUrls || []).map(refBasename)),
     spec: digest([Math.round(Number(input.duration) || 0), input.aspectRatio || '', input.resolution || '']),
     engine: digest([input.provider || '', input.model || '']),
   }
   return { signature: digest(parts), parts }
+}
+
+/** The generated segment limit includes opening transition and preparation overhead. */
+export function assertGeneratedSegmentDuration(contentSeconds: number, submittedSeconds: number, transitionSeconds = 0): void {
+  if (!Number.isFinite(contentSeconds) || contentSeconds < 4 || contentSeconds > 15) {
+    throw new Error('生成段时长必须在 4–15 秒内')
+  }
+  if (!Number.isFinite(submittedSeconds) || submittedSeconds < contentSeconds + transitionSeconds || submittedSeconds > 15) {
+    throw new Error('生成段含开场转场与准备时间不能超过 15 秒，请缩短生成段预算或转场')
+  }
 }
 
 /** 组装分镜的视频生成请求（不提交） */
@@ -138,11 +154,18 @@ export async function buildStoryboardVideoRequest(
     .where(eq(schema.episodes.id, storyboard.episodeId))
   if (!episode) throw new Error('剧集不存在')
   const [drama] = await db.select().from(schema.dramas).where(eq(schema.dramas.id, episode.dramaId))
+  const documentary = resolveDramaProjectType(episode.dramaId) === 'documentary'
+  const combo = toCombo(storyboard.combo)
+  if (documentary && (!combo || storyboard.designCardStatus !== 'confirmed')) throw new Error('设计卡未确认')
+  if (documentary && combo === 'A') throw new Error('未启用生成段')
 
   // 关键帧闸门：就绪且人工确认过才允许生成视频
   const keyframes = (await loadEpisodeKeyframes(episode.id)).get(storyboardId)
   if (!keyframes?.confirmed) {
     throw new Error(`分镜 #${storyboard.storyboardNumber} 的关键帧尚未确认`)
+  }
+  if (documentary && (combo === 'C' || combo === 'D') && (!keyframes.locked?.hash || keyframes.locked.stale)) {
+    throw new Error('衔接帧缺失或已过期，请先渲染图层段并重新确认关键帧')
   }
 
   // 配置优先级与 POST /tasks 一致：请求显式指定 > 集锁定配置 > 当前启用配置
@@ -160,7 +183,10 @@ export async function buildStoryboardVideoRequest(
 
   // ===== 开场转场（#11）：承接镜头提交前自动审核/生成，手动编辑过的不覆盖 =====
   let sb = storyboard
-  const contentDuration = Number(sb.duration || 10)
+  const contentDuration = documentary
+    ? Number(parseDesignCard(sb.designCard)?.budget.gen_s ?? sb.duration ?? 10)
+    : Number(sb.duration || 10)
+  if (documentary) assertGeneratedSegmentDuration(contentDuration, contentDuration)
   let transition: { text: string; seconds: number; extra: number } | null = null
   let submitDuration = contentDuration
   let midGuideTime = sb.midFrameTime ?? null
@@ -189,6 +215,10 @@ export async function buildStoryboardVideoRequest(
       }
     }
   }
+
+  // H3 silently clamps at 15s; reject before submission so guides, prompt and signature
+  // describe the actual generated segment, including transition preparation overhead.
+  if (documentary) assertGeneratedSegmentDuration(contentDuration, submitDuration, transition?.seconds ?? 0)
 
   // 视频提示词的 @引用 必须与视频绑定一致（Issue #7/#18），否则会出现“提到了却没带参考图”；
   // 带转场提交时，转场段里的 @引用 同样参与检查（转场写入时已同步到视频绑定）
@@ -258,6 +288,7 @@ export async function buildStoryboardVideoRequest(
     aspectRatio: drama?.aspectRatio || '16:9',
     resolution: episode.resolution || undefined,
     configId,
+    ...(keyframes.locked?.hash ? { junction_hash: keyframes.locked.hash, junction_slot: keyframes.locked.slot } : {}),
   }
 
   // 签名取请求的最终输出，与 sys_task 落库的 params 同一份口径
@@ -274,6 +305,7 @@ export async function buildStoryboardVideoRequest(
     resolution: params.resolution,
     provider: config.provider,
     model: resolvedModel,
+    junction: keyframes.locked?.hash ? { slot: keyframes.locked.slot, hash: keyframes.locked.hash } : null,
   })
 
   return {
@@ -337,6 +369,8 @@ export function videoSignatureFromTask(task: {
     resolution: typeof params.resolution === 'string' ? params.resolution : null,
     provider: task.provider,
     model: task.model,
+    junction: typeof params.junction_hash === 'string' && typeof params.junction_slot === 'string'
+      ? { hash: params.junction_hash, slot: params.junction_slot } : null,
   })
 }
 
