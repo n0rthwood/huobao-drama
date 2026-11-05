@@ -26,6 +26,7 @@ import { normalizeAssetName, normalizeNearName } from './asset-name.js'
 import { parseSemantics, type AssetSemantics } from './asset-semantics.js'
 import type { ExtractTarget } from './extraction.js'
 import { resolveDramaProjectType } from './project-type.js'
+import { markDesignCardsStaleForReviewItems } from './staleness.js'
 import {
   createTextTask,
   findActiveTextTask,
@@ -792,6 +793,9 @@ async function runAssetReview(taskId: number, episodeId: number, texts: string[]
     const partial = progress.failed > 0
     const diff = mergeDraftItems(episodeId, taskId, drafts, { keepUnmatched: partial })
     await patchTextTaskParams(taskId, { review_diff: diff })
+    // R4 接缝（契约 §6.1）：被本次对照改动的条目 → 引用它们的设计卡置过期，一次对照只调一次。
+    // 残缺的一轮也要调：那几条已经改了，设计卡不能继续按旧条目算「新鲜」。
+    await markDesignCardsStaleForReviewItems(episodeId, diff.changed_item_ids)
     // 完整跑完才作废旧的「资产库有变更」横幅理由
     if (!partial) await clearStaleReasons(episodeId)
     await finishTextTask(taskId, partial ? 'failed' : 'completed', {

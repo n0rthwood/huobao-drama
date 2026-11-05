@@ -5,7 +5,7 @@
  * 纯函数在 TS 里，用仓库自带的 tsx 子进程跑；落库用一次性 SQLITE_PATH 临时库。
  */
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -351,4 +351,17 @@ test('剧情项目短路：run 不启动、读接口 400 not_documentary、不�
   assert.equal(result.readCode, 'not_documentary')
   assert.equal(result.recomputed, 'none')
   assert.equal(result.status, 'none')
+})
+
+test('对照完成后把 changed_item_ids 交给 R4 的设计卡过期入口（每次对照一次）', () => {
+  const source = readFileSync(new URL('../src/services/asset-review.ts', import.meta.url), 'utf8')
+  assert.match(source, /import \{ markDesignCardsStaleForReviewItems \} from '\.\/staleness\.js'/)
+  const calls = source.match(/markDesignCardsStaleForReviewItems\(/g) || []
+  assert.equal(calls.length, 1, '整个服务里只调用一次（import 不带括号）')
+  assert.match(source, /await markDesignCardsStaleForReviewItems\(episodeId, diff\.changed_item_ids\)/)
+  // 顺序：必须在合并出 diff 之后
+  assert.ok(
+    source.indexOf('const diff = mergeDraftItems(') < source.indexOf('await markDesignCardsStaleForReviewItems('),
+    '过期传播要发生在 mergeDraftItems 之后',
+  )
 })
