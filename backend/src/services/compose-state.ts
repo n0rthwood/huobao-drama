@@ -337,7 +337,7 @@ function clipContextOf(segment: LayerSegment | undefined, combo: string | null |
   const position = segmentPositionOfCombo(combo)
   if (position === 'none') return context
   context.clips[position] = segment
-  context.fresh[position] = layerSegmentIsFresh(segment, spec)
+  context.fresh[position] = layerSegmentIsFresh(segment, spec, combo)
   return context
 }
 

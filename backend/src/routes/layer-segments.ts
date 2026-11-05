@@ -73,7 +73,7 @@ async function segmentPayload(storyboardId: number) {
     design_card_status: status,
     production_unlocked: gate.unlocked,
     gate_reason: gate.reason,
-    segment: segment ? { ...segment, fresh: layerSegmentIsFresh(segment, spec) } : null,
+    segment: segment ? { ...segment, fresh: layerSegmentIsFresh(segment, spec, sb.combo) } : null,
     junction,
     issues: segmentIssuesOf({
       card: parseDesignCard(sb.designCard),

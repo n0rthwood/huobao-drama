@@ -33,7 +33,7 @@ export async function previewLayerRenderBatch(episodeId: number, storyboardIds?:
         else if (segment.status === 'rendering') { item.status = 'skipped'; item.reason = 'generating' }
         else if (segment.stale_reasons.some(reason => reason !== 'migrated_multi_clip' && !RENDER_CONSUMED_SOURCE_REASONS.some(source => source === reason))) item.reason = `图层段输入已过期：${segment.stale_reasons.join('、')}`
         else {
-          item.status = !segment.stale_reasons.some(reason => RENDER_CONSUMED_SOURCE_REASONS.some(source => source === reason)) && layerSegmentIsFresh(segment, spec) ? 'unchanged' : segment.render_path ? 'changed' : 'missing'
+          item.status = !segment.stale_reasons.some(reason => RENDER_CONSUMED_SOURCE_REASONS.some(source => source === reason)) && layerSegmentIsFresh(segment, spec, sb.combo) ? 'unchanged' : segment.render_path ? 'changed' : 'missing'
           item.selectable = true
           item.checked = item.status !== 'unchanged'
           if (!item.checked) item.reason = 'unchanged'

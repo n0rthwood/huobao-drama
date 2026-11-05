@@ -461,17 +461,18 @@ export function fileSha256(relativePath: string): string {
   return sha
 }
 
-/** 图层段渲染签名（`'seg-v1'`）：输入任何一处变化（含底图文件本身被换掉）都要重渲染 */
+/** C/D v2 includes the encoded text-free boundary profile; A/legacy retain v1. */
 export function layerSegmentSignatureOf(
   segment: Pick<LayerSegment, 'layer_doc' | 'timeline' | 'duration'>,
   spec: Pick<SegmentSpec, 'width' | 'height' | 'fps'>,
+  combo?: string | null,
 ): string {
   const images = [segment.layer_doc.base.path]
   for (const layer of segment.layer_doc.layers) {
     if (layer.type === 'image') images.push(layer.src.path)
   }
   return crypto.createHash('sha256').update([
-    'seg-v1',
+    combo === 'C' || combo === 'D' ? `seg-v2-${combo}` : 'seg-v1',
     JSON.stringify(segment.layer_doc),
     JSON.stringify(segment.timeline),
     segment.duration.toFixed(3),
@@ -482,12 +483,12 @@ export function layerSegmentSignatureOf(
 }
 
 /** 已渲染的成品是否仍对得上当前输入（文件在 + 签名一致） */
-export function layerSegmentIsFresh(segment: LayerSegment, spec: Pick<SegmentSpec, 'width' | 'height' | 'fps'>): boolean {
+export function layerSegmentIsFresh(segment: LayerSegment, spec: Pick<SegmentSpec, 'width' | 'height' | 'fps'>, combo?: string | null): boolean {
   // quality_warnings are advisory; only the historical multi-clip migration note is nonblocking here.
   if (segment.stale_reasons.some(reason => reason !== SEGMENT_STALE_REASONS.migratedMultiClip)) return false
   if (!segment.render_path || !segment.render_signature) return false
   if (!fs.existsSync(getAbsolutePath(segment.render_path))) return false
-  return segment.render_signature === layerSegmentSignatureOf(segment, spec)
+  return segment.render_signature === layerSegmentSignatureOf(segment, spec, combo)
 }
 
 // ─── 画幅 ────────────────────────────────────────────────────

@@ -156,7 +156,7 @@ export async function episodeGateFacts(episodeId: number): Promise<GateFacts | n
     productionReady = rows.filter(sb => {
       if (sb.designCardStatus !== 'confirmed' || !sb.combo) return false
       const segment = segments.get(sb.id)
-      const layerReady = Boolean(segment && layerSegmentIsFresh(segment, spec))
+      const layerReady = Boolean(segment && layerSegmentIsFresh(segment, spec, sb.combo))
       if (sb.combo === 'A') return layerReady
       if (sb.combo === 'B') return sb.keyframesConfirmed === true
       return layerReady && sb.keyframesConfirmed === true

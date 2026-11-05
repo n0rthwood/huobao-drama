@@ -96,7 +96,7 @@ export async function startLayerSegmentRenderTask(storyboardId: number): Promise
     })
     const latestSegment = await getLayerSegment(storyboardId)
     // Do not consume a second source change that arrived while ffmpeg was rendering.
-    if (latestSegment && layerSegmentSignatureOf(latestSegment, spec) === result.render_signature) {
+    if (latestSegment && layerSegmentSignatureOf(latestSegment, spec, combo) === result.render_signature) {
       for (const reason of RENDER_CONSUMED_SOURCE_REASONS) await clearSegmentStaleReason(segment.id, reason)
     }
 
