@@ -55,8 +55,7 @@ test('row summaries stay independent of selection and late same-ID or other-ID r
   pending.length=0
   const rows = [186,188].map(id=>({id,combo:'A',design_card_status:'confirmed',layer_segment:{status:'ready',render_path:`static/${id}.mp4`,fresh:true}}))
   const app = renderer.createApp(Component,{episodeId:14,dramaId:8,storyboards:rows})
-  app.mount({})
-  const state=app._instance.setupState
+  const state=app.mount({}).$.setupState
   assert.equal(state.layerStatusOf(rows[0]),'ready')
   assert.equal(state.layerStatusOf({...rows[0],layer_segment:undefined}),'unknown')
   assert.equal(state.layerStatusOf({...rows[0],layer_segment:{status:'draft',exists:false,fresh:false,render_path:null}}),'unknown')
@@ -98,8 +97,7 @@ test('current confirmation truth updates on refresh and stale recorded approval 
   confirmations.length=0
   const shot={id:186,keyframes_confirmed:true,keyframes:{ready:true,confirmed:true}}
   const instance=renderer.createApp(Keyframes,{storyboards:[shot],embedded:true})
-  instance.mount({})
-  const state=instance._instance.setupState
+  const state=instance.mount({}).$.setupState
   assert.equal(state.kf(shot).confirmed,true)
   assert.equal(state.confirmationSet(shot),true)
   await state.toggleConfirm(shot)
