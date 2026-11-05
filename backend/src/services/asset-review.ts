@@ -155,9 +155,20 @@ export function canTransitionStatus(from: ReviewItemStatus, to: ReviewItemStatus
   return from === to || ALLOWED_TRANSITIONS[from].includes(to)
 }
 
-/** 状态优先级（评审裁决·疑问 9）：running > pending(有 missing) > passed > none */
-export function computeReviewStatus(facts: { running: boolean; total: number; missing: number }): AssetReviewStatus {
+/**
+ * 状态优先级（评审裁决·疑问 9）：running > pending(有 missing) > passed > none。
+ * `incomplete` = 最近一次对照有段落失败：那几段的信息点根本没被列出来，
+ * 「没有 missing」只是因为没问过，绝不能据此解锁分镜设计——一律按 pending 上锁，
+ * 直到重新对照完整跑完一次。
+ */
+export function computeReviewStatus(facts: {
+  running: boolean
+  total: number
+  missing: number
+  incomplete?: boolean
+}): AssetReviewStatus {
   if (facts.running) return 'running'
+  if (facts.incomplete) return 'pending'
   if (facts.total === 0) return 'none'
   return facts.missing > 0 ? 'pending' : 'passed'
 }
@@ -378,7 +389,12 @@ export interface ReviewRunDiff {
  *    命中就把那行改指纹迁过来，处置照样保留；
  * 3. 仍未命中 → 新建行；本次完全没认领的旧行删除。
  */
-export function mergeDraftItems(episodeId: number, runId: number, rawDrafts: DraftItem[]): ReviewRunDiff {
+export function mergeDraftItems(
+  episodeId: number,
+  runId: number,
+  rawDrafts: DraftItem[],
+  opts: { keepUnmatched?: boolean } = {},
+): ReviewRunDiff {
   const ts = now()
   // 全集去重：同一「信息点 + need_kind」跨段重复时只留第一条（指纹不含段号，
   // 留两条会直接撞 UNIQUE(episode_id, fingerprint)）
@@ -452,11 +468,15 @@ export function mergeDraftItems(episodeId: number, runId: number, rawDrafts: Dra
     diff.changed_item_ids.push(Number(res.lastInsertRowid))
   }
 
-  for (const row of existing) {
-    if (claimed.has(row.id)) continue
-    db.delete(schema.assetReviewItems).where(eq(schema.assetReviewItems.id, row.id)).run()
-    diff.removed++
-    diff.changed_item_ids.push(row.id)
+  // 本次有段落失败时 `keepUnmatched`：失败段的条目不在 drafts 里，删掉就等于把「还缺素材」
+  // 悄悄抹平，强门禁会被错误解锁。宁可留下陈旧条目，也不能凭一次残缺的对照放行。
+  if (!opts.keepUnmatched) {
+    for (const row of existing) {
+      if (claimed.has(row.id)) continue
+      db.delete(schema.assetReviewItems).where(eq(schema.assetReviewItems.id, row.id)).run()
+      diff.removed++
+      diff.changed_item_ids.push(row.id)
+    }
   }
   return diff
 }
@@ -485,7 +505,15 @@ export async function recomputeAssetReviewStatus(episodeId: number): Promise<Ass
   if (!isDocumentaryEpisode(episodeId).ok) return 'none'
   const counts = assetReviewCounts(episodeId)
   const running = !!await findActiveTextTask(episodeId, 'asset_review')
-  const status = computeReviewStatus({ running, total: counts.total, missing: counts.missing })
+  const latest = await findLatestTextTask(episodeId, 'asset_review')
+  const progress = parseTextTaskParams(latest?.params)?.progress
+  const status = computeReviewStatus({
+    running,
+    total: counts.total,
+    missing: counts.missing,
+    // 最近一次对照有失败段 → 清单不完整，门禁保持上锁（处置剩余条目也解不开）
+    incomplete: !!latest && Number(progress?.failed || 0) > 0,
+  })
   await db.update(schema.episodes)
     .set({ assetReviewStatus: status, updatedAt: now() })
     .where(eq(schema.episodes.id, episodeId))
@@ -698,11 +726,14 @@ async function runAssetReview(taskId: number, episodeId: number, texts: string[]
       logTaskProgress('AssetReview', 'segment', { episodeId, segmentNo, items: drafts.length })
     }
 
-    const diff = mergeDraftItems(episodeId, taskId, drafts)
+    // 有任何一段失败 = 这次对照不完整：既不删旧条目，也不算 completed，
+    // 否则「少了几段」会被当成「这几段没有缺口」而解锁分镜设计。
+    const partial = progress.failed > 0
+    const diff = mergeDraftItems(episodeId, taskId, drafts, { keepUnmatched: partial })
     await patchTextTaskParams(taskId, { review_diff: diff })
-    // 重新对照后旧的「资产库有变更」横幅理由作废
-    await clearStaleReasons(episodeId)
-    await finishTextTask(taskId, progress.failed === texts.length ? 'failed' : 'completed', {
+    // 完整跑完才作废旧的「资产库有变更」横幅理由
+    if (!partial) await clearStaleReasons(episodeId)
+    await finishTextTask(taskId, partial ? 'failed' : 'completed', {
       progress: { ...progress },
       outputText: JSON.stringify(diff),
       errorMsg: errors.length ? errors.join('；').slice(0, 500) : null,

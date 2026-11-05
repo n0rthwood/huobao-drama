@@ -243,6 +243,39 @@ test('重新对照：指纹命中保留处置；中间插段不影响既有条�
   assert.equal(migrated.decided, decidedBefore.get('车马坑').decidedAt)
 })
 
+test('对照有段落失败时：不删旧条目（强门禁不被残缺结果解锁）', () => {
+  const result = run(`
+    ${FIXTURE}
+    const { mergeDraftItems } = await import('./src/services/asset-review.ts')
+    const draft = (infoPoint, needKind, segmentNo) => ({
+      segmentNo, narrationExcerpt: '第 ' + segmentNo + ' 段',
+      infoPoint, needKind, needDesc: infoPoint + '的素材',
+      status: 'missing', assetKind: null, assetId: null, semanticId: null, reason: null,
+      fingerprint: fingerprintOf(infoPoint, needKind),
+    })
+    mergeDraftItems(1, 10, [draft('殷墟在哪里', 'prop_faithful', 1), draft('车马坑', 'prop', 2)])
+    // 第 2 段失败：drafts 只有第 1 段
+    const diff = mergeDraftItems(1, 11, [draft('殷墟在哪里', 'prop_faithful', 1)], { keepUnmatched: true })
+    const rows = await db.select().from(schema.assetReviewItems)
+    // 失败段落留痕在任务 progress 上：recompute 据此拒绝 passed
+    const { createTextTask, finishTextTask } = await import('./src/services/text-task.ts')
+    const taskId = await createTextTask({ kind: 'asset_review', episodeId: 1, dramaId: 1, progress: { completed: 4, failed: 1, total: 5 } })
+    await finishTextTask(taskId, 'failed', { progress: { completed: 4, failed: 1, total: 5 } })
+    // 即使把剩下的条目全部处置掉，门禁也不解锁
+    for (const row of rows) await updateAssetReviewItem(row.id, { status: 'not_needed', reason: '由图层卡片表达' })
+    const status = await recomputeAssetReviewStatus(1)
+    // 旁白稿已确认：此时 design 唯一的上锁理由只能是审核清单
+    await db.update(schema.episodes).set({ scriptConfirmedAt: at }).where(eq(schema.episodes.id, 1))
+    const gates = await (await import('./src/services/workflow-gates.ts')).episodeGates(1)
+    console.log('@@' + JSON.stringify({ diff, infos: rows.map(r => r.infoPoint).sort(), status, design: gates.unlocked.design, reason: gates.reasons.design }))
+  `)
+  assert.equal(result.diff.removed, 0)
+  assert.deepEqual(result.infos, ['殷墟在哪里', '车马坑'].sort())
+  assert.equal(result.status, 'pending', '有失败段时即便没有 missing 也不得 passed')
+  assert.equal(result.design, false, '清单不完整时分镜设计必须保持上锁')
+  assert.ok(result.reason)
+})
+
 test('失效理由只记横幅，不回退 passed', () => {
   const result = run(`
     ${FIXTURE}

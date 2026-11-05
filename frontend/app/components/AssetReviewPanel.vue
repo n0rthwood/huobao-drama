@@ -194,7 +194,9 @@ async function confirmIgnore() {
 }
 
 function openBind(item) {
-  bindDialog.value = { open: true, item, kind: assetKindOfItem(item), assetId: 0, saving: false }
+  // 选项值用 `kind:id`：三类资产的 id 各自从 1 开始，exposition 条目的候选跨类别，
+  // 只传裸 id 会把角色/场景错绑成同号道具
+  bindDialog.value = { open: true, item, kind: assetKindOfItem(item), assetId: '', saving: false }
   loadEpisodeAssets()
 }
 
@@ -210,11 +212,13 @@ const bindCandidates = computed(() => {
 async function confirmBind() {
   const dialog = bindDialog.value
   if (dialog.saving || !dialog.assetId) return
-  const asset = episodeAssets.value.find(a => a.id === Number(dialog.assetId) && a.kind === dialog.kind)
+  const [kind, id] = String(dialog.assetId).split(':')
+  const asset = episodeAssets.value.find(a => a.kind === kind && a.id === Number(id))
+  if (!asset) return
   dialog.saving = true
   try {
-    await patchItem(dialog.item, { status: 'have', asset_kind: asset?.kind || dialog.kind, asset_id: Number(dialog.assetId) })
-    bindDialog.value = { open: false, item: null, kind: 'prop', assetId: 0, saving: false }
+    await patchItem(dialog.item, { status: 'have', asset_kind: asset.kind, asset_id: asset.id })
+    bindDialog.value = { open: false, item: null, kind: 'prop', assetId: '', saving: false }
   } catch {
     dialog.saving = false
   }
@@ -424,10 +428,12 @@ onBeforeUnmount(() => { if (timer) clearTimeout(timer) })
         <div class="dialog-body">
           <p class="dim" style="font-size:12px">{{ t('episode.assetReview.bindDialog.hint') }}</p>
           <select v-model="bindDialog.assetId" class="input">
-            <option :value="0">{{ t('episode.assetReview.bindDialog.placeholder') }}</option>
-            <option v-for="asset in bindCandidates" :key="`${asset.kind}-${asset.id}`" :value="asset.id">
-              {{ asset.name }}
-            </option>
+            <option value="">{{ t('episode.assetReview.bindDialog.placeholder') }}</option>
+            <option
+              v-for="asset in bindCandidates"
+              :key="`${asset.kind}-${asset.id}`"
+              :value="`${asset.kind}:${asset.id}`"
+            >{{ asset.name }}（{{ t(`episode.assetReview.needKind.${asset.kind}`) }}）</option>
           </select>
           <p v-if="!bindCandidates.length" class="dim" style="font-size:12px">
             {{ t('episode.assetReview.bindDialog.empty') }}
