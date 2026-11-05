@@ -116,6 +116,15 @@ const CASES = [
     },
     size: { width: 800, height: 450 },
   },
+  {
+    name: 'R6 crop uses native whole-image aspect and marker label offsets',
+    doc: {
+      ...MAP_DOC,
+      base: { ...MAP_DOC.base, source_width: 4000, source_height: 3000, crop: { x: 0, y: 0.125, w: 1, h: 0.75 } },
+      layers: [{ id: 'offset', type: 'marker', at: [0.5, 0.5], text: '西宁', style: { label_dx: 0.1, label_dy: -0.02 } }],
+    },
+    size: { width: 1920, height: 1080 },
+  },
 ]
 
 const WRAPS = [
@@ -209,4 +218,12 @@ test('打包字体未覆盖的字符会被标出（渲染前阻断的依据）',
     assert.deepEqual(result.unsupported[index], expected[index])
     assert.deepEqual(front.unsupportedChars(text), expected[index])
   })
+})
+
+test('R6 default crop SVG and explicit whole-image SVG never double-extract', () => {
+  const { doc, svg } = result.cases[5]
+  assert.match(svg, /viewBox="0 375 4000 2250" preserveAspectRatio="none"/)
+  const full = front.layerDocToSvg(doc, { width: 4000, height: 3000 }, { viewport: { x: 0, y: 0, w: 1, h: 1 } })
+  assert.match(full, /viewBox="0 0 4000 3000"/)
+  assert.match(full, /<circle cx="2000" cy="1500"/, 'marker remains at original whole-image location')
 })

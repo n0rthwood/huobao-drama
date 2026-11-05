@@ -5,6 +5,7 @@
  */
 import { computed, ref, watch } from 'vue'
 import { THEME_PRESETS, layerBounds } from '~/utils/layerSvg'
+import { useMissingGlyphs } from '~/composables/useMissingGlyphs'
 
 export type LayerType = 'polygon' | 'polyline' | 'marker' | 'label' | 'card' | 'image'
 export type LayerTheme = 'archival' | 'clean' | 'ink'
@@ -19,20 +20,24 @@ export interface LayerRecord {
   z: number
   opacity: number
   rotation: number
-  anchor?: { asset_id?: number; semantic_id?: string; detached?: boolean }
+  anchor?: { asset_id?: number; semantic_id?: string; semantic_name?: string; detached?: boolean }
   points?: [number, number][]
   at?: [number, number]
   box?: LayerBox
   text?: string
   template?: 'name' | 'year' | 'chapter'
   fields?: { title: string; sub: string; meta: string }
-  src?: { path: string }
+  src?: { path: string; asset_kind?: 'prop' | 'scene' | 'character'; asset_id?: number; version_task_id?: number | null }
   fit?: 'contain' | 'cover'
   style: Record<string, unknown>
 }
 export interface LayerDocument {
   version: number
-  base: { path: string; width: number; height: number; filter?: Record<string, unknown> }
+  base: {
+    path: string; width: number; height: number; filter?: Record<string, unknown>
+    crop?: LayerBox; source_width?: number; source_height?: number
+    ref?: { asset_kind: 'prop' | 'scene' | 'character'; asset_id: number; version_task_id: number | null }
+  }
   theme: LayerTheme
   layers: LayerRecord[]
 }
@@ -93,7 +98,7 @@ export function createLayer(type: LayerType, theme: LayerTheme, index: number): 
   return base
 }
 
-export function useLayerDoc(onSave?: (doc: LayerDocument) => void) {
+export function useLayerDoc(onSave?: (doc: LayerDocument) => void, external?: { snapshot?: () => unknown; restore?: (value: unknown) => void }) {
   const doc = ref<LayerDocument>(emptyLayerDoc())
   const selectedIds = ref<string[]>([])
   const past = ref<string[]>([])
@@ -105,10 +110,22 @@ export function useLayerDoc(onSave?: (doc: LayerDocument) => void) {
   const canUndo = computed(() => past.value.length > 0)
   const canRedo = computed(() => future.value.length > 0)
   const aspect = computed(() => doc.value.base.width / doc.value.base.height)
+  const { missingGlyphs, missingGlyphsByLayer } = useMissingGlyphs(doc)
+
+  function captureSnapshot() {
+    return JSON.stringify({ doc: doc.value, external: external?.snapshot?.() })
+  }
+
+  function restoreSnapshot(snapshot: string) {
+    const value = JSON.parse(snapshot)
+    doc.value = value.doc
+    if ('external' in value) external?.restore?.(value.external)
+    selectedIds.value = selectedIds.value.filter(id => doc.value.layers.some(layer => layer.id === id))
+  }
 
   /** 在一次「可撤销的改动」之前调用；连续拖动只在按下时调一次。 */
   function pushHistory() {
-    past.value.push(JSON.stringify(doc.value))
+    past.value.push(captureSnapshot())
     if (past.value.length > HISTORY_LIMIT) past.value.shift()
     future.value = []
   }
@@ -121,20 +138,25 @@ export function useLayerDoc(onSave?: (doc: LayerDocument) => void) {
     future.value = []
   }
 
+  /** Accept normalized server metadata without resetting selection/history or autosaving it again. */
+  function acceptSaved(next: LayerDocument) {
+    clearTimeout(saveTimer ?? undefined)
+    silent = true
+    doc.value = JSON.parse(JSON.stringify(next))
+  }
+
   function undo() {
     const snapshot = past.value.pop()
     if (!snapshot) return
-    future.value.push(JSON.stringify(doc.value))
-    doc.value = JSON.parse(snapshot)
-    selectedIds.value = selectedIds.value.filter(id => doc.value.layers.some(layer => layer.id === id))
+    future.value.push(captureSnapshot())
+    restoreSnapshot(snapshot)
   }
 
   function redo() {
     const snapshot = future.value.pop()
     if (!snapshot) return
-    past.value.push(JSON.stringify(doc.value))
-    doc.value = JSON.parse(snapshot)
-    selectedIds.value = selectedIds.value.filter(id => doc.value.layers.some(layer => layer.id === id))
+    past.value.push(captureSnapshot())
+    restoreSnapshot(snapshot)
   }
 
   /** 坐标归一化 0–1（跨 Issue 契约）：编辑器里就钳住，避免服务端规范化后位置和画布对不上。 */
@@ -147,12 +169,36 @@ export function useLayerDoc(onSave?: (doc: LayerDocument) => void) {
     return out
   }
 
+  /** Geometry cannot silently detach an anchor; callers confirm before beginning a gesture. */
   function patchLayer(id: string, patch: Partial<LayerRecord>) {
     const layer = doc.value.layers.find(item => item.id === id)
     if (!layer) return
+    const geometryChanged = ['points', 'at', 'box', 'rotation'].some(key => key in patch)
+    if (geometryChanged && layer.anchor?.semantic_id && !layer.anchor.detached) {
+      return { confirmationRequired: true as const, layer }
+    }
     Object.assign(layer, clampGeometry(patch))
-    // 人工移动过的图层与语义标注脱钩（#47 锚点语义）
-    if (layer.anchor && ('points' in patch || 'at' in patch || 'box' in patch)) layer.anchor.detached = true
+    return { confirmationRequired: false as const, layer }
+  }
+
+  /** Explicit user-approved detach; history belongs to the complete gesture, not this helper. */
+  function detachAnchors(ids: string[]) {
+    for (const layer of doc.value.layers) {
+      if (ids.includes(layer.id) && layer.anchor) layer.anchor.detached = true
+    }
+  }
+
+  /** Rebinding is explicit and atomically restores the source geometry and its anchor. */
+  function reanchorLayer(id: string, patch: Partial<LayerRecord>) {
+    const layer = doc.value.layers.find(item => item.id === id)
+    if (!layer || !patch.anchor?.semantic_id) return
+    pushHistory()
+    Object.assign(layer, clampGeometry(patch), { anchor: { ...patch.anchor, detached: false } })
+  }
+
+  function setBase(base: LayerDocument['base']) {
+    pushHistory()
+    doc.value.base = JSON.parse(JSON.stringify(base))
   }
 
   function patchStyle(id: string, patch: Record<string, unknown>) {
@@ -180,6 +226,7 @@ export function useLayerDoc(onSave?: (doc: LayerDocument) => void) {
   function duplicateSelected() {
     if (!selectedIds.value.length) return
     pushHistory()
+    const maxZ = Math.max(...doc.value.layers.map(layer => layer.z), -1)
     const copies = selectedLayers.value.map((layer, index) => {
       const copy: LayerRecord = JSON.parse(JSON.stringify(layer))
       copy.id = `${layer.type}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}-${index}`
@@ -188,6 +235,7 @@ export function useLayerDoc(onSave?: (doc: LayerDocument) => void) {
       if (copy.points) copy.points = copy.points.map(([x, y]) => [x + 0.02, y + 0.02])
       if (copy.at) copy.at = [copy.at[0] + 0.02, copy.at[1] + 0.02]
       if (copy.box) copy.box = { ...copy.box, x: copy.box.x + 0.02, y: copy.box.y + 0.02 }
+      if (copy.anchor) copy.anchor = { ...copy.anchor, detached: true }
       return copy
     })
     doc.value.layers.push(...copies)
@@ -246,7 +294,13 @@ export function useLayerDoc(onSave?: (doc: LayerDocument) => void) {
     canUndo,
     canRedo,
     aspect,
+    missingGlyphs,
+    missingGlyphsByLayer,
+    detachAnchors,
+    reanchorLayer,
+    setBase,
     load,
+    acceptSaved,
     pushHistory,
     undo,
     redo,

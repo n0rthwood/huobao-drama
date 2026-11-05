@@ -383,6 +383,14 @@ Issue 整理完成后、实施前，必须让 **Fabel（Anthropic）或 Astra（
 - 首次旧设计迁移只接受已定义的 device × deterministic 组合；未定义组合保留可恢复设计内容、`combo=NULL`、`suggested_combo=NULL`，一律待审，并以 `migration_combo_unresolved` 提示显式重选。已迁移后人工确认的卡不重复回填或降级。
 - 设计卡未选组合/启用段预算为 NULL 时显示缺失状态，不用 0 秒或负余量冒充预算；明确填写 0 仍是无效值。原生类型选择器按内容自适应且不可压缩，紧凑高度必须同步减小纵向 padding。
 - 地图离线数据补 Natural Earth 50m 现代省界与城市背景点（公有领域，来源与校验和见 `backend/assets/geo/LICENSE.md`）；仅作现代定位参照，不代表古代边界，背景点不进入已审核语义点。渲染结果与 UI 明示覆盖计数及缺层警告，城市尺度无数据时不可伪造细节或隐式升级精度。
+### 图层编辑器与裁切/清晰度（Issue #59）
+- `LayerCanvas/PreciseKeyframeBar.vue` 替代 `ShotProduction/PreciseKeyframePanel.vue`：画布下方时间缩略条、逐帧取景/可见性/过渡检查器、首帧保护、末尾停留只读派生；组合 C 末端 / D 首端标记衔接，文字只警告不静默删除。
+- `base.crop` 是原图归一化有效区域，`viewport` 始终归一化于**整图**。无裁切沿用旧正方形归一化取景；有裁切采用保持源像素输出比例的矩形。应用裁切保留能容纳的原取景，不能容纳时显式提示钳制；裁切与全部取景共同撤销，绝不改写源文件。
+- `services/layer-quality.ts` 与 `utils/layerQuality.js` 同源：有效像素 = `viewport.w/h × source_width/height`，**不能再乘 crop**。保存时读取实际源文件尺寸并重算 `quality_warnings`；全幅 crop 省略，信息性来源/尺寸不使旧无裁切签名失效。
+- `LayerRail.vue` 是底图/图层/样式手风琴；素材沿用 `AssetPicker`，图片 `src.path` 仍为渲染真源，资产 ID/版本为出处。旧路径明确标识；继承底图禁换图/裁切/语义锚定。
+- 所有已锚定几何修改必须先确认，`patchLayer` 本身也拒绝静默解绑；`detachAnchors` / `reanchorLayer` 是明确动作。`useLayerDoc` 历史可携带外部时间线快照；服务端保存回灌走 `acceptSaved`，防止归一化元数据触发二次脏标记。
+- 缺字单源 `useMissingGlyphs` → 同源 `unsupportedChars`；字段/图层/画布即时展示，整段有缺字时禁渲染。共享 `StoryboardKeyframes` 的设计卡提示只在 `projectType='documentary'` 展示，剧情含 documentary_rules 不受影响。
+- 集成 smoke 恢复两条原路径：`useApi.ts` 必须显式导入 `apiBase`（Nuxt auto-import 不替代同名工具函数）；剧情 `StoryboardKeyframes` 挂载必须传真实 `epId`，批量预览不能误请求 `/episodes/0/…`。图片选择器的上传/库中帧图登记为真实素材版本，保存后刷新资产上下文，避免登记时立即刷新吞掉未保存编辑。
 
 ### 全局任务中心
 - `sys_task` 多了 `episode_id`（分镜任务由分镜反查、资产出图取发起时所在集、文本任务必填；启动时 `backfillTaskEpisodeIds()` 按 `storyboard_id` 回填存量行）与 `type='text'`。**文本任务不再存进程内存**：提取（`services/extraction.ts`）、关键帧/视频提示词批量（`keyframe-prompts.ts`/`video-prompts.ts`）、同步 chat 的剧本改写与拆分分镜（`routes/agent.ts`）都在开始时建 `sys_task(type='text')`，`params.kind` ∈ `extract_characters|extract_scenes|extract_props|keyframe_prompts|video_prompts|script_rewrite|storyboard_breaker`，进度写 `params.progress`（`{completed,total,failed,current_storyboard_id}`，**不复用 `remote_state`**，那是 qwen-jobs 追踪器的）。`/extract-status`、`/keyframe-prompts-status`、`/video-prompts-status` 响应结构不变，只是改成从库里读（函数变成 async）。

@@ -14,6 +14,7 @@
     <StoryboardKeyframes
       class="gs-kf"
       embedded
+      project-type="documentary"
       :locked-slot="lockedSlot"
       :storyboards="shots"
       :pool-candidates="poolCandidates"

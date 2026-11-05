@@ -10,6 +10,7 @@
  * `FrameState`，所以同一份时间线在单测、服务端渲染、前端预览里必然一致。
  */
 import { z } from 'zod'
+import { clampViewportToCrop, normalizeCrop } from './layer-quality.js'
 
 /** 取景框：归一化 0–1，相对图层文档坐标系（= 成片画幅） */
 export interface SegmentViewport {
@@ -121,7 +122,11 @@ const timelineIn = z.object({
  * 归一化坐标系里 `w === h` 才等于「与整幅同比例」（像素上就是 w·W : h·H = W : H），
  * 不等就会把画面拉伸，所以这里以较大的一边为准放大另一边，宁可多框一点也不变形。
  */
-export function normalizeViewport(raw: unknown): SegmentViewport {
+export function normalizeViewport(raw: unknown, crop?: unknown): SegmentViewport {
+  const bounds = normalizeCrop(crop)
+  if (bounds.x !== 0 || bounds.y !== 0 || bounds.w !== 1 || bounds.h !== 1) {
+    return clampViewportToCrop(raw, bounds).viewport
+  }
   const parsed = viewportIn.safeParse(raw)
   const box = parsed.success ? parsed.data : {}
   const x0 = box.x ?? 0
@@ -158,12 +163,12 @@ export function viewportFromPoints(points: Array<[number, number]>, pad = 1.3): 
   return normalizeViewport({ x: minX - (w - (maxX - minX)) / 2, y: minY - (h - (maxY - minY)) / 2, w, h })
 }
 
-function normalizeKeyframe(raw: unknown): PreciseKeyframe | null {
+function normalizeKeyframe(raw: unknown, crop?: unknown): PreciseKeyframe | null {
   const parsed = keyframeIn.safeParse(raw)
   if (!parsed.success) return null
   const frame: PreciseKeyframe = {
     t: Math.max(0, round(parsed.data.t ?? 0, 3)),
-    viewport: normalizeViewport(parsed.data.viewport),
+    viewport: normalizeViewport(parsed.data.viewport, crop),
     visible: [...new Set(parsed.data.visible)],
   }
   if (parsed.data.ease) frame.ease = parsed.data.ease
@@ -176,7 +181,7 @@ function normalizeKeyframe(raw: unknown): PreciseKeyframe | null {
  * 结构非法时退化为「单帧全图、无可见图层」，渲染器永远拿得到可用输入。
  * 读入时兼容 #50 的旧键名 `states`（一次性迁移与存量 JSON 列）。
  */
-export function normalizeTimeline(raw: unknown): SegmentTimeline {
+export function normalizeTimeline(raw: unknown, crop?: unknown): SegmentTimeline {
   const source = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {}
   const input = { ...source, keyframes: Array.isArray(source.keyframes) ? source.keyframes : source.states }
   const parsed = timelineIn.safeParse(input)
@@ -184,7 +189,7 @@ export function normalizeTimeline(raw: unknown): SegmentTimeline {
     ? parsed.data
     : { fps: undefined, ease: 'inout' as const, fade_ms: undefined, keyframes: [] as unknown[] }
   const frames = data.keyframes
-    .map(normalizeKeyframe)
+    .map(frame => normalizeKeyframe(frame, crop))
     .filter((frame): frame is PreciseKeyframe => frame !== null)
     .map((frame, index) => ({ frame, index }))
     .sort((a, b) => (a.frame.t - b.frame.t) || (a.index - b.index))
@@ -196,7 +201,7 @@ export function normalizeTimeline(raw: unknown): SegmentTimeline {
     if (last && Math.abs(last.t - frame.t) < 1e-6) deduped[deduped.length - 1] = frame
     else deduped.push(frame)
   }
-  if (!deduped.length) deduped.push({ t: 0, viewport: { ...FULL_VIEWPORT }, visible: [] })
+  if (!deduped.length) deduped.push({ t: 0, viewport: normalizeViewport(undefined, crop), visible: [] })
   return {
     fps: Math.round(clamp(data.fps ?? SEGMENT_DEFAULT_FPS, SEGMENT_FPS_MIN, SEGMENT_FPS_MAX)),
     ease: data.ease,
@@ -307,7 +312,12 @@ export function clampSegmentDuration(seconds: number, maxSeconds = MAX_LAYER_SEG
  * 末尾停留（派生值，契约 §3.2 裁决 1）：`duration − 末个精确关键帧 t`。
  * 不设列，`duration` 是权威；编辑器只展示。
  */
+export function clampEndHold(seconds: number): number {
+  return Number.isFinite(seconds) ? round(Math.max(0, seconds), 3) : 0
+}
+
 export function endHoldOf(timeline: SegmentTimeline, duration: number): number {
-  const last = timeline.keyframes[timeline.keyframes.length - 1]
-  return round(Math.max(0, duration - (last?.t ?? 0)), 3)
+  let last = 0
+  for (const frame of timeline.keyframes) last = Math.max(last, frame.t)
+  return clampEndHold(duration - last)
 }
