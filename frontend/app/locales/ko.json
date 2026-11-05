@@ -777,7 +777,7 @@
       "noCombo": "설계 카드를 확인하고 구간 조합을 선택하세요",
       "fresh": "최신", "stale": "미렌더 또는 오래됨", "failed": "실패", "rendering": "렌더링 중", "render": "다시 렌더",
       "inherited": "{seconds}s 잠금 상속 · 생성 안 함",
-      "junction": "연결점 {seconds}s · 픽셀 연속성 (잠금 상속)",
+      "junction": "연결점 {seconds}s · 연결 프레임 잠금 (연속성 목표)",
       "overBudget": "음성 실측이 예산을 초과합니다. 생성 전에 확인하세요", "confirmGenerate": "확인 후 생성",
       "subtitle": "자막은 음성에 자동 정렬 · 번인",
       "continuity": "연결 설계 (읽기 전용)", "continue": "연속", "cut": "컷",

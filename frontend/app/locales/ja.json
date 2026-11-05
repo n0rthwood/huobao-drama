@@ -777,7 +777,7 @@
       "noCombo": "設計カードを確認し、区間の組合せを選択してください",
       "fresh": "最新", "stale": "未レンダーまたは古い", "failed": "失敗", "rendering": "レンダー中", "render": "再レンダー",
       "inherited": "継承ロック {seconds}s · 生成不要",
-      "junction": "接続点 {seconds}s · 画素連続（継承ロック）",
+      "junction": "接続点 {seconds}s · 接続フレーム固定（連続性目標）",
       "overBudget": "音声実測が予算を超えています。生成前に確認してください", "confirmGenerate": "確認して生成",
       "subtitle": "字幕は音声に自動整列 · 焼き込み",
       "continuity": "接続設計（読取専用）", "continue": "継続", "cut": "カット",

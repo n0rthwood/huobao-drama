@@ -352,7 +352,8 @@ async function planVoiceBatch(ep: EpisodeRow, desired: VoiceParams, config: AICo
     const meta = parseNarrationMeta(sb.narrationMeta)
     const text = sb.narrationText || ''
     const shotParams: VoiceParams = { ...desired, normalize: resolveNarrationNormalize(desired.normalize, sb.narrationNormalize) }
-    const gate = documentary && (!sb.combo || sb.designCardStatus !== 'confirmed') ? '设计卡未确认' : null
+    const gate = ep.narrationEnabled !== true ? '本集未开启旁白，无法生成配音'
+      : documentary && (!sb.combo || sb.designCardStatus !== 'confirmed') ? '设计卡未确认' : null
     const status = classifyVoiceShot({
       narrationEnabled: sb.narrationEnabled !== false,
       text,

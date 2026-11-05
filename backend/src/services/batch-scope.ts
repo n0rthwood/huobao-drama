@@ -61,7 +61,7 @@ export async function batchScopeOf(episodeId: number, kind: BatchScopeKind, stor
     .where(and(eq(schema.storyboards.episodeId, episodeId), isNull(schema.storyboards.deletedAt)))
     .orderBy(schema.storyboards.storyboardNumber)
   const scope: BatchScope = { included: [], excluded: [] }
-  const only = storyboardIds?.length ? new Set(storyboardIds) : null
+  const only = storyboardIds === undefined ? null : new Set(storyboardIds)
   for (const row of rows) {
     if (only && !only.has(row.id)) continue
     const shot = { storyboard_id: row.id, storyboard_number: row.storyboardNumber }

@@ -777,7 +777,7 @@
       "noCombo": "Confirm the design card and select a segment combination",
       "fresh": "Up to date", "stale": "Not rendered or outdated", "failed": "Failed", "rendering": "Rendering", "render": "Render again",
       "inherited": "Locked inheritance at {seconds}s · no generation",
-      "junction": "Junction {seconds}s · pixel continuity (locked inheritance)",
+      "junction": "Junction {seconds}s · locked guide (target continuity)",
       "overBudget": "Measured narration exceeds the budget. Confirm before generating.", "confirmGenerate": "Confirm and generate",
       "subtitle": "Subtitles align automatically with narration · burned in",
       "continuity": "Continuity design (read only)", "continue": "Continue", "cut": "Cut",

@@ -186,7 +186,7 @@ function updateShot(sb) {
           <span class="export-section-title">{{ t('episode.export.posterTitle') }}</span>
           <span class="dim" style="font-size:11px">{{ t('episode.export.posterHint') }}</span>
         </div>
-        <div v-if="posterVersionOptions.length" class="export-poster-row">
+        <div v-if="posterVersionOptions.length || documentary" class="export-poster-row">
           <label class="export-poster-check">
             <input type="checkbox" v-model="exportPosterEnabled" :disabled="documentary && !posterFinal" />
             {{ t('episode.export.posterEnable') }}
