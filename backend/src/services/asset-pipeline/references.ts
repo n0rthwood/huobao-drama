@@ -13,14 +13,21 @@ export type ReferenceOrigin =
 export type RoundReferenceImage = ReferenceOrigin & { path: string }
 type SourcePath = { id: number | null; local_path: string }
 
-/** Never follow symlinks or inspect files outside static, including during provenance lookup. */
-export function canonicalReferencePath(value: string): string | null {
+/** Lexical storage boundary only: recorded historical identities must not depend on today's files. */
+function referencePathWithinStorage(value: string): string | null {
   if (!value || value.includes('\0') || value.includes('\\') || /^[a-z][a-z\d+.-]*:/i.test(value)) return null
   const root = path.resolve(STORAGE_ROOT)
   const relative = value.startsWith('/static/') ? value.slice(8)
     : value.startsWith('static/') ? value.slice(7) : value
   const absolute = path.resolve(root, relative)
-  if (!absolute.startsWith(root + path.sep)) return null
+  return absolute.startsWith(root + path.sep) ? absolute : null
+}
+
+/** Lookup fallback requires a real file; never follow symlinks or inspect files outside static. */
+export function canonicalReferencePath(value: string): string | null {
+  const absolute = referencePathWithinStorage(value)
+  if (!absolute) return null
+  const root = path.resolve(STORAGE_ROOT)
   try {
     // Walk from the storage root so realpath/stat cannot follow an escaping intermediate symlink.
     if (fs.lstatSync(root).isSymbolicLink()) return null
@@ -92,18 +99,21 @@ export async function roundReferenceImages(round: AssetRoundRow): Promise<RoundR
       ? [] : [{ type: 'unknown', path: '' }]
   }
   const images = params.referenceImages.map(value => typeof value === 'string' ? value : '')
-  let origins: ReferenceOrigin[]
   if (Array.isArray(params.pipeline_reference_origins)) {
-    origins = images.map((_, index) => readOrigin((params.pipeline_reference_origins as unknown[])[index]))
-  } else {
-    // Legacy tasks have no identity metadata. Use only the round's frozen spec snapshot, never live sources.
-    const spec = round.spec_id ? await getSpec(round.spec_id) : null
-    const sources = (spec?.sources ?? []).map(source => ({ id: source.source_id, local_path: source.local_path }))
-    const previous = (await listAssetRounds(round.asset_kind, round.asset_id)).filter(item => item.id < round.id)
-    origins = resolveReferenceOrigins(images, sources, previous)
+    const recordedOrigins = params.pipeline_reference_origins
+    // Identity is already recorded. Validate only the path boundary, without filesystem lookup:
+    // deleted files, replaced bytes and later symlinks cannot rewrite an immutable submitted identity.
+    return images.map((image, index) => ({
+      ...(referencePathWithinStorage(image) ? readOrigin(recordedOrigins[index]) : { type: 'unknown' as const }),
+      path: image,
+    }))
   }
-  return images.map((image, index) => ({
-    ...(canonicalReferencePath(image) ? origins[index]! : { type: 'unknown' as const }),
-    path: image,
+  // Legacy tasks have no identity metadata. Use only the round's frozen spec snapshot, never live sources.
+  const spec = round.spec_id ? await getSpec(round.spec_id) : null
+  const sources = (spec?.sources ?? []).map(source => ({ id: source.source_id, local_path: source.local_path }))
+  const previous = (await listAssetRounds(round.asset_kind, round.asset_id)).filter(item => item.id < round.id)
+  return resolveReferenceOrigins(images, sources, previous).map((origin, index) => ({
+    ...origin,
+    path: images[index]!,
   }))
 }

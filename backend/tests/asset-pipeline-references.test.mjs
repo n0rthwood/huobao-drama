@@ -144,6 +144,62 @@ try {
     import { roundReferenceImages } from './src/services/asset-pipeline/references.ts'
     console.log('@@' + JSON.stringify(await roundReferenceImages(await getRound(${result.generated.id}))))
   `)
+  result.afterCleanup = run(`
+    import fs from 'node:fs'
+    import path from 'node:path'
+    import { eq, inArray } from 'drizzle-orm'
+    import { db, schema } from './src/db/index.ts'
+    import { getRound } from './src/services/asset-pipeline/store.ts'
+    import { roundReferenceImages } from './src/services/asset-pipeline/references.ts'
+    const generated = await getRound(${result.generated.id})
+    const mixed = await getRound(${result.mixed.id})
+    const taskIds = [generated.image_task_id, mixed.image_task_id]
+    const taskParamsBefore = (await db.select().from(schema.sysTask).where(inArray(schema.sysTask.id, taskIds))).map(task => task.params)
+    const roundsBefore = JSON.stringify([generated, mixed])
+    const sourcePath = path.join(process.env.STORAGE_PATH, 'fixtures', 'one.png')
+    const previousPath = path.join(process.env.HUOBAO_DATA_DIR, generated.image_path)
+    fs.unlinkSync(sourcePath)
+    fs.unlinkSync(previousPath)
+    const missingSource = await roundReferenceImages(generated)
+    const missingPrevious = await roundReferenceImages(mixed)
+    // The same lexical path can now contain unrelated bytes or a symlink; neither changes a recorded historical identity.
+    fs.writeFileSync(sourcePath, 'unrelated replacement, not an image')
+    fs.symlinkSync(path.join(process.env.HUOBAO_DATA_DIR, 'outside.png'), previousPath)
+    const unsafePaths = ['static/../../outside.png', 'https://invalid.example/a.png', '/etc/passwd']
+    const at = new Date().toISOString()
+    await db.insert(schema.sysTask).values({
+      id: 600, type: 'image', status: 'completed', createdAt: at, updatedAt: at,
+      params: JSON.stringify({ referenceImages: unsafePaths, pipeline_reference_origins: unsafePaths.map(() => ({ type: 'source', source_id: 11 })) }),
+    })
+    await db.insert(schema.assetRound).values({
+      pipelineTaskId: generated.pipeline_task_id, assetKind: 'prop', assetId: 7, roundNo: 99, purpose: 'precision',
+      imageTaskId: 600, status: 'generated', referenceIds: '[]', createdAt: at, updatedAt: at,
+    })
+    const unsafeRound = (await db.select().from(schema.assetRound).where(eq(schema.assetRound.imageTaskId, 600)))[0]
+    const filesystemMethods = ['lstatSync', 'statSync', 'realpathSync', 'readFileSync']
+    const originalMethods = new Map(filesystemMethods.map(name => [name, fs[name]]))
+    let metadataFilesystemReads = 0
+    let replacedSource, replacedPrevious, unsafeDetail
+    try {
+      for (const name of filesystemMethods) fs[name] = () => {
+        metadataFilesystemReads++
+        throw new Error('recorded provenance must not inspect present-day files')
+      }
+      replacedSource = await roundReferenceImages(generated)
+      replacedPrevious = await roundReferenceImages(mixed)
+      unsafeDetail = await roundReferenceImages(await getRound(unsafeRound.id))
+    } finally {
+      for (const [name, original] of originalMethods) fs[name] = original
+    }
+    // Legacy tasks without recorded identity must still require a real, safe unique match.
+    const legacyRound = (await db.select().from(schema.assetRound).where(eq(schema.assetRound.imageTaskId, 501)))[0]
+    const legacy = await roundReferenceImages(await getRound(legacyRound.id))
+    console.log('@@' + JSON.stringify({
+      missingSource, missingPrevious, replacedSource, replacedPrevious, legacy, unsafeDetail, unsafePaths, metadataFilesystemReads,
+      tasksUnchanged: JSON.stringify(taskParamsBefore) === JSON.stringify((await db.select().from(schema.sysTask).where(inArray(schema.sysTask.id, taskIds))).map(task => task.params)),
+      roundsUnchanged: roundsBefore === JSON.stringify([await getRound(generated.id), await getRound(mixed.id)]),
+    }))
+  `)
 } finally { rmSync(dir, { recursive: true, force: true }) }
 
 test('precision source selection carries real IDs and persists only actually enqueued sources through both round writes', () => {
@@ -211,4 +267,16 @@ test('run detail API exposes ordered task-derived reference_images after current
   assert.equal(result.apiStatus, 200)
   assert.deepEqual(result.apiRound.reference_ids, [11, 13])
   assert.deepEqual(result.apiRound.reference_images, result.reopened)
+})
+
+test('persisted source and previous-round identities survive later file cleanup or replacement without rewriting history', () => {
+  assert.deepEqual(result.afterCleanup.missingSource, result.reopened)
+  assert.deepEqual(result.afterCleanup.missingPrevious, result.initialMixedDetail)
+  assert.deepEqual(result.afterCleanup.replacedSource, result.reopened)
+  assert.deepEqual(result.afterCleanup.replacedPrevious, result.initialMixedDetail)
+  assert.equal(result.afterCleanup.legacy[1].type, 'unknown', 'legacy path lookup must not follow the replacement symlink')
+  assert.equal(result.afterCleanup.metadataFilesystemReads, 0, 'recorded identity assembly must not touch current filesystem state')
+  assert.deepEqual(result.afterCleanup.unsafeDetail, result.afterCleanup.unsafePaths.map(path => ({ type: 'unknown', path })))
+  assert.equal(result.afterCleanup.tasksUnchanged, true)
+  assert.equal(result.afterCleanup.roundsUnchanged, true)
 })
