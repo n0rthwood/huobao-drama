@@ -85,6 +85,15 @@ export interface LayerSegment {
   updated_at: string
 }
 
+/** List-only facts; no segment is a known draft, not an unread/failed payload. */
+export interface LayerSegmentSummary {
+  exists: boolean
+  status: LayerSegmentStatus
+  fresh: boolean
+  render_path: string | null
+  stale_reasons: string[]
+}
+
 /**
  * 本集图层段规格：图层段必须与模型视频**同画幅同帧率**，否则拼接与最终 merge 会花屏/时基错乱。
  * 画幅与帧率都实测自本集首条已有**模型视频**（与 `probeIntroSpec` 同口径），
@@ -463,6 +472,28 @@ export function layerSegmentIsFresh(segment: LayerSegment, spec: Pick<SegmentSpe
   if (!segment.render_path || !segment.render_signature) return false
   if (!fs.existsSync(getAbsolutePath(segment.render_path))) return false
   return segment.render_signature === layerSegmentSignatureOf(segment, spec, combo)
+}
+
+/** Reuse native segment parsing/freshness once per episode, without detail assembly per shot. */
+export async function loadLayerSegmentSummaries(
+  episodeId: number,
+  rows: ReadonlyArray<Pick<typeof schema.storyboards.$inferSelect, 'id' | 'combo'>>,
+): Promise<Map<number, LayerSegmentSummary>> {
+  const applicable = rows.filter(row => hasLayerSegment(toCombo(row.combo)))
+  const segments = await segmentsByStoryboard(applicable.map(row => row.id))
+  const spec = segments.size ? await resolveEpisodeSegmentSpec(episodeId) : null
+  const summaries = new Map<number, LayerSegmentSummary>()
+  for (const row of applicable) {
+    const segment = segments.get(row.id)
+    summaries.set(row.id, {
+      exists: !!segment,
+      status: segment?.status ?? 'draft',
+      fresh: !!segment && !!spec && layerSegmentIsFresh(segment, spec, row.combo),
+      render_path: segment?.render_path ?? null,
+      stale_reasons: segment?.stale_reasons ?? [],
+    })
+  }
+  return summaries
 }
 
 // ─── 画幅 ────────────────────────────────────────────────────

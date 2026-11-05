@@ -54,7 +54,7 @@
             :viewport="timeline.keyframes[keyframeIndex]?.viewport"
             @select="selectedIds = $event" @history="pushHistory" @patch="onPatch"
             @delete="removeSelected" @duplicate="duplicateSelected" @undo="undo" @redo="redo"
-            @detach="detachAnchors" @crop="applyCrop" @source-size="onSourceSize" @viewport="onViewport"
+            @detach="detachAnchors" @crop="applyCrop" @viewport="onViewport"
           />
           <div v-if="mode === 'preview'" class="ls-preview">
             <!-- 与后端 composeFrame 同构：底图合滤镜 → 按取景框裁放 → 叠加层 SVG -->
@@ -276,10 +276,6 @@ function replaceBase(base) {
   doc.value.base={...doc.value.base,...base}
   markDirty()
 }
-function onSourceSize({width,height}) {
-  doc.value.base.source_width=width
-  doc.value.base.source_height=height
-}
 function onViewport(viewport) {
   const keyframes=timeline.value.keyframes.map((frame,index)=>index===keyframeIndex.value?{...frame,viewport}:frame)
   timeline.value={...timeline.value,keyframes}
@@ -293,7 +289,7 @@ async function makeDraft() {
   error.value = ''
   try {
     const data = await layerSegmentAPI.draft(shotId)
-    emit('changed', data)
+    emit('changed', shotId, data)
     if (props.storyboardId === shotId) applySegment(data.segment)
   } catch (e) {
     error.value = e?.body?.code === 'missing_base' ? t('episode.segment.missingBase') : (e?.message || String(e))
@@ -313,7 +309,7 @@ async function save() {
       timeline: JSON.parse(JSON.stringify(timeline.value)),
       duration: duration.value,
     })
-    emit('changed', data)
+    emit('changed', shotId, data)
     // 已经切到别的镜头：只记账，不把这一镜的时间线灌进别人的编辑器
     if (props.storyboardId === shotId && data.segment) {
       acceptSaved(data.segment.layer_doc)
@@ -342,7 +338,7 @@ async function render() {
   try {
     const data = await layerSegmentAPI.render(shotId)
     renderStamp.value = Date.now()
-    emit('changed', data)
+    emit('changed', shotId, data)
     toast.success(t('episode.segment.renderDone'))
     if (data.keyframes_invalidated) toast.warning(t('episode.segment.junctionInvalidated'))
   } catch (e) {

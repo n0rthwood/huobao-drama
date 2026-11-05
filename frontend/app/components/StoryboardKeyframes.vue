@@ -513,9 +513,9 @@
           <span class="kf-foot-hint">{{ kf(selected).ready ? t('episode.kf.readyHint') : t('episode.kf.notReadyHint', { slots: missingSlotLabels(selected) }) }}</span>
           <button
             class="btn btn-primary"
-            :disabled="!kf(selected).ready && !kf(selected).confirmed"
+            :disabled="!kf(selected).ready && !confirmationSet(selected)"
             @click="toggleConfirm(selected)"
-          >{{ kf(selected).confirmed ? t('episode.kf.unconfirm') : t('episode.kf.confirm') }}</button>
+          >{{ confirmationSet(selected) ? t('episode.kf.unconfirm') : t('episode.kf.confirm') }}</button>
         </div>
       </div>
       <div v-else class="kf-editor kf-editor-empty">{{ t('episode.kf.selectShot') }}</div>
@@ -801,6 +801,11 @@ function kf(sb) {
     ready: Boolean(k.ready),
     confirmed: Boolean(k.confirmed),
   }
+}
+// Effective confirmation can be false while an old recorded confirmation is stale.
+// Keep cancellation available without treating that stale record as production-ready.
+function confirmationSet(sb) {
+  return Boolean(sb?.keyframes_confirmed ?? sb?.keyframes?.confirmed)
 }
 /**
  * 锁定槽：衔接帧锁（keyframes.locked 指向的槽位）+ D + 承接时的首帧承接锁（locked_slots）。
@@ -1171,7 +1176,7 @@ function onMidTimeChange(sb, e) {
 }
 async function toggleConfirm(sb) {
   if (!sb) return
-  const next = !kf(sb).confirmed
+  const next = !confirmationSet(sb)
   if (next && !kf(sb).ready) {
     toast.warning(t('episode.kf.notReadyHint', { slots: missingSlotLabels(sb) }))
     return

@@ -1876,10 +1876,11 @@ const now = useNowTicker()
 const {
   episodeTasks, latestAssetTask, latestKeyframeTask, registerTask, refreshTasks, loadEpisodeTasks, onTaskFinished,
 } = useTasks()
-// 任务转为终态：素材图/分镜视频需要重新拉数据（关键帧槽位由 StoryboardKeyframes 自己处理）
+// Documentary summaries cover all shots, including background work on an unselected shot.
+// The legacy keyframe page owns its own slot refresh.
 onTaskFinished((task) => {
   if (Number(task.episode_id) !== Number(epId.value)) return
-  if (task.type === 'image' && task.storyboard_id) return
+  if (task.type === 'image' && task.storyboard_id && !isDocumentaryProject.value) return
   void refresh()
 })
 // 已点生成、后端尚未返回 sys_task 的空窗期（返回后立即被真实任务接管）
@@ -3430,7 +3431,7 @@ async function refresh() {
     toastError(e)
   }
   try { mergeData.value = await mergeAPI.status(epId.value) } catch {}
-  await Promise.all([loadEpisodeTasks(epId.value), loadExportMerges(), refreshGates()])
+  await Promise.all([loadEpisodeTasks(epId.value), loadExportMerges(), refreshGates({ background: true })])
   if ((panel.value === 'production' && prodTab.value === 'poster') || panel.value === 'export') await loadPosterData()
 }
 
