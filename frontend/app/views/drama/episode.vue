@@ -601,6 +601,8 @@
               :aspect-ratio="drama?.aspect_ratio || '16:9'"
               :model="bareModelName(imageModel)"
               :config-id="ownerConfigId(imageModelOptions, imageModel)"
+              :chat-model="chatModelOverride() || ''"
+              :chat-config-id="chatConfigId() || 0"
             />
           </div>
 

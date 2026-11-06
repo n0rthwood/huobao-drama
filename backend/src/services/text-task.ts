@@ -45,6 +45,8 @@ export type TextTaskKind =
   | 'asset_pipeline'
   /** 资产审核清单（Issue #55）：逐段对照旁白稿列「信息点 → 需要的素材 → 有/缺」 */
   | 'asset_review'
+  /** Poster AI 构想（Issue #72）：只写 episode_posters.concept，不写当前编辑字段 */
+  | 'poster_concept'
 
 export const TEXT_TASK_KINDS: TextTaskKind[] = [
   'extract_characters', 'extract_scenes', 'extract_props',
@@ -58,6 +60,7 @@ export const TEXT_TASK_KINDS: TextTaskKind[] = [
   'storyboard_fill_gaps',
   'asset_pipeline',
   'asset_review',
+  'poster_concept',
 ]
 
 /**

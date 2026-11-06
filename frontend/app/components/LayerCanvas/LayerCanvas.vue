@@ -25,8 +25,8 @@
       <button type="button" class="btn-ghost" @click="applyCrop">{{ t('layerCanvas.base.applyCrop') }}</button>
       <button type="button" class="btn-ghost" @click="mode = 'select'">{{ t('layerCanvas.base.cancelCrop') }}</button>
     </div>
-    <div v-if="baseImageError || !baseSrc" class="lc-banner"><TriangleAlert :size="14" />{{ t('layerCanvas.base.loadError') }}</div>
-    <div ref="viewportEl" class="lc-viewport" @wheel.prevent="onWheel" @pointerdown="onViewportDown">
+    <div v-if="baseImageError" class="lc-banner"><TriangleAlert :size="14" />{{ t('layerCanvas.base.loadError') }}</div>
+    <div ref="viewportEl" :class="['lc-viewport', { 'lc-empty': !baseSrc }]" @wheel.prevent="onWheel" @pointerdown="onViewportDown">
       <div class="lc-stage" :style="stageStyle">
         <div class="lc-base-surface">
           <div class="lc-source" :style="sourceStyle">
@@ -119,6 +119,8 @@ const props = defineProps({
   canRedo: { type: Boolean, default: true },
   cropLocked: { type: Boolean, default: false },
   viewport: { type: Object, default: null },
+  // Poster 固定文本变量（Issue #72）：变量层按剧集数据现场解析
+  variables: { type: Object, default: null },
 })
 const emit = defineEmits(['select', 'history', 'patch', 'delete', 'duplicate', 'undo', 'redo', 'crop', 'detach', 'viewport'])
 const { t } = useI18n()
@@ -229,6 +231,7 @@ const uiScale = computed(() => activeViewport.value.w * docWidth.value / Math.ma
 const svgMarkup = computed(() => layerDocToSvg(renderDoc.value, canvasDimensions.value, {
   viewport: activeViewport.value,
   resolveImage: path => mediaUrl(path),
+  variables: props.variables,
 }))
 const filterLayers = computed(() => baseFilterLayers(props.doc.base.filter, canvasDimensions.value))
 
@@ -254,7 +257,7 @@ const singleSelection = computed(() => selected.value.length === 1 && !selected.
 const hitShapes = computed(() => props.doc.layers
   .filter(layer => layer.visible)
   .map((layer) => {
-    const box = layerBounds(layer, props.doc.theme, aspect.value)
+    const box = layerBounds(layer, props.doc.theme, aspect.value, props.variables)
     const x = box.x * docWidth.value
     const y = box.y * docHeight.value
     const w = Math.max(box.w * docWidth.value, uiScale.value * 8)
@@ -270,10 +273,10 @@ const hitShapes = computed(() => props.doc.layers
 const selectionBox = computed(() => {
   if (!selected.value.length) return null
   if (singleSelection.value) {
-    const box = layerBounds(selected.value[0], props.doc.theme, aspect.value)
+    const box = layerBounds(selected.value[0], props.doc.theme, aspect.value, props.variables)
     return { x: box.x * docWidth.value, y: box.y * docHeight.value, w: box.w * docWidth.value, h: box.h * docHeight.value }
   }
-  const boxes = selected.value.map(layer => layerBounds(layer, props.doc.theme, aspect.value))
+  const boxes = selected.value.map(layer => layerBounds(layer, props.doc.theme, aspect.value, props.variables))
   const x = Math.min(...boxes.map(b => b.x)) * docWidth.value
   const y = Math.min(...boxes.map(b => b.y)) * docHeight.value
   const right = Math.max(...boxes.map(b => b.x + b.w)) * docWidth.value
@@ -340,7 +343,7 @@ function snapDelta(box, dx, dy) {
   const threshold = (SNAP_PX * uiScale.value) / docWidth.value
   const others = props.doc.layers
     .filter(layer => layer.visible && !props.selectedIds.includes(layer.id))
-    .map(layer => layerBounds(layer, props.doc.theme, aspect.value))
+    .map(layer => layerBounds(layer, props.doc.theme, aspect.value, props.variables))
   const xTargets = [0, 0.5, 1, ...others.flatMap(b => [b.x, b.x + b.w / 2, b.x + b.w])]
   const yTargets = [0, 0.5, 1, ...others.flatMap(b => [b.y, b.y + b.h / 2, b.y + b.h])]
   const candidates = [
@@ -389,7 +392,7 @@ function onLayerDown(id, event) {
 }
 
 function unionBounds(layers) {
-  const boxes = layers.map(layer => layerBounds(layer, props.doc.theme, aspect.value))
+  const boxes = layers.map(layer => layerBounds(layer, props.doc.theme, aspect.value, props.variables))
   if (!boxes.length) return { x: 0, y: 0, w: 0, h: 0 }
   const x = Math.min(...boxes.map(b => b.x))
   const y = Math.min(...boxes.map(b => b.y))
@@ -406,7 +409,7 @@ function startResize(handle, event) {
     start: pointFromEvent(event),
     layer: layer.id,
     geometry: geometryOf(layer),
-    box: layerBounds(layer, props.doc.theme, aspect.value),
+    box: layerBounds(layer, props.doc.theme, aspect.value, props.variables),
   }
   bindPointer(event)
 }
@@ -414,7 +417,7 @@ function startResize(handle, event) {
 function startRotate(event) {
   const layer = selected.value[0]
   if (!layer || layer.locked) return
-  const box = layerBounds(layer, props.doc.theme, aspect.value)
+  const box = layerBounds(layer, props.doc.theme, aspect.value, props.variables)
   const center = { x: (box.x + box.w / 2) * docWidth.value, y: (box.y + box.h / 2) * docHeight.value }
   const start = pointFromEvent(event)
   if (!confirmGeometry([layer])) return
@@ -577,7 +580,7 @@ function endPointer() {
     if (box.w > 0.005 || box.h > 0.005) {
       const hits = props.doc.layers.filter((layer) => {
         if (!layer.visible) return false
-        const bounds = layerBounds(layer, props.doc.theme, aspect.value)
+        const bounds = layerBounds(layer, props.doc.theme, aspect.value, props.variables)
         return bounds.x < box.x + box.w && bounds.x + bounds.w > box.x && bounds.y < box.y + box.h && bounds.y + bounds.h > box.y
       }).map(layer => layer.id)
       emit('select', drag.additive ? [...new Set([...drag.base, ...hits])] : hits)
@@ -647,16 +650,20 @@ function onWheel(event) {
 function ensureBundledFonts() {
   if (typeof document === 'undefined' || document.getElementById('layer-canvas-fonts')) return
   const faces = [
-    ['Noto Sans SC', 400, 'NotoSansSC-Regular.otf'],
-    ['Noto Sans SC', 700, 'NotoSansSC-Bold.otf'],
-    ['Noto Serif SC', 400, 'NotoSerifSC-Regular.otf'],
-    ['Noto Serif SC', 700, 'NotoSerifSC-Bold.otf'],
+    ['Noto Sans SC', 400, 'NotoSansSC-Regular.otf', 'opentype'],
+    ['Noto Sans SC', 700, 'NotoSansSC-Bold.otf', 'opentype'],
+    ['Noto Serif SC', 400, 'NotoSerifSC-Regular.otf', 'opentype'],
+    ['Noto Serif SC', 700, 'NotoSerifSC-Bold.otf', 'opentype'],
+    // Issue #72：Poster 四族字体，服务端与编辑器同一批文件
+    ['LXGW WenKai', 400, 'LXGWWenKai-Regular.ttf', 'truetype'],
+    ['LXGW WenKai', 700, 'LXGWWenKai-Medium.ttf', 'truetype'],
+    ['Ma Shan Zheng', 400, 'MaShanZheng-Regular.ttf', 'truetype'],
   ]
   const style = document.createElement('style')
   style.id = 'layer-canvas-fonts'
   style.textContent = faces
-    .map(([family, weight, file]) => `@font-face{font-family:'${family}';font-weight:${weight};font-display:swap;`
-      + `src:url('${apiBase()}/layer-docs/fonts/${file}') format('opentype');}`)
+    .map(([family, weight, file, format]) => `@font-face{font-family:'${family}';font-weight:${weight};font-display:swap;`
+      + `src:url('${apiBase()}/layer-docs/fonts/${file}') format('${format}');}`)
     .join('\n')
   document.head.appendChild(style)
 }
@@ -691,6 +698,7 @@ defineExpose({
 .lc-check { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
 .lc-zoom { display: inline-flex; align-items: center; gap: 2px; }
 .lc-viewport { position: relative; flex: 1; min-height: 0; display: grid; place-items: center; overflow: hidden; background: var(--surface-base); padding: 12px; touch-action: none; }
+.lc-viewport.lc-empty { background: #1a1d24; }
 /* 尺寸由 stageStyle 按视口实测算出（见 script），这里只管定位与投影 */
 .lc-stage { position: relative; transform-origin: center center; box-shadow: 0 2px 18px rgba(0, 0, 0, 0.18); }
 .lc-base-surface { position: absolute; inset: 0; overflow: hidden; }

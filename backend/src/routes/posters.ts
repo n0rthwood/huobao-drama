@@ -1,16 +1,24 @@
 /**
- * 剧集 Poster 接口（Issue #39），挂载在 /api/v1/episodes 下。
- * 所有校验失败都以 400 + 中文原因返回，前端直接展示。
+ * 剧集 Poster 接口（Issue #39 / #72），挂载在 /api/v1/episodes 下。
+ * 校验失败以 400 + 中文原因返回；provenance 冲突用 409 `manual_edit_conflict`，
+ * 前端据此显示「有手动编辑，是否需要覆盖？」。
  */
 import { Hono } from 'hono'
-import { success, badRequest } from '../utils/response.js'
+import { success, badRequest, notFound } from '../utils/response.js'
 import {
+  applyPosterConcept,
+  applyPosterLayerPlan,
   createPosterGeneration,
+  generateConceptCompositions,
   getPosterBundle,
+  loadPosterVersion,
+  PosterConflictError,
+  PosterNotFoundError,
   registerCompositeVersion,
   savePosterDraft,
   selectPosterVersion,
 } from '../services/posters.js'
+import { startPosterConcept } from '../services/poster-concept.js'
 import { logTaskError, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
 
 const app = new Hono()
@@ -25,12 +33,25 @@ async function readJson(c: Parameters<typeof badRequest>[0]): Promise<Record<str
 }
 
 function failure(c: Parameters<typeof badRequest>[0], err: unknown, action: string) {
+  if (err instanceof PosterConflictError) {
+    logTaskError('PosterAPI', action, { error: err.message, fields: err.fields })
+    return c.json({
+      code: 409,
+      error: 'manual_edit_conflict',
+      message: err.message,
+      fields: err.fields,
+    }, 409)
+  }
+  if (err instanceof PosterNotFoundError) {
+    logTaskError('PosterAPI', action, { error: err.message })
+    return notFound(c, err.message)
+  }
   const message = err instanceof Error ? err.message : String(err)
   logTaskError('PosterAPI', action, { error: message })
   return badRequest(c, message)
 }
 
-// GET /episodes/:id/poster — 编辑工程 + 变量 + 版本
+// GET /episodes/:id/poster — 编辑工程 + 变量 + 构想 + 版本
 app.get('/:id/poster', async (c) => {
   const episodeId = Number(c.req.param('id'))
   try {
@@ -40,7 +61,7 @@ app.get('/:id/poster', async (c) => {
   }
 })
 
-// PUT /episodes/:id/poster — 保存 prompt / 文字描述 / 参考图 / 底图 / 布局
+// PUT /episodes/:id/poster — 保存 prompt / 文字描述 / 文案 / 参考图 / 底图 / 图层文档
 app.put('/:id/poster', async (c) => {
   const episodeId = Number(c.req.param('id'))
   const body = await readJson(c)
@@ -51,7 +72,7 @@ app.put('/:id/poster', async (c) => {
   }
 })
 
-// POST /episodes/:id/poster/generate — 首次生图 / 合成图再生成 / 底图+图层再生成
+// POST /episodes/:id/poster/generate — 首次生图 / 合成图再生成 / 服务端图层再生成
 app.post('/:id/poster/generate', async (c) => {
   const episodeId = Number(c.req.param('id'))
   const body = await readJson(c)
@@ -65,7 +86,59 @@ app.post('/:id/poster/generate', async (c) => {
   }
 })
 
-// POST /episodes/:id/poster/versions — 登记本地合成的 Poster（自动设为最终版本）
+// POST /episodes/:id/poster/concept — AI 构想（异步文本任务）
+app.post('/:id/poster/concept', async (c) => {
+  const episodeId = Number(c.req.param('id'))
+  const body = await readJson(c)
+  try {
+    const result = await startPosterConcept(episodeId, {
+      model: typeof body.model === 'string' ? body.model : undefined,
+      configId: Number(body.config_id || 0) || undefined,
+    })
+    if (result.reason === 'running') return c.json({ code: 409, error: 'concept_running', message: '该集的 Poster 构想正在运行，请等它结束' }, 409)
+    if (result.reason === 'empty_script') return badRequest(c, '请先完成剧本改写/拆分，并且本集至少有一个带图的资产')
+    logTaskStart('PosterAPI', 'concept', { episodeId, taskId: result.task_id })
+    return success(c, { task_id: result.task_id })
+  } catch (err) {
+    return failure(c, err, 'concept')
+  }
+})
+
+// POST /episodes/:id/poster/concept/generate — 三个方案各提交一张冻结快照底图
+app.post('/:id/poster/concept/generate', async (c) => {
+  const episodeId = Number(c.req.param('id'))
+  const body = await readJson(c)
+  try {
+    const items = await generateConceptCompositions(episodeId, body)
+    return success(c, { items })
+  } catch (err) {
+    return failure(c, err, 'concept-generate')
+  }
+})
+
+// POST /episodes/:id/poster/concept/apply — 应用方案字段（手动字段默认 409）
+app.post('/:id/poster/concept/apply', async (c) => {
+  const episodeId = Number(c.req.param('id'))
+  const body = await readJson(c)
+  try {
+    return success(c, await applyPosterConcept(episodeId, body))
+  } catch (err) {
+    return failure(c, err, 'concept-apply')
+  }
+})
+
+// POST /episodes/:id/poster/concept/apply-layer-plan — 只替换 AI 文字层
+app.post('/:id/poster/concept/apply-layer-plan', async (c) => {
+  const episodeId = Number(c.req.param('id'))
+  const body = await readJson(c)
+  try {
+    return success(c, await applyPosterLayerPlan(episodeId, body))
+  } catch (err) {
+    return failure(c, err, 'concept-apply-layer')
+  }
+})
+
+// POST /episodes/:id/poster/versions — 服务端从 LayerDoc 渲染合成图并登记最终版本
 app.post('/:id/poster/versions', async (c) => {
   const episodeId = Number(c.req.param('id'))
   const body = await readJson(c)
@@ -84,6 +157,17 @@ app.put('/:id/poster/select', async (c) => {
     return success(c, await selectPosterVersion(episodeId, body.version_id))
   } catch (err) {
     return failure(c, err, 'select')
+  }
+})
+
+// POST /episodes/:id/poster/load-version — 把某版本的 layer_doc 载入当前工程
+app.post('/:id/poster/load-version', async (c) => {
+  const episodeId = Number(c.req.param('id'))
+  const body = await readJson(c)
+  try {
+    return success(c, await loadPosterVersion(episodeId, body.version_id))
+  } catch (err) {
+    return failure(c, err, 'load-version')
   }
 })
 

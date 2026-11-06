@@ -35,6 +35,7 @@ const TEXT_KIND_LABEL: Record<TextTaskKind, string> = {
   storyboard_fill_gaps: '补全剩余分镜',
   asset_pipeline: '资产流水线',
   asset_review: '资产审核清单',
+  poster_concept: 'Poster 构想',
 }
 
 const ASSET_KIND_LABEL: Record<string, string> = {

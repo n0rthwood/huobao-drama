@@ -1,8 +1,9 @@
 /**
  * 叠加图层的打包字体与 fontconfig 自检（Issue #48）。
  *
- * 服务端渲染必须**确定性**：只用仓库内 `backend/assets/fonts/` 的 Noto Sans/Serif SC
- * 子集，不读系统字体（不同机器的回退字体会让同一份文档渲染出不同画面）。
+ * 服务端渲染必须**确定性**：只用仓库内 `backend/assets/fonts/` 的打包字体
+ * （Noto Sans/Serif SC + LXGW WenKai + Ma Shan Zheng，四族字体，Issue #72），
+ * 不读系统字体（不同机器的回退字体会让同一份文档渲染出不同画面）。
  * 因此启动时写一份只含本目录的 fontconfig 配置并指向它，再做一次探针渲染；
  * 自检失败时 `renderLayerDoc` 直接抛错，**绝不输出豆腐块**。
  */
@@ -21,6 +22,9 @@ export const LAYER_FONT_FILES = [
   'NotoSansSC-Bold.otf',
   'NotoSerifSC-Regular.otf',
   'NotoSerifSC-Bold.otf',
+  'LXGWWenKai-Regular.ttf',
+  'LXGWWenKai-Medium.ttf',
+  'MaShanZheng-Regular.ttf',
 ] as const
 
 export interface LayerFontStatus {
@@ -124,8 +128,15 @@ export async function ensureLayerFonts(): Promise<LayerFontStatus> {
       }
       masks[key] = text
     }
-    if (differentPixels(masks.sans, masks.serif) < masks.sans.length * 0.002) {
-      throw new LayerFontError(`字体自检失败：sans 与 serif 渲染结果相同，fontconfig 没有选中打包字体（${fontDir}）`)
+    const pairs: [string, string, string][] = [
+      ['sans', 'serif', 'sans 与 serif'],
+      ['serif', 'kai', 'serif 与 kai'],
+      ['sans', 'hand', 'sans 与 hand'],
+    ]
+    for (const [a, b, label] of pairs) {
+      if (differentPixels(masks[a], masks[b]) < masks[a].length * 0.002) {
+        throw new LayerFontError(`字体自检失败：${label} 渲染结果相同，fontconfig 没有选中打包字体（${fontDir}）`)
+      }
     }
 
     cached = {

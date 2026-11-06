@@ -334,6 +334,11 @@ export const sqliteSchemaStatements = [
     reference_images TEXT,
     base_image TEXT,
     layout TEXT,
+    layer_doc TEXT,
+    concept TEXT,
+    copy TEXT,
+    provenance TEXT,
+    concept_updated_at TEXT,
     selected_version_id INTEGER,
     final_image TEXT,
     created_at TEXT NOT NULL,
@@ -347,9 +352,11 @@ export const sqliteSchemaStatements = [
     kind TEXT NOT NULL,
     image TEXT,
     base_image TEXT,
+    layer_doc TEXT,
     layout TEXT,
     prompt TEXT,
     text_prompt TEXT,
+    concept_composition_id TEXT,
     mode TEXT,
     reference_images TEXT,
     provider TEXT,
@@ -719,6 +726,15 @@ const columnAdditions: { table: string; column: string; type: string }[] = [
   { table: 'episodes', column: 'script_confirmed_at', type: 'TEXT' },
   { table: 'episodes', column: 'asset_review_status', type: "TEXT NOT NULL DEFAULT 'none'" },
   { table: 'episodes', column: 'asset_review_stale_reasons', type: 'TEXT' },
+  // Poster AI 构想与图层编辑器（Issue #72）：旧 layout 不再读写，新增 layer_doc / concept /
+  // copy / provenance / concept_updated_at；候选版本记 layer_doc 与所属构图方案。
+  { table: 'episode_posters', column: 'layer_doc', type: 'TEXT' },
+  { table: 'episode_posters', column: 'concept', type: 'TEXT' },
+  { table: 'episode_posters', column: 'copy', type: 'TEXT' },
+  { table: 'episode_posters', column: 'provenance', type: 'TEXT' },
+  { table: 'episode_posters', column: 'concept_updated_at', type: 'TEXT' },
+  { table: 'poster_versions', column: 'layer_doc', type: 'TEXT' },
+  { table: 'poster_versions', column: 'concept_composition_id', type: 'TEXT' },
 ]
 
 /**

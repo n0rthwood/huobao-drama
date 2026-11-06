@@ -12,8 +12,12 @@
 | `NotoSansSC-Bold.otf` | Noto Sans SC | 700 | 5.9 MB |
 | `NotoSerifSC-Regular.otf` | Noto Serif SC | 400 | 8.1 MB |
 | `NotoSerifSC-Bold.otf` | Noto Serif SC | 700 | 8.4 MB |
+| `LXGWWenKai-Regular.ttf` | LXGW WenKai | 400 | 12.7 MB |
+| `LXGWWenKai-Medium.ttf` | LXGW WenKai | 700（Medium） | 12.6 MB |
+| `MaShanZheng-Regular.ttf` | Ma Shan Zheng | 400 | 5.8 MB |
 
-合计 ≈ 28 MB（上游 SubsetOTF 原始四件 ≈ 40 MB，子集化省掉约 30%）。
+合计 ≈ 58 MB。Poster（Issue #72）的四族字体：`sans` = Noto Sans SC、`serif` = Noto Serif SC、
+`kai` = LXGW WenKai、`hand` = Ma Shan Zheng；服务端 fontconfig 与编辑器 `@font-face` 都用这一批文件。
 
 ## 为什么是「子集」而不是全量，也不是更小的常用字表
 
@@ -60,6 +64,29 @@ print('\n'.join('  [0x%04x, 0x%04x],'%(a,b) for a,b in out))
 `POST /layer-docs/render` 返回 400 并列出具体字符，不会渲染成豆腐块。扩大覆盖要同时改
 申请区间、重新子集化、重新生成 `FONT_CHAR_RANGES`，并更新本文件的大小表。
 
+**kai / hand 的覆盖较小**：LXGW WenKai 子集约 21945 个码位，Ma Shan Zheng 子集约 7001 个码位
+（多为 GB2312 常用字）。这两族字体在 `layer-svg.ts` 里排在其字族栈的第二位
+（`'LXGW WenKai', serif` / `'Ma Shan Zheng', sans-serif`），fontconfig 只认识本目录，
+所以缺字会回退到打包的 Noto Sans/Serif SC，不会出豆腐块；渲染前的 `FONT_CHAR_RANGES`
+检查仍以 Noto 四件的交集为准（21902 个码位），不因新增手写/楷体字体而缩小。
+
+## 新增字体的重新生成（Issue #72）
+
+```bash
+cd /tmp
+curl -sL -O https://github.com/lxgw/LxgwWenKai/releases/download/v1.530/LXGWWenKai-Regular.ttf
+curl -sL -O https://github.com/lxgw/LxgwWenKai/releases/download/v1.530/LXGWWenKai-Medium.ttf
+curl -sL -O https://raw.githubusercontent.com/google/fonts/main/ofl/mashanzheng/MaShanZheng-Regular.ttf
+UNI='U+0020-007E,U+00A0-00FF,U+2000-206F,U+2190-21FF,U+2460-24FF,U+25A0-25FF,U+3000-30FF,U+4E00-9FFF,U+FF00-FFEF'
+for f in LXGWWenKai-Regular LXGWWenKai-Medium MaShanZheng-Regular; do
+  /tmp/fontsub/bin/pyftsubset $f.ttf --unicodes="$UNI" \
+    --layout-features=kern,vert,vrt2,liga,calt --name-IDs='*' --output-file=$f.sub.ttf
+done
+```
+
+LXGW WenKai 上游没有 Bold，700 字重用 `LXGWWenKai-Medium.ttf` 注册（`layer-fonts.ts` 的
+`LAYER_FONT_FILES` 与编辑器 `@font-face` 同步改）。
+
 ## 重新生成（需要 fonttools，装在仓库外的临时环境里）
 
 ```bash
@@ -80,5 +107,8 @@ done
 
 ## 许可
 
-SIL Open Font License 1.1，见同目录 `OFL.txt`（取自 `notofonts/noto-cjk` 的 `Sans/LICENSE`，
-与 `Serif/LICENSE` 内容一致）。
+- Noto Sans SC / Noto Serif SC：SIL Open Font License 1.1，见同目录 `OFL.txt`
+  （取自 `notofonts/noto-cjk` 的 `Sans/LICENSE`，与 `Serif/LICENSE` 内容一致）。
+- LXGW WenKai：SIL Open Font License 1.1，见 `OFL-LXGW-WenKai.txt`（取自 `lxgw/LxgwWenKai`）。
+- Ma Shan Zheng：SIL Open Font License 1.1，见 `OFL-MaShanZheng.txt`（取自 Google Fonts
+  `google/fonts/ofl/mashanzheng`）。

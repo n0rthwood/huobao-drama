@@ -12,7 +12,7 @@
  * - 图片 href 由调用方的 resolveImage 决定（服务端内联 data URI，前端走 mediaUrl），
  *   这是两端唯一允许不同的地方。
  */
-import type { CardLayer, ImageLayer, Layer, LayerBox, LayerDoc, LayerTheme, LayerType, MarkerLayer, PolygonLayer, PolylineLayer, LabelLayer } from './layer-doc.js'
+import type { CardLayer, ImageLayer, Layer, LayerBox, LayerDoc, LayerTheme, LayerType, MarkerLayer, PolygonLayer, PolylineLayer, LabelLayer, LayerVariables } from './layer-doc.js'
 
 export const LINE_HEIGHT_EM = 1.35
 export const BASELINE_EM = 0.88
@@ -23,6 +23,10 @@ const EPS = 1e-9
 export const FONT_FAMILIES: Record<string, string> = {
   sans: "'Noto Sans SC', sans-serif",
   serif: "'Noto Serif SC', serif",
+  // Issue #72：四族打包字体。kai/hand 的字表比 Noto 小，缺字由 serif/sans 别名回退到打包的
+  // Noto（fontconfig 只认识本目录），所以不会出现豆腐块；字表交集仍按 FONT_CHAR_RANGES 检查。
+  kai: "'LXGW WenKai', serif",
+  hand: "'Ma Shan Zheng', sans-serif",
 }
 
 /** 主题预设：样式字段缺省时的兜底值（纪录片档案风 / 干净 / 水墨）。 */
@@ -250,7 +254,7 @@ function dashArray(kind: string, strokeWidth: number): string {
  * 图层的归一化包围盒：编辑器选择框、旋转中心、吸附参考线共用同一口径。
  * marker 把标签文字算进去（选择框要能框住文字）。
  */
-export function layerBounds(layer: Layer, theme: LayerTheme, aspect = 16 / 9): LayerBox {
+export function layerBounds(layer: Layer, theme: LayerTheme, aspect = 16 / 9, variables?: LayerVariables): LayerBox {
   if (layer.type === 'polygon' || layer.type === 'polyline') {
     const xs = layer.points.map(p => p[0])
     const ys = layer.points.map(p => p[1])
@@ -264,7 +268,7 @@ export function layerBounds(layer: Layer, theme: LayerTheme, aspect = 16 / 9): L
     const legacyOffset = styleOf(layer, theme, 'label_offset') as number[]
     const offset = [Number(layer.style.label_dx ?? legacyOffset[0]), Number(layer.style.label_dy ?? legacyOffset[1])]
     const [cx, cy] = layer.at
-    const textWidth = (measureTextEm(layer.text) * size) / aspect
+    const textWidth = (measureTextEm(resolvedText(layer, variables)) * size) / aspect
     const textX = offset[0] >= 0 ? cx + offset[0] : cx + offset[0] - textWidth
     const left = Math.min(cx - radius / aspect, textX)
     const right = Math.max(cx + radius / aspect, textX + textWidth)
@@ -281,6 +285,13 @@ interface SvgContext {
   theme: LayerTheme
   defs: string[]
   resolveImage: (path: string) => string
+  variables?: LayerVariables
+}
+
+/** 变量层的实际文本：Poster 固定文本按剧集数据现场解析；普通图层用自身文本。 */
+export function resolvedText(layer: Layer, variables?: LayerVariables): string {
+  if (layer.type === 'label' && layer.variable) return variables?.[layer.variable] || ''
+  return 'text' in layer ? String(layer.text || '') : ''
 }
 
 function textBlock(
@@ -295,24 +306,32 @@ function textBlock(
     align: string
     stroke?: string
     strokeWidth?: number
+    italic?: boolean
+    shadow?: boolean
+    shadowFilterId?: string
   },
 ): string {
   if (!lines.length) return ''
   const anchor = options.align === 'center' ? 'middle' : options.align === 'right' ? 'end' : 'start'
-  const spans = lines
-    .map((line, index) => {
-      const y = options.top + options.size * BASELINE_EM + index * options.size * LINE_HEIGHT_EM
-      return `<tspan x="${fmt(options.x)}" y="${fmt(y)}">${esc(line)}</tspan>`
-    })
-    .join('')
   const common = `font-family="${FONT_FAMILIES[options.font] || FONT_FAMILIES.sans}" font-size="${fmt(options.size)}"`
     + `${options.bold ? ' font-weight="700"' : ''} text-anchor="${anchor}" xml:space="preserve"`
   const strokeWidth = options.strokeWidth || 0
-  const halo = options.stroke && strokeWidth > 0
-    ? `<text ${common} fill="${esc(options.stroke)}" stroke="${esc(options.stroke)}" stroke-width="${fmt(strokeWidth * 2)}"`
-      + ` stroke-linejoin="round" stroke-linecap="round">${spans}</text>`
-    : ''
-  return `${halo}<text ${common} fill="${esc(options.color)}">${spans}</text>`
+  const shadow = options.shadow && options.shadowFilterId ? ` filter="url(#${esc(options.shadowFilterId)})"` : ''
+  // 斜体用绕基线 skewX 合成：CJK 字体没有 italic 字面，浏览器与 librsvg 对 font-style 的处理不一致，
+  // 显式变换才能保证两端看到同一种倾斜角度。
+  const texts = lines.map((line, index) => {
+    const y = options.top + options.size * BASELINE_EM + index * options.size * LINE_HEIGHT_EM
+    const transform = options.italic
+      ? ` transform="translate(0 ${fmt(y)}) skewX(-12) translate(0 ${fmt(-y)})"`
+      : ''
+    const span = `<tspan x="${fmt(options.x)}" y="${fmt(y)}">${esc(line)}</tspan>`
+    const halo = options.stroke && strokeWidth > 0
+      ? `<text ${common} fill="${esc(options.stroke)}" stroke="${esc(options.stroke)}" stroke-width="${fmt(strokeWidth * 2)}"`
+        + ` stroke-linejoin="round" stroke-linecap="round"${transform}>${span}</text>`
+      : ''
+    return `${halo}<text ${common} fill="${esc(options.color)}"${shadow}${transform}>${span}</text>`
+  }).join('')
+  return texts
 }
 
 function arrowHead(from: number[], to: number[], width: number, color: string): string {
@@ -374,7 +393,7 @@ function emitMarker(layer: MarkerLayer, ctx: SvgContext): string {
   let out = `<circle cx="${fmt(cx)}" cy="${fmt(cy)}" r="${fmt(radius)}" fill="${esc(color)}"`
     + ` stroke="${esc(stroke)}" stroke-width="${fmt(radius * 0.35)}"/>`
   if (layer.text) {
-    out += textBlock([layer.text], {
+    out += textBlock([resolvedText(layer, ctx.variables)], {
       x: cx + offset[0] * ctx.width,
       top: cy + offset[1] * ctx.height - size * BASELINE_EM,
       size,
@@ -399,12 +418,20 @@ function emitLabel(layer: LabelLayer, ctx: SvgContext): string {
   const bgOpacity = styleOf(layer, ctx.theme, 'bg_opacity') as number
   const pad = bgOpacity > 0 ? size * 0.3 : 0
   const align = styleOf(layer, ctx.theme, 'align') as string
-  const lines = wrapTextEm(layer.text, Math.max(1, (w - pad * 2) / size))
+  const lines = wrapTextEm(resolvedText(layer, ctx.variables), Math.max(1, (w - pad * 2) / size))
   const textX = align === 'center' ? x + w / 2 : align === 'right' ? x + w - pad : x + pad
   const bg = bgOpacity > 0
     ? `<rect x="${fmt(x)}" y="${fmt(y)}" width="${fmt(w)}" height="${fmt(h)}" rx="${fmt(size * 0.18)}"`
       + ` fill="${esc(styleOf(layer, ctx.theme, 'bg') as string)}" fill-opacity="${fmt(bgOpacity)}"/>`
     : ''
+  const shadow = Boolean(styleOf(layer, ctx.theme, 'shadow'))
+  const shadowFilterId = `text-shadow-${layer.id}`
+  if (shadow) {
+    ctx.defs.push(
+      `<filter id="${esc(shadowFilterId)}" x="-20%" y="-20%" width="140%" height="140%">`
+      + `<feDropShadow dx="0" dy="${fmt(size * 0.05)}" stdDeviation="${fmt(size * 0.18)}" flood-color="#000000" flood-opacity="0.65"/></filter>`,
+    )
+  }
   return bg + textBlock(lines, {
     x: textX,
     top: y + pad,
@@ -415,6 +442,9 @@ function emitLabel(layer: LabelLayer, ctx: SvgContext): string {
     align,
     stroke: styleOf(layer, ctx.theme, 'stroke') as string,
     strokeWidth: (styleOf(layer, ctx.theme, 'stroke_width') as number) * ctx.height,
+    italic: Boolean(styleOf(layer, ctx.theme, 'italic')),
+    shadow,
+    shadowFilterId,
   })
 }
 
@@ -426,14 +456,15 @@ function emitCard(layer: CardLayer, ctx: SvgContext): string {
   const font = styleOf(layer, ctx.theme, 'font') as string
   const color = styleOf(layer, ctx.theme, 'color') as string
   const accent = styleOf(layer, ctx.theme, 'accent') as string
+  const scale = Number(styleOf(layer, ctx.theme, 'scale') || 1)
   const bg = `<rect x="${fmt(x)}" y="${fmt(y)}" width="${fmt(w)}" height="${fmt(h)}"`
     + ` fill="${esc(styleOf(layer, ctx.theme, 'bg') as string)}" fill-opacity="${fmt(styleOf(layer, ctx.theme, 'bg_opacity') as number)}"/>`
   // `years`（#58 卡片字段契约）统一渲染为「标题下方的一行强调色年代」；为空时输出与 #48 逐字节相同
   const { title, sub, meta, years } = layer.fields
 
   if (layer.template === 'year') {
-    const titleSize = h * 0.5
-    const subSize = h * 0.18
+    const titleSize = h * 0.5 * scale
+    const subSize = h * 0.18 * scale
     return bg
       + `<rect x="${fmt(x)}" y="${fmt(y + h - h * 0.06)}" width="${fmt(w)}" height="${fmt(h * 0.06)}" fill="${esc(accent)}"/>`
       + textBlock([title], { x: x + w / 2, top: y + h * 0.12, size: titleSize, font, bold: true, color, align: 'center' })
@@ -441,8 +472,8 @@ function emitCard(layer: CardLayer, ctx: SvgContext): string {
       + (sub ? textBlock([sub], { x: x + w / 2, top: y + h * 0.72, size: subSize, font, bold: false, color, align: 'center' }) : '')
   }
   if (layer.template === 'chapter') {
-    const titleSize = h * 0.4
-    const subSize = h * 0.17
+    const titleSize = h * 0.4 * scale
+    const subSize = h * 0.17 * scale
     return bg
       + textBlock([title], { x: x + w / 2, top: y + h * 0.14, size: titleSize, font, bold: true, color, align: 'center' })
       + (years ? textBlock([years], { x: x + w / 2, top: y + h * 0.56, size: subSize, font, bold: false, color: accent, align: 'center' }) : '')
@@ -451,9 +482,9 @@ function emitCard(layer: CardLayer, ctx: SvgContext): string {
   }
   const stripe = Math.max(2, w * 0.012)
   const pad = h * 0.14
-  const titleSize = h * 0.38
-  const subSize = h * 0.2
-  const metaSize = h * 0.16
+  const titleSize = h * 0.38 * scale
+  const subSize = h * 0.2 * scale
+  const metaSize = h * 0.16 * scale
   // 标题下方逐行往下排：先 years（强调色），再 sub
   const yearsTop = y + pad + titleSize * LINE_HEIGHT_EM
   const subTop = yearsTop + (years ? subSize * LINE_HEIGHT_EM : 0)
@@ -559,6 +590,7 @@ export function layerDocToSvg(
     resolveImage?: (path: string) => string
     opacity?: Record<string, number>
     viewport?: { x: number; y: number; w: number; h: number }
+    variables?: LayerVariables
   } = {},
 ): string {
   // Cropped documents live in native whole-image geometry; output size is only the SVG surface.
@@ -570,6 +602,7 @@ export function layerDocToSvg(
     theme: doc.theme,
     defs: [],
     resolveImage: options.resolveImage || ((path: string) => path),
+    variables: options.variables,
   }
   const aspect = worldWidth / worldHeight
   const body: string[] = []
@@ -587,7 +620,7 @@ export function layerDocToSvg(
     else if (layer.type === 'card') inner = emitCard(layer, ctx)
     else if (layer.type === 'image') inner = emitImage(layer, ctx)
     if (!inner) continue
-    const bounds = layerBounds(layer, doc.theme, aspect)
+    const bounds = layerBounds(layer, doc.theme, aspect, options.variables)
     const cx = (bounds.x + bounds.w / 2) * worldWidth
     const cy = (bounds.y + bounds.h / 2) * worldHeight
     const transform = layer.rotation ? ` transform="rotate(${fmt(layer.rotation)} ${fmt(cx)} ${fmt(cy)})"` : ''

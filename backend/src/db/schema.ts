@@ -424,8 +424,17 @@ export const episodePosters = sqliteTable('episode_posters', {
   referenceImages: text('reference_images'),
   // 当前编辑底图
   baseImage: text('base_image'),
-  // 文字图层布局 JSON
+  // 旧文字布局（Issue #39）：Issue #72 起不再读写，仅保留旧数据
   layout: text('layout'),
+  // 图层文档（Issue #72）：与分镜制作同源，空底图也允许保存
+  layerDoc: text('layer_doc'),
+  // AI 构想（Issue #72，JSON）：三个构图方案、资产快照、推荐项与当前方案
+  concept: text('concept'),
+  // 海报文案（Issue #72，JSON：title/subtitle/era/place/notes）
+  copy: text('copy'),
+  // 字段/图层来源标记（Issue #72，JSON：ai|manual）
+  provenance: text('provenance'),
+  conceptUpdatedAt: text('concept_updated_at'),
   selectedVersionId: integer('selected_version_id'),
   finalImage: text('final_image'),
   createdAt: text('created_at').notNull(),
@@ -441,9 +450,12 @@ export const posterVersions = sqliteTable('poster_versions', {
   kind: text('kind').notNull(),
   image: text('image'),
   baseImage: text('base_image'),
+  layerDoc: text('layer_doc'),
   layout: text('layout'),
   prompt: text('prompt'),
   textPrompt: text('text_prompt'),
+  // 该候选属于哪个 AI 构图方案（Issue #72）
+  conceptCompositionId: text('concept_composition_id'),
   mode: text('mode'),
   referenceImages: text('reference_images'),
   provider: text('provider'),

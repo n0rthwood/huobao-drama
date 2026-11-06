@@ -4,7 +4,8 @@
       <summary><Image :size="15" />{{ t('layerCanvas.base.title') }}</summary>
       <div class="lr-base">
         <img v-if="doc.base.path && !baseImageError" :src="mediaUrl(doc.base.path)" alt="" @load="readSourceSize" @error="baseImageError = true">
-        <p v-if="baseImageError || !doc.base.path" class="lr-error">{{ t('layerCanvas.base.loadError') }}</p>
+        <p v-if="baseImageError" class="lr-error">{{ t('layerCanvas.base.loadError') }}</p>
+        <p v-else-if="!doc.base.path" class="lr-guide">{{ t('layerCanvas.base.noBase') }}</p>
         <strong>{{ currentBase?.name || baseAsset?.name || t('layerCanvas.base.unknown') }}</strong>
         <span v-if="doc.base.ref" class="lr-meta">{{ t('layerCanvas.base.version', { version: doc.base.ref.version_task_id ?? '—' }) }}
           <span v-if="currentBase?.faithful" :title="t('layerCanvas.base.verified')"><ShieldCheck :size="13" />{{ t('layerCanvas.base.verified') }}</span>
@@ -16,10 +17,17 @@
         <span v-if="outputRatio !== null" class="lr-meta">{{ t('layerCanvas.base.resolution', { times: outputRatio, sw: finalSize.width, sh: finalSize.height }) }}</span>
         <small v-if="!doc.base.source_width">{{ t('layerCanvas.base.saveSize') }}</small>
         <div class="lr-actions">
-          <button type="button" class="btn-ghost" :disabled="inherited" @click="pickerOpen = true"><ImagePlus :size="14" />{{ t('layerCanvas.base.replace') }}</button>
+          <button v-if="externalSources" type="button" class="btn-ghost" :disabled="inherited" @click="posterPickerOpen = !posterPickerOpen"><ImagePlus :size="14" />{{ t('layerCanvas.base.replace') }}</button>
+          <button v-else type="button" class="btn-ghost" :disabled="inherited" @click="pickerOpen = true"><ImagePlus :size="14" />{{ t('layerCanvas.base.replace') }}</button>
           <button type="button" class="btn-ghost" :disabled="inherited || !sourceSize.width || !sourceSize.height" @click="emit('crop-request')"><Crop :size="14" />{{ t('layerCanvas.base.cropTo169') }}</button>
         </div>
         <small class="lr-guide"><Info :size="13" />{{ t('layerCanvas.base.guide') }}</small>
+        <div v-if="posterPickerOpen" class="lr-poster-bases">
+          <button v-for="source in baseSources" :key="source.path" type="button" class="lr-poster-base" @click="chooseExternal(source)">
+            <img :src="mediaUrl(source.path)" alt="" loading="lazy">
+            <span>{{ source.label }}</span>
+          </button>
+        </div>
         <p v-if="loadError" class="lr-error">{{ t('layerCanvas.base.loadError') }}</p>
         <p v-if="pickerError" class="lr-error">{{ t('layerCanvas.image.selectionCount') }}</p>
         <details class="lr-overall"><summary>{{ t('layerCanvas.base.style') }}</summary>
@@ -48,17 +56,17 @@
     </details>
     <details open class="lr-section">
       <summary><Layers :size="15" />{{ t('layerCanvas.list.title') }}</summary>
-      <LayerList :doc="doc" :selected-ids="selectedIds" :anchor-states="anchorStates"
+      <LayerList :doc="doc" :selected-ids="selectedIds" :anchor-states="anchorStates" :variables="variables"
         @select="emit('select', $event)" @history="emit('history')" @patch="emit('patch', $event)"
         @reorder="emit('reorder', $event)" @add="(type, partial) => emit('add', type, partial)" @remove="emit('remove')"
         @duplicate="emit('duplicate')" @relink="startRelink" />
     </details>
     <details open class="lr-section">
       <summary><SlidersHorizontal :size="15" />{{ t('layerCanvas.style.docTitle') }}</summary>
-      <LayerStyle :doc="doc" :layer="selectedLayer" :assets="imageAssets" :drama-id="dramaId" :episode-id="episodeId" layer-only
+      <LayerStyle :doc="doc" :layer="selectedLayer" :assets="imageAssets" :drama-id="dramaId" :episode-id="episodeId" :variables="variables" layer-only
         @patch="emit('patch', $event)" @style="emit('style', $event)" @history="emit('history')" @registered="emit('assets-changed', $event)" />
     </details>
-    <AssetPicker :open="pickerOpen" :assets="baseChoices" @close="pickerOpen = false" @confirm="chooseBase" />
+    <AssetPicker v-if="!externalSources" :open="pickerOpen" :assets="baseChoices" @close="pickerOpen = false" @confirm="chooseBase" />
   </aside>
 </template>
 
@@ -91,6 +99,10 @@ const props = defineProps({
   inherited: { type: Boolean, default: false },
   baseAsset: { type: Object, default: null },
   assets: { type: Array, default: () => [] },
+  // Poster 固定文本变量（Issue #72）
+  variables: { type: Object, default: null },
+  // Poster 底图候选（Issue #72）：生成/合成版本、人工上传、资产图；非空时不再请求资产流水线候选
+  baseSources: { type: Array, default: null },
 })
 const emit = defineEmits(['select', 'patch', 'style', 'history', 'reorder', 'add', 'remove', 'duplicate', 'theme', 'filter', 'base', 'crop-request', 'reanchor', 'assets-changed'])
 const { t } = useI18n()
@@ -101,6 +113,7 @@ const semanticsLoaded = ref(false)
 const loadError = ref(false)
 const pickerError = ref(false)
 const pickerOpen = ref(false)
+const posterPickerOpen = ref(false)
 const relinkId = ref(null)
 const baseSection = ref(null)
 const naturalSize = ref({ width: 0, height: 0 })
@@ -108,10 +121,13 @@ const baseImageError = ref(false)
 let semanticRequest = 0
 let candidateRequest = 0
 
+const externalSources = computed(() => Array.isArray(props.baseSources))
 // AssetPicker selects by kind/id, so each version has a synthetic id; real ids stay on metadata.
-const baseChoices = computed(() => candidates.value.map((candidate, index) => ({
+const baseChoices = computed(() => (props.baseSources || candidates.value).map((candidate, index) => ({
   id: index + 1, kind: candidate.asset_kind, asset_id: candidate.asset_id,
-  name: `${candidate.asset_name} · ${t('layerCanvas.base.version', { version: candidate.version_task_id })}`,
+  name: candidate.label || (candidate.asset_name
+    ? `${candidate.asset_name} · ${t('layerCanvas.base.version', { version: candidate.version_task_id })}`
+    : `#${candidate.version_task_id ?? index + 1}`),
   image: candidate.path, version_task_id: candidate.version_task_id,
   faithful: candidate.verified === 'faithful' || candidate.verified === 'gate_passed', candidate,
 })))
@@ -141,7 +157,7 @@ const anchorStates = computed(() => Object.fromEntries(props.doc.layers.map(laye
 watch(() => props.episodeId, async (episodeId) => {
   const request = ++candidateRequest
   candidates.value = []
-  if (!episodeId) return
+  if (externalSources.value || !episodeId) return
   try {
     const result = await assetPipelineAPI.baseCandidates(episodeId)
     if (request === candidateRequest) candidates.value = result.candidates || []
@@ -168,13 +184,25 @@ async function refreshSemantics() {
 function readSourceSize(event) {
   naturalSize.value = { width: event.target.naturalWidth, height: event.target.naturalHeight }
 }
+/** Poster 底图候选没有 asset kind/id（生成版本/上传图），直接按路径选择，不经过 AssetPicker 分类。 */
+function chooseExternal(source) {
+  const base = { path: source.path, width: props.doc.base.width, height: props.doc.base.height,
+    ...(props.doc.base.filter ? { filter: { ...props.doc.base.filter } } : {}) }
+  if (source.ref) base.ref = { ...source.ref }
+  if (source.width && source.height) Object.assign(base, { source_width: source.width, source_height: source.height })
+  emit('base', base)
+  posterPickerOpen.value = false
+}
+
 function chooseBase(selected) {
   if (selected.length !== 1) { pickerError.value = true; return }
   const candidate = baseChoices.value.find(item => item.id === selected[0].id && item.kind === selected[0].kind)?.candidate
   if (!candidate) return
   const base = { path: candidate.path, width: props.doc.base.width, height: props.doc.base.height,
-    ...(props.doc.base.filter ? { filter: { ...props.doc.base.filter } } : {}),
-    ref: { asset_kind: candidate.asset_kind, asset_id: candidate.asset_id, version_task_id: candidate.version_task_id } }
+    ...(props.doc.base.filter ? { filter: { ...props.doc.base.filter } } : {}) }
+  if (candidate.asset_kind && candidate.asset_id) {
+    base.ref = { asset_kind: candidate.asset_kind, asset_id: candidate.asset_id, version_task_id: candidate.version_task_id }
+  }
   // Source dimensions are only persisted when already supplied by the server candidate.
   if (candidate.width && candidate.height) Object.assign(base, { source_width: candidate.width, source_height: candidate.height })
   emit('base', base)
@@ -226,5 +254,9 @@ defineExpose({ refreshSemantics })
 .lr-entry button:disabled { opacity: .4; cursor: not-allowed; }
 .lr-relink { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; color: var(--accent); }
 .lr-error { margin: 0; color: var(--danger, #c0472e); }
+.lr-poster-bases { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; }
+.lr-poster-base { display: flex; flex-direction: column; gap: 3px; padding: 4px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-card); color: var(--text-2); font-size: 10px; cursor: pointer; }
+.lr-poster-base img { width: 100%; height: 56px; object-fit: cover; border-radius: 4px; }
+.lr-poster-base span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .layer-rail :deep(.layer-list), .layer-rail :deep(.layer-style) { border: 0; }
 </style>

@@ -9,6 +9,8 @@ import { useMissingGlyphs } from '~/composables/useMissingGlyphs'
 
 export type LayerType = 'polygon' | 'polyline' | 'marker' | 'label' | 'card' | 'image'
 export type LayerTheme = 'archival' | 'clean' | 'ink'
+export type LayerVariable = 'project_title' | 'episode_title' | 'episode_no'
+export interface LayerVariables { project_title: string; episode_title: string; episode_no: string }
 
 export interface LayerBox { x: number; y: number; w: number; h: number }
 export interface LayerRecord {
@@ -25,6 +27,7 @@ export interface LayerRecord {
   at?: [number, number]
   box?: LayerBox
   text?: string
+  variable?: LayerVariable
   template?: 'name' | 'year' | 'chapter'
   fields?: { title: string; sub: string; meta: string }
   src?: { path: string; asset_kind?: 'prop' | 'scene' | 'character'; asset_id?: number; version_task_id?: number | null }
@@ -98,7 +101,11 @@ export function createLayer(type: LayerType, theme: LayerTheme, index: number): 
   return base
 }
 
-export function useLayerDoc(onSave?: (doc: LayerDocument) => void, external?: { snapshot?: () => unknown; restore?: (value: unknown) => void }) {
+export function useLayerDoc(
+  onSave?: (doc: LayerDocument) => void,
+  external?: { snapshot?: () => unknown; restore?: (value: unknown) => void },
+  variables?: () => LayerVariables | undefined,
+) {
   const doc = ref<LayerDocument>(emptyLayerDoc())
   const selectedIds = ref<string[]>([])
   const past = ref<string[]>([])
@@ -110,7 +117,7 @@ export function useLayerDoc(onSave?: (doc: LayerDocument) => void, external?: { 
   const canUndo = computed(() => past.value.length > 0)
   const canRedo = computed(() => future.value.length > 0)
   const aspect = computed(() => doc.value.base.width / doc.value.base.height)
-  const { missingGlyphs, missingGlyphsByLayer } = useMissingGlyphs(doc)
+  const { missingGlyphs, missingGlyphsByLayer } = useMissingGlyphs(doc, variables)
 
   function captureSnapshot() {
     return JSON.stringify({ doc: doc.value, external: external?.snapshot?.() })

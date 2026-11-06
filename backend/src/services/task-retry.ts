@@ -17,6 +17,7 @@ import { getVideoAdapter } from './adapters/registry.js'
 import { generateImage, generateVideo } from './generation.js'
 import { renderRefPrompt } from './task-center.js'
 import { LAYER_SEGMENT_PROVIDER, startLayerSegmentRenderTask, storyboardIdOfSegmentTask } from './layer-segment-task.js'
+import { startPosterConcept } from './poster-concept.js'
 import {
   createTextTask,
   findLatestTextTask,
@@ -51,6 +52,9 @@ interface StoredParams {
   refNameIndex?: Record<string, number>
   posterId?: number
   posterGenMode?: 'initial' | 'composite' | 'layers'
+  posterConceptComposition?: string
+  posterAutoBase?: boolean
+  posterSize?: string
   text_prompt?: string
   referenceMode?: string
   imageUrl?: string
@@ -122,6 +126,10 @@ async function retryImage(row: SysTaskRow, opts: RetryOptions): Promise<number> 
     posterId: params.posterId,
     posterGenMode: params.posterGenMode,
     posterTextPrompt: params.text_prompt,
+    posterConceptComposition: params.posterConceptComposition,
+    // 重试不改变「推荐方案自动成为临时编辑底图」的一次性语义：只在仍无底图时生效
+    posterAutoBase: params.posterAutoBase === true,
+    posterSize: params.posterSize,
   })
 }
 
@@ -252,6 +260,18 @@ async function retryText(row: SysTaskRow, opts: RetryOptions): Promise<number> {
     if (fill.reason === 'not_documentary') throw new Error('只有纪录片项目才有补镜')
     if (!fill.started) throw new Error('本集旁白已被分镜全部领走，没有需要补的缺口')
     return fill.taskId!
+  }
+
+  if (kind === 'poster_concept') {
+    const started = await startPosterConcept(episodeId, {
+      model: opts.model,
+      configId: opts.configId,
+      retryOf: row.id,
+    })
+    if (started.reason === 'running') throw new Error('该集的 Poster 构想正在运行，请等它结束')
+    if (started.reason === 'empty_script') throw new Error('请先完成剧本改写/拆分，并且本集至少有一个带图的资产')
+    if (!started.task_id) throw new Error('重试任务创建失败')
+    return started.task_id
   }
 
   const extractTarget = EXTRACT_TARGET_OF[kind]

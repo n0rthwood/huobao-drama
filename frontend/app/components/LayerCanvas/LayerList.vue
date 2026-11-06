@@ -60,6 +60,7 @@ const props = defineProps({
   doc: { type: Object, required: true },
   selectedIds: { type: Array, default: () => [] },
   anchorStates: { type: Object, default: () => ({}) },
+  variables: { type: Object, default: null },
 })
 const emit = defineEmits(['select', 'patch', 'history', 'reorder', 'add', 'remove', 'duplicate', 'relink'])
 const { t } = useI18n()
@@ -67,7 +68,7 @@ const { t } = useI18n()
 const LAYER_TYPES = ['polygon', 'polyline', 'marker', 'label', 'card', 'image']
 const TYPE_ICONS = { polygon: Lasso, polyline: Route, marker: MapPin, label: Type, card: IdCard, image: Image }
 const ANCHOR_ICONS = { anchored: Anchor, manual: Move, unlink: Unlink }
-const { missingGlyphsByLayer: glyphs } = useMissingGlyphs(() => props.doc)
+const { missingGlyphsByLayer: glyphs } = useMissingGlyphs(() => props.doc, () => props.variables)
 
 function status(layer) {
   return props.anchorStates[layer.id] || (layer.anchor?.semantic_id && !layer.anchor.detached ? 'anchored' : 'manual')
