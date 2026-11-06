@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <div class="overlay task-detail-overlay" @click.self="emit('close')">
-      <section class="dialog task-detail-dialog" role="dialog" aria-modal="true" :aria-label="t('taskCenter.detail.title')">
+      <section class="dialog task-detail-dialog" :class="{ 'is-review': reviewing }" role="dialog" aria-modal="true" :aria-label="t('taskCenter.detail.title')">
         <header class="dialog-head task-detail-head">
           <div class="task-detail-title-block">
             <span class="task-detail-kicker">{{ t('taskCenter.detail.title') }}</span>
@@ -12,14 +12,30 @@
           </button>
         </header>
 
+        <footer v-if="reviewing" id="pipeline-review-footer" class="dialog-foot task-detail-foot review-foot" />
+
         <div ref="bodyEl" class="task-detail-body">
+          <template v-if="reviewing && live.pipeline">
+            <div class="task-detail-status-row">
+              <span class="task-status-chip">{{ statusLabel }}</span>
+              <span v-if="live.pipeline?.awaiting">{{ t('episode.documentary.pipeline.roundLabel', { n: live.pipeline.awaiting.round_no }) }}</span>
+              <span v-if="elapsedText">{{ t('episode.documentary.pipeline.elapsedIncludingWaiting', { time: elapsedText }) }}</span>
+            </div>
+            <AssetPipelinePanel
+              :asset-kind="live.pipeline.asset_kind" :asset-id="live.pipeline.asset_id"
+              :episode-id="live.episode_id || 0" :review-run-id="live.id"
+              :asset-name="live.label || ''" @preview="showPreview" @update="emit('changed')"
+            />
+          </template>
+          <template v-else>
           <!-- 状态 / 进度 -->
           <div class="task-detail-status-row">
             <span :class="['task-status-chip', 'is-' + stateClass]">{{ statusLabel }}</span>
             <span class="task-detail-id">#{{ live.id }}</span>
             <span v-if="retryOf" class="task-detail-id">{{ t('taskCenter.detail.retryOf', { id: retryOf }) }}</span>
+            <button v-if="live.pipeline?.state === 'waiting_approval'" class="btn btn-sm" @click="reviewing = true">{{ t('episode.documentary.pipeline.reviewAction') }}</button>
             <ProgressRing
-              v-if="ring.status && ring.status !== 'completed'"
+              v-if="(!live.pipeline || live.pipeline.state === 'running') && ring.status && ring.status !== 'completed'"
               v-bind="ring"
               :size="34"
               :show-actions="false"
@@ -39,7 +55,7 @@
                 <Copy v-else :size="13" />
               </button>
             </div>
-            <pre class="task-detail-errorcard">{{ live.error_msg }}</pre>
+            <TaskErrorMessage :error="live.error_msg" :show-copy="false" />
           </div>
 
           <!-- 思考过程（仅文本任务，Issue #19） -->
@@ -106,7 +122,7 @@
               <dd><MediaTime :at="live.generated_at ?? live.completed_at_unix" /></dd>
             </div>
             <div v-if="elapsedText" class="task-detail-cell">
-              <dt>{{ t('taskCenter.detail.elapsed') }}</dt>
+              <dt>{{ live.pipeline ? t('episode.documentary.pipeline.elapsedLabel') : t('taskCenter.detail.elapsed') }}</dt>
               <dd>{{ elapsedText }}</dd>
             </div>
             <!-- AI 环节与实际使用的模型（#51）：视觉环节会把顶栏选的非视觉模型换掉 -->
@@ -157,9 +173,10 @@
             <img v-else :src="mediaSrc(resultUrl)" :alt="live.label || ''" loading="lazy" class="task-detail-result" />
             <MediaTime :at="live.generated_at ?? live.completed_at_unix" />
           </div>
+          </template>
         </div>
 
-        <footer class="dialog-foot task-detail-foot">
+        <footer v-if="!reviewing" class="dialog-foot task-detail-foot">
           <div class="task-detail-retry">
             <ModelSelect
               v-if="modelOptions.length"
@@ -184,6 +201,10 @@
           </div>
         </footer>
       </section>
+    </div>
+    <div v-if="previewUrl" class="pipeline-preview" role="dialog" aria-modal="true" :aria-label="previewTitle" @click.self="previewUrl = ''">
+      <button class="btn pipeline-preview-close" :aria-label="t('common.close')" @click="previewUrl = ''"><X :size="18" /></button>
+      <img :src="previewUrl" :alt="previewTitle" />
     </div>
 
     <ConfirmDialog
@@ -213,6 +234,9 @@ import ProgressRing from '~/components/ProgressRing.vue'
 import ModelSelect from '~/components/ModelSelect.vue'
 import ConfirmDialog from '~/components/ConfirmDialog.vue'
 import MediaTime from '~/components/MediaTime.vue'
+import AssetPipelinePanel from '~/components/AssetPipelinePanel.vue'
+import TaskErrorMessage from '~/components/TaskErrorMessage.vue'
+import { taskErrorPresentation } from '~/utils/taskError'
 import { taskAPI } from '~/composables/useApi'
 import { mapError, toastError, toastServerMessage } from '~/composables/useToast'
 import { loadModelOptions, bareModelName } from '~/composables/useModelOptions'
@@ -224,12 +248,17 @@ import {
 
 const props = defineProps({
   task: { type: Object, required: true },
+  reviewMode: { type: Boolean, default: false },
 })
 const emit = defineEmits(['close', 'changed'])
 
 const { t } = useI18n()
 const now = useNowTicker()
 const { tasksById, registerTask, refreshTasks } = useTasks()
+const reviewing = ref(props.reviewMode)
+const previewUrl = ref('')
+const previewTitle = ref('')
+function showPreview(url, title) { previewUrl.value = url; previewTitle.value = title }
 
 // 详情里的任务始终取 store 的最新快照（轮询会原地刷新进度/状态）
 const live = computed(() => ({ ...props.task, ...(tasksById.value[props.task.id] || {}) }))
@@ -257,7 +286,7 @@ const modelUsed = computed(() => {
 })
 const resultUrl = computed(() => live.value.local_path || live.value.result_url || '')
 const ring = computed(() => ringPropsFromTask(live.value, now.value))
-const taskActive = computed(() => isActiveTaskStatus(live.value.status))
+const taskActive = computed(() => isActiveTaskStatus(live.value.status) && (!live.value.pipeline || live.value.pipeline.state === 'running'))
 
 const FRAME_LABEL_KEYS = {
   first_frame: 'episode.kf.slotFirst', mid_frame: 'episode.kf.slotMid', last_frame: 'episode.kf.slotLast',
@@ -273,7 +302,9 @@ const typeLabel = computed(() => {
   if (live.value.type === 'video') return t('common.serviceType.video')
   return t('common.serviceType.image')
 })
-const statusLabel = computed(() => t(`taskCenter.status.${live.value.status || 'processing'}`))
+const statusLabel = computed(() => live.value.pipeline
+  ? t(`episode.documentary.pipeline.execution${live.value.pipeline.state.split('_').map(s => s[0].toUpperCase() + s.slice(1)).join('')}`)
+  : t(`taskCenter.status.${live.value.status || 'processing'}`))
 const stateClass = computed(() => {
   const s = live.value.status
   if (s === 'completed') return 'done'
@@ -300,7 +331,9 @@ const progressLines = computed(() => {
 
 const elapsedText = computed(() => {
   const start = Date.parse(String(live.value.created_at || ''))
-  const end = Date.parse(String(live.value.completed_at || live.value.updated_at || ''))
+  const end = live.value.completed_at
+    ? Date.parse(String(live.value.completed_at))
+    : isActiveTaskStatus(live.value.status) ? now.value : Date.parse(String(live.value.updated_at || ''))
   if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return ''
   return formatSeconds(t, Math.round((end - start) / 1000))
 })
@@ -314,7 +347,7 @@ const errorCopied = ref(false)
 let errorCopiedTimer = null
 
 async function copyError() {
-  const ok = await copyToClipboard(live.value.error_msg || '')
+  const ok = await copyToClipboard(taskErrorPresentation(live.value.error_msg || '', t).diagnostic)
   if (ok) {
     errorCopied.value = true
     clearTimeout(errorCopiedTimer)
@@ -402,7 +435,7 @@ watch(taskActive, (active) => {
     thinkingOpen.value = false
     fullView.value = false
     void fetchDetail()
-    void fetchReasoning()
+    if (live.value.pipeline?.state !== 'waiting_approval') void fetchReasoning()
   } else {
     startReasoningPolling()
   }
@@ -427,7 +460,7 @@ async function fetchModels() {
 }
 
 onMounted(() => {
-  if (live.value.type === 'text') {
+  if (live.value.type === 'text' && live.value.pipeline?.state !== 'waiting_approval') {
     void fetchReasoning()
     void fetchDetail()
   }
@@ -485,6 +518,13 @@ async function doCancel() {
   display: flex;
   flex-direction: column;
 }
+.task-detail-dialog.is-review { width: 1120px; max-height: calc(100vh - 48px); }
+.task-detail-head { flex: none; order: 0; }
+.task-detail-body { order: 1; min-height: 0; overflow-wrap: anywhere; }
+.task-detail-foot { flex: none; order: 2; }
+.pipeline-preview { position: fixed; inset: 0; z-index: 90; background: rgba(0,0,0,.9); display: flex; align-items: center; justify-content: center; padding: 48px; }
+.pipeline-preview img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.pipeline-preview-close { position: absolute; right: 16px; top: 16px; }
 .task-detail-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .task-detail-title-block { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .task-detail-kicker { font-size: 10.5px; color: var(--text-3); letter-spacing: 0.04em; }

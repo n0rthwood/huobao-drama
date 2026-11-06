@@ -11,10 +11,11 @@ import { db, schema } from '../db/index.js'
 import { badRequest, created, success } from '../utils/response.js'
 import { logTaskError } from '../utils/task-logger.js'
 import { StageVisionUnavailableError } from '../services/ai-stages.js'
-import { ACTIVE_TASK_STATUSES } from '../services/sys-task.js'
 import { parseTextTaskParams } from '../services/text-task.js'
 import { listBaseCandidates } from '../services/asset-pipeline/base-candidates.js'
 import { decideRound } from '../services/asset-pipeline/gate.js'
+import { pipelineExecution } from '../services/asset-pipeline/execution.js'
+import { serializeQcGate } from '../services/asset-pipeline/gate-serialization.js'
 import { roundReferenceImages } from '../services/asset-pipeline/references.js'
 import {
   approveRound,
@@ -23,7 +24,6 @@ import {
   PipelineConflictError,
   PipelineStateError,
   startAssetPipeline,
-  suspendedApproval,
 } from '../services/asset-pipeline/run.js'
 import { addAssetSource, AssetSourceError, deleteAssetSource } from '../services/asset-pipeline/sources.js'
 import {
@@ -59,6 +59,7 @@ async function serializeRun(row: typeof schema.sysTask.$inferSelect) {
     result: params?.result ?? null,
     created_at: row.createdAt,
     updated_at: row.updatedAt,
+    pipeline: await pipelineExecution(row),
   }
 }
 
@@ -98,15 +99,13 @@ app.get('/runs', async (c) => {
   const rows = await db.select().from(schema.sysTask)
     .where(eq(schema.sysTask.type, 'text'))
     .orderBy(desc(schema.sysTask.id))
-  const runs = []
-  for (const row of rows) {
+  const matching = rows.filter(row => {
     const params = parseTextTaskParams(row.params)
-    if (params?.kind !== ASSET_PIPELINE_KIND) continue
-    if (kind && params.asset_kind !== kind) continue
-    if (assetId && Number(params.asset_id) !== assetId) continue
-    runs.push(await serializeRun(row))
-  }
-  return success(c, { runs })
+    return params?.kind === ASSET_PIPELINE_KIND &&
+      (!kind || params.asset_kind === kind) &&
+      (!assetId || Number(params.asset_id) === assetId)
+  })
+  return success(c, { runs: await Promise.all(matching.map(serializeRun)) })
 })
 
 // GET /asset-pipeline/episodes/:id/base-candidates — 底图候选（R4/R5 的 HTTP 口）
@@ -203,44 +202,18 @@ app.get('/runs/:id', async (c) => {
       ...round,
       reference_images: await roundReferenceImages(round),
       qc,
-      gate: qc
-        ? {
-            pass: qc.gate_pass === 1,
-            coverage: qc.checklist_coverage,
-            invalid: qc.gate_invalid,
-            violations: (qc.verdicts?.must_have ?? [])
-              .filter(item => item.verdict === 'violation')
-              .map(item => ({
-                id: item.id,
-                element: spec?.must_have.find(need => need.id === item.id)?.element ?? item.id,
-                verdict: item.verdict,
-                evidence: item.evidence ?? '',
-              })),
-            forbidden_hits: (qc.verdicts?.forbidden ?? [])
-              .filter(item => item.detected)
-              .map(item => ({
-                id: item.id,
-                error: spec?.forbidden.find(ban => ban.id === item.id)?.error ?? item.id,
-                evidence: item.evidence ?? '',
-              })),
-            text_in_image: qc.verdicts?.text_in_image ?? { present: null, evidence: '' },
-            locate_checks: qc.locate_checks,
-          }
-        : null,
+      gate: qc ? serializeQcGate(qc, spec) : null,
       suggestion: qc ? decideRound(history.filter(item => item.round_no <= round.round_no)) : null,
     }
   }))
 
-  const mastraRunId = String(params.mastra_run_id ?? '')
-  const suspended = mastraRunId && ACTIVE_TASK_STATUSES.includes(row.status as typeof ACTIVE_TASK_STATUSES[number])
-    ? await suspendedApproval(mastraRunId)
-    : null
+  const run = await serializeRun(row)
 
   return success(c, {
-    run: await serializeRun(row),
+    run,
     spec,
     rounds: detail,
-    awaiting: suspended ? { round_id: suspended.payload.round_id, round_no: suspended.payload.round_no } : null,
+    awaiting: run.pipeline?.awaiting ?? null,
     sources: await listSources(kind, assetId),
   })
 })

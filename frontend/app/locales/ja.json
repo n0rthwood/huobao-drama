@@ -8,6 +8,7 @@
     "months": "{n} か月前"
   },
   "taskCenter": {
+    "errorPresentation": {"outputBlocked":"テキストサービスがモデルの生成出力を審査でブロックしました。生成結果は返されていません。","inputBlocked":"テキストサービスが入力を審査でブロックしました。生成結果は返されていません。","contentBlocked":"テキストサービスの審査でブロックされました。生成結果は返されていません。","noPassage":"サービスは該当箇所や分類を提供していないため、どの文が原因かは不明です。","serviceError":"テキストサービスのリクエストに失敗しました {status}。診断情報でサービスの応答を確認してください。","details":"診断情報","copy":"診断情報をコピー","copied":"コピー済み"},
     "button": "タスク",
     "title": "タスクセンター",
     "pageDesc": "全話の画像 / 動画 / テキスト生成タスク。既定では実行中と直近 7 日間を表示",
@@ -67,6 +68,7 @@
       "storyboard_breaker": "分镜の分割",
       "portrait_appearance": "史料画像から容姿を補完",
       "asset_semantics": "セマンティック注記",
+      "asset_pipeline": "素材パイプライン",
       "storyboard_fill_gaps": "残りのカット補完"
     },
     "detail": {
@@ -2246,6 +2248,26 @@
         "fidelityVerified": "忠実度検証済み"
       },
       "pipeline": {
+        "executionRunning": "実行中",
+        "executionWaitingApproval": "承認待ち",
+        "executionCompleted": "完了",
+        "executionFailed": "失敗",
+        "executionCancelled": "中止",
+        "executionUnknown": "状態不明",
+        "steps": {"research":"資料調査","curate":"資料整理","spec":"ファクトシート作成","prompt":"プロンプト準備","generate":"画像生成","qc":"品質検証","gate":"ゲート判定","approval":"人による承認","finalize":"実行終了"},
+        "waitingReason": "このラウンドは人による確認が必要です",
+        "reviewAction": "承認",
+        "elapsedLabel": "経過時間（待機を含む）",
+        "elapsedIncludingWaiting": "経過 {time}（待機を含む）",
+        "semanticsUnknown": "記録なし",
+        "referenceTitle": "実際の入力参照画像",
+        "referenceEmpty": "このラウンドに参照画像はありません。",
+        "referenceUnavailable": "過去の入力が未記録または読み取れず、参照画像は不明です。",
+        "generatorLabel": "実際の生成サービスとモデル：{generator}",
+        "modelOverall": "モデルの自己評価（計算ゲートではない）：{value}",
+        "suggestion": "モデルの提案：{action}；理由：{reason}",
+        "approvalConsequences": "承認するとこのラウンドを受け入れて実行を終了しますが、現在の素材画像には自動採用されません。差し戻しでは現行方針に従い次ラウンドを生成する場合があります。",
+        "mapConfigured": "この素材には地図ベースが設定されています。確定的レンダリングを使用してください。拡散パイプラインは開始できません。",
         "sectionTitle": "素材パイプライン（正確→美化）",
         "sectionHint": "ファクトシートに沿って生成・検証し、ラウンドごとに人が承認します",
         "computedNote": "判定はプログラムがファクトシートから計算します。モデルの自己申告は採用しません。",
@@ -2363,6 +2385,7 @@
         "approveFailed": "承認の送信に失敗しました"
       },
       "map": {
+        "create": "地図ベースを作成",
         "sectionTitle": "地図ベース（確定的レンダリング）",
         "sectionHint": "ベース画像は map_spec から確定的に描画します。拡散モデルはスタイルのみで、地理形状を変えてはいけません。",
         "noTextHint": "ベース画像には文字を一切描きません：地名・凡例・目盛りはすべてレイヤー側で重ねます。",

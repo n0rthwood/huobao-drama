@@ -16,6 +16,9 @@
         <Sparkles v-else :size="11" />
         {{ suggesting ? t('episode.documentary.map.suggesting') : t('episode.documentary.map.suggest') }}
       </button>
+      <button v-if="creating" class="map-toggle" type="button" :disabled="saving || rendering" @click.stop="emit('cancel')">
+        {{ t('common.cancel') }}
+      </button>
     </div>
 
     <p class="map-notice">{{ t('episode.documentary.map.noTextHint') }}</p>
@@ -189,9 +192,13 @@ const props = defineProps<{
   propId: number
   episodeId: number
   mapSpec?: MapSpec | null
+  creating?: boolean
 }>()
 
-const emit = defineEmits<{ (e: 'update'): void }>()
+const emit = defineEmits<{
+  (e: 'update', mapSpec: MapSpec): void
+  (e: 'cancel'): void
+}>()
 
 type LayerKey = keyof MapSpec['layers']
 const LAYERS: LayerKey[] = ['land', 'coastline', 'rivers', 'lakes', 'countries']
@@ -211,7 +218,7 @@ function emptySpec(): MapSpec {
 }
 
 const spec = ref<MapSpec>(props.mapSpec ? normalize(props.mapSpec) : emptySpec())
-const dirty = ref(false)
+const dirty = ref(!!props.creating)
 const saving = ref(false)
 const rendering = ref(false)
 const suggesting = ref(false)
@@ -327,7 +334,7 @@ async function save(): Promise<boolean> {
     spec.value = normalize(res?.map_spec ?? spec.value)
     dirty.value = false
     toast.success(t('episode.documentary.map.saved'))
-    emit('update')
+    emit('update', spec.value)
     return true
   } catch (err) {
     error.value = msg(err, t('episode.documentary.map.saveFailed'))
@@ -347,7 +354,7 @@ async function render() {
     const res = await propAPI.renderMapBase(props.propId, Number(props.episodeId))
     if (stopped) return
     rendered.value = res
-    emit('update')
+    emit('update', spec.value)
   } catch (err) {
     if (!stopped) error.value = msg(err, t('episode.documentary.map.renderFailed'))
   } finally {
@@ -404,7 +411,7 @@ watch(() => props.propId, () => {
   spec.value = emptySpec()
   rendered.value = null
   proposed.value = []
-  dirty.value = false
+  dirty.value = !!props.creating
   void load()
 })
 

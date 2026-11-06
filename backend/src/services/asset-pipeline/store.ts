@@ -98,6 +98,7 @@ export interface QcVerdicts {
   text_in_image: { present: boolean | null; evidence: string }
   locate?: Array<{ id: string; name?: string; at?: [number, number] | null }>
   overall?: string
+  gate_result?: GateResult
 }
 
 export interface AssetQcRecordRow {
@@ -359,7 +360,7 @@ export async function insertQcRecord(input: {
     assetId: input.assetId,
     modelConfigId: input.modelConfigId,
     checklistCoverage: input.gate.coverage,
-    verdicts: JSON.stringify(input.verdicts),
+    verdicts: JSON.stringify({ ...input.verdicts, gate_result: input.gate }),
     locateChecks: JSON.stringify(input.gate.locate_checks),
     gatePass: input.gate.pass ? 1 : 0,
     gateInvalid: JSON.stringify(input.gate.invalid),

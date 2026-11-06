@@ -948,11 +948,22 @@
                 @update="onAssetSemanticsUpdate(assetDetail.item, $event)"
                 @preview="openImageViewer"
               />
-              <!-- 地图确定性底图（Issue #56）：几何由 d3-geo 渲染，扩散模型不得重画地理形状 -->
+              <button
+                v-if="!assetDetail.item.map_spec && mapDraftAssetId !== assetDetail.item.id"
+                class="btn btn-sm"
+                type="button"
+                @click="mapDraftAssetId = assetDetail.item.id"
+              >
+                {{ t('episode.documentary.map.create') }}
+              </button>
               <MapSpecPanel
+                v-if="assetDetail.item.map_spec || mapDraftAssetId === assetDetail.item.id"
                 :key="`mapspec-${assetDetail.item.id}`"
                 :prop-id="assetDetail.item.id"
                 :episode-id="epId"
+                :creating="!assetDetail.item.map_spec"
+                @cancel="mapDraftAssetId = null"
+                @update="onAssetMapSpecUpdate(assetDetail.item, $event)"
               />
             </section>
 
@@ -968,6 +979,7 @@
                 :asset-id="assetDetail.item.id"
                 :episode-id="epId"
                 :asset-name="assetDetail.item.name"
+                :map-configured="assetDetail.type === 'prop' && !!assetDetail.item.map_spec"
                 @preview="openImageViewer"
               />
             </section>
@@ -1951,6 +1963,7 @@ async function toggleExportDone() {
   }
 }
 const assetDetail = ref({ open: false, type: '', item: null })
+const mapDraftAssetId = ref(null)
 const assetDetailDraft = ref({ appearance: '', styling: '', prompt: '', lighting: '', description: '', time: '' })
 // 最终提示词手动编辑：dirty 时才随保存提交，避免无修改保存误清空 Agent 生成的提示词
 const assetPromptDraft = ref('')
@@ -1994,6 +2007,7 @@ const focusSemanticId = ref('')
 
 function openAssetDetail(type, item) {
   if (!item) return
+  mapDraftAssetId.value = null
   assetDetail.value = { open: true, type, item }
   assetDetailDraft.value = {
     appearance: item.appearance || '',
@@ -2016,6 +2030,7 @@ function openPoolAssetDetail(asset) {
 }
 
 function closeAssetDetail() {
+  mapDraftAssetId.value = null
   focusSemanticId.value = ''
   assetDetail.value = { open: false, type: '', item: null }
   assetDetailDraft.value = { appearance: '', styling: '', prompt: '', lighting: '', description: '', time: '' }
@@ -4749,6 +4764,27 @@ function onAssetSemanticsUpdate(item, patch) {
   Object.assign(item, patch)
   const target = propItems.value.find(p => p.id === item.id)
   if (target && target !== item) Object.assign(target, patch)
+}
+
+async function onAssetMapSpecUpdate(item, mapSpec) {
+  onAssetSemanticsUpdate(item, { map_spec: mapSpec })
+  mapDraftAssetId.value = null
+  // Refresh server-owned map output/versions without replacing unsaved asset text drafts.
+  const episodeId = epId.value
+  try {
+    const rows = await episodeAPI.props(episodeId)
+    if (episodeId !== epId.value) return
+    propItems.value = rows
+    const updated = rows.find(prop => prop.id === item.id)
+    if (updated) {
+      Object.assign(item, updated)
+      if (assetDetail.value.type === 'prop' && assetDetail.value.item?.id === item.id) {
+        Object.assign(assetDetail.value.item, updated)
+      }
+    }
+  } catch (err) {
+    toastError(err)
+  }
 }
 
 // 忠实素材开关：打开直接写；关闭要人确认（关掉后这张图会重新进入生图与批量重绘）

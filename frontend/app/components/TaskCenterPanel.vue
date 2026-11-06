@@ -59,13 +59,17 @@
               <span v-if="row.provider" class="truncate">{{ row.provider }}{{ row.model ? ' · ' + row.model : '' }}</span>
               <span v-if="isParentRow(row) && row.counts" class="tc-row-counts">{{ countsText(row) }}</span>
               <MediaTime class="tc-row-time" :at="rowTime(row)" />
-              <span v-if="row.error_msg" class="tc-row-error truncate">{{ mapError(row.error_msg) }}</span>
+              <span v-if="row.error_msg" class="tc-row-error truncate">{{ taskErrorPresentation(row.error_msg, t).message }}</span>
               <button
                 v-if="row.error_msg"
                 class="btn btn-ghost btn-icon tc-error-copy"
                 :title="t('taskCenter.detail.copyError')"
                 @click.stop="copyRowError(row)"
               ><Copy :size="12" /></button>
+            </div>
+            <div v-if="row.pipeline?.state === 'waiting_approval'" class="tc-approval">
+              <span>{{ t('episode.documentary.pipeline.executionWaitingApproval') }} · {{ t('episode.documentary.pipeline.roundLabel', { n: row.pipeline.awaiting?.round_no }) }} · {{ t('episode.documentary.pipeline.waitingReason') }}</span>
+              <button class="btn btn-sm" @click.stop="openDetail(row, true)">{{ t('episode.documentary.pipeline.reviewAction') }}</button>
             </div>
             <details v-if="batchScopeOf(row)" class="tc-batch-scope" @click.stop>
               <summary>{{ t('episode.final.scope', { included: batchScopeOf(row).included.length, excluded: batchScopeOf(row).excluded.length }) }}</summary>
@@ -74,13 +78,13 @@
             </details>
           </div>
           <ProgressRing
-            v-if="rowRing(row).status && rowRing(row).status !== 'completed'"
+            v-if="(!row.pipeline || row.pipeline.state === 'running') && rowRing(row).status && rowRing(row).status !== 'completed'"
             v-bind="rowRing(row)"
             :size="30"
             compact
             class="tc-row-ring"
           />
-          <span v-else :class="['tc-row-status', 'is-' + stateClass(row.status)]">{{ statusLabel(row.status) }}</span>
+          <span v-else :class="['tc-row-status', 'is-' + stateClass(row.status)]">{{ row.pipeline ? pipelineStatus(row.pipeline.state) : statusLabel(row.status) }}</span>
         </div>
         <div v-if="isParentRow(row) && expanded.includes(rowKey(row))" class="tc-children">
           <div
@@ -94,7 +98,7 @@
                 <strong class="truncate">{{ child.label || ('#' + child.id) }}</strong>
               </div>
               <div class="tc-row-meta">
-                <span v-if="child.error_msg" class="tc-row-error truncate">{{ mapError(child.error_msg) }}</span>
+                <span v-if="child.error_msg" class="tc-row-error truncate">{{ taskErrorPresentation(child.error_msg, t).message }}</span>
                 <button
                   v-if="child.error_msg"
                   class="btn btn-ghost btn-icon tc-error-copy"
@@ -105,12 +109,12 @@
               </div>
             </div>
             <ProgressRing
-              v-if="rowRing(child).status && rowRing(child).status !== 'completed'"
+              v-if="(!child.pipeline || child.pipeline.state === 'running') && rowRing(child).status && rowRing(child).status !== 'completed'"
               v-bind="rowRing(child)"
               :size="26"
               compact
             />
-            <span v-else :class="['tc-row-status', 'is-' + stateClass(child.status)]">{{ statusLabel(child.status) }}</span>
+            <span v-else :class="['tc-row-status', 'is-' + stateClass(child.status)]">{{ child.pipeline ? pipelineStatus(child.pipeline.state) : statusLabel(child.status) }}</span>
           </div>
           <div v-if="!(row.children || []).length" class="tc-child-empty">{{ t('taskCenter.noChildren') }}</div>
         </div>
@@ -124,7 +128,7 @@
       <button class="btn btn-sm" :disabled="page >= totalPages || loading" @click="go(page + 1)">{{ t('taskCenter.next') }}</button>
     </div>
 
-    <TaskDetailDialog v-if="detailTask" :task="detailTask" @close="detailTask = null" @changed="reload" />
+    <TaskDetailDialog v-if="detailTask" :task="detailTask" :review-mode="detailReview" @close="detailTask = null" @changed="reload" />
   </div>
 </template>
 
@@ -143,8 +147,8 @@ import ProgressRing from '~/components/ProgressRing.vue'
 import TaskDetailDialog from '~/components/TaskDetailDialog.vue'
 import BaseSelect from '~/components/BaseSelect.vue'
 import MediaTime from '~/components/MediaTime.vue'
+import { taskErrorPresentation } from '~/utils/taskError'
 import { taskAPI, dramaAPI } from '~/composables/useApi'
-import { mapError } from '~/composables/useToast'
 import { useTasks, absorbRows, isParentRow } from '~/composables/useTasks'
 import { batchScopeOf } from '~/utils/documentaryFinal'
 import {
@@ -175,6 +179,7 @@ const items = ref([])
 const loading = ref(false)
 const expanded = ref([])
 const detailTask = ref(null)
+const detailReview = ref(false)
 const dramas = ref([])
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / PAGE_SIZE)))
@@ -239,6 +244,9 @@ function statusLabel(status) {
   const label = t(key)
   return label === key ? String(status || '') : label
 }
+function pipelineStatus(state) {
+  return t(`episode.documentary.pipeline.execution${state.split('_').map(s => s[0].toUpperCase() + s.slice(1)).join('')}`)
+}
 
 function stateClass(status) {
   if (status === 'completed' || status === 'done') return 'done'
@@ -283,13 +291,14 @@ function onRowClick(row) {
   if (isParentRow(row)) { toggleExpand(row); return }
   openDetail(row)
 }
-// 复制完整错误信息（截断显示只影响列表观感，剪贴板要完整原文，Issue #19）
+// Copy the same sanitized diagnostic shown in the detail dialog.
 async function copyRowError(row) {
-  const ok = await copyToClipboard(row?.error_msg || '')
+  const ok = await copyToClipboard(taskErrorPresentation(row?.error_msg || '', t).diagnostic)
   if (ok) toast.success(t('taskCenter.detail.copied'))
   else toast.error(t('taskCenter.detail.copyFailed'))
 }
-function openDetail(row) {
+function openDetail(row, review = false) {
+  detailReview.value = review || row.pipeline?.state === 'waiting_approval'
   detailTask.value = row
 }
 
@@ -395,6 +404,7 @@ defineExpose({ reload })
 .tc-expand :deep(svg.is-open) { transform: rotate(90deg); }
 .tc-expand-placeholder { width: 13px; flex-shrink: 0; }
 .tc-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.tc-approval { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 11px; color: var(--warn-text); overflow-wrap: anywhere; }
 .tc-row-title { display: flex; align-items: center; gap: 7px; min-width: 0; }
 .tc-row-title strong { font-size: 12.5px; font-weight: 600; color: var(--text-0); }
 .tc-row-kind {

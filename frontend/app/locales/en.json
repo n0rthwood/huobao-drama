@@ -8,6 +8,7 @@
     "months": "{n} months ago"
   },
   "taskCenter": {
+    "errorPresentation": {"outputBlocked":"The text provider blocked the model-generated output. No generated result was returned.","inputBlocked":"The text provider blocked the input. No generated result was returned.","contentBlocked":"The text provider blocked this request during content moderation. No generated result was returned.","noPassage":"The provider did not supply a matched passage or category; the exact trigger is unknown.","serviceError":"The text service request failed {status}. Expand diagnostics to inspect the provider response.","details":"Diagnostics","copy":"Copy diagnostics","copied":"Copied"},
     "button": "Tasks",
     "title": "Task Center",
     "pageDesc": "Image / video / text generation tasks across all episodes; active and last 7 days by default",
@@ -67,6 +68,7 @@
       "storyboard_breaker": "Storyboard breakdown",
       "portrait_appearance": "Appearance from archival portraits",
       "asset_semantics": "Semantic annotation",
+      "asset_pipeline": "Asset pipeline",
       "storyboard_fill_gaps": "Fill remaining storyboards"
     },
     "detail": {
@@ -2246,6 +2248,26 @@
         "fidelityVerified": "Fidelity verified"
       },
       "pipeline": {
+        "executionRunning": "Running",
+        "executionWaitingApproval": "Waiting for approval",
+        "executionCompleted": "Completed",
+        "executionFailed": "Failed",
+        "executionCancelled": "Cancelled",
+        "executionUnknown": "Status unknown",
+        "steps": {"research":"Research","curate":"Curate sources","spec":"Create fact sheet","prompt":"Prepare prompt","generate":"Generate image","qc":"Quality check","gate":"Compute gate","approval":"Human review","finalize":"Finish run"},
+        "waitingReason": "This round requires human review",
+        "reviewAction": "Review",
+        "elapsedLabel": "Elapsed time (including waiting)",
+        "elapsedIncludingWaiting": "Elapsed {time} (including waiting)",
+        "semanticsUnknown": "Not recorded",
+        "referenceTitle": "Actual input references",
+        "referenceEmpty": "This round had no reference images.",
+        "referenceUnavailable": "Historical inputs were not recorded or could not be read; references are unknown.",
+        "generatorLabel": "Actual provider and model: {generator}",
+        "modelOverall": "Model assessment (not the computed gate): {value}",
+        "suggestion": "Model suggestion: {action}; reason: {reason}",
+        "approvalConsequences": "Approval accepts this round and ends the run, but does not adopt it as the current asset image. Revision may generate another round under the current policy.",
+        "mapConfigured": "This asset has a configured map base. Use deterministic rendering; diffusion pipelines cannot be started.",
         "sectionTitle": "Asset pipeline (precise → beautified)",
         "sectionHint": "Generate and verify against the fact sheet, approved round by round",
         "computedNote": "The verdict is computed by the program from the fact sheet; the model's self-assessment is not trusted.",
@@ -2363,6 +2385,7 @@
         "approveFailed": "Failed to submit the approval"
       },
       "map": {
+        "create": "Create map base",
         "sectionTitle": "Map base (deterministic render)",
         "sectionHint": "The base image is rendered deterministically from map_spec; diffusion only styles it and must not alter geography.",
         "noTextHint": "The base image renders no text at all: place names, legends and ticks all come from overlay layers.",

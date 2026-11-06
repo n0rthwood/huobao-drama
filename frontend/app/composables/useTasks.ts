@@ -13,6 +13,7 @@ import { ref, computed, onScopeDispose, getCurrentScope } from 'vue'
 import { taskAPI } from '~/composables/useApi'
 import { isActiveTaskStatus } from '~/composables/useTaskProgress'
 import type { RemoteState } from '~/composables/useTaskProgress'
+import type { AssetPipelineState } from '~/composables/useApi'
 
 export type TaskType = 'image' | 'video' | 'text'
 export type TextKind =
@@ -20,6 +21,7 @@ export type TextKind =
   | 'keyframe_prompts' | 'video_prompts' | 'script_rewrite' | 'storyboard_breaker'
   | 'portrait_appearance'
   | 'asset_semantics'
+  | 'asset_pipeline'
   | 'storyboard_fill_gaps'
 
 export interface TaskParams {
@@ -64,6 +66,7 @@ export interface TaskRow {
   target_name?: string | null
   frame_type?: string | null
   kind?: string | null
+  pipeline?: AssetPipelineState
   // 文本任务进度（后端从 params.progress 透出）
   progress?: { completed?: number; total?: number; failed?: number; current_storyboard_id?: number | null } | null
   label?: string | null
