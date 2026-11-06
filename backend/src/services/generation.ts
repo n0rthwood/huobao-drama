@@ -17,6 +17,10 @@ import { completionStamp } from './media-time.js'
 import { saveStylingVersion } from './styling-version.js'
 import { onAssetLibraryChanged } from './asset-review.js'
 import { resolveDramaProjectType } from './project-type.js'
+import { normalizeLayerDoc } from './layer-doc.js'
+import { parseJsonObject } from './poster-store.js'
+import sharp from 'sharp'
+import { getAbsolutePath } from '../utils/storage.js'
 import { invalidateSegmentSpec } from './layer-segment.js'
 import type { ReferenceOrigin } from './asset-pipeline/references.js'
 import {
@@ -74,6 +78,12 @@ interface TaskOriginParams {
   posterId?: number
   posterGenMode?: 'initial' | 'composite' | 'layers'
   posterTextPrompt?: string
+  /** AI 构想方案的三案生图（Issue #72）：冻结方案快照的 id，不读当前编辑字段 */
+  posterConceptComposition?: string
+  /** 无底图时，仅推荐方案成功后自动设为临时编辑底图（不设为最终版本） */
+  posterAutoBase?: boolean
+  /** Poster 输出画幅（WxH）；自动底图据此同步 LayerDoc 画布 */
+  posterSize?: string
 }
 
 interface GenerateImageParams extends TaskOriginParams {
@@ -256,6 +266,9 @@ function originParams(params: TaskOriginParams): Record<string, unknown> {
   if (params.posterId) out.posterId = params.posterId
   if (params.posterGenMode) out.posterGenMode = params.posterGenMode
   if (params.posterTextPrompt) out.text_prompt = params.posterTextPrompt
+  if (params.posterConceptComposition) out.posterConceptComposition = params.posterConceptComposition
+  if (params.posterAutoBase) out.posterAutoBase = true
+  if (typeof params.posterSize === 'string' && /^\d+x\d+$/.test(params.posterSize)) out.posterSize = params.posterSize
   return out
 }
 
@@ -777,12 +790,45 @@ async function writeBackImageAssets(record: SysTaskRecord, localPath: string) {
         textPrompt: typeof params.text_prompt === 'string' ? params.text_prompt : null,
         mode: typeof params.posterGenMode === 'string' ? params.posterGenMode : null,
         referenceImages: Array.isArray(params.referenceImages) ? JSON.stringify(params.referenceImages) : null,
+        // AI 构想三案生图（Issue #72）：版本带所属方案，刷新后可恢复候选归属
+        conceptCompositionId: typeof params.posterConceptComposition === 'string' ? params.posterConceptComposition : null,
         provider: record.provider || null,
         model: record.model || null,
         sysTaskId: record.id,
         createdAt: now(),
         generatedAt: Math.floor(Date.now() / 1000),
       })
+      // 无底图时只让推荐方案的成功图成为临时编辑底图；完成瞬间用户已有底图则不覆盖
+      if (params.posterAutoBase === true) {
+        const [posterRow] = await db.select().from(schema.episodePosters)
+          .where(eq(schema.episodePosters.id, posterId))
+        if (posterRow && !posterRow.baseImage) {
+          const doc = normalizeLayerDoc(parseJsonObject(posterRow.layerDoc))
+          const [width, height] = String(params.posterSize || `${doc.base.width}x${doc.base.height}`)
+            .split('x').map(Number)
+          doc.base.path = localPath
+          // 新底图不继承上一张图的裁切/资产锚点；画幅与源尺寸按本次结果重算
+          delete doc.base.crop
+          delete doc.base.ref
+          if (width > 0 && height > 0) {
+            doc.base.width = width
+            doc.base.height = height
+          }
+          try {
+            const metadata = await sharp(getAbsolutePath(localPath)).metadata()
+            if (metadata.width && metadata.height) {
+              doc.base.source_width = metadata.width
+              doc.base.source_height = metadata.height
+            }
+          } catch { /* 源图尺寸探测失败不影响自动底图 */ }
+          await db.update(schema.episodePosters).set({
+            baseImage: localPath,
+            layerDoc: JSON.stringify(doc),
+            updatedAt: now(),
+          }).where(eq(schema.episodePosters.id, posterId))
+          logTaskSuccess('ImageTask', 'poster-auto-base', { id: record.id, posterId })
+        }
+      }
       logTaskSuccess('ImageTask', 'poster-version-saved', { id: record.id, posterId })
     } else {
       logTaskWarn('ImageTask', 'poster-task-missing-episode', { id: record.id, posterId })
