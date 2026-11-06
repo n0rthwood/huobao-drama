@@ -2597,6 +2597,52 @@
     "saving": "保存中…",
     "stageMeta": "{size} · {ratio}",
     "finalReady": "最終版あり",
+    "variables": {
+      "project_title": "プロジェクト名",
+      "episode_title": "エピソード名",
+      "episode_no": "話数"
+    },
+    "editor": {
+      "title": "Poster レイヤーエディタ",
+      "uploadBase": "背景をアップロード",
+      "save": "保存",
+      "rendering": "レンダリング中…",
+      "render": "合成をレンダリング",
+      "unsaved": "未保存の変更",
+      "saved": "保存済み",
+      "noBase": "背景がなくても文字を編集できます。「合成をレンダリング」には背景が必要です。",
+      "currentBase": "現在の背景",
+      "baseUploaded": "背景をアップロードしました"
+    },
+    "concept": {
+      "title": "AI コンセプト",
+      "modelHint": "コンセプトモデル：{model}",
+      "defaultModel": "上部のテキストモデルに従う",
+      "run": "AI で3案を生成",
+      "runAndGenerate": "コンセプト + 背景3枚",
+      "generateAll": "候補背景を3枚生成",
+      "running": "主題と構図を抽出中…",
+      "empty": "AI コンセプトはまだありません。脚本と素材説明から3案を生成します。",
+      "recommended": "推薦",
+      "imagePrompt": "画面プロンプト",
+      "textDescription": "文字レイアウト説明",
+      "copy": "ポスターコピー",
+      "layers": "文字レイヤー {n} 個",
+      "noImage": "候補画像はまだありません",
+      "generating": "生成中…",
+      "candidateReady": "候補 #{n}",
+      "useFinal": "最終版に設定",
+      "useBase": "編集用ベースに設定",
+"failed": "生成に失敗しました：{msg}",
+      "applyFields": "案の項目を適用",
+      "applyLayers": "レイヤー案を適用",
+      "generateOne": "この背景を生成",
+      "modelLine": "{model} · 脚本 {n} 段",
+      "copyTitle": "主タイトル",
+      "copySubtitle": "サブタイトル",
+      "copyEra": "年代",
+      "copyPlace": "場所"
+    },
     "stage": {
       "empty": "ベース画像を選択または生成してレイアウトを開始"
     },
@@ -2666,7 +2712,20 @@
       "saveComposite": "合成画像を保存して最終版に設定",
       "needBase": "先にベース画像を選択または生成してください",
       "needText": "先に文字レイヤーを 1 つ以上追加してください",
-      "needPrompt": "先に画面プロンプトを入力してください"
+      "needPrompt": "先に画面プロンプトを入力してください",
+      "copy": "ポスターコピー",
+      "removeRef": "参照画像を削除"
+    },
+    "conflict": {
+      "title": "手動編集があります",
+      "desc": "以下の項目/レイヤーは手動で編集されています。AI 案を適用すると上書きされます。続行しますか？",
+      "overwrite": "上書きして適用",
+      "field": {
+        "prompt": "画面プロンプト",
+        "text_prompt": "文字レイアウト説明",
+        "copy": "ポスターコピー",
+        "layer_doc": "レイヤー"
+      }
     },
     "versionLabel": "第 {n} 版 · {time}",
     "versions": {
@@ -2678,8 +2737,15 @@
       },
       "final": "最終",
       "select": "最終に設定",
-      "useBase": "編集ベースにする",
-      "loadLayout": "レイアウトを読み込む"
+      "loadLayout": "レイアウトを読み込む",
+      "useBase": "編集用ベースに設定",
+      "task": {
+        "queued": "待機中",
+        "processing": "生成中",
+        "completed": "完了",
+        "failed": "失敗",
+        "cancelled": "キャンセル"
+      }
     },
     "toast": {
       "refsSaved": "参考画像を保存しました（{n} 枚）",
@@ -2692,7 +2758,12 @@
       "compositeSaved": "合成画像を最終版に設定し、エピソードのサムネイルを更新しました",
       "selected": "最終版に設定しました（第 {n} 版）、サムネイルを更新しました",
       "baseSet": "編集ベースに設定しました",
-      "layoutLoaded": "このバージョンのレイアウトを読み込みました"
+      "layoutLoaded": "このバージョンのレイアウトを読み込みました",
+      "conceptStarted": "コンセプトタスクを送信しました",
+      "conceptGenerating": "候補背景を {n} 枚送信しました",
+      "conceptPartial": "{n} 案が失敗：{first}",
+      "fieldsApplied": "案の項目を適用しました",
+      "layersApplied": "AI 文字レイヤーを適用しました"
     }
   },
   "errors": {
@@ -2761,7 +2832,7 @@
   "layerCanvas": {
     "toolbar": {"select":"選択","pan":"移動","frame":"フレームの表示範囲","crop":"背景を切り抜く","undo":"元に戻す","redo":"やり直す","snap":"スナップ","zoomIn":"拡大","zoomOut":"縮小","fit":"画面に合わせる","edit":"編集","preview":"プレビュー","render":"区間を描画","rehearse":"ショット試写"},
     "keyframeBar": {"title":"精密キーフレーム","add":"現在時刻に追加","copyPrev":"前のフレームを複製","remove":"削除（先頭は保護）","duration":"区間長","endHold":"末尾保持","junction":"接続フレーム","junctionTextWarn":"接続には文字を含みません：{n} 個の文字レイヤーは出力されません","teach":"区間は精密キーフレームで構成されます。各フレームは時刻・表示範囲・可視レイヤーを定義し、プログラムが移動とフェードを補間して動画を描画します。スライドではありません。","ease":"次のフレームへの補間","fade":"新レイヤーのフェード","viewportPick":"表示範囲（キャンバスで操作）","visible":"可視レイヤー"},
-    "base": {"title":"背景","replace":"背景を変更","cropTo169":"16:9 に切り抜く","aspectBanner":"キャンバスまたは元画像の切り抜き比率 {aspect} は出力と異なり、レンダリング時に引き伸ばされます","cropHelp":"元画像の座標上で 16:9 の枠または角をドラッグ。元画像は変更されません。","applyCrop":"適用","cancelCrop":"キャンセル","outputSize":"出力キャンバス {w}×{h}","sourceSize":"元画像 {w}×{h}（原本の画素数）","sourceUnknown":"元画像のサイズは不明です","resolution":"切り抜き後の元画像の画素数は完成映像 {sw}×{sh} の {times} 倍（不足する軸を基準）","verified":"検証済み","inherited":"継承背景（固定）","guide":"元画像の画素数は切り抜き座標と鮮明さの判定に使用し、出力キャンバスのサイズは決めません。切り抜き後の幅・高さともに完成映像の2倍以上を推奨します。","style":"全体スタイル","unknown":"背景","version":"バージョン {version}","saveSize":"元画像のサイズはサーバーで未確認です。保存時に原本を読み取ります。","loadError":"素材または意味情報を読み込めません。","framingClamped":"一部の表示範囲を切り抜き内に収めました。元に戻すと全範囲を復元できます。"},
+    "base": {"title":"背景","noBase":"背景未選択（先に文字を編集できます）","replace":"背景を変更","cropTo169":"16:9 に切り抜く","aspectBanner":"キャンバスまたは元画像の切り抜き比率 {aspect} は出力と異なり、レンダリング時に引き伸ばされます","cropHelp":"元画像の座標上で 16:9 の枠または角をドラッグ。元画像は変更されません。","applyCrop":"適用","cancelCrop":"キャンセル","outputSize":"出力キャンバス {w}×{h}","sourceSize":"元画像 {w}×{h}（原本の画素数）","sourceUnknown":"元画像のサイズは不明です","resolution":"切り抜き後の元画像の画素数は完成映像 {sw}×{sh} の {times} 倍（不足する軸を基準）","verified":"検証済み","inherited":"継承背景（固定）","guide":"元画像の画素数は切り抜き座標と鮮明さの判定に使用し、出力キャンバスのサイズは決めません。切り抜き後の幅・高さともに完成映像の2倍以上を推奨します。","style":"全体スタイル","unknown":"背景","version":"バージョン {version}","saveSize":"元画像のサイズはサーバーで未確認です。保存時に原本を読み取ります。","loadError":"素材または意味情報を読み込めません。","framingClamped":"一部の表示範囲を切り抜き内に収めました。元に戻すと全範囲を復元できます。"},
     "anchor": {"anchored":"固定済み","manual":"手動","unlink":"参照項目が削除・改名されています","detachConfirm":"このレイヤーは「{name}」に固定されています。解除して移動しますか？","relink":"固定先を選択","toManual":"手動に変更","labelOffset":"ラベル位置補正","addMarker":"マーカー追加","addRegion":"領域追加","addRoute":"経路追加","noSemantics":"意味情報がありません。","inherited":"継承背景では固定を使用できません。","choose":"再固定する項目を選択","cancel":"キャンセル","points":"地点","regions":"領域","lines":"経路","labels":"ラベル"},
     "quality": {"badge":"有効 {w}×{h} < {sw}×{sh}（拡大過多）","frameDot":"有効画素が出力未満","hint":"高解像度画像を使うか縮小してください。"},
     "image": {"pick":"素材を選択","legacyPath":"旧ローカルパスです。素材を選び直してください。","selectionCount":"画像を1枚選択してください。","cover":"充填","contain":"全体表示","episode":"このエピソードの素材","uploadHint":"アップロード画像はこのエピソードの素材と正式バージョンに登録されます。","contextMissing":"アップロードやフレーム取り込みにはエピソード内で開いてください。"},
@@ -2791,7 +2862,9 @@
     },
     "font": {
       "sans": "ゴシック体",
-      "serif": "明朝体"
+      "serif": "明朝体",
+      "kai": "楷書",
+      "hand": "手書き"
     },
     "align": {
       "left": "左揃え",
@@ -2859,6 +2932,11 @@
       "borderWidth": "枠線の太さ",
       "radius": "角丸",
       "shadow": "影",
+      "italic": "斜体",
+      "scale": "文字倍率",
+      "variable": "固定変数",
+      "variableNone": "なし",
+      "variableReadonly": "変数テキストは読み取り専用で、エピソードデータから解決されます",
       "missingChars": "同梱フォントがこれらの文字をカバーしていないため、サーバーレンダリングでエラーになります：{chars}",
       "years": "年代"
     },

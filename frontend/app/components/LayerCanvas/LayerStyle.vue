@@ -80,8 +80,18 @@
       </section>
 
       <section v-else-if="layer.type === 'label'" class="ls-block">
-        <label class="ls-row ls-wide"><span>{{ t('layerCanvas.style.text') }}</span><textarea rows="3" :value="layer.text" @input="setLayer('text', $event.target.value)" @change="endEdit" /></label>
-        <small v-if="fieldMissing(layer.text).length" class="ls-warn"><TriangleAlert :size="12" />{{ t('layerCanvas.style.missingChars', { chars: fieldMissing(layer.text).join(' ') }) }}</small>
+        <label class="ls-row"><span>{{ t('layerCanvas.style.variable') }}</span>
+          <select :value="layer.variable || ''" @change="setVariable($event.target.value)">
+            <option value="">{{ t('layerCanvas.style.variableNone') }}</option>
+            <option v-for="key in VARIABLES" :key="key" :value="key">{{ t(`poster.variables.${key}`) }}</option>
+          </select>
+        </label>
+        <label v-if="!layer.variable" class="ls-row ls-wide"><span>{{ t('layerCanvas.style.text') }}</span><textarea rows="3" :value="layer.text" @input="setLayer('text', $event.target.value)" @change="endEdit" /></label>
+        <template v-else>
+          <span class="ls-row ls-wide"><span>{{ t('layerCanvas.style.text') }}</span><em class="ls-readonly">{{ variables?.[layer.variable] || '' }}</em></span>
+          <small class="ls-warn"><TriangleAlert :size="12" />{{ t('layerCanvas.style.variableReadonly') }}</small>
+        </template>
+        <small v-if="fieldMissing(layer.variable ? (variables?.[layer.variable] || '') : layer.text).length" class="ls-warn"><TriangleAlert :size="12" />{{ t('layerCanvas.style.missingChars', { chars: fieldMissing(layer.variable ? (variables?.[layer.variable] || '') : layer.text).join(' ') }) }}</small>
         <label class="ls-row"><span>{{ t('layerCanvas.style.font') }}</span><select :value="value('font')" @change="setStyle('font', $event.target.value); endEdit()"><option v-for="font in FONTS" :key="font" :value="font">{{ t(`layerCanvas.font.${font}`) }}</option></select></label>
         <label class="ls-row"><span>{{ t('layerCanvas.style.size') }}</span><input type="range" min="0.015" max="0.2" step="0.002" :value="value('size')" @input="setStyle('size', Number($event.target.value))" @change="endEdit"><em>{{ value('size') }}</em></label>
         <label class="ls-row"><span>{{ t('layerCanvas.style.color') }}</span><input type="color" :value="value('color')" @input="setStyle('color', $event.target.value)" @change="endEdit"></label>
@@ -91,6 +101,8 @@
         <label class="ls-row"><span>{{ t('layerCanvas.style.bgOpacity') }}</span><input type="range" min="0" max="1" step="0.05" :value="value('bg_opacity')" @input="setStyle('bg_opacity', Number($event.target.value))" @change="endEdit"><em>{{ value('bg_opacity') }}</em></label>
         <label class="ls-row"><span>{{ t('layerCanvas.style.align') }}</span><select :value="value('align')" @change="setStyle('align', $event.target.value); endEdit()"><option v-for="align in ALIGNS" :key="align" :value="align">{{ t(`layerCanvas.align.${align}`) }}</option></select></label>
         <label class="ls-row"><span>{{ t('layerCanvas.style.bold') }}</span><input type="checkbox" :checked="value('bold')" @change="setStyle('bold', $event.target.checked); endEdit()"></label>
+        <label class="ls-row"><span>{{ t('layerCanvas.style.italic') }}</span><input type="checkbox" :checked="value('italic')" @change="setStyle('italic', $event.target.checked); endEdit()"></label>
+        <label class="ls-row"><span>{{ t('layerCanvas.style.shadow') }}</span><input type="checkbox" :checked="value('shadow')" @change="setStyle('shadow', $event.target.checked); endEdit()"></label>
       </section>
 
       <section v-else-if="layer.type === 'card'" class="ls-block">
@@ -104,6 +116,8 @@
         <label class="ls-row"><span>{{ t('layerCanvas.style.bgOpacity') }}</span><input type="range" min="0" max="1" step="0.05" :value="value('bg_opacity')" @input="setStyle('bg_opacity', Number($event.target.value))" @change="endEdit"><em>{{ value('bg_opacity') }}</em></label>
         <label class="ls-row"><span>{{ t('layerCanvas.style.color') }}</span><input type="color" :value="value('color')" @input="setStyle('color', $event.target.value)" @change="endEdit"></label>
         <label class="ls-row"><span>{{ t('layerCanvas.style.accent') }}</span><input type="color" :value="value('accent')" @input="setStyle('accent', $event.target.value)" @change="endEdit"></label>
+        <label class="ls-row"><span>{{ t('layerCanvas.style.align') }}</span><select :value="value('align')" @change="setStyle('align', $event.target.value); endEdit()"><option v-for="align in ALIGNS" :key="align" :value="align">{{ t(`layerCanvas.align.${align}`) }}</option></select></label>
+        <label class="ls-row"><span>{{ t('layerCanvas.style.scale') }}</span><input type="range" min="0.4" max="2.5" step="0.05" :value="value('scale')" @input="setStyle('scale', Number($event.target.value))" @change="endEdit"><em>{{ value('scale') }}</em></label>
       </section>
 
       <section v-else class="ls-block">
@@ -149,6 +163,8 @@ const props = defineProps({
   assets: { type: Array, default: () => [] },
   dramaId: { type: Number, default: 0 },
   episodeId: { type: Number, default: 0 },
+  // Poster 固定文本变量（Issue #72）
+  variables: { type: Object, default: null },
 })
 const emit = defineEmits(['patch', 'style', 'history', 'theme', 'filter', 'registered'])
 const { t } = useI18n()
@@ -156,14 +172,15 @@ const { t } = useI18n()
 const THEMES = ['archival', 'clean', 'ink']
 const TINTS = ['none', 'sepia', 'cool', 'warm']
 const DASHES = ['none', 'dash', 'dot']
-const FONTS = ['sans', 'serif']
+const FONTS = ['sans', 'serif', 'kai', 'hand']
+const VARIABLES = ['project_title', 'episode_title', 'episode_no']
 const ALIGNS = ['left', 'center', 'right']
 const TEMPLATES = ['name', 'year', 'chapter']
 
 const editingKey = ref(null)
 const filter = computed(() => ({ paper: 0, tint: 'none', tint_strength: 0.35, vignette: 0, ...(props.doc.base.filter || {}) }))
 
-const missingChars = computed(() => missingGlyphsOf(props.layer))
+const missingChars = computed(() => missingGlyphsOf(props.layer, props.variables))
 const fieldMissing = text => unsupportedChars(text)
 const imagePicker = ref(false)
 const imageError = ref(false)
@@ -211,6 +228,13 @@ function setField(key, value) {
   emit('patch', { id: props.layer.id, patch: { fields: { ...props.layer.fields, [key]: value } } })
 }
 
+/** 变量层只读文本：切换变量时文本清空，由渲染层按剧集数据现场解析。 */
+function setVariable(value) {
+  beginEdit('variable')
+  emit('patch', { id: props.layer.id, patch: value ? { variable: value, text: '' } : { variable: undefined } })
+  endEdit()
+}
+
 </script>
 
 <style scoped>
@@ -230,4 +254,5 @@ function setField(key, value) {
 .ls-image img { width: 100%; max-height: 140px; object-fit: contain; background: var(--surface-base); }
 .ls-pick { display: inline-flex; align-items: center; gap: 5px; }
 .ls-source { font-size: 11px; color: var(--text-2); }
+.ls-readonly { font-style: normal; color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>

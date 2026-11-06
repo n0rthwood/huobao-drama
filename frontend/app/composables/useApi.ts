@@ -1323,8 +1323,13 @@ export const posterAPI = {
   get: (epId: number) => api.get(`/episodes/${epId}/poster`),
   save: (epId: number, data: Record<string, unknown>) => api.put(`/episodes/${epId}/poster`, data),
   generate: (epId: number, data: Record<string, unknown>) => api.post(`/episodes/${epId}/poster/generate`, data),
+  concept: (epId: number, data: Record<string, unknown>) => api.post(`/episodes/${epId}/poster/concept`, data),
+  conceptGenerate: (epId: number, data: Record<string, unknown>) => api.post(`/episodes/${epId}/poster/concept/generate`, data),
+  applyConcept: (epId: number, data: Record<string, unknown>) => api.post(`/episodes/${epId}/poster/concept/apply`, data),
+  applyLayerPlan: (epId: number, data: Record<string, unknown>) => api.post(`/episodes/${epId}/poster/concept/apply-layer-plan`, data),
   registerVersion: (epId: number, data: Record<string, unknown>) => api.post(`/episodes/${epId}/poster/versions`, data),
   selectVersion: (epId: number, versionId: number) => api.put(`/episodes/${epId}/poster/select`, { version_id: versionId }),
+  loadVersion: (epId: number, versionId: number) => api.post(`/episodes/${epId}/poster/load-version`, { version_id: versionId }),
 }
 export const aiConfigAPI = {
   list: (t?: string) => api.get(`/ai-configs${t ? `?service_type=${t}` : ''}`),

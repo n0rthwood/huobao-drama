@@ -2597,6 +2597,52 @@
     "saving": "保存中…",
     "stageMeta": "{size} · {ratio}",
     "finalReady": "已有最终版本",
+    "variables": {
+      "project_title": "项目名",
+      "episode_title": "剧集名",
+      "episode_no": "集数"
+    },
+    "editor": {
+      "title": "Poster 图层编辑器",
+      "uploadBase": "上传底图",
+      "save": "保存",
+      "rendering": "渲染中…",
+      "render": "渲染合成",
+      "unsaved": "有未保存的修改",
+      "saved": "已保存",
+      "noBase": "没有底图也能先编辑文字；「渲染合成」需要先生成或选择底图。",
+      "currentBase": "当前底图",
+      "baseUploaded": "底图已上传"
+    },
+    "concept": {
+      "title": "AI 构想",
+      "modelHint": "构想模型：{model}",
+      "defaultModel": "跟随顶栏文本模型",
+      "run": "AI 生成三个构想",
+      "runAndGenerate": "构想 + 生成三张底图",
+      "generateAll": "生成三张候选底图",
+      "running": "正在提炼中心思想与构图…",
+      "empty": "还没有 AI 构想。基于本集剧本改写稿与资产描述生成三套方案。",
+      "recommended": "推荐",
+      "imagePrompt": "画面 prompt",
+      "textDescription": "文字描述",
+      "copy": "海报文案",
+      "layers": "{n} 个文字图层",
+      "noImage": "还没有候选图",
+      "generating": "生成中…",
+      "candidateReady": "候选 #{n}",
+      "useFinal": "设为最终版本",
+      "useBase": "作为编辑底图",
+      "failed": "生成失败：{msg}",
+      "applyFields": "应用方案字段",
+      "applyLayers": "应用图层规划",
+      "generateOne": "生成这张底图",
+      "modelLine": "{model} · 覆盖 {n} 段剧本",
+      "copyTitle": "主标题",
+      "copySubtitle": "副标题",
+      "copyEra": "年代",
+      "copyPlace": "地点"
+    },
     "stage": {
       "empty": "选择或生成一张底图后开始排版"
     },
@@ -2666,7 +2712,20 @@
       "saveComposite": "保存合成图并设为最终版本",
       "needBase": "请先选择或生成一张底图",
       "needText": "请先添加至少一个文字图层",
-      "needPrompt": "请先填写画面 Prompt"
+      "needPrompt": "请先填写画面 Prompt",
+      "copy": "海报文案",
+      "removeRef": "移除参考图"
+    },
+    "conflict": {
+      "title": "有手动编辑",
+      "desc": "以下字段/图层被人工修改过，应用 AI 方案会覆盖它们。是否继续？",
+      "overwrite": "覆盖并应用",
+      "field": {
+        "prompt": "画面 Prompt",
+        "text_prompt": "文字描述",
+        "copy": "海报文案",
+        "layer_doc": "图层"
+      }
     },
     "versionLabel": "第 {n} 版 · {time}",
     "versions": {
@@ -2678,8 +2737,15 @@
       },
       "final": "最终",
       "select": "设为最终",
+      "loadLayout": "载入排版",
       "useBase": "作为编辑底图",
-      "loadLayout": "载入排版"
+      "task": {
+        "queued": "排队",
+        "processing": "生成中",
+        "completed": "已完成",
+        "failed": "失败",
+        "cancelled": "已取消"
+      }
     },
     "toast": {
       "refsSaved": "参考图已保存（{n} 张）",
@@ -2692,7 +2758,12 @@
       "compositeSaved": "合成图已保存并设为最终版本，剧集缩略图已更新",
       "selected": "已设为最终版本（第 {n} 版），剧集缩略图已更新",
       "baseSet": "已作为编辑底图",
-      "layoutLoaded": "已载入该版本的排版"
+      "layoutLoaded": "已载入该版本的排版",
+      "conceptStarted": "构想任务已提交",
+      "conceptGenerating": "已提交 {n} 张候选底图",
+      "conceptPartial": "{n} 个方案失败：{first}",
+      "fieldsApplied": "方案字段已应用",
+      "layersApplied": "AI 文字图层已应用"
     }
   },
   "errors": {
@@ -2761,7 +2832,7 @@
   "layerCanvas": {
     "toolbar": {"select":"选择","pan":"平移","frame":"编辑取景框","crop":"裁切底图","undo":"撤销","redo":"重做","snap":"吸附","zoomIn":"放大","zoomOut":"缩小","fit":"适配画布","edit":"编辑","preview":"预览","render":"渲染本段","rehearse":"预演本镜"},
     "keyframeBar": {"title":"精确关键帧","add":"在当前时刻添加帧","copyPrev":"复制上一帧","remove":"删除帧（首帧不可删）","duration":"段长","endHold":"末尾停留","junction":"衔接帧","junctionTextWarn":"衔接帧不含文字图层：渲染时这 {n} 个文字将不出现","teach":"这一段由若干张精确关键帧组成：每帧=某一时刻的取景+可见图层。程序在帧之间自动推拉与淡入，渲染成确定性视频——它们就是这段的关键帧，不是 PPT 动画。","ease":"到下一帧缓动","fade":"新图层淡入","viewportPick":"取景（在画布框选）","visible":"可见图层"},
-    "base": {"title":"底图","replace":"更换底图","cropTo169":"裁切到 16:9","aspectBanner":"画布或原图裁切比例 {aspect} 与输出不符，渲染时会拉伸","cropHelp":"拖动原图坐标中的 16:9 裁框或右下角；原图不变。","applyCrop":"应用裁切","cancelCrop":"取消","outputSize":"输出画布 {w}×{h}","sourceSize":"源图 {w}×{h}（原件像素）","sourceUnknown":"源图尺寸未知","resolution":"裁切后源图像素为成片 {sw}×{sh} 的 {times}×（按短板计）","verified":"已核验","inherited":"继承底图（锁定）","guide":"源图像素用于裁切与清晰度判断，不决定输出画布；建议裁切后宽高均≥成片的 2 倍。","style":"整体风格","unknown":"底图","version":"版本 {version}","saveSize":"源图尺寸尚未由服务端确认；保存时会读取原件。","loadError":"素材或语义条目加载失败。","framingClamped":"裁切无法保留部分原取景，已收回有效区域；可撤销恢复原裁切和全部取景。"},
+    "base": {"title":"底图","noBase":"未选择底图（可先编辑文字）","replace":"更换底图","cropTo169":"裁切到 16:9","aspectBanner":"画布或原图裁切比例 {aspect} 与输出不符，渲染时会拉伸","cropHelp":"拖动原图坐标中的 16:9 裁框或右下角；原图不变。","applyCrop":"应用裁切","cancelCrop":"取消","outputSize":"输出画布 {w}×{h}","sourceSize":"源图 {w}×{h}（原件像素）","sourceUnknown":"源图尺寸未知","resolution":"裁切后源图像素为成片 {sw}×{sh} 的 {times}×（按短板计）","verified":"已核验","inherited":"继承底图（锁定）","guide":"源图像素用于裁切与清晰度判断，不决定输出画布；建议裁切后宽高均≥成片的 2 倍。","style":"整体风格","unknown":"底图","version":"版本 {version}","saveSize":"源图尺寸尚未由服务端确认；保存时会读取原件。","loadError":"素材或语义条目加载失败。","framingClamped":"裁切无法保留部分原取景，已收回有效区域；可撤销恢复原裁切和全部取景。"},
     "anchor": {"anchored":"已锚定","manual":"手动","unlink":"源条目已删除或改名","detachConfirm":"该图层锚定于「{name}」。解除锚定并移动？","relink":"重新选择条目","toManual":"转为手动","labelOffset":"标签偏移","addMarker":"添加标记","addRegion":"添加区域","addRoute":"添加路线","noSemantics":"该素材尚未语义标注。","inherited":"继承底图不可使用语义锚点。","choose":"选择语义条目重新锚定","cancel":"取消","points":"地点","regions":"区域","lines":"路线","labels":"标签"},
     "quality": {"badge":"有效 {w}×{h} < {sw}×{sh}（推近过度）","frameDot":"有效像素低于输出","hint":"请使用更高分辨率底图或缩小推近。"},
     "image": {"pick":"选择素材","legacyPath":"本地路径（旧），建议重新选择素材。","selectionCount":"请选择一张图片。","cover":"填充","contain":"适应","episode":"本集资产","uploadHint":"上传图片将登记为本集资产及正式版本。","contextMissing":"请在剧集中打开编辑器后上传或导入帧图片。"},
@@ -2791,7 +2862,9 @@
     },
     "font": {
       "sans": "黑体",
-      "serif": "宋体"
+      "serif": "宋体",
+      "kai": "楷体",
+      "hand": "手写/圆体"
     },
     "align": {
       "left": "左对齐",
@@ -2859,6 +2932,11 @@
       "borderWidth": "边框粗细",
       "radius": "圆角",
       "shadow": "投影",
+      "italic": "斜体",
+      "scale": "字号缩放",
+      "variable": "固定变量",
+      "variableNone": "不使用",
+      "variableReadonly": "变量层文本只读，按剧集数据现场解析",
       "missingChars": "打包字体未覆盖这些字符，服务端渲染会报错：{chars}",
       "years": "年代"
     },
