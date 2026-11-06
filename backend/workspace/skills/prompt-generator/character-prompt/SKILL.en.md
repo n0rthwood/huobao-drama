@@ -75,4 +75,4 @@ When an episode registers a styling version (styling_version) for a character, u
 
 ## Saving
 
-Call `save_character_final_prompt`: the prompt argument contains no style words — **the project's visual style is automatically injected by the tool at the very front of the final prompt**.
+Call `saveCharacterFinalPrompt`: the prompt argument contains no style words — **the project's visual style is automatically injected by the tool at the very front of the final prompt**.

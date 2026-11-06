@@ -42,4 +42,4 @@ description: 道具最终提示词规范 — 白底单品静物，标准产品�
 
 ## 保存
 
-调用 `save_prop_final_prompt`：prompt 参数不含风格词，**项目视觉风格由工具自动注入到最终提示词的最前方**。
+调用 `savePropFinalPrompt`：prompt 参数不含风格词，**项目视觉风格由工具自动注入到最终提示词的最前方**。

@@ -99,4 +99,4 @@ description: 分镜关键帧提示词规范 — 为每个分镜段落生成首�
 
 ## 保存
 
-调用 `update_storyboard`（或分镜拆解时的 `save_storyboards`）写入关键帧字段。单独生成时 `update_storyboard` 只传 `storyboard_id` 与关键帧字段，不要回传其他字段，不要重新拆分整集。
+调用 `updateStoryboard`（或分镜拆解时的 `saveStoryboards`）写入关键帧字段。单独生成时 `updateStoryboard` 只传 `storyboard_id` 与关键帧字段，不要回传其他字段，不要重新拆分整集。

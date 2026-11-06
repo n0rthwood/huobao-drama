@@ -1,4 +1,5 @@
 import type { Agent, AgentExecutionOptionsBase } from '@mastra/core/agent'
+import type { FullOutput } from '@mastra/core/stream'
 import { runWithReasoningSink, type ReasoningSink } from './reasoning-sink.js'
 
 /**
@@ -11,12 +12,14 @@ import { runWithReasoningSink, type ReasoningSink } from './reasoning-sink.js'
  * 传入 sink 时（有 sys_task 的文本任务），本次运行的思考内容会被截取落盘（Issue #19）；
  * sink 的 flush 在成功/失败路径都执行，保证 reasoning_chars 与文件一致。
  */
+export type AgentRunOutput = FullOutput<unknown>
+
 export async function runAgent(
   agent: Agent,
   messages: Parameters<Agent['generate']>[0],
   options: AgentExecutionOptionsBase<unknown>,
   sink?: ReasoningSink,
-) {
+): Promise<AgentRunOutput> {
   const exec = async () => {
     const output = await agent.stream(messages, options)
     const full = await output.getFullOutput()
