@@ -8,6 +8,7 @@
     "months": "{n} 个月前"
   },
   "taskCenter": {
+    "errorPresentation": {"outputBlocked":"文本服务的内容审核拦截了模型生成的输出，本次未返回生成结果。","inputBlocked":"文本服务的内容审核拦截了本次输入，请求未返回生成结果。","contentBlocked":"文本服务返回内容审核拦截，本次未返回生成结果。","noPassage":"平台未提供具体命中片段或分类，无法确定哪一句触发了审核。","serviceError":"文本服务请求失败 {status}，请展开诊断信息查看平台响应。","details":"诊断信息","copy":"复制诊断信息","copied":"已复制"},
     "button": "任务",
     "title": "任务中心",
     "pageDesc": "全部剧集的图片 / 视频 / 文本生成任务，默认显示进行中与最近 7 天",
@@ -67,6 +68,7 @@
       "storyboard_breaker": "拆分分镜",
       "portrait_appearance": "按史料画像补充外貌",
       "asset_semantics": "语义标注",
+      "asset_pipeline": "资产流水线",
       "storyboard_fill_gaps": "补全剩余分镜"
     },
     "detail": {
@@ -2246,6 +2248,26 @@
         "fidelityVerified": "忠实度已校验"
       },
       "pipeline": {
+        "executionRunning": "运行中",
+        "executionWaitingApproval": "等待审批",
+        "executionCompleted": "已完成",
+        "executionFailed": "失败",
+        "executionCancelled": "已终止",
+        "executionUnknown": "状态未知",
+        "steps": {"research":"资料研究","curate":"整理资料","spec":"编制事实表","prompt":"准备提示词","generate":"生成图像","qc":"质量核验","gate":"计算闸门","approval":"人工审批","finalize":"结束流水线"},
+        "waitingReason": "本轮结果需要人工审核",
+        "reviewAction": "审批",
+        "elapsedLabel": "经过时间（含等待）",
+        "elapsedIncludingWaiting": "经过 {time}（含等待）",
+        "semanticsUnknown": "未记录",
+        "referenceTitle": "实际输入参考图",
+        "referenceEmpty": "本轮没有参考图。",
+        "referenceUnavailable": "历史输入未记录或无法读取，不能确定参考图。",
+        "generatorLabel": "实际生成服务及模型：{generator}",
+        "modelOverall": "模型自评（非程序闸门）：{value}",
+        "suggestion": "模型建议：{action}；原因：{reason}",
+        "approvalConsequences": "通过会接受本轮并结束流水线，但不会自动采用为资产当前图；打回可能按现有策略生成下一轮。",
+        "mapConfigured": "此资产已配置地图底图，请使用确定性渲染，不可启动扩散流水线。",
         "sectionTitle": "资产流水线（精确→美化）",
         "sectionHint": "按事实表生成与核验，逐轮人工审批",
         "computedNote": "结论由程序按事实表计算，不采信模型自判。",
@@ -2363,6 +2385,7 @@
         "approveFailed": "审批提交失败"
       },
       "map": {
+        "create": "创建地图底图",
         "sectionTitle": "地图底图（确定性渲染）",
         "sectionHint": "底图按 map_spec 确定性渲染，扩散模型只做风格化，不得改地理形状。",
         "noTextHint": "底图不渲染任何文字：地名、图例、刻度一律由图层叠加。",

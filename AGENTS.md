@@ -372,6 +372,14 @@ Issue 整理完成后、实施前，必须让 **Fabel（Anthropic）或 Astra（
 - **事实表出新版本 → 该资产 `final_prompt` 置空**（`classifyPromptInvalidation()` 的 `spec_version` 来源，走既有 `planFinalPromptWrite()` 出口）；`faithful=1` 的道具不动（`final-prompt.ts:130` 的 `skipped` 行为不变）。
 - 版本列表的 `fidelity/fidelity_reason`：存量派生版本仍读 `params.fidelity`，流水线轮次产出的版本改读闸门/人工结论（`asset-pipeline/fidelity.ts`，`asset-library.ts` 一次性批量预取，不在同步 map 里打库）。
 
+#### 审批可见性与错误呈现（Issue #74）
+- `services/asset-pipeline/execution.ts` 从真实 Mastra 快照的 suspended path / payload 推导 `pipeline.state` 与 `awaiting{round_id,round_no}`，用于流水线详情与任务中心；不新增全局任务状态，不把旧 `progress.step='approval'` 当等待依据，终态不能继承旧快照的等待状态。等待审批不显示生成/思考动画；经过时间是包含等待的墙钟时间，终态停止增长。
+- 任务中心直接复用 `AssetPipelinePanel` 的 `reviewRunId` 模式，显示实际输入参考图（可能为空）、本轮成图、完整事实表、逐项 QC 与程序闸门；阻断原因前置。弹窗固定头尾、正文滚动，小屏单列，长 URL 换行；审批仍须先打开本轮图片，FAIL 强行通过仍须覆盖闸门并说明理由，提交失败保留表单。通过只接受本轮并结束 run，不自动采用为资产当前图。
+- 新 QC 把完整 gate 存入既有 `verdicts.gate_result` JSON；`gate-serialization.ts` 对历史缺失的语义核验返回 `unknown`，不能捏造 PASS / 不适用，也不拿当前资产重新计算历史结论。
+- `TaskErrorMessage` / `utils/taskError.js` 把供应商错误转成人话，诊断默认折叠、脱敏且限长，按纯文本渲染。内容审核的 `assistant/user` 仅说明输出/输入方向，`level` 不代表分类；平台未提供命中片段时明确不可判断。没有新增模型重试、自动切换或审核绕过。
+- 非地图道具不挂载 `MapSpecPanel`；只有已有 `map_spec` 或明确点击「创建地图底图」才展示。新建草稿可取消且取消不写库；保存后按已配置地图显示并禁用扩散流水线入口。地图身份不从类型名称、faithful 或语义数组猜测。
+- 升级无需改库或同步供应商配置。精确轮模型优先级、用户指定参考图契约、原生铭文与零文字闸门冲突仍归 #73；OCR/文字框定位仅登记 #75，本次不变更算法。
+
 #### 地图底图：程序渲染，扩散不碰几何
 - `services/map-base-render.ts`：`d3-geo`（`geoMercator`/`geoEquirectangular` + `geoPath` + `fitExtent`）把 `backend/assets/geo/ne_50m_*.geojson`（Natural Earth 50m，公有领域，`HUOBAO_GEO_DIR` 可覆盖）投影成 SVG，再按 `layer-render.ts` 的 `sharp().composite()` 栅格化成 **16:9 / 默认 3840×2160** 的 PNG，落 `static/map-bases/<signature>.png`。**底图上绝不渲染任何文字**（地名/图例一律走叠加图层）；同 spec 同尺寸字节级一致，已存在即复用。
 - `props.map_spec`（`MapSpec`：`projection` 只有 mercator / equirectangular，`bbox`，`layers`，`places[]`，`routes[]`，`style.theme`）。接口在 `routes/props.ts`：`GET|PUT /props/:id/map-spec`、`POST /props/:id/map-render`、`POST /props/:id/map-suggest`（AI 建议坐标一律 `proposed`，人工勾选确认后前端才写进 `map_spec`）。

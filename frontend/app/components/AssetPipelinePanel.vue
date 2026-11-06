@@ -1,16 +1,16 @@
 <template>
   <div class="pip" @click.stop>
-    <div class="pip-head">
+    <div v-if="!reviewRunId" class="pip-head">
       <span class="pip-label">{{ t('episode.documentary.pipeline.sectionTitle') }}</span>
-      <span v-if="activeRun" class="pip-badge" :class="runStatusClass(activeRun.status)">
-        {{ t(`episode.documentary.pipeline.status${cap(activeRun.status)}`) }}
+      <span v-if="activeRun" class="pip-badge" :class="runStatusClass(activeRun.pipeline.state)">
+        {{ pipelineStatus(activeRun.pipeline.state) }}
       </span>
-      <span v-if="activeRun?.step" class="dim pip-step">{{ t('episode.documentary.pipeline.stepLabel', { step: activeRun.step }) }}</span>
+      <span v-if="activeRun?.step && activeRun.pipeline.state === 'running'" class="dim pip-step">{{ pipelineStep(activeRun.step) }}</span>
       <select v-model="purpose" class="input pip-select" :disabled="starting">
         <option value="precision">{{ t('episode.documentary.pipeline.purposePrecision') }}</option>
         <option value="beautify">{{ t('episode.documentary.pipeline.purposeBeautify') }}</option>
       </select>
-      <button class="pip-toggle" type="button" :disabled="starting" @click.stop="start">
+      <button class="pip-toggle" type="button" :disabled="starting || mapConfigured" @click.stop="start">
         <Loader2 v-if="starting" :size="11" class="animate-spin" />
         <Play v-else :size="11" />
         {{ starting ? t('episode.documentary.pipeline.starting') : t('episode.documentary.pipeline.start') }}
@@ -27,13 +27,23 @@
       </button>
     </div>
 
-    <p class="pip-notice">{{ t('episode.documentary.pipeline.sectionHint') }}</p>
-    <p v-if="startError" class="pip-error">{{ startError }}</p>
-    <p v-if="loadError" class="pip-error">{{ loadError }}</p>
-    <p v-if="detail?.run.error" class="pip-error">{{ t('episode.documentary.pipeline.errorLabel', { msg: detail.run.error }) }}</p>
+    <p v-if="!reviewRunId" class="pip-notice">{{ t('episode.documentary.pipeline.sectionHint') }}</p>
+    <p v-if="mapConfigured && !reviewRunId" class="pip-notice">{{ t('episode.documentary.pipeline.mapConfigured') }}</p>
+    <TaskErrorMessage v-if="startError" :error="startError" />
+    <TaskErrorMessage v-if="loadError" :error="loadError" />
+    <TaskErrorMessage v-if="detail?.run.error" :error="detail.run.error" />
+
+    <section v-if="selectedRound" class="pip-block">
+      <strong>{{ t('episode.documentary.pipeline.approveTitle') }}</strong>
+      <p class="pip-note">{{ t(awaitingRoundId === selectedRound.id ? 'episode.documentary.pipeline.waitingReason' : 'episode.documentary.pipeline.approveNotAwaiting') }}</p>
+      <p class="pip-note">{{ t('episode.documentary.pipeline.approvalConsequences') }}</p>
+      <ul v-if="blockingReasons.length" class="pip-list" role="status">
+        <li v-for="(reason, index) in blockingReasons" :key="index" class="pip-notice">{{ reason }}</li>
+      </ul>
+    </section>
 
     <!-- 运行列表：同资产的历史 run，切换只换读，不触发任何生成 -->
-    <div v-if="runs.length > 1" class="pip-runs">
+    <div v-if="!reviewRunId && runs.length > 1" class="pip-runs">
       <button
         v-for="run in runs"
         :key="run.id"
@@ -47,7 +57,7 @@
     </div>
 
     <!-- 素材 asset_source：全部人工入库，面板绝不自动抓取 -->
-    <section class="pip-block">
+    <section v-if="!reviewRunId" class="pip-block">
       <div class="pip-block-head" @click.stop="showSources = !showSources">
         <ChevronDown :size="12" :class="{ 'pip-rot': !showSources }" />
         <strong>{{ t('episode.documentary.pipeline.sourcesTitle') }}</strong>
@@ -104,48 +114,7 @@
       </template>
     </section>
 
-    <!-- 事实表：生成与核验共用的唯一清单 -->
-    <section class="pip-block">
-      <div class="pip-block-head" @click.stop="showSpec = !showSpec">
-        <ChevronDown :size="12" :class="{ 'pip-rot': !showSpec }" />
-        <strong>{{ t('episode.documentary.pipeline.specTitle') }}</strong>
-        <span v-if="spec" class="dim">{{ t('episode.documentary.pipeline.specVersion', { v: spec.version }) }}</span>
-      </div>
-      <template v-if="showSpec">
-        <p v-if="!spec" class="pip-empty dim">{{ t('episode.documentary.pipeline.specEmpty') }}</p>
-        <template v-else>
-          <p class="pip-note">{{ spec.summary }}</p>
-          <div class="pip-sub">
-            <strong>{{ t('episode.documentary.pipeline.specMustHave') }}</strong>
-            <ul class="pip-list">
-              <li v-for="item in spec.must_have" :key="item.id" class="pip-spec-row">
-                <span class="pip-badge">{{ t(`episode.documentary.pipeline.metric${cap(item.metric)}`) }}</span>
-                <span class="pip-source-main">{{ item.element }}</span>
-                <span class="dim">{{ t('episode.documentary.pipeline.specWhy', { why: item.why }) }}</span>
-                <span class="dim">{{ t('episode.documentary.pipeline.specCheck', { check: item.check }) }}</span>
-              </li>
-            </ul>
-          </div>
-          <div v-if="spec.forbidden.length" class="pip-sub">
-            <strong>{{ t('episode.documentary.pipeline.specForbidden') }}</strong>
-            <ul class="pip-list">
-              <li v-for="item in spec.forbidden" :key="item.id" class="pip-spec-row">
-                <span class="pip-source-main">{{ item.error }}</span>
-                <span class="dim">{{ item.why }}</span>
-              </li>
-            </ul>
-          </div>
-          <div v-if="spec.tolerances.length" class="pip-sub">
-            <strong>{{ t('episode.documentary.pipeline.specTolerances') }}</strong>
-            <ul class="pip-list"><li v-for="(x, i) in spec.tolerances" :key="`tol-${i}`" class="dim">{{ x }}</li></ul>
-          </div>
-          <div v-if="spec.uncertainties.length" class="pip-sub">
-            <strong>{{ t('episode.documentary.pipeline.specUncertainties') }}</strong>
-            <ul class="pip-list"><li v-for="(x, i) in spec.uncertainties" :key="`unc-${i}`" class="dim">{{ x }}</li></ul>
-          </div>
-        </template>
-      </template>
-    </section>
+    <AssetPipelineFactSheet v-if="!reviewRunId" :spec="spec" />
 
     <!-- 轮次时间线：r0 精确轮，r1/r2 美化轮 -->
     <section class="pip-block">
@@ -174,6 +143,13 @@
     <section v-if="selectedRound" class="pip-block pip-round">
       <div class="pip-round-grid">
         <div class="pip-round-image">
+          <strong>{{ t('episode.documentary.pipeline.referenceTitle') }}</strong>
+          <p v-if="referenceLoading" class="dim">{{ t('common.loading') }}</p>
+          <p v-else-if="referenceError" class="dim">{{ t('episode.documentary.pipeline.referenceUnavailable') }}</p>
+          <p v-else-if="!referenceImages.length" class="dim">{{ t('episode.documentary.pipeline.referenceEmpty') }}</p>
+          <img v-for="(url, index) in referenceImages" :key="index" :src="mediaUrl(url)" :alt="t('episode.documentary.pipeline.referenceTitle')" @click.stop="emit('preview', mediaUrl(url), t('episode.documentary.pipeline.referenceTitle'))" />
+          <strong>{{ t('episode.documentary.pipeline.roundImageTitle') }}</strong>
+          <p class="dim">{{ t('episode.documentary.pipeline.generatorLabel', { generator: selectedRound.generator || '—' }) }}</p>
           <img
             v-if="selectedRound.image_path"
             :src="mediaUrl(selectedRound.image_path)"
@@ -181,10 +157,11 @@
             @click.stop="openRoundImage(selectedRound)"
           />
           <p v-else class="pip-empty dim">{{ t('episode.documentary.pipeline.roundImageEmpty') }}</p>
-          <p v-if="selectedRound.error_msg" class="pip-error">{{ selectedRound.error_msg }}</p>
+          <TaskErrorMessage v-if="selectedRound.error_msg" :error="selectedRound.error_msg" />
         </div>
 
         <div class="pip-round-list">
+          <AssetPipelineFactSheet v-if="reviewRunId" :spec="spec" initially-open />
           <strong>{{ t('episode.documentary.pipeline.checklistTitle') }}</strong>
           <ul class="pip-list">
             <li
@@ -201,11 +178,11 @@
 
           <template v-if="selectedRound.gate">
             <strong>{{ t('episode.documentary.pipeline.forbiddenTitle') }}</strong>
-            <ul v-if="selectedRound.gate.forbidden_hits.length" class="pip-list">
-              <li v-for="hit in selectedRound.gate.forbidden_hits" :key="hit.id" class="pip-check v-violation">
-                <span class="pip-badge">{{ t('episode.documentary.pipeline.forbiddenHit') }}</span>
-                <span class="pip-source-main">{{ hit.error }}</span>
-                <span class="dim">{{ hit.evidence }}</span>
+            <ul v-if="forbiddenChecks.length" class="pip-list">
+              <li v-for="item in forbiddenChecks" :key="item.id" class="pip-check" :class="item.detected ? 'v-violation' : 'v-ok'">
+                <span class="pip-badge">{{ t(item.detected ? 'episode.documentary.pipeline.forbiddenHit' : 'episode.documentary.pipeline.verdictOk') }}</span>
+                <span class="pip-source-main">{{ item.element }}</span>
+                <span class="dim">{{ item.evidence }}</span>
               </li>
             </ul>
             <p v-else class="pip-empty dim">{{ t('episode.documentary.pipeline.forbiddenClear') }}</p>
@@ -242,6 +219,9 @@
                 <span class="pip-badge">{{ t(`episode.documentary.pipeline.semantics${pascal(selectedRound.gate.semantics_preserved.status)}`) }}</span>
                 <span class="dim">{{ selectedRound.gate.semantics_preserved.detail }}</span>
               </p>
+              <p v-if="selectedRound.gate.model_overall">{{ t('episode.documentary.pipeline.modelOverall', { value: selectedRound.gate.model_overall }) }}</p>
+              <p v-if="selectedRound.suggestion">{{ t('episode.documentary.pipeline.suggestion', { action: selectedRound.suggestion.action, reason: selectedRound.suggestion.reason }) }}</p>
+              <ul v-if="selectedRound.qc?.suggestions?.length" class="pip-list"><li v-for="(suggestion, i) in selectedRound.qc.suggestions" :key="i">{{ suggestion }}</li></ul>
             </div>
           </template>
         </div>
@@ -254,6 +234,7 @@
           <span v-if="awaitingRoundId === selectedRound.id" class="pip-badge gate-await">{{ t('episode.documentary.pipeline.approveAwaiting') }}</span>
           <span v-else class="dim">{{ t('episode.documentary.pipeline.approveNotAwaiting') }}</span>
         </div>
+        <p class="pip-note">{{ t('episode.documentary.pipeline.approvalConsequences') }}</p>
         <p v-if="!openedImages.length" class="pip-notice">{{ t('episode.documentary.pipeline.openedRequired') }}</p>
 
         <div v-if="violationOptions.length" class="pip-sub">
@@ -276,6 +257,7 @@
         </label>
         <p v-if="gateFailed" class="pip-note dim">{{ t('episode.documentary.pipeline.overrideGateHint') }}</p>
 
+        <Teleport to="#pipeline-review-footer" :disabled="!reviewRunId">
         <div class="pip-approve-actions">
           <button class="btn btn-sm btn-primary" type="button" :disabled="!canApprove" @click.stop="submit('approve')">
             {{ t('episode.documentary.pipeline.approve') }}
@@ -290,7 +272,8 @@
             {{ t('episode.documentary.pipeline.abort') }}
           </button>
         </div>
-        <p v-if="approveError" class="pip-error">{{ approveError }}</p>
+        </Teleport>
+        <TaskErrorMessage v-if="approveError" :error="approveError" />
       </div>
     </section>
   </div>
@@ -308,8 +291,11 @@
 import { ChevronDown, Loader2, Play, X } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
+import TaskErrorMessage from '~/components/TaskErrorMessage.vue'
+import AssetPipelineFactSheet from '~/components/AssetPipelineFactSheet.vue'
+import { useTasks } from '~/composables/useTasks'
 import {
-  assetPipelineAPI,
+  assetPipelineAPI, taskAPI,
   type AssetPipelineKind,
   type AssetPipelineOpenedImage,
   type AssetPipelineRound,
@@ -326,6 +312,8 @@ const props = defineProps<{
   assetId: number
   episodeId: number
   assetName?: string
+  reviewRunId?: number
+  mapConfigured?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -345,7 +333,6 @@ const starting = ref(false)
 const cancelling = ref(false)
 const purpose = ref<'precision' | 'beautify'>('precision')
 const showSources = ref(true)
-const showSpec = ref(false)
 const sources = ref<AssetSourceRow[]>([])
 const sourceError = ref('')
 const adding = ref(false)
@@ -361,9 +348,14 @@ const selectedViolations = ref<string[]>([])
 const notes = ref('')
 const overrideGate = ref(false)
 const approveError = ref('')
+const submitting = ref(false)
+const referenceImages = ref<string[]>([])
+const referenceLoading = ref(false)
+const referenceError = ref(false)
+let referenceSeq = 0
+const { tasksById, refreshTasks } = useTasks()
 
-let timer: ReturnType<typeof setTimeout> | null = null
-// 卸载后在途的轮询回来时不能再排下一轮，也不能往已销毁的面板写状态
+// Shared task updates drive detail refresh; there is no panel-specific polling.
 let stopped = false
 
 function msg(err: unknown, fallback: string): string {
@@ -382,22 +374,51 @@ function pascal(value: string): string {
 function roleKey(role: AssetSourceRole): string {
   return pascal(role)
 }
+function pipelineStatus(state: string) {
+  return t(`episode.documentary.pipeline.execution${pascal(state)}`)
+}
+function pipelineStep(step: string) {
+  const key = `episode.documentary.pipeline.steps.${step}`
+  const label = t(key)
+  return label === key ? step : label
+}
 
 const activeRun = computed(() => detail.value?.run ?? runs.value.find(r => r.id === selectedRunId.value) ?? null)
 const spec = computed(() => detail.value?.spec ?? null)
 const rounds = computed(() => detail.value?.rounds ?? [])
-const awaitingRoundId = computed(() => detail.value?.awaiting?.round_id ?? null)
+const awaitingRoundId = computed(() => detail.value?.run.pipeline.state === 'waiting_approval' ? detail.value.run.pipeline.awaiting?.round_id ?? null : null)
 const selectedRound = computed(() => rounds.value.find(r => r.id === selectedRoundId.value) ?? rounds.value[rounds.value.length - 1] ?? null)
 
 /** 违规排在最前：人先看要改的，再看通过项 */
 const checklist = computed(() => {
   const round = selectedRound.value
-  if (!round?.qc) return []
+  if (!round?.qc?.verdicts) return []
   const byId = new Map(spec.value?.must_have.map(item => [item.id, item.element]) ?? [])
   const rank: Record<string, number> = { violation: 0, minor: 1, ok: 2 }
   return round.qc.verdicts.must_have
     .map(item => ({ id: item.id, verdict: item.verdict, evidence: item.evidence, element: byId.get(item.id) || item.id }))
     .sort((a, b) => (rank[a.verdict] ?? 3) - (rank[b.verdict] ?? 3))
+})
+
+const forbiddenChecks = computed(() => {
+  const names = new Map(spec.value?.forbidden.map(item => [item.id, item.error]) ?? [])
+  return (selectedRound.value?.qc?.verdicts?.forbidden ?? []).map(item => ({
+    ...item, element: names.get(item.id) || item.id, evidence: item.evidence || '',
+  }))
+})
+
+const blockingReasons = computed(() => {
+  const gate = selectedRound.value?.gate
+  if (!gate || gate.pass) return []
+  const reasons = [
+    ...gate.invalid.map(id => t('episode.documentary.pipeline.gateInvalid', { ids: id })),
+    ...gate.violations.map(item => `${item.element}：${item.evidence}`),
+    ...gate.forbidden_hits.map(item => `${item.error}：${item.evidence}`),
+    ...gate.locate_checks.filter(item => item.status !== 'ok').map(item => `${item.name}：${item.detail}`),
+  ]
+  if (gate.text_in_image.present) reasons.push(`${t('episode.documentary.pipeline.textInImage')}${t('episode.documentary.pipeline.textPresent')}：${gate.text_in_image.evidence}`)
+  if (gate.semantics_preserved.status === 'fail') reasons.push(gate.semantics_preserved.detail)
+  return reasons
 })
 
 const coveragePct = computed(() => Math.round((selectedRound.value?.gate?.coverage ?? 0) * 100))
@@ -428,7 +449,7 @@ const gateFailed = computed(() => {
   return !!gate && !gate.pass
 })
 
-const canAct = computed(() => !!selectedRound.value && awaitingRoundId.value === selectedRound.value.id && openedImages.value.length > 0)
+const canAct = computed(() => !submitting.value && !!selectedRound.value && awaitingRoundId.value === selectedRound.value.id && openedImages.value.length > 0)
 // 闸门未过还要通过：必须同时勾「覆盖闸门」并写明理由，否则后端 400
 const canApprove = computed(() => canAct.value && (!gateFailed.value || (overrideGate.value && notes.value.trim().length > 0)))
 
@@ -458,18 +479,6 @@ function openRoundImage(round: AssetPipelineRound) {
   emit('preview', mediaUrl(path), props.assetName || t('episode.documentary.pipeline.roundImageTitle'))
 }
 
-function stopPoll() {
-  if (timer) { clearTimeout(timer); timer = null }
-}
-
-function schedulePoll() {
-  stopPoll()
-  const run = detail.value?.run
-  if (!run || stopped) return
-  const busy = run.status === 'queued' || run.status === 'processing'
-  if (!busy || detail.value?.awaiting) return
-  timer = setTimeout(() => { timer = null; void loadDetail(run.id, true) }, 3000)
-}
 
 async function loadRuns() {
   loadError.value = ''
@@ -490,14 +499,15 @@ async function loadDetail(runId: number, silent = false) {
   try {
     const res = await assetPipelineAPI.detail(runId)
     if (stopped) return
+    const previousAwaiting = detail.value?.run.pipeline.awaiting?.round_id ?? null
     detail.value = res
     sources.value = res?.sources ?? sources.value
     const list = res?.rounds ?? []
-    const awaiting = res?.awaiting?.round_id ?? null
-    if (!list.some(r => r.id === selectedRoundId.value)) {
+    const awaiting = res?.run.pipeline.state === 'waiting_approval' ? res.run.pipeline.awaiting?.round_id ?? null : null
+    if ((awaiting && awaiting !== previousAwaiting) || !list.some(r => r.id === selectedRoundId.value)) {
       selectedRoundId.value = awaiting ?? (list.length ? list[list.length - 1].id : null)
     }
-    schedulePoll()
+    loadError.value = ''
   } catch (err) {
     if (!stopped && !silent) loadError.value = msg(err, t('episode.documentary.pipeline.loadFailed'))
   }
@@ -520,7 +530,7 @@ function selectRun(runId: number) {
 }
 
 async function start() {
-  if (starting.value) return
+  if (starting.value || props.mapConfigured) return
   starting.value = true
   startError.value = ''
   try {
@@ -534,6 +544,7 @@ async function start() {
     toast.success(t('episode.documentary.pipeline.started'))
     selectedRunId.value = null
     await loadRuns()
+    await refreshTasks()
     emit('update')
   } catch (err) {
     // 409 = 同资产已有活跃 run，提示去看那一条，不重复起
@@ -555,6 +566,7 @@ async function cancel() {
     if (stopped) return
     toast.success(t('episode.documentary.pipeline.cancelled'))
     await loadRuns()
+    await refreshTasks()
   } catch (err) {
     if (!stopped) loadError.value = msg(err, t('episode.documentary.pipeline.cancelFailed'))
   } finally {
@@ -649,8 +661,9 @@ async function removeSource(sourceId: number) {
 async function submit(verdict: Verdict) {
   const run = detail.value?.run
   const round = selectedRound.value
-  if (!run || !round || !openedImages.value.length) return
+  if (!run || !round || !canAct.value) return
   if (verdict === 'approve' && !canApprove.value) return
+  submitting.value = true
   approveError.value = ''
   try {
     await assetPipelineAPI.approve(run.id, {
@@ -667,14 +680,17 @@ async function submit(verdict: Verdict) {
     notes.value = ''
     overrideGate.value = false
     await loadDetail(run.id)
+    await refreshTasks()
     emit('update')
   } catch (err) {
     if (!stopped) approveError.value = msg(err, t('episode.documentary.pipeline.approveFailed'))
+  } finally {
+    submitting.value = false
   }
 }
 
 watch(() => [props.assetKind, props.assetId], () => {
-  stopPoll()
+  if (props.reviewRunId) return
   detail.value = null
   runs.value = []
   selectedRunId.value = null
@@ -691,8 +707,44 @@ watch(selectedRoundId, () => {
   approveError.value = ''
 })
 
-onMounted(() => { void loadRuns(); void loadSources() })
-onBeforeUnmount(() => { stopped = true; stopPoll() })
+watch(() => {
+  const task = selectedRunId.value ? tasksById.value[selectedRunId.value] : null
+  return task ? JSON.stringify([task.status, task.pipeline, task.progress]) : ''
+}, (next, previous) => {
+  if (next && next !== previous && selectedRunId.value) void loadDetail(selectedRunId.value, true)
+})
+
+watch(() => selectedRound.value?.image_task_id, async (id) => {
+  const seq = ++referenceSeq
+  referenceImages.value = []
+  referenceError.value = false
+  if (!id) { referenceError.value = true; return }
+  referenceLoading.value = true
+  try {
+    const task = await taskAPI.get(id)
+    if (seq !== referenceSeq || stopped) return
+    if (Array.isArray(task.params?.referenceImages)) {
+      referenceImages.value = task.params.referenceImages
+    } else if (!Array.isArray(task.params?.pipeline_reference_origins) || task.params.pipeline_reference_origins.length) {
+      referenceError.value = true
+    }
+  } catch {
+    if (seq === referenceSeq && !stopped) referenceError.value = true
+  } finally {
+    if (seq === referenceSeq) referenceLoading.value = false
+  }
+}, { immediate: true })
+
+onMounted(() => {
+  if (props.reviewRunId) {
+    selectedRunId.value = props.reviewRunId
+    void loadDetail(props.reviewRunId)
+  } else {
+    void loadRuns()
+    void loadSources()
+  }
+})
+onBeforeUnmount(() => { stopped = true })
 </script>
 
 <style scoped>
@@ -701,6 +753,10 @@ onBeforeUnmount(() => { stopped = true; stopPoll() })
   flex-direction: column;
   gap: 6px;
 }
+.pip, .pip * { overflow-wrap: anywhere; }
+.pip-round-image, .pip-round-list { min-width: 0; }
+.pip-round-image { display: flex; flex-direction: column; gap: 6px; }
+@media (max-width: 959px) { .pip-round-grid { grid-template-columns: minmax(0, 1fr) !important; } }
 .pip-head {
   display: flex;
   align-items: center;

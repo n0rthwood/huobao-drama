@@ -983,7 +983,8 @@ export interface GateResult {
   forbidden_hits: Array<{ id: string; error: string; evidence: string }>
   text_in_image: { present: boolean | null; evidence: string }
   locate_checks: LocateCheck[]
-  semantics_preserved: { status: 'pass' | 'fail' | 'not_applicable'; detail: string }
+  semantics_preserved: { status: 'pass' | 'fail' | 'not_applicable' | 'unknown'; detail: string }
+  model_overall?: string | null
 }
 export interface QcRecordRow {
   id: number
@@ -1032,6 +1033,12 @@ export interface AssetPipelineRound {
   gate: GateResult | null
   suggestion: { action: 'pass' | 'revise' | 'rollback' | 'abort'; target_round_no: number | null; reason: string } | null
 }
+export interface AssetPipelineState {
+  state: 'running' | 'waiting_approval' | 'completed' | 'failed' | 'cancelled' | 'unknown'
+  awaiting: { round_id: number; round_no: number } | null
+  asset_kind: string
+  asset_id: number
+}
 export interface AssetPipelineRunSummary {
   id: number
   status: 'queued' | 'processing' | 'completed' | 'failed' | 'cancelled'
@@ -1039,6 +1046,7 @@ export interface AssetPipelineRunSummary {
   step: string | null
   asset_kind: string
   asset_id: number
+  pipeline: AssetPipelineState
   created_at: string
   updated_at: string
 }

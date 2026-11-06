@@ -25,6 +25,7 @@ import { composeEpisodeLabel, composeTaskLabel, type TaskTargetKind } from './ta
 import { toUnixSeconds } from './media-time.js'
 import { IMPORTED_TASK_PROVIDER } from './asset-library.js'
 import type { BatchScope } from './batch-scope.js'
+import { pipelineExecution } from './asset-pipeline/execution.js'
 
 export type { TaskLabelInput, TaskTargetKind } from './task-label.js'
 export { composeEpisodeLabel, composeTaskLabel, renderRefPrompt } from './task-label.js'
@@ -216,14 +217,21 @@ export function buildTaskRow(row: SysTaskRow, lookups: NameLookups): TaskRow {
 
 export async function enrichTasks(rows: SysTaskRow[]): Promise<TaskRow[]> {
   if (!rows.length) return []
-  const lookups = await loadLookups(rows)
-  return rows.map(row => buildTaskRow(row, lookups))
+  const [lookups, pipelines] = await Promise.all([
+    loadLookups(rows),
+    Promise.all(rows.map(row => pipelineExecution(row))),
+  ])
+  return rows.map((row, index) => {
+    const task = buildTaskRow(row, lookups)
+    if (pipelines[index]) task.pipeline = pipelines[index]
+    return task
+  })
 }
 
 export async function enrichTask(row: SysTaskRow | undefined | null): Promise<TaskRow | null> {
   if (!row) return null
-  const lookups = await loadLookups([row])
-  return buildTaskRow(row, lookups)
+  const [task] = await enrichTasks([row])
+  return task ?? null
 }
 
 // ─── 父任务行（批次 / 导出） ──────────────────────────────────
@@ -446,7 +454,15 @@ export async function listTaskCenter(filters: CenterFilters): Promise<{
 
   rows.sort((a, b) => Date.parse(String(b.created_at)) - Date.parse(String(a.created_at)) || Number(b.id) - Number(a.id))
   const start = (page - 1) * pageSize
-  return { items: rows.slice(start, start + pageSize), total: rows.length, page, page_size: pageSize }
+  const items = rows.slice(start, start + pageSize)
+  await Promise.all(items.map(async item => {
+    if (item.row_type !== 'task') return
+    const task = taskById.get(item.id)
+    if (!task) return
+    const pipeline = await pipelineExecution(task)
+    if (pipeline) item.pipeline = pipeline
+  }))
+  return { items, total: rows.length, page, page_size: pageSize }
 }
 
 /**
