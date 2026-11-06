@@ -106,4 +106,4 @@ description: 絵コンテのキーフレームプロンプト仕様 — 各絵�
 
 ## 保存
 
-`update_storyboard`（または絵コンテ分解時の `save_storyboards`）を呼び出してキーフレームフィールドを書き込む。単独で生成する場合、`update_storyboard` には `storyboard_id` とキーフレームフィールドのみを渡し、他のフィールドを返さず、話全体を再分解しない。
+`updateStoryboard`（または絵コンテ分解時の `saveStoryboards`）を呼び出してキーフレームフィールドを書き込む。単独で生成する場合、`updateStoryboard` には `storyboard_id` とキーフレームフィールドのみを渡し、他のフィールドを返さず、話全体を再分解しない。

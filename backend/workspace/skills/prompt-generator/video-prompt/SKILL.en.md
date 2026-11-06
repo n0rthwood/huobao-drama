@@ -58,7 +58,7 @@ Organize every segment in this order (items with no content may be omitted, but 
 
 ## Keyframe Alignment (hard rule)
 
-`read_storyboard_context` returns `first_frame_prompt`, `mid_frame_prompt`, `mid_frame_time`, `last_frame_prompt` and `inherits_first`, and you must align to them:
+`readStoryboardContext` returns `first_frame_prompt`, `mid_frame_prompt`, `mid_frame_time`, `last_frame_prompt` and `inherits_first`, and you must align to them:
 
 - **First frame**: with no transition segment, the first segment continues from the first keyframe image (when `inherits_first` is true, that is the previous storyboard's last keyframe; read the previous shot's `last_frame_prompt` / `result` to understand the image), keeping the same camera position and character placement, without re-establishing the space and without cutting at second 0; with a transition segment, the transition handles the spatial join and the first content segment after it continues from the transition's end image
 - **Mid frame**: when `mid_frame_time` has a value, some segment's **start must land exactly on that second**, and that segment's opening image must match `mid_frame_prompt`
@@ -73,7 +73,7 @@ Organize every segment in this order (items with no content may be omitted, but 
 
 ## Reference Rules (per-segment asset anchoring)
 
-- `@SceneName` / `@CharacterName` / `@PropName` must match the lists returned by read_storyboard_context exactly (they are automatically replaced with reference-image markers — never abbreviate them or add symbols); only reference assets bound to this storyboard segment. The info header lists the full set of bound assets; each time segment lists **the subset present in that segment** — the two do not substitute for each other
+- `@SceneName` / `@CharacterName` / `@PropName` must match the lists returned by readStoryboardContext exactly (they are automatically replaced with reference-image markers — never abbreviate them or add symbols); only reference assets bound to this storyboard segment. The info header lists the full set of bound assets; each time segment lists **the subset present in that segment** — the two do not substitute for each other
 - **Scene @-referenced in every segment (hard rule)**: the body of every time segment — including the opening transition segment, cut segments and pure close-up segments — must contain this shot's bound `@SceneName`, preferably as the segment's first reference. A change of shot size is not a change of scene: cuts, push-ins and close-ups get no exemption; @-referencing the scene tells the model "we are still here"
 - **Every on-screen asset @-referenced per segment (hard rule)**: any bound character/prop visible in the segment — including background, foreground blur, mirror images and stationary objects — is @-referenced in every segment, each with a short visibility phrase (position + pose is enough, it need not be an action). The segment in which an asset leaves the frame states the exit via @Name; afterwards segments either stop mentioning it or mention it as `@Name (off-screen)` per the bypass ban — an asset must never silently vanish and later silently return
 - **Props appear only inside holding/using/wearing sentences, and with a distinctive element**: the sentence containing `@PropName` must state who, with which body part, and how it is held/used/worn, with at least one distinctive element — a **functional part** (channel button, lens, hat brim), an **explicit grip point** (right thumb, bridge of the nose), or a **use action** (press, raise and point, put on). A bare weak stative verb (resting, sitting, leaning, holding, touching) + @Prop = non-compliant — "both hands resting on a black rectangle" is the shared prior of remote/gamepad/phone. Bridge to "one main action per segment": prefer expressing the distinctive element as a part-level **state** ("right hand holding the @RemoteControl, thumb resting lightly on the channel button" is a state and does not consume the main-action slot); write it as a use action only when the segment's main action is the prop operation itself
@@ -105,4 +105,4 @@ Organize every segment in this order (items with no content may be omitted, but 
 
 ## Saving
 
-Call `update_storyboard` to update only this storyboard segment's `video_prompt` field — do not touch other fields and do not re-breakdown the whole episode.
+Call `updateStoryboard` to update only this storyboard segment's `video_prompt` field — do not touch other fields and do not re-breakdown the whole episode.

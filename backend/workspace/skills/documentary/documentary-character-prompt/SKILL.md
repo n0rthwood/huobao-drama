@@ -40,7 +40,7 @@ description: 纪录片/历史题材的角色最终提示词附加规范 — 三�
 
 ## 四、忠实于史料画像（文本级）
 
-当 `read_characters` 返回 `has_archival_reference: true` 时，该角色已有入库的史料画像，其可见特征已经由提取环节文本化写进 `appearance` / `styling`：
+当 `readCharacters` 返回 `has_archival_reference: true` 时，该角色已有入库的史料画像，其可见特征已经由提取环节文本化写进 `appearance` / `styling`：
 
 - 脸型、发际、发型、髭须形状、是否蓄须、面部显著特征**严格按 `appearance` 原文落地**，不得美化、年轻化、改换发型或自行发挥；
 - 不得把画像的油画笔触、画框、背景、半身构图带进提示词——**忠实的是人物形象，不是那幅画**；

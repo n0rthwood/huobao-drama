@@ -69,4 +69,4 @@ description: 角色最终提示词规范 — 正脸特写 + 三视图（正面/9
 
 ## 保存
 
-调用 `save_character_final_prompt`：prompt 参数不含风格词，**项目视觉风格由工具自动注入到最终提示词的最前方**。
+调用 `saveCharacterFinalPrompt`：prompt 参数不含风格词，**项目视觉风格由工具自动注入到最终提示词的最前方**。

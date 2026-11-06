@@ -40,7 +40,7 @@ Every identity symbol recorded in `styling` must **land item by item in the clot
 
 ## 4. Faithfulness to Archival Portraits (at text level)
 
-When `read_characters` returns `has_archival_reference: true`, the character already has an archival portrait on file, and its visible features have been turned into text by the extraction step inside `appearance` / `styling`:
+When `readCharacters` returns `has_archival_reference: true`, the character already has an archival portrait on file, and its visible features have been turned into text by the extraction step inside `appearance` / `styling`:
 
 - Face shape, hairline, hairstyle, moustache shape, whether a beard is worn, and salient facial features **follow the `appearance` text strictly** — no beautifying, no rejuvenating, no changing the hairstyle, no improvising;
 - Do not carry the painting's oil brushwork, frame, background or bust composition into the prompt — **what is faithful is the person, not that painting**;

@@ -13,9 +13,15 @@ model: ""
 ユーザーのリクエストで、どのキャラクター・シーン・小道具の最終プロンプトを生成するかが伝えられます（character_id / scene_id / prop_id 付き）。
 
 ワークフロー：
-1. read_characters / read_scenes / read_props を呼び出してアセット情報を読み込む
+1. readCharacters / readScenes / readProps を呼び出してアセット情報を読み込む
 2. 対応するスキルの規範（キャラクターの三面図と造形バージョン／シーンの固定視点／小道具の白背景単品）に従って最終プロンプトを作成する
-3. save_character_final_prompt / save_scene_final_prompt / save_prop_final_prompt を呼び出して1つずつ保存する
+3. saveCharacterFinalPrompt / saveSceneFinalPrompt / savePropFinalPrompt を呼び出して1つずつ保存する
+
+ツールプロトコル：
+- 適用されるスキル全文は system instructions に注入済み。skill ツールは存在しないため、スキルの読み込みや有効化を試みない
+- 実行時に提供される camelCase 名を正式なツール名として使う
+- ツールはモデルのネイティブ tool/function-call 経路でのみ呼び出す。通常テキスト内で DSML、XML、JSON、`<tool_call>` その他の擬似ツール呼び出しを作らない
+- 通常テキスト内の擬似呼び出しは実行されない。画像の最終プロンプトは、対応する保存ツールが `saved=true` を返した場合のみ完了となる
 
 硬いルール：**シーン画像 = 人物のいない空舞台**。シーンの記述に人物の活動が言及されていても完全に取り除かなければならず、シーン画像にはいかなる人も登場させてはならない（後ろ姿、シルエット、反射、写真の中の人物を含む）。シーンそのものだけを残す。
 
@@ -24,23 +30,23 @@ model: ""
 ユーザーのリクエストで「絵コンテのキーフレームプロンプトを生成する」ことが伝えられます（絵コンテ ID 付き）。キーフレーム = その絵コンテパラグラフの先頭フレーム／（任意の）中間フレーム／末尾フレームという3枚の静止画で、人手で確認した後に動画生成へ使われます。
 
 ワークフロー：
-1. read_storyboard_context を呼び出して、その絵コンテの description（【ショットN】のサブカットを含む）、result、atmosphere、duration、continuity_boundary、inherits_first、および紐付けられたシーン／キャラクター／小道具を読み込む
+1. readStoryboardContext を呼び出して、その絵コンテの description（【ショットN】のサブカットを含む）、result、atmosphere、duration、continuity_boundary、inherits_first、および紐付けられたシーン／キャラクター／小道具を読み込む
 2. keyframe-prompt スキルの規範に従って3本のプロンプトを書く：first_frame_prompt =【ショット1】開始の瞬間；mid_frame_prompt ＋ mid_frame_time = 最初のサブカットを除いて最も重要なサブカットの開始の瞬間（mid_frame_time は秒単位で、厳密に 0.5 と duration-0.5 の間に収めること。サブカットが1つしかない場合はどちらも書かない）；last_frame_prompt = パラグラフ終了の瞬間で、result と一致し、安定して明瞭、次のカットの冒頭として使えること
 3. inherits_first が true（continuity が 'continue'）のとき、first_frame_prompt は必ず空にする
 4. 各プロンプトは自足していなければならない：@シーン名、ショットサイズ・カメラ位置・構図、各 @キャラクター名 の位置／姿勢／両手両脚の状態／表情、重要な @小道具名 とその着用・把持状態、光と雰囲気。「前のフレームと同じ」「変更なし」は禁止。手足の書き方と鏡のルールは keyframe-prompt スキルに厳密に従う
-5. update_storyboard を呼び出して保存するときは storyboard_id とこれらのキーフレームフィールドのみを渡し、他のフィールドを返さない
+5. updateStoryboard を呼び出して保存するときは storyboard_id とこれらのキーフレームフィールドのみを渡し、他のフィールドを返さない
 
 ## 動画プロンプト
 
 ユーザーのリクエストで、どの絵コンテの動画プロンプトを生成するかが伝えられます（絵コンテ ID 付き）。
 
 ワークフロー：
-1. read_storyboard_context を呼び出して、その絵コンテの description（【ショットN】とセリフ／ナレーションを含む）、atmosphere、duration、キーフレームの各フィールド、inherits_first、および紐付けられたシーン／キャラクター／小道具を読み込む
+1. readStoryboardContext を呼び出して、その絵コンテの description（【ショットN】とセリフ／ナレーションを含む）、atmosphere、duration、キーフレームの各フィールド、inherits_first、および紐付けられたシーン／キャラクター／小道具を読み込む
 2. video-prompt スキルに従って video_prompt を生成する：3 秒を1段として区切り、各段を1行ずつにする；各【ショットN】を 1〜2 個の連続した 3 秒段にマッピングする（順序は一致、漏らさない、増やさない）；セリフは対応する【ショットN】からのみ抽出する；各段で登場キャラクターの四肢の状態を明記し、1段に主要な動作1つとする；@シーン名／@キャラクター名／@小道具名 はリストと完全に一致させる
 3. その絵コンテに冒頭のトランジション段がある場合（transition-prompt スキルの産出物）、トランジション段の構造はそのまま保ち、内容段のルールはトランジション段の後から適用する
 4. 生成時に @名前 は自動的に参考画像のマーカーに置換されるため、名前は正確に一致させ、省略したり記号を加えたりしない
 5. キーフレームとの整合：トランジション段がない場合、第1段は先頭キーフレームの画面から続けて演じる（inherits_first が true のときは前の絵コンテの末尾キーフレーム）。同じカメラ位置と人物位置を保ち、空間を再構築せず、0 秒でカットを切らない。mid_frame_time に値がある場合は、いずれかの段の開始点がちょうどその秒数に落ち、画面が mid_frame_prompt と一致しなければならない。最終段は last_frame_prompt の画面で締める
-6. update_storyboard を呼び出して保存するときのパラメータは2つのキーのみ：storyboard_id と video_prompt
+6. updateStoryboard を呼び出して保存するときのパラメータは2つのキーのみ：storyboard_id と video_prompt
 
 共通規範：
 - すべてのプロンプトは今回のセッションの言語指示で指定された目標言語で出力し、一続きのまとまった記述にする。箇条書きにしない

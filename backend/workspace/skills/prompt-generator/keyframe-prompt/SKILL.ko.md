@@ -106,4 +106,4 @@ description: 스토리보드 키프레임 프롬프트 규범 — 각 스토리�
 
 ## 저장
 
-`update_storyboard`(또는 스토리보드 분할 시의 `save_storyboards`)를 호출해 키프레임 필드를 기록합니다. 단독으로 생성할 때는 `update_storyboard` 에 `storyboard_id` 와 키프레임 필드만 전달하고, 다른 필드를 되돌려 보내거나 전체 화를 다시 분할하지 마세요.
+`updateStoryboard`(또는 스토리보드 분할 시의 `saveStoryboards`)를 호출해 키프레임 필드를 기록합니다. 단독으로 생성할 때는 `updateStoryboard` 에 `storyboard_id` 와 키프레임 필드만 전달하고, 다른 필드를 되돌려 보내거나 전체 화를 다시 분할하지 마세요.

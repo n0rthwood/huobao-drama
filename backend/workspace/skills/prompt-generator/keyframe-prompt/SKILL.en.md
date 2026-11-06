@@ -106,4 +106,4 @@ The next segment may use this segment's last frame as its own first frame, so th
 
 ## Saving
 
-Call `update_storyboard` (or `save_storyboards` during storyboard breakdown) to write the keyframe fields. When generating them on their own, pass `update_storyboard` only the `storyboard_id` plus the keyframe fields — do not send back any other field, and do not re-breakdown the whole episode.
+Call `updateStoryboard` (or `saveStoryboards` during storyboard breakdown) to write the keyframe fields. When generating them on their own, pass `updateStoryboard` only the `storyboard_id` plus the keyframe fields — do not send back any other field, and do not re-breakdown the whole episode.

@@ -96,7 +96,15 @@ test('a forced rewrite fails when the agent does not save a new prompt, and succ
       stream: async () => ({
         getFullOutput: async () => {
           if (agentSaves) await db.update(schema.characters).set({ finalPrompt: '新稿：白羽老公鸡' }).where(eq(schema.characters.id, 3))
-          return {}
+          return {
+            error: undefined,
+            steps: [{}],
+            finishReason: 'stop',
+            toolCalls: [],
+            toolResults: [],
+            text: agentSaves ? 'saved' : 'not saved',
+            response: { messages: [{ role: 'assistant', content: agentSaves ? 'saved' : 'not saved' }] },
+          }
         },
       }),
     })
@@ -113,6 +121,162 @@ test('a forced rewrite fails when the agent does not save a new prompt, and succ
   assert.equal(result.savedPrompt, '新稿：白羽老公鸡')
 })
 
+
+test('final-prompt recovery appends one corrective turn, preserves one step budget, and covers all asset kinds', () => {
+  const result = run(`${seed}
+    const { mastra } = await import('./src/mastra/index.ts')
+    const {
+      ensureCharacterFinalPrompt,
+      ensureSceneFinalPrompt,
+      ensurePropFinalPrompt,
+    } = await import('./src/services/final-prompt.ts')
+
+    const full = (text, steps = 1, error = undefined) => ({
+      error,
+      steps: Array.from({ length: steps }, () => ({})),
+      finishReason: 'stop',
+      toolCalls: [],
+      toolResults: [],
+      text,
+      response: { messages: [{ role: 'assistant', content: text }] },
+    })
+    const loadCharacter = async () => (await db.select().from(schema.characters).where(eq(schema.characters.id, 3)))[0]
+
+    async function characterCase(mode, firstSteps = 1) {
+      await resetChar()
+      await db.update(schema.characters).set({ finalPrompt: null }).where(eq(schema.characters.id, 3))
+      const calls = []
+      let turn = 0
+      mastra.getAgent = () => ({
+        stream: async (messages, options) => {
+          calls.push({ messages, maxSteps: options.maxSteps })
+          const current = turn++
+          return {
+            getFullOutput: async () => {
+              if (mode === 'upstream-error') return full('', firstSteps, new Error('upstream failed'))
+              if (mode === 'initial-save' && current === 0) {
+                await db.update(schema.characters).set({ finalPrompt: '初轮保存' }).where(eq(schema.characters.id, 3))
+              }
+              if (mode === 'correction-save' && current === 1) {
+                await db.update(schema.characters).set({ finalPrompt: '纠正保存' }).where(eq(schema.characters.id, 3))
+              }
+              return full(current === 0 ? '<DSML>not a tool call</DSML>' : 'still not saved', current === 0 ? firstSteps : 1)
+            },
+          }
+        },
+      })
+      const outcome = await ensureCharacterFinalPrompt(await loadCharacter(), 2)
+      return {
+        outcome,
+        calls: calls.length,
+        budgets: calls.map(call => call.maxSteps),
+        roles: calls[1]?.messages.map(message => message.role) || [],
+        correction: calls[1]?.messages.at(-1)?.content || '',
+      }
+    }
+
+    const initialSuccess = await characterCase('initial-save')
+    const correctionSuccess = await characterCase('correction-save')
+    const correctionFailure = await characterCase('never-save')
+    const upstreamError = await characterCase('upstream-error')
+    const exhaustedBudget = await characterCase('never-save', 11)
+
+    await db.insert(schema.scenes).values({
+      id: 4,
+      dramaId: 1,
+      location: '客厅',
+      time: '午后',
+      prompt: '',
+      lighting: '',
+      finalPrompt: null,
+      createdAt: ts,
+      updatedAt: ts,
+    })
+    let sceneTurns = 0
+    mastra.getAgent = () => ({
+      stream: async () => ({
+        getFullOutput: async () => {
+          sceneTurns += 1
+          await db.update(schema.scenes)
+            .set({ finalPrompt: sceneTurns === 1 ? '客厅空镜' : '午后客厅空镜' })
+            .where(eq(schema.scenes.id, 4))
+          return full(sceneTurns === 1 ? 'saved without time' : 'saved with time')
+        },
+      }),
+    })
+    const [scene] = await db.select().from(schema.scenes).where(eq(schema.scenes.id, 4))
+    const sceneResult = await ensureSceneFinalPrompt(scene, 2)
+
+    await db.insert(schema.props).values({
+      id: 5,
+      dramaId: 1,
+      name: '遥控器',
+      type: '电器',
+      description: '黑色',
+      faithful: 0,
+      finalPrompt: null,
+      createdAt: ts,
+      updatedAt: ts,
+    })
+    let propTurns = 0
+    mastra.getAgent = () => ({
+      stream: async () => ({
+        getFullOutput: async () => {
+          propTurns += 1
+          if (propTurns === 2) {
+            await db.update(schema.props).set({ finalPrompt: '白底黑色遥控器' }).where(eq(schema.props.id, 5))
+          }
+          return full(propTurns === 1 ? 'not saved' : 'saved')
+        },
+      }),
+    })
+    const [prop] = await db.select().from(schema.props).where(eq(schema.props.id, 5))
+    const propResult = await ensurePropFinalPrompt(prop, 2)
+
+    process.stdout.write('@@' + JSON.stringify({
+      initialSuccess,
+      correctionSuccess,
+      correctionFailure,
+      upstreamError,
+      exhaustedBudget,
+      scene: { result: sceneResult, turns: sceneTurns },
+      prop: { result: propResult, turns: propTurns },
+    }))
+  `)
+
+  assert.equal(result.initialSuccess.outcome.outcome, 'regenerated')
+  assert.equal(result.initialSuccess.calls, 1)
+
+  assert.equal(result.correctionSuccess.outcome.outcome, 'regenerated')
+  assert.equal(result.correctionSuccess.outcome.prompt, '纠正保存')
+  assert.equal(result.correctionSuccess.calls, 2)
+  assert.deepEqual(result.correctionSuccess.budgets, [12, 11])
+  assert.deepEqual(result.correctionSuccess.roles, ['user', 'assistant', 'user'])
+  assert.match(result.correctionSuccess.correction, /HTTP 400/)
+  assert.match(result.correctionSuccess.correction, /readCharacters/)
+  assert.match(result.correctionSuccess.correction, /saveCharacterFinalPrompt/)
+  assert.match(result.correctionSuccess.correction, /唯一一次纠正 user turn/)
+  assert.match(result.correctionSuccess.correction, /characters\.final_prompt/)
+  assert.match(result.correctionSuccess.correction, /可识别工具结果=\[none\]/)
+  assert.match(result.correctionSuccess.correction, /postcondition=empty/)
+  assert.match(result.correctionSuccess.correction, /DSML\/XML\/JSON/)
+
+  assert.equal(result.correctionFailure.outcome.outcome, 'failed')
+  assert.equal(result.correctionFailure.calls, 2)
+  assert.equal(result.upstreamError.outcome.outcome, 'failed')
+  assert.equal(result.upstreamError.calls, 1)
+  assert.equal(result.exhaustedBudget.outcome.outcome, 'failed')
+  assert.deepEqual(result.exhaustedBudget.budgets, [12])
+
+  assert.deepEqual(result.scene, {
+    result: { prompt: '午后客厅空镜', outcome: 'regenerated' },
+    turns: 2,
+  })
+  assert.deepEqual(result.prop, {
+    result: { prompt: '白底黑色遥控器', outcome: 'regenerated' },
+    turns: 2,
+  })
+})
 /**
  * 事实表版本也是失效来源（Issue #56 验收 14）。
  * 纯函数用例：字段没动、只有 `asset_spec` 出了新版本时，来源必须被判为 `spec_version`。
