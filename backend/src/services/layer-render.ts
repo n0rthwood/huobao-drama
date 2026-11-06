@@ -11,8 +11,8 @@ import sharp from 'sharp'
 import { v4 as uuid } from 'uuid'
 import { DATA_ROOT, STORAGE_ROOT } from '../utils/paths.js'
 import { getAbsolutePath } from '../utils/storage.js'
-import type { LayerDoc } from './layer-doc.js'
-import { baseFilterLayers, layerDocToSvg } from './layer-svg.js'
+import type { LayerDoc, LayerVariables } from './layer-doc.js'
+import { baseFilterLayers, layerDocToSvg, resolvedText } from './layer-svg.js'
 import { assertRenderableText, ensureLayerFonts } from './layer-fonts.js'
 import { cropRectOf } from './layer-quality.js'
 
@@ -20,6 +20,10 @@ export interface LayerRenderOptions {
   width?: number
   height?: number
   visibleIds?: string[]
+  /** Poster 固定文本变量（Issue #72）：变量层按剧集数据现场解析 */
+  variables?: LayerVariables
+  /** 只输出透明叠加层 PNG（Poster 的 layers 二次生成用），不要求底图 */
+  transparent?: boolean
 }
 
 export interface LayerRenderResult {
@@ -54,11 +58,11 @@ function resolveLocalImage(relativePath: string, what: string): string {
   return absolute
 }
 
-function collectTexts(doc: LayerDoc): string[] {
+function collectTexts(doc: LayerDoc, variables?: LayerVariables): string[] {
   const texts: string[] = []
   for (const layer of doc.layers) {
     if (!layer.visible) continue
-    if (layer.type === 'label' || layer.type === 'marker') texts.push(layer.text)
+    if (layer.type === 'label' || layer.type === 'marker') texts.push(resolvedText(layer, variables))
     if (layer.type === 'card') texts.push(layer.fields.title, layer.fields.sub, layer.fields.meta, layer.fields.years)
   }
   return texts.filter(Boolean)
@@ -71,10 +75,27 @@ function collectTexts(doc: LayerDoc): string[] {
 export async function renderLayerDoc(doc: LayerDoc, options: LayerRenderOptions = {}): Promise<LayerRenderResult> {
   const started = Date.now()
   await ensureLayerFonts()
-  assertRenderableText(collectTexts(doc))
+  assertRenderableText(collectTexts(doc, options.variables))
 
   const width = Math.max(16, Math.min(8192, Math.trunc(options.width || doc.base.width)))
   const height = Math.max(16, Math.min(8192, Math.trunc(options.height || doc.base.height)))
+  if (options.transparent) {
+    const inlined: Record<string, string> = {}
+    const svg = layerDocToSvg(doc, { width, height }, {
+      visibleIds: options.visibleIds,
+      variables: options.variables,
+      resolveImage: (relativePath: string) => {
+        if (!inlined[relativePath]) {
+          const absolute = resolveLocalImage(relativePath, '图片图层')
+          const mime = MIME_BY_EXT[path.extname(absolute).toLowerCase()] || 'image/png'
+          inlined[relativePath] = `data:${mime};base64,${fs.readFileSync(absolute).toString('base64')}`
+        }
+        return inlined[relativePath]
+      },
+    })
+    const buffer = await sharp(Buffer.from(svg)).png().toBuffer()
+    return { buffer, width, height, ms: Date.now() - started }
+  }
   if (!doc.base.path) throw new Error('图层文档缺少底图路径 base.path')
   const basePath = resolveLocalImage(doc.base.path, '底图')
   const metadata = doc.base.crop ? await sharp(basePath).metadata() : null
@@ -85,6 +106,7 @@ export async function renderLayerDoc(doc: LayerDoc, options: LayerRenderOptions 
   const inlined: Record<string, string> = {}
   const svg = layerDocToSvg(renderDoc, { width, height }, {
     visibleIds: options.visibleIds,
+    variables: options.variables,
     resolveImage: (relativePath: string) => {
       if (!inlined[relativePath]) {
         const absolute = resolveLocalImage(relativePath, '图片图层')

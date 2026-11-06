@@ -24,8 +24,17 @@ export type LayerType = (typeof LAYER_TYPES)[number]
 export const CARD_TEMPLATES = ['name', 'year', 'chapter'] as const
 export type CardTemplate = (typeof CARD_TEMPLATES)[number]
 
-export const LAYER_FONTS = ['sans', 'serif'] as const
+export const LAYER_FONTS = ['sans', 'serif', 'kai', 'hand'] as const
 export type LayerFont = (typeof LAYER_FONTS)[number]
+
+/** Poster 固定文本变量（Issue #72）：变量层文本只读，渲染时按剧集数据现场解析。 */
+export const LAYER_VARIABLES = ['project_title', 'episode_title', 'episode_no'] as const
+export type LayerVariable = (typeof LAYER_VARIABLES)[number]
+export interface LayerVariables {
+  project_title: string
+  episode_title: string
+  episode_no: string
+}
 
 export const LAYER_ALIGNS = ['left', 'center', 'right'] as const
 export const LAYER_DASHES = ['none', 'dash', 'dot'] as const
@@ -93,6 +102,8 @@ export interface LabelLayer extends LayerBase {
   type: 'label'
   box: LayerBox
   text: string
+  /** 固定文本绑定（Issue #72）：有值时渲染用变量值，`text` 仅作占位/显示快照 */
+  variable?: LayerVariable
   style: LayerStyle
 }
 export interface CardLayer extends LayerBase {
@@ -272,9 +283,12 @@ const STYLE_FIELDS: Record<LayerType, Record<string, z.ZodTypeAny>> = {
     bg_opacity: num(0, 1, 0),
     align: enumWith(LAYER_ALIGNS, 'left'),
     bold: bool(false),
+    italic: bool(false),
+    shadow: bool(false),
   },
   card: {
     font: enumWith(LAYER_FONTS, 'sans'),
+    scale: num(0.4, 2.5, 1),
     bg: trimmedText(COLOR_MAX),
     bg_opacity: num(0, 1, 0.82),
     color: trimmedText(COLOR_MAX),
@@ -347,7 +361,12 @@ function normalizeLayer(raw: unknown, index: number): Layer | null {
   }
   const box = boxSchema.parse(source.box) as LayerBox
   if (type === 'label') {
-    return { ...base, type, box, text: text(TEXT_MAX).parse(source.text), style }
+    const variable = typeof source.variable === 'string' && (LAYER_VARIABLES as readonly string[]).includes(source.variable)
+      ? source.variable as LayerVariable
+      : undefined
+    const label: LabelLayer = { ...base, type, box, text: text(TEXT_MAX).parse(source.text), style }
+    if (variable) label.variable = variable
+    return label
   }
   if (type === 'card') {
     const fields = source.fields && typeof source.fields === 'object' ? (source.fields as Record<string, unknown>) : {}

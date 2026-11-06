@@ -95,6 +95,17 @@ const script = `
   const file = await renderLayerDocToFile(doc)
   out.file = { url: file.url, exists: fs.existsSync(path.join(dataDir, file.url)) }
 
+  // Poster layers 二次生成：透明叠加层不要求底图，背景 alpha=0、文字有像素
+  const overlay = await renderLayerDoc(normalizeLayerDoc({
+    base: { path: '', width: 400, height: 200 },
+    layers: [{
+      type: 'label', variable: 'project_title',
+      box: { x: 0.1, y: 0.3, w: 0.8, h: 0.3 }, style: { size: 0.25, align: 'center' },
+    }],
+  }), { transparent: true, width: 400, height: 200, variables: { project_title: '历史纵横', episode_title: '', episode_no: '' } })
+  const overlayAt = await probe(overlay.buffer)
+  out.transparent = { alpha: overlayAt(2, 2)[3], text_alpha: overlayAt(200, 100)[3], has_alpha: (await sharp(overlay.buffer).metadata()).hasAlpha }
+
   // 打包字体覆盖不到的字符必须阻断
   try {
     await renderLayerDoc(normalizeLayerDoc({
@@ -228,7 +239,7 @@ const out = execFileSync('node', ['--import', 'tsx', '--input-type=module', '--e
 const result = JSON.parse(out.slice(out.lastIndexOf('@@') + 2))
 
 test('字体自检通过并指向仓库内打包字体', () => {
-  assert.equal(result.fonts.files.length, 4)
+  assert.equal(result.fonts.files.length, 7)
   assert.match(result.fonts.font_dir, /backend\/assets\/fonts$/)
   assert.match(result.fonts.config_path, /fontconfig\/layer-fonts\.conf$/)
 })
@@ -288,6 +299,9 @@ test('风格化是纯 alpha 合成：像素值与手算一致（编辑器用同�
 test('render-to-file 落盘到 static/overlays 并返回相对地址', () => {
   assert.match(result.file.url, /^static\/overlays\/[0-9a-f-]+\.png$/)
   assert.equal(result.file.exists, true)
+  assert.equal(result.transparent.has_alpha, true)
+  assert.equal(result.transparent.alpha, 0)
+  assert.ok(result.transparent.text_alpha > 0, '透明叠加层文字必须有像素')
 })
 
 test('打包字体覆盖不到的字符阻断渲染（不输出豆腐块）', () => {

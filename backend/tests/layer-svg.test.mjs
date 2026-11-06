@@ -23,9 +23,9 @@ function backend(payload) {
         const doc = normalizeLayerDoc(item.doc)
         return {
           doc,
-          svg: layerDocToSvg(doc, item.size, { resolveImage, visibleIds: item.visible_ids }),
+          svg: layerDocToSvg(doc, item.size, { resolveImage, visibleIds: item.visible_ids, variables: item.variables }),
           filters: baseFilterLayers(doc.base.filter, item.size),
-          bounds: doc.layers.map(layer => layerBounds(layer, doc.theme, item.size.width / item.size.height)),
+          bounds: doc.layers.map(layer => layerBounds(layer, doc.theme, item.size.width / item.size.height, item.variables)),
         }
       }),
       wraps: input.wraps.map(([text, limit]) => wrapTextEm(text, limit)),
@@ -106,6 +106,26 @@ const CASES = [
     size: { width: 960, height: 544 },
   },
   {
+    name: 'Poster 固定变量 + 斜体/阴影 + kai/hand 打包字体',
+    doc: {
+      base: { path: 'static/uploads/map.png', width: 1344, height: 768 },
+      theme: 'archival',
+      layers: [
+        {
+          id: 'project', type: 'label', name: '项目名', box: { x: 0.1, y: 0.06, w: 0.8, h: 0.12 },
+          text: '旧文本会被变量覆盖', variable: 'project_title',
+          style: { font: 'kai', size: 0.08, align: 'center', bold: true, italic: true, shadow: true, stroke: '#f4ecd8', stroke_width: 0.004 },
+        },
+        {
+          id: 'episode', type: 'label', name: '集数', box: { x: 0.1, y: 0.88, w: 0.8, h: 0.08 },
+          variable: 'episode_no', style: { font: 'hand', size: 0.05, align: 'right' },
+        },
+      ],
+    },
+    size: { width: 1344, height: 768 },
+    variables: { project_title: '历史纵横', episode_title: '漕运', episode_no: 'EP01' },
+  },
+  {
     name: '隐藏与锁定图层不出现在 SVG 里',
     doc: {
       base: { path: 'static/uploads/map.png', width: 800, height: 450 },
@@ -139,16 +159,16 @@ const WRAPS = [
 const WIDTHS = ['斋桑湖', 'Irtysh', '1720 年', '']
 const UNSUPPORTED = ['额尔齐斯河 Irtysh 1720', '𠀋 rare', '\uE000盒']
 
-const result = backend({ cases: CASES.map(({ doc, size, visible_ids }) => ({ doc, size, visible_ids })), wraps: WRAPS, widths: WIDTHS, unsupported: UNSUPPORTED })
+const result = backend({ cases: CASES.map(({ doc, size, visible_ids, variables }) => ({ doc, size, visible_ids, variables })), wraps: WRAPS, widths: WIDTHS, unsupported: UNSUPPORTED })
 
 CASES.forEach((item, index) => {
   test(`layerDocToSvg 前后端逐例一致：${item.name}`, () => {
     const { doc, svg, filters, bounds } = result.cases[index]
-    const frontSvg = front.layerDocToSvg(doc, item.size, { resolveImage, visibleIds: item.visible_ids })
+    const frontSvg = front.layerDocToSvg(doc, item.size, { resolveImage, visibleIds: item.visible_ids, variables: item.variables })
     assert.equal(frontSvg, svg)
     assert.deepEqual(front.baseFilterLayers(doc.base.filter, item.size), filters)
     const aspect = item.size.width / item.size.height
-    assert.deepEqual(doc.layers.map(layer => front.layerBounds(layer, doc.theme, aspect)), bounds)
+    assert.deepEqual(doc.layers.map(layer => front.layerBounds(layer, doc.theme, aspect, item.variables)), bounds)
   })
 })
 
@@ -162,9 +182,10 @@ test('SVG 结构：根节点尺寸、图层分组、defs 只在需要时出现',
   assert.ok(svg.includes('transform="rotate(-4'), '旋转写在图层分组上')
   assert.ok(svg.includes('opacity="0.9"'), '透明度写在图层分组上')
   assert.ok(svg.includes('href="RES:static/uploads/portrait.png"'), '图片 href 走 resolveImage')
-  assert.ok(!result.cases[4].svg.includes('隐藏'), '不可见图层不渲染')
-  assert.ok(result.cases[4].svg.includes('可见'), '锁定图层照常渲染')
-  assert.ok(!result.cases[4].svg.includes('<defs>'), '没有图片/阴影时不输出空 defs')
+  const hidden = result.cases[CASES.findIndex(item => item.name.startsWith('隐藏与锁定'))]
+  assert.ok(!hidden.svg.includes('隐藏'), '不可见图层不渲染')
+  assert.ok(hidden.svg.includes('可见'), '锁定图层照常渲染')
+  assert.ok(!hidden.svg.includes('<defs>'), '没有图片/阴影时不输出空 defs')
 })
 
 test('SVG 结构：只渲染 visibleIds 指定的图层', () => {
@@ -221,9 +242,23 @@ test('打包字体未覆盖的字符会被标出（渲染前阻断的依据）',
 })
 
 test('R6 default crop SVG and explicit whole-image SVG never double-extract', () => {
-  const { doc, svg } = result.cases[5]
+  const { doc, svg } = result.cases[CASES.findIndex(item => item.name.startsWith('R6 crop'))]
   assert.match(svg, /viewBox="0 375 4000 2250" preserveAspectRatio="none"/)
   const full = front.layerDocToSvg(doc, { width: 4000, height: 3000 }, { viewport: { x: 0, y: 0, w: 1, h: 1 } })
   assert.match(full, /viewBox="0 0 4000 3000"/)
   assert.match(full, /<circle cx="2000" cy="1500"/, 'marker remains at original whole-image location')
+})
+
+
+test('Poster 变量层：文本按变量解析、字体四族、斜体 skew 与阴影 filter 两端一致', () => {
+  const item = CASES.find(c => c.name.startsWith('Poster 固定变量'))
+  const index = CASES.indexOf(item)
+  const svg = result.cases[index].svg
+  assert.ok(svg.includes('历史纵横'), '项目名变量按值渲染')
+  assert.ok(svg.includes('EP01'), '集数变量按值渲染')
+  assert.ok(!svg.includes('旧文本会被变量覆盖'), '变量层不使用占位文本')
+  assert.ok(svg.includes("font-family=\"'LXGW WenKai', serif\""), 'kai 使用打包的 LXGW WenKai')
+  assert.ok(svg.includes("font-family=\"'Ma Shan Zheng', sans-serif\""), 'hand 使用打包的 Ma Shan Zheng')
+  assert.ok(svg.includes('skewX(-12)'), '斜体用绕基线 skewX 合成')
+  assert.ok(svg.includes('<feDropShadow'), '阴影用 SVG filter')
 })
