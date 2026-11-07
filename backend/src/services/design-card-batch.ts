@@ -57,7 +57,7 @@ export async function startDesignCardBatch(
   opts: { model?: string; configId?: number; retryOf?: number } = {},
   storyboardIds?: number[],
 ): Promise<DesignCardBatchStart> {
-  if (await findActiveTextTask(episodeId, 'design_card')) return { started: false, total: -1 }
+  if (await findActiveTextTask(episodeId, 'design_card', opts.retryOf)) return { started: false, total: -1 }
   const documentary = resolveDramaProjectType(dramaId) === 'documentary'
   // 设计卡是按**实测配音时长**填的（#70）：骨架必须已确认，逐镜必须有当前有效配音。
   // 剧情项目没有这条链路，行为与改动前逐字相同。

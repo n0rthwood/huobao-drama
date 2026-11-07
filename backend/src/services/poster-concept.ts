@@ -545,7 +545,7 @@ export async function startPosterConcept(
 ): Promise<StartPosterConceptResult> {
   const context = await loadPosterContext(episodeId)
   const poster = await ensurePosterRow(context)
-  if (await findActiveTextTask(episodeId, 'poster_concept')) return { started: false, reason: 'running' }
+  if (await findActiveTextTask(episodeId, 'poster_concept', opts.retryOf)) return { started: false, reason: 'running' }
   const script = stripProvenanceBlock(context.episode.scriptContent)
   if (!script) return { started: false, reason: 'empty_script' }
   const assets = await loadConceptAssets(episodeId)

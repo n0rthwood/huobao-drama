@@ -282,7 +282,7 @@ export async function startPortraitAppearance(
 
   const portraits = await listArchivalImages(characterId)
   if (!portraits.length) return { started: false, reason: 'no_portrait', vision: { used: false }, portraits: 0 }
-  if (await findActiveTextTask(episodeId, 'portrait_appearance')) {
+  if (await findActiveTextTask(episodeId, 'portrait_appearance', opts.retryOf)) {
     return { started: false, reason: 'running', vision: { used: false }, portraits: portraits.length }
   }
 

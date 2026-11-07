@@ -24,6 +24,7 @@ import { runAgent, type AgentRunOutput } from '../agents/run.js'
 import { logTaskError, logTaskProgress } from '../utils/task-logger.js'
 import { sceneFinalPromptCoversTime } from './scene-time.js'
 import { resolveStageModel } from './ai-stages.js'
+import { isFirstAgentFailureSafe } from './text-task-context.js'
 
 type CharacterRow = typeof schema.characters.$inferSelect
 type SceneRow = typeof schema.scenes.$inferSelect
@@ -52,7 +53,7 @@ interface PromptRecoverySpec {
 }
 
 /** 顶栏选择的文本模型/配置覆盖（不传则跟随 Agent 与文本配置默认） */
-export interface PromptAgentOptions { model?: string; configId?: number }
+export interface PromptAgentOptions { model?: string; configId?: number; excludeConfigIds?: number[] }
 
 const PROMPT_AGENT_MAX_STEPS = 12
 const MIN_CORRECTION_STEPS = 2
@@ -226,6 +227,7 @@ export async function ensureCharacterFinalPrompt(char: CharacterRow, episodeId: 
     })
     return promptOutcome('character', char.id, char.finalPrompt, snapshot.prompt, force)
   } catch (err: unknown) {
+    if (isFirstAgentFailureSafe(err)) throw err
     logTaskError('FinalPrompt', 'character-generate', { characterId: char.id, error: err instanceof Error ? err.message : String(err) })
     return FAILED_PROMPT
   }
@@ -270,6 +272,7 @@ export async function ensureSceneFinalPrompt(scene: SceneRow, episodeId: number,
     }
     return result
   } catch (err: unknown) {
+    if (isFirstAgentFailureSafe(err)) throw err
     logTaskError('FinalPrompt', 'scene-generate', { sceneId: scene.id, error: err instanceof Error ? err.message : String(err) })
     return FAILED_PROMPT
   }
@@ -306,6 +309,7 @@ export async function ensurePropFinalPrompt(prop: PropRow, episodeId: number, fo
     })
     return promptOutcome('prop', prop.id, prop.finalPrompt, snapshot.prompt, force)
   } catch (err: unknown) {
+    if (isFirstAgentFailureSafe(err)) throw err
     logTaskError('FinalPrompt', 'prop-generate', { propId: prop.id, error: err instanceof Error ? err.message : String(err) })
     return FAILED_PROMPT
   }

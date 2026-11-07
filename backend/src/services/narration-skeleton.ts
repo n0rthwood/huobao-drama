@@ -556,8 +556,8 @@ export async function startSkeletonGeneration(
   await assertGate(episodeId, 'design')
   const script = (ep.scriptContent || ep.content || '').trim()
   if (!script) return { started: false, reason: 'script_missing' }
-  if (await findActiveTextTask(episodeId, 'storyboard_breaker')
-    || await findActiveTextTask(episodeId, 'storyboard_fill_gaps')) {
+  if (await findActiveTextTask(episodeId, 'storyboard_breaker', opts.retryOf)
+    || await findActiveTextTask(episodeId, 'storyboard_fill_gaps', opts.retryOf)) {
     return { started: false, reason: 'running' }
   }
 

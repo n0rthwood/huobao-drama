@@ -113,7 +113,7 @@ export async function startNarrationScript(
   opts: { model?: string; configId?: number; retryOf?: number } = {},
   storyboardIds?: number[],
 ): Promise<{ started: boolean; total: number }> {
-  if (await findActiveTextTask(episodeId, 'narration_script')) return { started: false, total: -1 }
+  if (await findActiveTextTask(episodeId, 'narration_script', opts.retryOf)) return { started: false, total: -1 }
 
   const rows = (await db.select().from(schema.storyboards)
     .where(eq(schema.storyboards.episodeId, episodeId))

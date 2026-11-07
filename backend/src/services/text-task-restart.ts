@@ -36,7 +36,7 @@ const argsSchema = z.object({
     absPath: z.string(), sourceTaskId: z.number().nullable(), configId: z.number().optional(), excludeConfigIds: z.array(z.number()).optional() }).optional(),
   req: z.object({ scope: z.enum(['characters', 'scenes', 'props', 'all']), episodeId: z.number(),
     rewritePrompts: z.boolean(), overwriteImages: z.boolean(), textModel: z.string().optional(),
-    textConfigId: z.number().optional(), imageModel: z.string().optional(), imageConfigId: z.number().optional() }).optional(),
+    textConfigId: z.number().optional(), excludeTextConfigIds: z.array(z.number()).optional(), imageModel: z.string().optional(), imageConfigId: z.number().optional() }).optional(),
 })
 
 /** Dispatch persisted inputs through the same validation and entry points as a new task. */
@@ -70,7 +70,7 @@ export async function dispatchTextTaskRestart(restart: TextTaskRestart, retryOf:
     case 'script_rewrite': result = await startRewriteRun(episodeId(), opts); break
     case 'portrait_appearance': result = await startPortraitAppearance(z.number().parse(a.characterId), { ...opts, episodeId: z.number().parse(a.opts?.episodeId) }); break
     case 'asset_semantics': result = await startSemanticsAuto({ ...argsSchema.shape.input.unwrap().parse(a.input), retryOf, excludeConfigIds: opts.excludeConfigIds }); break
-    case 'asset_batch': result = await startAssetBatch(dramaId(), argsSchema.shape.req.unwrap().parse(a.req), retryOf); break
+    case 'asset_batch': result = await startAssetBatch(dramaId(), { ...argsSchema.shape.req.unwrap().parse(a.req), excludeTextConfigIds: opts.excludeConfigIds ?? a.req?.excludeTextConfigIds }, retryOf); break
     default: throw new Error(`不支持恢复任务类型：${restart.kind}`)
   }
   if (result === false || (typeof result === 'object' && result !== null && 'started' in result && result.started === false)) throw new Error('任务恢复未启动')
@@ -88,9 +88,7 @@ export async function requeueFirstModelFailure(taskId: number, error: unknown, s
   if (!parsed.success) return false
   const { opts, input, req } = parsed.data
   if (opts?.configId != null || opts?.model || input?.configId != null || req?.textConfigId != null || req?.textModel) return false
-  const attempts = z.array(z.object({ config_id: z.number(), error_class: z.string().nullable() })).safeParse(params.attempts)
-  const failedAttempt = attempts.success ? attempts.data.findLast(attempt => attempt.error_class !== null) : undefined
-  const failedConfig = failedAttempt?.config_id ?? params.model_used?.config_id ?? params.configId
+  const failedConfig = params.model_used?.config_id ?? params.configId
   if (!failedConfig) return false
   await patchTextTaskParams(taskId, { requeued: true, auto_retry: 1 })
   try {
@@ -107,9 +105,19 @@ export async function resumeQueuedTextTasks(dispatch = dispatchTextTaskRestart):
   const rows = await db.select().from(schema.sysTask).where(and(
     eq(schema.sysTask.type, 'text'), eq(schema.sysTask.status, 'queued'),
   )).orderBy(asc(schema.sysTask.id))
+  // A crash may occur after the replacement is inserted but before its parent is cancelled.
+  // Existing retry_of links make that window idempotent, even if the child already completed.
+  const known = await db.select({ id: schema.sysTask.id, params: schema.sysTask.params })
+    .from(schema.sysTask).where(eq(schema.sysTask.type, 'text'))
   for (const row of rows) {
     const params = parseTextTaskParams(row.params)
     const restart = params?.restart as TextTaskRestart | undefined
+    const replacementExists = known.some(candidate => candidate.id > row.id && parseTextTaskParams(candidate.params)?.retry_of === row.id)
+    if (replacementExists) {
+      await db.update(schema.sysTask).set({ status: 'cancelled', errorMsg: '后端重启，已重新排队', updatedAt: now() })
+        .where(and(eq(schema.sysTask.id, row.id), eq(schema.sysTask.status, 'queued')))
+      continue
+    }
     if (params?.kind === 'asset_batch') {
       const batch = z.object({ items: z.array(z.object({ task_id: z.number().nullable().optional(), state: z.string() })) }).safeParse(params.asset_batch)
       if (batch.success && batch.data.items.some(item => item.task_id != null || item.state === 'submitted')) {
@@ -118,11 +126,15 @@ export async function resumeQueuedTextTasks(dispatch = dispatchTextTaskRestart):
         continue
       }
     }
-    await db.update(schema.sysTask).set({ status: 'cancelled', errorMsg: restart ? '后端重启，已重新排队' : '后端重启，无法恢复该任务', updatedAt: now() })
-      .where(and(eq(schema.sysTask.id, row.id), eq(schema.sysTask.status, 'queued')))
-    if (!restart) continue
+    if (!restart) {
+      await db.update(schema.sysTask).set({ status: 'cancelled', errorMsg: '后端重启，无法恢复该任务', updatedAt: now() })
+        .where(and(eq(schema.sysTask.id, row.id), eq(schema.sysTask.status, 'queued')))
+      continue
+    }
     try {
       await dispatch(restart, row.id)
+      await db.update(schema.sysTask).set({ status: 'cancelled', errorMsg: '后端重启，已重新排队', updatedAt: now() })
+        .where(and(eq(schema.sysTask.id, row.id), eq(schema.sysTask.status, 'queued')))
     } catch (err) {
       await db.update(schema.sysTask).set({ status: 'failed', errorMsg: `恢复失败：${err instanceof Error ? err.message : String(err)}`, updatedAt: now() })
         .where(eq(schema.sysTask.id, row.id))

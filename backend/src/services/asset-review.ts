@@ -690,7 +690,7 @@ export async function startAssetReview(
   if (resolveDramaProjectType(ep.dramaId) !== 'documentary') {
     return { started: false, reason: 'not_documentary' }
   }
-  if (await findActiveTextTask(episodeId, 'asset_review')) return { started: false, reason: 'running' }
+  if (await findActiveTextTask(episodeId, 'asset_review', opts.retryOf)) return { started: false, reason: 'running' }
 
   const { texts, auto } = splitNarrationSegments(ep.scriptContent || ep.content)
   if (!texts.length) return { started: false, reason: 'empty_script' }

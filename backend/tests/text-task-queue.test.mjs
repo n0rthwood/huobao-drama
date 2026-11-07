@@ -131,7 +131,7 @@ test('only a safe first model failure requeues once on another endpoint', () => 
   assert.equal(next.params.auto_retry, 1)
 })
 
-test('attempt history records actual endpoint attribution', () => {
+test('actual endpoint attribution updates the task model', () => {
   const result = isolated(`
     import { db, schema } from './src/db/index.ts'
     import { createTextTask, recordTextTaskAttempt } from './src/services/text-task.ts'
@@ -143,7 +143,7 @@ test('attempt history records actual endpoint attribution', () => {
   `)
   assert.equal(result.provider, 'openai')
   assert.equal(result.model, 'second')
-  assert.deepEqual(result.params.attempts.map(item => item.config_id), [1, 2])
+  assert.equal('attempts' in result.params, false)
   assert.equal(result.params.model_used.config_id, 2)
 })
 
@@ -164,4 +164,21 @@ test('first-call requeue leaves an explicitly pinned configuration alone', () =>
     console.log('@@'+JSON.stringify({started,count:rows.length}))
   `)
   assert.deepEqual(result, {started:false,count:1})
+})
+
+test('recovery does not recreate a parent when its replacement already exists', () => {
+  const result = isolated(`
+    import { db, schema } from './src/db/index.ts'
+    import { createTextTask } from './src/services/text-task.ts'
+    import { resumeQueuedTextTasks } from './src/services/text-task-restart.ts'
+    const parent = await createTextTask({kind:'asset_review',episodeId:1,queued:true,restart:{kind:'asset_review',args:{episodeId:1}}})
+    const child = await createTextTask({kind:'asset_review',episodeId:1,queued:true,retryOf:parent})
+    const calls = []
+    await resumeQueuedTextTasks(async (restart,id) => { calls.push(id) })
+    const rows = await db.select().from(schema.sysTask)
+    console.log('@@'+JSON.stringify({parent,child,calls,rows:rows.map(r=>({id:r.id,status:r.status}))}))
+  `)
+  assert.deepEqual(result.calls, [])
+  assert.equal(result.rows.find(row => row.id === result.parent).status, 'cancelled')
+  assert.equal(result.rows.find(row => row.id === result.child).status, 'cancelled')
 })

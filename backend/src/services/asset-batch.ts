@@ -1,4 +1,5 @@
-import { runWithTextTask } from './text-task-context.js'
+import { isFirstAgentFailureSafe, runWithTextTask } from './text-task-context.js'
+import { requeueFirstModelFailure } from './text-task-restart.js'
 
 /**
  * 资产批量生成（Issue #33）—— 角色 / 场景 / 道具 / 全部资产四个入口共用一条流水线。
@@ -124,6 +125,7 @@ export interface AssetBatchRequest {
   overwriteImages: boolean
   textModel?: string
   textConfigId?: number
+  excludeTextConfigIds?: number[]
   imageModel?: string
   imageConfigId?: number
 }
@@ -321,13 +323,13 @@ async function persist(taskId: number, batch: AssetBatchParams): Promise<void> {
   })
 }
 
-async function findActiveAssetBatchRow(dramaId: number): Promise<SysTaskRow | null> {
+async function findActiveAssetBatchRow(dramaId: number, excludeId?: number): Promise<SysTaskRow | null> {
   const rows = await db.select().from(schema.sysTask).where(and(
     eq(schema.sysTask.type, 'text'),
     eq(schema.sysTask.dramaId, dramaId),
     inArray(schema.sysTask.status, ACTIVE_TASK_STATUSES),
   ))
-  return rows.find(r => !!assetBatchParamsOf(r)) ?? null
+  return rows.find(r => r.id !== excludeId && !!assetBatchParamsOf(r)) ?? null
 }
 
 async function findLatestAssetBatchRow(dramaId: number): Promise<SysTaskRow | null> {
@@ -368,7 +370,7 @@ async function submitImage(asset: LoadedAsset, prompt: string, episodeId: number
 }
 
 async function ensurePrompt(asset: LoadedAsset, episodeId: number, req: AssetBatchRequest): Promise<FinalPromptResult> {
-  const opts = { model: req.textModel, configId: req.textConfigId }
+  const opts = { model: req.textModel, configId: req.textConfigId, excludeConfigIds: req.excludeTextConfigIds }
   if (asset.kind === 'character') {
     const [row] = await db.select().from(schema.characters).where(eq(schema.characters.id, asset.id))
     if (!row) return { prompt: '', outcome: 'failed' }
@@ -452,8 +454,11 @@ async function reconcileSubmitted(ctx: RunContext): Promise<void> {
 /** 文本侧有界并发池：K 个 worker 共享游标，每人「跑提示词 → 立刻提交自己的图」 */
 async function runPromptPool(ctx: RunContext, queue: LoadedAsset[]): Promise<void> {
   let cursor = 0
+  let failure: unknown
+  let stopped = false
   const worker = async (): Promise<void> => {
     for (;;) {
+      if (stopped) return
       if (cancelled(ctx)) return
       const asset = queue[cursor++]
       if (!asset) return
@@ -461,7 +466,14 @@ async function runPromptPool(ctx: RunContext, queue: LoadedAsset[]): Promise<voi
       const item = ctx.batch.items.find(i => i.kind === asset.kind && i.asset_id === asset.id)!
       item.state = 'prompting'
       await persist(ctx.taskId, ctx.batch)
-      const result = await ensurePrompt(asset, ctx.episodeId, ctx.req)
+      let result: FinalPromptResult
+      try {
+        result = await ensurePrompt(asset, ctx.episodeId, ctx.req)
+      } catch (err) {
+        stopped = true
+        failure = err
+        return
+      }
       item.prompt_outcome = result.outcome
       if (!shouldSubmitImage(result.outcome)) {
         item.state = 'failed'
@@ -470,11 +482,13 @@ async function runPromptPool(ctx: RunContext, queue: LoadedAsset[]): Promise<voi
         await persist(ctx.taskId, ctx.batch)
         continue
       }
+      if (stopped) return
       await dispatchImage(ctx, asset, result.prompt)
     }
   }
   const workers = Math.min(ASSET_PROMPT_CONCURRENCY, Math.max(1, queue.length))
   await Promise.all(Array.from({ length: workers }, worker))
+  if (stopped) throw failure
 }
 
 /**
@@ -542,6 +556,8 @@ async function runBatch(ctx: RunContext): Promise<void> {
     logTaskError('AssetBatch', 'batch crashed', { batch: ctx.taskId, error: message })
     await persist(ctx.taskId, ctx.batch).catch(() => {})
     await finish(ctx.taskId, 'failed', message)
+    const noOutput = ctx.batch.items.every(item => item.task_id == null && item.prompt_outcome == null)
+    await requeueFirstModelFailure(ctx.taskId, err, noOutput && isFirstAgentFailureSafe(err))
   }
 }
 
@@ -551,7 +567,7 @@ export async function startAssetBatch(dramaId: number, req: AssetBatchRequest, r
   const [episode] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, req.episodeId))
   if (!episode || episode.dramaId !== dramaId) throw new Error('剧集不存在或不属于该项目')
   // 同一项目同时只允许一个活跃资产批量（Q8）
-  if (await findActiveAssetBatchRow(dramaId)) throw new Error('该项目已有资产批量在运行，请等待或先停止')
+  if (await findActiveAssetBatchRow(dramaId, retryOf)) throw new Error('该项目已有资产批量在运行，请等待或先停止')
 
   const opts: AssetBatchOptions = { rewritePrompts: req.rewritePrompts, overwriteImages: req.overwriteImages }
   const assets = await loadScopeAssets(dramaId, req.scope)
@@ -576,7 +592,7 @@ export async function startAssetBatch(dramaId: number, req: AssetBatchRequest, r
   const counts = countItems(items)
   const pending = items.filter(i => i.state === 'pending').length
   // 父任务也记环节（#51）：实际提示词改写由 final-prompt.ts 按同一环节解析
-  const stageModel = await resolveStageModel('final_prompt', { model: req.textModel, configId: req.textConfigId })
+  const stageModel = await resolveStageModel('final_prompt', { model: req.textModel, configId: req.textConfigId, excludeConfigIds: req.excludeTextConfigIds })
   const taskId = await createTextTask({
     kind: 'asset_batch',
     episodeId: req.episodeId,

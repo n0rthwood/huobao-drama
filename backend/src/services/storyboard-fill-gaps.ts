@@ -304,8 +304,8 @@ export async function startFillGapsTask(
   if (resolveDramaProjectType(dramaId) !== 'documentary') {
     return { started: false, gaps: 0, reason: 'not_documentary' }
   }
-  if (await findActiveTextTask(episodeId, 'storyboard_fill_gaps')
-    || await findActiveTextTask(episodeId, 'storyboard_breaker')) {
+  if (await findActiveTextTask(episodeId, 'storyboard_fill_gaps', opts.retryOf)
+    || await findActiveTextTask(episodeId, 'storyboard_breaker', opts.retryOf)) {
     return { started: false, gaps: 0, reason: 'running' }
   }
 
