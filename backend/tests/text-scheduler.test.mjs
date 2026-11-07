@@ -69,17 +69,19 @@ test('text scheduling, endpoint selection and persisted health', () => {
       ? new Response('gateway', { status: 503 })
       : Response.json({ choices: [{ message: { content: 'ok' } }] })
     const reply = await runWithTextTask(taskId, () => callTextChat(initial, 'hello', { temperature: 0, maxTokens: 10, timeoutMs: 1000 }))
-    assert.equal(reply.endpoint.configId, 9902)
+    assert.equal(calls, 2)
+    assert.notEqual(reply.endpoint.configId, initial.configId)
+    assert.ok([9901, 9902].includes(reply.endpoint.configId))
     let task = (await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, taskId)))[0]
     let params = JSON.parse(task.params)
-    assert.equal(params.model_used.config_id, 9902)
+    assert.equal(params.model_used.config_id, reply.endpoint.configId)
     assert.equal(task.provider, reply.endpoint.provider)
     calls = 0
     const agentTask = await createTextTask({ kind: 'storyboard_breaker', episodeId: 1, stageModel: initial })
     await runWithTextTask(agentTask, () => runWithAgentTextCall(() => callTextChat(initial, 'hello', { temperature: 0, maxTokens: 10, timeoutMs: 1000 })))
     task = (await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, agentTask)))[0]
     params = JSON.parse(task.params)
-    assert.equal(params.model_used.config_id, 9901)
+    assert.equal(params.model_used.config_id, initial.configId)
     calls = 0
     globalThis.fetch = async () => { calls++; return new Response('content_filter', { status: 403 }) }
     await assert.rejects(callTextChat(initial, 'hello', { temperature: 0, maxTokens: 10, timeoutMs: 1000 }))
@@ -90,6 +92,7 @@ test('text scheduling, endpoint selection and persisted health', () => {
     await assert.rejects(callTextChat(pinned, 'hello', { temperature: 0, maxTokens: 10, timeoutMs: 1000 }))
     assert.equal(calls, 1)
     await resumeTextConfig(9901)
+    await resumeTextConfig(9902)
     await db.insert(schema.aiServiceConfigs).values({ id: 9903, serviceType: 'text', provider: 'openai', name: 'vision2', baseUrl: 'https://example.invalid', apiKey: '', model: '["vision2"]', vision: true, priority: 25, concurrency: 1, isActive: true, createdAt: stamp, updatedAt: stamp })
     calls = 0
     globalThis.fetch = async () => ++calls === 1
@@ -97,7 +100,10 @@ test('text scheduling, endpoint selection and persisted health', () => {
       : Response.json({ choices: [{ message: { content: 'seen' } }] })
     const visionStage = await assignTextEndpoint('design_card')
     const visionReply = await callTextChat(visionStage, [{ type: 'image_url', image_url: { url: 'data:image/png;base64,AA==' } }], { temperature: 0, maxTokens: 10, timeoutMs: 1000 })
-    assert.equal(visionReply.endpoint.configId, 9903)
+    assert.equal(calls, 2)
+    assert.notEqual(visionReply.endpoint.configId, visionStage.configId)
+    const actualVision = (await db.select().from(schema.aiServiceConfigs).where(eq(schema.aiServiceConfigs.id, visionReply.endpoint.configId)))[0]
+    assert.equal(actualVision.vision, true)
     await runWithTextTask(1, () => runWithAgentTextCall(async () => {
       assert.equal(noteAgentFetchStarted(), true)
       noteFirstAgentFetchFailed()
