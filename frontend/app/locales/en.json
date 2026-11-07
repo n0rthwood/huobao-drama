@@ -544,7 +544,41 @@
       "styles": "Style Presets",
       "storage": "Storage",
       "about": "About & Updates",
-      "agents": "Agent Config"
+      "agents": "Agent Config",
+      "research": "Research Sources"
+    },
+    "research": {
+      "title": "Research Sources",
+      "desc": "API keys used when precise asset production searches authoritative sources (museums, archives, academic collections). Keys are stored only in the local database and cannot be viewed in full after saving.",
+      "configured": "Configured",
+      "configuredHint": "Configured · ··{hint}",
+      "notConfigured": "Not configured",
+      "apply": "Get a key",
+      "keyLabel": "{name} API key",
+      "keyPlaceholder": "Paste API key",
+      "replacePlaceholder": "Enter a new key to replace the current one",
+      "show": "Show key",
+      "hide": "Hide key",
+      "test": "Test connection",
+      "testDraft": "Test entered key",
+      "save": "Save",
+      "clear": "Clear",
+      "saved": "{name} API key saved",
+      "cleared": "{name} API key cleared",
+      "testOk": "Connected. The test query returned {count} results",
+      "testFail": "Connection failed: {reason}",
+      "loadFailed": "Failed to load research source settings",
+      "securityNote": "Full keys are never shown in the page, API responses or logs. To change a key, enter the new one and save.",
+      "sources": {
+        "europeana": {
+          "desc": "The EU cultural heritage platform aggregating digitised collections from thousands of European museums, libraries and archives; every record carries licence information.",
+          "use": "Used to find China-related images, prints, maps and objects held in European collections (e.g. Opium War material)."
+        },
+        "smithsonian": {
+          "desc": "Smithsonian Open Access covering the collections of its 19 museums, many images CC0 public domain. Keys are issued by api.data.gov.",
+          "use": "Used to find photos of Ming–Qing objects, seals and bronzes (e.g. National Museum of Asian Art) as form references."
+        }
+      }
     },
     "common": {
       "disabled": "Disabled",

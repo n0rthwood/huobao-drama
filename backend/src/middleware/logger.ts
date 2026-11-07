@@ -40,7 +40,9 @@ export const requestLogger: MiddlewareHandler = async (c, next) => {
       const clone = c.req.raw.clone()
       const text = await clone.text()
       if (text) {
-        const truncated = text.length > 500 ? text.slice(0, 500) + '...' : text
+        // 密钥字段一律打码：设置页提交的 api_key（AI 服务、资料检索 #78）不能落进 pm2 日志
+        const redacted = text.replace(/("(?:api_key|apiKey|wskey|password|token|secret)"\s*:\s*)"[^"]*"/g, '$1"***"')
+        const truncated = redacted.length > 500 ? redacted.slice(0, 500) + '...' : redacted
         bodyInfo = `\n  ${colors.dim}body: ${truncated}${colors.reset}`
       }
     } catch {}

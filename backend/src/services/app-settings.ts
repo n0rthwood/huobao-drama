@@ -9,6 +9,7 @@
 import { eq } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
 import { now } from '../utils/response.js'
+import { isResearchSourceId, type ResearchSourceId } from '../config/research-sources.js'
 
 export const CONTENT_LANGUAGES = ['zh', 'en', 'ja', 'ko'] as const
 export type ContentLanguage = typeof CONTENT_LANGUAGES[number]
@@ -68,4 +69,45 @@ export function setToursSeen(ids: unknown): string[] {
     })
     .run()
   return clean
+}
+
+// ===== 资料检索 API key（Issue #78）=====
+// 与 AI 服务密钥同口径：只存业务库，不进仓库；对外接口只给末 4 位提示，完整值只供服务端检索调用读取。
+const RESEARCH_API_KEYS_KEY = 'research_api_keys'
+
+function readResearchApiKeys(): Partial<Record<ResearchSourceId, string>> {
+  const row = db.select().from(schema.appSettings)
+    .where(eq(schema.appSettings.key, RESEARCH_API_KEYS_KEY))
+    .get()
+  try {
+    const parsed: unknown = JSON.parse(row?.value || '{}')
+    if (!parsed || typeof parsed !== 'object') return {}
+    const out: Partial<Record<ResearchSourceId, string>> = {}
+    for (const [id, value] of Object.entries(parsed)) {
+      if (isResearchSourceId(id) && typeof value === 'string' && value) out[id] = value
+    }
+    return out
+  } catch {
+    return {}
+  }
+}
+
+/** 某个资料源当前保存的 key；未配置返回 null */
+export function getResearchApiKey(id: ResearchSourceId): string | null {
+  return readResearchApiKeys()[id] ?? null
+}
+
+/** 写入或清除（key=null）某个资料源的 key；key 已由 normalizeResearchKey 校验 */
+export function setResearchApiKey(id: ResearchSourceId, key: string | null): void {
+  const keys = readResearchApiKeys()
+  if (key) keys[id] = key
+  else delete keys[id]
+  const value = JSON.stringify(keys)
+  db.insert(schema.appSettings)
+    .values({ key: RESEARCH_API_KEYS_KEY, value, updatedAt: now() })
+    .onConflictDoUpdate({
+      target: schema.appSettings.key,
+      set: { value, updatedAt: now() },
+    })
+    .run()
 }

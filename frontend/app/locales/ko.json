@@ -544,7 +544,41 @@
       "styles": "스타일 프리셋",
       "storage": "저장 위치",
       "about": "업데이트 정보",
-      "agents": "Agent 설정"
+      "agents": "Agent 설정",
+      "research": "자료 검색"
+    },
+    "research": {
+      "title": "자료 검색",
+      "desc": "에셋 정밀 제작에서 권위 있는 자료(박물관·기록관·학술 자료)를 검색할 때 쓰는 API 키입니다. 키는 로컬 데이터베이스에만 저장되며 저장 후에는 전체를 볼 수 없습니다.",
+      "configured": "설정됨",
+      "configuredHint": "설정됨 · ··{hint}",
+      "notConfigured": "미설정",
+      "apply": "키 발급",
+      "keyLabel": "{name} API 키",
+      "keyPlaceholder": "API 키 붙여넣기",
+      "replacePlaceholder": "새 키를 입력하면 현재 키를 교체합니다",
+      "show": "키 표시",
+      "hide": "키 숨기기",
+      "test": "연결 테스트",
+      "testDraft": "입력한 키 테스트",
+      "save": "저장",
+      "clear": "삭제",
+      "saved": "{name} API 키를 저장했습니다",
+      "cleared": "{name} API 키를 삭제했습니다",
+      "testOk": "연결 성공. 테스트 검색 결과 {count}건",
+      "testFail": "연결 실패: {reason}",
+      "loadFailed": "자료 검색 설정을 불러오지 못했습니다",
+      "securityNote": "전체 키는 페이지, API 응답, 로그에 표시되지 않습니다. 키를 바꾸려면 새 키를 입력하고 저장하세요.",
+      "sources": {
+        "europeana": {
+          "desc": "EU 문화유산 플랫폼으로 유럽 수천 개 박물관·도서관·기록관의 디지털 소장품을 모으며 각 레코드에 라이선스 정보가 있습니다.",
+          "use": "유럽 소장 중국 관련 이미지·판화·지도·기물(아편전쟁 시기 자료 등) 검색에 사용합니다."
+        },
+        "smithsonian": {
+          "desc": "스미소니언 협회 오픈 데이터로 산하 19개 박물관 소장품을 포함하며 많은 이미지가 CC0 퍼블릭 도메인입니다. 키는 api.data.gov에서 발급합니다.",
+          "use": "명청 시대 기물·인장·청동기 실물 사진을 형태 참고용으로 검색하는 데 사용합니다."
+        }
+      }
     },
     "common": {
       "disabled": "비활성화됨",
