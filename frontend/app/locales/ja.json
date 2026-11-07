@@ -2763,6 +2763,34 @@
       "optional": "任意 · 連鎖外"
     },
     "assetReview": {
+      "batch": {
+        "extract": "一括追加抽出",
+        "create": "一括アップロード / AI生成",
+        "status": "一括で素材不要にする",
+        "hint": "現在のフィルター内の不足項目を選択します。一括アップロード / AI生成では空の素材カードだけを作成します。各カードでアップロードまたは生成してください。",
+        "selectAll": "すべて選択（{n} 件）",
+        "confirm": "確定（{n} 件）",
+        "queued": "待機中",
+        "processing": "抽出中"
+      },
+      "results": {
+        "title": "一括処理結果",
+        "extractSummary": "{done} 件を待機列に追加、{skipped} 件をスキップ",
+        "createSummary": "{done} 件のカードを作成、{skipped} 件をスキップ",
+        "statusSummary": "{done} 件を変更、{skipped} 件をスキップ",
+        "created": "カード作成済み",
+        "updated": "素材不要に変更済み",
+        "skipped": "スキップ",
+        "candidate": "既存候補：{kind}「{name}」（#{id}）、自動紐付けなし",
+        "reason": {
+          "not_found": "このエピソードに項目がありません",
+          "not_missing": "項目は既に不足ではありません",
+          "already_queued": "抽出タスクが既にあります",
+          "no_kind": "この要件では素材カードを作成できません",
+          "existing_asset": "同名の素材が既にあります",
+          "not_started": "抽出を開始できませんでした"
+        }
+      },
       "emptyTitle": "照合はまだ開始していません",
       "emptyDesc": "審査リストは「情報ポイント → 必要な素材 → 有/無」を一件ずつ並べます。すべて処置するとショット設計が解除されます。",
       "start": "照合を開始",

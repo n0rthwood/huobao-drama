@@ -2763,6 +2763,34 @@
       "optional": "Optional · not in the chain"
     },
     "assetReview": {
+      "batch": {
+        "extract": "Batch extract",
+        "create": "Batch upload / AI generate",
+        "status": "Batch mark not needed",
+        "hint": "Select missing items in the current filter. Batch upload / AI generate only creates blank asset cards; upload or generate within each card.",
+        "selectAll": "Select all ({n})",
+        "confirm": "Confirm ({n})",
+        "queued": "Queued",
+        "processing": "Extracting"
+      },
+      "results": {
+        "title": "Batch results",
+        "extractSummary": "{done} queued, {skipped} skipped",
+        "createSummary": "{done} cards created, {skipped} skipped",
+        "statusSummary": "{done} marked, {skipped} skipped",
+        "created": "Card created",
+        "updated": "Marked not needed",
+        "skipped": "Skipped",
+        "candidate": "Existing candidate: {kind} “{name}” (#{id}); not automatically bound",
+        "reason": {
+          "not_found": "Item not found in this episode",
+          "not_missing": "Item is no longer missing",
+          "already_queued": "Extraction already active",
+          "no_kind": "This need cannot create an asset card",
+          "existing_asset": "An asset with the same name exists",
+          "not_started": "Extraction could not be started"
+        }
+      },
       "emptyTitle": "Review has not started",
       "emptyDesc": "The checklist lists every info point → required asset → have/missing; shot design unlocks once all items are resolved.",
       "start": "Start review",

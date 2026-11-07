@@ -16,6 +16,7 @@ import { toast } from 'vue-sonner'
 import { assetReviewAPI, episodeAPI } from '~/composables/useApi'
 import { toastError } from '~/composables/useToast'
 import { onTaskFinished } from '~/composables/useTasks'
+import AssetReviewBatchDialog from './AssetReviewBatchDialog.vue'
 
 const props = defineProps({
   episodeId: { type: Number, default: 0 },
@@ -25,7 +26,7 @@ const props = defineProps({
 
 const emit = defineEmits(['update:status', 'open-asset', 'create-asset', 'goto-design'])
 
-const { t } = useI18n()
+const { t, te } = useI18n()
 
 const STATUSES = ['missing', 'have', 'added', 'ignored', 'not_needed']
 /** 轮询节奏与 PropSemanticsPanel 的自动标注一致 */
@@ -40,6 +41,10 @@ const episodeAssets = ref([])
 const busyItemId = ref(0)
 const ignoreDialog = ref({ open: false, item: null, reason: '', saving: false })
 const bindDialog = ref({ open: false, item: null, kind: 'prop', assetId: 0, saving: false })
+const batchMode = ref('')
+const batchItems = ref([])
+const batchSaving = ref(false)
+const batchResult = ref(null)
 let timer = null
 
 const status = computed(() => payload.value?.status || props.review?.review_status || 'none')
@@ -65,6 +70,8 @@ const filteredSegments = computed(() => {
     .map(seg => ({ ...seg, items: seg.items.filter(item => item.status === filter.value) }))
     .filter(seg => seg.items.length)
 })
+const filteredMissing = computed(() => filteredSegments.value.flatMap(seg => seg.items.filter(item => item.status === 'missing')))
+const activeExtractions = computed(() => segments.value.some(seg => seg.items.some(item => item.extraction)))
 
 const staleText = computed(() => staleReasons.value
   .map(reason => t(`episode.assetReview.staleReason.${reason}`))
@@ -98,7 +105,7 @@ async function load(opts = {}) {
     schedulePoll()
     // 只在状态真的变了才通知父级重算门禁：每次轮询都 emit 会让门禁刷新把面板卸载重挂，
     // 重挂又触发一次 load，形成无限循环
-    if (data.status !== props.review?.review_status) emit('update:status', data.status)
+    if (!batchResult.value && (opts.refreshGate || data.status !== props.review?.review_status)) emit('update:status', data.status)
   } catch (err) {
     // 剧情项目（400 not_documentary）在这个面板下不会被挂载；其余错误照常提示
     toastError(err)
@@ -109,7 +116,7 @@ async function load(opts = {}) {
 
 function schedulePoll() {
   if (timer) { clearTimeout(timer); timer = null }
-  if (running.value) timer = setTimeout(() => load({ silent: true }), POLL_MS)
+  if (running.value || activeExtractions.value) timer = setTimeout(() => load({ silent: true }), POLL_MS)
 }
 
 async function loadEpisodeAssets() {
@@ -170,10 +177,68 @@ async function extractItem(item) {
   try {
     const res = await assetReviewAPI.extract(item.id)
     toast.success(t('episode.assetReview.extractStarted', { name: res.asset_name }))
+    await load({ silent: true })
   } catch (err) {
     toastError(err)
   } finally {
     busyItemId.value = 0
+  }
+}
+
+function openBatch(mode) {
+  batchItems.value = [...filteredMissing.value]
+  batchResult.value = null
+  batchMode.value = mode
+}
+
+function closeBatch() {
+  if (batchSaving.value) return
+  const refreshGate = !!batchResult.value
+  batchMode.value = ''
+  batchResult.value = null
+  if (refreshGate) emit('update:status', status.value)
+}
+
+async function confirmBatch(ids) {
+  if (batchSaving.value || !ids.length) return
+  batchSaving.value = true
+  const mode = batchMode.value
+  const items = batchItems.value.filter(item => ids.includes(item.id))
+  try {
+    const result = mode === 'extract'
+      ? await assetReviewAPI.extractBatch(props.episodeId, ids)
+      : mode === 'create'
+        ? await assetReviewAPI.createAssets(props.episodeId, ids)
+        : await assetReviewAPI.batchStatus(props.episodeId, ids)
+    const done = mode === 'extract' ? result.queued.length : mode === 'create' ? result.created.length : result.updated
+    const summary = t(`episode.assetReview.results.${mode}Summary`, { done, skipped: result.skipped.length })
+    const skippedById = new Map(result.skipped.map(row => [row.item_id, row]))
+    const createdById = new Map((result.created || []).map(row => [row.item_id, row]))
+    const rows = items.map(item => ({
+      item_id: item.id,
+      info_point: item.info_point,
+      ...createdById.get(item.id),
+      ...skippedById.get(item.id),
+    }))
+    if (mode !== 'extract' && rows.length > 10) {
+      batchResult.value = { mode, summary, rows }
+    } else {
+      const details = mode === 'extract' ? '' : rows.map(row => {
+        if (!row.reason) return `${row.info_point}: ${t(`episode.assetReview.results.${mode === 'create' ? 'created' : 'updated'}`)}${row.name ? ` — ${row.name}` : ''}`
+        const key = `episode.assetReview.results.reason.${row.reason}`
+        const reason = te(key) ? t(key) : row.reason
+        const candidate = row.candidate ? ` — ${t('episode.assetReview.results.candidate', { kind: needKindLabel(row.candidate.kind), name: row.candidate.name, id: row.candidate.id })}` : ''
+        return `${row.info_point}: ${reason}${candidate}`
+      }).join('\n')
+      toast.success(summary, details ? { description: details } : undefined)
+      batchMode.value = ''
+    }
+    await load({ silent: true, refreshGate: true })
+    if (mode === 'create') await loadEpisodeAssets()
+  } catch (err) {
+    toastError(err)
+  } finally {
+    batchSaving.value = false
   }
 }
 
@@ -282,6 +347,9 @@ onBeforeUnmount(() => { if (timer) clearTimeout(timer) })
       <span class="tag mono">{{ t('episode.assetReview.statusLabel', { status: reviewStatusLabel }) }}</span>
       <span class="tag mono">{{ t('episode.assetReview.progress', { decided, total: counts.total }) }}</span>
       <span v-if="payload?.auto_segmented" class="tag">{{ t('episode.assetReview.autoSegmented') }}</span>
+      <button class="btn btn-sm" :disabled="!filteredMissing.length || batchSaving" @click="openBatch('extract')">{{ t('episode.assetReview.batch.extract') }}</button>
+      <button class="btn btn-sm" :disabled="!filteredMissing.length || batchSaving" @click="openBatch('create')">{{ t('episode.assetReview.batch.create') }}</button>
+      <button class="btn btn-sm" :disabled="!filteredMissing.length || batchSaving" @click="openBatch('status')">{{ t('episode.assetReview.batch.status') }}</button>
       <div class="ml-auto flex gap-1">
         <button class="btn btn-sm" :disabled="running" @click="runReview()">
           <Loader2 v-if="running" :size="11" class="animate-spin" />
@@ -367,7 +435,7 @@ onBeforeUnmount(() => { if (timer) clearTimeout(timer) })
               </div>
               <div class="review-item-actions">
                 <template v-if="item.status === 'missing'">
-                  <button class="btn btn-sm" :disabled="busyItemId === item.id" @click="extractItem(item)">{{ t('episode.assetReview.action.extract') }}</button>
+                  <button class="btn btn-sm" :disabled="busyItemId === item.id || !!item.extraction" @click="extractItem(item)">{{ item.extraction ? t(`episode.assetReview.batch.${item.extraction.status}`) : t('episode.assetReview.action.extract') }}</button>
                   <button class="btn btn-sm" :disabled="busyItemId === item.id" @click="createAsset(item)">{{ t('episode.assetReview.action.create') }}</button>
                   <button class="btn btn-sm" :disabled="busyItemId === item.id" @click="openBind(item)">{{ t('episode.assetReview.action.bind') }}</button>
                   <button class="btn btn-sm" :disabled="busyItemId === item.id" @click="openIgnore(item)">{{ t('episode.assetReview.action.ignore') }}</button>
@@ -450,11 +518,16 @@ onBeforeUnmount(() => { if (timer) clearTimeout(timer) })
         </div>
       </div>
     </div>
+    <AssetReviewBatchDialog
+      v-if="batchMode" :mode="batchMode" :items="batchItems" :saving="batchSaving" :result="batchResult"
+      @close="closeBatch" @confirm="confirmBatch"
+    />
   </div>
 </template>
 
 <style scoped>
 .prod-content { flex: 1; overflow-y: auto; padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 10px; }
+.prod-section-bar { flex-wrap: wrap; }
 .prod-section-bar { display: flex; align-items: center; gap: 8px; }
 .step-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; }
 .empty-visual { opacity: 0.5; }

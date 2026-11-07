@@ -2763,6 +2763,34 @@
       "optional": "可选 · 不入链"
     },
     "assetReview": {
+      "batch": {
+        "extract": "批量补提取",
+        "create": "批量上传 / AI生成",
+        "status": "批量标记无需素材",
+        "hint": "选择当前筛选下要处理的缺失项。批量上传 / AI生成只创建空资产卡，请在卡片中上传或生成。",
+        "selectAll": "全选（{n} 项）",
+        "confirm": "确认处理（{n} 项）",
+        "queued": "排队中",
+        "processing": "提取中"
+      },
+      "results": {
+        "title": "批量处理结果",
+        "extractSummary": "已排队 {done} 项，跳过 {skipped} 项",
+        "createSummary": "已建卡 {done} 项，跳过 {skipped} 项",
+        "statusSummary": "已标记 {done} 项，跳过 {skipped} 项",
+        "created": "已建卡",
+        "updated": "已标记无需素材",
+        "skipped": "已跳过",
+        "candidate": "已有候选：{kind}「{name}」（#{id}），未自动绑定",
+        "reason": {
+          "not_found": "条目不存在或不属于本集",
+          "not_missing": "条目已不再缺失",
+          "already_queued": "已有提取任务",
+          "no_kind": "此需求不能创建资产卡",
+          "existing_asset": "已有同名资产",
+          "not_started": "未能启动提取"
+        }
+      },
       "emptyTitle": "尚未开始对照",
       "emptyDesc": "资产审核清单会逐条列出「信息点 → 需要的素材 → 有/缺」，全部处置后才解锁分镜设计。",
       "start": "开始对照",
