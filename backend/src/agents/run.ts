@@ -1,6 +1,7 @@
 import type { Agent, AgentExecutionOptionsBase } from '@mastra/core/agent'
 import type { FullOutput } from '@mastra/core/stream'
 import { runWithReasoningSink, type ReasoningSink } from './reasoning-sink.js'
+import { markAgentFailureIfSafe, runWithAgentTextCall } from '../services/text-task-context.js'
 
 /**
  * 以流式方式执行 Agent，读完整个流后返回与 agent.generate() 相同结构的结果
@@ -26,12 +27,19 @@ export async function runAgent(
     if (full.error) throw full.error
     return full
   }
-  if (!sink) return exec()
-  return runWithReasoningSink(sink, async () => {
+  return runWithAgentTextCall(async () => {
     try {
-      return await exec()
-    } finally {
-      await sink.flush().catch(() => { /* 落盘失败不影响任务结果 */ })
+      if (!sink) return await exec()
+      return await runWithReasoningSink(sink, async () => {
+        try {
+          return await exec()
+        } finally {
+          await sink.flush().catch(() => { /* 落盘失败不影响任务结果 */ })
+        }
+      })
+    } catch (err) {
+      markAgentFailureIfSafe(err)
+      throw err
     }
   })
 }

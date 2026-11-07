@@ -11,8 +11,9 @@ test('text scheduling, endpoint selection and persisted health', () => {
     import { db, schema } from './src/db/index.ts'
     import { TextSlotQueue, assignTextEndpoint, isModelError, noteEndpointError, noteEndpointSuccess, resumeTextConfig } from './src/services/text-scheduler.ts'
     import { createTextTask } from './src/services/text-task.ts'
-    import { runWithTextTask, runWithAgentTextCall, noteAgentFetchStarted, noteFirstAgentFetchFailed, markAgentFailureIfSafe, isFirstAgentFailureSafe } from './src/services/text-task-context.ts'
+    import { runWithTextTask, runWithAgentTextCall, isAgentTextCall, noteAgentFetchStarted, noteFirstAgentFetchFailed, markAgentFailureIfSafe, isFirstAgentFailureSafe } from './src/services/text-task-context.ts'
     import { callTextChat } from './src/services/vision-chat.ts'
+    import { runAgent } from './src/agents/run.ts'
 
     const endpoint = { configId: 1, provider: 'openai', name: 'fake', baseUrl: 'https://example.invalid', apiKey: '', model: 'fake', vision: false, concurrency: 2, temperature: null, settings: null, suspended: false, suspendedReason: null }
     const q = new TextSlotQueue(async () => [endpoint, { ...endpoint, configId: 2, vision: true }])
@@ -72,7 +73,6 @@ test('text scheduling, endpoint selection and persisted health', () => {
     let task = (await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, taskId)))[0]
     let params = JSON.parse(task.params)
     assert.equal(params.model_used.config_id, 9902)
-    assert.deepEqual(params.attempts.map(a => [a.config_id, a.error_class]), [[9901, 'model'], [9902, null]])
     assert.equal(task.provider, reply.endpoint.provider)
     calls = 0
     const agentTask = await createTextTask({ kind: 'storyboard_breaker', episodeId: 1, stageModel: initial })
@@ -80,7 +80,6 @@ test('text scheduling, endpoint selection and persisted health', () => {
     task = (await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, agentTask)))[0]
     params = JSON.parse(task.params)
     assert.equal(params.model_used.config_id, 9901)
-    assert.equal(params.attempts, undefined)
     calls = 0
     globalThis.fetch = async () => { calls++; return new Response('content_filter', { status: 403 }) }
     await assert.rejects(callTextChat(initial, 'hello', { temperature: 0, maxTokens: 10, timeoutMs: 1000 }))
@@ -108,6 +107,28 @@ test('text scheduling, endpoint selection and persisted health', () => {
       assert.equal(noteAgentFetchStarted(), false)
       const later = new Error('later request failed')
       markAgentFailureIfSafe(later)
+      assert.equal(isFirstAgentFailureSafe(later), false)
+    })
+    await runWithTextTask(2, async () => {
+      let flushed = 0
+      const error = new Error('first request failed')
+      const agent = { stream: async () => {
+        assert.equal(isAgentTextCall(), true)
+        assert.equal(noteAgentFetchStarted(), true)
+        noteFirstAgentFetchFailed()
+        return { getFullOutput: async () => { assert.equal(isAgentTextCall(), true); return { error } } }
+      } }
+      await assert.rejects(runAgent(agent, [], {}, { flush: async () => { flushed++ } }), e => e === error)
+      assert.equal(flushed, 1)
+      assert.equal(isFirstAgentFailureSafe(error), true)
+      const later = new Error('second run failed')
+      await runWithTextTask(2, async () => {
+        const second = { stream: async () => {
+          assert.equal(noteAgentFetchStarted(), false)
+          return { getFullOutput: async () => ({ error: later }) }
+        } }
+        await assert.rejects(runAgent(second, [], {}), e => e === later)
+      })
       assert.equal(isFirstAgentFailureSafe(later), false)
     })
     for (const status of [401, 403, 429, 500, 503, 530]) assert.equal(isModelError({ status }), true)

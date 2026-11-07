@@ -6,7 +6,8 @@ const agentCall = new AsyncLocalStorage<boolean>()
 const safeAgentFailures = new WeakSet<object>()
 
 export function runWithTextTask<T>(taskId: number | null, fn: () => Promise<T>): Promise<T> {
-  return context.run({ taskId, agentFetches: 0, firstAgentFailureSafe: false }, fn)
+  const parent = context.getStore()
+  return context.run(parent && parent.taskId === taskId ? parent : { taskId, agentFetches: 0, firstAgentFailureSafe: false }, fn)
 }
 
 export function currentTextTaskId(): number | null {
@@ -15,6 +16,8 @@ export function currentTextTaskId(): number | null {
 
 /** Prevent nested Agent tools from rewriting the Agent's fixed model attribution. */
 export function runWithAgentTextCall<T>(fn: () => Promise<T>): Promise<T> {
+  const state = context.getStore()
+  if (state) state.firstAgentFailureSafe = false
   return agentCall.run(true, fn)
 }
 
