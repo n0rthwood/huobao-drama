@@ -12,6 +12,8 @@
  */
 import { getTextProviderBaseUrl, type AIConfig } from './ai.js'
 import { isModelError, noteEndpointError, noteEndpointSuccess, selectTextEndpoint, withTextSlot } from './text-scheduler.js'
+import { currentTextTaskId, isAgentTextCall } from './text-task-context.js'
+import { recordTextTaskAttempt } from './text-task.js'
 import sharp from 'sharp'
 import { getAbsolutePath, readImageAsCompressedDataUrl } from '../utils/storage.js'
 
@@ -21,6 +23,7 @@ export interface ChatEndpointConfig {
   id?: number
   pinned?: boolean
   vision?: boolean
+  name?: string
   baseUrl: string
   apiKey: string
   model: string
@@ -39,6 +42,7 @@ export interface ChatCallResult {
   text: string
   usage: ChatUsage | null
   finishReason?: string
+  endpoint: { configId: number; provider: string; model: string; name: string; baseUrl: string }
 }
 
 interface ChatCompletionResponse {
@@ -135,6 +139,13 @@ export async function callTextChat(
       })
       break
     } catch (err) {
+      const taskId = currentTextTaskId()
+      if (taskId != null && !isAgentTextCall()) {
+        const errorClass = isModelError(err) ? 'model' : err instanceof SyntaxError ? 'parse' : opts.signal?.aborted ? 'cancelled' : 'business'
+        await recordTextTaskAttempt(taskId, { config_id: configId, model: endpoint.model, error_class: errorClass }, {
+          configId, provider: endpoint.provider, model: endpoint.model, name: endpoint.name ?? '', vision: config.vision ?? vision,
+        })
+      }
       if (opts.signal?.aborted || !isModelError(err) || config.pinned || attempt === 2) throw err
       const next = await selectTextEndpoint({ vision, excludeConfigIds: attempted })
       if (!next) throw err
@@ -142,11 +153,18 @@ export async function callTextChat(
     }
   }
   if (!data) throw new Error('文本服务未返回结果')
+  const configId = endpoint.configId ?? endpoint.id
+  if (configId == null) throw new Error('文本模型缺少配置 ID，无法记录实际端点')
+  const actual = { configId, provider: endpoint.provider, model: endpoint.model, name: endpoint.name ?? '', baseUrl: endpoint.baseUrl }
+  const taskId = currentTextTaskId()
+  if (taskId != null && !isAgentTextCall()) {
+    await recordTextTaskAttempt(taskId, { config_id: configId, model: endpoint.model, error_class: null }, { ...actual, vision: config.vision ?? vision })
+  }
   const usage = data.usage
     ? {
         prompt_tokens: Number(data.usage.prompt_tokens) || 0,
         completion_tokens: Number(data.usage.completion_tokens) || 0,
       }
     : null
-  return { text: data.choices?.[0]?.message?.content ?? '', usage, finishReason: data.choices?.[0]?.finish_reason }
+  return { text: data.choices?.[0]?.message?.content ?? '', usage, finishReason: data.choices?.[0]?.finish_reason, endpoint: actual }
 }

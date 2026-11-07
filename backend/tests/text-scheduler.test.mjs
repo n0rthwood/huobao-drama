@@ -10,6 +10,9 @@ test('text scheduling, endpoint selection and persisted health', () => {
     import { eq } from 'drizzle-orm'
     import { db, schema } from './src/db/index.ts'
     import { TextSlotQueue, assignTextEndpoint, isModelError, noteEndpointError, noteEndpointSuccess, resumeTextConfig } from './src/services/text-scheduler.ts'
+    import { createTextTask } from './src/services/text-task.ts'
+    import { runWithTextTask, runWithAgentTextCall, noteAgentFetchStarted, noteFirstAgentFetchFailed, markAgentFailureIfSafe, isFirstAgentFailureSafe } from './src/services/text-task-context.ts'
+    import { callTextChat } from './src/services/vision-chat.ts'
 
     const endpoint = { configId: 1, provider: 'openai', name: 'fake', baseUrl: 'https://example.invalid', apiKey: '', model: 'fake', vision: false, concurrency: 2, temperature: null, settings: null, suspended: false, suspendedReason: null }
     const q = new TextSlotQueue(async () => [endpoint, { ...endpoint, configId: 2, vision: true }])
@@ -58,6 +61,37 @@ test('text scheduling, endpoint selection and persisted health', () => {
     row = (await db.select().from(schema.aiServiceConfigs).where(eq(schema.aiServiceConfigs.id, 9901)))[0]
     assert.equal(row.consecutiveErrors, 0); assert.equal(row.suspendedAt, null)
     assert.equal((await assignTextEndpoint('keyframe_prompts', { configId: 9901 })).configId, 9901)
+    const initial = await assignTextEndpoint('keyframe_prompts')
+    const taskId = await createTextTask({ kind: 'asset_review', episodeId: 1, stageModel: initial, queued: true })
+    let calls = 0
+    globalThis.fetch = async () => ++calls === 1
+      ? new Response('gateway', { status: 503 })
+      : Response.json({ choices: [{ message: { content: 'ok' } }] })
+    const reply = await runWithTextTask(taskId, () => callTextChat(initial, 'hello', { temperature: 0, maxTokens: 10, timeoutMs: 1000 }))
+    assert.equal(reply.endpoint.configId, 9902)
+    let task = (await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, taskId)))[0]
+    let params = JSON.parse(task.params)
+    assert.equal(params.model_used.config_id, 9902)
+    assert.deepEqual(params.attempts.map(a => [a.config_id, a.error_class]), [[9901, 'model'], [9902, null]])
+    assert.equal(task.provider, reply.endpoint.provider)
+    calls = 0
+    const agentTask = await createTextTask({ kind: 'storyboard_breaker', episodeId: 1, stageModel: initial })
+    await runWithTextTask(agentTask, () => runWithAgentTextCall(() => callTextChat(initial, 'hello', { temperature: 0, maxTokens: 10, timeoutMs: 1000 })))
+    task = (await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, agentTask)))[0]
+    params = JSON.parse(task.params)
+    assert.equal(params.model_used.config_id, 9901)
+    assert.equal(params.attempts, undefined)
+    await runWithTextTask(1, async () => {
+      assert.equal(noteAgentFetchStarted(), true)
+      noteFirstAgentFetchFailed()
+      const error = new Error('first request failed')
+      markAgentFailureIfSafe(error)
+      assert.equal(isFirstAgentFailureSafe(new Error('wrapped', { cause: error })), true)
+      assert.equal(noteAgentFetchStarted(), false)
+      const later = new Error('later request failed')
+      markAgentFailureIfSafe(later)
+      assert.equal(isFirstAgentFailureSafe(later), false)
+    })
     for (const status of [401, 403, 429, 500, 503, 530]) assert.equal(isModelError({ status }), true)
     for (const status of [400, 404, 422]) assert.equal(isModelError({ status }), false)
     assert.equal(isModelError(new DOMException('timeout', 'TimeoutError')), true)

@@ -11,7 +11,8 @@ import { createOpenAI } from '@ai-sdk/openai'
 import { Agent as HttpAgent, fetch as undiciFetch, Response as UndiciResponse } from 'undici'
 import { captureReasoningFromStream, getActiveReasoningSink } from './reasoning-sink.js'
 import { getTextConfig, getTextProviderBaseUrl, getConfigById } from '../services/ai.js'
-import { noteEndpointError, noteEndpointSuccess, withTextSlot } from '../services/text-scheduler.js'
+import { isModelError, noteEndpointError, noteEndpointSuccess, withTextSlot } from '../services/text-scheduler.js'
+import { noteAgentFetchStarted, noteFirstAgentFetchFailed } from '../services/text-task-context.js'
 import { logTaskProgress } from '../utils/task-logger.js'
 import { scriptTools } from './tools/script-tools.js'
 import { extractTools } from './tools/extract-tools.js'
@@ -390,9 +391,14 @@ function createScheduledFetch(configId: number, inner: typeof fetch): typeof fet
   return (input, init) => new Promise<Response>((resolve, reject) => {
     let delivered = false
     void withTextSlot({ configId, signal: init?.signal ?? undefined }, async () => {
+      const first = noteAgentFetchStarted()
+      let gotResponse = false
       try {
         const response = await inner(input, init)
-        const statusError = response.ok ? null : Object.assign(new Error(`文本服务 ${response.status}`), { status: response.status })
+        gotResponse = true
+        const detail = !response.ok ? (await response.clone().text()).slice(0, 300) : ''
+        const statusError = response.ok ? null : Object.assign(new Error(`文本服务 ${response.status}: ${detail}`), { status: response.status })
+        if (first && statusError && isModelError(statusError)) noteFirstAgentFetchFailed()
         if (!response.body) {
           if (statusError) await noteEndpointError(configId, statusError)
           else await noteEndpointSuccess(configId)
@@ -421,6 +427,7 @@ function createScheduledFetch(configId: number, inner: typeof fetch): typeof fet
         if (streamError || statusError) await noteEndpointError(configId, streamError || statusError)
         else await noteEndpointSuccess(configId)
       } catch (err) {
+        if (first && !gotResponse && isModelError(err)) noteFirstAgentFetchFailed()
         await noteEndpointError(configId, err)
         if (!delivered) { delivered = true; reject(err) }
       }
