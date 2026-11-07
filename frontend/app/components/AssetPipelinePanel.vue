@@ -10,7 +10,7 @@
         <option value="precision">{{ t('episode.documentary.pipeline.purposePrecision') }}</option>
         <option value="beautify">{{ t('episode.documentary.pipeline.purposeBeautify') }}</option>
       </select>
-      <button class="pip-toggle" type="button" :disabled="starting || mapConfigured" @click.stop="start">
+      <button class="pip-toggle" type="button" :disabled="starting || mapConfigured || !canStart" @click.stop="start">
         <Loader2 v-if="starting" :size="11" class="animate-spin" />
         <Play v-else :size="11" />
         {{ starting ? t('episode.documentary.pipeline.starting') : t('episode.documentary.pipeline.start') }}
@@ -29,6 +29,46 @@
 
     <p v-if="!reviewRunId" class="pip-notice">{{ t('episode.documentary.pipeline.sectionHint') }}</p>
     <p v-if="mapConfigured && !reviewRunId" class="pip-notice">{{ t('episode.documentary.pipeline.mapConfigured') }}</p>
+
+    <!-- 启动设置：模型与生成参考图在启动时定下来，后端冻结进任务参数（Issue #73 决策 #3） -->
+    <section v-if="!reviewRunId" class="pip-block">
+      <label class="pip-field">
+        <span>{{ t('episode.documentary.pipeline.imageModelTitle') }}</span>
+        <select v-model="modelKey" class="input" :disabled="starting || !modelOptions.length">
+          <option v-for="option in modelOptions" :key="option.key" :value="option.key">
+            {{ option.configName }} · {{ option.model }}
+          </option>
+        </select>
+      </label>
+      <p v-if="!modelOptions.length" class="pip-notice">{{ t('episode.documentary.pipeline.imageModelEmpty') }}</p>
+
+      <template v-if="purpose === 'precision'">
+        <div class="pip-block-head">
+          <strong>{{ t('episode.documentary.pipeline.referencePickTitle') }}</strong>
+          <span class="dim">{{ t('episode.documentary.pipeline.referenceSelected', { n: selectedSourceIds.length }) }}</span>
+        </div>
+        <p class="pip-note">{{ t('episode.documentary.pipeline.referencePickHint') }}</p>
+        <ul v-if="referenceCandidates.length" class="pip-list">
+          <li v-for="source in referenceCandidates" :key="source.id" class="pip-source">
+            <label class="pip-chk">
+              <input
+                type="checkbox"
+                :checked="selectionIndex(source.id) > 0"
+                :disabled="starting || (selectionIndex(source.id) === 0 && selectedSourceIds.length >= MAX_PIPELINE_REFERENCES)"
+                @change="toggleSource(source.id)"
+              />
+              <span class="pip-source-main">{{ source.title || source.url || source.local_path }}</span>
+            </label>
+            <span v-if="selectionIndex(source.id) > 0" class="pip-badge">{{ selectionIndex(source.id) }}</span>
+            <span class="dim">{{ source.license }}</span>
+            <span v-if="source.era" class="dim">{{ source.era }}</span>
+          </li>
+        </ul>
+        <p v-else class="pip-empty dim">{{ t('episode.documentary.pipeline.referencePickEmpty') }}</p>
+        <p v-if="!selectedSourceIds.length" class="pip-notice">{{ t('episode.documentary.pipeline.referenceRequired') }}</p>
+        <p v-else-if="selectedSourceIds.length >= MAX_PIPELINE_REFERENCES" class="pip-note dim">{{ t('episode.documentary.pipeline.referenceMaxReached') }}</p>
+      </template>
+    </section>
     <TaskErrorMessage v-if="startError" :error="startError" />
     <TaskErrorMessage v-if="loadError" :error="loadError" />
     <TaskErrorMessage v-if="detail?.run.error" :error="detail.run.error" />
@@ -200,7 +240,7 @@
               <p v-else class="dim">{{ t('episode.documentary.pipeline.gateInvalidEmpty') }}</p>
               <p>
                 {{ t('episode.documentary.pipeline.textInImage') }}
-                <span>{{ textInImageLabel }}</span>
+                <span>{{ textPolicy.label }}</span>
                 <span class="dim">{{ selectedRound.gate.text_in_image.evidence }}</span>
               </p>
               <div v-if="selectedRound.gate.locate_checks.length" class="pip-sub">
@@ -257,6 +297,22 @@
         </label>
         <p v-if="gateFailed" class="pip-note dim">{{ t('episode.documentary.pipeline.overrideGateHint') }}</p>
 
+        <!-- 打回后的下一轮用途：默认沿用本轮（精确→精确），人可显式转入美化（Issue #73 决策 #2） -->
+        <div v-if="awaitingRoundId === selectedRound.id" class="pip-sub">
+          <strong>{{ t('episode.documentary.pipeline.nextPurposeTitle') }}</strong>
+          <label class="pip-chk">
+            <input type="radio" value="precision" v-model="nextPurpose" :disabled="!hasNextRoundBlock" />
+            <span>{{ t('episode.documentary.pipeline.nextPurposePrecision') }}</span>
+          </label>
+          <label class="pip-chk">
+            <input type="radio" value="beautify" v-model="nextPurpose" :disabled="!hasNextRoundBlock || beautifyCapReached" />
+            <span>{{ t('episode.documentary.pipeline.nextPurposeBeautify') }}</span>
+          </label>
+          <p class="pip-note dim">{{ t('episode.documentary.pipeline.nextPurposeHint') }}</p>
+          <p v-if="!hasNextRoundBlock" class="pip-notice">{{ t('episode.documentary.pipeline.nextPurposeNoBlock') }}</p>
+          <p v-else-if="beautifyCapReached" class="pip-notice">{{ t('episode.documentary.pipeline.nextPurposeBeautifyCapped') }}</p>
+        </div>
+
         <Teleport to="#pipeline-review-footer" :disabled="!reviewRunId">
         <div class="pip-approve-actions">
           <button class="btn btn-sm btn-primary" type="button" :disabled="!canApprove" @click.stop="submit('approve')">
@@ -294,8 +350,9 @@ import { toast } from 'vue-sonner'
 import TaskErrorMessage from '~/components/TaskErrorMessage.vue'
 import AssetPipelineFactSheet from '~/components/AssetPipelineFactSheet.vue'
 import { useTasks } from '~/composables/useTasks'
+import { describeTextPolicy } from '~/utils/pipelineText'
 import {
-  assetPipelineAPI, taskAPI,
+  aiConfigAPI, assetPipelineAPI, taskAPI,
   type AssetPipelineKind,
   type AssetPipelineOpenedImage,
   type AssetPipelineRound,
@@ -322,6 +379,20 @@ const emit = defineEmits<{
 }>()
 
 type Verdict = 'approve' | 'revise' | 'rollback' | 'abort'
+/** 启动时冻结的图像模型选项：config_id 与模型名要一起传给后端 */
+interface PipelineModelOption { key: string; configId: number; configName: string; provider: string; model: string; priority: number }
+
+/** /ai-configs 的 model 字段可能是数组，也可能是 JSON 字符串 */
+function configModels(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw.map(String).filter(Boolean)
+  if (typeof raw !== 'string' || !raw) return []
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    return (Array.isArray(parsed) ? parsed : [parsed]).map(String).filter(Boolean)
+  } catch {
+    return [raw]
+  }
+}
 
 const runs = ref<AssetPipelineRunSummary[]>([])
 const detail = ref<AssetPipelineRunDetail | null>(null)
@@ -332,6 +403,15 @@ const startError = ref('')
 const starting = ref(false)
 const cancelling = ref(false)
 const purpose = ref<'precision' | 'beautify'>('precision')
+/** 精确轮参考图上限，与后端 MAX_PIPELINE_REFERENCES 同口径 */
+const MAX_PIPELINE_REFERENCES = 3
+const modelOptions = ref<PipelineModelOption[]>([])
+const modelKey = ref('')
+// 初次拉取模型清单期间禁用启动：否则会在选择器还没出现时就以后端默认起流程
+const modelsLoading = ref(true)
+// 点击顺序即参考图顺序，后端按这个顺序喂给模型
+const selectedSourceIds = ref<number[]>([])
+const nextPurpose = ref<'precision' | 'beautify'>('precision')
 const showSources = ref(true)
 const sources = ref<AssetSourceRow[]>([])
 const sourceError = ref('')
@@ -389,6 +469,34 @@ const rounds = computed(() => detail.value?.rounds ?? [])
 const awaitingRoundId = computed(() => detail.value?.run.pipeline.state === 'waiting_approval' ? detail.value.run.pipeline.awaiting?.round_id ?? null : null)
 const selectedRound = computed(() => rounds.value.find(r => r.id === selectedRoundId.value) ?? rounds.value[rounds.value.length - 1] ?? null)
 
+/** 可当生成参考的素材：rejected 不算，没落地文件的也不算（后端同一套判定） */
+const referenceCandidates = computed(() => sources.value.filter(item => item.role !== 'rejected' && !!item.local_path))
+/** 1-based 选中序号，0 = 未选；模板里直接当「第几张参考」展示 */
+function selectionIndex(sourceId: number): number {
+  return selectedSourceIds.value.indexOf(sourceId) + 1
+}
+function toggleSource(sourceId: number) {
+  const current = selectedSourceIds.value
+  if (current.includes(sourceId)) {
+    selectedSourceIds.value = current.filter(id => id !== sourceId)
+    return
+  }
+  if (current.length >= MAX_PIPELINE_REFERENCES) return
+  selectedSourceIds.value = [...current, sourceId]
+}
+const selectedModel = computed(() => modelOptions.value.find(option => option.key === modelKey.value) ?? null)
+// 精确轮零参考图后端直接 400，这里先把启动按钮关掉并给出提示；
+// 模型清单还没回来就启动会绕过选择器，所以加载期间也不放行
+const canStart = computed(() => !modelsLoading.value && (purpose.value !== 'precision' || selectedSourceIds.value.length > 0))
+
+/** 本 run 的轮次格子：精确轮起步 3 格（精确+2 美化），美化起步 2 格 */
+const roundBlockCount = computed(() => (detail.value?.run.purpose ?? purpose.value) === 'precision' ? 3 : 2)
+const hasNextRoundBlock = computed(() => {
+  const round = selectedRound.value
+  return !!round && round.round_no + 1 < roundBlockCount.value
+})
+const beautifyCapReached = computed(() => rounds.value.filter(item => item.purpose === 'beautify').length >= 2)
+
 /** 违规排在最前：人先看要改的，再看通过项 */
 const checklist = computed(() => {
   const round = selectedRound.value
@@ -416,19 +524,20 @@ const blockingReasons = computed(() => {
     ...gate.forbidden_hits.map(item => `${item.error}：${item.evidence}`),
     ...gate.locate_checks.filter(item => item.status !== 'ok').map(item => `${item.name}：${item.detail}`),
   ]
-  if (gate.text_in_image.present) reasons.push(`${t('episode.documentary.pipeline.textInImage')}${t('episode.documentary.pipeline.textPresent')}：${gate.text_in_image.evidence}`)
+  // 只有生成器额外叠加的文字算违规；器物自身铭文允许保留（Issue #73 决策 #1）
+  const textVerdict = describeTextPolicy(gate.text_in_image, t)
+  if (textVerdict.failed) reasons.push(`${t('episode.documentary.pipeline.textInImage')}${textVerdict.label}：${gate.text_in_image.evidence}`)
+  else if (gate.text_in_image.present === true && gate.text_in_image.overlay === null) {
+    // 旧记录没有 overlay：gate_pass 是当时按零文字规则算的，不能只显示「未通过」而不说原因
+    reasons.push(`${t('episode.documentary.pipeline.textInImage')}${textVerdict.label}：${gate.text_in_image.evidence}（${t('episode.documentary.pipeline.textOverlayHistoricalFail')}）`)
+  }
   if (gate.semantics_preserved.status === 'fail') reasons.push(gate.semantics_preserved.detail)
   return reasons
 })
 
 const coveragePct = computed(() => Math.round((selectedRound.value?.gate?.coverage ?? 0) * 100))
 
-const textInImageLabel = computed(() => {
-  const present = selectedRound.value?.gate?.text_in_image.present
-  if (present === true) return t('episode.documentary.pipeline.textPresent')
-  if (present === false) return t('episode.documentary.pipeline.textAbsent')
-  return t('episode.documentary.pipeline.textUnknown')
-})
+const textPolicy = computed(() => describeTextPolicy(selectedRound.value?.gate?.text_in_image ?? null, t))
 
 const violationOptions = computed(() => {
   const gate = selectedRound.value?.gate
@@ -516,9 +625,46 @@ async function loadDetail(runId: number, silent = false) {
 async function loadSources() {
   try {
     const res = await assetPipelineAPI.listSources(props.assetKind, props.assetId)
-    if (!stopped) sources.value = res?.sources ?? []
+    if (stopped) return
+    sources.value = res?.sources ?? []
+    // 素材被删/改角色后，已勾选但不再合格的参考图必须掉出选择，否则启动必被后端 400
+    const usable = new Set(referenceCandidates.value.map(item => item.id))
+    selectedSourceIds.value = selectedSourceIds.value.filter(id => usable.has(id))
   } catch (err) {
     if (!stopped) sourceError.value = msg(err, t('episode.documentary.pipeline.loadFailed'))
+  }
+}
+
+/**
+ * 启用的图像模型（配置 id + 模型名）。
+ *
+ * 不能复用 loadModelOptions：它按 provider/model 去重，两条同模型的启用配置只会留一条，
+ * 而这里要把 config_id 一起冻结进流水线，人必须能分别选到各自的配置。
+ * 默认 GPT Image；没有就取优先级最高的配置的首个模型。
+ */
+async function loadModels() {
+  try {
+    const raw: unknown = await aiConfigAPI.list('image')
+    if (stopped) return
+    const options: PipelineModelOption[] = []
+    for (const row of (Array.isArray(raw) ? raw : []) as Array<Record<string, unknown>>) {
+      const configId = Number(row.id)
+      if (!Number.isFinite(configId) || !(row.is_active ?? row.isActive)) continue
+      const provider = typeof row.provider === 'string' ? row.provider : ''
+      const name = typeof row.name === 'string' && row.name ? row.name : (provider || String(configId))
+      for (const model of configModels(row.model)) {
+        options.push({ key: `${configId}:${model}`, configId, configName: name, provider, model, priority: Number(row.priority) || 0 })
+      }
+    }
+    options.sort((a, b) => b.priority - a.priority)
+    modelOptions.value = options
+    if (modelKey.value && options.some(option => option.key === modelKey.value)) return
+    const gptImage = options.find(option => option.provider === 'openai' && option.model.toLowerCase().includes('gpt-image'))
+    modelKey.value = (gptImage ?? options[0])?.key ?? ''
+  } catch {
+    if (!stopped) modelOptions.value = []
+  } finally {
+    if (!stopped) modelsLoading.value = false
   }
 }
 
@@ -530,15 +676,20 @@ function selectRun(runId: number) {
 }
 
 async function start() {
-  if (starting.value || props.mapConfigured) return
+  if (starting.value || props.mapConfigured || !canStart.value) return
   starting.value = true
   startError.value = ''
   try {
+    const model = selectedModel.value
     await assetPipelineAPI.start({
       asset_kind: props.assetKind,
       asset_id: props.assetId,
       episode_id: Number(props.episodeId),
       purpose: purpose.value,
+      // 参考图只对精确轮有意义；美化轮由后端用上一轮成品
+      source_ids: purpose.value === 'precision' ? [...selectedSourceIds.value] : undefined,
+      config_id: model?.configId,
+      model: model?.model,
     })
     if (stopped) return
     toast.success(t('episode.documentary.pipeline.started'))
@@ -673,6 +824,8 @@ async function submit(verdict: Verdict) {
       notes: notes.value.trim() || undefined,
       opened: [...openedImages.value],
       override_gate: verdict === 'approve' && gateFailed.value ? true : undefined,
+      // next_purpose 只在打回时有效，后端对其他结论会 400
+      next_purpose: verdict === 'revise' ? nextPurpose.value : undefined,
     })
     if (stopped) return
     toast.success(t('episode.documentary.pipeline.approveDone'))
@@ -696,6 +849,7 @@ watch(() => [props.assetKind, props.assetId], () => {
   selectedRunId.value = null
   selectedRoundId.value = null
   openedByRound.value = {}
+  selectedSourceIds.value = []
   void loadRuns()
   void loadSources()
 })
@@ -705,6 +859,8 @@ watch(selectedRoundId, () => {
   selectedViolations.value = []
   overrideGate.value = false
   approveError.value = ''
+  // 打回的下一轮默认沿用本轮用途（精确→精确），人可以再改
+  nextPurpose.value = selectedRound.value?.purpose ?? 'precision'
 })
 
 watch(() => {
@@ -742,6 +898,7 @@ onMounted(() => {
   } else {
     void loadRuns()
     void loadSources()
+    void loadModels()
   }
 })
 onBeforeUnmount(() => { stopped = true })

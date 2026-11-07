@@ -6,8 +6,8 @@
  *
  * 关键约束写死在提示词里，不靠运行时纠正：
  * - 事实表每条必须带 `metric`（闸门禁用 `minor` 的依据）与年代约束；
- * - 出图提示词必须含 `no text, no labels, no captions, no legend`
- *   （底图零文字是图层体系的前提，画面文字一律判 FAIL）；
+ * - 出图提示词禁的是**额外加上去的**标注（`no added labels/captions/legend/watermark/signage`），
+ *   器物本身的铭文/刻字要保留（画面文字是否判 FAIL 只看 `text_in_image.overlay`）；
  * - QC 只许按清单逐条给 `verdict/detected/evidence`，不得自创 tolerance、不得改清单。
  */
 import type { AssetSpecRow, AssetSourceRow } from './store.js'
@@ -40,11 +40,15 @@ export const QC_SYSTEM = `你是图像质检员。你只负责**描述你在图�
 2. must_have 每条给 {id, verdict, evidence}，verdict 只能是 ok / minor / violation。evidence 必须写你在画面哪里看到了什么。
 3. forbidden 每条给 {id, detected, evidence}，detected 必须是布尔值 true/false。
 4. **不得自创容差**。若你认为某条应按容差放行，必须在该条上加 "tolerance" 字段并**原文照抄**给你的容差清单里的整句；抄不到就不要加。
-5. text_in_image 必须给 {present: true/false, evidence}：画面上只要有任何可辨认的文字、字母、数字、图例、水印，present 就是 true。
+5. text_in_image 必须给 {present: true/false, overlay: true/false, evidence}：
+   - present：画面上有没有任何可辨认的文字、字母、数字（含器物本身的铭文、印文、刻字、钱币文字）。
+   - overlay：这些文字里**有没有生成器额外加上去的**标注/图例/说明/字幕/水印/招牌——即不属于被画物体本身的文字。
+     只有 overlay=true 才算问题；器物本身的铭文只记 present=true、overlay=false。
+   - evidence 写清文字在画面哪里、写的是什么、你判断它属于物体本身还是额外添加。
 6. locate 只在给了定位目标时回答：每个目标给 {id, name, at:[x,y]}，x/y 是**归一化到 0–1** 的画面坐标（左上角为原点）。看不到就给 at:null。
 7. fidelity_score / beauty_score 一律给 **0–100 的整数**（不要用 0–1 的小数）：前者是对事实表的还原度，后者是画面质感。
 只返回 JSON，不要 Markdown 代码块：
-{"must_have":[{"id":"","verdict":"ok","evidence":""}],"forbidden":[{"id":"","detected":false,"evidence":""}],"text_in_image":{"present":false,"evidence":""},"locate":[],"fidelity_score":0,"beauty_score":0,"suggestions":[""],"overall":"pass"}`
+{"must_have":[{"id":"","verdict":"ok","evidence":""}],"forbidden":[{"id":"","detected":false,"evidence":""}],"text_in_image":{"present":false,"overlay":false,"evidence":""},"locate":[],"fidelity_score":0,"beauty_score":0,"suggestions":[""],"overall":"pass"}`
 
 export function researchUserPrompt(input: {
   assetKind: string
@@ -89,7 +93,7 @@ export function specUserPrompt(input: {
   ].filter(Boolean).join('\n')
 }
 
-/** 出图提示词：事实表 → 英文描述；底图零文字是硬约束 */
+/** 出图提示词：事实表 → 英文描述；只禁额外添加的标注，器物自带的铭文照留 */
 export function buildImagePrompt(spec: AssetSpecRow, input: {
   name: string
   purpose: 'precision' | 'beautify'
@@ -107,8 +111,8 @@ export function buildImagePrompt(spec: AssetSpecRow, input: {
     spec.palette || '',
     input.purpose === 'beautify' && input.stylePrompt ? input.stylePrompt : '',
     ...input.reviseNotes,
-    // 画面文字一律判 FAIL：地名/图例/标注都走图层体系，不进底图
-    'no text, no labels, no captions, no legend, no watermark, no signage',
+    // 地名/图例/说明走图层体系，不进底图；但器物自身的铭文属于形制，不能让模型抹掉
+    'no added labels, no captions, no legend, no watermark, no signage; keep any inscriptions or markings that are part of the object itself',
   ]
   return parts.filter(Boolean).join(', ')
 }

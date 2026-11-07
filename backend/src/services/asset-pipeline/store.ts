@@ -95,7 +95,8 @@ export interface AssetRoundRow {
 export interface QcVerdicts {
   must_have: Array<{ id: string; verdict: string; evidence?: string; tolerance?: string }>
   forbidden: Array<{ id: string; detected: boolean; evidence?: string }>
-  text_in_image: { present: boolean | null; evidence: string }
+  /** `overlay` = 是否为生成器额外加上去的标注/说明/水印（Issue #73）；老记录里没有这一项 */
+  text_in_image: { present: boolean | null; overlay?: boolean | null; evidence: string }
   locate?: Array<{ id: string; name?: string; at?: [number, number] | null }>
   overall?: string
   gate_result?: GateResult

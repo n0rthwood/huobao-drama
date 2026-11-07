@@ -18,6 +18,11 @@ import { pipelineExecution } from '../services/asset-pipeline/execution.js'
 import { serializeQcGate } from '../services/asset-pipeline/gate-serialization.js'
 import { roundReferenceImages } from '../services/asset-pipeline/references.js'
 import {
+  ImageSelectionError,
+  ReferenceSelectionError,
+  RoundPlanError,
+} from '../services/asset-pipeline/contract.js'
+import {
   approveRound,
   ASSET_PIPELINE_KIND,
   cancelRun,
@@ -34,6 +39,7 @@ import {
   listSources,
   SOURCE_ROLES,
   type AssetKind,
+  type RoundPurpose,
   type SourceRole,
 } from '../services/asset-pipeline/store.js'
 
@@ -50,6 +56,10 @@ async function serializeRun(row: typeof schema.sysTask.$inferSelect) {
     id: row.id,
     status: row.status,
     purpose: params?.purpose ?? 'precision',
+    // 启动时冻结的输入（Issue #73）：面板据此显示「本次用的参考图/出图模型」
+    reference_source_ids: Array.isArray(params?.reference_source_ids) ? params.reference_source_ids.map(Number) : null,
+    image_config_id: typeof params?.image_config_id === 'number' ? params.image_config_id : null,
+    image_model: typeof params?.image_model === 'string' ? params.image_model : null,
     step: params?.progress?.step ?? null,
     asset_kind: params?.asset_kind ?? null,
     asset_id: params?.asset_id ?? null,
@@ -72,12 +82,16 @@ app.post('/runs', async (c) => {
   const episodeId = Number(body.episode_id)
   if (!assetId || !episodeId) return badRequest(c, 'asset_id 与 episode_id 必填')
   const purpose = body.purpose === 'beautify' ? 'beautify' as const : 'precision' as const
+  if (body.source_ids !== undefined && !Array.isArray(body.source_ids)) {
+    return badRequest(c, 'source_ids 必须是素材 id 数组')
+  }
   try {
     const result = await startAssetPipeline({
       assetKind: kind,
       assetId,
       episodeId,
       purpose,
+      sourceIds: Array.isArray(body.source_ids) ? body.source_ids.map(Number) : null,
       configId: body.config_id ?? null,
       model: body.model ?? null,
       textConfigId: body.text_config_id ?? null,
@@ -87,6 +101,9 @@ app.post('/runs', async (c) => {
     if (err instanceof PipelineConflictError) return c.json({ success: false, error: err.message }, 409)
     if (err instanceof StageVisionUnavailableError) return badRequest(c, err.message)
     if (err instanceof PipelineStateError) return badRequest(c, err.message)
+    if (err instanceof ReferenceSelectionError) return badRequest(c, err.message)
+    if (err instanceof ImageSelectionError) return badRequest(c, err.message)
+    if (err instanceof RoundPlanError) return badRequest(c, err.message)
     logTaskError('AssetPipelineAPI', 'start', { error: err instanceof Error ? err.message : String(err) })
     return badRequest(c, err instanceof Error ? err.message : '启动流水线失败')
   }
@@ -233,6 +250,15 @@ app.post('/runs/:id/approve', async (c) => {
       })
     : []
   if (!opened.length) return badRequest(c, '审批必须附上已打开查看的图片（opened: [{path, sha256}]）')
+  const nextPurpose: RoundPurpose | null = body.next_purpose === 'precision' ? 'precision'
+    : body.next_purpose === 'beautify' ? 'beautify'
+    : null
+  if (!nextPurpose && body.next_purpose !== undefined && body.next_purpose !== null) {
+    return badRequest(c, 'next_purpose 只能是 precision（精确轮）或 beautify（美化轮）')
+  }
+  if (nextPurpose && verdict !== 'revise') {
+    return badRequest(c, '只有「打回重修」（verdict=revise）时才能指定 next_purpose')
+  }
   try {
     await approveRound({
       runId: id,
@@ -242,10 +268,14 @@ app.post('/runs/:id/approve', async (c) => {
       notes: body.notes ? String(body.notes) : null,
       opened,
       overrideGate: body.override_gate === true,
+      nextPurpose,
     })
     return success(c, { status: 'ok' })
   } catch (err) {
     if (err instanceof PipelineStateError) return badRequest(c, err.message)
+    if (err instanceof ReferenceSelectionError) return badRequest(c, err.message)
+    if (err instanceof ImageSelectionError) return badRequest(c, err.message)
+    if (err instanceof RoundPlanError) return badRequest(c, err.message)
     throw err
   }
 })

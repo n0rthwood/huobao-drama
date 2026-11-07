@@ -37,7 +37,7 @@ const script = `
   const baseQc = {
     must_have: spec.must_have.map(item => ok(item.id)),
     forbidden: spec.forbidden.map(item => clean(item.id)),
-    text_in_image: { present: false, evidence: '全图无文字' },
+    text_in_image: { present: false, overlay: false, evidence: '全图无文字' },
     overall: 'pass',
   }
 
@@ -99,16 +99,28 @@ const script = `
     ],
   })
 
-  // 画面里有文字
+  // 器物自身的铭文：有字但不是额外标注 → 不判 FAIL（Issue #73）
   results.textPresent = evaluateGate(specNoLocate, {
     ...baseQc,
-    text_in_image: { present: true, evidence: '右下角有展牌文字' },
+    text_in_image: { present: true, overlay: false, evidence: '舆侧有铸造铭文，属器物本身' },
   })
 
-  // text_in_image 缺布尔
+  // 生成器加上去的标注 → FAIL
+  results.textOverlay = evaluateGate(specNoLocate, {
+    ...baseQc,
+    text_in_image: { present: true, overlay: true, evidence: '右下角有展牌说明文字' },
+  })
+
+  // text_in_image.present 缺布尔
   results.textMissing = evaluateGate(specNoLocate, {
     ...baseQc,
-    text_in_image: { evidence: '没看清' },
+    text_in_image: { overlay: false, evidence: '没看清' },
+  })
+
+  // text_in_image.overlay 缺布尔（老口径的 QC 回答）→ 清单不完整，不是 PASS
+  results.overlayMissing = evaluateGate(specNoLocate, {
+    ...baseQc,
+    text_in_image: { present: true, evidence: '有字，但没说是不是额外标注' },
   })
 
   // 禁止项命中
@@ -226,12 +238,18 @@ test('QC 引用 spec 之外的 tolerance → invalid；引用白名单内的合�
   assert.equal(results.allowedTolerance.pass, true)
 })
 
-test('画面文字 present=true → FAIL；缺布尔 → invalid', () => {
-  assert.equal(results.textPresent.pass, false)
+test('器物自身铭文（overlay=false）→ 不判 FAIL；额外标注 overlay=true → FAIL；两个布尔缺一 → invalid', () => {
+  assert.equal(results.textPresent.pass, true)
   assert.equal(results.textPresent.text_in_image.present, true)
+  assert.equal(results.textPresent.text_in_image.overlay, false)
+  assert.equal(results.textOverlay.pass, false)
+  assert.equal(results.textOverlay.text_in_image.overlay, true)
   assert.equal(results.textMissing.pass, false)
   assert.equal(results.textMissing.text_in_image.present, null)
-  assert.ok(results.textMissing.invalid.some(text => text.includes('text_in_image')))
+  assert.ok(results.textMissing.invalid.some(text => text.includes('text_in_image.present')))
+  assert.equal(results.overlayMissing.pass, false)
+  assert.equal(results.overlayMissing.text_in_image.overlay, null)
+  assert.ok(results.overlayMissing.invalid.some(text => text.includes('text_in_image.overlay')))
 })
 
 test('禁止项命中 → FAIL；detected 不是布尔 → invalid', () => {
