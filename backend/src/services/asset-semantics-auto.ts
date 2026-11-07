@@ -1,3 +1,5 @@
+import { runWithTextTask } from './text-task-context.js'
+
 /**
  * 证据素材的自动语义标注（Issue #47）— VLM 语义锚点 + CV 几何
  *
@@ -512,6 +514,7 @@ export async function startSemanticsAuto(input: {
   absPath: string
   sourceTaskId: number | null
   configId?: number
+  retryOf?: number
 }): Promise<StartSemanticsAutoResult> {
   // 视觉环节（#51）：没有标定为视觉的配置就直接 400，不建一条注定失败的任务，
   // 更不拿纯文本模型硬编坐标。错误由路由层转成 400。
@@ -522,12 +525,15 @@ export async function startSemanticsAuto(input: {
     dramaId: input.dramaId,
     prompt: `为证据素材「${input.propName}」自动标注语义`,
     stageModel: config,
+    retryOf: input.retryOf,
+    queued: true,
+    restart: { kind: 'asset_semantics', args: { input } },
   })
   // 任务行按「集」落库；状态接口要据此只回本道具的那次任务
   await patchTextTaskParams(taskId, { prop_id: input.propId, semantics_phase: 'start' })
 
   logTaskStart('Semantics', 'auto', { propId: input.propId, model: config.model, path: input.absPath })
-  void runSemanticsTask(taskId, { ...input, config })
+  void runWithTextTask(taskId, () => runSemanticsTask(taskId, { ...input, config }))
   return { started: true, taskId }
 }
 

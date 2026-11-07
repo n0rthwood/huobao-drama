@@ -1,3 +1,5 @@
+import { runWithTextTask } from './text-task-context.js'
+
 /**
  * Poster AI 构想（Issue #72）：只用 AI 改写/拆分后的剧本 + 本集资产描述，
  * 一次产出三个有实质差异的构图方案（中心思想、选中资产、画面 prompt、文字描述、
@@ -555,11 +557,13 @@ export async function startPosterConcept(
     stageModel: stage,
     progress: { completed: 0, total: 1, failed: 0 },
     retryOf: opts.retryOf,
+    queued: true,
+    restart: { kind: 'poster_concept', args: { episodeId, opts } },
   })
   logTaskStart('PosterConcept', 'run', { episodeId, posterId: poster.id, model: stage.model })
 
   const lang = await getContentLanguage()
-  void runPosterConcept({ taskId, episodeId, posterId: poster.id, context, script, assets, stage, lang })
+  void runWithTextTask(taskId, () => runPosterConcept({ taskId, episodeId, posterId: poster.id, context, script, assets, stage, lang }))
   return { started: true, task_id: taskId }
 }
 

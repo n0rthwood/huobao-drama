@@ -97,6 +97,11 @@ export interface RewriteTaskParams {
   stages: Array<{ key: string; status: string; version_id: number | null; error: string | null }>
 }
 
+export interface TextTaskRestart {
+  kind: TextTaskKind
+  args: Record<string, unknown>
+}
+
 export interface TextTaskParams {
   kind: TextTaskKind
   progress?: TextTaskProgress
@@ -154,6 +159,8 @@ export async function createTextTask(input: {
   scope?: { included: Array<{ storyboard_id: number; storyboard_number: number }>; excluded: Array<{ storyboard_id: number; storyboard_number: number; reason: string }> }
   progress?: TextTaskProgress
   retryOf?: number
+  queued?: boolean
+  restart?: TextTaskRestart
 }): Promise<number> {
   const ts = now()
   const stage = input.stageModel
@@ -168,6 +175,7 @@ export async function createTextTask(input: {
     params.model_used = stageModelUsed(stage)
   }
   if (input.retryOf) params.retry_of = input.retryOf
+  if (input.restart) params.restart = input.restart
 
   const res = await db.insert(schema.sysTask).values({
     type: 'text',
@@ -178,11 +186,18 @@ export async function createTextTask(input: {
     model: stage ? stage.model : (input.model ?? null),
     prompt: input.prompt ?? null,
     params: JSON.stringify(params),
-    status: 'processing',
+    status: input.queued ? 'queued' : 'processing',
     createdAt: ts,
     updatedAt: ts,
   })
   return getInsertId(res)
+}
+
+/** Only the first admitted LLM call transitions a queued task into processing. */
+export async function markTextTaskStarted(id: number): Promise<void> {
+  await db.update(schema.sysTask)
+    .set({ status: 'processing', updatedAt: now() })
+    .where(and(eq(schema.sysTask.id, id), eq(schema.sysTask.status, 'queued')))
 }
 
 /** 合并写 params（保留 kind/storyboardIds 等其它键）；花名册与画像外貌等任务也复用这套读-合-写 */

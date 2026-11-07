@@ -1,3 +1,5 @@
+import { runWithTextTask } from './text-task-context.js'
+
 /**
  * 旁白写作任务（Issue #30，#35 改为两段式）。
  *
@@ -131,11 +133,13 @@ export async function startNarrationScript(
     progress,
     storyboardIds: targets.map(sb => sb.id),
     retryOf: opts.retryOf,
+    queued: true,
+    restart: { kind: 'narration_script', args: { episodeId, dramaId, opts, storyboardIds } },
   })
 
   logTaskStart('Narration', 'script-batch', { episodeId, dramaId, total: targets.length })
 
-  ;(async () => {
+  void runWithTextTask(taskId, async () => {
     const agent = narrationWriter()
     // 每次调用一份请求上下文：分块/单镜运行把允许落库的镜号带进去，save_narrations 据此拒绝越界写入
     const contextFor = (shotNumbers?: number[]) => buildAgentRequestContext({
@@ -218,7 +222,7 @@ export async function startNarrationScript(
     }
     await sink.flush().catch(() => { /* 落盘失败不影响任务结果 */ })
     return spine
-  })()
+  })
     .then(async (spine) => {
       await finishTextTask(taskId, progress.failed && !progress.completed ? 'failed' : 'completed', {
         progress,

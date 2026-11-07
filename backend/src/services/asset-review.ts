@@ -1,3 +1,5 @@
+import { runWithTextTask } from './text-task-context.js'
+
 /**
  * 资产审核清单（Issue #55）— 纪录片「资产」步的强门禁，唯一读写口
  *
@@ -700,12 +702,14 @@ export async function startAssetReview(
     stageModel: stage,
     progress: { completed: 0, failed: 0, total: texts.length },
     retryOf: opts.retryOf,
+    queued: true,
+    restart: { kind: 'asset_review', args: { episodeId, opts } },
   })
   await patchTextTaskParams(taskId, { auto_segmented: auto })
   await recomputeAssetReviewStatus(episodeId)
 
   logTaskStart('AssetReview', 'run', { episodeId, segments: texts.length, model: stage.model })
-  void runAssetReview(taskId, episodeId, texts, stage)
+  void runWithTextTask(taskId, () => runAssetReview(taskId, episodeId, texts, stage))
   return { started: true, taskId }
 }
 

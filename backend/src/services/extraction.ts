@@ -19,6 +19,24 @@ import {
 } from './text-task.js'
 import { resolveStageModel } from './ai-stages.js'
 import { onReviewExtractionFinished } from './asset-review.js'
+import { runWithTextTask } from './text-task-context.js'
+
+const extractionLocks = new Map<string, Promise<void>>()
+
+/** Serialize the whole extraction, including post-processing, for each episode/type. */
+export async function withExtractionLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  const previous = extractionLocks.get(key) ?? Promise.resolve()
+  let release!: () => void
+  const current = new Promise<void>(resolve => { release = resolve })
+  extractionLocks.set(key, current)
+  await previous
+  try {
+    return await fn()
+  } finally {
+    if (extractionLocks.get(key) === current) extractionLocks.delete(key)
+    release()
+  }
+}
 
 export type ExtractTarget = 'characters' | 'scenes' | 'props'
 export const EXTRACT_TARGETS: ExtractTarget[] = ['characters', 'scenes', 'props']
@@ -68,7 +86,7 @@ export async function startSingleAssetExtraction(
   dramaId: number,
   target: ExtractTarget,
   assetName: string,
-  opts: { model?: string; configId?: number; assetReviewItemId?: number } = {},
+  opts: { model?: string; configId?: number; retryOf?: number; assetReviewItemId?: number } = {},
 ): Promise<boolean> {
   const label = { characters: '角色', scenes: '场景', props: '道具' }[target]
   const message = `请只针对本集剧本中的${label}「${assetName}」重新提取信息并保存，不要处理其它${label}；`
@@ -85,7 +103,7 @@ async function startExtractorRun(
   opts: { model?: string; configId?: number; retryOf?: number; singleAssetName?: string; assetReviewItemId?: number } = {},
 ): Promise<boolean> {
   const kind = EXTRACT_TASK_KINDS[target]
-  if (await findActiveTextTask(episodeId, kind)) return false
+  if (!opts.assetReviewItemId && !opts.retryOf && await findActiveTextTask(episodeId, kind)) return false
 
   const resolved = await resolveStageModel('extractor', opts)
   const taskId = await createTextTask({
@@ -95,12 +113,14 @@ async function startExtractorRun(
     prompt: message,
     stageModel: resolved,
     retryOf: opts.retryOf,
+    queued: true,
+    restart: { kind, args: { episodeId, dramaId, target, message, opts } },
   })
   // 补提取（Issue #55）：记住这次提取是为哪条审核清单条目发起的，完成后按它回链
   if (opts.assetReviewItemId) await patchTextTaskParams(taskId, { assetReviewItemId: opts.assetReviewItemId })
 
   logTaskStart('Extract', target, { episodeId, dramaId, model: opts.model || undefined, configId: opts.configId || undefined })
-  ;(async () => {
+  void withExtractionLock(`episode:${episodeId}:${kind}`, () => runWithTextTask(taskId, async () => {
     const agent = mastra.getAgent('extractor')
     if (!agent) throw new Error('提取 Agent 不可用')
     const requestContext = buildAgentRequestContext({
@@ -126,7 +146,7 @@ async function startExtractorRun(
         })
       },
     }, createReasoningSink(taskId))
-  })()
+  })
     .then(async (result) => {
       await finishTextTask(taskId, 'completed', { outputText: result?.text || '' })
       const toolNames = (result?.toolCalls || []).map(t => t?.payload?.toolName).filter(Boolean)
@@ -143,7 +163,7 @@ async function startExtractorRun(
       const message = err instanceof Error ? err.message : '提取失败'
       await finishTextTask(taskId, 'failed', { errorMsg: message })
       logTaskError('Extract', target, { episodeId, error: message })
-    })
+    }))
   return true
 }
 

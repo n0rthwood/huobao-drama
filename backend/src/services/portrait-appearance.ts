@@ -1,3 +1,5 @@
+import { runWithTextTask } from './text-task-context.js'
+
 /**
  * 「按史料画像补充外貌」（Issue #32 A4/B4）
  *
@@ -271,7 +273,7 @@ function buildUserText(input: {
  */
 export async function startPortraitAppearance(
   characterId: number,
-  opts: { episodeId: number; configId?: number },
+  opts: { episodeId: number; configId?: number; retryOf?: number },
 ): Promise<StartPortraitAppearanceResult> {
   const { episodeId } = opts
   const [character] = await db.select().from(schema.characters).where(eq(schema.characters.id, characterId))
@@ -292,6 +294,9 @@ export async function startPortraitAppearance(
     dramaId: character.dramaId,
     prompt: `按史料画像补充「${character.name}」的外貌`,
     stageModel: vision,
+    retryOf: opts.retryOf,
+    queued: true,
+    restart: { kind: 'portrait_appearance', args: { characterId, opts } },
   })
   // 任务行按「集」落库，角色 id 必须进 params：状态接口要据此只回本角色的那次任务
   await patchTextTaskParams(taskId, {
@@ -304,7 +309,7 @@ export async function startPortraitAppearance(
     portraits: portraits.length, model: vision.model,
   })
 
-  void runPortraitAppearance(taskId, { character, episodeId, portraits, vision })
+  void runWithTextTask(taskId, () => runPortraitAppearance(taskId, { character, episodeId, portraits, vision }))
 
   return {
     started: true,

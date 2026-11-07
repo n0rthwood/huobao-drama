@@ -1,3 +1,5 @@
+import { runWithTextTask } from './text-task-context.js'
+
 /**
  * 设计卡填写（Issue #57，替换 #49 的 `shot-intent-batch.ts`）— 为纪录片分镜逐镜跑
  * `storyboard_breaker`，只写 `design_card`。
@@ -98,6 +100,8 @@ export async function startDesignCardBatch(
     storyboardIds: pending.map(sb => sb.id),
     progress,
     retryOf: opts.retryOf,
+    queued: true,
+    restart: { kind: 'design_card', args: { episodeId, dramaId, opts, storyboardIds } },
   })
   // 覆盖前留痕：这一批每镜的旧卡原样存进本次任务参数，人工可据此回退。
   // 被配音门禁挡掉的镜也记下来：任务详情要能说清「哪几镜没进这一批、为什么」。
@@ -113,7 +117,7 @@ export async function startDesignCardBatch(
 
   const outputs: string[] = []
   logTaskStart('DesignCard', 'batch', { episodeId, dramaId, total: pending.length, model: opts.model || undefined })
-  ;(async () => {
+  void runWithTextTask(taskId, async () => {
     const agent = mastra.getAgent('storyboard_breaker')
     if (!agent) throw new Error('分镜 Agent 不可用')
     const requestContext = buildAgentRequestContext({
@@ -178,7 +182,7 @@ export async function startDesignCardBatch(
         logTaskError('DesignCard', 'batch-shot', { storyboardId: sb.id, error: err instanceof Error ? err.message : String(err) })
       }
     }
-  })()
+  })
     .then(async () => {
       progress.current_storyboard_id = undefined
       await finishTextTask(taskId, 'completed', { progress, outputText: outputs.filter(s => s.trim()).join('\n\n') })

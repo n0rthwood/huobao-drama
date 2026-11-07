@@ -1,3 +1,5 @@
+import { runWithTextTask } from './text-task-context.js'
+
 /**
  * 旁白覆盖缺口的「补全剩余」（Issue #52）。
  *
@@ -326,6 +328,8 @@ export async function startFillGapsTask(
     prompt: message,
     stageModel: resolved,
     retryOf: opts.retryOf,
+    queued: true,
+    restart: { kind: 'storyboard_fill_gaps', args: { episodeId, opts } },
   })
   const evidence = await buildEvidenceImages(episodeId)
   if (evidence.length) {
@@ -345,7 +349,7 @@ export async function startFillGapsTask(
   const knownIds = new Set(rows.map(sb => sb.id))
   logTaskStart('FillGaps', 'run', { episodeId, dramaId, gaps: gaps.length, taskId })
 
-  runAgent(agent, [{ role: 'user', content: evidenceMessageParts(message, evidence) }], { maxSteps: 20, requestContext }, sink)
+  void runWithTextTask(taskId, () => runAgent(agent, [{ role: 'user', content: evidenceMessageParts(message, evidence) }], { maxSteps: 20, requestContext }, sink))
     .then(async result => {
       // 先按剧本位置归位编号，再按覆盖结果判定成败
       const renumber = await renumberStoryboardsByScript(episodeId)

@@ -1,3 +1,5 @@
+import { runWithTextTask } from './text-task-context.js'
+
 /**
  * 资产批量生成（Issue #33）—— 角色 / 场景 / 道具 / 全部资产四个入口共用一条流水线。
  *
@@ -31,7 +33,7 @@ import { resolveStageModel } from './ai-stages.js'
 import { partitionMissingReferences, resolveReferenceImages } from './reference-images.js'
 import { ACTIVE_TASK_STATUSES, isActiveTaskStatus, isQwenJobsTask, type SysTaskRow } from './sys-task.js'
 import { cancelImageTask } from './qwen-jobs.js'
-import { createTextTask, parseTextTaskParams, patchTextTaskParams } from './text-task.js'
+import { createTextTask, markTextTaskStarted, parseTextTaskParams, patchTextTaskParams } from './text-task.js'
 import { logTaskError, logTaskProgress, logTaskStart, logTaskSuccess, logTaskWarn } from '../utils/task-logger.js'
 import {
   classifyAsset,
@@ -416,6 +418,8 @@ async function dispatchImage(ctx: RunContext, asset: LoadedAsset, prompt: string
     return
   }
   try {
+    // A batch may need no prompt generation; image submission is irreversible too.
+    await markTextTaskStarted(ctx.taskId)
     const taskId = await submitImage(asset, prompt, ctx.episodeId, ctx.req)
     item.task_id = taskId
     item.state = 'submitted'
@@ -541,7 +545,7 @@ async function runBatch(ctx: RunContext): Promise<void> {
   }
 }
 
-export async function startAssetBatch(dramaId: number, req: AssetBatchRequest): Promise<AssetBatchJson> {
+export async function startAssetBatch(dramaId: number, req: AssetBatchRequest, retryOf?: number): Promise<AssetBatchJson> {
   const [drama] = await db.select().from(schema.dramas).where(eq(schema.dramas.id, dramaId))
   if (!drama) throw new Error('项目不存在')
   const [episode] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, req.episodeId))
@@ -579,6 +583,9 @@ export async function startAssetBatch(dramaId: number, req: AssetBatchRequest): 
     dramaId,
     prompt: `资产批量生成（${req.scope}）：${pending} 个待处理 / 共 ${counts.total} 个`,
     stageModel,
+    retryOf,
+    queued: true,
+    restart: { kind: 'asset_batch', args: { dramaId, req } },
   })
   await persist(taskId, batch)
   logTaskStart('AssetBatch', 'start', {
@@ -592,7 +599,7 @@ export async function startAssetBatch(dramaId: number, req: AssetBatchRequest): 
     taskId, dramaId, episodeId: req.episodeId, req, batch,
     assets: new Map(assets.map(a => [assetKey(a.kind, a.id), a])),
   }
-  void runBatch(ctx)
+  void runWithTextTask(taskId, () => runBatch(ctx))
 
   const [row] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, taskId))
   return toStatusJson(row!, batch)

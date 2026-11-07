@@ -49,6 +49,7 @@ import { resumeAssetPipelines } from './services/asset-pipeline/run.js'
 import { startQwenJobsTracker } from './services/qwen-jobs.js'
 import { QWEN_JOBS_PROVIDER } from './services/sys-task.js'
 import { backfillTaskEpisodeIds, failInterruptedTextTasks } from './services/task-center.js'
+import { resumeQueuedTextTasks } from './services/text-task-restart.js'
 import { failInterruptedRewriteRuns } from './services/script-rewrite/run.js'
 import { backfillGeneratedAt } from './services/media-time.js'
 import { migrateReferenceImages } from './services/reference-images.js'
@@ -175,6 +176,7 @@ db.update(schema.sysTask)
   // 文本任务（提取 / 提示词批量 / 剧本改写 / 拆分分镜）的执行线程同样随重启丢失，标记为失败供一键重试
   .then(() => failInterruptedTextTasks())
   .then(() => failInterruptedRewriteRuns())
+  .then(() => resumeQueuedTextTasks())
   // 存量任务补归属集：全局任务中心按剧/集筛选与编号
   .then(() => backfillTaskEpisodeIds())
   // 存量媒体补生成时间（unix 秒，按 completed_at || created_at），幂等

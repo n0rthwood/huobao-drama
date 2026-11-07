@@ -25,6 +25,7 @@ import {
 } from './text-task.js'
 import { resolveStageModel } from './ai-stages.js'
 import { batchScopeOf, type BatchScope } from './batch-scope.js'
+import { runWithTextTask } from './text-task-context.js'
 
 export type KeyframePromptBatchStatus = PromptBatchStatus
 
@@ -72,11 +73,13 @@ export async function startKeyframePromptBatch(
     scope,
     progress,
     retryOf: opts.retryOf,
+    queued: true,
+    restart: { kind: 'keyframe_prompts', args: { episodeId, dramaId, opts, storyboardIds } },
   })
 
   const outputs: string[] = []
   logTaskStart('KeyframePrompt', 'batch', { episodeId, dramaId, total: pending.length, model: opts.model || undefined })
-  ;(async () => {
+  void runWithTextTask(taskId, async () => {
     const agent = mastra.getAgent('prompt_generator')
     if (!agent) throw new Error('提示词 Agent 不可用')
     const requestContext = buildAgentRequestContext({
@@ -119,7 +122,7 @@ ${briefs.get(sb.id)?.text || ''}最后调用 update_storyboard 保存到分镜 I
         logTaskError('KeyframePrompt', 'batch-shot', { storyboardId: sb.id, error: err instanceof Error ? err.message : String(err) })
       }
     }
-  })()
+  })
     .then(async () => {
       progress.current_storyboard_id = undefined
       await finishTextTask(taskId, 'completed', { progress, outputText: outputs.filter(s => s.trim()).join('\n\n') })

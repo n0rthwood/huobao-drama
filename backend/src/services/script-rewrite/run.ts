@@ -1,3 +1,5 @@
+import { runWithTextTask } from '../text-task-context.js'
+
 /**
  * 分阶段改写的服务端串行 runner（Issue #70 §2）。
  *
@@ -216,6 +218,8 @@ export async function startRewriteRun(episodeId: number, opts: StartRunOptions =
     configId: stageModel ? undefined : opts.configId ?? null,
     retryOf: opts.retryOf,
     progress: { completed: 0, total: plan.length, failed: 0, step: plan[0]?.key },
+    queued: true,
+    restart: { kind: 'script_rewrite', args: { episodeId, opts } },
   })
   await patchTextTaskParams(taskId, {
     rewrite: {
@@ -229,7 +233,7 @@ export async function startRewriteRun(episodeId: number, opts: StartRunOptions =
   await updateRun(runId, { taskId, sourceVersionId, preparedVersionId, status: 'processing' })
 
   logTaskStart('ScriptRewrite', 'run', { runId, taskId, episodeId, stages: plan.map(entry => entry.key) })
-  void executeRun(runId).catch(err => logTaskError('ScriptRewrite', 'run', {
+  void runWithTextTask(taskId, () => executeRun(runId)).catch(err => logTaskError('ScriptRewrite', 'run', {
     runId, error: err instanceof Error ? err.message : String(err),
   }))
   return { run_id: runId, task_id: taskId }

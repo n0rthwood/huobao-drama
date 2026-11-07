@@ -27,6 +27,8 @@ import { runTransitionReview } from './transition-agent.js'
 import { buildDesignCardBriefs, loadDesignCardContext } from './design-card-context.js'
 import { toCombo } from './design-card.js'
 
+import { runWithTextTask } from './text-task-context.js'
+
 export type VideoPromptBatchStatus = PromptBatchStatus
 
 /** 启动批量生成（立即返回）；运行中返回 started:false,total:-1；无待生成分镜返回 started:false,total:0；
@@ -84,11 +86,13 @@ export async function startVideoPromptBatch(
     storyboardIds: pending.map(sb => sb.id),
     progress,
     retryOf: opts.retryOf,
+    queued: true,
+    restart: { kind: 'video_prompts', args: { episodeId, dramaId, opts, storyboardIds } },
   })
 
   const outputs: string[] = []
   logTaskStart('VideoPrompt', 'batch', { episodeId, dramaId, total: pending.length, model: opts.model || undefined })
-  ;(async () => {
+  void runWithTextTask(taskId, async () => {
     const agent = mastra.getAgent('prompt_generator')
     if (!agent) throw new Error('视频提示词 Agent 不可用')
     const requestContext = buildAgentRequestContext({
@@ -145,7 +149,7 @@ ${briefs.get(sb.id)?.text || ''}${transitionHint}然后调用 update_storyboard 
         logTaskError('VideoPrompt', 'batch-shot', { storyboardId: sb.id, error: err instanceof Error ? err.message : String(err) })
       }
     }
-  })()
+  })
     .then(async () => {
       progress.current_storyboard_id = undefined
       await finishTextTask(taskId, 'completed', { progress, outputText: outputs.filter(s => s.trim()).join('\n\n') })

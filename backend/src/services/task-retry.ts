@@ -39,6 +39,7 @@ import { assertShotGate } from './workflow-gates.js'
 import { retryFailedComposeBatch } from './shot-compose.js'
 import { retryRewriteRun } from './script-rewrite/run.js'
 import { startSkeletonGeneration } from './narration-skeleton.js'
+import { runWithTextTask } from './text-task-context.js'
 
 export interface RetryOptions {
   configId?: number
@@ -220,6 +221,8 @@ async function retryChatText(row: SysTaskRow, kind: TextTaskKind, episodeId: num
     prompt: message,
     stageModel: resolved,
     retryOf: row.id,
+    queued: true,
+    restart: { kind, args: { sourceTaskId: row.id, opts } },
   })
   const requestContext = buildAgentRequestContext({
     episodeId,
@@ -228,8 +231,9 @@ async function retryChatText(row: SysTaskRow, kind: TextTaskKind, episodeId: num
     modelOverride: resolved.model,
     textConfigId: resolved.configId ?? undefined,
   })
-  runAgent(agent, [{ role: 'user', content: message }], { maxSteps: 20, requestContext }, createReasoningSink(taskId))
+  void runWithTextTask(taskId, () => runAgent(agent, [{ role: 'user', content: message }], { maxSteps: 20, requestContext }, createReasoningSink(taskId)))
     .then(result => finishTextTask(taskId, 'completed', { outputText: result.text || '' }))
+    .catch(err => finishTextTask(taskId, 'failed', { errorMsg: err instanceof Error ? err.message : String(err) }))
   return taskId
 }
 
