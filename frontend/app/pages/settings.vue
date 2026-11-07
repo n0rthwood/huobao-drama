@@ -177,6 +177,11 @@
                     </button>
                   </div>
                   <div class="config-sub mono truncate">{{ c.base_url || t('settings.ai.noBaseUrl') }}</div>
+                  <div v-if="c.service_type === 'text'" class="config-sub">
+                    {{ t('settings.cfg.consecutiveErrors', { n: c.consecutive_errors ?? 0 }) }}
+                    <span v-if="c.suspended_at"> · {{ t('settings.cfg.suspended') }}: {{ c.suspended_reason || '—' }}</span>
+                    <button v-if="c.suspended_at || c.consecutive_errors" type="button" class="btn btn-ghost btn-sm" @click="resumeCfg(c)">{{ t('settings.cfg.resume') }}</button>
+                  </div>
                 </div>
                 <button v-if="st.type === 'text'" class="btn btn-ghost btn-sm" @click="testExistingCfg(c)">{{ t('settings.ai.test') }}</button>
                 <label class="config-switch">
@@ -518,6 +523,11 @@
             <input v-model.number="cfgForm.priority" class="input" type="number" min="0" max="999" />
             <span class="field-hint">{{ t('settings.cfg.priorityHint') }}</span>
           </label>
+          <label v-if="cfgForm.service_type === 'text'" class="field">
+            <span class="field-label">{{ t('settings.cfg.concurrency') }}</span>
+            <input v-model.number="cfgForm.concurrency" class="input" type="number" min="0" max="20" step="1" required />
+            <span class="field-hint">{{ t('settings.cfg.concurrencyHint') }}</span>
+          </label>
           <label class="field"><span class="field-label">API Key</span><input v-model="cfgForm.api_key" class="input" type="password" placeholder="sk-..." /></label>
           <label class="field"><span class="field-label">Base URL</span><input v-model="cfgForm.base_url" class="input" placeholder="https://..." /></label>
           <div class="field">
@@ -777,7 +787,7 @@ const huobaoRegion = ref(locale.value?.startsWith('zh') ? 'cn' : 'com')
 const huobaoSiteUrl = computed(() => `https://api.firemux.${huobaoRegion.value}`)
 // tts_* 参数只对 service_type='tts' 生效，存进配置的 settings JSON（音色在这里必选，#35）
 const cfgForm = reactive({
-  name: '', provider: '', api_key: '', base_url: '', models: [], service_type: 'text', priority: 0, temperature: '', vision: false,
+  name: '', provider: '', api_key: '', base_url: '', models: [], service_type: 'text', priority: 0, concurrency: 0, temperature: '', vision: false,
   tts_instructions: '', tts_cfg_value: '', tts_inference_timesteps: '', tts_seed: '', tts_voice: '',
 })
 const TTS_FORM_RESET = { tts_instructions: '', tts_cfg_value: '', tts_inference_timesteps: '', tts_seed: '', tts_voice: '' }
@@ -916,6 +926,13 @@ async function setDefaultModel(type, c, m) {
 }
 async function toggleCfg(c) { await aiConfigAPI.update(c.id, { is_active: !c.is_active }); loadCfgs() }
 async function delCfg(id) { await aiConfigAPI.del(id); toast.success(t('index.deleted')); loadCfgs() }
+async function resumeCfg(c) {
+  try {
+    await aiConfigAPI.resume(c.id)
+    await loadCfgs()
+    toast.success(t('settings.cfg.resumed'))
+  } catch (e) { toastError(e) }
+}
 async function applyHuobaoQuickConfig() {
   const apiKey = huobaoApiKey.value.trim()
   if (!apiKey) { toast.warning(t('settings.ai.apiKeyRequired')); return }
@@ -939,7 +956,7 @@ async function applyHuobaoQuickConfig() {
 function startAddCfg(t) {
   cfgEditId.value = null
   cfgTestResult.value = null
-  Object.assign(cfgForm, { name: '', provider: '', api_key: '', base_url: '', models: [], service_type: t, priority: 0, temperature: '', vision: false, ...TTS_FORM_RESET })
+  Object.assign(cfgForm, { name: '', provider: '', api_key: '', base_url: '', models: [], service_type: t, priority: 0, concurrency: 0, temperature: '', vision: false, ...TTS_FORM_RESET })
   ttsVoiceOptions.value = []
   ttsVoicesError.value = ''
   const firstPreset = presetsByType(t)[0]
@@ -957,6 +974,7 @@ function startEditCfg(c) {
     models: Array.isArray(c.model) ? [...c.model] : String(c.model || '').split(',').map(s => s.trim()).filter(Boolean),
     service_type: c.service_type,
     priority: c.priority ?? 0,
+    concurrency: c.concurrency ?? 0,
     temperature: c.temperature ?? '',
     vision: c.vision === true,
     tts_instructions: ttsSettingsOf(c).instructions ?? '',
@@ -1014,11 +1032,15 @@ async function saveCfg() {
   if (temperature !== null && (!Number.isFinite(temperature) || temperature < 0 || temperature > 2)) {
     toast.warning(t('settings.cfg.tempInvalid')); return
   }
+  if (cfgForm.service_type === 'text' && (!Number.isInteger(cfgForm.concurrency) || cfgForm.concurrency < 0 || cfgForm.concurrency > 20)) {
+    toast.warning(t('settings.cfg.concurrencyInvalid')); return
+  }
   const ttsSettings = cfgForm.service_type === 'tts' ? collectTtsSettings() : undefined
   if (ttsSettings === null) return
   try {
-    if (cfgEditId.value) await aiConfigAPI.update(cfgEditId.value, { name: cfgForm.name, provider: cfgForm.provider, api_key: cfgForm.api_key, base_url: cfgForm.base_url, model: models, priority: cfgForm.priority, temperature, vision: cfgForm.vision === true, tts_settings: ttsSettings })
-    else await aiConfigAPI.create({ service_type: cfgForm.service_type, provider: cfgForm.provider, name: cfgForm.name || `${cfgForm.provider}-${cfgForm.service_type}`, api_key: cfgForm.api_key, base_url: cfgForm.base_url, model: models, priority: cfgForm.priority, temperature, vision: cfgForm.vision === true, tts_settings: ttsSettings })
+    const concurrency = cfgForm.service_type === 'text' ? cfgForm.concurrency : undefined
+    if (cfgEditId.value) await aiConfigAPI.update(cfgEditId.value, { name: cfgForm.name, provider: cfgForm.provider, api_key: cfgForm.api_key, base_url: cfgForm.base_url, model: models, priority: cfgForm.priority, concurrency, temperature, vision: cfgForm.vision === true, tts_settings: ttsSettings })
+    else await aiConfigAPI.create({ service_type: cfgForm.service_type, provider: cfgForm.provider, name: cfgForm.name || `${cfgForm.provider}-${cfgForm.service_type}`, api_key: cfgForm.api_key, base_url: cfgForm.base_url, model: models, priority: cfgForm.priority, concurrency, temperature, vision: cfgForm.vision === true, tts_settings: ttsSettings })
     cfgDialog.value = false; toast.success(t('common.saved')); loadCfgs()
   } catch (e) { toastError(e) }
 }

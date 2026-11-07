@@ -32,6 +32,7 @@ interface LocalConfigEntry {
   api_key?: string
   model?: string[]
   priority?: number
+  concurrency?: number
   temperature?: number
   /** 文本配置是否能看图（Issue #51）：需要视觉的 AI 环节只会选 true 的配置 */
   vision?: boolean
@@ -63,6 +64,10 @@ for (const [i, e] of entries.entries()) {
     console.error(`${label} ${modelError}`)
     process.exit(1)
   }
+  if (e.concurrency !== undefined && (!Number.isInteger(e.concurrency) || e.concurrency < 0 || e.concurrency > 20)) {
+    console.error(`${label} concurrency 须为 0 到 20 之间的整数`)
+    process.exit(1)
+  }
   const model = Array.isArray(e.model) ? e.model : []
   const where = and(
     eq(schema.aiServiceConfigs.serviceType, e.service_type),
@@ -86,6 +91,7 @@ for (const [i, e] of entries.entries()) {
     apiKey: e.api_key || '',
     model: JSON.stringify(model),
     priority: Number(e.priority) || 0,
+    concurrency: e.concurrency ?? existing?.concurrency ?? 0,
     isActive: true,
     // 文本配置的视觉标定（#51）：没写就沿用库里已有标记（新行默认 false），避免 apply 一次把人工标定冲掉
     vision: typeof e.vision === 'boolean' ? e.vision : existing?.vision === true,

@@ -23,6 +23,16 @@ export interface AIConfig {
   name?: string
   /** 该文本配置是否被标定为视觉模型（Issue #51）；非文本服务恒为 false */
   vision?: boolean
+  concurrency?: number
+  consecutiveErrors?: number
+  suspendedAt?: string | null
+  suspendedReason?: string | null
+}
+
+export const TEXT_PROVIDER_DEFAULTS: Record<string, number> = { openai: 2, gemini: 2, volcengine: 2 }
+
+export function effectiveConcurrency(c: Pick<AIConfig, 'provider' | 'concurrency'>): number {
+  return c.concurrency && c.concurrency > 0 ? c.concurrency : (TEXT_PROVIDER_DEFAULTS[c.provider.toLowerCase()] ?? 2)
 }
 
 /** 从 settings JSON 解析 temperature；非法值一律视为未设置 */
@@ -107,7 +117,7 @@ export async function getActiveConfig(serviceType: ServiceType): Promise<AIConfi
   const rows = (await db.select().from(schema.aiServiceConfigs)
     .where(eq(schema.aiServiceConfigs.serviceType, serviceType))
   )
-    .filter(r => r.isActive && isOfficialProvider(serviceType, r.provider))
+    .filter(r => r.isActive && isOfficialProvider(serviceType, r.provider) && (serviceType !== 'text' || !r.suspendedAt))
     .sort((a, b) => (b.priority || 0) - (a.priority || 0)) // 高优先级优先
 
   const active = rows[0]
@@ -138,6 +148,10 @@ export async function getActiveConfig(serviceType: ServiceType): Promise<AIConfi
     settings: active.settings ?? null,
     name: active.name,
     vision: active.vision === true,
+    concurrency: active.concurrency,
+    consecutiveErrors: active.consecutiveErrors,
+    suspendedAt: active.suspendedAt,
+    suspendedReason: active.suspendedReason,
   }
 }
 
@@ -176,6 +190,10 @@ export async function listActiveTextConfigs(): Promise<AIConfig[]> {
       settings: row.settings ?? null,
       name: row.name,
       vision: row.vision === true,
+      concurrency: row.concurrency,
+      consecutiveErrors: row.consecutiveErrors,
+      suspendedAt: row.suspendedAt,
+      suspendedReason: row.suspendedReason,
     }]
   })
 }
@@ -226,5 +244,11 @@ export async function getConfigById(id: number, expectedServiceType?: ServiceTyp
     model: models[0] || '',
     temperature: parseConfigTemperature(row.settings),
     settings: row.settings ?? null,
+    name: row.name,
+    vision: row.vision === true,
+    concurrency: row.concurrency,
+    consecutiveErrors: row.consecutiveErrors,
+    suspendedAt: row.suspendedAt,
+    suspendedReason: row.suspendedReason,
   }
 }

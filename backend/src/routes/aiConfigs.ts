@@ -9,6 +9,7 @@ import { fetchVoices } from '../services/tts.js'
 import { probeVision, resolveVisionTextConfig } from '../services/vision-capability.js'
 import { AI_STAGES } from '../services/ai-stages.js'
 import { redactUrl, logTaskError, logTaskProgress, logTaskSuccess } from '../utils/task-logger.js'
+import { resumeTextConfig } from '../services/text-scheduler.js'
 
 const app = new Hono()
 
@@ -207,6 +208,9 @@ app.post('/', async (c) => {
   }
   const modelError = validateConfigModels(body.service_type, body.provider, body.model)
   if (modelError) return badRequest(c, modelError)
+  if ('concurrency' in body && (!Number.isInteger(body.concurrency) || body.concurrency < 0 || body.concurrency > 20)) {
+    return badRequest(c, 'concurrency 须为 0 到 20 之间的整数')
+  }
 
 
   let temperature: number | null = null
@@ -231,6 +235,7 @@ app.post('/', async (c) => {
     apiKey: body.api_key || '',
     model: JSON.stringify(body.model || []),
     priority: body.priority || 0,
+    concurrency: body.concurrency ?? 0,
     isActive: true,
     // 视觉标定（#51）：只有文本配置有意义，人工标定，不做探测初值
     vision: body.service_type === 'text' && body.vision === true,
@@ -397,6 +402,9 @@ app.put('/:id', async (c) => {
   }
   const modelError = validateConfigModels(serviceType, provider, models)
   if (modelError) return badRequest(c, modelError)
+  if ('concurrency' in body && (!Number.isInteger(body.concurrency) || body.concurrency < 0 || body.concurrency > 20)) {
+    return badRequest(c, 'concurrency 须为 0 到 20 之间的整数')
+  }
 
 
   const updates: Record<string, any> = { updatedAt: now() }
@@ -408,6 +416,7 @@ app.put('/:id', async (c) => {
   if ('api_key' in body) updates.apiKey = body.api_key
   if ('model' in body) updates.model = JSON.stringify(body.model)
   if ('priority' in body) updates.priority = body.priority
+  if ('concurrency' in body) updates.concurrency = body.concurrency
   if ('is_active' in body) updates.isActive = body.is_active
   // 视觉标定（#51）：非文本配置一律视为非视觉
   if ('vision' in body) updates.vision = serviceType === 'text' && body.vision === true
@@ -432,6 +441,15 @@ app.put('/:id', async (c) => {
   }
 
   await db.update(schema.aiServiceConfigs).set(updates).where(eq(schema.aiServiceConfigs.id, id))
+  return success(c)
+})
+
+// POST /ai-configs/:id/resume
+app.post('/:id/resume', async (c) => {
+  const id = Number(c.req.param('id'))
+  const [row] = await db.select().from(schema.aiServiceConfigs).where(eq(schema.aiServiceConfigs.id, id))
+  if (!row) return notFound(c)
+  await resumeTextConfig(id)
   return success(c)
 })
 
