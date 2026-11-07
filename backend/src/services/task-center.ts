@@ -44,7 +44,7 @@ export { composeEpisodeLabel, composeTaskLabel, renderRefPrompt } from './task-l
 export async function failInterruptedTextTasks(): Promise<void> {
   const active = await db.select().from(schema.sysTask).where(and(
     eq(schema.sysTask.type, 'text'),
-    inArray(schema.sysTask.status, ACTIVE_TASK_STATUSES),
+    eq(schema.sysTask.status, 'processing'),
   ))
   const ids = active
     .filter(row => parseTextTaskParams(row.params)?.kind !== 'asset_pipeline')

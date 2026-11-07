@@ -1,3 +1,6 @@
+import { isFirstAgentFailureSafe, runWithTextTask } from './text-task-context.js'
+import { requeueFirstModelFailure } from './text-task-autoretry.js'
+
 /**
  * 逐镜旁白骨架（Issue #70）—— 纪录片「最终剧本 → 骨架 → 人工确认 → 批量配音 → 实测时长填设计卡」里的第一步。
  *
@@ -553,8 +556,8 @@ export async function startSkeletonGeneration(
   await assertGate(episodeId, 'design')
   const script = (ep.scriptContent || ep.content || '').trim()
   if (!script) return { started: false, reason: 'script_missing' }
-  if (await findActiveTextTask(episodeId, 'storyboard_breaker')
-    || await findActiveTextTask(episodeId, 'storyboard_fill_gaps')) {
+  if (await findActiveTextTask(episodeId, 'storyboard_breaker', opts.retryOf)
+    || await findActiveTextTask(episodeId, 'storyboard_fill_gaps', opts.retryOf)) {
     return { started: false, reason: 'running' }
   }
 
@@ -569,6 +572,8 @@ export async function startSkeletonGeneration(
     prompt: message,
     stageModel: resolved,
     retryOf: opts.retryOf,
+    queued: true,
+    restart: { kind: 'storyboard_breaker', args: { episodeId, opts } },
   })
   const requestContext = buildAgentRequestContext({
     episodeId,
@@ -582,7 +587,7 @@ export async function startSkeletonGeneration(
   logTaskStart('NarrationSkeleton', 'generate', { episodeId, taskId })
 
   // 骨架是纯文本工作：不附证据图（证据素材属于设计卡阶段）
-  runAgent(agent, [{ role: 'user', content: message }], { maxSteps: 20, requestContext }, sink)
+  void runWithTextTask(taskId, () => runAgent(agent, [{ role: 'user', content: message }], { maxSteps: 20, requestContext }, sink))
     .then(async (result) => {
       await renumberStoryboardsByScript(episodeId)
       // 镜头数硬上限的止损（#57）：连续两批整批被拒就不再让模型重试
@@ -607,6 +612,7 @@ export async function startSkeletonGeneration(
     .catch(async (err: unknown) => {
       const detail = err instanceof Error ? err.message : '旁白骨架生成失败'
       await finishTextTask(taskId, 'failed', { errorMsg: detail })
+      await requeueFirstModelFailure(taskId, err, isFirstAgentFailureSafe(err))
       logTaskError('NarrationSkeleton', 'generate', { episodeId, taskId, error: detail })
     })
 

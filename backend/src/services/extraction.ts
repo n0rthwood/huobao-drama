@@ -19,6 +19,25 @@ import {
 } from './text-task.js'
 import { resolveStageModel } from './ai-stages.js'
 import { onReviewExtractionFinished } from './asset-review.js'
+import { isFirstAgentFailureSafe, runWithTextTask } from './text-task-context.js'
+import { requeueFirstModelFailure } from './text-task-autoretry.js'
+
+const extractionLocks = new Map<string, Promise<void>>()
+
+/** Serialize the whole extraction, including post-processing, for each episode/type. */
+export async function withExtractionLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  const previous = extractionLocks.get(key) ?? Promise.resolve()
+  let release!: () => void
+  const current = new Promise<void>(resolve => { release = resolve })
+  extractionLocks.set(key, current)
+  await previous
+  try {
+    return await fn()
+  } finally {
+    if (extractionLocks.get(key) === current) extractionLocks.delete(key)
+    release()
+  }
+}
 
 export type ExtractTarget = 'characters' | 'scenes' | 'props'
 export const EXTRACT_TARGETS: ExtractTarget[] = ['characters', 'scenes', 'props']
@@ -48,13 +67,13 @@ const EXTRACT_MESSAGES: Record<ExtractTarget, string> = {
   props: '请从本集剧本中提取道具信息并保存，本次只提取道具；提取与去重规范以系统提示词与技能为准。',
 }
 
-/** 启动异步提取任务（立即返回）；同集同类型已在运行时返回 false；可指定文本模型覆盖 */
+/** 启动异步提取任务（立即返回任务 id）；同集同类型已运行时返回 null。 */
 export async function startExtraction(
   episodeId: number,
   dramaId: number,
   target: ExtractTarget,
   opts: { model?: string; configId?: number; retryOf?: number } = {},
-): Promise<boolean> {
+): Promise<number | null> {
   return startExtractorRun(episodeId, dramaId, target, EXTRACT_MESSAGES[target], opts)
 }
 
@@ -68,8 +87,8 @@ export async function startSingleAssetExtraction(
   dramaId: number,
   target: ExtractTarget,
   assetName: string,
-  opts: { model?: string; configId?: number; assetReviewItemId?: number } = {},
-): Promise<boolean> {
+  opts: { model?: string; configId?: number; retryOf?: number; assetReviewItemId?: number } = {},
+): Promise<number | null> {
   const label = { characters: '角色', scenes: '场景', props: '道具' }[target]
   const message = `请只针对本集剧本中的${label}「${assetName}」重新提取信息并保存，不要处理其它${label}；`
     + `提取与去重规范以系统提示词与技能为准。该${label}的既有字段已被清空，请完整重写。`
@@ -83,9 +102,9 @@ async function startExtractorRun(
   target: ExtractTarget,
   message: string,
   opts: { model?: string; configId?: number; retryOf?: number; singleAssetName?: string; assetReviewItemId?: number } = {},
-): Promise<boolean> {
+): Promise<number | null> {
   const kind = EXTRACT_TASK_KINDS[target]
-  if (await findActiveTextTask(episodeId, kind)) return false
+  if (!opts.assetReviewItemId && !opts.retryOf && await findActiveTextTask(episodeId, kind)) return null
 
   const resolved = await resolveStageModel('extractor', opts)
   const taskId = await createTextTask({
@@ -95,12 +114,14 @@ async function startExtractorRun(
     prompt: message,
     stageModel: resolved,
     retryOf: opts.retryOf,
+    queued: true,
+    restart: { kind, args: { episodeId, dramaId, target, message, opts } },
   })
   // 补提取（Issue #55）：记住这次提取是为哪条审核清单条目发起的，完成后按它回链
   if (opts.assetReviewItemId) await patchTextTaskParams(taskId, { assetReviewItemId: opts.assetReviewItemId })
 
   logTaskStart('Extract', target, { episodeId, dramaId, model: opts.model || undefined, configId: opts.configId || undefined })
-  ;(async () => {
+  void withExtractionLock(`episode:${episodeId}:${kind}`, () => runWithTextTask(taskId, async () => {
     const agent = mastra.getAgent('extractor')
     if (!agent) throw new Error('提取 Agent 不可用')
     const requestContext = buildAgentRequestContext({
@@ -126,7 +147,7 @@ async function startExtractorRun(
         })
       },
     }, createReasoningSink(taskId))
-  })()
+  })
     .then(async (result) => {
       await finishTextTask(taskId, 'completed', { outputText: result?.text || '' })
       const toolNames = (result?.toolCalls || []).map(t => t?.payload?.toolName).filter(Boolean)
@@ -142,9 +163,10 @@ async function startExtractorRun(
     .catch(async (err: unknown) => {
       const message = err instanceof Error ? err.message : '提取失败'
       await finishTextTask(taskId, 'failed', { errorMsg: message })
+      await requeueFirstModelFailure(taskId, err, isFirstAgentFailureSafe(err))
       logTaskError('Extract', target, { episodeId, error: message })
-    })
-  return true
+    }))
+  return taskId
 }
 
 /** 查询某集三类资产的提取任务状态（未启动过的类型为 null） */

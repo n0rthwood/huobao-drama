@@ -27,6 +27,9 @@ import { runTransitionReview } from './transition-agent.js'
 import { buildDesignCardBriefs, loadDesignCardContext } from './design-card-context.js'
 import { toCombo } from './design-card.js'
 
+import { isFirstAgentFailureSafe, runWithTextTask } from './text-task-context.js'
+import { requeueFirstModelFailure } from './text-task-autoretry.js'
+
 export type VideoPromptBatchStatus = PromptBatchStatus
 
 /** 启动批量生成（立即返回）；运行中返回 started:false,total:-1；无待生成分镜返回 started:false,total:0；
@@ -37,7 +40,7 @@ export async function startVideoPromptBatch(
   opts: { model?: string; configId?: number; retryOf?: number } = {},
   storyboardIds?: number[],
 ): Promise<{ started: boolean; total: number }> {
-  if (await findActiveTextTask(episodeId, 'video_prompts')) return { started: false, total: -1 }
+  if (await findActiveTextTask(episodeId, 'video_prompts', opts.retryOf)) return { started: false, total: -1 }
 
   const sbs = await db.select().from(schema.storyboards)
     .where(eq(schema.storyboards.episodeId, episodeId))
@@ -84,11 +87,13 @@ export async function startVideoPromptBatch(
     storyboardIds: pending.map(sb => sb.id),
     progress,
     retryOf: opts.retryOf,
+    queued: true,
+    restart: { kind: 'video_prompts', args: { episodeId, dramaId, opts, storyboardIds } },
   })
 
   const outputs: string[] = []
   logTaskStart('VideoPrompt', 'batch', { episodeId, dramaId, total: pending.length, model: opts.model || undefined })
-  ;(async () => {
+  void runWithTextTask(taskId, async () => {
     const agent = mastra.getAgent('prompt_generator')
     if (!agent) throw new Error('视频提示词 Agent 不可用')
     const requestContext = buildAgentRequestContext({
@@ -141,11 +146,12 @@ ${briefs.get(sb.id)?.text || ''}${transitionHint}然后调用 update_storyboard 
           logTaskError('VideoPrompt', 'batch-shot', { storyboardId: sb.id, error: 'agent finished but video_prompt is empty' })
         }
       } catch (err: unknown) {
+        if (!progress.completed && isFirstAgentFailureSafe(err)) throw err
         progress.failed++
         logTaskError('VideoPrompt', 'batch-shot', { storyboardId: sb.id, error: err instanceof Error ? err.message : String(err) })
       }
     }
-  })()
+  })
     .then(async () => {
       progress.current_storyboard_id = undefined
       await finishTextTask(taskId, 'completed', { progress, outputText: outputs.filter(s => s.trim()).join('\n\n') })
@@ -155,6 +161,7 @@ ${briefs.get(sb.id)?.text || ''}${transitionHint}然后调用 update_storyboard 
       const message = err instanceof Error ? err.message : '批量生成失败'
       progress.current_storyboard_id = undefined
       await finishTextTask(taskId, 'failed', { errorMsg: message, progress })
+      await requeueFirstModelFailure(taskId, err, isFirstAgentFailureSafe(err))
       logTaskError('VideoPrompt', 'batch', { episodeId, error: message })
     })
   return { started: true, total: pending.length }

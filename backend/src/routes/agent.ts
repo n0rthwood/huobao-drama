@@ -10,6 +10,7 @@ import { mastra } from '../mastra/index.js'
 import { success, badRequest } from '../utils/response.js'
 import { logTaskError, logTaskPayload, logTaskProgress, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
 import { createTextTask, finishTextTask, patchTextTaskParams, type TextTaskKind } from '../services/text-task.js'
+import { runWithTextTask } from '../services/text-task-context.js'
 import { buildEvidenceImages, evidenceMessageParts } from '../services/evidence-images.js'
 import { agentChatStage, resolveStageModel, StageVisionUnavailableError, type StageModel } from '../services/ai-stages.js'
 import { db, schema } from '../db/index.js'
@@ -119,6 +120,7 @@ app.post('/:type/chat', async (c) => {
       dramaId: Number(drama_id),
       prompt: typeof message === 'string' ? message : null,
       stageModel: resolved,
+      queued: true,
     })
   }
   // 工具计量（#46 read_image）要知道写进哪条任务：任务行建在 rc 之后，这里补注入
@@ -138,12 +140,12 @@ app.post('/:type/chat', async (c) => {
   }
 
   try {
-    const result = await runAgent(
+    const result = await runWithTextTask(taskId, () => runAgent(
       agent,
       [{ role: 'user', content: evidenceMessageParts(String(message), evidence) }],
       { maxSteps: 20, requestContext },
       sink,
-    )
+    ))
 
     // 镜头数硬上限的止损（#57）：连续两批整批被拒就不再让模型重试，把任务判失败并给出合并建议
     if (agentType === 'storyboard_breaker' && kind) {

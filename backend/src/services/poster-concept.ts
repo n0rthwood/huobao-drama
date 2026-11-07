@@ -1,3 +1,6 @@
+import { runWithTextTask } from './text-task-context.js'
+import { requeueFirstModelFailure } from './text-task-autoretry.js'
+
 /**
  * Poster AI 构想（Issue #72）：只用 AI 改写/拆分后的剧本 + 本集资产描述，
  * 一次产出三个有实质差异的构图方案（中心思想、选中资产、画面 prompt、文字描述、
@@ -491,6 +494,7 @@ async function callConcept(args: {
   stage: StageModel
   lang: string
   userPrompt: string
+  onFirstResponse: () => void
 }): Promise<PosterConcept> {
   const first = await callTextChat(args.stage, args.userPrompt, {
     systemPrompt: systemPrompt(args.lang),
@@ -498,6 +502,7 @@ async function callConcept(args: {
     maxTokens: CONCEPT_MAX_TOKENS,
     timeoutMs: CONCEPT_TIMEOUT_MS,
   })
+  args.onFirstResponse()
   let reply = first.text
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
@@ -540,7 +545,7 @@ export async function startPosterConcept(
 ): Promise<StartPosterConceptResult> {
   const context = await loadPosterContext(episodeId)
   const poster = await ensurePosterRow(context)
-  if (await findActiveTextTask(episodeId, 'poster_concept')) return { started: false, reason: 'running' }
+  if (await findActiveTextTask(episodeId, 'poster_concept', opts.retryOf)) return { started: false, reason: 'running' }
   const script = stripProvenanceBlock(context.episode.scriptContent)
   if (!script) return { started: false, reason: 'empty_script' }
   const assets = await loadConceptAssets(episodeId)
@@ -555,11 +560,13 @@ export async function startPosterConcept(
     stageModel: stage,
     progress: { completed: 0, total: 1, failed: 0 },
     retryOf: opts.retryOf,
+    queued: true,
+    restart: { kind: 'poster_concept', args: { episodeId, opts } },
   })
   logTaskStart('PosterConcept', 'run', { episodeId, posterId: poster.id, model: stage.model })
 
   const lang = await getContentLanguage()
-  void runPosterConcept({ taskId, episodeId, posterId: poster.id, context, script, assets, stage, lang })
+  void runWithTextTask(taskId, () => runPosterConcept({ taskId, episodeId, posterId: poster.id, context, script, assets, stage, lang }))
   return { started: true, task_id: taskId }
 }
 
@@ -574,12 +581,14 @@ async function runPosterConcept(args: {
   lang: string
 }): Promise<void> {
   const progress = { completed: 0, total: 1, failed: 0 }
+  let firstResponse = false
   try {
     const style = await getDramaStylePrompt(args.context.drama.id)
     let script = args.script
     let segments = 1
     if (script.length > SCRIPT_BUDGET_CHARS) {
       const summarized = await summarizeLongScript(script, args.stage, args.lang, async (done, total) => {
+        firstResponse = true
         progress.total = total
         progress.completed = done
         await updateTextTaskProgress(args.taskId, { ...progress })
@@ -598,7 +607,7 @@ async function runPosterConcept(args: {
       assets: args.assets,
       summarized: segments > 1,
     })
-    const parsed = await callConcept({ stage: args.stage, lang: args.lang, userPrompt })
+    const parsed = await callConcept({ stage: args.stage, lang: args.lang, userPrompt, onFirstResponse: () => { firstResponse = true } })
     const compositions = parsed.compositions.filter((item): item is PosterComposition => Boolean(item)).slice(0, POSTER_CONCEPT_COUNT)
     const validated: PosterComposition[] = []
     const errors: string[] = []
@@ -651,6 +660,7 @@ async function runPosterConcept(args: {
       errorMsg: `Poster 构想失败：${message}`,
       progress: { ...progress },
     })
+    await requeueFirstModelFailure(args.taskId, err, !firstResponse)
     logTaskError('PosterConcept', 'run', { episodeId: args.episodeId, error: message })
   }
 }

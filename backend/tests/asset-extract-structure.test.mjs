@@ -14,8 +14,12 @@ test('extraction service runs per-target async tasks', () => {
   // 任务状态落在 sys_task(type='text')，按 集×类型 判重
   assert.match(svc, /EXTRACT_TASK_KINDS: Record<ExtractTarget, TextTaskKind>/)
   assert.match(svc, /status: 'running' \| 'done' \| 'error'/)
-  // 同集同类型运行中不重复启动
-  assert.match(svc, /findActiveTextTask\(episodeId, kind\)\) return false/)
+  // 整集重复点击仍去重（补提取/重试用 retryOf 绕过）；任务以 queued 入队并持久化重启参数
+  assert.match(svc, /findActiveTextTask\(episodeId, kind\)\) return null/)
+  assert.match(svc, /queued: true/)
+  assert.match(svc, /restart: \{ kind, args:/)
+  assert.match(svc, /withExtractionLock\(/)
+  assert.match(svc, /runWithTextTask\(taskId/)
   // 每类资产限定只提取该类型
   assert.match(svc, /本次只提取角色/)
   assert.match(svc, /本次只提取场景/)

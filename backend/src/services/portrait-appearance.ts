@@ -1,3 +1,6 @@
+import { runWithTextTask } from './text-task-context.js'
+import { requeueFirstModelFailure } from './text-task-autoretry.js'
+
 /**
  * 「按史料画像补充外貌」（Issue #32 A4/B4）
  *
@@ -271,7 +274,7 @@ function buildUserText(input: {
  */
 export async function startPortraitAppearance(
   characterId: number,
-  opts: { episodeId: number; configId?: number },
+  opts: { episodeId: number; configId?: number; retryOf?: number; excludeConfigIds?: number[] },
 ): Promise<StartPortraitAppearanceResult> {
   const { episodeId } = opts
   const [character] = await db.select().from(schema.characters).where(eq(schema.characters.id, characterId))
@@ -279,12 +282,12 @@ export async function startPortraitAppearance(
 
   const portraits = await listArchivalImages(characterId)
   if (!portraits.length) return { started: false, reason: 'no_portrait', vision: { used: false }, portraits: 0 }
-  if (await findActiveTextTask(episodeId, 'portrait_appearance')) {
+  if (await findActiveTextTask(episodeId, 'portrait_appearance', opts.retryOf)) {
     return { started: false, reason: 'running', vision: { used: false }, portraits: portraits.length }
   }
 
   // 视觉环节（#51）：读画像是这件事的全部意义，没有视觉配置就 400，不再退化成「照着维基编外貌」
-  const vision = await resolveStageModel('portrait_appearance', { configId: opts.configId })
+  const vision = await resolveStageModel('portrait_appearance', { configId: opts.configId, excludeConfigIds: opts.excludeConfigIds })
 
   const taskId = await createTextTask({
     kind: 'portrait_appearance',
@@ -292,6 +295,9 @@ export async function startPortraitAppearance(
     dramaId: character.dramaId,
     prompt: `按史料画像补充「${character.name}」的外貌`,
     stageModel: vision,
+    retryOf: opts.retryOf,
+    queued: true,
+    restart: { kind: 'portrait_appearance', args: { characterId, opts } },
   })
   // 任务行按「集」落库，角色 id 必须进 params：状态接口要据此只回本角色的那次任务
   await patchTextTaskParams(taskId, {
@@ -304,7 +310,7 @@ export async function startPortraitAppearance(
     portraits: portraits.length, model: vision.model,
   })
 
-  void runPortraitAppearance(taskId, { character, episodeId, portraits, vision })
+  void runWithTextTask(taskId, () => runPortraitAppearance(taskId, { character, episodeId, portraits, vision }))
 
   return {
     started: true,
@@ -321,6 +327,7 @@ async function runPortraitAppearance(taskId: number, ctx: {
   vision: StageModel
 }): Promise<void> {
   const { character, episodeId, portraits, vision } = ctx
+  let firstCallPending = false
   try {
     const [episode] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId))
     const [drama] = await db.select().from(schema.dramas).where(eq(schema.dramas.id, character.dramaId))
@@ -361,9 +368,11 @@ async function runPortraitAppearance(taskId: number, ctx: {
     }
     const content: ChatContent = [{ type: 'text', text: userText }, ...images]
 
+    firstCallPending = true
     const raw = await callChat({
-      baseUrl: vision.baseUrl, apiKey: vision.apiKey, model: vision.model, provider: vision.provider || '',
+      baseUrl: vision.baseUrl, apiKey: vision.apiKey, model: vision.model, provider: vision.provider || '', configId: vision.configId ?? undefined,
     }, content)
+    firstCallPending = false
     const appearance = composeAppearance(parseTraitJson(raw))
     if (!appearance) throw new Error('模型没有给出可用的外貌特征')
 
@@ -388,6 +397,7 @@ async function runPortraitAppearance(taskId: number, ctx: {
     const message = err instanceof Error ? err.message : String(err)
     logTaskError('Portrait', 'appearance-from-portrait', { characterId: character.id, error: message })
     await finishTextTask(taskId, 'failed', { errorMsg: message })
+    await requeueFirstModelFailure(taskId, err, firstCallPending)
   }
 }
 

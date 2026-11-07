@@ -333,6 +333,10 @@ export const aiServiceConfigs = sqliteTable('ai_service_configs', {
   isActive: integer('is_active', { mode: 'boolean' }).default(true),
   /** 文本配置能否接收图片消息（Issue #51）：人工标定，不做运行时探测 */
   vision: integer('vision', { mode: 'boolean' }).notNull().default(false),
+  concurrency: integer('concurrency').notNull().default(0),
+  consecutiveErrors: integer('consecutive_errors').notNull().default(0),
+  suspendedAt: text('suspended_at'),
+  suspendedReason: text('suspended_reason'),
   settings: text('settings'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),

@@ -1,3 +1,6 @@
+import { runWithTextTask } from './text-task-context.js'
+import { requeueFirstModelFailure } from './text-task-autoretry.js'
+
 /**
  * 证据素材的自动语义标注（Issue #47）— VLM 语义锚点 + CV 几何
  *
@@ -512,22 +515,27 @@ export async function startSemanticsAuto(input: {
   absPath: string
   sourceTaskId: number | null
   configId?: number
+  retryOf?: number
+  excludeConfigIds?: number[]
 }): Promise<StartSemanticsAutoResult> {
   // 视觉环节（#51）：没有标定为视觉的配置就直接 400，不建一条注定失败的任务，
   // 更不拿纯文本模型硬编坐标。错误由路由层转成 400。
-  const config = await resolveStageModel('asset_semantics', { configId: input.configId })
+  const config = await resolveStageModel('asset_semantics', { configId: input.configId, excludeConfigIds: input.excludeConfigIds })
   const taskId = await createTextTask({
     kind: 'asset_semantics',
     episodeId: input.episodeId,
     dramaId: input.dramaId,
     prompt: `为证据素材「${input.propName}」自动标注语义`,
     stageModel: config,
+    retryOf: input.retryOf,
+    queued: true,
+    restart: { kind: 'asset_semantics', args: { input } },
   })
   // 任务行按「集」落库；状态接口要据此只回本道具的那次任务
   await patchTextTaskParams(taskId, { prop_id: input.propId, semantics_phase: 'start' })
 
   logTaskStart('Semantics', 'auto', { propId: input.propId, model: config.model, path: input.absPath })
-  void runSemanticsTask(taskId, { ...input, config })
+  void runWithTextTask(taskId, () => runSemanticsTask(taskId, { ...input, config }))
   return { started: true, taskId }
 }
 
@@ -537,14 +545,16 @@ async function runSemanticsTask(taskId: number, ctx: {
   sourceTaskId: number | null
   config: StageModel
 }): Promise<void> {
+  let phase = ''
   try {
     const { semantics, warnings } = await runSemanticsPipeline({
       absPath: ctx.absPath,
       config: ctx.config,
       sourceTaskId: ctx.sourceTaskId,
-      onProgress: (phase) => {
-        logTaskProgress('Semantics', 'phase', { propId: ctx.propId, phase })
-        void patchTextTaskParams(taskId, { semantics_phase: phase })
+      onProgress: (phaseName) => {
+        phase = phaseName
+        logTaskProgress('Semantics', 'phase', { propId: ctx.propId, phase: phaseName })
+        void patchTextTaskParams(taskId, { semantics_phase: phaseName })
       },
     })
     const merged = mergeSemantics(await loadPropSemantics(ctx.propId), semantics)
@@ -561,6 +571,7 @@ async function runSemanticsTask(taskId: number, ctx: {
     const message = messageOf(err)
     logTaskError('Semantics', 'auto', { propId: ctx.propId, error: message })
     await finishTextTask(taskId, 'failed', { errorMsg: `自动标注失败：${message}` })
+    await requeueFirstModelFailure(taskId, err, phase === 'names')
   }
 }
 

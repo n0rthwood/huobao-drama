@@ -1337,6 +1337,7 @@ export const aiConfigAPI = {
   list: (t?: string) => api.get(`/ai-configs${t ? `?service_type=${t}` : ''}`),
   create: (d: any) => api.post('/ai-configs', d),
   update: (id: number, d: any) => api.put(`/ai-configs/${id}`, d),
+  resume: (id: number) => api.post(`/ai-configs/${id}/resume`, {}),
   del: (id: number) => api.del(`/ai-configs/${id}`),
   test: (d: any) => api.post('/ai-configs/test', d),
   // TTS 音色列表（#35）：设置页据此让人选音色，程序不自动取第一个

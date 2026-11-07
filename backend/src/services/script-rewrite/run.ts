@@ -1,3 +1,6 @@
+import { runWithTextTask } from '../text-task-context.js'
+import { requeueFirstModelFailure } from '../text-task-autoretry.js'
+
 /**
  * 分阶段改写的服务端串行 runner（Issue #70 §2）。
  *
@@ -58,6 +61,7 @@ export interface StartRunOptions {
   /** 前驱属于更早的原文快照时，必须显式确认才允许混用（默认 409 拦下） */
   acknowledgeSourceChange?: boolean
   retryOf?: number
+  excludeConfigIds?: number[]
 }
 
 export interface StartRunResult {
@@ -164,7 +168,7 @@ export async function startRewriteRun(episodeId: number, opts: StartRunOptions =
   let stageModel: StageModel | null = null
   if (firstModelStage) {
     try {
-      stageModel = await resolveStageModel(firstModelStage.aiStage, { configId: opts.configId, model: opts.model })
+      stageModel = await resolveStageModel(firstModelStage.aiStage, { configId: opts.configId, model: opts.model, excludeConfigIds: opts.excludeConfigIds })
     } catch (err) {
       throw new RewriteRequestError(400, 'model_unavailable', err instanceof Error ? err.message : '文本模型不可用')
     }
@@ -216,6 +220,8 @@ export async function startRewriteRun(episodeId: number, opts: StartRunOptions =
     configId: stageModel ? undefined : opts.configId ?? null,
     retryOf: opts.retryOf,
     progress: { completed: 0, total: plan.length, failed: 0, step: plan[0]?.key },
+    queued: true,
+    restart: { kind: 'script_rewrite', args: { episodeId, opts } },
   })
   await patchTextTaskParams(taskId, {
     rewrite: {
@@ -229,7 +235,7 @@ export async function startRewriteRun(episodeId: number, opts: StartRunOptions =
   await updateRun(runId, { taskId, sourceVersionId, preparedVersionId, status: 'processing' })
 
   logTaskStart('ScriptRewrite', 'run', { runId, taskId, episodeId, stages: plan.map(entry => entry.key) })
-  void executeRun(runId).catch(err => logTaskError('ScriptRewrite', 'run', {
+  void runWithTextTask(taskId, () => executeRun(runId)).catch(err => logTaskError('ScriptRewrite', 'run', {
     runId, error: err instanceof Error ? err.message : String(err),
   }))
   return { run_id: runId, task_id: taskId }
@@ -351,6 +357,7 @@ async function executeRun(runId: number): Promise<void> {
       await syncTaskProgress(fresh, plan, states, entry.key)
       // 阶段失败：下游停止，已完成版本与旧最终稿保留，不自动采用最近成功阶段
       await failRun(runId, run.taskId, `「${entry.label}」失败：${message}`)
+      if (run.taskId) await requeueFirstModelFailure(run.taskId, err, entry.key === 'fidelity' && plan[0]?.key === 'fidelity' && !entry.skipped)
       return
     }
   }

@@ -13,7 +13,8 @@
  *
  *   non_diegetic_music: ...
  */
-import { getTextProviderBaseUrl, type AIConfig } from '../ai.js'
+import { callTextChat } from '../vision-chat.js'
+import { isModelError } from '../text-scheduler.js'
 import { resolveStageModel } from '../ai-stages.js'
 
 export type H3Mode = 't2v' | 'firstlast' | 'reference'
@@ -184,9 +185,6 @@ function parsePromptObject(content: string): H3PromptObject {
   }
 }
 
-interface ChatCompletionResponse {
-  choices?: Array<{ message?: { content?: string | null }; finish_reason?: string }>
-}
 
 /** 用当前启用的文本模型（OpenAI 兼容）把用户描述扩写成 H3 三键提示词 */
 async function expandWithTextModel(
@@ -200,7 +198,6 @@ async function expandWithTextModel(
   if ((text.provider || '').toLowerCase() === 'gemini') {
     throw new Error('H3 提示词扩写需要 OpenAI 兼容的文本服务（当前启用的是 gemini）')
   }
-  const url = `${getTextProviderBaseUrl(text as unknown as AIConfig)}/chat/completions`
   const anchorExtra = mode === 'reference'
     ? keyframeExtra(anchors.hasFirst, anchors.midTime, anchors.hasLast)
     : ''
@@ -214,23 +211,13 @@ async function expandWithTextModel(
   for (const compact of [false, true]) {
     try {
       const system = compact ? `${baseSystem}\n第二次尝试:更紧凑,整体控制在 120 个英文词以内。` : baseSystem
-      const resp = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${text.apiKey}` },
-        body: JSON.stringify({
-          model: text.model,
-          temperature: 0.7,
-          max_tokens: 16384,
-          messages: [{ role: 'system', content: system }, { role: 'user', content: userText }],
-        }),
-        signal: AbortSignal.timeout(300_000),
+      const reply = await callTextChat(text, userText, {
+        systemPrompt: system, temperature: 0.7, maxTokens: 16384, timeoutMs: 300_000,
       })
-      if (!resp.ok) throw new Error(`文本服务 ${resp.status}: ${(await resp.text()).slice(0, 300)}`)
-      const data = (await resp.json()) as ChatCompletionResponse
-      const choice = data.choices?.[0]
-      if (choice?.finish_reason === 'length') throw new Error('输出被截断(finish_reason=length)')
-      return parsePromptObject(choice?.message?.content ?? '')
+      if (reply.finishReason === 'length') throw new Error('输出被截断(finish_reason=length)')
+      return parsePromptObject(reply.text)
     } catch (err) {
+      if (isModelError(err)) throw err
       errors.push(err instanceof Error ? err.message : String(err))
     }
   }

@@ -243,6 +243,10 @@ export const sqliteSchemaStatements = [
     is_default INTEGER DEFAULT 0,
     is_active INTEGER DEFAULT 1,
     vision INTEGER NOT NULL DEFAULT 0,
+    concurrency INTEGER NOT NULL DEFAULT 0,
+    consecutive_errors INTEGER NOT NULL DEFAULT 0,
+    suspended_at TEXT,
+    suspended_reason TEXT,
     settings TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
@@ -778,6 +782,10 @@ const columnAdditions: { table: string; column: string; type: string }[] = [
   // 文本配置的视觉能力标定（Issue #51）：存量行默认 0（不做一次性探测初值——HTTP 200 不等于真能看图），
   // 由 providers.json / 设置页人工标定。需要视觉的 AI 环节只会选 vision=1 的配置。
   { table: 'ai_service_configs', column: 'vision', type: 'INTEGER NOT NULL DEFAULT 0' },
+  { table: 'ai_service_configs', column: 'concurrency', type: 'INTEGER NOT NULL DEFAULT 0' },
+  { table: 'ai_service_configs', column: 'consecutive_errors', type: 'INTEGER NOT NULL DEFAULT 0' },
+  { table: 'ai_service_configs', column: 'suspended_at', type: 'TEXT' },
+  { table: 'ai_service_configs', column: 'suspended_reason', type: 'TEXT' },
   // 纪录片工作流门禁（Issue #54）：旁白稿确认时间（NULL = 未确认，拆分/补镜/AI 填卡被拦）；
   // 资产审核清单状态 none|running|pending|passed（R2 写值，R1 只建列并把非 passed 当未通过）；
   // 审核通过后资产库再变更只写横幅原因（JSON 数组），不回退 passed。

@@ -11,6 +11,7 @@ import { db, getInsertId, schema } from '../db/index.js'
 import { now } from '../utils/response.js'
 import { stageModelUsed, type AiStage, type StageModel, type StageModelUsed } from './ai-stages.js'
 import { completionStamp } from './media-time.js'
+import { isModelError } from './text-model-errors.js'
 import { ACTIVE_TASK_STATUSES, type SysTaskRow } from './sys-task.js'
 import type { BatchScope } from './batch-scope.js'
 import type { VoiceParams } from './narration-voice-params.js'
@@ -97,6 +98,11 @@ export interface RewriteTaskParams {
   stages: Array<{ key: string; status: string; version_id: number | null; error: string | null }>
 }
 
+export interface TextTaskRestart {
+  kind: TextTaskKind
+  args: Record<string, unknown>
+}
+
 export interface TextTaskParams {
   kind: TextTaskKind
   progress?: TextTaskProgress
@@ -154,6 +160,8 @@ export async function createTextTask(input: {
   scope?: { included: Array<{ storyboard_id: number; storyboard_number: number }>; excluded: Array<{ storyboard_id: number; storyboard_number: number; reason: string }> }
   progress?: TextTaskProgress
   retryOf?: number
+  queued?: boolean
+  restart?: TextTaskRestart
 }): Promise<number> {
   const ts = now()
   const stage = input.stageModel
@@ -168,6 +176,14 @@ export async function createTextTask(input: {
     params.model_used = stageModelUsed(stage)
   }
   if (input.retryOf) params.retry_of = input.retryOf
+  if (input.restart) params.restart = input.restart
+  if (input.retryOf) {
+    const parent = db.select().from(schema.sysTask).where(eq(schema.sysTask.id, input.retryOf)).get()
+    if (parseTextTaskParams(parent?.params)?.requeued === true) {
+      params.requeued = true
+      params.auto_retry = 1
+    }
+  }
 
   const res = await db.insert(schema.sysTask).values({
     type: 'text',
@@ -178,11 +194,18 @@ export async function createTextTask(input: {
     model: stage ? stage.model : (input.model ?? null),
     prompt: input.prompt ?? null,
     params: JSON.stringify(params),
-    status: 'processing',
+    status: input.queued ? 'queued' : 'processing',
     createdAt: ts,
     updatedAt: ts,
   })
   return getInsertId(res)
+}
+
+/** Only the first admitted LLM call transitions a queued task into processing. */
+export async function markTextTaskStarted(id: number): Promise<void> {
+  await db.update(schema.sysTask)
+    .set({ status: 'processing', updatedAt: now() })
+    .where(and(eq(schema.sysTask.id, id), eq(schema.sysTask.status, 'queued')))
 }
 
 /** 合并写 params（保留 kind/storyboardIds 等其它键）；花名册与画像外貌等任务也复用这套读-合-写 */
@@ -193,6 +216,27 @@ export async function patchTextTaskParams(id: number, patch: Partial<TextTaskPar
   await db.update(schema.sysTask)
     .set({ params: JSON.stringify(merged), updatedAt: now() })
     .where(eq(schema.sysTask.id, id))
+}
+
+/** Persist the endpoint actually used for the task's primary model call. */
+export async function recordTextTaskAttempt(
+  id: number,
+  _attempt: { config_id: number; model: string; error_class: string | null },
+  actual?: { configId: number; provider: string; model: string; name: string; vision: boolean },
+): Promise<void> {
+  if (!actual) return
+  const row = db.select().from(schema.sysTask).where(eq(schema.sysTask.id, id)).get()
+  if (!row) return
+  const params = parseTextTaskParams(row.params)
+  if (!params) return
+  params.model_used = {
+    config_id: actual.configId, provider: actual.provider, model: actual.model,
+    name: actual.name, vision: actual.vision,
+  }
+  db.update(schema.sysTask).set({
+    params: JSON.stringify(params), updatedAt: now(),
+    provider: actual.provider, model: actual.model,
+  }).where(eq(schema.sysTask.id, id)).run()
 }
 
 export async function updateTextTaskProgress(id: number, progress: TextTaskProgress): Promise<void> {
@@ -207,12 +251,29 @@ export async function updateTextTaskReasoningChars(id: number, chars: number): P
 export async function finishTextTask(
   id: number,
   status: 'completed' | 'failed',
-  extra: { errorMsg?: string | null; progress?: TextTaskProgress; outputText?: string } = {},
+  extra: { errorMsg?: string | null; error?: unknown; progress?: TextTaskProgress; outputText?: string } = {},
 ): Promise<void> {
   if (extra.progress) await patchTextTaskParams(id, { progress: extra.progress })
   // 最终正文全文保存（Issue #19，Q5 不截断），只在详情接口透出，不进任务列表
   if (typeof extra.outputText === 'string' && extra.outputText) {
     await patchTextTaskParams(id, { output_text: extra.outputText })
+  }
+  if (status === 'failed') {
+    const row = db.select().from(schema.sysTask).where(eq(schema.sysTask.id, id)).get()
+    const params = row ? parseTextTaskParams(row.params) : null
+    // 模型类错误自动换模型重排一次（#77）；auto_retry_from 标记保证最多两次尝试
+    if (row && params?.restart && !params.auto_retry_from
+      && (isModelError(extra.error) || isModelError(extra.errorMsg ?? ''))) {
+      // 静态 import 会形成 text-task ⇄ text-task-autoretry 的循环（后者依赖本文件的解析/写入），
+      // 这里按运行时需要延迟加载。
+      const { requeueFirstModelFailure } = await import('./text-task-autoretry.js')
+      if (await requeueFirstModelFailure(id, extra.error ?? extra.errorMsg ?? '', true)) {
+        await db.update(schema.sysTask)
+          .set({ status: 'cancelled', errorMsg: '模型错误，已换模型重新排队', updatedAt: now() })
+          .where(eq(schema.sysTask.id, id))
+        return
+      }
+    }
   }
   const ts = now()
   // 文本任务没有媒体产物：只有成功完成才算一次「产出」，失败行不写生成时间
@@ -223,13 +284,13 @@ export async function finishTextTask(
 }
 
 /** 该集该类型是否有正在运行的文本任务（取代原来的内存 Map 判重） */
-export async function findActiveTextTask(episodeId: number, kind: TextTaskKind): Promise<SysTaskRow | null> {
+export async function findActiveTextTask(episodeId: number, kind: TextTaskKind, excludeId?: number): Promise<SysTaskRow | null> {
   const rows = await db.select().from(schema.sysTask).where(and(
     eq(schema.sysTask.type, 'text'),
     eq(schema.sysTask.episodeId, episodeId),
     inArray(schema.sysTask.status, ACTIVE_TASK_STATUSES),
   ))
-  return rows.find(r => textTaskKindOf(r) === kind) ?? null
+  return rows.find(r => r.id !== excludeId && textTaskKindOf(r) === kind) ?? null
 }
 
 /** 该集该类型最近一次任务（状态页展示用；从未跑过为 null） */

@@ -25,6 +25,8 @@ import {
 } from './text-task.js'
 import { resolveStageModel } from './ai-stages.js'
 import { batchScopeOf, type BatchScope } from './batch-scope.js'
+import { isFirstAgentFailureSafe, runWithTextTask } from './text-task-context.js'
+import { requeueFirstModelFailure } from './text-task-autoretry.js'
 
 export type KeyframePromptBatchStatus = PromptBatchStatus
 
@@ -37,7 +39,7 @@ export async function startKeyframePromptBatch(
   opts: { model?: string; configId?: number; retryOf?: number } = {},
   storyboardIds?: number[],
 ): Promise<{ started: boolean; total: number }> {
-  if (await findActiveTextTask(episodeId, 'keyframe_prompts')) return { started: false, total: -1 }
+  if (await findActiveTextTask(episodeId, 'keyframe_prompts', opts.retryOf)) return { started: false, total: -1 }
 
   const rows = await db.select().from(schema.storyboards)
     .where(eq(schema.storyboards.episodeId, episodeId))
@@ -72,11 +74,13 @@ export async function startKeyframePromptBatch(
     scope,
     progress,
     retryOf: opts.retryOf,
+    queued: true,
+    restart: { kind: 'keyframe_prompts', args: { episodeId, dramaId, opts, storyboardIds } },
   })
 
   const outputs: string[] = []
   logTaskStart('KeyframePrompt', 'batch', { episodeId, dramaId, total: pending.length, model: opts.model || undefined })
-  ;(async () => {
+  void runWithTextTask(taskId, async () => {
     const agent = mastra.getAgent('prompt_generator')
     if (!agent) throw new Error('提示词 Agent 不可用')
     const requestContext = buildAgentRequestContext({
@@ -115,11 +119,12 @@ ${briefs.get(sb.id)?.text || ''}最后调用 update_storyboard 保存到分镜 I
           logTaskError('KeyframePrompt', 'batch-shot', { storyboardId: sb.id, error: 'agent finished but last_frame_prompt is empty' })
         }
       } catch (err: unknown) {
+        if (!progress.completed && isFirstAgentFailureSafe(err)) throw err
         progress.failed++
         logTaskError('KeyframePrompt', 'batch-shot', { storyboardId: sb.id, error: err instanceof Error ? err.message : String(err) })
       }
     }
-  })()
+  })
     .then(async () => {
       progress.current_storyboard_id = undefined
       await finishTextTask(taskId, 'completed', { progress, outputText: outputs.filter(s => s.trim()).join('\n\n') })
@@ -129,6 +134,7 @@ ${briefs.get(sb.id)?.text || ''}最后调用 update_storyboard 保存到分镜 I
       const message = err instanceof Error ? err.message : '批量生成失败'
       progress.current_storyboard_id = undefined
       await finishTextTask(taskId, 'failed', { errorMsg: message, progress })
+      await requeueFirstModelFailure(taskId, err, isFirstAgentFailureSafe(err))
       logTaskError('KeyframePrompt', 'batch', { episodeId, error: message })
     })
   return { started: true, total: pending.length }
