@@ -121,7 +121,7 @@ export async function assignTextEndpoint(stage: AiStage, opts: { configId?: numb
     if (spec.vision) throw new StageVisionUnavailableError(stage, spec.label)
     throw new Error('未配置可用文本模型，或指定的文本模型已停用或暂停')
   }
-  return { stage, label: spec.label, vision: spec.vision, ...endpoint,
+  return { ...endpoint, stage, label: spec.label, vision: spec.vision,
     model: opts.model || endpoint.model, pinned: opts.configId != null }
 }
 
