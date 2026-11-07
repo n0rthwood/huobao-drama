@@ -505,13 +505,15 @@ function normalizeQcVerdicts(raw: Record<string, unknown>): QcVerdicts {
   const mustHave = Array.isArray(raw.must_have) ? raw.must_have as QcVerdicts['must_have'] : []
   const forbidden = Array.isArray(raw.forbidden) ? raw.forbidden as QcVerdicts['forbidden'] : []
   const text = raw.text_in_image && typeof raw.text_in_image === 'object'
-    ? raw.text_in_image as { present?: unknown; evidence?: unknown }
+    ? raw.text_in_image as { present?: unknown; overlay?: unknown; evidence?: unknown }
     : {}
   return {
     must_have: mustHave,
     forbidden,
     text_in_image: {
       present: typeof text.present === 'boolean' ? text.present : null,
+      // 模型没给 overlay 就是 null：闸门据此判「清单不完整」，不替它猜是不是额外标注
+      overlay: typeof text.overlay === 'boolean' ? text.overlay : null,
       evidence: String(text.evidence ?? ''),
     },
     locate: Array.isArray(raw.locate) ? raw.locate as QcVerdicts['locate'] : [],

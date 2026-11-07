@@ -3,7 +3,20 @@ import path from 'path'
 import { eq } from 'drizzle-orm'
 import { db, schema } from '../../db/index.js'
 import { STORAGE_ROOT } from '../../utils/paths.js'
-import { getSpec, listAssetRounds, type AssetRoundRow } from './store.js'
+import { getSpec, listAssetRounds, listSources, type AssetKind, type AssetRoundRow, type AssetSourceRow } from './store.js'
+import { selectPrecisionSources } from './contract.js'
+
+/**
+ * 精确轮参考图的取数口（Issue #73）：纯判定在 `contract.ts`，这里只负责读当前资产的素材表。
+ * `ids` 为 undefined = 老 run 没有冻结选择，由 `selectPrecisionSources` 走兼容口径。
+ */
+export async function resolvePrecisionReferences(
+  kind: AssetKind,
+  assetId: number,
+  ids?: number[] | null,
+): Promise<AssetSourceRow[]> {
+  return selectPrecisionSources(await listSources(kind, assetId), ids)
+}
 
 /** Identity metadata aligned with sys_task.params.referenceImages; paths live only in that input. */
 export type ReferenceOrigin =

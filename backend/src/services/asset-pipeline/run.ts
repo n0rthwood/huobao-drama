@@ -17,11 +17,14 @@ import { now } from '../../utils/response.js'
 import { logTaskError, logTaskProgress, logTaskStart, logTaskWarn } from '../../utils/task-logger.js'
 import { ACTIVE_TASK_STATUSES, QWEN_JOBS_PROVIDER } from '../sys-task.js'
 import { cancelImageTask } from '../qwen-jobs.js'
-import { createTextTask, finishTextTask, parseTextTaskParams, patchTextTaskParams } from '../text-task.js'
+import { createTextTask, finishTextTask, parseTextTaskParams, patchTextTaskParams, type TextTaskParams } from '../text-task.js'
 import { pipelineMastra } from './mastra.js'
+import { planNextRound, RoundPlanError } from './contract.js'
+import { resolveImageSelection } from './generator.js'
+import { resolvePrecisionReferences } from './references.js'
 import { loadAssetTarget } from './steps.js'
 import { latestQcByRound, listRounds, type AssetKind, type RoundPurpose } from './store.js'
-import type { ApprovalResume, PipelineInput } from './workflow.js'
+import { roundPurposes, type ApprovalResume, type PipelineInput } from './workflow.js'
 
 export const ASSET_PIPELINE_KIND = 'asset_pipeline'
 export const ASSET_PIPELINE_PROVIDER = 'mastra'
@@ -93,6 +96,8 @@ export async function startAssetPipeline(input: {
   assetId: number
   episodeId: number
   purpose: RoundPurpose
+  /** 精确轮必填：人选定的 1–3 条已入库素材（Issue #73）。美化轮忽略 */
+  sourceIds?: number[] | null
   configId?: number | null
   model?: string | null
   textConfigId?: number | null
@@ -111,6 +116,14 @@ export async function startAssetPipeline(input: {
     }
   }
 
+  // 参考图与出图模型都在**启动时定下来**：之后每一轮、重启续跑都用同一套输入。
+  // 精确轮没有参考图就不许建任务（零参考图的「精确」只是换个说法的自由发挥）。
+  const references = input.purpose === 'precision'
+    ? await resolvePrecisionReferences(input.assetKind, input.assetId, input.sourceIds ?? [])
+    : []
+  const image = await resolveImageSelection({ configId: input.configId, model: input.model })
+  const referenceSourceIds = references.map(item => item.id)
+
   const taskId = await createTextTask({
     kind: ASSET_PIPELINE_KIND,
     episodeId: input.episodeId,
@@ -127,6 +140,9 @@ export async function startAssetPipeline(input: {
     asset_kind: input.assetKind,
     asset_id: input.assetId,
     purpose: input.purpose,
+    reference_source_ids: referenceSourceIds,
+    image_config_id: image.configId,
+    image_model: image.model,
     progress: { completed: 0, total: 0, failed: 0, step: 'research' },
   })
 
@@ -136,8 +152,9 @@ export async function startAssetPipeline(input: {
     assetId: input.assetId,
     episodeId: input.episodeId,
     purpose: input.purpose,
-    configId: input.configId ?? null,
-    model: input.model ?? null,
+    referenceSourceIds,
+    configId: image.configId,
+    model: image.model,
     textConfigId: input.textConfigId ?? null,
   }
   logTaskStart('AssetPipeline', 'run', { taskId, runId: run.runId, assetKind: input.assetKind, assetId: input.assetId })
@@ -205,6 +222,25 @@ export async function suspendedApproval(mastraRunId: string): Promise<{ step: st
   return { step, payload }
 }
 
+/**
+ * 续跑（人工审批 / 重启恢复）用的输入：一律取**启动时冻结**的那一套，
+ * 不读「现在的」素材角色与图片配置。老 run 的 params 里没有 `reference_source_ids`，
+ * 保持 `undefined` 让 `selectPrecisionSources()` 走兼容口径（而不是当成「选了 0 张」）。
+ */
+function frozenPipelineInput(params: TextTaskParams, taskId: number, episodeId: number): PipelineInput {
+  const rawIds = params.reference_source_ids
+  return {
+    pipelineTaskId: taskId,
+    assetKind: params.asset_kind as AssetKind,
+    assetId: Number(params.asset_id),
+    episodeId,
+    purpose: (params.purpose as RoundPurpose) ?? 'precision',
+    referenceSourceIds: Array.isArray(rawIds) ? rawIds.map(Number) : undefined,
+    configId: typeof params.image_config_id === 'number' ? params.image_config_id : null,
+    model: typeof params.image_model === 'string' && params.image_model ? params.image_model : null,
+  }
+}
+
 export interface ApproveInput {
   runId: number
   roundId: number
@@ -213,6 +249,8 @@ export interface ApproveInput {
   notes: string | null
   opened: Array<{ path: string; sha256: string }>
   overrideGate: boolean
+  /** 打回重修时下一轮的用途（Issue #73）；不给就沿用本轮用途 */
+  nextPurpose?: RoundPurpose | null
 }
 
 export async function approveRound(input: ApproveInput): Promise<void> {
@@ -243,13 +281,40 @@ export async function approveRound(input: ApproveInput): Promise<void> {
     throw new PipelineStateError(`页面上的轮次已过期：当前等待审批的是第 ${suspended.payload.round_no} 轮（round_id=${suspended.payload.round_id}），请刷新后重试`)
   }
 
-  const payload: PipelineInput = {
-    pipelineTaskId: input.runId,
-    assetKind: params.asset_kind as AssetKind,
-    assetId: Number(params.asset_id),
-    episodeId: row.episodeId ?? 0,
-    purpose: (params.purpose as RoundPurpose) ?? 'precision',
+  // 打回重修：下一轮用途默认沿用本轮，人可以显式改；去向不成立就别让它进工作流
+  let nextPurpose: RoundPurpose | null = null
+  if (input.nextPurpose) {
+    if (input.verdict !== 'revise') throw new PipelineStateError('只有「打回重修」时才能指定下一轮用途')
+    if (input.nextPurpose !== 'precision' && input.nextPurpose !== 'beautify') {
+      throw new PipelineStateError('next_purpose 只能是 precision（精确轮）或 beautify（美化轮）')
+    }
   }
+  if (input.verdict === 'revise') {
+    const startPurpose = (params.purpose as RoundPurpose) ?? 'precision'
+    try {
+      const plan = planNextRound({
+        currentPurpose: round.purpose,
+        currentRoundNo: round.round_no,
+        requested: input.nextPurpose ?? null,
+        beautifyDone: rounds.filter(item => item.purpose === 'beautify').length,
+        maxRounds: roundPurposes(startPurpose).length,
+      })
+      nextPurpose = plan.purpose
+    } catch (err) {
+      if (err instanceof RoundPlanError) throw new PipelineStateError(err.message)
+      throw err
+    }
+    if (nextPurpose === 'precision') {
+      // 参考图取不到就不要开新轮：错误要在点「打回」的那一刻说清楚，而不是让下一轮跑崩
+      const frozenIds = Array.isArray(params.reference_source_ids) ? params.reference_source_ids.map(Number) : undefined
+      if (frozenIds && !frozenIds.length) {
+        throw new PipelineStateError('这条流水线启动时没有选定精确轮参考图（以美化轮发起），无法转入精确轮；请终止后以「精确轮」重新发起并选择参考图')
+      }
+      await resolvePrecisionReferences(params.asset_kind as AssetKind, Number(params.asset_id), frozenIds)
+    }
+  }
+
+  const payload = frozenPipelineInput(params, input.runId, row.episodeId ?? 0)
   await driveRun(input.runId, mastraRunId, payload, 'resume', {
     verdict: input.verdict,
     round_id: input.roundId,
@@ -257,6 +322,7 @@ export async function approveRound(input: ApproveInput): Promise<void> {
     notes: input.notes,
     opened: input.opened,
     override_gate: input.overrideGate,
+    next_purpose: nextPurpose,
   }, suspended.step)
 }
 
@@ -332,13 +398,7 @@ export async function resumeAssetPipelines(): Promise<void> {
         continue
       }
       if (status === 'running') {
-        const payload: PipelineInput = {
-          pipelineTaskId: row.id,
-          assetKind: params.asset_kind as AssetKind,
-          assetId: Number(params.asset_id),
-          episodeId: row.episodeId ?? 0,
-          purpose: (params.purpose as RoundPurpose) ?? 'precision',
-        }
+        const payload = frozenPipelineInput(params, row.id, row.episodeId ?? 0)
         void driveRun(row.id, mastraRunId, payload, 'start')
         resumed++
       }

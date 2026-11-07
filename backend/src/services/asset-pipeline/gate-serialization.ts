@@ -5,13 +5,21 @@ export type SerializedGate = Omit<GateResult, 'semantics_preserved'> & {
   semantics_preserved: GateResult['semantics_preserved'] | { status: 'unknown'; detail: string }
 }
 
-/** Historical verdicts lack the computed gate; never recompute it against current assets. */
+/**
+ * Historical verdicts lack the computed gate; never recompute it against current assets.
+ * Issue #73 之前的记录没有 `overlay`：补 null = 「当时没核验过是不是额外标注」，不改判历史结论。
+ */
 export function serializeQcGate(qc: AssetQcRecordRow, spec: AssetSpecRow | null): SerializedGate {
   const saved = qc.verdicts?.gate_result
   if (saved) {
     return {
       ...saved,
       pass: qc.gate_pass === 1,
+      text_in_image: {
+        present: saved.text_in_image?.present ?? null,
+        overlay: saved.text_in_image?.overlay ?? null,
+        evidence: saved.text_in_image?.evidence ?? '',
+      },
       semantics_preserved: saved.semantics_preserved ?? { status: 'unknown', detail: '历史记录未保存此项核验结果' },
     }
   }
@@ -34,7 +42,11 @@ export function serializeQcGate(qc: AssetQcRecordRow, spec: AssetSpecRow | null)
         error: spec?.forbidden.find(ban => ban.id === item.id)?.error ?? item.id,
         evidence: item.evidence ?? '',
       })),
-    text_in_image: qc.verdicts?.text_in_image ?? { present: null, evidence: '' },
+    text_in_image: {
+      present: qc.verdicts?.text_in_image?.present ?? null,
+      overlay: qc.verdicts?.text_in_image?.overlay ?? null,
+      evidence: qc.verdicts?.text_in_image?.evidence ?? '',
+    },
     locate_checks: qc.locate_checks,
     semantics_preserved: { status: 'unknown', detail: '历史记录未保存此项核验结果' },
     model_overall: qc.verdicts?.overall ?? null,

@@ -13,19 +13,19 @@
  */
 import { createStep, createWorkflow } from '@mastra/core/workflows'
 import { z } from 'zod'
-import { decideRound, MAX_BEAUTIFY_ROUNDS, type RoundDecision } from './gate.js'
+import { decideRound, type RoundDecision } from './gate.js'
+import { planNextRound, RoundPlanError, type RoundPlan } from './contract.js'
 import {
   getSpec,
   latestQcByRound,
   listAssetRounds,
   listRounds,
-  listSources,
   recordHumanVerdict,
   type RoundPurpose,
 } from './store.js'
 import { withStepDeadline } from './deadline.js'
 import { loadAssetTarget, runCurate, runGenerate, runQc, runResearch, runSpec, writeStep } from './steps.js'
-import type { ReferenceOrigin } from './references.js'
+import { resolvePrecisionReferences, type ReferenceOrigin } from './references.js'
 
 export interface PipelineInput {
   pipelineTaskId: number
@@ -33,6 +33,8 @@ export interface PipelineInput {
   assetId: number
   episodeId: number
   purpose: RoundPurpose
+  /** 启动时冻结的精确轮参考图（Issue #73）；老 run 的快照里没有这一项 */
+  referenceSourceIds?: number[] | null
   configId?: number | null
   model?: string | null
   textConfigId?: number | null
@@ -48,6 +50,8 @@ export interface PipelineState {
   finalRoundNo: number | null
   rollbackTo: number | null
   warnings: string[]
+  /** 人在审批时改过用途的轮次（round_no → 用途），没改过的轮次按 roundPurposes() 走 */
+  purposeOverrides?: Record<number, RoundPurpose>
 }
 
 export interface ApprovalResume {
@@ -57,6 +61,8 @@ export interface ApprovalResume {
   notes?: string | null
   opened: Array<{ path: string; sha256: string }>
   override_gate?: boolean
+  /** 打回重修时下一轮的用途；不给就沿用本轮用途（默认继续精确轮） */
+  next_purpose?: RoundPurpose | null
 }
 
 /** 轮次 index → 用途。精确轮打头的 run 后面挂两轮美化；美化 run 两轮封顶 */
@@ -121,14 +127,20 @@ const prepareStep = createStep({
   },
 })
 
-/** 参考图：精确轮用已入库素材，美化轮用上一轮（或资产当前图） */
+/**
+ * 参考图：精确轮用**启动时人选定**的已入库素材（Issue #73），美化轮用上一轮（或资产当前图）。
+ * 精确轮取不到参考图会抛错，整轮不出图——绝不退化成「零参考图照样画」。
+ */
 export async function referencesFor(state: PipelineState, roundNo: number, purpose: RoundPurpose): Promise<{
   referenceImages: string[]
   referenceOrigins: ReferenceOrigin[]
 }> {
   if (purpose === 'precision') {
-    const sources = await listSources(state.input.assetKind, state.input.assetId)
-    const selected = sources.filter(item => item.role === 'generation_reference').slice(0, 3)
+    const selected = await resolvePrecisionReferences(
+      state.input.assetKind,
+      state.input.assetId,
+      state.input.referenceSourceIds,
+    )
     return {
       referenceImages: selected.map(item => item.local_path),
       referenceOrigins: selected.map(item => ({ type: 'source', source_id: item.id })),
@@ -156,7 +168,7 @@ function makeRoundStep(index: number) {
       const state = inputData
       const purposes = roundPurposes(state.input.purpose)
       if (state.done || index >= purposes.length) return state
-      const purpose = purposes[index]!
+      const purpose = state.purposeOverrides?.[index] ?? purposes[index]!
       const target = await loadAssetTarget(state.input.assetKind, state.input.assetId)
       if (!target) throw new Error('资产不存在')
       // 快照里只存 specId，事实表按 id 重新读库（整张表进 workflow snapshot 没有必要）
@@ -268,23 +280,38 @@ function makeApprovalStep(index: number) {
         const target = await lastPassingRound(state, current.id)
         return { ...state, done: true, rollbackTo: target, finalRoundNo: target }
       }
-      // revise：进下一轮；用满美化轮上限就只能回退/终止
+      // revise：默认**继续本轮用途**（精确轮继续精确），人可以显式改成美化；
+      // 块数或美化轮用满时不再开新轮，退回到此前通过的轮次（与原行为一致）
       const beautifyDone = history.filter(item => item.purpose === 'beautify').length
-      if (beautifyDone >= MAX_BEAUTIFY_ROUNDS || index + 1 >= purposes.length) {
+      let plan: RoundPlan
+      try {
+        plan = planNextRound({
+          currentPurpose: current.purpose,
+          currentRoundNo: index,
+          requested: resumeData.next_purpose ?? null,
+          beautifyDone,
+          maxRounds: purposes.length,
+        })
+      } catch (err) {
+        if (!(err instanceof RoundPlanError)) throw err
         const target = await lastPassingRound(state, current.id)
         return {
           ...state,
           done: true,
           rollbackTo: target,
           finalRoundNo: target,
-          warnings: [...state.warnings, `美化轮已用满 ${MAX_BEAUTIFY_ROUNDS} 轮，无法再打回重修`],
+          warnings: [...state.warnings, err.message],
         }
       }
       const violations = resumeData.selected_violations?.length
         ? [`fix these problems from the previous round: ${resumeData.selected_violations.join('; ')}`]
         : []
       const notes = resumeData.notes ? [resumeData.notes] : []
-      return { ...state, reviseNotes: [...violations, ...notes] }
+      return {
+        ...state,
+        reviseNotes: [...violations, ...notes],
+        purposeOverrides: { ...state.purposeOverrides, [plan.index]: plan.purpose },
+      }
     },
   })
 }

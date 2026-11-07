@@ -981,7 +981,8 @@ export interface GateResult {
   invalid: string[]
   violations: Array<{ id: string; element: string; verdict: string; evidence: string }>
   forbidden_hits: Array<{ id: string; error: string; evidence: string }>
-  text_in_image: { present: boolean | null; evidence: string }
+  /** overlay=生成器额外叠加的标签/图例/字幕/水印（违规）；器物自身铭文 overlay=false；旧记录为 null */
+  text_in_image: { present: boolean | null; overlay: boolean | null; evidence: string }
   locate_checks: LocateCheck[]
   semantics_preserved: { status: 'pass' | 'fail' | 'not_applicable' | 'unknown'; detail: string }
   model_overall?: string | null
@@ -994,7 +995,7 @@ export interface QcRecordRow {
   verdicts: {
     must_have: Array<{ id: string; verdict: 'ok' | 'minor' | 'violation'; evidence: string }>
     forbidden: Array<{ id: string; detected: boolean; evidence: string }>
-    text_in_image: { present: boolean | null; evidence: string }
+    text_in_image: { present: boolean | null; overlay: boolean | null; evidence: string }
   }
   locate_checks: LocateCheck[]
   gate_pass: 0 | 1
@@ -1075,12 +1076,13 @@ export interface AssetBaseCandidate {
 }
 
 export const assetPipelineAPI = {
-  start: (data: { asset_kind: AssetPipelineKind; asset_id: number; episode_id: number; purpose?: 'precision' | 'beautify'; config_id?: number; model?: string; text_config_id?: number }) =>
+  /** source_ids 仅精确轮用：启动时人工选 1–3 张已入库参考图，后端冻结在任务参数里 */
+  start: (data: { asset_kind: AssetPipelineKind; asset_id: number; episode_id: number; purpose?: 'precision' | 'beautify'; source_ids?: number[]; config_id?: number; model?: string; text_config_id?: number }) =>
     api.post<{ run_id: number; mastra_run_id: string }>('/asset-pipeline/runs', data),
   list: (assetKind: AssetPipelineKind, assetId: number) =>
     api.get<{ runs: AssetPipelineRunSummary[] }>(`/asset-pipeline/runs?asset_kind=${encodeURIComponent(assetKind)}&asset_id=${assetId}`),
   detail: (runId: number) => api.get<AssetPipelineRunDetail>(`/asset-pipeline/runs/${runId}`),
-  approve: (runId: number, data: { round_id: number; verdict: 'approve' | 'revise' | 'rollback' | 'abort'; selected_violations?: string[]; notes?: string; opened: AssetPipelineOpenedImage[]; override_gate?: boolean }) =>
+  approve: (runId: number, data: { round_id: number; verdict: 'approve' | 'revise' | 'rollback' | 'abort'; selected_violations?: string[]; notes?: string; opened: AssetPipelineOpenedImage[]; override_gate?: boolean; next_purpose?: 'precision' | 'beautify' }) =>
     api.post<{ status: string }>(`/asset-pipeline/runs/${runId}/approve`, data),
   cancel: (runId: number) => api.post<{ cancelled: boolean }>(`/asset-pipeline/runs/${runId}/cancel`),
   baseCandidates: (episodeId: number) => api.get<{ candidates: AssetBaseCandidate[] }>(`/asset-pipeline/episodes/${episodeId}/base-candidates`),

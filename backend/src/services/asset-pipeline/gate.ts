@@ -7,12 +7,14 @@
  *
  * 规则（逐条对应实验结论，改动必须同步 tests/asset-pipeline-gate.test.mjs）：
  * ① `must_have` / `forbidden` 的 id 必须被逐条覆盖一次：缺项、重复、枚举非法、
- *    `text_in_image.present` 不是布尔 → `invalid`（结论是「清单不完整」，**不是 PASS**）。
+ *    `text_in_image.present` / `text_in_image.overlay` 不是布尔 → `invalid`（结论是「清单不完整」，**不是 PASS**）。
  * ② 任一 `violation` 或 `forbidden.detected` → FAIL。
  * ③ `metric ∈ {count, arrangement, color}` 的条目给 `minor` 一律升级成 `violation`：
  *    这三类是可数/可比的硬事实，没有「轻微」可言。
  * ④ QC 引用的 tolerance 必须出自 `spec.tolerances` 白名单，自创即 `invalid`。
- * ⑤ 画面出现文字（`text_in_image.present=true`）→ FAIL：底图零文字是图层体系的前提。
+ * ⑤ 画面文字只禁**生成器加上去的**标注（`text_in_image.overlay=true` → FAIL）：
+ *    地名、图例、说明、水印、招牌走图层体系。器物本身的铭文/刻字/印文属于形制事实
+ *    （`present=true, overlay=false`），不判 FAIL，也不要求必须出现。
  * ⑥ 位置一致性用「目标点 + 两地标」做相似变换归一化后比距离；地标缺失 →
  *    `not_comparable` 且 FAIL（绝不退化成直接比原始坐标——画幅一变就全错）。
  * ⑦ 资产已有语义标注时追加 `semantics_preserved`：由调用方按改后的可抽色判据算好传进来
@@ -78,7 +80,7 @@ export interface QcLocateReport {
 export interface QcPayload {
   must_have?: QcMustHaveVerdict[]
   forbidden?: QcForbiddenVerdict[]
-  text_in_image?: { present?: unknown; evidence?: string }
+  text_in_image?: { present?: unknown; overlay?: unknown; evidence?: string }
   locate?: QcLocateReport[]
   fidelity_score?: number
   beauty_score?: number
@@ -118,7 +120,7 @@ export interface GateResult {
   invalid: string[]
   violations: Array<{ id: string; element: string; verdict: GateVerdict; evidence: string }>
   forbidden_hits: Array<{ id: string; error: string; evidence: string }>
-  text_in_image: { present: boolean | null; evidence: string }
+  text_in_image: { present: boolean | null; overlay: boolean | null; evidence: string }
   locate_checks: LocateCheck[]
   semantics_preserved: SemanticsPreserved
   /** 模型自报的结论，仅留痕（闸门不采信） */
@@ -298,10 +300,13 @@ export function evaluateGate(spec: GateSpec, qc: QcPayload, opts: GateOptions = 
     if (!forbidden.some(item => item.id === id)) invalid.push(`QC 回答了事实表里不存在的禁止项「${id}」`)
   }
 
-  // ⑤ 画面文字
+  // ⑤ 画面文字：present 只记录「有没有字」，判定看 overlay（是不是生成器额外加的标注）
   const textRaw = qc.text_in_image?.present
   const textPresent = typeof textRaw === 'boolean' ? textRaw : null
   if (textPresent === null) invalid.push('QC 没有给出 text_in_image.present 布尔值')
+  const overlayRaw = qc.text_in_image?.overlay
+  const textOverlay = typeof overlayRaw === 'boolean' ? overlayRaw : null
+  if (textOverlay === null) invalid.push('QC 没有给出 text_in_image.overlay 布尔值（是否为额外添加的标注/说明/水印）')
 
   const locateChecks = evaluateLocate(spec, qc, opts)
   const semanticsPreserved: SemanticsPreserved = opts.semanticsPreserved
@@ -313,7 +318,7 @@ export function evaluateGate(spec: GateSpec, qc: QcPayload, opts: GateOptions = 
   const pass = invalid.length === 0
     && violations.length === 0
     && forbiddenHits.length === 0
-    && textPresent === false
+    && textOverlay === false
     && locateChecks.every(check => check.status === 'ok')
     && semanticsPreserved.status !== 'fail'
 
@@ -323,7 +328,7 @@ export function evaluateGate(spec: GateSpec, qc: QcPayload, opts: GateOptions = 
     invalid,
     violations,
     forbidden_hits: forbiddenHits,
-    text_in_image: { present: textPresent, evidence: String(qc.text_in_image?.evidence ?? '') },
+    text_in_image: { present: textPresent, overlay: textOverlay, evidence: String(qc.text_in_image?.evidence ?? '') },
     locate_checks: locateChecks,
     semantics_preserved: semanticsPreserved,
     model_overall: typeof qc.overall === 'string' ? qc.overall : null,
