@@ -35,6 +35,8 @@ export const AI_STAGES = {
   asset_qc: { vision: true, label: '资产 QC 清单核验' },
   /** 史料画像 → 外貌：读画像 */
   portrait_appearance: { vision: true, label: '史料画像补充外貌' },
+  /** 资料检索的图像筛选（Issue #79）：看候选图判断是原件 / 同类参考 / 仅形制 / 排除 */
+  asset_curate: { vision: true, label: '资料图像筛选' },
   /** read_image 工具本身 */
   read_image: { vision: true, label: '读图工具' },
 
@@ -59,7 +61,7 @@ export const AI_STAGES = {
   narration_writer: { vision: false, label: '旁白写作' },
   /** H3 视频提示词扩写 */
   h3_prompt: { vision: false, label: 'H3 提示词扩写' },
-  /** 资产资料研究（Issue #56）：只产出候选 URL 与许可提示，不抓取、不看图 */
+  /** 资产资料研究（Issue #56/#79）：检索计划、著录预筛；检索与下载由程序完成，不看图 */
   asset_research: { vision: false, label: '资产资料研究' },
   /** 资产事实表（Issue #56）：资料 → 可逐条机检的 must_have / forbidden / tolerances */
   asset_spec: { vision: false, label: '资产事实表' },
@@ -97,7 +99,9 @@ export const AI_CALL_SITES: Record<string, AiStage[]> = {
   'services/adapters/h3-prompt.ts': ['h3_prompt'],
   'services/asset-semantics-auto.ts': ['asset_semantics'],
   // 资产流水线（#56）：资料研究 / 事实表（纯文本）+ QC 清单核验（视觉）
-  'services/asset-pipeline/steps.ts': ['asset_research', 'asset_spec', 'asset_qc'],
+  'services/asset-pipeline/steps.ts': ['asset_spec', 'asset_qc'],
+  // 资料检索（#79）：检索计划/预筛（文本）+ 候选图筛选（视觉）
+  'services/asset-research/run.ts': ['asset_research', 'asset_curate'],
   // 地图地点坐标建议复用资料研究环节（返回的坐标一律是候选，人工确认后才写库）
   'services/asset-pipeline/map-asset.ts': ['asset_research'],
   // 补全剩余（#52）：纪录片拆分分镜的续跑，复用同一视觉环节

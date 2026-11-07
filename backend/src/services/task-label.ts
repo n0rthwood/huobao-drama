@@ -36,6 +36,7 @@ const TEXT_KIND_LABEL: Record<TextTaskKind, string> = {
   asset_pipeline: '资产流水线',
   asset_review: '资产审核清单',
   poster_concept: 'Poster 构想',
+  asset_research: '资料检索',
 }
 
 const ASSET_KIND_LABEL: Record<string, string> = {

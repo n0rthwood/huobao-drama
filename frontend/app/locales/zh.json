@@ -68,6 +68,7 @@
       "storyboard_breaker": "拆分分镜",
       "portrait_appearance": "按史料画像补充外貌",
       "asset_semantics": "语义标注",
+      "asset_research": "资料检索",
       "asset_pipeline": "资产流水线",
       "storyboard_fill_gaps": "补全剩余分镜",
       "design_card": "填写设计卡",
@@ -2520,6 +2521,50 @@
         "fidelityFailed": "忠实度校验未通过",
         "fidelityVerified": "忠实度已校验"
       },
+      "research": {
+        "title": "检索权威资料",
+        "run": "检索资料",
+        "rerun": "重新检索",
+        "hint": "从维基百科/维基文库/维基共享资源、博物馆、档案馆、图书馆、学术索引检索文字与图像（自媒体网文不采用），图像由视觉模型判断用途。入库前请核对许可。",
+        "finishedAt": "上次检索：{time}",
+        "summary": "文字资料 {texts} 条 · 图像候选 {images} 张 · 查询 {queries} 条（失败 {failed} 条）",
+        "empty": "还没有检索过。点「检索资料」开始（约 5–10 分钟，进度见任务中心）。",
+        "started": "已开始检索资料",
+        "startFailed": "启动检索失败",
+        "loadFailed": "读取检索结果失败",
+        "license": "许可：",
+        "licenseUnknown": "未注明（入库前请填写）",
+        "tierA": "机构来源",
+        "tierB": "维基系来源",
+        "proves": "可作依据：",
+        "cautions": "注意：",
+        "ingest": "入库",
+        "ingested": "已入库",
+        "texts": "文字资料",
+        "textsHint": "事实表会引用这些资料",
+        "role": {
+          "original": "原件",
+          "generation_reference": "同类实物",
+          "shape_only": "仅形制参考",
+          "text_source": "文字来源",
+          "reject": "不建议使用"
+        },
+        "roleHint": {
+          "original": "图上就是这件资产本身",
+          "generation_reference": "同类同期实物，可作生成参考",
+          "shape_only": "只能参考形制/比例，不宜送进出图模型",
+          "text_source": "价值主要在文字",
+          "reject": "视觉判断为无关或可能误导"
+        },
+        "step": {
+          "plan": "制定检索计划",
+          "search": "检索中",
+          "texts": "读取文字资料",
+          "screen": "筛选图像",
+          "curate": "视觉判断图像",
+          "done": "完成"
+        }
+      },
       "pipeline": {
         "executionRunning": "运行中",
         "executionWaitingApproval": "等待审批",
@@ -2572,7 +2617,7 @@
         "statusFailed": "失败",
         "statusCancelled": "已终止",
         "sourcesTitle": "素材",
-        "sourcesHint": "素材一律人工入库：填写链接与授权后点「入库」，面板不会自动抓取任何图片。",
+        "sourcesHint": "素材是精确轮的输入：入库后可选作生成参考（送进出图模型）或仅形制参考；事实表会引用检索到的资料，质检按事实表逐条核对。",
         "sourcesEmpty": "还没有入库素材",
         "sourceUrl": "原图链接",
         "sourceTitleField": "标题",

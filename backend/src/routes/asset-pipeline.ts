@@ -31,6 +31,8 @@ import {
   startAssetPipeline,
 } from '../services/asset-pipeline/run.js'
 import { addAssetSource, AssetSourceError, deleteAssetSource } from '../services/asset-pipeline/sources.js'
+import { loadAssetTarget } from '../services/asset-pipeline/steps.js'
+import { getAssetResearch, ResearchConflictError, startAssetResearch } from '../services/asset-research/run.js'
 import {
   ASSET_KINDS,
   getSpec,
@@ -139,6 +141,36 @@ app.get('/assets/:kind/:id/sources', async (c) => {
   return success(c, { sources: await listSources(kind, Number(c.req.param('id'))) })
 })
 
+// POST /asset-pipeline/assets/:kind/:id/research — 启动「检索权威资料」（Issue #79）
+app.post('/assets/:kind/:id/research', async (c) => {
+  const kind = parseKind(c.req.param('kind'))
+  if (!kind) return badRequest(c, 'kind 必须是 character / scene / prop')
+  const body = await c.req.json().catch(() => ({}))
+  const episodeId = Number(body.episode_id)
+  if (!episodeId) return badRequest(c, 'episode_id 必填')
+  const target = await loadAssetTarget(kind, Number(c.req.param('id')))
+  if (!target) return badRequest(c, '资产不存在')
+  try {
+    const taskId = await startAssetResearch(
+      { kind, id: target.id, dramaId: target.dramaId, name: target.name, description: target.description },
+      episodeId,
+      { textConfigId: body.text_config_id ? Number(body.text_config_id) : undefined },
+    )
+    return created(c, { task_id: taskId })
+  } catch (err) {
+    if (err instanceof ResearchConflictError) return c.json({ success: false, error: err.message }, 409)
+    if (err instanceof StageVisionUnavailableError) return badRequest(c, err.message)
+    throw err
+  }
+})
+
+// GET /asset-pipeline/assets/:kind/:id/research — 最近一次检索的状态与结果
+app.get('/assets/:kind/:id/research', async (c) => {
+  const kind = parseKind(c.req.param('kind'))
+  if (!kind) return badRequest(c, 'kind 必须是 character / scene / prop')
+  return success(c, await getAssetResearch(kind, Number(c.req.param('id'))))
+})
+
 /**
  * POST /asset-pipeline/asset-sources — 人工入库一条素材。
  * 两种提交方式：JSON（`url` 由服务端下载 / `local_path` 复用已上传文件）与
@@ -171,6 +203,7 @@ app.post('/asset-sources', async (c) => {
       url: body.url ? String(body.url) : null,
       file,
       localPath: body.local_path ? String(body.local_path) : null,
+      sourceUrl: body.source_url ? String(body.source_url) : null,
       title: body.title ? String(body.title) : null,
       artist: body.artist ? String(body.artist) : null,
       license: String(body.license ?? ''),

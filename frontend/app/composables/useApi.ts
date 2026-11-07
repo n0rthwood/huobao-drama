@@ -1088,11 +1088,48 @@ export const assetPipelineAPI = {
   baseCandidates: (episodeId: number) => api.get<{ candidates: AssetBaseCandidate[] }>(`/asset-pipeline/episodes/${episodeId}/base-candidates`),
   listSources: (assetKind: AssetPipelineKind, assetId: number) =>
     api.get<{ sources: AssetSourceRow[] }>(`/asset-pipeline/assets/${assetKind}/${assetId}/sources`),
-  addSource: (data: { asset_kind: AssetPipelineKind; asset_id: number; url?: string; local_path?: string; title?: string; artist?: string; license: string; role: AssetSourceRole; era?: string; why_excluded?: string }) =>
+  addSource: (data: { asset_kind: AssetPipelineKind; asset_id: number; url?: string; local_path?: string; source_url?: string; title?: string; artist?: string; license: string; role: AssetSourceRole; era?: string; why_excluded?: string }) =>
     api.post<{ source: AssetSourceRow }>('/asset-pipeline/asset-sources', data),
   /** multipart 上传：人工把本地原件直接入库，字段与 JSON 模式同名 */
   uploadSource: (fd: FormData) => formDataReq<{ source: AssetSourceRow }>('/asset-pipeline/asset-sources', fd),
   deleteSource: (sourceId: number) => api.del<{ deleted: boolean }>(`/asset-pipeline/asset-sources/${sourceId}`),
+  /** 检索权威资料（#79）：多来源检索 + 视觉筛选；入库仍走 addSource（local_path + source_url） */
+  startResearch: (assetKind: AssetPipelineKind, assetId: number, data: { episode_id: number; text_config_id?: number }) =>
+    api.post<{ task_id: number }>(`/asset-pipeline/assets/${assetKind}/${assetId}/research`, data),
+  research: (assetKind: AssetPipelineKind, assetId: number) =>
+    api.get<AssetResearchStatus>(`/asset-pipeline/assets/${assetKind}/${assetId}/research`),
+}
+
+export type AssetResearchRole = 'original' | 'generation_reference' | 'shape_only' | 'text_source' | 'reject'
+export interface AssetResearchCandidate {
+  adapter: string
+  title: string
+  url: string | null
+  image: string | null
+  license: string
+  institution: string
+  date: string
+  snippet: string
+  tier: 'A' | 'B'
+  local_path: string
+  sha256: string
+  role: AssetResearchRole
+  depicts: string
+  what_it_proves: string[]
+  cautions: string[]
+}
+export interface AssetResearchStatus {
+  status: 'none' | 'running' | 'done' | 'error'
+  task_id: number | null
+  step: string | null
+  error: string | null
+  finished_at: string | null
+  result: {
+    queries: Array<{ adapter: string; query: string; hits: number; error?: string }>
+    texts: Array<{ adapter: string; title: string; url: string | null; excerpt: string }>
+    candidates: AssetResearchCandidate[]
+    dropped: number
+  } | null
 }
 
 /** 资产审核清单（Issue #55）：纪录片「资产 · 审核清单」页签的全部接口 */

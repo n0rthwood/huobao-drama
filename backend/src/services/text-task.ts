@@ -48,6 +48,8 @@ export type TextTaskKind =
   | 'asset_review'
   /** Poster AI 构想（Issue #72）：只写 episode_posters.concept，不写当前编辑字段 */
   | 'poster_concept'
+  /** 资产资料检索（Issue #79）：多来源检索 + 视觉筛选，结果落 params.asset_research，供面板入库与事实表引用 */
+  | 'asset_research'
 
 export const TEXT_TASK_KINDS: TextTaskKind[] = [
   'extract_characters', 'extract_scenes', 'extract_props',
@@ -62,6 +64,7 @@ export const TEXT_TASK_KINDS: TextTaskKind[] = [
   'asset_pipeline',
   'asset_review',
   'poster_concept',
+  'asset_research',
 ]
 
 /**
