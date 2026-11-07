@@ -25,6 +25,8 @@ const episodeId = Number(db.insert(schema.episodes).values({ dramaId, episodeNum
 for (const [id,combo,status] of [[1,'A','confirmed'],[2,null,'pending'],[3,'B','pending'],[4,'C','confirmed']]) {
  db.insert(schema.storyboards).values({ id, episodeId, storyboardNumber:id, combo, designCardStatus:status, narrationText:'测试旁白', createdAt:ts, updatedAt:ts }).run()
 }
+// #70：纪录片逐镜制作要求本镜有当前有效配音（门禁本身不放松）
+await (await import('./tests/fixtures/documentary-voice.mjs')).giveShotsValidVoice({episodeId,storyboardIds:[1,2,3,4]})
 `
 
 test('video scope excludes A, blocks null/unconfirmed, preserves unchanged opt-in and explicit empty selection', () => {

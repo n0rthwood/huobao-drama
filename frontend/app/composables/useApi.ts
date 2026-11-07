@@ -154,7 +154,7 @@ export const episodeAPI = {
   // 逐镜审计、批量填写（不带 storyboard_ids = 只补空白/过期）与批量状态、分镜重排。
   designCardContext: (id: number) => api.get<DesignCardContext>(`/episodes/${id}/design-card-context`),
   designCardAudit: (id: number) => api.get<DesignCardAuditItem[]>(`/episodes/${id}/design-cards/audit`),
-  designCardStatus: (id: number) => api.get(`/episodes/${id}/design-cards/status`),
+  // 填卡进度统一走全局任务 store（sys_task kind='design_card'），不再单独查批次状态（#70）
   fillDesignCards: (id: number, data: { storyboard_ids?: number[]; model?: string; config_id?: number } = {}) =>
     api.post(`/episodes/${id}/design-cards/fill`, {
       storyboard_ids: data.storyboard_ids?.length ? data.storyboard_ids : undefined,
@@ -201,10 +201,10 @@ export const episodeAPI = {
   narrationVoicePreview: (id: number, settings: VoiceSettings, storyboardIds?: number[]) =>
     api.post<{ items: VoicePlanItem[] }>(`/episodes/${id}/narration/voice-batch/preview`, {
       settings,
-      storyboard_ids: storyboardIds?.length ? storyboardIds : undefined,
+      storyboard_ids: storyboardIds,
     }),
   narrationVoiceBatch: (id: number, settings: VoiceSettings, storyboardIds?: number[]) =>
-    api.post(`/episodes/${id}/narration/voice-batch`, { settings, storyboard_ids: storyboardIds?.length ? storyboardIds : undefined }),
+    api.post(`/episodes/${id}/narration/voice-batch`, { settings, storyboard_ids: storyboardIds }),
   narrationVoiceBatchStatus: (id: number) => api.get(`/episodes/${id}/narration/voice-batch-status`),
   /**
    * 批量融合（#42）：先预览分类，再按显式勾选的 id 执行。
@@ -1465,6 +1465,273 @@ export const settingsAPI = {
   setContentLanguage: (language: string) => api.put('/settings/content-language', { language }),
 }
 
+// ===== 分阶段改写（#70，纪录片）：运行是可变执行状态，版本是不可变文本 =====
+/** 后端静态阶段注册表里的 AI 阶段；输入准备（prepared_source）不是 AI 阶段，不在其中 */
+export type RewriteStageKey = 'fidelity' | 'bridge'
+export type RewriteStageStatus = 'pending' | 'processing' | 'completed' | 'skipped' | 'failed'
+export type RewriteRunStatus = 'queued' | 'processing' | 'completed' | 'failed'
+/** 采用状态：pending=候选待采用，adopted=已写入最终稿，conflict=期间最终稿/原文被改，manual=本次运行只留候选 */
+export type RewriteAdoptionStatus = 'pending' | 'adopted' | 'conflict' | 'manual'
+/** 版本来源阶段：原文快照 / 过滤后正文 / 两个 AI 阶段 / 人工保存 */
+export type RewriteVersionStage = 'source_snapshot' | 'prepared_source' | RewriteStageKey | 'manual'
+
+export interface RewriteRunStage {
+  key: RewriteStageKey
+  status: RewriteStageStatus
+  version_id?: number | null
+  error?: string | null
+}
+
+export interface RewriteRun {
+  id: number
+  task_id: number | null
+  status: RewriteRunStatus
+  current_stage: RewriteStageKey | null
+  stage_plan: Array<RewriteStageDef & { skipped: boolean }>
+  source_revision: string | number
+  base_final_revision: string | number
+  adoption_status: RewriteAdoptionStatus
+  auto_adopt: boolean
+  candidate_version_id: number | null
+  /** 本次运行冻结的原文快照与过滤后正文（必定存在，过滤不可跳过） */
+  source_version_id: number | null
+  prepared_version_id: number | null
+  error: string | null
+  created_at: string
+  stages: RewriteRunStage[]
+}
+
+/** 输入准备报告：逐条「删了哪一段、属于哪类、为什么」，start/end 是原始资料里的字符区间 */
+export type RemovedCategory =
+  | 'source_link' | 'license' | 'contributor' | 'usage_note' | 'non_narration_note' | 'metadata_field'
+export interface RewriteRemovedSpan {
+  start: number
+  end: number
+  text: string
+  category: RemovedCategory | string
+  reason: string
+}
+export interface RewritePreparedReport {
+  removed: RewriteRemovedSpan[]
+  kept_notes?: string[]
+  raw_chars?: number
+  prepared_chars?: number
+}
+
+/** 忠实改写报告：±5% 基线按「过滤后正文」计，正文超限段单列 */
+export interface RewriteFidelityReport {
+  baseline_chars?: number
+  output_chars?: number
+  delta_ratio?: number
+  within_tolerance?: boolean
+  paragraphs?: number
+  over_limit_paragraphs?: Array<{ index: number; chars: number }>
+  warnings?: string[]
+  post_filter?: { removed: RewriteRemovedSpan[] }
+}
+
+/** 桥句决策：no_bridge / inserted / needed_but_unsafe 三分，弃答绝不记成「无需补写」 */
+export type BridgeDecision = 'no_bridge' | 'inserted' | 'needed_but_unsafe'
+export type BridgePlacement = 'end_of_left' | 'start_of_right' | 'standalone'
+export type BridgeAttribution = 'previous_tail' | 'next_head' | 'standalone'
+export interface RewriteBridgeBoundary {
+  boundary_id: string | number
+  left_paragraph?: string
+  right_paragraph?: string
+  relation?: string
+  decision: BridgeDecision
+  reason?: string
+  bridge_text: string | null
+  placement: BridgePlacement | null
+  shot_attribution: BridgeAttribution | null
+  spoken_chars: number | null
+  placement_adjusted?: boolean
+}
+export interface RewriteBridgeReport {
+  decisions: RewriteBridgeBoundary[]
+  inserted_count?: number
+  needed_but_unsafe_count?: number
+  boundary_count?: number
+  warnings?: string[]
+}
+
+/** 跳过版：真实副本 + 跳过留痕，没有模型调用 */
+export interface RewriteSkipReport { skipped: true; copied_from_version_id: number | null }
+
+export type RewriteReport =
+  | RewritePreparedReport | RewriteFidelityReport | RewriteBridgeReport | RewriteSkipReport | null
+
+export type RewriteVersionSource = 'source_snapshot' | 'prepared_source' | 'agent' | 'skip_copy' | 'manual'
+
+export interface RewriteVersion {
+  id: number
+  run_id: number | null
+  stage_key: RewriteVersionStage
+  stage_index: number | null
+  source: RewriteVersionSource
+  predecessor_id: number | null
+  content: string
+  content_hash?: string
+  task_id?: number | null
+  report: RewriteReport
+  created_at: string
+}
+
+export interface RewriteStageDef {
+  key: RewriteStageKey
+  label: string
+  revision: string
+}
+
+export interface ScriptRewriteState {
+  runs: RewriteRun[]
+  versions: RewriteVersion[]
+  current_run: RewriteRun | null
+  current_final_version_id: number | null
+  source_revision: string | number
+  final_revision: string | number
+  stages: RewriteStageDef[]
+}
+
+export interface ScriptRewriteStartBody {
+  start_stage?: RewriteStageKey
+  predecessor_version_id?: number
+  skip_stages?: RewriteStageKey[]
+  config_id?: number
+  model?: string
+  auto_adopt?: boolean
+  source_revision?: string | number
+  final_revision?: string | number
+  /** 前驱属于更早的原文快照时，后端先 409 source_changed，确认后带此标志重发 */
+  acknowledge_source_change?: boolean
+}
+
+/** sys_task(kind='script_rewrite').params.rewrite：阶段进度的唯一来源（任务中心共用） */
+export interface RewriteTaskProgress {
+  run_id: number
+  stage_key: RewriteStageKey | 'prepare'
+  stage_index: number
+  stage_total: number
+  stages: RewriteRunStage[]
+}
+
+/** 后端错误体：所有 HTTP status 与 code 一致 */
+export type RewriteErrorCode =
+  | 'run_active' | 'revision_conflict' | 'source_changed' | 'prepared_source_empty'
+  | 'not_documentary' | 'no_source' | 'predecessor_required' | 'invalid_predecessor' | 'invalid_stage'
+export interface RewriteErrorInfo { error: RewriteErrorCode; body: Record<string, unknown> }
+export function rewriteErrorOf(err: unknown): RewriteErrorInfo | null {
+  const body = (err as ApiError)?.body as { error?: string } | undefined
+  if (!body?.error) return null
+  return { error: body.error as RewriteErrorCode, body: body as Record<string, unknown> }
+}
+
+export const scriptRewriteAPI = {
+  state: (episodeId: number) => api.get<ScriptRewriteState>(`/episodes/${episodeId}/script-rewrite`),
+  start: (episodeId: number, body: ScriptRewriteStartBody = {}) =>
+    api.post<{ run_id: number; task_id: number }>(`/episodes/${episodeId}/script-rewrite`, body),
+  /** 运行期间进入编辑前必须先落盘「本次不自动采用」，再放行输入 */
+  manual: (episodeId: number, runId: number) =>
+    api.post<{ run_id: number; auto_adopt: false }>(`/episodes/${episodeId}/script-rewrite/runs/${runId}/manual`),
+  /** 显式采用某个版本（含历史版本）；修订不符时后端 409，绝不自动合并 */
+  adopt: (episodeId: number, versionId: number, body: { source_revision: string | number; final_revision: string | number }) =>
+    api.post<ScriptRewriteState & { adopted_version_id: number; changed: boolean }>(
+      `/episodes/${episodeId}/script-rewrite/versions/${versionId}/adopt`, body),
+  /** 人工保存最终稿：条件写入 + 产生一个人工版本；字节未变时 changed=false 且不推进修订 */
+  saveFinal: (
+    episodeId: number,
+    body: { content: string; final_revision: string | number; source_revision?: string | number },
+  ) => api.put<{ final_revision: string; source_revision: string; version_id: number; changed: boolean }>(
+    `/episodes/${episodeId}/script-rewrite/final`, body),
+}
+
+// ===== 旁白骨架（#70）：最终稿 → 逐镜骨架 → 确认 → 批量配音 → 实测时长设计卡 =====
+/** 配音有效性：按当前旁白 hash + 生效参数 + 实测时长判定，旧元数据一律不采信 */
+export type TtsInvalidReason =
+  | 'narration_disabled' | 'narration_empty' | 'narration_too_long' | 'markup_invalid'
+  | 'audio_missing' | 'text_changed' | 'voice_params_changed' | 'audio_file_missing' | 'duration_invalid'
+export interface SkeletonShotTts {
+  valid: boolean
+  reason: TtsInvalidReason | null
+  /** 后端已本地化的原因文本；未知 reason 时作为兜底展示 */
+  message?: string | null
+  duration_ms: number | null
+}
+export interface NarrationSkeletonShot {
+  storyboard_id: number
+  storyboard_number: number
+  narration_text: string
+  narration_chars: number
+  title: string | null
+  tts: SkeletonShotTts
+  design_card_status: DesignCardStatus
+  /** 设计卡已确认且配音有效 */
+  design_ready: boolean
+  /** 配音有效，现在就能填/确认设计卡 */
+  design_fillable: boolean
+  blocked_reason: string | null
+}
+export interface NarrationSkeletonCoverage {
+  script_chars: number
+  covered_chars: number
+  uncovered_chars: number
+  gaps: Array<{ start: number; end: number; text: string }>
+  complete: boolean
+}
+export interface NarrationSkeletonState {
+  episode_id: number
+  project_type: 'documentary' | 'drama'
+  /** 剧情项目恒 false：骨架流程只属于纪录片，其余字段为空 */
+  enabled: boolean
+  confirmed: boolean
+  revision: string
+  confirmed_revision: string | null
+  script_confirmed: boolean
+  confirmable: boolean
+  blocked_reason: string | null
+  coverage: NarrationSkeletonCoverage | null
+  tts: { valid: number; invalid: number; total: number }
+  shots: NarrationSkeletonShot[]
+  task_id?: number
+}
+/** 逐镜写入：id 缺省 = 新镜（拆分），少写某个 id = 删除该镜（合并）；顺序即最终顺序 */
+export interface NarrationSkeletonShotInput {
+  id?: number
+  narration_text: string
+  title?: string | null
+}
+
+/** PUT 校验失败的 400 体（problems 指向第几条、错在哪） */
+export type SkeletonProblemCode =
+  | 'empty' | 'too_long' | 'not_verbatim' | 'out_of_order' | 'overlap' | 'gap'
+  | 'unknown_id' | 'duplicate_id' | 'script_missing' | 'card_busy'
+export interface SkeletonProblem { index: number; code: SkeletonProblemCode; message: string }
+export function skeletonProblemsOf(err: unknown): SkeletonProblem[] | null {
+  const body = (err as ApiError)?.body as { error?: string; problems?: SkeletonProblem[] } | undefined
+  if (!body || body.error !== 'skeleton_invalid') return null
+  return Array.isArray(body.problems) ? body.problems : []
+}
+
+export const narrationSkeletonAPI = {
+  state: (episodeId: number) => api.get<NarrationSkeletonState>(`/episodes/${episodeId}/narration-skeleton`),
+  generate: (episodeId: number, data: { model?: string; config_id?: number } = {}) =>
+    api.post<NarrationSkeletonState & { task_id: number }>(`/episodes/${episodeId}/narration-skeleton/generate`, {
+      model: data.model || undefined,
+      config_id: data.config_id || undefined,
+    }),
+  confirm: (episodeId: number, revision: string) =>
+    api.post<NarrationSkeletonState>(`/episodes/${episodeId}/narration-skeleton/confirm`, { revision }),
+  unconfirm: (episodeId: number) =>
+    api.post<NarrationSkeletonState>(`/episodes/${episodeId}/narration-skeleton/unconfirm`),
+  save: (episodeId: number, revision: string, shots: NarrationSkeletonShotInput[]) =>
+    api.put<NarrationSkeletonState>(`/episodes/${episodeId}/narration-skeleton`, { revision, shots }),
+}
+export interface TtsRequiredBlock { storyboard_id: number; storyboard_number?: number; reason: TtsInvalidReason | string; message?: string }
+export function ttsRequiredOf(err: unknown): TtsRequiredBlock[] | null {
+  const body = (err as ApiError)?.body as { error?: string; blocked?: TtsRequiredBlock[] } | undefined
+  if (body?.error !== 'tts_required') return null
+  return Array.isArray(body.blocked) ? body.blocked : []
+}
 // 服务器/Docker 部署的版本检查与更新（桌面版走 useDesktopBridge，不用此 API）
 export const serverUpdateAPI = {
   state: () => api.get('/server-update/state'),

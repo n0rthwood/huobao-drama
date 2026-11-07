@@ -40,6 +40,7 @@ import { loadDesignCardContext, resolveDesignCard } from './design-card-context.
 import { toCombo } from './design-card.js'
 import { generatedSegmentSeconds } from './shot-duration.js'
 import { resolveDramaProjectType } from './project-type.js'
+import { assertShotTtsReady } from './narration-tts-gate.js'
 
 export interface StoryboardVideoOptions {
   model?: string
@@ -159,6 +160,8 @@ export async function buildStoryboardVideoRequest(
   const documentary = resolveDramaProjectType(episode.dramaId) === 'documentary'
   const combo = toCombo(storyboard.combo)
   if (documentary && (!combo || storyboard.designCardStatus !== 'confirmed')) throw new Error('设计卡未确认')
+  // 实测配音是制作的硬前置（#70）：段时长按实测音频排，音频失效就不能出画面
+  if (documentary) await assertShotTtsReady(storyboardId)
   if (documentary && combo === 'A') throw new Error('未启用生成段')
 
   // 关键帧闸门：就绪且人工确认过才允许生成视频

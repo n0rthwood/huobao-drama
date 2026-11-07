@@ -52,6 +52,8 @@ import {
   type KeyframeSlot,
 } from '../services/keyframes.js'
 import { assertShotGate } from '../services/workflow-gates.js'
+import { markStale } from '../services/staleness.js'
+import { isMarkupOnlyEdit } from '../services/narration-first.js'
 import { applyComboSwitch, comboChangeLogOf, comboImpactOf, ComboSwitchError } from '../services/combo-switch.js'
 import { junctionFrameOf } from '../services/junction-frame.js'
 import { invalidateSegmentSpec } from '../services/layer-segment.js'
@@ -222,6 +224,13 @@ app.put('/:id', async (c) => {
 
   await db.update(schema.storyboards).set(updates).where(eq(schema.storyboards.id, id))
   if ('video_url' in body && body.video_url !== storyboard.videoUrl) invalidateSegmentSpec(storyboard.episodeId)
+  // 旁白正文改了就是**内容变化**（#70）：本镜设计卡必须按新旁白重审。
+  // 只加发音标记（念出来的字没变）不算内容变化：音频会因文本指纹变化而失效，
+  // 重新配音后时长若仍适配，人工确认过的设计不该被无谓撤销。
+  if ('narration_text' in body && (body.narration_text || '') !== (storyboard.narrationText || '')
+    && !isMarkupOnlyEdit(storyboard.narrationText, body.narration_text)) {
+    await markStale('design_card', [id], '本镜旁白正文已修改：设计必须按新旁白重审')
+  }
   // 显式传入的绑定（含主场景）记为手选；提示词里的 @ 自动进池，但不会被记成手选
   const explicit = 'character_ids' in body || 'prop_ids' in body || ('scene_id' in body && body.scene_id != null)
     ? await applyExplicitBindings(id, {

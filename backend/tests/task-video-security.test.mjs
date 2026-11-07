@@ -51,8 +51,13 @@ const dramaEpisodeId = Number(db.insert(schema.episodes).values({ dramaId:dramaO
 const png = await sharp({create:{width:32,height:32,channels:3,background:'#456789'}}).png().toBuffer()
 for (const folder of ['images','layer-frames','layer-segments']) mkdirSync(path.join(process.env.STORAGE_PATH,folder),{recursive:true})
 for (const name of ['first','mid','last']) writeFileSync(path.join(process.env.STORAGE_PATH,'images',name+'.png'),png)
-function shot(number, combo, changes={}) {
-  return Number(db.insert(schema.storyboards).values({ episodeId, storyboardNumber:number, combo, designCardStatus:'confirmed', designCard:JSON.stringify({version:2,budget:{layer_s:2,gen_s:4}}), videoPrompt:'server-owned video prompt', firstFrameImage:'static/images/first.png', midFrameImage:'static/images/mid.png', midFramePrompt:'server middle', midFrameTime:2, lastFrameImage:'static/images/last.png', keyframesConfirmed:true, continuityBoundary:'cut', createdAt:ts, updatedAt:ts, ...changes }).run().lastInsertRowid)
+// #70：纪录片逐镜制作要求本镜有当前有效配音；这里只补事实，门禁不放松。
+// 带 episodeId 覆盖的是剧情集（没有这条链路），不补。
+const {giveShotsValidVoice} = await import('./tests/fixtures/documentary-voice.mjs')
+async function shot(number, combo, changes={}) {
+  const id = Number(db.insert(schema.storyboards).values({ episodeId, storyboardNumber:number, combo, designCardStatus:'confirmed', designCard:JSON.stringify({version:2,budget:{layer_s:2,gen_s:4}}), videoPrompt:'server-owned video prompt', firstFrameImage:'static/images/first.png', midFrameImage:'static/images/mid.png', midFramePrompt:'server middle', midFrameTime:2, lastFrameImage:'static/images/last.png', keyframesConfirmed:true, continuityBoundary:'cut', createdAt:ts, updatedAt:ts, ...changes }).run().lastInsertRowid)
+  if (!changes.episodeId) await giveShotsValidVoice({episodeId,storyboardIds:[id],confirmSkeleton:false,seconds:2})
+  return id
 }
 async function post(body) {
   const response = await app.request('/', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({type:'video',...body}) })
@@ -64,14 +69,14 @@ const forged = { prompt:'client video prompt', drama_id:dramaOnlyId, episode_id:
 test('generic video tasks cannot bypass documentary design, enabled-segment or keyframe gates with client guides', () => {
   const result = run(`
     const cases = [
-      shot(1,null),
-      shot(2,'B',{designCardStatus:'pending'}),
-      shot(3,'B',{designCardStatus:'stale'}),
-      shot(4,'A'),
-      shot(5,'B',{keyframesConfirmed:false}),
-      shot(6,'B',{lastFrameImage:'static/images/missing.png'}),
-      shot(7,'C'),
-      shot(8,'D'),
+      await shot(1,null),
+      await shot(2,'B',{designCardStatus:'pending'}),
+      await shot(3,'B',{designCardStatus:'stale'}),
+      await shot(4,'A'),
+      await shot(5,'B',{keyframesConfirmed:false}),
+      await shot(6,'B',{lastFrameImage:'static/images/missing.png'}),
+      await shot(7,'C'),
+      await shot(8,'D'),
     ]
     const responses=[]
     for(const id of cases) responses.push(await post({...forged,storyboard_id:id}))
@@ -86,7 +91,7 @@ test('generic video tasks cannot bypass documentary design, enabled-segment or k
 
 test('documentary B uses canonical saved inputs and ownership, accepting a minimal request and ignoring all client media', () => {
   const result = run(`
-    const id=shot(1,'B')
+    const id=await shot(1,'B')
     const expected=await buildStoryboardVideoRequest(id,{configId:alternateConfigId,model:'MiniMax-H3-explicit'})
     const minimal=await post({storyboard_id:id,config_id:alternateConfigId,model:'MiniMax-H3-explicit'})
     // This client guide combination would fail the manual schema; it is not an input to owned video generation.
@@ -119,7 +124,7 @@ test('documentary C/D persist server junction guides and reject stale or missing
     const expected=[]
     const stale=[]
     for (const [number,combo] of [[1,'C'],[2,'D']]) {
-      const id=shot(number,combo)
+      const id=await shot(number,combo)
       const segment=await saveLayerSegment(id,{layer_doc:{version:1,theme:'archival',base:{path:'static/images/first.png',width:1,height:1},layers:[]},timeline:{fps:25,keyframes:[{t:0,viewport:{x:0,y:0,w:1,h:1},visible:[]}]},duration:2})
       const spec=await resolveEpisodeSegmentSpec(episodeId)
       const hash=createHash('sha256').update(png).digest('hex')
@@ -153,7 +158,7 @@ test('documentary C/D persist server junction guides and reject stale or missing
 
 test('manual/unowned and drama-owned videos retain client inputs and the existing validation', () => {
   const result = run(`
-    const id=shot(1,null,{episodeId:dramaEpisodeId,designCardStatus:'pending',keyframesConfirmed:false})
+    const id=await shot(1,null,{episodeId:dramaEpisodeId,designCardStatus:'pending',keyframesConfirmed:false})
     const manual=await post({...forged,drama_id:dramaId,episode_id:episodeId})
     const drama=await post({...forged,drama_id:dramaOnlyId,episode_id:dramaEpisodeId,storyboard_id:id})
     const invalid=await post({prompt:'manual',mid_frame_url:'static/images/mid.png'})
@@ -185,7 +190,7 @@ test('manual/unowned and drama-owned videos retain client inputs and the existin
 
 test('documentary explicit disabled config is rejected rather than silently charging a different active service', () => {
   const result = run(`
-    const id=shot(1,'B')
+    const id=await shot(1,'B')
     await db.update(schema.aiServiceConfigs).set({isActive:false}).where(eq(schema.aiServiceConfigs.id,alternateConfigId))
     const response=await post({storyboard_id:id,config_id:alternateConfigId})
     console.log('@@'+JSON.stringify({response,tasks:db.select().from(schema.sysTask).all()}))
@@ -205,7 +210,7 @@ test('documentary explicit config stays on its selected local HTTP target; inval
     const url='http://127.0.0.1:'+server.address().port
     await db.update(schema.aiServiceConfigs).set({baseUrl:url+'/default'}).where(eq(schema.aiServiceConfigs.id,configId))
     await db.update(schema.aiServiceConfigs).set({baseUrl:url+'/selected'}).where(eq(schema.aiServiceConfigs.id,alternateConfigId))
-    const id=shot(1,'B',{videoPrompt:'integrated_multimodal_description: [Shot 1] The camera remains fixed. overall_soundscape: quiet room. non_diegetic_music: N/A'})
+    const id=await shot(1,'B',{videoPrompt:'integrated_multimodal_description: [Shot 1] The camera remains fixed. overall_soundscape: quiet room. non_diegetic_music: N/A'})
     const selected=await post({storyboard_id:id,config_id:alternateConfigId})
     const taskId=selected.body.data.id
     const deadline=Date.now()+5000

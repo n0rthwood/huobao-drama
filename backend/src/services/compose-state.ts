@@ -19,11 +19,11 @@
  * - 依赖检查一律看真实文件：URL 有值不等于文件在、字幕文件存在不等于里面有字幕。
  */
 import fs from 'fs'
-import path from 'path'
 import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
-import { DATA_ROOT, STORAGE_ROOT } from '../utils/paths.js'
+import { toAbsPath } from '../utils/paths.js'
 import { mediaFacts, mediaFactsAll, statMedia } from './media-probe.js'
+import { shotTtsValidity } from './narration-tts-gate.js'
 import { parseTransitionReview } from './transition.js'
 import { parseSrt } from './subtitle.js'
 import {
@@ -108,17 +108,6 @@ export interface ComposeStateItem {
   plan: ComposePlan | null
   inputs: ComposeInputAvailability
   composed_video_url: string | null
-}
-
-export function toAbsPath(relativePath: string): string {
-  const resolved = path.resolve(path.isAbsolute(relativePath) ? relativePath : relativePath.startsWith('static/') ? path.join(DATA_ROOT, relativePath) : path.join(STORAGE_ROOT, relativePath))
-  const roots = [path.resolve(DATA_ROOT), path.resolve(STORAGE_ROOT)]
-  if (!roots.some(root => resolved.startsWith(root + path.sep))) throw new Error('媒体路径必须位于本项目数据目录内')
-  if (fs.existsSync(resolved)) {
-    const real = fs.realpathSync(resolved)
-    if (!roots.some(root => fs.existsSync(root) && real.startsWith(fs.realpathSync(root) + path.sep))) throw new Error('媒体路径不能指向项目数据目录之外')
-  }
-  return resolved
 }
 
 /** 片段分项的稳定串：没有片段为空串，有片段时路径与渲染签名都参与 */
@@ -459,6 +448,12 @@ export async function inspectComposeInputs(
     if (!sb.subtitleUrl) return fail(`${shot} 缺少字幕文件：请重新生成配音或单独生成字幕`)
     if (cues === null) return fail(`${shot} 的字幕文件不存在或无法读取：${sb.subtitleUrl}`)
     if (cues === 0) return fail(`${shot} 的字幕文件里没有任何字幕行：请重新生成字幕`)
+    // 纪录片（#70）：当前配音是否有效只由 narration-tts-gate 判定——除了文本与文件，
+    // 还要核对本镜**当前生效的配音参数**与实测出的有限正数时长，旧元数据一概不算数。
+    if (documentary) {
+      const tts = await shotTtsValidity(sb.id)
+      if (!tts.valid) return fail(`${tts.message}`)
+    }
   }
 
   // dv：replace = 片段时长；否则 = 片头 + 模型视频 + 片尾（实测相加，concat 后与此一致）

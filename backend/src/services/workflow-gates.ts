@@ -23,8 +23,9 @@ import { composeStatesForEpisode } from './compose-state.js'
 import { resolveDramaProjectType, type ProjectType } from './project-type.js'
 import { now } from '../utils/response.js'
 import { markEpisodeDesignCardsStale } from './staleness.js'
-import { toDesignCardStatus, type DesignCardStatus } from './design-card.js'
+import { parseDesignCard, toCombo, toDesignCardStatus, validateDesignCard, type DesignCardStatus } from './design-card.js'
 import { segmentsByStoryboard, resolveEpisodeSegmentSpec, layerSegmentIsFresh } from './layer-segment.js'
+import { shotTtsValidity, toBlocked, TtsRequiredError, type TtsBlockedShot } from './narration-tts-gate.js'
 
 export const GATE_KEYS = ['assets', 'design', 'production', 'final', 'poster', 'export'] as const
 
@@ -203,23 +204,50 @@ export async function assertGate(episodeId: number, gate: GateKey): Promise<void
 }
 
 /**
- * 逐镜的「分镜制作」解锁事实（Issue #58）：本镜设计卡已确认即可制作。
+ * 逐镜的「分镜制作」解锁事实（Issue #58 + #70）：本镜设计卡已确认、且**当前配音有效**才能制作。
  * 剧情项目恒解锁（它们没有设计卡）；页面级入口仍由 `episodeGates().unlocked.production` 决定。
  * 与 `assertGate` 不同，这里**只回答本镜**，不因同集别的镜没确认而锁住。
  */
 export async function productionGateReason(
   episodeId: number,
   shot: { storyboardId: number; status: DesignCardStatus; number?: number },
-): Promise<{ unlocked: boolean; reason: string | null }> {
+): Promise<{ unlocked: boolean; reason: string | null; tts_blocked: TtsBlockedShot | null }> {
   const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId))
-  if (!ep) return { unlocked: false, reason: '剧集不存在' }
-  if (resolveDramaProjectType(ep.dramaId) !== 'documentary') return { unlocked: true, reason: null }
-  if (shot.status === 'confirmed') return { unlocked: true, reason: null }
+  if (!ep) return { unlocked: false, reason: '剧集不存在', tts_blocked: null }
+  if (resolveDramaProjectType(ep.dramaId) !== 'documentary') return { unlocked: true, reason: null, tts_blocked: null }
   const label = shot.number ? `#${String(shot.number).padStart(2, '0')}` : `#${shot.storyboardId}`
-  return {
-    unlocked: false,
-    reason: `先确认 ${label} 的设计卡：本镜的设计卡状态是「${DESIGN_CARD_STATUS_LABELS[shot.status]}」，未确认前不能保存/渲染图层段或生成关键帧`,
+  if (shot.status !== 'confirmed') {
+    return {
+      unlocked: false,
+      tts_blocked: null,
+      reason: `先确认 ${label} 的设计卡：本镜的设计卡状态是「${DESIGN_CARD_STATUS_LABELS[shot.status]}」，未确认前不能保存/渲染图层段或生成关键帧`,
+    }
   }
+  // 实测配音是制作的硬前置（#70）：设计卡是按实测时长填的，音频一旦失效，
+  // 这一镜的时长关系就不再成立，必须重新配音后再制作。纪录片没有例外——
+  // 纪录片每一镜都要承载一段旁白，「纯画面」或集级关旁白都不构成放行理由。
+  const [sb] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, shot.storyboardId))
+  const tts = await shotTtsValidity(shot.storyboardId)
+  if (!tts.valid) {
+    const blocked = toBlocked(tts)
+    return { unlocked: false, reason: `${blocked.message}（纪录片要求先有当前有效配音，才能进入制作）`, tts_blocked: blocked }
+  }
+  // 重配音之后的适配复核（#70）：确认记录保留，但新实测时长装不下已确认的段预算时
+  // 不得进入制作。这里只阻断并说明冲突，绝不替人改预算或截断旁白。
+  const fit = sb ? validateDesignCard({
+    card: parseDesignCard(sb.designCard),
+    combo: toCombo(sb.combo),
+    narrationText: sb.narrationText,
+    measuredSeconds: tts.duration_s,
+  }).filter(issue => issue.severity === 'block') : []
+  if (fit.length) {
+    return {
+      unlocked: false,
+      tts_blocked: null,
+      reason: `${label} 的设计卡与当前实测配音（${tts.duration_s}s）不再匹配：${fit.map(issue => issue.message).join('；')}。请调整设计卡后重新确认`,
+    }
+  }
+  return { unlocked: true, reason: null, tts_blocked: null }
 }
 
 /** 逐镜「分镜制作」门禁：图层段保存/渲染、关键帧生成都要先过它（契约 §2） */
@@ -233,6 +261,9 @@ export async function assertShotGate(storyboardId: number, gate: GateKey = 'prod
   }
   const result = await productionGateReason(sb.episodeId, shot)
   if (result.unlocked) return
+  // 缺当前有效配音与「设计卡没确认」是两种不同的阻断：前者走 tts_required，前端据此
+  // 把人引到批量配音，而不是引到一张还填不了的设计卡。
+  if (result.tts_blocked) throw new TtsRequiredError([result.tts_blocked])
   throw new GateBlockedError(gate, result.reason || '该步骤尚未解锁')
 }
 

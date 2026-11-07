@@ -42,8 +42,10 @@ export const AI_STAGES = {
   // ── 不需要视觉 ────────────────────────────────────────────
   /** 剧情项目拆分分镜：纯剧本文本；绝对图像优先规则下不描述外观 */
   storyboard_breaker: { vision: false, label: '拆分分镜（剧情）' },
-  /** 剧本改写 / 旁白稿 */
+  /** 剧本改写 / 旁白稿：纪录片分阶段改写的「忠实改写」阶段也用这个环节 */
   script_rewriter: { vision: false, label: '剧本改写' },
+  /** 桥句润色（Issue #70）：读冻结原文 + 忠实改写稿，逐边界判断该不该补一句承接 */
+  script_bridge: { vision: false, label: '桥句润色' },
   /** 资产提取：从剧本文本提取 */
   extractor: { vision: false, label: '资产提取' },
   /** 资产最终提示词（含资产批量） */
@@ -87,6 +89,8 @@ export const AI_CALL_SITES: Record<string, AiStage[]> = {
   'services/keyframe-prompts.ts': ['keyframe_prompts'],
   'services/video-prompts.ts': ['video_prompts'],
   'services/transition-agent.ts': ['transition_writer'],
+  // 分阶段改写（#70）：忠实改写沿用 script_rewriter 环节，桥句润色是独立环节
+  'services/script-rewrite/stages.ts': ['script_rewriter', 'script_bridge'],
   'services/narration-script.ts': ['narration_writer'],
   'services/task-retry.ts': ['script_rewriter', 'storyboard_breaker', 'storyboard_breaker_documentary'],
   'services/asset-review.ts': ['asset_review'],

@@ -613,7 +613,9 @@
             :storyboards="sbs"
             :chat-model="chatModelOverride() || ''"
             :chat-config-id="chatConfigId() || 0"
+            :narration-voice-batch="narrationVoiceBatch"
             @refresh="refresh"
+            @batch-narration-voice="batchNarrationVoice"
           />
 
           <!-- Sub: 分镜关键帧（剧情专用；纪录片走「分镜制作」步） -->
@@ -5226,6 +5228,8 @@ provide(WORKBENCH_CTX, {
   batchVideoPrompts,
   batchVideos,
   cancelVideoBatch,
+  chatConfigId,
+  chatModelOverride,
   composeBatchRunning,
   composeReasonOf,
   composeStateOf,
@@ -5239,6 +5243,7 @@ provide(WORKBENCH_CTX, {
   dramaAspectRatio,
   effectiveVideoDuration,
   effectiveVideoModelLabel,
+  epId,
   episode,
   episodeAudioMixMode,
   episodeFitDefault,

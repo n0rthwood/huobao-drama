@@ -88,6 +88,15 @@ export interface TextTaskProgress {
   items?: TextTaskProgressItem[]
 }
 
+/** 分阶段改写（Issue #70）的任务侧进度快照：阶段条与任务详情时间线读同一份 */
+export interface RewriteTaskParams {
+  run_id: number
+  stage_key: string | null
+  stage_index: number
+  stage_total: number
+  stages: Array<{ key: string; status: string; version_id: number | null; error: string | null }>
+}
+
 export interface TextTaskParams {
   kind: TextTaskKind
   progress?: TextTaskProgress
@@ -105,6 +114,11 @@ export interface TextTaskParams {
   roster?: { name: string; basis?: string; reason?: string }[]
   /** 补提取（Issue #55）：该提取任务是为哪条审核清单条目发起的，完成后按它回链 */
   assetReviewItemId?: number
+  /**
+   * 分阶段剧本改写（Issue #70）的运行与阶段进度：任务中心用一个父项 + 详情时间线展示，
+   * 不再实现页面私有轮询。`run_id` 也是「换模型重试」续跑的入口。
+   */
+  rewrite?: RewriteTaskParams
   [key: string]: unknown
 }
 

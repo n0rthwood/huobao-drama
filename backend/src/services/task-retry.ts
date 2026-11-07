@@ -37,6 +37,8 @@ import { retryFailedVoiceBatch } from './narration-voice.js'
 import { retryFailedLayerRenderBatch } from './layer-render-batch.js'
 import { assertShotGate } from './workflow-gates.js'
 import { retryFailedComposeBatch } from './shot-compose.js'
+import { retryRewriteRun } from './script-rewrite/run.js'
+import { startSkeletonGeneration } from './narration-skeleton.js'
 
 export interface RetryOptions {
   configId?: number
@@ -260,6 +262,25 @@ async function retryText(row: SysTaskRow, opts: RetryOptions): Promise<number> {
     if (fill.reason === 'not_documentary') throw new Error('只有纪录片项目才有补镜')
     if (!fill.started) throw new Error('本集旁白已被分镜全部领走，没有需要补的缺口')
     return fill.taskId!
+  }
+
+  // 纪录片剧本改写（#70）：重试 = 从失败的那个阶段续跑一轮分阶段运行，
+  // 已完成阶段的版本作为前驱复用。绝不回到旧的同步 chat 通路（那条路会直接写最终稿）。
+  if (kind === 'script_rewrite' && resolveDramaProjectType(dramaId) === 'documentary') {
+    return retryRewriteRun({ id: row.id, episodeId, params: row.params }, { configId: opts.configId, model: opts.model })
+  }
+
+  // 纪录片拆分分镜（#70）：重试 = 重新生成旁白骨架（只拆旁白，不填设计卡），
+  // 与分镜页按钮同一条通路：确认门禁、同类任务去重、覆盖校验都在。旧的同步 chat 重试会把
+  // 这些全绕开，还会无条件把任务标成完成，纪录片不再走它。
+  if (kind === 'storyboard_breaker' && resolveDramaProjectType(dramaId) === 'documentary') {
+    const skeleton = await startSkeletonGeneration(episodeId, {
+      model: opts.model, configId: opts.configId, retryOf: row.id,
+    })
+    if (skeleton.reason === 'running') throw new Error('该集的拆分/补镜任务正在运行，请等它结束')
+    if (skeleton.reason === 'script_missing') throw new Error('本集还没有最终旁白稿，无法拆分')
+    if (!skeleton.started || !skeleton.task_id) throw new Error('重试任务创建失败')
+    return skeleton.task_id
   }
 
   if (kind === 'poster_concept') {
