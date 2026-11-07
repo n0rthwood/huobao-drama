@@ -1,4 +1,6 @@
 import { runWithTextTask } from './text-task-context.js'
+import { isModelError } from './text-scheduler.js'
+import { requeueFirstModelFailure } from './text-task-restart.js'
 
 /**
  * 资产审核清单（Issue #55）— 纪录片「资产」步的强门禁，唯一读写口
@@ -760,6 +762,7 @@ function buildSegmentPrompt(args: {
 async function runAssetReview(taskId: number, episodeId: number, texts: string[], stage: StageModel): Promise<void> {
   const progress = { completed: 0, failed: 0, total: texts.length }
   const errors: string[] = []
+  let firstCallPending = false
   const drafts: DraftItem[] = []
   try {
     const skill = await loadSkillDoc('documentary/asset-review', getContentLanguage())
@@ -773,6 +776,7 @@ async function runAssetReview(taskId: number, episodeId: number, texts: string[]
       const segmentNo = i + 1
       const text = texts[i]!
       try {
+        if (i === 0) firstCallPending = true
         const { text: reply } = await callTextChat(stage, buildSegmentPrompt({
           segmentNo, total: texts.length, text, assets, prior,
         }), {
@@ -781,10 +785,12 @@ async function runAssetReview(taskId: number, episodeId: number, texts: string[]
           maxTokens: SEGMENT_MAX_TOKENS,
           timeoutMs: SEGMENT_TIMEOUT_MS,
         })
+        if (i === 0) firstCallPending = false
         const parsed = parseModelReply(reply)
         drafts.push(...toDraftItems(segmentNo, text.slice(0, EXCERPT_CHARS), parsed.items, assets))
         progress.completed++
       } catch (err) {
+        if (i === 0 && isModelError(err)) throw err
         progress.failed++
         const message = err instanceof Error ? err.message : String(err)
         errors.push(`第 ${segmentNo} 段：${message}`)
@@ -814,6 +820,7 @@ async function runAssetReview(taskId: number, episodeId: number, texts: string[]
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     await finishTextTask(taskId, 'failed', { errorMsg: `资产审核清单失败：${message}`, progress: { ...progress } })
+    await requeueFirstModelFailure(taskId, err, firstCallPending && progress.completed === 0)
     await recomputeAssetReviewStatus(episodeId)
     logTaskError('AssetReview', 'run', { episodeId, error: message })
   }

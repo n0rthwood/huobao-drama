@@ -15,8 +15,7 @@ import {
   startAssetReview,
   updateAssetReviewItem,
 } from '../services/asset-review.js'
-import { EXTRACT_TASK_KINDS, startSingleAssetExtraction } from '../services/extraction.js'
-import { findActiveTextTask } from '../services/text-task.js'
+import { startSingleAssetExtraction } from '../services/extraction.js'
 import { logTaskStart } from '../utils/task-logger.js'
 
 export const episodeAssetReview = new Hono()
@@ -100,14 +99,11 @@ assetReviewItems.post('/items/:id/extract', async (c) => {
   if (!Number.isInteger(itemId) || itemId <= 0) return badRequest(c, '条目 id 非法')
   try {
     const plan = reviewExtractionPlan(itemId)
-    const started = await startSingleAssetExtraction(plan.episodeId, plan.dramaId, plan.target, plan.assetName, {
+    const taskId = await startSingleAssetExtraction(plan.episodeId, plan.dramaId, plan.target, plan.assetName, {
       assetReviewItemId: itemId,
     })
-    if (!started) {
-      return c.json({ code: 409, error: 'extract_running', message: '该类型的提取任务正在运行，请等它结束' }, 409)
-    }
-    const task = await findActiveTextTask(plan.episodeId, EXTRACT_TASK_KINDS[plan.target])
-    return success(c, { task_id: task?.id ?? null, asset_name: plan.assetName })
+    if (taskId === null) throw new Error('补提取任务未创建')
+    return success(c, { task_id: taskId, asset_name: plan.assetName })
   } catch (err) {
     return failure(c, err)
   }

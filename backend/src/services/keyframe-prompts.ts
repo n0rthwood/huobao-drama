@@ -25,7 +25,8 @@ import {
 } from './text-task.js'
 import { resolveStageModel } from './ai-stages.js'
 import { batchScopeOf, type BatchScope } from './batch-scope.js'
-import { runWithTextTask } from './text-task-context.js'
+import { isFirstAgentFailureSafe, runWithTextTask } from './text-task-context.js'
+import { requeueFirstModelFailure } from './text-task-restart.js'
 
 export type KeyframePromptBatchStatus = PromptBatchStatus
 
@@ -118,6 +119,7 @@ ${briefs.get(sb.id)?.text || ''}最后调用 update_storyboard 保存到分镜 I
           logTaskError('KeyframePrompt', 'batch-shot', { storyboardId: sb.id, error: 'agent finished but last_frame_prompt is empty' })
         }
       } catch (err: unknown) {
+        if (!progress.completed && isFirstAgentFailureSafe(err)) throw err
         progress.failed++
         logTaskError('KeyframePrompt', 'batch-shot', { storyboardId: sb.id, error: err instanceof Error ? err.message : String(err) })
       }
@@ -132,6 +134,7 @@ ${briefs.get(sb.id)?.text || ''}最后调用 update_storyboard 保存到分镜 I
       const message = err instanceof Error ? err.message : '批量生成失败'
       progress.current_storyboard_id = undefined
       await finishTextTask(taskId, 'failed', { errorMsg: message, progress })
+      await requeueFirstModelFailure(taskId, err, isFirstAgentFailureSafe(err))
       logTaskError('KeyframePrompt', 'batch', { episodeId, error: message })
     })
   return { started: true, total: pending.length }

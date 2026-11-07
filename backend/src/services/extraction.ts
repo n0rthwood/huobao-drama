@@ -19,7 +19,8 @@ import {
 } from './text-task.js'
 import { resolveStageModel } from './ai-stages.js'
 import { onReviewExtractionFinished } from './asset-review.js'
-import { runWithTextTask } from './text-task-context.js'
+import { isFirstAgentFailureSafe, runWithTextTask } from './text-task-context.js'
+import { requeueFirstModelFailure } from './text-task-restart.js'
 
 const extractionLocks = new Map<string, Promise<void>>()
 
@@ -66,13 +67,13 @@ const EXTRACT_MESSAGES: Record<ExtractTarget, string> = {
   props: '请从本集剧本中提取道具信息并保存，本次只提取道具；提取与去重规范以系统提示词与技能为准。',
 }
 
-/** 启动异步提取任务（立即返回）；同集同类型已在运行时返回 false；可指定文本模型覆盖 */
+/** 启动异步提取任务（立即返回任务 id）；同集同类型已运行时返回 null。 */
 export async function startExtraction(
   episodeId: number,
   dramaId: number,
   target: ExtractTarget,
   opts: { model?: string; configId?: number; retryOf?: number } = {},
-): Promise<boolean> {
+): Promise<number | null> {
   return startExtractorRun(episodeId, dramaId, target, EXTRACT_MESSAGES[target], opts)
 }
 
@@ -87,7 +88,7 @@ export async function startSingleAssetExtraction(
   target: ExtractTarget,
   assetName: string,
   opts: { model?: string; configId?: number; retryOf?: number; assetReviewItemId?: number } = {},
-): Promise<boolean> {
+): Promise<number | null> {
   const label = { characters: '角色', scenes: '场景', props: '道具' }[target]
   const message = `请只针对本集剧本中的${label}「${assetName}」重新提取信息并保存，不要处理其它${label}；`
     + `提取与去重规范以系统提示词与技能为准。该${label}的既有字段已被清空，请完整重写。`
@@ -101,9 +102,9 @@ async function startExtractorRun(
   target: ExtractTarget,
   message: string,
   opts: { model?: string; configId?: number; retryOf?: number; singleAssetName?: string; assetReviewItemId?: number } = {},
-): Promise<boolean> {
+): Promise<number | null> {
   const kind = EXTRACT_TASK_KINDS[target]
-  if (!opts.assetReviewItemId && !opts.retryOf && await findActiveTextTask(episodeId, kind)) return false
+  if (!opts.assetReviewItemId && !opts.retryOf && await findActiveTextTask(episodeId, kind)) return null
 
   const resolved = await resolveStageModel('extractor', opts)
   const taskId = await createTextTask({
@@ -162,9 +163,10 @@ async function startExtractorRun(
     .catch(async (err: unknown) => {
       const message = err instanceof Error ? err.message : '提取失败'
       await finishTextTask(taskId, 'failed', { errorMsg: message })
+      await requeueFirstModelFailure(taskId, err, isFirstAgentFailureSafe(err))
       logTaskError('Extract', target, { episodeId, error: message })
     }))
-  return true
+  return taskId
 }
 
 /** 查询某集三类资产的提取任务状态（未启动过的类型为 null） */

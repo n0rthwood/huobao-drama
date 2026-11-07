@@ -1,4 +1,5 @@
-import { runWithTextTask } from './text-task-context.js'
+import { isFirstAgentFailureSafe, runWithTextTask } from './text-task-context.js'
+import { requeueFirstModelFailure } from './text-task-restart.js'
 
 /**
  * 旁白覆盖缺口的「补全剩余」（Issue #52）。
@@ -379,6 +380,7 @@ export async function startFillGapsTask(
     .catch(async (err: unknown) => {
       const message2 = err instanceof Error ? err.message : '补全剩余失败'
       await finishTextTask(taskId, 'failed', { errorMsg: message2 })
+      await requeueFirstModelFailure(taskId, err, isFirstAgentFailureSafe(err))
       logTaskError('FillGaps', 'run', { episodeId, taskId, error: message2 })
     })
 

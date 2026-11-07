@@ -49,7 +49,7 @@ export function mountReExtractRoute(app: Hono, kind: AssetKind) {
     // 否则被拦的请求会把资产清成空壳。资产生图/美化流水线不拦（资产是项目级、可跨集复用）。
     await assertGate(episodeId, 'assets')
     // 先确认能起任务再清字段：清空后才发现同类任务在跑的话，这个资产会被清成空壳
-    // （startSingleAssetExtraction 返回 false，字段已经没了）
+    // （startSingleAssetExtraction 返回 null，字段已经没了）
     if (await findActiveTextTask(episodeId, EXTRACT_TASK_KINDS[TARGET_OF[kind]])) {
       return badRequest(c, '该集的同类提取任务正在运行，请等它结束')
     }
@@ -61,12 +61,12 @@ export function mountReExtractRoute(app: Hono, kind: AssetKind) {
     await db.update(table).set(cleared).where(eq(table.id, id))
 
     logTaskStart('Extract', `${kind}-re-extract`, { assetId: id, episodeId, name })
-    const started = await startSingleAssetExtraction(episodeId, row.dramaId, TARGET_OF[kind], name, {
+    const taskId = await startSingleAssetExtraction(episodeId, row.dramaId, TARGET_OF[kind], name, {
       model: body.text_model || undefined,
       configId: body.text_config_id ?? undefined,
     })
     // 竞态兜底：两个请求同时挤进来时，后到的那个把字段还原不了，只能如实报错
-    if (!started) return badRequest(c, '该集的同类提取任务正在运行，请等它结束')
+    if (taskId === null) return badRequest(c, '该集的同类提取任务正在运行，请等它结束')
     return success(c, { started: true, asset_id: id, cleared_fields: CLEARED_FIELDS[kind] })
   })
 }

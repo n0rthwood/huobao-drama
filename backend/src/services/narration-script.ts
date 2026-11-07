@@ -1,4 +1,5 @@
-import { runWithTextTask } from './text-task-context.js'
+import { isFirstAgentFailureSafe, runWithTextTask } from './text-task-context.js'
+import { requeueFirstModelFailure } from './text-task-restart.js'
 
 /**
  * 旁白写作任务（Issue #30，#35 改为两段式）。
@@ -196,6 +197,7 @@ export async function startNarrationScript(
         try {
           await runChunk(chunk, index)
         } catch (err) {
+          if (!progress.completed && isFirstAgentFailureSafe(err)) throw err
           logTaskError('Narration', 'chunk-retry', { episodeId, chunk: index + 1, error: err instanceof Error ? err.message : String(err) })
           try {
             await runChunk(chunk, index)
@@ -237,6 +239,7 @@ export async function startNarrationScript(
         progress,
         errorMsg: err instanceof Error ? err.message : String(err),
       })
+      await requeueFirstModelFailure(taskId, err, isFirstAgentFailureSafe(err))
     })
 
   return { started: true, total: targets.length }

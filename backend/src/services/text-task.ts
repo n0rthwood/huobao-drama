@@ -176,6 +176,13 @@ export async function createTextTask(input: {
   }
   if (input.retryOf) params.retry_of = input.retryOf
   if (input.restart) params.restart = input.restart
+  if (input.retryOf) {
+    const parent = db.select().from(schema.sysTask).where(eq(schema.sysTask.id, input.retryOf)).get()
+    if (parseTextTaskParams(parent?.params)?.requeued === true) {
+      params.requeued = true
+      params.auto_retry = 1
+    }
+  }
 
   const res = await db.insert(schema.sysTask).values({
     type: 'text',
@@ -208,6 +215,28 @@ export async function patchTextTaskParams(id: number, patch: Partial<TextTaskPar
   await db.update(schema.sysTask)
     .set({ params: JSON.stringify(merged), updatedAt: now() })
     .where(eq(schema.sysTask.id, id))
+}
+
+/** Persist the endpoint actually used, including each model-class failure. */
+export async function recordTextTaskAttempt(
+  id: number,
+  attempt: { config_id: number; model: string; error_class: string | null },
+  actual?: { configId: number; provider: string; model: string; name: string; vision: boolean },
+): Promise<void> {
+  const row = db.select().from(schema.sysTask).where(eq(schema.sysTask.id, id)).get()
+  if (!row) return
+  const params = parseTextTaskParams(row.params)
+  if (!params) return
+  const attempts = Array.isArray(params.attempts) ? params.attempts : []
+  params.attempts = [...attempts, attempt]
+  if (actual) params.model_used = {
+    config_id: actual.configId, provider: actual.provider, model: actual.model,
+    name: actual.name, vision: actual.vision,
+  }
+  db.update(schema.sysTask).set({
+    params: JSON.stringify(params), updatedAt: now(),
+    ...(actual ? { provider: actual.provider, model: actual.model } : {}),
+  }).where(eq(schema.sysTask.id, id)).run()
 }
 
 export async function updateTextTaskProgress(id: number, progress: TextTaskProgress): Promise<void> {

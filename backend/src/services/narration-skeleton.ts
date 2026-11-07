@@ -1,4 +1,5 @@
-import { runWithTextTask } from './text-task-context.js'
+import { isFirstAgentFailureSafe, runWithTextTask } from './text-task-context.js'
+import { requeueFirstModelFailure } from './text-task-restart.js'
 
 /**
  * 逐镜旁白骨架（Issue #70）—— 纪录片「最终剧本 → 骨架 → 人工确认 → 批量配音 → 实测时长填设计卡」里的第一步。
@@ -611,6 +612,7 @@ export async function startSkeletonGeneration(
     .catch(async (err: unknown) => {
       const detail = err instanceof Error ? err.message : '旁白骨架生成失败'
       await finishTextTask(taskId, 'failed', { errorMsg: detail })
+      await requeueFirstModelFailure(taskId, err, isFirstAgentFailureSafe(err))
       logTaskError('NarrationSkeleton', 'generate', { episodeId, taskId, error: detail })
     })
 

@@ -39,7 +39,8 @@ import { assertShotGate } from './workflow-gates.js'
 import { retryFailedComposeBatch } from './shot-compose.js'
 import { retryRewriteRun } from './script-rewrite/run.js'
 import { startSkeletonGeneration } from './narration-skeleton.js'
-import { runWithTextTask } from './text-task-context.js'
+import { isFirstAgentFailureSafe, runWithTextTask } from './text-task-context.js'
+import { requeueFirstModelFailure } from './text-task-restart.js'
 
 export interface RetryOptions {
   configId?: number
@@ -233,7 +234,10 @@ async function retryChatText(row: SysTaskRow, kind: TextTaskKind, episodeId: num
   })
   void runWithTextTask(taskId, () => runAgent(agent, [{ role: 'user', content: message }], { maxSteps: 20, requestContext }, createReasoningSink(taskId)))
     .then(result => finishTextTask(taskId, 'completed', { outputText: result.text || '' }))
-    .catch(err => finishTextTask(taskId, 'failed', { errorMsg: err instanceof Error ? err.message : String(err) }))
+    .catch(async err => {
+      await finishTextTask(taskId, 'failed', { errorMsg: err instanceof Error ? err.message : String(err) })
+      await requeueFirstModelFailure(taskId, err, isFirstAgentFailureSafe(err))
+    })
   return taskId
 }
 
@@ -301,10 +305,10 @@ async function retryText(row: SysTaskRow, opts: RetryOptions): Promise<number> {
 
   const extractTarget = EXTRACT_TARGET_OF[kind]
   if (extractTarget) {
-    const started = await startExtraction(episodeId, dramaId, extractTarget, {
+    const taskId = await startExtraction(episodeId, dramaId, extractTarget, {
       model: opts.model, configId: opts.configId, retryOf: row.id,
     })
-    if (!started) throw new Error('该集的同类提取任务正在运行，请等它结束')
+    if (taskId === null) throw new Error('该集的同类提取任务正在运行，请等它结束')
   } else if (kind === 'keyframe_prompts' || kind === 'video_prompts') {
     const start = kind === 'keyframe_prompts' ? startKeyframePromptBatch : startVideoPromptBatch
     const result = await start(episodeId, dramaId, {

@@ -348,8 +348,8 @@ app.post('/:id/extract', async (c) => {
   // 门禁（#54）：资产提取属于「资产」步，剧本未确认先拦；
   // 资产生图/美化流水线不拦——资产是项目级、可跨集复用，不属于本集步骤链。
   await assertGate(id, 'assets')
-  const started = await startExtraction(ep.id, ep.dramaId, target, { model: body.model || undefined, configId: body.config_id ?? undefined })
-  return success(c, { target, status: 'running', already_running: !started })
+  const taskId = await startExtraction(ep.id, ep.dramaId, target, { model: body.model || undefined, configId: body.config_id ?? undefined })
+  return success(c, { target, status: 'running', already_running: taskId === null })
 })
 
 // GET /episodes/:id/extract-status — 查询三类资产提取任务状态

@@ -1,4 +1,5 @@
-import { runWithTextTask } from './text-task-context.js'
+import { isFirstAgentFailureSafe, runWithTextTask } from './text-task-context.js'
+import { requeueFirstModelFailure } from './text-task-restart.js'
 
 /**
  * 设计卡填写（Issue #57，替换 #49 的 `shot-intent-batch.ts`）— 为纪录片分镜逐镜跑
@@ -179,6 +180,7 @@ export async function startDesignCardBatch(
         await db.update(schema.storyboards)
           .set({ designCardStatus: previousStatus, updatedAt: now() })
           .where(eq(schema.storyboards.id, sb.id))
+        if (!progress.completed && isFirstAgentFailureSafe(err)) throw err
         logTaskError('DesignCard', 'batch-shot', { storyboardId: sb.id, error: err instanceof Error ? err.message : String(err) })
       }
     }
@@ -198,6 +200,7 @@ export async function startDesignCardBatch(
           .where(eq(schema.storyboards.id, sb.id))
       }
       await finishTextTask(taskId, 'failed', { errorMsg: message, progress })
+      await requeueFirstModelFailure(taskId, err, isFirstAgentFailureSafe(err))
       logTaskError('DesignCard', 'batch', { episodeId, error: message })
     })
   return { started: true, total: pending.length }

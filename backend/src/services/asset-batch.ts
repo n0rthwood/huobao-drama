@@ -299,7 +299,7 @@ function toStatusJson(row: SysTaskRow, batch: AssetBatchParams): AssetBatchJson 
     drama_id: row.dramaId ?? 0,
     episode_id: row.episodeId ?? null,
     scope: batch.scope,
-    status: (row.status || 'processing') === 'processing' ? 'running' : (row.status as AssetBatchStatus),
+    status: isActiveTaskStatus(row.status) ? 'running' : (row.status as AssetBatchStatus),
     cancel_requested: !!batch.cancel_requested,
     options: batch.options,
     counts,

@@ -27,7 +27,8 @@ import { runTransitionReview } from './transition-agent.js'
 import { buildDesignCardBriefs, loadDesignCardContext } from './design-card-context.js'
 import { toCombo } from './design-card.js'
 
-import { runWithTextTask } from './text-task-context.js'
+import { isFirstAgentFailureSafe, runWithTextTask } from './text-task-context.js'
+import { requeueFirstModelFailure } from './text-task-restart.js'
 
 export type VideoPromptBatchStatus = PromptBatchStatus
 
@@ -145,6 +146,7 @@ ${briefs.get(sb.id)?.text || ''}${transitionHint}然后调用 update_storyboard 
           logTaskError('VideoPrompt', 'batch-shot', { storyboardId: sb.id, error: 'agent finished but video_prompt is empty' })
         }
       } catch (err: unknown) {
+        if (!progress.completed && isFirstAgentFailureSafe(err)) throw err
         progress.failed++
         logTaskError('VideoPrompt', 'batch-shot', { storyboardId: sb.id, error: err instanceof Error ? err.message : String(err) })
       }
@@ -159,6 +161,7 @@ ${briefs.get(sb.id)?.text || ''}${transitionHint}然后调用 update_storyboard 
       const message = err instanceof Error ? err.message : '批量生成失败'
       progress.current_storyboard_id = undefined
       await finishTextTask(taskId, 'failed', { errorMsg: message, progress })
+      await requeueFirstModelFailure(taskId, err, isFirstAgentFailureSafe(err))
       logTaskError('VideoPrompt', 'batch', { episodeId, error: message })
     })
   return { started: true, total: pending.length }
