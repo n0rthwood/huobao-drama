@@ -1113,6 +1113,7 @@ export interface AssetReviewItem {
   semantics_needs_review: boolean
   reason: string | null
   decided_at: string | null
+  extraction: { task_id: number; status: 'queued' | 'processing' } | null
 }
 export interface AssetReviewSegment {
   segment_no: number
@@ -1142,6 +1143,12 @@ export interface AssetReviewItemPatch {
   reason?: string | null
 }
 
+export interface AssetReviewBatchSkipped {
+  item_id: number
+  reason: string
+  candidate?: { kind: 'character' | 'scene' | 'prop'; id: number; name: string }
+}
+
 export const assetReviewAPI = {
   get: (episodeId: number) => api.get<AssetReviewPayload>(`/episodes/${episodeId}/asset-review`),
   run: (episodeId: number, opts: { model?: string; configId?: number } = {}) =>
@@ -1151,6 +1158,12 @@ export const assetReviewAPI = {
     }),
   updateItem: (itemId: number, patch: AssetReviewItemPatch) => api.put<AssetReviewItem>(`/asset-review/items/${itemId}`, patch),
   extract: (itemId: number) => api.post<{ task_id: number | null; asset_name: string }>(`/asset-review/items/${itemId}/extract`),
+  extractBatch: (episodeId: number, itemIds: number[]) =>
+    api.post<{ queued: { item_id: number; task_id: number; asset_name: string; kind: string }[]; skipped: AssetReviewBatchSkipped[] }>(`/episodes/${episodeId}/asset-review/extract-batch`, { item_ids: itemIds }),
+  createAssets: (episodeId: number, itemIds: number[]) =>
+    api.post<{ created: { item_id: number; asset_kind: 'character' | 'scene' | 'prop'; asset_id: number; name: string }[]; skipped: AssetReviewBatchSkipped[] }>(`/episodes/${episodeId}/asset-review/create-assets`, { item_ids: itemIds }),
+  batchStatus: (episodeId: number, itemIds: number[]) =>
+    api.post<{ updated: number; skipped: AssetReviewBatchSkipped[] }>(`/episodes/${episodeId}/asset-review/batch-status`, { item_ids: itemIds, status: 'not_needed' }),
 }
 
 // 生成任务列表/详情（图片生成走各资产 API，视频生成走 storyboardAPI.generateVideo 与集级批量）

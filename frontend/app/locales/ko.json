@@ -2763,6 +2763,34 @@
       "optional": "선택 · 체인 제외"
     },
     "assetReview": {
+      "batch": {
+        "extract": "일괄 추가 추출",
+        "create": "일괄 업로드 / AI 생성",
+        "status": "일괄 소재 불필요 표시",
+        "hint": "현재 필터의 누락 항목을 선택하세요. 일괄 업로드 / AI 생성은 빈 소재 카드만 만들며, 각 카드에서 업로드하거나 생성합니다.",
+        "selectAll": "전체 선택 ({n}개)",
+        "confirm": "확인 ({n}개)",
+        "queued": "대기 중",
+        "processing": "추출 중"
+      },
+      "results": {
+        "title": "일괄 처리 결과",
+        "extractSummary": "{done}개 대기열 추가, {skipped}개 건너뜀",
+        "createSummary": "카드 {done}개 생성, {skipped}개 건너뜀",
+        "statusSummary": "{done}개 표시, {skipped}개 건너뜀",
+        "created": "카드 생성됨",
+        "updated": "소재 불필요로 표시됨",
+        "skipped": "건너뜀",
+        "candidate": "기존 후보: {kind} “{name}” (#{id}), 자동 연결하지 않음",
+        "reason": {
+          "not_found": "이 에피소드에 항목이 없습니다",
+          "not_missing": "항목이 더 이상 누락 상태가 아닙니다",
+          "already_queued": "이미 추출 작업이 있습니다",
+          "no_kind": "이 요구에는 소재 카드를 만들 수 없습니다",
+          "existing_asset": "같은 이름의 소재가 있습니다",
+          "not_started": "추출을 시작하지 못했습니다"
+        }
+      },
       "emptyTitle": "대조를 아직 시작하지 않았습니다",
       "emptyDesc": "검수 목록은 \"정보 포인트 → 필요한 소재 → 보유/누락\"을 항목별로 나열하며, 모두 처리해야 숏 설계가 열립니다.",
       "start": "대조 시작",

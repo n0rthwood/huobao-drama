@@ -9,6 +9,7 @@ import { runAgent } from '../agents/run.js'
 import { createReasoningSink } from '../agents/reasoning-sink.js'
 import { logTaskError, logTaskProgress, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
 import {
+  cancelTextTask,
   createTextTask,
   findActiveTextTask,
   findLatestTextTask,
@@ -18,7 +19,7 @@ import {
   type TextTaskKind,
 } from './text-task.js'
 import { resolveStageModel } from './ai-stages.js'
-import { onReviewExtractionFinished } from './asset-review.js'
+import { isReviewItemMissing, onReviewExtractionFinished } from './asset-review.js'
 import { isFirstAgentFailureSafe, runWithTextTask } from './text-task-context.js'
 import { requeueFirstModelFailure } from './text-task-autoretry.js'
 
@@ -122,6 +123,10 @@ async function startExtractorRun(
 
   logTaskStart('Extract', target, { episodeId, dramaId, model: opts.model || undefined, configId: opts.configId || undefined })
   void withExtractionLock(`episode:${episodeId}:${kind}`, () => runWithTextTask(taskId, async () => {
+    if (opts.assetReviewItemId && !isReviewItemMissing(opts.assetReviewItemId, episodeId)) {
+      await cancelTextTask(taskId, '条目已被人工处置')
+      return null
+    }
     const agent = mastra.getAgent('extractor')
     if (!agent) throw new Error('提取 Agent 不可用')
     const requestContext = buildAgentRequestContext({
@@ -149,6 +154,7 @@ async function startExtractorRun(
     }, createReasoningSink(taskId))
   })
     .then(async (result) => {
+      if (result === null) return
       await finishTextTask(taskId, 'completed', { outputText: result?.text || '' })
       const toolNames = (result?.toolCalls || []).map(t => t?.payload?.toolName).filter(Boolean)
       logTaskSuccess('Extract', target, {

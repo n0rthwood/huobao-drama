@@ -19,10 +19,10 @@ import { requeueFirstModelFailure } from './text-task-autoretry.js'
  * 剧情项目（`project_type='drama'`）永不写这两列，接口一律 400 `not_documentary`。
  */
 import { createHash } from 'node:crypto'
-import { and, asc, eq } from 'drizzle-orm'
+import { and, asc, eq, inArray } from 'drizzle-orm'
 import { z } from 'zod'
 
-import { db, schema } from '../db/index.js'
+import { db, getInsertId, schema } from '../db/index.js'
 import { loadSkillDoc } from '../agents/skills.js'
 import { getContentLanguage } from './app-settings.js'
 import { resolveStageModel, type StageModel } from './ai-stages.js'
@@ -45,6 +45,7 @@ import {
 import { callTextChat } from './vision-chat.js'
 import { logTaskError, logTaskProgress, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
 import { now } from '../utils/response.js'
+import { ACTIVE_TASK_STATUSES } from './sys-task.js'
 
 export const NEED_KINDS = ['character', 'scene', 'prop', 'prop_faithful', 'exposition', 'none'] as const
 export type NeedKind = typeof NEED_KINDS[number]
@@ -278,6 +279,18 @@ function loadReviewAssets(episodeId: number): ReviewAsset[] {
     })
   }
   return out.filter(a => !!a.name)
+}
+
+/** Strictly equal normalized names, independent of faithful/exposition flags. */
+export function findReviewAssetDuplicate(episodeId: number, kind: AssetKind, name: string): { kind: AssetKind; id: number; name: string } | null {
+  const normalized = normalizeAssetName(name)
+  const asset = loadReviewAssets(episodeId).find(a => a.kind === kind && normalizeAssetName(a.name) === normalized)
+  return asset ? { kind: asset.kind, id: asset.id, name: asset.name } : null
+}
+
+export function findReviewItemAssetDuplicate(itemId: number, kind: AssetKind, name: string) {
+  const row = db.select().from(schema.assetReviewItems).where(eq(schema.assetReviewItems.id, itemId)).get()
+  return row ? findReviewAssetDuplicate(row.episodeId, kind, name) : null
 }
 
 /** 语义条目名（建议 5）：`points/regions/lines[].name` 与 `labels[].text` */
@@ -843,6 +856,7 @@ export interface AssetReviewItemView {
   semantics_needs_review: boolean
   reason: string | null
   decided_at: string | null
+  extraction: { task_id: number; status: 'queued' | 'processing' } | null
 }
 
 export interface AssetReviewView {
@@ -866,7 +880,7 @@ export interface AssetReviewView {
   }[]
 }
 
-function itemView(row: ReviewItemRow, assets: ReviewAsset[]): AssetReviewItemView {
+function itemView(row: ReviewItemRow, assets: ReviewAsset[], extraction: AssetReviewItemView['extraction'] = null): AssetReviewItemView {
   const asset = row.assetId ? assets.find(a => a.kind === row.assetKind && a.id === row.assetId) ?? null : null
   const entries = asset ? semanticEntries(asset.semantics) : []
   const entry = row.semanticId ? entries.find(e => e.id === row.semanticId) ?? null : null
@@ -886,6 +900,7 @@ function itemView(row: ReviewItemRow, assets: ReviewAsset[]): AssetReviewItemVie
     semantics_needs_review: entry ? entry.needsReview : entries.some(e => e.needsReview),
     reason: row.reason ?? null,
     decided_at: row.decidedAt ?? null,
+    extraction,
   }
 }
 
@@ -902,10 +917,11 @@ export async function getAssetReview(episodeId: number): Promise<AssetReviewView
   const assets = loadReviewAssets(episodeId)
   const task = await findLatestTextTask(episodeId, 'asset_review')
   const params = task ? parseTextTaskParams(task.params) : null
+  const extractions = activeReviewExtractions(episodeId)
 
   const segments: AssetReviewView['segments'] = []
   for (const row of rows) {
-    const view = itemView(row, assets)
+    const view = itemView(row, assets, extractions.get(row.id) ?? null)
     let group = segments.find(s => s.segment_no === row.segmentNo)
     if (!group) {
       group = {
@@ -1017,6 +1033,88 @@ const EXTRACT_TARGET_OF: Record<AssetKind, ExtractTarget> = {
 function extractionNameOf(row: Pick<ReviewItemRow, 'needDesc' | 'infoPoint'>): string {
   const head = row.needDesc.split(/[，,。；;（(]/)[0] || row.infoPoint
   return normalizeAssetName(head) || row.infoPoint
+}
+
+/** Active review-linked extract tasks for the episode, including queued tasks. */
+export function activeReviewExtractions(episodeId: number): Map<number, NonNullable<AssetReviewItemView['extraction']>> {
+  const result = new Map<number, NonNullable<AssetReviewItemView['extraction']>>()
+  const tasks = db.select().from(schema.sysTask).where(and(
+    eq(schema.sysTask.type, 'text'),
+    eq(schema.sysTask.episodeId, episodeId),
+    inArray(schema.sysTask.status, ACTIVE_TASK_STATUSES),
+  )).all()
+  for (const task of tasks) {
+    const params = parseTextTaskParams(task.params)
+    if (!params?.kind?.startsWith('extract_') || !params.assetReviewItemId) continue
+    if (task.status !== 'queued' && task.status !== 'processing') continue
+    result.set(params.assetReviewItemId, { task_id: task.id, status: task.status })
+  }
+  return result
+}
+
+export function isReviewItemMissing(itemId: number, episodeId: number): boolean {
+  const row = db.select().from(schema.assetReviewItems).where(and(
+    eq(schema.assetReviewItems.id, itemId), eq(schema.assetReviewItems.episodeId, episodeId),
+  )).get()
+  return row?.status === 'missing'
+}
+
+export function reviewBatchItems(episodeId: number, ids: number[]): { rows: Map<number, ReviewItemRow>; dramaId: number } {
+  const ep = db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId)).get()
+  if (!ep) throw new AssetReviewError('not_found', '剧集不存在', 404)
+  if (resolveDramaProjectType(ep.dramaId) !== 'documentary') {
+    throw new AssetReviewError('not_documentary', '资产审核清单只用于纪录片项目')
+  }
+  const rows = db.select().from(schema.assetReviewItems).where(eq(schema.assetReviewItems.episodeId, episodeId)).all()
+  const selected = new Set(ids)
+  return { rows: new Map(rows.filter(row => selected.has(row.id)).map(row => [row.id, row])), dramaId: ep.dramaId }
+}
+
+const BATCH_NOT_NEEDED_REASON = '审核清单：批量标记无需素材'
+
+export async function batchReviewStatus(episodeId: number, ids: number[]) {
+  const { rows } = reviewBatchItems(episodeId, ids)
+  const skipped: { item_id: number; reason: string }[] = []
+  let updated = 0
+  for (const id of ids) {
+    const row = rows.get(id)
+    if (!row) { skipped.push({ item_id: id, reason: 'not_found' }); continue }
+    if (!isReviewItemMissing(id, episodeId)) { skipped.push({ item_id: id, reason: 'not_missing' }); continue }
+    await updateAssetReviewItem(id, { status: 'not_needed', reason: BATCH_NOT_NEEDED_REASON })
+    updated++
+  }
+  return { updated, skipped }
+}
+
+export async function batchCreateReviewAssets(episodeId: number, ids: number[]) {
+  const { rows, dramaId } = reviewBatchItems(episodeId, ids)
+  const created: { item_id: number; asset_kind: AssetKind; asset_id: number; name: string }[] = []
+  const skipped: { item_id: number; reason: string; candidate?: { kind: AssetKind; id: number; name: string } }[] = []
+  for (const id of ids) {
+    const row = rows.get(id)
+    if (!row) { skipped.push({ item_id: id, reason: 'not_found' }); continue }
+    if (!isReviewItemMissing(id, episodeId)) { skipped.push({ item_id: id, reason: 'not_missing' }); continue }
+    const kind = assetKindForNeed(row.needKind)
+    if (!kind) { skipped.push({ item_id: id, reason: 'no_kind' }); continue }
+    const name = extractionNameOf(row)
+    const candidate = findReviewAssetDuplicate(episodeId, kind, name)
+    if (candidate) { skipped.push({ item_id: id, reason: 'existing_asset', candidate }); continue }
+    const ts = now()
+    let assetId: number
+    if (kind === 'character') {
+      assetId = getInsertId(db.insert(schema.characters).values({ dramaId, name, role: '', description: '', appearance: '', styling: '', createdAt: ts, updatedAt: ts }).run())
+      db.insert(schema.episodeCharacters).values({ episodeId, characterId: assetId, createdAt: ts }).run()
+    } else if (kind === 'scene') {
+      assetId = getInsertId(db.insert(schema.scenes).values({ dramaId, episodeId, location: name, time: '', prompt: '', lighting: '', createdAt: ts, updatedAt: ts }).run())
+      db.insert(schema.episodeScenes).values({ episodeId, sceneId: assetId, createdAt: ts }).run()
+    } else {
+      assetId = getInsertId(db.insert(schema.props).values({ dramaId, name, type: '', description: '', faithful: row.needKind === 'prop_faithful' ? 1 : 0, createdAt: ts, updatedAt: ts }).run())
+      db.insert(schema.episodeProps).values({ episodeId, propId: assetId, createdAt: ts }).run()
+    }
+    await bindCreatedAssetToReviewItem(id, kind, assetId)
+    created.push({ item_id: id, asset_kind: kind, asset_id: assetId, name })
+  }
+  return { created, skipped }
 }
 
 export interface ReviewExtractionPlan {
