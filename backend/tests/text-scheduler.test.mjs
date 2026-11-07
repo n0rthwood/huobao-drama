@@ -81,6 +81,15 @@ test('text scheduling, endpoint selection and persisted health', () => {
     params = JSON.parse(task.params)
     assert.equal(params.model_used.config_id, 9901)
     assert.equal(params.attempts, undefined)
+    calls = 0
+    globalThis.fetch = async () => { calls++; return new Response('content_filter', { status: 403 }) }
+    await assert.rejects(callTextChat(initial, 'hello', { temperature: 0, maxTokens: 10, timeoutMs: 1000 }))
+    assert.equal(calls, 1)
+    calls = 0
+    globalThis.fetch = async () => { calls++; return new Response('gateway', { status: 503 }) }
+    const pinned = await assignTextEndpoint('keyframe_prompts', { configId: 9901 })
+    await assert.rejects(callTextChat(pinned, 'hello', { temperature: 0, maxTokens: 10, timeoutMs: 1000 }))
+    assert.equal(calls, 1)
     await runWithTextTask(1, async () => {
       assert.equal(noteAgentFetchStarted(), true)
       noteFirstAgentFetchFailed()
