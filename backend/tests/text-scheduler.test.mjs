@@ -90,6 +90,15 @@ test('text scheduling, endpoint selection and persisted health', () => {
     const pinned = await assignTextEndpoint('keyframe_prompts', { configId: 9901 })
     await assert.rejects(callTextChat(pinned, 'hello', { temperature: 0, maxTokens: 10, timeoutMs: 1000 }))
     assert.equal(calls, 1)
+    await resumeTextConfig(9901)
+    await db.insert(schema.aiServiceConfigs).values({ id: 9903, serviceType: 'text', provider: 'openai', name: 'vision2', baseUrl: 'https://example.invalid', apiKey: '', model: '["vision2"]', vision: true, priority: 25, concurrency: 1, isActive: true, createdAt: stamp, updatedAt: stamp })
+    calls = 0
+    globalThis.fetch = async () => ++calls === 1
+      ? new Response('gateway', { status: 503 })
+      : Response.json({ choices: [{ message: { content: 'seen' } }] })
+    const visionStage = await assignTextEndpoint('design_card')
+    const visionReply = await callTextChat(visionStage, [{ type: 'image_url', image_url: { url: 'data:image/png;base64,AA==' } }], { temperature: 0, maxTokens: 10, timeoutMs: 1000 })
+    assert.equal(visionReply.endpoint.configId, 9903)
     await runWithTextTask(1, async () => {
       assert.equal(noteAgentFetchStarted(), true)
       noteFirstAgentFetchFailed()
