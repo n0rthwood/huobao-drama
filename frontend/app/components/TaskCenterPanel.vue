@@ -78,7 +78,8 @@
             </details>
           </div>
           <ProgressRing
-            v-if="(!row.pipeline || row.pipeline.state === 'running') && rowRing(row).status && rowRing(row).status !== 'completed'"
+            v-if="(!row.pipeline || row.pipeline.state === 'running') && rowRing(row).status && rowRing(row).status !== 'completed'
+              && !(row.type === 'text' && row.status === 'queued')"
             v-bind="rowRing(row)"
             :size="30"
             compact
