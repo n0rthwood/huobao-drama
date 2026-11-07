@@ -8,27 +8,83 @@
   </div>
 
   <template v-else>
+    <!-- 分镜设计的三个子阶段（#70）：骨架 → 配音 → 设计卡；顶层仍是同一个「分镜设计」步 -->
+    <div class="dc-phases" role="tablist" :aria-label="t('episode.skeleton.phaseLabel')">
+      <button
+        v-for="(item, index) in phases"
+        :key="item.key"
+        type="button"
+        role="tab"
+        :class="['dc-phase', { on: phase === item.key }]"
+        :aria-selected="phase === item.key"
+        @click="setPhase(item.key)"
+      >
+        <span class="mono dc-phase-num">{{ index + 1 }}</span>
+        <span class="dc-phase-name">{{ item.label }}</span>
+        <span class="dc-phase-state">{{ item.state }}</span>
+      </button>
+    </div>
+
     <NarrationCoverageBar
+      v-if="phase === 'skeleton'"
       :episode-id="episodeId"
       :chat-model="chatModel"
       :chat-config-id="chatConfigId"
       @refresh="emit('refresh')"
     />
 
-    <div class="prod-content dc-step">
+    <NarrationSkeletonPanel
+      v-if="phase !== 'cards'"
+      :episode-id="episodeId"
+      :phase="phase"
+      :skeleton="skeleton"
+      :chat-model="chatModel"
+      :chat-config-id="chatConfigId"
+      :voice-batch="narrationVoiceBatch"
+      @update="applySkeleton"
+      @refresh="onSkeletonRefresh"
+      @voice-batch="ids => emit('batch-narration-voice', ids)"
+    />
+
+    <div v-else class="prod-content dc-step">
+      <p v-if="!skeleton.confirmed" class="dc-block">
+        {{ t('episode.skeleton.cardsNeedConfirm') }}
+        <button class="btn btn-sm" @click="setPhase('skeleton')">{{ t('episode.skeleton.gotoSkeleton') }}</button>
+      </p>
+      <p v-else-if="skeleton.tts.invalid" class="dc-block">
+        {{ t('episode.skeleton.cardsBlockedByTts', { n: skeleton.tts.invalid }) }}
+        <button class="btn btn-sm" @click="setPhase('voice')">{{ t('episode.skeleton.gotoVoice') }}</button>
+      </p>
+      <p v-if="batchTtsBlocked.length" class="dc-block">
+        {{ t('episode.skeleton.batchExcluded', { n: batchTtsBlocked.length }) }}
+        <span class="mono dim">{{ batchTtsBlocked.map(item => '#' + pad(item.storyboard_number)).join(' ') }}</span>
+        <button class="btn btn-sm" @click="setPhase('voice')">{{ t('episode.skeleton.gotoVoice') }}</button>
+      </p>
+
       <div class="dc-bar">
         <span class="dim" style="font-size:12px">{{ t('episode.design.title') }}</span>
         <span class="tag mono">{{ t('episode.design.summary', counts) }}</span>
+        <span class="tag mono">{{ t('episode.skeleton.fillableCount', { n: fillableIds.length, total: shots.length }) }}</span>
         <span v-if="batch.running" class="tag mono dc-tag-run">
           <Loader2 :size="11" class="animate-spin" />
           {{ t('episode.design.fill.progress', { done: batch.completed, total: batch.total }) }}
         </span>
         <span class="ml-auto" />
-        <button class="btn btn-sm" :disabled="batch.running || !shots.length" @click="openScope('fill')">
+        <button
+          class="btn btn-sm"
+          :disabled="batch.running || !fillableIds.length || !skeleton.confirmed"
+          :title="cardsBlockReason"
+          @click="openScope('fill')"
+        >
           <Sparkles :size="11" />
           {{ t('episode.design.batch.fillAll') }}
         </button>
-        <button class="btn btn-sm" :disabled="batch.running || !shots.length" @click="openScope('confirm')">
+        <button
+          class="btn btn-sm"
+          :disabled="batch.running || !fillableIds.length || !skeleton.confirmed"
+          :title="cardsBlockReason"
+          @click="openScope('confirm')"
+        >
           {{ t('episode.design.batch.confirmAll') }}
         </button>
       </div>
@@ -56,6 +112,10 @@
             <span class="dc-shot-no mono">{{ shotLabel(sb) }}</span>
             <span class="dc-shot-combo mono" :title="comboTitle(stateOf(sb).combo)">{{ comboGlyph(stateOf(sb).combo) }}</span>
             <span :class="['dc-dot', 'is-' + stateOf(sb).design_card_status]" :title="t(`episode.design.status.${stateOf(sb).design_card_status}`)" />
+            <span
+              :class="['dc-tts-dot', ttsOf(sb.id).valid ? 'is-ok' : 'is-bad']"
+              :title="ttsTitle(sb.id)"
+            >{{ ttsOf(sb.id).valid ? '♪' : '✕' }}</span>
             <span class="dc-shot-grip">
               <span
                 class="dc-move"
@@ -87,6 +147,7 @@
             <span :class="['dc-state', 'is-' + current.design_card_status]">
               {{ t(`episode.design.status.${current.design_card_status}`) }}
             </span>
+            <span :class="['dc-tts', ttsOf(selected.id).valid ? 'is-ok' : 'is-bad']">{{ ttsTitle(selected.id) }}</span>
             <span v-if="current.design_card_stale_reason" class="dc-stale" :title="current.design_card_stale_reason">
               {{ current.design_card_stale_reason === 'migration_combo_unresolved'
                 ? t('episode.design.migrationComboUnresolvedShort')
@@ -96,7 +157,12 @@
             </span>
             <span v-if="saveState" class="dim" style="font-size:11px">{{ saveState }}</span>
             <span class="ml-auto" />
-            <button class="btn btn-sm" :disabled="batch.running || busy" @click="refillOne">
+            <button
+              class="btn btn-sm"
+              :disabled="batch.running || busy || !ttsOf(selected.id).valid"
+              :title="ttsOf(selected.id).valid ? '' : ttsTitle(selected.id)"
+              @click="refillOne"
+            >
               <Loader2 v-if="batch.running" :size="11" class="animate-spin" />
               {{ batch.running ? t('episode.design.actions.refilling') : t('episode.design.actions.refill') }}
             </button>
@@ -261,16 +327,18 @@
                 </span>
               </div>
 
+              <!-- 旁白时长只认实测（#70）：没有当前有效配音就显示待配音，绝不显示估算 -->
               <div class="dc-narr-line">
-                <span v-if="budgetPositive" :class="['dc-narr-fill', narrationClass]" :style="{ width: narrationPct + '%' }" />
+                <span v-if="budgetPositive && measuredSeconds !== null" :class="['dc-narr-fill', narrationClass]" :style="{ width: narrationPct + '%' }" />
                 <span class="dc-narr-text mono">
-                  {{ current.narration_measured_s === null
-                    ? t('episode.design.budget.estimate', { n: narrationSeconds.toFixed(1) })
-                    : t('episode.design.budget.measured', { n: narrationSeconds.toFixed(1) }) }}
-                  <template v-if="!budgetPositive"> · {{ t('episode.design.budget.headroomMissing') }}</template>
-                  <template v-else-if="narrationClass === 'is-over'"> · {{ t('episode.design.budget.over') }}</template>
-                  <template v-else-if="narrationClass === 'is-tight'"> · {{ t('episode.design.budget.tight') }}</template>
-                  <template v-else> · {{ t('episode.design.budget.remain', { n: headroom.toFixed(1) }) }}</template>
+                  <template v-if="measuredSeconds === null">{{ ttsTitle(selected.id) }}</template>
+                  <template v-else>
+                    {{ t('episode.design.budget.measured', { n: measuredSeconds.toFixed(1) }) }}
+                    <template v-if="!budgetPositive"> · {{ t('episode.design.budget.headroomMissing') }}</template>
+                    <template v-else-if="narrationClass === 'is-over'"> · {{ t('episode.design.budget.over') }}</template>
+                    <template v-else-if="narrationClass === 'is-tight'"> · {{ t('episode.design.budget.tight') }}</template>
+                    <template v-else> · {{ t('episode.design.budget.remain', { n: headroom.toFixed(1) }) }}</template>
+                  </template>
                 </span>
               </div>
             </div>
@@ -472,27 +540,33 @@
  * 保存契约：后端**整份替换** `design_card`，所以任何一次改动都把完整卡片 PUT 回去，
  * 界面随后一律改用响应里的 design_card / issues / design_card_status（issues 是读时重算的
  * 结论，前端不自行推断）。同一镜的写入串行化，避免并发写各自用旧快照互相覆盖。
+ *
+ * Issue #70：本步内部分三个子阶段——旁白骨架 → 批量配音 → 实测时长设计卡。
+ * 当前有效配音是填卡与确认的**硬前置**：没有有效实测的镜一律阻断，没有估算草稿。
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
 import { useI18n } from 'vue-i18n'
 import { ChevronDown, ChevronUp, Layers, Loader2, Lock, Sparkles } from 'lucide-vue-next'
 import NarrationCoverageBar from '~/components/NarrationCoverageBar.vue'
+import NarrationSkeletonPanel from '~/components/NarrationSkeletonPanel.vue'
 import AssetPicker from '~/components/AssetPicker.vue'
 import ComboSwitchDialog from '~/components/ShotProduction/ComboSwitchDialog.vue'
-import { COMBOS, episodeAPI, storyboardAPI } from '~/composables/useApi'
+import { COMBOS, episodeAPI, narrationSkeletonAPI, storyboardAPI, ttsRequiredOf } from '~/composables/useApi'
+import { onTaskFinished, refreshTasks, useTasks } from '~/composables/useTasks'
 import { useWorkflowGates } from '~/composables/useWorkflowGates'
 import { toastError, toastServerMessage } from '~/composables/useToast'
 
-const { t } = useI18n()
+const { t, te } = useI18n()
 
 const props = defineProps({
   episodeId: { type: Number, required: true },
   storyboards: { type: Array, default: () => [] },
   chatModel: { type: String, default: '' },
   chatConfigId: { type: Number, default: 0 },
+  narrationVoiceBatch: { type: Object, default: () => ({ running: false, total: 0, completed: 0 }) },
 })
-const emit = defineEmits(['refresh'])
+const emit = defineEmits(['refresh', 'batch-narration-voice'])
 
 const COMBO_GLYPH = { A: '▣', B: '▶', C: '▣▶', D: '▶▣' }
 const EMPTY_CTX = {
@@ -515,10 +589,161 @@ const saveState = ref('')
 const infoDraft = ref('')
 const acknowledged = ref(false)
 const scope = ref(null)
-const batch = ref({ running: false, total: 0, completed: 0 })
+/** 刚提交、任务还没出现在全局 store 里的空窗期（下一次轮询就会接上） */
+const fillStarting = ref(false)
 const picker = reactive({ open: false, mode: 'asset', field: '', selected: [] })
 const comboSwitch = ref({ open: false, sbId: 0, shotNumber: 0, from: '', to: '' })
 const barEl = ref(null)
+
+// ===== 子阶段（#70）：骨架 / 配音 / 设计卡 =====
+const EMPTY_SKELETON = {
+  enabled: false,
+  confirmed: false,
+  revision: '',
+  confirmed_revision: null,
+  script_confirmed: false,
+  confirmable: false,
+  blocked_reason: null,
+  coverage: null,
+  tts: { valid: 0, invalid: 0, total: 0 },
+  shots: [],
+}
+const skeleton = ref({ ...EMPTY_SKELETON })
+const phase = ref('cards')
+const PHASE_KEY = 'huobao:designPhase'
+
+/** 配音状态按镜索引：设计卡的时长与门禁都只认这里的实测结果 */
+const ttsByShot = computed(() => {
+  const map = new Map()
+  for (const shot of skeleton.value.shots || []) map.set(shot.storyboard_id, shot)
+  return map
+})
+const INVALID_TTS = { valid: false, reason: 'audio_missing', message: null, duration_ms: null }
+/**
+ * 单镜配音状态的取值顺序：写入/确认响应 > 审计 > 骨架接口。
+ * 三者都是服务端判定，前端不自行推断有效性，也没有估算回退。
+ */
+function ttsOf(storyboardId) {
+  return overrides.value[storyboardId]?.tts
+    || auditById.value[storyboardId]?.tts
+    || ttsByShot.value.get(storyboardId)?.tts
+    || INVALID_TTS
+}
+function ttsTitle(storyboardId) {
+  const tts = ttsOf(storyboardId)
+  if (tts.valid) return t('episode.skeleton.ttsValid', { sec: ((tts.duration_ms || 0) / 1000).toFixed(1) })
+  const key = `episode.skeleton.ttsReason.${tts.reason || 'audio_missing'}`
+  return t('episode.skeleton.ttsInvalid', { reason: te(key) ? t(key) : (tts.message || tts.reason || '') })
+}
+/** 可填卡的镜：当前有有效实测配音（后端 design_fillable 同一口径） */
+const fillableIds = computed(() => (skeleton.value.shots || [])
+  .filter(shot => shot.design_fillable)
+  .map(shot => shot.storyboard_id))
+const cardsBlockReason = computed(() => {
+  if (!skeleton.value.confirmed) return t('episode.skeleton.cardsNeedConfirm')
+  if (!fillableIds.value.length) return t('episode.skeleton.cardsBlockedByTts', { n: skeleton.value.tts.invalid })
+  return ''
+})
+const phases = computed(() => [
+  {
+    key: 'skeleton',
+    label: t('episode.skeleton.phaseSkeleton'),
+    state: skeleton.value.confirmed
+      ? t('episode.skeleton.confirmed')
+      : t('episode.skeleton.phaseSkeletonPending', { n: skeleton.value.shots.length }),
+  },
+  {
+    key: 'voice',
+    label: t('episode.skeleton.phaseVoice'),
+    state: t('episode.skeleton.phaseVoiceState', { valid: skeleton.value.tts.valid, total: skeleton.value.tts.total }),
+  },
+  {
+    key: 'cards',
+    label: t('episode.skeleton.phaseCards'),
+    state: t('episode.skeleton.phaseCardsState', { n: fillableIds.value.length }),
+  },
+])
+
+function setPhase(key) {
+  phase.value = key
+  try { localStorage.setItem(PHASE_KEY, key) } catch { /* 静默 */ }
+}
+/** 合并时为 tts / shots 兜底：缺字段一律按「没有有效配音」渲染，绝不放行填卡 */
+function applySkeleton(next) {
+  if (!next) return
+  skeleton.value = {
+    ...EMPTY_SKELETON,
+    ...next,
+    tts: { ...EMPTY_SKELETON.tts, ...(next.tts || {}) },
+    shots: Array.isArray(next.shots) ? next.shots : [],
+  }
+}
+async function loadSkeleton() {
+  if (!props.episodeId) return
+  try {
+    applySkeleton(await narrationSkeletonAPI.state(props.episodeId))
+  } catch { /* 静默：骨架取不到时按「无有效配音」渲染，不放行填卡 */ }
+}
+function onSkeletonRefresh() {
+  emit('refresh')
+  loadSkeleton()
+  loadAudit()
+}
+
+// ===== 批量填卡进度：全局任务 store 是唯一来源（kind='design_card'），本组件不轮询 =====
+const { tasksById } = useTasks()
+const fillTask = computed(() => {
+  let latest = null
+  for (const task of Object.values(tasksById.value)) {
+    if (Number(task.episode_id) !== Number(props.episodeId)) continue
+    if (String(task.kind || task.params?.kind || '') !== 'design_card') continue
+    if (!latest || task.id > latest.id) latest = task
+  }
+  return latest
+})
+const batch = computed(() => {
+  const task = fillTask.value
+  const active = task?.status === 'queued' || task?.status === 'processing'
+  const progress = task?.progress || task?.params?.progress || {}
+  return {
+    running: Boolean(active) || fillStarting.value,
+    total: Number(progress.total || 0),
+    completed: Number(progress.completed || 0),
+  }
+})
+/** 本批次因缺少当前有效配音被排除的镜（后端写在任务 params.tts_blocked 上） */
+const batchTtsBlocked = computed(() => {
+  const blocked = fillTask.value?.params?.tts_blocked
+  return Array.isArray(blocked) ? blocked : []
+})
+// 任务一出现在 store 里就不再需要「刚提交」兜底
+watch(() => (fillTask.value?.status === 'queued' || fillTask.value?.status === 'processing'), (running) => {
+  if (running) fillStarting.value = false
+})
+// 填卡进度推进：逐镜结果已经落库，清掉本地覆盖并重新取审计
+watch(() => Number(batch.value.completed), (next, before) => {
+  if (next !== before && batch.value.running) { overrides.value = {}; emit('refresh'); loadAudit() }
+})
+
+onTaskFinished((task) => {
+  if (Number(task?.episode_id) !== Number(props.episodeId)) return
+  const kind = String(task?.kind || task?.params?.kind || '')
+  // 配音任务结束：实测时长与有效性全部重判（设计卡的硬前置）
+  if (kind === 'narration_tts') { loadSkeleton(); return }
+  if (kind !== 'design_card') return
+  fillStarting.value = false
+  overrides.value = {}
+  emit('refresh')
+  loadAudit()
+  loadSkeleton()
+  nextTick(syncDraft)
+  const failed = Number(task?.progress?.failed || task?.params?.progress?.failed || 0)
+  if (task?.status === 'completed') {
+    toast.success(failed ? t('episode.design.fill.doneFailed', { n: failed }) : t('episode.design.fill.done'))
+  } else {
+    toastError(task?.error_msg, { fallback: 'episode.design.error.fillFailed' })
+  }
+})
 
 // ===== 门禁 =====
 const { gates, ready: gatesReady, refreshGates, reasonOf, gotoOf } = useWorkflowGates(() => props.episodeId)
@@ -570,8 +795,7 @@ function stateOf(sb) {
     design_card_confirmed_at: sb?.design_card_confirmed_at ?? item?.confirmed_at ?? null,
     design_card_stale_reason: sb?.design_card_stale_reason ?? item?.stale_reason ?? null,
     issues: sb?.design_card_issues ?? card?.issues ?? item?.issues ?? [],
-    narration_estimate_s: item?.narration_estimate_s ?? 0,
-    narration_measured_s: item?.narration_measured_s ?? null,
+    // 旁白时长不再从审计读取：唯一来源是骨架接口里的当前有效配音实测值（#70）
   }
 }
 
@@ -669,13 +893,23 @@ const genOverPct = computed(() => (genSeconds.value > ctx.value.limits.gen_s
   ? ((genSeconds.value - ctx.value.limits.gen_s) / genSeconds.value) * 100 : 0))
 const overLimit = computed(() => layerOverPct.value > 0 || genOverPct.value > 0)
 
-const narrationSeconds = computed(() => Number(current.value.narration_measured_s ?? current.value.narration_estimate_s ?? 0))
-const headroom = computed(() => budgetPositive.value ? totalSeconds.value - narrationSeconds.value : null)
-const narrationPct = computed(() => (totalSeconds.value > 0
-  ? Math.min(100, (narrationSeconds.value / totalSeconds.value) * 100)
-  : 100))
+/**
+ * 旁白秒数只来自**当前有效配音的实测时长**（#70）。没有有效配音时为 null：
+ * 不回退估算、不沿用旧音频，预算对照与余量一律显示为「待配音」。
+ */
+const measuredSeconds = computed(() => {
+  const tts = ttsOf(selectedId.value)
+  if (!tts.valid || !Number.isFinite(Number(tts.duration_ms))) return null
+  return Number(tts.duration_ms) / 1000
+})
+const headroom = computed(() => (budgetPositive.value && measuredSeconds.value !== null
+  ? totalSeconds.value - measuredSeconds.value
+  : null))
+const narrationPct = computed(() => (totalSeconds.value > 0 && measuredSeconds.value !== null
+  ? Math.min(100, (measuredSeconds.value / totalSeconds.value) * 100)
+  : 0))
 const narrationClass = computed(() => {
-  if (!budgetPositive.value) return ''
+  if (!budgetPositive.value || headroom.value === null) return ''
   if (headroom.value < 0) return 'is-over'
   if (headroom.value < 0.5) return 'is-tight'
   return 'is-ok'
@@ -926,6 +1160,16 @@ function applyResult(id, res) {
 
 /** 结构化错误码 → 可读文案（400/409 的 code / gate 由后端给出） */
 function reportError(err, fallback) {
+  // 配音硬前置被拦下（#70）：逐镜列出哪一镜、因为什么被阻断，不给估算出路
+  const blocked = ttsRequiredOf(err)
+  if (blocked) {
+    const detail = blocked
+      .map(item => `#${pad(item.storyboard_number ?? 0)} ${ttsTitle(item.storyboard_id)}`)
+      .join(t('common.listJoin'))
+    toast.error(detail ? `${t('episode.skeleton.ttsRequired')}：${detail}` : t('episode.skeleton.ttsRequired'))
+    loadSkeleton()
+    return
+  }
   const body = err?.body || {}
   const map = {
     card_busy: 'episode.design.error.cardBusy',
@@ -963,6 +1207,7 @@ function reportError(err, fallback) {
 
 // ===== 确认 / 取消确认 =====
 const confirmBlockReason = computed(() => {
+  if (!ttsOf(selectedId.value).valid) return ttsTitle(selectedId.value)
   if (!draft.value.combo) return t('episode.design.issue.combo_missing')
   if (budgetMessage.value) return budgetMessage.value
   if (overLimit.value) {
@@ -1049,6 +1294,8 @@ async function commitOrder(ids) {
  * 其余逐镜给出被排除的原因（已确认 / AI 填写中 / 有阻断问题 / 有问题 / 状态不符）。
  */
 function excludeReasonFor(state, kind) {
+  // 没有当前有效配音的镜，既不能填卡也不能确认（硬前置，不是提醒）
+  if (!ttsOf(state.storyboard_id).valid) return 'ttsInvalid'
   if (state.design_card_status === 'ai_filling') return 'ai_filling'
   if (state.design_card_status === 'confirmed') return 'confirmed'
   if (kind === 'fill') {
@@ -1100,14 +1347,14 @@ async function startFill(ids) {
       model: props.chatModel || undefined,
       config_id: props.chatConfigId || undefined,
     })
-    if (!res?.total) {
-      if (res?.already_running) { batch.value = { running: true, total: 0, completed: 0 }; poll() }
-      else toast.info(t('episode.design.fill.allFilled'))
+    if (!res?.total && !res?.already_running) {
+      toast.info(t('episode.design.fill.allFilled'))
       return
     }
-    batch.value = { running: true, total: res.total, completed: 0 }
-    toast.info(t('episode.design.fill.started', { n: res.total }))
-    poll()
+    if (res?.total) toast.info(t('episode.design.fill.started', { n: res.total }))
+    fillStarting.value = true
+    // 进度来自全局任务 store（kind='design_card'）：立刻拉一次，之后随全局轮询刷新
+    void refreshTasks()
   } catch (err) {
     reportError(err, 'episode.design.error.fillFailed')
   }
@@ -1115,38 +1362,6 @@ async function startFill(ids) {
 async function refillOne() {
   if (!selected.value) return
   await startFill([selected.value.id])
-}
-
-let pollTimer = null
-function poll(attempts = 240) {
-  const tick = async (left) => {
-    pollTimer = null
-    try {
-      const st = await episodeAPI.designCardStatus(props.episodeId)
-      if (st && st.status !== 'running') {
-        batch.value = { running: false, total: 0, completed: 0 }
-        overrides.value = {}
-        emit('refresh')
-        await loadAudit()
-        syncDraft()
-        if (st.status === 'done') {
-          toast.success(st.failed ? t('episode.design.fill.doneFailed', { n: st.failed }) : t('episode.design.fill.done'))
-        } else {
-          toastError(st.error, { fallback: 'episode.design.error.fillFailed' })
-        }
-        return
-      }
-      if (st) {
-        const before = batch.value.completed
-        batch.value = { running: true, total: st.total || 0, completed: st.completed || 0 }
-        if ((st.completed || 0) !== before) { overrides.value = {}; emit('refresh'); loadAudit() }
-      }
-    } catch { /* 静默：轮询失败继续重试 */ }
-    if (left > 0) pollTimer = setTimeout(() => tick(left - 1), 5000)
-    else batch.value = { running: false, total: 0, completed: 0 }
-  }
-  if (pollTimer) clearTimeout(pollTimer)
-  pollTimer = setTimeout(() => tick(attempts), 5000)
 }
 
 // ===== 取数 =====
@@ -1166,16 +1381,6 @@ async function loadAudit() {
     audit.value = Array.isArray(data) ? data : []
   } catch { /* 静默：审计只影响左列状态点与批量范围 */ }
 }
-async function resumeFill() {
-  if (!props.episodeId) return
-  try {
-    const st = await episodeAPI.designCardStatus(props.episodeId)
-    if (st?.status === 'running' && !batch.value.running) {
-      batch.value = { running: true, total: st.total || 0, completed: st.completed || 0 }
-      poll()
-    }
-  } catch { /* 静默 */ }
-}
 
 function ensureSelection() {
   if (!shots.value.length) { selectedId.value = 0; return }
@@ -1191,6 +1396,8 @@ watch(() => props.storyboards, () => {
     if (serverIds === localOrder.value.join(',')) localOrder.value = null
   }
   ensureSelection()
+  loadSkeleton()
+  loadAudit()
   nextTick(syncDraft)
 })
 // 换镜前先把待写内容提交回原来那一镜，再按新镜的服务端事实重建草稿
@@ -1199,25 +1406,28 @@ watch(() => props.episodeId, () => {
   overrides.value = {}
   localOrder.value = null
   selectedId.value = 0
+  skeleton.value = { ...EMPTY_SKELETON }
   loadContext()
   loadAudit()
-  resumeFill()
+  loadSkeleton()
   refreshGates()
 })
 
 onMounted(() => {
+  try {
+    const saved = localStorage.getItem(PHASE_KEY)
+    if (saved === 'skeleton' || saved === 'voice' || saved === 'cards') phase.value = saved
+  } catch { /* 静默 */ }
   ensureSelection()
   syncDraft()
   loadContext()
   loadAudit()
-  resumeFill()
+  loadSkeleton()
   refreshGates()
 })
 onBeforeUnmount(() => {
   flushPending()
-  if (pollTimer) clearTimeout(pollTimer)
   if (debounceTimer) clearTimeout(debounceTimer)
-  pollTimer = null
   debounceTimer = null
 })
 </script>
@@ -1225,6 +1435,29 @@ onBeforeUnmount(() => {
 <style scoped>
 .dc-step { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
 .dc-bar { display: flex; align-items: center; gap: 8px; }
+
+/* 子阶段条（#70）：骨架 → 配音 → 设计卡 */
+.dc-phases { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.dc-phase {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 10px; border: 1px solid var(--border); border-radius: 999px;
+  background: var(--bg-2); color: var(--text-1); font-size: 12px; cursor: pointer;
+}
+.dc-phase.on { outline: 2px solid var(--accent); outline-offset: -2px; }
+.dc-phase-num { font-size: 10px; color: var(--text-3); font-weight: 700; }
+.dc-phase-name { font-weight: 600; }
+.dc-phase-state { font-size: 10.5px; color: var(--text-3); }
+.dc-block {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0;
+  padding: 7px 10px; font-size: 12px; color: var(--text-1);
+  background: var(--warn-bg); border: 1px solid var(--warn-border); border-radius: var(--radius);
+}
+.dc-tts { font-size: 11px; }
+.dc-tts.is-ok { color: var(--ok-text, var(--text-1)); }
+.dc-tts.is-bad { color: var(--tag-danger-text, #ef5350); }
+.dc-tts-dot { font-size: 10px; }
+.dc-tts-dot.is-ok { color: var(--ok-text, var(--text-2)); }
+.dc-tts-dot.is-bad { color: var(--tag-danger-text, #ef5350); }
 .dc-tag-run { display: inline-flex; align-items: center; gap: 4px; }
 
 .dc-body { display: grid; grid-template-columns: clamp(220px, 16vw, 300px) minmax(0, 1fr); gap: 10px; flex: 1; min-height: 0; }

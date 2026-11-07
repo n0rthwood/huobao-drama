@@ -14,7 +14,7 @@ import { buildEvidenceImages, evidenceMessageParts } from '../services/evidence-
 import { agentChatStage, resolveStageModel, StageVisionUnavailableError, type StageModel } from '../services/ai-stages.js'
 import { db, schema } from '../db/index.js'
 import { eq } from 'drizzle-orm'
-import { describeNarrationGaps, narrationCoverage, type NarrationGap } from '../services/narration-first.js'
+import { skeletonAcceptanceProblems } from '../services/narration-skeleton.js'
 import { resolveDramaProjectType } from '../services/project-type.js'
 import { assertGate } from '../services/workflow-gates.js'
 import { consumeStoryboardStopReason } from '../agents/tools/storyboard-tools.js'
@@ -25,18 +25,6 @@ const app = new Hono()
 const CHAT_TASK_KINDS: Record<string, TextTaskKind> = {
   script_rewriter: 'script_rewrite',
   storyboard_breaker: 'storyboard_breaker',
-}
-
-/** 纪录片项目本集剧本还没有被任何分镜领走的片段；非纪录片项目恒为空 */
-async function narrationCoverageGaps(episodeId: number): Promise<NarrationGap[]> {
-  const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId))
-  if (!ep || resolveDramaProjectType(ep.dramaId) !== 'documentary') return []
-  const rows = await db.select().from(schema.storyboards)
-    .where(eq(schema.storyboards.episodeId, episodeId))
-  const narrations = rows.filter(sb => !sb.deletedAt)
-    .sort((a, b) => a.storyboardNumber - b.storyboardNumber)
-    .map(sb => sb.narrationText)
-  return narrationCoverage(ep.scriptContent || ep.content, narrations).gaps
 }
 
 // Mastra v1.17 的 ToolCallChunk / ToolResultChunk 结构：
@@ -91,8 +79,13 @@ app.post('/:type/chat', async (c) => {
   // 按环节选模型（#51）：纪录片拆分分镜要看证据素材，顶栏即使选了 GLM 也会被换成视觉配置
   const projectType = resolveDramaProjectType(Number(drama_id))
   const stage = agentChatStage(agentType, projectType)
+  // 纪录片剧本改写已切到分阶段流水线（#70）：旧的同步 chat 入口不再处理纪录片项目。
+  // 放在建任务之前，避免留下一条必定失败的任务行与一次白烧的模型调用。
+  if (agentType === 'script_rewriter' && projectType === 'documentary') {
+    return badRequest(c, '纪录片剧本改写已改为分阶段流程：请使用 POST /episodes/:id/script-rewrite（自动过滤非旁白内容 → 忠实改写 → 桥句润色），本接口不再处理纪录片项目')
+  }
 
-  // 门禁（#54）：纪录片拆分分镜要求剧本已确认 + 资产审核清单已通过。
+  // 门禁（#54）：纪录片拆分分镜要求剧本已确认 + 资产审核清单已通过（七步门禁不变）。
   // 放在建 sys_task 之前：被拦时不留任务行，GateBlockedError 由全局 onError 转 400 {gate, reason}。
   if (agentType === 'storyboard_breaker' && projectType === 'documentary') {
     await assertGate(Number(episode_id), 'design')
@@ -162,13 +155,13 @@ app.post('/:type/chat', async (c) => {
       }
     }
 
-    // narration-first 闸门（#49）：纪录片拆分分镜必须把剧本正文**整篇**切进各镜旁白。
-    // 只看「写下来的话是否出自剧本」挡不住整段被跳过——实测 93 镜漏 746 字，S13 的句子
-    // 连镜头都没有。有缺口就把任务标失败并列出前几处，绝不静默成功。
+    // 骨架验收（#49 + #70）：纪录片拆分分镜必须把剧本正文**整篇、有序、不重不漏**地切进各镜旁白。
+    // 只看缺口挡不住「同一句被两镜重复领走」或顺序颠倒——两者都会让骨架无法确认，
+    // 任务却显示成功。验收口径与确认骨架完全一致；分镜保留，由人按问题清单修边界。
     if (agentType === 'storyboard_breaker' && kind) {
-      const gaps = await narrationCoverageGaps(Number(episode_id))
-      if (gaps.length) {
-        const detail = `旁白覆盖缺口：剧本有 ${gaps.length} 段未被任何分镜领走（${describeNarrationGaps(gaps)}）。请重新拆分或补镜。`
+      const problems = await skeletonAcceptanceProblems(Number(episode_id))
+      if (problems.length) {
+        const detail = `旁白骨架不合法：${problems.slice(0, 3).map(p => p.message).join('；')}${problems.length > 3 ? `（共 ${problems.length} 处）` : ''}。分镜已保留，请在「旁白骨架」里调整边界或重新拆分。`
         if (taskId) await finishTextTask(taskId, 'failed', { errorMsg: detail, outputText: result.text || '' })
         logTaskError('Agent', agentType, { episodeId: episode_id, error: detail })
         return badRequest(c, detail)

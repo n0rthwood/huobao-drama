@@ -8,7 +8,8 @@ import { eq } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
 import { now } from '../utils/response.js'
 import { mediaFacts } from './media-probe.js'
-import { resolveTransitionT, toAbsPath, loadClipComposeContext } from './compose-state.js'
+import { toAbsPath } from '../utils/paths.js'
+import { resolveTransitionT, loadClipComposeContext } from './compose-state.js'
 import { generatedSegmentSeconds, shotMaxSeconds } from './shot-duration.js'
 import { resolveDramaProjectType } from './project-type.js'
 import {
@@ -24,7 +25,6 @@ import {
   type ComposePlan,
   type NarrationFitRecord,
 } from './narration-fit.js'
-import { parseNarrationMeta } from './narration.js'
 
 
 
@@ -79,11 +79,12 @@ async function measure(storyboardId: number) {
     else dv += layerSeconds
   }
 
-  const meta = parseNarrationMeta(sb.narrationMeta)
+  // 当前实测时长只认音频文件本身（#70）：文件丢了/探测不出来就是没有当前有效配音，
+  // 绝不回退到 narration_meta 里的旧秒数（那是历史元数据，不是当前事实）。
   let da: number | null = null
   if (ep.narrationEnabled === true && sb.narrationEnabled !== false && sb.narrationAudioUrl) {
     const facts = await mediaFacts(toAbsPath(sb.narrationAudioUrl))
-    da = facts ? facts.durationMs / 1000 : (meta.audio ? meta.audio.duration_ms / 1000 : null)
+    da = facts && Number.isFinite(facts.durationMs) && facts.durationMs > 0 ? facts.durationMs / 1000 : null
   }
 
   const transition = await resolveTransitionT(storyboardId, sb.transitionReview, sb.videoUrl)

@@ -92,7 +92,7 @@ test('改稿自动取消确认；同值重存不取消', () => {
   assert.deepEqual(result, { start: true, sameValue: true, afterEdit: false, afterUnrelated: true, afterRaw: false })
 })
 
-test('Agent 改写路径（save_script 工具）同样触发自动取消', () => {
+test('纪录片旧 save_script 工具不能覆盖最终稿或撤销确认', () => {
   const result = run(`
     ${FIXTURE}
     import { scriptTools } from './src/agents/tools/script-tools.ts'
@@ -101,18 +101,15 @@ test('Agent 改写路径（save_script 工具）同样触发自动取消', () =>
     await confirmScript(1)
     const requestContext = new RequestContext()
     requestContext.set('episodeId', 1)
-    const confirmed = async () => {
-      const [row] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, 1))
-      return !!row.scriptConfirmedAt
-    }
-    const start = await confirmed()
-    await scriptTools.saveScript.execute({ content: '旁白稿正文。' }, { requestContext })
-    const sameValue = await confirmed()
-    await scriptTools.saveScript.execute({ content: 'Agent 改写后的旁白稿。' }, { requestContext })
-    const afterRewrite = await confirmed()
-    console.log('@@' + JSON.stringify({ start, sameValue, afterRewrite }))
+    const refusal = await scriptTools.saveScript.execute({ content: 'Agent 改写后的旁白稿。' }, { requestContext })
+    const [row] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, 1))
+    console.log('@@' + JSON.stringify({
+      refused: !!refusal.error,
+      content: row.scriptContent,
+      confirmed: !!row.scriptConfirmedAt,
+    }))
   `)
-  assert.deepEqual(result, { start: true, sameValue: true, afterRewrite: false })
+  assert.deepEqual(result, { refused: true, content: '旁白稿正文。', confirmed: true })
 })
 
 test('一次性升级迁移：已有分镜 → 已确认；重启重跑不会把用户取消的确认又填回来', () => {

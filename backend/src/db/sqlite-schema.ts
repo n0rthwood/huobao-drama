@@ -616,6 +616,64 @@ export const sqliteSchemaStatements = [
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_asset_review_items_fp ON asset_review_items (episode_id, fingerprint)`,
   `CREATE INDEX IF NOT EXISTS idx_asset_review_items_episode ON asset_review_items (episode_id, segment_no)`,
+
+  // ── 分阶段剧本改写（Issue #70）────────────────────────────
+  `CREATE TABLE IF NOT EXISTS script_rewrite_run (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    episode_id INTEGER NOT NULL,
+    drama_id INTEGER,
+    task_id INTEGER,
+    status TEXT NOT NULL DEFAULT 'queued',
+    current_stage TEXT,
+    stage_plan TEXT NOT NULL,
+    source_version_id INTEGER,
+    prepared_version_id INTEGER,
+    source_hash TEXT,
+    source_revision INTEGER NOT NULL,
+    base_final_revision INTEGER NOT NULL,
+    predecessor_version_id INTEGER,
+    candidate_version_id INTEGER,
+    adoption_status TEXT NOT NULL DEFAULT 'pending',
+    auto_adopt INTEGER NOT NULL DEFAULT 1,
+    config_id INTEGER,
+    model TEXT,
+    error_msg TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    finished_at TEXT
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_script_rewrite_run_episode ON script_rewrite_run (episode_id, id)`,
+  // 一集同时只允许一个活跃运行：部分唯一索引让并发 POST 的第二个请求直接撞约束，
+  // 不依赖「先查后插」那段竞态窗口（路由把约束错误翻成 409 run_active）
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_script_rewrite_run_active ON script_rewrite_run (episode_id) WHERE status IN ('queued', 'processing')`,
+  `CREATE TABLE IF NOT EXISTS script_version (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    episode_id INTEGER NOT NULL,
+    run_id INTEGER,
+    stage_key TEXT NOT NULL,
+    stage_index INTEGER,
+    source TEXT NOT NULL,
+    predecessor_id INTEGER,
+    content TEXT NOT NULL,
+    content_hash TEXT NOT NULL,
+    report TEXT,
+    task_id INTEGER,
+    created_at TEXT NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_script_version_episode ON script_version (episode_id, id)`,
+  `CREATE INDEX IF NOT EXISTS idx_script_version_run ON script_version (run_id, id)`,
+  `CREATE TABLE IF NOT EXISTS script_rewrite_stage (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id INTEGER NOT NULL,
+    stage_key TEXT NOT NULL,
+    stage_index INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    version_id INTEGER,
+    error_msg TEXT,
+    started_at TEXT,
+    finished_at TEXT
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_script_rewrite_stage_run ON script_rewrite_stage (run_id, stage_key)`,
 ]
 
 /**
@@ -735,6 +793,14 @@ const columnAdditions: { table: string; column: string; type: string }[] = [
   { table: 'episode_posters', column: 'concept_updated_at', type: 'TEXT' },
   { table: 'poster_versions', column: 'layer_doc', type: 'TEXT' },
   { table: 'poster_versions', column: 'concept_composition_id', type: 'TEXT' },
+  // 分阶段改写（Issue #70）：原文/最终稿修订号（存量行从 1 起算，升级不改任何正文）、
+  // 当前最终稿来自哪个不可变版本；旁白骨架确认时间与骨架修订号（存量纪录片集保持 NULL，
+  // 启动时不回填、不改写任何既有剧本/分镜/音频）。
+  { table: 'episodes', column: 'source_revision', type: 'INTEGER NOT NULL DEFAULT 1' },
+  { table: 'episodes', column: 'final_revision', type: 'INTEGER NOT NULL DEFAULT 1' },
+  { table: 'episodes', column: 'final_version_id', type: 'INTEGER' },
+  { table: 'episodes', column: 'narration_skeleton_confirmed_at', type: 'TEXT' },
+  { table: 'episodes', column: 'narration_skeleton_revision', type: 'TEXT' },
 ]
 
 /**

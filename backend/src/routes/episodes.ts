@@ -20,6 +20,12 @@ import {
   unconfirmScript,
 } from '../services/workflow-gates.js'
 import {
+  RevisionConflictError,
+  bumpSourceRevision,
+  writeCanonicalFinal,
+} from '../services/script-rewrite/store.js'
+import { holdAutoAdoptForManualEdit } from '../services/script-rewrite/run.js'
+import {
   cancelEpisodeVideoBatch,
   getEpisodeVideoBatch,
   previewEpisodeVideoBatch,
@@ -200,17 +206,47 @@ app.put('/:id', async (c) => {
     drizzleUpdates.narrationSpine = spine || null
   }
   if ('narration_normalize' in updates) drizzleUpdates.narrationNormalize = updates.narration_normalize === true
-  // 剧本正文/旁白稿真的变了才触发 script_changed（#54）：同值重存不取消确认
-  const scriptFields: ('content' | 'scriptContent')[] = []
-  if ('content' in drizzleUpdates) scriptFields.push('content')
-  if ('scriptContent' in drizzleUpdates) scriptFields.push('scriptContent')
-  let scriptChanged = false
-  if (scriptFields.length) {
-    const [before] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, id))
-    scriptChanged = !!before && scriptFields.some(f => (before[f] || '') !== (drizzleUpdates[f] || ''))
+  // 原始资料 / 最终稿的写入都要留下修订号与来源（#70）：
+  // - content 变化升 source_revision（运行中的改写据此判定「原文已变」）；
+  // - script_content 一律走版本化写入口，生成 manual 不可变版本并做 CAS，
+  //   任何路径都不能绕过它直接覆盖 script_content。
+  const writesSource = 'content' in drizzleUpdates
+  const writesFinal = 'scriptContent' in drizzleUpdates
+  const [before] = writesSource || writesFinal
+    ? await db.select().from(schema.episodes).where(eq(schema.episodes.id, id))
+    : []
+  if ((writesSource || writesFinal) && !before) return notFound(c, '剧集不存在')
+  const finalContent = writesFinal ? String(drizzleUpdates.scriptContent ?? '') : null
+  if (writesFinal) delete drizzleUpdates.scriptContent
+  const sourceChanged = writesSource && (before?.content || '') !== (drizzleUpdates.content || '')
+
+  // 最终稿先写：它是唯一可能因并发而 409 的一步，放在最前面就不会出现
+  // 「原文已经改了、旁白稿却没写成」的半截状态。
+  if (finalContent !== null) {
+    // 人工保存优先于正在跑的改写：本轮结果降级为候选，不会回头盖掉用户刚存的稿
+    await holdAutoAdoptForManualEdit(id)
+    const expectedFinal = typeof body.final_revision === 'number' ? body.final_revision : undefined
+    const expectedSource = typeof body.source_revision === 'number' ? body.source_revision : undefined
+    try {
+      await writeCanonicalFinal({
+        episodeId: id,
+        content: finalContent,
+        expectedFinalRevision: expectedFinal,
+        expectedSourceRevision: expectedSource,
+        reason: 'PUT /episodes/:id 保存旁白稿',
+      })
+    } catch (err) {
+      if (err instanceof RevisionConflictError) {
+        return c.json({ code: 409, error: 'revision_conflict', message: err.message, ...err.current }, 409)
+      }
+      throw err
+    }
   }
   await db.update(schema.episodes).set(drizzleUpdates).where(eq(schema.episodes.id, id))
-  if (scriptChanged) await onScriptChanged(id, 'PUT /episodes/:id 改写剧本正文或旁白稿')
+  if (sourceChanged) {
+    await bumpSourceRevision(id)
+    await onScriptChanged(id, 'PUT /episodes/:id 改写原始内容')
+  }
   return success(c)
 })
 

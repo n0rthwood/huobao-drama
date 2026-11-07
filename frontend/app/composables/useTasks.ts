@@ -23,6 +23,8 @@ export type TextKind =
   | 'asset_semantics'
   | 'asset_pipeline'
   | 'storyboard_fill_gaps'
+  | 'design_card'
+  | 'narration_tts'
 
 export interface TaskParams {
   frameType?: string

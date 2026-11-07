@@ -34,6 +34,10 @@ import layerSegments from './routes/layer-segments.js'
 import assetPipeline from './routes/asset-pipeline.js'
 import designCards, { designCardShots } from './routes/design-cards.js'
 import { episodeAssetReview, assetReviewItems } from './routes/asset-review.js'
+import scriptRewrite from './routes/script-rewrite.js'
+import narrationSkeleton from './routes/narration-skeleton.js'
+import { TtsRequiredError } from './services/narration-tts-gate.js'
+import { SkeletonNotConfirmedError } from './services/narration-skeleton.js'
 import { requestLogger, errorHandler } from './middleware/logger.js'
 import { db, schema } from './db/index.js'
 import { and, eq, isNull, ne, or } from 'drizzle-orm'
@@ -45,6 +49,7 @@ import { resumeAssetPipelines } from './services/asset-pipeline/run.js'
 import { startQwenJobsTracker } from './services/qwen-jobs.js'
 import { QWEN_JOBS_PROVIDER } from './services/sys-task.js'
 import { backfillTaskEpisodeIds, failInterruptedTextTasks } from './services/task-center.js'
+import { failInterruptedRewriteRuns } from './services/script-rewrite/run.js'
 import { backfillGeneratedAt } from './services/media-time.js'
 import { migrateReferenceImages } from './services/reference-images.js'
 import { migrateAssetNames } from './services/asset-name-migration.js'
@@ -73,6 +78,12 @@ app.onError((err, c) => {
   if (err instanceof GateBlockedError) {
     return c.json({ code: 400, error: 'gate_blocked', gate: err.gate, reason: err.reason, message: err.reason }, 400)
   }
+  if (err instanceof TtsRequiredError) {
+    return c.json({ code: 400, error: 'tts_required', message: err.message, blocked: err.blocked }, 400)
+  }
+  if (err instanceof SkeletonNotConfirmedError) {
+    return c.json({ code: 400, error: 'skeleton_unconfirmed', message: err.message }, 400)
+  }
   console.error(err.stack || err.message || err)
   return c.json({ code: 500, message: err.message || 'Internal Server Error' }, 500)
 })
@@ -91,6 +102,8 @@ api.route('/episodes', episodes)
 api.route('/episodes', posters)
 api.route('/episodes', designCards)
 api.route('/episodes', episodeAssetReview)
+api.route('/episodes', scriptRewrite)
+api.route('/episodes', narrationSkeleton)
 api.route('/storyboards', storyboards)
 api.route('/storyboards', designCardShots)
 api.route('/scenes', scenes)
@@ -161,6 +174,7 @@ db.update(schema.sysTask)
   .catch(err => console.error('清理中断任务失败:', err?.message))
   // 文本任务（提取 / 提示词批量 / 剧本改写 / 拆分分镜）的执行线程同样随重启丢失，标记为失败供一键重试
   .then(() => failInterruptedTextTasks())
+  .then(() => failInterruptedRewriteRuns())
   // 存量任务补归属集：全局任务中心按剧/集筛选与编号
   .then(() => backfillTaskEpisodeIds())
   // 存量媒体补生成时间（unix 秒，按 completed_at || created_at），幂等

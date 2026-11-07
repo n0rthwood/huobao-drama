@@ -13,6 +13,7 @@ import { db, schema } from '../db/index.js'
 import { getActiveConfig, getConfigById } from './ai.js'
 import { generateImage } from './generation.js'
 import { assertKeyframeEligible, SLOT_FRAME_TYPE, SLOT_LABEL, slotPrompt, type KeyframeSlot } from './keyframes.js'
+import { assertShotGate } from './workflow-gates.js'
 import {
   SLOT_PROMPT_FIELD,
   blockingIssuesFor,
@@ -299,6 +300,9 @@ export async function submitStoryboardKeyframe(
   slot: KeyframeSlot,
   opts: KeyframeGenerationOptions & { context?: KeyframeBuildContext } = {},
 ): Promise<number> {
+  // 逐镜制作门禁（#58 + #70）：设计卡已确认且当前配音有效才出图。
+  // 单镜路由与**批量**都经过这里，批量不再绕开门禁。剧情项目恒放行。
+  await assertShotGate(storyboardId, 'production')
   const request = await buildKeyframeRequest(storyboardId, slot, opts)
   return generateImage({
     storyboardId,

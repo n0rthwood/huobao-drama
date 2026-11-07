@@ -46,6 +46,22 @@
             <span v-for="(line, i) in progressLines" :key="i">{{ line }}</span>
           </div>
 
+          <!-- 改写运行的阶段时间线（#70）：一个父任务 + 详情时间线，不另建运行仪表盘 -->
+          <div v-if="rewriteStages.length" class="task-detail-section">
+            <span class="task-detail-section-title">
+              {{ t('taskCenter.detail.rewriteStages') }}
+              <span v-if="rewritePosition" class="task-detail-hint">{{ rewritePosition }}</span>
+            </span>
+            <ol class="task-detail-timeline">
+              <li v-for="stage in rewriteStages" :key="stage.key" :class="['is-' + stage.status]">
+                <span class="mono task-detail-timeline-glyph">{{ STAGE_GLYPH[stage.status] || '○' }}</span>
+                <span>{{ t(`episode.rewrite.stageName.${stage.key}`) }}</span>
+                <span class="task-detail-hint">{{ t(`episode.rewrite.stageStatus.${stage.status}`) }}</span>
+                <span v-if="stage.error" class="task-detail-timeline-error">{{ stage.error }}</span>
+              </li>
+            </ol>
+          </div>
+
           <!-- 错误信息（滚动 + 复制，Issue #19） -->
           <div v-if="live.error_msg" class="task-detail-section">
             <div class="task-detail-section-head">
@@ -312,6 +328,23 @@ const stateClass = computed(() => {
   return 'pending'
 })
 
+/** 改写运行（#70）：阶段进度来自 params.rewrite，和阶段条同一份事实 */
+const STAGE_GLYPH = { pending: '○', processing: '◌', completed: '✓', skipped: '⤼', failed: '✕' }
+const rewriteInfo = computed(() => {
+  const raw = params.value.rewrite
+  return raw && typeof raw === 'object' ? raw : null
+})
+const rewriteStages = computed(() => (Array.isArray(rewriteInfo.value?.stages) ? rewriteInfo.value.stages : []))
+const rewritePosition = computed(() => {
+  const info = rewriteInfo.value
+  if (!info?.stage_total || !info?.stage_key) return ''
+  return t('episode.rewrite.runStagePosition', {
+    index: info.stage_index,
+    total: info.stage_total,
+    name: t(`episode.rewrite.stageName.${info.stage_key}`),
+  })
+})
+
 const progressLines = computed(() => {
   const lines = []
   const r = ring.value
@@ -541,6 +574,12 @@ async function doCancel() {
 .task-status-chip.is-done { color: var(--ok-text, var(--text-1)); }
 .task-status-chip.is-failed { color: var(--danger-text, #d9534f); }
 .task-detail-progress { display: flex; flex-wrap: wrap; gap: 10px; font-size: 11.5px; color: var(--text-2); }
+.task-detail-timeline { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.task-detail-timeline li { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-1); flex-wrap: wrap; }
+.task-detail-timeline li.is-failed { color: var(--danger-text, #d9534f); }
+.task-detail-timeline li.is-pending { color: var(--text-3); }
+.task-detail-timeline-glyph { width: 14px; text-align: center; font-size: 11px; }
+.task-detail-timeline-error { font-size: 11px; color: var(--danger-text, #d9534f); }
 .task-detail-grid {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 10px 14px; margin: 0;

@@ -161,11 +161,15 @@ export function measuredNarrationSeconds(row: { narrationMeta?: string | null })
 /**
  * 库里的设计卡按**当前**上下文重新解析：语义标注被改过之后，原来可解析的条目
  * 可能已经失效，所以 `unresolved` 与 `issues` 永远是读时重算的结论，不吃库里的旧值。
+ *
+ * `measuredSeconds`：纪录片的写入/确认路径必须传 `narration-tts-gate` 实测出的秒数
+ * （`undefined` = 沿用 `narration_meta` 里的旧值，只供展示与存量数据；`null` = 明确没有实测）。
  */
 export function resolveDesignCard(
   row: DesignCardShotRow,
   ctx: DesignCardContext,
   mentioned?: Array<{ kind: 'character' | 'scene' | 'prop'; id: number }> | null,
+  measuredSeconds?: number | null,
 ): ResolvedDesignCard {
   const combo = toCombo(row.combo)
   const card = parseDesignCard(row.designCard, ctx)
@@ -173,7 +177,7 @@ export function resolveDesignCard(
     card,
     combo,
     narrationText: row.narrationText,
-    measuredSeconds: measuredNarrationSeconds(row),
+    measuredSeconds: measuredSeconds === undefined ? measuredNarrationSeconds(row) : measuredSeconds,
     mentioned: mentioned ?? null,
   })
   if (card) card.issues = issues
@@ -186,13 +190,14 @@ export function resolveDesignCardFrom(
   combo: Combo | null,
   ctx: DesignCardContext,
   shot: { narrationText?: string | null; narrationMeta?: string | null },
+  measuredSeconds?: number | null,
 ): ResolvedDesignCard {
   const card = normalizeDesignCard(raw, ctx)
   const issues = validateDesignCard({
     card,
     combo,
     narrationText: shot.narrationText,
-    measuredSeconds: measuredNarrationSeconds(shot),
+    measuredSeconds: measuredSeconds === undefined ? measuredNarrationSeconds(shot) : measuredSeconds,
   })
   if (card) card.issues = issues
   return { combo, card, issues }
