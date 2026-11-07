@@ -1,5 +1,5 @@
 import { runWithTextTask } from '../text-task-context.js'
-import { requeueFirstModelFailure } from '../text-task-restart.js'
+import { requeueFirstModelFailure } from '../text-task-autoretry.js'
 
 /**
  * 分阶段改写的服务端串行 runner（Issue #70 §2）。

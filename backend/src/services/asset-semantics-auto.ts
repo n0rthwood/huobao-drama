@@ -1,5 +1,5 @@
 import { runWithTextTask } from './text-task-context.js'
-import { requeueFirstModelFailure } from './text-task-restart.js'
+import { requeueFirstModelFailure } from './text-task-autoretry.js'
 
 /**
  * 证据素材的自动语义标注（Issue #47）— VLM 语义锚点 + CV 几何

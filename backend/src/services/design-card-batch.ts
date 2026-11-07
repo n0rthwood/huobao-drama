@@ -1,5 +1,5 @@
 import { isFirstAgentFailureSafe, runWithTextTask } from './text-task-context.js'
-import { requeueFirstModelFailure } from './text-task-restart.js'
+import { requeueFirstModelFailure } from './text-task-autoretry.js'
 
 /**
  * 设计卡填写（Issue #57，替换 #49 的 `shot-intent-batch.ts`）— 为纪录片分镜逐镜跑

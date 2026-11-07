@@ -1,5 +1,5 @@
 import { isFirstAgentFailureSafe, runWithTextTask } from './text-task-context.js'
-import { requeueFirstModelFailure } from './text-task-restart.js'
+import { requeueFirstModelFailure } from './text-task-autoretry.js'
 
 /**
  * 旁白写作任务（Issue #30，#35 改为两段式）。

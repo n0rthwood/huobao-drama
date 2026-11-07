@@ -1,5 +1,5 @@
 import { isFirstAgentFailureSafe, runWithTextTask } from './text-task-context.js'
-import { requeueFirstModelFailure } from './text-task-restart.js'
+import { requeueFirstModelFailure } from './text-task-autoretry.js'
 
 /**
  * 资产批量生成（Issue #33）—— 角色 / 场景 / 道具 / 全部资产四个入口共用一条流水线。

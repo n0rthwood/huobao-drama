@@ -100,11 +100,8 @@ test('accumulateVisionCalls sums counts and tokens across calls', () => {
 
 test('read_image execute: path guard, unsupported fallback, json parse and json_error', () => {
   const r = run(`${PREAMBLE}
-    import { mock } from 'node:test'
-    const CAP = url('/src/services/vision-capability.ts')
+    import { db, schema } from './src/db/index.ts'
     const CONFIG = { configId: 1, name: 'stub', provider: 'openai', baseUrl: 'http://127.0.0.1:9/v1', apiKey: 'k', model: 'deepseek-chat' }
-    let vision = null
-    mock.module(CAP, { namedExports: { resolveVisionTextConfig: async () => vision } })
 
     let reply = ''
     let lastBody = null
@@ -121,7 +118,13 @@ test('read_image execute: path guard, unsupported fallback, json parse and json_
     out.unsupported = await readImage.execute({ path: REL, question: 'q' }, undefined)
     out.outOfScope = await readImage.execute({ path: '../../etc/passwd', question: 'q' }, undefined)
 
-    vision = CONFIG
+    // 视觉配置来自 ai_service_configs（调度器按 DB 端点分配，不再 mock 解析函数）
+    const stamp = '2026-01-01'
+    await db.insert(schema.aiServiceConfigs).values({
+      id: CONFIG.configId, serviceType: 'text', provider: CONFIG.provider, name: CONFIG.name,
+      baseUrl: CONFIG.baseUrl, apiKey: CONFIG.apiKey, model: JSON.stringify([CONFIG.model]),
+      vision: 1, priority: 100, concurrency: 2, isActive: true, createdAt: stamp, updatedAt: stamp,
+    })
     reply = '图上可读地名：拉萨、西宁。'
     out.text = await readImage.execute({ path: REL, question: '列出地名' }, undefined)
     out.request = { temperature: lastBody.temperature, parts: lastBody.messages[0].content.map(p => p.type), model: lastBody.model }

@@ -1,5 +1,5 @@
 import { runWithTextTask } from './text-task-context.js'
-import { requeueFirstModelFailure } from './text-task-restart.js'
+import { requeueFirstModelFailure } from './text-task-autoretry.js'
 
 /**
  * Poster AI 构想（Issue #72）：只用 AI 改写/拆分后的剧本 + 本集资产描述，

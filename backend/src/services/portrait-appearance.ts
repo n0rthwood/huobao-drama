@@ -1,5 +1,5 @@
 import { runWithTextTask } from './text-task-context.js'
-import { requeueFirstModelFailure } from './text-task-restart.js'
+import { requeueFirstModelFailure } from './text-task-autoretry.js'
 
 /**
  * 「按史料画像补充外貌」（Issue #32 A4/B4）

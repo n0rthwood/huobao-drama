@@ -3,7 +3,8 @@ import { db, schema } from '../db/index.js'
 import { effectiveConcurrency, isOfficialProvider, listActiveTextConfigs } from './ai.js'
 import { AI_STAGES, StageVisionUnavailableError, type AiStage, type StageModel } from './ai-stages.js'
 import { currentTextTaskId } from './text-task-context.js'
-import { markTextTaskStarted } from './text-task.js'
+import { isModelError } from './text-model-errors.js'
+import { markTextTaskStarted, parseTextTaskParams } from './text-task.js'
 
 export interface TextEndpoint {
   configId: number
@@ -18,6 +19,7 @@ export interface TextEndpoint {
   settings: string | null
   suspended: boolean
   suspendedReason: string | null
+  consecutiveErrors: number
 }
 
 type Waiter = { interactive: boolean; resolve: () => void; reject: (error: unknown) => void; signal?: AbortSignal; abort?: () => void }
@@ -26,11 +28,23 @@ type Lane = { active: number; queue: Waiter[] }
 /** In-process admission; persistence of endpoint health belongs to the registry. */
 export class TextSlotQueue {
   private lanes = new Map<number, Lane>()
+  /** Assignments made before the first request runs: keeps 70 queued tasks from all picking one endpoint. */
+  private assigned = new Map<number, number>()
   constructor(private endpoints: () => Promise<TextEndpoint[]>, private onStart: () => Promise<void> = async () => {}) {}
 
   load(endpoint: TextEndpoint): number {
     const lane = this.lanes.get(endpoint.configId)
     return ((lane?.active ?? 0) + (lane?.queue.length ?? 0)) / endpoint.concurrency
+  }
+
+  /** Balance new task assignments by concurrency, independent of whether their first call has started. */
+  assignmentScore(endpoint: TextEndpoint): number {
+    const assigned = this.assigned.get(endpoint.configId) ?? 0
+    return assigned / endpoint.concurrency + endpoint.consecutiveErrors
+  }
+
+  noteAssigned(configId: number): void {
+    this.assigned.set(configId, (this.assigned.get(configId) ?? 0) + 1)
   }
 
   async eligible(opts: { vision: boolean; configId?: number }): Promise<TextEndpoint[]> {
@@ -39,7 +53,12 @@ export class TextSlotQueue {
 
   async run<T>(args: { configId: number; interactive?: boolean; signal?: AbortSignal }, fn: () => Promise<T>): Promise<T> {
     const endpoint = (await this.eligible({ vision: false, configId: args.configId }))[0]
-    if (!endpoint) throw new Error('文本模型不可用、已停用或已暂停')
+    if (!endpoint) {
+      const raw = (await this.endpoints()).find(candidate => candidate.configId === args.configId)
+      // 暂停是模型侧故障（可换端点重试），不是「没有可用配置」
+      if (raw?.suspended) throw Object.assign(new Error('文本模型已暂停'), { status: 503, configId: args.configId })
+      throw new Error('文本模型不可用、已停用或已暂停')
+    }
     if (args.signal?.aborted) throw args.signal.reason
     let lane = this.lanes.get(args.configId)
     if (!lane) { lane = { active: 0, queue: [] }; this.lanes.set(args.configId, lane) }
@@ -90,6 +109,7 @@ async function readEndpoints(): Promise<TextEndpoint[]> {
     apiKey: c.apiKey, model: c.model, vision: !!c.vision, concurrency: effectiveConcurrency(c),
     temperature: c.temperature ?? null, settings: c.settings ?? null,
     suspended: !!c.suspendedAt, suspendedReason: c.suspendedReason ?? null,
+    consecutiveErrors: c.consecutiveErrors ?? 0,
   }))
 }
 
@@ -109,18 +129,29 @@ export async function selectTextEndpoint(opts: { vision: boolean; excludeConfigI
   return endpoints[0]
 }
 
-export async function assignTextEndpoint(stage: AiStage, opts: { configId?: number; model?: string; excludeConfigIds?: number[] } = {}): Promise<StageModel> {
+export async function assignTextEndpoint(
+  stage: AiStage,
+  opts: { configId?: number; model?: string; excludeConfigIds?: number[]; retryOf?: number } = {},
+): Promise<StageModel> {
   const spec = AI_STAGES[stage]
   if (!spec) throw new Error(`未登记的 AI 环节：${stage}`)
+  const excluded = new Set(opts.excludeConfigIds ?? [])
+  if (opts.retryOf) {
+    // 自动/手动重试：避开原任务实际失败的那条配置，除非请求硬指定了配置
+    const [parent] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, opts.retryOf))
+    const failedConfigId = parent ? (parseTextTaskParams(parent.params)?.model_used as { config_id?: number | null } | undefined)?.config_id : null
+    if (failedConfigId != null) excluded.add(failedConfigId)
+  }
   const endpoints = (await listEligibleTextEndpoints({ vision: spec.vision, configId: opts.configId }))
-    .filter(endpoint => !opts.excludeConfigIds?.includes(endpoint.configId))
-  // Registry order is priority order; stable sort retains it on equal load.
-  endpoints.sort((a, b) => slots.load(a) - slots.load(b))
+    .filter(endpoint => !excluded.has(endpoint.configId))
+  // Balance by concurrency, then by error count; stable sort keeps priority order for ties.
+  endpoints.sort((a, b) => slots.assignmentScore(a) - slots.assignmentScore(b))
   const endpoint = endpoints[0]
   if (!endpoint) {
     if (spec.vision) throw new StageVisionUnavailableError(stage, spec.label)
-    throw new Error('未配置可用文本模型，或指定的文本模型已停用或暂停')
+    throw new Error(opts.configId != null ? '指定的文本模型已停用、暂停或不支持该环节' : '所有文本模型均不可用、已停用或暂停')
   }
+  slots.noteAssigned(endpoint.configId)
   return { ...endpoint, stage, label: spec.label, vision: spec.vision,
     model: opts.model || endpoint.model, pinned: opts.configId != null }
 }
@@ -129,18 +160,7 @@ export async function withTextSlot<T>(args: { configId: number; interactive?: bo
   return slots.run(args, fn)
 }
 
-export function isModelError(err: unknown): boolean {
-  if (!err || typeof err !== 'object') return false
-  const e = err as { name?: string; message?: string; status?: number; statusCode?: number; code?: string; cause?: unknown }
-  if (/content[_ -]?(filter|policy|moderation)|safety[_ -]?(filter|policy)|内容审核|内容安全/i.test(`${e.code ?? ''} ${e.message ?? ''}`)) return false
-  const status = e.status ?? e.statusCode
-  if (typeof status === 'number') return status === 401 || status === 403 || status === 429 || status >= 500 && status <= 599
-  if (e.name === 'TimeoutError') return true
-  if (e.name === 'AbortError' || e.name === 'SyntaxError') return false
-  if (e.code && /^(ECONN|ENET|EHOST|ETIMEDOUT|EPIPE|UND_ERR_)/.test(e.code)) return true
-  if (/\b(fetch failed|network error|socket hang up|timed?\s*out|timeout)\b/i.test(e.message || '')) return true
-  return e.cause != null && e.cause !== err ? isModelError(e.cause) : false
-}
+export { isModelError } from './text-model-errors.js'
 
 export async function noteEndpointSuccess(configId: number): Promise<void> {
   await db.update(schema.aiServiceConfigs).set({ consecutiveErrors: 0 }).where(eq(schema.aiServiceConfigs.id, configId))

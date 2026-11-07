@@ -1,5 +1,5 @@
 import { isFirstAgentFailureSafe, runWithTextTask } from './text-task-context.js'
-import { requeueFirstModelFailure } from './text-task-restart.js'
+import { requeueFirstModelFailure } from './text-task-autoretry.js'
 
 /**
  * 旁白覆盖缺口的「补全剩余」（Issue #52）。

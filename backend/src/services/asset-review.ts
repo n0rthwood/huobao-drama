@@ -1,6 +1,6 @@
 import { runWithTextTask } from './text-task-context.js'
 import { isModelError } from './text-scheduler.js'
-import { requeueFirstModelFailure } from './text-task-restart.js'
+import { requeueFirstModelFailure } from './text-task-autoretry.js'
 
 /**
  * 资产审核清单（Issue #55）— 纪录片「资产」步的强门禁，唯一读写口

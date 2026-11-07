@@ -1,5 +1,5 @@
 import { isFirstAgentFailureSafe, runWithTextTask } from './text-task-context.js'
-import { requeueFirstModelFailure } from './text-task-restart.js'
+import { requeueFirstModelFailure } from './text-task-autoretry.js'
 
 /**
  * 逐镜旁白骨架（Issue #70）—— 纪录片「最终剧本 → 骨架 → 人工确认 → 批量配音 → 实测时长填设计卡」里的第一步。

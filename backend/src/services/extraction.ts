@@ -20,7 +20,7 @@ import {
 import { resolveStageModel } from './ai-stages.js'
 import { onReviewExtractionFinished } from './asset-review.js'
 import { isFirstAgentFailureSafe, runWithTextTask } from './text-task-context.js'
-import { requeueFirstModelFailure } from './text-task-restart.js'
+import { requeueFirstModelFailure } from './text-task-autoretry.js'
 
 const extractionLocks = new Map<string, Promise<void>>()
 

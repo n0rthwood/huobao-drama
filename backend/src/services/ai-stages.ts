@@ -14,6 +14,7 @@
  * 否则 tests/ai-stages.test.mjs 的调用点扫描会失败。
  */
 import { assignTextEndpoint } from './text-scheduler.js'
+import { logTaskWarn } from '../utils/task-logger.js'
 
 export interface AiStageSpec {
   /** 该环节的判断是否建立在「看见画面」之上 */

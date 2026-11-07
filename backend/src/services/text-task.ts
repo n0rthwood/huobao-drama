@@ -264,9 +264,9 @@ export async function finishTextTask(
     // 模型类错误自动换模型重排一次（#77）；auto_retry_from 标记保证最多两次尝试
     if (row && params?.restart && !params.auto_retry_from
       && (isModelError(extra.error) || isModelError(extra.errorMsg ?? ''))) {
-      // 静态 import 会形成 text-task ⇄ text-task-restart 的循环（后者依赖本文件的解析/写入），
+      // 静态 import 会形成 text-task ⇄ text-task-autoretry 的循环（后者依赖本文件的解析/写入），
       // 这里按运行时需要延迟加载。
-      const { requeueFirstModelFailure } = await import('./text-task-restart.js')
+      const { requeueFirstModelFailure } = await import('./text-task-autoretry.js')
       if (await requeueFirstModelFailure(id, extra.error ?? extra.errorMsg ?? '', true)) {
         await db.update(schema.sysTask)
           .set({ status: 'cancelled', errorMsg: '模型错误，已换模型重新排队', updatedAt: now() })

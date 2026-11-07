@@ -106,7 +106,7 @@ test('only a safe first model failure requeues once on another endpoint', () => 
     import { db, schema } from './src/db/index.ts'
     import { createTextTask, finishTextTask, parseTextTaskParams } from './src/services/text-task.ts'
     import { resolveStageModel } from './src/services/ai-stages.ts'
-    import { requeueFirstModelFailure } from './src/services/text-task-restart.ts'
+    import { requeueFirstModelFailure } from './src/services/text-task-autoretry.ts'
     import { withExtractionLock } from './src/services/extraction.ts'
     const at = new Date().toISOString()
     for (const [id,priority] of [[1,100],[2,90]]) db.insert(schema.aiServiceConfigs).values({id,serviceType:'text',provider:'openai',name:'test'+id,baseUrl:'https://example.invalid',apiKey:'',model:JSON.stringify(['model'+id]),isActive:true,priority,createdAt:at,updatedAt:at}).run()
@@ -152,7 +152,7 @@ test('first-call requeue leaves an explicitly pinned configuration alone', () =>
     import { db, schema } from './src/db/index.ts'
     import { createTextTask, finishTextTask } from './src/services/text-task.ts'
     import { resolveStageModel } from './src/services/ai-stages.ts'
-    import { requeueFirstModelFailure } from './src/services/text-task-restart.ts'
+    import { requeueFirstModelFailure } from './src/services/text-task-autoretry.ts'
     const at = new Date().toISOString()
     db.insert(schema.aiServiceConfigs).values({id:1,serviceType:'text',provider:'openai',name:'test',baseUrl:'https://example.invalid',apiKey:'',model:JSON.stringify(['test']),isActive:true,createdAt:at,updatedAt:at}).run()
     const stage = await resolveStageModel('extractor',{configId:1})

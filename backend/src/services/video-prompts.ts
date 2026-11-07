@@ -28,7 +28,7 @@ import { buildDesignCardBriefs, loadDesignCardContext } from './design-card-cont
 import { toCombo } from './design-card.js'
 
 import { isFirstAgentFailureSafe, runWithTextTask } from './text-task-context.js'
-import { requeueFirstModelFailure } from './text-task-restart.js'
+import { requeueFirstModelFailure } from './text-task-autoretry.js'
 
 export type VideoPromptBatchStatus = PromptBatchStatus
 

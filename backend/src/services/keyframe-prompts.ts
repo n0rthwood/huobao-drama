@@ -26,7 +26,7 @@ import {
 import { resolveStageModel } from './ai-stages.js'
 import { batchScopeOf, type BatchScope } from './batch-scope.js'
 import { isFirstAgentFailureSafe, runWithTextTask } from './text-task-context.js'
-import { requeueFirstModelFailure } from './text-task-restart.js'
+import { requeueFirstModelFailure } from './text-task-autoretry.js'
 
 export type KeyframePromptBatchStatus = PromptBatchStatus
 

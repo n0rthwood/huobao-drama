@@ -40,7 +40,7 @@ import { retryFailedComposeBatch } from './shot-compose.js'
 import { retryRewriteRun } from './script-rewrite/run.js'
 import { startSkeletonGeneration } from './narration-skeleton.js'
 import { isFirstAgentFailureSafe, runWithTextTask } from './text-task-context.js'
-import { requeueFirstModelFailure } from './text-task-restart.js'
+import { requeueFirstModelFailure } from './text-task-autoretry.js'
 
 export interface RetryOptions {
   configId?: number

@@ -17,27 +17,7 @@ import { startPortraitAppearance } from './portrait-appearance.js'
 import { startSemanticsAuto } from './asset-semantics-auto.js'
 import { startAssetBatch } from './asset-batch.js'
 import { retryTask } from './task-retry.js'
-import { isModelError } from './text-scheduler.js'
-import { patchTextTaskParams } from './text-task.js'
-
-const optionsSchema = z.object({
-  model: z.string().optional(), configId: z.number().optional(), retryOf: z.number().optional(),
-  excludeConfigIds: z.array(z.number()).optional(),
-  singleAssetName: z.string().optional(), assetReviewItemId: z.number().optional(), episodeId: z.number().optional(),
-  startStage: z.enum(['fidelity', 'bridge']).optional(), predecessorVersionId: z.number().optional(),
-  skipStages: z.array(z.string()).optional(), autoAdopt: z.boolean().optional(),
-  sourceRevision: z.number().optional(), finalRevision: z.number().optional(), acknowledgeSourceChange: z.boolean().optional(),
-})
-const argsSchema = z.object({
-  episodeId: z.number().optional(), dramaId: z.number().optional(), characterId: z.number().optional(),
-  sourceTaskId: z.number().optional(), target: z.enum(['characters', 'scenes', 'props']).optional(),
-  storyboardIds: z.array(z.number()).optional(), opts: optionsSchema.optional(),
-  input: z.object({ propId: z.number(), episodeId: z.number(), dramaId: z.number(), propName: z.string(),
-    absPath: z.string(), sourceTaskId: z.number().nullable(), configId: z.number().optional(), excludeConfigIds: z.array(z.number()).optional() }).optional(),
-  req: z.object({ scope: z.enum(['characters', 'scenes', 'props', 'all']), episodeId: z.number(),
-    rewritePrompts: z.boolean(), overwriteImages: z.boolean(), textModel: z.string().optional(),
-    textConfigId: z.number().optional(), excludeTextConfigIds: z.array(z.number()).optional(), imageModel: z.string().optional(), imageConfigId: z.number().optional() }).optional(),
-})
+import { restartArgsSchema as argsSchema } from './text-task-restart-schema.js'
 
 /** Dispatch persisted inputs through the same validation and entry points as a new task. */
 export async function dispatchTextTaskRestart(restart: TextTaskRestart, retryOf: number, excluded?: number[]): Promise<void> {
@@ -74,30 +54,6 @@ export async function dispatchTextTaskRestart(restart: TextTaskRestart, retryOf:
     default: throw new Error(`不支持恢复任务类型：${restart.kind}`)
   }
   if (result === false || (typeof result === 'object' && result !== null && 'started' in result && result.started === false)) throw new Error('任务恢复未启动')
-}
-
-/** Requeue only a proven pre-output model failure; never switch a pinned endpoint. */
-export async function requeueFirstModelFailure(taskId: number, error: unknown, safe: boolean): Promise<boolean> {
-  if (!safe || !isModelError(error)) return false
-  const row = db.select().from(schema.sysTask).where(eq(schema.sysTask.id, taskId)).get()
-  const params = parseTextTaskParams(row?.params)
-  if (!params || params.requeued === true || params.progress?.completed) return false
-  const restart = params.restart as TextTaskRestart | undefined
-  if (!restart) return false
-  const parsed = argsSchema.safeParse(restart.args)
-  if (!parsed.success) return false
-  const { opts, input, req } = parsed.data
-  if (opts?.configId != null || opts?.model || input?.configId != null || req?.textConfigId != null || req?.textModel) return false
-  const failedConfig = params.model_used?.config_id ?? params.configId
-  if (!failedConfig) return false
-  await patchTextTaskParams(taskId, { requeued: true, auto_retry: 1 })
-  try {
-    await dispatchTextTaskRestart(restart, taskId, [...(opts?.excludeConfigIds ?? []), failedConfig])
-    return true
-  } catch (err) {
-    console.error('文本任务自动重排失败:', err instanceof Error ? err.message : String(err))
-    return false
-  }
 }
 
 /** A queued request has not acquired a model slot, so it is safe to resubmit. */
