@@ -197,7 +197,6 @@ export async function startNarrationScript(
         try {
           await runChunk(chunk, index)
         } catch (err) {
-          if (!progress.completed && isFirstAgentFailureSafe(err)) throw err
           logTaskError('Narration', 'chunk-retry', { episodeId, chunk: index + 1, error: err instanceof Error ? err.message : String(err) })
           try {
             await runChunk(chunk, index)
