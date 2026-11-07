@@ -98,7 +98,7 @@ test('text scheduling, endpoint selection and persisted health', () => {
     const visionStage = await assignTextEndpoint('design_card')
     const visionReply = await callTextChat(visionStage, [{ type: 'image_url', image_url: { url: 'data:image/png;base64,AA==' } }], { temperature: 0, maxTokens: 10, timeoutMs: 1000 })
     assert.equal(visionReply.endpoint.configId, 9903)
-    await runWithTextTask(1, async () => {
+    await runWithTextTask(1, () => runWithAgentTextCall(async () => {
       assert.equal(noteAgentFetchStarted(), true)
       noteFirstAgentFetchFailed()
       const error = new Error('first request failed')
@@ -108,7 +108,7 @@ test('text scheduling, endpoint selection and persisted health', () => {
       const later = new Error('later request failed')
       markAgentFailureIfSafe(later)
       assert.equal(isFirstAgentFailureSafe(later), false)
-    })
+    }))
     await runWithTextTask(2, async () => {
       let flushed = 0
       const error = new Error('first request failed')
@@ -130,6 +130,17 @@ test('text scheduling, endpoint selection and persisted health', () => {
         await assert.rejects(runAgent(second, [], {}), e => e === later)
       })
       assert.equal(isFirstAgentFailureSafe(later), false)
+    })
+    await runWithTextTask(3, async () => {
+      await runAgent({ stream: async () => ({ getFullOutput: async () => ({ text: 'ok' }) }) }, [], {})
+      const error = new Error('second run')
+      const second = { stream: async () => {
+        assert.equal(noteAgentFetchStarted(), false)
+        noteFirstAgentFetchFailed()
+        return { getFullOutput: async () => ({ error }) }
+      } }
+      await assert.rejects(runAgent(second, [], {}), e => e === error)
+      assert.equal(isFirstAgentFailureSafe(error), false)
     })
     for (const status of [401, 403, 429, 500, 503, 530]) assert.equal(isModelError({ status }), true)
     for (const status of [400, 404, 422]) assert.equal(isModelError({ status }), false)
