@@ -13,9 +13,7 @@
  * 新增 AI 环节必须在 `AI_STAGES` 登记并在 `AI_CALL_SITES` 写上调用点文件，
  * 否则 tests/ai-stages.test.mjs 的调用点扫描会失败。
  */
-import { getActiveConfig, getConfigById, type AIConfig } from './ai.js'
-import { resolveVisionTextConfig } from './vision-capability.js'
-import { logTaskProgress, logTaskWarn } from '../utils/task-logger.js'
+import { assignTextEndpoint } from './text-scheduler.js'
 
 export interface AiStageSpec {
   /** 该环节的判断是否建立在「看见画面」之上 */
@@ -122,6 +120,8 @@ export interface StageModel {
   /** 该环节是否要求视觉模型（= AI_STAGES[stage].vision） */
   vision: boolean
   configId: number | null
+  /** Whether the caller explicitly selected this configuration. */
+  pinned?: boolean
   name: string
   provider: string
   baseUrl: string
@@ -143,64 +143,15 @@ export class StageVisionUnavailableError extends Error {
 export interface StageModelOptions {
   /** 请求指定的 ai_service_configs.id */
   configId?: number
+  excludeConfigIds?: number[]
   /** 请求指定的模型名（只有在最终用的就是请求指定的那条配置时才生效） */
   model?: string
 }
 
-function toStageModel(stage: AiStage, config: AIConfig, model: string): StageModel {
-  return {
-    stage,
-    label: AI_STAGES[stage].label,
-    vision: AI_STAGES[stage].vision,
-    configId: config.id ?? null,
-    name: config.name || '',
-    provider: config.provider || '',
-    baseUrl: config.baseUrl,
-    apiKey: config.apiKey,
-    model,
-    temperature: config.temperature ?? null,
-    settings: config.settings ?? null,
-  }
-}
 
-/**
- * 按环节解析本次要用的文本配置与模型。
- *
- * - 不需要视觉：沿用原有规则（请求指定的配置 > 当前启用的最高优先级配置；模型名可被请求覆盖）。
- * - 需要视觉：请求指定的配置若已标定视觉则用它；否则换成优先级最高的视觉配置（顶栏选了 GLM
- *   也会被换掉，这是用户确认过的行为，前端有提示、任务里记 model_used）；一条都没有就抛
- *   `StageVisionUnavailableError`。换配置时请求指定的模型名一并作废——它属于另一条配置。
- */
+/** Resolve an eligible endpoint for this stage. */
 export async function resolveStageModel(stage: AiStage, opts: StageModelOptions = {}): Promise<StageModel> {
-  const spec = AI_STAGES[stage]
-  if (!spec) throw new Error(`未登记的 AI 环节：${stage}`)
-
-  if (!spec.vision) {
-    const config = (opts.configId ? await getConfigById(opts.configId) : null) ?? await getActiveConfig('text')
-    if (!config) throw new Error('未配置文本模型，请先到「设置」页添加并启用 AI 服务')
-    return toStageModel(stage, config, opts.model || config.model)
-  }
-
-  // 视觉配置的挑选只有一条路径：vision-capability.resolveVisionTextConfig（标记 + 官方 provider + 优先级）
-  const chosen = await resolveVisionTextConfig(opts.configId)
-  if (!chosen) throw new StageVisionUnavailableError(stage, spec.label)
-
-  const requested = opts.configId != null && chosen.configId === opts.configId
-  // 换了配置，请求指定的模型名一并作废——它属于另一条配置
-  const model = requested ? (opts.model || chosen.model) : chosen.model
-  if (opts.configId != null && !requested) {
-    logTaskProgress('AIStage', 'vision-config-substituted', {
-      stage, requestedConfigId: opts.configId, usedConfigId: chosen.configId, usedModel: model,
-    })
-  }
-  return toStageModel(stage, {
-    id: chosen.configId,
-    provider: chosen.provider,
-    baseUrl: chosen.baseUrl,
-    apiKey: chosen.apiKey,
-    model: chosen.model,
-    name: chosen.name,
-  }, model)
+  return assignTextEndpoint(stage, opts)
 }
 
 /** 任务 params 里记录的「实际用了什么」 */

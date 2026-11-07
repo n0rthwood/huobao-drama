@@ -11,6 +11,7 @@ import { createOpenAI } from '@ai-sdk/openai'
 import { Agent as HttpAgent, fetch as undiciFetch, Response as UndiciResponse } from 'undici'
 import { captureReasoningFromStream, getActiveReasoningSink } from './reasoning-sink.js'
 import { getTextConfig, getTextProviderBaseUrl, getConfigById } from '../services/ai.js'
+import { noteEndpointError, noteEndpointSuccess, withTextSlot } from '../services/text-scheduler.js'
 import { logTaskProgress } from '../utils/task-logger.js'
 import { scriptTools } from './tools/script-tools.js'
 import { extractTools } from './tools/extract-tools.js'
@@ -384,9 +385,52 @@ function createMaxTokensFetch(providerName: string, inner?: typeof fetch): typeo
   }
 }
 
+/** Keep the admission slot until the SDK has consumed or cancelled the response body. */
+function createScheduledFetch(configId: number, inner: typeof fetch): typeof fetch {
+  return (input, init) => new Promise<Response>((resolve, reject) => {
+    let delivered = false
+    void withTextSlot({ configId, signal: init?.signal ?? undefined }, async () => {
+      try {
+        const response = await inner(input, init)
+        const statusError = response.ok ? null : Object.assign(new Error(`文本服务 ${response.status}`), { status: response.status })
+        if (!response.body) {
+          if (statusError) await noteEndpointError(configId, statusError)
+          else await noteEndpointSuccess(configId)
+          delivered = true
+          resolve(response)
+          return
+        }
+        const reader = response.body.getReader()
+        let finish!: (error?: unknown) => void
+        const finished = new Promise<unknown>(done => { finish = done })
+        const body = new ReadableStream<Uint8Array>({
+          async pull(controller) {
+            try {
+              const result = await reader.read()
+              if (result.done) { controller.close(); finish() }
+              else controller.enqueue(result.value)
+            } catch (err) { controller.error(err); finish(err) }
+          },
+          async cancel(reason) {
+            try { await reader.cancel(reason) } finally { finish() }
+          },
+        })
+        delivered = true
+        resolve(new Response(body, { status: response.status, statusText: response.statusText, headers: response.headers }))
+        const streamError = await finished
+        if (streamError || statusError) await noteEndpointError(configId, streamError || statusError)
+        else await noteEndpointSuccess(configId)
+      } catch (err) {
+        await noteEndpointError(configId, err)
+        if (!delivered) { delivered = true; reject(err) }
+      }
+    }).catch(err => { if (!delivered) reject(err) })
+  })
+}
+
 async function getModel(fileModel: string | undefined, modelOverride?: string, textConfigId?: number) {
-  // 请求可指定文本配置（含其 provider/baseUrl/apiKey），否则回退到当前启用配置
-  const textConfig = (textConfigId ? await getConfigById(textConfigId) : null) || await getTextConfig()
+  const textConfig = textConfigId != null ? await getConfigById(textConfigId) : await getTextConfig()
+  if (!textConfig || textConfig.id == null) throw new Error('指定的文本模型不存在，无法排队')
   const modelName = modelOverride || fileModel || textConfig.model
   const providerName = textConfig.provider.toLowerCase()
   const resolvedBaseURL = getTextProviderBaseUrl(textConfig)
@@ -407,11 +451,11 @@ async function getModel(fileModel: string | undefined, modelOverride?: string, t
   const tempFetch = temperature !== null
     ? createTemperatureFetch(providerName, temperature, thinkingOffFetch)
     : thinkingOffFetch
-  const fetchImpl = createReasoningCaptureFetch(
+  const fetchImpl = createScheduledFetch(textConfig.id, createReasoningCaptureFetch(
     isOfficialOpenAIHost(resolvedBaseURL)
       ? tempFetch ?? textModelFetch
       : createMaxTokensFetch(providerName, tempFetch),
-  )
+  ))
 
   if (providerName === 'gemini') {
     const googleProvider = createGoogleGenerativeAI({

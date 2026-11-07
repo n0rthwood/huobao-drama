@@ -11,11 +11,16 @@
  * usage 是新增的只读回传（计量用），不影响既有调用方。
  */
 import { getTextProviderBaseUrl, type AIConfig } from './ai.js'
+import { isModelError, noteEndpointError, noteEndpointSuccess, selectTextEndpoint, withTextSlot } from './text-scheduler.js'
 import sharp from 'sharp'
 import { getAbsolutePath, readImageAsCompressedDataUrl } from '../utils/storage.js'
 
 /** 单次请求所需的最小配置：VisionTextConfig 与 AIConfig 都能满足 */
 export interface ChatEndpointConfig {
+  configId?: number | null
+  id?: number
+  pinned?: boolean
+  vision?: boolean
   baseUrl: string
   apiKey: string
   model: string
@@ -33,10 +38,11 @@ export interface ChatUsage {
 export interface ChatCallResult {
   text: string
   usage: ChatUsage | null
+  finishReason?: string
 }
 
 interface ChatCompletionResponse {
-  choices?: Array<{ message?: { content?: string | null } }>
+  choices?: Array<{ message?: { content?: string | null }; finish_reason?: string }>
   usage?: { prompt_tokens?: number; completion_tokens?: number }
 }
 
@@ -45,6 +51,7 @@ export interface ChatCallOptions {
   temperature: number
   maxTokens: number
   timeoutMs: number
+  interactive?: boolean
   /**
    * 上层（如资产流水线的步骤时限）的中止信号：与 `timeoutMs` 取**先到者**。
    * 不接这个 signal 的话，上层超时只是放弃等待，这条请求还挂在连接池里。
@@ -93,44 +100,53 @@ export async function callTextChat(
   content: ChatContent,
   opts: ChatCallOptions,
 ): Promise<ChatCallResult> {
-  const url = `${getTextProviderBaseUrl(config as unknown as AIConfig)}/chat/completions`
   const messages: Array<{ role: string; content: ChatContent }> = []
   if (opts.systemPrompt) messages.push({ role: 'system', content: opts.systemPrompt })
   messages.push({ role: 'user', content })
-
-  const signal = opts.signal
-    ? AbortSignal.any([opts.signal, AbortSignal.timeout(opts.timeoutMs)])
-    : AbortSignal.timeout(opts.timeoutMs)
-  let resp: Response
-  let data: ChatCompletionResponse
-  try {
-    resp = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.apiKey}` },
-      body: JSON.stringify({
-        model: config.model,
-        temperature: opts.temperature,
-        max_tokens: opts.maxTokens,
-        messages,
-      }),
-      signal,
-    })
-    if (!resp.ok) throw new Error(`文本服务 ${resp.status}: ${(await resp.text()).slice(0, 300)}`)
-    // 响应体同样受 signal 约束：模型「连上了但一直不吐字」时中止的就是这一段
-    data = (await resp.json()) as ChatCompletionResponse
-  } catch (err) {
-    const name = err instanceof Error ? err.name : ''
-    if (name === 'TimeoutError') {
-      throw new Error(`文本服务在 ${Math.round(opts.timeoutMs / 1000)} 秒内没有返回，请求已中止`)
+  const vision = !!config.vision || Array.isArray(content) && content.some(part => part.type === 'image_url')
+  let endpoint = config
+  const attempted: number[] = []
+  let data: ChatCompletionResponse | undefined
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const configId = endpoint.configId ?? endpoint.id
+    if (configId == null) throw new Error('文本模型缺少配置 ID，无法排队')
+    attempted.push(configId)
+    const signal = opts.signal
+      ? AbortSignal.any([opts.signal, AbortSignal.timeout(opts.timeoutMs)])
+      : AbortSignal.timeout(opts.timeoutMs)
+    try {
+      data = await withTextSlot({ configId, interactive: opts.interactive, signal }, async () => {
+        try {
+          const url = `${getTextProviderBaseUrl(endpoint as unknown as AIConfig)}/chat/completions`
+          const resp = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${endpoint.apiKey}` },
+            body: JSON.stringify({ model: endpoint.model, temperature: opts.temperature, max_tokens: opts.maxTokens, messages }),
+            signal,
+          })
+          if (!resp.ok) throw Object.assign(new Error(`文本服务 ${resp.status}: ${(await resp.text()).slice(0, 300)}`), { status: resp.status })
+          const result = await resp.json() as ChatCompletionResponse
+          await noteEndpointSuccess(configId)
+          return result
+        } catch (err) {
+          await noteEndpointError(configId, err)
+          throw err
+        }
+      })
+      break
+    } catch (err) {
+      if (opts.signal?.aborted || !isModelError(err) || config.pinned || attempt === 2) throw err
+      const next = await selectTextEndpoint({ vision, excludeConfigIds: attempted })
+      if (!next) throw err
+      endpoint = next
     }
-    if (name === 'AbortError') throw new Error('文本请求已被中止（上层时限到期）')
-    throw err
   }
+  if (!data) throw new Error('文本服务未返回结果')
   const usage = data.usage
     ? {
         prompt_tokens: Number(data.usage.prompt_tokens) || 0,
         completion_tokens: Number(data.usage.completion_tokens) || 0,
       }
     : null
-  return { text: data.choices?.[0]?.message?.content ?? '', usage }
+  return { text: data.choices?.[0]?.message?.content ?? '', usage, finishReason: data.choices?.[0]?.finish_reason }
 }

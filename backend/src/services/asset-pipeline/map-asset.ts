@@ -142,6 +142,7 @@ export async function suggestMapPlaces(input: {
     `上下文：${input.name}${input.description ? `（${input.description}）` : ''}`,
     '只返回 JSON，不要 Markdown 代码块：{"places":[{"name":"","lon":0,"lat":0,"source":"依据说明"}]}',
   ].join('\n'), {
+    interactive: true,
     temperature: 0.1,
     maxTokens: Number(process.env.AI_MAX_TOKENS) || 32768,
     timeoutMs: 180_000,

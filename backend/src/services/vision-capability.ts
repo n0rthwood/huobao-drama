@@ -6,7 +6,8 @@
  * 费时间。#51 改为**人工静态标定**：`ai_service_configs.vision` 为真的配置才会被
  * 需要视觉的环节选中；探测函数降级为设置页「测试」按钮的辅助校验，只显示结果、不改标记。
  */
-import { getTextProviderBaseUrl, isOfficialProvider, listActiveTextConfigs, type AIConfig } from './ai.js'
+import { getTextProviderBaseUrl, type AIConfig } from './ai.js'
+import { listEligibleTextEndpoints } from './text-scheduler.js'
 import { logTaskProgress, logTaskWarn } from '../utils/task-logger.js'
 
 export interface VisionTextConfig {
@@ -77,15 +78,15 @@ export async function probeVision(config: VisionTextConfig): Promise<{ ok: boole
  * 会被悄悄换回默认文本配置，「强制视觉」就白做了。
  */
 export async function resolveVisionTextConfig(preferConfigId?: number): Promise<VisionTextConfig | null> {
-  const rows = (await listActiveTextConfigs()).filter(c => c.vision && isOfficialProvider('text', c.provider))
-  const chosen = (preferConfigId ? rows.find(c => c.id === preferConfigId) : null) ?? rows[0]
+  const rows = await listEligibleTextEndpoints({ vision: true })
+  const chosen = (preferConfigId ? rows.find(c => c.configId === preferConfigId) : null) ?? rows[0]
   if (!chosen) {
     logTaskWarn('Vision', 'no-vision-config', { preferConfigId })
     return null
   }
-  logTaskProgress('Vision', 'config-selected', { configId: chosen.id, name: chosen.name, model: chosen.model })
+  logTaskProgress('Vision', 'config-selected', { configId: chosen.configId, name: chosen.name, model: chosen.model })
   return {
-    configId: chosen.id!,
+    configId: chosen.configId,
     name: chosen.name || '',
     provider: chosen.provider,
     baseUrl: chosen.baseUrl,
