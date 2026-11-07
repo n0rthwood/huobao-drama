@@ -22,6 +22,7 @@ export type TextKind =
   | 'portrait_appearance'
   | 'asset_semantics'
   | 'asset_pipeline'
+  | 'asset_research'
   | 'storyboard_fill_gaps'
   | 'design_card'
   | 'narration_tts'

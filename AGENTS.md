@@ -399,6 +399,12 @@ Issue 整理完成后、实施前，必须让 **Fabel（Anthropic）或 Astra（
 - **文字政策**：`QC_SYSTEM` 输出 `text_in_image{present, overlay, evidence}`；`overlay` 只表示生成器新增的标注/图例/字幕/水印/招牌。`buildImagePrompt()` 只禁这些新增叠加，并要求保留器物自身铭文，但**不要求**出现文字；不新增针对铭文内容的细化规则。新 QC 缺 `overlay` 布尔 → `invalid`；历史记录 `overlay=null` 显示“未记录”，原 `gate_pass` 不重算，旧记录因文字判 FAIL 时说明“当时按零文字规则判为未通过”。
 - 前端：启动区 `AssetPipelinePanel.vue` 提供模型下拉（默认 GPT Image）与参考图多选（上限 3、显示标题/许可/年代；零选禁用启动）并展示实际配置；打回区提供“继续精修 / 转入美化”（默认精修，展示本轮问题与上限）。文字展示口径由 `utils/pipelineText.js` 与 `tests/pipeline-text-policy.test.mjs` 同源覆盖。
 
+#### 检索权威资料（Issue #79）
+- 精确轮的资料检索是**程序真实检索**，不再让模型凭记忆列 URL。唯一实现 `services/asset-research/`：`sources.ts` 13 个适配器（维基百科中/英、维基文库、维基共享资源关键词 `filetype:bitmap` + 分类浏览、Europeana、Smithsonian（#78 key）、大都会、克利夫兰、美国国会图书馆、Internet Archive、英国国家档案馆、OpenAlex），分级 A 机构 / B 维基系，自媒体域名拒绝名单；单源失败只记录不中断。
+- `run.ts`：独立文本任务 `params.kind='asset_research'`（`POST|GET /asset-pipeline/assets/:kind/:id/research`，同资产进行中 409），步骤 = 检索计划（环节 `asset_research`，提示词要求中文器物名、分类浏览、分三类找图）→ 检索 + 维基正文摘录（每条文字查询取首条）→ 著录预筛 → 下载到 `static/asset-sources/candidates/<sha256>`（只收公网图片 ≤20 MB）→ 视觉判断角色（新环节 `asset_curate`：original / generation_reference / shape_only / text_source / reject）。结果整体在 `params.asset_research`，不建表。
+- 入库仍须用户点：面板 `AssetResearchPanel.vue`（嵌在流水线「素材」区块）按视觉判断分组展示，许可预填可改，入库走 `POST /asset-sources {local_path, source_url}`（`source_url` 只记出处，不重新下载；`local_path` 校验不变）。
+- 流水线 research 步：优先复用该资产最近一次成功检索；没有则现场只做文字检索（`withImages:false`，控制在步骤时限内）。结果冻结进 run 的 `params.asset_research`；#79 之前的 run 冻结的旧线索原样交给事实表。事实表提示词改为输入文字摘录 + 视觉判断后的图像资料，要求依据、测量对象、「不是什么」写进 forbidden、资料不足给合理示意并记 uncertainties（用户口径：尽量贴近、给出概念）。
+
 #### 地图底图：程序渲染，扩散不碰几何
 - `services/map-base-render.ts`：`d3-geo`（`geoMercator`/`geoEquirectangular` + `geoPath` + `fitExtent`）把 `backend/assets/geo/ne_50m_*.geojson`（Natural Earth 50m，公有领域，`HUOBAO_GEO_DIR` 可覆盖）投影成 SVG，再按 `layer-render.ts` 的 `sharp().composite()` 栅格化成 **16:9 / 默认 3840×2160** 的 PNG，落 `static/map-bases/<signature>.png`。**底图上绝不渲染任何文字**（地名/图例一律走叠加图层）；同 spec 同尺寸字节级一致，已存在即复用。
 - `props.map_spec`（`MapSpec`：`projection` 只有 mercator / equirectangular，`bbox`，`layers`，`places[]`，`routes[]`，`style.theme`）。接口在 `routes/props.ts`：`GET|PUT /props/:id/map-spec`、`POST /props/:id/map-render`、`POST /props/:id/map-suggest`（AI 建议坐标一律 `proposed`，人工勾选确认后前端才写进 `map_spec`）。

@@ -68,6 +68,7 @@
       "storyboard_breaker": "Storyboard breakdown",
       "portrait_appearance": "Appearance from archival portraits",
       "asset_semantics": "Semantic annotation",
+      "asset_research": "Source research",
       "asset_pipeline": "Asset pipeline",
       "storyboard_fill_gaps": "Fill remaining storyboards",
       "design_card": "Design card fill",
@@ -2520,6 +2521,50 @@
         "fidelityFailed": "Fidelity check failed",
         "fidelityVerified": "Fidelity verified"
       },
+      "research": {
+        "title": "Authoritative source research",
+        "run": "Research sources",
+        "rerun": "Research again",
+        "hint": "Searches Wikipedia/Wikisource/Wikimedia Commons, museums, archives, libraries and academic indexes for texts and images (no self-media); a vision model judges each image. Check the licence before adding.",
+        "finishedAt": "Last research: {time}",
+        "summary": "{texts} texts · {images} image candidates · {queries} queries ({failed} failed)",
+        "empty": "Not researched yet. Click “Research sources” (about 5–10 minutes; progress in the task center).",
+        "started": "Source research started",
+        "startFailed": "Failed to start research",
+        "loadFailed": "Failed to load research results",
+        "license": "Licence: ",
+        "licenseUnknown": "not stated (fill in before adding)",
+        "tierA": "institutional source",
+        "tierB": "Wikimedia source",
+        "proves": "Supports: ",
+        "cautions": "Caution: ",
+        "ingest": "Add",
+        "ingested": "Added",
+        "texts": "Texts",
+        "textsHint": "The fact sheet cites these texts",
+        "role": {
+          "original": "Original",
+          "generation_reference": "Same type",
+          "shape_only": "Shape only",
+          "text_source": "Text source",
+          "reject": "Not recommended"
+        },
+        "roleHint": {
+          "original": "This is the asset itself",
+          "generation_reference": "Same type and period; usable as generation reference",
+          "shape_only": "Form/proportion only; do not send to the image model",
+          "text_source": "Valuable mainly for its text",
+          "reject": "Judged unrelated or misleading"
+        },
+        "step": {
+          "plan": "Planning queries",
+          "search": "Searching",
+          "texts": "Reading texts",
+          "screen": "Screening images",
+          "curate": "Judging images",
+          "done": "Done"
+        }
+      },
       "pipeline": {
         "executionRunning": "Running",
         "executionWaitingApproval": "Waiting for approval",
@@ -2572,7 +2617,7 @@
         "statusFailed": "Failed",
         "statusCancelled": "Aborted",
         "sourcesTitle": "Sources",
-        "sourcesHint": "Sources are always registered by hand: fill in the URL and license, then click Register. The panel never fetches anything on its own.",
+        "sourcesHint": "Sources are the input to the precision round: once added they can be used as generation references (sent to the image model) or shape-only references; the fact sheet cites the research and QC checks against it item by item.",
         "sourcesEmpty": "No registered sources yet",
         "sourceUrl": "Original image URL",
         "sourceTitleField": "Title",

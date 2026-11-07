@@ -31,11 +31,10 @@ import {
   parseJsonReply,
   QC_SYSTEM,
   qcUserPrompt,
-  RESEARCH_SYSTEM,
-  researchUserPrompt,
   SPEC_SYSTEM,
   specUserPrompt,
 } from './prompts.js'
+import { getAssetResearch, performResearch, type AssetResearchResult } from '../asset-research/run.js'
 import { checkSemanticsPreserved, semanticsLabelsToCheck } from './semantics-check.js'
 import {
   ensureRound,
@@ -156,42 +155,32 @@ export async function writeStep(pipelineTaskId: number, step: string): Promise<v
 
 // ─── research ────────────────────────────────────────────────
 
-export interface ResearchResult {
-  candidates: Array<{ url: string; title?: string; artist?: string; license_hint?: string; era?: string; what_it_proves?: string }>
-  key_facts: string[]
-  notes: string
-}
+/**
+ * 流水线冻结的资料：#79 起是真实检索结果（文字摘录 + 视觉判断过的图像候选）；
+ * #79 之前的 run 冻结的是模型凭记忆列的线索（candidates/key_facts/notes），重放时原样交给事实表。
+ */
+export type ResearchResult = AssetResearchResult | Record<string, unknown>
 
 /**
- * 资料研究：只产出**候选线索**，绝不自动抓取（主进程裁决「必须改 1」）。
- * 维基系对本机 429/403，自动抓取既不可靠也绕过了许可核对。
+ * 资料研究（Issue #79）：优先复用该资产最近一次成功的「检索权威资料」任务；
+ * 没有时现场只做文字检索（跳过下载与视觉判断，控制在步骤时限内），结果冻结进本次 run。
  */
 export async function runResearch(input: {
   pipelineTaskId: number
   target: AssetTarget
   textConfigId?: number
-  signal?: AbortSignal
-}): Promise<{ result: ResearchResult; stageModel: StageModel }> {
-  const stageModel = await resolveStageModel('asset_research', { configId: input.textConfigId })
+}): Promise<{ result: ResearchResult }> {
   const [row] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, input.pipelineTaskId))
-  const cached = parseTextTaskParams(row?.params)?.asset_research as ResearchResult | undefined
-  if (cached?.key_facts) return { result: cached, stageModel }
+  const cached = parseTextTaskParams(row?.params)?.asset_research
+  if (cached && typeof cached === 'object') return { result: cached as ResearchResult }
 
-  const sources = await listSources(input.target.kind, input.target.id)
-  const parsed = await callJsonChat(stageModel, researchUserPrompt({
-    assetKind: input.target.kind,
-    name: input.target.name,
-    description: input.target.description,
-    era: null,
-    existing: sources,
-  }), { systemPrompt: RESEARCH_SYSTEM, temperature: TEXT_TEMPERATURE, signal: input.signal }) as Partial<ResearchResult>
-  const result: ResearchResult = {
-    candidates: Array.isArray(parsed.candidates) ? parsed.candidates : [],
-    key_facts: Array.isArray(parsed.key_facts) ? parsed.key_facts : [],
-    notes: typeof parsed.notes === 'string' ? parsed.notes : '',
-  }
+  const latest = (await getAssetResearch(input.target.kind, input.target.id)).result
+  const result = latest ?? await performResearch({
+    kind: input.target.kind, id: input.target.id, dramaId: input.target.dramaId,
+    name: input.target.name, description: input.target.description,
+  }, { textConfigId: input.textConfigId, withImages: false })
   await patchTextTaskParams(input.pipelineTaskId, { asset_research: result })
-  return { result, stageModel }
+  return { result }
 }
 
 // ─── curate ──────────────────────────────────────────────────
@@ -268,7 +257,7 @@ export async function runSpec(input: {
     assetKind: input.target.kind,
     name: input.target.name,
     description: input.target.description,
-    research: JSON.stringify(input.research),
+    research: input.research,
     sources,
   }), { systemPrompt: SPEC_SYSTEM, temperature: TEXT_TEMPERATURE, signal: input.signal })
   const mustHave = normalizeMustHave(parsed.must_have)

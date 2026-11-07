@@ -96,7 +96,7 @@
       </button>
     </div>
 
-    <!-- 素材 asset_source：全部人工入库，面板绝不自动抓取 -->
+    <!-- 素材 asset_source：检索结果与手工资料都要用户点「入库」才成为素材（#79） -->
     <section v-if="!reviewRunId" class="pip-block">
       <div class="pip-block-head" @click.stop="showSources = !showSources">
         <ChevronDown :size="12" :class="{ 'pip-rot': !showSources }" />
@@ -105,6 +105,14 @@
       </div>
       <template v-if="showSources">
         <p class="pip-note">{{ t('episode.documentary.pipeline.sourcesHint') }}</p>
+        <AssetResearchPanel
+          :asset-kind="assetKind"
+          :asset-id="assetId"
+          :episode-id="episodeId"
+          :ingested-shas="sources.map(s => s.sha256)"
+          @ingested="loadSources"
+          @preview="(url, title) => emit('preview', url, title)"
+        />
         <ul v-if="sources.length" class="pip-list">
           <li v-for="source in sources" :key="source.id" class="pip-source">
             <span class="pip-badge" :class="`role-${source.role}`">
@@ -349,6 +357,7 @@ import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import TaskErrorMessage from '~/components/TaskErrorMessage.vue'
 import AssetPipelineFactSheet from '~/components/AssetPipelineFactSheet.vue'
+import AssetResearchPanel from '~/components/AssetResearchPanel.vue'
 import { useTasks } from '~/composables/useTasks'
 import { describeTextPolicy } from '~/utils/pipelineText'
 import {

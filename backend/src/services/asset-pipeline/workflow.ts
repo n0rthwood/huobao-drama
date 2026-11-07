@@ -94,11 +94,10 @@ const prepareStep = createStep({
     if (!target) throw new Error('资产不存在')
 
     await writeStep(inputData.pipelineTaskId, 'research')
-    const { result } = await withStepDeadline('research', signal => runResearch({
+    const { result } = await withStepDeadline('research', () => runResearch({
       pipelineTaskId: inputData.pipelineTaskId,
       target,
       textConfigId: inputData.textConfigId ?? undefined,
-      signal,
     }))
 
     await writeStep(inputData.pipelineTaskId, 'curate')

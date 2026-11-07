@@ -68,6 +68,7 @@
       "storyboard_breaker": "分镜の分割",
       "portrait_appearance": "史料画像から容姿を補完",
       "asset_semantics": "セマンティック注記",
+      "asset_research": "資料検索",
       "asset_pipeline": "素材パイプライン",
       "storyboard_fill_gaps": "残りのカット補完",
       "design_card": "設計カード記入",
@@ -2520,6 +2521,50 @@
         "fidelityFailed": "忠実度検証に不合格",
         "fidelityVerified": "忠実度検証済み"
       },
+      "research": {
+        "title": "権威資料の検索",
+        "run": "資料を検索",
+        "rerun": "再検索",
+        "hint": "Wikipedia／Wikisource／Wikimedia Commons、博物館、アーカイブ、図書館、学術索引から文字と画像を検索し（個人メディアは除外）、画像は視覚モデルが用途を判定します。登録前にライセンスを確認してください。",
+        "finishedAt": "前回の検索：{time}",
+        "summary": "文字資料 {texts} 件 · 画像候補 {images} 枚 · クエリ {queries} 件（失敗 {failed} 件）",
+        "empty": "まだ検索していません。「資料を検索」を押してください（約 5–10 分、進捗はタスクセンター）。",
+        "started": "資料検索を開始しました",
+        "startFailed": "検索を開始できませんでした",
+        "loadFailed": "検索結果を読み込めませんでした",
+        "license": "ライセンス：",
+        "licenseUnknown": "未記載（登録前に入力）",
+        "tierA": "機関の資料",
+        "tierB": "ウィキ系の資料",
+        "proves": "根拠になる点：",
+        "cautions": "注意：",
+        "ingest": "登録",
+        "ingested": "登録済み",
+        "texts": "文字資料",
+        "textsHint": "事実表がこれらを引用します",
+        "role": {
+          "original": "原本",
+          "generation_reference": "同種の実物",
+          "shape_only": "形状のみ参考",
+          "text_source": "文字資料",
+          "reject": "非推奨"
+        },
+        "roleHint": {
+          "original": "この資産そのもの",
+          "generation_reference": "同時代の同種実物。生成参考に使える",
+          "shape_only": "形状・比率のみ参考。画像モデルには送らない",
+          "text_source": "主に文字に価値がある",
+          "reject": "無関係または誤解を招く"
+        },
+        "step": {
+          "plan": "検索計画",
+          "search": "検索中",
+          "texts": "文字資料を取得",
+          "screen": "画像を選別",
+          "curate": "画像を判定",
+          "done": "完了"
+        }
+      },
       "pipeline": {
         "executionRunning": "実行中",
         "executionWaitingApproval": "承認待ち",
@@ -2572,7 +2617,7 @@
         "statusFailed": "失敗",
         "statusCancelled": "中止",
         "sourcesTitle": "素材",
-        "sourcesHint": "素材は必ず手動で登録します：URL とライセンスを入力して「登録」を押してください。パネルが自動取得することはありません。",
+        "sourcesHint": "素材は精密ラウンドの入力です。登録すると生成参考（画像モデルに送る）または形状のみの参考として使えます。事実表は検索資料を引用し、QC は事実表に沿って項目ごとに確認します。",
         "sourcesEmpty": "登録済みの素材はまだありません",
         "sourceUrl": "原画像の URL",
         "sourceTitleField": "タイトル",

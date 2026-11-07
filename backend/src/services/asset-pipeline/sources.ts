@@ -68,6 +68,8 @@ export interface AddSourceInput {
   url?: string | null
   file?: { bytes: Buffer; filename: string } | null
   localPath?: string | null
+  /** 与 localPath 同用：只记录出处页，不重新下载（资料检索的候选图已缓存在本地，#79） */
+  sourceUrl?: string | null
   title?: string | null
   artist?: string | null
   license: string
@@ -134,7 +136,7 @@ export async function addAssetSource(input: AddSourceInput): Promise<AssetSource
   if (existing) {
     // 同一张图重复入库：只更新可变的登记信息，不重复落盘也不新建行
     await db.update(schema.assetSource).set({
-      url: input.url ?? existing.url,
+      url: input.url ?? input.sourceUrl ?? existing.url,
       title: input.title ?? existing.title,
       artist: input.artist ?? existing.artist,
       license: input.license,
@@ -149,7 +151,7 @@ export async function addAssetSource(input: AddSourceInput): Promise<AssetSource
   const res = await db.insert(schema.assetSource).values({
     assetKind: input.assetKind,
     assetId: input.assetId,
-    url: input.url ?? null,
+    url: input.url ?? input.sourceUrl ?? null,
     title: input.title ?? null,
     artist: input.artist ?? null,
     license: input.license,
