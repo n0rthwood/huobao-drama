@@ -65,5 +65,6 @@ test('text scheduling, endpoint selection and persisted health', () => {
     assert.equal(isModelError(new TypeError('fetch failed')), true)
     assert.equal(isModelError(new SyntaxError('invalid JSON')), false)
     assert.equal(isModelError(new Error('content policy violation')), false)
+    assert.equal(isModelError({ status: 403, message: 'content_filter' }), false)
   `], { cwd: backend, env: { ...process.env, SQLITE_PATH: ':memory:' }, stdio: 'pipe' })
 })

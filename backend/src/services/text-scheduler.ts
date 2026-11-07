@@ -132,6 +132,7 @@ export async function withTextSlot<T>(args: { configId: number; interactive?: bo
 export function isModelError(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false
   const e = err as { name?: string; message?: string; status?: number; statusCode?: number; code?: string; cause?: unknown }
+  if (/content[_ -]?(filter|policy|moderation)|safety[_ -]?(filter|policy)|内容审核|内容安全/i.test(`${e.code ?? ''} ${e.message ?? ''}`)) return false
   const status = e.status ?? e.statusCode
   if (typeof status === 'number') return status === 401 || status === 403 || status === 429 || status >= 500 && status <= 599
   if (e.name === 'TimeoutError') return true
