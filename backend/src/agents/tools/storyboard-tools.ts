@@ -23,6 +23,7 @@ import { stampFieldSavedAt } from '../../services/storyboard-fields.js'
 import { MAX_NARRATION_CHARS, narrationCharCount, parseNarrationMeta, sha256 } from '../../services/narration.js'
 import { describeNarrationGaps, fitNarrationToGaps, locateNarrationInScript, narrationCoverage, narrationMatchKey, scriptMatchKey, scriptParagraphs } from '../../services/narration-first.js'
 import { loadDesignCardContext, semanticEntries } from '../../services/design-card-context.js'
+import { shotTtsValidity } from '../../services/narration-tts-gate.js'
 import {
   COMBOS,
   INFO_POINT_VIAS,
@@ -340,10 +341,16 @@ const designCardSchema = z.object({
   suggested_combo: z.enum(COMBOS).describe("REQUIRED. Suggested segment combination ONLY: 'A' layer only, 'B' generated only, 'C' layer then generated, 'D' generated then layer. Always give exactly one suggestion — the human picks the real combo, which the server never takes from you."),
 })
 
-/** 纪录片项目：多一个 narration_text（#45，逐字取自剧本）与一份 design_card（#57，设计卡） */
-const documentaryStoryboardFields = storyboardFields.extend({
+/**
+ * 纪录片项目的拆镜 = **旁白骨架**（Issue #70）：只分配旁白边界、顺序与标题。
+ * 设计卡、画面描述、关键帧/视频提示词都属于后面的「按实测配音时长填设计卡」阶段，
+ * 这一步一个都不收——设计必须建立在实测时长之上，不能先凭估算编一版。
+ */
+const documentaryStoryboardFields = z.object({
+  shot_number: z.number(),
+  title: z.string().optional().describe('One sentence naming the single information point this shot delivers.'),
   narration_text: z.string().optional().describe(`Narration for this shot, copied VERBATIM from a consecutive stretch of the episode script (this project's script IS the narration script). Never rewrite, shorten, merge or invent text: the tool checks that the whitespace-stripped text occurs literally in the script and rejects anything else. Cut only at sentence boundaries, at most ${MAX_NARRATION_CHARS} spoken characters per shot. Every documentary shot MUST carry narration: shots with empty narration_text are rejected and listed in rejected[], and two shots may never claim the same passage.`),
-  design_card: designCardSchema.optional().describe('Design card for this shot: info points → layer segment plan → generated segment plan → budget → rationale. Required for every documentary shot.'),
+  continuity: z.enum(['continue', 'cut']).optional().describe("Transition from the previous shot: 'continue' means this shot continues the previous moment, 'cut' means a hard cut. Omit when unsure."),
 })
 
 /** 已经执行过整集清空的运行 id（纪录片变体）：同一次运行的后续批次不再清空 */
@@ -370,7 +377,7 @@ function buildSaveStoryboards(documentary: boolean) {
   return createTool({
   id: 'save_storyboards',
   description: documentary
-    ? 'Save storyboards for this episode. Call in batches of at most 8 storyboards: the first batch must set replace_existing: true (clears all old storyboards for the episode, then writes), every following batch omits replace_existing (appends). Rows are upserted by shot_number, so overlapping batches and retries never create duplicates. This is a documentary project: every shot also carries narration_text copied verbatim from the script, in script order, and the result reports how much of the script is still uncovered. In fill-gap mode (the user message says 补镜模式) replace_existing is forbidden and shot_number is ignored: every shot is inserted with a server-assigned number and its narration must fall inside one of the uncovered passages.'
+    ? 'Save the NARRATION SKELETON for this documentary episode. Call in batches of at most 8 shots: the first batch must set replace_existing: true (clears all old storyboards for the episode, then writes), every following batch omits replace_existing (appends). Rows are upserted by shot_number, so overlapping batches and retries never create duplicates. A skeleton shot carries ONLY shot_number, narration_text copied verbatim from the script in script order, a one-sentence title and the continuity flag — visual design (design cards, descriptions, keyframe/video prompts) belongs to a LATER stage that runs on measured voice-over durations, so do not send it here. The result reports how much of the script is still uncovered. In fill-gap mode (the user message says 补镜模式) replace_existing is forbidden and shot_number is ignored: every shot is inserted with a server-assigned number and its narration must fall inside one of the uncovered passages.'
     : 'Save storyboards for this episode. Call in batches of at most 8 storyboards: the first batch must set replace_existing: true (clears all old storyboards for the episode, then writes), every following batch omits replace_existing (appends). Rows are upserted by shot_number, so overlapping batches and retries never create duplicates.',
   inputSchema: z.object({
     replace_existing: z.boolean().optional(),
@@ -438,8 +445,6 @@ function buildSaveStoryboards(documentary: boolean) {
         .map(sb => sb.narrationText)).cursor
       : 0
     const narrationRejected: { shot_number: number; reason: string }[] = []
-    // 设计卡解析出的问题（#57）汇总回传，让模型在同一次运行里改引用
-    const designCardIssues: { shot_number: number; code: string; message: string }[] = []
     // 普通拆镜与补镜共享上限：短稿防过拆，但不得低于逐段合法切分旁白所需镜数。
     const paragraphs = documentary ? scriptParagraphs(episodeRow?.scriptContent || episodeRow?.content) : []
     const paragraphCount = paragraphs.length
@@ -520,58 +525,79 @@ function buildSaveStoryboards(documentary: boolean) {
     }
 
     for (const { sb, shotNumber, fillText } of queue) {
-      await validateStoryboardBindings(episodeId, dramaId, sb.scene_id, sb.character_ids, sb.prop_ids)
+      // 纪录片拆镜 = 旁白骨架（#70）：只写标题/衔接/旁白，不收画面字段、资产绑定与设计卡。
+      // 视觉设计要等批量配音出实测时长之后再填，这里先把 zod 的联合类型收敛成一份可读的字段视图。
+      const shot = sb as z.infer<typeof storyboardFields> & { narration_text?: string }
+      if (!documentary) {
+        await validateStoryboardBindings(episodeId, dramaId, shot.scene_id, shot.character_ids, shot.prop_ids)
+      }
       // 补镜模式永不 upsert：即使模型给的编号撞上已有镜，也只插入新行
       const existingId = fillGaps ? undefined : shotToId.get(shotNumber)
       if (existingId !== undefined) {
-        await db.update(schema.storyboards).set({
-          title: sb.title, shotType: sb.shot_type,
-          angle: sb.angle, movement: sb.movement,
-          location: sb.location, time: sb.time,
-          description: sb.description, result: sb.result,
-          atmosphere: sb.atmosphere,
-          firstFramePrompt: sb.first_frame_prompt,
-          midFramePrompt: sb.mid_frame_prompt,
-          midFrameTime: sb.mid_frame_time,
-          lastFramePrompt: sb.last_frame_prompt,
-          videoPrompt: sb.video_prompt, bgmPrompt: sb.bgm_prompt,
-          soundEffect: sb.sound_effect,
-          sceneId: sb.scene_id, duration: sb.duration || 10,
-          continuityBoundary: sb.continuity,
+        await db.update(schema.storyboards).set(documentary ? {
+          title: shot.title,
+          continuityBoundary: shot.continuity,
+          updatedAt: ts,
+        } : {
+          title: shot.title, shotType: shot.shot_type,
+          angle: shot.angle, movement: shot.movement,
+          location: shot.location, time: shot.time,
+          description: shot.description, result: shot.result,
+          atmosphere: shot.atmosphere,
+          firstFramePrompt: shot.first_frame_prompt,
+          midFramePrompt: shot.mid_frame_prompt,
+          midFrameTime: shot.mid_frame_time,
+          lastFramePrompt: shot.last_frame_prompt,
+          videoPrompt: shot.video_prompt, bgmPrompt: shot.bgm_prompt,
+          soundEffect: shot.sound_effect,
+          sceneId: shot.scene_id, duration: shot.duration || 10,
+          continuityBoundary: shot.continuity,
           updatedAt: ts,
         }).where(eq(schema.storyboards.id, existingId))
         // 拆镜显式传入的绑定 = 手选；提示词里的 @ 另由 syncStoryboardBindingsFromPrompts 自动进池
-        await applyExplicitBindings(existingId, {
-          characterIds: sb.character_ids || [],
-          propIds: sb.prop_ids || [],
-          sceneId: sb.scene_id ?? null,
-        })
+        if (!documentary) {
+          await applyExplicitBindings(existingId, {
+            characterIds: shot.character_ids || [],
+            propIds: shot.prop_ids || [],
+            sceneId: shot.scene_id ?? null,
+          })
+        }
       } else {
-        const res = await db.insert(schema.storyboards).values({
+        const res = await db.insert(schema.storyboards).values(documentary ? {
           episodeId,
           storyboardNumber: shotNumber,
-          title: sb.title, shotType: sb.shot_type,
-          angle: sb.angle, movement: sb.movement,
-          location: sb.location, time: sb.time,
-          description: sb.description, result: sb.result,
-          atmosphere: sb.atmosphere,
-          firstFramePrompt: sb.first_frame_prompt,
-          midFramePrompt: sb.mid_frame_prompt,
-          midFrameTime: sb.mid_frame_time,
-          lastFramePrompt: sb.last_frame_prompt,
-          videoPrompt: sb.video_prompt, bgmPrompt: sb.bgm_prompt,
-          soundEffect: sb.sound_effect,
-          continuityBoundary: fillGaps ? (sb.continuity ?? 'cut') : sb.continuity,
-          sceneId: sb.scene_id, duration: sb.duration || 10,
+          title: shot.title,
+          continuityBoundary: fillGaps ? (shot.continuity ?? 'cut') : shot.continuity,
+          // 时长由设计卡阶段按实测配音时长决定，骨架阶段不预设
+          duration: 0,
+          createdAt: ts, updatedAt: ts,
+        } : {
+          episodeId,
+          storyboardNumber: shotNumber,
+          title: shot.title, shotType: shot.shot_type,
+          angle: shot.angle, movement: shot.movement,
+          location: shot.location, time: shot.time,
+          description: shot.description, result: shot.result,
+          atmosphere: shot.atmosphere,
+          firstFramePrompt: shot.first_frame_prompt,
+          midFramePrompt: shot.mid_frame_prompt,
+          midFrameTime: shot.mid_frame_time,
+          lastFramePrompt: shot.last_frame_prompt,
+          videoPrompt: shot.video_prompt, bgmPrompt: shot.bgm_prompt,
+          soundEffect: shot.sound_effect,
+          continuityBoundary: shot.continuity,
+          sceneId: shot.scene_id, duration: shot.duration || 10,
           createdAt: ts, updatedAt: ts,
         })
         const newId = getInsertId(res)
         shotToId.set(shotNumber, newId)
-        await applyExplicitBindings(newId, {
-          characterIds: sb.character_ids || [],
-          propIds: sb.prop_ids || [],
-          sceneId: sb.scene_id ?? null,
-        })
+        if (!documentary) {
+          await applyExplicitBindings(newId, {
+            characterIds: shot.character_ids || [],
+            propIds: shot.prop_ids || [],
+            sceneId: shot.scene_id ?? null,
+          })
+        }
       }
       // 关键帧/视频提示词写入后：打字段保存时间 + 绑定跟随 @引用（LLM 不必自己传 ids）
       const savedId = existingId ?? shotToId.get(shotNumber)!
@@ -582,31 +608,7 @@ function buildSaveStoryboards(documentary: boolean) {
         await db.update(schema.storyboards).set({ fieldSavedAt: stamp.json })
           .where(eq(schema.storyboards.id, savedId))
       }
-      await syncStoryboardBindingsFromPrompts(savedId, writtenFields)
-      // 分镜设计卡（#57）：按本集语义标注规范化后落库；解析不到的条目保留并标 unresolved，
-      // 问题汇总回传给模型，让它在同一次运行里改引用，而不是把条目删掉蒙混过关。
-      // 模型给的 combo 一律忽略：段组合只能由人显式选，列保持 NULL。
-      if (documentary && 'design_card' in sb && sb.design_card) {
-        // 上下文在这里才装配：validateStoryboardBindings 可能刚把新资产关联进本集
-        const ctx = loadDesignCardContext(episodeId)
-        const card = normalizeDesignCard(sb.design_card, ctx)
-        if (card) {
-          const cardStamp = stampFieldSavedAt(savedRow?.fieldSavedAt, ['design_card'])
-          await db.update(schema.storyboards).set({
-            designCard: serializeDesignCard(card),
-            designCardStatus: 'pending',
-            designCardConfirmedAt: null,
-            designCardStaleReason: null,
-            ...(cardStamp.json ? { fieldSavedAt: cardStamp.json } : {}),
-            updatedAt: ts,
-          }).where(eq(schema.storyboards.id, savedId))
-          const narrationText = 'narration_text' in sb && typeof sb.narration_text === 'string' ? sb.narration_text : ''
-          for (const issue of validateDesignCard({ card, combo: null, narrationText })) {
-            if (issue.code === 'combo_missing') continue
-            designCardIssues.push({ shot_number: shotNumber, code: issue.code, message: issue.message })
-          }
-        }
-      }
+      if (!documentary) await syncStoryboardBindingsFromPrompts(savedId, writtenFields)
       // narration-first：逐字取自剧本才写库；改写过的文本不写旁白字段，画面字段照常保存
       if (documentary && (fillGaps || 'narration_text' in sb)) {
         // 补镜模式的文本在入队前已校验（逐字出自剧本 + 落在缺口内，必要时裁到边界）
@@ -687,7 +689,6 @@ function buildSaveStoryboards(documentary: boolean) {
       total_duration: totalDuration,
       rejected: narrationRejected,
       narration_rejected: narrationRejected,
-      design_card_issues: designCardIssues,
       shot_cap: shotCap || null,
       narration_paragraphs: paragraphCount || null,
       replace_existing_ignored: replaceIgnored,
@@ -806,7 +807,15 @@ const updateStoryboard = createTool({
         updates.designCardConfirmedAt = null
         updates.designCardStaleReason = null
       }
-      for (const issue of validateDesignCard({ card, combo: toCombo(storyboard.combo), narrationText: storyboard.narrationText })) {
+      // 预算校验与人工确认同一口径（#70）：用当前有效配音的实测秒数，而不是字数估算，
+      // 否则模型在这里过了、人在确认时又被挡。
+      const tts = await shotTtsValidity(storyboard_id)
+      for (const issue of validateDesignCard({
+        card,
+        combo: toCombo(storyboard.combo),
+        narrationText: storyboard.narrationText,
+        measuredSeconds: tts.valid ? tts.duration_s : null,
+      })) {
         cardReport.push({ code: issue.code, message: issue.message })
       }
     }

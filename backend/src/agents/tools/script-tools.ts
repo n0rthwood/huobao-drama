@@ -5,10 +5,11 @@
 import { createTool } from '@mastra/core/tools'
 import { z } from 'zod'
 import { db, schema } from '../../db/index.js'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { now } from '../../utils/response.js'
 import { getEpisodeId } from '../context.js'
 import { onScriptChanged } from '../../services/workflow-gates.js'
+import { resolveDramaProjectType } from '../../services/project-type.js'
 
 const readEpisodeScript = createTool({
   id: 'read_episode_script',
@@ -59,6 +60,13 @@ ${source}`,
   },
 })
 
+/**
+ * 旁白稿/剧本保存。
+ *
+ * 纪录片项目（Issue #70）已经改成分阶段改写：阶段产出只能落不可变版本，最终稿由
+ * 采用/人工保存经 `writeCanonicalFinal` 的修订号 CAS 写入。因此这里对纪录片**直接拒写**，
+ * 不保留任何绕过版本与并发保护的旧通路（剧情项目行为不变）。
+ */
 const saveScript = createTool({
   id: 'save_script',
   description: 'Save the rewritten screenplay content to the current episode.',
@@ -69,11 +77,22 @@ const saveScript = createTool({
     const episodeId = getEpisodeId(context?.requestContext)
     if (!episodeId) return { error: 'Missing episodeId in request context' }
     const [before] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId))
-    await db.update(schema.episodes)
-      .set({ scriptContent: content, updatedAt: now() })
-      .where(eq(schema.episodes.id, episodeId))
-    // 改稿自动取消剧本确认（#54）：Agent 改写路径与 PUT /episodes/:id 同一个写入口
-    if ((before?.scriptContent || '') !== content) await onScriptChanged(episodeId, 'save_script 工具写入旁白稿')
+    if (!before) return { error: `Episode not found (id=${episodeId})` }
+    if (resolveDramaProjectType(before.dramaId) === 'documentary') {
+      return {
+        error: '纪录片项目的旁白稿不再由本工具写入：请走分阶段改写接口 POST /episodes/:id/script-rewrite，'
+          + '阶段产出会落成不可变版本，最终稿由采用或人工保存按修订号写入。',
+      }
+    }
+    // 剧情项目：保持原有「直接写入 + 自动取消确认」语义，但把写入做成条件更新，
+    // 并发保存时后到的一方拿到明确冲突，而不是悄悄互相覆盖。
+    const baseRevision = before.finalRevision ?? 1
+    const changed = (before.scriptContent || '') !== content
+    const res = await db.update(schema.episodes)
+      .set({ scriptContent: content, finalRevision: changed ? baseRevision + 1 : baseRevision, updatedAt: now() })
+      .where(and(eq(schema.episodes.id, episodeId), eq(schema.episodes.finalRevision, baseRevision)))
+    if (!res.changes) return { error: '保存冲突：本集旁白稿刚被其它操作修改，请重新读取后再保存' }
+    if (changed) await onScriptChanged(episodeId, 'save_script 工具写入旁白稿')
 
     return { message: `Script saved`, word_count: content.length }
   },

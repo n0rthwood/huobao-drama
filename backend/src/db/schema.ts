@@ -73,6 +73,15 @@ export const episodes = sqliteTable('episodes', {
   assetReviewStatus: text('asset_review_status').notNull().default('none'),
   // 审核通过后资产库又变更的原因（JSON 数组）：只做横幅提示，不回退 passed
   assetReviewStaleReasons: text('asset_review_stale_reasons'),
+  // 分阶段改写（#70）的并发保护：原始资料与最终稿各自的修订号，每次真实字节变化 +1。
+  // 运行冻结启动时的两个号；采用/保存按它们做 CAS，改过就 409 保留候选，绝不静默覆盖。
+  sourceRevision: integer('source_revision').notNull().default(1),
+  finalRevision: integer('final_revision').notNull().default(1),
+  // 当前最终稿来自哪个不可变版本（script_version.id）；人工直接改写也会记一条 manual 版本
+  finalVersionId: integer('final_version_id'),
+  // 旁白骨架确认（#70）：确认时间 + 确认时的骨架修订号；NULL = 未确认
+  narrationSkeletonConfirmedAt: text('narration_skeleton_confirmed_at'),
+  narrationSkeletonRevision: text('narration_skeleton_revision'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
   deletedAt: text('deleted_at'),
@@ -696,4 +705,78 @@ export const assetQcRecord = sqliteTable('asset_qc_record', {
   /** 审批时人工确认「已打开看过」的图片 [{path, sha256}]；缺失则审批接口 400 */
   humanOpened: text('human_opened'),
   createdAt: text('created_at').notNull(),
+})
+
+/**
+ * 分阶段剧本改写的一次运行（Issue #70）。执行状态归 `sys_task`（task_id），
+ * 这里只存「这一轮冻结了什么、从哪个前驱开始、跑哪些阶段、候选稿是哪一版、采用了没有」。
+ * 同一集同时只允许一个 queued/processing 运行；历史运行只读。
+ */
+export const scriptRewriteRun = sqliteTable('script_rewrite_run', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  episodeId: integer('episode_id').notNull(),
+  dramaId: integer('drama_id'),
+  /** 执行状态所在的 sys_task（type='text', params.kind='script_rewrite'） */
+  taskId: integer('task_id'),
+  status: text('status').notNull().default('queued'),
+  /** 正在跑的阶段 key；完成/失败后保留最后一个阶段 */
+  currentStage: text('current_stage'),
+  /** 冻结的阶段计划快照 JSON：[{key,label,revision,skipped}]，后续新增阶段不改旧运行 */
+  stagePlan: text('stage_plan').notNull(),
+  /** 冻结输入：原始资料快照版本 + 自动过滤后的正文版本（过滤不可跳过） */
+  sourceVersionId: integer('source_version_id'),
+  preparedVersionId: integer('prepared_version_id'),
+  sourceHash: text('source_hash'),
+  /** 启动时的 episodes.source_revision / final_revision：采用前做 CAS */
+  sourceRevision: integer('source_revision').notNull(),
+  baseFinalRevision: integer('base_final_revision').notNull(),
+  /** 从某阶段重跑时引用的正式前驱版本（首阶段为空，前驱就是本轮过滤正文） */
+  predecessorVersionId: integer('predecessor_version_id'),
+  candidateVersionId: integer('candidate_version_id'),
+  /** pending | adopted | conflict | manual */
+  adoptionStatus: text('adoption_status').notNull().default('pending'),
+  /** 0 = 用户在运行期间开始手改，本轮结果一律只做候选，不自动采用 */
+  autoAdopt: integer('auto_adopt').notNull().default(1),
+  configId: integer('config_id'),
+  model: text('model'),
+  errorMsg: text('error_msg'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+  finishedAt: text('finished_at'),
+})
+
+/**
+ * 不可变文本版本（Issue #70）。成功或跳过之后才落版本；失败只留任务诊断。
+ * `source`：source_snapshot | prepared_source | agent | skip_copy | manual。
+ * 任何一条写进来就不再修改——采用、重跑、人工保存都只会产生新行。
+ */
+export const scriptVersion = sqliteTable('script_version', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  episodeId: integer('episode_id').notNull(),
+  runId: integer('run_id'),
+  /** source_snapshot | prepared_source | fidelity | bridge | manual */
+  stageKey: text('stage_key').notNull(),
+  /** AI 阶段在本轮计划里的序号（1 起）；非阶段版本为 NULL */
+  stageIndex: integer('stage_index'),
+  source: text('source').notNull(),
+  predecessorId: integer('predecessor_id'),
+  content: text('content').notNull(),
+  contentHash: text('content_hash').notNull(),
+  /** 结构化阶段报告 JSON（过滤报告 / 保真计量 / 逐边界桥句决策） */
+  report: text('report'),
+  taskId: integer('task_id'),
+  createdAt: text('created_at').notNull(),
+})
+
+/** 运行内每个阶段的执行状态（pending|processing|completed|skipped|failed） */
+export const scriptRewriteStage = sqliteTable('script_rewrite_stage', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  runId: integer('run_id').notNull(),
+  stageKey: text('stage_key').notNull(),
+  stageIndex: integer('stage_index').notNull(),
+  status: text('status').notNull().default('pending'),
+  versionId: integer('version_id'),
+  errorMsg: text('error_msg'),
+  startedAt: text('started_at'),
+  finishedAt: text('finished_at'),
 })

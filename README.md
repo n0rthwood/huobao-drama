@@ -124,6 +124,17 @@ Four built-in Mastra agents with database-backed configuration and Skill extensi
 
 The prompt agent's `update_storyboard` can only save prompts, never approved shot descriptions, duration, or explicit asset links. Video-prompt and keyframe-prompt batches expose separate narrow schemas and enforce the current shot and prompt scope at execution time. The storyboard-breaker retains full editing capability. This boundary is enforced in code rather than relying on model instructions. A safe backend restart activates the new tools; no local configuration changes are needed.
 
+### Documentary rewrite and narration timing
+
+Documentary projects use independent **fidelity rewrite → bridge polish** calls. Mandatory input preparation first removes administrative source links, licences, contributor fields and non-narration notes, retaining the raw material and an itemised removal report. Narrative attributions such as “according to the source” remain. Skipping any or all AI stages still performs this preparation; each skipped result is an immutable byte-for-byte copy of its actual predecessor.
+
+The script workspace shows stage status, immutable versions, predecessor-relative differences and an editable final script. Intermediate stages never replace the final script. A successful run adopts its candidate only when source/final revisions still match and manual editing has not disabled adoption; otherwise compare and adopt explicitly. Failed or interrupted runs retain completed versions and do not automatically replay paid calls. Only the selected final script feeds storyboards; adoption does not confirm it for the user.
+
+Inside **Storyboard design**, confirm the verbatim narration skeleton before batch voice-over, then fill design cards from **current, valid, measured audio**. Missing, failed, stale or unreadable audio blocks the affected shot's design and production; there is no estimated-duration bypass. Splitting or merging keeps unaffected media, while changed narration and voice parameters require validity checks. Beat markers remain non-spoken structural anchors.
+
+Startup adds rewrite history and revision/skeleton-confirmation fields without rewriting existing scripts or media. No new provider credentials or external configuration are required. Existing projects enter the new workflow through explicit actions; drama projects retain their previous rewrite behavior.
+
+
 ### 🌐 Multi-Language UI
 
 The interface ships in **中文 / English / 日本語 / 한국어**, with a global setting for AI-generated content language.

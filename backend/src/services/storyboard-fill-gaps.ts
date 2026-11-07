@@ -31,7 +31,6 @@ import {
 } from './narration-first.js'
 import { parseDesignCard } from './design-card.js'
 import { slotOwnImage } from './keyframes.js'
-import { startDesignCardBatch } from './design-card-batch.js'
 import { resolveStageModel } from './ai-stages.js'
 import { buildEvidenceImages, evidenceMessageParts } from './evidence-images.js'
 import { consumeStoryboardStopReason } from '../agents/tools/storyboard-tools.js'
@@ -354,11 +353,8 @@ export async function startFillGapsTask(
       const fresh = (await db.select().from(schema.storyboards)
         .where(eq(schema.storyboards.episodeId, episodeId)))
         .filter(sb => !sb.deletedAt && !knownIds.has(sb.id))
-      // 新镜的设计卡（#57）：补齐缺失的那几镜，不动既有镜
-      if (fresh.length) {
-        await startDesignCardBatch(episodeId, dramaId, { model: opts.model, configId: opts.configId },
-          fresh.filter(sb => !(sb.designCard || '').trim()).map(sb => sb.id))
-      }
+      // 补镜只补**旁白骨架**（#70）：新镜的设计卡要等批量配音出实测时长之后再填，
+      // 这里绝不自动起设计卡任务，否则又会得到一版按估算编出来的卡。
       const summary = `补镜完成：新增 ${fresh.length} 镜，重编号 ${renumber.changed} 镜。\n${result.text || ''}`
       // 镜头数硬上限的止损（#57）：连续两批整批被拒就不再让模型重试，直接给出合并建议
       const stop = consumeStoryboardStopReason(episodeId)

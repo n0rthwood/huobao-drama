@@ -55,6 +55,8 @@ const episodeId = Number(db.insert(schema.episodes).values({dramaId,episodeNumbe
 for (const [id, combo] of [[1,'A'],[2,'A'],[3,'A'],[4,'B'],[5,'B'],[6,'B'],[7,'C'],[8,'D'],[9,null],[10,'unknown']]) {
   db.insert(schema.storyboards).values({id,episodeId,storyboardNumber:id,combo,designCardStatus:'confirmed',continuityBoundary:'cut',firstFramePrompt:'first draft',midFramePrompt:'middle draft',lastFramePrompt:'last draft',createdAt:ts,updatedAt:ts}).run()
 }
+// #70：纪录片逐镜制作要求本镜有当前有效配音，补齐这一集的配音事实（门禁本身不放松）
+await (await import('./tests/fixtures/documentary-voice.mjs')).giveShotsValidVoice({episodeId,storyboardIds:[1,2,3,4,5,6,7,8,9,10]})
 const {default:episodes} = await import('./src/routes/episodes.ts')
 const {default:storyboards} = await import('./src/routes/storyboards.ts')
 const {default:tasks} = await import('./src/routes/tasks.ts')

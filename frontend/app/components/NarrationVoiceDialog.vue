@@ -221,6 +221,9 @@ function settingsPayload() {
 }
 
 async function load() {
+  ++planSeq
+  clearTimeout(planTimer)
+  planLoading.value = false
   loading.value = true
   loadError.value = ''
   options.value = null
@@ -248,7 +251,10 @@ async function refreshPlan() {
   planError.value = ''
   try {
     const res = await episodeAPI.narrationVoicePreview(props.episodeId, settingsPayload(), props.storyboardIds)
-    if (my === planSeq) plan.value = res.items || []
+    if (my === planSeq) {
+      const selected = props.storyboardIds === undefined ? null : new Set(props.storyboardIds.map(Number))
+      plan.value = (res.items || []).filter(item => selected === null || selected.has(Number(item.storyboard_id)))
+    }
   } catch (e) {
     if (my === planSeq) planError.value = e?.message || String(e)
   } finally {
@@ -257,6 +263,12 @@ async function refreshPlan() {
 }
 
 watch(() => props.open, (open) => { if (open) load() })
+watch([() => props.storyboardIds, () => props.episodeId, () => props.mode], () => {
+  ++planSeq
+  clearTimeout(planTimer)
+  plan.value = null
+  if (props.open) void load()
+})
 // 批量：参数变了重新分类（防抖），保证「将重配的镜头」与确定后实际执行的一致
 watch([form, seedMode], () => {
   if (props.mode !== 'batch' || !form.value) return

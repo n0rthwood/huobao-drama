@@ -25,18 +25,20 @@ import {
   type Combo,
   type DesignCardStatus,
 } from '../services/design-card.js'
-import { estimateNarrationSeconds, NARRATION_CHARS_PER_SECOND } from '../services/narration.js'
+import { NARRATION_CHARS_PER_SECOND } from '../services/narration.js'
 import {
   listBaseCandidates,
   loadDesignCardContext,
-  measuredNarrationSeconds,
   resolveDesignCard,
   resolveDesignCardFrom,
 } from '../services/design-card-context.js'
+import { assertShotTtsReady, shotTtsValidity } from '../services/narration-tts-gate.js'
+import { SkeletonNotConfirmedError } from '../services/narration-skeleton.js'
 import {
   auditEpisodeDesignCards,
   getDesignCardBatchStatus,
   startDesignCardBatch,
+  type DesignCardBatchStart,
 } from '../services/design-card-batch.js'
 import { reorderStoryboards } from '../services/storyboard-fill-gaps.js'
 
@@ -64,7 +66,11 @@ async function shotState(storyboardId: number) {
   const [row] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, storyboardId))
   if (!row) return null
   const ctx = loadDesignCardContext(row.episodeId)
-  const { combo, card, issues } = resolveDesignCard(row, ctx)
+  // 时长口径只有一个：当前有效配音的实测秒数（#70）。没有有效配音就是 null，
+  // 界面显示「待配音」，校验与展示都不给估算数字冒充实测。
+  const tts = await shotTtsValidity(storyboardId)
+  const measured = tts.valid ? tts.duration_s : null
+  const { combo, card, issues } = resolveDesignCard(row, ctx, null, measured)
   return {
     storyboard_id: row.id,
     shot_number: row.storyboardNumber,
@@ -75,8 +81,8 @@ async function shotState(storyboardId: number) {
     design_card_confirmed_at: row.designCardConfirmedAt ?? null,
     design_card_stale_reason: row.designCardStaleReason ?? null,
     issues,
-    narration_estimate_s: estimateNarrationSeconds(row.narrationText),
-    narration_measured_s: measuredNarrationSeconds(row),
+    narration_measured_s: tts.valid ? tts.duration_s : null,
+    tts: { valid: tts.valid, reason: tts.reason, message: tts.message, duration_ms: tts.duration_ms },
   }
 }
 
@@ -112,6 +118,8 @@ shots.put('/:id/design-card', async (c) => {
   const { row } = loaded
   const status = toDesignCardStatus(row.designCardStatus)
   if (status === 'ai_filling') return conflict(c, 'AI 正在填写这一镜的设计卡，请等它跑完再改', 'card_busy')
+  // 设计卡写入的硬前置（#70）：本镜必须有当前有效配音——卡里的段时长是按实测时长排的
+  const tts = await assertShotTtsReady(id)
 
   const body = await readJson(c)
   const wantsCombo = 'combo' in body
@@ -134,7 +142,7 @@ shots.put('/:id/design-card', async (c) => {
 
   const ctx = loadDesignCardContext(row.episodeId)
   const rawCard = wantsCard ? body.design_card : (row.designCard ? JSON.parse(row.designCard) : null)
-  const resolved = resolveDesignCardFrom(rawCard, combo, ctx, row)
+  const resolved = resolveDesignCardFrom(rawCard, combo, ctx, row, tts.duration_s)
   // 预算硬上限超限直接拒存：段条一旦存进库，下游（图层段 / 视频档位）就会按它排期
   const overLayer = resolved.issues.find(issue => issue.code === 'budget_over_layer')
   if (overLayer) return rejected(c, overLayer.message, 'budget_over_layer', resolved.issues)
@@ -163,9 +171,11 @@ shots.post('/:id/design-card/confirm', async (c) => {
   if (toDesignCardStatus(row.designCardStatus) === 'ai_filling') {
     return conflict(c, 'AI 正在填写这一镜的设计卡，请等它跑完再确认', 'card_busy')
   }
+  // 确认也要有当前有效配音（#70）：音频换了/失效了，卡里的时长关系就不再成立
+  const tts = await assertShotTtsReady(id)
   const body = await readJson(c)
   const ctx = loadDesignCardContext(row.episodeId)
-  const { card, issues } = resolveDesignCard(row, ctx)
+  const { card, issues } = resolveDesignCard(row, ctx, null, tts.duration_s)
 
   const blocking = issues.filter(issue => issue.severity === 'block')
   if (blocking.length) {
@@ -252,11 +262,22 @@ app.post('/:id/design-cards/fill', async (c) => {
   const storyboardIds = Array.isArray(body.storyboard_ids)
     ? body.storyboard_ids.map(Number).filter((n: number) => Number.isInteger(n) && n > 0)
     : undefined
-  const result = await startDesignCardBatch(
-    ep.id, ep.dramaId,
-    { model: typeof body.model === 'string' ? body.model : undefined, configId: body.config_id as number | undefined },
-    storyboardIds,
-  )
+  // 骨架未确认是预期中的操作顺序问题（#70），不是服务端异常。
+  // 全局 onError 也映射了 SkeletonNotConfirmedError；这里保留同形状的路由级映射，
+  // 让这个子应用被单独挂载/直接调用时也不会退化成 500。
+  let result: DesignCardBatchStart
+  try {
+    result = await startDesignCardBatch(
+      ep.id, ep.dramaId,
+      { model: typeof body.model === 'string' ? body.model : undefined, configId: body.config_id as number | undefined },
+      storyboardIds,
+    )
+  } catch (err) {
+    if (err instanceof SkeletonNotConfirmedError) {
+      return c.json({ code: 400, error: 'skeleton_unconfirmed', message: err.message }, 400)
+    }
+    throw err
+  }
   if (result.total === -1) return success(c, { status: 'running', already_running: true })
   if (!result.started) return success(c, { status: 'idle', total: 0 })
   return success(c, { status: 'running', total: result.total })

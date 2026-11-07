@@ -4,25 +4,33 @@
  *
  * markup 由 `episode.vue` 原样搬入，状态与方法通过工作台上下文注入；
  * 旁白稿确认是纪录片门禁链的第一环（未确认 → 资产、拆分全部锁住）。
+ *
+ * Issue #70：纪录片的改写子步骤改由 `ScriptRewritePanel` 承载（输入准备 → 忠实改写 →
+ * 桥句润色 → 候选采用 → 最终稿）；剧情项目保持原来的一次性改写与跳过不变。
  */
-import { inject } from 'vue'
+import { computed, inject } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Loader2 } from 'lucide-vue-next'
+import ScriptRewritePanel from '~/components/ScriptRewritePanel.vue'
 import { WORKBENCH_CTX } from '~/utils/workbenchSteps'
 
 const { t } = useI18n()
 const ctx = inject(WORKBENCH_CTX)
 const {
+  chatConfigId,
+  chatModelOverride,
   confirmScript,
   confirmingScript,
   doRewrite,
   episode,
+  epId,
   isDocumentaryProject,
   localRaw,
   localScript,
   panel,
   rawContent,
   rawLen,
+  refresh,
   rn,
   rt,
   saveRaw,
@@ -35,6 +43,10 @@ const {
   toast,
   unconfirmScript,
 } = ctx
+
+// 顶栏的文本模型覆盖是函数（每次读当前选择），改写面板只要当次取值
+const rewriteModel = computed(() => chatModelOverride() || '')
+const rewriteConfigId = computed(() => chatConfigId() || 0)
 </script>
 
 <template>
@@ -63,7 +75,54 @@ const {
     />
   </div>
 
-  <!-- Step 1: Rewrite -->
+  <!-- Step 1（纪录片 #70）：分阶段改写工作台 + 旁白稿确认 -->
+  <div v-else-if="scriptStep === 1 && isDocumentaryProject" class="step-editor">
+    <div class="step-toolbar">
+      <div class="toolbar-left">
+        <div class="step-indicator">
+          <span class="step-num">02</span>
+          <span class="step-name">{{ t('episode.script.rewrite') }}</span>
+        </div>
+      </div>
+    </div>
+
+    <ScriptRewritePanel
+      :episode-id="epId"
+      :final-content="scriptContent"
+      :raw-content="rawContent"
+      :chat-model="rewriteModel"
+      :chat-config-id="rewriteConfigId"
+      @refresh="refresh"
+    />
+
+    <!-- 旁白稿确认（#54）：采用/保存都不会自动确认，确认始终是显式动作 -->
+    <div class="script-confirm-bar">
+      <span :class="['script-confirm-dot', scriptConfirmed && 'ok']" />
+      <span v-if="scriptConfirmed" class="script-confirm-state">
+        {{ t('episode.script.confirmed') }}
+        <span v-if="scriptConfirmedAt" class="dim">· {{ t('episode.script.confirmedAt', { at: scriptConfirmedAt }) }}</span>
+      </span>
+      <span v-else class="script-confirm-state dim">{{ t('episode.script.confirmHint') }}</span>
+      <button
+        v-if="scriptConfirmed"
+        class="btn btn-sm ml-auto"
+        :disabled="confirmingScript"
+        @click="unconfirmScript()"
+      >{{ t('episode.script.unconfirm') }}</button>
+      <button
+        v-else
+        class="btn btn-sm btn-primary ml-auto"
+        :disabled="confirmingScript || !scriptContent"
+        :title="scriptContent ? t('episode.script.confirmHint') : t('episode.script.emptyScript')"
+        @click="confirmScript()"
+      >
+        <Loader2 v-if="confirmingScript" :size="11" class="animate-spin" />
+        {{ t('episode.script.confirm') }}
+      </button>
+    </div>
+  </div>
+
+  <!-- Step 1（剧情）：一次性改写 / 跳过，行为与 #70 之前逐字一致 -->
   <div v-else-if="scriptStep === 1" class="step-editor">
     <div class="step-toolbar">
       <div class="toolbar-left">
@@ -110,32 +169,6 @@ const {
       <div class="loading-text">{{ t('episode.script.rewriting') }}</div>
     </div>
     <textarea v-else class="fill-textarea" v-model="localScript" :placeholder="t('episode.script.scriptPlaceholder')" />
-
-      <!-- 旁白稿确认（#54）：确认后才允许拆分分镜；改稿自动取消确认 -->
-      <div v-if="isDocumentaryProject" class="script-confirm-bar">
-        <span :class="['script-confirm-dot', scriptConfirmed && 'ok']" />
-        <span v-if="scriptConfirmed" class="script-confirm-state">
-          {{ t('episode.script.confirmed') }}
-          <span v-if="scriptConfirmedAt" class="dim">· {{ t('episode.script.confirmedAt', { at: scriptConfirmedAt }) }}</span>
-        </span>
-        <span v-else class="script-confirm-state dim">{{ t('episode.script.confirmHint') }}</span>
-        <button
-          v-if="scriptConfirmed"
-          class="btn btn-sm ml-auto"
-          :disabled="confirmingScript"
-          @click="unconfirmScript()"
-        >{{ t('episode.script.unconfirm') }}</button>
-        <button
-          v-else
-          class="btn btn-sm btn-primary ml-auto"
-          :disabled="confirmingScript || !scriptContent"
-          :title="scriptContent ? t('episode.script.confirmHint') : t('episode.script.emptyScript')"
-          @click="confirmScript()"
-        >
-          <Loader2 v-if="confirmingScript" :size="11" class="animate-spin" />
-          {{ t('episode.script.confirm') }}
-        </button>
-      </div>
   </div>
 </div>
 </template>

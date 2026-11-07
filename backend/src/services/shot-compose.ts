@@ -332,9 +332,12 @@ function runCompose(input: RunComposeInput): Promise<void> {
         'asetpts=PTS-STARTPTS',
       ]
       filters.push(`[0:a]${bedSteps.join(',')}[bed]`)
+      // 旁白要同时喂给 sidechain 与 amix：filtergraph 里一个标签只能被消费一次，
+      // 不先 asplit 的话 ffmpeg 直接报 "Error binding filtergraph inputs/outputs"。
+      filters.push('[narr]asplit=2[narrmix][narrkey]')
       // 旁白响时底音再压 6 dB；amix 第一路固定是旁白，normalize=0 保证旁白电平不随模式变化
-      filters.push('[bed][narr]sidechaincompress=threshold=0.05:ratio=4:attack=20:release=300:makeup=1[ducked]')
-      filters.push(`[narr][ducked]amix=inputs=2:duration=first:dropout_transition=0:normalize=0,${LOUDNORM_FILTER}[aout]`)
+      filters.push('[bed][narrkey]sidechaincompress=threshold=0.05:ratio=4:attack=20:release=300:makeup=1[ducked]')
+      filters.push(`[narrmix][ducked]amix=inputs=2:duration=first:dropout_transition=0:normalize=0,${LOUDNORM_FILTER}[aout]`)
     } else {
       filters.push(`[narr]${LOUDNORM_FILTER}[aout]`)
     }

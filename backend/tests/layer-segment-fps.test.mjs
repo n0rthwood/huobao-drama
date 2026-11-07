@@ -69,8 +69,12 @@ const dramaId = Number(db.insert(schema.dramas).values({title:'FPS local fixture
 const episodeId = Number(db.insert(schema.episodes).values({dramaId,episodeNumber:1,title:'FPS fixture',scriptConfirmedAt:ts,assetReviewStatus:'passed',createdAt:ts,updatedAt:ts}).run().lastInsertRowid)
 const ids = []
 for (const [index,combo] of ['C','A','A','A'].entries()) {
- const id = Number(db.insert(schema.storyboards).values({episodeId,storyboardNumber:index+1,combo,designCardStatus:'confirmed',continuityBoundary:'cut',lastFrameImage:'static/base.png',narrationEnabled:false,narrationFit:JSON.stringify({audio_mix_mode:'mix'}),createdAt:ts,updatedAt:ts}).run().lastInsertRowid)
- ids.push(id)
+ ids.push(Number(db.insert(schema.storyboards).values({episodeId,storyboardNumber:index+1,combo,designCardStatus:'confirmed',continuityBoundary:'cut',lastFrameImage:'static/base.png',narrationFit:JSON.stringify({audio_mix_mode:'mix'}),createdAt:ts,updatedAt:ts}).run().lastInsertRowid))
+}
+// #70：纪录片逐镜制作要求本镜有当前有效配音。配音用静音 wav，保证混音后的信号归属可判定。
+const {giveShotsValidVoice} = await import('./tests/fixtures/documentary-voice.mjs')
+await giveShotsValidVoice({episodeId,storyboardIds:ids,confirmSkeleton:false,seconds:1})
+for (const id of ids) {
  await request('PUT',segmentUrl(id),{layer_doc:{version:1,base:{path:'static/base.png',width:960,height:544},theme:'clean',layers:[{id:'m',type:'marker',at:[.4,.5],text:'',style:{dot_radius:.03}}]},timeline:{fps:25,fade_ms:0,keyframes:[{t:0,viewport:{x:0,y:0,w:1,h:1},visible:['m']},{t:.8,viewport:{x:.05,y:.05,w:.9,h:.9},visible:['m']}]},duration:1})
  const rendered = await request('POST',segmentUrl(id)+'/render',{})
  assert.equal(rendered.segment.fresh,true)
@@ -118,8 +122,10 @@ assert.equal(video.r_frame_rate,'25/1')
 assert.equal(video.avg_frame_rate,'25/1')
 assert.equal(audio.sample_rate,'48000')
 assert.equal(audio.channels,2)
-assert.ok(Math.abs(Number(video.duration)-2)<.085,JSON.stringify(facts))
-assert.ok(Math.abs(Number(audio.duration)-2)<.085,JSON.stringify(facts))
+// 成片总长由图层段 + 画面 + 旁白适配共同决定（#70 之后本镜带旁白），这里不钉死秒数：
+// 要的是「音画等长、且长于单独的图层段」这两条原生合成不变量。
+assert.ok(Math.abs(Number(video.duration)-Number(audio.duration))<.085,JSON.stringify(facts))
+assert.ok(Number(video.duration)>1,JSON.stringify(facts))
 const pcm = execFileSync(ffmpeg,['-v','error','-i',abs(output),'-map','0:a:0','-f','f32le','-ac','1','-ar','48000','pipe:1'])
 let firstEnergy=0,lastEnergy=0;for(let i=0;i<pcm.length;i+=4){const x=pcm.readFloatLE(i);if(i<48000*4*.8)firstEnergy+=x*x;if(i>48000*4*1.2)lastEnergy+=x*x}
 assert.ok(lastEnergy>1 && lastEnergy>firstEnergy*5,'raw sine audio survives after the silent layer segment')
@@ -201,6 +207,7 @@ assert.equal(saved.timeline.fps,29.97,'new plans inherit the exact fractional ta
 assert.equal((await getLayerSegment(newShot)).timeline.fps,29.97)
 // Render a fractional plan for real, then only GET/reparse it: exact FPS, signature and bytes survive.
 db.update(schema.storyboards).set({designCardStatus:'confirmed'}).where(eq(schema.storyboards.id,newShot)).run()
+await (await import('./tests/fixtures/documentary-voice.mjs')).giveShotsValidVoice({episodeId:fallbackEpisode,storyboardIds:[newShot],confirmSkeleton:false,seconds:1})
 const fractional = await request('POST',segmentUrl(newShot)+'/render',{})
 assert.equal(fractional.segment.timeline.fps,29.97)
 assert.equal(fractional.segment.fresh,true)
@@ -227,6 +234,7 @@ assert.equal((await resolveEpisodeSegmentSpec(fallbackEpisode)).fps,24)
 const another=shot(4)
 assert.equal((await saveLayerSegment(another,{layer_doc:report.before.segment.layer_doc,duration:1})).timeline.fps,24)
 db.update(schema.storyboards).set({designCardStatus:'confirmed'}).where(eq(schema.storyboards.id,another)).run()
+await (await import('./tests/fixtures/documentary-voice.mjs')).giveShotsValidVoice({episodeId:fallbackEpisode,storyboardIds:[another],confirmSkeleton:false,seconds:1})
 const old24 = await request('POST',segmentUrl(another)+'/render',{})
 assert.equal(old24.segment.fresh,true)
 assert.equal(old24.segment.timeline.fps,24)

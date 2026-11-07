@@ -12,7 +12,7 @@ import { db, schema } from '../db/index.js'
 import { now } from '../utils/response.js'
 import { STORAGE_ROOT } from '../utils/paths.js'
 import { logTaskError, logTaskProgress, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
-import { getActiveConfig, getConfigById, type AIConfig } from './ai.js'
+import { type AIConfig } from './ai.js'
 import { NARRATION_SUBDIR, fetchCharAlign, fetchMarkupCatalog, fetchVoiceItems, parseTtsSettings, previewMarkup, synthesizeNarration } from './tts.js'
 import {
   VOXCPM_CFG,
@@ -21,8 +21,6 @@ import {
   classifyVoiceShot,
   episodeSettingsOf,
   groupVoices,
-  parseEpisodeVoiceSettings,
-  resolveVoiceParams,
   sanitizeVoiceSettings,
   type VoiceOption,
   type VoiceParams,
@@ -67,16 +65,12 @@ import {
 import { scopeFromPreview, type BatchScope } from './batch-scope.js'
 import { resolveDramaProjectType } from './project-type.js'
 import { parseTextTaskParams, patchTextTaskParams } from './text-task.js'
+import { effectiveVoiceParams, episodeTtsValidity, resolveTtsConfig } from './narration-tts-gate.js'
+import { requireConfirmedSkeleton } from './narration-skeleton.js'
 
-/** 本集生效的 TTS 配置：集锁定优先，其次当前启用的最高优先级配置 */
-export async function resolveTtsConfig(episode: { ttsConfigId?: number | null }): Promise<AIConfig> {
-  const locked = episode.ttsConfigId ? await getConfigById(episode.ttsConfigId) : null
-  const config = locked || await getActiveConfig('tts')
-  if (!config) {
-    throw new Error('未配置语音合成（TTS）服务：请到「设置」页添加并启用一个语音合成配置后重试')
-  }
-  return config
-}
+// 生效 TTS 配置与生效配音参数都由 narration-tts-gate 统一提供（#70）：
+// 「当前配音是否有效」与「这次该用什么参数合成」必须是同一份口径。
+export { resolveTtsConfig }
 
 /** 本镜生效的字幕时间码模式：镜级覆盖优先，其次集级，再次默认 sentence */
 export function resolveSubtitleTiming(
@@ -90,15 +84,7 @@ export function resolveSubtitleTiming(
 type EpisodeRow = typeof schema.episodes.$inferSelect
 type StoryboardRow = typeof schema.storyboards.$inferSelect
 
-/** 本镜生效的配音参数：集级 tts_settings → TTS 配置 → VoxCPM 默认；normalize 镜级覆盖 → 集级（#37） */
-function effectiveVoiceParams(ep: EpisodeRow, shotNormalize: boolean | null | undefined, config: AIConfig): VoiceParams {
-  return resolveVoiceParams({
-    episodeSettings: parseEpisodeVoiceSettings(ep.ttsSettings),
-    configSettings: parseTtsSettings(config.settings),
-    episodeNormalize: ep.narrationNormalize,
-    shotNormalize,
-  })
-}
+
 
 function requireVoxcpm(config: AIConfig) {
   if ((config.provider || '').toLowerCase() !== 'voxcpm') {
@@ -215,7 +201,9 @@ export async function generateShotVoice(
   if (!ep) throw new Error('剧集不存在')
   if (ep.narrationEnabled !== true) throw new Error('本集未开启旁白，无法生成配音')
   const documentary = resolveDramaProjectType(ep.dramaId) === 'documentary'
-  if (documentary && (!sb.combo || sb.designCardStatus !== 'confirmed')) throw new Error('设计卡未确认')
+  // 新顺序（#70）：骨架确认 → 批量配音 → 按实测时长填设计卡。
+  // 配音绝不再等设计卡，否则就是「卡等音频、音频等卡」的死循环。
+  if (documentary) await requireConfirmedSkeleton(ep.id)
   if (sb.narrationEnabled === false) throw new Error(`分镜 #${sb.storyboardNumber} 已标记为纯画面镜头，没有旁白可配音`)
 
   const text = (sb.narrationText || '').trim()
@@ -343,18 +331,31 @@ export interface VoicePlanItem {
 async function planVoiceBatch(ep: EpisodeRow, desired: VoiceParams, config: AIConfig, storyboardIds?: number[]) {
   const configSettings = parseTtsSettings(config.settings)
   const documentary = resolveDramaProjectType(ep.dramaId) === 'documentary'
+  // 纪录片批量配音的唯一前置（#70）：当前骨架已确认。预览与执行共用同一句原因文案。
+  let skeletonGate: string | null = null
+  if (documentary) {
+    try {
+      await requireConfirmedSkeleton(ep.id)
+    } catch (err) {
+      skeletonGate = err instanceof Error ? err.message : '旁白骨架尚未确认'
+    }
+  }
   const sbs = (await db.select().from(schema.storyboards)
     .where(eq(schema.storyboards.episodeId, ep.id))
     .orderBy(schema.storyboards.storyboardNumber))
     .filter(sb => !sb.deletedAt)
     .filter(sb => storyboardIds === undefined || storyboardIds.includes(sb.id))
+  // 文件级事实（#70）：元数据对得上但音频文件丢失/读不出时长的镜头必须重配，
+  // 不能按「未变化」跳过——制作门禁认的是文件实测，预览与执行必须用同一份口径。
+  const validity = await episodeTtsValidity(ep.id, { rows: sbs, episode: ep })
   return sbs.map((sb) => {
     const meta = parseNarrationMeta(sb.narrationMeta)
     const text = sb.narrationText || ''
     const shotParams: VoiceParams = { ...desired, normalize: resolveNarrationNormalize(desired.normalize, sb.narrationNormalize) }
     const gate = ep.narrationEnabled !== true ? '本集未开启旁白，无法生成配音'
-      : documentary && (!sb.combo || sb.designCardStatus !== 'confirmed') ? '设计卡未确认' : null
-    const status = classifyVoiceShot({
+      : skeletonGate
+    const fileBroken = validity.get(sb.id)?.reason
+    const classified = classifyVoiceShot({
       narrationEnabled: sb.narrationEnabled !== false,
       text,
       // 字数超单段上限、发音标记写错的镜头不浪费一次 GPU 合成；
@@ -364,14 +365,20 @@ async function planVoiceBatch(ep: EpisodeRow, desired: VoiceParams, config: AICo
       desired: shotParams,
       configSettings,
     })
+    const broken = classified === 'unchanged'
+      && (fileBroken === 'audio_file_missing' || fileBroken === 'duration_invalid' || fileBroken === 'audio_no_stream')
+    const status = broken ? 'changed' : classified
     const item: VoicePlanItem = {
       storyboard_id: sb.id,
       storyboard_number: sb.storyboardNumber,
       status,
       selectable: status === 'missing' || status === 'changed' || status === 'unchanged',
       checked: status === 'missing' || status === 'changed',
-      reason: gate || (status === 'unchanged' ? 'unchanged' : status === 'skipped' ? '旁白已禁用、为空或格式不符合配音要求' : undefined),
-      audio_seconds: meta.audio?.duration_ms ? meta.audio.duration_ms / 1000 : estimateNarrationSeconds(text),
+      reason: gate
+        || (broken ? '配音文件已丢失或读不出时长，需要重配' : undefined)
+        || (status === 'unchanged' ? 'unchanged' : status === 'skipped' ? '旁白已禁用、为空或格式不符合配音要求' : undefined),
+      // 实测秒数只认文件；文件不可用时退回字数估算（仅用于预览展示）
+      audio_seconds: validity.get(sb.id)?.duration_s ?? estimateNarrationSeconds(text),
     }
     return { item, params: shotParams }
   })
@@ -401,6 +408,8 @@ export async function startVoiceBatch(
 
   const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId))
   if (!ep || ep.narrationEnabled !== true) throw new Error('本集未开启旁白，无法生成配音')
+  // 纪录片批量配音的硬前置（#70）：当前骨架必须是已确认状态
+  if (resolveDramaProjectType(ep.dramaId) === 'documentary') await requireConfirmedSkeleton(episodeId)
 
   const config = await resolveTtsConfig(ep)
   let desired: VoiceParams

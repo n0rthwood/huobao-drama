@@ -281,8 +281,8 @@ test('the documentary split assigns narration verbatim and rejects rewritten or 
   assert.equal(result.rewrittenRejected.length, 1)
   assert.equal(result.rewrittenRejected[0].shot_number, 3)
   assert.match(result.rewrittenRejected[0].reason, /verbatim/)
+  // 改写过的旁白字段留空（骨架阶段不再保存画面字段，#70：画面属于实测设计卡阶段）
   assert.equal(result.afterRewrite[2].text, null)
-  assert.equal(result.afterRewrite[2].desc, '队列行进')
   // 原样重存后通过，整集旁白拼接 = 剧本正文（去空白、去节拍标记后逐字一致）
   assert.deepEqual(result.fixedRejected, [])
   assert.equal(result.coverage.covered_chars, result.scriptChars)

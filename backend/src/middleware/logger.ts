@@ -1,4 +1,6 @@
 import { GateBlockedError } from '../services/workflow-gates.js'
+import { TtsRequiredError } from '../services/narration-tts-gate.js'
+import { SkeletonNotConfirmedError } from '../services/narration-skeleton.js'
 import type { MiddlewareHandler } from 'hono'
 
 const colors = {
@@ -62,7 +64,7 @@ export const errorHandler: MiddlewareHandler = async (c, next) => {
   try {
     await next()
   } catch (err: any) {
-    if (err instanceof GateBlockedError) throw err
+    if (err instanceof GateBlockedError || err instanceof TtsRequiredError || err instanceof SkeletonNotConfirmedError) throw err
     const status = err.status || 500
     console.error(`${colors.red}[ERROR]${colors.reset} ${c.req.method} ${c.req.path}`)
     console.error(err.stack || err.message || err)
