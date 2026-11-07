@@ -72,6 +72,15 @@
           </section>
         </div>
 
+        <!-- ===== 资料检索 API key（#78） ===== -->
+        <div v-if="tab === 'research'" class="settings-scroll">
+          <div class="settings-head">
+            <h2 class="settings-title">{{ t('settings.research.title') }}</h2>
+            <p class="settings-desc">{{ t('settings.research.desc') }}</p>
+          </div>
+          <ResearchSourcesSettings />
+        </div>
+
         <!-- ===== AI 服务配置 ===== -->
         <div v-if="tab === 'ai'" class="settings-scroll">
           <div class="settings-head">
@@ -744,8 +753,9 @@
 </template>
 
 <script setup>
-import { Plus, Pencil, Trash2, FileText, ChevronDown, Check, Loader2, Bot, Cpu, Sparkles, Palette, ExternalLink, Star, HardDrive, Database, RefreshCw, Download, Languages, SunMoon, X } from 'lucide-vue-next'
+import { Plus, Pencil, Trash2, FileText, ChevronDown, Check, Loader2, Bot, Cpu, Sparkles, Palette, ExternalLink, Star, HardDrive, Database, RefreshCw, Download, Languages, SunMoon, X, Library } from 'lucide-vue-next'
 import BaseSelect from '~/components/BaseSelect.vue'
+import ResearchSourcesSettings from '~/components/ResearchSourcesSettings.vue'
 import { toast } from 'vue-sonner'
 import { toastError } from '~/composables/useToast'
 import { useI18n } from 'vue-i18n'
@@ -762,12 +772,13 @@ const { t, locale } = useI18n()
 const showBrandImage = ref(true)
 const route = useRoute()
 const { replaceQuery } = useQuerySync()
-// 设置页 deeplink：?tab=ai|general|styles|agents|storage|about（非法值静默回退 ai）
-const SETTINGS_TABS = ['ai', 'general', 'styles', 'agents', 'storage', 'about']
+// 设置页 deeplink：?tab=ai|general|research|styles|agents|storage|about（非法值静默回退 ai）
+const SETTINGS_TABS = ['ai', 'general', 'research', 'styles', 'agents', 'storage', 'about']
 const tab = ref(queryEnum(route.query.tab, SETTINGS_TABS) || 'ai')
 const baseTabs = computed(() => [
   { id: 'ai', label: t('settings.tabs.ai'), icon: Cpu },
   { id: 'general', label: t('settings.tabs.general'), icon: Languages },
+  { id: 'research', label: t('settings.tabs.research'), icon: Library },
   { id: 'styles', label: t('settings.tabs.styles'), icon: Palette },
   { id: 'agents', label: t('settings.tabs.agents'), icon: Bot },
   { id: 'storage', label: t('settings.tabs.storage'), icon: HardDrive },

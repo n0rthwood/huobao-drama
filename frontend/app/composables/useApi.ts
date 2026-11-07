@@ -1476,9 +1476,23 @@ export const layerSegmentAPI = {
     `${apiBase()}/layer-segments/storyboards/${storyboardId}/junction${bust ? `?v=${bust}` : ''}`,
 }
 
+export interface ResearchSourceView {
+  id: string
+  name: string
+  apply_url: string
+  configured: boolean
+  /** 末 4 位；key 短于 12 位时为空串；未配置为 null */
+  key_hint: string | null
+}
+export interface ResearchKeyTestResult { ok: boolean; status: number | null; count: number | null; message: string | null }
+
 export const settingsAPI = {
   contentLanguage: () => api.get<{ language: string }>('/settings/content-language'),
   setContentLanguage: (language: string) => api.put('/settings/content-language', { language }),
+  // 资料检索 API key（#78）：服务端只回末 4 位提示，完整 key 不会回到前端
+  researchSources: () => api.get<{ sources: ResearchSourceView[] }>('/settings/research-sources'),
+  setResearchKey: (id: string, apiKey: string | null) => api.put<ResearchSourceView>(`/settings/research-sources/${id}`, { api_key: apiKey }),
+  testResearchKey: (id: string, apiKey?: string) => api.post<ResearchKeyTestResult>(`/settings/research-sources/${id}/test`, apiKey ? { api_key: apiKey } : {}),
 }
 
 // ===== 分阶段改写（#70，纪录片）：运行是可变执行状态，版本是不可变文本 =====

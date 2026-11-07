@@ -544,7 +544,41 @@
       "styles": "风格预设",
       "storage": "存储位置",
       "about": "关于更新",
-      "agents": "Agent 配置"
+      "agents": "Agent 配置",
+      "research": "资料检索"
+    },
+    "research": {
+      "title": "资料检索",
+      "desc": "资产精确制作检索权威资料（博物馆、档案馆、学术资源）时使用的 API key。key 只保存在本机数据库，保存后不可再查看完整内容。",
+      "configured": "已配置",
+      "configuredHint": "已配置 · ··{hint}",
+      "notConfigured": "未配置",
+      "apply": "申请 key",
+      "keyLabel": "{name} API key",
+      "keyPlaceholder": "粘贴 API key",
+      "replacePlaceholder": "输入新 key 以替换当前 key",
+      "show": "显示 key",
+      "hide": "隐藏 key",
+      "test": "测试连接",
+      "testDraft": "测试输入的 key",
+      "save": "保存",
+      "clear": "清除",
+      "saved": "{name} 的 API key 已保存",
+      "cleared": "{name} 的 API key 已清除",
+      "testOk": "连接成功，测试查询返回 {count} 条结果",
+      "testFail": "连接失败：{reason}",
+      "loadFailed": "加载资料检索配置失败",
+      "securityNote": "完整 key 不会在页面、接口响应或日志中显示；需要更换时直接输入新 key 保存即可。",
+      "sources": {
+        "europeana": {
+          "desc": "欧盟文化遗产平台，汇集欧洲数千家博物馆、图书馆、档案馆的数字化藏品，每条记录带许可信息。",
+          "use": "用于检索欧洲收藏的中国题材图像、版画、地图与器物（如鸦片战争时期资料）。"
+        },
+        "smithsonian": {
+          "desc": "美国史密森尼学会开放数据，覆盖旗下 19 个博物馆的藏品，大量图像为 CC0 公有领域。key 由 api.data.gov 发放。",
+          "use": "用于检索亚洲艺术馆等收藏的明清器物、印章、铜器实物照片，作为形制参考。"
+        }
+      }
     },
     "common": {
       "disabled": "已停用",
