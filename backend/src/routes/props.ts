@@ -24,7 +24,7 @@ import {
 } from '../services/asset-semantics.js'
 import { getSemanticsAutoStatus, startSemanticsAuto } from '../services/asset-semantics-auto.js'
 import { resolveStageModel, StageVisionUnavailableError } from '../services/ai-stages.js'
-import { bindCreatedAssetToReviewItem, onAssetLibraryChanged, onAssetRemoved, onEpisodeAssetLinkChanged } from '../services/asset-review.js'
+import { bindCreatedAssetToReviewItem, findReviewItemAssetDuplicate, onAssetLibraryChanged, onAssetRemoved, onEpisodeAssetLinkChanged } from '../services/asset-review.js'
 import { MapSpecValidationError, normalizeMapSpec, parseMapSpec } from '../services/map-base-render.js'
 import { renderAndRegisterMapBase, suggestMapPlaces } from '../services/asset-pipeline/map-asset.js'
 import { getAbsolutePath } from '../utils/storage.js'
@@ -46,6 +46,10 @@ app.post('/', async (c) => {
   if (!body.drama_id) return badRequest(c, 'drama_id 必填')
   const name = normalizeAssetName(body.name)
   if (!name) return badRequest(c, EMPTY_ASSET_NAME_MESSAGE)
+  if (Number.isInteger(Number(body.asset_review_item_id)) && Number(body.asset_review_item_id) > 0) {
+    const candidate = findReviewItemAssetDuplicate(Number(body.asset_review_item_id), 'prop', name)
+    if (candidate) return c.json({ code: 409, error: 'duplicate_asset', message: '本集已有同名资产', candidate }, 409)
+  }
   const ts = now()
   const res = await db.insert(schema.props).values({
     name,

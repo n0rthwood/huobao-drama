@@ -283,6 +283,14 @@ export async function finishTextTask(
     .where(eq(schema.sysTask.id, id))
 }
 
+/** Cancel a text task without recording it as a successful output. */
+export async function cancelTextTask(id: number, reason: string): Promise<void> {
+  const ts = now()
+  await db.update(schema.sysTask)
+    .set({ status: 'cancelled', errorMsg: reason, completedAt: ts, updatedAt: ts })
+    .where(and(eq(schema.sysTask.id, id), inArray(schema.sysTask.status, ACTIVE_TASK_STATUSES)))
+}
+
 /** 该集该类型是否有正在运行的文本任务（取代原来的内存 Map 判重） */
 export async function findActiveTextTask(episodeId: number, kind: TextTaskKind, excludeId?: number): Promise<SysTaskRow | null> {
   const rows = await db.select().from(schema.sysTask).where(and(

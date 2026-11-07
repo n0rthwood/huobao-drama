@@ -14,7 +14,7 @@ import { EMPTY_ASSET_NAME_MESSAGE, normalizeAssetName } from '../services/asset-
 import { promptSourceChanged } from '../services/asset-prompt-invalidation.js'
 import { mountReExtractRoute } from './asset-reextract.js'
 import { toSnakeCase } from '../utils/transform.js'
-import { bindCreatedAssetToReviewItem, onAssetRemoved, onEpisodeAssetLinkChanged } from '../services/asset-review.js'
+import { bindCreatedAssetToReviewItem, findReviewItemAssetDuplicate, onAssetRemoved, onEpisodeAssetLinkChanged } from '../services/asset-review.js'
 
 const app = new Hono()
 
@@ -29,6 +29,10 @@ app.post('/', async (c) => {
   if (!body.drama_id) return badRequest(c, 'drama_id 必填')
   const location = normalizeAssetName(body.location)
   if (!location) return badRequest(c, EMPTY_ASSET_NAME_MESSAGE)
+  if (Number.isInteger(Number(body.asset_review_item_id)) && Number(body.asset_review_item_id) > 0) {
+    const candidate = findReviewItemAssetDuplicate(Number(body.asset_review_item_id), 'scene', location)
+    if (candidate) return c.json({ code: 409, error: 'duplicate_asset', message: '本集已有同名资产', candidate }, 409)
+  }
   const ts = now()
   const res = await db.insert(schema.scenes).values({
     dramaId: body.drama_id,

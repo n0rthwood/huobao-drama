@@ -16,7 +16,7 @@ import { planFinalPromptWrite, promptSourceChanged } from '../services/asset-pro
 import { mountReExtractRoute } from './asset-reextract.js'
 import { addArchivalImage, removeArchivalImage } from '../services/archival-images.js'
 import { getPortraitAppearanceStatus, startPortraitAppearance, type StartPortraitAppearanceResult } from '../services/portrait-appearance.js'
-import { bindCreatedAssetToReviewItem, onAssetRemoved, onEpisodeAssetLinkChanged } from '../services/asset-review.js'
+import { bindCreatedAssetToReviewItem, findReviewItemAssetDuplicate, onAssetRemoved, onEpisodeAssetLinkChanged } from '../services/asset-review.js'
 import { StageVisionUnavailableError } from '../services/ai-stages.js'
 
 const app = new Hono()
@@ -98,6 +98,10 @@ app.post('/', async (c) => {
   if (!body.drama_id) return badRequest(c, 'drama_id 必填')
   const name = normalizeAssetName(body.name)
   if (!name) return badRequest(c, EMPTY_ASSET_NAME_MESSAGE)
+  if (Number.isInteger(Number(body.asset_review_item_id)) && Number(body.asset_review_item_id) > 0) {
+    const candidate = findReviewItemAssetDuplicate(Number(body.asset_review_item_id), 'character', name)
+    if (candidate) return c.json({ code: 409, error: 'duplicate_asset', message: '本集已有同名资产', candidate }, 409)
+  }
   const ts = now()
   const res = await db.insert(schema.characters).values({
     name,
