@@ -265,8 +265,10 @@ import {
 const props = defineProps({
   task: { type: Object, required: true },
   reviewMode: { type: Boolean, default: false },
+  // 全屏正文视图：由宿主（任务中心面板）经 URL 同步（Issue #86 tfull）
+  fullView: { type: Boolean, default: false },
 })
-const emit = defineEmits(['close', 'changed'])
+const emit = defineEmits(['close', 'changed', 'update:fullView'])
 
 const { t } = useI18n()
 const now = useNowTicker()
@@ -394,7 +396,7 @@ async function copyError() {
 // ===== 思考过程（仅文本任务，Issue #19） =====
 const reasoning = ref({ chars: 0, text: '', offset: 0 })
 const thinkingOpen = ref(isActiveTaskStatus(props.task.status))
-const fullView = ref(false)
+const fullView = ref(Boolean(props.fullView))
 const followTail = ref(true)
 const thinkingEl = ref(null)
 let reasoningTimer = null
@@ -456,6 +458,23 @@ function stopReasoningPolling() {
   if (reasoningTimer) { clearInterval(reasoningTimer); reasoningTimer = null }
 }
 
+// 全屏正文视图与宿主双向同步（Issue #86）：宿主负责把它写进 URL
+watch(() => props.fullView, (open) => { if (open !== fullView.value) fullView.value = open })
+watch(fullView, (open) => {
+  emit('update:fullView', open)
+  // 非文本任务没有这个视图：链接里带了也要回落
+  if (open && live.value.type !== 'text') fullView.value = false
+})
+
+/** 从链接恢复全屏正文：展开思考块并按总字数取回全文（只读，不触发任何写操作） */
+async function restoreFullView() {
+  if (!fullView.value) return
+  if (live.value.type !== 'text') { fullView.value = false; return }
+  thinkingOpen.value = true
+  await fetchReasoning()
+  await loadFullReasoning()
+}
+
 onMounted(startReasoningPolling)
 onBeforeUnmount(() => {
   stopReasoningPolling()
@@ -497,6 +516,7 @@ onMounted(() => {
     void fetchReasoning()
     void fetchDetail()
   }
+  void restoreFullView()
 })
 
 function askRetry() {

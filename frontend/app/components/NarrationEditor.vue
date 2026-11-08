@@ -248,6 +248,7 @@ import {
   spokenText,
   toneMarker,
 } from '~/utils/narrationMarkup'
+import { DEEPLINK_KEYS, querySingle, useDeeplink } from '~/composables/useQuerySync'
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
@@ -255,6 +256,8 @@ const props = defineProps({
   placeholder: { type: String, default: '' },
   rows: { type: Number, default: 4 },
   disabled: { type: Boolean, default: false },
+  // deeplink（#86）：同一集会有多个编辑器实例，用所属分镜 id 区分；为 0 时不发布也不恢复
+  deeplinkId: { type: Number, default: 0 },
 })
 const emit = defineEmits(['input', 'commit'])
 const { t } = useI18n()
@@ -533,6 +536,14 @@ function confirmPause() {
 
 // ---------- 多音字检查：列出正文（未注音部分）里所有多音字 ----------
 const check = reactive({ open: false, loading: false, items: [] })
+// deeplink（#86）：多音字检查弹窗 nedlg=check:<分镜 id>。openCheck 只读本地词表与当前正文，没有任何业务写入，
+// 可以安全恢复；注音/声调/停顿三个弹窗依附未保存正文里的光标选区，恢复后会指到错误字符，故不入 URL。
+const link = useDeeplink('narration', DEEPLINK_KEYS.narration.filter(key => key === 'nedlg'))
+const urlCheck = querySingle(link.initial('nedlg'))
+watch(() => check.open, open => link.set({
+  nedlg: open && props.deeplinkId > 0 ? `check:${props.deeplinkId}` : '',
+}), { immediate: true })
+if (props.deeplinkId > 0 && urlCheck === `check:${props.deeplinkId}`) void openCheck()
 async function openCheck() {
   check.open = true
   check.loading = true

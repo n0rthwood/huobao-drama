@@ -141,6 +141,8 @@ import { useI18n } from 'vue-i18n'
 import { mediaLibraryAPI } from '~/composables/useApi'
 import { toastError } from '~/composables/useToast'
 import MediaTime from '~/components/MediaTime.vue'
+import { toast } from 'vue-sonner'
+import { DEEPLINK_KEYS, querySingle, useDeeplink } from '~/composables/useQuerySync'
 
 const { t } = useI18n()
 
@@ -173,6 +175,72 @@ const page = ref(1)
 const selected = ref([])
 const selectedDetails = ref({})
 const preview = ref(null)
+
+/**
+ * URL 子状态（Issue #86）：弹窗由宿主用 open 控制，所以这里只在 open 时发布自己的键，
+ * 关闭即移除、宿主的键原样保留。多选 selected 是未保存的挑选结果：不进 URL，更不会自动确认。
+ * 左树节点用 `<dramaId>:<episodeId|u|->:<kind|->:<ownerId|->:<slot|->` 编码（缺省段写 `-`），
+ * 页码与大图都挂在这个节点下：没有它，跨项目/下钻的链接会定位到另一份清单并误报素材缺失。
+ * 大图预览用素材的稳定身份 path 记录，不写临时 URL。
+ */
+const link = useDeeplink('mediaLib', DEEPLINK_KEYS.mediaLib)
+const urlPage = Number(querySingle(link.initial('libpage')) || 0)
+let pendingPage = Number.isInteger(urlPage) && urlPage > 1 ? urlPage : 0
+let pendingPreview = querySingle(link.initial('libview')) || ''
+let pendingNode = parseNodeKey(querySingle(link.initial('libnode')))
+
+/** 节点 → 紧凑键；没有选中项目时返回空串（不写键） */
+function nodeKey(current) {
+  if (!current?.dramaId) return ''
+  const episode = current.episodeId === 'unassigned' ? 'u' : (current.episodeId ?? '-')
+  return [current.dramaId, episode, current.kind || '-', current.ownerId || '-', current.slot || '-']
+    .map(part => (part === null || part === undefined || part === '' ? '-' : String(part)))
+    .join(':')
+}
+
+/** 紧凑键 → 节点；格式非法返回 null（调用方回落宿主默认节点） */
+function parseNodeKey(value) {
+  const parts = String(value || '').split(':')
+  const dramaId = Number(parts[0] || 0)
+  if (parts.length !== 5 || !Number.isInteger(dramaId) || dramaId <= 0) return null
+  const [, episode, kind, owner, slot] = parts
+  const next = { dramaId }
+  if (episode === 'u') next.episodeId = 'unassigned'
+  else if (episode !== '-' && Number(episode) > 0) next.episodeId = Number(episode)
+  if (kind !== '-') next.kind = kind
+  if (owner !== '-' && Number(owner) > 0) next.ownerId = Number(owner)
+  if (slot !== '-') next.slot = slot
+  return next
+}
+
+/** 还没打开过就不发布：否则会在宿主把弹窗打开、恢复发生之前把链接里的初始值清掉 */
+let published = false
+function publishLink() {
+  if (!props.open && !published) return
+  published = props.open
+  link.set({
+    libnode: props.open ? nodeKey(node.value) : '',
+    libpage: props.open && page.value > 1 ? page.value : '',
+    libview: props.open && preview.value ? preview.value.path : '',
+  })
+}
+
+/** 链接恢复：页码越界或预览素材已不在当前节点，就清掉自己的键 + 提示，留在素材库这一层 */
+function restoreFromLink(wantPage, wantPreview) {
+  if (!props.open) return
+  let missed = false
+  if (wantPage > 1 && wantPage > totalPages.value) {
+    page.value = 1
+    missed = true
+    loadImages()
+  } else if (wantPreview) {
+    const hit = images.value.find(image => image.path === wantPreview)
+    if (hit) preview.value = hit
+    else missed = true
+  }
+  if (missed) toast.warning(t('deeplink.missingNamed', { target: t('components.mediaLibrary.title') }))
+  publishLink()
+}
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / PAGE_SIZE)))
 
@@ -296,23 +364,41 @@ function confirm() {
 watch(() => props.open, async (isOpen) => {
   if (!isOpen) {
     preview.value = null
+    publishLink()
     return
   }
   selected.value = []
   selectedDetails.value = {}
-  page.value = 1
+  // 链接里的节点/页码/预览只在打开时消费一次：之后下钻、翻页、关大图都以用户操作为准
+  const wantNode = pendingNode
+  const wantPage = pendingPage
+  const wantPreview = pendingPreview
+  pendingNode = null
+  pendingPage = 0
+  pendingPreview = ''
+  page.value = wantPage > 1 ? wantPage : 1
   const focus = Number(props.dramaId) || 0
   await loadDramas()
-  const target = focus || dramas.value[0]?.id || 0
+  // 链接里的节点优先于宿主默认项目：没有它，跨项目链接会落到另一份清单
+  const wantDrama = wantNode?.dramaId || 0
+  const nodeDramaExists = wantDrama ? dramas.value.some(item => item.id === wantDrama) : false
+  const target = (nodeDramaExists ? wantDrama : 0) || focus || dramas.value[0]?.id || 0
   if (target) {
     expanded.value = target
-    node.value = { dramaId: target }
+    node.value = nodeDramaExists ? { ...wantNode } : { dramaId: target }
     await Promise.all([loadTree(target), loadImages()])
   } else {
     images.value = []
     total.value = 0
   }
+  if (wantDrama && !nodeDramaExists) {
+    toast.warning(t('deeplink.missingNamed', { target: t('components.mediaLibrary.title') }))
+  }
+  restoreFromLink(wantPage, wantPreview)
 }, { immediate: true })
+
+// 发布本层键：下钻、翻页与大图开关跟着用户操作走
+watch([() => props.open, node, page, preview], publishLink, { deep: true })
 </script>
 
 <style scoped>

@@ -140,6 +140,7 @@ import { assetLibraryAPI, episodeAPI } from '~/composables/useApi'
 import { thumbFallback, thumbOf } from '~/composables/useMedia'
 import { toastError } from '~/composables/useToast'
 import { isNameTaken, suggestUniqueName } from '~/utils/assetName'
+import { queryEnum, querySingle, useDeeplink } from '~/composables/useQuerySync'
 
 const { t } = useI18n()
 
@@ -158,8 +159,15 @@ const dramas = ref([])
 const items = ref([])
 const takenNames = ref({ character: [], scene: [], prop: [] })
 const activeDramaId = ref(0)
-const kind = ref('')
-const keyword = ref('')
+/**
+ * URL 子状态（Issue #86）：弹窗开关键 browser 由宿主发布，这里只管内部的类别页签与关键词；
+ * 勾选与改名是未保存的导入草稿，不进 URL、不恢复。
+ */
+const link = useDeeplink('assetBrowser', ['bkind', 'bq'])
+const kind = ref(queryEnum(link.initial('bkind'), ['character', 'scene', 'prop']) || '')
+const keyword = ref(querySingle(link.initial('bq')) || '')
+// 只在挂载期间发布；弹窗关闭 = 组件卸载，分组自动释放这两个键
+watch([kind, keyword], () => link.set({ bkind: kind.value, bq: keyword.value.trim() }))
 // key = `${kind}-${id}` → { item, name }
 const selected = ref({})
 

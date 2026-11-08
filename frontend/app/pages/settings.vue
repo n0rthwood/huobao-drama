@@ -766,15 +766,18 @@ import { useTheme } from '~/composables/useTheme'
 import { providerIconUrl } from '~/composables/useProviderIcon'
 import { startTour, autoTour } from '~/composables/useTour'
 import { confirmUnifiedLanguage } from '~/composables/useUnifiedLanguage'
+import { DEEPLINK_KEYS, deeplinkHydrate, queryEnum, useDeeplink } from '~/composables/useQuerySync'
 
 const { t, locale } = useI18n()
 
 const showBrandImage = ref(true)
-const route = useRoute()
-const { replaceQuery } = useQuerySync()
-// 设置页 deeplink：?tab=ai|general|research|styles|agents|storage|about（非法值静默回退 ai）
+// 设置页 deeplink（Issue #86）：页签组与弹窗组分开登记，关闭弹窗只移除弹窗键、页签位置不丢
+const link = useDeeplink('settings', DEEPLINK_KEYS.settings)
+const dialogLink = useDeeplink('settingsDialogs', DEEPLINK_KEYS.settingsDialogs)
+// ?tab=ai|general|research|styles|agents|storage|about（非法值静默回退 ai）
 const SETTINGS_TABS = ['ai', 'general', 'research', 'styles', 'agents', 'storage', 'about']
-const tab = ref(queryEnum(route.query.tab, SETTINGS_TABS) || 'ai')
+const SERVICE_TYPES = ['text', 'image', 'video', 'tts']
+const tab = ref(queryEnum(link.initial('tab'), SETTINGS_TABS) || 'ai')
 const baseTabs = computed(() => [
   { id: 'ai', label: t('settings.tabs.ai'), icon: Cpu },
   { id: 'general', label: t('settings.tabs.general'), icon: Languages },
@@ -1099,7 +1102,7 @@ async function loadTtsVoices() {
 
 // ===== Agent Configs =====
 const agentCfgs = ref([])
-const agentPane = ref(queryEnum(route.query.pane, ['prompt', 'skills']) || 'prompt')   // 右侧子 tab：prompt | skills
+const agentPane = ref(queryEnum(link.initial('pane'), ['prompt', 'skills']) || 'prompt')   // 右侧子 tab：prompt | skills
 const agentSaving = ref(false)
 const agentSaved = ref(null)
 const agentForm = reactive({ system_prompt: '' })
@@ -1165,7 +1168,7 @@ async function saveAgentCfg(type) {
 
 // ===== Skills =====
 // deeplink ?agent=：Agent 列表选择（白名单来自 agentDefs，非法值回退默认）
-const selectedAgent = ref(queryEnum(route.query.agent, agentDefs.value.map(d => d.type)) || 'script_rewriter')
+const selectedAgent = ref(queryEnum(link.initial('agent'), agentDefs.value.map(d => d.type)) || 'script_rewriter')
 const allSkills = ref([])   // { id, name, description }[]
 const editingSkill = ref(null)
 const skillContent = ref('')
@@ -1178,16 +1181,15 @@ const selectedAgentType = computed(() => selectedAgent.value)
 const selectedAgentLabel = computed(() => agentDefs.value.find(a => a.type === selectedAgent.value)?.label || '')
 const selectedAgentIcon = computed(() => agentDefs.value.find(a => a.type === selectedAgent.value)?.icon || '')
 
-// ===== 子状态 → URL 同步（replace：页签切换不进历史栈，返回键 = 离开设置页）=====
+// ===== 子状态 → URL 同步（deeplink 分组统一 replace：页签切换不进历史栈，返回键 = 离开设置页）=====
 // pane/agent 仅在 agents 页签下可见，只在此时写入，保持 URL 简洁
 watch([tab, agentPane, selectedAgent], () => {
-  const query = { tab: tab.value }
-  if (tab.value === 'agents') {
-    query.pane = agentPane.value
-    query.agent = selectedAgent.value
-  }
-  replaceQuery(query)
-})
+  link.set({
+    tab: tab.value,
+    pane: tab.value === 'agents' ? agentPane.value : '',
+    agent: tab.value === 'agents' ? selectedAgent.value : '',
+  })
+}, { immediate: true })
 
 // ===== 通用：AI 内容语言（全局设置，与界面语言相互独立） =====
 const contentLanguage = ref('zh')
@@ -1407,7 +1409,12 @@ async function saveStyle() {
   } catch (e) { toastError(e) }
 }
 
-onMounted(() => { loadCfgs(); loadAgents(); loadAllSkills(); loadAgentPrompt(selectedAgent.value); loadStylePresets() })
+// 各列表就绪后再恢复弹窗、开启 URL 写出（恢复只重建界面，不触发保存/迁移等写操作）
+onMounted(async () => {
+  await Promise.all([loadCfgs(), loadAgents(), loadAllSkills(), loadAgentPrompt(selectedAgent.value), loadStylePresets()])
+  await restoreSettingsDialogs()
+  deeplinkHydrate()
+})
 
 // ===== 应用内引导（设置页）：快捷配置 + 手动模板两步 =====
 const SETTINGS_TOUR = [
@@ -1427,6 +1434,63 @@ const migrateTarget = ref('')
 const migrateTargetFree = ref(null)
 const migrateFiles = ref(true)
 const migrating = ref(false)
+
+// ===== 弹窗 deeplink（Issue #86）：cfg / skill / style / migrate =====
+// 只恢复弹窗身份（能从实体 id 重建的部分），不回填草稿、不自动保存/迁移
+function deeplinkMissing(target) {
+  toast.warning(t('deeplink.missingNamed', { target }))
+}
+
+// 恢复期间用户已经自己打开了弹窗，就以用户操作为准
+async function restoreSettingsDialogs() {
+  const cfgRaw = dialogLink.initial('cfg') || ''
+  if (cfgRaw && !cfgDialog.value) {
+    if (cfgRaw === 'new' || cfgRaw.startsWith('new:')) {
+      // new:<service_type> 只记「点的是哪类服务的新增」，表单仍是该类型的空白预设
+      const type = cfgRaw.slice(4)
+      startAddCfg(SERVICE_TYPES.includes(type) ? type : 'text')
+    } else {
+      const c = cfgs.value.find(x => String(x.id) === cfgRaw)
+      if (c) startEditCfg(c)
+      else deeplinkMissing(t('settings.tabs.ai'))
+    }
+  }
+
+  const styleRaw = dialogLink.initial('style') || ''
+  if (styleRaw && !styleDialog.value) {
+    if (styleRaw === 'new') startAddStyle()
+    else {
+      const p = stylePresets.value.find(x => String(x.id) === styleRaw)
+      if (p) startEditStyle(p)
+      else deeplinkMissing(t('settings.tabs.styles'))
+    }
+  }
+
+  const skillRaw = dialogLink.initial('skill') || ''
+  if (skillRaw && !addSkillDialog.value && !editingSkill.value) {
+    if (skillRaw === 'new') addSkillDialog.value = true
+    else if (allSkills.value.some(s => s.id === skillRaw)) {
+      // Skill 编辑器只在 Agent 页签的 Skills 面板里：先补齐宿主上下文再展开
+      const owner = agentDefs.value.find(a => skillBelongsTo(skillRaw, a.type))
+      if (owner && owner.type !== selectedAgent.value) await selectAgent(owner.type)
+      agentPane.value = 'skills'
+      await toggleSkillEdit(skillRaw)
+    } else deeplinkMissing('Skill')
+  }
+
+  // 迁移弹窗只恢复外壳：目标目录与「同时搬运文件」不进 URL，仍须重新选目录（无目标时 startMigrate 直接返回）
+  if (dialogLink.initial('migrate') === '1' && !migrateDialog.value) migrateDialog.value = true
+}
+
+// 发布：关闭弹窗只移除自己的键，tab/pane/agent 保持不动
+watch([cfgDialog, cfgEditId, () => cfgForm.service_type, editingSkill, addSkillDialog, styleDialog, styleEditId, migrateDialog], () => {
+  dialogLink.set({
+    cfg: cfgDialog.value ? (cfgEditId.value ? String(cfgEditId.value) : `new:${cfgForm.service_type}`) : '',
+    skill: editingSkill.value || (addSkillDialog.value ? 'new' : ''),
+    style: styleDialog.value ? (styleEditId.value ? String(styleEditId.value) : 'new') : '',
+    migrate: migrateDialog.value ? '1' : '',
+  })
+}, { immediate: true })
 
 const isDesktopMode = computed(() => storageInfo.value?.mode === 'desktop' && !!desktopBridge)
 

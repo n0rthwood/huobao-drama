@@ -116,6 +116,7 @@ import { Loader2, Lock, X } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { thumbOf } from '~/composables/useMedia'
 import { serverMessage } from '~/composables/useToast'
+import { DEEPLINK_KEYS, queryEnum, querySingle, useDeeplink } from '~/composables/useQuerySync'
 
 const { t } = useI18n()
 
@@ -127,11 +128,20 @@ const props = defineProps({
   items: { type: Array, default: () => [] },
   // (asset, selected) => Promise：单项持久化，失败时抛错（错误文案就地展示）
   submit: { type: Function, default: async () => {} },
+  // 是否把筛选写进 URL（#86）：嵌入模式的关键帧编辑器不持有 pool 父键，这里也就不发布
+  deeplink: { type: Boolean, default: true },
 })
 const emit = defineEmits(['close'])
 
-const kind = ref('')
-const keyword = ref('')
+// deeplink（#86）：弹窗内部的类型栏与关键词（取自 keyframes 登记表的子键）；关闭即卸载 → 两个键自动随 pool 一起消失
+const POOL_KEYS = DEEPLINK_KEYS.keyframes.filter(key => key === 'poolkind' || key === 'poolq')
+const link = props.deeplink ? useDeeplink('pool', POOL_KEYS) : null
+const kind = ref(queryEnum(link?.initial('poolkind'), ['character', 'scene', 'prop']) || '')
+const keyword = ref(querySingle(link?.initial('poolq')) || '')
+watch([kind, keyword], () => {
+  link?.set({ poolkind: kind.value, poolq: keyword.value.trim() })
+}, { immediate: true })
+
 const busy = ref({})
 const errors = ref({})
 

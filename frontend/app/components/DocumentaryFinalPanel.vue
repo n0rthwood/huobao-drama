@@ -1,5 +1,5 @@
 <script setup>
-import { computed, inject, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { api, episodeAPI } from '~/composables/useApi'
 import { toastError } from '~/composables/useToast'
@@ -7,6 +7,8 @@ import { WORKBENCH_CTX } from '~/utils/workbenchSteps'
 import { batchScopeOf } from '~/utils/documentaryFinal'
 import DocumentaryFinalShot from '~/components/DocumentaryFinalShot.vue'
 import BatchScopeDialog from '~/components/BatchScopeDialog.vue'
+import { toast } from 'vue-sonner'
+import { DEEPLINK_KEYS, deeplinkInitial, queryIdList, querySingle, useDeeplink } from '~/composables/useQuerySync'
 const ctx = inject(WORKBENCH_CTX)
 const { t } = useI18n()
 const kinds = ['voice', 'layer', 'video', 'compose']
@@ -24,6 +26,34 @@ const episodeId = computed(() => ctx.episode.value?.id)
 const shots = computed(() => ctx.sbs.value || [])
 const scopeIds = computed(() => selectMode.value ? [...selected.value] : undefined)
 const failedCount = computed(() => kinds.reduce((n, kind) => n + (statuses.value[kind]?.items || []).filter(item => item.state === 'failed' || item.status === 'failed').length, 0))
+// deeplink（#86）：多选上下文（sel）。本面板没有「单选分镜」概念，shot 始终发布空值；
+// 批量范围弹窗（BatchScopeDialog）携带服务端 preview 返回的范围载荷与 retry 标记，恢复会变成一次隐式后端调用，故不恢复。
+const link = useDeeplink('finalPanel', DEEPLINK_KEYS.finalPanel)
+const urlSel = querySingle(link.initial('sel'))
+const urlRehearse = Number(querySingle(link.initial('rehearse')) || 0)
+// 单镜配音弹窗的键属于 NarrationBlock 分组，这里只读初值做「分镜不存在」的提示
+const urlVoice = Number(querySingle(deeplinkInitial('voice')) || 0)
+// 多音字检查弹窗 nedlg=check:<分镜 id>（NarrationEditor 分组），同样只做存在性提示
+const urlCheck = Number(/^check:(\d+)$/.exec(querySingle(deeplinkInitial('nedlg')) || '')?.[1] || 0)
+let selRestored = false
+watch(shots, list => {
+  if (selRestored || !list.length) return
+  selRestored = true
+  // 预演弹窗由对应分镜组件自行恢复，这里只负责「分镜已不存在」的提示
+  if (urlRehearse > 0 && !list.some(shot => shot.id === urlRehearse)) toast.warning(t('deeplink.missingNamed', { target: `#${urlRehearse}` }))
+  if (urlVoice > 0 && !list.some(shot => shot.id === urlVoice)) toast.warning(t('deeplink.missingNamed', { target: `#${urlVoice}` }))
+  if (urlCheck > 0 && !list.some(shot => shot.id === urlCheck)) toast.warning(t('deeplink.missingNamed', { target: `#${urlCheck}` }))
+  if (!urlSel) return
+  selectMode.value = true
+  const ids = queryIdList(urlSel)
+  const alive = ids.filter(id => list.some(shot => shot.id === id))
+  selected.value = alive
+  if (alive.length < ids.length) toast.warning(t('deeplink.missing'))
+}, { immediate: true })
+watch([selectMode, selected], () => link.set({
+  shot: '',
+  sel: selectMode.value ? (selected.value.join(',') || 'on') : '',
+}), { deep: true, immediate: true })
 function rowsOf(result) { return Array.isArray(result) ? result : result?.items || [] }
 async function preview(kind, retryOnly = false) {
   if (!episodeId.value) return

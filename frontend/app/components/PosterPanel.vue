@@ -230,6 +230,7 @@ import { mediaUrl } from '~/utils/url'
 import { toastError, toastServerMessage } from '~/composables/useToast'
 import PosterLayerEditor from '~/components/PosterLayerEditor.vue'
 import PosterReferencePicker from '~/components/PosterReferencePicker.vue'
+import { DEEPLINK_KEYS, querySingle, useDeeplink } from '~/composables/useQuerySync'
 
 const props = defineProps({
   episodeId: { type: Number, required: true },
@@ -254,6 +255,12 @@ const editorRef = ref(null)
 let saveTimer = null
 let unsubscribe = null
 let saveChain = Promise.resolve()
+
+// deeplink（#86）：参考图选择器开关 + 选中的合成版本；冲突覆盖弹窗是保存期冲突载荷，不恢复
+const link = useDeeplink('poster', DEEPLINK_KEYS.poster)
+const urlPickerOpen = querySingle(link.initial('posterpick')) === '1'
+const urlVersionId = Number(querySingle(link.initial('posterver')) || 0)
+let deeplinkRestored = false
 
 const variables = computed(() => poster.value?.variables || { project_title: '', episode_title: '', episode_no: '' })
 const copy = computed(() => poster.value?.copy || { title: '', subtitle: '', era: '', place: '', notes: [] })
@@ -291,12 +298,29 @@ async function load() {
   loading.value = true
   try {
     applyPoster(await posterAPI.get(props.episodeId))
+    restoreDeeplink()
   } catch (err) {
     toastError(err)
   } finally {
     loading.value = false
   }
 }
+
+/** 首次数据就绪后恢复 URL 子状态：目标版本不存在只提示并退回默认版本，不改任何数据 */
+function restoreDeeplink() {
+  if (deeplinkRestored) return
+  deeplinkRestored = true
+  if (urlVersionId > 0) {
+    if (compositeVersions.value.some(version => version.id === urlVersionId)) compositeVersionId.value = urlVersionId
+    else toast.warning(t('deeplink.missingNamed', { target: t('poster.versionLabel', { n: urlVersionId, time: '' }) }))
+  }
+  if (urlPickerOpen && poster.value) pickerOpen.value = true
+}
+
+watch([pickerOpen, compositeVersionId], () => link.set({
+  posterpick: pickerOpen.value ? '1' : '',
+  posterver: compositeVersionId.value || '',
+}), { immediate: true })
 
 function copyText(value) {
   return [value.title, value.subtitle, value.era, value.place, ...(value.notes || [])].filter(Boolean).join(' · ')

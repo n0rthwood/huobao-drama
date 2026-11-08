@@ -177,9 +177,11 @@
  */
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { toast } from 'vue-sonner'
 import { ChevronLeft, ShieldCheck, X } from 'lucide-vue-next'
 import { propAPI } from '~/composables/useApi'
 import { mediaUrl } from '~/utils/url'
+import { DEEPLINK_KEYS, queryEnum, querySingle, queryTypedId, useDeeplink } from '~/composables/useQuerySync'
 
 const { t } = useI18n()
 
@@ -192,9 +194,11 @@ const props = defineProps({
   // 已选条目：asset 模式是 AssetRef[]，semantic 模式是 SemanticRef[]
   selected: { type: Array, default: () => [] },
 })
-const emit = defineEmits(['close', 'confirm'])
+const emit = defineEmits(['close', 'confirm', 'goto-assets'])
 
 const TYPES = ['all', 'character', 'scene', 'prop', 'evidence', 'carrier']
+// 资产 deeplink 的类型前缀（drill=<kind>-<id>）：与资产详情弹窗同一口径
+const ASSET_KINDS = ['character', 'scene', 'prop']
 // 语义条目分组 → 可复用的图层类型文案（点/线/区域/标签）
 const GROUP_LAYER_TYPE = { point: 'marker', line: 'polyline', region: 'polygon', label: 'label' }
 const HOT_COLOR = '#ffb74d'
@@ -210,15 +214,29 @@ const geometry = ref(emptyGeometry())
 const geometryBase = ref('')
 const naturalSize = ref({ width: 0, height: 0 })
 
+// ===== deeplink（#86）：选择器内部状态（类型栏 / 关键词 / 下钻到的素材）也要能被链接复原 =====
+const link = useDeeplink('assetPicker', DEEPLINK_KEYS.picker)
+const urlType = queryEnum(link.initial('pktype'), TYPES)
+const urlKeyword = querySingle(link.initial('pkq'))
+const urlDrill = queryTypedId(link.initial('drill'), ASSET_KINDS)
+/** 链接给的内部状态只在「本次首次打开」消费一次，之后一律跟随用户操作 */
+let restorePending = Boolean(urlType || urlKeyword || urlDrill)
+
 function emptyGeometry() {
   return { image: { width: 0, height: 0 }, labels: [], points: [], regions: [], lines: [] }
 }
 
-/** 打开时按传入的已选值初始化，关闭不清空（父级每次打开都会重新传 selected） */
+/**
+ * 打开时按传入的已选值初始化，关闭不清空（父级每次打开都会重新传 selected）。
+ * 链接恢复只还原「看到哪里」，勾选内容仍只来自宿主已保存的值：
+ * 选了但没点确定的临时勾选是未保存草稿，不进 URL 也不恢复。
+ */
 watch(() => props.open, (open) => {
   if (!open) return
-  railType.value = 'all'
-  keyword.value = ''
+  const restore = restorePending
+  restorePending = false
+  railType.value = (restore && urlType) || 'all'
+  keyword.value = (restore && urlKeyword) || ''
   hoverId.value = ''
   drillAsset.value = null
   geometry.value = emptyGeometry()
@@ -230,7 +248,30 @@ watch(() => props.open, (open) => {
     pickedAssets.value = props.selected.map(item => ({ ...item }))
     pickedEntries.value = []
   }
+  // 下钻只在语义模式下存在；宿主素材清单可能晚到，到位后再判定一次
+  if (restore && urlDrill && props.mode === 'semantic' && !tryRestoreDrill()) {
+    const stop = watch(() => props.assets, () => { if (!props.open || tryRestoreDrill()) stop() })
+  }
 }, { immediate: true })
+
+/** 恢复下钻：只认宿主真实传进来的素材，找不到就留在列表层并提示一次 */
+function tryRestoreDrill() {
+  const asset = props.assets.find(item => item.kind === urlDrill.type && Number(item.id) === urlDrill.id)
+  if (asset) { openEntries(asset); return true }
+  if (!props.assets.length) return false
+  toast.error(t('deeplink.missingNamed', { target: t('designCard82.asset') }))
+  return true
+}
+
+// 发布：只在打开期间占用这三个键，关闭即移除（宿主层的键由宿主自己写，互不影响）
+watch([() => props.open, railType, keyword, drillAsset], () => {
+  if (!props.open) { link.set({}); return }
+  link.set({
+    pktype: railType.value === 'all' ? '' : railType.value,
+    pkq: keyword.value.trim(),
+    drill: drillAsset.value ? `${drillAsset.value.kind}-${drillAsset.value.id}` : '',
+  })
+})
 
 const hasAnyAsset = computed(() => props.assets.length > 0)
 
@@ -353,15 +394,14 @@ function confirm() {
   emit('confirm', props.mode === 'semantic' ? pickedEntries.value.map(item => ({ ...item })) : pickedAssets.value.map(item => ({ ...item })))
 }
 
-/** 空态出路：跳到本集资产页（带上资产 deeplink 时直接定位到那张素材） */
+/**
+ * 空态出路：请宿主做应用内切步到资产页（带素材时直接定位到那张素材），不整页 location.assign。
+ * 选择器关闭即卸载，它的 deeplink 分组自动释放 pktype/pkq/drill，宿主再释放 dpick，
+ * 所以不需要手工删 query 键。
+ */
 function gotoAssets(asset = null) {
-  const url = new URL(window.location.href)
-  url.searchParams.set('panel', 'production')
-  url.searchParams.set('tab', 'assets')
-  url.searchParams.set('sub', 'cards')
-  if (asset) url.searchParams.set('asset', `${asset.kind}-${asset.id}`)
-  else url.searchParams.delete('asset')
-  window.location.assign(url.toString())
+  emit('goto-assets', asset && asset.kind && asset.id ? { kind: asset.kind, id: asset.id } : null)
+  emit('close')
 }
 </script>
 

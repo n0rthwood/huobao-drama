@@ -141,6 +141,20 @@ const emit = defineEmits(['update', 'preview', 'appearance'])
 
 const searchOpen = ref(false)
 const query = ref('')
+
+// deeplink（#86）：史料检索弹窗带宿主角色，刷新后回到同一个角色的检索面板。
+// 只恢复界面与关键词，不自动发起检索（外部检索要由用户点一次），结果列表不入 URL
+const archivalLink = useDeeplink('archival', DEEPLINK_KEYS.archival)
+const archivalHost = computed(() => String(props.characterId || ''))
+watch([searchOpen, query], () => archivalLink.set({
+  arch: searchOpen.value ? archivalHost.value : '',
+  archq: searchOpen.value ? query.value.trim() : '',
+}))
+onMounted(() => {
+  if (archivalLink.initial('arch') !== archivalHost.value) return
+  searchOpen.value = true
+  query.value = archivalLink.initial('archq') || ''
+})
 const searching = ref(false)
 const searched = ref(false)
 const searchError = ref('')
