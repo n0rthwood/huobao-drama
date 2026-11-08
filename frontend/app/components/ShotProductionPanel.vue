@@ -665,7 +665,7 @@ function restoreDialog() {
   dialogRestored = true
   void nextTick(() => {
     if (urlDialog === 'scope:prompts') { void openPromptScope(); return }
-    if (urlDialog === 'scope:keyframes') { void openKeyframeScope(); return }
+    if (urlDialog === 'scope:keyframes') { void openBatchScope(); return }
     if (!selected.value) return
     if (urlDialog === 'combo') comboOpen.value = true
     else if (urlDialog === 'rehearse') rehearseOpen.value = true

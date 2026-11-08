@@ -2072,13 +2072,14 @@ watch([panel, scriptStep, prodTab, assetTab, extractTab], syncWorkbenchQuery)
 watch(assetDetail, syncWorkbenchQuery)
 
 // 资产详情弹窗内部位置（语义条目定位 / 地图编辑态）：只写自己的键，父层 asset 原样保留
-watch([assetDetail, focusSemanticId, mapDraftAssetId], () => {
+function syncAssetDetailQuery() {
   const item = assetDetail.value.open ? assetDetail.value.item : null
   assetDetailLink.set({
     sem: item ? focusSemanticId.value : '',
     mapedit: item && mapDraftAssetId.value === item.id ? '1' : '',
   })
-})
+}
+watch([assetDetail, focusSemanticId, mapDraftAssetId], syncAssetDetailQuery)
 
 // ─── 手动新增资产 ────────────────────────────────────────────
 // 类型短显示名渲染时求值（不模块级固化），逻辑判断一律用 kind code
@@ -5273,7 +5274,7 @@ function syncDialogQuery() {
     dlg: currentDialogKey(),
     view: imageViewer.value.open ? viewerKeyOf(imageViewer.value.src) : '',
     shot: shotOwned ? selectedSb.value?.id || '' : '',
-    sel: currentSelectionIds().join(','),
+    sel: currentSelectionIds().join(',') || ((shotOwned && videoSelectMode.value) || (panel.value === 'export' && exportSelTouched) ? 'on' : ''),
   })
 }
 watch([
@@ -5286,8 +5287,10 @@ watch([
 
 /** deeplink ?shot= / ?sel=：恢复视频步的选中分镜与多选上下文（只改界面，不触发任何生成） */
 function applyShotSelectionDeeplink() {
+  const videoOwned = panel.value === 'production' && prodTab.value === 'videos'
+  if (!videoOwned && panel.value !== 'export') return
   const ids = queryIdList(dialogLink.initial('sel')).filter(id => sbs.value.some(sb => sb.id === id))
-  if (ids.length) {
+  if (ids.length || dialogLink.initial('sel') === 'on') {
     if (panel.value === 'export') {
       exportSelTouched = true
       exportSelectedIds.value = ids
@@ -5296,6 +5299,7 @@ function applyShotSelectionDeeplink() {
       selectedVideoSbIds.value = ids
     }
   }
+  if (!videoOwned) return
   const shotId = Number(dialogLink.initial('shot') || 0)
   if (!shotId) return
   const sb = sbs.value.find(item => item.id === shotId)
@@ -5380,6 +5384,10 @@ onMounted(async () => {
   applyShotSelectionDeeplink()
   await applyDialogDeeplink()
   applyViewerDeeplink()
+  await nextTick()
+  syncWorkbenchQuery()
+  syncDialogQuery()
+  syncAssetDetailQuery()
   deeplinkHydrate()
   loadConfigs()
   syncExtractStatus()

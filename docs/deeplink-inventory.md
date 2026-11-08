@@ -45,7 +45,8 @@
 | 技能编辑 / 新增 | `skill=<id>` / `skill=new` | 切到所属 Agent + `pane=skills` + 展开编辑器（只 GET） | 同上 |
 | 风格新增/编辑 | `style=<id>` / `style=new` | 重建编辑态 | 同上 |
 | 数据迁移弹窗 | `migrate=1` | 只开外壳；不恢复目标目录/勾选，不启动迁移 | 无目标时不执行 |
-| 删除确认、连通性测试结果、TTS 音色列表 | 不入 URL | 未保存草稿 / 一次性测试结果（规则 §5） | — |
+| 风格 / Skill 删除确认 | `sdel=style:<id>` / `sdel=skill:<id>` | 按已有实体恢复宿主页签与确认框；仍须人工确认，恢复零删除请求 | 实体不存在 → 提示并摘键 |
+| 连通性测试结果、TTS 音色列表 | 不入 URL | 非独立弹窗的一次性测试内容不保留；恢复不得自动重新测试 | — |
 
 ### 2.3 任务中心（抽屉 + `/tasks` 页，`TaskCenterButton` / `TaskCenterPanel` / `TaskDetailDialog`）
 | 嵌套 UI | 键 | 恢复 | 失效处理 |
@@ -57,8 +58,10 @@
 | 任务详情弹窗 | `task=<taskId>` | 先查 store，再按 id 取（跨页/跨筛选也能开） | 未知/已删 → `missingNamed` + 清键 |
 | 详情审核模式 | `treview=1` | 恢复审核态，不自动审批 | — |
 | 详情内「全屏正文」视图 | `tfull=1` | 任务解析成功后展开全文（只读取） | 非文本任务回落 false 并摘键 |
-| `thinkingOpen` | 不入 URL | 由任务状态驱动（活动中展开、终态折叠），不是用户工作位置 | — |
-| 重试模型选择 / `overwriteAsk` 覆盖确认 | 不入 URL | 动作载荷（规则 §5） | — |
+| 思考块展开 / 折叠 | `tthink=1\|0` | 恢复当前查看状态；保留原有任务状态转换行为 | — |
+| 重试目标模型 | `tmodel=<已登记模型 key>` | 只 GET 模型清单并验证，不执行重试 | 配置不可用 → 提示并放弃覆盖确认恢复 |
+| 覆盖重试确认 | `taskoverwrite=1` | 仅支持会覆盖剧本/分镜的终态任务；只开确认外壳 | 任务不适用 → 提示并摘键 |
+| 流水线图片大图 | `tpreview=static/...` | 仅接受同源 static 路径；关闭只摘自己的键 | 加载失败 → 提示并摘键 |
 
 ### 2.4 项目详情页 `views/drama/detail.vue`
 | 嵌套 UI | 键 | 恢复 | 失效处理 |
@@ -127,8 +130,8 @@
 | --- | --- | --- | --- |
 | `StoryboardKeyframes` | `shot`、`sel`、`pool=1` | 选中分镜、批量多选、资产池弹窗（镜稳定后再开，父链完整） | 未知 shot → 默认首镜 + `deeplink.missing`，且不恢复 `pool` |
 | `StoryboardPoolDialog` | `poolkind`、`poolq` | 弹窗内部类别/关键词，仅挂载期间发布 | 非法枚举回落「全部」 |
-| `ShotProductionPanel` | `shot`、`seg=layer\|gen`、`spdlg=combo\|rehearse\|scope` | 选中分镜 + 片段页签（按该镜 combo 校验）+ 弹窗外壳 | 缺失 id → `missing`；设计卡未确认 → `locked`；两者都回落默认并摘子键 |
-| `DocumentaryFinalPanel` / `DocumentaryFinalShot` | `shot`、`sel`、`rehearse=<sbId>` | 选中/多选分镜、预演弹窗外壳（不自动起渲染） | 无效 id → 提示并摘键 |
+| `ShotProductionPanel` | `shot`、`seg=layer\|gen`、`spdlg=combo\|rehearse\|scope:prompts\|scope:keyframes` | 选中分镜 + 片段页签（按该镜 combo 校验）+ 弹窗外壳；范围清单仅重取只读预览 | 缺失 id → `missing`；设计卡未确认 → `locked`；两者都回落默认并摘子键 |
+| `DocumentaryFinalPanel` / `DocumentaryFinalShot` | `sel`、`rehearse=<sbId>`、`fdlg=voice\|layer\|video\|compose`（可追加 `:retry`） | 多选分镜、预演与批量范围弹窗；重取只读预览，不提交生成 | 无效目标 → 提示并摘键 |
 | `VideoShotPanel` / `ExportPanel` | 复用工作台 `shot` / `sel` / `dlg` | 自身无独立嵌套状态 | — |
 
 ### 2.8 纪录片资产面板
@@ -144,8 +147,8 @@
 ### 2.9 Poster / 剧本改写 / 旁白 / 图层
 | 组件 | 键 | 恢复 | 失效处理 |
 | --- | --- | --- | --- |
-| `PosterPanel` / `PosterReferencePicker` | `posterpick=1`、`posterver=<id>` | 参考图选择器外壳 + 选中合成版本 | 版本不存在 → `missingNamed` + 回落默认 |
-| `ScriptRewritePanel` | `rwstage`、`rwdlg=inspect` | 阶段选择 + 核查浮层 | 非法阶段回落 |
+| `PosterPanel` / `PosterReferencePicker` | `posterpick=1`、`posterver=<id>`、`pconflict=fields:<compositionId>\|layers:<compositionId>` | 参考图选择器、合成版本与只读冲突窗口；旧覆盖载荷不重放，需关闭后重新发起应用 | 版本/方案不存在 → 提示并回落 |
+| `ScriptRewritePanel` | `rwstage`、`rwdlg=inspect\|conflict:save\|conflict:adopt:<versionId>` | 核查恢复纯外壳，需手动重新核查；冲突恢复只读比较，已有候选按版本 id 回读，未保存草稿不伪造 | 非法阶段回落；不存在的候选提示并摘键 |
 | `NarrationBlock` | `voice=<storyboardId>` | 单镜配音弹窗外壳（不自动生成配音 = 不触发计费） | 分镜不存在 → 提示并摘键 |
 | `NarrationEditor` | `nedlg=check:<sbId>` / `pron:<sbId>:<start>-<end>:<源文字>` / `tone:<sbId>:<位置或区间>` / `pause:<sbId>:<位置或区间>` | 多音字检查浮层（纯本地词表计算）；注音/语气/停顿浮层带宿主分镜 + 正文区间 +（注音还带）源文字，恢复前用当前已保存正文逐字校验 | 校验不过（正文已改动）→ 浮层仍按链接上下文打开，但进入**只读态**：显示 `deeplink.staleRange` 说明、插入/自然停顿/确认全部禁用，绝不插到错位置 |
 | `LayerImagePicker` / `LayerRail` / `LayerStyle` | `lpick=1`、`lpmode=source\|asset\|library` | 图层图片选择器开关 + 内部三态来源页签，绑定到选中图层 | 无选中图层 → 不开 |

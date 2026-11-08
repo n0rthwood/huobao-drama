@@ -1480,15 +1480,31 @@ async function restoreSettingsDialogs() {
 
   // 迁移弹窗只恢复外壳：目标目录与「同时搬运文件」不进 URL，仍须重新选目录（无目标时 startMigrate 直接返回）
   if (dialogLink.initial('migrate') === '1' && !migrateDialog.value) migrateDialog.value = true
+  const deleteRaw = dialogLink.initial('sdel') || ''
+  if (deleteRaw && !styleToDelete.value && !skillToDelete.value) {
+    const match = /^(style|skill):(.+)$/.exec(deleteRaw)
+    if (match?.[1] === 'style') {
+      const preset = stylePresets.value.find(item => String(item.id) === match[2])
+      if (preset) { tab.value = 'styles'; styleToDelete.value = preset }
+      else deeplinkMissing(t('settings.tabs.styles'))
+    } else if (match?.[1] === 'skill' && allSkills.value.some(item => item.id === match[2])) {
+      const owner = agentDefs.value.find(agent => skillBelongsTo(match[2], agent.type))
+      tab.value = 'agents'
+      agentPane.value = 'skills'
+      if (owner) await selectAgent(owner.type)
+      skillToDelete.value = match[2]
+    } else deeplinkMissing('Skill')
+  }
 }
 
 // 发布：关闭弹窗只移除自己的键，tab/pane/agent 保持不动
-watch([cfgDialog, cfgEditId, () => cfgForm.service_type, editingSkill, addSkillDialog, styleDialog, styleEditId, migrateDialog], () => {
+watch([cfgDialog, cfgEditId, () => cfgForm.service_type, editingSkill, addSkillDialog, styleDialog, styleEditId, migrateDialog, styleToDelete, skillToDelete], () => {
   dialogLink.set({
     cfg: cfgDialog.value ? (cfgEditId.value ? String(cfgEditId.value) : `new:${cfgForm.service_type}`) : '',
     skill: editingSkill.value || (addSkillDialog.value ? 'new' : ''),
     style: styleDialog.value ? (styleEditId.value ? String(styleEditId.value) : 'new') : '',
     migrate: migrateDialog.value ? '1' : '',
+    sdel: styleToDelete.value ? `style:${styleToDelete.value.id}` : skillToDelete.value ? `skill:${skillToDelete.value}` : '',
   })
 }, { immediate: true })
 

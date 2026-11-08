@@ -206,11 +206,11 @@
       <div v-if="conflict" class="overlay" @click.self="conflict = null">
         <div class="dialog poster-conflict" role="dialog" aria-modal="true">
           <h3>{{ t('poster.conflict.title') }}</h3>
-          <p>{{ t('poster.conflict.desc') }}</p>
-          <p class="poster-conflict-fields">{{ conflict.fields.map(field => t(`poster.conflict.field.${field}`)).join('、') }}</p>
+          <p>{{ t(conflict.restored ? 'deeplink.readOnlyRestore' : 'poster.conflict.desc') }}</p>
+          <p v-if="conflict.fields.length" class="poster-conflict-fields">{{ conflict.fields.map(field => t(`poster.conflict.field.${field}`)).join('、') }}</p>
           <div class="poster-conflict-actions">
             <button type="button" class="btn" @click="conflict = null">{{ t('common.cancel') }}</button>
-            <button type="button" class="btn btn-primary" :disabled="busy" @click="confirmOverwrite">{{ t('poster.conflict.overwrite') }}</button>
+            <button v-if="!conflict.restored" type="button" class="btn btn-primary" :disabled="busy" @click="confirmOverwrite">{{ t('poster.conflict.overwrite') }}</button>
           </div>
         </div>
       </div>
@@ -256,10 +256,11 @@ let saveTimer = null
 let unsubscribe = null
 let saveChain = Promise.resolve()
 
-// deeplink（#86）：参考图选择器开关 + 选中的合成版本；冲突覆盖弹窗是保存期冲突载荷，不恢复
+// deeplink（#86）：参考图选择器、合成版本与冲突窗口。旧冲突载荷不重放，恢复仅供只读查看。
 const link = useDeeplink('poster', DEEPLINK_KEYS.poster)
 const urlPickerOpen = querySingle(link.initial('posterpick')) === '1'
 const urlVersionId = Number(querySingle(link.initial('posterver')) || 0)
+const urlConflict = querySingle(link.initial('pconflict'))
 let deeplinkRestored = false
 
 const variables = computed(() => poster.value?.variables || { project_title: '', episode_title: '', episode_no: '' })
@@ -315,11 +316,18 @@ function restoreDeeplink() {
     else toast.warning(t('deeplink.missingNamed', { target: t('poster.versionLabel', { n: urlVersionId, time: '' }) }))
   }
   if (urlPickerOpen && poster.value) pickerOpen.value = true
+  if (urlConflict && !conflict.value) {
+    const match = /^(fields|layers):(.+)$/.exec(urlConflict)
+    const composition = match && poster.value?.concept?.compositions?.find(item => String(item.id) === match[2])
+    if (composition) conflict.value = { compositionId: composition.id, kind: match[1], fields: [], restored: true }
+    else toast.warning(t('deeplink.missing'))
+  }
 }
 
-watch([pickerOpen, compositeVersionId], () => link.set({
+watch([pickerOpen, compositeVersionId, conflict], () => link.set({
   posterpick: pickerOpen.value ? '1' : '',
   posterver: compositeVersionId.value || '',
+  pconflict: conflict.value ? `${conflict.value.kind}:${conflict.value.compositionId}` : '',
 }), { immediate: true })
 
 function copyText(value) {
@@ -494,7 +502,7 @@ async function applyLayers(composition) {
 }
 
 async function confirmOverwrite() {
-  if (!conflict.value) return
+  if (!conflict.value || conflict.value.restored) return
   const { compositionId, kind, fields } = conflict.value
   conflict.value = null
   try {

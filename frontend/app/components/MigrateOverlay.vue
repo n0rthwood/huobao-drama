@@ -19,7 +19,7 @@ import { Loader2 } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { useMigrateState } from '~/composables/useMigrateState'
-import { DEEPLINK_KEYS, useDeeplink } from '~/composables/useQuerySync'
+import { DEEPLINK_KEYS, deeplinkRouteEpoch, useDeeplink } from '~/composables/useQuerySync'
 
 const { t } = useI18n()
 const { state } = useMigrateState()
@@ -27,8 +27,8 @@ const { state } = useMigrateState()
 // deeplink（#86）：遮罩在场时链接里带 migrating=1，复制出去能表达「这台机器正在迁移存储」。
 // 恢复只认真实状态：迁移进度来自桌面端主进程推送，刷新后没有在跑的迁移就摘键并说明，
 // 绝不凭链接伪造一个进度遮罩（那会假装有迁移在进行）。
-const link = useDeeplink('migrateOverlay', DEEPLINK_KEYS.migrateOverlay)
-watch(() => state.active, active => link.set({ migrating: active ? '1' : '' }), { immediate: true })
+const link = useDeeplink('migrateOverlay', DEEPLINK_KEYS.migrateOverlay, { persistent: true })
+watch([() => state.active, deeplinkRouteEpoch()], ([active]) => link.set({ migrating: active ? '1' : '' }), { immediate: true })
 onMounted(() => {
   if (link.initial('migrating') === '1' && !state.active) toast.info(t('deeplink.missing'))
 })

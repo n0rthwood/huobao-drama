@@ -3,7 +3,8 @@
     "missing": "The link target no longer exists; returned to the parent view.",
     "missingNamed": "The linked {target} no longer exists; returned to the parent view.",
     "locked": "The linked position is not available yet (prerequisite step unfinished); returned to the parent view.",
-    "staleRange": "The position recorded in the link no longer matches the saved text (the text changed). This dialog is read-only: re-select the target text manually before inserting a marker."
+    "staleRange": "The position recorded in the link no longer matches the saved text (the text changed). This dialog is read-only: re-select the target text manually before inserting a marker.",
+    "readOnlyRestore": "This restored window is read-only and does not claim a current conflict. The earlier unsaved action payload is not retained. Close it and initiate the action again; nothing runs automatically."
   },
   "designCard82": {"narration":"Measured narration","pendingVoice":"Awaiting voice","layerBudget":"▣ Layer budget","genBudget":"▶ Generation budget","notGenerated":"Not generated","total":"Total","remain":"Remaining","excess":"Over by","asset":"Asset","exists":"Exists","missingAsset":"Not in this episode or ambiguous","semantic":"Semantic entry","pendingAnnotation":"Awaiting annotation","available":"Available semantic entries","noSemantics":"This asset has no annotations"},
   "mediaTime": {
@@ -1052,6 +1053,11 @@
       "checking": "Checking the current narration draft…",
       "inspectionFailed": "Narration inspection failed. Save anyway?",
       "inspectionFound": "The current draft may contain non-narration material. Choose how to save:",
+      "inspectionRestoredTitle": "Narration inspection window restored",
+      "inspectionRestoredHint": "The link does not retain the previous draft or findings. Recheck the current saved text manually; no model call or save runs automatically.",
+      "inspectionRerun": "Recheck current text",
+      "inspectionClean": "No non-narration material found. Not saved yet.",
+      "restoredConflictHint": "This restored comparison is read-only and does not claim a current conflict. Unsaved drafts are not retained in links; saved candidate versions remain viewable. Close it to edit or select a version again.",
       "notLocatable": "(Not found in the current draft; shown only, cannot be deleted)",
       "deleteAndSave": "Delete located passages and save",
       "keepAndSave": "Keep and save",
