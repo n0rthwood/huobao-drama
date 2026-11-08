@@ -366,6 +366,7 @@ const callByIdStmt = sqlite.prepare('SELECT * FROM task_observed_call WHERE id =
 const callPageStmt = sqlite.prepare('SELECT * FROM task_observed_call WHERE task_id = ? AND id > ? ORDER BY id ASC LIMIT ?')
 const callPageByWorkStmt = sqlite.prepare('SELECT * FROM task_observed_call WHERE task_id = ? AND id > ? AND work_id = ? ORDER BY id ASC LIMIT ?')
 const countMessagesStmt = sqlite.prepare('SELECT COUNT(*) AS n FROM task_observed_message WHERE call_id = ?')
+const requestCharsByCallStmt = sqlite.prepare<[number], { n: number }>("SELECT COALESCE(SUM(chars), 0) AS n FROM task_observed_message WHERE call_id = ? AND phase = 'request'")
 // 正文走内容寻址表，流式进行中的那条还在 body 里：读的时候合并两处
 const messagePageStmt = sqlite.prepare(
   `SELECT m.id, m.call_id, m.work_id, m.task_id, m.seq, m.phase, m.role, m.name, m.tool_call_id,
@@ -1044,7 +1045,7 @@ export function observeTextCall(meta: ObservedCallMeta, inner: typeof fetch): ty
  * 注意 model_ms 是合成服务耗时，不是音频长度；音频字节绝不序列化。
  */
 export async function observeTaskOperation<T>(
-  input: { kind: 'tts'; configId: number | null; model: string; request: unknown },
+  input: { kind: 'tts'; configId: number | null; configName?: string; provider?: string; model: string; request: unknown },
   fn: () => Promise<T>,
 ): Promise<T> {
   const ctx = workALS.getStore()
@@ -1053,11 +1054,15 @@ export async function observeTaskOperation<T>(
   const call = beginCall(ctx, {
     kind: input.kind,
     configId: input.configId,
+    configName: input.configName,
+    provider: input.provider,
     model: input.model,
     queuedAt: queueALS.getStore()?.queuedAt ?? at,
     startedAt: at,
   })
-  appendMessage(call, 'request', { role: 'request', name: input.kind, body: safeJsonText(input.request) })
+  const requestBody = safeJsonText(input.request)
+  appendMessage(call, 'request', { role: 'request', name: input.kind, body: requestBody })
+  addRequestCharsStmt.run(requestBody.length, Date.now(), call.id)
   try {
     const result = await fn()
     const body = safeJsonText(result)
@@ -1185,19 +1190,30 @@ export function listObservedSamples(stage: ObservedStage, sampleKey: string): Ob
   return worksBySampleStmt.all(stage, sampleKey, 500) as ObservedWorkRow[]
 }
 
+/** 早期 TTS 记录已有完整请求与字数，只漏了调用级累计；只读恢复，不改写历史。 */
+function withRecordedRequestChars(call: ObservedCallRow): ObservedCallRow {
+  if (call.kind === 'tts' && call.request_chars === 0) {
+    const recorded = requestCharsByCallStmt.get(call.id)
+    if (recorded) call.request_chars = recorded.n
+  }
+  return call
+}
+
 export function listObservedCalls(
   taskId: number,
   opts: { workId?: number; afterId?: number; limit?: number } = {},
 ): ObservedCallRow[] {
   const limit = Math.min(Math.max(1, Math.trunc(opts.limit ?? 50)), 200)
   const after = Math.max(0, Math.trunc(opts.afterId ?? 0))
-  return (opts.workId != null
+  const calls = (opts.workId != null
     ? callPageByWorkStmt.all(taskId, after, opts.workId, limit)
     : callPageStmt.all(taskId, after, limit)) as ObservedCallRow[]
+  return calls.map(withRecordedRequestChars)
 }
 
 export function getObservedCall(callId: number): ObservedCallRow | null {
-  return (callByIdStmt.get(callId) as ObservedCallRow | undefined) ?? null
+  const call = callByIdStmt.get(callId) as ObservedCallRow | undefined
+  return call ? withRecordedRequestChars(call) : null
 }
 
 export function listObservedMessages(

@@ -37,7 +37,7 @@
       <li v-for="call in visibleCalls" :key="call.id" :class="['task-conv-call', 'is-' + call.status]">
         <button type="button" class="task-conv-call-head" @click="toggleCall(call.id)">
           <span class="task-conv-chip">{{ t(`taskCenter.detail.conversation.kind.${call.kind}`) }}</span>
-          <span class="truncate">{{ [call.config_name, call.model].filter(Boolean).join(' · ') || t('common.default') }}</span>
+          <span class="truncate">{{ [call.config_name || (call.config_id ? `#${call.config_id}` : call.provider), call.model].filter(Boolean).join(' · ') || '—' }}</span>
           <span class="task-conv-chip is-status">{{ t(`taskCenter.detail.conversation.status.${call.status}`) }}</span>
           <span v-if="call.http_status" class="task-detail-hint mono">HTTP {{ call.http_status }}</span>
           <span class="task-detail-hint">{{ t('taskCenter.detail.conversation.callTime', { time: msText(call.duration_ms) }) }}</span>

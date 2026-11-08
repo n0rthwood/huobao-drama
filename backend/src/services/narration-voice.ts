@@ -308,6 +308,8 @@ async function runShotSynthesis(ctx: ShotVoiceContext): Promise<VoiceResult> {
   const synthesis = await observeTaskOperation({
     kind: 'tts',
     configId: config.id ?? null,
+    configName: config.name,
+    provider: config.provider,
     model: config.model,
     request: { text: engineText, chars, engine_chars: engineText.length, params },
   }, () => synthesizeNarration(config, engineText, params))
