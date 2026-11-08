@@ -1236,12 +1236,18 @@ function reportError(err, fallback) {
     toast.error(detail ? `${t(key)}：${detail}` : t(key))
     return
   }
+  if (Array.isArray(body.issues) && body.issues.length) {
+    toast.error(body.issues.map(issue => issue.message || t(`episode.design.issue.${issue.code}`)).join(t('common.listJoin')))
+    return
+  }
   toastServerMessage(err, { fallback })
 }
 
 // ===== 确认 / 取消确认 =====
 const confirmBlockReason = computed(() => {
   if (!ttsOf(selectedId.value).valid) return ttsTitle(selectedId.value)
+  const blocking = issues.value.filter(issue => issue.severity === 'block')
+  if (blocking.length) return blocking.map(issue => issue.message || t(`episode.design.issue.${issue.code}`)).join(t('common.listJoin'))
   if (!draft.value.combo) return t('episode.design.issue.combo_missing')
   if (budgetMessage.value) return budgetMessage.value
   if (overLimit.value) {
@@ -1249,8 +1255,6 @@ const confirmBlockReason = computed(() => {
       ? t('episode.design.issue.budget_over_layer')
       : t('episode.design.issue.budget_over_gen')
   }
-  const blocking = issues.value.filter(issue => issue.severity === 'block')
-  if (blocking.length) return blocking.map(issue => issue.message || t(`episode.design.issue.${issue.code}`)).join(t('common.listJoin'))
   if (warnOnly.value && !acknowledged.value) return t('episode.design.error.needsAcknowledge')
   return ''
 })
@@ -1360,15 +1364,15 @@ async function runScope() {
 }
 async function confirmMany(ids) {
   busy.value = true
-  let failed = 0
   for (const id of ids) {
     try {
       const res = await storyboardAPI.confirmDesignCard(id, false)
       applyResult(id, res)
-    } catch { failed += 1 }
+    } catch (err) {
+      reportError(err, 'episode.design.error.confirmFailed')
+    }
   }
   busy.value = false
-  if (failed) toast.error(t('episode.design.error.confirmFailed'))
   emit('refresh')
   loadAudit()
   refreshGates({ background: true })
