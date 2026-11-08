@@ -22,7 +22,7 @@
 | `/drama/:id/episode/:n` | `views/drama/episode.vue` | `workbench` + `workbenchDialogs` + 各子面板分组 |
 | `/dev/layer-canvas` | `pages/dev/layer-canvas.vue` | 生产构建不包含该页（`nuxt.config.ts` 剔除 `/dev/`），不纳入盘点 |
 
-全局常驻：`layouts/default.vue` 的 `TaskCenterButton`（`taskDrawer`，跨路由 persistent）；`app.vue` 的 `MigrateOverlay`（桌面迁移阻塞层，自动关闭并刷新，不入 URL）。
+全局常驻：`layouts/default.vue` 的 `TaskCenterButton`（`taskDrawer`，跨路由 persistent）；`app.vue` 的 `MigrateOverlay`（`migrateOverlay` 组，`migrating=1`）；命令式挂载的语言切换确认框（`langSwitch` 组，`lang=<zh|en|ja|ko>`，由 `app.vue` 在挂载时恢复，切换仍需人工点确认；顺带修正了原本「取消也被当成确认」的 resolve 逻辑，恢复的弹窗取消时零后端写入）。
 
 ## 2. 清单（入口 / 父状态 / 实体标识 / URL 键 / 恢复结果）
 
@@ -147,7 +147,7 @@
 | `PosterPanel` / `PosterReferencePicker` | `posterpick=1`、`posterver=<id>` | 参考图选择器外壳 + 选中合成版本 | 版本不存在 → `missingNamed` + 回落默认 |
 | `ScriptRewritePanel` | `rwstage`、`rwdlg=inspect` | 阶段选择 + 核查浮层 | 非法阶段回落 |
 | `NarrationBlock` | `voice=<storyboardId>` | 单镜配音弹窗外壳（不自动生成配音 = 不触发计费） | 分镜不存在 → 提示并摘键 |
-| `NarrationEditor` | `nedlg=check:<storyboardId>` | 多音字检查浮层（纯本地词表计算） | 无匹配编辑器则不开 |
+| `NarrationEditor` | `nedlg=check:<sbId>` / `pron:<sbId>:<start>-<end>:<源文字>` / `tone:<sbId>:<位置或区间>` / `pause:<sbId>:<位置或区间>` | 多音字检查浮层（纯本地词表计算）；注音/语气/停顿浮层带宿主分镜 + 正文区间 +（注音还带）源文字，恢复前用当前已保存正文逐字校验 | 校验不过（正文已改动）→ 浮层仍按链接上下文打开，但进入**只读态**：显示 `deeplink.staleRange` 说明、插入/自然停顿/确认全部禁用，绝不插到错位置 |
 | `LayerImagePicker` / `LayerRail` / `LayerStyle` | `lpick=1`、`lpmode=source\|asset\|library` | 图层图片选择器开关 + 内部三态来源页签，绑定到选中图层 | 无选中图层 → 不开 |
 | `ReferenceImageManager` | `reflib=<type>-<id>` | 参考图素材库弹窗 + 宿主资产（多实例只有宿主匹配的那个打开） | 宿主不匹配则不开 |
 | `ArchivalImagePanel` | `arch=<characterId>`、`archq` | 史料检索浮层 + 关键词；**不自动发起外部检索**，由用户点一次 | 宿主不匹配则不开 |
@@ -157,9 +157,7 @@
 | 项 | 理由 |
 | --- | --- |
 | `AppMenu` / `BaseSelect` / `ModelSelect` / `LocaleSwitcher` / `MentionTextarea` 下拉 | 指针瞬时菜单，随失焦关闭，没有可定位的工作位置，也没有内容状态 |
-| `MigrateOverlay` | 桌面端迁移阻塞层，由全局状态驱动并在结束后自动刷新；恢复它等于伪造一次迁移 |
-| `LanguageSwitchDialog` | 动态挂载的语言切换确认，恢复即是把刷新当成决定 |
-| `NarrationEditor` 的 `pron`/`tone`/`pause` 标记弹窗 | 绑定**未保存正文**里的 start/end 选区；刷新后正文回到已保存版本，恢复的区间会落在不同字符上，确认会把标记写错位置 |
+| `MigrateOverlay` 的「伪造进度」 | 遮罩本身已入 URL（`migrating=1`），但恢复只认真实迁移状态：刷新后没有在跑的迁移就摘键 + 提示，不凭链接假装有迁移 |
 | 各类未保存草稿：设计卡草稿、图层/Poster 编辑器草稿、`MapSpecPanel`/`PropSemanticsPanel` 编辑、`NarrationFitPanel` 草稿、审批意见、导入勾选、选择器未确认多选 | 规则 §5：只恢复界面，不恢复未保存表单与敏感载荷 |
 | 列表滚动位置（像素） | 只在需要定位实体时滚入视图，不把滚动写进 URL |
 | `/dev/layer-canvas` | 生产构建不包含该路由 |

@@ -2,7 +2,8 @@
   "deeplink": {
     "missing": "链接指向的目标不存在或已被删除，已回到上一层。",
     "missingNamed": "链接指向的{target}不存在或已被删除，已回到上一层。",
-    "locked": "链接指向的位置当前不可进入（前置步骤未完成），已回到上一层。"
+    "locked": "链接指向的位置当前不可进入（前置步骤未完成），已回到上一层。",
+    "staleRange": "链接记录的位置在当前已保存正文里对不上（正文已改动），此处只读：请手动重新选中目标文字后再插入标记。"
   },
   "designCard82": {"narration":"旁白实测","pendingVoice":"待配音","layerBudget":"▣ 图层预算","genBudget":"▶ 生成预算","notGenerated":"未生成","total":"合计","remain":"余量","excess":"超出","asset":"资产","exists":"存在","missingAsset":"不在本集或无法确定","semantic":"语义条目","pendingAnnotation":"待标注","available":"现有语义条目","noSemantics":"该资产还没有语义标注"},
   "mediaTime": {

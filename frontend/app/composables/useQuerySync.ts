@@ -186,6 +186,14 @@ export function useDeeplink(name: string, keys: readonly string[], options: { pe
   return group
 }
 
+/**
+ * 命令式宿主（模块级 / createApp 挂上去的弹窗）注册分组：没有组件 scope，
+ * 调用方必须自己在关闭时 set 空值或 release()。组件里一律用 useDeeplink。
+ */
+export function deeplinkGroup(name: string, keys: readonly string[]): DeeplinkGroup {
+  return ensureStore().group(name, keys, true)
+}
+
 /** 当前路由进入时的 URL 原始值（用于「URL 显式给出就忽略本地记忆」的判定） */
 export function deeplinkInitial(key: string): string | null {
   return ensureStore().initial(key)
@@ -254,4 +262,8 @@ export const DEEPLINK_KEYS = {
   layerPicker: ['lpick', 'lpmode'],
   /** 旁白分镜块：单镜配音弹窗 voice=<分镜 id> / 旁白编辑器的多音字检查 nedlg=check:<分镜 id> */
   narration: ['voice', 'nedlg'],
+  /** 全局语言切换确认弹窗：目标语言（恢复只开确认框，仍需人工点确认） */
+  langSwitch: ['lang'],
+  /** 存储迁移阻塞遮罩：仅在迁移真的在进行时才可恢复 */
+  migrateOverlay: ['migrating'],
 } as const satisfies Record<string, readonly string[]>

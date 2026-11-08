@@ -2,7 +2,8 @@
   "deeplink": {
     "missing": "リンク先が存在しないか削除されています。上の階層に戻りました。",
     "missingNamed": "リンク先の{target}が存在しないか削除されています。上の階層に戻りました。",
-    "locked": "リンク先の位置は現在開けません（前提ステップが未完了）。上の階層に戻りました。"
+    "locked": "リンク先の位置は現在開けません（前提ステップが未完了）。上の階層に戻りました。",
+    "staleRange": "リンクに記録された位置が保存済み本文と一致しません（本文が変更されています）。ここは読み取り専用です：対象の文字を手動で選び直してからマーカーを挿入してください。"
   },
   "designCard82": {"narration":"ナレーション実測","pendingVoice":"音声待ち","layerBudget":"▣ レイヤー予算","genBudget":"▶ 生成予算","notGenerated":"未生成","total":"合計","remain":"余裕","excess":"超過","asset":"素材","exists":"存在","missingAsset":"本話にないか特定不能","semantic":"意味項目","pendingAnnotation":"注釈待ち","available":"既存の意味項目","noSemantics":"この素材には注釈がありません"},
   "mediaTime": {
