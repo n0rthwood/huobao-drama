@@ -133,6 +133,7 @@
       v-if="detailTask"
       :task="detailTask"
       :review-mode="detailReview"
+      :restore-link="restoreDetailUi"
       v-model:full-view="detailFull"
       @close="closeDetail"
       @changed="reload"
@@ -188,6 +189,7 @@ const items = ref([])
 const loading = ref(false)
 const expanded = ref([])
 const detailTask = ref(null)
+const restoreDetailUi = ref(false)
 const detailReview = ref(false)
 // 弹窗内部的「全屏正文」视图（Issue #86 tfull）：由弹窗经 v-model 回写
 const detailFull = ref(false)
@@ -341,12 +343,14 @@ async function copyRowError(row) {
 }
 function openDetail(row, review = false) {
   userActed = true
+  restoreDetailUi.value = false
   detailReview.value = review || row.pipeline?.state === 'waiting_approval'
   detailFull.value = false
   detailTask.value = row
 }
 function closeDetail() {
   detailTask.value = null
+  restoreDetailUi.value = false
   detailFull.value = false
 }
 
@@ -447,6 +451,7 @@ async function restoreDetail() {
   detailReview.value = urlReview || row.pipeline?.state === 'waiting_approval'
   // 弹窗内部视图跟在任务解析成功之后恢复
   detailFull.value = urlFull
+  restoreDetailUi.value = true
   detailTask.value = row
   publishDetail()
 }
