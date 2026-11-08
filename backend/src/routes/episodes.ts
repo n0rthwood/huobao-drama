@@ -83,7 +83,7 @@ import { loadEpisodeRosterRecord, saveEpisodeRosterRecord } from '../services/ch
 import type { RosterEntryInput } from '../services/character-roster.js'
 import { normalizeAssetName } from '../services/asset-name.js'
 import { episodeNarrationCoverage, startFillGapsTask } from '../services/storyboard-fill-gaps.js'
-import { stageSelectionErrorPayload } from '../services/ai-stages.js'
+import { parseFillModelSelection, stageSelectionErrorPayload } from '../services/ai-stages.js'
 
 const app = new Hono()
 
@@ -537,32 +537,38 @@ app.get('/:id/narration/voice-batch-status', async (c) => {
   return success(c, await getVoiceBatchStatus(Number(c.req.param('id'))))
 })
 
-// GET /episodes/:id/work-estimate?stage=skeleton|voice|design_card[&storyboard_ids=1,2] —
-// 三阶段「开始前」的源字数与历史样本 ETA（#87 §D）。没有同口径历史样本时 estimate_ms = null，
+// POST /episodes/:id/work-estimate — 按待提交的模型、范围与 TTS 参数计算只读预估。
+// 不把指令正文编码到 URL；无同口径历史样本时 estimate_ms = null。
 // 界面显示「暂无估计」，绝不编固定秒数。运行中/终态任务的真实计量一并返回。
-app.get('/:id/work-estimate', async (c) => {
+app.post('/:id/work-estimate', async (c) => {
   const id = Number(c.req.param('id'))
   const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, id))
   if (!ep) return notFound(c, '剧集不存在')
-  const stage = c.req.query('stage')
-  const idsParam = c.req.query('storyboard_ids')
-  const storyboardIds = idsParam
-    ? idsParam.split(',').map(Number).filter(n => Number.isInteger(n) && n > 0)
+  const body = await c.req.json().catch(() => ({}))
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return badRequest(c, '预估参数必须为对象')
+  const stage = body.stage
+  if (body.storyboard_ids !== undefined && !Array.isArray(body.storyboard_ids)) return badRequest(c, 'storyboard_ids 必须为数组')
+  const storyboardIds = Array.isArray(body.storyboard_ids)
+    ? body.storyboard_ids.map(Number).filter((n: number) => Number.isInteger(n) && n > 0)
     : undefined
+  const selection = parseFillModelSelection(body)
+  if ('error' in selection) return badRequest(c, selection.error)
   const kind = stage === 'skeleton' ? 'storyboard_breaker' : stage === 'voice' ? 'narration_tts' : 'design_card'
   try {
     const estimate = stage === 'skeleton'
-      ? await skeletonWorkEstimate(id)
+      ? await skeletonWorkEstimate(id, selection)
       : stage === 'voice'
-        ? await voiceWorkEstimate(id, undefined, storyboardIds)
+        ? await voiceWorkEstimate(id, body.settings, storyboardIds)
         : stage === 'design_card'
-          ? await designCardWorkEstimate(id, ep.dramaId, storyboardIds)
+          ? await designCardWorkEstimate(id, ep.dramaId, storyboardIds, selection)
           : null
     if (!estimate) return badRequest(c, 'stage 必须是 skeleton / voice / design_card')
     // 最近一次同阶段任务的真实计量：运行中给进度与 ETA，终态给冻结事实
     const latest = await findLatestTextTask(id, kind)
     return success(c, { estimate, observation_summary: latest ? getTaskWorkSummary(latest.id) : null })
   } catch (err) {
+    const selectionError = stageSelectionErrorPayload(err)
+    if (selectionError) return c.json(selectionError, 400)
     return badRequest(c, err instanceof Error ? err.message : '预估失败')
   }
 })

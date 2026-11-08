@@ -10,6 +10,7 @@ test('text scheduling, endpoint selection and persisted health', () => {
     import { eq } from 'drizzle-orm'
     import { db, schema } from './src/db/index.ts'
     import { TextSlotQueue, assignTextEndpoint, isModelError, noteEndpointError, noteEndpointSuccess, resumeTextConfig } from './src/services/text-scheduler.ts'
+    import { StagePinUnavailableError } from './src/services/ai-stages.ts'
     import { createTextTask } from './src/services/text-task.ts'
     import { runWithTextTask, runWithAgentTextCall, isAgentTextCall, noteAgentFetchStarted, noteFirstAgentFetchFailed, markAgentFailureIfSafe, isFirstAgentFailureSafe } from './src/services/text-task-context.ts'
     import { callTextChat } from './src/services/vision-chat.ts'
@@ -46,7 +47,9 @@ test('text scheduling, endpoint selection and persisted health', () => {
       await db.insert(schema.aiServiceConfigs).values({ id, serviceType: 'text', provider: 'openai', name: 'fake', baseUrl: 'https://example.invalid', apiKey: '', model: '["fake"]', vision, priority, concurrency: 1, isActive: true, createdAt: stamp, updatedAt: stamp })
     }
     assert.equal((await assignTextEndpoint('keyframe_prompts', { configId: 9901 })).configId, 9901)
-    await assert.rejects(assignTextEndpoint('design_card', { configId: 9901 }), { name: 'StageVisionUnavailableError' })
+    await assert.rejects(assignTextEndpoint('design_card', { configId: 9901 }), error =>
+      error instanceof StagePinUnavailableError && error.facts.reason === 'not_vision'
+      && error.alternatives.some(candidate => candidate.config_id === 9902))
     assert.equal((await assignTextEndpoint('design_card', { configId: 9902 })).configId, 9902)
     await assert.rejects(assignTextEndpoint('keyframe_prompts', { configId: 9901, excludeConfigIds: [9901] }))
     const fail = Object.assign(new Error('gateway'), { status: 530 })

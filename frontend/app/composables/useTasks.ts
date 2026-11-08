@@ -92,7 +92,7 @@ export interface TaskWorkSummary {
   updated_at: number
 }
 
-/** GET /episodes/:id/work-estimate 的 estimate 部分：开跑前的计划字数与历史 ETA */
+/** POST /episodes/:id/work-estimate 的 estimate 部分：按待提交参数计算计划字数与历史 ETA */
 export interface StageWorkEstimate {
   stage: ObservedStage
   unit: 'episode' | 'shot'

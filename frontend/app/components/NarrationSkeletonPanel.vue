@@ -232,16 +232,20 @@ const voiceSummary = computed(() => latestTaskOf('narration_tts')?.observation_s
 const skeletonEstimate = ref(null)
 const voiceEstimate = ref(null)
 
+let workEstimateSeq = 0
 async function loadWorkEstimates() {
+  const seq = ++workEstimateSeq
   if (!props.episodeId) return
   for (const [stage, target] of [['skeleton', skeletonEstimate], ['voice', voiceEstimate]]) {
+    target.value = null
     try {
-      const res = await episodeAPI.workEstimate(props.episodeId, stage)
-      target.value = res?.estimate || null
-    } catch { /* 静默：预估失败只是少一行提示，不挡任何操作 */ }
+      const res = await episodeAPI.workEstimate(props.episodeId, stage, undefined, stage === 'skeleton'
+        ? { config_id: props.chatConfigId || undefined, model: props.chatModel || undefined } : {})
+      if (seq === workEstimateSeq) target.value = res?.estimate || null
+    } catch { /* 预估失败保持未知，不复用其他配置的旧样本。 */ }
   }
 }
-watch(() => props.episodeId, loadWorkEstimates, { immediate: true })
+watch([() => props.episodeId, () => props.chatConfigId, () => props.chatModel], loadWorkEstimates, { immediate: true })
 
 function pad(n) { return `#${String(n ?? 0).padStart(2, '0')}` }
 function shotLabel(row, index) { return pad(index + 1) }

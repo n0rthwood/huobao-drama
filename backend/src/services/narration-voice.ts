@@ -478,6 +478,7 @@ export async function voiceWorkEstimate(
     : await validatedVoiceParams(rawSettings, config)
   const plan = await planVoiceBatch(ep, desired, config)
   const scope = scopeFromPreview(plan.map(p => p.item), storyboardIds)
+  const requested = storyboardIds === undefined ? null : new Set(storyboardIds)
   const included = new Set(scope.included.map(item => item.storyboard_id))
   const pending = plan.filter(p => included.has(p.item.storyboard_id) && p.item.selectable)
   const workPlan = buildWorkPlan({
@@ -494,7 +495,7 @@ export async function voiceWorkEstimate(
   })
   return {
     ...stageEstimateOf(workPlan, config.id ?? null, config.model),
-    blocked_units: scope.excluded.length,
+    blocked_units: plan.filter(p => !p.item.selectable && (!requested || requested.has(p.item.storyboard_id))).length,
   }
 }
 

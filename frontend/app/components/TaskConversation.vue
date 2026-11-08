@@ -97,10 +97,13 @@ import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ChevronDown } from 'lucide-vue-next'
 import { taskAPI } from '~/composables/useApi'
+import { toast } from 'vue-sonner'
+import { DEEPLINK_KEYS, deeplinkInitial, querySingle, useDeeplink } from '~/composables/useQuerySync'
 
 const props = defineProps({
   taskId: { type: Number, required: true },
   active: { type: Boolean, default: false },
+  restoreLink: { type: Boolean, default: false },
 })
 
 const { t } = useI18n()
@@ -108,14 +111,33 @@ const { t } = useI18n()
 const works = ref([])
 const calls = ref([])
 const threads = reactive({})
-// 列表页随调用带回的前几条消息：未展开的调用先存这里，展开时立刻可读
-const seeds = reactive({})
 const workFilter = ref(null)
 const hasMore = ref(false)
 const loading = ref(false)
 const loaded = ref(false)
 const loadError = ref('')
 const live = computed(() => props.active)
+const link = useDeeplink('taskConversation', DEEPLINK_KEYS.taskConversation)
+const urlWork = Number(querySingle(link.initial('owork')) || 0)
+const urlThreads = (querySingle(link.initial('ocalls')) || '').split(',').flatMap(value => {
+  const match = /^([1-9]\d*)(?::([1-9]\d*))?$/.exec(value)
+  return match ? [{ id: Number(match[1]), through: Number(match[2] || 0) }] : []
+})
+const nextCallCursor = ref(0)
+let callsRefreshPending = false
+let linkReady = false
+let interacted = false
+let disposed = false
+
+function threadBookmarks() {
+  return Object.entries(threads).sort(([a], [b]) => Number(a) - Number(b))
+    .map(([id, thread]) => `${id}${thread.messages.length ? `:${thread.messages[thread.messages.length - 1].id}` : ''}`).join(',')
+}
+function publishConversationLink() {
+  if (!linkReady) return
+  link.set({ owork: workFilter.value || '', ocalls: threadBookmarks() })
+}
+watch([workFilter, threadBookmarks], publishConversationLink)
 
 /** 列表页每条调用附带的消息条数；超出的按 call 继续读全文 */
 const PAGE_MESSAGE_LIMIT = 20
@@ -147,6 +169,7 @@ const visibleCalls = computed(() => (workFilter.value == null
   : calls.value.filter(call => call.work_id === workFilter.value)))
 
 function toggleWorkFilter(id) {
+  interacted = true
   workFilter.value = workFilter.value === id ? null : id
 }
 
@@ -171,54 +194,41 @@ function tailCursor() {
   return base === 0 ? 0 : calls.value[base - 1].id
 }
 
-/** 一页里带回来的消息：已展开的直接合并（覆盖原 id 的流式更新），未展开的先存着，展开即可见 */
-function absorbMessages(rows) {
-  const grouped = new Map()
-  for (const msg of rows) {
-    const list = grouped.get(msg.call_id) || []
-    list.push(msg)
-    grouped.set(msg.call_id, list)
-  }
-  for (const [callId, list] of grouped) {
-    const thread = threads[callId]
-    if (thread) {
-      const byId = new Map(thread.messages.map(msg => [msg.id, msg]))
-      for (const msg of list) byId.set(msg.id, msg)
-      thread.messages = [...byId.values()].sort((a, b) => a.id - b.id)
-      const call = calls.value.find(row => row.id === callId)
-      thread.total = Math.max(thread.total, call?.message_count ?? thread.messages.length)
-      thread.hasMore = thread.messages.length < thread.total
-    } else {
-      seeds[callId] = list
-    }
-  }
-}
 
-async function loadCalls(cursor) {
-  if (loading.value) return
+async function loadCalls(cursor, paginate = true) {
+  if (disposed) return
+  if (loading.value) { callsRefreshPending = true; return }
   loading.value = true
   try {
     const res = await taskAPI.observations(props.taskId, {
-      cursor: cursor ?? (calls.value.length ? calls.value[calls.value.length - 1].id : 0),
-      message_limit: PAGE_MESSAGE_LIMIT,
+      cursor: cursor ?? nextCallCursor.value,
+      with_messages: false,
     })
     const data = res?.data || res
     works.value = Array.isArray(data?.works) ? data.works : []
     mergeCalls(Array.isArray(data?.calls) ? data.calls : [])
-    absorbMessages(Array.isArray(data?.messages) ? data.messages : [])
-    hasMore.value = !!data?.has_more
+    const rows = Array.isArray(data?.calls) ? data.calls : []
+    if (paginate) {
+      nextCallCursor.value = data?.next_cursor ?? rows[rows.length - 1]?.id ?? nextCallCursor.value
+      hasMore.value = !!data?.has_more
+    } else if (data?.has_more) hasMore.value = true
     loadError.value = ''
   } catch (err) {
     loadError.value = err?.data?.error || err?.message || String(err)
   } finally {
     loading.value = false
     loaded.value = true
+    if (callsRefreshPending && !disposed) {
+      callsRefreshPending = false
+      void loadCalls(tailCursor(), false)
+    }
   }
 }
 
 async function loadMessages(callId, cursor) {
   const thread = threads[callId]
-  if (!thread || thread.loading) return
+  if (!thread || disposed) return false
+  if (thread.loading) { thread.refreshPending = true; return false }
   thread.loading = true
   try {
     const next = cursor ?? (thread.messages.length ? thread.messages[thread.messages.length - 1].id : 0)
@@ -229,22 +239,29 @@ async function loadMessages(callId, cursor) {
     thread.messages = [...byId.values()].sort((a, b) => a.id - b.id)
     thread.total = Number(data?.total || thread.messages.length)
     thread.hasMore = thread.messages.length < thread.total
-  } catch { /* 下一轮重试 */ } finally {
+    return true
+  } catch (err) {
+    loadError.value = err?.message || String(err)
+    return false
+  } finally {
     thread.loading = false
+    if (thread.refreshPending && !disposed && threads[callId] === thread) {
+      thread.refreshPending = false
+      void loadMessages(callId, messageTailCursor(thread))
+    }
   }
 }
 
 function toggleCall(callId) {
+  interacted = true
   if (threads[callId]) {
     delete threads[callId]
     return
   }
-  const seeded = seeds[callId] || []
   const call = calls.value.find(row => row.id === callId)
-  const total = call?.message_count ?? seeded.length
-  threads[callId] = { messages: seeded, total, hasMore: seeded.length < total, loading: false }
-  // 列表页已带回前几条：缺的才补，省一次往返
-  if (seeded.length < total) void loadMessages(callId, seeded.length ? seeded[seeded.length - 1].id : 0)
+  const total = call?.message_count ?? 0
+  threads[callId] = { messages: [], total, hasMore: total > 0, loading: false }
+  void loadMessages(callId, 0)
 }
 
 /**
@@ -253,16 +270,19 @@ function toggleCall(callId) {
  */
 const LIVE_MESSAGE_OVERLAP = 3
 
+function messageTailCursor(thread) {
+  const streaming = thread.messages.findIndex(msg => msg.streaming)
+  const base = streaming === -1
+    ? Math.max(0, thread.messages.length - LIVE_MESSAGE_OVERLAP) : streaming
+  return base === 0 ? 0 : thread.messages[base - 1].id
+}
+
 function refreshOpenThreads() {
   for (const [key, thread] of Object.entries(threads)) {
     const callId = Number(key)
     const call = calls.value.find(row => row.id === callId)
-    if (!call || thread.loading) continue
-    const streaming = thread.messages.findIndex(msg => msg.streaming)
-    const base = streaming === -1
-      ? Math.max(0, thread.messages.length - LIVE_MESSAGE_OVERLAP)
-      : streaming
-    void loadMessages(callId, base === 0 ? 0 : thread.messages[base - 1].id)
+    if (!call) continue
+    void loadMessages(callId, messageTailCursor(thread))
   }
 }
 
@@ -270,9 +290,9 @@ let timer = null
 
 function startPolling() {
   stopPolling()
-  if (!props.active) return
+  if (!props.active || disposed) return
   timer = setInterval(() => {
-    void loadCalls(tailCursor())
+    void loadCalls(tailCursor(), false)
     refreshOpenThreads()
   }, 4000)
 }
@@ -281,18 +301,51 @@ function stopPolling() {
   if (timer) { clearInterval(timer); timer = null }
 }
 
-onMounted(() => {
-  void loadCalls(0)
+async function restoreConversationLink() {
+  try {
+    if (!props.restoreLink || Number(deeplinkInitial('task')) !== props.taskId) return
+    if (urlWork) {
+      if (works.value.some(work => work.id === urlWork)) workFilter.value = urlWork
+      else toast.warning(t('deeplink.missing'))
+    }
+    for (const bookmark of urlThreads) {
+      if (disposed || interacted) return
+      try {
+        const res = await taskAPI.observationMessages(props.taskId, bookmark.id, { limit: PAGE_MESSAGE_LIMIT })
+        const data = res?.data || res
+        if (disposed || interacted) return
+        if (!data?.call || (workFilter.value && data.call.work_id !== workFilter.value)) {
+          toast.warning(t('deeplink.missing'))
+          continue
+        }
+        mergeCalls([{ ...data.call, message_count: data.total }])
+        const messages = Array.isArray(data.messages) ? data.messages : []
+        const thread = threads[bookmark.id] = { messages, total: data.total, hasMore: !!data.has_more, loading: false }
+        while (!interacted && thread.hasMore && (thread.messages[thread.messages.length - 1]?.id || 0) < bookmark.through) {
+          if (!await loadMessages(bookmark.id)) break
+        }
+      } catch { toast.warning(t('deeplink.missing')) }
+    }
+  } finally {
+    linkReady = true
+    publishConversationLink()
+  }
+}
+
+onMounted(async () => {
+  await loadCalls(0)
+  if (disposed) return
+  await restoreConversationLink()
   startPolling()
 })
-onBeforeUnmount(stopPolling)
+onBeforeUnmount(() => { disposed = true; stopPolling() })
 
 watch(() => props.active, (active) => {
   if (active) startPolling()
   else {
     stopPolling()
     // 任务刚转终态：补一次，拿到最后一条调用的收尾时间与正文
-    void loadCalls(tailCursor())
+    void loadCalls(tailCursor(), false)
     refreshOpenThreads()
   }
 })
@@ -301,9 +354,9 @@ watch(() => props.taskId, () => {
   works.value = []
   calls.value = []
   for (const key of Object.keys(threads)) delete threads[key]
-  for (const key of Object.keys(seeds)) delete seeds[key]
   workFilter.value = null
   loaded.value = false
+  nextCallCursor.value = 0
   void loadCalls(0)
   startPolling()
 })

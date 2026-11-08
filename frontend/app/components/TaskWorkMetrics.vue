@@ -1,17 +1,17 @@
 <template>
   <div v-if="summary || estimate" :class="['twm', { 'is-dense': dense }]">
     <!-- 开跑前：只有计划字数与历史样本 ETA -->
-    <template v-if="!summary && estimate">
+    <div v-if="estimate && (!summary || summary.terminal)" class="twm-group">
       <span class="twm-item mono">{{ t('workMetrics.plannedChars', { chars: estimate.planned_source_chars, units: estimate.planned_units }) }}</span>
       <span v-if="estimate.blocked_units" class="twm-item twm-warn">{{ t('workMetrics.blockedUnits', { n: estimate.blocked_units }) }}</span>
       <span v-if="estimate.estimate_ms !== null" class="twm-item mono">
         {{ t('workMetrics.planEta', { duration: fmtDuration(estimate.estimate_ms), n: estimate.sample_count }) }}
       </span>
       <span v-else class="twm-item twm-muted">{{ t('workMetrics.noSamples') }}</span>
-    </template>
+    </div>
 
     <!-- 运行中 / 已结束：全部数字来自持久观测事实 -->
-    <template v-else-if="summary">
+    <div v-if="summary" class="twm-group">
       <span class="twm-item mono">
         {{ t('workMetrics.units', { done: summary.completed_units, total: summary.planned_units }) }}
       </span>
@@ -64,7 +64,7 @@
         {{ t(summary.rate.basis === 'current_batch' ? 'workMetrics.basisBatch' : 'workMetrics.basisHistory', { n: summary.rate.sample_count }) }}
       </span>
       <span v-if="summary.terminal" class="twm-item twm-muted">{{ t('workMetrics.finished') }}</span>
-    </template>
+    </div>
   </div>
 </template>
 
@@ -84,7 +84,7 @@ import { useI18n } from 'vue-i18n'
 const props = defineProps({
   /** 运行中/已结束任务的观测汇总（后端 getTaskWorkSummary） */
   summary: { type: Object, default: null },
-  /** 开跑前的计划字数与历史 ETA（GET /episodes/:id/work-estimate） */
+  /** 开跑前的计划字数与历史 ETA（POST /episodes/:id/work-estimate，按待提交参数） */
   estimate: { type: Object, default: null },
   dense: { type: Boolean, default: false },
 })
@@ -136,6 +136,7 @@ function fmtClock(epochMs) {
   color: var(--text-2, #666);
 }
 .twm.is-dense { gap: 2px 8px; font-size: 10px; }
+.twm-group { display: flex; flex-wrap: wrap; align-items: center; gap: inherit; flex-basis: 100%; }
 .twm-item { white-space: nowrap; }
 .twm-muted { opacity: 0.7; }
 .twm-warn { color: var(--warn, #b26a00); }

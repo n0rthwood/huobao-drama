@@ -166,9 +166,9 @@ export const episodeAPI = {
       config_id: data.model_mode === 'pinned' ? data.config_id || undefined : undefined,
     }),
   // 三阶段「开始前」的源字数与历史样本 ETA（#87 §D）：没有同口径样本时 estimate_ms 为 null
-  workEstimate: (id: number, stage: 'skeleton' | 'voice' | 'design_card', storyboardIds?: number[]) =>
-    api.get<{ estimate: StageWorkEstimate; observation_summary: TaskWorkSummary | null }>(
-      `/episodes/${id}/work-estimate?stage=${stage}${storyboardIds?.length ? `&storyboard_ids=${storyboardIds.join(',')}` : ''}`,
+  workEstimate: (id: number, stage: 'skeleton' | 'voice' | 'design_card', storyboardIds?: number[], options: Record<string, unknown> = {}) =>
+    api.post<{ estimate: StageWorkEstimate; observation_summary: TaskWorkSummary | null }>(
+      `/episodes/${id}/work-estimate`, { ...options, stage, storyboard_ids: storyboardIds },
     ),
   reorderStoryboards: (id: number, ids: number[]) =>
     api.put<{ changed: number; entries: Array<{ id: number; from: number; to: number }>; reconfirm: number[] }>(
@@ -1295,6 +1295,7 @@ export interface TaskObservations {
 export interface TaskObservationMessages {
   task_id: number
   call_id: number
+  call: ObservedCallRow
   total: number
   messages: ObservedMessageRow[]
   limit: number
@@ -1325,7 +1326,7 @@ export const taskAPI = {
     return api.get(`/tasks/${id}/reasoning?${query.toString()}`)
   },
   // 持久调用观测（Issue #87）：工作项 + 调用分页（cursor = 上一页最后一个 call id，升序追加）
-  // + 本页各调用的前 message_limit 条公开消息；with_messages=false 只取轻量列表
+  // 默认轻量列表；with_messages=true 才附带本页各调用的前 message_limit 条公开消息
   observations: (
     id: number,
     opts: { work_id?: number; cursor?: number; limit?: number; with_messages?: boolean; message_limit?: number } = {},
@@ -1334,7 +1335,7 @@ export const taskAPI = {
     if (opts.work_id != null) query.set('work_id', String(opts.work_id))
     if (opts.cursor) query.set('cursor', String(opts.cursor))
     if (opts.limit) query.set('limit', String(opts.limit))
-    if (opts.with_messages === false) query.set('with_messages', '0')
+    if (opts.with_messages !== undefined) query.set('with_messages', opts.with_messages ? '1' : '0')
     if (opts.message_limit) query.set('message_limit', String(opts.message_limit))
     return api.get<TaskObservations>(`/tasks/${id}/observations${query.size ? `?${query.toString()}` : ''}`)
   },

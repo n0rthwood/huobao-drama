@@ -65,7 +65,7 @@ test('streamed multi-step agent calls persist the full public conversation, tool
     ]
     const step2 = [
       { choices: [{ delta: { content: '设计卡已写入' } }] },
-      { choices: [{ delta: {}, finish_reason: 'stop' }], usage: { prompt_tokens: 300, completion_tokens: 40 } },
+      { choices: [{ delta: { tool_calls: [{ index: 0, id: 'call_2', function: { name: 'update_storyboard', arguments: '{"storyboard_id":433}' } }] }, finish_reason: 'tool_calls' }], usage: { prompt_tokens: 300, completion_tokens: 40 } },
     ]
     const taskId = 9001
     await runObservedWork(
@@ -345,8 +345,13 @@ test('streamed credentials never enter either current rows or SQLite WAL, includ
     '{"token":1234567890',
     '{"url":"https://http-user:http-secret@provider.example"}',
     'Authorization: Basic dXNlcjpwYXNz',
+    JSON.stringify({ text: JSON.stringify({ password: 'PRIVATE_NESTED' }) }),
+    JSON.stringify({ text: JSON.stringify({ text: JSON.stringify({ api_key: 'PRIVATE_DEEP' }) }) }),
+    JSON.stringify({ title: 'valid title\\', password: 'PRIVATE_SLASH\\', after: 'public-after-credential' }),
+    '{"inline_b64":"QklOQVJZX0ZJRUxEX0ZJWFRVUkU=',
+    '{"b64_json":"U1RSRUFNRURfQjY0X0ZJWFRVUkU="}',
   ]
-  const secrets = ['PRIVATE_ALPHA', 'PRIVATE_ESCAPED_', 'TAILPRIVATE', 'PRIVATE_BACKSLASH', '1234567890', 'http-user', 'http-secret', 'dXNlcjpwYXNz']
+  const secrets = ['PRIVATE_ALPHA', 'PRIVATE_ESCAPED_', 'TAILPRIVATE', 'PRIVATE_BACKSLASH', '1234567890', 'http-user', 'http-secret', 'dXNlcjpwYXNz', 'PRIVATE_NESTED', 'PRIVATE_DEEP', 'PRIVATE_SLASH', 'QklOQVJZX0ZJRUxEX0ZJWFRVUkU=', 'U1RSRUFNRURfQjY0X0ZJWFRVUkU=', 'PRIVATE_TTS_NESTED', 'PRIVATE_RESULT_NESTED']
   const result = runScenario('obs-credentials', `${PRELUDE}
     import { existsSync, readFileSync } from 'node:fs'
     const inputs = ${JSON.stringify(inputs)}
@@ -358,6 +363,8 @@ test('streamed credentials never enter either current rows or SQLite WAL, includ
       }]))
       const response = await call('https://gw.example.com/v1/chat/completions', { method: 'POST', body: JSON.stringify({ messages: [{ role: 'user', content: 'Check storage redaction' }] }) })
       await response.text()
+      await observeTaskOperation({ kind: 'tts', configId: 7, model: 'fixture', request: { text: JSON.stringify({ password: 'PRIVATE_TTS_NESTED' }) } },
+        async () => ({ text: JSON.stringify({ token: 'PRIVATE_RESULT_NESTED' }) }))
     })
     const calls = listObservedCalls(9010)
     const messages = listObservedMessages(calls[0].id, { limit: 200 })
@@ -366,26 +373,28 @@ test('streamed credentials never enter either current rows or SQLite WAL, includ
   `)
   assert.deepEqual(result.leaked, [])
   assert.ok(result.messages.some(message => message.role === 'tool_call' && message.body.includes('valid title')))
+  assert.ok(result.messages.some(message => message.body.includes('public-after-credential')))
 })
 
 test('SSE error envelopes and non-2xx SSE-labelled bodies retain their actual failure', () => {
   const result = runScenario('obs-sse-errors', `${PRELUDE}
     const request = { stream: true, messages: [{ role: 'user', content: 'Inspect failed responses' }] }
-    for (const mode of ['envelope', 'http']) {
+    for (const mode of ['envelope', 'http', 'json']) {
       await runObservedWork({ taskId: 9011, stage: 'skeleton', sourceChars: 20, sampleKey: mode }, async () => {
         const call = observeTextCall(META, async () => mode === 'envelope'
           ? sseResponse([{ error: { message: 'provider quota exhausted' } }])
-          : new Response('{"error":{"message":"provider rate limit"}}', { status: 429, headers: { 'content-type': 'text/event-stream' } }))
+          : new Response('{"error":{"message":"provider rate limit"}}', { status: mode === 'json' ? 200 : 429, headers: { 'content-type': mode === 'json' ? 'application/json' : 'text/event-stream' } }))
         await (await call('https://gw.example.com/v1/chat/completions', { method: 'POST', body: JSON.stringify(request) })).text()
       })
     }
     const calls = listObservedCalls(9011)
     process.stdout.write('@@' + JSON.stringify({ calls, messages: calls.map(call => listObservedMessages(call.id, { limit: 200 })) }))
   `)
-  assert.deepEqual(result.calls.map(call => call.status), ['failed', 'failed'])
-  assert.deepEqual(result.calls.map(call => call.http_status), [200, 429])
+  assert.deepEqual(result.calls.map(call => call.status), ['failed', 'failed', 'failed'])
+  assert.deepEqual(result.calls.map(call => call.http_status), [200, 429, 200])
   assert.ok(result.messages[0].some(message => message.role === 'error' && message.body.includes('provider quota exhausted')))
   assert.ok(result.messages[1].some(message => message.role === 'error' && message.body.includes('provider rate limit')))
+  assert.ok(result.messages[2].some(message => message.role === 'error' && message.body.includes('provider rate limit')))
 })
 
 test('capture persistence failure is visible without rolling back completed business work or leaving a live timer', () => {
@@ -411,25 +420,37 @@ test('capture persistence failure is visible without rolling back completed busi
   assert.ok(result.messages.some(message => message.phase === 'response' && message.body === 'fixture-response'))
 })
 
-test('real Agent step persists its tool return before another admission wait and attributes nested vision correctly', () => {
+for (const protocol of ['openai', 'gemini']) test(`real ${protocol} Agent persists tool return before admission wait and attributes nested vision correctly`, () => {
   const result = runScenario('obs-agent-step', `${PRELUDE}
     import { Agent } from '@mastra/core/agent'
     import { createTool } from '@mastra/core/tools'
     import { createOpenAI } from '@ai-sdk/openai'
+    import { createGoogleGenerativeAI } from '@ai-sdk/google'
     import { z } from 'zod'
     import { runAgent } from './src/agents/run.ts'
+    const protocol = ${JSON.stringify(protocol)}
     let releaseNext, enteredNext
     const gate = new Promise(resolve => { releaseNext = resolve })
     const waiting = new Promise(resolve => { enteredNext = resolve })
     let requests = 0
-    const transport = observeTextCall(META, async () => requests === 1
-      ? sseResponse([{ id: 'fixture1', model: 'fixture', created: 1, choices: [{ index: 0, delta: { tool_calls: [{ index: 0, id: 'read-fixture', type: 'function', function: { name: 'inspect_fixture', arguments: '{}' } }] }, finish_reason: 'tool_calls' }] }])
-      : sseResponse([{ id: 'fixture2', model: 'fixture', created: 1, choices: [{ index: 0, delta: { content: 'Finished' }, finish_reason: 'stop' }] }]))
-    const provider = createOpenAI({ apiKey: 'fixture', baseURL: 'https://fixture.example/v1', fetch: async (input, init) => {
+    const transport = observeTextCall({ ...META, provider: protocol }, async () => {
+      if (protocol === 'gemini') return sseResponse([{
+        candidates: [{ index: 0, content: { role: 'model', parts: requests === 1
+          ? [{ functionCall: { name: 'inspect_fixture', args: {} } }]
+          : [{ text: 'Finished' }] }, finishReason: 'STOP' }],
+      }])
+      return requests === 1
+        ? sseResponse([{ id: 'fixture1', model: 'fixture', created: 1, choices: [{ index: 0, delta: { tool_calls: [{ index: 0, id: 'read-fixture', type: 'function', function: { name: 'inspect_fixture', arguments: '{}' } }] }, finish_reason: 'tool_calls' }] }])
+        : sseResponse([{ id: 'fixture2', model: 'fixture', created: 1, choices: [{ index: 0, delta: { content: 'Finished' }, finish_reason: 'stop' }] }])
+    })
+    const observedFetch = async (input, init) => {
       requests += 1
       if (requests > 1) { enteredNext(); await gate }
       return transport(input, init)
-    } })
+    }
+    const model = protocol === 'gemini'
+      ? createGoogleGenerativeAI({ apiKey: 'fixture', baseURL: 'https://fixture.example/v1beta', fetch: observedFetch })('gemini-2.5-flash')
+      : createOpenAI({ apiKey: 'fixture', baseURL: 'https://fixture.example/v1', fetch: observedFetch }).chat('fixture')
     const inspectFixture = createTool({
       id: 'inspect_fixture', description: 'Read a fixture through the vision boundary',
       inputSchema: z.object({}), outputSchema: z.object({ value: z.string() }),
@@ -439,7 +460,7 @@ test('real Agent step persists its tool return before another admission wait and
         return { value: 'persisted-before-queue' }
       },
     })
-    const agent = new Agent({ id: 'observed-fixture', name: 'Observed fixture', instructions: 'Use inspect_fixture, then finish.', model: provider.chat('fixture'), tools: { inspect_fixture: inspectFixture } })
+    const agent = new Agent({ id: 'observed-fixture', name: 'Observed fixture', instructions: 'Use inspect_fixture, then finish.', model, tools: { inspect_fixture: inspectFixture } })
     const running = runObservedWork({ taskId: 9013, stage: 'design_card', sourceChars: 40, sampleKey: 'agent-step' }, () => runAgent(agent, 'Read fixture', { maxSteps: 2 }))
     let timeout
     try {
@@ -454,6 +475,8 @@ test('real Agent step persists its tool return before another admission wait and
   const modelIndex = result.callsBeforeRelease.findIndex(call => call.kind === 'llm')
   const visionIndex = result.callsBeforeRelease.findIndex(call => call.kind === 'vision')
   assert.ok(modelIndex >= 0 && visionIndex >= 0)
-  assert.ok(result.messagesBeforeRelease[modelIndex].some(message => message.role === 'tool_result' && message.tool_call_id === 'read-fixture' && message.body.includes('persisted-before-queue')))
+  const toolCall = result.messagesBeforeRelease[modelIndex].find(message => message.phase === 'response' && message.role === 'tool_call')
+  assert.ok(toolCall?.tool_call_id)
+  assert.ok(result.messagesBeforeRelease[modelIndex].some(message => message.role === 'tool_result' && message.tool_call_id === toolCall.tool_call_id && message.body.includes('persisted-before-queue')))
   assert.ok(!result.messagesBeforeRelease[visionIndex].some(message => message.role === 'tool_result'))
 })

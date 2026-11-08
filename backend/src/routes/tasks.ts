@@ -302,7 +302,7 @@ app.get('/:id/observations', async (c) => {
   const workId = c.req.query('work_id') ? Number(c.req.query('work_id')) : undefined
   const limit = c.req.query('limit') ? Number(c.req.query('limit')) : 50
   const cursor = c.req.query('cursor') ? Number(c.req.query('cursor')) : 0
-  const withMessages = c.req.query('with_messages') !== '0'
+  const withMessages = c.req.query('with_messages') === '1'
   const messageLimit = Math.min(Math.max(1, Math.trunc(Number(c.req.query('message_limit'))) || 20), 200)
   const effectiveLimit = Math.min(Math.max(1, Math.trunc(limit) || 50), 200)
   const calls = listObservedCalls(id, { workId, afterId: cursor, limit }).map(call => ({
@@ -337,6 +337,7 @@ app.get('/:id/observations/calls/:callId/messages', async (c) => {
   return success(c, {
     task_id: id,
     call_id: callId,
+    call,
     total: countObservedMessages(callId),
     messages,
     limit: effectiveLimit,

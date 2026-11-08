@@ -225,9 +225,11 @@ export const DEEPLINK_KEYS = {
   /** 任务中心列表：范围/项目/剧集/类型/状态筛选 + 分页 + 展开行 */
   taskList: ['tscope', 'tdrama', 'tep', 'ttype', 'tstatus', 'tpage', 'texp'],
   /** 任务详情弹窗（任务 id 稳定）+ 审核模式 + 弹窗内部「全屏正文」视图 */
-  taskDetail: ['task', 'treview', 'tfull', 'tmodel', 'taskoverwrite', 'tpreview', 'tthink'],
+  taskDetail: ['task', 'treview', 'tfull', 'tmodel', 'taskoverwrite', 'tpreview', 'tthink', 'owork', 'ocalls'],
   /** 详情弹窗内部的重试目标、覆盖确认与本地图片预览；父组同时清理孤立的子键。 */
   taskDialogUi: ['tmodel', 'taskoverwrite', 'tpreview', 'tthink'],
+  /** 持久公开对话：工作项筛选与展开调用（callId:已载入末消息 id）。 */
+  taskConversation: ['owork', 'ocalls'],
   /** 项目详情页：页签 / 素材类型筛选 / 素材编辑弹窗 */
   detail: ['tab', 'filter', 'asset'],
   /** 项目详情页弹窗：图片大图 / 资产浏览器（含其内部筛选）/ 素材库宿主 / 新增剧集 / 项目设置 / 删除确认外壳 */

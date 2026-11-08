@@ -196,12 +196,16 @@ const workSummary = computed(() => {
   }
   return latest?.observation_summary || null
 })
+let workEstimateSeq = 0
 async function loadWorkEstimate() {
-  if (!props.episodeId) return
+  const seq = ++workEstimateSeq
+  workEstimate.value = null
+  if (!props.episodeId || !props.open || !form.value?.voice) return
   try {
-    const res = await episodeAPI.workEstimate(props.episodeId, 'voice', props.storyboardIds)
-    workEstimate.value = res?.estimate || null
-  } catch { /* 静默：预估失败只少一行提示 */ }
+    const ids = props.mode === 'single' ? [props.storyboardId] : props.storyboardIds
+    const res = await episodeAPI.workEstimate(props.episodeId, 'voice', ids, { settings: settingsPayload() })
+    if (seq === workEstimateSeq) workEstimate.value = res?.estimate || null
+  } catch { /* 当前参数没有可信估计就保持未知。 */ }
 }
 const todoCount = computed(() => planGroups.value.missing.length + planGroups.value.changed.length)
 const confirmLabel = computed(() => {
@@ -277,9 +281,14 @@ watch([() => props.storyboardIds, () => props.episodeId, () => props.mode], () =
 })
 // 批量：参数变了重新分类（防抖），保证「将重配的镜头」与确定后实际执行的一致
 watch([form, seedMode], () => {
-  if (props.mode !== 'batch' || !form.value) return
+  if (!props.open || !form.value) return
+  workEstimate.value = null
+  ++workEstimateSeq
   clearTimeout(planTimer)
-  planTimer = setTimeout(refreshPlan, 300)
+  planTimer = setTimeout(() => {
+    if (props.mode === 'batch') void refreshPlan()
+    void loadWorkEstimate()
+  }, 300)
 }, { deep: true })
 
 function confirm() {

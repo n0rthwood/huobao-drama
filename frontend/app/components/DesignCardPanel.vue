@@ -705,7 +705,7 @@ const scope = ref(null)
 const modelMode = ref('auto')
 /** 显式指定不可用时后端返回的 4xx：指名配置与原因，并给可用候选 */
 const pinError = ref(null)
-/** 开跑前的计划字数与历史 ETA（GET /episodes/:id/work-estimate） */
+/** 开跑前的计划字数与历史 ETA（POST /episodes/:id/work-estimate，按本次模型选择） */
 const fillEstimate = ref(null)
 /** 上一次提交的范围：改用其它配置重填时按同一范围重来，不悄悄扩大 */
 const lastFillIds = ref(null)
@@ -859,13 +859,19 @@ const batchTtsBlocked = computed(() => {
 const fillSummary = computed(() => fillTask.value?.observation_summary || null)
 
 /** 本次会填几镜、共多少源字数、历史同口径要多久；没有样本后端返回 null，界面显示「暂无估计」 */
+let fillEstimateSeq = 0
 async function loadFillEstimate() {
+  const seq = ++fillEstimateSeq
+  fillEstimate.value = null
   if (!props.episodeId) return
   try {
-    const res = await episodeAPI.workEstimate(props.episodeId, 'design_card')
-    fillEstimate.value = res?.estimate || null
-  } catch { /* 静默：预估失败不挡填卡，界面显示「暂无估计」 */ }
+    const res = await episodeAPI.workEstimate(props.episodeId, 'design_card', undefined, {
+      model_mode: modelMode.value, config_id: props.chatConfigId || undefined, model: props.chatModel || undefined,
+    })
+    if (seq === fillEstimateSeq) fillEstimate.value = res?.estimate || null
+  } catch { /* 不保留另一配置的旧估计；预估失败不挡操作。 */ }
 }
+watch([modelMode, () => props.chatConfigId, () => props.chatModel], loadFillEstimate)
 
 // ===== 实际引用版本的缩略图 / 大图 / 语义入口（#87 §E） =====
 /** 当前底图选的是哪条候选：缩略图必须用这条候选自己的 path 与版本，不拿资产当前图冒充 */

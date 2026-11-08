@@ -115,6 +115,7 @@
             class="task-detail-section"
             :task-id="live.id"
             :active="taskActive"
+            :restore-link="restoreLink"
           />
 
           <!-- 基本信息 -->

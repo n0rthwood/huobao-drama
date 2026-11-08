@@ -16,7 +16,7 @@ const backendRoot = fileURLToPath(new URL('..', import.meta.url))
 
 function run(body) {
   const script = `
-    import { parseFillModelSelection } from './src/routes/design-cards.ts'
+    import { parseFillModelSelection } from './src/services/ai-stages.ts'
     const out = (value) => console.log('@@' + JSON.stringify(value))
     ${body}
   `

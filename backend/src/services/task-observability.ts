@@ -17,6 +17,7 @@
  */
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { createHash } from 'node:crypto'
+import { isDeepStrictEqual } from 'node:util'
 import { getInsertId, sqlite } from '../db/index.js'
 
 // ─── 对外类型 ────────────────────────────────────────────────────────────
@@ -120,26 +121,92 @@ export interface ObservedCallMeta {
 
 const CREDENTIAL = '[已脱敏凭据]'
 const SECRET_KEY_RE = /^(?:authorization|api[_-]?key|apikey|access[_-]?token|refresh[_-]?token|client[_-]?secret|secret|password|passwd|token|signature)$/i
+const BINARY_KEY_RE = /(?:base64|b64)$|^b64_json$/i
+const JSON_ESCAPES: Record<string, string> = {
+  '"': '"', '\\': '\\', '/': '/', b: '\b', f: '\f', n: '\n', r: '\r', t: '\t',
+}
+
+/** 读取完整或尚未闭合的 JSON 字符串；未完成的转义保留为原文。 */
+function readJsonString(text: string, start: number): { end: number; closed: boolean; value: string } {
+  let at = start + 1
+  while (at < text.length) {
+    if (text[at] === '\\') at += 2
+    else if (text[at] === '"') break
+    else at++
+  }
+  const closed = at < text.length
+  const raw = text.slice(start + 1, closed ? at : text.length)
+  let value: string
+  try { value = JSON.parse(`"${raw}"`) as string } catch {
+    value = raw.replace(/\\(?:u([0-9a-fA-F]{4})|(["\\/bfnrt]))/g,
+      (match, hex: string | undefined, escape: string | undefined) => hex
+        ? String.fromCharCode(Number.parseInt(hex, 16)) : JSON_ESCAPES[escape ?? ''] ?? match)
+  }
+  return { end: closed ? at + 1 : text.length, closed, value }
+}
+
+function jsonValueEnd(text: string, start: number): number {
+  if (text[start] === '"') return readJsonString(text, start).end
+  if (text[start] === '{' || text[start] === '[') {
+    let depth = 0
+    for (let at = start; at < text.length; at++) {
+      if (text[at] === '"') { at = readJsonString(text, at).end - 1; continue }
+      if (text[at] === '{' || text[at] === '[') depth++
+      else if ((text[at] === '}' || text[at] === ']') && --depth === 0) return at + 1
+    }
+    return text.length
+  }
+  let at = start
+  while (at < text.length && !/[\s,}\]]/.test(text[at]!)) at++
+  return at
+}
+
+/** 按 JSON 词法识别字段，递归处理字符串中的 JSON；不猜测普通长字符串。 */
+function redactJsonFields(text: string): string {
+  let copied = 0
+  let result = ''
+  for (let at = 0; at < text.length;) {
+    if (text[at] !== '"') { at++; continue }
+    const token = readJsonString(text, at)
+    let end = token.end
+    let replacement: string | null = null
+    let valueStart = end
+    while (/\s/.test(text[valueStart] ?? '') && valueStart < text.length) valueStart++
+    const secret = SECRET_KEY_RE.test(token.value)
+    const binary = BINARY_KEY_RE.test(token.value)
+    if (token.closed && text[valueStart] === ':' && (secret || binary)) {
+      valueStart++
+      while (/\s/.test(text[valueStart] ?? '') && valueStart < text.length) valueStart++
+      if (valueStart < text.length) {
+        end = jsonValueEnd(text, valueStart)
+        replacement = text.slice(at, valueStart) + JSON.stringify(secret ? CREDENTIAL : '[二进制占位：显式 base64 字段未入库]')
+      }
+    } else {
+      const clean = sanitizeObservedText(token.value)
+      if (clean !== token.value) {
+        replacement = JSON.stringify(clean)
+        if (!token.closed) replacement = replacement.slice(0, -1)
+      }
+    }
+    if (replacement !== null) {
+      result += text.slice(copied, at) + replacement
+      copied = end
+    }
+    at = end
+  }
+  return copied ? result + text.slice(copied) : text
+}
 
 /**
  * 公开文本入库前的唯一处理：凭据脱敏 + 图片/二进制占位。
  * 绝不截断正文——旧 task-logger 的 sanitizeValue 会砍普通字符串，不能用于完整对话。
  */
 export function sanitizeObservedText(text: string): string {
-  return text
+  return redactJsonFields(text)
     .replace(/(Bearer\s+)[A-Za-z0-9._~+/-]{8,}=*/gi, `$1${CREDENTIAL}`)
     .replace(/\b(?:sk|sk-proj|sk-ant|xai|gsk|ak|pat)[-_][A-Za-z0-9._-]{12,}/gi, CREDENTIAL)
     .replace(/\b(https?:\/\/)[^\s/?#@"']+@/gi, `$1${CREDENTIAL}@`)
     .replace(/(\bauthorization\s*:\s*(?:basic|bearer)\s+)[^\s,;]+/gi, `$1${CREDENTIAL}`)
-    // 完整与尚未闭合的 JSON 凭据值都在落盘前遮蔽；转义引号不算字段结束。
-    .replace(
-      /("(?:authorization|api[_-]?key|apikey|access[_-]?token|refresh[_-]?token|client[_-]?secret|secret|password|passwd|token|signature)"\s*:\s*")(?:\\[\s\S]|[^"\\])*("|\\?$)/gi,
-      (_match: string, prefix: string, ending: string) => `${prefix}${CREDENTIAL}${ending === '"' ? '"' : ''}`,
-    )
-    .replace(
-      /("(?:password|passwd|token|secret|api[_-]?key)"\s*:\s*)(-?\d+(?:\.\d+)?|true|false|null)\b/gi,
-      `$1"${CREDENTIAL}"`,
-    )
     .replace(
       /([?&](?:key|token|api[_-]?key|access[_-]?token|signature|sign|sig|secret|password)=)[^&\s"'<>]+/gi,
       `$1${CREDENTIAL}`,
@@ -159,9 +226,8 @@ export function sanitizeObservedText(text: string): string {
  * JSON.stringify 会先调用 toJSON 再交给 replacer，Buffer 那时已经变成
  * `{type:'Buffer',data:[...字节...]}`——靠 replacer 拦不住，字节会被原样写进库。
  */
-const BINARY_KEY_RE = /(?:base64|b64)$|^b64_json$/i
-
 function normalizeForJson(value: unknown, seen: WeakSet<object>): unknown {
+  if (typeof value === 'string') return sanitizeObservedText(value)
   if (typeof value === 'bigint') return value.toString()
   if (typeof value === 'function') return '[函数未入库]'
   if (value instanceof ArrayBuffer) return `[二进制占位：${value.byteLength} 字节未入库]`
@@ -204,6 +270,19 @@ function argumentsText(args: unknown): string {
   return typeof args === 'string' ? sanitizeObservedText(args) : safeJsonText(args)
 }
 
+function comparableToolArgs(value: unknown): unknown {
+  let args = value
+  if (typeof args === 'string') {
+    const rawArgs = args
+    try { args = JSON.parse(rawArgs) } catch { return sanitizeObservedText(rawArgs) }
+  }
+  if (args && typeof args === 'object' && !Array.isArray(args)) {
+    const { __mastraMetadata, ...publicArgs } = args as Record<string, unknown>
+    args = publicArgs
+  }
+  return normalizeForJson(args, new WeakSet())
+}
+
 function errorText(err: unknown): string {
   return sanitizeObservedText(err instanceof Error ? (err.message || err.name) : String(err))
 }
@@ -244,9 +323,17 @@ const finishCallStmt = sqlite.prepare(
          prompt_tokens = ?, completion_tokens = ?, finish_reason = ?, error_msg = ?, heartbeat_at = ?
    WHERE id = ?`,
 )
-const lastCallStmt = sqlite.prepare('SELECT id FROM task_observed_call WHERE work_id = ? ORDER BY id DESC LIMIT 1')
 const toolCallOriginStmt = sqlite.prepare(
   "SELECT call_id AS id FROM task_observed_message WHERE work_id = ? AND tool_call_id = ? AND role = 'tool_call' AND phase = 'response' ORDER BY task_observed_message.id DESC LIMIT 1",
+)
+const unidentifiedToolCallsStmt = sqlite.prepare(
+  `SELECT m.id, m.call_id, COALESCE(m.body, t.body, '') AS body
+     FROM task_observed_message m
+     JOIN task_observed_call c ON c.id = m.call_id
+     LEFT JOIN task_observed_text t ON t.hash = m.text_hash
+    WHERE m.work_id = ? AND m.phase = 'response' AND m.role = 'tool_call'
+      AND m.tool_call_id IS NULL AND m.name = ? AND c.kind = 'llm'
+    ORDER BY m.call_id DESC, m.id ASC`,
 )
 const insertTextStmt = sqlite.prepare('INSERT OR IGNORE INTO task_observed_text (hash, body, chars, created_at) VALUES (?, ?, ?, ?)')
 const insertMessageStmt = sqlite.prepare(
@@ -598,11 +685,11 @@ function geminiRequestMessages(body: Record<string, unknown>): CapturedMessage[]
       if (fnCall && typeof fnCall === 'object') {
         flush()
         const fc = fnCall as Record<string, unknown>
-        out.push({ role: 'tool_call', name: typeof fc.name === 'string' ? fc.name : null, body: argumentsText(fc.args) })
+        out.push({ role: 'tool_call', name: typeof fc.name === 'string' ? fc.name : null, toolCallId: typeof fc.id === 'string' ? fc.id : null, body: argumentsText(fc.args) })
       } else if (fnResponse && typeof fnResponse === 'object') {
         flush()
         const fr = fnResponse as Record<string, unknown>
-        out.push({ role: 'tool', name: typeof fr.name === 'string' ? fr.name : null, body: safeJsonText(fr.response) })
+        out.push({ role: 'tool', name: typeof fr.name === 'string' ? fr.name : null, toolCallId: typeof fr.id === 'string' ? fr.id : null, body: safeJsonText(fr.response) })
       } else {
         buffer += (buffer ? '\n' : '') + partToText(rawPart)
       }
@@ -739,9 +826,9 @@ async function captureSseStream(call: CallHandle, body: ReadableStream<Uint8Arra
         else if (part.functionCall && typeof part.functionCall === 'object') {
           const fc = part.functionCall as Record<string, unknown>
           const index = toolCalls.size
-          const entry = { msg: beginStreamingMessage(call, 'response', 'tool_call'), id: null, name: typeof fc.name === 'string' ? fc.name : null }
+          const entry = { msg: beginStreamingMessage(call, 'response', 'tool_call'), id: typeof fc.id === 'string' ? fc.id : null, name: typeof fc.name === 'string' ? fc.name : null }
           toolCalls.set(index, entry)
-          setMessageIdentityStmt.run(entry.name, null, entry.msg.id)
+          setMessageIdentityStmt.run(entry.name, entry.id, entry.msg.id)
           pushStreaming(entry.msg, typeof fc.args === 'string' ? fc.args : JSON.stringify(fc.args ?? {}))
         }
       }
@@ -830,6 +917,12 @@ async function captureJsonBody(call: CallHandle, stream: ReadableStream<Uint8Arr
     const raw = sanitizeObservedText(text)
     appendMessage(call, 'response', { role: 'raw_response', body: raw })
     completeCall(call, { status: failure ? 'failed' : 'completed', responseChars: raw.length, errorMsg: failure })
+    return
+  }
+  if (parsed.error != null) {
+    const raw = safeJsonText(parsed)
+    appendMessage(call, 'response', { role: 'error', body: raw })
+    completeCall(call, { status: 'failed', responseChars: raw.length, errorMsg: failure ?? safeJsonText(parsed.error) })
     return
   }
 
@@ -992,6 +1085,22 @@ export async function recordFinalToolResults(output: unknown): Promise<void> {
   if (!ctx || !output || typeof output !== 'object' || !('toolResults' in output)) return
   while (ctx.pending.size) await Promise.all([...ctx.pending])
   if (ctx.captureErrors.length) throw ctx.captureErrors[0]
+  // Gemini 可能不给 functionCall.id；SDK 的公开步骤事件补齐其合成 id。
+  // 按名称与实际参数匹配，只在同一次发起调用内允许同名的未标号项回退。
+  const toolCalls = 'toolCalls' in output && Array.isArray(output.toolCalls) ? output.toolCalls : []
+  for (const chunk of toolCalls) {
+    if (!chunk || typeof chunk !== 'object') continue
+    const raw = 'payload' in chunk ? chunk.payload : chunk
+    if (!raw || typeof raw !== 'object') continue
+    const payload = raw as Record<string, unknown>
+    if (typeof payload.toolCallId !== 'string' || typeof payload.toolName !== 'string') continue
+    if (toolCallOriginStmt.get(ctx.workId, payload.toolCallId)) continue
+    const candidates = unidentifiedToolCallsStmt.all(ctx.workId, payload.toolName) as { id: number; call_id: number; body: string }[]
+    const expected = comparableToolArgs(payload.args)
+    const exact = candidates.find(candidate => isDeepStrictEqual(comparableToolArgs(candidate.body), expected))
+    const match = exact ?? (candidates.every(candidate => candidate.call_id === candidates[0]?.call_id) ? candidates[0] : undefined)
+    if (match) setMessageIdentityStmt.run(payload.toolName, payload.toolCallId, match.id)
+  }
   const results = output.toolResults
   if (!Array.isArray(results) || !results.length) return
   for (const chunk of results) {
@@ -1001,9 +1110,8 @@ export async function recordFinalToolResults(output: unknown): Promise<void> {
     const payload = payloadRaw as Record<string, unknown>
     const toolCallId = typeof payload.toolCallId === 'string' ? payload.toolCallId : null
     if (toolCallId && hasToolMessageStmt.get(ctx.workId, toolCallId)) continue
-    const owner = (toolCallId ? toolCallOriginStmt.get(ctx.workId, toolCallId) : undefined) as { id: number } | undefined
-    const target = owner ?? lastCallStmt.get(ctx.workId) as { id: number } | undefined
-    if (!target) continue
+    const target = (toolCallId ? toolCallOriginStmt.get(ctx.workId, toolCallId) : undefined) as { id: number } | undefined
+    if (!target) throw new Error('工具返回无法归属到已记录的模型调用，公开调用记录不完整')
     const counted = countMessagesStmt.get(target.id) as { n: number } | undefined
     const call: CallHandle = { id: target.id, ctx, startedAt: 0, queueMs: 0, seq: counted?.n ?? 0 }
     appendMessage(call, 'final', {

@@ -38,13 +38,20 @@
 
 ### `GET /tasks/{id}/observations?work_id=&cursor=&limit=` [S]（Issue #87，生产验收前）
 用途：回看任务的持久工作项与实际模型调用。`cursor` 是上一页最后一个调用的 `id`，不是分镜序号；`work_id` 可缩小到某个工作项，`limit` 默认 50、限制 1–200。
-返回 `{task_id, works[], calls[], limit, next_cursor, has_more}`。`works` 含 `stage/source_chars/sample_key/storyboard_id/started_at/finished_at/status/model_ms/queue_ms/work_ms`；`calls` 含实际 `config_id/provider/model/kind/status/http_status/started_at/finished_at/duration_ms/queue_ms/request_chars/response_chars/prompt_tokens/completion_tokens/message_count`。时间点是 epoch 毫秒、时长是毫秒；缺失的 usage 不编造。
+返回 `{task_id, works[], calls[], messages[], message_limit, messages_complete, limit, next_cursor, has_more}`。`works` 含 `stage/source_chars/sample_key/storyboard_id/started_at/finished_at/status/model_ms/queue_ms/work_ms`；`calls` 含实际 `config_id/provider/model/kind/status/http_status/started_at/finished_at/duration_ms/queue_ms/request_chars/response_chars/prompt_tokens/completion_tokens/message_count`。时间点是 epoch 毫秒、时长是毫秒；缺失的 usage 不编造。默认轻量列表；只有显式 `with_messages=1` 才附每次调用前 `message_limit` 条公开消息（默认 20 / 最大 200），不截断单条正文。任务窗口列表轮询不预取全文，展开调用后按需读消息。
 沿 `next_cursor` 翻页到末尾，不把第一页当完整历史。在飞调用/正文可以原 ID 增量更新，活动视图还须刷新已加载在飞行，不能只读取大于末尾 ID 的新行。旧任务没有观测记录不代表它没调用模型，不能回填伪造历史。
 
 ### `GET /tasks/{id}/observations/calls/{callId}/messages?cursor=&limit=` [S]（Issue #87，生产验收前）
 用途：读取该真实调用的完整公开输入输出，含注入的 system/SKILL、工具定义、assistant 正文、工具参数与结果；不是索取模型隐藏思维。`cursor` 是上一页最后一个消息 `id`，`limit` 默认 40、限制 1–200；调用不属于该任务时 400。
-返回 `{task_id, call_id, total, messages[], limit, next_cursor, has_more}`；消息包含 `phase/role/name/tool_call_id/body/chars/streaming/created_at`，正文按纯文本查看，分页不截断正文。图片/二进制是明确占位或安全资源引用，凭据在落盘前脱敏。失败前已收到的公开内容也保留；在飞正文由服务端分块持久化，重启后只显示已真实落盘的部分。
+返回 `{task_id, call_id, call, total, messages[], limit, next_cursor, has_more}`；`call` 是该调用的元数据。消息包含 `phase/role/name/tool_call_id/body/chars/streaming/created_at`，正文按纯文本查看，分页不截断正文。图片/二进制是明确占位或安全资源引用，凭据在落盘前脱敏。失败前已收到的公开内容也保留；在飞正文由服务端分块持久化，重启后只显示已真实落盘的部分。
 案例背景：用户无法从最终输出或 console 判定分镜设计在做什么，也无法审查实际 prompt/SKILL；因此 #87 先接骨架、设计卡及相关视觉子调用，配音记录真实 TTS 请求/结果与耗时，不冒称 LLM 对话。全局其他调用的逐项补齐在 #88，不因本接口存在就声称全局覆盖。
+
+### `POST /episodes/{id}/work-estimate` [S]（Issue #87，生产验收前）
+只读预估，不创建生成任务、不调用 LLM 或 TTS 合成。请求体：`{stage:'skeleton'|'voice'|'design_card',storyboard_ids?:number[],model_mode?:'auto'|'pinned',config_id?:number,model?:string,settings?:object}`。
+- 骨架与设计卡按本次模型选择预估：`auto` 忽略旧顶栏 config/model；`pinned` 校验明确指定的配置与模型，不可用时返回同生成入口的结构化 400，不偷换计费服务。
+- 配音使用当前待提交的 `settings`（voice、inference_timesteps、cfg_value、seed、instructions、normalize），不是只看已保存默认；单镜传该镜 id。`storyboard_ids:[]` 是显式空选，不能扩大为整集。
+- 返回 `{estimate,observation_summary}`：前者是当前待提交计划与同组历史 ETA，后者保留上一任务的真实进展/耗时，二者不能互相替代。`blocked_units` 只算所请求范围内不可执行的镜头，不把未勾选项算成阻断。
+
 
 ### `GET /style-presets` [R]
 用途：项目风格白名单与英文风格词来源。创建项目前先读，不能凭记忆写 style。

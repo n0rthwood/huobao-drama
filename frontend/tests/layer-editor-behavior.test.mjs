@@ -7,6 +7,7 @@ import { parse, compileScript } from 'vue/compiler-sfc'
 import { createI18n } from 'vue-i18n'
 import { baseAspectIssue, clampTimelineToCrop, cropRectOf } from '../app/utils/layerQuality.js'
 import { semanticEntries, semanticLayerPatch, anchorState } from '../app/utils/semanticGeometry.js'
+import { deeplinkRuntimeModule } from './sfc-deeplink-runtime.mjs'
 
 // Resolve Nuxt's compile-time aliases while executing the real Vue composables.
 const app = new URL('../app/', import.meta.url)
@@ -119,11 +120,13 @@ const componentAliases = {
   vue: import.meta.resolve('vue'),
   'vue-i18n': import.meta.resolve('vue-i18n'),
   'lucide-vue-next': import.meta.resolve('lucide-vue-next'),
+  'vue-sonner': dataModule('export const toast={warning(){},success(){},error(){},info(){}}'),
   '~/utils/layerSvg': new URL('utils/layerSvg.js', app).href,
   '~/utils/layerQuality': new URL('utils/layerQuality.js', app).href,
   '~/utils/semanticGeometry': new URL('utils/semanticGeometry.js', app).href,
   '~/utils/url': dataModule("export const mediaUrl = path => path; export const apiBase = () => '/api/v1';"),
   '~/composables/useApi': testApi,
+  '~/composables/useQuerySync': deeplinkRuntimeModule,
   '~/components/AssetPicker.vue': pickerPanel,
   './LayerList.vue': emptyPanel,
   './LayerStyle.vue': emptyPanel,
