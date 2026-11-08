@@ -1637,7 +1637,14 @@ const storedPanel = (() => {
 // - workbench：面板/子步骤/页签/资产子页签/提取筛选/资产详情弹窗（键名与取值与旧链接逐字兼容）
 // - workbenchDialogs：工作台自己托管的弹窗身份 dlg + 大图 view + 选中分镜 shot + 多选上下文 sel
 // - assetDetail：资产详情弹窗内部位置（语义条目 sem / 地图编辑 mapedit）
-const link = useDeeplink('workbench', DEEPLINK_KEYS.workbench)
+// 父级同时接管未挂载子步骤的初始键，门禁阻断时不会留下可误恢复到另一镜的孤立弹窗。
+const link = useDeeplink('workbench', [...new Set([
+  ...DEEPLINK_KEYS.workbench, ...DEEPLINK_KEYS.design, ...DEEPLINK_KEYS.picker,
+  ...DEEPLINK_KEYS.keyframes, ...DEEPLINK_KEYS.shotProduction, ...DEEPLINK_KEYS.finalPanel,
+  ...DEEPLINK_KEYS.rewrite, ...DEEPLINK_KEYS.poster, ...DEEPLINK_KEYS.assetReview,
+  ...DEEPLINK_KEYS.mediaLib, ...DEEPLINK_KEYS.layerPicker, ...DEEPLINK_KEYS.narration,
+  ...DEEPLINK_KEYS.refLibrary, ...DEEPLINK_KEYS.archival,
+])])
 const dialogLink = useDeeplink('workbenchDialogs', DEEPLINK_KEYS.workbenchDialogs)
 const assetDetailLink = useDeeplink('assetDetail', DEEPLINK_KEYS.assetDetail)
 const urlPanel = queryEnum(link.initial('panel'), ['script', 'production', 'export'])
@@ -2830,8 +2837,9 @@ function videoPreviewReason(item) {
 /** 批量视频确认框 = 服务端预览清单（逐镜按输入签名比较）+ 勾选；选择模式只缩小预览范围 */
 async function openBatchVideoConfirm(storyboardIds) {
   if (videoBatchRunning.value) { toast.info(t('episode.vid.batchAlreadyRunning')); return }
-  const scoped = Boolean(storyboardIds?.length)
-  batchVideoConfirm.value = { open: true, loading: true, scoped, ids: storyboardIds || [], items: [] }
+  const scoped = Array.isArray(storyboardIds)
+  batchVideoConfirm.value = { open: true, loading: !(scoped && !storyboardIds.length), scoped, ids: storyboardIds || [], items: [] }
+  if (scoped && !storyboardIds.length) return
   try {
     const res = await episodeAPI.previewVideoBatch(epId.value, {
       storyboard_ids: scoped ? storyboardIds : undefined,
@@ -2847,8 +2855,8 @@ async function openBatchVideoConfirm(storyboardIds) {
   }
 }
 function batchVideos() {
-  // 选择模式且有勾选 → 只预览所选；否则预览全集（已有视频的镜头按签名判断是否变化）
-  const useSelection = videoSelectMode.value && selectedVideoSbIds.value.length
+  // 选择模式即使显式空选也只预览空范围，不能放大为整集。
+  const useSelection = videoSelectMode.value
   openBatchVideoConfirm(useSelection ? [...selectedVideoSbIds.value] : null)
 }
 function retryFailedVideos() {
@@ -4212,7 +4220,7 @@ async function resumeComposeBatch() {
 
 /** 批量融合入口：先预览分类（范围可为整集或手动选镜），进行中则展示当前任务 */
 function openComposeDialog(storyboardIds) {
-  const scope = Array.isArray(storyboardIds) && storyboardIds.length ? [...storyboardIds] : undefined
+  const scope = Array.isArray(storyboardIds) ? [...storyboardIds] : undefined
   composeDialog.value = { open: true, scopeIds: scope, submitting: false }
   void resumeComposeBatch()
 }
@@ -5279,14 +5287,24 @@ function currentSelectionIds() {
   return []
 }
 
+/** 弹窗范围独立于工作区多选；关闭弹窗不改父级选择，显式空选记为 on。 */
+function currentBatchSelectionIds() {
+  if (voiceBatchDialog.value.open) return voiceBatchDialog.value.storyboardIds ?? null
+  if (composeDialog.value.open) return composeDialog.value.scopeIds ?? null
+  if (batchVideoConfirm.value.open) return batchVideoConfirm.value.scoped ? batchVideoConfirm.value.ids : null
+  return null
+}
+
 function syncDialogQuery() {
   // 视频步的选中分镜由工作台持有；其余步骤的选中分镜由各自面板组件发布同名 shot 键
   const shotOwned = panel.value === 'production' && prodTab.value === 'videos'
+  const batchSelection = currentBatchSelectionIds()
   dialogLink.set({
     dlg: currentDialogKey(),
     view: imageViewer.value.open ? viewerKeyOf(imageViewer.value.src) : '',
     shot: shotOwned ? selectedSb.value?.id || '' : '',
     sel: currentSelectionIds().join(',') || ((shotOwned && videoSelectMode.value) || (panel.value === 'export' && exportSelTouched) ? 'on' : ''),
+    bsel: batchSelection ? batchSelection.join(',') || 'on' : '',
   })
 }
 watch([
@@ -5337,7 +5355,9 @@ async function applyDialogDeeplink() {
   const [name, arg = ''] = raw.split(':')
   const typed = /^(character|scene|prop)-(\d+)$/.exec(arg)
   const typedItem = typed ? assetItemOf(typed[1], Number(typed[2])) : null
-  const scopeIds = queryIdList(dialogLink.initial('sel')).filter(id => sbs.value.some(sb => sb.id === id))
+  const scopeValue = dialogLink.initial('bsel') ?? dialogLink.initial('sel')
+  const scopeIds = queryIdList(scopeValue).filter(id => sbs.value.some(sb => sb.id === id))
+  const scope = scopeValue ? scopeIds : undefined
   switch (name) {
     case 'roster': return void openRosterDialog()
     case 'create': return void (['character', 'scene', 'prop'].includes(arg) && openAssetCreate(arg))
@@ -5364,10 +5384,10 @@ async function applyDialogDeeplink() {
     case 'narration-settings': return void (narrationSettingsOpen.value = true)
     case 'breakdown': return void (breakdownDialog.value = true)
     case 'voice-batch':
-      voiceBatchDialog.value = { open: true, storyboardIds: scopeIds.length ? scopeIds : undefined, submitting: false }
+      voiceBatchDialog.value = { open: true, storyboardIds: scope, submitting: false }
       return
-    case 'compose': return openComposeDialog(scopeIds)
-    case 'video-batch': return void openBatchVideoConfirm(scopeIds.length ? scopeIds : null)
+    case 'compose': return openComposeDialog(scope)
+    case 'video-batch': return void openBatchVideoConfirm(scope ?? null)
     case 'merge-confirm': return askMerge()
     case 'subtitle-regen': return void (subtitleRegenConfirm.value = true)
     case 'merge-delete':
