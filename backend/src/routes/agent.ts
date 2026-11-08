@@ -12,7 +12,7 @@ import { logTaskError, logTaskPayload, logTaskProgress, logTaskStart, logTaskSuc
 import { createTextTask, finishTextTask, patchTextTaskParams, type TextTaskKind } from '../services/text-task.js'
 import { runWithTextTask } from '../services/text-task-context.js'
 import { buildEvidenceImages, evidenceMessageParts } from '../services/evidence-images.js'
-import { agentChatStage, resolveStageModel, StageVisionUnavailableError, type StageModel } from '../services/ai-stages.js'
+import { agentChatStage, resolveStageModel, stageSelectionErrorPayload, type StageModel } from '../services/ai-stages.js'
 import { db, schema } from '../db/index.js'
 import { eq } from 'drizzle-orm'
 import { skeletonAcceptanceProblems } from '../services/narration-skeleton.js'
@@ -95,9 +95,10 @@ app.post('/:type/chat', async (c) => {
   try {
     resolved = await resolveStageModel(stage, { model: body.model || undefined, configId: body.config_id || undefined })
   } catch (err) {
-    if (err instanceof StageVisionUnavailableError) {
-      logTaskError('Agent', agentType, { stage, error: err.message })
-      return badRequest(c, err.message)
+    const selectionError = stageSelectionErrorPayload(err)
+    if (selectionError) {
+      logTaskError('Agent', agentType, { stage, error: selectionError.message })
+      return c.json(selectionError, 400)
     }
     throw err
   }

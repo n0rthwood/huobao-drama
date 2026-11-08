@@ -24,6 +24,8 @@
         <span>{{ t('episode.narration.charCount', { n: chars, sec: estimateSeconds }) }}</span>
         <span v-if="measuredSeconds">· {{ t('episode.narration.measured', { sec: measuredSeconds }) }}</span>
         <span v-if="cueCount">· {{ t('episode.narration.cues', { n: cueCount }) }}</span>
+        <!-- 本镜最近一次合成的真实服务调用耗时（#87 §D）：和音频长度分开显示 -->
+        <TaskWorkMetrics v-if="voiceSummary" :summary="voiceSummary" dense />
       </div>
 
       <div v-if="tooLongIssue" class="narration-issue">
@@ -133,6 +135,8 @@ import FieldSaveStatus from '~/components/FieldSaveStatus.vue'
 import NarrationFitPanel from '~/components/NarrationFitPanel.vue'
 import NarrationVoiceDialog from '~/components/NarrationVoiceDialog.vue'
 import NarrationEditor from '~/components/NarrationEditor.vue'
+import TaskWorkMetrics from '~/components/TaskWorkMetrics.vue'
+import { useTasks } from '~/composables/useTasks'
 import { spokenText } from '~/utils/narrationMarkup'
 
 // 与后端 MAX_NARRATION_CHARS 一致：TTS 单段字数上限（按念出来的纯文字算）
@@ -170,6 +174,21 @@ watch(() => props.storyboard?.id, () => { subtitleDirty.value = false })
 
 const sb = computed(() => props.storyboard || {})
 const narrationText = computed(() => sb.value.narration_text ?? sb.value.narrationText ?? '')
+
+/**
+ * 本镜最近一次配音任务的真实计量（#87 §D）：单镜重配也归一条 `narration_tts` 任务，
+ * 这里读的是和任务详情同一份 `observation_summary`，刷新页面不丢。
+ */
+const { tasksById } = useTasks()
+const voiceSummary = computed(() => {
+  let latest = null
+  for (const task of Object.values(tasksById.value)) {
+    if (Number(task.storyboard_id) !== Number(sb.value.id)) continue
+    if (String(task.kind || task.params?.kind || '') !== 'narration_tts') continue
+    if (!latest || task.id > latest.id) latest = task
+  }
+  return latest?.observation_summary || null
+})
 const enabled = computed(() => {
   const v = sb.value.narration_enabled ?? sb.value.narrationEnabled
   return v === undefined || v === null ? true : Boolean(v)

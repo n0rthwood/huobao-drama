@@ -36,6 +36,16 @@
 ### `GET /tasks/{id}` [R]
 用途：单任务详情、失败原因、`params`、`remote_state`、`elapsed_ms`、`cancellable`。
 
+### `GET /tasks/{id}/observations?work_id=&cursor=&limit=` [S]（Issue #87，生产验收前）
+用途：回看任务的持久工作项与实际模型调用。`cursor` 是上一页最后一个调用的 `id`，不是分镜序号；`work_id` 可缩小到某个工作项，`limit` 默认 50、限制 1–200。
+返回 `{task_id, works[], calls[], limit, next_cursor, has_more}`。`works` 含 `stage/source_chars/sample_key/storyboard_id/started_at/finished_at/status/model_ms/queue_ms/work_ms`；`calls` 含实际 `config_id/provider/model/kind/status/http_status/started_at/finished_at/duration_ms/queue_ms/request_chars/response_chars/prompt_tokens/completion_tokens/message_count`。时间点是 epoch 毫秒、时长是毫秒；缺失的 usage 不编造。
+沿 `next_cursor` 翻页到末尾，不把第一页当完整历史。在飞调用/正文可以原 ID 增量更新，活动视图还须刷新已加载在飞行，不能只读取大于末尾 ID 的新行。旧任务没有观测记录不代表它没调用模型，不能回填伪造历史。
+
+### `GET /tasks/{id}/observations/calls/{callId}/messages?cursor=&limit=` [S]（Issue #87，生产验收前）
+用途：读取该真实调用的完整公开输入输出，含注入的 system/SKILL、工具定义、assistant 正文、工具参数与结果；不是索取模型隐藏思维。`cursor` 是上一页最后一个消息 `id`，`limit` 默认 40、限制 1–200；调用不属于该任务时 400。
+返回 `{task_id, call_id, total, messages[], limit, next_cursor, has_more}`；消息包含 `phase/role/name/tool_call_id/body/chars/streaming/created_at`，正文按纯文本查看，分页不截断正文。图片/二进制是明确占位或安全资源引用，凭据在落盘前脱敏。失败前已收到的公开内容也保留；在飞正文由服务端分块持久化，重启后只显示已真实落盘的部分。
+案例背景：用户无法从最终输出或 console 判定分镜设计在做什么，也无法审查实际 prompt/SKILL；因此 #87 先接骨架、设计卡及相关视觉子调用，配音记录真实 TTS 请求/结果与耗时，不冒称 LLM 对话。全局其他调用的逐项补齐在 #88，不因本接口存在就声称全局覆盖。
+
 ### `GET /style-presets` [R]
 用途：项目风格白名单与英文风格词来源。创建项目前先读，不能凭记忆写 style。
 
@@ -332,12 +342,14 @@ Body：`{revision}`。人的确认，Agent 不自行调用。
 - `unresolved_layers: [{index, type, text, asset_id, asset_name, asset_exists, semantic_id, semantic_name, available_semantics:[{id,name,group}]}]` — 每个未解析锚点属于哪张资产、缺哪个语义条目、该资产现有哪些语义条目。报错时引用这些名字，不要只报 `issue.code`。
 - `video_generated: boolean` — 本镜是否已有生成视频。
 ### `POST /episodes/{e}/design-cards/fill` [R]（#82 行为变更亦为 `[R]`：八达岭 6 镜 AI 首次写入 combo #01 C / #02 D / #03–#06 C）
-Body：`{storyboard_ids?, config_id?, model?}`；不带 `storyboard_ids` = 只补空白/过期，纪录片还会带上「有卡但 `combo` 为空且 `pending`」的镜。
+Body：`{storyboard_ids?, model_mode?:"auto"|"pinned", config_id?, model?}`；不带 `storyboard_ids` = 只补空白/过期，纪录片还会带上「有卡但 `combo` 为空且 `pending`」的镜。
+`model_mode` 为 #87 新字段（`[S]`）：`auto` 明确忽略残留 `config_id` **和** `model`，按本阶段选健康候选；`pinned` 必须带正整数 `config_id`，不可用时不静默改用另一计费服务。旧客户端不带 mode 但带 config_id 仍视为显式指定；非法 mode 返回 400。
+模型选择错误为 400，`error ∈ model_pin_unavailable | vision_config_unavailable | text_config_unavailable`，含 `stage/stage_label/vision_required/message/alternatives[]`；显式指定不可用还带 `config_id/config_name/reason`（如 suspended/not_vision/inactive/missing/model_mismatch），每个候选含配置 ID、名称、provider/model/vision。自动模式无候选不代表全局不存在视觉配置；不要按错误文案擅自恢复暂停模型或改视觉标记。
 #82 起：模型可直接填 `design_card.combo`，`suggested_combo` 变为可选且仅供展示。
 - 该镜**已有 combo** → 保留，模型值被忽略；**无 combo** → 采用模型值。
 - 纪录片「有卡无 combo」走 **combo-only 补选**：只写 `combo`，不重写卡片内容。
 - 模型给出**非法/缺失 combo** → 该镜计入 `failed`，状态置 `pending` 并把原因写进 `design_card_stale_reason`。
-- 模型写了**不存在的 `semantic_id`/`name`** → 工具直接回错给模型、本镜不落卡；批次计 `failed` 但**保留原状态与原 stale_reason**（不写 `design_card_stale_reason`），原因只在任务输出/日志里。
+- **AI 依赖校验（#87 新行为 `[S]`）**：不存在/空白的必要语义、类型/归属/版本不相容、或有名无所需几何的定位/描线/区域设计，不得通过留空必要字段、“待人工补”而落成成功卡。工具把具体层及原因回给模型沿当前工具循环修正；仍不可实现时按失败处理并保留旧卡。无位置依赖的标题/定义/说明卡及无语义图的合法背景用途不因此被禁止；人工 PUT 不套 AI 限制。
 - 写入后卡片一律 `pending`、`design_card_confirmed_at` 清空；确认仍只能由人按。
 ### `GET /episodes/{e}/design-cards/status` [R]
 用途：填卡任务进度。

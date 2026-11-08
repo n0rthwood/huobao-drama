@@ -38,6 +38,75 @@ export interface TaskParams {
   [key: string]: unknown
 }
 
+/** 观测阶段（#87）：旁白骨架整集 / 配音逐镜 / 设计卡逐镜 */
+export type ObservedStage = 'skeleton' | 'voice' | 'design_card'
+
+export interface TaskWorkSummaryItem {
+  storyboard_id: number | null
+  storyboard_number: number | null
+  source_chars: number
+  state: 'pending' | 'processing' | 'completed' | 'failed' | 'interrupted'
+  /** 实际服务调用耗时（模型 / TTS 请求到响应），不是音频长度 */
+  call_ms: number
+  /** 工作墙钟（含工具与文件处理） */
+  work_ms: number
+}
+
+/**
+ * 三阶段真实计量汇总（后端 services/task-estimate.ts getTaskWorkSummary）。
+ * 任务详情与骨架/配音/设计卡界面读的是同一个对象：刷新浏览器、重启后端都从持久事实重算。
+ */
+export interface TaskWorkSummary {
+  task_id: number
+  stage: ObservedStage
+  unit: 'episode' | 'shot'
+  sample_key: string | null
+  task_status: string
+  terminal: boolean
+  planned_units: number
+  planned_source_chars: number
+  completed_units: number
+  failed_units: number
+  interrupted_units: number
+  remaining_units: number
+  completed_source_chars: number
+  remaining_source_chars: number
+  actual_call_ms: number
+  actual_queue_ms: number
+  queue_wait_known: boolean
+  work_wall_ms: number
+  current: {
+    storyboard_id: number | null
+    storyboard_number: number | null
+    source_chars: number
+    started_at: number
+    elapsed_ms: number
+    call_ms: number
+    estimate_ms: number | null
+    overrun: boolean
+  } | null
+  rate: { ms_per_char: number | null; per_unit_ms: number | null; sample_count: number; basis: 'current_batch' | 'history' } | null
+  eta: { remaining_ms: number; finish_at: number; overrun: boolean; basis: 'current_batch' | 'history'; sample_count: number } | null
+  eta_unknown_reason: 'no_samples' | 'terminal' | 'not_started' | null
+  items: TaskWorkSummaryItem[]
+  updated_at: number
+}
+
+/** GET /episodes/:id/work-estimate 的 estimate 部分：开跑前的计划字数与历史 ETA */
+export interface StageWorkEstimate {
+  stage: ObservedStage
+  unit: 'episode' | 'shot'
+  sample_key: string
+  config_id: number | null
+  model: string | null
+  planned_units: number
+  planned_source_chars: number
+  estimate_ms: number | null
+  sample_count: number
+  basis: 'history' | null
+  blocked_units: number
+}
+
 /** 后端 serializeTask + 任务中心附加字段（见 Issue #8 契约） */
 export interface TaskRow {
   row_type?: 'task'
@@ -74,6 +143,8 @@ export interface TaskRow {
   progress?: { completed?: number; total?: number; failed?: number; current_storyboard_id?: number | null } | null
   label?: string | null
   retry_of?: number | null
+  /** 三阶段真实计量（#87）：只有骨架/配音/设计卡任务有，其余为 null */
+  observation_summary?: TaskWorkSummary | null
 }
 
 /** 关键帧批次 / 视频批次 / 导出合成：任务中心里的父任务行 */

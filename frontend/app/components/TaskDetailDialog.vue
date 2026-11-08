@@ -103,6 +103,20 @@
             <pre class="task-detail-output">{{ outputText }}</pre>
           </div>
 
+          <!-- 真实字数/调用耗时/ETA（#87）：与阶段面板读同一个 observation_summary -->
+          <div v-if="live.observation_summary" class="task-detail-section">
+            <TaskWorkMetrics :summary="live.observation_summary" />
+          </div>
+
+          <!-- 完整公开对话与调用时序（#87）：分页按需读，不另起全局任务轮询；
+               没有观测记录时组件自身不渲染，不留空壳分区 -->
+          <TaskConversation
+            v-if="live.type === 'text'"
+            class="task-detail-section"
+            :task-id="live.id"
+            :active="taskActive"
+          />
+
           <!-- 基本信息 -->
           <dl class="task-detail-grid">
             <div class="task-detail-cell">
@@ -250,6 +264,8 @@ import ProgressRing from '~/components/ProgressRing.vue'
 import ModelSelect from '~/components/ModelSelect.vue'
 import ConfirmDialog from '~/components/ConfirmDialog.vue'
 import MediaTime from '~/components/MediaTime.vue'
+import TaskConversation from '~/components/TaskConversation.vue'
+import TaskWorkMetrics from '~/components/TaskWorkMetrics.vue'
 import AssetPipelinePanel from '~/components/AssetPipelinePanel.vue'
 import TaskErrorMessage from '~/components/TaskErrorMessage.vue'
 import { taskErrorPresentation } from '~/utils/taskError'

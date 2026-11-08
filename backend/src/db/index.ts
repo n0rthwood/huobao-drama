@@ -17,7 +17,7 @@ const repoRoot = path.resolve(__dirname, '../../..')
 export const dbPath = process.env.SQLITE_PATH || path.join(repoRoot, 'data', 'huobao.sqlite3')
 fs.mkdirSync(path.dirname(dbPath), { recursive: true })
 
-const sqlite = new Database(dbPath)
+const sqlite: Database.Database = new Database(dbPath)
 
 // WAL：生成任务轮询与页面读并发时不互相阻塞；busy_timeout 兜底写锁竞争
 sqlite.pragma('journal_mode = WAL')
@@ -46,3 +46,9 @@ export function getInsertId(result: unknown) {
 export const db = drizzle(sqlite, { schema })
 export { schema }
 export type DB = typeof db
+/**
+ * 同一个 better-sqlite3 连接的同步句柄（Issue #87）：任务观测的列表/统计是同步读，
+ * 走 drizzle 的 async 包装只会多一层 Promise；写入也要在同一连接上才能复用 WAL 与 busy_timeout。
+ * 只给需要同步语句的服务用，常规 CRUD 一律继续走 db。
+ */
+export { sqlite }

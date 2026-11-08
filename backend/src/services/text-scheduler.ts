@@ -1,7 +1,16 @@
 import { eq, sql } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
 import { effectiveConcurrency, isOfficialProvider, listActiveTextConfigs } from './ai.js'
-import { AI_STAGES, StageVisionUnavailableError, type AiStage, type StageModel } from './ai-stages.js'
+import {
+  AI_STAGES,
+  StagePinUnavailableError,
+  StageTextUnavailableError,
+  StageVisionUnavailableError,
+  type AiStage,
+  type StageCandidate,
+  type StageModel,
+  type StagePinFacts,
+} from './ai-stages.js'
 import { currentTextTaskId } from './text-task-context.js'
 import { isModelError } from './text-model-errors.js'
 import { markTextTaskStarted, parseTextTaskParams } from './text-task.js'
@@ -129,14 +138,60 @@ export async function selectTextEndpoint(opts: { vision: boolean; excludeConfigI
   return endpoints[0]
 }
 
+/** 本环节当前真正能用的配置（显式指定不可用时回给界面当候选） */
+async function stageCandidates(vision: boolean, excluded: Set<number>): Promise<StageCandidate[]> {
+  return (await listEligibleTextEndpoints({ vision }))
+    .filter(endpoint => !excluded.has(endpoint.configId))
+    .map(endpoint => ({
+      config_id: endpoint.configId,
+      name: endpoint.name || `配置 ${endpoint.configId}`,
+      provider: endpoint.provider,
+      model: endpoint.model,
+      vision: endpoint.vision,
+    }))
+}
+
+/** 某条配置登记的全部模型名（`ai_service_configs.model` 存的是 JSON 数组） */
+async function configModelNames(configId: number): Promise<string[]> {
+  const [row] = await db.select().from(schema.aiServiceConfigs).where(eq(schema.aiServiceConfigs.id, configId))
+  if (!row?.model) return []
+  try {
+    const parsed: unknown = JSON.parse(row.model)
+    const names = Array.isArray(parsed) ? parsed : [parsed]
+    return names.map(name => String(name || '')).filter(Boolean)
+  } catch {
+    return []
+  }
+}
+
+/**
+ * 显式指定的那条配置**为什么**不能用于本环节。按「改了也没用」优先：不存在 / 停用 / 厂商不支持 /
+ * 没有模型名 / 不是视觉模型，都比「暂停」更根本；暂停是可恢复的模型侧故障，单列。
+ */
+async function pinnedConfigFacts(configId: number, visionRequired: boolean): Promise<StagePinFacts> {
+  const [row] = await db.select().from(schema.aiServiceConfigs).where(eq(schema.aiServiceConfigs.id, configId))
+  const name = row?.name || `配置 ${configId}`
+  if (!row || row.serviceType !== 'text') return { configId, name, reason: 'missing' }
+  if (!row.isActive) return { configId, name, reason: 'inactive' }
+  if (!isOfficialProvider('text', row.provider)) {
+    return { configId, name, reason: 'unsupported_provider', detail: row.provider || null }
+  }
+  if (!(await configModelNames(configId)).length) return { configId, name, reason: 'no_model' }
+  if (visionRequired && row.vision !== true) return { configId, name, reason: 'not_vision' }
+  if (row.suspendedAt) return { configId, name, reason: 'suspended', detail: row.suspendedReason || null }
+  // 配置本身没问题，是本次请求把它排除了（重试避让 / 调用方显式 exclude）
+  return { configId, name, reason: 'missing', detail: '本次请求已排除这条配置' }
+}
+
 export async function assignTextEndpoint(
   stage: AiStage,
   opts: { configId?: number; model?: string; excludeConfigIds?: number[]; retryOf?: number } = {},
 ): Promise<StageModel> {
   const spec = AI_STAGES[stage]
   if (!spec) throw new Error(`未登记的 AI 环节：${stage}`)
+  const pinned = opts.configId != null
   const excluded = new Set(opts.excludeConfigIds ?? [])
-  if (opts.retryOf) {
+  if (opts.retryOf && !pinned) {
     // 自动/手动重试：避开原任务实际失败的那条配置，除非请求硬指定了配置
     const [parent] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, opts.retryOf))
     const failedConfigId = parent ? (parseTextTaskParams(parent.params)?.model_used as { config_id?: number | null } | undefined)?.config_id : null
@@ -148,12 +203,38 @@ export async function assignTextEndpoint(
   endpoints.sort((a, b) => slots.assignmentScore(a) - slots.assignmentScore(b))
   const endpoint = endpoints[0]
   if (!endpoint) {
+    // 显式指定的配置用不了：指名原因 + 列出可用候选，**绝不**静默换到另一条计费服务，
+    // 更不能谎称「全局没有视觉配置」（Issue #87 的 500 误报根因）。
+    if (pinned) {
+      throw new StagePinUnavailableError(
+        stage, spec.label, spec.vision,
+        await pinnedConfigFacts(opts.configId!, spec.vision),
+        await stageCandidates(spec.vision, excluded),
+      )
+    }
     if (spec.vision) throw new StageVisionUnavailableError(stage, spec.label)
-    throw new Error(opts.configId != null ? '指定的文本模型已停用、暂停或不支持该环节' : '所有文本模型均不可用、已停用或暂停')
+    throw new StageTextUnavailableError(stage, spec.label)
+  }
+  // 模型名只有在**最终用的就是请求指定的那条配置**时才生效（StageModelOptions 的既有口径）：
+  // 自动模式下顶栏残留的模型字符串绝不能套到另一条端点上，否则真正的调用会用错模型名。
+  if (pinned && opts.model && opts.model !== endpoint.model) {
+    const allowed = await configModelNames(endpoint.configId)
+    if (!allowed.includes(opts.model)) {
+      throw new StagePinUnavailableError(
+        stage, spec.label, spec.vision,
+        {
+          configId: endpoint.configId,
+          name: endpoint.name || `配置 ${endpoint.configId}`,
+          reason: 'model_mismatch',
+          detail: allowed.length ? `这条配置可用的模型：${allowed.join('、')}` : null,
+        },
+        await stageCandidates(spec.vision, excluded),
+      )
+    }
   }
   slots.noteAssigned(endpoint.configId)
   return { ...endpoint, stage, label: spec.label, vision: spec.vision,
-    model: opts.model || endpoint.model, pinned: opts.configId != null }
+    model: pinned && opts.model ? opts.model : endpoint.model, pinned }
 }
 
 export async function withTextSlot<T>(args: { configId: number; interactive?: boolean; signal?: AbortSignal }, fn: () => Promise<T>): Promise<T> {

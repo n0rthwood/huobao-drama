@@ -136,6 +136,16 @@ Issue 整理完成后、实施前，必须让 **Fabel（Anthropic）或 Astra（
 - **每次功能或 API 升级（新增/变更/下线接口、字段、流程阶段、约束）都必须回顾并更新技能**：补充新增 API 点、触发该功能的案例背景、以及为何需要该功能的记录；变更与业务提交同一个 Issue 分支提交。
 - 技能副本**不得包含真实密钥值**：`api_key`/token 的真实值、认证头实值、带真实凭据的 URL 一律不得写入；字段名、占位符与安全说明（例如 `GET /ai-configs` 响应含 `api_key`、只能在内存中白名单取字段）属于必要的 API 契约，必须保留。
 
+### LLM harness 可观察性与持久化（全局强制）
+
+- **每次 LLM harness 调用必须归属可查询的 task**：包括 Agent 工具循环、直接 chat、视觉子调用和分阶段/批量调用。任务窗口必须说明当前阶段、当前处理对象、已完成/失败数量及真实调用状态；不能用 console 日志或模型事后总结代替。
+- **公开对话必须持久保存并可分页回看**：保存实际发送的 system/user/assistant/tool（及使用到的其他公开角色）、注入的 Prompt/SKILL、工具定义、模型公开正文、工具参数与结果，失败前已收到的公开内容也保留。不得仅保存最终输出、计数、活动摘要或最近 N 条。图片/二进制使用明确占位或安全资源引用；凭据、认证信息和 URL secret 在落盘前脱敏；纯文本渲染。新记录不索取或伪造隐藏思维。
+- **计量口径分开且来自服务端事实**：源文本字数、实际输入/输出字数、排队等待、获得执行槽后的实际请求调用耗时、任务墙钟和媒体时长不得混用。模型调用耗时指应用观测到的服务调用时间，不冒称供应商纯计算时间；不得让模型自行估计或编造实际耗时。
+- **进度、对话、计时与 ETA 依据必须 survive 后端重启和浏览器刷新**：开始/结束/错误/中断及已完成项落盘；终态计时停止。在飞调用重启后按既有恢复政策标中断，冻结到最后已持久确认的时刻，不假装继续运行，不把中断计作成功样本；重试新任务保留关联与原记录。
+- **ETA 基于真实可比样本**：按阶段、实际配置/模型和影响耗时的参数分组，优先本批成功样本，再用历史同类样本；当前项同口径已用时间从预计总耗时扣除。显示样本来源/数量；无样本、未知队列或超过预估时如实说明，不能用固定秒数、音频长度或归零倒计时冒充完成预测。
+- 新增或修改 harness 必须验收：任务窗口能回看完整公开调用、多步工具交互与失败现场；刷新位置后统计不归零；后端重启后历史仍在、在飞项状态真实、终态耗时不增长。最终验收仍遵守 §9/§10 的生产专用测试项目与计费授权要求。
+- 全局规范不等于所有旧调用已接入：分镜设计链路由 Issue #87 落地；其他调用由 Issue #88 先逐项盘点，再分析并补齐，禁止用写完规则代替全局完成。
+
 火宝短剧（Huobao Drama）：AI 短剧一站式制作（小说 → 剧本 → 资产提取 → 生图 → 分镜 → 生视频 → FFmpeg 导出）。
 项目结构、命令与架构总览见 `CLAUDE.md`，本文件只记录 Agent 开发时容易踩坑的补充信息。
 
@@ -354,16 +364,17 @@ Issue 整理完成后、实施前，必须让 **Fabel（Anthropic）或 Astra（
 - 术语（四语 locale 同步）：表达设计 → **分镜设计**（`episode.prod.design` / `episode.stage.designDesc`）、图层 → **分镜制作**（`episode.prod.production`）、新增 **视频与成品**（`episode.prod.final`）；`episode.compose*` / `episode.export.sourceComposed|repairFusion` 的「融合 / fusion / 융합」文案一律改为**合成成品**（键名不变）。服务端 `task-label.ts`、`ai-stages.ts` 的 `shot_intent` 标签与 `storyboard-assets.ts` 的 `intent_unmet` 消息同步改为「分镜设计」。`episode.intent.*` 随 R4、`episode.clip.*` 随 R5 删除。
 
 ### 分镜设计卡 design card（纪录片专属，Issue #57，替换 #49 的表达设计）
-- 一镜最多由两段组成：**▣ 图层段**（确定性渲染，≤30 s）与 **▶ 生成段**（视频模型，≤15 s），二者不互斥。段组合 `storyboards.combo ∈ A|B|C|D`（A 只图层 / B 只生成 / C 图层→生成 / D 生成→图层）是**显式人工选择，没有默认值**，AI 只写 `design_card.suggested_combo`（服务端忽略模型给的 `combo`）。C 的首帧 / D 的尾帧由**衔接帧**锁定继承（派生归 R5）。
+- 一镜最多由两段组成：**▣ 图层段**（确定性渲染，≤30 s）与 **▶ 生成段**（视频模型，≤15 s），二者不互斥。段组合 `storyboards.combo ∈ A|B|C|D`（A 只图层 / B 只生成 / C 图层→生成 / D 生成→图层）没有默认值；Issue #82 起 AI 可给尚未选择组合的镜首次填写 `combo`，已有组合保留，仍须人工审阅/确认。C 的首帧 / D 的尾帧由**衔接帧**锁定继承（派生归 R5）。
 - 列：`storyboards.combo`、`design_card`（JSON）、`design_card_status ∈ blank|ai_filling|pending|confirmed|stale`、`design_card_confirmed_at`、`design_card_stale_reason`。`intent` / `intent_reviewed` 两列已由 `services/design-card-migration.ts` 转换后**自行 DROP COLUMN**（`sqlite-schema.ts` 的 `columnRemovals` 跑在数据迁移之前，不能用），回滚需从 DB 备份恢复。
 - 唯一 schema / 规范化 / 校验在 `services/design-card.ts`（纯函数，不读库）：链条是 **信息点 `info_points[{id,text,via}]` → 图层段计划 `layer_plan{base, must_mark[], planned_layers[]}` → 生成段计划 `gen_plan{reference_assets[], first/mid/last}` → 预算 `budget{layer_s, gen_s}` → `rationale`**。`issues` **读时重算、不落库**；阻断码 `combo_missing / budget_over_layer / budget_over_gen / budget_under_narration / missing_base / gen_slot_missing`，警告码 `info_point_unassigned / must_mark_not_planned / reference_not_mentioned / budget_tight / unresolved_ref`。配音实测时长只重算问题，**不回写 `budget`**。
 - **解析不到的引用保留并标 `unresolved`，绝不静默删除**（沿用 #49 的原则）。解析上下文 `services/design-card-context.ts` 的 `loadDesignCardContext(episodeId)` 必须保持**同步**（一致性检查在 `syncStoryboardBindingsFromPrompts` 的同步事务里调用，中途 await 会丢更新，#43 的教训）；底图候选 `listBaseCandidates()` 是异步的，单独走路由，**不进同步上下文**。`buildDesignCardBriefs()` 给关键帧/视频提示词批量拼「本镜设计卡 + 前后镜」的 message 片段。
+- **AI 设计必须依据现有资产可实现（Issue #87，Fabel 评审）**：选择资产前核对实际引用版本的图像、属性、语义与所需几何；需要定位/描线/区域的层不得引用不存在、不相容或空几何语义，也不得清空必要锚点后以“待人工补”保存为成功。无语义图片仍可用于其实际支持的整体展示/背景；不依赖资产内位置的标题/定义/说明卡可以无锚定。现有资产不能满足必要视觉任务时明确失败与缺口，不计成功、不静默丢失信息点；不得把普通河网冒充特定历史航线。此约束只用于 AI 写工具，不禁止人工增加信息、标注或扩展设计，不自动重写历史卡或删层。
 - 接口全在 `routes/design-cards.ts`（按 posters 的先例双挂载到 `/episodes` 与 `/storyboards`，`routes/episodes.ts` 只负责删掉旧的四条 intent 路由）：`PUT /storyboards/:id/design-card {combo?, design_card?}`（任何写入 → `pending`；预算超硬上限 400 `budget_over_layer|budget_over_gen`；已确认且有制作产物时改组合 400 `{gate:'combo_switch'}` 指向 R5）、`POST …/design-card/confirm {acknowledge?}`（0 阻断才放行，有警告需 `acknowledge:true`，否则 400 `blocked` / `needs_acknowledge` 并回传 `issues`）、`POST …/design-card/unconfirm`、`POST /episodes/:id/design-cards/fill`、`GET …/design-cards/{status,audit}`、`GET /episodes/:id/design-card-context`、`PUT /episodes/:id/storyboards/order {ids}`（ids 必须是本集存活分镜全集，两阶段负号写入 + 「上一镜变了就撤销关键帧确认」级联）。**`ai_filling` 中对同一镜的 PUT/confirm/unconfirm 一律 409 `card_busy`**。
 - AI 环节 `AI_STAGES.design_card = { vision: true }`（替换 `shot_intent`），调用点 `services/design-card-batch.ts`，任务 `sys_task(type='text', params.kind='design_card')`。续跑语义：指定 ids 重填这几镜，否则只补 `blank`/`stale`；运行期该镜置 `ai_filling`，成功写 `pending`、失败回原状态；**重填前把整批旧卡写进该次任务的 `params.previous_card`**（不存 `__prev`）。工具收窄用 `storyboardPromptScope='design_card'`（只给「读上下文 + `read_image` + 只写 design_card」，不给 `save_storyboards`）。
 - `ref_issues` 码 **`card_ref_unmet`（阻断，取代 `intent_unmet`）**：启用了生成段的镜头，`gen_plan.reference_assets` 每一条都必须被**写了内容的**关键帧/视频提示词 `@` 到。`combo='A'` 的镜头不再报 `empty_video_prompt`（整镜由图层段渲染，本来就没有模型视频），也被 `keyframe-prompts.ts` / `video-prompts.ts` / `video-batch.ts` 跳过（判据从 device 常量换成 `combo`，`clipPositionOfCombo()` 在 `storyboard-clips.ts`）。`clip-draft.ts` 改读 `layer_plan`（最小端口，卡片字段/默认位置/底图回退三项缺陷仍归 R5）。
 - **拆镜硬上限（契约 §8）**：`save_storyboards` 的纪录片变体在写库前算 `cap = min(ceil(段数 × 1.5), 段数 + 3)`（段数 = `scriptParagraphs(script)`，`services/narration-first.ts`），超出的镜**逐条拒存**并写进返回值 `rejected[]`；**空旁白拒存**（纪录片每镜必须承载一段旁白，旧的「关掉旁白」分支已删）；**重复旁白拒存**（按 `narrationMatchKey` 归一化比对本集既有镜 + 本批）。止损：同一集**连续 2 批整批被拒** → `consumeStoryboardStopReason()` 把合并建议交给调用方（`routes/agent.ts` 与 `storyboard-fill-gaps.ts`），任务判 `failed`，不让模型无限重试。
 - 过期传播的唯一写入口 `services/staleness.ts`：`onScriptChanged()` → 整集设计卡 `stale`（`script_changed`）；`markDesignCardsStaleForReviewItems()` 消费 R2 的 `changed_item_ids`，只把**引用了被改动条目**的卡置过期（`asset_review_items` 表还没合并时返回 0，表一出现自动生效）。`blank` / `ai_filling` 的镜头不置过期。
-- 技能（四语）：`documentary-storyboard` 的 §4 改写为设计卡链路 + 组合建议规则（**永不决定 `combo`**）+ 三条硬规则；`documentary-keyframe-prompt` 的 device 分支表换成 combo 分支（A 不写提示词、C/D 的锁定槽位不写提示词，阻断码文案改 `card_ref_unmet`）。
+- 技能（四语）：`documentary-storyboard` 的阶段二规定设计卡链路、AI 首次组合选择与现有资产可实现性；不能保留“缺语义仍规划、空锚点待人工补”的旧成功出口。`documentary-keyframe-prompt` 按 combo 分支（A 不写提示词、C/D 的锁定槽位不写提示词，阻断码为 `card_ref_unmet`）。
 - 前端：`components/DesignCardPanel.vue`（R1 的挂载壳内部）+ `components/AssetPicker.vue`（统一素材/语义条目选择弹层）；i18n 键组 `episode.design.*`（四语同步），`episode.intent.*` 已删除。镜表支持拖拽与上移/下移重排。
 
 ### 资产审核清单（纪录片专属，Issue #55）

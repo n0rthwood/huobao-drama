@@ -17,7 +17,7 @@ import { mountReExtractRoute } from './asset-reextract.js'
 import { addArchivalImage, removeArchivalImage } from '../services/archival-images.js'
 import { getPortraitAppearanceStatus, startPortraitAppearance, type StartPortraitAppearanceResult } from '../services/portrait-appearance.js'
 import { bindCreatedAssetToReviewItem, findReviewItemAssetDuplicate, onAssetRemoved, onEpisodeAssetLinkChanged } from '../services/asset-review.js'
-import { StageVisionUnavailableError } from '../services/ai-stages.js'
+import { stageSelectionErrorPayload } from '../services/ai-stages.js'
 
 const app = new Hono()
 const CHARACTER_IMAGE_SIZE = '1920x1080'
@@ -67,8 +67,8 @@ app.post('/:id/appearance-from-portrait', async (c) => {
   try {
     result = await startPortraitAppearance(id, { episodeId, configId: body.text_config_id ?? undefined })
   } catch (err) {
-    // 视觉环节无可用视觉配置（#51）
-    if (err instanceof StageVisionUnavailableError) return badRequest(c, err.message)
+    const selectionError = stageSelectionErrorPayload(err)
+    if (selectionError) return c.json(selectionError, 400)
     throw err
   }
   if (!result.started) {

@@ -13,6 +13,7 @@ import { captureReasoningFromStream, getActiveReasoningSink } from './reasoning-
 import { getTextConfig, getTextProviderBaseUrl, getConfigById } from '../services/ai.js'
 import { isModelError, noteEndpointError, noteEndpointSuccess, withTextSlot } from '../services/text-scheduler.js'
 import { noteAgentFetchStarted, noteFirstAgentFetchFailed } from '../services/text-task-context.js'
+import { observeQueueWait, observeTextCall } from '../services/task-observability.js'
 import { logTaskProgress } from '../utils/task-logger.js'
 import { scriptTools } from './tools/script-tools.js'
 import { extractTools } from './tools/extract-tools.js'
@@ -285,7 +286,7 @@ function openaiThinkingOffPatch(): Record<string, any> {
   }
 }
 
-function createThinkingOffFetch(providerName: string, baseURL: string): typeof fetch | undefined {
+function createThinkingOffFetch(providerName: string, baseURL: string, transport: typeof fetch): typeof fetch | undefined {
   if (!thinkingOffEnabled || isOfficialTextHost(baseURL)) return undefined
   const openaiPatch = openaiThinkingOffPatch()
 
@@ -313,7 +314,7 @@ function createThinkingOffFetch(providerName: string, baseURL: string): typeof f
         }
       }
     } catch { /* 解析失败则原样透传 */ }
-    return textModelFetch(input, init)
+    return transport(input, init)
   }
 }
 
@@ -325,8 +326,8 @@ function createThinkingOffFetch(providerName: string, baseURL: string): typeof f
  * 需要在文本服务配置里显式指定并随每个请求下发。
  * inner 传 thinking-off fetch 时可链式叠加两个补丁。
  */
-function createTemperatureFetch(providerName: string, temperature: number, inner?: typeof fetch): typeof fetch {
-  const base = inner || textModelFetch
+function createTemperatureFetch(providerName: string, temperature: number, transport: typeof fetch, inner?: typeof fetch): typeof fetch {
+  const base = inner || transport
   return async (input: any, init?: any) => {
     try {
       if (init?.body && typeof init.body === 'string') {
@@ -365,8 +366,8 @@ function isOfficialOpenAIHost(baseURL: string) {
   return /api\.openai\.com/.test(baseURL)
 }
 
-function createMaxTokensFetch(providerName: string, inner?: typeof fetch): typeof fetch {
-  const base = inner || textModelFetch
+function createMaxTokensFetch(providerName: string, transport: typeof fetch, inner?: typeof fetch): typeof fetch {
+  const base = inner || transport
   return async (input: any, init?: any) => {
     try {
       if (init?.body && typeof init.body === 'string') {
@@ -453,16 +454,31 @@ async function getModel(fileModel: string | undefined, modelOverride?: string, t
     })
   }
 
+  // 真实调用观测（#87）装在**补丁链之内、网络传输之前**：thinking-off / 温度 / 输出上限
+  // 都会重写 init.body，采集必须看到真正发出去的那份请求体，否则 request_params 是假的。
+  // 排队标记仍在取槽位之外，采集本身仍在槽位之内，既有超时/dispatcher/响应语义一概不变。
+  const observedTransport = observeTextCall(
+    {
+      kind: 'llm',
+      configId: textConfig.id,
+      configName: textConfig.name ?? null,
+      provider: textConfig.provider,
+      model: modelName,
+      baseUrl: resolvedBaseURL,
+    },
+    createReasoningCaptureFetch(textModelFetch),
+  )
   // 叠加请求补丁：thinking-off（非官方端点）+ 配置温度 + 输出上限（非官方 OpenAI）
-  const thinkingOffFetch = createThinkingOffFetch(providerName, resolvedBaseURL)
+  const thinkingOffFetch = createThinkingOffFetch(providerName, resolvedBaseURL, observedTransport)
   const tempFetch = temperature !== null
-    ? createTemperatureFetch(providerName, temperature, thinkingOffFetch)
+    ? createTemperatureFetch(providerName, temperature, observedTransport, thinkingOffFetch)
     : thinkingOffFetch
-  const fetchImpl = createScheduledFetch(textConfig.id, createReasoningCaptureFetch(
-    isOfficialOpenAIHost(resolvedBaseURL)
-      ? tempFetch ?? textModelFetch
-      : createMaxTokensFetch(providerName, tempFetch),
-  ))
+  const patchedFetch = isOfficialOpenAIHost(resolvedBaseURL)
+    ? tempFetch ?? observedTransport
+    : createMaxTokensFetch(providerName, observedTransport, tempFetch)
+  const scheduledFetch = createScheduledFetch(textConfig.id, patchedFetch)
+  const fetchImpl = ((input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) =>
+    observeQueueWait(() => scheduledFetch(input, init))) as typeof fetch
 
   if (providerName === 'gemini') {
     const googleProvider = createGoogleGenerativeAI({

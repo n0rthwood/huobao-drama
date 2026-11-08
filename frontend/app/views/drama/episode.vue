@@ -616,6 +616,8 @@
             :narration-voice-batch="narrationVoiceBatch"
             @refresh="refresh"
             @batch-narration-voice="batchNarrationVoice"
+            @open-asset="openAssetFromReview"
+            @preview="openDesignImagePreview"
           />
 
           <!-- Sub: 分镜关键帧（剧情专用；纪录片走「分镜制作」步） -->
@@ -925,7 +927,7 @@
             </section>
 
             <!-- 证据素材与语义标注（Issue #47）：忠实素材只做标注与底图切换，不走生图 -->
-            <section v-if="assetDetail.type === 'prop'" class="asset-detail-ref-panel">
+            <section v-if="assetDetail.type === 'prop'" ref="assetSemanticsSection" class="asset-detail-ref-panel">
               <div class="asset-detail-section-title">
                 <span>{{ t('episode.documentary.semantics.sectionTitle') }}</span>
                 <span class="dim">{{ t('episode.documentary.semantics.sectionHint') }}</span>
@@ -1988,6 +1990,11 @@ function closeImageViewer() {
   imageViewer.value = { open: false, src: '', title: '' }
 }
 
+function openDesignImagePreview(preview) {
+  if (!preview?.path) return
+  openImageViewer(mediaUrl(preview.path), preview.title || '')
+}
+
 // 场景时段词表：与 #21 的提取/提示词规则同一套（入库值固定为中文词，界面按语言显示）
 const TIME_PERIODS = ['清晨', '上午', '正午', '午后', '黄昏', '夜晚', '深夜']
 const TIME_PERIOD_KEYS = {
@@ -2008,6 +2015,7 @@ function onSceneTimePreset(value) {
 
 /** 语义面板要滚动并高亮的条目 id（审核清单的「标注待修正」直达用；为空与改动前逐字一致） */
 const focusSemanticId = ref('')
+const assetSemanticsSection = ref(null)
 
 function openAssetDetail(type, item) {
   if (!item) return
@@ -2137,9 +2145,13 @@ function openAssetDetailById(type, id, semanticId = null) {
   openAssetDetail(type, item)
 }
 
-function openAssetFromReview(payload) {
+async function openAssetFromReview(payload) {
   if (!payload?.kind || !payload?.id) return
   openAssetDetailById(payload.kind, payload.id, payload.semantic_id || null)
+  if (payload.section === 'semantics' && payload.kind === 'prop') {
+    await nextTick()
+    assetSemanticsSection.value?.scrollIntoView({ block: 'start' })
+  }
 }
 
 function openAssetCreateFromReview(payload) {

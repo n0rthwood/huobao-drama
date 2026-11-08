@@ -41,6 +41,7 @@ import {
   type DesignCardBatchStart,
 } from '../services/design-card-batch.js'
 import { reorderStoryboards } from '../services/storyboard-fill-gaps.js'
+import { stageSelectionErrorPayload } from '../services/ai-stages.js'
 
 type Ctx = Parameters<typeof badRequest>[0]
 
@@ -51,6 +52,30 @@ async function readJson(c: Ctx): Promise<Record<string, unknown>> {
   } catch {
     return {}
   }
+}
+
+/**
+ * 填卡请求里的模型选择（Issue #87 B）。
+ * `model_mode='auto'`：本次没有显式指定，后端自动选健康候选——顶栏残留的历史选择（localStorage）
+ * 不算用户此次主动选择，所以 `config_id` / `model` 一律忽略，绝不把旧模型名套到别的端点上。
+ * `model_mode='pinned'`：用户此次明确指定，必须带正整数 `config_id`；不可用时由调度器指名原因，
+ * 不静默换到另一条计费服务。不传 `model_mode` 的老客户端：带了 `config_id` 就按显式指定处理。
+ */
+export function parseFillModelSelection(
+  body: Record<string, unknown>,
+): { mode: 'auto' | 'pinned'; configId?: number; model?: string } | { error: string } {
+  const configId = Number.isInteger(body.config_id) && Number(body.config_id) > 0 ? Number(body.config_id) : undefined
+  const mode = body.model_mode === undefined || body.model_mode === null
+    ? (configId === undefined ? 'auto' : 'pinned')
+    : body.model_mode
+  if (mode !== 'auto' && mode !== 'pinned') {
+    return { error: `model_mode 只能是 auto 或 pinned，收到 ${JSON.stringify(body.model_mode)}` }
+  }
+  if (mode === 'auto') return { mode }
+  if (configId === undefined) {
+    return { error: 'model_mode=pinned 必须同时给出正整数 config_id；若要后端自动选择请改传 model_mode=auto' }
+  }
+  return { mode, configId, model: typeof body.model === 'string' && body.model.trim() ? body.model.trim() : undefined }
 }
 
 function conflict(c: Ctx, message: string, code: string) {
@@ -262,6 +287,8 @@ app.post('/:id/design-cards/fill', async (c) => {
   const storyboardIds = Array.isArray(body.storyboard_ids)
     ? body.storyboard_ids.map(Number).filter((n: number) => Number.isInteger(n) && n > 0)
     : undefined
+  const selection = parseFillModelSelection(body)
+  if ('error' in selection) return badRequest(c, selection.error)
   // 骨架未确认是预期中的操作顺序问题（#70），不是服务端异常。
   // 全局 onError 也映射了 SkeletonNotConfirmedError；这里保留同形状的路由级映射，
   // 让这个子应用被单独挂载/直接调用时也不会退化成 500。
@@ -269,12 +296,24 @@ app.post('/:id/design-cards/fill', async (c) => {
   try {
     result = await startDesignCardBatch(
       ep.id, ep.dramaId,
-      { model: typeof body.model === 'string' ? body.model : undefined, configId: body.config_id as number | undefined },
+      {
+        model: selection.model,
+        configId: selection.configId,
+      },
       storyboardIds,
     )
   } catch (err) {
     if (err instanceof SkeletonNotConfirmedError) {
       return c.json({ code: 400, error: 'skeleton_unconfirmed', message: err.message }, 400)
+    }
+    // 选不到模型是用户可处理的选择问题（指定的配置暂停/非视觉/停用/不存在，或确实一条视觉
+    // 配置都没有），不是服务端异常：返回指名原因与可用候选，不再逃逸成 500。
+    const payload = stageSelectionErrorPayload(err)
+    if (payload) {
+      logTaskError('DesignCardAPI', 'fill-model-unavailable', {
+        episodeId: id, error: payload.error, configId: payload.config_id, reason: payload.reason,
+      })
+      return c.json(payload, 400)
     }
     throw err
   }

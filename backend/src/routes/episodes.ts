@@ -70,7 +70,11 @@ import {
 } from '../services/narration.js'
 import { composeStateMap, narrationStatusFor, type ComposeStateItem } from '../services/compose-state.js'
 import { getNarrationScriptStatus, startNarrationScript } from '../services/narration-script.js'
-import { getMarkupCatalog, getTtsOptions, getVoiceBatchStatus, previewVoiceBatch, previewFailedVoiceBatch, resolveSubtitleTiming, startVoiceBatch, retryFailedVoiceBatch } from '../services/narration-voice.js'
+import { getMarkupCatalog, getTtsOptions, getVoiceBatchStatus, previewVoiceBatch, previewFailedVoiceBatch, resolveSubtitleTiming, startVoiceBatch, retryFailedVoiceBatch, voiceWorkEstimate } from '../services/narration-voice.js'
+import { skeletonWorkEstimate } from '../services/narration-skeleton.js'
+import { designCardWorkEstimate } from '../services/design-card-batch.js'
+import { getTaskWorkSummary } from '../services/task-estimate.js'
+import { findLatestTextTask } from '../services/text-task.js'
 import { previewLayerRenderBatch, startLayerRenderBatch, getLayerRenderBatchStatus, retryFailedLayerRenderBatch } from '../services/layer-render-batch.js'
 import { getComposeBatchStatus, previewComposeBatch, startComposeBatch, retryFailedComposeBatch } from '../services/shot-compose.js'
 import { DEFAULT_FIT_RECORD, parseFitRecord, validateFitRecord } from '../services/narration-fit.js'
@@ -79,7 +83,7 @@ import { loadEpisodeRosterRecord, saveEpisodeRosterRecord } from '../services/ch
 import type { RosterEntryInput } from '../services/character-roster.js'
 import { normalizeAssetName } from '../services/asset-name.js'
 import { episodeNarrationCoverage, startFillGapsTask } from '../services/storyboard-fill-gaps.js'
-import { StageVisionUnavailableError } from '../services/ai-stages.js'
+import { stageSelectionErrorPayload } from '../services/ai-stages.js'
 
 const app = new Hono()
 
@@ -533,6 +537,36 @@ app.get('/:id/narration/voice-batch-status', async (c) => {
   return success(c, await getVoiceBatchStatus(Number(c.req.param('id'))))
 })
 
+// GET /episodes/:id/work-estimate?stage=skeleton|voice|design_card[&storyboard_ids=1,2] —
+// 三阶段「开始前」的源字数与历史样本 ETA（#87 §D）。没有同口径历史样本时 estimate_ms = null，
+// 界面显示「暂无估计」，绝不编固定秒数。运行中/终态任务的真实计量一并返回。
+app.get('/:id/work-estimate', async (c) => {
+  const id = Number(c.req.param('id'))
+  const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, id))
+  if (!ep) return notFound(c, '剧集不存在')
+  const stage = c.req.query('stage')
+  const idsParam = c.req.query('storyboard_ids')
+  const storyboardIds = idsParam
+    ? idsParam.split(',').map(Number).filter(n => Number.isInteger(n) && n > 0)
+    : undefined
+  const kind = stage === 'skeleton' ? 'storyboard_breaker' : stage === 'voice' ? 'narration_tts' : 'design_card'
+  try {
+    const estimate = stage === 'skeleton'
+      ? await skeletonWorkEstimate(id)
+      : stage === 'voice'
+        ? await voiceWorkEstimate(id, undefined, storyboardIds)
+        : stage === 'design_card'
+          ? await designCardWorkEstimate(id, ep.dramaId, storyboardIds)
+          : null
+    if (!estimate) return badRequest(c, 'stage 必须是 skeleton / voice / design_card')
+    // 最近一次同阶段任务的真实计量：运行中给进度与 ETA，终态给冻结事实
+    const latest = await findLatestTextTask(id, kind)
+    return success(c, { estimate, observation_summary: latest ? getTaskWorkSummary(latest.id) : null })
+  } catch (err) {
+    return badRequest(c, err instanceof Error ? err.message : '预估失败')
+  }
+})
+
 // POST /episodes/:id/compose-batch/preview — 逐镜列出 未合成/已变化/未变化/无法比较/阻断/进行中
 // body.storyboard_ids 省略 = 整集范围；显式传数组（含空数组）= 只看这些镜头，不扩大
 app.post('/:id/compose-batch/preview', async (c) => {
@@ -758,8 +792,8 @@ app.post('/:id/storyboards/fill-gaps', async (c) => {
     if (!result.started) return success(c, { status: 'idle', gaps: 0 })
     return success(c, { status: 'running', gaps: result.gaps, task_id: result.taskId })
   } catch (err) {
-    // 补镜是视觉环节（#51）：没有可用视觉配置时给中文原因，不要 500
-    if (err instanceof StageVisionUnavailableError) return badRequest(c, err.message)
+    const selectionError = stageSelectionErrorPayload(err)
+    if (selectionError) return c.json(selectionError, 400)
     return badRequest(c, err instanceof Error ? err.message : '补全剩余失败')
   }
 })

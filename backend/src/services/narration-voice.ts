@@ -37,6 +37,8 @@ import {
   toVoxcpmText,
 } from './narration-markup.js'
 import { parseFitRecord } from './narration-fit.js'
+import { observeTaskOperation, runObservedWork } from './task-observability.js'
+import { buildSampleKey, buildWorkPlan, stageEstimateOf, type StageWorkEstimate } from './task-estimate.js'
 import {
   DEFAULT_SUBTITLE_TIMING,
   DEFAULT_TAIL_PAD_SECONDS,
@@ -185,8 +187,23 @@ export interface VoiceResult {
   jobId: string | null
 }
 
+/** 一次单镜合成的已解析上下文（校验/参数解析之后、真正开工之前） */
+interface ShotVoiceContext {
+  sb: typeof schema.storyboards.$inferSelect
+  ep: typeof schema.episodes.$inferSelect
+  documentary: boolean
+  text: string
+  chars: number
+  config: AIConfig
+  params: VoiceParams
+}
+
 /**
  * 为一个镜头生成配音 + 字幕。整镜一次合成（不按句分段）。
+ *
+ * 计量（#87 §D）：批量由 `startVoiceBatch` 开好工作项后用 `observed` 传进来；
+ * 单镜重配自己开一条 `narration_tts` 任务，这样真实合成用时与源字数同样落库，
+ * 批量 ETA 也能用这些同参数样本。音频长度不是合成耗时，两者分开记录。
  */
 export async function generateShotVoice(
   storyboardId: number,
@@ -194,6 +211,8 @@ export async function generateShotVoice(
   rawSettings?: unknown,
   /** 批量已解析好的参数（跳过校验与保存） */
   presetParams?: VoiceParams,
+  /** 批量调用：调用方已经开了观测工作项，这里不再另起任务 */
+  observed?: { taskId: number; sampleKey: string },
 ): Promise<VoiceResult> {
   const [sb] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, storyboardId))
   if (!sb) throw new Error('镜头不存在')
@@ -226,6 +245,56 @@ export async function generateShotVoice(
   params ??= effectiveVoiceParams(ep, sb.narrationNormalize, config)
   logTaskStart('Narration', 'voice', { storyboardId, episodeId: sb.episodeId, chars })
 
+  const ctx: ShotVoiceContext = { sb, ep, documentary, text, chars, config, params }
+  if (observed) return runShotSynthesis(ctx)
+
+  // 单镜重配也归一条任务：没有任务就没有地方落「真实合成用时 / 源字数 / 失败原因」
+  const sampleKey = buildSampleKey({ stage: 'voice', configId: config.id ?? null, model: config.model, voice: params })
+  const progress: TextTaskProgress = {
+    completed: 0, failed: 0, total: 1,
+    items: [{ storyboard_id: storyboardId, storyboard_number: sb.storyboardNumber, state: 'processing', reason: null }],
+  }
+  const taskId = await createTextTask({
+    kind: 'narration_tts',
+    episodeId: sb.episodeId,
+    dramaId: ep.dramaId,
+    storyboardId,
+    prompt: `为分镜 #${sb.storyboardNumber} 生成旁白配音`,
+    progress,
+    storyboardIds: [storyboardId],
+  })
+  await patchTextTaskParams(taskId, {
+    voice_settings: params,
+    work_plan: buildWorkPlan({
+      stage: 'voice',
+      unit: 'shot',
+      sampleKey,
+      items: [{ storyboard_id: storyboardId, storyboard_number: sb.storyboardNumber, source_chars: chars }],
+    }),
+  })
+  try {
+    const result = await runObservedWork({
+      taskId, stage: 'voice', sourceChars: chars, sampleKey,
+      storyboardId, storyboardNumber: sb.storyboardNumber,
+    }, () => runShotSynthesis(ctx))
+    progress.completed = 1
+    progress.items![0]!.state = 'completed'
+    await finishTextTask(taskId, 'completed', { progress })
+    return result
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    progress.failed = 1
+    progress.items![0]!.state = 'failed'
+    progress.items![0]!.reason = message
+    await finishTextTask(taskId, 'failed', { progress, errorMsg: message })
+    throw err
+  }
+}
+
+async function runShotSynthesis(ctx: ShotVoiceContext): Promise<VoiceResult> {
+  const { sb, ep, documentary, text, chars, config, params } = ctx
+  const storyboardId = sb.id
+
   // 发音标记（#38）：源文本 → VoxCPM 语法；先让 Studio 按它自己的规则解析一遍，
   // 它认出的「念出来的字」必须与我们的 engineSpokenText 一致，否则不合成（字幕对不上）
   const engineText = toVoxcpmText(text)
@@ -235,7 +304,13 @@ export async function generateShotVoice(
   if (preview.spoken.replace(/\s+/g, '') !== expectedSpoken.replace(/\s+/g, '')) {
     throw new Error(`语音服务解析出的朗读文字与旁白不一致，已停止合成：服务端「${preview.spoken}」/ 期望「${expectedSpoken}」`)
   }
-  const synthesis = await synthesizeNarration(config, engineText, params)
+  // 真实合成用时由观测层按「请求发出 → 响应结束」记录；audio.duration_ms 是媒体长度，不是耗时
+  const synthesis = await observeTaskOperation({
+    kind: 'tts',
+    configId: config.id ?? null,
+    model: config.model,
+    request: { text: engineText, chars, engine_chars: engineText.length, params },
+  }, () => synthesizeNarration(config, engineText, params))
 
   // 字幕：两种时间码模式都基于这一次整镜合成的音频，对齐数据统一取逐字时间戳
   // （TTS 服务只支持 level=word|char，sentence 模式由 buildSubtitleCues 按句聚合）。
@@ -380,8 +455,47 @@ async function planVoiceBatch(ep: EpisodeRow, desired: VoiceParams, config: AICo
       // 实测秒数只认文件；文件不可用时退回字数估算（仅用于预览展示）
       audio_seconds: validity.get(sb.id)?.duration_s ?? estimateNarrationSeconds(text),
     }
-    return { item, params: shotParams }
+    // source_chars = 去标记后的源旁白字数：ETA 按它缩放（不是提示词、更不是音频长度）
+    return { item, params: shotParams, source_chars: narrationCharCount(text) }
   })
+}
+
+/**
+ * 配音「开始前」的字数与历史 ETA（#87 §D）：按本次弹窗参数挑出会合成的镜，
+ * 逐镜源字数求和，再用同配置/同音色/同步数的历史成功样本给出预计耗时。
+ * 预计耗时是**合成服务调用耗时**，不是音频总长度。
+ */
+export async function voiceWorkEstimate(
+  episodeId: number,
+  rawSettings?: unknown,
+  storyboardIds?: number[],
+): Promise<StageWorkEstimate> {
+  const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId))
+  if (!ep) throw new Error('剧集不存在')
+  const config = await resolveTtsConfig(ep)
+  const desired = rawSettings === undefined
+    ? effectiveVoiceParams(ep, null, config)
+    : await validatedVoiceParams(rawSettings, config)
+  const plan = await planVoiceBatch(ep, desired, config)
+  const scope = scopeFromPreview(plan.map(p => p.item), storyboardIds)
+  const included = new Set(scope.included.map(item => item.storyboard_id))
+  const pending = plan.filter(p => included.has(p.item.storyboard_id) && p.item.selectable)
+  const workPlan = buildWorkPlan({
+    stage: 'voice',
+    unit: 'shot',
+    sampleKey: buildSampleKey({ stage: 'voice', configId: config.id ?? null, model: config.model, voice: desired }),
+    items: pending.map(p => ({
+      storyboard_id: p.item.storyboard_id,
+      storyboard_number: p.item.storyboard_number,
+      source_chars: p.source_chars,
+      // 逐镜生效参数（normalize 是镜级覆盖）才是分组依据，不能都按弹窗参数算
+      sample_key: buildSampleKey({ stage: 'voice', configId: config.id ?? null, model: config.model, voice: p.params }),
+    })),
+  })
+  return {
+    ...stageEstimateOf(workPlan, config.id ?? null, config.model),
+    blocked_units: scope.excluded.length,
+  }
 }
 
 /** 批量配音预览：按弹窗参数把镜头分成缺失 / 已变化 / 未变化 / 跳过 */
@@ -444,7 +558,25 @@ export async function startVoiceBatch(
     scope,
     retryOf: retry?.retryOf,
   })
-  await patchTextTaskParams(taskId, { voice_settings: desired })
+  // 开跑前落计划：总镜数、逐镜源字数、逐镜生效的分组口径
+  //（同配置/音色/步数/cfg/规范化/指令/种子模式才同池；normalize 可被镜级覆盖，故逐项落键）
+  const sampleKey = buildSampleKey({ stage: 'voice', configId: config.id ?? null, model: config.model, voice: desired })
+  const sampleKeyOf = (params: VoiceParams) =>
+    buildSampleKey({ stage: 'voice', configId: config.id ?? null, model: config.model, voice: params })
+  await patchTextTaskParams(taskId, {
+    voice_settings: desired,
+    work_plan: buildWorkPlan({
+      stage: 'voice',
+      unit: 'shot',
+      sampleKey,
+      items: pending.map(p => ({
+        storyboard_id: p.item.storyboard_id,
+        storyboard_number: p.item.storyboard_number,
+        source_chars: p.source_chars,
+        sample_key: sampleKeyOf(p.params),
+      })),
+    }),
+  })
 
   logTaskStart('Narration', 'voice-batch', { episodeId, total: pending.length, voice: desired.voice })
 
@@ -455,7 +587,14 @@ export async function startVoiceBatch(
       item.state = 'processing'
       await updateTextTaskProgress(taskId, progress)
       try {
-        await generateShotVoice(p.item.storyboard_id, undefined, p.params)
+        await runObservedWork({
+          taskId,
+          stage: 'voice',
+          sourceChars: p.source_chars,
+          sampleKey: sampleKeyOf(p.params),
+          storyboardId: p.item.storyboard_id,
+          storyboardNumber: p.item.storyboard_number,
+        }, () => generateShotVoice(p.item.storyboard_id, undefined, p.params, { taskId, sampleKey: sampleKeyOf(p.params) }))
         progress.completed++
         item.state = 'completed'
       } catch (err) {
