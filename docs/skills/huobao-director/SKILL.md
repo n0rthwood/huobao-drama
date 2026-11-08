@@ -77,7 +77,7 @@ description: 通过火宝 HTTP API 按阶段推进剧本、资产、Poster、分
 
 Agent 可以做**技术验收**（结构、时长、音画、可解码、签名一致），但必须标注“技术验收”，不得写成“用户艺术批准”。
 
-**硬禁止**：Agent 永不自行调用下列**破坏性或背书性**写入——`script/confirm|unconfirm`、`design-card/confirm|unconfirm`、`confirm-keyframes`、`character-roster` 的批准保存、`asset-pipeline/runs/{id}/approve` 的 `verdict`/`override_gate`、段组合的人工写入 `PUT /storyboards/{id}/design-card {combo}` 与 `POST /storyboards/{id}/combo`、`asset-review/items/{id}` 的 `not_needed`/`ignored`、`DELETE /storyboards/{id}`、`DELETE /tasks/{id}`、`DELETE /episodes/{e}/merges/{id}`。这些只在人已给出明确决定后执行；执行时在 `requests.jsonl` 记录“人授权原话/时间”，否则视为越权。唯一例外是 #82 的纪录片设计卡批次 `POST /episodes/{e}/design-cards/fill`：服务端只给**尚无 combo** 的镜写一次模型所选 combo，卡片仍是 `pending`，确认依旧由人按。
+**硬禁止**：Agent 永不自行调用下列**破坏性或背书性**写入——`script/confirm|unconfirm`、`design-card/confirm|unconfirm`、`confirm-keyframes`、`character-roster` 的批准保存、`asset-pipeline/runs/{id}/approve` 的 `verdict`/`override_gate`、段组合的人工写入 `PUT /storyboards/{id}/design-card {combo}` 与 `POST /storyboards/{id}/combo`、`asset-review/items/{id}` 的 `not_needed`/`ignored`、`DELETE /storyboards/{id}`、`DELETE /tasks/{id}`、`DELETE /merge/episodes/{e}/merges/{mergeId}`。这些只在人已给出明确决定后执行；执行时在 `requests.jsonl` 记录“人授权原话/时间”，否则视为越权。唯一例外是 #82 的纪录片设计卡批次 `POST /episodes/{e}/design-cards/fill`：服务端只给**尚无 combo** 的镜写一次模型所选 combo，卡片仍是 `pending`，确认依旧由人按。
 （只读 GET、preview、生成提示词/图片/配音/视频等“新增产物”的提交不在此列，但必须受 §1.2 预算台账约束。）
 
 ---
@@ -223,10 +223,10 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 - 陷阱：只有 `unchanged` + `exportable:true` 才可导出；`missing/changed/unknown` 要重做；`blocked/skipped` 先按 reason 修。200 与“导出成功”不是一回事。
 
 ### S11 导出
-- 端点：`GET /episodes/{e}/merge`、`POST /episodes/{e}/merge {storyboard_ids, poster_version_id?, poster_duration?}`、`GET /episodes/{e}/merges`。
+- 端点（**注意 router 前缀 `/merge`**）：`GET /merge/episodes/{e}/merge`、`POST /merge/episodes/{e}/merge {storyboard_ids, poster_version_id?, poster_duration?}`、`GET /merge/episodes/{e}/merges`、`DELETE /merge/episodes/{e}/merges/{mergeId}`。
 - 用途：按所选镜头顺序拼成最终片，可加 Poster 片头。
 - 组合场景：显式 `storyboard_ids`（省略=整集，导出时必须显式）；`poster_duration` 钳 0.5–10 秒。
-- 陷阱：任一镜未 `exportable` 且开启旁白 → 整体 400 并给 `blocked[]`，不能静默回退原片/少镜；merge record 的 `duration` 是整数显示，精确时长必须用 ffprobe 测。
+- 陷阱：写成 `/episodes/{e}/merge`（漏 `/merge` 前缀）会得到 **200 + HTML（SPA）**，不是 404——必须校验 `Content-Type`（八达岭实测踩中，见 §4.6）。任一镜未 `exportable` 且开启旁白 → 整体 400 并给 `blocked[]`，不能静默回退原片/少镜；merge record 的 `duration` 是整数显示，精确时长要用 ffprobe（无 ffprobe 时如实写明依据，如浏览器媒体元数据）。
 
 ### S12 任务与返工（贯穿）
 - 端点：`GET /tasks/active`、`GET /tasks/center`、`GET /tasks/{id}`、`POST /tasks/{id}/retry`、`POST /tasks/{id}/cancel`。
@@ -334,7 +334,7 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 - `POST /episodes/14/compose-batch/preview {storyboard_ids:[186..190]}`：5 镜 `missing`、`plan` 显示 `dv/da/d` 与 `gapRatio`。
 - `POST /episodes/14/compose-batch {storyboard_ids:[186..190]}` → 轮询 `GET /compose-batch-status`：`5 completed / 0 failed / 0 skipped`。
 - `GET /episodes/14/storyboards`：逐镜 `compose_state.status="unchanged"`、`exportable=true`。
-- `GET /episodes/14/merge` → `POST /episodes/14/merge {storyboard_ids:[186..190], poster_version_id:10, poster_duration:2}` → merge 26 → 轮询到 completed。
+- `GET /merge/episodes/14/merge` → `POST /merge/episodes/14/merge {storyboard_ids:[186..190], poster_version_id:10, poster_duration:2}` → merge 26 → 轮询到 completed。
 - 下载最终片，ffprobe + 全解码 + 五镜联系表 + 浏览器播放。
 - 实际：`54.76s / 960×544 / 25fps / 1369 帧`；Poster 51 帧 2.04s；五合成片 `dff15a3b…/781364c2…/395f2172…/5818152f…/d6c0c0e0…`。
 - 为什么：签名只证明“输入一致”，不证明画面正确；必须打开实际媒体。
