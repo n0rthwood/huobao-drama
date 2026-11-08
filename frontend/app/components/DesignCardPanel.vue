@@ -395,16 +395,17 @@
                 </option>
               </select>
               <!-- 实际引用版本的缩略图（#87 §E）：取底图候选自己的 path/version，不拿资产当前图冒充 -->
-              <button
-                v-if="baseCandidate && baseCandidate.path"
-                type="button"
-                class="dc-thumb"
-                :title="t('designCard87.viewImage')"
-                @click="previewImage(baseCandidate.path, baseCandidate.name, baseCandidate.version_task_id)"
-              >
-                <img :src="mediaUrl(baseCandidate.path)" :alt="baseCandidate.name">
-                <span class="dc-thumb-tag mono">{{ baseCandidate.version_task_id ? t('designCard87.version', { n: baseCandidate.version_task_id }) : t('designCard87.currentVersion') }}</span>
-              </button>
+              <div v-if="baseCandidate && baseCandidate.path" class="dc-asset-grid">
+                <button
+                  type="button"
+                  class="dc-thumb"
+                  :title="t('designCard87.viewImage')"
+                  @click="previewImage(baseCandidate.path, baseCandidate.name, baseCandidate.version_task_id)"
+                >
+                  <img :src="mediaUrl(baseCandidate.path)" :alt="baseCandidate.name">
+                  <span class="dc-thumb-tag mono">{{ baseCandidate.version_task_id ? t('designCard87.version', { n: baseCandidate.version_task_id }) : t('designCard87.currentVersion') }}</span>
+                </button>
+              </div>
               <span v-else-if="baseValue && baseValue !== 'inherit_prev'" class="dim">{{ t('designCard87.noImage') }}</span>
             </div>
 
@@ -413,8 +414,8 @@
                 {{ t('episode.design.field.mustMark') }}
                 <span class="dc-affect" :title="t('episode.design.affectsTip.mustMark')">{{ t('episode.design.affects.mustMark') }}</span>
               </span>
-              <div class="dc-chips">
-                <span v-for="(item, index) in layerPlan.must_mark" :key="`${item.asset_id}:${item.semantic_id}`" :class="['dc-chip', { 'is-unresolved': item.unresolved }]">
+              <div class="dc-asset-grid">
+                <span v-for="(item, index) in layerPlan.must_mark" :key="`${item.asset_id}:${item.semantic_id}`" :class="['dc-chip', 'dc-asset-card', { 'is-unresolved': item.unresolved }]">
                   <button
                     v-if="assetImage('prop', item.asset_id)"
                     type="button"
@@ -422,6 +423,7 @@
                     :title="t('designCard87.viewImage')"
                     @click="previewImage(assetImage('prop', item.asset_id), item.name)"
                   ><img :src="mediaUrl(assetImage('prop', item.asset_id))" :alt="item.name"></button>
+                  <span v-else class="dc-asset-empty">{{ t('designCard87.noImage') }}</span>
                   <span class="dc-chip-text">{{ item.name }}</span>
                   <button
                     type="button"
@@ -477,8 +479,8 @@
                 {{ t('episode.design.field.referenceAssets') }}
                 <span class="dc-affect" :title="t('episode.design.affectsTip.referenceAssets')">{{ t('episode.design.affects.referenceAssets') }}</span>
               </span>
-              <div class="dc-chips">
-                <span v-for="(item, index) in genPlan.reference_assets" :key="`${item.kind}:${item.id}`" :class="['dc-chip', { 'is-unresolved': item.unresolved }]">
+              <div class="dc-asset-grid">
+                <span v-for="(item, index) in genPlan.reference_assets" :key="`${item.kind}:${item.id}`" :class="['dc-chip', 'dc-asset-card', { 'is-unresolved': item.unresolved }]">
                   <button
                     v-if="assetImage(item.kind, item.id)"
                     type="button"
@@ -486,6 +488,7 @@
                     :title="t('designCard87.viewImage')"
                     @click="previewImage(assetImage(item.kind, item.id), item.name)"
                   ><img :src="mediaUrl(assetImage(item.kind, item.id))" :alt="item.name"></button>
+                  <span v-else class="dc-asset-empty">{{ t('designCard87.noImage') }}</span>
                   <span class="dc-chip-text">{{ item.name }}</span>
                   <button
                     type="button"
@@ -1781,19 +1784,24 @@ onBeforeUnmount(() => {
 .dc-pin-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 
 /* 实际引用版本的缩略图（#87 §E）：点开大图走集页面既有查看器 */
+.dc-asset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 180px)); justify-content: start; align-items: start; gap: 8px; }
+.dc-asset-grid > .btn { justify-self: start; }
 .dc-thumb {
-  position: relative; display: inline-flex; padding: 0; margin-left: 6px;
-  border: 1px solid var(--border); border-radius: 4px; background: var(--bg-2); cursor: zoom-in;
+  position: relative; display: block; width: 100%; padding: 0;
+  border: 1px solid var(--border); border-radius: 6px; background: var(--bg-2); cursor: zoom-in;
 }
-.dc-thumb img { width: 72px; height: 48px; object-fit: cover; border-radius: 3px; display: block; }
+.dc-thumb img { width: 100%; aspect-ratio: 16 / 10; object-fit: contain; border-radius: 5px; display: block; }
 .dc-thumb-tag {
   position: absolute; left: 0; bottom: 0; right: 0;
   font-size: 9px; line-height: 1.4; text-align: center;
-  background: rgba(0, 0, 0, 0.55); color: #fff; border-radius: 0 0 3px 3px;
+  background: var(--header-bg); color: var(--text-1); border-radius: 0 0 5px 5px;
 }
-.dc-chip-thumb { padding: 0; border: 0; background: none; cursor: zoom-in; display: inline-flex; }
-.dc-chip-thumb img { width: 20px; height: 20px; object-fit: cover; border-radius: 3px; display: block; }
-.dc-chip-open { border: 0; background: none; cursor: pointer; color: var(--text-2); font-size: 12px; }
+.dc-asset-grid .dc-asset-card { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 6px; padding: 6px; border-radius: 8px; min-width: 0; }
+.dc-asset-card .dc-chip-text { min-width: 0; max-width: none; }
+.dc-chip-thumb { grid-column: 1 / -1; width: 100%; aspect-ratio: 16 / 10; padding: 0; border: 0; border-radius: 5px; background: var(--bg-2); cursor: zoom-in; display: grid; }
+.dc-chip-thumb img { width: 100%; height: 100%; object-fit: contain; border-radius: 5px; display: block; }
+.dc-asset-empty { grid-column: 1 / -1; aspect-ratio: 16 / 10; display: grid; place-items: center; color: var(--text-3); background: var(--bg-2); border-radius: 5px; }
+.dc-chip-open { border: 0; background: none; cursor: pointer; color: var(--text-2); font-size: 12px; min-width: 24px; min-height: 24px; }
 
 /* 语义引用问题卡：原因说一次，逐层说明缺什么、影响什么，并给修复入口 */
 .dc-unresolved {
