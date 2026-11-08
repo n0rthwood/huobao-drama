@@ -98,7 +98,10 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 **这是三个独立动作，不是一张可自由代填的表：原始内容 → 火宝 AI 改写 → 人工确认。** `content` 与 `script_content` 是不同的业务字段；API 可写不代表本阶段获准写，也不代表写入的文字由火宝生成。
 
 1. **第一步「原始内容」（`?panel=script&step=0`）**：在本次已获授权的项目/剧集内（既有对象或另获准新建的对象），读取用户指定材料，保留来源，做必要的提取与排版，使用 `PUT /episodes/{e} {"content":"原始材料"}` 导入。不得把助手写出的解说稿替换为原始材料，也不得同一请求夹带 `script_content`。来源署名也保存在 `content`；只有用户额外明确授权 `description` 字段时才可写该资料说明字段，不因“只做第一步”顺手修改其他字段，更不能声称尚未执行的改写已完成。写后从 `GET /dramas/{d}` 的 `episodes[]` 读回核对；用户说“只做第一步”“先让我看”“等我”时，此处即结束，给第一步链接等待，不触发 AI 改写、确认或其他阶段。
-2. **第二步「AI 改写」（`?panel=script&step=1`）**：仅在用户已授权该步时，调用 `POST /agent/script_rewriter/chat {drama_id:d, episode_id:e, message:"本次改写要求"}`，可按已有配置附 `config_id` / `model`。由火宝内部工种读取 `content`、生成并保存 `script_content`；助手负责传达要求、检查任务和读回实际结果，不在本地或聊天里代写完整结果再 PUT 回第二步。重新 `GET /dramas/{d}` 核对真正保存的稿件，再交用户审核；没有该次火宝调用与保存结果，不得报告“火宝已改写”。本端点在本次漕运错误案例中未调用，不能冒充该案例的实测成功路径。
+2. **第二步「AI 改写」（`?panel=script&step=1`）**：仅在用户已授权该步时执行，且**按片种分两条路**——
+   - **纪录片（`project_type=documentary`）必须走分阶段流水线**：`POST /episodes/{e}/script-rewrite {start_stage?, skip_stages?, config_id?, model?, auto_adopt?, source_revision?, final_revision?}`（异步，返回 run/task），用 `GET /episodes/{e}/script-rewrite` 读运行、阶段与版本，必要时 `POST …/versions/{versionId}/adopt` 显式采用。**旧的 `POST /agent/script_rewriter/chat` 对纪录片直接 400**（`backend/src/routes/agent.ts:85-86`），不要再调。
+   - **剧情项目**仍用 `POST /agent/script_rewriter/chat {drama_id:d, episode_id:e, message:"本次改写要求", config_id?, model?}`。
+   两条路都由火宝内部工种读取 `content`、生成并保存稿件；助手负责传达要求、检查任务和读回实际结果，不在本地或聊天里代写完整结果再 PUT 回第二步。重新 `GET /dramas/{d}`（或 `GET /episodes/{e}/script-rewrite`）核对真正保存的稿件，再交用户审核；没有该次火宝调用与保存结果，不得报告“火宝已改写”。
 3. **人工确认**：执行 AI 改写的授权不等于认可其结果；确认是另一个人的决定。只有用户明确批准当前稿件，才可按授权调用 `POST /episodes/{e}/script/confirm`；不能因计划获批、普通“continue”、文本已保存或任务 completed 代替稿件批准，也不能用这些回应突破用户此前明确的“仅第一步”边界。
 
 - **遇到改写规则不适用时**：若火宝内置技能只允许整理、限制内容量等，与用户的压缩改写目标冲突，说明具体冲突并等待用户决定；不自行改全局 Prompt/Skill，不绕过火宝代写，不用直接 PUT `script_content` 作假回退。
@@ -116,7 +119,7 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 - **人工保存前的检查**：`POST /episodes/{e}/script-rewrite/inspect-narration {content, config_id?, model?}` → `{findings:[{text, reason, locatable}]}`。它检查**当前提交的草稿**，不是上一轮改写报告，并且**不写库**。仅纪录片项目可用（其它项目 400）；模型返回被截断或格式不合法时返回 502 `inspection_failed`。
 - **检测失败 ≠ 稿件干净**：502 或字段缺失时必须按「检测失败」呈报并让人决定是否照样保存，不得当成「无问题」。`locatable:false` 的片段只能展示、不能自动删除（它在当前稿里找不到逐字匹配）。
 - **删除是人的选择**：命中后由人选「删除可定位片段并保存」或「保留并保存」；Agent 不得自行决定删哪段，也不得把删除扩大成改写正文。
-- 正例：改稿 → 调 `inspect-narration` → 把 `findings` 原样报给人（逐条 `text` + `reason` + 是否可定位）→ 按人的选择保存。
+- 正例：改稿 → 调 `inspect-narration` → 把 `findings` 原样报给人（逐条 `text` + `reason` + 是否可定位）→ 按人的选择保存：人工保存走 `PUT /episodes/{e}/script-rewrite/final {content, final_revision, source_revision?}`（`final_revision` 必填做并发保护；会产生 manual 版本并把活跃运行降级为只留候选）。
 - 反例：① 自己写正则删「参考：…ISBN」；② 把 502 当作通过直接保存；③ 用 `inspect-narration` 的结果直接 `PUT` 改写正文；④ 拿上一次改写的 `ai_exclusions` 冒充本次草稿的检查结论。
 
 ### S2 资产（纪录片含“提取→审核→精确→美化”）
@@ -162,8 +165,8 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 - 端点：`GET /episodes/{e}/design-card-context`、`GET /episodes/{e}/design-cards/audit`、`POST /episodes/{e}/design-cards/fill`、`GET /episodes/{e}/design-cards/status`、`PUT /storyboards/{id}/design-card {combo, design_card}`、`POST /storyboards/{id}/design-card/confirm {acknowledge}`。
 - 用途：把“这一镜怎么拍”写成导演分镜单；`combo` 决定是否用图层段/生成段及顺序。
 - **案例背景（#82）**：E01 实测 20 张已填卡里 12 张 `combo` 为空，批量确认全被 `combo_missing` 挡住；卡头显示「实测 0.0s」（audit 的 `tts` 没有 `duration_ms`，前端把 `undefined` 当 0）；310 个 `unresolved_ref` 只显示通用文案，看不出是哪张资产、缺哪个语义条目。用户的决定：AI 直接把 combo 选出来、把时长关系讲清楚、把错误写成人能照着修的话，并且**绝不虚构语义名**。
-- **AI 填 combo（变更）**：`design_card` 工具 schema 新增 `combo`，`suggested_combo` 变为可选仅供展示。`POST /episodes/{e}/design-cards/fill` 批次里：该镜**已有 combo** → 保留，不被覆盖；**没有 combo** → 采用模型所选；模型给出非法/缺失 combo → 该镜失败并把原因写进 `design_card_stale_reason`。纪录片「有卡但没 combo」的镜会进入 **combo-only 补选**：只补 combo，**不重写卡片内容**。写入后卡片一律回到 `pending`，确认仍由人按。
-- **语义引用不得虚构**：批次提示词里带本集真实语义清单；模型写了不存在的 `semantic_id`/`name` → 该镜直接失败并回报可读原因。正确做法是**保留规划图层**、把 `semantic_id` 与 `name` 留空、在 `rationale` 写明「待标注」，不要为了过校验而降级成卡片/标签。
+- **AI 填 combo（变更）**：`design_card` 工具 schema 新增 `combo`，`suggested_combo` 变为可选仅供展示。`POST /episodes/{e}/design-cards/fill` 批次里：该镜**已有 combo** → 保留，不被覆盖；**没有 combo** → 采用模型所选；模型给出非法/缺失 combo → 该镜计入 `failed`，状态置 `pending` 并把原因写进 `design_card_stale_reason`。纪录片「有卡但没 combo」的镜会进入 **combo-only 补选**：只补 combo，**不重写卡片内容**。写入成功后卡片一律回到 `pending`，确认仍由人按。
+- **语义引用不得虚构**：批次提示词里带本集真实语义清单；模型写了不存在的 `semantic_id`/`name` → 工具直接回错给模型、本镜**不落卡**，批次计 `failed` 并**保留原状态与原 stale_reason**（与非法 combo 不同，这条不会写 `design_card_stale_reason`），具体原因只在任务输出/日志里。正确做法是**保留规划图层**、把 `semantic_id` 与 `name` 留空、在 `rationale` 写明「待标注」，不要为了过校验而降级成卡片/标签。
 - **audit 新字段**：`tts.duration_ms`（缺失就显示「待配音」，**不要写 0.0s**）、`unresolved_layers[{index,type,text,asset_id,asset_name,asset_exists,semantic_id,semantic_name,available_semantics[]}]`、`video_generated`。报问题时引用 `issue.message` 与 `unresolved_layers` 的具体资产/语义名，不要只报 `code`。
 - 组合场景：AI 填卡（含 combo）→ 人逐镜审阅并按需改 → 人确认（0 block；有 warn 需 acknowledge）。
 - 陷阱：预算 `layer_s≤30`、`gen_s≤15` 超限直接拒存；已确认且有产物时改 combo 会被拒，必须走 `POST /storyboards/{id}/combo`（先看 `combo/impact`）；批次只对「无 combo」的镜写 combo，不要指望它纠正人已选的组合；确认失败时读返回体 `issues[].message`，它已包含具体原因。
