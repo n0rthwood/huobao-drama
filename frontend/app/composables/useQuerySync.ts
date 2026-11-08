@@ -113,15 +113,20 @@ function ensureStore(): DeeplinkStore {
     router.replace({ query })
   }
 
-  // 换路由 = 换工作位置：重新取快照并暂停写出，等新页面恢复完成后再 hydrate
-  watch(() => current().path, () => {
-    hydrated = false
-    dirty = false
-    initialQuery = snapshotQuery(current().query as Record<string, unknown>)
-    pending.clear()
-    for (const [key, value] of Object.entries(initialQuery)) pending.set(key, value)
-    for (const entry of groups.values()) entry.values = {}
-    routeEpoch.value += 1
+  // 换路由 = 换工作位置：重新取快照并暂停写出，等新页面恢复完成后再 hydrate。
+  // store 是进程内单例，这个 watcher 必须挂在独立 scope 上：否则它会被绑到「第一个
+  // 调用 useDeeplink 的组件」的 effect scope，那个组件一卸载（例如从 default 布局
+  // 跨到 studio 布局的工作台）watcher 就被销毁，之后换路由再也不会重置快照。
+  effectScope(true).run(() => {
+    watch(() => current().path, () => {
+      hydrated = false
+      dirty = false
+      initialQuery = snapshotQuery(current().query as Record<string, unknown>)
+      pending.clear()
+      for (const [key, value] of Object.entries(initialQuery)) pending.set(key, value)
+      for (const entry of groups.values()) entry.values = {}
+      routeEpoch.value += 1
+    })
   })
 
   store = {
