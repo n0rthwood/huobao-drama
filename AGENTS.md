@@ -120,11 +120,20 @@ Issue 整理完成后、实施前，必须让 **Fabel（Anthropic）或 Astra（
 - 操作方式：**使用 huobao-director 技能**（`docs/skills/huobao-director/SKILL.md` 与 `references/`）调用生产 API。
 - 证据清单：项目/集/任务 ID、每个关键阶段的截图、只读 DB 查询（状态与产物路径）、失败任务的日志片段。
 
+**首次执行记录（2026-11-08）**
+
+- 项目/集/合并：drama **10**（八达岭长城测试 1008）/ episode **16** / merge **27**。
+- 最终媒体：`static/merged/c9bbd119-b086-42a6-8eaf-6ce63ed185fa.mp4`，浏览器实测 **960×544 / 65.44 s**（`readyState=4`），SHA-256 `62cc07d621227d499f6d054b8f01604ac19e11fc7149d0ff14f16fa4a2260fce`（本机无 ffprobe，时长/分辨率以浏览器媒体元数据为准）。
+- 预算实际消耗（上限 → 实际）：图片 16 → **11**（资产 1226、1230–1233、1245–1246；关键帧 1248–1251），视频 2 → **2**（1254/1255），TTS 8 → **6**（voice batch 1228，#01–#06）。
+- 报告与证据：`docs/qa/8daling-1008-20261108T061008Z/report.md`（含 `requests.jsonl` 与 01–11 截图，`11-voice-player-verify.png` 为配音页 6 个 audio 元素的验证）。
+- 已知失败/偏差（保留原始证据，未补跑 GPU）：#02 关键帧提示词在 GLM / DeepSeek local / DeepSeek cloud 三模型下均失败，combo 回退为 A 并由 #04 C 保留第二条生成视频；图层 draft 首次 `missing_base`；API 文档中 merge/rewrite 路径与实际存在偏差，已在报告中留痕。
+- 成片的史实、画面与声音审美仍需用户审核；本记录只代表链路、预算与媒体可读性的技术验收。
+
 ### 11. huobao-director 技能同步
 
 - 技能已入库：`docs/skills/huobao-director/`（`SKILL.md` + `references/`，来源与同步规则见该目录 `README.md`）。
 - **每次功能或 API 升级（新增/变更/下线接口、字段、流程阶段、约束）都必须回顾并更新技能**：补充新增 API 点、触发该功能的案例背景、以及为何需要该功能的记录；变更与业务提交同一个 Issue 分支提交。
-- 技能副本不得包含 `api_key`、认证头或带凭据的 URL。
+- 技能副本**不得包含真实密钥值**：`api_key`/token 的真实值、认证头实值、带真实凭据的 URL 一律不得写入；字段名、占位符与安全说明（例如 `GET /ai-configs` 响应含 `api_key`、只能在内存中白名单取字段）属于必要的 API 契约，必须保留。
 
 火宝短剧（Huobao Drama）：AI 短剧一站式制作（小说 → 剧本 → 资产提取 → 生图 → 分镜 → 生视频 → FFmpeg 导出）。
 项目结构、命令与架构总览见 `CLAUDE.md`，本文件只记录 Agent 开发时容易踩坑的补充信息。
