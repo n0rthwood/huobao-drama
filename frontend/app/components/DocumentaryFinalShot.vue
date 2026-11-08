@@ -12,6 +12,7 @@ import NarrationBlock from '~/components/NarrationBlock.vue'
 import ShotFusionPanel from '~/components/ShotFusionPanel.vue'
 import MentionTextarea from '~/components/MentionTextarea.vue'
 import FieldSaveStatus from '~/components/FieldSaveStatus.vue'
+import { DEEPLINK_KEYS, querySingle, useDeeplink } from '~/composables/useQuerySync'
 const props = defineProps({ storyboard: { type: Object, required: true }, number: Number })
 const ctx = inject(WORKBENCH_CTX)
 const { t } = useI18n()
@@ -29,6 +30,11 @@ const segment = computed(() => segmentState.value?.segment)
 const junction = computed(() => segmentState.value?.junction)
 const rendering = ref(false)
 const rehearsal = ref(false)
+// deeplink（#86）：预演弹窗只按分镜 id 恢复外壳，不触发任何渲染/生成；
+// 只认领 rehearse 键（shot/sel 归面板），每个分镜实例只在自己弹窗打开时发布
+const link = useDeeplink('finalShot', DEEPLINK_KEYS.finalPanel.filter(key => key === 'rehearse'))
+if (Number(querySingle(link.initial('rehearse')) || 0) === props.storyboard.id) rehearsal.value = true
+watch(rehearsal, open => link.set({ rehearse: open ? sb.value.id : '' }), { immediate: true })
 const overConfirm = ref(false)
 const history = ref([])
 const preview = ref('')

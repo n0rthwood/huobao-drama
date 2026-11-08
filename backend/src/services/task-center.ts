@@ -21,6 +21,7 @@ import {
 } from './sys-task.js'
 import { aggregateBatchItems, type KeyframeBatchItem } from './keyframe-batch-progress.js'
 import { parseTextTaskParams } from './text-task.js'
+import { getTaskWorkSummary, type WorkSampleCache } from './task-estimate.js'
 import { composeEpisodeLabel, composeTaskLabel, type TaskTargetKind } from './task-label.js'
 import { toUnixSeconds } from './media-time.js'
 import { IMPORTED_TASK_PROVIDER } from './asset-library.js'
@@ -152,8 +153,13 @@ function paramsOf(row: SysTaskRow): Record<string, unknown> {
 
 export type TaskRow = Record<string, unknown> & { row_type: 'task'; id: number }
 
-/** sys_task 行 → 任务中心行（serializeTask + 归属信息 + 编号） */
-export function buildTaskRow(row: SysTaskRow, lookups: NameLookups): TaskRow {
+/**
+ * sys_task 行 → 任务中心行（serializeTask + 归属信息 + 编号）。
+ *
+ * `cache` 是一次请求内的历史样本缓存（#87）：列表一页可能上百行，
+ * 同阶段同分组的历史速率只算一次，不做常驻缓存。
+ */
+export function buildTaskRow(row: SysTaskRow, lookups: NameLookups, cache?: WorkSampleCache): TaskRow {
   const params = paramsOf(row)
   const storyboard = row.storyboardId != null ? lookups.storyboards.get(row.storyboardId) : undefined
   const episodeId = row.episodeId ?? storyboard?.episodeId ?? null
@@ -197,6 +203,9 @@ export function buildTaskRow(row: SysTaskRow, lookups: NameLookups): TaskRow {
     target_kind: targetKind,
     target_name: targetName,
     frame_type: frameType,
+    // 三阶段真实计量（#87 §D）：只有带批量计划的任务才有观测汇总，其余行不白扫观测库。
+    // 任务详情与骨架/配音/设计卡界面读的是同一个对象。
+    observation_summary: params.work_plan ? getTaskWorkSummary(row.id, Date.now(), cache) : null,
     kind,
     progress: row.type === 'text' ? parseTextTaskParams(row.params)?.progress ?? null : null,
     reasoning_chars: row.type === 'text' && typeof params.reasoning_chars === 'number' ? params.reasoning_chars : null,
@@ -221,8 +230,9 @@ export async function enrichTasks(rows: SysTaskRow[]): Promise<TaskRow[]> {
     loadLookups(rows),
     Promise.all(rows.map(row => pipelineExecution(row))),
   ])
+  const cache: WorkSampleCache = new Map()
   return rows.map((row, index) => {
-    const task = buildTaskRow(row, lookups)
+    const task = buildTaskRow(row, lookups, cache)
     if (pipelines[index]) task.pipeline = pipelines[index]
     return task
   })
@@ -364,6 +374,8 @@ export async function listTaskCenter(filters: CenterFilters): Promise<{
     !recentOnly || active || Date.parse(createdAt) >= cutoff
 
   const rows: CenterRow[] = []
+  // 本次列表请求共用一份历史样本缓存（#87）：同分组的历史速率只算一次
+  const summaryCache: WorkSampleCache = new Map()
 
   for (const row of allTasks) {
     // 跨项目导入复制出的版本行（Issue #9）不是真的跑过的任务，不进任务中心
@@ -371,7 +383,7 @@ export async function listTaskCenter(filters: CenterFilters): Promise<{
     if (childIds.has(row.id)) continue
     if (filters.type && row.type !== filters.type) continue
     if (!matchesTaskStatus(filters.status, row.status)) continue
-    const built = buildTaskRow(row, lookups)
+    const built = buildTaskRow(row, lookups, summaryCache)
     if (filters.episodeId && built.episode_id !== filters.episodeId) continue
     if (filters.dramaId && built.drama_id !== filters.dramaId) continue
     if (!inRange(row.createdAt, isActiveTaskStatus(row.status))) continue
@@ -387,7 +399,7 @@ export async function listTaskCenter(filters: CenterFilters): Promise<{
     const children = items
       .map(item => (item.task_id != null ? taskById.get(item.task_id) : undefined))
       .filter((row): row is SysTaskRow => !!row)
-      .map(row => buildTaskRow(row, lookups))
+      .map(row => buildTaskRow(row, lookups, summaryCache))
     const remoteByTask: Record<number, RemoteState> = {}
     for (const item of items) {
       if (item.task_id == null) continue

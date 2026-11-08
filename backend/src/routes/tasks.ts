@@ -13,6 +13,9 @@ import { enrichTask, listActiveTasks, listTaskCenter } from '../services/task-ce
 import { retryTask } from '../services/task-retry.js'
 import { completionStamp } from '../services/media-time.js'
 import { readReasoningFile } from '../agents/reasoning-sink.js'
+import {
+  countObservedMessages, getObservedCall, listObservedCalls, listObservedMessages, listObservedWork,
+} from '../services/task-observability.js'
 import { parseTextTaskParams } from '../services/text-task.js'
 import { onAssetLibraryChanged } from '../services/asset-review.js'
 import { buildStoryboardVideoRequest } from '../services/storyboard-video.js'
@@ -285,6 +288,62 @@ app.get('/:id/reasoning', async (c) => {
   const offset = c.req.query('offset') != null ? Math.max(0, Number(c.req.query('offset')) || 0) : null
   const result = await readReasoningFile(id, offset == null ? { tail } : { offset, limit: tail })
   return success(c, result)
+})
+
+// GET /tasks/:id/observations — 该任务的持久调用观测（Issue #87）
+// 一页包含：工作项全量（行很小）+ 调用按游标分页（cursor = 上一页最后一个 call id，升序追加）
+// + 这页每条调用的前 message_limit 条公开消息（with_messages=0 可只取轻量列表）。
+// 每条调用都带 message_count，超出部分走 /observations/calls/:callId/messages 继续按游标读全文，
+// 任何一层都不做「只给最近 N 条」的截断。
+app.get('/:id/observations', async (c) => {
+  const id = Number(c.req.param('id'))
+  const [row] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, id))
+  if (!row) return badRequest(c, '任务不存在')
+  const workId = c.req.query('work_id') ? Number(c.req.query('work_id')) : undefined
+  const limit = c.req.query('limit') ? Number(c.req.query('limit')) : 50
+  const cursor = c.req.query('cursor') ? Number(c.req.query('cursor')) : 0
+  const withMessages = c.req.query('with_messages') === '1'
+  const messageLimit = Math.min(Math.max(1, Math.trunc(Number(c.req.query('message_limit'))) || 20), 200)
+  const effectiveLimit = Math.min(Math.max(1, Math.trunc(limit) || 50), 200)
+  const calls = listObservedCalls(id, { workId, afterId: cursor, limit }).map(call => ({
+    ...call,
+    message_count: countObservedMessages(call.id),
+  }))
+  const messages = withMessages ? calls.flatMap(call => listObservedMessages(call.id, { limit: messageLimit })) : []
+  return success(c, {
+    task_id: id,
+    works: listObservedWork(id),
+    calls,
+    messages,
+    message_limit: withMessages ? messageLimit : 0,
+    // 这页的消息是否已是全文：否则按 call 继续读子资源
+    messages_complete: withMessages && calls.every(call => call.message_count <= messageLimit),
+    limit: effectiveLimit,
+    next_cursor: calls.length === effectiveLimit ? calls[calls.length - 1]!.id : null,
+    has_more: calls.length === effectiveLimit,
+  })
+})
+
+// GET /tasks/:id/observations/calls/:callId/messages — 单次调用的公开消息全文（游标分页，不截断正文）
+app.get('/:id/observations/calls/:callId/messages', async (c) => {
+  const id = Number(c.req.param('id'))
+  const callId = Number(c.req.param('callId'))
+  const call = getObservedCall(callId)
+  if (!call || call.task_id !== id) return badRequest(c, '调用记录不存在')
+  const limit = c.req.query('limit') ? Number(c.req.query('limit')) : 40
+  const cursor = c.req.query('cursor') ? Number(c.req.query('cursor')) : 0
+  const messages = listObservedMessages(callId, { afterId: cursor, limit })
+  const effectiveLimit = Math.min(Math.max(1, Math.trunc(limit) || 40), 200)
+  return success(c, {
+    task_id: id,
+    call_id: callId,
+    call,
+    total: countObservedMessages(callId),
+    messages,
+    limit: effectiveLimit,
+    next_cursor: messages.length === effectiveLimit ? messages[messages.length - 1]!.id : null,
+    has_more: messages.length === effectiveLimit,
+  })
 })
 
 // GET /tasks/:id — 轮询任务状态（带编号与归属信息）；详情额外带 output_text 全文（不进列表行）

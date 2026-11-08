@@ -99,13 +99,14 @@
               </label>
               <p class="nedit-hint">{{ t('episode.narrationEditor.homophoneHint') }}</p>
             </template>
-            <p v-if="pronError" class="nedit-error">{{ pronError }}</p>
+            <p v-if="pron.stale" class="nedit-error">{{ t('deeplink.staleRange') }}</p>
+            <p v-if="pronError && !pron.stale" class="nedit-error">{{ pronError }}</p>
           </div>
           <footer class="dialog-foot">
             <button v-if="pron.editing" class="btn" @click="removeMarker(pron.editing); pron.open = false">{{ t('episode.narrationEditor.remove') }}</button>
             <span class="ml-auto" />
             <button class="btn" @click="pron.open = false">{{ t('common.cancel') }}</button>
-            <button class="btn btn-primary" :disabled="!!pronError" @click="confirmPron">{{ t('episode.narrationEditor.insert') }}</button>
+            <button class="btn btn-primary" :disabled="pron.stale || !!pronError" @click="confirmPron">{{ t('episode.narrationEditor.insert') }}</button>
           </footer>
         </div>
       </div>
@@ -133,13 +134,14 @@
                 >{{ opt.label }}</button>
               </div>
             </div>
+            <p v-if="tone.stale" class="nedit-error">{{ t('deeplink.staleRange') }}</p>
             <p class="nedit-hint">{{ t('episode.narrationEditor.toneHint') }}</p>
           </div>
           <footer class="dialog-foot">
             <button v-if="tone.editing" class="btn" @click="removeMarker(tone.editing); tone.open = false">{{ t('episode.narrationEditor.remove') }}</button>
             <span class="ml-auto" />
             <button class="btn" @click="tone.open = false">{{ t('common.cancel') }}</button>
-            <button class="btn btn-primary" :disabled="!tone.value" @click="confirmTone">{{ t('episode.narrationEditor.insert') }}</button>
+            <button class="btn btn-primary" :disabled="tone.stale || !tone.value" @click="confirmTone">{{ t('episode.narrationEditor.insert') }}</button>
           </footer>
         </div>
       </div>
@@ -157,7 +159,7 @@
             <template v-if="!pause.editing">
               <span class="nedit-group-label">{{ t('episode.narrationEditor.pauseNatural') }}</span>
               <div class="nedit-cands">
-                <button v-for="p in NATURAL_PAUSES" :key="p.ins" type="button" class="nedit-cand" :title="t(p.tip)" @click="insertNatural(p.ins)">
+                <button v-for="p in NATURAL_PAUSES" :key="p.ins" type="button" class="nedit-cand" :disabled="pause.stale" :title="t(p.tip)" @click="insertNatural(p.ins)">
                   <strong>{{ p.ins }}</strong> <span class="dim">{{ t(p.label) }}</span>
                 </button>
               </div>
@@ -179,13 +181,14 @@
               <input v-model.number="pause.seconds" class="input nedit-seconds" type="number" :min="pauseRange.min" :max="pauseRange.max" step="0.1" />
             </label>
             <p class="nedit-hint">{{ t('episode.narrationEditor.pauseExactHint') }}</p>
-            <p v-if="pauseError" class="nedit-error">{{ pauseError }}</p>
+            <p v-if="pause.stale" class="nedit-error">{{ t('deeplink.staleRange') }}</p>
+            <p v-if="pauseError && !pause.stale" class="nedit-error">{{ pauseError }}</p>
           </div>
           <footer class="dialog-foot">
             <button v-if="pause.editing" class="btn" @click="removeMarker(pause.editing); pause.open = false">{{ t('episode.narrationEditor.remove') }}</button>
             <span class="ml-auto" />
             <button class="btn" @click="pause.open = false">{{ t('common.cancel') }}</button>
-            <button class="btn btn-primary" :disabled="!!pauseError" @click="confirmPause">{{ t('episode.narrationEditor.insert') }}</button>
+            <button class="btn btn-primary" :disabled="pause.stale || !!pauseError" @click="confirmPause">{{ t('episode.narrationEditor.insert') }}</button>
           </footer>
         </div>
       </div>
@@ -248,6 +251,7 @@ import {
   spokenText,
   toneMarker,
 } from '~/utils/narrationMarkup'
+import { DEEPLINK_KEYS, querySingle, useDeeplink } from '~/composables/useQuerySync'
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
@@ -255,6 +259,8 @@ const props = defineProps({
   placeholder: { type: String, default: '' },
   rows: { type: Number, default: 4 },
   disabled: { type: Boolean, default: false },
+  // deeplink（#86）：同一集会有多个编辑器实例，用所属分镜 id 区分；为 0 时不发布也不恢复
+  deeplinkId: { type: Number, default: 0 },
 })
 const emit = defineEmits(['input', 'commit'])
 const { t } = useI18n()
@@ -396,7 +402,8 @@ function editMarker(seg) {
 }
 
 // ---------- 注音 ----------
-const pron = reactive({ open: false, start: 0, end: 0, base: '', mode: 'pinyin', rows: [], homophone: '', editing: null })
+// stale = 从链接恢复但位置与已保存正文对不上：只读展示，禁止提交（见 openStale）
+const pron = reactive({ open: false, start: 0, end: 0, base: '', mode: 'pinyin', rows: [], homophone: '', editing: null, stale: false })
 
 const pronMarker = computed(() => {
   if (pron.mode === 'homophone') return rubyMarker(pron.base, pron.homophone)
@@ -476,10 +483,11 @@ async function openPron(range, editing = null) {
   pron.editing = editing
   pron.mode = editing?.kind === 'homophone' ? 'homophone' : 'pinyin'
   pron.homophone = editing?.kind === 'homophone' ? editing.reading : ''
+  pron.stale = false
   pron.open = true
 }
 function confirmPron() {
-  if (pronError.value) return
+  if (pron.stale || pronError.value) return
   const normalized = pron.mode === 'pinyin'
     ? rubyMarker(pron.base, pron.rows.map(r => normalizeSyllable(r.value).value).join(' '))
     : pronMarker.value
@@ -488,23 +496,24 @@ function confirmPron() {
 }
 
 // ---------- 语气 ----------
-const tone = reactive({ open: false, value: '', pos: 0, editing: null })
+const tone = reactive({ open: false, value: '', pos: 0, editing: null, stale: false })
 async function openTone(editing = null) {
   await loadCatalog()
   tone.editing = editing
   tone.value = editing?.tag || ''
   tone.pos = editing ? editing.start : safeInsertPos(selection().start)
+  tone.stale = false
   tone.open = true
 }
 function confirmTone() {
-  if (!tone.value) return
+  if (tone.stale || !tone.value) return
   if (tone.editing) replaceRange(tone.editing.start, tone.editing.end, toneMarker(tone.value))
   else replaceRange(tone.pos, tone.pos, toneMarker(tone.value))
   tone.open = false
 }
 
 // ---------- 停顿 ----------
-const pause = reactive({ open: false, seconds: 1, pos: 0, editing: null })
+const pause = reactive({ open: false, seconds: 1, pos: 0, editing: null, stale: false })
 const pauseError = computed(() => {
   const s = Number(pause.seconds)
   if (!Number.isFinite(s) || s < pauseRange.value.min || s > pauseRange.value.max) {
@@ -517,14 +526,16 @@ async function openPause(editing = null) {
   pause.editing = editing
   pause.seconds = editing?.seconds ?? 1
   pause.pos = editing ? editing.start : safeInsertPos(selection().start)
+  pause.stale = false
   pause.open = true
 }
 function insertNatural(str) {
+  if (pause.stale) return
   replaceRange(pause.pos, pause.pos, str)
   pause.open = false
 }
 function confirmPause() {
-  if (pauseError.value) return
+  if (pause.stale || pauseError.value) return
   const marker = pauseMarker(Math.round(Number(pause.seconds) * 10) / 10)
   if (pause.editing) replaceRange(pause.editing.start, pause.editing.end, marker)
   else replaceRange(pause.pos, pause.pos, marker)
@@ -533,6 +544,75 @@ function confirmPause() {
 
 // ---------- 多音字检查：列出正文（未注音部分）里所有多音字 ----------
 const check = reactive({ open: false, loading: false, items: [] })
+// deeplink（#86）：四个浮层都要能直达。check 是纯本地计算，可以直接恢复；
+// 注音/语气/停顿依附正文位置，链接里带上宿主分镜 + 区间 +（注音还带）源文字，
+// 恢复时先用当前已保存正文校验：对得上才按原样打开，对不上只读打开并明示，绝不插到错位置。
+const link = useDeeplink('narration', DEEPLINK_KEYS.narration.filter(key => key === 'nedlg'))
+const urlDialog = querySingle(link.initial('nedlg'))
+
+/** 当前浮层的链接身份：<种类>:<分镜 id>[:<区间>[:<源文字>]] */
+function markerLinkKey() {
+  const id = props.deeplinkId
+  if (!(id > 0)) return ''
+  if (check.open) return `check:${id}`
+  if (pron.open) return `pron:${id}:${pron.start}-${pron.end}:${encodeURIComponent(pron.base || '')}`
+  if (tone.open) return `tone:${id}:${tone.editing ? `${tone.editing.start}-${tone.editing.end}` : tone.pos}`
+  if (pause.open) return `pause:${id}:${pause.editing ? `${pause.editing.start}-${pause.editing.end}` : pause.pos}`
+  return ''
+}
+watch(
+  () => [check.open, pron.open, tone.open, pause.open, pron.start, pron.end, tone.pos, pause.pos].join('|'),
+  () => link.set({ nedlg: markerLinkKey() }),
+  { immediate: true },
+)
+
+/** 已保存正文里 [start,end) 上的同类标记（恢复「编辑已有标记」用） */
+function markerSegmentAt(start, end, types) {
+  return parsed.value.segments.find(seg => seg.start === start && seg.end === end && types.includes(seg.type)) || null
+}
+
+/** 位置对不上时的只读外壳：保留宿主、区间与链接记录的内容，但不允许提交 */
+function openStale(kind, start, end, base) {
+  if (kind === 'pron') {
+    Object.assign(pron, { rows: [], start, end, base, editing: null, mode: 'pinyin', homophone: '', stale: true, open: true })
+  } else if (kind === 'tone') {
+    Object.assign(tone, { value: '', pos: start, editing: null, stale: true, open: true })
+  } else {
+    Object.assign(pause, { seconds: 1, pos: start, editing: null, stale: true, open: true })
+  }
+  toast.warning(t('deeplink.staleRange'))
+}
+
+async function restoreMarkerDeeplink() {
+  const matched = /^(check|pron|tone|pause):(\d+)(?::(\d+)(?:-(\d+))?(?::(.*))?)?$/.exec(urlDialog || '')
+  if (!matched) return
+  const [, kind, idText, startText, endText, baseText] = matched
+  if (!(props.deeplinkId > 0) || Number(idText) !== props.deeplinkId) return
+  if (kind === 'check') { void openCheck(); return }
+  const start = Number(startText || 0)
+  const end = endText === undefined ? start : Number(endText)
+  if (!Number.isInteger(start) || start < 0 || start > text.value.length) { openStale(kind, 0, 0, ''); return }
+  if (kind === 'pron') {
+    const base = decodeURIComponent(baseText || '')
+    const seg = markerSegmentAt(start, end, ['ruby', 'invalid'])
+    if (seg && (!base || seg.base === base)) { await openPron({ start, end }, seg); return }
+    if (base && text.value.slice(start, end) === base && !markerAt(text.value, start)) { await openPron({ start, end }); return }
+    openStale('pron', start, end, base)
+    return
+  }
+  const types = kind === 'tone' ? ['tone'] : ['pause']
+  const seg = end > start ? markerSegmentAt(start, end, types) : null
+  if (seg) { await (kind === 'tone' ? openTone(seg) : openPause(seg)); return }
+  // 插入位（没有区间）：位置必须仍是合法插入点，否则只读
+  if (end === start && safeInsertPos(start) === start && !markerAt(text.value, start)) {
+    await (kind === 'tone' ? openTone() : openPause())
+    if (kind === 'tone') tone.pos = start
+    else pause.pos = start
+    return
+  }
+  openStale(kind, start, end, '')
+}
+void restoreMarkerDeeplink()
 async function openCheck() {
   check.open = true
   check.loading = true

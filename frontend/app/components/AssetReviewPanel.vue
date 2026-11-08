@@ -16,6 +16,7 @@ import { toast } from 'vue-sonner'
 import { assetReviewAPI, episodeAPI } from '~/composables/useApi'
 import { toastError } from '~/composables/useToast'
 import { onTaskFinished } from '~/composables/useTasks'
+import { DEEPLINK_KEYS, queryEnum, querySingle, useDeeplink } from '~/composables/useQuerySync'
 import AssetReviewBatchDialog from './AssetReviewBatchDialog.vue'
 
 const props = defineProps({
@@ -32,10 +33,35 @@ const STATUSES = ['missing', 'have', 'added', 'ignored', 'not_needed']
 /** 轮询节奏与 PropSemanticsPanel 的自动标注一致 */
 const POLL_MS = 3000
 
+/** 批量弹窗的动作白名单：URL 里只认这三个值，别的一律按失效链接处理 */
+const BATCH_MODES = ['extract', 'create', 'status']
+
+/**
+ * URL 子状态（Issue #86）：列表筛选 + 三个自持弹窗（忽略 / 绑定 / 批量）。
+ * 理由文本与绑定下拉都是未保存草稿：只按条目 id 重建弹窗外壳，不回填内容、不自动提交。
+ * 批量弹窗只记动作名，条目按恢复时「当前筛选下的实时缺失清单」重算，不恢复任何快照与勾选，
+ * 恢复过程零写请求，确认仍必须由人点击。
+ */
+const link = useDeeplink('assetReview', DEEPLINK_KEYS.assetReview)
+const urlFilter = queryEnum(link.initial('arfilter'), ['all', ...STATUSES])
+/** `ignore:<itemId>` / `bind:<itemId>` / `batch:<mode>`；清单到位后才能解析成条目 */
+let pendingDialog = parseDialogRef(link.initial('ardlg'))
+
+function parseDialogRef(raw) {
+  const value = querySingle(raw) || ''
+  if (!value) return null
+  const item = /^(ignore|bind):(\d+)$/.exec(value)
+  if (item) return { mode: item[1], id: Number(item[2]) }
+  const batch = /^batch:([a-z_]+)$/.exec(value)
+  if (batch && BATCH_MODES.includes(batch[1])) return { mode: 'batch', batch: batch[1] }
+  // 取值不合法：仍要走一次恢复流程，好清掉自己的键并提示
+  return { mode: 'invalid' }
+}
+
 const loading = ref(false)
 const running = ref(false)
 const payload = ref(null)
-const filter = ref('all')
+const filter = ref(urlFilter || 'all')
 const collapsed = ref({})
 const episodeAssets = ref([])
 const busyItemId = ref(0)
@@ -331,6 +357,57 @@ watch(() => props.episodeId, () => {
   load()
   loadEpisodeAssets()
 }, { immediate: true })
+
+/** 发布本层键；弹窗只认「有条目的打开态」，关闭即从 URL 移除，父级（工作台）键原样保留 */
+function publishLink() {
+  const ignore = ignoreDialog.value
+  const bind = bindDialog.value
+  link.set({
+    arfilter: filter.value === 'all' ? '' : filter.value,
+    ardlg: ignore.open && ignore.item
+      ? `ignore:${ignore.item.id}`
+      : bind.open && bind.item
+        ? `bind:${bind.item.id}`
+        : batchMode.value ? `batch:${batchMode.value}` : '',
+  })
+}
+
+function missingLinkToast(target) {
+  toast.warning(t('deeplink.missingNamed', { target }))
+  publishLink()
+}
+
+/** 清单到位后重建弹窗外壳：目标不存在就清掉自己的键并提示，停在清单这一层 */
+function restoreDialogFromLink() {
+  const target = pendingDialog
+  if (!target || !payload.value) return
+  pendingDialog = null
+  // 恢复期间人已经自己开了弹窗：手动操作优先
+  if (ignoreDialog.value.open || bindDialog.value.open || batchMode.value) return
+  if (target.mode === 'invalid') {
+    missingLinkToast(t('episode.assets.tabReview'))
+    return
+  }
+  if (target.mode === 'batch') {
+    // 条目按「当前筛选下的实时缺失清单」重算（openBatch 不发任何请求），确认仍由人点
+    if (!filteredMissing.value.length) {
+      missingLinkToast(t(`episode.assetReview.batch.${target.batch}`))
+      return
+    }
+    openBatch(target.batch)
+    return
+  }
+  const item = segments.value.flatMap(seg => seg.items || []).find(row => row.id === target.id)
+  if (!item) {
+    missingLinkToast(t(target.mode === 'ignore' ? 'episode.assetReview.ignoreDialog.title' : 'episode.assetReview.bindDialog.title'))
+    return
+  }
+  if (target.mode === 'ignore') openIgnore(item)
+  else openBind(item)
+}
+
+watch(payload, restoreDialogFromLink)
+watch([filter, ignoreDialog, bindDialog, batchMode], publishLink, { deep: true })
 
 onTaskFinished((task) => {
   const kind = String(task?.kind || task?.params?.kind || '')

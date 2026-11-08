@@ -103,6 +103,21 @@
             <pre class="task-detail-output">{{ outputText }}</pre>
           </div>
 
+          <!-- 真实字数/调用耗时/ETA（#87）：与阶段面板读同一个 observation_summary -->
+          <div v-if="live.observation_summary" class="task-detail-section">
+            <TaskWorkMetrics :summary="live.observation_summary" />
+          </div>
+
+          <!-- 完整公开对话与调用时序（#87）：分页按需读，不另起全局任务轮询；
+               没有观测记录时组件自身不渲染，不留空壳分区 -->
+          <TaskConversation
+            v-if="live.type === 'text'"
+            class="task-detail-section"
+            :task-id="live.id"
+            :active="taskActive"
+            :restore-link="restoreLink"
+          />
+
           <!-- 基本信息 -->
           <dl class="task-detail-grid">
             <div class="task-detail-cell">
@@ -220,7 +235,7 @@
     </div>
     <div v-if="previewUrl" class="pipeline-preview" role="dialog" aria-modal="true" :aria-label="previewTitle" @click.self="previewUrl = ''">
       <button class="btn pipeline-preview-close" :aria-label="t('common.close')" @click="previewUrl = ''"><X :size="18" /></button>
-      <img :src="previewUrl" :alt="previewTitle" />
+      <img :src="previewUrl" :alt="previewTitle" @error="previewUnavailable" />
     </div>
 
     <ConfirmDialog
@@ -250,6 +265,8 @@ import ProgressRing from '~/components/ProgressRing.vue'
 import ModelSelect from '~/components/ModelSelect.vue'
 import ConfirmDialog from '~/components/ConfirmDialog.vue'
 import MediaTime from '~/components/MediaTime.vue'
+import TaskConversation from '~/components/TaskConversation.vue'
+import TaskWorkMetrics from '~/components/TaskWorkMetrics.vue'
 import AssetPipelinePanel from '~/components/AssetPipelinePanel.vue'
 import TaskErrorMessage from '~/components/TaskErrorMessage.vue'
 import { taskErrorPresentation } from '~/utils/taskError'
@@ -258,6 +275,8 @@ import { mapError, toastError, toastServerMessage } from '~/composables/useToast
 import { loadModelOptions, bareModelName } from '~/composables/useModelOptions'
 import { useTasks } from '~/composables/useTasks'
 import { copyToClipboard } from '~/utils/clipboard'
+import { mediaUrl } from '~/utils/url'
+import { DEEPLINK_KEYS, deeplinkInitial, querySingle, useDeeplink } from '~/composables/useQuerySync'
 import {
   useNowTicker, ringPropsFromTask, isActiveTaskStatus, formatSeconds, taskRemoteState,
 } from '~/composables/useTaskProgress'
@@ -265,8 +284,11 @@ import {
 const props = defineProps({
   task: { type: Object, required: true },
   reviewMode: { type: Boolean, default: false },
+  restoreLink: { type: Boolean, default: false },
+  // 全屏正文视图：由宿主（任务中心面板）经 URL 同步（Issue #86 tfull）
+  fullView: { type: Boolean, default: false },
 })
-const emit = defineEmits(['close', 'changed'])
+const emit = defineEmits(['close', 'changed', 'update:fullView'])
 
 const { t } = useI18n()
 const now = useNowTicker()
@@ -394,7 +416,7 @@ async function copyError() {
 // ===== 思考过程（仅文本任务，Issue #19） =====
 const reasoning = ref({ chars: 0, text: '', offset: 0 })
 const thinkingOpen = ref(isActiveTaskStatus(props.task.status))
-const fullView = ref(false)
+const fullView = ref(Boolean(props.fullView))
 const followTail = ref(true)
 const thinkingEl = ref(null)
 let reasoningTimer = null
@@ -456,6 +478,23 @@ function stopReasoningPolling() {
   if (reasoningTimer) { clearInterval(reasoningTimer); reasoningTimer = null }
 }
 
+// 全屏正文视图与宿主双向同步（Issue #86）：宿主负责把它写进 URL
+watch(() => props.fullView, (open) => { if (open !== fullView.value) fullView.value = open })
+watch(fullView, (open) => {
+  emit('update:fullView', open)
+  // 非文本任务没有这个视图：链接里带了也要回落
+  if (open && live.value.type !== 'text') fullView.value = false
+})
+
+/** 从链接恢复全屏正文：展开思考块并按总字数取回全文（只读，不触发任何写操作） */
+async function restoreFullView() {
+  if (!fullView.value) return
+  if (live.value.type !== 'text') { fullView.value = false; return }
+  thinkingOpen.value = true
+  await fetchReasoning()
+  await loadFullReasoning()
+}
+
 onMounted(startReasoningPolling)
 onBeforeUnmount(() => {
   stopReasoningPolling()
@@ -482,6 +521,51 @@ const busy = ref(false)
 const overwriteAsk = ref(false)
 // 剧本改写 / 拆分分镜的重试会覆盖本集剧本或分镜（Agent 工具直接写库），先让用户确认
 const OVERWRITING_KINDS = ['script_rewrite', 'storyboard_breaker']
+const uiLink = useDeeplink('taskDialogUi', DEEPLINK_KEYS.taskDialogUi)
+const urlRetryModel = querySingle(uiLink.initial('tmodel'))
+const urlOverwrite = uiLink.initial('taskoverwrite') === '1'
+const urlPreview = querySingle(uiLink.initial('tpreview'))
+const urlThinking = querySingle(uiLink.initial('tthink'))
+
+function previewIdentity(value) {
+  if (!value) return ''
+  try {
+    const url = new URL(value, window.location.href)
+    if (url.origin !== window.location.origin) return ''
+    const start = url.pathname.indexOf('/static/')
+    if (start < 0) return ''
+    const path = decodeURIComponent(url.pathname.slice(start + 1))
+    return path.split('/').some(part => part === '..' || part === '.' || /[\\\u0000-\u001f]/.test(part)) ? '' : path
+  } catch { return '' }
+}
+function previewUnavailable() {
+  previewUrl.value = ''
+  toast.warning(t('deeplink.missing'))
+}
+function restoreTaskUi() {
+  if (!props.restoreLink || Number(deeplinkInitial('task')) !== Number(live.value.id)) return
+  let validModel = true
+  if (urlRetryModel && !retryModel.value) {
+    if (modelOptions.value.some(option => option.key === urlRetryModel)) retryModel.value = urlRetryModel
+    else { validModel = false; toast.warning(t('deeplink.missing')) }
+  }
+  if (urlOverwrite && validModel) {
+    if (OVERWRITING_KINDS.includes(textKind.value) && !isActiveTaskStatus(live.value.status)) overwriteAsk.value = true
+    else toast.warning(t('deeplink.missing'))
+  }
+  if (urlThinking === '1' || urlThinking === '0') thinkingOpen.value = urlThinking === '1'
+  if (urlPreview && !previewUrl.value) {
+    const path = previewIdentity(urlPreview)
+    if (path) showPreview(mediaUrl(path), path)
+    else toast.warning(t('deeplink.missing'))
+  }
+}
+watch([previewUrl, retryModel, overwriteAsk, thinkingOpen], () => uiLink.set({
+  tpreview: previewIdentity(previewUrl.value),
+  tmodel: retryModel.value || '',
+  taskoverwrite: overwriteAsk.value ? '1' : '',
+  tthink: thinkingOpen.value ? '1' : '0',
+}), { immediate: true })
 
 async function fetchModels() {
   const serviceType = SERVICE_TYPE[live.value.type] || 'image'
@@ -492,11 +576,14 @@ async function fetchModels() {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   if (live.value.type === 'text' && live.value.pipeline?.state !== 'waiting_approval') {
     void fetchReasoning()
     void fetchDetail()
   }
+  void restoreFullView()
+  await fetchModels()
+  restoreTaskUi()
 })
 
 function askRetry() {

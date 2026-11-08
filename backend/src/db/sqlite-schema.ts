@@ -678,6 +678,90 @@ export const sqliteSchemaStatements = [
     finished_at TEXT
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_script_rewrite_stage_run ON script_rewrite_stage (run_id, stage_key)`,
+
+  // ── 任务级持久调用观测（Issue #87 C 段）────────────────────────────
+  // 四张表而不是往 sys_task.params 塞大 JSON：params 是读-合-写，公开对话会把它撑成兆级并产生覆盖竞态。
+  // work = 一次被观测的工作项（骨架整集 / 设计卡逐镜 / 配音逐镜），call = 该工作项里真实发生的
+  // 模型/TTS 调用，message = 调用的公开消息（system/user/assistant/tool/工具定义/工具调用与结果），
+  // text = 消息正文的内容寻址表（同一段 system/技能全文在多步里逐步重发，存一份、消息行引用）。
+  // 时间一律是毫秒 epoch 整数：墙钟、模型服务耗时、队列等待分列，便于 ETA 按同口径复算。
+  `CREATE TABLE IF NOT EXISTS task_observed_work (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    task_id INTEGER NOT NULL,
+    stage TEXT NOT NULL,
+    source_chars INTEGER NOT NULL DEFAULT 0,
+    sample_key TEXT NOT NULL,
+    storyboard_id INTEGER,
+    storyboard_number INTEGER,
+    started_at INTEGER NOT NULL,
+    finished_at INTEGER,
+    status TEXT NOT NULL DEFAULT 'processing',
+    model_ms INTEGER NOT NULL DEFAULT 0,
+    queue_ms INTEGER NOT NULL DEFAULT 0,
+    work_ms INTEGER NOT NULL DEFAULT 0,
+    call_count INTEGER NOT NULL DEFAULT 0,
+    heartbeat_at INTEGER NOT NULL,
+    error_msg TEXT,
+    created_at INTEGER NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_task_observed_work_task ON task_observed_work (task_id, id)`,
+  `CREATE INDEX IF NOT EXISTS idx_task_observed_work_sample ON task_observed_work (stage, sample_key, id)`,
+  `CREATE TABLE IF NOT EXISTS task_observed_call (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    work_id INTEGER NOT NULL,
+    task_id INTEGER NOT NULL,
+    kind TEXT NOT NULL,
+    config_id INTEGER,
+    config_name TEXT,
+    provider TEXT,
+    model TEXT,
+    url TEXT,
+    stream INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'processing',
+    http_status INTEGER,
+    queued_at INTEGER,
+    started_at INTEGER NOT NULL,
+    finished_at INTEGER,
+    duration_ms INTEGER,
+    queue_ms INTEGER NOT NULL DEFAULT 0,
+    request_chars INTEGER NOT NULL DEFAULT 0,
+    response_chars INTEGER NOT NULL DEFAULT 0,
+    prompt_tokens INTEGER,
+    completion_tokens INTEGER,
+    finish_reason TEXT,
+    error_msg TEXT,
+    heartbeat_at INTEGER NOT NULL,
+    created_at INTEGER NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_task_observed_call_task ON task_observed_call (task_id, id)`,
+  `CREATE INDEX IF NOT EXISTS idx_task_observed_call_work ON task_observed_call (work_id, id)`,
+  // 公开消息正文内容寻址：同一段 system/技能全文在多步工具调用里逐步重发，
+  // 按 sha256 存一份、消息行引用，既保留每次调用的完整可还原上下文，又不按步数平方放大磁盘。
+  // 流式进行中的助手正文先写 body（可增量更新），收尾时落入 text 表并清空 body。
+  `CREATE TABLE IF NOT EXISTS task_observed_text (
+    hash TEXT PRIMARY KEY,
+    body TEXT NOT NULL,
+    chars INTEGER NOT NULL,
+    created_at INTEGER NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS task_observed_message (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    call_id INTEGER NOT NULL,
+    work_id INTEGER NOT NULL,
+    task_id INTEGER NOT NULL,
+    seq INTEGER NOT NULL,
+    phase TEXT NOT NULL,
+    role TEXT NOT NULL,
+    name TEXT,
+    tool_call_id TEXT,
+    body TEXT,
+    text_hash TEXT,
+    chars INTEGER NOT NULL DEFAULT 0,
+    streaming INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_task_observed_message_call ON task_observed_message (call_id, id)`,
+  `CREATE INDEX IF NOT EXISTS idx_task_observed_message_tool ON task_observed_message (work_id, tool_call_id)`,
 ]
 
 /**

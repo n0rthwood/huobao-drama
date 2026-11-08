@@ -10,7 +10,7 @@ import { desc, eq } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
 import { badRequest, created, success } from '../utils/response.js'
 import { logTaskError } from '../utils/task-logger.js'
-import { StageVisionUnavailableError } from '../services/ai-stages.js'
+import { stageSelectionErrorPayload } from '../services/ai-stages.js'
 import { parseTextTaskParams } from '../services/text-task.js'
 import { listBaseCandidates } from '../services/asset-pipeline/base-candidates.js'
 import { decideRound } from '../services/asset-pipeline/gate.js'
@@ -101,7 +101,8 @@ app.post('/runs', async (c) => {
     return created(c, { run_id: result.runId, mastra_run_id: result.mastraRunId })
   } catch (err) {
     if (err instanceof PipelineConflictError) return c.json({ success: false, error: err.message }, 409)
-    if (err instanceof StageVisionUnavailableError) return badRequest(c, err.message)
+    const selectionError = stageSelectionErrorPayload(err)
+    if (selectionError) return c.json(selectionError, 400)
     if (err instanceof PipelineStateError) return badRequest(c, err.message)
     if (err instanceof ReferenceSelectionError) return badRequest(c, err.message)
     if (err instanceof ImageSelectionError) return badRequest(c, err.message)
@@ -159,7 +160,8 @@ app.post('/assets/:kind/:id/research', async (c) => {
     return created(c, { task_id: taskId })
   } catch (err) {
     if (err instanceof ResearchConflictError) return c.json({ success: false, error: err.message }, 409)
-    if (err instanceof StageVisionUnavailableError) return badRequest(c, err.message)
+    const selectionError = stageSelectionErrorPayload(err)
+    if (selectionError) return c.json(selectionError, 400)
     throw err
   }
 })

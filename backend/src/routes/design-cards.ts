@@ -41,6 +41,7 @@ import {
   type DesignCardBatchStart,
 } from '../services/design-card-batch.js'
 import { reorderStoryboards } from '../services/storyboard-fill-gaps.js'
+import { parseFillModelSelection, stageSelectionErrorPayload } from '../services/ai-stages.js'
 
 type Ctx = Parameters<typeof badRequest>[0]
 
@@ -262,6 +263,8 @@ app.post('/:id/design-cards/fill', async (c) => {
   const storyboardIds = Array.isArray(body.storyboard_ids)
     ? body.storyboard_ids.map(Number).filter((n: number) => Number.isInteger(n) && n > 0)
     : undefined
+  const selection = parseFillModelSelection(body)
+  if ('error' in selection) return badRequest(c, selection.error)
   // 骨架未确认是预期中的操作顺序问题（#70），不是服务端异常。
   // 全局 onError 也映射了 SkeletonNotConfirmedError；这里保留同形状的路由级映射，
   // 让这个子应用被单独挂载/直接调用时也不会退化成 500。
@@ -269,12 +272,24 @@ app.post('/:id/design-cards/fill', async (c) => {
   try {
     result = await startDesignCardBatch(
       ep.id, ep.dramaId,
-      { model: typeof body.model === 'string' ? body.model : undefined, configId: body.config_id as number | undefined },
+      {
+        model: selection.model,
+        configId: selection.configId,
+      },
       storyboardIds,
     )
   } catch (err) {
     if (err instanceof SkeletonNotConfirmedError) {
       return c.json({ code: 400, error: 'skeleton_unconfirmed', message: err.message }, 400)
+    }
+    // 选不到模型是用户可处理的选择问题（指定的配置暂停/非视觉/停用/不存在，或确实一条视觉
+    // 配置都没有），不是服务端异常：返回指名原因与可用候选，不再逃逸成 500。
+    const payload = stageSelectionErrorPayload(err)
+    if (payload) {
+      logTaskError('DesignCardAPI', 'fill-model-unavailable', {
+        episodeId: id, error: payload.error, configId: payload.config_id, reason: payload.reason,
+      })
+      return c.json(payload, 400)
     }
     throw err
   }

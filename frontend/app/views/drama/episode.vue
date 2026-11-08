@@ -616,6 +616,10 @@
             :narration-voice-batch="narrationVoiceBatch"
             @refresh="refresh"
             @batch-narration-voice="batchNarrationVoice"
+            @open-asset="openAssetFromReview"
+            @preview="openDesignImagePreview"
+            @goto-step="gotoWorkbenchStep"
+            @goto-asset="gotoAssetFromPicker"
           />
 
           <!-- Sub: 分镜关键帧（剧情专用；纪录片走「分镜制作」步） -->
@@ -925,7 +929,7 @@
             </section>
 
             <!-- 证据素材与语义标注（Issue #47）：忠实素材只做标注与底图切换，不走生图 -->
-            <section v-if="assetDetail.type === 'prop'" class="asset-detail-ref-panel">
+            <section v-if="assetDetail.type === 'prop'" ref="assetSemanticsSection" class="asset-detail-ref-panel">
               <div class="asset-detail-section-title">
                 <span>{{ t('episode.documentary.semantics.sectionTitle') }}</span>
                 <span class="dim">{{ t('episode.documentary.semantics.sectionHint') }}</span>
@@ -1629,17 +1633,23 @@ const storedPanel = (() => {
 //      &tab=assets|poster|keyframes|videos（纪录片项目为 assets|poster|design|production|final）
 //      &sub=cards|review（资产步的子页签，纪录片才有审核清单）
 //      &extract=characters|scenes|props &asset=类型-id =====
-const { replaceQuery } = useQuerySync()
-const urlPanel = queryEnum(route.query.panel, ['script', 'production', 'export'])
-const urlStep = queryEnum(route.query.step, ['0', '1'])
+// Issue #86：统一走 useDeeplink 分组（键登记在 DEEPLINK_KEYS），工作台不再自己整包覆盖 query：
+// - workbench：面板/子步骤/页签/资产子页签/提取筛选/资产详情弹窗（键名与取值与旧链接逐字兼容）
+// - workbenchDialogs：工作台自己托管的弹窗身份 dlg + 大图 view + 选中分镜 shot + 多选上下文 sel
+// - assetDetail：资产详情弹窗内部位置（语义条目 sem / 地图编辑 mapedit）
+const link = useDeeplink('workbench', DEEPLINK_KEYS.workbench)
+const dialogLink = useDeeplink('workbenchDialogs', DEEPLINK_KEYS.workbenchDialogs)
+const assetDetailLink = useDeeplink('assetDetail', DEEPLINK_KEYS.assetDetail)
+const urlPanel = queryEnum(link.initial('panel'), ['script', 'production', 'export'])
+const urlStep = queryEnum(link.initial('step'), ['0', '1'])
 // 两类项目的页签并集（含旧链接 expression/layers，由 remapProdTab 归一）
-const urlProdTab = queryEnum(route.query.tab, [...PROD_TAB_KEYS, 'expression', 'layers'])
-const urlAssetTab = queryEnum(route.query.sub, ASSET_SUB_TABS)
+const urlProdTab = queryEnum(link.initial('tab'), [...PROD_TAB_KEYS, 'expression', 'layers'])
+const urlAssetTab = queryEnum(link.initial('sub'), ASSET_SUB_TABS)
 // extract：资产面板的类型筛选页签（null = 全部），与左侧 EXTRACT_TARGETS 三类一致
-const urlExtract = queryEnum(route.query.extract, ['characters', 'scenes', 'props'])
-const pendingAssetLink = queryTypedId(route.query.asset, ['character', 'scene', 'prop'])
+const urlExtract = queryEnum(link.initial('extract'), ['characters', 'scenes', 'props'])
+const pendingAssetLink = queryTypedId(link.initial('asset'), ['character', 'scene', 'prop'])
 // 任一面板子状态出现在 URL（含非法值）即以 URL 为完整来源，缺失子参数取默认值，忽略本地记忆
-const urlPanelGiven = !!(querySingle(route.query.panel) || urlStep || urlProdTab || querySingle(route.query.extract))
+const urlPanelGiven = !!(link.initial('panel') || urlStep || urlProdTab || link.initial('extract'))
 // 首个 refresh 时若已恢复面板位置（URL 显式 step 或无 URL 面板参数时的本地记忆），跳过按内容自动重置 scriptStep
 let panelRestored = urlStep !== null || (!urlPanelGiven && !!storedPanel)
 const panel = ref(urlPanelGiven
@@ -1988,6 +1998,11 @@ function closeImageViewer() {
   imageViewer.value = { open: false, src: '', title: '' }
 }
 
+function openDesignImagePreview(preview) {
+  if (!preview?.path) return
+  openImageViewer(mediaUrl(preview.path), preview.title || '')
+}
+
 // 场景时段词表：与 #21 的提取/提示词规则同一套（入库值固定为中文词，界面按语言显示）
 const TIME_PERIODS = ['清晨', '上午', '正午', '午后', '黄昏', '夜晚', '深夜']
 const TIME_PERIOD_KEYS = {
@@ -2008,6 +2023,7 @@ function onSceneTimePreset(value) {
 
 /** 语义面板要滚动并高亮的条目 id（审核清单的「标注待修正」直达用；为空与改动前逐字一致） */
 const focusSemanticId = ref('')
+const assetSemanticsSection = ref(null)
 
 function openAssetDetail(type, item) {
   if (!item) return
@@ -2043,14 +2059,10 @@ function closeAssetDetail() {
 }
 
 // ===== 子状态 → URL 同步（deeplink）：replace 更新，不污染历史栈，返回键 = 退出工作台 =====
-// URL 始终镜像当前面板/子步骤/类型筛选/资产弹窗，任意时刻复制地址即可分享/刷新还原
-// 水合守卫：首个 refresh 会按内容自动重置 scriptStep，若此时就 replace 会抢在
-// applyAssetDeeplink 之前把 URL 里的 asset 参数冲掉（query 变化重建组件后链路丢失），
-// 故在 onMounted 完成数据加载 + 资产弹窗回放后再整体同步一次
-let workbenchHydrated = false
-let workbenchDirty = false
+// URL 始终镜像当前面板/子步骤/类型筛选/资产弹窗，任意时刻复制地址即可分享/刷新还原。
+// 写出时机由 deeplink store 统一把关：onMounted 数据就绪 + 各层恢复完成后才 hydrate，
+// 恢复期间只收集不写地址，不会抢在 applyAssetDeeplink 之前把链接里的深层参数冲掉。
 function syncWorkbenchQuery() {
-  if (!workbenchHydrated) { workbenchDirty = true; return }
   const query = { panel: panel.value }
   // step 仅在剧本面板、tab/extract 仅在制作面板可见，只写当前有意义的键，保持 URL 简洁
   if (panel.value === 'script') query.step = String(scriptStep.value)
@@ -2062,10 +2074,20 @@ function syncWorkbenchQuery() {
   if (assetDetail.value.open && assetDetail.value.item?.id) {
     query.asset = `${assetDetail.value.type}-${assetDetail.value.item.id}`
   }
-  replaceQuery(query)
+  link.set(query)
 }
 watch([panel, scriptStep, prodTab, assetTab, extractTab], syncWorkbenchQuery)
 watch(assetDetail, syncWorkbenchQuery)
+
+// 资产详情弹窗内部位置（语义条目定位 / 地图编辑态）：只写自己的键，父层 asset 原样保留
+function syncAssetDetailQuery() {
+  const item = assetDetail.value.open ? assetDetail.value.item : null
+  assetDetailLink.set({
+    sem: item ? focusSemanticId.value : '',
+    mapedit: item && mapDraftAssetId.value === item.id ? '1' : '',
+  })
+}
+watch([assetDetail, focusSemanticId, mapDraftAssetId], syncAssetDetailQuery)
 
 // ─── 手动新增资产 ────────────────────────────────────────────
 // 类型短显示名渲染时求值（不模块级固化），逻辑判断一律用 kind code
@@ -2137,9 +2159,31 @@ function openAssetDetailById(type, id, semanticId = null) {
   openAssetDetail(type, item)
 }
 
-function openAssetFromReview(payload) {
+async function openAssetFromReview(payload) {
   if (!payload?.kind || !payload?.id) return
   openAssetDetailById(payload.kind, payload.id, payload.semantic_id || null)
+  if (payload.section === 'semantics' && payload.kind === 'prop') {
+    await nextTick()
+    assetSemanticsSection.value?.scrollIntoView({ block: 'start' })
+  }
+}
+
+/**
+ * 子面板的跨步骤出路（门禁提示、选择器空态）：panel/tab 的所有者在这里做应用内切步，
+ * 不整页 location.assign；被卸载的子面板会自动释放它自己的 deeplink 键，不跟到新步骤。
+ */
+function gotoWorkbenchStep(target) {
+  if (target === 'script') { panel.value = 'script'; return }
+  panel.value = 'production'
+  if (PROD_TAB_KEYS.includes(target)) prodTab.value = target
+}
+
+/** 选择器空态「去资产页」：切到资产步，带素材时直接打开那张素材的详情弹窗 */
+function gotoAssetFromPicker(asset) {
+  panel.value = 'production'
+  prodTab.value = 'assets'
+  if (isDocumentaryProject.value) assetTab.value = 'cards'
+  if (asset?.kind && asset?.id) openAssetDetailById(asset.kind, asset.id)
 }
 
 function openAssetCreateFromReview(payload) {
@@ -5169,26 +5213,194 @@ async function loadConfigs() {
   } catch (e) { console.error('Failed to load AI configs', e) }
 }
 
-// deeplink ?asset=类型-id：数据就绪后打开对应资产详情弹窗（并定位到资产面板）；
-// 资产已删除/不存在时静默忽略，停留在按 URL/localStorage 恢复的面板
-function applyAssetDeeplink() {
-  if (!pendingAssetLink) return
-  const { type, id } = pendingAssetLink
-  const list = type === 'character' ? chars.value : type === 'scene' ? scenes.value : propItems.value
-  const item = list.find(x => x.id === id)
-  if (!item) return
-  panel.value = 'production'
-  prodTab.value = 'assets'
-  openAssetDetail(type, item)
+/** 按类型 + id 取本集资产（deeplink 恢复只认已加载的真实数据，绝不凭空造一个目标） */
+function assetItemOf(type, id) {
+  const list = type === 'character' ? chars.value : type === 'scene' ? scenes.value : type === 'prop' ? propItems.value : null
+  return list ? list.find(x => x.id === Number(id)) || null : null
 }
 
-// 水合完成：数据就绪 + 资产弹窗回放后开启 URL 同步；带参数进入或水合期间状态已变化时整体同步一次
-const WORKBENCH_QUERY_KEYS = ['panel', 'step', 'tab', 'extract', 'asset']
+/** 链接目标已删除/不存在：给可读反馈并留在父级位置，不悄悄换一个目标冒充成功 */
+function deeplinkMissing(target) {
+  toast.info(target ? t('deeplink.missingNamed', { target }) : t('deeplink.missing'))
+}
+
+// deeplink ?asset=类型-id：数据就绪后打开对应资产详情弹窗；URL 已显式给出面板/页签时
+// 保留原工作位置（从设计卡复制的链接不该被拽回资产主步骤），只有纯 ?asset= 链接才定位到资产步
+function applyAssetDeeplink() {
+  if (!link.initial('asset')) return
+  const item = pendingAssetLink ? assetItemOf(pendingAssetLink.type, pendingAssetLink.id) : null
+  if (!item) { deeplinkMissing(assetKindLabel(pendingAssetLink?.type || '')); return }
+  const { type, id } = pendingAssetLink
+  if (!urlPanelGiven) {
+    panel.value = 'production'
+    prodTab.value = 'assets'
+  }
+  // 弹窗内部位置：语义条目定位 / 地图编辑态（openAssetDetail 会重置 mapDraftAssetId，故放在其后）
+  openAssetDetailById(type, id, assetDetailLink.initial('sem'))
+  if (type === 'prop' && assetDetailLink.initial('mapedit') === '1') mapDraftAssetId.value = item.id
+}
+
+/** 大图的可恢复身份：只接受本站 /static/ 媒体路径，外链 / data: / blob: 一律不入 URL */
+function viewerKeyOf(src) {
+  const value = String(src || '')
+  if (/^(data:|blob:)/i.test(value)) return ''
+  if (/^https?:\/\//i.test(value) && !value.startsWith(window.location.origin)) return ''
+  const index = value.indexOf('/static/')
+  return index < 0 ? '' : value.slice(index + 1)
+}
+
+/** 当前打开的工作台级弹窗身份（同一时刻只有一个；资产详情弹窗用独立的 asset 键） */
+function currentDialogKey() {
+  if (roster.value.open) return 'roster'
+  if (assetCreate.value.open) return `create:${assetCreate.value.type}`
+  if (assetDelete.value.open && assetDelete.value.item?.id) return `delete:${assetDelete.value.type}-${assetDelete.value.item.id}`
+  if (reExtract.value.open && reExtract.value.id) return `reextract:${reExtract.value.type}-${reExtract.value.id}`
+  if (faithfulConfirm.value.open) return 'faithful'
+  if (assetLibrary.value.open) return `library:${assetLibrary.value.kind}-${assetLibrary.value.id}`
+  if (assetBatch.open) return `batch:${assetBatch.scope}`
+  if (assetBrowserOpen.value) return 'browser'
+  if (narrationSettingsOpen.value) return 'narration-settings'
+  if (breakdownDialog.value) return 'breakdown'
+  if (voiceBatchDialog.value.open) return 'voice-batch'
+  if (composeDialog.value.open) return 'compose'
+  if (batchVideoConfirm.value.open) return 'video-batch'
+  if (mergeConfirm.value.open) return 'merge-confirm'
+  if (mergeDelete.value.open && mergeDelete.value.item?.id) return `merge-delete:${mergeDelete.value.item.id}`
+  if (subtitleRegenConfirm.value) return 'subtitle-regen'
+  if (activeMerge.value?.id) return `merge:${activeMerge.value.id}`
+  if (previewShot.value?.id) return `shot-preview:${previewShot.value.id}`
+  return ''
+}
+
+/** 当前面板的多选上下文：导出勾选 / 视频批量勾选（其它面板的多选由各自面板发布） */
+function currentSelectionIds() {
+  if (panel.value === 'export') return exportSelectedIds.value
+  if (panel.value === 'production' && prodTab.value === 'videos' && videoSelectMode.value) return selectedVideoSbIds.value
+  return []
+}
+
+function syncDialogQuery() {
+  // 视频步的选中分镜由工作台持有；其余步骤的选中分镜由各自面板组件发布同名 shot 键
+  const shotOwned = panel.value === 'production' && prodTab.value === 'videos'
+  dialogLink.set({
+    dlg: currentDialogKey(),
+    view: imageViewer.value.open ? viewerKeyOf(imageViewer.value.src) : '',
+    shot: shotOwned ? selectedSb.value?.id || '' : '',
+    sel: currentSelectionIds().join(',') || ((shotOwned && videoSelectMode.value) || (panel.value === 'export' && exportSelTouched) ? 'on' : ''),
+  })
+}
+watch([
+  roster, assetCreate, assetDelete, reExtract, faithfulConfirm, assetLibrary, assetBatch,
+  assetBrowserOpen, narrationSettingsOpen, breakdownDialog, voiceBatchDialog, composeDialog,
+  batchVideoConfirm, mergeConfirm, mergeDelete, subtitleRegenConfirm, activeMerge, previewShot,
+  imageViewer, selectedVideoSbIds, videoSelectMode, exportSelectedIds, panel, prodTab,
+  () => selectedSb.value?.id,
+], syncDialogQuery, { deep: true })
+
+/** deeplink ?shot= / ?sel=：恢复视频步的选中分镜与多选上下文（只改界面，不触发任何生成） */
+function applyShotSelectionDeeplink() {
+  const videoOwned = panel.value === 'production' && prodTab.value === 'videos'
+  if (!videoOwned && panel.value !== 'export') return
+  const ids = queryIdList(dialogLink.initial('sel')).filter(id => sbs.value.some(sb => sb.id === id))
+  if (ids.length || dialogLink.initial('sel') === 'on') {
+    if (panel.value === 'export') {
+      exportSelTouched = true
+      exportSelectedIds.value = ids
+    } else {
+      videoSelectMode.value = true
+      selectedVideoSbIds.value = ids
+    }
+  }
+  if (!videoOwned) return
+  const shotId = Number(dialogLink.initial('shot') || 0)
+  if (!shotId) return
+  const sb = sbs.value.find(item => item.id === shotId)
+  if (!sb) { deeplinkMissing(t('episode.sb.title')); return }
+  selectedSb.value = sb
+}
+
+/** deeplink ?view=static/...：按媒体身份重开大图；路径非法或不是本站媒体时不开 */
+function applyViewerDeeplink() {
+  const key = querySingle(dialogLink.initial('view'))
+  if (!key) return
+  if (!key.startsWith('static/') || key.includes('..')) { deeplinkMissing(''); return }
+  openImageViewer(mediaUrl(`/${key}`))
+}
+
+/**
+ * deeplink ?dlg=：重开工作台级弹窗。只恢复界面与可公开 id 重建的内容，
+ * 确认类弹窗一律仍需人工点击（刷新不等于提交），绝不自动生成/保存/删除/审批。
+ */
+async function applyDialogDeeplink() {
+  const raw = querySingle(dialogLink.initial('dlg'))
+  if (!raw) return
+  const [name, arg = ''] = raw.split(':')
+  const typed = /^(character|scene|prop)-(\d+)$/.exec(arg)
+  const typedItem = typed ? assetItemOf(typed[1], Number(typed[2])) : null
+  const scopeIds = queryIdList(dialogLink.initial('sel')).filter(id => sbs.value.some(sb => sb.id === id))
+  switch (name) {
+    case 'roster': return void openRosterDialog()
+    case 'create': return void (['character', 'scene', 'prop'].includes(arg) && openAssetCreate(arg))
+    case 'delete':
+      if (!typedItem) return deeplinkMissing(assetKindLabel(typed?.[1] || ''))
+      return askDeleteAsset(typed[1], typedItem)
+    case 'reextract':
+      if (!typedItem) return deeplinkMissing(assetKindLabel(typed?.[1] || ''))
+      if (!assetDetail.value.open) openAssetDetail(typed[1], typedItem)
+      return askReExtract()
+    case 'faithful':
+      // 「取消原件」确认框依附于已打开的资产详情弹窗，父链不在就不单独弹
+      if (!assetDetail.value.open || assetDetail.value.type !== 'prop') return deeplinkMissing('')
+      faithfulConfirm.value = { open: true, name: assetDetail.value.item?.name || '' }
+      return
+    case 'library': {
+      const match = /^(character|scene|prop)-(\d+)$/.exec(arg)
+      const host = match ? assetItemOf(match[1], Number(match[2])) : null
+      if (!host) return deeplinkMissing(assetKindLabel(match?.[1] || ''))
+      return openAssetLibrary(match[1], host.id)
+    }
+    case 'batch': return void (ASSET_BATCH_SCOPES.includes(arg) && openAssetBatch(arg))
+    case 'browser': return void (assetBrowserOpen.value = true)
+    case 'narration-settings': return void (narrationSettingsOpen.value = true)
+    case 'breakdown': return void (breakdownDialog.value = true)
+    case 'voice-batch':
+      voiceBatchDialog.value = { open: true, storyboardIds: scopeIds.length ? scopeIds : undefined, submitting: false }
+      return
+    case 'compose': return openComposeDialog(scopeIds)
+    case 'video-batch': return void openBatchVideoConfirm(scopeIds.length ? scopeIds : null)
+    case 'merge-confirm': return askMerge()
+    case 'subtitle-regen': return void (subtitleRegenConfirm.value = true)
+    case 'merge-delete':
+    case 'merge': {
+      await loadExportMerges()
+      const merge = exportMerges.value.find(m => String(m.id) === arg)
+      if (!merge) return deeplinkMissing(t('episode.viewer.filmPreview'))
+      if (name === 'merge') activeMerge.value = merge
+      else askDeleteMerge(merge)
+      return
+    }
+    case 'shot-preview': {
+      const sb = sbs.value.find(item => String(item.id) === arg)
+      if (!sb) return deeplinkMissing(t('episode.sb.title'))
+      previewShot.value = sb
+      return
+    }
+    default: deeplinkMissing('')
+  }
+}
+
+// 水合完成：数据就绪 + 各层弹窗回放后才开启 URL 写出（此前只收集，不改地址）
 onMounted(async () => {
   await refresh()
   applyAssetDeeplink()
-  workbenchHydrated = true
-  if (workbenchDirty || WORKBENCH_QUERY_KEYS.some(k => k in route.query)) syncWorkbenchQuery()
+  applyShotSelectionDeeplink()
+  await applyDialogDeeplink()
+  applyViewerDeeplink()
+  await nextTick()
+  syncWorkbenchQuery()
+  syncDialogQuery()
+  syncAssetDetailQuery()
+  deeplinkHydrate()
   loadConfigs()
   syncExtractStatus()
   loadVideoBatch() // 批量进度在服务端，刷新页面后继续展示

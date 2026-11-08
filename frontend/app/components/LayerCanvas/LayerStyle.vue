@@ -154,6 +154,7 @@ import { TriangleAlert, ImagePlus } from 'lucide-vue-next'
 import LayerImagePicker from './LayerImagePicker.vue'
 import { missingGlyphsOf } from '~/composables/useMissingGlyphs'
 import { mediaUrl } from '~/utils/url'
+import { deeplinkInitial, querySingle } from '~/composables/useQuerySync'
 
 const props = defineProps({
   doc: { type: Object, required: true },
@@ -182,7 +183,10 @@ const filter = computed(() => ({ paper: 0, tint: 'none', tint_strength: 0.35, vi
 
 const missingChars = computed(() => missingGlyphsOf(props.layer, props.variables))
 const fieldMissing = text => unsupportedChars(text)
-const imagePicker = ref(false)
+// deeplink（#86）：lpick=1 且带 lpmode 时由本宿主重开图片选择器（lpmode 没有时属于 LayerRail 的底图选择器）；
+// 键的发布仍由 LayerImagePicker 的分组负责，这里只恢复开关，不自己写 URL
+const imagePicker = ref(querySingle(deeplinkInitial('lpick')) === '1' && Boolean(deeplinkInitial('lpmode'))
+  && !props.documentOnly && Boolean(props.layer))
 const imageError = ref(false)
 watch(() => [props.layer?.id, props.layer?.src?.path], () => { imageError.value = false })
 

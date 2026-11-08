@@ -14,6 +14,7 @@ import { getTextProviderBaseUrl, type AIConfig } from './ai.js'
 import { isModelError, noteEndpointError, noteEndpointSuccess, selectTextEndpoint, withTextSlot } from './text-scheduler.js'
 import { currentTextTaskId, isAgentTextCall } from './text-task-context.js'
 import { recordTextTaskAttempt } from './text-task.js'
+import { observeQueueWait, observeTextCall } from './task-observability.js'
 import sharp from 'sharp'
 import { getAbsolutePath, readImageAsCompressedDataUrl } from '../utils/storage.js'
 
@@ -119,10 +120,19 @@ export async function callTextChat(
       ? AbortSignal.any([opts.signal, AbortSignal.timeout(opts.timeoutMs)])
       : AbortSignal.timeout(opts.timeoutMs)
     try {
-      data = await withTextSlot({ configId, interactive: opts.interactive, signal }, async () => {
+      // 读图等直连调用也归当前任务（#87）：排队标记在取槽位之外，采集层在槽位之内
+      data = await observeQueueWait(() => withTextSlot({ configId, interactive: opts.interactive, signal }, async () => {
         try {
           const url = `${getTextProviderBaseUrl(endpoint as unknown as AIConfig)}/chat/completions`
-          const resp = await fetch(url, {
+          const observedFetch = observeTextCall({
+            kind: 'vision_chat',
+            configId,
+            configName: endpoint.name ?? null,
+            provider: endpoint.provider,
+            model: endpoint.model,
+            baseUrl: url,
+          }, fetch)
+          const resp = await observedFetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${endpoint.apiKey}` },
             body: JSON.stringify({ model: endpoint.model, temperature: opts.temperature, max_tokens: opts.maxTokens, messages }),
@@ -136,7 +146,7 @@ export async function callTextChat(
           await noteEndpointError(configId, err)
           throw err
         }
-      })
+      }))
       break
     } catch (err) {
       const taskId = currentTextTaskId()

@@ -96,7 +96,11 @@
               </template>
             </div>
 
-            <p class="voice-eta">{{ t('episode.voiceDialog.eta', { sec: etaText }) }}</p>
+            <!--
+              预计耗时只来自历史真实合成样本（#87 §D）：同配置 / 同音色 / 同步数 / 同 cfg / 同规范化才同池。
+              音频长度 × RTF 不是服务调用耗时，已不再用它冒充预估；没有样本就显示「暂无估计」。
+            -->
+            <TaskWorkMetrics class="voice-eta" :estimate="workEstimate" :summary="workSummary" />
             <p class="voice-hint">{{ t('episode.voiceDialog.saveNote') }}</p>
           </template>
         </div>
@@ -123,6 +127,8 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Loader2, X } from 'lucide-vue-next'
 import { episodeAPI } from '~/composables/useApi'
+import { useTasks } from '~/composables/useTasks'
+import TaskWorkMetrics from '~/components/TaskWorkMetrics.vue'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -138,6 +144,7 @@ const props = defineProps({
 })
 const emit = defineEmits(['cancel', 'confirm'])
 const { t } = useI18n()
+const { tasksById } = useTasks()
 
 const loading = ref(false)
 const loadError = ref('')
@@ -163,19 +170,6 @@ const voiceGroups = computed(() => {
 })
 const voiceKnown = computed(() => (options.value?.voices || []).some(v => v.name === form.value?.voice))
 
-function rtfFor(steps) {
-  const table = options.value?.steps.presets || []
-  if (!table.length) return 0.49
-  if (steps <= table[0].steps) return table[0].rtf
-  const last = table[table.length - 1]
-  if (steps >= last.steps) return last.rtf
-  for (let i = 0; i < table.length - 1; i++) {
-    const a = table[i]; const b = table[i + 1]
-    if (steps >= a.steps && steps <= b.steps) return a.rtf + ((b.rtf - a.rtf) * (steps - a.steps)) / (b.steps - a.steps)
-  }
-  return 0.49
-}
-
 const hasDigits = computed(() => /\d/.test(props.text || ''))
 
 const planGroups = computed(() => {
@@ -188,15 +182,31 @@ const todoNumbers = computed(() => [...planGroups.value.missing, ...planGroups.v
   .map(it => `#${String(it.storyboard_number).padStart(2, '0')}`)
   .join(' '))
 
-const audioSeconds = computed(() => {
-  if (props.mode === 'batch') {
-    return [...planGroups.value.missing, ...planGroups.value.changed].reduce((sum, it) => sum + Number(it.audio_seconds || 0), 0)
+/**
+ * 真实计量（#87 §D）：开跑前只给「计划字数 + 历史同参数样本 ETA」，
+ * 有正在跑/刚跑完的配音任务时直接读它的 observation_summary（与任务详情同一对象）。
+ */
+const workEstimate = ref(null)
+const workSummary = computed(() => {
+  let latest = null
+  for (const task of Object.values(tasksById.value)) {
+    if (Number(task.episode_id) !== Number(props.episodeId)) continue
+    if (String(task.kind || task.params?.kind || '') !== 'narration_tts') continue
+    if (!latest || task.id > latest.id) latest = task
   }
-  const chars = (props.text || '').replace(/\s+/g, '').length
-  return chars / (options.value?.chars_per_second || 4.5)
+  return latest?.observation_summary || null
 })
-const etaText = computed(() => form.value ? (audioSeconds.value * rtfFor(form.value.inference_timesteps)).toFixed(1) : '0')
-
+let workEstimateSeq = 0
+async function loadWorkEstimate() {
+  const seq = ++workEstimateSeq
+  workEstimate.value = null
+  if (!props.episodeId || !props.open || !form.value?.voice) return
+  try {
+    const ids = props.mode === 'single' ? [props.storyboardId] : props.storyboardIds
+    const res = await episodeAPI.workEstimate(props.episodeId, 'voice', ids, { settings: settingsPayload() })
+    if (seq === workEstimateSeq) workEstimate.value = res?.estimate || null
+  } catch { /* 当前参数没有可信估计就保持未知。 */ }
+}
 const todoCount = computed(() => planGroups.value.missing.length + planGroups.value.changed.length)
 const confirmLabel = computed(() => {
   if (props.mode === 'batch') return t('episode.voiceDialog.confirmBatch', { n: todoCount.value })
@@ -262,18 +272,23 @@ async function refreshPlan() {
   }
 }
 
-watch(() => props.open, (open) => { if (open) load() })
+watch(() => props.open, (open) => { if (open) { load(); void loadWorkEstimate() } })
 watch([() => props.storyboardIds, () => props.episodeId, () => props.mode], () => {
   ++planSeq
   clearTimeout(planTimer)
   plan.value = null
-  if (props.open) void load()
+  if (props.open) { void load(); void loadWorkEstimate() }
 })
 // 批量：参数变了重新分类（防抖），保证「将重配的镜头」与确定后实际执行的一致
 watch([form, seedMode], () => {
-  if (props.mode !== 'batch' || !form.value) return
+  if (!props.open || !form.value) return
+  workEstimate.value = null
+  ++workEstimateSeq
   clearTimeout(planTimer)
-  planTimer = setTimeout(refreshPlan, 300)
+  planTimer = setTimeout(() => {
+    if (props.mode === 'batch') void refreshPlan()
+    void loadWorkEstimate()
+  }, 300)
 }, { deep: true })
 
 function confirm() {

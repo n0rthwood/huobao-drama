@@ -36,6 +36,7 @@ import {
   toDesignCardStatus,
   validateDesignCard,
 } from '../../services/design-card.js'
+import { checkDesignCardGrounding, groundingRejectionMessage } from '../../services/design-card-grounding.js'
 
 async function getEpisodeSceneIds(episodeId: number) {
   const links = await db.select().from(schema.episodeScenes)
@@ -811,11 +812,15 @@ const updateStoryboard = createTool({
         context?.requestContext?.set('designCardError' as never, reason as never)
         return { error: reason }
       }
+      // AI 写入路径的依据机检（#87）：只认当前已有资产能支撑的设计。
+      // 旧实现只拒「填了名字但解析不到」的引用，留空的几何层照样放行——用户已裁定
+      // 「留空待人工补标注」不是 AI 完成设计的出口。人工 PUT 不走这里，不受此限制。
       if (!comboOnly && scope === 'design_card' && card) {
-        const refs = [...(card.layer_plan?.must_mark || []), ...(card.layer_plan?.planned_layers || []).flatMap(layer => layer.anchor ? [layer.anchor] : [])]
-        const invalid = refs.filter(ref => ref.unresolved && (ref.semantic_id || ref.name))
-        if (invalid.length) return {
-          error: `语义引用不存在：${invalid.map(ref => ref.unresolved_reason).join('；')}。请只使用真实语义条目；尚未标注时保留规划图层，锚点的 semantic_id 和 name 留空，标明待标注。`,
+        const violations = checkDesignCardGrounding(card, ctx, combo)
+        if (violations.length) {
+          const reason = groundingRejectionMessage(violations)
+          context?.requestContext?.set('designCardError' as never, reason as never)
+          return { error: reason, grounding_issues: violations }
         }
       }
       if (card && !comboOnly) {
@@ -823,6 +828,8 @@ const updateStoryboard = createTool({
         updates.designCardStatus = 'pending'
         updates.designCardConfirmedAt = null
         updates.designCardStaleReason = null
+        // 本次写入被接受：清掉上一轮工具拒绝留下的原因，批量不能把它当成本镜失败
+        context?.requestContext?.set('designCardError' as never, null as never)
       }
       if (scope === 'design_card' && !storyboard.combo && combo) updates.combo = combo
       const actualCard = comboOnly ? parseDesignCard(storyboard.designCard, ctx) : card

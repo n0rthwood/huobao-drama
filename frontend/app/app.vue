@@ -14,6 +14,7 @@ import MigrateOverlay from '~/components/MigrateOverlay.vue'
 import { useDesktopBridge } from '~/composables/useDesktopBridge'
 import { useMigrateState } from '~/composables/useMigrateState'
 import { useTheme } from '~/composables/useTheme'
+import { restoreLanguageSwitchDeeplink } from '~/composables/useUnifiedLanguage'
 
 const { t } = useI18n()
 const { resolvedTheme } = useTheme()
@@ -25,6 +26,8 @@ const bridge = useDesktopBridge()
 const { state, begin, update, end } = useMigrateState()
 
 onMounted(() => {
+  // deeplink（#86）：?lang= 只重新弹出全局语言切换确认框（带目标语言），切换仍需用户点确认
+  restoreLanguageSwitchDeeplink()
   if (!bridge) return
   bridge.onMigrateProgress((p) => {
     if (p.phase === 'done') {

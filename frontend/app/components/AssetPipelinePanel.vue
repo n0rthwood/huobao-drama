@@ -370,6 +370,7 @@ import {
   type AssetSourceRole,
   type AssetSourceRow,
 } from '~/composables/useApi'
+import { DEEPLINK_KEYS, querySingle, useDeeplink } from '~/composables/useQuerySync'
 
 const { t } = useI18n()
 
@@ -407,6 +408,25 @@ const runs = ref<AssetPipelineRunSummary[]>([])
 const detail = ref<AssetPipelineRunDetail | null>(null)
 const selectedRunId = ref<number | null>(null)
 const selectedRoundId = ref<number | null>(null)
+
+/**
+ * URL 子状态（Issue #86）：本面板住在资产详情弹窗里，弹窗身份键 asset= 由工作台发布，
+ * 这里只发布 run/round，链接形如 asset=prop-103&run=..&round=..。
+ * 违规勾选 / 审批意见 / 覆盖闸门都是未保存的审批草稿：不进 URL、不恢复、更不会自动审批。
+ */
+const link = useDeeplink('assetPipeline', DEEPLINK_KEYS.assetDetail)
+function linkId(key: string): number {
+  const raw = Number(querySingle(link.initial(key)) || 0)
+  return Number.isInteger(raw) && raw > 0 ? raw : 0
+}
+let pendingRunId = linkId('run')
+let pendingRoundId = linkId('round')
+
+/** 链接指向的 run/round 已不存在：清键 + 提示，回落到默认的最新一轮 */
+function notifyMissingLink() {
+  toast.warning(t('deeplink.missingNamed', { target: t('episode.documentary.pipeline.sectionTitle') }))
+}
+
 const loadError = ref('')
 const startError = ref('')
 const starting = ref(false)
@@ -604,6 +624,13 @@ async function loadRuns() {
     const res = await assetPipelineAPI.list(props.assetKind, props.assetId)
     if (stopped) return
     runs.value = res?.runs ?? []
+    // 链接里的 run 先于默认值生效；不存在就丢弃它（连同 round）并提示，不闪错误的 run
+    if (pendingRunId) {
+      const wanted = pendingRunId
+      pendingRunId = 0
+      if (runs.value.some(r => r.id === wanted)) selectedRunId.value = wanted
+      else { pendingRoundId = 0; notifyMissingLink() }
+    }
     if (runs.value.length && !runs.value.some(r => r.id === selectedRunId.value)) {
       selectedRunId.value = runs.value[0].id
     }
@@ -622,7 +649,15 @@ async function loadDetail(runId: number, silent = false) {
     sources.value = res?.sources ?? sources.value
     const list = res?.rounds ?? []
     const awaiting = res?.run.pipeline.state === 'waiting_approval' ? res.run.pipeline.awaiting?.round_id ?? null : null
-    if ((awaiting && awaiting !== previousAwaiting) || !list.some(r => r.id === selectedRoundId.value)) {
+    // 链接里的 round 优先于「待审批轮/最后一轮」的默认定位；不存在就回落默认并提示
+    let restoredRound = false
+    if (pendingRoundId) {
+      const wanted = pendingRoundId
+      pendingRoundId = 0
+      if (list.some(r => r.id === wanted)) { selectedRoundId.value = wanted; restoredRound = true }
+      else notifyMissingLink()
+    }
+    if (!restoredRound && ((awaiting && awaiting !== previousAwaiting) || !list.some(r => r.id === selectedRoundId.value))) {
       selectedRoundId.value = awaiting ?? (list.length ? list[list.length - 1].id : null)
     }
     loadError.value = ''
@@ -870,6 +905,15 @@ watch(selectedRoundId, () => {
   approveError.value = ''
   // 打回的下一轮默认沿用本轮用途（精确→精确），人可以再改
   nextPurpose.value = selectedRound.value?.purpose ?? 'precision'
+})
+
+// 发布本层键：run/round 跟着选择走；面板随弹窗卸载时自动移除这两个键，宿主的 asset= 原样保留
+watch([selectedRunId, selectedRoundId], () => {
+  link.set({
+    // 审核视图里的 run 由宿主传入（reviewRunId），不由本面板写进 URL
+    run: props.reviewRunId ? '' : selectedRunId.value || '',
+    round: selectedRoundId.value || '',
+  })
 })
 
 watch(() => {

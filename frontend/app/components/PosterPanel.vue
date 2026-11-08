@@ -206,11 +206,11 @@
       <div v-if="conflict" class="overlay" @click.self="conflict = null">
         <div class="dialog poster-conflict" role="dialog" aria-modal="true">
           <h3>{{ t('poster.conflict.title') }}</h3>
-          <p>{{ t('poster.conflict.desc') }}</p>
-          <p class="poster-conflict-fields">{{ conflict.fields.map(field => t(`poster.conflict.field.${field}`)).join('、') }}</p>
+          <p>{{ t(conflict.restored ? 'deeplink.readOnlyRestore' : 'poster.conflict.desc') }}</p>
+          <p v-if="conflict.fields.length" class="poster-conflict-fields">{{ conflict.fields.map(field => t(`poster.conflict.field.${field}`)).join('、') }}</p>
           <div class="poster-conflict-actions">
             <button type="button" class="btn" @click="conflict = null">{{ t('common.cancel') }}</button>
-            <button type="button" class="btn btn-primary" :disabled="busy" @click="confirmOverwrite">{{ t('poster.conflict.overwrite') }}</button>
+            <button v-if="!conflict.restored" type="button" class="btn btn-primary" :disabled="busy" @click="confirmOverwrite">{{ t('poster.conflict.overwrite') }}</button>
           </div>
         </div>
       </div>
@@ -230,6 +230,7 @@ import { mediaUrl } from '~/utils/url'
 import { toastError, toastServerMessage } from '~/composables/useToast'
 import PosterLayerEditor from '~/components/PosterLayerEditor.vue'
 import PosterReferencePicker from '~/components/PosterReferencePicker.vue'
+import { DEEPLINK_KEYS, querySingle, useDeeplink } from '~/composables/useQuerySync'
 
 const props = defineProps({
   episodeId: { type: Number, required: true },
@@ -254,6 +255,13 @@ const editorRef = ref(null)
 let saveTimer = null
 let unsubscribe = null
 let saveChain = Promise.resolve()
+
+// deeplink（#86）：参考图选择器、合成版本与冲突窗口。旧冲突载荷不重放，恢复仅供只读查看。
+const link = useDeeplink('poster', DEEPLINK_KEYS.poster)
+const urlPickerOpen = querySingle(link.initial('posterpick')) === '1'
+const urlVersionId = Number(querySingle(link.initial('posterver')) || 0)
+const urlConflict = querySingle(link.initial('pconflict'))
+let deeplinkRestored = false
 
 const variables = computed(() => poster.value?.variables || { project_title: '', episode_title: '', episode_no: '' })
 const copy = computed(() => poster.value?.copy || { title: '', subtitle: '', era: '', place: '', notes: [] })
@@ -291,12 +299,36 @@ async function load() {
   loading.value = true
   try {
     applyPoster(await posterAPI.get(props.episodeId))
+    restoreDeeplink()
   } catch (err) {
     toastError(err)
   } finally {
     loading.value = false
   }
 }
+
+/** 首次数据就绪后恢复 URL 子状态：目标版本不存在只提示并退回默认版本，不改任何数据 */
+function restoreDeeplink() {
+  if (deeplinkRestored) return
+  deeplinkRestored = true
+  if (urlVersionId > 0) {
+    if (compositeVersions.value.some(version => version.id === urlVersionId)) compositeVersionId.value = urlVersionId
+    else toast.warning(t('deeplink.missingNamed', { target: t('poster.versionLabel', { n: urlVersionId, time: '' }) }))
+  }
+  if (urlPickerOpen && poster.value) pickerOpen.value = true
+  if (urlConflict && !conflict.value) {
+    const match = /^(fields|layers):(.+)$/.exec(urlConflict)
+    const composition = match && poster.value?.concept?.compositions?.find(item => String(item.id) === match[2])
+    if (composition) conflict.value = { compositionId: composition.id, kind: match[1], fields: [], restored: true }
+    else toast.warning(t('deeplink.missing'))
+  }
+}
+
+watch([pickerOpen, compositeVersionId, conflict], () => link.set({
+  posterpick: pickerOpen.value ? '1' : '',
+  posterver: compositeVersionId.value || '',
+  pconflict: conflict.value ? `${conflict.value.kind}:${conflict.value.compositionId}` : '',
+}), { immediate: true })
 
 function copyText(value) {
   return [value.title, value.subtitle, value.era, value.place, ...(value.notes || [])].filter(Boolean).join(' · ')
@@ -470,7 +502,7 @@ async function applyLayers(composition) {
 }
 
 async function confirmOverwrite() {
-  if (!conflict.value) return
+  if (!conflict.value || conflict.value.restored) return
   const { compositionId, kind, fields } = conflict.value
   conflict.value = null
   try {

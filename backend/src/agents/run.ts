@@ -2,6 +2,7 @@ import type { Agent, AgentExecutionOptionsBase } from '@mastra/core/agent'
 import type { FullOutput } from '@mastra/core/stream'
 import { runWithReasoningSink, type ReasoningSink } from './reasoning-sink.js'
 import { markAgentFailureIfSafe, runWithAgentTextCall } from '../services/text-task-context.js'
+import { recordFinalToolResults } from '../services/task-observability.js'
 
 /**
  * 以流式方式执行 Agent，读完整个流后返回与 agent.generate() 相同结构的结果
@@ -22,8 +23,16 @@ export async function runAgent(
   sink?: ReasoningSink,
 ): Promise<AgentRunOutput> {
   const exec = async () => {
-    const output = await agent.stream(messages, options)
+    const output = await agent.stream(messages, {
+      ...options,
+      onStepFinish: async (step) => {
+        await recordFinalToolResults(step)
+        await options.onStepFinish?.(step)
+      },
+    })
     const full = await output.getFullOutput()
+    // 无后续模型请求的最后一步同样补记；失败也不丢已经发生的公开工具返回。
+    await recordFinalToolResults(full)
     if (full.error) throw full.error
     return full
   }

@@ -18,7 +18,8 @@
             <button class="btn btn-ghost btn-icon" :aria-label="t('common.close')" @click="closeTaskCenter"><X :size="14" /></button>
           </div>
         </header>
-        <TaskCenterPanel :episode-id="episodeId" :drama-id="dramaId" variant="drawer" />
+        <!-- 抽屉跨路由常驻，但面板的 deeplink 分组属于注册时那条路由：换路由重挂一次，按新路由的链接重新恢复/发布 -->
+        <TaskCenterPanel :key="routeEpoch" :episode-id="episodeId" :drama-id="dramaId" variant="drawer" />
       </aside>
     </div>
   </Teleport>
@@ -29,11 +30,12 @@
  * 任务中心入口：顶栏按钮 + 进行中角标 + 抽屉。
  * 抽屉开关是全局状态，页面里只渲染一个按钮实例即可覆盖该页面。
  */
-import { onMounted, onBeforeUnmount } from 'vue'
+import { onMounted, onBeforeUnmount, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ListTodo, X } from 'lucide-vue-next'
 import TaskCenterPanel from '~/components/TaskCenterPanel.vue'
 import { useTasks } from '~/composables/useTasks'
+import { DEEPLINK_KEYS, deeplinkRouteEpoch, querySingle, useDeeplink } from '~/composables/useQuerySync'
 
 const props = defineProps({
   // 剧集工作台传入后，抽屉默认只筛选当前集
@@ -45,6 +47,18 @@ const props = defineProps({
 const { t } = useI18n()
 const { activeCount, centerOpen, openTaskCenter, closeTaskCenter } = useTasks()
 
+// 抽屉是跨路由常驻的顶栏状态（Issue #86）：换路由后要重新认领并发布自己的键
+const link = useDeeplink('taskDrawer', DEEPLINK_KEYS.taskDrawer, { persistent: true })
+const routeEpoch = deeplinkRouteEpoch()
+
+function publishDrawer() {
+  link.set({ tasks: centerOpen.value ? '1' : '' })
+}
+// 恢复只是打开界面：抽屉内的列表自己按 URL 恢复筛选，不触发任何写操作
+function restoreDrawer() {
+  if (querySingle(link.initial('tasks')) === '1' && !centerOpen.value) open()
+}
+
 function open() {
   openTaskCenter({ episodeId: props.episodeId || null, dramaId: props.dramaId || null })
 }
@@ -52,7 +66,15 @@ function open() {
 function onKeydown(e) {
   if (e.key === 'Escape' && centerOpen.value) closeTaskCenter()
 }
-onMounted(() => window.addEventListener('keydown', onKeydown))
+
+watch(centerOpen, publishDrawer)
+watch(routeEpoch, () => { restoreDrawer(); publishDrawer() })
+
+onMounted(() => {
+  window.addEventListener('keydown', onKeydown)
+  restoreDrawer()
+  publishDrawer()
+})
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown)
   closeTaskCenter()

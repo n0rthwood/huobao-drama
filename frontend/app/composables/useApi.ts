@@ -1,4 +1,4 @@
-import type { TaskRow, CenterRow } from '~/composables/useTasks'
+import type { TaskRow, CenterRow, StageWorkEstimate, TaskWorkSummary } from '~/composables/useTasks'
 import { apiBase } from '~/utils/url'
 
 // 子路径部署：'/api/v1' 或 '/huobao/api/v1'（见 utils/url.ts）
@@ -154,13 +154,22 @@ export const episodeAPI = {
   // 逐镜审计、批量填写（不带 storyboard_ids = 只补空白/过期）与批量状态、分镜重排。
   designCardContext: (id: number) => api.get<DesignCardContext>(`/episodes/${id}/design-card-context`),
   designCardAudit: (id: number) => api.get<DesignCardAuditItem[]>(`/episodes/${id}/design-cards/audit`),
-  // 填卡进度统一走全局任务 store（sys_task kind='design_card'），不再单独查批次状态（#70）
-  fillDesignCards: (id: number, data: { storyboard_ids?: number[]; model?: string; config_id?: number } = {}) =>
+  // 填卡进度统一走全局任务 store（sys_task kind='design_card'），不再单独查批次状态（#70）。
+  // model_mode 必填（#87 §B）：'auto' = 后端自己挑健康视觉配置（顶栏残留的 model/config_id 一概忽略），
+  // 'pinned' = 用户本次显式指定，后端绝不静默换到另一条计费服务。
+  fillDesignCards: (id: number, data: { storyboard_ids?: number[]; model_mode: 'auto' | 'pinned'; model?: string; config_id?: number }) =>
     api.post(`/episodes/${id}/design-cards/fill`, {
-      storyboard_ids: data.storyboard_ids?.length ? data.storyboard_ids : undefined,
-      model: data.model || undefined,
-      config_id: data.config_id || undefined,
+      // 显式数组（含空数组）原样传：空选 = 0 镜，绝不退化成整集默认范围
+      storyboard_ids: Array.isArray(data.storyboard_ids) ? data.storyboard_ids : undefined,
+      model_mode: data.model_mode,
+      model: data.model_mode === 'pinned' ? data.model || undefined : undefined,
+      config_id: data.model_mode === 'pinned' ? data.config_id || undefined : undefined,
     }),
+  // 三阶段「开始前」的源字数与历史样本 ETA（#87 §D）：没有同口径样本时 estimate_ms 为 null
+  workEstimate: (id: number, stage: 'skeleton' | 'voice' | 'design_card', storyboardIds?: number[], options: Record<string, unknown> = {}) =>
+    api.post<{ estimate: StageWorkEstimate; observation_summary: TaskWorkSummary | null }>(
+      `/episodes/${id}/work-estimate`, { ...options, stage, storyboard_ids: storyboardIds },
+    ),
   reorderStoryboards: (id: number, ids: number[]) =>
     api.put<{ changed: number; entries: Array<{ id: number; from: number; to: number }>; reconfirm: number[] }>(
       `/episodes/${id}/storyboards/order`,
@@ -1203,6 +1212,97 @@ export const assetReviewAPI = {
     api.post<{ updated: number; skipped: AssetReviewBatchSkipped[] }>(`/episodes/${episodeId}/asset-review/batch-status`, { item_ids: itemIds, status: 'not_needed' }),
 }
 
+/** 持久调用观测（Issue #87）：后端 task_observed_* 三张表的对外形状，snake_case 与接口一致 */
+export interface ObservedWorkRow {
+  id: number
+  task_id: number
+  stage: 'skeleton' | 'voice' | 'design_card'
+  source_chars: number
+  sample_key: string
+  storyboard_id: number | null
+  storyboard_number: number | null
+  started_at: number
+  finished_at: number | null
+  status: 'processing' | 'completed' | 'failed' | 'interrupted'
+  model_ms: number
+  queue_ms: number
+  work_ms: number
+  call_count: number
+  heartbeat_at: number
+  error_msg: string | null
+  created_at: number
+}
+
+export interface ObservedCallRow {
+  id: number
+  work_id: number
+  task_id: number
+  kind: 'llm' | 'vision_chat' | 'tts'
+  config_id: number | null
+  config_name: string | null
+  provider: string | null
+  model: string | null
+  /** 进行中的那次调用（终态恒为 null）：当前项已用 = model_ms + (now - active_call_started_at) */
+  active_call_started_at: number | null
+  active_call_heartbeat_at: number | null
+  url: string | null
+  stream: number
+  status: 'processing' | 'completed' | 'failed' | 'interrupted'
+  http_status: number | null
+  queued_at: number | null
+  started_at: number
+  finished_at: number | null
+  duration_ms: number | null
+  queue_ms: number
+  request_chars: number
+  response_chars: number
+  prompt_tokens: number | null
+  completion_tokens: number | null
+  finish_reason: string | null
+  error_msg: string | null
+  message_count: number
+}
+
+export interface ObservedMessageRow {
+  id: number
+  call_id: number
+  work_id: number
+  task_id: number
+  seq: number
+  phase: 'request' | 'response' | 'final'
+  role: string
+  name: string | null
+  tool_call_id: string | null
+  body: string
+  chars: number
+  streaming: number
+  created_at: number
+}
+
+export interface TaskObservations {
+  task_id: number
+  works: ObservedWorkRow[]
+  calls: ObservedCallRow[]
+  /** 这页各调用的前 message_limit 条公开消息（升序）；超出的按 call 继续读子资源 */
+  messages: ObservedMessageRow[]
+  message_limit: number
+  messages_complete: boolean
+  limit: number
+  next_cursor: number | null
+  has_more: boolean
+}
+
+export interface TaskObservationMessages {
+  task_id: number
+  call_id: number
+  call: ObservedCallRow
+  total: number
+  messages: ObservedMessageRow[]
+  limit: number
+  next_cursor: number | null
+  has_more: boolean
+}
+
 // 生成任务列表/详情（图片生成走各资产 API，视频生成走 storyboardAPI.generateVideo 与集级批量）
 export const taskAPI = {
   // source='media-library' 时后端把 params 记为 { source:'media-library', copied_from }
@@ -1224,6 +1324,27 @@ export const taskAPI = {
     if (opts.offset != null) query.set('offset', String(opts.offset))
     query.set('tail', String(opts.tail ?? 4096))
     return api.get(`/tasks/${id}/reasoning?${query.toString()}`)
+  },
+  // 持久调用观测（Issue #87）：工作项 + 调用分页（cursor = 上一页最后一个 call id，升序追加）
+  // 默认轻量列表；with_messages=true 才附带本页各调用的前 message_limit 条公开消息
+  observations: (
+    id: number,
+    opts: { work_id?: number; cursor?: number; limit?: number; with_messages?: boolean; message_limit?: number } = {},
+  ) => {
+    const query = new URLSearchParams()
+    if (opts.work_id != null) query.set('work_id', String(opts.work_id))
+    if (opts.cursor) query.set('cursor', String(opts.cursor))
+    if (opts.limit) query.set('limit', String(opts.limit))
+    if (opts.with_messages !== undefined) query.set('with_messages', opts.with_messages ? '1' : '0')
+    if (opts.message_limit) query.set('message_limit', String(opts.message_limit))
+    return api.get<TaskObservations>(`/tasks/${id}/observations${query.size ? `?${query.toString()}` : ''}`)
+  },
+  // 单次调用的公开消息全文（游标分页，不截断正文）
+  observationMessages: (id: number, callId: number, opts: { cursor?: number; limit?: number } = {}) => {
+    const query = new URLSearchParams()
+    if (opts.cursor) query.set('cursor', String(opts.cursor))
+    if (opts.limit) query.set('limit', String(opts.limit))
+    return api.get<TaskObservationMessages>(`/tasks/${id}/observations/calls/${callId}/messages${query.size ? `?${query.toString()}` : ''}`)
   },
   list: (params?: { type?: 'image' | 'video'; drama_id?: number; storyboard_id?: number; character_id?: number; scene_id?: number; prop_id?: number }) => {
     const query = new URLSearchParams()
