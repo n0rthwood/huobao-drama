@@ -22,7 +22,7 @@ test('design card tool chooses legal combos, protects existing cards, and report
       await db.insert(schema.dramas).values({ id: 1, title: 'project', createdAt: at, updatedAt: at })
       await db.insert(schema.episodes).values({ id: 1, dramaId: 1, episodeNumber: 1, title: 'episode', createdAt: at, updatedAt: at })
       await db.insert(schema.props).values({ id: 39, dramaId: 1, name: 'Map', createdAt: at, updatedAt: at })
-      await db.insert(schema.episodeProps).values({ episodeId: 1, propId: 39 })
+      await db.insert(schema.episodeProps).values({ episodeId: 1, propId: 39, createdAt: at })
       const oldCard = JSON.stringify({ version: 2, rationale: 'human content', budget: { layer_s: 8, gen_s: null }, layer_plan: { planned_layers: [{ type: 'marker', text: 'river', anchor: { asset_id: 39, semantic_id: 'fiction' } }] } })
       for (const [id, combo, card] of [[1, null, null], [2, 'B', oldCard], [3, null, oldCard], [4, null, null]]) {
         await db.insert(schema.storyboards).values({ id, episodeId: 1, storyboardNumber: id, combo, designCard: card, designCardStatus: card ? 'pending' : 'blank', createdAt: at, updatedAt: at })

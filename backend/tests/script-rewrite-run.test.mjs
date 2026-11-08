@@ -51,7 +51,7 @@ let delayMs = 0
 const setMode = (next, delay) => { mode = next; delayMs = delay || 0 }
 
 const replyFor = (user) => {
-  if (user.indexOf('【原始内容】') === 0) return user.slice('【原始内容】'.length).replace(/^\\n/, '')
+  if (user.indexOf('【原始内容】') === 0) return JSON.stringify({ content: user.slice('【原始内容】'.length).replace(/^\\n/, ''), exclusions: [] })
   if (mode === 'bad') return '这不是 JSON，模型跑题了'
   const boundaries = [...user.matchAll(/^(B\\d+)：(P\\d+) → (P\\d+)$/gm)].map((m, index) => ({
     boundary_id: m[1], left_paragraph: m[2], right_paragraph: m[3],

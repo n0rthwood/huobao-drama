@@ -561,10 +561,10 @@ test('design card audit reports the same current audio duration as the skeleton'
     const { auditEpisodeDesignCards } = await import('./src/services/design-card-batch.ts')
     const state = (await (await get()).json()).data
     const audit = await auditEpisodeDesignCards(1)
-    const voiced = audit.find(item => item.storyboard_id === 10)
-    const missing = audit.find(item => item.storyboard_id === 12)
+    const voicedItem = audit.find(item => item.storyboard_id === 10)
+    const missingItem = audit.find(item => item.storyboard_id === 12)
     emit({ skeleton: state.shots.find(shot => shot.storyboard_id === 10).tts.duration_ms,
-      measured: voiced.narration_measured_s, audit: voiced.tts.duration_ms, missing: missing.tts.duration_ms })
+      measured: voicedItem.narration_measured_s, audit: voicedItem.tts.duration_ms, missing: missingItem.tts.duration_ms })
   `)
   assert.equal(result.audit, result.skeleton)
   assert.equal(result.audit, 3000)
