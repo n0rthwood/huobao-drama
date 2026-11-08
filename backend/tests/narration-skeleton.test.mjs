@@ -121,6 +121,45 @@ const confirm = (body) => skeletonApp.request('/1/narration-skeleton/confirm', {
 const emit = (payload) => console.log('@@' + JSON.stringify(payload))
 `
 
+test('draft validation exposes short gaps and excerpts without writing; insertion and both merge directions preserve text', () => {
+  const result = run(`${SETUP}
+    await db.update(schema.storyboards).set({ narrationText: S2.slice(3) }).where(eq(schema.storyboards.id, 11))
+    const before = (await (await get()).json()).data
+    const shots = before.shots.map(s => ({ id: s.storyboard_id, narration_text: s.narration_text }))
+    const draft = await json(await put({ revision: before.revision, shots, validate_only: true }))
+    const invalid = shots.map((s, i) => i === 0 ? { ...s, narration_text: '不是原文' } : s)
+    const bad = await json(await put({ revision: before.revision, shots: invalid, validate_only: true }))
+    const afterDryRun = (await (await get()).json()).data
+    const gap = draft.body.data.gaps[0]
+    shots.splice(gap.next_index, 0, { narration_text: gap.text })
+    const inserted = await json(await put({ revision: before.revision, shots }))
+    const insertedRows = inserted.body.data.shots.map(s => ({ id: s.storyboard_id, narration_text: s.narration_text }))
+    insertedRows[0].narration_text += insertedRows[1].narration_text
+    insertedRows.splice(1, 1)
+    const up = await json(await put({ revision: inserted.body.data.revision, shots: insertedRows }))
+    const downRows = up.body.data.shots.map(s => ({ id: s.storyboard_id, narration_text: s.narration_text }))
+    downRows[1].narration_text = downRows[0].narration_text + downRows[1].narration_text
+    downRows.splice(0, 1)
+    const down = await json(await put({ revision: up.body.data.revision, shots: downRows }))
+    const conflict = await json(await put({ revision: before.revision, shots, validate_only: true }))
+    emit({ draft, bad, before, afterDryRun, inserted, up, down, conflict })
+  `)
+  assert.equal(result.draft.status, 200)
+  assert.equal(result.draft.body.data.gaps[0].text, S2.slice(0, 3))
+  assert.equal(result.draft.body.data.gaps[0].next_index, 1)
+  assert.ok(result.draft.body.data.problems.some(p => p.code === 'gap'))
+  assert.ok(result.bad.body.data.problems.some(p => p.code === 'not_verbatim'))
+  assert.ok(result.bad.body.data.excerpts['0'].startsWith(S1))
+  assert.equal(result.before.revision, result.afterDryRun.revision)
+  assert.equal(result.inserted.status, 200)
+  assert.equal(result.inserted.body.data.coverage.complete, true)
+  assert.equal(result.up.status, 200)
+  assert.equal(result.down.status, 200)
+  assert.equal(result.down.body.data.coverage.complete, true)
+  assert.equal(result.down.body.data.shots.map(s => s.narration_text).join(''), S1 + S2 + S3)
+  assert.equal(result.conflict.status, 409)
+})
+
 test('skeleton state reports verbatim coverage and per-shot current-valid TTS', () => {
   const result = run(`${SETUP}
     const state = (await (await get()).json()).data
@@ -134,6 +173,9 @@ test('skeleton state reports verbatim coverage and per-shot current-valid TTS', 
       shots: state.shots.length,
       s1Valid: byNumber[1].tts.valid,
       s1Duration: byNumber[1].tts.duration_ms,
+      s1Audio: byNumber[1].tts.audio_url,
+      s1AudioVersion: byNumber[1].tts.audio_version,
+      s3Audio: byNumber[3].tts.audio_url,
       s1Fillable: byNumber[1].design_fillable,
       s3Valid: byNumber[3].tts.valid,
       s3Reason: byNumber[3].tts.reason,
@@ -150,6 +192,9 @@ test('skeleton state reports verbatim coverage and per-shot current-valid TTS', 
   assert.equal(result.shots, 3)
   // 实测时长来自音频文件本身，不是 narration_meta 里的旧数字
   assert.equal(result.s1Valid, true)
+  assert.equal(result.s1Audio, 'static/narration/a1.wav')
+  assert.ok(result.s1AudioVersion)
+  assert.equal(result.s3Audio, null)
   assert.ok(result.s1Duration > 0)
   assert.equal(result.s1Fillable, true)
   // 没配过音的那一镜单独失效，不拖累前两镜

@@ -34,6 +34,19 @@
       <p v-if="!skeleton.script_confirmed" class="nsk-block">{{ t('episode.skeleton.needScript') }}</p>
       <p v-else-if="skeleton.blocked_reason" class="nsk-block">{{ skeleton.blocked_reason }}</p>
       <p v-if="dirty" class="nsk-hint">{{ t('episode.skeleton.dirtyHint') }}</p>
+      <p class="nsk-hint">{{ t('episode.skeleton.editContract') }}</p>
+      <div v-if="draftGaps.length" class="nsk-gaps">
+        <p>{{ t('episode.skeleton.gapHint') }}</p>
+        <div v-for="gap in draftGaps" :key="gap.start" class="nsk-row">
+          <strong>{{ t('episode.skeleton.gapRange', { start: gap.start, end: gap.end, chars: gap.chars }) }}</strong>
+          <p class="nsk-preview">{{ gap.text }}</p>
+          <div class="nsk-row-foot">
+            <button class="btn btn-sm" :disabled="gap.next_index === 0" @click="applyGap(gap, 'previous')">{{ t('episode.skeleton.gapPrevious') }}</button>
+            <button class="btn btn-sm" :disabled="gap.next_index === rows.length" @click="applyGap(gap, 'next')">{{ t('episode.skeleton.gapNext') }}</button>
+            <button class="btn btn-sm" @click="applyGap(gap, 'new')">{{ t('episode.skeleton.gapNew') }}</button>
+          </div>
+        </div>
+      </div>
       <ul v-if="problems.length" class="nsk-problems">
         <li v-for="(problem, i) in problems" :key="i">
           {{ t('episode.skeleton.problem', { index: problem.index + 1, message: problem.message }) }}
@@ -58,6 +71,9 @@
             <button class="btn btn-ghost btn-sm" :disabled="index === 0" @click="mergeUp(index)">
               {{ t('episode.skeleton.mergeUp') }}
             </button>
+            <button class="btn btn-ghost btn-sm" :disabled="index === rows.length - 1" @click="mergeDown(index)">
+              {{ t('episode.skeleton.mergeDown') }}
+            </button>
             <button class="btn btn-ghost btn-sm" @click="splitAt(index)">{{ t('episode.skeleton.split') }}</button>
           </div>
           <textarea
@@ -68,6 +84,10 @@
             :placeholder="t('episode.skeleton.textPlaceholder')"
             @input="touch"
           />
+          <div v-for="(problem, i) in rowProblems(index)" :key="i" class="nsk-problems">
+            {{ problem.message }}
+            <span v-if="draftExcerpts[index]">{{ t('episode.skeleton.originalExcerpt', { text: draftExcerpts[index] }) }}</span>
+          </div>
           <div class="nsk-row-foot">
             <span :class="['nsk-tts', 'is-' + (ttsOf(row).valid ? 'ok' : 'bad')]">
               {{ ttsLabel(ttsOf(row)) }}
@@ -121,6 +141,11 @@
             >{{ shot.tts.valid ? t('episode.narration.regenerateVoice') : t('episode.narration.generateVoice') }}</button>
           </div>
           <p class="nsk-preview">{{ shot.narration_text }}</p>
+          <p v-if="!shot.tts.audio_url" class="nsk-hint">{{ t('episode.skeleton.audioMissing') }}</p>
+          <template v-else>
+            <p v-if="!shot.tts.valid" class="nsk-hint">{{ t('episode.skeleton.audioStale') }}</p>
+            <audio v-if="shot.tts.valid" :key="audioSource(shot.tts)" :src="audioSource(shot.tts)" controls preload="none" />
+          </template>
         </li>
       </ul>
     </template>
@@ -135,7 +160,7 @@
  * 骨架只管理连续文本边界、顺序与标题，不在这里改正文；配音状态只显示实测结果，
  * 没有任何估算回退——缺失/失败/过期/只剩旧音频一律按「无有效配音」处理。
  */
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { Loader2 } from 'lucide-vue-next'
@@ -144,6 +169,7 @@ import { narrationSkeletonAPI, skeletonProblemsOf } from '~/composables/useApi'
 import { onTaskFinished, refreshTasks, registerTask, useTasks } from '~/composables/useTasks'
 import { toastError } from '~/composables/useToast'
 import { spokenText } from '~/utils/narrationMarkup'
+import { mediaUrl } from '~/utils/url'
 
 const props = defineProps({
   episodeId: { type: Number, required: true },
@@ -167,6 +193,11 @@ const rowsRevision = ref(null)
 const busy = ref(false)
 const problems = ref([])
 const areas = ref({})
+const draftGaps = ref([])
+const draftExcerpts = ref({})
+const draftProblems = ref([])
+let validateTimer
+let validationSequence = 0
 let rowSeq = 0
 
 const shots = computed(() => props.skeleton?.shots || [])
@@ -195,6 +226,39 @@ function ttsLabel(tts) {
   return t('episode.skeleton.ttsInvalid', { reason: te(key) ? t(key) : (tts?.message || tts?.reason || '') })
 }
 
+function audioSource(tts) {
+  const url = mediaUrl(tts.audio_url)
+  return `${url}${url.includes('?') ? '&' : '?'}v=${encodeURIComponent(tts.audio_version || '')}`
+}
+
+function rowProblems(index) {
+  return draftProblems.value.filter(problem => problem.index === index)
+}
+
+function draftShots() {
+  return rows.value.map(row => ({ id: row.id || undefined, narration_text: row.narration_text || '', title: row.title || null }))
+}
+
+function scheduleValidation() {
+  clearTimeout(validateTimer)
+  const sequence = ++validationSequence
+  validateTimer = setTimeout(async () => {
+    try {
+      const result = await narrationSkeletonAPI.validate(props.episodeId, rowsRevision.value, draftShots())
+      if (sequence !== validationSequence) return
+      draftProblems.value = result.problems
+      draftGaps.value = result.gaps
+      draftExcerpts.value = result.excerpts
+    } catch (err) {
+      if (sequence !== validationSequence) return
+      draftGaps.value = []
+      draftProblems.value = []
+      toastError(err, { fallback: 'episode.skeleton.error.saveFailed' })
+    }
+  }, 350)
+}
+onBeforeUnmount(() => { clearTimeout(validateTimer); validationSequence++ })
+
 function registerArea(key, el) {
   if (el) areas.value[key] = el
   else delete areas.value[key]
@@ -212,12 +276,13 @@ function syncRows() {
   dirty.value = false
   rowsRevision.value = props.skeleton.revision
   problems.value = []
+  scheduleValidation()
 }
 watch(() => props.skeleton, () => {
   if (!dirty.value) syncRows()
 }, { immediate: true, deep: false })
 
-function touch() { dirty.value = true }
+function touch() { dirty.value = true; scheduleValidation() }
 
 /** 在光标处拆成两镜：后半段成为新镜（无 id），顺序与逐字覆盖不变 */
 function splitAt(index) {
@@ -239,7 +304,7 @@ function splitAt(index) {
     title: '',
     narration_text: tail,
   })
-  dirty.value = true
+  touch()
 }
 
 /** 并入上一镜：文本直接相接，被并掉的那一镜在保存时删除 */
@@ -249,18 +314,33 @@ function mergeUp(index) {
   const row = rows.value[index]
   previous.narration_text = `${previous.narration_text || ''}${row.narration_text || ''}`
   rows.value.splice(index, 1)
-  dirty.value = true
+  touch()
+}
+
+function mergeDown(index) {
+  if (index >= rows.value.length - 1) return
+  rows.value[index + 1].narration_text = `${rows.value[index].narration_text || ''}${rows.value[index + 1].narration_text || ''}`
+  rows.value.splice(index, 1)
+  touch()
+}
+
+function applyGap(gap, action) {
+  const index = gap.next_index
+  if (action === 'previous' && index > 0) rows.value[index - 1].narration_text += gap.text
+  else if (action === 'next' && index < rows.value.length) rows.value[index].narration_text = gap.text + rows.value[index].narration_text
+  else if (action === 'new') rows.value.splice(index, 0, {
+    key: `n${++rowSeq}`, id: undefined, storyboard_number: 0, title: '', narration_text: gap.text,
+  })
+  else return
+  draftGaps.value = []
+  touch()
 }
 
 async function save() {
   busy.value = true
   problems.value = []
   try {
-    const next = await narrationSkeletonAPI.save(props.episodeId, rowsRevision.value, rows.value.map(row => ({
-      id: row.id || undefined,
-      narration_text: row.narration_text || '',
-      title: row.title || null,
-    })))
+    const next = await narrationSkeletonAPI.save(props.episodeId, rowsRevision.value, draftShots())
     dirty.value = false
     emit('update', next)
     toast.success(t('episode.skeleton.saved'))
@@ -341,6 +421,7 @@ onTaskFinished((task) => {
 .nsk-hint { margin: 0; padding: 6px 12px; font-size: 11.5px; color: var(--text-2); }
 .nsk-problems { margin: 0; padding: 6px 12px 6px 28px; font-size: 11.5px; color: var(--danger-text, #d9534f); line-height: 1.7; }
 .nsk-empty { padding: 28px 12px; text-align: center; font-size: 12.5px; color: var(--text-3); }
+.nsk-gaps { padding: 8px 12px; display: grid; gap: 8px; overflow-y: auto; max-height: 35vh; }
 .nsk-list { list-style: none; margin: 0; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; flex: 1; min-height: 0; }
 .nsk-row { border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 10px; background: var(--surface-raised); }
 .nsk-row-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }

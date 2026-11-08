@@ -59,7 +59,7 @@ export interface SkeletonShot {
   title: string | null
   narration_text: string
   narration_chars: number
-  tts: { valid: boolean; reason: string | null; message: string | null; duration_ms: number | null }
+  tts: { valid: boolean; reason: string | null; message: string | null; duration_ms: number | null; audio_url: string | null; audio_version: string | null }
   design_card_status: DesignCardStatus
   /** 设计卡已确认且当前配音有效 = 本镜可以进入制作 */
   design_ready: boolean
@@ -232,6 +232,8 @@ export async function narrationSkeletonState(episodeId: number): Promise<Skeleto
         reason: tts?.reason ?? null,
         message: tts?.message ?? null,
         duration_ms: tts?.duration_ms ?? null,
+        audio_url: sb.narrationAudioUrl ?? null,
+        audio_version: parseNarrationMeta(sb.narrationMeta).audio?.generated_at ?? sb.updatedAt ?? null,
       },
       design_card_status: status,
       design_ready: status === 'confirmed' && tts?.valid === true,
@@ -394,6 +396,34 @@ export function validateSkeletonAllocation(script: string | null | undefined, sh
     })
   }
   return { problems, spans }
+}
+
+/** 校验当前草稿，不写库；缺口坐标属于去空白及节拍标记后的剧本。 */
+export async function validateNarrationSkeletonDraft(episodeId: number, revision: string, shots: SkeletonShotInput[]) {
+  const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId))
+  if (!ep) throw new Error('剧集不存在')
+  if (resolveDramaProjectType(ep.dramaId) !== 'documentary') throw new Error('只有纪录片项目有旁白骨架这一步')
+  const rows = await liveStoryboards(episodeId)
+  const script = ep.scriptContent || ep.content
+  const current = skeletonRevision(script, rows)
+  if (revision !== current) throw new SkeletonConflictError(current)
+  const allocation = validateSkeletonAllocation(script, shots)
+  const key = scriptMatchKey(script)
+  const gaps: Array<{ start: number; end: number; chars: number; text: string; next_index: number }> = []
+  const excerpts: Record<number, string> = {}
+  let cursor = 0
+  let located = true
+  shots.forEach((shot, index) => {
+    const text = narrationMatchKey(spokenText(shot.narration_text || ''))
+    excerpts[index] = key.slice(cursor, cursor + 80)
+    if (!text) { located = false; return }
+    const start = key.indexOf(text, cursor)
+    if (start < 0) { located = false; return }
+    if (start > cursor) gaps.push({ start: cursor, end: start, chars: start - cursor, text: key.slice(cursor, start), next_index: index })
+    cursor = start + text.length
+  })
+  if (cursor < key.length) gaps.push({ start: cursor, end: key.length, chars: key.length - cursor, text: key.slice(cursor), next_index: shots.length })
+  return { problems: allocation.problems, gaps: located ? gaps : [], excerpts }
 }
 
 /**

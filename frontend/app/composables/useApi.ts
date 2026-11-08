@@ -1725,6 +1725,8 @@ export interface SkeletonShotTts {
   /** 后端已本地化的原因文本；未知 reason 时作为兜底展示 */
   message?: string | null
   duration_ms: number | null
+  audio_url: string | null
+  audio_version: string | null
 }
 export interface NarrationSkeletonShot {
   storyboard_id: number
@@ -1744,7 +1746,7 @@ export interface NarrationSkeletonCoverage {
   script_chars: number
   covered_chars: number
   uncovered_chars: number
-  gaps: Array<{ start: number; end: number; text: string }>
+  gaps: Array<{ start: number; end: number; chars: number; excerpt: string }>
   complete: boolean
 }
 export interface NarrationSkeletonState {
@@ -1794,6 +1796,9 @@ export const narrationSkeletonAPI = {
     api.post<NarrationSkeletonState>(`/episodes/${episodeId}/narration-skeleton/unconfirm`),
   save: (episodeId: number, revision: string, shots: NarrationSkeletonShotInput[]) =>
     api.put<NarrationSkeletonState>(`/episodes/${episodeId}/narration-skeleton`, { revision, shots }),
+  validate: (episodeId: number, revision: string, shots: NarrationSkeletonShotInput[]) =>
+    api.put<{ problems: SkeletonProblem[]; gaps: Array<{ start: number; end: number; chars: number; text: string; next_index: number }>; excerpts: Record<number, string> }>(
+      `/episodes/${episodeId}/narration-skeleton`, { revision, shots, validate_only: true }),
 }
 export interface TtsRequiredBlock { storyboard_id: number; storyboard_number?: number; reason: TtsInvalidReason | string; message?: string }
 export function ttsRequiredOf(err: unknown): TtsRequiredBlock[] | null {
