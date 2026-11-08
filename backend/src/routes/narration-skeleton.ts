@@ -12,6 +12,7 @@ import {
   saveNarrationSkeleton,
   startSkeletonGeneration,
   unconfirmNarrationSkeleton,
+  validateNarrationSkeletonDraft,
   SkeletonConflictError,
   SkeletonInvalidError,
   type SkeletonShotInput,
@@ -78,6 +79,9 @@ app.put('/:id/narration-skeleton', async (c) => {
   if (!shots) return badRequest(c, 'shots 必须是 [{id?, narration_text, title?}] 数组')
   if (typeof body.revision !== 'string' || !body.revision) return badRequest(c, '缺少 revision：请带上刚读到的骨架修订号')
   try {
+    if (body.validate_only === true) {
+      return success(c, await validateNarrationSkeletonDraft(id, body.revision, shots))
+    }
     return success(c, await saveNarrationSkeleton(id, body.revision, shots))
   } catch (err) {
     if (err instanceof SkeletonConflictError) {

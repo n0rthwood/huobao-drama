@@ -266,6 +266,11 @@ Issue 整理完成后、实施前，必须让 **Fabel（Anthropic）或 Astra（
 - **改风格（新值 ≠ 原值）时后端清空本项目三类资产的全部 `final_prompt`**（含手工修改过的），下次生图由 `services/final-prompt.ts ensure*FinalPrompt` 按新风格重写；同值保存不清空。已生成的图片/视频不自动重做：关键帧与视频签名都对**含风格词的最终提示词**和尺寸/画幅取哈希，改动后批量预览自动把旧镜头标「已变化」。
 - 角色定妆照固定 1920x1080（`routes/characters.ts CHARACTER_IMAGE_SIZE`），不随项目画幅变化。
 
+### 纪录片旁白骨架编辑（Issue #81）
+- 骨架编辑（含缺口三种处置、并入和拆分）先暂存，统一保存；防抖调用 `PUT /episodes/:id/narration-skeleton` 的 `validate_only`，复用后端逐字校验。缺口坐标为去空白及节拍标记的剧本位置；超过 80 字应在保存前拆分。出处及版权信息应回旁白稿处理（#80）。
+- 保存使用 revision CAS；修订变化使确认失效，需重新确认。冲突时刷新后重新编辑。并入的镜软删除并保留媒体；`backend/src/services/narration-skeleton.ts` 的 `saveNarrationSkeleton` 会将文本变化镜及结构变化邻镜的设计卡标 stale。
+- 配音仅当前有效时可试听；存在 URL 但无效时标记已过期，不允许播放旧音频；没有 URL 显示未生成。播放器不预加载，地址附生成版本以避免缓存。
+
 ### 旁白配音参数（Issue #37）
 - 唯一实现 `services/narration-voice-params.ts`（纯函数，行为测试 `backend/tests/narration-voice-params.test.mjs`）。生效参数 = 集级 `episodes.tts_settings`（JSON `{voice, inference_timesteps, cfg_value, seed|null, instructions}`）→ TTS 配置行 settings → VoxCPM 默认（10 步 / cfg 2.0 / seed 随机）；规范化沿用 #35：镜级 `storyboards.narration_normalize` → 集级 `episodes.narration_normalize`。
 - 单镜「生成/重新生成配音」与「批量生成配音」都先弹 `components/NarrationVoiceDialog.vue`：选项来自 `GET /episodes/:id/tts-options?storyboard_id=`（实时读 VoxCPM Studio `GET /api/voices`，分组同 Studio「我的音色」+「预置 · 分类」；步数 2–30 + 预设 4/10/30 及 RTF 0.35/0.49/0.93；cfg 1.0–3.0），预填当前生效值。确定 = `settings` 随 `POST /storyboards/:id/narration/voice` 或 `POST /episodes/:id/narration/voice-batch` 提交，服务端校验（音色必须在列表里）并**保存为本集默认**（规范化写当前生效那一层：单镜有镜级覆盖则写镜级）。
