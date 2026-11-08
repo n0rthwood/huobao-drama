@@ -27,7 +27,7 @@ function runScenario(name, script) {
 const PRELUDE = `
   import {
     runObservedWork, observeTaskOperation, observeTextCall, recordFinalToolResults,
-    freezeInterruptedObservations, listObservedWork, listObservedCalls, listObservedMessages,
+    freezeInterruptedObservations, listObservedWork, listObservedCalls, getObservedCall, listObservedMessages,
   } from './src/services/task-observability.ts'
   import { sqlite } from './src/db/index.ts'
   const NL = String.fromCharCode(10)
@@ -152,7 +152,7 @@ test('non-stream vision calls and TTS operations persist placeholders instead of
         const res = await call('https://gw.example.com/v1/chat/completions?api_key=sk-livesecretvalue123456', { method: 'POST', body: JSON.stringify(request) })
         await res.json()
         await observeTaskOperation(
-          { kind: 'tts', configId: 7, model: 'voxcpm', request: { text: '邗沟开凿', voice: 'narrator', token: 'sk-ttssecretvalue1234', audio_prompt: Buffer.from([1, 2, 3, 4, 5, 6, 7, 8]) } },
+          { kind: 'tts', configId: 7, configName: 'Narration', provider: 'voxcpm', model: 'voxcpm', request: { text: '邗沟开凿', voice: 'narrator', token: 'sk-ttssecretvalue1234', audio_prompt: Buffer.from([1, 2, 3, 4, 5, 6, 7, 8]) } },
           async () => ({ audio_url: '/static/narration/1.wav', duration_ms: 7200, bytes: Buffer.alloc(64), inline_b64: 'B'.repeat(2048) }),
         )
       },
@@ -160,7 +160,11 @@ test('non-stream vision calls and TTS operations persist placeholders instead of
     const calls = listObservedCalls(taskId, { limit: 50 })
     const vision = listObservedMessages(calls[0].id, { limit: 200 })
     const tts = listObservedMessages(calls[1].id, { limit: 200 })
-    process.stdout.write('@@' + JSON.stringify({ calls, vision, tts }))
+    sqlite.prepare('UPDATE task_observed_call SET request_chars = 0 WHERE id = ?').run(calls[1].id)
+    const legacy = getObservedCall(calls[1].id)
+    const legacyListed = listObservedCalls(taskId).find(c => c.id === calls[1].id)
+    const storedChars = sqlite.prepare('SELECT request_chars FROM task_observed_call WHERE id = ?').get(calls[1].id).request_chars
+    process.stdout.write('@@' + JSON.stringify({ calls, vision, tts, legacy, legacyListed, storedChars }))
   `)
 
   const [vision, tts] = result.calls
@@ -178,8 +182,14 @@ test('non-stream vision calls and TTS operations persist placeholders instead of
   // TTS：请求/结果元信息留存，音频字节与凭据不留存；模型耗时不是音频长度
   assert.equal(tts.kind, 'tts')
   assert.equal(tts.model, 'voxcpm')
+  assert.equal(tts.config_name, 'Narration')
+  assert.equal(tts.provider, 'voxcpm')
   assert.ok(tts.duration_ms !== null && tts.duration_ms < 7200)
   const ttsRequest = result.tts.find(m => m.phase === 'request')
+  assert.equal(tts.request_chars, ttsRequest.chars)
+  assert.equal(result.legacy.request_chars, ttsRequest.chars)
+  assert.equal(result.legacyListed.request_chars, ttsRequest.chars)
+  assert.equal(result.storedChars, 0)
   assert.ok(ttsRequest.body.includes('邗沟开凿'))
   assert.ok(!ttsRequest.body.includes('sk-ttssecretvalue'))
   const ttsResult = result.tts.find(m => m.phase === 'response')
