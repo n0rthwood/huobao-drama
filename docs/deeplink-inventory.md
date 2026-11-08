@@ -89,6 +89,7 @@
 | 图片大图 | `view=static/...` | 只接受本站 `static/` 媒体路径；外链 / `data:` / `blob:` 不入 URL | 路径非法 → `deeplink.missing`，不开大图 |
 | 视频步选中分镜 | `shot=<storyboardId>` | 仅视频步由工作台发布（其余步骤由各自面板发布同名键） | 分镜不存在 → `missingNamed` |
 | 多选上下文（导出勾选 / 视频批量勾选） | `sel=<id,id>` | 过滤到本集存在的分镜后恢复勾选 | 无存活 id 时不进入选择模式 |
+| 弹窗独立批量范围 | `bsel=<id,id>` / `bsel=on` | 与父级 `sel` 分开；配音/合成/视频弹窗保存自己的范围，`on` 表示显式空选；未单独指定时才沿用父级选择 | 无存活 id 时保持空范围，绝不扩大为整集 |
 | 工作台级弹窗 | `dlg=<身份>` | 见下表 | 未知取值 → `deeplink.missing` |
 
 `dlg` 取值与恢复语义（全部只恢复界面，确认类仍需人工点击）：
@@ -105,9 +106,9 @@
 | `browser` | 资产浏览器 | 内部筛选由弹窗自身的 `bkind`/`bq` 恢复 |
 | `narration-settings` | 旁白设置面板 | — |
 | `breakdown` | 拆分分镜确认 | 不自动拆分 |
-| `voice-batch` | 批量配音参数 | 范围取 `sel`；不自动提交（计费动作必须人工点） |
-| `compose` | 批量融合 | 范围取 `sel`；恢复只读预览与进度 |
-| `video-batch` | 批量视频确认 | 范围取 `sel`；只重取服务端**只读预览清单**，不提交生成 |
+| `voice-batch` | 批量配音参数 | 范围取 `bsel`（未指定才取父级 `sel`）；不自动提交 |
+| `compose` | 批量融合 | 独立 `bsel` 范围；恢复只读预览与进度，保留显式空选 |
+| `video-batch` | 批量视频确认 | 独立 `bsel` 范围；只读预览，不提交生成；空范围不请求整集预览 |
 | `merge-confirm` | 拼接前确认 | 按当前 `sel` 重算纳入/排除 |
 | `merge-delete:<mergeId>` | 删除成片确认 | 按成片 id 重建，零删除请求 |
 | `subtitle-regen` | 重出全部字幕确认 | 不自动执行 |
@@ -115,6 +116,8 @@
 | `shot-preview:<sbId>` | 镜头素材预览 | 按分镜 id |
 
 跨步骤出路（门禁提示、选择器空态）改为**应用内导航**：`DesignCardPanel` 的 `goto-step`、`AssetPicker` 的 `goto-assets` 冒泡到工作台切换 `panel`/`tab`，不再 `window.location.assign` 整页跳；被卸载的子面板自动释放自己的键。
+门禁阻断的步骤不会挂载其子面板；工作台父组同时认领这些子键的初始兜底，清掉孤立的 `seg/spdlg` 等键，不能把旧弹窗偷偷恢复到默认的另一镜。
+
 
 ### 2.6 分镜设计（`DesignCardPanel` + `AssetPicker`）
 | 嵌套 UI | 键 | 恢复 | 失效处理 |
