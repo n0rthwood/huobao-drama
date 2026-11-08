@@ -233,7 +233,7 @@ function emptyGeometry() {
  */
 watch(() => props.open, (open) => {
   if (!open) return
-  const restore = restorePending
+  const restore = restorePending && Boolean(link.initial('pktype') || link.initial('pkq') || link.initial('drill'))
   restorePending = false
   railType.value = (restore && urlType) || 'all'
   keyword.value = (restore && urlKeyword) || ''
@@ -271,7 +271,7 @@ watch([() => props.open, railType, keyword, drillAsset], () => {
     pkq: keyword.value.trim(),
     drill: drillAsset.value ? `${drillAsset.value.kind}-${drillAsset.value.id}` : '',
   })
-})
+}, { immediate: true })
 
 const hasAnyAsset = computed(() => props.assets.length > 0)
 

@@ -407,7 +407,7 @@ function restoreDialogFromLink() {
 }
 
 watch(payload, restoreDialogFromLink)
-watch([filter, ignoreDialog, bindDialog, batchMode], publishLink, { deep: true })
+watch([filter, ignoreDialog, bindDialog, batchMode], publishLink, { deep: true, immediate: true })
 
 onTaskFinished((task) => {
   const kind = String(task?.kind || task?.params?.kind || '')

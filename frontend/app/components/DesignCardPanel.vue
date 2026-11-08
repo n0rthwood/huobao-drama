@@ -666,7 +666,7 @@ import ComboSwitchDialog from '~/components/ShotProduction/ComboSwitchDialog.vue
 import TaskWorkMetrics from '~/components/TaskWorkMetrics.vue'
 import { mediaUrl } from '~/utils/url'
 import { COMBOS, episodeAPI, narrationSkeletonAPI, storyboardAPI, ttsRequiredOf } from '~/composables/useApi'
-import { DEEPLINK_KEYS, queryEnum, queryIdList, useDeeplink } from '~/composables/useQuerySync'
+import { DEEPLINK_KEYS, queryEnum, queryIdList, querySingle, useDeeplink } from '~/composables/useQuerySync'
 import { onTaskFinished, refreshTasks, useTasks } from '~/composables/useTasks'
 import { useWorkflowGates } from '~/composables/useWorkflowGates'
 import { toastError, toastServerMessage } from '~/composables/useToast'
@@ -715,7 +715,7 @@ const lastFillIds = ref(null)
 /** 刚提交、任务还没出现在全局 store 里的空窗期（下一次轮询就会接上） */
 const fillStarting = ref(false)
 // layerIndexes 非空时是「改绑计划图层 anchor」模式（#87 §E）
-const picker = reactive({ open: false, mode: 'asset', field: '', selected: [], layerIndexes: null })
+const picker = reactive({ open: false, mode: 'asset', field: '', selected: [], layerIndexes: null, anchorId: '' })
 const comboSwitch = ref({ open: false, sbId: 0, shotNumber: 0, from: '', to: '' })
 const barEl = ref(null)
 
@@ -739,7 +739,8 @@ const PHASES = ['skeleton', 'voice', 'cards']
 /** 进入时 URL 给出的子状态：各自只消费一次，之后一律以用户操作为准 */
 const urlPhase = queryEnum(link.initial('phase'), PHASES)
 const urlShot = queryIdList(link.initial('shot'))[0] || 0
-const urlPick = queryEnum(link.initial('dpick'), ['semantic:must_mark', 'asset:reference_assets'])
+const urlPick = queryEnum(link.initial('dpick'), ['semantic:must_mark', 'asset:reference_assets', 'semantic:anchor'])
+const urlAnchor = querySingle(link.initial('danchor'))
 const urlCombo = queryIdList(link.initial('dcombo'))[0] || 0
 const urlScope = queryEnum(link.initial('dscope'), ['fill', 'confirm'])
 /** 子阶段只认 URL：旧版的 localStorage 记忆跨集串味（#86 已删），缺省回到设计卡 */
@@ -1065,6 +1066,9 @@ const unresolvedGroups = computed(() => {
   }
   return [...groups.values()]
 })
+function anchorIdentity(group) {
+  return JSON.stringify([group.asset_id || group.asset_name || '', group.semantic_id || group.semantic_name || ''])
+}
 const warnOnly = computed(() => issues.value.length > 0 && issues.value.every(issue => issue.severity !== 'block'))
 const junctionSlot = computed(() => (draft.value.combo === 'C' ? 'first' : (draft.value.combo === 'D' ? 'last' : '')))
 
@@ -1291,6 +1295,7 @@ function removeReference(index) {
 function openPicker(field) {
   picker.field = field
   picker.layerIndexes = null
+  picker.anchorId = ''
   picker.mode = field === 'must_mark' ? 'semantic' : 'asset'
   picker.selected = field === 'must_mark'
     ? layerPlan.value.must_mark.map(item => ({ ...item }))
@@ -1306,6 +1311,7 @@ function openAnchorPicker(group) {
   picker.field = 'anchor'
   picker.mode = 'semantic'
   picker.layerIndexes = group.layers.map(layer => layer.index)
+  picker.anchorId = anchorIdentity(group)
   picker.selected = []
   picker.open = true
 }
@@ -1717,7 +1723,11 @@ watch([gatesReady, designLocked], () => {
 function restoreChildren() {
   childRestore = false
   // 选择器按 openPicker 的口径重新种入当前已存值，恢复本身不写回任何选择
-  if (urlPick) openPicker(urlPick.split(':')[1])
+  if (urlPick === 'semantic:anchor') {
+    const group = unresolvedGroups.value.find(item => anchorIdentity(item) === urlAnchor)
+    if (group) openAnchorPicker(group)
+    else toast.error(t('deeplink.missingNamed', { target: t('designCard87.changeRef') }))
+  } else if (urlPick) openPicker(urlPick.split(':')[1])
   if (urlCombo) {
     const sb = shots.value.find(item => item.id === urlCombo)
     const from = sb ? stateOf(sb).combo || '' : ''
@@ -1748,6 +1758,7 @@ watch([phase, selectedId, picker, comboSwitch, scope, designLocked], () => {
     phase: phase.value,
     shot: selectedId.value || '',
     dpick: picker.open ? `${picker.mode}:${picker.field}` : '',
+    danchor: picker.open && picker.field === 'anchor' ? picker.anchorId : '',
     dcombo: comboSwitch.value.open ? comboSwitch.value.sbId : '',
     dscope: scope.value ? scope.value.kind : '',
   })

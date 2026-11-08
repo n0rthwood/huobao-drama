@@ -7,7 +7,7 @@ const vue = import.meta.resolve('vue')
 const source = readFileSync(new URL('../app/composables/useQuerySync.ts', import.meta.url), 'utf8')
 const runtime = `
 import { ref, watch, effectScope, onScopeDispose } from '${vue}'
-const router = {
+export const router = {
   currentRoute: ref({ path: '/component-test', query: {} }),
   replace({ query }) {
     router.currentRoute.value = { ...router.currentRoute.value, query }
