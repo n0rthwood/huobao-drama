@@ -60,7 +60,7 @@ export function queryIdList(v: unknown): number[] {
  * hydrate()。跨路由常驻的组件（如顶栏任务中心）可 watch routeEpoch 重新发布自己的键。
  */
 export interface DeeplinkGroup {
-  /** 本分组声明键的初始值（进入当前路由时的 URL 快照，不随后续同步变化） */
+  /** 当前路由进入时的快照；用户交互后不再用于恢复，避免后来打开的宿主复活旧弹窗 */
   initial: (key: string) => string | null
   /** 发布本分组当前键值全集：空/缺省值即从 URL 移除 */
   set: (values: Record<string, string | number | null | undefined | false>) => void
@@ -100,6 +100,14 @@ function ensureStore(): DeeplinkStore {
   const groups = new Map<object, { name: string, values: Record<string, string> }>()
   const routeEpoch = ref(0)
   let hydrated = false
+  let restorationCancelled = false
+  const initialValue = (key: string) => restorationCancelled ? null : initialQuery[key] ?? null
+  // 用户的新操作优先；快照本身保留不变，但之后挂载的子层不能再次消费旧位置。
+  if (typeof document !== 'undefined') {
+    const cancelRestoration = () => { restorationCancelled = true }
+    document.addEventListener('click', cancelRestoration, true)
+    document.addEventListener('keydown', cancelRestoration, true)
+  }
   let dirty = false
 
   function flush() {
@@ -121,6 +129,7 @@ function ensureStore(): DeeplinkStore {
     watch(() => current().path, () => {
       hydrated = false
       dirty = false
+      restorationCancelled = false
       initialQuery = snapshotQuery(current().query as Record<string, unknown>)
       pending.clear()
       for (const [key, value] of Object.entries(initialQuery)) pending.set(key, value)
@@ -131,7 +140,7 @@ function ensureStore(): DeeplinkStore {
 
   store = {
     routeEpoch,
-    initial: (key: string) => initialQuery[key] ?? null,
+    initial: initialValue,
     hydrate() {
       if (hydrated) return
       hydrated = true
@@ -145,7 +154,7 @@ function ensureStore(): DeeplinkStore {
       // 跨路由常驻分组（顶栏抽屉）每次发布时认领当前路由
       let epoch = routeEpoch.value
       return {
-        initial: (key: string) => (own.includes(key) ? initialQuery[key] ?? null : null),
+        initial: (key: string) => (own.includes(key) ? initialValue(key) : null),
         set(values) {
           if (persistent) epoch = routeEpoch.value
           const entry = groups.get(token)
@@ -245,7 +254,7 @@ export const DEEPLINK_KEYS = {
   /** 角色档案图面板：检索弹窗与关键词 */
   archival: ['arch', 'archq'],
   /** 设计卡：子阶段 / 选中分镜 / 选择器 / 切换组合弹窗 / 批量范围 */
-  design: ['phase', 'shot', 'dpick', 'dcombo', 'dscope'],
+  design: ['phase', 'shot', 'dpick', 'danchor', 'dcombo', 'dscope'],
   /** 素材/语义选择器内部：类型栏 / 关键词 / 下钻到的素材 */
   picker: ['pktype', 'pkq', 'drill'],
   /** 关键帧步骤：选中分镜 / 批量多选 / 资产池弹窗 */

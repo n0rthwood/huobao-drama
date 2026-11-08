@@ -178,6 +178,7 @@ const link = useDeeplink('narration', DEEPLINK_KEYS.narration)
 const urlVoiceId = Number(querySingle(link.initial('voice')) || 0)
 let voiceRestored = false
 watch(() => props.storyboard?.id, id => {
+  if (!link.initial('voice')) { voiceRestored = true; return }
   if (voiceRestored || !id || urlVoiceId !== Number(id)) return
   voiceRestored = true
   voiceDialogOpen.value = true
