@@ -1,0 +1,809 @@
+{
+  "purpose": "Temporary human-editable non-metered UI fixture only; not AI grounding success",
+  "storyboard_id": 519,
+  "original_card": {
+    "version": 2,
+    "info_points": [
+      {
+        "id": "ip1",
+        "text": "明永乐以后蒙古诸部屡次南下，越过边墙向关内推进",
+        "via": "layer"
+      },
+      {
+        "id": "ip2",
+        "text": "朝廷把京师北面防线层层加厚：外有宣府、大同，内有居庸关",
+        "via": "layer"
+      },
+      {
+        "id": "ip3",
+        "text": "八达岭扼守关沟最窄处",
+        "via": "layer"
+      },
+      {
+        "id": "ip4",
+        "text": "八达岭的位置使它成为居庸关的前哨",
+        "via": "layer"
+      }
+    ],
+    "budget": {
+      "layer_s": 15,
+      "gen_s": 0
+    },
+    "rationale": "本镜旁白是一整段背景交代：「明永乐以后，蒙古诸部屡次南下，朝廷把京师北面的防线层层加厚：外有宣府、大同，内有居庸关，而八达岭扼守关沟最窄处，成为居庸关的前哨」——全部是地理层级与相对位置关系，没有人物、没有可演的过程，因此选 A「只图层」：用 15 秒在一张舆图上把这套纵深关系逐层标出，恰好容纳实测配音 14.4 秒（15 ≥ 14.4）。\n\n底图用 prop #169 @进京路线示意图。选择依据：它是本集唯一一张图面自塞外草原（蒙古包与牧群）经边墙、宣府、大同、居庸关、八达岭关沟北口，直到北京城一线贯通、并以朱红色箭头虚线串起自塞外指向京城方向的资产，其图面呈现与旁白的「南下—层层加厚—八达岭在关沟北口」完全对应，且该资产已有图（image_url 现存）。已用 read_image 核验图面：可读标注含「居庸关」（图中部）、「皇城宫殿」（图下方矩形城垣内）、以及自上方蒙古包营地经边墙、土木驿、居庸关一路向下指向城垣的朱红色带箭头虚线，方向朝京城；这与旁白所述南下方向一致，因此本镜不做反向或杜撰的新路线。\n\n图层安排按配音时间轴排：0 秒先出年代与事件卡（明永乐以后蒙古诸部屡次南下），2.5 秒标出图中那条自塞外越墙南下的箭头路线，4.5 秒标外线宣府、大同，8 秒标内线居庸关，10 秒标八达岭扼守关沟最窄处，12.5 秒压上结论「居庸关前哨：八达岭」。\n\n引用依据说明：本集真实",
+    "suggested_combo": "C",
+    "issues": [
+      {
+        "code": "gen_slot_missing",
+        "severity": "block",
+        "message": "生成段缺尾帧描述（首帧由衔接帧锁定继承）"
+      }
+    ],
+    "layer_plan": {
+      "base": {
+        "kind": "asset",
+        "asset_kind": "prop",
+        "asset_id": 169,
+        "version_task_id": null
+      },
+      "must_mark": [],
+      "planned_layers": [
+        {
+          "type": "card",
+          "at_s": 0,
+          "text": "明永乐以后 · 蒙古诸部屡次南下"
+        },
+        {
+          "type": "label",
+          "at_s": 2.5,
+          "text": "南下路线：塞外越过边墙 → 关内山道"
+        },
+        {
+          "type": "label",
+          "at_s": 4.5,
+          "text": "外线：宣府 · 大同"
+        },
+        {
+          "type": "label",
+          "at_s": 8,
+          "text": "内线：居庸关"
+        },
+        {
+          "type": "label",
+          "at_s": 10,
+          "text": "八达岭 · 扼守关沟最窄处"
+        },
+        {
+          "type": "label",
+          "at_s": 12.5,
+          "text": "居庸关前哨：八达岭"
+        }
+      ]
+    },
+    "gen_plan": {
+      "reference_assets": []
+    }
+  },
+  "fixture_response": {
+    "code": 200,
+    "data": {
+      "storyboard_id": 519,
+      "shot_number": 3,
+      "narration_text": "明永乐以后，蒙古诸部屡次南下，朝廷把京师北面的防线层层加厚：外有宣府、大同，内有居庸关，而八达岭扼守关沟最窄处，成为居庸关的前哨。",
+      "combo": "C",
+      "design_card": {
+        "version": 2,
+        "info_points": [
+          {
+            "id": "ip1",
+            "text": "明永乐以后蒙古诸部屡次南下，越过边墙向关内推进",
+            "via": "layer"
+          },
+          {
+            "id": "ip2",
+            "text": "朝廷把京师北面防线层层加厚：外有宣府、大同，内有居庸关",
+            "via": "layer"
+          },
+          {
+            "id": "ip3",
+            "text": "八达岭扼守关沟最窄处",
+            "via": "layer"
+          },
+          {
+            "id": "ip4",
+            "text": "八达岭的位置使它成为居庸关的前哨",
+            "via": "layer"
+          }
+        ],
+        "budget": {
+          "layer_s": 15,
+          "gen_s": 0
+        },
+        "rationale": "本镜旁白是一整段背景交代：「明永乐以后，蒙古诸部屡次南下，朝廷把京师北面的防线层层加厚：外有宣府、大同，内有居庸关，而八达岭扼守关沟最窄处，成为居庸关的前哨」——全部是地理层级与相对位置关系，没有人物、没有可演的过程，因此选 A「只图层」：用 15 秒在一张舆图上把这套纵深关系逐层标出，恰好容纳实测配音 14.4 秒（15 ≥ 14.4）。\n\n底图用 prop #169 @进京路线示意图。选择依据：它是本集唯一一张图面自塞外草原（蒙古包与牧群）经边墙、宣府、大同、居庸关、八达岭关沟北口，直到北京城一线贯通、并以朱红色箭头虚线串起自塞外指向京城方向的资产，其图面呈现与旁白的「南下—层层加厚—八达岭在关沟北口」完全对应，且该资产已有图（image_url 现存）。已用 read_image 核验图面：可读标注含「居庸关」（图中部）、「皇城宫殿」（图下方矩形城垣内）、以及自上方蒙古包营地经边墙、土木驿、居庸关一路向下指向城垣的朱红色带箭头虚线，方向朝京城；这与旁白所述南下方向一致，因此本镜不做反向或杜撰的新路线。\n\n图层安排按配音时间轴排：0 秒先出年代与事件卡（明永乐以后蒙古诸部屡次南下），2.5 秒标出图中那条自塞外越墙南下的箭头路线，4.5 秒标外线宣府、大同，8 秒标内线居庸关，10 秒标八达岭扼守关沟最窄处，12.5 秒压上结论「居庸关前哨：八达岭」。\n\n引用依据说明：本集真实",
+        "suggested_combo": "C",
+        "issues": [
+          {
+            "code": "gen_slot_missing",
+            "severity": "block",
+            "message": "生成段缺尾帧描述（首帧由衔接帧锁定继承）"
+          }
+        ],
+        "layer_plan": {
+          "base": {
+            "kind": "asset",
+            "asset_kind": "prop",
+            "asset_id": 169,
+            "version_task_id": null
+          },
+          "must_mark": [],
+          "planned_layers": [
+            {
+              "type": "card",
+              "at_s": 0,
+              "text": "明永乐以后 · 蒙古诸部屡次南下"
+            },
+            {
+              "type": "marker",
+              "at_s": 0,
+              "text": "QA 引用修复测试（非史实标注）"
+            },
+            {
+              "type": "label",
+              "at_s": 2.5,
+              "text": "南下路线：塞外越过边墙 → 关内山道"
+            },
+            {
+              "type": "label",
+              "at_s": 4.5,
+              "text": "外线：宣府 · 大同"
+            },
+            {
+              "type": "label",
+              "at_s": 8,
+              "text": "内线：居庸关"
+            },
+            {
+              "type": "label",
+              "at_s": 10,
+              "text": "八达岭 · 扼守关沟最窄处"
+            },
+            {
+              "type": "label",
+              "at_s": 12.5,
+              "text": "居庸关前哨：八达岭"
+            }
+          ]
+        },
+        "gen_plan": {
+          "reference_assets": []
+        }
+      },
+      "design_card_status": "pending",
+      "design_card_confirmed_at": null,
+      "design_card_stale_reason": null,
+      "issues": [
+        {
+          "code": "gen_slot_missing",
+          "severity": "block",
+          "message": "生成段缺尾帧描述（首帧由衔接帧锁定继承）"
+        }
+      ],
+      "narration_measured_s": 14.4,
+      "tts": {
+        "valid": true,
+        "reason": null,
+        "message": null,
+        "duration_ms": 14400
+      }
+    },
+    "message": "success"
+  },
+  "audit": {
+    "code": 200,
+    "data": [
+      {
+        "storyboard_id": 517,
+        "shot_number": 1,
+        "narration_text": "八达岭长城位于北京西北的军都山关沟北口，是明代长城中规制最高、保存最完整的段落之一。",
+        "combo": null,
+        "suggested_combo": null,
+        "status": "blank",
+        "confirmed_at": null,
+        "stale_reason": null,
+        "has_card": false,
+        "unresolved": 0,
+        "unresolved_layers": [],
+        "video_generated": false,
+        "issues": [
+          {
+            "code": "combo_missing",
+            "severity": "block",
+            "message": "还没有选段组合：A 只用图层 / B 只用生成 / C 图层→生成 / D 生成→图层，必须显式选一个"
+          }
+        ],
+        "narration_measured_s": 8.8,
+        "tts": {
+          "valid": true,
+          "reason": null,
+          "message": null,
+          "duration_ms": 8800
+        },
+        "budget": {
+          "layer_s": null,
+          "gen_s": null
+        }
+      },
+      {
+        "storyboard_id": 518,
+        "shot_number": 2,
+        "narration_text": "这样的规格，与它在京师北面防线上的位置分不开。",
+        "combo": "D",
+        "suggested_combo": "D",
+        "status": "pending",
+        "confirmed_at": null,
+        "stale_reason": null,
+        "has_card": true,
+        "unresolved": 0,
+        "unresolved_layers": [],
+        "video_generated": false,
+        "issues": [],
+        "narration_measured_s": 3.8,
+        "tts": {
+          "valid": true,
+          "reason": null,
+          "message": null,
+          "duration_ms": 3840
+        },
+        "budget": {
+          "layer_s": 2,
+          "gen_s": 9
+        }
+      },
+      {
+        "storyboard_id": 519,
+        "shot_number": 3,
+        "narration_text": "明永乐以后，蒙古诸部屡次南下，朝廷把京师北面的防线层层加厚：外有宣府、大同，内有居庸关，而八达岭扼守关沟最窄处，成为居庸关的前哨。",
+        "combo": "C",
+        "suggested_combo": "C",
+        "status": "pending",
+        "confirmed_at": null,
+        "stale_reason": null,
+        "has_card": true,
+        "unresolved": 0,
+        "unresolved_layers": [],
+        "video_generated": false,
+        "issues": [
+          {
+            "code": "gen_slot_missing",
+            "severity": "block",
+            "message": "生成段缺尾帧描述（首帧由衔接帧锁定继承）"
+          }
+        ],
+        "narration_measured_s": 14.4,
+        "tts": {
+          "valid": true,
+          "reason": null,
+          "message": null,
+          "duration_ms": 14400
+        },
+        "budget": {
+          "layer_s": 15,
+          "gen_s": 0
+        }
+      },
+      {
+        "storyboard_id": 520,
+        "shot_number": 4,
+        "narration_text": "城墙依山脊起伏，以条石为基、青砖包砌，顶部宽处可容五马并行，便于快速调兵。",
+        "combo": "B",
+        "suggested_combo": "B",
+        "status": "pending",
+        "confirmed_at": null,
+        "stale_reason": null,
+        "has_card": true,
+        "unresolved": 0,
+        "unresolved_layers": [],
+        "video_generated": false,
+        "issues": [],
+        "narration_measured_s": 9.9,
+        "tts": {
+          "valid": true,
+          "reason": null,
+          "message": null,
+          "duration_ms": 9920
+        },
+        "budget": {
+          "layer_s": 0,
+          "gen_s": 12
+        }
+      },
+      {
+        "storyboard_id": 521,
+        "shot_number": 5,
+        "narration_text": "沿线每隔数百米设敌台与烽燧，守军以烟火与号炮为信，警讯昼夜之间即可传到京城。",
+        "combo": "C",
+        "suggested_combo": "C",
+        "status": "pending",
+        "confirmed_at": null,
+        "stale_reason": null,
+        "has_card": true,
+        "unresolved": 0,
+        "unresolved_layers": [],
+        "video_generated": false,
+        "issues": [],
+        "narration_measured_s": 10.2,
+        "tts": {
+          "valid": true,
+          "reason": null,
+          "message": null,
+          "duration_ms": 10240
+        },
+        "budget": {
+          "layer_s": 6,
+          "gen_s": 5
+        }
+      },
+      {
+        "storyboard_id": 522,
+        "shot_number": 6,
+        "narration_text": "它的作用不只是阻挡，更是把进攻者逼入狭窄山道，使明军能以较少兵力守住通往北京的咽喉。",
+        "combo": "C",
+        "suggested_combo": "C",
+        "status": "pending",
+        "confirmed_at": null,
+        "stale_reason": null,
+        "has_card": true,
+        "unresolved": 0,
+        "unresolved_layers": [],
+        "video_generated": false,
+        "issues": [],
+        "narration_measured_s": 8.8,
+        "tts": {
+          "valid": true,
+          "reason": null,
+          "message": null,
+          "duration_ms": 8800
+        },
+        "budget": {
+          "layer_s": 4,
+          "gen_s": 10
+        }
+      }
+    ],
+    "message": "success"
+  },
+  "corrected_anchor_response": {
+    "code": 200,
+    "data": {
+      "storyboard_id": 519,
+      "shot_number": 3,
+      "narration_text": "明永乐以后，蒙古诸部屡次南下，朝廷把京师北面的防线层层加厚：外有宣府、大同，内有居庸关，而八达岭扼守关沟最窄处，成为居庸关的前哨。",
+      "combo": "C",
+      "design_card": {
+        "version": 2,
+        "info_points": [
+          {
+            "id": "ip1",
+            "text": "明永乐以后蒙古诸部屡次南下，越过边墙向关内推进",
+            "via": "layer"
+          },
+          {
+            "id": "ip2",
+            "text": "朝廷把京师北面防线层层加厚：外有宣府、大同，内有居庸关",
+            "via": "layer"
+          },
+          {
+            "id": "ip3",
+            "text": "八达岭扼守关沟最窄处",
+            "via": "layer"
+          },
+          {
+            "id": "ip4",
+            "text": "八达岭的位置使它成为居庸关的前哨",
+            "via": "layer"
+          }
+        ],
+        "budget": {
+          "layer_s": 15,
+          "gen_s": 0
+        },
+        "rationale": "本镜旁白是一整段背景交代：「明永乐以后，蒙古诸部屡次南下，朝廷把京师北面的防线层层加厚：外有宣府、大同，内有居庸关，而八达岭扼守关沟最窄处，成为居庸关的前哨」——全部是地理层级与相对位置关系，没有人物、没有可演的过程，因此选 A「只图层」：用 15 秒在一张舆图上把这套纵深关系逐层标出，恰好容纳实测配音 14.4 秒（15 ≥ 14.4）。\n\n底图用 prop #169 @进京路线示意图。选择依据：它是本集唯一一张图面自塞外草原（蒙古包与牧群）经边墙、宣府、大同、居庸关、八达岭关沟北口，直到北京城一线贯通、并以朱红色箭头虚线串起自塞外指向京城方向的资产，其图面呈现与旁白的「南下—层层加厚—八达岭在关沟北口」完全对应，且该资产已有图（image_url 现存）。已用 read_image 核验图面：可读标注含「居庸关」（图中部）、「皇城宫殿」（图下方矩形城垣内）、以及自上方蒙古包营地经边墙、土木驿、居庸关一路向下指向城垣的朱红色带箭头虚线，方向朝京城；这与旁白所述南下方向一致，因此本镜不做反向或杜撰的新路线。\n\n图层安排按配音时间轴排：0 秒先出年代与事件卡（明永乐以后蒙古诸部屡次南下），2.5 秒标出图中那条自塞外越墙南下的箭头路线，4.5 秒标外线宣府、大同，8 秒标内线居庸关，10 秒标八达岭扼守关沟最窄处，12.5 秒压上结论「居庸关前哨：八达岭」。\n\n引用依据说明：本集真实",
+        "suggested_combo": "C",
+        "issues": [
+          {
+            "code": "gen_slot_missing",
+            "severity": "block",
+            "message": "生成段缺尾帧描述（首帧由衔接帧锁定继承）"
+          },
+          {
+            "code": "unresolved_ref",
+            "severity": "warn",
+            "message": "「进京路线示意图」的语义标注里没有「qa_missing_semantic」",
+            "index": 0
+          }
+        ],
+        "layer_plan": {
+          "base": {
+            "kind": "asset",
+            "asset_kind": "prop",
+            "asset_id": 169,
+            "version_task_id": null
+          },
+          "must_mark": [],
+          "planned_layers": [
+            {
+              "type": "card",
+              "at_s": 0,
+              "text": "明永乐以后 · 蒙古诸部屡次南下"
+            },
+            {
+              "type": "marker",
+              "at_s": 0,
+              "text": "QA 引用修复测试（非史实标注）",
+              "anchor": {
+                "asset_id": 169,
+                "semantic_id": "qa_missing_semantic",
+                "name": "",
+                "unresolved": true,
+                "unresolved_reason": "「进京路线示意图」的语义标注里没有「qa_missing_semantic」"
+              }
+            },
+            {
+              "type": "label",
+              "at_s": 2.5,
+              "text": "南下路线：塞外越过边墙 → 关内山道"
+            },
+            {
+              "type": "label",
+              "at_s": 4.5,
+              "text": "外线：宣府 · 大同"
+            },
+            {
+              "type": "label",
+              "at_s": 8,
+              "text": "内线：居庸关"
+            },
+            {
+              "type": "label",
+              "at_s": 10,
+              "text": "八达岭 · 扼守关沟最窄处"
+            },
+            {
+              "type": "label",
+              "at_s": 12.5,
+              "text": "居庸关前哨：八达岭"
+            }
+          ]
+        },
+        "gen_plan": {
+          "reference_assets": []
+        }
+      },
+      "design_card_status": "pending",
+      "design_card_confirmed_at": null,
+      "design_card_stale_reason": null,
+      "issues": [
+        {
+          "code": "gen_slot_missing",
+          "severity": "block",
+          "message": "生成段缺尾帧描述（首帧由衔接帧锁定继承）"
+        },
+        {
+          "code": "unresolved_ref",
+          "severity": "warn",
+          "message": "「进京路线示意图」的语义标注里没有「qa_missing_semantic」",
+          "index": 0
+        }
+      ],
+      "narration_measured_s": 14.4,
+      "tts": {
+        "valid": true,
+        "reason": null,
+        "message": null,
+        "duration_ms": 14400
+      }
+    },
+    "message": "success"
+  },
+  "corrected_audit": {
+    "code": 200,
+    "data": [
+      {
+        "storyboard_id": 517,
+        "shot_number": 1,
+        "narration_text": "八达岭长城位于北京西北的军都山关沟北口，是明代长城中规制最高、保存最完整的段落之一。",
+        "combo": null,
+        "suggested_combo": null,
+        "status": "blank",
+        "confirmed_at": null,
+        "stale_reason": null,
+        "has_card": false,
+        "unresolved": 0,
+        "unresolved_layers": [],
+        "video_generated": false,
+        "issues": [
+          {
+            "code": "combo_missing",
+            "severity": "block",
+            "message": "还没有选段组合：A 只用图层 / B 只用生成 / C 图层→生成 / D 生成→图层，必须显式选一个"
+          }
+        ],
+        "narration_measured_s": 8.8,
+        "tts": {
+          "valid": true,
+          "reason": null,
+          "message": null,
+          "duration_ms": 8800
+        },
+        "budget": {
+          "layer_s": null,
+          "gen_s": null
+        }
+      },
+      {
+        "storyboard_id": 518,
+        "shot_number": 2,
+        "narration_text": "这样的规格，与它在京师北面防线上的位置分不开。",
+        "combo": "D",
+        "suggested_combo": "D",
+        "status": "pending",
+        "confirmed_at": null,
+        "stale_reason": null,
+        "has_card": true,
+        "unresolved": 0,
+        "unresolved_layers": [],
+        "video_generated": false,
+        "issues": [],
+        "narration_measured_s": 3.8,
+        "tts": {
+          "valid": true,
+          "reason": null,
+          "message": null,
+          "duration_ms": 3840
+        },
+        "budget": {
+          "layer_s": 2,
+          "gen_s": 9
+        }
+      },
+      {
+        "storyboard_id": 519,
+        "shot_number": 3,
+        "narration_text": "明永乐以后，蒙古诸部屡次南下，朝廷把京师北面的防线层层加厚：外有宣府、大同，内有居庸关，而八达岭扼守关沟最窄处，成为居庸关的前哨。",
+        "combo": "C",
+        "suggested_combo": "C",
+        "status": "pending",
+        "confirmed_at": null,
+        "stale_reason": null,
+        "has_card": true,
+        "unresolved": 1,
+        "unresolved_layers": [
+          {
+            "index": 1,
+            "type": "marker",
+            "text": "QA 引用修复测试（非史实标注）",
+            "asset_id": 169,
+            "asset_name": "进京路线示意图",
+            "asset_exists": true,
+            "semantic_id": "qa_missing_semantic",
+            "semantic_name": "",
+            "available_semantics": []
+          }
+        ],
+        "video_generated": false,
+        "issues": [
+          {
+            "code": "gen_slot_missing",
+            "severity": "block",
+            "message": "生成段缺尾帧描述（首帧由衔接帧锁定继承）"
+          },
+          {
+            "code": "unresolved_ref",
+            "severity": "warn",
+            "message": "「进京路线示意图」的语义标注里没有「qa_missing_semantic」"
+          }
+        ],
+        "narration_measured_s": 14.4,
+        "tts": {
+          "valid": true,
+          "reason": null,
+          "message": null,
+          "duration_ms": 14400
+        },
+        "budget": {
+          "layer_s": 15,
+          "gen_s": 0
+        }
+      },
+      {
+        "storyboard_id": 520,
+        "shot_number": 4,
+        "narration_text": "城墙依山脊起伏，以条石为基、青砖包砌，顶部宽处可容五马并行，便于快速调兵。",
+        "combo": "B",
+        "suggested_combo": "B",
+        "status": "pending",
+        "confirmed_at": null,
+        "stale_reason": null,
+        "has_card": true,
+        "unresolved": 0,
+        "unresolved_layers": [],
+        "video_generated": false,
+        "issues": [],
+        "narration_measured_s": 9.9,
+        "tts": {
+          "valid": true,
+          "reason": null,
+          "message": null,
+          "duration_ms": 9920
+        },
+        "budget": {
+          "layer_s": 0,
+          "gen_s": 12
+        }
+      },
+      {
+        "storyboard_id": 521,
+        "shot_number": 5,
+        "narration_text": "沿线每隔数百米设敌台与烽燧，守军以烟火与号炮为信，警讯昼夜之间即可传到京城。",
+        "combo": "C",
+        "suggested_combo": "C",
+        "status": "pending",
+        "confirmed_at": null,
+        "stale_reason": null,
+        "has_card": true,
+        "unresolved": 0,
+        "unresolved_layers": [],
+        "video_generated": false,
+        "issues": [],
+        "narration_measured_s": 10.2,
+        "tts": {
+          "valid": true,
+          "reason": null,
+          "message": null,
+          "duration_ms": 10240
+        },
+        "budget": {
+          "layer_s": 6,
+          "gen_s": 5
+        }
+      },
+      {
+        "storyboard_id": 522,
+        "shot_number": 6,
+        "narration_text": "它的作用不只是阻挡，更是把进攻者逼入狭窄山道，使明军能以较少兵力守住通往北京的咽喉。",
+        "combo": "C",
+        "suggested_combo": "C",
+        "status": "pending",
+        "confirmed_at": null,
+        "stale_reason": null,
+        "has_card": true,
+        "unresolved": 0,
+        "unresolved_layers": [],
+        "video_generated": false,
+        "issues": [],
+        "narration_measured_s": 8.8,
+        "tts": {
+          "valid": true,
+          "reason": null,
+          "message": null,
+          "duration_ms": 8800
+        },
+        "budget": {
+          "layer_s": 4,
+          "gen_s": 10
+        }
+      }
+    ],
+    "message": "success"
+  },
+  "restore_response": {
+    "code": 200,
+    "data": {
+      "storyboard_id": 519,
+      "shot_number": 3,
+      "narration_text": "明永乐以后，蒙古诸部屡次南下，朝廷把京师北面的防线层层加厚：外有宣府、大同，内有居庸关，而八达岭扼守关沟最窄处，成为居庸关的前哨。",
+      "combo": "C",
+      "design_card": {
+        "version": 2,
+        "info_points": [
+          {
+            "id": "ip1",
+            "text": "明永乐以后蒙古诸部屡次南下，越过边墙向关内推进",
+            "via": "layer"
+          },
+          {
+            "id": "ip2",
+            "text": "朝廷把京师北面防线层层加厚：外有宣府、大同，内有居庸关",
+            "via": "layer"
+          },
+          {
+            "id": "ip3",
+            "text": "八达岭扼守关沟最窄处",
+            "via": "layer"
+          },
+          {
+            "id": "ip4",
+            "text": "八达岭的位置使它成为居庸关的前哨",
+            "via": "layer"
+          }
+        ],
+        "budget": {
+          "layer_s": 15,
+          "gen_s": 0
+        },
+        "rationale": "本镜旁白是一整段背景交代：「明永乐以后，蒙古诸部屡次南下，朝廷把京师北面的防线层层加厚：外有宣府、大同，内有居庸关，而八达岭扼守关沟最窄处，成为居庸关的前哨」——全部是地理层级与相对位置关系，没有人物、没有可演的过程，因此选 A「只图层」：用 15 秒在一张舆图上把这套纵深关系逐层标出，恰好容纳实测配音 14.4 秒（15 ≥ 14.4）。\n\n底图用 prop #169 @进京路线示意图。选择依据：它是本集唯一一张图面自塞外草原（蒙古包与牧群）经边墙、宣府、大同、居庸关、八达岭关沟北口，直到北京城一线贯通、并以朱红色箭头虚线串起自塞外指向京城方向的资产，其图面呈现与旁白的「南下—层层加厚—八达岭在关沟北口」完全对应，且该资产已有图（image_url 现存）。已用 read_image 核验图面：可读标注含「居庸关」（图中部）、「皇城宫殿」（图下方矩形城垣内）、以及自上方蒙古包营地经边墙、土木驿、居庸关一路向下指向城垣的朱红色带箭头虚线，方向朝京城；这与旁白所述南下方向一致，因此本镜不做反向或杜撰的新路线。\n\n图层安排按配音时间轴排：0 秒先出年代与事件卡（明永乐以后蒙古诸部屡次南下），2.5 秒标出图中那条自塞外越墙南下的箭头路线，4.5 秒标外线宣府、大同，8 秒标内线居庸关，10 秒标八达岭扼守关沟最窄处，12.5 秒压上结论「居庸关前哨：八达岭」。\n\n引用依据说明：本集真实",
+        "suggested_combo": "C",
+        "issues": [
+          {
+            "code": "gen_slot_missing",
+            "severity": "block",
+            "message": "生成段缺尾帧描述（首帧由衔接帧锁定继承）"
+          }
+        ],
+        "layer_plan": {
+          "base": {
+            "kind": "asset",
+            "asset_kind": "prop",
+            "asset_id": 169,
+            "version_task_id": null
+          },
+          "must_mark": [],
+          "planned_layers": [
+            {
+              "type": "card",
+              "at_s": 0,
+              "text": "明永乐以后 · 蒙古诸部屡次南下"
+            },
+            {
+              "type": "label",
+              "at_s": 2.5,
+              "text": "南下路线：塞外越过边墙 → 关内山道"
+            },
+            {
+              "type": "label",
+              "at_s": 4.5,
+              "text": "外线：宣府 · 大同"
+            },
+            {
+              "type": "label",
+              "at_s": 8,
+              "text": "内线：居庸关"
+            },
+            {
+              "type": "label",
+              "at_s": 10,
+              "text": "八达岭 · 扼守关沟最窄处"
+            },
+            {
+              "type": "label",
+              "at_s": 12.5,
+              "text": "居庸关前哨：八达岭"
+            }
+          ]
+        },
+        "gen_plan": {
+          "reference_assets": []
+        }
+      },
+      "design_card_status": "pending",
+      "design_card_confirmed_at": null,
+      "design_card_stale_reason": null,
+      "issues": [
+        {
+          "code": "gen_slot_missing",
+          "severity": "block",
+          "message": "生成段缺尾帧描述（首帧由衔接帧锁定继承）"
+        }
+      ],
+      "narration_measured_s": 14.4,
+      "tts": {
+        "valid": true,
+        "reason": null,
+        "message": null,
+        "duration_ms": 14400
+      }
+    },
+    "message": "success"
+  },
+  "original_card_restored": true,
+  "restored_at": "2026-11-08T20:53:45.563Z"
+}

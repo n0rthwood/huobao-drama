@@ -1,12 +1,23 @@
 # 火宝生产 API 参考（agent / storyboards / posters / merge / episodes 生产路由）
 
-> **历史参考（2026-11-02 快照）**：若与 `SKILL.md` 或 `references/api-catalog.md` 冲突，以新文档为准；标 `[S]` 的契约在写入前需重新 GET/预览校验。
+> **历史参考（2026-11-02 快照，revision `7ad79f6`）。本文件不是当前可执行指令。**
+> 当前契约以 `SKILL.md` 与 `references/api-catalog.md`（源码快照：#86/#87 功能提交 `4a43731`，已合并 main `5f19f4a`，发布 `release 20261108T191425Z`）为准；冲突时一律以 api-catalog 为准。本文件保留 drama 5 / episode 6 的真实运行证据（请求、响应、媒体校验），**证据不删**，但其中的操作配方已被下列变更作废：
+>
+> | 本文写法（已过时） | 当前事实（见 api-catalog） |
+> |---|---|
+> | Poster 用 `layout:{texts:[...]}`，本地脚本渲染 PNG → `POST /upload/image` → `POST /poster/versions {image,...}` | Poster 工程是 `layer_doc`（旧 `layout` 不再读写）；`POST /poster/versions {layer_doc?}` 由**服务端**渲染合成图并登记、设为最终版本，不需要上传画布；另有 `/poster/concept*`、`/poster/load-version` 流程（api-catalog §4） |
+> | 「compose 写 v2 签名」 | 有 `combo` 的纪录片镜写 **v4**，无 combo 的剧情镜仍写 v2（`services/compose-state.ts:70-137`，api-catalog §11） |
+> | §6A 的「剧本 → 分镜 → 关键帧 → 旁白/配音 → 视频」顺序，以及纪录片用 `POST /agent/script_rewriter/chat` 改写 | 纪录片改写入口是 `POST /episodes/{e}/script-rewrite`（`script_rewriter/chat` 对纪录片**直接 400**）；时长必须先由配音实测确定，**配音在关键帧/视频之前**（见下方 §6A 的当前顺序） |
+> | 图层段 `timeline.fps` 由调用方设定、「保持 25」 | `fps` 是派生值，沿用本集既有计划帧率（24 / 29.97 等照常保留，#69），请求里的 fps 不生效 |
+> | 「16:9 最终输出 = 960×544」 | 960×544 是无视频时的 16:9 兜底值，也是当时那一集的实测结果；画布以本集首条模型视频实测为准 |
+>
+> 标 `[S]` 的契约在任何写入前都要重新 GET/预览校验；标 `[R]` 的只证明 2026-11-02 那一轮真实发过的请求，不得外推到别的集或别的参数。
 
-依据 2026-11-02 源码核对（当前 `huobao-drama` revision `7ad79f6be09c7665c88193953fa1ca067de17f1a`；`backend/src/routes/{agent,storyboards,posters,merge,episodes}.ts` + `backend/src/services/{posters,poster-layout,narration-fit,narration-fit-service,narration-voice,narration-voice-params,narration,compose-state,keyframe-batch,video-batch,shot-compose,ffmpeg-merge}.ts`）以及 drama 5 / episode 6 的既有运行证据。最终合成/导出先按当前 frontend/useApi、路由和委派服务重扫，再以同一 revision/hash 实跑；源码证据和文件 SHA-256 见 `work/huobao-director-charcoal-20261102/compose-current/source-contract.{md,json}`，实际调用和媒体检查见 `compose-final/`。revision/hash 变更就必须重扫。
+依据 2026-11-02 源码核对（当时 `huobao-drama` revision `7ad79f6be09c7665c88193953fa1ca067de17f1a`；`backend/src/routes/{agent,storyboards,posters,merge,episodes}.ts` + `backend/src/services/{posters,poster-layout,narration-fit,narration-fit-service,narration-voice,narration-voice-params,narration,compose-state,keyframe-batch,video-batch,shot-compose,ffmpeg-merge}.ts`）以及 drama 5 / episode 6 的既有运行证据。源码证据和文件 SHA-256 见 `work/huobao-director-charcoal-20261102/compose-current/source-contract.{md,json}`，实际调用和媒体检查见 `compose-final/`。该 revision 早已变更，照本文行动前必须按 api-catalog 重扫。
 
-路径拼接规则：`HUOBAO_API` 以 `/api/v1` 结尾（当前批准部署为 `http://172.30.3.164/huobao/api/v1/`），本文以 `/` 开头的路径与其直接字符串拼接。响应统一 `{code:200|201, data, message}`；错误为 400/404 + 中文 `message`；**收到 200 `text/html` 一律是路由/前缀错误，不是成功**。除特别注明外，POST/PUT 请求体为 JSON。返回 `static/...` 或 `/static/...` 媒体要保留部署前缀下载，例如 `http://172.30.3.164/huobao/static/...`；`/upload/image` 的 `path`（`static/...`）仍是 Poster 后续传参口径。
+路径拼接规则：`HUOBAO_API` 以 `/api/v1` 结尾（当前批准部署为 `http://172.30.3.164/huobao/api/v1/`），本文以 `/` 开头的路径与其直接字符串拼接。响应统一 `{code:200|201, data, message}`；错误为 400/404 + 中文 `message`；**收到 200 `text/html` 一律是路由/前缀错误，不是成功**。除特别注明外，POST/PUT 请求体为 JSON。返回 `static/...` 或 `/static/...` 媒体要保留部署前缀下载，例如 `http://172.30.3.164/huobao/static/...`；`POST /upload/image` 仍是通用图片落盘入口（返回 `path` = `static/...`），但它**不再**是 Poster 合成版本的登记前置。
 
-> **最终合成已完成当前源码重扫 [S] 与受控运行 [R]：**下面 §2/§3/§5 的通用契约来自 revision `7ad79f6`；d5/e6 的三镜实例在源 hash 再核对后以 JSON Content-Type、明确 IDs、实时 `compose_state` 和实际媒体进行验证。当前实现有 `POST /episodes/{e}/compose-batch/preview`，以服务端 `compose_state`/v2 签名统一单镜、批量与导出 readiness；不要把任何旧 `compose_stale` 报告认作现存 bug。运行只验证所列路径和证据，不自动构成人工艺术批准。
+> **最终合成的 2026-11-02 记录：**下面 §2/§3/§5 的通用契约来自 revision `7ad79f6`；d5/e6 的三镜实例在源 hash 再核对后以 JSON Content-Type、明确 IDs、实时 `compose_state` 和实际媒体进行验证。当时已有 `POST /episodes/{e}/compose-batch/preview`，以服务端 `compose_state` 签名统一单镜、批量与导出 readiness（签名版本口径见上表）；不要把任何旧 `compose_stale` 报告认作现存 bug。运行只验证所列路径和证据，不自动构成人工艺术批准。
 
 ## 0. 覆盖清单（method + path → 本文档节）
 
@@ -45,11 +56,11 @@
 | POST /episodes/{e}/compose-batch | §3 | [R]（d5/e6 显式 `[119,120,121]`，串行终态 completed:3/failed:0/skipped:0） |
 | GET /episodes/{e}/compose-batch-status | §3 | [R]（未启动 null 与上述 completed 终态） |
 | GET /episodes/{e}/pipeline-status；extract/extract-status；assets/link；character-roster；characters/scenes/props | §3 | [S] |
-| GET/PUT /episodes/{e}/poster；POST /poster/generate（仅 `mode:"initial"`）；POST /poster/versions；PUT /poster/select | §4 | [R]（`composite`／`layers` 仍 [S]） |
+| GET/PUT /episodes/{e}/poster；POST /poster/generate（仅 `mode:"initial"`）；POST /poster/versions；PUT /poster/select | §4 | **契约已变更，不可照用**（当时 [R]：`layout` + 上传画布登记；`composite`／`layers` 当时 [S]）→ 见 api-catalog §4 |
 | POST /merge/episodes/{id}/merge | §5 | [R]（d5/e6 fail-closed 400，以及显式三镜＋Poster 9/2s 的 merge 21 成功） |
 | GET /merge/episodes/{id}/merge；GET /merge/episodes/{id}/merges | §5 | [R]（null/[]、merge 21 completed 与 history 读回） |
 | DELETE /merge/episodes/{id}/merges/{mergeId} | §5 | [S] |
-| POST /upload/image（multipart `file`；Poster/参考图落盘入口） | §4 | [R]（Poster 画布上传） |
+| POST /upload/image（multipart `file`；通用图片落盘入口） | §4 | [R]（当时用于上传 Poster 画布；Poster 登记已改服务端渲染，该用途作废） |
 
 通用约定：
 
@@ -141,7 +152,8 @@ Body：`settings?`。**不传 settings = 用当前生效参数直接合成**；�
 不重跑 TTS。返回 `{subtitleUrl, cues, source}`。
 
 ### POST /storyboards/{id}/compose — 单镜原生合成 [S]
-**无 body、同步返回** `{storyboardId,composedVideoUrl,durationMs,plan,burned}`。本集 `narration_enabled` 必须为 true；服务先实测文件，再要求 raw `video_url`、（非纯画面镜的）非空旁白、与旁白文本 SHA-256 匹配的配音、可读且至少一条 cue 的 SRT、非阻断 fit。成功生成 `static/composed/{uuid}.mp4`，仅写 `composed_video_url` 与 `narration_meta.composed`；输出期间任一输入变化会在下次状态计算为 `changed`，不会冒充最新（`routes/storyboards.ts:503-524`、`services/shot-compose.ts:85-168`、`services/compose-state.ts:271-358`）。
+**无 body、同步返回** `{storyboardId,composedVideoUrl,durationMs,plan,burned}`。本集 `narration_enabled` 必须为 true；服务先实测文件，再要求 raw `video_url`、（非纯画面镜的）非空旁白、与旁白文本 SHA-256 匹配的配音、可读且至少一条 cue 的 SRT、非阻断 fit。成功生成 `static/composed/{uuid}.mp4`，仅写 `composed_video_url` 与 `narration_meta.composed`；输出期间任一输入变化会在下次状态计算为 `changed`，不会冒充最新（2026-11-02 行号：`routes/storyboards.ts:503-524`、`services/shot-compose.ts:85-168`、`services/compose-state.ts:271-358`）。
+**签名版本（当前事实，已非 2026-11-02 口径）**：有 `combo` 的纪录片镜写 v4（含 combo、图层段片段键、衔接帧 hash、视频任务 ID），无 combo 的剧情镜仍写 v2 且字节不变（`services/compose-state.ts:70-137`）。本文其余处若写「v2 签名」按此纠正。
 
 字幕按实际 `tempo` 和 `plan.narrationStart` 平移/缩放后烧录。`audio_mix_mode:'replace'` 只保留旁白；`'mix'` 在原片实际有音轨时以底音混入（无原音时降级 replace）。画面不足冻结末帧、超长裁尾；旁白绝不裁断；输出 H.264/AAC 48kHz、faststart（`services/shot-compose.ts:98-274`）。fit 规则阻断时 HTTP 400 为 `{success:false,message,block_reason:'narration_too_long'|'narration_gap_too_large',gap_ratio,current_sec,avail_sec,suggested_chars}`；其它依赖/占用/ffmpeg 错误是普通 `{code:400,message}`。
 
@@ -238,9 +250,12 @@ Body `model?/config_id?`。要求该镜 keyframesConfirmed（否则 400），在
 
 ---
 
-## 4. Poster（`routes/posters.ts`，挂 /api/v1/episodes 下）
+## 4. Poster（`routes/posters.ts`，挂 /api/v1/episodes 下）—— **2026-11-02 历史契约，已不可执行**
 
-每集一份编辑工程。**[R]** `GET /episodes/{e}/poster` 返回 bundle；`PUT /episodes/{e}/poster` 的 prompt、text_prompt、base_image、reference_images 和 layout 已被实际接受；`POST /episodes/{e}/poster/generate {"mode":"initial"}` 已轮询至 completed 并下载实际 PNG；脚本渲染的文字画布也已实际上传、登记和选版。以下未另标者仍为 [S]；这些实测不代表人类艺术批准、独立审核通过或最终拼接通过。
+> **不要按本节操作。** Poster 工程自 Issue #39/#72 起改为 `layer_doc`：旧 `layout:{texts:[...]}` 既不写也不读，`POST /episodes/{e}/poster/versions` 改为 `{layer_doc?, prompt?, text_prompt?}` 并由**服务端**渲染合成图、登记 `composite` 版本、自动设为最终版并同步缩略图，不再需要本地渲染 PNG + `POST /upload/image` + 传 `image`。另有 `/poster/concept`、`/poster/concept/generate`、`/poster/concept/apply`、`/poster/concept/apply-layer-plan`、`/poster/load-version` 与 `provenance` 冲突 409（`manual_edit_conflict`）等当时不存在的环节。当前契约见 `references/api-catalog.md` §4。
+> 以下内容仅作历史记录：说明 2026-11-02 那一轮**实际发生过什么**（`poster-resume/` 证据），不构成今天的可执行步骤，其中的 `[R]` 只属于当时的 `layout` 契约。
+
+每集一份编辑工程。**[R，历史]** `GET /episodes/{e}/poster` 返回 bundle；`PUT /episodes/{e}/poster` 的 prompt、text_prompt、base_image、reference_images 和 layout 当时被实际接受；`POST /episodes/{e}/poster/generate {"mode":"initial"}` 已轮询至 completed 并下载实际 PNG；脚本渲染的文字画布也已实际上传、登记和选版。以下未另标者仍为 [S]；这些实测不代表人类艺术批准、独立审核通过或最终拼接通过。
 ```json
 {"id":1,"prompt":"...","text_prompt":"...","reference_images":["static/..."],
  "base_image":"static/...|null","layout":{"texts":[...]},"size":"...",
@@ -311,29 +326,52 @@ Body `{version_id:number}`。同步 episodes.thumbnail。返回 bundle；实测�
 
 ---
 
-## 6. 可执行配方（给运行 worker 的首选端点序列）
+## 6. 配方
 
-### A. 剧本 → 分镜 → 关键帧 → 确认 → 视频 → 配音 → 合成 → 成片
-1. `PUT /episodes/{e} {"content":...}` →（人审）→ `POST /agent/script_rewriter/chat`。
-2. `POST /episodes/{e}/extract {"target":"characters"|"scenes"|"props"}` ×3，轮询 `extract-status`；补关联 `POST /episodes/{e}/assets/link`。
-3. `POST /agent/storyboard_breaker/chat`（覆盖式，先快照 `GET /episodes/{e}/storyboards`）。
-4. `POST /episodes/{e}/generate-keyframe-prompts {}` → 轮询。关键帧文本可在此阶段准备；不要同时提交 video Prompt 和会改变时长的配音批次。
-5. `POST /episodes/{e}/keyframe-batch/preview {}` → 取 checked 项组 items → `POST /episodes/{e}/keyframe-batch` → 轮询 `GET /episodes/{e}/keyframe-batch`，逐槽打开检查。
-6. `PUT /episodes/{e} {"narration_enabled":true}` → `POST /episodes/{e}/generate-narration` → 轮询；单镜重写 `POST /storyboards/{s}/narration/write`；人工修订用 `PUT /storyboards/{s} {"narration_text":...}`。
-7. `GET /episodes/{e}/tts-options` → 以 `current` 全量 + 人的改动组 settings → `POST /episodes/{e}/narration/voice-batch/preview`（只校验+分类，不落库）→ `POST /episodes/{e}/narration/voice-batch` → 轮询；逐镜重建字幕，必要时保存 narration-fit，并读回实际 duration。
-8. **时长稳定后才写视频 Prompt。** 从当前文本配置取得 `T`／`TM`，`POST /episodes/{e}/generate-video-prompts {"storyboard_ids":[...],"config_id":T,"model":TM}` → 轮询；重新 GET 分镜，逐镜核对实际 `duration`、`mid_frame_time` 和 video_prompt 最末时间段终点。voice-batch 与本步**不得并发**；任一旧秒数或不匹配均先校准 Prompt。视频批次另在下一步使用它自己的 video `C`／`M`。
-9. **[S] 人工帧闸门。** 对每个已审的当前镜头单独 `POST /storyboards/{s}/confirm-keyframes {"confirmed":true}`；先 GET 分镜核对首／中／尾的当前有效版本和承接关系，绝不以 batch ready 代替确认。
-10. **[S] 视频批次。** 从当前集实际锁定的 video config／model 取得 `C`／`M`（不要沿用文字或图像配置），先 `POST /episodes/{e}/video-batch/preview {"storyboard_ids":[...],"config_id":C,"model":M}`，只选择 `selectable:true` 且在授权范围的 IDs。以**完全相同**的 `storyboard_ids,config_id,model` POST `/episodes/{e}/video-batch {"storyboard_ids":[...],"config_id":C,"model":M}`，轮询 GET `/episodes/{e}/video-batch`；它串行执行。下载每个完成片段并实际检查媒体，不能用任务状态代替。
-11. **当前合成 [R，通用门槛仍依源码逐项复核]：**原视频、旁白、字幕与 fit 都稳定后，先 `GET /episodes/{e}/storyboards`，逐镜读 `compose_state.inputs`、`status`、`reason`、`plan`；必要时先 GET/PUT narration-fit 和 `POST /storyboards/{s}/narration/subtitle`。`POST /episodes/{e}/compose-batch/preview {"storyboard_ids":[...]}`，只取 `selectable:true` 的显式勾选项；再 `POST /episodes/{e}/compose-batch {"storyboard_ids":[...]}`，轮询 status，并重新 GET 分镜确认每个已选镜是 `unchanged,exportable:true`。d5/e6 实测 batch 只接受 `storyboard_ids`、串行完成且无 skipped；单镜返工可 `POST /storyboards/{s}/compose {}`，该单镜路径仍 [S]。下载检查每个融合片的真实轨道、full decode、烧录字幕样帧，并把其音频与当前 TTS source 作可复现实测比对；不可用状态、failed/skipped 或任何 400 都按服务结构化响应处理，不用本地合成替代。
-12. **当前 merge [R，仍非自动媒体判定]：**仅在所有**显式所选**镜头 `exportable:true` 后，POST `/merge/episodes/{e}/merge {"storyboard_ids":[...],"poster_version_id":V,"poster_duration":D}`（Poster 不需要时省略后两键）。检查 400 `blocked[]`、轮询 GET `/merge/episodes/{e}/merge` 至 terminal、再下载实际 `merged_url` 与 history。d5/e6 实测有 `poster_duration:2`、3 个明确 composed sources、`skipped:[]` 的完成 merge 21；实际 Poster 是 51 帧/2.04 s，说明参数值不是帧精确时长承诺。不要把接受响应、skipped 空数组或整数 `duration` 当作最终媒体验收：须 full decode、ffprobe 精确时长/帧数、实际打开 Poster/字幕帧，并逐段比对最终音频与每个 native composed source。
+本节分两部分：**6.0 当前顺序**（可执行）与 **6.A/6.B 历史证据（不可执行）**。历史小节保留 2026-11-02 那一轮真实跑过的 ID、参数与结果，供追溯；不要照着它的步骤顺序操作。
 
-### B. 带文字 Poster（API 工程 + 授权脚本画布）
-1. `GET /episodes/{e}/poster` 取 variables/aspect_ratio/size（[R]）。
-2. `PUT /episodes/{e}/poster {"prompt":"...","reference_images":["static/assets/..."],"layout":{"texts":[{"id":"t1","kind":"project_title","x":0.1,"y":0.12,"width":0.8,"fontSize":0.1,"align":"center","color":"#ffffff"},{"id":"t2","kind":"text","text":"为什么木炭燃烧需要氧气","x":0.1,"y":0.3,"width":0.8,"fontSize":0.08}]}}`（[R] 接受 layout；此示例不代表文字内容已获人审）。
-3. `POST /episodes/{e}/poster/generate {"mode":"initial"}` → 轮询任务；完成后 `GET /episodes/{e}/poster` 看 generated 版本并下载／查看图像（[R]，但不等于人审通过）。
-4. 若选择生成版：`PUT /episodes/{e}/poster/select {"version_id":V}`（[R]）。若需要精确 UI 等价文字排版且有用户授权：以步骤 1 的 `layout`／`variables` 和指定底图渲染本地 PNG → `POST /upload/image` → `POST /episodes/{e}/poster/versions {"image":"static/uploads/...","base_image":"static/...","layout":{...}}`；重新 GET bundle 并下载 final_image，检查已登记的版本、layout 与实际像素（[R]）。
-5. 拼接带片头：当前源码是 `POST /merge/episodes/{id}/merge {"storyboard_ids":[...],"poster_version_id":V,"poster_duration":2}`；V 必须属于该集且图片存在，时长单位是秒并会钳到 0.5–10。d5/e6 的 Poster 9 (1344×768) 以 2 秒片头成功写入 960×544 final，样帧中文字未被裁切；这只验证该实例的渲染结果，仍须每次打开所生成片头。
-（要 AI 重排文字：`mode:"composite"`；`mode:"layers"` 需脚本产出文字图层并先 `POST /upload/image`。二者均仍为 [S]。）
+### 6.0 当前顺序（以 `references/api-catalog.md` 为准）
+
+**纪录片（`project_type=documentary`）**：
+1. **剧本**：`PUT /episodes/{e} {"content":...}` 导入原始内容 →（人明确授权改写后）`POST /episodes/{e}/script-rewrite` 轮询 `GET /episodes/{e}/script-rewrite`。**纪录片不能用 `POST /agent/script_rewriter/chat`（直接 400）**，也不能由助手本地代写再 PUT `script_content`。人工保存旁白稿前先 `POST /episodes/{e}/script-rewrite/inspect-narration` 查非旁白杂质，删留由人决定。人确认：`POST /episodes/{e}/script/confirm`。
+2. **资产**：`POST /episodes/{e}/extract` ×3 → `POST /episodes/{e}/asset-review/run` 对清单补缺 → 需要精确/美化时走 `POST /asset-pipeline/runs` + `approve`（每次 `revise` 再花一轮预算）。每进下一阶段前读 `GET /episodes/{e}/gates`。
+3. **旁白骨架**：`POST /episodes/{e}/narration-skeleton/generate`（返回整份骨架 + `task_id`）→ 用 `PUT /episodes/{e}/narration-skeleton {validate_only:true}` dry-run 调边界 → 人工 `POST .../narration-skeleton/confirm`。
+4. **配音先行**：先确保本集 `narration_enabled=true`（`PUT /episodes/{e} {"narration_enabled":true}`，否则 voice-batch 抛「本集未开启旁白，无法生成配音」）→ `GET /episodes/{e}/tts-options` 取 `current` 全量作基线 → `POST /episodes/{e}/narration/voice-batch/preview` → `POST /episodes/{e}/narration/voice-batch`（真入批时返回 `task_id`）→ `GET .../voice-batch-status`。**实测时长在这里产生**，后面的设计卡门禁、video_prompt 时间段、合成时长都依赖它。
+5. **设计卡**：可选先 `POST /episodes/{e}/work-estimate {"stage":"design_card"}` 看计划字数/ETA/`blocked_units` → `POST /episodes/{e}/design-cards/fill` → `GET .../design-cards/status` → `GET .../design-cards/audit` 逐镜读 issue/`unresolved_layers` → 人工逐镜 `POST /storyboards/{s}/design-card/confirm`。**没有当前有效配音的镜一个都不会进批次**（`services/design-card-batch.ts:83-99`），所以第 4 步不能后置。
+6. **图层段**：`POST /layer-segments/storyboards/{s}/draft` → `PUT /layer-segments/storyboards/{s}`（`layer_doc`/`duration`/`base_ref`；`timeline.fps` 是派生值，传了不生效）→ `POST .../render` → 打开 `thumbnail/{which}` 与 `junction` 实际查看。
+7. **关键帧**：`POST /episodes/{e}/generate-keyframe-prompts` → `POST /episodes/{e}/keyframe-batch/preview` → `POST /episodes/{e}/keyframe-batch` → 逐张打开检查 → 人工逐镜 `POST /storyboards/{s}/confirm-keyframes {"confirmed":true}`（确认会快照 junction hash，图层重渲后自动作废）。
+8. **视频 Prompt → 视频**：时长稳定后才 `POST /episodes/{e}/generate-video-prompts`（与 voice-batch **不得并发**），读回核对 `duration`/`mid_frame_time`/末段终点；再 `POST /episodes/{e}/video-batch/preview` → `POST /episodes/{e}/video-batch`（preview 与启动用完全相同的 ids/config/model）。
+9. **合成 → 导出**：`POST /episodes/{e}/compose-batch/preview` → `POST /episodes/{e}/compose-batch {"storyboard_ids":[...]}` → 轮询 `compose-batch-status` → 逐镜 `exportable:true` 后 `POST /merge/episodes/{e}/merge`（显式 ids；Poster 片头可选）。下载真实字节做解码/字幕/音频检查，不以状态代替媒体验收。
+10. **贯穿**：要看某阶段真的调了什么模型、发了什么 prompt，拿该阶段的任务 ID 去 `GET /tasks/{id}/observations`（#86/#87，代码已上线，生产验收前按 `[S]` 对待）。骨架 `generate`、配音 `voice-batch` 的发起响应**直接带 `task_id`**；**设计卡 `fill` 与 `design-cards/status` 都没有 `task_id`**，要用投单前后两次 `GET /tasks/center?episode_id={e}&type=text&page_size=200` 的差集按 `kind="design_card"` 认领本次任务——取不到 ID 不等于任务失败，不要据此中止（会白费一次已授权生成）。
+
+**剧情片（`project_type=drama`）** 走另一条链，不要套纪录片的骨架/设计卡/图层段端点：`PUT /episodes/{e} {"content":...}` → `POST /agent/script_rewriter/chat` → `POST /episodes/{e}/extract` ×3 + `POST /episodes/{e}/assets/link` → `POST /agent/storyboard_breaker/chat`（覆盖式，先快照分镜）→ 之后与上面共用：旁白写作/配音实测（第 4 步）→ 关键帧提示词与批次 → 人工 `confirm-keyframes` → video_prompt 校准 → video-batch → compose-batch → merge。**配音/实测时长仍必须在视频 Prompt 与关键帧确认之前**；`narration-skeleton*`、`design-cards*`、`layer-segments*` 是纪录片专有，剧情片不适用。
+
+### 6.A 历史证据（不可执行）：2026-11-02 d5/e6 的实际执行顺序
+
+> 下面是当时真实跑过的步骤与结果，**不是今天的操作指引**。已知两处与当前要求冲突：(a) 它把关键帧批次放在旁白/配音之前，导致 video_prompt 末段仍是旧秒数（复核结论见 §3「时序与画面复核缺口」）；(b) 它用 `POST /agent/script_rewriter/chat` 改写，这对纪录片现在直接 400。当前顺序见 §6.0。
+
+1. 〔历史〕`PUT /episodes/{e} {"content":...}` →（人审）→ `POST /agent/script_rewriter/chat`。
+2. 〔历史〕`POST /episodes/{e}/extract {"target":"characters"|"scenes"|"props"}` ×3，轮询 `extract-status`；补关联 `POST /episodes/{e}/assets/link`。
+3. 〔历史〕`POST /agent/storyboard_breaker/chat`（覆盖式，先快照 `GET /episodes/{e}/storyboards`）。
+4. 〔历史〕`POST /episodes/{e}/generate-keyframe-prompts {}` → 轮询。
+5. 〔历史〕`POST /episodes/{e}/keyframe-batch/preview {}` → 取 checked 项组 items → `POST /episodes/{e}/keyframe-batch` → 轮询 `GET /episodes/{e}/keyframe-batch`，逐槽打开检查。
+6. 〔历史〕`PUT /episodes/{e} {"narration_enabled":true}` → `POST /episodes/{e}/generate-narration` → 轮询；单镜重写 `POST /storyboards/{s}/narration/write`；人工修订用 `PUT /storyboards/{s} {"narration_text":...}`。
+7. 〔历史〕`GET /episodes/{e}/tts-options` → 以 `current` 全量 + 人的改动组 settings → `POST /episodes/{e}/narration/voice-batch/preview`（只校验+分类，不落库）→ `POST /episodes/{e}/narration/voice-batch` → 轮询；逐镜重建字幕，必要时保存 narration-fit，并读回实际 duration。
+8. 〔历史〕**时长稳定后才写视频 Prompt。** 从当时文本配置取得 `T`／`TM`，`POST /episodes/{e}/generate-video-prompts {"storyboard_ids":[...],"config_id":T,"model":TM}` → 轮询；重新 GET 分镜，逐镜核对实际 `duration`、`mid_frame_time` 和 video_prompt 最末时间段终点。voice-batch 与该步不得并发（这一轮实际并发了，见复核缺口）。
+9. 〔历史〕**[S] 人工帧闸门。** 对每个已审的当前镜头单独 `POST /storyboards/{s}/confirm-keyframes {"confirmed":true}`；先 GET 分镜核对首／中／尾的当前有效版本和承接关系，绝不以 batch ready 代替确认。
+10. 〔历史〕**[S] 视频批次。** 从当集实际锁定的 video config／model 取得 `C`／`M`（不要沿用文字或图像配置），先 `POST /episodes/{e}/video-batch/preview {"storyboard_ids":[...],"config_id":C,"model":M}`，只选择 `selectable:true` 且在授权范围的 IDs；以**完全相同**的 `storyboard_ids,config_id,model` POST `/episodes/{e}/video-batch`，轮询 GET `/episodes/{e}/video-batch`；它串行执行。下载每个完成片段并实际检查媒体。
+11. 〔历史，结果 [R]〕原视频、旁白、字幕与 fit 稳定后，逐镜读 `compose_state.inputs/status/reason/plan`；`POST /episodes/{e}/compose-batch/preview {"storyboard_ids":[...]}` 只取 `selectable:true`；再 `POST /episodes/{e}/compose-batch {"storyboard_ids":[...]}`，轮询 status，重新 GET 分镜确认每个已选镜 `unchanged,exportable:true`。d5/e6 实测 batch 只接受 `storyboard_ids`、串行完成且无 skipped；单镜返工 `POST /storyboards/{s}/compose {}` 当时未跑（[S]）。下载检查真实轨道、full decode、烧录字幕样帧，并与当前 TTS source 作可复现比对。
+12. 〔历史，结果 [R]〕仅在所有**显式所选**镜头 `exportable:true` 后 POST `/merge/episodes/{e}/merge {"storyboard_ids":[...],"poster_version_id":V,"poster_duration":D}`。检查 400 `blocked[]`、轮询至 terminal、下载 `merged_url` 与 history。d5/e6 得到 `poster_duration:2`、3 个 composed sources、`skipped:[]` 的 merge 21；实际 Poster 是 51 帧/2.04 s，说明参数值不是帧精确时长承诺。不要把接受响应、空 `skipped` 或整数 `duration` 当作媒体验收。
+
+### 6.B 历史证据（不可执行）：2026-11-02 的带文字 Poster 做法
+
+> **当前不要照做**：Poster 已改 `layer_doc` + 服务端渲染（api-catalog §4）。下列第 2、4 步依赖的 `layout` 字段与「本地渲染 PNG → `/upload/image` → `POST /poster/versions {image}`」路径都已不存在。
+
+1. 〔历史〕`GET /episodes/{e}/poster` 取 variables/aspect_ratio/size。
+2. 〔历史，字段已废〕`PUT /episodes/{e}/poster {"prompt":"...","reference_images":["static/assets/..."],"layout":{"texts":[{"id":"t1","kind":"project_title",...},{"id":"t2","kind":"text","text":"为什么木炭燃烧需要氧气",...}]}}`（当时接受 `layout`；此示例不代表文字内容已获人审）。
+3. 〔历史〕`POST /episodes/{e}/poster/generate {"mode":"initial"}` → 轮询任务；完成后 `GET /episodes/{e}/poster` 看 generated 版本并下载／查看图像（不等于人审通过）。
+4. 〔历史，路径已废〕选生成版用 `PUT /episodes/{e}/poster/select {"version_id":V}`（这一步今天仍有效）；当时若要精确文字排版，是本地按 `layout`／`variables` 渲染 PNG → `POST /upload/image` → `POST /episodes/{e}/poster/versions {"image":...,"layout":{...}}`。**现在改为 `POST /episodes/{e}/poster/versions {"layer_doc":{...}}`，由服务端渲染并登记。**
+5. 〔历史，结果 [R]〕拼接带片头：`POST /merge/episodes/{id}/merge {"storyboard_ids":[...],"poster_version_id":V,"poster_duration":2}`；V 必须属于该集且图片存在，时长单位是秒并钳 0.5–10。d5/e6 的 Poster 9 (1344×768) 以 2 秒片头写入该集 960×544 成片，样帧中文字未被裁切；这只验证该实例，仍须每次打开所生成片头。
 
 ### 安全吞吐
 - 视频服务端按镜串行；批次内镜头不要再单投 `generate-video`。TTS 批量也串行。
@@ -341,7 +379,7 @@ Body `{version_id:number}`。同步 episodes.thumbnail。返回 bundle；实测�
 - 预览与启动保持相同 model/config_id/storyboard_ids 口径。
 
 ## 7. 已知 UI/API 差距（未虚构补齐）
-- Poster 排版化合成图（画布拖拽效果）无纯 API 渲染端点：只能选 generated 版本、或授权脚本产图后经 `/upload/image` + `POST /poster/versions` 登记。
+- ~~Poster 排版化合成图无纯 API 渲染端点~~ **该差距已消除**：`POST /episodes/{e}/poster/versions {"layer_doc":{...}}`（省略则用工程里已存的 `layer_doc`）由服务端渲染合成图、登记 `composite` 版本、自动设为最终版并同步 `episodes.thumbnail`（`services/posters.ts:655-697`）。不再需要浏览器 canvas，也不再需要脚本产图 + `/upload/image` + 传 `image`。文字层经 `PUT /episodes/{e}/poster {"layer_doc":...}` 或 `POST /poster/concept/apply-layer-plan` 写入，均为纯 API。完整当前契约见 `references/api-catalog.md` §4；本文件 §4/§6.B 的 `layout` + 上传做法只是历史记录。
 - `/tasks/{id}/cancel` 仅支持 qwen-jobs 图片任务；文本/视频任务不可取消。
 - compose 批量没有取消端点；merge 也没有取消端点。merge 进行中只能等完，之后才可删除记录。
 - 当前 API/status 没有返回“烧录字幕可读、音频可听清、视频内容正确”的自动判定；必须下载真实 composed/merged bytes 做解码、画面/字幕和音频检查，不能把 `exportable` 当内容 QA。含 Poster 的 merge 应逐段比较最终 AAC 与每个 composed AAC，并以 AAC packet/priming 允许的**子样本**延迟寻优，不能使用粗粒度 1 ms 网格误判缺音：d5/e6 merge 21 的 119 实际起播 `2.0266667 s`（95 AAC frames），native→final `0.99952`、TTS→final `0.99855`、100 ms speech windows ≥`0.993`、envelope `0.99975`、尾部 −132 dBFS，raw-H3 `0.019`；120/121 分别为 `0.99948/0.99933`。独立复核据此确认三个 replace narration 段保留完整、无 H3 泄漏；仍不等同人类听感或艺术批准。

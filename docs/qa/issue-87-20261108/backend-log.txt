@@ -1,0 +1,75 @@
+17:02:00 [ScriptRewrite] START run | runId=4 taskId=1268 episodeId=17 stages=["fidelity","bridge"]
+17:04:45 [AssetReview] START run | episodeId=17 segments=6 model=deepseek-flash
+17:04:45 [AssetReviewAPI] START run | episodeId=17 taskId=1278
+17:04:53 [AssetReview] segment | episodeId=17 segmentNo=1 items=4
+17:04:58 [AssetReview] segment | episodeId=17 segmentNo=2 items=7
+17:05:08 [AssetReview] segment | episodeId=17 segmentNo=3 items=13
+17:05:12 [AssetReview] segment | episodeId=17 segmentNo=4 items=17
+17:05:19 [AssetReview] segment | episodeId=17 segmentNo=5 items=21
+17:05:28 [AssetReview] segment | episodeId=17 segmentNo=6 items=25
+17:05:28 [AssetReview] DONE run | episodeId=17 kept=0 added=25 removed=0 changed_item_ids=[310,311,312,313,314,315,316,317,318,319,320,321,322,323,324,325,326,327,328,329,330,331,332,333,334] failed=0
+17:07:06 [Extract] START props | episodeId=17 dramaId=11
+17:07:06 [Extract] START props | episodeId=17 dramaId=11
+17:07:28 [ExtractTool] DONE read-script | episodeId=17 dramaId=11 scriptLength=282
+17:07:28 [ExtractTool] DONE read-props | episodeId=17 dramaId=11 projectProps=9 episodeProps=9
+17:07:28 [Extract] props-step | episodeId=17 tools=readScriptForExtraction,readExistingProps text=我先读取本集剧本与项目已有道具，确认这件道具的上下文与去重情况。
+17:08:05 [ExtractTool] save-props-begin | episodeId=17 dramaId=11 names=蒙古诸部南下侵扰的说明性画面
+17:08:05 [ExtractTool] DONE save-props-complete | episodeId=17 created=0 merged=1
+17:08:05 [Extract] props-step | episodeId=17 tools=saveDedupProps text=已读取剧本与已有道具。确认情况：
+17:08:13 [Extract] props-step | episodeId=17 text=已完成「蒙古诸部南下侵扰的说明性画面」的重新提取与保存，未处理其它道具。结果如下：
+17:08:13 [Extract] DONE props | episodeId=17 steps=3 toolCalls=readScriptForExtraction,readExistingProps,saveDedupProps reply=我先读取本集剧本与项目已有道具，确认这件道具的上下文与去重情况。已读取剧本与已有道具。确认情况：
+17:08:20 [ExtractTool] DONE read-script | episodeId=17 dramaId=11 scriptLength=282
+17:08:20 [ExtractTool] DONE read-props | episodeId=17 dramaId=11 projectProps=9 episodeProps=9
+17:08:20 [Extract] props-step | episodeId=17 tools=readScriptForExtraction,readExistingProps
+17:09:09 [ExtractTool] save-props-begin | episodeId=17 dramaId=11 names=明军少量守军据关列阵防守的说明性画面
+17:09:09 [ExtractTool] DONE save-props-complete | episodeId=17 created=1 merged=0
+17:09:09 [Extract] props-step | episodeId=17 tools=saveDedupProps text=本集剧本已读取，目标道具对应的剧本依据是【要害】段：
+17:09:18 [Extract] props-step | episodeId=17 text=已完成目标道具的重提取与保存，未触及其它道具。
+17:09:18 [Extract] DONE props | episodeId=17 steps=3 toolCalls=readScriptForExtraction,readExistingProps,saveDedupProps reply=本集剧本已读取，目标道具对应的剧本依据是【要害】段：
+19:16:41 [NarrationSkeleton] START generate | episodeId=17 taskId=1281
+19:16:42 [StoryboardTool] DONE read-context | episodeId=17 dramaId=11 characters=0 scenes=10 props=10 expositionAssets=2 existingStoryboards=0 scriptLength=282
+19:16:45 [StoryboardTool] save-begin | episodeId=17 dramaId=11 replaceExisting=true count=10 shotNumbers=1,2,3,4,5,6,7,8,9,10
+19:16:45 [StoryboardTool] DONE save-complete | episodeId=17 count=9 totalDuration=0
+19:16:48 [StoryboardTool] save-begin | episodeId=17 dramaId=11 replaceExisting=true count=6 shotNumbers=1,2,3,4,5,6
+19:16:48 [StoryboardTool] DONE save-complete | episodeId=17 count=6 totalDuration=0
+19:16:51 [FillGaps] DONE renumber | episodeId=17 changed=4 reconfirm=0
+19:16:51 [NarrationSkeleton] ERROR generate | episodeId=17 taskId=1281 error=旁白骨架不合法：第 6 镜 的旁白在剧本里出现在前一镜之前：骨架必须按剧本顺序排列；第 7 镜 的旁白为空：纪录片每一镜都必须承载一段旁白；第 9 镜 的旁白为空：纪录片每一镜都必须承载一段旁白。分镜已保留，请在「旁白骨架」里调整边界或重新生成。
+19:20:02 [FillGaps] DONE renumber | episodeId=17 changed=1 reconfirm=0
+19:20:36 [Narration] START voice-batch | episodeId=17 total=6 voice=纪录片·沉稳男声
+19:20:36 [Narration] START voice | storyboardId=517 episodeId=17 chars=42
+19:20:41 [Narration] START voice | storyboardId=518 episodeId=17 chars=23
+19:20:43 [Narration] START voice | storyboardId=519 episodeId=17 chars=65
+19:20:51 [Narration] START voice | storyboardId=520 episodeId=17 chars=37
+19:20:56 [Narration] START voice | storyboardId=521 episodeId=17 chars=38
+19:21:01 [Narration] START voice | storyboardId=522 episodeId=17 chars=42
+19:21:06 [Narration] DONE voice-batch | episodeId=17 completed=6 failed=0
+19:23:46 [DesignCardAPI] ERROR fill-model-unavailable | episodeId=17 error=model_pin_unavailable configId=10 reason=suspended
+19:23:46 [DesignCard] START batch | episodeId=17 dramaId=11 total=1
+19:23:46 [DesignCard] batch-shot | episodeId=17 storyboardId=522 index=1 total=1
+19:23:48 [StoryboardTool] DONE read-context | episodeId=17 dramaId=11 characters=0 scenes=10 props=10 expositionAssets=2 existingStoryboards=6 scriptLength=282
+19:24:46 [StoryboardTool] update-begin | episodeId=17 storyboardId=522 fields=["design_card"]
+19:24:50 [StoryboardTool] update-begin | episodeId=17 storyboardId=522 fields=["design_card"]
+19:24:50 [StoryboardTool] DONE update-complete | episodeId=17 storyboardId=522 updatedFields=["updatedAt","designCard","designCardStatus","designCardConfirmedAt","designCardStaleReason","combo","fieldSavedAt"]
+19:24:52 [DesignCard] DONE batch | episodeId=17 total=1 completed=1 failed=0
+19:26:33 [DesignCard] START batch | episodeId=17 dramaId=11 total=1
+19:26:33 [DesignCard] batch-shot | episodeId=17 storyboardId=517 index=1 total=1
+19:26:35 [StoryboardTool] DONE read-context | episodeId=17 dramaId=11 characters=0 scenes=10 props=10 expositionAssets=2 existingStoryboards=6 scriptLength=282
+19:27:36 [DesignCard] START batch | episodeId=17 dramaId=11 total=4
+19:27:36 [DesignCard] batch-shot | episodeId=17 storyboardId=518 index=1 total=4
+19:27:37 [StoryboardTool] DONE read-context | episodeId=17 dramaId=11 characters=0 scenes=10 props=10 expositionAssets=2 existingStoryboards=6 scriptLength=282
+19:29:16 [StoryboardTool] update-begin | episodeId=17 storyboardId=518 fields=["design_card"]
+19:29:16 [StoryboardTool] DONE update-complete | episodeId=17 storyboardId=518 updatedFields=["updatedAt","designCard","designCardStatus","designCardConfirmedAt","designCardStaleReason","combo","fieldSavedAt"]
+19:29:18 [DesignCard] batch-shot | episodeId=17 storyboardId=519 index=2 total=4
+19:29:19 [StoryboardTool] DONE read-context | episodeId=17 dramaId=11 characters=0 scenes=10 props=10 expositionAssets=2 existingStoryboards=6 scriptLength=282
+19:32:14 [StoryboardTool] update-begin | episodeId=17 storyboardId=519 fields=["design_card"]
+19:32:14 [StoryboardTool] DONE update-complete | episodeId=17 storyboardId=519 updatedFields=["updatedAt","designCard","designCardStatus","designCardConfirmedAt","designCardStaleReason","combo","fieldSavedAt"]
+19:32:19 [DesignCard] batch-shot | episodeId=17 storyboardId=520 index=3 total=4
+19:32:20 [StoryboardTool] DONE read-context | episodeId=17 dramaId=11 characters=0 scenes=10 props=10 expositionAssets=2 existingStoryboards=6 scriptLength=282
+19:32:50 [StoryboardTool] update-begin | episodeId=17 storyboardId=520 fields=["design_card"]
+19:32:50 [StoryboardTool] DONE update-complete | episodeId=17 storyboardId=520 updatedFields=["updatedAt","designCard","designCardStatus","designCardConfirmedAt","designCardStaleReason","combo","fieldSavedAt"]
+19:32:52 [DesignCard] batch-shot | episodeId=17 storyboardId=521 index=4 total=4
+19:32:53 [StoryboardTool] DONE read-context | episodeId=17 dramaId=11 characters=0 scenes=10 props=10 expositionAssets=2 existingStoryboards=6 scriptLength=282
+19:33:51 [StoryboardTool] update-begin | episodeId=17 storyboardId=521 fields=["design_card"]
+19:33:51 [StoryboardTool] DONE update-complete | episodeId=17 storyboardId=521 updatedFields=["updatedAt","designCard","designCardStatus","designCardConfirmedAt","designCardStaleReason","combo","fieldSavedAt"]
+19:33:54 [DesignCard] DONE batch | episodeId=17 total=4 completed=4 failed=0
+

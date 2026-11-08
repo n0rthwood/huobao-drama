@@ -7,7 +7,10 @@
 - `SKILL.md`：主技能文档（流程阶段、调用顺序、禁止事项、证据要求）。
 - `references/api-catalog.md`：API 清单与证据规范。
 - `references/api-core.md`：核心接口（项目/集/资产/配置/任务）细节与安全约束。
-- `references/api-production.md`：生产链路（生图、分镜、生视频、导出）接口细节。
+- `references/api-production.md`：2026-11-02 生产链路历史快照；已作废的操作不能当现行配方，当前契约以 `api-catalog.md` 为准。
+- `references/diagnostic-example.md`：历史五镜诊断片与助手误填案例；保留原始证据及作废流程警告。
+- `references/anti-patterns.md`：强制反模式对照表，约束力与主文档相同。
+- `references/fixed-case-8daling.md`：固定 224 字案例正文、出处、授权边界及首轮实测证据。
 
 ## 为什么入库
 
@@ -28,15 +31,16 @@
 ## 同步到全局 managed skill（每次更新后必做）
 
 1. 用 omp 的 `manage_skill` **update**（`name: huobao-director`）写入本目录 `SKILL.md` 的正文（去掉 YAML front matter，`description` 走参数）。
-2. 把本目录 `references/` 全量复制到 `~/.omp/agent/managed-skills/huobao-director/references/`。
-3. 复制后核对两边 `SKILL.md` 正文与 `references/*.md` 内容一致，并确认不含 `api_key`、认证头或带凭据的 URL。
+2. 把本目录 `references/` 与被正文引用的 `reviews/` 全量复制到 managed skill 的同名子目录，保留 #84 未发布标记与其原始评审。
+3. 复制后核对两边 `SKILL.md` 正文与所有辅助文件内容一致，确认无真实凭据值、认证头实值或带真实凭据的 URL；必要字段名与占位符不得删掉。
 4. managed skills 是隔离目录，只动 `huobao-director`，不要触碰用户自建技能。
 
 ## 版本记录
 
 | 日期 | 对应 Issue | 技能变更 |
 |---|---|---|
-| 2026-11-08 | #86 / #87（待生产验收） | 全应用嵌套界面与弹窗 deeplink；纪录片设计依赖真实资产与语义；自动/显式视觉模型选择；骨架、配音、设计卡持久调用与字数/耗时/ETA；任务中心公开对话按需分页。全局历史补齐另见 #88。 |
+| 2026-11-08 | #86 / #87（生产 release `20261108T204444Z`） | 全应用嵌套界面与弹窗 deeplink；设计依赖真实资产与语义；自动/显式视觉模型选择；骨架、配音、设计卡持久调用与字数/耗时/ETA；任务中心公开对话按需分页。drama 11 / episode 17 已真实执行 65 次调用、分页读全 727 条公开消息，保留骨架失败与在飞重启中断；卡片待人工审核，不冒充全部内容通过。全局其他调用另见 #88。 |
+| 2026-11-08 | #84（仅保留待发布文档） | 保留已评审分支 `1eb48cb` 的地图技能、API 与评审，所有新增地图契约仍为 `[S]`，代码未合并/未发布；避免本次同步覆盖并行工作。 |
 | 2026-11-08（晚） | #85 续：八达岭 1008 首次生产验收 | 契约快照升至 `5d08b18`；#80/#81/#82 本轮实际调用的端点/字段由 `[S]` 改 `[R]`（drama 10 / episode 16 / merge 27，证据 `docs/qa/8daling-1008-20261108T061008Z/`），未调用的保持 `[S]`；更正纪录片改写入口为 `POST /episodes/{e}/script-rewrite`（旧 agent 入口对纪录片 400）并补全 rewrite 流水线端点；更正 merge 路径为 `/merge/episodes/{e}/merge(s)`（漏前缀会得到 200+HTML）；骨架字段更正为 `storyboard_number` 并补三种缺口处置；更正「虚构语义」失败语义（不写 `design_card_stale_reason`）；§4.6 追加「首次执行结果（2026-11-08）」 |
 | 2026-11-08 | #85（随 #80/#81/#82 发布 `20261108T055548Z`） | 新增 `POST /episodes/{e}/script-rewrite/inspect-narration` 与 `fidelity.v2` 剔除清单（#80）；旁白骨架 `validate_only` dry-run、缺口处置与 `tts.audio_url/audio_version`（#81）；设计卡 AI 填 `combo`、combo-only 补选、audit 的 `tts.duration_ms`/`unresolved_layers`/`video_generated` 与可读 `issues[].message`（#82）；修订「AI 绝不选 combo」旧口径；新增 §4.6「八达岭长城测试 1008」生产验收案例（含固定 224 字原始内容与故意保留的出处行） |
 | 2026-11-07 | #83 | 技能首次入库（从本机全局 managed skills 复制），建立同步规则 |

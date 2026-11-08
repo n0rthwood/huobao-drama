@@ -1,0 +1,109 @@
+{
+  "backend": {
+    "baseline": {
+      "counts": [
+        "# tests 556",
+        "# pass 546",
+        "# fail 10"
+      ],
+      "failures": [
+        "characters route supports manual create and soft delete",
+        "scenes route links new scenes to episode and soft deletes",
+        "props route supports manual create and soft delete",
+        "characters and scenes tables store the agent-written final prompt",
+        "prompt agent instructions reference per-asset skills; skill files define the specs",
+        "backend removes TTS endpoints and audio-specific schema fields",
+        "MiniMax image and video provider surfaces are removed",
+        "MySQL startup removes all saved MiniMax configurations including audio",
+        "image/video generation tasks are unified into a single sys_task table",
+        "prompt_generator video prompt format uses @name references instead of XML tags"
+      ]
+    },
+    "final": {
+      "counts": [
+        "# tests 594",
+        "# pass 584",
+        "# fail 10"
+      ],
+      "failures": [
+        "characters route supports manual create and soft delete",
+        "scenes route links new scenes to episode and soft deletes",
+        "props route supports manual create and soft delete",
+        "characters and scenes tables store the agent-written final prompt",
+        "prompt agent instructions reference per-asset skills; skill files define the specs",
+        "backend removes TTS endpoints and audio-specific schema fields",
+        "MiniMax image and video provider surfaces are removed",
+        "MySQL startup removes all saved MiniMax configurations including audio",
+        "image/video generation tasks are unified into a single sys_task table",
+        "prompt_generator video prompt format uses @name references instead of XML tags"
+      ]
+    },
+    "added": [],
+    "removed": []
+  },
+  "frontend": {
+    "baseline": {
+      "counts": [
+        "# tests 67",
+        "# pass 49",
+        "# fail 18"
+      ],
+      "failures": [
+        "tests/apple-light-theme-structure.test.mjs",
+        "episode card exposes a delete action",
+        "drama detail header links to the asset library page",
+        "episode status is manually marked, not derived from script content",
+        "asset library page lists character and scene images",
+        "tests/button-system-structure.test.mjs",
+        "add episode dialog asks for a title and a fixed video resolution",
+        "addEpisode posts drama_id, title and resolution",
+        "episode card resolution is editable via a dropdown persisted to episodes.resolution",
+        "add episode dialog does not preload config lists",
+        "tests/model-selection-structure.test.mjs",
+        "settings page exposes official provider templates only",
+        "settings page offers official default model IDs",
+        "tests/professional-redesign-surface.test.mjs",
+        "tests/remove-audio-voice-structure.test.mjs",
+        "tests/remove-grid-feature-structure.test.mjs",
+        "project creation dialog only asks for title and visual style",
+        "settings page manages style presets in a base tab"
+      ]
+    },
+    "final": {
+      "counts": [
+        "# tests 68",
+        "# pass 50",
+        "# fail 18"
+      ],
+      "failures": [
+        "tests/apple-light-theme-structure.test.mjs",
+        "episode card exposes a delete action",
+        "drama detail header links to the asset library page",
+        "episode status is manually marked, not derived from script content",
+        "asset library page lists character and scene images",
+        "tests/button-system-structure.test.mjs",
+        "add episode dialog asks for a title and a fixed video resolution",
+        "addEpisode posts drama_id, title and resolution",
+        "episode card resolution is editable via a dropdown persisted to episodes.resolution",
+        "add episode dialog does not preload config lists",
+        "tests/model-selection-structure.test.mjs",
+        "settings page exposes official provider templates only",
+        "settings page offers official default model IDs",
+        "tests/professional-redesign-surface.test.mjs",
+        "tests/remove-audio-voice-structure.test.mjs",
+        "tests/remove-grid-feature-structure.test.mjs",
+        "project creation dialog only asks for title and visual style",
+        "settings page manages style presets in a base tab"
+      ]
+    },
+    "added": [],
+    "removed": [],
+    "added_failures": [],
+    "removed_failures": []
+  },
+  "typecheck": "passed",
+  "focused_backend": "38/38 before final TTS correction; capture10/10 after correction",
+  "mounted_ui": "16/16",
+  "production_generate": "passed",
+  "test_cases_deleted": 0
+}

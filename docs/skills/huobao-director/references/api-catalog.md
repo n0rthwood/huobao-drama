@@ -2,8 +2,9 @@
 
 所有路径都相对 `HUOBAO_API = {HUOBAO_BASE}api/v1/`（默认 `http://172.30.3.164/huobao/api/v1/`，以会话配置为准）。
 拼接时**去掉路径开头的 `/`** 再拼；用 `urljoin` 会把 `/huobao/api/v1` 前缀丢掉，打到 SPA。
-标注：`[R]` = 真实跑通（2026-11-05 殷墟五镜诊断片，和/或 2026-11-08 八达岭长城测试 1008 生产验收 drama 10 / episode 16 / merge 27）；`[S]` = 仅源码核对，未在这两轮运行；`[S/R]` = 部分实测或只跑通读路径，写入前先用 GET/preview 校验。
-本目录对齐 `origin/master` `5d08b18`（含 Issue #80/#81/#82）；八达岭轮**实际调用过的**端点与字段标 `[R]`（证据见 `docs/qa/8daling-1008-20261108T061008Z/`），本轮未调用的仍保持 `[S]`（如 `script-rewrite/final`、`versions/{id}/adopt`、`runs/{id}/manual`、各 `unconfirm`、`DELETE` 类）。
+标注：`[R]` = 对应请求/行为真实运行；历史案例见 references，本轮为 drama 11 / episode 17（八达岭长城测试 1008-2）。`[S]` = 仅源码/实现自测；`[S/R]` = 部分实测。不能把相邻实测扩成全分支验证。
+**源码快照**：功能代码至 `3eec6f7`，main `c6bf2ab`，release `20261108T204444Z`；早期 #80–#82 证据仍保留。
+**本轮证据**：`docs/qa/issue-87-20261108/`。公开观测/消息分页、三阶段预估、auto 与暂停 pin 错误已在生产调用；未触发的错误原因/写分支保持 `[S]`。#84 的新地图 API 仍未发布、全 `[S]`；#88 仍开放。
 
 ## 0. 通用约定
 
@@ -36,21 +37,36 @@
 ### `GET /tasks/{id}` [R]
 用途：单任务详情、失败原因、`params`、`remote_state`、`elapsed_ms`、`cancellable`。
 
-### `GET /tasks/{id}/observations?work_id=&cursor=&limit=` [S]（Issue #87，生产验收前）
-用途：回看任务的持久工作项与实际模型调用。`cursor` 是上一页最后一个调用的 `id`，不是分镜序号；`work_id` 可缩小到某个工作项，`limit` 默认 50、限制 1–200。
-返回 `{task_id, works[], calls[], messages[], message_limit, messages_complete, limit, next_cursor, has_more}`。`works` 含 `stage/source_chars/sample_key/storyboard_id/started_at/finished_at/status/model_ms/queue_ms/work_ms`；`calls` 含实际 `config_id/provider/model/kind/status/http_status/started_at/finished_at/duration_ms/queue_ms/request_chars/response_chars/prompt_tokens/completion_tokens/message_count`。时间点是 epoch 毫秒、时长是毫秒；缺失的 usage 不编造。默认轻量列表；只有显式 `with_messages=1` 才附每次调用前 `message_limit` 条公开消息（默认 20 / 最大 200），不截断单条正文。任务窗口列表轮询不预取全文，展开调用后按需读消息。
-沿 `next_cursor` 翻页到末尾，不把第一页当完整历史。在飞调用/正文可以原 ID 增量更新，活动视图还须刷新已加载在飞行，不能只读取大于末尾 ID 的新行。旧任务没有观测记录不代表它没调用模型，不能回填伪造历史。
+### `GET /tasks/{id}/observations?work_id=&cursor=&limit=&with_messages=&message_limit=` [R]（tasks 1281–1285；65 条调用完整分页）
+用途：回看任务的持久工作项与实际模型调用。`cursor` 是上一页最后一个调用的 `id`，不是分镜序号；`work_id` 可缩小到某个工作项，`limit` 默认 50、钳 1–200；任务不存在时返回 400（不是 404）。
+返回恒定形状 `{task_id, works[], calls[], messages[], message_limit, messages_complete, limit, next_cursor, has_more}`：`messages`/`message_limit`/`messages_complete` **在轻量模式下也始终存在**，分别是 `[]`、`0`、`false`，不要把 `messages_complete:false` 读成「正文被截断」，轻量模式本来就没取正文（`backend/src/routes/tasks.ts:298-325`）。
+- `with_messages=1`（严格等于字符串 `1`，`true` 不生效）才附消息；此时 `message_limit` 默认 20、钳 1–200，是**每条调用**取前 N 条；`messages_complete=true` 仅当本页每条调用的 `message_count ≤ message_limit`。
+- `works[]` 每行：`id/task_id/stage/source_chars/sample_key/storyboard_id/storyboard_number/started_at/finished_at/status/model_ms/queue_ms/work_ms/call_count/heartbeat_at/error_msg/created_at/active_call_started_at/active_call_heartbeat_at`。`stage ∈ skeleton|voice|design_card`，`status ∈ processing|completed|failed|interrupted`。
+- `calls[]` 每行：`id/work_id/task_id/kind/config_id/config_name/provider/model/url/stream/status/http_status/queued_at/started_at/finished_at/duration_ms/queue_ms/request_chars/response_chars/prompt_tokens/completion_tokens/finish_reason/error_msg/heartbeat_at/created_at`，外加接口计算的 `message_count`。`kind ∈ llm|vision_chat|tts`（配音记的是真实 TTS 请求，不冒称 LLM 对话）。
+- 时间点是 epoch 毫秒、时长是毫秒；`prompt_tokens`/`completion_tokens` 允许为 null，缺失的 usage 不编造。
+任务窗口列表轮询用轻量模式，展开某条调用后再按需读消息。沿 `next_cursor` 翻页到末尾（`has_more` 为真即继续），不把第一页当完整历史。在飞调用/正文可以原 ID 增量更新，活动视图还须刷新已加载在飞行，不能只读取大于末尾 ID 的新行。旧任务没有观测记录不代表它没调用模型，不能回填伪造历史。
 
-### `GET /tasks/{id}/observations/calls/{callId}/messages?cursor=&limit=` [S]（Issue #87，生产验收前）
-用途：读取该真实调用的完整公开输入输出，含注入的 system/SKILL、工具定义、assistant 正文、工具参数与结果；不是索取模型隐藏思维。`cursor` 是上一页最后一个消息 `id`，`limit` 默认 40、限制 1–200；调用不属于该任务时 400。
-返回 `{task_id, call_id, call, total, messages[], limit, next_cursor, has_more}`；`call` 是该调用的元数据。消息包含 `phase/role/name/tool_call_id/body/chars/streaming/created_at`，正文按纯文本查看，分页不截断正文。图片/二进制是明确占位或安全资源引用，凭据在落盘前脱敏。失败前已收到的公开内容也保留；在飞正文由服务端分块持久化，重启后只显示已真实落盘的部分。
-案例背景：用户无法从最终输出或 console 判定分镜设计在做什么，也无法审查实际 prompt/SKILL；因此 #87 先接骨架、设计卡及相关视觉子调用，配音记录真实 TTS 请求/结果与耗时，不冒称 LLM 对话。全局其他调用的逐项补齐在 #88，不因本接口存在就声称全局覆盖。
+### `GET /tasks/{id}/observations/calls/{callId}/messages?cursor=&limit=` [R]（727 条公开消息读全，含跨任务 400）
+用途：读取该真实调用的完整公开输入输出，含注入的 system/SKILL、工具定义、assistant 正文、工具参数与结果；不是索取模型隐藏思维。`cursor` 是上一页最后一个消息 `id`，`limit` 默认 40、钳 1–200。
+错误：调用不存在，**或该调用的 `task_id` 不等于路径里的任务**，都返回 400「调用记录不存在」——跨任务取 callId 不会越权读到别人的正文（`backend/src/routes/tasks.ts:328-347`）。
+返回 `{task_id, call_id, call, total, messages[], limit, next_cursor, has_more}`；`call` 就是上面 `calls[]` 的同一行调用元数据（含 `config_id/config_name/provider/model/url/kind/status/http_status/duration_ms/queue_ms/request_chars/response_chars/finish_reason/error_msg`，但这里**不含** `message_count`，条数看 `total`）。
+`messages[]` 每条：`id/call_id/work_id/task_id/seq/phase/role/name/tool_call_id/body/chars/streaming/created_at`。`id` 是游标键（按它翻页，不要用 `seq`）；`phase ∈ request|response|final`；`role` 取 `system|user|assistant|tool|tool_call|tool_result|tool_definitions|request_params|request|result|error|raw_response`。正文按纯文本查看，分页不截断正文。图片/二进制是明确占位或安全资源引用，凭据在落盘前脱敏。失败前已收到的公开内容也保留；在飞正文由服务端分块持久化，重启后只显示已真实落盘的部分。
+案例背景：用户无法从最终输出或 console 判定分镜设计在做什么，也无法审查实际 prompt/SKILL；因此 #87 先接骨架、设计卡及相关视觉子调用，配音记录真实 TTS 请求/结果与耗时。全局其他调用的逐项补齐仍在 **#88（未关闭）**，不因本接口存在就声称全局覆盖。
+本轮 TTS 旧记录有完整请求正文，但早期调用级 request_chars 漏计；读取时只从已存请求 chars 合计恢复，不回写旧记录，也不从当前配置伪造历史 provider/name。新调用正常累计并冻结实际配置元数据；未知旧名称在 UI 用配置 ID 表示，不写“默认模型”。
 
-### `POST /episodes/{id}/work-estimate` [S]（Issue #87，生产验收前）
-只读预估，不创建生成任务、不调用 LLM 或 TTS 合成。请求体：`{stage:'skeleton'|'voice'|'design_card',storyboard_ids?:number[],model_mode?:'auto'|'pinned',config_id?:number,model?:string,settings?:object}`。
-- 骨架与设计卡按本次模型选择预估：`auto` 忽略旧顶栏 config/model；`pinned` 校验明确指定的配置与模型，不可用时返回同生成入口的结构化 400，不偷换计费服务。
-- 配音使用当前待提交的 `settings`（voice、inference_timesteps、cfg_value、seed、instructions、normalize），不是只看已保存默认；单镜传该镜 id。`storyboard_ids:[]` 是显式空选，不能扩大为整集。
-- 返回 `{estimate,observation_summary}`：前者是当前待提交计划与同组历史 ETA，后者保留上一任务的真实进展/耗时，二者不能互相替代。`blocked_units` 只算所请求范围内不可执行的镜头，不把未勾选项算成阻断。
+### `POST /episodes/{id}/work-estimate` [R]（三阶段、显式空选、配音草稿与模型选择）
+只读预估，不创建生成任务、不调用 LLM 或 TTS 合成。请求体：`{stage:'skeleton'|'voice'|'design_card', storyboard_ids?:number[], model_mode?:'auto'|'pinned', config_id?:number, model?:string, settings?:object}`。
+- 本端点确实支持 `model_mode`（`backend/src/services/ai-stages.ts:326-341`）：`auto` 忽略残留 `config_id`/`model`；`pinned` 必须带正整数 `config_id`，否则 400 文案指名要求；不传 `model_mode` 但带 `config_id` 按 `pinned` 处理。选不到模型时返回与生成入口同形状的结构化 400（`error ∈ model_pin_unavailable|vision_config_unavailable|text_config_unavailable`），不偷换计费服务。
+- 配音使用当前待提交的 `settings`（voice、inference_timesteps、cfg_value、seed、instructions、normalize），不是只看已保存默认；单镜传该镜 id。`storyboard_ids:[]` 经过滤后等于显式空选，不能扩大为整集。`stage` 不在三值内 → 400。
+- 返回 `{estimate, observation_summary}`（`backend/src/routes/episodes.ts:540-574`、`services/task-estimate.ts:70-123,272-300`）：
+  - `estimate`：`{stage, unit:'episode'|'shot', sample_key, config_id, model, planned_units, planned_source_chars, estimate_ms, sample_count, basis:'history'|null, blocked_units}`。**本次待提交计划**：骨架 `unit='episode'`（整集一项），配音/设计卡 `unit='shot'`。`planned_source_chars` 是源旁白字数（骨架=整集旁白稿字数），不是提示词字数；ETA 按它缩放。`estimate_ms=null` + `sample_count=0` + `basis=null` 就是「暂无估计」，界面必须照实显示，不得编固定秒数。`blocked_units` 只算所请求范围内被前置门禁挡住的镜头，不把未勾选项算成阻断。
+  - `observation_summary`：最近一次**同阶段**任务的真实计量，没有历史任务时为 `null`。字段 `{task_id, stage, unit, sample_key, task_status, terminal, planned_units, planned_source_chars, completed_units, failed_units, interrupted_units, remaining_units, completed_source_chars, remaining_source_chars, actual_call_ms, actual_queue_ms, queue_wait_known, work_wall_ms, current, rate, eta, eta_unknown_reason, items[], updated_at}`。
+    - `actual_call_ms` 是实际服务调用耗时之和（并发时不是墙钟，也不是音频长度），`work_wall_ms` 是工作项墙钟之和；`queue_wait_known=false` 表示外部供应商队列不可知，不要把 `actual_queue_ms=0` 当成「没排队」。
+    - `current`（进行中那一项）：`{storyboard_id, storyboard_number, source_chars, started_at, elapsed_ms, call_ms, estimate_ms, overrun}`。`overrun=true` = 已超过预计，界面显示「超过预估/更新中」，**不返回 0 倒计时**。
+    - `eta`：`{remaining_ms, finish_at, overrun, basis:'current_batch'|'history', sample_count}`；为 `null` 时必须读 `eta_unknown_reason ∈ no_samples|terminal|not_started` 并照实呈现。`rate`：`{ms_per_char, per_unit_ms, sample_count, basis}`，无字数依据的项才用 `per_unit_ms`。
+    - `items[]`：`{storyboard_id, storyboard_number, source_chars, state:'pending'|'processing'|'completed'|'failed'|'interrupted', call_ms, work_ms}`。
+  - 两者不能互相替代：`estimate` 是「这次要跑什么」，`observation_summary` 是「上一个任务真实跑了什么」；失败/中断样本不进成功样本池，终态任务不再倒计时。
+  - `observation_summary.task_id` 指的是**同阶段最近一次**任务，可直接拿去 `GET /tasks/{id}/observations` 回看上一轮。它**不保证**等于你刚提交的那一次：刚投单后要定位本次任务，用 `GET /tasks/center?episode_id={e}&type=text&page_size=200` 的前后快照差（骨架/配音则直接用发起响应里的 `task_id`）。
 
 
 ### `GET /style-presets` [R]
@@ -89,7 +105,7 @@ Body：任意项目字段，常用 `{documentary_rules:"on"|"off"|"auto"}`、`{s
 ### `POST /episodes` [R]
 Body：`{drama_id, title, resolution, image_config_id, video_config_id, tts_config_id}`
 返回：code 200（不是 201），不要用 201 判定成功。
-`resolution` 是生成档位，不等于最终画布：最终输出按项目 `aspect_ratio` 定尺寸（16:9=960×544），关键帧按画幅定尺寸（16:9=1344×768），两者不要混用。
+`resolution` 是生成档位，不等于最终画布。关键帧尺寸确实按画幅查表（16:9=1344×768，`services/storyboard-keyframes.ts:37-41`）。图层段/成片画布则是**实测优先**：按本集已有的第一条模型视频探测宽高与帧率，只有本集还没有模型视频时才退回画幅内置默认（16:9=960×544、9:16=544×960、1:1=768×768、4:3=960×720，`services/layer-segment.ts:114-119,536-560`）。所以 960×544 是「无视频时的 16:9 兜底值」，也是八达岭那一集实际成片的量得结果，不是全项目恒定尺寸——每集都要自己读 `GET /layer-segments/storyboards/{id}` 的 `spec` 或 ffprobe 实测，不要照抄。
 
 ### `PUT /episodes/{e}` [R]
 Body 常用：
@@ -209,7 +225,7 @@ Body：`{episode_id?, config_id?, model?}`
 ### `PUT /props/{id}/faithful-source` [R]
 Body：`{version_task_id}`；把某个已登记版本标为忠实原件来源。
 ### `POST /upload/image` [R]
-multipart `file`；返回 `{url,path}`。用于本地上传原件（地图、照片、Poster 画布）。
+multipart `file`；返回 `{url,path}`。用于本地上传原件（地图、照片等素材）。**不再用于 Poster**：Poster 合成图由服务端从 `layer_doc` 渲染登记（§4），没有上传画布这一步。§3.84 的 `reference_image` 若该分支上线，也走这条上传路径——但 §3.84 本身未合并、未发布，不要据此认为地图工作流已可用。
 ### `POST /tasks/register-upload` [R]
 Body：`{asset_type:"character"|"scene"|"prop", asset_id, local_path}`
 用途：把上传图片登记为该资产的新版本并设为当前图（`provider='upload'`）。
@@ -266,21 +282,88 @@ Body：`{scope:"all"|"characters"|"scenes"|"props", episode_id?, rewrite_prompts
 ### `POST /dramas/{d}/assets/batch-generate`、`GET` 同路径 [S]
 用途：启动/查看资产批量；同项目同时只允许一个。`rewrite_prompts` 与 `overwrite_images` 是独立操作。
 
+### 3.84 地图资产工作流（S2，Issue #84）[S]
+
+> **来源与状态**：本小节原样取自 Issue #84 分支 `origin/issue/84-map-workflow`（`1eb48cb039e55bcedcdfc2fb5088f4eece837a68`）的已评审文档，**代码未合并、未发布**。这里所有端点与字段一律 `[S]`：仅源码/文档核对，既无本目录两轮运行证据，也**不得假定生产环境已可用**；调用前先确认该分支是否已上线。
+
+**背景**：旧地图面板没有串联检索、底图、风格与可编辑几何，地图生成后甚至可能没有点线语义。本流程以显式类型和持久化阶段解决该问题；扩散仅做底纹，地图几何不由扩散产生。新增端点在生产实测留痕前保持 `[S]`。
+
+#### 类型与持久化
+
+`POST /props {drama_id,name,type?,description?,episode_id?,asset_type:"map"}` 新建地图；普通道具为 `"prop"`。`PUT /props/{p} {asset_type}` 可显式更改，map→prop 另需 `confirm_asset_type_change:true`，不删除地图数据。跨项目资产导入仍用 `kind:"prop"`，保留地图分类与数据，不共享运行任务。
+
+注意：此处 `asset_type` 是 prop 的地图子类；`POST /tasks/register-upload` 的 `asset_type` 则是目标表类别，地图仍填写 `"prop"`。不能写 `"map"` 作为第四类目标。
+
+#### `GET /props/{p}/map-workflow`
+
+返回 `{asset_type,brief,stage,status,mode,revision,task_id,steps,issues,research,map_spec,outputs,history,error}`。普通道具返回 400 `not_a_map`；不存在返回 404。
+
+- `stage ∈ brief|research|base|style|drawing|complete`，是当前或下一待执行阶段；`status ∈ idle|running|awaiting_review|blocked|failed|completed`。检查 `steps[].status/message` 判断哪些阶段真正完成。
+- `issues[] = {field,code,message,blocking}`；`blocking=true` 要补齐，不把失败当无问题。
+- `research.queries[]` 逐源记录 hits/error；来源固定为 `wikipedia-zh / wikipedia-en / europeana / smithsonian`，不是模型自选任意网站。`sources[]` 保存机构、年代、许可、URL 与实际摘录；`features[]` 保存点线面、坐标依据、支持原文、不确定性、来源引用和冲突。URL 存在不等于它证明了某个坐标。Europeana/Smithsonian 凭据仍由「设置→资料检索」保管，Agent 不获取、落盘或写入请求留痕；无 key 的来源失败应如实呈报。
+- `outputs = {base_image,texture_image,final_image,kmz,layer_doc}`；image 项含 `{path,width,height,source,task_id,provenance}`。`provenance.registration` 是 geo↔像素配准真源；Earth 使用通过独立检验的实测控制网格，不用名义相机或 bbox 仿射替代；检验点残差超过 3px 或相机漂移时失败，保留标定截图、控制点与残差证据。
+
+- research 阶段会把有依据的点线面加入 `map_spec`，AI 新项带 `proposed:true`。自动制图可使用候选，但不是人工批准；人工采纳须去掉相应项的 `proposed` 再 PUT 保存，此后检索不覆盖该项。近似区域只能在显式 `schematic:true` 下采用，必须保留不确定性；没有依据不虚构范围。
+#### `PUT /props/{p}/map-workflow`
+
+Body：`{expected_revision,brief?,map_spec?,mode?}`，至少一个可保存字段。顶层未传的字段保留，brief 内字段合并；**map_spec 一旦传入就是完整替换**，不是按 ID 合并。先 GET 完整 spec，仅修改获准的项，带当前 expected_revision 保存并读回核对；省略已有 places/routes/regions 会丢掉它们。人工确认项的保留承诺仅针对自动检索合并，不会拦住人有意删除。
+
+`brief` 字段：`{subject,era,location,purpose,detail_level:"overview"|"regional"|"site",schematic:boolean,base_mode:"program"|"earth"|"image",style:"archival"|"clean"|"ink",notes,reference_image?}`。
+
+- 对象/时代/空间/用途可由 AI 解释隐含信息，但缺时代不能擅自默认；已知字段不得用模型猜测覆盖。
+- `base_mode:"image"` 的 `reference_image = {path,source_url,license,control_points:[{x,y,lon,lat}]}`；先通过 `POST /upload/image` 上传，`path` 是返回的 static 相对路径，`x/y` 是源图像素，`lon/lat` 是 WGS84 度。至少三个非共线点，必须有来源与许可；最大拟合残差超过源图对角线 5% 时拒绝，保留 max/rms 像素残差供人工核对。恰好三个控制点可拟合为零，不代表整张图精准；残差不能代替史实核验。
+- `map_spec` 沿用投影、bbox、背景层与 `places/routes`，新增 `regions:[{id,name,points:[[lon,lat],...],proposed?}]`。面至少三个不同且非共线顶点，规范化后闭合。人工确认的几何不能被重跑检索覆盖。
+- 保存只是改真源，不等于已渲染新图。输出上限为 60 图层、每条线/面 240 顶点，画面外/地平线后或超限几何会阻断，不丢点、钳边或缩减内容。
+- 几何编辑后读回响应的 `stage`：投影/bbox/背景层不变可复用配准底图和底纹，从 drawing 手动推进绘制，再推进 complete 采用，或在已授权范围内 auto 续跑；投影/bbox/背景层变更先重做 base。相同规范化 spec 保存不作废已有成图。
+
+#### 执行与人工控制
+
+- `POST /props/{p}/map-workflow/run {mode:"auto"|"manual",expected_revision,text_config_id?,image_config_id?,image_model?}`：继续当前 `stage`，不会从 brief 重启；整条重做要先显式 rollback。auto 连续执行到完成或阻断，可能发生文本与底纹模型调用，先授权、先预扣预算；manual 仅执行当前一步供审阅。已 completed 时返回 `already_completed`，不重复计费。
+- `POST /props/{p}/map-workflow/advance {expected_revision,text_config_id?,image_config_id?,image_model?,skip?}`：从当前 `stage` 执行一步。`skip:true` 仅可跳过 `style`（底纹）；不得跳过信息充分性或检索来伪造流程通过。
+- `POST /props/{p}/map-workflow/rollback {stage,expected_revision}`：回到指定阶段，保留已确认几何与历史，不替代人的史实批准。
+- `POST /props/{p}/map-workflow/cancel {}`：按人的决定取消该地图当前执行；此接口不接收 expected_revision，执行前读回当前 task_id，不把它描述为取消某个旧快照。已发出的底纹任务仍可能完成并消耗额度，取消不是退费，也不能声称上游任务已停止。
+- 启动/推进返回工作流详情与 `task_id`，通过 `GET /tasks/{task_id}` 与本详情读到终态并打开真实产物。后台重启后保留产物与失败原因，由人明确继续，不自动重复计费步骤。
+- `mode` 优先级：PUT 保存选择但不启动；run 使用请求 mode（省略默认 manual，不沿用已保存 auto）；advance 固定 manual，与 run manual 都执行当前一步，只有 advance 支持 skip。通常自动续跑用 run，逐步审核/跳过底纹用 advance。
+- 正常完整流程：brief 1 次文本、research 2 次文本（计划+摘录提取），style 固定模板发 1 次图片；其余阶段确定性。未钉选文本端点时通用调用可最多尝试 3 个端点，完整流程保守预留至多 9 次文本；显式 text_config_id 钉选则不自动切端点。失败后重开阶段仍按实际新请求计数，不按容器任务数算账。
+- complete 是当前图/语义/原件版本的技术采用，不是人批准史实；没有 opened 参数，不要自造。manual 在推进 complete 前打开 final，auto 完成后立即打开；都须在请求证据里记录实际打开的路径与 SHA-256，交人审核。地图最终图可带默认 35% alpha 独立底纹与标注，原始底图版本保存在 faithful_source；faithful 与 map 分类不是同一字段，不能把派生图当未改动原件。
+
+
+409 `revision_conflict|workflow_busy`：保留本地草稿，刷新并由人决定；不无限重试。关键需求/关键证据缺失、充分性检查失败或所有来源均无有效结果会阻断；单源失败/无命中和非关键细节缺失保留告警，核心依据足够可继续。Earth/外部配准失败不得当通过或自动换路线冒充成功。失败重试也占额度，每次 GPU 提交前须有剩余预算和对应授权。
+
+**正例**：获准地图与预算 → 新建 map → 保存对象/时代/用途 → manual 检查与检索 → 看来源/风险 → 生产选定底图 → 仅生成底纹 → 确定性绘制 → 开图核对 → 交人审核。**反例**：上传真实地图后调普通 `generate-image`；用博物馆搜索命中为模型猜测的疆域背书；配准失败后拿程序图标成 Earth；把 `completed` 当史实/版权通过。
+
 ---
 
 ## 4. Poster（S3，可选旁路，在资产之后）
 
-### `GET /episodes/{e}/poster` [R]
-返回：编辑工程 `{prompt, base_image, reference_images, layout, variables, versions[]}`。
-### `PUT /episodes/{e}/poster` [R]
-Body：`{prompt, base_image, reference_images[], layout:{texts:[{id,kind,text,x,y,width,fontSize,fontFamily,color,bold,align,strokeWidth,shadow}]}}`
-坐标/字号是 0–1 比例。
-### `POST /episodes/{e}/poster/generate` [S/R]
-Body：`{mode:"initial"|"composite"|"layers"}`；异步生成海报版本。
-### `POST /episodes/{e}/poster/versions` [R]
-Body：`{image, base_image, layout}`；登记本地渲染的文字画布（必须先用 `POST /upload/image` 上传）。
-### `PUT /episodes/{e}/poster/select` [R]
-Body：`{version_id}`；选定最终海报。
+**当前契约是 `layer_doc` + 服务端渲染（Issue #39/#72，`backend/src/routes/posters.ts`、`services/posters.ts:4-8`）**：编辑工程里的旧 `layout:{texts:[...]}` 已不再读写；文字排版合成图由服务端从 `layer_doc` 渲染，**不需要**浏览器 canvas，也不需要先 `POST /upload/image` 再登记。api-production.md §4/§6B 里「本地渲染 PNG → 上传 → 带 `image` 登记版本」的做法属于 2026-11-02 历史快照，已不可执行。
+本节字段按当前源码核对，未在殷墟/八达岭两轮调用过，一律 `[S]`。
+
+### `GET /episodes/{e}/poster` [S]
+返回 bundle：`{id, prompt, text_prompt, copy, reference_images[], base_image, layer_doc, concept, provenance, variables, aspect_ratio, size, versions[], selected_version_id, final_image, task_status, error_msg}`。
+- `layer_doc` 与分镜图层段同源（结构见 §7 `PUT /layer-segments/storyboards/{id}` 的 `layer_doc`）；`size` 取关键帧档位（16:9=1344×768）。
+- `provenance` 记录每个字段/每个图层是 `ai` 还是 `manual`，AI 应用方案时据此判冲突。
+### `PUT /episodes/{e}/poster` [S]
+Body 只传要改的：`{prompt(≤4000), text_prompt(≤2000), copy, reference_images[](必须 static/ 下), base_image(static/ 或 null), layer_doc}`。写入的字段在 `provenance` 里被标成 `manual`；底图像素由服务端 `sharp` 实测写回，输出画布恒为本集画幅。
+### `POST /episodes/{e}/poster/concept` [S]
+Body：`{config_id?, model?}`；异步 AI 构想（只写 `concept`，不动编辑字段）。返回 `{task_id}`；已有构想在跑 → 409 `concept_running`；剧本/带图资产不足 → 400。
+### `POST /episodes/{e}/poster/concept/generate` [S]
+Body：`{composition_ids?, config_id?, model?}`；为方案各提交一张冻结快照底图（底图不带字）。返回 `{items}`。
+### `POST /episodes/{e}/poster/concept/apply` [S]
+Body：`{composition_id, fields?:("prompt"|"text_prompt"|"copy")[], overwrite?}`；省略 `fields` = 三个都应用。命中 `provenance=manual` 的字段 → **409 `manual_edit_conflict` + `fields[]`**，必须由人决定是否 `overwrite:true`，Agent 不自行覆盖人工稿。
+### `POST /episodes/{e}/poster/concept/apply-layer-plan` [S]
+Body：`{composition_id, overwrite?}`；只替换 `ai:` 前缀的文字层，保留变量层与人工层；`layer_doc` 或任一 AI 层被手改过时同样 409。
+### `POST /episodes/{e}/poster/generate` [S]
+Body：`{mode:"initial"|"composite"|"layers", prompt?, text_prompt?, version_id?, config_id?, model?}`；异步，返回 `{task_id, mode, prompt, references[]}`，轮询 `GET /tasks/{task_id}`。
+- `initial`：当前工程 prompt + 参考图，自动前置项目风格词；**底图 prompt 不得带文字**。
+- `composite`：以指定/当前 `composite` 版本图为唯一参考，附由 `layer_doc`+变量现场生成的文字指令；没有合成版本 → 400。
+- `layers`：底图与透明文字层两张参考，**均由服务端从 `layer_doc` 渲染**；无底图或无可见文字层 → 400；FLUX 配置 → 400（改用 composite）。
+### `POST /episodes/{e}/poster/versions` [S]
+Body：`{layer_doc?, prompt?, text_prompt?}`；**服务端**按当前（或传入的）`layer_doc` 渲染合成图，登记 `kind:'composite'` 版本、自动设为最终版本并同步 `episodes.thumbnail`，返回整份 bundle。没有底图 → 400。不要再传 `image`。
+### `PUT /episodes/{e}/poster/select` [S]
+Body：`{version_id}`；选定最终海报并同步缩略图。
+### `POST /episodes/{e}/poster/load-version` [S]
+Body：`{version_id}`；把某版本的 `layer_doc` 载回当前工程（旧版本没有 `layer_doc` 时只换底图），载入后工程 `provenance.layer_doc='manual'`。
 
 注意：Poster 不进主闸门；不得阻塞资产→分镜主线。生成海报时**不要**把真实照片/地图送扩散重绘，优先确定性底图 + 文字层。
 
@@ -317,7 +400,11 @@ Body：`{drama_id, episode_id, config_id?, model?, message}`
 `tts.audio_url` / `tts.audio_version`（#81 新增）：仅 `valid:true` 时可试听；`valid:false` 表示音频与当前旁白不一致（已过期），不得当作本镜配音证据。播放时按 `audio_version` 附版本参数避免缓存旧音频。八达岭实测 6 镜 `duration_ms` = 8800/3840/14400/9920/10240/8800。
 
 ### `POST /episodes/{e}/narration-skeleton/generate` [R]
-Body：`{config_id?, model?}`；AI 按旁白稿拆骨架（只写分镜序号 / `narration_text` / `title` / `continuity`）。首批 `replace_existing` 会硬删本集既有分镜行——重拆需人授权。八达岭实测 task 1227 出 6 镜、覆盖 241/241 且无 gap。
+Body：**只有 `{config_id?, model?}`**；本端点没有 `model_mode`（`backend/src/routes/narration-skeleton.ts:56-72` 只读这两个键），别把设计卡/`work-estimate` 的 `model_mode` 照抄过来——多传的键会被静默忽略，不会变成「显式指定」。不带 `config_id` 时由 `storyboard_breaker_documentary` 环节自动选健康视觉候选。
+AI 按旁白稿拆骨架（只写分镜序号 / `narration_text` / `title` / `continuity`）。首批 `replace_existing` 会硬删本集既有分镜行——重拆需人授权。
+返回：**整份骨架状态（同 `GET /episodes/{e}/narration-skeleton`）再加 `task_id`**，所以发起后直接拿返回里的 `task_id` 去轮询 `GET /tasks/{id}` 或 `GET /tasks/{id}/observations`，不用去任务列表里猜。
+拒绝发起时是 400 + 中文 `message`（非纪录片 / 旁白稿为空 / 拆分或补镜任务正在运行 / 门禁未过），不是 `started:false` 的 200。
+八达岭实测 task 1227 出 6 镜、覆盖 241/241 且无 gap。drama 11 / episode 17 的生产运行同样从发起响应直接拿到 `task_id`（1281）——该轮整体验收仍由主控最终裁定，不在此处升格结论。
 
 ### `PUT /episodes/{e}/narration-skeleton` [R]
 Body：`{revision, shots:[{id?, narration_text, title?}], validate_only?: true}`
@@ -350,30 +437,36 @@ Body：`{revision}`。人的确认，Agent 不自行调用。
 - `video_generated: boolean` — 本镜是否已有生成视频。
 ### `POST /episodes/{e}/design-cards/fill` [R]（#82 行为变更亦为 `[R]`：八达岭 6 镜 AI 首次写入 combo #01 C / #02 D / #03–#06 C）
 Body：`{storyboard_ids?, model_mode?:"auto"|"pinned", config_id?, model?}`；不带 `storyboard_ids` = 只补空白/过期，纪录片还会带上「有卡但 `combo` 为空且 `pending`」的镜。
-`model_mode` 为 #87 新字段（`[S]`）：`auto` 明确忽略残留 `config_id` **和** `model`，按本阶段选健康候选；`pinned` 必须带正整数 `config_id`，不可用时不静默改用另一计费服务。旧客户端不带 mode 但带 config_id 仍视为显式指定；非法 mode 返回 400。
-模型选择错误为 400，`error ∈ model_pin_unavailable | vision_config_unavailable | text_config_unavailable`，含 `stage/stage_label/vision_required/message/alternatives[]`；显式指定不可用还带 `config_id/config_name/reason`（如 suspended/not_vision/inactive/missing/model_mismatch），每个候选含配置 ID、名称、provider/model/vision。自动模式无候选不代表全局不存在视觉配置；不要按错误文案擅自恢复暂停模型或改视觉标记。
+返回（`backend/src/routes/design-cards.ts:254-299`）只有三种 200：`{status:"running", total}`（已入批）、`{status:"running", already_running:true}`（本集已有填卡任务在跑，**不带 total**，不要重复投单）、`{status:"idle", total:0}`（没有要处理的镜）。**本端点不返回 `task_id`**；`GET /episodes/{e}/design-cards/status` 也不带（它是 `PromptBatchStatus`：`{status,total,completed,failed,started_at,finished_at?,...}`）。生产实测即为此形状（episode 17 填卡返回 `{status:"running",total:1}`，状态接口返回 `done` 且无 `task_id`）——**不要因为取不到 `task_id` 就判定失败并停下**：任务照常在跑，误停会白白消耗一次已授权的生成额度。
+取本次任务 ID 的可靠办法（生产实测）：投单**前后各取一次** `GET /tasks/center?episode_id={e}&type=text&page_size=200` 快照，在返回行里按 `kind="design_card"` 挑**新出现的那个 ID、且范围与本次提交一致**的行。不要「拿最近一条 active」当答案，也不要凭空编造 `task_id` 字段。`POST /episodes/{e}/work-estimate {stage:"design_card"}` 的 `observation_summary.task_id` 只是「同阶段最近一次」，在投单后未必就是刚投的这一次，只能作对照，不能当本次任务 ID。
+前置拒绝：非纪录片 400；资产审核门禁未过按 gate 报错；骨架未确认 → 400 `{error:"skeleton_unconfirmed"}`。
+`model_mode` 为 #87 新字段（`[R]`：episode 17 自动模式忽略暂停的 config 10 与残留 model，实际视觉调用均用 Cloud config 14；显式 pin 10 返回 suspended）：`auto` 明确忽略残留 `config_id` **和** `model`，按本阶段选健康候选；`pinned` 必须带正整数 `config_id`，不可用时不静默改用另一计费服务。旧客户端不带 mode 但带 config_id 仍视为显式指定；非法 mode 返回 400（后二项仅源码/自测 `[S]`）。
+模型选择错误为 400，`error ∈ model_pin_unavailable | vision_config_unavailable | text_config_unavailable`，含 `stage/stage_label/vision_required/message/alternatives[]`；显式指定不可用还带 `config_id/config_name/reason`（如 suspended/not_vision/inactive/missing/model_mismatch），每个候选含配置 ID、名称、provider/model/vision。仅 suspended 拒绝及 Cloud 替代候选已生产实测 `[R]`，其他错误分支仍 `[S]`。自动模式无候选不代表全局不存在视觉配置；不要按错误文案擅自恢复暂停模型或改视觉标记。
 #82 起：模型可直接填 `design_card.combo`，`suggested_combo` 变为可选且仅供展示。
 - 该镜**已有 combo** → 保留，模型值被忽略；**无 combo** → 采用模型值。
 - 纪录片「有卡无 combo」走 **combo-only 补选**：只写 `combo`，不重写卡片内容。
 - 模型给出**非法/缺失 combo** → 该镜计入 `failed`，状态置 `pending` 并把原因写进 `design_card_stale_reason`。
-- **AI 依赖校验（#87 新行为 `[S]`）**：不存在/空白的必要语义、类型/归属/版本不相容、或有名无所需几何的定位/描线/区域设计，不得通过留空必要字段、“待人工补”而落成成功卡。工具把具体层及原因回给模型沿当前工具循环修正；仍不可实现时按失败处理并保留旧卡。无位置依赖的标题/定义/说明卡及无语义图的合法背景用途不因此被禁止；人工 PUT 不套 AI 限制。
+- **AI 依赖校验（#87 新行为 `[S/R]`）**：不存在/空白的必要语义、类型/归属/版本不相容、或有名无所需几何的定位/描线/区域设计，不得通过留空必要字段、“待人工补”而落成成功卡。工具把具体层及原因回给模型沿当前工具循环修正；仍不可实现时按失败处理并保留旧卡。无位置依赖的标题/定义/说明卡及无语义图的合法背景用途不因此被禁止；人工 PUT 不套 AI 限制。episode 17 已真实读取图片并保存五张待审卡 `[R]`；各拒绝边界仅行为自测 `[S]`，任务 completed 不等于卡片零阻断或人工通过。
 - 写入后卡片一律 `pending`、`design_card_confirmed_at` 清空；确认仍只能由人按。
 ### `GET /episodes/{e}/design-cards/status` [R]
-用途：填卡任务进度。
+用途：填卡任务进度。返回 `PromptBatchStatus`：`{status:"running"|"done"|"error", total, completed, failed, current_storyboard_id?, phase?, started_at, finished_at?, error?}`；从未跑过是 `data:null`。**没有 `task_id`**（取法见上）；`status:"done"` 只表示任务结束，必须查 `failed` 与逐镜卡片状态。
 ### `PUT /storyboards/{id}/design-card` [R]
 Body：`{combo:"A"|"B"|"C"|"D"|null, design_card:{...}}`
 `design_card` 结构（实测/源码）：
 ```
 {
- version: number,
+ version: 2,                                                             // 当前卡片版本号（services/design-card.ts:102-113）
  info_points: [{id, text, via:"layer"|"generated"|"narration_only"}],   // ≤12 条
  budget: {layer_s: number|null, gen_s: number|null},                     // layer≤30, gen≤15
  rationale: string,                                                      // ≤600
  suggested_combo: "A"|"B"|"C"|"D"|null,                                   // 仅展示；实际 combo 存在分镜列上
  layer_plan: {
    base: {kind:"asset", asset_kind:"character"|"scene"|"prop", asset_id, version_task_id|null} | {kind:"inherit_prev"} | null,
-   must_mark: string[],                                                  // ≤20
-   planned_layers: [{type:"label"|"polygon"|"polyline"|..., at_s?:number, text?, ...}]  // ≤40
+   must_mark: [{asset_id, semantic_id, name, unresolved?, unresolved_reason?}],       // SemanticRef，≤20；不是字符串数组
+   planned_layers: [{type:"polygon"|"polyline"|"marker"|"label"|"card"|"image",       // ≤40，按 at_s 升序存
+                     at_s: number,                                                    // 必有；缺省/非法归一化为 0
+                     text?: string,
+                     anchor?: {asset_id, semantic_id, name, unresolved?, unresolved_reason?}}]
  } | null,
  gen_plan: {
    reference_assets: [{kind, id, name}],
@@ -382,6 +475,7 @@ Body：`{combo:"A"|"B"|"C"|"D"|null, design_card:{...}}`
 }
 ```
 `via:"narration_only"` 表示该信息点只由旁白/字幕承担，不需要画面资产。
+`must_mark` / `planned_layers[].anchor` 里的 `asset_id` + `semantic_id` 必须来自 `GET /episodes/{e}/design-card-context` 当场返回的候选资产与语义条目（归一化会丢弃类型不在白名单的层，但**不会**替你造语义）。解析不到的引用会带 `unresolved/unresolved_reason` 落卡，并在 `issues` 里出现 `unresolved_ref`（warn），逐条明细读 `GET /episodes/{e}/design-cards/audit` 的 `unresolved_layers`。下游 `POST /layer-segments/storyboards/{id}/draft` 对无几何的 polygon/polyline/marker 只能告警跳过——所以不要凭想象写语义名，先回资产侧补语义。
 - `A` 图层段 only；`B` 生成段 only；`C` 图层→生成；`D` 生成→图层。**没有默认值**：要么由人显式写入本端点/`POST /storyboards/{id}/combo`，要么由 #82 的设计卡批次在该镜尚无 combo 时首次写入；本端点收到的 `combo` 永远视为人工决定，Agent 不自行调用。
 - `budget.layer_s` ≤30；`budget.gen_s` ≤15；超限直接 400。
 - 写卡后状态回 `pending`，需要重新确认。
@@ -414,7 +508,8 @@ Body 四选一/组合：`{layer_doc?, timeline?, duration?, base_ref?}`
   - 图层类型：`label`（文字，`box{x,y,w,h}` 0–1、`style{font,size,color,bold,align,stroke_width,bg_opacity}`）、`polygon`/`polyline`（`points` 0–1、`style{fill/fill_opacity/stroke/width/arrow_end}`）、image 等。
   - `z` 控制叠放；`visible` 控制默认可见性。
 - `timeline`：`{fps, ease:"inout"|..., fade_ms, keyframes:[{t, viewport{x,y,w,h}, visible:[layerId]}]}`
-  - `fps` 会被持久化，作为该集图层段的目标帧率（1–60，允许小数）。保持 25 与最终视频一致，避免混帧率 stale。
+  - **`fps` 不是可选项，是派生值**：保存时服务端一律写成本集目标帧率（`services/layer-segment.ts:266-272`），请求里的 `fps` 不生效。目标帧率取「本集最前一条有效图层计划的 `timeline.fps`」→ 没有计划时取本集首条模型视频的实测帧率（保留三位小数，29.97 不取整为 30）→ 都没有才用内置默认 25（`services/layer-segment.ts:101-103,520-560`，范围 1–60、允许小数）。
+  - 因此 **24 / 29.97 等既有计划帧率会被沿用**（#69），不要为了「统一 25」去改已有集；原生合成会用 fps 滤镜把模型视频统一到这个目标帧率。要确认当前值就读 `GET /layer-segments/storyboards/{id}` 的 `spec.fps`（`spec.source` 只说明**画幅**来自 video 还是 default，不代表帧率来源）。
 - `duration`：图层段秒数（≤30）。
 - `base_ref`：A 镜的确定性底图引用（真实照片/地图按 contain 摆放，不重绘）。结构：
   `{kind:"asset", asset_kind:"character"|"scene"|"prop", asset_id, version_task_id:number|null, unresolved?, unresolved_reason?}` 或 `{kind:"inherit_prev"}`；`null`=无引用。
@@ -489,8 +584,10 @@ Body：`{confirmed:true|false}`；`ready` 要求首帧与尾帧都有图，且�
 Body：`{storyboard_ids?, settings:{voice, inference_timesteps, cfg_value, seed|null, instructions, normalize}}`
 返回 `missing`（无配音）/`changed`（文本哈希变或参数变）分类，无副作用。
 ### `POST /episodes/{e}/narration/voice-batch` [R]
-同一 body；只配 `missing` + `changed`；保存为本集默认参数。
+同一 body；只配 `missing` + `changed`；带 `settings` 时保存为本集默认参数。
+返回 `{status:"running", total, task_id, scope}`（真的入批时才有 `task_id`）／`{status:"running", already_running:true, total, completed, scope}`（本集已有配音任务，**无 task_id**，改去读状态）／`{status:"idle", total:0, scope}`。
 ### `GET /episodes/{e}/narration/voice-batch-status` [R]
+返回 `PromptBatchStatus` 再加 `{task_id, scope, items[]}`——**配音是三个阶段里唯一能从状态接口直接拿到 `task_id` 的**，可直接拿去 `GET /tasks/{id}/observations`；从未跑过是 `data:null`。drama 11 / episode 17 生产运行的配音任务 ID 为 1282（发起响应与状态接口一致）。
 ### `POST /episodes/{e}/narration/voice-batch/retry-failed` [S]
 ### `POST /storyboards/{id}/narration/voice` [S/R]
 Body：`{settings?}`；单镜配音（整镜一次），带 settings 时校验并保存为本集默认。
@@ -537,7 +634,8 @@ Body：`{config_id?, model?}`；单镜生成。要求关键帧已确认且 `vide
 ## 11. 单镜合成（S10）
 
 ### `POST /storyboards/{id}/compose` [S]
-无 body；同步生成「视频 + 旁白音轨 + 烧录字幕」的融合片，写 v2 签名。
+无 body；同步生成「视频 + 旁白音轨 + 烧录字幕」的融合片。
+**签名版本按是否有 combo 分叉**（`services/compose-state.ts:70-137`）：纪录片（该镜有 `combo`）写 **v4**，摘要额外含 combo、图层段片段键、衔接帧 hash 与视频任务 ID；没有 combo 的剧情镜仍写 **v2**，字节完全不变（所以存量剧情成片不会因为版本升级被判 changed）。看到旧文档里「compose 一律写 v2 签名」按本节纠正。`signature_version < 2` 的历史行读成 `unknown`，由人决定是否重做。
 ### `POST /episodes/{e}/compose-batch/preview` [R]
 Body：`{storyboard_ids?}`（省略=整集，显式 `[]`=空范围）
 返回逐镜 `status`（missing/changed/unchanged/unknown/blocked/skipped）、`exportable`、`plan`、`signature`、`inputs{video,audio,subtitle,pure_visual}`、`change_reasons`。

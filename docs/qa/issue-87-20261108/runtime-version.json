@@ -1,0 +1,12 @@
+{
+  "at": "2026-11-08T20:59:30.319Z",
+  "feature_commit": "3eec6f7",
+  "main_feature_merge": "c6bf2ab",
+  "release": "20261108T204444Z",
+  "pm2_parent_pid": 887795,
+  "listener_pid": 887835,
+  "listener_port": 5679,
+  "release_directory": "~/huobao-releases/20261108T204444Z",
+  "loaded_asset": "4WNccslB.js",
+  "verification": "release.sh health/index/prefix/deeplink/hash-resource smoke plus readlink/ss/ps; actual production browser 16-case matrix"
+}
