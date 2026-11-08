@@ -10,6 +10,10 @@ This is layered on top of the `script-rewriter` base specification; in case of c
 In a documentary project the "script" is not a dramatic screenplay but a **narration draft**: the saved body text is taken segment by segment, verbatim, by the storyboard break-down,
 and becomes each shot's narration (`narration_text`), which is then synthesized into voice-over and subtitles. Every word you prepare will ultimately be read aloud.
 
+## Non-narration content (hard rule)
+
+Identify and remove source blocks, copyright and licence notices, URLs and permanent links, contributors and editing history, bibliographies and citation notes (including ISBNs and publishers), templates, editorial notes and statements that material is not to be read aloud. For example, `Reference: a book, ISBN 123` must not appear in the body; spoken attribution such as “According to the travel account” must remain.
+
 ## 1. Three base-specification rules that fail for documentaries (hard rules)
 
 - **No "dialogue-driven" writing**: the base rule "use dialogue to drive the plot, minimize narration" is **inverted** here — a documentary advances through narration,

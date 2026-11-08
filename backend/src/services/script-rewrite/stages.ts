@@ -71,6 +71,33 @@ export interface FidelityReport {
   over_limit_paragraphs: Array<{ index: number; chars: number }>
   warnings: string[]
   post_filter: { removed: RemovedSpan[] }
+  ai_exclusions: AiExcludedSpan[]
+  adjusted_baseline_chars: number
+}
+
+export interface AiExcludedSpan {
+  text: string
+  category: 'source' | 'license' | 'link' | 'contributor' | 'bibliography' | 'editorial' | 'not_narration'
+  reason: string
+  start: number
+  end: number
+}
+
+/** Validate model-reported exclusions against the frozen input; never edit the input. */
+export function parseFidelityOutput(reply: string, input: string): { content: string; exclusions: AiExcludedSpan[] } {
+  const parsed: unknown = JSON.parse(stripFence(reply))
+  if (!parsed || typeof parsed !== 'object' || !('content' in parsed) || typeof parsed.content !== 'string' || !('exclusions' in parsed) || !Array.isArray(parsed.exclusions)) throw new Error('忠实改写返回的正文或剔除清单格式不合法')
+  const categories: Record<string, true> = { source: true, license: true, link: true, contributor: true, bibliography: true, editorial: true, not_narration: true }
+  const exclusions: AiExcludedSpan[] = []
+  for (const entry of parsed.exclusions) {
+    if (!entry || typeof entry !== 'object' || typeof entry.text !== 'string' || !entry.text.trim() || typeof entry.reason !== 'string' || !entry.reason.trim() || typeof entry.category !== 'string' || !Object.hasOwn(categories, entry.category)) throw new Error('非旁白剔除清单格式或类别不合法')
+    let start = input.indexOf(entry.text)
+    while (start >= 0 && exclusions.some(span => start < span.end && start + entry.text.length > span.start)) start = input.indexOf(entry.text, start + 1)
+    if (start < 0 || parsed.content.includes(entry.text)) throw new Error('非旁白剔除片段无法在输入中唯一定位或仍在输出中')
+    const category = entry.category as AiExcludedSpan['category'] // membership was validated above
+    exclusions.push({ text: entry.text, reason: entry.reason, category, start, end: start + entry.text.length })
+  }
+  return { content: parsed.content, exclusions }
 }
 
 /** 模型爱把正文包进 ```；统一剥掉围栏，其它字节不动 */
@@ -84,15 +111,17 @@ const FIDELITY_OUTPUT_CONTRACT = [
   '',
   '# 本次输出要求（覆盖技能里关于工具调用的步骤说明）',
   '- 你**不要**调用任何工具，也不要解释、不要前言、不要 Markdown 代码块。',
-  '- 直接输出整理后的旁白稿正文本身；它会被逐字保存为本阶段的不可变版本。',
+  '- 只返回 JSON：{"content":"整理后的旁白稿正文","exclusions":[{"text":"输入中逐字复制的被剔除片段","category":"source|license|link|contributor|bibliography|editorial|not_narration","reason":"非旁白理由"}]}。不得把清单写进正文；没有剔除时 exclusions 为 []。',
   '- 输入已经由系统自动剥离来源、许可证、永久链接、贡献者与使用说明等非旁白材料；',
   '  **不要把这类内容写回正文**，也不要补写输入里没有的事实。',
+  '- 旁白稿必须剔除出处块、版权许可、URL/永久链接、贡献者或编辑历史、书目和引用尾注（含 ISBN、出版社）、模板或编辑说明以及不作为朗读稿的声明。',
+  '- 正文中的可朗读归属表述（如「据《异域录》记载」）必须保留。',
 ].join('\n')
 
 const fidelity: RewriteStageSpec = {
   key: 'fidelity',
   label: '忠实改写',
-  revision: 'fidelity.v1',
+  revision: 'fidelity.v2',
   aiStage: 'script_rewriter',
   async run(ctx) {
     const lang = await getContentLanguage()
@@ -105,8 +134,9 @@ const fidelity: RewriteStageSpec = {
       maxTokens: MAX_TOKENS,
       timeoutMs: STAGE_TIMEOUT_MS,
     })
-    const raw = stripFence(text)
-    if (!raw) throw new Error('忠实改写阶段没有返回正文')
+    const parsed = parseFidelityOutput(text, ctx.preparedText)
+    const raw = parsed.content
+    if (!raw.trim()) throw new Error('忠实改写阶段没有返回正文')
     // 二次防漏：模型即使抄回来源/许可/链接，也不会进入下游（验收 17）
     const guarded = guardStageOutput(raw)
     const content = guarded.text
@@ -114,7 +144,7 @@ const fidelity: RewriteStageSpec = {
 
     // 契约违例 = 阶段失败：不产生正式版本，下游不执行，最终稿不被采用。
     // 诊断仍然完整地留在任务错误信息里，供重试或跳过时查看。
-    const report = evaluateFidelity(ctx.preparedText, content, guarded.removed)
+    const report = evaluateFidelity(ctx.preparedText, content, guarded.removed, parsed.exclusions)
     return { content, report }
   },
 }
@@ -132,9 +162,11 @@ export class FidelityContractError extends Error {
  * 节拍标记只是分段锚点，不是朗读内容，算进去会让短稿出现假超标。
  * 超出 ±5% 或任一段超过 80 字 → 抛 `FidelityContractError`。
  */
-export function evaluateFidelity(preparedText: string, content: string, removed: RemovedSpan[] = []): FidelityReport {
+export function evaluateFidelity(preparedText: string, content: string, removed: RemovedSpan[] = [], exclusions: AiExcludedSpan[] = []): FidelityReport {
   const narrationChars = (text: string) => text.replace(BEAT_MARKER, '').replace(/[\s\u3000]/g, '').length
   const baseline = narrationChars(preparedText)
+  const excluded = exclusions.reduce((sum, span) => sum + narrationChars(span.text), 0)
+  const adjustedBaseline = baseline - excluded
   const outputChars = narrationChars(content)
   const deltaRatio = baseline ? (outputChars - baseline) / baseline : 0
   const blocks = parseBlocks(content)
@@ -142,7 +174,7 @@ export function evaluateFidelity(preparedText: string, content: string, removed:
   const overLimit = paragraphs
     .map((p, index) => ({ index: index + 1, chars: narrationChars(p.text) }))
     .filter(p => p.chars > PARAGRAPH_CHAR_LIMIT)
-  const withinTolerance = Math.abs(deltaRatio) <= FIDELITY_TOLERANCE
+  const withinTolerance = outputChars <= baseline * (1 + FIDELITY_TOLERANCE) && outputChars >= adjustedBaseline * (1 - FIDELITY_TOLERANCE)
   const warnings: string[] = []
   if (removed.length) warnings.push(`产出里带回了 ${removed.length} 处非旁白内容，已自动剥离（见过滤明细）`)
 
@@ -154,11 +186,13 @@ export function evaluateFidelity(preparedText: string, content: string, removed:
     paragraphs: paragraphs.length,
     over_limit_paragraphs: overLimit,
     warnings,
+    ai_exclusions: exclusions,
+    adjusted_baseline_chars: adjustedBaseline,
     post_filter: { removed },
   }
   const violations: string[] = []
   if (!withinTolerance) {
-    violations.push(`内容量相对过滤后正文变化 ${(deltaRatio * 100).toFixed(1)}%（${baseline} → ${outputChars} 字），超过 ±${FIDELITY_TOLERANCE * 100}%`)
+    violations.push(`内容量相对过滤后正文变化 ${(deltaRatio * 100).toFixed(1)}%（${baseline} → ${outputChars} 字），超过 ±${FIDELITY_TOLERANCE * 100}%；缩短部分未由可定位的非旁白剔除清单充分解释`)
   }
   for (const p of overLimit) violations.push(`第 ${p.index} 段 ${p.chars} 字，超过每段 ${PARAGRAPH_CHAR_LIMIT} 字上限`)
   if (violations.length) throw new FidelityContractError(`忠实改写不符合保真契约：${violations.join('；')}`, report)

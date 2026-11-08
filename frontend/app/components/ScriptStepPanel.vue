@@ -81,7 +81,7 @@ const rewriteConfigId = computed(() => chatConfigId() || 0)
       <div class="toolbar-left">
         <div class="step-indicator">
           <span class="step-num">02</span>
-          <span class="step-name">{{ t('episode.script.rewrite') }}</span>
+          <span class="step-name">{{ t('episode.rewrite.narrationRewrite') }}</span>
         </div>
       </div>
     </div>

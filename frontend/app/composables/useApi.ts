@@ -1694,6 +1694,8 @@ export function rewriteErrorOf(err: unknown): RewriteErrorInfo | null {
 }
 
 export const scriptRewriteAPI = {
+  inspectNarration: (episodeId: number, body: { content: string; config_id?: number; model?: string }) =>
+    api.post<{ findings: Array<{ text: string; reason: string; locatable: boolean }> }>(`/episodes/${episodeId}/script-rewrite/inspect-narration`, body),
   state: (episodeId: number) => api.get<ScriptRewriteState>(`/episodes/${episodeId}/script-rewrite`),
   start: (episodeId: number, body: ScriptRewriteStartBody = {}) =>
     api.post<{ run_id: number; task_id: number }>(`/episodes/${episodeId}/script-rewrite`, body),
