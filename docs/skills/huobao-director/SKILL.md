@@ -457,6 +457,17 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 - **证据清单**：`drama_id`/`episode_id`/各阶段 `task_id`；每个关键阶段的浏览器截图（读图后再下结论）；只读 DB 查询（状态与产物路径）；失败任务的日志片段；GPU 消耗台账（图片/视频/TTS 条数）。报告必须给出这些 ID 与证据路径，不能只写「已验证」。
 - **纪律**：生产测试消耗真实额度，任何计费生成任务先取得用户同意；严禁修改、生成、删除既有真实项目数据；DB 一律只读；失败不隐瞒，保留证据。
 
+#### 首次执行结果（2026-11-08，`[R]`）
+
+- **对象**：drama **10**「八达岭长城测试 1008」/ episode **16**；生产入口 `http://172.30.3.164/huobao/`；证据目录 `docs/qa/8daling-1008-20261108T061008Z/`（`report.md` + `requests.jsonl` + 截图）。
+- **规模与预算**：6 镜；旁白覆盖 **241/241**；图片 **11/16**（资产 1226、1230–1233、1245–1246；关键帧 1248–1251）、视频 **2/2**（1254 #01、1255 #04）、TTS **6/8**（batch 1228）。无超预算、无失败后追加 GPU。
+- **成片**：compose 6/6 `unchanged`+`exportable`，merge **27** completed，媒体 `static/merged/c9bbd119-b086-42a6-8eaf-6ce63ed185fa.mp4`，浏览器实开 **960×544 / 65.44s**（本环境无 ffprobe，时长依据为浏览器媒体元数据，已如实标注）。
+- **#80 通过**：旧入口 `POST /agent/script_rewriter/chat` 对纪录片真实返回 400 → 改走 `POST /episodes/16/script-rewrite`（run 3 / task 1212）。`inspect-narration` 在原稿命中 1 条可定位 finding（出处行），`fidelity.v2` 基线 224 / 输出 224 / `adjusted_baseline_chars=224`，prepared 阶段 raw 256→224；定稿再跑 `findings=[]`。
+- **#81 通过**：骨架 task 1227 出 6 镜、无 gap；`validate_only:true` 在正常草稿返回空，在人为删掉第 2 镜首字「它」后返回精确 `{start:42,end:43,chars:1,text:"它",next_index:1}` 且**未写库**；配音后 6 镜 `tts.valid=true`，`audio_url`/`audio_version`/`duration_ms`（8800/3840/14400/9920/10240/8800）齐全，UI 可试听。
+- **#82 通过**：`design-cards/fill` 在 6 个空 combo 的镜上真实写入 AI 初选（#01 C、#02 D、#03–#06 C）；audit 返回非零 `tts.duration_ms`（UI 显示「实测 8.8s」而非 0.0s）；`unresolved_layers` 给出资产 ID/名称与 `available_semantics`（如 asset 161「八达岭区位示意图」，`available_semantics=[]`），`issues[].message` 可读，未虚构语义名。
+- **失败与偏差（保留，不隐瞒）**：① #02 的关键帧提示词在 GLM、DeepSeek local、DeepSeek cloud 三种已配置模型下均失败 → 经 combo impact 后改为确定性 **A**，由 #04 C 维持第二条生成视频，**未追加 GPU 预算**；② 图层 draft 首次全部 `missing_base`，先按设计卡生成真实 base 再重 draft/render（1234–1239、1256–1259）；③ 资产初审 6 项缺失，补提取 1218–1223 后新建 scene 90 / prop 166 补齐，终审 22 total / 17 have / 4 added / 1 not_needed / 0 missing；④ 文档 merge 路径错误导致 200+HTML，改用 `/merge/episodes/:id/merge` 成功（已回写 S11）；⑤ 本环境无 ffprobe/ffmpeg，未伪报 ffprobe 结论。
+- **性质**：以上为**技术验收**；史实/画面/声音的艺术验收仍待用户审核（`…/huobao/drama/10/episode/1?panel=export`）。
+
 ---
 
 ## 5. 失败处理与报告模板

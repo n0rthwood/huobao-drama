@@ -2,8 +2,8 @@
 
 所有路径都相对 `HUOBAO_API = {HUOBAO_BASE}api/v1/`（默认 `http://172.30.3.164/huobao/api/v1/`，以会话配置为准）。
 拼接时**去掉路径开头的 `/`** 再拼；用 `urljoin` 会把 `/huobao/api/v1` 前缀丢掉，打到 SPA。
-标注：`[R]` = 2026-11-05 殷墟五镜诊断片实测通过；`[S]` = 仅源码核对，未在本轮运行；`[S/R]` = 部分实测或只跑通读路径，写入前先用 GET/preview 校验。
-本目录对齐 `origin/master` `9cd3458`（含 Issue #80/#81/#82）；这三个 Issue 带来的端点与字段**全部是 `[S]`**，首次生产使用按 `SKILL.md` §4.6「八达岭长城测试 1008」验收后再改标注。
+标注：`[R]` = 真实跑通（2026-11-05 殷墟五镜诊断片，和/或 2026-11-08 八达岭长城测试 1008 生产验收 drama 10 / episode 16 / merge 27）；`[S]` = 仅源码核对，未在这两轮运行；`[S/R]` = 部分实测或只跑通读路径，写入前先用 GET/preview 校验。
+本目录对齐 `origin/master` `5d08b18`（含 Issue #80/#81/#82）；这三个 Issue 的端点与字段已在八达岭轮实测，标 `[R]`，证据见 `docs/qa/8daling-1008-20261108T061008Z/`。
 
 ## 0. 通用约定
 
@@ -281,21 +281,27 @@ Body：`{drama_id, episode_id, config_id?, model?, message}`
 
 ## 5A. 纪录片旁白骨架（S4.5，Issue #81）
 
-### `GET /episodes/{e}/narration-skeleton` [S]
-返回：`{revision, confirmed_at, coverage{script_chars,covered_chars,uncovered_chars,gaps[{start,end,chars,excerpt}],complete}, shots:[{storyboard_id, shot_number, title, narration_text, narration_chars, tts{valid,reason,message,duration_ms,audio_url,audio_version}, design_card_status, design_ready}]}`。
-`tts.audio_url` / `tts.audio_version`（#81 新增）：仅 `valid:true` 时可试听；`valid:false` 表示音频与当前旁白不一致（已过期），不得当作本镜配音证据。播放时按 `audio_version` 附版本参数避免缓存旧音频。
+### `GET /episodes/{e}/narration-skeleton` [R]
+返回：`{revision, confirmed_at, coverage{script_chars,covered_chars,uncovered_chars,gaps[{start,end,chars,excerpt}],in_order,not_in_script,complete}, shots:[{storyboard_id, storyboard_number, title, narration_text, narration_chars, tts{valid,reason,message,duration_ms,audio_url,audio_version}, design_card_status, design_ready}]}`。
+注意字段名是 **`storyboard_number`**（不是 `shot_number`）。
+`tts.audio_url` / `tts.audio_version`（#81 新增）：仅 `valid:true` 时可试听；`valid:false` 表示音频与当前旁白不一致（已过期），不得当作本镜配音证据。播放时按 `audio_version` 附版本参数避免缓存旧音频。八达岭实测 6 镜 `duration_ms` = 8800/3840/14400/9920/10240/8800。
 
-### `POST /episodes/{e}/narration-skeleton/generate` [S]
-Body：`{config_id?, model?}`；AI 按旁白稿拆骨架（只写 `shot_number/narration_text/title/continuity`）。首批 `replace_existing` 会硬删本集既有分镜行——重拆需人授权。
+### `POST /episodes/{e}/narration-skeleton/generate` [R]
+Body：`{config_id?, model?}`；AI 按旁白稿拆骨架（只写分镜序号 / `narration_text` / `title` / `continuity`）。首批 `replace_existing` 会硬删本集既有分镜行——重拆需人授权。八达岭实测 task 1227 出 6 镜、覆盖 241/241 且无 gap。
 
-### `PUT /episodes/{e}/narration-skeleton` [S]
+### `PUT /episodes/{e}/narration-skeleton` [R]
 Body：`{revision, shots:[{id?, narration_text, title?}], validate_only?: true}`
 - `revision` 必填，取自刚读到的骨架；不匹配 → 冲突错误，先重读再编辑。
 - `shots` 不带 `id` = 新建一镜；原有镜不出现在列表 = 合并/删除。
 - 保存按**有序、连续、逐字**重写各镜旁白边界；正文改字会被逐字校验拒绝（要改字回旁白稿）。保存改变 `revision`，**原有确认失效**，须重新确认。
-- **`validate_only:true`（#81 新增）= dry-run**：返回 `{problems, gaps:[{start,end,chars,text,next_index}], excerpts:{<行号>: string}}`，**不写库**。坐标是去空白与 `【】` 节拍标记后的剧本下标（左闭右开）；`next_index` 是该缺口应并入的下一镜序号（等于 `shots.length` 表示结尾缺口）。任一镜旁白在剧本中定位不到时 `gaps` 返回空数组，只看 `problems`。
+- **`validate_only:true`（#81 新增）= dry-run**：返回 `{problems, gaps:[{start,end,chars,text,next_index}], excerpts:{<行号>: string}}`，**不写库**（八达岭实测：人为删掉第 2 镜首字「它」→ `{start:42,end:43,chars:1,text:"它",next_index:1}`，库未变）。坐标是去空白与 `【】` 节拍标记后的剧本下标（左闭右开）；`next_index` 是该缺口应并入的下一镜序号（等于 `shots.length` 表示结尾缺口）。任一镜旁白在剧本中定位不到时 `gaps` 返回空数组，只看 `problems`。
+- **缺口处置就是改这同一份 `shots` 草稿**（都先 dry-run 再正式保存）：
+  - **补到上一镜末尾**：把缺口原文接到 `shots[next_index-1].narration_text` 末尾（`next_index=0` 时不可用）。
+  - **补到下一镜开头**：接到 `shots[next_index].narration_text` 开头（`next_index === shots.length` 时不可用，该缺口在结尾）。
+  - **新建一镜领走这段**：在 `next_index` 位置插入一条**不带 `id`** 的 `{narration_text: 缺口原文, title?}`。
+  - 单镜上限 80 字：超长缺口先插新镜再拆分。**属于出处/版权/链接的缺口不要并进旁白**，回 S1-80（`inspect-narration` + 旁白稿保存）处理。
 
-### `POST /episodes/{e}/narration-skeleton/confirm` [S]
+### `POST /episodes/{e}/narration-skeleton/confirm` [R]
 Body：`{revision}`。人的确认，Agent 不自行调用。
 ### `POST /episodes/{e}/narration-skeleton/unconfirm` [S]
 破坏性：重锁下游；需人授权。

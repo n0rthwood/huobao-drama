@@ -126,7 +126,7 @@ Issue 整理完成后、实施前，必须让 **Fabel（Anthropic）或 Astra（
 - 最终媒体：`static/merged/c9bbd119-b086-42a6-8eaf-6ce63ed185fa.mp4`，浏览器实测 **960×544 / 65.44 s**（`readyState=4`），SHA-256 `62cc07d621227d499f6d054b8f01604ac19e11fc7149d0ff14f16fa4a2260fce`（本机无 ffprobe，时长/分辨率以浏览器媒体元数据为准）。
 - 预算实际消耗（上限 → 实际）：图片 16 → **11**（资产 1226、1230–1233、1245–1246；关键帧 1248–1251），视频 2 → **2**（1254/1255），TTS 8 → **6**（voice batch 1228，#01–#06）。
 - 报告与证据：`docs/qa/8daling-1008-20261108T061008Z/report.md`（含 `requests.jsonl` 与 01–11 截图，`11-voice-player-verify.png` 为配音页 6 个 audio 元素的验证）。
-- **已知证据缺口**：本次**未取得只读 DB 查询证据**（本机无生产 SQLite 文件，未越 DB/SSH 边界直连生产库），实际只有生产 API 只读读回与浏览器实测的 drama/episode/storyboard/task/merge 状态与媒体路径。这是本轮留痕的缺项，不构成 §9「只读 DB 查询」的合规替代；补齐 DB 查询前，本次留痕不视为完整。
+- 只读 DB 查询（主 agent 复核，2026-11-08）：`backend/data/huobao.sqlite3` 只读 —— `video_merges` id **27** → `episode_id` 16 / `drama_id` 10 / `status` completed / `merged_url` `static/merged/c9bbd119-b086-42a6-8eaf-6ce63ed185fa.mp4` / `duration` 65；episode 16 存活 `storyboards` **6**。另 `GET /episodes/16/narration-skeleton`：`confirmed=true`、6 镜、TTS 6/6，前两镜含 `audio_url`/`audio_version`/`duration_ms` 8800、3840。（原报告「本仓库无本地生产 SQLite 文件」不准确。）
 - 已知失败/偏差（保留原始证据，未补跑 GPU）：#02 关键帧提示词在 GLM / DeepSeek local / DeepSeek cloud 三模型下均失败，combo 回退为 A 并由 #04 C 保留第二条生成视频；图层 draft 首次 `missing_base`；API 文档中 merge/rewrite 路径与实际存在偏差，已在报告中留痕。
 - 成片的史实、画面与声音审美仍需用户审核；本记录只代表链路、预算与媒体可读性的技术验收。
 

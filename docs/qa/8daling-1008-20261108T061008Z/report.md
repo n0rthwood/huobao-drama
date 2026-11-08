@@ -71,6 +71,15 @@
 - `ffprobe` 和 `ffmpeg` 在本运行环境中不存在（命令返回 127/1）；媒体没有声称通过 ffprobe。浏览器已实际解码打开每个 raw 和最终 MP4。
 - 本仓库无本地生产 SQLite 文件；为避免违反生产 DB/SSH 边界，没有直接连接生产数据库。生产 API 的 drama/episode/storyboard/task/merge 读回状态及媒体路径已完整记录。
 
+## 主 agent 复核（2026-11-08）
+
+本节更正第 72 行：**「本仓库无本地生产 SQLite 文件」不准确**，`backend/data/huobao.sqlite3` 存在且可只读访问。主 agent 已完成以下只读复核：
+
+- 只读 DB（`backend/data/huobao.sqlite3`，仅 SELECT）：`video_merges` id **27** → `episode_id` 16 / `drama_id` 10 / `status` completed / `merged_url` `static/merged/c9bbd119-b086-42a6-8eaf-6ce63ed185fa.mp4` / `duration` 65；episode 16 存活 `storyboards` **6**。
+- `GET /episodes/16/narration-skeleton`：`confirmed=true`、6 镜、TTS 6/6，前两镜含 `audio_url`/`audio_version`/`duration_ms` 8800、3840。
+- 最终媒体 HTTP 复核：**200**，`Content-Type: video/mp4`，`Content-Length: 4900463`。
+- 配音页实测 **6 个 `<audio>` 元素**（截图 `11-voice-player-verify.png`）。
+
 ## 审核所需
 
 请用户审核最终成片的史实、画面和声音审美；技术验收只证明链路、预算、可读取媒体和签名/状态就绪，不构成艺术批准。
