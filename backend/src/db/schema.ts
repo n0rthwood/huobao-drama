@@ -546,8 +546,14 @@ export const props = sqliteTable('props', {
   faithfulSource: integer('faithful_source'),
   // 语义标注 JSON（labels/points/regions/lines，坐标为原图像素）；唯一读写口在 services/asset-semantics.ts
   semantics: text('semantics'),
-  // 地图底图规格 JSON（Issue #56）：投影 + bbox + 地点 + 路线；几何由程序确定性渲染，不经扩散模型
+  // 资产类别（Issue #84）：'prop' = 普通道具，'map' = 地图资产（独有 map_spec / 工作流 / 地图 UI）。
+  // 显式列，不再按 map_spec 是否为空推断——推断会让「做了一半的地图」和普通道具长得一样。
+  assetType: text('asset_type').notNull().default('prop'),
+  // 地图底图规格 JSON（Issue #56）：投影 + bbox + 地点 + 路线 + 面（#84）；几何由程序确定性渲染，不经扩散模型
   mapSpec: text('map_spec'),
+  // 地图工作流 JSON（Issue #84）：brief → research → base → style → drawing → complete 的持久状态，
+  // 含修订号 / 步骤 / 问题 / 检索证据 / 产出 / 历史快照。唯一读写口在 services/map-workflow/store.ts
+  mapWorkflow: text('map_workflow'),
   // 背景信息载体（Issue #47）：旁白提到但不出场、只作视觉承载的实体
   exposition: integer('exposition').notNull().default(0),
   createdAt: text('created_at').notNull(),

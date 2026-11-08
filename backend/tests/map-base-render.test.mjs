@@ -234,6 +234,7 @@ test('normalizeMapSpec：最小 spec 填入默认值；parseMapSpec 读路径不
     layers: { land: true, coastline: true, rivers: true, lakes: true, countries: true },
     places: [],
     routes: [],
+    regions: [],
     style: { theme: 'archival' },
   })
   assert.equal(result.parse.bad, null)

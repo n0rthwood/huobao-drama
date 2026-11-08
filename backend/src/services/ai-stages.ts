@@ -103,8 +103,9 @@ export const AI_CALL_SITES: Record<string, AiStage[]> = {
   'services/asset-pipeline/steps.ts': ['asset_spec', 'asset_qc'],
   // 资料检索（#79）：检索计划/预筛（文本）+ 候选图筛选（视觉）
   'services/asset-research/run.ts': ['asset_research', 'asset_curate'],
-  // 地图地点坐标建议复用资料研究环节（返回的坐标一律是候选，人工确认后才写库）
-  'services/asset-pipeline/map-asset.ts': ['asset_research'],
+  // 地图工作流（#84）：需求充分性与资料检索都是纯文本环节；地图几何由程序渲染，模型不参与
+  'services/map-workflow/brief.ts': ['asset_research'],
+  'services/map-workflow/research.ts': ['asset_research'],
   // 补全剩余（#52）：纪录片拆分分镜的续跑，复用同一视觉环节
   'services/storyboard-fill-gaps.ts': ['storyboard_breaker_documentary'],
   'services/portrait-appearance.ts': ['portrait_appearance'],

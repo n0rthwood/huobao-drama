@@ -32,6 +32,7 @@
                 image: preview.skipped.has_image,
                 running: preview.skipped.running,
                 faithful: preview.skipped.faithful,
+                map: preview.skipped.map || 0,
               }) }}
             </p>
 

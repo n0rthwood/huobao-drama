@@ -1108,7 +1108,8 @@ export async function batchCreateReviewAssets(episodeId: number, ids: number[]) 
       assetId = getInsertId(db.insert(schema.scenes).values({ dramaId, episodeId, location: name, time: '', prompt: '', lighting: '', createdAt: ts, updatedAt: ts }).run())
       db.insert(schema.episodeScenes).values({ episodeId, sceneId: assetId, createdAt: ts }).run()
     } else {
-      assetId = getInsertId(db.insert(schema.props).values({ dramaId, name, type: '', description: '', faithful: row.needKind === 'prop_faithful' ? 1 : 0, createdAt: ts, updatedAt: ts }).run())
+      // 资产类别显式写入（Issue #84）：审核清单补齐的一律是普通道具，不靠列默认值兜底
+      assetId = getInsertId(db.insert(schema.props).values({ dramaId, name, type: '', description: '', assetType: 'prop', faithful: row.needKind === 'prop_faithful' ? 1 : 0, createdAt: ts, updatedAt: ts }).run())
       db.insert(schema.episodeProps).values({ episodeId, propId: assetId, createdAt: ts }).run()
     }
     await bindCreatedAssetToReviewItem(id, kind, assetId)

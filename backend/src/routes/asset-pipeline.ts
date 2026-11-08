@@ -12,6 +12,7 @@ import { badRequest, created, success } from '../utils/response.js'
 import { logTaskError } from '../utils/task-logger.js'
 import { StageVisionUnavailableError } from '../services/ai-stages.js'
 import { parseTextTaskParams } from '../services/text-task.js'
+import { isMapAsset } from '../services/map-workflow/store.js'
 import { listBaseCandidates } from '../services/asset-pipeline/base-candidates.js'
 import { decideRound } from '../services/asset-pipeline/gate.js'
 import { pipelineExecution } from '../services/asset-pipeline/execution.js'
@@ -86,6 +87,14 @@ app.post('/runs', async (c) => {
   const purpose = body.purpose === 'beautify' ? 'beautify' as const : 'precision' as const
   if (body.source_ids !== undefined && !Array.isArray(body.source_ids)) {
     return badRequest(c, 'source_ids 必须是素材 id 数组')
+  }
+  // 地图资产（Issue #84）不进「精确 → 美化」流水线：它的画面由地图工作流确定性渲染，
+  // 美化轮会让扩散模型重画几何——这正是第一轮把海岸线画错的事故形态。
+  if (kind === 'prop') {
+    const [prop] = await db.select().from(schema.props).where(eq(schema.props.id, assetId))
+    if (prop && isMapAsset(prop)) {
+      return badRequest(c, '地图资产不能走资产流水线；请在地图工作流里生成底图与成图（扩散模型只用于质感底纹）', { error: 'map_asset' })
+    }
   }
   try {
     const result = await startAssetPipeline({

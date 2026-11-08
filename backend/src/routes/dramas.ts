@@ -7,6 +7,7 @@ import { toSnakeCase, toSnakeCaseArray } from '../utils/transform.js'
 import { lookupGeneratedAt } from '../services/media-time.js'
 import { logTaskError } from '../utils/task-logger.js'
 import { AssetLibraryError, importAsset, isAssetKind } from '../services/asset-library.js'
+import { serializeProp } from '../services/map-workflow/store.js'
 import { isDocumentaryRuleMode, resolveProjectRuleset } from '../services/genre-ruleset.js'
 import { DOCUMENTARY_DEFAULT_STYLE, isProjectType, normalizeProjectType } from '../services/project-type.js'
 import { cancelAssetBatch, getAssetBatch, previewAssetBatch, startAssetBatch } from '../services/asset-batch.js'
@@ -141,7 +142,11 @@ app.get('/:id', async (c) => {
     episodes: toSnakeCaseArray(eps),
     characters: withTime(chars),
     scenes: withTime(scns),
-    props: withTime(prps),
+    // 道具走地图感知的序列化：普通道具不带任何地图字段，地图资产带 map_spec 不带大文档
+    props: prps.map(row => ({
+      ...serializeProp(row),
+      image_generated_at: (row.imageUrl ? generatedAt.get(row.imageUrl) : undefined) ?? null,
+    })),
   })
 })
 

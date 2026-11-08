@@ -111,6 +111,12 @@ interface GenerateImageParams extends TaskOriginParams {
    * 打回的美化图会在落地瞬间顶掉原件。
    */
   pipelineRound?: boolean
+  /**
+   * 地图质感底纹（Issue #84）：扩散模型在地图链路里**只被允许做这一件事**——出一张纸纹/底色，
+   * 绝不参与任何地理几何。因此这条任务刻意**不带 propId**：它既不回写资产当前图，
+   * 也不进该地图的版本历史，只作为工作流的中间产物被引用。
+   */
+  mapTexture?: { propId: number; propName: string }
 }
 
 interface GenerateVideoParams extends TaskOriginParams {
@@ -170,6 +176,8 @@ export async function generateImage(params: GenerateImageParams): Promise<number
     referenceImages: params.referenceImages,
     characterVersion: params.characterVersion,
     ...(params.pipelineRound ? { pipeline_round: true } : {}),
+    // 地图底纹（#84）：标记用于任务中心识别与重试；不带 propId，因此完成回调也不会回写任何资产
+    ...(params.mapTexture ? { map_texture: { prop_id: params.mapTexture.propId, prop_name: params.mapTexture.propName } } : {}),
     ...(params.pipelineReferenceOrigins ? { pipeline_reference_origins: params.pipelineReferenceOrigins } : {}),
     ...originParams(params),
   })

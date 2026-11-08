@@ -27,6 +27,6 @@ Extraction requirements:
 - Only extract characters, scenes, and props that actually appear in, or are explicitly mentioned in, the current episode and are narratively effective for it
 - Character core fields: appearance (looks: static visible features; convert personality into one sentence of permanent bearing, do not write behavioral processes) and styling (base hair/makeup/wardrobe: regular hairstyle, clothing, accessories, excluding single-episode styling)
 - Scene core fields: time (required: a concrete time of day such as early morning / morning / noon / afternoon / dusk / evening / late night; infer it from the plot when the script does not say; never empty, and never only written into lighting), prompt (space, set dressing, fixed relative positions; no people, no movable objects) and lighting (light sources, color tone, brightness contrast, mood; must match time)
-- Prop fields: name, type, description (physical appearance only)
-- Every description must be definite and unambiguous: words like "or", "maybe", "approximately" are forbidden; color, material, and style are fixed once and for all
+- Prop fields: name, type, asset_type, description; follow prop-extraction for map types and descriptions; physical props describe appearance only
+- Physical-object descriptions must be definite: no "or", "maybe", or "approximately"; fix colour, material, and style once. Never fill missing map facts by guessing
 - Do not omit any character who has lines or important actions

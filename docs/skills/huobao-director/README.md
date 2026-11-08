@@ -8,6 +8,7 @@
 - `references/api-catalog.md`：API 清单与证据规范。
 - `references/api-core.md`：核心接口（项目/集/资产/配置/任务）细节与安全约束。
 - `references/api-production.md`：生产链路（生图、分镜、生视频、导出）接口细节。
+- `references/diagnostic-example.md`：完整五镜诊断片的实际步骤、参数与失败证据；为满足 managed skill 单文件大小限制从主文档原样迁入，内容未删。
 
 ## 为什么入库
 
@@ -36,6 +37,7 @@
 
 | 日期 | 对应 Issue | 技能变更 |
 |---|---|---|
+| 2026-11-08（#84 待发布） | #84 | 显式地图分类、统一工作流 API、三条底图、AI 候选点线面、续跑/CAS 与独立底纹边界；补文本预算、整体 map_spec 保存和人工决定清单。新增端点全为 `[S]`，未完成生产计费验收；封闭文档评审及最小处置见 `reviews/issue84-map-review.md` / `issue84-map-response.md` |
 | 2026-11-08（晚） | #85 续：八达岭 1008 首次生产验收 | 契约快照升至 `5d08b18`；#80/#81/#82 本轮实际调用的端点/字段由 `[S]` 改 `[R]`（drama 10 / episode 16 / merge 27，证据 `docs/qa/8daling-1008-20261108T061008Z/`），未调用的保持 `[S]`；更正纪录片改写入口为 `POST /episodes/{e}/script-rewrite`（旧 agent 入口对纪录片 400）并补全 rewrite 流水线端点；更正 merge 路径为 `/merge/episodes/{e}/merge(s)`（漏前缀会得到 200+HTML）；骨架字段更正为 `storyboard_number` 并补三种缺口处置；更正「虚构语义」失败语义（不写 `design_card_stale_reason`）；§4.6 追加「首次执行结果（2026-11-08）」 |
 | 2026-11-08 | #85（随 #80/#81/#82 发布 `20261108T055548Z`） | 新增 `POST /episodes/{e}/script-rewrite/inspect-narration` 与 `fidelity.v2` 剔除清单（#80）；旁白骨架 `validate_only` dry-run、缺口处置与 `tts.audio_url/audio_version`（#81）；设计卡 AI 填 `combo`、combo-only 补选、audit 的 `tts.duration_ms`/`unresolved_layers`/`video_generated` 与可读 `issues[].message`（#82）；修订「AI 绝不选 combo」旧口径；新增 §4.6「八达岭长城测试 1008」生产验收案例（含固定 224 字原始内容与故意保留的出处行） |
 | 2026-11-07 | #83 | 技能首次入库（从本机全局 managed skills 复制），建立同步规则 |

@@ -10,6 +10,7 @@ import { getKeyframePromptBatchStatus, startKeyframePromptBatch } from '../servi
 import { isKeyframeSlot, keyframesJson, loadEpisodeKeyframes, type KeyframeSlot } from '../services/keyframes.js'
 import { batchScopeOf, scopeFromPreview } from '../services/batch-scope.js'
 import { parseStylingVersion } from '../services/styling-version.js'
+import { serializeProp, type PropRow } from '../services/map-workflow/store.js'
 import { resolveDramaProjectType } from '../services/project-type.js'
 import { loadLayerSegmentSummaries } from '../services/layer-segment.js'
 import {
@@ -91,7 +92,9 @@ async function attachImageVersions<T extends { id: number; imageUrl: string | nu
   return rows.map((row) => {
     const versions = versionsOf.get(row.id) ?? []
     return {
-      ...toSnakeCase(row),
+      // 道具按地图感知口径序列化（Issue #84）：普通道具不带任何地图字段，
+      // 地图资产带 map_spec 但不驮工作流大文档（它只由 /props/:id/map-workflow 提供）
+      ...(kind === 'prop' ? serializeProp(row as unknown as PropRow) : toSnakeCase(row)),
       image_versions: versions,
       image_generated_at: versions.find(version => version.is_current)?.generated_at ?? null,
     }
@@ -1004,7 +1007,7 @@ app.get('/:episode_id/storyboards', async (c) => {
         .map(ch => toSnakeCase(ch)),
       props: allProps
         .filter(p => (propIdsByStoryboard.get(row.id) || []).includes(p.id))
-        .map(p => toSnakeCase(p)),
+        .map(p => serializeProp(p)),
     }
   })))
 })

@@ -41,7 +41,7 @@ function normalizeConfig(raw: unknown): AiConfigRow | null {
 }
 
 /** 配置中的模型数组（首位为配置默认）；API 可能返回数组或 JSON 字符串 */
-function configModels(raw: unknown): string[] {
+export function configModels(raw: unknown): string[] {
   if (!raw) return []
   if (Array.isArray(raw)) return raw.map(String).filter(Boolean)
   if (typeof raw !== 'string') return []

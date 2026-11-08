@@ -2,7 +2,6 @@ import { Hono } from 'hono'
 import { and, eq } from 'drizzle-orm'
 import { db, getInsertId, schema } from '../db/index.js'
 import { success, created, badRequest, now } from '../utils/response.js'
-import { toSnakeCase } from '../utils/transform.js'
 import { generateImage } from '../services/generation.js'
 import { getDramaStylePrompt } from '../services/style-preset.js'
 import { ensurePropFinalPrompt, savedPromptOf } from '../services/final-prompt.js'
@@ -25,15 +24,21 @@ import {
 import { getSemanticsAutoStatus, startSemanticsAuto } from '../services/asset-semantics-auto.js'
 import { resolveStageModel, StageVisionUnavailableError } from '../services/ai-stages.js'
 import { bindCreatedAssetToReviewItem, findReviewItemAssetDuplicate, onAssetLibraryChanged, onAssetRemoved, onEpisodeAssetLinkChanged } from '../services/asset-review.js'
-import { MapSpecValidationError, normalizeMapSpec, parseMapSpec } from '../services/map-base-render.js'
-import { renderAndRegisterMapBase, suggestMapPlaces } from '../services/asset-pipeline/map-asset.js'
 import { getAbsolutePath } from '../utils/storage.js'
+import { parseAssetType } from '../services/map-workflow/types.js'
+import { isMapAsset, serializeProp } from '../services/map-workflow/store.js'
 
 const app = new Hono()
 // 道具图：白底单品静物，方形画布
 const PROP_IMAGE_SIZE = '1024x1024'
 /** 证据素材不进生图链路时的统一口径（路由 400 与批量 skip_faithful 同义） */
 const FAITHFUL_BLOCKED_MESSAGE = '该素材已标记为证据素材（忠实素材），不能重绘；如需风格化请用「美化」生成派生版本，或先关闭忠实标记'
+/**
+ * 地图资产（Issue #84）永远不进扩散生图链路：几何必须由程序确定性渲染。
+ * 这条拦截比 faithful 更早也更硬——刚建的地图还没有底图、faithful 还是 0，
+ * 正是这个窗口期最容易把地图送进重绘。
+ */
+const MAP_DIFFUSION_BLOCKED_MESSAGE = '地图资产的画面由地图工作流确定性渲染，不能走通用生图；请在地图工作流里生成底图与成图（扩散模型只用于质感底纹）'
 
 // POST/DELETE /props/:id/reference-images — 道具参考图（生图输入，与成片图互不影响）
 mountReferenceImageRoutes(app, 'prop')
@@ -50,8 +55,11 @@ app.post('/', async (c) => {
     const candidate = findReviewItemAssetDuplicate(Number(body.asset_review_item_id), 'prop', name)
     if (candidate) return c.json({ code: 409, error: 'duplicate_asset', message: '本集已有同名资产', candidate }, 409)
   }
+  const assetType = parseAssetType(body.asset_type ?? body.assetType, 'prop')
+  if (!assetType) return badRequest(c, 'asset_type 只能是 prop 或 map', { error: 'invalid_asset_type', field: 'asset_type' })
   const ts = now()
   const res = await db.insert(schema.props).values({
+    assetType,
     name,
     type: body.type || '',
     description: body.description || '',
@@ -77,7 +85,7 @@ app.post('/', async (c) => {
     else await onEpisodeAssetLinkChanged(Number(body.episode_id), 'asset_linked')
   }
   const [row] = await db.select().from(schema.props).where(eq(schema.props.id, propId))
-  return created(c, toSnakeCase(row))
+  return created(c, serializeProp(row))
 })
 
 // DELETE /props/:id — 软删除
@@ -106,6 +114,17 @@ app.put('/:id', async (c) => {
   }
   if (body.type !== undefined) updates.type = body.type
   if (body.description !== undefined) updates.description = body.description
+  // 资产类别（Issue #84）：prop ↔ map 显式切换。切回普通道具必须确认——地图资产的几何
+  // 与工作流数据**不删**（随时可以再切回来），但它从此会重新进入通用生图链路。
+  if (body.asset_type !== undefined || body.assetType !== undefined) {
+    const nextType = parseAssetType(body.asset_type ?? body.assetType, prop.assetType === 'map' ? 'map' : 'prop')
+    if (!nextType) return badRequest(c, 'asset_type 只能是 prop 或 map', { error: 'invalid_asset_type', field: 'asset_type' })
+    const hasMapData = !!prop.mapSpec || !!prop.mapWorkflow
+    if (nextType === 'prop' && prop.assetType === 'map' && hasMapData && body.confirm_asset_type_change !== true) {
+      return badRequest(c, '该地图已有地图数据（几何/工作流）。切回普通道具后它会重新进入通用生图链路；数据会保留，请传 confirm_asset_type_change=true 显式确认', { error: 'asset_type_change_needs_confirm' })
+    }
+    updates.assetType = nextType
+  }
   // 忠实标记（Issue #47）：打开随手可做，关掉必须显式确认——关掉就等于把证据素材
   // 重新放回扩散模型的射程里，事故正是这样发生的
   if (body.faithful !== undefined) {
@@ -131,7 +150,7 @@ app.put('/:id', async (c) => {
   // 审核清单（#55）：关掉忠实标记会让 prop_faithful 条目的绑定失效（硬退化）
   if (updates.faithful === 0 && Number(prop.faithful) === 1) await onAssetRemoved('prop', id)
   const [updated] = await db.select().from(schema.props).where(eq(schema.props.id, id))
-  return success(c, toSnakeCase(updated))
+  return success(c, serializeProp(updated))
 })
 
 /** 本地兜底提示词：白底单品，不掺杂其他元素 */
@@ -154,6 +173,7 @@ app.post('/:id/generate-prompt', async (c) => {
   const body = await c.req.json()
   const [prop] = await db.select().from(schema.props).where(eq(schema.props.id, id))
   if (!prop) return badRequest(c, '道具不存在')
+  if (isMapAsset(prop)) return badRequest(c, MAP_DIFFUSION_BLOCKED_MESSAGE, { error: 'map_asset' })
   if (Number(prop.faithful) === 1) return badRequest(c, FAITHFUL_BLOCKED_MESSAGE)
   if (!body.episode_id) return badRequest(c, 'episode_id 必填')
 
@@ -176,6 +196,7 @@ app.post('/:id/generate-image', async (c) => {
   const body = await c.req.json()
   const [prop] = await db.select().from(schema.props).where(eq(schema.props.id, id))
   if (!prop) return badRequest(c, '道具不存在')
+  if (isMapAsset(prop)) return badRequest(c, MAP_DIFFUSION_BLOCKED_MESSAGE, { error: 'map_asset' })
   if (Number(prop.faithful) === 1) return badRequest(c, FAITHFUL_BLOCKED_MESSAGE)
   if (!body.episode_id) return badRequest(c, 'episode_id 必填')
 
@@ -235,7 +256,7 @@ app.put('/:id/faithful-source', async (c) => {
   }).where(eq(schema.props.id, id))
   logTaskSuccess('Faithful', 'source-selected', { propId: id, versionTaskId, path })
   const [updated] = await db.select().from(schema.props).where(eq(schema.props.id, id))
-  return success(c, toSnakeCase(updated))
+  return success(c, serializeProp(updated))
 })
 
 // GET /props/:id/semantics — 语义标注 + 坐标所针对的底图
@@ -306,83 +327,14 @@ app.get('/:id/semantics/auto/status', async (c) => {
   return success(c, await getSemanticsAutoStatus(id))
 })
 
-// ─── 地图底图（Issue #56）────────────────────────────────────
-// 地图/图示类证据素材的几何由程序确定性渲染，扩散模型绝不参与；
-// 这里替换掉 #47 的一次性 `POST /props/:id/beautify`（美化改由资产流水线承担）。
-
-// GET /props/:id/map-spec
-app.get('/:id/map-spec', async (c) => {
-  const [prop] = await db.select().from(schema.props).where(eq(schema.props.id, Number(c.req.param('id'))))
-  if (!prop) return badRequest(c, '道具不存在')
-  return success(c, { map_spec: parseMapSpec(prop.mapSpec) })
-})
-
-// PUT /props/:id/map-spec
-app.put('/:id/map-spec', async (c) => {
-  const id = Number(c.req.param('id'))
-  const body = await c.req.json()
-  const [prop] = await db.select().from(schema.props).where(eq(schema.props.id, id))
-  if (!prop) return badRequest(c, '道具不存在')
-  try {
-    const spec = normalizeMapSpec(body.map_spec)
-    await db.update(schema.props)
-      .set({ mapSpec: JSON.stringify(spec), updatedAt: now() })
-      .where(eq(schema.props.id, id))
-    return success(c, { map_spec: spec })
-  } catch (err) {
-    if (err instanceof MapSpecValidationError) return badRequest(c, err.message)
-    throw err
-  }
-})
-
-// POST /props/:id/map-render — 渲染底图、登记成原件版本、按投影写语义
-app.post('/:id/map-render', async (c) => {
-  const id = Number(c.req.param('id'))
-  const body = await c.req.json()
-  const [prop] = await db.select().from(schema.props).where(eq(schema.props.id, id))
-  if (!prop) return badRequest(c, '道具不存在')
-  const raw = body.map_spec ?? prop.mapSpec
-  if (!raw) return badRequest(c, '该道具还没有地图规格（map_spec）')
-  try {
-    const spec = typeof raw === 'string' ? normalizeMapSpec(JSON.parse(raw)) : normalizeMapSpec(raw)
-    const result = await renderAndRegisterMapBase({
-      propId: id,
-      spec,
-      width: body.width ? Number(body.width) : undefined,
-    })
-    return success(c, result)
-  } catch (err) {
-    if (err instanceof MapSpecValidationError) return badRequest(c, err.message)
-    const message = err instanceof Error ? err.message : String(err)
-    logTaskError('MapBase', 'render', { propId: id, error: message })
-    throw err
-  }
-})
-
-/**
- * POST /props/:id/map-suggest — AI 建议地点经纬度。
- * 返回的一律是**候选**（`proposed: true`）：人工勾选确认后前端才写进 map_spec。
- * 坐标是关键选择，不允许模型直接落库（用户确认的「关键选择显式」）。
- */
-app.post('/:id/map-suggest', async (c) => {
-  const id = Number(c.req.param('id'))
-  const body = await c.req.json()
-  const [prop] = await db.select().from(schema.props).where(eq(schema.props.id, id))
-  if (!prop) return badRequest(c, '道具不存在')
-  const names: string[] = Array.isArray(body.names) ? body.names.map(String).filter(Boolean) : []
-  if (!names.length) return badRequest(c, '请先填写要定位的地名（names）')
-  try {
-    const places = await suggestMapPlaces({
-      name: prop.name,
-      description: prop.description,
-      names,
-      textConfigId: body.text_config_id ?? undefined,
-    })
-    return success(c, { places })
-  } catch (err) {
-    if (err instanceof StageVisionUnavailableError) return badRequest(c, err.message)
-    return badRequest(c, err instanceof Error ? err.message : '建议坐标失败')
-  }
-})
+// ─── 地图资产（Issue #84）────────────────────────────────────────────────
+// #56 的 `GET/PUT /props/:id/map-spec`、`POST /props/:id/map-render`、
+// `POST /props/:id/map-suggest` 已全部移除：地图状态的唯一写入口是
+// `/props/:id/map-workflow`（routes/map-workflow.ts）。
+//
+// 原因不是整洁，而是正确性：那三个接口绕过工作流的 CAS 与失效规则，
+// 能在一次执行进行中直接改写 map_spec / 当前图 / 语义，正是 #84 要根治的覆盖事故。
+// 几何读取走 `GET /props/:id/map-workflow` 的 `map_spec`，几何写入走它的 `PUT`，
+// 坐标建议由工作流的「资料检索」步给出（带出处与不确定度，不再是裸坐标）。
 
 export default app

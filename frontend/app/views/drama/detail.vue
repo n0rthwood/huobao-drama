@@ -341,16 +341,17 @@
                     <div class="prop-name-row">
                       <span class="asset-name" :title="m.name">{{ m.name }}</span>
                       <span class="tag">{{ m.type || t('common.prop') }}</span>
+                      <span v-if="g.kindKey === 'prop' && assetTypeOf(m) === 'map'" class="tag is-map">{{ t('episode.asset.assetType.map') }}</span>
                     </div>
                     <div class="asset-meta asset-desc dim" :title="m.description || ''">{{ m.description || t('episode.asset.noDescription') }}</div>
                   </template>
-                  <div class="asset-meta asset-final" :class="{ dim: !(m.final_prompt || m.finalPrompt) }" :title="m.final_prompt || m.finalPrompt || ''">
+                  <div v-if="assetTypeOf(m) !== 'map'" class="asset-meta asset-final" :class="{ dim: !(m.final_prompt || m.finalPrompt) }" :title="m.final_prompt || m.finalPrompt || ''">
                     <span class="afp-label">{{ g.kindKey === 'scene' ? t('episode.asset.finalPromptFixed') : t('episode.asset.finalPromptWhiteBg') }}</span>
                     {{ m.final_prompt || m.finalPrompt || (g.kindKey === 'scene' ? t('episode.asset.finalPromptAutoFixed') : t('episode.asset.finalPromptAutoWhiteBg')) }}
                     <FinalPromptSourceBadge :source="m.final_prompt_source || ''" :final-prompt="m.final_prompt || m.finalPrompt || ''" :updated-at="m.final_prompt_updated_at || ''" rewritable :busy="generatingPromptKeys.includes(pendingKey(m))" @rewrite="rewriteCardPrompt(m)" />
                   </div>
                 </div>
-                <div v-if="materialRing(m)" class="asset-task-ring" @click.stop>
+                <div v-if="assetTypeOf(m) !== 'map' && materialRing(m)" class="asset-task-ring" @click.stop>
                   <ProgressRing
                     v-bind="materialRing(m)"
                     :size="36"
@@ -362,16 +363,17 @@
                 </div>
                 <div class="asset-foot">
                   <span :class="['dot', matHasImage(m) && 'ok', isPending(m) && 'pending']" />
-                  <button class="btn btn-sm ml-auto" type="button" :title="t('episode.asset.uploadImage')" :disabled="isUploading(m)" @click.stop="uploadMaterial(m)">
+                  <button v-if="assetTypeOf(m) !== 'map'" class="btn btn-sm ml-auto" type="button" :title="t('episode.asset.uploadImage')" :disabled="isUploading(m)" @click.stop="uploadMaterial(m)">
                     <span v-if="isUploading(m)" class="ring-spinner sm"></span>
                     <svg v-else width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                     {{ t('episode.asset.upload') }}
                   </button>
-                  <button class="btn btn-sm" type="button" :title="t('components.mediaLibrary.pickAsset')" :disabled="isUploading(m)" @click.stop="openMaterialLibrary(m)">
+                  <button v-if="assetTypeOf(m) !== 'map'" class="btn btn-sm" type="button" :title="t('components.mediaLibrary.pickAsset')" :disabled="isUploading(m)" @click.stop="openMaterialLibrary(m)">
                     <Images :size="11" />
                     {{ t('components.mediaLibrary.pick') }}
                   </button>
-                  <button class="btn btn-sm" type="button" :disabled="isPending(m)" @click.stop="generateMaterial(m)">
+                  <button v-if="assetTypeOf(m) === 'map'" class="btn btn-sm btn-primary ml-auto" type="button" @click.stop="openEdit(m)">{{ t('episode.documentary.map.panel.openWorkbench') }}</button>
+                  <button v-else class="btn btn-sm" type="button" :disabled="isPending(m)" @click.stop="generateMaterial(m)">
                     <span v-if="isPending(m)" class="ring-spinner sm"></span>
                     {{ matHasImage(m) ? t('episode.asset.regen') : (isPending(m) ? t('episode.asset.generating') : t('episode.asset.generate')) }}
                   </button>
@@ -397,8 +399,8 @@
       </div>
 
       <!-- 素材详情 / 编辑对话框（与工作台资产卡片同款布局） -->
-      <div v-if="editDialog && editTarget" class="overlay mat-detail-overlay" @click.self="closeEdit">
-        <section class="dialog mat-detail-dialog" :aria-label="t('detail.mat.dialogAria')">
+      <div v-if="editDialog && editTarget" class="overlay mat-detail-overlay" :class="{ 'is-map-overlay': assetTypeOf(editTarget) === 'map' }" @click.self="closeEdit">
+        <section class="dialog mat-detail-dialog" :class="{ 'is-map-dialog': assetTypeOf(editTarget) === 'map' }" :aria-label="t('detail.mat.dialogAria')">
           <header class="dialog-head mat-detail-head">
             <div class="mat-detail-title-block">
               <span class="mat-detail-kicker">{{ editTarget.kindKey === 'character' ? t('episode.asset.typeChar') : editTarget.kindKey === 'scene' ? t('episode.asset.typeScene') : t('episode.asset.typeProp') }}</span>
@@ -458,7 +460,7 @@
                   <span class="dim">{{ editTarget.kindKey === 'character' ? t('episode.asset.editHintChar') : editTarget.kindKey === 'prop' ? t('episode.asset.editHintProp') : t('episode.asset.editHintScene') }}</span>
                 </div>
 
-                <!-- 道具：单列物品外貌 -->
+                <!-- 道具：单列物品外貌；地图是独立资产类型（Issue #84） -->
                 <div v-if="editTarget.kindKey === 'prop'" class="mat-detail-edit-grid mat-detail-edit-grid--prop">
                   <label class="mat-detail-edit-field">
                     <span>{{ t('episode.create.name') }}</span>
@@ -468,9 +470,25 @@
                     <span>{{ t('episode.create.typeField') }}</span>
                     <input v-model="editDraft.type" class="input" :placeholder="t('detail.mat.propTypePlaceholder')" />
                   </label>
+                  <div class="mat-detail-edit-field">
+                    <span>{{ t('episode.asset.assetTypeLabel') }}</span>
+                    <div class="asset-type-row">
+                      <label v-for="option in ASSET_TYPES" :key="option" class="asset-type-choice">
+                        <input
+                          type="radio"
+                          :value="option"
+                          :checked="assetTypeOf(editTarget) === option"
+                          :disabled="assetTypeSaving"
+                          @change="onAssetTypeChange(editTarget, option)"
+                        />
+                        <span>{{ t(`episode.asset.assetType.${option}`) }}</span>
+                      </label>
+                    </div>
+                    <span class="dim asset-type-hint">{{ t('episode.asset.assetTypeHint') }}</span>
+                  </div>
                   <label class="mat-detail-edit-field">
-                    <span>{{ t('episode.asset.appearanceOfObject') }}</span>
-                    <textarea v-model="editDraft.description" class="textarea mat-detail-textarea" rows="6" :placeholder="t('episode.asset.appearancePlaceholder')" />
+                    <span>{{ assetTypeOf(editTarget) === 'map' ? t('episode.asset.mapDescription') : t('episode.asset.appearanceOfObject') }}</span>
+                    <textarea v-model="editDraft.description" class="textarea mat-detail-textarea" rows="6" :placeholder="assetTypeOf(editTarget) === 'map' ? t('episode.asset.mapDescription') : t('episode.asset.appearancePlaceholder')" />
                   </label>
                 </div>
 
@@ -520,8 +538,23 @@
               </section>
             </div>
 
+            <!-- 地图资产工作流（Issue #84）：只有 asset_type='map' 的道具有地图界面 -->
+            <section v-if="editTarget.kindKey === 'prop' && assetTypeOf(editTarget) === 'map'" class="mat-detail-map-panel">
+              <div class="mat-detail-section-title">
+                <span>{{ t('episode.documentary.map.panel.sectionTitle') }}</span>
+                <span class="dim">{{ t('episode.documentary.map.panel.sectionHint') }}</span>
+              </div>
+              <MapWorkflowPanel
+                :key="`mapflow-${editTarget.id}`"
+                :prop-id="editTarget.id"
+                :asset-name="editTarget.name"
+                @preview="openMapPreview"
+                @changed="onMapWorkflowChanged"
+              />
+            </section>
+
             <!-- 最终提示词：可生成 / 重新生成 / 手动编辑 -->
-            <section class="mat-detail-prompt-panel">
+            <section v-if="assetTypeOf(editTarget) !== 'map'" class="mat-detail-prompt-panel">
               <div class="mat-detail-section-title">
                 <span>{{ t('detail.mat.finalPromptLabel') }}</span>
                 <span class="dim">{{ t('detail.mat.finalPromptSub') }}</span>
@@ -560,6 +593,7 @@
             </div>
             <div class="mat-detail-primary-actions">
               <button
+                v-if="assetTypeOf(editTarget) !== 'map'"
                 class="btn"
                 :disabled="isUploading(editTarget)"
                 @click="uploadMaterial(editTarget)"
@@ -569,6 +603,7 @@
                 {{ t('episode.asset.uploadImage') }}
               </button>
               <button
+                v-if="assetTypeOf(editTarget) !== 'map'"
                 class="btn"
                 :disabled="isUploading(editTarget)"
                 @click="openMaterialLibrary(editTarget)"
@@ -577,6 +612,7 @@
                 {{ t('components.mediaLibrary.pickAsset') }}
               </button>
               <button
+                v-if="assetTypeOf(editTarget) !== 'map'"
                 class="btn"
                 :disabled="isPending(editTarget)"
                 @click="generateMaterial(editTarget)"
@@ -715,6 +751,7 @@ import MediaTime from '~/components/MediaTime.vue'
 import AssetBrowserDialog from '~/components/AssetBrowserDialog.vue'
 import MediaLibraryDialog from '~/components/MediaLibraryDialog.vue'
 import FinalPromptSourceBadge from '~/components/FinalPromptSourceBadge.vue'
+import MapWorkflowPanel from '~/components/MapWorkflowPanel.vue'
 import { useNowTicker, ringPropsFromTask, isActiveTaskStatus } from '~/composables/useTaskProgress'
 
 const { t, locale } = useI18n()
@@ -1050,6 +1087,7 @@ async function cancelMaterial(m) {
 }
 
 async function generateMaterial(m) {
+  if (assetTypeOf(m) === 'map') { openEdit(m); return }
   const epId = drama.value?.episodes?.[0]?.id
   if (!epId) { toast.error(t('detail.mat.needEpisodeForImage')); return }
   const key = pendingKey(m)
@@ -1137,6 +1175,42 @@ async function applyMaterialFromLibrary(urls) {
 function openAssetViewer(m) {
   assetViewer.value = { open: true, src: assetSrc(m), title: `${m.kind} · ${m.name}` }
 }
+
+// 资产类型（Issue #84）：地图是独立类型，地图界面只认服务端持久化的 asset_type
+const ASSET_TYPES = ['prop', 'map']
+const assetTypeSaving = ref(false)
+
+function assetTypeOf(item) {
+  return item?.asset_type === 'map' ? 'map' : 'prop'
+}
+
+/** 地图 → 普通道具要人确认：地图数据不会被删，但整套地图界面会收起来 */
+async function onAssetTypeChange(item, next) {
+  if (assetTypeSaving.value || !item || assetTypeOf(item) === next) return
+  const downgrade = assetTypeOf(item) === 'map' && next === 'prop'
+  if (downgrade && !window.confirm(t('episode.asset.assetTypeDowngradeConfirm', { name: item.name || '' }))) return
+  assetTypeSaving.value = true
+  try {
+    const updated = await propAPI.update(item.id, { asset_type: next, confirm_asset_type_change: downgrade || undefined })
+    Object.assign(item, updated)
+    toast.success(t('episode.asset.assetTypeSaved', { type: t(`episode.asset.assetType.${next}`) }))
+    await load()
+  } catch (e) {
+    toastError(e)
+  } finally {
+    assetTypeSaving.value = false
+  }
+}
+
+function openMapPreview(src, title) {
+  assetViewer.value = { open: true, src, title }
+}
+
+/** 工作流推进会登记新的底图/成品版本，拉一次项目数据让卡片封面跟上 */
+async function onMapWorkflowChanged() {
+  await load()
+}
+
 function closeAssetViewer() {
   assetViewer.value = { open: false, src: '', title: '' }
 }
@@ -1185,6 +1259,7 @@ function updateAsset(m, payload) {
 const generatingPromptKeys = ref([])
 const firstEpisodeId = computed(() => drama.value?.episodes?.[0]?.id || null)
 async function generateFinalPrompt(m) {
+  if (assetTypeOf(m) === 'map') { openEdit(m); return }
   const epId = firstEpisodeId.value
   if (!epId) { toast.error(t('detail.mat.needEpisodeForPrompt')); return }
   const key = pendingKey(m)
@@ -1236,6 +1311,7 @@ async function generateFinalPrompt(m) {
  * 卡片场景下 editDraft 为空，会把素材的信息字段写成空值。
  */
 async function rewriteCardPrompt(m) {
+  if (assetTypeOf(m) === 'map') { openEdit(m); return }
   const epId = firstEpisodeId.value
   if (!epId) { toast.error(t('detail.mat.needEpisodeForPrompt')); return }
   const key = pendingKey(m)
@@ -1874,6 +1950,19 @@ onUnmounted(() => {
   gap: 8px;
 }
 .prop-name-row .asset-name { min-width: 0; }
+.tag.is-map { border-color: var(--accent-text); color: var(--accent-text); }
+/* 资产类型选择（Issue #84） */
+.asset-type-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; font-size: 11.5px; color: var(--text-1); }
+.asset-type-choice { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+.asset-type-hint { font-size: 10.5px; }
+/* 地图工作台最小工作宽度 1280：窄于此由容器横向滚动，不压缩画布 */
+.mat-detail-map-panel {
+  margin-top: 18px;
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+  overflow-x: auto;
+}
+.mat-detail-map-panel > * { min-width: 1280px; }
 .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--bg-3); flex-shrink: 0; }
 .dot.ok { background: var(--success); }
 .dot.pending { background: var(--accent); }
@@ -1920,6 +2009,21 @@ onUnmounted(() => {
   width: min(1040px, calc(100vw - 56px));
   max-height: calc(100vh - 56px);
 }
+.mat-detail-overlay.is-map-overlay { padding: 16px; }
+.mat-detail-dialog.is-map-dialog {
+  width: min(1800px, calc(100vw - 32px));
+  max-width: none;
+  height: calc(100vh - 32px);
+  max-height: calc(100vh - 32px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.is-map-dialog .mat-detail-head, .is-map-dialog .mat-detail-foot { flex: 0 0 auto; }
+.is-map-dialog .mat-detail-body { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.is-map-dialog .mat-detail-shell { grid-template-columns: minmax(0, 1fr); }
+.is-map-dialog .mat-detail-preview-panel { position: static; display: none; }
+.is-map-dialog .mat-detail-map-panel { overflow: visible; min-width: 1280px; }
 .mat-detail-head {
   display: flex; align-items: center; justify-content: space-between;
   gap: 12px; padding: 14px 16px;

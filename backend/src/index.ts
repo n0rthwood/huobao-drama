@@ -22,6 +22,7 @@ import agent from './routes/agent.js'
 import merge from './routes/merge.js'
 import skills from './routes/skills.js'
 import props from './routes/props.js'
+import mapWorkflow from './routes/map-workflow.js'
 import settings from './routes/settings.js'
 import storage from './routes/storage.js'
 import serverUpdate from './routes/serverUpdate.js'
@@ -51,6 +52,7 @@ import { QWEN_JOBS_PROVIDER } from './services/sys-task.js'
 import { backfillTaskEpisodeIds, failInterruptedTextTasks } from './services/task-center.js'
 import { resumeQueuedTextTasks } from './services/text-task-restart.js'
 import { failInterruptedRewriteRuns } from './services/script-rewrite/run.js'
+import { failInterruptedMapWorkflows } from './services/map-workflow/run.js'
 import { backfillGeneratedAt } from './services/media-time.js'
 import { migrateReferenceImages } from './services/reference-images.js'
 import { migrateAssetNames } from './services/asset-name-migration.js'
@@ -121,6 +123,8 @@ api.route('/video-queue', videoQueue)
 api.route('/merge', merge)
 api.route('/skills', skills)
 api.route('/props', props)
+// 地图资产工作流（#84）：/props/:id/map-workflow/*，与道具路由同前缀、分文件
+api.route('/props', mapWorkflow)
 api.route('/storage', storage)
 api.route('/settings', settings)
 api.route('/server-update', serverUpdate)
@@ -176,6 +180,8 @@ db.update(schema.sysTask)
   // 文本任务（提取 / 提示词批量 / 剧本改写 / 拆分分镜）的执行线程同样随重启丢失，标记为失败供一键重试
   .then(() => failInterruptedTextTasks())
   .then(() => failInterruptedRewriteRuns())
+  // 地图工作流（#84）：running 的工作流标失败并说明原因，产出保留，绝不自动重放模型与出图
+  .then(() => failInterruptedMapWorkflows())
   .then(() => resumeQueuedTextTasks())
   // 存量任务补归属集：全局任务中心按剧/集筛选与编号
   .then(() => backfillTaskEpisodeIds())

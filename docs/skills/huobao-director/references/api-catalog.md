@@ -249,6 +249,54 @@ Body：`{scope:"all"|"characters"|"scenes"|"props", episode_id?, rewrite_prompts
 ### `POST /dramas/{d}/assets/batch-generate`、`GET` 同路径 [S]
 用途：启动/查看资产批量；同项目同时只允许一个。`rewrite_prompts` 与 `overwrite_images` 是独立操作。
 
+### 3.84 地图资产工作流（S2，Issue #84）[S]
+
+**背景**：旧地图面板没有串联检索、底图、风格与可编辑几何，地图生成后甚至可能没有点线语义。本流程以显式类型和持久化阶段解决该问题；扩散仅做底纹，地图几何不由扩散产生。新增端点在生产实测留痕前保持 `[S]`。
+
+#### 类型与持久化
+
+`POST /props {drama_id,name,type?,description?,episode_id?,asset_type:"map"}` 新建地图；普通道具为 `"prop"`。`PUT /props/{p} {asset_type}` 可显式更改，map→prop 另需 `confirm_asset_type_change:true`，不删除地图数据。跨项目资产导入仍用 `kind:"prop"`，保留地图分类与数据，不共享运行任务。
+
+注意：此处 `asset_type` 是 prop 的地图子类；`POST /tasks/register-upload` 的 `asset_type` 则是目标表类别，地图仍填写 `"prop"`。不能写 `"map"` 作为第四类目标。
+
+#### `GET /props/{p}/map-workflow`
+
+返回 `{asset_type,brief,stage,status,mode,revision,task_id,steps,issues,research,map_spec,outputs,history,error}`。普通道具返回 400 `not_a_map`；不存在返回 404。
+
+- `stage ∈ brief|research|base|style|drawing|complete`，是当前或下一待执行阶段；`status ∈ idle|running|awaiting_review|blocked|failed|completed`。检查 `steps[].status/message` 判断哪些阶段真正完成。
+- `issues[] = {field,code,message,blocking}`；`blocking=true` 要补齐，不把失败当无问题。
+- `research.queries[]` 逐源记录 hits/error；来源固定为 `wikipedia-zh / wikipedia-en / europeana / smithsonian`，不是模型自选任意网站。`sources[]` 保存机构、年代、许可、URL 与实际摘录；`features[]` 保存点线面、坐标依据、支持原文、不确定性、来源引用和冲突。URL 存在不等于它证明了某个坐标。Europeana/Smithsonian 凭据仍由「设置→资料检索」保管，Agent 不获取、落盘或写入请求留痕；无 key 的来源失败应如实呈报。
+- `outputs = {base_image,texture_image,final_image,kmz,layer_doc}`；image 项含 `{path,width,height,source,task_id,provenance}`。`provenance.registration` 是 geo↔像素配准真源；Earth 使用通过独立检验的实测控制网格，不用名义相机或 bbox 仿射替代；检验点残差超过 3px 或相机漂移时失败，保留标定截图、控制点与残差证据。
+
+- research 阶段会把有依据的点线面加入 `map_spec`，AI 新项带 `proposed:true`。自动制图可使用候选，但不是人工批准；人工采纳须去掉相应项的 `proposed` 再 PUT 保存，此后检索不覆盖该项。近似区域只能在显式 `schematic:true` 下采用，必须保留不确定性；没有依据不虚构范围。
+#### `PUT /props/{p}/map-workflow`
+
+Body：`{expected_revision,brief?,map_spec?,mode?}`，至少一个可保存字段。顶层未传的字段保留，brief 内字段合并；**map_spec 一旦传入就是完整替换**，不是按 ID 合并。先 GET 完整 spec，仅修改获准的项，带当前 expected_revision 保存并读回核对；省略已有 places/routes/regions 会丢掉它们。人工确认项的保留承诺仅针对自动检索合并，不会拦住人有意删除。
+
+`brief` 字段：`{subject,era,location,purpose,detail_level:"overview"|"regional"|"site",schematic:boolean,base_mode:"program"|"earth"|"image",style:"archival"|"clean"|"ink",notes,reference_image?}`。
+
+- 对象/时代/空间/用途可由 AI 解释隐含信息，但缺时代不能擅自默认；已知字段不得用模型猜测覆盖。
+- `base_mode:"image"` 的 `reference_image = {path,source_url,license,control_points:[{x,y,lon,lat}]}`；先通过 `POST /upload/image` 上传，`path` 是返回的 static 相对路径，`x/y` 是源图像素，`lon/lat` 是 WGS84 度。至少三个非共线点，必须有来源与许可；最大拟合残差超过源图对角线 5% 时拒绝，保留 max/rms 像素残差供人工核对。恰好三个控制点可拟合为零，不代表整张图精准；残差不能代替史实核验。
+- `map_spec` 沿用投影、bbox、背景层与 `places/routes`，新增 `regions:[{id,name,points:[[lon,lat],...],proposed?}]`。面至少三个不同且非共线顶点，规范化后闭合。人工确认的几何不能被重跑检索覆盖。
+- 保存只是改真源，不等于已渲染新图。输出上限为 60 图层、每条线/面 240 顶点，画面外/地平线后或超限几何会阻断，不丢点、钳边或缩减内容。
+- 几何编辑后读回响应的 `stage`：投影/bbox/背景层不变可复用配准底图和底纹，从 drawing 手动推进绘制，再推进 complete 采用，或在已授权范围内 auto 续跑；投影/bbox/背景层变更先重做 base。相同规范化 spec 保存不作废已有成图。
+
+#### 执行与人工控制
+
+- `POST /props/{p}/map-workflow/run {mode:"auto"|"manual",expected_revision,text_config_id?,image_config_id?,image_model?}`：继续当前 `stage`，不会从 brief 重启；整条重做要先显式 rollback。auto 连续执行到完成或阻断，可能发生文本与底纹模型调用，先授权、先预扣预算；manual 仅执行当前一步供审阅。已 completed 时返回 `already_completed`，不重复计费。
+- `POST /props/{p}/map-workflow/advance {expected_revision,text_config_id?,image_config_id?,image_model?,skip?}`：从当前 `stage` 执行一步。`skip:true` 仅可跳过 `style`（底纹）；不得跳过信息充分性或检索来伪造流程通过。
+- `POST /props/{p}/map-workflow/rollback {stage,expected_revision}`：回到指定阶段，保留已确认几何与历史，不替代人的史实批准。
+- `POST /props/{p}/map-workflow/cancel {}`：按人的决定取消该地图当前执行；此接口不接收 expected_revision，执行前读回当前 task_id，不把它描述为取消某个旧快照。已发出的底纹任务仍可能完成并消耗额度，取消不是退费，也不能声称上游任务已停止。
+- 启动/推进返回工作流详情与 `task_id`，通过 `GET /tasks/{task_id}` 与本详情读到终态并打开真实产物。后台重启后保留产物与失败原因，由人明确继续，不自动重复计费步骤。
+- `mode` 优先级：PUT 保存选择但不启动；run 使用请求 mode（省略默认 manual，不沿用已保存 auto）；advance 固定 manual，与 run manual 都执行当前一步，只有 advance 支持 skip。通常自动续跑用 run，逐步审核/跳过底纹用 advance。
+- 正常完整流程：brief 1 次文本、research 2 次文本（计划+摘录提取），style 固定模板发 1 次图片；其余阶段确定性。未钉选文本端点时通用调用可最多尝试 3 个端点，完整流程保守预留至多 9 次文本；显式 text_config_id 钉选则不自动切端点。失败后重开阶段仍按实际新请求计数，不按容器任务数算账。
+- complete 是当前图/语义/原件版本的技术采用，不是人批准史实；没有 opened 参数，不要自造。manual 在推进 complete 前打开 final，auto 完成后立即打开；都须在请求证据里记录实际打开的路径与 SHA-256，交人审核。地图最终图可带默认 35% alpha 独立底纹与标注，原始底图版本保存在 faithful_source；faithful 与 map 分类不是同一字段，不能把派生图当未改动原件。
+
+
+409 `revision_conflict|workflow_busy`：保留本地草稿，刷新并由人决定；不无限重试。关键需求/关键证据缺失、充分性检查失败或所有来源均无有效结果会阻断；单源失败/无命中和非关键细节缺失保留告警，核心依据足够可继续。Earth/外部配准失败不得当通过或自动换路线冒充成功。失败重试也占额度，每次 GPU 提交前须有剩余预算和对应授权。
+
+**正例**：获准地图与预算 → 新建 map → 保存对象/时代/用途 → manual 检查与检索 → 看来源/风险 → 生产选定底图 → 仅生成底纹 → 确定性绘制 → 开图核对 → 交人审核。**反例**：上传真实地图后调普通 `generate-image`；用博物馆搜索命中为模型猜测的疆域背书；配准失败后拿程序图标成 Earth；把 `completed` 当史实/版权通过。
+
 ---
 
 ## 4. Poster（S3，可选旁路，在资产之后）

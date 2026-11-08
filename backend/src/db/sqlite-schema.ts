@@ -761,6 +761,10 @@ const columnAdditions: { table: string; column: string; type: string }[] = [
   // 地图底图规格（Issue #56）：地图类证据素材的几何由 d3-geo + Natural Earth 确定性渲染，
   // 扩散模型只能做低强度风格化，绝不参与几何——第一轮事故就是扩散把河流海岸线重画了。
   { table: 'props', column: 'map_spec', type: 'TEXT' },
+  // 地图资产（Issue #84）：显式类别列 + 地图工作流持久状态。
+  // asset_type 首次补列时把「已有 map_spec」的存量道具迁成 'map'（见 migrateMapAssetType）。
+  { table: 'props', column: 'asset_type', type: "TEXT NOT NULL DEFAULT 'prop'" },
+  { table: 'props', column: 'map_workflow', type: 'TEXT' },
   // 背景信息载体（Issue #47）：旁白提到但不出场、需要视觉承载的实体（近卫团、彼得一世、波尔塔瓦）。
   // 不新增第 4 类资产：仍按角色/场景/道具三类落库，这一列只回答「它是不是背景信息载体」，
   // 供表达设计（#49）的 exposition_assets 单列引用。
@@ -1015,6 +1019,22 @@ function migrateFaithfulProps(sqlite: Database.Database): void {
 }
 
 /**
+ * 存量迁移（Issue #84）— 只在 props.asset_type 列首次补上时执行一次：
+ * 已经有非空 `map_spec` 的道具就是地图资产，迁成 `asset_type='map'`。
+ *
+ * 只改类别列：不动 image_url / faithful / semantics / map_spec 本身，
+ * 因此存量地图的底图、语义坐标与已生成的关键帧签名全部保持不变，
+ * 只是从此会显示地图 UI（普通道具不会）。
+ */
+function migrateMapAssetType(sqlite: Database.Database): void {
+  const res = sqlite.prepare(
+    `UPDATE props SET asset_type = 'map'
+     WHERE asset_type != 'map' AND map_spec IS NOT NULL AND TRIM(map_spec) NOT IN ('', 'null')`,
+  ).run()
+  console.log(`🗺️ 地图资产迁移：${res.changes} 个带 map_spec 的道具标记为 asset_type='map'（只改类别，不动底图与语义）`)
+}
+
+/**
  * 风格预设种子数据 — value 存入 dramas.style，prompt 注入生图提示词（作为前缀拼接）
  *
  * prompt 统一按多维结构书写，保证跨模型/跨镜头的风格控制力：
@@ -1108,8 +1128,10 @@ export function initSqliteSchema(sqlite: Database.Database) {
     "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'storyboard_pool_selections'",
   ).get()
   // props.faithful 是否已存在：不存在说明是首次升级到 #47，需要一次性把地图原件标成证据素材
-  const hadFaithful = (sqlite.prepare('PRAGMA table_info(props)').all() as { name: string }[])
-    .some(col => col.name === 'faithful')
+  const propColumns = (sqlite.prepare('PRAGMA table_info(props)').all() as { name: string }[]).map(col => col.name)
+  const hadFaithful = propColumns.includes('faithful')
+  // props.asset_type 是否已存在：不存在说明是首次升级到 #84，需要一次性把有 map_spec 的道具迁成地图资产
+  const hadAssetType = propColumns.includes('asset_type')
   for (const statement of sqliteSchemaStatements) {
     sqlite.exec(statement)
   }
@@ -1120,6 +1142,8 @@ export function initSqliteSchema(sqlite: Database.Database) {
   if (!hadTargetAssets) migrateStoryboardTargetAssets(sqlite)
   if (!hadPoolSelections) migrateStoryboardPoolSelections(sqlite)
   if (!hadFaithful) migrateFaithfulProps(sqlite)
+  // 必须在任何地图工作流读取之前跑完：没迁移的存量地图会被当成普通道具（看不到地图 UI）
+  if (!hadAssetType) migrateMapAssetType(sqlite)
   applyColumnRemovals(sqlite)
   cleanupStaleAssetLinks(sqlite)
   const insertSeed = sqlite.prepare(SEED_SQL)

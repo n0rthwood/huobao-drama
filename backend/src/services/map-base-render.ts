@@ -23,6 +23,11 @@ export const MAP_BASE_WIDTH = 3840
 export const MAP_BASE_HEIGHT = 2160
 /** 路线/河流在底图上的渲染色：必须是有彩色（后续图层/风格化会按颜色提取线条） */
 export const MAP_ROUTE_COLOR = '#1f6fd0'
+/**
+ * 区域（势力范围/行政区/战役范围）在底图上的填充色（Issue #84）。
+ * 与路线色分开：风格化/抽色时面与线必须可区分，二者混色会让下游把边界当路线。
+ */
+export const MAP_REGION_COLOR = '#b4573c'
 
 /** 水体固定冷蓝，比路线色浅，避免风格化后把海洋误当路线 */
 const MAP_WATER_COLOR = '#8fc1e8'
@@ -36,6 +41,8 @@ export class MapSpecValidationError extends Error {
 
 export interface MapPlace { id: string; name: string; lon: number; lat: number; proposed?: boolean }
 export interface MapRoute { id: string; name: string; points: Array<[number, number]>; proposed?: boolean }
+/** 面要素：外环（首尾点由 normalizeMapSpec 自动闭合），经纬度与 routes 同口径 */
+export interface MapRegion { id: string; name: string; points: Array<[number, number]>; proposed?: boolean }
 export interface MapSpec {
   version: 1
   projection: { type: 'mercator' | 'equirectangular' }
@@ -44,6 +51,8 @@ export interface MapSpec {
   layers: { land: boolean; coastline: boolean; rivers: boolean; lakes: boolean; countries: boolean }
   places: MapPlace[]
   routes: MapRoute[]
+  /** Issue #84：面几何。老 map_spec 没有这个字段，规范化后为 []，渲染签名与改动前逐字节一致。 */
+  regions: MapRegion[]
   style: { theme: 'archival' | 'clean' | 'ink' }
 }
 
@@ -51,6 +60,7 @@ export interface MapCanvasSize { width: number; height: number }
 
 export interface MapProjectedPoint { id: string; name: string; at: [number, number] }
 export interface MapProjectedRoute { id: string; name: string; points: Array<[number, number]>; color: string }
+export interface MapProjectedRegion { id: string; name: string; points: Array<[number, number]>; color: string }
 export interface MapContextCoverage {
   disclaimer: string
   boundary_features: number
@@ -65,6 +75,7 @@ export interface MapRenderResult {
   sha256: string
   points: MapProjectedPoint[]
   routes: MapProjectedRoute[]
+  regions: MapProjectedRegion[]
   /** 现代定位背景，不进入用户审核的 places/routes 语义。 */
   context: MapContextCoverage
   /** 该签名的文件此前已存在（本次未重新栅格化） */
@@ -76,6 +87,8 @@ export interface MapRenderResult {
 const MAX_PLACES = 200
 const MAX_ROUTES = 50
 const MAX_ROUTE_POINTS = 5000
+const MAX_REGIONS = 30
+const MAX_REGION_POINTS = 2000
 /** mercator 在两极发散，纬度按 Web 地图惯例截到 ±85 */
 const MERCATOR_LAT_LIMIT = 85
 
@@ -107,11 +120,25 @@ const specSchema = z.object({
     points: z.array(lonLatTuple),
     proposed: z.boolean().optional(),
   })).optional(),
+  regions: z.array(z.object({
+    id: z.string().min(1),
+    name: z.string(),
+    points: z.array(lonLatTuple),
+    proposed: z.boolean().optional(),
+  })).optional(),
   style: z.object({ theme: z.enum(['archival', 'clean', 'ink']) }).optional(),
 })
 
 function fail(message: string): never {
   throw new MapSpecValidationError(message)
+}
+
+/** 外环首尾闭合（GeoJSON 惯例）；已闭合则原样返回 */
+function closeRing(points: Array<[number, number]>): Array<[number, number]> {
+  const first = points[0]
+  const last = points[points.length - 1]
+  if (first && last && (first[0] !== last[0] || first[1] !== last[1])) return [...points, [first[0], first[1]]]
+  return points
 }
 
 /**
@@ -161,6 +188,46 @@ export function normalizeMapSpec(raw: unknown): MapSpec {
     }
   }
 
+  const regions = data.regions ?? []
+  if (regions.length > MAX_REGIONS) fail(`地图配置字段 regions 非法：区域最多 ${MAX_REGIONS} 个，当前 ${regions.length} 个`)
+  for (const region of regions) {
+    if (region.points.length < 3) {
+      fail(`地图配置字段 regions[${region.id}].points 非法：面至少需要 3 个点，当前 ${region.points.length} 个`)
+    }
+    if (region.points.length > MAX_REGION_POINTS) {
+      fail(`地图配置字段 regions[${region.id}].points 非法：单个面最多 ${MAX_REGION_POINTS} 个点，当前 ${region.points.length} 个`)
+    }
+    for (const [lon, lat] of region.points) {
+      if (lon < -180 || lon > 180 || lat < -90 || lat > 90) {
+        fail(`地图配置字段 regions[${region.id}].points 非法：经度需在 -180~180、纬度需在 -90~90 之间`)
+      }
+    }
+    // 退化面（所有点同一位置/同一条线）会被画成不可见的一道线，几何上也不是「范围」。
+    // 只数不同点不够：三个共线的不同点仍然围不出面积，必须真算面积。
+    const unique = new Set(region.points.map(([lon, lat]) => `${lon},${lat}`))
+    if (unique.size < 3) {
+      fail(`地图配置字段 regions[${region.id}].points 非法：至少要有 3 个不同的点，当前只有 ${unique.size} 个`)
+    }
+    const ring = closeRing(region.points.map(([lon, lat]) => [lon, lat] as [number, number]))
+    // 先平移到首点附近，避免大经纬度相乘再相减吞掉窄运河/走廊真正存在的面积。
+    const [originLon, originLat] = ring[0]
+    let twiceArea = 0
+    let coordinateScale = 0
+    for (let i = 0; i < ring.length - 1; i++) {
+      const x1 = ring[i][0] - originLon
+      const y1 = ring[i][1] - originLat
+      const x2 = ring[i + 1][0] - originLon
+      const y2 = ring[i + 1][1] - originLat
+      twiceArea += x1 * y2 - x2 * y1
+      coordinateScale = Math.max(coordinateScale, Math.abs(x1), Math.abs(y1), Math.abs(x2), Math.abs(y2))
+    }
+    // 只拒绝数值退化，不按形状的宽窄比设门槛：合法的运河带可以很长很窄。
+    const areaEpsilon = coordinateScale * coordinateScale * 1e-12
+    if (Math.abs(twiceArea) <= areaEpsilon) {
+      fail(`地图配置字段 regions[${region.id}].points 非法：这些点共线或面积数值退化，围不出有面积的范围（请改用折线 routes）`)
+    }
+  }
+
   return {
     version: 1,
     projection: { type: projectionType },
@@ -185,6 +252,13 @@ export function normalizeMapSpec(raw: unknown): MapSpec {
       points: item.points.map(([lon, lat]) => [lon, lat] as [number, number]),
       ...(item.proposed ? { proposed: true as const } : {}),
     })),
+    // 外环按 GeoJSON 惯例闭合：首尾同点，重复点不计入上限校验
+    regions: regions.map(item => ({
+      id: item.id,
+      name: item.name,
+      points: closeRing(item.points.map(([lon, lat]) => [lon, lat] as [number, number])),
+      ...(item.proposed ? { proposed: true as const } : {}),
+    })),
     style: { theme: data.style?.theme ?? 'archival' },
   }
 }
@@ -201,8 +275,8 @@ export function parseMapSpec(raw: string | null | undefined): MapSpec | null {
 
 // ---------------------------------------------------------------- 投影
 
-/** 画布强制 16:9（宽为准），最小 1280×720 */
-function normalizeSize(size: Partial<MapCanvasSize> | undefined): MapCanvasSize {
+/** 画布强制 16:9（宽为准），最小 1280×720。导出：地图登记件要按同一口径复算画布。 */
+export function normalizeMapCanvas(size: Partial<MapCanvasSize> | undefined): MapCanvasSize {
   const rawWidth = Math.trunc(size?.width ?? MAP_BASE_WIDTH)
   const width = Math.max(1280, Math.min(7680, Number.isFinite(rawWidth) ? rawWidth : MAP_BASE_WIDTH))
   // 宽为准推 16:9；偶数宽保证高度整数化后比例误差 < 1px
@@ -215,16 +289,19 @@ function normalizeSize(size: Partial<MapCanvasSize> | undefined): MapCanvasSize 
  * 逆时针小环表示「整个地球减去这个矩形」，fitExtent 会去拟合全球，豫北 bbox 实测会塌成
  * 1280×720 画布上 5px 宽的一小团（见 tests/map-base-render.test.mjs 的跨度断言）。
  */
-function bboxPolygon(spec: MapSpec) {
+function bboxPolygon(spec: Pick<MapSpec, 'bbox'>) {
   const [w, s, e, n] = spec.bbox
   return {
     type: 'Polygon' as const,
     coordinates: [[[w, s], [w, n], [e, n], [e, s], [w, s]]],
   }
 }
-
-/** 渲染与坐标换算共用同一个投影实例口径，否则标注会和底图错位 */
-function buildProjection(spec: MapSpec, size: MapCanvasSize): GeoProjection {
+/**
+ * 渲染与坐标换算共用同一个投影实例口径，否则标注会和底图错位。
+ * 导出给 map-geometry：登记件（registration）里只存 projection + bbox + 画布尺寸，
+ * 复原投影必须走这个唯一实现，绝不允许第二份 fitExtent 写法。
+ */
+export function mapProjectionFor(spec: Pick<MapSpec, 'projection' | 'bbox'>, size: MapCanvasSize): GeoProjection {
   const projection = spec.projection.type === 'mercator' ? geoMercator() : geoEquirectangular()
   // fitExtent 自身保持纵横比并居中，16:9 画幅下允许上下/左右留边
   projection.fitExtent([[0, 0], [size.width, size.height]], bboxPolygon(spec))
@@ -232,13 +309,13 @@ function buildProjection(spec: MapSpec, size: MapCanvasSize): GeoProjection {
 }
 
 export function projectLonLat(spec: MapSpec, size: MapCanvasSize, lonlat: [number, number]): [number, number] {
-  const projected = buildProjection(spec, normalizeSize(size))(lonlat)
+  const projected = mapProjectionFor(spec, normalizeMapCanvas(size))(lonlat)
   if (!projected) throw new MapSpecValidationError(`坐标 [${lonlat[0]}, ${lonlat[1]}] 无法投影到当前地图`)
   return [projected[0], projected[1]]
 }
 
 export function unprojectPixel(spec: MapSpec, size: MapCanvasSize, px: [number, number]): [number, number] {
-  const projection = buildProjection(spec, normalizeSize(size))
+  const projection = mapProjectionFor(spec, normalizeMapCanvas(size))
   const inverted = projection.invert?.(px)
   if (!inverted) throw new MapSpecValidationError(`像素 [${px[0]}, ${px[1]}] 无法反算经纬度`)
   return [inverted[0], inverted[1]]
@@ -295,7 +372,7 @@ function loadGeoLayer(name: GeoLayerName): unknown | null {
 
 /** 背景数据和语义目标使用相同投影；只裁背景，不修改用户指定的坐标或路线。 */
 function projectContext(spec: MapSpec, size: MapCanvasSize) {
-  const projection = buildProjection(spec, size)
+  const projection = mapProjectionFor(spec, size)
   const [west, south, east, north] = spec.bbox
   const sw = projection([west, south])!
   const ne = projection([east, north])!
@@ -349,7 +426,7 @@ function round(value: number): number {
  */
 export function buildMapSvg(spec: MapSpec, size: MapCanvasSize): string {
   const theme = THEMES[spec.style.theme]
-  const projection = buildProjection(spec, size)
+  const projection = mapProjectionFor(spec, size)
   // digits 固定小数位：同 spec 必定生成同一串 path，保证字节级确定性
   const pathGen = geoPath(projection).digits?.(3) ?? geoPath(projection)
 
@@ -390,6 +467,22 @@ export function buildMapSvg(spec: MapSpec, size: MapCanvasSize): string {
   }
   parts.push('</g>')
 
+  // 面在线和点之下：范围是背景语义，绝不能盖住路线与地点。
+  // 逐点投影后画 <polygon>，不走 geoPath：d3 的球面多边形语义对环绕方向敏感（见 bboxPolygon 注释），
+  // 用户画的环方向不受控，按球面解释会把「一个省」变成「整个地球减去这个省」。
+  for (const region of spec.regions) {
+    const pts = region.points
+      .map(point => projection(point))
+      .filter((point): point is [number, number] => Array.isArray(point))
+      .map(point => `${round(point[0])},${round(point[1])}`)
+    if (pts.length < 3) continue
+    parts.push(
+      `<polygon points="${pts.join(' ')}" fill="${MAP_REGION_COLOR}" fill-opacity="0.28"`
+      + ` stroke="${MAP_REGION_COLOR}" stroke-width="${round(strokeWidth * 0.7)}" stroke-linejoin="round"`
+      + ` data-region="${escapeAttr(region.id)}"/>`,
+    )
+  }
+
   for (const route of spec.routes) {
     const pts = route.points
       .map(point => projection(point))
@@ -419,7 +512,7 @@ export function buildMapSvg(spec: MapSpec, size: MapCanvasSize): string {
 
 /** 同 spec + 同尺寸 → 同签名（用于复用已渲染文件与断言确定性） */
 export function mapBaseSignature(spec: MapSpec, size: MapCanvasSize): string {
-  const canvas = normalizeSize(size)
+  const canvas = normalizeMapCanvas(size)
   // 字段顺序固定，避免对象字面量书写顺序影响签名
   const canonical = JSON.stringify({
     v: spec.version,
@@ -429,6 +522,10 @@ export function mapBaseSignature(spec: MapSpec, size: MapCanvasSize): string {
     l: [spec.layers.land, spec.layers.coastline, spec.layers.rivers, spec.layers.lakes, spec.layers.countries],
     pl: spec.places.map(item => [item.id, item.name, item.lon, item.lat, item.proposed === true]),
     rt: spec.routes.map(item => [item.id, item.name, item.points, item.proposed === true]),
+    // 没有面的 spec 不写这个键：Issue #84 之前落盘的底图签名保持逐字节不变，不会被整批作废重渲
+    ...(spec.regions.length
+      ? { rg: spec.regions.map(item => [item.id, item.name, item.points, item.proposed === true]) }
+      : {}),
     s: spec.style.theme,
     w: canvas.width,
     h: canvas.height,
@@ -438,7 +535,7 @@ export function mapBaseSignature(spec: MapSpec, size: MapCanvasSize): string {
 
 /** 渲染底图并落盘。默认 3840×2160（16:9）。**绝不渲染任何文字**（地名/图例/刻度一律没有）。 */
 export async function renderMapBase(spec: MapSpec, opts?: Partial<MapCanvasSize>): Promise<MapRenderResult> {
-  const size = normalizeSize(opts)
+  const size = normalizeMapCanvas(opts)
   const signature = mapBaseSignature(spec, size)
   const dir = path.join(STORAGE_ROOT, 'map-bases')
   const filename = `${signature}.png`
@@ -466,7 +563,7 @@ export async function renderMapBase(spec: MapSpec, opts?: Partial<MapCanvasSize>
     fs.writeFileSync(absolute, buffer)
   }
 
-  const projection = buildProjection(spec, size)
+  const projection = mapProjectionFor(spec, size)
   const points: MapProjectedPoint[] = []
   for (const place of spec.places) {
     const at = projection([place.lon, place.lat])
@@ -482,6 +579,15 @@ export async function renderMapBase(spec: MapSpec, opts?: Partial<MapCanvasSize>
       .map(point => [point[0], point[1]] as [number, number]),
     color: MAP_ROUTE_COLOR,
   }))
+  const regions: MapProjectedRegion[] = spec.regions.map(region => ({
+    id: region.id,
+    name: region.name,
+    points: region.points
+      .map(point => projection(point))
+      .filter((point): point is [number, number] => Array.isArray(point))
+      .map(point => [point[0], point[1]] as [number, number]),
+    color: MAP_REGION_COLOR,
+  }))
 
   return {
     path: `static/map-bases/${filename}`,
@@ -490,6 +596,7 @@ export async function renderMapBase(spec: MapSpec, opts?: Partial<MapCanvasSize>
     sha256: crypto.createHash('sha256').update(buffer).digest('hex'),
     points,
     routes,
+    regions,
     context: projectContext(spec, size).coverage,
     reused,
   }

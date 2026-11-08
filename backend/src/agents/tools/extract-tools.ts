@@ -665,6 +665,12 @@ const saveDedupProps = createTool({
       name: z.string(),
       type: z.string().optional(),
       description: z.string().optional(),
+      /**
+       * 地图资产（Issue #84）：必须**显式声明**，绝不按名字猜。
+       * 'map' 的资产不进通用生图链路，画面由地图工作流确定性渲染（扩散只做底纹）。
+       */
+      asset_type: z.enum(['prop', 'map']).optional()
+        .describe("'map' = 地图/示意图资产：画面由地图工作流确定性渲染，不走生图；其余一律 'prop'"),
       // 背景信息载体（Issue #47）：旁白提到的组织/事件的视觉载体（近卫团旗、勋章、版画、文书）
       exposition: z.boolean().optional()
         .describe('true = 背景信息载体：旁白提到但本集不出场的组织/事件，用一件可画的器物或版画承载（会标在 type 上）'),
@@ -702,6 +708,8 @@ const saveDedupProps = createTool({
         // 已存在：合并信息，保留 ID；物品外貌变更后旧的最终提示词失效
         const expositionNow = prop.exposition === true || Number(existing.exposition) === 1
         await db.update(schema.props).set({
+          // 地图标记只加不减（与 exposition 同理）：已经是地图资产的，重跑提取不会把它降回普通道具
+          assetType: prop.asset_type === 'map' || existing.assetType === 'map' ? 'map' : 'prop',
           type: expositionNow ? markExposition(prop.type || existing.type) : (prop.type || existing.type),
           description: prop.description || existing.description,
           finalPrompt: prop.description ? null : existing.finalPrompt,
@@ -714,6 +722,7 @@ const saveDedupProps = createTool({
         results.merged++
       } else {
         const res = await db.insert(schema.props).values({
+          assetType: prop.asset_type === 'map' ? 'map' : 'prop',
           name: prop.name,
           type: prop.exposition ? markExposition(prop.type) : (prop.type || ''),
           description: prop.description || '',

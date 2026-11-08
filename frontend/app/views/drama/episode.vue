@@ -302,6 +302,9 @@
                 <svg v-else width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
                 {{ extractingTargets.length ? t('episode.prod.extractingTypesDots', { types: extractingLabels }) : t('episode.prod.startExtract') }}
               </button>
+              <button v-if="!extractTab || extractTab === 'props'" class="btn" @click="openAssetCreate('prop')">
+                <Plus :size="13" /> {{ t('common.add') }} {{ t('common.prop') }} / {{ t('episode.asset.assetType.map') }}
+              </button>
             </div>
             <template v-else>
             <div v-if="imageQueue.total" class="image-queue-bar">
@@ -544,15 +547,17 @@
                   <div class="prop-name-row">
                     <span class="asset-name" :title="p.name">{{ p.name }}</span>
                     <span class="tag">{{ p.type || t('common.prop') }}</span>
+                    <span v-if="isMapAsset(p)" class="tag asset-map-tag" :title="t('episode.asset.assetTypeHint')">{{ t('episode.asset.assetType.map') }}</span>
                     <span v-if="p.faithful" class="tag asset-faithful-tag" :title="t('episode.asset.faithfulHint')">{{ t('episode.asset.faithfulBadge') }}</span>
                   </div>
                   <div class="asset-meta asset-desc dim" :title="p.description || ''">{{ p.description || t('episode.asset.noDescription') }}</div>
-                  <div class="asset-meta asset-final" :class="{ dim: !(p.final_prompt || p.finalPrompt) }" :title="p.final_prompt || p.finalPrompt || ''">
+                  <div v-if="!isMapAsset(p)" class="asset-meta asset-final" :class="{ dim: !(p.final_prompt || p.finalPrompt) }" :title="p.final_prompt || p.finalPrompt || ''">
                     <span class="afp-label">{{ t('episode.asset.finalPromptWhiteBg') }}</span>
                     {{ p.final_prompt || p.finalPrompt || t('episode.asset.finalPromptAutoWhiteBg') }}
                     <FinalPromptSourceBadge :source="p.final_prompt_source || ''" :final-prompt="p.final_prompt || p.finalPrompt || ''" :updated-at="p.final_prompt_updated_at || ''" :rewritable="!p.faithful" :busy="isGeneratingPrompt('prop', p.id)" @rewrite="rewriteAssetPrompt('prop', p.id)" />
                   </div>
                   <ReferenceImageManager
+                    v-if="!isMapAsset(p)"
                     asset-type="prop"
                     :asset-id="p.id"
                     :references="p.reference_images ?? p.referenceImages"
@@ -561,7 +566,7 @@
                     @preview="openImageViewer"
                   />
                 </div>
-                <div v-if="assetImageRing('prop', p.id)" class="asset-task-ring" @click.stop>
+                <div v-if="!isMapAsset(p) && assetImageRing('prop', p.id)" class="asset-task-ring" @click.stop>
                   <ProgressRing
                     v-bind="assetImageRing('prop', p.id)"
                     :size="36"
@@ -573,16 +578,17 @@
                 </div>
                 <div class="asset-foot">
                   <span :class="['dot', (p.image_url || p.imageUrl) && 'ok', isPendingPropImage(p.id) && 'pending']" />
-                  <button class="btn btn-sm ml-auto" :title="t('episode.asset.uploadPropImage')" :disabled="isUploadingAsset('prop', p.id)" @click.stop="uploadAssetImage('prop', p.id)">
+                  <button v-if="!isMapAsset(p)" class="btn btn-sm ml-auto" :title="t('episode.asset.uploadPropImage')" :disabled="isUploadingAsset('prop', p.id)" @click.stop="uploadAssetImage('prop', p.id)">
                     <Loader2 v-if="isUploadingAsset('prop', p.id)" :size="11" class="animate-spin" />
                     <svg v-else width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                     {{ t('episode.asset.upload') }}
                   </button>
-                  <button class="btn btn-sm" :title="t('components.mediaLibrary.pickAsset')" :disabled="isUploadingAsset('prop', p.id)" @click.stop="openAssetLibrary('prop', p.id)">
+                  <button v-if="!isMapAsset(p)" class="btn btn-sm" :title="t('components.mediaLibrary.pickAsset')" :disabled="isUploadingAsset('prop', p.id)" @click.stop="openAssetLibrary('prop', p.id)">
                     <Images :size="11" />
                     {{ t('components.mediaLibrary.pick') }}
                   </button>
-                  <button v-if="!p.faithful" class="btn btn-sm" :disabled="isPendingPropImage(p.id)" @click.stop="genPropImg(p.id)">
+                  <button v-if="isMapAsset(p)" class="btn btn-sm btn-primary ml-auto" @click.stop="openAssetDetail('prop', p)">{{ t('episode.documentary.map.panel.openWorkbench') }}</button>
+                  <button v-else-if="!p.faithful" class="btn btn-sm" :disabled="isPendingPropImage(p.id)" @click.stop="genPropImg(p.id)">
                     <Loader2 v-if="isPendingPropImage(p.id)" :size="11" class="animate-spin" />
                     {{ (p.image_url || p.imageUrl) ? t('episode.asset.regen') : (isPendingPropImage(p.id) ? t('episode.asset.generating') : t('episode.asset.generate')) }}
                   </button>
@@ -722,9 +728,10 @@
       </div>
       <ExportPanel v-else />
 
-      <div v-if="assetDetail.open && assetDetail.item" class="overlay asset-detail-overlay" @click.self="closeAssetDetail">
+      <div v-if="assetDetail.open && assetDetail.item" class="overlay asset-detail-overlay" :class="{ 'is-map-overlay': isMapAsset(assetDetail.item) }" @click.self="closeAssetDetail">
         <section
           class="dialog asset-detail-dialog"
+          :class="{ 'is-map-dialog': isMapAsset(assetDetail.item) }"
           role="dialog"
           aria-modal="true"
           :aria-label="t('episode.asset.detailTitle', { type: assetTypeLabel(assetDetail.type) })"
@@ -837,14 +844,30 @@
                   <span class="dim asset-detail-time-hint">{{ t('episode.asset.timeHint') }}</span>
                 </div>
 
+                <!-- 地图是独立资产类型（Issue #84）：这里明确选择，普通道具不出现任何地图字段/按钮 -->
+                <div v-if="assetDetail.type === 'prop'" class="asset-type-row">
+                  <span class="asset-type-label">{{ t('episode.asset.assetTypeLabel') }}</span>
+                  <label v-for="option in ASSET_TYPES" :key="option" class="asset-type-choice">
+                    <input
+                      type="radio"
+                      :value="option"
+                      :checked="assetTypeOf(assetDetail.item) === option"
+                      :disabled="assetTypeSaving"
+                      @change="onAssetTypeChange(assetDetail.item, option)"
+                    />
+                    <span>{{ t(`episode.asset.assetType.${option}`) }}</span>
+                  </label>
+                  <span class="dim asset-type-hint">{{ t('episode.asset.assetTypeHint') }}</span>
+                </div>
+
                 <div v-if="assetDetail.type === 'prop'" class="asset-detail-edit-grid asset-detail-edit-grid--prop">
                   <label class="asset-detail-edit-field">
-                    <span>{{ t('episode.asset.appearanceOfObject') }}</span>
+                    <span>{{ isMapAsset(assetDetail.item) ? t('episode.asset.mapDescription') : t('episode.asset.appearanceOfObject') }}</span>
                     <textarea
                       v-model="assetDetailDraft.description"
                       class="textarea asset-detail-textarea"
                       rows="6"
-                      :placeholder="t('episode.asset.appearancePlaceholder')"
+                      :placeholder="isMapAsset(assetDetail.item) ? t('episode.asset.mapDescription') : t('episode.asset.appearancePlaceholder')"
                     />
                   </label>
                 </div>
@@ -891,7 +914,7 @@
               </section>
             </div>
 
-            <section class="asset-detail-ref-panel">
+            <section v-if="!isMapAsset(assetDetail.item)" class="asset-detail-ref-panel">
               <div class="asset-detail-section-title">
                 <span>{{ t('episode.asset.refSectionTitle') }}</span>
                 <span class="dim">{{ t('episode.asset.refSectionHint') }}</span>
@@ -924,8 +947,8 @@
               />
             </section>
 
-            <!-- 证据素材与语义标注（Issue #47）：忠实素材只做标注与底图切换，不走生图 -->
-            <section v-if="assetDetail.type === 'prop'" class="asset-detail-ref-panel">
+            <!-- 证据素材与语义标注（Issue #47）：忠实素材只做标注与底图切换，不走生图；地图资产走地图工作流，不在这里标注 -->
+            <section v-if="assetDetail.type === 'prop' && !isMapAsset(assetDetail.item)" class="asset-detail-ref-panel">
               <div class="asset-detail-section-title">
                 <span>{{ t('episode.documentary.semantics.sectionTitle') }}</span>
                 <span class="dim">{{ t('episode.documentary.semantics.sectionHint') }}</span>
@@ -952,27 +975,25 @@
                 @update="onAssetSemanticsUpdate(assetDetail.item, $event)"
                 @preview="openImageViewer"
               />
-              <button
-                v-if="!assetDetail.item.map_spec && mapDraftAssetId !== assetDetail.item.id"
-                class="btn btn-sm"
-                type="button"
-                @click="mapDraftAssetId = assetDetail.item.id"
-              >
-                {{ t('episode.documentary.map.create') }}
-              </button>
-              <MapSpecPanel
-                v-if="assetDetail.item.map_spec || mapDraftAssetId === assetDetail.item.id"
-                :key="`mapspec-${assetDetail.item.id}`"
+            </section>
+
+            <!-- 地图资产工作流（Issue #84）：只有 asset_type='map' 的资产有地图界面，普通道具一个地图字段都不显示 -->
+            <section v-if="assetDetail.type === 'prop' && isMapAsset(assetDetail.item)" class="asset-detail-ref-panel asset-detail-map-panel">
+              <div class="asset-detail-section-title">
+                <span>{{ t('episode.documentary.map.panel.sectionTitle') }}</span>
+                <span class="dim">{{ t('episode.documentary.map.panel.sectionHint') }}</span>
+              </div>
+              <MapWorkflowPanel
+                :key="`mapflow-${assetDetail.item.id}`"
                 :prop-id="assetDetail.item.id"
-                :episode-id="epId"
-                :creating="!assetDetail.item.map_spec"
-                @cancel="mapDraftAssetId = null"
-                @update="onAssetMapSpecUpdate(assetDetail.item, $event)"
+                :asset-name="assetDetail.item.name"
+                @preview="openImageViewer"
+                @changed="onMapWorkflowChanged(assetDetail.item, $event)"
               />
             </section>
 
             <!-- 资产「精确→美化」流水线（Issue #56）：三类资产通用，闸门结论由后端计算 -->
-            <section class="asset-detail-ref-panel">
+            <section v-if="!isMapAsset(assetDetail.item)" class="asset-detail-ref-panel">
               <div class="asset-detail-section-title">
                 <span>{{ t('episode.documentary.pipeline.sectionTitle') }}</span>
                 <span class="dim">{{ t('episode.documentary.pipeline.sectionHint') }}</span>
@@ -983,7 +1004,7 @@
                 :asset-id="assetDetail.item.id"
                 :episode-id="epId"
                 :asset-name="assetDetail.item.name"
-                :map-configured="assetDetail.type === 'prop' && !!assetDetail.item.map_spec"
+                :map-configured="assetDetail.type === 'prop' && isMapAsset(assetDetail.item)"
                 @preview="openImageViewer"
               />
             </section>
@@ -1000,7 +1021,7 @@
               />
             </section>
 
-            <section class="asset-detail-prompt-panel">
+            <section v-if="!isMapAsset(assetDetail.item)" class="asset-detail-prompt-panel">
               <div class="asset-detail-section-title">
                 <span>{{ assetDetail.type === 'character' ? t('episode.asset.finalPromptTurnaround') : assetDetail.type === 'scene' ? t('episode.asset.finalPromptFixed') : t('episode.asset.finalPromptWhiteBg') }}</span>
                 <div class="asset-detail-prompt-head-actions">
@@ -1073,6 +1094,7 @@
             </div>
             <div class="asset-detail-primary-actions">
               <button
+                v-if="!isMapAsset(assetDetail.item)"
                 class="btn"
                 :disabled="isUploadingAsset(assetDetail.type, assetDetail.item.id)"
                 @click="uploadAssetImage(assetDetail.type, assetDetail.item.id)"
@@ -1082,6 +1104,7 @@
                 {{ t('episode.asset.uploadImage') }}
               </button>
               <button
+                v-if="!isMapAsset(assetDetail.item)"
                 class="btn"
                 :disabled="isUploadingAsset(assetDetail.type, assetDetail.item.id)"
                 @click="openAssetLibrary(assetDetail.type, assetDetail.item.id)"
@@ -1106,7 +1129,7 @@
                 {{ assetImageSrc(assetDetail.item) ? t('episode.asset.regenScene') : (isPendingSceneImage(assetDetail.item.id) ? t('episode.asset.generating') : t('episode.asset.genScene')) }}
               </button>
               <button
-                v-else-if="assetDetail.type === 'prop' && !assetDetailFaithful"
+                v-else-if="assetDetail.type === 'prop' && !assetDetailFaithful && !isMapAsset(assetDetail.item)"
                 class="btn"
                 :disabled="isPendingPropImage(assetDetail.item.id)"
                 @click="genPropImg(assetDetail.item.id)"
@@ -1259,9 +1282,19 @@
               <label class="field"><span class="field-label">{{ t('episode.asset.sceneLightField') }}</span><input v-model="assetCreateDraft.lighting" class="input" :placeholder="t('episode.create.lightPlaceholder')" /></label>
             </template>
             <template v-else>
+              <div class="field">
+                <span class="field-label">{{ t('episode.asset.assetTypeLabel') }}</span>
+                <div class="asset-type-row">
+                  <label v-for="option in ASSET_TYPES" :key="option" class="asset-type-choice">
+                    <input v-model="assetCreateDraft.asset_type" type="radio" :value="option" />
+                    <span>{{ t(`episode.asset.assetType.${option}`) }}</span>
+                  </label>
+                </div>
+                <span class="dim asset-type-hint">{{ t('episode.asset.assetTypeCreateHint') }}</span>
+              </div>
               <label class="field"><span class="field-label">{{ t('episode.create.name') }}</span><input v-model="assetCreateDraft.name" class="input" :placeholder="t('episode.create.namePlaceholderProp')" /></label>
               <label class="field"><span class="field-label">{{ t('episode.create.typeField') }}</span><input v-model="assetCreateDraft.type" class="input" :placeholder="t('episode.create.typePlaceholder')" /></label>
-              <label class="field"><span class="field-label">{{ t('episode.asset.appearanceOfObject') }}</span><textarea v-model="assetCreateDraft.description" class="textarea" rows="3" :placeholder="t('episode.create.appearanceOnlyPlaceholder')" /></label>
+              <label class="field"><span class="field-label">{{ assetCreateDraft.asset_type === 'map' ? t('episode.asset.mapDescription') : t('episode.asset.appearanceOfObject') }}</span><textarea v-model="assetCreateDraft.description" class="textarea" rows="3" /></label>
             </template>
           </div>
           <footer class="dialog-foot">
@@ -1522,7 +1555,7 @@ import ReferenceImageManager from '~/components/ReferenceImageManager.vue'
 import ArchivalImagePanel from '~/components/ArchivalImagePanel.vue'
 import PropSemanticsPanel from '~/components/PropSemanticsPanel.vue'
 import AssetPipelinePanel from '~/components/AssetPipelinePanel.vue'
-import MapSpecPanel from '~/components/MapSpecPanel.vue'
+import MapWorkflowPanel from '~/components/MapWorkflowPanel.vue'
 import ResearchCitationList from '~/components/ResearchCitationList.vue'
 import FinalPromptSourceBadge from '~/components/FinalPromptSourceBadge.vue'
 import MediaLibraryDialog from '~/components/MediaLibraryDialog.vue'
@@ -1967,7 +2000,7 @@ async function toggleExportDone() {
   }
 }
 const assetDetail = ref({ open: false, type: '', item: null })
-const mapDraftAssetId = ref(null)
+const assetTypeSaving = ref(false)
 const assetDetailDraft = ref({ appearance: '', styling: '', prompt: '', lighting: '', description: '', time: '' })
 // 最终提示词手动编辑：dirty 时才随保存提交，避免无修改保存误清空 Agent 生成的提示词
 const assetPromptDraft = ref('')
@@ -2011,7 +2044,7 @@ const focusSemanticId = ref('')
 
 function openAssetDetail(type, item) {
   if (!item) return
-  mapDraftAssetId.value = null
+  assetTypeSaving.value = false
   assetDetail.value = { open: true, type, item }
   assetDetailDraft.value = {
     appearance: item.appearance || '',
@@ -2034,7 +2067,7 @@ function openPoolAssetDetail(asset) {
 }
 
 function closeAssetDetail() {
-  mapDraftAssetId.value = null
+  assetTypeSaving.value = false
   focusSemanticId.value = ''
   assetDetail.value = { open: false, type: '', item: null }
   assetDetailDraft.value = { appearance: '', styling: '', prompt: '', lighting: '', description: '', time: '' }
@@ -2082,7 +2115,7 @@ const assetCreateDraft = ref({})
 const assetCreateTypeLabel = computed(() => assetKindLabel(assetCreate.value.type))
 
 function openAssetCreate(type, prefill = null) {
-  assetCreateDraft.value = { name: '', role: '', appearance: '', styling: '', location: '', time: '', prompt: '', lighting: '', type: '', description: '' }
+  assetCreateDraft.value = { name: '', role: '', appearance: '', styling: '', location: '', time: '', prompt: '', lighting: '', type: '', description: '', asset_type: 'prop' }
   // 审核清单（#55）的「上传 / AI 生成」带着条目预填进来：名称 = 需要的素材描述
   if (prefill?.name) {
     if (type === 'scene') assetCreateDraft.value.location = prefill.name
@@ -2113,7 +2146,7 @@ async function saveAssetCreate() {
     let createdRow = null
     if (type === 'character') createdRow = await characterAPI.create({ ...base, name: d.name, role: d.role, appearance: d.appearance, styling: d.styling })
     else if (type === 'scene') createdRow = await sceneAPI.create({ ...base, location: d.location, time: d.time, prompt: d.prompt, lighting: d.lighting })
-    else createdRow = await propAPI.create({ ...base, name: d.name, type: d.type, description: d.description, faithful: assetCreate.value.faithful || undefined })
+    else createdRow = await propAPI.create({ ...base, name: d.name, type: d.type, description: d.description, asset_type: d.asset_type === 'map' ? 'map' : 'prop', faithful: assetCreate.value.faithful || undefined })
     toast.success(t('episode.create.created', { type: assetCreateTypeLabel.value }))
     const fromReview = !!assetCreate.value.reviewItemId
     assetCreate.value.open = false
@@ -2231,6 +2264,10 @@ async function ensureAssetPrompt(type, id, force = false) {
 
 /** 卡片上的「交给 Agent 重写」（Issue #32）：外部写入的最终提示词直接强制重生成 */
 async function rewriteAssetPrompt(type, id) {
+  if (type === 'prop') {
+    const map = propItems.value.find(item => item.id === id && isMapAsset(item))
+    if (map) { openAssetDetail('prop', map); return }
+  }
   if (isGeneratingPrompt(type, id)) return
   try {
     const fp = await ensureAssetPrompt(type, id, true)
@@ -2249,6 +2286,7 @@ async function rewriteAssetPrompt(type, id) {
 async function genAssetFinalPrompt() {
   const { open, type, item } = assetDetail.value
   if (!open || !item?.id) return
+  if (type === 'prop' && isMapAsset(item)) return
   const infoPatch = assetInfoPatch(type, item)
   if (!infoPatch) return
   if (Object.keys(infoPatch).length) {
@@ -4304,6 +4342,8 @@ function genSceneImg(id) {
     'episode.image.generatingScene')
 }
 function genPropImg(id) {
+  const map = propItems.value.find(item => item.id === id && isMapAsset(item))
+  if (map) { openAssetDetail('prop', map); return }
   return submitAssetImage('prop', id,
     () => propAPI.generateImage(id, epId.value, bareModelName(imageModel.value) || undefined, ownerConfigId(imageModelOptions.value, imageModel.value), chatModelOverride(), chatConfigId()),
     'episode.image.generatingProp')
@@ -4321,7 +4361,7 @@ const assetBatchCounts = computed(() => assetBatch.status?.counts || null)
 const assetBatchDone = computed(() => {
   const c = assetBatchCounts.value
   if (!c) return 0
-  return c.image.done + c.image.failed + c.skipped.has_image + c.skipped.running + c.skipped.faithful
+  return c.image.done + c.image.failed + c.skipped.has_image + c.skipped.running + c.skipped.faithful + (c.skipped.map || 0)
 })
 
 function openAssetBatch(scope) {
@@ -4770,24 +4810,55 @@ function onAssetSemanticsUpdate(item, patch) {
   if (target && target !== item) Object.assign(target, patch)
 }
 
-async function onAssetMapSpecUpdate(item, mapSpec) {
-  onAssetSemanticsUpdate(item, { map_spec: mapSpec })
-  mapDraftAssetId.value = null
-  // Refresh server-owned map output/versions without replacing unsaved asset text drafts.
+/**
+ * 地图工作流（Issue #84）：阶段推进可能产出新的底图/成品并登记为资产版本，
+ * 所以每次详情变化都按服务端重新拉一次道具行，但不覆盖人正在编辑的文本草稿。
+ */
+async function onMapWorkflowChanged(item, detail) {
+  if (!detail) return
   const episodeId = epId.value
   try {
     const rows = await episodeAPI.props(episodeId)
     if (episodeId !== epId.value) return
     propItems.value = rows
     const updated = rows.find(prop => prop.id === item.id)
-    if (updated) {
-      Object.assign(item, updated)
-      if (assetDetail.value.type === 'prop' && assetDetail.value.item?.id === item.id) {
-        Object.assign(assetDetail.value.item, updated)
-      }
+    if (!updated) return
+    Object.assign(item, updated)
+    if (assetDetail.value.type === 'prop' && assetDetail.value.item?.id === item.id) {
+      Object.assign(assetDetail.value.item, updated)
     }
   } catch (err) {
     toastError(err)
+  }
+}
+
+// 资产类型（Issue #84）：地图是独立类型，地图界面只认服务端持久化的 asset_type
+const ASSET_TYPES = ['prop', 'map']
+
+function assetTypeOf(item) {
+  return item?.asset_type === 'map' ? 'map' : 'prop'
+}
+
+function isMapAsset(item) {
+  return assetTypeOf(item) === 'map'
+}
+
+/** 地图 → 普通道具要人确认：地图数据不会被删，但整套地图界面会收起来 */
+async function onAssetTypeChange(item, next) {
+  if (assetTypeSaving.value || !item || assetTypeOf(item) === next) return
+  const downgrade = assetTypeOf(item) === 'map' && next === 'prop'
+  if (downgrade && !window.confirm(t('episode.asset.assetTypeDowngradeConfirm', { name: item.name || '' }))) return
+  assetTypeSaving.value = true
+  try {
+    const updated = await propAPI.update(item.id, { asset_type: next, confirm_asset_type_change: downgrade || undefined })
+    Object.assign(item, updated)
+    const target = propItems.value.find(prop => prop.id === item.id)
+    if (target && target !== item) Object.assign(target, updated)
+    toast.success(t('episode.asset.assetTypeSaved', { type: t(`episode.asset.assetType.${next}`) }))
+  } catch (err) {
+    toastError(err)
+  } finally {
+    assetTypeSaving.value = false
   }
 }
 
@@ -6706,6 +6777,21 @@ button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
   width: min(1040px, calc(100vw - 56px));
   max-height: calc(100vh - 56px);
 }
+.asset-detail-overlay.is-map-overlay { padding: 16px; }
+.asset-detail-dialog.is-map-dialog {
+  width: min(1800px, calc(100vw - 32px));
+  max-width: none;
+  height: calc(100vh - 32px);
+  max-height: calc(100vh - 32px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.is-map-dialog .asset-detail-head, .is-map-dialog .asset-detail-foot { flex: 0 0 auto; }
+.is-map-dialog .asset-detail-body { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.is-map-dialog .asset-detail-shell { grid-template-columns: minmax(0, 1fr); }
+.is-map-dialog .asset-detail-preview-panel { position: static; display: none; }
+.is-map-dialog .asset-detail-map-panel { overflow: visible; min-width: 1280px; }
 .asset-detail-head {
   display: flex;
   align-items: center;
@@ -7076,6 +7162,8 @@ button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
   gap: 8px;
 }
 .asset-detail-ref-panel :deep(.ref-images) { border-top: 0; padding-top: 0; }
+/* 地图资产（Issue #84）：卡片一眼能看出这是地图，不用点开详情 */
+.asset-map-tag { border-color: var(--accent-text); color: var(--accent-text); }
 /* 证据素材（Issue #47）：卡片徽标与弹窗开关 */
 .asset-faithful-tag {
   background: var(--warn-bg);
@@ -7094,6 +7182,21 @@ button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
   margin: 0;
   font-size: 10.5px;
 }
+/* 资产类型选择（Issue #84）：地图与普通道具是两种资产，选择要一眼可见 */
+.asset-type-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 11.5px;
+  color: var(--text-1);
+}
+.asset-type-label { font-weight: 600; }
+.asset-type-choice { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+.asset-type-hint { font-size: 10.5px; }
+/* 地图工作台最小工作宽度 1280：窄于此由资产详情容器横向滚动，不压缩画布 */
+.asset-detail-map-panel { min-width: 0; overflow-x: auto; }
+.asset-detail-map-panel > * { min-width: 1280px; }
 .asset-detail-prompt-head-actions {
   display: flex;
   align-items: center;

@@ -429,7 +429,7 @@ Issue 整理完成后、实施前，必须让 **Fabel（Anthropic）或 Astra（
 - 任务中心直接复用 `AssetPipelinePanel` 的 `reviewRunId` 模式，显示实际输入参考图（可能为空）、本轮成图、完整事实表、逐项 QC 与程序闸门；阻断原因前置。弹窗固定头尾、正文滚动，小屏单列，长 URL 换行；审批仍须先打开本轮图片，FAIL 强行通过仍须覆盖闸门并说明理由，提交失败保留表单。通过只接受本轮并结束 run，不自动采用为资产当前图。
 - 新 QC 把完整 gate 存入既有 `verdicts.gate_result` JSON；`gate-serialization.ts` 对历史缺失的语义核验返回 `unknown`，不能捏造 PASS / 不适用，也不拿当前资产重新计算历史结论。
 - `TaskErrorMessage` / `utils/taskError.js` 把供应商错误转成人话，诊断默认折叠、脱敏且限长，按纯文本渲染。内容审核的 `assistant/user` 仅说明输出/输入方向，`level` 不代表分类；平台未提供命中片段时明确不可判断。没有新增模型重试、自动切换或审核绕过。
-- 非地图道具不挂载 `MapSpecPanel`；只有已有 `map_spec` 或明确点击「创建地图底图」才展示。新建草稿可取消且取消不写库；保存后按已配置地图显示并禁用扩散流水线入口。地图身份不从类型名称、faithful 或语义数组猜测。
+- 地图类型由 `props.asset_type='map'` 显式决定（Issue #84），普通道具不挂地图 UI；`MapWorkflowPanel` 替代旧地图面板，地图禁用普通出图与扩散流水线。类型不能从名称、faithful 或语义数组猜测，map→prop 需明确确认。
 - 升级无需改库或同步供应商配置。精确轮参考图/模型契约与文字政策已由 #73 落地（见下节）；OCR/文字框定位仅登记 #75，本次不变更算法。
 
 #### 精确轮启动契约与文字政策（Issue #73）
@@ -445,11 +445,12 @@ Issue 整理完成后、实施前，必须让 **Fabel（Anthropic）或 Astra（
 - 入库仍须用户点：面板 `AssetResearchPanel.vue`（嵌在流水线「素材」区块）按视觉判断分组展示，许可预填可改，入库走 `POST /asset-sources {local_path, source_url}`（`source_url` 只记出处，不重新下载；`local_path` 校验不变）。
 - 流水线 research 步：优先复用该资产最近一次成功检索；没有则现场只做文字检索（`withImages:false`，控制在步骤时限内）。结果冻结进 run 的 `params.asset_research`；#79 之前的 run 冻结的旧线索原样交给事实表。事实表提示词改为输入文字摘录 + 视觉判断后的图像资料，要求依据、测量对象、「不是什么」写进 forbidden、资料不足给合理示意并记 uncertainties（用户口径：尽量贴近、给出概念）。
 
-#### 地图底图：程序渲染，扩散不碰几何
-- `services/map-base-render.ts`：`d3-geo`（`geoMercator`/`geoEquirectangular` + `geoPath` + `fitExtent`）把 `backend/assets/geo/ne_50m_*.geojson`（Natural Earth 50m，公有领域，`HUOBAO_GEO_DIR` 可覆盖）投影成 SVG，再按 `layer-render.ts` 的 `sharp().composite()` 栅格化成 **16:9 / 默认 3840×2160** 的 PNG，落 `static/map-bases/<signature>.png`。**底图上绝不渲染任何文字**（地名/图例一律走叠加图层）；同 spec 同尺寸字节级一致，已存在即复用。
-- `props.map_spec`（`MapSpec`：`projection` 只有 mercator / equirectangular，`bbox`，`layers`，`places[]`，`routes[]`，`style.theme`）。接口在 `routes/props.ts`：`GET|PUT /props/:id/map-spec`、`POST /props/:id/map-render`、`POST /props/:id/map-suggest`（AI 建议坐标一律 `proposed`，人工勾选确认后前端才写进 `map_spec`）。
-- `POST /props/:id/map-render` 之后产物被登记成**原件版本**（`sys_task.provider='map-render'`，`props.faithful=1` + `faithful_source` 指向它），并把投影换算出的点/线像素坐标直接写进 `props.semantics`（`source='cv'`、`confidence=1`、`model='map-render'`）——**不经 VLM、不经色域抽线**，第一轮「扩散重画海岸线 / 殷墟点跑到燕山以北」那类事故在这条路径上结构性不可能。
-- 风格化（底图作参考图走 `image_edit`）**默认关闭**：`qwen-jobs` 的 `image_edit` 分支不传 `denoising_strength`（`qwen-jobs-client.ts:187` 只在 FLUX 分支用常量），没有可调低强度，开着等于让扩散重画几何。
+#### 地图资产工作流：三条底图路线，扩散不碰几何（Issue #84）
+- 地图仍属于 props，保留 ID/剧集关联/@引用。`props.asset_type`、`map_workflow` 与已有 `map_spec` 存需求和阶段，首次迁移只把已有 map_spec 的道具识别为 map；不重生成既有媒体。唯一入口 `GET|PUT /props/:id/map-workflow` 与 `POST …/run|advance|rollback|cancel`（`routes/map-workflow.ts`、`services/map-workflow/`），旧独立地图写入口整体删除。业务 API 与授权/预算规则见 `docs/skills/huobao-director/` S2-84 / 目录 §3.84。
+- 阶段 `brief→research→base→style→drawing→complete` 持久化并以 revision/CAS 防迟到回调覆盖；run 继续当前阶段，整条重做先显式回退。充分性检查读语义，不以非空冒充明确；真实检索限定维基中/英、Europeana、Smithsonian，记录证据、失败与不确定性。AI 点/线/区域带 proposed，人工确认后的几何不被自动检索覆盖。
+- 底图由 `services/map-geometry.ts` 统一生产与配准：Natural Earth/d3 程序背景、外部图至少三非共线控制点仿射标定、KMZ+真实 Google Earth 自动截图。程序背景不烧入可编辑要素；Earth 实测 17×17 控制网格并用 256 个独立检验点验证（最大≤3px），相机漂移>0.25px 拒绝，不用解析公式自洽冒充对齐；交付 KMZ 与标定证据分别保存。
+- 新出图只允许无地理内容的独立底纹任务，绝不把原始地图/Earth影像送扩散。绘制阶段以底图配准产生可编辑点线面及标签，完成时当前图/语义/原件版本一并 CAS 采用；原件 `map-render` 版本保存在 faithful_source，当前成图 `provider='map-workflow'`。改几何只重绘标注，取景/背景层变化才重做底图；画外/超限明确报错，不丢点或钳边。
+- 外部配置仍放仓库外：资料检索 key 在设置页；Earth 运行时 `${HUOBAO_LOCAL_CONFIG_DIR:-~/.config/huobao-drama-local}/earth-runtime.json` 只配置 python/chromium 路径（可用 HUOBAO_EARTH_PYTHON/CHROMIUM 覆盖）。依赖 Python+Playwright+Pillow+Chromium，部署包含 `backend/scripts/earth-map.py` 与 `earth_calibration.py`；缺失或失败不伪装为另一条路线成功。
 - **上传截图的语义阈值放宽**（契约 §8 的遗留缺陷）：Google Earth 截图上同一条水体沿程从 rgb(80,144,224) 压到 rgb(16,48,96)，欧氏距离 172、偏色幅度 48 同时被 `colorMask` 的两条判据判掉，命中率为 0。现在 `isExtractableLineColor()` 对强蓝（`b−r>60 且 b−g>20`）跳过亮度下限，`colorMask(..., { hueOnly: true })` 改按**通道序 + 最小彩度 `HUE_ONLY_MIN_CHROMA=24`** 判。放宽**只用于上传截图路径**：`asset-semantics-auto.ts` 的抽线先按严格判据试，失败才放宽重试（两条理由都写进 warnings），扫描印刷图走原判据不受影响。
 
 ### 发布前遗留闭环（Issue #61）

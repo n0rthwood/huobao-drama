@@ -50,6 +50,12 @@ export type TextTaskKind =
   | 'poster_concept'
   /** 资产资料检索（Issue #79）：多来源检索 + 视觉筛选，结果落 params.asset_research，供面板入库与事实表引用 */
   | 'asset_research'
+  /**
+   * 地图资产工作流（Issue #84）：需求 → 检索 → 底图 → 底纹 → 标注 → 完成。
+   * 状态本体在 `props.map_workflow`，这条任务只是执行容器：`params.map_prop_id` 指向地图资产，
+   * `params.map_stage` 是当前步名。扩散模型只在「底纹」那一步出一张纸纹，不碰几何。
+   */
+  | 'map_workflow'
 
 export const TEXT_TASK_KINDS: TextTaskKind[] = [
   'extract_characters', 'extract_scenes', 'extract_props',
@@ -65,6 +71,7 @@ export const TEXT_TASK_KINDS: TextTaskKind[] = [
   'asset_review',
   'poster_concept',
   'asset_research',
+  'map_workflow',
 ]
 
 /**
@@ -149,9 +156,12 @@ export function textTaskKindOf(row: Pick<SysTaskRow, 'type' | 'params'>): TextTa
 
 export async function createTextTask(input: {
   kind: TextTaskKind
-  episodeId: number
+  /** 集级任务必填；资产级任务（地图工作流 #84）没有归属集，传 null */
+  episodeId: number | null
   dramaId?: number | null
   storyboardId?: number | null
+  /** 资产级任务的归属道具（地图工作流）：任务中心据此回链资产 */
+  propId?: number | null
   prompt?: string | null
   /** 本次解析出来的环节模型（Issue #51）：provider/model/configId 与 params.stage/model_used 都由它来 */
   stageModel?: StageModel
@@ -193,6 +203,7 @@ export async function createTextTask(input: {
     episodeId: input.episodeId,
     dramaId: input.dramaId ?? null,
     storyboardId: input.storyboardId ?? null,
+    propId: input.propId ?? null,
     provider: stage ? stage.provider : (input.provider ?? null),
     model: stage ? stage.model : (input.model ?? null),
     prompt: input.prompt ?? null,

@@ -39,6 +39,13 @@ Without prop assets, a storyboard prompt that mentions an object can only descri
 - No parentheses, no aliases, no episode numbers; the same object across episodes keeps the same name and reuses the existing prop
 - The name is matched exactly by the storyboard via `@prop name` (longest match wins), so it must be stable and unambiguous
 
+## Explicit Map Type (Issue #84)
+
+- A map, location diagram, or schematic used to express places, routes, rivers, territories, or spatial regions is saved with `asset_type: "map"`; a physical prop uses `asset_type: "prop"`. Maps retain the prop asset ID and `@name` reference syntax, not a fourth reference kind.
+- A map's `description` is exempt from the physical-object rules below that forbid purpose and uncertainty. Record the script-supported **subject, era, spatial extent, purpose, and level of detail**; state missing information instead of inventing coordinates, historical boundaries, citations, or dates.
+- Positive example: a Yinxu chariot-pit location map records the known subject and location purpose, leaving implicit-era verification to the map workflow. A Tongzhou section of the Grand Canal without an era must say “era required”, not silently choose Ming or modern times. Do not invent territorial polygons to fill a map.
+- Reuse existing assets by their explicit `asset_type`; never change it merely because a name contains “map”, `faithful` is set, or semantics exist. Research, sufficiency checking, base production, texture, and drawing belong to the dedicated map workflow; extraction does not generate images or approve results.
+
 ## How to Write `description` (definiteness requirement)
 
 Write only the object's own physical appearance, item by item: **material, colour, shape, size (relative to the character's palm / body), how new or old it is, marks of wear**.
@@ -48,7 +55,7 @@ Write only the object's own physical appearance, item by item: **material, colou
 - Relative size matters: write executable ratios such as "the bar is about twice the length of a guinea pig's front paw" to stop the prop from ballooning in close-ups
 - For paired objects, state "two of them, a pair, completely identical"
 
-Props **do not need an image prompt** — the final white-background single-item prompt is produced by the prompt-generation Agent following the prop-prompt skill.
+Physical props **do not need an image prompt** — the final white-background single-item prompt is produced by the prompt-generation Agent following the prop-prompt skill. Maps do not use the white-background product-image pipeline.
 
 ## Saving
 

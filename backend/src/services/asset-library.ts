@@ -35,6 +35,7 @@ import {
 } from './reference-images.js'
 import { EMPTY_ASSET_NAME_MESSAGE, normalizeAssetName } from './asset-name.js'
 import { fidelityOf, loadPipelineFidelity } from './asset-pipeline/fidelity.js'
+import { prepareImportedWorkflow } from './map-workflow/store.js'
 
 export const ASSET_KINDS: AssetKind[] = ['character', 'scene', 'prop']
 
@@ -92,6 +93,10 @@ interface AssetRow {
   /** 道具独有：证据素材标记（Issue #47） */
   faithful?: number | null
   semantics?: string | null
+  /** 道具独有：资产类别、地图几何与工作流（Issue #84）——跨项目导入时随资产一起复制 */
+  assetType?: string | null
+  mapSpec?: string | null
+  mapWorkflow?: string | null
 }
 
 /** 关联表行的并集视图（episode_characters / episode_scenes / episode_props） */
@@ -287,6 +292,8 @@ export interface LibraryAsset {
   reference_count: number
   /** 证据素材标记（Issue #47）：只有道具会为 1，角色/场景恒为 0 */
   faithful: 0 | 1
+  /** 资产类别（Issue #84）：只有道具可能是 'map'，角色/场景恒为 'prop' */
+  asset_type: 'prop' | 'map'
   episodes: Array<{ id: number; episode_number: number; title: string }>
 }
 
@@ -341,6 +348,7 @@ export async function listAssetLibrary(filters: {
         version_count: (versions.get(row.id) ?? []).length,
         reference_count: parseReferenceImages(row.referenceImages).length,
         faithful: kind === 'prop' && Number(row.faithful) === 1 ? 1 : 0,
+        asset_type: kind === 'prop' && row.assetType === 'map' ? 'map' : 'prop',
         episodes: (linkedEpisodes.get(row.id) ?? []).sort((a, b) => a.episode_number - b.episode_number),
       })
     }
@@ -379,6 +387,7 @@ export async function getLibraryAsset(kind: AssetKind, id: number) {
     fields: textFieldsOf(kind, row),
     image_url: row.imageUrl ?? null,
     faithful: kind === 'prop' && Number(row.faithful) === 1 ? 1 : 0,
+    asset_type: kind === 'prop' && row.assetType === 'map' ? 'map' : 'prop',
     image_versions: versions,
     reference_images: parseReferenceImages(row.referenceImages),
     episodes,
@@ -731,6 +740,11 @@ async function insertAssetRow(
     // 人在目标项目里重新选一次原件即可。
     faithful: Number(source.faithful) === 1 ? 1 : 0,
     semantics: source.semantics ?? null,
+    // 地图资产身份、几何与工作流随资产走（Issue #84）：换个项目它仍然是地图，仍然不进生图链路。
+    // 工作流文档经 prepareImportedWorkflow 复位运行态与版本引用，需求/检索证据/产出/历史保留。
+    assetType: source.assetType === 'map' ? 'map' : 'prop',
+    mapSpec: source.mapSpec ?? null,
+    mapWorkflow: prepareImportedWorkflow(source.mapWorkflow),
     createdAt: ts,
     updatedAt: ts,
   }))

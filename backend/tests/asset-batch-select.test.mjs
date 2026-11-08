@@ -45,6 +45,9 @@ const classifyCases = [
   // 活跃图像任务：无论勾什么都跳过（忠实素材优先级更高）
   [asset(true, true, false, true), opts(true, true), 'skip_running'],
   [asset(false, false, false, true), opts(false, false), 'skip_running'],
+  // Issue #84 地图资产：优先级在忠实素材之上——刚建的地图还没有底图、faithful 还是 0
+  [{ ...asset(false, true, false, false), isMap: true }, opts(true, true), 'skip_map'],
+  [{ ...asset(true, true, true, true), isMap: true }, opts(false, false), 'skip_map'],
 ]
 
 const submitCases = [
@@ -65,6 +68,8 @@ const plan = [
   { kind: 'scene', asset_id: 4, name: 'D', selection: 'skip_has_image', has_prompt: true },
   { kind: 'prop', asset_id: 5, name: 'E', selection: 'skip_running', has_prompt: true },
   { kind: 'prop', asset_id: 6, name: 'F', selection: 'skip_faithful', has_prompt: true },
+  // Issue #84：地图资产的几何由地图工作流确定性渲染，批量重绘永不触碰
+  { kind: 'prop', asset_id: 7, name: 'G', selection: 'skip_map', has_prompt: true },
 ]
 
 const faithfulCases = [
@@ -127,9 +132,9 @@ test('提示词阶段结论 → 是否出图：failed 与 skipped 不出图', ()
 
 test('分类统计：缺提示词/重写/复用三类进 will_generate，三类跳过分别计数', () => {
   assert.deepEqual(result.summary, {
-    total: 6,
+    total: 7,
     will_generate: { missing_prompt: 1, reuse_prompt: 1, rewrite_prompt: 1 },
-    skipped: { has_image: 1, running: 1, faithful: 1 },
+    skipped: { has_image: 1, running: 1, faithful: 1, map: 1 },
   })
 })
 

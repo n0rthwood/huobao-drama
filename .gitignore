@@ -22,6 +22,10 @@ dist/
 .DS_Store
 Thumbs.db
 
+# Python browser-helper bytecode
+__pycache__/
+*.pyc
+
 # Data (database and uploaded files)
 data/drama_generator.db
 data/drama_generator.db-wal

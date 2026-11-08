@@ -30,7 +30,7 @@ export function isAssetBatchScope(value: unknown): value is AssetBatchScope {
 /** 忠实素材：人工上传（register-upload）与跨项目导入复制出的版本行 */
 export const FAITHFUL_PROVIDERS = ['upload', 'import']
 
-export type AssetSelectionState = 'ready' | 'need_prompt' | 'skip_has_image' | 'skip_running' | 'skip_faithful'
+export type AssetSelectionState = 'ready' | 'need_prompt' | 'skip_has_image' | 'skip_running' | 'skip_faithful' | 'skip_map'
 
 export interface AssetBatchOptions {
   /** 勾「重写提示词」：已有提示词也重新生成 */
@@ -48,9 +48,16 @@ export interface AssetSelectionInput {
   faithful: boolean
   /** 该资产存在活跃的图像 sys_task */
   running: boolean
+  /**
+   * 地图资产（Issue #84，`props.asset_type='map'`）：画面由地图工作流确定性渲染。
+   * 它排在 faithful 之前——刚建的地图还没有底图、faithful 还是 0，
+   * 正是这个窗口最容易被批量重绘卷进扩散模型。
+   */
+  isMap?: boolean
 }
 
 export function classifyAsset(input: AssetSelectionInput, opts: AssetBatchOptions): AssetSelectionState {
+  if (input.isMap) return 'skip_map'
   if (input.faithful) return 'skip_faithful'
   if (input.running) return 'skip_running'
   if (!input.hasPrompt || opts.rewritePrompts) return 'need_prompt'
@@ -83,6 +90,8 @@ export interface AssetBatchPreviewCounts {
     has_image: number
     running: number
     faithful: number
+    /** 地图资产（Issue #84）：确定性渲染，批量重绘永不触碰 */
+    map: number
   }
 }
 
@@ -91,7 +100,7 @@ export function summarizeAssetBatchPlan(items: AssetBatchPlanItem[]): AssetBatch
   const counts: AssetBatchPreviewCounts = {
     total: items.length,
     will_generate: { missing_prompt: 0, reuse_prompt: 0, rewrite_prompt: 0 },
-    skipped: { has_image: 0, running: 0, faithful: 0 },
+    skipped: { has_image: 0, running: 0, faithful: 0, map: 0 },
   }
   for (const item of items) {
     switch (item.selection) {
@@ -110,6 +119,9 @@ export function summarizeAssetBatchPlan(items: AssetBatchPlanItem[]): AssetBatch
         break
       case 'skip_faithful':
         counts.skipped.faithful++
+        break
+      case 'skip_map':
+        counts.skipped.map++
         break
     }
   }

@@ -1,0 +1,111 @@
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+
+// Real service/database/render path. The inert text config supplies task metadata only:
+// resuming a deterministic stage must not invoke a model or restart brief/research.
+test('地图继续当前阶段：原件与成图原子采用，几何编辑复用底图且不重新计费', () => {
+  const backend = fileURLToPath(new URL('..', import.meta.url))
+  const dir = mkdtempSync(path.join(tmpdir(), 'map-execution-'))
+  const script = `
+    import assert from 'node:assert/strict'
+    import {db,schema,getInsertId} from 'file://${backend}src/db/index.ts'
+    import {now} from 'file://${backend}src/utils/response.ts'
+    import {loadWorkflow,serializeDetail,mutateWorkflow,briefHash,getProp} from 'file://${backend}src/services/map-workflow/store.ts'
+    import {emptyBrief} from 'file://${backend}src/services/map-workflow/types.ts'
+    import {startMapWorkflow,advanceMapWorkflow,saveMapWorkflowDraft,failInterruptedMapWorkflows} from 'file://${backend}src/services/map-workflow/run.ts'
+    import {normalizeMapSpec} from 'file://${backend}src/services/map-base-render.ts'
+    const ts=now()
+    const dramaId=getInsertId(await db.insert(schema.dramas).values({title:'地图执行回归',createdAt:ts,updatedAt:ts}))
+    const configId=getInsertId(await db.insert(schema.aiServiceConfigs).values({serviceType:'text',provider:'openai',name:'Inert metadata fixture',baseUrl:'http://127.0.0.1:1',apiKey:'not-a-credential',model:'["inert-model"]',isActive:true,createdAt:ts,updatedAt:ts}))
+    const propId=getInsertId(await db.insert(schema.props).values({dramaId,name:'测试区位图',description:'原始资产说明',assetType:'map',createdAt:ts,updatedAt:ts}))
+    let loaded=await loadWorkflow(propId)
+    assert.equal(serializeDetail(loaded).brief.subject,'测试区位图')
+    await saveMapWorkflowDraft(propId,{expectedRevision:0,brief:{era:'明代'}})
+    loaded=await loadWorkflow(propId)
+    assert.equal(loaded.state.brief.subject,'测试区位图')
+    assert.equal(loaded.state.brief.notes,'原始资产说明')
+    const spec=normalizeMapSpec({bbox:[113,35.2,115.6,36.8],places:[{id:'a',name:'安阳',lon:114.39,lat:36.09}]})
+    await mutateWorkflow(propId,{action:'fixture_geometry',actor:'system',requireIdle:true,mutate:ctx=>{
+      ctx.mapSpec=spec
+      ctx.state.brief={...emptyBrief(),subject:'测试区位图',era:'明代',location:'安阳',purpose:'位置示意'}
+      ctx.state.brief_hash=briefHash(ctx.state.brief)
+      ctx.state.stage='base';ctx.state.status='idle'
+    }})
+    const settle=async()=>{
+      const deadline=Date.now()+20000
+      for(;;){
+        const row=await loadWorkflow(propId)
+        if(row.state.status!=='running')return serializeDetail(row)
+        if(Date.now()>deadline)throw Error('Map deterministic stage did not finish')
+        await new Promise(resolve=>setTimeout(resolve,20))
+      }
+    }
+    loaded=await loadWorkflow(propId)
+    await startMapWorkflow(propId,{mode:'manual',expectedRevision:loaded.state.revision,textConfigId:configId})
+    let state=await settle()
+    assert.equal(state.stage,'style',state.error||'run must resume base, not restart brief')
+    assert.equal(state.status,'awaiting_review')
+    assert.equal((await getProp(propId)).imageUrl,null,'unreviewed base must not replace current asset')
+    const base=state.outputs.base_image
+    await advanceMapWorkflow(propId,{expectedRevision:state.revision,skip:true})
+    state=serializeDetail(await loadWorkflow(propId))
+    assert.equal(state.stage,'drawing')
+    await startMapWorkflow(propId,{mode:'auto',expectedRevision:state.revision,textConfigId:configId})
+    state=await settle()
+    assert.equal(state.status,'completed',state.error||'auto must resume drawing without new model work')
+    const prop=await getProp(propId)
+    assert.equal(prop.imageUrl,state.outputs.final_image.path)
+    assert.equal(prop.faithfulSource,base.task_id)
+    assert.equal(JSON.parse(prop.semantics).image.source_task_id,state.outputs.final_image.task_id)
+    assert.equal(state.outputs.texture_image,null)
+    const priorFinal=state.outputs.final_image.path
+    state=await saveMapWorkflowDraft(propId,{expectedRevision:state.revision,mapSpec:state.map_spec})
+    assert.equal(state.status,'completed','unchanged save must not invalidate current map')
+    assert.equal(state.outputs.final_image.path,priorFinal)
+    state.map_spec.places[0].lon+=0.05
+    state=await saveMapWorkflowDraft(propId,{expectedRevision:state.revision,mapSpec:state.map_spec})
+    assert.equal(state.stage,'drawing')
+    assert.equal(state.outputs.base_image.path,base.path)
+    assert.equal(state.outputs.final_image,null)
+    assert.equal((await getProp(propId)).imageUrl,priorFinal,'old current image remains paired with its old semantics until new adoption')
+    await startMapWorkflow(propId,{mode:'auto',expectedRevision:state.revision,textConfigId:configId})
+    state=await settle()
+    assert.equal(state.status,'completed',state.error)
+    assert.notEqual(state.outputs.final_image.path,priorFinal)
+    assert.equal(state.outputs.base_image.task_id,base.task_id)
+    assert.equal(state.outputs.texture_image,null)
+    const completedRevision=state.revision
+    const completedFinal=state.outputs.final_image.path
+    await failInterruptedMapWorkflows()
+    state=serializeDetail(await loadWorkflow(propId))
+    assert.equal(state.revision,completedRevision,'historical running entries must not trigger recovery or a revision bump')
+    assert.equal(state.status,'completed')
+    await mutateWorkflow(propId,{action:'fixture_interruption',actor:'system',mutate:ctx=>{
+      ctx.state.status='running'
+      ctx.state.steps.find(step=>step.id==='drawing').status='running'
+    }})
+    await failInterruptedMapWorkflows()
+    state=serializeDetail(await loadWorkflow(propId))
+    assert.equal(state.status,'failed')
+    assert.equal(state.task_id,null)
+    assert.equal(state.steps.find(step=>step.id==='drawing').status,'failed')
+    assert.equal(state.outputs.final_image.path,completedFinal,'restart preserves already-produced media')
+    console.log('MAP_EXECUTION_OK')
+  `
+  const probe = path.join(dir, 'probe.mts')
+  writeFileSync(probe, script)
+  try {
+    const result = execFileSync('node_modules/.bin/tsx', [probe], {
+      cwd: backend, encoding: 'utf8', timeout: 45000,
+      env: { ...process.env, SQLITE_PATH: path.join(dir, 'test.sqlite3'), HUOBAO_DATA_DIR: dir, STORAGE_PATH: path.join(dir, 'static') },
+    })
+    assert.match(result, /MAP_EXECUTION_OK/)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})

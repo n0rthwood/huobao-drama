@@ -89,7 +89,7 @@ export interface AssetBatchItem {
 
 export interface AssetBatchCounts {
   total: number
-  skipped: { has_image: number; running: number; faithful: number }
+  skipped: { has_image: number; running: number; faithful: number; map: number }
   prompt: { done: number; failed: number; reused: number; regenerated: number; unchanged_after_rewrite: number }
   image: { submitted: number; done: number; failed: number }
 }
@@ -148,6 +148,8 @@ interface LoadedAsset {
   hasPrompt: boolean
   /** 持久的证据素材标记（Issue #47，只有道具会是 1）：一票判定 skip_faithful */
   faithful: number
+  /** 地图资产（Issue #84，只有道具可能为 true）：一票判定 skip_map，先于 faithful */
+  isMap: boolean
 }
 
 const SCOPE_KINDS: Record<AssetBatchScope, AssetKind[]> = {
@@ -170,7 +172,7 @@ async function loadScopeAssets(dramaId: number, scope: AssetBatchScope): Promise
         assets.push({
           kind, id: row.id, name: row.name, dramaId: row.dramaId,
           imageUrl: row.imageUrl, localPath: row.localPath, referenceImages: row.referenceImages,
-          finalPrompt: row.finalPrompt, hasPrompt: !!row.finalPrompt, faithful: 0,
+          finalPrompt: row.finalPrompt, hasPrompt: !!row.finalPrompt, faithful: 0, isMap: false,
         })
       }
     } else if (kind === 'scene') {
@@ -183,7 +185,7 @@ async function loadScopeAssets(dramaId: number, scope: AssetBatchScope): Promise
           imageUrl: row.imageUrl, localPath: row.localPath, referenceImages: row.referenceImages,
           finalPrompt: row.finalPrompt,
           hasPrompt: !!row.finalPrompt && sceneFinalPromptCoversTime(row.finalPrompt, row.time),
-          faithful: 0,
+          faithful: 0, isMap: false,
         })
       }
     } else {
@@ -195,6 +197,7 @@ async function loadScopeAssets(dramaId: number, scope: AssetBatchScope): Promise
           kind, id: row.id, name: row.name, dramaId: row.dramaId,
           imageUrl: row.imageUrl, localPath: row.localPath, referenceImages: row.referenceImages,
           finalPrompt: row.finalPrompt, hasPrompt: !!row.finalPrompt, faithful: row.faithful ?? 0,
+          isMap: row.assetType === 'map',
         })
       }
     }
@@ -239,6 +242,7 @@ function buildPlan(assets: LoadedAsset[], tasks: SysTaskRow[], opts: AssetBatchO
       hasPrompt: asset.hasPrompt,
       faithful: isFaithfulCurrentImage(asset, versions),
       running: hasActiveImageTask(tasks, asset.kind, asset.id),
+      isMap: asset.isMap,
     }, opts)
     return { kind: asset.kind, asset_id: asset.id, name: asset.name, selection, has_prompt: asset.hasPrompt }
   })
@@ -273,7 +277,7 @@ function assetBatchParamsOf(row: SysTaskRow): AssetBatchParams | null {
 function countItems(items: AssetBatchItem[]): AssetBatchCounts {
   const counts: AssetBatchCounts = {
     total: items.length,
-    skipped: { has_image: 0, running: 0, faithful: 0 },
+    skipped: { has_image: 0, running: 0, faithful: 0, map: 0 },
     prompt: { done: 0, failed: 0, reused: 0, regenerated: 0, unchanged_after_rewrite: 0 },
     image: { submitted: 0, done: 0, failed: 0 },
   }
@@ -281,6 +285,7 @@ function countItems(items: AssetBatchItem[]): AssetBatchCounts {
     if (item.state === 'skip_has_image') counts.skipped.has_image++
     if (item.state === 'skip_running') counts.skipped.running++
     if (item.state === 'skip_faithful') counts.skipped.faithful++
+    if (item.state === 'skip_map') counts.skipped.map++
     switch (item.prompt_outcome) {
       case 'reused': counts.prompt.reused++; counts.prompt.done++; break
       case 'regenerated': counts.prompt.regenerated++; counts.prompt.done++; break
@@ -350,6 +355,9 @@ export async function getAssetBatch(dramaId: number): Promise<AssetBatchJson | n
 
 /** 图像提交：资产的最终提示词 + 资产自己的参考图；绝不使用本地兜底提示词 */
 async function submitImage(asset: LoadedAsset, prompt: string, episodeId: number, req: AssetBatchRequest): Promise<number> {
+  // 结构性兜底：选集判定之外再挡一次。地图资产的几何由地图工作流确定性渲染，
+  // 任何路径都不得把它送进扩散模型（选集判定不是安全边界，它只是用来算统计的）。
+  if (asset.isMap) throw new Error(`地图资产「${asset.name}」不能走批量生图：请在地图工作流里生成底图与成图`)
   const { present: referenceImages, missing } = partitionMissingReferences(resolveReferenceImages(asset.referenceImages))
   if (missing.length) logTaskWarn('AssetBatch', 'reference-missing', { kind: asset.kind, assetId: asset.id, missing })
   if (asset.kind === 'scene') {
