@@ -3,6 +3,7 @@
 所有路径都相对 `HUOBAO_API = {HUOBAO_BASE}api/v1/`（默认 `http://172.30.3.164/huobao/api/v1/`，以会话配置为准）。
 拼接时**去掉路径开头的 `/`** 再拼；用 `urljoin` 会把 `/huobao/api/v1` 前缀丢掉，打到 SPA。
 标注：`[R]` = 2026-11-05 殷墟五镜诊断片实测通过；`[S]` = 仅源码核对，未在本轮运行；`[S/R]` = 部分实测或只跑通读路径，写入前先用 GET/preview 校验。
+本目录对齐 `origin/master` `9cd3458`（含 Issue #80/#81/#82）；这三个 Issue 带来的端点与字段**全部是 `[S]`**，首次生产使用按 `SKILL.md` §4.6「八达岭长城测试 1008」验收后再改标注。
 
 ## 0. 通用约定
 
@@ -88,6 +89,19 @@ Body：`{drama_id:d, episode_id:e, message:"用户的具体改写要求", config
 由火宝工种读取原始 `content`、生成并保存 `script_content`。调用后从 `GET /dramas/{d}` 的 `episodes[]` 读回实际稿件，未保存就不能报告成功；改写授权不等于人工批准。
 不能改为助手本地代写再 PUT `script_content`，也不能因技能不适合压缩而自行绕过。这个入口已核对本地路由，但在2026-11-06漕运错误案例中**没有执行**，不能标成该案例的实测成功。
 若用户说“不要再操作，只更新技能”，连开工 GET、回滚/清空和本入口都不得调用；这里只能修改明确获准的助手技能文件。
+
+### `POST /episodes/{e}/script-rewrite/inspect-narration` [S]（Issue #80）
+用途：纪录片旁白稿保存前的**非旁白内容检测**。检查的是本次提交的草稿，不是上一轮改写报告；**不写库**。
+Body：`{content: string, config_id?: number, model?: string}`（`content` 必填）。
+返回：`{findings:[{text, reason, locatable}]}`。`text` 是从草稿逐字复制的片段；`locatable=false` 表示在当前草稿里定位不到（只能展示，不能自动删除）。
+识别范围：出处块、版权许可、URL/永久链接、贡献者与编辑历史、书目与引用尾注、模板/编辑说明、「不作为朗读稿」声明。正文里可朗读的归属表述（如「据《异域录》记载」）与 `【】` 节拍标记**不算**杂质。
+错误：非纪录片项目 400；剧集不存在 404；模型回包被截断或格式不合法 → 502 `inspection_failed`。
+注意：**502 或字段缺失不等于稿件干净**，必须按「检测失败」呈报并由人决定是否照样保存。删除哪些片段是人的选择，Agent 不自行删改正文。
+
+### 改写阶段契约 `fidelity.v2` [S]（Issue #80）
+忠实改写阶段的模型输出改为 JSON：`{"content":"整理后的旁白稿正文","exclusions":[{"text","category","reason"}]}`，`category ∈ source|license|link|contributor|bibliography|editorial|not_narration`。
+服务端在**冻结输入**里唯一定位每条 `text`；定位不到、片段互相重叠、或该片段仍出现在 `content` 中 → 阶段失败，不产生版本。
+`FidelityReport` 新增 `ai_exclusions:[{text,category,reason,start,end}]` 与 `adjusted_baseline_chars`；内容量判定上界按原始基线、下界按扣除剔除清单后的基线，即「变短」必须由可定位的剔除清单解释。
 
 ### `GET /episodes/{e}/gates` [R]
 用途：读阶段闸门与阻断原因。**每进入下一阶段前先读**。
@@ -265,15 +279,46 @@ Body：`{drama_id, episode_id, config_id?, model?, message}`
 
 ---
 
+## 5A. 纪录片旁白骨架（S4.5，Issue #81）
+
+### `GET /episodes/{e}/narration-skeleton` [S]
+返回：`{revision, confirmed_at, coverage{script_chars,covered_chars,uncovered_chars,gaps[{start,end,chars,excerpt}],complete}, shots:[{storyboard_id, shot_number, title, narration_text, narration_chars, tts{valid,reason,message,duration_ms,audio_url,audio_version}, design_card_status, design_ready}]}`。
+`tts.audio_url` / `tts.audio_version`（#81 新增）：仅 `valid:true` 时可试听；`valid:false` 表示音频与当前旁白不一致（已过期），不得当作本镜配音证据。播放时按 `audio_version` 附版本参数避免缓存旧音频。
+
+### `POST /episodes/{e}/narration-skeleton/generate` [S]
+Body：`{config_id?, model?}`；AI 按旁白稿拆骨架（只写 `shot_number/narration_text/title/continuity`）。首批 `replace_existing` 会硬删本集既有分镜行——重拆需人授权。
+
+### `PUT /episodes/{e}/narration-skeleton` [S]
+Body：`{revision, shots:[{id?, narration_text, title?}], validate_only?: true}`
+- `revision` 必填，取自刚读到的骨架；不匹配 → 冲突错误，先重读再编辑。
+- `shots` 不带 `id` = 新建一镜；原有镜不出现在列表 = 合并/删除。
+- 保存按**有序、连续、逐字**重写各镜旁白边界；正文改字会被逐字校验拒绝（要改字回旁白稿）。保存改变 `revision`，**原有确认失效**，须重新确认。
+- **`validate_only:true`（#81 新增）= dry-run**：返回 `{problems, gaps:[{start,end,chars,text,next_index}], excerpts:{<行号>: string}}`，**不写库**。坐标是去空白与 `【】` 节拍标记后的剧本下标（左闭右开）；`next_index` 是该缺口应并入的下一镜序号（等于 `shots.length` 表示结尾缺口）。任一镜旁白在剧本中定位不到时 `gaps` 返回空数组，只看 `problems`。
+
+### `POST /episodes/{e}/narration-skeleton/confirm` [S]
+Body：`{revision}`。人的确认，Agent 不自行调用。
+### `POST /episodes/{e}/narration-skeleton/unconfirm` [S]
+破坏性：重锁下游；需人授权。
+
+---
+
 ## 6. 设计卡与段组合（S5）
 
 ### `GET /episodes/{e}/design-card-context` [R]
 返回：候选资产、语义条目、底图候选、段时长上限（图层 ≤30s、生成 ≤15s）。
-### `GET /episodes/{e}/design-cards/audit` [R]
+### `GET /episodes/{e}/design-cards/audit` [R]（#82 新字段 `[S]`）
 返回逐镜结构机检：`combo`、`status`、`budget{layer_s,gen_s}`、`issues`、`unresolved`、旁白估算/实测时长。
-### `POST /episodes/{e}/design-cards/fill` [R]
-Body：`{storyboard_ids?, config_id?, model?}`；不带 `storyboard_ids` = 只补空白/过期。
-注意：AI 填卡是**草稿**，不替人选组合；`combo` 必须由人显式决定。
+#82 新增：
+- `tts.duration_ms: number|null` — 当前有效配音的实测毫秒数；为 `null` 时展示「待配音」，**不得**当作 0.0s。
+- `unresolved_layers: [{index, type, text, asset_id, asset_name, asset_exists, semantic_id, semantic_name, available_semantics:[{id,name,group}]}]` — 每个未解析锚点属于哪张资产、缺哪个语义条目、该资产现有哪些语义条目。报错时引用这些名字，不要只报 `issue.code`。
+- `video_generated: boolean` — 本镜是否已有生成视频。
+### `POST /episodes/{e}/design-cards/fill` [R]（#82 行为变更 `[S]`）
+Body：`{storyboard_ids?, config_id?, model?}`；不带 `storyboard_ids` = 只补空白/过期，纪录片还会带上「有卡但 `combo` 为空且 `pending`」的镜。
+#82 起：模型可直接填 `design_card.combo`，`suggested_combo` 变为可选且仅供展示。
+- 该镜**已有 combo** → 保留，模型值被忽略；**无 combo** → 采用模型值。
+- 纪录片「有卡无 combo」走 **combo-only 补选**：只写 `combo`，不重写卡片内容。
+- 模型给出非法/缺失 combo，或写了不存在的 `semantic_id`/`name` → 该镜计入 `failed`，原因写进 `design_card_stale_reason`（状态置 `pending`）。
+- 写入后卡片一律 `pending`、`design_card_confirmed_at` 清空；确认仍只能由人按。
 ### `GET /episodes/{e}/design-cards/status` [R]
 用途：填卡任务进度。
 ### `PUT /storyboards/{id}/design-card` [R]
@@ -285,7 +330,7 @@ Body：`{combo:"A"|"B"|"C"|"D"|null, design_card:{...}}`
  info_points: [{id, text, via:"layer"|"generated"|"narration_only"}],   // ≤12 条
  budget: {layer_s: number|null, gen_s: number|null},                     // layer≤30, gen≤15
  rationale: string,                                                      // ≤600
- suggested_combo: "A"|"B"|"C"|"D"|null,
+ suggested_combo: "A"|"B"|"C"|"D"|null,                                   // 仅展示；实际 combo 存在分镜列上
  layer_plan: {
    base: {kind:"asset", asset_kind:"character"|"scene"|"prop", asset_id, version_task_id|null} | {kind:"inherit_prev"} | null,
    must_mark: string[],                                                  // ≤20
@@ -298,13 +343,14 @@ Body：`{combo:"A"|"B"|"C"|"D"|null, design_card:{...}}`
 }
 ```
 `via:"narration_only"` 表示该信息点只由旁白/字幕承担，不需要画面资产。
-- `A` 图层段 only；`B` 生成段 only；`C` 图层→生成；`D` 生成→图层。**必须显式，不允许默认推定**。
+- `A` 图层段 only；`B` 生成段 only；`C` 图层→生成；`D` 生成→图层。**没有默认值**：要么由人显式写入本端点/`POST /storyboards/{id}/combo`，要么由 #82 的设计卡批次在该镜尚无 combo 时首次写入；本端点收到的 `combo` 永远视为人工决定，Agent 不自行调用。
 - `budget.layer_s` ≤30；`budget.gen_s` ≤15；超限直接 400。
 - 写卡后状态回 `pending`，需要重新确认。
 - 已确认且已有制作产物时改 `combo` 会被拒（gate `combo_switch`），必须走 `POST /storyboards/{id}/combo`。
 ### `POST /storyboards/{id}/design-card/confirm` [R]
 Body：`{acknowledge?:true}`
 - 有 `block` 级 issue → 400；只有 `warn` 时必须 `acknowledge:true` 才放行。
+- 400 响应体带 `issues[]`，其中 `message` 是可读原因（#82 起前端与报告都应直接引用它，而不是只显示 `code`）。
 - 确认是人的背书，不是 Agent 的“看起来没问题”。
 ### `POST /storyboards/{id}/design-card/unconfirm` [S]
 注意：撤销确认会重锁制作；需人授权，Agent 不自行调用。

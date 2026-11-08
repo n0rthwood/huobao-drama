@@ -23,6 +23,21 @@
 3. 技能更新与对应业务改动在**同一个 Issue 分支**提交，不单独积压。
 4. 本目录是权威版本；本机全局 managed skills 目录只是运行时副本，修改后应从本目录重新同步，避免两边各自演化。
 5. **严禁写入密钥**：`api_key`、认证头、带凭据的 URL 一律不得出现在 `SKILL.md` 或 `references/` 中（`GET /ai-configs` 的响应含 `api_key`，只能在内存中白名单取字段）。
+6. 新端点/新字段在生产实测前一律标 `[S]`，实测通过后才改 `[R]`；标注与 `SKILL.md` 顶部的契约快照（`origin/master` commit）一起更新。
+
+## 同步到全局 managed skill（每次更新后必做）
+
+1. 用 omp 的 `manage_skill` **update**（`name: huobao-director`）写入本目录 `SKILL.md` 的正文（去掉 YAML front matter，`description` 走参数）。
+2. 把本目录 `references/` 全量复制到 `~/.omp/agent/managed-skills/huobao-director/references/`。
+3. 复制后核对两边 `SKILL.md` 正文与 `references/*.md` 内容一致，并确认不含 `api_key`、认证头或带凭据的 URL。
+4. managed skills 是隔离目录，只动 `huobao-director`，不要触碰用户自建技能。
+
+## 版本记录
+
+| 日期 | 对应 Issue | 技能变更 |
+|---|---|---|
+| 2026-11-08 | #85（随 #80/#81/#82 发布 `20261108T055548Z`） | 新增 `POST /episodes/{e}/script-rewrite/inspect-narration` 与 `fidelity.v2` 剔除清单（#80）；旁白骨架 `validate_only` dry-run、缺口处置与 `tts.audio_url/audio_version`（#81）；设计卡 AI 填 `combo`、combo-only 补选、audit 的 `tts.duration_ms`/`unresolved_layers`/`video_generated` 与可读 `issues[].message`（#82）；修订「AI 绝不选 combo」旧口径；新增 §4.6「八达岭长城测试 1008」生产验收案例（含固定 224 字原始内容与故意保留的出处行） |
+| 2026-11-07 | #83 | 技能首次入库（从本机全局 managed skills 复制），建立同步规则 |
 
 ## 使用场景
 

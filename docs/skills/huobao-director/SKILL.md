@@ -5,7 +5,7 @@ description: 通过火宝 HTTP API 按阶段推进剧本、资产、Poster、分
 
 # 火宝制作助理：从目标到成片的 API 工作法
 
-> 契约快照：基于 `origin/master` `63a2bfb` 与 2026-11-05 殷墟五镜实测；标注 `[R]` 的端点当轮真实跑过，`[S]` 仅源码核对。路由/schema 变更后先 GET/预览校验再写。
+> 契约快照：基于 `origin/master` `9cd3458`（含 Issue #80/#81/#82，release `20261108T055548Z`）与 2026-11-05 殷墟五镜实测；标注 `[R]` 的端点当轮真实跑过，`[S]` 仅源码核对。#80/#81/#82 的新端点与新字段当前均为 `[S]`（源码核对，尚未生产实测），首次使用前按 §4.6「八达岭长城测试 1008」做生产验收。路由/schema 变更后先 GET/预览校验再写。
 >
 > 历史细表：`references/api-core.md`、`references/api-production.md` 为 2026-11-02 快照，覆盖本目录未列的旧端点细节；与 `references/api-catalog.md` 或本正文冲突时，以新文档为准。错误案例中的 `[R]` 仅表示该错误行为有真实记录，不表示流程正确或已获授权。
 
@@ -18,7 +18,7 @@ description: 通过火宝 HTTP API 按阶段推进剧本、资产、Poster、分
 5. `merge` 导出必须显式 `storyboard_ids`（省略=整集）。
 6. `opened` 必须**下载并打开**、本地核对 sha256 一致后才能填。
 7. 真实照片/地图/文物/档案**不进** t2i/image_edit/i2v/pipeline；判据是来源真实，与资产类型无关。
-8. 段组合由人显式给 A/B/C/D；预算不足不是选 A 的理由。
+8. 段组合 A/B/C/D：纪录片设计卡批次（#82）起**允许 AI 填 combo**，但只在该镜**尚无 combo** 时写入，且必须经人工审阅并由人确认设计卡；Agent 仍不得手工替人改写既有 combo（`PUT /storyboards/{id}/design-card {combo}`、`POST /storyboards/{id}/combo`），预算不足不是选 A 的理由。
 9. HTTP 200 / `completed` / `exportable` **不等于**内容通过；必须打开真实媒体。
 10. 恢复只补剩余（`retry-failed`/`fill-gaps`）；全量重跑需书面理由+人授权。
 11. 业务写入只走火宝 API；本地 ffmpeg 只读检查，不拼片。
@@ -65,7 +65,7 @@ description: 通过火宝 HTTP API 按阶段推进剧本、资产、Poster、分
 |---|---|
 | 剧本确认 `POST /episodes/{e}/script/confirm` | 决定“拍什么”，是内容责任 |
 | 风格与画幅 | 影响全项目提示词与尺寸，改风格会清空 `final_prompt` |
-| 段组合 A/B/C/D | 决定“这一镜怎么拍”，不能由 AI 或“设备默认”推定 |
+| 段组合 A/B/C/D 的**审阅与改写** | 决定“这一镜怎么拍”。#82 起纪录片设计卡批次可由 AI 对**尚无 combo** 的镜首次填入，人必须逐镜审阅；改写已有 combo、或手工指定 combo，仍是人的决定 |
 | 设计卡确认 | 导演分镜单背书 |
 | 关键帧确认 `confirm-keyframes` | 视觉表演与构图通过 |
 | 资产流水线 `override_gate` | 程序 gate FAIL 时是否接受，属技术例外，必须写明范围；仍不是艺术批准 |
@@ -77,7 +77,7 @@ description: 通过火宝 HTTP API 按阶段推进剧本、资产、Poster、分
 
 Agent 可以做**技术验收**（结构、时长、音画、可解码、签名一致），但必须标注“技术验收”，不得写成“用户艺术批准”。
 
-**硬禁止**：Agent 永不自行调用下列**破坏性或背书性**写入——`script/confirm|unconfirm`、`design-card/confirm|unconfirm`、`confirm-keyframes`、`character-roster` 的批准保存、`asset-pipeline/runs/{id}/approve` 的 `verdict`/`override_gate`、段组合写入 `PUT /storyboards/{id}/design-card {combo}` 与 `POST /storyboards/{id}/combo`、`asset-review/items/{id}` 的 `not_needed`/`ignored`、`DELETE /storyboards/{id}`、`DELETE /tasks/{id}`、`DELETE /episodes/{e}/merges/{id}`。这些只在人已给出明确决定后执行；执行时在 `requests.jsonl` 记录“人授权原话/时间”，否则视为越权。
+**硬禁止**：Agent 永不自行调用下列**破坏性或背书性**写入——`script/confirm|unconfirm`、`design-card/confirm|unconfirm`、`confirm-keyframes`、`character-roster` 的批准保存、`asset-pipeline/runs/{id}/approve` 的 `verdict`/`override_gate`、段组合的人工写入 `PUT /storyboards/{id}/design-card {combo}` 与 `POST /storyboards/{id}/combo`、`asset-review/items/{id}` 的 `not_needed`/`ignored`、`DELETE /storyboards/{id}`、`DELETE /tasks/{id}`、`DELETE /episodes/{e}/merges/{id}`。这些只在人已给出明确决定后执行；执行时在 `requests.jsonl` 记录“人授权原话/时间”，否则视为越权。唯一例外是 #82 的纪录片设计卡批次 `POST /episodes/{e}/design-cards/fill`：服务端只给**尚无 combo** 的镜写一次模型所选 combo，卡片仍是 `pending`，确认依旧由人按。
 （只读 GET、preview、生成提示词/图片/配音/视频等“新增产物”的提交不在此列，但必须受 §1.2 预算台账约束。）
 
 ---
@@ -107,6 +107,18 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 - 项目/集基础端点仍为 `POST /dramas`、按当前读回需要时 `PUT /dramas/{d}`、`POST /episodes`。纪录片项目必须 `project_type=documentary` + `documentary_rules=on`；`POST /episodes` 返回 200 而非 201。项目设置与音频设置不因导入原始内容自动获得修改授权。
 - 没有 `GET /episodes/{id}`：从 `GET /dramas/{d}` 的 `episodes[]` 按数据库 ID 找集，核对 `episode_number`；审核链接用显示集数。`content/script_content/script_confirmed_at` 都在集行中。`gates` 只反映服务端状态，不代替用户逐步授权。
 
+#### S1-80 纪录片旁白稿纯净度（Issue #80，`[S]`）
+
+**案例背景**：《历史纵横》E01（drama 9 / episode 15）的 `script_content` 带着维基出处块（原始材料 / 永久链接 / 原作者 / 许可 / 说明），旁白骨架用 `scriptMatchKey` 做逐字匹配，模型只能漏掉这些行（gap）或把 URL、许可写进旁白，于是「旁白骨架不合法」反复失败。用户的决策是：**非旁白内容必须由 AI 在改写阶段智能识别并剔除，不要再加关键词/正则规则；人工保存时命中只提示，由人决定删或留。**
+
+- **纪录片的「剧本」就是旁白稿**：正文逐字朗读，`【】` 节拍标记不是杂质；出处块、版权许可、URL/永久链接、贡献者与编辑历史、书目与引用尾注（含 ISBN、出版社）、模板/编辑说明、「不作为朗读稿」声明都不属于旁白。正文里可朗读的归属表述（如「据《异域录》记载」）必须保留。
+- **改写阶段（`fidelity.v2`）**：忠实改写现在要求模型返回 `{"content":…,"exclusions":[{"text","category","reason"}]}`，`category ∈ source|license|link|contributor|bibliography|editorial|not_narration`。服务端把每条 `text` 在**冻结输入**里唯一定位；定位不到、互相重叠、或仍出现在 `content` 里 → 阶段失败，不产生版本。`FidelityReport` 因此新增 `ai_exclusions[]` 与 `adjusted_baseline_chars`：内容量容差上界仍按原始基线，下界按**扣除剔除清单后的基线**，即「变短」必须由可定位的剔除清单解释，不能靠删正文压字数。
+- **人工保存前的检查**：`POST /episodes/{e}/script-rewrite/inspect-narration {content, config_id?, model?}` → `{findings:[{text, reason, locatable}]}`。它检查**当前提交的草稿**，不是上一轮改写报告，并且**不写库**。仅纪录片项目可用（其它项目 400）；模型返回被截断或格式不合法时返回 502 `inspection_failed`。
+- **检测失败 ≠ 稿件干净**：502 或字段缺失时必须按「检测失败」呈报并让人决定是否照样保存，不得当成「无问题」。`locatable:false` 的片段只能展示、不能自动删除（它在当前稿里找不到逐字匹配）。
+- **删除是人的选择**：命中后由人选「删除可定位片段并保存」或「保留并保存」；Agent 不得自行决定删哪段，也不得把删除扩大成改写正文。
+- 正例：改稿 → 调 `inspect-narration` → 把 `findings` 原样报给人（逐条 `text` + `reason` + 是否可定位）→ 按人的选择保存。
+- 反例：① 自己写正则删「参考：…ISBN」；② 把 502 当作通过直接保存；③ 用 `inspect-narration` 的结果直接 `PUT` 改写正文；④ 拿上一次改写的 `ai_exclusions` 冒充本次草稿的检查结论。
+
 ### S2 资产（纪录片含“提取→审核→精确→美化”）
 - 提取：`POST /episodes/{e}/extract {target}` ×3 → `extract-status` → 读 `characters/scenes/props`。
 - 字段与关联：`PUT /scenes/{id}`、`PUT /props/{id}`、`POST /episodes/{e}/assets/link`、`DELETE .../assets/link`。
@@ -132,11 +144,29 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 - 组合场景：旁白模式必须逐段使用原旁白原文（覆盖率 100%），镜数=段落数；拆镜阶段不启动任何生成。
 - 陷阱：完整重拆会覆盖；**先获人授权并保存快照**，不能自行重拆；不能用重拆修一条视频 Prompt；部分失败用 `fill-gaps`。
 
-### S5 设计卡与段组合
-- 端点：`GET /design-card-context`、`GET /design-cards/audit`、`POST /design-cards/fill`、`GET /design-cards/status`、`PUT /storyboards/{id}/design-card {combo, design_card}`、`POST .../design-card/confirm {acknowledge}`。
+### S4.5 纪录片旁白骨架（Issue #81，`[S]`）
+
+纪录片在拆镜与设计卡之间有一步「旁白骨架」：把已确认的旁白稿**有序、连续、逐字**地分配到各镜 `storyboards.narration_text`，并写镜头标题与衔接；没有独立的表，骨架修订号 `revision` 是脚本 + 分镜行的指纹。
+
+**案例背景**：E01 的骨架页只有「并入上一镜 / 在光标处拆分」，缺口只能靠反复保存试错，报错把同一处缺口按镜重复累计（1→12→93 字），而且配音页没有试听入口，人无法判断某镜的音频是否就是当前旁白。#81 因此加了 dry-run 校验、缺口处置按钮与骨架内试听。
+
+- 端点：`GET /episodes/{e}/narration-skeleton`、`PUT /episodes/{e}/narration-skeleton {revision, shots:[{id?, narration_text, title?}]}`、`POST /episodes/{e}/narration-skeleton/confirm|unconfirm`。
+- **dry-run 校验（新）**：同一个 `PUT` 加 `validate_only:true` → `{problems, gaps:[{start,end,chars,text,next_index}], excerpts}`，**不写库**。`revision` 仍要带且仍会冲突报错（人在别处改过 → 先重读）。坐标是**去空白与 `【】` 节拍标记后**的剧本下标，左闭右开；`next_index` 是该缺口应并入的下一镜序号（`shots.length` 表示结尾处缺口）。任何一镜的旁白在剧本里定位不到时，`gaps` 返回空数组（无法给出可信坐标），只看 `problems`。
+- **缺口处置**：把缺口补到上一镜末尾 / 下一镜开头 / 新建一镜领走；属于出处或版权信息的缺口**不要并进旁白**，回 S1-80 的旁白稿处理。单镜上限 80 字，超长缺口先建新镜再拆分。
+- **骨架内试听（新）**：`tts` 新增 `audio_url` 与 `audio_version`。`valid:true` 才可播放；`valid:false` 表示音频与当前旁白不一致（已过期），**不得**拿旧音频当本镜配音证据，必须重新生成。播放地址按 `audio_version` 加版本参数防缓存。
+- **保存语义**：`shots` 不带 `id` = 新建一镜；原有镜不出现在列表 = 合并/删除；保存会改变 `revision`，**原有确认随之失效**，必须重新确认。正文改字会被逐字校验拒绝——要改字去旁白稿，不在骨架里改。
+- 正例：编辑草稿 → `validate_only:true` 看 `problems/gaps/excerpts` → 处置缺口 → 再 dry-run 直到干净 → 正式 `PUT` → 人确认 → 配音 → 逐镜试听（只听 `valid:true`）。
+- 反例：① 直接正式保存去试错；② 把许可/链接缺口并进某镜旁白凑覆盖率；③ 播放 `valid:false` 的旧音频并报告「配音已完成」；④ 用骨架编辑代替旁白稿改写。
+
+### S5 设计卡与段组合（含 Issue #82 变更，`[S]`）
+- 端点：`GET /episodes/{e}/design-card-context`、`GET /episodes/{e}/design-cards/audit`、`POST /episodes/{e}/design-cards/fill`、`GET /episodes/{e}/design-cards/status`、`PUT /storyboards/{id}/design-card {combo, design_card}`、`POST /storyboards/{id}/design-card/confirm {acknowledge}`。
 - 用途：把“这一镜怎么拍”写成导演分镜单；`combo` 决定是否用图层段/生成段及顺序。
-- 组合场景：AI 填草稿 → 人改 → 人显式选 A/B/C/D → 确认（0 block；有 warn 需 acknowledge）。
-- 陷阱：AI 不得替人选 combo；预算 `layer_s≤30`、`gen_s≤15` 超限直接拒存；已确认且有产物时改 combo 会被拒，必须走 `POST /storyboards/{id}/combo`（先看 `combo/impact`）。
+- **案例背景（#82）**：E01 实测 20 张已填卡里 12 张 `combo` 为空，批量确认全被 `combo_missing` 挡住；卡头显示「实测 0.0s」（audit 的 `tts` 没有 `duration_ms`，前端把 `undefined` 当 0）；310 个 `unresolved_ref` 只显示通用文案，看不出是哪张资产、缺哪个语义条目。用户的决定：AI 直接把 combo 选出来、把时长关系讲清楚、把错误写成人能照着修的话，并且**绝不虚构语义名**。
+- **AI 填 combo（变更）**：`design_card` 工具 schema 新增 `combo`，`suggested_combo` 变为可选仅供展示。`POST /episodes/{e}/design-cards/fill` 批次里：该镜**已有 combo** → 保留，不被覆盖；**没有 combo** → 采用模型所选；模型给出非法/缺失 combo → 该镜失败并把原因写进 `design_card_stale_reason`。纪录片「有卡但没 combo」的镜会进入 **combo-only 补选**：只补 combo，**不重写卡片内容**。写入后卡片一律回到 `pending`，确认仍由人按。
+- **语义引用不得虚构**：批次提示词里带本集真实语义清单；模型写了不存在的 `semantic_id`/`name` → 该镜直接失败并回报可读原因。正确做法是**保留规划图层**、把 `semantic_id` 与 `name` 留空、在 `rationale` 写明「待标注」，不要为了过校验而降级成卡片/标签。
+- **audit 新字段**：`tts.duration_ms`（缺失就显示「待配音」，**不要写 0.0s**）、`unresolved_layers[{index,type,text,asset_id,asset_name,asset_exists,semantic_id,semantic_name,available_semantics[]}]`、`video_generated`。报问题时引用 `issue.message` 与 `unresolved_layers` 的具体资产/语义名，不要只报 `code`。
+- 组合场景：AI 填卡（含 combo）→ 人逐镜审阅并按需改 → 人确认（0 block；有 warn 需 acknowledge）。
+- 陷阱：预算 `layer_s≤30`、`gen_s≤15` 超限直接拒存；已确认且有产物时改 combo 会被拒，必须走 `POST /storyboards/{id}/combo`（先看 `combo/impact`）；批次只对「无 combo」的镜写 combo，不要指望它纠正人已选的组合；确认失败时读返回体 `issues[].message`，它已包含具体原因。
 
 ### S6 图层段
 - 端点：`GET /layer-segments/storyboards/{id}`、`POST .../draft`、`PUT .../{id} {layer_doc,timeline,duration,base_ref}`、`POST .../render`、`GET .../thumbnail/{first|last|frame-N}`、`GET .../junction`、`GET /layer-docs/fonts`。
@@ -256,7 +286,7 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
   - 188/189/190：`combo:"A"`，`budget.layer_s` 10/10/12，`layer_plan.base` 指向确定性底图（188 用示意底图，189 用流程底图，190 用真实照片 92 + 现代定位图 93）。
 - 人逐镜审卡/定组合后 → `POST /storyboards/{id}/design-card/confirm {acknowledge:true}` ×5（Agent 不得自发确认）。
 - `GET /design-cards/audit`：5 镜 `confirmed`，`unresolved=0`。
-- 为什么：组合是人的选择；C 的衔接帧锁定必须体现在卡里（first 由图层末帧继承）。
+- 为什么：本轮（2026-11-05）组合全部由人显式给出；C 的衔接帧锁定必须体现在卡里（first 由图层末帧继承）。**口径已更新**：#82 之后纪录片批次可为「尚无 combo」的镜首次写入 AI 所选组合，人改为逐镜审阅 + 确认（见 S5）。
 
 ### 步骤 6：图层段
 - `GET /layer-segments/storyboards/186`：`combo:"C"`、`production_unlocked:true`。
@@ -377,10 +407,11 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 ### 4.4 每阶段最小核对清单
 
 - **第一步原始内容**：来源与 `content` 对应；未夹带 `script_content` 或改写调用；到达用户指定停止点即结束。
-- **第二步 AI 改写**：已获该步授权；存在真实火宝改写调用与保存结果；不是助手代写回填；再审原文 vs 改写差异与事实归属。稿件确认和后续旁白覆盖率另按阶段检查。
+- **第二步 AI 改写**：已获该步授权；存在真实火宝改写调用与保存结果；不是助手代写回填；再审原文 vs 改写差异与事实归属。保存前跑过 `inspect-narration` 并把 `findings` 原样呈报（502 记为「检测失败」）；改写报告的 `ai_exclusions` 逐条可定位。稿件确认和后续旁白覆盖率另按阶段检查。
+- **旁白骨架**：正式保存前 `validate_only:true` 干净（`problems` 空、`gaps` 空）；缺口按「并入上/下镜或新建镜」处置，非旁白内容回旁白稿；保存后重新确认；试听只用 `tts.valid=true` 的音频。
 - **资产**：本集关联是否正确；名字无空格；`faithful` 未进扩散；审核清单 0 missing；程序 gate 与人工例外分开记录。
 - **Poster**：文字未裁切、底图来源正确、未调用不必要生图。
-- **设计卡**：5 个信息点都有 `via`；预算不超限；组合显式；确认状态 `confirmed`。
+- **设计卡**：5 个信息点都有 `via`；预算不超限；每镜都有 combo（AI 首次填入的也必须人工审阅）；`unresolved_layers` 逐条有真实资产与语义名或明确「待标注」；`tts.duration_ms` 缺失时显示「待配音」而非 0.0s；确认状态 `confirmed`。
 - **图层段**：`base` 尺寸/裁切正确；文字安全边；junction 去文字；`timeline.fps` 与输出一致；`thumbnail` 实际打开。
 - **关键帧**：预览分类正确；锁定槽未出图；版本签名与当前提示词/参考图一致；确认后再提交视频。
 - **旁白**：字数 ≤80（按 spokenText）；发音标记合法；配音实测时长；fit 不截断旁白；字幕与音频逐字对齐。
@@ -396,6 +427,32 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 - **为什么必须禁止**：用户失去第一步的审核与推进控制；第二步失去火宝内部工种的生成链路与记录；即使没有确认或生成媒体，提前代填第二步本身已经越权。
 - **应当怎样做**：原文只进 `content` → 读回并提交第一步链接 → 等用户；获准改写后才调用火宝 `script_rewriter` → 读回火宝稿件 → 再等用户审核。规则冲突就报告，不本地代写补位。
 - **纠错边界**：用户随后明确“不要再操作，只更新 skill”。这时只改已授权的助手技能文档；不再请求火宝、清空稿件、运行改写或声称已经恢复某个业务状态。本案例记录的是错误及预防规则，不是可复制的成功流程。
+
+### 4.6 生产验收固定案例：八达岭长城测试 1008（`AGENTS.md` §9/§10）
+
+**为什么用它做生产验收**：隔离 worktree（独立端口 + DB 副本）从 2026-11-08 起不再作为验收依据——它跑的是副本数据与副本静态目录，掩盖过生产独有的路径前缀、任务队列与真实模型行为。验收必须在生产入口 + 生产后端 + 生产库上留痕，又绝不能碰既有真实项目（尤其 drama 3《利哈列夫远征》）。固定一个**主题、篇幅、命名都确定**的新项目，既保证每轮验收覆盖同样的链路、可横向对比，又把写入限制在一次性测试项目里。
+
+- **主题**：八达岭长城对明朝防御的作用。
+- **原始内容（固定文本，正文 224 字，去空白计；只进第一步 `PUT /episodes/{e} {content}`）**：长度刻意压在 200–300 字，是为了让旁白骨架、配音、设计卡在可控镜数内跑完，GPU 成本可预算。正文（内容为公有领域历史常识整理，可公开）：
+
+  > 八达岭长城位于北京西北的军都山关沟北口，是明代长城中规制最高、保存最完整的段落之一。明永乐以后，蒙古诸部屡次南下，朝廷把京师北面的防线层层加厚：外有宣府、大同，内有居庸关，而八达岭扼守关沟最窄处，成为居庸关的前哨。城墙依山脊起伏，以条石为基、青砖包砌，顶部宽处可容五马并行，便于快速调兵。沿线每隔数百米设敌台与烽燧，守军以烟火与号炮为信，警讯昼夜之间即可传到京城。它的作用不只是阻挡，更是把进攻者逼入狭窄山道，使明军能以较少兵力守住通往北京的咽喉。
+
+  正文之后再**另起一行**附这条**故意保留的非旁白出处行**（它不是旁白，用来触发 #80 的检测；不计入上面的 224 字）：
+
+  > 资料来源：公有领域历史常识整理；本行为出处说明，不作为朗读稿。
+
+  导入时两段一起写进 `content`（原始材料保留出处是 S1 的要求）；AI 改写走第二步，改写与保存前的检测应当把这条出处行识别为 `source`/`not_narration` 并给出可定位的 `findings`，正文 224 字不得被改写删减。
+- **项目命名**：`八达岭长城测试 1008`；同名已存在时追加序号（`八达岭长城测试 1008-2`）。**不复用旧测试项目**；实际 `drama_id`/`episode_id` 以创建结果为准并写进报告。
+- **链路**：建项目（`project_type=documentary` + `documentary_rules=on`）→ 原始内容 → AI 改写 → 旁白稿检查（#80）→ 人工确认 → 资产提取/审核 → 旁白骨架（#81）→ 配音 → 设计卡（#82）→ 图层段/关键帧 → 视频 → 合成 → 导出。本轮验收涉及的阶段必须真实跑通，不涉及的阶段写明「未覆盖」。
+- **本案例要覆盖的新功能**：
+  1. `POST /episodes/{e}/script-rewrite/inspect-narration`：在原始内容尾部刻意保留一条出处/链接行，验证 AI 识别、`locatable` 判定与「删除可定位片段 / 保留」两条人工路径；
+  2. `fidelity.v2` 的 `ai_exclusions` 与 `adjusted_baseline_chars`：改写报告能看到被剔除片段与调整后基线；
+  3. `PUT …/narration-skeleton {validate_only:true}`：缺口坐标、`excerpts`、三种缺口处置；
+  4. 骨架 `tts.audio_url` / `audio_version`：配音后逐镜试听，并验证改动旁白后旧音频转为 `valid:false` 不可试听；
+  5. `POST …/design-cards/fill` 的 AI combo 与 combo-only 补选（含「已有 combo 不被覆盖」）；
+  6. `GET …/design-cards/audit` 的 `tts.duration_ms`、`unresolved_layers`、`video_generated`，以及确认失败时可读的 `issues[].message`。
+- **证据清单**：`drama_id`/`episode_id`/各阶段 `task_id`；每个关键阶段的浏览器截图（读图后再下结论）；只读 DB 查询（状态与产物路径）；失败任务的日志片段；GPU 消耗台账（图片/视频/TTS 条数）。报告必须给出这些 ID 与证据路径，不能只写「已验证」。
+- **纪律**：生产测试消耗真实额度，任何计费生成任务先取得用户同意；严禁修改、生成、删除既有真实项目数据；DB 一律只读；失败不隐瞒，保留证据。
 
 ---
 
