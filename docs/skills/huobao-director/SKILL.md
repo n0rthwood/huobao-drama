@@ -5,7 +5,7 @@ description: 通过火宝 HTTP API 按阶段推进剧本、资产、Poster、分
 
 # 火宝制作助理：从目标到成片的 API 工作法
 
-> 契约快照：基于 `origin/master` `9cd3458`（含 Issue #80/#81/#82，release `20261108T055548Z`）与 2026-11-05 殷墟五镜实测；标注 `[R]` 的端点当轮真实跑过，`[S]` 仅源码核对。#80/#81/#82 的新端点与新字段当前均为 `[S]`（源码核对，尚未生产实测），首次使用前按 §4.6「八达岭长城测试 1008」做生产验收。路由/schema 变更后先 GET/预览校验再写。
+> 契约快照：基于 `origin/master` `5d08b18`（含 Issue #80/#81/#82，release `20261108T055548Z`）。`[R]` = 真实跑过：殷墟五镜（2026-11-05）与**八达岭长城测试 1008 生产验收（2026-11-08，drama 10 / episode 16 / merge 27）**；`[S]` 仅源码核对。#80/#81/#82 的新端点与新字段已在八达岭轮实测通过，标为 `[R]`（证据：`docs/qa/8daling-1008-20261108T061008Z/`，见 §4.6）。路由/schema 变更后先 GET/预览校验再写。
 >
 > 历史细表：`references/api-core.md`、`references/api-production.md` 为 2026-11-02 快照，覆盖本目录未列的旧端点细节；与 `references/api-catalog.md` 或本正文冲突时，以新文档为准。错误案例中的 `[R]` 仅表示该错误行为有真实记录，不表示流程正确或已获授权。
 
@@ -110,7 +110,7 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 - 项目/集基础端点仍为 `POST /dramas`、按当前读回需要时 `PUT /dramas/{d}`、`POST /episodes`。纪录片项目必须 `project_type=documentary` + `documentary_rules=on`；`POST /episodes` 返回 200 而非 201。项目设置与音频设置不因导入原始内容自动获得修改授权。
 - 没有 `GET /episodes/{id}`：从 `GET /dramas/{d}` 的 `episodes[]` 按数据库 ID 找集，核对 `episode_number`；审核链接用显示集数。`content/script_content/script_confirmed_at` 都在集行中。`gates` 只反映服务端状态，不代替用户逐步授权。
 
-#### S1-80 纪录片旁白稿纯净度（Issue #80，`[S]`）
+#### S1-80 纪录片旁白稿纯净度（Issue #80，`[R]`：drama 10 / episode 16，run 3 / task 1212）
 
 **案例背景**：《历史纵横》E01（drama 9 / episode 15）的 `script_content` 带着维基出处块（原始材料 / 永久链接 / 原作者 / 许可 / 说明），旁白骨架用 `scriptMatchKey` 做逐字匹配，模型只能漏掉这些行（gap）或把 URL、许可写进旁白，于是「旁白骨架不合法」反复失败。用户的决策是：**非旁白内容必须由 AI 在改写阶段智能识别并剔除，不要再加关键词/正则规则；人工保存时命中只提示，由人决定删或留。**
 
@@ -147,7 +147,7 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 - 组合场景：旁白模式必须逐段使用原旁白原文（覆盖率 100%），镜数=段落数；拆镜阶段不启动任何生成。
 - 陷阱：完整重拆会覆盖；**先获人授权并保存快照**，不能自行重拆；不能用重拆修一条视频 Prompt；部分失败用 `fill-gaps`。
 
-### S4.5 纪录片旁白骨架（Issue #81，`[S]`）
+### S4.5 纪录片旁白骨架（Issue #81，`[R]`：drama 10 / episode 16，骨架 task 1227、TTS batch 1228）
 
 纪录片在拆镜与设计卡之间有一步「旁白骨架」：把已确认的旁白稿**有序、连续、逐字**地分配到各镜 `storyboards.narration_text`，并写镜头标题与衔接；没有独立的表，骨架修订号 `revision` 是脚本 + 分镜行的指纹。
 
@@ -161,7 +161,7 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 - 正例：编辑草稿 → `validate_only:true` 看 `problems/gaps/excerpts` → 处置缺口 → 再 dry-run 直到干净 → 正式 `PUT` → 人确认 → 配音 → 逐镜试听（只听 `valid:true`）。
 - 反例：① 直接正式保存去试错；② 把许可/链接缺口并进某镜旁白凑覆盖率；③ 播放 `valid:false` 的旧音频并报告「配音已完成」；④ 用骨架编辑代替旁白稿改写。
 
-### S5 设计卡与段组合（含 Issue #82 变更，`[S]`）
+### S5 设计卡与段组合（含 Issue #82 变更，`[R]`：drama 10 / episode 16，6 镜 AI 首次写入 combo）
 - 端点：`GET /episodes/{e}/design-card-context`、`GET /episodes/{e}/design-cards/audit`、`POST /episodes/{e}/design-cards/fill`、`GET /episodes/{e}/design-cards/status`、`PUT /storyboards/{id}/design-card {combo, design_card}`、`POST /storyboards/{id}/design-card/confirm {acknowledge}`。
 - 用途：把“这一镜怎么拍”写成导演分镜单；`combo` 决定是否用图层段/生成段及顺序。
 - **案例背景（#82）**：E01 实测 20 张已填卡里 12 张 `combo` 为空，批量确认全被 `combo_missing` 挡住；卡头显示「实测 0.0s」（audit 的 `tts` 没有 `duration_ms`，前端把 `undefined` 当 0）；310 个 `unresolved_ref` 只显示通用文案，看不出是哪张资产、缺哪个语义条目。用户的决定：AI 直接把 combo 选出来、把时长关系讲清楚、把错误写成人能照着修的话，并且**绝不虚构语义名**。
