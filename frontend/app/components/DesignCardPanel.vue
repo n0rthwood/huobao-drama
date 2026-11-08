@@ -123,7 +123,7 @@
             :class="['dc-shot', { on: sb.id === selectedId }]"
             :aria-pressed="sb.id === selectedId"
             draggable="true"
-            @click="selectedId = sb.id"
+            @click="selectShot(sb.id)"
             @dragstart="onDragStart(sb)"
             @dragover.prevent
             @drop.prevent="onDrop(index)"
@@ -635,6 +635,7 @@
       :selected="picker.selected"
       @close="picker.open = false"
       @confirm="onPicked"
+      @goto-assets="asset => { picker.open = false; emit('goto-asset', asset) }"
     />
   </template>
 </template>
@@ -662,6 +663,7 @@ import ComboSwitchDialog from '~/components/ShotProduction/ComboSwitchDialog.vue
 import TaskWorkMetrics from '~/components/TaskWorkMetrics.vue'
 import { mediaUrl } from '~/utils/url'
 import { COMBOS, episodeAPI, narrationSkeletonAPI, storyboardAPI, ttsRequiredOf } from '~/composables/useApi'
+import { DEEPLINK_KEYS, queryEnum, queryIdList, useDeeplink } from '~/composables/useQuerySync'
 import { onTaskFinished, refreshTasks, useTasks } from '~/composables/useTasks'
 import { useWorkflowGates } from '~/composables/useWorkflowGates'
 import { toastError, toastServerMessage } from '~/composables/useToast'
@@ -676,7 +678,7 @@ const props = defineProps({
   narrationVoiceBatch: { type: Object, default: () => ({ running: false, total: 0, completed: 0 }) },
 })
 // preview / open-asset 由集页面接到既有大图查看器与资产语义弹窗（#87 §E，#86 负责 URL 态）
-const emit = defineEmits(['refresh', 'batch-narration-voice', 'preview', 'open-asset'])
+const emit = defineEmits(['refresh', 'batch-narration-voice', 'preview', 'open-asset', 'goto-step', 'goto-asset'])
 
 const COMBO_GLYPH = { A: '▣', B: '▶', C: '▣▶', D: '▶▣' }
 const EMPTY_CTX = {
@@ -728,8 +730,23 @@ const EMPTY_SKELETON = {
   shots: [],
 }
 const skeleton = ref({ ...EMPTY_SKELETON })
-const phase = ref('cards')
-const PHASE_KEY = 'huobao:designPhase'
+// ===== deeplink（#86）：子阶段 / 选中镜 / 子弹层一律由 URL 承载，刷新与复制链接都回到同一处 =====
+const link = useDeeplink('design', DEEPLINK_KEYS.design)
+const PHASES = ['skeleton', 'voice', 'cards']
+/** 进入时 URL 给出的子状态：各自只消费一次，之后一律以用户操作为准 */
+const urlPhase = queryEnum(link.initial('phase'), PHASES)
+const urlShot = queryIdList(link.initial('shot'))[0] || 0
+const urlPick = queryEnum(link.initial('dpick'), ['semantic:must_mark', 'asset:reference_assets'])
+const urlCombo = queryIdList(link.initial('dcombo'))[0] || 0
+const urlScope = queryEnum(link.initial('dscope'), ['fill', 'confirm'])
+/** 子阶段只认 URL：旧版的 localStorage 记忆跨集串味（#86 已删），缺省回到设计卡 */
+const phase = ref(urlPhase || 'cards')
+let shotRestore = urlShot > 0
+let childRestore = Boolean(urlPick || urlCombo || urlScope)
+/** 用户在恢复途中自己点过镜：此后链接恢复不再改选中镜（换集时重置） */
+let userPicked = false
+/** 首轮取数是否到位：子弹层要等上下文 / 审计 / 骨架都就绪再开，避免闪出错误内容 */
+const loaded = reactive({ ctx: false, audit: false, skeleton: false })
 
 /** 配音状态按镜索引：设计卡的时长与门禁都只认这里的实测结果 */
 const ttsByShot = computed(() => {
@@ -786,7 +803,6 @@ const phases = computed(() => [
 
 function setPhase(key) {
   phase.value = key
-  try { localStorage.setItem(PHASE_KEY, key) } catch { /* 静默 */ }
 }
 /** 合并时为 tts / shots 兜底：缺字段一律按「没有有效配音」渲染，绝不放行填卡 */
 function applySkeleton(next) {
@@ -802,7 +818,7 @@ async function loadSkeleton() {
   if (!props.episodeId) return
   try {
     applySkeleton(await narrationSkeletonAPI.state(props.episodeId))
-  } catch { /* 静默：骨架取不到时按「无有效配音」渲染，不放行填卡 */ }
+  } catch { /* 静默：骨架取不到时按「无有效配音」渲染，不放行填卡 */ } finally { loaded.skeleton = true }
 }
 function onSkeletonRefresh() {
   emit('refresh')
@@ -916,17 +932,10 @@ const { gates, ready: gatesReady, refreshGates, reasonOf, gotoOf } = useWorkflow
 // 门禁未判定（首屏未取到 /gates 或取数失败）时同样按锁定渲染，内容绝不先闪出来
 const designLocked = computed(() => !gatesReady.value || gates.value.unlocked?.design === false)
 const lockReason = computed(() => reasonOf('design') || t('episode.gate.checking'))
+// 门禁出路：交给工作台做应用内切步（panel/tab 的所有者在那里），不整页 location.assign；
+// 本面板卸载时它的 deeplink 分组会自动释放 phase/shot/dpick/dcombo/dscope，不会跟到新步骤
 function gotoBlocker() {
-  const target = gotoOf('design') || 'assets'
-  const url = new URL(window.location.href)
-  if (target === 'script') {
-    url.searchParams.set('panel', 'script')
-    url.searchParams.delete('tab')
-  } else {
-    url.searchParams.set('panel', 'production')
-    url.searchParams.set('tab', target)
-  }
-  window.location.assign(url.toString())
+  emit('goto-step', gotoOf('design') || 'assets')
 }
 
 // ===== 镜列表与选中镜 =====
@@ -1621,6 +1630,8 @@ async function loadContext() {
     ctx.value = { ...EMPTY_CTX, ...(data || {}), limits: { ...EMPTY_CTX.limits, ...(data?.limits || {}) } }
   } catch (err) {
     toastError(err, { fallback: 'episode.design.error.loadFailed' })
+  } finally {
+    loaded.ctx = true
   }
 }
 async function loadAudit() {
@@ -1628,12 +1639,25 @@ async function loadAudit() {
   try {
     const data = await episodeAPI.designCardAudit(props.episodeId)
     audit.value = Array.isArray(data) ? data : []
-  } catch { /* 静默：审计只影响左列状态点与批量范围 */ }
+  } catch { /* 静默：审计只影响左列状态点与批量范围 */ } finally { loaded.audit = true }
 }
 
 function ensureSelection() {
   if (!shots.value.length) { selectedId.value = 0; return }
+  // 链接点名的镜优先；本集没有这一镜时保持默认选中，并且只在用户确实带着链接来时提示
+  if (shotRestore) {
+    shotRestore = false
+    const target = shots.value.find(sb => sb.id === urlShot)
+    if (target) { selectedId.value = target.id; return }
+    toast.error(t('deeplink.missingNamed', { target: t('components.mediaLibrary.storyboards') }))
+  }
   if (!shots.value.some(sb => sb.id === selectedId.value)) selectedId.value = shots.value[0].id
+}
+/** 用户点选镜：恢复途中用户自己选了哪一镜就以他为准，后到的链接恢复不再覆盖 */
+function selectShot(id) {
+  shotRestore = false
+  userPicked = true
+  selectedId.value = id
 }
 
 watch(() => props.storyboards, () => {
@@ -1656,6 +1680,11 @@ watch(() => props.episodeId, () => {
   localOrder.value = null
   selectedId.value = 0
   skeleton.value = { ...EMPTY_SKELETON }
+  // 换集后首轮取数重新开始：链接恢复（若还没发生）必须等新集的数据到位
+  loaded.ctx = false
+  loaded.audit = false
+  loaded.skeleton = false
+  userPicked = false
   loadContext()
   loadAudit()
   loadSkeleton()
@@ -1663,11 +1692,61 @@ watch(() => props.episodeId, () => {
   refreshGates()
 })
 
+// ===== deeplink：先按链接恢复，再把当前子状态发布回 URL =====
+/** 门禁未放行时只渲染锁定页：告诉用户链接指向的位置进不去，并放弃本次恢复 */
+let lockNotified = false
+watch([gatesReady, designLocked], () => {
+  if (lockNotified || !gatesReady.value || !designLocked.value) return
+  if (!(urlPhase || urlShot || urlPick || urlCombo || urlScope)) return
+  lockNotified = true
+  shotRestore = false
+  childRestore = false
+  toast.error(t('deeplink.locked'))
+}, { immediate: true })
+
+/** 恢复子弹层：只把界面重新打开，绝不自动选中 / 切换组合 / 提交批量 */
+function restoreChildren() {
+  childRestore = false
+  // 选择器按 openPicker 的口径重新种入当前已存值，恢复本身不写回任何选择
+  if (urlPick) openPicker(urlPick.split(':')[1])
+  if (urlCombo) {
+    const sb = shots.value.find(item => item.id === urlCombo)
+    const from = sb ? stateOf(sb).combo || '' : ''
+    // from 为空说明这一镜还没有组合，也就没有「切换影响」可看：按目标不存在处理
+    if (sb && from) {
+      // dcombo 指名的就是这张卡：选中镜跟着对齐（用户已经自己点过镜时以用户为准）
+      if (!userPicked) selectedId.value = sb.id
+      comboSwitch.value = { open: true, sbId: sb.id, shotNumber: Number(stateOf(sb).shot_number) || 0, from, to: '' }
+    } else {
+      toast.error(t('deeplink.missingNamed', { target: t('components.mediaLibrary.storyboards') }))
+    }
+  }
+  // 批量范围只是「将处理 / 被排除」的清单，重新算一遍即可，执行仍要用户点确认
+  if (urlScope) openScope(urlScope)
+}
+watch([() => loaded.ctx, () => loaded.audit, () => loaded.skeleton, selectedId, designLocked], () => {
+  if (!childRestore || designLocked.value) return
+  if (!loaded.ctx || !loaded.audit || !loaded.skeleton) return
+  // 还没有选中镜：等分镜到位；本集压根没有分镜时各子弹层本来就无内容可开
+  if (!selectedId.value) return
+  restoreChildren()
+})
+
+// 发布：本组五个键每次写全，关掉子弹层只移除子弹层的键，phase / shot 原样留在地址里
+watch([phase, selectedId, picker, comboSwitch, scope, designLocked], () => {
+  if (designLocked.value) { link.set({}); return }
+  link.set({
+    phase: phase.value,
+    shot: selectedId.value || '',
+    dpick: picker.open ? `${picker.mode}:${picker.field}` : '',
+    dcombo: comboSwitch.value.open ? comboSwitch.value.sbId : '',
+    dscope: scope.value ? scope.value.kind : '',
+  })
+}, { deep: true, immediate: true })
+
 onMounted(() => {
-  try {
-    const saved = localStorage.getItem(PHASE_KEY)
-    if (saved === 'skeleton' || saved === 'voice' || saved === 'cards') phase.value = saved
-  } catch { /* 静默 */ }
+  // 旧版把子阶段记在 localStorage，会跨集串味（#86）：顺手清掉遗留键，之后只认 URL
+  try { localStorage.removeItem('huobao:designPhase') } catch { /* 静默 */ }
   ensureSelection()
   syncDraft()
   loadContext()

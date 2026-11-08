@@ -1,4 +1,11 @@
 {
+  "deeplink": {
+    "missing": "链接指向的目标不存在或已被删除，已回到上一层。",
+    "missingNamed": "链接指向的{target}不存在或已被删除，已回到上一层。",
+    "locked": "链接指向的位置当前不可进入（前置步骤未完成），已回到上一层。",
+    "staleRange": "链接记录的位置在当前已保存正文里对不上（正文已改动），此处只读：请手动重新选中目标文字后再插入标记。",
+    "readOnlyRestore": "已恢复只读窗口，不表示当前仍有冲突。先前未保存的操作载荷未保留；请关闭后重新发起操作，不会自动执行。"
+  },
   "designCard82": {"narration":"旁白实测","pendingVoice":"待配音","layerBudget":"▣ 图层预算","genBudget":"▶ 生成预算","notGenerated":"未生成","total":"合计","remain":"余量","excess":"超出","asset":"资产","exists":"存在","missingAsset":"不在本集或无法确定","semantic":"语义条目","pendingAnnotation":"待标注","available":"现有语义条目","noSemantics":"该资产还没有语义标注"},
   "workMetrics": {
     "plannedChars": "计划 {chars} 字 · {units} 项",
@@ -1133,6 +1140,11 @@
       "checking": "正在检查当前旁白稿…",
       "inspectionFailed": "旁白稿检测失败，仍要保存吗？",
       "inspectionFound": "当前稿中可能含非旁白内容，请选择如何保存：",
+      "inspectionRestoredTitle": "已恢复旁白核查窗口",
+      "inspectionRestoredHint": "链接不保存上次草稿和核查结果。可手动重新核查当前已保存稿；不会自动调用模型或保存。",
+      "inspectionRerun": "重新核查当前稿",
+      "inspectionClean": "未发现非旁白内容；尚未保存。",
+      "restoredConflictHint": "已恢复只读比较窗口，不表示当前仍有冲突。未保存草稿不会随链接保留；已保存的候选版本可供查看。关闭后可重新编辑或选择版本。",
       "notLocatable": "（无法在当前稿中定位，仅供查看，不能删除）",
       "deleteAndSave": "删除可定位片段并保存",
       "keepAndSave": "保留并保存",

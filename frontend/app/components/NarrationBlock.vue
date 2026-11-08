@@ -17,6 +17,7 @@
         :model-value="narrationText"
         :episode-id="Number(storyboard.episode_id ?? storyboard.episodeId)"
         :placeholder="t('episode.narration.placeholder')"
+        :deeplink-id="Number(storyboard.id || 0)"
         @input="emit('field-dirty', storyboard, 'narration_text', $event)"
         @commit="emit('update-field', storyboard, 'narration_text', $event)"
       />
@@ -138,6 +139,7 @@ import NarrationEditor from '~/components/NarrationEditor.vue'
 import TaskWorkMetrics from '~/components/TaskWorkMetrics.vue'
 import { useTasks } from '~/composables/useTasks'
 import { spokenText } from '~/utils/narrationMarkup'
+import { DEEPLINK_KEYS, querySingle, useDeeplink } from '~/composables/useQuerySync'
 
 // 与后端 MAX_NARRATION_CHARS 一致：TTS 单段字数上限（按念出来的纯文字算）
 const MAX_NARRATION_CHARS = 80
@@ -169,6 +171,20 @@ const subtitleDirty = ref(false)
 const voiceDialogOpen = ref(false)
 const busy = computed(() => voicing.value || writing.value || subtitling.value)
 const batchRunning = computed(() => Boolean(props.narrationBatch?.running))
+
+// deeplink（#86）：单镜配音弹窗（voice=分镜 id）。只恢复弹窗外壳，绝不自动生成配音；
+// 每个分镜块只在自己的弹窗打开时发布这个键，关闭即移除。
+const link = useDeeplink('narration', DEEPLINK_KEYS.narration)
+const urlVoiceId = Number(querySingle(link.initial('voice')) || 0)
+let voiceRestored = false
+watch(() => props.storyboard?.id, id => {
+  if (voiceRestored || !id || urlVoiceId !== Number(id)) return
+  voiceRestored = true
+  voiceDialogOpen.value = true
+}, { immediate: true })
+watch([voiceDialogOpen, () => props.storyboard?.id], () => link.set({
+  voice: voiceDialogOpen.value && props.storyboard?.id ? props.storyboard.id : '',
+}), { immediate: true })
 
 watch(() => props.storyboard?.id, () => { subtitleDirty.value = false })
 

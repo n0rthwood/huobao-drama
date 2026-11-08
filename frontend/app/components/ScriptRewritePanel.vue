@@ -183,10 +183,11 @@
         <div v-if="checking" class="rw-hint">{{ t('episode.rewrite.checking') }}</div>
         <Teleport to="body">
           <div v-if="inspection" class="overlay" @click.self="inspection = null">
-            <div class="dialog rw-inspection-dialog" role="dialog" aria-modal="true" :aria-label="t(inspection.failed ? 'episode.rewrite.inspectionFailed' : 'episode.rewrite.inspectionFound')">
+            <div class="dialog rw-inspection-dialog" role="dialog" aria-modal="true" :aria-label="inspectionTitle">
               <div class="dialog-body rw-inspection-body">
-                <strong>{{ t(inspection.failed ? 'episode.rewrite.inspectionFailed' : 'episode.rewrite.inspectionFound') }}</strong>
-                <ul v-if="!inspection.failed" class="rw-list">
+                <strong>{{ inspectionTitle }}</strong>
+                <p v-if="inspection.restored" class="rw-hint">{{ t('episode.rewrite.inspectionRestoredHint') }}</p>
+                <ul v-else-if="!inspection.failed" class="rw-list">
                   <li v-for="(item, index) in inspection.findings" :key="index">
                     <pre class="rw-plain">{{ item.text }}</pre>
                     {{ item.reason }} <span v-if="!item.locatable">{{ t('episode.rewrite.notLocatable') }}</span>
@@ -195,8 +196,11 @@
               </div>
               <footer class="dialog-foot">
                 <button class="btn btn-sm" @click="inspection = null">{{ t('common.cancel') }}</button>
-                <button v-if="!inspection.failed && inspection.findings.some(item => item.locatable)" class="btn btn-sm" @click="finishInspection(true)">{{ t('episode.rewrite.deleteAndSave') }}</button>
-                <button class="btn btn-sm btn-primary" @click="finishInspection(false)">{{ t(inspection.failed ? 'episode.rewrite.saveAnyway' : 'episode.rewrite.keepAndSave') }}</button>
+                <button v-if="inspection.restored" class="btn btn-sm btn-primary" :disabled="checking || !finalDraft.trim()" @click="recheckInspection">{{ t('episode.rewrite.inspectionRerun') }}</button>
+                <template v-else>
+                  <button v-if="!inspection.failed && inspection.findings.some(item => item.locatable)" class="btn btn-sm" @click="finishInspection(true)">{{ t('episode.rewrite.deleteAndSave') }}</button>
+                  <button class="btn btn-sm btn-primary" @click="finishInspection(false)">{{ t(inspection.failed ? 'episode.rewrite.saveAnyway' : 'episode.rewrite.keepAndSave') }}</button>
+                </template>
               </footer>
             </div>
           </div>
@@ -241,13 +245,14 @@
     </div>
 
     <ConflictDialog
-      v-if="rw.conflict.value"
-      :kind="rw.conflict.value.kind"
-      :mine="rw.conflict.value.mine"
+      v-if="conflictView"
+      :kind="conflictView.kind"
+      :mine="conflictView.mine"
       :current="currentServerContent"
-      :message="rw.conflict.value.message"
+      :message="conflictView.message || ''"
+      :read-only="!rw.conflict.value"
       :busy="rw.busy.value"
-      @close="rw.conflict.value = null"
+      @close="closeConflict"
       @keep="keepCurrentFinal"
       @apply="applyConflict"
     />
@@ -276,6 +281,7 @@ import { useScriptRewrite } from '~/composables/useScriptRewrite'
 import { onTaskFinished } from '~/composables/useTasks'
 import { scriptRewriteAPI } from '~/composables/useApi'
 import { inspectDraftForSave, applyInspectionChoice } from '~/utils/narrationInspection'
+import { DEEPLINK_KEYS, querySingle, useDeeplink } from '~/composables/useQuerySync'
 
 const props = defineProps({
   episodeId: { type: Number, required: true },
@@ -302,6 +308,28 @@ const draftRevision = ref(null)
 const sourceChangePrompt = ref(null)
 const checking = ref(false)
 const inspection = ref(null)
+const restoredConflict = ref(null)
+const conflictView = computed(() => rw.conflict.value || restoredConflict.value)
+const inspectionTitle = computed(() => t(inspection.value?.restored
+  ? 'episode.rewrite.inspectionRestoredTitle'
+  : inspection.value?.failed ? 'episode.rewrite.inspectionFailed'
+  : inspection.value?.findings.length ? 'episode.rewrite.inspectionFound' : 'episode.rewrite.inspectionClean'))
+
+function closeConflict() {
+  rw.conflict.value = null
+  restoredConflict.value = null
+}
+
+// deeplink（#86）：阶段、核查窗口与冲突比较窗口；未保存草稿不进 URL。
+// 恢复核查不调用模型；冲突窗口只读，候选版本按持久化 id 回读。
+const link = useDeeplink('rewrite', DEEPLINK_KEYS.rewrite)
+const urlStage = querySingle(link.initial('rwstage'))
+const urlDialog = querySingle(link.initial('rwdlg'))
+// URL 显式给出阶段时优先于 localStorage 记忆；校验要等阶段表加载完
+let urlStageActive = Boolean(urlStage)
+let stageRestored = false
+let stagePicked = false
+if (urlStage && urlStage !== 'final') selectedStage.value = urlStage
 
 
 const storeKey = computed(() => `huobao:rewrite:${props.episodeId}`)
@@ -380,6 +408,8 @@ function stageName(key) {
 function selectStage(key) {
   // 最终稿不是预览的一格：点它只是把焦点移到可编辑正文，预览与差异保持原样
   if (key === 'final') { editorEl.value?.focus(); return }
+  // 用户已经自己选了格子：异步恢复不得再覆盖
+  stagePicked = true
   selectedStage.value = key
   persist()
 }
@@ -409,12 +439,63 @@ function restore() {
   try {
     const saved = JSON.parse(localStorage.getItem(storeKey.value) || 'null')
     if (!saved) return
-    if (saved.stage) selectedStage.value = saved.stage
+    if (saved.stage && !urlStageActive) selectedStage.value = saved.stage
     if (saved.versions && typeof saved.versions === 'object') pickedVersion.value = saved.versions
     if (saved.diffMode === 'plain' || saved.diffMode === 'diff') diffMode.value = saved.diffMode
   } catch { /* 静默 */ }
 }
 watch(diffMode, persist)
+
+/** 阶段表就绪后校验 URL 阶段：不存在则提示并退回默认阶段（prepared_source） */
+watch(() => [rw.loaded.value, rw.strip.value.map(stage => stage.key).join(',')], ([, keys]) => {
+  if (stageRestored || !rw.loaded.value) return
+  stageRestored = true
+  urlStageActive = false
+  // 'final' 是阶段条上单独的最终稿格子，不属于预览阶段：不报错也不改预览选中
+  if (urlStage && urlStage !== 'final' && !stagePicked && !keys.split(',').includes(urlStage)) {
+    selectedStage.value = 'prepared_source'
+    toast.warning(t('deeplink.missingNamed', { target: stageName(urlStage) }))
+  }
+  restoreRewriteDialog()
+}, { immediate: true })
+
+/** 只恢复外壳与已保存版本，不执行核查、采用或保存。 */
+function restoreRewriteDialog() {
+  if (!urlDialog || inspection.value || conflictView.value) return
+  if (urlDialog === 'inspect') {
+    inspection.value = { draft: finalDraft.value, failed: false, findings: [], restored: true }
+    return
+  }
+  const match = /^conflict:(save|adopt)(?::(\d+))?$/.exec(urlDialog)
+  if (!match) { toast.warning(t('deeplink.missing')); return }
+  const version = match[1] === 'adopt' ? rw.versionById.value.get(Number(match[2])) : null
+  if (match[1] === 'adopt' && !version) { toast.warning(t('deeplink.missing')); return }
+  restoredConflict.value = { kind: match[1], versionId: version?.id ?? null, mine: version?.content || '' }
+}
+
+/** 用户显式重新核查：即使没有问题，也只展示结果，仍须人工选择保存。 */
+async function recheckInspection() {
+  const draft = finalDraft.value
+  if (checking.value || !draft.trim()) return
+  checking.value = true
+  try {
+    const result = await inspectDraftForSave(draft, content => scriptRewriteAPI.inspectNarration(props.episodeId, {
+      content, config_id: props.chatConfigId || undefined, model: props.chatModel || undefined,
+    }))
+    if (finalDraft.value === draft) inspection.value = result
+  } finally {
+    checking.value = false
+  }
+}
+
+watch([selectedStage, inspection, conflictView], () => {
+  const conflict = conflictView.value
+  link.set({
+    rwstage: selectedStage.value || '',
+    rwdlg: inspection.value ? 'inspect' : conflict
+      ? `conflict:${conflict.kind}${conflict.kind === 'adopt' ? `:${conflict.versionId}` : ''}` : '',
+  })
+}, { immediate: true })
 
 // ===== 执行 =====
 function modelArgs() {
@@ -492,6 +573,7 @@ async function saveFinal() {
 
 async function finishInspection(remove) {
   const pending = inspection.value
+  if (pending?.restored) return
   if (!pending || finalDraft.value !== pending.draft) { inspection.value = null; return }
   const content = applyInspectionChoice(pending, remove)
   inspection.value = null

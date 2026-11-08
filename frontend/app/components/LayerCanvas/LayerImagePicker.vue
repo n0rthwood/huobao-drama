@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div v-if="open && mode === 'source'" class="overlay" @click.self="close">
+    <div v-if="effectiveOpen && mode === 'source'" class="overlay" @click.self="close">
       <section class="dialog lip-dialog" role="dialog" aria-modal="true" :aria-label="t('layerCanvas.image.pick')">
         <header class="dialog-head"><h3 class="dialog-title">{{ t('layerCanvas.image.pick') }}</h3>
           <button type="button" class="btn-ghost" :aria-label="t('components.mediaLibrary.close')" @click="close"><X :size="16" /></button>
@@ -19,8 +19,8 @@
       </section>
     </div>
   </Teleport>
-  <AssetPicker :open="open && mode === 'asset'" :assets="assets" @close="mode = 'source'" @confirm="chooseAsset" />
-  <MediaLibraryDialog :open="open && mode === 'library'" :drama-id="dramaId" :submitting="busy" detailed
+  <AssetPicker :open="effectiveOpen && mode === 'asset'" :assets="assets" @close="mode = 'source'" @confirm="chooseAsset" />
+  <MediaLibraryDialog :open="effectiveOpen && mode === 'library'" :drama-id="dramaId" :submitting="busy" detailed
     @close="mode = 'source'" @pick="chooseLibrary" />
 </template>
 
@@ -32,12 +32,13 @@
  * No fabricated ids and no unregistered upload paths can enter a new image layer.
  * registered emits after asset creation so the parent can refresh its asset/candidate context.
  */
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Layers, Images, Upload, X, Loader2 } from 'lucide-vue-next'
 import AssetPicker from '~/components/AssetPicker.vue'
 import MediaLibraryDialog from '~/components/MediaLibraryDialog.vue'
 import { assetLibraryAPI, mediaLibraryAPI, propAPI, taskAPI, uploadAPI } from '~/composables/useApi'
+import { DEEPLINK_KEYS, queryEnum, querySingle, useDeeplink } from '~/composables/useQuerySync'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -53,12 +54,29 @@ const uploadInput = ref(null)
 const selectionError = ref(false)
 const errorText = ref('')
 
+// Deeplink (#86): publish lpick/lpmode while this picker is open so a copied link lands on the same
+// inner surface; the nested AssetPicker / MediaLibraryDialog keep their own groups.
+// The host (LayerStyle) always starts closed, so a restored link reopens the picker locally; only the
+// instance that actually has an episode/drama context takes it, which keeps document-only hosts passive.
+const link = useDeeplink('layerPicker', DEEPLINK_KEYS.layerPicker)
+const urlMode = querySingle(link.initial('lpick')) === '1' ? queryEnum(link.initial('lpmode'), ['source', 'asset', 'library']) : null
+const deeplinkOpen = ref(Boolean(urlMode) && props.dramaId > 0 && props.episodeId > 0)
+const effectiveOpen = computed(() => props.open || deeplinkOpen.value)
+if (deeplinkOpen.value) mode.value = urlMode
 watch(() => props.open, (open) => {
-  if (open) { mode.value = 'source'; selectionError.value = false; errorText.value = '' }
+  if (!open) return
+  deeplinkOpen.value = false
+  mode.value = 'source'
+  selectionError.value = false
+  errorText.value = ''
 })
+watch([effectiveOpen, mode], () => link.set({
+  lpick: effectiveOpen.value ? '1' : '',
+  lpmode: effectiveOpen.value ? mode.value : '',
+}), { immediate: true })
 
-function close() { if (!busy.value) emit('close') }
-function complete(src) { emit('select', src); emit('close') }
+function close() { if (busy.value) return; deeplinkOpen.value = false; emit('close') }
+function complete(src) { deeplinkOpen.value = false; emit('select', src); emit('close') }
 function failure(error) {
   mode.value = 'source'
   errorText.value = error instanceof Error ? error.message : t('layerCanvas.base.loadError')

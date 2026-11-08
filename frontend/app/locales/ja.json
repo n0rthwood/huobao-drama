@@ -1,4 +1,11 @@
 {
+  "deeplink": {
+    "missing": "リンク先が存在しないか削除されています。上の階層に戻りました。",
+    "missingNamed": "リンク先の{target}が存在しないか削除されています。上の階層に戻りました。",
+    "locked": "リンク先の位置は現在開けません（前提ステップが未完了）。上の階層に戻りました。",
+    "staleRange": "リンクに記録された位置が保存済み本文と一致しません（本文が変更されています）。ここは読み取り専用です：対象の文字を手動で選び直してからマーカーを挿入してください。",
+    "readOnlyRestore": "復元した画面は読み取り専用で、現在の競合を示すものではありません。以前の未保存操作は保持されません。閉じて操作をやり直してください。自動実行はしません。"
+  },
   "designCard82": {"narration":"ナレーション実測","pendingVoice":"音声待ち","layerBudget":"▣ レイヤー予算","genBudget":"▶ 生成予算","notGenerated":"未生成","total":"合計","remain":"余裕","excess":"超過","asset":"素材","exists":"存在","missingAsset":"本話にないか特定不能","semantic":"意味項目","pendingAnnotation":"注釈待ち","available":"既存の意味項目","noSemantics":"この素材には注釈がありません"},
   "workMetrics": {
     "plannedChars": "予定 {chars} 文字 · {units} 件",
@@ -1133,6 +1140,11 @@
       "checking": "現在のナレーション原稿を確認中…",
       "inspectionFailed": "原稿の確認に失敗しました。それでも保存しますか？",
       "inspectionFound": "現在の原稿にナレーション以外の内容が含まれる可能性があります。保存方法を選択してください：",
+      "inspectionRestoredTitle": "ナレーション確認ウィンドウを復元しました",
+      "inspectionRestoredHint": "リンクには前回の原稿や確認結果を保存しません。現在の保存済み原稿は手動で再確認できます。モデル呼び出しや保存は自動実行されません。",
+      "inspectionRerun": "現在の原稿を再確認",
+      "inspectionClean": "ナレーション以外の内容は見つかりませんでした。未保存です。",
+      "restoredConflictHint": "復元した比較画面は読み取り専用で、現在も競合しているとは限りません。未保存原稿はリンクに残りません。保存済み候補は参照できます。閉じてから編集やバージョン選択をやり直してください。",
       "notLocatable": "（現在の原稿で見つからないため表示のみ、削除不可）",
       "deleteAndSave": "見つかった箇所を削除して保存",
       "keepAndSave": "残して保存",

@@ -89,6 +89,8 @@ import { assetPipelineAPI, propAPI } from '~/composables/useApi'
 import { semanticEntries, semanticLayerPatch, anchorState } from '~/utils/semanticGeometry'
 import { normalizeCrop } from '~/utils/layerQuality'
 import { mediaUrl } from '~/utils/url'
+import { DEEPLINK_KEYS, querySingle, useDeeplink } from '~/composables/useQuerySync'
+import { toast } from 'vue-sonner'
 
 const props = defineProps({
   doc: { type: Object, required: true },
@@ -121,7 +123,17 @@ const baseImageError = ref(false)
 let semanticRequest = 0
 let candidateRequest = 0
 
+// Deeplink (#86): lpick marks an open image picker. This rail owns the base AssetPicker, which has no
+// inner mode, so it only claims lpick when the link carries no lpmode (that one belongs to LayerImagePicker).
+const link = useDeeplink('layerPicker', DEEPLINK_KEYS.layerPicker)
+const urlPickerOpen = querySingle(link.initial('lpick')) === '1' && !link.initial('lpmode')
+watch(pickerOpen, open => link.set({ lpick: open ? '1' : '', lpmode: '' }), { immediate: true })
 const externalSources = computed(() => Array.isArray(props.baseSources))
+if (urlPickerOpen) {
+  // Poster hosts replace the base from an inline source list, so there is no AssetPicker to restore.
+  if (externalSources.value) toast.warning(t('deeplink.missing'))
+  else pickerOpen.value = true
+}
 // AssetPicker selects by kind/id, so each version has a synthetic id; real ids stay on metadata.
 const baseChoices = computed(() => (props.baseSources || candidates.value).map((candidate, index) => ({
   id: index + 1, kind: candidate.asset_kind, asset_id: candidate.asset_id,

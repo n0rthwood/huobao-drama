@@ -15,12 +15,17 @@
 
 <script setup>
 /** 独立任务中心页（default 布局）：与顶栏抽屉同一套列表/筛选/详情 */
+import { onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import TaskCenterPanel from '~/components/TaskCenterPanel.vue'
 import { useTasks } from '~/composables/useTasks'
+import { deeplinkHydrate } from '~/composables/useQuerySync'
 
 const { t } = useI18n()
 const { activeCount } = useTasks()
+
+// 面板（子组件）先读完链接再放行 URL 写出（Issue #86）
+onMounted(() => { deeplinkHydrate() })
 </script>
 
 <style scoped>

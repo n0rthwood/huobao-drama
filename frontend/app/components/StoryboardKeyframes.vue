@@ -593,18 +593,20 @@
       :shot-number="selectedIndex + 1"
       :items="poolItems"
       :submit="submitPoolAsset"
+      :deeplink="!embedded"
       @close="poolPickerOpen = false"
     />
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { toast } from 'vue-sonner'
 import { useI18n } from 'vue-i18n'
 import { Loader2 } from 'lucide-vue-next'
 import { episodeAPI, storyboardAPI, taskAPI, imageQueueAPI } from '~/composables/useApi'
 import { toastError, toastServerMessage, mapError } from '~/composables/useToast'
+import { DEEPLINK_KEYS, queryIdList, querySingle, useDeeplink } from '~/composables/useQuerySync'
 import MentionTextarea from '~/components/MentionTextarea.vue'
 import ProgressRing from '~/components/ProgressRing.vue'
 import ConfirmDialog from '~/components/ConfirmDialog.vue'
@@ -929,6 +931,18 @@ function missingSlotLabels(sb) {
 const confirmedCount = computed(() => props.storyboards.filter(sb => kf(sb).confirmed).length)
 
 // ===== 选中分镜 =====
+// deeplink（#86）：嵌入模式下 shot/sel/pool 由 ShotProductionPanel 持有，这里不注册，避免两层抢同一个键
+const link = props.embedded ? null : useDeeplink('keyframes', DEEPLINK_KEYS.keyframes)
+const urlShotRaw = querySingle(link?.initial('shot'))
+const urlShotId = Number(urlShotRaw || 0) || 0
+const urlSelIds = link ? queryIdList(link.initial('sel')) : []
+const urlPoolOpen = link?.initial('pool') === '1'
+// 恢复只做一次，且不覆盖用户在恢复期间的操作；shot=abc / shot=0 同样算「显式给了但无效」
+let shotRestored = urlShotRaw === null
+let shotMissing = false
+let selRestored = !urlSelIds.length
+let poolRestored = !urlPoolOpen
+
 const selectedId = ref(0)
 const selected = computed(() => props.storyboards.find(sb => sb.id === selectedId.value) || null)
 const selectedIndex = computed(() => props.storyboards.findIndex(sb => sb.id === selectedId.value))
@@ -944,12 +958,27 @@ const hasBlockingIssue = computed(() => refIssues.value.some(issue => issue.seve
 
 watch(() => props.storyboards, (list) => {
   if (!list.length) { selectedId.value = 0; return }
+  if (!shotRestored) {
+    shotRestored = true
+    const hit = list.find(sb => sb.id === urlShotId)
+    if (hit) selectedId.value = hit.id
+    // 链接指向的分镜已不在本集：留在默认镜并提示，不静默换一个
+    else { shotMissing = true; toast.warning(t('deeplink.missing')) }
+  }
   if (!list.some(sb => sb.id === selectedId.value)) selectedId.value = list[0].id
 }, { immediate: true, deep: false })
 
 // 资产池选择器：切镜时关闭，避免上一镜的选择结果被当成新镜的操作
 const poolPickerOpen = ref(false)
 watch(selectedId, () => { poolPickerOpen.value = false })
+// deeplink：pool=1 跟随已恢复的 shot 一起打开（父链 shot + pool）；
+// 放到 nextTick 是为了避开上面「切镜即关闭」的 pre watcher
+watch(() => props.storyboards, (list) => {
+  if (poolRestored || !list.length) return
+  poolRestored = true
+  if (shotMissing || !selectedId.value) return
+  void nextTick(() => { if (selected.value) poolPickerOpen.value = true })
+}, { immediate: true })
 /** 选择器单项持久化：把发起操作时的分镜对象固定下来，异步结果只写回它 */
 async function submitPoolAsset(asset, nextSelected) {
   const sb = selected.value
@@ -1005,6 +1034,25 @@ function selectUnconfirmed() {
 watch(() => props.storyboards, (list) => {
   selectedIds.value = selectedIds.value.filter(id => list.some(sb => sb.id === id))
 })
+
+// deeplink：sel=id,id → 进入批量选择模式并还原勾选（只保留本集还存在的分镜）
+watch(() => props.storyboards, (list) => {
+  if (selRestored || !list.length) return
+  selRestored = true
+  const valid = urlSelIds.filter(id => list.some(sb => sb.id === id))
+  if (!valid.length) { toast.warning(t('deeplink.missing')); return }
+  selectMode.value = true
+  selectedIds.value = valid
+}, { immediate: true })
+
+// deeplink：本层键统一在这里写出（选中镜 / 批量多选 / 资产池弹窗）
+watch([selectedId, selectMode, selectedIds, poolPickerOpen], () => {
+  link?.set({
+    shot: selectedId.value || '',
+    sel: selectMode.value && selectedIds.value.length ? selectedIds.value.join(',') : '',
+    pool: poolPickerOpen.value && selected.value ? '1' : '',
+  })
+}, { deep: true, immediate: true })
 
 // ===== 单张关键帧生成：状态来自全局任务 store =====
 // 槽位归属取 sys_task.params.frameType（后端同时透出 frame_type），
