@@ -275,7 +275,7 @@ import { loadModelOptions, bareModelName } from '~/composables/useModelOptions'
 import { useTasks } from '~/composables/useTasks'
 import { copyToClipboard } from '~/utils/clipboard'
 import { mediaUrl } from '~/utils/url'
-import { DEEPLINK_KEYS, querySingle, useDeeplink } from '~/composables/useQuerySync'
+import { DEEPLINK_KEYS, deeplinkInitial, querySingle, useDeeplink } from '~/composables/useQuerySync'
 import {
   useNowTicker, ringPropsFromTask, isActiveTaskStatus, formatSeconds, taskRemoteState,
 } from '~/composables/useTaskProgress'
@@ -283,6 +283,7 @@ import {
 const props = defineProps({
   task: { type: Object, required: true },
   reviewMode: { type: Boolean, default: false },
+  restoreLink: { type: Boolean, default: false },
   // 全屏正文视图：由宿主（任务中心面板）经 URL 同步（Issue #86 tfull）
   fullView: { type: Boolean, default: false },
 })
@@ -541,6 +542,7 @@ function previewUnavailable() {
   toast.warning(t('deeplink.missing'))
 }
 function restoreTaskUi() {
+  if (!props.restoreLink || Number(deeplinkInitial('task')) !== Number(live.value.id)) return
   let validModel = true
   if (urlRetryModel && !retryModel.value) {
     if (modelOptions.value.some(option => option.key === urlRetryModel)) retryModel.value = urlRetryModel
