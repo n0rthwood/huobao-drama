@@ -5,7 +5,7 @@ description: 通过火宝 HTTP API 按阶段推进剧本、资产、Poster、分
 
 # 火宝制作助理：从目标到成片的 API 工作法
 
-> 契约快照：基于 `origin/master` `5d08b18`（含 Issue #80/#81/#82，release `20261108T055548Z`）。`[R]` = 真实跑过：殷墟五镜（2026-11-05）与**八达岭长城测试 1008 生产验收（2026-11-08，drama 10 / episode 16 / merge 27）**；`[S]` 仅源码核对。#80/#81/#82 的新端点与新字段已在八达岭轮实测通过，标为 `[R]`（证据：`docs/qa/8daling-1008-20261108T061008Z/`，见 §4.6）。路由/schema 变更后先 GET/预览校验再写。
+> 契约快照：基于 `origin/master` `5d08b18`（含 Issue #80/#81/#82，release `20261108T055548Z`）。`[R]` = 真实跑过：殷墟五镜（2026-11-05）与**八达岭长城测试 1008 生产验收（2026-11-08，drama 10 / episode 16 / merge 27）**；`[S]` 仅源码核对。#80/#81/#82 的主链路端点与字段已在八达岭轮实测标 `[R]`，**本轮未调用的仍是 `[S]`**（如 `script-rewrite/final`、`versions/{id}/adopt`、`runs/{id}/manual`、各 `unconfirm`）。证据：`docs/qa/8daling-1008-20261108T061008Z/`，结果见 §4.6。路由/schema 变更后先 GET/预览校验再写。
 >
 > 历史细表：`references/api-core.md`、`references/api-production.md` 为 2026-11-02 快照，覆盖本目录未列的旧端点细节；与 `references/api-catalog.md` 或本正文冲突时，以新文档为准。错误案例中的 `[R]` 仅表示该错误行为有真实记录，不表示流程正确或已获授权。
 
@@ -119,7 +119,7 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 - **人工保存前的检查**：`POST /episodes/{e}/script-rewrite/inspect-narration {content, config_id?, model?}` → `{findings:[{text, reason, locatable}]}`。它检查**当前提交的草稿**，不是上一轮改写报告，并且**不写库**。仅纪录片项目可用（其它项目 400）；模型返回被截断或格式不合法时返回 502 `inspection_failed`。
 - **检测失败 ≠ 稿件干净**：502 或字段缺失时必须按「检测失败」呈报并让人决定是否照样保存，不得当成「无问题」。`locatable:false` 的片段只能展示、不能自动删除（它在当前稿里找不到逐字匹配）。
 - **删除是人的选择**：命中后由人选「删除可定位片段并保存」或「保留并保存」；Agent 不得自行决定删哪段，也不得把删除扩大成改写正文。
-- 正例：改稿 → 调 `inspect-narration` → 把 `findings` 原样报给人（逐条 `text` + `reason` + 是否可定位）→ 按人的选择保存：人工保存走 `PUT /episodes/{e}/script-rewrite/final {content, final_revision, source_revision?}`（`final_revision` 必填做并发保护；会产生 manual 版本并把活跃运行降级为只留候选）。
+- 正例：改稿 → 调 `inspect-narration`（`[R]`，八达岭实测命中 1 条出处行）→ 把 `findings` 原样报给人（逐条 `text` + `reason` + 是否可定位）→ 按人的选择保存：人工保存走 `PUT /episodes/{e}/script-rewrite/final {content, final_revision, source_revision?}`（`[S]`，八达岭轮未调用；`final_revision` 必填做并发保护，会产生 manual 版本并把活跃运行降级为只留候选）。
 - 反例：① 自己写正则删「参考：…ISBN」；② 把 502 当作通过直接保存；③ 用 `inspect-narration` 的结果直接 `PUT` 改写正文；④ 拿上一次改写的 `ai_exclusions` 冒充本次草稿的检查结论。
 
 ### S2 资产（纪录片含“提取→审核→精确→美化”）

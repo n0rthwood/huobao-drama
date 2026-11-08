@@ -3,7 +3,7 @@
 所有路径都相对 `HUOBAO_API = {HUOBAO_BASE}api/v1/`（默认 `http://172.30.3.164/huobao/api/v1/`，以会话配置为准）。
 拼接时**去掉路径开头的 `/`** 再拼；用 `urljoin` 会把 `/huobao/api/v1` 前缀丢掉，打到 SPA。
 标注：`[R]` = 真实跑通（2026-11-05 殷墟五镜诊断片，和/或 2026-11-08 八达岭长城测试 1008 生产验收 drama 10 / episode 16 / merge 27）；`[S]` = 仅源码核对，未在这两轮运行；`[S/R]` = 部分实测或只跑通读路径，写入前先用 GET/preview 校验。
-本目录对齐 `origin/master` `5d08b18`（含 Issue #80/#81/#82）；这三个 Issue 的端点与字段已在八达岭轮实测，标 `[R]`，证据见 `docs/qa/8daling-1008-20261108T061008Z/`。
+本目录对齐 `origin/master` `5d08b18`（含 Issue #80/#81/#82）；八达岭轮**实际调用过的**端点与字段标 `[R]`（证据见 `docs/qa/8daling-1008-20261108T061008Z/`），本轮未调用的仍保持 `[S]`（如 `script-rewrite/final`、`versions/{id}/adopt`、`runs/{id}/manual`、各 `unconfirm`、`DELETE` 类）。
 
 ## 0. 通用约定
 
@@ -83,14 +83,27 @@ Body 常用：
 - `{subtitle_timing:"sentence"|"char"}`：字幕时间码模式。
 - `{narration_normalize:true|false}`：旁白文本规范化（镜级可覆盖）。
 
-### `POST /agent/script_rewriter/chat` [S]
+### `POST /agent/script_rewriter/chat` [S]（**纪录片不可用**）
 用途：第二步「AI 改写」（`step=1`）的火宝内部生成入口。仅在用户明确授权该阶段后调用；第一步导入不隐含此权限。
 Body：`{drama_id:d, episode_id:e, message:"用户的具体改写要求", config_id?, model?}`。
 由火宝工种读取原始 `content`、生成并保存 `script_content`。调用后从 `GET /dramas/{d}` 的 `episodes[]` 读回实际稿件，未保存就不能报告成功；改写授权不等于人工批准。
 不能改为助手本地代写再 PUT `script_content`，也不能因技能不适合压缩而自行绕过。这个入口已核对本地路由，但在2026-11-06漕运错误案例中**没有执行**，不能标成该案例的实测成功。
 若用户说“不要再操作，只更新技能”，连开工 GET、回滚/清空和本入口都不得调用；这里只能修改明确获准的助手技能文件。
+**纪录片（`project_type=documentary`）调用本入口直接 400** [R]（八达岭实测，`backend/src/routes/agent.ts:85-86`）：必须改走下面的分阶段流水线。
 
-### `POST /episodes/{e}/script-rewrite/inspect-narration` [S]（Issue #80）
+### `POST /episodes/{e}/script-rewrite` [R]（纪录片改写入口，Issue #70/#80）
+Body：`{start_stage?, skip_stages?[], predecessor_version_id?, config_id?, model?, auto_adopt?, source_revision?, final_revision?, acknowledge_source_change?}`；异步，返回 `{run_id, task_id}`。
+阶段：输入准备（自动过滤非旁白内容，必经）→ 忠实改写 `fidelity.v2` → 桥句润色。八达岭实测 run **3** / task **1212** 完成。
+### `GET /episodes/{e}/script-rewrite` [R]
+整页状态：运行、阶段、版本与修订号（`source_revision`/`final_revision`）。
+### `GET /episodes/{e}/script-rewrite/runs/{runId}` [R]（八达岭 run 3 轮询 31 次）、`POST /episodes/{e}/script-rewrite/runs/{runId}/manual` [S]（本轮未调用）
+单个运行详情；`manual` = 运行期间开始手改，先关掉自动采用。
+### `POST /episodes/{e}/script-rewrite/versions/{versionId}/adopt` [S]（本轮未调用；八达岭走的是 `auto_adopt` 默认路径）
+显式采用候选或历史版本。
+### `PUT /episodes/{e}/script-rewrite/final` [S]（本轮**未调用**：八达岭只实测了分阶段 run + `GET` 状态/版本）
+Body：`{content, final_revision, source_revision?}`（`final_revision` 必填，CAS 并发保护）。人工保存最终稿：产生 manual 不可变版本，并把活跃运行降级为「只留候选」。返回 `{changed, source_revision, final_revision, version_id}`。
+
+### `POST /episodes/{e}/script-rewrite/inspect-narration` [R]（Issue #80）
 用途：纪录片旁白稿保存前的**非旁白内容检测**。检查的是本次提交的草稿，不是上一轮改写报告；**不写库**。
 Body：`{content: string, config_id?: number, model?: string}`（`content` 必填）。
 返回：`{findings:[{text, reason, locatable}]}`。`text` 是从草稿逐字复制的片段；`locatable=false` 表示在当前草稿里定位不到（只能展示，不能自动删除）。
@@ -98,7 +111,7 @@ Body：`{content: string, config_id?: number, model?: string}`（`content` 必�
 错误：非纪录片项目 400；剧集不存在 404；模型回包被截断或格式不合法 → 502 `inspection_failed`。
 注意：**502 或字段缺失不等于稿件干净**，必须按「检测失败」呈报并由人决定是否照样保存。删除哪些片段是人的选择，Agent 不自行删改正文。
 
-### 改写阶段契约 `fidelity.v2` [S]（Issue #80）
+### 改写阶段契约 `fidelity.v2` [R]（Issue #80）
 忠实改写阶段的模型输出改为 JSON：`{"content":"整理后的旁白稿正文","exclusions":[{"text","category","reason"}]}`，`category ∈ source|license|link|contributor|bibliography|editorial|not_narration`。
 服务端在**冻结输入**里唯一定位每条 `text`；定位不到、片段互相重叠、或该片段仍出现在 `content` 中 → 阶段失败，不产生版本。
 `FidelityReport` 新增 `ai_exclusions:[{text,category,reason,start,end}]` 与 `adjusted_baseline_chars`；内容量判定上界按原始基线、下界按扣除剔除清单后的基线，即「变短」必须由可定位的剔除清单解释。
@@ -312,18 +325,19 @@ Body：`{revision}`。人的确认，Agent 不自行调用。
 
 ### `GET /episodes/{e}/design-card-context` [R]
 返回：候选资产、语义条目、底图候选、段时长上限（图层 ≤30s、生成 ≤15s）。
-### `GET /episodes/{e}/design-cards/audit` [R]（#82 新字段 `[S]`）
+### `GET /episodes/{e}/design-cards/audit` [R]（#82 新字段亦为 `[R]`：八达岭 drama 10 / episode 16）
 返回逐镜结构机检：`combo`、`status`、`budget{layer_s,gen_s}`、`issues`、`unresolved`、旁白估算/实测时长。
 #82 新增：
 - `tts.duration_ms: number|null` — 当前有效配音的实测毫秒数；为 `null` 时展示「待配音」，**不得**当作 0.0s。
 - `unresolved_layers: [{index, type, text, asset_id, asset_name, asset_exists, semantic_id, semantic_name, available_semantics:[{id,name,group}]}]` — 每个未解析锚点属于哪张资产、缺哪个语义条目、该资产现有哪些语义条目。报错时引用这些名字，不要只报 `issue.code`。
 - `video_generated: boolean` — 本镜是否已有生成视频。
-### `POST /episodes/{e}/design-cards/fill` [R]（#82 行为变更 `[S]`）
+### `POST /episodes/{e}/design-cards/fill` [R]（#82 行为变更亦为 `[R]`：八达岭 6 镜 AI 首次写入 combo #01 C / #02 D / #03–#06 C）
 Body：`{storyboard_ids?, config_id?, model?}`；不带 `storyboard_ids` = 只补空白/过期，纪录片还会带上「有卡但 `combo` 为空且 `pending`」的镜。
 #82 起：模型可直接填 `design_card.combo`，`suggested_combo` 变为可选且仅供展示。
 - 该镜**已有 combo** → 保留，模型值被忽略；**无 combo** → 采用模型值。
 - 纪录片「有卡无 combo」走 **combo-only 补选**：只写 `combo`，不重写卡片内容。
-- 模型给出非法/缺失 combo，或写了不存在的 `semantic_id`/`name` → 该镜计入 `failed`，原因写进 `design_card_stale_reason`（状态置 `pending`）。
+- 模型给出**非法/缺失 combo** → 该镜计入 `failed`，状态置 `pending` 并把原因写进 `design_card_stale_reason`。
+- 模型写了**不存在的 `semantic_id`/`name`** → 工具直接回错给模型、本镜不落卡；批次计 `failed` 但**保留原状态与原 stale_reason**（不写 `design_card_stale_reason`），原因只在任务输出/日志里。
 - 写入后卡片一律 `pending`、`design_card_confirmed_at` 清空；确认仍只能由人按。
 ### `GET /episodes/{e}/design-cards/status` [R]
 用途：填卡任务进度。
@@ -519,17 +533,19 @@ Body：`{storyboard_ids:[...]}`；显式非空数组；串行执行、持久化�
 
 ## 12. 导出与拼接（S11）
 
-### `GET /episodes/{e}/merge` [R]
+**路径前缀**：merge router 挂在 `/merge`（`backend/src/index.ts:121`），完整路径是 `/merge/episodes/{e}/...`。写成 `/episodes/{e}/merge` 会命中 SPA，返回 **200 + text/html**（八达岭实测踩中），必须校验 `Content-Type`。
+
+### `GET /merge/episodes/{e}/merge` [R]
 用途：最新拼接任务状态与结果（`merged_url`、history）。
-### `POST /episodes/{e}/merge` [R]
+### `POST /merge/episodes/{e}/merge` [R]
 Body：`{storyboard_ids:[...], poster_version_id?, poster_duration?}`
 - `storyboard_ids` **省略 = 整集**；导出必须显式传所选镜头，避免意外全量。
 - `poster_version_id` + `poster_duration`（秒，默认 3，钳 0.5–10）= 可选片头。
 - 旁白开启时任一镜未 `exportable` → 整体 400 并返回 `blocked[]`；不得静默回退原片或少镜。
-返回：`{merge_id, status:"processing", skipped:[]}`（受理，不是完成）。
-### `GET /episodes/{e}/merges` [R]
+返回：`{merge_id, status:"processing", skipped:[]}`（受理，不是完成）。八达岭实测：显式 IDs `[511..516]` → merge **27** completed，`skipped:[]`，媒体 960×544 / 65.44s。
+### `GET /merge/episodes/{e}/merges` [R]
 用途：历史导出记录。
-### `DELETE /episodes/{e}/merges/{mergeId}` [S]
+### `DELETE /merge/episodes/{e}/merges/{mergeId}` [S]
 用途：删除导出记录；破坏性，需人授权。
 
 ---
