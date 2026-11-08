@@ -5,16 +5,18 @@ description: 通过火宝 HTTP API 按阶段推进剧本、资产、Poster、分
 
 # 火宝制作助理：从目标到成片的 API 工作法
 
-> 契约快照：基于 `origin/master` `5d08b18`（含 Issue #80/#81/#82，release `20261108T055548Z`）。`[R]` = 真实跑过：殷墟五镜（2026-11-05）与**八达岭长城测试 1008 生产验收（2026-11-08，drama 10 / episode 16 / merge 27）**；`[S]` 仅源码核对。#80/#81/#82 的主链路端点与字段已在八达岭轮实测标 `[R]`，**本轮未调用的仍是 `[S]`**（如 `script-rewrite/final`、`versions/{id}/adopt`、`runs/{id}/manual`、各 `unconfirm`）。证据：`docs/qa/8daling-1008-20261108T061008Z/`，结果见 §4.6。路由/schema 变更后先 GET/预览校验再写。
+> 契约快照：功能代码至 `3eec6f7`，已并入 main `c6bf2ab`，release `20261108T204444Z`。`[R]` 为真实运行证据，`[S]` 为仅源码/实现自测，`[S/R]` 为部分实测；未调用分支不能随整节升格。历史殷墟/八达岭首轮见必读 references；本轮 drama 11 / episode 17 的骨架、TTS、设计与公开观测证据在 `docs/qa/issue-87-20261108/`。65 次调用、727 条公开消息已按游标读全；五张卡写入待审不代表零阻断，未声称 #88 全局补齐。路由/schema 变化后先用只读 GET/preview 核验再写。
 >
-> 历史细表：`references/api-core.md`、`references/api-production.md` 为 2026-11-02 快照，覆盖本目录未列的旧端点细节；与 `references/api-catalog.md` 或本正文冲突时，以新文档为准。错误案例中的 `[R]` 仅表示该错误行为有真实记录，不表示流程正确或已获授权。
+> **Issue #84 待发布变更**：地图新增契约来自独立分支 `origin/issue/84-map-workflow` `1eb48cb`，**代码尚未合并/发布，也没有生产计费验收**；S2-84 与目录 §3.84 一律保持 `[S]`，不得假定生产可用。保留原评审 `reviews/issue84-map-{review,response}.md`，不以本轮发布替代它的验收。
+>
+> 历史细表：`references/api-core.md`、`references/api-production.md` 为 2026-11-02 快照；与 `references/api-catalog.md` 或本正文冲突时以新文档为准。§3 与 `references/diagnostic-example.md` 是历史案例，其 Poster 本地画布、「镜数=段落数」、固定 25fps 等说法**不得当作现行配方**，现行口径见 §2。错误案例中的 `[R]` 只表示该错误行为真实发生过，不表示流程正确或已获授权。
 
 ### 0. 铁律框（任何模型不得越过；仅汇聚后文，不新增规则）
 
 1. `gates`/`production_unlocked` 为 false 的阶段**不得写入**，无论服务端是否放行。
-2. 人决定端点（确认/审批/combo/verdict/override_gate/not_needed/ignored/unconfirm/DELETE）**永不自行调用**；只在人明确决定后执行并记录授权原话。
-3. 每次 GPU 提交前查预算台账；余额 ≤0 停下问人；`revise` 轮按 ≥1 图预扣。
-4. 批量一律**先 preview**，启动传显式 `storyboard_ids`/`items`。
+2. 人决定端点（确认/审批/combo/verdict/override_gate/not_needed/ignored/unconfirm/DELETE，以及 S2-84 的地图候选采纳、路线/风格/示意模式选择、跳过底纹、回退/取消与地图↔普通道具类型降级）**永不自行调用**；只在人明确决定后执行并记录授权原话。
+3. 每次计费提交前查预算台账：GPU（图片/视频/TTS）与**计费文本 LLM 调用**（改写、`inspect-narration`、骨架、填卡、关键帧/视频提示词）分列计数；余额 ≤0 停下问人；`revise` 轮按 ≥1 图预扣。
+4. **凡有 preview 的入口一律先 preview**：批量入口 `POST /dramas/{d}/assets/batch-generate/preview`、`POST /episodes/{e}/keyframe-batch/preview`、`POST /episodes/{e}/video-batch/preview`、`POST /episodes/{e}/compose-batch/preview`、`POST /episodes/{e}/narration/voice-batch/preview`；镜级 preview `GET /storyboards/{id}/narration-fit/preview`。启动批量传显式 `storyboard_ids`/`items`；没有 preview 的入口（如 `design-cards/fill`、`script-rewrite`、`extract`）按其自身前置检查执行，不得编造预览。`POST /episodes/{e}/work-estimate` 是耗时预估，**不是范围预览**，不能替代上面任何一个 preview。
 5. `merge` 导出必须显式 `storyboard_ids`（省略=整集）。
 6. `opened` 必须**下载并打开**、本地核对 sha256 一致后才能填。
 7. 真实照片/地图/文物/档案**不进** t2i/image_edit/i2v/pipeline；判据是来源真实，与资产类型无关。
@@ -27,6 +29,8 @@ description: 通过火宝 HTTP API 按阶段推进剧本、资产、Poster、分
 14. 终产物必须实际打开；精确时长以 ffprobe 为准。
 15. 旁白不得截断凑时长；长度阻断读结构化原因。
 16. **原始内容≠AI 改写**：第一步只导入 `content`；第二步必须在获准后由火宝 `script_rewriter` 生成。不得自行代写后 PUT `script_content` 冒充火宝改写。到达用户指定停止点，或收到立即停止/只改技能指令后，不再调用火宝业务 API（含 GET、清空或撤回）；第一步写后读回只可在尚未收到立即停止指令时完成，不是停止后继续查询的例外。详见 S1 与 §4.5。
+17. 纪录片执行顺序（#70，硬）：**最终旁白稿 → 逐镜旁白骨架 → 人工确认骨架 → 批量配音（实测时长）→ 设计卡 → 制作（关键帧/图层段/视频/合成）**。`[S]` 服务端对无有效配音的镜直接阻断填卡/确认与全部下游制作（`narration-tts-gate.ts`）。§3 的历史示例（先设计卡后配音）不覆盖本条。
+18. **采集失败 ≠ 业务失败**：助手侧证据采集（截图、页面抓取、媒体下载、证据落盘）失败，或服务端返回「公开调用记录持久化失败」时，**业务副作用可能已经落库**（`runObservedWork` 先跑业务再提交观测，采集异常只把工作项标 failed 并抛错）。必须如实报告「采集失败」而不是「执行失败」，先 GET 读回实际状态（设计卡/骨架/音频/任务），确认缺什么再决定是否获准重发；**绝不未读回就重跑**，避免重复计费与覆盖。
 
 ## 1. 综述：火宝要解决什么
 
@@ -41,7 +45,7 @@ description: 通过火宝 HTTP API 按阶段推进剧本、资产、Poster、分
 
 ### 1.1 Agent 的规划算法（每次接任务先跑一遍）
 
-1. **复述目标**：片种（剧情/纪录片）、集数、镜数、时长、预算（图片/视频/配音各几条）、人明确要求的产物。
+1. **复述目标**：片种（剧情/纪录片）、集数、镜数、时长、预算（图片/视频/配音各几条，外加计费文本 LLM 调用几次）、人明确要求的产物。
 2. **先核授权再读现状**：明确本次获准的 UI 步骤、可写字段与停止点；仅在授权包含火宝操作时执行 `GET /health` → `GET /tasks/active` → `GET /dramas/{d}` → `GET /episodes/{e}/gates` → 相关阶段列表。若用户已要求停止火宝操作、仅更新技能，不执行这串开工 GET。
 3. **判断从哪一步继续**：已有产物不重做；已有活跃任务只观察；缺失的才补。**恢复要“补剩余”，不要从头上重跑。**
 4. **拆阶段**：每个阶段先问“这一阶段的闸门是什么、需要人决定什么、我怎么验证”。
@@ -50,10 +54,11 @@ description: 通过火宝 HTTP API 按阶段推进剧本、资产、Poster、分
 7. **记录**：首次提交与终态必须逐条写 `requests.jsonl`；中间轮询可按批次汇总。图片/视频/音频的“实际看过”与“推测”分开写。
 8. **软规则偏离**：标注为“默认/软”的流程可偏离，但必须在证据里写一句理由；写不出理由就按默认执行（弱模型无偏离权）。
 
-### 1.2 预算台账（每次 GPU 请求前必做）
+### 1.2 预算台账（每次计费请求前必做）
 
-- 开工把预算写成硬台账：`{images: n, videos: n, tts: n}`，并列出已消耗的任务 ID。
-- 只有真正提交到图像/视频/TTS 模型的请求计数；`compose`/`merge`/图层渲染/Poster 确定性画布不占 AI 额度。
+- 开工把预算写成硬台账：`{images: n, videos: n, tts: n, text_calls: n}`，并列出已消耗的任务 ID。
+- GPU 额度：真正提交到图像/视频/TTS 模型的请求；`compose`/`merge`/图层渲染/Poster 的服务端 LayerDoc 渲染不占 AI 额度。
+- **计费文本 LLM 额度（独立于 GPU 计数，同样要事先授权）**：`POST /episodes/{e}/script-rewrite`（及各阶段重跑）、`POST /episodes/{e}/script-rewrite/inspect-narration`（只读检查但真实调用计费模型）、拆镜/旁白骨架、`POST /episodes/{e}/design-cards/fill`、`POST /episodes/{e}/generate-keyframe-prompts`、`POST /episodes/{e}/generate-video-prompts`、各资产 `generate-prompt`（含 `force` 重写）、资产提取与审核。只读 GET、`POST /episodes/{e}/work-estimate` 与 `GET /tasks/{id}/observations*` 不计费。
 - 每次提交前先读台账：余额 ≤0 就**停下来问人**，不得“再试一条”。
 - 失败重试也算新请求（图片/视频重试一律新建 `sys_task`），必须提前计入余额。
 - 批次中途失败只补剩余（`retry-failed`/`fill-gaps`），不从头重跑，避免双倍消耗。
@@ -125,7 +130,7 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 ### S2 资产（纪录片含“提取→审核→精确→美化”）
 - 提取：`POST /episodes/{e}/extract {target}` ×3 → `extract-status` → 读 `characters/scenes/props`。
 - 字段与关联：`PUT /scenes/{id}`、`PUT /props/{id}`、`POST /episodes/{e}/assets/link`、`DELETE .../assets/link`。
-- 单资产出图：`generate-prompt`（可 `force`）→ `generate-image` → `GET /tasks/{id}` → 下载并打开。
+- 单资产出图：`generate-prompt`（可 `force`）→ `generate-image` → `GET /tasks/{id}` → 下载并打开。`reused` 是复用有效稿，正常成功；`regenerated` 才是 Agent 保存了不同的新稿。`unchanged_after_rewrite` 是 force 后逐字未变：批量单列该状态且允许提交图片（`asset-batch-select.ts`），**单发 generate-prompt 经 savedPromptOf 只接受 reused/regenerated，其余返回 400**，不能把旧稿冒称本次新稿。`failed/skipped` 不提交批量图片；不为制造差异盲目重试。资产文本/风格改变或人要求重写时才用 force。
 - 批量：`POST /dramas/{d}/assets/batch-generate/preview` → 人确认范围 → 同 body 启动 → `GET` 状态。
 - 纪录片审核：`POST /episodes/{e}/asset-review/run` → `GET /asset-review` → 逐条 `PUT /asset-review/items/{id}`（`not_needed` 必须写理由）。
 - 语义：`purpose:"precision"` 不是“精确复原”，而是“带权威参照、程序 gate 与人工审批的生成逼近”，产物仍是艺术再现；不得声称考古/器物级精确复原。
@@ -135,16 +140,34 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 - 组合场景：先提取→审核→（缺项补提取）→ 精确/美化 → 才允许拆镜。
 - 陷阱：资产批量是**项目范围**，传 `episode_id` 不代表只改本集；`rewrite_prompts` 与 `overwrite_images` 是两个独立操作；审批没带 `opened` 会被 400（这是硬规则，防止没看图就批）。
 
-### S3 Poster（可选，资产之后）
-- 端点：`GET/PUT /episodes/{e}/poster`、`POST /poster/generate {mode}`、`POST /poster/versions`（本地画布登记）、`PUT /poster/select`。
+#### S2-84 地图资产专用流程（Issue #84，来自 `origin/issue/84-map-workflow` `1eb48cb`；**未合并/未发布，全部 `[S]`**）
+
+**背景**：历史地图原先只有互不串联的坐标建议、配置与渲染面板，资产甚至没有点线语义。#84 要求显式地图类型、充分性判断、权威检索（Wikipedia / Europeana / Smithsonian）、三条底图路径、自动与逐步审核、可回退与可编辑点线面；扩散仅生成底纹，绝不重画地理几何。**先确认部署真有这些接口再用，不得假定生产已可用，也不得把开发副本检查标成 `[R]`。**
+
+- **类型**：`POST /props` 与 `PUT /props/{p}` 的 `asset_type:"map"|"prop"` 是道具内的显式分类，不新增第四类资产引用。地图仍用 `kind:"prop"` 与同一资产 ID；`POST /tasks/register-upload` 的目标 `asset_type` 仍写 `"prop"`。地图改回普通道具需 `confirm_asset_type_change:true`，必须由人明确要求，地图数据保留不删除。
+- **唯一工作入口**：`GET|PUT /props/{p}/map-workflow`、`POST .../run|advance|rollback|cancel`，完整参数见 `references/api-catalog.md` §3.84。不另拼旧地图接口或直写 `map_spec` 绕过修订保护；对普通道具调用该工作流返回 `not_a_map`。
+- **自动点线面与人工确认**：research 阶段把来源支持的要素并入 `map_spec`，AI 新增项带 `proposed:true`；auto 可用候选直接制图，但这不是人工批准。人工逐项审核后去掉该项 `proposed` 并通过工作流 PUT 保存，之后重跑不覆盖它。只有在明确选择示意模式时才可采用标明近似的区域；缺关键依据要阻断，不虚构疆界。
+- **需求与缺失分级**：对象 / 时代 / 空间定位 / 用途与粒度要能明确解析（「殷墟车马坑」可由 AI 解释隐含时代与位置，「京杭运河通州段」缺时代必须补齐）；不明确或充分性检查失败会阻断，单个来源无结果、非关键细节缺失只记录风险，所有来源都无结果不算已完成检索。AI 推断不等于出处考证：`issues[].blocking` 阻断时补需求，`research.features[].uncertainty/conflicts` 有风险时呈报。
+- **阶段与续跑**：`brief → research → base → style → drawing → complete`。`run` 始终继续当前待执行的 `stage`，不会隐式回到 brief；整条重做须先按人的决定显式 rollback。`run {mode:"auto"}` 从当前阶段连续执行到完成或阻断，可能发生文本调用和一次底纹生成，先拿到该范围的授权并按 §1.2 预留 `text_calls` 与 `images`；`manual` 只执行当前一步。`awaiting_review` 不代表后面阶段已做完。
+- **三条底图**：`program` 为 Natural Earth 程序底图；`earth` 真实载入 KMZ，分别保留交付图与像素标定证据，实测控制网格是正反换算真源，独立检验点残差超过 3px 或相机漂移时阻断，不用相机数学自洽冒充实际点位对齐；`image` 使用已上传图片、来源、许可和至少三个非共线控制点。标定残差不是历史位置正确性的证明。
+- **编辑后重绘**：点线面变更但投影/bbox/背景层不变时，保存后待执行阶段回到 `drawing`，保留配准底图与已有底纹；投影/bbox/背景层变化先重做 base；底纹独立于几何，可复用。失败重试同样计额度，提交前核对剩余预算。
+- **模型与原件边界**：地图原件、Earth 影像和外部史料图不进入 t2i/image_edit/i2v。地图流程的图片调用只生成无地理内容的独立底纹；点线面与文字由程序叠加。`asset_type:"map"` 才是地图判据（不是 `faithful`）；完成时原始底图版本保存在 `faithful_source`，当前 `image_url` 可为派生图，不能称其为未改动原件。底纹默认 35%（上限 60%）alpha。人要求原图外观不变时须明确跳过 style。`texture_image.task_id` 计 `images` 预算；`base_image/final_image` 的确定性版本不计 GPU 图数。
+- **编辑与回退**：先 GET 当前 `revision`，PUT 带 `expected_revision`；409 保留草稿、重新读回，由人决定如何合并，不盲目重投。几何真源是 WGS84 `map_spec`，画布拖动须用底图实际配准反算。回退/取消按人的明确要求执行，不把历史状态冒充新一轮审核通过。
+- **读回与验收**：打开 `outputs.base_image/final_image` 核对配准、图例文字/点位与来源；检查 `outputs.layer_doc`、`research.queries` 的失败/无命中及风险提示。`completed` 只代表流程技术完成，史实、许可与发布合规仍需人审核。
+- **保存粒度**：顶层 `brief/map_spec/mode` 不传则保留，brief 内字段合并；传 `map_spec` 是**完整替换**（含 places/routes/regions）。先 GET 完整 spec，仅改获准的项并带当前 `expected_revision`；人工确认项只保证不被自动检索合并覆盖。
+- **调用量与模式**：正常完整地图为 brief 1 次文本、research 2 次文本（计划+提取）、style 1 次图片；base/drawing/complete 无模型调用。通用文本端点未钉选时一次调用最多尝试 3 个端点，完整流程须按 §1.2 的 `text_calls` 保守预留最多 9 次；预算紧时显式 `text_config_id` 钉选并用 manual 分段核账。run 入参覆盖保存的 mode，未传默认 manual；advance 永远 manual，只有它支持 skip；PUT mode 只保存选择，不会自行启动。
+
+### S3 Poster（可选，资产之后；Issue #39/#72）
+- 端点：`GET /episodes/{e}/poster`、`PUT /episodes/{e}/poster {prompt?, text_prompt?, copy?, reference_images?, base_image?, layer_doc}`、`POST …/poster/generate {mode:"initial"|"composite"|"layers", config_id?, model?, version_id?, composition_id?}`、`POST …/poster/concept`、`POST …/poster/concept/generate`、`POST …/poster/concept/apply`、`POST …/poster/concept/apply-layer-plan`、`POST …/poster/versions {layer_doc?, prompt?, text_prompt?}`、`PUT …/poster/select {version_id}`、`POST …/poster/load-version {version_id}`。
 - 用途：片头海报；**不进主闸门**，不能阻塞资产→分镜。
-- 组合场景：需要精确文字排版时，按保存的 `layout` 本地渲染 PNG → `POST /upload/image` → `POST /poster/versions` → `PUT /poster/select`。
-- 陷阱：把真实照片/地图送扩散重绘会得到伪文字/几何漂移；优先确定性底图 + 文字层。
+- **编辑工程 = `layer_doc`（与分镜图层同源）；#72 起旧 `layout` 字段不再读写，浏览器画布合成也已取消。**精确文字排版的正确做法：`PUT …/poster {layer_doc}` 保存图层 → `POST …/poster/versions`，**服务端**从当前 LayerDoc 渲染合成图（版本记 `provider:"local"`、`model:"layer-doc"`）并自动设为最终版本 → 需要换版时 `PUT …/poster/select`，想回到某版继续编辑用 `POST …/poster/load-version`。不要再本地渲染 PNG 后 `POST /upload/image` 登记版本。
+- `generate` 三种 mode：`initial` = 出不带字的底图（注入项目风格词，AI 构想方案可直接带 `composition_id`）；`composite` = 对已登记的合成版本再生成；`layers` = 底图＋服务端渲染的文字层双参考图再生成（FLUX 配置不支持，会 400）。AI 构想只写 `concept`，套用必须显式调 `concept/apply`（手动字段冲突返回 409 `manual_edit_conflict`，覆盖要人决定并显式 `overwrite`）。
+- 陷阱：把真实照片/地图送扩散重绘会得到伪文字/几何漂移；优先确定性底图 + 图层文字。`POST …/poster/versions` 没有底图（`layer_doc.base.path` 空）会 400。
 
 ### S4 分镜拆分
 - 端点：`POST /agent/storyboard_breaker/chat {drama_id, episode_id, config_id, model, message}`；`GET /episodes/{e}/storyboards`；`POST .../storyboards/fill-gaps`。
 - 用途：按叙事节拍拆镜，产出描述、资产关联、关键帧/视频初稿。
-- 组合场景：旁白模式必须逐段使用原旁白原文（覆盖率 100%），镜数=段落数；拆镜阶段不启动任何生成。
+- 组合场景：旁白模式必须逐段使用原旁白原文（覆盖率 100%）；拆镜阶段不启动任何生成。**镜数不等于段落数**：单镜旁白上限 80 个朗读字，长段落必须拆成多镜；服务端硬上限 `storyboardCountCap` = max(短稿防过拆上限 `min(⌈段落数×1.5⌉, 段落数+3)`，各段按 80 字切分所需镜数之和)。只在段落都短于 80 字时镜数才可能恰好等于段落数。
 - 陷阱：完整重拆会覆盖；**先获人授权并保存快照**，不能自行重拆；不能用重拆修一条视频 Prompt；部分失败用 `fill-gaps`。
 
 ### S4.5 纪录片旁白骨架（Issue #81，`[R]`：drama 10 / episode 16，骨架 task 1227、TTS batch 1228）
@@ -166,17 +189,17 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 - 用途：把“这一镜怎么拍”写成导演分镜单；`combo` 决定是否用图层段/生成段及顺序。
 - **案例背景（#82）**：E01 实测 20 张已填卡里 12 张 `combo` 为空，批量确认全被 `combo_missing` 挡住；卡头显示「实测 0.0s」（audit 的 `tts` 没有 `duration_ms`，前端把 `undefined` 当 0）；310 个 `unresolved_ref` 只显示通用文案，看不出是哪张资产、缺哪个语义条目。用户的决定：AI 直接把 combo 选出来、把时长关系讲清楚、把错误写成人能照着修的话，并且**绝不虚构语义名**。
 - **AI 填 combo（变更）**：`design_card` 工具 schema 新增 `combo`，`suggested_combo` 变为可选仅供展示。`POST /episodes/{e}/design-cards/fill` 批次里：该镜**已有 combo** → 保留，不被覆盖；**没有 combo** → 采用模型所选；模型给出非法/缺失 combo → 该镜计入 `failed`，状态置 `pending` 并把原因写进 `design_card_stale_reason`。纪录片「有卡但没 combo」的镜会进入 **combo-only 补选**：只补 combo，**不重写卡片内容**。写入成功后卡片一律回到 `pending`，确认仍由人按。
-- **现有资产可实现性（#87，`[S]`，生产验收前）**：AI 必须先读实际引用资产/版本的图像、属性、真实语义及所需几何，再决定用途。不得以资产名冒充语义，不得借用跨资产/不相容版本的同名条目，也不得把需要定位、描线或区域几何的层留空锚点、备注“待人工补”后算成功。无语义图片仍可用于现有图像实际支持的背景/整体展示；不依赖资产内位置的标题、定义、说明卡可以无锚定。可改 AI 自选表现手法，但不能丢信息点、把用户必要视觉任务退为纯旁白或把普通河网冒充特定历史路线；现有条件无法满足必要任务时明确失败与缺口，保留旧卡，不计成功。人工可以自行增加信息或标注，AI 不能借人工路径绕过自身校验。
+- **现有资产可实现性（#87，`[S/R]`）**：先读实际资产/版本图像、属性、真实语义及所需几何。不许资产名冒充语义、跨资产/不相容版本借同名条目，或把必要定位/描线/区域层留空锚点、备注“待人工补”后算成功。无语义图片可作其实际支持的背景；无位置依赖的标题/说明卡可无锚定，但不能丢信息点、把必要视觉任务退成纯旁白或把普通河网冒充特定历史路线。无法满足必要任务时失败、保留旧卡、不计成功；人工路径不放宽 AI 校验。本轮真实读图 19 次、成功五卡；各种非法依赖的拒绝分支有行为自测，不冒称都在生产触发。
 - **audit 新字段**：`tts.duration_ms`（缺失就显示「待配音」，**不要写 0.0s**）、`unresolved_layers[{index,type,text,asset_id,asset_name,asset_exists,semantic_id,semantic_name,available_semantics[]}]`、`video_generated`。报问题时引用 `issue.message` 与 `unresolved_layers` 的具体资产/语义名，不要只报 `code`。
 - 组合场景：AI 填卡（含 combo）→ 人逐镜审阅并按需改 → 人确认（0 block；有 warn 需 acknowledge）。
 - 陷阱：预算 `layer_s≤30`、`gen_s≤15` 超限直接拒存；已确认且有产物时改 combo 会被拒，必须走 `POST /storyboards/{id}/combo`（先看 `combo/impact`）；批次只对「无 combo」的镜写 combo，不要指望它纠正人已选的组合；确认失败时读返回体 `issues[].message`，它已包含具体原因。
 - **为何改（#87）**：《历史纵横》E01 的第 01 镜五个计划图层都引用资产 #103 的同名“语义”，实际语义清单为空。旧指令允许“保留规划、空锚点待标注”，使 AI 明知缺信息仍能把设计当成完成；Fabel 判定必须同时修正 prompt、AI 写工具和成功计数，不是一句“不要幻觉”或一个人工补标注按钮能解决。人工审核时仍可打开资产语义弹窗，按实际绑定重查问题；新增标注不等于旧引用自动修好。
+- **人工核对界面（#87，`[S/R]`）**：图像使用 120–180px 流式卡片、contain；底图取候选的 path/version，不拿当前图冒充固定旧版本；引用卡取相应资产当前图。点击开大图，`⌕` 打开现有资产/语义面板。未解析引用按具体层列缺口，可打开语义或改绑真实条目；改绑只改计划层 anchor，不删层、不改资产。新增标注不会自动修好旧引用。本轮已打开真实参考图；固定旧版本及缺失语义修复写入未在生产制造测试数据，仍是源码/行为核验。
 
-#### S5-87 分镜设计任务公开对话与真实计量（Issue #87，`[S]`，生产验收前）
-
+#### S5-87 任务公开对话与真实计量（`[R]`：tasks 1281–1285；未触发分支另标 `[S]`）
 - **新 API 点**：`GET /tasks/{id}/observations?work_id=&cursor=&limit=` 读取持久工作项与实际调用；`GET /tasks/{id}/observations/calls/{callId}/messages?cursor=&limit=` 分页回看某次调用的完整公开消息。游标及字段见 `references/api-catalog.md`，不要拿第一页冒充全历史。
-- 开跑前用 `POST /episodes/{e}/work-estimate`，将本次模型选择或当前配音参数放请求体；显式空选 `storyboard_ids:[]` 不得变成整集。这个 POST 只读预估、不计费，不能与计费稿件检查混淆。
-- **为什么需要**：旁白骨架、配音、设计卡开始后，用户此前看不到实际交互，也没有按真实字数/调用用时估计批量完成的能力；浏览器刷新或后端重启不能成为清空现场的理由。
+- **采集失败的处置（`[S]`，有故障注入自测）**：出现「公开调用记录持久化失败」时，卡片/骨架/音频可能已保存。先读回状态与产物再决定是否重提；如实报采集缺口，不回滚业务、不自动补跑。
+- 开跑前用 `POST /episodes/{e}/work-estimate {stage:"skeleton"|"voice"|"design_card", storyboard_ids?, settings?, model?/config_id?}`，把本次模型选择或当前配音参数放请求体；显式空选 `storyboard_ids:[]` 不得变成整集。这个 POST 只读预估、不计费；它**不是范围预览**（不返回逐镜 `status/checked/reason`），不能替代 §铁律 4 列出的任何 preview，也不能与计费稿件检查混淆。无同口径样本时 `estimate_ms=null`，显示「暂无估计」，不编固定秒数。
 - **对话是什么**：实际发送的 system/user/assistant/tool 等公开消息、注入的 Prompt/SKILL 与工具定义、模型公开正文、工具参数与返回（含失败）；read_image 子调用须可归属同一任务。图片/二进制用明确占位或安全引用，凭据脱敏，不索取隐藏思维，不用最终一句“完成”或活动计数替代正文。
 - **三阶段怎么计量**：骨架按整稿、设计卡按镜、TTS 按合成请求统计；源字数、实际请求/输出字数、排队、实际服务调用耗时、任务墙钟和音频长度分别看。配音没有 LLM normalize，不给它虚构 LLM 对话；音频长度也不是合成推理耗时。
 - **如何理解 ETA**：使用同阶段、实际配置/模型及相关参数的成功样本，优先本批再看历史；当前项已用从该项同口径预计总耗时扣除。无样本/未知队列显示未知，超过估计显示超出预估，不把剩余零秒当作已完成；并发调用耗时相加不等于墙钟完成时间。
@@ -192,8 +215,8 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
   - A：整个镜头=图层段（适合原理示意、流程、地图定位）。
   - C：前段图层（如 4s 定位/标注）→ 末精确帧去文字 → 作为生成段首帧。
   - D：生成段 → 首精确帧作为生成段尾帧 → 图层收束。
-- 陷阱：设计卡未确认不能写/渲；无合格底图 → 400 `missing_base`；重渲改变 junction hash 会让关键帧确认失效；`timeline.fps` 会被持久化为目标帧率，必须与最终输出一致（默认 25），混帧率会导致 stale。
-- **输出规格**：图层渲染画布取剧集画幅（16:9 = 960×544；源图可为 1920×1088 或 1024×1024，按 contain/裁切记录在 `base.source_width/source_height`）。最终 compose/merge 沿用同一画幅；模型 raw 可能是 24fps，merge 会输出 25fps CFR，不需要也不允许把图层改成 24fps 迎合 raw。
+- 陷阱：设计卡未确认不能写/渲；无合格底图 → 400 `missing_base`；重渲改变 junction hash 会让关键帧确认失效；`timeline.fps` 不是可选项——保存时一律被改写为本集目标帧率，自己传的值会被忽略，混帧率会导致 stale。
+- **输出规格（Issue #69）**：画幅取本集已有**模型视频**实测值；本集还没有视频时按画幅比例用内置默认（16:9 = 960×544、9:16 = 544×960、1:1 = 768×768）。源图可为 1920×1088 或 1024×1024，按 contain/裁切记录在 `base.source_width/source_height`。**目标帧率 = 本集最靠前的有效既存图层计划的 `timeline.fps`**；没有计划才回退到实测视频帧率（保留三位小数，29.97 不取整为 30），再没有才用默认 25。合法范围 1–60，所以 24 / 25 / 29.97 等都成立：**不要再假设全项目恒为 25fps**。最终 compose/merge 沿用同一画幅与同一目标帧率，模型 raw 的不同帧率由 `fps` 滤镜统一，不需要改图层去迎合 raw。
 
 ### S7 关键帧
 - 端点（全路径）：`GET /episodes/{e}/keyframe-prompts/scope`、`POST /episodes/{e}/generate-keyframe-prompts`、`GET /episodes/{e}/keyframe-prompts-status`、`POST /episodes/{e}/keyframe-batch/preview`、`POST /episodes/{e}/keyframe-batch {items}`、`GET /episodes/{e}/keyframe-batch`、`POST /storyboards/{id}/keyframes/{slot}/generate`、`GET /storyboards/{id}/keyframes/{slot}/versions`、`PUT /storyboards/{id}/keyframes/{slot} {image|inherit}`、`POST /storyboards/{id}/confirm-keyframes`。
@@ -209,7 +232,7 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 
 ### S8 旁白、配音、字幕、音画适配
 - **旁白模式的两条不变量（硬）**：①关键帧出图/确认必须在实测配音时长之后；②视频提交必须在关键帧确认之后。
-- 默认顺序（软，可记录理由后调整）：旁白文稿 → 配音（实测时长）→ 字幕 → `narration-fit` → 视频 Prompt 按时长对齐 → `mid_frame_time` 落定 → 关键帧出图与确认 → 视频。关键帧提示词可以提前写。
+- 纪录片的执行顺序是硬的（#70，见铁律 17）：旁白骨架确认 → 配音（实测时长）→ 设计卡 → 制作。其余环节的默认顺序（软，可记录理由后调整）：字幕 → `narration-fit` → 视频 Prompt 按时长对齐 → `mid_frame_time` 落定 → 关键帧出图与确认 → 视频。关键帧**提示词文本**可在设计卡确认后提前写，但出图/确认仍受两条不变量与铁律 17 约束；纪录片不得在配音与设计卡确认之前启动任何制作阶段调用。
 - 端点（全路径）：`GET /episodes/{e}/tts-options`、`POST /episodes/{e}/narration/voice-batch/preview`、`POST /episodes/{e}/narration/voice-batch`、`GET /episodes/{e}/narration/voice-batch-status`、`POST /episodes/{e}/narration/voice-batch/retry-failed`、`POST /storyboards/{id}/narration/voice`、`POST /storyboards/{id}/narration/write`、`POST /episodes/{e}/generate-narration`、`GET /episodes/{e}/narration-coverage`、`POST /storyboards/{id}/narration/subtitle`、`GET/PUT/DELETE /storyboards/{id}/narration-fit`。
 - 用途：写旁白 → 配音 → 实测时长 → 字幕 → fit → 视频 Prompt 时长对齐。
 - 组合场景：批量先 preview 分类 `missing/changed`，只配这两类；镜级 fit 用 `mode:"pad"|"tempo"` + `pad_ms`（毫秒，0–3000）+ `pad_position` + `audio_mix_mode:"replace"|"mix"`。
@@ -232,7 +255,7 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 
 ### S10 合成
 - 端点：`POST /storyboards/{id}/compose`、`POST /episodes/{e}/compose-batch/preview`、`POST .../compose-batch {storyboard_ids}`、`GET .../compose-batch-status`、`POST .../retry-failed`。
-- 用途：把视频 + 旁白音轨 + 烧录字幕变成可导出的融合片，写 v2 签名。
+- 用途：把视频 + 旁白音轨 + 烧录字幕变成可导出的融合片，写输入快照签名。**带显式段组合的纪录片镜头写 v4**（#60：段组合、图层段、生成版本、衔接帧都进签名）；**无 combo 的剧情镜仍写 v2**（#42：video/audio/subtitle/burned/text/fit/T），这是刻意保持的逐字兼容，不是遗留 bug。签名版本 <2 的历史记录一律判 `unknown`，需重做。
 - 组合场景：preview 读 `status/exportable/plan/signature` → 启动显式 IDs → 轮询 → 逐镜读回 `compose_state`。
 - 陷阱：只有 `unchanged` + `exportable:true` 才可导出；`missing/changed/unknown` 要重做；`blocked/skipped` 先按 reason 修。200 与“导出成功”不是一回事。
 
@@ -249,118 +272,9 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 
 ---
 
-## 3. 以诊断片为例：目标 → 步骤 → API
+## 3. 诊断片实测案例（2026-11-05，历史记录）
 
-**授权前提（重要）**：本案例是“用户已明确授权五镜技术测试、逐镜确认 C/B/A/A/A 与预算、允许保留失败证据”的前提下，由协调者执行的记录。因此下文出现的 `script/confirm`、`design-card/confirm`、`confirm-keyframes`、`approve{override_gate:true}` 都是**人在此前已给出决定、协调者代按**的事实；通用 Agent 不得据此把这些端点当成可自主调用——必须逐项停下请人做决定，再做技术执行与记录。
-
-**工作目标**：在一个纪录片项目里，用 5 个镜头、约 55 秒，验证“剧本→资产→Poster→设计卡→图层段→关键帧→旁白→视频→合成→导出”全链路；预算 12 张 AI 图、2 条生产视频；不追求艺术验收，允许保留失败证据。
-
-实际成片：`54.76s / 960×544 / 25fps / 1369 帧`，5 个合成片全部最新可导出；C186 衔接视觉 FAIL，B187 细节形变，均原样保留。下面每一步都给出**为什么这样做**与**实际参数**。
-
-### 步骤 0：接入与预算确认
-- 调用：`GET /health`；`GET /tasks/active`；`GET /style-presets`；`GET /ai-configs?service_type=text|image|video|tts`；`GET /skills?lang=zh`；`GET /prompts`。
-- 目的：确认服务、拿 `config_id`（text=1/10、image=9、video=8、tts=13）、确认没有遗留任务、确认风格 `documentary-archival` 存在。
-- 读回：`active_count=0`。
-
-### 步骤 1：立项与剧本
-- `POST /dramas`：`{title:"殷墟与碳十四·Round2五镜技术测试", project_type:"documentary", aspect_ratio:"16:9", genre:"历史纪录片", style:"documentary-archival", description:"…非用户艺术批准"}`
-- `PUT /dramas/8`：`{documentary_rules:"on"}`（补落盘）。
-- `POST /episodes`：`{drama_id:8, title:"年代如何被推知", resolution:"720p", image_config_id:9, video_config_id:8, tts_config_id:13}`
-- **历史测试写入，仅保留审计，不是首轮导入模板**：当轮曾 `PUT /episodes/14 {content, script_content, narration_enabled:true, audio_mix_mode:"replace", subtitle_timing:"sentence"}`。这条记录不能复制为现行操作步骤，也不能证明 AI 改写已获授权或由火宝执行；普通任务按 S1 分开导入原文、获准后调用火宝改写。
-- `GET /dramas/8`：读回项目/集/资产，核对 ID 与显示集数。
-- **人**确认剧本 → 人授权后 `POST /episodes/14/script/confirm`（Agent 只准备差异与事实报告）。
-- `GET /episodes/14/gates`：确认剧本闸门已开。
-- 为什么：没有剧本确认，后续所有阶段都不该开工。
-
-### 步骤 2：资产提取与审核
-- `POST /episodes/14/extract` ×3：`{target:"characters"|"scenes"|"props", config_id:1, model:"glm-5.3"}`；轮询 `GET /extract-status`。
-- `GET /episodes/14/{characters,scenes,props}`、`GET /character-roster`。
-- 修正：`PUT /scenes/40`、`PUT /scenes/41`（`location/prompt/lighting/time`），`PUT /props/91 {name,description}`；`DELETE /episodes/14/assets/link?kind=scene&asset_id=42`、`kind=prop&asset_id=90`（去掉误关联）。
-- 生图：`POST /scenes/40/generate-prompt {episode_id:14,text_config_id:1}` → `POST /scenes/40/generate-image {episode_id:14,config_id:9,model:"qwen-image-2.1"}`；道具同理。任务 935/936。
-- 忠实素材：`POST /props {drama_id:8, episode_id:14, name:"车马坑原始照片", type:"证据素材", description:"…", faithful:true}` → `POST /upload/image` → `POST /tasks/register-upload {asset_type:"prop", asset_id:92, local_path:"static/uploads/…"}` → `PUT /props/92/faithful-source {version_task_id}`；93 同。
-- 资产审核：`POST /episodes/14/asset-review/run {config_id:1,model:"glm-5.3"}` → `GET /asset-review` → `PUT /asset-review/items/7|8|11 {status:"not_needed", reason:"…"}`。
-- 语义：`purpose:"precision"` 不是“精确复原”，而是“带权威参照、程序 gate 与人工审批的生成逼近”，产物仍是艺术再现；不得声称考古/器物级精确复原。
-- 精确→美化：`POST /asset-pipeline/asset-sources`（multipart CC0 照片 + `role:"generation_reference"`、`license`、`title`、`artist`、`era`）→ `POST /asset-pipeline/runs {asset_kind:"scene", asset_id:41, episode_id:14, purpose:"precision", config_id:9, model:"qwen-image-2.1", text_config_id:1}`（run 934）→ `GET /asset-pipeline/runs/934` 轮询 → 人打开 round1（task 940）→ `POST /asset-pipeline/runs/934/approve {round_id:1, verdict:"revise", selected_violations:["mh6"], notes:"…", opened:[{path,sha256}], override_gate:false}` → 美化 task 941 → 人开图 → **人明确授权技术例外后** `POST /asset-pipeline/runs/934/approve {round_id:2, verdict:"approve", notes:"技术例外：后轮辐条在原照中被遮挡…", opened:[…], override_gate:true}`。
-- 读回：13 项审核 `8 have / 5 not_needed / 0 missing / 0 ignored`；两个程序 gate 仍 `gate_pass=0`（mh6），记录保留。
-- 为什么：纪录片必须先解决“信息点需要什么资产”，缺的补、不要的可写理由；精确/美化不是随便重绘，必须带权威素材与开图审批。
-
-### 步骤 3：Poster（可选）
-- `GET /episodes/14/poster` → `PUT /episodes/14/poster {prompt, base_image, reference_images, layout{texts[...]}}`（3 个文字层，坐标 0–1）→ 本地按 layout 渲染 PNG → `POST /upload/image` → `POST /episodes/14/poster/versions {image, base_image, layout}` → `PUT /episodes/14/poster/select {version_id:10}`。
-- 读回：Poster 10，0 张 AI 图。
-- 为什么：Poster 不进主线闸门；精确排版用确定性画布，不靠扩散写字。
-
-### 步骤 4：拆镜
-- `POST /agent/storyboard_breaker/chat {drama_id:8, episode_id:14, config_id:10, model:"deepseek-chat", message:"…恰好五段一镜一段，旁白逐字原文，覆盖率100%，不启动任何生成…"}`
-- `GET /episodes/14/storyboards`：得到 186–190。
-- 为什么：镜数=段落数，旁白原文不动，避免拆镜阶段偷跑生成。
-
-### 步骤 5：设计卡与组合
-- `GET /design-card-context`、`GET /design-cards/audit`。
-- `POST /design-cards/fill {storyboard_ids:[186..190], config_id:10, model:"deepseek-chat"}`（草稿）→ `GET /design-cards/status`。
-- 人显式定：C/B/A/A/A。逐镜 `PUT /storyboards/{id}/design-card`：
-  - 186：`combo:"C"`，`budget:{layer_s:4,gen_s:6}`，`layer_plan`（3 个 label：河南·安阳 / 殷墟 / 艺术再现），`gen_plan.first` 不写（由衔接帧锁定），`mid/last` 只写机位与“无人无文字”。
-  - 187：`combo:"B"`，`budget:{layer_s:null,gen_s:10}`，`gen_plan.first/mid/last` 只用 `@车马坑艺术再现` 指代，不描述外形。
-  - 188/189/190：`combo:"A"`，`budget.layer_s` 10/10/12，`layer_plan.base` 指向确定性底图（188 用示意底图，189 用流程底图，190 用真实照片 92 + 现代定位图 93）。
-- 人逐镜审卡/定组合后 → `POST /storyboards/{id}/design-card/confirm {acknowledge:true}` ×5（Agent 不得自发确认）。
-- `GET /design-cards/audit`：5 镜 `confirmed`，`unresolved=0`。
-- 为什么：本轮（2026-11-05）组合全部由人显式给出；C 的衔接帧锁定必须体现在卡里（first 由图层末帧继承）。**口径已更新**：#82 之后纪录片批次可为「尚无 combo」的镜首次写入 AI 所选组合，人改为逐镜审阅 + 确认（见 S5）。
-
-### 步骤 6：图层段
-- `GET /layer-segments/storyboards/186`：`combo:"C"`、`production_unlocked:true`。
-- `POST /layer-segments/storyboards/186/draft`（按 `layer_plan` 出草稿）。
-- `PUT /layer-segments/storyboards/186`：`{layer_doc{version,base{path,width:960,height:544,source_width:1920,source_height:1088},theme:"archival",layers[4 label]}, timeline{fps:25,ease:"inout",fade_ms:250,keyframes[{t:0,visible:[location,art]},{t:0.8,…},{t:1.5,…},{t:4,…}]}, duration:4}`
-- `POST /layer-segments/storyboards/186/render`：task 945；读回 `junction.hash=72d30e…`。
-- A 镜：`GET /base-candidates` → `PUT /layer-segments/storyboards/188|189|190 {layer_doc, timeline, duration, base_ref}` → render。188 初次渲染后人工发现半衰期数字错，**只改 `layer_doc` 再 render**（不重跑上游）。
-- 实际查看 `thumbnail/last`：文字安全边、对比度、数字正确。
-- `mid_frame_time` 是**生成段内**时刻（186 生成段 6s → mid=3），不是整镜 10.583s 的中点。
-- 为什么：图层用于精确信息；C 的末帧必须**去掉全部文字**再当生成段首帧。
-
-### 步骤 7：关键帧提示词与预检（只写文本，不出图）
-- `GET /episodes/14/keyframe-prompts/scope` → `POST /episodes/14/generate-keyframe-prompts {storyboard_ids:[186..190], config_id:1, model:"glm-5.3"}` → `GET /episodes/14/keyframe-prompts-status`。
-- `POST /episodes/14/keyframe-batch/preview {storyboard_ids:[186..190], config_id:9, model:"qwen-image-2.1"}`：
-  - 186-first `skipped`（衔接帧锁定，C 首帧由图层末帧继承）；
-  - 188/190 首尾 `skipped`（A 无生成段 / 提示词空）；
-  - 187 首中尾 `missing`；189 首尾虽显示 `missing`，但 A 镜不用于生成视频，本轮**不出图**（避免浪费额度）。
-- 读回待出图清单：**186 mid/last + 187 first/mid/last = 5 张**。
-- 为什么：关键帧用于生成段；A 镜由图层段承担全部画面，不需要关键帧。锁定槽不能单独出图。
-
-### 步骤 8：旁白与配音（实测时长）
-- `GET /episodes/14/tts-options`。
-- `POST /episodes/14/narration/voice-batch/preview {storyboard_ids:[186..190], settings:{voice:"纪录片·沉稳男声", inference_timesteps:10, cfg_value:2, seed:1720, instructions:"中年男声…", normalize:true}}`
-- `POST /episodes/14/narration/voice-batch` 同 body → `GET /episodes/14/narration/voice-batch-status`；5 条 TTS（951）。
-- 逐镜 `GET /storyboards/{id}/narration-fit/preview`。
-- `POST /storyboards/{id}/narration/subtitle` ×5；`PUT /storyboards/{id}/narration-fit {mode:"pad", pad_ms:800, pad_position:"tail", audio_mix_mode:"replace"}` ×5。
-- 实测时长落定后 → `PUT /storyboards/186 {mid_frame_time:3, continuity_boundary:"cut"}`（mid 是**生成段内**时刻：186 生成段 6s → mid=3；不是整镜 10.583s 的中点）。
-- 下载 WAV/SRT 实际检查；覆盖率 161/161。
-- 为什么：先定配音实测时长与生成段预算，才能落定 mid 时刻、校准视频 Prompt 尾段；否则关键帧引导时间与成片时长对不上。
-
-### 步骤 9：关键帧出图与确认 → 视频提示词 → 视频
-- 实际出图（按步骤 7 的清单，共 5 张）：`POST /storyboards/186/keyframes/mid|last/generate`，`POST /storyboards/187/keyframes/first|mid|last/generate`（tasks 954/955/957/958/959）。
-- 轮询 `GET /tasks/{id}` → 下载并开图检查构图/参考一致性。
-- `POST /episodes/14/generate-video-prompts {storyboard_ids:[186..190], config_id:1, model:"glm-5.3"}` → `GET /episodes/14/video-prompts-status`（此时配音时长已定，可对齐尾段）。
-- 人看过已出关键帧后 → `POST /storyboards/186/confirm-keyframes {confirmed:true}`、187 同。
-- `POST /episodes/14/video-batch/preview {storyboard_ids:[186..190], config_id:8, model:"MiniMax-H3-INT8-ComfyUI"}`：186/187 `missing`，188/189/190 `excluded:no_generated_segment`。
-- `POST /episodes/14/video-batch {storyboard_ids:[186,187], config_id:8, model:"…"}`：恰好 2 条生产视频（960/961）。
-- 轮询 `GET /episodes/14/video-batch` 与 `GET /tasks/960|961`；下载 raw：C 请求 6s→实际 6.583333s/24fps；B 请求 10s→10.125s/24fps。
-- 为什么：确认必须在实测时长与最终 mid 落定之后；批量只提交预览勾选的生成段镜头；A 镜由图层段直接产出视频，不走模型。
-
-### 步骤 10：合成与导出
-- `POST /episodes/14/compose-batch/preview {storyboard_ids:[186..190]}`：5 镜 `missing`、`plan` 显示 `dv/da/d` 与 `gapRatio`。
-- `POST /episodes/14/compose-batch {storyboard_ids:[186..190]}` → 轮询 `GET /compose-batch-status`：`5 completed / 0 failed / 0 skipped`。
-- `GET /episodes/14/storyboards`：逐镜 `compose_state.status="unchanged"`、`exportable=true`。
-- `GET /merge/episodes/14/merge` → `POST /merge/episodes/14/merge {storyboard_ids:[186..190], poster_version_id:10, poster_duration:2}` → merge 26 → 轮询到 completed。
-- 下载最终片，ffprobe + 全解码 + 五镜联系表 + 浏览器播放。
-- 实际：`54.76s / 960×544 / 25fps / 1369 帧`；Poster 51 帧 2.04s；五合成片 `dff15a3b…/781364c2…/395f2172…/5818152f…/d6c0c0e0…`。
-- 为什么：签名只证明“输入一致”，不证明画面正确；必须打开实际媒体。
-
-### 步骤 11：验收与失败记录
-- 逐镜比对：C186 的首帧应为 junction PNG（hash `72d30e…`）；实测生成首帧与 junction SSIM **0.248407**，成片约 6.04s 出现机位/天空/柱基跳变 → 判 **视觉 FAIL**，保留在成片中。
-- 零 GPU 诊断：确认上传首帧/ref0 字节都等于 junction hash；引擎图 `guide0 frame_idx=0 / guide1=72 / guide2=-1`，latent 131；扩写提示词与图片几何矛盾（高俯角/填满/圆孔 vs 有天空/无圆孔）。结论只能是“上传与图结构未发现错误；唯一因果未证明”，不能把“模型局限”写成 PASS。
-- B187：车轮远近景辐条/毂形变；资产程序 gate mh6 仍 FAIL。
-- 音频：五旁白保留（native→final 相关 0.998788–0.999594，100ms 语音窗 ≥0.97956）；未人工听审；AAC 解码少量峰值 >1.0 如实记录。
-- 成本：9 AI 图（935/936/940/941/954/955/957/958/959）、2 生产视频、5 TTS；Poster 与原生图 0。
-- 为什么：诊断片的价值是暴露问题；把 `exportable` 当“质量通过”会掩盖 C 的真实缺陷。
-
+完整步骤、参数、成本与失败证据见 [`references/diagnostic-example.md`](references/diagnostic-example.md)（分离只为满足 64,000 bytes 上限，内容未删减），**抄作业或做全流程规划前必读**。摘要 `[R]`（drama 8 / ep 14，5 镜）：`54.76s / 960×544 / 25fps / 1369 帧`，Poster 10，merge 26；9 图 / 2 视频 / 5 TTS；C186 首帧 vs junction SSIM **0.248407** 视觉 FAIL，B187 形变，gate mh6 FAIL，均原样保留。该轮的 Poster 本地画布、「镜数=段落数」、固定 25fps、「设计卡在配音之前」已分别被 #72 / #57+#70 / #69 取代——现行按 §2 与铁律 17。
 ---
 
 ## 4. 正例/反例与设计原则
@@ -384,52 +298,32 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 | 场景 | 正确做法 |
 |---|---|
 | 第一页导入原始内容 | 只写 `content`，读回后给 `step=0` 链接；用户要求先等候就到此停止 |
-| 用户已授权 AI 改写 | 走火宝 `POST /agent/script_rewriter/chat`，读回火宝保存的结果；不是助手代写回填 |
+| 用户已授权 AI 改写 | 纪录片走 `POST /episodes/{e}/script-rewrite` 流水线（旧 `/agent/script_rewriter/chat` 对纪录片 400），剧情项目走 `POST /agent/script_rewriter/chat`；都读回火宝保存的结果，不是助手代写回填 |
 | 每阶段开工 | 先核本次授权；获准操作后再读 `GET /episodes/{e}/gates` / 预览 / `tasks/active`，不猜、不抢跑 |
-| 批量生成 | 一律先 preview，读 `checked/status/reason`，人确认后传显式 IDs |
+| 批量生成 | 有 preview 的入口一律先 preview，读 `checked/status/reason`，人确认后传显式 IDs；没有 preview 的入口（`design-cards/fill` 等）照其前置检查执行，`work-estimate` 不算预览 |
 | 写入 | 先快照 → 最小字段 PUT → 重新 GET 对照 → 报告 before/after |
 | 审批 | 必须开图并附 `opened:[{path,sha256}]`；程序 FAIL 保留，`override_gate` 只写技术例外范围 |
 | 返工 | 定位错在哪一层（剧本/资产/绑定/关键帧/时长/模型），从对应入口修；通用规则缺陷交维护任务 |
 | 恢复 | 用批次状态/`fill-gaps`/`retry-failed` 补剩余，不从头重跑；已有活跃任务只观察 |
 | 证据 | 每次调用写 `requests.jsonl`；媒体“已打开”与“未核”分开记录 |
 | 验收 | 技术验收与艺术批准分开写；`exportable` 只代表签名就绪 |
-| 成本 | 任何新 GPU 请求前确认预算；额度用尽时停下来问人 |
+| 成本 | 任何新 GPU **或计费文本 LLM** 请求前确认预算台账；额度用尽时停下来问人 |
 
 ### 4.3 反例模式（Agent 常犯的错误想法）
 
-| 错误想法 | 为什么错 | 正确做法 |
-|---|---|---|
-| “第一步和第二步都是文本，我一次填完更省事” | 混淆原始材料与 AI 工种产物，越过用户要求的停止点 | 第一页只写 `content`；等用户授权第二步，再让火宝生成 |
-| “API 能写 script_content，所以我能代做 AI 改写” | 可写字段不等于阶段授权；经火宝保存不等于由火宝生成 | AI 改写必须走火宝内部工种；直接人工编辑须用户逐项明确授权且如实标明 |
-| “纪录片技能限制整理范围，我本地写好再存进去” | 用规则冲突为绕开业务工种找理由 | 报告冲突并等用户决定，不换成助手代写或改全局技能 |
-| “用户说停下，我先 GET/清空错稿再停” | 停止指令已收窄操作范围，修错不自动新增业务权限 | 立即停止火宝调用；仅完成明确获准的技能修订，回滚另等授权 |
-| “HTTP 200 / completed / exportable，所以这镜通过了” | 这些只证明受理/输入一致，不证明画面正确 | 下载并打开真实媒体；逐项比对（首帧/junction、轮辐、字幕边界、音频） |
-| “先把图都生成了再说” | 跳过剧本确认/资产审核/设计卡闸门，浪费预算且产物不可用 | 按 S1→S2→S5 顺序推进，每阶段先读 gate |
-| “AI 填卡就能替人确认或改写既有 combo” | AI 首次填入只形成待审草稿，不是内容背书，也不能覆盖已有组合 | #82 起无 combo 的镜可由 AI 首次填写；人工仍须审阅/确认，既有 combo 通过显式改选流程处理 |
-| “图层更可控，所有镜头都用图层” | 叙事/表演镜头需要扩散的表现力；全图层会像幻灯片 | A 只用于精确信息镜；B/C/D 保留生成段 |
-| “扩散更漂亮，真实照片也重绘一下” | 地图/文物/档案会被改几何、造伪文字 | 忠实素材只做确定性底图+图层；艺术再现另建资产并标注 |
-| “关键帧提示词里写清角色长相更稳” | 文字与图片打架，模型会改掉已定形象 | 只用 `@名字` 指代；外形以图片为准 |
-| “C 的首帧槽也出一张，保险” | 锁定槽由图层衔接帧继承，另出一张会破坏锁定 | `skipped/slot_locked` 就跳过；只出 mid/last |
-| “A 镜也出首中尾，反正没坏处” | A 没有生成段，图不会被用，白花钱 | 预览 `excluded:no_generated_segment`，不出 |
-| “先定视频时长再配音，省事” | 实测配音与视频尾段不符，合成时挤压/留白 | 旁白→配音→fit→视频 Prompt 时长对齐→关键帧确认→视频 |
-| “批量失败就整个重跑” | 重复花钱、覆盖已完成产物 | `retry-failed` / `fill-gaps` 只补剩余 |
-| “merge 不传 IDs 就是全部，正好” | 省略=整集，可能带入未就绪镜头或非预期镜头 | 导出必须显式 `storyboard_ids` |
-| “本地 ffmpeg 拼一下更快” | 绕过业务签名/音频/字幕逻辑，产物不可追溯 | 只用火宝 compose/merge；本地 ffmpeg 仅只读检查 |
-| “改库/写 media/重启服务能绕过 bug” | 破坏业务事实源与其他项目 | 报告缺口；业务写入只走 API |
-| “asset gate 没过，直接 approve 算了” | 没开图/没写理由的批准是造假 | `opened` 必填；`override_gate` 需技术理由与范围，保留 gate FAIL |
-| “用户之前同意过类似版本，这次也算同意” | 沉默/旧版本/别的镜头批准不等于本版通过 | 每版重新取得明确同意 |
-| “C 跳变是模型局限，标注 PASS 吧” | 未证明唯一因果，且视觉确实 FAIL | 保留 FAIL，报告证据与可选修复路径，等人决定预算 |
-| “先 release 再说，验证回头补” | 发布不等于验收；生产改动会影响真实项目 | 先验证真实路径，再发布；发布后回归原项目 |
+完整的 21 条错误想法 → 为什么错 → 正确做法对照表移至 [`references/anti-patterns.md`](references/anti-patterns.md)（分离只为满足 managed skill 64,000 bytes 上限，条目未删减）。**开工前必须读该表**；它与铁律框等效，不是可选读物。
+
+最常踩的五条：① 把 `content` 与 `script_content` 一次填完冒充火宝改写；② 把 HTTP 200 / `completed` / `exportable` 当内容通过；③ AI 填卡替人确认或改写既有 combo；④ 先定视频时长再配音；⑤ 没开图就 `approve` 或 `override_gate`。
 
 ### 4.4 每阶段最小核对清单
 
 - **第一步原始内容**：来源与 `content` 对应；未夹带 `script_content` 或改写调用；到达用户指定停止点即结束。
-- **第二步 AI 改写**：已获该步授权；存在真实火宝改写调用与保存结果；不是助手代写回填；再审原文 vs 改写差异与事实归属。保存前跑过 `inspect-narration` 并把 `findings` 原样呈报（502 记为「检测失败」）；改写报告的 `ai_exclusions` 逐条可定位。稿件确认和后续旁白覆盖率另按阶段检查。
+- **第二步 AI 改写**：已获该步授权；存在真实火宝改写调用与保存结果（纪录片 `POST /episodes/{e}/script-rewrite`，剧情 `POST /agent/script_rewriter/chat`）；不是助手代写回填；再审原文 vs 改写差异与事实归属。保存前跑过 `POST /episodes/{e}/script-rewrite/inspect-narration` 并把 `findings` 原样呈报（502 记为「检测失败」）；改写报告的 `ai_exclusions` 逐条可定位。稿件确认和后续旁白覆盖率另按阶段检查。
 - **旁白骨架**：正式保存前 `validate_only:true` 干净（`problems` 空、`gaps` 空）；缺口按「并入上/下镜或新建镜」处置，非旁白内容回旁白稿；保存后重新确认；试听只用 `tts.valid=true` 的音频。
 - **资产**：本集关联是否正确；名字无空格；`faithful` 未进扩散；审核清单 0 missing；程序 gate 与人工例外分开记录。
-- **Poster**：文字未裁切、底图来源正确、未调用不必要生图。
-- **设计卡**：各信息点都有 `via`，必要视觉任务未丢失；预算不超限；每镜都有 combo（AI 首次填入仍待人工审阅）；AI 输出的必要语义/几何依赖真实、归属和版本相容且可执行，不能以「待标注」占位算完成；无锚定层确实不依赖资产内位置；`tts.duration_ms` 缺失显示「待配音」而非 0.0s；确认状态仍由人决定。
-- **图层段**：`base` 尺寸/裁切正确；文字安全边；junction 去文字；`timeline.fps` 与输出一致；`thumbnail` 实际打开。
+- **Poster**：编辑工程用 `layer_doc`（无 `layout`、无本地画布上传）；版本由 `POST …/poster/versions` 服务端渲染并已 `select`；文字未裁切、底图来源正确、未调用不必要生图。
+- **设计卡**：纪录片已先确认骨架并有有效配音（无配音时服务端直接阻断）；各信息点都有 `via`，必要视觉任务未丢失；预算不超限；每镜都有 combo（AI 首次填入仍待人工审阅）；AI 输出的必要语义/几何依赖真实、归属和版本相容且可执行，不能以「待标注」占位算完成；无锚定层确实不依赖资产内位置；`tts.duration_ms` 缺失显示「待配音」而非 0.0s；底图缩略图看的是**该候选的实际版本**（`version_task_id`），`must_mark`/`reference_assets` 芯片显示的是该资产**当前图**（要核特定版本得去资产弹窗）；未解析引用经「改绑引用」处理而不是靠新增标注；确认状态仍由人决定。
+- **图层段**：`base` 尺寸/裁切正确；文字安全边；junction 去文字；`timeline.fps` = 本集目标帧率（服务端派生，与成片一致，不假设 25）；`thumbnail` 实际打开。
 - **关键帧**：预览分类正确；锁定槽未出图；版本签名与当前提示词/参考图一致；确认后再提交视频。
 - **旁白**：字数 ≤80（按 spokenText）；发音标记合法；配音实测时长；fit 不截断旁白；字幕与音频逐字对齐。
 - **视频**：raw 时长/帧率；首帧 vs junction（C）/尾帧 vs junction（D）；引导链；参考图顺序。
@@ -438,50 +332,11 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 
 ### 4.5 典型错误案例：助手代填「AI 改写」（2026-11-06，《历史纵横》漕运，第1集）
 
-- **用户边界**：先做第一步、让用户看完再等指令。两页分别是 `drama/9/episode/1?panel=script&step=0`「原始内容」与 `...&step=1`「AI 改写」；数据库 `drama_id=9`、`episode_id=15`。
-- **真实错误 [R]**：助手自行写了840字符、16段解说稿，直接 `PUT /episodes/15`，请求含 `content`、`description`、`script_content`。结果原始内容与 AI 改写两页同时被填上，但没有调用 `POST /agent/script_rewriter/chat`。经 API 存进去的自写稿不是“通过火宝改写”。
-- **错误推理**：把“用户想用火宝改写”误当成“允许助手代写回填”；把通用字段编辑能力误当成当前阶段授权；又以纪录片内置技能只允许整理、内容量±5%为理由绕开火宝。计划里写入了这套错误方案，也不能替代用户的具体阶段边界。旧流程把两种文本字段并列、历史示例又同时写两者，容易强化误读，但不是越权借口。
-- **为什么必须禁止**：用户失去第一步的审核与推进控制；第二步失去火宝内部工种的生成链路与记录；即使没有确认或生成媒体，提前代填第二步本身已经越权。
-- **应当怎样做**：原文只进 `content` → 读回并提交第一步链接 → 等用户；获准改写后才调用火宝 `script_rewriter` → 读回火宝稿件 → 再等用户审核。规则冲突就报告，不本地代写补位。
-- **纠错边界**：用户随后明确“不要再操作，只更新 skill”。这时只改已授权的助手技能文档；不再请求火宝、清空稿件、运行改写或声称已经恢复某个业务状态。本案例记录的是错误及预防规则，不是可复制的成功流程。
+完整经过见 [`references/diagnostic-example.md`](references/diagnostic-example.md) 末节。要点 `[R]`：助手自写 840 字符解说稿直接 `PUT /episodes/15`（含 `content`+`description`+`script_content`），从未调火宝改写——经 API 存进去的自写稿不是「通过火宝改写」。正确做法：原文只进 `content` → 读回交第一步链接 → 获准后才由火宝改写。用户要求「只更新 skill」后，不得再请求火宝、清稿或自行回滚。
 
 ### 4.6 生产验收固定案例：八达岭长城测试 1008（`AGENTS.md` §9/§10）
 
-**为什么用它做生产验收**：隔离 worktree（独立端口 + DB 副本）从 2026-11-08 起不再作为验收依据——它跑的是副本数据与副本静态目录，掩盖过生产独有的路径前缀、任务队列与真实模型行为。验收必须在生产入口 + 生产后端 + 生产库上留痕，又绝不能碰既有真实项目（尤其 drama 3《利哈列夫远征》）。固定一个**主题、篇幅、命名都确定**的新项目，既保证每轮验收覆盖同样的链路、可横向对比，又把写入限制在一次性测试项目里。
-
-- **主题**：八达岭长城对明朝防御的作用。
-- **原始内容（固定文本，正文 224 字，去空白计；只进第一步 `PUT /episodes/{e} {content}`）**：长度刻意压在 200–300 字，是为了让旁白骨架、配音、设计卡在可控镜数内跑完，GPU 成本可预算。正文（内容为公有领域历史常识整理，可公开）：
-
-  > 八达岭长城位于北京西北的军都山关沟北口，是明代长城中规制最高、保存最完整的段落之一。明永乐以后，蒙古诸部屡次南下，朝廷把京师北面的防线层层加厚：外有宣府、大同，内有居庸关，而八达岭扼守关沟最窄处，成为居庸关的前哨。城墙依山脊起伏，以条石为基、青砖包砌，顶部宽处可容五马并行，便于快速调兵。沿线每隔数百米设敌台与烽燧，守军以烟火与号炮为信，警讯昼夜之间即可传到京城。它的作用不只是阻挡，更是把进攻者逼入狭窄山道，使明军能以较少兵力守住通往北京的咽喉。
-
-  正文之后再**另起一行**附这条**故意保留的非旁白出处行**（它不是旁白，用来触发 #80 的检测；不计入上面的 224 字）：
-
-  > 资料来源：公有领域历史常识整理；本行为出处说明，不作为朗读稿。
-
-  导入时两段一起写进 `content`（原始材料保留出处是 S1 的要求）；AI 改写走第二步，改写与保存前的检测应当把这条出处行识别为 `source`/`not_narration` 并给出可定位的 `findings`，正文 224 字不得被改写删减。
-- **项目命名**：`八达岭长城测试 1008`；同名已存在时追加序号（`八达岭长城测试 1008-2`）。**不复用旧测试项目**；实际 `drama_id`/`episode_id` 以创建结果为准并写进报告。
-- **链路**：建项目（`project_type=documentary` + `documentary_rules=on`）→ 原始内容 → AI 改写 → 旁白稿检查（#80）→ 人工确认 → 资产提取/审核 → 旁白骨架（#81）→ 配音 → 设计卡（#82）→ 图层段/关键帧 → 视频 → 合成 → 导出。本轮验收涉及的阶段必须真实跑通，不涉及的阶段写明「未覆盖」。
-- **本案例要覆盖的新功能**：
-  1. `POST /episodes/{e}/script-rewrite/inspect-narration`：在原始内容尾部刻意保留一条出处/链接行，验证 AI 识别、`locatable` 判定与「删除可定位片段 / 保留」两条人工路径；
-  2. `fidelity.v2` 的 `ai_exclusions` 与 `adjusted_baseline_chars`：改写报告能看到被剔除片段与调整后基线；
-  3. `PUT …/narration-skeleton {validate_only:true}`：缺口坐标、`excerpts`、三种缺口处置；
-  4. 骨架 `tts.audio_url` / `audio_version`：配音后逐镜试听，并验证改动旁白后旧音频转为 `valid:false` 不可试听；
-  5. `POST …/design-cards/fill` 的 AI combo 与 combo-only 补选（含「已有 combo 不被覆盖」）；
-  6. `GET …/design-cards/audit` 的 `tts.duration_ms`、`unresolved_layers`、`video_generated`，以及确认失败时可读的 `issues[].message`。
-- **证据清单**：`drama_id`/`episode_id`/各阶段 `task_id`；每个关键阶段的浏览器截图（读图后再下结论）；只读 DB 查询（状态与产物路径）；失败任务的日志片段；GPU 消耗台账（图片/视频/TTS 条数）。报告必须给出这些 ID 与证据路径，不能只写「已验证」。
-- **纪律**：生产测试消耗真实额度，任何计费生成任务先取得用户同意；严禁修改、生成、删除既有真实项目数据；DB 一律只读；失败不隐瞒，保留证据。
-
-#### 首次执行结果（2026-11-08，`[R]`）
-
-- **对象**：drama **10**「八达岭长城测试 1008」/ episode **16**；生产入口 `http://172.30.3.164/huobao/`；证据目录 `docs/qa/8daling-1008-20261108T061008Z/`（`report.md` + `requests.jsonl` + 截图）。
-- **规模与预算**：6 镜；旁白覆盖 **241/241**；图片 **11/16**（资产 1226、1230–1233、1245–1246；关键帧 1248–1251）、视频 **2/2**（1254 #01、1255 #04）、TTS **6/8**（batch 1228）。无超预算、无失败后追加 GPU。
-- **成片**：compose 6/6 `unchanged`+`exportable`，merge **27** completed，媒体 `static/merged/c9bbd119-b086-42a6-8eaf-6ce63ed185fa.mp4`，浏览器实开 **960×544 / 65.44s**（本环境无 ffprobe，时长依据为浏览器媒体元数据，已如实标注）。
-- **#80 通过**：旧入口 `POST /agent/script_rewriter/chat` 对纪录片真实返回 400 → 改走 `POST /episodes/16/script-rewrite`（run 3 / task 1212）。`inspect-narration` 在原稿命中 1 条可定位 finding（出处行），`fidelity.v2` 基线 224 / 输出 224 / `adjusted_baseline_chars=224`，prepared 阶段 raw 256→224；定稿再跑 `findings=[]`。
-- **#81 通过**：骨架 task 1227 出 6 镜、无 gap；`validate_only:true` 在正常草稿返回空，在人为删掉第 2 镜首字「它」后返回精确 `{start:42,end:43,chars:1,text:"它",next_index:1}` 且**未写库**；配音后 6 镜 `tts.valid=true`，`audio_url`/`audio_version`/`duration_ms`（8800/3840/14400/9920/10240/8800）齐全，UI 可试听。
-- **#82 通过**：`design-cards/fill` 在 6 个空 combo 的镜上真实写入 AI 初选（#01 C、#02 D、#03–#06 C）；audit 返回非零 `tts.duration_ms`（UI 显示「实测 8.8s」而非 0.0s）；`unresolved_layers` 给出资产 ID/名称与 `available_semantics`（如 asset 161「八达岭区位示意图」，`available_semantics=[]`），`issues[].message` 可读，未虚构语义名。
-- **失败与偏差（保留，不隐瞒）**：① #02 的关键帧提示词在 GLM、DeepSeek local、DeepSeek cloud 三种已配置模型下均失败 → 经 combo impact 后改为确定性 **A**，由 #04 C 维持第二条生成视频，**未追加 GPU 预算**；② 图层 draft 首次全部 `missing_base`，先按设计卡生成真实 base 再重 draft/render（1234–1239、1256–1259）；③ 资产初审 6 项缺失，补提取 1218–1223 后新建 scene 90 / prop 166 补齐，终审 22 total / 17 have / 4 added / 1 not_needed / 0 missing；④ 文档 merge 路径错误导致 200+HTML，改用 `/merge/episodes/:id/merge` 成功（已回写 S11）；⑤ 本环境无 ffprobe/ffmpeg，未伪报 ffprobe 结论。
-- **性质**：以上为**技术验收**；史实/画面/声音的艺术验收仍待用户审核（`…/huobao/drama/10/episode/1?panel=export`）。
-
+固定定义（主题、224 字固定正文与那条故意保留的出处行、命名、链路、新功能覆盖清单、证据清单与纪律）及 2026-11-08 首轮结果 `[R]` 见 [`references/fixed-case-8daling.md`](references/fixed-case-8daling.md)，**跑生产验收前必读并逐条照做**，正文 224 字与授权边界不得改写。要点：隔离 worktree 自 2026-11-08 起不再是验收依据，必须在生产入口/后端/库留痕，只写一次性测试项目，绝不碰既有真实项目（尤其 drama 3）；计费生成先取得同意；DB 只读；失败留证。首轮：drama 10 / ep 16，6 镜，覆盖 241/241，merge 27，960×544 / 65.44s（浏览器元数据，无 ffprobe），#80/#81/#82 通过。
 ---
 
 ## 5. 失败处理与报告模板
@@ -494,6 +349,7 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 4. **因果状态**：能证明什么、不能证明什么（例如“上传与图结构未发现错误；prompt 与图片几何矛盾；唯一因果未证明”）。
 5. **可选修复**：改通用规则/重出哪一段/需要多少预算；明确“不保证一次通过”。
 6. **保留证据**：失败版本不删、不本地修补、不改签名冒充通过。
+7. **区分「业务执行失败」与「证据/观测采集失败」**：助手侧的截图、页面抓取、媒体下载、证据落盘失败，以及服务端「公开调用记录持久化失败」，都属于采集失败。此时业务副作用可能**已经提交**：先保留它、如实报「采集失败」，再用对应的 GET/status/`observations` 读回当前状态，确认缺什么后才讨论是否获准重发；**禁止盲目重跑**可能已落库的请求。照实写「业务结果 X / 证据缺 Y」（见铁律 18、S5-87）。
 
 报告给用户时给：可播放链接、审核深链、真实文件路径、成本账、通过项、失败项、需要他做的决定。
 

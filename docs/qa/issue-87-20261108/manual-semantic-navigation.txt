@@ -1,0 +1,4 @@
+Dedicated human UI fixture only; no semantic save or annotation.
+Clicked Cancel from restored anchor picker; clicked 打开该资产语义; observed asset=prop-169&sem=qa_missing_semantic with phase=cards&shot=519 retained.
+Clicked 关闭; waited until asset removed. Clicked 改绑引用; waited for dpick=semantic:anchor; captured 09-manual-rebind.png. Clicked 取消; waited until dpick removed; final URL retains phase=cards&shot=519 only.
+Browser errors empty. Original card restored through API; see semantic-repair-fixture.json.
