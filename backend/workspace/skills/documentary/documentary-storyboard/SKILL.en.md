@@ -119,8 +119,8 @@ Every information point needs an owner. Entries without one are flagged `info_po
   **copied verbatim** from the `semantics` list returned by `read_storyboard_context` (`asset_id` + `id` + `name` must all match).
   Inventing a name gets it flagged `unresolved`, shown in red on the design card page — the same as not writing it.
   Every place, river, lake, fort, polity extent or route spoken in the narration should find a match here;
-  when the image genuinely lacks one, do not force it: state in `rationale` that "the narration mentions X, asset N has no X in its semantics",
-  and switch asset or move the point to the generated segment. Use `read_image` when you need to check the original.
+  when semantics are missing, preserve the planned annotation layer, leave its anchor semantic_id and name empty,
+  and state in `rationale` that annotation is pending. Never invent an entry or downgrade the layer.
 - `planned_layers[]`: which layers to draw and in which order they appear. Each entry
   `{ type, text?, anchor?: {asset_id, semantic_id, name}, at_s }`:
   - `type ∈ polygon | polyline | marker | label | card | image`
@@ -145,10 +145,10 @@ Every information point needs an owner. Entries without one are flagged `info_po
 - Do not use the generated segment to act out geography: a man walking on open ground cannot express "upstream along the Irtysh" — that is the
   layer segment's job.
 
-### 2.2.4 `suggested_combo`: a suggestion only, never a decision
+### 2.2.4 Segment combination `combo`
 
-- You only write `suggested_combo ∈ A | B | C | D`. **Never write `combo`**: the server ignores any `combo` sent by a model,
-  the segment combination must be chosen by a human. State in one sentence in `rationale` why you suggest it.
+- Write `combo ∈ A | B | C | D`; optionally also write `suggested_combo`. Existing choices are preserved for human review or modification.
+  Explain the choice in one sentence in `rationale`.
 - Criteria for the four combinations:
   - **A** "annotation and pans over a map / original document: telling where · who · which year"
   - **B** "AI-generated shot: telling what happened"

@@ -327,6 +327,13 @@
                 </span>
               </div>
 
+              <p class="dc-hint mono">
+                {{ t('designCard82.narration') }}: {{ measuredSeconds === null ? t('designCard82.pendingVoice') : `${measuredSeconds.toFixed(1)}s` }}
+                <template v-if="hasLayer"> · {{ t('designCard82.layerBudget') }}: {{ layerSeconds === null ? '—' : `${layerSeconds.toFixed(1)}s` }}</template>
+                <template v-if="hasGen"> · {{ t('designCard82.genBudget') }}: {{ genSeconds === null ? '—' : `${genSeconds.toFixed(1)}s` }}<template v-if="!auditById[selected.id]?.video_generated"> ({{ t('designCard82.notGenerated') }})</template></template>
+                · {{ t('designCard82.total') }}: {{ totalSeconds === null ? '—' : `${totalSeconds.toFixed(1)}s` }}
+                <template v-if="headroom !== null"> · {{ t(headroom < 0 ? 'designCard82.excess' : 'designCard82.remain') }}: {{ Math.abs(headroom).toFixed(1) }}s</template>
+              </p>
               <!-- 旁白时长只认实测（#70）：没有当前有效配音就显示待配音，绝不显示估算 -->
               <div class="dc-narr-line">
                 <span v-if="budgetPositive && measuredSeconds !== null" :class="['dc-narr-fill', narrationClass]" :style="{ width: narrationPct + '%' }" />
@@ -470,8 +477,15 @@
               @blur="saveNow()"
             />
             <ul v-if="issues.length" class="dc-issues">
-              <li v-for="(issue, index) in issues" :key="`${issue.code}-${index}`" :class="['dc-issue', 'is-' + issue.severity]">
-                {{ t(`episode.design.issue.${issue.code}`) }}
+              <li v-for="(issue, index) in groupedIssues" :key="`${issue.code}-${index}`" :class="['dc-issue', 'is-' + issue.severity]">
+                {{ issue.message || t(`episode.design.issue.${issue.code}`) }} <small>({{ issue.code }})</small><template v-if="issue.count > 1"> ×{{ issue.count }}</template>
+              </li>
+              <li v-for="group in unresolvedGroups" :key="group.key" class="dc-issue is-warn">
+                {{ t('designCard82.asset') }} #{{ group.asset_id }} {{ group.asset_name || '' }} — {{ t(group.asset_exists ? 'designCard82.exists' : 'designCard82.missingAsset') }};
+                {{ t('designCard82.semantic') }}: {{ group.semantic_id || group.semantic_name || t('designCard82.pendingAnnotation') }};
+                {{ t('designCard82.available') }}: {{ group.available_semantics.length ? group.available_semantics.map(item => `${item.name} (${item.id})`).join(', ') : t('designCard82.noSemantics') }}
+                <span v-if="group.layers.length > 1"> ×{{ group.layers.length }}</span>
+                <ul><li v-for="layer in group.layers" :key="layer.index">#{{ layer.index + 1 }} · {{ layer.type }} · {{ layer.text || '—' }}</li></ul>
               </li>
             </ul>
             <label v-if="warnOnly" class="dc-ack">
@@ -631,7 +645,8 @@ function ttsOf(storyboardId) {
 }
 function ttsTitle(storyboardId) {
   const tts = ttsOf(storyboardId)
-  if (tts.valid) return t('episode.skeleton.ttsValid', { sec: ((tts.duration_ms || 0) / 1000).toFixed(1) })
+  if (tts.valid && typeof tts.duration_ms === 'number' && tts.duration_ms > 0) return t('episode.skeleton.ttsValid', { sec: (tts.duration_ms / 1000).toFixed(1) })
+  if (tts.valid) return t('designCard82.pendingVoice')
   const key = `episode.skeleton.ttsReason.${tts.reason || 'audio_missing'}`
   return t('episode.skeleton.ttsInvalid', { reason: te(key) ? t(key) : (tts.message || tts.reason || '') })
 }
@@ -862,6 +877,25 @@ const genPlan = computed(() => draft.value.gen_plan)
 const suggestedCombo = computed(() => draft.value.suggested_combo)
 const issues = computed(() => (current.value.issues || []).filter(issue => !budgetMissing.value
   || !['budget_under_narration', 'budget_tight'].includes(issue.code)))
+const groupedIssues = computed(() => {
+  const groups = new Map()
+  for (const issue of issues.value) {
+    const key = `${issue.code}\0${issue.severity}\0${issue.message}`
+    const group = groups.get(key)
+    if (group) group.count++
+    else groups.set(key, { ...issue, count: 1 })
+  }
+  return [...groups.values()]
+})
+const unresolvedGroups = computed(() => {
+  const groups = new Map()
+  for (const layer of auditById.value[selectedId.value]?.unresolved_layers || []) {
+    const key = JSON.stringify([layer.asset_id, layer.asset_name, layer.semantic_id, layer.semantic_name])
+    if (!groups.has(key)) groups.set(key, { ...layer, key, layers: [] })
+    groups.get(key).layers.push(layer)
+  }
+  return [...groups.values()]
+})
 const warnOnly = computed(() => issues.value.length > 0 && issues.value.every(issue => issue.severity !== 'block'))
 const junctionSlot = computed(() => (draft.value.combo === 'C' ? 'first' : (draft.value.combo === 'D' ? 'last' : '')))
 
@@ -899,7 +933,7 @@ const overLimit = computed(() => layerOverPct.value > 0 || genOverPct.value > 0)
  */
 const measuredSeconds = computed(() => {
   const tts = ttsOf(selectedId.value)
-  if (!tts.valid || !Number.isFinite(Number(tts.duration_ms))) return null
+  if (!tts.valid || typeof tts.duration_ms !== 'number' || !Number.isFinite(tts.duration_ms) || tts.duration_ms <= 0) return null
   return Number(tts.duration_ms) / 1000
 })
 const headroom = computed(() => (budgetPositive.value && measuredSeconds.value !== null
@@ -1197,7 +1231,7 @@ function reportError(err, fallback) {
   const key = map[body.error]
   if (key) {
     const detail = Array.isArray(body.issues) && body.issues.length
-      ? body.issues.map(issue => t(`episode.design.issue.${issue.code}`)).join(t('common.listJoin'))
+      ? body.issues.map(issue => issue.message || t(`episode.design.issue.${issue.code}`)).join(t('common.listJoin'))
       : ''
     toast.error(detail ? `${t(key)}：${detail}` : t(key))
     return
@@ -1216,7 +1250,7 @@ const confirmBlockReason = computed(() => {
       : t('episode.design.issue.budget_over_gen')
   }
   const blocking = issues.value.filter(issue => issue.severity === 'block')
-  if (blocking.length) return blocking.map(issue => t(`episode.design.issue.${issue.code}`)).join(t('common.listJoin'))
+  if (blocking.length) return blocking.map(issue => issue.message || t(`episode.design.issue.${issue.code}`)).join(t('common.listJoin'))
   if (warnOnly.value && !acknowledged.value) return t('episode.design.error.needsAcknowledge')
   return ''
 })
@@ -1299,7 +1333,7 @@ function excludeReasonFor(state, kind) {
   if (state.design_card_status === 'ai_filling') return 'ai_filling'
   if (state.design_card_status === 'confirmed') return 'confirmed'
   if (kind === 'fill') {
-    return ['blank', 'stale'].includes(state.design_card_status) ? '' : 'notPending'
+    return ['blank', 'stale'].includes(state.design_card_status) || (state.design_card_status === 'pending' && !state.combo) ? '' : 'notPending'
   }
   if (state.design_card_status !== 'pending') return 'notPending'
   if ((state.issues || []).some(issue => issue.severity === 'block')) return 'blocked'

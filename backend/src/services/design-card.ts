@@ -2,7 +2,7 @@
  * 分镜设计卡（design card）— `storyboards.design_card` 的唯一 schema / 规范化 / 校验（Issue #57）
  *
  * 一镜最多由两段组成：▣ 图层段（确定性渲染，≤30s）与 ▶ 生成段（视频模型，≤15s），
- * 二者不互斥。段组合 A/B/C/D 是**显式人工选择**，没有默认值，AI 只能写 `suggested_combo`。
+ * 二者不互斥。段组合 A/B/C/D 没有默认值，可由 AI 填写并由人工审阅或修改。
  *
  * 设计卡是导演分镜单：叙事（信息点）→ 结构（组合 + 预算）→ 图层段计划 → 生成段计划 → 理由，
  * 每一组字段都对应下游的某一步，校验结论（`issues`）读时重算、不落库。
@@ -106,7 +106,7 @@ export interface DesignCard {
   layer_plan?: LayerPlan
   gen_plan?: GenPlan
   rationale: string
-  /** AI 建议，仅展示；`combo` 永远由人选 */
+  /** AI 建议，仅展示；实际 combo 单独存于分镜列。 */
   suggested_combo: Combo | null
   /** 读时重算，不落库 */
   issues: CardIssue[]
@@ -325,7 +325,7 @@ function normalizePlannedLayers(raw: unknown, ctx: DesignCardContext | undefined
 /**
  * 规范化。永远返回结构合法的设计卡（不抛错）：解析不到的引用保留并标 `unresolved`。
  * `raw` 不是对象时返回 `null`（视为「这一镜还没有设计卡」）。
- * **不读 `combo`**：组合只存在列上，由人选。
+ * `combo` 单独存于分镜列，由写入入口规范化；不写进设计卡 JSON。
  */
 export function normalizeDesignCard(raw: unknown, ctx?: DesignCardContext): DesignCard | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null

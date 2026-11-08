@@ -69,7 +69,8 @@ export async function startDesignCardBatch(
   const alive = rows.filter(sb => !sb.deletedAt)
   const requested = storyboardIds?.length
     ? alive.filter(sb => storyboardIds.includes(sb.id))
-    : alive.filter(sb => FILLABLE.includes(toDesignCardStatus(sb.designCardStatus)))
+    : alive.filter(sb => FILLABLE.includes(toDesignCardStatus(sb.designCardStatus))
+      || (documentary && !sb.combo && toDesignCardStatus(sb.designCardStatus) === 'pending'))
   if (!requested.length) return { started: false, total: 0 }
 
   // 没有当前有效配音的镜一个都不进批次：不调模型、不置 ai_filling、不写卡。
@@ -133,6 +134,10 @@ export async function startDesignCardBatch(
     for (const sb of pending) {
       const previousStatus = toDesignCardStatus(sb.designCardStatus)
       requestContext.set('storyboardId', sb.id)
+      const comboOnly = documentary && !!sb.designCard && !sb.combo && previousStatus === 'pending'
+      requestContext.set('designCardComboOnly' as never, comboOnly as never)
+      requestContext.set('designCardSaved' as never, false as never)
+      requestContext.set('designCardError' as never, null as never)
       progress.current_storyboard_id = sb.id
       await updateTextTaskProgress(taskId, progress)
       logTaskProgress('DesignCard', 'batch-shot', {
@@ -150,28 +155,32 @@ export async function startDesignCardBatch(
         : `两段之和必须 ≥ 实测配音 ${measuredSeconds} 秒`
       try {
         const evidence = await buildEvidenceImages(episodeId, { storyboardIds: [sb.id] })
+        const semantics = loadDesignCardContext(episodeId).assets.map(asset =>
+          `${asset.kind} #${asset.id} ${asset.name}：${asset.semantics?.length ? asset.semantics.map(item => `${item.id} (${item.name}, ${item.group})`).join('、') : '无语义条目'}`).join('\n')
         const result = await runAgent(agent, [{
           role: 'user',
           content: evidenceMessageParts(`请为分镜 #${sb.storyboardNumber}(ID:${sb.id}) 填写设计卡（design_card），严格遵循 documentary-storyboard 技能里「设计卡」一节。${measuredSeconds === undefined ? '' : `
 本镜旁白的**实测配音时长是 ${measuredSeconds} 秒**（已经配音完成，不是估算）：时长预算 budget 必须以这个实测值为准，不要再按字数估算。`}
-先调用 read_storyboard_context：读本镜的 narration_text（旁白原文），读前后镜的设计卡（同一段落要共用底图与图层状态，不要各写各的），读 props 里每张证据素材的 semantics（只有名称与 id，没有坐标）与 exposition_assets。
-然后按这个顺序想：这一镜要让观众 get 到哪几个信息点（info_points，每条标明 via=layer/generated/narration_only）→ 图层段计划（layer_plan：底图 base、必须标注 must_mark、计划图层 planned_layers 与各自出现时刻 at_s）→ 生成段计划（gen_plan：参考素材 reference_assets、首/中/尾各一句话）→ 两段的时长预算 budget（layer_s ≤30，gen_s ≤15，${budgetRule}）→ rationale 写明理由。
-段组合只写 suggested_combo（A 只图层 / B 只生成 / C 图层→生成 / D 生成→图层），**绝不自己决定 combo**：组合由人确认，服务端会忽略模型给的 combo。
-必要时用 read_image 打开证据素材的局部细节；图上没有的东西就在 rationale 里写明并降级，不要凭空写一个不存在的要素。
+先调用 read_storyboard_context，读取本镜旁白、前后镜设计卡及资产。本集真实语义清单：
+${semantics}
+semantic_id 只能使用对应资产清单中的真实 id；语义为空时保留需要标注的规划图层，anchor 的 semantic_id 和 name 留空，并在 rationale 写明待标注；绝不虚构语义名或降级图层。
+${comboOnly ? `本卡已有人工内容，只补选 combo，不重写卡片。现有卡：${sb.designCard}` : `规划信息点、图层段、生成段与预算（${budgetRule}），并填写 rationale。`}
+填写 combo（A 只图层 / B 只生成 / C 图层→生成 / D 生成→图层），同时可填写 suggested_combo；已有组合将保留。
 最后调用 update_storyboard 保存，参数只传 storyboard_id 和 design_card 两个键。`, evidence),
         }], { maxSteps: 10, requestContext }, sink)
         outputs.push(`分镜 #${sb.storyboardNumber}：${result.text || ''}`)
         // 以实际落库为准判定成败
         const [fresh] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, sb.id))
-        if ((fresh?.designCard || '').trim()) {
+        if (requestContext.get('designCardSaved' as never) === true && (fresh?.designCard || '').trim() && (!comboOnly || !!fresh?.combo)) {
           progress.completed++
           await db.update(schema.storyboards)
             .set({ designCardStatus: 'pending', designCardConfirmedAt: null, updatedAt: now() })
             .where(eq(schema.storyboards.id, sb.id))
         } else {
           progress.failed++
+          const reason = requestContext.get('designCardError' as never)
           await db.update(schema.storyboards)
-            .set({ designCardStatus: previousStatus, updatedAt: now() })
+            .set({ designCardStatus: typeof reason === 'string' ? 'pending' : previousStatus, designCardStaleReason: typeof reason === 'string' ? reason : sb.designCardStaleReason, updatedAt: now() })
             .where(eq(schema.storyboards.id, sb.id))
           logTaskError('DesignCard', 'batch-shot', { storyboardId: sb.id, error: 'agent finished but design_card is empty' })
         }
@@ -222,9 +231,14 @@ export interface DesignCardAuditItem {
   has_card: boolean
   unresolved: number
   issues: { code: string; severity: string; message: string }[]
+  unresolved_layers: Array<{
+    index: number; type: string; text: string; asset_id: number; asset_name: string | null
+    asset_exists: boolean; semantic_id: string; semantic_name: string; available_semantics: Array<{ id: string; name: string; group: string }>
+  }>
+  video_generated: boolean
   /** 当前有效配音的实测秒数；没有当前有效配音时为 null（#70：不给估算） */
   narration_measured_s: number | null
-  tts: { valid: boolean; reason: string | null; message: string | null }
+  tts: { valid: boolean; reason: string | null; message: string | null; duration_ms: number | null }
   budget: { layer_s: number | null; gen_s: number | null }
 }
 
@@ -241,6 +255,18 @@ export async function auditEpisodeDesignCards(episodeId: number): Promise<Design
     const measured = tts?.valid ? tts.duration_s : null
     const { combo, card, issues } = resolveDesignCard(sb, ctx, null, measured)
     const budget = estimateCardBudget(card, sb.narrationText, measured)
+    const unresolvedLayers = (card?.layer_plan?.planned_layers || []).flatMap((layer, index) => {
+      const ref = layer.anchor
+      if (!ref?.unresolved) return []
+      const matches = ctx.assets.filter(asset => asset.id === ref.asset_id)
+      const asset = matches.length === 1 ? matches[0] : undefined
+      return [{
+        index, type: layer.type, text: layer.text || '', asset_id: ref.asset_id,
+        asset_name: asset?.name ?? null, asset_exists: !!asset,
+        semantic_id: ref.semantic_id, semantic_name: ref.name,
+        available_semantics: asset?.semantics ?? [],
+      }]
+    })
     return {
       storyboard_id: sb.id,
       shot_number: sb.storyboardNumber,
@@ -252,9 +278,11 @@ export async function auditEpisodeDesignCards(episodeId: number): Promise<Design
       stale_reason: sb.designCardStaleReason ?? null,
       has_card: !!card,
       unresolved: issues.filter(issue => issue.code === 'unresolved_ref').length,
+      unresolved_layers: unresolvedLayers,
+      video_generated: !!sb.videoUrl,
       issues: issues.map(issue => ({ code: issue.code, severity: issue.severity, message: issue.message })),
       narration_measured_s: measured,
-      tts: { valid: tts?.valid === true, reason: tts?.reason ?? null, message: tts?.message ?? null },
+      tts: { valid: tts?.valid === true, reason: tts?.reason ?? null, message: tts?.message ?? null, duration_ms: tts?.duration_ms ?? null },
       budget: { layer_s: budget.layer_s, gen_s: budget.gen_s },
     }
   })
