@@ -1,4 +1,5 @@
 {
+  "designCard82": {"narration":"Measured narration","pendingVoice":"Awaiting voice","layerBudget":"▣ Layer budget","genBudget":"▶ Generation budget","notGenerated":"Not generated","total":"Total","remain":"Remaining","excess":"Over by","asset":"Asset","exists":"Exists","missingAsset":"Not in this episode or ambiguous","semantic":"Semantic entry","pendingAnnotation":"Awaiting annotation","available":"Available semantic entries","noSemantics":"This asset has no annotations"},
   "mediaTime": {
     "seconds": "{n} seconds ago",
     "minutes": "{n} minutes ago",

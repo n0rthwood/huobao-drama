@@ -1,4 +1,5 @@
 {
+  "designCard82": {"narration":"내레이션 실측","pendingVoice":"음성 대기","layerBudget":"▣ 레이어 예산","genBudget":"▶ 생성 예산","notGenerated":"미생성","total":"합계","remain":"여유","excess":"초과","asset":"에셋","exists":"존재","missingAsset":"이 회차에 없거나 식별 불가","semantic":"의미 항목","pendingAnnotation":"주석 대기","available":"기존 의미 항목","noSemantics":"이 에셋에는 주석이 없습니다"},
   "mediaTime": {
     "seconds": "{n}초 전",
     "minutes": "{n}분 전",

@@ -301,9 +301,10 @@ const semanticRefSchema = z.object({
 /**
  * 分镜设计卡（Issue #57）。纪录片每一镜都要先回答「这一镜要让观众 get 到哪几个信息点、
  * 图层段画什么、生成段拍什么、两段各占多久」，再去写画面描述与关键帧提示词。
- * **没有 `combo`**：段组合由人显式选，模型只写 `suggested_combo`（服务端忽略模型给的 combo）。
+ * combo 由模型填写，已有组合不会被后台批量填写覆盖。
  */
 const designCardSchema = z.object({
+  combo: z.string().optional().describe("Segment combination: A layer only, B generated only, C layer then generated, D generated then layer."),
   info_points: z.array(z.object({
     id: z.string().optional().describe('Stable short id such as ip1.'),
     text: z.string().describe('One piece of information the viewer must get from this shot.'),
@@ -319,7 +320,7 @@ const designCardSchema = z.object({
       asset_kind: z.enum(['character', 'scene', 'prop']).optional(),
       asset_id: z.number().optional(),
     }).optional().describe('Base image of the layer segment.'),
-    must_mark: z.array(semanticRefSchema).max(20).optional().describe('Annotated elements this shot promises to mark on the base image. Every geographic name, route or extent spoken in the narration must appear here and must exist in the asset semantics.'),
+    must_mark: z.array(semanticRefSchema).max(20).optional().describe('Elements this shot promises to mark. Use real asset semantics only; when an annotation is missing, leave semantic_id and name empty and retain the planned layer as awaiting annotation.'),
     planned_layers: z.array(z.object({
       type: z.enum(PLANNED_LAYER_TYPES).describe('Layer type drawn on top of the base image.'),
       text: z.string().optional().describe('Text shown by this layer (label/card content).'),
@@ -338,7 +339,7 @@ const designCardSchema = z.object({
     last: z.string().optional().describe('One sentence for the last story keyframe. Omit when the junction frame locks it (combo D).'),
   }).optional().describe('Generated segment plan. Required when the shot has a generated segment (combos B, C, D).'),
   rationale: z.string().optional().describe('Why this plan expresses the narration; mention the neighbouring shots when this shot continues them.'),
-  suggested_combo: z.enum(COMBOS).describe("REQUIRED. Suggested segment combination ONLY: 'A' layer only, 'B' generated only, 'C' layer then generated, 'D' generated then layer. Always give exactly one suggestion — the human picks the real combo, which the server never takes from you."),
+  suggested_combo: z.enum(COMBOS).optional().describe("Suggested segment combination for display."),
 })
 
 /**
@@ -728,7 +729,7 @@ const storyboardUpdateSchema = z.object({
     prop_ids: z.array(z.number()).optional(),
     duration: z.number().optional(),
     continuity: z.enum(['continue', 'cut']).optional().describe("Transition from the previous shot: 'continue' means this shot starts exactly where the previous shot ended and inherits the previous shot's LAST keyframe image as its first keyframe (first_frame_prompt stays empty); 'cut' means a hard cut and needs its own first_frame_prompt."),
-    design_card: designCardSchema.optional().describe('Design card for this shot (documentary projects only): info points → layer segment plan → generated segment plan → budget. Never contains combo — the human picks it.'),
+    design_card: designCardSchema.optional().describe('Documentary design card, including the chosen combo and optional suggestion.'),
 })
 const updateStoryboard = createTool({
   id: 'update_storyboard',
@@ -796,23 +797,39 @@ const updateStoryboard = createTool({
     if ('scene_id' in fields) updates.sceneId = fields.scene_id
     if ('continuity' in fields) updates.continuityBoundary = fields.continuity
     if ('duration' in fields) updates.duration = fields.duration
-    // 分镜设计卡（#57）：写入即回到「待审」；解析不到的引用保留并标 unresolved，回传给模型。
-    // 模型给的 combo 一律忽略（段组合只能人工选）。
+    // 只有设计卡批次接受模型选择；已有组合保留。补选模式绝不改写原有卡片。
     const cardReport: { code: string; message: string }[] = []
     if ('design_card' in fields && fields.design_card) {
-      const card = normalizeDesignCard(fields.design_card, loadDesignCardContext(episodeId))
-      if (card) {
+      const scope = context?.requestContext?.get('storyboardPromptScope' as never)
+      const comboOnly = context?.requestContext?.get('designCardComboOnly' as never) === true
+      const ctx = loadDesignCardContext(episodeId)
+      const card = normalizeDesignCard(fields.design_card, ctx)
+      const proposed = toCombo(fields.design_card.combo)
+      const combo = toCombo(storyboard.combo) || (scope === 'design_card' ? proposed : null)
+      if (scope === 'design_card' && !toCombo(storyboard.combo) && !proposed) {
+        const reason = `模型给出非法组合 ${String(fields.design_card.combo ?? '（缺失）')}；请选择 A、B、C 或 D 后重试`
+        context?.requestContext?.set('designCardError' as never, reason as never)
+        return { error: reason }
+      }
+      if (!comboOnly && scope === 'design_card' && card) {
+        const refs = [...(card.layer_plan?.must_mark || []), ...(card.layer_plan?.planned_layers || []).flatMap(layer => layer.anchor ? [layer.anchor] : [])]
+        const invalid = refs.filter(ref => ref.unresolved && (ref.semantic_id || ref.name))
+        if (invalid.length) return {
+          error: `语义引用不存在：${invalid.map(ref => ref.unresolved_reason).join('；')}。请只使用真实语义条目；尚未标注时保留规划图层，锚点的 semantic_id 和 name 留空，标明待标注。`,
+        }
+      }
+      if (card && !comboOnly) {
         updates.designCard = serializeDesignCard(card)
         updates.designCardStatus = 'pending'
         updates.designCardConfirmedAt = null
         updates.designCardStaleReason = null
       }
-      // 预算校验与人工确认同一口径（#70）：用当前有效配音的实测秒数，而不是字数估算，
-      // 否则模型在这里过了、人在确认时又被挡。
+      if (scope === 'design_card' && !storyboard.combo && combo) updates.combo = combo
+      const actualCard = comboOnly ? parseDesignCard(storyboard.designCard, ctx) : card
       const tts = await shotTtsValidity(storyboard_id)
       for (const issue of validateDesignCard({
-        card,
-        combo: toCombo(storyboard.combo),
+        card: actualCard,
+        combo,
         narrationText: storyboard.narrationText,
         measuredSeconds: tts.valid ? tts.duration_s : null,
       })) {
@@ -822,6 +839,9 @@ const updateStoryboard = createTool({
     const stamp = stampFieldSavedAt(storyboard.fieldSavedAt, Object.keys(fields))
     if (stamp.json) updates.fieldSavedAt = stamp.json
     await db.update(schema.storyboards).set(updates).where(eq(schema.storyboards.id, storyboard_id))
+    if (context?.requestContext?.get('storyboardPromptScope' as never) === 'design_card' && fields.design_card) {
+      context.requestContext.set('designCardSaved' as never, true as never)
+    }
     if ('character_ids' in fields || 'prop_ids' in fields || ('scene_id' in fields && fields.scene_id != null)) {
       // 显式传入的绑定 = 手选（Issue #43）；只替换传入类别，主场景只增不减
       await applyExplicitBindings(storyboard_id, {

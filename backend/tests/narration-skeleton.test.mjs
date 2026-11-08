@@ -555,3 +555,19 @@ test('a readable media file without an audio track is not current-valid TTS', ()
   assert.equal(result.gateUnlocked, false)
   assert.equal(result.gateBlockedReason, 'audio_no_stream')
 })
+
+test('design card audit reports the same current audio duration as the skeleton', () => {
+  const result = run(`${SETUP}
+    const { auditEpisodeDesignCards } = await import('./src/services/design-card-batch.ts')
+    const state = (await (await get()).json()).data
+    const audit = await auditEpisodeDesignCards(1)
+    const voiced = audit.find(item => item.storyboard_id === 10)
+    const missing = audit.find(item => item.storyboard_id === 12)
+    emit({ skeleton: state.shots.find(shot => shot.storyboard_id === 10).tts.duration_ms,
+      measured: voiced.narration_measured_s, audit: voiced.tts.duration_ms, missing: missing.tts.duration_ms })
+  `)
+  assert.equal(result.audit, result.skeleton)
+  assert.equal(result.audit, 3000)
+  assert.equal(result.measured, 3)
+  assert.equal(result.missing, null)
+})
