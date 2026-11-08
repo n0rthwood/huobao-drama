@@ -28,6 +28,7 @@ import {
   writeCanonicalFinal,
 } from '../services/script-rewrite/store.js'
 import type { RewriteStageKey } from '../services/script-rewrite/stages.js'
+import { inspectNarration } from '../services/script-rewrite/narration-inspection.js'
 
 const app = new Hono()
 
@@ -109,6 +110,25 @@ app.post('/:id/script-rewrite/versions/:versionId/adopt', async (c) => {
     return fail(c, err)
   }
 })
+// Inspect the submitted draft, not a previous rewrite report. This endpoint never writes it.
+app.post('/:id/script-rewrite/inspect-narration', async (c) => {
+  const episodeId = Number(c.req.param('id'))
+  const body = await c.req.json().catch(() => ({} as Record<string, unknown>))
+  if (typeof body.content !== 'string') return badRequest(c, 'content 必填')
+  const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId))
+  if (!ep) return notFound(c, '剧集不存在')
+  if (resolveDramaProjectType(ep.dramaId ?? 0) !== 'documentary') return badRequest(c, '仅纪录片可检查旁白稿')
+  try {
+    const findings = await inspectNarration(body.content, {
+      configId: numberOr(body.config_id),
+      model: typeof body.model === 'string' && body.model ? body.model : undefined,
+    })
+    return success(c, { findings })
+  } catch {
+    return c.json({ code: 502, error: 'inspection_failed', message: '旁白稿检测失败' }, 502)
+  }
+})
+
 
 // PUT /episodes/:id/script-rewrite/final — 人工保存最终稿（产生 manual 不可变版本 + CAS 写入）
 app.put('/:id/script-rewrite/final', async (c) => {

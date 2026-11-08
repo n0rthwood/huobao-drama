@@ -2981,7 +2981,7 @@ function goProductionBlockTarget() {
   panel.value = 'production'
   prodTab.value = 'assets'
 }
-const stepLabels = computed(() => [t('episode.script.raw'), t('episode.script.rewrite')])
+const stepLabels = computed(() => [t('episode.script.raw'), t(isDocumentaryProject.value ? 'episode.rewrite.narrationRewrite' : 'episode.script.rewrite')])
 
 const charImgCount = computed(() => visualChars.value.filter(c => c.image_url || c.imageUrl).length)
 const sceneImgCount = computed(() => scenes.value.filter(s => s.image_url || s.imageUrl).length)
@@ -3073,7 +3073,7 @@ const sidebarSections = computed(() => ([
     label: isDocumentaryProject.value ? t('episode.stage.narrationScript') : t('episode.stage.script'),
     items: [
       { key: 'script:raw', label: t('episode.script.raw'), desc: '', icon: FileText },
-      { key: 'script:rewrite', label: t('episode.script.rewrite'), desc: '', icon: FileText },
+      { key: 'script:rewrite', label: t(isDocumentaryProject.value ? 'episode.rewrite.narrationRewrite' : 'episode.script.rewrite'), desc: '', icon: FileText },
     ],
   },
   {
@@ -3520,7 +3520,7 @@ function isExtracting(target) { return extractingTargets.value.includes(target) 
 
 function doExtract(target) {
   if (isExtracting(target) || !epId.value) return
-  saveScr()
+  if (!isDocumentaryProject.value) saveScr()
   extractingTargets.value.push(target)
   episodeAPI.extract(epId.value, target, chatModelOverride(), chatConfigId())
     .then(() => pollExtractStatus(target))

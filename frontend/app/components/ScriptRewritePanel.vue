@@ -4,7 +4,7 @@
     <div class="rw-top">
       <button class="btn btn-sm btn-primary" :disabled="rw.busy.value || rw.runActive.value || !hasSource" @click="runAll">
         <Loader2 v-if="rw.runActive.value" :size="11" class="animate-spin" />
-        {{ t('episode.rewrite.runAll') }}
+        {{ t('episode.rewrite.narrationRunAll') }}
       </button>
       <button
         class="btn btn-sm"
@@ -151,6 +151,14 @@
               <ul v-if="fidelityWarnings.length" class="rw-list">
                 <li v-for="(warn, i) in fidelityWarnings" :key="i">{{ warn }}</li>
               </ul>
+              <div v-if="fidelityReport.ai_exclusions?.length">
+                <strong>{{ t('episode.rewrite.aiExclusions') }}</strong>
+                <ul class="rw-list">
+                  <li v-for="(item, i) in fidelityReport.ai_exclusions" :key="i">
+                    <pre class="rw-plain">{{ item.text }}</pre>{{ item.reason }}
+                  </li>
+                </ul>
+              </div>
               <FilterReport v-if="fidelityReport.post_filter" :report="fidelityReport.post_filter" />
             </section>
           </template>
@@ -160,16 +168,39 @@
       <!-- 右：当前最终稿（唯一可编辑正文） -->
       <section class="rw-final">
         <header class="rw-sec-head">
-          <strong class="rw-sec-title">{{ t('episode.rewrite.finalTitle') }}</strong>
+          <strong class="rw-sec-title">{{ t('episode.rewrite.narrationFinalTitle') }}</strong>
           <span class="dim rw-origin">{{ finalOriginLabel }}</span>
           <span v-if="dirty" class="tag rw-tag-warn">{{ t('episode.rewrite.unsaved') }}</span>
           <span v-else class="tag">{{ t('episode.rewrite.saved') }}</span>
           <span class="ml-auto" />
           <span v-if="finalChars" class="char-count mono">{{ t('episode.script.charCount', { n: finalChars }) }}</span>
-          <button class="btn btn-sm btn-primary" :disabled="!rw.loaded.value || !dirty || rw.busy.value || editLocked" @click="saveFinal">
-            {{ t('episode.rewrite.saveFinal') }}
+          <button class="btn btn-sm btn-primary" :disabled="!rw.loaded.value || !dirty || rw.busy.value || editLocked || checking || inspection" @click="saveFinal">
+            {{ t('episode.rewrite.narrationSave') }}
           </button>
         </header>
+
+        <p class="rw-hint">{{ t('episode.rewrite.narrationHint') }}</p>
+        <div v-if="checking" class="rw-hint">{{ t('episode.rewrite.checking') }}</div>
+        <Teleport to="body">
+          <div v-if="inspection" class="overlay" @click.self="inspection = null">
+            <div class="dialog rw-inspection-dialog" role="dialog" aria-modal="true" :aria-label="t(inspection.failed ? 'episode.rewrite.inspectionFailed' : 'episode.rewrite.inspectionFound')">
+              <div class="dialog-body rw-inspection-body">
+                <strong>{{ t(inspection.failed ? 'episode.rewrite.inspectionFailed' : 'episode.rewrite.inspectionFound') }}</strong>
+                <ul v-if="!inspection.failed" class="rw-list">
+                  <li v-for="(item, index) in inspection.findings" :key="index">
+                    <pre class="rw-plain">{{ item.text }}</pre>
+                    {{ item.reason }} <span v-if="!item.locatable">{{ t('episode.rewrite.notLocatable') }}</span>
+                  </li>
+                </ul>
+              </div>
+              <footer class="dialog-foot">
+                <button class="btn btn-sm" @click="inspection = null">{{ t('common.cancel') }}</button>
+                <button v-if="!inspection.failed && inspection.findings.some(item => item.locatable)" class="btn btn-sm" @click="finishInspection(true)">{{ t('episode.rewrite.deleteAndSave') }}</button>
+                <button class="btn btn-sm btn-primary" @click="finishInspection(false)">{{ t(inspection.failed ? 'episode.rewrite.saveAnyway' : 'episode.rewrite.keepAndSave') }}</button>
+              </footer>
+            </div>
+          </div>
+        </Teleport>
 
         <div v-if="editLocked" class="rw-lock">
           <span>{{ t('episode.rewrite.editLocked') }}</span>
@@ -190,8 +221,8 @@
           ref="editorEl"
           class="rw-editor"
           v-model="finalDraft"
-          :readonly="editLocked || !rw.loaded.value"
-          :placeholder="t('episode.script.scriptPlaceholder')"
+          :readonly="editLocked || !rw.loaded.value || checking || !!inspection"
+          :placeholder="t('episode.rewrite.narrationFinalTitle')"
         />
       </section>
     </div>
@@ -243,6 +274,8 @@ import BridgeReport from '~/components/ScriptRewrite/BridgeReport.vue'
 import ConflictDialog from '~/components/ScriptRewrite/ConflictDialog.vue'
 import { useScriptRewrite } from '~/composables/useScriptRewrite'
 import { onTaskFinished } from '~/composables/useTasks'
+import { scriptRewriteAPI } from '~/composables/useApi'
+import { inspectDraftForSave, applyInspectionChoice } from '~/utils/narrationInspection'
 
 const props = defineProps({
   episodeId: { type: Number, required: true },
@@ -267,6 +300,9 @@ const baseline = ref(props.finalContent)
 const externalChange = ref(false)
 const draftRevision = ref(null)
 const sourceChangePrompt = ref(null)
+const checking = ref(false)
+const inspection = ref(null)
+
 
 const storeKey = computed(() => `huobao:rewrite:${props.episodeId}`)
 
@@ -437,12 +473,39 @@ async function unlockEditing() {
 }
 
 async function saveFinal() {
-  const res = await rw.saveFinal(finalDraft.value, draftRevision.value || undefined)
+  const draft = finalDraft.value
+  checking.value = true
+  try {
+    const result = await inspectDraftForSave(draft, content => scriptRewriteAPI.inspectNarration(props.episodeId, {
+      content, config_id: props.chatConfigId || undefined, model: props.chatModel || undefined,
+    }))
+    if (finalDraft.value !== draft) return
+    if (result.failed || result.findings.length) {
+      inspection.value = result
+      return
+    }
+    await persistFinal(draft)
+  } finally {
+    checking.value = false
+  }
+}
+
+async function finishInspection(remove) {
+  const pending = inspection.value
+  if (!pending || finalDraft.value !== pending.draft) { inspection.value = null; return }
+  const content = applyInspectionChoice(pending, remove)
+  inspection.value = null
+  finalDraft.value = content
+  await persistFinal(content)
+}
+
+async function persistFinal(content) {
+  const res = await rw.saveFinal(content, draftRevision.value || undefined)
   if (!res.ok) {
     if (!rw.conflict.value) toast.error(res.message || t('episode.rewrite.error.saveFailed'))
     return
   }
-  baseline.value = finalDraft.value
+  baseline.value = content
   externalChange.value = false
   captureDraftRevision()
   toast.success(res.changed ? t('episode.rewrite.savedToast') : t('episode.rewrite.savedNoChange'))
@@ -467,16 +530,10 @@ function applyConflict() {
     rw.conflict.value = null
     return adoptVersion(conflict.versionId)
   }
-  return rw.forceSave(conflict.mine).then((res) => {
-    if (res.ok) {
-      baseline.value = conflict.mine
-      finalDraft.value = conflict.mine
-      externalChange.value = false
-      captureDraftRevision()
-      toast.success(t('episode.rewrite.savedToast'))
-      emit('refresh')
-    }
-  })
+  rw.conflict.value = null
+  finalDraft.value = conflict.mine
+  captureDraftRevision()
+  return saveFinal()
 }
 
 function compareExternal() {
@@ -542,6 +599,8 @@ onMounted(() => {
 .rw-history-select { height: 26px; font-size: 11px; padding: 0 6px; }
 .rw-error { margin: 0; padding: 6px 12px; font-size: 12px; color: var(--danger-text, #d9534f); }
 .rw-hint { margin: 0; padding: 6px 12px; font-size: 11.5px; color: var(--text-2); }
+.rw-inspection-dialog { width: 700px; max-width: calc(100vw - 48px); max-height: calc(100vh - 64px); display: flex; flex-direction: column; }
+.rw-inspection-body { overflow-y: auto; }
 .rw-ack {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0;
   padding: 7px 12px; font-size: 12px; color: var(--text-1);
