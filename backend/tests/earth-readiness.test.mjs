@@ -69,3 +69,60 @@ print(json.dumps({'found':found['label'],'screen':page.screen,
   assert.equal(result.clean, 'Clean')
   assert.equal(result.settings_screen, 'settings', 'A normal settings Close is not an onboarding blocker')
 })
+
+test('Earth waits for an observed import when a late coachmark consumes the open action', () => {
+  const result = JSON.parse(execFileSync('python3', ['-c', `
+import json, runpy, sys
+helpers = runpy.run_path(sys.argv[1])
+
+def node(label, ident):
+    return {'id':ident,'label':label,'role':'button','x':0,'y':0,'w':40,'h':20}
+
+class Page:
+    def __init__(self):
+        self.menu=False
+        self.hint=False
+        self.swallow_next=True
+        self.pending_hint=False
+        self.picker={'requested':0,'file_reads':0}
+        self.pickers_shown=[]
+    def evaluate(self, script, ident=None):
+        if ident is None:
+            if '__huobaoPicker' in script:
+                return self.picker
+            result=[node('File','file')]
+            if self.menu: result.append(node('Open local KML file\\\\nCtrl+I','open'))
+            if self.hint: result.append(node('Dismiss','dismiss'))
+            return result
+        if ident=='dismiss':
+            self.hint=False
+            self.menu=False
+        elif ident=='file':
+            self.menu=not self.menu
+        elif ident=='open':
+            if self.swallow_next:
+                # A coachmark appears after the menu click and eats the action.
+                self.swallow_next=False
+                self.pending_hint=True
+            elif not self.hint:
+                self.picker['requested']+=1
+                self.picker['file_reads']+=1
+                self.menu=False
+        return True
+    def wait_for_timeout(self, ms):
+        pass
+    def wait_for_function(self, script, timeout):
+        if self.pending_hint:
+            self.pending_hint=False
+            self.hint=True
+        elif not self.picker['requested']:
+            raise RuntimeError('No picker and no observed blocker: retrying without evidence')
+
+page=Page()
+helpers['open_local_kml'](page)
+print(json.dumps({'picker':page.picker,'hint':page.hint,'menu':page.menu,'screen':'editor'}))
+`, helper], { encoding: 'utf8' }))
+  assert.equal(result.picker.file_reads, 1, 'The swallowed first click must not count as import')
+  assert.equal(result.picker.requested, 1, 'A resolved blocker must not reopen the picker twice')
+  assert.equal(result.hint, false, 'The late coachmark must be dismissed before retrying')
+})

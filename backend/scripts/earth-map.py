@@ -26,6 +26,7 @@ import math
 import re
 import signal
 import sys
+import time
 import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
@@ -398,16 +399,33 @@ def open_local_kml(page) -> None:
     if not find(page, L_FILE_MENU, timeout=15, required=False):
         click(page, L_LOCAL_KML_EDITOR, timeout=20)
         find(page, L_FILE_MENU, timeout=30)
-    click(page, L_FILE_MENU)
-    if find(page, L_OPEN_KML, exact=False, timeout=5, required=False):
-        click(page, L_OPEN_KML, exact=False, timeout=10, settle=0)
-        return
-    for label in L_OPEN_KML_DEVICE_LABELS:
-        if find(page, label, timeout=5, required=False):
-            click(page, label, timeout=10, settle=0)
+    deadline = time.monotonic() + 90
+    while time.monotonic() < deadline:
+        picker = page.evaluate("() => window.__huobaoPicker")
+        if picker["file_reads"] > 0:
             return
-    labels = sorted({node["label"][:80] for node in nodes(page)})
-    raise EarthError(f"Google Earth File menu has no local-KML open action; saw {labels[:40]}")
+        if picker["requested"] > 0:
+            # A picker already exists: never reopen/import the file twice.
+            page.wait_for_function("() => window.__huobaoPicker?.file_reads > 0", timeout=15000)
+            return
+        find(page, L_FILE_MENU, timeout=20)
+        labels = (L_OPEN_KML, *L_OPEN_KML_DEVICE_LABELS)
+        if not any(match(nodes(page), label, False) for label in labels):
+            click(page, L_FILE_MENU)
+        for label in labels:
+            if find(page, label, exact=False, timeout=5, required=False):
+                click(page, label, exact=False, timeout=10, settle=0)
+                break
+        else:
+            raise EarthError("Google Earth File menu has no local-KML open action")
+        # DOM activation is not import proof. A late coachmark can consume the
+        # action after find() returned; only an observed blocker permits reopening.
+        page.wait_for_function(
+            "() => window.__huobaoPicker?.requested > 0 || "
+            f"({_NODES_JS})().some(n => n.label === 'Dismiss' || "
+            "n.role === 'alert' || n.role === 'alertdialog' || n.label === 'Alert')",
+            timeout=15000)
+    raise EarthError("Google Earth local-KML action remained blocked; no file was imported")
 
 def capture_failure(page, prefix: str, tag: str) -> str:
     """失败现场：截图 + 当前 URL + 可见标签。关页面之前必须留下，否则无从诊断。"""
