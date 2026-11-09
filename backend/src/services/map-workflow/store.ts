@@ -34,6 +34,7 @@ export type PropRow = typeof schema.props.$inferSelect
 
 /** 历史快照上限：够回退与追责，又不会把一列 JSON 撑爆 */
 const MAX_HISTORY = 30
+const IMPORT_MEDIA_KEYS = new Set(['path', 'base', 'texture', 'background', 'evidence_image', 'evidence_path', 'screenshot', 'kmz'])
 
 export class MapWorkflowConflictError extends Error {
   code: 'revision_conflict' | 'workflow_busy'
@@ -374,15 +375,17 @@ function mergeConfirmed<T extends { id: string; name: string }>(base: T[], confi
 }
 
 /**
- * 跨项目导入（Issue #84）：工作流随资产一起过去，但要做目标项目安全的复位。
- *
- * 保留什么：需求、检索证据、产出路径、历史快照（文件是内容寻址的，同一部署里路径仍然有效）。
- * 复位什么：运行态（task_id / running 步骤）——那次执行属于源项目；
- * 产出里的 `task_id` 指向源资产的版本行，置空后目标项目重新登记，绝不跨资产引用版本。
+ * 跨项目导入：当前产物和回退快照都指向目标项目自己的文件与版本。
+ * 源任务只作为导入来源保留在版本元数据中，不作为新工作流的执行任务。
  */
-export function prepareImportedWorkflow(raw: string | null | undefined): string | null {
+export function prepareImportedWorkflow(
+  raw: string | null | undefined,
+  options: { copyPath: (path: string) => string; versionIds: ReadonlyMap<number, number> },
+): string | null {
   if (!raw) return null
-  const state = parseWorkflow(raw)
+  const state = parseWorkflow(JSON.stringify(parseWorkflow(raw), (key, value: unknown) =>
+    IMPORT_MEDIA_KEYS.has(key) && typeof value === 'string' && value.startsWith('static/') ? options.copyPath(value) : value))
+  state.brief_hash = briefHash(state.brief)
   const at = now()
   state.task_id = null
   state.error = null
@@ -390,9 +393,11 @@ export function prepareImportedWorkflow(raw: string | null | undefined): string 
   for (const step of state.steps) {
     if (step.status === 'running') Object.assign(step, { status: 'pending', message: null, started_at: null, finished_at: null })
   }
-  for (const key of ['base_image', 'texture_image', 'final_image'] as const) {
-    const output = state.outputs[key]
-    if (output) state.outputs[key] = { ...output, task_id: null }
+  for (const outputs of [state.outputs, ...state.history.flatMap(item => item.snapshot ? [item.snapshot.outputs] : [])]) {
+    for (const key of ['base_image', 'texture_image', 'final_image'] as const) {
+      const output = outputs[key]
+      if (output) output.task_id = options.versionIds.get(output.task_id ?? 0) ?? null
+    }
   }
   state.revision += 1
   state.updated_at = at
@@ -403,7 +408,7 @@ export function prepareImportedWorkflow(raw: string | null | undefined): string 
     status: state.status,
     action: 'imported',
     actor: 'system',
-    note: '从其它项目导入：需求/检索/产出保留，运行态与版本引用已复位',
+    note: '从其它项目导入：文件与版本已独立复制，运行态已复位',
   }
   state.history = [...state.history, entry].slice(-MAX_HISTORY)
   return JSON.stringify(state)

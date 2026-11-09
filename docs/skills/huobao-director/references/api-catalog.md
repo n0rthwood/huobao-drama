@@ -291,6 +291,8 @@ Body：`{scope:"all"|"characters"|"scenes"|"props", episode_id?, rewrite_prompts
 
 `POST /props {drama_id,name,type?,description?,episode_id?,asset_type:"map"}` 新建地图；普通道具为 `"prop"`。`PUT /props/{p} {asset_type}` 可显式更改，map→prop 另需 `confirm_asset_type_change:true`，不删除地图数据。跨项目资产导入仍用 `kind:"prop"`，保留地图分类与数据，不共享运行任务。
 
+地图全量导入独立复制工作流使用的底图、底纹、成图、图层底图与历史快照依赖；版本 ID、`faithful_source` 和语义的 `image.source_task_id` 映射到目标资产的新版本，不共享源任务。依赖文件缺失时导入补偿回滚，不能留下字段齐全却无法重绘的完成态。生产旧缺陷例：prop 183 复制后 complete 失败（task 1321）；修复后仍需用新副本验收，不伪造修复旧记录。
+
 注意：此处 `asset_type` 是 prop 的地图子类；`POST /tasks/register-upload` 的 `asset_type` 则是目标表类别，地图仍填写 `"prop"`。不能写 `"map"` 作为第四类目标。
 
 #### `GET /props/{p}/map-workflow`
@@ -301,6 +303,7 @@ Body：`{scope:"all"|"characters"|"scenes"|"props", episode_id?, rewrite_prompts
 - `issues[] = {field,code,message,blocking}`；`blocking=true` 要补齐，不把失败当无问题。
 - `research.queries[]` 逐源记录 hits/error；来源固定为 `wikipedia-zh / wikipedia-en / europeana / smithsonian`，不是模型自选任意网站。`sources[]` 保存机构、年代、许可、URL 与实际摘录；`features[]` 保存点线面、坐标依据、支持原文、不确定性、来源引用和冲突。URL 存在不等于它证明了某个坐标。Europeana/Smithsonian 凭据仍由「设置→资料检索」保管，Agent 不获取、落盘或写入请求留痕；无 key 的来源失败应如实呈报。
 - `outputs = {base_image,texture_image,final_image,kmz,layer_doc}`；image 项含 `{path,width,height,source,task_id,provenance}`。`provenance.registration` 是 geo↔像素配准真源；Earth 使用通过独立检验的实测控制网格，不用名义相机或 bbox 仿射替代；检验点残差超过 3px 或相机漂移时失败，保留标定截图、控制点与残差证据。
+- 当前新采集使用 33×33 控制网格和每格独立中心（1024 留出点）；仍要求最大残差 ≤3px、相机漂移 ≤0.25px。旧 17×17 在山地出现 5.408px 残差的 task 1320 已真实失败；不能放宽阈值或把失败截图登记成底图。Earth 新版 onboarding 以语义节点身份激活，不发送会退出编辑器的全局 Escape；维护修复后只续跑 base，不重做检索。
 - 地名文本按共享字号/换行模型放进独立 label 图层并避让，marker 的真实点位不因排版移动；过于拥挤时明确报空间不足，不截断地名。历史成图不被升级自动覆盖，需重新 drawing 才采用新版布局，已有底图/底纹可复用。
 
 - research 阶段会把有依据的点线面加入 `map_spec`，AI 新项带 `proposed:true`。自动制图可使用候选，但不是人工批准；人工采纳须去掉相应项的 `proposed` 再 PUT 保存，此后检索不覆盖该项。近似区域只能在显式 `schematic:true` 下采用，必须保留不确定性；没有依据不虚构范围。

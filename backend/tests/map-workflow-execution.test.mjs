@@ -19,6 +19,7 @@ test('地图继续当前阶段：原件与成图原子采用，几何编辑复�
     import {emptyBrief} from 'file://${backend}src/services/map-workflow/types.ts'
     import {startMapWorkflow,advanceMapWorkflow,saveMapWorkflowDraft,failInterruptedMapWorkflows,rollbackMapWorkflow} from 'file://${backend}src/services/map-workflow/run.ts'
     import {normalizeMapSpec} from 'file://${backend}src/services/map-base-render.ts'
+    import {importAsset} from 'file://${backend}src/services/asset-library.ts'
     const ts=now()
     const dramaId=getInsertId(await db.insert(schema.dramas).values({title:'地图执行回归',createdAt:ts,updatedAt:ts}))
     const configId=getInsertId(await db.insert(schema.aiServiceConfigs).values({serviceType:'text',provider:'openai',name:'Inert metadata fixture',baseUrl:'http://127.0.0.1:1',apiKey:'not-a-credential',model:'["inert-model"]',isActive:true,createdAt:ts,updatedAt:ts}))
@@ -36,10 +37,10 @@ test('地图继续当前阶段：原件与成图原子采用，几何编辑复�
       ctx.state.brief_hash=briefHash(ctx.state.brief)
       ctx.state.stage='base';ctx.state.status='idle'
     }})
-    const settle=async()=>{
+    const settle=async(id=propId)=>{
       const deadline=Date.now()+20000
       for(;;){
-        const row=await loadWorkflow(propId)
+        const row=await loadWorkflow(id)
         if(row.state.status!=='running')return serializeDetail(row)
         if(Date.now()>deadline)throw Error('Map deterministic stage did not finish')
         await new Promise(resolve=>setTimeout(resolve,20))
@@ -97,7 +98,7 @@ test('地图继续当前阶段：原件与成图原子采用，几何编辑复�
     // A paid texture may finish while the map runner is down. Resume must adopt
     // that image, not submit another billable task or lose its origin.
     const {createRequire}=await import('node:module')
-    const {mkdirSync}=await import('node:fs')
+    const {mkdirSync,readFileSync,unlinkSync}=await import('node:fs')
     const sharp=createRequire('file://${backend}package.json')('sharp')
     mkdirSync(process.env.STORAGE_PATH+'/map-textures',{recursive:true})
     const texturePath='static/map-textures/recovered.png'
@@ -133,6 +134,29 @@ test('地图继续当前阶段：原件与成图原子采用，几何编辑复�
     assert.equal(state.status,'completed',state.error)
     assert.equal(state.outputs.texture_image.task_id,imageId)
     assert.equal(state.outputs.base_image.task_id,texturedBase)
+    // Full-copy semantics: redraw must still work after the source files disappear.
+    const targetDramaId=getInsertId(await db.insert(schema.dramas).values({title:'地图导入目标',createdAt:ts,updatedAt:ts}))
+    const imported=await importAsset({targetDramaId,kind:'prop',sourceId:propId})
+    let cloned=serializeDetail(await loadWorkflow(imported.id))
+    const clonedProp=await getProp(imported.id)
+    assert.equal(clonedProp.faithfulSource,cloned.outputs.base_image.task_id)
+    assert.equal(JSON.parse(clonedProp.semantics).image.source_task_id,cloned.outputs.final_image.task_id)
+    for(const key of ['base_image','texture_image','final_image']){
+      const original=state.outputs[key],copied=cloned.outputs[key]
+      assert.notEqual(copied.path,original.path,'Imported media must be independent files')
+      assert.deepEqual(readFileSync(process.env.HUOBAO_DATA_DIR+'/'+copied.path),readFileSync(process.env.HUOBAO_DATA_DIR+'/'+original.path))
+      unlinkSync(process.env.HUOBAO_DATA_DIR+'/'+original.path)
+    }
+    const versions=await db.select().from(schema.sysTask)
+    for(const key of ['base_image','final_image']){
+      assert.equal(versions.find(row=>row.id===cloned.outputs[key].task_id).propId,imported.id)
+    }
+    cloned.map_spec.places[0].lon+=0.01
+    cloned=await saveMapWorkflowDraft(imported.id,{expectedRevision:cloned.revision,mapSpec:cloned.map_spec})
+    await startMapWorkflow(imported.id,{mode:'auto',expectedRevision:cloned.revision,textConfigId:configId})
+    cloned=await settle(imported.id)
+    assert.equal(cloned.status,'completed',cloned.error)
+    assert.equal((await getProp(imported.id)).imageUrl,cloned.outputs.final_image.path)
     console.log('MAP_EXECUTION_OK')
   `
   const probe = path.join(dir, 'probe.mts')

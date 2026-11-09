@@ -1,7 +1,7 @@
 """Pixel-grounded Earth registration. No terrain/projection assumptions are accepted as proof.
 
-A capture-only KMZ draws centered, fixed-size magenta icons on a 17x17 geographic grid
-and 16x16 independent cell centers. Actual screenshot pixels determine the grid;
+A capture-only KMZ draws centered, fixed-size magenta icons on a 33x33 geographic grid
+and 32x32 independent cell centers. Actual screenshot pixels determine the grid;
 withheld centers must agree with bilinear interpolation within 3px or capture fails.
 The user's deliverable KMZ is not modified.
 """
@@ -13,7 +13,7 @@ import math
 import zipfile
 from pathlib import Path
 
-GRID_NODES = 17
+GRID_NODES = 33
 MAX_RESIDUAL_PX = 3.0
 
 

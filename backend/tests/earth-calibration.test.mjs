@@ -19,14 +19,16 @@ helper = runpy.run_path(sys.argv[1])
 controls = helper['build_controls']([113, 35, 115, 37])
 
 def project(points, camera, window):
-    return [(40+(lon-113)*700, 40+(37-lat)*700, True) for lon, lat in points]
+    return [(40+(lon-113)*1600, 40+(37-lat)*1600, True) for lon, lat in points]
 
 def fixture(output, mode):
-    image = Image.new('RGB', (1500, 1500), (80, 95, 50))
+    image = Image.new('RGB', (3300, 3300), (80, 95, 50))
     draw = ImageDraw.Draw(image)
     for index, control in enumerate(controls):
         if mode == 'missing' and index == 0: continue
         x, y, _ = project([(control['lon'], control['lat'])], None, None)[0]
+        if mode == 'terrain':
+            x += 5 * math.sin((control['lon']-113)/2*16*math.pi) * math.cos((37-control['lat'])/2*12*math.pi)
         if mode == 'bad' and control['kind'] == 'validation' and control['row'] == 3 and control['col'] == 3:
             x += 6
         x, y = round(x), round(y)
@@ -40,6 +42,8 @@ with tempfile.TemporaryDirectory() as directory:
     measured = helper['measure_controls'](controls, screenshot, None, None, project)
     fixture(screenshot, 'large')
     large = helper['measure_controls'](controls, screenshot, None, None, project)
+    fixture(screenshot, 'terrain')
+    terrain = helper['measure_controls'](controls, screenshot, None, None, project)
     failures = {}
     for mode in ('bad', 'missing'):
         fixture(screenshot, mode)
@@ -48,15 +52,17 @@ with tempfile.TemporaryDirectory() as directory:
             failures[mode] = None
         except RuntimeError as error:
             failures[mode] = str(error)
-    print(json.dumps({'residual': measured['residual_px'], 'validation_count': measured['validation_count'],
+    print(json.dumps({'residual': measured['residual_px'], 'terrain_residual': terrain['residual_px'], 'validation_count': measured['validation_count'],
                       'grid_count': len(measured['pixels']), 'first_pixel': measured['pixels'][0],
                       'large_count': len(large['pixels']), 'large_first_pixel': large['pixels'][0], 'failures': failures}))
 `, helper], { encoding: 'utf8' }))
-  assert.equal(result.grid_count, 17 * 17)
-  assert.equal(result.validation_count, 16 * 16)
+  const rows = Math.sqrt(result.grid_count)
+  assert.equal(rows, Math.trunc(rows), 'Registration is a complete rectangular grid')
+  assert.equal(result.validation_count, (rows - 1) ** 2, 'Every grid cell has an independent withheld control')
+  assert.ok(result.terrain_residual.max <= 3, 'Local terrain curvature must remain within the unchanged accuracy guard')
   assert.deepEqual(result.first_pixel, [40, 40], 'Measured icon centers use full-window pixel origin')
   assert.ok(result.residual.max <= 1, 'Pixel quantization is independently measured, not fabricated zero')
-  assert.equal(result.large_count, 17 * 17, 'Earth renders valid 32×32 icons: a 900-pixel area cap loses every control')
+  assert.equal(result.large_count, result.grid_count, 'Screen-size icons must preserve the same complete geographic coverage')
   assert.deepEqual(result.large_first_pixel, [39.5, 39.5])
   assert.match(result.failures.bad, /validation failed/)
   assert.match(result.failures.missing, /could not uniquely find/)

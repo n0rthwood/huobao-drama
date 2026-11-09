@@ -1,7 +1,7 @@
 /**
  * 地图资产工作流的纯函数行为（Issue #84）：
  * 类别判定、需求校验与路径围栏、检索结果并入几何时「人工确认过的坐标不被覆盖」、
- * 「非示意图模式不虚构历史疆域」、跨项目导入的工作流复位、坏 JSON 的容错读取。
+ * 「非示意图模式不虚构历史疆域」、坏 JSON 的容错读取。
  *
  * 纯函数在 TS 里，用仓库自带的 tsx 子进程跑一次并以 JSON 回传（不碰数据库、不发网络请求）。
  */
@@ -20,7 +20,7 @@ after(() => rmSync(dataDir, { recursive: true, force: true }))
 
 const script = `
   import { parseAssetType, normalizeBrief, emptyBrief } from 'file://${backendRoot}src/services/map-workflow/types.ts'
-  import { parseWorkflow, prepareImportedWorkflow, restoreSnapshot } from 'file://${backendRoot}src/services/map-workflow/store.ts'
+  import { parseWorkflow, restoreSnapshot } from 'file://${backendRoot}src/services/map-workflow/store.ts'
   import { adoptResearchIntoSpec } from 'file://${backendRoot}src/services/map-workflow/run.ts'
   import { judgeBrief, parseBriefVerdict } from 'file://${backendRoot}src/services/map-workflow/brief.ts'
 
@@ -32,7 +32,6 @@ const script = `
   }
 
   const adopted = tryCall(() => adoptResearchIntoSpec(input.spec, input.research, input.brief))
-  const imported = prepareImportedWorkflow(JSON.stringify(input.workflow))
 
   // 回退：历史里有两次进入 base（旧的一次 + 重跑的一次），
   // 且当前几何里有一条人工确认过的地点，回退不能把它抹掉
@@ -76,8 +75,6 @@ const script = `
       ? { places: adopted.value.spec.places, regions: adopted.value.spec.regions, notes: adopted.value.notes, bbox: adopted.value.spec.bbox }
       : adopted,
     brokenJson: parseWorkflow('{not json'),
-    imported: JSON.parse(imported),
-    importedRead: parseWorkflow(imported),
     rollback: {
       note: rollbackNote,
       places: rollbackCtx.mapSpec?.places ?? [],
@@ -169,29 +166,6 @@ const input = {
     uncertainties: [],
     notes: [],
     searched_at: '2026-11-08T00:00:00.000Z',
-  },
-  workflow: {
-    version: 1,
-    stage: 'drawing',
-    status: 'running',
-    mode: 'auto',
-    revision: 7,
-    task_id: 4321,
-    error: null,
-    brief: null,
-    brief_hash: null,
-    steps: [{ id: 'drawing', label: '标注绘制', status: 'running', message: null, started_at: null, finished_at: null }],
-    issues: [],
-    research: null,
-    outputs: {
-      base_image: { path: 'static/map-bases/a.png', width: 10, height: 10, source: 'map-base:program', task_id: 99, provenance: null },
-      texture_image: null, final_image: null, kmz: null, layer_doc: null,
-    },
-    history: [],
-    text_config_id: null,
-    image_config_id: null,
-    image_model: null,
-    updated_at: '2026-11-08T00:00:00.000Z',
   },
   // 回退夹具：两次进入 base 的历史快照（旧的检索结果 + 重跑后的检索结果）
   rollbackState: {
@@ -294,17 +268,6 @@ test('坏 JSON 的工作流读取不炸，回到初始状态', () => {
   assert.equal(out.brokenJson.steps.length, 6)
 })
 
-test('跨项目导入：需求/产出保留，运行态与版本引用复位', () => {
-  assert.equal(out.imported.status, 'idle')
-  assert.equal(out.imported.task_id, null)
-  assert.equal(out.imported.steps.find(step => step.id === 'drawing').status, 'pending')
-  assert.equal(out.imported.outputs.base_image.path, 'static/map-bases/a.png')
-  assert.equal(out.imported.outputs.base_image.task_id, null, '版本行 id 属于源资产，导入后必须清空')
-  assert.equal(out.imported.history.at(-1).action, 'imported')
-  assert.equal(out.importedRead.task_id, null, '持久化读回不能把空任务 ID 转成不存在的任务 #0')
-  assert.equal(out.importedRead.text_config_id, null)
-  assert.equal(out.importedRead.image_config_id, null)
-})
 
 test('回退取「最近一次」快照，并保留人工确认过的几何', () => {
   assert.deepEqual(out.rollback.research.notes, ['第二轮检索'])

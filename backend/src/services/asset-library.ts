@@ -36,6 +36,7 @@ import {
 import { EMPTY_ASSET_NAME_MESSAGE, normalizeAssetName } from './asset-name.js'
 import { fidelityOf, loadPipelineFidelity } from './asset-pipeline/fidelity.js'
 import { prepareImportedWorkflow } from './map-workflow/store.js'
+import { parseSemantics } from './asset-semantics.js'
 
 export const ASSET_KINDS: AssetKind[] = ['character', 'scene', 'prop']
 
@@ -92,6 +93,7 @@ interface AssetRow {
   sortOrder?: number | null
   /** 道具独有：证据素材标记（Issue #47） */
   faithful?: number | null
+  faithfulSource?: number | null
   semantics?: string | null
   /** 道具独有：资产类别、地图几何与工作流（Issue #84）——跨项目导入时随资产一起复制 */
   assetType?: string | null
@@ -590,6 +592,7 @@ export async function importAsset(input: {
 
     let skippedVersions = 0
     let versionCount = 0
+    const importedVersionIds = new Map<number, number>()
     for (const task of versionTasks) {
       let newLocal: string | null = null
       let newResult: string | null = null
@@ -607,10 +610,12 @@ export async function importAsset(input: {
         skippedVersions += 1
         continue
       }
-      insertedTaskIds.push(await insertVersionTask({
+      const importedId = await insertVersionTask({
         kind, ownerId: newId, dramaId: targetDramaId, episodeId: episode?.id ?? null,
         source: task, localPath: newLocal, resultUrl: newResult, ts,
-      }))
+      })
+      insertedTaskIds.push(importedId)
+      importedVersionIds.set(task.id, importedId)
       versionCount += 1
     }
 
@@ -642,6 +647,24 @@ export async function importAsset(input: {
       ...(kind === 'scene' ? { status: imageUrl ? 'completed' : 'pending' } : {}),
       updatedAt: now(),
     }).where(eq(table.id, newId))
+
+    if (kind === 'prop' && source.assetType === 'map') {
+      const mapWorkflow = prepareImportedWorkflow(source.mapWorkflow, {
+        versionIds: importedVersionIds,
+        copyPath: rel => {
+          const copied = copyOnce(rel)
+          if (!copied) throw new AssetLibraryError(`地图依赖文件已缺失，无法完整导入：${rel}`)
+          return copied
+        },
+      })
+      const semantics = parseSemantics(source.semantics)
+      if (semantics) semantics.image.source_task_id = importedVersionIds.get(semantics.image.source_task_id ?? 0) ?? null
+      await db.update(schema.props).set({
+        mapWorkflow,
+        faithfulSource: importedVersionIds.get(Number(source.faithfulSource)) ?? null,
+        semantics: semantics ? JSON.stringify(semantics) : null,
+      }).where(eq(schema.props.id, newId))
+    }
 
     // 5. 可选：同时关联到目标集（剧集资产页导入）
     if (episode) await insertLink(kind, episode.id, newId, ts)
@@ -735,16 +758,13 @@ async function insertAssetRow(
     description: source.description ?? null,
     prompt: source.prompt ?? null,
     finalPrompt: source.finalPrompt ?? null,
-    // 证据素材属性随资产走（Issue #47）：是不是原件不因换项目而改变，语义标注的坐标
-    // 也仍然对得上复制过去的那张图；faithful_source 不复制——版本行在目标项目是新 id，
-    // 人在目标项目里重新选一次原件即可。
+    // 普通道具沿用原有原件重选政策；地图在版本复制完成后按新 id 重建原件和语义引用。
     faithful: Number(source.faithful) === 1 ? 1 : 0,
     semantics: source.semantics ?? null,
-    // 地图资产身份、几何与工作流随资产走（Issue #84）：换个项目它仍然是地图，仍然不进生图链路。
-    // 工作流文档经 prepareImportedWorkflow 复位运行态与版本引用，需求/检索证据/产出/历史保留。
+    // 地图身份与几何保留；工作流待文件和版本完整复制后再写入，不能留下源资产引用。
     assetType: source.assetType === 'map' ? 'map' : 'prop',
     mapSpec: source.mapSpec ?? null,
-    mapWorkflow: prepareImportedWorkflow(source.mapWorkflow),
+    mapWorkflow: null,
     createdAt: ts,
     updatedAt: ts,
   }))
