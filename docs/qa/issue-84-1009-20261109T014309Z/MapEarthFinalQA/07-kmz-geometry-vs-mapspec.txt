@@ -1,0 +1,20 @@
+members ['doc.kml']
+bbox [115.722, 39.98, 116.393, 40.624]
+FOLDER: 地点
+FOLDER: 路线
+FOLDER: 区域
+  八达岭（居庸外镇）: Point n=1 in_bbox=True has_0_0=False closed=None
+  居庸关（中关城）: Point n=1 in_bbox=True has_0_0=False closed=None
+  南口（南口城）: Point n=1 in_bbox=True has_0_0=False closed=None
+  上关城: Point n=1 in_bbox=True has_0_0=False closed=None
+  岔道城: Point n=1 in_bbox=True has_0_0=False closed=None
+  关沟五道防线空间序列示意（南口—居庸关—上关城—八达岭—岔道城）: LineString n=5 in_bbox=True has_0_0=False closed=None
+  关沟防御走廊近似示意区（非历史边界）: Polygon n=12 in_bbox=True has_0_0=False closed=True
+--- map_spec vs KMZ ---
+place 八达岭（居庸外镇） -> 八达岭（居庸外镇） delta_deg=(0.0, 0.0) proposed=True
+place 居庸关（中关城） -> 居庸关（中关城） delta_deg=(0.0, 0.0) proposed=True
+place 南口（南口城） -> 南口（南口城） delta_deg=(0.0, 0.0) proposed=True
+place 上关城 -> 上关城 delta_deg=(0.0, 0.0) proposed=True
+place 岔道城 -> 岔道城 delta_deg=(0.0, 0.0) proposed=True
+route spec 关沟五道防线空间序列示意（南口—居庸关—上关城—八达岭—岔道城） pts 5 proposed True
+region spec 关沟防御走廊近似示意区（非历史边界） pts 12 proposed True

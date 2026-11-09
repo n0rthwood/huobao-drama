@@ -1,0 +1,2 @@
+VALID    /home/joysort/projects/huobao-drama/data/static/map-kmz/517e91af9e0af7e5c0e201c37c52d8ca.kmz
+VALID    /home/joysort/projects/huobao-drama/data/static/map-bases/earth/pixelgrid-v2-517e91af9e0af7e5c0e201c3-3840-calibration.kmz

@@ -1,0 +1,170 @@
+{
+  "scope": "Issue #84 production acceptance, dedicated drama12 Earth map slice",
+  "technical_acceptance": "blocked at real Google Earth KMZ-load capture",
+  "not_artistic_or_historical_approval": true,
+  "production": {
+    "api_root": "production edge /huobao/api/v1",
+    "drama_id": 12,
+    "drama_title": "八达岭长城测试 1009",
+    "episode_id": 18,
+    "prop_id": 179,
+    "prop_name": "1009_Earth_明代八达岭居庸关关沟防御区位图",
+    "project_level": true
+  },
+  "authorized_brief": {
+    "subject": "明代八达岭与居庸关关沟防御区位及防御作用",
+    "era": "明代",
+    "location": "北京西北关沟（八达岭、居庸关及其相连关沟）",
+    "purpose": "用于历史纪录片区位示意，说明八达岭扼守关沟并作为居庸关北侧前哨的防御作用。",
+    "detail_level": "regional",
+    "schematic": true,
+    "base_mode": "earth",
+    "style": "archival",
+    "region_constraint": "仅在资料支持时加入近似防御区域（示意，非历史边界）"
+  },
+  "configuration": {
+    "initial_text_config": {"id": 1, "model": "glm-5.3"},
+    "controlled_model_switch": {
+      "to_config_id": 14,
+      "to_model": "deepseek-flash",
+      "reason": "Both GLM extraction attempts (tasks 1291 and 1298) timed out at about 300 seconds; parent explicitly authorized one Cloud retry after observed-work release."
+    },
+    "image_config_id": 9,
+    "image_model": "qwen-image-2.1",
+    "width_override": null,
+    "default_output_width": 3840
+  },
+  "task_evidence": {
+    "brief": {
+      "task_id": 1289,
+      "status": "completed",
+      "provider": "openai",
+      "model": "glm-5.3",
+      "elapsed_ms": 70041,
+      "public_observations": "empty because this task predated the observed-work release"
+    },
+    "pre_release_research_failures": [
+      {
+        "task_id": 1291,
+        "status": "failed",
+        "model": "glm-5.3",
+        "elapsed_ms": 383322,
+        "error": "The operation was aborted due to timeout",
+        "public_observations": "empty because this task predated the observed-work release"
+      },
+      {
+        "task_id": 1298,
+        "work_id": 15,
+        "status": "failed",
+        "model": "glm-5.3",
+        "elapsed_ms": 351242,
+        "error": "The operation was aborted due to timeout",
+        "actual_observed_calls": [
+          {"call_id": 67, "status": "completed", "http_status": 200, "duration_ms": 14271, "result": "10-query plan"},
+          {"call_id": 69, "status": "failed", "http_status": null, "duration_ms": 299998, "error": "The operation was aborted due to timeout"}
+        ]
+      }
+    ],
+    "cloud_research": {
+      "task_id": 1304,
+      "work_id": 20,
+      "status": "completed",
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "config_id": 14,
+      "elapsed_ms": 85671,
+      "actual_observed_calls": [
+        {"call_id": 73, "status": "completed", "http_status": 200, "duration_ms": 4698, "request_chars": 602, "response_chars": 500},
+        {"call_id": 74, "status": "completed", "http_status": 200, "duration_ms": 46466, "request_chars": 19585, "response_chars": 2810}
+      ],
+      "public_call_messages_complete": true
+    },
+    "earth_base": {
+      "task_id": 1305,
+      "work_id": 21,
+      "status": "failed",
+      "elapsed_ms": 120806,
+      "model_calls": 0,
+      "error": "Google Earth screenshot KMZ-load pass could not find the File control within 90s; the returned accessibility labels identify the newer Earth UI with Local KML editor/Map projects instead.",
+      "guard_response": "No retry, fallback to program base, manual geometry, image submission, or tolerance reduction was made."
+    }
+  },
+  "consumption": {
+    "authorized_text_cap_after_parent_adjustment": 8,
+    "conservative_text_accounting": "7 of 8: completed brief (1) + first failed research reserved as 2 + second GLM research observed calls (2) + controlled Cloud research observed calls (2).",
+    "image_submissions": 0,
+    "texture_task_id": null,
+    "base_task_id": null,
+    "drawing_task_id": null
+  },
+  "source_research": {
+    "status": "completed and persisted by Cloud research task 1304",
+    "query_count": 9,
+    "source_count": 24,
+    "feature_count": 7,
+    "query_plan": [
+      "wikipedia-zh: 八达岭, 居庸关, 关沟, 明长城",
+      "wikipedia-en: Badaling, Juyong Pass, Great Wall of China Ming dynasty",
+      "europeana: Great Wall of China Ming map, Badaling Juyongguan",
+      "smithsonian: Great Wall of China Ming"
+    ],
+    "persisted_geometry": {
+      "places": 5,
+      "routes": 1,
+      "regions": 1,
+      "all_proposed": true,
+      "bbox": [115.722, 39.98, 116.393, 40.624]
+    },
+    "region": {
+      "name": "关沟防御走廊近似示意区（非历史边界）",
+      "uncertainty": "high",
+      "source_basis": "S1 says Juyongguan is in Guangu, about 20 km deep, and lists five defense lines; S12 says Guangu is 40 li with Nankou and Chadaocheng at its south/north ends. The resulting narrow corridor is explicitly an approximate schematic, not a Ming boundary or precise defense district.",
+      "human_approval": "not granted or implied; the proposed flag remains true"
+    }
+  },
+  "earth_delivery": {
+    "status": "not produced",
+    "kmz": null,
+    "base_image": null,
+    "evidence_image": null,
+    "final_image": null,
+    "sidecar": null,
+    "registration_grid": null,
+    "independent_residual_proof": null,
+    "camera_drift_proof": null,
+    "official_kml_xsd_validation": "not run because the base task failed before producing a KMZ delivery artifact",
+    "opened_media": [],
+    "failure_stage": "KMZ-load pass before Google Earth calibration and clean-base capture",
+    "failure_evidence": "Task 1305 / work 21 error is recorded verbatim in requests.jsonl. The API exposed no completed base artifact or sidecar to download or open."
+  },
+  "workflow_terminal_state": {
+    "status": "failed",
+    "stage": "base",
+    "revision": 16,
+    "error_class": "Google Earth Web UI control mismatch / File control absent",
+    "no_retry_after_base_failure": true,
+    "no_cancel": true,
+    "no_program_fallback": true,
+    "no_guard_lowering": true,
+    "no_texture_or_drawing_started": true
+  },
+  "evidence": {
+    "request_ledger": "/home/joysort/projects/huobao-drama-issue-84/docs/qa/issue-84-1009-20261109T014309Z/MapEarthQA/requests.jsonl",
+    "request_ledger_entries": 251,
+    "request_ledger_sha256": "02638d42e36abd28727bf0cf24b74578f99632281785030c39a98744888b6fb8",
+    "result": "/home/joysort/projects/huobao-drama-issue-84/docs/qa/issue-84-1009-20261109T014309Z/MapEarthQA/result.json",
+    "complete_public_call_message_paths": [
+      "/tasks/1298/observations/calls/67/messages?limit=100",
+      "/tasks/1298/observations/calls/69/messages?limit=100",
+      "/tasks/1304/observations/calls/73/messages?limit=100",
+      "/tasks/1304/observations/calls/74/messages?limit=100"
+    ]
+  },
+  "parent_notified": {
+    "recipient": "web-01a1bbb3-9468-7000-9d52-a702129d46a4",
+    "notifications": [
+      "Cloud research region source basis and proposed-only state",
+      "Earth task 1305 failed before calibration because File control was absent in changed Earth UI"
+    ]
+  }
+}

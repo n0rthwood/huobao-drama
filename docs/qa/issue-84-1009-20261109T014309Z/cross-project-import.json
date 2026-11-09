@@ -1,0 +1,14 @@
+{
+  "code": 200,
+  "data": {
+    "kind": "prop",
+    "id": 183,
+    "name": "八达岭1009外部标定图",
+    "version_count": 2,
+    "skipped_versions": 0,
+    "skipped_reference_images": 0,
+    "has_image": true,
+    "linked_episode_id": null
+  },
+  "message": "success"
+}

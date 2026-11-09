@@ -1,0 +1,7 @@
+grid 129 129 16641 expect 16641
+八达岭（居庸外镇）: predicted=(1298.3,1605.4) nearest_earth_marker_px=(1301, 1605) dist=2.77
+居庸关（中关城）: predicted=(1575.0,1992.0) nearest_earth_marker_px=(1577, 1990) dist=2.85
+南口（南口城）: predicted=(1868.2,2299.1) nearest_earth_marker_px=(1870, 2297) dist=2.78
+上关城: predicted=(1425.5,1796.2) nearest_earth_marker_px=(1426, 1794) dist=2.3
+岔道城: predicted=(1199.6,1540.8) nearest_earth_marker_px=(1202, 1540) dist=2.57
+sheet saved: left=clean base, right=earth-rendered KMZ, rows = 5 places

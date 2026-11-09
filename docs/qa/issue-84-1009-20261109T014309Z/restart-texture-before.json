@@ -1,0 +1,137 @@
+{
+  "map_task": {
+    "code": 200,
+    "data": {
+      "id": 1313,
+      "type": "text",
+      "storyboard_id": null,
+      "episode_id": null,
+      "drama_id": 12,
+      "scene_id": null,
+      "character_id": null,
+      "prop_id": 181,
+      "provider": "openai",
+      "prompt": "地图工作流：明代八达岭与居庸关关沟防御区位示意（外部标定）",
+      "model": "glm-5.3",
+      "params": {
+        "kind": "map_workflow",
+        "configId": 1,
+        "stage": "asset_research",
+        "model_used": {
+          "config_id": 1,
+          "name": "GLM 5.3 (local)",
+          "provider": "openai",
+          "model": "glm-5.3",
+          "vision": false
+        },
+        "map_prop_id": 181,
+        "map_stage": "style",
+        "map_mode": "manual",
+        "map_texture_task_id": 1314,
+        "map_texture_theme": "archival"
+      },
+      "task_id": null,
+      "result_url": null,
+      "local_path": null,
+      "remote_state": null,
+      "status": "processing",
+      "error_msg": null,
+      "created_at": "2026-11-09T03:12:22.368Z",
+      "updated_at": "2026-11-09T03:12:22.380Z",
+      "completed_at": null,
+      "generated_at": null,
+      "created_at_unix": 1794193942,
+      "completed_at_unix": null,
+      "elapsed_ms": 16283,
+      "cancellable": false,
+      "row_type": "task",
+      "drama_title": "八达岭长城测试 1009",
+      "episode_number": null,
+      "storyboard_number": null,
+      "target_kind": "prop",
+      "target_name": "八达岭1009外部标定图",
+      "frame_type": null,
+      "observation_summary": null,
+      "kind": "map_workflow",
+      "progress": null,
+      "reasoning_chars": null,
+      "retry_of": null,
+      "label": "《八达岭长城测试 1009》· 地图工作流"
+    },
+    "message": "success"
+  },
+  "image_task": {
+    "code": 200,
+    "data": {
+      "id": 1314,
+      "type": "image",
+      "storyboard_id": null,
+      "episode_id": null,
+      "drama_id": 12,
+      "scene_id": null,
+      "character_id": null,
+      "prop_id": null,
+      "provider": "qwen-jobs",
+      "prompt": "seamless aged paper texture background only, parchment fiber grain, subtle ink wash stains, soft vignette, uniform tone, absolutely no map, no coastline, no rivers, no borders, no roads, no landmass, no continents, no text, no letters, no numbers, no symbols, no compass, no illustration, no objects, warm sepia archival parchment tone",
+      "model": "qwen-image-2.1",
+      "params": {
+        "size": "1920x1080",
+        "map_texture": {
+          "prop_id": 181,
+          "prop_name": "八达岭1009外部标定图"
+        }
+      },
+      "task_id": "87454af9-36c7-49c3-a051-21f38fe45738",
+      "result_url": null,
+      "local_path": null,
+      "remote_state": {
+        "remote_status": "running",
+        "queue": null,
+        "progress": {
+          "fraction": 0.071,
+          "elapsed_seconds": 12.8,
+          "remaining_seconds": 168.8,
+          "phase": "sampling",
+          "step": 1,
+          "total_steps": 25
+        },
+        "estimate": {
+          "run_seconds": 181.6,
+          "basis": "measured",
+          "samples": 116
+        },
+        "estimated_finish_seconds": 168.8,
+        "cancel_requested": false,
+        "updated_at": "2026-11-09T03:12:36.576Z"
+      },
+      "status": "processing",
+      "error_msg": null,
+      "created_at": "2026-11-09T03:12:22.379Z",
+      "updated_at": "2026-11-09T03:12:36.577Z",
+      "completed_at": null,
+      "generated_at": null,
+      "created_at_unix": 1794193942,
+      "completed_at_unix": null,
+      "elapsed_ms": 16271,
+      "cancellable": true,
+      "row_type": "task",
+      "drama_title": "八达岭长城测试 1009",
+      "episode_number": null,
+      "storyboard_number": null,
+      "target_kind": null,
+      "target_name": null,
+      "frame_type": null,
+      "observation_summary": null,
+      "kind": null,
+      "progress": null,
+      "reasoning_chars": null,
+      "retry_of": null,
+      "label": "《八达岭长城测试 1009》· 图片"
+    },
+    "message": "success"
+  },
+  "only_executing_ids": [
+    1313,
+    1314
+  ]
+}

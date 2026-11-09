@@ -1,0 +1,14 @@
+{
+  "reason": "GLM extraction tasks1291 and1298 both timed out; controlled explicit endpoint switch for remaining stage, no automatic fallback",
+  "selected": {
+    "id": 14,
+    "name": "DeepSeek V4.1 Flash 1017 (Cloud)",
+    "provider": "openai",
+    "model": [
+      "deepseek-flash"
+    ],
+    "is_active": true,
+    "vision": true
+  },
+  "scope": "2 additional calls within overall20-text envelope; no additional image allowance"
+}

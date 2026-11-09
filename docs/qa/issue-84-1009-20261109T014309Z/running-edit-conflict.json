@@ -1,0 +1,7 @@
+{
+  "code": 409,
+  "error": "workflow_busy",
+  "message": "地图工作流正在执行「质感底纹」（任务 #1316），请先等待完成或取消",
+  "revision": 15,
+  "task_id": 1316
+}

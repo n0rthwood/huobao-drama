@@ -1,0 +1,6 @@
+{
+  "task_id": 1334,
+  "error": "Google Earth 截图失败（退出码 1）：NameError: name 'folders' is not defined",
+  "elapsed_ms": 535812,
+  "archive": "/home/joysort/huobao-backup/issue84-capture-failure-1334"
+}

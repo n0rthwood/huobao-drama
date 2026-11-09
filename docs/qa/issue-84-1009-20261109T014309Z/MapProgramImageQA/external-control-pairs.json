@@ -1,0 +1,37 @@
+{
+  "program_prop_id": 177,
+  "base_task_id": 1293,
+  "registration_renderer": "d3-geo+natural-earth-50m",
+  "control_pairs": [
+    {
+      "x": 1768.4967745598406,
+      "y": 890.3705504593818,
+      "lon": 116.00694,
+      "lat": 40.35417,
+      "derived_x": 1768.4967745598406,
+      "derived_y": 890.3705504593818,
+      "residual_px": 0.0
+    },
+    {
+      "x": 1937.4110849604476,
+      "y": 1115.82088421761,
+      "lon": 116.07,
+      "lat": 40.29,
+      "derived_x": 1937.4110849604476,
+      "derived_y": 1115.82088421761,
+      "residual_px": 0.0
+    },
+    {
+      "x": 2116.8791914754547,
+      "y": 1284.320768419042,
+      "lon": 116.137,
+      "lat": 40.242,
+      "derived_x": 2116.8791914754547,
+      "derived_y": 1284.320768419042,
+      "residual_px": 0.0
+    }
+  ],
+  "twice_triangle_area_px2": 11999.102770298574,
+  "max_residual_px": 0.0,
+  "note": "Derived only from saved real program Mercator registration; no historical placement claim."
+}

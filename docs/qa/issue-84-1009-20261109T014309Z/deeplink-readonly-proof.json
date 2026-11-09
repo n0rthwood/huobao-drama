@@ -1,0 +1,13 @@
+{
+  "prop_id": 181,
+  "before_sha256": "4786de505c3249d8f414c2022494493bb56a2bd15c0e3cc836a1f1e004b570b7",
+  "after_sha256": "4786de505c3249d8f414c2022494493bb56a2bd15c0e3cc836a1f1e004b570b7",
+  "exercised": [
+    "saved feature identity",
+    "refresh restoration",
+    "copied new tab",
+    "invalid target readable feedback and key removal",
+    "popup close preserves tab/filter"
+  ],
+  "mutation": false
+}

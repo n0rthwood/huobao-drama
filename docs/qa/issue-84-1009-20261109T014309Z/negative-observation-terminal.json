@@ -1,0 +1,506 @@
+{
+  "workflow": {
+    "code": 200,
+    "data": {
+      "stage": "brief",
+      "status": "blocked",
+      "mode": "manual",
+      "revision": 8,
+      "task_id": 1299,
+      "error": null,
+      "brief": {
+        "subject": "京杭运河通州段",
+        "era": "古代",
+        "location": "北京通州，京杭运河北端河道",
+        "purpose": "通州段河道线路示意，需匹配所选历史时期",
+        "detail_level": "regional",
+        "schematic": false,
+        "base_mode": "program",
+        "style": "archival",
+        "notes": "京杭运河通州段线路示意。未指定时代，用于核验信息充分性判断；不启动图片生成。",
+        "reference_image": null,
+        "inferred": []
+      },
+      "steps": [
+        {
+          "id": "brief",
+          "label": "地图需求",
+          "status": "awaiting_review",
+          "message": "时代「古代」还不足以唯一确定这张图：「古代」跨越多个形制时期：京杭运河体系内的通州段，元代为郭守敬开通惠河、以积水潭为终点；明代通惠河起点改至大通桥，北运河经通州的线路与码头仓储布局亦有调整；清代格局又有所变化。三代河道走向并不相同，无法唯一确定线路请指明元代 / 明代 / 清代（或清末）其中之一。请改写得更具体后重试。",
+          "started_at": "2026-11-09T02:19:59.850Z",
+          "finished_at": "2026-11-09T02:21:28.449Z"
+        },
+        {
+          "id": "research",
+          "label": "资料检索",
+          "status": "pending",
+          "message": null,
+          "started_at": null,
+          "finished_at": null
+        },
+        {
+          "id": "base",
+          "label": "底图生产",
+          "status": "pending",
+          "message": null,
+          "started_at": null,
+          "finished_at": null
+        },
+        {
+          "id": "style",
+          "label": "质感底纹",
+          "status": "pending",
+          "message": null,
+          "started_at": null,
+          "finished_at": null
+        },
+        {
+          "id": "drawing",
+          "label": "标注绘制",
+          "status": "pending",
+          "message": null,
+          "started_at": null,
+          "finished_at": null
+        },
+        {
+          "id": "complete",
+          "label": "完成登记",
+          "status": "pending",
+          "message": null,
+          "started_at": null,
+          "finished_at": null
+        }
+      ],
+      "issues": [
+        {
+          "field": "notes",
+          "code": "minor_uncertainty",
+          "blocking": false,
+          "message": "地域「北京通州，京杭运河北端河道」与 regional 详略量级匹配，不算含混；但具体河道走向需待时代确定后才能落实"
+        },
+        {
+          "field": "notes",
+          "code": "minor_uncertainty",
+          "blocking": false,
+          "message": "用途「河道线路示意」已说明画法取舍（呈现线路走向），本身明确，其『匹配所选历史时期』的要求同样卡在时代未定"
+        },
+        {
+          "field": "notes",
+          "code": "minor_uncertainty",
+          "blocking": false,
+          "message": "底图方式已定为 program；是否标注现代地名、配色等次要细节未说明，可在时代确定后于生成阶段另行确认"
+        },
+        {
+          "field": "era",
+          "code": "ambiguous_era",
+          "blocking": true,
+          "message": "时代「古代」还不足以唯一确定这张图：「古代」跨越多个形制时期：京杭运河体系内的通州段，元代为郭守敬开通惠河、以积水潭为终点；明代通惠河起点改至大通桥，北运河经通州的线路与码头仓储布局亦有调整；清代格局又有所变化。三代河道走向并不相同，无法唯一确定线路请指明元代 / 明代 / 清代（或清末）其中之一。请改写得更具体后重试。"
+        }
+      ],
+      "research": null,
+      "outputs": {
+        "base_image": null,
+        "texture_image": null,
+        "final_image": null,
+        "kmz": null,
+        "layer_doc": null
+      },
+      "history": [
+        {
+          "revision": 1,
+          "at": "2026-11-09T01:56:20.156Z",
+          "stage": "brief",
+          "status": "idle",
+          "action": "edit_brief",
+          "actor": "manual",
+          "note": "需求",
+          "snapshot": {
+            "brief": null,
+            "map_spec": null,
+            "outputs": {
+              "base_image": null,
+              "texture_image": null,
+              "final_image": null,
+              "kmz": null,
+              "layer_doc": null
+            },
+            "research": null
+          }
+        },
+        {
+          "revision": 2,
+          "at": "2026-11-09T01:56:20.284Z",
+          "stage": "brief",
+          "status": "running",
+          "action": "advance:brief",
+          "actor": "manual",
+          "note": "模式 manual"
+        },
+        {
+          "revision": 3,
+          "at": "2026-11-09T01:56:20.284Z",
+          "stage": "brief",
+          "status": "running",
+          "action": "stage_start:brief",
+          "actor": "manual",
+          "note": null
+        },
+        {
+          "revision": 4,
+          "at": "2026-11-09T01:58:34.461Z",
+          "stage": "brief",
+          "status": "blocked",
+          "action": "stage_done:brief",
+          "actor": "manual",
+          "note": "缺少时代：同一地名在不同时代的位置、河道与疆界可能完全不同，没有明确时代就只能猜。京杭运河通州段的河道线路随时代变化很大，对象本身无法唯一推出时期：元代通惠河至元三十年（1293）通航，自白浮泉引水、在张家湾一带入白河（北运河）；明代白浮引水段废弃，通惠河改以大通桥为起点、经城南至通州，漕粮转运改在石坝、土坝；清代大体沿明道，但北运河堤线与局部河势有调整；1855年黄河改道后漕运衰落、河段淤废，1912年潮白河改道又改变了通州段水源与河势。「京杭运河」专名只能限定不早于元代，取值必须由人确定。；请指明其一：元代（1293年通惠河通航后）/ 明代 / 清代漕运全盛期（如18世纪）/ 近代（1855年后）/ 现今遗存。请补充后重新开始。",
+          "snapshot": {
+            "brief": {
+              "subject": "京杭运河通州段",
+              "era": "",
+              "location": "北京通州，京杭运河北端河道",
+              "purpose": "通州段河道线路示意，需匹配所选历史时期",
+              "detail_level": "regional",
+              "schematic": false,
+              "base_mode": "program",
+              "style": "archival",
+              "notes": "京杭运河通州段线路示意。未指定时代，用于核验信息充分性判断；不启动图片生成。",
+              "reference_image": null,
+              "inferred": []
+            },
+            "map_spec": null,
+            "outputs": {
+              "base_image": null,
+              "texture_image": null,
+              "final_image": null,
+              "kmz": null,
+              "layer_doc": null
+            },
+            "research": null
+          }
+        },
+        {
+          "revision": 5,
+          "at": "2026-11-09T02:19:13.960Z",
+          "stage": "brief",
+          "status": "idle",
+          "action": "edit_brief",
+          "actor": "manual",
+          "note": "需求",
+          "snapshot": {
+            "brief": {
+              "subject": "京杭运河通州段",
+              "era": "",
+              "location": "北京通州，京杭运河北端河道",
+              "purpose": "通州段河道线路示意，需匹配所选历史时期",
+              "detail_level": "regional",
+              "schematic": false,
+              "base_mode": "program",
+              "style": "archival",
+              "notes": "京杭运河通州段线路示意。未指定时代，用于核验信息充分性判断；不启动图片生成。",
+              "reference_image": null,
+              "inferred": []
+            },
+            "map_spec": null,
+            "outputs": {
+              "base_image": null,
+              "texture_image": null,
+              "final_image": null,
+              "kmz": null,
+              "layer_doc": null
+            },
+            "research": null
+          }
+        },
+        {
+          "revision": 6,
+          "at": "2026-11-09T02:19:59.849Z",
+          "stage": "brief",
+          "status": "running",
+          "action": "advance:brief",
+          "actor": "manual",
+          "note": "模式 manual"
+        },
+        {
+          "revision": 7,
+          "at": "2026-11-09T02:19:59.850Z",
+          "stage": "brief",
+          "status": "running",
+          "action": "stage_start:brief",
+          "actor": "manual",
+          "note": null
+        },
+        {
+          "revision": 8,
+          "at": "2026-11-09T02:21:28.449Z",
+          "stage": "brief",
+          "status": "blocked",
+          "action": "stage_done:brief",
+          "actor": "manual",
+          "note": "时代「古代」还不足以唯一确定这张图：「古代」跨越多个形制时期：京杭运河体系内的通州段，元代为郭守敬开通惠河、以积水潭为终点；明代通惠河起点改至大通桥，北运河经通州的线路与码头仓储布局亦有调整；清代格局又有所变化。三代河道走向并不相同，无法唯一确定线路请指明元代 / 明代 / 清代（或清末）其中之一。请改写得更具体后重试。",
+          "snapshot": {
+            "brief": {
+              "subject": "京杭运河通州段",
+              "era": "古代",
+              "location": "北京通州，京杭运河北端河道",
+              "purpose": "通州段河道线路示意，需匹配所选历史时期",
+              "detail_level": "regional",
+              "schematic": false,
+              "base_mode": "program",
+              "style": "archival",
+              "notes": "京杭运河通州段线路示意。未指定时代，用于核验信息充分性判断；不启动图片生成。",
+              "reference_image": null,
+              "inferred": []
+            },
+            "map_spec": null,
+            "outputs": {
+              "base_image": null,
+              "texture_image": null,
+              "final_image": null,
+              "kmz": null,
+              "layer_doc": null
+            },
+            "research": null
+          }
+        }
+      ],
+      "text_config_id": 1,
+      "image_config_id": null,
+      "image_model": null,
+      "updated_at": "2026-11-09T02:21:28.449Z",
+      "prop_id": 178,
+      "prop_name": "1009_通州段_信息不足负例",
+      "asset_type": "map",
+      "map_spec": null,
+      "busy": false
+    },
+    "message": "success"
+  },
+  "observations": {
+    "code": 200,
+    "data": {
+      "task_id": 1299,
+      "works": [
+        {
+          "id": 16,
+          "task_id": 1299,
+          "stage": "map_workflow",
+          "source_chars": 79,
+          "sample_key": "map_workflow|cfg:1|model:glm-5.3|start:brief|base:program",
+          "storyboard_id": null,
+          "storyboard_number": null,
+          "started_at": 1794190799850,
+          "finished_at": 1794190888450,
+          "status": "completed",
+          "model_ms": 88597,
+          "queue_ms": 0,
+          "work_ms": 88600,
+          "call_count": 1,
+          "heartbeat_at": 1794190888450,
+          "error_msg": null,
+          "created_at": 1794190799850,
+          "active_call_started_at": null,
+          "active_call_heartbeat_at": null
+        }
+      ],
+      "calls": [
+        {
+          "id": 68,
+          "work_id": 16,
+          "task_id": 1299,
+          "kind": "llm",
+          "config_id": 1,
+          "config_name": "GLM 5.3 (local)",
+          "provider": "openai",
+          "model": "glm-5.3",
+          "url": "https://open.bigmodel.cn/api/coding/paas/v4/chat/completions",
+          "stream": 0,
+          "status": "completed",
+          "http_status": 200,
+          "queued_at": 1794190799851,
+          "started_at": 1794190799851,
+          "finished_at": 1794190888448,
+          "duration_ms": 88597,
+          "queue_ms": 0,
+          "request_chars": 1010,
+          "response_chars": 671,
+          "prompt_tokens": 509,
+          "completion_tokens": 3495,
+          "finish_reason": "stop",
+          "error_msg": null,
+          "heartbeat_at": 1794190888448,
+          "created_at": 1794190799851,
+          "message_count": 4
+        }
+      ],
+      "messages": [
+        {
+          "id": 761,
+          "call_id": 68,
+          "work_id": 16,
+          "task_id": 1299,
+          "seq": 0,
+          "phase": "request",
+          "role": "system",
+          "name": null,
+          "tool_call_id": null,
+          "body": "你在审核一张历史地图的需求，判断它是否**足以唯一确定一张图**。审两件事：\n\nA. 已填的值是否够明确。填了不等于够：\n   - 「古代」「近代」这种跨越多个形制时期的说法 → 列进 ambiguous；\n   - 「中国」「华北」这种与对象实际范围差一个数量级的地域 → 列进 ambiguous；\n   - 「地图」「展示」这种没有说明画法取舍的用途 → 列进 ambiguous。\n   能唯一确定的（如「商代晚期」「河南安阳小屯一带」「遗址位置图」）不要列。\nB. 空着的值能否由对象本身唯一推出。只有唯一指向时才补：\n   例「殷墟车马坑」→ 时代：商代晚期；地域：河南安阳小屯一带；用途：遗址位置图。\n   对象横跨多个时代且形态不同（河道改道、城址迁移等）→ 不要补，列进 missing，\n   写明为什么必须由人确定，并给出可选项提示。\n\n不确定就给 low 置信度，不要把猜测写成考证结论。配色、是否标注现代地名等次要细节不要列进 missing/ambiguous，放 notes。\n\n只返回 JSON（四个键都要有，没有内容就给空数组）：\n{\"inferred\":[{\"field\":\"era\",\"value\":\"商代晚期（约前13—前11世纪）\",\"basis\":\"殷墟是商代晚期都城遗址\",\"confidence\":\"high\"}],\n\"ambiguous\":[{\"field\":\"era\",\"reason\":\"「古代」跨越的时期里河道与疆界差别很大\",\"hint\":\"请指明具体朝代或世纪\"}],\n\"missing\":[{\"field\":\"era\",\"reason\":\"该河段在元、明、清三代多次改道\",\"hint\":\"请指明元代 / 明代 / 清末其中之一\"}],\n\"notes\":[\"次要的不确定之处\"]}",
+          "chars": 771,
+          "streaming": 0,
+          "created_at": 1794190799851
+        },
+        {
+          "id": 762,
+          "call_id": 68,
+          "work_id": 16,
+          "task_id": 1299,
+          "seq": 1,
+          "phase": "request",
+          "role": "user",
+          "name": null,
+          "tool_call_id": null,
+          "body": "地图对象（subject）：京杭运河通州段\n时代（era）：古代\n地域（location）：北京通州，京杭运河北端河道\n用途（purpose）：通州段河道线路示意，需匹配所选历史时期\n详略：regional；示意图模式：关闭；底图方式：program\n补充说明：京杭运河通州段线路示意。未指定时代，用于核验信息充分性判断；不启动图片生成。",
+          "chars": 169,
+          "streaming": 0,
+          "created_at": 1794190799851
+        },
+        {
+          "id": 763,
+          "call_id": 68,
+          "work_id": 16,
+          "task_id": 1299,
+          "seq": 2,
+          "phase": "request",
+          "role": "request_params",
+          "name": null,
+          "tool_call_id": null,
+          "body": "{\n  \"model\": \"glm-5.3\",\n  \"temperature\": 0.1,\n  \"max_tokens\": 131072\n}",
+          "chars": 70,
+          "streaming": 0,
+          "created_at": 1794190799851
+        },
+        {
+          "id": 772,
+          "call_id": 68,
+          "work_id": 16,
+          "task_id": 1299,
+          "seq": 3,
+          "phase": "response",
+          "role": "assistant",
+          "name": null,
+          "tool_call_id": null,
+          "body": "{\n  \"inferred\": [],\n  \"ambiguous\": [\n    {\n      \"field\": \"era\",\n      \"reason\": \"「古代」跨越多个形制时期：京杭运河体系内的通州段，元代为郭守敬开通惠河、以积水潭为终点；明代通惠河起点改至大通桥，北运河经通州的线路与码头仓储布局亦有调整；清代格局又有所变化。三代河道走向并不相同，无法唯一确定线路\",\n      \"hint\": \"请指明元代 / 明代 / 清代（或清末）其中之一\"\n    }\n  ],\n  \"missing\": [\n    {\n      \"field\": \"era\",\n      \"reason\": \"补充说明已声明未指定时代。「京杭运河」这一名称虽把范围收窄到元代以后的运河体系（隋唐运河不走京杭线），但通州段在元、明、清三代的线路走向、通惠河入口位置与漕运设施均不相同，无法由对象本身唯一推出，必须由人确定\",\n      \"hint\": \"可选项：元代（至元三十年通惠河通航后）/ 明代 / 清代\"\n    }\n  ],\n  \"notes\": [\n    \"地域「北京通州，京杭运河北端河道」与 regional 详略量级匹配，不算含混；但具体河道走向需待时代确定后才能落实\",\n    \"用途「河道线路示意」已说明画法取舍（呈现线路走向），本身明确，其『匹配所选历史时期』的要求同样卡在时代未定\",\n    \"底图方式已定为 program；是否标注现代地名、配色等次要细节未说明，可在时代确定后于生成阶段另行确认\"\n  ]\n}",
+          "chars": 671,
+          "streaming": 0,
+          "created_at": 1794190888448
+        }
+      ],
+      "message_limit": 200,
+      "messages_complete": true,
+      "limit": 50,
+      "next_cursor": null,
+      "has_more": false
+    },
+    "message": "success"
+  },
+  "messages": {
+    "code": 200,
+    "data": {
+      "task_id": 1299,
+      "call_id": 68,
+      "call": {
+        "id": 68,
+        "work_id": 16,
+        "task_id": 1299,
+        "kind": "llm",
+        "config_id": 1,
+        "config_name": "GLM 5.3 (local)",
+        "provider": "openai",
+        "model": "glm-5.3",
+        "url": "https://open.bigmodel.cn/api/coding/paas/v4/chat/completions",
+        "stream": 0,
+        "status": "completed",
+        "http_status": 200,
+        "queued_at": 1794190799851,
+        "started_at": 1794190799851,
+        "finished_at": 1794190888448,
+        "duration_ms": 88597,
+        "queue_ms": 0,
+        "request_chars": 1010,
+        "response_chars": 671,
+        "prompt_tokens": 509,
+        "completion_tokens": 3495,
+        "finish_reason": "stop",
+        "error_msg": null,
+        "heartbeat_at": 1794190888448,
+        "created_at": 1794190799851
+      },
+      "total": 4,
+      "messages": [
+        {
+          "id": 761,
+          "call_id": 68,
+          "work_id": 16,
+          "task_id": 1299,
+          "seq": 0,
+          "phase": "request",
+          "role": "system",
+          "name": null,
+          "tool_call_id": null,
+          "body": "你在审核一张历史地图的需求，判断它是否**足以唯一确定一张图**。审两件事：\n\nA. 已填的值是否够明确。填了不等于够：\n   - 「古代」「近代」这种跨越多个形制时期的说法 → 列进 ambiguous；\n   - 「中国」「华北」这种与对象实际范围差一个数量级的地域 → 列进 ambiguous；\n   - 「地图」「展示」这种没有说明画法取舍的用途 → 列进 ambiguous。\n   能唯一确定的（如「商代晚期」「河南安阳小屯一带」「遗址位置图」）不要列。\nB. 空着的值能否由对象本身唯一推出。只有唯一指向时才补：\n   例「殷墟车马坑」→ 时代：商代晚期；地域：河南安阳小屯一带；用途：遗址位置图。\n   对象横跨多个时代且形态不同（河道改道、城址迁移等）→ 不要补，列进 missing，\n   写明为什么必须由人确定，并给出可选项提示。\n\n不确定就给 low 置信度，不要把猜测写成考证结论。配色、是否标注现代地名等次要细节不要列进 missing/ambiguous，放 notes。\n\n只返回 JSON（四个键都要有，没有内容就给空数组）：\n{\"inferred\":[{\"field\":\"era\",\"value\":\"商代晚期（约前13—前11世纪）\",\"basis\":\"殷墟是商代晚期都城遗址\",\"confidence\":\"high\"}],\n\"ambiguous\":[{\"field\":\"era\",\"reason\":\"「古代」跨越的时期里河道与疆界差别很大\",\"hint\":\"请指明具体朝代或世纪\"}],\n\"missing\":[{\"field\":\"era\",\"reason\":\"该河段在元、明、清三代多次改道\",\"hint\":\"请指明元代 / 明代 / 清末其中之一\"}],\n\"notes\":[\"次要的不确定之处\"]}",
+          "chars": 771,
+          "streaming": 0,
+          "created_at": 1794190799851
+        },
+        {
+          "id": 762,
+          "call_id": 68,
+          "work_id": 16,
+          "task_id": 1299,
+          "seq": 1,
+          "phase": "request",
+          "role": "user",
+          "name": null,
+          "tool_call_id": null,
+          "body": "地图对象（subject）：京杭运河通州段\n时代（era）：古代\n地域（location）：北京通州，京杭运河北端河道\n用途（purpose）：通州段河道线路示意，需匹配所选历史时期\n详略：regional；示意图模式：关闭；底图方式：program\n补充说明：京杭运河通州段线路示意。未指定时代，用于核验信息充分性判断；不启动图片生成。",
+          "chars": 169,
+          "streaming": 0,
+          "created_at": 1794190799851
+        },
+        {
+          "id": 763,
+          "call_id": 68,
+          "work_id": 16,
+          "task_id": 1299,
+          "seq": 2,
+          "phase": "request",
+          "role": "request_params",
+          "name": null,
+          "tool_call_id": null,
+          "body": "{\n  \"model\": \"glm-5.3\",\n  \"temperature\": 0.1,\n  \"max_tokens\": 131072\n}",
+          "chars": 70,
+          "streaming": 0,
+          "created_at": 1794190799851
+        },
+        {
+          "id": 772,
+          "call_id": 68,
+          "work_id": 16,
+          "task_id": 1299,
+          "seq": 3,
+          "phase": "response",
+          "role": "assistant",
+          "name": null,
+          "tool_call_id": null,
+          "body": "{\n  \"inferred\": [],\n  \"ambiguous\": [\n    {\n      \"field\": \"era\",\n      \"reason\": \"「古代」跨越多个形制时期：京杭运河体系内的通州段，元代为郭守敬开通惠河、以积水潭为终点；明代通惠河起点改至大通桥，北运河经通州的线路与码头仓储布局亦有调整；清代格局又有所变化。三代河道走向并不相同，无法唯一确定线路\",\n      \"hint\": \"请指明元代 / 明代 / 清代（或清末）其中之一\"\n    }\n  ],\n  \"missing\": [\n    {\n      \"field\": \"era\",\n      \"reason\": \"补充说明已声明未指定时代。「京杭运河」这一名称虽把范围收窄到元代以后的运河体系（隋唐运河不走京杭线），但通州段在元、明、清三代的线路走向、通惠河入口位置与漕运设施均不相同，无法由对象本身唯一推出，必须由人确定\",\n      \"hint\": \"可选项：元代（至元三十年通惠河通航后）/ 明代 / 清代\"\n    }\n  ],\n  \"notes\": [\n    \"地域「北京通州，京杭运河北端河道」与 regional 详略量级匹配，不算含混；但具体河道走向需待时代确定后才能落实\",\n    \"用途「河道线路示意」已说明画法取舍（呈现线路走向），本身明确，其『匹配所选历史时期』的要求同样卡在时代未定\",\n    \"底图方式已定为 program；是否标注现代地名、配色等次要细节未说明，可在时代确定后于生成阶段另行确认\"\n  ]\n}",
+          "chars": 671,
+          "streaming": 0,
+          "created_at": 1794190888448
+        }
+      ],
+      "limit": 200,
+      "next_cursor": null,
+      "has_more": false
+    },
+    "message": "success"
+  }
+}

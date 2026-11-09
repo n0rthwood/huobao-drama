@@ -1,0 +1,176 @@
+{
+  "scope": "MapProgramImageQA production map workflows, drama 12 only",
+  "evidence_root": "/home/joysort/projects/huobao-drama-issue-84/docs/qa/issue-84-1009-20261109T014309Z/MapProgramImageQA",
+  "budget": {
+    "image_submissions_by_this_slice": 1,
+    "image_task_ids": [
+      1295
+    ],
+    "new_text_stage_container_tasks": [
+      1287,
+      1288,
+      1297,
+      1300
+    ],
+    "text_config_id": 1,
+    "image_config_id": 9,
+    "image_model": "qwen-image-2.1",
+    "note": "Map task observations were absent pre-release for 1287/1288; post-release 1297/1300 have persisted system/user/request_params/assistant messages and 3 real calls."
+  },
+  "program_map": {
+    "prop_id": 177,
+    "name": "八达岭1009程序标定图",
+    "status": "completed before parent post-release deterministic redraw takeover",
+    "stage_task_ids": {
+      "brief": 1287,
+      "research": 1288,
+      "base": 1292,
+      "base_version": 1293,
+      "auto_style_drawing_complete": 1294,
+      "texture": 1295,
+      "final_drawing": 1296
+    },
+    "research": {
+      "sources": 24,
+      "features": 5,
+      "queries": {
+        "wikipedia-zh": "hits",
+        "wikipedia-en": "hits",
+        "europeana": 0,
+        "smithsonian": 0
+      },
+      "geometry": {
+        "places": 4,
+        "routes": 1,
+        "regions": 0,
+        "all_proposed": true
+      },
+      "gap": "No AI-backed region: the attempted approximate area was dropped for fewer than three vertices; no fake region was seeded or claimed."
+    },
+    "media": {
+      "base": {
+        "path": "static/map-bases/f9c922818d10f1966ca622e341b4a8c1.png",
+        "sha256": "1dfa19c72f1637e1becf64c86eed08abb43280ac5a3a022f7edf52280c9a4cd8",
+        "opened": "program-base.png"
+      },
+      "texture": {
+        "url": "http://172.30.3.164/huobao/static/images/eeaf8d64-4e9c-4275-8451-09d4154808ed.png",
+        "path": "/home/joysort/projects/huobao-drama-issue-84/docs/qa/issue-84-1009-20261109T014309Z/MapProgramImageQA/program-texture_image.png",
+        "sha256": "beef5b8b54e1c7099bf964480b203b77da608f8d649ddc5729c456989a77c17a",
+        "bytes": 4543056,
+        "source_task_id": 1295
+      },
+      "final": {
+        "url": "http://172.30.3.164/huobao/static/map-drawings/98a6b31d85cc9641f7f6aa8ba987d066.png",
+        "path": "/home/joysort/projects/huobao-drama-issue-84/docs/qa/issue-84-1009-20261109T014309Z/MapProgramImageQA/program-final_image.png",
+        "sha256": "6507ef94301a33608a71fa5b615b0f430c9670ba2e69deb553c033792ebfe1fb",
+        "bytes": 10626682,
+        "source_task_id": 1296
+      }
+    },
+    "opened_findings": [
+      "Base is the expected featureless local-scale Natural Earth 50m output with a faint angular line.",
+      "Texture is a non-geographic parchment texture.",
+      "Final was opened: 4-point/1-line annotation over the featureless base; northern labels overlap. Parent owns the released general label-wrap/avoidance redraw; no coordinate edit was made to mask it."
+    ],
+    "negative_revision_test": {
+      "expected_revision": 9,
+      "actual_revision": 10,
+      "status": 409,
+      "error": "revision_conflict",
+      "data_mutated": false
+    }
+  },
+  "external_map": {
+    "prop_id": 181,
+    "name": "八达岭1009外部标定图",
+    "state_at_handoff": {
+      "stage": "style",
+      "status": "awaiting_review",
+      "revision": 10
+    },
+    "reference_input": {
+      "uploaded_path": "static/uploads/94f824ea-5ce8-46eb-b3d5-b71e7966e5c5.png",
+      "source_url": "https://www.naturalearthdata.com/",
+      "license": "Public domain; production Natural Earth program schematic used as known-registration calibration input",
+      "source_program_prop": 177,
+      "source_base_task": 1293,
+      "control_pair_evidence": "external-control-pairs.json"
+    },
+    "post_release_observed_tasks": {
+      "brief": {
+        "task_id": 1297,
+        "work_id": 14,
+        "call_id": 66
+      },
+      "research": {
+        "task_id": 1300,
+        "work_id": 17,
+        "call_ids": [
+          70,
+          71
+        ]
+      },
+      "base": {
+        "task_id": 1302,
+        "base_version": 1303
+      }
+    },
+    "observability": {
+      "calls_have_roles": [
+        "system",
+        "user",
+        "request_params",
+        "assistant"
+      ],
+      "calls_total": 3,
+      "messages_page_complete": true
+    },
+    "research": {
+      "sources": 24,
+      "features": 8,
+      "geometry": {
+        "places": 6,
+        "routes": 1,
+        "regions": 1,
+        "all_proposed": true
+      },
+      "region": {
+        "name": "关沟防御区（示意，范围近似，非历史疆界）",
+        "source_basis": "F8/S4: five-defense-line north–south sequence and Guangou approximately 20 km depth; explicitly high-uncertainty approximate valley/corridor buffer, not historical boundary or jurisdiction."
+      }
+    },
+    "base": {
+      "path": "static/map-bases/image/5a866bcbf6a3fb1d3ed79b9f.png",
+      "sha256": "6f51ffc053bac7173d3b4d26802ca43db210ba0c6465eabace5d82381a6d3f36",
+      "opened": "external-base.png",
+      "registration": "external-image+affine; three real program-registration pairs; max/rms residual 0"
+    },
+    "handoff": "Parent owns style in-flight restart/reuse, deterministic drawing/completion, UI geometry editing and final media review; no further 181 API write was made after handoff."
+  },
+  "ordinary_prop_negative_control": {
+    "prop_id": 180,
+    "api": "GET /props/180/map-workflow => 400 not_a_map",
+    "ui_screenshot": "ordinary-prop-no-map-ui.png",
+    "opened": true,
+    "finding": "Rendered ordinary-prop detail explicitly states “普通道具不显示任何地图界面”; no map workbench/semantics control was mounted; console errors empty."
+  },
+  "artifacts": {
+    "requests_ledger": "requests.jsonl",
+    "program_terminal": "program-terminal.json",
+    "external_pause": "external-paused-style.json",
+    "calibration_pairs": "external-control-pairs.json",
+    "opened_media": [
+      "program-base.png",
+      "program-texture_image.png",
+      "program-final_image.png",
+      "external-base.png",
+      "ordinary-prop-no-map-ui.png"
+    ]
+  },
+  "limits_and_approval": {
+    "human_historical_approval": false,
+    "proposed_geometries_preserved": true,
+    "no_direct_database_or_production_filesystem_business_writes": true
+  }
+}

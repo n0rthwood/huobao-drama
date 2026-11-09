@@ -1,0 +1,8 @@
+{
+  "coordinates": 21,
+  "max_drift_px": 0.0,
+  "base_version": 1303,
+  "texture_task": 1314,
+  "final_version": 1317,
+  "note": "Coordinates of production LayerDoc vs production fixed affine registration; not independent archival accuracy."
+}

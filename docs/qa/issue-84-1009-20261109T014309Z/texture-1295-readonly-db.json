@@ -1,0 +1,39 @@
+{
+  "id": 1295,
+  "provider": "qwen-jobs",
+  "model": "qwen-image-2.1",
+  "prompt": "seamless aged paper texture background only, parchment fiber grain, subtle ink wash stains, soft vignette, uniform tone, absolutely no map, no coastline, no rivers, no borders, no roads, no landmass, no continents, no text, no letters, no numbers, no symbols, no compass, no illustration, no objects, warm sepia archival parchment tone",
+  "params": {
+    "size": "1920x1080",
+    "map_texture": {
+      "prop_id": 177,
+      "prop_name": "八达岭1009程序标定图"
+    }
+  },
+  "remote_state": {
+    "request": {
+      "mode": "text_to_image",
+      "prompt": "seamless aged paper texture background only, parchment fiber grain, subtle ink wash stains, soft vignette, uniform tone, absolutely no map, no coastline, no rivers, no borders, no roads, no landmass, no continents, no text, no letters, no numbers, no symbols, no compass, no illustration, no objects, warm sepia archival parchment tone",
+      "metadata": {
+        "sys_task_id": "1295"
+      },
+      "width": 1920,
+      "height": 1088
+    },
+    "config_id": 9,
+    "idempotency_key": "huobao-sys_task-1295-f3e9f9e8-c33a-4e32-a7bf-8af45da51463",
+    "remote_status": "succeeded",
+    "queue": null,
+    "progress": null,
+    "estimate": {
+      "run_seconds": 181.6,
+      "basis": "measured",
+      "samples": 116
+    },
+    "estimated_finish_seconds": null,
+    "cancel_requested": false,
+    "updated_at": "2026-11-09T02:07:50.190Z"
+  },
+  "status": "completed",
+  "local_path": "static/images/eeaf8d64-4e9c-4275-8451-09d4154808ed.png"
+}

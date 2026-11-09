@@ -1,0 +1,26 @@
+[
+  {
+    "id": 1003,
+    "kind": "asset_pipeline",
+    "pipeline_state": "waiting_approval",
+    "status": "processing"
+  },
+  {
+    "id": 1004,
+    "kind": "asset_pipeline",
+    "pipeline_state": "waiting_approval",
+    "status": "processing"
+  },
+  {
+    "id": 1203,
+    "kind": "asset_pipeline",
+    "pipeline_state": "waiting_approval",
+    "status": "processing"
+  },
+  {
+    "id": 1264,
+    "kind": "asset_pipeline",
+    "pipeline_state": "waiting_approval",
+    "status": "processing"
+  }
+]

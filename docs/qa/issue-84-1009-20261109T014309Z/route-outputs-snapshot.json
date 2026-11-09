@@ -1,0 +1,138 @@
+{
+  "177": {
+    "stage": "complete",
+    "status": "completed",
+    "revision": 29,
+    "outputs": {
+      "base_image": {
+        "path": "static/map-bases/f9c922818d10f1966ca622e341b4a8c1.png",
+        "width": 3840,
+        "height": 2160,
+        "source": "map-base:program",
+        "task_id": 1293
+      },
+      "texture_image": {
+        "path": "static/images/eeaf8d64-4e9c-4275-8451-09d4154808ed.png",
+        "width": 1920,
+        "height": 1088,
+        "source": "diffusion-texture",
+        "task_id": 1295
+      },
+      "final_image": {
+        "path": "static/map-drawings/0cc85284d87786fdcaf386ee40581f80.png",
+        "width": 3840,
+        "height": 2160,
+        "source": "map-drawing",
+        "task_id": 1311
+      },
+      "kmz": null
+    },
+    "research": {
+      "queries": 9,
+      "sources": 24,
+      "features": 5
+    }
+  },
+  "181": {
+    "stage": "complete",
+    "status": "completed",
+    "revision": 41,
+    "outputs": {
+      "base_image": {
+        "path": "static/map-bases/image/5a866bcbf6a3fb1d3ed79b9f.png",
+        "width": 3840,
+        "height": 2160,
+        "source": "map-base:image",
+        "task_id": 1303
+      },
+      "texture_image": {
+        "path": "static/images/1c9552e0-258c-44ae-a5cc-3e2c6c238394.png",
+        "width": 1920,
+        "height": 1088,
+        "source": "diffusion-texture",
+        "task_id": 1314
+      },
+      "final_image": {
+        "path": "static/map-drawings/0faced4dbf494930bb0183d79cee13dd.png",
+        "width": 3840,
+        "height": 2160,
+        "source": "map-drawing",
+        "task_id": 1341
+      },
+      "kmz": null
+    },
+    "research": {
+      "queries": 10,
+      "sources": 24,
+      "features": 8
+    }
+  },
+  "184": {
+    "stage": "complete",
+    "status": "completed",
+    "revision": 27,
+    "outputs": {
+      "base_image": {
+        "path": "static/images/c33b4bee-7268-4e2c-87d0-27d96d49ed40.png",
+        "width": 3840,
+        "height": 2160,
+        "source": "map-base:image",
+        "task_id": 1324
+      },
+      "texture_image": {
+        "path": "static/images/1566436f-a63c-48ed-bd78-ae8072601541.png",
+        "width": 1920,
+        "height": 1088,
+        "source": "diffusion-texture",
+        "task_id": null
+      },
+      "final_image": {
+        "path": "static/map-drawings/97b9abbfacf66da33bfa1f7a9e660f61.png",
+        "width": 3840,
+        "height": 2160,
+        "source": "map-drawing",
+        "task_id": 1327
+      },
+      "kmz": null
+    },
+    "research": {
+      "queries": 10,
+      "sources": 24,
+      "features": 8
+    }
+  },
+  "185": {
+    "stage": "complete",
+    "status": "completed",
+    "revision": 14,
+    "outputs": {
+      "base_image": {
+        "path": "static/map-bases/4def28ebe8b7e51e10355fcc16ae6328.png",
+        "width": 3840,
+        "height": 2160,
+        "source": "map-base:program",
+        "task_id": 1337
+      },
+      "texture_image": {
+        "path": "static/images/41ec6126-00e2-4db0-a3f2-bad629b5280e.png",
+        "width": 1920,
+        "height": 1088,
+        "source": "diffusion-texture",
+        "task_id": 1338
+      },
+      "final_image": {
+        "path": "static/map-drawings/27153cccdb20a669b02fa7792bafa1d5.png",
+        "width": 3840,
+        "height": 2160,
+        "source": "map-drawing",
+        "task_id": 1339
+      },
+      "kmz": null
+    },
+    "research": {
+      "queries": 9,
+      "sources": 24,
+      "features": 4
+    }
+  }
+}

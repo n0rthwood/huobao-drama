@@ -1,0 +1,100 @@
+[
+  {
+    "id": 1290,
+    "status": "failed",
+    "error_msg": "地图工作流已阻塞：缺少时代：同一地名在不同时代的位置、河道与疆界可能完全不同，没有明确时代就只能猜。京杭运河通州段的河道线路随时代变化很大，对象本身无法唯一推出时期：元代通惠河至元三十年（1293）通航，自白浮泉引水、在张家湾一带入白河（北运河）；明代白浮引水段废弃，通惠河改以大通桥为起点、经城南至通州，漕粮转运改在石坝、土坝；清代大体沿明道，但北运河堤线与局部河势有调整；1855年黄河改道后漕运衰落、河段淤废，1912年潮白河改道又改变了通州段水源与河势。「京杭运河」专名只能限定不早于元代，取值必须由人确定。；请指明其一：元代（1293年通惠河通航后）/ 明代 / 清代漕运全盛期（如18世纪）/ 近代（1855年后）/ 现今遗存。请补充后重新开始。",
+    "created_at": "2026-11-09T01:56:20.283Z",
+    "completed_at": "2026-11-09T01:58:34.462Z"
+  },
+  {
+    "id": 1291,
+    "status": "failed",
+    "error_msg": "The operation was aborted due to timeout",
+    "created_at": "2026-11-09T01:57:40.413Z",
+    "completed_at": "2026-11-09T02:04:03.735Z"
+  },
+  {
+    "id": 1298,
+    "status": "failed",
+    "error_msg": "The operation was aborted due to timeout",
+    "created_at": "2026-11-09T02:19:11.612Z",
+    "completed_at": "2026-11-09T02:25:02.856Z"
+  },
+  {
+    "id": 1299,
+    "status": "failed",
+    "error_msg": "地图工作流已阻塞：时代「古代」还不足以唯一确定这张图：「古代」跨越多个形制时期：京杭运河体系内的通州段，元代为郭守敬开通惠河、以积水潭为终点；明代通惠河起点改至大通桥，北运河经通州的线路与码头仓储布局亦有调整；清代格局又有所变化。三代河道走向并不相同，无法唯一确定线路请指明元代 / 明代 / 清代（或清末）其中之一。请改写得更具体后重试。",
+    "created_at": "2026-11-09T02:19:59.849Z",
+    "completed_at": "2026-11-09T02:21:28.450Z"
+  },
+  {
+    "id": 1305,
+    "status": "failed",
+    "error_msg": "Google Earth 截图失败（退出码 1）：EarthError: 载入 KMZ 这一趟失败：EarthError: Google Earth Web 控件 'File' 在 90s 内没出现；界面可能已变更。当前可见标签：['Click to learn more about storage quota', 'Data layers', 'Explore Earth', 'Filter by Modified', 'Filter by People', 'Last modified', 'Local KML editor', 'Map projects', 'Name', 'New', 'No projects yet', 'Owner', 'Refresh projects', 'Search Google Earth, Press to search', 'Settings', 'Shortcuts', 'Sign in to create projects', 'Standard', 'Storage\\n0 B of 0 B used 0', 'Storage used', 'Tap to view account details\\nChoose an ac', 'Upgrade now'] | url=https://earth.google.com/web/@0,-24.32928486,0a,22251752.77375655d,35y,0h,0t,0r/data=CgRCAggBQgIIAUoNCP___________wEQAA | screenshot=/home/joysort/projects/huobao-drama/data/static/map-bases/earth/pixelgrid-v2-517e91af9e0af7e5c0e201c3-3840-kmz-pass.png | diagnostics=/home/joysort/projects/huobao-drama/data/static/map-bases/earth/pixelgrid-v2-517e91af9e0af7e5c0e201c3-3840-kmz-pass.json | labels=['Refresh projects', 'New', 'Map projects', 'Data layers', 'Storage\\n0 B of 0 B used 0', 'Click to learn more about storage quota', 'Local KML editor', 'Explore Earth', 'Settings', 'Search Google Earth, Press to search', 'Standard', 'Upgrade now', 'Tap to view account details\\nChoose an ac', 'Map projects', 'Shortcuts', 'Filter by People', 'Filter by Modified', 'Name', 'Owner', 'Storage used']",
+    "created_at": "2026-11-09T02:30:39.018Z",
+    "completed_at": "2026-11-09T02:32:39.824Z"
+  },
+  {
+    "id": 1306,
+    "status": "failed",
+    "error_msg": "Google Earth 截图失败（退出码 1）：EarthError: 载入 KMZ 这一趟失败：EarthError: Google Earth Local KML editor opened, but no device-open action appeared; expected one of ['Open KML/Z from device', 'Open KML from device'], saw ['Click to learn more about storage quota', 'Data layers', 'Explore Earth', 'Filter by Modified', 'Filter by People', 'Last modified', 'Local KML editor', 'Map projects', 'Name', 'New', 'No projects yet', 'Owner', 'Refresh projects', 'Search Google Earth, Press to search', 'Settings', 'Shortcuts', 'Sign in to create projects', 'Standard', 'Storage\\n0 B of 0 B used 0', 'Storage used', 'Tap to view account details\\nChoose an account', 'Upgrade now'] | url=https://earth.google.com/web/@0,-24.35479987,0a,22251752.77375655d,35y,0h,0t,0r/data=CgRCAggBQgIIAUoNCP___________wEQAA | screenshot=/home/joysort/projects/huobao-drama/data/static/map-bases/earth/pixelgrid-v2-517e91af9e0af7e5c0e201c3-3840-kmz-pass.png | diagnostics=/home/joysort/projects/huobao-drama/data/static/map-bases/earth/pixelgrid-v2-517e91af9e0af7e5c0e201c3-3840-kmz-pass.json | labels=['Refresh projects', 'New', 'Map projects', 'Data layers', 'Storage\\n0 B of 0 B used 0', 'Click to learn more about storage quota', 'Local KML editor', 'Explore Earth', 'Settings', 'Search Google Earth, Press to search', 'Standard', 'Upgrade now', 'Tap to view account details\\nChoose an ac', 'Map projects', 'Shortcuts', 'Filter by People', 'Filter by Modified', 'Name', 'Owner', 'Storage used']",
+    "created_at": "2026-11-09T02:44:44.841Z",
+    "completed_at": "2026-11-09T02:45:44.471Z"
+  },
+  {
+    "id": 1309,
+    "status": "failed",
+    "error_msg": "Google Earth 截图失败（退出码 1）：EarthError: 载入 KMZ 这一趟失败：EarthError: Google Earth Web 控件 'File' 在 30s 内没出现；界面可能已变更。当前可见标签：['Click to learn more about storage quota', 'Data layers', 'Explore Earth', 'Filter by Modified', 'Filter by People', 'Last modified', 'Local KML editor', 'Map projects', 'Name', 'New', 'No projects yet', 'Owner', 'Refresh projects', 'Search Google Earth, Press to search', 'Settings', 'Shortcuts', 'Sign in to create projects', 'Standard', 'Storage\\n0 B of 0 B used 0', 'Storage used', 'Tap to view account details\\nChoose an ac', 'Upgrade now'] | url=https://earth.google.com/web/@0,-0.40319539,0a,22251752.77375655d,35y,0h,0t,0r/data=CgRCAggBQgIIAUoNCP___________wEQAA | screenshot=/home/joysort/projects/huobao-drama/data/static/map-bases/earth/pixelgrid-v2-517e91af9e0af7e5c0e201c3-3840-kmz-pass.png | diagnostics=/home/joysort/projects/huobao-drama/data/static/map-bases/earth/pixelgrid-v2-517e91af9e0af7e5c0e201c3-3840-kmz-pass.json | labels=['Refresh projects', 'New', 'Map projects', 'Data layers', 'Storage\\n0 B of 0 B used 0', 'Click to learn more about storage quota', 'Local KML editor', 'Explore Earth', 'Settings', 'Search Google Earth, Press to search', 'Standard', 'Upgrade now', 'Tap to view account details\\nChoose an ac', 'Map projects', 'Shortcuts', 'Filter by People', 'Filter by Modified', 'Name', 'Owner', 'Storage used']",
+    "created_at": "2026-11-09T02:56:23.736Z",
+    "completed_at": "2026-11-09T02:57:48.003Z"
+  },
+  {
+    "id": 1313,
+    "status": "failed",
+    "error_msg": "后端重启中断",
+    "created_at": "2026-11-09T03:12:22.368Z",
+    "completed_at": null
+  },
+  {
+    "id": 1320,
+    "status": "failed",
+    "error_msg": "Google Earth 截图失败（退出码 1）：EarthError: 真实像素校准失败：RuntimeError: Actual Earth pixel-grid validation failed: max=5.408px rms=1.450px over 256 withheld controls (limit 3.0px). Do not use this imagery as a registered map; choose program mode or a smaller bbox | url=https://earth.google.com/web/@40.302444,116.147425,0a,144086d,30y,0h,0t,0r/data=CgRCAggBQgIIAEoICIvrtPABEAA | screenshot=/home/joysort/projects/huobao-drama/data/static/map-bases/earth/pixelgrid-v2-517e91af9e0af7e5c0e201c3-3840-calibration-pass.png | diagnostics=/home/joysort/projects/huobao-drama/data/static/map-bases/earth/pixelgrid-v2-517e91af9e0af7e5c0e201c3-3840-calibration-pass.json | labels=['View all map projects', 'Undo last action', 'Redo last action', 'New!, Select features', 'Show historical imagery', 'New!, Show weather forecast', 'Add placemark', 'Add path or polygon', 'New!, Additional drawing tools', 'This feature is unavailable in local KML', 'Measure distance and area', 'This feature is unavailable in local KML', 'This feature is unavailable in local KML', 'Show the menu bar', 'Search Google Earth, Press to search', 'Tap to view account details\\nChoose an ac', 'Expand panel', 'Basemap settings, Change basemap', 'Show Street View', 'Show your location']",
+    "created_at": "2026-11-09T03:18:32.987Z",
+    "completed_at": "2026-11-09T03:23:18.522Z"
+  },
+  {
+    "id": 1321,
+    "status": "failed",
+    "error_msg": "还没有成图，无法完成登记；请先完成底图与标注绘制",
+    "created_at": "2026-11-09T03:19:55.472Z",
+    "completed_at": "2026-11-09T03:19:57.518Z"
+  },
+  {
+    "id": 1323,
+    "status": "failed",
+    "error_msg": "Google Earth 截图失败（退出码 1）：EarthError: 真实像素校准失败：RuntimeError: Pixel calibration could not uniquely find grid[0,2] at predicted (333.7,150.2); nearest=31.737168134044953, association radius=30.0px; projection/terrain/UI may hide the control, refusing an unregistered screenshot | url=https://earth.google.com/web/@40.302444,116.147425,0a,144086d,30y,0h,0t,0r/data=CgRCAggBQgIIAEoICKrIgKkDEAA | screenshot=/home/joysort/projects/huobao-drama/data/static/map-bases/earth/pixelgrid-v2-517e91af9e0af7e5c0e201c3-3840-calibration-pass.png | diagnostics=/home/joysort/projects/huobao-drama/data/static/map-bases/earth/pixelgrid-v2-517e91af9e0af7e5c0e201c3-3840-calibration-pass.json | labels=['View all map projects', 'Undo last action', 'Redo last action', 'New!, Select features', 'Show historical imagery', 'New!, Show weather forecast', 'Add placemark', 'Add path or polygon', 'New!, Additional drawing tools', 'This feature is unavailable in local KML', 'Measure distance and area', 'This feature is unavailable in local KML', 'This feature is unavailable in local KML', 'Show the menu bar', 'Search Google Earth, Press to search', 'Tap to view account details\\nChoose an ac', 'Expand panel', 'Basemap settings, Change basemap', 'Show Street View', 'Show your location']",
+    "created_at": "2026-11-09T03:33:07.095Z",
+    "completed_at": "2026-11-09T03:38:00.482Z"
+  },
+  {
+    "id": 1328,
+    "status": "failed",
+    "error_msg": "Google Earth 截图失败（退出码 1）：EarthError: 真实像素校准失败：RuntimeError: Actual Earth pixel-grid validation failed: max=5.701px rms=1.082px over 1024 withheld controls (limit 3.0px). Do not use this imagery as a registered map; choose program mode or a smaller bbox | url=https://earth.google.com/web/@40.302444,116.147425,0a,144086d,30y,0h,0t,0r/data=CgRCAggBQgIIAEoICIygqpoEEAA | screenshot=/home/joysort/projects/huobao-drama/data/static/map-bases/earth/pixelgrid-v2-517e91af9e0af7e5c0e201c3-3840-calibration-pass.png | diagnostics=/home/joysort/projects/huobao-drama/data/static/map-bases/earth/pixelgrid-v2-517e91af9e0af7e5c0e201c3-3840-calibration-pass.json | labels=['View all map projects', 'Undo last action', 'Redo last action', 'New!, Select features', 'Show historical imagery', 'New!, Show weather forecast', 'Add placemark', 'Add path or polygon', 'New!, Additional drawing tools', 'This feature is unavailable in local KML', 'Measure distance and area', 'This feature is unavailable in local KML', 'This feature is unavailable in local KML', 'Show the menu bar', 'Search Google Earth, Press to search', 'Tap to view account details\\nChoose an ac', 'Expand panel', 'Basemap settings, Change basemap', 'Show Street View', 'Show your location']",
+    "created_at": "2026-11-09T03:47:53.634Z",
+    "completed_at": "2026-11-09T03:52:51.673Z"
+  },
+  {
+    "id": 1333,
+    "status": "failed",
+    "error_msg": "Google Earth 截图失败（退出码 1）：EarthError: 真实像素校准失败：RuntimeError: Actual Earth pixel-grid validation failed: max=4.962px rms=0.772px over 4096 withheld controls (limit 3.0px). Do not use this imagery as a registered map; choose program mode or a smaller bbox | url=https://earth.google.com/web/@40.302444,116.147425,0a,144086d,30y,0h,0t,0r/data=CgRCAggBQgIIAEoICKySyqQEEAA | screenshot=/home/joysort/projects/huobao-drama/data/static/map-bases/earth/pixelgrid-v2-517e91af9e0af7e5c0e201c3-3840-calibration-pass.png | diagnostics=/home/joysort/projects/huobao-drama/data/static/map-bases/earth/pixelgrid-v2-517e91af9e0af7e5c0e201c3-3840-calibration-pass.json | labels=['View all map projects', 'Undo last action', 'Redo last action', 'New!, Select features', 'Show historical imagery', 'New!, Show weather forecast', 'Add placemark', 'Add path or polygon', 'New!, Additional drawing tools', 'This feature is unavailable in local KML', 'Measure distance and area', 'This feature is unavailable in local KML', 'This feature is unavailable in local KML', 'Show the menu bar', 'Search Google Earth, Press to search', 'Tap to view account details\\nChoose an ac', 'Expand panel', 'Basemap settings, Change basemap', 'Show Street View', 'Show your location']",
+    "created_at": "2026-11-09T04:07:34.287Z",
+    "completed_at": "2026-11-09T04:12:25.346Z"
+  },
+  {
+    "id": 1334,
+    "status": "failed",
+    "error_msg": "Google Earth 截图失败（退出码 1）：NameError: name 'folders' is not defined",
+    "created_at": "2026-11-09T04:30:15.670Z",
+    "completed_at": "2026-11-09T04:39:11.482Z"
+  }
+]

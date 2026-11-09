@@ -1,0 +1,15 @@
+{
+ "spec_equals_original": true,
+ "regions": 1,
+ "region_points": 9,
+ "closed": true,
+ "proposed": true,
+ "stage": "complete",
+ "status": "completed",
+ "revision": 41,
+ "task_id": 1340,
+ "final_image": "static/map-drawings/0faced4dbf494930bb0183d79cee13dd.png",
+ "final_task": 1341,
+ "base_task": 1303,
+ "texture_task": 1314
+}

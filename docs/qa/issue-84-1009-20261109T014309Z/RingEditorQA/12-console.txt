@@ -1,0 +1,20 @@
+[log] %c[API] %cGET %c/dramas/12 color:#888 color:#4fc3f7;font-weight:bold color:#ccc 
+[log] %c[API] %cGET %c/ai-configs color:#888 color:#4fc3f7;font-weight:bold color:#ccc 
+[log] %c[API] %cGET /tasks/active %c200 %c8ms color:#888 color:#66bb6a color:#66bb6a;font-weight:bold color:#888
+[log] %c[API] %cGET /style-presets %c200 %c4ms color:#888 color:#66bb6a color:#66bb6a;font-weight:bold color:#888
+[log] %c[API] %cGET /ai-configs %c200 %c3ms color:#888 color:#66bb6a color:#66bb6a;font-weight:bold color:#888
+[log] %c[API] %cGET /dramas/12 %c200 %c14ms color:#888 color:#66bb6a color:#66bb6a;font-weight:bold color:#888
+[log] %c[API] %cGET %c/tasks?type=image&drama_id=12 color:#888 color:#4fc3f7;font-weight:bold color:#ccc 
+[log] %c[API] %cGET %c/props/181/map-workflow color:#888 color:#4fc3f7;font-weight:bold color:#ccc 
+[log] %c[API] %cGET %c/ai-configs?service_type=text color:#888 color:#4fc3f7;font-weight:bold color:#ccc 
+[log] %c[API] %cGET %c/ai-configs?service_type=image color:#888 color:#4fc3f7;font-weight:bold color:#ccc 
+[log] %c[API] %cGET /tasks?type=image&drama_id=12 %c200 %c46ms color:#888 color:#66bb6a color:#66bb6a;font-weight:bold color:#888
+[log] %c[API] %cGET /ai-configs?service_type=text %c200 %c43ms color:#888 color:#66bb6a color:#66bb6a;font-weight:bold color:#888
+[log] %c[API] %cGET /props/181/map-workflow %c200 %c84ms color:#888 color:#66bb6a color:#66bb6a;font-weight:bold color:#888
+[log] %c[API] %cGET %c/dramas/12 color:#888 color:#4fc3f7;font-weight:bold color:#ccc 
+[log] %c[API] %cGET /ai-configs?service_type=image %c200 %c145ms color:#888 color:#66bb6a color:#66bb6a;font-weight:bold color:#888
+[log] %c[API] %cGET /dramas/12 %c200 %c133ms color:#888 color:#66bb6a color:#66bb6a;font-weight:bold color:#888
+[log] %c[API] %cGET %c/tasks/active color:#888 color:#4fc3f7;font-weight:bold color:#ccc 
+[log] %c[API] %cGET /tasks/active %c200 %c9ms color:#888 color:#66bb6a color:#66bb6a;font-weight:bold color:#888
+[log] %c[API] %cGET %c/tasks/active color:#888 color:#4fc3f7;font-weight:bold color:#ccc 
+[log] %c[API] %cGET /tasks/active %c200 %c6ms color:#888 color:#66bb6a color:#66bb6a;font-weight:bold color:#888

@@ -1,0 +1,9 @@
+Source: ~/.pm2/logs/huobao-backend-out.log:880850-880861
+04:47:06 POST /api/v1/props 201 5ms
+04:47:06 PUT /api/v1/props/185/map-workflow 200 3ms
+04:47:06 POST /api/v1/props/185/map-workflow/run
+  body: {"mode":"auto","expected_revision":1,"text_config_id":14,"image_config_id":9,"image_model":"qwen-image-2.1"}
+04:47:06 [MapWorkflow] START run | taskId=1335 propId=185 mode=auto stage=brief
+04:47:06 POST /api/v1/props/185/map-workflow/run 200 17ms
+
+Failure details are durable sys_task.error_msg rows, not invented pm2 stderr; see failed-map-task-ledger.json.

@@ -1,0 +1,21 @@
+{
+  "picker": {
+    "requested": 1,
+    "file_reads": 1,
+    "name": "earth-current-local-editor-probe.kmz",
+    "bytes": 298
+  },
+  "folder": "Drag to reorder\nHuobao current UI probe folder, folder",
+  "actions": [
+    "Close",
+    "Close",
+    "Dismiss",
+    "Dismiss",
+    "Dismiss",
+    "Dismiss",
+    "Dismiss",
+    "Dismiss",
+    "Dismiss"
+  ],
+  "url": "https://earth.google.com/web/@40.289,116.068,-420a,1000d,30y,0h,0t,0r/data=CgRCAggBQgIIAEoICLrY_7wGEAA"
+}

@@ -1,0 +1,92 @@
+{
+ "scope": "Issue84 ring-editor UI regression QA on production external map prop 181 (drama12)",
+ "session": "agent-browser worktree-scoped huobao-ringqa (closed after run)",
+ "step1_first_vertex_drag": {
+  "ui": "real pointer move/down/move/move/up on first region handle, then 保存几何 click",
+  "handles_exposed": 8,
+  "stored_points_before": 9,
+  "stored_points_after": 9,
+  "closure_first_equals_last": true,
+  "changed_indices": [
+   0,
+   8
+  ],
+  "independent_points_changed": 1,
+  "proposed_preserved": true,
+  "evidence": [
+   "01-ring-before-drag.png",
+   "02-ring-after-drag.png",
+   "03-ui-first-vertex-drag-readback.json"
+  ]
+ },
+ "step2_delete_continue_triangle": {
+  "delete_vertex": "dblclick on ring handle -> handles 8->7, saved spec 8 stored points, closed, proposed kept",
+  "continue_shape": "继续编辑此形状 draft started with 7 points (closing duplicate excluded), one UI click added 8th, 完成（8 点）, saved -> 9 stored / 8 unique / closed",
+  "triangle_minimum": "synthetic UI region 'QA三角形最小点数测试（非历史范围）' drawn via UI (3 vertices); dblclick on its vertex is a no-op (still 3). Discarded unsaved, never persisted.",
+  "evidence": [
+   "04-after-delete-and-continue.json",
+   "05-triangle-min-and-continued-ring.png"
+  ]
+ },
+ "step3_restore_and_deterministic_run": {
+  "put_revision_in": 35,
+  "revision_after_put": 36,
+  "spec_equals_original_after_put": true,
+  "run": {
+   "mode": "auto",
+   "expected_revision": 36,
+   "container_task_id": 1340,
+   "elapsed_ms": 282,
+   "llm_calls": 0
+  },
+  "final": {
+   "stage": "complete",
+   "status": "completed",
+   "revision": 41,
+   "drawing_task_id": 1341,
+   "final_image": "static/map-drawings/0faced4dbf494930bb0183d79cee13dd.png (identical to pre-QA final from task 1332)",
+   "base_task_reused": 1303,
+   "texture_task_reused": 1314
+  },
+  "spec_equals_original_final": true,
+  "regions": 1,
+  "ai_region_points": 9,
+  "closed": true,
+  "proposed": true,
+  "evidence": [
+   "00-original-map-spec.json",
+   "06-restore-original-spec.json",
+   "07-final-after-deterministic-run.json",
+   "08-final-verification.json"
+  ],
+  "model_call_accounting": {
+   "task_1340": "type=text provider=openai model=glm-5.3 kind=map_workflow; GET /tasks/1340/observations -> works=1 (stage map_workflow, call_count=0, work_ms=229), calls=[], messages=[] => orchestration record with zero model calls",
+   "task_1341": "type=image provider=map-workflow model=map-drawing; observations works=[] calls=[] => deterministic local drawing render, no provider job",
+   "evidence": [
+    "13-task-1340-observations.json",
+    "14-task-1341-observations.json"
+   ]
+  }
+ },
+ "step4_deeplink_and_diagnostics": {
+  "reload_same_tab": "mfocus=region:g_939f4e86 focused saved region, 8 handles",
+  "new_tab": "same focus, 8 handles, read-only",
+  "write_requests_during_readonly_phase": 0,
+  "page_errors": 0,
+  "api_requests": "24, all GET 200",
+  "evidence": [
+   "09-newtab-focus-final.png",
+   "10-network-requests.txt",
+   "11-errors.txt",
+   "12-console.txt"
+  ]
+ },
+ "paid_calls_by_this_agent": {
+  "image": 0,
+  "text": 0,
+  "video": 0,
+  "tts": 0,
+  "basis": "task observations above; no other tasks created in window"
+ },
+ "failing_before_evidence": "parent ../ui-geometry-save-readback.json (old editor 9->10) left untouched"
+}

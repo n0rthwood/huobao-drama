@@ -1,0 +1,18 @@
+{
+  "backend_tsc": "passed",
+  "python_syntax": "passed",
+  "affected_tests": {
+    "total": 44,
+    "passed": 44,
+    "failed": 0
+  },
+  "recovery_regression": "failed before fix (attempted a new image despite completed paid texture), passed after fix",
+  "label_regression": "retains complete nearby place names, disjoint in-frame text boxes and exact geographic pixel coordinates",
+  "prior_incidental_assertion_removed": "marker.text storage location only; full visible-name/geometry assertions retained; no historical failing tests removed",
+  "production_restart_preflight": [
+    1003,
+    1004,
+    1203,
+    1264
+  ]
+}

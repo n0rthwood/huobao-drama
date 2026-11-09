@@ -1,0 +1,18 @@
+{
+  "root_task_id": 1343,
+  "result": "failed capture: calibration KMZ was never requested or read; no residual measurement from this attempt",
+  "picker": {"requested":0,"file_reads":0,"bytes":135403},
+  "page_errors": [],
+  "observed_sequence": [
+    "File discovery dismissed Close at 1/2s and Dismiss at 3 through 8s; File ready at 9s",
+    "Both Open local KML file readiness snapshots show actual menu item Open local KML file\\nCtrl+I and no visible Dismiss",
+    "open_local_kml dispatched semantic el.click() with settle=0 and returned",
+    "15s wait_for_function(file_reads>0) expired; picker.requested and picker.file_reads both zero",
+    "Failure snapshot shows Ask Google Earth for help coachmark with Dismiss/Try it now, globe at Africa, no calibration grid"
+  ],
+  "source_contract_defect": "activate() reports only node existence plus DOM click dispatch, not Flutter action success; open_local_kml returns immediately after dispatch, then file_reads waiting does not handle late blockers",
+  "inference": "A late onboarding coachmark consumed the local-open action. Saved evidence proves post-click coachmark and no picker request, but cannot prove hit-test causality because activation logs were not recorded.",
+  "unchanged": {"map_spec_sha256":"196e946f6e5787528b734ba7aa24791a49ccaa8fa2bb6476f085ff72d080e383","brief_sha256":"74714644bf6f22549705deaf809200f3fd28e3f0291a104580acb81862430747","bbox":[115.722,39.98,116.393,40.624]},
+  "model_calls": {"image":0,"text":0,"video":0,"tts":0},
+  "next_action": "No automatic retry. Parent fixing picker postcondition/readiness; production acceptance remains blocked."
+}

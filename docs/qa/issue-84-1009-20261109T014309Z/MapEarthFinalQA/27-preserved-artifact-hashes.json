@@ -1,0 +1,13 @@
+{
+  "root1343_backup": "/home/joysort/huobao-backup/issue84-prop179-root1343-failure-20261109/",
+  "failure_state_sha256":"9a6f19921364993d9ba7c70cd9aec365ca413ac91ff592273bd302aaab5f64f0",
+  "failure_task_sha256":"ca6e97cec18472caf9242ffdb3177fc72e15ebbecf9acffd353c079855d3a6b4",
+  "failure_screenshot_sha256":"a6ce58d86248cfb5acfc210fb480802dbc0a1e0bd3095fc9fe0d6f5aeefbfc0a",
+  "failure_diagnostics_sha256":"45f0aa22f706dcee3c077dd68b2e27a2dc87314f94c4e8fb820c7c227a80af85",
+  "rejected1342_backup":"/home/joysort/huobao-backup/issue84-prop179-base1342-20261109T050000Z/",
+  "rejected1342_base_sha256":"c032dfbc42b4af4277940523274c955eca87ece5d7c519a6693c0de60a3f3783",
+  "rejected1342_sidecar_sha256":"ca95e4dec4b1e6f5a20637dc0692f7fa405c01b300587ad55b4078da9cfdd9c4",
+  "delivery_kmz_sha256":"517e91af9e0af7e5c0e201c37c52d8cae26a51a6af0ed797da3245a1b4aad92a",
+  "browser_closed":true,
+  "lingering_watcher_cancelled":"bg_36"
+}

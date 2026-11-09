@@ -1,0 +1,103 @@
+{
+  "mode": "sqlite URI mode=ro",
+  "project": {
+    "id": 12,
+    "title": "八达岭长城测试 1009",
+    "project_type": "documentary",
+    "aspect_ratio": "16:9"
+  },
+  "episode": {
+    "id": 18,
+    "drama_id": 12,
+    "episode_number": 1,
+    "script_content": null,
+    "script_confirmed_at": null,
+    "source_chars": 257
+  },
+  "props": [
+    {
+      "id": 177,
+      "name": "八达岭1009程序标定图",
+      "asset_type": "map",
+      "faithful": 1,
+      "faithful_source": 1293,
+      "image_url": "static/map-drawings/98a6b31d85cc9641f7f6aa8ba987d066.png",
+      "workflow": {
+        "stage": "complete",
+        "status": "completed",
+        "revision": 17,
+        "task_id": 1294
+      }
+    },
+    {
+      "id": 178,
+      "name": "1009_通州段_信息不足负例",
+      "asset_type": "map",
+      "faithful": 0,
+      "faithful_source": null,
+      "image_url": null,
+      "workflow": {
+        "stage": "brief",
+        "status": "blocked",
+        "revision": 8,
+        "task_id": 1299
+      }
+    },
+    {
+      "id": 179,
+      "name": "1009_Earth_明代八达岭居庸关关沟防御区位图",
+      "asset_type": "map",
+      "faithful": 0,
+      "faithful_source": null,
+      "image_url": null,
+      "workflow": {
+        "stage": "research",
+        "status": "running",
+        "revision": 9,
+        "task_id": 1298
+      }
+    },
+    {
+      "id": 180,
+      "name": "八达岭1009普通道具错误路径",
+      "asset_type": "prop",
+      "faithful": 0,
+      "faithful_source": null,
+      "image_url": null,
+      "workflow": {
+        "stage": null,
+        "status": null,
+        "revision": null,
+        "task_id": null
+      }
+    },
+    {
+      "id": 181,
+      "name": "八达岭1009外部标定图",
+      "asset_type": "map",
+      "faithful": 0,
+      "faithful_source": null,
+      "image_url": null,
+      "workflow": {
+        "stage": "research",
+        "status": "running",
+        "revision": 6,
+        "task_id": 1300
+      }
+    },
+    {
+      "id": 182,
+      "name": "1009_殷墟车马坑_隐含信息核验",
+      "asset_type": "map",
+      "faithful": 0,
+      "faithful_source": null,
+      "image_url": null,
+      "workflow": {
+        "stage": "brief",
+        "status": "running",
+        "revision": 3,
+        "task_id": 1301
+      }
+    }
+  ]
+}

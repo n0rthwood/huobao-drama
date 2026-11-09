@@ -1,0 +1,150 @@
+{
+  "prop_id": 185,
+  "task_id": 1335,
+  "brief": {
+    "subject": "明代八达岭与居庸关关沟防御区位示意",
+    "era": "明代",
+    "location": "北京市西北部：八达岭、居庸关与关沟",
+    "purpose": "展示八达岭关、居庸关两关位置及关沟走向的区域示意；服务于历史地理定位，不作边界复原。",
+    "detail_level": "regional",
+    "schematic": true,
+    "base_mode": "program",
+    "style": "archival",
+    "notes": "仅依据可核查来源添加两关与关沟要素。检索固定覆盖 Wikipedia 中文/英文、Europeana、Smithsonian；保留无命中、冲突和不确定性。若来源支持区域尺度，可标注“关沟防御区（示意，范围近似，非历史疆界）”；若不支持，不添加区域。所有 AI 研究几何保持 proposed，等待人工历史审核。 本案例从 brief 开始一次全自动运行，原件、底纹与矢量分别保存。",
+    "reference_image": null,
+    "inferred": []
+  },
+  "response": {
+    "code": 200,
+    "data": {
+      "stage": "brief",
+      "status": "running",
+      "mode": "auto",
+      "revision": 2,
+      "task_id": 1335,
+      "error": null,
+      "brief": {
+        "subject": "明代八达岭与居庸关关沟防御区位示意",
+        "era": "明代",
+        "location": "北京市西北部：八达岭、居庸关与关沟",
+        "purpose": "展示八达岭关、居庸关两关位置及关沟走向的区域示意；服务于历史地理定位，不作边界复原。",
+        "detail_level": "regional",
+        "schematic": true,
+        "base_mode": "program",
+        "style": "archival",
+        "notes": "仅依据可核查来源添加两关与关沟要素。检索固定覆盖 Wikipedia 中文/英文、Europeana、Smithsonian；保留无命中、冲突和不确定性。若来源支持区域尺度，可标注“关沟防御区（示意，范围近似，非历史疆界）”；若不支持，不添加区域。所有 AI 研究几何保持 proposed，等待人工历史审核。 本案例从 brief 开始一次全自动运行，原件、底纹与矢量分别保存。",
+        "reference_image": null,
+        "inferred": []
+      },
+      "steps": [
+        {
+          "id": "brief",
+          "label": "地图需求",
+          "status": "pending",
+          "message": null,
+          "started_at": null,
+          "finished_at": null
+        },
+        {
+          "id": "research",
+          "label": "资料检索",
+          "status": "pending",
+          "message": null,
+          "started_at": null,
+          "finished_at": null
+        },
+        {
+          "id": "base",
+          "label": "底图生产",
+          "status": "pending",
+          "message": null,
+          "started_at": null,
+          "finished_at": null
+        },
+        {
+          "id": "style",
+          "label": "质感底纹",
+          "status": "pending",
+          "message": null,
+          "started_at": null,
+          "finished_at": null
+        },
+        {
+          "id": "drawing",
+          "label": "标注绘制",
+          "status": "pending",
+          "message": null,
+          "started_at": null,
+          "finished_at": null
+        },
+        {
+          "id": "complete",
+          "label": "完成登记",
+          "status": "pending",
+          "message": null,
+          "started_at": null,
+          "finished_at": null
+        }
+      ],
+      "issues": [
+        {
+          "field": "brief",
+          "code": "brief_changed",
+          "blocking": false,
+          "message": "需求已修改：请重新开始工作流以按新需求检索与出图；此前的底图/成图仍保留在产出与历史中"
+        }
+      ],
+      "research": null,
+      "outputs": {
+        "base_image": null,
+        "texture_image": null,
+        "final_image": null,
+        "kmz": null,
+        "layer_doc": null
+      },
+      "history": [
+        {
+          "revision": 1,
+          "at": "2026-11-09T04:47:06.286Z",
+          "stage": "brief",
+          "status": "idle",
+          "action": "edit_brief",
+          "actor": "manual",
+          "note": "需求",
+          "snapshot": {
+            "stage": "brief",
+            "brief": null,
+            "map_spec": null,
+            "outputs": {
+              "base_image": null,
+              "texture_image": null,
+              "final_image": null,
+              "kmz": null,
+              "layer_doc": null
+            },
+            "research": null
+          }
+        },
+        {
+          "revision": 2,
+          "at": "2026-11-09T04:47:06.303Z",
+          "stage": "brief",
+          "status": "running",
+          "action": "run:brief",
+          "actor": "manual",
+          "note": "模式 auto"
+        }
+      ],
+      "text_config_id": 14,
+      "image_config_id": 9,
+      "image_model": "qwen-image-2.1",
+      "updated_at": "2026-11-09T04:47:06.303Z",
+      "prop_id": 185,
+      "prop_name": "八达岭1009全自动区位图",
+      "asset_type": "map",
+      "map_spec": null,
+      "busy": true
+    },
+    "message": "success"
+  }
+}

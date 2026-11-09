@@ -1,0 +1,346 @@
+{
+  "workflow": {
+    "code": 200,
+    "data": {
+      "stage": "research",
+      "status": "awaiting_review",
+      "mode": "manual",
+      "revision": 4,
+      "task_id": 1301,
+      "error": null,
+      "brief": {
+        "subject": "殷墟车马坑",
+        "era": "商代晚期（约前13—前11世纪）",
+        "location": "河南安阳小屯一带（殷墟遗址范围内，洹河两岸）",
+        "purpose": "遗址位置图",
+        "detail_level": "site",
+        "schematic": false,
+        "base_mode": "program",
+        "style": "archival",
+        "notes": "殷墟车马坑",
+        "reference_image": null,
+        "inferred": [
+          {
+            "field": "era",
+            "value": "商代晚期（约前13—前11世纪）",
+            "basis": "殷墟为商代晚期都城遗址，车马坑属殷墟文化时期遗存，时代指向唯一",
+            "confidence": "high"
+          },
+          {
+            "field": "location",
+            "value": "河南安阳小屯一带（殷墟遗址范围内，洹河两岸）",
+            "basis": "殷墟位于河南安阳西北郊、以小屯村为中心，车马坑均分布于该遗址范围内，地域指向唯一",
+            "confidence": "high"
+          },
+          {
+            "field": "purpose",
+            "value": "遗址位置图",
+            "basis": "对象为考古遗迹点位、详略层级为 site，唯一合理的用途即标示车马坑在殷墟中的位置",
+            "confidence": "high"
+          }
+        ]
+      },
+      "steps": [
+        {
+          "id": "brief",
+          "label": "地图需求",
+          "status": "completed",
+          "message": "需求已确认（3 项由 AI 补全）",
+          "started_at": "2026-11-09T02:22:32.132Z",
+          "finished_at": "2026-11-09T02:23:06.481Z"
+        },
+        {
+          "id": "research",
+          "label": "资料检索",
+          "status": "pending",
+          "message": null,
+          "started_at": null,
+          "finished_at": null
+        },
+        {
+          "id": "base",
+          "label": "底图生产",
+          "status": "pending",
+          "message": null,
+          "started_at": null,
+          "finished_at": null
+        },
+        {
+          "id": "style",
+          "label": "质感底纹",
+          "status": "pending",
+          "message": null,
+          "started_at": null,
+          "finished_at": null
+        },
+        {
+          "id": "drawing",
+          "label": "标注绘制",
+          "status": "pending",
+          "message": null,
+          "started_at": null,
+          "finished_at": null
+        },
+        {
+          "id": "complete",
+          "label": "完成登记",
+          "status": "pending",
+          "message": null,
+          "started_at": null,
+          "finished_at": null
+        }
+      ],
+      "issues": [
+        {
+          "field": "notes",
+          "code": "minor_uncertainty",
+          "blocking": false,
+          "message": "殷墟范围内已发掘多座车马坑（小屯宫殿区附近、孝民屯、郭家庄、大司空村等），「殷墟车马坑」按集合点位群处理；若用户实际想画某一具体坑（如殷墟博物苑车马坑展馆所在坑），需另行说明"
+        },
+        {
+          "field": "notes",
+          "code": "minor_uncertainty",
+          "blocking": false,
+          "message": "底图为程序生成，是否叠加洹河河道、殷墟保护区边界等背景要素可由制图者酌定，不影响图的唯一性"
+        },
+        {
+          "field": "era",
+          "code": "inferred_field",
+          "blocking": false,
+          "message": "时代由 AI 据「殷墟为商代晚期都城遗址，车马坑属殷墟文化时期遗存，时代指向唯一」推断为「商代晚期（约前13—前11世纪）」（置信度 high），请确认或改写。"
+        },
+        {
+          "field": "location",
+          "code": "inferred_field",
+          "blocking": false,
+          "message": "地域范围由 AI 据「殷墟位于河南安阳西北郊、以小屯村为中心，车马坑均分布于该遗址范围内，地域指向唯一」推断为「河南安阳小屯一带（殷墟遗址范围内，洹河两岸）」（置信度 high），请确认或改写。"
+        },
+        {
+          "field": "purpose",
+          "code": "inferred_field",
+          "blocking": false,
+          "message": "用途由 AI 据「对象为考古遗迹点位、详略层级为 site，唯一合理的用途即标示车马坑在殷墟中的位置」推断为「遗址位置图」（置信度 high），请确认或改写。"
+        }
+      ],
+      "research": null,
+      "outputs": {
+        "base_image": null,
+        "texture_image": null,
+        "final_image": null,
+        "kmz": null,
+        "layer_doc": null
+      },
+      "history": [
+        {
+          "revision": 1,
+          "at": "2026-11-09T02:22:32.123Z",
+          "stage": "brief",
+          "status": "idle",
+          "action": "edit_brief",
+          "actor": "manual",
+          "note": "需求",
+          "snapshot": {
+            "brief": null,
+            "map_spec": null,
+            "outputs": {
+              "base_image": null,
+              "texture_image": null,
+              "final_image": null,
+              "kmz": null,
+              "layer_doc": null
+            },
+            "research": null
+          }
+        },
+        {
+          "revision": 2,
+          "at": "2026-11-09T02:22:32.131Z",
+          "stage": "brief",
+          "status": "running",
+          "action": "advance:brief",
+          "actor": "manual",
+          "note": "模式 manual"
+        },
+        {
+          "revision": 3,
+          "at": "2026-11-09T02:22:32.132Z",
+          "stage": "brief",
+          "status": "running",
+          "action": "stage_start:brief",
+          "actor": "manual",
+          "note": null
+        },
+        {
+          "revision": 4,
+          "at": "2026-11-09T02:23:06.481Z",
+          "stage": "research",
+          "status": "awaiting_review",
+          "action": "stage_done:brief",
+          "actor": "manual",
+          "note": "需求已确认（3 项由 AI 补全）",
+          "snapshot": {
+            "brief": {
+              "subject": "殷墟车马坑",
+              "era": "",
+              "location": "",
+              "purpose": "",
+              "detail_level": "site",
+              "schematic": false,
+              "base_mode": "program",
+              "style": "archival",
+              "notes": "殷墟车马坑",
+              "reference_image": null,
+              "inferred": []
+            },
+            "map_spec": null,
+            "outputs": {
+              "base_image": null,
+              "texture_image": null,
+              "final_image": null,
+              "kmz": null,
+              "layer_doc": null
+            },
+            "research": null
+          }
+        }
+      ],
+      "text_config_id": 1,
+      "image_config_id": null,
+      "image_model": null,
+      "updated_at": "2026-11-09T02:23:06.481Z",
+      "prop_id": 182,
+      "prop_name": "1009_殷墟车马坑_隐含信息核验",
+      "asset_type": "map",
+      "map_spec": null,
+      "busy": false
+    },
+    "message": "success"
+  },
+  "observations": {
+    "code": 200,
+    "data": {
+      "task_id": 1301,
+      "works": [
+        {
+          "id": 18,
+          "task_id": 1301,
+          "stage": "map_workflow",
+          "source_chars": 10,
+          "sample_key": "map_workflow|cfg:1|model:glm-5.3|start:brief|base:program",
+          "storyboard_id": null,
+          "storyboard_number": null,
+          "started_at": 1794190952131,
+          "finished_at": 1794190986481,
+          "status": "completed",
+          "model_ms": 34346,
+          "queue_ms": 1,
+          "work_ms": 34350,
+          "call_count": 1,
+          "heartbeat_at": 1794190986481,
+          "error_msg": null,
+          "created_at": 1794190952131,
+          "active_call_started_at": null,
+          "active_call_heartbeat_at": null
+        }
+      ],
+      "calls": [
+        {
+          "id": 72,
+          "work_id": 18,
+          "task_id": 1301,
+          "kind": "llm",
+          "config_id": 1,
+          "config_name": "GLM 5.3 (local)",
+          "provider": "openai",
+          "model": "glm-5.3",
+          "url": "https://open.bigmodel.cn/api/coding/paas/v4/chat/completions",
+          "stream": 0,
+          "status": "completed",
+          "http_status": 200,
+          "queued_at": 1794190952132,
+          "started_at": 1794190952133,
+          "finished_at": 1794190986479,
+          "duration_ms": 34346,
+          "queue_ms": 1,
+          "request_chars": 946,
+          "response_chars": 528,
+          "prompt_tokens": 469,
+          "completion_tokens": 1526,
+          "finish_reason": "stop",
+          "error_msg": null,
+          "heartbeat_at": 1794190986479,
+          "created_at": 1794190952133,
+          "message_count": 4
+        }
+      ],
+      "messages": [
+        {
+          "id": 776,
+          "call_id": 72,
+          "work_id": 18,
+          "task_id": 1301,
+          "seq": 0,
+          "phase": "request",
+          "role": "system",
+          "name": null,
+          "tool_call_id": null,
+          "body": "你在审核一张历史地图的需求，判断它是否**足以唯一确定一张图**。审两件事：\n\nA. 已填的值是否够明确。填了不等于够：\n   - 「古代」「近代」这种跨越多个形制时期的说法 → 列进 ambiguous；\n   - 「中国」「华北」这种与对象实际范围差一个数量级的地域 → 列进 ambiguous；\n   - 「地图」「展示」这种没有说明画法取舍的用途 → 列进 ambiguous。\n   能唯一确定的（如「商代晚期」「河南安阳小屯一带」「遗址位置图」）不要列。\nB. 空着的值能否由对象本身唯一推出。只有唯一指向时才补：\n   例「殷墟车马坑」→ 时代：商代晚期；地域：河南安阳小屯一带；用途：遗址位置图。\n   对象横跨多个时代且形态不同（河道改道、城址迁移等）→ 不要补，列进 missing，\n   写明为什么必须由人确定，并给出可选项提示。\n\n不确定就给 low 置信度，不要把猜测写成考证结论。配色、是否标注现代地名等次要细节不要列进 missing/ambiguous，放 notes。\n\n只返回 JSON（四个键都要有，没有内容就给空数组）：\n{\"inferred\":[{\"field\":\"era\",\"value\":\"商代晚期（约前13—前11世纪）\",\"basis\":\"殷墟是商代晚期都城遗址\",\"confidence\":\"high\"}],\n\"ambiguous\":[{\"field\":\"era\",\"reason\":\"「古代」跨越的时期里河道与疆界差别很大\",\"hint\":\"请指明具体朝代或世纪\"}],\n\"missing\":[{\"field\":\"era\",\"reason\":\"该河段在元、明、清三代多次改道\",\"hint\":\"请指明元代 / 明代 / 清末其中之一\"}],\n\"notes\":[\"次要的不确定之处\"]}",
+          "chars": 771,
+          "streaming": 0,
+          "created_at": 1794190952133
+        },
+        {
+          "id": 777,
+          "call_id": 72,
+          "work_id": 18,
+          "task_id": 1301,
+          "seq": 1,
+          "phase": "request",
+          "role": "user",
+          "name": null,
+          "tool_call_id": null,
+          "body": "地图对象（subject）：殷墟车马坑\n时代（era）：（空）\n地域（location）：（空）\n用途（purpose）：（空）\n详略：site；示意图模式：关闭；底图方式：program\n补充说明：殷墟车马坑",
+          "chars": 105,
+          "streaming": 0,
+          "created_at": 1794190952133
+        },
+        {
+          "id": 778,
+          "call_id": 72,
+          "work_id": 18,
+          "task_id": 1301,
+          "seq": 2,
+          "phase": "request",
+          "role": "request_params",
+          "name": null,
+          "tool_call_id": null,
+          "body": "{\n  \"model\": \"glm-5.3\",\n  \"temperature\": 0.1,\n  \"max_tokens\": 131072\n}",
+          "chars": 70,
+          "streaming": 0,
+          "created_at": 1794190952133
+        },
+        {
+          "id": 779,
+          "call_id": 72,
+          "work_id": 18,
+          "task_id": 1301,
+          "seq": 3,
+          "phase": "response",
+          "role": "assistant",
+          "name": null,
+          "tool_call_id": null,
+          "body": "{\"inferred\":[{\"field\":\"era\",\"value\":\"商代晚期（约前13—前11世纪）\",\"basis\":\"殷墟为商代晚期都城遗址，车马坑属殷墟文化时期遗存，时代指向唯一\",\"confidence\":\"high\"},{\"field\":\"location\",\"value\":\"河南安阳小屯一带（殷墟遗址范围内，洹河两岸）\",\"basis\":\"殷墟位于河南安阳西北郊、以小屯村为中心，车马坑均分布于该遗址范围内，地域指向唯一\",\"confidence\":\"high\"},{\"field\":\"purpose\",\"value\":\"遗址位置图\",\"basis\":\"对象为考古遗迹点位、详略层级为 site，唯一合理的用途即标示车马坑在殷墟中的位置\",\"confidence\":\"high\"}],\"ambiguous\":[],\"missing\":[],\"notes\":[\"殷墟范围内已发掘多座车马坑（小屯宫殿区附近、孝民屯、郭家庄、大司空村等），「殷墟车马坑」按集合点位群处理；若用户实际想画某一具体坑（如殷墟博物苑车马坑展馆所在坑），需另行说明\",\"底图为程序生成，是否叠加洹河河道、殷墟保护区边界等背景要素可由制图者酌定，不影响图的唯一性\"]}",
+          "chars": 528,
+          "streaming": 0,
+          "created_at": 1794190986479
+        }
+      ],
+      "message_limit": 200,
+      "messages_complete": true,
+      "limit": 50,
+      "next_cursor": null,
+      "has_more": false
+    },
+    "message": "success"
+  }
+}

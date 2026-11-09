@@ -1,0 +1,50 @@
+{
+  "wikipedia-zh": [
+    {
+      "hits": 5,
+      "error": null
+    },
+    {
+      "hits": 5,
+      "error": null
+    },
+    {
+      "hits": 5,
+      "error": null
+    },
+    {
+      "hits": 5,
+      "error": null
+    },
+    {
+      "hits": 5,
+      "error": null
+    }
+  ],
+  "wikipedia-en": [
+    {
+      "hits": 5,
+      "error": null
+    },
+    {
+      "hits": 5,
+      "error": null
+    },
+    {
+      "hits": 0,
+      "error": null
+    }
+  ],
+  "europeana": [
+    {
+      "hits": 1,
+      "error": null
+    }
+  ],
+  "smithsonian": [
+    {
+      "hits": 8,
+      "error": null
+    }
+  ]
+}

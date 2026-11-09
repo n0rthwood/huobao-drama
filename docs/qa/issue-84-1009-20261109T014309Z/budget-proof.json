@@ -1,0 +1,191 @@
+{
+  "images_limit": 4,
+  "text_calls_limit": 20,
+  "observed_calls": [
+    {
+      "id": 66,
+      "task_id": 1297,
+      "kind": "llm",
+      "model": "glm-5.3",
+      "status": "completed",
+      "duration_ms": 128205,
+      "queue_ms": 1,
+      "request_chars": 1324,
+      "response_chars": 359
+    },
+    {
+      "id": 67,
+      "task_id": 1298,
+      "kind": "llm",
+      "model": "glm-5.3",
+      "status": "completed",
+      "duration_ms": 14271,
+      "queue_ms": 0,
+      "request_chars": 595,
+      "response_chars": 519
+    },
+    {
+      "id": 68,
+      "task_id": 1299,
+      "kind": "llm",
+      "model": "glm-5.3",
+      "status": "completed",
+      "duration_ms": 88597,
+      "queue_ms": 0,
+      "request_chars": 1010,
+      "response_chars": 671
+    },
+    {
+      "id": 69,
+      "task_id": 1298,
+      "kind": "llm",
+      "model": "glm-5.3",
+      "status": "failed",
+      "duration_ms": 299998,
+      "queue_ms": 2,
+      "request_chars": 19576,
+      "response_chars": 0
+    },
+    {
+      "id": 70,
+      "task_id": 1300,
+      "kind": "llm",
+      "model": "glm-5.3",
+      "status": "completed",
+      "duration_ms": 11591,
+      "queue_ms": 1,
+      "request_chars": 764,
+      "response_chars": 533
+    },
+    {
+      "id": 71,
+      "task_id": 1300,
+      "kind": "llm",
+      "model": "glm-5.3",
+      "status": "completed",
+      "duration_ms": 294156,
+      "queue_ms": 1,
+      "request_chars": 19794,
+      "response_chars": 4688
+    },
+    {
+      "id": 72,
+      "task_id": 1301,
+      "kind": "llm",
+      "model": "glm-5.3",
+      "status": "completed",
+      "duration_ms": 34346,
+      "queue_ms": 1,
+      "request_chars": 946,
+      "response_chars": 528
+    },
+    {
+      "id": 73,
+      "task_id": 1304,
+      "kind": "llm",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "duration_ms": 4698,
+      "queue_ms": 1,
+      "request_chars": 602,
+      "response_chars": 500
+    },
+    {
+      "id": 74,
+      "task_id": 1304,
+      "kind": "llm",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "duration_ms": 46466,
+      "queue_ms": 2,
+      "request_chars": 19585,
+      "response_chars": 2810
+    },
+    {
+      "id": 87,
+      "task_id": 1335,
+      "kind": "llm",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "duration_ms": 11350,
+      "queue_ms": 1,
+      "request_chars": 1206,
+      "response_chars": 271
+    },
+    {
+      "id": 88,
+      "task_id": 1335,
+      "kind": "llm",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "duration_ms": 4197,
+      "queue_ms": 1,
+      "request_chars": 644,
+      "response_chars": 494
+    },
+    {
+      "id": 89,
+      "task_id": 1335,
+      "kind": "llm",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "duration_ms": 41993,
+      "queue_ms": 1,
+      "request_chars": 19712,
+      "response_chars": 1752
+    }
+  ],
+  "observed_count": 12,
+  "old_unobserved_upper_bound": 7,
+  "text_total_upper_bound": 19,
+  "paid_image_tasks": [
+    {
+      "id": 1295,
+      "status": "completed",
+      "model": "qwen-image-2.1",
+      "prop_id": 177,
+      "mode": "text_to_image",
+      "request_keys": [
+        "height",
+        "metadata",
+        "mode",
+        "prompt",
+        "width"
+      ],
+      "has_reference_inputs": false
+    },
+    {
+      "id": 1314,
+      "status": "completed",
+      "model": "qwen-image-2.1",
+      "prop_id": 181,
+      "mode": "text_to_image",
+      "request_keys": [
+        "height",
+        "metadata",
+        "mode",
+        "prompt",
+        "width"
+      ],
+      "has_reference_inputs": false
+    },
+    {
+      "id": 1338,
+      "status": "completed",
+      "model": "qwen-image-2.1",
+      "prop_id": 185,
+      "mode": "text_to_image",
+      "request_keys": [
+        "height",
+        "metadata",
+        "mode",
+        "prompt",
+        "width"
+      ],
+      "has_reference_inputs": false
+    }
+  ],
+  "video_calls": 0,
+  "tts_calls": 0,
+  "note": "Old missing call records are not fabricated; deterministic/import image-version rows do not count as GPU submissions."
+}

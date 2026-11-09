@@ -1,0 +1,66 @@
+{
+  "code": 200,
+  "data": {
+    "task_id": 1299,
+    "works": [
+      {
+        "id": 16,
+        "task_id": 1299,
+        "stage": "map_workflow",
+        "source_chars": 79,
+        "sample_key": "map_workflow|cfg:1|model:glm-5.3|start:brief|base:program",
+        "storyboard_id": null,
+        "storyboard_number": null,
+        "started_at": 1794190799850,
+        "finished_at": null,
+        "status": "processing",
+        "model_ms": 0,
+        "queue_ms": 0,
+        "work_ms": 5000,
+        "call_count": 0,
+        "heartbeat_at": 1794190804850,
+        "error_msg": null,
+        "created_at": 1794190799850,
+        "active_call_started_at": 1794190799851,
+        "active_call_heartbeat_at": 1794190804850
+      }
+    ],
+    "calls": [
+      {
+        "id": 68,
+        "work_id": 16,
+        "task_id": 1299,
+        "kind": "llm",
+        "config_id": 1,
+        "config_name": "GLM 5.3 (local)",
+        "provider": "openai",
+        "model": "glm-5.3",
+        "url": "https://open.bigmodel.cn/api/coding/paas/v4/chat/completions",
+        "stream": 0,
+        "status": "processing",
+        "http_status": null,
+        "queued_at": 1794190799851,
+        "started_at": 1794190799851,
+        "finished_at": null,
+        "duration_ms": null,
+        "queue_ms": 0,
+        "request_chars": 1010,
+        "response_chars": 0,
+        "prompt_tokens": null,
+        "completion_tokens": null,
+        "finish_reason": null,
+        "error_msg": null,
+        "heartbeat_at": 1794190804850,
+        "created_at": 1794190799851,
+        "message_count": 3
+      }
+    ],
+    "messages": [],
+    "message_limit": 0,
+    "messages_complete": false,
+    "limit": 50,
+    "next_cursor": null,
+    "has_more": false
+  },
+  "message": "success"
+}

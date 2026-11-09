@@ -1,0 +1,10 @@
+{
+  "environment": "production",
+  "title": "八达岭长城测试 1009",
+  "drama_id": 12,
+  "episode_id": 18,
+  "release": "20261109T015027Z",
+  "code_commit": "ff09732",
+  "source_chars": 224,
+  "scope": "project-level map assets; no episode gates bypassed; no script_content synthesis or confirmation; script/narration/video/export outside #84 map acceptance"
+}

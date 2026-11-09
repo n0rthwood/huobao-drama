@@ -1,0 +1,181 @@
+{
+  "source": "pixelgrid-v2-...-calibration-pass.json (task 1333 failure, 04:12Z)",
+  "why_kept": "only surviving readiness timeline; shows Basemap control readiness vs onboarding Dismiss handling",
+  "timeline": [
+    {
+      "target": "File",
+      "elapsed_s": 0.0,
+      "labels": 0,
+      "basemap_label_present": false,
+      "action": null
+    },
+    {
+      "target": "File",
+      "elapsed_s": 1.0,
+      "labels": 6,
+      "basemap_label_present": false,
+      "action": "Close"
+    },
+    {
+      "target": "File",
+      "elapsed_s": 2.0,
+      "labels": 6,
+      "basemap_label_present": false,
+      "action": "Close"
+    },
+    {
+      "target": "File",
+      "elapsed_s": 3.0,
+      "labels": 38,
+      "basemap_label_present": true,
+      "action": "Dismiss"
+    },
+    {
+      "target": "File",
+      "elapsed_s": 4.0,
+      "labels": 38,
+      "basemap_label_present": true,
+      "action": "Dismiss"
+    },
+    {
+      "target": "File",
+      "elapsed_s": 5.0,
+      "labels": 38,
+      "basemap_label_present": true,
+      "action": "Dismiss"
+    },
+    {
+      "target": "File",
+      "elapsed_s": 6.0,
+      "labels": 38,
+      "basemap_label_present": true,
+      "action": "Dismiss"
+    },
+    {
+      "target": "File",
+      "elapsed_s": 7.0,
+      "labels": 40,
+      "basemap_label_present": true,
+      "action": "Dismiss"
+    },
+    {
+      "target": "File",
+      "elapsed_s": 8.0,
+      "labels": 40,
+      "basemap_label_present": true,
+      "action": "Dismiss"
+    },
+    {
+      "target": "File",
+      "elapsed_s": 9.0,
+      "labels": 36,
+      "basemap_label_present": true,
+      "action": null
+    },
+    {
+      "target": "File",
+      "elapsed_s": 0.0,
+      "labels": 36,
+      "basemap_label_present": true,
+      "action": null
+    },
+    {
+      "target": "Open local KML file",
+      "elapsed_s": 0.0,
+      "labels": 51,
+      "basemap_label_present": true,
+      "action": null
+    },
+    {
+      "target": "Open local KML file",
+      "elapsed_s": 0.0,
+      "labels": 51,
+      "basemap_label_present": true,
+      "action": null
+    },
+    {
+      "target": ", folder",
+      "elapsed_s": 0.0,
+      "labels": 27,
+      "basemap_label_present": false,
+      "action": "Dismiss"
+    },
+    {
+      "target": ", folder",
+      "elapsed_s": 1.0,
+      "labels": 23,
+      "basemap_label_present": false,
+      "action": null
+    },
+    {
+      "target": ", folder",
+      "elapsed_s": 2.0,
+      "labels": 53,
+      "basemap_label_present": true,
+      "action": null
+    },
+    {
+      "target": "Basemap settings, Change basemap",
+      "elapsed_s": 0.0,
+      "labels": 55,
+      "basemap_label_present": true,
+      "action": "Dismiss"
+    },
+    {
+      "target": "Basemap settings, Change basemap",
+      "elapsed_s": 1.0,
+      "labels": 55,
+      "basemap_label_present": true,
+      "action": "Dismiss"
+    },
+    {
+      "target": "Basemap settings, Change basemap",
+      "elapsed_s": 2.0,
+      "labels": 59,
+      "basemap_label_present": true,
+      "action": "Dismiss"
+    },
+    {
+      "target": "Basemap settings, Change basemap",
+      "elapsed_s": 3.0,
+      "labels": 59,
+      "basemap_label_present": true,
+      "action": "Dismiss"
+    },
+    {
+      "target": "Basemap settings, Change basemap",
+      "elapsed_s": 4.0,
+      "labels": 56,
+      "basemap_label_present": true,
+      "action": null
+    },
+    {
+      "target": "Clean",
+      "elapsed_s": 0.0,
+      "labels": 76,
+      "basemap_label_present": true,
+      "action": null
+    },
+    {
+      "target": "Close",
+      "elapsed_s": 0.0,
+      "labels": 76,
+      "basemap_label_present": true,
+      "action": null
+    },
+    {
+      "target": "Hide the menu bar",
+      "elapsed_s": 0.0,
+      "labels": 77,
+      "basemap_label_present": true,
+      "action": null
+    },
+    {
+      "target": "Collapse panel",
+      "elapsed_s": 0.0,
+      "labels": 57,
+      "basemap_label_present": true,
+      "action": null
+    }
+  ]
+}

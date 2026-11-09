@@ -1,0 +1,138 @@
+{
+  "mode": "ro",
+  "props": [
+    {
+      "id": 103,
+      "drama_id": 9,
+      "name": "邗沟走向示意图",
+      "asset_type": "map",
+      "faithful": 1,
+      "faithful_source": 1026,
+      "image_url": "static/map-bases/b801f08f585da62ecf3707ad0fbb5c14.png",
+      "places": 0,
+      "routes": 0,
+      "regions": null,
+      "semantic_version": 1026
+    },
+    {
+      "id": 177,
+      "drama_id": 12,
+      "name": "八达岭1009程序标定图",
+      "asset_type": "map",
+      "faithful": 1,
+      "faithful_source": 1293,
+      "image_url": "static/map-drawings/0cc85284d87786fdcaf386ee40581f80.png",
+      "places": 4,
+      "routes": 1,
+      "regions": 0,
+      "semantic_version": 1311
+    },
+    {
+      "id": 178,
+      "drama_id": 12,
+      "name": "1009_通州段_信息不足负例",
+      "asset_type": "map",
+      "faithful": 0,
+      "faithful_source": null,
+      "image_url": null,
+      "places": null,
+      "routes": null,
+      "regions": null,
+      "semantic_version": null
+    },
+    {
+      "id": 179,
+      "drama_id": 12,
+      "name": "1009_Earth_明代八达岭居庸关关沟防御区位图",
+      "asset_type": "map",
+      "faithful": 0,
+      "faithful_source": null,
+      "image_url": null,
+      "places": 5,
+      "routes": 1,
+      "regions": 1,
+      "semantic_version": null
+    },
+    {
+      "id": 180,
+      "drama_id": 12,
+      "name": "八达岭1009普通道具错误路径",
+      "asset_type": "prop",
+      "faithful": 0,
+      "faithful_source": null,
+      "image_url": null,
+      "places": null,
+      "routes": null,
+      "regions": null,
+      "semantic_version": null
+    },
+    {
+      "id": 181,
+      "drama_id": 12,
+      "name": "八达岭1009外部标定图",
+      "asset_type": "map",
+      "faithful": 1,
+      "faithful_source": 1303,
+      "image_url": "static/map-drawings/0faced4dbf494930bb0183d79cee13dd.png",
+      "places": 6,
+      "routes": 1,
+      "regions": 1,
+      "semantic_version": 1332
+    },
+    {
+      "id": 182,
+      "drama_id": 12,
+      "name": "1009_殷墟车马坑_隐含信息核验",
+      "asset_type": "map",
+      "faithful": 0,
+      "faithful_source": null,
+      "image_url": null,
+      "places": null,
+      "routes": null,
+      "regions": null,
+      "semantic_version": null
+    },
+    {
+      "id": 183,
+      "drama_id": 13,
+      "name": "八达岭1009外部标定图",
+      "asset_type": "map",
+      "faithful": 1,
+      "faithful_source": null,
+      "image_url": "static/images/9ec346a0-6789-4109-b569-0f353ab7c142.png",
+      "places": 6,
+      "routes": 1,
+      "regions": 1,
+      "semantic_version": 1317
+    },
+    {
+      "id": 184,
+      "drama_id": 13,
+      "name": "八达岭1009独立地图副本",
+      "asset_type": "map",
+      "faithful": 1,
+      "faithful_source": 1324,
+      "image_url": "static/map-drawings/97b9abbfacf66da33bfa1f7a9e660f61.png",
+      "places": 6,
+      "routes": 1,
+      "regions": 1,
+      "semantic_version": 1327
+    }
+  ],
+  "episodes": [
+    {
+      "id": 18,
+      "drama_id": 12,
+      "raw_chars": 257,
+      "script_content": null,
+      "script_confirmed_at": null
+    },
+    {
+      "id": 19,
+      "drama_id": 13,
+      "raw_chars": 257,
+      "script_content": null,
+      "script_confirmed_at": null
+    }
+  ]
+}

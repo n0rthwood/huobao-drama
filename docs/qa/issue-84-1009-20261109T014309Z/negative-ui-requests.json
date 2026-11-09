@@ -1,0 +1,45 @@
+{
+  "url": "/huobao/drama/12?tab=assets&filter=all&asset=prop-178",
+  "requests": [
+    {
+      "method": "PUT",
+      "url": "/huobao/api/v1/props/178/map-workflow",
+      "body": {
+        "expected_revision": 0,
+        "brief": {
+          "subject": "京杭运河通州段",
+          "location": "北京通州，京杭运河北端河道",
+          "purpose": "通州段河道线路示意，需匹配所选历史时期"
+        }
+      },
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "/huobao/api/v1/props/178/map-workflow/advance",
+      "body": {
+        "text_config_id": 1,
+        "expected_revision": 1
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "/huobao/api/v1/props/178/map-workflow",
+      "body": null,
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "/huobao/api/v1/props/178/map-workflow",
+      "body": null,
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "/huobao/api/v1/props/178/map-workflow",
+      "body": null,
+      "status": 200
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "code": "f149a0e",
+  "docs_commit": "1955ab7",
+  "release": "20261109T062625Z",
+  "release_dir": "/home/joysort/huobao-releases/20261109T062625Z",
+  "smoke": {"backend_health": 200, "backend_index": 200, "edge_index": 200, "edge_api": 200, "edge_deeplink": 200, "hashed_asset": 200},
+  "backend_listener": {"pid": 921055, "cmd": "node --import tsx src/index.ts", "cwd": "/home/joysort/projects/huobao-drama/backend"},
+  "note": "Earlier releases this round: 20261109T042531Z(42de2e3), 044548Z(542a535), 050538Z(3c469b7), 052007Z(4d9ac2c)."
+}
