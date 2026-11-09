@@ -193,7 +193,7 @@
         "messageCount": "{n} messages",
         "streaming": "receiving",
         "unknown": "unknown",
-        "stage": { "skeleton": "Narration skeleton", "voice": "Voiceover", "design_card": "Design card" },
+        "stage": { "skeleton": "Narration skeleton", "voice": "Voiceover", "design_card": "Design card", "map_workflow": "Map workflow" },
         "status": { "processing": "Running", "completed": "Completed", "failed": "Failed", "interrupted": "Interrupted" },
         "kind": { "llm": "Model request", "vision_chat": "Image read", "tts": "Speech synthesis" },
         "phase": { "request": "sent", "response": "returned", "final": "final" },

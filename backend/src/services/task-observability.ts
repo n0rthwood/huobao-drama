@@ -7,8 +7,8 @@
  *   不声称供应商的纯 GPU 计算时间；排队等待 queue_ms 单独记，工具/文件处理不算进来。
  * - 媒体长度：音频时长属于产物属性，绝不拿来冒充 TTS 合成耗时。
  *
- * 落盘范围：只有被 runObservedWork 包住的工作项（本轮 = 旁白骨架 / 配音 / 设计卡）才采集，
- * 其余 LLM harness 留给后续 Issue #88 统一接入——这里用 AsyncLocalStorage 是否存在工作项做门禁。
+ * 落盘范围：只有被 runObservedWork 包住的工作项（旁白骨架 / 配音 / 设计卡 / 地图工作流）才采集，
+ * 其余旧 LLM harness 留给 Issue #88 逐项接入；未接入的历史调用不伪造回填。
  *
  * 公开对话的完整性：实际发出的全部公开角色消息（system/user/assistant/tool）、注入的技能全文、
  * 工具定义、工具调用参数与工具返回（含失败返回）都逐字保存，不摘要、不差分、不截断。
@@ -22,13 +22,13 @@ import { getInsertId, sqlite } from '../db/index.js'
 
 // ─── 对外类型 ────────────────────────────────────────────────────────────
 
-export type ObservedStage = 'skeleton' | 'voice' | 'design_card'
+export type ObservedStage = 'skeleton' | 'voice' | 'design_card' | 'map_workflow'
 export type ObservedStatus = 'processing' | 'completed' | 'failed' | 'interrupted'
 
 export interface ObservedWorkInput {
   taskId: number
   stage: ObservedStage
-  /** 源旁白字数（骨架 = 整集剧本字数，设计卡/配音 = 本镜旁白字数），**不是**提示词字数 */
+  /** 源文本字数（旁白正文或地图需求文本），**不是**实际发送的提示词字数 */
   sourceChars: number
   /** 同口径样本分组键：阶段 + 实际配置/模型（配音再加合成参数），由调用方构造 */
   sampleKey: string

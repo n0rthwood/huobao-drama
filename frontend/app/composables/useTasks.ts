@@ -38,8 +38,8 @@ export interface TaskParams {
   [key: string]: unknown
 }
 
-/** 观测阶段（#87）：旁白骨架整集 / 配音逐镜 / 设计卡逐镜 */
-export type ObservedStage = 'skeleton' | 'voice' | 'design_card'
+/** 持久观测阶段：旁白骨架 / 配音 / 设计卡 / 地图工作流 */
+export type ObservedStage = 'skeleton' | 'voice' | 'design_card' | 'map_workflow'
 
 export interface TaskWorkSummaryItem {
   storyboard_id: number | null
@@ -143,7 +143,7 @@ export interface TaskRow {
   progress?: { completed?: number; total?: number; failed?: number; current_storyboard_id?: number | null } | null
   label?: string | null
   retry_of?: number | null
-  /** 三阶段真实计量（#87）：只有骨架/配音/设计卡任务有，其余为 null */
+  /** 持久计量：已接入观测的任务有值，旧调用无记录时为 null */
   observation_summary?: TaskWorkSummary | null
 }
 

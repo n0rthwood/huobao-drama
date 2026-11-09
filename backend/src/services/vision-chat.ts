@@ -125,7 +125,7 @@ export async function callTextChat(
         try {
           const url = `${getTextProviderBaseUrl(endpoint as unknown as AIConfig)}/chat/completions`
           const observedFetch = observeTextCall({
-            kind: 'vision_chat',
+            kind: vision ? 'vision_chat' : 'llm',
             configId,
             configName: endpoint.name ?? null,
             provider: endpoint.provider,

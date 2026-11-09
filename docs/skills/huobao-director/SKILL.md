@@ -7,7 +7,7 @@ description: 通过火宝 HTTP API 按阶段推进剧本、资产、Poster、分
 
 > 契约快照：功能代码至 `3eec6f7`，已并入 main `c6bf2ab`，release `20261108T204444Z`。`[R]` 为真实运行证据，`[S]` 为仅源码/实现自测，`[S/R]` 为部分实测；未调用分支不能随整节升格。历史殷墟/八达岭首轮见必读 references；本轮 drama 11 / episode 17 的骨架、TTS、设计与公开观测证据在 `docs/qa/issue-87-20261108/`。65 次调用、727 条公开消息已按游标读全；五张卡写入待审不代表零阻断，未声称 #88 全局补齐。路由/schema 变化后先用只读 GET/preview 核验再写。
 >
-> **Issue #84 待发布变更**：地图新增契约来自独立分支 `origin/issue/84-map-workflow` `1eb48cb`，**代码尚未合并/发布，也没有生产计费验收**；S2-84 与目录 §3.84 一律保持 `[S]`，不得假定生产可用。保留原评审 `reviews/issue84-map-{review,response}.md`，不以本轮发布替代它的验收。
+> **Issue #84 生产状态**：地图代码已合并至 `ff09732`，发布 `20261109T015027Z`；「八达岭长城测试 1009」项目 12 / 集 18 的生产验收进行中。端点可用不等于三路线全部通过，逐项证据以 `docs/qa/issue-84-1009-20261109T014309Z/` 为准；未跑分支仍为 `[S]`。保留原评审 `reviews/issue84-map-{review,response}.md`。
 >
 > 历史细表：`references/api-core.md`、`references/api-production.md` 为 2026-11-02 快照；与 `references/api-catalog.md` 或本正文冲突时以新文档为准。§3 与 `references/diagnostic-example.md` 是历史案例，其 Poster 本地画布、「镜数=段落数」、固定 25fps 等说法**不得当作现行配方**，现行口径见 §2。错误案例中的 `[R]` 只表示该错误行为真实发生过，不表示流程正确或已获授权。
 
@@ -142,15 +142,16 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 - 组合场景：先提取→审核→（缺项补提取）→ 精确/美化 → 才允许拆镜。
 - 陷阱：资产批量是**项目范围**，传 `episode_id` 不代表只改本集；`rewrite_prompts` 与 `overwrite_images` 是两个独立操作；审批没带 `opened` 会被 400（这是硬规则，防止没看图就批）。
 
-#### S2-84 地图资产专用流程（Issue #84，来自 `origin/issue/84-map-workflow` `1eb48cb`；**未合并/未发布，全部 `[S]`**）
+#### S2-84 地图资产专用流程（Issue #84，`ff09732` 已发布；生产逐项验收中 `[S/R]`）
 
-**背景**：历史地图原先只有互不串联的坐标建议、配置与渲染面板，资产甚至没有点线语义。#84 要求显式地图类型、充分性判断、权威检索（Wikipedia / Europeana / Smithsonian）、三条底图路径、自动与逐步审核、可回退与可编辑点线面；扩散仅生成底纹，绝不重画地理几何。**先确认部署真有这些接口再用，不得假定生产已可用，也不得把开发副本检查标成 `[R]`。**
+**背景**：历史地图原先只有互不串联的坐标建议、配置与渲染面板，资产甚至没有点线语义。#84 要求显式地图类型、充分性判断、权威检索（Wikipedia / Europeana / Smithsonian）、三条底图路径、自动与逐步审核、可回退与可编辑点线面；扩散仅生成底纹，绝不重画地理几何。生产入口已可用，但仍须检查实际部署版本，不把开发副本检查标成 `[R]`。
 
 - **类型**：`POST /props` 与 `PUT /props/{p}` 的 `asset_type:"map"|"prop"` 是道具内的显式分类，不新增第四类资产引用。地图仍用 `kind:"prop"` 与同一资产 ID；`POST /tasks/register-upload` 的目标 `asset_type` 仍写 `"prop"`。地图改回普通道具需 `confirm_asset_type_change:true`，必须由人明确要求，地图数据保留不删除。
 - **唯一工作入口**：`GET|PUT /props/{p}/map-workflow`、`POST .../run|advance|rollback|cancel`，完整参数见 `references/api-catalog.md` §3.84。不另拼旧地图接口或直写 `map_spec` 绕过修订保护；对普通道具调用该工作流返回 `not_a_map`。
 - **自动点线面与人工确认**：research 阶段把来源支持的要素并入 `map_spec`，AI 新增项带 `proposed:true`；auto 可用候选直接制图，但这不是人工批准。人工逐项审核后去掉该项 `proposed` 并通过工作流 PUT 保存，之后重跑不覆盖它。只有在明确选择示意模式时才可采用标明近似的区域；缺关键依据要阻断，不虚构疆界。
 - **需求与缺失分级**：对象 / 时代 / 空间定位 / 用途与粒度要能明确解析（「殷墟车马坑」可由 AI 解释隐含时代与位置，「京杭运河通州段」缺时代必须补齐）；不明确或充分性检查失败会阻断，单个来源无结果、非关键细节缺失只记录风险，所有来源都无结果不算已完成检索。AI 推断不等于出处考证：`issues[].blocking` 阻断时补需求，`research.features[].uncertainty/conflicts` 有风险时呈报。
 - **阶段与续跑**：`brief → research → base → style → drawing → complete`。`run` 始终继续当前待执行的 `stage`，不会隐式回到 brief；整条重做须先按人的决定显式 rollback。`run {mode:"auto"}` 从当前阶段连续执行到完成或阻断，可能发生文本调用和一次底纹生成，先拿到该范围的授权并按 §1.2 预留 `text_calls` 与 `images`；`manual` 只执行当前一步。`awaiting_review` 不代表后面阶段已做完。
+- **调用留痕**：地图任务复用公开观测工作项，实际 system/user/assistant、调用耗时与排队分别持久化，可通过 `GET /tasks/{id}/observations` 与调用消息分页读取。仅接入后的新任务有记录；初版任务 1287–1291 的旧调用不得伪造回填。计费数以真实 `text_attempts` / 调用行及底纹图片任务为准，不把工作流容器数当请求数。
 - **三条底图**：`program` 为 Natural Earth 程序底图；`earth` 真实载入 KMZ，分别保留交付图与像素标定证据，实测控制网格是正反换算真源，独立检验点残差超过 3px 或相机漂移时阻断，不用相机数学自洽冒充实际点位对齐；`image` 使用已上传图片、来源、许可和至少三个非共线控制点。标定残差不是历史位置正确性的证明。
 - **编辑后重绘**：点线面变更但投影/bbox/背景层不变时，保存后待执行阶段回到 `drawing`，保留配准底图与已有底纹；投影/bbox/背景层变化先重做 base；底纹独立于几何，可复用。失败重试同样计额度，提交前核对剩余预算。
 - **模型与原件边界**：地图原件、Earth 影像和外部史料图不进入 t2i/image_edit/i2v。地图流程的图片调用只生成无地理内容的独立底纹；点线面与文字由程序叠加。`asset_type:"map"` 才是地图判据（不是 `faithful`）；完成时原始底图版本保存在 `faithful_source`，当前 `image_url` 可为派生图，不能称其为未改动原件。底纹默认 35%（上限 60%）alpha。人要求原图外观不变时须明确跳过 style。`texture_image.task_id` 计 `images` 预算；`base_image/final_image` 的确定性版本不计 GPU 图数。

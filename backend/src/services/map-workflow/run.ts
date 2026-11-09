@@ -33,6 +33,8 @@ import {
   textTaskOutcome,
 } from '../text-task.js'
 import { runWithTextTask } from '../text-task-context.js'
+import { runObservedWork, type ObservedWorkInput } from '../task-observability.js'
+import { buildSampleKey } from '../task-estimate.js'
 import { normalizeMapSpec, type MapSpec } from '../map-base-render.js'
 import { normalizeSemantics, type AssetSemantics } from '../asset-semantics.js'
 import { onAssetLibraryChanged } from '../asset-review.js'
@@ -593,17 +595,19 @@ async function activeWorkflowTask(propId: number): Promise<number | null> {
 }
 
 /** 后台跑：auto 跑到底，manual 只跑一步 */
-function runStages(propId: number, taskId: number, mode: MapWorkflowMode, startStage: MapWorkflowStage): void {
+function runStages(propId: number, taskId: number, mode: MapWorkflowMode, startStage: MapWorkflowStage, observation: ObservedWorkInput): void {
   void runWithTextTask(taskId, async () => {
     let stage: MapWorkflowStage | null = startStage
     let lastMessage = ''
     try {
-      while (stage) {
-        const outcome: StageOutcome = await executeStage(propId, taskId, stage)
-        lastMessage = outcome.message
-        if (!outcome.proceed || mode !== 'auto') break
-        stage = nextStage(stage)
-      }
+      await runObservedWork(observation, async () => {
+        while (stage) {
+          const outcome: StageOutcome = await executeStage(propId, taskId, stage)
+          lastMessage = outcome.message
+          if (!outcome.proceed || mode !== 'auto') break
+          stage = nextStage(stage)
+        }
+      })
       const final = await loadWorkflow(propId)
       const status = final?.state.status
       if (status === 'blocked') {
@@ -730,7 +734,13 @@ async function startRun(propId: number, input: {
   }
 
   logTaskStart('MapWorkflow', 'run', { taskId, propId, mode: input.mode, stage: startStage })
-  runStages(propId, taskId, input.mode, startStage)
+  runStages(propId, taskId, input.mode, startStage, {
+    taskId,
+    stage: 'map_workflow',
+    sourceChars: effectiveBrief.subject.length + effectiveBrief.era.length + effectiveBrief.location.length
+      + effectiveBrief.purpose.length + effectiveBrief.notes.length,
+    sampleKey: `${buildSampleKey({ stage: 'map_workflow', configId: stageModel.configId, model: stageModel.model })}|start:${startStage}|base:${effectiveBrief.base_mode}`,
+  })
   return detail
 }
 

@@ -45,7 +45,7 @@
 
       <span v-if="summary.current" class="twm-item mono">
         {{ t('workMetrics.current', {
-          label: summary.current.storyboard_number === null ? t('workMetrics.wholeScript') : '#' + pad(summary.current.storyboard_number),
+          label: summary.stage === 'map_workflow' ? t('taskCenter.detail.conversation.stage.map_workflow') : summary.current.storyboard_number === null ? t('workMetrics.wholeScript') : '#' + pad(summary.current.storyboard_number),
           elapsed: fmtDuration(summary.current.elapsed_ms),
         }) }}
         <template v-if="summary.current.estimate_ms !== null">
