@@ -68,7 +68,7 @@ _NODES_JS = """() => {
       if (span) label = span.textContent.trim();
     }
     if (!label || r.width < 1 || r.height < 1) continue;
-    out.push({role: el.getAttribute('role') || '', label,
+    out.push({id: el.id, role: el.getAttribute('role') || '', label,
               x: r.x, y: r.y, w: r.width, h: r.height});
   }
   return out;
@@ -205,7 +205,6 @@ def match(found, label: str, exact: bool):
 
 def find(page, label: str, *, exact: bool = True, timeout: float = 20.0, required: bool = True):
     waited, seen = 0.0, []
-    previous_blocker = None
     reopen_after_dismiss = False
     while waited <= timeout:
         seen = nodes(page)
@@ -216,26 +215,21 @@ def find(page, label: str, *, exact: bool = True, timeout: float = 20.0, require
         blocked = dismiss is not None or any(
             n["role"] in ("alert", "alertdialog") or n["label"] == "Alert"
             or n["label"].startswith("Find infrastructure assets") for n in seen)
-        signature = tuple(sorted(n["label"] for n in seen)) if blocked else None
         history = getattr(page, "_huobao_readiness", [])
         observation = {"target": label, "elapsed_s": waited, "labels": [n["label"] for n in seen]}
         history.append(observation)
         page._huobao_readiness = history[-100:]
         if blocked and label not in (L_CLOSE, L_DISMISS):
             close = dismiss or match(seen, L_CLOSE, True)
-            if signature == previous_blocker or close is None:
-                page.keyboard.press("Escape")
-                observation["action"] = "Escape"
-            else:
-                # 必须用这次观测到的 bbox，不能复用弹窗动画之前的位置。
-                page.mouse.click(close["x"] + close["w"] / 2, close["y"] + close["h"] / 2)
+            if close is not None:
+                # Coachmark 的语义节点可能先于画布完成移动；按节点激活，
+                # 不按旧像素误点“项目”，也不发会退出编辑器的全局 Escape。
+                activate(page, close)
                 observation["action"] = close["label"]
-            previous_blocker = signature
-            reopen_after_dismiss = label == L_OPEN_KML
+            reopen_after_dismiss = label == L_OPEN_KML or label in L_OPEN_KML_DEVICE_LABELS
             page.wait_for_timeout(1000)
             waited += 1.0
             continue  # 重读语义树；必须观测到弹窗消失、目标可用才算就绪
-        previous_blocker = None
         hit = match(seen, label, exact)
         if hit:
             return hit
@@ -245,8 +239,7 @@ def find(page, label: str, *, exact: bool = True, timeout: float = 20.0, require
             reopen_after_dismiss = False
             file_menu = match(seen, L_FILE_MENU, True)
             if file_menu is not None:
-                page.mouse.click(file_menu["x"] + file_menu["w"] / 2,
-                                 file_menu["y"] + file_menu["h"] / 2)
+                activate(page, file_menu)
                 observation["action"] = "Open File menu"
         page.wait_for_timeout(1000)
         waited += 1.0
@@ -257,12 +250,25 @@ def find(page, label: str, *, exact: bool = True, timeout: float = 20.0, require
                      f"界面可能已变更。当前可见标签：{labels}")
 
 
+def activate(page, node) -> bool:
+    """Flutter 语义动作以节点身份定位，避免动画期间的旧 bbox 命中别处。"""
+    return page.evaluate("""(id) => {
+      const el = document.getElementById(id);
+      if (!el) return false;
+      el.click();
+      return true;
+    }""", node["id"])
+
+
 def click(page, label: str, *, exact: bool = True, timeout: float = 20.0,
           required: bool = True, settle: int = 1500) -> bool:
     node = find(page, label, exact=exact, timeout=timeout, required=required)
     if node is None:
         return False
-    page.mouse.click(node["x"] + node["w"] / 2, node["y"] + node["h"] / 2)
+    if not activate(page, node):
+        if required:
+            raise EarthError(f"Google Earth 控件 {label!r} 在激活前已变化，请重试本阶段")
+        return False
     page.wait_for_timeout(settle)
     return True
 
