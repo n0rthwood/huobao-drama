@@ -133,7 +133,12 @@ export interface MapBaseProvenance {
   attribution: string
   reused: boolean
   warnings: string[]
-  earth?: EarthSidecar & { evidence_image: string }
+  /** 完整测量点留在独立 sidecar；工作流快照只内联配准网格和校准摘要。 */
+  earth?: Omit<EarthSidecar, 'calibration'> & {
+    calibration: Omit<EarthSidecar['calibration'], 'controls' | 'grid'>
+    sidecar_path: string
+    evidence_image: string
+  }
   image?: { residual_px: { max: number; rms: number }; control_points: ControlPoint[]; source_url: string; license: string }
   /** program 模式独有：Natural Earth 背景覆盖度与免责说明 */
   context?: MapContextCoverage
@@ -578,7 +583,20 @@ async function createEarthBase(spec: MapSpec, width?: number): Promise<MapBaseAr
       warnings: [
         '最终底图里不含 KMZ 几何：地名/路线/范围由可编辑图层承担，载入证明见 evidence_image。',
       ],
-      earth: { ...sidecar, evidence_image: relFromStatic(evidenceAbs) },
+      earth: {
+        ...sidecar,
+        calibration: {
+          residual_px: sidecar.calibration.residual_px,
+          validation_count: sidecar.calibration.validation_count,
+          tolerance_px: sidecar.calibration.tolerance_px,
+          camera_drift_px: sidecar.calibration.camera_drift_px,
+          screenshot: relFromStatic(sidecar.calibration.screenshot),
+          kmz: relFromStatic(sidecar.calibration.kmz),
+          kmz_sha256: sidecar.calibration.kmz_sha256,
+        },
+        sidecar_path: relFromStatic(sidecarAbs),
+        evidence_image: relFromStatic(evidenceAbs),
+      },
     },
   }
 }

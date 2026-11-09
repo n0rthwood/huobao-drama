@@ -19,7 +19,7 @@ test('地图继续当前阶段：原件与成图原子采用，几何编辑复�
     import {emptyBrief} from 'file://${backend}src/services/map-workflow/types.ts'
     import {startMapWorkflow,advanceMapWorkflow,saveMapWorkflowDraft,failInterruptedMapWorkflows,rollbackMapWorkflow} from 'file://${backend}src/services/map-workflow/run.ts'
     import {normalizeMapSpec} from 'file://${backend}src/services/map-base-render.ts'
-    import {importAsset} from 'file://${backend}src/services/asset-library.ts'
+    import {importAsset,AssetLibraryError} from 'file://${backend}src/services/asset-library.ts'
     const ts=now()
     const dramaId=getInsertId(await db.insert(schema.dramas).values({title:'地图执行回归',createdAt:ts,updatedAt:ts}))
     const configId=getInsertId(await db.insert(schema.aiServiceConfigs).values({serviceType:'text',provider:'openai',name:'Inert metadata fixture',baseUrl:'http://127.0.0.1:1',apiKey:'not-a-credential',model:'["inert-model"]',isActive:true,createdAt:ts,updatedAt:ts}))
@@ -164,6 +164,11 @@ test('地图继续当前阶段：原件与成图原子采用，几何编辑复�
     assert.equal(dormantProp.assetType,'prop','Import must not reactivate a map explicitly changed to an ordinary prop')
     assert.deepEqual(JSON.parse(dormantProp.mapSpec),cloned.map_spec)
     assert.ok(JSON.parse(dormantProp.mapWorkflow).outputs.base_image.task_id,'Changing category must not erase recoverable map history')
+    const assetIdsBefore=(await db.select().from(schema.props)).map(row=>row.id)
+    const taskIdsBefore=(await db.select().from(schema.sysTask)).map(row=>row.id)
+    await assert.rejects(importAsset({targetDramaId,kind:'prop',sourceId:propId,name:'依赖缺失应回滚'}),error=>error instanceof AssetLibraryError)
+    assert.deepEqual((await db.select().from(schema.props)).map(row=>row.id),assetIdsBefore,'Failed import must not leave a partial asset')
+    assert.deepEqual((await db.select().from(schema.sysTask)).map(row=>row.id),taskIdsBefore,'Failed import must roll back copied versions')
     console.log('MAP_EXECUTION_OK')
   `
   const probe = path.join(dir, 'probe.mts')

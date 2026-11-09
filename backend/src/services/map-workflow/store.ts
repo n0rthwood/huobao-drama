@@ -34,7 +34,7 @@ export type PropRow = typeof schema.props.$inferSelect
 
 /** 历史快照上限：够回退与追责，又不会把一列 JSON 撑爆 */
 const MAX_HISTORY = 30
-const IMPORT_MEDIA_KEYS = new Set(['path', 'base', 'texture', 'background', 'evidence_image', 'evidence_path', 'screenshot', 'kmz'])
+const IMPORT_MEDIA_KEYS = new Set(['path', 'base', 'texture', 'background', 'evidence_image', 'evidence_path', 'sidecar_path', 'screenshot', 'kmz'])
 
 export class MapWorkflowConflictError extends Error {
   code: 'revision_conflict' | 'workflow_busy'

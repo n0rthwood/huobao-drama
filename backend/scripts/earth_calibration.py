@@ -13,9 +13,10 @@ import math
 import zipfile
 from pathlib import Path
 
-GRID_NODES = 65
+GRID_NODES = 129
 MAX_RESIDUAL_PX = 3.0
 ANCHOR_STRIDE = (GRID_NODES - 1) // 16
+SEED_STRIDE = (GRID_NODES - 1) // 32
 
 
 def build_controls(bbox):
@@ -37,7 +38,7 @@ def build_controls(bbox):
 def write_calibration_kmz(controls, output: Path):
     from PIL import Image
     icons = {}
-    for name, color in (("fiducial.png", (255, 0, 255, 255)), ("anchor.png", (0, 255, 255, 255))):
+    for name, color in (("fiducial.png", (255, 0, 255, 255)), ("anchor.png", (0, 255, 255, 255)), ("seed.png", (255, 255, 0, 255))):
         icon = io.BytesIO()
         Image.new("RGBA", (11, 11), color).save(icon, "PNG")
         icons[name] = icon.getvalue()
@@ -49,10 +50,14 @@ def write_calibration_kmz(controls, output: Path):
            '<Style id="anchor"><IconStyle><scale>0.25</scale><Icon><href>anchor.png</href></Icon>'
            '<hotSpot x="0.5" y="0.5" xunits="fraction" yunits="fraction"/></IconStyle>'
            '<LabelStyle><scale>0</scale></LabelStyle></Style>'
+           '<Style id="seed"><IconStyle><scale>0.25</scale><Icon><href>seed.png</href></Icon>'
+           '<hotSpot x="0.5" y="0.5" xunits="fraction" yunits="fraction"/></IconStyle>'
+           '<LabelStyle><scale>0</scale></LabelStyle></Style>'
            '<Folder><name>Pixel calibration controls</name>')
     for control in controls:
         anchor = control["kind"] == "grid" and control["row"] % ANCHOR_STRIDE == 0 and control["col"] % ANCHOR_STRIDE == 0
-        style = "anchor" if anchor else "calibration"
+        seed = control["kind"] == "grid" and control["row"] % SEED_STRIDE == 0 and control["col"] % SEED_STRIDE == 0
+        style = "anchor" if anchor else "seed" if seed else "calibration"
         kml += (f'<Placemark><styleUrl>#{style}</styleUrl><Point><altitudeMode>clampToGround</altitudeMode>'
                 f'<coordinates>{control["lon"]:.12f},{control["lat"]:.12f},0</coordinates>'
                 '</Point></Placemark>')
@@ -65,14 +70,18 @@ def write_calibration_kmz(controls, output: Path):
     return hashlib.sha256(output.read_bytes()).hexdigest()
 
 
-def detect_centers(screenshot: Path, *, anchor=False):
+def detect_centers(screenshot: Path, *, kind="calibration"):
     from PIL import Image, ImageChops
     image = Image.open(screenshot).convert("RGB")
     red, green, blue = image.split()
     high = [0] * 211 + [255] * 45
     low = [255] * 65 + [0] * 191
-    mask = (ImageChops.multiply(ImageChops.multiply(red.point(low), green.point(high)), blue.point(high))
-            if anchor else ImageChops.multiply(ImageChops.multiply(red.point(high), blue.point(high)), green.point(low)))
+    if kind == "anchor":
+        mask = ImageChops.multiply(ImageChops.multiply(red.point(low), green.point(high)), blue.point(high))
+    elif kind == "seed":
+        mask = ImageChops.multiply(ImageChops.multiply(red.point(high), green.point(high)), blue.point(low))
+    else:
+        mask = ImageChops.multiply(ImageChops.multiply(red.point(high), blue.point(high)), green.point(low))
     width, height = image.size
     pixels = mask.tobytes()
     remaining = {index for index, value in enumerate(pixels) if value}
@@ -132,6 +141,21 @@ def associate_controls(controls, centers, predicted, radius):
     return measured
 
 
+def interpolate_controls(controls, anchors, stride):
+    cols = (GRID_NODES - 1) // stride + 1
+    predicted = []
+    for control in controls:
+        offset = .5 if control["kind"] == "validation" else 0
+        u, v = (control["col"] + offset) / stride, (control["row"] + offset) / stride
+        col, row = min(int(u), cols - 2), min(int(v), cols - 2)
+        a, b = u - col, v - row
+        corners = [anchors[row * cols + col]["pixel"], anchors[row * cols + col + 1]["pixel"],
+                   anchors[(row + 1) * cols + col]["pixel"], anchors[(row + 1) * cols + col + 1]["pixel"]]
+        predicted.append([corners[0][axis] * (1-a) * (1-b) + corners[1][axis] * a * (1-b)
+                          + corners[2][axis] * (1-a) * b + corners[3][axis] * a * b for axis in (0, 1)])
+    return predicted
+
+
 def measure_controls(controls, screenshot: Path, camera, window, project):
     nominal = project([(control["lon"], control["lat"]) for control in controls], camera, window)
     if not all(point[2] for point in nominal):
@@ -146,21 +170,16 @@ def measure_controls(controls, screenshot: Path, camera, window, project):
     # dense control into its neighbor's association radius.
     anchor_indices = [i for i, c in enumerate(controls) if c["kind"] == "grid"
                       and c["row"] % ANCHOR_STRIDE == 0 and c["col"] % ANCHOR_STRIDE == 0]
-    anchor_centers = detect_centers(screenshot, anchor=True)
+    anchor_centers = detect_centers(screenshot, kind="anchor")
     anchors = associate_controls([controls[i] for i in anchor_indices], anchor_centers,
                                  [nominal[i] for i in anchor_indices], radius * ANCHOR_STRIDE)
-    anchor_cols = (GRID_NODES - 1) // ANCHOR_STRIDE + 1
-    predicted = []
-    for control in controls:
-        offset = .5 if control["kind"] == "validation" else 0
-        u, v = (control["col"] + offset) / ANCHOR_STRIDE, (control["row"] + offset) / ANCHOR_STRIDE
-        col, row = min(int(u), anchor_cols - 2), min(int(v), anchor_cols - 2)
-        a, b = u - col, v - row
-        corners = [anchors[row * anchor_cols + col]["pixel"], anchors[row * anchor_cols + col + 1]["pixel"],
-                   anchors[(row + 1) * anchor_cols + col]["pixel"], anchors[(row + 1) * anchor_cols + col + 1]["pixel"]]
-        predicted.append([corners[0][axis] * (1-a) * (1-b) + corners[1][axis] * a * (1-b)
-                          + corners[2][axis] * (1-a) * b + corners[3][axis] * a * b for axis in (0, 1)])
-    measured = associate_controls(controls, detect_centers(screenshot) + anchor_centers, predicted, radius)
+    seed_controls = [c for c in controls if c["kind"] == "grid"
+                     and c["row"] % SEED_STRIDE == 0 and c["col"] % SEED_STRIDE == 0]
+    seed_centers = detect_centers(screenshot, kind="seed") + anchor_centers
+    seeds = associate_controls(seed_controls, seed_centers,
+                               interpolate_controls(seed_controls, anchors, ANCHOR_STRIDE), radius * SEED_STRIDE)
+    measured = associate_controls(controls, detect_centers(screenshot) + seed_centers,
+                                  interpolate_controls(controls, seeds, SEED_STRIDE), radius)
     grid = [control["pixel"] for control in measured if control["kind"] == "grid"]
     errors = []
     for control in measured:
@@ -181,4 +200,4 @@ def measure_controls(controls, screenshot: Path, camera, window, project):
     return {"cols": GRID_NODES, "rows": GRID_NODES, "pixels": grid, "controls": measured,
             "residual_px": {"max": maximum, "rms": rms}, "validation_count": len(errors),
             "tolerance_px": MAX_RESIDUAL_PX, "coordinate_origin": "window-top-left",
-            "association": "measured-sparse-anchors", "anchor_count": len(anchors)}
+            "association": "measured-hierarchical-anchors", "anchor_count": len(anchors), "seed_count": len(seeds)}

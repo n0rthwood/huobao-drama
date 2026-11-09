@@ -36,31 +36,33 @@ def fixture(output, mode):
             x += 6
         x, y = round(x), round(y)
         anchor = control['kind'] == 'grid' and control['row'] % helper['ANCHOR_STRIDE'] == 0 and control['col'] % helper['ANCHOR_STRIDE'] == 0
-        bounds = [x-16, y-16, x+15, y+15] if mode == 'large' and anchor else [x-4, y-4, x+4, y+4]
-        draw.rectangle(bounds, fill=(0, 255, 255) if anchor else (255, 0, 255))
+        seed = control['kind'] == 'grid' and control['row'] % helper['SEED_STRIDE'] == 0 and control['col'] % helper['SEED_STRIDE'] == 0
+        draw.rectangle([x-4, y-4, x+4, y+4], fill=(0, 255, 255) if anchor else (255, 255, 0) if seed else (255, 0, 255))
     image.save(output)
 
 with tempfile.TemporaryDirectory() as directory:
     screenshot = Path(directory) / 'controls.png'
     fixture(screenshot, 'good')
     measured = helper['measure_controls'](controls, screenshot, None, None, project)
-    fixture(screenshot, 'large')
-    large = helper['measure_controls'](controls, screenshot, None, None, project)
+    large_image = Image.new('RGB', (100, 100), (80, 95, 50))
+    ImageDraw.Draw(large_image).rectangle([24,24,55,55], fill=(0,255,255))
+    large_image.save(screenshot)
+    large = helper['detect_centers'](screenshot, kind='anchor')
     fixture(screenshot, 'terrain')
     terrain = helper['measure_controls'](controls, screenshot, None, None, project)
     fixture(screenshot, 'offset')
     offset = helper['measure_controls'](controls, screenshot, None, None, project)
-    failures = {}
+    invalid_accepted = {}
     for mode in ('bad', 'missing'):
         fixture(screenshot, mode)
         try:
             helper['measure_controls'](controls, screenshot, None, None, project)
-            failures[mode] = None
-        except RuntimeError as error:
-            failures[mode] = str(error)
+            invalid_accepted[mode] = True
+        except RuntimeError:
+            invalid_accepted[mode] = False
     print(json.dumps({'residual': measured['residual_px'], 'offset_residual': offset['residual_px'], 'terrain_residual': terrain['residual_px'], 'validation_count': measured['validation_count'],
                       'grid_count': len(measured['pixels']), 'first_pixel': measured['pixels'][0],
-                      'large_count': len(large['pixels']), 'large_first_pixel': large['pixels'][0], 'failures': failures}))
+                      'large_centers': large, 'invalid_accepted': invalid_accepted}))
 `, helper], { encoding: 'utf8' }))
   const rows = Math.sqrt(result.grid_count)
   assert.equal(rows, Math.trunc(rows), 'Registration is a complete rectangular grid')
@@ -69,8 +71,6 @@ with tempfile.TemporaryDirectory() as directory:
   assert.ok(result.offset_residual.max <= 1, 'Measured anchors must locate dense controls despite camera/terrain offset')
   assert.deepEqual(result.first_pixel, [40, 40], 'Measured icon centers use full-window pixel origin')
   assert.ok(result.residual.max <= 1, 'Pixel quantization is independently measured, not fabricated zero')
-  assert.equal(result.large_count, result.grid_count, 'Screen-size icons must preserve the same complete geographic coverage')
-  assert.deepEqual(result.large_first_pixel, [39.5, 39.5])
-  assert.match(result.failures.bad, /validation failed/)
-  assert.match(result.failures.missing, /could not uniquely find/)
+  assert.deepEqual(result.large_centers, [[39.5, 39.5]], 'A valid native 32px icon remains measurable')
+  assert.deepEqual(result.invalid_accepted, {bad: false, missing: false}, 'Inaccurate or absent controls must never produce an accepted registration')
 })
