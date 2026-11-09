@@ -382,6 +382,18 @@ function closePreview() {
   previewView.value = null
 }
 
+/**
+ * Esc 只关自己这一层：捕获阶段拦下并停止传播，宿主（资产详情弹窗）的全局 Esc 不能顺带把资产也关掉。
+ * 预览没开时完全不插手，宿主行为保持原样。
+ */
+function onPreviewKeydown(event: KeyboardEvent) {
+  if (event.key !== 'Escape' || !previewView.value) return
+  event.stopPropagation()
+  closePreview()
+}
+onMounted(() => window.addEventListener('keydown', onPreviewKeydown, true))
+onBeforeUnmount(() => window.removeEventListener('keydown', onPreviewKeydown, true))
+
 /** 面板自己的键：打开写 mview，关闭只清 mview（宿主的 asset / mfocus 不受影响） */
 watch(previewView, view => previewLink.set({ mview: view ?? '' }))
 
