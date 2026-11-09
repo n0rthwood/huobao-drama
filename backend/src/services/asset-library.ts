@@ -648,7 +648,7 @@ export async function importAsset(input: {
       updatedAt: now(),
     }).where(eq(table.id, newId))
 
-    if (kind === 'prop' && source.assetType === 'map') {
+    if (kind === 'prop' && (source.assetType === 'map' || source.mapWorkflow)) {
       const mapWorkflow = prepareImportedWorkflow(source.mapWorkflow, {
         versionIds: importedVersionIds,
         copyPath: rel => {

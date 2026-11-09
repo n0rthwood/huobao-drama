@@ -27,13 +27,17 @@ def fixture(output, mode):
     for index, control in enumerate(controls):
         if mode == 'missing' and index == 0: continue
         x, y, _ = project([(control['lon'], control['lat'])], None, None)[0]
+        if mode == 'offset':
+            x += 35
+            y += 35
         if mode == 'terrain':
             x += 5 * math.sin((control['lon']-113)/2*16*math.pi) * math.cos((37-control['lat'])/2*12*math.pi)
         if mode == 'bad' and control['kind'] == 'validation' and control['row'] == 3 and control['col'] == 3:
             x += 6
         x, y = round(x), round(y)
         bounds = [x-16, y-16, x+15, y+15] if mode == 'large' else [x-4, y-4, x+4, y+4]
-        draw.rectangle(bounds, fill=(255, 0, 255))
+        anchor = control['kind'] == 'grid' and control['row'] % helper['ANCHOR_STRIDE'] == 0 and control['col'] % helper['ANCHOR_STRIDE'] == 0
+        draw.rectangle(bounds, fill=(0, 255, 255) if anchor else (255, 0, 255))
     image.save(output)
 
 with tempfile.TemporaryDirectory() as directory:
@@ -44,6 +48,8 @@ with tempfile.TemporaryDirectory() as directory:
     large = helper['measure_controls'](controls, screenshot, None, None, project)
     fixture(screenshot, 'terrain')
     terrain = helper['measure_controls'](controls, screenshot, None, None, project)
+    fixture(screenshot, 'offset')
+    offset = helper['measure_controls'](controls, screenshot, None, None, project)
     failures = {}
     for mode in ('bad', 'missing'):
         fixture(screenshot, mode)
@@ -52,7 +58,7 @@ with tempfile.TemporaryDirectory() as directory:
             failures[mode] = None
         except RuntimeError as error:
             failures[mode] = str(error)
-    print(json.dumps({'residual': measured['residual_px'], 'terrain_residual': terrain['residual_px'], 'validation_count': measured['validation_count'],
+    print(json.dumps({'residual': measured['residual_px'], 'offset_residual': offset['residual_px'], 'terrain_residual': terrain['residual_px'], 'validation_count': measured['validation_count'],
                       'grid_count': len(measured['pixels']), 'first_pixel': measured['pixels'][0],
                       'large_count': len(large['pixels']), 'large_first_pixel': large['pixels'][0], 'failures': failures}))
 `, helper], { encoding: 'utf8' }))
@@ -60,6 +66,7 @@ with tempfile.TemporaryDirectory() as directory:
   assert.equal(rows, Math.trunc(rows), 'Registration is a complete rectangular grid')
   assert.equal(result.validation_count, (rows - 1) ** 2, 'Every grid cell has an independent withheld control')
   assert.ok(result.terrain_residual.max <= 3, 'Local terrain curvature must remain within the unchanged accuracy guard')
+  assert.ok(result.offset_residual.max <= 1, 'Measured anchors must locate dense controls despite camera/terrain offset')
   assert.deepEqual(result.first_pixel, [40, 40], 'Measured icon centers use full-window pixel origin')
   assert.ok(result.residual.max <= 1, 'Pixel quantization is independently measured, not fabricated zero')
   assert.equal(result.large_count, result.grid_count, 'Screen-size icons must preserve the same complete geographic coverage')

@@ -1,8 +1,8 @@
 """Pixel-grounded Earth registration. No terrain/projection assumptions are accepted as proof.
 
-A capture-only KMZ draws centered, fixed-size magenta icons on a 33x33 geographic grid
-and 32x32 independent cell centers. Actual screenshot pixels determine the grid;
-withheld centers must agree with bilinear interpolation within 3px or capture fails.
+A capture-only KMZ draws a dense geographic grid and independent cell centers.
+Separately colored sparse anchors locate dense controls from measured pixels,
+not nominal terrain geometry. Withheld centers must agree within 3px or fail.
 The user's deliverable KMZ is not modified.
 """
 from __future__ import annotations
@@ -15,6 +15,7 @@ from pathlib import Path
 
 GRID_NODES = 33
 MAX_RESIDUAL_PX = 3.0
+ANCHOR_STRIDE = (GRID_NODES - 1) // 16
 
 
 def build_controls(bbox):
@@ -35,34 +36,43 @@ def build_controls(bbox):
 
 def write_calibration_kmz(controls, output: Path):
     from PIL import Image
-    icon = io.BytesIO()
-    Image.new("RGBA", (11, 11), (255, 0, 255, 255)).save(icon, "PNG")
+    icons = {}
+    for name, color in (("fiducial.png", (255, 0, 255, 255)), ("anchor.png", (0, 255, 255, 255))):
+        icon = io.BytesIO()
+        Image.new("RGBA", (11, 11), color).save(icon, "PNG")
+        icons[name] = icon.getvalue()
     kml = ('<?xml version="1.0" encoding="UTF-8"?>'
            '<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Pixel calibration</name>'
-           '<Style id="calibration"><IconStyle><scale>1</scale><Icon><href>fiducial.png</href></Icon>'
+           '<Style id="calibration"><IconStyle><scale>0.5</scale><Icon><href>fiducial.png</href></Icon>'
+           '<hotSpot x="0.5" y="0.5" xunits="fraction" yunits="fraction"/></IconStyle>'
+           '<LabelStyle><scale>0</scale></LabelStyle></Style>'
+           '<Style id="anchor"><IconStyle><scale>1</scale><Icon><href>anchor.png</href></Icon>'
            '<hotSpot x="0.5" y="0.5" xunits="fraction" yunits="fraction"/></IconStyle>'
            '<LabelStyle><scale>0</scale></LabelStyle></Style>'
            '<Folder><name>Pixel calibration controls</name>')
     for control in controls:
-        kml += ('<Placemark><styleUrl>#calibration</styleUrl><Point><altitudeMode>clampToGround</altitudeMode>'
+        anchor = control["kind"] == "grid" and control["row"] % ANCHOR_STRIDE == 0 and control["col"] % ANCHOR_STRIDE == 0
+        style = "anchor" if anchor else "calibration"
+        kml += (f'<Placemark><styleUrl>#{style}</styleUrl><Point><altitudeMode>clampToGround</altitudeMode>'
                 f'<coordinates>{control["lon"]:.12f},{control["lat"]:.12f},0</coordinates>'
                 '</Point></Placemark>')
     kml += '</Folder></Document></kml>'
     with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-        for name, data in (("doc.kml", kml.encode()), ("fiducial.png", icon.getvalue())):
+        for name, data in (("doc.kml", kml.encode()), *icons.items()):
             entry = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
             entry.compress_type = zipfile.ZIP_DEFLATED
             archive.writestr(entry, data)
     return hashlib.sha256(output.read_bytes()).hexdigest()
 
 
-def detect_centers(screenshot: Path):
+def detect_centers(screenshot: Path, *, anchor=False):
     from PIL import Image, ImageChops
     image = Image.open(screenshot).convert("RGB")
     red, green, blue = image.split()
     high = [0] * 211 + [255] * 45
     low = [255] * 65 + [0] * 191
-    mask = ImageChops.multiply(ImageChops.multiply(red.point(high), blue.point(high)), green.point(low))
+    mask = (ImageChops.multiply(ImageChops.multiply(red.point(low), green.point(high)), blue.point(high))
+            if anchor else ImageChops.multiply(ImageChops.multiply(red.point(high), blue.point(high)), green.point(low)))
     width, height = image.size
     pixels = mask.tobytes()
     remaining = {index for index, value in enumerate(pixels) if value}
@@ -93,21 +103,10 @@ def detect_centers(screenshot: Path):
     return centers
 
 
-def measure_controls(controls, screenshot: Path, camera, window, project):
-    centers = detect_centers(screenshot)
-    predicted = project([(control["lon"], control["lat"]) for control in controls], camera, window)
-    if not all(point[2] for point in predicted):
-        raise RuntimeError("Calibration controls cross Earth's horizon; reduce the requested bbox")
-    grid_spacing = min(math.hypot(predicted[1][0] - predicted[0][0], predicted[1][1] - predicted[0][1]),
-                       math.hypot(predicted[GRID_NODES][0] - predicted[0][0],
-                                  predicted[GRID_NODES][1] - predicted[0][1]))
-    # Interstitial controls are sqrt(.5) grid-spacing apart. Refuse a possible neighboring association.
-    radius = grid_spacing * .32
-    if radius < 5:
-        raise RuntimeError("Calibration controls are less than 16px apart; increase map width or use a less extreme aspect ratio")
+def associate_controls(controls, centers, predicted, radius):
     measured, used = [], set()
     for index, control in enumerate(controls):
-        px, py, _ = predicted[index]
+        px, py = predicted[index][:2]
         candidates = [(math.hypot(center[0] - px, center[1] - py), ci, center)
                       for ci, center in enumerate(centers) if ci not in used]
         candidates.sort(key=lambda item: item[0])
@@ -121,6 +120,38 @@ def measure_controls(controls, screenshot: Path, camera, window, project):
         distance, ci, center = candidates[0]
         used.add(ci)
         measured.append({**control, "pixel": center, "predicted": [px, py], "model_error_px": distance})
+    return measured
+
+
+def measure_controls(controls, screenshot: Path, camera, window, project):
+    nominal = project([(control["lon"], control["lat"]) for control in controls], camera, window)
+    if not all(point[2] for point in nominal):
+        raise RuntimeError("Calibration controls cross Earth's horizon; reduce the requested bbox")
+    spacing = min(math.hypot(nominal[1][0] - nominal[0][0], nominal[1][1] - nominal[0][1]),
+                  math.hypot(nominal[GRID_NODES][0] - nominal[0][0], nominal[GRID_NODES][1] - nominal[0][1]))
+    radius = spacing * .32
+    if radius < 5:
+        raise RuntimeError("Calibration controls are less than 16px apart; increase map width or use a less extreme aspect ratio")
+    # Nominal camera geometry identifies only the sparse, separately colored anchors.
+    # Their actual pixels then locate dense controls; terrain offset cannot push a
+    # dense control into its neighbor's association radius.
+    anchor_indices = [i for i, c in enumerate(controls) if c["kind"] == "grid"
+                      and c["row"] % ANCHOR_STRIDE == 0 and c["col"] % ANCHOR_STRIDE == 0]
+    anchor_centers = detect_centers(screenshot, anchor=True)
+    anchors = associate_controls([controls[i] for i in anchor_indices], anchor_centers,
+                                 [nominal[i] for i in anchor_indices], radius * ANCHOR_STRIDE)
+    anchor_cols = (GRID_NODES - 1) // ANCHOR_STRIDE + 1
+    predicted = []
+    for control in controls:
+        offset = .5 if control["kind"] == "validation" else 0
+        u, v = (control["col"] + offset) / ANCHOR_STRIDE, (control["row"] + offset) / ANCHOR_STRIDE
+        col, row = min(int(u), anchor_cols - 2), min(int(v), anchor_cols - 2)
+        a, b = u - col, v - row
+        corners = [anchors[row * anchor_cols + col]["pixel"], anchors[row * anchor_cols + col + 1]["pixel"],
+                   anchors[(row + 1) * anchor_cols + col]["pixel"], anchors[(row + 1) * anchor_cols + col + 1]["pixel"]]
+        predicted.append([corners[0][axis] * (1-a) * (1-b) + corners[1][axis] * a * (1-b)
+                          + corners[2][axis] * (1-a) * b + corners[3][axis] * a * b for axis in (0, 1)])
+    measured = associate_controls(controls, detect_centers(screenshot) + anchor_centers, predicted, radius)
     grid = [control["pixel"] for control in measured if control["kind"] == "grid"]
     errors = []
     for control in measured:
@@ -140,4 +171,5 @@ def measure_controls(controls, screenshot: Path, camera, window, project):
                            "Do not use this imagery as a registered map; choose program mode or a smaller bbox")
     return {"cols": GRID_NODES, "rows": GRID_NODES, "pixels": grid, "controls": measured,
             "residual_px": {"max": maximum, "rms": rms}, "validation_count": len(errors),
-            "tolerance_px": MAX_RESIDUAL_PX, "coordinate_origin": "window-top-left"}
+            "tolerance_px": MAX_RESIDUAL_PX, "coordinate_origin": "window-top-left",
+            "association": "measured-sparse-anchors", "anchor_count": len(anchors)}

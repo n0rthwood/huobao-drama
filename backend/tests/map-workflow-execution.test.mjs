@@ -157,6 +157,13 @@ test('地图继续当前阶段：原件与成图原子采用，几何编辑复�
     cloned=await settle(imported.id)
     assert.equal(cloned.status,'completed',cloned.error)
     assert.equal((await getProp(imported.id)).imageUrl,cloned.outputs.final_image.path)
+    const {eq}=createRequire('file://${backend}package.json')('drizzle-orm')
+    await db.update(schema.props).set({assetType:'prop'}).where(eq(schema.props.id,imported.id))
+    const dormant=await importAsset({targetDramaId,kind:'prop',sourceId:imported.id,name:'保留历史地图数据'})
+    const dormantProp=await getProp(dormant.id)
+    assert.equal(dormantProp.assetType,'prop','Import must not reactivate a map explicitly changed to an ordinary prop')
+    assert.deepEqual(JSON.parse(dormantProp.mapSpec),cloned.map_spec)
+    assert.ok(JSON.parse(dormantProp.mapWorkflow).outputs.base_image.task_id,'Changing category must not erase recoverable map history')
     console.log('MAP_EXECUTION_OK')
   `
   const probe = path.join(dir, 'probe.mts')

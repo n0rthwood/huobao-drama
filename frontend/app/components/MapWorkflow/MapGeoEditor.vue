@@ -476,7 +476,7 @@ function setPlaceCoord(index: number, axis: 'lon' | 'lat', event: Event) {
 .geo-vertex { fill: var(--surface); stroke: var(--text-1); stroke-width: 1; cursor: grab; }
 .geo-draft { fill: none; stroke: var(--accent-text); stroke-dasharray: 6 4; }
 .geo-draft-vertex { fill: var(--accent-text); }
-.geo-text { fill: var(--text-1); paint-order: stroke; stroke: var(--surface); stroke-width: 2; }
+.geo-text { fill: var(--text-1); paint-order: stroke; stroke: var(--surface); stroke-width: 2; pointer-events: none; }
 .geo-lists {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
