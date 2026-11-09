@@ -92,9 +92,38 @@ test('地图继续当前阶段：原件与成图原子采用，几何编辑复�
     await failInterruptedMapWorkflows()
     state=serializeDetail(await loadWorkflow(propId))
     assert.equal(state.status,'failed')
-    assert.equal(state.task_id,null)
     assert.equal(state.steps.find(step=>step.id==='drawing').status,'failed')
     assert.equal(state.outputs.final_image.path,completedFinal,'restart preserves already-produced media')
+    // A paid texture may finish while the map runner is down. Resume must adopt
+    // that image, not submit another billable task or lose its origin.
+    const {createRequire}=await import('node:module')
+    const {mkdirSync}=await import('node:fs')
+    const sharp=createRequire('file://${backend}package.json')('sharp')
+    mkdirSync(process.env.STORAGE_PATH+'/map-textures',{recursive:true})
+    const texturePath='static/map-textures/recovered.png'
+    await sharp({create:{width:16,height:16,channels:3,background:'#e2d5ba'}}).png().toFile(process.env.HUOBAO_DATA_DIR+'/'+texturePath)
+    const imageId=getInsertId(await db.insert(schema.sysTask).values({
+      type:'image',dramaId,provider:'qwen-jobs',model:'fixture-image',
+      params:JSON.stringify({map_texture:{prop_id:propId,prop_name:'测试区位图'}}),
+      status:'completed',localPath:texturePath,createdAt:ts,updatedAt:ts,
+    }))
+    const interruptedId=getInsertId(await db.insert(schema.sysTask).values({
+      type:'text',dramaId,propId,provider:'openai',model:'inert-model',
+      params:JSON.stringify({kind:'map_workflow',map_prop_id:propId,map_texture_task_id:imageId,map_texture_theme:'archival'}),
+      status:'failed',createdAt:ts,updatedAt:ts,
+    }))
+    await mutateWorkflow(propId,{action:'fixture_texture_interruption',actor:'system',mutate:ctx=>{
+      ctx.state.stage='style';ctx.state.status='running';ctx.state.task_id=interruptedId
+      ctx.state.steps.find(step=>step.id==='style').status='running'
+    }})
+    await failInterruptedMapWorkflows()
+    loaded=await loadWorkflow(propId)
+    await startMapWorkflow(propId,{mode:'auto',expectedRevision:loaded.state.revision,textConfigId:configId})
+    state=await settle()
+    assert.equal(state.status,'completed',state.error)
+    assert.equal(state.outputs.texture_image.task_id,imageId,'restart must reuse the paid texture task')
+    assert.equal((await getProp(propId)).imageUrl,state.outputs.final_image.path)
+    assert.equal(JSON.parse((await getProp(propId)).semantics).image.source_task_id,state.outputs.final_image.task_id)
     console.log('MAP_EXECUTION_OK')
   `
   const probe = path.join(dir, 'probe.mts')

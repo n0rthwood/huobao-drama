@@ -59,8 +59,13 @@ const EXTRACT_SYSTEM = `你在从**已经检索到的资料**里整理一张历�
    - "approximate_schematic"：只能给出大致方位的示意位置。
 3. 坐标是 WGS84 十进制度。拿不准就用 approximate_schematic 并把 uncertainty 设为 high，不要假装精确。
 4. 同一地点不同来源给出不同位置时，写进 conflicts，不要自行取舍。
-5. 历史时期的**面状边界**（疆域、辖境）除非资料里有明确范围描述，否则不要给 points；宁可只给中心点。
-6. basis 用一句话说明坐标怎么来的；uncertainties 列出这张图里读者需要知道的不确定之处。
+5. 历史时期的**面状边界**（疆域、辖境）只有资料明确描述范围时才能给出，严禁凭几个地点任意包围出“真实防区”。
+   若需求明确开启示意图模式、要表达资料中有依据的山谷/通道等空间范围，可用 approximate_schematic 给近似示意面，
+   basis 必须说明来源中的范围依据以及人为概括之处，uncertainty=high；不能把它表述成历史辖界。
+6. 几何按 kind 分别填写：place 必须给 lon/lat；route 的 points 至少两个不同顶点；
+   region 的 points 必须至少三个不同且不共线的 WGS84 顶点（可首尾闭合）。
+   不要返回 kind=region 却只给中心点或空 points：没有足够范围依据就不输出该面，并在 uncertainties 明确缺口。
+7. basis 用一句话说明坐标怎么来的；uncertainties 列出这张图里读者需要知道的不确定之处。
 
 只返回 JSON：
 {"features":[{"kind":"place|route|region","name":"","lon":0,"lat":0,"points":[[lon,lat]],

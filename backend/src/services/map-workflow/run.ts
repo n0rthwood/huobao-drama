@@ -240,17 +240,32 @@ async function waitForImageTask(taskId: number): Promise<{ ok: boolean; path: st
   }
 }
 
-async function generateTexture(input: { propId: number; dramaId: number; propName: string; theme: MapSpec['style']['theme']; opts: MapRunOptions }): Promise<{ path: string; taskId: number }> {
-  const prompt = `${TEXTURE_PROMPT}, ${TEXTURE_THEME_HINT[input.theme]}`
-  const taskId = await generateImage({
-    dramaId: input.dramaId,
-    prompt,
-    size: TEXTURE_SIZE,
-    configId: input.opts.imageConfigId,
-    model: input.opts.imageModel,
-    // 地图底纹是**独立产物**：不挂在道具上，完成后不回写任何资产当前图（propId 刻意不传）
-    mapTexture: { propId: input.propId, propName: input.propName },
-  })
+async function generateTexture(input: { propId: number; dramaId: number; propName: string; workflowTaskId: number; theme: MapSpec['style']['theme']; opts: MapRunOptions }): Promise<{ path: string; taskId: number }> {
+  const [owner] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, input.workflowTaskId))
+  const saved = parseTextTaskParams(owner?.params)
+  const previousId = Number(saved?.map_texture_task_id)
+  const [previous] = Number.isInteger(previousId) && previousId > 0
+    ? await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, previousId))
+    : []
+  const marker = parseTextTaskParams(previous?.params)?.map_texture as { prop_id?: number } | undefined
+  let taskId = previous?.type === 'image' && marker?.prop_id === input.propId
+    && saved?.map_texture_theme === input.theme
+    && (previous.status === 'queued' || previous.status === 'processing' || previous.status === 'completed')
+    ? previous.id : null
+  if (taskId === null) {
+    const prompt = `${TEXTURE_PROMPT}, ${TEXTURE_THEME_HINT[input.theme]}`
+    taskId = await generateImage({
+      dramaId: input.dramaId,
+      prompt,
+      size: TEXTURE_SIZE,
+      configId: input.opts.imageConfigId,
+      model: input.opts.imageModel,
+      // 独立产物：不挂在道具上，完成回调不覆盖地图当前图。
+      mapTexture: { propId: input.propId, propName: input.propName },
+    })
+  }
+  // 等图之前立即持久化归属：重启/等待超时后认领同一张在飞或已完成底纹，不重复计费。
+  await patchTextTaskParams(input.workflowTaskId, { map_texture_task_id: taskId, map_texture_theme: input.theme })
   const waited = await waitForImageTask(taskId)
   if (!waited.ok || !waited.path) throw new Error(`质感底纹生成失败：${waited.error}；可改选图片模型后重试，或跳过这一步直接出图`)
   return { path: waited.path, taskId }
@@ -467,7 +482,7 @@ async function executeStage(propId: number, taskId: number, stage: MapWorkflowSt
     const [prop] = await db.select().from(schema.props).where(eq(schema.props.id, propId))
     if (!prop) throw new MapWorkflowRequestError('道具不存在', 'not_found')
     const texture = await generateTexture({
-      propId, dramaId: prop.dramaId, propName: prop.name,
+      propId, dramaId: prop.dramaId, propName: prop.name, workflowTaskId: taskId,
       theme: brief.style, opts,
     })
     const meta = await imageMeta(texture.path)
@@ -698,7 +713,19 @@ async function startRun(propId: number, input: {
     stageModel,
     prompt: `地图工作流：${effectiveBrief.subject}`,
   })
-  await patchTextTaskParams(taskId, { map_prop_id: propId, map_stage: startStage, map_mode: input.mode })
+  const [previousRun] = startStage === 'style' && loaded.state.task_id
+    ? await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, loaded.state.task_id))
+    : []
+  const previousParams = parseTextTaskParams(previousRun?.params)
+  const reuseTexture = (input.opts.imageConfigId ?? loaded.state.image_config_id) === loaded.state.image_config_id
+    && (input.opts.imageModel ?? loaded.state.image_model) === loaded.state.image_model
+  await patchTextTaskParams(taskId, {
+    map_prop_id: propId, map_stage: startStage, map_mode: input.mode,
+    ...(reuseTexture ? {
+      map_texture_task_id: previousParams?.map_texture_task_id ?? null,
+      map_texture_theme: previousParams?.map_texture_theme ?? null,
+    } : {}),
+  })
 
   let detail: MapWorkflowDetail
   try {
@@ -911,7 +938,6 @@ export async function failInterruptedMapWorkflows(): Promise<void> {
           const message = '服务重启，地图工作流在执行中被中断；已产出的内容保留，请从当前步骤重新开始'
           ctx.state.status = 'failed'
           ctx.state.error = message
-          ctx.state.task_id = null
           for (const step of ctx.state.steps) {
             if (step.status === 'running') Object.assign(step, { status: 'failed', message, finished_at: now() })
           }
