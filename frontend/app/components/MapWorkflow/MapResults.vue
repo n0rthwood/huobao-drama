@@ -114,6 +114,7 @@ import { useI18n } from 'vue-i18n'
 import type { MapResearch, MapWorkflowOutputs } from '~/composables/useApi'
 import { mapPreviewImage, type MapPreviewView } from '~/utils/mapPreview'
 import { registrationSummary, type MapRegistration } from '~/utils/mapRegistration'
+import { mediaUrl } from '~/utils/url'
 
 const { t } = useI18n()
 
