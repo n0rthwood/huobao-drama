@@ -719,6 +719,9 @@ export function captureEarthBase(input: EarthCaptureInput): Promise<EarthSidecar
  * 任何一条不过就抛错——宁可没有底图，也不要一张不知道拍了哪里的影像。
  */
 function verifyEarthCapture(input: EarthCaptureInput, plan: EarthPlan, sidecar: EarthSidecar): void {
+  if (sidecar.basemap !== 'clean (no Google labels/borders/roads)') {
+    throw new EarthCaptureError('Earth 底图未切换为 Clean，仍可能含现代地名/道路；拒绝登记')
+  }
   const calibration = sidecar.calibration
   if (sidecar.capture_version !== 'pixelgrid-v2' || !calibration
     || !Number.isFinite(calibration.residual_px?.max) || calibration.residual_px.max > 3

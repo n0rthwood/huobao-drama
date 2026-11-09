@@ -520,18 +520,22 @@ async function createEarthBase(spec: MapSpec, width?: number): Promise<MapBaseAr
   const longSide = Math.max(820, Math.min(4000, Math.trunc(width ?? 2000)))
   const dir = path.join(STORAGE_ROOT, 'map-bases', 'earth')
   fs.mkdirSync(dir, { recursive: true })
-  const stem = `pixelgrid-v2-${kmz.sha256.slice(0, 24)}-${longSide}`
+  const stem = `pixelgrid-v2-clean-${kmz.sha256.slice(0, 24)}-${longSide}`
   const baseAbs = path.join(dir, `${stem}.png`)
   const evidenceAbs = path.join(dir, `${stem}-kmz.png`)
   const sidecarAbs = path.join(dir, `${stem}.json`)
 
-  let sidecar: EarthSidecar
+  let sidecar: EarthSidecar | null = null
   let reused = false
   if (fs.existsSync(baseAbs) && fs.existsSync(evidenceAbs) && fs.existsSync(sidecarAbs)) {
-    // 同一份 KMZ + 同一画幅已经拍过：Earth 一次要两分钟，不重复开浏览器
-    sidecar = JSON.parse(fs.readFileSync(sidecarAbs, 'utf8'))
-    reused = true
-  } else {
+    // 只复用合格的干净影像，不沿用曾静默回退到 default 的缓存。
+    const cached: EarthSidecar = JSON.parse(fs.readFileSync(sidecarAbs, 'utf8'))
+    if (cached.basemap === 'clean (no Google labels/borders/roads)') {
+      sidecar = cached
+      reused = true
+    }
+  }
+  if (!sidecar) {
     sidecar = await captureEarthBase({
       spec,
       kmzAbsPath: kmzAbs,

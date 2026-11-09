@@ -323,13 +323,10 @@ def settle_tiles(page, timeout: float = 60.0, quiet_rounds: int = 2) -> float:
 
 def clean_basemap(page) -> bool:
     """Earth 自带的 Clean 底图：卫星影像但没有 Google 的现代地名/国界/道路。"""
-    if not click(page, L_BASEMAP, required=False, timeout=8, settle=2500):
-        return False
-    picked = click(page, L_BASEMAP_CLEAN, exact=False, required=False, timeout=8, settle=4000)
-    if not click(page, L_CLOSE, required=False, timeout=4, settle=1500):
-        page.keyboard.press("Escape")
-        page.wait_for_timeout(1200)
-    return picked
+    click(page, L_BASEMAP, timeout=90, settle=2500)
+    click(page, L_BASEMAP_CLEAN, exact=False, timeout=30, settle=4000)
+    click(page, L_CLOSE, timeout=20, settle=1500)
+    return True
 
 
 def read_camera(page):
