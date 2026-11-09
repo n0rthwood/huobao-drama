@@ -6,7 +6,7 @@
 
 - 证据目录：`docs/qa/issue-84-1009-20261109T014309Z/`
 - 原始归档：`/home/joysort/huobao-backup/issue84-qa-raw-20261109/issue84-qa-20261109T014309Z.tar.gz`
-- 归档 SHA256：`59c145a888a68771156e16136777e7f7be0e807cf8287055fa8e4382a95dea79`
+- 归档 SHA256：`819fbbc25673605975497c9992aafea806cbfa1e4ee7da186402366b5926b2eb`（含 Earth 最终证据的完整重归档）
 - 代码：`f149a0e`（`origin/master`），文档提交 `1955ab7`；release `20261109T062625Z`
 - 授权原话：「你需要发布后，在生产上进行验收。不要每次都要求批准预算。八达岭长城测试需要用 1009，现在已经 9 号了」
 

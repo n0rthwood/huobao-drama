@@ -1,8 +1,8 @@
 {
-  "tracked_sha256": "d265af86878321c6388248833e1a7e17ae3e2cb3980cbd2333d13dac59f9729c",
-  "managed_sha256": "d265af86878321c6388248833e1a7e17ae3e2cb3980cbd2333d13dac59f9729c",
+  "tracked_sha256": "2765dc81f9018eb8f3fac566af54a03739a5ba37cfaf94fa31a29a2a14fb377c",
+  "managed_sha256": "2765dc81f9018eb8f3fac566af54a03739a5ba37cfaf94fa31a29a2a14fb377c",
   "identical": true,
-  "tracked_bytes": 63983,
+  "tracked_bytes": 63990,
   "fresh_process_probe": {
     "command": "omp -p --no-session --no-tools --model zhipu-coding-plan/glm-5.3-flash",
     "observed": [
@@ -19,5 +19,11 @@
     "reviews/issue84-final-slow-review.md",
     "reviews/issue84-final-disposition.md"
   ],
-  "note": "Global copy is a snapshot; re-sync after final Earth status is appended."
+  "note": "Snapshot; re-sync if docs change again.",
+  "fresh_process_probe_after_earth": {
+    "observed_name": "huobao-director",
+    "observed_earth_line": "Earth179已通过（1349，2.693px/0漂移/16384点）",
+    "observed_catalog_heading": "### 3.84 地图资产工作流（S2，Issue #84）[S/R]"
+  },
+  "archive_sha256": "819fbbc25673605975497c9992aafea806cbfa1e4ee7da186402366b5926b2eb"
 }
