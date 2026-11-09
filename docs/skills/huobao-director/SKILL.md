@@ -7,7 +7,7 @@ description: 通过火宝 HTTP API 按阶段推进剧本、资产、Poster、分
 
 > 契约快照：功能代码至 `3eec6f7`，已并入 main `c6bf2ab`，release `20261108T204444Z`。`[R]` 为真实运行证据，`[S]` 为仅源码/实现自测，`[S/R]` 为部分实测；未调用分支不能随整节升格。历史殷墟/八达岭首轮见必读 references；本轮 drama 11 / episode 17 的骨架、TTS、设计与公开观测证据在 `docs/qa/issue-87-20261108/`。65 次调用、727 条公开消息已按游标读全；五张卡写入待审不代表零阻断，未声称 #88 全局补齐。路由/schema 变化后先用只读 GET/preview 核验再写。
 >
-> **Issue #84 生产状态**：地图代码已合并至 `ff09732`，发布 `20261109T015027Z`；「八达岭长城测试 1009」项目 12 / 集 18 的生产验收进行中。端点可用不等于三路线全部通过，逐项证据以 `docs/qa/issue-84-1009-20261109T014309Z/` 为准；未跑分支仍为 `[S]`。保留原评审 `reviews/issue84-map-{review,response}.md`。
+> **Issue #84**：`f149a0e` / release `20261109T062625Z`。项目12/集18、13/集19；程序177、外部181、副本184、全自动185已实测；Earth1336过标定但非Clean，修复后重验。证据 `docs/qa/issue-84-1009-20261109T014309Z/`；未跑分支 `[S]`。
 >
 > 历史细表：`references/api-core.md`、`references/api-production.md` 为 2026-11-02 快照；与 `references/api-catalog.md` 或本正文冲突时以新文档为准。§3 与 `references/diagnostic-example.md` 是历史案例，其 Poster 本地画布、「镜数=段落数」、固定 25fps 等说法**不得当作现行配方**，现行口径见 §2。错误案例中的 `[R]` 只表示该错误行为真实发生过，不表示流程正确或已获授权。
 
@@ -15,7 +15,7 @@ description: 通过火宝 HTTP API 按阶段推进剧本、资产、Poster、分
 
 1. `gates`/`production_unlocked` 为 false 的阶段**不得写入**，无论服务端是否放行。
 2. 人决定端点（确认/审批/combo/verdict/override_gate/not_needed/ignored/unconfirm/DELETE，以及 S2-84 的地图候选采纳、路线/风格/示意模式选择、跳过底纹、回退/取消与地图↔普通道具类型降级）**永不自行调用**；只在人明确决定后执行并记录授权原话。
-3. 每次计费提交前查预算台账：GPU（图片/视频/TTS）与**计费文本 LLM 调用**（改写、`inspect-narration`、骨架、填卡、关键帧/视频提示词）分列计数；余额 ≤0 停下问人；`revise` 轮按 ≥1 图预扣。
+3. 每次计费提交前查预算台账：GPU（图片/视频/TTS）与**计费文本 LLM 调用**（改写、`inspect-narration`、骨架、填卡、关键帧/视频提示词、地图 brief/research）分列计数；地图 style 底纹是图片额度；余额 ≤0 停下问人；`revise` 轮按 ≥1 图预扣。
 4. **凡有 preview 的入口一律先 preview**：批量入口 `POST /dramas/{d}/assets/batch-generate/preview`、`POST /episodes/{e}/keyframe-batch/preview`、`POST /episodes/{e}/video-batch/preview`、`POST /episodes/{e}/compose-batch/preview`、`POST /episodes/{e}/narration/voice-batch/preview`；镜级 preview `GET /storyboards/{id}/narration-fit/preview`。启动批量传显式 `storyboard_ids`/`items`；没有 preview 的入口（如 `design-cards/fill`、`script-rewrite`、`extract`）按其自身前置检查执行，不得编造预览。`POST /episodes/{e}/work-estimate` 是耗时预估，**不是范围预览**，不能替代上面任何一个 preview。
 5. `merge` 导出必须显式 `storyboard_ids`（省略=整集）。
 6. `opened` 必须**下载并打开**、本地核对 sha256 一致后才能填。
@@ -59,7 +59,7 @@ description: 通过火宝 HTTP API 按阶段推进剧本、资产、Poster、分
 - 开工把预算写成硬台账：`{images: n, videos: n, tts: n, text_calls: n}`，并列出已消耗的任务 ID。
 - 授权按本轮目标生效：用户已明确要求“发布后在生产验收”时，范围内直接持续执行并记账，不逐任务/逐阶段重复索要预算批准；明确上限仍遵守，新目标或新的重大风险另行确认。2026-11-09 本轮测试使用“八达岭长城测试 1009”，不是历史 1008。
 - GPU 额度：真正提交到图像/视频/TTS 模型的请求；`compose`/`merge`/图层渲染/Poster 的服务端 LayerDoc 渲染不占 AI 额度。
-- **计费文本 LLM 额度（独立于 GPU 计数，同样要事先授权）**：`POST /episodes/{e}/script-rewrite`（及各阶段重跑）、`POST /episodes/{e}/script-rewrite/inspect-narration`（只读检查但真实调用计费模型）、拆镜/旁白骨架、`POST /episodes/{e}/design-cards/fill`、`POST /episodes/{e}/generate-keyframe-prompts`、`POST /episodes/{e}/generate-video-prompts`、各资产 `generate-prompt`（含 `force` 重写）、资产提取与审核。只读 GET、`POST /episodes/{e}/work-estimate` 与 `GET /tasks/{id}/observations*` 不计费。
+- **计费文本 LLM 额度（独立于 GPU 计数，同样要事先授权）**：`POST /episodes/{e}/script-rewrite`（及各阶段重跑）、`POST /episodes/{e}/script-rewrite/inspect-narration`（只读检查但真实调用计费模型）、拆镜/旁白骨架、`POST /episodes/{e}/design-cards/fill`、`POST /episodes/{e}/generate-keyframe-prompts`、`POST /episodes/{e}/generate-video-prompts`、各资产 `generate-prompt`（含 `force` 重写）、资产提取与审核、地图工作流 brief/research 文本调用（未钉选文本端点时一次调用最多尝试 3 个端点，重试另计）。只读 GET、`POST /episodes/{e}/work-estimate` 与 `GET /tasks/{id}/observations*` 不计费。
 - 每次提交前先读台账：余额 ≤0 就**停下来问人**，不得“再试一条”。
 - 失败重试也算新请求（图片/视频重试一律新建 `sys_task`），必须提前计入余额。
 - 批次中途失败只补剩余（`retry-failed`/`fill-gaps`），不从头重跑，避免双倍消耗。
@@ -142,11 +142,12 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 - 组合场景：先提取→审核→（缺项补提取）→ 精确/美化 → 才允许拆镜。
 - 陷阱：资产批量是**项目范围**，传 `episode_id` 不代表只改本集；`rewrite_prompts` 与 `overwrite_images` 是两个独立操作；审批没带 `opened` 会被 400（这是硬规则，防止没看图就批）。
 
-#### S2-84 地图资产专用流程（Issue #84，`ff09732` 已发布；生产逐项验收中 `[S/R]`）
+#### S2-84 地图资产专用流程（Issue #84，`f149a0e` 已发布；逐方法证据 `[S/R]`）
 
 **背景**：历史地图原先只有互不串联的坐标建议、配置与渲染面板，资产甚至没有点线语义。#84 要求显式地图类型、充分性判断、权威检索（Wikipedia / Europeana / Smithsonian）、三条底图路径、自动与逐步审核、可回退与可编辑点线面；扩散仅生成底纹，绝不重画地理几何。生产入口已可用，但仍须检查实际部署版本，不把开发副本检查标成 `[R]`。
 
 - **类型**：`POST /props` 与 `PUT /props/{p}` 的 `asset_type:"map"|"prop"` 是道具内的显式分类，不新增第四类资产引用。地图仍用 `kind:"prop"` 与同一资产 ID；`POST /tasks/register-upload` 的目标 `asset_type` 仍写 `"prop"`。地图改回普通道具需 `confirm_asset_type_change:true`，必须由人明确要求，地图数据保留不删除。
+- **项目范围**：新建 `POST /props {drama_id,name,description,asset_type:"map"}`，不必关联集，不受集剧本确认门禁；不能为地图伪造 `script_content` 或确认剧本，集级提取/设计仍守门禁。
 - **唯一工作入口**：`GET|PUT /props/{p}/map-workflow`、`POST .../run|advance|rollback|cancel`，完整参数见 `references/api-catalog.md` §3.84。不另拼旧地图接口或直写 `map_spec` 绕过修订保护；对普通道具调用该工作流返回 `not_a_map`。
 - **自动点线面与人工确认**：research 阶段把来源支持的要素并入 `map_spec`，AI 新增项带 `proposed:true`；auto 可用候选直接制图，但这不是人工批准。人工逐项审核后去掉该项 `proposed` 并通过工作流 PUT 保存，之后重跑不覆盖它。只有在明确选择示意模式时才可采用标明近似的区域；缺关键依据要阻断，不虚构疆界。
 - **需求与缺失分级**：对象 / 时代 / 空间定位 / 用途与粒度要能明确解析（「殷墟车马坑」可由 AI 解释隐含时代与位置，「京杭运河通州段」缺时代必须补齐）；不明确或充分性检查失败会阻断，单个来源无结果、非关键细节缺失只记录风险，所有来源都无结果不算已完成检索。AI 推断不等于出处考证：`issues[].blocking` 阻断时补需求，`research.features[].uncertainty/conflicts` 有风险时呈报。
@@ -338,9 +339,9 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 
 完整经过见 [`references/diagnostic-example.md`](references/diagnostic-example.md) 末节。要点 `[R]`：助手自写 840 字符解说稿直接 `PUT /episodes/15`（含 `content`+`description`+`script_content`），从未调火宝改写——经 API 存进去的自写稿不是「通过火宝改写」。正确做法：原文只进 `content` → 读回交第一步链接 → 获准后才由火宝改写。用户要求「只更新 skill」后，不得再请求火宝、清稿或自行回滚。
 
-### 4.6 生产验收固定案例：八达岭长城测试（按执行日 MMDD，本轮 1009；`AGENTS.md` §9/§10）
+### 4.6 生产验收固定案例：八达岭长城测试（本轮用户指定 1009；`AGENTS.md` §9/§10）
 
-固定定义（主题、224 字固定正文与那条故意保留的出处行、命名、链路、新功能覆盖清单、证据清单与纪律）及 2026-11-08 首轮结果 `[R]` 见 [`references/fixed-case-8daling.md`](references/fixed-case-8daling.md)，**跑生产验收前必读并逐条照做**，正文 224 字与授权边界不得改写。要点：隔离 worktree 自 2026-11-08 起不再是验收依据，必须在生产入口/后端/库留痕，只写一次性测试项目，绝不碰既有真实项目（尤其 drama 3）；计费生成先取得同意；DB 只读；失败留证。首轮：drama 10 / ep 16，6 镜，覆盖 241/241，merge 27，960×544 / 65.44s（浏览器元数据，无 ffprobe），#80/#81/#82 通过。
+固定定义（主题、224 字固定正文与那条故意保留的出处行、命名、链路、新功能覆盖清单、证据清单与纪律）及 2026-11-08 首轮结果 `[R]` 见 [`references/fixed-case-8daling.md`](references/fixed-case-8daling.md)，**跑生产验收前必读并逐条照做**，正文 224 字与授权边界不得改写。要点：隔离 worktree 自 2026-11-08 起不再是验收依据，必须在生产入口/后端/库留痕，只写一次性测试项目，绝不碰既有真实项目（尤其 drama 3）；计费生成先取得同意；DB 只读；失败留证。首轮：drama 10 / ep 16，6 镜，覆盖 241/241，merge 27，960×544 / 65.44s（浏览器元数据，无 ffprobe）；各功能只覆盖报告明列路径。
 ---
 
 ## 5. 失败处理与报告模板
