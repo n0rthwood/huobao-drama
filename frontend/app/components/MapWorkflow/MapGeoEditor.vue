@@ -147,7 +147,7 @@
             @click="selected = { kind: section.kind, id: shape.id }"
           >
             <input class="input geo-name" :value="shape.name" :disabled="disabled" :placeholder="t('episode.documentary.map.editor.name')" @input="setName(section.kind, index, $event)" />
-            <span class="geo-count">{{ t('episode.documentary.map.editor.pointCount', { n: shape.points.length }) }}</span>
+            <span class="geo-count">{{ t('episode.documentary.map.editor.pointCount', { n: vertexCount(section.kind, shape.points) }) }}</span>
             <span v-if="shape.proposed" class="geo-badge">{{ t('episode.documentary.map.editor.proposed') }}</span>
             <button v-if="shape.proposed" type="button" class="geo-tool" :disabled="disabled" @click.stop="accept(section.kind, index)">{{ t('episode.documentary.map.editor.accept') }}</button>
             <button type="button" class="geo-tool" :disabled="disabled || !registration" @click.stop="continueShape(section.kind, shape.id)">{{ t('episode.documentary.map.editor.continueShape') }}</button>
@@ -256,15 +256,26 @@ const placeShapes = computed(() => props.spec.places.flatMap((place) => {
   return at ? [{ id: place.id, name: place.name, at, proposed: !!place.proposed }] : []
 }))
 
-function shapesOf(list: Array<MapRoute | MapRegion>) {
+function vertexCount(kind: LinearKind, points: Array<[number, number]>): number {
+  const first = points[0], last = points[points.length - 1]
+  return points.length - (kind === 'region' && points.length > 1 && first && last && first[0] === last[0] && first[1] === last[1] ? 1 : 0)
+}
+
+function shapesOf(list: Array<MapRoute | MapRegion>, kind: LinearKind) {
   return list.map((shape) => {
-    const pixels = shape.points.map(pt => pixelOf(pt[0], pt[1])).filter((pt): pt is [number, number] => !!pt)
+    const pixels: Array<[number, number]> = []
+    const count = vertexCount(kind, shape.points)
+    for (let index = 0; index < count; index++) {
+      const point = shape.points[index]!
+      const pixel = pixelOf(point[0], point[1])
+      if (pixel) pixels.push(pixel)
+    }
     return { id: shape.id, name: shape.name, pixels, attr: pixels.map(pt => `${pt[0]},${pt[1]}`).join(' ') }
   }).filter(shape => shape.pixels.length >= 2)
 }
 
-const routeShapes = computed(() => shapesOf(props.spec.routes))
-const regionShapes = computed(() => shapesOf(props.spec.regions))
+const routeShapes = computed(() => shapesOf(props.spec.routes, 'route'))
+const regionShapes = computed(() => shapesOf(props.spec.regions, 'region'))
 const linearSections = computed(() => [
   { kind: 'route' as LinearKind, items: props.spec.routes },
   { kind: 'region' as LinearKind, items: props.spec.regions },
@@ -319,7 +330,13 @@ function continueShape(kind: LinearKind, id: string) {
   if (!shape) return
   mode.value = kind
   selected.value = { kind, id }
-  draft.value = { kind, id, points: shape.points.map(pt => [pt[0], pt[1]] as [number, number]) }
+  const points: Array<[number, number]> = []
+  const count = vertexCount(kind, shape.points)
+  for (let index = 0; index < count; index++) {
+    const point = shape.points[index]!
+    points.push([point[0], point[1]])
+  }
+  draft.value = { kind, id, points }
 }
 
 function eventGeo(event: PointerEvent | MouseEvent): [number, number] | null {
@@ -394,9 +411,15 @@ function onPointerMove(event: PointerEvent) {
     const list = drag.kind === 'route' ? next.routes : next.regions
     const shape = list.find(item => item.id === drag.id)
     const point = shape?.points[drag.index]
-    if (!point) return
+    if (!shape || !point) return
+    const closed = drag.kind === 'region' && vertexCount('region', shape.points) < shape.points.length
     point[0] = lon
     point[1] = lat
+    if (closed && drag.index === 0) {
+      const last = shape.points[shape.points.length - 1]!
+      last[0] = lon
+      last[1] = lat
+    }
   }
   emit('update', next)
 }
@@ -410,8 +433,16 @@ function removeVertex(kind: LinearKind, id: string, index: number) {
   const next = cloneSpec()
   const list = kind === 'route' ? next.routes : next.regions
   const shape = list.find(item => item.id === id)
-  if (!shape || shape.points.length <= (kind === 'region' ? 3 : 2)) return
+  if (!shape) return
+  const count = vertexCount(kind, shape.points)
+  if (count <= (kind === 'region' ? 3 : 2)) return
+  const closed = kind === 'region' && count < shape.points.length
   shape.points.splice(index, 1)
+  if (closed) {
+    const first = shape.points[0]!, last = shape.points[shape.points.length - 1]!
+    last[0] = first[0]
+    last[1] = first[1]
+  }
   emit('update', next)
 }
 

@@ -546,6 +546,7 @@ def main() -> int:
                 # materialize the KMZ and Earth must expose its parsed folder.
                 page.wait_for_function("() => window.__huobaoPicker?.file_reads > 0", timeout=15000)
                 find(page, ", folder", exact=False, timeout=90)
+                folders = [node["label"] for node in nodes(page) if ", folder" in node["label"]]
                 while click(page, L_DISMISS, required=False, timeout=3, settle=1200):
                     pass
                 tidy_ui(page)

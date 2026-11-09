@@ -318,6 +318,7 @@ Body：`{expected_revision,brief?,map_spec?,mode?}`，至少一个可保存字�
 - 对象/时代/空间/用途可由 AI 解释隐含信息，但缺时代不能擅自默认；已知字段不得用模型猜测覆盖。
 - `base_mode:"image"` 的 `reference_image = {path,source_url,license,control_points:[{x,y,lon,lat}]}`；先通过 `POST /upload/image` 上传，`path` 是返回的 static 相对路径，`x/y` 是源图像素，`lon/lat` 是 WGS84 度。至少三个非共线点，必须有来源与许可；最大拟合残差超过源图对角线 5% 时拒绝，保留 max/rms 像素残差供人工核对。恰好三个控制点可拟合为零，不代表整张图精准；残差不能代替史实核验。
 - `map_spec` 沿用投影、bbox、背景层与 `places/routes`，新增 `regions:[{id,name,points:[[lon,lat],...],proposed?}]`。面至少三个不同且非共线顶点，规范化后闭合。人工确认的几何不能被重跑检索覆盖。
+- 闭合面的末点是首点副本，不是独立顶点：编辑器只显示/计数独立顶点，拖动首点同步闭合点，删除或续画保持同一面身份；三角形不能再删顶点。
 - 保存只是改真源，不等于已渲染新图。输出上限为 60 图层、每条线/面 240 顶点，画面外/地平线后或超限几何会阻断，不丢点、钳边或缩减内容。
 - 几何编辑后读回响应的 `stage`：投影/bbox/背景层不变可复用配准底图和底纹，从 drawing 手动推进绘制，再推进 complete 采用，或在已授权范围内 auto 续跑；投影/bbox/背景层变更先重做 base。相同规范化 spec 保存不作废已有成图。
 
