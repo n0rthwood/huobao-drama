@@ -1669,7 +1669,7 @@ const storedPanel = (() => {
 // Issue #86：统一走 useDeeplink 分组（键登记在 DEEPLINK_KEYS），工作台不再自己整包覆盖 query：
 // - workbench：面板/子步骤/页签/资产子页签/提取筛选/资产详情弹窗（键名与取值与旧链接逐字兼容）
 // - workbenchDialogs：工作台自己托管的弹窗身份 dlg + 大图 view + 选中分镜 shot + 多选上下文 sel
-// - assetDetail：资产详情弹窗内部位置（语义条目 sem / 地图编辑 mapedit）
+// - assetDetail：资产详情弹窗内部位置（语义条目 sem）
 // 父级同时接管未挂载子步骤的初始键，门禁阻断时不会留下可误恢复到另一镜的孤立弹窗。
 const link = useDeeplink('workbench', [...new Set([
   ...DEEPLINK_KEYS.workbench, ...DEEPLINK_KEYS.design, ...DEEPLINK_KEYS.picker,
@@ -2119,15 +2119,12 @@ function syncWorkbenchQuery() {
 watch([panel, scriptStep, prodTab, assetTab, extractTab], syncWorkbenchQuery)
 watch(assetDetail, syncWorkbenchQuery)
 
-// 资产详情弹窗内部位置（语义条目定位 / 地图编辑态）：只写自己的键，父层 asset 原样保留
+// 资产详情弹窗内部位置（语义条目定位）：只写自己的键，父层 asset 原样保留
 function syncAssetDetailQuery() {
   const item = assetDetail.value.open ? assetDetail.value.item : null
-  assetDetailLink.set({
-    sem: item ? focusSemanticId.value : '',
-    mapedit: item && mapDraftAssetId.value === item.id ? '1' : '',
-  })
+  assetDetailLink.set({ sem: item ? focusSemanticId.value : '' })
 }
-watch([assetDetail, focusSemanticId, mapDraftAssetId], syncAssetDetailQuery)
+watch([assetDetail, focusSemanticId], syncAssetDetailQuery)
 
 // ─── 手动新增资产 ────────────────────────────────────────────
 // 类型短显示名渲染时求值（不模块级固化），逻辑判断一律用 kind code
@@ -5314,9 +5311,8 @@ function applyAssetDeeplink() {
     panel.value = 'production'
     prodTab.value = 'assets'
   }
-  // 弹窗内部位置：语义条目定位 / 地图编辑态（openAssetDetail 会重置 mapDraftAssetId，故放在其后）
+  // 弹窗内部位置：语义条目定位
   openAssetDetailById(type, id, assetDetailLink.initial('sem'))
-  if (type === 'prop' && assetDetailLink.initial('mapedit') === '1') mapDraftAssetId.value = item.id
 }
 
 /** 大图的可恢复身份：只接受本站 /static/ 媒体路径，外链 / data: / blob: 一律不入 URL */
