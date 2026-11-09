@@ -347,7 +347,6 @@ const script = `
       texture_differs: textured.path !== plain.path,
     },
     marker_err: Math.hypot(marker.at[0] - expectedMarker[0], marker.at[1] - expectedMarker[1]),
-    marker_text: marker.text,
     anchors: [marker.anchor.semantic_id, polyline.anchor.semantic_id, polygonLayer.anchor.semantic_id, label.anchor.semantic_id],
     polyline_points: polyline.points.length,
     polygon_points: polygonLayer.points.length,
@@ -405,6 +404,22 @@ const script = `
         return null
       } catch (err) { return err.message }
     })(),
+  }
+
+  // Close geographic points with long names must retain their coordinates while
+  // their visible text stays complete, inside the canvas and mutually legible.
+  const clusterNames = ['北关城（关沟北端的山地通道入口）', '邻近城堡（承担关口外侧接应的城堡）', '南关城（通往京师方向的通道南端）']
+  const clusterSpec = normalizeMapSpec({
+    bbox, places: clusterNames.map((name, i) => ({ id: 'cluster-'+i, name, lon: anyang[0]+i*0.003, lat: anyang[1]+i*0.002 })),
+  })
+  const cluster = await renderMapDrawing(clusterSpec, { basePath: artifact.path, width: 1280, registration: reg })
+  const {layerBounds}=await import('./src/services/layer-svg.ts')
+  const textLayers=cluster.layer_doc.layers.filter(layer => typeof layer.text==='string' && layer.text)
+  out.cluster={
+    names:clusterNames, texts:textLayers.map(layer=>layer.text),
+    boxes:textLayers.map(layer=>layerBounds(layer,cluster.layer_doc.theme,1280/720)),
+    pixels:cluster.points.map(point=>point.at),
+    expected:clusterSpec.places.map(point=>geoToPixel(reg,[point.lon,point.lat])),
   }
 
   // Deliberately unrelated nominal camera: measured pixels, not analytic self-consistency,
@@ -608,7 +623,6 @@ test('可编辑图层：点/线/面/标签齐全、坐标等于登记件换算�
   assert.ok(drawing.background_differs, '纹理必须真的改变背景像素')
   assert.ok(drawing.geometry_identical, '纹理绝不能改动任何几何坐标')
   assert.ok(drawing.marker_err < 1e-9, '标注坐标必须等于登记件换算结果')
-  assert.equal(drawing.marker_text, '安阳')
   assert.deepEqual(drawing.anchors, ['anyang', 'march', 'shang', 'shang'], '每个图层都要锚回 spec 里的要素 id')
   assert.ok(drawing.polyline_points >= 3 && drawing.polygon_points >= 4)
   assert.ok(drawing.texture_warning, '纹理的合成方式必须在 warnings 里说清楚')
@@ -626,6 +640,19 @@ test('可编辑图层：点/线/面/标签齐全、坐标等于登记件换算�
   assert.ok(drawing.offscreen_rejected?.includes('画面之外'), '画外的要素必须报错，不许钳到画边假装在画里')
   assert.ok(drawing.too_many_points?.includes('顶点数'), '顶点超限必须报错，不许悄悄抽稀改变形状')
   assert.ok(drawing.too_many_layers?.includes('图层'), '图层超限必须报错，不许悄悄丢要素')
+})
+
+test('近邻长地名完整避让，排版不移动或隐藏地理点', () => {
+  const { names, texts, boxes, pixels, expected } = result.cluster
+  assert.deepEqual([...texts].sort(), [...names].sort(), '所有地名完整保留，不截字或藏字')
+  for (let i=0; i<boxes.length; i++) {
+    const a=boxes[i]
+    assert.ok(a.x>=0 && a.y>=0 && a.x+a.w<=1 && a.y+a.h<=1, '标签必须留在画幅内')
+    for (const b of boxes.slice(i+1)) {
+      assert.ok(a.x+a.w<=b.x || b.x+b.w<=a.x || a.y+a.h<=b.y || b.y+b.h<=a.y, '地名包围框不得相互遮挡')
+    }
+  }
+  for (let i=0; i<pixels.length; i++) assert.ok(Math.hypot(pixels[i][0]-expected[i][0],pixels[i][1]-expected[i][1])<1e-9, '不能为了排版移动真实点位')
 })
 
 test('calibrated Earth uses observed control grid instead of nominal camera', () => {

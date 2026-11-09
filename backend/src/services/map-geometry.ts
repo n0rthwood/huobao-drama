@@ -41,7 +41,7 @@ import {
 } from './map-earth.js'
 import { applyAffine, fitAffine, type AffineForward, type AffineInverse, type ControlPoint } from './map-image-calibration.js'
 import { ensureLayerFonts } from './layer-fonts.js'
-import { FONT_FAMILIES } from './layer-svg.js'
+import { FONT_FAMILIES, LINE_HEIGHT_EM, measureTextEm, wrapTextEm } from './layer-svg.js'
 import { normalizeLayerDoc, LAYER_MAX_COUNT, LAYER_MAX_POINTS, type Layer, type LayerDoc } from './layer-doc.js'
 import { gridGeoToNormalized, gridNormalizedToGeo } from './map-registration-grid.js'
 import { renderLayerDoc } from './layer-render.js'
@@ -811,6 +811,45 @@ function buildLayerDoc(
   const toNorm = (point: [number, number]): [number, number] => [point[0] / options.width, point[1] / options.height]
   const layers: Layer[] = []
   let z = 0
+  const aspect = options.width / options.height
+  const gap = 0.012
+  // 只安排文字，不移动地理点。标记预留区防止别处的长标签盖住点位。
+  const occupied = geometry.points.map(point => {
+    const [x, y] = toNorm(point.at)
+    return { x: x - 0.01 / aspect, y: y - 0.01, w: 0.02 / aspect, h: 0.02 }
+  })
+  const placeLabel = (text: string, at: [number, number], size: number) => {
+    const w = Math.min(0.34, Math.max(0.07, (measureTextEm(text) + 0.6) * size / aspect))
+    const h = (wrapTextEm(text, w * aspect / size - 0.6).length * LINE_HEIGHT_EM + 0.6) * size
+    const fits = (x: number, y: number) => x >= 0.02 && y >= 0.02 && x + w <= 0.98 && y + h <= 0.98
+      && !occupied.some(box => x < box.x + box.w + gap && x + w + gap > box.x
+        && y < box.y + box.h + gap && y + h + gap > box.y)
+    for (let row = 0; row < 15; row++) {
+      const shift = Math.ceil(row / 2) * (h + gap) * (row % 2 ? 1 : -1)
+      const candidates = [
+        [at[0] + 0.02, at[1] - h / 2 + shift],
+        [at[0] - w - 0.02, at[1] - h / 2 + shift],
+        [at[0] - w / 2, at[1] - h - 0.02 + shift],
+        [at[0] - w / 2, at[1] + 0.02 + shift],
+      ]
+      for (const [x, y] of candidates) {
+        if (!fits(x, y)) continue
+        const box = { x, y, w, h }
+        occupied.push(box)
+        return box
+      }
+    }
+    // 近邻拥挤时使用剩余空白；没有位置就明确失败，不截断文字或伪造点位。
+    for (let y = 0.02; y + h <= 0.98; y += h + gap) {
+      for (let x = 0.02; x + w <= 0.98; x += w + gap) {
+        if (!fits(x, y)) continue
+        const box = { x, y, w, h }
+        occupied.push(box)
+        return box
+      }
+    }
+    throw new MapGeometryError(`地名「${text}」没有足够的无重叠排版空间，请缩短名称或减少同图要素；地理坐标未修改`)
+  }
   // 面在最下、线居中、点与文字在上：和底图渲染的堆叠顺序一致
   for (const region of geometry.regions) {
     layers.push({
@@ -854,17 +893,24 @@ function buildLayerDoc(
       rotation: 0,
       anchor: { semantic_id: point.id, semantic_name: point.name || point.id },
       at: toNorm(point.at),
-      text: point.name || '',
-      style: { color: MAP_ROUTE_COLOR, dot_radius: 0.008, size: 0.028 },
+      text: '',
+      style: { color: MAP_ROUTE_COLOR, dot_radius: 0.008 },
+    })
+    if (point.name) layers.push({
+      id: `place-label-${point.id}`, type: 'label', name: point.name,
+      visible: true, locked: false, z: z++, opacity: 1, rotation: 0,
+      anchor: { semantic_id: point.id, semantic_name: point.name },
+      box: placeLabel(point.name, toNorm(point.at), 0.022),
+      text: point.name,
+      style: { size: 0.022, bg_opacity: 0.84, align: 'left' },
     })
   }
-  // 面没有自带文字，给每个面配一条可编辑标签（放在外接框中心）
+  // 面没有自带文字，从外接框中心就近安排可编辑标签并避让已有文字。
   for (const region of geometry.regions) {
     if (!region.name) continue
     const xs = region.points.map(point => point[0])
     const ys = region.points.map(point => point[1])
     const centre: [number, number] = [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2]
-    const box = toNorm(centre)
     layers.push({
       id: `region-label-${region.id}`,
       type: 'label',
@@ -875,9 +921,9 @@ function buildLayerDoc(
       opacity: 1,
       rotation: 0,
       anchor: { semantic_id: region.id, semantic_name: region.name },
-      box: { x: Math.max(0, box[0] - 0.08), y: Math.max(0, box[1] - 0.02), w: 0.16, h: 0.05 },
+      box: placeLabel(region.name, toNorm(centre), 0.022),
       text: region.name,
-      style: { color: region.color, size: 0.03, align: 'center' },
+      style: { color: region.color, size: 0.022, bg_opacity: 0.84, align: 'left' },
     })
   }
   assertWithinLayerLimits(geometry, layers.length)
@@ -942,6 +988,7 @@ export async function renderMapDrawing(
   const textureAbs = options.texturePath ? resolveStaticImage(options.texturePath, '地图纹理') : null
   const opacity = Math.min(MAX_TEXTURE_OPACITY, Math.max(0, options.textureOpacity ?? 0.35))
   const signature = crypto.createHash('sha256').update(JSON.stringify({
+    renderer: 'map-label-layout-v2',
     base: options.basePath,
     texture: options.texturePath ?? null,
     opacity,

@@ -416,6 +416,11 @@ function canRollbackTo(target: MapWorkflowStage): boolean {
  * 由人按「保存」或「放弃修改」决定，后台刷新绝不能吞掉正在编辑的内容。
  */
 function applyDetail(next: MapWorkflowDetail, adopt?: 'brief' | 'spec') {
+  // 首次恢复显示服务端实际固定的配置；后台刷新不覆盖用户尚未提交的新选择。
+  if (!detail.value) {
+    textConfigId.value = next.text_config_id ?? 0
+    imageKey.value = next.image_config_id && next.image_model ? `${next.image_config_id}:${next.image_model}` : ''
+  }
   detail.value = next
   const nextBrief = JSON.stringify({ ...emptyBrief(), ...next.brief })
   if (adopt === 'brief' || !briefDirty.value) briefDraft.value = JSON.parse(nextBrief) as MapBrief

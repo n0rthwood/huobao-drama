@@ -704,7 +704,7 @@ async function startRun(propId: number, input: {
   }
 
   const [prop] = await db.select().from(schema.props).where(eq(schema.props.id, propId))
-  const stageModel = await resolveStageModel('asset_research', { configId: input.opts.textConfigId })
+  const stageModel = await resolveStageModel('asset_research', { configId: input.opts.textConfigId ?? loaded.state.text_config_id ?? undefined })
   const taskId = await createTextTask({
     kind: 'map_workflow',
     episodeId: null,

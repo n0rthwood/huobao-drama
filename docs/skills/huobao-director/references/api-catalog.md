@@ -295,12 +295,13 @@ Body：`{scope:"all"|"characters"|"scenes"|"props", episode_id?, rewrite_prompts
 
 #### `GET /props/{p}/map-workflow`
 
-返回 `{asset_type,brief,stage,status,mode,revision,task_id,steps,issues,research,map_spec,outputs,history,error}`。普通道具返回 400 `not_a_map`；不存在返回 404。
+返回 `{asset_type,brief,stage,status,mode,revision,task_id,text_config_id,image_config_id,image_model,steps,issues,research,map_spec,outputs,history,error}`。配置字段是已保存的选择（可为 null）；续跑省略覆盖项时沿用它们。普通道具返回 400 `not_a_map`；不存在返回 404。
 
 - `stage ∈ brief|research|base|style|drawing|complete`，是当前或下一待执行阶段；`status ∈ idle|running|awaiting_review|blocked|failed|completed`。检查 `steps[].status/message` 判断哪些阶段真正完成。
 - `issues[] = {field,code,message,blocking}`；`blocking=true` 要补齐，不把失败当无问题。
 - `research.queries[]` 逐源记录 hits/error；来源固定为 `wikipedia-zh / wikipedia-en / europeana / smithsonian`，不是模型自选任意网站。`sources[]` 保存机构、年代、许可、URL 与实际摘录；`features[]` 保存点线面、坐标依据、支持原文、不确定性、来源引用和冲突。URL 存在不等于它证明了某个坐标。Europeana/Smithsonian 凭据仍由「设置→资料检索」保管，Agent 不获取、落盘或写入请求留痕；无 key 的来源失败应如实呈报。
 - `outputs = {base_image,texture_image,final_image,kmz,layer_doc}`；image 项含 `{path,width,height,source,task_id,provenance}`。`provenance.registration` 是 geo↔像素配准真源；Earth 使用通过独立检验的实测控制网格，不用名义相机或 bbox 仿射替代；检验点残差超过 3px 或相机漂移时失败，保留标定截图、控制点与残差证据。
+- 地名文本按共享字号/换行模型放进独立 label 图层并避让，marker 的真实点位不因排版移动；过于拥挤时明确报空间不足，不截断地名。历史成图不被升级自动覆盖，需重新 drawing 才采用新版布局，已有底图/底纹可复用。
 
 - research 阶段会把有依据的点线面加入 `map_spec`，AI 新项带 `proposed:true`。自动制图可使用候选，但不是人工批准；人工采纳须去掉相应项的 `proposed` 再 PUT 保存，此后检索不覆盖该项。近似区域只能在显式 `schematic:true` 下采用，必须保留不确定性；没有依据不虚构范围。
 #### `PUT /props/{p}/map-workflow`

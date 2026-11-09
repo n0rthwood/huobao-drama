@@ -1028,6 +1028,9 @@ export interface MapWorkflowDetail {
   revision: number
   busy: boolean
   task_id: number | null
+  text_config_id: number | null
+  image_config_id: number | null
+  image_model: string | null
   error: string | null
   updated_at: string | null
   brief: MapBrief

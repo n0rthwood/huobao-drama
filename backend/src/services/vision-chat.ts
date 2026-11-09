@@ -108,7 +108,8 @@ export async function callTextChat(
   const messages: Array<{ role: string; content: ChatContent }> = []
   if (opts.systemPrompt) messages.push({ role: 'system', content: opts.systemPrompt })
   messages.push({ role: 'user', content })
-  const vision = !!config.vision || Array.isArray(content) && content.some(part => part.type === 'image_url')
+  const hasImages = Array.isArray(content) && content.some(part => part.type === 'image_url')
+  const vision = !!config.vision || hasImages
   let endpoint = config
   const attempted: number[] = []
   let data: ChatCompletionResponse | undefined
@@ -125,7 +126,7 @@ export async function callTextChat(
         try {
           const url = `${getTextProviderBaseUrl(endpoint as unknown as AIConfig)}/chat/completions`
           const observedFetch = observeTextCall({
-            kind: vision ? 'vision_chat' : 'llm',
+            kind: hasImages ? 'vision_chat' : 'llm',
             configId,
             configName: endpoint.name ?? null,
             provider: endpoint.provider,

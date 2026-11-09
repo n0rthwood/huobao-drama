@@ -43,6 +43,10 @@ CAMERA_SLACK = 0.04
 L_PLACEHOLDER = "flt-semantics-placeholder"
 L_FILE_MENU = "File"
 L_OPEN_KML = "Open local KML file"
+# 2026-11 Google Earth home screen: local files now enter through the rebuilt
+# Local KML editor instead of the legacy File menu.
+L_LOCAL_KML_EDITOR = "Local KML editor"
+L_OPEN_KML_DEVICE_LABELS = ("Open KML/Z from device", "Open KML from device")
 L_DISMISS = "Dismiss"
 L_COLLAPSE = "Collapse panel"
 L_HIDE_MENU = "Hide the menu bar"
@@ -344,8 +348,9 @@ def apply_camera(page, camera, earth_url: str, tries: int = 3):
 
 
 def init_script(kmz: Path) -> str:
-    """`File → Open local KML file` 调的是 showOpenFilePicker（File System Access API），
-    Playwright 的文件选择器拦截服务不了它；在页面加载前把它换成一个直接返回 KMZ 字节的句柄。"""
+    """The local-KML open actions call showOpenFilePicker (File System Access API).
+    Playwright's file chooser interception cannot serve it, so install a handle
+    returning the KMZ bytes before Earth loads."""
     payload = base64.b64encode(kmz.read_bytes()).decode()
     name = json.dumps(kmz.name)
     return f"""
@@ -378,10 +383,32 @@ def prepare_page(page, earth_url: str) -> None:
     # 真正的就绪信号是语义树可用，由 enable_semantics 轮询判定。
     page.goto(earth_url, wait_until="domcontentloaded", timeout=120000)
     enable_semantics(page)
-    # 不是「点一次 Close 就算完」：find 在整个等待窗口内持续处理迟到的 alert/dialog，
-    # 直到当前语义树实际暴露 File 菜单（推广弹窗已经消失、底层应用就绪）。
-    find(page, L_FILE_MENU, timeout=90)
 
+
+def open_local_kml(page) -> None:
+    """Open a KMZ through the current home-screen editor or legacy File menu.
+
+    Current Earth home screens expose ``Local KML editor`` rather than ``File``.
+    Both routes must invoke the injected File System Access picker; reaching a
+    dialog alone is not treated as import success by the callers below.
+    """
+    if find(page, L_LOCAL_KML_EDITOR, timeout=10, required=False):
+        click(page, L_LOCAL_KML_EDITOR, timeout=10)
+        for label in L_OPEN_KML_DEVICE_LABELS:
+            if find(page, label, timeout=10, required=False):
+                click(page, label, timeout=10)
+                return
+        labels = sorted({node["label"][:80] for node in nodes(page)})
+        raise EarthError(
+            "Google Earth Local KML editor opened, but no device-open action appeared; "
+            f"expected one of {list(L_OPEN_KML_DEVICE_LABELS)!r}, saw {labels[:40]}"
+        )
+
+    # Legacy Earth Web remains supported for deployments that still render the
+    # File menu. Do not infer import success from clicking either menu item.
+    find(page, L_FILE_MENU, timeout=60)
+    click(page, L_FILE_MENU)
+    click(page, L_OPEN_KML, exact=False, timeout=30, settle=0)
 
 def capture_failure(page, prefix: str, tag: str) -> str:
     """失败现场：截图 + 当前 URL + 可见标签。关页面之前必须留下，否则无从诊断。"""
@@ -492,8 +519,8 @@ def main() -> int:
     # 调用方据此精确找到本次作业拉起的浏览器进程（绝不按进程名乱杀）。
     if job.get("marker"):
         launch_args.append(f"--huobao-earth-job={job['marker']}")
-    # 控件是按**英文标签**找的（File / Open local KML file / Dismiss …），
-    # 所以必须显式要英文界面，不能听凭容器默认 locale。
+    # Controls are located by English labels (Local KML editor / File / Dismiss),
+    # so the browser locale must not follow the container default.
     context_options = {
         "viewport": {"width": window[0], "height": window[1]},
         "device_scale_factor": 1,
@@ -512,15 +539,11 @@ def main() -> int:
             page = context.new_page()
             try:
                 prepare_page(page, earth_url)
-                find(page, L_FILE_MENU, timeout=60)
-                click(page, L_FILE_MENU)
-                click(page, L_OPEN_KML, exact=False, timeout=30, settle=0)
-                # 点击菜单不是导入成功的证据：先确认受控 picker 的 getFile 真被调用，
-                # 再等 Earth 解析出的文件夹；否则立即保留计数器/页面异常供诊断。
+                open_local_kml(page)
+                # Opening an editor is not import proof: the injected picker must
+                # materialize the KMZ and Earth must expose its parsed folder.
                 page.wait_for_function("() => window.__huobaoPicker?.file_reads > 0", timeout=15000)
                 find(page, ", folder", exact=False, timeout=90)
-                folders = sorted({n["label"][:60] for n in nodes(page)
-                                  if ", folder" in n["label"].lower()})
                 while click(page, L_DISMISS, required=False, timeout=3, settle=1200):
                     pass
                 tidy_ui(page)
@@ -539,8 +562,7 @@ def main() -> int:
             page = context.new_page()
             try:
                 prepare_page(page, earth_url)
-                click(page, L_FILE_MENU)
-                click(page, L_OPEN_KML, exact=False, timeout=30, settle=0)
+                open_local_kml(page)
                 page.wait_for_function("() => window.__huobaoPicker?.file_reads > 0", timeout=15000)
                 find(page, ", folder", exact=False, timeout=90)
                 tidy_ui(page)
