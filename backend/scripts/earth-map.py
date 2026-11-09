@@ -31,6 +31,13 @@ import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:  # playwright only exists in the Earth runtime, not in the unit-test python
+    from playwright.sync_api import TimeoutError as _PlaywrightTimeout
+except ImportError:
+    _PlaywrightTimeout = None
+
+_TIMEOUT_ERRORS = (TimeoutError,) + ((_PlaywrightTimeout,) if _PlaywrightTimeout else ())
+
 EARTH_RADIUS_M = 6_371_008.8
 CHROME = {"left": 110, "top": 130, "right": 110, "bottom": 130}
 LABEL_CHAR_PX = 29.5
@@ -399,14 +406,19 @@ def open_local_kml(page) -> None:
     if not find(page, L_FILE_MENU, timeout=15, required=False):
         click(page, L_LOCAL_KML_EDITOR, timeout=20)
         find(page, L_FILE_MENU, timeout=30)
-    deadline = time.monotonic() + 90
+    deadline = time.monotonic() + 120
+    attempts = 0
     while time.monotonic() < deadline:
         picker = page.evaluate("() => window.__huobaoPicker")
         if picker["file_reads"] > 0:
             return
         if picker["requested"] > 0:
             # A picker already exists: never reopen/import the file twice.
-            page.wait_for_function("() => window.__huobaoPicker?.file_reads > 0", timeout=15000)
+            try:
+                page.wait_for_function("() => window.__huobaoPicker?.file_reads > 0", timeout=15000)
+            except _TIMEOUT_ERRORS:
+                attempts += 1
+                continue
             return
         find(page, L_FILE_MENU, timeout=20)
         labels = (L_OPEN_KML, *L_OPEN_KML_DEVICE_LABELS)
@@ -414,18 +426,33 @@ def open_local_kml(page) -> None:
             click(page, L_FILE_MENU)
         for label in labels:
             if find(page, label, exact=False, timeout=5, required=False):
-                click(page, label, exact=False, timeout=10, settle=0)
+                if attempts:
+                    # 语义节点 .click() 不是受信任的用户手势；连续失败后改用
+                    # Earth 菜单自带的快捷键（Ctrl+I），它也是真实的键盘激活。
+                    page.keyboard.press("Control+I")
+                else:
+                    click(page, label, exact=False, timeout=10, settle=0)
                 break
         else:
             raise EarthError("Google Earth File menu has no local-KML open action")
+        attempts += 1
         # DOM activation is not import proof. A late coachmark can consume the
-        # action after find() returned; only an observed blocker permits reopening.
-        page.wait_for_function(
-            "() => window.__huobaoPicker?.requested > 0 || "
-            f"({_NODES_JS})().some(n => n.label === 'Dismiss' || "
-            "n.role === 'alert' || n.role === 'alertdialog' || n.label === 'Alert')",
-            timeout=15000)
-    raise EarthError("Google Earth local-KML action remained blocked; no file was imported")
+        # action after find() returned; an observed picker OR blocker decides
+        # whether the next iteration may reopen the menu. No signal at all means
+        # the click did nothing: retry rather than declaring success.
+        try:
+            page.wait_for_function(
+                "() => window.__huobaoPicker?.requested > 0 || "
+                f"({_NODES_JS})().some(n => n.label === 'Dismiss' || "
+                "n.role === 'alert' || n.role === 'alertdialog' || n.label === 'Alert')",
+                timeout=15000)
+        except _TIMEOUT_ERRORS:
+            continue
+    picker = page.evaluate("() => window.__huobaoPicker") or {}
+    raise EarthError(
+        f"Google Earth 本地 KMZ 一直没有被导入（尝试 {attempts} 次，picker"
+        f" requested={picker.get('requested')} file_reads={picker.get('file_reads')}）；"
+        "拒绝把未导入的截图当作底图")
 
 def capture_failure(page, prefix: str, tag: str) -> str:
     """失败现场：截图 + 当前 URL + 可见标签。关页面之前必须留下，否则无从诊断。"""

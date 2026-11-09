@@ -86,6 +86,7 @@ class Page:
         self.pending_hint=False
         self.picker={'requested':0,'file_reads':0}
         self.pickers_shown=[]
+        self.keyboard=self
     def evaluate(self, script, ident=None):
         if ident is None:
             if '__huobaoPicker' in script:
@@ -109,6 +110,13 @@ class Page:
                 self.picker['file_reads']+=1
                 self.menu=False
         return True
+    def press(self, key):
+        if key == 'Control+I' and self.menu:
+            self.picker['requested']+=1
+            self.picker['file_reads']+=1
+            self.menu=False
+        elif key == 'Escape':
+            self.screen='projects'
     def wait_for_timeout(self, ms):
         pass
     def wait_for_function(self, script, timeout):
@@ -116,7 +124,7 @@ class Page:
             self.pending_hint=False
             self.hint=True
         elif not self.picker['requested']:
-            raise RuntimeError('No picker and no observed blocker: retrying without evidence')
+            raise TimeoutError('No picker and no observed blocker: retry')
 
 page=Page()
 helpers['open_local_kml'](page)
