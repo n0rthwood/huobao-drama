@@ -208,6 +208,8 @@ export interface MapWorkflowHistoryEntry {
   note: string | null
   /** 回退用快照：该修订之前的 brief / map_spec / 产出 */
   snapshot?: {
+    /** 快照取自变更之前，不能用 history.stage（变更之后）代替。旧记录由 action 判定。 */
+    stage?: MapWorkflowStage
     brief: MapBrief | null
     map_spec: MapSpec | null
     outputs: MapWorkflowOutputs

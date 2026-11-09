@@ -386,29 +386,25 @@ def prepare_page(page, earth_url: str) -> None:
 
 
 def open_local_kml(page) -> None:
-    """Open a KMZ through the current home-screen editor or legacy File menu.
+    """Prefer an already-ready editor; the home-screen link is navigation, not import.
 
-    Current Earth home screens expose ``Local KML editor`` rather than ``File``.
-    Both routes must invoke the injected File System Access picker; reaching a
-    dialog alone is not treated as import success by the callers below.
+    At large production viewports both File and Local KML editor can be visible.
+    Clicking the latter from an editor navigates back to Map projects and loses
+    the usable File menu. Only use it when no editor menu is present.
     """
-    if find(page, L_LOCAL_KML_EDITOR, timeout=10, required=False):
-        click(page, L_LOCAL_KML_EDITOR, timeout=10)
-        for label in L_OPEN_KML_DEVICE_LABELS:
-            if find(page, label, timeout=10, required=False):
-                click(page, label, timeout=10)
-                return
-        labels = sorted({node["label"][:80] for node in nodes(page)})
-        raise EarthError(
-            "Google Earth Local KML editor opened, but no device-open action appeared; "
-            f"expected one of {list(L_OPEN_KML_DEVICE_LABELS)!r}, saw {labels[:40]}"
-        )
-
-    # Legacy Earth Web remains supported for deployments that still render the
-    # File menu. Do not infer import success from clicking either menu item.
-    find(page, L_FILE_MENU, timeout=60)
+    if not find(page, L_FILE_MENU, timeout=15, required=False):
+        click(page, L_LOCAL_KML_EDITOR, timeout=20)
+        find(page, L_FILE_MENU, timeout=30)
     click(page, L_FILE_MENU)
-    click(page, L_OPEN_KML, exact=False, timeout=30, settle=0)
+    if find(page, L_OPEN_KML, exact=False, timeout=5, required=False):
+        click(page, L_OPEN_KML, exact=False, timeout=10, settle=0)
+        return
+    for label in L_OPEN_KML_DEVICE_LABELS:
+        if find(page, label, timeout=5, required=False):
+            click(page, label, timeout=10, settle=0)
+            return
+    labels = sorted({node["label"][:80] for node in nodes(page)})
+    raise EarthError(f"Google Earth File menu has no local-KML open action; saw {labels[:40]}")
 
 def capture_failure(page, prefix: str, tag: str) -> str:
     """失败现场：截图 + 当前 URL + 可见标签。关页面之前必须留下，否则无从诊断。"""

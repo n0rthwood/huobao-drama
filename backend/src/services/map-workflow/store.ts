@@ -246,6 +246,7 @@ export async function mutateWorkflow(propId: number, opts: MutateOptions): Promi
 
   const before: MapWorkflowHistoryEntry['snapshot'] | undefined = opts.snapshot
     ? {
+      stage: state.stage,
       brief: state.brief ? JSON.parse(JSON.stringify(state.brief)) : null,
       map_spec: mapSpec ? JSON.parse(JSON.stringify(mapSpec)) : null,
       outputs: JSON.parse(JSON.stringify(state.outputs)),
@@ -315,7 +316,9 @@ export function restoreSnapshot(ctx: MutateContext, stage: MapWorkflowStage): st
   let entry: MapWorkflowHistoryEntry | null = null
   for (let i = ctx.state.history.length - 1; i >= 0; i--) {
     const item = ctx.state.history[i]!
-    if (stageIndex(item.stage) < target) break
+    const beforeStage = item.snapshot?.stage ?? (item.action.startsWith('stage_done:')
+      ? item.action.slice('stage_done:'.length) as MapWorkflowStage : item.stage)
+    if (stageIndex(beforeStage) < target) break
     if (item.snapshot) entry = item
   }
   if (!entry?.snapshot) return null

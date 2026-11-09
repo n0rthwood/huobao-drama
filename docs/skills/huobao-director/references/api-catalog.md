@@ -320,7 +320,7 @@ Body：`{expected_revision,brief?,map_spec?,mode?}`，至少一个可保存字�
 
 - `POST /props/{p}/map-workflow/run {mode:"auto"|"manual",expected_revision,text_config_id?,image_config_id?,image_model?}`：继续当前 `stage`，不会从 brief 重启；整条重做要先显式 rollback。auto 连续执行到完成或阻断，可能发生文本与底纹模型调用，先授权、先预扣预算；manual 仅执行当前一步供审阅。已 completed 时返回 `already_completed`，不重复计费。
 - `POST /props/{p}/map-workflow/advance {expected_revision,text_config_id?,image_config_id?,image_model?,skip?}`：从当前 `stage` 执行一步。`skip:true` 仅可跳过 `style`（底纹）；不得跳过信息充分性或检索来伪造流程通过。
-- `POST /props/{p}/map-workflow/rollback {stage,expected_revision}`：回到指定阶段，保留已确认几何与历史，不替代人的史实批准。
+- `POST /props/{p}/map-workflow/rollback {stage,expected_revision}`：恢复目标阶段开始前的快照，保留上游已完成产物、已确认几何和历史；回退 drawing 不应清掉已经付费生成的底纹。`history.stage` 是事件后的阶段，`snapshot.stage` 才是快照实际取值阶段；旧记录从结构化 action 判定，不回填或伪造历史。回退不替代人的史实批准。
 - `POST /props/{p}/map-workflow/cancel {}`：按人的决定取消该地图当前执行；此接口不接收 expected_revision，执行前读回当前 task_id，不把它描述为取消某个旧快照。已发出的底纹任务仍可能完成并消耗额度，取消不是退费，也不能声称上游任务已停止。
 - 启动/推进返回工作流详情与 `task_id`，通过 `GET /tasks/{task_id}` 与本详情读到终态并打开真实产物。后台重启后保留产物与失败原因，由人明确继续，不自动重复计费步骤。
 - `mode` 优先级：PUT 保存选择但不启动；run 使用请求 mode（省略默认 manual，不沿用已保存 auto）；advance 固定 manual，与 run manual 都执行当前一步，只有 advance 支持 skip。通常自动续跑用 run，逐步审核/跳过底纹用 advance。

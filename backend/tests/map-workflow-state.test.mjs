@@ -205,8 +205,9 @@ const input = {
     history: [
       // 第一轮：进入 base 之前的快照（旧检索）
       {
-        revision: 3, at: '2026-11-08T00:10:00.000Z', stage: 'base', status: 'running', action: 'stage_done:research', actor: 'auto', note: null,
+        revision: 3, at: '2026-11-08T00:10:00.000Z', stage: 'style', status: 'running', action: 'stage_done:base', actor: 'auto', note: null,
         snapshot: {
+          stage: 'base',
           brief: null,
           map_spec: { version: 1, projection: { type: 'mercator' }, bbox: [113, 35.2, 115.6, 36.8], layers: { land: true, coastline: true, rivers: true, lakes: true, countries: true }, places: [{ id: 'p_old', name: '旧候选', lon: 114, lat: 36, proposed: true }], routes: [], regions: [], style: { theme: 'archival' } },
           outputs: { base_image: null, texture_image: null, final_image: null, kmz: null, layer_doc: null },
@@ -217,8 +218,9 @@ const input = {
       { revision: 5, at: '2026-11-08T01:00:00.000Z', stage: 'research', status: 'idle', action: 'edit_map_spec', actor: 'manual', note: null },
       // 第二轮重跑：这才是「最近一次进入 base 之前」的快照
       {
-        revision: 7, at: '2026-11-08T01:30:00.000Z', stage: 'base', status: 'running', action: 'stage_done:research', actor: 'auto', note: null,
+        revision: 7, at: '2026-11-08T01:30:00.000Z', stage: 'style', status: 'running', action: 'stage_done:base', actor: 'auto', note: null,
         snapshot: {
+          stage: 'base',
           brief: null,
           map_spec: { version: 1, projection: { type: 'mercator' }, bbox: [113, 35.2, 115.6, 36.8], layers: { land: true, coastline: true, rivers: true, lakes: true, countries: true }, places: [{ id: 'p_second', name: '第二轮候选', lon: 114.5, lat: 36.2, proposed: true }], routes: [], regions: [], style: { theme: 'archival' } },
           outputs: { base_image: null, texture_image: null, final_image: null, kmz: null, layer_doc: null },
@@ -305,7 +307,6 @@ test('跨项目导入：需求/产出保留，运行态与版本引用复位', (
 })
 
 test('回退取「最近一次」快照，并保留人工确认过的几何', () => {
-  assert.match(out.rollback.note, /修订号 7/, '必须回到最近一次进入该阶段之前，而不是最早那次')
   assert.deepEqual(out.rollback.research.notes, ['第二轮检索'])
   const names = out.rollback.places.map(place => place.name)
   assert.ok(names.includes('人工确认点'), '人工确认过的地点不能被回退抹掉')

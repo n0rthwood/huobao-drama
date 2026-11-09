@@ -17,7 +17,7 @@ test('地图继续当前阶段：原件与成图原子采用，几何编辑复�
     import {now} from 'file://${backend}src/utils/response.ts'
     import {loadWorkflow,serializeDetail,mutateWorkflow,briefHash,getProp} from 'file://${backend}src/services/map-workflow/store.ts'
     import {emptyBrief} from 'file://${backend}src/services/map-workflow/types.ts'
-    import {startMapWorkflow,advanceMapWorkflow,saveMapWorkflowDraft,failInterruptedMapWorkflows} from 'file://${backend}src/services/map-workflow/run.ts'
+    import {startMapWorkflow,advanceMapWorkflow,saveMapWorkflowDraft,failInterruptedMapWorkflows,rollbackMapWorkflow} from 'file://${backend}src/services/map-workflow/run.ts'
     import {normalizeMapSpec} from 'file://${backend}src/services/map-base-render.ts'
     const ts=now()
     const dramaId=getInsertId(await db.insert(schema.dramas).values({title:'地图执行回归',createdAt:ts,updatedAt:ts}))
@@ -124,6 +124,15 @@ test('地图继续当前阶段：原件与成图原子采用，几何编辑复�
     assert.equal(state.outputs.texture_image.task_id,imageId,'restart must reuse the paid texture task')
     assert.equal((await getProp(propId)).imageUrl,state.outputs.final_image.path)
     assert.equal(JSON.parse((await getProp(propId)).semantics).image.source_task_id,state.outputs.final_image.task_id)
+    const texturedBase=state.outputs.base_image.task_id
+    await rollbackMapWorkflow(propId,'drawing',state.revision)
+    loaded=await loadWorkflow(propId)
+    assert.equal(loaded.state.outputs.texture_image.task_id,imageId,'rolling back drawing must preserve completed upstream texture')
+    await startMapWorkflow(propId,{mode:'auto',expectedRevision:loaded.state.revision,textConfigId:configId})
+    state=await settle()
+    assert.equal(state.status,'completed',state.error)
+    assert.equal(state.outputs.texture_image.task_id,imageId)
+    assert.equal(state.outputs.base_image.task_id,texturedBase)
     console.log('MAP_EXECUTION_OK')
   `
   const probe = path.join(dir, 'probe.mts')
