@@ -1,0 +1,23 @@
+{
+  "tracked_sha256": "d265af86878321c6388248833e1a7e17ae3e2cb3980cbd2333d13dac59f9729c",
+  "managed_sha256": "d265af86878321c6388248833e1a7e17ae3e2cb3980cbd2333d13dac59f9729c",
+  "identical": true,
+  "tracked_bytes": 63983,
+  "fresh_process_probe": {
+    "command": "omp -p --no-session --no-tools --model zhipu-coding-plan/glm-5.3-flash",
+    "observed": [
+      "huobao-director",
+      "# 火宝制作助理：从目标到成片的 API 工作法",
+      "### 3.84 地图资产工作流（S2，Issue #84）[S/R]",
+      "错误想法"
+    ],
+    "exit": "0",
+    "elapsed_s": 60
+  },
+  "reviews": [
+    "reviews/issue84-final-default-review.md",
+    "reviews/issue84-final-slow-review.md",
+    "reviews/issue84-final-disposition.md"
+  ],
+  "note": "Global copy is a snapshot; re-sync after final Earth status is appended."
+}

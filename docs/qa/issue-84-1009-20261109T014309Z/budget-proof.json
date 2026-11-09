@@ -183,9 +183,24 @@
         "width"
       ],
       "has_reference_inputs": false
+    },
+    {
+      "id": 1347,
+      "prop_id": 179,
+      "status": "completed",
+      "model": "qwen-image-2.1",
+      "mode": "text_to_image",
+      "request_keys": [
+        "map_texture",
+        "size"
+      ],
+      "has_reference_inputs": false,
+      "note": "submitted before the power loss, completed after restart; reclaimed on resume, no duplicate"
     }
   ],
   "video_calls": 0,
   "tts_calls": 0,
-  "note": "Old missing call records are not fabricated; deterministic/import image-version rows do not count as GPU submissions."
+  "note": "Old missing call records are not fabricated. Deterministic/import image-version rows do not count as GPU submissions. Base/style orchestration stages make no LLM call.",
+  "images_used": 4,
+  "images_reserved": 0
 }

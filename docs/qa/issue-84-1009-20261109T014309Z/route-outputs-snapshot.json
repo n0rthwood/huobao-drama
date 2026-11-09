@@ -134,5 +134,56 @@
       "sources": 24,
       "features": 4
     }
+  },
+  "179": {
+    "stage": "complete",
+    "status": "completed",
+    "revision": 58,
+    "outputs": {
+      "base_image": {
+        "path": "static/map-bases/earth/pixelgrid-v2-clean-517e91af9e0af7e5c0e201c3-3840.png",
+        "width": 3056,
+        "height": 3826,
+        "source": "map-base:earth",
+        "task_id": 1345
+      },
+      "texture_image": {
+        "path": "static/images/c64c833f-2cb4-4df2-a62b-36655ec4eac9.png",
+        "width": 1920,
+        "height": 1088,
+        "source": "diffusion-texture",
+        "task_id": 1347
+      },
+      "final_image": {
+        "path": "static/map-drawings/31b5c7d7e07497c0f654ea296d13d949.png",
+        "width": 3056,
+        "height": 3826,
+        "source": "map-drawing",
+        "task_id": 1349
+      },
+      "kmz": {
+        "path": "static/map-kmz/517e91af9e0af7e5c0e201c37c52d8ca.kmz"
+      }
+    },
+    "earth": {
+      "basemap": "clean (no Google labels/borders/roads)",
+      "residual_px": {
+        "max": 2.692582403567252,
+        "rms": 0.5112824654938641
+      },
+      "validation_count": 16384,
+      "camera_drift_px": 0,
+      "kmz_folders": [
+        "Drag to reorder\n地点, folder",
+        "Drag to reorder\n路线, folder",
+        "Drag to reorder\n区域, folder"
+      ],
+      "sidecar_path": "static/map-bases/earth/pixelgrid-v2-clean-517e91af9e0af7e5c0e201c3-3840.json"
+    },
+    "research": {
+      "queries": 9,
+      "sources": 24,
+      "features": 7
+    }
   }
 }

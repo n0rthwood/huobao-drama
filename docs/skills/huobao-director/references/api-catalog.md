@@ -284,7 +284,7 @@ Body：`{scope:"all"|"characters"|"scenes"|"props", episode_id?, rewrite_prompts
 
 ### 3.84 地图资产工作流（S2，Issue #84）[S/R]
 
-> **来源与状态**：功能至 `f149a0e`，release `20261109T062625Z`。生产专用项目12/集18、导入项目13/集19；证据 `docs/qa/issue-84-1009-20261109T014309Z/`。程序177、外部181、副本184已成图；185/root1335从brief单次跑完六阶段，三次文本、图片1338、成图1339。Earth尚在Clean修复后重验，不能拿1336的合格标定代替清洁影像通过。
+> **来源与状态**：功能至 `f149a0e`，release `20261109T062625Z`。生产专用项目12/集18、导入项目13/集19；证据 `docs/qa/issue-84-1009-20261109T014309Z/`。程序177、外部181、副本184已成图；185/root1335从brief单次跑完六阶段，三次文本、图片1338、成图1339。Earth179已通过：底图1345（Clean、16384留出点max2.693px、漂移0）、底纹1347、成图1349；1336/1342标定合格但非Clean，仍保留为失败。
 **背景**：旧地图面板没有串联检索、底图、风格与可编辑几何。本流程以显式类型和持久化阶段解决；扩散仅做底纹，地图几何不由扩散产生。实测不能跨方法或跨分支泛化。
 
 #### 类型与持久化
@@ -305,7 +305,7 @@ Body：`{scope:"all"|"characters"|"scenes"|"props", episode_id?, rewrite_prompts
 - `issues[] = {field,code,message,blocking}`；`blocking=true` 要补齐，不把失败当无问题。
 - `research.queries[]` 逐源记录 hits/error；来源固定为 `wikipedia-zh / wikipedia-en / europeana / smithsonian`，不是模型自选任意网站。`sources[]` 保存机构、年代、许可、URL 与实际摘录；`features[]` 保存点线面、坐标依据、支持原文、不确定性、来源引用和冲突。URL 存在不等于它证明了某个坐标。Europeana/Smithsonian 凭据仍由「设置→资料检索」保管，Agent 不获取、落盘或写入请求留痕；无 key 的来源失败应如实呈报。
 - `outputs = {base_image,texture_image,final_image,kmz,layer_doc}`；image 项含 `{path,width,height,source,task_id,provenance}`。`provenance.registration` 是 geo↔像素配准真源；Earth 使用通过独立检验的实测控制网格，不用名义相机或 bbox 仿射替代；检验点残差超过 3px 或相机漂移时失败，保留标定截图、控制点与残差证据。
-- 新采集使用 129×129 控制网格及 16384 留出中心；异色 17×17 锚点定位 33×33 中间网格，再关联密集控制点，名义相机只负责粗定位。最大残差仍须 ≤3px、相机漂移 ≤0.25px。旧失败保留：1320（17×17，5.408px）、1323（相机预测关联失败）、1328（33×33，5.701px）、1333（65×65，4.962px）。不能放宽门槛或登记失败截图。onboarding 按语义节点激活，不发全局 Escape；只续跑 base，不重做检索。
+- 新采集使用 129×129 控制网格及 16384 留出中心；异色 17×17 锚点定位 33×33 中间网格，再关联密集控制点，名义相机只负责粗定位。最大残差仍须 ≤3px、相机漂移 ≤0.25px。旧失败保留：1320（17×17，5.408px）、1323（相机预测关联失败）、1328（33×33，5.701px）、1333（65×65，4.962px）、1336（标定合格但非Clean）。不能放宽门槛或登记失败截图。onboarding 按语义节点激活，不发全局 Escape；只续跑 base，不重做检索。
 - Clean 切换是必需条件，不允许超时后静默退到含现代地名/道路的 default。1336/base1342 虽通过2.693px校准，但目视有道路盾牌，保留为失败验收，不提交底纹；新 clean 缓存命名空间不覆盖该旧原件版本，旧 default 缓存不复用。
 - 为免大数组在每次修订快照重复膨胀，新 Earth provenance 的 `earth.calibration` 只内联残差/数量/容差/相机漂移与截图、标定 KMZ；完整 controls/grid 在 `earth.sidecar_path` 所指的 static JSON，像素换算仍只用 `provenance.registration.grid`。历史存量记录不重写。独立导入同样复制 sidecar 与标定工件，不能用源文件地址冒充独立副本。
 - 地名文本按共享字号/换行模型放进独立 label 图层并避让，marker 的真实点位不因排版移动；过于拥挤时明确报空间不足，不截断地名。历史成图不被升级自动覆盖，需重新 drawing 才采用新版布局，已有底图/底纹可复用。

@@ -88,3 +88,7 @@ backend/assets/fonts/.uuid
 data/mastra-workflows.db
 data/mastra-workflows.db-wal
 data/mastra-workflows.db-shm
+
+# Issue #84 production raw ledgers/media are hash-archived outside the repository.
+# Curated report, proof summary and previews are explicitly versioned.
+/docs/qa/issue-84-1009-20261109T014309Z/*

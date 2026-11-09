@@ -83,23 +83,22 @@
 - 内容：八达岭关、居庸关两点 + 关沟谷道线 + 「关沟防御区（示意，范围近似，非历史疆界）」区域，全部 `proposed:true` 待人工史实审核；几何由程序绘制，底纹不改地理。
 - 证据：`full-auto-submission.json`、`full-auto-completed.json`、`full-auto-observations.json`、`backend-log-excerpts.txt`。
 
-### 3.5 Google Earth 路线（prop 179）— 未通过，保留失败
+### 3.5 Google Earth 路线（prop 179）— `[R]` 通过（含一次断电恢复）
 
-实际像素标定已能在生产通过：**129×129 网格 / 16384 个独立留出点，max 2.692582px、RMS 0.511282px、相机漂移 0px**（root 1336 / base 1342），交付与标定 KMZ 均 XSD VALID。
-但该次交付底图的 sidecar 记录 `basemap="default"`，成图肉眼可见现代路名、G6 路牌与 POI 图标（`MapEarthFinalQA/14-cleanbase-defect-crop.png`），故**判失败，不提交底纹**，原件已保全：
+- 底图版本 **1345**：`static/map-bases/earth/pixelgrid-v2-clean-517e91af9e0af7e5c0e201c3-3840.png`（3056×3826，SHA256 `4afce7e8…29ff6`）
+- 标定（真实截图实测）：**129×129 网格 / 16384 个独立留出点，max 2.692582px、RMS 0.511282px、相机漂移 0px**，`basemap="clean (no Google labels/borders/roads)"`，KMZ 文件夹解析出 `地点 / 路线 / 区域`。
+- 交付 KMZ `static/map-kmz/517e91af…c52d8ca.kmz` 与标定 KMZ 均用官方 OGC/Google XSD 校验 **VALID**。
+- 底纹（保留的唯一一张付费图）**1347**：`static/images/c64c833f-2cb4-4df2-a62b-36655ec4eac9.png`；请求体只含 `size` 与 `map_texture`，提示词为「seamless aged paper texture background only…」，**无参考图**。
+- 成图 **1349**：`static/map-drawings/31b5c7d7e07497c0f654ea296d13d949.png`（3056×3826，SHA256 `b6c4e350…79093`），已打开：底图为干净卫星影像（无 Google 路名/路牌/POI），叠加 5 个点位（岔道城、八达岭、上关城、居庸关、南口）、1 条关沟路线、1 个「关沟防御走廊近似示意区（非历史边界）」区域，全部 `proposed:true` 待人工史实审核；右下角烧入 Google/Landsat/Copernicus 署名。
+- 尺寸说明：Earth 路线按验收口径保留其**可配准真实画布**（3056×3826），不复用 3840×2160 默认规格。
 
-`/home/joysort/huobao-backup/issue84-prop179-base1342-20261109T050000Z/`
+真实缺陷与修复（均保留失败证据）：
 
-独立缺陷 2：后续重跑中「Open local KML file」菜单节点可见，但 `window.__huobaoPicker` `requested=0`、`file_reads=0`——语义节点 `.click()` 不等于 Earth 真正执行导入（1343/1344）。
+1. **Clean 底图静默回退**：1336/底图 1342 的标定已合格（max 2.69px、drift 0），但 sidecar 记录 `basemap="default"`，成图肉眼可见现代路名、G6 路牌与 POI（`MapEarthFinalQA/14-cleanbase-defect-crop.png`），因此**判失败、不提交底纹**。原件保全于 `/home/joysort/huobao-backup/issue84-prop179-base1342-20261109T050000Z/`。修复：Clean 改为硬性条件（超时不再回退），服务端拒绝非 Clean sidecar，且不复用旧 default 缓存，新缓存命名空间 `pixelgrid-v2-clean-…` 不改写已拒绝原件。
+2. **语义点击 ≠ 导入**：1343/1344 中 `Open local KML file` 节点可见，但 `window.__huobaoPicker` `requested=0`、`file_reads=0`，Earth 未真正读取 KMZ。修复：导入改为后置条件驱动（必须观察到 picker 读取），遮挡先清 blocker 再重开菜单，最多 120s，首轮失败后改用真实键盘加速键 `Ctrl+I`；回归测试覆盖「晚到的引导气泡吃掉第一次点击」。
+3. **计划外断电**：底图与底纹（1347）已产出后整机重启，工作流在 style 阶段被标 `failed`（错误「服务重启，地图工作流在执行中被中断」）。恢复时按 `params.map_texture_task_id=1347` **认领已完成底纹**，根任务 1348 直接复用，未重复提交任何图片；随后 drawing/complete 确定性完成（revision 58）。付费图片总数保持 **4**。
 
-已发布修复（均带回归测试）：
-
-1. Clean 底图改为硬性条件，超时不再静默退到含地名/道路的 default；服务端拒绝非 Clean sidecar，且不复用旧 default 缓存；新缓存命名空间 `pixelgrid-v2-clean-…` 不改写已拒绝的原件。
-2. 导入改为**后置条件驱动**：必须观察到 picker 真正读取 KMZ；遇到遮挡先清 blocker 再重开菜单，最多 120s；首轮失败后改用真实键盘加速键 `Ctrl+I`（语义 `.click()` 不是受信任手势）。
-
-历史失败全部保留（不删、不伪装）：1290 缺时代、1291/1298 超时、1299「古代」歧义、1305 无 File 控件、1306 编辑器路径、1309 全局 Escape 退出、1320 5.408px、1323 关联失败、1328 5.701px、1333 4.962px、1334 `NameError`、1336 非 Clean、1343/1344 未导入。清单：`failed-map-task-ledger.json`。
-
-**当前结论：Earth 路线尚未验收通过。** Issue #84 保持 OPEN，直到该路线通过或用户改判范围。
+历史失败全部保留（不删、不伪装）：1290 缺时代、1291/1298 超时、1299「古代」歧义、1305 无 File 控件、1306 编辑器路径、1309 全局 Escape 退出、1320 5.408px、1323 关联失败、1328 5.701px、1333 4.962px、1334 `NameError`、1336 非 Clean、1343/1344 未导入、1346 被断电中断。清单：`failed-map-task-ledger.json`（1346 补充于 `earth-resume.json`）。
 
 ### 3.6 负例与边界
 

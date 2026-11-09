@@ -1,0 +1,65 @@
+{
+  "prop": 179,
+  "base_version_task": 1345,
+  "texture_task": 1347,
+  "final_version_task": 1349,
+  "root_task_after_resume": 1348,
+  "interrupted_root": 1346,
+  "revision": 58,
+  "calibration": {
+    "grid": "129x129",
+    "withheld": 16384,
+    "max_px": 2.692582403567252,
+    "rms_px": 0.5112824654938641,
+    "camera_drift_px": 0,
+    "basemap": "clean (no Google labels/borders/roads)",
+    "kmz_folders": [
+      "地点",
+      "路线",
+      "区域"
+    ]
+  },
+  "kmz_xsd": {
+    "delivery": "VALID",
+    "calibration": "VALID",
+    "validator": "kmz-google-earth/references/validate_kml_xsd.py"
+  },
+  "files": {
+    "base": {
+      "path": "static/map-bases/earth/pixelgrid-v2-clean-517e91af9e0af7e5c0e201c3-3840.png",
+      "task_id": "1345",
+      "bytes": 34432054,
+      "sha256": "4afce7e8787ed3e8d8e15c3455b3ef94567423a4b558b8209243e03bcf329ff6"
+    },
+    "calibration_png": {
+      "path": "static/map-bases/earth/pixelgrid-v2-clean-517e91af9e0af7e5c0e201c3-3840-calibration.png",
+      "task_id": null,
+      "bytes": 24460573,
+      "sha256": "9608c81251626519b7199661cdfbf391674d42b3c4bce4ec3cfd5fa1a5837942"
+    },
+    "delivery_kmz": {
+      "path": "static/map-kmz/517e91af9e0af7e5c0e201c37c52d8ca.kmz",
+      "task_id": null,
+      "bytes": 1222,
+      "sha256": "517e91af9e0af7e5c0e201c37c52d8cae26a51a6af0ed797da3245a1b4aad92a"
+    },
+    "calibration_kmz": {
+      "path": "static/map-bases/earth/pixelgrid-v2-clean-517e91af9e0af7e5c0e201c3-3840-calibration.kmz",
+      "task_id": null,
+      "bytes": 135403,
+      "sha256": "16637a874659ca7b9efe6897b5e19c57bb6dd7ca41b01190134d69839401a90f"
+    },
+    "texture": {
+      "path": "static/images/c64c833f-2cb4-4df2-a62b-36655ec4eac9.png",
+      "task_id": "1347",
+      "bytes": 4397227,
+      "sha256": "df0fbc55e92a3fa709ccc5ebb7a84faf8a11baf23e62c60e5cac9978b041f7e2"
+    },
+    "final": {
+      "path": "static/map-drawings/31b5c7d7e07497c0f654ea296d13d949.png",
+      "task_id": "1349",
+      "bytes": 30253626,
+      "sha256": "b6c4e350aabfde1b410d16fd039c34422ead41ee0600472b1ae538fc8c079093"
+    }
+  }
+}

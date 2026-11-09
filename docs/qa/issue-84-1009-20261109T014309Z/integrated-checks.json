@@ -14,5 +14,26 @@
     1004,
     1203,
     1264
-  ]
+  ],
+  "date": "2026-11-09",
+  "commit": "f149a0e",
+  "command": "cd backend && npx tsc --noEmit && node --test tests/map-*.test.mjs tests/earth-*.test.mjs tests/asset-library.test.mjs",
+  "result": {
+    "tests": 43,
+    "pass": 43,
+    "fail": 0,
+    "duration_ms": 9527,
+    "tsc": "clean"
+  },
+  "note": "Only the affected suites; the full repository suite was not run, so no global-green claim.",
+  "removed_source_text_tests": [
+    "7 wiring/source-text assertions removed from asset-library.test.mjs; the 3 name-rule behaviour tests kept",
+    "obsolete 'imported version ids must be nulled' test replaced by real DB/media/render behaviour",
+    "Earth error-wording assertions replaced by actual rejection behaviour"
+  ],
+  "new_behaviour_tests": [
+    "Earth import requires an observed picker read (late coachmark swallowing the first click)",
+    "Clean basemap is mandatory; rejected default-cache is not reused"
+  ],
+  "production_proof": "184 edit->deterministic redraw with no model call; 185 single-root full auto; 181 first-vertex drag keeps 9 stored points"
 }
