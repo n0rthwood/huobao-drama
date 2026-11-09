@@ -1,7 +1,12 @@
-## 3. 以诊断片为例：目标 → 步骤 → API
+# 诊断片实测案例（2026-11-05 殷墟五镜，历史记录）
+
+> 本文件从 `SKILL.md` §3 原样移出（移出方式沿用 Issue #84 分支 `1eb48cb` 的做法，仅为满足 managed skill 单文件 64,000 bytes 上限），内容不删减。
+> 这是**历史案例**，不是现行配方：Poster 本地画布、「镜数=段落数」、固定 25fps、以及「设计卡在配音之前」的次序都已被 #72 / #57+#70 / #69 取代，执行一律按 `SKILL.md` §2。
+## 3. 以诊断片为例：目标 → 步骤 → API（2026-11-05 历史案例，不是现行配方）
 
 **授权前提（重要）**：本案例是“用户已明确授权五镜技术测试、逐镜确认 C/B/A/A/A 与预算、允许保留失败证据”的前提下，由协调者执行的记录。因此下文出现的 `script/confirm`、`design-card/confirm`、`confirm-keyframes`、`approve{override_gate:true}` 都是**人在此前已给出决定、协调者代按**的事实；通用 Agent 不得据此把这些端点当成可自主调用——必须逐项停下请人做决定，再做技术执行与记录。
 
+**时效前提（同样重要）**：本节是 2026-11-05 那一轮的事实记录。其中的 Poster 本地画布登记（现为 #72 服务端 LayerDoc 渲染，见 S3）、「镜数=段落数」（现按 80 字上限与 `storyboardCountCap`，见 S4）、`timeline.fps:25` 与「25fps CFR」（现按 #69 派生目标帧率，见 S6）、以及「设计卡在配音之前」的步骤次序（纪录片现为 #70 的骨架→配音→设计卡→制作，见铁律 17）都已被后续 Issue 取代。**执行时一律按 §2，不照抄本节的旧配方。**
 **工作目标**：在一个纪录片项目里，用 5 个镜头、约 55 秒，验证“剧本→资产→Poster→设计卡→图层段→关键帧→旁白→视频→合成→导出”全链路；预算 12 张 AI 图、2 条生产视频；不追求艺术验收，允许保留失败证据。
 
 实际成片：`54.76s / 960×544 / 25fps / 1369 帧`，5 个合成片全部最新可导出；C186 衔接视觉 FAIL，B187 细节形变，均原样保留。下面每一步都给出**为什么这样做**与**实际参数**。
@@ -33,15 +38,16 @@
 - 读回：13 项审核 `8 have / 5 not_needed / 0 missing / 0 ignored`；两个程序 gate 仍 `gate_pass=0`（mh6），记录保留。
 - 为什么：纪录片必须先解决“信息点需要什么资产”，缺的补、不要的可写理由；精确/美化不是随便重绘，必须带权威素材与开图审批。
 
-### 步骤 3：Poster（可选）
-- `GET /episodes/14/poster` → `PUT /episodes/14/poster {prompt, base_image, reference_images, layout{texts[...]}}`（3 个文字层，坐标 0–1）→ 本地按 layout 渲染 PNG → `POST /upload/image` → `POST /episodes/14/poster/versions {image, base_image, layout}` → `PUT /episodes/14/poster/select {version_id:10}`。
+### 步骤 3：Poster（可选）**【已过时：#72 之后按 S3 执行】**
+- 当轮调用（历史）：`GET /episodes/14/poster` → `PUT /episodes/14/poster {prompt, base_image, reference_images, layout{texts[...]}}`（3 个文字层，坐标 0–1）→ 本地按 layout 渲染 PNG → `POST /upload/image` → `POST /episodes/14/poster/versions {image, base_image, layout}` → `PUT /episodes/14/poster/select {version_id:10}`。
 - 读回：Poster 10，0 张 AI 图。
-- 为什么：Poster 不进主线闸门；精确排版用确定性画布，不靠扩散写字。
+- **现行做法**：`layout` 与本地画布已被 `layer_doc` + `POST …/poster/versions` 的服务端渲染取代（S3）；不要再本地渲染后 `POST /upload/image` 登记。
+- 为什么：Poster 不进主线闸门；精确排版用确定性渲染，不靠扩散写字。
 
 ### 步骤 4：拆镜
 - `POST /agent/storyboard_breaker/chat {drama_id:8, episode_id:14, config_id:10, model:"deepseek-chat", message:"…恰好五段一镜一段，旁白逐字原文，覆盖率100%，不启动任何生成…"}`
 - `GET /episodes/14/storyboards`：得到 186–190。
-- 为什么：镜数=段落数，旁白原文不动，避免拆镜阶段偷跑生成。
+- 为什么（当轮事实）：本稿五段都短于 80 字，所以恰好五镜一段。**不要把它读成通则**：现行上限见 S4（单镜 ≤80 朗读字、`storyboardCountCap`），长段落必须拆成多镜；旁白原文不动、拆镜阶段不偷跑生成这两条仍然有效。
 
 ### 步骤 5：设计卡与组合
 - `GET /design-card-context`、`GET /design-cards/audit`。
@@ -52,12 +58,12 @@
   - 188/189/190：`combo:"A"`，`budget.layer_s` 10/10/12，`layer_plan.base` 指向确定性底图（188 用示意底图，189 用流程底图，190 用真实照片 92 + 现代定位图 93）。
 - 人逐镜审卡/定组合后 → `POST /storyboards/{id}/design-card/confirm {acknowledge:true}` ×5（Agent 不得自发确认）。
 - `GET /design-cards/audit`：5 镜 `confirmed`，`unresolved=0`。
-- 为什么：本轮（2026-11-05）组合全部由人显式给出；C 的衔接帧锁定必须体现在卡里（first 由图层末帧继承）。**口径已更新**：#82 之后纪录片批次可为「尚无 combo」的镜首次写入 AI 所选组合，人改为逐镜审阅 + 确认（见 S5）。
+- 为什么：本轮（2026-11-05）组合全部由人显式给出；C 的衔接帧锁定必须体现在卡里（first 由图层末帧继承）。**两处口径已更新**：① #82 之后纪录片批次可为「尚无 combo」的镜首次写入 AI 所选组合，人改为逐镜审阅 + 确认（见 S5）；② #70 之后纪录片必须先确认旁白骨架、先配音拿到实测时长，才允许填/确认设计卡——本轮这个「设计卡在配音（步骤 8）之前」的次序已不可照抄。
 
 ### 步骤 6：图层段
 - `GET /layer-segments/storyboards/186`：`combo:"C"`、`production_unlocked:true`。
 - `POST /layer-segments/storyboards/186/draft`（按 `layer_plan` 出草稿）。
-- `PUT /layer-segments/storyboards/186`：`{layer_doc{version,base{path,width:960,height:544,source_width:1920,source_height:1088},theme:"archival",layers[4 label]}, timeline{fps:25,ease:"inout",fade_ms:250,keyframes[{t:0,visible:[location,art]},{t:0.8,…},{t:1.5,…},{t:4,…}]}, duration:4}`
+- `PUT /layer-segments/storyboards/186`：`{layer_doc{version,base{path,width:960,height:544,source_width:1920,source_height:1088},theme:"archival",layers[4 label]}, timeline{fps:25,ease:"inout",fade_ms:250,keyframes[{t:0,visible:[location,art]},{t:0.8,…},{t:1.5,…},{t:4,…}]}, duration:4}`（当轮本集的目标帧率恰为 25；现行 `timeline.fps` 由服务端按 #69 派生并覆盖请求值，见 S6）
 - `POST /layer-segments/storyboards/186/render`：task 945；读回 `junction.hash=72d30e…`。
 - A 镜：`GET /base-candidates` → `PUT /layer-segments/storyboards/188|189|190 {layer_doc, timeline, duration, base_ref}` → render。188 初次渲染后人工发现半衰期数字错，**只改 `layer_doc` 再 render**（不重跑上游）。
 - 实际查看 `thumbnail/last`：文字安全边、对比度、数字正确。
@@ -110,5 +116,11 @@
 - 成本：9 AI 图（935/936/940/941/954/955/957/958/959）、2 生产视频、5 TTS；Poster 与原生图 0。
 - 为什么：诊断片的价值是暴露问题；把 `exportable` 当“质量通过”会掩盖 C 的真实缺陷。
 
----
+## 附：典型错误案例 — 助手代填「AI 改写」（2026-11-06，《历史纵横》漕运，第 1 集；`SKILL.md` §4.5 全文）
 
+- **用户边界**：先做第一步、让用户看完再等指令。两页分别是 `drama/9/episode/1?panel=script&step=0`「原始内容」与 `...&step=1`「AI 改写」；数据库 `drama_id=9`、`episode_id=15`。
+- **真实错误 [R]**：助手自行写了840字符、16段解说稿，直接 `PUT /episodes/15`，请求含 `content`、`description`、`script_content`。结果原始内容与 AI 改写两页同时被填上，但没有调用 `POST /agent/script_rewriter/chat`。经 API 存进去的自写稿不是“通过火宝改写”。
+- **错误推理**：把“用户想用火宝改写”误当成“允许助手代写回填”；把通用字段编辑能力误当成当前阶段授权；又以纪录片内置技能只允许整理、内容量±5%为理由绕开火宝。计划里写入了这套错误方案，也不能替代用户的具体阶段边界。旧流程把两种文本字段并列、历史示例又同时写两者，容易强化误读，但不是越权借口。
+- **为什么必须禁止**：用户失去第一步的审核与推进控制；第二步失去火宝内部工种的生成链路与记录；即使没有确认或生成媒体，提前代填第二步本身已经越权。
+- **应当怎样做**：原文只进 `content` → 读回并提交第一步链接 → 等用户；获准改写后才调用火宝 `script_rewriter` → 读回火宝稿件 → 再等用户审核。规则冲突就报告，不本地代写补位。
+- **纠错边界**：用户随后明确“不要再操作，只更新 skill”。这时只改已授权的助手技能文档；不再请求火宝、清空稿件、运行改写或声称已经恢复某个业务状态。本案例记录的是错误及预防规则，不是可复制的成功流程。

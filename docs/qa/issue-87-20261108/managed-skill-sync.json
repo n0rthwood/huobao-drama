@@ -1,0 +1,80 @@
+{
+  "at": "2026-11-08T20:57:39.279Z",
+  "target": "~/.omp/agent/managed-skills/huobao-director",
+  "files": [
+    {
+      "file": "SKILL.md body",
+      "bytes": 61731,
+      "sha256": "819ea8e8783a54c7950bb90887e4c4f25a2de78eb99bff4a38540f94a9b3b758",
+      "equal": true
+    },
+    {
+      "file": "references/api-core.md",
+      "bytes": 48363,
+      "sha256": "e6c3baf454286d76dd51d244ad148db49126e2e1418571b8140ac6537f0b6599",
+      "equal": true
+    },
+    {
+      "file": "references/api-catalog.md",
+      "bytes": 71571,
+      "sha256": "696887491cf5d6bce376c8d73a49b5c8053f65c1ae7221165bb42e968ff6f4f0",
+      "equal": true
+    },
+    {
+      "file": "references/api-production.md",
+      "bytes": 57797,
+      "sha256": "4931ca445b5ccdf21dd322ef8b689f4d770228914355466e723140921ccc84ed",
+      "equal": true
+    },
+    {
+      "file": "references/fixed-case-8daling.md",
+      "bytes": 7588,
+      "sha256": "c5f2b459e3a73255221a7ae95e537ce0f66fa79ac0b988668e6083d1816e84d1",
+      "equal": true
+    },
+    {
+      "file": "references/anti-patterns.md",
+      "bytes": 4098,
+      "sha256": "4d0de78dc534c9cda3f553fbf45f417655505e05abdc636240e1d6c30e794633",
+      "equal": true
+    },
+    {
+      "file": "references/diagnostic-example.md",
+      "bytes": 17634,
+      "sha256": "19badad4ada5e47c010a1fe39ab82cf9edf8e69668bd17f5c339b528b40f93da",
+      "equal": true
+    },
+    {
+      "file": "reviews/20261108-issue87-gpt6.1-sol.md",
+      "bytes": 6292,
+      "sha256": "087d69ef6037dcf44cda691605c1317af543f7d27c98611022ee8eaa3d546be9",
+      "equal": true
+    },
+    {
+      "file": "reviews/20261108-issue87-response.md",
+      "bytes": 2809,
+      "sha256": "8924d4dcf31d3a63321bf1d0ea121b20a0c2e85c93eea6c57e83edef67d1fd5d",
+      "equal": true
+    },
+    {
+      "file": "reviews/20261108-issue87-fabel.md",
+      "bytes": 4988,
+      "sha256": "856b29d17994f5d3d83ef2821ad010b34e03ff9adc0b1e9308ef72c0ed8440b2",
+      "equal": true
+    },
+    {
+      "file": "reviews/issue84-map-review.md",
+      "bytes": 19153,
+      "sha256": "ade87989f37464683544c768a8e543af921982afc75209ba8a3b2b2d6debaa64",
+      "equal": true
+    },
+    {
+      "file": "reviews/issue84-map-response.md",
+      "bytes": 2813,
+      "sha256": "ece369f2bba35d5a3ef5c777caa87fd4c3cffe11f88aee9a4b456cc0d301df52",
+      "equal": true
+    }
+  ],
+  "fresh_process_command": "omp read skill://huobao-director:1-12 && omp read skill://huobao-director/references/api-catalog.md:1-6",
+  "fresh_process_result": "both resolved to managed skill and nested catalog; no model call"
+}

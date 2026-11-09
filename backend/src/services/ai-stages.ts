@@ -138,12 +138,136 @@ export interface StageModel {
   settings: string | null
 }
 
-/** 需要视觉的环节没有任何可用视觉配置 —— 路由层据此返回 400 */
+/** 本环节当前可用的候选配置（4xx 里回给界面，用户可一键改用其中一条） */
+export interface StageCandidate {
+  config_id: number
+  name: string
+  provider: string
+  model: string
+  vision: boolean
+}
+
+/**
+ * 需要视觉的环节**没有任何**可用视觉配置（自动模式）—— 路由层据此返回 400。
+ * 注意：用户显式指定了一条不可用的配置时**不能**用这个错误，那是 `StagePinUnavailableError`，
+ * 否则界面会谎称「全局没有视觉配置」（Issue #87 的误报根因）。
+ */
 export class StageVisionUnavailableError extends Error {
-  constructor(public readonly stage: AiStage, label: string) {
-    super(`「${label}」需要视觉模型，但没有任何启用并标定为「视觉模型」的文本配置。请在「设置 → AI 服务」里给能看图的文本配置打开「视觉模型」开关。`)
+  constructor(public readonly stage: AiStage, public readonly stageLabel: string) {
+    super(`「${stageLabel}」需要视觉模型，但当前没有可用的视觉文本配置。配置可能未启用、已暂停或尚未标记视觉能力；请在「设置 → AI 服务」检查对应配置的状态与「视觉模型」开关。`)
     this.name = 'StageVisionUnavailableError'
   }
+}
+
+/** 不需要视觉的环节一条可用文本配置都没有（自动模式） */
+export class StageTextUnavailableError extends Error {
+  constructor(public readonly stage: AiStage, public readonly stageLabel: string) {
+    super(`「${stageLabel}」没有可用的文本配置：所有文本模型都已停用、暂停或缺少模型名。`)
+    this.name = 'StageTextUnavailableError'
+  }
+}
+
+export type StagePinReason =
+  | 'missing' | 'inactive' | 'unsupported_provider' | 'no_model' | 'not_vision' | 'suspended'
+  /** 指定了这条配置，但同时指定的模型名不在这条配置登记的模型里 */
+  | 'model_mismatch'
+
+export interface StagePinFacts {
+  configId: number
+  name: string
+  reason: StagePinReason
+  /** 暂停原因等补充说明（可能来自模型服务的报错正文） */
+  detail?: string | null
+}
+
+const PIN_REASON_TEXT: Record<StagePinReason, string> = {
+  missing: '这条配置不存在或不是文本服务',
+  inactive: '这条配置已停用',
+  unsupported_provider: '这条配置的厂商不在支持列表里',
+  no_model: '这条配置没有填写可用的模型名',
+  not_vision: '这条配置没有标定为「视觉模型」，而本环节必须看图',
+  suspended: '这条配置连续失败后已被暂停',
+  model_mismatch: '指定的模型名不属于这条配置',
+}
+
+/**
+ * 用户**显式指定**的配置不能用于本环节。绝不静默换到另一条（= 另一家计费服务）：
+ * 指名原因 + 给出当前可用候选，由用户自己决定改用哪条（Issue #87 B）。
+ */
+export class StagePinUnavailableError extends Error {
+  constructor(
+    public readonly stage: AiStage,
+    public readonly stageLabel: string,
+    public readonly visionRequired: boolean,
+    public readonly facts: StagePinFacts,
+    public readonly alternatives: StageCandidate[],
+  ) {
+    const detail = facts.detail ? `（${facts.detail}）` : ''
+    const usable = alternatives.length
+      ? `当前可用于本环节的配置：${alternatives.map(item => `${item.name}（#${item.config_id}，${item.model}）`).join('、')}。`
+      : `当前没有其他可用于本环节的配置。`
+    super(`「${stageLabel}」指定使用配置「${facts.name}」（#${facts.configId}），但${PIN_REASON_TEXT[facts.reason]}${detail}。${usable}未经选择不会替你换到别的模型服务。`)
+    this.name = 'StagePinUnavailableError'
+  }
+}
+
+export type StageSelectionErrorCode = 'model_pin_unavailable' | 'vision_config_unavailable' | 'text_config_unavailable'
+
+export interface StageSelectionErrorPayload {
+  code: 400
+  error: StageSelectionErrorCode
+  message: string
+  stage: AiStage
+  stage_label: string
+  vision_required: boolean
+  config_id?: number
+  config_name?: string
+  reason?: StagePinReason
+  alternatives: StageCandidate[]
+}
+
+/**
+ * 选模型失败 → 路由 4xx 响应体；不是选模型失败时返回 null（调用方继续抛）。
+ * 三类分开：显式指定不可用 / 自动模式无可用视觉候选 / 自动模式无可用文本候选。
+ */
+export function stageSelectionErrorPayload(err: unknown): StageSelectionErrorPayload | null {
+  if (err instanceof StagePinUnavailableError) {
+    return {
+      code: 400,
+      error: 'model_pin_unavailable',
+      message: err.message,
+      stage: err.stage,
+      stage_label: err.stageLabel,
+      vision_required: err.visionRequired,
+      config_id: err.facts.configId,
+      config_name: err.facts.name,
+      reason: err.facts.reason,
+      alternatives: err.alternatives,
+    }
+  }
+  if (err instanceof StageVisionUnavailableError) {
+    return {
+      code: 400,
+      error: 'vision_config_unavailable',
+      message: err.message,
+      stage: err.stage,
+      stage_label: err.stageLabel,
+      vision_required: true,
+      alternatives: [],
+    }
+  }
+  if (err instanceof StageTextUnavailableError) {
+    return {
+      code: 400,
+      error: 'text_config_unavailable',
+      message: err.message,
+      stage: err.stage,
+      stage_label: err.stageLabel,
+      vision_required: false,
+      alternatives: [],
+    }
+  }
+  return null
 }
 
 /** 顶栏文本模型选择器 / 接口参数传来的覆盖 */
@@ -191,4 +315,28 @@ export function agentChatStage(agentType: string, projectType: 'drama' | 'docume
   // Agent 类型与环节一一对应；新 Agent 必须先登记环节
   logTaskWarn('AIStage', 'unregistered-agent', { agentType })
   throw new Error(`Agent「${agentType}」没有在 AI_STAGES 登记视觉标定`)
+}
+
+/**
+ * 阶段生成与只读预估共用的模型选择（Issue #87 B/D）。
+ * `model_mode='auto'`：本次没有显式指定，后端自动选健康候选——顶栏残留的历史选择（localStorage）
+ * 不算用户此次主动选择，所以 `config_id` / `model` 一律忽略，绝不把旧模型名套到别的端点上。
+ * `model_mode='pinned'`：用户此次明确指定，必须带正整数 `config_id`；不可用时由调度器指名原因，
+ * 不静默换到另一条计费服务。不传 `model_mode` 的老客户端：带了 `config_id` 就按显式指定处理。
+ */
+export function parseFillModelSelection(
+  body: Record<string, unknown>,
+): { mode: 'auto' | 'pinned'; configId?: number; model?: string } | { error: string } {
+  const configId = Number.isInteger(body.config_id) && Number(body.config_id) > 0 ? Number(body.config_id) : undefined
+  const mode = body.model_mode === undefined || body.model_mode === null
+    ? (configId === undefined ? 'auto' : 'pinned')
+    : body.model_mode
+  if (mode !== 'auto' && mode !== 'pinned') {
+    return { error: `model_mode 只能是 auto 或 pinned，收到 ${JSON.stringify(body.model_mode)}` }
+  }
+  if (mode === 'auto') return { mode }
+  if (configId === undefined) {
+    return { error: 'model_mode=pinned 必须同时给出正整数 config_id；若要后端自动选择请改传 model_mode=auto' }
+  }
+  return { mode, configId, model: typeof body.model === 'string' && body.model.trim() ? body.model.trim() : undefined }
 }

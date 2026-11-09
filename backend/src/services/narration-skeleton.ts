@@ -26,7 +26,9 @@ import { runAgent } from '../agents/run.js'
 import { consumeStoryboardStopReason } from '../agents/tools/storyboard-tools.js'
 import { createReasoningSink } from '../agents/reasoning-sink.js'
 import { resolveStageModel } from './ai-stages.js'
-import { createTextTask, findActiveTextTask, finishTextTask } from './text-task.js'
+import { createTextTask, findActiveTextTask, finishTextTask, patchTextTaskParams } from './text-task.js'
+import { runObservedWork } from './task-observability.js'
+import { buildSampleKey, buildWorkPlan, stageEstimateOf, type StageWorkEstimate } from './task-estimate.js'
 import {
   MAX_NARRATION_CHARS,
   narrationCharCount,
@@ -573,6 +575,38 @@ ${script}`
 }
 
 /**
+ * 骨架生成「跑完但验收不通过」（镜头数止损 / 逐字覆盖不合法）。
+ * 这一次不是成功样本：观测工作项按失败结束，不进 ETA 速率池；
+ * 任务仍按原策略标 failed、保留已拆出来的分镜行与模型正文，也不触发重派。
+ */
+class SkeletonRejectedError extends Error {
+  constructor(message: string, readonly outputText: string) {
+    super(message)
+  }
+}
+
+/**
+ * 骨架「开始前」的字数与历史 ETA（#87 §D）：整集一项，源字数 = 旁白稿正文字数。
+ * 历史没有同阶段同模型的成功样本就返回 null，界面显示「暂无估计」。
+ */
+export async function skeletonWorkEstimate(
+  episodeId: number,
+  opts: { model?: string; configId?: number } = {},
+): Promise<StageWorkEstimate> {
+  const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId))
+  if (!ep) throw new Error('剧集不存在')
+  const script = (ep.scriptContent || ep.content || '').trim()
+  const resolved = await resolveStageModel('storyboard_breaker_documentary', opts)
+  const plan = buildWorkPlan({
+    stage: 'skeleton',
+    unit: 'episode',
+    sampleKey: buildSampleKey({ stage: 'skeleton', configId: resolved.configId, model: resolved.model }),
+    items: [{ storyboard_id: null, storyboard_number: null, source_chars: narrationCharCount(script) }],
+  })
+  return stageEstimateOf(plan, resolved.configId ?? null, resolved.model)
+}
+
+/**
  * 发起骨架生成（只拆旁白，不填设计卡）。异步：返回 task_id，进度走任务中心。
  */
 export async function startSkeletonGeneration(
@@ -595,6 +629,9 @@ export async function startSkeletonGeneration(
   if (!agent) throw new Error('分镜 Agent 不可用')
   const resolved = await resolveStageModel('storyboard_breaker_documentary', opts)
   const message = skeletonPrompt(script)
+  // 源字数 = 旁白稿正文字数（去发音标记与空白），不是提示词字数：ETA 按它缩放
+  const scriptChars = narrationCharCount(script)
+  const sampleKey = buildSampleKey({ stage: 'skeleton', configId: resolved.configId, model: resolved.model })
   const taskId = await createTextTask({
     kind: 'storyboard_breaker',
     episodeId,
@@ -604,6 +641,15 @@ export async function startSkeletonGeneration(
     retryOf: opts.retryOf,
     queued: true,
     restart: { kind: 'storyboard_breaker', args: { episodeId, opts } },
+  })
+  // 骨架是「整集一项」的工作：开跑前落计划，刷新/重启后字数与口径都还在
+  await patchTextTaskParams(taskId, {
+    work_plan: buildWorkPlan({
+      stage: 'skeleton',
+      unit: 'episode',
+      sampleKey,
+      items: [{ storyboard_id: null, storyboard_number: null, source_chars: scriptChars }],
+    }),
   })
   const requestContext = buildAgentRequestContext({
     episodeId,
@@ -616,30 +662,38 @@ export async function startSkeletonGeneration(
   const sink = createReasoningSink(taskId)
   logTaskStart('NarrationSkeleton', 'generate', { episodeId, taskId })
 
-  // 骨架是纯文本工作：不附证据图（证据素材属于设计卡阶段）
-  void runWithTextTask(taskId, () => runAgent(agent, [{ role: 'user', content: message }], { maxSteps: 20, requestContext }, sink))
-    .then(async (result) => {
+  // 骨架是纯文本工作：不附证据图（证据素材属于设计卡阶段）。
+  // 验收（止损 + 逐字覆盖）必须留在观测窗口**之内**：模型跑完不等于骨架合法，
+  // 被拒的这次不能当成功样本去抬高/拉低后续 ETA。
+  void runWithTextTask(taskId, () => runObservedWork(
+    { taskId, stage: 'skeleton', sourceChars: scriptChars, sampleKey },
+    async () => {
+      const result = await runAgent(agent, [{ role: 'user', content: message }], { maxSteps: 20, requestContext }, sink)
       await renumberStoryboardsByScript(episodeId)
       // 镜头数硬上限的止损（#57）：连续两批整批被拒就不再让模型重试
       const stop = consumeStoryboardStopReason(episodeId)
-      if (stop) {
-        await finishTextTask(taskId, 'failed', { errorMsg: stop, outputText: result.text || '' })
-        logTaskError('NarrationSkeleton', 'generate', { episodeId, taskId, error: stop })
-        return
-      }
+      if (stop) throw new SkeletonRejectedError(stop, result.text || '')
       // 验收口径与「能否确认骨架」完全一致（#70）：不只看缺口，重复领取、顺序颠倒、
       // 改写原文同样判失败。已拆出来的行保留，让人按问题清单显式修边界。
       const problems = await skeletonAcceptanceProblems(episodeId)
       if (problems.length) {
         const detail = `旁白骨架不合法：${problems.slice(0, 3).map(p => p.message).join('；')}${problems.length > 3 ? `（共 ${problems.length} 处）` : ''}。分镜已保留，请在「旁白骨架」里调整边界或重新生成。`
-        await finishTextTask(taskId, 'failed', { errorMsg: detail, outputText: result.text || '' })
-        logTaskError('NarrationSkeleton', 'generate', { episodeId, taskId, error: detail })
-        return
+        throw new SkeletonRejectedError(detail, result.text || '')
       }
+      return result
+    },
+  ))
+    .then(async (result) => {
       await finishTextTask(taskId, 'completed', { outputText: result.text || '' })
       logTaskSuccess('NarrationSkeleton', 'generate', { episodeId, taskId })
     })
     .catch(async (err: unknown) => {
+      // 验收不通过：任务失败、已拆的行保留、模型正文照旧可看；不是模型调用失败，不触发重派
+      if (err instanceof SkeletonRejectedError) {
+        await finishTextTask(taskId, 'failed', { errorMsg: err.message, outputText: err.outputText })
+        logTaskError('NarrationSkeleton', 'generate', { episodeId, taskId, error: err.message })
+        return
+      }
       const detail = err instanceof Error ? err.message : '旁白骨架生成失败'
       await finishTextTask(taskId, 'failed', { errorMsg: detail })
       await requeueFirstModelFailure(taskId, err, isFirstAgentFailureSafe(err))

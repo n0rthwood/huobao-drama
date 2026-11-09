@@ -1,0 +1,91 @@
+[
+  {
+    "id": 1,
+    "service_type": "text",
+    "name": "GLM 5.3 (local)",
+    "model": [
+      "glm-5.3"
+    ],
+    "priority": 100,
+    "is_active": true
+  },
+  {
+    "id": 2,
+    "service_type": "image",
+    "name": "GPT Image (codex)",
+    "model": [
+      "gpt-image-2"
+    ],
+    "priority": 90,
+    "is_active": true
+  },
+  {
+    "id": 6,
+    "service_type": "text",
+    "name": "Qwen3.6 (175)",
+    "model": [
+      "Qwen3.6-35B-A3B"
+    ],
+    "priority": 80,
+    "is_active": false
+  },
+  {
+    "id": 8,
+    "service_type": "video",
+    "name": "MiniMax H3 INT8 (ComfyUI 102)",
+    "model": [
+      "MiniMax-H3-INT8-ComfyUI",
+      "MiniMax-H3-FastH3-Omni-INT8"
+    ],
+    "priority": 100,
+    "is_active": true
+  },
+  {
+    "id": 9,
+    "service_type": "image",
+    "name": "Qwen Image 2.1 (ComfyUI 110)",
+    "model": [
+      "qwen-image-2.1"
+    ],
+    "priority": 100,
+    "is_active": true
+  },
+  {
+    "id": 10,
+    "service_type": "text",
+    "name": "DeepSeek V4.1 Flash 1017 (local)",
+    "model": [
+      "deepseek-chat"
+    ],
+    "priority": 90,
+    "is_active": true
+  },
+  {
+    "id": 11,
+    "service_type": "image",
+    "name": "FLUX.1-dev (202 dev)",
+    "model": [
+      "flux-dev"
+    ],
+    "priority": 80,
+    "is_active": true
+  },
+  {
+    "id": 13,
+    "service_type": "tts",
+    "name": "VoxCPM Studio (local)",
+    "model": [],
+    "priority": 100,
+    "is_active": true
+  },
+  {
+    "id": 14,
+    "service_type": "text",
+    "name": "DeepSeek V4.1 Flash 1017 (Cloud)",
+    "model": [
+      "deepseek-flash"
+    ],
+    "priority": 80,
+    "is_active": true
+  }
+]

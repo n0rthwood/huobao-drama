@@ -1,0 +1,61 @@
+[
+  {
+    "width": 1280,
+    "screenshot": "design-1280.png",
+    "cards": [
+      {
+        "width": 180
+      }
+    ],
+    "images": [
+      {
+        "fit": "contain",
+        "loaded": true
+      }
+    ],
+    "theme": "light"
+  },
+  {
+    "width": 1440,
+    "screenshot": "design-1440.png",
+    "cards": [
+      {
+        "width": 180
+      }
+    ],
+    "images": [
+      {
+        "fit": "contain",
+        "loaded": true
+      }
+    ],
+    "theme": "light"
+  },
+  {
+    "width": 1920,
+    "screenshot": "design-1920.png",
+    "cards": [
+      {
+        "width": 180
+      }
+    ],
+    "images": [
+      {
+        "fit": "contain",
+        "loaded": true
+      }
+    ],
+    "theme": "light"
+  },
+  {
+    "width": 1440,
+    "screenshot": "design-dark.png",
+    "theme": "\"light\"\n"
+  },
+  {
+    "width": 1440,
+    "screenshot": "design-dark-verified.png",
+    "theme": "dark",
+    "verification": "waited for actual data-theme=dark before capture; earlier design-dark.png was light and is not dark-mode proof"
+  }
+]

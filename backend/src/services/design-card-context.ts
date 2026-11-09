@@ -22,15 +22,28 @@ import {
 } from './design-card.js'
 import { parseNarrationMeta } from './narration.js'
 
-/** 某张证据素材的语义条目摘要（名称 + 稳定 id + 组别） */
+/**
+ * 某张证据素材的语义条目摘要（名称 + 稳定 id + 组别 + 实际几何点数）。
+ * 几何点数给 #87 的依据机检用：ID 真实存在但几何为空，同样不能当作可实现的依据。
+ */
 export function semanticEntries(semanticsJson: string | null | undefined): DesignCardSemanticEntry[] {
   const doc = parseSemantics(semanticsJson)
   if (!doc) return []
   return [
-    ...doc.labels.map(item => ({ id: item.id, name: item.text, group: 'label' as const })),
-    ...doc.points.map(item => ({ id: item.id, name: item.name, group: 'point' as const })),
-    ...doc.regions.map(item => ({ id: item.id, name: item.name, group: 'region' as const })),
-    ...doc.lines.map(item => ({ id: item.id, name: item.name, group: 'line' as const })),
+    ...doc.labels.map(item => ({
+      id: item.id, name: item.text, group: 'label' as const,
+      geometry_points: Array.isArray(item.bbox) && item.bbox.length === 4 && item.bbox.every(Number.isFinite) ? 1 : 0,
+    })),
+    ...doc.points.map(item => ({
+      id: item.id, name: item.name, group: 'point' as const,
+      geometry_points: Array.isArray(item.at) && item.at.length === 2 && item.at.every(Number.isFinite) ? 1 : 0,
+    })),
+    ...doc.regions.map(item => ({
+      id: item.id, name: item.name, group: 'region' as const, geometry_points: item.points?.length ?? 0,
+    })),
+    ...doc.lines.map(item => ({
+      id: item.id, name: item.name, group: 'line' as const, geometry_points: item.points?.length ?? 0,
+    })),
   ]
 }
 
@@ -75,6 +88,8 @@ export function loadDesignCardContext(episodeId: number): DesignCardContext {
       faithful: Number(row.faithful) === 1,
       image: row.localPath || row.imageUrl || null,
       semantics: semanticEntries(row.semantics),
+      // #87 的依据机检要判断「语义坐标依据的是哪一版图」，人工手填的标注可能没有版本
+      semantics_source_task_id: parseSemantics(row.semantics)?.image.source_task_id ?? null,
     })
   }
   return { assets }

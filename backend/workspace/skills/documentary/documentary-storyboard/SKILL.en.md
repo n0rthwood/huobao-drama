@@ -118,14 +118,18 @@ Every information point needs an owner. Entries without one are flagged `info_po
 - `must_mark[]`: the annotated elements this shot must mark on the base image, each `{ asset_id, semantic_id, name }`,
   **copied verbatim** from the `semantics` list returned by `read_storyboard_context` (`asset_id` + `id` + `name` must all match).
   Inventing a name gets it flagged `unresolved`, shown in red on the design card page — the same as not writing it.
-  Every place, river, lake, fort, polity extent or route spoken in the narration should find a match here;
-  when semantics are missing, preserve the planned annotation layer, leave its anchor semantic_id and name empty,
-  and state in `rationale` that annotation is pending. Never invent an entry or downgrade the layer.
+  Every place, river, lake, fort, polity extent or route spoken in the narration should find a match here.
+  When this episode has no such semantic entry, do **not** write a blank `must_mark` waiting for a human to annotate it: either use an
+  expression the asset's existing annotations really support, or switch to an asset that genuinely carries that entry; if neither works,
+  report the gap per 2.2.7 and do not save the card.
 - `planned_layers[]`: which layers to draw and in which order they appear. Each entry
   `{ type, text?, anchor?: {asset_id, semantic_id, name}, at_s }`:
   - `type ∈ polygon | polyline | marker | label | card | image`
     (extent highlight / river·route·arrow / place / place-name·year text / name bar·year card / inset image).
-  - `anchor` points at the same semantic entry as `must_mark`; text layers carry their text in `text`.
+  - `anchor` points at the same semantic entry as `must_mark`, and it must exist on **the asset and version used as this shot's base image**,
+    with a compatible type and complete geometry: `polygon` / `polyline` take a vertexed `region` or `line` (≥3 and ≥2 points respectively),
+    `marker` takes a `point`, a positioned `label` takes a `label`. Text-only layers carry their text in `text`; omit `anchor` when the layer
+    does not point at a specific place in the picture.
   - `at_s`: at which second inside the layer segment this layer appears. **Lay it out on the measured audio timeline**: whatever the narration
     says first appears first; "simultaneously" / "in two columns" is expressed by **two layers with the same `at_s`**, "first … then …" by
     different `at_s` values. `at_s` must not exceed this segment's `layer_s`.
@@ -173,6 +177,67 @@ Every information point needs an owner. Entries without one are flagged `info_po
 ≤600 characters covering: why the information points are split this way, why you suggest this combination, what it carries over from the
 previous shot ("continuing the flotilla already shown, this shot only marks the destination"), and any missing asset / missing annotation /
 budget conflict.
+
+### 2.2.7 Asset grounding and feasibility (hard constraints for AI card filling)
+
+This section constrains **AI generation and the AI write tool only**. Humans may add information, create annotations and extend designs
+without these limits; the AI must never rewrite historical cards, delete layers or overwrite existing production artefacts.
+
+1. **Design within existing assets and existing production capability.** The design must be realisable from the asset images, attributes,
+   semantics and rendering capability available now. Never write information that does not yet exist, annotations not yet created, or guessed
+   points and routes as if they were already available.
+2. **Confirm the evidence before choosing an asset.** Read the existing information relevant to the intended use and confirm the asset and
+   version you actually reference. A file name, an asset title, another version's image or another asset's semantics never substitute for
+   evidence about the referenced object. Use `read_image` when the judgement is about picture content; never claim to have seen what you did not read.
+3. **Distinguish "not read yet" from "confirmed absent".** Read it if you have not. Once confirmed absent, you may not keep treating it as
+   present, and "a human will add it later" is not a reason to call the design done.
+4. **Every dependency needs real, compatible, executable evidence.** A layer bound to a position, object, route or area must reference a
+   semantic entry that exists on the base image's asset and version, is compatible in meaning and type, and carries the required geometry
+   (`polygon` / `polyline` from a vertexed `region` or `line`, `marker` from a `point`, a positioned `label` from a `label`). IDs and names may only come from the real inventory: never invent
+   one, never pass an asset name off as a semantic entry, never borrow a same-named entry from another asset or an incompatible version.
+   The base image and the generation segment's `reference_assets` must be assets that **already have an image** (an original or a generated
+   one); never plan around "an image will exist later". When the base is pinned to a `version_task_id`, that asset's annotations must be
+   verifiably made against that version; if that cannot be confirmed, do not pin a version.
+   **An entry that exists but has empty geometry is still not evidence.**
+5. **Decide anchoring by the actual dependency.** Pure chapter titles, definition cards, explanatory cards and screen-layout elements that do
+   not point at a specific object or position may deliberately carry no `anchor`. But a layer is not exempt just because its type is `label`
+   or `card`: if its content really points at a place, area or route, rule 4 still applies. **A blank anchor is not wrong by itself; leaving it
+   blank where anchoring is required is** — such geometry layers are dropped entirely at render time.
+6. **An asset without semantics may be used for what it actually supports**: background, whole-image presentation, or anything that does not
+   depend on the missing annotation. Not every image must be annotated first. But never present an ordinary river network as one specific
+   historical route, and never turn "the picture contains a river" into "an executable path for that voyage already exists".
+7. **You may change the technique, never silently drop the task.** If one presentation is impossible, choose another the existing assets
+   support, but keep every information point and satisfy the visual task the script or the user explicitly requires. Never alter the verbatim
+   narration, and never demote a relation that must be shown on screen into narration only.
+8. **If the current conditions cannot meet a required task, do not save a completed design.** Check feasible alternatives first; if none works,
+   do not call `update_storyboard` for this card. State instead: the affected shot and layers, the evidence required, what the current assets
+   lack, and why the alternatives do not satisfy it. You may note which human annotations would change feasibility — that is a gap report,
+   not a finished design.
+9. **Handle tool rejections inside this loop.** When `update_storyboard` returns a reference, type, geometry or feasibility error for a specific
+   layer, correct it from the actual response and retry within the existing tool budget. Do not drop the reference field, rename it to
+   "unanchored", route around it through the human write path, or invent fields to claim success.
+
+**Acceptable**
+
+- The map carries `ln-2 (Kyrgyz River, line, 42 geometry points)` and the shot must trace that river: a `polyline` anchored to `ln-2`, on that same base image.
+- An unannotated river-network map where the shot only needs "the overall look of the Jiang-Huai waterways": present the whole image after
+  reading it; add no unfounded routes or places.
+- A pure chapter title "Chapter 2 — The Yonghui Years": `card` / `label` with no `anchor`, rendered by screen layout.
+- A portrait as an `image` layer anchored to that portrait asset — provided the asset really has an image.
+
+**Not acceptable**
+
+- The asset has no "Han Canal alignment" entry, yet `anchor.semantic_id = 'Han Canal alignment map'` (passing the **asset name** off as a semantic entry).
+- All five geometry layers leave `anchor` blank with `rationale` saying "to be annotated by a human" — the forbidden "pending" success card.
+- Borrowing a same-named `ln-7` from a different map for this shot's base image (cross-asset borrowing; the coordinates do not land on this base).
+- Using a real entry `rg-3` that holds a single point as a `polygon` (insufficient geometry; the layer is skipped at render time).
+- Pinning the base to an old `version_task_id` while the asset's annotations were made against a different version (incompatible version).
+- Declaring a river visible in the image to be "the canal route attested in the sources" (an unproven historical conclusion).
+- Quietly reducing an explicitly requested "two columns advancing, visible on screen" to narration only.
+
+**Pre-save checklist**: information points and visual tasks complete → actual asset and version verified → semantic ownership and meaning
+compatible → required geometry executable → unanchored layers genuinely independent of picture position → no "pending human annotation"
+placeholder → the tool actually accepted the write.
 
 ## 2.3 Picture discipline
 

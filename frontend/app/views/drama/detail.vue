@@ -961,15 +961,19 @@ async function confirmDeleteMaterial() {
 }
 
 /* ===== 素材库 Tab（deeplink：?tab=episodes|assets &filter=all|character|scene|prop &asset=类型-id）===== */
-const { replaceQuery } = useQuerySync()
-const urlTab = queryEnum(route.query.tab, ['episodes', 'assets'])
-const pendingAssetLink = queryTypedId(route.query.asset, ['character', 'scene', 'prop'])
+// Issue #86：页面自身的键由 detail 组声明；弹窗层键单独成组，关闭弹窗只摘掉弹窗键
+const link = useDeeplink('detail', DEEPLINK_KEYS.detail)
+// bkind/bq 由 AssetBrowserDialog 自己的分组发布，本页不声明（声明了会抢占同名键的兜底值）
+const dialogLink = useDeeplink('detailDialogs', DEEPLINK_KEYS.detailDialogs.filter(k => k !== 'bkind' && k !== 'bq'))
+const urlTab = queryEnum(link.initial('tab'), ['episodes', 'assets'])
+const pendingAssetLink = queryTypedId(link.initial('asset'), ['character', 'scene', 'prop'])
 // URL 携带 tab（含非法值）即以 URL 为准，非法回退默认；asset 参数隐含素材库页签
-const activeTab = ref(pendingAssetLink ? 'assets' : ((querySingle(route.query.tab) && urlTab) || 'episodes'))
-const assetTab = ref(queryEnum(route.query.filter, ['all', 'character', 'scene', 'prop']) || 'all')
+const activeTab = ref(pendingAssetLink ? 'assets' : ((querySingle(link.initial('tab')) && urlTab) || 'episodes'))
+const assetTab = ref(queryEnum(link.initial('filter'), ['all', 'character', 'scene', 'prop']) || 'all')
 // 资产管理器（#9）：从其他项目全量复制导入资产到本项目（不关联剧集）
 const assetBrowserOpen = ref(false)
-const assetViewer = ref({ open: false, src: '', title: '' })
+// 大图查看器按「资产身份」记录（kindKey+id），src 由当前素材求值，绝不把签名路径写进 URL
+const assetViewer = ref({ open: false, kindKey: '', id: 0, src: '', title: '' })
 const assetTabs = computed(() => ([
   { label: t('index.status.all'), value: 'all' },
   { label: t('common.role'), value: 'character' },
@@ -1173,7 +1177,7 @@ async function applyMaterialFromLibrary(urls) {
 }
 
 function openAssetViewer(m) {
-  assetViewer.value = { open: true, src: assetSrc(m), title: `${m.kind} · ${m.name}` }
+  assetViewer.value = { open: true, kindKey: m.kindKey, id: m.id, src: assetSrc(m), title: `${m.kind} · ${m.name}` }
 }
 
 // 资产类型（Issue #84）：地图是独立类型，地图界面只认服务端持久化的 asset_type
@@ -1212,7 +1216,7 @@ async function onMapWorkflowChanged() {
 }
 
 function closeAssetViewer() {
-  assetViewer.value = { open: false, src: '', title: '' }
+  assetViewer.value = { open: false, kindKey: '', id: 0, src: '', title: '' }
 }
 
 function fmtDate(s) {
@@ -1363,32 +1367,102 @@ async function saveEdit() {
   }
 }
 
-// ===== 子状态 → URL 同步（replace：页签切换不进历史栈，返回键 = 回列表/上一页）=====
-watch([activeTab, assetTab, editDialog, editTarget], () => {
-  const query = { tab: activeTab.value }
-  if (activeTab.value === 'assets') query.filter = assetTab.value
+// ===== 子状态 → URL 同步（Issue #86：只经 deeplink 组写出，replace，不进历史栈）=====
+function publishDetailLink() {
   const m = editTarget.value
-  if (editDialog.value && m?.id) query.asset = `${m.kindKey}-${m.id}`
-  replaceQuery(query)
-})
+  link.set({
+    tab: activeTab.value,
+    filter: activeTab.value === 'assets' ? assetTab.value : '',
+    asset: editDialog.value && m?.id ? `${m.kindKey}-${m.id}` : '',
+  })
+}
+// 弹窗层：大图按资产身份、资产浏览器/新增剧集/项目设置只记开关、素材库记宿主资产、删除确认记待删实体
+function publishDialogLink() {
+  const viewer = assetViewer.value
+  const host = materialLibrary.value.target
+  const ep = episodeToDelete.value
+  const mat = assetToDelete.value
+  dialogLink.set({
+    view: viewer.open && viewer.id ? `${viewer.kindKey}-${viewer.id}` : '',
+    browser: assetBrowserOpen.value ? '1' : '',
+    addep: addDialog.value ? '1' : '',
+    proj: showSettings.value ? '1' : '',
+    lib: materialLibrary.value.open && host?.id ? `${host.kindKey}-${host.id}` : '',
+    del: ep?.id ? `episode-${ep.id}` : (mat?.id ? `${mat.kindKey}-${mat.id}` : ''),
+  })
+}
+watch([activeTab, assetTab, editDialog, editTarget], publishDetailLink)
+watch(
+  [assetViewer, assetBrowserOpen, addDialog, showSettings, materialLibrary, episodeToDelete, assetToDelete],
+  publishDialogLink,
+  { deep: true },
+)
 
-// deeplink ?asset=类型-id：数据就绪后打开素材编辑弹窗；素材已删除/不存在则静默忽略
+const DEEPLINK_KINDS = ['character', 'scene', 'prop']
+function findMaterialByRef(ref_) {
+  return ref_ ? materials.value.find(x => x.kindKey === ref_.type && x.id === ref_.id) || null : null
+}
+function missingTargetToast(ref_) {
+  toast.error(t('deeplink.missingNamed', { target: `${assetKindLabel(ref_.type)} #${ref_.id}` }))
+}
+
+// deeplink ?asset=类型-id：数据就绪后打开素材编辑弹窗；素材已删除/不存在则清键并提示，停留在父级页签
 function applyAssetDeeplink() {
-  if (!querySingle(route.query.asset)) return
-  const m = pendingAssetLink
-    ? materials.value.find(x => x.kindKey === pendingAssetLink.type && x.id === pendingAssetLink.id)
-    : null
+  if (!link.initial('asset')) return
+  const m = findMaterialByRef(pendingAssetLink)
   if (!m) {
-    replaceQuery({ tab: activeTab.value, ...(activeTab.value === 'assets' ? { filter: assetTab.value } : {}) })
+    if (pendingAssetLink) missingTargetToast(pendingAssetLink)
+    else toast.error(t('deeplink.missing'))
     return
   }
   openEdit(m)
+}
+
+// 弹窗层恢复：只还原界面，不触发保存/生成/删除；bkind/bq 由资产浏览器自己的分组负责
+function applyDialogDeeplinks() {
+  const viewerRef = queryTypedId(dialogLink.initial('view'), DEEPLINK_KINDS)
+  if (dialogLink.initial('view')) {
+    const m = findMaterialByRef(viewerRef)
+    if (m && matHasImage(m)) openAssetViewer(m)
+    else if (viewerRef) missingTargetToast(viewerRef)
+    else toast.error(t('deeplink.missing'))
+  }
+  if (querySingle(dialogLink.initial('browser'))) assetBrowserOpen.value = true
+  if (querySingle(dialogLink.initial('addep'))) openAddEpisode()
+  if (querySingle(dialogLink.initial('proj')) && drama.value) openSettings()
+  if (dialogLink.initial('lib')) {
+    const hostRef = queryTypedId(dialogLink.initial('lib'), DEEPLINK_KINDS)
+    const host = findMaterialByRef(hostRef)
+    if (host) openMaterialLibrary(host)
+    else if (hostRef) missingTargetToast(hostRef)
+    else toast.error(t('deeplink.missing'))
+  }
+  // 删除确认：只按实体 id 重建外壳（标题/名称取自实体本身），删除请求仍需用户手动点确认
+  if (dialogLink.initial('del')) {
+    const delRef = queryTypedId(dialogLink.initial('del'), ['episode', ...DEEPLINK_KINDS])
+    if (delRef?.type === 'episode') {
+      const ep = (drama.value?.episodes || []).find(x => x.id === delRef.id)
+      if (ep) episodeToDelete.value = ep
+      else toast.error(t('deeplink.missingNamed', { target: `${t('detail.tabs.episodes')} #${delRef.id}` }))
+    } else {
+      const m = findMaterialByRef(delRef)
+      if (m) assetToDelete.value = m
+      else if (delRef) missingTargetToast(delRef)
+      else toast.error(t('deeplink.missing'))
+    }
+  }
 }
 
 onMounted(async () => {
   loadStylePresets().catch(toastError)
   await load()
   applyAssetDeeplink()
+  applyDialogDeeplinks()
+  // 恢复结果立即发布一次：失效的 asset/view/lib 在此被本组清掉（watch 不会因「没变化」而触发）
+  publishDetailLink()
+  publishDialogLink()
+  // 项目与素材都已就绪、各层恢复完毕：此时才允许写回 URL
+  deeplinkHydrate()
   await loadImageTasks()
 })
 onUnmounted(() => {

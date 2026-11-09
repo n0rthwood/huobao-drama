@@ -223,15 +223,22 @@ import { dramaAPI } from '~/composables/useApi'
 import { useStylePresets, ASPECT_RATIO_OPTIONS } from '~/composables/useStylePresets'
 import BaseSelect from '~/components/BaseSelect.vue'
 import { startTour, autoTour } from '~/composables/useTour'
+import { DEEPLINK_KEYS, deeplinkHydrate, queryEnum, useDeeplink } from '~/composables/useQuerySync'
 
 const { t, locale } = useI18n()
 
+// ===== deeplink（Issue #86）：搜索词 / 状态筛选 / 排序 / 弹窗都进 URL，刷新与复制链接可还原 =====
+const link = useDeeplink('home', DEEPLINK_KEYS.home)
+const STATUS_VALUES = ['all', 'draft', 'active', 'completed']
+const SORT_VALUES = ['updated', 'title']
+
 const dramas = ref([])
 const loading = ref(false)
-const showCreate = ref(false)
-const searchKeyword = ref('')
-const statusFilter = ref('all')
-const sortMode = ref('updated')
+// dlg=create 只恢复弹窗外壳：表单草稿不入 URL，也不预填、不提交
+const showCreate = ref(link.initial('dlg') === 'create')
+const searchKeyword = ref(link.initial('q') || '')
+const statusFilter = ref(queryEnum(link.initial('status'), STATUS_VALUES) || 'all')
+const sortMode = ref(queryEnum(link.initial('sort'), SORT_VALUES) || 'updated')
 const sortOptions = computed(() => ([
   { label: t('index.sortUpdated'), value: 'updated' },
   { label: t('index.sortTitle'), value: 'title' },
@@ -308,20 +315,45 @@ const filteredDramas = computed(() => {
   })
 })
 
+let loadFailed = false
 async function load() {
   loading.value = true
   try {
     const [res] = await Promise.all([dramaAPI.list(), loadStylePresets(true)])
     dramas.value = res.items || []
+    loadFailed = false
     if (!form.value.style && stylePresets.value.length) {
       form.value.style = stylePresets.value[0].value
     }
   } catch (e) {
+    loadFailed = true
     toastError(e)
   } finally {
     loading.value = false
   }
 }
+
+// 列表就绪后恢复 dlg=delete:<id>：只重建确认弹窗，仍须用户点「确认」才删除
+function restoreDeeplinkDialog() {
+  const dlg = link.initial('dlg') || ''
+  if (!dlg.startsWith('delete:')) return
+  if (showCreate.value || dramaToDelete.value) return   // 恢复期间用户已有操作：以用户为准
+  if (loadFailed) return                                 // 列表没加载成功时不能断言目标已不存在
+  const id = Number(dlg.slice('delete:'.length))
+  const target = dramas.value.find(d => Number(d.id) === id)
+  if (target) dramaToDelete.value = target
+  else toast.warning(t('deeplink.missing'))              // 键由下面的发布 watch 自动清掉
+}
+
+// 发布：默认值不写 URL；弹窗关闭只移除 dlg 键，搜索/筛选/排序键保持不动
+watch([searchKeyword, statusFilter, sortMode, showCreate, dramaToDelete], () => {
+  link.set({
+    q: searchKeyword.value.trim(),
+    status: statusFilter.value === 'all' ? '' : statusFilter.value,
+    sort: sortMode.value === 'updated' ? '' : sortMode.value,
+    dlg: showCreate.value ? 'create' : (dramaToDelete.value ? `delete:${dramaToDelete.value.id}` : ''),
+  })
+}, { immediate: true })
 
 async function create() {
   if (!form.value.title?.trim()) return
@@ -387,7 +419,12 @@ function fmtDate(s) {
   return d.toLocaleDateString(locale.value === 'zh' ? 'zh-CN' : locale.value, { month: 'short', day: 'numeric' })
 }
 
-onMounted(load)
+// 列表与风格预设就绪后再恢复弹窗、开启 URL 写出，避免恢复完成前地址被改写
+onMounted(async () => {
+  await load()
+  restoreDeeplinkDialog()
+  deeplinkHydrate()
+})
 
 // ===== 应用内引导（首页）：3 步 — 欢迎 / 新建项目 / AI 配置提醒 =====
 const INDEX_TOUR = [

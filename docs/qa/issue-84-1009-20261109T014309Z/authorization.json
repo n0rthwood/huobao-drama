@@ -1,0 +1,5 @@
+{
+  "user_instruction": "你需要发布后，在生产上进行验收。不要每次都要求批准预算。 八达岭长城测试需要用 1009，现在已经 9 号了",
+  "scope": "Issue #84 publish first, then real production acceptance in a newly created dedicated 八达岭长城测试 1009 project; no repeated per-call budget approval; no writes to existing projects",
+  "accounting": "Track real model requests and task IDs, including failed attempts; initial planning reference images4/text20/video0/TTS0, not a fresh approval prompt on each stage"
+}

@@ -139,6 +139,12 @@ export interface DesignCardSemanticEntry {
   id: string
   name: string
   group: 'label' | 'point' | 'region' | 'line'
+  /**
+   * 这条语义实际带了几个几何点（label 的 bbox 记 1，point 的坐标记 1，region/line 记折点数）。
+   * 设计卡的依据机检（#87）据此判断「ID 真实存在但几何为空」——那同样不能当作可实现的依据。
+   * 旧调用方没填时为 undefined，机检按「几何未知」放行，只看组别相容性。
+   */
+  geometry_points?: number
 }
 
 export interface DesignCardAssetEntry {
@@ -149,6 +155,11 @@ export interface DesignCardAssetEntry {
   faithful?: boolean
   image?: string | null
   semantics?: DesignCardSemanticEntry[]
+  /**
+   * 这份语义标注是针对哪张图（生成图的 sys_task id）做的；人工手填的标注可能为 null。
+   * 设计卡的依据机检（#87）用它判断「底图指定的版本」与「语义坐标所依据的版本」是否相容。
+   */
+  semantics_source_task_id?: number | null
 }
 
 export interface DesignCardContext {

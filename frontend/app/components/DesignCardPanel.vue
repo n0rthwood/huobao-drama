@@ -69,7 +69,13 @@
           <Loader2 :size="11" class="animate-spin" />
           {{ t('episode.design.fill.progress', { done: batch.completed, total: batch.total }) }}
         </span>
+        <TaskWorkMetrics :summary="fillSummary" :estimate="fillEstimate" dense />
         <span class="ml-auto" />
+        <!-- 模型选择（#87 §B）：默认「自动」由后端挑健康视觉配置；顶栏残留的选择不冒充本次显式指定 -->
+        <select v-model="modelMode" class="input dc-select dc-model-mode" :aria-label="t('workMetrics.modelMode')">
+          <option value="auto">{{ t('workMetrics.modelAuto') }}</option>
+          <option value="pinned" :disabled="!chatConfigId">{{ t('workMetrics.modelPinned', { name: chatModel || t('workMetrics.modelTopbar') }) }}</option>
+        </select>
         <button
           class="btn btn-sm"
           :disabled="batch.running || !fillableIds.length || !skeleton.confirmed"
@@ -89,6 +95,20 @@
         </button>
       </div>
 
+      <!-- 模型选择失败（#87 §B）：指名原因，并给可用配置的一键重填入口，不静默换计费服务 -->
+      <div v-if="pinError" class="dc-pin-error">
+        <p>{{ pinError.message }}</p>
+        <div class="dc-pin-actions">
+          <button
+            v-for="alt in pinError.alternatives"
+            :key="alt.config_id"
+            class="btn btn-sm btn-primary"
+            @click="retryWithConfig(alt)"
+          >{{ t('workMetrics.retryWith', { name: alt.name }) }}</button>
+          <button class="btn btn-sm" @click="pinError = null">{{ t('episode.design.batch.cancel') }}</button>
+        </div>
+      </div>
+
       <div v-if="!shots.length" class="step-empty" style="flex:1">
         <div class="empty-title">{{ t('episode.design.empty.noShots') }}</div>
       </div>
@@ -103,7 +123,7 @@
             :class="['dc-shot', { on: sb.id === selectedId }]"
             :aria-pressed="sb.id === selectedId"
             draggable="true"
-            @click="selectedId = sb.id"
+            @click="selectShot(sb.id)"
             @dragstart="onDragStart(sb)"
             @dragover.prevent
             @drop.prevent="onDrop(index)"
@@ -374,6 +394,19 @@
                   {{ candidate.name }}{{ candidate.verified ? ` · ${t('episode.design.picker.verified')}` : '' }}
                 </option>
               </select>
+              <!-- 实际引用版本的缩略图（#87 §E）：取底图候选自己的 path/version，不拿资产当前图冒充 -->
+              <div v-if="baseCandidate && baseCandidate.path" class="dc-asset-grid">
+                <button
+                  type="button"
+                  class="dc-thumb"
+                  :title="t('designCard87.viewImage')"
+                  @click="previewImage(baseCandidate.path, baseCandidate.name, baseCandidate.version_task_id)"
+                >
+                  <img :src="mediaUrl(baseCandidate.path)" :alt="baseCandidate.name">
+                  <span class="dc-thumb-tag mono">{{ baseCandidate.version_task_id ? t('designCard87.version', { n: baseCandidate.version_task_id }) : t('designCard87.currentVersion') }}</span>
+                </button>
+              </div>
+              <span v-else-if="baseValue && baseValue !== 'inherit_prev'" class="dim">{{ t('designCard87.noImage') }}</span>
             </div>
 
             <div class="dc-field">
@@ -381,9 +414,23 @@
                 {{ t('episode.design.field.mustMark') }}
                 <span class="dc-affect" :title="t('episode.design.affectsTip.mustMark')">{{ t('episode.design.affects.mustMark') }}</span>
               </span>
-              <div class="dc-chips">
-                <span v-for="(item, index) in layerPlan.must_mark" :key="`${item.asset_id}:${item.semantic_id}`" :class="['dc-chip', { 'is-unresolved': item.unresolved }]">
+              <div class="dc-asset-grid">
+                <span v-for="(item, index) in layerPlan.must_mark" :key="`${item.asset_id}:${item.semantic_id}`" :class="['dc-chip', 'dc-asset-card', { 'is-unresolved': item.unresolved }]">
+                  <button
+                    v-if="assetImage('prop', item.asset_id)"
+                    type="button"
+                    class="dc-chip-thumb"
+                    :title="t('designCard87.viewImage')"
+                    @click="previewImage(assetImage('prop', item.asset_id), item.name)"
+                  ><img :src="mediaUrl(assetImage('prop', item.asset_id))" :alt="item.name"></button>
+                  <span v-else class="dc-asset-empty">{{ t('designCard87.noImage') }}</span>
                   <span class="dc-chip-text">{{ item.name }}</span>
+                  <button
+                    type="button"
+                    class="dc-chip-open"
+                    :title="t('designCard87.openSemantics')"
+                    @click="emit('open-asset', { kind: 'prop', id: item.asset_id, semantic_id: item.semantic_id || undefined, section: 'semantics' })"
+                  >⌕</button>
                   <button type="button" class="dc-chip-del" :aria-label="t('episode.design.actions.remove')" @click="removeMustMark(index)">×</button>
                 </span>
                 <button type="button" class="btn btn-sm" @click="openPicker('must_mark')">{{ t('episode.design.actions.add') }}</button>
@@ -432,9 +479,23 @@
                 {{ t('episode.design.field.referenceAssets') }}
                 <span class="dc-affect" :title="t('episode.design.affectsTip.referenceAssets')">{{ t('episode.design.affects.referenceAssets') }}</span>
               </span>
-              <div class="dc-chips">
-                <span v-for="(item, index) in genPlan.reference_assets" :key="`${item.kind}:${item.id}`" :class="['dc-chip', { 'is-unresolved': item.unresolved }]">
+              <div class="dc-asset-grid">
+                <span v-for="(item, index) in genPlan.reference_assets" :key="`${item.kind}:${item.id}`" :class="['dc-chip', 'dc-asset-card', { 'is-unresolved': item.unresolved }]">
+                  <button
+                    v-if="assetImage(item.kind, item.id)"
+                    type="button"
+                    class="dc-chip-thumb"
+                    :title="t('designCard87.viewImage')"
+                    @click="previewImage(assetImage(item.kind, item.id), item.name)"
+                  ><img :src="mediaUrl(assetImage(item.kind, item.id))" :alt="item.name"></button>
+                  <span v-else class="dc-asset-empty">{{ t('designCard87.noImage') }}</span>
                   <span class="dc-chip-text">{{ item.name }}</span>
+                  <button
+                    type="button"
+                    class="dc-chip-open"
+                    :title="t('designCard87.openAsset')"
+                    @click="emit('open-asset', { kind: item.kind, id: item.id, section: 'semantics' })"
+                  >⌕</button>
                   <button type="button" class="dc-chip-del" :aria-label="t('episode.design.actions.remove')" @click="removeReference(index)">×</button>
                 </span>
                 <button type="button" class="btn btn-sm" @click="openPicker('reference_assets')">{{ t('episode.design.actions.add') }}</button>
@@ -476,18 +537,53 @@
               @input="patchDraft({ rationale: $event.target.value }, true)"
               @blur="saveNow()"
             />
-            <ul v-if="issues.length" class="dc-issues">
+            <ul v-if="groupedIssues.length" class="dc-issues">
               <li v-for="(issue, index) in groupedIssues" :key="`${issue.code}-${index}`" :class="['dc-issue', 'is-' + issue.severity]">
                 {{ issue.message || t(`episode.design.issue.${issue.code}`) }} <small>({{ issue.code }})</small><template v-if="issue.count > 1"> ×{{ issue.count }}</template>
               </li>
-              <li v-for="group in unresolvedGroups" :key="group.key" class="dc-issue is-warn">
-                {{ t('designCard82.asset') }} #{{ group.asset_id }} {{ group.asset_name || '' }} — {{ t(group.asset_exists ? 'designCard82.exists' : 'designCard82.missingAsset') }};
-                {{ t('designCard82.semantic') }}: {{ group.semantic_id || group.semantic_name || t('designCard82.pendingAnnotation') }};
-                {{ t('designCard82.available') }}: {{ group.available_semantics.length ? group.available_semantics.map(item => `${item.name} (${item.id})`).join(', ') : t('designCard82.noSemantics') }}
-                <span v-if="group.layers.length > 1"> ×{{ group.layers.length }}</span>
-                <ul><li v-for="layer in group.layers" :key="layer.index">#{{ layer.index + 1 }} · {{ layer.type }} · {{ layer.text || '—' }}</li></ul>
-              </li>
             </ul>
+            <!--
+              语义引用问题合并成一张可操作卡（#87 §E）：原因只说一次，逐层说明缺什么、影响什么，
+              并给「打开该资产语义」「改绑引用」「看实际引用版本的大图」。不自动删层、不改真实数据。
+            -->
+            <div v-for="group in unresolvedGroups" :key="group.key" class="dc-unresolved">
+              <div class="dc-unresolved-head">
+                <strong>{{ t('designCard87.unresolvedTitle') }}</strong>
+                <span class="dim">{{ t('designCard87.affectedLayers', { n: group.layers.length }) }}</span>
+              </div>
+              <p class="dc-unresolved-cause">
+                {{ t('designCard87.cause', {
+                  asset: `#${group.asset_id} ${group.asset_name || ''}`,
+                  state: t(group.asset_exists ? 'designCard82.exists' : 'designCard82.missingAsset'),
+                  semantic: group.semantic_id || group.semantic_name || t('designCard87.blankAnchor'),
+                }) }}
+              </p>
+              <p class="dc-unresolved-cause">
+                {{ group.available_semantics.length
+                  ? t('designCard87.availableList', { list: group.available_semantics.map(item => `${item.name} (${item.id})`).join('、') })
+                  : t('designCard82.noSemantics') }}
+              </p>
+              <p class="dc-unresolved-impact">{{ t('designCard87.impact') }}</p>
+              <ul class="dc-unresolved-layers">
+                <li v-for="layer in group.layers" :key="layer.index">
+                  <span class="mono">#{{ layer.index + 1 }}</span>
+                  <span>{{ t(`episode.design.layerType.${layer.type}`) }}</span>
+                  <span class="dc-unresolved-text">{{ layer.text || '—' }}</span>
+                  <span class="mono dim">{{ t('episode.design.atSeconds', { n: layerAt(layer.index) }) }}</span>
+                  <span class="dc-unresolved-need">{{ t(`designCard87.need.${needOf(layer.type)}`) }}</span>
+                </li>
+              </ul>
+              <div class="dc-unresolved-actions">
+                <button type="button" class="btn btn-sm" @click="openAssetSemantics(group)">{{ t('designCard87.openSemantics') }}</button>
+                <button type="button" class="btn btn-sm" @click="openAnchorPicker(group)">{{ t('designCard87.changeRef') }}</button>
+                <button
+                  v-if="assetImage('prop', group.asset_id)"
+                  type="button"
+                  class="btn btn-sm"
+                  @click="previewImage(assetImage('prop', group.asset_id), group.asset_name)"
+                >{{ t('designCard87.viewImage') }}</button>
+              </div>
+            </div>
             <label v-if="warnOnly" class="dc-ack">
               <input type="checkbox" :checked="acknowledged" @change="acknowledged = $event.target.checked">
               {{ t('episode.design.actions.acknowledge') }}
@@ -542,6 +638,7 @@
       :selected="picker.selected"
       @close="picker.open = false"
       @confirm="onPicked"
+      @goto-assets="asset => { picker.open = false; emit('goto-asset', asset) }"
     />
   </template>
 </template>
@@ -566,7 +663,10 @@ import NarrationCoverageBar from '~/components/NarrationCoverageBar.vue'
 import NarrationSkeletonPanel from '~/components/NarrationSkeletonPanel.vue'
 import AssetPicker from '~/components/AssetPicker.vue'
 import ComboSwitchDialog from '~/components/ShotProduction/ComboSwitchDialog.vue'
+import TaskWorkMetrics from '~/components/TaskWorkMetrics.vue'
+import { mediaUrl } from '~/utils/url'
 import { COMBOS, episodeAPI, narrationSkeletonAPI, storyboardAPI, ttsRequiredOf } from '~/composables/useApi'
+import { DEEPLINK_KEYS, queryEnum, queryIdList, querySingle, useDeeplink } from '~/composables/useQuerySync'
 import { onTaskFinished, refreshTasks, useTasks } from '~/composables/useTasks'
 import { useWorkflowGates } from '~/composables/useWorkflowGates'
 import { toastError, toastServerMessage } from '~/composables/useToast'
@@ -580,7 +680,8 @@ const props = defineProps({
   chatConfigId: { type: Number, default: 0 },
   narrationVoiceBatch: { type: Object, default: () => ({ running: false, total: 0, completed: 0 }) },
 })
-const emit = defineEmits(['refresh', 'batch-narration-voice'])
+// preview / open-asset 由集页面接到既有大图查看器与资产语义弹窗（#87 §E，#86 负责 URL 态）
+const emit = defineEmits(['refresh', 'batch-narration-voice', 'preview', 'open-asset', 'goto-step', 'goto-asset'])
 
 const COMBO_GLYPH = { A: '▣', B: '▶', C: '▣▶', D: '▶▣' }
 const EMPTY_CTX = {
@@ -603,9 +704,18 @@ const saveState = ref('')
 const infoDraft = ref('')
 const acknowledged = ref(false)
 const scope = ref(null)
+/** 本次填卡用哪条模型（#87 §B）：'auto' = 后端挑健康视觉配置；'pinned' = 用户显式指定顶栏那条 */
+const modelMode = ref('auto')
+/** 显式指定不可用时后端返回的 4xx：指名配置与原因，并给可用候选 */
+const pinError = ref(null)
+/** 开跑前的计划字数与历史 ETA（POST /episodes/:id/work-estimate，按本次模型选择） */
+const fillEstimate = ref(null)
+/** 上一次提交的范围：改用其它配置重填时按同一范围重来，不悄悄扩大 */
+const lastFillIds = ref(null)
 /** 刚提交、任务还没出现在全局 store 里的空窗期（下一次轮询就会接上） */
 const fillStarting = ref(false)
-const picker = reactive({ open: false, mode: 'asset', field: '', selected: [] })
+// layerIndexes 非空时是「改绑计划图层 anchor」模式（#87 §E）
+const picker = reactive({ open: false, mode: 'asset', field: '', selected: [], layerIndexes: null, anchorId: '' })
 const comboSwitch = ref({ open: false, sbId: 0, shotNumber: 0, from: '', to: '' })
 const barEl = ref(null)
 
@@ -623,8 +733,24 @@ const EMPTY_SKELETON = {
   shots: [],
 }
 const skeleton = ref({ ...EMPTY_SKELETON })
-const phase = ref('cards')
-const PHASE_KEY = 'huobao:designPhase'
+// ===== deeplink（#86）：子阶段 / 选中镜 / 子弹层一律由 URL 承载，刷新与复制链接都回到同一处 =====
+const link = useDeeplink('design', DEEPLINK_KEYS.design)
+const PHASES = ['skeleton', 'voice', 'cards']
+/** 进入时 URL 给出的子状态：各自只消费一次，之后一律以用户操作为准 */
+const urlPhase = queryEnum(link.initial('phase'), PHASES)
+const urlShot = queryIdList(link.initial('shot'))[0] || 0
+const urlPick = queryEnum(link.initial('dpick'), ['semantic:must_mark', 'asset:reference_assets', 'semantic:anchor'])
+const urlAnchor = querySingle(link.initial('danchor'))
+const urlCombo = queryIdList(link.initial('dcombo'))[0] || 0
+const urlScope = queryEnum(link.initial('dscope'), ['fill', 'confirm'])
+/** 子阶段只认 URL：旧版的 localStorage 记忆跨集串味（#86 已删），缺省回到设计卡 */
+const phase = ref(urlPhase || 'cards')
+let shotRestore = urlShot > 0
+let childRestore = Boolean(urlPick || urlCombo || urlScope)
+/** 用户在恢复途中自己点过镜：此后链接恢复不再改选中镜（换集时重置） */
+let userPicked = false
+/** 首轮取数是否到位：子弹层要等上下文 / 审计 / 骨架都就绪再开，避免闪出错误内容 */
+const loaded = reactive({ ctx: false, audit: false, skeleton: false })
 
 /** 配音状态按镜索引：设计卡的时长与门禁都只认这里的实测结果 */
 const ttsByShot = computed(() => {
@@ -681,7 +807,6 @@ const phases = computed(() => [
 
 function setPhase(key) {
   phase.value = key
-  try { localStorage.setItem(PHASE_KEY, key) } catch { /* 静默 */ }
 }
 /** 合并时为 tts / shots 兜底：缺字段一律按「没有有效配音」渲染，绝不放行填卡 */
 function applySkeleton(next) {
@@ -697,7 +822,7 @@ async function loadSkeleton() {
   if (!props.episodeId) return
   try {
     applySkeleton(await narrationSkeletonAPI.state(props.episodeId))
-  } catch { /* 静默：骨架取不到时按「无有效配音」渲染，不放行填卡 */ }
+  } catch { /* 静默：骨架取不到时按「无有效配音」渲染，不放行填卡 */ } finally { loaded.skeleton = true }
 }
 function onSkeletonRefresh() {
   emit('refresh')
@@ -731,6 +856,56 @@ const batchTtsBlocked = computed(() => {
   const blocked = fillTask.value?.params?.tts_blocked
   return Array.isArray(blocked) ? blocked : []
 })
+/**
+ * 真实计量（#87 §D）：和任务详情读同一个 `observation_summary`，不另起轮询。
+ * 任务还没出现（或已终态很久）时退回「开始前」的计划字数与历史 ETA。
+ */
+const fillSummary = computed(() => fillTask.value?.observation_summary || null)
+
+/** 本次会填几镜、共多少源字数、历史同口径要多久；没有样本后端返回 null，界面显示「暂无估计」 */
+let fillEstimateSeq = 0
+async function loadFillEstimate() {
+  const seq = ++fillEstimateSeq
+  fillEstimate.value = null
+  if (!props.episodeId) return
+  try {
+    const res = await episodeAPI.workEstimate(props.episodeId, 'design_card', undefined, {
+      model_mode: modelMode.value, config_id: props.chatConfigId || undefined, model: props.chatModel || undefined,
+    })
+    if (seq === fillEstimateSeq) fillEstimate.value = res?.estimate || null
+  } catch { /* 不保留另一配置的旧估计；预估失败不挡操作。 */ }
+}
+watch([modelMode, () => props.chatConfigId, () => props.chatModel], loadFillEstimate)
+
+// ===== 实际引用版本的缩略图 / 大图 / 语义入口（#87 §E） =====
+/** 当前底图选的是哪条候选：缩略图必须用这条候选自己的 path 与版本，不拿资产当前图冒充 */
+const baseCandidate = computed(() => (ctx.value.base_candidates || [])
+  .find(candidate => baseKeyOf(candidate) === baseValue.value) || null)
+
+function assetImage(kind, id) {
+  const asset = (ctx.value.assets || []).find(item => item.kind === kind && Number(item.id) === Number(id))
+  return asset?.image || null
+}
+function previewImage(path, title, versionTaskId) {
+  if (!path) return
+  emit('preview', { path, title: title || '', version_task_id: versionTaskId ?? null })
+}
+function openAssetSemantics(group) {
+  emit('open-asset', {
+    kind: 'prop',
+    id: group.asset_id,
+    semantic_id: group.semantic_id || undefined,
+    section: 'semantics',
+  })
+}
+/** 问题卡里逐层显示计划时间点：用草稿里的真实值，没有就显示 0 */
+function layerAt(index) {
+  return Number(layerPlan.value.planned_layers?.[index]?.at_s ?? 0)
+}
+/** 这一层缺的是「可执行几何」还是「位置锚点」：决定人要补什么 */
+function needOf(type) {
+  return ['polygon', 'polyline', 'marker', 'image'].includes(type) ? 'geometry' : 'anchor'
+}
 // 任务一出现在 store 里就不再需要「刚提交」兜底
 watch(() => (fillTask.value?.status === 'queued' || fillTask.value?.status === 'processing'), (running) => {
   if (running) fillStarting.value = false
@@ -750,6 +925,8 @@ onTaskFinished((task) => {
   overrides.value = {}
   emit('refresh')
   loadAudit()
+  // 这一批的真实样本已落库：下一次「开始前预估」用得上
+  loadFillEstimate()
   loadSkeleton()
   nextTick(syncDraft)
   const failed = Number(task?.progress?.failed || task?.params?.progress?.failed || 0)
@@ -765,17 +942,10 @@ const { gates, ready: gatesReady, refreshGates, reasonOf, gotoOf } = useWorkflow
 // 门禁未判定（首屏未取到 /gates 或取数失败）时同样按锁定渲染，内容绝不先闪出来
 const designLocked = computed(() => !gatesReady.value || gates.value.unlocked?.design === false)
 const lockReason = computed(() => reasonOf('design') || t('episode.gate.checking'))
+// 门禁出路：交给工作台做应用内切步（panel/tab 的所有者在那里），不整页 location.assign；
+// 本面板卸载时它的 deeplink 分组会自动释放 phase/shot/dpick/dcombo/dscope，不会跟到新步骤
 function gotoBlocker() {
-  const target = gotoOf('design') || 'assets'
-  const url = new URL(window.location.href)
-  if (target === 'script') {
-    url.searchParams.set('panel', 'script')
-    url.searchParams.delete('tab')
-  } else {
-    url.searchParams.set('panel', 'production')
-    url.searchParams.set('tab', target)
-  }
-  window.location.assign(url.toString())
+  emit('goto-step', gotoOf('design') || 'assets')
 }
 
 // ===== 镜列表与选中镜 =====
@@ -896,6 +1066,9 @@ const unresolvedGroups = computed(() => {
   }
   return [...groups.values()]
 })
+function anchorIdentity(group) {
+  return JSON.stringify([group.asset_id || group.asset_name || '', group.semantic_id || group.semantic_name || ''])
+}
 const warnOnly = computed(() => issues.value.length > 0 && issues.value.every(issue => issue.severity !== 'block'))
 const junctionSlot = computed(() => (draft.value.combo === 'C' ? 'first' : (draft.value.combo === 'D' ? 'last' : '')))
 
@@ -933,8 +1106,14 @@ const overLimit = computed(() => layerOverPct.value > 0 || genOverPct.value > 0)
  */
 const measuredSeconds = computed(() => {
   const tts = ttsOf(selectedId.value)
-  if (!tts.valid || typeof tts.duration_ms !== 'number' || !Number.isFinite(tts.duration_ms) || tts.duration_ms <= 0) return null
-  return Number(tts.duration_ms) / 1000
+  if (!tts.valid) return null
+  if (typeof tts.duration_ms === 'number' && Number.isFinite(tts.duration_ms) && tts.duration_ms > 0) {
+    return Number(tts.duration_ms) / 1000
+  }
+  // 审计接口的 tts 可能只回 {valid:true}；实测秒数另有 narration_measured_s。
+  // 缺失值一律显示「待配音」，绝不把 undefined 变成 0.0s（#82）。
+  const measured = auditById.value[selectedId.value]?.narration_measured_s
+  return typeof measured === 'number' && Number.isFinite(measured) && measured > 0 ? measured : null
 })
 const headroom = computed(() => (budgetPositive.value && measuredSeconds.value !== null
   ? totalSeconds.value - measuredSeconds.value
@@ -1115,14 +1294,44 @@ function removeReference(index) {
 
 function openPicker(field) {
   picker.field = field
+  picker.layerIndexes = null
+  picker.anchorId = ''
   picker.mode = field === 'must_mark' ? 'semantic' : 'asset'
   picker.selected = field === 'must_mark'
     ? layerPlan.value.must_mark.map(item => ({ ...item }))
     : genPlan.value.reference_assets.map(item => ({ ...item }))
   picker.open = true
 }
+/**
+ * 改绑引用（#87 §E）：直接改这些计划图层的 anchor。
+ * 只挑一个真实语义条目，其余图层字段（类型 / 文案 / 时间点）原样保留；
+ * 不删层、不自动清空，人工确认后照常走保存与审计刷新。
+ */
+function openAnchorPicker(group) {
+  picker.field = 'anchor'
+  picker.mode = 'semantic'
+  picker.layerIndexes = group.layers.map(layer => layer.index)
+  picker.anchorId = anchorIdentity(group)
+  picker.selected = []
+  picker.open = true
+}
 function onPicked(items) {
   picker.open = false
+  if (picker.field === 'anchor') {
+    const pick = items?.[0]
+    const indexes = picker.layerIndexes || []
+    picker.layerIndexes = null
+    if (!pick || !indexes.length) return
+    const anchor = { asset_id: Number(pick.asset_id), semantic_id: String(pick.semantic_id), name: String(pick.name || '') }
+    const layers = layerPlan.value.planned_layers.map((layer, index) => (
+      indexes.includes(index) ? { ...layer, anchor: { ...anchor } } : layer
+    ))
+    patchDraft({ layer_plan: { ...layerPlan.value, planned_layers: layers } })
+    saveNow()
+    // 等这一镜的保存队列落库后再刷新审计，否则看到的还是改绑前的旧警告
+    void (saveQueues.get(selectedId.value) || Promise.resolve()).then(() => { loadAudit(); emit('refresh') })
+    return
+  }
   if (picker.field === 'must_mark') patchDraft({ layer_plan: { ...layerPlan.value, must_mark: items } })
   else patchGen({ reference_assets: items })
 }
@@ -1378,12 +1587,20 @@ async function confirmMany(ids) {
   refreshGates({ background: true })
 }
 
-async function startFill(ids) {
+/**
+ * 发起填卡（#87 §B）：模型选择必须显式。
+ * 'auto' 不带 model/config_id —— 顶栏 localStorage 的残留选择绝不冒充本次用户指定；
+ * 'pinned' 带上用户选的那条，后端不可用时返回指名原因的 4xx，不静默换到另一计费服务。
+ */
+async function startFill(ids, override) {
+  pinError.value = null
+  const mode = override?.config_id ? 'pinned' : modelMode.value
   try {
     const res = await episodeAPI.fillDesignCards(props.episodeId, {
       storyboard_ids: ids,
-      model: props.chatModel || undefined,
-      config_id: props.chatConfigId || undefined,
+      model_mode: mode,
+      model: override?.model ?? props.chatModel,
+      config_id: override?.config_id ?? props.chatConfigId,
     })
     if (!res?.total && !res?.already_running) {
       toast.info(t('episode.design.fill.allFilled'))
@@ -1391,11 +1608,29 @@ async function startFill(ids) {
     }
     if (res?.total) toast.info(t('episode.design.fill.started', { n: res.total }))
     fillStarting.value = true
+    lastFillIds.value = ids || null
     // 进度来自全局任务 store（kind='design_card'）：立刻拉一次，之后随全局轮询刷新
     void refreshTasks()
   } catch (err) {
+    const body = err?.body
+    const code = body?.error
+    if (code === 'model_pin_unavailable' || code === 'vision_config_unavailable' || code === 'text_config_unavailable') {
+      // 指名原因直接显示后端文案（它带配置名与具体原因），并给可用候选的一键重填
+      pinError.value = {
+        message: String(body.message || t('episode.design.error.fillFailed')),
+        alternatives: Array.isArray(body.alternatives) ? body.alternatives : [],
+      }
+      lastFillIds.value = ids || null
+      return
+    }
     reportError(err, 'episode.design.error.fillFailed')
   }
+}
+/** 「改用可用配置重填」：显式切到用户点的那条，不是后端悄悄换 */
+async function retryWithConfig(alt) {
+  pinError.value = null
+  modelMode.value = 'pinned'
+  await startFill(lastFillIds.value || undefined, { config_id: alt.config_id, model: alt.model })
 }
 async function refillOne() {
   if (!selected.value) return
@@ -1410,6 +1645,8 @@ async function loadContext() {
     ctx.value = { ...EMPTY_CTX, ...(data || {}), limits: { ...EMPTY_CTX.limits, ...(data?.limits || {}) } }
   } catch (err) {
     toastError(err, { fallback: 'episode.design.error.loadFailed' })
+  } finally {
+    loaded.ctx = true
   }
 }
 async function loadAudit() {
@@ -1417,12 +1654,25 @@ async function loadAudit() {
   try {
     const data = await episodeAPI.designCardAudit(props.episodeId)
     audit.value = Array.isArray(data) ? data : []
-  } catch { /* 静默：审计只影响左列状态点与批量范围 */ }
+  } catch { /* 静默：审计只影响左列状态点与批量范围 */ } finally { loaded.audit = true }
 }
 
 function ensureSelection() {
   if (!shots.value.length) { selectedId.value = 0; return }
+  // 链接点名的镜优先；本集没有这一镜时保持默认选中，并且只在用户确实带着链接来时提示
+  if (shotRestore) {
+    shotRestore = false
+    const target = shots.value.find(sb => sb.id === urlShot)
+    if (target) { selectedId.value = target.id; return }
+    toast.error(t('deeplink.missingNamed', { target: t('components.mediaLibrary.storyboards') }))
+  }
   if (!shots.value.some(sb => sb.id === selectedId.value)) selectedId.value = shots.value[0].id
+}
+/** 用户点选镜：恢复途中用户自己选了哪一镜就以他为准，后到的链接恢复不再覆盖 */
+function selectShot(id) {
+  shotRestore = false
+  userPicked = true
+  selectedId.value = id
 }
 
 watch(() => props.storyboards, () => {
@@ -1445,22 +1695,84 @@ watch(() => props.episodeId, () => {
   localOrder.value = null
   selectedId.value = 0
   skeleton.value = { ...EMPTY_SKELETON }
+  // 换集后首轮取数重新开始：链接恢复（若还没发生）必须等新集的数据到位
+  loaded.ctx = false
+  loaded.audit = false
+  loaded.skeleton = false
+  userPicked = false
   loadContext()
   loadAudit()
   loadSkeleton()
+  loadFillEstimate()
   refreshGates()
 })
 
+// ===== deeplink：先按链接恢复，再把当前子状态发布回 URL =====
+/** 门禁未放行时只渲染锁定页：告诉用户链接指向的位置进不去，并放弃本次恢复 */
+let lockNotified = false
+watch([gatesReady, designLocked], () => {
+  if (lockNotified || !gatesReady.value || !designLocked.value) return
+  if (!(urlPhase || urlShot || urlPick || urlCombo || urlScope)) return
+  lockNotified = true
+  shotRestore = false
+  childRestore = false
+  toast.error(t('deeplink.locked'))
+}, { immediate: true })
+
+/** 恢复子弹层：只把界面重新打开，绝不自动选中 / 切换组合 / 提交批量 */
+function restoreChildren() {
+  childRestore = false
+  // 选择器按 openPicker 的口径重新种入当前已存值，恢复本身不写回任何选择
+  if (urlPick === 'semantic:anchor') {
+    const group = unresolvedGroups.value.find(item => anchorIdentity(item) === urlAnchor)
+    if (group) openAnchorPicker(group)
+    else toast.error(t('deeplink.missingNamed', { target: t('designCard87.changeRef') }))
+  } else if (urlPick) openPicker(urlPick.split(':')[1])
+  if (urlCombo) {
+    const sb = shots.value.find(item => item.id === urlCombo)
+    const from = sb ? stateOf(sb).combo || '' : ''
+    // from 为空说明这一镜还没有组合，也就没有「切换影响」可看：按目标不存在处理
+    if (sb && from) {
+      // dcombo 指名的就是这张卡：选中镜跟着对齐（用户已经自己点过镜时以用户为准）
+      if (!userPicked) selectedId.value = sb.id
+      comboSwitch.value = { open: true, sbId: sb.id, shotNumber: Number(stateOf(sb).shot_number) || 0, from, to: '' }
+    } else {
+      toast.error(t('deeplink.missingNamed', { target: t('components.mediaLibrary.storyboards') }))
+    }
+  }
+  // 批量范围只是「将处理 / 被排除」的清单，重新算一遍即可，执行仍要用户点确认
+  if (urlScope) openScope(urlScope)
+}
+watch([() => loaded.ctx, () => loaded.audit, () => loaded.skeleton, selectedId, designLocked], () => {
+  if (!childRestore || designLocked.value) return
+  if (!loaded.ctx || !loaded.audit || !loaded.skeleton) return
+  // 还没有选中镜：等分镜到位；本集压根没有分镜时各子弹层本来就无内容可开
+  if (!selectedId.value) return
+  restoreChildren()
+})
+
+// 发布：本组五个键每次写全，关掉子弹层只移除子弹层的键，phase / shot 原样留在地址里
+watch([phase, selectedId, picker, comboSwitch, scope, designLocked], () => {
+  if (designLocked.value) { link.set({}); return }
+  link.set({
+    phase: phase.value,
+    shot: selectedId.value || '',
+    dpick: picker.open ? `${picker.mode}:${picker.field}` : '',
+    danchor: picker.open && picker.field === 'anchor' ? picker.anchorId : '',
+    dcombo: comboSwitch.value.open ? comboSwitch.value.sbId : '',
+    dscope: scope.value ? scope.value.kind : '',
+  })
+}, { deep: true, immediate: true })
+
 onMounted(() => {
-  try {
-    const saved = localStorage.getItem(PHASE_KEY)
-    if (saved === 'skeleton' || saved === 'voice' || saved === 'cards') phase.value = saved
-  } catch { /* 静默 */ }
+  // 旧版把子阶段记在 localStorage，会跨集串味（#86）：顺手清掉遗留键，之后只认 URL
+  try { localStorage.removeItem('huobao:designPhase') } catch { /* 静默 */ }
   ensureSelection()
   syncDraft()
   loadContext()
   loadAudit()
   loadSkeleton()
+  loadFillEstimate()
   refreshGates()
 })
 onBeforeUnmount(() => {
@@ -1472,7 +1784,49 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .dc-step { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
-.dc-bar { display: flex; align-items: center; gap: 8px; }
+.dc-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.dc-model-mode { max-width: 220px; }
+
+/* 模型选择失败（#87 §B）：指名原因 + 可用候选，不静默换服务 */
+.dc-pin-error {
+  border: 1px solid var(--warn, #b26a00); border-radius: 6px;
+  padding: 8px 10px; font-size: 12px; background: var(--bg-2);
+}
+.dc-pin-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+
+/* 实际引用版本的缩略图（#87 §E）：点开大图走集页面既有查看器 */
+.dc-asset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 180px)); justify-content: start; align-items: start; gap: 8px; }
+.dc-asset-grid > .btn { justify-self: start; }
+.dc-thumb {
+  position: relative; display: block; width: 100%; padding: 0;
+  border: 1px solid var(--border); border-radius: 6px; background: var(--bg-2); cursor: zoom-in;
+}
+.dc-thumb img { width: 100%; aspect-ratio: 16 / 10; object-fit: contain; border-radius: 5px; display: block; }
+.dc-thumb-tag {
+  position: absolute; left: 0; bottom: 0; right: 0;
+  font-size: 9px; line-height: 1.4; text-align: center;
+  background: var(--header-bg); color: var(--text-1); border-radius: 0 0 5px 5px;
+}
+.dc-asset-grid .dc-asset-card { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 6px; padding: 6px; border-radius: 8px; min-width: 0; }
+.dc-asset-card .dc-chip-text { min-width: 0; max-width: none; }
+.dc-chip-thumb { grid-column: 1 / -1; width: 100%; aspect-ratio: 16 / 10; padding: 0; border: 0; border-radius: 5px; background: var(--bg-2); cursor: zoom-in; display: grid; }
+.dc-chip-thumb img { width: 100%; height: 100%; object-fit: contain; border-radius: 5px; display: block; }
+.dc-asset-empty { grid-column: 1 / -1; aspect-ratio: 16 / 10; display: grid; place-items: center; color: var(--text-3); background: var(--bg-2); border-radius: 5px; }
+.dc-chip-open { border: 0; background: none; cursor: pointer; color: var(--text-2); font-size: 12px; min-width: 24px; min-height: 24px; }
+
+/* 语义引用问题卡：原因说一次，逐层说明缺什么、影响什么，并给修复入口 */
+.dc-unresolved {
+  border: 1px solid var(--warn, #b26a00); border-radius: 6px;
+  padding: 8px 10px; margin-top: 6px; font-size: 12px; background: var(--bg-2);
+}
+.dc-unresolved-head { display: flex; align-items: baseline; gap: 8px; }
+.dc-unresolved-cause { margin: 4px 0 0; }
+.dc-unresolved-impact { margin: 4px 0 0; color: var(--warn, #b26a00); }
+.dc-unresolved-layers { margin: 6px 0 0; padding-left: 16px; }
+.dc-unresolved-layers li { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
+.dc-unresolved-text { flex: 1 1 160px; min-width: 0; overflow-wrap: anywhere; }
+.dc-unresolved-need { color: var(--warn, #b26a00); }
+.dc-unresolved-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 
 /* 子阶段条（#70）：骨架 → 配音 → 设计卡 */
 .dc-phases { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }

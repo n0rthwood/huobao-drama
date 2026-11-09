@@ -22,7 +22,7 @@ import {
   SemanticsValidationError,
 } from '../services/asset-semantics.js'
 import { getSemanticsAutoStatus, startSemanticsAuto } from '../services/asset-semantics-auto.js'
-import { resolveStageModel, StageVisionUnavailableError } from '../services/ai-stages.js'
+import { resolveStageModel, stageSelectionErrorPayload } from '../services/ai-stages.js'
 import { bindCreatedAssetToReviewItem, findReviewItemAssetDuplicate, onAssetLibraryChanged, onAssetRemoved, onEpisodeAssetLinkChanged } from '../services/asset-review.js'
 import { getAbsolutePath } from '../utils/storage.js'
 import { parseAssetType } from '../services/map-workflow/types.js'
@@ -315,8 +315,8 @@ app.post('/:id/semantics/auto', async (c) => {
     })
     return success(c, { started: result.started, task_id: result.taskId })
   } catch (err) {
-    // 视觉环节无可用视觉配置（#51）：明确 400，不建一条注定失败的任务
-    if (err instanceof StageVisionUnavailableError) return badRequest(c, err.message)
+    const selectionError = stageSelectionErrorPayload(err)
+    if (selectionError) return c.json(selectionError, 400)
     throw err
   }
 })

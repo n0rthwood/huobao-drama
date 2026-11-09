@@ -209,7 +209,7 @@
  * A 组合只有图层段（不渲染任何故事关键帧 UI），B 组合只有生成段（同剧情项目）。
  * 批量入口只有两个：批量AI提示词、批量出关键帧，都先弹范围清单再提交。
  */
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { Loader2 } from 'lucide-vue-next'
@@ -222,6 +222,7 @@ import RehearsalDialog from '~/components/ShotProduction/RehearsalDialog.vue'
 import { episodeAPI, layerSegmentAPI } from '~/composables/useApi'
 import { toastError, toastServerMessage } from '~/composables/useToast'
 import { isActiveBatchItemState } from '~/composables/useTaskProgress'
+import { DEEPLINK_KEYS, queryEnum, querySingle, useDeeplink } from '~/composables/useQuerySync'
 
 const props = defineProps({
   episodeId: { type: Number, required: true },
@@ -259,6 +260,18 @@ const emit = defineEmits([
 const { t } = useI18n()
 
 const COMBO_GLYPH = { A: '▣', B: '▶', C: '▣▶', D: '▶▣' }
+
+// deeplink（#86）：选中镜 / 片段页签 / 弹窗；恢复只还原界面，不自动切组合、不自动起预演渲染
+const link = useDeeplink('shotProduction', DEEPLINK_KEYS.shotProduction)
+const urlShotRaw = querySingle(link.initial('shot'))
+const urlShotId = Number(urlShotRaw || 0) || 0
+const urlSegment = queryEnum(link.initial('seg'), ['layer', 'gen'])
+// spdlg 取值：combo | rehearse | scope:prompts | scope:keyframes（范围清单也要能恢复，不豁免瞬时弹窗）
+const urlDialog = queryEnum(link.initial('spdlg'), ['combo', 'rehearse', 'scope:prompts', 'scope:keyframes'])
+// shot=abc / shot=0 也算「显式给了但无效」：照样提示并回到默认镜
+let shotRestored = urlShotRaw === null
+let dialogRestored = !urlDialog
+let deeplinkShotWins = false
 
 const selectedId = ref(0)
 const activeSegment = ref('layer')
@@ -629,22 +642,90 @@ function stopBatchPolling() {
 }
 
 // ===== 选中镜的同步 =====
+/** 片段页签：URL 给的值只在本镜确实有该段时生效，否则按组合取默认段 */
+function pickSegment(combo, preferred) {
+  const segments = segmentsOf(combo)
+  if (preferred && segments[preferred]) return preferred
+  return segments.layer ? 'layer' : 'gen'
+}
+let segPending = urlSegment
+function consumeSegment() {
+  const seg = segPending
+  segPending = null
+  return seg
+}
+
+/**
+ * 弹窗壳体恢复：combo / rehearse 跟着已恢复的分镜打开；
+ * 范围清单（scope:*）重新拉一次只读预览（GET …/keyframe-prompts/scope、POST …/keyframe-batch/preview
+ * 都只 select/计算、不落库、不入队），清单仍要人工点「确认」才提交，恢复过程零提交。
+ */
+function restoreDialog() {
+  if (dialogRestored) return
+  dialogRestored = true
+  void nextTick(() => {
+    if (urlDialog === 'scope:prompts') { void openPromptScope(); return }
+    if (urlDialog === 'scope:keyframes') { void openBatchScope(); return }
+    if (!selected.value) return
+    if (urlDialog === 'combo') comboOpen.value = true
+    else if (urlDialog === 'rehearse') rehearseOpen.value = true
+  })
+}
+
 watch(() => props.storyboards, () => {
+  // deeplink：先按 URL 的 shot 恢复一次（失败则留在默认镜并提示）
+  if (!shotRestored && shots.value.length) {
+    shotRestored = true
+    const hit = shots.value.find(shot => shot.sb.id === urlShotId)
+    // 父键没恢复成功就不要把「镜级」子层（页签/组合/预演弹窗）套到另一镜上；
+    // 范围清单是集级的，与 shot 无关，仍然照常恢复
+    if (!hit || !hit.unlocked) {
+      segPending = null
+      if (urlDialog === 'combo' || urlDialog === 'rehearse') dialogRestored = true
+    }
+    if (!hit) toast.warning(t('deeplink.missing'))
+    else if (!hit.unlocked) toast.warning(t('deeplink.locked'))
+    else {
+      selectedId.value = hit.sb.id
+      deeplinkShotWins = true
+      activeSegment.value = pickSegment(hit.combo, consumeSegment())
+      state.value = null
+      void loadState(hit.sb.id)
+      restoreDialog()
+      void loadBatch()
+      return
+    }
+  }
   if (!selectedId.value || !shots.value.some(shot => shot.sb.id === selectedId.value)) {
     const first = shots.value.find(shot => shot.unlocked) || shots.value[0]
     if (first) {
       selectedId.value = first.sb.id
-      activeSegment.value = segmentsOf(first.combo).layer ? 'layer' : 'gen'
+      activeSegment.value = pickSegment(first.combo, consumeSegment())
       void loadState(first.sb.id)
     }
   } else {
     syncActiveSegment()
     void loadState(selectedId.value)
   }
+  if (shots.value.length) restoreDialog()
   void loadBatch()
 }, { immediate: true })
 
+// deeplink：本层键统一在这里写出（选中镜 / 片段页签 / 弹窗身份）
+watch([selectedId, activeSegment, comboOpen, rehearseOpen, () => scopeDialog.value.open, () => scopeDialog.value.kind], () => {
+  const dialog = scopeDialog.value.open
+    ? `scope:${scopeDialog.value.kind === 'keyframes' ? 'keyframes' : 'prompts'}`
+    : (selectedId.value && comboOpen.value ? 'combo' : (selectedId.value && rehearseOpen.value ? 'rehearse' : ''))
+  link.set({
+    shot: selectedId.value || '',
+    seg: selectedId.value ? activeSegment.value : '',
+    spdlg: dialog,
+  })
+}, { immediate: true })
+
 watch(() => props.focusStoryboardId, (id) => {
+  // 显式 deeplink 的 shot 优先级最高：首轮不让上次跳转残留的聚焦覆盖它
+  if (deeplinkShotWins) { deeplinkShotWins = false; return }
   if (!id) return
   const shot = shots.value.find(item => item.sb.id === id)
   if (shot && shot.unlocked && shot.sb.id !== selectedId.value) {

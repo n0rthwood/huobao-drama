@@ -1,6 +1,6 @@
 # 火宝 HTTP API 核心参考（api-core.md）
 
-> **历史参考（2026-11-02 快照）**：若与 `SKILL.md` 或 `references/api-catalog.md` 冲突，以新文档为准；标 `[S]` 的契约在写入前需重新 GET/预览校验。
+> **历史参考（2026-11-02 快照）**：若与 `SKILL.md` 或 `references/api-catalog.md` 冲突，以新文档为准；标 `[S]` 的契约在写入前需重新 GET/预览校验。本文的 `[R]` 只证明 2026-11-02 那一轮真的跑过该调用，**不扩展到之后新增的字段、模式或新链路**；Poster 本地画布上传（§11）已被 Issue #72 的服务端 LayerDoc 渲染取代，见 `SKILL.md` S3。
 
 > 覆盖范围：项目／剧集 CRUD 与剧本、资产（角色／场景／道具）CRUD 与出图、单资产重提取、参考图、史料画像与外貌补写、选角名册、资料检索、资产库／素材库、上传、通用任务、图片／视频队列估计、AI 配置、风格预设、Prompt／技能管理、全局设置与服务器更新。
 > 分镜／关键帧／视频／旁白／合成的生产路径见 `SKILL.md` §C–G（另一作者维护，不在本文件展开）。
@@ -103,7 +103,7 @@ Body：
 `content`（原始文本）、`script_content`（AI 改写稿）、`title`、`description`、`status`、`resolution`(枚举)、`narration_enabled`(bool)、`tts_config_id`(null=清除)、`subtitle_timing`(`sentence|char`)、`audio_mix_mode`(`replace|mix`)、`audio_bed_gain_db`(number|null)、`narration_fit_default`(对象或 JSON 串，须过 fit 校验)、`narration_spine`(空白串→null)、`narration_normalize`(bool)。
 最小原始内容导入例：`PUT /episodes/12 {"content":"<原文>"}`。响应 `data:null`。
 
-**阶段授权约束**：上面的白名单只是接口能力，不是同时填写两步的授权。第一步只导入 `content`；用户要求等待时就停下。第二步 AI 改写必须在获准后通过 `POST /agent/script_rewriter/chat {drama_id,episode_id,message}` 由火宝生成保存；不得助手自写后 PUT `script_content` 冒充生成。人工改已有稿/导入用户定稿须另有明确指令，详见主技能 S1 与错误案例 §4.5。用户已要求停止业务操作、仅更新技能时，不调用火宝核对或回滚。
+**阶段授权约束**：上面的白名单只是接口能力，不是同时填写两步的授权。第一步只导入 `content`；用户要求等待时就停下。第二步 AI 改写必须在获准后由火宝生成保存：**纪录片走 `POST /episodes/:id/script-rewrite` 流水线**（旧 `POST /agent/script_rewriter/chat` 对纪录片直接 400），剧情项目走 `POST /agent/script_rewriter/chat {drama_id,episode_id,message}`；不得助手自写后 PUT `script_content` 冒充生成。人工改已有稿/导入用户定稿须另有明确指令，详见主技能 S1 与错误案例 §4.5。用户已要求停止业务操作、仅更新技能时，不调用火宝核对或回滚。
 
 ### DELETE /episodes/:id — 软删集 **[授权要求]**
 分镜/生成记录保留但不可达；404 检查存在性。
@@ -144,7 +144,7 @@ data：`{episode_id, steps:{script_rewrite, extract_characters, extract_scenes, 
 同时清理参考图文件、集关联与分镜绑定（避免已删角色继续被提取/@引用看到）。
 
 ### POST /characters/:id/generate-prompt — 生成三视图最终提示词（同步）
-`{episode_id✅, force?(true=强制重写), text_model?, text_config_id?}` → data `{final_prompt}`。失败 400。
+`{episode_id✅, force?(true=强制重写), text_model?, text_config_id?}` → data `{final_prompt}`。不传 force 且库中提示词有效时正常复用；本次确有不同的新稿时返回新稿。force 后逐字未变属于 `unchanged_after_rewrite`，**单发路由的 savedPromptOf 不接受该状态，返回 400**，不得当成已生成新稿或盲目重试。批量 `prompt_outcome` 会区分 `reused/regenerated/unchanged_after_rewrite/failed`，其中 unchanged 可继续批量出图（`asset-batch-select.ts:shouldSubmitImage`）；不要把单发和批量行为混为一谈。
 
 ### POST /characters/:id/generate-image — 出角色定妆图（异步）
 `{episode_id✅, model?, config_id?(缺省=集锁定 image 配置), text_model?, text_config_id?, reference_images?}`。
@@ -173,7 +173,7 @@ data：`{episode_id, steps:{script_rewrite, extract_characters, extract_scenes, 
 可写：`location, prompt, description(别名→prompt), lighting, time, image_url/imageUrl(直传图，非空同时置 status='completed'), local_path/localPath, final_prompt`。
 **场景时间不变量（Issue #21）**：final_prompt 必须引用 time；改 time/画面字段会让旧提示词失效。time/final_prompt 的合法性由 `planSceneTimePatch` 裁决，可能 400。响应 data = 更新后整行（snake）。纠正既有场景的时段／光线时，快照后只传必要键，例如 `PUT /scenes/{id} {"time":"室内恒定灯光","lighting":"恒定顶灯中性白光，亮度稳定"}`；重新 GET 后再 `POST /scenes/{id}/generate-prompt {"episode_id":e,"force":true}`。不要为此使用 `re-extract`：它不会把旧场景的 `time` 自动协调为修订剧本，且会清空提取字段。**[R]** 此窄 PUT → 强制改 Prompt → generate-image 链路已实际跑通并下载图像；它只证明接口、失效与媒体回写闭环，图像科学／视觉质量另由独立审查决定。
 
-### POST /scenes/:id/generate-prompt — 同角色语义（`{episode_id✅, force?, text_model?, text_config_id?}` → `{final_prompt}`）。
+### POST /scenes/:id/generate-prompt — 同角色语义（`{episode_id✅, force?, text_model?, text_config_id?}` → `{final_prompt}`）。单发只接受 reused/regenerated；force 后未变仍返回 400，批量单列 unchanged_after_rewrite 的规则见 §3。场景稿未覆盖 time 也属失败。
 ### POST /scenes/:id/generate-image — 同角色语义；尺寸走适配器默认；受理时置 `status='processing'`，失败置 `'failed'`；完成自动回写 `image_url` + `status='completed'`。无人物约束兜底：回退拼接会追加「画面中没有任何人物…」。**[R]** 受理、轮询完成、媒体下载均已验证；首次生成可能不符合内容要求，不能由 completed/status 推定正确。
 
 ### DELETE /scenes/:id — 软删 + 清理参考图与关联，同角色。
@@ -186,7 +186,7 @@ data：`{episode_id, steps:{script_rewrite, extract_characters, extract_scenes, 
 ### PUT /props/:id
 可写：`name, type, description, image_url/imageUrl, local_path/localPath, final_prompt`；name/type/description 变化作废旧 final_prompt（同 Issue #24）。响应 data = 更新后整行。**[R]** 有既存 final_prompt 时，对 description 的窄编辑会使其变为 null；保存前后仅比较授权字段，再以 force 生成新 Prompt。
 
-### POST /props/:id/generate-prompt、/generate-image — 同角色语义；固定尺寸 1024x1024 白底单品；完成自动回写 `image_url`。**[R]** 已实测 `generate-prompt {episode_id,force,text_model,text_config_id}` 后提交 image、轮询并下载当前图；任务受理或 completed 不代表首版几何／科学内容正确，保留失败版作为证据并在授权下修订资产文本后重走该链路。
+### POST /props/:id/generate-prompt、/generate-image — 同角色语义（复用 vs `force` 重写的口径见 §3，`force` 后文本不变也是成功）；固定尺寸 1024x1024 白底单品；完成自动回写 `image_url`。**[R]** 已实测 `generate-prompt {episode_id,force,text_model,text_config_id}` 后提交 image、轮询并下载当前图；任务受理或 completed 不代表首版几何／科学内容正确，保留失败版作为证据并在授权下修订资产文本后重走该链路。
 
 ### DELETE /props/:id — 软删 + 清理，同角色。
 
@@ -226,7 +226,7 @@ data：`{episode_id, steps:{script_rewrite, extract_characters, extract_scenes, 
 
 ## 11. 上传 — `backend/src/routes/upload.ts`（均 multipart `file=`）
 
-- **POST /upload/image**：任意图片。data：`{url:'/static/uploads/…', path}`（同步生成缩略图）。**[R]** 2026-11-02 Poster 画布上传返回该形状；Poster 后续传 `path`，不传根绝对 `url`。
+- **POST /upload/image**：任意图片。data：`{url:'/static/uploads/…', path}`（同步生成缩略图）。**[R]** 2026-11-02 的实测形状来自当时的 Poster 画布上传；**该 Poster 用法已被 Issue #72 取代**（编辑工程改 `layer_doc`，合成图由 `POST /episodes/:id/poster/versions` 服务端渲染），本端点本身仍可用于一般图片上传，凡引用已保存图片的接口一律传 `path`，不传根绝对 `url`。
 - **POST /upload/video**：`.mp4/.mov/.webm/.m4v`，≤50MB。
 - **POST /upload/audio**：`.mp3/.wav/.m4a/.aac`，≤20MB。
 上传只落文件；要把上传图登记为某资产当前图/版本用 **POST /tasks/register-upload**（见 §12）。MIME 可伪造，扩展名为准。
@@ -402,7 +402,7 @@ dramas.ts、episodes.ts、characters.ts、scenes.ts、props.ts、asset-reextract
 | GET /media-library/tree | §10 | S | 同上 |
 | GET /media-library/images | §10 | S | 同上 |
 | POST /media-library/copy | §10 | S | 同上 |
-| POST /upload/image | §11 | R | upload.ts + utils/storage.ts（Poster 画布上传实测） |
+| POST /upload/image | §11 | R | upload.ts + utils/storage.ts（2026-11-02 经当时的 Poster 画布上传实测；该 Poster 路径已被 #72 服务端渲染取代） |
 | POST /upload/video | §11 | S | 同上 |
 | POST /upload/audio | §11 | S | 同上 |
 | GET /tasks | §12 | S | tasks.ts |

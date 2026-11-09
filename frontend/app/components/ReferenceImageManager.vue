@@ -100,6 +100,7 @@ import { thumbFallback, thumbOf } from '~/composables/useMedia'
 import { toastError } from '~/composables/useToast'
 import MediaTime from '~/components/MediaTime.vue'
 import MediaLibraryDialog from '~/components/MediaLibraryDialog.vue'
+import { deeplinkInitial } from '~/composables/useQuerySync'
 
 const { t } = useI18n()
 
@@ -127,6 +128,17 @@ const confirmOpen = ref(false)
 const broken = ref([])
 const libraryOpen = ref(false)
 const picking = ref(false)
+
+// deeplink（#86）：素材库弹窗要带上宿主资产，刷新后不会打开一个不知道回填给谁的孤立弹窗。
+// 多个管理器实例共用 reflib 键，只有真正打开的那一个在发布（关闭即摘键，父层 asset 保持）
+const hostRef = computed(() => `${props.assetType}-${props.assetId}`)
+const refLibLink = useDeeplink('refLibrary', DEEPLINK_KEYS.refLibrary)
+watch(libraryOpen, open => refLibLink.set({ reflib: open ? hostRef.value : '' }))
+onMounted(() => {
+  // 同一资产可能同时有卡片和详情管理器；链接指向详情时只由大号实例恢复。
+  if (props.size === 'compact' && deeplinkInitial('asset') === hostRef.value) return
+  if (refLibLink.initial('reflib') === hostRef.value) libraryOpen.value = true
+})
 
 const refs = computed(() => parseReferenceImages(props.references))
 const assetApi = computed(() => API_BY_TYPE[props.assetType])

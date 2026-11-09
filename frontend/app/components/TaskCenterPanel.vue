@@ -129,7 +129,15 @@
       <button class="btn btn-sm" :disabled="page >= totalPages || loading" @click="go(page + 1)">{{ t('taskCenter.next') }}</button>
     </div>
 
-    <TaskDetailDialog v-if="detailTask" :task="detailTask" :review-mode="detailReview" @close="detailTask = null" @changed="reload" />
+    <TaskDetailDialog
+      v-if="detailTask"
+      :task="detailTask"
+      :review-mode="detailReview"
+      :restore-link="restoreDetailUi"
+      v-model:full-view="detailFull"
+      @close="closeDetail"
+      @changed="reload"
+    />
   </div>
 </template>
 
@@ -150,11 +158,12 @@ import BaseSelect from '~/components/BaseSelect.vue'
 import MediaTime from '~/components/MediaTime.vue'
 import { taskErrorPresentation } from '~/utils/taskError'
 import { taskAPI, dramaAPI } from '~/composables/useApi'
-import { useTasks, absorbRows, isParentRow } from '~/composables/useTasks'
+import { useTasks, absorbRows, isParentRow, registerTask } from '~/composables/useTasks'
 import { batchScopeOf } from '~/utils/documentaryFinal'
 import {
   useNowTicker, ringPropsFromTask, ringPropsFromBatchItem,
 } from '~/composables/useTaskProgress'
+import { DEEPLINK_KEYS, queryEnum, queryIdList, querySingle, useDeeplink } from '~/composables/useQuerySync'
 
 const props = defineProps({
   // 剧集工作台打开时默认只看当前集，可切换为全部
@@ -165,7 +174,7 @@ const props = defineProps({
 
 const { t } = useI18n()
 const now = useNowTicker()
-const { tasksById, activeCount, onTaskFinished } = useTasks()
+const { tasksById, activeCount, onTaskFinished, centerOpen } = useTasks()
 
 const PAGE_SIZE = 20
 const onlyEpisode = ref(Boolean(props.episodeId))
@@ -180,8 +189,41 @@ const items = ref([])
 const loading = ref(false)
 const expanded = ref([])
 const detailTask = ref(null)
+const restoreDetailUi = ref(false)
 const detailReview = ref(false)
+// 弹窗内部的「全屏正文」视图（Issue #86 tfull）：由弹窗经 v-model 回写
+const detailFull = ref(false)
 const dramas = ref([])
+
+// ===== deeplink（Issue #86）：列表筛选 / 分页 / 展开行 + 详情弹窗 =====
+const link = useDeeplink('taskList', DEEPLINK_KEYS.taskList)
+const detailLink = useDeeplink('taskDetail', DEEPLINK_KEYS.taskDetail)
+// /tasks 页与顶栏抽屉可能同时挂载：抽屉盖在页面之上时，由抽屉这份占用这几个键
+const ownsLink = computed(() => props.variant === 'drawer' || !centerOpen.value)
+// 恢复期间用户已经自己操作过：用户的选择优先，异步恢复不再覆盖
+let userActed = false
+// 宿主默认值（抽屉由工作台带入）：与默认一致就不写进 URL，宿主上下文已经在路由里
+const defaultScope = props.episodeId ? 'episode' : 'recent'
+const defaultDrama = props.dramaId ? String(props.dramaId) : ''
+
+// 筛选在首次 reload 之前恢复：首个请求就与链接一致（恢复只改界面，不触发任何写操作）
+const urlScope = queryEnum(link.initial('tscope'), ['recent', 'all', 'episode'])
+if (urlScope === 'episode') onlyEpisode.value = Boolean(props.episodeId)
+else if (urlScope) { onlyEpisode.value = false; scopeFilter.value = urlScope }
+const urlDrama = queryIdList(link.initial('tdrama'))[0] || 0
+dramaFilter.value = urlDrama ? String(urlDrama) : defaultDrama
+const urlEpisode = queryIdList(link.initial('tep'))[0] || 0
+if (urlEpisode) episodeFilter.value = String(urlEpisode)
+const urlType = queryEnum(link.initial('ttype'), ['image', 'video', 'text'])
+if (urlType) typeFilter.value = urlType
+const urlStatus = queryEnum(link.initial('tstatus'), ['active', 'completed', 'failed', 'cancelled'])
+if (urlStatus) statusFilter.value = urlStatus
+const urlPage = queryIdList(link.initial('tpage'))[0] || 0
+if (urlPage > 1) page.value = urlPage
+const urlExpanded = queryIdList(link.initial('texp'))
+const urlTask = queryIdList(detailLink.initial('task'))[0] || 0
+const urlReview = querySingle(detailLink.initial('treview')) === '1'
+const urlFull = querySingle(detailLink.initial('tfull')) === '1'
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / PAGE_SIZE)))
 
@@ -283,6 +325,7 @@ function rowTime(row) {
 }
 
 function toggleExpand(row) {
+  userActed = true
   const key = rowKey(row)
   expanded.value = expanded.value.includes(key)
     ? expanded.value.filter(k => k !== key)
@@ -299,8 +342,16 @@ async function copyRowError(row) {
   else toast.error(t('taskCenter.detail.copyFailed'))
 }
 function openDetail(row, review = false) {
+  userActed = true
+  restoreDetailUi.value = false
   detailReview.value = review || row.pipeline?.state === 'waiting_approval'
+  detailFull.value = false
   detailTask.value = row
+}
+function closeDetail() {
+  detailTask.value = null
+  restoreDetailUi.value = false
+  detailFull.value = false
 }
 
 function queryParams() {
@@ -328,20 +379,96 @@ async function reload() {
 }
 
 function go(next) {
+  userActed = true
   page.value = Math.min(Math.max(1, next), totalPages.value)
 }
 
 function setOnlyEpisode(value) {
+  userActed = true
   onlyEpisode.value = value
   page.value = 1
 }
 
+/** 展开的批次行在 URL 里只记 id（行键是 row_type-id） */
+const expandedIds = computed(() => expanded.value
+  .map(key => Number(String(key).split('-').pop()))
+  .filter(id => Number.isInteger(id) && id > 0))
+
+function publishList() {
+  if (!ownsLink.value) { link.set({}); return }
+  const scope = onlyEpisode.value ? 'episode' : scopeFilter.value
+  link.set({
+    tscope: scope === defaultScope ? '' : scope,
+    tdrama: onlyEpisode.value || dramaFilter.value === defaultDrama ? '' : dramaFilter.value,
+    tep: onlyEpisode.value ? '' : episodeFilter.value,
+    ttype: typeFilter.value,
+    tstatus: statusFilter.value,
+    tpage: page.value > 1 ? String(page.value) : '',
+    texp: expandedIds.value.join(','),
+  })
+}
+function publishDetail() {
+  if (!ownsLink.value) { detailLink.set({}); return }
+  detailLink.set({
+    task: detailTask.value?.id || '',
+    treview: detailTask.value && detailReview.value ? '1' : '',
+    tfull: detailTask.value && detailFull.value ? '1' : '',
+  })
+}
+
+/** 链接里的页码越界：回到第 1 页并提示，不静默显示另一页内容 */
+function restorePage() {
+  if (urlPage <= 1 || userActed || !ownsLink.value) return
+  if (page.value === urlPage && urlPage > totalPages.value) {
+    toast.error(t('deeplink.missing'))
+    page.value = 1 // watch(page) 会重新拉一次列表
+  }
+}
+
+/** 展开行恢复：只展开当前这页确实存在的批次父行，其余 id 从链接里落掉 */
+function restoreExpanded() {
+  if (!urlExpanded.length || userActed || !ownsLink.value) return
+  const keys = rows.value.filter(row => isParentRow(row) && urlExpanded.includes(Number(row.id))).map(rowKey)
+  if (keys.length) expanded.value = keys
+}
+
+/** 详情恢复：任务 id 全局稳定，不在当前页也按 id 取回后打开弹窗（只读，不重试不保存） */
+async function restoreDetail() {
+  // 抽屉盖在 /tasks 页之上时，由抽屉那份面板恢复详情，页面这份不跟着开第二个弹窗
+  if (!urlTask || !ownsLink.value) { publishDetail(); return }
+  let row = tasksById.value[urlTask] || null
+  if (!row) {
+    try { row = await taskAPI.get(urlTask) } catch { row = null }
+  }
+  // 用户在恢复途中已经自己开了别的详情（或抽屉已接管）：以用户操作为准
+  if (userActed || detailTask.value || !ownsLink.value) { publishDetail(); return }
+  if (!row?.id) {
+    toast.error(t('deeplink.missingNamed', { target: `${t('taskCenter.title')} #${urlTask}` }))
+    publishDetail()
+    return
+  }
+  registerTask(row)
+  detailReview.value = urlReview || row.pipeline?.state === 'waiting_approval'
+  // 弹窗内部视图跟在任务解析成功之后恢复
+  detailFull.value = urlFull
+  restoreDetailUi.value = true
+  detailTask.value = row
+  publishDetail()
+}
+
 watch([onlyEpisode, dramaFilter, episodeFilter, typeFilter, statusFilter, scopeFilter], () => {
+  userActed = true
   page.value = 1
   void reload()
 })
 watch(page, () => { void reload() })
 watch(dramaFilter, () => { episodeFilter.value = '' })
+// 子状态发布到 URL（Issue #86）：只经 link.set，不自己调 router
+watch(
+  [onlyEpisode, dramaFilter, episodeFilter, typeFilter, statusFilter, scopeFilter, page, expandedIds, ownsLink],
+  publishList,
+)
+watch([detailTask, detailReview, detailFull, ownsLink], publishDetail)
 // 任务结束时列表需要换状态/补结果
 onTaskFinished(() => { void reload() })
 
@@ -353,13 +480,18 @@ watch(activeCount, (n) => {
 }, { immediate: true })
 onBeforeUnmount(() => { clearInterval(timer) })
 
-onMounted(async () => {
-  if (props.dramaId) dramaFilter.value = String(props.dramaId)
-  void reload()
-  try {
-    const data = await dramaAPI.list()
-    dramas.value = Array.isArray(data?.items) ? data.items : []
-  } catch { /* 剧列表失败：筛选退化为全部 */ }
+onMounted(() => {
+  // 剧列表与任务列表并行拉取；链接恢复跟在首个列表请求之后（筛选/页码已在 setup 里就位）
+  dramaAPI.list()
+    .then((data) => { dramas.value = Array.isArray(data?.items) ? data.items : [] })
+    .catch(() => { /* 剧列表失败：筛选退化为全部 */ })
+  void (async () => {
+    await reload()
+    restorePage()
+    restoreExpanded()
+    publishList()
+    await restoreDetail()
+  })()
 })
 
 defineExpose({ reload })

@@ -9,49 +9,64 @@
 import { createApp, h, ref } from 'vue'
 import { i18n, setUiLocale, type UiLocale } from '~/composables/i18n'
 import { settingsAPI } from '~/composables/useApi'
+import { DEEPLINK_KEYS, deeplinkGroup, deeplinkInitial, queryEnum, type DeeplinkGroup } from '~/composables/useQuerySync'
 import LanguageSwitchDialog from '~/components/LanguageSwitchDialog.vue'
 
 let pending: { resolve: (ok: boolean) => void } | null = null
 
-/** 弹确认框；resolve(true) = 用户确认切换 */
+// deeplink（#86）：确认框是全局浮层，复制链接要能把它原样带走。
+// 这里是命令式挂载（createApp），没有组件 scope，所以用 deeplinkGroup 并自行摘键。
+let langLink: DeeplinkGroup | null = null
+function publishLang(lang: UiLocale | '') {
+  if (!langLink) langLink = deeplinkGroup('langSwitch', DEEPLINK_KEYS.langSwitch)
+  langLink.set({ lang })
+}
+
+/** 从链接恢复：只重新弹出确认框（带目标语言），切换仍然必须由用户点确认 */
+export function restoreLanguageSwitchDeeplink() {
+  const lang = queryEnum(deeplinkInitial('lang'), ['zh', 'en', 'ja', 'ko']) as UiLocale | null
+  if (lang) void confirmUnifiedLanguage(lang)
+}
+
+/** 弹确认框；resolve(true) = 用户点了确认，resolve(false) = 取消/关闭（绝不写后端） */
 function confirmDialog(lang: UiLocale): Promise<boolean> {
-  return new Promise((resolve) => {
-    const langNameKeys = { zh: 'langNameZh', en: 'langNameEn', ja: 'langNameJa', ko: 'langNameKo' }
-    const nameKey = `settings.general.${langNameKeys[lang] || 'langNameZh'}`
-    const title = i18n.global.t('components.langSwitch.title', { lang: i18n.global.t(nameKey) })
-    const message = i18n.global.t('components.langSwitch.message')
+  const { promise, resolve } = Promise.withResolvers<boolean>()
+  const langNameKeys = { zh: 'langNameZh', en: 'langNameEn', ja: 'langNameJa', ko: 'langNameKo' }
+  const nameKey = `settings.general.${langNameKeys[lang] || 'langNameZh'}`
+  const title = i18n.global.t('components.langSwitch.title', { lang: i18n.global.t(nameKey) })
+  const message = i18n.global.t('components.langSwitch.message')
 
-    const open = ref(true)
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const app = createApp({
-      setup: () => () => h(LanguageSwitchDialog, {
-        open: open.value,
-        title,
-        message,
-        onConfirm: () => { open.value = false },
-        onCancel: () => { open.value = false },
-      }),
-    })
-    app.use(i18n as unknown as Parameters<typeof app.use>[0])
-    app.mount(host)
-
-    pending = {
-      resolve: (ok) => {
-        app.unmount()
-        host.remove()
-        resolve(ok)
-      },
-    }
-    // open 置 false 后由 watch 关闭并 resolve —— 用简单轮询代替（弹窗体积小，不值得引 watch 复杂度）
-    const timer = setInterval(() => {
-      if (!open.value) {
-        clearInterval(timer)
-        pending?.resolve(true)
-        pending = null
-      }
-    }, 80)
+  const open = ref(true)
+  const host = document.createElement('div')
+  document.body.appendChild(host)
+  // 确认与取消各自给出结果：弹窗可由链接恢复，取消路径绝不能当成确认去写内容语言
+  const settle = (ok: boolean) => {
+    open.value = false
+    pending?.resolve(ok)
+    pending = null
+  }
+  const app = createApp({
+    setup: () => () => h(LanguageSwitchDialog, {
+      open: open.value,
+      title,
+      message,
+      onConfirm: () => settle(true),
+      onCancel: () => settle(false),
+    }),
   })
+  app.use(i18n as unknown as Parameters<typeof app.use>[0])
+  app.mount(host)
+  publishLang(lang)
+
+  pending = {
+    resolve: (ok) => {
+      app.unmount()
+      host.remove()
+      publishLang('')
+      resolve(ok)
+    },
+  }
+  return promise
 }
 
 let switching = false

@@ -4,6 +4,7 @@ import { test } from 'node:test'
 import { parse, compileScript } from 'vue/compiler-sfc'
 import { createRenderer, nextTick } from 'vue'
 import ts from 'typescript'
+import { deeplinkRuntimeModule } from './sfc-deeplink-runtime.mjs'
 
 const app = new URL('../app/', import.meta.url)
 const dataModule = source => `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`
@@ -42,6 +43,7 @@ const modules = {
   '~/composables/useApi': dataModule('export const {episodeAPI,layerSegmentAPI}=globalThis.__productionUiApi'),
   '~/composables/useToast': dataModule('export const toastError=()=>{},toastServerMessage=()=>{}'),
   '~/composables/useTaskProgress': dataModule('export const isActiveBatchItemState=()=>false'),
+  '~/composables/useQuerySync': deeplinkRuntimeModule,
 }
 const { descriptor } = parse(readFileSync(new URL('components/ShotProductionPanel.vue', app), 'utf8'))
 let source = compileScript(descriptor, {id:'production-contract'}).content

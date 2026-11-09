@@ -12,6 +12,7 @@
         </span>
         <span v-if="skeleton.confirmed" class="tag nsk-tag-ok">{{ t('episode.skeleton.confirmed') }}</span>
         <span v-else-if="skeleton.confirmed_revision" class="tag nsk-tag-warn">{{ t('episode.skeleton.changedSinceConfirm') }}</span>
+        <TaskWorkMetrics :summary="skeletonSummary" :estimate="skeletonEstimate" dense />
 
         <span class="ml-auto" />
         <button class="btn btn-sm" :disabled="busy || generating || !skeleton.script_confirmed" @click="generate">
@@ -111,6 +112,7 @@
           <Loader2 :size="11" class="animate-spin" />
           {{ t('episode.narration.voiceBatchProgress', { done: voiceBatch.completed, total: voiceBatch.total }) }}
         </span>
+        <TaskWorkMetrics :summary="voiceSummary" :estimate="voiceEstimate" dense />
 
         <span class="ml-auto" />
         <button
@@ -165,11 +167,12 @@ import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { Loader2 } from 'lucide-vue-next'
 
-import { narrationSkeletonAPI, skeletonProblemsOf } from '~/composables/useApi'
+import { episodeAPI, narrationSkeletonAPI, skeletonProblemsOf } from '~/composables/useApi'
 import { onTaskFinished, refreshTasks, registerTask, useTasks } from '~/composables/useTasks'
 import { toastError } from '~/composables/useToast'
 import { spokenText } from '~/utils/narrationMarkup'
 import { mediaUrl } from '~/utils/url'
+import TaskWorkMetrics from '~/components/TaskWorkMetrics.vue'
 
 const props = defineProps({
   episodeId: { type: Number, required: true },
@@ -210,6 +213,39 @@ const generating = computed(() => Object.values(tasksById.value).some(task => (
   && String(task.kind || task.params?.kind || '') === 'storyboard_breaker'
   && (task.status === 'queued' || task.status === 'processing')
 )))
+
+/**
+ * 三阶段真实计量（#87 §D）：运行中/已结束读全局任务 store 上的 `observation_summary`
+ * （与任务详情同一个对象，刷新浏览器也不归零）；还没有任务时读「开始前」的计划字数与历史 ETA。
+ */
+function latestTaskOf(kind) {
+  let latest = null
+  for (const task of Object.values(tasksById.value)) {
+    if (Number(task.episode_id) !== Number(props.episodeId)) continue
+    if (String(task.kind || task.params?.kind || '') !== kind) continue
+    if (!latest || task.id > latest.id) latest = task
+  }
+  return latest
+}
+const skeletonSummary = computed(() => latestTaskOf('storyboard_breaker')?.observation_summary || null)
+const voiceSummary = computed(() => latestTaskOf('narration_tts')?.observation_summary || null)
+const skeletonEstimate = ref(null)
+const voiceEstimate = ref(null)
+
+let workEstimateSeq = 0
+async function loadWorkEstimates() {
+  const seq = ++workEstimateSeq
+  if (!props.episodeId) return
+  for (const [stage, target] of [['skeleton', skeletonEstimate], ['voice', voiceEstimate]]) {
+    target.value = null
+    try {
+      const res = await episodeAPI.workEstimate(props.episodeId, stage, undefined, stage === 'skeleton'
+        ? { config_id: props.chatConfigId || undefined, model: props.chatModel || undefined } : {})
+      if (seq === workEstimateSeq) target.value = res?.estimate || null
+    } catch { /* 预估失败保持未知，不复用其他配置的旧样本。 */ }
+  }
+}
+watch([() => props.episodeId, () => props.chatConfigId, () => props.chatModel], loadWorkEstimates, { immediate: true })
 
 function pad(n) { return `#${String(n ?? 0).padStart(2, '0')}` }
 function shotLabel(row, index) { return pad(index + 1) }
@@ -400,8 +436,11 @@ async function generate() {
 // 骨架生成任务结束：拉回最新骨架并让页面重载分镜
 onTaskFinished((task) => {
   if (Number(task?.episode_id) !== Number(props.episodeId)) return
-  if (String(task?.kind || task?.params?.kind || '') !== 'storyboard_breaker') return
-  emit('refresh')
+  const kind = String(task?.kind || task?.params?.kind || '')
+  // 骨架/配音任务结束都会产生新的真实样本：预估按新样本重算
+  if (kind !== 'storyboard_breaker' && kind !== 'narration_tts') return
+  void loadWorkEstimates()
+  if (kind === 'storyboard_breaker') emit('refresh')
 })
 </script>
 

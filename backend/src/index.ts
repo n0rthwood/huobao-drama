@@ -51,6 +51,8 @@ import { startQwenJobsTracker } from './services/qwen-jobs.js'
 import { QWEN_JOBS_PROVIDER } from './services/sys-task.js'
 import { backfillTaskEpisodeIds, failInterruptedTextTasks } from './services/task-center.js'
 import { resumeQueuedTextTasks } from './services/text-task-restart.js'
+import { freezeInterruptedObservations } from './services/task-observability.js'
+import { releaseInterruptedDesignCardShots } from './services/design-card-batch.js'
 import { failInterruptedRewriteRuns } from './services/script-rewrite/run.js'
 import { failInterruptedMapWorkflows } from './services/map-workflow/run.js'
 import { backfillGeneratedAt } from './services/media-time.js'
@@ -179,6 +181,12 @@ db.update(schema.sysTask)
   .catch(err => console.error('清理中断任务失败:', err?.message))
   // 文本任务（提取 / 提示词批量 / 剧本改写 / 拆分分镜）的执行线程同样随重启丢失，标记为失败供一键重试
   .then(() => failInterruptedTextTasks())
+  // 在飞的观测调用（#87）：标中断并把耗时冻结到最后一次持久心跳，不拿重启时刻当结束时间
+  .then(() => freezeInterruptedObservations())
+  // 被重启打断的设计卡镜（#87）：ai_filling 永远卡死会让后续 PUT/确认一律 409，
+  // 按已落盘事实释放（已保存→pending，未保存→任务里记录的原状态），不补跑、不改卡
+  .then(() => releaseInterruptedDesignCardShots())
+  .then(n => { if (n > 0) console.log(`🔓 已释放 ${n} 个被中断的设计卡镜`) })
   .then(() => failInterruptedRewriteRuns())
   // 地图工作流（#84）：running 的工作流标失败并说明原因，产出保留，绝不自动重放模型与出图
   .then(() => failInterruptedMapWorkflows())

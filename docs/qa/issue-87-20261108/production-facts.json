@@ -1,0 +1,2308 @@
+{
+  "at": "2026-11-08T20:54:30.554Z",
+  "environment": "production",
+  "database": "production data/huobao.sqlite3, opened readonly",
+  "project_id": 11,
+  "episode_id": 17,
+  "tasks": [
+    {
+      "id": 1281,
+      "type": "text",
+      "status": "failed",
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "error_msg": "旁白骨架不合法：第 6 镜 的旁白在剧本里出现在前一镜之前：骨架必须按剧本顺序排列；第 7 镜 的旁白为空：纪录片每一镜都必须承载一段旁白；第 9 镜 的旁白为空：纪录片每一镜都必须承载一段旁白。分镜已保留，请在「旁白骨架」里调整边界或重新生成。",
+      "created_at": "2026-11-08T19:16:41.610Z",
+      "completed_at": "2026-11-08T19:16:51.605Z"
+    },
+    {
+      "id": 1282,
+      "type": "text",
+      "status": "completed",
+      "provider": null,
+      "model": null,
+      "error_msg": null,
+      "created_at": "2026-11-08T19:20:36.552Z",
+      "completed_at": "2026-11-08T19:21:06.384Z"
+    },
+    {
+      "id": 1283,
+      "type": "text",
+      "status": "completed",
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "error_msg": null,
+      "created_at": "2026-11-08T19:23:46.958Z",
+      "completed_at": "2026-11-08T19:24:52.922Z"
+    },
+    {
+      "id": 1284,
+      "type": "text",
+      "status": "failed",
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "error_msg": "后端重启中断",
+      "created_at": "2026-11-08T19:26:33.924Z",
+      "completed_at": null
+    },
+    {
+      "id": 1285,
+      "type": "text",
+      "status": "completed",
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "error_msg": null,
+      "created_at": "2026-11-08T19:27:36.227Z",
+      "completed_at": "2026-11-08T19:33:54.777Z"
+    }
+  ],
+  "works": [
+    {
+      "id": 1,
+      "task_id": 1281,
+      "stage": "skeleton",
+      "source_chars": 267,
+      "sample_key": "skeleton|cfg:14|model:deepseek-flash",
+      "storyboard_id": null,
+      "storyboard_number": null,
+      "started_at": 1794165401611,
+      "finished_at": 1794165411604,
+      "status": "failed",
+      "model_ms": 9844,
+      "queue_ms": 5,
+      "work_ms": 9993,
+      "call_count": 4,
+      "heartbeat_at": 1794165411604,
+      "error_msg": "旁白骨架不合法：第 6 镜 的旁白在剧本里出现在前一镜之前：骨架必须按剧本顺序排列；第 7 镜 的旁白为空：纪录片每一镜都必须承载一段旁白；第 9 镜 的旁白为空：纪录片每一镜都必须承载一段旁白。分镜已保留，请在「旁白骨架」里调整边界或重新生成。",
+      "created_at": 1794165401611
+    },
+    {
+      "id": 2,
+      "task_id": 1282,
+      "stage": "voice",
+      "source_chars": 42,
+      "sample_key": "voice|cfg:13|model:unknown|voice:纪录片·沉稳男声|steps:10|cfgv:2|norm:1|inst:25.1w2hoeo|seed:1720",
+      "storyboard_id": 517,
+      "storyboard_number": 1,
+      "started_at": 1794165636553,
+      "finished_at": 1794165641346,
+      "status": "completed",
+      "model_ms": 4529,
+      "queue_ms": 0,
+      "work_ms": 4793,
+      "call_count": 1,
+      "heartbeat_at": 1794165641346,
+      "error_msg": null,
+      "created_at": 1794165636553
+    },
+    {
+      "id": 3,
+      "task_id": 1282,
+      "stage": "voice",
+      "source_chars": 23,
+      "sample_key": "voice|cfg:13|model:unknown|voice:纪录片·沉稳男声|steps:10|cfgv:2|norm:1|inst:25.1w2hoeo|seed:1720",
+      "storyboard_id": 518,
+      "storyboard_number": 2,
+      "started_at": 1794165641347,
+      "finished_at": 1794165643723,
+      "status": "completed",
+      "model_ms": 2267,
+      "queue_ms": 0,
+      "work_ms": 2376,
+      "call_count": 1,
+      "heartbeat_at": 1794165643723,
+      "error_msg": null,
+      "created_at": 1794165641347
+    },
+    {
+      "id": 4,
+      "task_id": 1282,
+      "stage": "voice",
+      "source_chars": 65,
+      "sample_key": "voice|cfg:13|model:unknown|voice:纪录片·沉稳男声|steps:10|cfgv:2|norm:1|inst:25.1w2hoeo|seed:1720",
+      "storyboard_id": 519,
+      "storyboard_number": 3,
+      "started_at": 1794165643724,
+      "finished_at": 1794165651152,
+      "status": "completed",
+      "model_ms": 7279,
+      "queue_ms": 0,
+      "work_ms": 7428,
+      "call_count": 1,
+      "heartbeat_at": 1794165651152,
+      "error_msg": null,
+      "created_at": 1794165643724
+    },
+    {
+      "id": 5,
+      "task_id": 1282,
+      "stage": "voice",
+      "source_chars": 37,
+      "sample_key": "voice|cfg:13|model:unknown|voice:纪录片·沉稳男声|steps:10|cfgv:2|norm:1|inst:25.1w2hoeo|seed:1720",
+      "storyboard_id": 520,
+      "storyboard_number": 4,
+      "started_at": 1794165651152,
+      "finished_at": 1794165656337,
+      "status": "completed",
+      "model_ms": 5019,
+      "queue_ms": 0,
+      "work_ms": 5185,
+      "call_count": 1,
+      "heartbeat_at": 1794165656337,
+      "error_msg": null,
+      "created_at": 1794165651152
+    },
+    {
+      "id": 6,
+      "task_id": 1282,
+      "stage": "voice",
+      "source_chars": 38,
+      "sample_key": "voice|cfg:13|model:unknown|voice:纪录片·沉稳男声|steps:10|cfgv:2|norm:1|inst:25.1w2hoeo|seed:1720",
+      "storyboard_id": 521,
+      "storyboard_number": 5,
+      "started_at": 1794165656338,
+      "finished_at": 1794165661731,
+      "status": "completed",
+      "model_ms": 5270,
+      "queue_ms": 0,
+      "work_ms": 5393,
+      "call_count": 1,
+      "heartbeat_at": 1794165661731,
+      "error_msg": null,
+      "created_at": 1794165656338
+    },
+    {
+      "id": 7,
+      "task_id": 1282,
+      "stage": "voice",
+      "source_chars": 42,
+      "sample_key": "voice|cfg:13|model:unknown|voice:纪录片·沉稳男声|steps:10|cfgv:2|norm:1|inst:25.1w2hoeo|seed:1720",
+      "storyboard_id": 522,
+      "storyboard_number": 6,
+      "started_at": 1794165661732,
+      "finished_at": 1794165666383,
+      "status": "completed",
+      "model_ms": 4525,
+      "queue_ms": 0,
+      "work_ms": 4651,
+      "call_count": 1,
+      "heartbeat_at": 1794165666383,
+      "error_msg": null,
+      "created_at": 1794165661732
+    },
+    {
+      "id": 8,
+      "task_id": 1283,
+      "stage": "design_card",
+      "source_chars": 42,
+      "sample_key": "design_card|cfg:14|model:deepseek-flash",
+      "storyboard_id": 522,
+      "storyboard_number": 6,
+      "started_at": 1794165826960,
+      "finished_at": 1794165892921,
+      "status": "completed",
+      "model_ms": 97613,
+      "queue_ms": 11,
+      "work_ms": 65961,
+      "call_count": 11,
+      "heartbeat_at": 1794165892921,
+      "error_msg": null,
+      "created_at": 1794165826960
+    },
+    {
+      "id": 9,
+      "task_id": 1284,
+      "stage": "design_card",
+      "source_chars": 42,
+      "sample_key": "design_card|cfg:14|model:deepseek-flash",
+      "storyboard_id": 517,
+      "storyboard_number": 1,
+      "started_at": 1794165993949,
+      "finished_at": 1794165995159,
+      "status": "interrupted",
+      "model_ms": 1183,
+      "queue_ms": 2,
+      "work_ms": 1210,
+      "call_count": 2,
+      "heartbeat_at": 1794165995159,
+      "error_msg": "服务重启，调用中断（计时冻结在最后一次持久心跳）",
+      "created_at": 1794165993949
+    },
+    {
+      "id": 10,
+      "task_id": 1285,
+      "stage": "design_card",
+      "source_chars": 23,
+      "sample_key": "design_card|cfg:14|model:deepseek-flash",
+      "storyboard_id": 518,
+      "storyboard_number": 2,
+      "started_at": 1794166056230,
+      "finished_at": 1794166158858,
+      "status": "completed",
+      "model_ms": 102077,
+      "queue_ms": 15,
+      "work_ms": 102628,
+      "call_count": 12,
+      "heartbeat_at": 1794166158858,
+      "error_msg": null,
+      "created_at": 1794166056230
+    },
+    {
+      "id": 11,
+      "task_id": 1285,
+      "stage": "design_card",
+      "source_chars": 65,
+      "sample_key": "design_card|cfg:14|model:deepseek-flash",
+      "storyboard_id": 519,
+      "storyboard_number": 3,
+      "started_at": 1794166158859,
+      "finished_at": 1794166339063,
+      "status": "completed",
+      "model_ms": 199124,
+      "queue_ms": 13,
+      "work_ms": 180204,
+      "call_count": 14,
+      "heartbeat_at": 1794166339063,
+      "error_msg": null,
+      "created_at": 1794166158859
+    },
+    {
+      "id": 12,
+      "task_id": 1285,
+      "stage": "design_card",
+      "source_chars": 37,
+      "sample_key": "design_card|cfg:14|model:deepseek-flash",
+      "storyboard_id": 520,
+      "storyboard_number": 4,
+      "started_at": 1794166339064,
+      "finished_at": 1794166372597,
+      "status": "completed",
+      "model_ms": 40647,
+      "queue_ms": 8,
+      "work_ms": 33533,
+      "call_count": 7,
+      "heartbeat_at": 1794166372597,
+      "error_msg": null,
+      "created_at": 1794166339064
+    },
+    {
+      "id": 13,
+      "task_id": 1285,
+      "stage": "design_card",
+      "source_chars": 38,
+      "sample_key": "design_card|cfg:14|model:deepseek-flash",
+      "storyboard_id": 521,
+      "storyboard_number": 5,
+      "started_at": 1794166372598,
+      "finished_at": 1794166434776,
+      "status": "completed",
+      "model_ms": 61788,
+      "queue_ms": 8,
+      "work_ms": 62178,
+      "call_count": 9,
+      "heartbeat_at": 1794166434776,
+      "error_msg": null,
+      "created_at": 1794166372598
+    }
+  ],
+  "calls": [
+    {
+      "id": 1,
+      "work_id": 1,
+      "task_id": 1281,
+      "kind": "llm",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794165401665,
+      "finished_at": 1794165402525,
+      "duration_ms": 860,
+      "queue_ms": 2,
+      "request_chars": 89567,
+      "response_chars": 18,
+      "prompt_tokens": 23840,
+      "completion_tokens": 31
+    },
+    {
+      "id": 2,
+      "work_id": 1,
+      "task_id": 1281,
+      "kind": "llm",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794165402564,
+      "finished_at": 1794165405830,
+      "duration_ms": 3266,
+      "queue_ms": 1,
+      "request_chars": 96087,
+      "response_chars": 1354,
+      "prompt_tokens": 27933,
+      "completion_tokens": 708
+    },
+    {
+      "id": 3,
+      "work_id": 1,
+      "task_id": 1281,
+      "kind": "llm",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794165405857,
+      "finished_at": 1794165408615,
+      "duration_ms": 2758,
+      "queue_ms": 1,
+      "request_chars": 100534,
+      "response_chars": 985,
+      "prompt_tokens": 29851,
+      "completion_tokens": 568
+    },
+    {
+      "id": 4,
+      "work_id": 1,
+      "task_id": 1281,
+      "kind": "llm",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794165408634,
+      "finished_at": 1794165411594,
+      "duration_ms": 2960,
+      "queue_ms": 1,
+      "request_chars": 101879,
+      "response_chars": 689,
+      "prompt_tokens": 30561,
+      "completion_tokens": 444
+    },
+    {
+      "id": 5,
+      "work_id": 2,
+      "task_id": 1282,
+      "kind": "tts",
+      "config_id": 13,
+      "provider": null,
+      "model": "",
+      "status": "completed",
+      "started_at": 1794165636556,
+      "finished_at": 1794165641085,
+      "duration_ms": 4529,
+      "queue_ms": 0,
+      "request_chars": 0,
+      "response_chars": 192,
+      "prompt_tokens": null,
+      "completion_tokens": null
+    },
+    {
+      "id": 6,
+      "work_id": 3,
+      "task_id": 1282,
+      "kind": "tts",
+      "config_id": 13,
+      "provider": null,
+      "model": "",
+      "status": "completed",
+      "started_at": 1794165641365,
+      "finished_at": 1794165643632,
+      "duration_ms": 2267,
+      "queue_ms": 0,
+      "request_chars": 0,
+      "response_chars": 192,
+      "prompt_tokens": null,
+      "completion_tokens": null
+    },
+    {
+      "id": 7,
+      "work_id": 4,
+      "task_id": 1282,
+      "kind": "tts",
+      "config_id": 13,
+      "provider": null,
+      "model": "",
+      "status": "completed",
+      "started_at": 1794165643740,
+      "finished_at": 1794165651019,
+      "duration_ms": 7279,
+      "queue_ms": 0,
+      "request_chars": 0,
+      "response_chars": 193,
+      "prompt_tokens": null,
+      "completion_tokens": null
+    },
+    {
+      "id": 8,
+      "work_id": 5,
+      "task_id": 1282,
+      "kind": "tts",
+      "config_id": 13,
+      "provider": null,
+      "model": "",
+      "status": "completed",
+      "started_at": 1794165651218,
+      "finished_at": 1794165656237,
+      "duration_ms": 5019,
+      "queue_ms": 0,
+      "request_chars": 0,
+      "response_chars": 192,
+      "prompt_tokens": null,
+      "completion_tokens": null
+    },
+    {
+      "id": 9,
+      "work_id": 6,
+      "task_id": 1282,
+      "kind": "tts",
+      "config_id": 13,
+      "provider": null,
+      "model": "",
+      "status": "completed",
+      "started_at": 1794165656354,
+      "finished_at": 1794165661624,
+      "duration_ms": 5270,
+      "queue_ms": 0,
+      "request_chars": 0,
+      "response_chars": 193,
+      "prompt_tokens": null,
+      "completion_tokens": null
+    },
+    {
+      "id": 10,
+      "work_id": 7,
+      "task_id": 1282,
+      "kind": "tts",
+      "config_id": 13,
+      "provider": null,
+      "model": "",
+      "status": "completed",
+      "started_at": 1794165661759,
+      "finished_at": 1794165666284,
+      "duration_ms": 4525,
+      "queue_ms": 0,
+      "request_chars": 0,
+      "response_chars": 192,
+      "prompt_tokens": null,
+      "completion_tokens": null
+    },
+    {
+      "id": 11,
+      "work_id": 8,
+      "task_id": 1283,
+      "kind": "llm",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794165826996,
+      "finished_at": 1794165828030,
+      "duration_ms": 1034,
+      "queue_ms": 1,
+      "request_chars": 77124,
+      "response_chars": 12,
+      "prompt_tokens": 22092,
+      "completion_tokens": 28
+    },
+    {
+      "id": 12,
+      "work_id": 8,
+      "task_id": 1283,
+      "kind": "llm",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794165828044,
+      "finished_at": 1794165829677,
+      "duration_ms": 1633,
+      "queue_ms": 1,
+      "request_chars": 86482,
+      "response_chars": 235,
+      "prompt_tokens": 27047,
+      "completion_tokens": 204
+    },
+    {
+      "id": 13,
+      "work_id": 8,
+      "task_id": 1283,
+      "kind": "vision_chat",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794165829812,
+      "finished_at": 1794165837849,
+      "duration_ms": 8037,
+      "queue_ms": 1,
+      "request_chars": 204,
+      "response_chars": 466,
+      "prompt_tokens": 965,
+      "completion_tokens": 947
+    },
+    {
+      "id": 14,
+      "work_id": 8,
+      "task_id": 1283,
+      "kind": "llm",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794165837855,
+      "finished_at": 1794165839904,
+      "duration_ms": 2049,
+      "queue_ms": 1,
+      "request_chars": 87366,
+      "response_chars": 347,
+      "prompt_tokens": 27660,
+      "completion_tokens": 286
+    },
+    {
+      "id": 15,
+      "work_id": 8,
+      "task_id": 1283,
+      "kind": "vision_chat",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794165839972,
+      "finished_at": 1794165874857,
+      "duration_ms": 34885,
+      "queue_ms": 1,
+      "request_chars": 202,
+      "response_chars": 0,
+      "prompt_tokens": 737,
+      "completion_tokens": 4096
+    },
+    {
+      "id": 16,
+      "work_id": 8,
+      "task_id": 1283,
+      "kind": "vision_chat",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794165839980,
+      "finished_at": 1794165872021,
+      "duration_ms": 32041,
+      "queue_ms": 1,
+      "request_chars": 217,
+      "response_chars": 0,
+      "prompt_tokens": 747,
+      "completion_tokens": 4096
+    },
+    {
+      "id": 17,
+      "work_id": 8,
+      "task_id": 1283,
+      "kind": "llm",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794165874865,
+      "finished_at": 1794165876393,
+      "duration_ms": 1528,
+      "queue_ms": 1,
+      "request_chars": 87927,
+      "response_chars": 171,
+      "prompt_tokens": 28038,
+      "completion_tokens": 146
+    },
+    {
+      "id": 18,
+      "work_id": 8,
+      "task_id": 1283,
+      "kind": "vision_chat",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794165876472,
+      "finished_at": 1794165882753,
+      "duration_ms": 6281,
+      "queue_ms": 1,
+      "request_chars": 207,
+      "response_chars": 507,
+      "prompt_tokens": 741,
+      "completion_tokens": 826
+    },
+    {
+      "id": 19,
+      "work_id": 8,
+      "task_id": 1283,
+      "kind": "llm",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794165882760,
+      "finished_at": 1794165886952,
+      "duration_ms": 4192,
+      "queue_ms": 1,
+      "request_chars": 88723,
+      "response_chars": 1028,
+      "prompt_tokens": 28558,
+      "completion_tokens": 584
+    },
+    {
+      "id": 20,
+      "work_id": 8,
+      "task_id": 1283,
+      "kind": "llm",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794165886969,
+      "finished_at": 1794165890413,
+      "duration_ms": 3444,
+      "queue_ms": 1,
+      "request_chars": 90644,
+      "response_chars": 994,
+      "prompt_tokens": 29666,
+      "completion_tokens": 580
+    },
+    {
+      "id": 21,
+      "work_id": 8,
+      "task_id": 1283,
+      "kind": "llm",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794165890428,
+      "finished_at": 1794165892917,
+      "duration_ms": 2489,
+      "queue_ms": 1,
+      "request_chars": 91605,
+      "response_chars": 463,
+      "prompt_tokens": 30267,
+      "completion_tokens": 287
+    },
+    {
+      "id": 22,
+      "work_id": 9,
+      "task_id": 1284,
+      "kind": "llm",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794165993980,
+      "finished_at": 1794165995159,
+      "duration_ms": 1179,
+      "queue_ms": 1,
+      "request_chars": 77124,
+      "response_chars": 12,
+      "prompt_tokens": 22092,
+      "completion_tokens": 28
+    },
+    {
+      "id": 23,
+      "work_id": 9,
+      "task_id": 1284,
+      "kind": "llm",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "interrupted",
+      "started_at": 1794165995174,
+      "finished_at": 1794165995178,
+      "duration_ms": 4,
+      "queue_ms": 1,
+      "request_chars": 87339,
+      "response_chars": 0,
+      "prompt_tokens": null,
+      "completion_tokens": null
+    },
+    {
+      "id": 24,
+      "work_id": 10,
+      "task_id": 1285,
+      "kind": "llm",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794166056334,
+      "finished_at": 1794166057355,
+      "duration_ms": 1021,
+      "queue_ms": 2,
+      "request_chars": 77124,
+      "response_chars": 13,
+      "prompt_tokens": 22092,
+      "completion_tokens": 29
+    },
+    {
+      "id": 25,
+      "work_id": 10,
+      "task_id": 1285,
+      "kind": "llm",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794166057376,
+      "finished_at": 1794166058429,
+      "duration_ms": 1053,
+      "queue_ms": 1,
+      "request_chars": 87340,
+      "response_chars": 103,
+      "prompt_tokens": 27507,
+      "completion_tokens": 95
+    },
+    {
+      "id": 26,
+      "work_id": 10,
+      "task_id": 1285,
+      "kind": "llm",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794166058440,
+      "finished_at": 1794166060162,
+      "duration_ms": 1722,
+      "queue_ms": 1,
+      "request_chars": 87942,
+      "response_chars": 293,
+      "prompt_tokens": 27732,
+      "completion_tokens": 240
+    },
+    {
+      "id": 27,
+      "work_id": 10,
+      "task_id": 1285,
+      "kind": "vision_chat",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794166060301,
+      "finished_at": 1794166072090,
+      "duration_ms": 11789,
+      "queue_ms": 2,
+      "request_chars": 218,
+      "response_chars": 751,
+      "prompt_tokens": 975,
+      "completion_tokens": 1687
+    },
+    {
+      "id": 28,
+      "work_id": 10,
+      "task_id": 1285,
+      "kind": "llm",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794166072104,
+      "finished_at": 1794166073824,
+      "duration_ms": 1720,
+      "queue_ms": 2,
+      "request_chars": 96149,
+      "response_chars": 211,
+      "prompt_tokens": 32456,
+      "completion_tokens": 175
+    },
+    {
+      "id": 29,
+      "work_id": 10,
+      "task_id": 1285,
+      "kind": "vision_chat",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794166073901,
+      "finished_at": 1794166088579,
+      "duration_ms": 14678,
+      "queue_ms": 1,
+      "request_chars": 247,
+      "response_chars": 593,
+      "prompt_tokens": 768,
+      "completion_tokens": 1991
+    },
+    {
+      "id": 30,
+      "work_id": 10,
+      "task_id": 1285,
+      "kind": "llm",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794166088587,
+      "finished_at": 1794166090134,
+      "duration_ms": 1547,
+      "queue_ms": 1,
+      "request_chars": 97066,
+      "response_chars": 216,
+      "prompt_tokens": 33058,
+      "completion_tokens": 176
+    },
+    {
+      "id": 31,
+      "work_id": 10,
+      "task_id": 1285,
+      "kind": "vision_chat",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794166090209,
+      "finished_at": 1794166119958,
+      "duration_ms": 29749,
+      "queue_ms": 1,
+      "request_chars": 252,
+      "response_chars": 359,
+      "prompt_tokens": 771,
+      "completion_tokens": 4096
+    },
+    {
+      "id": 32,
+      "work_id": 10,
+      "task_id": 1285,
+      "kind": "llm",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794166119966,
+      "finished_at": 1794166121806,
+      "duration_ms": 1840,
+      "queue_ms": 1,
+      "request_chars": 97753,
+      "response_chars": 221,
+      "prompt_tokens": 33536,
+      "completion_tokens": 186
+    },
+    {
+      "id": 33,
+      "work_id": 10,
+      "task_id": 1285,
+      "kind": "vision_chat",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794166121866,
+      "finished_at": 1794166147905,
+      "duration_ms": 26039,
+      "queue_ms": 1,
+      "request_chars": 256,
+      "response_chars": 295,
+      "prompt_tokens": 779,
+      "completion_tokens": 3603
+    },
+    {
+      "id": 34,
+      "work_id": 10,
+      "task_id": 1285,
+      "kind": "llm",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794166147916,
+      "finished_at": 1794166156208,
+      "duration_ms": 8292,
+      "queue_ms": 1,
+      "request_chars": 98381,
+      "response_chars": 1855,
+      "prompt_tokens": 33983,
+      "completion_tokens": 1133
+    },
+    {
+      "id": 35,
+      "work_id": 10,
+      "task_id": 1285,
+      "kind": "llm",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794166156226,
+      "finished_at": 1794166158853,
+      "duration_ms": 2627,
+      "queue_ms": 1,
+      "request_chars": 100201,
+      "response_chars": 438,
+      "prompt_tokens": 35140,
+      "completion_tokens": 288
+    },
+    {
+      "id": 36,
+      "work_id": 11,
+      "task_id": 1285,
+      "kind": "llm",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794166158881,
+      "finished_at": 1794166159888,
+      "duration_ms": 1007,
+      "queue_ms": 0,
+      "request_chars": 77126,
+      "response_chars": 15,
+      "prompt_tokens": 22092,
+      "completion_tokens": 30
+    },
+    {
+      "id": 37,
+      "work_id": 11,
+      "task_id": 1285,
+      "kind": "llm",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794166159903,
+      "finished_at": 1794166162667,
+      "duration_ms": 2764,
+      "queue_ms": 1,
+      "request_chars": 88793,
+      "response_chars": 406,
+      "prompt_tokens": 28320,
+      "completion_tokens": 329
+    },
+    {
+      "id": 38,
+      "work_id": 11,
+      "task_id": 1285,
+      "kind": "vision_chat",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794166162726,
+      "finished_at": 1794166182109,
+      "duration_ms": 19383,
+      "queue_ms": 1,
+      "request_chars": 244,
+      "response_chars": 1182,
+      "prompt_tokens": 763,
+      "completion_tokens": 3296
+    },
+    {
+      "id": 39,
+      "work_id": 11,
+      "task_id": 1285,
+      "kind": "vision_chat",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794166162741,
+      "finished_at": 1794166194544,
+      "duration_ms": 31803,
+      "queue_ms": 1,
+      "request_chars": 235,
+      "response_chars": 0,
+      "prompt_tokens": 761,
+      "completion_tokens": 4096
+    },
+    {
+      "id": 40,
+      "work_id": 11,
+      "task_id": 1285,
+      "kind": "llm",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794166194551,
+      "finished_at": 1794166196167,
+      "duration_ms": 1616,
+      "queue_ms": 1,
+      "request_chars": 90680,
+      "response_chars": 190,
+      "prompt_tokens": 29576,
+      "completion_tokens": 159
+    },
+    {
+      "id": 41,
+      "work_id": 11,
+      "task_id": 1285,
+      "kind": "vision_chat",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794166196242,
+      "finished_at": 1794166229452,
+      "duration_ms": 33210,
+      "queue_ms": 1,
+      "request_chars": 226,
+      "response_chars": 0,
+      "prompt_tokens": 752,
+      "completion_tokens": 4096
+    },
+    {
+      "id": 42,
+      "work_id": 11,
+      "task_id": 1285,
+      "kind": "llm",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794166229461,
+      "finished_at": 1794166230995,
+      "duration_ms": 1534,
+      "queue_ms": 1,
+      "request_chars": 90977,
+      "response_chars": 152,
+      "prompt_tokens": 29783,
+      "completion_tokens": 133
+    },
+    {
+      "id": 43,
+      "work_id": 11,
+      "task_id": 1285,
+      "kind": "vision_chat",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794166231064,
+      "finished_at": 1794166267034,
+      "duration_ms": 35970,
+      "queue_ms": 0,
+      "request_chars": 188,
+      "response_chars": 0,
+      "prompt_tokens": 727,
+      "completion_tokens": 4096
+    },
+    {
+      "id": 44,
+      "work_id": 11,
+      "task_id": 1285,
+      "kind": "llm",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794166267040,
+      "finished_at": 1794166268693,
+      "duration_ms": 1653,
+      "queue_ms": 1,
+      "request_chars": 91236,
+      "response_chars": 173,
+      "prompt_tokens": 29964,
+      "completion_tokens": 148
+    },
+    {
+      "id": 45,
+      "work_id": 11,
+      "task_id": 1285,
+      "kind": "vision_chat",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794166268768,
+      "finished_at": 1794166297348,
+      "duration_ms": 28580,
+      "queue_ms": 1,
+      "request_chars": 209,
+      "response_chars": 0,
+      "prompt_tokens": 744,
+      "completion_tokens": 4096
+    },
+    {
+      "id": 46,
+      "work_id": 11,
+      "task_id": 1285,
+      "kind": "llm",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794166297354,
+      "finished_at": 1794166298648,
+      "duration_ms": 1294,
+      "queue_ms": 1,
+      "request_chars": 91516,
+      "response_chars": 154,
+      "prompt_tokens": 30160,
+      "completion_tokens": 135
+    },
+    {
+      "id": 47,
+      "work_id": 11,
+      "task_id": 1285,
+      "kind": "vision_chat",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794166298724,
+      "finished_at": 1794166326857,
+      "duration_ms": 28133,
+      "queue_ms": 1,
+      "request_chars": 190,
+      "response_chars": 0,
+      "prompt_tokens": 730,
+      "completion_tokens": 4096
+    },
+    {
+      "id": 48,
+      "work_id": 11,
+      "task_id": 1285,
+      "kind": "llm",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794166326867,
+      "finished_at": 1794166334889,
+      "duration_ms": 8022,
+      "queue_ms": 2,
+      "request_chars": 91777,
+      "response_chars": 2216,
+      "prompt_tokens": 30343,
+      "completion_tokens": 1252
+    },
+    {
+      "id": 49,
+      "work_id": 11,
+      "task_id": 1285,
+      "kind": "llm",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794166334904,
+      "finished_at": 1794166339059,
+      "duration_ms": 4155,
+      "queue_ms": 1,
+      "request_chars": 94005,
+      "response_chars": 994,
+      "prompt_tokens": 31650,
+      "completion_tokens": 591
+    },
+    {
+      "id": 50,
+      "work_id": 12,
+      "task_id": 1285,
+      "kind": "llm",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794166339085,
+      "finished_at": 1794166340092,
+      "duration_ms": 1007,
+      "queue_ms": 1,
+      "request_chars": 77124,
+      "response_chars": 13,
+      "prompt_tokens": 22092,
+      "completion_tokens": 29
+    },
+    {
+      "id": 51,
+      "work_id": 12,
+      "task_id": 1285,
+      "kind": "llm",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794166340103,
+      "finished_at": 1794166342317,
+      "duration_ms": 2214,
+      "queue_ms": 1,
+      "request_chars": 90189,
+      "response_chars": 382,
+      "prompt_tokens": 29104,
+      "completion_tokens": 318
+    },
+    {
+      "id": 52,
+      "work_id": 12,
+      "task_id": 1285,
+      "kind": "vision_chat",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794166342455,
+      "finished_at": 1794166352881,
+      "duration_ms": 10426,
+      "queue_ms": 1,
+      "request_chars": 241,
+      "response_chars": 766,
+      "prompt_tokens": 999,
+      "completion_tokens": 1489
+    },
+    {
+      "id": 53,
+      "work_id": 12,
+      "task_id": 1285,
+      "kind": "vision_chat",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794166342468,
+      "finished_at": 1794166349786,
+      "duration_ms": 7318,
+      "queue_ms": 2,
+      "request_chars": 211,
+      "response_chars": 706,
+      "prompt_tokens": 972,
+      "completion_tokens": 1015
+    },
+    {
+      "id": 54,
+      "work_id": 12,
+      "task_id": 1285,
+      "kind": "llm",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794166352888,
+      "finished_at": 1794166361665,
+      "duration_ms": 8777,
+      "queue_ms": 1,
+      "request_chars": 92274,
+      "response_chars": 1876,
+      "prompt_tokens": 30514,
+      "completion_tokens": 1240
+    },
+    {
+      "id": 55,
+      "work_id": 12,
+      "task_id": 1285,
+      "kind": "llm",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794166361675,
+      "finished_at": 1794166370168,
+      "duration_ms": 8493,
+      "queue_ms": 1,
+      "request_chars": 92633,
+      "response_chars": 1959,
+      "prompt_tokens": 30624,
+      "completion_tokens": 1262
+    },
+    {
+      "id": 56,
+      "work_id": 12,
+      "task_id": 1285,
+      "kind": "llm",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794166370181,
+      "finished_at": 1794166372593,
+      "duration_ms": 2412,
+      "queue_ms": 1,
+      "request_chars": 94568,
+      "response_chars": 463,
+      "prompt_tokens": 31909,
+      "completion_tokens": 315
+    },
+    {
+      "id": 57,
+      "work_id": 13,
+      "task_id": 1285,
+      "kind": "llm",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794166372612,
+      "finished_at": 1794166373928,
+      "duration_ms": 1316,
+      "queue_ms": 0,
+      "request_chars": 77126,
+      "response_chars": 12,
+      "prompt_tokens": 22092,
+      "completion_tokens": 28
+    },
+    {
+      "id": 58,
+      "work_id": 13,
+      "task_id": 1285,
+      "kind": "llm",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794166374003,
+      "finished_at": 1794166375652,
+      "duration_ms": 1649,
+      "queue_ms": 1,
+      "request_chars": 91555,
+      "response_chars": 193,
+      "prompt_tokens": 29919,
+      "completion_tokens": 165
+    },
+    {
+      "id": 59,
+      "work_id": 13,
+      "task_id": 1285,
+      "kind": "vision_chat",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794166375710,
+      "finished_at": 1794166405390,
+      "duration_ms": 29680,
+      "queue_ms": 1,
+      "request_chars": 228,
+      "response_chars": 0,
+      "prompt_tokens": 758,
+      "completion_tokens": 4096
+    },
+    {
+      "id": 60,
+      "work_id": 13,
+      "task_id": 1285,
+      "kind": "llm",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794166405397,
+      "finished_at": 1794166406780,
+      "duration_ms": 1383,
+      "queue_ms": 1,
+      "request_chars": 91855,
+      "response_chars": 173,
+      "prompt_tokens": 30132,
+      "completion_tokens": 149
+    },
+    {
+      "id": 61,
+      "work_id": 13,
+      "task_id": 1285,
+      "kind": "vision_chat",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794166406833,
+      "finished_at": 1794166413077,
+      "duration_ms": 6244,
+      "queue_ms": 1,
+      "request_chars": 208,
+      "response_chars": 230,
+      "prompt_tokens": 743,
+      "completion_tokens": 740
+    },
+    {
+      "id": 62,
+      "work_id": 13,
+      "task_id": 1285,
+      "kind": "llm",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794166413083,
+      "finished_at": 1794166414935,
+      "duration_ms": 1852,
+      "queue_ms": 1,
+      "request_chars": 92373,
+      "response_chars": 194,
+      "prompt_tokens": 30508,
+      "completion_tokens": 167
+    },
+    {
+      "id": 63,
+      "work_id": 13,
+      "task_id": 1285,
+      "kind": "vision_chat",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794166415090,
+      "finished_at": 1794166422947,
+      "duration_ms": 7857,
+      "queue_ms": 1,
+      "request_chars": 229,
+      "response_chars": 582,
+      "prompt_tokens": 988,
+      "completion_tokens": 1158
+    },
+    {
+      "id": 64,
+      "work_id": 13,
+      "task_id": 1285,
+      "kind": "llm",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794166422953,
+      "finished_at": 1794166431678,
+      "duration_ms": 8725,
+      "queue_ms": 1,
+      "request_chars": 93270,
+      "response_chars": 2135,
+      "prompt_tokens": 31110,
+      "completion_tokens": 1298
+    },
+    {
+      "id": 65,
+      "work_id": 13,
+      "task_id": 1285,
+      "kind": "llm",
+      "config_id": 14,
+      "provider": "openai",
+      "model": "deepseek-flash",
+      "status": "completed",
+      "started_at": 1794166431690,
+      "finished_at": 1794166434772,
+      "duration_ms": 3082,
+      "queue_ms": 1,
+      "request_chars": 95348,
+      "response_chars": 551,
+      "prompt_tokens": 32431,
+      "completion_tokens": 376
+    }
+  ],
+  "messageRoles": [
+    {
+      "task_id": 1281,
+      "phase": "final",
+      "role": "tool_result",
+      "messages": 3,
+      "chars": 11356
+    },
+    {
+      "task_id": 1281,
+      "phase": "request",
+      "role": "assistant",
+      "messages": 3,
+      "chars": 48
+    },
+    {
+      "task_id": 1281,
+      "phase": "request",
+      "role": "request_params",
+      "messages": 4,
+      "chars": 1012
+    },
+    {
+      "task_id": 1281,
+      "phase": "request",
+      "role": "system",
+      "messages": 16,
+      "chars": 100532
+    },
+    {
+      "task_id": 1281,
+      "phase": "request",
+      "role": "tool",
+      "messages": 6,
+      "chars": 26266
+    },
+    {
+      "task_id": 1281,
+      "phase": "request",
+      "role": "tool_call",
+      "messages": 6,
+      "chars": 3485
+    },
+    {
+      "task_id": 1281,
+      "phase": "request",
+      "role": "tool_definitions",
+      "messages": 4,
+      "chars": 253996
+    },
+    {
+      "task_id": 1281,
+      "phase": "request",
+      "role": "user",
+      "messages": 4,
+      "chars": 2728
+    },
+    {
+      "task_id": 1281,
+      "phase": "response",
+      "role": "assistant",
+      "messages": 2,
+      "chars": 705
+    },
+    {
+      "task_id": 1281,
+      "phase": "response",
+      "role": "tool_call",
+      "messages": 3,
+      "chars": 2341
+    },
+    {
+      "task_id": 1282,
+      "phase": "request",
+      "role": "request",
+      "messages": 6,
+      "chars": 1669
+    },
+    {
+      "task_id": 1282,
+      "phase": "response",
+      "role": "result",
+      "messages": 6,
+      "chars": 1154
+    },
+    {
+      "task_id": 1283,
+      "phase": "final",
+      "role": "tool_result",
+      "messages": 8,
+      "chars": 14780
+    },
+    {
+      "task_id": 1283,
+      "phase": "request",
+      "role": "assistant",
+      "messages": 6,
+      "chars": 60
+    },
+    {
+      "task_id": 1283,
+      "phase": "request",
+      "role": "request_params",
+      "messages": 11,
+      "chars": 2071
+    },
+    {
+      "task_id": 1283,
+      "phase": "request",
+      "role": "system",
+      "messages": 28,
+      "chars": 167223
+    },
+    {
+      "task_id": 1283,
+      "phase": "request",
+      "role": "tool",
+      "messages": 30,
+      "chars": 64141
+    },
+    {
+      "task_id": 1283,
+      "phase": "request",
+      "role": "tool_call",
+      "messages": 30,
+      "chars": 5802
+    },
+    {
+      "task_id": 1283,
+      "phase": "request",
+      "role": "tool_definitions",
+      "messages": 7,
+      "chars": 352975
+    },
+    {
+      "task_id": 1283,
+      "phase": "request",
+      "role": "user",
+      "messages": 11,
+      "chars": 18429
+    },
+    {
+      "task_id": 1283,
+      "phase": "response",
+      "role": "assistant",
+      "messages": 4,
+      "chars": 1446
+    },
+    {
+      "task_id": 1283,
+      "phase": "response",
+      "role": "tool_call",
+      "messages": 8,
+      "chars": 2777
+    },
+    {
+      "task_id": 1284,
+      "phase": "final",
+      "role": "tool_result",
+      "messages": 1,
+      "chars": 13535
+    },
+    {
+      "task_id": 1284,
+      "phase": "request",
+      "role": "assistant",
+      "messages": 1,
+      "chars": 10
+    },
+    {
+      "task_id": 1284,
+      "phase": "request",
+      "role": "request_params",
+      "messages": 2,
+      "chars": 506
+    },
+    {
+      "task_id": 1284,
+      "phase": "request",
+      "role": "system",
+      "messages": 8,
+      "chars": 47778
+    },
+    {
+      "task_id": 1284,
+      "phase": "request",
+      "role": "tool",
+      "messages": 1,
+      "chars": 10203
+    },
+    {
+      "task_id": 1284,
+      "phase": "request",
+      "role": "tool_call",
+      "messages": 1,
+      "chars": 2
+    },
+    {
+      "task_id": 1284,
+      "phase": "request",
+      "role": "tool_definitions",
+      "messages": 2,
+      "chars": 100850
+    },
+    {
+      "task_id": 1284,
+      "phase": "request",
+      "role": "user",
+      "messages": 2,
+      "chars": 5114
+    },
+    {
+      "task_id": 1284,
+      "phase": "response",
+      "role": "assistant",
+      "messages": 1,
+      "chars": 10
+    },
+    {
+      "task_id": 1284,
+      "phase": "response",
+      "role": "tool_call",
+      "messages": 1,
+      "chars": 2
+    },
+    {
+      "task_id": 1285,
+      "phase": "final",
+      "role": "tool_result",
+      "messages": 26,
+      "chars": 83638
+    },
+    {
+      "task_id": 1285,
+      "phase": "request",
+      "role": "assistant",
+      "messages": 23,
+      "chars": 262
+    },
+    {
+      "task_id": 1285,
+      "phase": "request",
+      "role": "request_params",
+      "messages": 42,
+      "chars": 7956
+    },
+    {
+      "task_id": 1285,
+      "phase": "request",
+      "role": "system",
+      "messages": 108,
+      "chars": 645003
+    },
+    {
+      "task_id": 1285,
+      "phase": "request",
+      "role": "tool",
+      "messages": 95,
+      "chars": 344659
+    },
+    {
+      "task_id": 1285,
+      "phase": "request",
+      "role": "tool_call",
+      "messages": 95,
+      "chars": 19084
+    },
+    {
+      "task_id": 1285,
+      "phase": "request",
+      "role": "tool_definitions",
+      "messages": 27,
+      "chars": 1361475
+    },
+    {
+      "task_id": 1285,
+      "phase": "request",
+      "role": "user",
+      "messages": 42,
+      "chars": 71324
+    },
+    {
+      "task_id": 1285,
+      "phase": "response",
+      "role": "assistant",
+      "messages": 17,
+      "chars": 7955
+    },
+    {
+      "task_id": 1285,
+      "phase": "response",
+      "role": "tool_call",
+      "messages": 26,
+      "chars": 13110
+    }
+  ],
+  "shots": [
+    {
+      "id": 517,
+      "storyboard_number": 1,
+      "narration_text": "八达岭长城位于北京西北的军都山关沟北口，是明代长城中规制最高、保存最完整的段落之一。",
+      "narration_audio_url": "static/narration/460f0bef-536b-4159-9e53-64ba69d660ee.wav",
+      "narration_meta": {
+        "text_sha256": "5a7568468059081592003eff06494304f69601e4be688e5c1b80fe5a2e394353",
+        "audio": {
+          "duration_ms": 8800,
+          "chars": 42,
+          "voice": "纪录片·沉稳男声",
+          "seed": 1720,
+          "job_id": "8c1b8afeb7fb471a",
+          "provider": "voxcpm",
+          "config_id": 13,
+          "generated_at": "2026-11-08T19:20:41.344Z",
+          "text_sha256": "5a7568468059081592003eff06494304f69601e4be688e5c1b80fe5a2e394353",
+          "params": {
+            "voice": "纪录片·沉稳男声",
+            "inference_timesteps": 10,
+            "cfg_value": 2,
+            "seed": 1720,
+            "instructions": "中年男声，沉稳清晰、节奏自然，适合历史纪录片旁白。",
+            "normalize": true
+          }
+        },
+        "subtitle": {
+          "cues": 2,
+          "source": "sentence",
+          "timing": "sentence",
+          "generated_at": "2026-11-08T19:20:41.344Z"
+        }
+      },
+      "combo": null,
+      "design_card_status": "blank",
+      "design_card": null,
+      "design_card_stale_reason": null
+    },
+    {
+      "id": 518,
+      "storyboard_number": 2,
+      "narration_text": "这样的规格，与它在京师北面防线上的位置分不开。",
+      "narration_audio_url": "static/narration/73f9ac7d-86c3-47ac-8c9a-8389097f9dc6.wav",
+      "narration_meta": {
+        "text_sha256": "e00f30a20a560119f7f6343158f5abe367b9ab45363010d1588dc61d215effbe",
+        "audio": {
+          "duration_ms": 3840,
+          "chars": 23,
+          "voice": "纪录片·沉稳男声",
+          "seed": 1720,
+          "job_id": "c197f3c7d2a04a4f",
+          "provider": "voxcpm",
+          "config_id": 13,
+          "generated_at": "2026-11-08T19:20:43.722Z",
+          "text_sha256": "e00f30a20a560119f7f6343158f5abe367b9ab45363010d1588dc61d215effbe",
+          "params": {
+            "voice": "纪录片·沉稳男声",
+            "inference_timesteps": 10,
+            "cfg_value": 2,
+            "seed": 1720,
+            "instructions": "中年男声，沉稳清晰、节奏自然，适合历史纪录片旁白。",
+            "normalize": true
+          }
+        },
+        "subtitle": {
+          "cues": 1,
+          "source": "sentence",
+          "timing": "sentence",
+          "generated_at": "2026-11-08T19:20:43.722Z"
+        }
+      },
+      "combo": "D",
+      "design_card_status": "pending",
+      "design_card": {
+        "version": 2,
+        "info_points": [
+          {
+            "id": "p1",
+            "text": "八达岭长城沿军都山山脊起伏、城墙上敌台相间矗立，是明代长城中规制突出的段落",
+            "via": "generated"
+          },
+          {
+            "id": "p2",
+            "text": "八达岭夹在京师北面层层防线之中，是防线上的一个具体节点（后镜再展开外线宣府、大同与内线居庸关的层次）",
+            "via": "layer"
+          }
+        ],
+        "budget": {
+          "layer_s": 2,
+          "gen_s": 9
+        },
+        "rationale": "本镜旁白只有一句「这样的规格，与它在京师北面防线上的位置分不开」，实测配音 3.8 秒，信息量是两层：先看见「规格」（墙体依山脊起伏、敌台相间、保存完整），再落到「它在京师北面防线上」这层关系。因此选 D「先入戏再落到地图」：先用生成段承接前一镜的 @八达岭长城 实景镜头（本镜 inherits_first，首帧由前镜尾帧锁定，不重写），把八达岭「规制高、段落完整、敌台相间」的实体感受演出来，再用图层段把结论落回舆图。\n\n图层段底图用本集已有图的 prop #168 @明北疆防线示意图（已用 read_image 核验：图上确实是多重同心环状的防线体系与大量关隘、城堡符号，赭色粗线连成层层纵深）。该资产在真实语义清单里没有任何语义条目（scenes #91–#100 与 props #167–#176 全部为「无语义条目」），所以 must_mark 留空，planned_layers 只用不指向图面具体坐标的排版文字层（「京师北面防线」「八达岭：防线上的关键节点」「防线越向外越厚 · 八达岭在阵中」），不写杜撰的 marker/polygon/polyline，也不留「待人工补标注」的空几何层。底图不钉 version_task_id，因为无法确认标注针对哪一版。\n\n信息点 p2 只说八达岭「在防线之中、是关键节点」，把「外有宣府、大同，内有居庸关，八达岭为居庸关前哨」的完整纵深",
+        "suggested_combo": "D",
+        "layer_plan": {
+          "base": {
+            "kind": "asset",
+            "asset_kind": "prop",
+            "asset_id": 168,
+            "version_task_id": null
+          },
+          "must_mark": [],
+          "planned_layers": [
+            {
+              "type": "card",
+              "at_s": 0,
+              "text": "京师北面防线"
+            },
+            {
+              "type": "label",
+              "at_s": 1,
+              "text": "八达岭：防线上的关键节点"
+            },
+            {
+              "type": "label",
+              "at_s": 2,
+              "text": "防线越向外越厚 · 八达岭在阵中"
+            }
+          ]
+        },
+        "gen_plan": {
+          "reference_assets": [
+            {
+              "kind": "scene",
+              "id": 91,
+              "name": "八达岭长城"
+            }
+          ],
+          "first": "正午强光下，八达岭长城的宽阔马道自画面前景沿山脊向纵深翻越起伏，两侧垛口齐整，沿线敌台相间矗立，天空晴朗，画面中无人物与可动物件。",
+          "mid": "视线稍稍抬高并向侧后方推移，城墙在数座山头之间连续折转，垛口与女墙的阴影整齐排列，近处一座方形敌台的箭窗与顶部垛口清晰可见。",
+          "last": "视线拉远收成一幅整体图景：八达岭段城墙横亘在军都山山脊上，多座敌台沿墙线相间分布，城下关沟谷道收窄成一线，正午阳光把山脊与谷底划出分明的明暗。"
+        }
+      },
+      "design_card_stale_reason": null
+    },
+    {
+      "id": 519,
+      "storyboard_number": 3,
+      "narration_text": "明永乐以后，蒙古诸部屡次南下，朝廷把京师北面的防线层层加厚：外有宣府、大同，内有居庸关，而八达岭扼守关沟最窄处，成为居庸关的前哨。",
+      "narration_audio_url": "static/narration/98f5b58c-4a8c-4f0c-b567-3484880001b5.wav",
+      "narration_meta": {
+        "text_sha256": "d250da808951ac93a4dcab4486edbea0ce7556d6249dfb0cc6063a0b19b002d2",
+        "audio": {
+          "duration_ms": 14400,
+          "chars": 65,
+          "voice": "纪录片·沉稳男声",
+          "seed": 1720,
+          "job_id": "44e7cca265da42d2",
+          "provider": "voxcpm",
+          "config_id": 13,
+          "generated_at": "2026-11-08T19:20:51.151Z",
+          "text_sha256": "d250da808951ac93a4dcab4486edbea0ce7556d6249dfb0cc6063a0b19b002d2",
+          "params": {
+            "voice": "纪录片·沉稳男声",
+            "inference_timesteps": 10,
+            "cfg_value": 2,
+            "seed": 1720,
+            "instructions": "中年男声，沉稳清晰、节奏自然，适合历史纪录片旁白。",
+            "normalize": true
+          }
+        },
+        "subtitle": {
+          "cues": 2,
+          "source": "sentence",
+          "timing": "sentence",
+          "generated_at": "2026-11-08T19:20:51.151Z"
+        }
+      },
+      "combo": "C",
+      "design_card_status": "pending",
+      "design_card": {
+        "version": 2,
+        "info_points": [
+          {
+            "id": "ip1",
+            "text": "明永乐以后蒙古诸部屡次南下，越过边墙向关内推进",
+            "via": "layer"
+          },
+          {
+            "id": "ip2",
+            "text": "朝廷把京师北面防线层层加厚：外有宣府、大同，内有居庸关",
+            "via": "layer"
+          },
+          {
+            "id": "ip3",
+            "text": "八达岭扼守关沟最窄处",
+            "via": "layer"
+          },
+          {
+            "id": "ip4",
+            "text": "八达岭的位置使它成为居庸关的前哨",
+            "via": "layer"
+          }
+        ],
+        "budget": {
+          "layer_s": 15,
+          "gen_s": 0
+        },
+        "rationale": "本镜旁白是一整段背景交代：「明永乐以后，蒙古诸部屡次南下，朝廷把京师北面的防线层层加厚：外有宣府、大同，内有居庸关，而八达岭扼守关沟最窄处，成为居庸关的前哨」——全部是地理层级与相对位置关系，没有人物、没有可演的过程，因此选 A「只图层」：用 15 秒在一张舆图上把这套纵深关系逐层标出，恰好容纳实测配音 14.4 秒（15 ≥ 14.4）。\n\n底图用 prop #169 @进京路线示意图。选择依据：它是本集唯一一张图面自塞外草原（蒙古包与牧群）经边墙、宣府、大同、居庸关、八达岭关沟北口，直到北京城一线贯通、并以朱红色箭头虚线串起自塞外指向京城方向的资产，其图面呈现与旁白的「南下—层层加厚—八达岭在关沟北口」完全对应，且该资产已有图（image_url 现存）。已用 read_image 核验图面：可读标注含「居庸关」（图中部）、「皇城宫殿」（图下方矩形城垣内）、以及自上方蒙古包营地经边墙、土木驿、居庸关一路向下指向城垣的朱红色带箭头虚线，方向朝京城；这与旁白所述南下方向一致，因此本镜不做反向或杜撰的新路线。\n\n图层安排按配音时间轴排：0 秒先出年代与事件卡（明永乐以后蒙古诸部屡次南下），2.5 秒标出图中那条自塞外越墙南下的箭头路线，4.5 秒标外线宣府、大同，8 秒标内线居庸关，10 秒标八达岭扼守关沟最窄处，12.5 秒压上结论「居庸关前哨：八达岭」。\n\n引用依据说明：本集真实",
+        "suggested_combo": "C",
+        "layer_plan": {
+          "base": {
+            "kind": "asset",
+            "asset_kind": "prop",
+            "asset_id": 169,
+            "version_task_id": null
+          },
+          "must_mark": [],
+          "planned_layers": [
+            {
+              "type": "card",
+              "at_s": 0,
+              "text": "明永乐以后 · 蒙古诸部屡次南下"
+            },
+            {
+              "type": "label",
+              "at_s": 2.5,
+              "text": "南下路线：塞外越过边墙 → 关内山道"
+            },
+            {
+              "type": "label",
+              "at_s": 4.5,
+              "text": "外线：宣府 · 大同"
+            },
+            {
+              "type": "label",
+              "at_s": 8,
+              "text": "内线：居庸关"
+            },
+            {
+              "type": "label",
+              "at_s": 10,
+              "text": "八达岭 · 扼守关沟最窄处"
+            },
+            {
+              "type": "label",
+              "at_s": 12.5,
+              "text": "居庸关前哨：八达岭"
+            }
+          ]
+        },
+        "gen_plan": {
+          "reference_assets": []
+        }
+      },
+      "design_card_stale_reason": null
+    },
+    {
+      "id": 520,
+      "storyboard_number": 4,
+      "narration_text": "城墙依山脊起伏，以条石为基、青砖包砌，顶部宽处可容五马并行，便于快速调兵。",
+      "narration_audio_url": "static/narration/931a112e-9914-4d9c-ad93-2b71fc78821f.wav",
+      "narration_meta": {
+        "text_sha256": "32f67b801d81c529ea594f7d7234d0a085ffdac3d6b2d6f4f4019e36db0bb0ff",
+        "audio": {
+          "duration_ms": 9920,
+          "chars": 37,
+          "voice": "纪录片·沉稳男声",
+          "seed": 1720,
+          "job_id": "421f390e8bff4882",
+          "provider": "voxcpm",
+          "config_id": 13,
+          "generated_at": "2026-11-08T19:20:56.337Z",
+          "text_sha256": "32f67b801d81c529ea594f7d7234d0a085ffdac3d6b2d6f4f4019e36db0bb0ff",
+          "params": {
+            "voice": "纪录片·沉稳男声",
+            "inference_timesteps": 10,
+            "cfg_value": 2,
+            "seed": 1720,
+            "instructions": "中年男声，沉稳清晰、节奏自然，适合历史纪录片旁白。",
+            "normalize": true
+          }
+        },
+        "subtitle": {
+          "cues": 1,
+          "source": "sentence",
+          "timing": "sentence",
+          "generated_at": "2026-11-08T19:20:56.337Z"
+        }
+      },
+      "combo": "B",
+      "design_card_status": "pending",
+      "design_card": {
+        "version": 2,
+        "info_points": [
+          {
+            "id": "p1",
+            "text": "城墙不是直线，而是随山脊起伏翻越多座山头",
+            "via": "generated"
+          },
+          {
+            "id": "p2",
+            "text": "墙体以条石垒砌墙基、外面用青砖包砌",
+            "via": "generated"
+          },
+          {
+            "id": "p3",
+            "text": "墙顶的马道宽阔，宽处可容五匹马并行",
+            "via": "generated"
+          },
+          {
+            "id": "p4",
+            "text": "宽阔马道便于守军沿墙快速调兵",
+            "via": "generated"
+          }
+        ],
+        "budget": {
+          "layer_s": 0,
+          "gen_s": 12
+        },
+        "rationale": "本镜旁白只有一句「城墙依山脊起伏，以条石为基、青砖包砌，顶部宽处可容五马并行，便于快速调兵」，实测配音 9.9 秒。这句话的内容全部是**城墙本体的实体特征与由此带来的用途**——依山起伏、条石基、青砖包砌、马道宽可五马并行、便于调兵——没有地名层级、没有路线或区域关系，任何图层段都无处可标，因此选 **B「只生成段」**：用 12 秒（≥ 9.9 秒）的生成段把这四点依次演出来，比在一张舆图上压排版字更能说明「为什么宽马道能调兵」。\n\n承接关系：本镜 inherits_first = true，首帧由前镜 #3（combo C，末端是图层段）与本镜图层段衔接的既有约定锁定为 @八达岭长城 的墙顶马道画面，生成段第一段不重新建立空间，直接从画面已有的宽阔马道继续推进。\n\n引用依据（均已核验）：生成段引用两张现在就有图的场景资产——scene #91 @八达岭长城（static/images/981f7f9d…png，已用 read_image 确认：中轴线平视略俯，铺方砖的宽阔马道约可容 5–6 人并排，两侧垛口带矩形射孔、内侧女墙较低，前方一座方形敌台，山脊上另有 3–4 座敌台相间，正午偏左阳光、垛口短影，画面内无人物无文字）承担「依山起伏、马道宽阔、敌台相间」；scene #93 @长城马道调兵（static/images/b5276539…png，已用 read_image",
+        "suggested_combo": "B",
+        "gen_plan": {
+          "reference_assets": [
+            {
+              "kind": "scene",
+              "id": 91,
+              "name": "八达岭长城"
+            },
+            {
+              "kind": "scene",
+              "id": 93,
+              "name": "长城马道调兵"
+            }
+          ],
+          "first": "@八达岭长城 墙顶马道的中轴线平视画面，铺方砖的马道宽阔平直，两侧垛口与内侧女墙齐整，远处一座方形敌台横在视线尽头，视线顺着马道沿山脊向纵深翻越，正午阳光斜照、垛口阴影短促整齐，画面中无人物与可动物件（沿用前镜尾帧画面，不重新建立空间）。",
+          "mid": "低角度仰拍 @八达岭长城 的外侧墙体：条石垒砌的墙基压在裸岩坡面上，其上青砖包砌的墙面向上收分、对缝工整，墙体顶部垛口连成一线，正午硬光下砖石纹理与灰缝清晰。",
+          "last": "马道中景，一队守军沿马道纵向成列行进，队形沿 @长城马道调兵 的宽阔墙顶展开、可容五骑并行，两侧垛口在线，远处敌台矗立马道尽头，正午顶光下人物与垛口投下短促阴影。"
+        }
+      },
+      "design_card_stale_reason": null
+    },
+    {
+      "id": 521,
+      "storyboard_number": 5,
+      "narration_text": "沿线每隔数百米设敌台与烽燧，守军以烟火与号炮为信，警讯昼夜之间即可传到京城。",
+      "narration_audio_url": "static/narration/dd6ae395-02c0-4034-ab03-2d20cd0253f6.wav",
+      "narration_meta": {
+        "text_sha256": "06cd86bc68d824dfc6004f7d03721b77aae0180d186fa3e3e57017a93a3e5490",
+        "audio": {
+          "duration_ms": 10240,
+          "chars": 38,
+          "voice": "纪录片·沉稳男声",
+          "seed": 1720,
+          "job_id": "212808005da64764",
+          "provider": "voxcpm",
+          "config_id": 13,
+          "generated_at": "2026-11-08T19:21:01.731Z",
+          "text_sha256": "06cd86bc68d824dfc6004f7d03721b77aae0180d186fa3e3e57017a93a3e5490",
+          "params": {
+            "voice": "纪录片·沉稳男声",
+            "inference_timesteps": 10,
+            "cfg_value": 2,
+            "seed": 1720,
+            "instructions": "中年男声，沉稳清晰、节奏自然，适合历史纪录片旁白。",
+            "normalize": true
+          }
+        },
+        "subtitle": {
+          "cues": 1,
+          "source": "sentence",
+          "timing": "sentence",
+          "generated_at": "2026-11-08T19:21:01.731Z"
+        }
+      },
+      "combo": "C",
+      "design_card_status": "pending",
+      "design_card": {
+        "version": 2,
+        "info_points": [
+          {
+            "id": "ip1",
+            "text": "长城沿线每隔数百米就设置敌台，敌台高出墙体、四面开箭窗，与烽燧台相间排列在墙顶一侧",
+            "via": "generated"
+          },
+          {
+            "id": "ip2",
+            "text": "守军以灯火、烽烟、号炮作为传讯信号，信号一台接一台沿山脊相接",
+            "via": "layer"
+          },
+          {
+            "id": "ip3",
+            "text": "警讯自边关传往京城，昼夜之间即可抵达",
+            "via": "layer"
+          }
+        ],
+        "budget": {
+          "layer_s": 6,
+          "gen_s": 5
+        },
+        "rationale": "本镜旁白一句「沿线每隔数百米设敌台与烽燧，守军以烟火与号炮为信，警讯昼夜之间即可传到京城」，实测配音 10.2 秒，信息分两层：先要看见「敌台与烽燧沿线相间设在墙体上」这个实体设施，再要说明「用烟火、号炮为信号、昼夜之间传到京城」这套传讯机制。设施是实体、可以演，机制是跨越很长距离的过程，只能靠示意与排版讲清，所以选 C「先定位再入戏」的反向顺序在本镜不成立，改为更贴合的 C（图层段先立机制示意，再接生成段实景）：图层段底图用 prop #170 @烽燧烟火信号示意图——已用 read_image 核验：图上确有方形砖石烽燧台两座（顶部带垛口）、左侧台顶升起黑灰色烟柱、右侧台顶架着一门火炮喷出红橙色烟火、两座台之间有一条红色虚线箭头由左指向右，正与旁白「敌台与烽燧、烟火与号炮、一台接一台传递」逐项对应，是本集现有资产中唯一真正画出「烟火+号炮+传讯方向」的图版；画面不是舆图坐标式的地图，也没有任何可用的坐标语义，所以 must_mark 留空、planned_layers 只用不指向图面具体位置的纯排版文字层（传讯方式、一台接一台、昼夜抵京），不写杜撰的 marker/polyline，也不留空的几何占位层；底图不钉 version_task_id，因为无法确认标注针对哪一版。生成段用本集已有图的 scene #91 @八达岭长城（static/images/981f7f9d…pn",
+        "suggested_combo": "C",
+        "layer_plan": {
+          "base": {
+            "kind": "asset",
+            "asset_kind": "prop",
+            "asset_id": 170,
+            "version_task_id": null
+          },
+          "must_mark": [],
+          "planned_layers": [
+            {
+              "type": "card",
+              "at_s": 0,
+              "text": "烽燧传讯 · 烟火与号炮为信"
+            },
+            {
+              "type": "label",
+              "at_s": 1.5,
+              "text": "敌台与烽燧 · 一台接一台"
+            },
+            {
+              "type": "label",
+              "at_s": 3,
+              "text": "一盏火 → 一柱烟 → 一声炮"
+            },
+            {
+              "type": "card",
+              "at_s": 4.5,
+              "text": "警讯抵达京城：昼夜之间"
+            }
+          ]
+        },
+        "gen_plan": {
+          "reference_assets": [
+            {
+              "kind": "scene",
+              "id": 91,
+              "name": "八达岭长城"
+            }
+          ],
+          "first": "@八达岭长城 沿山脊延展的墙顶上，一座方形砖砌敌台高踞墙线一侧，台顶垛口与侧面箭窗清晰，远处山脊上另有多座方形墩台相间排列成一线，阳光斜照出短促阴影，墙体在画面中段形成由近及远的层叠纵深，画面中无人物与可动物件。",
+          "mid": "高角度俯看 @八达岭长城 的墙顶与敌台，敌台四面箭窗朝向不同方向、顶部垛口环列，数座敌台与台体沿山脊一字排开，墙体随山势上下折转，午前斜光把垛口与敌台的阴影整齐拉向一侧。",
+          "last": "黄昏色的山脊天际线上，@八达岭长城 的敌台顶部升起一缕细烟逆光散开，敌台轮廓剪影清晰，墙线与远处的多座台体在山脊上连成一线，天光渐暗。"
+        }
+      },
+      "design_card_stale_reason": null
+    },
+    {
+      "id": 522,
+      "storyboard_number": 6,
+      "narration_text": "它的作用不只是阻挡，更是把进攻者逼入狭窄山道，使明军能以较少兵力守住通往北京的咽喉。",
+      "narration_audio_url": "static/narration/59927f6d-0319-4bae-a3b5-bf99bf6a6200.wav",
+      "narration_meta": {
+        "text_sha256": "db4ac606c18fa41ec12f378e234a6fff1e307e7b3b26ca76236c8e39013a3ac1",
+        "audio": {
+          "duration_ms": 8800,
+          "chars": 42,
+          "voice": "纪录片·沉稳男声",
+          "seed": 1720,
+          "job_id": "29ef876c728940fd",
+          "provider": "voxcpm",
+          "config_id": 13,
+          "generated_at": "2026-11-08T19:21:06.383Z",
+          "text_sha256": "db4ac606c18fa41ec12f378e234a6fff1e307e7b3b26ca76236c8e39013a3ac1",
+          "params": {
+            "voice": "纪录片·沉稳男声",
+            "inference_timesteps": 10,
+            "cfg_value": 2,
+            "seed": 1720,
+            "instructions": "中年男声，沉稳清晰、节奏自然，适合历史纪录片旁白。",
+            "normalize": true
+          }
+        },
+        "subtitle": {
+          "cues": 2,
+          "source": "sentence",
+          "timing": "sentence",
+          "generated_at": "2026-11-08T19:21:06.383Z"
+        }
+      },
+      "combo": "C",
+      "design_card_status": "pending",
+      "design_card": {
+        "version": 2,
+        "info_points": [
+          {
+            "id": "ip1",
+            "text": "八达岭的作用不只是阻挡，更是把进攻者逼入狭窄山道",
+            "via": "generated"
+          },
+          {
+            "id": "ip2",
+            "text": "守军据关列阵，以较少兵力扼守谷口",
+            "via": "generated"
+          },
+          {
+            "id": "ip3",
+            "text": "八达岭扼守的是通往北京的咽喉要道",
+            "via": "layer"
+          }
+        ],
+        "budget": {
+          "layer_s": 4,
+          "gen_s": 10
+        },
+        "rationale": "承接前镜（#5 烽燧传讯）的图层底图，本镜先用 4 秒把「咽喉」这层关系落在图上，只做不依赖具体点位坐标的排版文字层（关沟北口通往北京的咽喉定位），不使用杜撰锚点、也不留空几何层。随后 10 秒切入生成段，以本集已有图的 @八达岭长城 场景演出「进攻者被逼入狭窄山道、守军以少兵据关扼守」的过程：据关列阵的守军改由生成段演绎（assets #176 当前无图，未引用）。两段合计 14 秒 ≥ 实测配音 8.8 秒，三个信息点全部由画面承担。",
+        "suggested_combo": "C",
+        "layer_plan": {
+          "base": {
+            "kind": "inherit_prev"
+          },
+          "must_mark": [],
+          "planned_layers": [
+            {
+              "type": "label",
+              "at_s": 0,
+              "text": "咽喉：关沟北口 → 北京"
+            },
+            {
+              "type": "card",
+              "at_s": 2,
+              "text": "要害定位：八达岭扼守关沟北口"
+            }
+          ]
+        },
+        "gen_plan": {
+          "reference_assets": [
+            {
+              "kind": "scene",
+              "id": 91,
+              "name": "八达岭长城"
+            }
+          ],
+          "mid": "俯瞰收窄的关沟谷道，骑兵首尾相衔挤满山道无法展开，八达岭关城横跨谷口，城台上守军持枪张弓列阵",
+          "last": "关城券门紧闭、城台上守军列阵静立，山道内挤满的骑兵队形散乱地受阻于关门前"
+        }
+      },
+      "design_card_stale_reason": null
+    }
+  ],
+  "imageOrVideoGenerations": []
+}

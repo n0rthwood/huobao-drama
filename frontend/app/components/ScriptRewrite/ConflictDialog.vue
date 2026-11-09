@@ -10,27 +10,29 @@
         </header>
 
         <div class="dialog-body cd-body">
-          <p class="cd-note">{{ note }}</p>
+          <p class="cd-note">{{ readOnly ? t('episode.rewrite.restoredConflictHint') : note }}</p>
           <p v-if="message" class="cd-server">{{ message }}</p>
 
-          <div class="cd-columns">
+          <div class="cd-columns" :class="{ 'read-only': readOnly && !mine }">
             <section class="cd-col">
               <h3 class="cd-col-title">{{ t('episode.rewrite.conflict.current') }}</h3>
               <pre class="cd-text">{{ current || '—' }}</pre>
             </section>
-            <section class="cd-col">
+            <section v-if="mine || !readOnly" class="cd-col">
               <h3 class="cd-col-title">{{ mineTitle }}</h3>
               <pre class="cd-text">{{ mine || '—' }}</pre>
             </section>
           </div>
 
-          <section class="cd-diff">
+          <section v-if="mine || !readOnly" class="cd-diff">
             <h3 class="cd-col-title">{{ t('episode.rewrite.conflict.diffTitle') }}</h3>
             <DiffView :before="current" :after="mine" />
           </section>
         </div>
 
         <footer class="dialog-foot cd-foot">
+          <button v-if="readOnly" class="btn" @click="emit('close')">{{ t('common.close') }}</button>
+          <template v-else>
           <button class="btn" :disabled="busy" @click="emit('keep')">{{ t('episode.rewrite.conflict.keepCurrent') }}</button>
           <button class="btn" :disabled="busy || !mine" @click="copyMine">
             {{ copied ? t('episode.rewrite.conflict.copied') : t('episode.rewrite.conflict.copyMine') }}
@@ -38,6 +40,7 @@
           <button class="btn btn-primary" :disabled="busy || !mine" @click="emit('apply')">
             {{ kind === 'adopt' ? t('episode.rewrite.conflict.adoptAgain') : t('episode.rewrite.conflict.overwrite') }}
           </button>
+          </template>
         </footer>
       </div>
     </div>
@@ -64,6 +67,7 @@ const props = defineProps({
   current: { type: String, default: '' },
   message: { type: String, default: '' },
   busy: { type: Boolean, default: false },
+  readOnly: { type: Boolean, default: false },
 })
 const emit = defineEmits(['close', 'keep', 'apply'])
 
@@ -96,6 +100,7 @@ async function copyMine() {
 .cd-note { margin: 0; font-size: 12.5px; color: var(--text-1); line-height: 1.7; }
 .cd-server { margin: 0; font-size: 11.5px; color: var(--danger-text, #d9534f); }
 .cd-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.cd-columns.read-only { grid-template-columns: 1fr; }
 @media (max-width: 1100px) { .cd-columns { grid-template-columns: 1fr; } }
 .cd-col { min-width: 0; display: flex; flex-direction: column; gap: 5px; }
 .cd-col-title { margin: 0; font-size: 11.5px; font-weight: 700; color: var(--text-2); }
