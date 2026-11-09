@@ -13,7 +13,7 @@ import math
 import zipfile
 from pathlib import Path
 
-GRID_NODES = 33
+GRID_NODES = 65
 MAX_RESIDUAL_PX = 3.0
 ANCHOR_STRIDE = (GRID_NODES - 1) // 16
 
@@ -43,10 +43,10 @@ def write_calibration_kmz(controls, output: Path):
         icons[name] = icon.getvalue()
     kml = ('<?xml version="1.0" encoding="UTF-8"?>'
            '<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Pixel calibration</name>'
-           '<Style id="calibration"><IconStyle><scale>0.5</scale><Icon><href>fiducial.png</href></Icon>'
+           '<Style id="calibration"><IconStyle><scale>0.25</scale><Icon><href>fiducial.png</href></Icon>'
            '<hotSpot x="0.5" y="0.5" xunits="fraction" yunits="fraction"/></IconStyle>'
            '<LabelStyle><scale>0</scale></LabelStyle></Style>'
-           '<Style id="anchor"><IconStyle><scale>1</scale><Icon><href>anchor.png</href></Icon>'
+           '<Style id="anchor"><IconStyle><scale>0.25</scale><Icon><href>anchor.png</href></Icon>'
            '<hotSpot x="0.5" y="0.5" xunits="fraction" yunits="fraction"/></IconStyle>'
            '<LabelStyle><scale>0</scale></LabelStyle></Style>'
            '<Folder><name>Pixel calibration controls</name>')
@@ -105,17 +105,26 @@ def detect_centers(screenshot: Path, *, anchor=False):
 
 def associate_controls(controls, centers, predicted, radius):
     measured, used = [], set()
+    bins = {}
+    for ci, center in enumerate(centers):
+        cell = (math.floor(center[0] / radius), math.floor(center[1] / radius))
+        bins.setdefault(cell, []).append((ci, center))
     for index, control in enumerate(controls):
         px, py = predicted[index][:2]
-        candidates = [(math.hypot(center[0] - px, center[1] - py), ci, center)
-                      for ci, center in enumerate(centers) if ci not in used]
-        candidates.sort(key=lambda item: item[0])
-        if not candidates or candidates[0][0] > radius:
-            nearest = candidates[0][0] if candidates else None
+        bx, by = math.floor(px / radius), math.floor(py / radius)
+        candidates = []
+        for y in range(by - 1, by + 2):
+            for x in range(bx - 1, bx + 2):
+                for ci, center in bins.get((x, y), ()):
+                    if ci in used: continue
+                    distance = math.hypot(center[0] - px, center[1] - py)
+                    if distance <= radius: candidates.append((distance, ci, center))
+        if not candidates:
+            nearest = min((math.hypot(c[0] - px, c[1] - py) for ci, c in enumerate(centers) if ci not in used), default=None)
             raise RuntimeError(f"Pixel calibration could not uniquely find {control['kind']}[{control['row']},{control['col']}] "
                                f"at predicted ({px:.1f},{py:.1f}); nearest={nearest}, association radius={radius:.1f}px; "
                                "projection/terrain/UI may hide the control, refusing an unregistered screenshot")
-        if len(candidates) > 1 and candidates[1][0] <= radius:
+        if len(candidates) > 1:
             raise RuntimeError(f"Ambiguous pixel fiducial at {control}; refusing to guess")
         distance, ci, center = candidates[0]
         used.add(ci)

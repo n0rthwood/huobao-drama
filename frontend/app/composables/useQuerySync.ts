@@ -242,13 +242,15 @@ export const DEEPLINK_KEYS = {
   /** 项目详情页：页签 / 素材类型筛选 / 素材编辑弹窗 */
   detail: ['tab', 'filter', 'asset'],
   /** 项目详情页弹窗：图片大图 / 资产浏览器（含其内部筛选）/ 素材库宿主 / 新增剧集 / 项目设置 / 删除确认外壳 */
-  detailDialogs: ['view', 'browser', 'bkind', 'bq', 'lib', 'addep', 'proj', 'del'],
+  detailDialogs: ['view', 'browser', 'bkind', 'bq', 'lib', 'addep', 'proj', 'del', 'mfocus'],
   /** 剧集工作台：面板 / 剧本子步骤 / 制作页签 / 资产子页签 / 提取筛选 / 资产详情弹窗 */
   workbench: ['panel', 'step', 'tab', 'sub', 'extract', 'asset'],
   /** 工作台弹窗层：弹窗 / 大图 / 选中分镜 / 工作区多选 / 弹窗独立批量范围 */
-  workbenchDialogs: ['dlg', 'view', 'shot', 'sel', 'bsel'],
+  workbenchDialogs: ['dlg', 'view', 'shot', 'sel', 'bsel', 'mfocus'],
   /** 资产详情弹窗内部：定位的语义条目 / 流水线轮次 */
   assetDetail: ['sem', 'run', 'round'],
+  /** 地图几何编辑器：已保存要素的类型与稳定 id；不承载未保存坐标或绘制草稿。 */
+  mapGeometry: ['mfocus'],
   /** 参考图管理器：素材库弹窗的宿主资产（值 = 类型-id，多实例共用一个键） */
   refLibrary: ['reflib'],
   /** 角色档案图面板：检索弹窗与关键词 */

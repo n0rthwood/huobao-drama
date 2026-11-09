@@ -35,8 +35,8 @@ def fixture(output, mode):
         if mode == 'bad' and control['kind'] == 'validation' and control['row'] == 3 and control['col'] == 3:
             x += 6
         x, y = round(x), round(y)
-        bounds = [x-16, y-16, x+15, y+15] if mode == 'large' else [x-4, y-4, x+4, y+4]
         anchor = control['kind'] == 'grid' and control['row'] % helper['ANCHOR_STRIDE'] == 0 and control['col'] % helper['ANCHOR_STRIDE'] == 0
+        bounds = [x-16, y-16, x+15, y+15] if mode == 'large' and anchor else [x-4, y-4, x+4, y+4]
         draw.rectangle(bounds, fill=(0, 255, 255) if anchor else (255, 0, 255))
     image.save(output)
 

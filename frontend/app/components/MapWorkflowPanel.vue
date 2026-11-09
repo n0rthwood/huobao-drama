@@ -139,6 +139,7 @@
       <p v-if="specDirty" class="mw-warn">{{ t('episode.documentary.map.panel.specDirtyWarn') }}</p>
       <MapGeoEditor
         :spec="specDraft"
+        :persisted-spec="detail.map_spec"
         :registration="registration"
         :base-image="editorBase"
         :disabled="busy"

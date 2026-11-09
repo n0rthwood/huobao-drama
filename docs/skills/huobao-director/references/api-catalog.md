@@ -303,9 +303,9 @@ Body：`{scope:"all"|"characters"|"scenes"|"props", episode_id?, rewrite_prompts
 - `issues[] = {field,code,message,blocking}`；`blocking=true` 要补齐，不把失败当无问题。
 - `research.queries[]` 逐源记录 hits/error；来源固定为 `wikipedia-zh / wikipedia-en / europeana / smithsonian`，不是模型自选任意网站。`sources[]` 保存机构、年代、许可、URL 与实际摘录；`features[]` 保存点线面、坐标依据、支持原文、不确定性、来源引用和冲突。URL 存在不等于它证明了某个坐标。Europeana/Smithsonian 凭据仍由「设置→资料检索」保管，Agent 不获取、落盘或写入请求留痕；无 key 的来源失败应如实呈报。
 - `outputs = {base_image,texture_image,final_image,kmz,layer_doc}`；image 项含 `{path,width,height,source,task_id,provenance}`。`provenance.registration` 是 geo↔像素配准真源；Earth 使用通过独立检验的实测控制网格，不用名义相机或 bbox 仿射替代；检验点残差超过 3px 或相机漂移时失败，保留标定截图、控制点与残差证据。
-- 新采集使用 33×33 控制网格和每格独立中心（1024 留出点）；稀疏异色锚点先按真实像素定位，再关联密集控制点，名义相机只负责粗定位。最大残差仍须 ≤3px、相机漂移 ≤0.25px。旧 17×17 残差 5.408px（task 1320）与密集网格相机预测关联失败（1323）均保留失败；不能放宽门槛或登记失败截图。新版 onboarding 按语义节点激活，不发全局 Escape；修复后只续跑 base，不重做检索。
+- 新采集使用 65×65 控制网格和每格独立中心（4096 留出点）；稀疏异色锚点先按真实像素定位，再关联密集控制点，名义相机只负责粗定位。最大残差仍须 ≤3px、相机漂移 ≤0.25px。17×17 残差 5.408px（task 1320）、33×33 相机预测关联失败（1323）与山地留出残差 5.701px（1328）均保留失败；不能放宽门槛或登记失败截图。新版 onboarding 按语义节点激活，不发全局 Escape；修复后只续跑 base，不重做检索。
 - 地名文本按共享字号/换行模型放进独立 label 图层并避让，marker 的真实点位不因排版移动；过于拥挤时明确报空间不足，不截断地名。历史成图不被升级自动覆盖，需重新 drawing 才采用新版布局，已有底图/底纹可复用。
-- 编辑画布的文字不参与鼠标命中，拖拽地点/线面顶点不会被上方文字截获；修改仍须显式保存几何并重绘，不等于点击「采纳」或史实批准。
+- 编辑画布仅显示选中要素名称，其余名称可悬停或在列表查看，避免密集标签互相遮挡；文字不参与鼠标命中。`mfocus=place:<id>|route:<id>|region:<id>` 与宿主 `asset=prop-<id>` 一起定位已保存要素，刷新/新标签只恢复界面；未保存坐标与绘制草稿不入 URL。修改须显式保存几何并重绘，不等于点击「采纳」或史实批准。
 
 - research 阶段会把有依据的点线面加入 `map_spec`，AI 新项带 `proposed:true`。自动制图可使用候选，但不是人工批准；人工采纳须去掉相应项的 `proposed` 再 PUT 保存，此后检索不覆盖该项。近似区域只能在显式 `schematic:true` 下采用，必须保留不确定性；没有依据不虚构范围。
 #### `PUT /props/{p}/map-workflow`

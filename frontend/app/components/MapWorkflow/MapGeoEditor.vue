@@ -47,7 +47,7 @@
             :points="region.attr"
             :class="['geo-region', { 'is-active': selected?.kind === 'region' && selected.id === region.id }]"
             :stroke-width="unit * 1.2"
-          />
+          ><title>{{ region.name }}</title></polygon>
           <circle
             v-for="(pt, i) in region.pixels"
             :key="`rgv-${region.id}-${i}`"
@@ -58,7 +58,7 @@
             @pointerdown.stop="startDrag('region', region.id, i, $event)"
             @dblclick.stop="removeVertex('region', region.id, i)"
           />
-          <text v-if="region.pixels[0]" :x="region.pixels[0][0] + unit * 3" :y="region.pixels[0][1] - unit * 2" :font-size="unit * 9" class="geo-text">{{ region.name }}</text>
+          <text v-if="region.pixels[0] && selected?.kind === 'region' && selected.id === region.id" :x="region.pixels[0][0] + unit * 3" :y="region.pixels[0][1] - unit * 2" :font-size="unit * 4" class="geo-text">{{ region.name }}</text>
         </g>
 
         <g v-for="route in routeShapes" :key="`rt-${route.id}`">
@@ -66,7 +66,7 @@
             :points="route.attr"
             :class="['geo-route', { 'is-active': selected?.kind === 'route' && selected.id === route.id }]"
             :stroke-width="unit * 1.8"
-          />
+          ><title>{{ route.name }}</title></polyline>
           <circle
             v-for="(pt, i) in route.pixels"
             :key="`rtv-${route.id}-${i}`"
@@ -77,7 +77,7 @@
             @pointerdown.stop="startDrag('route', route.id, i, $event)"
             @dblclick.stop="removeVertex('route', route.id, i)"
           />
-          <text v-if="route.pixels[0]" :x="route.pixels[0][0] + unit * 3" :y="route.pixels[0][1] - unit * 2" :font-size="unit * 9" class="geo-text">{{ route.name }}</text>
+          <text v-if="route.pixels[0] && selected?.kind === 'route' && selected.id === route.id" :x="route.pixels[0][0] + unit * 3" :y="route.pixels[0][1] - unit * 2" :font-size="unit * 4" class="geo-text">{{ route.name }}</text>
         </g>
 
         <g v-for="place in placeShapes" :key="`pl-${place.id}`">
@@ -87,8 +87,8 @@
             :r="unit * 3"
             :class="['geo-place', { 'is-active': selected?.kind === 'place' && selected.id === place.id, 'is-proposed': place.proposed }]"
             @pointerdown.stop="startDrag('place', place.id, 0, $event)"
-          />
-          <text :x="place.at[0] + unit * 4" :y="place.at[1] + unit * 3" :font-size="unit * 9" class="geo-text">{{ place.name }}</text>
+          ><title>{{ place.name }}</title></circle>
+          <text v-if="selected?.kind === 'place' && selected.id === place.id" :x="place.at[0] + unit * 4" :y="place.at[1] + unit * 3" :font-size="unit * 4" class="geo-text">{{ place.name }}</text>
         </g>
 
         <g v-if="draftPixels.length">
@@ -171,6 +171,8 @@
  */
 import { X } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
+import { toast } from 'vue-sonner'
+import { DEEPLINK_KEYS, useDeeplink } from '~/composables/useQuerySync'
 import type { MapRegion, MapRoute, MapSpec } from '~/composables/useApi'
 import { geoToPixel, pixelToGeo, registrationSummary, type MapRegistration } from '~/utils/mapRegistration'
 import { mediaUrl } from '~/utils/url'
@@ -179,6 +181,7 @@ const { t } = useI18n()
 
 const props = defineProps<{
   spec: MapSpec
+  persistedSpec: MapSpec | null
   registration: MapRegistration | null
   baseImage: { path: string; width: number; height: number } | null
   disabled?: boolean
@@ -202,6 +205,33 @@ const draft = ref<{ kind: LinearKind; id: string | null; points: Array<[number, 
 const dragging = ref<{ kind: FeatureKind; id: string; index: number } | null>(null)
 const svgEl = ref<SVGSVGElement | null>(null)
 const naturalSize = ref({ width: 0, height: 0 })
+
+const link = useDeeplink('mapGeometry', DEEPLINK_KEYS.mapGeometry)
+function hasFeature(spec: MapSpec | null, feature: { kind: FeatureKind; id: string }): boolean {
+  const list = feature.kind === 'place' ? spec?.places : feature.kind === 'route' ? spec?.routes : spec?.regions
+  return !!list?.some(item => item.id === feature.id)
+}
+const initialFocus = link.initial('mfocus')
+if (initialFocus) {
+  const match = /^(place|route|region):(.+)$/.exec(initialFocus)
+  const kind = match?.[1]
+  const id = match?.[2]
+  if ((kind === 'place' || kind === 'route' || kind === 'region') && id && hasFeature(props.persistedSpec, { kind, id })) {
+    selected.value = { kind, id }
+  } else {
+    toast.warning(t('deeplink.missing'))
+  }
+}
+let focusOnLoad = Boolean(initialFocus && selected.value)
+watch([selected, () => props.spec, () => props.persistedSpec], () => {
+  const feature = selected.value
+  if (feature && !hasFeature(props.spec, feature)) {
+    selected.value = null
+    link.set({})
+    return
+  }
+  link.set({ mfocus: feature && hasFeature(props.persistedSpec, feature) ? `${feature.kind}:${feature.id}` : '' })
+}, { immediate: true })
 
 const baseUrl = computed(() => (props.baseImage?.path ? mediaUrl(props.baseImage.path) : ''))
 const viewWidth = computed(() => props.registration?.width || props.baseImage?.width || naturalSize.value.width)
@@ -257,6 +287,10 @@ function onBaseLoad(event: Event) {
   naturalSize.value = { width: img.naturalWidth, height: img.naturalHeight }
   // 外部原件还没经后端出图时，控制点配准要用这张图的真实像素尺寸
   emit('base-size', { width: img.naturalWidth, height: img.naturalHeight })
+  if (focusOnLoad && link.initial('mfocus')) {
+    focusOnLoad = false
+    void nextTick(() => svgEl.value?.scrollIntoView({ block: 'center' }))
+  }
 }
 
 function newId(prefix: string): string {
