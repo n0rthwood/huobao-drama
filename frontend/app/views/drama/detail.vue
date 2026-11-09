@@ -548,7 +548,6 @@
                 :key="`mapflow-${editTarget.id}`"
                 :prop-id="editTarget.id"
                 :asset-name="editTarget.name"
-                @preview="openMapPreview"
                 @changed="onMapWorkflowChanged"
               />
             </section>
@@ -1204,10 +1203,6 @@ async function onAssetTypeChange(item, next) {
   } finally {
     assetTypeSaving.value = false
   }
-}
-
-function openMapPreview(src, title) {
-  assetViewer.value = { open: true, src, title }
 }
 
 /** 工作流推进会登记新的底图/成品版本，拉一次项目数据让卡片封面跟上 */

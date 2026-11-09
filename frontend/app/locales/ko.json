@@ -3083,6 +3083,11 @@
           "warningsTitle": "그리기 품질 주의({n}건)",
           "calibrationEvidence": "Earth 실측 기준점 증거",
           "calibrationCheck": "독립 검증 {n}점 · RMS {rms}px · 최대 오차 {max}px"
+        },
+        "preview": {
+          "close": "큰 이미지 닫기",
+          "unavailable": "링크의 「{view}」 산출물을 지금 표시할 수 없습니다(롤백되었거나 아직 생성되지 않음). 미리보기 파라미터를 제거했습니다.",
+          "invalidLink": "링크의 미리보기 값 「{value}」을(를) 인식할 수 없어 제거했습니다."
         }
       },
       "citationsSectionTitle": "자료 출처",

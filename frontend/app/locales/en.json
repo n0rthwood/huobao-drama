@@ -3083,6 +3083,11 @@
           "warningsTitle": "Drawing quality warnings ({n})",
           "calibrationEvidence": "Earth measured control-point evidence",
           "calibrationCheck": "{n} independent checks · RMS {rms}px · maximum error {max}px"
+        },
+        "preview": {
+          "close": "Close preview",
+          "unavailable": "The link's “{view}” output is not available right now (rolled back or not generated yet); the preview parameter was cleared.",
+          "invalidLink": "The preview parameter “{value}” in the link is not recognized and was cleared."
         }
       },
       "citationsSectionTitle": "Sources",

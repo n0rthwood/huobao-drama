@@ -3083,6 +3083,11 @@
           "warningsTitle": "绘制时的质量提醒（{n} 条）",
           "calibrationEvidence": "Earth 实测控制点证据",
           "calibrationCheck": "独立检验 {n} 点 · 均方根 {rms}px · 最大偏差 {max}px"
+        },
+        "preview": {
+          "close": "关闭大图",
+          "unavailable": "链接里的「{view}」当前没有可显示的产出（已回退或尚未生成），已清掉该预览参数。",
+          "invalidLink": "链接里的大图参数「{value}」无法识别，已清掉。"
         }
       },
       "citationsSectionTitle": "资料来源",

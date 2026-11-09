@@ -3083,6 +3083,11 @@
           "warningsTitle": "描画時の品質注意（{n} 件）",
           "calibrationEvidence": "Earth 実測基準点の証拠",
           "calibrationCheck": "独立検証 {n} 点 · RMS {rms}px · 最大誤差 {max}px"
+        },
+        "preview": {
+          "close": "大画像を閉じる",
+          "unavailable": "リンクの「{view}」は現在表示できる成果物がありません（巻き戻し済みまたは未生成）。プレビュー用パラメータを削除しました。",
+          "invalidLink": "リンクのプレビュー指定「{value}」は認識できないため削除しました。"
         }
       },
       "citationsSectionTitle": "資料出典",

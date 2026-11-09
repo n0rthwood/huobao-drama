@@ -991,7 +991,6 @@
                 :key="`mapflow-${assetDetail.item.id}`"
                 :prop-id="assetDetail.item.id"
                 :asset-name="assetDetail.item.name"
-                @preview="openImageViewer"
                 @changed="onMapWorkflowChanged(assetDetail.item, $event)"
               />
             </section>

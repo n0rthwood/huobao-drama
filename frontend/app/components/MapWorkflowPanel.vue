@@ -149,12 +149,13 @@
     </section>
 
     <section v-if="detail" class="mw-block">
+      <p v-if="previewWarning" class="mw-warn">{{ previewWarning }}</p>
       <p v-if="stage !== 'complete'" class="mw-hint dim">{{ t('episode.documentary.map.panel.adoptNote') }}</p>
       <MapResults
         :outputs="detail.outputs"
         :research="detail.research"
         :registration="registration"
-        @preview="(url, title) => emit('preview', url, title)"
+        @preview="openPreview"
       />
     </section>
 
@@ -176,6 +177,23 @@
     </section>
 
     <p v-if="!detail && !loading && !error" class="mw-hint dim">{{ t('episode.documentary.map.panel.empty') }}</p>
+
+    <!-- 产出大图：本面板自己的层，teleport 到 body 才能稳定盖在宿主弹窗之上；关闭只清 mview、保留 asset/mfocus -->
+    <Teleport to="body">
+      <div v-if="previewImage" class="mw-preview-overlay" @click.self="closePreview">
+        <div class="mw-preview-dialog">
+          <div class="mw-preview-head">
+            <span class="mw-preview-title">{{ previewTitle }}</span>
+            <button type="button" class="mw-tool" @click="closePreview">
+              <X :size="12" />
+              {{ t('episode.documentary.map.preview.close') }}
+            </button>
+          </div>
+          <img :src="previewImage.url" :alt="previewTitle" class="mw-preview-img" />
+          <p class="mw-preview-meta dim">{{ t('episode.documentary.map.results.size', { w: previewImage.width, h: previewImage.height }) }} · {{ t('episode.documentary.map.results.source', { source: previewImage.source }) }}</p>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -206,6 +224,8 @@ import {
 import { onTaskFinished, refreshTasks, useTasks } from '~/composables/useTasks'
 import { configModels } from '~/composables/useModelOptions'
 import { registrationFrom, registrationFromControlPoints, type MapRegistration } from '~/utils/mapRegistration'
+import { mapPreviewImage, mapPreviewView, type MapPreviewView } from '~/utils/mapPreview'
+import { DEEPLINK_KEYS, useDeeplink } from '~/composables/useQuerySync'
 
 const { t } = useI18n()
 
@@ -215,7 +235,6 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'preview', url: string, title: string): void
   (e: 'changed', detail: MapWorkflowDetail): void
 }>()
 
@@ -234,6 +253,16 @@ const textConfigId = ref(0)
 const imageKey = ref('')
 const textConfigs = ref<Array<{ id: number; name: string }>>([])
 const imageOptions = ref<Array<{ key: string; configId: number; configName: string; model: string }>>([])
+
+/**
+ * 产出大图预览（Issue #84 / #86）：本面板自己的 deeplink 键 mview。
+ * 只记产出身份（base|texture|final|calibration），URL 里绝不出现图片路径；刷新/新标签按当前详情重新求值。
+ * 关闭只清自己的键，宿主的 asset / mfocus 原样保留。
+ */
+const previewLink = useDeeplink('mapPreview', DEEPLINK_KEYS.mapPreview)
+const previewView = ref<MapPreviewView | null>(null)
+const previewWarning = ref('')
+let previewRestored = false
 
 const briefDraft = ref<MapBrief>(emptyBrief())
 const specDraft = ref<MapSpec>(emptySpec())
@@ -329,6 +358,62 @@ const registration = computed<MapRegistration | null>(() => {
     )
   }
   return null
+})
+
+/** 当前预览身份对应的真实图片；产出被回退清掉时为 null（此时不显示大图，只给提示） */
+const previewImage = computed(() => (previewView.value ? mapPreviewImage(previewView.value, detail.value?.outputs, registration.value) : null))
+const previewTitle = computed(() => {
+  const view = previewView.value
+  if (!view) return ''
+  const label = t(`episode.documentary.map.results.${previewLabelKey(view)}`)
+  return props.assetName ? `${props.assetName} · ${label}` : label
+})
+
+function previewLabelKey(view: MapPreviewView): string {
+  return view === 'calibration' ? 'calibrationEvidence' : `${view}_image`
+}
+
+function openPreview(view: MapPreviewView) {
+  previewWarning.value = ''
+  previewView.value = view
+}
+
+function closePreview() {
+  previewView.value = null
+}
+
+/** 面板自己的键：打开写 mview，关闭只清 mview（宿主的 asset / mfocus 不受影响） */
+watch(previewView, view => previewLink.set({ mview: view ?? '' }))
+
+/**
+ * 链接恢复：详情到手后才判定，因为产出是否存在只有详情说了算。
+ * 非法值或该产出当前不存在 —— 给一句能读懂的提示并清掉这个键，绝不停在空白大图上。
+ */
+function restorePreviewFromLink() {
+  if (previewRestored) return
+  previewRestored = true
+  const raw = previewLink.initial('mview')
+  if (!raw) return
+  const view = mapPreviewView(raw)
+  if (!view) {
+    previewWarning.value = t('episode.documentary.map.preview.invalidLink', { value: raw })
+    previewLink.set({ mview: '' })
+    return
+  }
+  if (!mapPreviewImage(view, detail.value?.outputs, registration.value)) {
+    previewWarning.value = t('episode.documentary.map.preview.unavailable', { view: t(`episode.documentary.map.results.${previewLabelKey(view)}`) })
+    previewLink.set({ mview: '' })
+    return
+  }
+  previewView.value = view
+}
+
+/** 产出被回退/重跑清掉时，正在看的大图不能停在旧图：给提示并关掉自己的层 */
+watch(previewImage, image => {
+  const view = previewView.value
+  if (!view || image) return
+  previewWarning.value = t('episode.documentary.map.preview.unavailable', { view: t(`episode.documentary.map.results.${previewLabelKey(view)}`) })
+  previewView.value = null
 })
 
 /**
@@ -439,6 +524,7 @@ async function load(silent = false) {
     if (stopped) return
     error.value = ''
     applyDetail(res)
+    restorePreviewFromLink()
   } catch (err) {
     if (!stopped) error.value = err instanceof Error && err.message ? err.message : t('episode.documentary.map.panel.loadFailed')
   } finally {
@@ -788,4 +874,30 @@ onBeforeUnmount(() => { stopped = true })
 }
 .mw-rev { font-weight: 600; color: var(--text-1); }
 .mw-actor { padding: 0 6px; border-radius: 999px; border: 1px solid var(--border-strong); font-weight: 600; }
+
+/* 产出大图：必须盖在宿主素材详情弹窗（z-index 118）之上，否则图开了也看不见、关不掉 */
+.mw-preview-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 240;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+  background: rgba(0, 0, 0, 0.72);
+}
+.mw-preview-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: min(1280px, calc(100vw - 56px));
+  max-height: calc(100vh - 56px);
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--bg-1);
+}
+.mw-preview-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.mw-preview-title { font-size: 12px; font-weight: 600; color: var(--text-1); }
+.mw-preview-img { max-width: 100%; max-height: calc(100vh - 140px); object-fit: contain; border-radius: 6px; background: var(--bg-2); }
+.mw-preview-meta { margin: 0; font-size: 10.5px; }
 </style>

@@ -251,6 +251,8 @@ export const DEEPLINK_KEYS = {
   assetDetail: ['sem', 'run', 'round'],
   /** 地图几何编辑器：已保存要素的类型与稳定 id；不承载未保存坐标或绘制草稿。 */
   mapGeometry: ['mfocus'],
+  /** 地图产出大图：产出身份 base|texture|final|calibration；绝不写图片路径，刷新时按当前详情重新求值。 */
+  mapPreview: ['mview'],
   /** 参考图管理器：素材库弹窗的宿主资产（值 = 类型-id，多实例共用一个键） */
   refLibrary: ['reflib'],
   /** 角色档案图面板：检索弹窗与关键词 */

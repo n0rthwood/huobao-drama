@@ -7,7 +7,7 @@
       </header>
       <div class="res-cards">
         <figure v-for="card in cards" :key="card.key" class="res-card">
-          <button type="button" class="res-thumb" @click="emit('preview', card.url, card.label)">
+          <button type="button" class="res-thumb" @click="emit('preview', card.view)">
             <img :src="card.url" :alt="card.label" loading="lazy" />
           </button>
           <figcaption class="res-caption">
@@ -26,7 +26,7 @@
       </header>
       <div class="res-compare">
         <figure v-for="card in [beforeCard, finalCard]" :key="`cmp-${card.key}`" class="res-card res-card--wide">
-          <button type="button" class="res-thumb" @click="emit('preview', card.url, card.label)">
+          <button type="button" class="res-thumb" @click="emit('preview', card.view)">
             <img :src="card.url" :alt="card.label" loading="lazy" />
           </button>
           <figcaption class="res-caption"><strong>{{ card.label }}</strong></figcaption>
@@ -112,8 +112,8 @@
  */
 import { useI18n } from 'vue-i18n'
 import type { MapResearch, MapWorkflowOutputs } from '~/composables/useApi'
+import { mapPreviewImage, type MapPreviewView } from '~/utils/mapPreview'
 import { registrationSummary, type MapRegistration } from '~/utils/mapRegistration'
-import { mediaUrl } from '~/utils/url'
 
 const { t } = useI18n()
 
@@ -123,40 +123,42 @@ const props = defineProps<{
   registration: MapRegistration | null
 }>()
 
-const emit = defineEmits<{ (e: 'preview', url: string, title: string): void }>()
+const emit = defineEmits<{ (e: 'preview', view: MapPreviewView): void }>()
 
-interface ResultCard { key: string; url: string; label: string; width: number; height: number; source: string }
+interface ResultCard { key: string; view: MapPreviewView; url: string; label: string; width: number; height: number; source: string }
 
-function cardOf(key: 'base_image' | 'texture_image' | 'final_image'): ResultCard | null {
-  const image = props.outputs[key]
-  if (!image?.path) return null
+function cardOf(view: Exclude<MapPreviewView, 'calibration'>): ResultCard | null {
+  const image = mapPreviewImage(view, props.outputs, props.registration)
+  if (!image) return null
   return {
-    key,
-    url: mediaUrl(image.path),
-    label: t(`episode.documentary.map.results.${key}`),
+    key: image.labelKey,
+    view,
+    url: image.url,
+    label: t(`episode.documentary.map.results.${image.labelKey}`),
     width: image.width,
     height: image.height,
-    source: image.source || '-',
+    source: image.source,
   }
 }
 
 const cards = computed(() => {
-  const list = [cardOf('base_image'), cardOf('texture_image'), cardOf('final_image')].filter((card): card is ResultCard => !!card)
-  const earth = props.registration?.earth
-  if (earth?.calibration_image) {
+  const list = [cardOf('base'), cardOf('texture'), cardOf('final')].filter((card): card is ResultCard => !!card)
+  const earth = mapPreviewImage('calibration', props.outputs, props.registration)
+  if (earth) {
     list.push({
       key: 'calibration',
-      url: mediaUrl(earth.calibration_image),
+      view: 'calibration',
+      url: earth.url,
       label: t('episode.documentary.map.results.calibrationEvidence'),
-      width: earth.window.width,
-      height: earth.window.height,
-      source: 'Google Earth',
+      width: earth.width,
+      height: earth.height,
+      source: earth.source,
     })
   }
   return list
 })
-const beforeCard = computed(() => cardOf('base_image'))
-const finalCard = computed(() => cardOf('final_image'))
+const beforeCard = computed(() => cardOf('base'))
+const finalCard = computed(() => cardOf('final'))
 
 /**
  * 影像署名。
