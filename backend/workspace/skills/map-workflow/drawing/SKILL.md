@@ -56,6 +56,7 @@ description: 地图工作流·标注绘制阶段 — 用 LayerDoc 矢量图层�
 - 颜色写成 `#rrggbb` 这样的字符串。字体（font）取 `sans`、`serif`、`kai`、`hand` 之一。
 - 文字只能用常用汉字、英文字母、数字和常见标点；生僻字没有字形，会渲染失败。
 - 一份文档最多 60 个图层，每个 polygon 或 polyline 最多 240 个点。
+- marker 的 `color` 是点的填色，`text_color` 是点旁文字的颜色，`stroke` 同时是点的外圈和**文字描边**的颜色。描边应该用与文字反差大的浅色（例如底色 `#f4ecd8`）；如果描边和文字都用深色，粗体字会糊成一团。label 的 `stroke` 和 `stroke_width` 也是文字描边，用法相同。
 
 ## 作图建议（不是校验项，由你判断）
 

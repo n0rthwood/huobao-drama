@@ -43,13 +43,14 @@ export async function renderMapLayerDoc(doc: LayerDoc): Promise<RenderedMapDoc> 
   return { path: `static/map-drawings/${file}`, sha256, width: rendered.width, height: rendered.height }
 }
 
-/** 地图 LayerDoc 的底图必须就是本次合成的背景（路径与尺寸都一致） */
+/** 地图 LayerDoc 的底图必须就是本次合成的背景（路径与尺寸一致、不裁切：裁切会让语义像素坐标与画面错位） */
 export function backgroundProblems(doc: LayerDoc, background: Pick<MapBackgroundResult, 'path' | 'width' | 'height'>): string[] {
   const problems: string[] = []
   if (doc.base.path !== background.path) problems.push(`base.path 必须是 ${JSON.stringify(background.path)}，当前是 ${JSON.stringify(doc.base.path)}`)
   if (doc.base.width !== background.width || doc.base.height !== background.height) {
     problems.push(`base.width/height 必须是 ${background.width}×${background.height}，当前是 ${doc.base.width}×${doc.base.height}`)
   }
+  if (doc.base.crop) problems.push('地图底图不能裁切（base.crop）：裁切会让语义坐标与画面错位；需要改取景请回到底图阶段')
   return problems
 }
 

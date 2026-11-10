@@ -2894,7 +2894,7 @@
           "openWorkbench": "Open map workbench",
           "sectionHint": "Staged flow from brief to finished map; state lives on the server and survives reloads",
           "title": "Map workflow",
-          "hint": "Geography is produced deterministically by the program; diffusion only makes texture and never repaints coastlines, rivers or borders.",
+          "hint": "Research, base framing and drawing are done by the model in a tool loop; every delivery is checked by the program and rejections go back to the model to fix. Diffusion only makes texture and never repaints coastlines, rivers or borders.",
           "revision": "Revision {n}",
           "mode": {
             "auto": "Run automatically",

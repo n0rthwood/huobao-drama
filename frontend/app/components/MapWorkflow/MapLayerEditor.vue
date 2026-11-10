@@ -44,6 +44,7 @@
             :doc="doc"
             :selected-ids="selectedIds"
             :base-src="baseSrc"
+            crop-locked
             :missing-glyphs="missingGlyphs"
             :can-undo="canUndo"
             :can-redo="canRedo"
