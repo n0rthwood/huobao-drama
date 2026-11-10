@@ -23,7 +23,7 @@ import { STORAGE_ROOT } from '../utils/paths.js'
 import { ffmpeg, checkFfmpegSuite, writeSilentWav } from '../utils/ffmpeg.js'
 import { extractVideoPoster } from '../utils/video-poster.js'
 import { logTaskError, logTaskProgress, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
-import { renderSrt, parseSrt, transformCues } from './subtitle.js'
+import { renderSrt, parseSrt, transformCues, layoutCueText, SUBTITLE_MAX_CHARS_PER_LINE, SUBTITLE_WRAP_MAX_LINES } from './subtitle.js'
 import { mediaFacts, probeVideoSpec } from './media-probe.js'
 import type { ComposeFit, ComposePlan } from './narration-fit.js'
 import { parseNarrationMeta, type NarrationMeta } from './narration.js'
@@ -102,15 +102,21 @@ async function runComposeShot(storyboardId: number, batchTaskId?: number): Promi
   const reserved = (await persistedComposeReservations(sb.episodeId, batchTaskId)).get(storyboardId)
   if (reserved) throw new Error(`该镜头${reserved}，不能重复提交`)
 
-  // 字幕：时间码按 tempo 缩放、按旁白起播点平移，写成临时 SRT 供 ffmpeg 烧录
+  // 字幕：时间码按 tempo 缩放、按旁白起播点平移，并按**实际输出画面**重排行宽（#91），写成临时 SRT 供 ffmpeg 烧录
   const tempDir = path.join(STORAGE_ROOT, 'temp')
   fs.mkdirSync(tempDir, { recursive: true })
   let burnSrtAbs: string | null = null
   if (input.subtitleAbs) {
     const cues = parseSrt(fs.readFileSync(input.subtitleAbs, 'utf8'))
     const shifted = transformCues(cues, { shiftMs: Math.round(plan.narrationStart * 1000), tempo: fit.tempo })
+    const charsPerLine = input.parts.subtitle_chars_per_line ?? SUBTITLE_MAX_CHARS_PER_LINE
+    const relaid = shifted.map(cue => ({ ...cue, text: layoutCueText(cue.text.replace(/\n/g, ''), charsPerLine) }))
+    const overflow = relaid.filter(cue => cue.text.split('\n').some(line => line.length > charsPerLine))
+    if (overflow.length) {
+      logTaskProgress('ShotCompose', 'subtitle-overflow', { storyboardId, charsPerLine, maxLines: SUBTITLE_WRAP_MAX_LINES, cues: overflow.length })
+    }
     burnSrtAbs = path.join(tempDir, `${uuid()}.srt`)
-    fs.writeFileSync(burnSrtAbs, renderSrt(shifted), 'utf8')
+    fs.writeFileSync(burnSrtAbs, renderSrt(relaid), 'utf8')
   }
   // 无旁白且不混底音时仍要有一条等长静音轨，保证 concat 时音轨布局一致
   const silenceAbs = !input.audioAbs && fit.audioMixMode !== 'mix'

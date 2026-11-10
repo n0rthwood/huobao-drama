@@ -10,12 +10,36 @@
 import type { AlignItem } from './tts.js'
 import type { SubtitleTiming } from './narration.js'
 
-/** 每行最多字数（全角计 1） */
+/** 每行最多字数（全角计 1）；横屏默认，也是上限 */
 export const SUBTITLE_MAX_CHARS_PER_LINE = 20
-/** 每条字幕最多行数 */
+/** 每条字幕最多行数（20 字/行的旧口径，决定每条 40 字上限） */
 export const SUBTITLE_MAX_LINES = 2
+/** 窄画面按输出宽度重排时允许的最大行数（Issue #91） */
+export const SUBTITLE_WRAP_MAX_LINES = 4
 /** 一条字幕最多字数 */
 export const SUBTITLE_MAX_CHARS_PER_CUE = SUBTITLE_MAX_CHARS_PER_LINE * SUBTITLE_MAX_LINES
+
+/**
+ * 烧录字幕在给定输出画面下每行能放多少个全角字（Issue #91）。
+ *
+ * 标定前提（改动任何一项都要重新实测）：
+ * - 烧录样式固定为 `FontSize=18,Outline=1,Shadow=0,MarginV=28`（`shot-compose.ts`），不指定 `FontName`，
+ *   生产 `ffmpeg-static` 的 fontconfig 命中 `Noto Sans CJK JP Regular`；
+ * - SRT 没有 PlayRes，libass 按脚本坐标（PlayResY=288 / PlayResX=384）缩放，单个全角字的步进实测
+ *   ≈ 0.0425 × 输出高（544×960=40.8px、960×544=23.2px、768×768=32.6px）；
+ * - 可用宽度要**扣掉 libass 默认左右边距**（各 10 个脚本单位，按 W/384 缩放），样式里只覆盖了 MarginV。
+ *
+ * 结果以旧值 20 为上限：横屏/方形仍是 20 字/行，既有成片不受影响。
+ */
+export function subtitleCharsPerLine(width: number, height: number): number {
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+    return SUBTITLE_MAX_CHARS_PER_LINE
+  }
+  const sideMargins = 2 * 10 * (width / 384)
+  const glyph = 0.0425 * height
+  const fit = Math.floor((width - sideMargins) / glyph)
+  return Math.max(1, Math.min(SUBTITLE_MAX_CHARS_PER_LINE, fit))
+}
 
 /** 句末标点（切句用） */
 const SENTENCE_END = '。！？；!?;'
@@ -76,18 +100,40 @@ export function splitChunks(text: string, maxChars = SUBTITLE_MAX_CHARS_PER_CUE)
   return chunks
 }
 
-/** 一条字幕的展示文本：超过单行上限时折成两行（在可断点处优先） */
-export function layoutCueText(chunk: string): string {
-  if (chunk.length <= SUBTITLE_MAX_CHARS_PER_LINE) return chunk
-  let cut = -1
-  for (let i = SUBTITLE_MAX_CHARS_PER_LINE - 1; i >= Math.floor(SUBTITLE_MAX_CHARS_PER_LINE / 2); i--) {
-    if (CLAUSE_BREAK.includes(chunk[i]) || SENTENCE_END.includes(chunk[i])) {
-      cut = i + 1
-      break
+/**
+ * 一条字幕的展示文本：超过单行上限时按可断点优先折行（Issue #91 起行宽随输出画面变化）。
+ *
+ * `charsPerLine = 20`（旧口径）时**恒按旧实现行为**：只在超过 20 字时切一次，第二行整行输出
+ * （可能超过 20 字），与 `maxLines` 无关——既有横屏成片的字幕逐字节不变。
+ * 重排（`charsPerLine < 20`）时折成 ≤ `maxLines` 行，并做容量校验：靠前的标点断点若会让剩余
+ * 文本塞不进剩下的行，就放弃它改用硬切，避免「前面几行很短、最后一行超宽被裁」。
+ */
+export function layoutCueText(
+  chunk: string,
+  charsPerLine = SUBTITLE_MAX_CHARS_PER_LINE,
+  maxLines = SUBTITLE_WRAP_MAX_LINES,
+): string {
+  // 旧口径固定两行预算，保证 20 字/行逐字节兼容
+  const lineBudget = charsPerLine >= SUBTITLE_MAX_CHARS_PER_LINE ? SUBTITLE_MAX_LINES : maxLines
+  const lines: string[] = []
+  let rest = chunk
+  while (lines.length < lineBudget - 1 && rest.length > charsPerLine) {
+    // 在 [charsPerLine/2, charsPerLine] 窗口内找最靠后的可断点，找不到就硬切
+    let cut = -1
+    for (let i = charsPerLine - 1; i >= Math.floor(charsPerLine / 2); i--) {
+      if (CLAUSE_BREAK.includes(rest[i]) || SENTENCE_END.includes(rest[i])) {
+        cut = i + 1
+        break
+      }
     }
+    const remainingCapacity = (lineBudget - lines.length - 1) * charsPerLine
+    if (cut > 0 && charsPerLine < SUBTITLE_MAX_CHARS_PER_LINE && rest.length - cut > remainingCapacity) cut = -1
+    if (cut <= 0) cut = charsPerLine
+    lines.push(rest.slice(0, cut))
+    rest = rest.slice(cut)
   }
-  if (cut <= 0) cut = SUBTITLE_MAX_CHARS_PER_LINE
-  return `${chunk.slice(0, cut)}\n${chunk.slice(cut)}`
+  lines.push(rest)
+  return lines.join('\n')
 }
 
 /** 按字数比例把 [startMs, endMs] 分给各块 */

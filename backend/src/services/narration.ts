@@ -95,6 +95,11 @@ export interface ComposeInputParts {
   fit_key: string
   /** 生效的转场偏移 T（秒）；纯画面镜头不做偏移，恒为 0 */
   transition_t: number
+  /**
+   * 烧录字幕按输出画面算出的每行字数（Issue #91）。
+   * 只在**烧录且 ≠ 20**（窄画面）时出现：横屏既有成片的签名输入逐字节不变。
+   */
+  subtitle_chars_per_line?: number
   /** Documentary v4 only. Absent for legacy drama v2. */
   combo?: 'A' | 'B' | 'C' | 'D'
   layer_segment?: ComposeClipPart | null

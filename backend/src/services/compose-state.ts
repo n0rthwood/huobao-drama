@@ -22,10 +22,10 @@ import fs from 'fs'
 import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
 import { toAbsPath } from '../utils/paths.js'
-import { mediaFacts, mediaFactsAll, statMedia } from './media-probe.js'
+import { mediaFacts, mediaFactsAll, probeVideoSpec, statMedia } from './media-probe.js'
 import { shotTtsValidity } from './narration-tts-gate.js'
 import { parseTransitionReview } from './transition.js'
-import { parseSrt } from './subtitle.js'
+import { parseSrt, subtitleCharsPerLine, SUBTITLE_MAX_CHARS_PER_LINE } from './subtitle.js'
 import {
   ComposeBlockedError,
   planCompose,
@@ -134,7 +134,21 @@ export function composeSignatureOf(parts: ComposeInputParts): string {
   ]
   // v2 的摘要输入必须一个字节都不变：多拼三个空串也会换摘要
   if (version === 4) fields.push(parts.combo!, clipKey(parts.layer_segment), parts.junction_hash || '', String(parts.video_task_id ?? ''))
+  // Issue #91：字幕行宽只在**烧录且 ≠ 20**（窄画面）时进签名；横屏逐字节不变
+  if (parts.burned && parts.subtitle_chars_per_line !== undefined && parts.subtitle_chars_per_line !== SUBTITLE_MAX_CHARS_PER_LINE) {
+    fields.push(`cpl=${parts.subtitle_chars_per_line}`)
+  }
   return sha256(fields.join('\u0000'))
+}
+
+/**
+ * 烧录字幕在本镜**实际输出画面**下的行宽（Issue #91）。
+ * 输出画面与 `shot-compose` 的渲染链路同源：有图层段（parts.combo）时按本集段规格缩放，
+ * 否则原样输出模型视频，取实测宽高；探测不到尺寸时回落默认 20，不猜尺寸。
+ */
+export async function composeCharsPerLine(episodeId: number, useSegmentSpec: boolean, videoAbs: string): Promise<number> {
+  const size = useSegmentSpec ? await resolveEpisodeSegmentSpec(episodeId) : await probeVideoSpec(videoAbs)
+  return size ? subtitleCharsPerLine(size.width, size.height) : SUBTITLE_MAX_CHARS_PER_LINE
 }
 
 /** 逐项对比两份快照，给出人能看懂的变化原因 */
@@ -154,6 +168,12 @@ export function describeComposeDiff(current: ComposeInputParts, previous: Compos
   if (current.burned !== previous.burned) reasons.push(current.burned ? '改为烧录字幕' : '改为不烧录字幕')
   if (current.text_sha256 !== previous.text_sha256) reasons.push('旁白文本已修改')
   if (current.fit_key !== previous.fit_key) reasons.push('匹配参数已调整（留白 / 倍速 / 音轨模式 / 底音增益）')
+  // 不烧录、或两边都是默认 20（含字段缺省）时不算变化
+  const cplOf = (parts: ComposeInputParts) =>
+    (parts.burned ? parts.subtitle_chars_per_line ?? SUBTITLE_MAX_CHARS_PER_LINE : SUBTITLE_MAX_CHARS_PER_LINE)
+  if (cplOf(current) !== cplOf(previous)) {
+    reasons.push(`字幕排版已变化（每行 ${cplOf(previous)} 字 → 每行 ${cplOf(current)} 字）`)
+  }
   if (Math.abs(current.transition_t - previous.transition_t) > 1e-3) {
     reasons.push(`生效的转场偏移已变化（${previous.transition_t} 秒 → ${current.transition_t} 秒）`)
   }
@@ -491,6 +511,15 @@ export async function inspectComposeInputs(
     text_sha256: sha256(wantsNarration ? text : ''),
     fit_key: fit.key,
     transition_t: Math.round(t * 1000) / 1000,
+  }
+  if (wantsNarration) {
+    // Issue #91：行宽按真实输出画面算，窄画面才进签名（横屏恒为 20，签名逐字节不变）
+    const charsPerLine = await composeCharsPerLine(
+      sb.episodeId,
+      Boolean(documentary && combo),
+      replaceClip ? replaceAbs! : modelVideoAbs!,
+    )
+    if (charsPerLine !== SUBTITLE_MAX_CHARS_PER_LINE) parts.subtitle_chars_per_line = charsPerLine
   }
   if (documentary && combo) {
     parts.combo = combo

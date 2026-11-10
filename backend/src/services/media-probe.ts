@@ -104,13 +104,20 @@ export interface VideoSpec {
   fps: number
 }
 
+const specCache = new Map<string, VideoSpec>()
+
 /**
  * 读取视频的画幅与帧率；文件不存在、不是视频或尺寸缺失时返回 null
  * （调用方按画幅默认兜底，绝不猜尺寸）。
+ * 与 `mediaFacts` 同一套缓存键（路径 + 大小 + mtime），整集逐镜调用不会反复 ffprobe。
  */
 export async function probeVideoSpec(absPath: string): Promise<VideoSpec | null> {
-  if (!statMedia(absPath)) return null
-  return new Promise<VideoSpec | null>((resolve) => {
+  const stat = statMedia(absPath)
+  if (!stat) return null
+  const key = keyOf(absPath, stat)
+  const cached = specCache.get(key)
+  if (cached) return cached
+  const spec = await new Promise<VideoSpec | null>((resolve) => {
     ffmpeg.ffprobe(absPath, (err, data) => {
       if (err) return resolve(null)
       const video = (data?.streams || []).find(stream => stream.codec_type === 'video')
@@ -121,4 +128,6 @@ export async function probeVideoSpec(absPath: string): Promise<VideoSpec | null>
       resolve({ width: video.width, height: video.height, fps: Number.isFinite(fps) && fps > 0 ? fps : 25 })
     })
   })
+  if (spec) specCache.set(key, spec)
+  return spec
 }
