@@ -106,6 +106,19 @@ test('layoutCueText 窄画面：靠前的标点断点不得挤爆最后一行', 
   for (const line of lines) assert.ok(line.length <= 12, `${line.length}: ${line}`)
 })
 
+test('layoutCueText 窄画面：下一行不得以标点开头（避头点）', () => {
+  // drama 14 / episode 20 实测：硬切把「。」「，」甩到行首
+  for (const chunk of ['赵高果然亲自来到斋宫问病。', '那个只建立了十几年的帝国，在这一天结束。', '这年冬天，楚军到了霸上——咸阳的门槛外。']) {
+    const lines = layoutCueText(chunk, 12).split('\n')
+    assert.equal(lines.join(''), chunk)
+    assert.ok(lines.length <= SUBTITLE_WRAP_MAX_LINES)
+    for (const line of lines) {
+      assert.ok(line.length <= 12, line)
+      assert.ok(!/^[，。、；：！？）」』》〉”’…—,.;:!?)]/.test(line), `行首标点: ${JSON.stringify(lines)}`)
+    }
+  }
+})
+
 test('比例分配：cue 文本拼接等于原文，末条不超过配音时长', () => {
   const cues = proportionalCues(TEXT, 9000)
   assert.ok(cues.length >= 2)
