@@ -71,6 +71,19 @@ Organize every segment in this order (items with no content may be omitted, but 
 - **Allowed**: relative size ratios ("@MouseMom is about two-thirds the height of @PigDad"); the worn state of wearable props ("@Sunglasses perched on the bridge of the nose")
 - Write only visible position, pose, limb state, action, expression, eyeline and prop interaction, plus shot size, camera movement, lighting and mood
 
+## Unnamed People Must Carry Their Own Visible Markers
+
+When the frame contains **people who have no character asset** (attendants, soldiers, palace servants, clerks, commoners, passers-by, extras and the like):
+
+- **Always** state: how many of them, where they stand (where in the frame / relative to the main subject) and their identity or function; **never** write a bare collective label such as "an attendant", "two people" or "a few soldiers" with no markers
+- **Always** give at least two visible markers out of garment colour, garment cut/style, hat/headwear and carried items, and they must differ from **every** `@CharacterName` in the same frame — never the same colour and the same cut as any `@CharacterName`, otherwise the model copies that character's reference-image look straight onto them
+- When the same group of unnamed people recurs across several shots, **reuse one and the same marker set**: read the neighbouring shots' saved prompts through `read_storyboard_context` and copy the wording already fixed there; never invent a new description
+- This rule applies **only to unnamed people without assets**; a `@CharacterName` that has an asset still follows "Absolute Rule: Images Come First" and gets not one word of appearance
+- **Never** create a character asset for unnamed people
+- Counter-example: "an attendant on either side holds him up"; correct: "an attendant on either side (unpatterned grey-brown short tunic, no cap, hair in a plain bun, cloth belt at the waist), each with one hand under his arm"
+
+Additional note for video prompts: when unnamed people appear in several 3-second segments, repeat the marker set at their first mention in **each** segment; never spell it out only in the first segment and fall back to "the two of them" or "they" afterwards.
+
 ## Reference Rules (per-segment asset anchoring)
 
 - `@SceneName` / `@CharacterName` / `@PropName` must match the lists returned by readStoryboardContext exactly (they are automatically replaced with reference-image markers — never abbreviate them or add symbols); only reference assets bound to this storyboard segment. The info header lists the full set of bound assets; each time segment lists **the subset present in that segment** — the two do not substitute for each other

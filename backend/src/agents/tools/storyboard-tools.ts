@@ -37,6 +37,30 @@ import {
   validateDesignCard,
 } from '../../services/design-card.js'
 import { checkDesignCardGrounding, groundingRejectionMessage } from '../../services/design-card-grounding.js'
+import { aspectConflictMessage, compositionOf, findAspectConflicts, normalizeAspect } from '../../services/aspect.js'
+
+/** 项目画幅（Issue #92）：出图尺寸按它查表，提示词里的画幅/构图写法也必须与它一致 */
+async function dramaAspectRatio(dramaId: number): Promise<string> {
+  const [drama] = await db.select().from(schema.dramas).where(eq(schema.dramas.id, dramaId))
+  return normalizeAspect(drama?.aspectRatio)
+}
+
+/** 关键帧提示词字段 → 退回信息；三条提示词都查，返回空数组表示放行 */
+function aspectRejections(
+  fields: { first_frame_prompt?: string; mid_frame_prompt?: string; last_frame_prompt?: string },
+  aspect: string,
+): string[] {
+  const reasons: string[] = []
+  for (const [field, text] of [
+    ['first_frame_prompt', fields.first_frame_prompt],
+    ['mid_frame_prompt', fields.mid_frame_prompt],
+    ['last_frame_prompt', fields.last_frame_prompt],
+  ] as const) {
+    const conflicts = findAspectConflicts(text, aspect)
+    if (conflicts.length) reasons.push(aspectConflictMessage(field, conflicts, aspect))
+  }
+  return reasons
+}
 
 async function getEpisodeSceneIds(episodeId: number) {
   const links = await db.select().from(schema.episodeScenes)
@@ -240,6 +264,9 @@ const readStoryboardContext = createTool({
         }
       }))
 
+    // 项目画幅（Issue #92）：关键帧/视频提示词里的画幅与构图方向必须照这两个值写，
+    // 技能文本不再写死 16:9；写错方向保存时会被退回。
+    const aspectRatio = await dramaAspectRatio(dramaId)
     const payload = {
       episode: {
         id: ep.id,
@@ -247,6 +274,8 @@ const readStoryboardContext = createTool({
         episode_number: ep.episodeNumber,
         description: ep.description || '',
       },
+      aspect_ratio: aspectRatio,
+      composition: compositionOf(aspectRatio),
       script,
       characters,
       scenes,
@@ -263,6 +292,7 @@ const readStoryboardContext = createTool({
       expositionAssets: expositionAssets.length,
       existingStoryboards: payload.existing_storyboards.length,
       scriptLength: script.length,
+      aspectRatio,
     })
     return payload
   },
@@ -397,6 +427,27 @@ function buildSaveStoryboards(documentary: boolean) {
       count: storyboards.length,
       shotNumbers: storyboards.map(sb => sb.shot_number).join(','),
     })
+    // 画幅校验（Issue #92）：必须在 replace_existing 清空之前判完 —— 否则一批写错画幅的
+    // 提示词会先删掉整集分镜再被拒。任一镜不合格则整批不落地，逐镜说明退回给模型改正。
+    if (!documentary) {
+      const aspect = await dramaAspectRatio(dramaId)
+      const aspectRejected = (storyboards as z.infer<typeof storyboardFields>[])
+        .flatMap(sb => aspectRejections(sb, aspect).map(reason => ({ shot_number: sb.shot_number, reason })))
+      if (aspectRejected.length) {
+        logTaskProgress('StoryboardTool', 'save-aspect-rejected', {
+          episodeId,
+          aspect,
+          shotNumbers: [...new Set(aspectRejected.map(item => item.shot_number))].join(','),
+        })
+        return {
+          error: `本项目画幅是 ${aspect} ${compositionOf(aspect)}，有 ${aspectRejected.length} 条关键帧提示词写了别的画幅或构图方向，整批未保存。请按下面逐镜说明改写后重新调用 save_storyboards。`,
+          count: 0,
+          rejected: aspectRejected,
+          aspect_ratio: aspect,
+          composition: compositionOf(aspect),
+        }
+      }
+    }
     // 补镜模式（Issue #52）：既有分镜一条都不动，只把旁白覆盖缺口补成新镜头。
     // 纯插入——忽略模型给的 shot_number（服务端从 max+1 起分配临时编号），跑完由
     // renumberStoryboardsByScript 按旁白在剧本中的位置整集归位，绝不 upsert 到已有镜。
@@ -757,6 +808,18 @@ const updateStoryboard = createTool({
       storyboardId: storyboard_id,
       fields: Object.keys(fields),
     })
+    // 画幅校验（Issue #92）：写错画幅/构图方向的关键帧提示词一律不落库，退回让模型自己改正
+    const aspect = await dramaAspectRatio(dramaId)
+    const aspectReasons = aspectRejections(fields, aspect)
+    if (aspectReasons.length) {
+      logTaskProgress('StoryboardTool', 'update-aspect-rejected', { episodeId, storyboardId: storyboard_id, aspect })
+      return {
+        error: aspectReasons.join(' '),
+        rejected: aspectReasons,
+        aspect_ratio: aspect,
+        composition: compositionOf(aspect),
+      }
+    }
 
     const currentCharacterIds = 'character_ids' in fields
       ? fields.character_ids
