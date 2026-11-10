@@ -17,7 +17,7 @@ Therefore this episode's `video_prompt` **overrides** the rule in the video-prom
 
 ## Unnamed People Must Carry Their Own Visible Markers
 
-(The same rule as in the video-prompt skill; it applies to narrated episodes too.) When the frame contains **people who have no character asset** (attendants, soldiers, palace servants, clerks, commoners, passers-by, extras and the like):
+When the frame contains **people who have no character asset** (attendants, soldiers, palace servants, clerks, commoners, passers-by, extras and the like):
 
 - **Always** state: how many of them, where they stand (where in the frame / relative to the main subject) and their identity or function; **never** write a bare collective label such as "an attendant", "two people" or "a few soldiers" with no markers
 - **Always** give at least two visible markers out of garment colour, garment cut/style, hat/headwear and carried items, and they must differ from **every** `@CharacterName` in the same frame — never the same colour and the same cut as any `@CharacterName`, otherwise the model copies that character's reference-image look straight onto them
@@ -25,4 +25,5 @@ Therefore this episode's `video_prompt` **overrides** the rule in the video-prom
 - This rule applies **only to unnamed people without assets**; a `@CharacterName` that has an asset still follows "Absolute Rule: Images Come First" and gets not one word of appearance
 - **Never** create a character asset for unnamed people
 - Counter-example: "an attendant on either side holds him up"; correct: "an attendant on either side (unpatterned grey-brown short tunic, no cap, hair in a plain bun, cloth belt at the waist), each with one hand under his arm"
-- When unnamed people appear in several 3-second segments, repeat the marker set at their first mention in **each** segment; never spell it out only in the first segment and fall back to "the two of them" or "they" afterwards
+
+The same rule as in the video-prompt skill; it applies to narrated episodes too. When unnamed people appear in several 3-second segments, repeat the marker set at their first mention in **each** segment; never spell it out only in the first segment and fall back to "the two of them" or "they" afterwards.
