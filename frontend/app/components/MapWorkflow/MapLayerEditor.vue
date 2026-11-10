@@ -104,6 +104,7 @@ import LayerStyle from '~/components/LayerCanvas/LayerStyle.vue'
 import { useLayerDoc } from '~/composables/useLayerDoc'
 import { mapLayerDocProblemsOf, mapWorkflowAPI, mapWorkflowConflictOf } from '~/composables/useApi'
 import { normalizeMapLayerDoc } from '~/utils/mapLayerDoc'
+import { DEEPLINK_KEYS, useDeeplink } from '~/composables/useQuerySync'
 import { mediaUrl } from '~/utils/url'
 
 const props = defineProps({
@@ -149,8 +150,28 @@ watch(() => props.layerDoc, next => {
   applyDoc(next)
 })
 
+/**
+ * 选中图层是工作位置：用稳定的图层 id 写进 mlsel，刷新/新标签回到同一个图层与样式面板。
+ * 恢复只改选择，不触发任何保存或重绘；图层已不存在就清键并提示，不静默换一个图层冒充。
+ */
+const selectionLink = useDeeplink('mapLayerSelection', DEEPLINK_KEYS.mapLayerEditor)
+
+function restoreSelectionFromLink() {
+  const raw = selectionLink.initial('mlsel')
+  if (!raw) return
+  if (doc.value.layers.some(layer => layer.id === raw)) {
+    selectedIds.value = [raw]
+    return
+  }
+  selectionLink.set({ mlsel: '' })
+  toast.warning(t('deeplink.missingNamed', { target: t('episode.documentary.map.layerEditor.layerTarget') }))
+}
+
+watch(selectedIds, ids => selectionLink.set({ mlsel: ids[0] ?? '' }))
+
 onMounted(() => {
   applyDoc(props.layerDoc)
+  restoreSelectionFromLink()
   window.addEventListener('keydown', onKeydown, true)
 })
 onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown, true))
@@ -181,7 +202,9 @@ function onReorder({ id, toIndex }) {
   reorder(id, toIndex)
 }
 function onAdd(type, partial) {
-  addLayer(type, partial)
+  const layer = addLayer(type, partial)
+  // 后端 normalizeLayer 的 card 一定带 fields.years；新建时就补上，否则严格校验必然拒收
+  if (layer?.type === 'card' && layer.fields && !('years' in layer.fields)) layer.fields.years = ''
 }
 function onRemove() {
   removeSelected()

@@ -1039,8 +1039,9 @@ export interface MapAgentState {
   task_id: number | null
   rounds: Partial<Record<'brief' | 'research' | 'base' | 'drawing', number>>
   rollbacks: number
-  max_rounds: number
-  max_rollbacks: number
+  /** 上限由契约固定（3 轮 / 2 次回退）；服务端没回传时前端按常量显示，不编造别的数字 */
+  max_rounds?: number
+  max_rollbacks?: number
   attempts: MapAgentAttempt[]
 }
 export interface MapWorkflowDetail {

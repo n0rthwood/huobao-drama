@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { dedupeLayerIds, normalizeMapLayerDoc, sortLayersByZ } from '../app/utils/mapLayerDoc.js'
+import { backendLayerId, dedupeLayerIds, normalizeMapLayerDoc, sortLayersByZ } from '../app/utils/mapLayerDoc.js'
 
 // 期望值对照 backend/src/services/layer-doc.ts 的 normalizeLayerDoc：
 // 稳定排序 `(a.z - b.z) || (a.index - b.index)`，重复 id 取 `${id}-${index+1}` 并在占用时递增。
@@ -13,9 +13,22 @@ test('z 排序稳定：z 相同的图层保持提交时的先后顺序', () => {
   assert.deepEqual(layers.map(item => item.id), ['a', 'b', 'c', 'd', 'e'])
 })
 
-test('z 非法时按原始下标参与排序（与后端 num(0,9999,index) 的回落一致）', () => {
+test('z 非法或越界时按后端口径参与排序（num(0,9999,index) 的钳制与回落）', () => {
   const layers = [{ ...layer('a', 5) }, { ...layer('b'), z: undefined }, { ...layer('c', 0) }]
   assert.deepEqual(sortLayersByZ(layers).map(item => item.id), ['c', 'b', 'a'])
+  // -3 钳到 0、20000 钳到 9999：按原值排序会把 neg 排到 zero 之前，钳制后两者同值按原序
+  const clamped = [{ ...layer('big', 20000) }, { ...layer('neg', -3) }, { ...layer('zero', 0) }]
+  assert.deepEqual(sortLayersByZ(clamped).map(item => item.id), ['neg', 'zero', 'big'])
+})
+
+test('id 取后端口径：trim 到 64 字符，空 id 回落成排序前下标的 layer-N', () => {
+  assert.equal(backendLayerId({ id: '  pin  ' }, 0), 'pin')
+  assert.equal(backendLayerId({ id: '' }, 2), 'layer-3')
+  assert.equal(backendLayerId({}, 0), 'layer-1')
+  assert.equal(backendLayerId({ id: 'x'.repeat(80) }, 0), 'x'.repeat(64))
+  // 缺 id 的图层不会被当成同一个 id 互相撞车，更不会产生 undefined-2
+  const out = normalizeMapLayerDoc({ layers: [{ ...layer(undefined, 1) }, { ...layer(undefined, 0) }] })
+  assert.deepEqual(out.layers.map(item => item.id), ['layer-2', 'layer-1'])
 })
 
 test('重复 id 按排序后的下标加后缀，后缀被占用时继续递增', () => {

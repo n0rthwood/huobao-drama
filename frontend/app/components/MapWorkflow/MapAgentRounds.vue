@@ -15,16 +15,16 @@
         v-for="item in counters"
         :key="item.stage"
         class="mar-counter"
-        :class="{ 'is-exhausted': item.used >= agent.max_rounds, 'is-current': item.stage === stage }"
+        :class="{ 'is-exhausted': item.used >= maxRounds, 'is-current': item.stage === stage }"
       >
         {{ t('episode.documentary.map.agent.rounds', {
           stage: t('episode.documentary.map.stage.' + item.stage),
           used: item.used,
-          max: agent.max_rounds,
+          max: maxRounds,
         }) }}
       </span>
-      <span class="mar-counter" :class="{ 'is-exhausted': agent.rollbacks >= agent.max_rollbacks }">
-        {{ t('episode.documentary.map.agent.rollbacks', { used: agent.rollbacks, max: agent.max_rollbacks }) }}
+      <span class="mar-counter" :class="{ 'is-exhausted': agent.rollbacks >= maxRollbacks }">
+        {{ t('episode.documentary.map.agent.rollbacks', { used: agent.rollbacks, max: maxRollbacks }) }}
       </span>
     </div>
 
@@ -92,6 +92,10 @@ const emit = defineEmits<{ (e: 'open', stage: string): void }>()
 const MODEL_STAGES: Array<'brief' | 'research' | 'base' | 'drawing'> = ['brief', 'research', 'base', 'drawing']
 
 const counters = computed(() => MODEL_STAGES.map(name => ({ stage: name, used: props.agent.rounds[name] ?? 0 })))
+
+/** 契约固定的上限：每个模型阶段 3 轮、每次运行 2 次跨阶段回退；服务端回传时以服务端为准 */
+const maxRounds = computed(() => props.agent.max_rounds ?? 3)
+const maxRollbacks = computed(() => props.agent.max_rollbacks ?? 2)
 
 /** 分组按阶段首次出现的顺序；组内保持服务端给的时间顺序（最新在后）。 */
 const groups = computed(() => {

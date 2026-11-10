@@ -3118,6 +3118,7 @@
           "open": "Edit layers",
           "title": "Edit layers",
           "target": "map layer document",
+          "layerTarget": "layer the link points to",
           "hint": "You are editing the layer document the model delivered; saving re-renders it on the server through the same render chain and registers a new version.",
           "close": "Close",
           "save": "Save and re-render",

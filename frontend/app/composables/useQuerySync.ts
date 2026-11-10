@@ -259,6 +259,8 @@ export const DEEPLINK_KEYS = {
    * mround=<brief|research|base|style|drawing|complete> 展开该阶段的交付记录。
    */
   mapAgent: ['mlayer', 'mround'],
+  /** 地图图层编辑器内部：当前选中的图层 id（稳定实体身份，不承载未保存的几何草稿）。 */
+  mapLayerEditor: ['mlsel'],
   /** 参考图管理器：素材库弹窗的宿主资产（值 = 类型-id，多实例共用一个键） */
   refLibrary: ['reflib'],
   /** 角色档案图面板：检索弹窗与关键词 */
