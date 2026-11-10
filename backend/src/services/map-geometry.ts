@@ -23,7 +23,6 @@ import {
   MAP_ROUTE_COLOR,
   MapSpecValidationError,
   mapProjectionFor,
-  normalizeMapCanvas,
   renderMapBase,
   type MapContextCoverage,
   type MapSpec,
@@ -41,10 +40,8 @@ import {
 } from './map-earth.js'
 import { applyAffine, fitAffine, type AffineForward, type AffineInverse, type ControlPoint } from './map-image-calibration.js'
 import { ensureLayerFonts } from './layer-fonts.js'
-import { FONT_FAMILIES, LINE_HEIGHT_EM, measureTextEm, wrapTextEm } from './layer-svg.js'
-import { normalizeLayerDoc, LAYER_MAX_COUNT, LAYER_MAX_POINTS, type Layer, type LayerDoc } from './layer-doc.js'
+import { FONT_FAMILIES } from './layer-svg.js'
 import { gridGeoToNormalized, gridNormalizedToGeo } from './map-registration-grid.js'
-import { renderLayerDoc } from './layer-render.js'
 
 export class MapGeometryError extends Error {
   constructor(message: string) {
@@ -720,16 +717,6 @@ export interface MapProjectedGeometry {
   regions: Array<{ id: string; name: string; points: Array<[number, number]>; color: string }>
 }
 
-export interface MapDrawingResult extends MapProjectedGeometry {
-  path: string
-  background_path: string
-  width: number
-  height: number
-  layer_doc: LayerDoc
-  registration: MapRegistration
-  warnings: string[]
-}
-
 /**
  * 把 spec 的地理要素按登记件投到画布上。
  *
@@ -801,204 +788,38 @@ export function projectSpecGeometry(
   return result
 }
 
-/**
- * 顶点数超限一律报错，不抽稀：抽稀会悄悄改掉河道/边界的形状，而这是地图，
- * 「大致一样」就是错的。真要简化，应该在 map_spec 里按史料简化并留痕。
- */
-function assertWithinLayerLimits(geometry: MapProjectedGeometry, layerCount: number): void {
-  const tooMany = [
-    ...geometry.routes.map(route => ({ what: `路线「${route.name || route.id}」`, count: route.points.length })),
-    ...geometry.regions.map(region => ({ what: `区域「${region.name || region.id}」`, count: region.points.length })),
-  ].filter(item => item.count > LAYER_MAX_POINTS)
-  if (tooMany.length) {
-    throw new MapGeometryError(
-      `这些要素的顶点数超过单个图层上限 ${LAYER_MAX_POINTS}：`
-      + tooMany.map(item => `${item.what}（${item.count} 点）`).join('、')
-      + '。请在 map_spec 里先简化这些几何（简化会留在数据里，可追溯），渲染不会替你抽稀。',
-    )
-  }
-  if (layerCount > LAYER_MAX_COUNT) {
-    throw new MapGeometryError(
-      `这张图共需要 ${layerCount} 个图层，超过单文档上限 ${LAYER_MAX_COUNT}（面 ${geometry.regions.length}、`
-      + `线 ${geometry.routes.length}、点 ${geometry.points.length}，另加每个命名面一条标签）。`
-      + '请拆成多张底图或减少要素；超出的图层不会被悄悄丢掉。',
-    )
-  }
-}
-
-function buildLayerDoc(
-  geometry: MapProjectedGeometry,
-  options: { backgroundPath: string; width: number; height: number; theme: MapSpec['style']['theme'] },
-): LayerDoc {
-  const toNorm = (point: [number, number]): [number, number] => [point[0] / options.width, point[1] / options.height]
-  const layers: Layer[] = []
-  let z = 0
-  const aspect = options.width / options.height
-  const gap = 0.012
-  // 只安排文字，不移动地理点。标记预留区防止别处的长标签盖住点位。
-  const occupied = geometry.points.map(point => {
-    const [x, y] = toNorm(point.at)
-    return { x: x - 0.01 / aspect, y: y - 0.01, w: 0.02 / aspect, h: 0.02 }
-  })
-  const placeLabel = (text: string, at: [number, number], size: number) => {
-    const w = Math.min(0.34, Math.max(0.07, (measureTextEm(text) + 0.6) * size / aspect))
-    const h = (wrapTextEm(text, w * aspect / size - 0.6).length * LINE_HEIGHT_EM + 0.6) * size
-    const fits = (x: number, y: number) => x >= 0.02 && y >= 0.02 && x + w <= 0.98 && y + h <= 0.98
-      && !occupied.some(box => x < box.x + box.w + gap && x + w + gap > box.x
-        && y < box.y + box.h + gap && y + h + gap > box.y)
-    for (let row = 0; row < 15; row++) {
-      const shift = Math.ceil(row / 2) * (h + gap) * (row % 2 ? 1 : -1)
-      const candidates = [
-        [at[0] + 0.02, at[1] - h / 2 + shift],
-        [at[0] - w - 0.02, at[1] - h / 2 + shift],
-        [at[0] - w / 2, at[1] - h - 0.02 + shift],
-        [at[0] - w / 2, at[1] + 0.02 + shift],
-      ]
-      for (const [x, y] of candidates) {
-        if (!fits(x, y)) continue
-        const box = { x, y, w, h }
-        occupied.push(box)
-        return box
-      }
-    }
-    // 近邻拥挤时使用剩余空白；没有位置就明确失败，不截断文字或伪造点位。
-    for (let y = 0.02; y + h <= 0.98; y += h + gap) {
-      for (let x = 0.02; x + w <= 0.98; x += w + gap) {
-        if (!fits(x, y)) continue
-        const box = { x, y, w, h }
-        occupied.push(box)
-        return box
-      }
-    }
-    throw new MapGeometryError(`地名「${text}」没有足够的无重叠排版空间，请缩短名称或减少同图要素；地理坐标未修改`)
-  }
-  // 面在最下、线居中、点与文字在上：和底图渲染的堆叠顺序一致
-  for (const region of geometry.regions) {
-    layers.push({
-      id: `region-${region.id}`,
-      type: 'polygon',
-      name: region.name || region.id,
-      visible: true,
-      locked: false,
-      z: z++,
-      opacity: 1,
-      rotation: 0,
-      anchor: { semantic_id: region.id, semantic_name: region.name || region.id },
-      points: region.points.map(toNorm),
-      style: { fill: region.color, fill_opacity: 0.28, stroke: region.color, stroke_width: 0.003 },
-    })
-  }
-  for (const route of geometry.routes) {
-    layers.push({
-      id: `route-${route.id}`,
-      type: 'polyline',
-      name: route.name || route.id,
-      visible: true,
-      locked: false,
-      z: z++,
-      opacity: 1,
-      rotation: 0,
-      anchor: { semantic_id: route.id, semantic_name: route.name || route.id },
-      points: route.points.map(toNorm),
-      style: { stroke: route.color, width: 0.005 },
-    })
-  }
-  for (const point of geometry.points) {
-    layers.push({
-      id: `place-${point.id}`,
-      type: 'marker',
-      name: point.name || point.id,
-      visible: true,
-      locked: false,
-      z: z++,
-      opacity: 1,
-      rotation: 0,
-      anchor: { semantic_id: point.id, semantic_name: point.name || point.id },
-      at: toNorm(point.at),
-      text: '',
-      style: { color: MAP_ROUTE_COLOR, dot_radius: 0.008 },
-    })
-    if (point.name) layers.push({
-      id: `place-label-${point.id}`, type: 'label', name: point.name,
-      visible: true, locked: false, z: z++, opacity: 1, rotation: 0,
-      anchor: { semantic_id: point.id, semantic_name: point.name },
-      box: placeLabel(point.name, toNorm(point.at), 0.022),
-      text: point.name,
-      style: { size: 0.022, bg_opacity: 0.84, align: 'left' },
-    })
-  }
-  // 面没有自带文字，从外接框中心就近安排可编辑标签并避让已有文字。
-  for (const region of geometry.regions) {
-    if (!region.name) continue
-    const xs = region.points.map(point => point[0])
-    const ys = region.points.map(point => point[1])
-    const centre: [number, number] = [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2]
-    layers.push({
-      id: `region-label-${region.id}`,
-      type: 'label',
-      name: region.name,
-      visible: true,
-      locked: false,
-      z: z++,
-      opacity: 1,
-      rotation: 0,
-      anchor: { semantic_id: region.id, semantic_name: region.name },
-      box: placeLabel(region.name, toNorm(centre), 0.022),
-      text: region.name,
-      style: { color: region.color, size: 0.022, bg_opacity: 0.84, align: 'left' },
-    })
-  }
-  assertWithinLayerLimits(geometry, layers.length)
-  return normalizeLayerDoc({
-    version: 1,
-    base: { path: options.backgroundPath, width: options.width, height: options.height, source_width: options.width, source_height: options.height },
-    theme: options.theme,
-    layers,
-  })
+export interface MapBackgroundResult {
+  /** `static/map-drawings/<sig>-bg.png`：模型 LayerDoc 的 base.path */
+  path: string
+  width: number
+  height: number
+  /** 已按背景尺寸缩放的登记件：经纬度 ↔ 背景像素 */
+  registration: MapRegistration
+  warnings: string[]
 }
 
 /**
- * 底图（+ 可选扩散纹理）→ 背景图 + 可编辑图层文档 + 拍平预览。
+ * 「底图 + 可选质感底纹」确定性合成一次，作为模型作图的 LayerDoc 底图（Issue #90）。
  *
- * 纹理永远只合成到**背景**上（底图之上、几何之下），几何由登记件算出来再画，
- * 所以扩散模型无论生成什么都不可能移动或替换一个地理要素。
+ * 纹理只合成到背景上；点线面、标签、取舍全部由模型在图层文档里画，
+ * 代码不排版、不投影出图——成图只能是同一条 renderLayerDoc 渲染链的产物。
  */
-export async function renderMapDrawing(
-  spec: MapSpec,
-  options: {
-    basePath: string
-    width?: number
-    texturePath?: string
-    style?: MapSpec['style']['theme']
-    registration?: MapRegistration | unknown
-    textureOpacity?: number
-  },
-): Promise<MapDrawingResult> {
+export async function prepareMapBackground(options: {
+  basePath: string
+  registration: unknown
+  width?: number
+  texturePath?: string
+  textureOpacity?: number
+}): Promise<MapBackgroundResult> {
   const baseAbs = resolveStaticImage(options.basePath, '地图底图')
   const baseMeta = await sharp(baseAbs).metadata()
   if (!baseMeta.width || !baseMeta.height) throw new MapGeometryError(`地图底图无法解码尺寸：${options.basePath}`)
-
   const width = Math.max(640, Math.min(7680, Math.trunc(options.width ?? baseMeta.width)))
   const height = Math.max(1, Math.round((baseMeta.height * width) / baseMeta.width))
 
-  const provided = options.registration ? parseRegistration(options.registration) : null
-  if (options.registration && !provided) {
-    throw new MapGeometryError('传入的地图登记件（registration）不合法，无法把经纬度换算成像素；请重新生成底图')
-  }
-  let registration: MapRegistration
-  if (provided) {
-    registration = rescaleRegistration(provided, width)
-  } else {
-    // 程序底图可以从 spec 复原（画布口径与 renderMapBase 一致）；earth/image 复原不出来，必须显式传入
-    const canvas = normalizeMapCanvas({ width })
-    if (canvas.width !== width || canvas.height !== height) {
-      throw new MapGeometryError(
-        `没有传入登记件时只能处理程序底图（16:9 画幅），当前底图是 ${baseMeta.width}×${baseMeta.height}；`
-        + 'earth/image 底图必须把 createMapBaseArtifact 返回的 registration 一并传进来',
-      )
-    }
-    registration = programRegistration(spec, canvas)
-  }
+  const provided = parseRegistration(options.registration)
+  if (!provided) throw new MapGeometryError('底图缺少合法的登记件（registration），无法把经纬度换算成像素；请重新生成底图')
+  const registration = rescaleRegistration(provided, width)
   if (registration.width !== width || Math.abs(registration.height - height) > 1) {
     throw new MapGeometryError(
       `登记件尺寸 ${registration.width}×${registration.height} 与底图 ${width}×${height} 对不上，像素换算会整体错位`,
@@ -1006,36 +827,23 @@ export async function renderMapDrawing(
   }
 
   const warnings: string[] = []
-  // 纹理的校验与说明不能藏在缓存分支里：命中缓存时也必须拒绝越界路径、也必须说清楚纹理怎么叠的
   const textureAbs = options.texturePath ? resolveStaticImage(options.texturePath, '地图纹理') : null
   const opacity = Math.min(MAX_TEXTURE_OPACITY, Math.max(0, options.textureOpacity ?? 0.35))
+  if (textureAbs) warnings.push(`纹理以 ${(opacity * 100).toFixed(0)}% 不透明度叠加在底图之上，只影响背景质感。`)
   const signature = crypto.createHash('sha256').update(JSON.stringify({
-    renderer: 'map-label-layout-v2',
+    renderer: 'map-background-v1',
     base: options.basePath,
     texture: options.texturePath ?? null,
     opacity,
     width,
-    style: options.style ?? spec.style.theme,
-    reg: registration.mode === 'program' ? registration.program : registration.mode === 'earth' ? registration.earth : registration.image,
-    spec: {
-      places: spec.places.map(place => [place.id, place.name, place.lon, place.lat]),
-      routes: spec.routes.map(route => [route.id, route.name, route.points]),
-      regions: spec.regions.map(region => [region.id, region.name, region.points]),
-    },
   })).digest('hex').slice(0, 32)
 
   const dir = path.join(STORAGE_ROOT, 'map-drawings')
   fs.mkdirSync(dir, { recursive: true })
   const backgroundAbs = path.join(dir, `${signature}-bg.png`)
-  const flatAbs = path.join(dir, `${signature}.png`)
-
-  if (textureAbs) {
-    warnings.push(`纹理以 ${(opacity * 100).toFixed(0)}% 不透明度叠加在底图之上，地理几何仍由登记件确定性绘制。`)
-  }
   if (!fs.existsSync(backgroundAbs)) {
     let background = sharp(baseAbs).resize(width, height, { fit: 'fill' })
     if (textureAbs) {
-      // 纹理只做氛围：限幅不透明度叠在底图之上，几何稍后单独画在最上层。
       // removeAlpha 先去掉素材自带的透明通道：ensureAlpha 只对「没有 alpha」的图生效，
       // 否则 PNG 纹理会按自己的 alpha 全幅盖住底图
       const texture = await sharp(textureAbs)
@@ -1048,30 +856,7 @@ export async function renderMapDrawing(
     }
     fs.writeFileSync(backgroundAbs, await background.png().toBuffer())
   }
-
-  const geometry = projectSpecGeometry(spec, registration)
-  const layerDoc = buildLayerDoc(geometry, {
-    backgroundPath: relFromStatic(backgroundAbs),
-    width,
-    height,
-    theme: options.style ?? spec.style.theme,
-  })
-
-  if (!fs.existsSync(flatAbs)) {
-    const rendered = await renderLayerDoc(layerDoc, { width, height })
-    fs.writeFileSync(flatAbs, rendered.buffer)
-  }
-
-  return {
-    path: relFromStatic(flatAbs),
-    background_path: relFromStatic(backgroundAbs),
-    width,
-    height,
-    layer_doc: layerDoc,
-    registration,
-    warnings,
-    ...geometry,
-  }
+  return { path: relFromStatic(backgroundAbs), width, height, registration, warnings }
 }
 
 /** map_spec 校验错误与几何错误对外是同一类「可直接展示」的错误 */

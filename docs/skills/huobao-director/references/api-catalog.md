@@ -287,6 +287,44 @@ Body：`{scope:"all"|"characters"|"scenes"|"props", episode_id?, rewrite_prompts
 > **来源与状态**：功能至 `f149a0e`，release `20261109T062625Z`。生产专用项目12/集18、导入项目13/集19；证据 `docs/qa/issue-84-1009-20261109T014309Z/`。程序177、外部181、副本184已成图；185/root1335从brief单次跑完六阶段，三次文本、图片1338、成图1339。Earth179已通过：底图1345（Clean、16384留出点max2.693px、漂移0）、底纹1347、成图1349；1336/1342标定合格但非Clean，仍保留为失败。
 **背景**：旧地图面板没有串联检索、底图、风格与可编辑几何。本流程以显式类型和持久化阶段解决；扩散仅做底纹，地图几何不由扩散产生。实测不能跨方法或跨分支泛化。
 
+#### Issue #90：模型阶段工具循环、错误回给模型、LayerDoc 作图 [S]
+
+**案例背景**：prop 103「邗沟走向示意图」任务 1350/1353 在 drawing 报「顶点落在底图画面之外」。根因是 research 的模型把提示词模板里的占位 `"lon":0,"lat":0` 抄成了「古射阳湖（示意范围）」的坐标；代码随后把这个面静默退化成点，越界只写成一条非阻断提示。drawing 阶段零模型调用，错误只到了人手里，模型看不到，重跑也不可能自愈。旧 bbox `[100,20,130,45]` 是整个东亚，邗沟要素在画面上只占约 1%。
+**为何需要**：用户要求：任何步骤的错误都要回给模型，让它发现并修正自己的错误；代码只强制流程，阶段内的工作由模型完成；图由模型自己画（矢量图层），并且与人工编辑共用同一套渲染代码。
+
+- **模型阶段**：`brief`、`research`、`base`、`drawing`。
+  - brief 仍是单次判定：回复不合约或调用失败时，把原因回给模型重答。
+  - research、base、drawing 是 Mastra 工具循环。工具内部的任何异常都作为结构化 `{error}` 回给模型；交付工具只判收或拒，拒收原因逐条写明字段、当前值和期望值，代码不降级、不退化、不钳制、不补默认值。
+- **轮次与回退**：
+  - 每阶段最多交付 3 轮：每次交付算一轮；一次运行没有交付就结束也算一轮。
+  - 模型可调用 `request_rollback` 回到更早的模型阶段，每次运行最多回退 2 次。回退本身不消耗轮次，目标阶段的轮次重新从 0 算，回退原因交给目标阶段。目标阶段之后的底图或成图版本标记为 `cancelled`；底纹按运行链认领，不重复计费。
+  - 轮次或回退用尽时，阶段判失败交给人；失败原因会交给下一次运行的模型。
+  - style（底纹）和 complete（采用）是基础设施阶段，失败时自动重试 2 次后交人。complete 如果发现成图或语义缺失，按回退到 drawing 处理。
+- **research 工具**：
+  - `search_sources {adapter,query}`：四个来源每个都必须检索过。
+  - `read_source {source_id}`
+  - `submit_features {features,uncertainties?,notes?}`：以下情况拒收——占位坐标（`(0,0)`、非数字）；route/region 带 lon/lat；未开示意图模式却提交 region；离群坐标（可用 `far_from_others_reason` 说明）；逐字出处在来源里查不到；引用的来源不存在；改写人工确认过的要素。
+- **base 工具**：
+  - `render_base {mode,bbox,projection?,layers?}`：底图路线、bbox 和取景全部由模型决定，旧 bbox 只作参考。返回 `frame.problems`。
+  - `read_image`
+  - `submit_base {artifact_id}`：要素必须全部在画面内并留 2% 边距，要素外包框的最大边至少占画面 30%。Earth 标定门槛不放宽。被采用的 bbox 写回 `map_spec`。
+- **drawing 工具**：
+  - `geo_to_pixel`
+  - `render_layer_doc {layer_doc,omitted?}`：与成图、图层编辑器共用同一个 `renderLayerDoc`，不消耗轮次。
+  - `read_image`
+  - `submit_layer_doc {layer_doc,omitted?}`：
+    - 文档必须原样就是 `normalizeLayerDoc` 的结果（严格校验），并且之前已经成功预览过。
+    - 每个要素要有且只有一个锚定几何图层：`anchor.semantic_id` 等于要素 id，place 对应 marker、route 对应 polyline、region 对应 polygon。几何位置要与投影位置一致，容差为 max(6px, 长边的 0.4%)；也可以写进 `omitted` 并说明理由。
+    - 成图就是这份文档的确定性渲染，按内容寻址存为 `static/map-drawings/<sha>.png`。语义从锚定图层导出，所以要素 id 与历史语义 id 保持一致。程序标签排版 `map-label-layout-v2` 已删除。
+- **详情新增 `agent`**：`{task_id, rounds:{brief?,research?,base?,drawing?}, rollbacks, max_rounds:3, max_rollbacks:2, attempts:[{task_id,stage,round,outcome:"accepted"|"rejected"|"no_delivery"|"error"|"rollback"|"infra_retry",problems[],target_stage?,at}]}`。计数按运行计；`attempts` 跨运行保留，最多 80 条，重启后不归零。`outputs.layer_doc` 是被采用的模型文档（或人工保存的文档），`final_image.provenance.background` 是它的底图（底图与底纹合成）。
+- **`PUT /props/{p}/map-workflow/layer-doc {layer_doc,expected_revision}`**（人工编辑图层）：
+  - 严格校验 → 同一渲染链出图 → 登记成图版本（`model:"map-layer-doc-manual"`）→ 当前图、忠实底图和语义一次性 CAS 采用，状态变为 `completed`。
+  - 400 `layer_doc_invalid`：带 `problems:[{path,message}]`。
+  - 400 `missing_drawing`：还没有成图文档。
+  - 409：同其他地图接口。
+  - 不经过模型，也不计费。
+- **视觉依赖**：会进入 base 或 drawing 的运行（auto 模式在 complete 之前启动，或从 base、drawing 启动）要求存在启用了视觉的文本配置（供 `read_image` 使用），否则返回 400 `vision_config_unavailable`。这个检查只影响本次运行，不影响后端服务。
+
 #### 类型与持久化
 
 `POST /props {drama_id,name,type?,description?,episode_id?,asset_type:"map"}` 新建地图；普通道具为 `"prop"`。`PUT /props/{p} {asset_type}` 可显式更改，map→prop 另需 `confirm_asset_type_change:true`，不删除地图数据。跨项目资产导入仍用 `kind:"prop"`，保留地图分类与数据，不共享运行任务。
@@ -308,7 +346,7 @@ Body：`{scope:"all"|"characters"|"scenes"|"props", episode_id?, rewrite_prompts
 - 新采集使用 129×129 控制网格及 16384 留出中心；异色 17×17 锚点定位 33×33 中间网格，再关联密集控制点，名义相机只负责粗定位。最大残差仍须 ≤3px、相机漂移 ≤0.25px。旧失败保留：1320（17×17，5.408px）、1323（相机预测关联失败）、1328（33×33，5.701px）、1333（65×65，4.962px）、1336（标定合格但非Clean）。不能放宽门槛或登记失败截图。onboarding 按语义节点激活，不发全局 Escape；只续跑 base，不重做检索。
 - Clean 切换是必需条件，不允许超时后静默退到含现代地名/道路的 default。1336/base1342 虽通过2.693px校准，但目视有道路盾牌，保留为失败验收，不提交底纹；新 clean 缓存命名空间不覆盖该旧原件版本，旧 default 缓存不复用。
 - 为免大数组在每次修订快照重复膨胀，新 Earth provenance 的 `earth.calibration` 只内联残差/数量/容差/相机漂移与截图、标定 KMZ；完整 controls/grid 在 `earth.sidecar_path` 所指的 static JSON，像素换算仍只用 `provenance.registration.grid`。历史存量记录不重写。独立导入同样复制 sidecar 与标定工件，不能用源文件地址冒充独立副本。
-- 地名文本按共享字号/换行模型放进独立 label 图层并避让，marker 的真实点位不因排版移动；过于拥挤时明确报空间不足，不截断地名。历史成图不被升级自动覆盖，需重新 drawing 才采用新版布局，已有底图/底纹可复用。
+- 地名与标签由模型在 LayerDoc 里排（#90 起没有程序排版）：模型预览后用 read_image 自检遮挡与可读性，marker 的点位必须贴合投影位置（交付校验）。#90 之前的历史成图不被自动覆盖。
 - 编辑画布仅显示选中要素名称，其余名称可悬停或在列表查看，避免密集标签互相遮挡；文字不参与鼠标命中。`mfocus=place:<id>|route:<id>|region:<id>` 与宿主 `asset=prop-<id>` 一起定位已保存要素，刷新/新标签只恢复界面；未保存坐标与绘制草稿不入 URL。修改须显式保存几何并重绘，不等于点击「采纳」或史实批准。
 - 地图大图由工作台自身持有：`mview=base|texture|final|calibration` 指定当前产物，与 `asset=prop-<id>` / `mfocus` 共存；关闭只摘 mview。实际覆盖宿主弹窗，不复用会落在宿主后面的旧查看器。无产物/失效值给提示并清自己的键，恢复不保存或生成。
 
@@ -323,8 +361,8 @@ Body：`{expected_revision,brief?,map_spec?,mode?}`，至少一个可保存字�
 - `base_mode:"image"` 的 `reference_image = {path,source_url,license,control_points:[{x,y,lon,lat}]}`；先通过 `POST /upload/image` 上传，`path` 是返回的 static 相对路径，`x/y` 是源图像素，`lon/lat` 是 WGS84 度。至少三个非共线点，必须有来源与许可；最大拟合残差超过源图对角线 5% 时拒绝，保留 max/rms 像素残差供人工核对。恰好三个控制点可拟合为零，不代表整张图精准；残差不能代替史实核验。
 - `map_spec` 沿用投影、bbox、背景层与 `places/routes`，新增 `regions:[{id,name,points:[[lon,lat],...],proposed?}]`。面至少三个不同且非共线顶点，规范化后闭合。人工确认的几何不能被重跑检索覆盖。
 - 闭合面的末点是首点副本，不是独立顶点：编辑器只显示/计数独立顶点，拖动首点同步闭合点，删除或续画保持同一面身份；三角形不能再删顶点。
-- 保存只是改真源，不等于已渲染新图。输出上限为 60 图层、每条线/面 240 顶点，画面外/地平线后或超限几何会阻断，不丢点、钳边或缩减内容。
-- 几何编辑后读回响应的 `stage`：投影/bbox/背景层不变可复用配准底图和底纹，从 drawing 手动推进绘制，再推进 complete 采用，或在已授权范围内 auto 续跑；投影/bbox/背景层变更先重做 base。相同规范化 spec 保存不作废已有成图。
+- 保存只是改真源，不等于已渲染新图。图层文档上限 60 图层、每条线/面 240 顶点；超限或越界的文档被严格校验拒收（不丢点、不钳边）。
+- 几何编辑后读回响应的 `stage`：投影/bbox/背景层不变可复用配准底图和底纹，从 drawing 推进（模型按新几何重新作图），再推进 complete 采用；投影/bbox/背景层变更先重做 base（模型重新取景）。相同规范化 spec 保存不作废已有成图。
 
 #### 执行与人工控制
 
@@ -334,13 +372,13 @@ Body：`{expected_revision,brief?,map_spec?,mode?}`，至少一个可保存字�
 - `POST /props/{p}/map-workflow/cancel {}`：按人的决定取消该地图当前执行；此接口不接收 expected_revision，执行前读回当前 task_id，不把它描述为取消某个旧快照。已发出的底纹任务仍可能完成并消耗额度，取消不是退费，也不能声称上游任务已停止。
 - 启动/推进返回工作流详情与 `task_id`，通过 `GET /tasks/{task_id}` 与本详情读到终态并打开真实产物。后台重启后保留产物与失败原因，由人明确继续，不自动重复计费步骤。
 - `mode` 优先级：PUT 保存选择但不启动；run 使用请求 mode（省略默认 manual，不沿用已保存 auto）；advance 固定 manual，与 run manual 都执行当前一步，只有 advance 支持 skip。通常自动续跑用 run，逐步审核/跳过底纹用 advance。
-- 正常完整流程：brief 1 次文本、research 2 次文本（计划+摘录提取），style 固定模板发 1 次图片；其余阶段确定性。未钉选文本端点时通用调用可最多尝试 3 个端点，完整流程保守预留至多 9 次文本；显式 text_config_id 钉选则不自动切端点。失败后重开阶段仍按实际新请求计数，不按容器任务数算账。
+- 调用量（#90）：brief 1–3 次文本；research/base/drawing 各是多步工具循环（每步一次文本调用，交付 ≤3 轮，含 read_image 视觉调用），回退让目标阶段重跑；style 固定模板 1 次图片。按阶段步数保守预留文本额度；显式 text_config_id 钉选则不自动切端点。失败后重开阶段按实际新请求计数，不按容器任务数算账。
 - complete 是当前图/语义/原件版本的技术采用，不是人批准史实；没有 opened 参数，不要自造。manual 在推进 complete 前打开 final，auto 完成后立即打开；都须在请求证据里记录实际打开的路径与 SHA-256，交人审核。地图最终图可带默认 35% alpha 独立底纹与标注，原始底图版本保存在 faithful_source；faithful 与 map 分类不是同一字段，不能把派生图当未改动原件。
 
 
 409 `revision_conflict|workflow_busy`：保留本地草稿，刷新并由人决定；不无限重试。关键需求/关键证据缺失、充分性检查失败或所有来源均无有效结果会阻断；单源失败/无命中和非关键细节缺失保留告警，核心依据足够可继续。Earth/外部配准失败不得当通过或自动换路线冒充成功。失败重试也占额度，每次 GPU 提交前须有剩余预算和对应授权。
 
-**正例**：获准地图与预算 → 新建 map → 保存对象/时代/用途 → manual 检查与检索 → 看来源/风险 → 生产选定底图 → 仅生成底纹 → 确定性绘制 → 开图核对 → 交人审核。**反例**：上传真实地图后调普通 `generate-image`；用博物馆搜索命中为模型猜测的疆域背书；配准失败后拿程序图标成 Earth；把 `completed` 当史实/版权通过。
+**正例**：获准地图与预算 → 新建 map → 保存对象/时代/用途 → manual 检查与检索 → 看来源/风险与 `agent.attempts` → 模型取景出底图 → 仅生成底纹 → 模型用图层作图 → 开图核对（必要时「编辑图层」）→ 交人审核。**反例**：上传真实地图后调普通 `generate-image`；用博物馆搜索命中为模型猜测的疆域背书；配准失败后拿程序图标成 Earth；把 `completed` 当史实/版权通过；手改 `map_spec` 绕过模型阶段的拒收。
 
 ---
 

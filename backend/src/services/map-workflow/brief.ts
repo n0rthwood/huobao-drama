@@ -15,6 +15,8 @@ import { resolveStageModel } from '../ai-stages.js'
 import { callTextChat } from '../vision-chat.js'
 import { parseJsonReply } from '../asset-pipeline/prompts.js'
 import { logTaskWarn } from '../../utils/task-logger.js'
+import { MapStageExhaustedError } from './agent-loop.js'
+import { MAP_MAX_STAGE_ROUNDS } from './types.js'
 import type { MapBrief, MapBriefInference, MapWorkflowIssue } from './types.js'
 
 const MAX_TOKENS = Number(process.env.AI_MAX_TOKENS) || 32768
@@ -232,21 +234,58 @@ export function judgeBrief(brief: MapBrief, verdict: BriefVerdict | null, failur
   return { brief: next, issues }
 }
 
-/** 调模型做一次语义充分性判断，再交给纯函数 `judgeBrief` 定夺 */
-export async function checkBriefSufficiency(brief: MapBrief, opts: { textConfigId?: number } = {}): Promise<BriefCheckResult> {
+const VERDICT_CONTRACT = '回复必须是一个 JSON 对象，inferred / ambiguous / missing / notes 四个键都存在且都是数组；'
+  + 'field 只能是 subject / era / location / purpose；inferred 的 value 不能为空、confidence 只能是 high / medium / low；notes 只能是字符串'
+
+export interface BriefRoundRecorder {
+  (round: number, outcome: 'accepted' | 'rejected' | 'error', problems: string[]): Promise<void>
+}
+
+/**
+ * 调模型做语义充分性判断，再交给纯函数 `judgeBrief` 定夺（Issue #90）。
+ *
+ * 调用失败或回复不合约**回给模型重答**（计入本阶段轮次），不再静默按「没判成」处理；
+ * 轮次用完抛 MapStageExhaustedError 交人。判定逻辑与「阻断项交人」不变。
+ */
+export async function checkBriefSufficiency(brief: MapBrief, opts: {
+  textConfigId?: number
+  startRounds?: number
+  feedback?: string | null
+  record?: BriefRoundRecorder
+} = {}): Promise<BriefCheckResult> {
   if (!brief.subject) return judgeBrief(brief, { inferred: [], ambiguous: [], missing: [], notes: [] })
-  let verdict: BriefVerdict | null = null
-  let failure: string | undefined
-  try {
-    const model = await resolveStageModel('asset_research', { configId: opts.textConfigId })
-    const reply = await callTextChat(model, briefText(brief), {
-      systemPrompt: SYSTEM, temperature: 0.1, maxTokens: MAX_TOKENS, timeoutMs: TEXT_TIMEOUT_MS, interactive: true,
-    })
-    verdict = parseBriefVerdict(parseJsonReply(reply.text))
-    if (!verdict) failure = '模型回复不是约定的 JSON 结论'
-  } catch (err) {
-    failure = err instanceof Error ? err.message : String(err)
-    logTaskWarn('MapWorkflow', 'brief-check-failed', { error: failure })
+  const model = await resolveStageModel('asset_research', { configId: opts.textConfigId })
+  let round = opts.startRounds ?? 0
+  let feedback = opts.feedback ?? null
+  let problems: string[] = []
+  while (round < MAP_MAX_STAGE_ROUNDS) {
+    round += 1
+    let replyText = ''
+    let verdict: BriefVerdict | null = null
+    let outcome: 'rejected' | 'error' = 'rejected'
+    try {
+      const reply = await callTextChat(model, [briefText(brief), feedback ? `\n上一轮的情况（请据此修正）：\n${feedback}` : ''].join(''), {
+        systemPrompt: SYSTEM, temperature: 0.1, maxTokens: MAX_TOKENS, timeoutMs: TEXT_TIMEOUT_MS, interactive: true,
+      })
+      replyText = reply.text
+      let parsed: unknown = null
+      let parseError = ''
+      try {
+        parsed = parseJsonReply(reply.text)
+      } catch (err) {
+        parseError = err instanceof Error ? err.message : String(err)
+      }
+      verdict = parseBriefVerdict(parsed)
+      problems = verdict ? [] : [`回复不符合约定${parseError ? `（${parseError}）` : ''}：${VERDICT_CONTRACT}`]
+    } catch (err) {
+      outcome = 'error'
+      problems = [`本轮调用出错：${err instanceof Error ? err.message : String(err)}`]
+      logTaskWarn('MapWorkflow', 'brief-check-failed', { round, error: problems[0] })
+    }
+    // 记录在 try 之外：工作流被取消（Stale）必须终止执行，而不是被当成一次调用出错回给模型
+    await opts.record?.(round, verdict ? 'accepted' : outcome, problems)
+    if (verdict) return judgeBrief(brief, verdict)
+    feedback = [...problems, replyText ? `你上一轮的回复原文：${replyText.slice(0, 2000)}` : ''].filter(Boolean).join('\n')
   }
-  return judgeBrief(brief, verdict, failure)
+  throw new MapStageExhaustedError('brief', problems)
 }

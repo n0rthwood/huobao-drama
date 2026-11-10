@@ -16,11 +16,16 @@ import { toSnakeCase } from '../../utils/transform.js'
 import { normalizeMapSpec, parseMapSpec, type MapSpec } from '../map-base-render.js'
 import {
   EMPTY_OUTPUTS,
+  emptyAgentState,
   emptyBrief,
+  MAP_MAX_ROLLBACKS,
+  MAP_MAX_STAGE_ROUNDS,
   MAP_WORKFLOW_STAGES,
   STAGE_LABEL,
   emptySteps,
   emptyWorkflow,
+  type MapAgentAttempt,
+  type MapAgentState,
   type MapBrief,
   type MapWorkflowHistoryEntry,
   type MapWorkflowIssue,
@@ -132,6 +137,29 @@ export function parseWorkflow(raw: string | null | undefined): MapWorkflowState 
     image_config_id: nullableId(record.image_config_id),
     image_model: typeof record.image_model === 'string' ? record.image_model : null,
     updated_at: typeof record.updated_at === 'string' ? record.updated_at : null,
+    agent: parseAgentState(record.agent),
+  }
+}
+
+/** 轮次记录只是可回看的事实：坏数据退回空记录，绝不让详情接口 500 */
+function parseAgentState(raw: unknown): MapAgentState {
+  const base = emptyAgentState()
+  if (!raw || typeof raw !== 'object') return base
+  const record = raw as Record<string, unknown>
+  const counts = (value: unknown): Record<string, number> => {
+    if (!value || typeof value !== 'object') return {}
+    return Object.fromEntries(Object.entries(value as Record<string, unknown>)
+      .filter(([, n]) => Number.isFinite(Number(n)))
+      .map(([key, n]) => [key, Number(n)]))
+  }
+  return {
+    task_id: nullableId(record.task_id),
+    rounds: counts(record.rounds),
+    rollbacks: Number.isFinite(Number(record.rollbacks)) ? Number(record.rollbacks) : 0,
+    feedback: record.feedback && typeof record.feedback === 'object'
+      ? Object.fromEntries(Object.entries(record.feedback as Record<string, unknown>).filter(([, v]) => typeof v === 'string')) as MapAgentState['feedback']
+      : {},
+    attempts: Array.isArray(record.attempts) ? record.attempts as MapAgentAttempt[] : [],
   }
 }
 
@@ -210,6 +238,11 @@ export interface MutateOptions {
   expectedTaskId?: number | null
   expectedBriefHash?: string | null
   action: string
+  /**
+   * 是否写一条修订历史（默认写）。模型阶段的逐轮记录（#90）只改 `agent` 计数与尝试列表，
+   * 不进历史——否则几轮重交就会把回退所需的快照挤出 MAX_HISTORY。
+   */
+  history?: boolean
   actor: 'auto' | 'manual' | 'system'
   note?: string | null
   /** 记录回退快照（brief / map_spec / 产出 / 检索） */
@@ -267,19 +300,21 @@ export async function mutateWorkflow(propId: number, opts: MutateOptions): Promi
   next.version = 1
   next.revision = state.revision + 1
   next.updated_at = now()
-  next.history = [
-    ...state.history,
-    {
-      revision: next.revision,
-      at: next.updated_at,
-      stage: next.stage,
-      status: next.status,
-      action: opts.action,
-      actor: opts.actor,
-      note: opts.note ?? null,
-      ...(before ? { snapshot: before } : {}),
-    },
-  ].slice(-MAX_HISTORY)
+  if (opts.history !== false) {
+    next.history = [
+      ...state.history,
+      {
+        revision: next.revision,
+        at: next.updated_at,
+        stage: next.stage,
+        status: next.status,
+        action: opts.action,
+        actor: opts.actor,
+        note: opts.note ?? null,
+        ...(before ? { snapshot: before } : {}),
+      },
+    ].slice(-MAX_HISTORY)
+  }
 
   // 几何永远过一遍 normalizeMapSpec：工作流不是绕开地图校验的后门
   const nextSpec = ctx.mapSpec ? normalizeMapSpec(ctx.mapSpec) : null
@@ -431,17 +466,19 @@ export function serializeProp(row: PropRow): Record<string, unknown> {
   return payload
 }
 
-export interface MapWorkflowDetail extends Omit<MapWorkflowState, 'version' | 'brief_hash'> {
+export interface MapWorkflowDetail extends Omit<MapWorkflowState, 'version' | 'brief_hash' | 'agent'> {
   prop_id: number
   prop_name: string
   asset_type: 'map'
   map_spec: MapSpec | null
   busy: boolean
+  agent: Omit<MapAgentState, 'feedback'> & { max_rounds: number; max_rollbacks: number }
 }
 
 export function serializeDetail(loaded: LoadedWorkflow): MapWorkflowDetail {
   const { prop, state, mapSpec } = loaded
-  const { brief_hash: _hash, version: _version, ...rest } = state
+  const { brief_hash: _hash, version: _version, agent, ...rest } = state
+  const { feedback: _feedback, ...agentView } = agent
   return {
     ...rest,
     prop_id: prop.id,
@@ -451,5 +488,6 @@ export function serializeDetail(loaded: LoadedWorkflow): MapWorkflowDetail {
     brief: briefOfProp(prop, state),
     map_spec: mapSpec,
     busy: state.status === 'running',
+    agent: { ...agentView, max_rounds: MAP_MAX_STAGE_ROUNDS, max_rollbacks: MAP_MAX_ROLLBACKS },
   }
 }

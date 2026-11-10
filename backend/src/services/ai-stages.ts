@@ -103,9 +103,10 @@ export const AI_CALL_SITES: Record<string, AiStage[]> = {
   'services/asset-pipeline/steps.ts': ['asset_spec', 'asset_qc'],
   // 资料检索（#79）：检索计划/预筛（文本）+ 候选图筛选（视觉）
   'services/asset-research/run.ts': ['asset_research', 'asset_curate'],
-  // 地图工作流（#84）：需求充分性与资料检索都是纯文本环节；地图几何由程序渲染，模型不参与
+  // 地图工作流（#84 → #90）：需求充分性是单次判定（失败回给模型重答）；检索 / 底图 / 作图是工具循环 Agent，
+  // 主模型走资料研究环节，看图走 read_image（底图与作图阶段启动时要求有视觉配置）
   'services/map-workflow/brief.ts': ['asset_research'],
-  'services/map-workflow/research.ts': ['asset_research'],
+  'services/map-workflow/agent-loop.ts': ['asset_research', 'read_image'],
   // 补全剩余（#52）：纪录片拆分分镜的续跑，复用同一视觉环节
   'services/storyboard-fill-gaps.ts': ['storyboard_breaker_documentary'],
   'services/portrait-appearance.ts': ['portrait_appearance'],

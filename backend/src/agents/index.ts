@@ -5,6 +5,7 @@
  * episodeId/dramaId 由工具从 RequestContext 读取
  */
 import { Agent } from '@mastra/core/agent'
+import type { MastraModelConfig } from '@mastra/core/llm'
 import type { RequestContext } from '@mastra/core/request-context'
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { createOpenAI } from '@ai-sdk/openai'
@@ -436,7 +437,8 @@ function createScheduledFetch(configId: number, inner: typeof fetch): typeof fet
   })
 }
 
-async function getModel(fileModel: string | undefined, modelOverride?: string, textConfigId?: number) {
+/** 按文本配置构建 Agent 模型（排队、调用观测、thinking-off 等补丁链都在这里）；地图工作流（#90）的阶段 Agent 也走它 */
+export async function getModel(fileModel: string | undefined, modelOverride?: string, textConfigId?: number): Promise<MastraModelConfig> {
   const textConfig = textConfigId != null ? await getConfigById(textConfigId) : await getTextConfig()
   if (!textConfig || textConfig.id == null) throw new Error('指定的文本模型不存在，无法排队')
   const modelName = modelOverride || fileModel || textConfig.model
