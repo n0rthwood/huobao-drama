@@ -3088,6 +3088,47 @@
           "close": "大画像を閉じる",
           "unavailable": "リンクの「{view}」は現在表示できる成果物がありません（巻き戻し済みまたは未生成）。プレビュー用パラメータを削除しました。",
           "invalidLink": "リンクのプレビュー指定「{value}」は認識できないため削除しました。"
+        },
+        "agent": {
+          "title": "モデルのラウンド",
+          "hint": "モデル段階ごとに最大 3 回の提出、1 回の実行で最大 2 回の段階間ロールバック。使い切ると人手に引き継ぎます。",
+          "target": "その段階の提出記録",
+          "runTask": "今回の実行：タスク #{id}",
+          "runNone": "モデル実行はまだ始まっていません",
+          "rounds": "{stage} {used}/{max} ラウンド",
+          "rollbacks": "段階間ロールバック {used}/{max}",
+          "noAttempts": "今回の実行にはまだ提出記録がありません。",
+          "attemptsCount": "{n} 件",
+          "round": "第 {n} ラウンド",
+          "roundNone": "提出ラウンド以外",
+          "taskRef": "タスク #{id}",
+          "rollbackTarget": "{stage}へロールバック",
+          "latestRejection": "{stage}第 {n} ラウンドが却下された理由",
+          "viewAttempts": "この段階の提出記録を見る",
+          "outcome": {
+            "accepted": "採用",
+            "rejected": "却下",
+            "no_delivery": "未提出",
+            "error": "実行エラー",
+            "rollback": "段階間ロールバック",
+            "infra_retry": "インフラ再試行"
+          }
+        },
+        "layerEditor": {
+          "open": "レイヤーを編集",
+          "title": "レイヤーを編集",
+          "target": "地図レイヤー文書",
+          "hint": "編集対象はモデルが提出したレイヤー文書です。保存するとサーバーが同じ描画チェーンで再描画し、新しいバージョンを登録します。",
+          "close": "閉じる",
+          "save": "保存して再描画",
+          "saving": "保存中…",
+          "saved": "レイヤーを保存し、完成画像を再描画しました",
+          "unsaved": "未保存の変更あり",
+          "confirmDiscard": "未保存の変更があります。破棄して閉じますか？",
+          "invalidTitle": "サーバーがこのレイヤー文書を受け付けませんでした",
+          "problemsTitle": "サーバーが指摘した問題（{n} 件）：",
+          "problemRoot": "文書全体",
+          "invalidHint": "下書きは保持しています。上のパスを直してからもう一度保存してください。"
         }
       },
       "citationsSectionTitle": "資料出典",

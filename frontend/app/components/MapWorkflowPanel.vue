@@ -78,6 +78,19 @@
         <p v-for="issue in softIssues" :key="issue.code + issue.field" class="mw-issue">{{ issue.message }}</p>
       </div>
 
+      <!-- 当前/失败阶段的最新一轮被拒原因：卡在哪条校验上要和步骤状态一起看见，不用展开 -->
+      <div v-if="latestRejection" class="mw-issues">
+        <strong>
+          {{ t('episode.documentary.map.agent.latestRejection', {
+            n: latestRejection.round,
+            stage: t('episode.documentary.map.stage.' + latestRejection.stage),
+          }) }}
+        </strong>
+        <p v-for="(reason, index) in latestRejection.problems" :key="index" class="mw-issue">{{ reason }}</p>
+        <p v-if="!latestRejection.problems.length" class="mw-issue">{{ t('episode.documentary.map.agent.outcome.' + latestRejection.outcome) }}</p>
+        <button type="button" class="mw-tool" @click="openAttempts(latestRejection.stage)">{{ t('episode.documentary.map.agent.viewAttempts') }}</button>
+      </div>
+
       <p v-if="draftsDirty" class="mw-warn">{{ t('episode.documentary.map.panel.nextDirty') }}</p>
       <div class="mw-actions">
         <button type="button" class="btn btn-sm btn-primary" :disabled="busy || !canRun" @click="run">
@@ -95,6 +108,10 @@
           <X v-else :size="11" />
           {{ t('episode.documentary.map.panel.cancel') }}
         </button>
+        <button type="button" class="btn btn-sm" :disabled="!canEditLayers" @click="openLayerEditor">
+          <PenLine :size="11" />
+          {{ t('episode.documentary.map.layerEditor.open') }}
+        </button>
         <label class="mw-select">
           <span>{{ t('episode.documentary.map.panel.textConfig') }}</span>
           <select v-model="textConfigId" class="input">
@@ -111,6 +128,16 @@
         </label>
       </div>
       <p class="mw-hint dim">{{ t('episode.documentary.map.panel.textureHint') }}</p>
+    </section>
+
+    <section v-if="detail" class="mw-block">
+      <MapAgentRounds
+        :agent="agentState"
+        :stage="stage"
+        :open-stage="openAttemptStage"
+        :now="nowMs"
+        @open="setAttemptStage"
+      />
     </section>
 
     <section v-if="detail" class="mw-block">
@@ -194,6 +221,20 @@
         </div>
       </div>
     </Teleport>
+
+    <!-- 图层编辑器：同样 teleport 到 body；关闭只清 mlayer，宿主的 asset / mfocus 原样保留 -->
+    <Teleport to="body">
+      <MapLayerEditor
+        v-if="editorOpen && editorDoc && detail"
+        :prop-id="propId"
+        :layer-doc="editorDoc"
+        :revision="detail.revision"
+        :asset-name="assetName || ''"
+        @close="closeLayerEditor"
+        @saved="onLayerDocSaved"
+        @conflict="reloadQuiet"
+      />
+    </Teleport>
   </div>
 </template>
 
@@ -206,16 +247,20 @@
  * 几何真值是 map_spec（经纬度），扩散模型只产出纹理，绝不重画地理形状。
  * 任务进度一律从全局任务 store 读，面板自己不轮询。
  */
-import { Loader2, Play, RefreshCw, StepForward, X } from 'lucide-vue-next'
+import { Loader2, PenLine, Play, RefreshCw, StepForward, X } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import MapBriefForm from '~/components/MapWorkflow/MapBriefForm.vue'
 import MapGeoEditor from '~/components/MapWorkflow/MapGeoEditor.vue'
 import MapResults from '~/components/MapWorkflow/MapResults.vue'
+import MapAgentRounds from '~/components/MapWorkflow/MapAgentRounds.vue'
+import MapLayerEditor from '~/components/MapWorkflow/MapLayerEditor.vue'
 import {
   aiConfigAPI,
   mapWorkflowAPI,
   mapWorkflowConflictOf,
+  type MapAgentAttempt,
+  type MapAgentState,
   type MapBrief,
   type MapSpec,
   type MapWorkflowDetail,
@@ -253,6 +298,18 @@ const textConfigId = ref(0)
 const imageKey = ref('')
 const textConfigs = ref<Array<{ id: number; name: string }>>([])
 const imageOptions = ref<Array<{ key: string; configId: number; configName: string; model: string }>>([])
+
+/**
+ * 模型轮次与图层编辑器（Issue #90）：本面板自己的 deeplink 组 mapAgent。
+ * mlayer=1 只开编辑器界面（恢复绝不触发保存/重绘），mround 记住展开的阶段；
+ * 目标不存在时清掉自己的键并给可读提示，不停在空壳上。
+ */
+const agentLink = useDeeplink('mapAgent', DEEPLINK_KEYS.mapAgent)
+const editorOpen = ref(false)
+const openAttemptStage = ref('')
+const nowMs = ref(Date.now())
+let agentRestored = false
+let clockTimer: ReturnType<typeof setInterval> | null = null
 
 /**
  * 产出大图预览（Issue #84 / #86）：本面板自己的 deeplink 键 mview。
@@ -337,6 +394,30 @@ const taskProgress = computed(() => {
   const progress = taskRow.value?.progress
   if (!progress || !progress.total) return ''
   return t('episode.documentary.map.panel.progress', { done: progress.completed ?? 0, total: progress.total })
+})
+
+/** 轮次账本：后端没给（旧记录 / 还没跑过模型）时按空账本显示，不编造计数 */
+const EMPTY_AGENT: MapAgentState = { task_id: null, rounds: {}, rollbacks: 0, max_rounds: 3, max_rollbacks: 2, attempts: [] }
+const agentState = computed<MapAgentState>(() => detail.value?.agent ?? EMPTY_AGENT)
+
+/** 模型交付的 LayerDoc：当前成品图就是它渲染出来的；没有就没得编辑 */
+const editorDoc = computed(() => (detail.value?.outputs.layer_doc as Record<string, unknown> | null) ?? null)
+const canEditLayers = computed(() => !!editorDoc.value && !isRunning.value && !busy.value)
+
+/**
+ * 当前（或失败）阶段最近一次不被接受的交付：被拒原因要贴着步骤状态显示，不用点开才看得见。
+ * 只看当前阶段：别的阶段早已通过，它的旧拒绝不是现在卡住的原因。
+ */
+const REJECTED_OUTCOMES = ['rejected', 'no_delivery', 'error']
+const latestRejection = computed<MapAgentAttempt | null>(() => {
+  const attempts = agentState.value.attempts
+  for (let index = attempts.length - 1; index >= 0; index -= 1) {
+    const attempt = attempts[index]!
+    if (attempt.stage !== stage.value) continue
+    if (attempt.outcome === 'accepted') return null
+    if (REJECTED_OUTCOMES.includes(attempt.outcome)) return attempt
+  }
+  return null
 })
 
 /**
@@ -427,6 +508,71 @@ watch(previewImage, image => {
   previewWarning.value = t('episode.documentary.map.preview.unavailable', { view: t(`episode.documentary.map.results.${previewLabelKey(view)}`) })
   previewView.value = null
 })
+
+/** 「编辑图层」：只开界面；真正的重绘发生在保存时，由服务端用同一条 renderLayerDoc 链做 */
+function openLayerEditor() {
+  if (!canEditLayers.value) return
+  editorOpen.value = true
+}
+
+function closeLayerEditor() {
+  editorOpen.value = false
+}
+
+/** 保存成功：服务端已登记新版本并采纳图与语义，整份详情（含成品图）按返回值更新 */
+function onLayerDocSaved(next: MapWorkflowDetail) {
+  applyDetail(next)
+  conflict.value = null
+}
+
+/** 图层保存撞上 409：服务端状态没变，这里只回读最新修订号，编辑器里的草稿由它自己保留 */
+function reloadQuiet() {
+  void load(true)
+}
+
+function setAttemptStage(value: string) {
+  openAttemptStage.value = value
+}
+
+function openAttempts(target: string) {
+  openAttemptStage.value = target
+}
+
+/** 自己的键：开/关与展开阶段各写各的，宿主的 asset / mfocus / mview 不受影响 */
+watch(editorOpen, open => agentLink.set({ mlayer: open ? '1' : '' }))
+watch(openAttemptStage, value => agentLink.set({ mround: value }))
+
+/** 产出被回退清掉（layer_doc 没了）时，编辑器不能停在旧文档上 */
+watch(editorDoc, doc => {
+  if (!doc && editorOpen.value) {
+    editorOpen.value = false
+    toast.warning(t('deeplink.missingNamed', { target: t('episode.documentary.map.layerEditor.target') }))
+  }
+})
+
+/**
+ * 链接恢复：详情到手后才判定——有没有 layer_doc、某阶段有没有交付记录，只有详情说了算。
+ * 恢复只开界面，绝不触发保存或重绘；目标不存在就清掉自己的键并给可读提示。
+ */
+function restoreAgentFromLink() {
+  if (agentRestored) return
+  agentRestored = true
+  const round = agentLink.initial('mround')
+  if (round) {
+    if (agentState.value.attempts.some(attempt => attempt.stage === round)) openAttemptStage.value = round
+    else {
+      agentLink.set({ mround: '' })
+      toast.warning(t('deeplink.missingNamed', { target: t('episode.documentary.map.agent.target') }))
+    }
+  }
+  if (agentLink.initial('mlayer') !== '1') return
+  if (!editorDoc.value) {
+    agentLink.set({ mlayer: '' })
+    toast.warning(t('deeplink.missingNamed', { target: t('episode.documentary.map.layerEditor.target') }))
+    return
+  }
+  editorOpen.value = true
+}
 
 /**
  * 编辑画布底图：必须是**没有要素**的那张图。
@@ -537,6 +683,7 @@ async function load(silent = false) {
     error.value = ''
     applyDetail(res)
     restorePreviewFromLink()
+    restoreAgentFromLink()
   } catch (err) {
     if (!stopped) error.value = err instanceof Error && err.message ? err.message : t('episode.documentary.map.panel.loadFailed')
   } finally {
@@ -748,6 +895,9 @@ watch(() => props.propId, () => {
   serverBrief.value = JSON.stringify(briefDraft.value)
   serverSpec.value = JSON.stringify(specDraft.value)
   conflict.value = null
+  // 换资产等于换工作位置：编辑器与展开的轮次都收起，自己的键一并清掉
+  editorOpen.value = false
+  openAttemptStage.value = ''
   void load()
 })
 
@@ -758,9 +908,14 @@ watch(() => detail.value?.mode, (mode) => {
 onMounted(() => {
   void load()
   void loadConfigs()
+  // 交付记录只显示相对时间，每分钟刷一次本地时钟即可（面板自己不轮询服务端）
+  clockTimer = setInterval(() => { nowMs.value = Date.now() }, 60_000)
 })
 
-onBeforeUnmount(() => { stopped = true })
+onBeforeUnmount(() => {
+  stopped = true
+  if (clockTimer) clearInterval(clockTimer)
+})
 </script>
 
 <style scoped>

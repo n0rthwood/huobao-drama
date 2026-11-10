@@ -253,6 +253,12 @@ export const DEEPLINK_KEYS = {
   mapGeometry: ['mfocus'],
   /** 地图产出大图：产出身份 base|texture|final|calibration；绝不写图片路径，刷新时按当前详情重新求值。 */
   mapPreview: ['mview'],
+  /**
+   * 地图模型轮次与图层编辑器（Issue #90）：
+   * mlayer=1 打开「编辑图层」（只开界面，不触发保存/重绘；没有 layer_doc 时清键并提示）；
+   * mround=<brief|research|base|style|drawing|complete> 展开该阶段的交付记录。
+   */
+  mapAgent: ['mlayer', 'mround'],
   /** 参考图管理器：素材库弹窗的宿主资产（值 = 类型-id，多实例共用一个键） */
   refLibrary: ['reflib'],
   /** 角色档案图面板：检索弹窗与关键词 */
