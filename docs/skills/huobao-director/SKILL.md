@@ -7,7 +7,7 @@ description: 通过火宝 HTTP API 按阶段推进剧本、资产、Poster、分
 
 > 契约快照：功能代码至 `3eec6f7`，已并入 main `c6bf2ab`，release `20261108T204444Z`。`[R]` 为真实运行证据，`[S]` 为仅源码/实现自测，`[S/R]` 为部分实测；未调用分支不能随整节升格。历史殷墟/八达岭首轮见必读 references；本轮 drama 11 / episode 17 的骨架、TTS、设计与公开观测证据在 `docs/qa/issue-87-20261108/`。65 次调用、727 条公开消息已按游标读全；五张卡写入待审不代表零阻断，未声称 #88 全局补齐。路由/schema 变化后先用只读 GET/preview 核验再写。
 >
-> **Issue #84**：`f149a0e` / release `20261109T062625Z`。项目12/集18、13/集19；程序177、外部181、副本184、全自动185已实测；Earth179已通过（1349，2.693px/0漂移/16384点）。证据 `docs/qa/issue-84-1009-20261109T014309Z/`；未跑分支 `[S]`。
+> **Issue #84**：`f149a0e` / release `20261109T062625Z`。项目12/集18、13/集19；程序177、外部181、副本184、全自动185已实测；Earth179已通过（1349，2.693px/0漂移/16384点）。证据 `docs/qa/issue-84-1009-20261109T014309Z/`；未跑分支 `[S]`。**#90**：`3ff84f0`/`20261110T032127Z`，prop103 1361/1365 `[R]`，见 `docs/qa/issue-90-20261110/`。
 >
 > 历史细表：`references/api-core.md`、`references/api-production.md` 为 2026-11-02 快照；与 `references/api-catalog.md` 或本正文冲突时以新文档为准。§3 与 `references/diagnostic-example.md` 是历史案例，其 Poster 本地画布、「镜数=段落数」、固定 25fps 等说法**不得当作现行配方**，现行口径见 §2。错误案例中的 `[R]` 只表示该错误行为真实发生过，不表示流程正确或已获授权。
 
@@ -152,8 +152,8 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 - **自动点线面与人工确认**：research 阶段把来源支持的要素并入 `map_spec`，AI 新增项带 `proposed:true`；auto 可用候选直接制图，但这不是人工批准。人工逐项审核后去掉该项 `proposed` 并通过工作流 PUT 保存，之后重跑不覆盖它。只有在明确选择示意模式时才可采用标明近似的区域；缺关键依据要阻断，不虚构疆界。
 - **需求与缺失分级**：对象 / 时代 / 空间定位 / 用途与粒度要能明确解析（「殷墟车马坑」可由 AI 解释隐含时代与位置，「京杭运河通州段」缺时代必须补齐）；不明确或充分性检查失败会阻断，单个来源无结果、非关键细节缺失只记录风险，所有来源都无结果不算已完成检索。AI 推断不等于出处考证：`issues[].blocking` 阻断时补需求，`research.features[].uncertainty/conflicts` 有风险时呈报。
 - **阶段与续跑**：`brief → research → base → style → drawing → complete`。`run` 始终继续当前待执行的 `stage`，不会隐式回到 brief；整条重做须先按人的决定显式 rollback。`run {mode:"auto"}` 从当前阶段连续执行到完成或阻断，可能发生文本调用和一次底纹生成，先拿到该范围的授权并按 §1.2 预留 `text_calls` 与 `images`；`manual` 只执行当前一步。`awaiting_review` 不代表后面阶段已做完。
-- **调用留痕**：每次文本/视觉调用、工具参数与结果持久化，`GET /tasks/{id}/observations` 分页可读；旧任务 1287–1291 无记录，不伪造回填。按服务端调用行与底纹图片任务计数，不把工作流容器数当请求数。
-- **模型阶段（#90）**：brief/research/base/drawing 由模型在工具循环内完成，交付被校验拒收或工具出错都回给模型改，每阶段≤3 轮、每次运行跨阶段回退≤2 次，用完才判失败交人；底图路线、bbox 与取景由模型定（旧 bbox 仅参考，要素须在画内且外包框最大边≥30% 画面）；作图是模型写 LayerDoc，预览/成图/人工编辑同一 `renderLayerDoc`，语义从锚定图层导出。`detail.agent` 读轮次、回退与逐轮拒收原因；base/drawing 需视觉文本配置，否则 run 返回 `vision_config_unavailable`。人工编辑走 `PUT …/map-workflow/layer-doc`（严格校验，400 `layer_doc_invalid` 带字段级 `problems`）。
+- **调用留痕**：每次文本/视觉调用、工具参数与结果持久化，`GET /tasks/{id}/observations` 分页可读；旧任务 1287–1291 无记录，勿回填。按服务端调用行与底纹图片任务计数，不把工作流容器数当请求数。
+- **模型阶段（#90）**：brief/research/base/drawing 由模型在工具循环内完成，拒收或工具出错都回给模型改，每阶段≤3 轮、每次运行回退≤2 次，用完才交人；底图路线、bbox 与取景由模型定（旧 bbox 仅参考，要素须在画内且外包框最大边≥30% 画面）；作图是模型写 LayerDoc，预览/成图/人工编辑同一 `renderLayerDoc`，语义从锚定图层导出。`detail.agent` 读轮次与拒收原因；base/drawing 需视觉配置，否则 `vision_config_unavailable`。人工编辑走 `PUT …/map-workflow/layer-doc`（拒收为 400 `layer_doc_invalid`）。
 - **三条底图**：`program` Natural Earth；`earth` 真实载入 KMZ，实测控制网格为换算真源，检验点残差>3px 或相机漂移即失败；`image` 需上传图、来源、许可与≥3 个非共线控制点。标定残差不证明史实位置。点线面改动不动投影/bbox/背景层时回到 `drawing` 复用底图与底纹，否则先重做 base。
 - **重启后的底纹续接**：工作流在飞时重启会标失败，保留阶段与原任务 ID，不假装仍在执行。同配置续跑 style 会认领原任务 `params.map_texture_task_id` 指向的排队中/生成中/已完成图片，不重复下单；换图片配置/模型或原图任务已失败时才新建计费任务。显式回退/取消仍按人的决定执行。
 - **模型与原件边界**：地图原件、Earth 影像和外部史料图不进入 t2i/image_edit/i2v；图片调用只生成无地理内容的底纹，点线面与文字是模型写的图层。`asset_type:"map"` 才是地图判据；完成时原始底图版本存 `faithful_source`，`image_url` 是派生图。底纹默认 35%（上限 60%）alpha，人要求原图外观不变时跳过 style。`texture_image.task_id` 计 `images` 预算，回退后同运行链按原任务认领不重复计费；`base_image/final_image` 不计 GPU 图数。
