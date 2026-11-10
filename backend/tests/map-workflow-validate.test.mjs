@@ -110,6 +110,9 @@ const script = `
     missing: drawingProblems({ doc: normalizeLayerDoc({ ...doc, layers: doc.layers.filter(l => l.id !== 'm3') }), features: specFeats, registration: reg, omitted: [] }).problems,
     omitted: drawingProblems({ doc: normalizeLayerDoc({ ...doc, layers: doc.layers.filter(l => l.id !== 'm3') }), features: specFeats, registration: reg, omitted: [{ feature_id: 'p3', reason: '与标题重叠，改由图注说明' }] }),
     wrongType: drawingProblems({ doc: normalizeLayerDoc({ ...doc, layers: doc.layers.map(l => l.id === 'route' ? { ...l, type: 'marker', at: l.points[0], text: '' } : l) }), features: specFeats, registration: reg, omitted: [] }).problems,
+    // 生产 #1364 的形状：想画画框却交了一个实心的全幅 polygon，把底图整片盖掉
+    solidFrame: drawingProblems({ doc: normalizeLayerDoc({ ...doc, layers: [layer('frame', 0, { type: 'polygon', points: [[0.01, 0.01], [0.99, 0.01], [0.99, 0.99], [0.01, 0.99]], style: { fill: '#5b4024', fill_opacity: 1 } }), ...doc.layers.map(l => ({ ...l, z: l.z + 1 }))] }), features: specFeats, registration: reg, omitted: [] }).problems,
+    hollowFrame: drawingProblems({ doc: normalizeLayerDoc({ ...doc, layers: [layer('frame', 0, { type: 'polygon', points: [[0.01, 0.01], [0.99, 0.01], [0.99, 0.99], [0.01, 0.99]], style: { stroke: '#5b4024', fill_opacity: 0 } }), ...doc.layers.map(l => ({ ...l, z: l.z + 1 }))] }), features: specFeats, registration: reg, omitted: [] }).problems,
     geometry: drawnGeometryOf(strictDoc, specFeats),
     expectedPx: features.places.map(p => { const v = n([p.lon, p.lat]); return [v[0] * tight.width, v[1] * tight.height] }),
   }
@@ -177,6 +180,8 @@ test('作图交付：锚定几何须与投影一致、缺失要素须显式省�
   assert.deepEqual(result.drawing.omitted.problems, [])
   assert.deepEqual(result.drawing.omitted.omitted, [{ feature_id: 'p3', reason: '与标题重叠，改由图注说明' }])
   assert.match(result.drawing.wrongType.join(), /type=polyline/)
+  assert.match(result.drawing.solidFrame.join(), /盖住了画面的 9\d%.*frame/, '实心全幅面会盖住底图，必须拒收')
+  assert.deepEqual(result.drawing.hollowFrame, [], '只描边的画框不遮挡底图')
   const { geometry, expectedPx } = result.drawing
   assert.deepEqual(geometry.points.map(p => p.id), ['p0', 'p1', 'p2', 'p3'])
   geometry.points.forEach((p, i) => assert.ok(Math.hypot(p.at[0] - expectedPx[i][0], p.at[1] - expectedPx[i][1]) < 0.01))

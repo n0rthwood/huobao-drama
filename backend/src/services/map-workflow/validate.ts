@@ -32,6 +32,11 @@ export const FRAME_MIN_EXTENT = 0.3
 /** 锚定几何与要素投影位置的容差：max(6px, 长边 0.4%)（3840 宽约 15px） */
 const GEOMETRY_TOLERANCE_MIN_PX = 6
 const GEOMETRY_TOLERANCE_RATIO = 0.004
+/** 底图必须看得见：有效不透明度 ≥0.5 的填充面合计盖住画面超过 30% 即拒收 */
+const OPAQUE_FILL_ALPHA = 0.5
+export const OPAQUE_COVER_LIMIT = 0.3
+const COVER_GRID_X = 64
+const COVER_GRID_Y = 36
 
 /** 比对用的归一化：去空白与常见标点差异，避免「逐字核对」被空格打败 */
 export function matchKey(text: string): string {
@@ -359,6 +364,52 @@ function polylineDistance(p: [number, number], line: Array<[number, number]>, cl
   return best
 }
 
+/** 非零环绕规则（与 SVG polygon 默认 fill-rule 一致）判断点是否被面覆盖 */
+function windingContains(polygon: Array<[number, number]>, p: [number, number]): boolean {
+  let winding = 0
+  for (let i = 0; i < polygon.length; i++) {
+    const [x1, y1] = polygon[i]!
+    const [x2, y2] = polygon[(i + 1) % polygon.length]!
+    const cross = (x2 - x1) * (p[1] - y1) - (p[0] - x1) * (y2 - y1)
+    if (y1 <= p[1]) {
+      if (y2 > p[1] && cross > 0) winding++
+    } else if (y2 <= p[1] && cross < 0) winding--
+  }
+  return winding !== 0
+}
+
+/**
+ * 不透明填充面对底图的遮盖：按网格采样（非零环绕，与渲染同口径），返回总覆盖比例与逐层比例。
+ * 地图的意义在于底图上的真实地理；大面积不透明填充会把它整片盖掉（例如把画框画成实心面）。
+ */
+export function opaqueFillCoverage(doc: LayerDoc): { total: number; layers: Array<{ id: string; ratio: number }> } {
+  const preset = THEME_PRESETS[doc.theme].polygon
+  const opaque = doc.layers.filter((layer): layer is Extract<Layer, { type: 'polygon' }> => {
+    if (layer.type !== 'polygon' || !layer.visible) return false
+    const fillOpacity = typeof layer.style.fill_opacity === 'number' ? layer.style.fill_opacity : Number(preset.fill_opacity)
+    return layer.opacity * fillOpacity >= OPAQUE_FILL_ALPHA && layer.style.fill !== 'none'
+  })
+  const hits = new Map<string, number>()
+  let covered = 0
+  for (let gy = 0; gy < COVER_GRID_Y; gy++) {
+    for (let gx = 0; gx < COVER_GRID_X; gx++) {
+      const p: [number, number] = [(gx + 0.5) / COVER_GRID_X, (gy + 0.5) / COVER_GRID_Y]
+      let any = false
+      for (const layer of opaque) {
+        if (!windingContains(layer.points, p)) continue
+        any = true
+        hits.set(layer.id, (hits.get(layer.id) ?? 0) + 1)
+      }
+      if (any) covered++
+    }
+  }
+  const cells = COVER_GRID_X * COVER_GRID_Y
+  return {
+    total: covered / cells,
+    layers: [...hits].map(([id, count]) => ({ id, ratio: count / cells })).sort((a, b) => b.ratio - a.ratio),
+  }
+}
+
 export interface OmittedFeature {
   feature_id: string
   reason: string
@@ -450,6 +501,12 @@ export function drawingProblems(input: {
     if (stray.length) {
       problems.push(`${label} 的图层 ${layer.id} 有 ${stray.length} 个点离开了要素本身的走向（例如 ${fmt(stray[0]!)}），几何必须贴合要素`)
     }
+  }
+  const coverage = opaqueFillCoverage(doc)
+  if (coverage.total > OPAQUE_COVER_LIMIT) {
+    problems.push(`不透明的填充面盖住了画面的 ${(coverage.total * 100).toFixed(0)}%（上限 ${OPAQUE_COVER_LIMIT * 100}%），底图上的地理会被遮掉：`
+      + coverage.layers.map(item => `${item.id} 约 ${(item.ratio * 100).toFixed(0)}%`).join('、')
+      + '。画框/边框请用 polyline 或空心描边（fill_opacity 设为 0），大范围示意面请把 fill_opacity 调到 0.5 以下')
   }
   return { problems, omitted }
 }

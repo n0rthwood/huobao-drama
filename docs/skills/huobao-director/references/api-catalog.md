@@ -315,6 +315,7 @@ Body：`{scope:"all"|"characters"|"scenes"|"props", episode_id?, rewrite_prompts
   - `submit_layer_doc {layer_doc,omitted?}`：
     - 文档必须原样就是 `normalizeLayerDoc` 的结果（严格校验），并且之前已经成功预览过。
     - 每个要素要有且只有一个锚定几何图层：`anchor.semantic_id` 等于要素 id，place 对应 marker、route 对应 polyline、region 对应 polygon。几何位置要与投影位置一致，容差为 max(6px, 长边的 0.4%)；也可以写进 `omitted` 并说明理由。
+    - 底图必须看得见：有效不透明度 ≥0.5 的 polygon 合计覆盖画面不能超过 30%，按网格非零环绕采样计算。生产首跑成图 1364 就是因为把画框画成了实心的全幅面（盖住约 97% 的画面），之后才加了这项校验。
     - 成图就是这份文档的确定性渲染，按内容寻址存为 `static/map-drawings/<sha>.png`。语义从锚定图层导出，所以要素 id 与历史语义 id 保持一致。程序标签排版 `map-label-layout-v2` 已删除。
 - **详情新增 `agent`**：`{task_id, rounds:{brief?,research?,base?,drawing?}, rollbacks, max_rounds:3, max_rollbacks:2, attempts:[{task_id,stage,round,outcome:"accepted"|"rejected"|"no_delivery"|"error"|"rollback"|"infra_retry",problems[],target_stage?,at}]}`。计数按运行计；`attempts` 跨运行保留，最多 80 条，重启后不归零。`outputs.layer_doc` 是被采用的模型文档（或人工保存的文档），`final_image.provenance.background` 是它的底图（底图与底纹合成）。
 - **`PUT /props/{p}/map-workflow/layer-doc {layer_doc,expected_revision}`**（人工编辑图层）：
