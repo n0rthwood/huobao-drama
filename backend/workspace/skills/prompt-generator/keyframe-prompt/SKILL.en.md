@@ -31,6 +31,17 @@ A character's look and clothing are decided entirely by the asset reference imag
 - **Allowed**: relative size ratios ("@MouseMom is about two-thirds the height of @PigDad" — a ratio is not a look); the worn state of wearable props ("@Sunglasses perched on the bridge of the nose", "@PanamaHat held in the left hand" — these are prop references)
 - What you may write: shot size, camera angle, composition, character placement, pose, limb action, expression, eyeline, prop interaction, lighting and mood
 
+## Unnamed People Must Carry Their Own Visible Markers
+
+When the frame contains **people who have no character asset** (attendants, soldiers, palace servants, clerks, commoners, passers-by, extras and the like):
+
+- **Always** state: how many of them, where they stand (where in the frame / relative to the main subject) and their identity or function; **never** write a bare collective label such as "an attendant", "two people" or "a few soldiers" with no markers
+- **Always** give at least two visible markers out of garment colour, garment cut/style, hat/headwear and carried items, and they must differ from **every** `@CharacterName` in the same frame — never the same colour and the same cut as any `@CharacterName`, otherwise the model copies that character's reference-image look straight onto them
+- When the same group of unnamed people recurs across several shots, **reuse one and the same marker set**: read the neighbouring shots' saved prompts through `read_storyboard_context` and copy the wording already fixed there; never invent a new description
+- This rule applies **only to unnamed people without assets**; a `@CharacterName` that has an asset still follows "Absolute Rule: Images Come First" and gets not one word of appearance
+- **Never** create a character asset for unnamed people
+- Counter-example: "an attendant on either side holds him up"; correct: "an attendant on either side (unpatterned grey-brown short tunic, no cap, hair in a plain bun, cloth belt at the waist), each with one hand under his arm"
+
 ## Limb-State Checklist (verify every item in every prompt)
 
 For **every** character present in the frame:
@@ -69,18 +80,24 @@ Each keyframe is rendered independently (only the asset reference images plus th
 
 **@SceneName + time/lighting → shot size and camera angle → composition (who is where in frame) → the main @CharacterName's pose · limb state · expression · eyeline → key @PropName and the interaction/worn state → mood and lighting → closing phrase**
 
-Always end with: 16:9 landscape cinematic film still, single static frame.
+Always end with: `{aspect_ratio} {composition} cinematic film still, single static frame`.
+
+- `{aspect_ratio}` and `{composition}` are taken **verbatim** from the `aspect_ratio` (e.g. `16:9`, `9:16`) and `composition` returned by `read_storyboard_context` (the tool returns the Chinese term `横构图` / `竖构图` / `方构图`; write its equivalent in the prompt language). **Never** hard-code an aspect from habit — a prompt that disagrees with the project's aspect is rejected on save and must be rewritten
+- One example line for each ending (pick the one matching the project's actual aspect; do not copy either line blindly):
+  - `16:9 landscape cinematic film still, single static frame`
+  - `9:16 portrait cinematic film still, single static frame`
+- Framing for a vertical composition (`9:16`, `3:4`): keep the character complete along the vertical axis (full head-to-feet or head-to-knee framing), leave a safety margin at the top and the bottom of the frame for subtitles and titles, and keep the subject near the middle; do not reuse the wide layout with large empty margins left and right
 
 Example (first frame, with props and limb states):
 
 ```
-@Balcony, early morning, bright warm dawn light spread evenly across the floor, 16:9 landscape cinematic film still. Medium shot, eye-level, static camera; @Gini stands on the @TrainingMat at the center of the frame, both paws hugging one @MiniDumbbell against the chest, the other @MiniDumbbell lying flat on the mat to the front right, legs together and planted, both hind paws clearly visible on the mat, expression focused, gaze resting on the dumbbell in her arms. Open balcony floor is left around the frame, the dawn light soft with no heavy shadows. Single static frame, no motion blur.
+@Balcony, early morning, bright warm dawn light spread evenly across the floor, {aspect_ratio} {composition} cinematic film still. Medium shot, eye-level, static camera; @Gini stands on the @TrainingMat at the center of the frame, both paws hugging one @MiniDumbbell against the chest, the other @MiniDumbbell lying flat on the mat to the front right, legs together and planted, both hind paws clearly visible on the mat, expression focused, gaze resting on the dumbbell in her arms. Open balcony floor is left around the figure, the dawn light soft with no heavy double shadows. Single static frame, no motion blur.
 ```
 
 Example (last frame, to be carried over by the next segment):
 
 ```
-@LivingRoom, afternoon, light warm natural illumination spread evenly through the space, 16:9 landscape cinematic film still. Medium shot, eye-level, static camera; @MonkeyBaby stands just right of center in front of the @FullLengthMirror, body facing the off-screen sofa, the right hand holding the @Sunglasses at chest height, the left hand hanging naturally at the side, legs together and planted with both soles on the ground and visible, lips slightly pursed, gaze out of frame. The mirror occupies only the right edge of the frame and shows a partial back view of him. The composition is stable, the character fully in frame. Single static frame, no motion blur.
+@LivingRoom, afternoon, light warm natural illumination spread evenly through the space, {aspect_ratio} {composition} cinematic film still. Medium shot, eye-level, static camera; @MonkeyBaby stands just right of center in front of the @FullLengthMirror, body facing the off-screen sofa, the right hand holding the @Sunglasses at chest height, the left hand hanging naturally at the side, legs together and planted with both soles on the ground and visible, lips slightly pursed, gaze out of frame. The mirror occupies only the right edge of the frame and shows a partial back view of him. The composition is stable, the character fully in frame. Single static frame, no motion blur.
 ```
 
 ## Extra Requirements for the Last Frame
