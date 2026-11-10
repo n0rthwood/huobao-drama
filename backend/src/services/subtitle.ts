@@ -45,6 +45,8 @@ export function subtitleCharsPerLine(width: number, height: number): number {
 const SENTENCE_END = '。！？；!?;'
 /** 句内可断点（长句再切用） */
 const CLAUSE_BREAK = '，、：,:—…'
+/** 不能出现在行首的标点（避头点）：窄画面折行时断点后移到它们之前（Issue #91） */
+const NO_LINE_START = '，。、；：！？）」』》〉”’…—,.;:!?)'
 
 export interface SubtitleCue {
   startMs: number
@@ -106,7 +108,9 @@ export function splitChunks(text: string, maxChars = SUBTITLE_MAX_CHARS_PER_CUE)
  * `charsPerLine = 20`（旧口径）时**恒按旧实现行为**：只在超过 20 字时切一次，第二行整行输出
  * （可能超过 20 字），与 `maxLines` 无关——既有横屏成片的字幕逐字节不变。
  * 重排（`charsPerLine < 20`）时折成 ≤ `maxLines` 行，并做容量校验：靠前的标点断点若会让剩余
- * 文本塞不进剩下的行，就放弃它改用硬切，避免「前面几行很短、最后一行超宽被裁」。
+ * 文本塞不进剩下的行，就放弃它改用硬切，避免「前面几行很短、最后一行超宽被裁」；
+ * 同时遵守避头点：断点后的下一行不能以标点开头（如单独一个「。」成行），否则把断点前移，
+ * 让前一个字随标点一起换到下一行。
  */
 export function layoutCueText(
   chunk: string,
@@ -129,6 +133,9 @@ export function layoutCueText(
     const remainingCapacity = (lineBudget - lines.length - 1) * charsPerLine
     if (cut > 0 && charsPerLine < SUBTITLE_MAX_CHARS_PER_LINE && rest.length - cut > remainingCapacity) cut = -1
     if (cut <= 0) cut = charsPerLine
+    if (charsPerLine < SUBTITLE_MAX_CHARS_PER_LINE) {
+      while (cut > 1 && NO_LINE_START.includes(rest[cut])) cut--
+    }
     lines.push(rest.slice(0, cut))
     rest = rest.slice(cut)
   }
