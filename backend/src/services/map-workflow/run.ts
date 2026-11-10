@@ -1,15 +1,16 @@
 /**
- * 地图工作流的执行引擎（Issue #84）
+ * 地图工作流的执行引擎（Issue #84，#90 改为「代码强制流程、模型在工具循环里完成阶段工作」）
  *
  * 阶段：需求 → 资料检索 → 底图 → 质感底纹 → 标注绘制 → 完成登记。
  * 自动模式一口气跑到底（遇阻塞/失败停住），手动模式一次只推进一步，随时可回退。
  *
- * 三条不可动摇的红线：
- * 1. **几何确定性**：底图与标注由 map-geometry 程序渲染，扩散模型只产一张底纹，
- *    绝不参与地理；底纹只铺在背景层，不覆盖真实地理。
- * 2. **证据优先**：检索是真的去维基/Europeana/Smithsonian 拉数据；一条来源都没有就阻塞，
- *    不接受「模型自己知道」。近似位置必须显式可见。
- * 3. **写入安全**：每次落库都走 store 的 CAS；期间人工改过 brief、回退过阶段、
+ * 不可动摇的红线：
+ * 1. **错误回给模型**：需求 / 检索 / 底图 / 作图是模型阶段，工具异常与交付校验失败都回给模型自我修正；
+ *    每阶段最多 3 轮交付、每次运行最多 2 次跨阶段回退，用完才交人。代码只判收/拒，不修正模型产出。
+ * 2. **同一渲染链**：模型用 LayerDoc 作图，预览、成图与人工编辑都走 renderLayerDoc；
+ *    扩散模型只产一张底纹，绝不参与地理；底纹只铺在背景层。
+ * 3. **证据优先**：检索是真的去维基/Europeana/Smithsonian 拉数据，近似位置必须显式可见。
+ * 4. **写入安全**：每次落库都走 store 的 CAS；期间人工改过 brief、回退过阶段、
  *    或任务已被取消，迟到的异步结果一律作废，既有产出原样保留。
  */
 import { eq } from 'drizzle-orm'
@@ -22,7 +23,7 @@ import { now } from '../../utils/response.js'
 import { logTaskError, logTaskStart, logTaskSuccess, logTaskWarn } from '../../utils/task-logger.js'
 import { completionStamp } from '../media-time.js'
 import { generateImage } from '../generation.js'
-import { resolveStageModel } from '../ai-stages.js'
+import { resolveStageModel, StageVisionUnavailableError } from '../ai-stages.js'
 import {
   createTextTask,
   cancelTextTask,
@@ -38,14 +39,20 @@ import { buildSampleKey } from '../task-estimate.js'
 import { normalizeMapSpec, type MapSpec } from '../map-base-render.js'
 import { normalizeSemantics, type AssetSemantics } from '../asset-semantics.js'
 import { onAssetLibraryChanged } from '../asset-review.js'
-import { createMapBaseArtifact, parseRegistration, renderMapDrawing } from '../map-geometry.js'
+import { prepareMapBackground } from '../map-geometry.js'
+import { strictLayerDocProblems, type LayerDocProblem } from '../layer-doc.js'
 import { checkBriefSufficiency } from './brief.js'
-import { researchMap } from './research.js'
+import { runResearchStage } from './research.js'
+import { runBaseStage } from './base.js'
+import { backgroundProblems, renderMapLayerDoc, runDrawingStage, type RenderedMapDoc } from './drawing.js'
+import { recordAttempt } from './agent-loop.js'
+import { drawnGeometryOf, specFeatures, type DrawnGeometry } from './validate.js'
 import {
   MapWorkflowConflictError,
   MapWorkflowStaleError,
   briefHash,
   briefOfProp,
+  getProp,
   loadWorkflow,
   mutateWorkflow,
   parseWorkflow,
@@ -57,8 +64,11 @@ import {
   type MutateContext,
 } from './store.js'
 import {
+  MAP_INFRA_RETRIES,
+  MAP_MAX_ROLLBACKS,
   MAP_WORKFLOW_STAGES,
   STAGE_LABEL,
+  isMapAgentStage,
   normalizeBrief,
   type MapBrief,
   type MapResearch,
@@ -71,8 +81,6 @@ import {
 /** 底纹生成的等待上限与轮询节奏（与资产流水线一致） */
 const IMAGE_WAIT_TIMEOUT_MS = 20 * 60_000
 const IMAGE_POLL_INTERVAL_MS = 5000
-/** 工作区画幅：与 map-base-render 的 16:9 口径一致 */
-const DEFAULT_WIDTH = 3840
 const TEXTURE_SIZE = '1920x1080'
 /** 底纹提示词里**不允许**出现任何地理要素——这是扩散模型唯一被允许做的事 */
 const TEXTURE_PROMPT = [
@@ -200,15 +208,13 @@ export function adoptResearchIntoSpec(spec: MapSpec | null, research: MapResearc
     ...routes.flatMap(item => item.points),
     ...regions.flatMap(item => item.points),
   ]
+  // 已有 bbox 只是底图阶段模型的参考（#90）：取景由底图阶段的模型决定并经取景校验，这里不判越界。
   let bbox = spec?.bbox
   if (!bbox) {
     if (!coords.length) {
       throw new MapWorkflowRequestError('检索没有得到任何可定位的地点，无法确定底图范围；请人工补充至少一个地点坐标后再继续', 'missing_geometry')
     }
     bbox = bboxOf(coords)
-  } else {
-    const outside = coords.filter(([lon, lat]) => lon < bbox![0] || lon > bbox![2] || lat < bbox![1] || lat > bbox![3])
-    if (outside.length) notes.push(`${outside.length} 个新地点落在当前底图范围之外，可在地图面板调整 bbox 或删除这些地点`)
   }
 
   return {
@@ -277,6 +283,8 @@ interface StageOutcome {
   /** 自动模式是否继续下一阶段 */
   proceed: boolean
   message: string
+  /** 回退时自动模式接着执行的阶段（缺省为顺序的下一阶段） */
+  next?: MapWorkflowStage
 }
 
 async function imageMeta(path: string): Promise<{ width: number; height: number }> {
@@ -299,8 +307,8 @@ async function discardVersion(taskId: number, err: unknown): Promise<void> {
 }
 
 /**
- * 从成图版本行里读回投影后的像素几何，组装语义文档。
- * 几何是「标注绘制」那一步算出来的（确定性投影，不经模型），随版本行存在 params 里，
+ * 从成图版本行里读回像素几何，组装语义文档。
+ * 几何从模型（或人工）交付的那份 LayerDoc 的锚定图层导出（#90），随版本行存在 params 里，
  * 于是「采用成图」与「写语义」能在同一次 CAS 里完成，不会出现图换了而坐标没换的中间态。
  */
 async function semanticsOfVersion(versionTaskId: number): Promise<AssetSemantics | null> {
@@ -338,7 +346,133 @@ async function semanticsOfVersion(versionTaskId: number): Promise<AssetSemantics
 }
 
 /**
+ * 跨阶段回退（Issue #90）：由模型的 request_rollback 或 complete 发现成图不合法时发起。
+ * 目标阶段之后的产物在本运行内作废（不进入 complete），目标阶段轮次重置，回退原因交给目标阶段的模型。
+ */
+async function applyRollback(input: {
+  propId: number
+  taskId: number
+  from: MapWorkflowStage
+  target: MapWorkflowStage
+  reason: string
+  mode: MapWorkflowMode
+}): Promise<StageOutcome> {
+  const loaded = await loadWorkflow(input.propId)
+  const used = loaded?.state.agent.task_id === input.taskId ? loaded.state.agent.rollbacks : 0
+  if (used >= MAP_MAX_ROLLBACKS) {
+    throw new MapWorkflowRequestError(`跨阶段回退已用完（${used}/${MAP_MAX_ROLLBACKS}），无法回到「${STAGE_LABEL[input.target]}」：${input.reason}`, 'rollbacks_exhausted')
+  }
+  const nth = used + 1
+  const discarded: number[] = []
+  await mutateWorkflow(input.propId, {
+    expectedTaskId: input.taskId,
+    action: `agent_rollback:${input.from}->${input.target}`,
+    actor: 'auto',
+    note: input.reason,
+    snapshot: true,
+    mutate: (ctx) => {
+      const agent = ctx.state.agent
+      agent.rollbacks = nth
+      if (isMapAgentStage(input.target)) agent.rounds[input.target] = 0
+      agent.feedback[input.target] = `来自「${STAGE_LABEL[input.from]}」的回退（第 ${nth}/${MAP_MAX_ROLLBACKS} 次）：${input.reason}`
+      agent.attempts = [...agent.attempts, {
+        task_id: input.taskId, stage: input.from, round: 0, outcome: 'rollback' as const,
+        problems: [input.reason], target_stage: input.target, at: now(),
+      }].slice(-80)
+      const outputs = ctx.state.outputs
+      const target = stageIndex(input.target)
+      if (target <= stageIndex('base') && outputs.base_image?.task_id) discarded.push(outputs.base_image.task_id)
+      if (outputs.final_image?.task_id) discarded.push(outputs.final_image.task_id)
+      if (target <= stageIndex('base')) {
+        outputs.base_image = null
+        outputs.kmz = null
+      }
+      // 底纹只取决于风格主题，与检索/取景无关：回退不作废它；style 重跑时按本运行登记的底纹任务认领，不重复计费
+      outputs.final_image = null
+      outputs.layer_doc = null
+      for (const step of ctx.state.steps) {
+        if (stageIndex(step.id) >= target) Object.assign(step, { status: 'pending', message: null, started_at: null, finished_at: null })
+      }
+      setStep(ctx.state, input.from, { message: `已回退到「${STAGE_LABEL[input.target]}」：${input.reason}` })
+      ctx.state.stage = input.target
+      ctx.state.status = input.mode === 'auto' ? 'running' : 'awaiting_review'
+    },
+  })
+  await cancelDiscardedVersions(input.propId, discarded, `回退到「${STAGE_LABEL[input.target]}」后作废：${input.reason}`)
+  return {
+    proceed: input.mode === 'auto',
+    next: input.target,
+    message: `已回退到「${STAGE_LABEL[input.target]}」（第 ${nth}/${MAP_MAX_ROLLBACKS} 次）：${input.reason}`,
+  }
+}
+
+/** 回退作废的版本行标 cancelled；仍被资产当前图/语义引用的行（上一次采用的成果）不动 */
+async function cancelDiscardedVersions(propId: number, ids: number[], reason: string): Promise<void> {
+  if (!ids.length) return
+  const prop = await getProp(propId)
+  let semanticsSource: number | null = null
+  try {
+    semanticsSource = Number(JSON.parse(prop?.semantics ?? 'null')?.image?.source_task_id) || null
+  } catch { /* 坏语义不阻止作废 */ }
+  for (const id of ids) {
+    if (id === prop?.faithfulSource || id === semanticsSource) continue
+    await db.update(schema.sysTask).set({ status: 'cancelled', errorMsg: reason, updatedAt: now() }).where(eq(schema.sysTask.id, id))
+  }
+}
+
+/** 底纹 / 完成登记是基础设施阶段：失败自动重试 MAP_INFRA_RETRIES 次，仍失败交人（文本模型修不了生图服务或写库冲突） */
+async function withInfraRetry<T>(propId: number, taskId: number, stage: MapWorkflowStage, work: () => Promise<T>): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await work()
+    } catch (err) {
+      if (err instanceof MapWorkflowStaleError || attempt >= MAP_INFRA_RETRIES) throw err
+      if (err instanceof MapWorkflowRequestError) throw err
+      await recordAttempt(propId, taskId, {
+        stage, round: 0, outcome: 'infra_retry',
+        problems: [`第 ${attempt + 1} 次失败，自动重试（共 ${MAP_INFRA_RETRIES} 次）：${err instanceof Error ? err.message : String(err)}`],
+      })
+    }
+  }
+}
+
+/** 登记一条成图版本行（模型交付与人工保存共用）；几何从 LayerDoc 导出，随行存进 params */
+async function registerDrawingVersion(input: {
+  propId: number
+  dramaId: number
+  subject: string
+  stage: 'drawing' | 'manual_edit'
+  rendered: RenderedMapDoc
+  geometry: DrawnGeometry
+  extra: Record<string, unknown>
+}): Promise<number> {
+  const ts = now()
+  return getInsertId(await db.insert(schema.sysTask).values({
+    type: 'image',
+    propId: input.propId,
+    dramaId: input.dramaId,
+    provider: MAP_WORKFLOW_PROVIDER,
+    model: input.stage === 'drawing' ? 'map-layer-doc' : 'map-layer-doc-manual',
+    prompt: `地图成图：${input.subject}`,
+    params: JSON.stringify({
+      source: 'map-workflow',
+      stage: input.stage,
+      png_sha256: input.rendered.sha256,
+      ...input.extra,
+      geometry: input.geometry,
+    }),
+    resultUrl: input.rendered.path,
+    localPath: input.rendered.path,
+    status: 'completed',
+    createdAt: ts,
+    updatedAt: ts,
+    ...completionStamp(ts),
+  }))
+}
+
+/**
  * 执行一个阶段：加锁标记 running（CAS）→ 在锁外做真正的长活 → 带 task/brief 指纹 CAS 回写。
+ * 模型阶段（brief / research / base / drawing）在工具循环里完成，错误回给模型；
  * 回写落空（人改了 brief / 回退了 / 取消了）只记日志，绝不推进阶段，也绝不盖掉现有产出。
  */
 async function executeStage(propId: number, taskId: number, stage: MapWorkflowStage): Promise<StageOutcome> {
@@ -353,6 +487,9 @@ async function executeStage(propId: number, taskId: number, stage: MapWorkflowSt
   }
   const hashAtStart = state.brief_hash
   const mode = state.mode
+  // 回馈只交给本阶段这一次执行：读出后清掉，避免下次运行重复喂旧原因
+  const feedback = state.agent.feedback[stage] ?? null
+  const startRounds = isMapAgentStage(stage) && state.agent.task_id === taskId ? state.agent.rounds[stage] ?? 0 : 0
 
   await mutateWorkflow(propId, {
     expectedTaskId: taskId,
@@ -362,6 +499,7 @@ async function executeStage(propId: number, taskId: number, stage: MapWorkflowSt
       ctx.state.stage = stage
       ctx.state.status = 'running'
       ctx.state.error = null
+      delete ctx.state.agent.feedback[stage]
       setStep(ctx.state, stage, { status: 'running', message: null, started_at: now(), finished_at: null })
     },
   })
@@ -397,9 +535,25 @@ async function executeStage(propId: number, taskId: number, stage: MapWorkflowSt
     })
     return outcome
   }
+  const rollback = (result: { stage: MapWorkflowStage; reason: string }) =>
+    applyRollback({ propId, taskId, from: stage, target: result.stage, reason: result.reason, mode })
+  const agentInput = async () => ({
+    propId,
+    taskId,
+    dramaId: loaded.prop.dramaId,
+    stageModel: await resolveStageModel('asset_research', { configId: opts.textConfigId }),
+    brief,
+    startRounds,
+    feedback,
+  })
 
   if (stage === 'brief') {
-    const checked = await checkBriefSufficiency(brief, { textConfigId: opts.textConfigId })
+    const checked = await checkBriefSufficiency(brief, {
+      textConfigId: opts.textConfigId,
+      startRounds,
+      feedback,
+      record: (round, outcome, problems) => recordAttempt(propId, taskId, { stage: 'brief', round, outcome, problems }, round),
+    })
     const blocking = checked.issues.filter(issue => issue.blocking)
     return await finish((ctx) => {
       ctx.state.brief = checked.brief
@@ -412,16 +566,15 @@ async function executeStage(propId: number, taskId: number, stage: MapWorkflowSt
   }
 
   if (stage === 'research') {
-    const research = await researchMap(brief, {
-      textConfigId: opts.textConfigId,
-      onStep: step => { void patchTextTaskParams(taskId, { map_research_step: step }) },
-    })
+    const outcome = await runResearchStage({ ...await agentInput(), spec: loaded.mapSpec })
+    if (outcome.kind === 'rollback') return await rollback(outcome)
+    const research = outcome.result
     const adopted = adoptResearchIntoSpec(loaded.mapSpec, research, brief)
     return await finish((ctx) => {
       ctx.state.research = research
       ctx.mapSpec = adopted.spec
       ctx.state.issues = [
-        ...ctx.state.issues.filter(issue => issue.code !== 'research_note'),
+        ...ctx.state.issues.filter(issue => issue.code !== 'research_note' && issue.code !== 'approximate_position'),
         ...[...adopted.notes, ...research.notes].map((message): MapWorkflowIssue => ({ field: 'research', code: 'research_note', message, blocking: false })),
         ...research.features.filter(feature => feature.approximate).map((feature): MapWorkflowIssue => ({
           field: 'research', code: 'approximate_position', blocking: false,
@@ -437,22 +590,20 @@ async function executeStage(propId: number, taskId: number, stage: MapWorkflowSt
   if (stage === 'base') {
     const spec = loaded.mapSpec
     if (!spec) throw new MapWorkflowRequestError('还没有地图几何（map_spec），无法生成底图；请先完成资料检索或人工填写地点', 'missing_map_spec')
+    const outcome = await runBaseStage({ ...await agentInput(), spec })
+    if (outcome.kind === 'rollback') return await rollback(outcome)
+    const { artifact, mode: baseMode, spec: framed } = outcome.result
     // 只产文件，**不碰库**：所有资产写入都必须等 CAS 通过。否则一条迟到的底图回调
     // 会把人工已经编辑过/已经回退过的地图直接顶掉（这正是 #84 要根治的事故形态）。
-    const artifact = await createMapBaseArtifact(spec, {
-      mode: brief.base_mode,
-      width: DEFAULT_WIDTH,
-      referenceImage: brief.reference_image ?? undefined,
-    })
     const ts = now()
     const baseTaskId = getInsertId(await db.insert(schema.sysTask).values({
       type: 'image',
       propId,
       dramaId: loaded.prop.dramaId,
       provider: MAP_RENDER_PROVIDER,
-      model: String(artifact.provenance.renderer ?? brief.base_mode),
+      model: String(artifact.provenance.renderer ?? baseMode),
       prompt: `地图底图：${brief.subject || loaded.prop.name}`,
-      params: JSON.stringify({ source: 'map-workflow', stage: 'base', base_mode: brief.base_mode, provenance: artifact.provenance }),
+      params: JSON.stringify({ source: 'map-workflow', stage: 'base', base_mode: baseMode, bbox: framed.bbox, provenance: artifact.provenance }),
       resultUrl: artifact.path,
       localPath: artifact.path,
       status: 'completed',
@@ -464,14 +615,15 @@ async function executeStage(propId: number, taskId: number, stage: MapWorkflowSt
       return await finish((ctx) => {
         ctx.state.outputs.base_image = {
           path: artifact.path, width: artifact.width, height: artifact.height,
-          source: `map-base:${brief.base_mode}`, task_id: baseTaskId,
+          source: `map-base:${baseMode}`, task_id: baseTaskId,
           provenance: artifact.provenance,
         }
         ctx.state.outputs.kmz = artifact.kmz_path ? { path: artifact.kmz_path, provenance: artifact.provenance } : null
+        // 模型选定的取景写回几何：之后的绘制与人工几何编辑都以它为准
+        ctx.mapSpec = framed
         // 底图只**登记版本**，不动资产当前图与语义：当前图与语义必须成对切换，
-        // 否则「新底图 + 旧地图的语义坐标」会在中间态被下游（图层段/审核清单）读到。
         // 真正的采用在 complete 那一步一次性完成。
-      }, { proceed: true, message: `底图已生成（${brief.base_mode}，${artifact.width}×${artifact.height}），已登记为版本 #${baseTaskId}` })
+      }, { proceed: true, message: `底图已生成（${baseMode}，bbox ${JSON.stringify(framed.bbox)}，${artifact.width}×${artifact.height}），已登记为版本 #${baseTaskId}` })
     } catch (err) {
       await discardVersion(baseTaskId, err)
       throw err
@@ -481,10 +633,10 @@ async function executeStage(propId: number, taskId: number, stage: MapWorkflowSt
   if (stage === 'style') {
     const [prop] = await db.select().from(schema.props).where(eq(schema.props.id, propId))
     if (!prop) throw new MapWorkflowRequestError('道具不存在', 'not_found')
-    const texture = await generateTexture({
+    const texture = await withInfraRetry(propId, taskId, 'style', () => generateTexture({
       propId, dramaId: prop.dramaId, propName: prop.name, workflowTaskId: taskId,
       theme: brief.style, opts,
-    })
+    }))
     const meta = await imageMeta(texture.path)
     return await finish((ctx) => {
       ctx.state.outputs.texture_image = {
@@ -499,72 +651,56 @@ async function executeStage(propId: number, taskId: number, stage: MapWorkflowSt
     const spec = loaded.mapSpec
     const base = state.outputs.base_image
     if (!spec || !base) throw new MapWorkflowRequestError('缺少底图或地图几何，无法绘制标注；请先完成底图步骤', 'missing_base')
-    // 配准信息是 earth/image 底图继续编辑的唯一依据；用几何侧的解析器读回，不自己猜形状
-    const registration = parseRegistration(
-      base.provenance && 'registration' in base.provenance ? base.provenance.registration : undefined,
-    ) ?? undefined
-    const drawing = await renderMapDrawing(spec, {
+    const background = await prepareMapBackground({
       basePath: base.path,
-      width: base.width,
+      registration: base.provenance && 'registration' in base.provenance ? base.provenance.registration : undefined,
       texturePath: state.outputs.texture_image?.path,
-      style: brief.style,
-      registration,
     })
-    const warnings = drawing.warnings ?? []
-    const ts = now()
-    const versionTaskId = getInsertId(await db.insert(schema.sysTask).values({
-      type: 'image',
+    const outcome = await runDrawingStage({ ...await agentInput(), spec, background })
+    if (outcome.kind === 'rollback') return await rollback(outcome)
+    const { doc, rendered, geometry, omitted } = outcome.result
+    const baseMode = base.provenance && 'mode' in base.provenance ? String(base.provenance.mode) : brief.base_mode
+    const versionTaskId = await registerDrawingVersion({
       propId,
       dramaId: loaded.prop.dramaId,
-      provider: MAP_WORKFLOW_PROVIDER,
-      model: 'map-drawing',
-      prompt: `地图成图：${brief.subject || loaded.prop.name}`,
-      params: JSON.stringify({
-        source: 'map-workflow',
-        stage: 'drawing',
+      subject: brief.subject || loaded.prop.name,
+      stage: 'drawing',
+      rendered,
+      geometry,
+      extra: {
         base_task_id: base.task_id,
-        base_mode: brief.base_mode,
+        base_mode: baseMode,
         texture_task_id: state.outputs.texture_image?.task_id ?? null,
-        registration: drawing.registration,
-        warnings,
-        // 投影后的像素几何随版本行一起存：complete 那一步据此写语义，
-        // 于是「当前图 ↔ 语义坐标」永远成对切换，中间不存在半截状态
-        geometry: {
-          width: drawing.width,
-          height: drawing.height,
-          points: drawing.points ?? [],
-          routes: drawing.routes ?? [],
-          regions: drawing.regions ?? [],
-        },
-      }),
-      resultUrl: drawing.path,
-      localPath: drawing.path,
-      status: 'completed',
-      createdAt: ts,
-      updatedAt: ts,
-      ...completionStamp(ts),
-    }))
+        registration: background.registration,
+        warnings: background.warnings,
+        omitted,
+      },
+    })
     try {
       const done = await finish((ctx) => {
         ctx.state.outputs.final_image = {
-          path: drawing.path, width: drawing.width, height: drawing.height,
+          path: rendered.path, width: rendered.width, height: rendered.height,
           source: 'map-drawing', task_id: versionTaskId,
           provenance: {
-            registration: drawing.registration, warnings,
-            base: base.path, base_mode: brief.base_mode,
+            registration: background.registration, warnings: background.warnings, omitted,
+            base: base.path, base_mode: baseMode,
             texture: state.outputs.texture_image?.path ?? null,
-            background: drawing.background_path,
+            background: background.path,
             attribution: base.provenance && 'attribution' in base.provenance ? base.provenance.attribution : null,
           },
         }
-        ctx.state.outputs.layer_doc = drawing.layer_doc
+        ctx.state.outputs.layer_doc = doc
         ctx.state.issues = [
-          ...ctx.state.issues.filter(issue => issue.code !== 'drawing_warning'),
-          ...warnings.map((message): MapWorkflowIssue => ({ field: 'drawing', code: 'drawing_warning', message, blocking: false })),
+          ...ctx.state.issues.filter(issue => issue.code !== 'drawing_warning' && issue.code !== 'drawing_omitted'),
+          ...background.warnings.map((message): MapWorkflowIssue => ({ field: 'drawing', code: 'drawing_warning', message, blocking: false })),
+          ...omitted.map((item): MapWorkflowIssue => ({
+            field: 'drawing', code: 'drawing_omitted', blocking: false,
+            message: `要素 ${item.feature_id} 未画入成图：${item.reason}`,
+          })),
         ]
       }, {
         proceed: true,
-        message: `标注已绘制（${drawing.width}×${drawing.height}${warnings.length ? `，${warnings.length} 条告警` : ''}），待「完成登记」后成为当前图`,
+        message: `模型已用图层文档作图（${doc.layers.length} 个图层，${rendered.width}×${rendered.height}${omitted.length ? `，省略 ${omitted.length} 个要素` : ''}），待「完成登记」后成为当前图`,
       })
       // 版本行落库成功才通知资产库：下游（图层段来源、审核清单绑定）据此失效重算
       await onAssetLibraryChanged('prop', propId, 'version_registered')
@@ -576,16 +712,18 @@ async function executeStage(propId: number, taskId: number, stage: MapWorkflowSt
   }
 
   // complete：当前图 / 忠实原件 / 语义**一次性成对采用**。
-  // 几何真源仍是程序渲染的底图版本（faithful_source），成图只是它的确定性叠加。
   const final = state.outputs.final_image
   const baseTaskId = state.outputs.base_image?.task_id ?? null
   const finalTaskId = final?.task_id ?? null
-  if (!final || !finalTaskId || !baseTaskId) {
-    throw new MapWorkflowRequestError('还没有成图，无法完成登记；请先完成底图与标注绘制', 'missing_final_image')
+  const semantics = finalTaskId ? await semanticsOfVersion(finalTaskId) : null
+  if (!final || !finalTaskId || !baseTaskId || !semantics) {
+    // 成图或语义不合法属于 drawing 交付校验的漏网：回退到 drawing（计入回退次数），不在这里修补
+    return await rollback({
+      stage: 'drawing',
+      reason: !final || !finalTaskId || !baseTaskId ? '完成登记时没有可采用的成图或底图版本' : '成图版本缺少像素几何，无法写语义',
+    })
   }
-  const semantics = await semanticsOfVersion(finalTaskId)
-  if (!semantics) throw new MapWorkflowRequestError('成图版本缺少像素几何，无法写语义；请重新执行「标注绘制」', 'missing_geometry')
-  const completed = await finish((ctx) => {
+  const completed = await withInfraRetry(propId, taskId, 'complete', () => finish((ctx) => {
     ctx.propPatch.imageUrl = final.path
     ctx.propPatch.localPath = final.path
     ctx.propPatch.faithful = 1
@@ -594,7 +732,7 @@ async function executeStage(propId: number, taskId: number, stage: MapWorkflowSt
   }, {
     proceed: false,
     message: `已采用成图（版本 #${finalTaskId}）：当前图、忠实底图（版本 #${baseTaskId}）与语义 ${semantics.points.length} 点 / ${semantics.lines.length} 线 / ${semantics.regions.length} 面 一次性生效`,
-  })
+  }))
   await onAssetLibraryChanged('prop', propId, 'semantics_changed')
   return completed
 }
@@ -620,7 +758,7 @@ function runStages(propId: number, taskId: number, mode: MapWorkflowMode, startS
           const outcome: StageOutcome = await executeStage(propId, taskId, stage)
           lastMessage = outcome.message
           if (!outcome.proceed || mode !== 'auto') break
-          stage = nextStage(stage)
+          stage = outcome.next ?? nextStage(stage)
         }
       })
       const final = await loadWorkflow(propId)
@@ -650,6 +788,8 @@ function runStages(propId: number, taskId: number, mode: MapWorkflowMode, startS
             ctx.state.status = 'failed'
             ctx.state.error = message
             setStep(ctx.state, ctx.state.stage, { status: 'failed', message, finished_at: now() })
+            // 人工从失败处重跑时，失败原因与轮次记录作为输入交给该阶段的模型
+            ctx.state.agent.feedback[ctx.state.stage] = `上一次执行失败：${message}`
           },
         })
       } catch (nested) {
@@ -684,6 +824,19 @@ async function startRun(propId: number, input: {
 
   // 继续当前待办；整条重跑必须由人显式回退到 brief，不能把一次拖点变成新的模型账单。
   const startStage = loaded.state.stage
+  // 底图与作图阶段的模型要用 read_image 看自己的产物：没有视觉配置就在启动时说清楚，不降级为盲画
+  const reachesVision = startStage === 'base' || startStage === 'drawing'
+    || (input.mode === 'auto' && stageIndex(startStage) < stageIndex('complete'))
+  if (reachesVision && !input.skip) {
+    try {
+      await resolveStageModel('read_image')
+    } catch (err) {
+      if (err instanceof StageVisionUnavailableError) {
+        throw new MapWorkflowRequestError(`地图的底图与作图阶段需要能看图的文本配置（read_image）：${err.message}`, 'vision_config_unavailable')
+      }
+      throw err
+    }
+  }
   if (input.skip) {
     // 跳过只对可选步骤开放：底纹是唯一可以没有的产出
     if (startStage !== 'style') throw new MapWorkflowRequestError(`「${STAGE_LABEL[startStage]}」不能跳过，只有质感底纹是可选的`, 'stage_not_skippable')
@@ -713,7 +866,8 @@ async function startRun(propId: number, input: {
     stageModel,
     prompt: `地图工作流：${effectiveBrief.subject}`,
   })
-  const [previousRun] = startStage === 'style' && loaded.state.task_id
+  // 底纹认领沿运行链传递（#90）：本次运行若因回退重跑 style，可认领上一运行已付费的同主题底纹，不重复出图
+  const [previousRun] = loaded.state.task_id
     ? await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, loaded.state.task_id))
     : []
   const previousParams = parseTextTaskParams(previousRun?.params)
@@ -738,6 +892,8 @@ async function startRun(propId: number, input: {
       mutate: (ctx) => {
         ctx.state.mode = input.mode
         ctx.state.task_id = taskId
+        // 轮次与回退按运行计数：新运行重新计数，历史尝试与待交给模型的回馈保留
+        ctx.state.agent = { ...ctx.state.agent, task_id: taskId, rounds: {}, rollbacks: 0 }
         ctx.state.status = 'running'
         ctx.state.error = null
         ctx.state.stage = startStage
@@ -915,6 +1071,92 @@ export async function cancelMapWorkflow(propId: number): Promise<MapWorkflowDeta
     },
   })
   return serializeDetail(updated)
+}
+
+/** 人工保存的图层文档不合法：字段级问题原样返回给编辑器（不修正、不入库） */
+export class MapLayerDocInvalidError extends Error {
+  code = 'layer_doc_invalid'
+  problems: LayerDocProblem[]
+  constructor(problems: LayerDocProblem[]) {
+    super(`图层文档不合法（${problems.length} 处）：${problems.slice(0, 3).map(item => `${item.path || '(文档)'} ${item.message}`).join('；')}`)
+    this.name = 'MapLayerDocInvalidError'
+    this.problems = problems
+  }
+}
+
+/**
+ * 人工在图层编辑器里保存地图成图（Issue #90）。
+ *
+ * 与模型交付走同一条链：严格校验（不修正）→ 同一 renderLayerDoc 出图 → 登记成图版本（语义从 LayerDoc 导出）
+ * → 当前图 / 忠实底图 / 语义一次性 CAS 采用。人工保存不经过模型，校验失败直接返回字段级问题。
+ */
+export async function saveMapLayerDoc(propId: number, body: { layerDoc: unknown; expectedRevision?: number | null }): Promise<MapWorkflowDetail> {
+  const loaded = await loadWorkflow(propId)
+  if (!loaded) throw new MapWorkflowRequestError('道具不存在', 'not_found')
+  const { state, mapSpec } = loaded
+  const current = state.outputs.layer_doc as { base?: { path?: string; width?: number; height?: number } } | null
+  const base = state.outputs.base_image
+  if (!current?.base?.path || !base?.task_id || !mapSpec) {
+    throw new MapWorkflowRequestError('这张地图还没有由工作流绘制出图层文档，不能编辑图层；请先完成「标注绘制」', 'missing_drawing')
+  }
+  const strict = strictLayerDocProblems(body.layerDoc)
+  const problems = [
+    ...strict.problems,
+    ...backgroundProblems(strict.doc, { path: current.base.path, width: Number(current.base.width), height: Number(current.base.height) })
+      .map(message => ({ path: 'base', message })),
+  ]
+  if (problems.length) throw new MapLayerDocInvalidError(problems)
+
+  const doc = strict.doc
+  const rendered = await renderMapLayerDoc(doc)
+  const geometry: DrawnGeometry = drawnGeometryOf(doc, specFeatures(mapSpec))
+  const finalProvenance = state.outputs.final_image?.provenance ?? {}
+  const versionTaskId = await registerDrawingVersion({
+    propId,
+    dramaId: loaded.prop.dramaId,
+    subject: state.brief?.subject || loaded.prop.name,
+    stage: 'manual_edit',
+    rendered,
+    geometry,
+    extra: { base_task_id: base.task_id, previous_final_task_id: state.outputs.final_image?.task_id ?? null },
+  })
+  try {
+    const semantics = await semanticsOfVersion(versionTaskId)
+    if (!semantics) throw new MapWorkflowRequestError('成图版本缺少像素几何，无法写语义', 'missing_geometry')
+    const updated = await mutateWorkflow(propId, {
+      expectedRevision: body.expectedRevision,
+      requireIdle: true,
+      action: 'edit_layer_doc',
+      actor: 'manual',
+      note: `人工编辑图层（${doc.layers.length} 个图层）`,
+      snapshot: true,
+      mutate: (ctx) => {
+        ctx.state.outputs.final_image = {
+          path: rendered.path, width: rendered.width, height: rendered.height,
+          source: 'map-drawing-manual', task_id: versionTaskId,
+          provenance: { ...finalProvenance, background: current.base!.path, manual_edit: true },
+        }
+        ctx.state.outputs.layer_doc = doc
+        ctx.propPatch.imageUrl = rendered.path
+        ctx.propPatch.localPath = rendered.path
+        ctx.propPatch.faithful = 1
+        ctx.propPatch.faithfulSource = base.task_id
+        ctx.propPatch.semantics = JSON.stringify(semantics)
+        const message = `人工编辑图层后已采用成图（版本 #${versionTaskId}，语义 ${semantics.points.length} 点 / ${semantics.lines.length} 线 / ${semantics.regions.length} 面）`
+        setStep(ctx.state, 'drawing', { status: 'completed', message, finished_at: now() })
+        setStep(ctx.state, 'complete', { status: 'completed', message, finished_at: now() })
+        ctx.state.stage = 'complete'
+        ctx.state.status = 'completed'
+        ctx.state.error = null
+      },
+    })
+    await onAssetLibraryChanged('prop', propId, 'version_registered')
+    await onAssetLibraryChanged('prop', propId, 'semantics_changed')
+    return serializeDetail(updated)
+  } catch (err) {
+    await discardVersion(versionTaskId, err)
+    throw err
+  }
 }
 
 /**

@@ -2894,7 +2894,7 @@
           "openWorkbench": "지도 작업대 열기",
           "sectionHint": "작업 지시부터 완성 지도까지의 단계별 흐름이며 상태는 서버에 저장되어 새로고침해도 유지됩니다",
           "title": "지도 워크플로",
-          "hint": "지리 형상은 프로그램이 결정적으로 생성합니다. 디퓨전은 질감만 담당하며 해안선·수로·경계를 다시 그리지 않습니다.",
+          "hint": "고증·베이스 범위 결정·작도는 모델이 도구 루프에서 수행하며, 제출마다 프로그램이 검증해 거부 사유를 모델에 돌려 고치게 합니다. 디퓨전은 질감만 담당하며 해안선·수로·경계를 다시 그리지 않습니다.",
           "revision": "리비전 {n}",
           "mode": {
             "auto": "자동으로 끝까지",
@@ -3088,6 +3088,48 @@
           "close": "큰 이미지 닫기",
           "unavailable": "링크의 「{view}」 산출물을 지금 표시할 수 없습니다(롤백되었거나 아직 생성되지 않음). 미리보기 파라미터를 제거했습니다.",
           "invalidLink": "링크의 미리보기 값 「{value}」을(를) 인식할 수 없어 제거했습니다."
+        },
+        "agent": {
+          "title": "모델 라운드",
+          "hint": "모델 단계마다 최대 3회 제출, 실행당 최대 2회 단계 간 롤백이며 모두 소진되면 사람이 이어받습니다.",
+          "target": "해당 단계의 제출 기록",
+          "runTask": "이번 실행: 작업 #{id}",
+          "runNone": "아직 모델 실행이 시작되지 않았습니다",
+          "rounds": "{stage} {used}/{max} 라운드",
+          "rollbacks": "단계 간 롤백 {used}/{max}",
+          "noAttempts": "이번 실행에는 아직 제출 기록이 없습니다.",
+          "attemptsCount": "{n}건",
+          "round": "{n}라운드",
+          "roundNone": "제출 라운드 아님",
+          "taskRef": "작업 #{id}",
+          "rollbackTarget": "{stage}(으)로 롤백",
+          "latestRejection": "{stage} {n}라운드가 거부된 이유",
+          "viewAttempts": "이 단계의 제출 기록 보기",
+          "outcome": {
+            "accepted": "채택됨",
+            "rejected": "거부됨",
+            "no_delivery": "제출 없음",
+            "error": "실행 오류",
+            "rollback": "단계 간 롤백",
+            "infra_retry": "인프라 재시도"
+          }
+        },
+        "layerEditor": {
+          "open": "레이어 편집",
+          "title": "레이어 편집",
+          "target": "지도 레이어 문서",
+          "layerTarget": "링크가 가리키는 레이어",
+          "hint": "모델이 제출한 레이어 문서를 편집합니다. 저장하면 서버가 동일한 렌더 체인으로 다시 그리고 새 버전을 등록합니다.",
+          "close": "닫기",
+          "save": "저장하고 다시 그리기",
+          "saving": "저장 중…",
+          "saved": "레이어를 저장하고 최종 이미지를 다시 그렸습니다",
+          "unsaved": "저장하지 않은 변경",
+          "confirmDiscard": "저장하지 않은 변경이 있습니다. 닫고 버릴까요?",
+          "invalidTitle": "서버가 이 레이어 문서를 거부했습니다",
+          "problemsTitle": "서버가 알려준 문제({n}건):",
+          "problemRoot": "문서 전체",
+          "invalidHint": "초안은 유지됩니다. 위 경로를 고친 뒤 다시 저장하세요."
         }
       },
       "citationsSectionTitle": "자료 출처",

@@ -2894,7 +2894,7 @@
           "openWorkbench": "打开地图工作台",
           "sectionHint": "从任务说明到成品地图的分阶段流程，状态存在服务端，刷新不丢",
           "title": "地图工作流",
-          "hint": "地理几何由程序确定性产出，扩散模型只负责纹理底色，绝不重画海岸线、河道与边界。",
+          "hint": "检索、底图取景与作图由模型在工具循环里完成，每次交付都经程序校验，被拒原因回给模型修正；扩散模型只负责纹理底色，绝不重画海岸线、河道与边界。",
           "revision": "修订号 {n}",
           "mode": {
             "auto": "自动连跑",
@@ -3088,6 +3088,48 @@
           "close": "关闭大图",
           "unavailable": "链接里的「{view}」当前没有可显示的产出（已回退或尚未生成），已清掉该预览参数。",
           "invalidLink": "链接里的大图参数「{value}」无法识别，已清掉。"
+        },
+        "agent": {
+          "title": "模型轮次",
+          "hint": "每个模型阶段最多 3 轮交付，整次运行最多 2 次跨阶段回退；用完即转人工。",
+          "target": "该阶段的交付记录",
+          "runTask": "本次运行：任务 #{id}",
+          "runNone": "本轮尚未开始模型运行",
+          "rounds": "{stage} {used}/{max} 轮",
+          "rollbacks": "跨阶段回退 {used}/{max}",
+          "noAttempts": "本次运行还没有交付记录。",
+          "attemptsCount": "{n} 条记录",
+          "round": "第 {n} 轮",
+          "roundNone": "非交付轮次",
+          "taskRef": "任务 #{id}",
+          "rollbackTarget": "回退到{stage}",
+          "latestRejection": "{stage}第 {n} 轮被拒原因",
+          "viewAttempts": "查看该阶段交付记录",
+          "outcome": {
+            "accepted": "已采纳",
+            "rejected": "被拒",
+            "no_delivery": "未交付",
+            "error": "执行出错",
+            "rollback": "跨阶段回退",
+            "infra_retry": "基础设施重试"
+          }
+        },
+        "layerEditor": {
+          "open": "编辑图层",
+          "title": "编辑图层",
+          "target": "地图图层文档",
+          "layerTarget": "链接指向的图层",
+          "hint": "编辑的是模型交付的图层文档；保存后由服务端用同一条渲染链重绘并登记新版本。",
+          "close": "关闭",
+          "save": "保存并重绘",
+          "saving": "保存中…",
+          "saved": "图层已保存，成品图已重绘",
+          "unsaved": "有未保存修改",
+          "confirmDiscard": "有未保存修改，确定关闭并放弃？",
+          "invalidTitle": "服务端拒收了这份图层文档",
+          "problemsTitle": "服务端逐条指出的问题（{n} 处）：",
+          "problemRoot": "文档整体",
+          "invalidHint": "草稿已保留：按上面的路径改好后可以再次保存。"
         }
       },
       "citationsSectionTitle": "资料来源",

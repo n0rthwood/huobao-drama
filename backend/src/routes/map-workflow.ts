@@ -16,14 +16,15 @@ import {
   serializeDetail,
 } from '../services/map-workflow/store.js'
 import {
+  MapLayerDocInvalidError,
   MapWorkflowRequestError,
   advanceMapWorkflow,
   cancelMapWorkflow,
   rollbackMapWorkflow,
+  saveMapLayerDoc,
   saveMapWorkflowDraft,
   startMapWorkflow,
 } from '../services/map-workflow/run.js'
-import { MapResearchEmptyError } from '../services/map-workflow/research.js'
 import { MapWorkflowValidationError, MAP_WORKFLOW_STAGES, type MapWorkflowStage } from '../services/map-workflow/types.js'
 import { MapSpecValidationError } from '../services/map-base-render.js'
 
@@ -39,7 +40,7 @@ function fail(c: Ctx, err: unknown) {
   if (err instanceof MapAssetTypeError) return badRequest(c, err.message, { error: err.code })
   if (err instanceof MapWorkflowValidationError) return badRequest(c, err.message, { error: err.code, field: err.field })
   if (err instanceof MapSpecValidationError) return badRequest(c, err.message, { error: 'invalid_map_spec' })
-  if (err instanceof MapResearchEmptyError) return badRequest(c, err.message, { error: err.code })
+  if (err instanceof MapLayerDocInvalidError) return badRequest(c, err.message, { error: err.code, problems: err.problems })
   if (err instanceof MapWorkflowRequestError) {
     if (err.code === 'not_found') return notFound(c, err.message)
     return badRequest(c, err.message, { error: err.code })
@@ -168,6 +169,20 @@ app.post('/:id/map-workflow/rollback', async (c) => {
 app.post('/:id/map-workflow/cancel', async (c) => {
   try {
     return success(c, await cancelMapWorkflow(propId(c)))
+  } catch (err) {
+    return fail(c, err)
+  }
+})
+
+// PUT /props/:id/map-workflow/layer-doc — 人工编辑地图图层后保存：严格校验 → 同一渲染链出图 → 成图与语义一次性采用（#90）
+app.put('/:id/map-workflow/layer-doc', async (c) => {
+  try {
+    const payload = await body(c)
+    if (payload.layer_doc === undefined) return badRequest(c, '缺少 layer_doc', { error: 'invalid_body', field: 'layer_doc' })
+    return success(c, await saveMapLayerDoc(propId(c), {
+      layerDoc: payload.layer_doc,
+      expectedRevision: optionalNumber(payload.expected_revision, 'expected_revision') ?? null,
+    }))
   } catch (err) {
     return fail(c, err)
   }

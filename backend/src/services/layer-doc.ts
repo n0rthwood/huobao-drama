@@ -492,3 +492,127 @@ export function normalizeLayerDoc(raw: unknown): LayerDoc {
     layers,
   }
 }
+
+export interface LayerDocProblem {
+  /** 出问题的字段路径，如 `layers[3].style.width` */
+  path: string
+  message: string
+}
+
+const STRICT_PROBLEM_LIMIT = 40
+
+function describeValue(value: unknown): string {
+  const json = JSON.stringify(value)
+  return json === undefined ? 'undefined' : json.length > 80 ? `${json.slice(0, 77)}...` : json
+}
+
+/** 实际值与规范化结果逐字段对照：哪里会被补、丢、钳、改，就在哪里报出来 */
+function diffAgainstNormalized(actual: unknown, expected: unknown, path: string, out: LayerDocProblem[]): void {
+  if (Array.isArray(expected)) {
+    if (!Array.isArray(actual)) {
+      out.push({ path, message: `必须是数组，当前是 ${describeValue(actual)}` })
+      return
+    }
+    if (actual.length !== expected.length) {
+      out.push({ path, message: `元素个数 ${actual.length} 会被规范化成 ${expected.length}（越界、非法或超上限的元素会被丢弃）` })
+      return
+    }
+    expected.forEach((item, index) => diffAgainstNormalized(actual[index], item, `${path}[${index}]`, out))
+    return
+  }
+  if (expected && typeof expected === 'object') {
+    if (!actual || typeof actual !== 'object' || Array.isArray(actual)) {
+      out.push({ path, message: `必须是对象，当前是 ${describeValue(actual)}` })
+      return
+    }
+    const actualRecord = actual as Record<string, unknown>
+    const expectedRecord = expected as Record<string, unknown>
+    for (const [key, value] of Object.entries(expectedRecord)) {
+      const child = path ? `${path}.${key}` : key
+      if (!(key in actualRecord)) out.push({ path: child, message: `缺少该字段；请显式写出 ${describeValue(value)}` })
+      else diffAgainstNormalized(actualRecord[key], value, child, out)
+    }
+    for (const key of Object.keys(actualRecord)) {
+      if (!(key in expectedRecord)) {
+        out.push({ path: path ? `${path}.${key}` : key, message: `不支持该字段或取值非法（${describeValue(actualRecord[key])}），规范化会把它丢掉；请删除或改成合法值` })
+      }
+    }
+    return
+  }
+  if (actual !== expected) {
+    out.push({ path, message: `值 ${describeValue(actual)} 会被规范化成 ${describeValue(expected)}（超出允许范围、类型不对或缺省回落）；请直接写成合法值` })
+  }
+}
+
+/** 键序无关的等值比较（严格校验的最终判据） */
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value as Record<string, unknown>).sort()
+      .map(key => `${JSON.stringify(key)}:${canonicalJson((value as Record<string, unknown>)[key])}`).join(',')}}`
+  }
+  return JSON.stringify(value) ?? 'undefined'
+}
+
+/**
+ * 严格校验（Issue #90，地图工作流专用）：文档必须**原样**就是规范化结果。
+ *
+ * 判据唯一：`normalizeLayerDoc(doc)` 与 doc 深等。规则仍只有 normalizeLayerDoc 一份，
+ * 这里只负责把「规范化会改动的地方」逐字段指出来——钳制、补缺省、丢字段、排序、id 去重
+ * 都是静默修正，地图路径一律拒收，由提交方（模型或编辑器）自己改成合法值。
+ */
+export function strictLayerDocProblems(raw: unknown): { doc: LayerDoc; problems: LayerDocProblem[] } {
+  const doc = normalizeLayerDoc(raw)
+  const problems: LayerDocProblem[] = []
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return { doc, problems: [{ path: '', message: '图层文档必须是 JSON 对象' }] }
+  }
+  const source = raw as Record<string, unknown>
+  for (const key of Object.keys(source)) {
+    if (!['version', 'base', 'theme', 'layers'].includes(key)) problems.push({ path: key, message: '不支持的顶层字段，规范化会把它丢掉；请删除' })
+  }
+  diffAgainstNormalized(source.version, doc.version, 'version', problems)
+  diffAgainstNormalized(source.theme, doc.theme, 'theme', problems)
+  diffAgainstNormalized(source.base, doc.base, 'base', problems)
+
+  const rawLayers: unknown[] = Array.isArray(source.layers) ? source.layers : []
+  if (!Array.isArray(source.layers)) problems.push({ path: 'layers', message: '必须是图层数组' })
+  if (rawLayers.length > LAYER_MAX_COUNT) {
+    problems.push({ path: 'layers', message: `图层数 ${rawLayers.length} 超过上限 ${LAYER_MAX_COUNT}，多出的会被丢掉；请合并或删减图层` })
+  }
+  const kept: Layer[] = []
+  rawLayers.slice(0, LAYER_MAX_COUNT).forEach((item, index) => {
+    const layer = normalizeLayer(item, index)
+    const path = `layers[${index}]`
+    if (!layer) {
+      const type = item && typeof item === 'object' ? (item as Record<string, unknown>).type : undefined
+      problems.push({
+        path,
+        message: `该图层会被整体丢弃：type=${describeValue(type)}；type 必须是 ${LAYER_TYPES.join('/')}，`
+          + 'polygon 至少 3 个合法点、polyline 至少 2 个、marker 需要合法 at、image 需要 src.path',
+      })
+      return
+    }
+    diffAgainstNormalized(item, layer, path, problems)
+    kept.push(layer)
+  })
+  const ids = kept.map(layer => layer.id)
+  const duplicate = ids.filter((id, index) => ids.indexOf(id) !== index)
+  if (duplicate.length) {
+    problems.push({ path: 'layers', message: `图层 id 重复：${[...new Set(duplicate)].join('、')}；规范化会给重复者加后缀，请自己改成唯一 id` })
+  }
+  const zs = kept.map(layer => layer.z)
+  if (zs.some((z, index) => index > 0 && z < zs[index - 1]!)) {
+    problems.push({ path: 'layers', message: `图层必须按 z 从小到大排列（当前 z 序列 ${describeValue(zs)}）；规范化会重排，请自己按 z 排好` })
+  }
+  if (!problems.length && canonicalJson(source) !== canonicalJson(doc)) {
+    problems.push({ path: '', message: '图层文档与规范化结果不一致；请按 schema 写出完整、合法的文档' })
+  }
+  const overflow = problems.length - STRICT_PROBLEM_LIMIT
+  return {
+    doc,
+    problems: overflow > 0
+      ? [...problems.slice(0, STRICT_PROBLEM_LIMIT), { path: '', message: `……另有 ${overflow} 处同类问题未列出` }]
+      : problems,
+  }
+}

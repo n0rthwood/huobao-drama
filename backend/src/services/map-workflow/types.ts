@@ -217,6 +217,51 @@ export interface MapWorkflowHistoryEntry {
   }
 }
 
+/**
+ * 模型阶段的交付轮次与跨阶段回退（Issue #90）。
+ *
+ * 计数属于一次运行（task_id）：新的运行重新计数，历史尝试记录保留供回看。
+ * 记录与计数随工作流文档落库，后端重启后不归零。
+ */
+export const MAP_AGENT_STAGES = ['brief', 'research', 'base', 'drawing'] as const
+export type MapAgentStage = typeof MAP_AGENT_STAGES[number]
+/** 每个模型阶段最多交付 3 轮（含被拒后的重交） */
+export const MAP_MAX_STAGE_ROUNDS = 3
+/** 一次运行跨阶段回退最多 2 次 */
+export const MAP_MAX_ROLLBACKS = 2
+/** 非模型阶段（质感底纹 / 完成登记）的基础设施失败自动重试次数 */
+export const MAP_INFRA_RETRIES = 2
+
+export type MapAgentOutcome = 'accepted' | 'rejected' | 'no_delivery' | 'error' | 'rollback' | 'infra_retry'
+
+export interface MapAgentAttempt {
+  task_id: number
+  stage: MapWorkflowStage
+  /** 1 起的交付轮次；非轮次类记录（回退、基础设施重试）为 0 */
+  round: number
+  outcome: MapAgentOutcome
+  problems: string[]
+  target_stage?: MapWorkflowStage
+  at: string
+}
+
+export interface MapAgentState {
+  task_id: number | null
+  rounds: Partial<Record<MapAgentStage, number>>
+  rollbacks: number
+  /** 交给某阶段模型的回馈（回退原因、上次失败原因），该阶段下一次执行时读出 */
+  feedback: Partial<Record<MapWorkflowStage, string>>
+  attempts: MapAgentAttempt[]
+}
+
+export function emptyAgentState(): MapAgentState {
+  return { task_id: null, rounds: {}, rollbacks: 0, feedback: {}, attempts: [] }
+}
+
+export function isMapAgentStage(stage: MapWorkflowStage): stage is MapAgentStage {
+  return (MAP_AGENT_STAGES as readonly string[]).includes(stage)
+}
+
 /** 落库的工作流文档（props.map_workflow 的 JSON 根） */
 export interface MapWorkflowState {
   version: 1
@@ -238,6 +283,7 @@ export interface MapWorkflowState {
   image_config_id: number | null
   image_model: string | null
   updated_at: string | null
+  agent: MapAgentState
 }
 
 export const EMPTY_OUTPUTS: MapWorkflowOutputs = {
@@ -271,6 +317,7 @@ export function emptyWorkflow(): MapWorkflowState {
     image_config_id: null,
     image_model: null,
     updated_at: null,
+    agent: emptyAgentState(),
   }
 }
 

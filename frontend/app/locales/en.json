@@ -2894,7 +2894,7 @@
           "openWorkbench": "Open map workbench",
           "sectionHint": "Staged flow from brief to finished map; state lives on the server and survives reloads",
           "title": "Map workflow",
-          "hint": "Geography is produced deterministically by the program; diffusion only makes texture and never repaints coastlines, rivers or borders.",
+          "hint": "Research, base framing and drawing are done by the model in a tool loop; every delivery is checked by the program and rejections go back to the model to fix. Diffusion only makes texture and never repaints coastlines, rivers or borders.",
           "revision": "Revision {n}",
           "mode": {
             "auto": "Run automatically",
@@ -3088,6 +3088,48 @@
           "close": "Close preview",
           "unavailable": "The link's “{view}” output is not available right now (rolled back or not generated yet); the preview parameter was cleared.",
           "invalidLink": "The preview parameter “{value}” in the link is not recognized and was cleared."
+        },
+        "agent": {
+          "title": "Model rounds",
+          "hint": "Each model stage gets at most 3 delivery rounds, and a run gets at most 2 cross-stage rollbacks; once used up it goes to a human.",
+          "target": "the delivery log of that stage",
+          "runTask": "This run: task #{id}",
+          "runNone": "No model run has started yet",
+          "rounds": "{stage} {used}/{max} rounds",
+          "rollbacks": "Cross-stage rollbacks {used}/{max}",
+          "noAttempts": "No delivery has been recorded for this run yet.",
+          "attemptsCount": "{n} entries",
+          "round": "Round {n}",
+          "roundNone": "Not a delivery round",
+          "taskRef": "Task #{id}",
+          "rollbackTarget": "Rolled back to {stage}",
+          "latestRejection": "Why round {n} of {stage} was rejected",
+          "viewAttempts": "View this stage's delivery log",
+          "outcome": {
+            "accepted": "Accepted",
+            "rejected": "Rejected",
+            "no_delivery": "No delivery",
+            "error": "Error",
+            "rollback": "Cross-stage rollback",
+            "infra_retry": "Infrastructure retry"
+          }
+        },
+        "layerEditor": {
+          "open": "Edit layers",
+          "title": "Edit layers",
+          "target": "map layer document",
+          "layerTarget": "layer the link points to",
+          "hint": "You are editing the layer document the model delivered; saving re-renders it on the server through the same render chain and registers a new version.",
+          "close": "Close",
+          "save": "Save and re-render",
+          "saving": "Saving…",
+          "saved": "Layers saved; the final image was re-rendered",
+          "unsaved": "Unsaved changes",
+          "confirmDiscard": "There are unsaved changes. Close and discard them?",
+          "invalidTitle": "The server rejected this layer document",
+          "problemsTitle": "Problems reported by the server ({n}):",
+          "problemRoot": "Whole document",
+          "invalidHint": "Your draft is kept: fix the paths above and save again."
         }
       },
       "citationsSectionTitle": "Sources",

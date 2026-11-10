@@ -41,7 +41,7 @@ const script = `
     EarthDependencyError,
   } from './src/services/map-earth.ts'
   import {
-    createMapBaseArtifact, renderMapDrawing, geoToPixel, pixelToGeo,
+    createMapBaseArtifact, prepareMapBackground, geoToPixel, pixelToGeo,
     geoToNormalized, normalizedToGeo, rescaleRegistration, parseRegistration,
     MapGeometryError,
   } from './src/services/map-geometry.ts'
@@ -323,103 +323,31 @@ const script = `
     })(),
   }
 
-  // 9. 可编辑图层草稿：几何确定性 + 纹理不替换几何
+  // 9. 作图背景（#90）：底图 + 底纹确定性合成一次，几何全部交给模型的 LayerDoc
   const texRel = 'static/uploads/texture.png'
   await sharp({ create: { width: 640, height: 360, channels: 3, background: '#402010' } })
     .png().toFile(path.join(process.env.HUOBAO_DATA_DIR, texRel))
-  const plain = await renderMapDrawing(fullSpec, { basePath: artifact.path, width: 1280, registration: reg })
-  const textured = await renderMapDrawing(fullSpec, { basePath: artifact.path, width: 1280, registration: reg, texturePath: texRel })
-  const layerTypes = plain.layer_doc.layers.map(l => l.type)
-  const marker = plain.layer_doc.layers.find(l => l.id === 'place-anyang')
-  const polyline = plain.layer_doc.layers.find(l => l.id === 'route-march')
-  const polygonLayer = plain.layer_doc.layers.find(l => l.id === 'region-shang')
-  const label = plain.layer_doc.layers.find(l => l.id === 'region-label-shang')
-  const expectedMarker = geoToNormalized(reg, anyang)
-  const bgPlain = fs.readFileSync(path.join(process.env.HUOBAO_DATA_DIR, plain.background_path))
-  const bgTextured = fs.readFileSync(path.join(process.env.HUOBAO_DATA_DIR, textured.background_path))
-  out.drawing = {
-    layer_types: layerTypes,
-    base_is_background: plain.layer_doc.base.path === plain.background_path,
-    background_differs: !bgPlain.equals(bgTextured),
-    flat_exists: fs.existsSync(path.join(process.env.HUOBAO_DATA_DIR, plain.path)),
-    deterministic_paths: {
-      same: (await renderMapDrawing(fullSpec, { basePath: artifact.path, width: 1280, registration: reg })).path === plain.path,
-      texture_differs: textured.path !== plain.path,
-    },
-    marker_err: Math.hypot(marker.at[0] - expectedMarker[0], marker.at[1] - expectedMarker[1]),
-    anchors: [marker.anchor.semantic_id, polyline.anchor.semantic_id, polygonLayer.anchor.semantic_id, label.anchor.semantic_id],
-    polyline_points: polyline.points.length,
-    polygon_points: polygonLayer.points.length,
-    geometry_identical: textured.points.every((p, i) => p.at[0] === plain.points[i].at[0] && p.at[1] === plain.points[i].at[1])
-      && textured.regions[0].points.length === plain.regions[0].points.length,
-    pixel_points: plain.points.map(p => p.at),
-    expected_pixels: fullSpec.places.map(p => geoToPixel(reg, [p.lon, p.lat])),
-    regions_returned: plain.regions.map(r => r.id),
-    routes_returned: plain.routes.map(r => r.id),
-    texture_warning: textured.warnings.some(w => w.includes('纹理')),
-    registration_mode: plain.registration.mode,
-    image_base: await (async () => {
-      const drawing = await renderMapDrawing(fullSpec, {
-        basePath: imageArtifact.path, width: imageArtifact.width, registration: imageReg,
-      })
-      const expected = geoToNormalized(imageReg, anyang)
-      const found = drawing.layer_doc.layers.find(l => l.id === 'place-anyang')
-      return { err: Math.hypot(found.at[0] - expected[0], found.at[1] - expected[1]), mode: drawing.registration.mode }
-    })(),
-    needs_registration: await (async () => {
-      try {
-        await renderMapDrawing(fullSpec, { basePath: imageArtifact.path, width: imageArtifact.width })
-        return null
-      } catch (err) { return err.message }
-    })(),
-    bad_registration: await (async () => {
-      try {
-        await renderMapDrawing(fullSpec, { basePath: artifact.path, width: 1280, registration: { mode: 'nope' } })
-        return null
-      } catch (err) { return err.message }
-    })(),
-    // 画外/超限的几何必须报错，不许钳边、不许抽稀、不许丢图层
-    offscreen_rejected: await (async () => {
-      const spec = normalizeMapSpec({ bbox, places: [{ id: 'far', name: '远方', lon: 120.0, lat: 40.0 }] })
-      try {
-        await renderMapDrawing(spec, { basePath: artifact.path, width: 1280, registration: reg })
-        return null
-      } catch (err) { return err.message }
-    })(),
-    too_many_points: await (async () => {
-      const dense = Array.from({ length: 300 }, (_, i) => [114.2 + i * 0.001, 36.0 + i * 0.0005])
-      const spec = normalizeMapSpec({ bbox, routes: [{ id: 'dense', name: '密集路线', points: dense }] })
-      try {
-        await renderMapDrawing(spec, { basePath: artifact.path, width: 1280, registration: reg })
-        return null
-      } catch (err) { return err.message }
-    })(),
-    too_many_layers: await (async () => {
-      const places = Array.from({ length: 61 }, (_, i) => ({
-        id: 'p' + i, name: '点' + i, lon: 113.5 + (i % 10) * 0.1, lat: 35.5 + Math.floor(i / 10) * 0.1,
-      }))
-      const spec = normalizeMapSpec({ bbox, places })
-      try {
-        await renderMapDrawing(spec, { basePath: artifact.path, width: 1280, registration: reg })
-        return null
-      } catch (err) { return err.message }
-    })(),
+  const plain = await prepareMapBackground({ basePath: artifact.path, width: 1280, registration: reg })
+  const textured = await prepareMapBackground({ basePath: artifact.path, width: 1280, registration: reg, texturePath: texRel })
+  const bgPlain = fs.readFileSync(path.join(process.env.HUOBAO_DATA_DIR, plain.path))
+  const bgTextured = fs.readFileSync(path.join(process.env.HUOBAO_DATA_DIR, textured.path))
+  const rejectMessage = async (options) => {
+    try { await prepareMapBackground(options); return null } catch (err) { return err.message }
   }
-
-  // Close geographic points with long names must retain their coordinates while
-  // their visible text stays complete, inside the canvas and mutually legible.
-  const clusterNames = ['北关城（关沟北端的山地通道入口）', '邻近城堡（承担关口外侧接应的城堡）', '南关城（通往京师方向的通道南端）']
-  const clusterSpec = normalizeMapSpec({
-    bbox, places: clusterNames.map((name, i) => ({ id: 'cluster-'+i, name, lon: anyang[0]+i*0.003, lat: anyang[1]+i*0.002 })),
-  })
-  const cluster = await renderMapDrawing(clusterSpec, { basePath: artifact.path, width: 1280, registration: reg })
-  const {layerBounds}=await import('./src/services/layer-svg.ts')
-  const textLayers=cluster.layer_doc.layers.filter(layer => typeof layer.text==='string' && layer.text)
-  out.cluster={
-    names:clusterNames, texts:textLayers.map(layer=>layer.text),
-    boxes:textLayers.map(layer=>layerBounds(layer,cluster.layer_doc.theme,1280/720)),
-    pixels:cluster.points.map(point=>point.at),
-    expected:clusterSpec.places.map(point=>geoToPixel(reg,[point.lon,point.lat])),
+  out.background = {
+    in_drawings: plain.path.startsWith('static/map-drawings/'),
+    size: [plain.width, plain.height],
+    same_path: (await prepareMapBackground({ basePath: artifact.path, width: 1280, registration: reg })).path === plain.path,
+    texture_differs: textured.path !== plain.path && !bgPlain.equals(bgTextured),
+    texture_warning: textured.warnings.some(w => w.includes('纹理')),
+    registration_scaled: plain.registration.width === 1280 && Math.abs(plain.registration.height - 720) <= 1,
+    point_matches: (() => {
+      const a = geoToPixel(plain.registration, anyang)
+      const b = geoToNormalized(reg, anyang)
+      return Math.hypot(a[0] / 1280 - b[0], a[1] / plain.height - b[1]) < 1e-9
+    })(),
+    needs_registration: await rejectMessage({ basePath: imageArtifact.path }),
+    bad_registration: await rejectMessage({ basePath: artifact.path, registration: { mode: 'nope' } }),
   }
 
   // Deliberately unrelated nominal camera: measured pixels, not analytic self-consistency,
@@ -610,49 +538,17 @@ test('外部底图：落盘、残差与许可入档、像素↔经纬度可逆�
   assert.ok(rejects.directory?.message.includes('普通文件'), '目录不能当外部底图解码')
 })
 
-test('可编辑图层：点/线/面/标签齐全、坐标等于登记件换算、纹理不改动任何几何', () => {
-  const drawing = result.drawing
-  assert.ok(drawing.layer_types.includes('polygon'), '面要生成 polygon 图层')
-  assert.ok(drawing.layer_types.includes('polyline'), '线要生成 polyline 图层')
-  assert.ok(drawing.layer_types.includes('marker'), '点要生成 marker 图层')
-  assert.ok(drawing.layer_types.includes('label'), '面要配一条可编辑标签')
-  assert.ok(drawing.base_is_background, '图层文档的底图必须是不含几何的背景图')
-  assert.ok(drawing.flat_exists, '拍平预览必须落盘')
-  assert.ok(drawing.deterministic_paths.same, '同样输入必须命中同一个文件')
-  assert.ok(drawing.deterministic_paths.texture_differs, '加了纹理必须是另一个文件')
-  assert.ok(drawing.background_differs, '纹理必须真的改变背景像素')
-  assert.ok(drawing.geometry_identical, '纹理绝不能改动任何几何坐标')
-  assert.ok(drawing.marker_err < 1e-9, '标注坐标必须等于登记件换算结果')
-  assert.deepEqual(drawing.anchors, ['anyang', 'march', 'shang', 'shang'], '每个图层都要锚回 spec 里的要素 id')
-  assert.ok(drawing.polyline_points >= 3 && drawing.polygon_points >= 4)
-  assert.ok(drawing.texture_warning, '纹理的合成方式必须在 warnings 里说清楚')
-  assert.equal(drawing.registration_mode, 'program')
-  for (const [index, pixel] of drawing.pixel_points.entries()) {
-    const expected = drawing.expected_pixels[index]
-    assert.ok(Math.hypot(pixel[0] - expected[0], pixel[1] - expected[1]) < 1e-9, '返回的像素几何必须来自登记件')
-  }
-  assert.deepEqual(drawing.regions_returned, ['shang'])
-  assert.deepEqual(drawing.routes_returned, ['march'])
-  assert.ok(drawing.image_base.err < 1e-9, '外部底图上的标注同样按登记件换算')
-  assert.equal(drawing.image_base.mode, 'image')
-  assert.ok(drawing.needs_registration?.includes('registration'), '非程序底图缺登记件必须报错，不许瞎猜 bbox')
-  assert.ok(drawing.bad_registration?.includes('登记件'), '非法登记件必须报错')
-  assert.ok(drawing.offscreen_rejected?.includes('画面之外'), '画外的要素必须报错，不许钳到画边假装在画里')
-  assert.ok(drawing.too_many_points?.includes('顶点数'), '顶点超限必须报错，不许悄悄抽稀改变形状')
-  assert.ok(drawing.too_many_layers?.includes('图层'), '图层超限必须报错，不许悄悄丢要素')
-})
-
-test('近邻长地名完整避让，排版不移动或隐藏地理点', () => {
-  const { names, texts, boxes, pixels, expected } = result.cluster
-  assert.deepEqual([...texts].sort(), [...names].sort(), '所有地名完整保留，不截字或藏字')
-  for (let i=0; i<boxes.length; i++) {
-    const a=boxes[i]
-    assert.ok(a.x>=0 && a.y>=0 && a.x+a.w<=1 && a.y+a.h<=1, '标签必须留在画幅内')
-    for (const b of boxes.slice(i+1)) {
-      assert.ok(a.x+a.w<=b.x || b.x+b.w<=a.x || a.y+a.h<=b.y || b.y+b.h<=a.y, '地名包围框不得相互遮挡')
-    }
-  }
-  for (let i=0; i<pixels.length; i++) assert.ok(Math.hypot(pixels[i][0]-expected[i][0],pixels[i][1]-expected[i][1])<1e-9, '不能为了排版移动真实点位')
+test('作图背景：底图 + 底纹确定性合成，登记件随尺寸缩放，缺登记件明确报错', () => {
+  const bg = result.background
+  assert.ok(bg.in_drawings, '背景图落在 static/map-drawings/')
+  assert.deepEqual(bg.size, [1280, 720])
+  assert.ok(bg.same_path, '同样输入必须命中同一个文件')
+  assert.ok(bg.texture_differs, '加了纹理必须是另一张、像素真的不同的背景')
+  assert.ok(bg.texture_warning, '纹理的合成方式必须在 warnings 里说清楚')
+  assert.ok(bg.registration_scaled, '登记件必须缩放到背景尺寸')
+  assert.ok(bg.point_matches, '背景上的经纬度换算必须与原登记件一致')
+  assert.ok(bg.needs_registration?.includes('registration'), '缺登记件必须报错，不许瞎猜 bbox')
+  assert.ok(bg.bad_registration?.includes('registration'), '非法登记件必须报错')
 })
 
 test('calibrated Earth uses observed control grid instead of nominal camera', () => {

@@ -144,7 +144,7 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 
 #### S2-84 地图资产专用流程（Issue #84，`f149a0e` 已发布；逐方法证据 `[S/R]`）
 
-**背景**：历史地图原先只有互不串联的坐标建议、配置与渲染面板，资产甚至没有点线语义。#84 要求显式地图类型、充分性判断、权威检索（Wikipedia / Europeana / Smithsonian）、三条底图路径、自动与逐步审核、可回退与可编辑点线面；扩散仅生成底纹，绝不重画地理几何。生产入口已可用，但仍须检查实际部署版本，不把开发副本检查标成 `[R]`。
+**背景**：历史地图原先没有串联流程与点线语义。#84 引入显式地图类型、充分性判断、权威检索（Wikipedia / Europeana / Smithsonian）、三条底图路径、逐步审核与回退；扩散只生成底纹。#90（prop 103 任务 1353：检索把模板占位 `0,0` 写成地点、越界只给人看）改为模型阶段工具循环，错误一律回给模型。
 
 - **类型**：`POST /props` 与 `PUT /props/{p}` 的 `asset_type:"map"|"prop"` 是道具内的显式分类，不新增第四类资产引用。地图仍用 `kind:"prop"` 与同一资产 ID；`POST /tasks/register-upload` 的目标 `asset_type` 仍写 `"prop"`。地图改回普通道具需 `confirm_asset_type_change:true`，必须由人明确要求，地图数据保留不删除。
 - **项目范围**：新建 `POST /props {drama_id,name,description,asset_type:"map"}`，不必关联集，不受集剧本确认门禁；不能为地图伪造 `script_content` 或确认剧本，集级提取/设计仍守门禁。
@@ -152,15 +152,15 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 - **自动点线面与人工确认**：research 阶段把来源支持的要素并入 `map_spec`，AI 新增项带 `proposed:true`；auto 可用候选直接制图，但这不是人工批准。人工逐项审核后去掉该项 `proposed` 并通过工作流 PUT 保存，之后重跑不覆盖它。只有在明确选择示意模式时才可采用标明近似的区域；缺关键依据要阻断，不虚构疆界。
 - **需求与缺失分级**：对象 / 时代 / 空间定位 / 用途与粒度要能明确解析（「殷墟车马坑」可由 AI 解释隐含时代与位置，「京杭运河通州段」缺时代必须补齐）；不明确或充分性检查失败会阻断，单个来源无结果、非关键细节缺失只记录风险，所有来源都无结果不算已完成检索。AI 推断不等于出处考证：`issues[].blocking` 阻断时补需求，`research.features[].uncertainty/conflicts` 有风险时呈报。
 - **阶段与续跑**：`brief → research → base → style → drawing → complete`。`run` 始终继续当前待执行的 `stage`，不会隐式回到 brief；整条重做须先按人的决定显式 rollback。`run {mode:"auto"}` 从当前阶段连续执行到完成或阻断，可能发生文本调用和一次底纹生成，先拿到该范围的授权并按 §1.2 预留 `text_calls` 与 `images`；`manual` 只执行当前一步。`awaiting_review` 不代表后面阶段已做完。
-- **调用留痕**：地图任务复用公开观测工作项，实际 system/user/assistant、调用耗时与排队分别持久化，可通过 `GET /tasks/{id}/observations` 与调用消息分页读取。仅接入后的新任务有记录；初版任务 1287–1291 的旧调用不得伪造回填，也不能声称已可靠核计真实请求数。新调用按服务端调用行及底纹图片任务计数，不把工作流容器数当请求数。
-- **三条底图**：`program` 为 Natural Earth 程序底图；`earth` 真实载入 KMZ，分别保留交付图与像素标定证据，实测控制网格是正反换算真源，独立检验点残差超过 3px 或相机漂移时阻断，不用相机数学自洽冒充实际点位对齐；`image` 使用已上传图片、来源、许可和至少三个非共线控制点。标定残差不是历史位置正确性的证明。
-- **编辑后重绘**：点线面变更但投影/bbox/背景层不变时，保存后待执行阶段回到 `drawing`，保留配准底图与已有底纹；投影/bbox/背景层变化先重做 base；底纹独立于几何，可复用。失败重试同样计额度，提交前核对剩余预算。
+- **调用留痕**：每次文本/视觉调用、工具参数与结果持久化，`GET /tasks/{id}/observations` 分页可读；旧任务 1287–1291 无记录，不伪造回填。按服务端调用行与底纹图片任务计数，不把工作流容器数当请求数。
+- **模型阶段（#90）**：brief/research/base/drawing 由模型在工具循环内完成，交付被校验拒收或工具出错都回给模型改，每阶段≤3 轮、每次运行跨阶段回退≤2 次，用完才判失败交人；底图路线、bbox 与取景由模型定（旧 bbox 仅参考，要素须在画内且外包框最大边≥30% 画面）；作图是模型写 LayerDoc，预览/成图/人工编辑同一 `renderLayerDoc`，语义从锚定图层导出。`detail.agent` 读轮次、回退与逐轮拒收原因；base/drawing 需视觉文本配置，否则 run 返回 `vision_config_unavailable`。人工编辑走 `PUT …/map-workflow/layer-doc`（严格校验，400 `layer_doc_invalid` 带字段级 `problems`）。
+- **三条底图**：`program` Natural Earth；`earth` 真实载入 KMZ，实测控制网格为换算真源，检验点残差>3px 或相机漂移即失败；`image` 需上传图、来源、许可与≥3 个非共线控制点。标定残差不证明史实位置。点线面改动不动投影/bbox/背景层时回到 `drawing` 复用底图与底纹，否则先重做 base。
 - **重启后的底纹续接**：工作流在飞时重启会标失败，保留阶段与原任务 ID，不假装仍在执行。同配置续跑 style 会认领原任务 `params.map_texture_task_id` 指向的排队中/生成中/已完成图片，不重复下单；换图片配置/模型或原图任务已失败时才新建计费任务。显式回退/取消仍按人的决定执行。
-- **模型与原件边界**：地图原件、Earth 影像和外部史料图不进入 t2i/image_edit/i2v。地图流程的图片调用只生成无地理内容的独立底纹；点线面与文字由程序叠加。`asset_type:"map"` 才是地图判据（不是 `faithful`）；完成时原始底图版本保存在 `faithful_source`，当前 `image_url` 可为派生图，不能称其为未改动原件。底纹默认 35%（上限 60%）alpha。人要求原图外观不变时须明确跳过 style。`texture_image.task_id` 计 `images` 预算；`base_image/final_image` 的确定性版本不计 GPU 图数。
-- **编辑与回退**：先 GET 当前 `revision`，PUT 带 `expected_revision`；409 保留草稿、重新读回，由人决定如何合并，不盲目重投。几何真源是 WGS84 `map_spec`，画布拖动须用底图实际配准反算。回退/取消按人的明确要求执行，不把历史状态冒充新一轮审核通过。
+- **模型与原件边界**：地图原件、Earth 影像和外部史料图不进入 t2i/image_edit/i2v；图片调用只生成无地理内容的底纹，点线面与文字是模型写的图层。`asset_type:"map"` 才是地图判据；完成时原始底图版本存 `faithful_source`，`image_url` 是派生图。底纹默认 35%（上限 60%）alpha，人要求原图外观不变时跳过 style。`texture_image.task_id` 计 `images` 预算，回退后同运行链按原任务认领不重复计费；`base_image/final_image` 不计 GPU 图数。
+- **编辑与回退**：先 GET `revision`，PUT 带 `expected_revision`；409 保留草稿、重新读回，由人决定合并。几何真源是 WGS84 `map_spec`，画布拖动按实际配准反算。回退/取消按人的明确要求执行，不把历史状态冒充新一轮审核通过。
 - **读回与验收**：打开 `outputs.base_image/final_image` 核对配准、图例文字/点位与来源；检查 `outputs.layer_doc`、`research.queries` 的失败/无命中及风险提示。`completed` 只代表流程技术完成，史实、许可与发布合规仍需人审核。
 - **保存粒度**：顶层 `brief/map_spec/mode` 不传则保留，brief 内字段合并；传 `map_spec` 是**完整替换**（含 places/routes/regions）。先 GET 完整 spec，仅改获准的项并带当前 `expected_revision`；人工确认项只保证不被自动检索合并覆盖。
-- **调用量与模式**：正常完整地图为 brief 1 次文本、research 2 次文本（计划+提取）、style 1 次图片；base/drawing/complete 无模型调用。通用文本端点未钉选时一次调用最多尝试 3 个端点，完整流程须按 §1.2 的 `text_calls` 保守预留最多 9 次；预算紧时显式 `text_config_id` 钉选并用 manual 分段核账。run 入参覆盖保存的 mode，未传默认 manual；advance 永远 manual，只有它支持 skip；PUT mode 只保存选择，不会自行启动。
+- **调用量与模式**：brief 1–3 次文本；research/base/drawing 各是多步工具循环（每步一次文本调用，交付≤3 轮，另含 read_image 视觉调用），回退会让目标阶段重跑；style 1 次图片。预算按阶段步数保守预留，紧时显式 `text_config_id` 钉选并用 manual 分段核账。run 入参覆盖保存的 mode，未传默认 manual；advance 永远 manual，只有它支持 skip；PUT mode 只保存选择，不会自行启动。
 
 ### S3 Poster（可选，资产之后；Issue #39/#72）
 - 端点：`GET /episodes/{e}/poster`、`PUT /episodes/{e}/poster {prompt?, text_prompt?, copy?, reference_images?, base_image?, layer_doc}`、`POST …/poster/generate {mode:"initial"|"composite"|"layers", config_id?, model?, version_id?, composition_id?}`、`POST …/poster/concept`、`POST …/poster/concept/generate`、`POST …/poster/concept/apply`、`POST …/poster/concept/apply-layer-plan`、`POST …/poster/versions {layer_doc?, prompt?, text_prompt?}`、`PUT …/poster/select {version_id}`、`POST …/poster/load-version {version_id}`。

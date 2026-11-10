@@ -1019,6 +1019,31 @@ export interface MapWorkflowHistoryEntry {
   actor: 'auto' | 'manual' | 'system'
   note: string | null
 }
+/** 模型阶段（brief/research/base/drawing）每轮交付的结论；rollback 另记目标阶段 */
+export type MapAgentOutcome = 'accepted' | 'rejected' | 'no_delivery' | 'error' | 'rollback' | 'infra_retry'
+export interface MapAgentAttempt {
+  task_id: number
+  stage: MapWorkflowStage
+  round: number
+  outcome: MapAgentOutcome
+  /** 已脱敏的中文原因，直接展示，禁止 v-html */
+  problems: string[]
+  target_stage?: string
+  at: string
+}
+/**
+ * 模型工具循环的轮次账本（Issue #90）：计数属于一次运行（task_id），
+ * 新运行重新计数，attempts 保留历史（服务端封顶）。
+ */
+export interface MapAgentState {
+  task_id: number | null
+  rounds: Partial<Record<'brief' | 'research' | 'base' | 'drawing', number>>
+  rollbacks: number
+  /** 上限由契约固定（3 轮 / 2 次回退）；服务端没回传时前端按常量显示，不编造别的数字 */
+  max_rounds?: number
+  max_rollbacks?: number
+  attempts: MapAgentAttempt[]
+}
 export interface MapWorkflowDetail {
   prop_id: number
   asset_type: 'map'
@@ -1040,6 +1065,7 @@ export interface MapWorkflowDetail {
   map_spec: MapSpec | null
   outputs: MapWorkflowOutputs
   history: MapWorkflowHistoryEntry[]
+  agent: MapAgentState
 }
 
 export interface MapWorkflowRunOptions {
@@ -1062,6 +1088,12 @@ export const mapWorkflowAPI = {
   rollback: (propId: number, stage: MapWorkflowStage, expectedRevision?: number) =>
     api.post<MapWorkflowDetail>(`/props/${propId}/map-workflow/rollback`, { stage, expected_revision: expectedRevision }),
   cancel: (propId: number) => api.post<MapWorkflowDetail>(`/props/${propId}/map-workflow/cancel`, {}),
+  /**
+   * 人工在图层编辑器里改完的 LayerDoc（Issue #90）：服务端严格校验（normalizeLayerDoc 会改动即拒收）、
+   * 用同一条 renderLayerDoc 链重绘、登记新版本并原子采纳图与语义。
+   */
+  saveLayerDoc: (propId: number, layerDoc: Record<string, unknown>, expectedRevision?: number) =>
+    api.put<MapWorkflowDetail>(`/props/${propId}/map-workflow/layer-doc`, { layer_doc: layerDoc, expected_revision: expectedRevision }),
 }
 
 /** 409 冲突体：修订号冲突 / 阶段正在执行；两者都不会改服务端状态，本地草稿保留 */
@@ -1076,6 +1108,20 @@ export function mapWorkflowConflictOf(err: unknown): { kind: 'revision' | 'busy'
     return { kind: 'busy', taskId: Number(body.task_id) || undefined, message: String(body.message || '') }
   }
   return null
+}
+
+/** 400 layer_doc_invalid：严格校验逐条指出「规范化会改动哪里」，草稿一律保留由人改 */
+export function mapLayerDocProblemsOf(err: unknown): { message: string; problems: Array<{ path: string; message: string }> } | null {
+  const body = (err as ApiError)?.body
+  if (!body || body.error !== 'layer_doc_invalid') return null
+  const raw = Array.isArray(body.problems) ? body.problems : []
+  return {
+    message: String(body.message || ''),
+    problems: raw.map((item: unknown) => {
+      const row = (item ?? {}) as Record<string, unknown>
+      return { path: String(row.path ?? ''), message: String(row.message ?? '') }
+    }),
+  }
 }
 
 // 资产「精确→美化」流水线（Issue #56）。闸门结论由后端按清单计算，前端只渲染，不复算也不采信模型自判。

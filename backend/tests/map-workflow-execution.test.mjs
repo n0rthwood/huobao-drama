@@ -6,8 +6,9 @@ import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-// Real service/database/render path. The inert text config supplies task metadata only:
-// resuming a deterministic stage must not invoke a model or restart brief/research.
+// Real service/database/render path. Base and drawing are model stages since #90, so a local scripted
+// OpenAI-compatible model frames the base from the current map_spec bbox and draws the anchored layers;
+// resuming must still continue the current stage instead of restarting brief/research.
 test('地图继续当前阶段：原件与成图原子采用，几何编辑复用底图且不重新计费', () => {
   const backend = fileURLToPath(new URL('..', import.meta.url))
   const dir = mkdtempSync(path.join(tmpdir(), 'map-execution-'))
@@ -20,9 +21,29 @@ test('地图继续当前阶段：原件与成图原子采用，几何编辑复�
     import {startMapWorkflow,advanceMapWorkflow,saveMapWorkflowDraft,failInterruptedMapWorkflows,rollbackMapWorkflow} from 'file://${backend}src/services/map-workflow/run.ts'
     import {normalizeMapSpec} from 'file://${backend}src/services/map-base-render.ts'
     import {importAsset,AssetLibraryError} from 'file://${backend}src/services/asset-library.ts'
+    import {startMockOpenAIChat,toolResults,systemText,userText} from 'file://${backend}tests/fixtures/mock-openai-chat.mjs'
+    const mock=await startMockOpenAIChat(async body=>{
+      const sys=systemText(body),user=userText(body)
+      if(sys.includes('地图工作流：底图')){
+        const renders=toolResults(body,'render_base')
+        if(!renders.length)return{toolCalls:[{name:'render_base',args:{mode:'program',bbox:JSON.parse(user.match(/bbox=(\\[[^\\]]+\\])/)[1])}}]}
+        return{toolCalls:[{name:'submit_base',args:{artifact_id:renders[0].artifact_id}}]}
+      }
+      if(sys.includes('地图工作流：用图层文档作图')){
+        const skeleton=JSON.parse(user.match(/起始文档骨架：\\n(\\{.*\\})/)[1])
+        const layers=[...user.matchAll(/- id=(\\S+) place「(.+?)」→ 归一化坐标 (\\[.*\\])/g)].map((m,z)=>({
+          id:'l-'+m[1],type:'marker',name:m[2],visible:true,locked:false,z,opacity:1,rotation:0,
+          anchor:{semantic_id:m[1],semantic_name:m[2]},at:JSON.parse(m[3])[0],text:m[2],style:{},
+        }))
+        const doc={...skeleton,layers}
+        if(!toolResults(body,'render_layer_doc').length)return{toolCalls:[{name:'render_layer_doc',args:{layer_doc:doc}}]}
+        return{toolCalls:[{name:'submit_layer_doc',args:{layer_doc:doc}}]}
+      }
+      return{text:'无事可做'}
+    })
     const ts=now()
     const dramaId=getInsertId(await db.insert(schema.dramas).values({title:'地图执行回归',createdAt:ts,updatedAt:ts}))
-    const configId=getInsertId(await db.insert(schema.aiServiceConfigs).values({serviceType:'text',provider:'openai',name:'Inert metadata fixture',baseUrl:'http://127.0.0.1:1',apiKey:'not-a-credential',model:'["inert-model"]',isActive:true,createdAt:ts,updatedAt:ts}))
+    const configId=getInsertId(await db.insert(schema.aiServiceConfigs).values({serviceType:'text',provider:'openai',name:'Scripted map model',baseUrl:mock.baseUrl,apiKey:'not-a-credential',model:'["mock-agent"]',isActive:true,vision:true,createdAt:ts,updatedAt:ts}))
     const propId=getInsertId(await db.insert(schema.props).values({dramaId,name:'测试区位图',description:'原始资产说明',assetType:'map',createdAt:ts,updatedAt:ts}))
     let loaded=await loadWorkflow(propId)
     assert.equal(serializeDetail(loaded).brief.subject,'测试区位图')
@@ -38,11 +59,11 @@ test('地图继续当前阶段：原件与成图原子采用，几何编辑复�
       ctx.state.stage='base';ctx.state.status='idle'
     }})
     const settle=async(id=propId)=>{
-      const deadline=Date.now()+20000
+      const deadline=Date.now()+60000
       for(;;){
         const row=await loadWorkflow(id)
         if(row.state.status!=='running')return serializeDetail(row)
-        if(Date.now()>deadline)throw Error('Map deterministic stage did not finish')
+        if(Date.now()>deadline)throw Error('Map stage did not finish')
         await new Promise(resolve=>setTimeout(resolve,20))
       }
     }
@@ -58,7 +79,7 @@ test('地图继续当前阶段：原件与成图原子采用，几何编辑复�
     assert.equal(state.stage,'drawing')
     await startMapWorkflow(propId,{mode:'auto',expectedRevision:state.revision,textConfigId:configId})
     state=await settle()
-    assert.equal(state.status,'completed',state.error||'auto must resume drawing without new model work')
+    assert.equal(state.status,'completed',state.error||'auto must resume drawing, not restart brief/research')
     const prop=await getProp(propId)
     assert.equal(prop.imageUrl,state.outputs.final_image.path)
     assert.equal(prop.faithfulSource,base.task_id)
@@ -169,13 +190,14 @@ test('地图继续当前阶段：原件与成图原子采用，几何编辑复�
     await assert.rejects(importAsset({targetDramaId,kind:'prop',sourceId:propId,name:'依赖缺失应回滚'}),error=>error instanceof AssetLibraryError)
     assert.deepEqual((await db.select().from(schema.props)).map(row=>row.id),assetIdsBefore,'Failed import must not leave a partial asset')
     assert.deepEqual((await db.select().from(schema.sysTask)).map(row=>row.id),taskIdsBefore,'Failed import must roll back copied versions')
+    await mock.close()
     console.log('MAP_EXECUTION_OK')
   `
   const probe = path.join(dir, 'probe.mts')
   writeFileSync(probe, script)
   try {
     const result = execFileSync('node_modules/.bin/tsx', [probe], {
-      cwd: backend, encoding: 'utf8', timeout: 45000,
+      cwd: backend, encoding: 'utf8', timeout: 180000,
       env: { ...process.env, SQLITE_PATH: path.join(dir, 'test.sqlite3'), HUOBAO_DATA_DIR: dir, STORAGE_PATH: path.join(dir, 'static') },
     })
     assert.match(result, /MAP_EXECUTION_OK/)
