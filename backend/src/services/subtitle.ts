@@ -103,19 +103,21 @@ export function splitChunks(text: string, maxChars = SUBTITLE_MAX_CHARS_PER_CUE)
 /**
  * 一条字幕的展示文本：超过单行上限时按可断点优先折行（Issue #91 起行宽随输出画面变化）。
  *
- * 行预算只剩最后一行时，剩余文本整行输出（可能超过 `charsPerLine`）——这正是旧实现的行为，
- * 所以 `charsPerLine = 20`（默认行预算 2 行）时输出与旧实现逐字节一致，既有横屏成片不受影响。
- * 重排（`charsPerLine < 20`）时额外做容量校验：靠前的标点断点若会让剩余文本塞不进剩下的行，
- * 就放弃它改用硬切，避免「前面几行很短、最后一行超宽被裁」。
+ * `charsPerLine = 20`（旧口径）时**恒按旧实现行为**：只在超过 20 字时切一次，第二行整行输出
+ * （可能超过 20 字），与 `maxLines` 无关——既有横屏成片的字幕逐字节不变。
+ * 重排（`charsPerLine < 20`）时折成 ≤ `maxLines` 行，并做容量校验：靠前的标点断点若会让剩余
+ * 文本塞不进剩下的行，就放弃它改用硬切，避免「前面几行很短、最后一行超宽被裁」。
  */
 export function layoutCueText(
   chunk: string,
   charsPerLine = SUBTITLE_MAX_CHARS_PER_LINE,
-  maxLines = charsPerLine >= SUBTITLE_MAX_CHARS_PER_LINE ? SUBTITLE_MAX_LINES : SUBTITLE_WRAP_MAX_LINES,
+  maxLines = SUBTITLE_WRAP_MAX_LINES,
 ): string {
+  // 旧口径固定两行预算，保证 20 字/行逐字节兼容
+  const lineBudget = charsPerLine >= SUBTITLE_MAX_CHARS_PER_LINE ? SUBTITLE_MAX_LINES : maxLines
   const lines: string[] = []
   let rest = chunk
-  while (lines.length < maxLines - 1 && rest.length > charsPerLine) {
+  while (lines.length < lineBudget - 1 && rest.length > charsPerLine) {
     // 在 [charsPerLine/2, charsPerLine] 窗口内找最靠后的可断点，找不到就硬切
     let cut = -1
     for (let i = charsPerLine - 1; i >= Math.floor(charsPerLine / 2); i--) {
@@ -124,7 +126,7 @@ export function layoutCueText(
         break
       }
     }
-    const remainingCapacity = (maxLines - lines.length - 1) * charsPerLine
+    const remainingCapacity = (lineBudget - lines.length - 1) * charsPerLine
     if (cut > 0 && charsPerLine < SUBTITLE_MAX_CHARS_PER_LINE && rest.length - cut > remainingCapacity) cut = -1
     if (cut <= 0) cut = charsPerLine
     lines.push(rest.slice(0, cut))

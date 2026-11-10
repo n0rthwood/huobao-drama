@@ -78,6 +78,7 @@ test('layoutCueText 在 20 字/行时与旧实现逐字节一致', () => {
   for (const chunk of cases) {
     assert.equal(layoutCueText(chunk), legacyLayoutCueText(chunk), chunk)
     assert.equal(layoutCueText(chunk, SUBTITLE_MAX_CHARS_PER_LINE), legacyLayoutCueText(chunk), chunk)
+    assert.equal(layoutCueText(chunk, SUBTITLE_MAX_CHARS_PER_LINE, SUBTITLE_WRAP_MAX_LINES), legacyLayoutCueText(chunk), chunk)
   }
 })
 
