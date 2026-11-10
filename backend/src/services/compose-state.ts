@@ -134,8 +134,10 @@ export function composeSignatureOf(parts: ComposeInputParts): string {
   ]
   // v2 的摘要输入必须一个字节都不变：多拼三个空串也会换摘要
   if (version === 4) fields.push(parts.combo!, clipKey(parts.layer_segment), parts.junction_hash || '', String(parts.video_task_id ?? ''))
-  // Issue #91：窄画面的字幕行宽参与签名，且只在**烧录**时生效（横屏恒为 20，字段缺省，签名不变）
-  if (parts.burned && parts.subtitle_chars_per_line !== undefined) fields.push(`cpl=${parts.subtitle_chars_per_line}`)
+  // Issue #91：字幕行宽只在**烧录且 ≠ 20**（窄画面）时进签名；横屏逐字节不变
+  if (parts.burned && parts.subtitle_chars_per_line !== undefined && parts.subtitle_chars_per_line !== SUBTITLE_MAX_CHARS_PER_LINE) {
+    fields.push(`cpl=${parts.subtitle_chars_per_line}`)
+  }
   return sha256(fields.join('\u0000'))
 }
 
@@ -166,8 +168,11 @@ export function describeComposeDiff(current: ComposeInputParts, previous: Compos
   if (current.burned !== previous.burned) reasons.push(current.burned ? '改为烧录字幕' : '改为不烧录字幕')
   if (current.text_sha256 !== previous.text_sha256) reasons.push('旁白文本已修改')
   if (current.fit_key !== previous.fit_key) reasons.push('匹配参数已调整（留白 / 倍速 / 音轨模式 / 底音增益）')
-  if (current.burned && current.subtitle_chars_per_line !== previous.subtitle_chars_per_line) {
-    reasons.push(`字幕排版已变化（每行 ${previous.subtitle_chars_per_line ?? SUBTITLE_MAX_CHARS_PER_LINE} 字 → 每行 ${current.subtitle_chars_per_line ?? SUBTITLE_MAX_CHARS_PER_LINE} 字）`)
+  // 不烧录、或两边都是默认 20（含字段缺省）时不算变化
+  const cplOf = (parts: ComposeInputParts) =>
+    (parts.burned ? parts.subtitle_chars_per_line ?? SUBTITLE_MAX_CHARS_PER_LINE : SUBTITLE_MAX_CHARS_PER_LINE)
+  if (cplOf(current) !== cplOf(previous)) {
+    reasons.push(`字幕排版已变化（每行 ${cplOf(previous)} 字 → 每行 ${cplOf(current)} 字）`)
   }
   if (Math.abs(current.transition_t - previous.transition_t) > 1e-3) {
     reasons.push(`生效的转场偏移已变化（${previous.transition_t} 秒 → ${current.transition_t} 秒）`)

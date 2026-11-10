@@ -105,6 +105,8 @@ export function splitChunks(text: string, maxChars = SUBTITLE_MAX_CHARS_PER_CUE)
  *
  * 行预算只剩最后一行时，剩余文本整行输出（可能超过 `charsPerLine`）——这正是旧实现的行为，
  * 所以 `charsPerLine = 20`（默认行预算 2 行）时输出与旧实现逐字节一致，既有横屏成片不受影响。
+ * 重排（`charsPerLine < 20`）时额外做容量校验：靠前的标点断点若会让剩余文本塞不进剩下的行，
+ * 就放弃它改用硬切，避免「前面几行很短、最后一行超宽被裁」。
  */
 export function layoutCueText(
   chunk: string,
@@ -122,6 +124,8 @@ export function layoutCueText(
         break
       }
     }
+    const remainingCapacity = (maxLines - lines.length - 1) * charsPerLine
+    if (cut > 0 && charsPerLine < SUBTITLE_MAX_CHARS_PER_LINE && rest.length - cut > remainingCapacity) cut = -1
     if (cut <= 0) cut = charsPerLine
     lines.push(rest.slice(0, cut))
     rest = rest.slice(cut)

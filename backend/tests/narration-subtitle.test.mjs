@@ -96,6 +96,15 @@ test('layoutCueText 窄画面折成 ≤4 行，不丢字不改字，优先在标
   assert.deepEqual(layoutCueText('一二三四五六，七八九十甲乙丙丁戊己', 12).split('\n'), ['一二三四五六，', '七八九十甲乙丙丁戊己'])
 })
 
+test('layoutCueText 窄画面：靠前的标点断点不得挤爆最后一行', () => {
+  const chunk = ('甲'.repeat(6) + '，').repeat(3) + '乙'.repeat(19)
+  assert.equal(chunk.length, SUBTITLE_MAX_CHARS_PER_CUE)
+  const lines = layoutCueText(chunk, 12).split('\n')
+  assert.ok(lines.length <= SUBTITLE_WRAP_MAX_LINES)
+  assert.equal(lines.join(''), chunk)
+  for (const line of lines) assert.ok(line.length <= 12, `${line.length}: ${line}`)
+})
+
 test('比例分配：cue 文本拼接等于原文，末条不超过配音时长', () => {
   const cues = proportionalCues(TEXT, 9000)
   assert.ok(cues.length >= 2)
