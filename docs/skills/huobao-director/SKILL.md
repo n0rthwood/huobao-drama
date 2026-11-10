@@ -267,6 +267,8 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 - 用途：把视频 + 旁白音轨 + 烧录字幕变成可导出的融合片，写输入快照签名。**带显式段组合的纪录片镜头写 v4**（#60：段组合、图层段、生成版本、衔接帧都进签名）；**无 combo 的剧情镜仍写 v2**（#42：video/audio/subtitle/burned/text/fit/T），这是刻意保持的逐字兼容，不是遗留 bug。签名版本 <2 的历史记录一律判 `unknown`，需重做。
 - 组合场景：preview 读 `status/exportable/plan/signature` → 启动显式 IDs → 轮询 → 逐镜读回 `compose_state`。
 - 陷阱：只有 `unchanged` + `exportable:true` 才可导出；`missing/changed/unknown` 要重做；`blocked/skipped` 先按 reason 修。200 与“导出成功”不是一回事。
+- **烧录字幕行宽随输出画面（#91）**：合成时按实际输出尺寸重排每条字幕（单字宽 ≈ 0.0425×输出高，扣 libass 默认左右边距；544×960 = 12 字/行，横屏与方形封顶 20 字/行），一条最多 4 行，窄画面遵守避头点（下一行不以标点开头）；字号/字体不变，配音阶段写的 SRT 不变。只有「烧录 且 行宽 ≠ 20」时行宽才进合成签名，所以横屏既有成片逐字节不变、仍为 `unchanged`；竖屏在 #91 发布前合成的镜头会显示 `changed`（原因「字幕排版已变化（每行 20 字 → 每行 12 字）」），重合成即可，不占 GPU。案例背景：drama 14 / episode 20（9:16）merge 29 的字幕在 544 宽画面左右被裁。
+- **视频预览返回整集**：`POST /episodes/{e}/video-batch/preview {storyboard_ids:[544]}` 实测返回了整集 22 镜的逐镜结果（其中别的镜也可能是 `changed`+`checked`）；启动 `video-batch` 前必须再按自己要做的 ID 过滤，不能把预览里所有 `checked` 原样提交（#91/#92 生产验收时因此误重出一条视频，已改选回原版）。
 
 ### S11 导出
 - 端点（**注意 router 前缀 `/merge`**）：`GET /merge/episodes/{e}/merge`、`POST /merge/episodes/{e}/merge {storyboard_ids, poster_version_id?, poster_duration?}`、`GET /merge/episodes/{e}/merges`、`DELETE /merge/episodes/{e}/merges/{mergeId}`。
