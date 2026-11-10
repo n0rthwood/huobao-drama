@@ -8,10 +8,28 @@ const {
   renderSrt,
   splitChunks,
   splitSentences,
+  subtitleCharsPerLine,
   transformCues,
   SUBTITLE_MAX_CHARS_PER_LINE,
   SUBTITLE_MAX_CHARS_PER_CUE,
+  SUBTITLE_WRAP_MAX_LINES,
 } = await import('../src/services/subtitle.ts')
+
+/** Issue #91 之前的实现，原样保留用于逐字节对比 */
+function legacyLayoutCueText(chunk) {
+  const CLAUSE_BREAK = '，、：,:—…'
+  const SENTENCE_END = '。！？；!?;'
+  if (chunk.length <= 20) return chunk
+  let cut = -1
+  for (let i = 19; i >= 10; i--) {
+    if (CLAUSE_BREAK.includes(chunk[i]) || SENTENCE_END.includes(chunk[i])) {
+      cut = i + 1
+      break
+    }
+  }
+  if (cut <= 0) cut = 20
+  return `${chunk.slice(0, cut)}\n${chunk.slice(cut)}`
+}
 
 const TEXT = '一七二〇年，清、准、俄三方，都在这片草原上押下重注。同一张棋盘上，两场远征同时开局。'
 
@@ -37,6 +55,45 @@ test('layoutCueText 超过单行上限时折成两行', () => {
   assert.equal(lines.length, 2)
   assert.ok(lines.every(line => line.length <= SUBTITLE_MAX_CHARS_PER_LINE))
   assert.equal(laid.replace('\n', ''), chunk)
+})
+
+test('subtitleCharsPerLine 按输出画面决定行宽（生产 ffmpeg 实测标定）', () => {
+  assert.equal(subtitleCharsPerLine(960, 544), 20)
+  assert.equal(subtitleCharsPerLine(544, 960), 12)
+  assert.equal(subtitleCharsPerLine(768, 768), 20)
+  // 竖屏介于两者之间、永远不超过旧上限；尺寸不可用时回落默认
+  assert.ok(subtitleCharsPerLine(720, 1280) >= 12 && subtitleCharsPerLine(720, 1280) <= 20)
+  assert.equal(subtitleCharsPerLine(0, 0), 20)
+})
+
+test('layoutCueText 在 20 字/行时与旧实现逐字节一致', () => {
+  const cases = [
+    '甲'.repeat(25),
+    '甲'.repeat(40),
+    '短句',
+    '甲'.repeat(16) + '，' + '乙'.repeat(23), // 断点落在 [10,19] 窗口内，旧实现第二行超过 20 字
+    '一七二〇年，清、准、俄三方，都在这片草原上押下重注，同一张棋盘上两场远征同时开局。',
+    '前十个字就断，' + '丙'.repeat(33),
+  ]
+  for (const chunk of cases) {
+    assert.equal(layoutCueText(chunk), legacyLayoutCueText(chunk), chunk)
+    assert.equal(layoutCueText(chunk, SUBTITLE_MAX_CHARS_PER_LINE), legacyLayoutCueText(chunk), chunk)
+  }
+})
+
+test('layoutCueText 窄画面折成 ≤4 行，不丢字不改字，优先在标点处断行', () => {
+  const chunk = '一七二〇年，清、准、俄三方，都在这片草原上押下重注，两场远征同时开局。'
+  const lines = layoutCueText(chunk, 12).split('\n')
+  assert.ok(lines.length >= 3 && lines.length <= SUBTITLE_WRAP_MAX_LINES)
+  assert.equal(lines.join(''), chunk)
+  for (const line of lines) assert.ok(line.length <= 12, line)
+  // 40 字满条在 12 字/行下仍放得进 4 行
+  const full = layoutCueText('甲'.repeat(SUBTITLE_MAX_CHARS_PER_CUE), 12).split('\n')
+  assert.equal(full.length, SUBTITLE_WRAP_MAX_LINES)
+  assert.equal(full.join(''), '甲'.repeat(SUBTITLE_MAX_CHARS_PER_CUE))
+  for (const line of full) assert.ok(line.length <= 12)
+  // 断点优先级：窗口内最靠后的标点
+  assert.deepEqual(layoutCueText('一二三四五六，七八九十甲乙丙丁戊己', 12).split('\n'), ['一二三四五六，', '七八九十甲乙丙丁戊己'])
 })
 
 test('比例分配：cue 文本拼接等于原文，末条不超过配音时长', () => {

@@ -366,3 +366,32 @@ test('documentary v4 tracks junction hash and adopted generated version independ
   for (const field of ['junction', 'video', 'order']) assert.notEqual(got[field], got.base)
   assert.ok(got.junctionDiff.some(reason => reason.includes('衔接帧')))
 })
+
+test('compose 快照 #91：竖屏字幕行宽进签名，横屏与不烧录镜头签名逐字节不变', () => {
+  const got = run(`
+    const landscape = {
+      video_src: 'static/videos/a.mp4', audio_src: 'static/narration/a.mp3',
+      subtitle_src: 'static/narration/a.srt', burned: true,
+      text_sha256: 'abc', fit_key: 'pad:800', transition_t: 0,
+    }
+    const portrait = { ...landscape, subtitle_chars_per_line: 12 }
+    const pureVisual = { video_src: 'static/videos/a.mp4', audio_src: null, subtitle_src: null, burned: false, text_sha256: '', fit_key: '', transition_t: 0 }
+    out({
+      landscapeSig: composeSignatureOf(landscape),
+      portraitSig: composeSignatureOf(portrait),
+      portraitV4: composeSignatureOf({ ...portrait, combo: 'A', layer_segment: { src: 's.mp4', signature: 'sig1' } }),
+      landscapeV4: composeSignatureOf({ ...landscape, combo: 'A', layer_segment: { src: 's.mp4', signature: 'sig1' } }),
+      pureVisualSig: composeSignatureOf(pureVisual),
+      pureVisualPortraitSig: composeSignatureOf({ ...pureVisual, subtitle_chars_per_line: 12 }),
+      pureVisualDiff: describeComposeDiff({ ...pureVisual, subtitle_chars_per_line: 12 }, pureVisual),
+      diff: describeComposeDiff(portrait, landscape),
+    })
+  `)
+  // #50 测试里同一份 parts 的既有摘要常量
+  assert.equal(got.landscapeSig, 'a77ed49e620bb74708ed1711b9f52b1072edafdcb7425d8e1e52a4690d6aa8a7', '横屏（20 字/行，字段缺省）摘要与 #91 之前逐字节一致')
+  assert.notEqual(got.portraitSig, got.landscapeSig, '竖屏行宽进摘要 → 既有竖屏成片判 changed')
+  assert.notEqual(got.portraitV4, got.landscapeV4, 'v4 同样纳入行宽')
+  assert.equal(got.pureVisualPortraitSig, got.pureVisualSig, '竖屏但不烧录字幕的镜头：行宽不进摘要，保持 unchanged')
+  assert.deepEqual(got.pureVisualDiff, ['输入快照与上次合成不一致'], '不烧录时不报字幕排版变化')
+  assert.ok(got.diff.some(r => r.includes('字幕排版')))
+})
