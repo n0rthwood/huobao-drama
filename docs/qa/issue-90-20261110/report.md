@@ -29,14 +29,14 @@
 
 ## 截图（已逐张打开查看）
 
-- 工作树后端 :5689 + 生产库副本（`/tmp/qa90`），真实 DeepSeek：research、base 都是第 1 轮通过；drawing 第 1 轮因为没预览就交付被拒，第 2 轮通过；complete 采用。
+- `01-panel-agent-rounds.png`：生产面板的「模型轮次」，当前运行为 1365（要素绘制 1/3 轮，跨阶段回退 0/2），以及各阶段的记录。
 - `02-base-rejection-round.png`：「底图生成」展开后，第 1 轮被拒原因与第 2 轮采纳。
 - `03-layer-editor-same-render.png`：「编辑图层」打开后，LayerCanvas 画面与服务端成图一致，裁切工具已禁用（只打开查看，没有在生产保存）。
 - 浏览器检查：`errors` 与 console error 为 0。
 
 ## 隔离环境自测（不作为验收依据，只用于实现期）
 
-- 工作树后端 :5689 + 生产库副本（`/tmp/qa90`），真实 DeepSeek：research、base、drawing 第 1 轮都在未预览就交付时被拒，第 2 轮通过，complete 采用。
+- 工作树后端 :5689 + 生产库副本（`/tmp/qa90`），真实 DeepSeek：research、base 都是第 1 轮通过；drawing 第 1 轮因为没预览就交付被拒，第 2 轮通过；complete 采用。
 - 在隔离环境的前端里保存「编辑图层」两次（改不透明度、改偏色），均以 `map-drawing-manual` 版本采用成功。字段级拒收由单测覆盖。
 
 ## 已知问题（交人审美判断，未用代码修补）
