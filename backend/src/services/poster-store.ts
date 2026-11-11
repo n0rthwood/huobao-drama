@@ -111,3 +111,22 @@ export function posterVariablesOf(context: PosterContext): PosterVariables {
     episode_no: `EP${String(episodeNumber).padStart(2, '0')}`,
   }
 }
+
+/**
+ * Poster 集号行（`poster_project.sub`）的显示文本（Issue #96）。
+ *
+ * 变量 `episode_no` 是生产编号 `EP01`，不是规范要求的「第N集」，也不能拼上集名，
+ * 所以这里落**字面文本**：`第1集 · 漕运兴衰`。缺集号或集名时只写存在的那一段。
+ * 槽位容量放不下整行时由 `posterProjectFields` 退到 `posterEpisodeNumberLabel`。
+ */
+export function posterEpisodeLabel(episode: PosterContext['episode']): string {
+  const number = posterEpisodeNumberLabel(episode)
+  const title = String(episode.title || '').trim()
+  return [number, title].filter(Boolean).join(' · ')
+}
+
+/** 只有集号 `第N集`（规范的写法，也是集号行的兜底）。 */
+export function posterEpisodeNumberLabel(episode: PosterContext['episode']): string {
+  const episodeNumber = Number(episode.episodeNumber || 0)
+  return episodeNumber > 0 ? `第${episodeNumber}集` : ''
+}

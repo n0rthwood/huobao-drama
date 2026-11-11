@@ -18,7 +18,8 @@ import {
   savePosterDraft,
   selectPosterVersion,
 } from '../services/posters.js'
-import { startPosterConcept } from '../services/poster-concept.js'
+import { startPosterConcept, PosterPlanLegacyError } from '../services/poster-concept.js'
+import { TextLayerError } from '../services/layer-text.js'
 import { logTaskError, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
 
 const app = new Hono()
@@ -41,6 +42,21 @@ function failure(c: Parameters<typeof badRequest>[0], err: unknown, action: stri
       message: err.message,
       fields: err.fields,
     }, 409)
+  }
+  // 模板文本框有阻断问题（溢出/缺字段/同位冲突…）：拒绝出成品并逐条回给编辑器（Issue #96）
+  if (err instanceof TextLayerError) {
+    logTaskError('PosterAPI', action, { error: err.message, problems: err.problems.length })
+    return c.json({
+      code: 400,
+      error: 'text_layer_invalid',
+      message: err.message,
+      problems: err.problems,
+    }, 400)
+  }
+  // 旧构想（模型坐标/样式）不迁移：明确请用户重新生成（Issue #96）
+  if (err instanceof PosterPlanLegacyError) {
+    logTaskError('PosterAPI', action, { error: err.message })
+    return badRequest(c, err.message, { error: 'layer_plan_legacy' })
   }
   if (err instanceof PosterNotFoundError) {
     logTaskError('PosterAPI', action, { error: err.message })

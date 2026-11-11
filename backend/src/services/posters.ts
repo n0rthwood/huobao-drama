@@ -23,12 +23,15 @@ import { getDramaStylePrompt } from './style-preset.js'
 import { normalizeLayerDoc, type LayerDoc } from './layer-doc.js'
 import { renderLayerDocToFile } from './layer-render.js'
 import { resolvedText } from './layer-svg.js'
+import { POSTER_ONLY_ROLES, textLayerTexts, textLayoutById } from './layer-text.js'
 import { parseMentions } from './storyboard-assets.js'
 import { renderRefPrompt } from './task-label.js'
 import {
   compositionOf,
   compositionToLayers,
   parsePosterConcept,
+  posterLayerPlanOf,
+  PosterPlanLegacyError,
   type PosterComposition,
   type PosterConcept,
   type PosterCopy,
@@ -39,6 +42,8 @@ import {
   normalizeProvenance,
   parseJsonArray,
   parseJsonObject,
+  posterEpisodeLabel,
+  posterEpisodeNumberLabel,
   posterVariablesOf,
   type PosterField,
   type PosterProvenance,
@@ -122,6 +127,13 @@ export function buildPosterTextInstruction(doc: LayerDoc, variables: PosterVaria
     if (layer.type === 'card') {
       for (const value of [layer.fields.title, layer.fields.sub, layer.fields.meta, layer.fields.years]) {
         if (value.trim()) texts.push(value.trim())
+      }
+    }
+    // 模板文本框（Issue #96）：字段值按 role 白名单取，变量绑定现场解析
+    if (layer.type === 'text') {
+      for (const value of textLayerTexts(layer, variables)) {
+        const trimmed = value.trim()
+        if (trimmed && !texts.includes(trimmed)) texts.push(trimmed)
       }
     }
   }
@@ -607,7 +619,10 @@ export async function applyPosterConcept(
   return getPosterBundle(episodeId)
 }
 
-/** 只应用 AI 文字层：替换 `ai:` 层，保留固定变量层与人工层；重复应用不重复文字。 */
+/**
+ * 只应用 AI 文字层（Issue #96）：替换 `ai:` 层为三类模板文本框、写文档级 `text_layout`，
+ * 保留人工层与固定变量层；重复应用不重复文字。旧形状的 layer_plan 拒绝应用并要求重新生成构想。
+ */
 export async function applyPosterLayerPlan(
   episodeId: number,
   body: { composition_id?: unknown; overwrite?: unknown },
@@ -617,6 +632,12 @@ export async function applyPosterLayerPlan(
   const concept = parsePosterConcept(poster.concept)
   const composition = compositionOf(concept, body.composition_id)
   if (!concept || !composition) throw new PosterNotFoundError()
+  const plan = posterLayerPlanOf(composition)
+  if (!plan) throw new PosterPlanLegacyError()
+  const located = textLayoutById(plan.text_layout)
+  if (!located || located.medium !== 'poster') {
+    throw new Error(`构想里的版式套「${plan.text_layout || '（空）'}」不是可用的 Poster 套，请重新生成构想`)
+  }
   const provenance = normalizeProvenance(poster.provenance)
   const doc = normalizeLayerDoc(parseJsonObject(poster.layerDoc))
   const manualAiLayers = Object.entries(provenance.layers || {})
@@ -626,10 +647,16 @@ export async function applyPosterLayerPlan(
   if (conflict) throw new PosterConflictError(['layer_doc'], '图层有手动编辑，是否需要覆盖 AI 图层？')
 
   const base = { width: doc.base.width, height: doc.base.height }
-  const aiLayers = compositionToLayers(composition, base)
+  const aiLayers = compositionToLayers(composition, base, {
+    variables: posterVariablesOf(context),
+    episodeLabel: posterEpisodeLabel(context.episode),
+    episodeLabelShort: posterEpisodeNumberLabel(context.episode),
+  })
+  const missing = POSTER_ONLY_ROLES.filter(role => !aiLayers.some(layer => layer.type === 'text' && layer.role === role))
+  if (missing.length) throw new Error(`构想里的文字图层规划缺少 ${missing.join('、')}，请重新生成构想`)
   const retained = doc.layers.filter(layer => !layer.id.startsWith('ai:'))
   const layers = [...retained, ...aiLayers.map((layer, index) => ({ ...layer, z: retained.length + index }))]
-  const nextDoc: LayerDoc = normalizeLayerDoc({ ...doc, layers })
+  const nextDoc: LayerDoc = normalizeLayerDoc({ ...doc, text_layout: plan.text_layout, layers })
   const nextLayers: Record<string, 'ai' | 'manual'> = { ...(provenance.layers || {}) }
   for (const id of Object.keys(nextLayers)) if (!nextDoc.layers.some(layer => layer.id === id)) delete nextLayers[id]
   for (const layer of aiLayers) nextLayers[layer.id] = 'ai'
