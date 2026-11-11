@@ -5,7 +5,9 @@ description: Scene final-prompt addendum for documentary / historical subjects â
 
 # Documentary / Historical Subjects: Scene Final-Prompt Addendum
 
-This skill is injected only when the project subject is judged to be documentary / historical, and is layered on top of `scene-prompt`. The base layout (fixed-camera wide establishing shot, foreground / middle-ground / background layering, no people, `time` written out verbatim) all remains in force.
+This skill is injected only when the project subject is judged to be documentary / historical, and is layered on top of `scene-prompt`. The base layout (fixed-camera wide establishing shot, foreground / middle-ground / background layering, no people, `time` written out verbatim, the `{aspect_ratio} {composition}` returned by `read_scenes` written out verbatim) all remains in force.
+
+The aspect ratio is a hard rule: the scene image is rendered at the project aspect. In a portrait project (9:16 / 3:4) the establishing shot is organized along the height â€” a gate tower, pagoda, gatehouse or courtyard must be **fully in frame with its top not cut off**, with sky and roof depth above and ground, steps and foreground dressing below; in landscape (16:9) keep the existing left-to-right plus depth spread. A wrong orientation or a missing aspect phrase is rejected by `saveSceneFinalPrompt`.
 
 ## 1. The Period / Region / Function Triad (all three must appear)
 

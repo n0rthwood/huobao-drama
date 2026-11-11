@@ -48,7 +48,8 @@ const dramaId = Number(db.insert(schema.dramas).values({ title:'documentary', pr
 const dramaOnlyId = Number(db.insert(schema.dramas).values({ title:'drama', projectType:'drama', aspectRatio:'9:16', createdAt:ts, updatedAt:ts }).run().lastInsertRowid)
 const episodeId = Number(db.insert(schema.episodes).values({ dramaId, episodeNumber:1, title:'E1', videoConfigId:configId, resolution:'480p', createdAt:ts, updatedAt:ts }).run().lastInsertRowid)
 const dramaEpisodeId = Number(db.insert(schema.episodes).values({ dramaId:dramaOnlyId, episodeNumber:1, title:'drama E1', videoConfigId:configId, resolution:'720p', createdAt:ts, updatedAt:ts }).run().lastInsertRowid)
-const png = await sharp({create:{width:32,height:32,channels:3,background:'#456789'}}).png().toBuffer()
+// 底图按成片比例（#94）：比例不符的底图是 contain 留白，必须先过视觉验证才能生成视频
+const png = await sharp({create:{width:32,height:18,channels:3,background:'#456789'}}).png().toBuffer()
 for (const folder of ['images','layer-frames','layer-segments']) mkdirSync(path.join(process.env.STORAGE_PATH,folder),{recursive:true})
 for (const name of ['first','mid','last']) writeFileSync(path.join(process.env.STORAGE_PATH,'images',name+'.png'),png)
 // #70：纪录片逐镜制作要求本镜有当前有效配音；这里只补事实，门禁不放松。

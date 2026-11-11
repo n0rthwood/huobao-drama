@@ -5,6 +5,7 @@
  * narrationMarkup.js）。编辑器直接把本函数的输出插进画布，服务端把同一份输出
  * 交给 sharp 合成，所以「所见即所得」是结构保证。
  */
+import { baseFrameOf } from './layerQuality.js'
 
 export const LINE_HEIGHT_EM = 1.35
 export const BASELINE_EM = 0.88
@@ -245,8 +246,9 @@ function dashArray(kind, strokeWidth) {
 /**
  * 图层的归一化包围盒：编辑器选择框、旋转中心、吸附参考线共用同一口径。
  * marker 把标签文字算进去（选择框要能框住文字）。
+ * `aspect` = 世界宽/世界高；`unitRatio` = 尺寸单位 / 世界高（contain 留白时世界比取景框大）。
  */
-export function layerBounds(layer, theme, aspect = 16 / 9, variables) {
+export function layerBounds(layer, theme, aspect = 16 / 9, variables, unitRatio = 1) {
   if (layer.type === 'polygon' || layer.type === 'polyline') {
     const xs = layer.points.map(p => p[0])
     const ys = layer.points.map(p => p[1])
@@ -255,8 +257,8 @@ export function layerBounds(layer, theme, aspect = 16 / 9, variables) {
     return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y }
   }
   if (layer.type === 'marker') {
-    const radius = styleOf(layer, theme, 'dot_radius')
-    const size = styleOf(layer, theme, 'size')
+    const radius = styleOf(layer, theme, 'dot_radius') * unitRatio
+    const size = styleOf(layer, theme, 'size') * unitRatio
     const legacyOffset = styleOf(layer, theme, 'label_offset')
     const offset = [Number(layer.style.label_dx ?? legacyOffset[0]), Number(layer.style.label_dy ?? legacyOffset[1])]
     const [cx, cy] = layer.at
@@ -321,7 +323,7 @@ function arrowHead(from, to, width, color) {
 
 function emitPolygon(layer, ctx) {
   const points = layer.points.map(p => `${fmt(p[0] * ctx.width)},${fmt(p[1] * ctx.height)}`).join(' ')
-  const strokeWidth = styleOf(layer, ctx.theme, 'stroke_width') * ctx.height
+  const strokeWidth = styleOf(layer, ctx.theme, 'stroke_width') * ctx.unit
   const dash = dashArray(styleOf(layer, ctx.theme, 'dash'), strokeWidth)
   const stroke = strokeWidth > 0
     ? ` stroke="${esc(styleOf(layer, ctx.theme, 'stroke'))}" stroke-width="${fmt(strokeWidth)}" stroke-linejoin="round"${dash ? ` stroke-dasharray="${dash}"` : ''}`
@@ -333,7 +335,7 @@ function emitPolygon(layer, ctx) {
 function emitPolyline(layer, ctx) {
   const pixels = layer.points.map(p => [p[0] * ctx.width, p[1] * ctx.height])
   const points = pixels.map(p => `${fmt(p[0])},${fmt(p[1])}`).join(' ')
-  const width = styleOf(layer, ctx.theme, 'width') * ctx.height
+  const width = styleOf(layer, ctx.theme, 'width') * ctx.unit
   const color = styleOf(layer, ctx.theme, 'stroke')
   const dash = dashArray(styleOf(layer, ctx.theme, 'dash'), width)
   let out = `<polyline points="${points}" fill="none" stroke="${esc(color)}" stroke-width="${fmt(width)}"`
@@ -350,10 +352,10 @@ function emitPolyline(layer, ctx) {
 function emitMarker(layer, ctx) {
   const cx = layer.at[0] * ctx.width
   const cy = layer.at[1] * ctx.height
-  const radius = styleOf(layer, ctx.theme, 'dot_radius') * ctx.height
+  const radius = styleOf(layer, ctx.theme, 'dot_radius') * ctx.unit
   const color = styleOf(layer, ctx.theme, 'color')
   const stroke = styleOf(layer, ctx.theme, 'stroke')
-  const size = styleOf(layer, ctx.theme, 'size') * ctx.height
+  const size = styleOf(layer, ctx.theme, 'size') * ctx.unit
   const legacyOffset = styleOf(layer, ctx.theme, 'label_offset')
   const offset = [Number(layer.style.label_dx ?? legacyOffset[0]), Number(layer.style.label_dy ?? legacyOffset[1])]
   let out = `<circle cx="${fmt(cx)}" cy="${fmt(cy)}" r="${fmt(radius)}" fill="${esc(color)}"`
@@ -380,7 +382,7 @@ function emitLabel(layer, ctx) {
   const y = box.y * ctx.height
   const w = box.w * ctx.width
   const h = box.h * ctx.height
-  const size = styleOf(layer, ctx.theme, 'size') * ctx.height
+  const size = styleOf(layer, ctx.theme, 'size') * ctx.unit
   const bgOpacity = styleOf(layer, ctx.theme, 'bg_opacity')
   const pad = bgOpacity > 0 ? size * 0.3 : 0
   const align = styleOf(layer, ctx.theme, 'align')
@@ -407,7 +409,7 @@ function emitLabel(layer, ctx) {
     color: styleOf(layer, ctx.theme, 'color'),
     align,
     stroke: styleOf(layer, ctx.theme, 'stroke'),
-    strokeWidth: styleOf(layer, ctx.theme, 'stroke_width') * ctx.height,
+    strokeWidth: styleOf(layer, ctx.theme, 'stroke_width') * ctx.unit,
     italic: Boolean(styleOf(layer, ctx.theme, 'italic')),
     shadow,
     shadowFilterId,
@@ -467,8 +469,8 @@ function emitImage(layer, ctx) {
   const y = layer.box.y * ctx.height
   const w = layer.box.w * ctx.width
   const h = layer.box.h * ctx.height
-  const radius = styleOf(layer, ctx.theme, 'radius') * ctx.height
-  const borderWidth = styleOf(layer, ctx.theme, 'border_width') * ctx.height
+  const radius = styleOf(layer, ctx.theme, 'radius') * ctx.unit
+  const borderWidth = styleOf(layer, ctx.theme, 'border_width') * ctx.unit
   const clipId = `clip-${layer.id}`
   ctx.defs.push(
     `<clipPath id="${esc(clipId)}"><rect x="${fmt(x)}" y="${fmt(y)}" width="${fmt(w)}" height="${fmt(h)}" rx="${fmt(radius)}"/></clipPath>`,
@@ -478,7 +480,7 @@ function emitImage(layer, ctx) {
     const shadowId = `shadow-${layer.id}`
     ctx.defs.push(
       `<filter id="${esc(shadowId)}" x="-20%" y="-20%" width="140%" height="140%">`
-      + `<feDropShadow dx="0" dy="${fmt(ctx.height * 0.006)}" stdDeviation="${fmt(ctx.height * 0.006)}" flood-color="#000000" flood-opacity="0.45"/></filter>`,
+      + `<feDropShadow dx="0" dy="${fmt(ctx.unit * 0.006)}" stdDeviation="${fmt(ctx.unit * 0.006)}" flood-color="#000000" flood-opacity="0.45"/></filter>`,
     )
     filter = ` filter="url(#${esc(shadowId)})"`
   }
@@ -540,23 +542,39 @@ export function baseFilterLayers(filter, size) {
 }
 
 /**
+ * SVG 的世界坐标系（与后端 svgWorldOf 同源）：
+ * - cover 且无裁切 → 世界 = 输出画布；
+ * - 有裁切或 contain 留白 → 世界 = 源图像素，取景（可为负）进 viewBox，等比缩放。
+ * 标量尺寸单位：contain 时取取景框的像素高度，仍然等于「成片高度的比例」。
+ */
+export function svgWorldOf(doc, size) {
+  const { mode, frame } = baseFrameOf(doc.base, size)
+  const native = Boolean(doc.base.crop) || mode === 'contain'
+  const width = native ? (doc.base.source_width || doc.base.width) : size.width
+  const height = native ? (doc.base.source_height || doc.base.height) : size.height
+  return { width, height, unit: mode === 'contain' ? frame.h * height : height, view: native ? frame : { x: 0, y: 0, w: 1, h: 1 }, native }
+}
+
+/**
  * 文档 → 叠加层 SVG（不含底图；底图由服务端 sharp 或编辑器的 <img> 承载）。
  * `visibleIds` 只渲染给定图层；`opacity` 按图层 id 叠乘不透明度（淡入淡出）；
- * `viewport`（归一化 0–1）把取景框搬进 viewBox——Ken Burns 推近时图层与底图同步放大（#50）。
+ * `viewport`（整图归一化）把取景框搬进 viewBox——Ken Burns 推近时图层与底图同步放大（#50）。
  */
 export function layerDocToSvg(doc, size, options = {}) {
-  // Cropped documents live in native whole-image geometry; output size is only the SVG surface.
-  const worldWidth = doc.base.crop ? (doc.base.source_width || doc.base.width) : size.width
-  const worldHeight = doc.base.crop ? (doc.base.source_height || doc.base.height) : size.height
+  const world = svgWorldOf(doc, size)
+  const worldWidth = world.width
+  const worldHeight = world.height
   const ctx = {
     width: worldWidth,
     height: worldHeight,
+    unit: world.unit,
     theme: doc.theme,
     defs: [],
     resolveImage: options.resolveImage || (path => path),
     variables: options.variables,
   }
   const aspect = worldWidth / worldHeight
+  const unitRatio = world.unit / worldHeight
   const body = []
   for (const layer of doc.layers) {
     if (!layer.visible) continue
@@ -572,7 +590,7 @@ export function layerDocToSvg(doc, size, options = {}) {
     else if (layer.type === 'card') inner = emitCard(layer, ctx)
     else if (layer.type === 'image') inner = emitImage(layer, ctx)
     if (!inner) continue
-    const bounds = layerBounds(layer, doc.theme, aspect, options.variables)
+    const bounds = layerBounds(layer, doc.theme, aspect, options.variables, unitRatio)
     const cx = (bounds.x + bounds.w / 2) * worldWidth
     const cy = (bounds.y + bounds.h / 2) * worldHeight
     const transform = layer.rotation ? ` transform="rotate(${fmt(layer.rotation)} ${fmt(cx)} ${fmt(cy)})"` : ''
@@ -580,10 +598,10 @@ export function layerDocToSvg(doc, size, options = {}) {
     body.push(`<g data-layer="${esc(layer.id)}"${opacity}${transform}>${inner}</g>`)
   }
   const defs = ctx.defs.length ? `<defs>${ctx.defs.join('')}</defs>` : ''
-  const view = options.viewport || doc.base.crop
-  const viewBox = view
-    ? `${fmt(view.x * worldWidth)} ${fmt(view.y * worldHeight)} ${fmt(view.w * worldWidth)} ${fmt(view.h * worldHeight)}`
-    : `0 0 ${worldWidth} ${worldHeight}`
+  const view = options.viewport || world.view
+  const viewBox = `${fmt(view.x * worldWidth)} ${fmt(view.y * worldHeight)} ${fmt(view.w * worldWidth)} ${fmt(view.h * worldHeight)}`
+  // 世界 = 输出画布时取景是正方（比例已对齐），只有旧的非方取景才需要拉伸兜底
+  const stretch = !world.native && view.w !== view.h ? ' preserveAspectRatio="none"' : ''
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size.width}" height="${size.height}"`
-    + ` viewBox="${viewBox}"${doc.base.crop || (view && view.w !== view.h) ? ' preserveAspectRatio="none"' : ''}>${defs}${body.join('')}</svg>`
+    + ` viewBox="${viewBox}"${stretch}>${defs}${body.join('')}</svg>`
 }

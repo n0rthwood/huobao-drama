@@ -39,6 +39,8 @@ export const AI_STAGES = {
   asset_curate: { vision: true, label: '资料图像筛选' },
   /** read_image 工具本身 */
   read_image: { vision: true, label: '读图工具' },
+  /** 图层底图视觉验证（Issue #94）：看裁切/留白后的无字取景画面，判主体完整、取景合理、无变形 */
+  layer_base_check: { vision: true, label: '图层底图视觉验证' },
 
   // ── 不需要视觉 ────────────────────────────────────────────
   /** 剧情项目拆分分镜：纯剧本文本；绝对图像优先规则下不描述外观 */
@@ -99,6 +101,8 @@ export const AI_CALL_SITES: Record<string, AiStage[]> = {
   'services/poster-concept.ts': ['poster_concept'],
   'services/adapters/h3-prompt.ts': ['h3_prompt'],
   'services/asset-semantics-auto.ts': ['asset_semantics'],
+  // 图层底图视觉验证（#94）：渲染成功后自动核验裁切/留白结果
+  'services/layer-base-check.ts': ['layer_base_check'],
   // 资产流水线（#56）：资料研究 / 事实表（纯文本）+ QC 清单核验（视觉）
   'services/asset-pipeline/steps.ts': ['asset_spec', 'asset_qc'],
   // 资料检索（#79）：检索计划/预筛（文本）+ 候选图筛选（视觉）

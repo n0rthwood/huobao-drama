@@ -50,6 +50,8 @@ export interface RetryOptions {
 interface StoredParams {
   config_id?: number
   size?: string
+  /** 画幅锁定（Issue #94）：重试必须照样锁，否则重试一次就退回「跟随参考图比例」 */
+  aspect_locked?: boolean
   frameType?: string
   referenceImages?: string[]
   sourcePrompt?: string
@@ -121,6 +123,7 @@ async function retryImage(row: SysTaskRow, opts: RetryOptions): Promise<number> 
     prompt: promptForRetry(row, params, 'image', config.provider),
     model: opts.model || (opts.configId ? undefined : row.model || undefined),
     size: params.size,
+    aspectLocked: params.aspect_locked === true,
     referenceImages: params.referenceImages,
     frameType: params.frameType,
     configId: config.id,

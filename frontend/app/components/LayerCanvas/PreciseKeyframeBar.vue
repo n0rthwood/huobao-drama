@@ -12,7 +12,7 @@
     <input class="pk-scrub" :aria-label="t('episode.segment.time')" type="range" min="0" :max="duration" step="0.02" :value="time" @input="emit('update:time', Number($event.target.value))">
     <div class="pk-track">
       <button v-for="(frame, index) in timeline.keyframes" :key="index" class="pk-frame" :class="{selected:index === selectedIndex, junction:isJunction(index)}" :aria-pressed="index === selectedIndex" :title="`${frame.t.toFixed(2)}s · ${frame.ease || timeline.ease} · ${frame.fade_ms ?? timeline.fade_ms}ms`" @click="selectFrame(index)">
-        <div class="pk-thumbnail"><div :style="thumbnailStyle(frame)"><img v-if="baseSrc && !baseFailed" :src="baseSrc" alt="" draggable="false" @error="baseFailed = true"><div v-html="thumbnailSvg(frame)" /></div></div>
+        <div class="pk-thumbnail"><div :style="thumbnailStyle(frame)"><img v-if="baseSrc && !baseFailed" :src="baseSrc" :style="thumbnailBaseStyle" alt="" draggable="false" @error="baseFailed = true"><div v-html="thumbnailSvg(frame)" /></div></div>
         <span class="pk-diamond"><Diamond :size="18" /><Lock v-if="isJunction(index)" :size="11" /><i v-if="quality.some(q => q.frame_index === index)" class="pk-low" /></span>
         <span>{{ frame.t.toFixed(2) }}s</span><small v-if="isJunction(index)">{{ t('layerCanvas.keyframeBar.junction') }}</small>
       </button>
@@ -21,7 +21,7 @@
     <p v-if="junctionTextCount" class="pk-warning"><TriangleAlert :size="14" />{{ t('layerCanvas.keyframeBar.junctionTextWarn', {n:junctionTextCount}) }}</p>
     <div v-if="current" class="pk-inspector">
       <label>{{ t('episode.segment.time') }}<input :aria-label="t('episode.segment.time')" type="number" min="0" :max="duration" step="0.1" :disabled="selectedIndex === 0" :value="current.t" @change="setTime($event.target.value)"></label>
-      <fieldset><legend><button type="button" class="btn btn-sm" @click="emit('viewport-pick')">{{ t('layerCanvas.keyframeBar.viewportPick') }}</button></legend><label v-for="key in ['x','y','w','h']" :key="key">{{ key }}<input :aria-label="`${t('layerCanvas.keyframeBar.viewportPick')} ${key}`" type="number" min="0" max="1" step="0.01" :value="current.viewport[key]" @change="setViewport(key, Number($event.target.value))"></label></fieldset>
+      <fieldset><legend><button type="button" class="btn btn-sm" @click="emit('viewport-pick')">{{ t('layerCanvas.keyframeBar.viewportPick') }}</button></legend><label v-for="key in ['x','y','w','h']" :key="key">{{ key }}<input :aria-label="`${t('layerCanvas.keyframeBar.viewportPick')} ${key}`" type="number" min="-3" max="7" step="0.01" :value="current.viewport[key]" @change="setViewport(key, Number($event.target.value))"></label></fieldset>
       <fieldset class="pk-visible"><legend>{{ t('layerCanvas.keyframeBar.visible') }}</legend><label v-for="layer in doc.layers" :key="layer.id"><input type="checkbox" :checked="current.visible.includes(layer.id)" @change="toggleVisible(layer.id, $event.target.checked)">{{ layer.name || layer.id }}</label></fieldset>
       <fieldset><legend>{{ t('layerCanvas.keyframeBar.ease') }}</legend><select :value="current.ease || ''" @change="patchFrame({ease:$event.target.value || undefined})"><option value="">{{ t('episode.segment.inherit') }}</option><option value="linear">{{ t('episode.segment.easeLinear') }}</option><option value="inout">{{ t('episode.segment.easeInout') }}</option></select><label>{{ t('layerCanvas.keyframeBar.fade') }}<input :aria-label="t('layerCanvas.keyframeBar.fade')" type="number" min="0" max="3000" step="50" :value="current.fade_ms ?? timeline.fade_ms" @change="patchFrame({fade_ms:Math.max(0,Math.min(3000,Number($event.target.value)))})">ms</label></fieldset>
     </div>
@@ -33,6 +33,7 @@ import { useI18n } from 'vue-i18n'
 import { Copy, Diamond, DiamondPlus, Info, Lock, Trash2, TriangleAlert, X } from 'lucide-vue-next'
 import { layerDocToSvg } from '~/utils/layerSvg'
 import { endHoldOf, clampSegmentDuration, normalizeViewport, SEGMENT_MAX_KEYFRAMES } from '~/utils/segmentTimeline'
+import { baseFrameOf } from '~/utils/layerQuality'
 import { mediaUrl } from '~/utils/url'
 const props = defineProps({timeline:{type:Object,required:true}, duration:{type:Number,required:true}, doc:{type:Object,required:true}, spec:{type:Object,required:true}, junction:{type:Object,default:null}, quality:{type:Array,default:()=>[]}, selectedIndex:{type:Number,default:0}, time:{type:Number,default:0}})
 const emit = defineEmits(['update:timeline','update:duration','update:time','update:selectedIndex','select-frame','history','viewport-pick'])
@@ -53,18 +54,24 @@ function addFrame(copy){const previous=copy ? props.timeline.keyframes[Math.max(
 function removeFrame(){if(props.selectedIndex===0)return;const frames=props.timeline.keyframes.filter((_,i)=>i!==props.selectedIndex);updateFrames(frames,Math.max(0,props.selectedIndex-1))}
 function patchFrame(patch){if(!current.value)return;const frame={...current.value,...patch};for(const k of ['ease','fade_ms'])if(frame[k]===undefined)delete frame[k];updateFrames(props.timeline.keyframes.map((f,i)=>i===props.selectedIndex?frame:f),props.selectedIndex)}
 function setTime(raw){patchFrame({t:Math.max(0,Math.min(props.duration,Number(raw)||0))})}
+/** 取景比例永远 = 成片比例（取景框比例）：改宽高时按取景框联动，再按取景框夹取 */
 function setViewport(key, value) {
+  const frame = baseFrameOf(props.doc.base, props.spec).frame
   const viewport = {...current.value.viewport, [key]:value}
-  const crop = props.doc.base.crop || {w:1,h:1}
-  if (key === 'w') viewport.h = value * crop.h / crop.w
-  if (key === 'h') viewport.w = value * crop.w / crop.h
-  patchFrame({viewport:normalizeViewport(viewport,props.doc.base.crop)})
+  if (key === 'w') viewport.h = value * frame.h / frame.w
+  if (key === 'h') viewport.w = value * frame.w / frame.h
+  patchFrame({viewport:normalizeViewport(viewport, frame)})
 }
 function toggleVisible(id,on){patchFrame({visible:on?[...current.value.visible.filter(v=>v!==id),id]:current.value.visible.filter(v=>v!==id)})}
 function changeDuration(raw){const duration=clampSegmentDuration(raw,30);emit('history');emit('update:duration',duration);emit('update:timeline',{...props.timeline,keyframes:props.timeline.keyframes.map(f=>({...f,t:Math.min(f.t,duration)}))})}
+/** 缩略图里底图只占 bounds（= crop，缺省整图）：contain 留白带留空，不拉伸 */
+const thumbnailBaseStyle = computed(() => {
+  const box = baseFrameOf(props.doc.base, props.spec).bounds
+  return { left: `${box.x * 100}%`, top: `${box.y * 100}%`, width: `${box.w * 100}%`, height: `${box.h * 100}%` }
+})
 function thumbnailStyle(frame){const v=frame.viewport;return{position:'absolute',width:`${100/v.w}%`,height:`${100/v.h}%`,left:`${-100*v.x/v.w}%`,top:`${-100*v.y/v.h}%`}}
 function thumbnailSvg(frame){return layerDocToSvg(props.doc,props.spec,{viewport:{x:0,y:0,w:1,h:1},visibleIds:frame.visible,resolveImage:mediaUrl})}
 </script>
 <style scoped>
-.pk-bar{border:1px solid var(--border);border-radius:8px;padding:12px;background:var(--bg-2);min-width:0}.pk-controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.pk-controls label{margin-left:auto}.pk-bar input[type=number]{width:64px;background:var(--bg-1);border:1px solid var(--border);border-radius:4px;padding:4px;color:var(--text-1)}.pk-scrub{width:100%;margin:14px 0}.pk-track{display:flex;align-items:flex-end;gap:16px;overflow-x:auto;padding:4px 4px 12px;border-bottom:1px solid var(--border)}.pk-frame{display:flex;flex:none;flex-direction:column;align-items:center;gap:4px;width:90px;border:1px solid transparent;border-radius:6px;padding:5px;color:var(--text-2);background:transparent}.pk-frame.selected{border-color:var(--accent);background:var(--bg-3)}.pk-frame.junction .pk-diamond{outline:2px solid var(--accent);border-radius:50%}.pk-thumbnail{height:48px;width:80px;position:relative;overflow:hidden;background:var(--bg-1)}.pk-thumbnail img,.pk-thumbnail :deep(svg),.pk-thumbnail>div>div{position:absolute;width:100%;height:100%;inset:0}.pk-thumbnail img{object-fit:fill}.pk-diamond{position:relative;display:flex;align-items:center;gap:2px}.pk-low{width:7px;height:7px;border-radius:50%;background:#d69b29;position:absolute;right:-5px;top:0}.pk-end{margin-left:auto;align-self:center;white-space:nowrap}.pk-inspector{display:grid;grid-template-columns:90px 1fr 1fr 1fr;gap:12px;padding-top:12px}.pk-inspector fieldset{border:1px solid var(--border);border-radius:5px;display:flex;gap:5px;flex-wrap:wrap;min-width:0}.pk-inspector label{display:flex;gap:4px;align-items:center;flex-wrap:wrap;font-size:11px}.pk-inspector legend{font-size:11px;color:var(--text-3)}.pk-visible{max-height:110px;overflow:auto}.pk-teach,.pk-warning{display:flex;align-items:center;gap:8px;font-size:12px;line-height:1.6;padding:8px;background:var(--bg-3);border-radius:5px;margin-bottom:10px}.pk-warning{color:var(--warning)}.pk-teach .btn{margin-left:auto;flex:none}
+.pk-bar{border:1px solid var(--border);border-radius:8px;padding:12px;background:var(--bg-2);min-width:0}.pk-controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.pk-controls label{margin-left:auto}.pk-bar input[type=number]{width:64px;background:var(--bg-1);border:1px solid var(--border);border-radius:4px;padding:4px;color:var(--text-1)}.pk-scrub{width:100%;margin:14px 0}.pk-track{display:flex;align-items:flex-end;gap:16px;overflow-x:auto;padding:4px 4px 12px;border-bottom:1px solid var(--border)}.pk-frame{display:flex;flex:none;flex-direction:column;align-items:center;gap:4px;width:90px;border:1px solid transparent;border-radius:6px;padding:5px;color:var(--text-2);background:transparent}.pk-frame.selected{border-color:var(--accent);background:var(--bg-3)}.pk-frame.junction .pk-diamond{outline:2px solid var(--accent);border-radius:50%}.pk-thumbnail{height:48px;width:80px;position:relative;overflow:hidden;background:var(--bg-1)}.pk-thumbnail :deep(svg),.pk-thumbnail>div>div{position:absolute;width:100%;height:100%;inset:0}.pk-thumbnail img{position:absolute}.pk-diamond{position:relative;display:flex;align-items:center;gap:2px}.pk-low{width:7px;height:7px;border-radius:50%;background:#d69b29;position:absolute;right:-5px;top:0}.pk-end{margin-left:auto;align-self:center;white-space:nowrap}.pk-inspector{display:grid;grid-template-columns:90px 1fr 1fr 1fr;gap:12px;padding-top:12px}.pk-inspector fieldset{border:1px solid var(--border);border-radius:5px;display:flex;gap:5px;flex-wrap:wrap;min-width:0}.pk-inspector label{display:flex;gap:4px;align-items:center;flex-wrap:wrap;font-size:11px}.pk-inspector legend{font-size:11px;color:var(--text-3)}.pk-visible{max-height:110px;overflow:auto}.pk-teach,.pk-warning{display:flex;align-items:center;gap:8px;font-size:12px;line-height:1.6;padding:8px;background:var(--bg-3);border-radius:5px;margin-bottom:10px}.pk-warning{color:var(--warning)}.pk-teach .btn{margin-left:auto;flex:none}
 </style>

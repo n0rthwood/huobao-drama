@@ -219,8 +219,11 @@ Body：`{episode_id, text_config_id?, force?}`
 
 ### `POST /scenes/{id}/generate-image`、`POST /props/{id}/generate-image`、`POST /characters/{id}/generate-image` [R]
 Body：`{episode_id?, config_id?, model?}`
-用途：提交图片生成任务（异步）。角色定妆照固定 1920×1080；场景/道具按配置。
+用途：提交图片生成任务（异步）。角色定妆照固定 1920×1080、道具 1024×1024；场景按项目画幅（Issue #94：16:9=1920×1080、9:16=1080×1920、4:3=1664×1248、3:4=1248×1664、1:1=1440×1440，任务带 `aspect_locked`，出图比例偏差 >2% 判失败）。
 返回任务；用 `GET /tasks/{id}` 跟到 completed，再下载实际图片查看。
+
+### `POST /scenes/{id}/aspect-version`、`POST /props/{id}/aspect-version`、`POST /characters/{id}/aspect-version` [S]
+Body：`{episode_id, config_id?}` → `{task_id, size}`。Issue #94：以当前图为唯一参考、按项目画幅（场景尺寸表）重出一版并成为当前图；用于被图层当底图但比例与成片不符的资产。400 `{code,message,error}`：忠实素材、地图道具、无图、已是项目画幅。计 GPU 图片额度。
 
 ### `PUT /props/{id}/faithful-source` [R]
 Body：`{version_task_id}`；把某个已登记版本标为忠实原件来源。
@@ -567,6 +570,10 @@ Body 四选一/组合：`{layer_doc?, timeline?, duration?, base_ref?}`
 ### `POST /layer-segments/storyboards/{id}/render` [R]
 用途：同步渲染 mp4 + 出衔接帧，建 `sys_task`。返回 `{task_id, spec, segment, junction, keyframes_invalidated}`。
 注意：重渲改变 junction hash 会让已确认关键帧失效；必须重新确认。
+渲染后若底图有裁切或为 contain（`baseFrameOf`，Issue #94），自动起 `layer_base_check` 视觉验证文本任务；未通过前衔接帧不可用、视频/合成阻断。
+
+### `POST /layer-segments/storyboards/{id}/base-check`、`POST /layer-segments/storyboards/{id}/base-check/override` [S]
+Issue #94。前者重跑底图视觉验证；后者 `{reason}`（必填）人工放行，属于人决定端点。`GET /layer-segments/storyboards/{id}` 返回 `base_check{required,signature,status: pending|passed|failed|error|overridden,problems,notes,task_id,config_id,model,checked_at,override_reason}`、`base_check_required`、`base_check_satisfied`。
 
 ### `GET /layer-segments/storyboards/{id}/thumbnail/{which}` [R]
 `which`：`first|last|frame-<index>`。用途：实际查看文字排版/几何，不能只看 render 200。

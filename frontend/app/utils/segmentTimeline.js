@@ -8,7 +8,7 @@
  * 逐帧覆盖：某关键帧的 `ease` 覆盖「本帧 → 下一帧」这一区间的插值缓动；
  * 目标帧的 `fade_ms` 覆盖到达该帧时的淡入淡出时长。两者缺省时沿用 timeline 级的值。
  */
-import { clampViewportToCrop, normalizeCrop } from './layerQuality.js'
+import { clampViewportToBox, normalizeFrameBox } from './layerQuality.js'
 
 export const SEGMENT_DEFAULT_FADE_MS = 400
 export const SEGMENT_MAX_KEYFRAMES = 60
@@ -39,13 +39,13 @@ export function clampSegmentDuration(seconds, maxSeconds = SEGMENT_MAX_SECONDS) 
 }
 
 /**
- * 未裁切沿用同比例方框；裁切时坐标仍相对整图，以 crop 的原图像素比例约束取景。
- * 与后端 normalizeViewport(raw, crop?) 同口径，不把取景转换为 crop 相对坐标。
+ * 给定取景框（frame，可超出 [0,1]）时按取景框比例约束取景；没有取景框信息时沿用同比例方框。
+ * 与后端 normalizeViewport(raw, frame?) 同口径，不把取景转换为 crop 相对坐标。
  */
-export function normalizeViewport(raw, crop) {
-  const bounds = normalizeCrop(crop)
+export function normalizeViewport(raw, frame) {
+  const bounds = normalizeFrameBox(frame)
   if (bounds.x !== 0 || bounds.y !== 0 || bounds.w !== 1 || bounds.h !== 1) {
-    return clampViewportToCrop(raw, bounds).viewport
+    return clampViewportToBox(raw, bounds).viewport
   }
   const source = Array.isArray(raw) && raw.length >= 4
     ? { x: raw[0], y: raw[1], w: raw[2], h: raw[3] }
@@ -55,6 +55,8 @@ export function normalizeViewport(raw, crop) {
   const y0 = numberOf(source.y, 0)
   const w0 = numberOf(source.w, 1)
   const h0 = numberOf(source.h, 1)
+  // 超出整图的取景只可能来自 contain 留白（#94）：原样清洗保留，权威归一在保存/渲染/编辑器加载时做
+  if (w0 > 1 || h0 > 1 || x0 < 0 || y0 < 0) return normalizeFrameBox({ x: x0, y: y0, w: w0, h: h0 })
   const size = clamp(Math.max(w0, h0), SEGMENT_MIN_VIEWPORT, 1)
   const cx = clamp(x0 + w0 / 2, 0, 1)
   const cy = clamp(y0 + h0 / 2, 0, 1)

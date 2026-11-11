@@ -38,6 +38,7 @@ const TEXT_KIND_LABEL: Record<TextTaskKind, string> = {
   poster_concept: 'Poster 构想',
   asset_research: '资料检索',
   map_workflow: '地图工作流',
+  layer_base_check: '图层底图视觉验证',
 }
 
 const ASSET_KIND_LABEL: Record<string, string> = {

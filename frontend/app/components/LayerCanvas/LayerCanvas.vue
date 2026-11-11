@@ -18,7 +18,7 @@
     </div>
     <div v-if="aspectIssue" class="lc-banner">
       <TriangleAlert :size="14" />{{ t('layerCanvas.base.aspectBanner', { aspect: aspectIssue.aspect }) }}
-      <button type="button" class="btn-ghost" :disabled="cropLocked || !sourceKnown" @click="startCrop">{{ t('layerCanvas.base.cropTo169') }}</button>
+      <button type="button" class="btn-ghost" :disabled="cropLocked || !sourceKnown" @click="startCrop">{{ t('layerCanvas.base.cropToOutput') }}</button>
     </div>
     <div v-if="mode === 'crop'" class="lc-banner">
       <Crop :size="14" />{{ t('layerCanvas.base.cropHelp') }}
@@ -30,8 +30,16 @@
       <div class="lc-stage" :style="stageStyle">
         <div class="lc-base-surface">
           <div class="lc-source" :style="sourceStyle">
-            <img v-if="baseSrc && !baseImageError" class="lc-base" :src="baseSrc" alt="" draggable="false" @load="onBaseLoad" @error="baseImageError = true">
-            <div v-for="filter in filterLayers" :key="filter.id" class="lc-filter" :style="filterStyle(filter)" />
+            <!-- 取景框：留白垫底（同图放大模糊）→ 底图按 bounds 等比摆放 → 底图滤镜，口径同后端栅格 -->
+            <div class="lc-frame-surface" :style="frameStyle">
+              <img v-if="baseSrc && !baseImageError && letterboxed" class="lc-backdrop" :src="baseSrc" :style="backdropStyle" alt="" draggable="false">
+            </div>
+            <div class="lc-bounds" :style="boundsStyle">
+              <img v-if="baseSrc && !baseImageError" class="lc-base" :src="baseSrc" :style="baseImageStyle" alt="" draggable="false" @load="onBaseLoad" @error="baseImageError = true">
+            </div>
+            <div class="lc-frame-surface" :style="frameStyle">
+              <div v-for="filter in filterLayers" :key="filter.id" class="lc-filter" :style="filterStyle(filter)" />
+            </div>
           </div>
         </div>
         <!-- eslint-disable-next-line vue/no-v-html -- 与后端同源的 layerDocToSvg 输出，内容已转义 -->
@@ -103,8 +111,8 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { MousePointer2, Hand, Frame, Crop, Undo2, Redo2, Magnet, ZoomIn, ZoomOut, Maximize2, TriangleAlert } from 'lucide-vue-next'
-import { baseFilterLayers, layerBounds, layerDocToSvg } from '~/utils/layerSvg'
-import { normalizeCrop } from '~/utils/layerQuality'
+import { baseFilterLayers, layerBounds, layerDocToSvg, svgWorldOf } from '~/utils/layerSvg'
+import { baseFrameOf } from '~/utils/layerQuality'
 import { apiBase, mediaUrl } from '~/utils/url'
 
 const props = defineProps({
@@ -159,7 +167,8 @@ function setMode(next) {
 
 function startCrop() {
   if (props.cropLocked || !sourceKnown.value) return
-  const ratio = (16 / 9) / (sourceDimensions.value.width / sourceDimensions.value.height)
+  // 裁框按**成片比例**（#94）：竖版项目要能裁出 9:16，写死 16:9 的时代结束了
+  const ratio = outputAspect.value / (sourceDimensions.value.width / sourceDimensions.value.height)
   const w = Math.min(1, ratio)
   const h = w / ratio
   cropDraft.value = props.doc.base.crop ? { ...props.doc.base.crop } : { x: (1 - w) / 2, y: (1 - h) / 2, w, h }
@@ -193,31 +202,43 @@ function confirmGeometry(layers) {
   return true
 }
 
-// Native rendering fills the output surface unless an explicit crop opts into source geometry.
+// 取景框（#94）：底图边界比例与成片不符时按 contain 留白显示，底图等比落在框内，**绝不拉伸**。
 // Loading an image supplies local display metadata only; saving probes source pixels server-side.
 const outputDimensions = computed(() => ({
   width: props.doc.base.width || 1344,
   height: props.doc.base.height || 768,
 }))
+const outputAspect = computed(() => outputDimensions.value.width / outputDimensions.value.height)
 const sourceKnown = computed(() => !!((props.doc.base.source_width || sourceSize.value.width) && (props.doc.base.source_height || sourceSize.value.height)))
 const sourceDimensions = computed(() => ({
   width: props.doc.base.source_width || sourceSize.value.width || outputDimensions.value.width,
   height: props.doc.base.source_height || sourceSize.value.height || outputDimensions.value.height,
 }))
+const measuredBase = computed(() => ({
+  ...props.doc.base,
+  source_width: sourceDimensions.value.width,
+  source_height: sourceDimensions.value.height,
+}))
+const baseFrame = computed(() => baseFrameOf(measuredBase.value, outputDimensions.value))
 const canvasDimensions = computed(() => mode.value === 'crop' ? sourceDimensions.value : outputDimensions.value)
-const sourceGeometry = computed(() => mode.value === 'crop' || !!props.doc.base.crop)
+const sourceGeometry = computed(() => mode.value === 'crop' || !!props.doc.base.crop || baseFrame.value.mode === 'contain')
 const worldDimensions = computed(() => sourceGeometry.value ? sourceDimensions.value : outputDimensions.value)
 const docWidth = computed(() => worldDimensions.value.width)
 const docHeight = computed(() => worldDimensions.value.height)
 const aspect = computed(() => docWidth.value / docHeight.value)
 const renderDoc = computed(() => sourceGeometry.value ? {
   ...props.doc,
-  base: { ...props.doc.base, source_width: sourceDimensions.value.width, source_height: sourceDimensions.value.height,
-    crop: props.doc.base.crop || { x: 0, y: 0, w: 1, h: 1 } },
+  base: { ...measuredBase.value, crop: props.doc.base.crop || { x: 0, y: 0, w: 1, h: 1 } },
 } : props.doc)
-// Frame mode edits a rectangle on the crop surface; applying the rectangle itself here
+// 命中框/吸附与 SVG 用同一个尺寸单位：contain 时字号按取景框像素高度换算
+const unitRatio = computed(() => svgWorldOf(renderDoc.value, canvasDimensions.value).unit / docHeight.value)
+// 裁切模式把整张源图摊开来选框；其余模式按取景框显示（留白带也在画面里）
+const surface = computed(() => mode.value === 'crop'
+  ? { bounds: { x: 0, y: 0, w: 1, h: 1 }, frame: { x: 0, y: 0, w: 1, h: 1 } }
+  : { bounds: baseFrame.value.bounds, frame: baseFrame.value.frame })
+// Frame mode edits a rectangle on the frame surface; applying the rectangle itself here
 // would rebase pointer coordinates during its drag. Preview/render apply that viewport.
-const activeViewport = computed(() => normalizeCrop(mode.value === 'crop' ? null : props.doc.base.crop))
+const activeViewport = computed(() => surface.value.frame)
 const uiViewBox = computed(() => {
   const view = activeViewport.value
   return `${view.x * docWidth.value} ${view.y * docHeight.value} ${view.w * docWidth.value} ${view.h * docHeight.value}`
@@ -225,6 +246,35 @@ const uiViewBox = computed(() => {
 const sourceStyle = computed(() => {
   const view = activeViewport.value
   return { width: `${100 / view.w}%`, height: `${100 / view.h}%`, left: `${-100 * view.x / view.w}%`, top: `${-100 * view.y / view.h}%` }
+})
+/** 取景框在整图坐标系里的位置（滤镜与留白垫底都铺在它上面，与后端取景框画布一致） */
+const frameStyle = computed(() => {
+  const frame = surface.value.frame
+  return { left: `${frame.x * 100}%`, top: `${frame.y * 100}%`, width: `${frame.w * 100}%`, height: `${frame.h * 100}%` }
+})
+/** 底图只占 bounds（= crop，缺省整图）：按比例摆放，不做任何非等比缩放 */
+const boundsStyle = computed(() => {
+  const bounds = surface.value.bounds
+  return { left: `${bounds.x * 100}%`, top: `${bounds.y * 100}%`, width: `${bounds.w * 100}%`, height: `${bounds.h * 100}%` }
+})
+const baseImageStyle = computed(() => {
+  const bounds = surface.value.bounds
+  return { width: `${100 / bounds.w}%`, height: `${100 / bounds.h}%`, left: `${-100 * bounds.x / bounds.w}%`, top: `${-100 * bounds.y / bounds.h}%` }
+})
+const letterboxed = computed(() => surface.value.frame.w > surface.value.bounds.w + 1e-6 || surface.value.frame.h > surface.value.bounds.h + 1e-6)
+/** 留白垫底 = 同一张图放大模糊（用户确认的方案）：把 bounds 放大到盖满取景框 */
+const backdropStyle = computed(() => {
+  const { bounds, frame } = surface.value
+  const scale = Math.max(frame.w / bounds.w, frame.h / bounds.h)
+  const cx = frame.x + frame.w / 2
+  const cy = frame.y + frame.h / 2
+  return {
+    width: `${scale / frame.w * 100}%`,
+    height: `${scale / frame.h * 100}%`,
+    left: `${(cx * (1 - scale) - frame.x) / frame.w * 100}%`,
+    top: `${(cy * (1 - scale) - frame.y) / frame.h * 100}%`,
+    filter: `blur(${Math.max(2, Math.round(stageWidth.value / outputAspect.value / 24))}px)`,
+  }
 })
 const uiScale = computed(() => activeViewport.value.w * docWidth.value / Math.max(1, stageWidth.value))
 
@@ -257,7 +307,7 @@ const singleSelection = computed(() => selected.value.length === 1 && !selected.
 const hitShapes = computed(() => props.doc.layers
   .filter(layer => layer.visible)
   .map((layer) => {
-    const box = layerBounds(layer, props.doc.theme, aspect.value, props.variables)
+    const box = layerBounds(layer, props.doc.theme, aspect.value, props.variables, unitRatio.value)
     const x = box.x * docWidth.value
     const y = box.y * docHeight.value
     const w = Math.max(box.w * docWidth.value, uiScale.value * 8)
@@ -273,10 +323,10 @@ const hitShapes = computed(() => props.doc.layers
 const selectionBox = computed(() => {
   if (!selected.value.length) return null
   if (singleSelection.value) {
-    const box = layerBounds(selected.value[0], props.doc.theme, aspect.value, props.variables)
+    const box = layerBounds(selected.value[0], props.doc.theme, aspect.value, props.variables, unitRatio.value)
     return { x: box.x * docWidth.value, y: box.y * docHeight.value, w: box.w * docWidth.value, h: box.h * docHeight.value }
   }
-  const boxes = selected.value.map(layer => layerBounds(layer, props.doc.theme, aspect.value, props.variables))
+  const boxes = selected.value.map(layer => layerBounds(layer, props.doc.theme, aspect.value, props.variables, unitRatio.value))
   const x = Math.min(...boxes.map(b => b.x)) * docWidth.value
   const y = Math.min(...boxes.map(b => b.y)) * docHeight.value
   const right = Math.max(...boxes.map(b => b.x + b.w)) * docWidth.value
@@ -343,7 +393,7 @@ function snapDelta(box, dx, dy) {
   const threshold = (SNAP_PX * uiScale.value) / docWidth.value
   const others = props.doc.layers
     .filter(layer => layer.visible && !props.selectedIds.includes(layer.id))
-    .map(layer => layerBounds(layer, props.doc.theme, aspect.value, props.variables))
+    .map(layer => layerBounds(layer, props.doc.theme, aspect.value, props.variables, unitRatio.value))
   const xTargets = [0, 0.5, 1, ...others.flatMap(b => [b.x, b.x + b.w / 2, b.x + b.w])]
   const yTargets = [0, 0.5, 1, ...others.flatMap(b => [b.y, b.y + b.h / 2, b.y + b.h])]
   const candidates = [
@@ -392,7 +442,7 @@ function onLayerDown(id, event) {
 }
 
 function unionBounds(layers) {
-  const boxes = layers.map(layer => layerBounds(layer, props.doc.theme, aspect.value, props.variables))
+  const boxes = layers.map(layer => layerBounds(layer, props.doc.theme, aspect.value, props.variables, unitRatio.value))
   if (!boxes.length) return { x: 0, y: 0, w: 0, h: 0 }
   const x = Math.min(...boxes.map(b => b.x))
   const y = Math.min(...boxes.map(b => b.y))
@@ -409,7 +459,7 @@ function startResize(handle, event) {
     start: pointFromEvent(event),
     layer: layer.id,
     geometry: geometryOf(layer),
-    box: layerBounds(layer, props.doc.theme, aspect.value, props.variables),
+    box: layerBounds(layer, props.doc.theme, aspect.value, props.variables, unitRatio.value),
   }
   bindPointer(event)
 }
@@ -417,7 +467,7 @@ function startResize(handle, event) {
 function startRotate(event) {
   const layer = selected.value[0]
   if (!layer || layer.locked) return
-  const box = layerBounds(layer, props.doc.theme, aspect.value, props.variables)
+  const box = layerBounds(layer, props.doc.theme, aspect.value, props.variables, unitRatio.value)
   const center = { x: (box.x + box.w / 2) * docWidth.value, y: (box.y + box.h / 2) * docHeight.value }
   const start = pointFromEvent(event)
   if (!confirmGeometry([layer])) return
@@ -525,10 +575,10 @@ function onPointerMove(event) {
   const point = pointFromEvent(event)
   if (drag.mode === 'rect') {
     const origin = drag.origin
-    const bounds = drag.crop ? { x: 0, y: 0, w: 1, h: 1 } : (props.doc.base.crop || { x: 0, y: 0, w: 1, h: 1 })
+    const bounds = drag.crop ? { x: 0, y: 0, w: 1, h: 1 } : surface.value.frame
     let next
     if (drag.resize) {
-      const targetAspect = drag.crop ? 16 / 9 : outputDimensions.value.width / outputDimensions.value.height
+      const targetAspect = outputAspect.value
       const ratio = targetAspect / aspect.value
       const w = Math.max(0.01, Math.min(point.x - origin.x, (point.y - origin.y) * ratio,
         bounds.x + bounds.w - origin.x, (bounds.y + bounds.h - origin.y) * ratio))
@@ -580,7 +630,7 @@ function endPointer() {
     if (box.w > 0.005 || box.h > 0.005) {
       const hits = props.doc.layers.filter((layer) => {
         if (!layer.visible) return false
-        const bounds = layerBounds(layer, props.doc.theme, aspect.value, props.variables)
+        const bounds = layerBounds(layer, props.doc.theme, aspect.value, props.variables, unitRatio.value)
         return bounds.x < box.x + box.w && bounds.x + bounds.w > box.x && bounds.y < box.y + box.h && bounds.y + bounds.h > box.y
       }).map(layer => layer.id)
       emit('select', drag.additive ? [...new Set([...drag.base, ...hits])] : hits)
@@ -703,7 +753,11 @@ defineExpose({
 .lc-stage { position: relative; transform-origin: center center; box-shadow: 0 2px 18px rgba(0, 0, 0, 0.18); }
 .lc-base-surface { position: absolute; inset: 0; overflow: hidden; }
 .lc-source { position: absolute; }
-.lc-base { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; user-select: none; }
+/* 位置与尺寸全部由 script 的取景框几何算出；底图框本身就是等比的，绝不用 object-fit 拉伸 */
+.lc-frame-surface { position: absolute; overflow: hidden; pointer-events: none; }
+.lc-bounds { position: absolute; overflow: hidden; }
+.lc-backdrop { position: absolute; user-select: none; }
+.lc-base { position: absolute; user-select: none; }
 .lc-filter { position: absolute; inset: 0; background-size: 100% 100%; pointer-events: none; }
 .lc-overlay { position: absolute; inset: 0; pointer-events: none; }
 .lc-overlay :deep(svg) { width: 100%; height: 100%; display: block; }

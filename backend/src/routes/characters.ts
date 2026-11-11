@@ -18,14 +18,17 @@ import { addArchivalImage, removeArchivalImage } from '../services/archival-imag
 import { getPortraitAppearanceStatus, startPortraitAppearance, type StartPortraitAppearanceResult } from '../services/portrait-appearance.js'
 import { bindCreatedAssetToReviewItem, findReviewItemAssetDuplicate, onAssetRemoved, onEpisodeAssetLinkChanged } from '../services/asset-review.js'
 import { stageSelectionErrorPayload } from '../services/ai-stages.js'
+import { mountAspectVersionRoute } from './asset-aspect-version.js'
+import { CHARACTER_IMAGE_SIZE } from '../services/asset-image-size.js'
 
 const app = new Hono()
-const CHARACTER_IMAGE_SIZE = '1920x1080'
 
 // POST/DELETE /characters/:id/reference-images — 角色参考图（生图输入，与成片图互不影响）
 mountReferenceImageRoutes(app, 'character')
 // POST /characters/:id/re-extract — 单资产重新提取（Issue #32）
 mountReExtractRoute(app, 'character')
+// POST /characters/:id/aspect-version — 以当前图为参考按项目画幅重出一版（Issue #94）
+mountAspectVersionRoute(app, 'character')
 
 // POST /characters/:id/archival-images — 从 Commons 入库史料画像（不进生图链路）
 app.post('/:id/archival-images', async (c) => {

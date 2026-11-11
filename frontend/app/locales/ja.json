@@ -3549,10 +3549,27 @@
       }
     }
   },
+  "baseCheck": {
+    "status": {"none":"背景の視覚検証待ち","pending":"背景の視覚検証を実行中","passed":"背景の視覚検証に合格","failed":"背景の視覚検証に不合格","error":"背景の視覚検証でエラー","overridden":"背景を手動で承認済み"},
+    "neverChecked": "この背景は切り抜きまたは余白付きです。描画後に自動で検証が始まります",
+    "overrideReason": "承認理由：{reason}",
+    "viewTask": "タスク #{id} を表示",
+    "recheck": "再検証",
+    "rechecking": "検証中…",
+    "override": "手動で承認",
+    "overridePrompt": "手動承認の理由を入力してください（必須）：",
+    "overrideDone": "手動で承認しました",
+    "aspectVersionHint": "背景の比率 {aspect} は完成映像と異なり、余白付きで描画されます。完成比率に切り抜くか、この素材のプロジェクト比率版を生成してください。",
+    "aspectVersion": "プロジェクト比率版を生成",
+    "aspectVersionRunning": "送信中…",
+    "aspectVersionStarted": "プロジェクト比率版（{size}）を送信しました。完了後に現在の画像になります",
+    "pinnedOutdated": "この区間は旧バージョンを固定しています。新しい版に切り替えられます",
+    "switchToCurrent": "現在のバージョンに切り替え"
+  },
   "layerCanvas": {
     "toolbar": {"select":"選択","pan":"移動","frame":"フレームの表示範囲","crop":"背景を切り抜く","undo":"元に戻す","redo":"やり直す","snap":"スナップ","zoomIn":"拡大","zoomOut":"縮小","fit":"画面に合わせる","edit":"編集","preview":"プレビュー","render":"区間を描画","rehearse":"ショット試写"},
     "keyframeBar": {"title":"精密キーフレーム","add":"現在時刻に追加","copyPrev":"前のフレームを複製","remove":"削除（先頭は保護）","duration":"区間長","endHold":"末尾保持","junction":"接続フレーム","junctionTextWarn":"接続には文字を含みません：{n} 個の文字レイヤーは出力されません","teach":"区間は精密キーフレームで構成されます。各フレームは時刻・表示範囲・可視レイヤーを定義し、プログラムが移動とフェードを補間して動画を描画します。スライドではありません。","ease":"次のフレームへの補間","fade":"新レイヤーのフェード","viewportPick":"表示範囲（キャンバスで操作）","visible":"可視レイヤー"},
-    "base": {"title":"背景","noBase":"背景未選択（先に文字を編集できます）","replace":"背景を変更","cropTo169":"16:9 に切り抜く","aspectBanner":"キャンバスまたは元画像の切り抜き比率 {aspect} は出力と異なり、レンダリング時に引き伸ばされます","cropHelp":"元画像の座標上で 16:9 の枠または角をドラッグ。元画像は変更されません。","applyCrop":"適用","cancelCrop":"キャンセル","outputSize":"出力キャンバス {w}×{h}","sourceSize":"元画像 {w}×{h}（原本の画素数）","sourceUnknown":"元画像のサイズは不明です","resolution":"切り抜き後の元画像の画素数は完成映像 {sw}×{sh} の {times} 倍（不足する軸を基準）","verified":"検証済み","inherited":"継承背景（固定）","guide":"元画像の画素数は切り抜き座標と鮮明さの判定に使用し、出力キャンバスのサイズは決めません。切り抜き後の幅・高さともに完成映像の2倍以上を推奨します。","style":"全体スタイル","unknown":"背景","version":"バージョン {version}","saveSize":"元画像のサイズはサーバーで未確認です。保存時に原本を読み取ります。","loadError":"素材または意味情報を読み込めません。","framingClamped":"一部の表示範囲を切り抜き内に収めました。元に戻すと全範囲を復元できます。"},
+    "base": {"title":"背景","noBase":"背景未選択（先に文字を編集できます）","replace":"背景を変更","cropToOutput":"完成比率に切り抜く","aspectBanner":"背景の比率 {aspect} は完成映像と異なります。余白を付けてレンダリングするため視覚検証が必要です。完成比率に切り抜くか、この素材のプロジェクト比率版を生成してください","cropHelp":"元画像の座標上で完成比率の枠または角をドラッグ。元画像は変更されません。","applyCrop":"適用","cancelCrop":"キャンセル","outputSize":"出力キャンバス {w}×{h}","sourceSize":"元画像 {w}×{h}（原本の画素数）","sourceUnknown":"元画像のサイズは不明です","resolution":"切り抜き後の元画像の画素数は完成映像 {sw}×{sh} の {times} 倍（不足する軸を基準）","verified":"検証済み","inherited":"継承背景（固定）","guide":"元画像の画素数は切り抜き座標と鮮明さの判定に使用し、出力キャンバスのサイズは決めません。切り抜き後の幅・高さともに完成映像の2倍以上を推奨します。","style":"全体スタイル","unknown":"背景","version":"バージョン {version}","saveSize":"元画像のサイズはサーバーで未確認です。保存時に原本を読み取ります。","loadError":"素材または意味情報を読み込めません。","framingClamped":"一部の表示範囲を切り抜き内に収めました。元に戻すと全範囲を復元できます。"},
     "anchor": {"anchored":"固定済み","manual":"手動","unlink":"参照項目が削除・改名されています","detachConfirm":"このレイヤーは「{name}」に固定されています。解除して移動しますか？","relink":"固定先を選択","toManual":"手動に変更","labelOffset":"ラベル位置補正","addMarker":"マーカー追加","addRegion":"領域追加","addRoute":"経路追加","noSemantics":"意味情報がありません。","inherited":"継承背景では固定を使用できません。","choose":"再固定する項目を選択","cancel":"キャンセル","points":"地点","regions":"領域","lines":"経路","labels":"ラベル"},
     "quality": {"badge":"有効 {w}×{h} < {sw}×{sh}（拡大過多）","frameDot":"有効画素が出力未満","hint":"高解像度画像を使うか縮小してください。"},
     "image": {"pick":"素材を選択","legacyPath":"旧ローカルパスです。素材を選び直してください。","selectionCount":"画像を1枚選択してください。","cover":"充填","contain":"全体表示","episode":"このエピソードの素材","uploadHint":"アップロード画像はこのエピソードの素材と正式バージョンに登録されます。","contextMissing":"アップロードやフレーム取り込みにはエピソード内で開いてください。"},

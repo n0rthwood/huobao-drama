@@ -19,6 +19,7 @@ import { resolveStageModel, type StageModel } from '../ai-stages.js'
 import { callTextChat, imageContentPart, type ChatContent } from '../vision-chat.js'
 import { generateImage } from '../generation.js'
 import { getDramaStylePrompt } from '../style-preset.js'
+import { assetImageSizeForDrama } from '../asset-image-size.js'
 import { patchTextTaskParams, parseTextTaskParams } from '../text-task.js'
 import { classifyPromptInvalidation, planFinalPromptWrite } from '../asset-prompt-invalidation.js'
 import { evaluateGate, normalizeScore, type GateMetric, type GateResult, type SpecForbidden, type SpecMustHave } from './gate.js'
@@ -408,9 +409,11 @@ export async function runGenerate(input: {
     }
   }
   if (!imageTaskId) {
-    // 派生图必须与底图同画幅，否则既有语义坐标全部错位（prop-beautify.ts:62 的不变量）
-    let size: string | undefined
-    const base = input.referenceImages[0] ? canonicalReferencePath(input.referenceImages[0]) : null
+    // 道具/角色的派生图必须与底图同画幅，否则既有语义坐标全部错位（prop-beautify.ts:62 的不变量）；
+    // 场景则一律按项目画幅出图（Issue #94）——底图可能是改造前留下的横图，跟随它只会把挤压延续下去
+    const scene = input.target.kind === 'scene'
+    let size: string | undefined = scene ? await assetImageSizeForDrama('scene', input.target.dramaId) : undefined
+    const base = !scene && input.referenceImages[0] ? canonicalReferencePath(input.referenceImages[0]) : null
     if (base) {
       try {
         const meta = await sharp(base).metadata()
@@ -429,6 +432,7 @@ export async function runGenerate(input: {
       prompt,
       model: generator.model,
       size,
+      aspectLocked: scene,
       referenceImages: input.referenceImages.length ? input.referenceImages : undefined,
       pipelineReferenceOrigins: referenceOrigins,
       configId: generator.configId ?? undefined,

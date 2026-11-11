@@ -241,9 +241,10 @@ test('打包字体未覆盖的字符会被标出（渲染前阻断的依据）',
   })
 })
 
-test('R6 default crop SVG and explicit whole-image SVG never double-extract', () => {
+test('R6 crop SVG keeps whole-image geometry and never stretches (#94)', () => {
   const { doc, svg } = result.cases[CASES.findIndex(item => item.name.startsWith('R6 crop'))]
-  assert.match(svg, /viewBox="0 375 4000 2250" preserveAspectRatio="none"/)
+  assert.match(svg, /viewBox="0 375 4000 2250"/)
+  assert.ok(!svg.includes('preserveAspectRatio="none"'), '取景比例已归一到成片比例，不再拉伸矢量')
   const full = front.layerDocToSvg(doc, { width: 4000, height: 3000 }, { viewport: { x: 0, y: 0, w: 1, h: 1 } })
   assert.match(full, /viewBox="0 0 4000 3000"/)
   assert.match(full, /<circle cx="2000" cy="1500"/, 'marker remains at original whole-image location')

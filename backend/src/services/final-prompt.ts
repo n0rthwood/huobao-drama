@@ -24,6 +24,8 @@ import { runAgent, type AgentRunOutput } from '../agents/run.js'
 import { logTaskError, logTaskProgress } from '../utils/task-logger.js'
 import { sceneFinalPromptCoversTime } from './scene-time.js'
 import { resolveStageModel } from './ai-stages.js'
+import { aspectPhrase, sceneAspectIssue } from './aspect.js'
+import { resolveDramaAspect } from './asset-image-size.js'
 import { isFirstAgentFailureSafe } from './text-task-context.js'
 
 type CharacterRow = typeof schema.characters.$inferSelect
@@ -236,20 +238,25 @@ export async function ensureCharacterFinalPrompt(char: CharacterRow, episodeId: 
 /**
  * 确保场景拥有固定视角（前中后景）最终提示词；force 时忽略已有提示词强制重新生成。
  * 已存提示词没有引用当前场景时间（Issue #21）视为无效，重新生成；新稿同样没写到时间时记失败。
+ * 与项目画幅冲突、或非 16:9 项目没写画幅短语的已存提示词同样视为无效（Issue #94）——
+ * 场景图按项目画幅出图，提示词还按横版取景就会把主体截掉。
  */
 export async function ensureSceneFinalPrompt(scene: SceneRow, episodeId: number, force = false, opts?: PromptAgentOptions): Promise<FinalPromptResult> {
-  if (scene.finalPrompt && !force && sceneFinalPromptCoversTime(scene.finalPrompt, scene.time)) {
+  const aspect = await resolveDramaAspect(scene.dramaId)
+  if (scene.finalPrompt && !force
+    && sceneFinalPromptCoversTime(scene.finalPrompt, scene.time)
+    && !sceneAspectIssue(scene.finalPrompt, aspect)) {
     return { prompt: scene.finalPrompt, outcome: 'reused' }
   }
   const time = (scene.time || '').trim()
   try {
-    logTaskProgress('FinalPrompt', 'scene-generate', { sceneId: scene.id, episodeId, time: time || undefined })
+    logTaskProgress('FinalPrompt', 'scene-generate', { sceneId: scene.id, episodeId, time: time || undefined, aspect })
     const snapshot = await runPromptAgentWithOneCorrection({
       kind: 'scene',
       id: scene.id,
       episodeId,
       dramaId: scene.dramaId,
-      message: `为场景「${scene.location}」(scene_id=${scene.id}) 生成固定视角（前景/中景/后景）最终提示词，并调用 saveSceneFinalPrompt 保存。注意：这是无人物空镜——场景图中不能出现任何的人（含背影、剪影、倒影、照片里的人），即使场景描述提到人物活动也必须剔除，只保留场景本身。${time ? `场景时间是「${time}」：提示词必须原样写出「${time}」，光线按该时段描写。` : ''}`,
+      message: `为场景「${scene.location}」(scene_id=${scene.id}) 生成固定视角（前景/中景/后景）最终提示词，并调用 saveSceneFinalPrompt 保存。注意：这是无人物空镜——场景图中不能出现任何的人（含背影、剪影、倒影、照片里的人），即使场景描述提到人物活动也必须剔除，只保留场景本身。本项目画幅是 ${aspectPhrase(aspect)}：提示词必须逐字写出「${aspectPhrase(aspect)}」，并按该画幅组织建立镜头（主体完整入画，竖构图沿高度方向分层）。${time ? `场景时间是「${time}」：提示词必须原样写出「${time}」，光线按该时段描写。` : ''}`,
       before: scene.finalPrompt,
       force,
       readTool: 'readScenes',
@@ -260,14 +267,19 @@ export async function ensureSceneFinalPrompt(scene: SceneRow, episodeId: number,
       },
       accepts: snapshot => Boolean(
         savedPromptOf(classifyPromptOutcome(scene.finalPrompt, snapshot.prompt, force))
-        && sceneFinalPromptCoversTime(snapshot.prompt || '', snapshot.time),
+        && sceneFinalPromptCoversTime(snapshot.prompt || '', snapshot.time)
+        && !sceneAspectIssue(snapshot.prompt || '', aspect),
       ),
       opts,
     })
     const result = promptOutcome('scene', scene.id, scene.finalPrompt, snapshot.prompt, force)
-    // Agent 没能保存引用时间的提示词时记失败，交给调用方回退拼接（回退拼接包含 time）
+    // Agent 没能保存引用时间的提示词时记失败，交给调用方回退拼接（回退拼接包含 time 与画幅）
     if (result.prompt && !sceneFinalPromptCoversTime(result.prompt, snapshot.time)) {
       logTaskError('FinalPrompt', 'scene-generate', { sceneId: scene.id, error: 'final prompt does not cover scene time' })
+      return FAILED_PROMPT
+    }
+    if (result.prompt && sceneAspectIssue(result.prompt, aspect)) {
+      logTaskError('FinalPrompt', 'scene-generate', { sceneId: scene.id, error: 'final prompt conflicts with project aspect' })
       return FAILED_PROMPT
     }
     return result

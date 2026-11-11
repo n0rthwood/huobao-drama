@@ -22,10 +22,15 @@ export class OpenAIImageAdapter implements ImageProviderAdapter {
     const model = record.model || config.model || 'gpt-image-2'
     const isGptImage = model.startsWith('gpt-image-')
     const isGptImage2 = model === 'gpt-image-2'
+    // DALL-E 只认三档固定尺寸；其它 OpenAI 兼容模型（自建网关、第三方镜像）尺寸能力未知，
+    // 一律原样透传，不替它们改写（Issue #94）
+    const isDalle = /^dall-e/i.test(model)
     const size = isGptImage2
       ? this.normalizeGptImage2Size(record.size)
       : isGptImage
       ? this.normalizeGptImageSize(record.size)
+      : isDalle
+      ? this.normalizeDalleSize(record.size)
       : record.size || '1024x1024'
 
     // 有参考图 → 走 edits（multipart 上传图片文件）；无参考图 → 纯文生图 generations
@@ -117,6 +122,22 @@ export class OpenAIImageAdapter implements ImageProviderAdapter {
     if (!width || !height) return 'auto'
     if (width === height) return '1024x1024'
     return width > height ? '1536x1024' : '1024x1536'
+  }
+
+  /**
+   * DALL-E 2/3 只接受固定档位（3 代：1024x1024 / 1792x1024 / 1024x1792）：资产画幅（如 1080x1920）
+   * 原样透传会被接口拒绝，因此按方向映射到最接近的受支持档位（Issue #94）。
+   */
+  private normalizeDalleSize(size?: string | null): string {
+    const allowed = ['1024x1024', '1792x1024', '1024x1792']
+    const normalized = (size || '').toLowerCase().trim()
+    if (!normalized) return '1024x1024'
+    if (allowed.includes(normalized)) return normalized
+
+    const [width, height] = normalized.split('x').map(Number)
+    if (!width || !height) return '1024x1024'
+    if (width === height) return '1024x1024'
+    return width > height ? '1792x1024' : '1024x1792'
   }
 
   private normalizeGptImage2Size(size?: string | null): string {

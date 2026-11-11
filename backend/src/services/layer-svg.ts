@@ -13,6 +13,7 @@
  *   这是两端唯一允许不同的地方。
  */
 import type { CardLayer, ImageLayer, Layer, LayerBox, LayerDoc, LayerTheme, LayerType, MarkerLayer, PolygonLayer, PolylineLayer, LabelLayer, LayerVariables } from './layer-doc.js'
+import { baseFrameOf } from './layer-quality.js'
 
 export const LINE_HEIGHT_EM = 1.35
 export const BASELINE_EM = 0.88
@@ -253,8 +254,9 @@ function dashArray(kind: string, strokeWidth: number): string {
 /**
  * 图层的归一化包围盒：编辑器选择框、旋转中心、吸附参考线共用同一口径。
  * marker 把标签文字算进去（选择框要能框住文字）。
+ * `aspect` = 世界宽/世界高；`unitRatio` = 尺寸单位 / 世界高（contain 留白时世界比取景框大）。
  */
-export function layerBounds(layer: Layer, theme: LayerTheme, aspect = 16 / 9, variables?: LayerVariables): LayerBox {
+export function layerBounds(layer: Layer, theme: LayerTheme, aspect = 16 / 9, variables?: LayerVariables, unitRatio = 1): LayerBox {
   if (layer.type === 'polygon' || layer.type === 'polyline') {
     const xs = layer.points.map(p => p[0])
     const ys = layer.points.map(p => p[1])
@@ -263,8 +265,8 @@ export function layerBounds(layer: Layer, theme: LayerTheme, aspect = 16 / 9, va
     return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y }
   }
   if (layer.type === 'marker') {
-    const radius = styleOf(layer, theme, 'dot_radius') as number
-    const size = styleOf(layer, theme, 'size') as number
+    const radius = (styleOf(layer, theme, 'dot_radius') as number) * unitRatio
+    const size = (styleOf(layer, theme, 'size') as number) * unitRatio
     const legacyOffset = styleOf(layer, theme, 'label_offset') as number[]
     const offset = [Number(layer.style.label_dx ?? legacyOffset[0]), Number(layer.style.label_dy ?? legacyOffset[1])]
     const [cx, cy] = layer.at
@@ -282,6 +284,8 @@ export function layerBounds(layer: Layer, theme: LayerTheme, aspect = 16 / 9, va
 interface SvgContext {
   width: number
   height: number
+  /** 标量尺寸（字号/线宽/半径）的像素单位：cover = 世界高，contain = 取景框像素高 */
+  unit: number
   theme: LayerTheme
   defs: string[]
   resolveImage: (path: string) => string
@@ -355,7 +359,7 @@ function arrowHead(from: number[], to: number[], width: number, color: string): 
 
 function emitPolygon(layer: PolygonLayer, ctx: SvgContext): string {
   const points = layer.points.map(p => `${fmt(p[0] * ctx.width)},${fmt(p[1] * ctx.height)}`).join(' ')
-  const strokeWidth = (styleOf(layer, ctx.theme, 'stroke_width') as number) * ctx.height
+  const strokeWidth = (styleOf(layer, ctx.theme, 'stroke_width') as number) * ctx.unit
   const dash = dashArray(styleOf(layer, ctx.theme, 'dash') as string, strokeWidth)
   const stroke = strokeWidth > 0
     ? ` stroke="${esc(styleOf(layer, ctx.theme, 'stroke') as string)}" stroke-width="${fmt(strokeWidth)}" stroke-linejoin="round"${dash ? ` stroke-dasharray="${dash}"` : ''}`
@@ -367,7 +371,7 @@ function emitPolygon(layer: PolygonLayer, ctx: SvgContext): string {
 function emitPolyline(layer: PolylineLayer, ctx: SvgContext): string {
   const pixels = layer.points.map(p => [p[0] * ctx.width, p[1] * ctx.height])
   const points = pixels.map(p => `${fmt(p[0])},${fmt(p[1])}`).join(' ')
-  const width = (styleOf(layer, ctx.theme, 'width') as number) * ctx.height
+  const width = (styleOf(layer, ctx.theme, 'width') as number) * ctx.unit
   const color = styleOf(layer, ctx.theme, 'stroke') as string
   const dash = dashArray(styleOf(layer, ctx.theme, 'dash') as string, width)
   let out = `<polyline points="${points}" fill="none" stroke="${esc(color)}" stroke-width="${fmt(width)}"`
@@ -384,10 +388,10 @@ function emitPolyline(layer: PolylineLayer, ctx: SvgContext): string {
 function emitMarker(layer: MarkerLayer, ctx: SvgContext): string {
   const cx = layer.at[0] * ctx.width
   const cy = layer.at[1] * ctx.height
-  const radius = (styleOf(layer, ctx.theme, 'dot_radius') as number) * ctx.height
+  const radius = (styleOf(layer, ctx.theme, 'dot_radius') as number) * ctx.unit
   const color = styleOf(layer, ctx.theme, 'color') as string
   const stroke = styleOf(layer, ctx.theme, 'stroke') as string
-  const size = (styleOf(layer, ctx.theme, 'size') as number) * ctx.height
+  const size = (styleOf(layer, ctx.theme, 'size') as number) * ctx.unit
   const legacyOffset = styleOf(layer, ctx.theme, 'label_offset') as number[]
   const offset = [Number(layer.style.label_dx ?? legacyOffset[0]), Number(layer.style.label_dy ?? legacyOffset[1])]
   let out = `<circle cx="${fmt(cx)}" cy="${fmt(cy)}" r="${fmt(radius)}" fill="${esc(color)}"`
@@ -414,7 +418,7 @@ function emitLabel(layer: LabelLayer, ctx: SvgContext): string {
   const y = box.y * ctx.height
   const w = box.w * ctx.width
   const h = box.h * ctx.height
-  const size = (styleOf(layer, ctx.theme, 'size') as number) * ctx.height
+  const size = (styleOf(layer, ctx.theme, 'size') as number) * ctx.unit
   const bgOpacity = styleOf(layer, ctx.theme, 'bg_opacity') as number
   const pad = bgOpacity > 0 ? size * 0.3 : 0
   const align = styleOf(layer, ctx.theme, 'align') as string
@@ -441,7 +445,7 @@ function emitLabel(layer: LabelLayer, ctx: SvgContext): string {
     color: styleOf(layer, ctx.theme, 'color') as string,
     align,
     stroke: styleOf(layer, ctx.theme, 'stroke') as string,
-    strokeWidth: (styleOf(layer, ctx.theme, 'stroke_width') as number) * ctx.height,
+    strokeWidth: (styleOf(layer, ctx.theme, 'stroke_width') as number) * ctx.unit,
     italic: Boolean(styleOf(layer, ctx.theme, 'italic')),
     shadow,
     shadowFilterId,
@@ -501,8 +505,8 @@ function emitImage(layer: ImageLayer, ctx: SvgContext): string {
   const y = layer.box.y * ctx.height
   const w = layer.box.w * ctx.width
   const h = layer.box.h * ctx.height
-  const radius = (styleOf(layer, ctx.theme, 'radius') as number) * ctx.height
-  const borderWidth = (styleOf(layer, ctx.theme, 'border_width') as number) * ctx.height
+  const radius = (styleOf(layer, ctx.theme, 'radius') as number) * ctx.unit
+  const borderWidth = (styleOf(layer, ctx.theme, 'border_width') as number) * ctx.unit
   const clipId = `clip-${layer.id}`
   ctx.defs.push(
     `<clipPath id="${esc(clipId)}"><rect x="${fmt(x)}" y="${fmt(y)}" width="${fmt(w)}" height="${fmt(h)}" rx="${fmt(radius)}"/></clipPath>`,
@@ -512,7 +516,7 @@ function emitImage(layer: ImageLayer, ctx: SvgContext): string {
     const shadowId = `shadow-${layer.id}`
     ctx.defs.push(
       `<filter id="${esc(shadowId)}" x="-20%" y="-20%" width="140%" height="140%">`
-      + `<feDropShadow dx="0" dy="${fmt(ctx.height * 0.006)}" stdDeviation="${fmt(ctx.height * 0.006)}" flood-color="#000000" flood-opacity="0.45"/></filter>`,
+      + `<feDropShadow dx="0" dy="${fmt(ctx.unit * 0.006)}" stdDeviation="${fmt(ctx.unit * 0.006)}" flood-color="#000000" flood-opacity="0.45"/></filter>`,
     )
     filter = ` filter="url(#${esc(shadowId)})"`
   }
@@ -577,9 +581,33 @@ export function baseFilterLayers(
 }
 
 /**
+ * SVG 的世界坐标系（前后端同源）：
+ * - cover 且无裁切 → 世界 = 输出画布（与 #48 完全一致，像素不变）；
+ * - 有裁切或 contain 留白 → 世界 = 源图像素，取景（可为负、可超出图像）进 viewBox，
+ *   因为取景比例已经归一到成片比例，等比缩放即可，不需要 `preserveAspectRatio="none"`。
+ * 标量尺寸（字号/线宽）的单位：contain 时取取景框的像素高度，仍然等于「成片高度的比例」。
+ */
+export function svgWorldOf(
+  doc: LayerDoc,
+  size: { width: number; height: number },
+): { width: number; height: number; unit: number; view: { x: number; y: number; w: number; h: number }; native: boolean } {
+  const { mode, frame } = baseFrameOf(doc.base, size)
+  const native = Boolean(doc.base.crop) || mode === 'contain'
+  const width = native ? (doc.base.source_width || doc.base.width) : size.width
+  const height = native ? (doc.base.source_height || doc.base.height) : size.height
+  return {
+    width,
+    height,
+    unit: mode === 'contain' ? frame.h * height : height,
+    view: native ? frame : { x: 0, y: 0, w: 1, h: 1 },
+    native,
+  }
+}
+
+/**
  * 文档 → 叠加层 SVG（不含底图；底图由服务端 sharp 或编辑器的 <img> 承载）。
  * `visibleIds` 只渲染给定图层；`opacity` 按图层 id 叠乘不透明度（淡入淡出）；
- * `viewport`（归一化 0–1）把取景框搬进 viewBox——Ken Burns 推近时图层与底图同步放大，
+ * `viewport`（整图归一化）把取景框搬进 viewBox——Ken Burns 推近时图层与底图同步放大，
  * 描边与字号也跟着放大，这正是「镜头推近」应有的样子（#50）。
  */
 export function layerDocToSvg(
@@ -593,18 +621,20 @@ export function layerDocToSvg(
     variables?: LayerVariables
   } = {},
 ): string {
-  // Cropped documents live in native whole-image geometry; output size is only the SVG surface.
-  const worldWidth = doc.base.crop ? (doc.base.source_width || doc.base.width) : size.width
-  const worldHeight = doc.base.crop ? (doc.base.source_height || doc.base.height) : size.height
+  const world = svgWorldOf(doc, size)
+  const worldWidth = world.width
+  const worldHeight = world.height
   const ctx: SvgContext = {
     width: worldWidth,
     height: worldHeight,
+    unit: world.unit,
     theme: doc.theme,
     defs: [],
     resolveImage: options.resolveImage || ((path: string) => path),
     variables: options.variables,
   }
   const aspect = worldWidth / worldHeight
+  const unitRatio = world.unit / worldHeight
   const body: string[] = []
   for (const layer of doc.layers) {
     if (!layer.visible) continue
@@ -620,7 +650,7 @@ export function layerDocToSvg(
     else if (layer.type === 'card') inner = emitCard(layer, ctx)
     else if (layer.type === 'image') inner = emitImage(layer, ctx)
     if (!inner) continue
-    const bounds = layerBounds(layer, doc.theme, aspect, options.variables)
+    const bounds = layerBounds(layer, doc.theme, aspect, options.variables, unitRatio)
     const cx = (bounds.x + bounds.w / 2) * worldWidth
     const cy = (bounds.y + bounds.h / 2) * worldHeight
     const transform = layer.rotation ? ` transform="rotate(${fmt(layer.rotation)} ${fmt(cx)} ${fmt(cy)})"` : ''
@@ -628,10 +658,10 @@ export function layerDocToSvg(
     body.push(`<g data-layer="${esc(layer.id)}"${opacity}${transform}>${inner}</g>`)
   }
   const defs = ctx.defs.length ? `<defs>${ctx.defs.join('')}</defs>` : ''
-  const view = options.viewport || doc.base.crop
-  const viewBox = view
-    ? `${fmt(view.x * worldWidth)} ${fmt(view.y * worldHeight)} ${fmt(view.w * worldWidth)} ${fmt(view.h * worldHeight)}`
-    : `0 0 ${worldWidth} ${worldHeight}`
+  const view = options.viewport || world.view
+  const viewBox = `${fmt(view.x * worldWidth)} ${fmt(view.y * worldHeight)} ${fmt(view.w * worldWidth)} ${fmt(view.h * worldHeight)}`
+  // 世界 = 输出画布时取景是正方（比例已对齐），只有旧的非方取景才需要拉伸兜底
+  const stretch = !world.native && view.w !== view.h ? ' preserveAspectRatio="none"' : ''
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size.width}" height="${size.height}"`
-    + ` viewBox="${viewBox}"${doc.base.crop || (view && view.w !== view.h) ? ' preserveAspectRatio="none"' : ''}>${defs}${body.join('')}</svg>`
+    + ` viewBox="${viewBox}"${stretch}>${defs}${body.join('')}</svg>`
 }

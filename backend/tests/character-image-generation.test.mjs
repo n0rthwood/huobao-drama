@@ -1,15 +1,28 @@
-import { readFileSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
 const root = new URL('..', import.meta.url)
-const read = (path) => readFileSync(new URL(path, root), 'utf8')
 
-test('character image generation uses 16:9 asset size', () => {
-  const source = read('src/routes/characters.ts')
-
-  assert.match(source, /CHARACTER_IMAGE_SIZE = '1920x1080'/)
-  assert.match(source, /16:9 横版角色定妆照/)
-  assert.match(source, /半身角色海报构图/)
-  assert.match(source, /size: CHARACTER_IMAGE_SIZE/)
+test('角色定妆照固定 16:9：尺寸表不随项目画幅变化', () => {
+  // 尺寸的唯一来源是 assetImageSizeFor（Issue #94 把常量从 routes 搬进 asset-image-size.ts）
+  const script = `
+    import { assetImageSizeFor } from './src/services/asset-image-size.ts'
+    console.log('@@' + JSON.stringify(['16:9', '9:16', '1:1'].map(a => assetImageSizeFor('character', a))))
+  `
+  const dir = mkdtempSync(join(tmpdir(), 'huobao-character-size-'))
+  try {
+    const stdout = execFileSync(process.execPath, ['--import', 'tsx', '--input-type=module', '--eval', script], {
+      cwd: fileURLToPath(root),
+      encoding: 'utf8',
+      env: { ...process.env, SQLITE_PATH: join(dir, 'db.sqlite3'), HUOBAO_DATA_DIR: dir },
+    })
+    assert.deepEqual(JSON.parse(stdout.slice(stdout.lastIndexOf('@@') + 2)), ['1920x1080', '1920x1080', '1920x1080'])
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
 })

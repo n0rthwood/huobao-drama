@@ -897,6 +897,9 @@ const columnAdditions: { table: string; column: string; type: string }[] = [
   { table: 'episodes', column: 'final_version_id', type: 'INTEGER' },
   { table: 'episodes', column: 'narration_skeleton_confirmed_at', type: 'TEXT' },
   { table: 'episodes', column: 'narration_skeleton_revision', type: 'TEXT' },
+  // 底图视觉验证（Issue #94）：图层段底图有裁切或按 contain 留白时，渲染结果要过一次视觉模型核验。
+  // 存量行为 NULL = 从未验证；读时按当前底图/裁切/取景框现算是否需要验证，不做一次性回填。
+  { table: 'storyboard_layer_segments', column: 'base_check', type: 'TEXT' },
 ]
 
 /**
