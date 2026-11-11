@@ -21,7 +21,7 @@ import { now } from '../utils/response.js'
 import { getAbsolutePath } from '../utils/storage.js'
 import { probeVideoSpec } from './media-probe.js'
 import { normalizeLayerDoc, type LayerDoc } from './layer-doc.js'
-import { qualityWarningsOf } from './layer-quality.js'
+import { baseFrameOf, qualityWarningsOf } from './layer-quality.js'
 import {
   MAX_LAYER_SEGMENT_SECONDS,
   SEGMENT_DEFAULT_FPS,
@@ -42,6 +42,9 @@ import {
   type Combo,
   type DesignCard,
 } from './design-card.js'
+// `layer-base-check.ts` 反向依赖本文件（底图 sha / 段读取 / 画幅）：两边都只在函数体里互相调用，
+// 顶层求值不触碰对方，ESM 循环安全。
+import { LAYER_BASE_CHECK_STATUSES, type LayerBaseCheck, type LayerBaseCheckStatus } from './layer-base-check.js'
 
 export const LAYER_SEGMENT_STATUSES = ['draft', 'rendering', 'ready', 'failed'] as const
 export type LayerSegmentStatus = typeof LAYER_SEGMENT_STATUSES[number]
@@ -83,6 +86,8 @@ export interface LayerSegment {
   junction_hash: string | null
   status: LayerSegmentStatus
   stale_reasons: string[]
+  /** 底图视觉验证结论（Issue #94）；null = 从未验证。不参与 `layerSegmentIsFresh` */
+  base_check: LayerBaseCheck | null
   created_at: string
   updated_at: string
 }
@@ -172,6 +177,32 @@ function parseBaseRef(raw: string | null): BaseRef | null {
   return null
 }
 
+/** 底图视觉验证结论（Issue #94）。坏 JSON / 未知状态一律当「从未验证」，绝不当成通过。 */
+function parseBaseCheck(raw: string | null): LayerBaseCheck | null {
+  if (!raw) return null
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return null
+    const row = parsed as Record<string, unknown>
+    const status = LAYER_BASE_CHECK_STATUSES.find(value => value === row.status) as LayerBaseCheckStatus | undefined
+    if (!status || typeof row.signature !== 'string') return null
+    return {
+      required: row.required !== false,
+      signature: row.signature,
+      status,
+      problems: Array.isArray(row.problems) ? row.problems.filter((item): item is string => typeof item === 'string') : [],
+      notes: typeof row.notes === 'string' ? row.notes : null,
+      task_id: Number.isInteger(row.task_id) ? Number(row.task_id) : null,
+      config_id: Number.isInteger(row.config_id) ? Number(row.config_id) : null,
+      model: typeof row.model === 'string' ? row.model : null,
+      checked_at: typeof row.checked_at === 'string' ? row.checked_at : null,
+      override_reason: typeof row.override_reason === 'string' ? row.override_reason : null,
+      error: typeof row.error === 'string' ? row.error : null,
+    }
+  } catch { /* 坏 JSON 视为从未验证 */ }
+  return null
+}
+
 /** Stored plans retain their exact target, including fractional FPS; no normalized default. */
 function storedTimelineFps(timeline: unknown): number | undefined {
   const fps = timeline && typeof timeline === 'object' ? (timeline as Record<string, unknown>).fps : undefined
@@ -192,6 +223,7 @@ function parseSegmentRow(row: SegmentRow): LayerSegment {
     timeline = null
   }
   const doc = normalizeLayerDoc(layerDoc)
+  // 读时只做清洗：取景框的权威归一在保存、渲染与编辑器加载时按真实成片规格做
   const normalized = normalizeTimeline(timeline, doc.base.crop)
   normalized.fps = storedTimelineFps(timeline) ?? normalized.fps
   return {
@@ -210,6 +242,7 @@ function parseSegmentRow(row: SegmentRow): LayerSegment {
     junction_hash: row.junctionHash,
     status: (row.status as LayerSegmentStatus) || 'draft',
     stale_reasons: parseStringArray(row.staleReasons),
+    base_check: parseBaseCheck(row.baseCheck),
     created_at: row.createdAt,
     updated_at: row.updatedAt,
   }
@@ -267,7 +300,7 @@ export async function saveLayerSegment(
   // fps 是派生值：跟随本集既存计划/回退目标，保存时不能把 29.97 取整为 30。
   const spec = await resolveEpisodeSegmentSpec(row.episodeId)
   const timeline = {
-    ...normalizeTimeline('timeline' in input ? input.timeline : existing?.timeline, layerDoc.base.crop),
+    ...normalizeTimeline('timeline' in input ? input.timeline : existing?.timeline, baseFrameOf(layerDoc.base, spec).frame),
     fps: spec.fps,
   }
   const duration = clampSegmentDuration(
@@ -324,6 +357,7 @@ export async function saveLayerSegment(
     end_hold: endHoldOf(timeline, duration),
     base_ref: baseRef,
     quality_warnings: warnings,
+    base_check: null,
     render_path: null,
     render_signature: null,
     rendered_at: null,
@@ -453,7 +487,11 @@ function renderInputsOf(doc: LayerDoc): LayerDoc {
   }
 }
 
-/** C/D v2 includes the encoded text-free boundary profile; A/legacy retain v1. */
+/**
+ * C/D v2 includes the encoded text-free boundary profile; A/legacy retain v1.
+ * contain 留白（Issue #94）把取景框并入签名：比例不符的旧段因此变为过期（它们的成片确实是拉伸的），
+ * cover 段的签名逐字节不变。
+ */
 export function layerSegmentSignatureOf(
   segment: Pick<LayerSegment, 'layer_doc' | 'timeline' | 'duration'>,
   spec: Pick<SegmentSpec, 'width' | 'height' | 'fps'>,
@@ -463,6 +501,7 @@ export function layerSegmentSignatureOf(
   for (const layer of segment.layer_doc.layers) {
     if (layer.type === 'image') images.push(layer.src.path)
   }
+  const base = baseFrameOf(segment.layer_doc.base, spec)
   return crypto.createHash('sha256').update([
     combo === 'C' || combo === 'D' ? `seg-v2-${combo}` : 'seg-v1',
     JSON.stringify(renderInputsOf(segment.layer_doc)),
@@ -470,6 +509,7 @@ export function layerSegmentSignatureOf(
     segment.duration.toFixed(3),
     endHoldOf(segment.timeline, segment.duration).toFixed(3),
     `${spec.width}x${spec.height}@${spec.fps}`,
+    ...(base.mode === 'contain' ? [`contain:${JSON.stringify(base.frame)}`] : []),
     ...images.map(path => `${path}@${fileSha256(path)}`),
   ].join('\u0000'), 'utf8').digest('hex')
 }

@@ -27,6 +27,7 @@ import {
 import { invalidateKeyframeConfirmation } from './keyframes.js'
 import { toCombo } from './design-card.js'
 import { refreshLayerSegmentSources, RENDER_CONSUMED_SOURCE_REASONS } from './segment-source-refresh.js'
+import { ensureLayerBaseCheck } from './layer-base-check.js'
 
 /** 图层段任务的 provider 常量：任务中心据此把它当普通行、可重试 */
 export const LAYER_SEGMENT_PROVIDER = 'layer-segment'
@@ -130,6 +131,8 @@ export async function startLayerSegmentRenderTask(storyboardId: number): Promise
       junction: result.junction?.hash || '',
       ms: String(result.ms),
     })
+    // 底图视觉验证（Issue #94）：需要验证且签名变了才起任务；不阻塞本次渲染的响应
+    void ensureLayerBaseCheck(storyboardId)
     return {
       task_id: taskId,
       render_path: result.render_path,

@@ -301,6 +301,13 @@ export const storyboardLayerSegments = sqliteTable('storyboard_layer_segments', 
   junctionHash: text('junction_hash'),
   status: text('status').notNull().default('draft'),
   staleReasons: text('stale_reasons'),
+  /**
+   * 底图视觉验证（Issue #94）：JSON `{ required, signature, status, problems, notes,
+   * task_id, config_id, model, checked_at, override_reason, error }`。
+   * 底图有裁切或按 contain 留白渲染时必须验证通过，才允许衔接帧 / 关键帧 / 视频 / 合成往下走。
+   * **不并入渲染新鲜度**：验证不通过不等于成品要重渲，批量渲染不能把它当「已变化」。
+   */
+  baseCheck: text('base_check'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 }, (table) => [

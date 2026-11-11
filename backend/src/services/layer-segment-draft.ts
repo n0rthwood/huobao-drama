@@ -19,9 +19,9 @@ import type {
 } from './asset-semantics.js'
 import type { BaseRef, Combo, DesignCard, PlannedLayer } from './design-card.js'
 import { hasLayerSegment } from './design-card.js'
-import { normalizeLayerDoc, type LayerDoc } from './layer-doc.js'
+import { normalizeLayerDoc, type LayerBox, type LayerDoc } from './layer-doc.js'
+import { baseFrameOf } from './layer-quality.js'
 import {
-  FULL_VIEWPORT,
   MAX_LAYER_SEGMENT_SECONDS,
   SEGMENT_DEFAULT_FADE_MS,
   SEGMENT_DEFAULT_FPS,
@@ -120,6 +120,26 @@ function imageSizeOf(asset: SegmentDraftAsset): { width: number; height: number 
   return { width: width > 0 ? width : 1, height: height > 0 ? height : 1 }
 }
 
+/**
+ * 草稿的取景框：底图比例与成片不符时渲染是 contain 留白（#94），默认位置必须按**取景框**放，
+ * 否则文字会落到模糊留白带里甚至出画。底图像素未知时退化为整图（与 #94 之前一致）。
+ */
+function draftFrameOf(ctx: SegmentDraftContext): LayerBox {
+  const size = ctx.base ? imageSizeOf(ctx.base) : { width: 1, height: 1 }
+  if (size.width <= 1 || size.height <= 1) return { x: 0, y: 0, w: 1, h: 1 }
+  return baseFrameOf({ source_width: size.width, source_height: size.height }, { width: ctx.width, height: ctx.height }).frame
+}
+
+/** 取景框内的相对位置 → 整图归一化坐标（图层坐标的唯一口径） */
+function inFrame(frame: LayerBox, box: { x: number; y: number; w: number; h: number }): LayerBox {
+  return {
+    x: Math.round((frame.x + box.x * frame.w) * 10000) / 10000,
+    y: Math.round((frame.y + box.y * frame.h) * 10000) / 10000,
+    w: Math.round(box.w * frame.w * 10000) / 10000,
+    h: Math.round(box.h * frame.h * 10000) / 10000,
+  }
+}
+
 interface DraftedLayer {
   layer: Record<string, unknown>
   /** 该层在底图上的归一化坐标点，用于算推近取景框 */
@@ -149,6 +169,7 @@ export function layerFromPlannedLayer(
   warnings: string[],
 ): DraftedLayer | null {
   const id = `L${index + 1}`
+  const frame = draftFrameOf(ctx)
   const anchorAsset = assetOf(ctx, item.anchor?.asset_id) ?? ctx.base
   const semantic = findSemantic(anchorAsset, item.anchor?.semantic_id || item.anchor?.name)
   const size = anchorAsset ? imageSizeOf(anchorAsset) : { width: 1, height: 1 }
@@ -206,7 +227,7 @@ export function layerFromPlannedLayer(
       warnings.push(`第 ${index + 1} 层（label）没有文字，已跳过`)
       return null
     }
-    let box = { x: 0.06, y: 0.08 + index * 0.1, w: 0.3, h: 0.09 }
+    let box = inFrame(frame, { x: 0.06, y: 0.08 + index * 0.1, w: 0.3, h: 0.09 })
     const points: Array<[number, number]> = []
     const bbox = semantic?.group === 'labels' ? semantic.entry.bbox : null
     if (bbox) {
@@ -235,7 +256,7 @@ export function layerFromPlannedLayer(
     return {
       layer: {
         id, type: 'card', name: fields.title || fields.years, z: index + 1,
-        box: { ...CARD_DEFAULT_BOX },
+        box: inFrame(frame, CARD_DEFAULT_BOX),
         template: fields.years && !fields.title ? 'year' : 'name',
         fields: { title: fields.title, sub: '', meta: '', years: fields.years },
       },
@@ -249,7 +270,7 @@ export function layerFromPlannedLayer(
     warnings.push(`第 ${index + 1} 层（image）找不到可用的图片资产，已跳过`)
     return null
   }
-  const box = { x: 0.62, y: 0.1, w: 0.3, h: 0.44 }
+  const box = inFrame(frame, { x: 0.62, y: 0.1, w: 0.3, h: 0.44 })
   return {
     layer: {
       id, type: 'image', name: anchorAsset?.name || `图片 ${index + 1}`, z: index + 1, box,
@@ -284,6 +305,8 @@ export function draftSegment(card: DesignCard, combo: Combo | null, ctx: Segment
     MAX_LAYER_SEGMENT_SECONDS,
   )
 
+  const frame = draftFrameOf(ctx)
+  const baseSize = ctx.base ? imageSizeOf(ctx.base) : null
   const layerDoc = normalizeLayerDoc({
     version: 1,
     theme: 'archival',
@@ -291,6 +314,8 @@ export function draftSegment(card: DesignCard, combo: Combo | null, ctx: Segment
       path: ctx.base_path,
       width: ctx.width,
       height: ctx.height,
+      source_width: baseSize && baseSize.width > 1 ? baseSize.width : undefined,
+      source_height: baseSize && baseSize.height > 1 ? baseSize.height : undefined,
       filter: { paper: 0.16, tint: 'sepia', tint_strength: 0.18, vignette: 0.28 },
     },
     layers: drafted.map(entry => entry.layer),
@@ -298,7 +323,7 @@ export function draftSegment(card: DesignCard, combo: Combo | null, ctx: Segment
 
   // 精确关键帧：t=0 干净底图 → 按 at_s 逐层显现 → 推近到已显现几何的外接框
   const revealed: string[] = []
-  const keyframes: PreciseKeyframe[] = [{ t: 0, viewport: { ...FULL_VIEWPORT }, visible: [] }]
+  const keyframes: PreciseKeyframe[] = [{ t: 0, viewport: { ...frame }, visible: [] }]
   const slots = drafted.length || 1
   for (const [index, entry] of drafted.entries()) {
     const item = planned[Number(String(entry.layer.id).slice(1)) - 1]
@@ -308,14 +333,14 @@ export function draftSegment(card: DesignCard, combo: Combo | null, ctx: Segment
       Math.max(0.2, Number.isFinite(item?.at_s) ? Number(item!.at_s) : fallback),
     )
     revealed.push(String(entry.layer.id))
-    // 设计卡不带视口（它是导演层的图纸）：草稿一律全幅，取景由图层编辑器（R6）定
-    keyframes.push({ t: Math.round(t * 100) / 100, viewport: { ...FULL_VIEWPORT }, visible: [...revealed] })
+    // 设计卡不带视口（它是导演层的图纸）：草稿一律取满取景框，取景由图层编辑器（R6）定
+    keyframes.push({ t: Math.round(t * 100) / 100, viewport: { ...frame }, visible: [...revealed] })
   }
   const geometry = drafted.flatMap(entry => entry.points)
   if (geometry.length >= 2 && duration > 2) {
     keyframes.push({
       t: Math.round(Math.max(0.6, duration * 0.8) * 100) / 100,
-      viewport: normalizeViewport(viewportFromPoints(geometry, LAYER_SEGMENT_PUSH_IN_PAD)),
+      viewport: normalizeViewport(viewportFromPoints(geometry, LAYER_SEGMENT_PUSH_IN_PAD), frame),
       visible: [...revealed],
     })
   }
@@ -332,7 +357,7 @@ export function draftSegment(card: DesignCard, combo: Combo | null, ctx: Segment
       ease: 'inout',
       fade_ms: SEGMENT_DEFAULT_FADE_MS,
       keyframes,
-    }),
+    }, frame),
     warnings,
   }
 }

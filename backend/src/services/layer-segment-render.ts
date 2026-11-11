@@ -41,10 +41,12 @@ import { logTaskProgress } from '../utils/task-logger.js'
 import { getAbsolutePath } from '../utils/storage.js'
 import { mediaFacts } from './media-probe.js'
 import { assertRenderableText, ensureLayerFonts } from './layer-fonts.js'
-import { baseFilterLayers, layerDocToSvg } from './layer-svg.js'
+import { baseFilterLayers, layerDocToSvg, svgWorldOf } from './layer-svg.js'
 import type { Layer, LayerDoc } from './layer-doc.js'
-import { clampTimelineToCrop, clampViewportToCrop, cropRectOf } from './layer-quality.js'
+import { clampTimelineToFrame, clampViewportToBox, frameRectOf } from './layer-quality.js'
+import { renderFrameCanvas, type FrameCanvas } from './layer-frame-raster.js'
 import {
+  SEGMENT_DEFAULT_FPS,
   frameCount,
   frameKeyOf,
   frameStateAt,
@@ -53,7 +55,7 @@ import {
   type FrameState,
   type SegmentTimeline,
 } from './segment-timeline.js'
-import { layerSegmentSignatureOf, type LayerSegment, type SegmentSpec } from './layer-segment.js'
+import { layerSegmentSignatureOf, withBaseSourceSize, type LayerSegment, type SegmentSpec } from './layer-segment.js'
 
 /** 画布相对成片画幅的最大预放大倍数：再大只是浪费内存，1920 宽的底图也到头了 */
 const MAX_CANVAS_SCALE = 2.5
@@ -144,35 +146,36 @@ function planOf(timeline: SegmentTimeline, duration: number, spec: Pick<SegmentS
   }
 }
 
-/** 一次性准备好的逐帧渲染素材：预合成底图（raw RGB）+ 预缩放图片 + 时间线涉及的图层 */
+/** 一次性准备好的逐帧渲染素材：预合成取景框画布（raw RGB）+ 预缩放图片 + 时间线涉及的图层 */
 interface FrameSource {
-  baseBuffer: Buffer
+  canvas: FrameCanvas
   resolveImage: (path: string) => string
   layerIds: string[]
 }
 
 async function prepareFrameSource(doc: LayerDoc, plan: RenderPlan, timeline: SegmentTimeline): Promise<FrameSource> {
   const baseAbs = resolveLocalImage(doc.base.path, '底图')
-  const size = { width: plan.canvasWidth, height: plan.canvasHeight }
-  const baseBuffer = await sharp(baseAbs)
-    .resize(plan.canvasWidth, plan.canvasHeight, { fit: 'fill' })
-    .composite(baseFilterLayers(doc.base.filter, size).map(layer => ({ input: Buffer.from(layer.svg) })))
-    .removeAlpha()
-    .raw()
-    .toBuffer()
-  const imageCanvas = doc.base.crop
-    ? { width: size.width, height: Math.max(1, Math.round(size.width * (doc.base.source_height || doc.base.height) / (doc.base.source_width || doc.base.width))) }
-    : size
+  const canvas = await renderFrameCanvas(
+    doc.base,
+    baseAbs,
+    { width: plan.width, height: plan.height },
+    { width: plan.canvasWidth, height: plan.canvasHeight },
+  )
+  // image 图层按 SVG 世界的像素尺寸预缩放：世界是源图时按源图比例，否则就是画布
+  const world = svgWorldOf(doc, { width: plan.width, height: plan.height })
+  const imageCanvas = world.native
+    ? { width: plan.canvasWidth, height: Math.max(1, Math.round(plan.canvasWidth * world.height / world.width)) }
+    : { width: plan.canvasWidth, height: plan.canvasHeight }
   const inlined = await prescaleImageLayers(doc, imageCanvas)
   return {
-    baseBuffer,
+    canvas,
     resolveImage: (relativePath: string) => inlined[relativePath] || relativePath,
     layerIds: timelineLayerIds(timeline),
   }
 }
 
 /**
- * 合成一帧：从预合成底图里裁取景框 → 缩放到成片画幅 → 叠加层 SVG。
+ * 合成一帧：从预合成的取景框画布里裁取景 → 缩放到成片画幅 → 叠加层 SVG。
  * sharp 的算子顺序是固定的（extract → resize → composite），所以底图必须是**已经**
  * 合过滤镜的 raw 缓冲：在同一条管线里「先 composite 再 extract」会被重排成先裁后叠，
  * 叠加层尺寸对不上直接报错（spike 里踩过）。
@@ -184,17 +187,21 @@ async function composeFrame(
   state: FrameState,
   format: 'raw' | 'png',
 ): Promise<Buffer> {
-  // Crop constrains a whole-image viewport. Never extract crop then extract viewport again.
-  const viewport = clampViewportToCrop(state.viewport, doc.base.crop).viewport
+  // 取景永远落在取景框内并与成片同比例：绝不先裁边界再裁取景，也绝不缩放变形
+  const viewport = clampViewportToBox(state.viewport, source.canvas.frame).viewport
   const svg = layerDocToSvg(doc, { width: plan.width, height: plan.height }, {
     resolveImage: source.resolveImage,
     viewport,
     opacity: state.opacity,
     visibleIds: source.layerIds.filter(id => state.opacity[id] > 0),
   })
-  const rectangle = cropRectOf({ crop: viewport }, plan.canvasWidth, plan.canvasHeight)
-  const pipeline = sharp(source.baseBuffer, {
-    raw: { width: plan.canvasWidth, height: plan.canvasHeight, channels: 3 },
+  const rectangle = frameRectOf(viewport, source.canvas.frame, source.canvas.width, source.canvas.height)
+  // 最后防线：比例对不上宁可整段渲染失败，也不要悄悄拉伸（Issue #94）
+  if (Math.abs((rectangle.width / rectangle.height) / (plan.width / plan.height) - 1) > 0.01) {
+    throw new Error('取景比例与成片不符，拒绝拉伸')
+  }
+  const pipeline = sharp(source.canvas.buffer, {
+    raw: { width: source.canvas.width, height: source.canvas.height, channels: 3 },
   })
     .extract(rectangle)
     .resize(plan.width, plan.height, { fit: 'fill' })
@@ -291,11 +298,11 @@ export async function renderLayerSegment(
     throw new Error('本机 ffmpeg 不可用，无法渲染图层段。请删除 node_modules 后重新安装依赖，或设置 FFMPEG_BIN/FFPROBE_BIN 后重启服务')
   }
   await ensureLayerFonts()
-  const doc = segment.layer_doc
+  const doc = await withBaseSourceSize(segment.layer_doc)
   if (!doc.base.path) throw new Error('图层文档缺少底图路径 base.path')
   assertRenderableText(collectTexts(doc))
 
-  const timeline = clampTimelineToCrop(segment.timeline, doc.base.crop).timeline
+  const timeline = clampTimelineToFrame(segment.timeline, doc.base, spec).timeline
   const plan = planOf(timeline, segment.duration, spec)
   const source = await prepareFrameSource(doc, plan, timeline)
   const moment = junctionMoment(combo, segment.duration)
@@ -400,12 +407,33 @@ export async function renderSegmentFrame(
   t: number,
 ): Promise<Buffer> {
   await ensureLayerFonts()
-  const doc = segment.layer_doc
+  const doc = await withBaseSourceSize(segment.layer_doc)
   if (!doc.base.path) throw new Error('图层文档缺少底图路径 base.path')
   assertRenderableText(collectTexts(doc))
-  const timeline = clampTimelineToCrop(segment.timeline, doc.base.crop).timeline
+  const timeline = clampTimelineToFrame(segment.timeline, doc.base, spec).timeline
   const plan = planOf(timeline, segment.duration, spec)
   const source = await prepareFrameSource(doc, plan, timeline)
   const time = Math.min(Math.max(0, t), Math.max(0, segment.duration - 1 / plan.fps))
   return composeFrame(doc, plan, source, frameStateAt(timeline, time), 'png')
+}
+
+/**
+ * 无字的取景框整幅画面（Issue #94 底图视觉验证用）：不画任何图层、取景 = 整个取景框、
+ * 带底图滤镜，输出正好是成片尺寸。
+ */
+export async function renderBaseFramePng(doc: LayerDoc, spec: { width: number; height: number }): Promise<Buffer> {
+  const measured = await withBaseSourceSize(doc)
+  if (!measured.base.path) throw new Error('图层文档缺少底图路径 base.path')
+  const plan: RenderPlan = {
+    width: spec.width,
+    height: spec.height,
+    fps: SEGMENT_DEFAULT_FPS,
+    frames: 1,
+    canvasWidth: spec.width,
+    canvasHeight: spec.height,
+  }
+  const bare: LayerDoc = { ...measured, layers: [] }
+  const source = await prepareFrameSource(bare, plan, { fps: plan.fps, ease: 'inout', fade_ms: 0, keyframes: [] })
+  const frame = source.canvas.frame
+  return composeFrame(bare, plan, source, { viewport: frame, opacity: {} }, 'png')
 }

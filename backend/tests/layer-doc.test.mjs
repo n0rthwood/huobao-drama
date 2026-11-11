@@ -61,15 +61,16 @@ test('normalizeLayerDoc: invalid layers are dropped, not repaired', () => {
   assert.equal(doc.layers[0].text, '保留')
 })
 
-test('normalizeLayerDoc: coordinates are clamped to the 0–1 contract, boxes keep a minimum size', () => {
+test('normalizeLayerDoc: coordinates are clamped to the contain-frame range, boxes keep a minimum size', () => {
   const [doc] = normalize([{
     layers: [
       { type: 'polygon', points: [[-9, 0.2], [0.5, 9], [0.8, 0.8], 'nope'] },
       { type: 'label', box: { x: 3, y: -3, w: 0, h: 99 }, text: 'x' },
     ],
   }])
-  assert.deepEqual(doc.layers[0].points, [[0, 0.2], [0.5, 1], [0.8, 0.8]])
-  assert.deepEqual(doc.layers[1].box, { x: 1, y: 0, w: 0.005, h: 2 })
+  // #94：contain 留白时取景框会超出源图（竖版项目里可到 y∈[-1.06, 2.06]），坐标范围放宽到 [-3, 4]
+  assert.deepEqual(doc.layers[0].points, [[-3, 0.2], [0.5, 4], [0.8, 0.8]])
+  assert.deepEqual(doc.layers[1].box, { x: 3, y: -3, w: 0.005, h: 7 })
 })
 
 test('normalizeLayerDoc: id dedup never lands on an id that already exists', () => {

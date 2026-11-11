@@ -33,10 +33,11 @@ test('R6 real metadata, persisted quality, stable legacy signature, and crop ren
       const hash = () => crypto.createHash('sha256').update(fs.readFileSync(source)).digest('hex')
       const initialHash = hash()
       const ts = now()
-      const dramaId = Number(db.insert(schema.dramas).values({ title: 'Crop regression', aspectRatio: '16:9', projectType: 'documentary', createdAt: ts, updatedAt: ts }).run().lastInsertRowid)
+      const dramaId = Number(db.insert(schema.dramas).values({ title: 'Crop regression', aspectRatio: '4:3', projectType: 'documentary', createdAt: ts, updatedAt: ts }).run().lastInsertRowid)
       const episodeId = Number(db.insert(schema.episodes).values({ dramaId, episodeNumber: 1, title: 'E1', createdAt: ts, updatedAt: ts }).run().lastInsertRowid)
       const storyboardId = Number(db.insert(schema.storyboards).values({ episodeId, storyboardNumber: 1, combo: 'A', createdAt: ts, updatedAt: ts }).run().lastInsertRowid)
-      const spec = { width: 1920, height: 1080, fps: 25 }
+      // 签名口径按 4:3（= 源图比例）：比例一致的底图是 cover，签名不因量到源图尺寸而变
+      const spec = { width: 1600, height: 1200, fps: 25 }
       const legacy = normalizeLayerDoc({ base: { path: 'static/base.png', width: 320, height: 240 }, layers: [] })
       const timeline = normalizeTimeline({ fade_ms: 0, keyframes: [{ t: 0, viewport: { x: 0, y: 0, w: 1, h: 1 }, visible: [] }] })
       const before = layerSegmentSignatureOf({ layer_doc: legacy, timeline, duration: 6 }, spec)
@@ -93,8 +94,9 @@ test('R6 real metadata, persisted quality, stable legacy signature, and crop ren
     assert.equal(result.imageProvenanceStable, true)
     assert.equal(result.cropChangesSignature, true)
     assert.deepEqual(result.storedDoc.base.crop, { x: 0.25, y: 0.125, w: 0.5, h: 0.375 })
+    // 读时只按裁切边界清洗（权威归一在保存/渲染/编辑器加载时按成片规格做）
     assert.deepEqual(result.loaded.timeline.keyframes[0].viewport, result.storedDoc.base.crop)
-    assert.deepEqual(result.clampedViewport, result.storedDoc.base.crop, 'saving old full-frame viewport under a new crop keeps the entire crop, not a centre square')
+    assert.deepEqual(result.clampedViewport, { x: 0.25, y: 0.0625, w: 0.5, h: 0.5 }, 'saving old full-frame viewport under a new crop keeps the entire crop plus its letterbox band, not a centre square')
     assert.equal(result.loaded.end_hold, 0.4)
     assert.equal(result.storedWarnings.length, 2)
     assert.equal(result.loaded.quality_warnings[1].frame_index, 1)
@@ -105,7 +107,8 @@ test('R6 real metadata, persisted quality, stable legacy signature, and crop ren
     for (const pixels of [result.segmentPixels, result.stillPixels]) {
       pixels.forEach((color, i) => color.forEach((channel, axis) => assert.ok(Math.abs(channel - expected[i][axis]) < 24, `probe ${i}: ${color}`)))
     }
-    assert.match(result.svg, /viewBox="80 30 160 90" preserveAspectRatio="none"/)
+    assert.match(result.svg, /viewBox="80 30 160 90"/)
+    assert.ok(!result.svg.includes('preserveAspectRatio="none"'), '#94：取景与成片同比例，矢量等比缩放')
     assert.match(result.fullSvg, /viewBox="0 0 320 240"/)
   } finally {
     rmSync(dir, { recursive: true, force: true })

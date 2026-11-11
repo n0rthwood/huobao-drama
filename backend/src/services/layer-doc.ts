@@ -50,9 +50,11 @@ const TEXT_MAX = 400
 const NAME_MAX = 60
 const COLOR_MAX = 32
 const PATH_MAX = 512
-// 跨 Issue 契约（#44 handoff §3）：坐标归一化 0–1，越界一律钳回画面内
-const COORD_MIN = 0
-const COORD_MAX = 1
+// 跨 Issue 契约（#44 handoff §3）：坐标归一化到整张源图；contain 留白（#94）时取景框会超出
+// 源图（1920×1088 底图配 9:16 成片的取景框是 y∈[-1.06, 2.06]），留白带里也要能放文字，
+// 所以钳制放宽到 [-3, 4]，仍然拦得住脏数据。
+const COORD_MIN = -3
+const COORD_MAX = 4
 
 export interface LayerAnchor {
   asset_id?: number
@@ -213,8 +215,8 @@ const boxSchema = z.preprocess(
   z.object({
     x: coord(),
     y: coord(),
-    w: num(0.005, 2, 0.3),
-    h: num(0.005, 2, 0.12),
+    w: num(0.005, 7, 0.3),
+    h: num(0.005, 7, 0.12),
   }),
 )
 
@@ -555,6 +557,24 @@ function canonicalJson(value: unknown): string {
 }
 
 /**
+ * 地图文档的坐标必须落在整幅底图内（[0,1]）：地图的语义坐标直接按像素外发，出血会把
+ * 「扬州」画到图片外面。#94 把通用坐标范围放宽到 [-3,4] 是为了 contain 留白带里的文字，
+ * 地图路径不走留白，这里收回严格口径。
+ */
+function clampMapLayer(layer: Layer): Layer {
+  const unit = (n: number) => Math.min(1, Math.max(0, n))
+  if (layer.type === 'polygon' || layer.type === 'polyline') {
+    return { ...layer, points: layer.points.map(([x, y]) => [unit(x), unit(y)] as [number, number]) }
+  }
+  if (layer.type === 'marker') return { ...layer, at: [unit(layer.at[0]), unit(layer.at[1])] as [number, number] }
+  return { ...layer, box: { ...layer.box, x: unit(layer.box.x), y: unit(layer.box.y), w: Math.min(2, layer.box.w), h: Math.min(2, layer.box.h) } }
+}
+
+function clampMapCoords(doc: LayerDoc): LayerDoc {
+  return { ...doc, layers: doc.layers.map(clampMapLayer) }
+}
+
+/**
  * 严格校验（Issue #90，地图工作流专用）：文档必须**原样**就是规范化结果。
  *
  * 判据唯一：`normalizeLayerDoc(doc)` 与 doc 深等。规则仍只有 normalizeLayerDoc 一份，
@@ -562,7 +582,7 @@ function canonicalJson(value: unknown): string {
  * 都是静默修正，地图路径一律拒收，由提交方（模型或编辑器）自己改成合法值。
  */
 export function strictLayerDocProblems(raw: unknown): { doc: LayerDoc; problems: LayerDocProblem[] } {
-  const doc = normalizeLayerDoc(raw)
+  const doc = clampMapCoords(normalizeLayerDoc(raw))
   const problems: LayerDocProblem[] = []
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
     return { doc, problems: [{ path: '', message: '图层文档必须是 JSON 对象' }] }
@@ -582,7 +602,8 @@ export function strictLayerDocProblems(raw: unknown): { doc: LayerDoc; problems:
   }
   const kept: Layer[] = []
   rawLayers.slice(0, LAYER_MAX_COUNT).forEach((item, index) => {
-    const layer = normalizeLayer(item, index)
+    const normalized = normalizeLayer(item, index)
+    const layer = normalized ? clampMapLayer(normalized) : normalized
     const path = `layers[${index}]`
     if (!layer) {
       const type = item && typeof item === 'object' ? (item as Record<string, unknown>).type : undefined

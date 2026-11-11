@@ -5,7 +5,7 @@ import ts from 'typescript'
 import { createRenderer, h, nextTick, reactive, ref } from 'vue'
 import { parse, compileScript } from 'vue/compiler-sfc'
 import { createI18n } from 'vue-i18n'
-import { baseAspectIssue, clampTimelineToCrop, cropRectOf } from '../app/utils/layerQuality.js'
+import { baseAspectIssue, baseFrameOf, clampTimelineToFrame, cropRectOf } from '../app/utils/layerQuality.js'
 import { semanticEntries, semanticLayerPatch, anchorState } from '../app/utils/semanticGeometry.js'
 import { deeplinkRuntimeModule } from './sfc-deeplink-runtime.mjs'
 
@@ -49,7 +49,7 @@ test('crop undo restores both document crop and all whole-image frame viewports'
   editor.pushHistory()
   const crop = {x: 0, y: .125, w: 1, h: .75}
   editor.doc.value.base.crop = crop
-  const result = clampTimelineToCrop(timeline, crop)
+  const result = clampTimelineToFrame(timeline, { source_width: 1920, source_height: 1080, crop }, { width: 960, height: 544 })
   timeline = result.timeline
   assert.equal(result.changed, true)
   assert.notEqual(JSON.stringify(timeline), original)
@@ -58,7 +58,8 @@ test('crop undo restores both document crop and all whole-image frame viewports'
   assert.equal(JSON.stringify(timeline), original)
   editor.redo()
   assert.deepEqual(editor.doc.value.base.crop, crop)
-  assert.deepEqual(timeline.keyframes[0].viewport, crop)
+  // contain：取景归一到取景框（含留白带），不是裁切框本身
+  assert.deepEqual(timeline.keyframes[0].viewport, baseFrameOf({ source_width: 1920, source_height: 1080, crop }, { width: 960, height: 544 }).frame)
 })
 
 test('saved server metadata preserves history/selection and does not trigger a new save', async () => {
@@ -204,25 +205,31 @@ const outputDoc = base => ({
     src: { path: 'static/layer.png' }, box: { x: .25, y: .25, w: .5, h: .5 }, fit: 'cover', style: {} }],
 })
 
-test('960×544 canvas, SVG, selection and frame overlays use output dimensions, not 1024² source', async t => {
+const viewBoxOf = box => `${box.x * 1024} ${box.y * 1024} ${box.w * 1024} ${box.h * 1024}`
+const containFrame = baseFrameOf({ source_width: 1024, source_height: 1024 }, { width: 960, height: 544 }).frame
+
+test('1024² 源图在 960×544 项目里 contain：舞台是成片，世界是源图，取景框含留白带（#94）', async t => {
   const doc = outputDoc()
   const mounted = await mountCanvasComponent(t, Canvas, {
     doc, baseSrc: doc.base.path, selectedIds: ['image'], viewport: { x: .25, y: .25, w: .5, h: .5 },
   })
   const stage = withClass(mounted.root, 'lc-stage')
   assert.deepEqual([stage.props.style.width, stage.props.style.height], ['960px', '544px'])
-  assert.equal(withClass(mounted.root, 'lc-ui').props.viewBox, '0 0 960 544')
+  assert.equal(withClass(mounted.root, 'lc-ui').props.viewBox, viewBoxOf(containFrame), '取景框按成片比例向两侧扩出留白')
   const markup = withClass(mounted.root, 'lc-overlay').props.innerHTML
-  assert.match(markup, /width="960" height="544" viewBox="0 0 960 544"/)
+  assert.match(markup, /width="960" height="544"/)
+  assert.ok(!markup.includes('preserveAspectRatio="none"'), '矢量不再拉伸')
   const hit = withClass(mounted.root, 'lc-hit')
-  assert.deepEqual([hit.props.x, hit.props.y, hit.props.width, hit.props.height], [240, 136, 480, 272])
+  assert.deepEqual([hit.props.x, hit.props.y, hit.props.width, hit.props.height], [256, 256, 512, 512], '命中框按源图像素')
+  // 留白垫底是同一张图放大模糊，底图本身按 bounds 等比摆放
+  assert.equal(withClass(mounted.root, 'lc-backdrop').props.style.filter.startsWith('blur('), true)
   mounted.instance.startViewport()
   await nextTick()
   const frame = withClass(mounted.root, 'lc-frame')
-  assert.deepEqual([frame.props.x, frame.props.y, frame.props.width, frame.props.height], [240, 136, 480, 272])
+  assert.deepEqual([frame.props.x, frame.props.y, frame.props.width, frame.props.height], [256, 256, 512, 512])
 })
 
-test('explicit crop uses original-source aspect and emits whole-source crop coordinates without editing the doc', async t => {
+test('裁切框按成片比例（9:16 项目裁 9:16），坐标仍是整张源图，且不改文档（#94）', async t => {
   const doc = outputDoc()
   const before = JSON.stringify(doc)
   let crop
@@ -233,35 +240,44 @@ test('explicit crop uses original-source aspect and emits whole-source crop coor
   assert.equal(stage.props.style.width, stage.props.style.height)
   assert.equal(withClass(mounted.root, 'lc-ui').props.viewBox, '0 0 1024 1024')
   const frame = withClass(mounted.root, 'lc-frame')
-  assert.deepEqual([frame.props.x, frame.props.y, frame.props.width, frame.props.height], [0, 224, 1024, 576])
+  const expectedHeight = 1024 * 544 / 960
+  assert.equal(frame.props.x, 0)
+  assert.equal(frame.props.width, 1024)
+  assert.ok(Math.abs(frame.props.height - expectedHeight) < 1, `裁框高度按成片比例：${frame.props.height}`)
+  assert.ok(Math.abs(frame.props.y - (1024 - expectedHeight) / 2) < 1, '裁框居中')
   const apply = allNodes(mounted.root).find(node => node.type === 'button' && nodeText(node) === 'Apply crop')
   apply.props.onClick()
   await nextTick()
-  assert.deepEqual(crop, { x: 0, y: .21875, w: 1, h: .5625 })
-  assert.deepEqual(cropRectOf({ crop }, 1024, 1024), { left: 0, top: 224, width: 1024, height: 576 })
+  assert.ok(Math.abs((crop.w * 1024) / (crop.h * 1024) - 960 / 544) < 0.01, '裁出的比例就是成片比例')
+  assert.deepEqual(cropRectOf({ crop }, 1024, 1024), { left: 0, top: Math.round((1024 - expectedHeight) / 2), width: 1024, height: Math.round(expectedHeight) })
   assert.equal(JSON.stringify(doc), before)
-  assert.equal(withClass(mounted.root, 'lc-ui').props.viewBox, '0 0 960 544')
+  assert.equal(withClass(mounted.root, 'lc-ui').props.viewBox, viewBoxOf(containFrame), '退出裁切后回到 contain 取景框')
 })
 
 test('persisted crop projects the same source rectangle for image, SVG, hit testing and frame editing', async t => {
-  const doc = outputDoc({ crop: { x: 0, y: .25, w: 1, h: .5 } })
+  const crop = { x: 0, y: .25, w: 1, h: .5 }
+  const doc = outputDoc({ crop })
+  const cropFrame = baseFrameOf(doc.base, { width: 960, height: 544 }).frame
   const patches = []
   const mounted = await mountCanvasComponent(t, Canvas, {
-    doc, baseSrc: doc.base.path, selectedIds: ['image'], viewport: { ...doc.base.crop },
+    doc, baseSrc: doc.base.path, selectedIds: ['image'], viewport: { ...crop },
     onPatch: patch => patches.push(patch),
   })
   assert.equal(withClass(mounted.root, 'lc-stage').props.style.height, '544px')
-  assert.equal(withClass(mounted.root, 'lc-ui').props.viewBox, '0 256 1024 512')
-  assert.match(withClass(mounted.root, 'lc-overlay').props.innerHTML, /viewBox="0 256 1024 512"/)
+  // 2:1 的裁切在 960×544 项目里也是 contain：取景框沿高度扩出留白带
+  assert.equal(withClass(mounted.root, 'lc-ui').props.viewBox, viewBoxOf(cropFrame))
+  assert.ok(!withClass(mounted.root, 'lc-overlay').props.innerHTML.includes('preserveAspectRatio="none"'), '矢量与栅格同取景框，不拉伸')
   const sourceStyle = withClass(mounted.root, 'lc-source').props.style
-  assert.equal(sourceStyle.width, '100%')
-  assert.equal(sourceStyle.height, '200%')
-  assert.equal(sourceStyle.top, '-50%')
+  assert.equal(sourceStyle.width, `${100 / cropFrame.w}%`)
+  assert.equal(sourceStyle.height, `${100 / cropFrame.h}%`)
+  const boundsStyle = withClass(mounted.root, 'lc-bounds').props.style
+  assert.equal(boundsStyle.top, `${crop.y * 100}%`, '底图只占裁切区域，留白带不画底图')
+  assert.equal(boundsStyle.height, `${crop.h * 100}%`)
   withClass(mounted.root, 'lc-hit').props.onPointerdown({
     clientX: 480, clientY: 272, target: {}, pointerId: 1, stopPropagation() {},
   })
   mounted.listeners.get('pointermove')({ clientX: 480, clientY: 326.4 })
-  assert.ok(Math.abs(patches.at(-1).patch.box.y - (.25 + .1 * .5)) < 1e-9)
+  assert.ok(Math.abs(patches.at(-1).patch.box.y - (.25 + .1 * cropFrame.h)) < 1e-9)
   mounted.listeners.get('pointerup')()
   mounted.instance.startViewport()
   await nextTick()
@@ -283,7 +299,7 @@ test('legacy source load is display-only and does not resize or save the output 
   await nextTick()
   assert.equal(JSON.stringify(doc), before)
   assert.equal(sourceEvents, 0)
-  assert.equal(withClass(mounted.root, 'lc-ui').props.viewBox, '0 0 960 544')
+  assert.equal(withClass(mounted.root, 'lc-ui').props.viewBox, viewBoxOf(containFrame), '量到源图后按 contain 取景框显示')
   mounted.instance.startCrop()
   await nextTick()
   assert.equal(withClass(mounted.root, 'lc-ui').props.viewBox, '0 0 1024 1024')
@@ -299,15 +315,13 @@ test('same-size source/output canvas and legacy crop coordinates remain unchange
   assert.deepEqual([frame.props.x, frame.props.y, frame.props.width, frame.props.height], [0, 0, 1920, 1080])
 })
 
-test('aspect diagnostics follow output-fill versus explicit source crop semantics, not blanket suppression', () => {
+test('比例诊断 = contain 留白（#94）：只按源图真实像素判断，量不到尺寸就不下结论', () => {
   const spec = { width: 960, height: 544 }
-  assert.equal(baseAspectIssue(outputDoc().base, spec), null)
-  assert.deepEqual(baseAspectIssue(outputDoc({ width: 1024, height: 1024 }).base, spec), { aspect: '1:1' })
-  assert.deepEqual(baseAspectIssue(outputDoc({ crop: { x: .25, y: .25, w: .5, h: .5 } }).base, spec), { aspect: '1:1' })
-  assert.equal(baseAspectIssue(outputDoc({ crop: { x: 0, y: .21875, w: 1, h: .5625 } }).base, spec), null)
+  assert.deepEqual(baseAspectIssue(outputDoc().base, spec), { aspect: '1:1', mode: 'contain' }, '1024² 底图在 960×544 项目里留白渲染')
+  assert.deepEqual(baseAspectIssue(outputDoc({ crop: { x: .25, y: .25, w: .5, h: .5 } }).base, spec), { aspect: '1:1', mode: 'contain' })
+  assert.equal(baseAspectIssue(outputDoc({ crop: { x: 0, y: .21875, w: 1, h: .5625 } }).base, spec), null, '裁到成片比例即 cover')
   assert.equal(baseAspectIssue({ width: 1920, height: 1080, source_width: 1920, source_height: 1080 }, spec), null)
-  assert.equal(baseAspectIssue({ width: 960, height: 544 }, spec), null)
-  assert.deepEqual(baseAspectIssue({ width: 1024, height: 1024 }, spec), { aspect: '1:1' })
+  assert.equal(baseAspectIssue({ width: 1024, height: 1024 }, spec), null, '源图尺寸未知时无法判断，不误报')
   assert.equal(baseAspectIssue({}, spec), null)
 })
 

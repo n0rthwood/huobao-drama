@@ -15,6 +15,7 @@ import { startSkeletonGeneration } from './narration-skeleton.js'
 import { startRewriteRun } from './script-rewrite/run.js'
 import { startPortraitAppearance } from './portrait-appearance.js'
 import { startSemanticsAuto } from './asset-semantics-auto.js'
+import { startLayerBaseCheck } from './layer-base-check.js'
 import { startAssetBatch } from './asset-batch.js'
 import { retryTask } from './task-retry.js'
 import { restartArgsSchema as argsSchema } from './text-task-restart-schema.js'
@@ -50,6 +51,7 @@ export async function dispatchTextTaskRestart(restart: TextTaskRestart, retryOf:
     case 'script_rewrite': result = await startRewriteRun(episodeId(), opts); break
     case 'portrait_appearance': result = await startPortraitAppearance(z.number().parse(a.characterId), { ...opts, episodeId: z.number().parse(a.opts?.episodeId) }); break
     case 'asset_semantics': result = await startSemanticsAuto({ ...argsSchema.shape.input.unwrap().parse(a.input), retryOf, excludeConfigIds: opts.excludeConfigIds }); break
+    case 'layer_base_check': result = await startLayerBaseCheck(z.number().parse(a.storyboardId), { retryOf, excludeConfigIds: opts.excludeConfigIds }); break
     case 'asset_batch': result = await startAssetBatch(dramaId(), { ...argsSchema.shape.req.unwrap().parse(a.req), excludeTextConfigIds: opts.excludeConfigIds ?? a.req?.excludeTextConfigIds }, retryOf); break
     default: throw new Error(`不支持恢复任务类型：${restart.kind}`)
   }

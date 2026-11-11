@@ -103,7 +103,8 @@ test('组合 A 草稿：底图由调用方解析（设计卡 base），语义像
   assert.equal(got.labelText, '拉萨', 'label 文字取自语义条目的 text')
   assert.deepEqual(got.times, [0, 3, 6, 9, 11, 12, 15], '0 s 干净底图 + 四个 reveal + 推近 + 末帧落在段尾 15 s')
   assert.deepEqual(got.visible, [0, 1, 2, 3, 4, 4, 4], '每个精确关键帧累积一层')
-  assert.equal(got.lastViewport.w, got.lastViewport.h)
+  // 2000×1000 底图配 960×544 成片是 contain：取景比例 = 成片比例，不再是归一化方框
+  assert.ok(Math.abs((got.lastViewport.w * 2000) / (got.lastViewport.h * 1000) / (960 / 544) - 1) < 0.01, `取景像素比例 ${got.lastViewport.w}×${got.lastViewport.h}`)
   assert.deepEqual(got.warnings, [])
   assert.equal(got.legacyStates, false, '输出只有 keyframes')
 })

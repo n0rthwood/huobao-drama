@@ -12,9 +12,9 @@ import { v4 as uuid } from 'uuid'
 import { DATA_ROOT, STORAGE_ROOT } from '../utils/paths.js'
 import { getAbsolutePath } from '../utils/storage.js'
 import type { LayerDoc, LayerVariables } from './layer-doc.js'
-import { baseFilterLayers, layerDocToSvg, resolvedText } from './layer-svg.js'
+import { layerDocToSvg, resolvedText } from './layer-svg.js'
 import { assertRenderableText, ensureLayerFonts } from './layer-fonts.js'
-import { cropRectOf } from './layer-quality.js'
+import { renderFramePng } from './layer-frame-raster.js'
 
 export interface LayerRenderOptions {
   width?: number
@@ -98,8 +98,9 @@ export async function renderLayerDoc(doc: LayerDoc, options: LayerRenderOptions 
   }
   if (!doc.base.path) throw new Error('图层文档缺少底图路径 base.path')
   const basePath = resolveLocalImage(doc.base.path, '底图')
-  const metadata = doc.base.crop ? await sharp(basePath).metadata() : null
-  const renderDoc = metadata?.width && metadata.height
+  // 取景框要按底图真实像素算，源图尺寸一律现场读（只读文件头）
+  const metadata = await sharp(basePath).metadata()
+  const renderDoc = metadata.width && metadata.height
     ? { ...doc, base: { ...doc.base, source_width: metadata.width, source_height: metadata.height } }
     : doc
 
@@ -117,32 +118,8 @@ export async function renderLayerDoc(doc: LayerDoc, options: LayerRenderOptions 
     },
   })
 
-  let buffer: Buffer
-  if (doc.base.crop) {
-    // Precompose filters on the WHOLE image, as the editor and segment renderer do.
-    // A single viewport extraction follows; crop is never a second coordinate system.
-    const scale = Math.min(2.5, Math.max(1, 1 / doc.base.crop.w, 1 / doc.base.crop.h))
-    const canvas = { width: Math.round(width * scale), height: Math.round(height * scale) }
-    const base = await sharp(basePath)
-      .resize(canvas.width, canvas.height, { fit: 'fill' })
-      .composite(baseFilterLayers(doc.base.filter, canvas).map(layer => ({ input: Buffer.from(layer.svg) })))
-      .removeAlpha().raw().toBuffer()
-    buffer = await sharp(base, { raw: { ...canvas, channels: 3 } })
-      .extract(cropRectOf(doc.base, canvas.width, canvas.height))
-      .resize(width, height, { fit: 'fill' })
-      .composite([{ input: Buffer.from(svg) }])
-      .png().toBuffer()
-  } else {
-    // Preserve the uncropped pipeline and its pixels exactly.
-    const composites: sharp.OverlayOptions[] = baseFilterLayers(doc.base.filter, { width, height }).map(layer => ({
-      input: Buffer.from(layer.svg),
-    }))
-    composites.push({ input: Buffer.from(svg) })
-    buffer = await sharp(basePath)
-      .resize(width, height, { fit: 'fill' })
-      .composite(composites)
-      .png().toBuffer()
-  }
+  // 底图栅格与图层段同源：cover 一条管线（像素不变），contain 走取景框画布（自带模糊垫底）
+  const buffer = await renderFramePng(renderDoc.base, basePath, { width, height }, Buffer.from(svg))
 
   return { buffer, width, height, ms: Date.now() - started }
 }

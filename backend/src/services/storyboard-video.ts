@@ -41,6 +41,8 @@ import { toCombo } from './design-card.js'
 import { generatedSegmentSeconds } from './shot-duration.js'
 import { resolveDramaProjectType } from './project-type.js'
 import { assertShotTtsReady } from './narration-tts-gate.js'
+import { getLayerSegment, resolveEpisodeSegmentSpec } from './layer-segment.js'
+import { baseCheckBlockReason } from './layer-base-check.js'
 
 export interface StoryboardVideoOptions {
   model?: string
@@ -162,6 +164,14 @@ export async function buildStoryboardVideoRequest(
   if (documentary && (!combo || storyboard.designCardStatus !== 'confirmed')) throw new Error('设计卡未确认')
   // 实测配音是制作的硬前置（#70）：段时长按实测音频排，音频失效就不能出画面
   if (documentary) await assertShotTtsReady(storyboardId)
+
+  // 底图视觉验证（Issue #94）：裁切/留白的底图没过验证就不能当引导帧或整镜画面；
+  // 排在「A 组合无生成段」之前，A 的那张底图就是整镜画面，理由要说准。
+  const layerSegment = await getLayerSegment(storyboardId)
+  if (layerSegment) {
+    const baseReason = baseCheckBlockReason(layerSegment, await resolveEpisodeSegmentSpec(episode.id))
+    if (baseReason) throw new Error(baseReason)
+  }
   if (documentary && combo === 'A') throw new Error('未启用生成段')
 
   // 关键帧闸门：就绪且人工确认过才允许生成视频

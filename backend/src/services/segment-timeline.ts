@@ -10,7 +10,7 @@
  * `FrameState`，所以同一份时间线在单测、服务端渲染、前端预览里必然一致。
  */
 import { z } from 'zod'
-import { clampViewportToCrop, normalizeCrop } from './layer-quality.js'
+import { clampViewportToBox, normalizeFrameBox } from './layer-quality.js'
 
 /** 取景框：归一化 0–1，相对图层文档坐标系（= 成片画幅） */
 export interface SegmentViewport {
@@ -118,14 +118,14 @@ const timelineIn = z.object({
 })
 
 /**
- * 取景框规范化：钳进画面内、保证最小边长，并把宽高**按归一化等值**对齐。
- * 归一化坐标系里 `w === h` 才等于「与整幅同比例」（像素上就是 w·W : h·H = W : H），
- * 不等就会把画面拉伸，所以这里以较大的一边为准放大另一边，宁可多框一点也不变形。
+ * 取景框规范化：钳进取景框内、保证最小边长。给定 `frame`（底图取景框，可超出 [0,1]）时
+ * 按取景框的比例归一；没有取景框信息时退回「整幅同比例」口径——归一化坐标系里 `w === h`
+ * 才等于与整幅同比例（像素上就是 w·W : h·H = W : H），以较大的一边为准放大另一边。
  */
-export function normalizeViewport(raw: unknown, crop?: unknown): SegmentViewport {
-  const bounds = normalizeCrop(crop)
+export function normalizeViewport(raw: unknown, frame?: unknown): SegmentViewport {
+  const bounds = normalizeFrameBox(frame)
   if (bounds.x !== 0 || bounds.y !== 0 || bounds.w !== 1 || bounds.h !== 1) {
-    return clampViewportToCrop(raw, bounds).viewport
+    return clampViewportToBox(raw, bounds).viewport
   }
   const parsed = viewportIn.safeParse(raw)
   const box = parsed.success ? parsed.data : {}
@@ -133,6 +133,9 @@ export function normalizeViewport(raw: unknown, crop?: unknown): SegmentViewport
   const y0 = box.y ?? 0
   const w0 = box.w ?? 1
   const h0 = box.h ?? 1
+  // 超出整图的取景只可能来自 contain 留白（#94）：原样清洗保留，别把留白带squash掉；
+  // 权威归一（按成片比例）在保存、渲染与编辑器加载时用真实成片规格做。
+  if (w0 > 1 || h0 > 1 || x0 < 0 || y0 < 0) return normalizeFrameBox({ x: x0, y: y0, w: w0, h: h0 })
   const size = clamp(Math.max(w0, h0), SEGMENT_MIN_VIEWPORT, 1)
   const cx = clamp(x0 + w0 / 2, 0, 1)
   const cy = clamp(y0 + h0 / 2, 0, 1)

@@ -3548,10 +3548,27 @@
       }
     }
   },
+  "baseCheck": {
+    "status": {"none":"图层底图待视觉验证","pending":"图层底图视觉验证进行中","passed":"图层底图视觉验证通过","failed":"图层底图视觉验证未通过","error":"图层底图视觉验证出错","overridden":"图层底图已人工放行"},
+    "neverChecked": "本段底图有裁切或留白，渲染后会自动发起验证",
+    "overrideReason": "放行理由：{reason}",
+    "viewTask": "查看任务 #{id}",
+    "recheck": "重新验证",
+    "rechecking": "验证中…",
+    "override": "人工放行",
+    "overridePrompt": "请写明人工放行的理由（必填）：",
+    "overrideDone": "已人工放行",
+    "aspectVersionHint": "底图比例 {aspect} 与成片不符，将以留白渲染；可裁切到成片比例，或为该资产生成项目画幅版本。",
+    "aspectVersion": "生成项目画幅版本",
+    "aspectVersionRunning": "提交中…",
+    "aspectVersionStarted": "已提交项目画幅版本（{size}），完成后成为当前图",
+    "pinnedOutdated": "本段钉选旧版本，可切换到新版本",
+    "switchToCurrent": "切换到当前版本"
+  },
   "layerCanvas": {
     "toolbar": {"select":"选择","pan":"平移","frame":"编辑取景框","crop":"裁切底图","undo":"撤销","redo":"重做","snap":"吸附","zoomIn":"放大","zoomOut":"缩小","fit":"适配画布","edit":"编辑","preview":"预览","render":"渲染本段","rehearse":"预演本镜"},
     "keyframeBar": {"title":"精确关键帧","add":"在当前时刻添加帧","copyPrev":"复制上一帧","remove":"删除帧（首帧不可删）","duration":"段长","endHold":"末尾停留","junction":"衔接帧","junctionTextWarn":"衔接帧不含文字图层：渲染时这 {n} 个文字将不出现","teach":"这一段由若干张精确关键帧组成：每帧=某一时刻的取景+可见图层。程序在帧之间自动推拉与淡入，渲染成确定性视频——它们就是这段的关键帧，不是 PPT 动画。","ease":"到下一帧缓动","fade":"新图层淡入","viewportPick":"取景（在画布框选）","visible":"可见图层"},
-    "base": {"title":"底图","noBase":"未选择底图（可先编辑文字）","replace":"更换底图","cropTo169":"裁切到 16:9","aspectBanner":"画布或原图裁切比例 {aspect} 与输出不符，渲染时会拉伸","cropHelp":"拖动原图坐标中的 16:9 裁框或右下角；原图不变。","applyCrop":"应用裁切","cancelCrop":"取消","outputSize":"输出画布 {w}×{h}","sourceSize":"源图 {w}×{h}（原件像素）","sourceUnknown":"源图尺寸未知","resolution":"裁切后源图像素为成片 {sw}×{sh} 的 {times}×（按短板计）","verified":"已核验","inherited":"继承底图（锁定）","guide":"源图像素用于裁切与清晰度判断，不决定输出画布；建议裁切后宽高均≥成片的 2 倍。","style":"整体风格","unknown":"底图","version":"版本 {version}","saveSize":"源图尺寸尚未由服务端确认；保存时会读取原件。","loadError":"素材或语义条目加载失败。","framingClamped":"裁切无法保留部分原取景，已收回有效区域；可撤销恢复原裁切和全部取景。"},
+    "base": {"title":"底图","noBase":"未选择底图（可先编辑文字）","replace":"更换底图","cropToOutput":"裁切到成片比例","aspectBanner":"底图比例 {aspect} 与成片不符，将以留白渲染，需视觉验证；可裁切到成片比例或为该资产生成项目画幅版本","cropHelp":"拖动原图坐标中的成片比例裁框或右下角；原图不变。","applyCrop":"应用裁切","cancelCrop":"取消","outputSize":"输出画布 {w}×{h}","sourceSize":"源图 {w}×{h}（原件像素）","sourceUnknown":"源图尺寸未知","resolution":"裁切后源图像素为成片 {sw}×{sh} 的 {times}×（按短板计）","verified":"已核验","inherited":"继承底图（锁定）","guide":"源图像素用于裁切与清晰度判断，不决定输出画布；建议裁切后宽高均≥成片的 2 倍。","style":"整体风格","unknown":"底图","version":"版本 {version}","saveSize":"源图尺寸尚未由服务端确认；保存时会读取原件。","loadError":"素材或语义条目加载失败。","framingClamped":"裁切无法保留部分原取景，已收回有效区域；可撤销恢复原裁切和全部取景。"},
     "anchor": {"anchored":"已锚定","manual":"手动","unlink":"源条目已删除或改名","detachConfirm":"该图层锚定于「{name}」。解除锚定并移动？","relink":"重新选择条目","toManual":"转为手动","labelOffset":"标签偏移","addMarker":"添加标记","addRegion":"添加区域","addRoute":"添加路线","noSemantics":"该素材尚未语义标注。","inherited":"继承底图不可使用语义锚点。","choose":"选择语义条目重新锚定","cancel":"取消","points":"地点","regions":"区域","lines":"路线","labels":"标签"},
     "quality": {"badge":"有效 {w}×{h} < {sw}×{sh}（推近过度）","frameDot":"有效像素低于输出","hint":"请使用更高分辨率底图或缩小推近。"},
     "image": {"pick":"选择素材","legacyPath":"本地路径（旧），建议重新选择素材。","selectionCount":"请选择一张图片。","cover":"填充","contain":"适应","episode":"本集资产","uploadHint":"上传图片将登记为本集资产及正式版本。","contextMissing":"请在剧集中打开编辑器后上传或导入帧图片。"},

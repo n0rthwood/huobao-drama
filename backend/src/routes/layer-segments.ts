@@ -18,7 +18,7 @@ import { junctionFrameOf } from '../services/junction-frame.js'
 import { assertShotGate, productionGateReason } from '../services/workflow-gates.js'
 import { parseDesignCard, toCombo, toDesignCardStatus } from '../services/design-card.js'
 import { segmentIssuesOf } from '../services/segment-issues.js'
-import { clampViewportToCrop } from '../services/layer-quality.js'
+import { clampViewportToFrame } from '../services/layer-quality.js'
 import {
   deleteLayerSegment,
   getLayerSegment,
@@ -28,6 +28,12 @@ import {
   saveSegmentDraft,
   type SegmentDraftOutcome,
 } from '../services/layer-segment.js'
+import {
+  baseCheckRequired,
+  baseCheckSatisfied,
+  overrideLayerBaseCheck,
+  startLayerBaseCheck,
+} from '../services/layer-base-check.js'
 
 const app = new Hono()
 
@@ -74,7 +80,14 @@ async function segmentPayload(storyboardId: number) {
     design_card_status: status,
     production_unlocked: gate.unlocked,
     gate_reason: gate.reason,
-    segment: segment ? { ...segment, fresh: layerSegmentIsFresh(segment, spec, sb.combo) } : null,
+    segment: segment
+      ? {
+        ...segment,
+        fresh: layerSegmentIsFresh(segment, spec, sb.combo),
+        base_check_required: baseCheckRequired(segment.layer_doc, spec),
+        base_check_satisfied: baseCheckSatisfied(segment, spec),
+      }
+      : null,
     junction,
     issues: segmentIssuesOf({
       card: parseDesignCard(sb.designCard),
@@ -119,8 +132,10 @@ app.put('/storyboards/:id', async (c) => {
     })
     const submitted = body.timeline && typeof body.timeline === 'object' ? body.timeline as Record<string, unknown> : null
     const frames = Array.isArray(submitted?.keyframes) ? submitted.keyframes : []
-    const viewportClamped = Boolean(saved.layer_doc.base.crop) && frames.some(frame =>
-      frame && typeof frame === 'object' && clampViewportToCrop(frame.viewport, saved.layer_doc.base.crop).changed,
+    // 取景框按成片比例归一（Issue #94）：裁切与 contain 留白都可能改写提交上来的 viewport
+    const saveSpec = await resolveEpisodeSegmentSpec(sb.episodeId)
+    const viewportClamped = frames.some(frame =>
+      frame && typeof frame === 'object' && clampViewportToFrame(frame.viewport, saved.layer_doc.base, saveSpec).changed,
     )
     return success(c, { ...await segmentPayload(storyboardId), viewport_clamped: viewportClamped })
   } catch (err) {
@@ -176,6 +191,39 @@ app.post('/storyboards/:id/render', async (c) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     logTaskError('LayerSegmentAPI', 'render', { storyboardId, error: message })
+    return badRequest(c, message)
+  }
+})
+
+/** 重新验证底图（Issue #94）：按当前底图/裁切/取景重新起一次视觉任务 */
+app.post('/storyboards/:id/base-check', async (c) => {
+  const storyboardId = Number(c.req.param('id'))
+  if (!await storyboardOf(storyboardId)) return notFound(c, '分镜不存在')
+  try {
+    const outcome = await startLayerBaseCheck(storyboardId)
+    const payload = await segmentPayload(storyboardId)
+    return success(c, { task_id: outcome.taskId, started: outcome.started, reason: outcome.reason ?? null, segment: payload?.segment })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    logTaskError('LayerSegmentAPI', 'base-check', { storyboardId, error: message })
+    return badRequest(c, message)
+  }
+})
+
+/** 人工放行底图验证（Issue #94）：必须写明理由，理由与时间记在段上 */
+app.post('/storyboards/:id/base-check/override', async (c) => {
+  const storyboardId = Number(c.req.param('id'))
+  if (!await storyboardOf(storyboardId)) return notFound(c, '分镜不存在')
+  const body = await c.req.json().catch(() => ({})) as Record<string, unknown>
+  const reason = typeof body.reason === 'string' ? body.reason.trim() : ''
+  if (!reason) return badRequest(c, '人工放行必须写明理由')
+  try {
+    await overrideLayerBaseCheck(storyboardId, reason)
+    const payload = await segmentPayload(storyboardId)
+    return success(c, { segment: payload?.segment })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    logTaskError('LayerSegmentAPI', 'base-check-override', { storyboardId, error: message })
     return badRequest(c, message)
   }
 })

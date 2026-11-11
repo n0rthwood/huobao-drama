@@ -19,7 +19,7 @@
         <div class="lr-actions">
           <button v-if="externalSources" type="button" class="btn-ghost" :disabled="inherited" @click="posterPickerOpen = !posterPickerOpen"><ImagePlus :size="14" />{{ t('layerCanvas.base.replace') }}</button>
           <button v-else type="button" class="btn-ghost" :disabled="inherited" @click="pickerOpen = true"><ImagePlus :size="14" />{{ t('layerCanvas.base.replace') }}</button>
-          <button type="button" class="btn-ghost" :disabled="inherited || !sourceSize.width || !sourceSize.height" @click="emit('crop-request')"><Crop :size="14" />{{ t('layerCanvas.base.cropTo169') }}</button>
+          <button type="button" class="btn-ghost" :disabled="inherited || !sourceSize.width || !sourceSize.height" @click="emit('crop-request')"><Crop :size="14" />{{ t('layerCanvas.base.cropToOutput') }}</button>
         </div>
         <small class="lr-guide"><Info :size="13" />{{ t('layerCanvas.base.guide') }}</small>
         <div v-if="posterPickerOpen" class="lr-poster-bases">

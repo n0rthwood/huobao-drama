@@ -18,6 +18,7 @@ import {
   segmentsByStoryboard,
 } from './layer-segment.js'
 import { toCombo, lockedGenSlot, type Combo } from './design-card.js'
+import { baseCheckBlockReason } from './layer-base-check.js'
 
 export interface JunctionFrame {
   /** `layer_last` = 图层段末帧（C），`layer_first` = 图层段首帧（D）；没有图层段时为 null */
@@ -27,6 +28,8 @@ export interface JunctionFrame {
   path: string | null
   hash: string | null
   stale: boolean
+  /** 底图视觉验证未通过/待验证的原因（Issue #94）；通过或不需要验证时为 null */
+  base_check_reason: string | null
   /** 段本身的新鲜度（与 `stale` 区分：段可能新鲜但衔接帧文件被清掉了） */
   segment_fresh: boolean
   combo: Combo | null
@@ -38,6 +41,7 @@ const EMPTY_JUNCTION: Omit<JunctionFrame, 'combo'> = {
   path: null,
   hash: null,
   stale: true,
+  base_check_reason: null,
   segment_fresh: false,
 }
 
@@ -54,12 +58,15 @@ export async function junctionFrameOf(storyboardId: number): Promise<JunctionFra
   const fresh = layerSegmentIsFresh(segment, spec, combo)
   const path = segment.junction_path
   const fileExists = Boolean(path && fs.existsSync(getAbsolutePath(path)))
+  // 底图视觉验证没过的衔接帧不能当引导帧用（Issue #94）：它正是被裁切/留白的那一张
+  const baseCheckReason = baseCheckBlockReason(segment, spec)
   return {
     source: slot === 'first' ? 'layer_last' : 'layer_first',
     t: slot === 'first' ? segment.duration : 0,
     path,
     hash: segment.junction_hash,
-    stale: !fresh || !fileExists || !segment.junction_hash,
+    stale: !fresh || !fileExists || !segment.junction_hash || !!baseCheckReason,
+    base_check_reason: baseCheckReason,
     segment_fresh: fresh,
     combo,
   }
@@ -88,12 +95,14 @@ export async function junctionFramesOfEpisode(episodeId: number): Promise<Map<nu
     }
     const fresh = layerSegmentIsFresh(segment, spec, combo)
     const fileExists = Boolean(segment.junction_path && fs.existsSync(getAbsolutePath(segment.junction_path)))
+    const baseCheckReason = baseCheckBlockReason(segment, spec)
     out.set(row.id, {
       source: slot === 'first' ? 'layer_last' : 'layer_first',
       t: slot === 'first' ? segment.duration : 0,
       path: segment.junction_path,
       hash: segment.junction_hash,
-      stale: !fresh || !fileExists || !segment.junction_hash,
+      stale: !fresh || !fileExists || !segment.junction_hash || !!baseCheckReason,
+      base_check_reason: baseCheckReason,
       segment_fresh: fresh,
       combo,
     })

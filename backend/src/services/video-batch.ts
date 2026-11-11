@@ -26,6 +26,8 @@ import { logTaskError, logTaskProgress, logTaskStart, logTaskSuccess, logTaskWar
 import { transitionStatus } from './transition.js'
 import { scopeFromPreview, type BatchScope } from './batch-scope.js'
 import { resolveDramaProjectType } from './project-type.js'
+import { getLayerSegment, resolveEpisodeSegmentSpec } from './layer-segment.js'
+import { baseCheckBlockReason } from './layer-base-check.js'
 
 export type BatchStatus = 'running' | 'done' | 'cancelled'
 export type BatchItemState = 'pending' | 'running' | 'completed' | 'failed' | 'skipped'
@@ -191,7 +193,17 @@ async function loadActiveStoryboardIds(): Promise<Set<number>> {
     .map(task => task.storyboardId as number))
 }
 
-/** 某镜此刻是否被阻断（关键帧未确认 / 视频提示词与绑定不一致）；可生成时返回 null */
+/**
+ * 底图视觉验证（Issue #94）：裁切/留白的底图没过验证就不能往下走。
+ * A 组合没有生成段，但那张底图就是整镜画面，同样要拦，所以这一条单独拿出来给预览循环用。
+ */
+async function layerBaseCheckReason(sb: typeof schema.storyboards.$inferSelect): Promise<string | null> {
+  const segment = await getLayerSegment(sb.id)
+  if (!segment) return null
+  return baseCheckBlockReason(segment, await resolveEpisodeSegmentSpec(sb.episodeId))
+}
+
+/** 某镜此刻是否被阻断（底图视觉验证 / 关键帧未确认 / 视频提示词与绑定不一致）；可生成时返回 null */
 async function videoBlockReason(
   sb: typeof schema.storyboards.$inferSelect,
   keyframes: Map<number, StoryboardKeyframeState>,
@@ -200,8 +212,12 @@ async function videoBlockReason(
   const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, sb.episodeId))
   if (resolveDramaProjectType(ep?.dramaId) === 'documentary') {
     if (!sb.combo || sb.designCardStatus !== 'confirmed') return '设计卡未确认'
-    if (sb.combo === 'A') return '未启用生成段'
   }
+  // 排在关键帧之前：衔接帧不可用的真实原因是底图没过验证，
+  // 只报「关键帧尚未确认」会把人引到错误的修复动作上。
+  const baseReason = await layerBaseCheckReason(sb)
+  if (baseReason) return baseReason
+  if (resolveDramaProjectType(ep?.dramaId) === 'documentary' && sb.combo === 'A') return '未启用生成段'
   if (!keyframes.get(sb.id)?.confirmed) return '关键帧尚未确认'
   const blocking = blockingIssuesFor(await checkStoryboardRefs(sb), 'video_prompt')
   if (blocking.length) return `视频提示词与参考图不一致：${describeIssues(blocking)}`
@@ -233,6 +249,12 @@ export async function previewEpisodeVideoBatch(
   const result: VideoPreviewItem[] = []
   for (const sb of targets) {
     const base = { storyboard_id: sb.id, storyboard_number: sb.storyboardNumber }
+    // 底图没过验证的镜头先于「A 组合无生成段」报出来：A 的那张底图就是整镜画面
+    const baseBlocked = await layerBaseCheckReason(sb)
+    if (baseBlocked) {
+      result.push({ ...base, status: 'blocked', checked: false, selectable: false, reason: baseBlocked })
+      continue
+    }
     if (sb.combo === 'A') {
       result.push({ ...base, status: 'excluded', checked: false, selectable: false, reason: 'no_generated_segment' })
       continue

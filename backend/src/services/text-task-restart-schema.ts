@@ -17,7 +17,7 @@ export const restartOptionsSchema = z.object({
 export const restartArgsSchema = z.object({
   episodeId: z.number().optional(), dramaId: z.number().optional(), characterId: z.number().optional(),
   sourceTaskId: z.number().optional(), target: z.enum(['characters', 'scenes', 'props']).optional(),
-  storyboardIds: z.array(z.number()).optional(), opts: restartOptionsSchema.optional(),
+  storyboardIds: z.array(z.number()).optional(), storyboardId: z.number().optional(), opts: restartOptionsSchema.optional(),
   input: z.object({ propId: z.number(), episodeId: z.number(), dramaId: z.number(), propName: z.string(),
     absPath: z.string(), sourceTaskId: z.number().nullable(), configId: z.number().optional(), excludeConfigIds: z.array(z.number()).optional() }).optional(),
   req: z.object({ scope: z.enum(['characters', 'scenes', 'props', 'all']), episodeId: z.number(),

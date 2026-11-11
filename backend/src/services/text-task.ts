@@ -56,6 +56,8 @@ export type TextTaskKind =
    * `params.map_stage` 是当前步名。扩散模型只在「底纹」那一步出一张纸纹，不碰几何。
    */
   | 'map_workflow'
+  /** 图层底图视觉验证（Issue #94）：渲染后核验裁切/留白的取景画面，结论写 storyboard_layer_segments.base_check */
+  | 'layer_base_check'
 
 export const TEXT_TASK_KINDS: TextTaskKind[] = [
   'extract_characters', 'extract_scenes', 'extract_props',
@@ -72,6 +74,7 @@ export const TEXT_TASK_KINDS: TextTaskKind[] = [
   'poster_concept',
   'asset_research',
   'map_workflow',
+  'layer_base_check',
 ]
 
 /**

@@ -57,6 +57,7 @@ import { shotMaxSeconds } from './shot-duration.js'
 import { resolveDramaProjectType } from './project-type.js'
 import { toCombo } from './design-card.js'
 import { junctionFrameOf } from './junction-frame.js'
+import { baseCheckBlockReason } from './layer-base-check.js'
 import { GateBlockedError } from './workflow-gates.js'
 import { videoTaskJunction } from './video-guide-snapshot.js'
 
@@ -428,6 +429,12 @@ export async function inspectComposeInputs(
   if (documentary && (!combo || sb.designCardStatus !== 'confirmed')) return fail('设计卡未确认')
   if (documentary && (combo === 'A' || combo === 'C' || combo === 'D') && !replaceClip && !preClip && !postClip) {
     return fail(`${shot} 的图层段尚未渲染`)
+  }
+  // 底图视觉验证（Issue #94）：A 组合没有衔接帧，但整镜画面就是这张底图，同样要过验证
+  const checkedClip = replaceClip ?? preClip ?? postClip
+  if (documentary && checkedClip) {
+    const baseReason = baseCheckBlockReason(checkedClip, await resolveEpisodeSegmentSpec(sb.episodeId))
+    if (baseReason) return fail(`${shot} ${baseReason}`)
   }
   let junctionHash: string | null = null
   if (documentary && (combo === 'C' || combo === 'D')) {

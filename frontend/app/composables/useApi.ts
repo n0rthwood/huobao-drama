@@ -901,6 +901,15 @@ export const propAPI = {
   autoSemanticsStatus: (id: number) => api.get<PropSemanticsAutoStatus>(`/props/${id}/semantics/auto/status`),
 }
 
+/** 资产画幅版本（Issue #94）：以当前图为参考按项目画幅重出一版，完成后成为当前图 */
+export interface AssetAspectVersionResp { task_id: number; size: string }
+
+export const assetAspectAPI = {
+  // 忠实素材与地图道具会返回 400（不能重绘，只能裁切或留白并通过视觉验证）
+  generate: (kind: 'scene' | 'prop' | 'character', id: number, body: { episode_id: number; config_id?: number }) =>
+    api.post<AssetAspectVersionResp>(`/${kind}s/${id}/aspect-version`, { episode_id: body.episode_id, config_id: body.config_id || undefined }),
+}
+
 /** 地图几何真值（经纬度）：底图与图层都由它确定性产出，proposed 的条目必须人工确认后才算数 */
 export interface MapPlace { id: string; name: string; lon: number; lat: number; proposed?: boolean }
 export interface MapRoute { id: string; name: string; points: Array<[number, number]>; proposed?: boolean }
@@ -1761,6 +1770,20 @@ export interface LayerSegmentIssue {
   message: string
   [key: string]: unknown
 }
+/** 底图视觉验证结论（Issue #94）：裁切或 contain 留白的底图必须过验证才能往下走 */
+export interface LayerBaseCheck {
+  required: boolean
+  signature: string
+  status: 'pending' | 'passed' | 'failed' | 'error' | 'overridden'
+  problems: string[]
+  notes: string | null
+  task_id: number | null
+  config_id: number | null
+  model: string | null
+  checked_at: string | null
+  override_reason: string | null
+  error: string | null
+}
 export interface LayerSegment {
   id: number
   storyboard_id: number
@@ -1780,6 +1803,11 @@ export interface LayerSegment {
   stale_reasons: string[]
   /** 已渲染且仍对得上当前图层/时间线/规格；false = 需要重新渲染 */
   fresh: boolean
+  base_check: LayerBaseCheck | null
+  /** 本段底图是否需要视觉验证（有裁切或 contain 留白） */
+  base_check_required: boolean
+  /** 不需要验证，或签名一致且 passed/overridden */
+  base_check_satisfied: boolean
 }
 export interface LayerSegmentJunction {
   source: 'layer_last' | 'layer_first' | null
@@ -1787,6 +1815,8 @@ export interface LayerSegmentJunction {
   path: string | null
   hash: string | null
   stale: boolean
+  /** 底图视觉验证未通过/待验证的原因；通过时为 null */
+  base_check_reason: string | null
 }
 export interface LayerSegmentState {
   spec: SegmentSpec
@@ -1819,6 +1849,15 @@ export const layerSegmentAPI = {
       junction: LayerSegmentJunction
       keyframes_invalidated: boolean
     }>(`/layer-segments/storyboards/${storyboardId}/render`),
+  // 底图视觉验证（Issue #94）：重新验证起一次视觉任务；人工放行必须写理由
+  baseCheck: (storyboardId: number) =>
+    api.post<{ task_id: number | null; started: boolean; reason: string | null; segment: LayerSegment | null }>(
+      `/layer-segments/storyboards/${storyboardId}/base-check`,
+    ),
+  baseCheckOverride: (storyboardId: number, reason: string) =>
+    api.post<{ segment: LayerSegment | null }>(
+      `/layer-segments/storyboards/${storyboardId}/base-check/override`, { reason },
+    ),
   // 帧缩略图/衔接帧都是 PNG 字节流，直接当 <img src> 用（后端 no-store，带 cache buster）
   thumbnailUrl: (storyboardId: number, which: 'first' | 'last' | `frame-${number}`, bust = 0) =>
     `${apiBase()}/layer-segments/storyboards/${storyboardId}/thumbnail/${which}${bust ? `?v=${bust}` : ''}`,
