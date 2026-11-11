@@ -22,17 +22,19 @@ import { parseReferenceImages, referenceImagePaths } from '../../services/refere
 import { stampFieldSavedAt } from '../../services/storyboard-fields.js'
 import { MAX_NARRATION_CHARS, narrationCharCount, parseNarrationMeta, sha256 } from '../../services/narration.js'
 import { describeNarrationGaps, fitNarrationToGaps, locateNarrationInScript, narrationCoverage, narrationMatchKey, scriptMatchKey, scriptParagraphs } from '../../services/narration-first.js'
-import { loadDesignCardContext, semanticEntries } from '../../services/design-card-context.js'
+import { layerTextSpecPayload, loadDesignCardContext, semanticEntries } from '../../services/design-card-context.js'
 import { shotTtsValidity } from '../../services/narration-tts-gate.js'
 import {
   COMBOS,
   INFO_POINT_VIAS,
   PLANNED_LAYER_TYPES,
+  aiTextPlanRejections,
   lockedGenSlot,
   normalizeDesignCard,
   parseDesignCard,
   serializeDesignCard,
   storyboardCountCap,
+  textPlanRejectionMessage,
   toCombo,
   toDesignCardStatus,
   validateDesignCard,
@@ -128,7 +130,7 @@ function requireIds(context: ToolContext): { episodeId: number; dramaId: number 
 
 const readStoryboardContext = createTool({
   id: 'read_storyboard_context',
-  description: 'Read the screenplay, characters, scenes, and props for storyboard breakdown.',
+  description: 'Read the screenplay, characters, scenes, props, existing storyboards, the project aspect and (for documentary design cards) the template text-box spec text_spec: layouts, roles and per-field capacity.',
   inputSchema: z.object({}),
   execute: async (_input, context) => {
     const ids = requireIds(context)
@@ -283,6 +285,8 @@ const readStoryboardContext = createTool({
       },
       aspect_ratio: aspectRatio,
       composition: compositionOf(aspectRatio),
+      // 模板文本框规范（#96）：本画幅家族的成套位置、类型字段与逐字段容量（数字全部由引擎算）
+      text_spec: layerTextSpecPayload(aspectRatio),
       script,
       characters,
       scenes,
@@ -360,11 +364,14 @@ const designCardSchema = z.object({
     }).optional().describe('Base image of the layer segment.'),
     must_mark: z.array(semanticRefSchema).max(20).optional().describe('Elements this shot promises to mark. Use real asset semantics only; when an annotation is missing, leave semantic_id and name empty and retain the planned layer as awaiting annotation.'),
     planned_layers: z.array(z.object({
-      type: z.enum(PLANNED_LAYER_TYPES).describe('Layer type drawn on top of the base image.'),
-      text: z.string().optional().describe('Text shown by this layer (label/card content).'),
-      anchor: semanticRefSchema.optional().describe('Annotated element this layer is drawn from.'),
+      type: z.enum(PLANNED_LAYER_TYPES).describe("Layer type drawn on top of the base image. Screen typography is ALWAYS type 'text' (a template text box: role + fields); 'card' is not accepted anymore, and 'label' is only for text pinned to an annotated element (it requires anchor)."),
+      text: z.string().optional().describe('Text shown by an anchored label or an image caption (ignored for text layers).'),
+      anchor: semanticRefSchema.optional().describe('Annotated element this layer is drawn from (required for label).'),
+      role: z.string().optional().describe("Only for type 'text': role id copied verbatim from text_spec.roles in read_storyboard_context (date / heading / statement / keyword / quote / metric / bullets)."),
+      fields: z.record(z.string(), z.union([z.string(), z.array(z.string())])).optional().describe("Only for type 'text': field values keyed by the role's field keys. Respect text_spec.capacity[layout][role] (chars per line × lines) for the chosen layout; list fields take a string array."),
       at_s: z.number().optional().describe('Seconds from the start of the layer segment when this layer appears.'),
-    })).max(40).optional().describe('Rough layer plan. A map without any layer is just a prop being panned over.'),
+    })).max(40).optional().describe('Rough layer plan. Screen typography must use text template boxes; a map without any layer is just a prop being panned over.'),
+    text_layout: z.string().optional().describe('The template text-box layout id (成套位置) for this shot, copied from text_spec.layouts. Choose it by where the base image subject/chart sits (subject right → left-hand layout). Required as soon as planned_layers contains a text layer.'),
   }).optional().describe('Layer segment plan. Required when the shot has a layer segment (combos A, C, D).'),
   gen_plan: z.object({
     reference_assets: z.array(z.object({
@@ -932,6 +939,16 @@ const updateStoryboard = createTool({
       // AI 写入路径的依据机检（#87）：只认当前已有资产能支撑的设计。
       // 旧实现只拒「填了名字但解析不到」的引用，留空的几何层照样放行——用户已裁定
       // 「留空待人工补标注」不是 AI 完成设计的出口。人工 PUT 不走这里，不受此限制。
+      // AI 写入路径的模板文本框硬规则（#96）：card、无锚点的 label、没选成套位置、
+      // 引擎报出的阻断级排版问题（含逐字段容量数字）都不落库，当前循环内回给模型改正。
+      if (!comboOnly && scope === 'design_card' && card) {
+        const textRejections = aiTextPlanRejections(card, ctx.aspect, fields.design_card.layer_plan?.planned_layers)
+        if (textRejections.length) {
+          const reason = textPlanRejectionMessage(textRejections)
+          context?.requestContext?.set('designCardError' as never, reason as never)
+          return { error: reason, text_plan_issues: textRejections }
+        }
+      }
       if (!comboOnly && scope === 'design_card' && card) {
         const violations = checkDesignCardGrounding(card, ctx, combo)
         if (violations.length) {
@@ -956,6 +973,7 @@ const updateStoryboard = createTool({
         combo,
         narrationText: storyboard.narrationText,
         measuredSeconds: tts.valid ? tts.duration_s : null,
+        aspect: ctx.aspect,
       })) {
         cardReport.push({ code: issue.code, message: issue.message })
       }

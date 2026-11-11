@@ -21,6 +21,14 @@ import {
   type DesignCardSemanticEntry,
 } from './design-card.js'
 import { parseNarrationMeta } from './narration.js'
+import { normalizeAspect, orientationOf } from './aspect.js'
+import {
+  TEXT_SPEC,
+  textCapacity,
+  textLayoutsFor,
+  textRolesFor,
+  type TextFieldCapacity,
+} from './layer-text.js'
 
 /**
  * 某张证据素材的语义条目摘要（名称 + 稳定 id + 组别 + 实际几何点数）。
@@ -92,7 +100,77 @@ export function loadDesignCardContext(episodeId: number): DesignCardContext {
       semantics_source_task_id: parseSemantics(row.semantics)?.image.source_task_id ?? null,
     })
   }
-  return { assets }
+  // #96：模板文本框的规范家族与容量取决于项目画幅，同步读一次剧集 → 项目
+  const [episode] = db.select().from(schema.episodes)
+    .where(eq(schema.episodes.id, episodeId)).all()
+  const [drama] = episode
+    ? db.select().from(schema.dramas).where(eq(schema.dramas.id, episode.dramaId)).all()
+    : []
+  return { assets, aspect: normalizeAspect(drama?.aspectRatio) }
+}
+
+/**
+ * 模板文本框规范（#96）给模型/界面的上下文：本画幅家族的视频版式、类型字段与逐字段容量。
+ * 所有数字都由排版引擎现算（`textCapacity`），技能文本与提示词里不许硬编码另一份。
+ */
+export interface LayerTextSpecPayload {
+  layouts: Array<{ id: string; name: string; slots: Array<{ role: string; zone?: string }> }>
+  roles: Array<{
+    id: string
+    name: string
+    category: string
+    purpose: string
+    extract: string
+    fields: Array<{ key: string; label: string; optional: boolean; kind: 'text' | 'list' }>
+  }>
+  capacity: Record<string, Record<string, TextFieldCapacity[]>>
+}
+
+export function layerTextSpecPayload(aspect?: string | null): LayerTextSpecPayload {
+  const family = orientationOf(aspect) === 'portrait' ? '9:16' : '16:9'
+  const layouts = textLayoutsFor(family, 'video')
+  // 字段是否列表由引擎的容量口径给出（同一个字段在所有套里行类型一致）
+  const fieldKind = (roleId: string, key: string): 'text' | 'list' => {
+    for (const layout of layouts) {
+      const hit = textCapacity(layout.id, roleId).find(item => item.field === key)
+      if (hit) return hit.kind
+    }
+    return 'text'
+  }
+  const roles = textRolesFor('video').map(id => {
+    const role = TEXT_SPEC.roles[id]
+    return {
+      id,
+      name: role.name,
+      category: role.category,
+      purpose: role.purpose,
+      extract: role.extract,
+      fields: role.fields.map(field => ({
+        key: field.key,
+        label: field.label,
+        optional: Boolean(field.optional),
+        kind: fieldKind(id, field.key),
+      })),
+    }
+  })
+  const capacity: LayerTextSpecPayload['capacity'] = {}
+  for (const layout of layouts) {
+    const perRole: Record<string, TextFieldCapacity[]> = {}
+    for (const slot of layout.slots) {
+      const rows = textCapacity(layout.id, slot.role)
+      if (rows.length) perRole[slot.role] = rows
+    }
+    capacity[layout.id] = perRole
+  }
+  return {
+    layouts: layouts.map(layout => ({
+      id: layout.id,
+      name: layout.name,
+      slots: layout.slots.map(slot => ({ role: slot.role, zone: slot.zone })),
+    })),
+    roles,
+    capacity,
+  }
 }
 
 export interface BaseCandidate {
@@ -194,6 +272,7 @@ export function resolveDesignCard(
     narrationText: row.narrationText,
     measuredSeconds: measuredSeconds === undefined ? measuredNarrationSeconds(row) : measuredSeconds,
     mentioned: mentioned ?? null,
+    aspect: ctx.aspect,
   })
   if (card) card.issues = issues
   return { combo, card, issues }
@@ -213,6 +292,7 @@ export function resolveDesignCardFrom(
     combo,
     narrationText: shot.narrationText,
     measuredSeconds: measuredSeconds === undefined ? measuredNarrationSeconds(shot) : measuredSeconds,
+    aspect: ctx.aspect,
   })
   if (card) card.issues = issues
   return { combo, card, issues }

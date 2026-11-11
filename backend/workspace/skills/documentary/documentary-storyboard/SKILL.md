@@ -90,7 +90,7 @@ description: 纪录片项目的分镜附加规范 — 两个阶段：① 旁白�
 
 ```
 这一镜要让观众接到哪些信息（info_points[]，≤12 条）
-  → 哪些信息由图层段画出来（layer_plan：底图 base + 必须标出的语义 must_mark[] + 计划图层 planned_layers[]）
+  → 哪些信息由图层段画出来（layer_plan：底图 base + 必须标出的语义 must_mark[] + 计划图层 planned_layers[] + 屏幕文字的成套位置 text_layout）
   → 哪些信息由生成段演出来（gen_plan：参考资产 reference_assets[] + 首/中/尾帧描述）
   → 两段各占多少秒（budget：layer_s / gen_s），两段之和必须 ≥ 实测配音时长
   → 为什么这样安排（rationale，≤600 字）
@@ -122,16 +122,23 @@ description: 纪录片项目的分镜附加规范 — 两个阶段：① 旁白�
   要么换一张真有这条标注的资产；都不行就按 2.2.7 说明缺口，不保存这张卡。
   必要时用 `read_image` 打开原图确认到底有没有。
 - `planned_layers[]`：计划画哪些层、按什么顺序显现。每条
-  `{ type, text?, anchor?: {asset_id, semantic_id, name}, at_s }`：
-  - `type ∈ polygon | polyline | marker | label | card | image`
-    （范围高亮 / 河流·路线·箭头 / 地点 / 地名·年代文字 / 姓名条·年份卡 / 内嵌小图）。
+  `{ type, text?, anchor?: {asset_id, semantic_id, name}, role?, fields?, at_s }`：
+  - `type ∈ polygon | polyline | marker | label | text | image`
+    （范围高亮 / 河流·路线·箭头 / 地点 / 钉在语义位置上的地名 / 屏幕文字模板框 / 内嵌小图）。
+  - **屏幕文字一律用 `text` 模板文本框**：`{ type:'text', role, fields }`，`role` 与 `fields` 的键逐字取自
+    `read_storyboard_context` 的 `text_spec.roles`，字数上限取自同一份 `text_spec.capacity`；
+    细节规则见 `layer-text-design` 技能（类型边界、成套位置、同屏与节奏、失败处置）。
+    不再使用 `card`；`label` 只用于钉在底图语义位置上的文字，必须带 `anchor`。
   - `anchor` 指向与 `must_mark` 同一条语义项，且必须是**本镜底图那张资产、那个版本**上真实存在、
     类型相容、几何完整的条目：`polygon` / `polyline` 用带折点的 `region` 或 `line`（`polygon` ≥3 点、
-    `polyline` ≥2 点），`marker` 用 `point`，带位置的 `label` 用 `label`。纯文字层用 `text` 写要显示的字；
-    不指向画面上具体位置时不写 `anchor`。
+    `polyline` ≥2 点），`marker` 用 `point`，带位置的 `label` 用 `label`。不指向画面上具体位置时不写 `anchor`。
   - `at_s`：该层在图层段内第几秒出现。**按实测配音的时间轴排**：旁白先说哪个，哪个先出现；
     「同时」「分两路」用**同一 `at_s` 的两层**表达，「先…后…」用不同 `at_s` 拉开。
     `at_s` 不得超过本段的 `layer_s`。
+- `text_layout`：屏幕文字的成套位置（`text_spec.layouts` 里的 id）。有计划 `text` 层就必须选一套；
+  先读底图主体位置再选（主体在右选左侧的套，主体在左选右侧的套）。同一 zone 里后出现的框替换先出现的
+  （heading 2s → statement 4s 是同一条主叙事线），同一 `at_s` 的同区两个框才是冲突；
+  `date` 可与主信息框同屏，`keyword` 只在概念必须被记住时叠加。
 - 每一条 `must_mark` 都应当有至少一层 `planned_layers` 把它画出来；缺的会被标成 `must_mark_not_planned`（警告）。
 - 有图层段的镜（组合 A / C / D）必须给出 `base`，否则阻断 `missing_base`。
 
@@ -190,8 +197,8 @@ AI 也不得自动重写历史卡、删层或覆盖已有制作产物。
    不得借用别的资产或不相容版本上的同名语义；**语义真实存在但几何为空，同样不算依据**。
    底图与生成段 `reference_assets` 必须是**现在就有图**的资产（有原件或已生成图），不能按「以后会出图」规划；
    把底图钉在某个 `version_task_id` 时，该资产的标注必须能确认是针对那一版做的，确认不了就不要钉版本。
-5. **按实际依赖判断要不要锚定。** 纯章节标题、定义卡、说明卡以及不指向画面具体位置的排版元素，
-   可以明确不写 `anchor`；但不能因为类型是 `label` / `card` 就自动免除依据——内容实际指向某地某线某范围时仍须满足第 4 条。
+5. **按实际依赖判断要不要锚定。** 纯章节标题、定义、说明这类排版元素用 `text` 模板文本框，本来就不锚定；
+   但不能因为类型是 `label` 就自动免除依据——`label` 已经要求带 `anchor`，内容实际指向某地某线某范围时仍须满足第 4 条。
    **空锚点本身不是错误；需要锚定却留空才是错误**（留空的几何层渲染时会被整层丢弃）。
 6. **无语义资产可以用于它实际支持的用途。** 没有标注的图可以做背景、整体展示或其他不依赖缺失标注的表达，
    不要求每张图先标注；但不得把普通河网说成某条特定历史航线，也不得把「图上有河」当成「已具备这条路线的可执行几何」。
@@ -207,7 +214,8 @@ AI 也不得自动重写历史卡、删层或覆盖已有制作产物。
 
 - 地图资产有 `ln-2（吉尔吉斯河，line，42 个几何点）`，本镜要描这条河：`polyline` 锚 `ln-2`，底图就是该资产。
 - 一张没有任何标注的河网图，本镜只要「江淮水网的整体面貌」：读过原图后整体展示，不加任何无依据的路线或地点。
-- 纯章节标题「第二章 永徽年间」：`card` / `label` 不写 `anchor`，由屏幕排版呈现。
+- 纯章节标题「第二章 永徽年间」：用 `text` 模板文本框（`heading`，必要时加一个 `date`），不写 `anchor`；
+  旧的 `card` / 无锚点 `label` 已不再接受。
 - 人物肖像作 `image` 层：锚到该肖像资产，前提是它确实有图。
 
 **不合格的写法**

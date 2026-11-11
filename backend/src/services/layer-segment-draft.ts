@@ -20,6 +20,8 @@ import type {
 import type { BaseRef, Combo, DesignCard, PlannedLayer } from './design-card.js'
 import { hasLayerSegment } from './design-card.js'
 import { normalizeLayerDoc, type LayerBox, type LayerDoc } from './layer-doc.js'
+import { TEXT_SPEC } from './layer-text.js'
+import { revealBeats, textZoneOf } from './layer-text-visibility.js'
 import { baseFrameOf } from './layer-quality.js'
 import {
   MAX_LAYER_SEGMENT_SECONDS,
@@ -162,11 +164,17 @@ function cardFields(item: PlannedLayer, entryName: string, base: SegmentDraftAss
   }
 }
 
+/**
+ * `modernText` = 这张卡用的是模板文本框（有计划 text 层或已选成套位置）：此时不再生成
+ * 没有锚点的 label / card 屏幕排版层，屏幕文字统一走 text 层。旧卡（没有任何 text 计划）
+ * 保持原来的转换行为，不做迁移。
+ */
 export function layerFromPlannedLayer(
   item: PlannedLayer,
   index: number,
   ctx: SegmentDraftContext,
   warnings: string[],
+  modernText = false,
 ): DraftedLayer | null {
   const id = `L${index + 1}`
   const frame = draftFrameOf(ctx)
@@ -227,6 +235,11 @@ export function layerFromPlannedLayer(
       warnings.push(`第 ${index + 1} 层（label）没有文字，已跳过`)
       return null
     }
+    // 新版设计（有模板文本框或已选成套位置）只用 text 层做屏幕排版；旧卡里没有锚点的 label 不再落到新草稿
+    if (!item.anchor && modernText) {
+      warnings.push(`第 ${index + 1} 层（label）没有锚点：新版设计用 text 模板文本框排版，已跳过「${label}」`)
+      return null
+    }
     let box = inFrame(frame, { x: 0.06, y: 0.08 + index * 0.1, w: 0.3, h: 0.09 })
     const points: Array<[number, number]> = []
     const bbox = semantic?.group === 'labels' ? semantic.entry.bbox : null
@@ -248,6 +261,10 @@ export function layerFromPlannedLayer(
   }
 
   if (item.type === 'card') {
+    if (!item.anchor && modernText) {
+      warnings.push(`第 ${index + 1} 层（card）没有锚点：新版设计用 text 模板文本框排版，已跳过`)
+      return null
+    }
     const fields = cardFields(item, entryName, ctx.base)
     if (!fields.title && !fields.years) {
       warnings.push(`第 ${index + 1} 层（card）没有可显示的标题或年代，已跳过`)
@@ -259,6 +276,23 @@ export function layerFromPlannedLayer(
         box: inFrame(frame, CARD_DEFAULT_BOX),
         template: fields.years && !fields.title ? 'year' : 'name',
         fields: { title: fields.title, sub: '', meta: '', years: fields.years },
+      },
+      points: [],
+    }
+  }
+
+  if (item.type === 'text') {
+    // #96 模板文本框：只带类型与字段，位置/样式由文档级 text_layout 决定（屏幕上排版，不锚定）
+    const roleName = item.role ? TEXT_SPEC.roles[item.role]?.name : ''
+    if (!item.role || !roleName) {
+      warnings.push(`第 ${index + 1} 层（text）缺少合法的文本框类型，已跳过`)
+      return null
+    }
+    return {
+      layer: {
+        id, type: 'text', name: roleName, z: index + 1,
+        role: item.role,
+        fields: item.fields || {},
       },
       points: [],
     }
@@ -289,9 +323,10 @@ export function draftSegment(card: DesignCard, combo: Combo | null, ctx: Segment
   if (!hasLayerSegment(combo)) throw new Error('该段组合没有图层段')
   const warnings: string[] = []
   const planned = card.layer_plan?.planned_layers || []
+  const modernText = planned.some(item => item.type === 'text') || Boolean(card.layer_plan?.text_layout)
   const drafted: DraftedLayer[] = []
   for (const [index, item] of planned.entries()) {
-    const layer = layerFromPlannedLayer(item, index, ctx, warnings)
+    const layer = layerFromPlannedLayer(item, index, ctx, warnings, modernText)
     if (layer) drafted.push(layer)
   }
 
@@ -310,6 +345,7 @@ export function draftSegment(card: DesignCard, combo: Combo | null, ctx: Segment
   const layerDoc = normalizeLayerDoc({
     version: 1,
     theme: 'archival',
+    ...(card.layer_plan?.text_layout ? { text_layout: card.layer_plan.text_layout } : {}),
     base: {
       path: ctx.base_path,
       width: ctx.width,
@@ -322,20 +358,30 @@ export function draftSegment(card: DesignCard, combo: Combo | null, ctx: Segment
   })
 
   // 精确关键帧：t=0 干净底图 → 按 at_s 逐层显现 → 推近到已显现几何的外接框
-  const revealed: string[] = []
-  const keyframes: PreciseKeyframe[] = [{ t: 0, viewport: { ...frame }, visible: [] }]
   const slots = drafted.length || 1
-  for (const [index, entry] of drafted.entries()) {
+  const revealAt = drafted.map((entry, index) => {
     const item = planned[Number(String(entry.layer.id).slice(1)) - 1]
     const fallback = ((index + 1) / (slots + 1)) * duration
     const t = Math.min(
       duration - 0.4,
       Math.max(0.2, Number.isFinite(item?.at_s) ? Number(item!.at_s) : fallback),
     )
-    revealed.push(String(entry.layer.id))
+    return Math.round(t * 100) / 100
+  })
+  // 可见集合走同一个实现：模板文本框同 zone 后出现的替换先出现的，其余图层累计可见
+  const beats = revealBeats(drafted.map((entry, index) => ({
+    id: String(entry.layer.id),
+    zone: entry.layer.type === 'text'
+      ? textZoneOf(card.layer_plan?.text_layout, String(entry.layer.role ?? ''))
+      : null,
+    at: revealAt[index],
+  })))
+  const keyframes: PreciseKeyframe[] = [{ t: 0, viewport: { ...frame }, visible: [] }]
+  for (const [index, entry] of drafted.entries()) {
     // 设计卡不带视口（它是导演层的图纸）：草稿一律取满取景框，取景由图层编辑器（R6）定
-    keyframes.push({ t: Math.round(t * 100) / 100, viewport: { ...frame }, visible: [...revealed] })
+    keyframes.push({ t: revealAt[index], viewport: { ...frame }, visible: [...beats[index + 1]] })
   }
+  const revealed = beats[beats.length - 1]
   const geometry = drafted.flatMap(entry => entry.points)
   if (geometry.length >= 2 && duration > 2) {
     keyframes.push({
@@ -360,4 +406,16 @@ export function draftSegment(card: DesignCard, combo: Combo | null, ctx: Segment
     }, frame),
     warnings,
   }
+}
+
+/**
+ * 同屏拍（#96 文本层检查用）：时间线的每个关键帧就是一段「同一时刻可见的图层 id 集合」。
+ * 从未出现在任何关键帧的图层追加成最后一拍，保证它们也参与检查；只用于检查，不改文档。
+ */
+export function textBeatsOfTimeline(doc: LayerDoc, timeline: SegmentTimeline): string[][] {
+  const beats = timeline.keyframes.map(frame => frame.visible.slice())
+  const seen = new Set<string>()
+  for (const beat of beats) for (const id of beat) seen.add(id)
+  const absent = doc.layers.filter(layer => !seen.has(layer.id)).map(layer => layer.id)
+  return absent.length ? [...beats, absent] : beats
 }

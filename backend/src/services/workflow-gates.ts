@@ -24,6 +24,7 @@ import { resolveDramaProjectType, type ProjectType } from './project-type.js'
 import { now } from '../utils/response.js'
 import { markEpisodeDesignCardsStale } from './staleness.js'
 import { parseDesignCard, toCombo, toDesignCardStatus, validateDesignCard, type DesignCardStatus } from './design-card.js'
+import { normalizeAspect } from './aspect.js'
 import { segmentsByStoryboard, resolveEpisodeSegmentSpec, layerSegmentIsFresh } from './layer-segment.js'
 import { shotTtsValidity, toBlocked, TtsRequiredError, type TtsBlockedShot } from './narration-tts-gate.js'
 
@@ -234,11 +235,15 @@ export async function productionGateReason(
   }
   // 重配音之后的适配复核（#70）：确认记录保留，但新实测时长装不下已确认的段预算时
   // 不得进入制作。这里只阻断并说明冲突，绝不替人改预算或截断旁白。
+  // #96：模板文本框的排版判定需要项目画幅（规范家族决定容量与套位），读一次项目即可。
+  const [drama] = await db.select().from(schema.dramas).where(eq(schema.dramas.id, ep.dramaId))
+  const aspect = normalizeAspect(drama?.aspectRatio)
   const fit = sb ? validateDesignCard({
     card: parseDesignCard(sb.designCard),
     combo: toCombo(sb.combo),
     narrationText: sb.narrationText,
     measuredSeconds: tts.duration_s,
+    aspect,
   }).filter(issue => issue.severity === 'block') : []
   if (fit.length) {
     return {

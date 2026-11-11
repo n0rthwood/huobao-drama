@@ -27,6 +27,7 @@ import {
 } from '../services/design-card.js'
 import { NARRATION_CHARS_PER_SECOND } from '../services/narration.js'
 import {
+  layerTextSpecPayload,
   listBaseCandidates,
   loadDesignCardContext,
   resolveDesignCard,
@@ -223,9 +224,14 @@ app.get('/:id/design-card-context', async (c) => {
   const id = Number(c.req.param('id'))
   const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, id))
   if (!ep) return notFound(c, '剧集不存在')
+  const cardContext = loadDesignCardContext(id)
   return success(c, {
-    assets: loadDesignCardContext(id).assets,
+    assets: cardContext.assets,
     base_candidates: await listBaseCandidates(id),
+    // 项目画幅（#96）：文本框规范家族与容量都按它算
+    aspect_ratio: cardContext.aspect,
+    // 模板文本框规范（#96）：本画幅家族的成套位置、类型字段与逐字段容量（数字全部由引擎算）
+    text_spec: layerTextSpecPayload(cardContext.aspect),
     combos: COMBOS,
     info_point_vias: INFO_POINT_VIAS,
     planned_layer_types: PLANNED_LAYER_TYPES,

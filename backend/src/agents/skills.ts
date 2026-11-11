@@ -97,8 +97,13 @@ const PROJECT_TYPE_SKILL_MAP: Record<string, Record<string, string[]>> = {
   documentary: {
     // 旁白优先的剧本整理：剧本正文就是旁白稿，不做对白化改写
     script_rewriter: ['documentary/documentary-script'],
-    // 两栏脚本纪律 + 表达设计（#49）：信息点 → device → must_show → overlay_plan
-    storyboard_breaker: ['documentary/documentary-storyboard', 'documentary/documentary-keyframe-prompt'],
+    // 两栏脚本纪律 + 表达设计（#49）：信息点 → device → must_show → overlay_plan；
+    // #96 的模板文本框规则只在设计卡阶段真正用到（骨架阶段不写视觉），随同一 Agent 注入
+    storyboard_breaker: [
+      'documentary/documentary-storyboard',
+      'documentary/documentary-keyframe-prompt',
+      'documentary/layer-text-design',
+    ],
     // 关键帧/视频提示词按 device 分支（#49）：map_anim/archival 不写扩散提示词，
     // 再现类镜头必须覆盖 must_show 并允许承接上一镜
     prompt_generator: ['documentary/documentary-keyframe-prompt'],

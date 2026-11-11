@@ -90,7 +90,7 @@ Before writing picture content, walk this chain and record the conclusions in `d
 
 ```
 which pieces of information the viewer must receive (info_points[], ≤12)
-  → which of them the layer segment draws (layer_plan: base image, must_mark[], planned_layers[])
+  → which of them the layer segment draws (layer_plan: base image, must_mark[], planned_layers[], and the screen-text layout text_layout)
   → which of them the generated segment acts out (gen_plan: reference_assets[], first / mid / last frame descriptions)
   → how many seconds each segment takes (budget: layer_s / gen_s); their sum must be ≥ the measured voice-over duration
   → why it is arranged this way (rationale, ≤600 characters)
@@ -123,16 +123,23 @@ Every information point needs an owner. Entries without one are flagged `info_po
   expression the asset's existing annotations really support, or switch to an asset that genuinely carries that entry; if neither works,
   report the gap per 2.2.7 and do not save the card.
 - `planned_layers[]`: which layers to draw and in which order they appear. Each entry
-  `{ type, text?, anchor?: {asset_id, semantic_id, name}, at_s }`:
-  - `type ∈ polygon | polyline | marker | label | card | image`
-    (extent highlight / river·route·arrow / place / place-name·year text / name bar·year card / inset image).
+  `{ type, text?, anchor?: {asset_id, semantic_id, name}, role?, fields?, at_s }`:
+  - `type ∈ polygon | polyline | marker | label | text | image`
+    (extent highlight / river·route·arrow / place / place name pinned to a semantic entry / screen text template box / inset image).
+  - **Screen typography always uses a `text` template box**: `{ type:'text', role, fields }`, with `role` and the `fields` keys copied verbatim
+    from `text_spec.roles` returned by `read_storyboard_context`, and length limits taken from the same `text_spec.capacity`. The detailed rules
+    (role boundaries, layouts, same-beat and rhythm rules, failure handling) live in the `layer-text-design` skill. `card` is no longer used;
+    `label` is only for text pinned to an annotated element and must carry `anchor`.
   - `anchor` points at the same semantic entry as `must_mark`, and it must exist on **the asset and version used as this shot's base image**,
     with a compatible type and complete geometry: `polygon` / `polyline` take a vertexed `region` or `line` (≥3 and ≥2 points respectively),
-    `marker` takes a `point`, a positioned `label` takes a `label`. Text-only layers carry their text in `text`; omit `anchor` when the layer
-    does not point at a specific place in the picture.
+    `marker` takes a `point`, a positioned `label` takes a `label`. Omit `anchor` when the layer does not point at a specific place.
   - `at_s`: at which second inside the layer segment this layer appears. **Lay it out on the measured audio timeline**: whatever the narration
     says first appears first; "simultaneously" / "in two columns" is expressed by **two layers with the same `at_s`**, "first … then …" by
     different `at_s` values. `at_s` must not exceed this segment's `layer_s`.
+- `text_layout`: the template text-box layout (an id from `text_spec.layouts`). Any planned `text` layer requires it. Read the base image first and
+  pick by where its subject sits (subject right → a left-hand layout, subject left → a right-hand layout). Inside one zone a later box replaces
+  the earlier one (heading at 2 s → statement at 4 s is one narrative line); only two boxes in one zone with the same `at_s` conflict. `date` may
+  share the beat with the primary box; `keyword` is added only when the concept must land.
 - Every `must_mark` entry should be drawn by at least one `planned_layers` entry; missing ones are flagged `must_mark_not_planned` (warning).
 - Shots that have a layer segment (combos A / C / D) must provide `base`, otherwise `missing_base` blocks.
 
@@ -199,9 +206,9 @@ without these limits; the AI must never rewrite historical cards, delete layers 
    one); never plan around "an image will exist later". When the base is pinned to a `version_task_id`, that asset's annotations must be
    verifiably made against that version; if that cannot be confirmed, do not pin a version.
    **An entry that exists but has empty geometry is still not evidence.**
-5. **Decide anchoring by the actual dependency.** Pure chapter titles, definition cards, explanatory cards and screen-layout elements that do
-   not point at a specific object or position may deliberately carry no `anchor`. But a layer is not exempt just because its type is `label`
-   or `card`: if its content really points at a place, area or route, rule 4 still applies. **A blank anchor is not wrong by itself; leaving it
+5. **Decide anchoring by the actual dependency.** Pure chapter titles, definitions and explanatory typography use a `text` template box and are
+   never anchored by design. But a `label` is not exempt just because of its type — it now requires an `anchor`, and if its content really points
+   at a place, area or route, rule 4 still applies. **A blank anchor is not wrong by itself; leaving it
    blank where anchoring is required is** — such geometry layers are dropped entirely at render time.
 6. **An asset without semantics may be used for what it actually supports**: background, whole-image presentation, or anything that does not
    depend on the missing annotation. Not every image must be annotated first. But never present an ordinary river network as one specific
@@ -222,7 +229,8 @@ without these limits; the AI must never rewrite historical cards, delete layers 
 - The map carries `ln-2 (Kyrgyz River, line, 42 geometry points)` and the shot must trace that river: a `polyline` anchored to `ln-2`, on that same base image.
 - An unannotated river-network map where the shot only needs "the overall look of the Jiang-Huai waterways": present the whole image after
   reading it; add no unfounded routes or places.
-- A pure chapter title "Chapter 2 — The Yonghui Years": `card` / `label` with no `anchor`, rendered by screen layout.
+- A pure chapter title "Chapter 2 — The Yonghui Years": a `text` template box (`heading`, plus a `date` when needed) with no `anchor`;
+  the old `card` / unanchored `label` is no longer accepted.
 - A portrait as an `image` layer anchored to that portrait asset — provided the asset really has an image.
 
 **Not acceptable**

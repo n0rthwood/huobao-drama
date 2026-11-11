@@ -22,7 +22,7 @@
  *
  * ## 衔接帧（Issue #58，契约 §3.3）
  * 渲染产物除了 mp4，还有一张**衔接帧 PNG**：C = 图层段末帧（t=duration，即末尾停留的最终画面），
- * D = 首帧（t=0）。它**不含文字类图层**——`label`、`card` 整层隐藏，`marker` 只画点不画文字，
+ * D = 首帧（t=0）。它**不含文字类图层**——`label`、`card`、`text` 整层隐藏，`marker` 只画点不画文字，
  * `polygon/polyline/image` 保留；落盘 `static/layer-frames/<segment_id>-<hash>.png`，
  * `hash = sha256(PNG 字节)`。旧 hash 的 PNG 在渲染成功后清理，但**保留 `storyboards.keyframes_junction_hash`
  * 仍在引用的那一张**（契约 §10 裁决 8）。
@@ -41,6 +41,8 @@ import { logTaskProgress } from '../utils/task-logger.js'
 import { getAbsolutePath } from '../utils/storage.js'
 import { mediaFacts } from './media-probe.js'
 import { assertRenderableText, ensureLayerFonts } from './layer-fonts.js'
+import { assertTextLayersRenderable, textLayerTexts } from './layer-text.js'
+import { textBeatsOfTimeline } from './layer-segment-draft.js'
 import { baseFilterLayers, layerDocToSvg, svgWorldOf } from './layer-svg.js'
 import type { Layer, LayerDoc } from './layer-doc.js'
 import { clampTimelineToFrame, clampViewportToBox, frameRectOf } from './layer-quality.js'
@@ -87,6 +89,8 @@ function collectTexts(doc: LayerDoc): string[] {
     if (!layer.visible) continue
     if (layer.type === 'label' || layer.type === 'marker') texts.push(layer.text)
     if (layer.type === 'card') texts.push(layer.fields.title, layer.fields.sub, layer.fields.meta, layer.fields.years)
+    // #96：模板文本框的每个字段（列表字段逐条）都要过缺字自检
+    if (layer.type === 'text') texts.push(...textLayerTexts(layer))
   }
   return texts.filter(Boolean)
 }
@@ -217,14 +221,14 @@ function junctionMoment(combo: string | null, duration: number): { source: 'laye
 }
 
 /**
- * 衔接帧 PNG：`label`/`card` 整层隐藏、`marker` 只画点不画文字（契约 §3.3）。
+ * 衔接帧 PNG：`label`/`card`/`text` 整层隐藏、`marker` 只画点不画文字（契约 §3.3）。
  * 只改传给 SVG 的可见集合与 marker 的文本，**不改**存档的图层文档——
  * 图层段的实际编码边界也使用同一张去字画面；段内文字在边界前后淡出/淡入。
  */
-function withoutText(doc: LayerDoc): LayerDoc {
+export function withoutText(doc: LayerDoc): LayerDoc {
   const layers: Layer[] = []
   for (const layer of doc.layers) {
-    if (layer.type === 'label' || layer.type === 'card') continue
+    if (layer.type === 'label' || layer.type === 'card' || layer.type === 'text') continue
     layers.push(layer.type === 'marker' ? { ...layer, text: '' } : layer)
   }
   return { ...doc, layers }
@@ -304,6 +308,11 @@ export async function renderLayerSegment(
 
   const timeline = clampTimelineToFrame(segment.timeline, doc.base, spec).timeline
   const plan = planOf(timeline, segment.duration, spec)
+  // 成品闸门（#96）：模板文本框的溢出 / 同拍冲突等阻断级问题必须在任何像素工作之前失败，
+  // 拍由时间线的关键帧给出（与成片实际可见集合一致）。
+  assertTextLayersRenderable(doc, { width: plan.width, height: plan.height }, {
+    beats: textBeatsOfTimeline(doc, timeline),
+  })
   const source = await prepareFrameSource(doc, plan, timeline)
   const moment = junctionMoment(combo, segment.duration)
   // 衔接帧先算：它失败时不要把 mp4 写出来（宁可整段渲染失败，也不要留下「有片无衔接帧」的段）
@@ -412,6 +421,7 @@ export async function renderSegmentFrame(
   assertRenderableText(collectTexts(doc))
   const timeline = clampTimelineToFrame(segment.timeline, doc.base, spec).timeline
   const plan = planOf(timeline, segment.duration, spec)
+  // 预览帧不套成品闸门：文本框有问题时编辑器要能看到真实的溢出画面（出片由 renderLayerSegment 拒绝）
   const source = await prepareFrameSource(doc, plan, timeline)
   const time = Math.min(Math.max(0, t), Math.max(0, segment.duration - 1 / plan.fps))
   return composeFrame(doc, plan, source, frameStateAt(timeline, time), 'png')

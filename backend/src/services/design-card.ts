@@ -10,6 +10,19 @@
  * 纯函数模块：不读库、不读文件，解析上下文由调用方装配（`loadDesignCardContext`）。
  */
 import { estimateNarrationSeconds, MAX_NARRATION_CHARS, narrationCharCount } from './narration.js'
+import { normalizeLayerDoc, type LayerDoc } from './layer-doc.js'
+import { revealBeats, textZoneOf } from './layer-text-visibility.js'
+import { orientationOf } from './aspect.js'
+import {
+  TEXT_CANONICAL_SIZES,
+  TEXT_SPEC,
+  textCapacity,
+  textLayoutById,
+  textLayerProblems,
+  textRolesFor,
+  type TextFieldCapacity,
+  type TextProblem,
+} from './layer-text.js'
 
 /** 段组合：A 只图层 / B 只生成 / C 图层→生成 / D 生成→图层 */
 export const COMBOS = ['A', 'B', 'C', 'D'] as const
@@ -127,6 +140,9 @@ export type CardIssueCode =
   | 'budget_under_narration'
   | 'missing_base'
   | 'gen_slot_missing'
+  // 阻断/警告（#96 模板文本框）
+  | 'text_plan_invalid'
+  | 'text_plan_warning'
   // 警告
   | 'info_point_unassigned'
   | 'must_mark_not_planned'
@@ -170,6 +186,11 @@ export interface DesignCardAssetEntry {
 
 export interface DesignCardContext {
   assets: DesignCardAssetEntry[]
+  /**
+   * 项目画幅（#96）：模板文本框的规范家族（16:9 / 9:16）与容量都由它决定。
+   * 没有这项事实时读写两侧都**跳过**文本框的排版判定（不猜横版，免得误伤竖屏套位）。
+   */
+  aspect?: string
 }
 
 const KIND_LABELS: Record<AssetKindName, string> = { character: '角色', scene: '场景', prop: '道具' }
@@ -316,6 +337,21 @@ function normalizeBaseRef(raw: unknown, ctx: DesignCardContext | undefined): Bas
   return ref
 }
 
+/**
+ * 模板文本框的记录层字段：清洗口径必须与 #48 `normalizeLayerDoc` 完全一致（未知字段丢弃、
+ * 列表字段切条、长度上限），所以直接借用它的 text 图层规范化，而不是再抄一份规则。
+ * 未知 `role` 返回 null（整层丢弃：规范里没有这个类型，排版与容量都无从谈起）。
+ */
+function normalizePlannedTextFields(role: string, raw: unknown): Record<string, string | string[]> | null {
+  const doc = normalizeLayerDoc({
+    version: 1,
+    base: { path: '', width: 1, height: 1 },
+    layers: [{ id: 'probe', type: 'text', role, fields: raw }],
+  })
+  const layer = doc.layers[0]
+  return layer && layer.type === 'text' ? layer.fields : null
+}
+
 function normalizePlannedLayers(raw: unknown, ctx: DesignCardContext | undefined): PlannedLayer[] {
   if (!Array.isArray(raw)) return []
   const items: PlannedLayer[] = []
@@ -329,6 +365,17 @@ function normalizePlannedLayers(raw: unknown, ctx: DesignCardContext | undefined
       at_s: typeof row.at_s === 'number' && Number.isFinite(row.at_s)
         ? Math.max(0, Math.round(Number(row.at_s) * 100) / 100)
         : 0,
+    }
+    if (item.type === 'text') {
+      // #96：模板文本框只认类型 + 字段（位置与样式由规范决定，不锚定、不写自由文字）
+      const role = typeof row.role === 'string' ? row.role.trim() : ''
+      if (!role) continue
+      const fields = normalizePlannedTextFields(role, row.fields)
+      if (!fields) continue
+      item.role = role
+      item.fields = fields
+      items.push(item)
+      continue
     }
     const body = text(row.text, 200)
     if (body) item.text = body
@@ -377,6 +424,9 @@ export function normalizeDesignCard(raw: unknown, ctx?: DesignCardContext): Desi
       must_mark: mustMark,
       planned_layers: normalizePlannedLayers(layerRaw.planned_layers, ctx),
     }
+    // #96：成套位置只认规范里的视频版式（Poster 版式不能被写进分镜设计卡）
+    const located = textLayoutById(typeof layerRaw.text_layout === 'string' ? layerRaw.text_layout.trim() : null)
+    if (located && located.medium === 'video') card.layer_plan.text_layout = located.layout.id
   }
 
   if (genRaw) {
@@ -398,6 +448,162 @@ export function normalizeDesignCard(raw: unknown, ctx?: DesignCardContext): Desi
   }
 
   return card
+}
+
+// ---------- 模板文本框（#96） ----------
+
+/** 设计卡按项目画幅的规范家族排版：容量与自检都用这套标准成片尺寸（引擎口径）。 */
+export function textPlanSize(aspect: string): { width: number; height: number } {
+  const family = orientationOf(aspect) === 'portrait' ? '9:16' : '16:9'
+  return TEXT_CANONICAL_SIZES[`${family}/video`]
+}
+
+/**
+ * 设计卡里的模板文本框 → 临时图层文档（与草稿同构：id 按计划顺序、`text_layout` 取卡片值）。
+ * 排版引擎据此判定溢出、缺字段、同拍冲突等；草稿阶段再用同一份数据落成真正的图层段。
+ */
+export function textPlanDoc(card: DesignCard | null): LayerDoc {
+  const planned = (card?.layer_plan?.planned_layers || []).filter(layer => layer.type === 'text')
+  const textLayout = card?.layer_plan?.text_layout
+  return normalizeLayerDoc({
+    version: 1,
+    base: { path: '', width: 1, height: 1 },
+    ...(textLayout ? { text_layout: textLayout } : {}),
+    layers: planned.map((item, index) => ({
+      id: `text-${index + 1}`,
+      type: 'text',
+      role: item.role,
+      fields: item.fields,
+    })),
+  })
+}
+
+/**
+ * 同屏拍 = 依次显现后同一时刻可见的文本框集合。与草稿共用 `layer-text-visibility` 的规则：
+ * 同 zone 的框后出现的替换先出现的，`at_s` 相同的框同时出现（同区即冲突）。
+ * id 与 `textPlanDoc` 一致（`text-{计划序号}`），两边的结论逐拍对得上。
+ */
+export function textPlanBeats(card: DesignCard | null): string[][] {
+  const planned = (card?.layer_plan?.planned_layers || []).filter(layer => layer.type === 'text')
+  return revealBeats(planned.map((item, index) => ({
+    id: `text-${index + 1}`,
+    zone: textZoneOf(card?.layer_plan?.text_layout, item.role || ''),
+    at: item.at_s,
+  })))
+}
+
+/**
+ * 设计卡的模板文本框问题（引擎结论；阻断 = 出不了成品，警告 = 会被自动缩小或与标注重叠）。
+ * `aspect` 是判定输入（画幅家族决定容量与套位是否合法），**没有画幅事实就不算**：
+ * 猜一个横版会误伤竖屏项目的套位，而读到这条结论的路径都带着项目画幅（`DesignCardContext.aspect`）。
+ */
+export function textPlanProblems(card: DesignCard | null, aspect?: string | null): TextProblem[] {
+  const doc = textPlanDoc(card)
+  if (!doc.layers.some(layer => layer.type === 'text')) return []
+  if (!aspect) return []
+  return textLayerProblems(doc, textPlanSize(aspect), { beats: textPlanBeats(card) })
+}
+
+/** 某套某类型的字段容量（引擎数字，绝不在提示词里硬编码）：给模型「该写多短」的可执行上限。 */
+function describeTextCapacity(layoutId: string, roleId: string): string {
+  const capacity: TextFieldCapacity[] = textCapacity(layoutId, roleId)
+  if (!capacity.length) return ''
+  return capacity.map(item => {
+    const limit = item.kind === 'list'
+      ? `最多 ${item.max_items} 条，每条 ${item.chars_per_line} 字 × ${item.max_lines} 行`
+      : `每行 ${item.chars_per_line} 字 × ${item.max_lines} 行 = 最多 ${item.max_chars} 字`
+    return `${item.label}（${item.field}）${limit}${item.optional ? '，可选' : '，必填'}`
+  }).join('；')
+}
+
+/** AI 写入路径的文本框硬规则（人工写入不受限，只吃读时问题） */
+export interface TextPlanRejection {
+  code: 'card_layer_rejected' | 'label_unanchored' | 'text_layout_missing' | 'text_role_invalid' | 'text_plan_invalid'
+  layer_index: number | null
+  message: string
+}
+
+/**
+ * AI 写入路径的模板文本框硬规则：任何 `card`、没有锚点的 `label`、有文本框却没选成套位置、
+ * 以及引擎的阻断级问题（溢出 / 缺必填字段 / 同拍冲突 / 画幅不符）都不许落库。
+ * 拒信里带上引擎算出的字段容量，模型才知道该改多短（写作口径：改短 → 拆拍 → 换类型）。
+ */
+export function aiTextPlanRejections(
+  card: DesignCard | null,
+  aspect?: string | null,
+  /**
+   * 模型原始写进来的 `planned_layers`：规范化会把 `role` 缺失或未知的 text 层整层丢弃，
+   * 从规范化结果里看不出模型写错了什么，所以规则按**原文**判一次，绝不静默丢文字。
+   */
+  rawPlanned?: unknown,
+): TextPlanRejection[] {
+  if (!card) return []
+  const plan = card.layer_plan
+  const out: TextPlanRejection[] = []
+  if (Array.isArray(rawPlanned)) {
+    rawPlanned.forEach((entry, index) => {
+      if (!entry || typeof entry !== 'object') return
+      const row = entry as Record<string, unknown>
+      if (String(row.type || '').trim().toLowerCase() !== 'text') return
+      const role = typeof row.role === 'string' ? row.role.trim() : ''
+      if (role && TEXT_SPEC.roles[role]) return
+      out.push({
+        code: 'text_role_invalid',
+        layer_index: index,
+        message: `第 ${index + 1} 层是 text，但 ${role ? `role「${role}」不在规范里` : '没有写 role'}。role 只能逐字取自 read_storyboard_context 的 text_spec.roles（${textRolesFor('video').join(' / ')}），字段必须按该类型的 fields 填写。`,
+      })
+    })
+  }
+  for (const [index, layer] of (plan?.planned_layers || []).entries()) {
+    if (layer.type === 'card') {
+      out.push({
+        code: 'card_layer_rejected',
+        layer_index: index,
+        message: `第 ${index + 1} 层用了 card。分镜的屏幕文字现在只用模板文本框（type:'text' + role + fields + layer_plan.text_layout），card 不再允许：把它的标题/年代拆到 date、heading、statement 等类型里去。`,
+      })
+    }
+    if (layer.type === 'label' && !layer.anchor) {
+      out.push({
+        code: 'label_unanchored',
+        layer_index: index,
+        message: `第 ${index + 1} 层是没有锚点的 label（「${layer.text || '无文字'}」）。屏幕排版文字一律用模板文本框；label 只用于把文字钉在底图某个语义位置上（必须带 anchor）。`,
+      })
+    }
+  }
+  const hasText = (plan?.planned_layers || []).some(layer => layer.type === 'text')
+  if (hasText && !plan?.text_layout) {
+    out.push({
+      code: 'text_layout_missing',
+      layer_index: null,
+      message: '有计划文本框但没有选成套位置：layer_plan.text_layout 必须从 read_storyboard_context 的 text_spec.layouts 里按底图主体位置选一套。',
+    })
+  }
+  const layoutId = plan?.text_layout
+  for (const problem of textPlanProblems(card, aspect)) {
+    if (problem.level !== 'error') continue
+    // 缺套已经在上面报过一次，不重复
+    if (problem.code === 'text_layout_missing') continue
+    const index = problem.layer_id ? Number(problem.layer_id.replace(/^text-/, '')) - 1 : null
+    const layer = index !== null ? (plan?.planned_layers || []).filter(item => item.type === 'text')[index] : undefined
+    const capacity = layer?.role && layoutId ? describeTextCapacity(layoutId, layer.role) : ''
+    out.push({
+      code: 'text_plan_invalid',
+      layer_index: index,
+      message: `${problem.message}${capacity ? `。这一套里「${TEXT_SPEC.roles[layer!.role!]?.name ?? layer!.role}」的字段容量：${capacity}` : ''}。处置顺序：改短 → 拆成多拍（不同 at_s）→ 换成更合适的类型；自动缩小只是兜底，不能当常规容量。`,
+    })
+  }
+  return out
+}
+
+/** 工具拒绝时回给模型的正文（与 groundingRejectionMessage 同形） */
+export function textPlanRejectionMessage(rejections: TextPlanRejection[]): string {
+  return [
+    '设计卡没有保存：模板文本框的计划还不合法。',
+    ...rejections.map((item, index) => `${index + 1}. ${item.message}`),
+    '请按 read_storyboard_context 返回的 text_spec 改正后重新调用 update_storyboard：layouts 决定成套位置，'
+    + 'roles 决定类型与字段，capacity 给出这一套每个字段的字数上限（numbers 来自引擎，不要凭记忆估算）。'
+    + '不要用 card、不要在屏幕排版时用没有锚点的 label，也不要删掉文本框改成纯旁白。',
+  ].join('\n')
 }
 
 export interface CardBudget {
@@ -442,12 +648,16 @@ export interface CardValidateInput {
   measuredSeconds?: number | null
   /** 本镜提示词里已经 @ 到的资产；未提供时跳过 `reference_not_mentioned` */
   mentioned?: Array<{ kind: AssetKindName; id: number }> | null
+  /** 项目画幅（#96）：模板文本框按它的规范家族排版与校验；缺省时跳过文本框判定 */
+  aspect?: string | null
 }
 
 /**
  * 校验分级（契约 §3.1）：
- * 阻断 = 未选 combo / 预算超限 / 总时长 < 旁白 / A·C·D 无底图 / B·C·D 缺非锁定槽位描述；
- * 警告 = 信息点无归属 / must_mark 未被计划图层锚定 / 参考素材未被 @ / 余量偏紧 / 引用解析不到。
+ * 阻断 = 未选 combo / 预算超限 / 总时长 < 旁白 / A·C·D 无底图 / B·C·D 缺非锁定槽位描述 /
+ *        模板文本框不合法（溢出、缺必填字段、同拍冲突、画幅不符）；
+ * 警告 = 信息点无归属 / must_mark 未被计划图层锚定 / 参考素材未被 @ / 余量偏紧 / 引用解析不到 /
+ *        文本框会被自动缩小或与锚定标注重叠。
  */
 export function validateDesignCard(input: CardValidateInput): CardIssue[] {
   const { card, combo } = input
@@ -532,6 +742,12 @@ export function validateDesignCard(input: CardValidateInput): CardIssue[] {
   }
   for (const ref of card.gen_plan?.reference_assets || []) if (ref.unresolved) unresolved.push(ref.unresolved_reason || `参考素材「${ref.name}」解析不到`)
   for (const [index, reason] of unresolved.entries()) add('unresolved_ref', 'warn', reason, index)
+
+  // #96：模板文本框的引擎结论（溢出 / 缺必填字段 / 同拍冲突 / 画幅不符 = 阻断）
+  for (const problem of textPlanProblems(card, input.aspect)) {
+    if (problem.level === 'error') add('text_plan_invalid', 'block', problem.message)
+    else add('text_plan_warning', 'warn', problem.message)
+  }
 
   return issues
 }

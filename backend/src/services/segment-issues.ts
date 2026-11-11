@@ -7,13 +7,17 @@
  * - `reference_not_mentioned`：`gen_plan.reference_assets` 没有被任何槽位提示词 `@`；
  * - `card_subtitle_overlap`：卡片图层底边进入字幕安全区（> 0.88）；
  * - `budget_mismatch`：实际段长与设计卡 `budget.layer_s` 偏差 > 0.5 s；
- * - `missing_base`：A/C/D 的设计卡没有合法底图（草稿也就没法落行）。
+ * - `missing_base`：A/C/D 的设计卡没有合法底图（草稿也就没法落行）；
+ * - `text_layer_invalid` / `text_layer_warning`（#96）：模板文本框的溢出、缺字段、同拍冲突、
+ *   自动缩小、与锚定标注重叠。拍取时间线关键帧的可见集合，尺寸取段文档的画幅。
  *
  * 与 `storyboard-assets.ts` 的 @ 解析同源：名字归一（空白→下划线、大小写无关），
  * 只认**写了内容**的提示词字段。
  */
 import { BUDGET_TIGHT_SECONDS, hasLayerSegment, type Combo, type DesignCard } from './design-card.js'
-import { SUBTITLE_SAFE_BOTTOM } from './layer-segment-draft.js'
+import { SUBTITLE_SAFE_BOTTOM, textBeatsOfTimeline } from './layer-segment-draft.js'
+import { TEXT_CANONICAL_SIZES, textFamilyOf, textLayerProblems } from './layer-text.js'
+import type { LayerDoc } from './layer-doc.js'
 import type { LayerSegment } from './layer-segment.js'
 
 export const SEGMENT_ISSUE_CODES = [
@@ -22,12 +26,15 @@ export const SEGMENT_ISSUE_CODES = [
   'reference_not_mentioned',
   'card_subtitle_overlap',
   'budget_mismatch',
+  'text_layer_invalid',
+  'text_layer_warning',
 ] as const
 export type SegmentIssueCode = typeof SEGMENT_ISSUE_CODES[number]
 
 export interface SegmentIssue {
   code: SegmentIssueCode
-  severity: 'warn'
+  /** `text_layer_invalid` 是阻断级（渲染闸门会拒绝出片），其余只提示 */
+  severity: 'warn' | 'block'
   message: string
   /** 「一键创建标记并锚定」需要的语义定位（`must_mark_not_marked` 才有） */
   asset_id?: number
@@ -64,6 +71,13 @@ function normalizedName(name: string): string {
   return name.trim().replace(/\s+/g, '_').toLowerCase()
 }
 
+/** 段文档的成片尺寸：文档里的 base.width/height 就是图层段的输出画幅 */
+function textSizeOf(doc: LayerDoc): { width: number; height: number } {
+  const { width, height } = doc.base
+  if (width > 1 && height > 1) return { width, height }
+  return TEXT_CANONICAL_SIZES[`${textFamilyOf(width, height)}/video`]
+}
+
 /** 图层锚定的语义条目集合（`asset_id:semantic_id`） */
 function anchoredKeyframes(segment: LayerSegment | null): Set<string> {
   const out = new Set<string>()
@@ -82,6 +96,21 @@ export function segmentIssuesOf(input: SegmentIssueInput): SegmentIssue[] {
   if (!hasLayerSegment(combo)) return issues
   if (!card) return issues
   const plan = card.layer_plan
+  // 模板文本框的问题只取决于已存的段文档，与设计卡底图无关，所以放在 missing_base 早退之前
+  if (segment) {
+    const textLayers = segment.layer_doc.layers.filter(layer => layer.type === 'text')
+    if (textLayers.length) {
+      for (const problem of textLayerProblems(segment.layer_doc, textSizeOf(segment.layer_doc), {
+        beats: textBeatsOfTimeline(segment.layer_doc, segment.timeline),
+      })) {
+        issues.push({
+          code: problem.level === 'error' ? 'text_layer_invalid' : 'text_layer_warning',
+          severity: problem.level === 'error' ? 'block' : 'warn',
+          message: problem.message,
+        })
+      }
+    }
+  }
   if (!plan?.base) {
     issues.push({
       code: 'missing_base',
@@ -116,6 +145,7 @@ export function segmentIssuesOf(input: SegmentIssueInput): SegmentIssue[] {
   }
 
   if (segment) {
+    // 模板文本框（#96）在规范安全区内排版，不参与字幕安全区判定；只有旧 card 层会压进去
     for (const layer of segment.layer_doc.layers) {
       if (layer.type !== 'card') continue
       const bottom = layer.box.y + layer.box.h
