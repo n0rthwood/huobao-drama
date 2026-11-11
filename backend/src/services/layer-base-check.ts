@@ -27,6 +27,8 @@ import { callTextChat, imageContentPart } from './vision-chat.js'
 import { extractFirstJson } from '../agents/tools/vision-tools.js'
 import { createTextTask, finishTextTask, patchTextTaskParams } from './text-task.js'
 import { runWithTextTask } from './text-task-context.js'
+import { runObservedWork } from './task-observability.js'
+import { buildSampleKey } from './task-estimate.js'
 import { baseFrameOf, normalizeCrop } from './layer-quality.js'
 import { renderBaseFramePng } from './layer-segment-render.js'
 import { fileSha256, getLayerSegment, resolveEpisodeSegmentSpec, type SegmentSpec } from './layer-segment.js'
@@ -294,11 +296,19 @@ async function runCheckTask(taskId: number, storyboardId: number, signature: str
       '任何一条不合格就 pass=false，并在 problems 里写清楚；全部合格时 problems 为空数组。',
     ].filter(part => part !== undefined).join('\n')
 
-    const { text } = await callTextChat(
+    // 观测窗口包住真实的视觉模型调用：公开请求/响应、计时随任务持久化，任务中心可回看（AGENTS LLM harness 规则）
+    const { text } = await runObservedWork({
+      taskId,
+      stage: 'layer_base_check',
+      sourceChars: (sb!.narrationText || '').length,
+      sampleKey: buildSampleKey({ stage: 'layer_base_check', configId: config.configId, model: config.model }),
+      storyboardId,
+      storyboardNumber: sb!.storyboardNumber,
+    }, () => callTextChat(
       config,
       [{ type: 'text', text: question }, ...parts],
       { systemPrompt: SYSTEM_PROMPT, temperature: CHECK_TEMPERATURE, maxTokens: CHECK_MAX_TOKENS, timeoutMs: CHECK_TIMEOUT_MS },
-    )
+    ))
     const parsed = extractFirstJson(text)
     if ('error' in parsed) throw new Error(`模型返回无法解析为 JSON：${parsed.error}`)
     const json = parsed.json as Record<string, unknown>
