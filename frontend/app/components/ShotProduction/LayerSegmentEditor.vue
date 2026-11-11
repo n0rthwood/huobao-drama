@@ -346,7 +346,11 @@ async function switchToCurrentVersion() {
 }
 
 /** 某一时刻：取景框 + 图层不透明度都由时间线插值得出（口径同后端 frameStateAt） */
-const frame = computed(() => frameStateAt(timeline.value, time.value))
+const frame = computed(() => frameStateAt(
+  timeline.value,
+  time.value,
+  (doc.value?.layers || []).filter(layer => layer.type === 'text').map(layer => layer.id),
+))
 /**
  * 叠加层按整幅画出，裁切交给外层 DOM，这样底图/滤镜/图层共用同一个取景框。
  * `visibleIds` 必须显式给：`opacity` 只覆盖时间线提到过的图层，缺省 key 在

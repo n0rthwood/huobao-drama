@@ -629,7 +629,7 @@ Body：`{config_id?, model?, prompt?}`
 Body：`{image}` 选版本；或 `{inherit:true}`（仅首帧，承接上一镜尾帧）。
 注意：选版变化会自动取消关键帧确认，并连带取消继承它的下一镜。
 ### `POST /storyboards/{id}/confirm-keyframes` [R]
-Body：`{confirmed:true|false}`；`ready` 要求首帧与尾帧都有图，且写了中间帧提示词的必须有中间帧图。
+Body：`{confirmed:true|false}`（**必须显式 `true` 才是确认**：服务端 `confirmed = body.confirmed === true`，空 body `{}` 等于取消确认——#96 竖版验收实测踩中）；`ready` 要求首帧与尾帧都有图，且写了中间帧提示词的必须有中间帧图。
 确认会快照当前 junction hash；图层重渲后 hash 变 → 确认自动作废。
 
 ---

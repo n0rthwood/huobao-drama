@@ -356,12 +356,14 @@ export async function renderLayerSegment(
   })
 
   let renderedFrames = 0
+  // 模板文本框先出后进（#96），同区替换不叠字
+  const textIds = doc.layers.filter(layer => layer.type === 'text').map(layer => layer.id)
   try {
     let lastKey = ''
     let lastFrame: Buffer | null = null
     for (let index = 0; index < plan.frames; index++) {
       const sample = junctionVideoSample(combo, index, plan.frames, plan.fps, segment.duration, timeline.fade_ms)
-      const state = frameStateAt(timeline, sample.t)
+      const state = frameStateAt(timeline, sample.t, textIds)
       const key = `${frameKeyOf(state)}:${sample.textAlpha}`
       // 静止段相邻帧的状态键完全相同，直接复用上一帧像素（15 s 片段里通常有七八成）
       if (key !== lastKey || !lastFrame) {
@@ -424,7 +426,7 @@ export async function renderSegmentFrame(
   // 预览帧不套成品闸门：文本框有问题时编辑器要能看到真实的溢出画面（出片由 renderLayerSegment 拒绝）
   const source = await prepareFrameSource(doc, plan, timeline)
   const time = Math.min(Math.max(0, t), Math.max(0, segment.duration - 1 / plan.fps))
-  return composeFrame(doc, plan, source, frameStateAt(timeline, time), 'png')
+  return composeFrame(doc, plan, source, frameStateAt(timeline, time, doc.layers.filter(layer => layer.type === 'text').map(layer => layer.id)), 'png')
 }
 
 /**

@@ -125,6 +125,24 @@ test('S01 逐层显现：0/3/6/9 秒各多一层，fade 结束后是整数不透
   assert.equal(got.frames, 375, '15 s @25fps = 375 帧')
 })
 
+test('模板文本框先出后进（#96）：同区替换时旧框在过渡前半段淡完、新框后半段才出现，两端实现一致', () => {
+  const timeline = { fps: 25, ease: 'linear', fade_ms: 400, keyframes: [
+    { t: 0, viewport: { x: 0, y: 0, w: 1, h: 1 }, visible: ['heading'] },
+    { t: 2, viewport: { x: 0, y: 0, w: 1, h: 1 }, visible: ['statement'] },
+  ] }
+  const got = run(`
+    const timeline = ${JSON.stringify(timeline)}
+    const at = t => frameStateAt(timeline, t, ['heading', 'statement']).opacity
+    out({ t2_1: at(2.1), t2_2: at(2.2), t2_3: at(2.3), crossfade: frameStateAt(timeline, 2.1).opacity })
+  `)
+  assert.deepEqual(got.t2_1, { heading: 0.5, statement: 0 }, '前半段只有旧框在淡出')
+  assert.deepEqual(got.t2_2, { heading: 0, statement: 0 }, '中点两框都不可见，不叠字')
+  assert.deepEqual(got.t2_3, { heading: 0, statement: 0.5 })
+  assert.deepEqual(got.crossfade, { heading: 0.75, statement: 0.25 }, '非文本层仍是交叉淡化')
+  const front = t => frontTimeline.frameStateAt(timeline, t, ['heading', 'statement']).opacity
+  assert.deepEqual([front(2.1), front(2.2), front(2.3)], [got.t2_1, got.t2_2, got.t2_3])
+})
+
 test('Ken Burns：9→12 秒线性推近，12 秒后保持末状态；inout 两端更慢', () => {
   const got = run(`${S01}
     const easeIn = normalizeTimeline({ ...timeline, ease: 'inout' })

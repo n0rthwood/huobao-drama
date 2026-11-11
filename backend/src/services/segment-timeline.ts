@@ -228,8 +228,11 @@ export function timelineLayerIds(timeline: SegmentTimeline): string[] {
  * 取景框：在包夹该时刻的两个关键帧之间按 `ease` 插值；首帧之前 / 末帧之后保持不变。
  * 图层：以**该时刻所处的关键帧**为目标值、前一个关键帧为起点，自关键帧时刻起用 `fade_ms` 过渡。
  * 首个关键帧之前一律不可见——图层段开头先给观众看干净的底图，再逐层显现。
+ *
+ * `staged`（Issue #96，模板文本框 id）：这些图层「先出后进」——淡出在过渡前半段完成、淡入在后半段才开始，
+ * 同一位置区的框互相替换时不会在过渡中叠在一起（交叉淡化会让两块底板与两段文字同时半透明重叠）。
  */
-export function frameStateAt(timeline: SegmentTimeline, t: number): FrameState {
+export function frameStateAt(timeline: SegmentTimeline, t: number, staged: string[] = []): FrameState {
   const frames = timeline.keyframes
   const time = Math.max(0, t)
 
@@ -269,7 +272,10 @@ export function frameStateAt(timeline: SegmentTimeline, t: number): FrameState {
   for (const id of ids) {
     const to = target && target.visible.includes(id) ? 1 : 0
     const from = previous && previous.visible.includes(id) ? 1 : 0
-    opacity[id] = round(from + (to - from) * progress, 3)
+    const step = staged.includes(id)
+      ? (to > from ? clamp(progress * 2 - 1, 0, 1) : to < from ? clamp(progress * 2, 0, 1) : progress)
+      : progress
+    opacity[id] = round(from + (to - from) * step, 3)
   }
   return { viewport, opacity }
 }

@@ -61,6 +61,19 @@ test('剧本出处块只按结构剔除，不误删正文', () => {
   assert.equal(result.empty, '')
 })
 
+test('集号行：默认集名就是「第N集」时不重复写，有真实集名才拼接', () => {
+  const result = run(`
+    import { posterEpisodeLabel } from './src/services/poster-store.ts'
+    console.log('@@' + JSON.stringify([
+      posterEpisodeLabel({ episodeNumber: 1, title: '第1集' }),
+      posterEpisodeLabel({ episodeNumber: 2, title: 'EP02' }),
+      posterEpisodeLabel({ episodeNumber: 1, title: '秦亡' }),
+      posterEpisodeLabel({ episodeNumber: 0, title: '序章' }),
+    ]))
+  `)
+  assert.deepEqual(result, ['第1集', '第2集', '第1集 · 秦亡', '序章'])
+})
+
 test('方案资产校验：必须属于本集、有图、同名不重复、prompt 逐个 @ 选中的资产', () => {
   const result = run(`
     import { validateComposition } from './src/services/poster-concept.ts'

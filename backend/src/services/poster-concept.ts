@@ -530,6 +530,23 @@ function capacityNote(layoutId: string, role: string, field: string | undefined,
   return `（${role}.${cap.field}「${cap.label}」基准容量：${base}${fallback}）`
 }
 
+/**
+ * 溢出时给出同族同媒介里该字段容量更大的套（验收实测：竖版窄侧栏套标题只有 3 字×2 行，
+ * 模型只被告知「改短」时两次都没想到换套）。
+ */
+function widerLayoutsNote(layoutId: string, role: string, problem: TextProblem, size: { width: number; height: number }): string {
+  const located = textLayoutById(layoutId)
+  if (problem.code !== 'text_overflow' || !role || !located) return ''
+  const current = textCapacity(layoutId, role, size).find(item => item.field === problem.field)
+  if (!current) return ''
+  const wider = textLayoutsFor(located.family, located.medium)
+    .filter(layout => layout.id !== layoutId)
+    .map(layout => ({ layout, cap: textCapacity(layout.id, role, size).find(item => item.field === problem.field) }))
+    .filter(item => item.cap && item.cap.max_chars > current.max_chars)
+    .map(item => `${item.layout.id}（${item.layout.name}）${item.cap!.chars_per_line} 字×${item.cap!.max_lines} 行`)
+  return wider.length ? `；也可以换到容量更大的套：${wider.join('、')}` : ''
+}
+
 export interface PosterLayerPlanCheck {
   plan: PosterLayerPlan | null
   errors: string[]
@@ -593,7 +610,7 @@ export function normalizePosterLayerPlan(raw: unknown, ctx: PosterPlanContext): 
   for (const problem of blocking) {
     const layer = doc.layers.find(item => item.id === problem.layer_id)
     const role = layer && layer.type === 'text' ? layer.role : ''
-    errors.push(`${problem.message}${capacityNote(plan.text_layout, role, problem.field, size)}`)
+    errors.push(`${problem.message}${capacityNote(plan.text_layout, role, problem.field, size)}${widerLayoutsNote(plan.text_layout, role, problem, size)}`)
   }
   return { plan: errors.length ? null : plan, errors, problems }
 }

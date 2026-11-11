@@ -122,7 +122,9 @@ export function posterVariablesOf(context: PosterContext): PosterVariables {
 export function posterEpisodeLabel(episode: PosterContext['episode']): string {
   const number = posterEpisodeNumberLabel(episode)
   const title = String(episode.title || '').trim()
-  return [number, title].filter(Boolean).join(' · ')
+  // 默认集名就是「第N集」（或 EP01 之类的编号写法）时不重复写（验收实测「第1集 · 第1集」）
+  const redundant = Boolean(number) && (title === number || /^(第\s*\d+\s*集|EP\s*\d+|Episode\s*\d+)$/i.test(title))
+  return redundant ? number : [number, title].filter(Boolean).join(' · ')
 }
 
 /** 只有集号 `第N集`（规范的写法，也是集号行的兜底）。 */

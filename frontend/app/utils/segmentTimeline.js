@@ -85,9 +85,9 @@ export function endHoldOf(timeline, duration) {
  * 取景框：包夹该时刻的两个关键帧之间按 ease 插值（起始帧的 ease 覆盖 timeline 级 ease），
  * 首帧之前 / 末帧之后保持不变。
  * 图层：以所处关键帧为目标、前一帧为起点，自该帧时刻起用 fade_ms（目标帧覆盖优先）过渡；
- * 首帧之前全不可见。
+ * 首帧之前全不可见。`staged`（#96 模板文本框 id）先出后进：淡出占前半段、淡入占后半段，避免同区替换时叠字。
  */
-export function frameStateAt(timeline, t) {
+export function frameStateAt(timeline, t, staged = []) {
   const keyframes = timeline?.keyframes?.length
     ? timeline.keyframes
     : [{ t: 0, viewport: { ...FULL_VIEWPORT }, visible: [] }]
@@ -129,7 +129,10 @@ export function frameStateAt(timeline, t) {
   for (const id of ids) {
     const to = target && target.visible.includes(id) ? 1 : 0
     const from = previous && previous.visible.includes(id) ? 1 : 0
-    opacity[id] = round(from + (to - from) * progress, 3)
+    const step = staged.includes(id)
+      ? (to > from ? clamp(progress * 2 - 1, 0, 1) : to < from ? clamp(progress * 2, 0, 1) : progress)
+      : progress
+    opacity[id] = round(from + (to - from) * step, 3)
   }
   return { viewport, opacity }
 }
