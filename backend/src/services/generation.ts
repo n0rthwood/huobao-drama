@@ -22,6 +22,7 @@ import { parseJsonObject } from './poster-store.js'
 import sharp from 'sharp'
 import { getAbsolutePath } from '../utils/storage.js'
 import { invalidateSegmentSpec } from './layer-segment.js'
+import { aspectLockedMismatchMessage } from './asset-image-size.js'
 import type { ReferenceOrigin } from './asset-pipeline/references.js'
 import {
   buildImageJobBody,
@@ -117,6 +118,14 @@ interface GenerateImageParams extends TaskOriginParams {
    * 也不进该地图的版本历史，只作为工作流的中间产物被引用。
    */
   mapTexture?: { propId: number; propName: string }
+  /**
+   * 画幅锁定（Issue #94）：这张图必须按 `size` 的比例出，**有参考图也不许跟随参考图比例**
+   * （qwen-jobs 的 image_edit 模式就是跟随第 1 张参考图的，场景按项目画幅出图正是栽在这里）。
+   * 落库为 `params.aspect_locked`，提交时让适配器带上画幅，完成时再核验实际出图比例。
+   */
+  aspectLocked?: boolean
+  /** 资产画幅版本（Issue #94）：任务中心据此解释这条任务的来由，回写与普通资产出图一致 */
+  aspectVersion?: boolean
 }
 
 interface GenerateVideoParams extends TaskOriginParams {
@@ -172,6 +181,8 @@ export async function generateImage(params: GenerateImageParams): Promise<number
     model: params.model || config.model,
   }, {
     size: params.size || '1920x1080',
+    ...(params.aspectLocked ? { aspect_locked: true } : {}),
+    ...(params.aspectVersion ? { aspect_version: true } : {}),
     frameType: params.frameType,
     referenceImages: params.referenceImages,
     characterVersion: params.characterVersion,
@@ -538,7 +549,8 @@ async function submitQwenJobsImage(record: SysTaskRecord, config: AIConfig, para
     }
     for (const ref of (flux ? refs.slice(0, 1) : refs)) fileIds.push(await uploadReferenceImage(config, ref))
 
-    // Qwen：关键帧按剧集画幅 reference_to_image，角色/道具编辑 image_edit（不带画幅），提示词补 <imageN>；
+    // Qwen：关键帧与画幅锁定任务按指定画幅 reference_to_image，其余角色/道具编辑走 image_edit
+    //（不带画幅、跟随第 1 张参考图），提示词补 <imageN>；
     // FLUX：有参考图一律 reference_to_image + denoising_strength，只带第 1 张，不加 <imageN>。
     const isKeyframe = !!FRAME_TYPE_SLOT[String(params.frameType || '')]
     const body: QwenJobRequest = buildImageJobBody({
@@ -548,6 +560,7 @@ async function submitQwenJobsImage(record: SysTaskRecord, config: AIConfig, para
       size: params.size,
       flux,
       posterMode: params.posterGenMode,
+      aspectLocked: params.aspect_locked === true,
     })
     body.metadata = flux && refs.length > 1
       ? { sys_task_id: String(record.id), [FLUX_REFS_DROPPED_NOTE]: String(refs.length) }
@@ -663,6 +676,7 @@ export async function resumeQwenJobsTask(row: SysTaskRecord, config: AIConfig): 
  */
 export async function completeImageTaskFromBytes(record: SysTaskRecord, bytes: Buffer, contentType: string) {
   const localPath = await saveImageBuffer(bytes, contentType, 'images')
+  if (await rejectAspectLockedMismatch(record, localPath)) return
   await generateImageThumb(localPath)
   const res = await db.update(schema.sysTask)
     .set({ localPath, status: 'completed', ...completionStamp(), updatedAt: now() })
@@ -752,8 +766,36 @@ async function pollTask(record: SysTaskRecord, config: AIConfig, taskId: string)
   await failTask(record.id, 'Timeout: polling attempts exhausted')
 }
 
+/**
+ * 画幅锁定任务（Issue #94）的出图比例核验：厂商忽略画幅参数时（有参考图的编辑模式最常见）
+ * 出来的是跟随参考图的横图，静默回写就等于把挤压问题推到图层渲染。比例不符一律标失败、
+ * 不回写任何资产当前图；返回 true 表示本次完成已被拒绝。
+ */
+async function rejectAspectLockedMismatch(record: SysTaskRecord, localPath: string): Promise<boolean> {
+  const params = parseTaskParams(record.params)
+  if (params.aspect_locked !== true) return false
+  let metadata: { width?: number; height?: number }
+  try {
+    metadata = await sharp(getAbsolutePath(localPath)).metadata()
+  } catch (err) {
+    // 探测失败不构成新的失败来源：照常完成，比例问题留给底图视觉验证兜底
+    logTaskWarn('ImageTask', 'aspect-probe-failed', { id: record.id, localPath, error: err instanceof Error ? err.message : String(err) })
+    return false
+  }
+  const message = aspectLockedMismatchMessage(params.size, metadata)
+  if (!message) return false
+  logTaskError('ImageTask', 'aspect-locked-mismatch', {
+    id: record.id,
+    requested: params.size,
+    actual: `${metadata.width}x${metadata.height}`,
+  })
+  await failTask(record.id, message)
+  return true
+}
+
 async function handleImageComplete(record: SysTaskRecord, imageUrl: string, headers?: Record<string, string>) {
   const localPath = await downloadFile(imageUrl, 'images', headers)
+  if (await rejectAspectLockedMismatch(record, localPath)) return
   // 列表页缩略图（前端按命名约定推导地址，失败不影响主流程）
   await generateImageThumb(localPath)
 
@@ -768,6 +810,7 @@ async function handleImageComplete(record: SysTaskRecord, imageUrl: string, head
 
 async function handleImageCompleteBase64(record: SysTaskRecord, base64Data: string, mimeType: string) {
   const localPath = await saveBase64Image(base64Data, mimeType, 'images')
+  if (await rejectAspectLockedMismatch(record, localPath)) return
   await generateImageThumb(localPath)
 
   await db.update(schema.sysTask)

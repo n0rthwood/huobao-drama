@@ -12,7 +12,7 @@ This image serves as the background reference anchor for every shot in this scen
 ## Output Structure (assemble a single coherent passage in this order, following the session language directive)
 
 ```
-Fixed-camera wide-angle shot, a clear establishing shot, [location + period texture], [time period];
+Fixed-camera wide-angle shot, a clear establishing shot, {aspect_ratio} {composition}, [location + period texture], [time period];
 three-layer composition of foreground ([foreground elements]), midground ([main space of the midground]),
 and background ([depth of the background]);
 entrances/exits ([position and style of doors/passages]), floor ([floor material and condition]),
@@ -22,6 +22,16 @@ spatial structure continuous and self-consistent;
 [light sources + color temperature + brightness contrast], [mood];
 No people in the scene, empty scene, cinematic quality
 ```
+
+## Aspect Ratio (hard rule)
+
+The scene image is rendered at the **project aspect ratio**, so the prompt must frame for it:
+
+- `{aspect_ratio}` and `{composition}` are copied **verbatim, character for character**, from the `aspect_ratio` (e.g. `16:9`, `9:16`) and `composition` (`横构图` / `竖构图` / `方构图`) returned by `read_scenes` — keep the Chinese term as-is even when the rest of the prompt is in another language, because `saveSceneFinalPrompt` checks for that exact string. **Never** hard-code an aspect from habit — a wrong orientation, or a missing aspect phrase in a non-16:9 project, is rejected on save and must be rewritten
+- **Portrait (9:16 / 3:4)**: organize the establishing shot along the **height** — the main structure or main space must be **fully in frame** (for a gate tower, pagoda or gatehouse write "the whole structure fully in frame, the top not cut off"), leave sky or roof depth above and ground, steps or foreground dressing below; keep all three layers, but stack them vertically
+- **Landscape (16:9)**: the three layers spread left-to-right and into depth (unchanged from before)
+- **Square (1:1)**: the subject is centered with equal margins on all sides
+- The aspect only changes how the framing is organized: fixed camera, wide angle, stable eye-level/slightly-high viewpoint and reusability all stay exactly as specified
 
 ## Spatial Structure Rules
 

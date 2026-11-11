@@ -27,10 +27,10 @@ import { bindCreatedAssetToReviewItem, findReviewItemAssetDuplicate, onAssetLibr
 import { getAbsolutePath } from '../utils/storage.js'
 import { parseAssetType } from '../services/map-workflow/types.js'
 import { isMapAsset, serializeProp } from '../services/map-workflow/store.js'
+import { mountAspectVersionRoute } from './asset-aspect-version.js'
+import { PROP_IMAGE_SIZE } from '../services/asset-image-size.js'
 
 const app = new Hono()
-// 道具图：白底单品静物，方形画布
-const PROP_IMAGE_SIZE = '1024x1024'
 /** 证据素材不进生图链路时的统一口径（路由 400 与批量 skip_faithful 同义） */
 const FAITHFUL_BLOCKED_MESSAGE = '该素材已标记为证据素材（忠实素材），不能重绘；如需风格化请用「美化」生成派生版本，或先关闭忠实标记'
 /**
@@ -44,6 +44,8 @@ const MAP_DIFFUSION_BLOCKED_MESSAGE = '地图资产的画面由地图工作流�
 mountReferenceImageRoutes(app, 'prop')
 // POST /props/:id/re-extract — 单资产重新提取（Issue #32）
 mountReExtractRoute(app, 'prop')
+// POST /props/:id/aspect-version — 以当前图为参考按项目画幅重出一版（Issue #94）
+mountAspectVersionRoute(app, 'prop')
 
 // POST /props — 手动新增道具（传入 episode_id 时关联到该集）
 app.post('/', async (c) => {

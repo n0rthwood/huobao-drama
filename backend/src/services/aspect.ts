@@ -92,3 +92,31 @@ export function aspectConflictMessage(field: string, conflicts: string[], aspect
   const projectAspect = normalizeAspect(aspect)
   return `${field} 与项目画幅不符：本项目是 ${projectAspect} ${compositionOf(projectAspect)}，提示词里却写了「${conflicts.join('」「')}」。请按 ${projectAspect} ${compositionOf(projectAspect)} 重写这条提示词后再保存。`
 }
+
+/** 技能文本里要求逐字写出的画幅短语，如 `9:16 竖构图` */
+export function aspectPhrase(aspect: string | null | undefined): string {
+  const projectAspect = normalizeAspect(aspect)
+  return `${projectAspect} ${compositionOf(projectAspect)}`
+}
+
+/**
+ * 场景最终提示词的画幅校验（Issue #94）。场景图现在按项目画幅出图，提示词里的取景
+ * 必须跟着画幅走，否则模型按横版取景、竖版画布只能截掉主体（ep 21 城楼被截即此）。
+ *
+ * 两条判据：
+ * 1. 任何与项目画幅冲突的写法一律退回（与关键帧提示词同口径）；
+ * 2. **非 16:9 项目**还必须逐字写出画幅短语。16:9 是历史默认值，老提示词不写画幅
+ *    出图结果也对，强制改写只会把所有存量项目的提示词作废。
+ *
+ * 返回退回说明；放行时返回 null。
+ */
+export function sceneAspectIssue(prompt: string | null | undefined, aspect: string | null | undefined): string | null {
+  const projectAspect = normalizeAspect(aspect)
+  const conflicts = findAspectConflicts(prompt, projectAspect)
+  if (conflicts.length) return aspectConflictMessage('场景最终提示词', conflicts, projectAspect)
+  if (projectAspect === DEFAULT_ASPECT) return null
+  const phrase = aspectPhrase(projectAspect)
+  if (String(prompt || '').includes(phrase)) return null
+  return `场景最终提示词缺少画幅：本项目是 ${phrase}，提示词必须逐字写出「${phrase}」，`
+    + `并按该画幅组织建立镜头（主体完整入画，竖构图时沿高度方向分层）。请补齐后再保存。`
+}

@@ -15,6 +15,9 @@ import { promptSourceChanged } from '../services/asset-prompt-invalidation.js'
 import { mountReExtractRoute } from './asset-reextract.js'
 import { toSnakeCase } from '../utils/transform.js'
 import { bindCreatedAssetToReviewItem, findReviewItemAssetDuplicate, onAssetRemoved, onEpisodeAssetLinkChanged } from '../services/asset-review.js'
+import { mountAspectVersionRoute } from './asset-aspect-version.js'
+import { assetImageSizeFor, resolveDramaAspect } from '../services/asset-image-size.js'
+import { aspectPhrase } from '../services/aspect.js'
 
 const app = new Hono()
 
@@ -22,6 +25,8 @@ const app = new Hono()
 mountReferenceImageRoutes(app, 'scene')
 // POST /scenes/:id/re-extract — 单资产重新提取（Issue #32）
 mountReExtractRoute(app, 'scene')
+// POST /scenes/:id/aspect-version — 以当前图为参考按项目画幅重出一版（Issue #94）
+mountAspectVersionRoute(app, 'scene')
 
 // POST /scenes — 手动新增场景（传入 episode_id 时关联到该集）
 app.post('/', async (c) => {
@@ -118,14 +123,17 @@ app.post('/:id/generate-image', async (c) => {
   if (!ep) return badRequest(c, '剧集不存在')
 
   const stylePrompt = await getDramaStylePrompt(scene.dramaId)
+  const aspect = await resolveDramaAspect(scene.dramaId)
   const finalPrompt = savedPromptOf(await ensureSceneFinalPrompt(scene, ep.id, false, { model: body.text_model, configId: body.text_config_id ?? undefined }))
-  // 回退拼接也要守住无人物约束：场景描述(prompt)可能含人物活动，直接拼会让人混进图里
+  // 回退拼接也要守住无人物约束：场景描述(prompt)可能含人物活动，直接拼会让人混进图里；
+  // 画幅短语同样要写进去（Issue #94），否则模型按横版取景、竖版画布截掉主体
   const prompt = finalPrompt || [
     stylePrompt || '',
     scene.location,
     scene.time || '',
     scene.prompt || '高质量场景',
     scene.lighting || '电影感光影',
+    aspectPhrase(aspect),
     '画面中没有任何人物，空场景，只有场景本身',
   ].filter(Boolean).join(', ')
   // 默认用场景自己保存的参考图；请求显式传 reference_images（含空数组）时以请求为准
@@ -135,7 +143,9 @@ app.post('/:id/generate-image', async (c) => {
   try {
     logTaskStart('SceneImage', 'generate', { sceneId: id, episodeId: ep.id, dramaId: scene.dramaId, location: scene.location, references: referenceImages.length })
     await db.update(schema.scenes).set({ status: 'processing', updatedAt: now() }).where(eq(schema.scenes.id, id))
-    const genId = await generateImage({ sceneId: id, episodeId: ep.id, dramaId: scene.dramaId, prompt, model: body.model, referenceImages: referenceImages.length ? referenceImages : undefined, configId: body.config_id ?? ep.imageConfigId ?? undefined })
+    // 场景按项目画幅出图（Issue #94）：有参考图时也锁画幅，不跟随参考图比例
+    const size = assetImageSizeFor('scene', aspect)
+    const genId = await generateImage({ sceneId: id, episodeId: ep.id, dramaId: scene.dramaId, prompt, model: body.model, size, aspectLocked: true, referenceImages: referenceImages.length ? referenceImages : undefined, configId: body.config_id ?? ep.imageConfigId ?? undefined })
     logTaskSuccess('SceneImage', 'generate', { sceneId: id, generationId: genId })
     return success(c, { image_generation_id: genId, reference_images: referenceImages, missing_reference_images: missing })
   } catch (err: any) {

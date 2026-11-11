@@ -17,6 +17,8 @@ import { now } from '../../utils/response.js'
 import { getDramaStylePrompt } from '../../services/style-preset.js'
 import { getDramaId } from '../context.js'
 import { sceneFinalPromptCoversTime, sceneTimeMissingMessage } from '../../services/scene-time.js'
+import { compositionOf, sceneAspectIssue } from '../../services/aspect.js'
+import { resolveDramaAspect } from '../../services/asset-image-size.js'
 
 // ─── 角色提示词 ───────────────────────────────────────
 
@@ -81,7 +83,7 @@ const saveCharacterFinalPrompt = createTool({
 
 const readScenes = createTool({
   id: 'read_scenes',
-  description: '读取当前剧集中的所有场景信息，用于生成场景固定视角最终提示词。',
+  description: '读取当前剧集中的所有场景信息与项目画幅，用于生成场景固定视角最终提示词。',
   inputSchema: z.object({}),
   execute: async (_input, context) => {
     const dramaId = getDramaId(context?.requestContext)
@@ -89,7 +91,11 @@ const readScenes = createTool({
     const scenes = (await db.select().from(schema.scenes)
       .where(eq(schema.scenes.dramaId, dramaId)))
       .filter(s => !s.deletedAt)
+    // 项目画幅（Issue #94）：场景图按项目画幅出图，提示词必须逐字写出 `{aspect_ratio} {composition}`
+    const aspectRatio = await resolveDramaAspect(dramaId)
     return {
+      aspect_ratio: aspectRatio,
+      composition: compositionOf(aspectRatio),
       scenes: scenes.map(s => ({
         id: s.id,
         location: s.location,
@@ -103,10 +109,10 @@ const readScenes = createTool({
 
 const saveSceneFinalPrompt = createTool({
   id: 'save_scene_final_prompt',
-  description: '保存为场景创作的固定视角（前景/中景/后景）最终提示词。项目视觉风格会由工具自动拼接，prompt 参数中不要包含风格词。场景 time 非空时 prompt 必须原样包含 time 文字，否则拒绝保存。',
+  description: '保存为场景创作的固定视角（前景/中景/后景）最终提示词。项目视觉风格会由工具自动拼接，prompt 参数中不要包含风格词。场景 time 非空时 prompt 必须原样包含 time 文字；非 16:9 项目的 prompt 必须逐字包含 read_scenes 返回的「{aspect_ratio} {composition}」，否则拒绝保存。',
   inputSchema: z.object({
     scene_id: z.number(),
-    prompt: z.string().describe('场景固定视角最终提示词（使用会话语言指令指定的目标语言，不含风格词；必须原样包含场景 time）'),
+    prompt: z.string().describe('场景固定视角最终提示词（使用会话语言指令指定的目标语言，不含风格词；必须原样包含场景 time 与项目画幅短语）'),
   }),
   execute: async ({ scene_id, prompt }, context) => {
     const dramaId = getDramaId(context?.requestContext)
@@ -117,6 +123,11 @@ const saveSceneFinalPrompt = createTool({
     // 场景时间是正式字段（Issue #21）：最终提示词必须引用它，不满足则让 Agent 重写
     if (!sceneFinalPromptCoversTime(prompt, s.time)) {
       return { error: `${sceneTimeMissingMessage(s.time!)}；未保存，请按 time 改写后重新调用 save_scene_final_prompt`, saved: false }
+    }
+    // 项目画幅（Issue #94）：写错方向或非 16:9 项目漏写画幅都退回让模型改，不静默重写
+    const aspectIssue = sceneAspectIssue(prompt, await resolveDramaAspect(dramaId))
+    if (aspectIssue) {
+      return { error: `${aspectIssue}未保存，请改写后重新调用 save_scene_final_prompt`, saved: false }
     }
 
     const stylePrompt = await getDramaStylePrompt(dramaId)

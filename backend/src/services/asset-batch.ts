@@ -48,13 +48,7 @@ import {
   type AssetKind,
   type AssetSelectionState,
 } from './asset-batch-select.js'
-
-/** 资产出图画幅：角色横版定妆照、道具白底方图、场景走 generateImage 默认值 */
-export const ASSET_IMAGE_SIZE: Record<AssetKind, string | undefined> = {
-  character: '1920x1080',
-  scene: undefined,
-  prop: '1024x1024',
-}
+import { assetImageSizeForDrama } from './asset-image-size.js'
 
 /** 文本并发默认 3（图像侧 2 个 worker，并发 3 足以持续喂饱；env 可调） */
 export const ASSET_PROMPT_CONCURRENCY = (() => {
@@ -371,7 +365,9 @@ async function submitImage(asset: LoadedAsset, prompt: string, episodeId: number
     dramaId: asset.dramaId,
     prompt,
     model: req.imageModel,
-    size: ASSET_IMAGE_SIZE[asset.kind],
+    size: await assetImageSizeForDrama(asset.kind, asset.dramaId),
+    // 场景必须按项目画幅出图：有参考图时也不许跟随参考图比例（Issue #94）
+    aspectLocked: asset.kind === 'scene',
     referenceImages: referenceImages.length ? referenceImages : undefined,
     configId: req.imageConfigId,
   })

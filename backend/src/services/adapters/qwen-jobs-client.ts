@@ -161,6 +161,8 @@ export interface ImageJobBodyOptions {
   flux: boolean
   /** Poster 任务模式（Issue #39）：initial 按画幅出图；composite/layers 跟随参考图尺寸 */
   posterMode?: string | null
+  /** 画幅锁定（Issue #94）：有参考图也必须按 size 出图（场景按项目画幅、资产画幅版本） */
+  aspectLocked?: boolean
 }
 
 /** 多参考图在 FLUX 下被降级为第 1 张时的说明，写入任务 metadata（远端任务详情可查） */
@@ -168,7 +170,7 @@ export const FLUX_REFS_DROPPED_NOTE = 'flux_reference_to_image_only_takes_1_refe
 
 /**
  * qwen-jobs 图片任务请求体组装（generation.ts 唯一构造点）。
- * - Qwen：无参考图 text_to_image；关键帧 reference_to_image（带画幅）；其余 image_edit（跟随第 1 张参考图，不带画幅），提示词补 <imageN> 标记。
+ * - Qwen：无参考图 text_to_image；关键帧/画幅锁定 reference_to_image（带画幅）；其余 image_edit（跟随第 1 张参考图，不带画幅），提示词补 <imageN> 标记。
  * - FLUX：无参考图 text_to_image；有参考图一律 reference_to_image（img2img，只带第 1 张参考图，
  *   画幅照常、显式 denoising_strength），提示词不加 <imageN>（FLUX 不解析）。
  */
@@ -189,7 +191,8 @@ export function buildImageJobBody(opts: ImageJobBodyOptions): QwenJobRequest {
   }
   // Poster initial 需要按剧集画幅出图；composite/layers 的第一张参考图已是 Poster 画幅，
   // 用 image_edit 跟随它并保留文字保真度。
-  const fixedAspect = isKeyframe || opts.posterMode === 'initial'
+  // 画幅锁定（#94）同理走 reference_to_image：image_edit 不带 width/height，输出一定跟随参考图比例。
+  const fixedAspect = isKeyframe || opts.posterMode === 'initial' || opts.aspectLocked === true
   const mode: QwenJobMode = !fileIds.length ? 'text_to_image' : fixedAspect ? 'reference_to_image' : 'image_edit'
   return {
     mode,
