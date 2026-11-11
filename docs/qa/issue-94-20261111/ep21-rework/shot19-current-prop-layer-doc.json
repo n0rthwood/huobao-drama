@@ -1,0 +1,350 @@
+{
+  "before": {
+    "base": {
+      "path": "static/images/2e6eda55-3b3b-4a62-9ac9-07f98f504b7f.png",
+      "width": 544,
+      "height": 960,
+      "source_width": 1024,
+      "source_height": 1024,
+      "crop": {
+        "x": 0.05,
+        "y": 0.14,
+        "w": 0.9,
+        "h": 0.72
+      },
+      "filter": {
+        "paper": 0.16,
+        "tint": "sepia",
+        "tint_strength": 0.18,
+        "vignette": 0.28
+      }
+    },
+    "base_ref": {
+      "kind": "asset",
+      "asset_kind": "prop",
+      "asset_id": 217,
+      "version_task_id": null
+    }
+  },
+  "updatedBase": {
+    "path": "static/images/8c03d0ac-1fbe-4140-8f83-dcca1ba7e88b.png",
+    "width": 544,
+    "height": 960,
+    "source_width": 1088,
+    "source_height": 1920,
+    "filter": {
+      "paper": 0.16,
+      "tint": "sepia",
+      "tint_strength": 0.18,
+      "vignette": 0.28
+    }
+  },
+  "response": {
+    "code": 200,
+    "data": {
+      "spec": {
+        "width": 544,
+        "height": 960,
+        "fps": 25,
+        "source": "video"
+      },
+      "combo": "C",
+      "design_card_status": "confirmed",
+      "production_unlocked": true,
+      "gate_reason": null,
+      "segment": {
+        "id": 39,
+        "storyboard_id": 591,
+        "layer_doc": {
+          "version": 1,
+          "base": {
+            "path": "static/images/8c03d0ac-1fbe-4140-8f83-dcca1ba7e88b.png",
+            "width": 544,
+            "height": 960,
+            "source_width": 1088,
+            "source_height": 1920,
+            "filter": {
+              "paper": 0.16,
+              "tint": "sepia",
+              "tint_strength": 0.18,
+              "vignette": 0.28
+            }
+          },
+          "theme": "archival",
+          "layers": [
+            {
+              "id": "L1",
+              "type": "label",
+              "name": "巨鹿一战",
+              "visible": true,
+              "locked": false,
+              "z": 1,
+              "opacity": 1,
+              "rotation": 0,
+              "box": {
+                "x": 0.07,
+                "y": 0.22,
+                "w": 0.431,
+                "h": 0.09
+              },
+              "text": "巨鹿一战",
+              "style": {
+                "font": "serif",
+                "size": 0.052,
+                "color": "#f7efe0",
+                "stroke": "#1d1712",
+                "stroke_width": 0.0022,
+                "bg": "#1d1712",
+                "bg_opacity": 0.62,
+                "align": "left",
+                "bold": true
+              }
+            },
+            {
+              "id": "L2",
+              "type": "label",
+              "name": "秦军主力被项羽打垮",
+              "visible": true,
+              "locked": false,
+              "z": 2,
+              "opacity": 1,
+              "rotation": 0,
+              "box": {
+                "x": 0.07,
+                "y": 0.3,
+                "w": 0.616,
+                "h": 0.09
+              },
+              "text": "秦军主力被项羽打垮",
+              "style": {
+                "font": "serif",
+                "size": 0.036,
+                "color": "#f7efe0",
+                "stroke": "#1d1712",
+                "stroke_width": 0.0022,
+                "bg": "#1d1712",
+                "bg_opacity": 0.62,
+                "align": "left",
+                "bold": true
+              }
+            },
+            {
+              "id": "L3",
+              "type": "label",
+              "name": "刘邦绕道武关　直取国都",
+              "visible": true,
+              "locked": false,
+              "z": 3,
+              "opacity": 1,
+              "rotation": 0,
+              "box": {
+                "x": 0.07,
+                "y": 0.3,
+                "w": 0.743,
+                "h": 0.09
+              },
+              "text": "刘邦绕道武关　直取国都",
+              "style": {
+                "font": "serif",
+                "size": 0.036,
+                "color": "#f7efe0",
+                "stroke": "#1d1712",
+                "stroke_width": 0.0022,
+                "bg": "#1d1712",
+                "bg_opacity": 0.62,
+                "align": "left",
+                "bold": true
+              }
+            },
+            {
+              "id": "L4",
+              "type": "label",
+              "name": "外面一刀　里面一刀",
+              "visible": true,
+              "locked": false,
+              "z": 4,
+              "opacity": 1,
+              "rotation": 0,
+              "box": {
+                "x": 0.07,
+                "y": 0.3,
+                "w": 0.616,
+                "h": 0.09
+              },
+              "text": "外面一刀　里面一刀",
+              "style": {
+                "font": "serif",
+                "size": 0.036,
+                "color": "#f7efe0",
+                "stroke": "#1d1712",
+                "stroke_width": 0.0022,
+                "bg": "#1d1712",
+                "bg_opacity": 0.62,
+                "align": "left",
+                "bold": true
+              }
+            }
+          ]
+        },
+        "timeline": {
+          "fps": 25,
+          "ease": "inout",
+          "fade_ms": 250,
+          "keyframes": [
+            {
+              "t": 0,
+              "viewport": {
+                "x": 0.05,
+                "y": 0.05,
+                "w": 0.9,
+                "h": 0.9
+              },
+              "visible": []
+            },
+            {
+              "t": 0.4,
+              "viewport": {
+                "x": 0.05,
+                "y": 0.05,
+                "w": 0.9,
+                "h": 0.9
+              },
+              "visible": [
+                "L1"
+              ]
+            },
+            {
+              "t": 1.6,
+              "viewport": {
+                "x": 0.05,
+                "y": 0.05,
+                "w": 0.9,
+                "h": 0.9
+              },
+              "visible": [
+                "L2"
+              ]
+            },
+            {
+              "t": 3.4,
+              "viewport": {
+                "x": 0.05,
+                "y": 0.05,
+                "w": 0.9,
+                "h": 0.9
+              },
+              "visible": [
+                "L3"
+              ]
+            },
+            {
+              "t": 5.4,
+              "viewport": {
+                "x": 0.05,
+                "y": 0.05,
+                "w": 0.9,
+                "h": 0.9
+              },
+              "visible": [
+                "L4"
+              ]
+            },
+            {
+              "t": 6,
+              "viewport": {
+                "x": 0.05,
+                "y": 0.05,
+                "w": 0.9,
+                "h": 0.9
+              },
+              "visible": [
+                "L4"
+              ]
+            }
+          ]
+        },
+        "duration": 6,
+        "end_hold": 0,
+        "base_ref": {
+          "kind": "asset",
+          "asset_kind": "prop",
+          "asset_id": 217,
+          "version_task_id": null
+        },
+        "quality_warnings": [],
+        "render_path": "static/layer-segments/de705c58-586b-4528-a41c-0e83c4b35d00.mp4",
+        "render_signature": "72dd0a0847c8d3a1359b9b6efbf140b86072d9bd4744e35e1d73398b3cd79daa",
+        "rendered_at": "2026-11-11T07:17:14.435Z",
+        "junction_path": "static/layer-frames/39-061d9f7fd6e4acb351a0da538c7c8ece50f42be76d465480aa0ba857f49114c5.png",
+        "junction_hash": "061d9f7fd6e4acb351a0da538c7c8ece50f42be76d465480aa0ba857f49114c5",
+        "status": "ready",
+        "stale_reasons": [],
+        "base_check": {
+          "required": true,
+          "signature": "348b2cba7a426abcf9aa3e8ec1b485975c0c30718731c6206534cc3dfc46b587",
+          "status": "failed",
+          "problems": [
+            "画面中部地图主体上下边缘出现明显的白色横带，与上下模糊垫底区域衔接生硬，疑似取景框超出原图边界导致的留白撕裂",
+            "地图主体被压缩在画面中部狭窄区域，上下模糊垫底占比过大，主体在画面中位置偏小、被留白挤占"
+          ],
+          "notes": "地图主体完整且无变形，但上下模糊垫底与主体之间存在明显白色撕裂带，留白填充不自然，需修正取景框或垫底衔接。",
+          "task_id": 1842,
+          "config_id": 10,
+          "model": "deepseek-chat",
+          "checked_at": "2026-11-11T07:17:19.120Z",
+          "override_reason": null,
+          "error": null
+        },
+        "created_at": "2026-11-10T18:49:57.104Z",
+        "updated_at": "2026-11-11T07:18:23.114Z",
+        "fresh": false,
+        "base_check_required": false,
+        "base_check_satisfied": true
+      },
+      "junction": {
+        "source": "layer_last",
+        "t": 6,
+        "path": "static/layer-frames/39-061d9f7fd6e4acb351a0da538c7c8ece50f42be76d465480aa0ba857f49114c5.png",
+        "hash": "061d9f7fd6e4acb351a0da538c7c8ece50f42be76d465480aa0ba857f49114c5",
+        "stale": true,
+        "base_check_reason": null,
+        "segment_fresh": false,
+        "combo": "C"
+      },
+      "issues": [],
+      "viewport_clamped": false
+    },
+    "message": "success"
+  },
+  "after": {
+    "base": {
+      "path": "static/images/8c03d0ac-1fbe-4140-8f83-dcca1ba7e88b.png",
+      "width": 544,
+      "height": 960,
+      "source_width": 1088,
+      "source_height": 1920,
+      "filter": {
+        "paper": 0.16,
+        "tint": "sepia",
+        "tint_strength": 0.18,
+        "vignette": 0.28
+      }
+    },
+    "base_ref": {
+      "kind": "asset",
+      "asset_kind": "prop",
+      "asset_id": 217,
+      "version_task_id": null
+    },
+    "junction": {
+      "source": "layer_last",
+      "t": 6,
+      "path": "static/layer-frames/39-061d9f7fd6e4acb351a0da538c7c8ece50f42be76d465480aa0ba857f49114c5.png",
+      "hash": "061d9f7fd6e4acb351a0da538c7c8ece50f42be76d465480aa0ba857f49114c5",
+      "stale": true,
+      "base_check_reason": null,
+      "segment_fresh": false,
+      "combo": "C"
+    }
+  }
+}

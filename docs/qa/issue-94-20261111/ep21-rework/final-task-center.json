@@ -1,0 +1,6040 @@
+{
+  "relevant": [
+    {
+      "id": 1944,
+      "type": "image",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": null,
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "created_at": "2026-11-11T10:40:23.939Z",
+      "completed_at": "2026-11-11T10:45:01.459Z",
+      "error_msg": null,
+      "params": {
+        "size": "768x1344",
+        "referenceImages": [
+          "static/images/2e5d4bed-cbaa-44bc-8018-3ac7ea93bd79.png",
+          "static/images/09e4bff3-8939-4b25-86c2-96fc52efd952.png",
+          "static/images/ee2cd87d-ff5d-444f-92bf-ba6a7efaacac.png",
+          "static/images/9a07edd0-1069-4132-acf0-5c0cd08b143e.png",
+          "static/images/63ae6cc3-8e9e-4aa2-923b-ea3b9fa125fa.png",
+          "static/images/f20f147a-da02-473f-a1ae-5b15287d4c03.png"
+        ],
+        "sourcePrompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark\n\n9:16 竖构图，时间轴式纵向蒙太奇，画面自下而上分层叠合：最底部是 @徭役工地 的黄土城墙段与斜坡土岗，正午硬光下浮尘泛白，夯板与夯杵斜靠墙根；向上过渡到 @大泽乡 雨后泥泞土路与芦苇沼泽，灰白晨雾低垂；中段偏上是 @项羽 身披玄黑漆皮札甲、深红长袍、腰佩青铜剑，挺拔立于破败的秦军残旗与烟尘之间，目光凌厉；画面中心是 @轵道 车辙深陷的黄土土路与低矮秦式石标，初冬薄雾贴地；土路中央 @子婴 头戴黑色漆纱高冠、身着素白细麻深衣、颈系生丝素绳、双手捧玺，内敛颔首而立；画面顶部是 @咸阳 秦式高台宫殿群在夜色中燃烧，橙红火光映亮焦黑梁柱与塌落屋顶，浓烟向上翻卷冲出画面顶端。整体冷灰蓝调与琥珀火光交替，35mm 电影质感，柔和阴天光，轻微颗粒与暗角，画面中无任何文字。\n\n画面中不要出现任何文字、字母、数字、标题、标语、印章文字或书籍正文；参考图中的书籍、文件、印章只保留材质、形状与装帧，页面必须留空，不得复制或生成任何文字痕迹；所有文字与排版由后期图层叠加，底图只保留画面。",
+        "refNameIndex": {
+          "徭役工地": 1,
+          "大泽乡": 2,
+          "项羽": 3,
+          "轵道": 4,
+          "子婴": 5,
+          "咸阳": 6
+        },
+        "posterId": 12,
+        "posterGenMode": "initial",
+        "text_prompt": "纵向时间轴排版：顶部标题区压在大火烟柱上，中段节点用小字标注年代与事件，底部留白处放副标题与时间账数字，整体左对齐，文字用浅米白与琥珀色点缀。",
+        "posterSize": "768x1344"
+      }
+    },
+    {
+      "id": 1942,
+      "type": "image",
+      "kind": null,
+      "status": "failed",
+      "storyboard_id": null,
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "created_at": "2026-11-11T10:38:43.024Z",
+      "completed_at": null,
+      "error_msg": "qwen-jobs 网络错误: fetch failed",
+      "params": {
+        "size": "768x1344",
+        "referenceImages": [
+          "static/images/2e5d4bed-cbaa-44bc-8018-3ac7ea93bd79.png",
+          "static/images/09e4bff3-8939-4b25-86c2-96fc52efd952.png",
+          "static/images/ee2cd87d-ff5d-444f-92bf-ba6a7efaacac.png",
+          "static/images/9a07edd0-1069-4132-acf0-5c0cd08b143e.png",
+          "static/images/63ae6cc3-8e9e-4aa2-923b-ea3b9fa125fa.png",
+          "static/images/f20f147a-da02-473f-a1ae-5b15287d4c03.png"
+        ],
+        "sourcePrompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark\n\n9:16 竖构图，时间轴式纵向蒙太奇，画面自下而上分层叠合：最底部是 @徭役工地 的黄土城墙段与斜坡土岗，正午硬光下浮尘泛白，夯板与夯杵斜靠墙根；向上过渡到 @大泽乡 雨后泥泞土路与芦苇沼泽，灰白晨雾低垂；中段偏上是 @项羽 身披玄黑漆皮札甲、深红长袍、腰佩青铜剑，挺拔立于破败的秦军残旗与烟尘之间，目光凌厉；画面中心是 @轵道 车辙深陷的黄土土路与低矮秦式石标，初冬薄雾贴地；土路中央 @子婴 头戴黑色漆纱高冠、身着素白细麻深衣、颈系生丝素绳、双手捧玺，内敛颔首而立；画面顶部是 @咸阳 秦式高台宫殿群在夜色中燃烧，橙红火光映亮焦黑梁柱与塌落屋顶，浓烟向上翻卷冲出画面顶端。整体冷灰蓝调与琥珀火光交替，35mm 电影质感，柔和阴天光，轻微颗粒与暗角，画面中无任何文字。\n\n画面中不要出现任何文字、字母、数字、标题、标语、印章文字或书籍正文；参考图中的书籍、文件、印章只保留材质、形状与装帧，页面必须留空，不得复制或生成任何文字痕迹；所有文字与排版由后期图层叠加，底图只保留画面。",
+        "refNameIndex": {
+          "徭役工地": 1,
+          "大泽乡": 2,
+          "项羽": 3,
+          "轵道": 4,
+          "子婴": 5,
+          "咸阳": 6
+        },
+        "posterId": 12,
+        "posterGenMode": "initial",
+        "text_prompt": "纵向时间轴排版：顶部标题区压在大火烟柱上，中段节点用小字标注年代与事件，底部留白处放副标题与时间账数字，整体左对齐，文字用浅米白与琥珀色点缀。",
+        "posterConceptComposition": "c1",
+        "posterAutoBase": true,
+        "posterSize": "768x1344"
+      }
+    },
+    {
+      "id": 1941,
+      "type": "text",
+      "kind": "poster_concept",
+      "status": "completed",
+      "storyboard_id": null,
+      "provider": "openai",
+      "model": "deepseek-chat",
+      "created_at": "2026-11-11T10:37:10.595Z",
+      "completed_at": "2026-11-11T10:38:23.213Z",
+      "error_msg": null,
+      "params": {
+        "kind": "poster_concept",
+        "progress": {
+          "completed": 1,
+          "total": 1,
+          "failed": 0
+        },
+        "configId": 10,
+        "stage": "poster_concept",
+        "model_used": {
+          "config_id": 10,
+          "provider": "openai",
+          "model": "deepseek-chat",
+          "name": "DeepSeek V4.1 Flash 1017 (local)",
+          "vision": false
+        },
+        "restart": {
+          "kind": "poster_concept",
+          "args": {
+            "episodeId": 21,
+            "opts": {
+              "model": "deepseek-chat",
+              "configId": 10
+            }
+          }
+        },
+        "concept_theme": "秦亡不是被一支军队打倒，而是在投降的姿态、废法的三句话与不杀降的决断中，十五年帝国一点点让出了天下。",
+        "concept_compositions": [
+          {
+            "id": "c1",
+            "approach": "时间轴式蒙太奇：从徭役工地到大泽乡、巨鹿破秦、轵道投降、咸阳大火，纵向叠成一条帝国崩塌的时间带",
+            "recommended": true
+          },
+          {
+            "id": "c2",
+            "approach": "重点场景 + 多人物群像与姿态：轵道土路为舞台，子婴低首自缚在前，刘邦按剑在后，远处项羽与秦二世以虚影/侧位并置，形成权力交接的对峙群像",
+            "recommended": false
+          },
+          {
+            "id": "c3",
+            "approach": "关键物件特写 + 人物/场景：白车白马、丝绳、皇帝玺三件信物在前景并列特写，子婴与轵道土路虚化在后，突出投降姿态的物证",
+            "recommended": false
+          }
+        ]
+      }
+    },
+    {
+      "id": 23,
+      "status": "done",
+      "created_at": "2026-11-11T09:25:47.117Z",
+      "params": {
+        "scope": {
+          "included": [
+            {
+              "storyboard_id": 573,
+              "storyboard_number": 1
+            },
+            {
+              "storyboard_id": 574,
+              "storyboard_number": 2
+            },
+            {
+              "storyboard_id": 575,
+              "storyboard_number": 3
+            },
+            {
+              "storyboard_id": 576,
+              "storyboard_number": 4
+            },
+            {
+              "storyboard_id": 577,
+              "storyboard_number": 5
+            },
+            {
+              "storyboard_id": 578,
+              "storyboard_number": 6
+            },
+            {
+              "storyboard_id": 579,
+              "storyboard_number": 7
+            },
+            {
+              "storyboard_id": 580,
+              "storyboard_number": 8
+            },
+            {
+              "storyboard_id": 581,
+              "storyboard_number": 9
+            },
+            {
+              "storyboard_id": 582,
+              "storyboard_number": 10
+            },
+            {
+              "storyboard_id": 583,
+              "storyboard_number": 11
+            },
+            {
+              "storyboard_id": 584,
+              "storyboard_number": 12
+            },
+            {
+              "storyboard_id": 585,
+              "storyboard_number": 13
+            },
+            {
+              "storyboard_id": 586,
+              "storyboard_number": 14
+            },
+            {
+              "storyboard_id": 587,
+              "storyboard_number": 15
+            },
+            {
+              "storyboard_id": 588,
+              "storyboard_number": 16
+            },
+            {
+              "storyboard_id": 589,
+              "storyboard_number": 17
+            },
+            {
+              "storyboard_id": 590,
+              "storyboard_number": 18
+            },
+            {
+              "storyboard_id": 591,
+              "storyboard_number": 19
+            },
+            {
+              "storyboard_id": 592,
+              "storyboard_number": 20
+            },
+            {
+              "storyboard_id": 593,
+              "storyboard_number": 21
+            },
+            {
+              "storyboard_id": 594,
+              "storyboard_number": 22
+            }
+          ],
+          "excluded": []
+        }
+      }
+    },
+    {
+      "id": 1917,
+      "type": "text",
+      "kind": "layer_base_check",
+      "status": "completed",
+      "storyboard_id": 588,
+      "provider": "openai",
+      "model": "deepseek-chat",
+      "created_at": "2026-11-11T09:00:05.790Z",
+      "completed_at": "2026-11-11T09:00:14.885Z",
+      "error_msg": null,
+      "params": {
+        "kind": "layer_base_check",
+        "configId": 10,
+        "stage": "layer_base_check",
+        "model_used": {
+          "config_id": 10,
+          "provider": "openai",
+          "model": "deepseek-chat",
+          "name": "DeepSeek V4.1 Flash 1017 (local)",
+          "vision": true
+        },
+        "restart": {
+          "kind": "layer_base_check",
+          "args": {
+            "storyboardId": 588
+          }
+        },
+        "storyboard_id": 588,
+        "layer_segment_id": 36
+      }
+    },
+    {
+      "id": 1915,
+      "type": "image",
+      "kind": null,
+      "status": "failed",
+      "storyboard_id": 583,
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "created_at": "2026-11-11T08:59:55.038Z",
+      "completed_at": null,
+      "error_msg": "KSampler: Allocation on device 0 would exceed allowed memory. (out of memory)\nCurrently allocated     : 8.28 GiB\nRequested               : 687.26 MiB\nDevice limit            : 11.63 GiB\nFree (according to CUDA): 28.81 MiB\nPyTorch limit (set by user-supplied memory fraction)\n                        : 17179869184.00 GiB\nThis error means you ran out of memory on your GPU.\n\nTIPS: If the workflow worked before you might have accidentally set the batch_size to a large number.",
+      "params": {
+        "size": "768x1344",
+        "frameType": "mid_frame",
+        "referenceImages": [
+          "static/images/9a07edd0-1069-4132-acf0-5c0cd08b143e.png",
+          "static/images/63ae6cc3-8e9e-4aa2-923b-ea3b9fa125fa.png",
+          "static/images/f10f6661-b720-4206-b6e4-565af728912e.png",
+          "static/images/62117d18-a6b3-4df9-8f0c-d4ddaf3a9c45.png",
+          "static/images/b392a424-701c-49dc-ae2a-72a7fd65d0a0.png",
+          "static/images/b1e1ba78-c2d6-489b-a6c3-ec37cea6b808.png",
+          "static/images/e253a577-b872-4781-b872-1a41ed7e8576.png"
+        ],
+        "sourcePrompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark，\n@轵道，上午偏白日光，初冬薄雾贴在黄土路面上，车辙深沟里的积水映出浅灰反光，9:16 竖构图电影感剧照。中景平视固定机位，车辙深陷的黄土土路上，@子婴 立于画面左侧、身体正面朝向画外略偏右，颈间 @丝绳 的绳圈贴于颈侧、绳头垂在胸前衣襟上，双手在胸前并拢捧起——右掌托住 @皇帝玺 的方形底部、拇指扣在玺身一侧边沿，左手握住 @符节 的节身中段、指腹搭在节圈凸起上，@符节 顶端的红褐绶带垂落在他腕侧，双臂向前微伸，两件信物正朝画面右侧送出；双腿并拢站定、两只黑布履踏在车辙里清晰可见，目光落在被送出的两件信物上，神情凝重自持。@刘邦 立于画面右侧半步之外、身体正面转向 @子婴，右手抬起摊开在身前半空、掌心朝上、五指略张开停在 @皇帝玺 下方一寸处准备承接，左手自然垂在体侧空着，双腿并拢站定、两只黑皮短靴踏在黄土上可见，目光紧盯对方手中送来的两件信物，眉梢微扬。两人身后画面右后方停着 @素车白马，素白车厢侧板与一只车轮露出，车轮沾着薄泥；画面左缘可见 @轵道 路旁的灰色长方石标与初冬枯草，土路向远处延伸，画面中没有第三个人、没有兵、没有仪仗。主体纵向完整入画，画面上下留出字幕与标题安全区。单帧静态画面，无运动模糊。",
+        "refNameIndex": {
+          "轵道": 1,
+          "子婴": 2,
+          "刘邦": 3,
+          "丝绳": 4,
+          "皇帝玺": 5,
+          "符节": 6,
+          "素车白马": 7
+        }
+      }
+    },
+    {
+      "id": 1907,
+      "type": "image",
+      "kind": null,
+      "status": "failed",
+      "storyboard_id": 585,
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "created_at": "2026-11-11T08:42:01.678Z",
+      "completed_at": null,
+      "error_msg": "KSampler: Allocation on device 0 would exceed allowed memory. (out of memory)\nCurrently allocated     : 7.65 GiB\nRequested               : 784.69 MiB\nDevice limit            : 11.63 GiB\nFree (according to CUDA): 13.81 MiB\nPyTorch limit (set by user-supplied memory fraction)\n                        : 17179869184.00 GiB\nThis error means you ran out of memory on your GPU.\n\nTIPS: If the workflow worked before you might have accidentally set the batch_size to a large number.",
+      "params": {
+        "size": "768x1344",
+        "frameType": "last_frame",
+        "referenceImages": [
+          "static/images/9a07edd0-1069-4132-acf0-5c0cd08b143e.png",
+          "static/images/63ae6cc3-8e9e-4aa2-923b-ea3b9fa125fa.png",
+          "static/images/f10f6661-b720-4206-b6e4-565af728912e.png",
+          "static/images/62117d18-a6b3-4df9-8f0c-d4ddaf3a9c45.png",
+          "static/images/b392a424-701c-49dc-ae2a-72a7fd65d0a0.png",
+          "static/images/b1e1ba78-c2d6-489b-a6c3-ec37cea6b808.png",
+          "static/images/e253a577-b872-4781-b872-1a41ed7e8576.png",
+          "static/images/843613e0-7c4e-4181-8b3a-4430b68d05cf.png"
+        ],
+        "sourcePrompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark，\n@轵道，上午偏白日光，光线均匀阴冷，初冬薄雾在贴地的黄土上渐渐散开，车辙积水反出浅灰高光，9:16 竖构图电影感剧照。中景略俯固定机位，车辙深陷的黄土土路上，@刘邦 位于画面中央偏右、身体正面朝向画外略偏左，双手重又抬起并在身前摊稳、掌心向下、十指自然张开，两只手都空着不持物，腰间 @佩剑 的剑鞘与剑柄留在革带上一动不动、未曾出鞘；双腿并拢站定、两只黑皮短靴踏在车辙路面上清晰可见，抬眼平视画外、神色宽和有威、下颌微收。@子婴 位于画面左侧半步之外，颈间 @丝绳 的绳圈贴于颈侧、绳头垂在胸前衣襟上，双手在胸前并拢托住两件信物——右掌托住 @皇帝玺 的方形底部、拇指扣在玺身边沿，左手握住 @符节 的节身中段、指腹搭在节圈凸起上，@符节 顶端的红褐绶带垂落在他腕侧；双腿并拢站定、两只黑布履着地清晰可见，视线低垂落在手中信物上，神情自持沉静。@刘邦 身后半步处一名劝进者（灰青粗麻短袍、束发无冠、腰缠深褐布带、双手合抱在身前）低头侍立不动。画面右后方停着 @素车白马，素净车厢侧板与一只十六辐车轮在冷白日光下可辨，车厢下沿沾着薄泥；画面左缘是 @轵道 路旁的灰色长方石标与初冬枯草，中景几株秃枝老树，远景城郭剪影被薄雾削弱，画面中没有第二个人、没有兵、没有仪仗。主体纵向完整入画，画面上下留出字幕与标题安全区。单帧静态画面，无运动模糊。",
+        "refNameIndex": {
+          "轵道": 1,
+          "子婴": 2,
+          "刘邦": 3,
+          "丝绳": 4,
+          "皇帝玺": 5,
+          "符节": 6,
+          "素车白马": 7,
+          "佩剑": 8
+        }
+      }
+    },
+    {
+      "id": 1904,
+      "type": "image",
+      "kind": null,
+      "status": "failed",
+      "storyboard_id": 583,
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "created_at": "2026-11-11T08:42:01.334Z",
+      "completed_at": null,
+      "error_msg": "KSampler: Allocation on device 0 would exceed allowed memory. (out of memory)\nCurrently allocated     : 8.28 GiB\nRequested               : 687.26 MiB\nDevice limit            : 11.63 GiB\nFree (according to CUDA): 13.81 MiB\nPyTorch limit (set by user-supplied memory fraction)\n                        : 17179869184.00 GiB\nThis error means you ran out of memory on your GPU.\n\nTIPS: If the workflow worked before you might have accidentally set the batch_size to a large number.",
+      "params": {
+        "size": "768x1344",
+        "frameType": "mid_frame",
+        "referenceImages": [
+          "static/images/9a07edd0-1069-4132-acf0-5c0cd08b143e.png",
+          "static/images/63ae6cc3-8e9e-4aa2-923b-ea3b9fa125fa.png",
+          "static/images/f10f6661-b720-4206-b6e4-565af728912e.png",
+          "static/images/62117d18-a6b3-4df9-8f0c-d4ddaf3a9c45.png",
+          "static/images/b392a424-701c-49dc-ae2a-72a7fd65d0a0.png",
+          "static/images/b1e1ba78-c2d6-489b-a6c3-ec37cea6b808.png",
+          "static/images/e253a577-b872-4781-b872-1a41ed7e8576.png"
+        ],
+        "sourcePrompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark，\n@轵道，上午偏白日光，初冬薄雾贴在黄土路面上，车辙深沟里的积水映出浅灰反光，9:16 竖构图电影感剧照。中景平视固定机位，车辙深陷的黄土土路上，@子婴 立于画面左侧、身体正面朝向画外略偏右，颈间 @丝绳 的绳圈贴于颈侧、绳头垂在胸前衣襟上，双手在胸前并拢捧起——右掌托住 @皇帝玺 的方形底部、拇指扣在玺身一侧边沿，左手握住 @符节 的节身中段、指腹搭在节圈凸起上，@符节 顶端的红褐绶带垂落在他腕侧，双臂向前微伸，两件信物正朝画面右侧送出；双腿并拢站定、两只黑布履踏在车辙里清晰可见，目光落在被送出的两件信物上，神情凝重自持。@刘邦 立于画面右侧半步之外、身体正面转向 @子婴，右手抬起摊开在身前半空、掌心朝上、五指略张开停在 @皇帝玺 下方一寸处准备承接，左手自然垂在体侧空着，双腿并拢站定、两只黑皮短靴踏在黄土上可见，目光紧盯对方手中送来的两件信物，眉梢微扬。两人身后画面右后方停着 @素车白马，素白车厢侧板与一只车轮露出，车轮沾着薄泥；画面左缘可见 @轵道 路旁的灰色长方石标与初冬枯草，土路向远处延伸，画面中没有第三个人、没有兵、没有仪仗。主体纵向完整入画，画面上下留出字幕与标题安全区。单帧静态画面，无运动模糊。",
+        "refNameIndex": {
+          "轵道": 1,
+          "子婴": 2,
+          "刘邦": 3,
+          "丝绳": 4,
+          "皇帝玺": 5,
+          "符节": 6,
+          "素车白马": 7
+        }
+      }
+    },
+    {
+      "id": 1872,
+      "type": "image",
+      "kind": null,
+      "status": "failed",
+      "storyboard_id": 585,
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "created_at": "2026-11-11T07:20:37.572Z",
+      "completed_at": null,
+      "error_msg": "KSampler: Allocation on device 0 would exceed allowed memory. (out of memory)\nCurrently allocated     : 7.65 GiB\nRequested               : 784.69 MiB\nDevice limit            : 11.63 GiB\nFree (according to CUDA): 13.81 MiB\nPyTorch limit (set by user-supplied memory fraction)\n                        : 17179869184.00 GiB\nThis error means you ran out of memory on your GPU.\n\nTIPS: If the workflow worked before you might have accidentally set the batch_size to a large number.",
+      "params": {
+        "size": "768x1344",
+        "frameType": "last_frame",
+        "referenceImages": [
+          "static/images/9a07edd0-1069-4132-acf0-5c0cd08b143e.png",
+          "static/images/63ae6cc3-8e9e-4aa2-923b-ea3b9fa125fa.png",
+          "static/images/f10f6661-b720-4206-b6e4-565af728912e.png",
+          "static/images/62117d18-a6b3-4df9-8f0c-d4ddaf3a9c45.png",
+          "static/images/b392a424-701c-49dc-ae2a-72a7fd65d0a0.png",
+          "static/images/b1e1ba78-c2d6-489b-a6c3-ec37cea6b808.png",
+          "static/images/e253a577-b872-4781-b872-1a41ed7e8576.png",
+          "static/images/843613e0-7c4e-4181-8b3a-4430b68d05cf.png"
+        ],
+        "sourcePrompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark，\n@轵道，上午偏白日光，光线均匀阴冷，初冬薄雾在贴地的黄土上渐渐散开，车辙积水反出浅灰高光，9:16 竖构图电影感剧照。中景略俯固定机位，车辙深陷的黄土土路上，@刘邦 位于画面中央偏右、身体正面朝向画外略偏左，双手重又抬起并在身前摊稳、掌心向下、十指自然张开，两只手都空着不持物，腰间 @佩剑 的剑鞘与剑柄留在革带上一动不动、未曾出鞘；双腿并拢站定、两只黑皮短靴踏在车辙路面上清晰可见，抬眼平视画外、神色宽和有威、下颌微收。@子婴 位于画面左侧半步之外，颈间 @丝绳 的绳圈贴于颈侧、绳头垂在胸前衣襟上，双手在胸前并拢托住两件信物——右掌托住 @皇帝玺 的方形底部、拇指扣在玺身边沿，左手握住 @符节 的节身中段、指腹搭在节圈凸起上，@符节 顶端的红褐绶带垂落在他腕侧；双腿并拢站定、两只黑布履着地清晰可见，视线低垂落在手中信物上，神情自持沉静。@刘邦 身后半步处一名劝进者（灰青粗麻短袍、束发无冠、腰缠深褐布带、双手合抱在身前）低头侍立不动。画面右后方停着 @素车白马，素净车厢侧板与一只十六辐车轮在冷白日光下可辨，车厢下沿沾着薄泥；画面左缘是 @轵道 路旁的灰色长方石标与初冬枯草，中景几株秃枝老树，远景城郭剪影被薄雾削弱，画面中没有第二个人、没有兵、没有仪仗。主体纵向完整入画，画面上下留出字幕与标题安全区。单帧静态画面，无运动模糊。",
+        "refNameIndex": {
+          "轵道": 1,
+          "子婴": 2,
+          "刘邦": 3,
+          "丝绳": 4,
+          "皇帝玺": 5,
+          "符节": 6,
+          "素车白马": 7,
+          "佩剑": 8
+        }
+      }
+    },
+    {
+      "id": 1869,
+      "type": "image",
+      "kind": null,
+      "status": "failed",
+      "storyboard_id": 584,
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "created_at": "2026-11-11T07:20:37.275Z",
+      "completed_at": null,
+      "error_msg": "KSampler: Allocation on device 0 would exceed allowed memory. (out of memory)\nCurrently allocated     : 8.28 GiB\nRequested               : 688.36 MiB\nDevice limit            : 11.63 GiB\nFree (according to CUDA): 13.81 MiB\nPyTorch limit (set by user-supplied memory fraction)\n                        : 17179869184.00 GiB\nThis error means you ran out of memory on your GPU.\n\nTIPS: If the workflow worked before you might have accidentally set the batch_size to a large number.",
+      "params": {
+        "size": "768x1344",
+        "frameType": "mid_frame",
+        "referenceImages": [
+          "static/images/9a07edd0-1069-4132-acf0-5c0cd08b143e.png",
+          "static/images/63ae6cc3-8e9e-4aa2-923b-ea3b9fa125fa.png",
+          "static/images/f10f6661-b720-4206-b6e4-565af728912e.png",
+          "static/images/62117d18-a6b3-4df9-8f0c-d4ddaf3a9c45.png",
+          "static/images/b392a424-701c-49dc-ae2a-72a7fd65d0a0.png",
+          "static/images/b1e1ba78-c2d6-489b-a6c3-ec37cea6b808.png",
+          "static/images/e253a577-b872-4781-b872-1a41ed7e8576.png"
+        ],
+        "sourcePrompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark，\n@轵道，上午偏白日光，光线均匀阴冷，初冬薄雾浮在贴地的黄土上，车辙深沟里的积水映出浅灰高光，9:16 竖构图电影感剧照。中景平视固定机位，车辙深陷的黄土土路上，@刘邦 立于画面右侧、身体侧向画面左边，右手抬到胸前、掌心朝外推出并停在半空作摆手之势，左手自然垂在体侧、空着未持物，双腿并拢站定、两只黑皮短靴踏在黄土车辙里清晰可见，眉头微敛、目光落在画面左侧的对方身上，神色宽和有威。@子婴 立于画面左侧半步之外、身体正面朝向画外略偏右，颈间 @丝绳 的绳圈贴于颈侧、绳头垂在胸前衣襟上，右手掌握着 @皇帝玺 的方形玺身、拇指扣在玺身边沿，左手掌握着 @符节 的节身中段、指腹搭在节圈凸起上，@符节 顶端的红褐绶带垂落在他的腕侧；双腿并拢站定、两只黑布履踏在车辙里可见，视线低垂落在自己手中的两件信物上，神情自持沉静。@刘邦 身后半步处一名劝进者（灰青粗麻短袍、束发无冠、腰缠深褐布带、双手合抱在身前）侧身低头、肩背前倾进言。画面右后方停着 @素车白马，素净车厢侧板与一只十六辐车轮在冷白日光下可辨，车厢下沿与车轮沾着薄泥；画面左缘是 @轵道 路旁的灰色长方石标与初冬枯草，中景几株秃枝老树，远景城郭剪影被薄雾削弱，画面中没有第二个人、没有兵、没有仪仗。主体纵向完整入画，画面上下留出字幕与标题安全区。单帧静态画面，无运动模糊。",
+        "refNameIndex": {
+          "轵道": 1,
+          "子婴": 2,
+          "刘邦": 3,
+          "丝绳": 4,
+          "皇帝玺": 5,
+          "符节": 6,
+          "素车白马": 7
+        }
+      }
+    },
+    {
+      "id": 1868,
+      "type": "image",
+      "kind": null,
+      "status": "failed",
+      "storyboard_id": 583,
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "created_at": "2026-11-11T07:20:37.190Z",
+      "completed_at": null,
+      "error_msg": "KSampler: Allocation on device 0 would exceed allowed memory. (out of memory)\nCurrently allocated     : 8.27 GiB\nRequested               : 686.62 MiB\nDevice limit            : 11.63 GiB\nFree (according to CUDA): 13.81 MiB\nPyTorch limit (set by user-supplied memory fraction)\n                        : 17179869184.00 GiB\nThis error means you ran out of memory on your GPU.\n\nTIPS: If the workflow worked before you might have accidentally set the batch_size to a large number.",
+      "params": {
+        "size": "768x1344",
+        "frameType": "last_frame",
+        "referenceImages": [
+          "static/images/9a07edd0-1069-4132-acf0-5c0cd08b143e.png",
+          "static/images/63ae6cc3-8e9e-4aa2-923b-ea3b9fa125fa.png",
+          "static/images/f10f6661-b720-4206-b6e4-565af728912e.png",
+          "static/images/62117d18-a6b3-4df9-8f0c-d4ddaf3a9c45.png",
+          "static/images/b392a424-701c-49dc-ae2a-72a7fd65d0a0.png",
+          "static/images/b1e1ba78-c2d6-489b-a6c3-ec37cea6b808.png",
+          "static/images/e253a577-b872-4781-b872-1a41ed7e8576.png"
+        ],
+        "sourcePrompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark，\n@轵道，上午偏白日光，光线均匀阴冷，初冬薄雾浮在贴地的黄土上，车辙积水反出浅灰高光，9:16 竖构图电影感剧照。中景略俯固定机位，车辙深陷的黄土土路上，@刘邦 位于画面右侧、正面朝向画外略偏左，双手在身前掌心向上承住两件信物——右掌托住 @皇帝玺 的方形底部、拇指扣在玺身边沿，左手握住 @符节 的节身中段、指腹搭在节圈凸起上，@符节 顶端的红褐绶带垂落在他的腕侧；双腿并拢站定、两只黑皮短靴踏在车辙路面上清晰可见，抬眼平视、神色宽和有威。@子婴 位于画面左侧半步之外，颈间 @丝绳 的绳圈贴于颈侧、绳头垂在胸前衣襟上，双手向前平伸摊开、掌心向上、十指伸展，掌中空无一物；双腿并拢站定、两只黑布履着地清晰可见，视线低垂落在已交出的两件信物上，神情自持沉静。两人身后画面右后方停着 @素车白马，素净车厢侧板与一只车轮在冷白日光下可辨，车厢下沿沾着薄泥；画面左缘是 @轵道 路旁的灰色长方石标与初冬枯草，中景几株秃枝老树，远景城郭剪影被薄雾削弱，画面中没有第三个人、没有兵、没有仪仗。主体纵向完整入画，画面上下留出字幕与标题安全区。单帧静态画面，无运动模糊。",
+        "refNameIndex": {
+          "轵道": 1,
+          "子婴": 2,
+          "刘邦": 3,
+          "丝绳": 4,
+          "皇帝玺": 5,
+          "符节": 6,
+          "素车白马": 7
+        }
+      }
+    },
+    {
+      "id": 1867,
+      "type": "image",
+      "kind": null,
+      "status": "failed",
+      "storyboard_id": 583,
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "created_at": "2026-11-11T07:20:37.103Z",
+      "completed_at": null,
+      "error_msg": "KSampler: Allocation on device 0 would exceed allowed memory. (out of memory)\nCurrently allocated     : 8.28 GiB\nRequested               : 687.26 MiB\nDevice limit            : 11.63 GiB\nFree (according to CUDA): 13.81 MiB\nPyTorch limit (set by user-supplied memory fraction)\n                        : 17179869184.00 GiB\nThis error means you ran out of memory on your GPU.\n\nTIPS: If the workflow worked before you might have accidentally set the batch_size to a large number.",
+      "params": {
+        "size": "768x1344",
+        "frameType": "mid_frame",
+        "referenceImages": [
+          "static/images/9a07edd0-1069-4132-acf0-5c0cd08b143e.png",
+          "static/images/63ae6cc3-8e9e-4aa2-923b-ea3b9fa125fa.png",
+          "static/images/f10f6661-b720-4206-b6e4-565af728912e.png",
+          "static/images/62117d18-a6b3-4df9-8f0c-d4ddaf3a9c45.png",
+          "static/images/b392a424-701c-49dc-ae2a-72a7fd65d0a0.png",
+          "static/images/b1e1ba78-c2d6-489b-a6c3-ec37cea6b808.png",
+          "static/images/e253a577-b872-4781-b872-1a41ed7e8576.png"
+        ],
+        "sourcePrompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark，\n@轵道，上午偏白日光，初冬薄雾贴在黄土路面上，车辙深沟里的积水映出浅灰反光，9:16 竖构图电影感剧照。中景平视固定机位，车辙深陷的黄土土路上，@子婴 立于画面左侧、身体正面朝向画外略偏右，颈间 @丝绳 的绳圈贴于颈侧、绳头垂在胸前衣襟上，双手在胸前并拢捧起——右掌托住 @皇帝玺 的方形底部、拇指扣在玺身一侧边沿，左手握住 @符节 的节身中段、指腹搭在节圈凸起上，@符节 顶端的红褐绶带垂落在他腕侧，双臂向前微伸，两件信物正朝画面右侧送出；双腿并拢站定、两只黑布履踏在车辙里清晰可见，目光落在被送出的两件信物上，神情凝重自持。@刘邦 立于画面右侧半步之外、身体正面转向 @子婴，右手抬起摊开在身前半空、掌心朝上、五指略张开停在 @皇帝玺 下方一寸处准备承接，左手自然垂在体侧空着，双腿并拢站定、两只黑皮短靴踏在黄土上可见，目光紧盯对方手中送来的两件信物，眉梢微扬。两人身后画面右后方停着 @素车白马，素白车厢侧板与一只车轮露出，车轮沾着薄泥；画面左缘可见 @轵道 路旁的灰色长方石标与初冬枯草，土路向远处延伸，画面中没有第三个人、没有兵、没有仪仗。主体纵向完整入画，画面上下留出字幕与标题安全区。单帧静态画面，无运动模糊。",
+        "refNameIndex": {
+          "轵道": 1,
+          "子婴": 2,
+          "刘邦": 3,
+          "丝绳": 4,
+          "皇帝玺": 5,
+          "符节": 6,
+          "素车白马": 7
+        }
+      }
+    },
+    {
+      "id": 19,
+      "status": "done",
+      "created_at": "2026-11-11T07:20:35.216Z",
+      "params": {}
+    },
+    {
+      "id": 1847,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 591,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T07:18:33.334Z",
+      "completed_at": "2026-11-11T07:18:34.436Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 39,
+        "combo": "C",
+        "duration": 6,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1846,
+      "type": "text",
+      "kind": "layer_render_batch",
+      "status": "completed",
+      "storyboard_id": null,
+      "provider": null,
+      "model": null,
+      "created_at": "2026-11-11T07:18:33.328Z",
+      "completed_at": "2026-11-11T07:18:34.440Z",
+      "error_msg": null,
+      "params": {
+        "kind": "layer_render_batch",
+        "progress": {
+          "completed": 1,
+          "failed": 0,
+          "total": 1,
+          "items": [
+            {
+              "storyboard_id": 591,
+              "storyboard_number": 19,
+              "state": "completed",
+              "reason": null
+            }
+          ]
+        },
+        "storyboardIds": [
+          591
+        ],
+        "scope": {
+          "included": [
+            {
+              "storyboard_id": 591,
+              "storyboard_number": 19
+            }
+          ],
+          "excluded": [
+            {
+              "storyboard_id": 573,
+              "storyboard_number": 1,
+              "reason": "unchanged"
+            },
+            {
+              "storyboard_id": 574,
+              "storyboard_number": 2,
+              "reason": "unchanged"
+            },
+            {
+              "storyboard_id": 575,
+              "storyboard_number": 3,
+              "reason": "unchanged"
+            },
+            {
+              "storyboard_id": 576,
+              "storyboard_number": 4,
+              "reason": "unchanged"
+            },
+            {
+              "storyboard_id": 577,
+              "storyboard_number": 5,
+              "reason": "unchanged"
+            },
+            {
+              "storyboard_id": 578,
+              "storyboard_number": 6,
+              "reason": "unchanged"
+            },
+            {
+              "storyboard_id": 579,
+              "storyboard_number": 7,
+              "reason": "unchanged"
+            },
+            {
+              "storyboard_id": 580,
+              "storyboard_number": 8,
+              "reason": "unchanged"
+            },
+            {
+              "storyboard_id": 581,
+              "storyboard_number": 9,
+              "reason": "unchanged"
+            },
+            {
+              "storyboard_id": 582,
+              "storyboard_number": 10,
+              "reason": "unchanged"
+            },
+            {
+              "storyboard_id": 583,
+              "storyboard_number": 11,
+              "reason": "unchanged"
+            },
+            {
+              "storyboard_id": 584,
+              "storyboard_number": 12,
+              "reason": "unchanged"
+            },
+            {
+              "storyboard_id": 585,
+              "storyboard_number": 13,
+              "reason": "unchanged"
+            },
+            {
+              "storyboard_id": 586,
+              "storyboard_number": 14,
+              "reason": "unchanged"
+            },
+            {
+              "storyboard_id": 587,
+              "storyboard_number": 15,
+              "reason": "unchanged"
+            },
+            {
+              "storyboard_id": 588,
+              "storyboard_number": 16,
+              "reason": "unchanged"
+            },
+            {
+              "storyboard_id": 589,
+              "storyboard_number": 17,
+              "reason": "unchanged"
+            },
+            {
+              "storyboard_id": 590,
+              "storyboard_number": 18,
+              "reason": "unchanged"
+            },
+            {
+              "storyboard_id": 592,
+              "storyboard_number": 20,
+              "reason": "unchanged"
+            },
+            {
+              "storyboard_id": 593,
+              "storyboard_number": 21,
+              "reason": "unchanged"
+            },
+            {
+              "storyboard_id": 594,
+              "storyboard_number": 22,
+              "reason": "unchanged"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": 1845,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 594,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T07:17:21.451Z",
+      "completed_at": "2026-11-11T07:17:23.988Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 42,
+        "combo": "C",
+        "duration": 2.2,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1844,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 593,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T07:17:16.421Z",
+      "completed_at": "2026-11-11T07:17:21.443Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 41,
+        "combo": "C",
+        "duration": 5.8,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1843,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 592,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T07:17:14.457Z",
+      "completed_at": "2026-11-11T07:17:16.407Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 40,
+        "combo": "C",
+        "duration": 4,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1842,
+      "type": "text",
+      "kind": "layer_base_check",
+      "status": "completed",
+      "storyboard_id": 591,
+      "provider": "openai",
+      "model": "deepseek-chat",
+      "created_at": "2026-11-11T07:17:14.448Z",
+      "completed_at": "2026-11-11T07:17:19.120Z",
+      "error_msg": null,
+      "params": {
+        "kind": "layer_base_check",
+        "configId": 10,
+        "stage": "layer_base_check",
+        "model_used": {
+          "config_id": 10,
+          "provider": "openai",
+          "model": "deepseek-chat",
+          "name": "DeepSeek V4.1 Flash 1017 (local)",
+          "vision": true
+        },
+        "restart": {
+          "kind": "layer_base_check",
+          "args": {
+            "storyboardId": 591
+          }
+        },
+        "storyboard_id": 591,
+        "layer_segment_id": 39
+      }
+    },
+    {
+      "id": 1841,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 591,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T07:17:13.262Z",
+      "completed_at": "2026-11-11T07:17:14.438Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 39,
+        "combo": "C",
+        "duration": 6,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1840,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 590,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T07:17:08.942Z",
+      "completed_at": "2026-11-11T07:17:13.254Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 38,
+        "combo": "C",
+        "duration": 5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1839,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 589,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T07:17:05.938Z",
+      "completed_at": "2026-11-11T07:17:08.934Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 37,
+        "combo": "C",
+        "duration": 4,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1838,
+      "type": "text",
+      "kind": "layer_base_check",
+      "status": "completed",
+      "storyboard_id": 588,
+      "provider": "openai",
+      "model": "deepseek-chat",
+      "created_at": "2026-11-11T07:17:05.932Z",
+      "completed_at": "2026-11-11T07:17:09.614Z",
+      "error_msg": null,
+      "params": {
+        "kind": "layer_base_check",
+        "configId": 10,
+        "stage": "layer_base_check",
+        "model_used": {
+          "config_id": 10,
+          "provider": "openai",
+          "model": "deepseek-chat",
+          "name": "DeepSeek V4.1 Flash 1017 (local)",
+          "vision": true
+        },
+        "restart": {
+          "kind": "layer_base_check",
+          "args": {
+            "storyboardId": 588
+          }
+        },
+        "storyboard_id": 588,
+        "layer_segment_id": 36
+      }
+    },
+    {
+      "id": 1837,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 588,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T07:17:03.742Z",
+      "completed_at": "2026-11-11T07:17:05.926Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 36,
+        "combo": "C",
+        "duration": 5.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1836,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 587,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T07:17:00.126Z",
+      "completed_at": "2026-11-11T07:17:03.734Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 35,
+        "combo": "C",
+        "duration": 5.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1835,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 586,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T07:16:57.075Z",
+      "completed_at": "2026-11-11T07:17:00.117Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 34,
+        "combo": "D",
+        "duration": 4.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1834,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 585,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T07:16:53.401Z",
+      "completed_at": "2026-11-11T07:16:57.065Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 33,
+        "combo": "C",
+        "duration": 5.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1833,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 584,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T07:16:50.325Z",
+      "completed_at": "2026-11-11T07:16:53.386Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 32,
+        "combo": "C",
+        "duration": 4,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1832,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 583,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T07:16:46.907Z",
+      "completed_at": "2026-11-11T07:16:50.315Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 31,
+        "combo": "C",
+        "duration": 5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1831,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 582,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T07:16:44.191Z",
+      "completed_at": "2026-11-11T07:16:46.897Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 30,
+        "combo": "C",
+        "duration": 3.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1830,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 581,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T07:16:40.842Z",
+      "completed_at": "2026-11-11T07:16:44.182Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 29,
+        "combo": "C",
+        "duration": 5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1829,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 580,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T07:16:38.053Z",
+      "completed_at": "2026-11-11T07:16:40.831Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 28,
+        "combo": "C",
+        "duration": 3.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1828,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 579,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T07:16:34.877Z",
+      "completed_at": "2026-11-11T07:16:38.043Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 27,
+        "combo": "C",
+        "duration": 4.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1827,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 578,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T07:16:32.100Z",
+      "completed_at": "2026-11-11T07:16:34.867Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 26,
+        "combo": "C",
+        "duration": 3.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1826,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 577,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T07:16:28.674Z",
+      "completed_at": "2026-11-11T07:16:32.089Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 25,
+        "combo": "C",
+        "duration": 5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1825,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 576,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T07:16:25.588Z",
+      "completed_at": "2026-11-11T07:16:28.663Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 24,
+        "combo": "C",
+        "duration": 4.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1824,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 575,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T07:16:22.763Z",
+      "completed_at": "2026-11-11T07:16:25.576Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 23,
+        "combo": "C",
+        "duration": 3.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1823,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 574,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T07:16:20.563Z",
+      "completed_at": "2026-11-11T07:16:22.745Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 22,
+        "combo": "C",
+        "duration": 5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1820,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 573,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T07:16:17.118Z",
+      "completed_at": "2026-11-11T07:16:20.551Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 21,
+        "combo": "C",
+        "duration": 8.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1819,
+      "type": "text",
+      "kind": "layer_render_batch",
+      "status": "completed",
+      "storyboard_id": null,
+      "provider": null,
+      "model": null,
+      "created_at": "2026-11-11T07:16:17.108Z",
+      "completed_at": "2026-11-11T07:17:23.990Z",
+      "error_msg": null,
+      "params": {
+        "kind": "layer_render_batch",
+        "progress": {
+          "completed": 22,
+          "failed": 0,
+          "total": 22,
+          "items": [
+            {
+              "storyboard_id": 573,
+              "storyboard_number": 1,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 574,
+              "storyboard_number": 2,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 575,
+              "storyboard_number": 3,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 576,
+              "storyboard_number": 4,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 577,
+              "storyboard_number": 5,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 578,
+              "storyboard_number": 6,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 579,
+              "storyboard_number": 7,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 580,
+              "storyboard_number": 8,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 581,
+              "storyboard_number": 9,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 582,
+              "storyboard_number": 10,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 583,
+              "storyboard_number": 11,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 584,
+              "storyboard_number": 12,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 585,
+              "storyboard_number": 13,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 586,
+              "storyboard_number": 14,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 587,
+              "storyboard_number": 15,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 588,
+              "storyboard_number": 16,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 589,
+              "storyboard_number": 17,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 590,
+              "storyboard_number": 18,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 591,
+              "storyboard_number": 19,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 592,
+              "storyboard_number": 20,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 593,
+              "storyboard_number": 21,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 594,
+              "storyboard_number": 22,
+              "state": "completed",
+              "reason": null
+            }
+          ]
+        },
+        "storyboardIds": [
+          573,
+          574,
+          575,
+          576,
+          577,
+          578,
+          579,
+          580,
+          581,
+          582,
+          583,
+          584,
+          585,
+          586,
+          587,
+          588,
+          589,
+          590,
+          591,
+          592,
+          593,
+          594
+        ],
+        "scope": {
+          "included": [
+            {
+              "storyboard_id": 573,
+              "storyboard_number": 1
+            },
+            {
+              "storyboard_id": 574,
+              "storyboard_number": 2
+            },
+            {
+              "storyboard_id": 575,
+              "storyboard_number": 3
+            },
+            {
+              "storyboard_id": 576,
+              "storyboard_number": 4
+            },
+            {
+              "storyboard_id": 577,
+              "storyboard_number": 5
+            },
+            {
+              "storyboard_id": 578,
+              "storyboard_number": 6
+            },
+            {
+              "storyboard_id": 579,
+              "storyboard_number": 7
+            },
+            {
+              "storyboard_id": 580,
+              "storyboard_number": 8
+            },
+            {
+              "storyboard_id": 581,
+              "storyboard_number": 9
+            },
+            {
+              "storyboard_id": 582,
+              "storyboard_number": 10
+            },
+            {
+              "storyboard_id": 583,
+              "storyboard_number": 11
+            },
+            {
+              "storyboard_id": 584,
+              "storyboard_number": 12
+            },
+            {
+              "storyboard_id": 585,
+              "storyboard_number": 13
+            },
+            {
+              "storyboard_id": 586,
+              "storyboard_number": 14
+            },
+            {
+              "storyboard_id": 587,
+              "storyboard_number": 15
+            },
+            {
+              "storyboard_id": 588,
+              "storyboard_number": 16
+            },
+            {
+              "storyboard_id": 589,
+              "storyboard_number": 17
+            },
+            {
+              "storyboard_id": 590,
+              "storyboard_number": 18
+            },
+            {
+              "storyboard_id": 591,
+              "storyboard_number": 19
+            },
+            {
+              "storyboard_id": 592,
+              "storyboard_number": 20
+            },
+            {
+              "storyboard_id": 593,
+              "storyboard_number": 21
+            },
+            {
+              "storyboard_id": 594,
+              "storyboard_number": 22
+            }
+          ],
+          "excluded": []
+        }
+      }
+    },
+    {
+      "id": 1815,
+      "type": "image",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": null,
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "created_at": "2026-11-11T07:00:04.159Z",
+      "completed_at": "2026-11-11T07:13:31.478Z",
+      "error_msg": null,
+      "params": {
+        "size": "1080x1920",
+        "aspect_locked": true,
+        "aspect_version": true,
+        "referenceImages": [
+          "static/images/2e6eda55-3b3b-4a62-9ac9-07f98f504b7f.png"
+        ]
+      }
+    },
+    {
+      "id": 1814,
+      "type": "image",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": null,
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "created_at": "2026-11-11T07:00:04.154Z",
+      "completed_at": "2026-11-11T07:09:23.861Z",
+      "error_msg": null,
+      "params": {
+        "size": "1080x1920",
+        "aspect_locked": true
+      }
+    },
+    {
+      "id": 1813,
+      "type": "image",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": null,
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "created_at": "2026-11-11T07:00:04.152Z",
+      "completed_at": "2026-11-11T07:09:30.748Z",
+      "error_msg": null,
+      "params": {
+        "size": "1080x1920",
+        "aspect_locked": true
+      }
+    },
+    {
+      "id": 1812,
+      "type": "image",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": null,
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "created_at": "2026-11-11T07:00:04.149Z",
+      "completed_at": "2026-11-11T07:12:26.249Z",
+      "error_msg": null,
+      "params": {
+        "size": "1080x1920",
+        "aspect_locked": true
+      }
+    },
+    {
+      "id": 1811,
+      "type": "image",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": null,
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "created_at": "2026-11-11T07:00:04.147Z",
+      "completed_at": "2026-11-11T07:06:16.226Z",
+      "error_msg": null,
+      "params": {
+        "size": "1080x1920",
+        "aspect_locked": true
+      }
+    },
+    {
+      "id": 1810,
+      "type": "image",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": null,
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "created_at": "2026-11-11T07:00:04.144Z",
+      "completed_at": "2026-11-11T07:03:08.855Z",
+      "error_msg": null,
+      "params": {
+        "size": "1080x1920",
+        "aspect_locked": true
+      }
+    },
+    {
+      "id": 1809,
+      "type": "image",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": null,
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "created_at": "2026-11-11T07:00:04.141Z",
+      "completed_at": "2026-11-11T07:03:23.669Z",
+      "error_msg": null,
+      "params": {
+        "size": "1080x1920",
+        "aspect_locked": true
+      }
+    },
+    {
+      "id": 1808,
+      "type": "image",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": null,
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "created_at": "2026-11-11T07:00:04.134Z",
+      "completed_at": "2026-11-11T07:06:29.186Z",
+      "error_msg": null,
+      "params": {
+        "size": "1080x1920",
+        "aspect_locked": true
+      }
+    },
+    {
+      "id": 34,
+      "status": "completed",
+      "created_at": "2026-11-11T00:12:42.004Z",
+      "error_msg": null
+    },
+    {
+      "id": 1796,
+      "type": "text",
+      "kind": "shot_compose",
+      "status": "completed",
+      "storyboard_id": null,
+      "provider": null,
+      "model": null,
+      "created_at": "2026-11-11T00:11:55.855Z",
+      "completed_at": "2026-11-11T00:12:24.298Z",
+      "error_msg": null,
+      "params": {
+        "kind": "shot_compose",
+        "progress": {
+          "completed": 22,
+          "failed": 0,
+          "skipped": 0,
+          "total": 22,
+          "items": [
+            {
+              "storyboard_id": 573,
+              "storyboard_number": 1,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 574,
+              "storyboard_number": 2,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 575,
+              "storyboard_number": 3,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 576,
+              "storyboard_number": 4,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 577,
+              "storyboard_number": 5,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 578,
+              "storyboard_number": 6,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 579,
+              "storyboard_number": 7,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 580,
+              "storyboard_number": 8,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 581,
+              "storyboard_number": 9,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 582,
+              "storyboard_number": 10,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 583,
+              "storyboard_number": 11,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 584,
+              "storyboard_number": 12,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 585,
+              "storyboard_number": 13,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 586,
+              "storyboard_number": 14,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 587,
+              "storyboard_number": 15,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 588,
+              "storyboard_number": 16,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 589,
+              "storyboard_number": 17,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 590,
+              "storyboard_number": 18,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 591,
+              "storyboard_number": 19,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 592,
+              "storyboard_number": 20,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 593,
+              "storyboard_number": 21,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 594,
+              "storyboard_number": 22,
+              "state": "completed",
+              "reason": null
+            }
+          ]
+        },
+        "storyboardIds": [
+          573,
+          574,
+          575,
+          576,
+          577,
+          578,
+          579,
+          580,
+          581,
+          582,
+          583,
+          584,
+          585,
+          586,
+          587,
+          588,
+          589,
+          590,
+          591,
+          592,
+          593,
+          594
+        ],
+        "scope": {
+          "included": [
+            {
+              "storyboard_id": 573,
+              "storyboard_number": 1
+            },
+            {
+              "storyboard_id": 574,
+              "storyboard_number": 2
+            },
+            {
+              "storyboard_id": 575,
+              "storyboard_number": 3
+            },
+            {
+              "storyboard_id": 576,
+              "storyboard_number": 4
+            },
+            {
+              "storyboard_id": 577,
+              "storyboard_number": 5
+            },
+            {
+              "storyboard_id": 578,
+              "storyboard_number": 6
+            },
+            {
+              "storyboard_id": 579,
+              "storyboard_number": 7
+            },
+            {
+              "storyboard_id": 580,
+              "storyboard_number": 8
+            },
+            {
+              "storyboard_id": 581,
+              "storyboard_number": 9
+            },
+            {
+              "storyboard_id": 582,
+              "storyboard_number": 10
+            },
+            {
+              "storyboard_id": 583,
+              "storyboard_number": 11
+            },
+            {
+              "storyboard_id": 584,
+              "storyboard_number": 12
+            },
+            {
+              "storyboard_id": 585,
+              "storyboard_number": 13
+            },
+            {
+              "storyboard_id": 586,
+              "storyboard_number": 14
+            },
+            {
+              "storyboard_id": 587,
+              "storyboard_number": 15
+            },
+            {
+              "storyboard_id": 588,
+              "storyboard_number": 16
+            },
+            {
+              "storyboard_id": 589,
+              "storyboard_number": 17
+            },
+            {
+              "storyboard_id": 590,
+              "storyboard_number": 18
+            },
+            {
+              "storyboard_id": 591,
+              "storyboard_number": 19
+            },
+            {
+              "storyboard_id": 592,
+              "storyboard_number": 20
+            },
+            {
+              "storyboard_id": 593,
+              "storyboard_number": 21
+            },
+            {
+              "storyboard_id": 594,
+              "storyboard_number": 22
+            }
+          ],
+          "excluded": []
+        }
+      }
+    },
+    {
+      "id": 1795,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 594,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T00:11:48.291Z",
+      "completed_at": "2026-11-11T00:11:49.577Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 42,
+        "combo": "C",
+        "duration": 2.2,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1794,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 593,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T00:11:44.836Z",
+      "completed_at": "2026-11-11T00:11:48.260Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 41,
+        "combo": "C",
+        "duration": 5.8,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1793,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 592,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T00:11:41.699Z",
+      "completed_at": "2026-11-11T00:11:44.812Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 40,
+        "combo": "C",
+        "duration": 4,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1792,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 591,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T00:11:39.389Z",
+      "completed_at": "2026-11-11T00:11:41.674Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 39,
+        "combo": "C",
+        "duration": 6,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1791,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 590,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T00:11:36.147Z",
+      "completed_at": "2026-11-11T00:11:39.353Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 38,
+        "combo": "C",
+        "duration": 5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1790,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 589,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T00:11:33.054Z",
+      "completed_at": "2026-11-11T00:11:36.116Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 37,
+        "combo": "C",
+        "duration": 4,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1789,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 588,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T00:11:30.885Z",
+      "completed_at": "2026-11-11T00:11:33.028Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 36,
+        "combo": "C",
+        "duration": 5.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1788,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 587,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T00:11:27.346Z",
+      "completed_at": "2026-11-11T00:11:30.858Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 35,
+        "combo": "C",
+        "duration": 5.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1787,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 586,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T00:11:24.398Z",
+      "completed_at": "2026-11-11T00:11:27.318Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 34,
+        "combo": "D",
+        "duration": 4.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1786,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 585,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T00:11:20.742Z",
+      "completed_at": "2026-11-11T00:11:24.366Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 33,
+        "combo": "C",
+        "duration": 5.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1785,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 584,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T00:11:17.678Z",
+      "completed_at": "2026-11-11T00:11:20.716Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 32,
+        "combo": "C",
+        "duration": 4,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1784,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 583,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T00:11:14.180Z",
+      "completed_at": "2026-11-11T00:11:17.653Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 31,
+        "combo": "C",
+        "duration": 5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1783,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 582,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T00:11:11.358Z",
+      "completed_at": "2026-11-11T00:11:14.152Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 30,
+        "combo": "C",
+        "duration": 3.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1782,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 581,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T00:11:07.907Z",
+      "completed_at": "2026-11-11T00:11:11.329Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 29,
+        "combo": "C",
+        "duration": 5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1781,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 580,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T00:11:05.011Z",
+      "completed_at": "2026-11-11T00:11:07.879Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 28,
+        "combo": "C",
+        "duration": 3.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1780,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 579,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T00:11:01.726Z",
+      "completed_at": "2026-11-11T00:11:04.986Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 27,
+        "combo": "C",
+        "duration": 4.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1779,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 578,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T00:10:58.882Z",
+      "completed_at": "2026-11-11T00:11:01.700Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 26,
+        "combo": "C",
+        "duration": 3.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1778,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 577,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T00:10:55.479Z",
+      "completed_at": "2026-11-11T00:10:58.857Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 25,
+        "combo": "C",
+        "duration": 5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1777,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 576,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T00:10:52.344Z",
+      "completed_at": "2026-11-11T00:10:55.450Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 24,
+        "combo": "C",
+        "duration": 4.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1776,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 575,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T00:10:49.544Z",
+      "completed_at": "2026-11-11T00:10:52.315Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 23,
+        "combo": "C",
+        "duration": 3.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1775,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 574,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T00:10:46.290Z",
+      "completed_at": "2026-11-11T00:10:49.518Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 22,
+        "combo": "C",
+        "duration": 5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1774,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 573,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-11T00:10:42.817Z",
+      "completed_at": "2026-11-11T00:10:46.263Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 21,
+        "combo": "C",
+        "duration": 8.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 33,
+      "status": "completed",
+      "created_at": "2026-11-11T00:05:47.526Z",
+      "error_msg": null
+    },
+    {
+      "id": 1773,
+      "type": "text",
+      "kind": "shot_compose",
+      "status": "completed",
+      "storyboard_id": null,
+      "provider": null,
+      "model": null,
+      "created_at": "2026-11-11T00:04:55.995Z",
+      "completed_at": "2026-11-11T00:05:24.814Z",
+      "error_msg": null,
+      "params": {
+        "kind": "shot_compose",
+        "progress": {
+          "completed": 22,
+          "failed": 0,
+          "skipped": 0,
+          "total": 22,
+          "items": [
+            {
+              "storyboard_id": 573,
+              "storyboard_number": 1,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 574,
+              "storyboard_number": 2,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 575,
+              "storyboard_number": 3,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 576,
+              "storyboard_number": 4,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 577,
+              "storyboard_number": 5,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 578,
+              "storyboard_number": 6,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 579,
+              "storyboard_number": 7,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 580,
+              "storyboard_number": 8,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 581,
+              "storyboard_number": 9,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 582,
+              "storyboard_number": 10,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 583,
+              "storyboard_number": 11,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 584,
+              "storyboard_number": 12,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 585,
+              "storyboard_number": 13,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 586,
+              "storyboard_number": 14,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 587,
+              "storyboard_number": 15,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 588,
+              "storyboard_number": 16,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 589,
+              "storyboard_number": 17,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 590,
+              "storyboard_number": 18,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 591,
+              "storyboard_number": 19,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 592,
+              "storyboard_number": 20,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 593,
+              "storyboard_number": 21,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 594,
+              "storyboard_number": 22,
+              "state": "completed",
+              "reason": null
+            }
+          ]
+        },
+        "storyboardIds": [
+          573,
+          574,
+          575,
+          576,
+          577,
+          578,
+          579,
+          580,
+          581,
+          582,
+          583,
+          584,
+          585,
+          586,
+          587,
+          588,
+          589,
+          590,
+          591,
+          592,
+          593,
+          594
+        ],
+        "scope": {
+          "included": [
+            {
+              "storyboard_id": 573,
+              "storyboard_number": 1
+            },
+            {
+              "storyboard_id": 574,
+              "storyboard_number": 2
+            },
+            {
+              "storyboard_id": 575,
+              "storyboard_number": 3
+            },
+            {
+              "storyboard_id": 576,
+              "storyboard_number": 4
+            },
+            {
+              "storyboard_id": 577,
+              "storyboard_number": 5
+            },
+            {
+              "storyboard_id": 578,
+              "storyboard_number": 6
+            },
+            {
+              "storyboard_id": 579,
+              "storyboard_number": 7
+            },
+            {
+              "storyboard_id": 580,
+              "storyboard_number": 8
+            },
+            {
+              "storyboard_id": 581,
+              "storyboard_number": 9
+            },
+            {
+              "storyboard_id": 582,
+              "storyboard_number": 10
+            },
+            {
+              "storyboard_id": 583,
+              "storyboard_number": 11
+            },
+            {
+              "storyboard_id": 584,
+              "storyboard_number": 12
+            },
+            {
+              "storyboard_id": 585,
+              "storyboard_number": 13
+            },
+            {
+              "storyboard_id": 586,
+              "storyboard_number": 14
+            },
+            {
+              "storyboard_id": 587,
+              "storyboard_number": 15
+            },
+            {
+              "storyboard_id": 588,
+              "storyboard_number": 16
+            },
+            {
+              "storyboard_id": 589,
+              "storyboard_number": 17
+            },
+            {
+              "storyboard_id": 590,
+              "storyboard_number": 18
+            },
+            {
+              "storyboard_id": 591,
+              "storyboard_number": 19
+            },
+            {
+              "storyboard_id": 592,
+              "storyboard_number": 20
+            },
+            {
+              "storyboard_id": 593,
+              "storyboard_number": 21
+            },
+            {
+              "storyboard_id": 594,
+              "storyboard_number": 22
+            }
+          ],
+          "excluded": []
+        }
+      }
+    },
+    {
+      "id": 32,
+      "status": "completed",
+      "created_at": "2026-11-10T23:54:12.123Z",
+      "error_msg": null
+    },
+    {
+      "id": 1772,
+      "type": "text",
+      "kind": "shot_compose",
+      "status": "completed",
+      "storyboard_id": null,
+      "provider": null,
+      "model": null,
+      "created_at": "2026-11-10T23:52:49.825Z",
+      "completed_at": "2026-11-10T23:53:18.195Z",
+      "error_msg": null,
+      "params": {
+        "kind": "shot_compose",
+        "progress": {
+          "completed": 22,
+          "failed": 0,
+          "skipped": 0,
+          "total": 22,
+          "items": [
+            {
+              "storyboard_id": 573,
+              "storyboard_number": 1,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 574,
+              "storyboard_number": 2,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 575,
+              "storyboard_number": 3,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 576,
+              "storyboard_number": 4,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 577,
+              "storyboard_number": 5,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 578,
+              "storyboard_number": 6,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 579,
+              "storyboard_number": 7,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 580,
+              "storyboard_number": 8,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 581,
+              "storyboard_number": 9,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 582,
+              "storyboard_number": 10,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 583,
+              "storyboard_number": 11,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 584,
+              "storyboard_number": 12,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 585,
+              "storyboard_number": 13,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 586,
+              "storyboard_number": 14,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 587,
+              "storyboard_number": 15,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 588,
+              "storyboard_number": 16,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 589,
+              "storyboard_number": 17,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 590,
+              "storyboard_number": 18,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 591,
+              "storyboard_number": 19,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 592,
+              "storyboard_number": 20,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 593,
+              "storyboard_number": 21,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 594,
+              "storyboard_number": 22,
+              "state": "completed",
+              "reason": null
+            }
+          ]
+        },
+        "storyboardIds": [
+          573,
+          574,
+          575,
+          576,
+          577,
+          578,
+          579,
+          580,
+          581,
+          582,
+          583,
+          584,
+          585,
+          586,
+          587,
+          588,
+          589,
+          590,
+          591,
+          592,
+          593,
+          594
+        ],
+        "scope": {
+          "included": [
+            {
+              "storyboard_id": 573,
+              "storyboard_number": 1
+            },
+            {
+              "storyboard_id": 574,
+              "storyboard_number": 2
+            },
+            {
+              "storyboard_id": 575,
+              "storyboard_number": 3
+            },
+            {
+              "storyboard_id": 576,
+              "storyboard_number": 4
+            },
+            {
+              "storyboard_id": 577,
+              "storyboard_number": 5
+            },
+            {
+              "storyboard_id": 578,
+              "storyboard_number": 6
+            },
+            {
+              "storyboard_id": 579,
+              "storyboard_number": 7
+            },
+            {
+              "storyboard_id": 580,
+              "storyboard_number": 8
+            },
+            {
+              "storyboard_id": 581,
+              "storyboard_number": 9
+            },
+            {
+              "storyboard_id": 582,
+              "storyboard_number": 10
+            },
+            {
+              "storyboard_id": 583,
+              "storyboard_number": 11
+            },
+            {
+              "storyboard_id": 584,
+              "storyboard_number": 12
+            },
+            {
+              "storyboard_id": 585,
+              "storyboard_number": 13
+            },
+            {
+              "storyboard_id": 586,
+              "storyboard_number": 14
+            },
+            {
+              "storyboard_id": 587,
+              "storyboard_number": 15
+            },
+            {
+              "storyboard_id": 588,
+              "storyboard_number": 16
+            },
+            {
+              "storyboard_id": 589,
+              "storyboard_number": 17
+            },
+            {
+              "storyboard_id": 590,
+              "storyboard_number": 18
+            },
+            {
+              "storyboard_id": 591,
+              "storyboard_number": 19
+            },
+            {
+              "storyboard_id": 592,
+              "storyboard_number": 20
+            },
+            {
+              "storyboard_id": 593,
+              "storyboard_number": 21
+            },
+            {
+              "storyboard_id": 594,
+              "storyboard_number": 22
+            }
+          ],
+          "excluded": []
+        }
+      }
+    },
+    {
+      "id": 21,
+      "status": "done",
+      "created_at": "2026-11-10T22:22:30.638Z",
+      "params": {
+        "scope": {
+          "included": [
+            {
+              "storyboard_id": 573,
+              "storyboard_number": 1
+            },
+            {
+              "storyboard_id": 574,
+              "storyboard_number": 2
+            },
+            {
+              "storyboard_id": 575,
+              "storyboard_number": 3
+            },
+            {
+              "storyboard_id": 576,
+              "storyboard_number": 4
+            },
+            {
+              "storyboard_id": 577,
+              "storyboard_number": 5
+            },
+            {
+              "storyboard_id": 578,
+              "storyboard_number": 6
+            },
+            {
+              "storyboard_id": 579,
+              "storyboard_number": 7
+            },
+            {
+              "storyboard_id": 580,
+              "storyboard_number": 8
+            },
+            {
+              "storyboard_id": 581,
+              "storyboard_number": 9
+            },
+            {
+              "storyboard_id": 582,
+              "storyboard_number": 10
+            },
+            {
+              "storyboard_id": 583,
+              "storyboard_number": 11
+            },
+            {
+              "storyboard_id": 584,
+              "storyboard_number": 12
+            },
+            {
+              "storyboard_id": 585,
+              "storyboard_number": 13
+            },
+            {
+              "storyboard_id": 586,
+              "storyboard_number": 14
+            },
+            {
+              "storyboard_id": 587,
+              "storyboard_number": 15
+            },
+            {
+              "storyboard_id": 588,
+              "storyboard_number": 16
+            },
+            {
+              "storyboard_id": 589,
+              "storyboard_number": 17
+            },
+            {
+              "storyboard_id": 590,
+              "storyboard_number": 18
+            },
+            {
+              "storyboard_id": 591,
+              "storyboard_number": 19
+            },
+            {
+              "storyboard_id": 592,
+              "storyboard_number": 20
+            },
+            {
+              "storyboard_id": 593,
+              "storyboard_number": 21
+            },
+            {
+              "storyboard_id": 594,
+              "storyboard_number": 22
+            }
+          ],
+          "excluded": []
+        }
+      }
+    },
+    {
+      "id": 1749,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 594,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T22:22:02.183Z",
+      "completed_at": "2026-11-10T22:22:03.429Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 42,
+        "combo": "C",
+        "duration": 2.2,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1748,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 593,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T22:21:59.890Z",
+      "completed_at": "2026-11-10T22:22:02.161Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 41,
+        "combo": "C",
+        "duration": 5.8,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1747,
+      "type": "text",
+      "kind": "video_prompts",
+      "status": "completed",
+      "storyboard_id": null,
+      "provider": "openai",
+      "model": "deepseek-chat",
+      "created_at": "2026-11-10T21:56:46.885Z",
+      "completed_at": "2026-11-10T22:17:05.614Z",
+      "error_msg": null,
+      "params": {
+        "kind": "video_prompts",
+        "progress": {
+          "completed": 22,
+          "failed": 0,
+          "total": 22
+        },
+        "storyboardIds": [
+          573,
+          574,
+          575,
+          576,
+          577,
+          578,
+          579,
+          580,
+          581,
+          582,
+          583,
+          584,
+          585,
+          586,
+          587,
+          588,
+          589,
+          590,
+          591,
+          592,
+          593,
+          594
+        ],
+        "configId": 10,
+        "stage": "video_prompts",
+        "model_used": {
+          "config_id": 10,
+          "name": "DeepSeek V4.1 Flash 1017 (local)",
+          "provider": "openai",
+          "model": "deepseek-chat",
+          "vision": false
+        },
+        "restart": {
+          "kind": "video_prompts",
+          "args": {
+            "episodeId": 21,
+            "dramaId": 15,
+            "opts": {}
+          }
+        },
+        "reasoning_chars": 332
+      }
+    },
+    {
+      "id": 1746,
+      "type": "image",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 579,
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "created_at": "2026-11-10T21:48:52.714Z",
+      "completed_at": "2026-11-10T21:52:48.386Z",
+      "error_msg": null,
+      "params": {
+        "size": "768x1344",
+        "frameType": "last_frame",
+        "referenceImages": [
+          "static/images/050a7ba7-601d-4865-8f25-5b3d765f90c8.png",
+          "static/images/63ae6cc3-8e9e-4aa2-923b-ea3b9fa125fa.png",
+          "static/images/62117d18-a6b3-4df9-8f0c-d4ddaf3a9c45.png",
+          "static/images/b392a424-701c-49dc-ae2a-72a7fd65d0a0.png",
+          "static/images/b1e1ba78-c2d6-489b-a6c3-ec37cea6b808.png"
+        ],
+        "sourcePrompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark，\n@咸阳城门，上午冷白日光，门洞内幽暗、门外明亮，薄尘在光柱中浮动，9:16 竖构图电影感剧照。中景平视固定机位，门洞外的黄土车辙路面上，@子婴 正面朝向画外、颈间 @丝绳 绳圈贴于颈侧、绳头垂在胸前素白衣襟上；双手在胸前并拢捧持两件信物：右掌托住 @皇帝玺 的青白玉方玺、五指扣在玺身边沿，左手握住 @符节 的细长节身中段——@符节 是青灰色青铜长条，表面一圈圈凸起的节环、带绿锈，顶端垂下一条红褐绶带；双臂微屈收在身前，双腿并拢站定、两只黑布履踏在车辙路面可见，目光落在掌中信物上，神情凝重。画面中只有他一人，无前景手部、无悬浮物体、无文字。",
+        "refNameIndex": {
+          "咸阳城门": 1,
+          "子婴": 2,
+          "丝绳": 3,
+          "皇帝玺": 4,
+          "符节": 5
+        }
+      }
+    },
+    {
+      "id": 1745,
+      "type": "image",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 579,
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "created_at": "2026-11-10T21:40:51.756Z",
+      "completed_at": "2026-11-10T21:44:53.687Z",
+      "error_msg": null,
+      "params": {
+        "size": "768x1344",
+        "frameType": "last_frame",
+        "referenceImages": [
+          "static/images/050a7ba7-601d-4865-8f25-5b3d765f90c8.png",
+          "static/images/63ae6cc3-8e9e-4aa2-923b-ea3b9fa125fa.png",
+          "static/images/62117d18-a6b3-4df9-8f0c-d4ddaf3a9c45.png",
+          "static/images/b392a424-701c-49dc-ae2a-72a7fd65d0a0.png",
+          "static/images/b1e1ba78-c2d6-489b-a6c3-ec37cea6b808.png"
+        ],
+        "sourcePrompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark，\n@咸阳城门，上午冷白日光，门洞内幽暗、门外明亮，薄尘在光柱中浮动、明暗对比强烈，9:16 竖构图电影感剧照。中景平视固定机位，门洞外的黄土车辙路面上，@子婴 身体正面朝向画外，颈间 @丝绳 的绳圈贴于颈侧、绳头垂在胸前素白衣襟上；他双手在胸前并拢捧起——右掌托住 @皇帝玺 的方形玉底、五指扣在玺身两侧边沿，左手握住 @符节 的节身中段、指腹搭在节圈凸起上，@符节 顶端的红褐绶带垂落在他腕侧；双腿并拢站定、两只黑布履踏在车辙路面上清晰可见，目光落在掌中两件信物上，神情凝重。画面中只有他一人，无第二个人、无前景手部、无悬浮物体、无文字。",
+        "refNameIndex": {
+          "咸阳城门": 1,
+          "子婴": 2,
+          "丝绳": 3,
+          "皇帝玺": 4,
+          "符节": 5
+        }
+      }
+    },
+    {
+      "id": 1743,
+      "type": "image",
+      "kind": null,
+      "status": "failed",
+      "storyboard_id": 585,
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "created_at": "2026-11-10T21:19:50.855Z",
+      "completed_at": null,
+      "error_msg": "KSampler: Allocation on device 0 would exceed allowed memory. (out of memory)\nCurrently allocated     : 7.65 GiB\nRequested               : 785.04 MiB\nDevice limit            : 11.63 GiB\nFree (according to CUDA): 30.81 MiB\nPyTorch limit (set by user-supplied memory fraction)\n                        : 17179869184.00 GiB\nThis error means you ran out of memory on your GPU.\n\nTIPS: If the workflow worked before you might have accidentally set the batch_size to a large number.",
+      "params": {
+        "size": "768x1344",
+        "frameType": "mid_frame",
+        "referenceImages": [
+          "static/images/0b148c9f-0008-482a-b4a8-4331a16288dc.png",
+          "static/images/63ae6cc3-8e9e-4aa2-923b-ea3b9fa125fa.png",
+          "static/images/f10f6661-b720-4206-b6e4-565af728912e.png",
+          "static/images/62117d18-a6b3-4df9-8f0c-d4ddaf3a9c45.png",
+          "static/images/b392a424-701c-49dc-ae2a-72a7fd65d0a0.png",
+          "static/images/b1e1ba78-c2d6-489b-a6c3-ec37cea6b808.png",
+          "static/images/e253a577-b872-4781-b872-1a41ed7e8576.png",
+          "static/images/843613e0-7c4e-4181-8b3a-4430b68d05cf.png"
+        ],
+        "sourcePrompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark，\n@轵道，上午偏白日光，光线均匀阴冷，初冬薄雾浮在贴地的黄土上，车辙深沟里的积水与白色干涸痕迹映出浅灰高光，9:16 竖构图电影感剧照。中景平视固定机位，车辙深陷的黄土土路上，@刘邦 立于画面右侧、身体正面朝向画外略偏左，右手自然垂下停在体侧、指节收拢贴在自己腰侧 @佩剑 的剑柄旁但并未拔出，剑鞘仍挂在腰间革带上，左手垂在另一侧体侧、空着未持物，双腿并拢站定、两只黑皮短靴踏在车辙路面清晰可见，眉头微敛、视线落在画面左侧的对方身上，神色宽和有威。@子婴 立于画面左侧半步之外、身体正面朝向画外略偏右，颈间 @丝绳 的绳圈贴于颈侧、绳头垂在胸前衣襟上，右手掌握着 @皇帝玺 的方形玺身、拇指扣在玺身边沿，左手掌握着 @符节 的节身中段、指腹搭在节圈凸起上，@符节 顶端的红褐绶带垂落在他的腕侧；双腿并拢站定、两只黑布履踏在车辙里可见，视线低垂落在自己手中的两件信物上，神情自持沉静。@刘邦 身后半步处一名劝进者（灰青粗麻短袍、束发无冠、腰缠深褐布带、双手合抱在身前）低头侍立。画面右后方停着 @素车白马，素净车厢侧板与一只十六辐车轮在冷白日光下可辨，车厢下沿与车轮沾着薄泥；画面左缘是 @轵道 路旁的灰色长方石标与初冬枯草，中景几株秃枝老树，远景城郭剪影被薄雾削弱，画面中没有第二个人、没有兵、没有仪仗。主体纵向完整入画，画面上下留出字幕与标题安全区。单帧静态画面，无运动模糊。",
+        "refNameIndex": {
+          "轵道": 1,
+          "子婴": 2,
+          "刘邦": 3,
+          "丝绳": 4,
+          "皇帝玺": 5,
+          "符节": 6,
+          "素车白马": 7,
+          "佩剑": 8
+        }
+      }
+    },
+    {
+      "id": 1741,
+      "type": "image",
+      "kind": null,
+      "status": "failed",
+      "storyboard_id": 585,
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "created_at": "2026-11-10T21:08:39.632Z",
+      "completed_at": null,
+      "error_msg": "KSampler: Allocation on device 0 would exceed allowed memory. (out of memory)\nCurrently allocated     : 7.65 GiB\nRequested               : 785.04 MiB\nDevice limit            : 11.63 GiB\nFree (according to CUDA): 30.81 MiB\nPyTorch limit (set by user-supplied memory fraction)\n                        : 17179869184.00 GiB\nThis error means you ran out of memory on your GPU.\n\nTIPS: If the workflow worked before you might have accidentally set the batch_size to a large number.",
+      "params": {
+        "size": "768x1344",
+        "frameType": "mid_frame",
+        "referenceImages": [
+          "static/images/0b148c9f-0008-482a-b4a8-4331a16288dc.png",
+          "static/images/63ae6cc3-8e9e-4aa2-923b-ea3b9fa125fa.png",
+          "static/images/f10f6661-b720-4206-b6e4-565af728912e.png",
+          "static/images/62117d18-a6b3-4df9-8f0c-d4ddaf3a9c45.png",
+          "static/images/b392a424-701c-49dc-ae2a-72a7fd65d0a0.png",
+          "static/images/b1e1ba78-c2d6-489b-a6c3-ec37cea6b808.png",
+          "static/images/e253a577-b872-4781-b872-1a41ed7e8576.png",
+          "static/images/843613e0-7c4e-4181-8b3a-4430b68d05cf.png"
+        ],
+        "sourcePrompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark，\n@轵道，上午偏白日光，光线均匀阴冷，初冬薄雾浮在贴地的黄土上，车辙深沟里的积水与白色干涸痕迹映出浅灰高光，9:16 竖构图电影感剧照。中景平视固定机位，车辙深陷的黄土土路上，@刘邦 立于画面右侧、身体正面朝向画外略偏左，右手自然垂下停在体侧、指节收拢贴在自己腰侧 @佩剑 的剑柄旁但并未拔出，剑鞘仍挂在腰间革带上，左手垂在另一侧体侧、空着未持物，双腿并拢站定、两只黑皮短靴踏在车辙路面清晰可见，眉头微敛、视线落在画面左侧的对方身上，神色宽和有威。@子婴 立于画面左侧半步之外、身体正面朝向画外略偏右，颈间 @丝绳 的绳圈贴于颈侧、绳头垂在胸前衣襟上，右手掌握着 @皇帝玺 的方形玺身、拇指扣在玺身边沿，左手掌握着 @符节 的节身中段、指腹搭在节圈凸起上，@符节 顶端的红褐绶带垂落在他的腕侧；双腿并拢站定、两只黑布履踏在车辙里可见，视线低垂落在自己手中的两件信物上，神情自持沉静。@刘邦 身后半步处一名劝进者（灰青粗麻短袍、束发无冠、腰缠深褐布带、双手合抱在身前）低头侍立。画面右后方停着 @素车白马，素净车厢侧板与一只十六辐车轮在冷白日光下可辨，车厢下沿与车轮沾着薄泥；画面左缘是 @轵道 路旁的灰色长方石标与初冬枯草，中景几株秃枝老树，远景城郭剪影被薄雾削弱，画面中没有第二个人、没有兵、没有仪仗。主体纵向完整入画，画面上下留出字幕与标题安全区。单帧静态画面，无运动模糊。",
+        "refNameIndex": {
+          "轵道": 1,
+          "子婴": 2,
+          "刘邦": 3,
+          "丝绳": 4,
+          "皇帝玺": 5,
+          "符节": 6,
+          "素车白马": 7,
+          "佩剑": 8
+        }
+      }
+    },
+    {
+      "id": 1738,
+      "type": "image",
+      "kind": null,
+      "status": "failed",
+      "storyboard_id": 583,
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "created_at": "2026-11-10T21:08:39.344Z",
+      "completed_at": null,
+      "error_msg": "KSampler: Allocation on device 0 would exceed allowed memory. (out of memory)\nCurrently allocated     : 8.27 GiB\nRequested               : 686.62 MiB\nDevice limit            : 11.63 GiB\nFree (according to CUDA): 30.81 MiB\nPyTorch limit (set by user-supplied memory fraction)\n                        : 17179869184.00 GiB\nThis error means you ran out of memory on your GPU.\n\nTIPS: If the workflow worked before you might have accidentally set the batch_size to a large number.",
+      "params": {
+        "size": "768x1344",
+        "frameType": "last_frame",
+        "referenceImages": [
+          "static/images/0b148c9f-0008-482a-b4a8-4331a16288dc.png",
+          "static/images/63ae6cc3-8e9e-4aa2-923b-ea3b9fa125fa.png",
+          "static/images/f10f6661-b720-4206-b6e4-565af728912e.png",
+          "static/images/62117d18-a6b3-4df9-8f0c-d4ddaf3a9c45.png",
+          "static/images/b392a424-701c-49dc-ae2a-72a7fd65d0a0.png",
+          "static/images/b1e1ba78-c2d6-489b-a6c3-ec37cea6b808.png",
+          "static/images/e253a577-b872-4781-b872-1a41ed7e8576.png"
+        ],
+        "sourcePrompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark，\n@轵道，上午偏白日光，光线均匀阴冷，初冬薄雾浮在贴地的黄土上，车辙积水反出浅灰高光，9:16 竖构图电影感剧照。中景略俯固定机位，车辙深陷的黄土土路上，@刘邦 位于画面右侧、正面朝向画外略偏左，双手在身前掌心向上承住两件信物——右掌托住 @皇帝玺 的方形底部、拇指扣在玺身边沿，左手握住 @符节 的节身中段、指腹搭在节圈凸起上，@符节 顶端的红褐绶带垂落在他的腕侧；双腿并拢站定、两只黑皮短靴踏在车辙路面上清晰可见，抬眼平视、神色宽和有威。@子婴 位于画面左侧半步之外，颈间 @丝绳 的绳圈贴于颈侧、绳头垂在胸前衣襟上，双手向前平伸摊开、掌心向上、十指伸展，掌中空无一物；双腿并拢站定、两只黑布履着地清晰可见，视线低垂落在已交出的两件信物上，神情自持沉静。两人身后画面右后方停着 @素车白马，素净车厢侧板与一只车轮在冷白日光下可辨，车厢下沿沾着薄泥；画面左缘是 @轵道 路旁的灰色长方石标与初冬枯草，中景几株秃枝老树，远景城郭剪影被薄雾削弱，画面中没有第三个人、没有兵、没有仪仗。主体纵向完整入画，画面上下留出字幕与标题安全区。单帧静态画面，无运动模糊。",
+        "refNameIndex": {
+          "轵道": 1,
+          "子婴": 2,
+          "刘邦": 3,
+          "丝绳": 4,
+          "皇帝玺": 5,
+          "符节": 6,
+          "素车白马": 7
+        }
+      }
+    },
+    {
+      "id": 1718,
+      "type": "image",
+      "kind": null,
+      "status": "failed",
+      "storyboard_id": 585,
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "created_at": "2026-11-10T19:49:34.942Z",
+      "completed_at": null,
+      "error_msg": "KSampler: Allocation on device 0 would exceed allowed memory. (out of memory)\nCurrently allocated     : 7.65 GiB\nRequested               : 785.04 MiB\nDevice limit            : 11.63 GiB\nFree (according to CUDA): 30.81 MiB\nPyTorch limit (set by user-supplied memory fraction)\n                        : 17179869184.00 GiB\nThis error means you ran out of memory on your GPU.\n\nTIPS: If the workflow worked before you might have accidentally set the batch_size to a large number.",
+      "params": {
+        "size": "768x1344",
+        "frameType": "mid_frame",
+        "referenceImages": [
+          "static/images/0b148c9f-0008-482a-b4a8-4331a16288dc.png",
+          "static/images/63ae6cc3-8e9e-4aa2-923b-ea3b9fa125fa.png",
+          "static/images/f10f6661-b720-4206-b6e4-565af728912e.png",
+          "static/images/62117d18-a6b3-4df9-8f0c-d4ddaf3a9c45.png",
+          "static/images/b392a424-701c-49dc-ae2a-72a7fd65d0a0.png",
+          "static/images/b1e1ba78-c2d6-489b-a6c3-ec37cea6b808.png",
+          "static/images/e253a577-b872-4781-b872-1a41ed7e8576.png",
+          "static/images/843613e0-7c4e-4181-8b3a-4430b68d05cf.png"
+        ],
+        "sourcePrompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark，\n@轵道，上午偏白日光，光线均匀阴冷，初冬薄雾浮在贴地的黄土上，车辙深沟里的积水与白色干涸痕迹映出浅灰高光，9:16 竖构图电影感剧照。中景平视固定机位，车辙深陷的黄土土路上，@刘邦 立于画面右侧、身体正面朝向画外略偏左，右手自然垂下停在体侧、指节收拢贴在自己腰侧 @佩剑 的剑柄旁但并未拔出，剑鞘仍挂在腰间革带上，左手垂在另一侧体侧、空着未持物，双腿并拢站定、两只黑皮短靴踏在车辙路面清晰可见，眉头微敛、视线落在画面左侧的对方身上，神色宽和有威。@子婴 立于画面左侧半步之外、身体正面朝向画外略偏右，颈间 @丝绳 的绳圈贴于颈侧、绳头垂在胸前衣襟上，右手掌握着 @皇帝玺 的方形玺身、拇指扣在玺身边沿，左手掌握着 @符节 的节身中段、指腹搭在节圈凸起上，@符节 顶端的红褐绶带垂落在他的腕侧；双腿并拢站定、两只黑布履踏在车辙里可见，视线低垂落在自己手中的两件信物上，神情自持沉静。@刘邦 身后半步处一名劝进者（灰青粗麻短袍、束发无冠、腰缠深褐布带、双手合抱在身前）低头侍立。画面右后方停着 @素车白马，素净车厢侧板与一只十六辐车轮在冷白日光下可辨，车厢下沿与车轮沾着薄泥；画面左缘是 @轵道 路旁的灰色长方石标与初冬枯草，中景几株秃枝老树，远景城郭剪影被薄雾削弱，画面中没有第二个人、没有兵、没有仪仗。主体纵向完整入画，画面上下留出字幕与标题安全区。单帧静态画面，无运动模糊。",
+        "refNameIndex": {
+          "轵道": 1,
+          "子婴": 2,
+          "刘邦": 3,
+          "丝绳": 4,
+          "皇帝玺": 5,
+          "符节": 6,
+          "素车白马": 7,
+          "佩剑": 8
+        }
+      }
+    },
+    {
+      "id": 1717,
+      "type": "image",
+      "kind": null,
+      "status": "failed",
+      "storyboard_id": 584,
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "created_at": "2026-11-10T19:49:34.860Z",
+      "completed_at": null,
+      "error_msg": "KSampler: Allocation on device 0 would exceed allowed memory. (out of memory)\nCurrently allocated     : 8.28 GiB\nRequested               : 687.23 MiB\nDevice limit            : 11.63 GiB\nFree (according to CUDA): 30.81 MiB\nPyTorch limit (set by user-supplied memory fraction)\n                        : 17179869184.00 GiB\nThis error means you ran out of memory on your GPU.\n\nTIPS: If the workflow worked before you might have accidentally set the batch_size to a large number.",
+      "params": {
+        "size": "768x1344",
+        "frameType": "last_frame",
+        "referenceImages": [
+          "static/images/0b148c9f-0008-482a-b4a8-4331a16288dc.png",
+          "static/images/63ae6cc3-8e9e-4aa2-923b-ea3b9fa125fa.png",
+          "static/images/f10f6661-b720-4206-b6e4-565af728912e.png",
+          "static/images/62117d18-a6b3-4df9-8f0c-d4ddaf3a9c45.png",
+          "static/images/b392a424-701c-49dc-ae2a-72a7fd65d0a0.png",
+          "static/images/b1e1ba78-c2d6-489b-a6c3-ec37cea6b808.png",
+          "static/images/e253a577-b872-4781-b872-1a41ed7e8576.png"
+        ],
+        "sourcePrompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark，\n@轵道，上午偏白日光，光线均匀阴冷，初冬薄雾浮在贴地的黄土上，车辙积水反出浅灰高光，9:16 竖构图电影感剧照。中景略俯固定机位，车辙深陷的黄土土路上，@刘邦 位于画面右侧、身体正面朝向画外略偏左，右臂抬起横在身前、手掌竖起掌心朝外作摆手之势并停在半空，左手自然垂在体侧、空着未持物，双腿并拢站定、两只黑皮短靴踏在车辙路面上清晰可见，抬眼平视、神色宽和有威。@子婴 位于画面左侧半步之外，颈间 @丝绳 的绳圈贴于颈侧、绳头垂在胸前衣襟上，双手在身前交握——右掌压住 @皇帝玺 的方形底部、拇指扣在玺身边沿，左手托住 @符节 的节身中段、指腹搭在节圈凸起上，@符节 顶端的红褐绶带垂落在他腕侧；双腿并拢站定、两只黑布履着地清晰可见，视线低垂、神情自持沉静。劝进者已退到画面右缘之外、只剩半侧肩影入画，双手合抱在身前。两人右后方停着 @素车白马，素净车厢侧板与一只十六辐车轮在冷白日光下可辨，车厢下沿沾着薄泥；画面左缘是 @轵道 路旁的灰色长方石标与初冬枯草，中景几株秃枝老树，远景城郭剪影被薄雾削弱，画面中没有第二个人、没有兵、没有仪仗。主体纵向完整入画，画面上下留出字幕与标题安全区。单帧静态画面，无运动模糊。",
+        "refNameIndex": {
+          "轵道": 1,
+          "子婴": 2,
+          "刘邦": 3,
+          "丝绳": 4,
+          "皇帝玺": 5,
+          "符节": 6,
+          "素车白马": 7
+        }
+      }
+    },
+    {
+      "id": 1716,
+      "type": "image",
+      "kind": null,
+      "status": "failed",
+      "storyboard_id": 584,
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "created_at": "2026-11-10T19:49:34.776Z",
+      "completed_at": null,
+      "error_msg": "KSampler: Allocation on device 0 would exceed allowed memory. (out of memory)\nCurrently allocated     : 8.28 GiB\nRequested               : 688.36 MiB\nDevice limit            : 11.63 GiB\nFree (according to CUDA): 30.81 MiB\nPyTorch limit (set by user-supplied memory fraction)\n                        : 17179869184.00 GiB\nThis error means you ran out of memory on your GPU.\n\nTIPS: If the workflow worked before you might have accidentally set the batch_size to a large number.",
+      "params": {
+        "size": "768x1344",
+        "frameType": "mid_frame",
+        "referenceImages": [
+          "static/images/0b148c9f-0008-482a-b4a8-4331a16288dc.png",
+          "static/images/63ae6cc3-8e9e-4aa2-923b-ea3b9fa125fa.png",
+          "static/images/f10f6661-b720-4206-b6e4-565af728912e.png",
+          "static/images/62117d18-a6b3-4df9-8f0c-d4ddaf3a9c45.png",
+          "static/images/b392a424-701c-49dc-ae2a-72a7fd65d0a0.png",
+          "static/images/b1e1ba78-c2d6-489b-a6c3-ec37cea6b808.png",
+          "static/images/e253a577-b872-4781-b872-1a41ed7e8576.png"
+        ],
+        "sourcePrompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark，\n@轵道，上午偏白日光，光线均匀阴冷，初冬薄雾浮在贴地的黄土上，车辙深沟里的积水映出浅灰高光，9:16 竖构图电影感剧照。中景平视固定机位，车辙深陷的黄土土路上，@刘邦 立于画面右侧、身体侧向画面左边，右手抬到胸前、掌心朝外推出并停在半空作摆手之势，左手自然垂在体侧、空着未持物，双腿并拢站定、两只黑皮短靴踏在黄土车辙里清晰可见，眉头微敛、目光落在画面左侧的对方身上，神色宽和有威。@子婴 立于画面左侧半步之外、身体正面朝向画外略偏右，颈间 @丝绳 的绳圈贴于颈侧、绳头垂在胸前衣襟上，右手掌握着 @皇帝玺 的方形玺身、拇指扣在玺身边沿，左手掌握着 @符节 的节身中段、指腹搭在节圈凸起上，@符节 顶端的红褐绶带垂落在他的腕侧；双腿并拢站定、两只黑布履踏在车辙里可见，视线低垂落在自己手中的两件信物上，神情自持沉静。@刘邦 身后半步处一名劝进者（灰青粗麻短袍、束发无冠、腰缠深褐布带、双手合抱在身前）侧身低头、肩背前倾进言。画面右后方停着 @素车白马，素净车厢侧板与一只十六辐车轮在冷白日光下可辨，车厢下沿与车轮沾着薄泥；画面左缘是 @轵道 路旁的灰色长方石标与初冬枯草，中景几株秃枝老树，远景城郭剪影被薄雾削弱，画面中没有第二个人、没有兵、没有仪仗。主体纵向完整入画，画面上下留出字幕与标题安全区。单帧静态画面，无运动模糊。",
+        "refNameIndex": {
+          "轵道": 1,
+          "子婴": 2,
+          "刘邦": 3,
+          "丝绳": 4,
+          "皇帝玺": 5,
+          "符节": 6,
+          "素车白马": 7
+        }
+      }
+    },
+    {
+      "id": 1715,
+      "type": "image",
+      "kind": null,
+      "status": "failed",
+      "storyboard_id": 583,
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "created_at": "2026-11-10T19:49:34.693Z",
+      "completed_at": null,
+      "error_msg": "KSampler: Allocation on device 0 would exceed allowed memory. (out of memory)\nCurrently allocated     : 8.27 GiB\nRequested               : 686.62 MiB\nDevice limit            : 11.63 GiB\nFree (according to CUDA): 30.81 MiB\nPyTorch limit (set by user-supplied memory fraction)\n                        : 17179869184.00 GiB\nThis error means you ran out of memory on your GPU.\n\nTIPS: If the workflow worked before you might have accidentally set the batch_size to a large number.",
+      "params": {
+        "size": "768x1344",
+        "frameType": "last_frame",
+        "referenceImages": [
+          "static/images/0b148c9f-0008-482a-b4a8-4331a16288dc.png",
+          "static/images/63ae6cc3-8e9e-4aa2-923b-ea3b9fa125fa.png",
+          "static/images/f10f6661-b720-4206-b6e4-565af728912e.png",
+          "static/images/62117d18-a6b3-4df9-8f0c-d4ddaf3a9c45.png",
+          "static/images/b392a424-701c-49dc-ae2a-72a7fd65d0a0.png",
+          "static/images/b1e1ba78-c2d6-489b-a6c3-ec37cea6b808.png",
+          "static/images/e253a577-b872-4781-b872-1a41ed7e8576.png"
+        ],
+        "sourcePrompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark，\n@轵道，上午偏白日光，光线均匀阴冷，初冬薄雾浮在贴地的黄土上，车辙积水反出浅灰高光，9:16 竖构图电影感剧照。中景略俯固定机位，车辙深陷的黄土土路上，@刘邦 位于画面右侧、正面朝向画外略偏左，双手在身前掌心向上承住两件信物——右掌托住 @皇帝玺 的方形底部、拇指扣在玺身边沿，左手握住 @符节 的节身中段、指腹搭在节圈凸起上，@符节 顶端的红褐绶带垂落在他的腕侧；双腿并拢站定、两只黑皮短靴踏在车辙路面上清晰可见，抬眼平视、神色宽和有威。@子婴 位于画面左侧半步之外，颈间 @丝绳 的绳圈贴于颈侧、绳头垂在胸前衣襟上，双手向前平伸摊开、掌心向上、十指伸展，掌中空无一物；双腿并拢站定、两只黑布履着地清晰可见，视线低垂落在已交出的两件信物上，神情自持沉静。两人身后画面右后方停着 @素车白马，素净车厢侧板与一只车轮在冷白日光下可辨，车厢下沿沾着薄泥；画面左缘是 @轵道 路旁的灰色长方石标与初冬枯草，中景几株秃枝老树，远景城郭剪影被薄雾削弱，画面中没有第三个人、没有兵、没有仪仗。主体纵向完整入画，画面上下留出字幕与标题安全区。单帧静态画面，无运动模糊。",
+        "refNameIndex": {
+          "轵道": 1,
+          "子婴": 2,
+          "刘邦": 3,
+          "丝绳": 4,
+          "皇帝玺": 5,
+          "符节": 6,
+          "素车白马": 7
+        }
+      }
+    },
+    {
+      "id": 18,
+      "status": "done",
+      "created_at": "2026-11-10T19:49:32.799Z",
+      "params": {}
+    },
+    {
+      "id": 1693,
+      "type": "text",
+      "kind": "keyframe_prompts",
+      "status": "completed",
+      "storyboard_id": null,
+      "provider": "openai",
+      "model": "deepseek-chat",
+      "created_at": "2026-11-10T19:44:06.753Z",
+      "completed_at": "2026-11-10T19:47:07.936Z",
+      "error_msg": null,
+      "params": {
+        "kind": "keyframe_prompts",
+        "progress": {
+          "completed": 3,
+          "failed": 0,
+          "total": 3
+        },
+        "storyboardIds": [
+          589,
+          590,
+          591
+        ],
+        "scope": {
+          "included": [
+            {
+              "storyboard_id": 589,
+              "storyboard_number": 17
+            },
+            {
+              "storyboard_id": 590,
+              "storyboard_number": 18
+            },
+            {
+              "storyboard_id": 591,
+              "storyboard_number": 19
+            }
+          ],
+          "excluded": []
+        },
+        "configId": 10,
+        "stage": "keyframe_prompts",
+        "model_used": {
+          "config_id": 10,
+          "name": "DeepSeek V4.1 Flash 1017 (local)",
+          "provider": "openai",
+          "model": "deepseek-chat",
+          "vision": false
+        },
+        "restart": {
+          "kind": "keyframe_prompts",
+          "args": {
+            "episodeId": 21,
+            "dramaId": 15,
+            "opts": {},
+            "storyboardIds": [
+              589,
+              590,
+              591
+            ]
+          }
+        },
+        "reasoning_chars": 56
+      }
+    },
+    {
+      "id": 1692,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 590,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T19:44:04.550Z",
+      "completed_at": "2026-11-10T19:44:06.691Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 38,
+        "combo": "C",
+        "duration": 5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1691,
+      "type": "image",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": null,
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "created_at": "2026-11-10T19:36:57.323Z",
+      "completed_at": "2026-11-10T19:40:01.799Z",
+      "error_msg": null,
+      "params": {
+        "size": "1920x1080"
+      }
+    },
+    {
+      "id": 1690,
+      "type": "text",
+      "kind": "keyframe_prompts",
+      "status": "completed",
+      "storyboard_id": null,
+      "provider": "openai",
+      "model": "deepseek-chat",
+      "created_at": "2026-11-10T19:32:37.501Z",
+      "completed_at": "2026-11-10T19:34:18.740Z",
+      "error_msg": null,
+      "params": {
+        "kind": "keyframe_prompts",
+        "progress": {
+          "completed": 2,
+          "failed": 0,
+          "total": 2
+        },
+        "storyboardIds": [
+          573,
+          582
+        ],
+        "scope": {
+          "included": [
+            {
+              "storyboard_id": 573,
+              "storyboard_number": 1
+            },
+            {
+              "storyboard_id": 582,
+              "storyboard_number": 10
+            }
+          ],
+          "excluded": []
+        },
+        "configId": 10,
+        "stage": "keyframe_prompts",
+        "model_used": {
+          "config_id": 10,
+          "name": "DeepSeek V4.1 Flash 1017 (local)",
+          "provider": "openai",
+          "model": "deepseek-chat",
+          "vision": false
+        },
+        "restart": {
+          "kind": "keyframe_prompts",
+          "args": {
+            "episodeId": 21,
+            "dramaId": 15,
+            "opts": {},
+            "storyboardIds": [
+              573,
+              582
+            ]
+          }
+        },
+        "reasoning_chars": 40
+      }
+    },
+    {
+      "id": 1689,
+      "type": "text",
+      "kind": "keyframe_prompts",
+      "status": "completed",
+      "storyboard_id": null,
+      "provider": "openai",
+      "model": "deepseek-chat",
+      "created_at": "2026-11-10T19:04:40.080Z",
+      "completed_at": "2026-11-10T19:31:45.886Z",
+      "error_msg": null,
+      "params": {
+        "kind": "keyframe_prompts",
+        "progress": {
+          "completed": 20,
+          "failed": 2,
+          "total": 22
+        },
+        "storyboardIds": [
+          573,
+          574,
+          575,
+          576,
+          577,
+          578,
+          579,
+          580,
+          581,
+          582,
+          583,
+          584,
+          585,
+          586,
+          587,
+          588,
+          589,
+          590,
+          591,
+          592,
+          593,
+          594
+        ],
+        "scope": {
+          "included": [
+            {
+              "storyboard_id": 573,
+              "storyboard_number": 1
+            },
+            {
+              "storyboard_id": 574,
+              "storyboard_number": 2
+            },
+            {
+              "storyboard_id": 575,
+              "storyboard_number": 3
+            },
+            {
+              "storyboard_id": 576,
+              "storyboard_number": 4
+            },
+            {
+              "storyboard_id": 577,
+              "storyboard_number": 5
+            },
+            {
+              "storyboard_id": 578,
+              "storyboard_number": 6
+            },
+            {
+              "storyboard_id": 579,
+              "storyboard_number": 7
+            },
+            {
+              "storyboard_id": 580,
+              "storyboard_number": 8
+            },
+            {
+              "storyboard_id": 581,
+              "storyboard_number": 9
+            },
+            {
+              "storyboard_id": 582,
+              "storyboard_number": 10
+            },
+            {
+              "storyboard_id": 583,
+              "storyboard_number": 11
+            },
+            {
+              "storyboard_id": 584,
+              "storyboard_number": 12
+            },
+            {
+              "storyboard_id": 585,
+              "storyboard_number": 13
+            },
+            {
+              "storyboard_id": 586,
+              "storyboard_number": 14
+            },
+            {
+              "storyboard_id": 587,
+              "storyboard_number": 15
+            },
+            {
+              "storyboard_id": 588,
+              "storyboard_number": 16
+            },
+            {
+              "storyboard_id": 589,
+              "storyboard_number": 17
+            },
+            {
+              "storyboard_id": 590,
+              "storyboard_number": 18
+            },
+            {
+              "storyboard_id": 591,
+              "storyboard_number": 19
+            },
+            {
+              "storyboard_id": 592,
+              "storyboard_number": 20
+            },
+            {
+              "storyboard_id": 593,
+              "storyboard_number": 21
+            },
+            {
+              "storyboard_id": 594,
+              "storyboard_number": 22
+            }
+          ],
+          "excluded": []
+        },
+        "configId": 10,
+        "stage": "keyframe_prompts",
+        "model_used": {
+          "config_id": 10,
+          "name": "DeepSeek V4.1 Flash 1017 (local)",
+          "provider": "openai",
+          "model": "deepseek-chat",
+          "vision": false
+        },
+        "restart": {
+          "kind": "keyframe_prompts",
+          "args": {
+            "episodeId": 21,
+            "dramaId": 15,
+            "opts": {}
+          }
+        },
+        "reasoning_chars": 332
+      }
+    },
+    {
+      "id": 1688,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 591,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T19:04:01.722Z",
+      "completed_at": "2026-11-10T19:04:02.958Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 39,
+        "combo": "C",
+        "duration": 6,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1687,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 591,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T19:03:10.573Z",
+      "completed_at": "2026-11-10T19:03:13.562Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 39,
+        "combo": "C",
+        "duration": 6,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1686,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 590,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T19:03:08.410Z",
+      "completed_at": "2026-11-10T19:03:10.532Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 38,
+        "combo": "C",
+        "duration": 5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1685,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 589,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T19:03:06.401Z",
+      "completed_at": "2026-11-10T19:03:08.365Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 37,
+        "combo": "C",
+        "duration": 4,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1684,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 591,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T19:02:18.464Z",
+      "completed_at": "2026-11-10T19:02:21.498Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 39,
+        "combo": "C",
+        "duration": 6,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1683,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 590,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T19:02:15.336Z",
+      "completed_at": "2026-11-10T19:02:18.430Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 38,
+        "combo": "C",
+        "duration": 5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1682,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 589,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T19:02:13.333Z",
+      "completed_at": "2026-11-10T19:02:15.294Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 37,
+        "combo": "C",
+        "duration": 4,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1681,
+      "type": "image",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": null,
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "created_at": "2026-11-10T18:59:59.424Z",
+      "completed_at": "2026-11-10T19:01:35.261Z",
+      "error_msg": null,
+      "params": {
+        "size": "1024x1024"
+      }
+    },
+    {
+      "id": 1680,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 575,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:58:38.592Z",
+      "completed_at": "2026-11-10T18:58:41.243Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 23,
+        "combo": "C",
+        "duration": 3.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1679,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 588,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:58:35.434Z",
+      "completed_at": "2026-11-10T18:58:38.573Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 36,
+        "combo": "C",
+        "duration": 5.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1678,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 579,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:58:33.269Z",
+      "completed_at": "2026-11-10T18:58:35.407Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 27,
+        "combo": "C",
+        "duration": 4.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1677,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 577,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:58:30.919Z",
+      "completed_at": "2026-11-10T18:58:33.249Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 25,
+        "combo": "C",
+        "duration": 5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1676,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 594,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:56:13.905Z",
+      "completed_at": "2026-11-10T18:56:16.496Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 42,
+        "combo": "C",
+        "duration": 4,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1675,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 593,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:56:10.497Z",
+      "completed_at": "2026-11-10T18:56:13.882Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 41,
+        "combo": "C",
+        "duration": 9,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1674,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 592,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:56:07.532Z",
+      "completed_at": "2026-11-10T18:56:10.477Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 40,
+        "combo": "C",
+        "duration": 4,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1673,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 591,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:56:04.509Z",
+      "completed_at": "2026-11-10T18:56:07.512Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 39,
+        "combo": "C",
+        "duration": 6,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1672,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 590,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:56:01.440Z",
+      "completed_at": "2026-11-10T18:56:04.489Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 38,
+        "combo": "C",
+        "duration": 5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1671,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 589,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:55:58.579Z",
+      "completed_at": "2026-11-10T18:56:01.421Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 37,
+        "combo": "C",
+        "duration": 4,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1670,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 588,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:55:55.583Z",
+      "completed_at": "2026-11-10T18:55:58.561Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 36,
+        "combo": "C",
+        "duration": 5.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1669,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 587,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:55:52.128Z",
+      "completed_at": "2026-11-10T18:55:55.556Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 35,
+        "combo": "C",
+        "duration": 5.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1668,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 586,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:55:49.210Z",
+      "completed_at": "2026-11-10T18:55:52.105Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 34,
+        "combo": "D",
+        "duration": 4.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1667,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 585,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:55:45.530Z",
+      "completed_at": "2026-11-10T18:55:49.190Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 33,
+        "combo": "C",
+        "duration": 5.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1666,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 584,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:55:42.551Z",
+      "completed_at": "2026-11-10T18:55:45.511Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 32,
+        "combo": "C",
+        "duration": 4,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1665,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 583,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:55:39.315Z",
+      "completed_at": "2026-11-10T18:55:42.529Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 31,
+        "combo": "C",
+        "duration": 5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1664,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 582,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:55:37.592Z",
+      "completed_at": "2026-11-10T18:55:39.295Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 30,
+        "combo": "C",
+        "duration": 3.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1663,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 581,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:55:34.308Z",
+      "completed_at": "2026-11-10T18:55:37.573Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 29,
+        "combo": "C",
+        "duration": 5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1662,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 580,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:55:32.488Z",
+      "completed_at": "2026-11-10T18:55:34.283Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 28,
+        "combo": "C",
+        "duration": 3.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1661,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 579,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:55:29.369Z",
+      "completed_at": "2026-11-10T18:55:32.470Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 27,
+        "combo": "C",
+        "duration": 4.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1660,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 578,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:55:26.590Z",
+      "completed_at": "2026-11-10T18:55:29.343Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 26,
+        "combo": "C",
+        "duration": 3.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1659,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 577,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:55:23.289Z",
+      "completed_at": "2026-11-10T18:55:26.567Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 25,
+        "combo": "C",
+        "duration": 5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1658,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 576,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:55:20.282Z",
+      "completed_at": "2026-11-10T18:55:23.263Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 24,
+        "combo": "C",
+        "duration": 4.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1657,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 575,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:55:17.596Z",
+      "completed_at": "2026-11-10T18:55:20.254Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 23,
+        "combo": "C",
+        "duration": 3.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1656,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 574,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:55:14.375Z",
+      "completed_at": "2026-11-10T18:55:17.571Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 22,
+        "combo": "C",
+        "duration": 5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1655,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 573,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:55:10.908Z",
+      "completed_at": "2026-11-10T18:55:14.356Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 21,
+        "combo": "C",
+        "duration": 8.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1654,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 594,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:52:52.976Z",
+      "completed_at": "2026-11-10T18:52:55.641Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 42,
+        "combo": "C",
+        "duration": 4,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1653,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 593,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:52:49.562Z",
+      "completed_at": "2026-11-10T18:52:52.946Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 41,
+        "combo": "C",
+        "duration": 9,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1652,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 592,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:52:46.420Z",
+      "completed_at": "2026-11-10T18:52:49.534Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 40,
+        "combo": "C",
+        "duration": 4,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1651,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 591,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:52:43.318Z",
+      "completed_at": "2026-11-10T18:52:46.399Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 39,
+        "combo": "C",
+        "duration": 6,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1650,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 590,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:52:40.207Z",
+      "completed_at": "2026-11-10T18:52:43.299Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 38,
+        "combo": "C",
+        "duration": 5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1649,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 589,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:52:37.316Z",
+      "completed_at": "2026-11-10T18:52:40.188Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 37,
+        "combo": "C",
+        "duration": 4,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1648,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 588,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:52:34.200Z",
+      "completed_at": "2026-11-10T18:52:37.281Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 36,
+        "combo": "C",
+        "duration": 5.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1647,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 587,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:52:30.791Z",
+      "completed_at": "2026-11-10T18:52:34.180Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 35,
+        "combo": "C",
+        "duration": 5.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1646,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 586,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:52:28.866Z",
+      "completed_at": "2026-11-10T18:52:30.770Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 34,
+        "combo": "D",
+        "duration": 4.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1645,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 585,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:52:25.296Z",
+      "completed_at": "2026-11-10T18:52:28.847Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 33,
+        "combo": "C",
+        "duration": 5.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1644,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 584,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:52:22.593Z",
+      "completed_at": "2026-11-10T18:52:25.277Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 32,
+        "combo": "C",
+        "duration": 4,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1643,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 583,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:52:19.405Z",
+      "completed_at": "2026-11-10T18:52:22.572Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 31,
+        "combo": "C",
+        "duration": 5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1642,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 582,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:52:17.676Z",
+      "completed_at": "2026-11-10T18:52:19.372Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 30,
+        "combo": "C",
+        "duration": 3.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1641,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 581,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:52:14.443Z",
+      "completed_at": "2026-11-10T18:52:17.657Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 29,
+        "combo": "C",
+        "duration": 5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1640,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 580,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:52:11.714Z",
+      "completed_at": "2026-11-10T18:52:14.424Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 28,
+        "combo": "C",
+        "duration": 3.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1639,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 579,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:52:08.656Z",
+      "completed_at": "2026-11-10T18:52:11.686Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 27,
+        "combo": "C",
+        "duration": 4.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1638,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 578,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:52:05.986Z",
+      "completed_at": "2026-11-10T18:52:08.635Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 26,
+        "combo": "C",
+        "duration": 3.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1637,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 577,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:52:02.783Z",
+      "completed_at": "2026-11-10T18:52:05.967Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 25,
+        "combo": "C",
+        "duration": 5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1636,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 576,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:51:59.719Z",
+      "completed_at": "2026-11-10T18:52:02.734Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 24,
+        "combo": "C",
+        "duration": 4.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1635,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 575,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:51:57.108Z",
+      "completed_at": "2026-11-10T18:51:59.694Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 23,
+        "combo": "C",
+        "duration": 3.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1634,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 574,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:51:54.837Z",
+      "completed_at": "2026-11-10T18:51:57.090Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 22,
+        "combo": "C",
+        "duration": 5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1633,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 573,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:51:51.363Z",
+      "completed_at": "2026-11-10T18:51:54.816Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 21,
+        "combo": "C",
+        "duration": 8.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1632,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 594,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:50:07.781Z",
+      "completed_at": "2026-11-10T18:50:09.811Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 42,
+        "combo": "C",
+        "duration": 4,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1631,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 593,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:50:03.666Z",
+      "completed_at": "2026-11-10T18:50:07.754Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 41,
+        "combo": "C",
+        "duration": 9,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1630,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 592,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:50:00.748Z",
+      "completed_at": "2026-11-10T18:50:03.638Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 40,
+        "combo": "C",
+        "duration": 4,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1629,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 591,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:49:57.118Z",
+      "completed_at": "2026-11-10T18:50:00.722Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 39,
+        "combo": "C",
+        "duration": 6,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1628,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 590,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:49:53.872Z",
+      "completed_at": "2026-11-10T18:49:57.087Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 38,
+        "combo": "C",
+        "duration": 5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1627,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 589,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:49:51.005Z",
+      "completed_at": "2026-11-10T18:49:53.844Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 37,
+        "combo": "C",
+        "duration": 4,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1626,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 588,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:49:47.568Z",
+      "completed_at": "2026-11-10T18:49:50.978Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 36,
+        "combo": "C",
+        "duration": 5.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1625,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 587,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:49:44.052Z",
+      "completed_at": "2026-11-10T18:49:47.538Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 35,
+        "combo": "C",
+        "duration": 5.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1624,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 586,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:49:40.896Z",
+      "completed_at": "2026-11-10T18:49:44.026Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 34,
+        "combo": "D",
+        "duration": 4.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1623,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 585,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:49:37.376Z",
+      "completed_at": "2026-11-10T18:49:40.863Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 33,
+        "combo": "C",
+        "duration": 5.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1622,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 584,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:49:34.531Z",
+      "completed_at": "2026-11-10T18:49:37.341Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 32,
+        "combo": "C",
+        "duration": 4,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1621,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 583,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:49:31.283Z",
+      "completed_at": "2026-11-10T18:49:34.499Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 31,
+        "combo": "C",
+        "duration": 5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1620,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 582,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:49:28.896Z",
+      "completed_at": "2026-11-10T18:49:31.265Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 30,
+        "combo": "C",
+        "duration": 3.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1619,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 581,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:49:25.687Z",
+      "completed_at": "2026-11-10T18:49:28.875Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 29,
+        "combo": "C",
+        "duration": 5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1618,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 580,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:49:23.046Z",
+      "completed_at": "2026-11-10T18:49:25.669Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 28,
+        "combo": "C",
+        "duration": 3.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1617,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 579,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:49:20.161Z",
+      "completed_at": "2026-11-10T18:49:23.026Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 27,
+        "combo": "C",
+        "duration": 4.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1616,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 578,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:49:18.592Z",
+      "completed_at": "2026-11-10T18:49:20.130Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 26,
+        "combo": "C",
+        "duration": 3.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1615,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 577,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:49:15.428Z",
+      "completed_at": "2026-11-10T18:49:18.573Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 25,
+        "combo": "C",
+        "duration": 5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1614,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 576,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:49:12.777Z",
+      "completed_at": "2026-11-10T18:49:15.410Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 24,
+        "combo": "C",
+        "duration": 4.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1613,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 575,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:49:10.330Z",
+      "completed_at": "2026-11-10T18:49:12.757Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 23,
+        "combo": "C",
+        "duration": 3.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1612,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 574,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:49:08.178Z",
+      "completed_at": "2026-11-10T18:49:10.311Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 22,
+        "combo": "C",
+        "duration": 5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1611,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 573,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:49:04.748Z",
+      "completed_at": "2026-11-10T18:49:08.159Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 21,
+        "combo": "C",
+        "duration": 8.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1610,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 583,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:48:46.515Z",
+      "completed_at": "2026-11-10T18:48:49.621Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 31,
+        "combo": "C",
+        "duration": 5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1609,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 582,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:48:44.218Z",
+      "completed_at": "2026-11-10T18:48:46.490Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 30,
+        "combo": "C",
+        "duration": 3.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1608,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 581,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:48:41.043Z",
+      "completed_at": "2026-11-10T18:48:44.193Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 29,
+        "combo": "C",
+        "duration": 5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1607,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 580,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:48:38.331Z",
+      "completed_at": "2026-11-10T18:48:41.019Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 28,
+        "combo": "C",
+        "duration": 3.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1606,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 579,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:48:35.299Z",
+      "completed_at": "2026-11-10T18:48:38.306Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 27,
+        "combo": "C",
+        "duration": 4.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1605,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 578,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:48:33.019Z",
+      "completed_at": "2026-11-10T18:48:35.274Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 26,
+        "combo": "C",
+        "duration": 3.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1604,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 577,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:48:30.694Z",
+      "completed_at": "2026-11-10T18:48:32.996Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 25,
+        "combo": "C",
+        "duration": 5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1603,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 576,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:48:28.127Z",
+      "completed_at": "2026-11-10T18:48:30.669Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 24,
+        "combo": "C",
+        "duration": 4.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1602,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 575,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:48:25.660Z",
+      "completed_at": "2026-11-10T18:48:28.064Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 23,
+        "combo": "C",
+        "duration": 3.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1601,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 574,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:48:22.576Z",
+      "completed_at": "2026-11-10T18:48:25.633Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 22,
+        "combo": "C",
+        "duration": 5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1600,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 573,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:48:19.137Z",
+      "completed_at": "2026-11-10T18:48:22.551Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 21,
+        "combo": "C",
+        "duration": 8.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1599,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 573,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:47:08.761Z",
+      "completed_at": "2026-11-10T18:47:11.991Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 21,
+        "combo": "C",
+        "duration": 8.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1598,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 573,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:46:11.393Z",
+      "completed_at": "2026-11-10T18:46:14.602Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 21,
+        "combo": "C",
+        "duration": 8.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1597,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 573,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:43:18.541Z",
+      "completed_at": "2026-11-10T18:43:21.738Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 21,
+        "combo": "C",
+        "duration": 8.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1596,
+      "type": "video",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": 573,
+      "provider": "layer-segment",
+      "model": "layer-segment",
+      "created_at": "2026-11-10T18:39:50.025Z",
+      "completed_at": "2026-11-10T18:39:51.081Z",
+      "error_msg": null,
+      "params": {
+        "segment_id": 21,
+        "combo": "C",
+        "duration": 8.5,
+        "size": "544x960",
+        "fps": 25
+      }
+    },
+    {
+      "id": 1595,
+      "type": "text",
+      "kind": "design_card",
+      "status": "completed",
+      "storyboard_id": null,
+      "provider": "openai",
+      "model": "deepseek-chat",
+      "created_at": "2026-11-10T18:05:21.050Z",
+      "completed_at": "2026-11-10T18:36:21.141Z",
+      "error_msg": null,
+      "params": {
+        "kind": "design_card",
+        "progress": {
+          "completed": 22,
+          "failed": 0,
+          "total": 22,
+          "items": [
+            {
+              "storyboard_id": 573,
+              "storyboard_number": 1,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 574,
+              "storyboard_number": 2,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 575,
+              "storyboard_number": 3,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 576,
+              "storyboard_number": 4,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 577,
+              "storyboard_number": 5,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 578,
+              "storyboard_number": 6,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 579,
+              "storyboard_number": 7,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 580,
+              "storyboard_number": 8,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 581,
+              "storyboard_number": 9,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 582,
+              "storyboard_number": 10,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 583,
+              "storyboard_number": 11,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 584,
+              "storyboard_number": 12,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 585,
+              "storyboard_number": 13,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 586,
+              "storyboard_number": 14,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 587,
+              "storyboard_number": 15,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 588,
+              "storyboard_number": 16,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 589,
+              "storyboard_number": 17,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 590,
+              "storyboard_number": 18,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 591,
+              "storyboard_number": 19,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 592,
+              "storyboard_number": 20,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 593,
+              "storyboard_number": 21,
+              "state": "completed",
+              "reason": null
+            },
+            {
+              "storyboard_id": 594,
+              "storyboard_number": 22,
+              "state": "completed",
+              "reason": null
+            }
+          ]
+        },
+        "storyboardIds": [
+          573,
+          574,
+          575,
+          576,
+          577,
+          578,
+          579,
+          580,
+          581,
+          582,
+          583,
+          584,
+          585,
+          586,
+          587,
+          588,
+          589,
+          590,
+          591,
+          592,
+          593,
+          594
+        ],
+        "configId": 10,
+        "stage": "design_card",
+        "model_used": {
+          "config_id": 10,
+          "name": "DeepSeek V4.1 Flash 1017 (local)",
+          "provider": "openai",
+          "model": "deepseek-chat",
+          "vision": true
+        },
+        "restart": {
+          "kind": "design_card",
+          "args": {
+            "episodeId": 21,
+            "dramaId": 15,
+            "opts": {}
+          }
+        },
+        "previous_card": [
+          {
+            "storyboard_id": 573,
+            "combo": null,
+            "design_card": null,
+            "design_card_status": "blank"
+          },
+          {
+            "storyboard_id": 574,
+            "combo": null,
+            "design_card": null,
+            "design_card_status": "blank"
+          },
+          {
+            "storyboard_id": 575,
+            "combo": null,
+            "design_card": null,
+            "design_card_status": "blank"
+          },
+          {
+            "storyboard_id": 576,
+            "combo": null,
+            "design_card": null,
+            "design_card_status": "blank"
+          },
+          {
+            "storyboard_id": 577,
+            "combo": null,
+            "design_card": null,
+            "design_card_status": "blank"
+          },
+          {
+            "storyboard_id": 578,
+            "combo": null,
+            "design_card": null,
+            "design_card_status": "blank"
+          },
+          {
+            "storyboard_id": 579,
+            "combo": null,
+            "design_card": null,
+            "design_card_status": "blank"
+          },
+          {
+            "storyboard_id": 580,
+            "combo": null,
+            "design_card": null,
+            "design_card_status": "blank"
+          },
+          {
+            "storyboard_id": 581,
+            "combo": null,
+            "design_card": null,
+            "design_card_status": "blank"
+          },
+          {
+            "storyboard_id": 582,
+            "combo": null,
+            "design_card": null,
+            "design_card_status": "blank"
+          },
+          {
+            "storyboard_id": 583,
+            "combo": null,
+            "design_card": null,
+            "design_card_status": "blank"
+          },
+          {
+            "storyboard_id": 584,
+            "combo": null,
+            "design_card": null,
+            "design_card_status": "blank"
+          },
+          {
+            "storyboard_id": 585,
+            "combo": null,
+            "design_card": null,
+            "design_card_status": "blank"
+          },
+          {
+            "storyboard_id": 586,
+            "combo": null,
+            "design_card": null,
+            "design_card_status": "blank"
+          },
+          {
+            "storyboard_id": 587,
+            "combo": null,
+            "design_card": null,
+            "design_card_status": "blank"
+          },
+          {
+            "storyboard_id": 588,
+            "combo": null,
+            "design_card": null,
+            "design_card_status": "blank"
+          },
+          {
+            "storyboard_id": 589,
+            "combo": null,
+            "design_card": null,
+            "design_card_status": "blank"
+          },
+          {
+            "storyboard_id": 590,
+            "combo": null,
+            "design_card": null,
+            "design_card_status": "blank"
+          },
+          {
+            "storyboard_id": 591,
+            "combo": null,
+            "design_card": null,
+            "design_card_status": "blank"
+          },
+          {
+            "storyboard_id": 592,
+            "combo": null,
+            "design_card": null,
+            "design_card_status": "blank"
+          },
+          {
+            "storyboard_id": 593,
+            "combo": null,
+            "design_card": null,
+            "design_card_status": "blank"
+          },
+          {
+            "storyboard_id": 594,
+            "combo": null,
+            "design_card": null,
+            "design_card_status": "blank"
+          }
+        ],
+        "tts_blocked": [],
+        "work_plan": {
+          "stage": "design_card",
+          "unit": "shot",
+          "sample_key": "design_card|cfg:10|model:deepseek-chat",
+          "planned_units": 22,
+          "planned_source_chars": 890,
+          "items": [
+            {
+              "storyboard_id": 573,
+              "storyboard_number": 1,
+              "source_chars": 53
+            },
+            {
+              "storyboard_id": 574,
+              "storyboard_number": 2,
+              "source_chars": 41
+            },
+            {
+              "storyboard_id": 575,
+              "storyboard_number": 3,
+              "source_chars": 43
+            },
+            {
+              "storyboard_id": 576,
+              "storyboard_number": 4,
+              "source_chars": 44
+            },
+            {
+              "storyboard_id": 577,
+              "storyboard_number": 5,
+              "source_chars": 46
+            },
+            {
+              "storyboard_id": 578,
+              "storyboard_number": 6,
+              "source_chars": 43
+            },
+            {
+              "storyboard_id": 579,
+              "storyboard_number": 7,
+              "source_chars": 43
+            },
+            {
+              "storyboard_id": 580,
+              "storyboard_number": 8,
+              "source_chars": 39
+            },
+            {
+              "storyboard_id": 581,
+              "storyboard_number": 9,
+              "source_chars": 41
+            },
+            {
+              "storyboard_id": 582,
+              "storyboard_number": 10,
+              "source_chars": 38
+            },
+            {
+              "storyboard_id": 583,
+              "storyboard_number": 11,
+              "source_chars": 46
+            },
+            {
+              "storyboard_id": 584,
+              "storyboard_number": 12,
+              "source_chars": 40
+            },
+            {
+              "storyboard_id": 585,
+              "storyboard_number": 13,
+              "source_chars": 38
+            },
+            {
+              "storyboard_id": 586,
+              "storyboard_number": 14,
+              "source_chars": 34
+            },
+            {
+              "storyboard_id": 587,
+              "storyboard_number": 15,
+              "source_chars": 43
+            },
+            {
+              "storyboard_id": 588,
+              "storyboard_number": 16,
+              "source_chars": 45
+            },
+            {
+              "storyboard_id": 589,
+              "storyboard_number": 17,
+              "source_chars": 31
+            },
+            {
+              "storyboard_id": 590,
+              "storyboard_number": 18,
+              "source_chars": 35
+            },
+            {
+              "storyboard_id": 591,
+              "storyboard_number": 19,
+              "source_chars": 37
+            },
+            {
+              "storyboard_id": 592,
+              "storyboard_number": 20,
+              "source_chars": 35
+            },
+            {
+              "storyboard_id": 593,
+              "storyboard_number": 21,
+              "source_chars": 49
+            },
+            {
+              "storyboard_id": 594,
+              "storyboard_number": 22,
+              "source_chars": 26
+            }
+          ]
+        },
+        "reasoning_chars": 332,
+        "vision_calls": {
+          "count": 56,
+          "prompt_tokens": 46923,
+          "completion_tokens": 14832,
+          "model": "deepseek-chat"
+        }
+      }
+    },
+    {
+      "id": 1594,
+      "type": "image",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": null,
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "created_at": "2026-11-10T17:57:43.391Z",
+      "completed_at": "2026-11-10T18:02:24.491Z",
+      "error_msg": null,
+      "params": {
+        "size": "1024x1024"
+      }
+    },
+    {
+      "id": 1593,
+      "type": "image",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": null,
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "created_at": "2026-11-10T17:57:43.385Z",
+      "completed_at": "2026-11-10T18:04:08.682Z",
+      "error_msg": null,
+      "params": {
+        "size": "1920x1080"
+      }
+    },
+    {
+      "id": 1592,
+      "type": "image",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": null,
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "created_at": "2026-11-10T17:57:43.379Z",
+      "completed_at": "2026-11-10T18:00:48.033Z",
+      "error_msg": null,
+      "params": {
+        "size": "1920x1080"
+      }
+    },
+    {
+      "id": 1591,
+      "type": "image",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": null,
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "created_at": "2026-11-10T17:57:43.370Z",
+      "completed_at": "2026-11-10T18:01:01.588Z",
+      "error_msg": null,
+      "params": {
+        "size": "1920x1080"
+      }
+    },
+    {
+      "id": 1590,
+      "type": "image",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": null,
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "created_at": "2026-11-10T17:29:48.229Z",
+      "completed_at": "2026-11-10T17:50:59.747Z",
+      "error_msg": null,
+      "params": {
+        "size": "1024x1024"
+      }
+    },
+    {
+      "id": 1589,
+      "type": "image",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": null,
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "created_at": "2026-11-10T17:29:45.108Z",
+      "completed_at": "2026-11-10T17:50:54.073Z",
+      "error_msg": null,
+      "params": {
+        "size": "1024x1024"
+      }
+    },
+    {
+      "id": 1588,
+      "type": "image",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": null,
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "created_at": "2026-11-10T17:29:24.300Z",
+      "completed_at": "2026-11-10T17:49:21.407Z",
+      "error_msg": null,
+      "params": {
+        "size": "1024x1024"
+      }
+    },
+    {
+      "id": 1587,
+      "type": "image",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": null,
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "created_at": "2026-11-10T17:29:16.155Z",
+      "completed_at": "2026-11-10T17:49:17.971Z",
+      "error_msg": null,
+      "params": {
+        "size": "1024x1024"
+      }
+    },
+    {
+      "id": 1586,
+      "type": "image",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": null,
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "created_at": "2026-11-10T17:29:05.100Z",
+      "completed_at": "2026-11-10T17:47:45.049Z",
+      "error_msg": null,
+      "params": {
+        "size": "1024x1024"
+      }
+    },
+    {
+      "id": 1585,
+      "type": "image",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": null,
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "created_at": "2026-11-10T17:28:41.988Z",
+      "completed_at": "2026-11-10T17:47:41.581Z",
+      "error_msg": null,
+      "params": {
+        "size": "1024x1024"
+      }
+    },
+    {
+      "id": 1584,
+      "type": "image",
+      "kind": null,
+      "status": "completed",
+      "storyboard_id": null,
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "created_at": "2026-11-10T17:28:33.762Z",
+      "completed_at": "2026-11-10T17:45:59.429Z",
+      "error_msg": null,
+      "params": {
+        "size": "1024x1024"
+      }
+    }
+  ]
+}

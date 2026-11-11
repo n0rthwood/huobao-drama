@@ -1,0 +1,114 @@
+{
+  "completed": [
+    {
+      "id": 112,
+      "drama_id": 15,
+      "episode_id": null,
+      "location": "咸阳城门",
+      "time": "上午",
+      "prompt": "公元前207年秦代咸阳城城门，夯土与木构城楼，双扇厚重的暗褐木门向内打开，门洞内是幽深的通道，门框上有秦式纹样木构件，门外是碾压过的黄土路面与低矮的土坡，门两侧无守卫队列，无人物。",
+      "lighting": "上午的冷白日光，雾已散薄，门洞内暗、门外亮，明暗对比强烈，空气中有薄尘。",
+      "final_prompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark, 固定机位广角镜头，清晰的建立镜头，9:16 竖构图，公元前207年秦代咸阳城门，上午，前景（画面下缘一道被车轮反复碾压的黄土路面，路面中央留着两道深陷车辙与散碎的干草屑，右下角一段低矮土坡的斜面与几块夯土碎块），中景（画面中部的主体：夯土城台与木构城楼全貌完整入画，顶部不被截断，双扇厚重的暗褐木门向内打开，门板上钉着金属门钉与木闩，门框上装有秦式纹样木构件，门洞内是幽深的通道，向里延伸至暗处收束），后景（城台墙体沿高度方向向上延伸至画面顶部，墙头露出木构屋檐与雉堞轮廓，上方留出上午开阔的天空纵深），出入口（画面正中央的双扇木门门洞，门框外两侧各一段夯土垛墙，墙体上可见风化的夯层与苔痕），地面（门外为压实黄土路面，表面有车辙、泥脚印与散落的浮土），墙面（夯土城墙表面呈土黄色，夯层纹理粗粝，有剥落的浅坑与水渍痕，木构件为暗褐色并带锯切与手工凿刻的痕迹），主要陈设及其固定相对位置（门洞居中，左右各立一根粗木门柱，门柱根部有石础；门洞内侧左壁悬一段木栅，门洞内侧右壁立一只木架，门外路面左侧横放一根拦门木杠），空间结构连续、自洽，上午冷白日光自画面左前方斜射进门洞，门外土路亮而泛浅灰高光，门洞内幽暗形成强烈明暗对比，空气中浮着薄尘，雾已散薄，空气清冷肃静，画面中没有任何人物，空场景，电影质感",
+      "final_prompt_source": "agent",
+      "final_prompt_updated_at": "2026-11-11T06:54:42.256Z",
+      "storyboard_count": 1,
+      "image_url": "static/images/ae339244-2c26-414f-9136-0bcb99c08466.png",
+      "reference_images": null,
+      "status": "completed",
+      "local_path": null,
+      "exposition": 0,
+      "created_at": "2026-11-10T16:24:23.988Z",
+      "updated_at": "2026-11-11T07:03:23.670Z",
+      "deleted_at": null,
+      "image_versions": [
+        {
+          "id": 1809,
+          "url": "static/images/ae339244-2c26-414f-9136-0bcb99c08466.png",
+          "provider": "qwen-jobs",
+          "model": "qwen-image-2.1",
+          "prompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark, 固定机位广角镜头，清晰的建立镜头，9:16 竖构图，公元前207年秦代咸阳城门，上午，前景（画面下缘一道被车轮反复碾压的黄土路面，路面中央留着两道深陷车辙与散碎的干草屑，右下角一段低矮土坡的斜面与几块夯土碎块），中景（画面中部的主体：夯土城台与木构城楼全貌完整入画，顶部不被截断，双扇厚重的暗褐木门向内打开，门板上钉着金属门钉与木闩，门框上装有秦式纹样木构件，门洞内是幽深的通道，向里延伸至暗处收束），后景（城台墙体沿高度方向向上延伸至画面顶部，墙头露出木构屋檐与雉堞轮廓，上方留出上午开阔的天空纵深），出入口（画面正中央的双扇木门门洞，门框外两侧各一段夯土垛墙，墙体上可见风化的夯层与苔痕），地面（门外为压实黄土路面，表面有车辙、泥脚印与散落的浮土），墙面（夯土城墙表面呈土黄色，夯层纹理粗粝，有剥落的浅坑与水渍痕，木构件为暗褐色并带锯切与手工凿刻的痕迹），主要陈设及其固定相对位置（门洞居中，左右各立一根粗木门柱，门柱根部有石础；门洞内侧左壁悬一段木栅，门洞内侧右壁立一只木架，门外路面左侧横放一根拦门木杠），空间结构连续、自洽，上午冷白日光自画面左前方斜射进门洞，门外土路亮而泛浅灰高光，门洞内幽暗形成强烈明暗对比，空气中浮着薄尘，雾已散薄，空气清冷肃静，画面中没有任何人物，空场景，电影质感",
+          "created_at": "2026-11-11T07:00:04.141Z",
+          "generated_at": 1794380603,
+          "is_current": true,
+          "fidelity": null,
+          "fidelity_reason": null
+        },
+        {
+          "id": 1577,
+          "url": "static/images/050a7ba7-601d-4865-8f25-5b3d765f90c8.png",
+          "provider": "qwen-jobs",
+          "model": "qwen-image-2.1",
+          "prompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark, 固定机位广角镜头，清晰的建立镜头，公元前207年秦代咸阳城门，上午。前景（画面左右两侧各有一截低矮土坡与散落的碎石、枯草，浅坑洼的黄土路面从画面下缘延伸进中景）。中景（主体空间是城门门洞与城楼基座：夯土城墙墙面，表面有夯筑层痕与风化剥落，墙顶架起木构城楼，城楼为深褐木柱与坡面屋顶，门洞居中，双扇厚重的暗褐木门向内敞开，门框上嵌有秦式方折回纹木构件，门洞内是一条幽深的夯土通道，通道尽头透出一点远处的街道微光）。后景（城门内更远的城郭街巷轮廓，被门洞裁成一段窄长深处，上方是上午泛白的天色）。出入口（画面中央门洞为城内外的唯一通道，双扇木门向内打开、贴靠在门洞内侧土壁上）。地面（门外为被车轮碾压出数道平行车辙的黄土路面，路面上浮着薄尘）。墙面（夯土城墙呈灰黄土色，墙面有风雨冲刷的竖向沟痕与斑驳剥落）。主要陈设及其固定相对位置：城门门洞居于画面正中，城楼横跨城墙顶端正对门洞上方，门外土路正对门洞朝画面下缘延伸，路面车辙与门洞中线对齐，路两侧土坡分列左右。空间结构连续、自洽，门内门外的层次前后贯通。上午的冷白日光从画面上方偏后斜照，雾已散薄，门外路面被照得发亮、门洞内通道暗沉，明暗对比强烈，空气中有薄尘悬浮，氛围清冷肃静。画面中没有任何人物，空场景，电影质感",
+          "created_at": "2026-11-10T17:27:08.579Z",
+          "generated_at": 1794332291,
+          "is_current": false,
+          "fidelity": null,
+          "fidelity_reason": null
+        }
+      ],
+      "image_generated_at": 1794380603
+    },
+    {
+      "id": 113,
+      "drama_id": 15,
+      "episode_id": null,
+      "location": "轵道",
+      "time": "上午",
+      "prompt": "公元前207年咸阳城外的轵道旁，一条车辙深陷的黄土土路横贯画面，路旁是初冬枯草、低矮土坎与几株秃枝老树，远处是灰褐色的田野与咸阳城郭剪影；路侧有一块低矮的秦式路旁石标，无宫殿、无宗庙、无人物。",
+      "lighting": "上午偏白的日光，光线均匀略显阴冷，初冬雾气残留于地表，土路反出浅灰高光。",
+      "final_prompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark, 固定机位广角镜头，清晰的建立镜头，9:16 竖构图，公元前207年秦代咸阳城外的轵道，上午，初冬时节，前景（画面下缘一道低矮黄土土坎与几丛枯黄杂草，路面边缘散着碎石与浅淡霜痕）、中景（一条车辙深陷的黄土土路自画面下方延伸并横贯主体空间，车辙两侧翻起的黄土干裂，路旁立着一块低矮的秦式路旁石标，方柱形、顶部平削、表面粗粝无纹），后景（沿高度方向向上延伸：土路向远处山口方向收束，两旁是灰褐色冬田与几株秃枝老树的枝干轮廓，画面顶部是灰蒙蒙的初冬天空与远处的咸阳城郭土墙及城楼剪影，城郭全貌完整入画、顶部不被截断），出入口（土路以画面下方近处为来路、向上通向远处城郭方向，是画面唯一的通路，两侧并无岔道），地面（黄土路面被车轮反复碾压，中央数道平行深车辙，辙底泛出浅灰高光，路肩松软黄土被踩出零散凹坑），墙面（无墙，仅土坎断面露出层状夯黄土，边缘风化剥落、草根外露），主要陈设及固定相对位置（秦式石标固定在土路左缘中段，正对车辙方向；土路右缘是一段低矮土坎与三两株秃枝老树，树身歪斜、枝干枯细；远处城郭土墙横压在画面顶部，与土路走向垂直相对），空间结构连续、自洽，上午偏白的日光自画面斜上方均匀洒下，色温冷白、明暗对比平淡，初冬雾气残余贴着地表漫过土坎与车辙，光线均匀略显阴冷，空气清冷空旷，画面中没有任何人物，空场景，电影质感",
+      "final_prompt_source": "agent",
+      "final_prompt_updated_at": "2026-11-11T06:55:10.107Z",
+      "storyboard_count": 1,
+      "image_url": "static/images/9a07edd0-1069-4132-acf0-5c0cd08b143e.png",
+      "reference_images": null,
+      "status": "completed",
+      "local_path": null,
+      "exposition": 0,
+      "created_at": "2026-11-10T16:24:23.988Z",
+      "updated_at": "2026-11-11T07:03:08.856Z",
+      "deleted_at": null,
+      "image_versions": [
+        {
+          "id": 1810,
+          "url": "static/images/9a07edd0-1069-4132-acf0-5c0cd08b143e.png",
+          "provider": "qwen-jobs",
+          "model": "qwen-image-2.1",
+          "prompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark, 固定机位广角镜头，清晰的建立镜头，9:16 竖构图，公元前207年秦代咸阳城外的轵道，上午，初冬时节，前景（画面下缘一道低矮黄土土坎与几丛枯黄杂草，路面边缘散着碎石与浅淡霜痕）、中景（一条车辙深陷的黄土土路自画面下方延伸并横贯主体空间，车辙两侧翻起的黄土干裂，路旁立着一块低矮的秦式路旁石标，方柱形、顶部平削、表面粗粝无纹），后景（沿高度方向向上延伸：土路向远处山口方向收束，两旁是灰褐色冬田与几株秃枝老树的枝干轮廓，画面顶部是灰蒙蒙的初冬天空与远处的咸阳城郭土墙及城楼剪影，城郭全貌完整入画、顶部不被截断），出入口（土路以画面下方近处为来路、向上通向远处城郭方向，是画面唯一的通路，两侧并无岔道），地面（黄土路面被车轮反复碾压，中央数道平行深车辙，辙底泛出浅灰高光，路肩松软黄土被踩出零散凹坑），墙面（无墙，仅土坎断面露出层状夯黄土，边缘风化剥落、草根外露），主要陈设及固定相对位置（秦式石标固定在土路左缘中段，正对车辙方向；土路右缘是一段低矮土坎与三两株秃枝老树，树身歪斜、枝干枯细；远处城郭土墙横压在画面顶部，与土路走向垂直相对），空间结构连续、自洽，上午偏白的日光自画面斜上方均匀洒下，色温冷白、明暗对比平淡，初冬雾气残余贴着地表漫过土坎与车辙，光线均匀略显阴冷，空气清冷空旷，画面中没有任何人物，空场景，电影质感",
+          "created_at": "2026-11-11T07:00:04.144Z",
+          "generated_at": 1794380588,
+          "is_current": true,
+          "fidelity": null,
+          "fidelity_reason": null
+        },
+        {
+          "id": 1578,
+          "url": "static/images/0b148c9f-0008-482a-b4a8-4331a16288dc.png",
+          "provider": "qwen-jobs",
+          "model": "qwen-image-2.1",
+          "prompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark, 固定机位广角镜头，清晰的建立镜头，公元前207年秦代咸阳城外的轵道，上午，初冬时节，前景（画面左下角一小段塌陷的土坎，坎边枯黄的草丛与几根裸露的树根，作为框景）；中景（一条车辙深陷的黄土土路自画面左下方斜向贯穿至右上方，路面被碾压出两道平行的深车辙，辙底积着薄泥与浅灰积水痕，路侧立一块低矮的秦式路旁石标，方形石身、顶部略削平、表面无字迹、边缘被风化磨圆）；后景（灰褐色的初冬田野铺向地平线，几株秃枝老树错落立在路右一侧，枝干细瘦无叶，更远处是模糊的咸阳城郭剪影与低矮城楼轮廓），出入口（画面右上方土路笔直延伸消失于远处城郭方向，画面左侧中段有一条细窄岔道从主路分出，通向左后方的田野），地面（压实黄土路面，表面干硬泛浅灰高光，辙沟、碎石与枯草根散布，路缘有薄霜与残雾痕），墙面（无墙，仅有路旁低矮的黄土坎断面，土质粗粒、断口干裂，边缘零星长着枯草），空间结构连续、自洽，上午偏白的日光从画面左上方斜射，色温偏冷、光线均匀略显阴冷，明暗对比柔和，初冬雾气残留贴伏于地表，土路反出浅灰高光，空气清寒寂寥，画面中没有任何人物，空场景，电影质感",
+          "created_at": "2026-11-10T17:27:16.700Z",
+          "generated_at": 1794332306,
+          "is_current": false,
+          "fidelity": null,
+          "fidelity_reason": null
+        }
+      ],
+      "image_generated_at": 1794380588
+    }
+  ],
+  "out": [
+    {
+      "path": "static/images/ae339244-2c26-414f-9136-0bcb99c08466.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/after/assets/scene-112.png",
+      "bytes": 4361559,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/9a07edd0-1069-4132-acf0-5c0cd08b143e.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/after/assets/scene-113.png",
+      "bytes": 4404719,
+      "contentType": "image/png"
+    }
+  ]
+}

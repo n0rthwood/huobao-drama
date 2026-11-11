@@ -1,0 +1,66 @@
+[
+  {
+    "id": 1808,
+    "status": "processing",
+    "error_msg": null,
+    "result_url": null,
+    "local_path": null,
+    "completed_at": null
+  },
+  {
+    "id": 1809,
+    "status": "completed",
+    "error_msg": null,
+    "result_url": "qwen-jobs:18c4f78e-12ff-4d60-9e42-e62aa9f57fe8/0",
+    "local_path": "static/images/ae339244-2c26-414f-9136-0bcb99c08466.png",
+    "completed_at": "2026-11-11T07:03:23.669Z"
+  },
+  {
+    "id": 1810,
+    "status": "completed",
+    "error_msg": null,
+    "result_url": "qwen-jobs:34db0e49-3b47-4a2a-89f1-74a3907dd88f/0",
+    "local_path": "static/images/9a07edd0-1069-4132-acf0-5c0cd08b143e.png",
+    "completed_at": "2026-11-11T07:03:08.855Z"
+  },
+  {
+    "id": 1811,
+    "status": "processing",
+    "error_msg": null,
+    "result_url": null,
+    "local_path": null,
+    "completed_at": null
+  },
+  {
+    "id": 1812,
+    "status": "queued",
+    "error_msg": null,
+    "result_url": null,
+    "local_path": null,
+    "completed_at": null
+  },
+  {
+    "id": 1813,
+    "status": "queued",
+    "error_msg": null,
+    "result_url": null,
+    "local_path": null,
+    "completed_at": null
+  },
+  {
+    "id": 1814,
+    "status": "queued",
+    "error_msg": null,
+    "result_url": null,
+    "local_path": null,
+    "completed_at": null
+  },
+  {
+    "id": 1815,
+    "status": "queued",
+    "error_msg": null,
+    "result_url": null,
+    "local_path": null,
+    "completed_at": null
+  }
+]

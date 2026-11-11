@@ -1,0 +1,416 @@
+{
+  "preview": {
+    "items": [
+      {
+        "storyboard_id": 573,
+        "storyboard_number": 1,
+        "status": "unchanged",
+        "selectable": true,
+        "checked": false,
+        "reason": "unchanged"
+      },
+      {
+        "storyboard_id": 574,
+        "storyboard_number": 2,
+        "status": "unchanged",
+        "selectable": true,
+        "checked": false,
+        "reason": "unchanged"
+      },
+      {
+        "storyboard_id": 575,
+        "storyboard_number": 3,
+        "status": "unchanged",
+        "selectable": true,
+        "checked": false,
+        "reason": "unchanged"
+      },
+      {
+        "storyboard_id": 576,
+        "storyboard_number": 4,
+        "status": "unchanged",
+        "selectable": true,
+        "checked": false,
+        "reason": "unchanged"
+      },
+      {
+        "storyboard_id": 577,
+        "storyboard_number": 5,
+        "status": "unchanged",
+        "selectable": true,
+        "checked": false,
+        "reason": "unchanged"
+      },
+      {
+        "storyboard_id": 578,
+        "storyboard_number": 6,
+        "status": "unchanged",
+        "selectable": true,
+        "checked": false,
+        "reason": "unchanged"
+      },
+      {
+        "storyboard_id": 579,
+        "storyboard_number": 7,
+        "status": "unchanged",
+        "selectable": true,
+        "checked": false,
+        "reason": "unchanged"
+      },
+      {
+        "storyboard_id": 580,
+        "storyboard_number": 8,
+        "status": "unchanged",
+        "selectable": true,
+        "checked": false,
+        "reason": "unchanged"
+      },
+      {
+        "storyboard_id": 581,
+        "storyboard_number": 9,
+        "status": "unchanged",
+        "selectable": true,
+        "checked": false,
+        "reason": "unchanged"
+      },
+      {
+        "storyboard_id": 582,
+        "storyboard_number": 10,
+        "status": "unchanged",
+        "selectable": true,
+        "checked": false,
+        "reason": "unchanged"
+      },
+      {
+        "storyboard_id": 583,
+        "storyboard_number": 11,
+        "status": "unchanged",
+        "selectable": true,
+        "checked": false,
+        "reason": "unchanged"
+      },
+      {
+        "storyboard_id": 584,
+        "storyboard_number": 12,
+        "status": "unchanged",
+        "selectable": true,
+        "checked": false,
+        "reason": "unchanged"
+      },
+      {
+        "storyboard_id": 585,
+        "storyboard_number": 13,
+        "status": "unchanged",
+        "selectable": true,
+        "checked": false,
+        "reason": "unchanged"
+      },
+      {
+        "storyboard_id": 586,
+        "storyboard_number": 14,
+        "status": "unchanged",
+        "selectable": true,
+        "checked": false,
+        "reason": "unchanged"
+      },
+      {
+        "storyboard_id": 587,
+        "storyboard_number": 15,
+        "status": "unchanged",
+        "selectable": true,
+        "checked": false,
+        "reason": "unchanged"
+      },
+      {
+        "storyboard_id": 588,
+        "storyboard_number": 16,
+        "status": "unchanged",
+        "selectable": true,
+        "checked": false,
+        "reason": "unchanged"
+      },
+      {
+        "storyboard_id": 589,
+        "storyboard_number": 17,
+        "status": "unchanged",
+        "selectable": true,
+        "checked": false,
+        "reason": "unchanged"
+      },
+      {
+        "storyboard_id": 590,
+        "storyboard_number": 18,
+        "status": "unchanged",
+        "selectable": true,
+        "checked": false,
+        "reason": "unchanged"
+      },
+      {
+        "storyboard_id": 591,
+        "storyboard_number": 19,
+        "status": "changed",
+        "selectable": true,
+        "checked": true
+      },
+      {
+        "storyboard_id": 592,
+        "storyboard_number": 20,
+        "status": "unchanged",
+        "selectable": true,
+        "checked": false,
+        "reason": "unchanged"
+      },
+      {
+        "storyboard_id": 593,
+        "storyboard_number": 21,
+        "status": "unchanged",
+        "selectable": true,
+        "checked": false,
+        "reason": "unchanged"
+      },
+      {
+        "storyboard_id": 594,
+        "storyboard_number": 22,
+        "status": "unchanged",
+        "selectable": true,
+        "checked": false,
+        "reason": "unchanged"
+      }
+    ],
+    "scope": {
+      "included": [
+        {
+          "storyboard_id": 591,
+          "storyboard_number": 19
+        }
+      ],
+      "excluded": [
+        {
+          "storyboard_id": 573,
+          "storyboard_number": 1,
+          "reason": "unchanged"
+        },
+        {
+          "storyboard_id": 574,
+          "storyboard_number": 2,
+          "reason": "unchanged"
+        },
+        {
+          "storyboard_id": 575,
+          "storyboard_number": 3,
+          "reason": "unchanged"
+        },
+        {
+          "storyboard_id": 576,
+          "storyboard_number": 4,
+          "reason": "unchanged"
+        },
+        {
+          "storyboard_id": 577,
+          "storyboard_number": 5,
+          "reason": "unchanged"
+        },
+        {
+          "storyboard_id": 578,
+          "storyboard_number": 6,
+          "reason": "unchanged"
+        },
+        {
+          "storyboard_id": 579,
+          "storyboard_number": 7,
+          "reason": "unchanged"
+        },
+        {
+          "storyboard_id": 580,
+          "storyboard_number": 8,
+          "reason": "unchanged"
+        },
+        {
+          "storyboard_id": 581,
+          "storyboard_number": 9,
+          "reason": "unchanged"
+        },
+        {
+          "storyboard_id": 582,
+          "storyboard_number": 10,
+          "reason": "unchanged"
+        },
+        {
+          "storyboard_id": 583,
+          "storyboard_number": 11,
+          "reason": "unchanged"
+        },
+        {
+          "storyboard_id": 584,
+          "storyboard_number": 12,
+          "reason": "unchanged"
+        },
+        {
+          "storyboard_id": 585,
+          "storyboard_number": 13,
+          "reason": "unchanged"
+        },
+        {
+          "storyboard_id": 586,
+          "storyboard_number": 14,
+          "reason": "unchanged"
+        },
+        {
+          "storyboard_id": 587,
+          "storyboard_number": 15,
+          "reason": "unchanged"
+        },
+        {
+          "storyboard_id": 588,
+          "storyboard_number": 16,
+          "reason": "unchanged"
+        },
+        {
+          "storyboard_id": 589,
+          "storyboard_number": 17,
+          "reason": "unchanged"
+        },
+        {
+          "storyboard_id": 590,
+          "storyboard_number": 18,
+          "reason": "unchanged"
+        },
+        {
+          "storyboard_id": 592,
+          "storyboard_number": 20,
+          "reason": "unchanged"
+        },
+        {
+          "storyboard_id": 593,
+          "storyboard_number": 21,
+          "reason": "unchanged"
+        },
+        {
+          "storyboard_id": 594,
+          "storyboard_number": 22,
+          "reason": "unchanged"
+        }
+      ]
+    }
+  },
+  "start": {
+    "started": true,
+    "total": 1,
+    "task_id": 1846,
+    "scope": {
+      "included": [
+        {
+          "storyboard_id": 591,
+          "storyboard_number": 19
+        }
+      ],
+      "excluded": [
+        {
+          "storyboard_id": 573,
+          "storyboard_number": 1,
+          "reason": "unchanged"
+        },
+        {
+          "storyboard_id": 574,
+          "storyboard_number": 2,
+          "reason": "unchanged"
+        },
+        {
+          "storyboard_id": 575,
+          "storyboard_number": 3,
+          "reason": "unchanged"
+        },
+        {
+          "storyboard_id": 576,
+          "storyboard_number": 4,
+          "reason": "unchanged"
+        },
+        {
+          "storyboard_id": 577,
+          "storyboard_number": 5,
+          "reason": "unchanged"
+        },
+        {
+          "storyboard_id": 578,
+          "storyboard_number": 6,
+          "reason": "unchanged"
+        },
+        {
+          "storyboard_id": 579,
+          "storyboard_number": 7,
+          "reason": "unchanged"
+        },
+        {
+          "storyboard_id": 580,
+          "storyboard_number": 8,
+          "reason": "unchanged"
+        },
+        {
+          "storyboard_id": 581,
+          "storyboard_number": 9,
+          "reason": "unchanged"
+        },
+        {
+          "storyboard_id": 582,
+          "storyboard_number": 10,
+          "reason": "unchanged"
+        },
+        {
+          "storyboard_id": 583,
+          "storyboard_number": 11,
+          "reason": "unchanged"
+        },
+        {
+          "storyboard_id": 584,
+          "storyboard_number": 12,
+          "reason": "unchanged"
+        },
+        {
+          "storyboard_id": 585,
+          "storyboard_number": 13,
+          "reason": "unchanged"
+        },
+        {
+          "storyboard_id": 586,
+          "storyboard_number": 14,
+          "reason": "unchanged"
+        },
+        {
+          "storyboard_id": 587,
+          "storyboard_number": 15,
+          "reason": "unchanged"
+        },
+        {
+          "storyboard_id": 588,
+          "storyboard_number": 16,
+          "reason": "unchanged"
+        },
+        {
+          "storyboard_id": 589,
+          "storyboard_number": 17,
+          "reason": "unchanged"
+        },
+        {
+          "storyboard_id": 590,
+          "storyboard_number": 18,
+          "reason": "unchanged"
+        },
+        {
+          "storyboard_id": 592,
+          "storyboard_number": 20,
+          "reason": "unchanged"
+        },
+        {
+          "storyboard_id": 593,
+          "storyboard_number": 21,
+          "reason": "unchanged"
+        },
+        {
+          "storyboard_id": 594,
+          "storyboard_number": 22,
+          "reason": "unchanged"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,96 @@
+{
+  "jobs": [
+    {
+      "scene_id": 111,
+      "response": {
+        "code": 200,
+        "data": {
+          "image_generation_id": 1808,
+          "reference_images": [],
+          "missing_reference_images": []
+        },
+        "message": "success"
+      }
+    },
+    {
+      "scene_id": 112,
+      "response": {
+        "code": 200,
+        "data": {
+          "image_generation_id": 1809,
+          "reference_images": [],
+          "missing_reference_images": []
+        },
+        "message": "success"
+      }
+    },
+    {
+      "scene_id": 113,
+      "response": {
+        "code": 200,
+        "data": {
+          "image_generation_id": 1810,
+          "reference_images": [],
+          "missing_reference_images": []
+        },
+        "message": "success"
+      }
+    },
+    {
+      "scene_id": 114,
+      "response": {
+        "code": 200,
+        "data": {
+          "image_generation_id": 1811,
+          "reference_images": [],
+          "missing_reference_images": []
+        },
+        "message": "success"
+      }
+    },
+    {
+      "scene_id": 115,
+      "response": {
+        "code": 200,
+        "data": {
+          "image_generation_id": 1812,
+          "reference_images": [],
+          "missing_reference_images": []
+        },
+        "message": "success"
+      }
+    },
+    {
+      "scene_id": 116,
+      "response": {
+        "code": 200,
+        "data": {
+          "image_generation_id": 1813,
+          "reference_images": [],
+          "missing_reference_images": []
+        },
+        "message": "success"
+      }
+    },
+    {
+      "scene_id": 122,
+      "response": {
+        "code": 200,
+        "data": {
+          "image_generation_id": 1814,
+          "reference_images": [],
+          "missing_reference_images": []
+        },
+        "message": "success"
+      }
+    }
+  ],
+  "prop": {
+    "code": 200,
+    "data": {
+      "task_id": 1815,
+      "size": "1080x1920"
+    },
+    "message": "success"
+  }
+}

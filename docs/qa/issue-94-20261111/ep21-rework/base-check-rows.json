@@ -1,0 +1,796 @@
+[
+  {
+    "storyboard_id": 573,
+    "storyboard_number": 1,
+    "base_ref": {
+      "kind": "asset",
+      "asset_kind": "scene",
+      "asset_id": 112,
+      "version_task_id": null
+    },
+    "base": {
+      "path": "static/images/ae339244-2c26-414f-9136-0bcb99c08466.png",
+      "width": 544,
+      "height": 960,
+      "source_width": 1088,
+      "source_height": 1920,
+      "filter": {
+        "paper": 0.16,
+        "tint": "sepia",
+        "tint_strength": 0.18,
+        "vignette": 0.28
+      }
+    },
+    "base_check": null,
+    "base_check_satisfied": true,
+    "junction": {
+      "source": "layer_last",
+      "t": 8.5,
+      "path": "static/layer-frames/21-31beb09deaacfa337c0c33dcc8546cf050d4a2e61a79d14ffc3e634ab46d92a9.png",
+      "hash": "31beb09deaacfa337c0c33dcc8546cf050d4a2e61a79d14ffc3e634ab46d92a9",
+      "stale": false,
+      "base_check_reason": null,
+      "segment_fresh": true,
+      "combo": "C"
+    }
+  },
+  {
+    "storyboard_id": 574,
+    "storyboard_number": 2,
+    "base_ref": {
+      "kind": "asset",
+      "asset_kind": "scene",
+      "asset_id": 111,
+      "version_task_id": null
+    },
+    "base": {
+      "path": "static/images/699cd023-ab79-4370-b6e6-3897049728ab.png",
+      "width": 544,
+      "height": 960,
+      "source_width": 1088,
+      "source_height": 1920,
+      "filter": {
+        "paper": 0.16,
+        "tint": "sepia",
+        "tint_strength": 0.18,
+        "vignette": 0.28
+      }
+    },
+    "base_check": null,
+    "base_check_satisfied": true,
+    "junction": {
+      "source": "layer_last",
+      "t": 5,
+      "path": "static/layer-frames/22-248cd78dc56792384a942cb22ab6332d6c885cc768367e4b677e7c6948fcc875.png",
+      "hash": "248cd78dc56792384a942cb22ab6332d6c885cc768367e4b677e7c6948fcc875",
+      "stale": false,
+      "base_check_reason": null,
+      "segment_fresh": true,
+      "combo": "C"
+    }
+  },
+  {
+    "storyboard_id": 575,
+    "storyboard_number": 3,
+    "base_ref": {
+      "kind": "asset",
+      "asset_kind": "scene",
+      "asset_id": 112,
+      "version_task_id": null
+    },
+    "base": {
+      "path": "static/images/ae339244-2c26-414f-9136-0bcb99c08466.png",
+      "width": 544,
+      "height": 960,
+      "source_width": 1088,
+      "source_height": 1920,
+      "filter": {
+        "paper": 0.16,
+        "tint": "sepia",
+        "tint_strength": 0.18,
+        "vignette": 0.28
+      }
+    },
+    "base_check": null,
+    "base_check_satisfied": true,
+    "junction": {
+      "source": "layer_last",
+      "t": 3.5,
+      "path": "static/layer-frames/23-7b8408de432ec2da7b98485cbd6fa4fc8871ee2f5a87fca741e44ef69655b6ba.png",
+      "hash": "7b8408de432ec2da7b98485cbd6fa4fc8871ee2f5a87fca741e44ef69655b6ba",
+      "stale": false,
+      "base_check_reason": null,
+      "segment_fresh": true,
+      "combo": "C"
+    }
+  },
+  {
+    "storyboard_id": 576,
+    "storyboard_number": 4,
+    "base_ref": {
+      "kind": "asset",
+      "asset_kind": "scene",
+      "asset_id": 112,
+      "version_task_id": null
+    },
+    "base": {
+      "path": "static/images/ae339244-2c26-414f-9136-0bcb99c08466.png",
+      "width": 544,
+      "height": 960,
+      "source_width": 1088,
+      "source_height": 1920,
+      "filter": {
+        "paper": 0.16,
+        "tint": "sepia",
+        "tint_strength": 0.18,
+        "vignette": 0.28
+      }
+    },
+    "base_check": null,
+    "base_check_satisfied": true,
+    "junction": {
+      "source": "layer_last",
+      "t": 4.5,
+      "path": "static/layer-frames/24-7b8408de432ec2da7b98485cbd6fa4fc8871ee2f5a87fca741e44ef69655b6ba.png",
+      "hash": "7b8408de432ec2da7b98485cbd6fa4fc8871ee2f5a87fca741e44ef69655b6ba",
+      "stale": false,
+      "base_check_reason": null,
+      "segment_fresh": true,
+      "combo": "C"
+    }
+  },
+  {
+    "storyboard_id": 577,
+    "storyboard_number": 5,
+    "base_ref": {
+      "kind": "asset",
+      "asset_kind": "scene",
+      "asset_id": 113,
+      "version_task_id": null
+    },
+    "base": {
+      "path": "static/images/9a07edd0-1069-4132-acf0-5c0cd08b143e.png",
+      "width": 544,
+      "height": 960,
+      "source_width": 1088,
+      "source_height": 1920,
+      "filter": {
+        "paper": 0.16,
+        "tint": "sepia",
+        "tint_strength": 0.18,
+        "vignette": 0.28
+      }
+    },
+    "base_check": null,
+    "base_check_satisfied": true,
+    "junction": {
+      "source": "layer_last",
+      "t": 5,
+      "path": "static/layer-frames/25-9e201681dda2cfd9a72e7ed4175caef19fc72495cbc9b2d5188611cd0af52b2a.png",
+      "hash": "9e201681dda2cfd9a72e7ed4175caef19fc72495cbc9b2d5188611cd0af52b2a",
+      "stale": false,
+      "base_check_reason": null,
+      "segment_fresh": true,
+      "combo": "C"
+    }
+  },
+  {
+    "storyboard_id": 578,
+    "storyboard_number": 6,
+    "base_ref": {
+      "kind": "asset",
+      "asset_kind": "scene",
+      "asset_id": 112,
+      "version_task_id": null
+    },
+    "base": {
+      "path": "static/images/ae339244-2c26-414f-9136-0bcb99c08466.png",
+      "width": 544,
+      "height": 960,
+      "source_width": 1088,
+      "source_height": 1920,
+      "filter": {
+        "paper": 0.16,
+        "tint": "sepia",
+        "tint_strength": 0.18,
+        "vignette": 0.28
+      }
+    },
+    "base_check": null,
+    "base_check_satisfied": true,
+    "junction": {
+      "source": "layer_last",
+      "t": 3.5,
+      "path": "static/layer-frames/26-7b8408de432ec2da7b98485cbd6fa4fc8871ee2f5a87fca741e44ef69655b6ba.png",
+      "hash": "7b8408de432ec2da7b98485cbd6fa4fc8871ee2f5a87fca741e44ef69655b6ba",
+      "stale": false,
+      "base_check_reason": null,
+      "segment_fresh": true,
+      "combo": "C"
+    }
+  },
+  {
+    "storyboard_id": 579,
+    "storyboard_number": 7,
+    "base_ref": {
+      "kind": "asset",
+      "asset_kind": "scene",
+      "asset_id": 113,
+      "version_task_id": null
+    },
+    "base": {
+      "path": "static/images/9a07edd0-1069-4132-acf0-5c0cd08b143e.png",
+      "width": 544,
+      "height": 960,
+      "source_width": 1088,
+      "source_height": 1920,
+      "filter": {
+        "paper": 0.16,
+        "tint": "sepia",
+        "tint_strength": 0.18,
+        "vignette": 0.28
+      }
+    },
+    "base_check": null,
+    "base_check_satisfied": true,
+    "junction": {
+      "source": "layer_last",
+      "t": 4.5,
+      "path": "static/layer-frames/27-9e201681dda2cfd9a72e7ed4175caef19fc72495cbc9b2d5188611cd0af52b2a.png",
+      "hash": "9e201681dda2cfd9a72e7ed4175caef19fc72495cbc9b2d5188611cd0af52b2a",
+      "stale": false,
+      "base_check_reason": null,
+      "segment_fresh": true,
+      "combo": "C"
+    }
+  },
+  {
+    "storyboard_id": 580,
+    "storyboard_number": 8,
+    "base_ref": {
+      "kind": "asset",
+      "asset_kind": "scene",
+      "asset_id": 112,
+      "version_task_id": null
+    },
+    "base": {
+      "path": "static/images/ae339244-2c26-414f-9136-0bcb99c08466.png",
+      "width": 544,
+      "height": 960,
+      "source_width": 1088,
+      "source_height": 1920,
+      "filter": {
+        "paper": 0.16,
+        "tint": "sepia",
+        "tint_strength": 0.18,
+        "vignette": 0.28
+      }
+    },
+    "base_check": null,
+    "base_check_satisfied": true,
+    "junction": {
+      "source": "layer_last",
+      "t": 3.5,
+      "path": "static/layer-frames/28-31beb09deaacfa337c0c33dcc8546cf050d4a2e61a79d14ffc3e634ab46d92a9.png",
+      "hash": "31beb09deaacfa337c0c33dcc8546cf050d4a2e61a79d14ffc3e634ab46d92a9",
+      "stale": false,
+      "base_check_reason": null,
+      "segment_fresh": true,
+      "combo": "C"
+    }
+  },
+  {
+    "storyboard_id": 581,
+    "storyboard_number": 9,
+    "base_ref": {
+      "kind": "asset",
+      "asset_kind": "scene",
+      "asset_id": 114,
+      "version_task_id": null
+    },
+    "base": {
+      "path": "static/images/a517901d-1279-41ee-b47e-43c65072b493.png",
+      "width": 544,
+      "height": 960,
+      "source_width": 1088,
+      "source_height": 1920,
+      "filter": {
+        "paper": 0.16,
+        "tint": "sepia",
+        "tint_strength": 0.18,
+        "vignette": 0.28
+      }
+    },
+    "base_check": null,
+    "base_check_satisfied": true,
+    "junction": {
+      "source": "layer_last",
+      "t": 5,
+      "path": "static/layer-frames/29-259551d563c3d1010df68ddcec15f5d53b937f878d152aae086c967310c05674.png",
+      "hash": "259551d563c3d1010df68ddcec15f5d53b937f878d152aae086c967310c05674",
+      "stale": false,
+      "base_check_reason": null,
+      "segment_fresh": true,
+      "combo": "C"
+    }
+  },
+  {
+    "storyboard_id": 582,
+    "storyboard_number": 10,
+    "base_ref": {
+      "kind": "asset",
+      "asset_kind": "scene",
+      "asset_id": 114,
+      "version_task_id": null
+    },
+    "base": {
+      "path": "static/images/a517901d-1279-41ee-b47e-43c65072b493.png",
+      "width": 544,
+      "height": 960,
+      "source_width": 1088,
+      "source_height": 1920,
+      "filter": {
+        "paper": 0.16,
+        "tint": "sepia",
+        "tint_strength": 0.18,
+        "vignette": 0.28
+      }
+    },
+    "base_check": null,
+    "base_check_satisfied": true,
+    "junction": {
+      "source": "layer_last",
+      "t": 3.5,
+      "path": "static/layer-frames/30-52569e0bc8fa6d4f65b321b35eacfdc0f85d81dc96d4013efac807fa42cec39a.png",
+      "hash": "52569e0bc8fa6d4f65b321b35eacfdc0f85d81dc96d4013efac807fa42cec39a",
+      "stale": false,
+      "base_check_reason": null,
+      "segment_fresh": true,
+      "combo": "C"
+    }
+  },
+  {
+    "storyboard_id": 583,
+    "storyboard_number": 11,
+    "base_ref": {
+      "kind": "asset",
+      "asset_kind": "scene",
+      "asset_id": 113,
+      "version_task_id": null
+    },
+    "base": {
+      "path": "static/images/9a07edd0-1069-4132-acf0-5c0cd08b143e.png",
+      "width": 544,
+      "height": 960,
+      "source_width": 1088,
+      "source_height": 1920,
+      "filter": {
+        "paper": 0.16,
+        "tint": "sepia",
+        "tint_strength": 0.18,
+        "vignette": 0.28
+      }
+    },
+    "base_check": null,
+    "base_check_satisfied": true,
+    "junction": {
+      "source": "layer_last",
+      "t": 5,
+      "path": "static/layer-frames/31-9e201681dda2cfd9a72e7ed4175caef19fc72495cbc9b2d5188611cd0af52b2a.png",
+      "hash": "9e201681dda2cfd9a72e7ed4175caef19fc72495cbc9b2d5188611cd0af52b2a",
+      "stale": false,
+      "base_check_reason": null,
+      "segment_fresh": true,
+      "combo": "C"
+    }
+  },
+  {
+    "storyboard_id": 584,
+    "storyboard_number": 12,
+    "base_ref": {
+      "kind": "asset",
+      "asset_kind": "scene",
+      "asset_id": 113,
+      "version_task_id": null
+    },
+    "base": {
+      "path": "static/images/9a07edd0-1069-4132-acf0-5c0cd08b143e.png",
+      "width": 544,
+      "height": 960,
+      "source_width": 1088,
+      "source_height": 1920,
+      "filter": {
+        "paper": 0.16,
+        "tint": "sepia",
+        "tint_strength": 0.18,
+        "vignette": 0.28
+      }
+    },
+    "base_check": null,
+    "base_check_satisfied": true,
+    "junction": {
+      "source": "layer_last",
+      "t": 4,
+      "path": "static/layer-frames/32-9e201681dda2cfd9a72e7ed4175caef19fc72495cbc9b2d5188611cd0af52b2a.png",
+      "hash": "9e201681dda2cfd9a72e7ed4175caef19fc72495cbc9b2d5188611cd0af52b2a",
+      "stale": false,
+      "base_check_reason": null,
+      "segment_fresh": true,
+      "combo": "C"
+    }
+  },
+  {
+    "storyboard_id": 585,
+    "storyboard_number": 13,
+    "base_ref": {
+      "kind": "asset",
+      "asset_kind": "scene",
+      "asset_id": 113,
+      "version_task_id": null
+    },
+    "base": {
+      "path": "static/images/9a07edd0-1069-4132-acf0-5c0cd08b143e.png",
+      "width": 544,
+      "height": 960,
+      "source_width": 1088,
+      "source_height": 1920,
+      "filter": {
+        "paper": 0.16,
+        "tint": "sepia",
+        "tint_strength": 0.18,
+        "vignette": 0.28
+      }
+    },
+    "base_check": null,
+    "base_check_satisfied": true,
+    "junction": {
+      "source": "layer_last",
+      "t": 5.5,
+      "path": "static/layer-frames/33-9e201681dda2cfd9a72e7ed4175caef19fc72495cbc9b2d5188611cd0af52b2a.png",
+      "hash": "9e201681dda2cfd9a72e7ed4175caef19fc72495cbc9b2d5188611cd0af52b2a",
+      "stale": false,
+      "base_check_reason": null,
+      "segment_fresh": true,
+      "combo": "C"
+    }
+  },
+  {
+    "storyboard_id": 586,
+    "storyboard_number": 14,
+    "base_ref": {
+      "kind": "asset",
+      "asset_kind": "scene",
+      "asset_id": 115,
+      "version_task_id": null
+    },
+    "base": {
+      "path": "static/images/1e940834-903d-4871-b98f-5278e407d1ec.png",
+      "width": 544,
+      "height": 960,
+      "source_width": 1088,
+      "source_height": 1920,
+      "filter": {
+        "paper": 0.16,
+        "tint": "sepia",
+        "tint_strength": 0.18,
+        "vignette": 0.28
+      }
+    },
+    "base_check": null,
+    "base_check_satisfied": true,
+    "junction": {
+      "source": "layer_first",
+      "t": 0,
+      "path": "static/layer-frames/34-52fc6393e524f568f0fecc3f9abe27bea3fe4bf619037b75005dc2b5977a3ecb.png",
+      "hash": "52fc6393e524f568f0fecc3f9abe27bea3fe4bf619037b75005dc2b5977a3ecb",
+      "stale": false,
+      "base_check_reason": null,
+      "segment_fresh": true,
+      "combo": "D"
+    }
+  },
+  {
+    "storyboard_id": 587,
+    "storyboard_number": 15,
+    "base_ref": {
+      "kind": "asset",
+      "asset_kind": "scene",
+      "asset_id": 115,
+      "version_task_id": null
+    },
+    "base": {
+      "path": "static/images/1e940834-903d-4871-b98f-5278e407d1ec.png",
+      "width": 544,
+      "height": 960,
+      "source_width": 1088,
+      "source_height": 1920,
+      "filter": {
+        "paper": 0.16,
+        "tint": "sepia",
+        "tint_strength": 0.18,
+        "vignette": 0.28
+      }
+    },
+    "base_check": null,
+    "base_check_satisfied": true,
+    "junction": {
+      "source": "layer_last",
+      "t": 5.5,
+      "path": "static/layer-frames/35-bb5e16ef3469e0b923a3b1b4795d9e201f7fdeab782ad3f17c2817674999a2f1.png",
+      "hash": "bb5e16ef3469e0b923a3b1b4795d9e201f7fdeab782ad3f17c2817674999a2f1",
+      "stale": false,
+      "base_check_reason": null,
+      "segment_fresh": true,
+      "combo": "C"
+    }
+  },
+  {
+    "storyboard_id": 588,
+    "storyboard_number": 16,
+    "base_ref": {
+      "kind": "asset",
+      "asset_kind": "scene",
+      "asset_id": 120,
+      "version_task_id": null
+    },
+    "base": {
+      "path": "static/images/5535e5be-5489-4b3e-ae55-51623c1c98e5.png",
+      "width": 544,
+      "height": 960,
+      "source_width": 1920,
+      "source_height": 1088,
+      "filter": {
+        "paper": 0.16,
+        "tint": "sepia",
+        "tint_strength": 0.18,
+        "vignette": 0.28
+      }
+    },
+    "base_check": {
+      "required": true,
+      "signature": "9f426236e5c34e087c06a0f53dcdb44ebfea812071c12a7a6cc404957c07e192",
+      "status": "passed",
+      "problems": [],
+      "notes": "取景画面完整保留了帐篷、火把、石阶与木架等主体，比例与底图一致，上下模糊垫底带衔接自然，无撕裂或重影。",
+      "task_id": 1838,
+      "config_id": 10,
+      "model": "deepseek-chat",
+      "checked_at": "2026-11-11T07:17:09.613Z",
+      "override_reason": null,
+      "error": null
+    },
+    "base_check_satisfied": true,
+    "junction": {
+      "source": "layer_last",
+      "t": 5.5,
+      "path": "static/layer-frames/36-9be396cf30c06815d483dffda399895c96223b1ef2361d33c87a96da3b15edd8.png",
+      "hash": "9be396cf30c06815d483dffda399895c96223b1ef2361d33c87a96da3b15edd8",
+      "stale": false,
+      "base_check_reason": null,
+      "segment_fresh": true,
+      "combo": "C"
+    }
+  },
+  {
+    "storyboard_id": 589,
+    "storyboard_number": 17,
+    "base_ref": {
+      "kind": "asset",
+      "asset_kind": "scene",
+      "asset_id": 112,
+      "version_task_id": null
+    },
+    "base": {
+      "path": "static/images/ae339244-2c26-414f-9136-0bcb99c08466.png",
+      "width": 544,
+      "height": 960,
+      "source_width": 1088,
+      "source_height": 1920,
+      "filter": {
+        "paper": 0.16,
+        "tint": "sepia",
+        "tint_strength": 0.18,
+        "vignette": 0.28
+      }
+    },
+    "base_check": null,
+    "base_check_satisfied": true,
+    "junction": {
+      "source": "layer_last",
+      "t": 4,
+      "path": "static/layer-frames/37-31beb09deaacfa337c0c33dcc8546cf050d4a2e61a79d14ffc3e634ab46d92a9.png",
+      "hash": "31beb09deaacfa337c0c33dcc8546cf050d4a2e61a79d14ffc3e634ab46d92a9",
+      "stale": false,
+      "base_check_reason": null,
+      "segment_fresh": true,
+      "combo": "C"
+    }
+  },
+  {
+    "storyboard_id": 590,
+    "storyboard_number": 18,
+    "base_ref": {
+      "kind": "asset",
+      "asset_kind": "scene",
+      "asset_id": 122,
+      "version_task_id": null
+    },
+    "base": {
+      "path": "static/images/09e4bff3-8939-4b25-86c2-96fc52efd952.png",
+      "width": 544,
+      "height": 960,
+      "source_width": 1088,
+      "source_height": 1920,
+      "filter": {
+        "paper": 0.16,
+        "tint": "sepia",
+        "tint_strength": 0.18,
+        "vignette": 0.28
+      }
+    },
+    "base_check": null,
+    "base_check_satisfied": true,
+    "junction": {
+      "source": "layer_last",
+      "t": 5,
+      "path": "static/layer-frames/38-3e78ca036db329f20300bab9f3d744e0a435b9841d36350dbc3624c17a8b5d51.png",
+      "hash": "3e78ca036db329f20300bab9f3d744e0a435b9841d36350dbc3624c17a8b5d51",
+      "stale": false,
+      "base_check_reason": null,
+      "segment_fresh": true,
+      "combo": "C"
+    }
+  },
+  {
+    "storyboard_id": 591,
+    "storyboard_number": 19,
+    "base_ref": {
+      "kind": "asset",
+      "asset_kind": "prop",
+      "asset_id": 217,
+      "version_task_id": null
+    },
+    "base": {
+      "path": "static/images/8c03d0ac-1fbe-4140-8f83-dcca1ba7e88b.png",
+      "width": 544,
+      "height": 960,
+      "source_width": 1088,
+      "source_height": 1920,
+      "filter": {
+        "paper": 0.16,
+        "tint": "sepia",
+        "tint_strength": 0.18,
+        "vignette": 0.28
+      }
+    },
+    "base_check": {
+      "required": false,
+      "signature": "5d043768626e33643b261b04c3a2801a07925e5d5c0cfdd4f4d1fc5e4029be0f",
+      "status": "passed",
+      "problems": [],
+      "notes": "底图比例与成片一致且无裁切，无需视觉验证",
+      "task_id": null,
+      "config_id": null,
+      "model": null,
+      "checked_at": "2026-11-11T07:18:34.440Z",
+      "override_reason": null,
+      "error": null
+    },
+    "base_check_satisfied": true,
+    "junction": {
+      "source": "layer_last",
+      "t": 6,
+      "path": "static/layer-frames/39-6d16e8903993b1331c40814cb35bc0b93f72212786ad6a69db26efcc2afac528.png",
+      "hash": "6d16e8903993b1331c40814cb35bc0b93f72212786ad6a69db26efcc2afac528",
+      "stale": false,
+      "base_check_reason": null,
+      "segment_fresh": true,
+      "combo": "C"
+    }
+  },
+  {
+    "storyboard_id": 592,
+    "storyboard_number": 20,
+    "base_ref": {
+      "kind": "asset",
+      "asset_kind": "scene",
+      "asset_id": 116,
+      "version_task_id": null
+    },
+    "base": {
+      "path": "static/images/f20f147a-da02-473f-a1ae-5b15287d4c03.png",
+      "width": 544,
+      "height": 960,
+      "source_width": 1088,
+      "source_height": 1920,
+      "filter": {
+        "paper": 0.16,
+        "tint": "sepia",
+        "tint_strength": 0.18,
+        "vignette": 0.28
+      }
+    },
+    "base_check": null,
+    "base_check_satisfied": true,
+    "junction": {
+      "source": "layer_last",
+      "t": 4,
+      "path": "static/layer-frames/40-8b8163e541b8b980dc36d15f3d6af2df79310722721e0a22b9033a9ea76abfbe.png",
+      "hash": "8b8163e541b8b980dc36d15f3d6af2df79310722721e0a22b9033a9ea76abfbe",
+      "stale": false,
+      "base_check_reason": null,
+      "segment_fresh": true,
+      "combo": "C"
+    }
+  },
+  {
+    "storyboard_id": 593,
+    "storyboard_number": 21,
+    "base_ref": {
+      "kind": "asset",
+      "asset_kind": "scene",
+      "asset_id": 115,
+      "version_task_id": null
+    },
+    "base": {
+      "path": "static/images/1e940834-903d-4871-b98f-5278e407d1ec.png",
+      "width": 544,
+      "height": 960,
+      "source_width": 1088,
+      "source_height": 1920,
+      "filter": {
+        "paper": 0.16,
+        "tint": "sepia",
+        "tint_strength": 0.18,
+        "vignette": 0.28
+      }
+    },
+    "base_check": null,
+    "base_check_satisfied": true,
+    "junction": {
+      "source": "layer_last",
+      "t": 5.8,
+      "path": "static/layer-frames/41-bb5e16ef3469e0b923a3b1b4795d9e201f7fdeab782ad3f17c2817674999a2f1.png",
+      "hash": "bb5e16ef3469e0b923a3b1b4795d9e201f7fdeab782ad3f17c2817674999a2f1",
+      "stale": false,
+      "base_check_reason": null,
+      "segment_fresh": true,
+      "combo": "C"
+    }
+  },
+  {
+    "storyboard_id": 594,
+    "storyboard_number": 22,
+    "base_ref": {
+      "kind": "asset",
+      "asset_kind": "scene",
+      "asset_id": 111,
+      "version_task_id": null
+    },
+    "base": {
+      "path": "static/images/699cd023-ab79-4370-b6e6-3897049728ab.png",
+      "width": 544,
+      "height": 960,
+      "source_width": 1088,
+      "source_height": 1920,
+      "filter": {
+        "paper": 0.16,
+        "tint": "sepia",
+        "tint_strength": 0.18,
+        "vignette": 0.28
+      }
+    },
+    "base_check": null,
+    "base_check_satisfied": true,
+    "junction": {
+      "source": "layer_last",
+      "t": 2.2,
+      "path": "static/layer-frames/42-248cd78dc56792384a942cb22ab6332d6c885cc768367e4b677e7c6948fcc875.png",
+      "hash": "248cd78dc56792384a942cb22ab6332d6c885cc768367e4b677e7c6948fcc875",
+      "stale": false,
+      "base_check_reason": null,
+      "segment_fresh": true,
+      "combo": "C"
+    }
+  }
+]

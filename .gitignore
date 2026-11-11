@@ -92,3 +92,7 @@ data/mastra-workflows.db-shm
 # Issue #84 production raw ledgers/media are hash-archived outside the repository.
 # Curated report, proof summary and previews are explicitly versioned.
 /docs/qa/issue-84-1009-20261109T014309Z/*
+
+# Issue #94 ep21 返工：原始媒体副本（生产 static 可重取），只入库报告/拼版/截图
+/docs/qa/issue-94-20261111/ep21-rework/before/
+/docs/qa/issue-94-20261111/ep21-rework/after/

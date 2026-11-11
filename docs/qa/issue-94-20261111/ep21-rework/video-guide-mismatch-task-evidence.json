@@ -1,0 +1,473 @@
+{
+  "batch": {
+    "id": 23,
+    "episode_id": 21,
+    "status": "done",
+    "current_storyboard_id": null,
+    "cancel_requested": false,
+    "created_at": "2026-11-11T09:25:47.117Z",
+    "updated_at": "2026-11-11T10:47:01.096Z",
+    "items": [
+      {
+        "storyboard_id": 573,
+        "storyboard_number": 1,
+        "state": "completed",
+        "task_id": 1922,
+        "error": null
+      },
+      {
+        "storyboard_id": 574,
+        "storyboard_number": 2,
+        "state": "completed",
+        "task_id": 1923,
+        "error": null
+      },
+      {
+        "storyboard_id": 575,
+        "storyboard_number": 3,
+        "state": "completed",
+        "task_id": 1924,
+        "error": null
+      },
+      {
+        "storyboard_id": 576,
+        "storyboard_number": 4,
+        "state": "completed",
+        "task_id": 1925,
+        "error": null
+      },
+      {
+        "storyboard_id": 577,
+        "storyboard_number": 5,
+        "state": "completed",
+        "task_id": 1926,
+        "error": null
+      },
+      {
+        "storyboard_id": 578,
+        "storyboard_number": 6,
+        "state": "completed",
+        "task_id": 1927,
+        "error": null
+      },
+      {
+        "storyboard_id": 579,
+        "storyboard_number": 7,
+        "state": "completed",
+        "task_id": 1928,
+        "error": null
+      },
+      {
+        "storyboard_id": 580,
+        "storyboard_number": 8,
+        "state": "completed",
+        "task_id": 1929,
+        "error": null
+      },
+      {
+        "storyboard_id": 581,
+        "storyboard_number": 9,
+        "state": "completed",
+        "task_id": 1930,
+        "error": null
+      },
+      {
+        "storyboard_id": 582,
+        "storyboard_number": 10,
+        "state": "completed",
+        "task_id": 1931,
+        "error": null
+      },
+      {
+        "storyboard_id": 583,
+        "storyboard_number": 11,
+        "state": "completed",
+        "task_id": 1932,
+        "error": null
+      },
+      {
+        "storyboard_id": 584,
+        "storyboard_number": 12,
+        "state": "completed",
+        "task_id": 1933,
+        "error": null
+      },
+      {
+        "storyboard_id": 585,
+        "storyboard_number": 13,
+        "state": "completed",
+        "task_id": 1934,
+        "error": null
+      },
+      {
+        "storyboard_id": 586,
+        "storyboard_number": 14,
+        "state": "completed",
+        "task_id": 1935,
+        "error": null
+      },
+      {
+        "storyboard_id": 587,
+        "storyboard_number": 15,
+        "state": "completed",
+        "task_id": 1936,
+        "error": null
+      },
+      {
+        "storyboard_id": 588,
+        "storyboard_number": 16,
+        "state": "completed",
+        "task_id": 1937,
+        "error": null
+      },
+      {
+        "storyboard_id": 589,
+        "storyboard_number": 17,
+        "state": "completed",
+        "task_id": 1938,
+        "error": null
+      },
+      {
+        "storyboard_id": 590,
+        "storyboard_number": 18,
+        "state": "completed",
+        "task_id": 1939,
+        "error": null
+      },
+      {
+        "storyboard_id": 591,
+        "storyboard_number": 19,
+        "state": "completed",
+        "task_id": 1940,
+        "error": null
+      },
+      {
+        "storyboard_id": 592,
+        "storyboard_number": 20,
+        "state": "completed",
+        "task_id": 1943,
+        "error": null
+      },
+      {
+        "storyboard_id": 593,
+        "storyboard_number": 21,
+        "state": "completed",
+        "task_id": 1945,
+        "error": null
+      },
+      {
+        "storyboard_id": 594,
+        "storyboard_number": 22,
+        "state": "completed",
+        "task_id": 1946,
+        "error": null
+      }
+    ],
+    "scope": {
+      "included": [
+        {
+          "storyboard_id": 573,
+          "storyboard_number": 1
+        },
+        {
+          "storyboard_id": 574,
+          "storyboard_number": 2
+        },
+        {
+          "storyboard_id": 575,
+          "storyboard_number": 3
+        },
+        {
+          "storyboard_id": 576,
+          "storyboard_number": 4
+        },
+        {
+          "storyboard_id": 577,
+          "storyboard_number": 5
+        },
+        {
+          "storyboard_id": 578,
+          "storyboard_number": 6
+        },
+        {
+          "storyboard_id": 579,
+          "storyboard_number": 7
+        },
+        {
+          "storyboard_id": 580,
+          "storyboard_number": 8
+        },
+        {
+          "storyboard_id": 581,
+          "storyboard_number": 9
+        },
+        {
+          "storyboard_id": 582,
+          "storyboard_number": 10
+        },
+        {
+          "storyboard_id": 583,
+          "storyboard_number": 11
+        },
+        {
+          "storyboard_id": 584,
+          "storyboard_number": 12
+        },
+        {
+          "storyboard_id": 585,
+          "storyboard_number": 13
+        },
+        {
+          "storyboard_id": 586,
+          "storyboard_number": 14
+        },
+        {
+          "storyboard_id": 587,
+          "storyboard_number": 15
+        },
+        {
+          "storyboard_id": 588,
+          "storyboard_number": 16
+        },
+        {
+          "storyboard_id": 589,
+          "storyboard_number": 17
+        },
+        {
+          "storyboard_id": 590,
+          "storyboard_number": 18
+        },
+        {
+          "storyboard_id": 591,
+          "storyboard_number": 19
+        },
+        {
+          "storyboard_id": 592,
+          "storyboard_number": 20
+        },
+        {
+          "storyboard_id": 593,
+          "storyboard_number": 21
+        },
+        {
+          "storyboard_id": 594,
+          "storyboard_number": 22
+        }
+      ],
+      "excluded": []
+    }
+  },
+  "taskByStoryboard": {
+    "573": 1922,
+    "588": 1937,
+    "591": 1940
+  },
+  "tasks": {
+    "573": {
+      "id": 1922,
+      "type": "video",
+      "storyboard_id": 573,
+      "episode_id": 21,
+      "drama_id": 15,
+      "scene_id": null,
+      "character_id": null,
+      "prop_id": null,
+      "provider": "comfyui",
+      "prompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark，\n出场人物：@图片3子婴；场景：@图片2咸阳城门；道具：@图片4皇帝玺、@图片5符节。\n0-3秒：@图片2咸阳城门，切换为微仰的半身构图，门洞内幽深昏暗、门外明亮，厚重的暗褐双扇木门向内敞开贴住门洞内壁，秦式木构件与门枢在两侧清楚可辨；@图片3子婴 立于门洞中段、身体正面朝向画外，双手在胸前并拢抬起，右掌托住 @图片4皇帝玺 的方形玉底、五指扣在玺身两侧边沿，左手轻扶在 @图片4皇帝玺 的螭虎兽钮旁侧，双腿并拢站定、两只黑布履踏在门洞内的石铺地面上，肩背微收，神情凝重、眼睑下垂，目光低垂落在掌中的 @图片4皇帝玺 上；薄尘在斜射的光柱里浮动，门洞外的黄土车辙路面与低矮土坡在画面下方露出亮部。\n3-6秒：@图片2咸阳城门，切到中景平视，@图片3子婴 自门洞中段向前走出两步、走到门外碾实的黄土路面上，身体正面朝向画外方向，右手掌掌握住 @图片4皇帝玺 的方形玺身、拇指扣在玺身边沿，左手掌掌握住 @图片5符节 的节身中段、指腹搭在节圈凸起上，@图片5符节 顶端的红褐绶带自节顶垂落在他腕侧，双手分别持物落在胸腹之间，双腿并拢站定、两只黑布履踏在车辙路面上，脊背挺直流畅、下颌微抬，目光平视画外、神情自持凝重；上午冷白日光自门外斜射过来，门洞内幽暗、门外明亮，光比强烈，薄尘悬在光柱里，门洞两侧夯土城楼墙体与坡上枯黄的草茬在冷白日光下可辨。",
+      "model": "MiniMax-H3-INT8-ComfyUI",
+      "params": {
+        "referenceMode": "reference",
+        "firstFrameUrl": "static/layer-frames/21-31beb09deaacfa337c0c33dcc8546cf050d4a2e61a79d14ffc3e634ab46d92a9.png",
+        "midFrameUrl": "static/images/b5e8a7d8-2af0-42cf-ab17-be12ecb59ac5.png",
+        "midFrameTime": 3,
+        "lastFrameUrl": "static/images/403f9957-6926-49df-9c72-58782c392b58.png",
+        "referenceImageUrls": [
+          "static/layer-frames/21-31beb09deaacfa337c0c33dcc8546cf050d4a2e61a79d14ffc3e634ab46d92a9.png",
+          "static/images/ae339244-2c26-414f-9136-0bcb99c08466.png",
+          "static/images/63ae6cc3-8e9e-4aa2-923b-ea3b9fa125fa.png",
+          "static/images/b392a424-701c-49dc-ae2a-72a7fd65d0a0.png",
+          "static/images/b1e1ba78-c2d6-489b-a6c3-ec37cea6b808.png"
+        ],
+        "generateAudio": 1,
+        "duration": 6,
+        "aspectRatio": "9:16",
+        "resolution": "720p",
+        "config_id": 8,
+        "junction_hash": "31beb09deaacfa337c0c33dcc8546cf050d4a2e61a79d14ffc3e634ab46d92a9",
+        "junction_slot": "first",
+        "sourcePrompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark，\n出场人物：@子婴；场景：@咸阳城门；道具：@皇帝玺、@符节。\n0-3秒：@咸阳城门，切换为微仰的半身构图，门洞内幽深昏暗、门外明亮，厚重的暗褐双扇木门向内敞开贴住门洞内壁，秦式木构件与门枢在两侧清楚可辨；@子婴 立于门洞中段、身体正面朝向画外，双手在胸前并拢抬起，右掌托住 @皇帝玺 的方形玉底、五指扣在玺身两侧边沿，左手轻扶在 @皇帝玺 的螭虎兽钮旁侧，双腿并拢站定、两只黑布履踏在门洞内的石铺地面上，肩背微收，神情凝重、眼睑下垂，目光低垂落在掌中的 @皇帝玺 上；薄尘在斜射的光柱里浮动，门洞外的黄土车辙路面与低矮土坡在画面下方露出亮部。\n3-6秒：@咸阳城门，切到中景平视，@子婴 自门洞中段向前走出两步、走到门外碾实的黄土路面上，身体正面朝向画外方向，右手掌掌握住 @皇帝玺 的方形玺身、拇指扣在玺身边沿，左手掌掌握住 @符节 的节身中段、指腹搭在节圈凸起上，@符节 顶端的红褐绶带自节顶垂落在他腕侧，双手分别持物落在胸腹之间，双腿并拢站定、两只黑布履踏在车辙路面上，脊背挺直流畅、下颌微抬，目光平视画外、神情自持凝重；上午冷白日光自门外斜射过来，门洞内幽暗、门外明亮，光比强烈，薄尘悬在光柱里，门洞两侧夯土城楼墙体与坡上枯黄的草茬在冷白日光下可辨。",
+        "refNameIndex": {
+          "咸阳城门": 2,
+          "子婴": 3,
+          "皇帝玺": 4,
+          "符节": 5
+        }
+      },
+      "task_id": "ab16e294-4498-42e7-a470-98b14ac9091b",
+      "result_url": "http://tianan2.riadev.top:10280/video/view?filename=task1922_00001_.mp4&subfolder=huobao&type=output",
+      "local_path": "static/videos/b3185667-e483-404c-836d-b590d76615ce.mp4",
+      "remote_state": null,
+      "status": "completed",
+      "error_msg": null,
+      "created_at": "2026-11-11T09:25:47.253Z",
+      "updated_at": "2026-11-11T09:29:10.422Z",
+      "completed_at": "2026-11-11T09:29:10.422Z",
+      "generated_at": 1794389350,
+      "created_at_unix": 1794389147,
+      "completed_at_unix": 1794389350,
+      "elapsed_ms": 203169,
+      "cancellable": false,
+      "row_type": "task",
+      "drama_title": "历史上的今天纪录片",
+      "episode_number": 1,
+      "storyboard_number": 1,
+      "target_kind": "storyboard",
+      "target_name": null,
+      "frame_type": null,
+      "observation_summary": null,
+      "kind": null,
+      "progress": null,
+      "reasoning_chars": null,
+      "retry_of": null,
+      "label": "《历史上的今天纪录片》E01-#01 · 视频"
+    },
+    "588": {
+      "id": 1937,
+      "type": "video",
+      "storyboard_id": 588,
+      "episode_id": 21,
+      "drama_id": 15,
+      "scene_id": null,
+      "character_id": null,
+      "prop_id": null,
+      "provider": "comfyui",
+      "prompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark，\n出场人物：@图片3刘邦，以及献礼百姓（灰青与浅灰粗麻短衫、束发无冠、腰缠深褐布带或麻绳）；场景：@图片2咸阳街道；道具：@图片5酒食、@图片4牛羊。\n\n0-3秒：@图片2咸阳街道，上午，斜射日光自画面左上方铺在黄土街面上、右侧民居檐下留在阴影里，细尘在光柱中浮动，暖褐色调；接在图层段之后，切到中近景平视固定机位，笔直黄土街面的中段，@图片3刘邦 立于街心偏右、身体正面朝向画外，右手抬到胸前、掌心向前竖起、五指张开停在半空作推辞之势，左手自然垂在体侧、空着未持物，双腿并拢站定、两只黑皮短靴踏在中央车辙上清晰可见，眉头微敛、视线落在画面左侧递来之物上，神色宽和有威；画面左侧半步之外，一名献礼百姓（灰青粗麻短衫、束发无冠、腰缠深褐布带）双手把 @图片5酒食 捧在胸前向前递出——右掌托住 @图片5酒食 中粗陶双耳酒罐的罐底、左掌托住编织食篮的浅底，罐口覆布与绑扎的麻绳清楚可见、篮口素白麻布一角垂落，双腿并拢站定、两只麻鞋踏在街面浮土里；其身后半步另一名献礼百姓（浅灰粗麻短衫、束发无冠、腰缠麻绳）右手攥着纤维绳牵住 @图片4牛羊，@图片4牛羊 中的小牛与绵羊并排站在街面左侧、头朝向街心，前蹄踏在浮土里、牵绳在他手中绷直，他左手垂在体侧、双腿站定；街道两侧低矮夯土木构民居沿街排布，左侧近景木格门窗与低矮屋檐、右侧近处长条木槽可见，街道向远处收束至尘雾中的宫城剪影，街上无案桌、无仪仗、无旗帜。\n\n3-6.5秒：@图片2咸阳街道，切到中全景平视固定机位并略后拉，笔直黄土街面的中段，@图片3刘邦 立于画面中部偏右、身体正面朝向画外，双手成对垂在体侧、掌心朝向身体、十指自然收拢，两只手都空着不持物，双腿并拢站定、两只黑皮短靴踏在中央车辙路面清晰可见，抬眼平视画外、神色从容宽和、下颌微收；画面左侧半步之外，几名献礼百姓（灰青与浅灰粗麻短衫、束发无冠、腰缠深褐布带或麻绳）仍站在原处、无人上前，其中一人双手在胸前捧着未被接下的 @图片5酒食——右掌托住粗陶双耳酒罐的罐底、左掌托住食篮浅底，罐口覆布与绑扎麻绳清楚可见、篮口素白麻布一角垂落，双腿站定、两只麻鞋着地；另一人右手攥着纤维绳牵住 @图片4牛羊，小牛与绵羊并排站在街面左侧、头朝街心、前蹄踏在浮土里，牵绳在他手中绷直、他左手垂在体侧，其余百姓双手垂在体侧、双腿站定；街心在 @图片3刘邦 与百姓之间空出一步距离，献上来的东西停在原地、没有人接；浮尘在光里缓缓落定，街道两侧低矮夯土木构民居沿街排布，左侧近景木格门窗与低矮屋檐、右侧近处长条木槽可见，街道向远处收束至尘雾中的宫城剪影，画面无士兵、无仪仗、无案桌、无旗帜。",
+      "model": "MiniMax-H3-INT8-ComfyUI",
+      "params": {
+        "referenceMode": "reference",
+        "firstFrameUrl": "static/layer-frames/36-9be396cf30c06815d483dffda399895c96223b1ef2361d33c87a96da3b15edd8.png",
+        "midFrameUrl": "static/images/aeecbe76-77af-4e6b-97d6-63effd589c85.png",
+        "midFrameTime": 3,
+        "lastFrameUrl": "static/images/41349098-a441-48fb-a86b-6bc2cc7e4bf4.png",
+        "referenceImageUrls": [
+          "static/layer-frames/36-9be396cf30c06815d483dffda399895c96223b1ef2361d33c87a96da3b15edd8.png",
+          "static/images/1e940834-903d-4871-b98f-5278e407d1ec.png",
+          "static/images/f10f6661-b720-4206-b6e4-565af728912e.png",
+          "static/images/60a488cf-2223-4c9d-9535-43bbd5e446c2.png",
+          "static/images/1e9a4842-c750-4cd5-9a97-f10c4106b856.png"
+        ],
+        "generateAudio": 1,
+        "duration": 6.5,
+        "aspectRatio": "9:16",
+        "resolution": "720p",
+        "config_id": 8,
+        "junction_hash": "9be396cf30c06815d483dffda399895c96223b1ef2361d33c87a96da3b15edd8",
+        "junction_slot": "first",
+        "sourcePrompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark，\n出场人物：@刘邦，以及献礼百姓（灰青与浅灰粗麻短衫、束发无冠、腰缠深褐布带或麻绳）；场景：@咸阳街道；道具：@酒食、@牛羊。\n\n0-3秒：@咸阳街道，上午，斜射日光自画面左上方铺在黄土街面上、右侧民居檐下留在阴影里，细尘在光柱中浮动，暖褐色调；接在图层段之后，切到中近景平视固定机位，笔直黄土街面的中段，@刘邦 立于街心偏右、身体正面朝向画外，右手抬到胸前、掌心向前竖起、五指张开停在半空作推辞之势，左手自然垂在体侧、空着未持物，双腿并拢站定、两只黑皮短靴踏在中央车辙上清晰可见，眉头微敛、视线落在画面左侧递来之物上，神色宽和有威；画面左侧半步之外，一名献礼百姓（灰青粗麻短衫、束发无冠、腰缠深褐布带）双手把 @酒食 捧在胸前向前递出——右掌托住 @酒食 中粗陶双耳酒罐的罐底、左掌托住编织食篮的浅底，罐口覆布与绑扎的麻绳清楚可见、篮口素白麻布一角垂落，双腿并拢站定、两只麻鞋踏在街面浮土里；其身后半步另一名献礼百姓（浅灰粗麻短衫、束发无冠、腰缠麻绳）右手攥着纤维绳牵住 @牛羊，@牛羊 中的小牛与绵羊并排站在街面左侧、头朝向街心，前蹄踏在浮土里、牵绳在他手中绷直，他左手垂在体侧、双腿站定；街道两侧低矮夯土木构民居沿街排布，左侧近景木格门窗与低矮屋檐、右侧近处长条木槽可见，街道向远处收束至尘雾中的宫城剪影，街上无案桌、无仪仗、无旗帜。\n\n3-6.5秒：@咸阳街道，切到中全景平视固定机位并略后拉，笔直黄土街面的中段，@刘邦 立于画面中部偏右、身体正面朝向画外，双手成对垂在体侧、掌心朝向身体、十指自然收拢，两只手都空着不持物，双腿并拢站定、两只黑皮短靴踏在中央车辙路面清晰可见，抬眼平视画外、神色从容宽和、下颌微收；画面左侧半步之外，几名献礼百姓（灰青与浅灰粗麻短衫、束发无冠、腰缠深褐布带或麻绳）仍站在原处、无人上前，其中一人双手在胸前捧着未被接下的 @酒食——右掌托住粗陶双耳酒罐的罐底、左掌托住食篮浅底，罐口覆布与绑扎麻绳清楚可见、篮口素白麻布一角垂落，双腿站定、两只麻鞋着地；另一人右手攥着纤维绳牵住 @牛羊，小牛与绵羊并排站在街面左侧、头朝街心、前蹄踏在浮土里，牵绳在他手中绷直、他左手垂在体侧，其余百姓双手垂在体侧、双腿站定；街心在 @刘邦 与百姓之间空出一步距离，献上来的东西停在原地、没有人接；浮尘在光里缓缓落定，街道两侧低矮夯土木构民居沿街排布，左侧近景木格门窗与低矮屋檐、右侧近处长条木槽可见，街道向远处收束至尘雾中的宫城剪影，画面无士兵、无仪仗、无案桌、无旗帜。",
+        "refNameIndex": {
+          "咸阳街道": 2,
+          "刘邦": 3,
+          "牛羊": 4,
+          "酒食": 5
+        }
+      },
+      "task_id": "5c9192b8-467f-4a67-b92b-1900f1da2c4b",
+      "result_url": "http://tianan2.riadev.top:10280/video/view?filename=task1937_00001_.mp4&subfolder=huobao&type=output",
+      "local_path": "static/videos/ed6be8d5-0140-4ffd-afe0-7e326db9562e.mp4",
+      "remote_state": null,
+      "status": "completed",
+      "error_msg": null,
+      "created_at": "2026-11-11T10:25:56.223Z",
+      "updated_at": "2026-11-11T10:29:44.137Z",
+      "completed_at": "2026-11-11T10:29:44.137Z",
+      "generated_at": 1794392984,
+      "created_at_unix": 1794392756,
+      "completed_at_unix": 1794392984,
+      "elapsed_ms": 227914,
+      "cancellable": false,
+      "row_type": "task",
+      "drama_title": "历史上的今天纪录片",
+      "episode_number": 1,
+      "storyboard_number": 16,
+      "target_kind": "storyboard",
+      "target_name": null,
+      "frame_type": null,
+      "observation_summary": null,
+      "kind": null,
+      "progress": null,
+      "reasoning_chars": null,
+      "retry_of": null,
+      "label": "《历史上的今天纪录片》E01-#16 · 视频"
+    },
+    "591": {
+      "id": 1940,
+      "type": "video",
+      "storyboard_id": 591,
+      "episode_id": 21,
+      "drama_id": 15,
+      "scene_id": null,
+      "character_id": null,
+      "prop_id": null,
+      "provider": "comfyui",
+      "prompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark，\n出场人物：@图片5项羽、@图片4刘邦，以及无名骑兵（深褐皮甲、束发无冠、无旗）、无名随从（灰褐粗麻短袍、束发无冠、腰缠布带）；场景：@图片2咸阳、@图片3函谷关外至武关道；道具：@图片6佩剑。\n\n0-3秒：接在图层段之后，@图片2咸阳，清晨灰白天光压在城郭上方，尚未起火；切到中景略仰固定机位，画面中部是 @图片2咸阳 的夯土城郭与高台宫室轮廓，墙体层层叠起、檐口积着薄雾；@图片5项羽 立于画面中部偏左的城郭前坡地上、身体正面朝向画外，右手五指按在腰前 @图片6佩剑 的剑柄上、拇指扣住方形剑格，@图片6佩剑 的深褐木鞘挂在革带左侧、鞘尾青铜箍垂向地面，左手自然垂在体侧、空着未持物，双腿并拢站定、两只战靴踏在黄土坡上清晰可见，肩背绷直、下颌微抬、神情冷峻，视线落到画外方向；他身后四五名无名骑兵（深褐皮甲、束发无冠、无旗）牵马停在坡地一侧，各自一手攥缰、一手垂在体侧，双腿站立，队形沿坡线铺开。\n\n3-6.5秒：@图片2咸阳，切到中景略仰平视，城郭轮廓仍在他身后不动，@图片5项羽 抬起右手向前一指，手臂在肩高处伸直、食指朝向画外方向，@图片6佩剑 的剑柄仍挂在革带左侧、鞘口青铜箍反出冷光，左手垂在体侧、空着，双腿并拢站定、两只战靴踏在坡地上可见，下颌抬起、目光凌厉逼人；身后那几名无名骑兵（深褐皮甲、束发无冠、无旗）各自翻身上马、一手握缰一手扶鞍，双腿夹在马腹两侧，马蹄在坡面踏起浮土，画面无旗帜、无兵列。\n\n6.5-9.5秒：硬切到 @图片3函谷关外至武关道，清晨，山脊荒坡紧贴山壁，斜射日光压低枯草、碎石与黄土被照出暖灰调，远山层叠顶在薄雾里；切到中景略仰固定机位，@图片5项羽 与四五名无名骑兵（深褐皮甲、束发无冠、无旗）沿山脊疾进，@图片5项羽 身体正面朝向画外、骑在马上，右手握缰绳停在腰前、拇指压住缰绳结，左手垂在体侧，双腿夹在马腹两侧、战靴踏在马镫上，下颌抬起、神情冷峻；骑兵队形在他身后铺开、马蹄踏起浮土，山脊枯草被风压低。\n\n9.5-12.5秒：@图片3函谷关外至武关道，切到中全景平视固定机位，车辙土路夹在山壁与枯草之间向远处山口延伸，远处关隘门楼轮廓被薄雾削弱；@图片4刘邦 沿车辙土路行进、身体正面朝向画外，右臂垂在体侧、手空着，左臂在身前轻按腰带，双腿向前迈步、两只黑皮短靴踏在土路上清晰可见，抬眼平视；三四名无名随从（灰褐粗麻短袍、束发无冠、腰缠布带）在他身后半步排开、各自手臂垂在体侧、双腿交替迈步，队形沿路成列，画面无旗帜、无车马仪仗。\n\n12.5-13秒：@图片3函谷关外至武关道，机位不变，@图片4刘邦 停步站在车辙土路中段、身体正面朝向画外，右臂垂在体侧、左手在身前轻按腰带，双腿并拢站定、两只黑皮短靴踏在土路上清晰可见，抬眼平视、神色宽和有威；三四名无名随从（灰褐粗麻短袍、束发无冠、腰缠布带）在他身后半步排开站定、手臂垂在体侧、双腿并拢；冷白日光从山口斜照下来，远处关隘轮廓被薄雾削弱，画面无文字、无旗帜。",
+      "model": "MiniMax-H3-INT8-ComfyUI",
+      "params": {
+        "referenceMode": "reference",
+        "firstFrameUrl": "static/layer-frames/39-6d16e8903993b1331c40814cb35bc0b93f72212786ad6a69db26efcc2afac528.png",
+        "midFrameUrl": "static/images/6c796fda-d2dd-4f2c-bd75-5179bf1b2f59.png",
+        "midFrameTime": 3.5,
+        "lastFrameUrl": "static/images/d14491ad-4b21-45b5-a97e-8eb9c326e6d8.png",
+        "referenceImageUrls": [
+          "static/layer-frames/39-6d16e8903993b1331c40814cb35bc0b93f72212786ad6a69db26efcc2afac528.png",
+          "static/images/f20f147a-da02-473f-a1ae-5b15287d4c03.png",
+          "static/images/6dc449f2-12da-40fc-b765-82b3da895a19.png",
+          "static/images/f10f6661-b720-4206-b6e4-565af728912e.png",
+          "static/images/ee2cd87d-ff5d-444f-92bf-ba6a7efaacac.png",
+          "static/images/843613e0-7c4e-4181-8b3a-4430b68d05cf.png"
+        ],
+        "generateAudio": 1,
+        "duration": 7,
+        "aspectRatio": "9:16",
+        "resolution": "720p",
+        "config_id": 8,
+        "junction_hash": "6d16e8903993b1331c40814cb35bc0b93f72212786ad6a69db26efcc2afac528",
+        "junction_slot": "first",
+        "sourcePrompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark，\n出场人物：@项羽、@刘邦，以及无名骑兵（深褐皮甲、束发无冠、无旗）、无名随从（灰褐粗麻短袍、束发无冠、腰缠布带）；场景：@咸阳、@函谷关外至武关道；道具：@佩剑。\n\n0-3秒：接在图层段之后，@咸阳，清晨灰白天光压在城郭上方，尚未起火；切到中景略仰固定机位，画面中部是 @咸阳 的夯土城郭与高台宫室轮廓，墙体层层叠起、檐口积着薄雾；@项羽 立于画面中部偏左的城郭前坡地上、身体正面朝向画外，右手五指按在腰前 @佩剑 的剑柄上、拇指扣住方形剑格，@佩剑 的深褐木鞘挂在革带左侧、鞘尾青铜箍垂向地面，左手自然垂在体侧、空着未持物，双腿并拢站定、两只战靴踏在黄土坡上清晰可见，肩背绷直、下颌微抬、神情冷峻，视线落到画外方向；他身后四五名无名骑兵（深褐皮甲、束发无冠、无旗）牵马停在坡地一侧，各自一手攥缰、一手垂在体侧，双腿站立，队形沿坡线铺开。\n\n3-6.5秒：@咸阳，切到中景略仰平视，城郭轮廓仍在他身后不动，@项羽 抬起右手向前一指，手臂在肩高处伸直、食指朝向画外方向，@佩剑 的剑柄仍挂在革带左侧、鞘口青铜箍反出冷光，左手垂在体侧、空着，双腿并拢站定、两只战靴踏在坡地上可见，下颌抬起、目光凌厉逼人；身后那几名无名骑兵（深褐皮甲、束发无冠、无旗）各自翻身上马、一手握缰一手扶鞍，双腿夹在马腹两侧，马蹄在坡面踏起浮土，画面无旗帜、无兵列。\n\n6.5-9.5秒：硬切到 @函谷关外至武关道，清晨，山脊荒坡紧贴山壁，斜射日光压低枯草、碎石与黄土被照出暖灰调，远山层叠顶在薄雾里；切到中景略仰固定机位，@项羽 与四五名无名骑兵（深褐皮甲、束发无冠、无旗）沿山脊疾进，@项羽 身体正面朝向画外、骑在马上，右手握缰绳停在腰前、拇指压住缰绳结，左手垂在体侧，双腿夹在马腹两侧、战靴踏在马镫上，下颌抬起、神情冷峻；骑兵队形在他身后铺开、马蹄踏起浮土，山脊枯草被风压低。\n\n9.5-12.5秒：@函谷关外至武关道，切到中全景平视固定机位，车辙土路夹在山壁与枯草之间向远处山口延伸，远处关隘门楼轮廓被薄雾削弱；@刘邦 沿车辙土路行进、身体正面朝向画外，右臂垂在体侧、手空着，左臂在身前轻按腰带，双腿向前迈步、两只黑皮短靴踏在土路上清晰可见，抬眼平视；三四名无名随从（灰褐粗麻短袍、束发无冠、腰缠布带）在他身后半步排开、各自手臂垂在体侧、双腿交替迈步，队形沿路成列，画面无旗帜、无车马仪仗。\n\n12.5-13秒：@函谷关外至武关道，机位不变，@刘邦 停步站在车辙土路中段、身体正面朝向画外，右臂垂在体侧、左手在身前轻按腰带，双腿并拢站定、两只黑皮短靴踏在土路上清晰可见，抬眼平视、神色宽和有威；三四名无名随从（灰褐粗麻短袍、束发无冠、腰缠布带）在他身后半步排开站定、手臂垂在体侧、双腿并拢；冷白日光从山口斜照下来，远处关隘轮廓被薄雾削弱，画面无文字、无旗帜。",
+        "refNameIndex": {
+          "咸阳": 2,
+          "函谷关外至武关道": 3,
+          "刘邦": 4,
+          "项羽": 5,
+          "佩剑": 6
+        }
+      },
+      "task_id": "22258396-5667-48e8-bf86-5f9f104337b4",
+      "result_url": "http://tianan2.riadev.top:10280/video/view?filename=task1940_00001_.mp4&subfolder=huobao&type=output",
+      "local_path": "static/videos/934f1cbf-8a62-4119-bc63-7c7ed5a72501.mp4",
+      "remote_state": null,
+      "status": "completed",
+      "error_msg": null,
+      "created_at": "2026-11-11T10:34:54.722Z",
+      "updated_at": "2026-11-11T10:39:29.840Z",
+      "completed_at": "2026-11-11T10:39:29.840Z",
+      "generated_at": 1794393569,
+      "created_at_unix": 1794393294,
+      "completed_at_unix": 1794393569,
+      "elapsed_ms": 275118,
+      "cancellable": false,
+      "row_type": "task",
+      "drama_title": "历史上的今天纪录片",
+      "episode_number": 1,
+      "storyboard_number": 19,
+      "target_kind": "storyboard",
+      "target_name": null,
+      "frame_type": null,
+      "observation_summary": null,
+      "kind": null,
+      "progress": null,
+      "reasoning_chars": null,
+      "retry_of": null,
+      "label": "《历史上的今天纪录片》E01-#19 · 视频"
+    }
+  }
+}

@@ -1,0 +1,5154 @@
+[
+  {
+    "spec": {
+      "width": 544,
+      "height": 960,
+      "fps": 25,
+      "source": "video"
+    },
+    "combo": "C",
+    "design_card_status": "confirmed",
+    "production_unlocked": true,
+    "gate_reason": null,
+    "segment": {
+      "id": 21,
+      "storyboard_id": 573,
+      "layer_doc": {
+        "version": 1,
+        "base": {
+          "path": "static/images/050a7ba7-601d-4865-8f25-5b3d765f90c8.png",
+          "width": 544,
+          "height": 960,
+          "source_width": 1920,
+          "source_height": 1088,
+          "filter": {
+            "paper": 0.16,
+            "tint": "sepia",
+            "tint_strength": 0.18,
+            "vignette": 0.28
+          }
+        },
+        "theme": "archival",
+        "layers": [
+          {
+            "id": "L1",
+            "type": "label",
+            "name": "公元前207年11月14日",
+            "visible": true,
+            "locked": false,
+            "z": 1,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.725,
+              "h": 0.09
+            },
+            "text": "公元前207年11月14日",
+            "style": {
+              "font": "serif",
+              "size": 0.03,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L2",
+            "type": "label",
+            "name": "皇帝",
+            "visible": true,
+            "locked": false,
+            "z": 2,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.22,
+              "w": 0.248,
+              "h": 0.09
+            },
+            "text": "皇帝",
+            "style": {
+              "font": "serif",
+              "size": 0.052,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L3",
+            "type": "label",
+            "name": "只用了十五年（前221 — 前207）",
+            "visible": true,
+            "locked": false,
+            "z": 3,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.88,
+              "h": 0.14
+            },
+            "text": "只用了十五年（前221 — 前207）",
+            "style": {
+              "font": "serif",
+              "size": 0.03,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          }
+        ]
+      },
+      "timeline": {
+        "fps": 25,
+        "ease": "inout",
+        "fade_ms": 250,
+        "keyframes": [
+          {
+            "t": 0,
+            "viewport": {
+              "x": 0,
+              "y": 0,
+              "w": 1,
+              "h": 1
+            },
+            "visible": []
+          },
+          {
+            "t": 0.6,
+            "viewport": {
+              "x": 0.02,
+              "y": 0.0004,
+              "w": 0.96,
+              "h": 0.96
+            },
+            "visible": [
+              "L1"
+            ]
+          },
+          {
+            "t": 2.6,
+            "viewport": {
+              "x": 0.04,
+              "y": 0.0008,
+              "w": 0.92,
+              "h": 0.92
+            },
+            "visible": [
+              "L2"
+            ]
+          },
+          {
+            "t": 5,
+            "viewport": {
+              "x": 0.06,
+              "y": 0.0012,
+              "w": 0.88,
+              "h": 0.88
+            },
+            "visible": [
+              "L3"
+            ]
+          },
+          {
+            "t": 8.5,
+            "viewport": {
+              "x": 0.03,
+              "y": 0.03,
+              "w": 0.94,
+              "h": 0.94
+            },
+            "visible": [
+              "L3"
+            ]
+          }
+        ]
+      },
+      "duration": 8.5,
+      "end_hold": 0,
+      "base_ref": {
+        "kind": "asset",
+        "asset_kind": "scene",
+        "asset_id": 112,
+        "version_task_id": null
+      },
+      "quality_warnings": [
+        {
+          "frame_index": 3,
+          "t": 5,
+          "effective_w": 1690,
+          "effective_h": 957,
+          "output_w": 544,
+          "output_h": 960,
+          "spec_w": 544,
+          "spec_h": 960
+        }
+      ],
+      "render_path": "static/layer-segments/df79de9b-c998-4e7a-bec3-b7d6ffb01a53.mp4",
+      "render_signature": "f3271f0132c4be72ce36b9dba85bd0b04b97e5d939c7b25ebbb575d1bcd4c5de",
+      "rendered_at": "2026-11-11T00:10:46.262Z",
+      "junction_path": "static/layer-frames/21-63bd611f7519536bc862e7232d21f0bf34572b88e791dc09d8da30be5667621f.png",
+      "junction_hash": "63bd611f7519536bc862e7232d21f0bf34572b88e791dc09d8da30be5667621f",
+      "status": "ready",
+      "stale_reasons": [],
+      "base_check": null,
+      "created_at": "2026-11-10T18:39:38.083Z",
+      "updated_at": "2026-11-11T00:10:46.262Z",
+      "fresh": false,
+      "base_check_required": true,
+      "base_check_satisfied": false
+    },
+    "junction": {
+      "source": "layer_last",
+      "t": 8.5,
+      "path": "static/layer-frames/21-63bd611f7519536bc862e7232d21f0bf34572b88e791dc09d8da30be5667621f.png",
+      "hash": "63bd611f7519536bc862e7232d21f0bf34572b88e791dc09d8da30be5667621f",
+      "stale": true,
+      "base_check_reason": "图层底图待视觉验证",
+      "segment_fresh": false,
+      "combo": "C"
+    },
+    "issues": []
+  },
+  {
+    "spec": {
+      "width": 544,
+      "height": 960,
+      "fps": 25,
+      "source": "video"
+    },
+    "combo": "C",
+    "design_card_status": "confirmed",
+    "production_unlocked": true,
+    "gate_reason": null,
+    "segment": {
+      "id": 22,
+      "storyboard_id": 574,
+      "layer_doc": {
+        "version": 1,
+        "base": {
+          "path": "static/images/391d6e28-bd6f-4963-ba4e-3038530eb451.png",
+          "width": 544,
+          "height": 960,
+          "source_width": 1920,
+          "source_height": 1088,
+          "filter": {
+            "paper": 0.16,
+            "tint": "sepia",
+            "tint_strength": 0.18,
+            "vignette": 0.28
+          }
+        },
+        "theme": "archival",
+        "layers": [
+          {
+            "id": "L1",
+            "type": "label",
+            "name": "汉元年十月 · 霸上",
+            "visible": true,
+            "locked": false,
+            "z": 1,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.68,
+              "h": 0.09
+            },
+            "text": "汉元年十月 · 霸上",
+            "style": {
+              "font": "serif",
+              "size": 0.036,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L2",
+            "type": "label",
+            "name": "咸阳城外",
+            "visible": true,
+            "locked": false,
+            "z": 2,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.22,
+              "w": 0.431,
+              "h": 0.09
+            },
+            "text": "咸阳城外",
+            "style": {
+              "font": "serif",
+              "size": 0.052,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L3",
+            "type": "label",
+            "name": "楚",
+            "visible": true,
+            "locked": false,
+            "z": 3,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.22,
+              "w": 0.156,
+              "h": 0.09
+            },
+            "text": "楚",
+            "style": {
+              "font": "serif",
+              "size": 0.052,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          }
+        ]
+      },
+      "timeline": {
+        "fps": 25,
+        "ease": "inout",
+        "fade_ms": 250,
+        "keyframes": [
+          {
+            "t": 0,
+            "viewport": {
+              "x": 0,
+              "y": 0,
+              "w": 1,
+              "h": 1
+            },
+            "visible": []
+          },
+          {
+            "t": 0.5,
+            "viewport": {
+              "x": 0.02,
+              "y": 0.0004,
+              "w": 0.96,
+              "h": 0.96
+            },
+            "visible": [
+              "L1"
+            ]
+          },
+          {
+            "t": 2.2,
+            "viewport": {
+              "x": 0.04,
+              "y": 0.0008,
+              "w": 0.92,
+              "h": 0.92
+            },
+            "visible": [
+              "L2"
+            ]
+          },
+          {
+            "t": 3.2,
+            "viewport": {
+              "x": 0.06,
+              "y": 0.0012,
+              "w": 0.88,
+              "h": 0.88
+            },
+            "visible": [
+              "L3"
+            ]
+          },
+          {
+            "t": 5,
+            "viewport": {
+              "x": 0.03,
+              "y": 0.03,
+              "w": 0.94,
+              "h": 0.94
+            },
+            "visible": [
+              "L3"
+            ]
+          }
+        ]
+      },
+      "duration": 5,
+      "end_hold": 0,
+      "base_ref": {
+        "kind": "asset",
+        "asset_kind": "scene",
+        "asset_id": 111,
+        "version_task_id": null
+      },
+      "quality_warnings": [
+        {
+          "frame_index": 3,
+          "t": 3.2,
+          "effective_w": 1690,
+          "effective_h": 957,
+          "output_w": 544,
+          "output_h": 960,
+          "spec_w": 544,
+          "spec_h": 960
+        }
+      ],
+      "render_path": "static/layer-segments/104df72a-1050-4c09-a681-3b15485dc81c.mp4",
+      "render_signature": "e4b35cfdbc0442374d676ddd8aecfa4812887f383022e6d190b20f4f31462c2b",
+      "rendered_at": "2026-11-11T00:10:49.517Z",
+      "junction_path": "static/layer-frames/22-f837da6759bc0a7c4bd548ce5f6b2615f05be7911d3db02cd78698b625667d1c.png",
+      "junction_hash": "f837da6759bc0a7c4bd548ce5f6b2615f05be7911d3db02cd78698b625667d1c",
+      "status": "ready",
+      "stale_reasons": [],
+      "base_check": null,
+      "created_at": "2026-11-10T18:48:22.562Z",
+      "updated_at": "2026-11-11T00:10:49.517Z",
+      "fresh": false,
+      "base_check_required": true,
+      "base_check_satisfied": false
+    },
+    "junction": {
+      "source": "layer_last",
+      "t": 5,
+      "path": "static/layer-frames/22-f837da6759bc0a7c4bd548ce5f6b2615f05be7911d3db02cd78698b625667d1c.png",
+      "hash": "f837da6759bc0a7c4bd548ce5f6b2615f05be7911d3db02cd78698b625667d1c",
+      "stale": true,
+      "base_check_reason": "图层底图待视觉验证",
+      "segment_fresh": false,
+      "combo": "C"
+    },
+    "issues": []
+  },
+  {
+    "spec": {
+      "width": 544,
+      "height": 960,
+      "fps": 25,
+      "source": "video"
+    },
+    "combo": "C",
+    "design_card_status": "confirmed",
+    "production_unlocked": true,
+    "gate_reason": null,
+    "segment": {
+      "id": 23,
+      "storyboard_id": 575,
+      "layer_doc": {
+        "version": 1,
+        "base": {
+          "path": "static/images/050a7ba7-601d-4865-8f25-5b3d765f90c8.png",
+          "width": 544,
+          "height": 960,
+          "source_width": 1920,
+          "source_height": 1088,
+          "filter": {
+            "paper": 0.16,
+            "tint": "sepia",
+            "tint_strength": 0.18,
+            "vignette": 0.28
+          }
+        },
+        "theme": "archival",
+        "layers": [
+          {
+            "id": "L1",
+            "type": "label",
+            "name": "他只带了三样东西",
+            "visible": true,
+            "locked": false,
+            "z": 1,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.553,
+              "h": 0.09
+            },
+            "text": "他只带了三样东西",
+            "style": {
+              "font": "serif",
+              "size": 0.036,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L2",
+            "type": "label",
+            "name": "三样",
+            "visible": true,
+            "locked": false,
+            "z": 2,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.22,
+              "w": 0.248,
+              "h": 0.09
+            },
+            "text": "三样",
+            "style": {
+              "font": "serif",
+              "size": 0.052,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          }
+        ]
+      },
+      "timeline": {
+        "fps": 25,
+        "ease": "inout",
+        "fade_ms": 250,
+        "keyframes": [
+          {
+            "t": 0,
+            "viewport": {
+              "x": 0,
+              "y": 0,
+              "w": 1,
+              "h": 1
+            },
+            "visible": []
+          },
+          {
+            "t": 1.2,
+            "viewport": {
+              "x": 0.02,
+              "y": 0.0004,
+              "w": 0.96,
+              "h": 0.96
+            },
+            "visible": [
+              "L1"
+            ]
+          },
+          {
+            "t": 2.4,
+            "viewport": {
+              "x": 0.04,
+              "y": 0.0008,
+              "w": 0.92,
+              "h": 0.92
+            },
+            "visible": [
+              "L2"
+            ]
+          },
+          {
+            "t": 3.5,
+            "viewport": {
+              "x": 0.03,
+              "y": 0.03,
+              "w": 0.94,
+              "h": 0.94
+            },
+            "visible": [
+              "L2"
+            ]
+          }
+        ]
+      },
+      "duration": 3.5,
+      "end_hold": 0,
+      "base_ref": {
+        "kind": "asset",
+        "asset_kind": "scene",
+        "asset_id": 112,
+        "version_task_id": null
+      },
+      "quality_warnings": [],
+      "render_path": "static/layer-segments/0556e9c2-fdfa-478e-8a94-02d748ae91f1.mp4",
+      "render_signature": "1a7133ba17da2fa3ec846c97307406615998f7f286b3541bf1c915175cae8961",
+      "rendered_at": "2026-11-11T00:10:52.314Z",
+      "junction_path": "static/layer-frames/23-2520cfc5c13242d757fb2bf302ed0c52b90494f8dbe92cf814b1417260297014.png",
+      "junction_hash": "2520cfc5c13242d757fb2bf302ed0c52b90494f8dbe92cf814b1417260297014",
+      "status": "ready",
+      "stale_reasons": [],
+      "base_check": null,
+      "created_at": "2026-11-10T18:48:25.645Z",
+      "updated_at": "2026-11-11T00:10:52.314Z",
+      "fresh": false,
+      "base_check_required": true,
+      "base_check_satisfied": false
+    },
+    "junction": {
+      "source": "layer_last",
+      "t": 3.5,
+      "path": "static/layer-frames/23-2520cfc5c13242d757fb2bf302ed0c52b90494f8dbe92cf814b1417260297014.png",
+      "hash": "2520cfc5c13242d757fb2bf302ed0c52b90494f8dbe92cf814b1417260297014",
+      "stale": true,
+      "base_check_reason": "图层底图待视觉验证",
+      "segment_fresh": false,
+      "combo": "C"
+    },
+    "issues": []
+  },
+  {
+    "spec": {
+      "width": 544,
+      "height": 960,
+      "fps": 25,
+      "source": "video"
+    },
+    "combo": "C",
+    "design_card_status": "confirmed",
+    "production_unlocked": true,
+    "gate_reason": null,
+    "segment": {
+      "id": 24,
+      "storyboard_id": 576,
+      "layer_doc": {
+        "version": 1,
+        "base": {
+          "path": "static/images/050a7ba7-601d-4865-8f25-5b3d765f90c8.png",
+          "width": 544,
+          "height": 960,
+          "source_width": 1920,
+          "source_height": 1088,
+          "filter": {
+            "paper": 0.16,
+            "tint": "sepia",
+            "tint_strength": 0.18,
+            "vignette": 0.28
+          }
+        },
+        "theme": "archival",
+        "layers": [
+          {
+            "id": "L1",
+            "type": "label",
+            "name": "第一样 · 白车白马",
+            "visible": true,
+            "locked": false,
+            "z": 1,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.68,
+              "h": 0.09
+            },
+            "text": "第一样 · 白车白马",
+            "style": {
+              "font": "serif",
+              "size": 0.036,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L2",
+            "type": "label",
+            "name": "白色不是颜色，是丧礼",
+            "visible": true,
+            "locked": false,
+            "z": 2,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.68,
+              "h": 0.09
+            },
+            "text": "白色不是颜色，是丧礼",
+            "style": {
+              "font": "serif",
+              "size": 0.036,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          }
+        ]
+      },
+      "timeline": {
+        "fps": 25,
+        "ease": "inout",
+        "fade_ms": 250,
+        "keyframes": [
+          {
+            "t": 0,
+            "viewport": {
+              "x": 0,
+              "y": 0,
+              "w": 1,
+              "h": 1
+            },
+            "visible": []
+          },
+          {
+            "t": 0.5,
+            "viewport": {
+              "x": 0.02,
+              "y": 0.0004,
+              "w": 0.96,
+              "h": 0.96
+            },
+            "visible": [
+              "L1"
+            ]
+          },
+          {
+            "t": 2.4,
+            "viewport": {
+              "x": 0.04,
+              "y": 0.0008,
+              "w": 0.92,
+              "h": 0.92
+            },
+            "visible": [
+              "L2"
+            ]
+          },
+          {
+            "t": 4.5,
+            "viewport": {
+              "x": 0.03,
+              "y": 0.03,
+              "w": 0.94,
+              "h": 0.94
+            },
+            "visible": [
+              "L2"
+            ]
+          }
+        ]
+      },
+      "duration": 4.5,
+      "end_hold": 0,
+      "base_ref": {
+        "kind": "asset",
+        "asset_kind": "scene",
+        "asset_id": 112,
+        "version_task_id": null
+      },
+      "quality_warnings": [],
+      "render_path": "static/layer-segments/765abe83-23ba-4c18-aec1-fdcfe0994674.mp4",
+      "render_signature": "10488c403e45a69491c6d0dc1b32313a6598ed1876ec8abc8553f244d0fc62b3",
+      "rendered_at": "2026-11-11T00:10:55.449Z",
+      "junction_path": "static/layer-frames/24-2520cfc5c13242d757fb2bf302ed0c52b90494f8dbe92cf814b1417260297014.png",
+      "junction_hash": "2520cfc5c13242d757fb2bf302ed0c52b90494f8dbe92cf814b1417260297014",
+      "status": "ready",
+      "stale_reasons": [],
+      "base_check": null,
+      "created_at": "2026-11-10T18:48:28.085Z",
+      "updated_at": "2026-11-11T00:10:55.449Z",
+      "fresh": false,
+      "base_check_required": true,
+      "base_check_satisfied": false
+    },
+    "junction": {
+      "source": "layer_last",
+      "t": 4.5,
+      "path": "static/layer-frames/24-2520cfc5c13242d757fb2bf302ed0c52b90494f8dbe92cf814b1417260297014.png",
+      "hash": "2520cfc5c13242d757fb2bf302ed0c52b90494f8dbe92cf814b1417260297014",
+      "stale": true,
+      "base_check_reason": "图层底图待视觉验证",
+      "segment_fresh": false,
+      "combo": "C"
+    },
+    "issues": []
+  },
+  {
+    "spec": {
+      "width": 544,
+      "height": 960,
+      "fps": 25,
+      "source": "video"
+    },
+    "combo": "C",
+    "design_card_status": "confirmed",
+    "production_unlocked": true,
+    "gate_reason": null,
+    "segment": {
+      "id": 25,
+      "storyboard_id": 577,
+      "layer_doc": {
+        "version": 1,
+        "base": {
+          "path": "static/images/0b148c9f-0008-482a-b4a8-4331a16288dc.png",
+          "width": 544,
+          "height": 960,
+          "source_width": 1920,
+          "source_height": 1088,
+          "filter": {
+            "paper": 0.16,
+            "tint": "sepia",
+            "tint_strength": 0.18,
+            "vignette": 0.28
+          }
+        },
+        "theme": "archival",
+        "layers": [
+          {
+            "id": "L1",
+            "type": "label",
+            "name": "第二样 · 系颈以组",
+            "visible": true,
+            "locked": false,
+            "z": 1,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.68,
+              "h": 0.09
+            },
+            "text": "第二样 · 系颈以组",
+            "style": {
+              "font": "serif",
+              "size": 0.036,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L2",
+            "type": "label",
+            "name": "《史记》只留下四个字",
+            "visible": true,
+            "locked": false,
+            "z": 2,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.68,
+              "h": 0.09
+            },
+            "text": "《史记》只留下四个字",
+            "style": {
+              "font": "serif",
+              "size": 0.036,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L3",
+            "type": "label",
+            "name": "系颈以组",
+            "visible": true,
+            "locked": false,
+            "z": 3,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.22,
+              "w": 0.431,
+              "h": 0.09
+            },
+            "text": "系颈以组",
+            "style": {
+              "font": "serif",
+              "size": 0.052,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          }
+        ]
+      },
+      "timeline": {
+        "fps": 25,
+        "ease": "inout",
+        "fade_ms": 250,
+        "keyframes": [
+          {
+            "t": 0,
+            "viewport": {
+              "x": 0,
+              "y": 0,
+              "w": 1,
+              "h": 1
+            },
+            "visible": []
+          },
+          {
+            "t": 0.5,
+            "viewport": {
+              "x": 0.02,
+              "y": 0.0004,
+              "w": 0.96,
+              "h": 0.96
+            },
+            "visible": [
+              "L1"
+            ]
+          },
+          {
+            "t": 2.4,
+            "viewport": {
+              "x": 0.04,
+              "y": 0.0008,
+              "w": 0.92,
+              "h": 0.92
+            },
+            "visible": [
+              "L2"
+            ]
+          },
+          {
+            "t": 4,
+            "viewport": {
+              "x": 0.06,
+              "y": 0.0012,
+              "w": 0.88,
+              "h": 0.88
+            },
+            "visible": [
+              "L3"
+            ]
+          },
+          {
+            "t": 5,
+            "viewport": {
+              "x": 0.03,
+              "y": 0.03,
+              "w": 0.94,
+              "h": 0.94
+            },
+            "visible": [
+              "L3"
+            ]
+          }
+        ]
+      },
+      "duration": 5,
+      "end_hold": 0,
+      "base_ref": {
+        "kind": "asset",
+        "asset_kind": "scene",
+        "asset_id": 113,
+        "version_task_id": null
+      },
+      "quality_warnings": [
+        {
+          "frame_index": 3,
+          "t": 4,
+          "effective_w": 1690,
+          "effective_h": 957,
+          "output_w": 544,
+          "output_h": 960,
+          "spec_w": 544,
+          "spec_h": 960
+        }
+      ],
+      "render_path": "static/layer-segments/4711786d-0039-4a9e-8b1e-5e711fcad275.mp4",
+      "render_signature": "ba0ce51709ba83c63501e07a411bc2c532adbc7fc60dd5dcc78ed422d4783d7a",
+      "rendered_at": "2026-11-11T00:10:58.857Z",
+      "junction_path": "static/layer-frames/25-cae7a24e7283819e385bc55eb23a1e15d39727c604597ec19959e3fdc2889065.png",
+      "junction_hash": "cae7a24e7283819e385bc55eb23a1e15d39727c604597ec19959e3fdc2889065",
+      "status": "ready",
+      "stale_reasons": [],
+      "base_check": null,
+      "created_at": "2026-11-10T18:48:30.679Z",
+      "updated_at": "2026-11-11T00:10:58.857Z",
+      "fresh": false,
+      "base_check_required": true,
+      "base_check_satisfied": false
+    },
+    "junction": {
+      "source": "layer_last",
+      "t": 5,
+      "path": "static/layer-frames/25-cae7a24e7283819e385bc55eb23a1e15d39727c604597ec19959e3fdc2889065.png",
+      "hash": "cae7a24e7283819e385bc55eb23a1e15d39727c604597ec19959e3fdc2889065",
+      "stale": true,
+      "base_check_reason": "图层底图待视觉验证",
+      "segment_fresh": false,
+      "combo": "C"
+    },
+    "issues": []
+  },
+  {
+    "spec": {
+      "width": 544,
+      "height": 960,
+      "fps": 25,
+      "source": "video"
+    },
+    "combo": "C",
+    "design_card_status": "confirmed",
+    "production_unlocked": true,
+    "gate_reason": null,
+    "segment": {
+      "id": 26,
+      "storyboard_id": 578,
+      "layer_doc": {
+        "version": 1,
+        "base": {
+          "path": "static/images/050a7ba7-601d-4865-8f25-5b3d765f90c8.png",
+          "width": 544,
+          "height": 960,
+          "source_width": 1920,
+          "source_height": 1088,
+          "filter": {
+            "paper": 0.16,
+            "tint": "sepia",
+            "tint_strength": 0.18,
+            "vignette": 0.28
+          }
+        },
+        "theme": "archival",
+        "layers": [
+          {
+            "id": "L1",
+            "type": "label",
+            "name": "把绳子先系好了",
+            "visible": true,
+            "locked": false,
+            "z": 1,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.489,
+              "h": 0.09
+            },
+            "text": "把绳子先系好了",
+            "style": {
+              "font": "serif",
+              "size": 0.036,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L2",
+            "type": "label",
+            "name": "替对方省下了绑他的那道手续",
+            "visible": true,
+            "locked": false,
+            "z": 2,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.725,
+              "h": 0.09
+            },
+            "text": "替对方省下了绑他的那道手续",
+            "style": {
+              "font": "serif",
+              "size": 0.03,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          }
+        ]
+      },
+      "timeline": {
+        "fps": 25,
+        "ease": "inout",
+        "fade_ms": 250,
+        "keyframes": [
+          {
+            "t": 0,
+            "viewport": {
+              "x": 0,
+              "y": 0,
+              "w": 1,
+              "h": 1
+            },
+            "visible": []
+          },
+          {
+            "t": 0.6,
+            "viewport": {
+              "x": 0.02,
+              "y": 0.0004,
+              "w": 0.96,
+              "h": 0.96
+            },
+            "visible": [
+              "L1"
+            ]
+          },
+          {
+            "t": 2,
+            "viewport": {
+              "x": 0.04,
+              "y": 0.0008,
+              "w": 0.92,
+              "h": 0.92
+            },
+            "visible": [
+              "L2"
+            ]
+          },
+          {
+            "t": 3.5,
+            "viewport": {
+              "x": 0.03,
+              "y": 0.03,
+              "w": 0.94,
+              "h": 0.94
+            },
+            "visible": [
+              "L2"
+            ]
+          }
+        ]
+      },
+      "duration": 3.5,
+      "end_hold": 0,
+      "base_ref": {
+        "kind": "asset",
+        "asset_kind": "scene",
+        "asset_id": 112,
+        "version_task_id": null
+      },
+      "quality_warnings": [],
+      "render_path": "static/layer-segments/bffc715f-6467-40cd-b00d-1972610ee77a.mp4",
+      "render_signature": "30afc80caec33d825c1aaaa34fbe022f8b108a86a36b70e7e319090bcbe95f26",
+      "rendered_at": "2026-11-11T00:11:01.699Z",
+      "junction_path": "static/layer-frames/26-2520cfc5c13242d757fb2bf302ed0c52b90494f8dbe92cf814b1417260297014.png",
+      "junction_hash": "2520cfc5c13242d757fb2bf302ed0c52b90494f8dbe92cf814b1417260297014",
+      "status": "ready",
+      "stale_reasons": [],
+      "base_check": null,
+      "created_at": "2026-11-10T18:48:33.006Z",
+      "updated_at": "2026-11-11T00:11:01.699Z",
+      "fresh": false,
+      "base_check_required": true,
+      "base_check_satisfied": false
+    },
+    "junction": {
+      "source": "layer_last",
+      "t": 3.5,
+      "path": "static/layer-frames/26-2520cfc5c13242d757fb2bf302ed0c52b90494f8dbe92cf814b1417260297014.png",
+      "hash": "2520cfc5c13242d757fb2bf302ed0c52b90494f8dbe92cf814b1417260297014",
+      "stale": true,
+      "base_check_reason": "图层底图待视觉验证",
+      "segment_fresh": false,
+      "combo": "C"
+    },
+    "issues": []
+  },
+  {
+    "spec": {
+      "width": 544,
+      "height": 960,
+      "fps": 25,
+      "source": "video"
+    },
+    "combo": "C",
+    "design_card_status": "confirmed",
+    "production_unlocked": true,
+    "gate_reason": null,
+    "segment": {
+      "id": 27,
+      "storyboard_id": 579,
+      "layer_doc": {
+        "version": 1,
+        "base": {
+          "path": "static/images/0b148c9f-0008-482a-b4a8-4331a16288dc.png",
+          "width": 544,
+          "height": 960,
+          "source_width": 1920,
+          "source_height": 1088,
+          "filter": {
+            "paper": 0.16,
+            "tint": "sepia",
+            "tint_strength": 0.18,
+            "vignette": 0.28
+          }
+        },
+        "theme": "archival",
+        "layers": [
+          {
+            "id": "L1",
+            "type": "label",
+            "name": "第三样 · 皇帝玺与符节",
+            "visible": true,
+            "locked": false,
+            "z": 1,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.807,
+              "h": 0.09
+            },
+            "text": "第三样 · 皇帝玺与符节",
+            "style": {
+              "font": "serif",
+              "size": 0.036,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L2",
+            "type": "label",
+            "name": "玺与节",
+            "visible": true,
+            "locked": false,
+            "z": 2,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.22,
+              "w": 0.34,
+              "h": 0.09
+            },
+            "text": "玺与节",
+            "style": {
+              "font": "serif",
+              "size": 0.052,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L3",
+            "type": "label",
+            "name": "权力的实物凭证",
+            "visible": true,
+            "locked": false,
+            "z": 3,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.489,
+              "h": 0.09
+            },
+            "text": "权力的实物凭证",
+            "style": {
+              "font": "serif",
+              "size": 0.036,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          }
+        ]
+      },
+      "timeline": {
+        "fps": 25,
+        "ease": "inout",
+        "fade_ms": 250,
+        "keyframes": [
+          {
+            "t": 0,
+            "viewport": {
+              "x": 0,
+              "y": 0,
+              "w": 1,
+              "h": 1
+            },
+            "visible": []
+          },
+          {
+            "t": 0.5,
+            "viewport": {
+              "x": 0.02,
+              "y": 0.0004,
+              "w": 0.96,
+              "h": 0.96
+            },
+            "visible": [
+              "L1"
+            ]
+          },
+          {
+            "t": 2.2,
+            "viewport": {
+              "x": 0.04,
+              "y": 0.0008,
+              "w": 0.92,
+              "h": 0.92
+            },
+            "visible": [
+              "L2"
+            ]
+          },
+          {
+            "t": 3.6,
+            "viewport": {
+              "x": 0.06,
+              "y": 0.0012,
+              "w": 0.88,
+              "h": 0.88
+            },
+            "visible": [
+              "L3"
+            ]
+          },
+          {
+            "t": 4.5,
+            "viewport": {
+              "x": 0.03,
+              "y": 0.03,
+              "w": 0.94,
+              "h": 0.94
+            },
+            "visible": [
+              "L3"
+            ]
+          }
+        ]
+      },
+      "duration": 4.5,
+      "end_hold": 0,
+      "base_ref": {
+        "kind": "asset",
+        "asset_kind": "scene",
+        "asset_id": 113,
+        "version_task_id": null
+      },
+      "quality_warnings": [
+        {
+          "frame_index": 3,
+          "t": 3.6,
+          "effective_w": 1690,
+          "effective_h": 957,
+          "output_w": 544,
+          "output_h": 960,
+          "spec_w": 544,
+          "spec_h": 960
+        }
+      ],
+      "render_path": "static/layer-segments/c7dd6074-f7c3-463b-a36f-8cc17f639e59.mp4",
+      "render_signature": "6bbfc1191014957f688b0070d0b201386fc0b5825097db5cc225bc78e8f5d234",
+      "rendered_at": "2026-11-11T00:11:04.985Z",
+      "junction_path": "static/layer-frames/27-cae7a24e7283819e385bc55eb23a1e15d39727c604597ec19959e3fdc2889065.png",
+      "junction_hash": "cae7a24e7283819e385bc55eb23a1e15d39727c604597ec19959e3fdc2889065",
+      "status": "ready",
+      "stale_reasons": [],
+      "base_check": null,
+      "created_at": "2026-11-10T18:48:35.285Z",
+      "updated_at": "2026-11-11T00:11:04.985Z",
+      "fresh": false,
+      "base_check_required": true,
+      "base_check_satisfied": false
+    },
+    "junction": {
+      "source": "layer_last",
+      "t": 4.5,
+      "path": "static/layer-frames/27-cae7a24e7283819e385bc55eb23a1e15d39727c604597ec19959e3fdc2889065.png",
+      "hash": "cae7a24e7283819e385bc55eb23a1e15d39727c604597ec19959e3fdc2889065",
+      "stale": true,
+      "base_check_reason": "图层底图待视觉验证",
+      "segment_fresh": false,
+      "combo": "C"
+    },
+    "issues": []
+  },
+  {
+    "spec": {
+      "width": 544,
+      "height": 960,
+      "fps": 25,
+      "source": "video"
+    },
+    "combo": "C",
+    "design_card_status": "confirmed",
+    "production_unlocked": true,
+    "gate_reason": null,
+    "segment": {
+      "id": 28,
+      "storyboard_id": 580,
+      "layer_doc": {
+        "version": 1,
+        "base": {
+          "path": "static/images/050a7ba7-601d-4865-8f25-5b3d765f90c8.png",
+          "width": 544,
+          "height": 960,
+          "source_width": 1920,
+          "source_height": 1088,
+          "filter": {
+            "paper": 0.16,
+            "tint": "sepia",
+            "tint_strength": 0.18,
+            "vignette": 0.28
+          }
+        },
+        "theme": "archival",
+        "layers": [
+          {
+            "id": "L1",
+            "type": "label",
+            "name": "他叫子婴",
+            "visible": true,
+            "locked": false,
+            "z": 1,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.22,
+              "w": 0.431,
+              "h": 0.09
+            },
+            "text": "他叫子婴",
+            "style": {
+              "font": "serif",
+              "size": 0.052,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L2",
+            "type": "label",
+            "name": "秦王",
+            "visible": true,
+            "locked": false,
+            "z": 2,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.22,
+              "w": 0.248,
+              "h": 0.09
+            },
+            "text": "秦王",
+            "style": {
+              "font": "serif",
+              "size": 0.052,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L3",
+            "type": "label",
+            "name": "他没当过皇帝　史书叫他秦王",
+            "visible": true,
+            "locked": false,
+            "z": 3,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.725,
+              "h": 0.09
+            },
+            "text": "他没当过皇帝　史书叫他秦王",
+            "style": {
+              "font": "serif",
+              "size": 0.03,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          }
+        ]
+      },
+      "timeline": {
+        "fps": 25,
+        "ease": "inout",
+        "fade_ms": 250,
+        "keyframes": [
+          {
+            "t": 0,
+            "viewport": {
+              "x": 0,
+              "y": 0,
+              "w": 1,
+              "h": 1
+            },
+            "visible": []
+          },
+          {
+            "t": 0.4,
+            "viewport": {
+              "x": 0.02,
+              "y": 0.0004,
+              "w": 0.96,
+              "h": 0.96
+            },
+            "visible": [
+              "L1"
+            ]
+          },
+          {
+            "t": 2.2,
+            "viewport": {
+              "x": 0.04,
+              "y": 0.0008,
+              "w": 0.92,
+              "h": 0.92
+            },
+            "visible": [
+              "L2"
+            ]
+          },
+          {
+            "t": 2.9,
+            "viewport": {
+              "x": 0.06,
+              "y": 0.0012,
+              "w": 0.88,
+              "h": 0.88
+            },
+            "visible": [
+              "L3"
+            ]
+          },
+          {
+            "t": 3.5,
+            "viewport": {
+              "x": 0.03,
+              "y": 0.03,
+              "w": 0.94,
+              "h": 0.94
+            },
+            "visible": [
+              "L3"
+            ]
+          }
+        ]
+      },
+      "duration": 3.5,
+      "end_hold": 0,
+      "base_ref": {
+        "kind": "asset",
+        "asset_kind": "scene",
+        "asset_id": 112,
+        "version_task_id": null
+      },
+      "quality_warnings": [
+        {
+          "frame_index": 3,
+          "t": 2.9,
+          "effective_w": 1690,
+          "effective_h": 957,
+          "output_w": 544,
+          "output_h": 960,
+          "spec_w": 544,
+          "spec_h": 960
+        }
+      ],
+      "render_path": "static/layer-segments/b31ee991-205a-4822-8929-12dd1a53d526.mp4",
+      "render_signature": "487d937f8d1374c29347410abb2371d59dbd52c85f3e3ad8e7be89799d587088",
+      "rendered_at": "2026-11-11T00:11:07.878Z",
+      "junction_path": "static/layer-frames/28-63bd611f7519536bc862e7232d21f0bf34572b88e791dc09d8da30be5667621f.png",
+      "junction_hash": "63bd611f7519536bc862e7232d21f0bf34572b88e791dc09d8da30be5667621f",
+      "status": "ready",
+      "stale_reasons": [],
+      "base_check": null,
+      "created_at": "2026-11-10T18:48:38.317Z",
+      "updated_at": "2026-11-11T00:11:07.878Z",
+      "fresh": false,
+      "base_check_required": true,
+      "base_check_satisfied": false
+    },
+    "junction": {
+      "source": "layer_last",
+      "t": 3.5,
+      "path": "static/layer-frames/28-63bd611f7519536bc862e7232d21f0bf34572b88e791dc09d8da30be5667621f.png",
+      "hash": "63bd611f7519536bc862e7232d21f0bf34572b88e791dc09d8da30be5667621f",
+      "stale": true,
+      "base_check_reason": "图层底图待视觉验证",
+      "segment_fresh": false,
+      "combo": "C"
+    },
+    "issues": []
+  },
+  {
+    "spec": {
+      "width": 544,
+      "height": 960,
+      "fps": 25,
+      "source": "video"
+    },
+    "combo": "C",
+    "design_card_status": "confirmed",
+    "production_unlocked": true,
+    "gate_reason": null,
+    "segment": {
+      "id": 29,
+      "storyboard_id": 581,
+      "layer_doc": {
+        "version": 1,
+        "base": {
+          "path": "static/images/48646d2e-63ec-4c43-8584-92872effb191.png",
+          "width": 544,
+          "height": 960,
+          "source_width": 1920,
+          "source_height": 1088,
+          "filter": {
+            "paper": 0.16,
+            "tint": "sepia",
+            "tint_strength": 0.18,
+            "vignette": 0.28
+          }
+        },
+        "theme": "archival",
+        "layers": [
+          {
+            "id": "L1",
+            "type": "label",
+            "name": "四十六天",
+            "visible": true,
+            "locked": false,
+            "z": 1,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.22,
+              "w": 0.431,
+              "h": 0.09
+            },
+            "text": "四十六天",
+            "style": {
+              "font": "serif",
+              "size": 0.052,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L2",
+            "type": "label",
+            "name": "他杀了权臣赵高",
+            "visible": true,
+            "locked": false,
+            "z": 2,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.489,
+              "h": 0.09
+            },
+            "text": "他杀了权臣赵高",
+            "style": {
+              "font": "serif",
+              "size": 0.036,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L3",
+            "type": "label",
+            "name": "而赵高，刚刚杀了秦二世",
+            "visible": true,
+            "locked": false,
+            "z": 3,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.743,
+              "h": 0.09
+            },
+            "text": "而赵高，刚刚杀了秦二世",
+            "style": {
+              "font": "serif",
+              "size": 0.036,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          }
+        ]
+      },
+      "timeline": {
+        "fps": 25,
+        "ease": "inout",
+        "fade_ms": 250,
+        "keyframes": [
+          {
+            "t": 0,
+            "viewport": {
+              "x": 0,
+              "y": 0,
+              "w": 1,
+              "h": 1
+            },
+            "visible": []
+          },
+          {
+            "t": 0.5,
+            "viewport": {
+              "x": 0.02,
+              "y": 0.0004,
+              "w": 0.96,
+              "h": 0.96
+            },
+            "visible": [
+              "L1"
+            ]
+          },
+          {
+            "t": 2,
+            "viewport": {
+              "x": 0.04,
+              "y": 0.0008,
+              "w": 0.92,
+              "h": 0.92
+            },
+            "visible": [
+              "L2"
+            ]
+          },
+          {
+            "t": 3.4,
+            "viewport": {
+              "x": 0.06,
+              "y": 0.0012,
+              "w": 0.88,
+              "h": 0.88
+            },
+            "visible": [
+              "L3"
+            ]
+          },
+          {
+            "t": 5,
+            "viewport": {
+              "x": 0.03,
+              "y": 0.03,
+              "w": 0.94,
+              "h": 0.94
+            },
+            "visible": [
+              "L3"
+            ]
+          }
+        ]
+      },
+      "duration": 5,
+      "end_hold": 0,
+      "base_ref": {
+        "kind": "asset",
+        "asset_kind": "scene",
+        "asset_id": 114,
+        "version_task_id": null
+      },
+      "quality_warnings": [
+        {
+          "frame_index": 3,
+          "t": 3.4,
+          "effective_w": 1690,
+          "effective_h": 957,
+          "output_w": 544,
+          "output_h": 960,
+          "spec_w": 544,
+          "spec_h": 960
+        }
+      ],
+      "render_path": "static/layer-segments/2e978e3a-9886-4d93-adcf-c0fea7bb9fda.mp4",
+      "render_signature": "eb9c99d0378a387533052d9910b6be585988c2617201ef1554fe28031ee040cd",
+      "rendered_at": "2026-11-11T00:11:11.328Z",
+      "junction_path": "static/layer-frames/29-e388de430b026f22fa8568be0ed77c2c8344df92831741f5331c50f827b4abb4.png",
+      "junction_hash": "e388de430b026f22fa8568be0ed77c2c8344df92831741f5331c50f827b4abb4",
+      "status": "ready",
+      "stale_reasons": [],
+      "base_check": null,
+      "created_at": "2026-11-10T18:48:41.029Z",
+      "updated_at": "2026-11-11T00:11:11.328Z",
+      "fresh": false,
+      "base_check_required": true,
+      "base_check_satisfied": false
+    },
+    "junction": {
+      "source": "layer_last",
+      "t": 5,
+      "path": "static/layer-frames/29-e388de430b026f22fa8568be0ed77c2c8344df92831741f5331c50f827b4abb4.png",
+      "hash": "e388de430b026f22fa8568be0ed77c2c8344df92831741f5331c50f827b4abb4",
+      "stale": true,
+      "base_check_reason": "图层底图待视觉验证",
+      "segment_fresh": false,
+      "combo": "C"
+    },
+    "issues": []
+  },
+  {
+    "spec": {
+      "width": 544,
+      "height": 960,
+      "fps": 25,
+      "source": "video"
+    },
+    "combo": "C",
+    "design_card_status": "confirmed",
+    "production_unlocked": true,
+    "gate_reason": null,
+    "segment": {
+      "id": 30,
+      "storyboard_id": 582,
+      "layer_doc": {
+        "version": 1,
+        "base": {
+          "path": "static/images/48646d2e-63ec-4c43-8584-92872effb191.png",
+          "width": 544,
+          "height": 960,
+          "source_width": 1920,
+          "source_height": 1088,
+          "filter": {
+            "paper": 0.16,
+            "tint": "sepia",
+            "tint_strength": 0.18,
+            "vignette": 0.28
+          }
+        },
+        "theme": "archival",
+        "layers": [
+          {
+            "id": "L1",
+            "type": "label",
+            "name": "咸阳宫里的血",
+            "visible": true,
+            "locked": false,
+            "z": 1,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.426,
+              "h": 0.09
+            },
+            "text": "咸阳宫里的血",
+            "style": {
+              "font": "serif",
+              "size": 0.036,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L2",
+            "type": "label",
+            "name": "不是禅让，是一场刺杀",
+            "visible": true,
+            "locked": false,
+            "z": 2,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.68,
+              "h": 0.09
+            },
+            "text": "不是禅让，是一场刺杀",
+            "style": {
+              "font": "serif",
+              "size": 0.036,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          }
+        ]
+      },
+      "timeline": {
+        "fps": 25,
+        "ease": "inout",
+        "fade_ms": 250,
+        "keyframes": [
+          {
+            "t": 0,
+            "viewport": {
+              "x": 0,
+              "y": 0,
+              "w": 1,
+              "h": 1
+            },
+            "visible": []
+          },
+          {
+            "t": 0.4,
+            "viewport": {
+              "x": 0.02,
+              "y": 0.0004,
+              "w": 0.96,
+              "h": 0.96
+            },
+            "visible": [
+              "L1"
+            ]
+          },
+          {
+            "t": 1.8,
+            "viewport": {
+              "x": 0.04,
+              "y": 0.0008,
+              "w": 0.92,
+              "h": 0.92
+            },
+            "visible": [
+              "L2"
+            ]
+          },
+          {
+            "t": 3.5,
+            "viewport": {
+              "x": 0.03,
+              "y": 0.03,
+              "w": 0.94,
+              "h": 0.94
+            },
+            "visible": [
+              "L2"
+            ]
+          }
+        ]
+      },
+      "duration": 3.5,
+      "end_hold": 0,
+      "base_ref": {
+        "kind": "asset",
+        "asset_kind": "scene",
+        "asset_id": 114,
+        "version_task_id": null
+      },
+      "quality_warnings": [],
+      "render_path": "static/layer-segments/8b73f6fb-5ca9-4b40-ad2b-0a8fe5e9a608.mp4",
+      "render_signature": "7c3c64b5a1d15e6890aa6c71f5fafa6d0a0bf8608784f2b6c1805a6265ed0bd3",
+      "rendered_at": "2026-11-11T00:11:14.151Z",
+      "junction_path": "static/layer-frames/30-ee6dfd5754e84d7e8cdc234911ef3b81dbacad07d4131d8310b0e948902698b7.png",
+      "junction_hash": "ee6dfd5754e84d7e8cdc234911ef3b81dbacad07d4131d8310b0e948902698b7",
+      "status": "ready",
+      "stale_reasons": [],
+      "base_check": null,
+      "created_at": "2026-11-10T18:48:44.205Z",
+      "updated_at": "2026-11-11T00:11:14.151Z",
+      "fresh": false,
+      "base_check_required": true,
+      "base_check_satisfied": false
+    },
+    "junction": {
+      "source": "layer_last",
+      "t": 3.5,
+      "path": "static/layer-frames/30-ee6dfd5754e84d7e8cdc234911ef3b81dbacad07d4131d8310b0e948902698b7.png",
+      "hash": "ee6dfd5754e84d7e8cdc234911ef3b81dbacad07d4131d8310b0e948902698b7",
+      "stale": true,
+      "base_check_reason": "图层底图待视觉验证",
+      "segment_fresh": false,
+      "combo": "C"
+    },
+    "issues": []
+  },
+  {
+    "spec": {
+      "width": 544,
+      "height": 960,
+      "fps": 25,
+      "source": "video"
+    },
+    "combo": "C",
+    "design_card_status": "confirmed",
+    "production_unlocked": true,
+    "gate_reason": null,
+    "segment": {
+      "id": 31,
+      "storyboard_id": 583,
+      "layer_doc": {
+        "version": 1,
+        "base": {
+          "path": "static/images/0b148c9f-0008-482a-b4a8-4331a16288dc.png",
+          "width": 544,
+          "height": 960,
+          "source_width": 1920,
+          "source_height": 1088,
+          "filter": {
+            "paper": 0.16,
+            "tint": "sepia",
+            "tint_strength": 0.18,
+            "vignette": 0.28
+          }
+        },
+        "theme": "archival",
+        "layers": [
+          {
+            "id": "L1",
+            "type": "label",
+            "name": "轵道旁",
+            "visible": true,
+            "locked": false,
+            "z": 1,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.22,
+              "w": 0.34,
+              "h": 0.09
+            },
+            "text": "轵道旁",
+            "style": {
+              "font": "serif",
+              "size": 0.052,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L2",
+            "type": "label",
+            "name": "不是宫殿，不是宗庙，是路边",
+            "visible": true,
+            "locked": false,
+            "z": 2,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.725,
+              "h": 0.09
+            },
+            "text": "不是宫殿，不是宗庙，是路边",
+            "style": {
+              "font": "serif",
+              "size": 0.03,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L3",
+            "type": "label",
+            "name": "路边",
+            "visible": true,
+            "locked": false,
+            "z": 3,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.22,
+              "w": 0.248,
+              "h": 0.09
+            },
+            "text": "路边",
+            "style": {
+              "font": "serif",
+              "size": 0.052,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          }
+        ]
+      },
+      "timeline": {
+        "fps": 25,
+        "ease": "inout",
+        "fade_ms": 250,
+        "keyframes": [
+          {
+            "t": 0,
+            "viewport": {
+              "x": 0,
+              "y": 0,
+              "w": 1,
+              "h": 1
+            },
+            "visible": []
+          },
+          {
+            "t": 0.5,
+            "viewport": {
+              "x": 0.02,
+              "y": 0.0004,
+              "w": 0.96,
+              "h": 0.96
+            },
+            "visible": [
+              "L1"
+            ]
+          },
+          {
+            "t": 2.4,
+            "viewport": {
+              "x": 0.04,
+              "y": 0.0008,
+              "w": 0.92,
+              "h": 0.92
+            },
+            "visible": [
+              "L2"
+            ]
+          },
+          {
+            "t": 4.4,
+            "viewport": {
+              "x": 0.06,
+              "y": 0.0012,
+              "w": 0.88,
+              "h": 0.88
+            },
+            "visible": [
+              "L3"
+            ]
+          },
+          {
+            "t": 5,
+            "viewport": {
+              "x": 0.03,
+              "y": 0.03,
+              "w": 0.94,
+              "h": 0.94
+            },
+            "visible": [
+              "L3"
+            ]
+          }
+        ]
+      },
+      "duration": 5,
+      "end_hold": 0,
+      "base_ref": {
+        "kind": "asset",
+        "asset_kind": "scene",
+        "asset_id": 113,
+        "version_task_id": null
+      },
+      "quality_warnings": [
+        {
+          "frame_index": 3,
+          "t": 4.4,
+          "effective_w": 1690,
+          "effective_h": 957,
+          "output_w": 544,
+          "output_h": 960,
+          "spec_w": 544,
+          "spec_h": 960
+        }
+      ],
+      "render_path": "static/layer-segments/d13849b5-93ee-44f9-8e81-e92eb62e1a47.mp4",
+      "render_signature": "a5f191aea300d6d8b88a42a97ba4a1ab028e943ee87be9d2b9a45a0a8d30aa80",
+      "rendered_at": "2026-11-11T00:11:17.652Z",
+      "junction_path": "static/layer-frames/31-cae7a24e7283819e385bc55eb23a1e15d39727c604597ec19959e3fdc2889065.png",
+      "junction_hash": "cae7a24e7283819e385bc55eb23a1e15d39727c604597ec19959e3fdc2889065",
+      "status": "ready",
+      "stale_reasons": [],
+      "base_check": null,
+      "created_at": "2026-11-10T18:48:46.501Z",
+      "updated_at": "2026-11-11T00:11:17.652Z",
+      "fresh": false,
+      "base_check_required": true,
+      "base_check_satisfied": false
+    },
+    "junction": {
+      "source": "layer_last",
+      "t": 5,
+      "path": "static/layer-frames/31-cae7a24e7283819e385bc55eb23a1e15d39727c604597ec19959e3fdc2889065.png",
+      "hash": "cae7a24e7283819e385bc55eb23a1e15d39727c604597ec19959e3fdc2889065",
+      "stale": true,
+      "base_check_reason": "图层底图待视觉验证",
+      "segment_fresh": false,
+      "combo": "C"
+    },
+    "issues": []
+  },
+  {
+    "spec": {
+      "width": 544,
+      "height": 960,
+      "fps": 25,
+      "source": "video"
+    },
+    "combo": "C",
+    "design_card_status": "confirmed",
+    "production_unlocked": true,
+    "gate_reason": null,
+    "segment": {
+      "id": 32,
+      "storyboard_id": 584,
+      "layer_doc": {
+        "version": 1,
+        "base": {
+          "path": "static/images/0b148c9f-0008-482a-b4a8-4331a16288dc.png",
+          "width": 544,
+          "height": 960,
+          "source_width": 1920,
+          "source_height": 1088,
+          "filter": {
+            "paper": 0.16,
+            "tint": "sepia",
+            "tint_strength": 0.18,
+            "vignette": 0.28
+          }
+        },
+        "theme": "archival",
+        "layers": [
+          {
+            "id": "L1",
+            "type": "label",
+            "name": "有人低声劝：杀了他",
+            "visible": true,
+            "locked": false,
+            "z": 1,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.616,
+              "h": 0.09
+            },
+            "text": "有人低声劝：杀了他",
+            "style": {
+              "font": "serif",
+              "size": 0.036,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L2",
+            "type": "label",
+            "name": "免得后患",
+            "visible": true,
+            "locked": false,
+            "z": 2,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.22,
+              "w": 0.431,
+              "h": 0.09
+            },
+            "text": "免得后患",
+            "style": {
+              "font": "serif",
+              "size": 0.052,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L3",
+            "type": "label",
+            "name": "杀之不祥",
+            "visible": true,
+            "locked": false,
+            "z": 3,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.22,
+              "w": 0.431,
+              "h": 0.09
+            },
+            "text": "杀之不祥",
+            "style": {
+              "font": "serif",
+              "size": 0.052,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          }
+        ]
+      },
+      "timeline": {
+        "fps": 25,
+        "ease": "inout",
+        "fade_ms": 250,
+        "keyframes": [
+          {
+            "t": 0,
+            "viewport": {
+              "x": 0,
+              "y": 0,
+              "w": 1,
+              "h": 1
+            },
+            "visible": []
+          },
+          {
+            "t": 0.5,
+            "viewport": {
+              "x": 0.02,
+              "y": 0.0004,
+              "w": 0.96,
+              "h": 0.96
+            },
+            "visible": [
+              "L1"
+            ]
+          },
+          {
+            "t": 2,
+            "viewport": {
+              "x": 0.04,
+              "y": 0.0008,
+              "w": 0.92,
+              "h": 0.92
+            },
+            "visible": [
+              "L2"
+            ]
+          },
+          {
+            "t": 3.4,
+            "viewport": {
+              "x": 0.06,
+              "y": 0.0012,
+              "w": 0.88,
+              "h": 0.88
+            },
+            "visible": [
+              "L3"
+            ]
+          },
+          {
+            "t": 4,
+            "viewport": {
+              "x": 0.03,
+              "y": 0.03,
+              "w": 0.94,
+              "h": 0.94
+            },
+            "visible": [
+              "L3"
+            ]
+          }
+        ]
+      },
+      "duration": 4,
+      "end_hold": 0,
+      "base_ref": {
+        "kind": "asset",
+        "asset_kind": "scene",
+        "asset_id": 113,
+        "version_task_id": null
+      },
+      "quality_warnings": [
+        {
+          "frame_index": 3,
+          "t": 3.4,
+          "effective_w": 1690,
+          "effective_h": 957,
+          "output_w": 544,
+          "output_h": 960,
+          "spec_w": 544,
+          "spec_h": 960
+        }
+      ],
+      "render_path": "static/layer-segments/8b5c0aea-1942-4165-9f15-12dc0e8c3991.mp4",
+      "render_signature": "6ebdfdd35696ce5edbfd21aa96672b9527946697822baf0d7f3be40842d0e2b7",
+      "rendered_at": "2026-11-11T00:11:20.715Z",
+      "junction_path": "static/layer-frames/32-cae7a24e7283819e385bc55eb23a1e15d39727c604597ec19959e3fdc2889065.png",
+      "junction_hash": "cae7a24e7283819e385bc55eb23a1e15d39727c604597ec19959e3fdc2889065",
+      "status": "ready",
+      "stale_reasons": [],
+      "base_check": null,
+      "created_at": "2026-11-10T18:49:34.517Z",
+      "updated_at": "2026-11-11T00:11:20.715Z",
+      "fresh": false,
+      "base_check_required": true,
+      "base_check_satisfied": false
+    },
+    "junction": {
+      "source": "layer_last",
+      "t": 4,
+      "path": "static/layer-frames/32-cae7a24e7283819e385bc55eb23a1e15d39727c604597ec19959e3fdc2889065.png",
+      "hash": "cae7a24e7283819e385bc55eb23a1e15d39727c604597ec19959e3fdc2889065",
+      "stale": true,
+      "base_check_reason": "图层底图待视觉验证",
+      "segment_fresh": false,
+      "combo": "C"
+    },
+    "issues": []
+  },
+  {
+    "spec": {
+      "width": 544,
+      "height": 960,
+      "fps": 25,
+      "source": "video"
+    },
+    "combo": "C",
+    "design_card_status": "confirmed",
+    "production_unlocked": true,
+    "gate_reason": null,
+    "segment": {
+      "id": 33,
+      "storyboard_id": 585,
+      "layer_doc": {
+        "version": 1,
+        "base": {
+          "path": "static/images/0b148c9f-0008-482a-b4a8-4331a16288dc.png",
+          "width": 544,
+          "height": 960,
+          "source_width": 1920,
+          "source_height": 1088,
+          "filter": {
+            "paper": 0.16,
+            "tint": "sepia",
+            "tint_strength": 0.18,
+            "vignette": 0.28
+          }
+        },
+        "theme": "archival",
+        "layers": [
+          {
+            "id": "L1",
+            "type": "label",
+            "name": "换你是刘邦：杀，还是不杀",
+            "visible": true,
+            "locked": false,
+            "z": 1,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.807,
+              "h": 0.09
+            },
+            "text": "换你是刘邦：杀，还是不杀",
+            "style": {
+              "font": "serif",
+              "size": 0.036,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L2",
+            "type": "label",
+            "name": "杀，泄一时之愤；不杀，落一世之名",
+            "visible": true,
+            "locked": false,
+            "z": 2,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.88,
+              "h": 0.09
+            },
+            "text": "杀，泄一时之愤；不杀，落一世之名",
+            "style": {
+              "font": "serif",
+              "size": 0.03,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L3",
+            "type": "label",
+            "name": "乱世里，名声比刀更贵",
+            "visible": true,
+            "locked": false,
+            "z": 3,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.68,
+              "h": 0.09
+            },
+            "text": "乱世里，名声比刀更贵",
+            "style": {
+              "font": "serif",
+              "size": 0.036,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          }
+        ]
+      },
+      "timeline": {
+        "fps": 25,
+        "ease": "inout",
+        "fade_ms": 250,
+        "keyframes": [
+          {
+            "t": 0,
+            "viewport": {
+              "x": 0,
+              "y": 0,
+              "w": 1,
+              "h": 1
+            },
+            "visible": []
+          },
+          {
+            "t": 0.5,
+            "viewport": {
+              "x": 0.02,
+              "y": 0.0004,
+              "w": 0.96,
+              "h": 0.96
+            },
+            "visible": [
+              "L1"
+            ]
+          },
+          {
+            "t": 2.4,
+            "viewport": {
+              "x": 0.04,
+              "y": 0.0008,
+              "w": 0.92,
+              "h": 0.92
+            },
+            "visible": [
+              "L2"
+            ]
+          },
+          {
+            "t": 4.9,
+            "viewport": {
+              "x": 0.06,
+              "y": 0.0012,
+              "w": 0.88,
+              "h": 0.88
+            },
+            "visible": [
+              "L3"
+            ]
+          },
+          {
+            "t": 5.5,
+            "viewport": {
+              "x": 0.03,
+              "y": 0.03,
+              "w": 0.94,
+              "h": 0.94
+            },
+            "visible": [
+              "L3"
+            ]
+          }
+        ]
+      },
+      "duration": 5.5,
+      "end_hold": 0,
+      "base_ref": {
+        "kind": "asset",
+        "asset_kind": "scene",
+        "asset_id": 113,
+        "version_task_id": null
+      },
+      "quality_warnings": [
+        {
+          "frame_index": 3,
+          "t": 4.9,
+          "effective_w": 1690,
+          "effective_h": 957,
+          "output_w": 544,
+          "output_h": 960,
+          "spec_w": 544,
+          "spec_h": 960
+        }
+      ],
+      "render_path": "static/layer-segments/e10aaaa9-68c4-4e10-be5d-5d2a1f844544.mp4",
+      "render_signature": "47d18d26c0f530b295314bc180c4709fd7ebd760222c3bc13e8e2f7a6f9815a9",
+      "rendered_at": "2026-11-11T00:11:24.365Z",
+      "junction_path": "static/layer-frames/33-cae7a24e7283819e385bc55eb23a1e15d39727c604597ec19959e3fdc2889065.png",
+      "junction_hash": "cae7a24e7283819e385bc55eb23a1e15d39727c604597ec19959e3fdc2889065",
+      "status": "ready",
+      "stale_reasons": [],
+      "base_check": null,
+      "created_at": "2026-11-10T18:49:37.357Z",
+      "updated_at": "2026-11-11T00:11:24.365Z",
+      "fresh": false,
+      "base_check_required": true,
+      "base_check_satisfied": false
+    },
+    "junction": {
+      "source": "layer_last",
+      "t": 5.5,
+      "path": "static/layer-frames/33-cae7a24e7283819e385bc55eb23a1e15d39727c604597ec19959e3fdc2889065.png",
+      "hash": "cae7a24e7283819e385bc55eb23a1e15d39727c604597ec19959e3fdc2889065",
+      "stale": true,
+      "base_check_reason": "图层底图待视觉验证",
+      "segment_fresh": false,
+      "combo": "C"
+    },
+    "issues": []
+  },
+  {
+    "spec": {
+      "width": 544,
+      "height": 960,
+      "fps": 25,
+      "source": "video"
+    },
+    "combo": "D",
+    "design_card_status": "confirmed",
+    "production_unlocked": true,
+    "gate_reason": null,
+    "segment": {
+      "id": 34,
+      "storyboard_id": 586,
+      "layer_doc": {
+        "version": 1,
+        "base": {
+          "path": "static/images/ad030aed-3e58-4837-a6eb-9993f029a5ce.png",
+          "width": 544,
+          "height": 960,
+          "source_width": 1920,
+          "source_height": 1088,
+          "filter": {
+            "paper": 0.16,
+            "tint": "sepia",
+            "tint_strength": 0.18,
+            "vignette": 0.28
+          }
+        },
+        "theme": "archival",
+        "layers": [
+          {
+            "id": "L1",
+            "type": "label",
+            "name": "进城之后　他不颁布新法",
+            "visible": true,
+            "locked": false,
+            "z": 1,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.743,
+              "h": 0.09
+            },
+            "text": "进城之后　他不颁布新法",
+            "style": {
+              "font": "serif",
+              "size": 0.036,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L2",
+            "type": "label",
+            "name": "只留下三句话",
+            "visible": true,
+            "locked": false,
+            "z": 2,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.426,
+              "h": 0.09
+            },
+            "text": "只留下三句话",
+            "style": {
+              "font": "serif",
+              "size": 0.036,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L3",
+            "type": "label",
+            "name": "杀人者死　伤人及盗抵罪",
+            "visible": true,
+            "locked": false,
+            "z": 3,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.743,
+              "h": 0.09
+            },
+            "text": "杀人者死　伤人及盗抵罪",
+            "style": {
+              "font": "serif",
+              "size": 0.036,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L4",
+            "type": "label",
+            "name": "约法三章",
+            "visible": true,
+            "locked": false,
+            "z": 4,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.22,
+              "w": 0.431,
+              "h": 0.09
+            },
+            "text": "约法三章",
+            "style": {
+              "font": "serif",
+              "size": 0.052,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          }
+        ]
+      },
+      "timeline": {
+        "fps": 25,
+        "ease": "inout",
+        "fade_ms": 250,
+        "keyframes": [
+          {
+            "t": 0,
+            "viewport": {
+              "x": 0,
+              "y": 0,
+              "w": 1,
+              "h": 1
+            },
+            "visible": []
+          },
+          {
+            "t": 0.4,
+            "viewport": {
+              "x": 0.02,
+              "y": 0.0004,
+              "w": 0.96,
+              "h": 0.96
+            },
+            "visible": [
+              "L1"
+            ]
+          },
+          {
+            "t": 1.8,
+            "viewport": {
+              "x": 0.04,
+              "y": 0.0008,
+              "w": 0.92,
+              "h": 0.92
+            },
+            "visible": [
+              "L2"
+            ]
+          },
+          {
+            "t": 2.8,
+            "viewport": {
+              "x": 0.06,
+              "y": 0.0012,
+              "w": 0.88,
+              "h": 0.88
+            },
+            "visible": [
+              "L3"
+            ]
+          },
+          {
+            "t": 3.6,
+            "viewport": {
+              "x": 0.06,
+              "y": 0.0012,
+              "w": 0.88,
+              "h": 0.88
+            },
+            "visible": [
+              "L4"
+            ]
+          },
+          {
+            "t": 4.5,
+            "viewport": {
+              "x": 0.03,
+              "y": 0.03,
+              "w": 0.94,
+              "h": 0.94
+            },
+            "visible": [
+              "L4"
+            ]
+          }
+        ]
+      },
+      "duration": 4.5,
+      "end_hold": 0,
+      "base_ref": {
+        "kind": "asset",
+        "asset_kind": "scene",
+        "asset_id": 115,
+        "version_task_id": null
+      },
+      "quality_warnings": [
+        {
+          "frame_index": 3,
+          "t": 2.8,
+          "effective_w": 1690,
+          "effective_h": 957,
+          "output_w": 544,
+          "output_h": 960,
+          "spec_w": 544,
+          "spec_h": 960
+        },
+        {
+          "frame_index": 4,
+          "t": 3.6,
+          "effective_w": 1690,
+          "effective_h": 957,
+          "output_w": 544,
+          "output_h": 960,
+          "spec_w": 544,
+          "spec_h": 960
+        }
+      ],
+      "render_path": "static/layer-segments/6bd6e006-fe5c-42dd-97dd-e5b7066d79f8.mp4",
+      "render_signature": "3be2404162ee0a75d822f42376d9abff4aca4f954a993815f8fa8d5dcbeb7142",
+      "rendered_at": "2026-11-11T00:11:27.317Z",
+      "junction_path": "static/layer-frames/34-5b20a3f1512524aebf1e86846132fa9ac195da05d119b574b75388b97e1a9c32.png",
+      "junction_hash": "5b20a3f1512524aebf1e86846132fa9ac195da05d119b574b75388b97e1a9c32",
+      "status": "ready",
+      "stale_reasons": [],
+      "base_check": null,
+      "created_at": "2026-11-10T18:49:40.879Z",
+      "updated_at": "2026-11-11T00:11:27.317Z",
+      "fresh": false,
+      "base_check_required": true,
+      "base_check_satisfied": false
+    },
+    "junction": {
+      "source": "layer_first",
+      "t": 0,
+      "path": "static/layer-frames/34-5b20a3f1512524aebf1e86846132fa9ac195da05d119b574b75388b97e1a9c32.png",
+      "hash": "5b20a3f1512524aebf1e86846132fa9ac195da05d119b574b75388b97e1a9c32",
+      "stale": true,
+      "base_check_reason": "图层底图待视觉验证",
+      "segment_fresh": false,
+      "combo": "D"
+    },
+    "issues": []
+  },
+  {
+    "spec": {
+      "width": 544,
+      "height": 960,
+      "fps": 25,
+      "source": "video"
+    },
+    "combo": "C",
+    "design_card_status": "confirmed",
+    "production_unlocked": true,
+    "gate_reason": null,
+    "segment": {
+      "id": 35,
+      "storyboard_id": 587,
+      "layer_doc": {
+        "version": 1,
+        "base": {
+          "path": "static/images/ad030aed-3e58-4837-a6eb-9993f029a5ce.png",
+          "width": 544,
+          "height": 960,
+          "source_width": 1920,
+          "source_height": 1088,
+          "filter": {
+            "paper": 0.16,
+            "tint": "sepia",
+            "tint_strength": 0.18,
+            "vignette": 0.28
+          }
+        },
+        "theme": "archival",
+        "layers": [
+          {
+            "id": "L1",
+            "type": "label",
+            "name": "其余秦法　一并废掉",
+            "visible": true,
+            "locked": false,
+            "z": 1,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.616,
+              "h": 0.09
+            },
+            "text": "其余秦法　一并废掉",
+            "style": {
+              "font": "serif",
+              "size": 0.036,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L2",
+            "type": "label",
+            "name": "徭役　连坐　轻罪重刑",
+            "visible": true,
+            "locked": false,
+            "z": 2,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.68,
+              "h": 0.09
+            },
+            "text": "徭役　连坐　轻罪重刑",
+            "style": {
+              "font": "serif",
+              "size": 0.036,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L3",
+            "type": "label",
+            "name": "十五年",
+            "visible": true,
+            "locked": false,
+            "z": 3,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.22,
+              "w": 0.34,
+              "h": 0.09
+            },
+            "text": "十五年",
+            "style": {
+              "font": "serif",
+              "size": 0.052,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          }
+        ]
+      },
+      "timeline": {
+        "fps": 25,
+        "ease": "inout",
+        "fade_ms": 250,
+        "keyframes": [
+          {
+            "t": 0,
+            "viewport": {
+              "x": 0,
+              "y": 0,
+              "w": 1,
+              "h": 1
+            },
+            "visible": []
+          },
+          {
+            "t": 0.4,
+            "viewport": {
+              "x": 0.02,
+              "y": 0.0004,
+              "w": 0.96,
+              "h": 0.96
+            },
+            "visible": [
+              "L1"
+            ]
+          },
+          {
+            "t": 2,
+            "viewport": {
+              "x": 0.04,
+              "y": 0.0008,
+              "w": 0.92,
+              "h": 0.92
+            },
+            "visible": [
+              "L2"
+            ]
+          },
+          {
+            "t": 4.4,
+            "viewport": {
+              "x": 0.06,
+              "y": 0.0012,
+              "w": 0.88,
+              "h": 0.88
+            },
+            "visible": [
+              "L3"
+            ]
+          },
+          {
+            "t": 5.5,
+            "viewport": {
+              "x": 0.03,
+              "y": 0.03,
+              "w": 0.94,
+              "h": 0.94
+            },
+            "visible": [
+              "L3"
+            ]
+          }
+        ]
+      },
+      "duration": 5.5,
+      "end_hold": 0,
+      "base_ref": {
+        "kind": "asset",
+        "asset_kind": "scene",
+        "asset_id": 115,
+        "version_task_id": null
+      },
+      "quality_warnings": [
+        {
+          "frame_index": 3,
+          "t": 4.4,
+          "effective_w": 1690,
+          "effective_h": 957,
+          "output_w": 544,
+          "output_h": 960,
+          "spec_w": 544,
+          "spec_h": 960
+        }
+      ],
+      "render_path": "static/layer-segments/2a5d262d-34ca-487b-b397-a4d84d82b194.mp4",
+      "render_signature": "995c5fc03f97a59fa3176a3ee0d443b7e3c9a85f2389814be2766c506e66722c",
+      "rendered_at": "2026-11-11T00:11:30.857Z",
+      "junction_path": "static/layer-frames/35-71192df6d9424f9a027e0d5cf852f026389108d4813c9d9f6282780bce22c1e5.png",
+      "junction_hash": "71192df6d9424f9a027e0d5cf852f026389108d4813c9d9f6282780bce22c1e5",
+      "status": "ready",
+      "stale_reasons": [],
+      "base_check": null,
+      "created_at": "2026-11-10T18:49:44.039Z",
+      "updated_at": "2026-11-11T00:11:30.857Z",
+      "fresh": false,
+      "base_check_required": true,
+      "base_check_satisfied": false
+    },
+    "junction": {
+      "source": "layer_last",
+      "t": 5.5,
+      "path": "static/layer-frames/35-71192df6d9424f9a027e0d5cf852f026389108d4813c9d9f6282780bce22c1e5.png",
+      "hash": "71192df6d9424f9a027e0d5cf852f026389108d4813c9d9f6282780bce22c1e5",
+      "stale": true,
+      "base_check_reason": "图层底图待视觉验证",
+      "segment_fresh": false,
+      "combo": "C"
+    },
+    "issues": []
+  },
+  {
+    "spec": {
+      "width": 544,
+      "height": 960,
+      "fps": 25,
+      "source": "video"
+    },
+    "combo": "C",
+    "design_card_status": "confirmed",
+    "production_unlocked": true,
+    "gate_reason": null,
+    "segment": {
+      "id": 36,
+      "storyboard_id": 588,
+      "layer_doc": {
+        "version": 1,
+        "base": {
+          "path": "static/images/5535e5be-5489-4b3e-ae55-51623c1c98e5.png",
+          "width": 544,
+          "height": 960,
+          "source_width": 1920,
+          "source_height": 1088,
+          "filter": {
+            "paper": 0.16,
+            "tint": "sepia",
+            "tint_strength": 0.18,
+            "vignette": 0.28
+          }
+        },
+        "theme": "archival",
+        "layers": [
+          {
+            "id": "L1",
+            "type": "label",
+            "name": "关中百姓大喜　争着送牛羊酒食",
+            "visible": true,
+            "locked": false,
+            "z": 1,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.778,
+              "h": 0.09
+            },
+            "text": "关中百姓大喜　争着送牛羊酒食",
+            "style": {
+              "font": "serif",
+              "size": 0.03,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L2",
+            "type": "label",
+            "name": "牛羊酒食",
+            "visible": true,
+            "locked": false,
+            "z": 2,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.22,
+              "w": 0.431,
+              "h": 0.09
+            },
+            "text": "牛羊酒食",
+            "style": {
+              "font": "serif",
+              "size": 0.052,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L3",
+            "type": "label",
+            "name": "刘邦推辞不收",
+            "visible": true,
+            "locked": false,
+            "z": 3,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.426,
+              "h": 0.09
+            },
+            "text": "刘邦推辞不收",
+            "style": {
+              "font": "serif",
+              "size": 0.036,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L4",
+            "type": "label",
+            "name": "仓里有粮",
+            "visible": true,
+            "locked": false,
+            "z": 4,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.22,
+              "w": 0.431,
+              "h": 0.09
+            },
+            "text": "仓里有粮",
+            "style": {
+              "font": "serif",
+              "size": 0.052,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          }
+        ]
+      },
+      "timeline": {
+        "fps": 25,
+        "ease": "inout",
+        "fade_ms": 250,
+        "keyframes": [
+          {
+            "t": 0,
+            "viewport": {
+              "x": 0,
+              "y": 0,
+              "w": 1,
+              "h": 1
+            },
+            "visible": []
+          },
+          {
+            "t": 0.4,
+            "viewport": {
+              "x": 0.02,
+              "y": 0.0004,
+              "w": 0.96,
+              "h": 0.96
+            },
+            "visible": [
+              "L1"
+            ]
+          },
+          {
+            "t": 2.2,
+            "viewport": {
+              "x": 0.04,
+              "y": 0.0008,
+              "w": 0.92,
+              "h": 0.92
+            },
+            "visible": [
+              "L2"
+            ]
+          },
+          {
+            "t": 3.6,
+            "viewport": {
+              "x": 0.06,
+              "y": 0.0012,
+              "w": 0.88,
+              "h": 0.88
+            },
+            "visible": [
+              "L3"
+            ]
+          },
+          {
+            "t": 4.9,
+            "viewport": {
+              "x": 0.06,
+              "y": 0.0012,
+              "w": 0.88,
+              "h": 0.88
+            },
+            "visible": [
+              "L4"
+            ]
+          },
+          {
+            "t": 5.5,
+            "viewport": {
+              "x": 0.03,
+              "y": 0.03,
+              "w": 0.94,
+              "h": 0.94
+            },
+            "visible": [
+              "L4"
+            ]
+          }
+        ]
+      },
+      "duration": 5.5,
+      "end_hold": 0,
+      "base_ref": {
+        "kind": "asset",
+        "asset_kind": "scene",
+        "asset_id": 120,
+        "version_task_id": null
+      },
+      "quality_warnings": [
+        {
+          "frame_index": 3,
+          "t": 3.6,
+          "effective_w": 1690,
+          "effective_h": 957,
+          "output_w": 544,
+          "output_h": 960,
+          "spec_w": 544,
+          "spec_h": 960
+        },
+        {
+          "frame_index": 4,
+          "t": 4.9,
+          "effective_w": 1690,
+          "effective_h": 957,
+          "output_w": 544,
+          "output_h": 960,
+          "spec_w": 544,
+          "spec_h": 960
+        }
+      ],
+      "render_path": "static/layer-segments/3c530d35-4b8d-4f9f-b8e5-eb699d75813c.mp4",
+      "render_signature": "39f78170f76864caf10f884c58865ab788ec80f8f7a79f1cc8230a93773bfc97",
+      "rendered_at": "2026-11-11T00:11:33.027Z",
+      "junction_path": "static/layer-frames/36-ea24bffa7130f4a2746bf37d3ee4c34b27d511223fd73e89d56e3f66c7df753c.png",
+      "junction_hash": "ea24bffa7130f4a2746bf37d3ee4c34b27d511223fd73e89d56e3f66c7df753c",
+      "status": "ready",
+      "stale_reasons": [],
+      "base_check": null,
+      "created_at": "2026-11-10T18:49:47.554Z",
+      "updated_at": "2026-11-11T00:11:33.027Z",
+      "fresh": false,
+      "base_check_required": true,
+      "base_check_satisfied": false
+    },
+    "junction": {
+      "source": "layer_last",
+      "t": 5.5,
+      "path": "static/layer-frames/36-ea24bffa7130f4a2746bf37d3ee4c34b27d511223fd73e89d56e3f66c7df753c.png",
+      "hash": "ea24bffa7130f4a2746bf37d3ee4c34b27d511223fd73e89d56e3f66c7df753c",
+      "stale": true,
+      "base_check_reason": "图层底图待视觉验证",
+      "segment_fresh": false,
+      "combo": "C"
+    },
+    "issues": []
+  },
+  {
+    "spec": {
+      "width": 544,
+      "height": 960,
+      "fps": 25,
+      "source": "video"
+    },
+    "combo": "C",
+    "design_card_status": "confirmed",
+    "production_unlocked": true,
+    "gate_reason": null,
+    "segment": {
+      "id": 37,
+      "storyboard_id": 589,
+      "layer_doc": {
+        "version": 1,
+        "base": {
+          "path": "static/images/050a7ba7-601d-4865-8f25-5b3d765f90c8.png",
+          "width": 544,
+          "height": 960,
+          "source_width": 1920,
+          "source_height": 1088,
+          "filter": {
+            "paper": 0.16,
+            "tint": "sepia",
+            "tint_strength": 0.18,
+            "vignette": 0.28
+          }
+        },
+        "theme": "archival",
+        "layers": [
+          {
+            "id": "L1",
+            "type": "label",
+            "name": "算一笔时间账",
+            "visible": true,
+            "locked": false,
+            "z": 1,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.426,
+              "h": 0.09
+            },
+            "text": "算一笔时间账",
+            "style": {
+              "font": "serif",
+              "size": 0.036,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L2",
+            "type": "label",
+            "name": "从秦灭六国 · 天下一统　到这一天：十五年",
+            "visible": true,
+            "locked": false,
+            "z": 2,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.88,
+              "h": 0.14
+            },
+            "text": "从秦灭六国 · 天下一统　到这一天：十五年",
+            "style": {
+              "font": "serif",
+              "size": 0.03,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L3",
+            "type": "label",
+            "name": "前221 — 前207",
+            "visible": true,
+            "locked": false,
+            "z": 3,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.743,
+              "h": 0.09
+            },
+            "text": "前221 — 前207",
+            "style": {
+              "font": "serif",
+              "size": 0.036,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          }
+        ]
+      },
+      "timeline": {
+        "fps": 25,
+        "ease": "inout",
+        "fade_ms": 250,
+        "keyframes": [
+          {
+            "t": 0,
+            "viewport": {
+              "x": 0,
+              "y": 0,
+              "w": 1,
+              "h": 1
+            },
+            "visible": []
+          },
+          {
+            "t": 0.4,
+            "viewport": {
+              "x": 0.02,
+              "y": 0.0004,
+              "w": 0.96,
+              "h": 0.96
+            },
+            "visible": [
+              "L1"
+            ]
+          },
+          {
+            "t": 1.4,
+            "viewport": {
+              "x": 0.04,
+              "y": 0.0008,
+              "w": 0.92,
+              "h": 0.92
+            },
+            "visible": [
+              "L2"
+            ]
+          },
+          {
+            "t": 2.6,
+            "viewport": {
+              "x": 0.06,
+              "y": 0.0012,
+              "w": 0.88,
+              "h": 0.88
+            },
+            "visible": [
+              "L3"
+            ]
+          },
+          {
+            "t": 4,
+            "viewport": {
+              "x": 0.03,
+              "y": 0.03,
+              "w": 0.94,
+              "h": 0.94
+            },
+            "visible": [
+              "L3"
+            ]
+          }
+        ]
+      },
+      "duration": 4,
+      "end_hold": 0,
+      "base_ref": {
+        "kind": "asset",
+        "asset_kind": "scene",
+        "asset_id": 112,
+        "version_task_id": null
+      },
+      "quality_warnings": [
+        {
+          "frame_index": 3,
+          "t": 2.6,
+          "effective_w": 1690,
+          "effective_h": 957,
+          "output_w": 544,
+          "output_h": 960,
+          "spec_w": 544,
+          "spec_h": 960
+        }
+      ],
+      "render_path": "static/layer-segments/743e034b-b2a9-4cba-9440-73099f47a400.mp4",
+      "render_signature": "c89d48e3e0fe4eb75acdc1debbd7f25c16245b9221ba03b7b4b0ee127b3f9cdd",
+      "rendered_at": "2026-11-11T00:11:36.115Z",
+      "junction_path": "static/layer-frames/37-63bd611f7519536bc862e7232d21f0bf34572b88e791dc09d8da30be5667621f.png",
+      "junction_hash": "63bd611f7519536bc862e7232d21f0bf34572b88e791dc09d8da30be5667621f",
+      "status": "ready",
+      "stale_reasons": [],
+      "base_check": null,
+      "created_at": "2026-11-10T18:49:50.991Z",
+      "updated_at": "2026-11-11T00:11:36.115Z",
+      "fresh": false,
+      "base_check_required": true,
+      "base_check_satisfied": false
+    },
+    "junction": {
+      "source": "layer_last",
+      "t": 4,
+      "path": "static/layer-frames/37-63bd611f7519536bc862e7232d21f0bf34572b88e791dc09d8da30be5667621f.png",
+      "hash": "63bd611f7519536bc862e7232d21f0bf34572b88e791dc09d8da30be5667621f",
+      "stale": true,
+      "base_check_reason": "图层底图待视觉验证",
+      "segment_fresh": false,
+      "combo": "C"
+    },
+    "issues": []
+  },
+  {
+    "spec": {
+      "width": 544,
+      "height": 960,
+      "fps": 25,
+      "source": "video"
+    },
+    "combo": "C",
+    "design_card_status": "confirmed",
+    "production_unlocked": true,
+    "gate_reason": null,
+    "segment": {
+      "id": 38,
+      "storyboard_id": 590,
+      "layer_doc": {
+        "version": 1,
+        "base": {
+          "path": "static/images/31144355-79a0-4a5f-bc03-e53d19984df3.png",
+          "width": 544,
+          "height": 960,
+          "source_width": 1920,
+          "source_height": 1088,
+          "filter": {
+            "paper": 0.16,
+            "tint": "sepia",
+            "tint_strength": 0.18,
+            "vignette": 0.28
+          }
+        },
+        "theme": "archival",
+        "layers": [
+          {
+            "id": "L1",
+            "type": "label",
+            "name": "大泽乡",
+            "visible": true,
+            "locked": false,
+            "z": 1,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.22,
+              "w": 0.34,
+              "h": 0.09
+            },
+            "text": "大泽乡",
+            "style": {
+              "font": "serif",
+              "size": 0.052,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L2",
+            "type": "label",
+            "name": "王侯将相宁有种乎",
+            "visible": true,
+            "locked": false,
+            "z": 2,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.553,
+              "h": 0.09
+            },
+            "text": "王侯将相宁有种乎",
+            "style": {
+              "font": "serif",
+              "size": 0.036,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L3",
+            "type": "label",
+            "name": "到咸阳城门打开",
+            "visible": true,
+            "locked": false,
+            "z": 3,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.489,
+              "h": 0.09
+            },
+            "text": "到咸阳城门打开",
+            "style": {
+              "font": "serif",
+              "size": 0.036,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L4",
+            "type": "label",
+            "name": "只过了两年多",
+            "visible": true,
+            "locked": false,
+            "z": 4,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.426,
+              "h": 0.09
+            },
+            "text": "只过了两年多",
+            "style": {
+              "font": "serif",
+              "size": 0.036,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          }
+        ]
+      },
+      "timeline": {
+        "fps": 25,
+        "ease": "inout",
+        "fade_ms": 250,
+        "keyframes": [
+          {
+            "t": 0,
+            "viewport": {
+              "x": 0,
+              "y": 0,
+              "w": 1,
+              "h": 1
+            },
+            "visible": []
+          },
+          {
+            "t": 0.4,
+            "viewport": {
+              "x": 0.02,
+              "y": 0.0004,
+              "w": 0.96,
+              "h": 0.96
+            },
+            "visible": [
+              "L1"
+            ]
+          },
+          {
+            "t": 1.6,
+            "viewport": {
+              "x": 0.04,
+              "y": 0.0008,
+              "w": 0.92,
+              "h": 0.92
+            },
+            "visible": [
+              "L2"
+            ]
+          },
+          {
+            "t": 3.2,
+            "viewport": {
+              "x": 0.06,
+              "y": 0.0012,
+              "w": 0.88,
+              "h": 0.88
+            },
+            "visible": [
+              "L3"
+            ]
+          },
+          {
+            "t": 3.8,
+            "viewport": {
+              "x": 0.06,
+              "y": 0.0012,
+              "w": 0.88,
+              "h": 0.88
+            },
+            "visible": [
+              "L4"
+            ]
+          },
+          {
+            "t": 5,
+            "viewport": {
+              "x": 0.03,
+              "y": 0.03,
+              "w": 0.94,
+              "h": 0.94
+            },
+            "visible": [
+              "L4"
+            ]
+          }
+        ]
+      },
+      "duration": 5,
+      "end_hold": 0,
+      "base_ref": {
+        "kind": "asset",
+        "asset_kind": "scene",
+        "asset_id": 122,
+        "version_task_id": null
+      },
+      "quality_warnings": [
+        {
+          "frame_index": 3,
+          "t": 3.2,
+          "effective_w": 1690,
+          "effective_h": 957,
+          "output_w": 544,
+          "output_h": 960,
+          "spec_w": 544,
+          "spec_h": 960
+        },
+        {
+          "frame_index": 4,
+          "t": 3.8,
+          "effective_w": 1690,
+          "effective_h": 957,
+          "output_w": 544,
+          "output_h": 960,
+          "spec_w": 544,
+          "spec_h": 960
+        }
+      ],
+      "render_path": "static/layer-segments/6a11fcf4-f64d-484f-90f2-4757eec64eac.mp4",
+      "render_signature": "f5ccca72140b41fbe44f1ccfd57b99fda030bc5fe8484ecac4a97070910a5878",
+      "rendered_at": "2026-11-11T00:11:39.352Z",
+      "junction_path": "static/layer-frames/38-1e0833eba48d89d8631ea07935afa4f0471dfa430964c6f05f6e19b19f1beb5f.png",
+      "junction_hash": "1e0833eba48d89d8631ea07935afa4f0471dfa430964c6f05f6e19b19f1beb5f",
+      "status": "ready",
+      "stale_reasons": [],
+      "base_check": null,
+      "created_at": "2026-11-10T18:49:53.857Z",
+      "updated_at": "2026-11-11T00:11:39.352Z",
+      "fresh": false,
+      "base_check_required": true,
+      "base_check_satisfied": false
+    },
+    "junction": {
+      "source": "layer_last",
+      "t": 5,
+      "path": "static/layer-frames/38-1e0833eba48d89d8631ea07935afa4f0471dfa430964c6f05f6e19b19f1beb5f.png",
+      "hash": "1e0833eba48d89d8631ea07935afa4f0471dfa430964c6f05f6e19b19f1beb5f",
+      "stale": true,
+      "base_check_reason": "图层底图待视觉验证",
+      "segment_fresh": false,
+      "combo": "C"
+    },
+    "issues": []
+  },
+  {
+    "spec": {
+      "width": 544,
+      "height": 960,
+      "fps": 25,
+      "source": "video"
+    },
+    "combo": "C",
+    "design_card_status": "confirmed",
+    "production_unlocked": true,
+    "gate_reason": null,
+    "segment": {
+      "id": 39,
+      "storyboard_id": 591,
+      "layer_doc": {
+        "version": 1,
+        "base": {
+          "path": "static/images/2e6eda55-3b3b-4a62-9ac9-07f98f504b7f.png",
+          "width": 544,
+          "height": 960,
+          "source_width": 1024,
+          "source_height": 1024,
+          "crop": {
+            "x": 0.05,
+            "y": 0.14,
+            "w": 0.9,
+            "h": 0.72
+          },
+          "filter": {
+            "paper": 0.16,
+            "tint": "sepia",
+            "tint_strength": 0.18,
+            "vignette": 0.28
+          }
+        },
+        "theme": "archival",
+        "layers": [
+          {
+            "id": "L1",
+            "type": "label",
+            "name": "巨鹿一战",
+            "visible": true,
+            "locked": false,
+            "z": 1,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.22,
+              "w": 0.431,
+              "h": 0.09
+            },
+            "text": "巨鹿一战",
+            "style": {
+              "font": "serif",
+              "size": 0.052,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L2",
+            "type": "label",
+            "name": "秦军主力被项羽打垮",
+            "visible": true,
+            "locked": false,
+            "z": 2,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.616,
+              "h": 0.09
+            },
+            "text": "秦军主力被项羽打垮",
+            "style": {
+              "font": "serif",
+              "size": 0.036,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L3",
+            "type": "label",
+            "name": "刘邦绕道武关　直取国都",
+            "visible": true,
+            "locked": false,
+            "z": 3,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.743,
+              "h": 0.09
+            },
+            "text": "刘邦绕道武关　直取国都",
+            "style": {
+              "font": "serif",
+              "size": 0.036,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L4",
+            "type": "label",
+            "name": "外面一刀　里面一刀",
+            "visible": true,
+            "locked": false,
+            "z": 4,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.616,
+              "h": 0.09
+            },
+            "text": "外面一刀　里面一刀",
+            "style": {
+              "font": "serif",
+              "size": 0.036,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          }
+        ]
+      },
+      "timeline": {
+        "fps": 25,
+        "ease": "inout",
+        "fade_ms": 250,
+        "keyframes": [
+          {
+            "t": 0,
+            "viewport": {
+              "x": 0.05,
+              "y": 0.14,
+              "w": 0.9,
+              "h": 0.72
+            },
+            "visible": []
+          },
+          {
+            "t": 0.4,
+            "viewport": {
+              "x": 0.05,
+              "y": 0.14,
+              "w": 0.9,
+              "h": 0.72
+            },
+            "visible": [
+              "L1"
+            ]
+          },
+          {
+            "t": 1.6,
+            "viewport": {
+              "x": 0.05,
+              "y": 0.14,
+              "w": 0.9,
+              "h": 0.72
+            },
+            "visible": [
+              "L2"
+            ]
+          },
+          {
+            "t": 3.4,
+            "viewport": {
+              "x": 0.05,
+              "y": 0.14,
+              "w": 0.9,
+              "h": 0.72
+            },
+            "visible": [
+              "L3"
+            ]
+          },
+          {
+            "t": 5.4,
+            "viewport": {
+              "x": 0.05,
+              "y": 0.14,
+              "w": 0.9,
+              "h": 0.72
+            },
+            "visible": [
+              "L4"
+            ]
+          },
+          {
+            "t": 6,
+            "viewport": {
+              "x": 0.05,
+              "y": 0.14,
+              "w": 0.9,
+              "h": 0.72
+            },
+            "visible": [
+              "L4"
+            ]
+          }
+        ]
+      },
+      "duration": 6,
+      "end_hold": 0,
+      "base_ref": {
+        "kind": "asset",
+        "asset_kind": "prop",
+        "asset_id": 217,
+        "version_task_id": 1681
+      },
+      "quality_warnings": [
+        {
+          "frame_index": 0,
+          "t": 0,
+          "effective_w": 922,
+          "effective_h": 737,
+          "output_w": 544,
+          "output_h": 960,
+          "spec_w": 544,
+          "spec_h": 960
+        },
+        {
+          "frame_index": 1,
+          "t": 0.4,
+          "effective_w": 922,
+          "effective_h": 737,
+          "output_w": 544,
+          "output_h": 960,
+          "spec_w": 544,
+          "spec_h": 960
+        },
+        {
+          "frame_index": 2,
+          "t": 1.6,
+          "effective_w": 922,
+          "effective_h": 737,
+          "output_w": 544,
+          "output_h": 960,
+          "spec_w": 544,
+          "spec_h": 960
+        },
+        {
+          "frame_index": 3,
+          "t": 3.4,
+          "effective_w": 922,
+          "effective_h": 737,
+          "output_w": 544,
+          "output_h": 960,
+          "spec_w": 544,
+          "spec_h": 960
+        },
+        {
+          "frame_index": 4,
+          "t": 5.4,
+          "effective_w": 922,
+          "effective_h": 737,
+          "output_w": 544,
+          "output_h": 960,
+          "spec_w": 544,
+          "spec_h": 960
+        },
+        {
+          "frame_index": 5,
+          "t": 6,
+          "effective_w": 922,
+          "effective_h": 737,
+          "output_w": 544,
+          "output_h": 960,
+          "spec_w": 544,
+          "spec_h": 960
+        }
+      ],
+      "render_path": "static/layer-segments/b6659e66-78c1-4efd-bc7a-2c447268c3b2.mp4",
+      "render_signature": "105e1375ef39ea06ff966f23048598cffb17df2d419a004d5cc167964ce8a9e4",
+      "rendered_at": "2026-11-11T00:11:41.673Z",
+      "junction_path": "static/layer-frames/39-d0629aca82c506b21338ede62e794fc4f015ffd90f49c05d4a59ca826f79dab1.png",
+      "junction_hash": "d0629aca82c506b21338ede62e794fc4f015ffd90f49c05d4a59ca826f79dab1",
+      "status": "ready",
+      "stale_reasons": [],
+      "base_check": null,
+      "created_at": "2026-11-10T18:49:57.104Z",
+      "updated_at": "2026-11-11T00:11:41.673Z",
+      "fresh": false,
+      "base_check_required": true,
+      "base_check_satisfied": false
+    },
+    "junction": {
+      "source": "layer_last",
+      "t": 6,
+      "path": "static/layer-frames/39-d0629aca82c506b21338ede62e794fc4f015ffd90f49c05d4a59ca826f79dab1.png",
+      "hash": "d0629aca82c506b21338ede62e794fc4f015ffd90f49c05d4a59ca826f79dab1",
+      "stale": true,
+      "base_check_reason": "图层底图待视觉验证",
+      "segment_fresh": false,
+      "combo": "C"
+    },
+    "issues": []
+  },
+  {
+    "spec": {
+      "width": 544,
+      "height": 960,
+      "fps": 25,
+      "source": "video"
+    },
+    "combo": "C",
+    "design_card_status": "confirmed",
+    "production_unlocked": true,
+    "gate_reason": null,
+    "segment": {
+      "id": 40,
+      "storyboard_id": 592,
+      "layer_doc": {
+        "version": 1,
+        "base": {
+          "path": "static/images/e89e0f08-712f-4ac8-893b-c161291c05a9.png",
+          "width": 544,
+          "height": 960,
+          "source_width": 1920,
+          "source_height": 1088,
+          "filter": {
+            "paper": 0.16,
+            "tint": "sepia",
+            "tint_strength": 0.18,
+            "vignette": 0.28
+          }
+        },
+        "theme": "archival",
+        "layers": [
+          {
+            "id": "L1",
+            "type": "label",
+            "name": "可投降没有救他",
+            "visible": true,
+            "locked": false,
+            "z": 1,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.489,
+              "h": 0.09
+            },
+            "text": "可投降没有救他",
+            "style": {
+              "font": "serif",
+              "size": 0.036,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L2",
+            "type": "label",
+            "name": "两个多月后 · 项羽屠咸阳　杀子婴",
+            "visible": true,
+            "locked": false,
+            "z": 2,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.88,
+              "h": 0.14
+            },
+            "text": "两个多月后 · 项羽屠咸阳　杀子婴",
+            "style": {
+              "font": "serif",
+              "size": 0.03,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L3",
+            "type": "label",
+            "name": "烧秦宫室　火三月不灭",
+            "visible": true,
+            "locked": false,
+            "z": 3,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.68,
+              "h": 0.09
+            },
+            "text": "烧秦宫室　火三月不灭",
+            "style": {
+              "font": "serif",
+              "size": 0.036,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          }
+        ]
+      },
+      "timeline": {
+        "fps": 25,
+        "ease": "inout",
+        "fade_ms": 250,
+        "keyframes": [
+          {
+            "t": 0,
+            "viewport": {
+              "x": 0,
+              "y": 0,
+              "w": 1,
+              "h": 1
+            },
+            "visible": []
+          },
+          {
+            "t": 0.4,
+            "viewport": {
+              "x": 0.02,
+              "y": 0.0004,
+              "w": 0.96,
+              "h": 0.96
+            },
+            "visible": [
+              "L1"
+            ]
+          },
+          {
+            "t": 1.8,
+            "viewport": {
+              "x": 0.04,
+              "y": 0.0008,
+              "w": 0.92,
+              "h": 0.92
+            },
+            "visible": [
+              "L2"
+            ]
+          },
+          {
+            "t": 2.8,
+            "viewport": {
+              "x": 0.06,
+              "y": 0.0012,
+              "w": 0.88,
+              "h": 0.88
+            },
+            "visible": [
+              "L3"
+            ]
+          },
+          {
+            "t": 4,
+            "viewport": {
+              "x": 0.03,
+              "y": 0.03,
+              "w": 0.94,
+              "h": 0.94
+            },
+            "visible": [
+              "L3"
+            ]
+          }
+        ]
+      },
+      "duration": 4,
+      "end_hold": 0,
+      "base_ref": {
+        "kind": "asset",
+        "asset_kind": "scene",
+        "asset_id": 116,
+        "version_task_id": null
+      },
+      "quality_warnings": [
+        {
+          "frame_index": 3,
+          "t": 2.8,
+          "effective_w": 1690,
+          "effective_h": 957,
+          "output_w": 544,
+          "output_h": 960,
+          "spec_w": 544,
+          "spec_h": 960
+        }
+      ],
+      "render_path": "static/layer-segments/9b56ab8d-fd29-47d2-ba1b-520432fdbf06.mp4",
+      "render_signature": "c10e79c9a76c1a6797bd8d4a4e2a9012128884e28323dfe3534ab93a7199c204",
+      "rendered_at": "2026-11-11T00:11:44.811Z",
+      "junction_path": "static/layer-frames/40-d3493de3aa6eaa6c7ae005381f9bbd212b6ec2f79e9e7c5fdc4da81b59ebfeb1.png",
+      "junction_hash": "d3493de3aa6eaa6c7ae005381f9bbd212b6ec2f79e9e7c5fdc4da81b59ebfeb1",
+      "status": "ready",
+      "stale_reasons": [],
+      "base_check": null,
+      "created_at": "2026-11-10T18:50:00.735Z",
+      "updated_at": "2026-11-11T00:11:44.811Z",
+      "fresh": false,
+      "base_check_required": true,
+      "base_check_satisfied": false
+    },
+    "junction": {
+      "source": "layer_last",
+      "t": 4,
+      "path": "static/layer-frames/40-d3493de3aa6eaa6c7ae005381f9bbd212b6ec2f79e9e7c5fdc4da81b59ebfeb1.png",
+      "hash": "d3493de3aa6eaa6c7ae005381f9bbd212b6ec2f79e9e7c5fdc4da81b59ebfeb1",
+      "stale": true,
+      "base_check_reason": "图层底图待视觉验证",
+      "segment_fresh": false,
+      "combo": "C"
+    },
+    "issues": []
+  },
+  {
+    "spec": {
+      "width": 544,
+      "height": 960,
+      "fps": 25,
+      "source": "video"
+    },
+    "combo": "C",
+    "design_card_status": "confirmed",
+    "production_unlocked": true,
+    "gate_reason": null,
+    "segment": {
+      "id": 41,
+      "storyboard_id": 593,
+      "layer_doc": {
+        "version": 1,
+        "base": {
+          "path": "static/images/ad030aed-3e58-4837-a6eb-9993f029a5ce.png",
+          "width": 544,
+          "height": 960,
+          "source_width": 1920,
+          "source_height": 1088,
+          "filter": {
+            "paper": 0.16,
+            "tint": "sepia",
+            "tint_strength": 0.18,
+            "vignette": 0.28
+          }
+        },
+        "theme": "archival",
+        "layers": [
+          {
+            "id": "L1",
+            "type": "label",
+            "name": "秦不是被一支军队打倒的",
+            "visible": true,
+            "locked": false,
+            "z": 1,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.743,
+              "h": 0.09
+            },
+            "text": "秦不是被一支军队打倒的",
+            "style": {
+              "font": "serif",
+              "size": 0.036,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L2",
+            "type": "label",
+            "name": "十五年的徭役",
+            "visible": true,
+            "locked": false,
+            "z": 2,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.426,
+              "h": 0.09
+            },
+            "text": "十五年的徭役",
+            "style": {
+              "font": "serif",
+              "size": 0.036,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L3",
+            "type": "label",
+            "name": "秦法无数条　刘邦只留三句",
+            "visible": true,
+            "locked": false,
+            "z": 3,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.807,
+              "h": 0.09
+            },
+            "text": "秦法无数条　刘邦只留三句",
+            "style": {
+              "font": "serif",
+              "size": 0.036,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L4",
+            "type": "label",
+            "name": "一句「杀降不祥」",
+            "visible": true,
+            "locked": false,
+            "z": 4,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.553,
+              "h": 0.09
+            },
+            "text": "一句「杀降不祥」",
+            "style": {
+              "font": "serif",
+              "size": 0.036,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L5",
+            "type": "label",
+            "name": "一点点让出了天下",
+            "visible": true,
+            "locked": false,
+            "z": 5,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.553,
+              "h": 0.09
+            },
+            "text": "一点点让出了天下",
+            "style": {
+              "font": "serif",
+              "size": 0.036,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          }
+        ]
+      },
+      "timeline": {
+        "fps": 25,
+        "ease": "inout",
+        "fade_ms": 250,
+        "keyframes": [
+          {
+            "t": 0,
+            "viewport": {
+              "x": 0,
+              "y": 0,
+              "w": 1,
+              "h": 1
+            },
+            "visible": []
+          },
+          {
+            "t": 0.4,
+            "viewport": {
+              "x": 0.02,
+              "y": 0.0004,
+              "w": 0.96,
+              "h": 0.96
+            },
+            "visible": [
+              "L1"
+            ]
+          },
+          {
+            "t": 2.2,
+            "viewport": {
+              "x": 0.04,
+              "y": 0.0008,
+              "w": 0.92,
+              "h": 0.92
+            },
+            "visible": [
+              "L2"
+            ]
+          },
+          {
+            "t": 4.2,
+            "viewport": {
+              "x": 0.06,
+              "y": 0.0012,
+              "w": 0.88,
+              "h": 0.88
+            },
+            "visible": [
+              "L3"
+            ]
+          },
+          {
+            "t": 5.2,
+            "viewport": {
+              "x": 0.06,
+              "y": 0.0012,
+              "w": 0.88,
+              "h": 0.88
+            },
+            "visible": [
+              "L5"
+            ]
+          },
+          {
+            "t": 5.8,
+            "viewport": {
+              "x": 0.03,
+              "y": 0.03,
+              "w": 0.94,
+              "h": 0.94
+            },
+            "visible": [
+              "L5"
+            ]
+          }
+        ]
+      },
+      "duration": 5.8,
+      "end_hold": 0,
+      "base_ref": {
+        "kind": "asset",
+        "asset_kind": "scene",
+        "asset_id": 115,
+        "version_task_id": null
+      },
+      "quality_warnings": [
+        {
+          "frame_index": 3,
+          "t": 4.2,
+          "effective_w": 1690,
+          "effective_h": 957,
+          "output_w": 544,
+          "output_h": 960,
+          "spec_w": 544,
+          "spec_h": 960
+        },
+        {
+          "frame_index": 4,
+          "t": 5.2,
+          "effective_w": 1690,
+          "effective_h": 957,
+          "output_w": 544,
+          "output_h": 960,
+          "spec_w": 544,
+          "spec_h": 960
+        }
+      ],
+      "render_path": "static/layer-segments/c427513b-e847-4b3e-adde-4eef07cc6d64.mp4",
+      "render_signature": "1aa51d5214c8cf159ff344f92e2dd48264ba61202d65f414c8e0fa7a5b084222",
+      "rendered_at": "2026-11-11T00:11:48.259Z",
+      "junction_path": "static/layer-frames/41-71192df6d9424f9a027e0d5cf852f026389108d4813c9d9f6282780bce22c1e5.png",
+      "junction_hash": "71192df6d9424f9a027e0d5cf852f026389108d4813c9d9f6282780bce22c1e5",
+      "status": "ready",
+      "stale_reasons": [],
+      "base_check": null,
+      "created_at": "2026-11-10T18:50:03.652Z",
+      "updated_at": "2026-11-11T00:11:48.259Z",
+      "fresh": false,
+      "base_check_required": true,
+      "base_check_satisfied": false
+    },
+    "junction": {
+      "source": "layer_last",
+      "t": 5.8,
+      "path": "static/layer-frames/41-71192df6d9424f9a027e0d5cf852f026389108d4813c9d9f6282780bce22c1e5.png",
+      "hash": "71192df6d9424f9a027e0d5cf852f026389108d4813c9d9f6282780bce22c1e5",
+      "stale": true,
+      "base_check_reason": "图层底图待视觉验证",
+      "segment_fresh": false,
+      "combo": "C"
+    },
+    "issues": []
+  },
+  {
+    "spec": {
+      "width": 544,
+      "height": 960,
+      "fps": 25,
+      "source": "video"
+    },
+    "combo": "C",
+    "design_card_status": "confirmed",
+    "production_unlocked": true,
+    "gate_reason": null,
+    "segment": {
+      "id": 42,
+      "storyboard_id": 594,
+      "layer_doc": {
+        "version": 1,
+        "base": {
+          "path": "static/images/391d6e28-bd6f-4963-ba4e-3038530eb451.png",
+          "width": 544,
+          "height": 960,
+          "source_width": 1920,
+          "source_height": 1088,
+          "filter": {
+            "paper": 0.16,
+            "tint": "sepia",
+            "tint_strength": 0.18,
+            "vignette": 0.28
+          }
+        },
+        "theme": "archival",
+        "layers": [
+          {
+            "id": "L1",
+            "type": "label",
+            "name": "下一期",
+            "visible": true,
+            "locked": false,
+            "z": 1,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.22,
+              "w": 0.34,
+              "h": 0.09
+            },
+            "text": "下一期",
+            "style": {
+              "font": "serif",
+              "size": 0.052,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L2",
+            "type": "label",
+            "name": "刘邦去了鸿门",
+            "visible": true,
+            "locked": false,
+            "z": 2,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.426,
+              "h": 0.09
+            },
+            "text": "刘邦去了鸿门",
+            "style": {
+              "font": "serif",
+              "size": 0.036,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L3",
+            "type": "label",
+            "name": "鸿门",
+            "visible": true,
+            "locked": false,
+            "z": 3,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.22,
+              "w": 0.248,
+              "h": 0.09
+            },
+            "text": "鸿门",
+            "style": {
+              "font": "serif",
+              "size": 0.052,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          },
+          {
+            "id": "L4",
+            "type": "label",
+            "name": "那一天，中国差一点就没有汉朝",
+            "visible": true,
+            "locked": false,
+            "z": 4,
+            "opacity": 1,
+            "rotation": 0,
+            "box": {
+              "x": 0.07,
+              "y": 0.3,
+              "w": 0.778,
+              "h": 0.09
+            },
+            "text": "那一天，中国差一点就没有汉朝",
+            "style": {
+              "font": "serif",
+              "size": 0.03,
+              "color": "#f7efe0",
+              "stroke": "#1d1712",
+              "stroke_width": 0.0022,
+              "bg": "#1d1712",
+              "bg_opacity": 0.62,
+              "align": "left",
+              "bold": true
+            }
+          }
+        ]
+      },
+      "timeline": {
+        "fps": 25,
+        "ease": "inout",
+        "fade_ms": 250,
+        "keyframes": [
+          {
+            "t": 0,
+            "viewport": {
+              "x": 0,
+              "y": 0,
+              "w": 1,
+              "h": 1
+            },
+            "visible": []
+          },
+          {
+            "t": 0.4,
+            "viewport": {
+              "x": 0.02,
+              "y": 0.0004,
+              "w": 0.96,
+              "h": 0.96
+            },
+            "visible": [
+              "L1"
+            ]
+          },
+          {
+            "t": 1.6,
+            "viewport": {
+              "x": 0.06,
+              "y": 0.0012,
+              "w": 0.88,
+              "h": 0.88
+            },
+            "visible": [
+              "L4"
+            ]
+          },
+          {
+            "t": 2.2,
+            "viewport": {
+              "x": 0.03,
+              "y": 0.03,
+              "w": 0.94,
+              "h": 0.94
+            },
+            "visible": [
+              "L4"
+            ]
+          }
+        ]
+      },
+      "duration": 2.2,
+      "end_hold": 0,
+      "base_ref": {
+        "kind": "asset",
+        "asset_kind": "scene",
+        "asset_id": 111,
+        "version_task_id": null
+      },
+      "quality_warnings": [
+        {
+          "frame_index": 2,
+          "t": 1.6,
+          "effective_w": 1690,
+          "effective_h": 957,
+          "output_w": 544,
+          "output_h": 960,
+          "spec_w": 544,
+          "spec_h": 960
+        }
+      ],
+      "render_path": "static/layer-segments/4580cace-3f3f-4b37-88d5-6207d50d8b9a.mp4",
+      "render_signature": "0a5dc4e4f52d3f974413c836d489143afc651f407ffc8ea249e1c4cf1be03c80",
+      "rendered_at": "2026-11-11T00:11:49.577Z",
+      "junction_path": "static/layer-frames/42-f837da6759bc0a7c4bd548ce5f6b2615f05be7911d3db02cd78698b625667d1c.png",
+      "junction_hash": "f837da6759bc0a7c4bd548ce5f6b2615f05be7911d3db02cd78698b625667d1c",
+      "status": "ready",
+      "stale_reasons": [],
+      "base_check": null,
+      "created_at": "2026-11-10T18:50:07.767Z",
+      "updated_at": "2026-11-11T00:11:49.577Z",
+      "fresh": false,
+      "base_check_required": true,
+      "base_check_satisfied": false
+    },
+    "junction": {
+      "source": "layer_last",
+      "t": 2.2,
+      "path": "static/layer-frames/42-f837da6759bc0a7c4bd548ce5f6b2615f05be7911d3db02cd78698b625667d1c.png",
+      "hash": "f837da6759bc0a7c4bd548ce5f6b2615f05be7911d3db02cd78698b625667d1c",
+      "stale": true,
+      "base_check_reason": "图层底图待视觉验证",
+      "segment_fresh": false,
+      "combo": "C"
+    },
+    "issues": []
+  }
+]

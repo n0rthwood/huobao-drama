@@ -1,0 +1,625 @@
+{
+  "query_scope": {
+    "episode_id": 21,
+    "storyboard_ids": [
+      573,
+      574,
+      575,
+      576,
+      577,
+      578,
+      579,
+      580,
+      581,
+      582,
+      583,
+      584,
+      585,
+      586,
+      587,
+      588,
+      589,
+      590,
+      591,
+      592,
+      593,
+      594
+    ]
+  },
+  "storyboards": [
+    {
+      "id": 573,
+      "storyboard_number": 1,
+      "combo": "C",
+      "first_frame_image": null,
+      "mid_frame_image": "static/images/abafb7e8-b67f-4ee5-8830-916e9b5cfecc.png",
+      "last_frame_image": "static/images/4df7860c-dcff-4991-a181-8f03cc79fbd8.png",
+      "video_url": "static/videos/ca48a806-84bd-48d2-8d40-c96592e2ace6.mp4",
+      "composed_video_url": "static/composed/dc950a79-4202-4ae8-8abf-8c369f650d87.mp4",
+      "keyframes_confirmed": 1,
+      "keyframes_junction_hash": "63bd611f7519536bc862e7232d21f0bf34572b88e791dc09d8da30be5667621f",
+      "keyframes_stale_reason": null
+    },
+    {
+      "id": 574,
+      "storyboard_number": 2,
+      "combo": "C",
+      "first_frame_image": null,
+      "mid_frame_image": "static/images/247696b2-78cb-4ec8-9d79-3ec203c81d8c.png",
+      "last_frame_image": "static/images/ba68788e-f738-4306-8c0f-da876bce7d4b.png",
+      "video_url": "static/videos/cd492581-b4e2-4262-b235-047356080d02.mp4",
+      "composed_video_url": "static/composed/f530da3f-b798-40dc-a0cb-8d19b20b7da8.mp4",
+      "keyframes_confirmed": 1,
+      "keyframes_junction_hash": "f837da6759bc0a7c4bd548ce5f6b2615f05be7911d3db02cd78698b625667d1c",
+      "keyframes_stale_reason": null
+    },
+    {
+      "id": 575,
+      "storyboard_number": 3,
+      "combo": "C",
+      "first_frame_image": null,
+      "mid_frame_image": "static/images/1a0c5ecf-a02d-4905-b4c7-c59c9608212c.png",
+      "last_frame_image": "static/images/2ff22a59-4288-416b-a77b-b58df2d6dc99.png",
+      "video_url": "static/videos/32255848-0870-44f7-b481-fceddcc0bd5e.mp4",
+      "composed_video_url": "static/composed/c84dfc96-2c49-47fd-9240-0012ef083f26.mp4",
+      "keyframes_confirmed": 1,
+      "keyframes_junction_hash": "2520cfc5c13242d757fb2bf302ed0c52b90494f8dbe92cf814b1417260297014",
+      "keyframes_stale_reason": null
+    },
+    {
+      "id": 576,
+      "storyboard_number": 4,
+      "combo": "C",
+      "first_frame_image": null,
+      "mid_frame_image": "static/images/590451ef-ceb0-48e9-b70a-d7551adecc1e.png",
+      "last_frame_image": "static/images/4ae13f18-0ec7-4fec-9836-2d2ce8650955.png",
+      "video_url": "static/videos/2161f489-4345-4637-a2fb-28727305182b.mp4",
+      "composed_video_url": "static/composed/d38deb1d-ce72-49c5-86fb-1a097344ab4c.mp4",
+      "keyframes_confirmed": 1,
+      "keyframes_junction_hash": "2520cfc5c13242d757fb2bf302ed0c52b90494f8dbe92cf814b1417260297014",
+      "keyframes_stale_reason": null
+    },
+    {
+      "id": 577,
+      "storyboard_number": 5,
+      "combo": "C",
+      "first_frame_image": null,
+      "mid_frame_image": "static/images/9b95ad66-6c75-4ede-8d91-7c3471a96462.png",
+      "last_frame_image": "static/images/b9fa7e50-f612-4731-8fe9-f3f8d726f12c.png",
+      "video_url": "static/videos/7ea5d31d-f80e-4ffd-b388-aae911e0b9f1.mp4",
+      "composed_video_url": "static/composed/c557ef23-febd-4586-9c2c-9dc828549200.mp4",
+      "keyframes_confirmed": 1,
+      "keyframes_junction_hash": "cae7a24e7283819e385bc55eb23a1e15d39727c604597ec19959e3fdc2889065",
+      "keyframes_stale_reason": null
+    },
+    {
+      "id": 578,
+      "storyboard_number": 6,
+      "combo": "C",
+      "first_frame_image": null,
+      "mid_frame_image": "static/images/bb3e72d0-a305-448b-a173-3c0fe945fff5.png",
+      "last_frame_image": "static/images/655f159d-964d-4614-bc69-02bd5d9b7feb.png",
+      "video_url": "static/videos/6e6050ff-e745-420a-8c43-530c2a0bf874.mp4",
+      "composed_video_url": "static/composed/8310ac56-4d2f-4929-829c-68f32758ca62.mp4",
+      "keyframes_confirmed": 1,
+      "keyframes_junction_hash": "2520cfc5c13242d757fb2bf302ed0c52b90494f8dbe92cf814b1417260297014",
+      "keyframes_stale_reason": null
+    },
+    {
+      "id": 579,
+      "storyboard_number": 7,
+      "combo": "C",
+      "first_frame_image": null,
+      "mid_frame_image": "static/images/582b21f4-b81a-45e2-90d2-44a506b41637.png",
+      "last_frame_image": "static/images/79eb8276-50c8-435e-9cd9-c039531b6f28.png",
+      "video_url": "static/videos/8998b70d-ae28-4001-9c5a-d3766ccf9750.mp4",
+      "composed_video_url": "static/composed/5911ba88-ec00-4c7d-8f92-4955ec40d2b0.mp4",
+      "keyframes_confirmed": 1,
+      "keyframes_junction_hash": "cae7a24e7283819e385bc55eb23a1e15d39727c604597ec19959e3fdc2889065",
+      "keyframes_stale_reason": null
+    },
+    {
+      "id": 580,
+      "storyboard_number": 8,
+      "combo": "C",
+      "first_frame_image": null,
+      "mid_frame_image": "static/images/0995bc6d-5723-4031-89d9-7ff3ad07f5d7.png",
+      "last_frame_image": "static/images/1e8ecaf3-25f4-45cd-8b50-2d9aee14fd1a.png",
+      "video_url": "static/videos/df98e5d3-2e56-4d7c-8dea-dedd68d4e0fc.mp4",
+      "composed_video_url": "static/composed/15f5cd4c-0c68-495f-aad6-32f0cfaf0116.mp4",
+      "keyframes_confirmed": 1,
+      "keyframes_junction_hash": "63bd611f7519536bc862e7232d21f0bf34572b88e791dc09d8da30be5667621f",
+      "keyframes_stale_reason": null
+    },
+    {
+      "id": 581,
+      "storyboard_number": 9,
+      "combo": "C",
+      "first_frame_image": null,
+      "mid_frame_image": "static/images/14abf355-300a-4e37-90db-d8bd0cdff769.png",
+      "last_frame_image": "static/images/23025369-ee19-46ae-843b-e79e56d6e25f.png",
+      "video_url": "static/videos/77aec254-dca4-4788-88ed-31e4e8b20fa9.mp4",
+      "composed_video_url": "static/composed/d4edc929-b012-4149-b613-f062dbfee7d3.mp4",
+      "keyframes_confirmed": 1,
+      "keyframes_junction_hash": "e388de430b026f22fa8568be0ed77c2c8344df92831741f5331c50f827b4abb4",
+      "keyframes_stale_reason": null
+    },
+    {
+      "id": 582,
+      "storyboard_number": 10,
+      "combo": "C",
+      "first_frame_image": null,
+      "mid_frame_image": "static/images/9ded7211-f6b8-4eb8-9404-cf6ad0170e19.png",
+      "last_frame_image": "static/images/f7e064d8-a1fc-4dc7-805c-6e74aec00273.png",
+      "video_url": "static/videos/c31e32b5-31ab-40a7-ad52-a4ad69c14a8d.mp4",
+      "composed_video_url": "static/composed/2a870f1f-db46-45c9-9a83-a2f73b07869b.mp4",
+      "keyframes_confirmed": 1,
+      "keyframes_junction_hash": "ee6dfd5754e84d7e8cdc234911ef3b81dbacad07d4131d8310b0e948902698b7",
+      "keyframes_stale_reason": null
+    },
+    {
+      "id": 583,
+      "storyboard_number": 11,
+      "combo": "C",
+      "first_frame_image": null,
+      "mid_frame_image": "static/images/6d11c7c7-90b8-4757-a523-2dab4dc6ce6b.png",
+      "last_frame_image": "static/images/bef5f3a9-53ba-44bd-99a2-26013cd2f66e.png",
+      "video_url": "static/videos/76e76248-f5e5-422e-aa3e-027606ea08c8.mp4",
+      "composed_video_url": "static/composed/08d08562-02b7-4e5e-8613-630dd38f5fef.mp4",
+      "keyframes_confirmed": 1,
+      "keyframes_junction_hash": "cae7a24e7283819e385bc55eb23a1e15d39727c604597ec19959e3fdc2889065",
+      "keyframes_stale_reason": null
+    },
+    {
+      "id": 584,
+      "storyboard_number": 12,
+      "combo": "C",
+      "first_frame_image": null,
+      "mid_frame_image": "static/images/cfd27aaf-3e25-48e1-af81-20ebf03889c5.png",
+      "last_frame_image": "static/images/618b45c1-7df0-427f-a751-87534b015662.png",
+      "video_url": "static/videos/38582b2a-953a-425f-9840-8d86893221a2.mp4",
+      "composed_video_url": "static/composed/6b1db92f-6465-40d2-a2aa-0f17905248ba.mp4",
+      "keyframes_confirmed": 1,
+      "keyframes_junction_hash": "cae7a24e7283819e385bc55eb23a1e15d39727c604597ec19959e3fdc2889065",
+      "keyframes_stale_reason": null
+    },
+    {
+      "id": 585,
+      "storyboard_number": 13,
+      "combo": "C",
+      "first_frame_image": null,
+      "mid_frame_image": "static/images/76561e4a-fa3d-4cec-b5cf-4db928889a70.png",
+      "last_frame_image": "static/images/b574c436-b39b-432d-a416-410b813efe87.png",
+      "video_url": "static/videos/eb3d2d51-f679-477a-a6f8-f86e5abfd396.mp4",
+      "composed_video_url": "static/composed/1fdbd071-081b-4fe9-b9a7-314682bc24fc.mp4",
+      "keyframes_confirmed": 1,
+      "keyframes_junction_hash": "cae7a24e7283819e385bc55eb23a1e15d39727c604597ec19959e3fdc2889065",
+      "keyframes_stale_reason": null
+    },
+    {
+      "id": 586,
+      "storyboard_number": 14,
+      "combo": "D",
+      "first_frame_image": "static/images/e81fdb03-62fe-4b3e-bf20-b23cfa91dc67.png",
+      "mid_frame_image": "static/images/171b53be-3f66-453d-95ce-5406b574a337.png",
+      "last_frame_image": null,
+      "video_url": "static/videos/02ecb7f0-dd74-4411-b92c-65718bfe0720.mp4",
+      "composed_video_url": "static/composed/95473f28-4aa5-44c5-98b2-6bc02f0a2d70.mp4",
+      "keyframes_confirmed": 1,
+      "keyframes_junction_hash": "5b20a3f1512524aebf1e86846132fa9ac195da05d119b574b75388b97e1a9c32",
+      "keyframes_stale_reason": null
+    },
+    {
+      "id": 587,
+      "storyboard_number": 15,
+      "combo": "C",
+      "first_frame_image": null,
+      "mid_frame_image": "static/images/430c084a-d70e-4fa8-9f7f-c288b3adb4c4.png",
+      "last_frame_image": "static/images/e2665bfe-9558-49f4-8b0d-93b29b7548ca.png",
+      "video_url": "static/videos/684006f9-ca24-4eb3-a220-2bc96edc11e8.mp4",
+      "composed_video_url": "static/composed/e3d57c0a-6a5b-4d04-97da-76491e6b926b.mp4",
+      "keyframes_confirmed": 1,
+      "keyframes_junction_hash": "71192df6d9424f9a027e0d5cf852f026389108d4813c9d9f6282780bce22c1e5",
+      "keyframes_stale_reason": null
+    },
+    {
+      "id": 588,
+      "storyboard_number": 16,
+      "combo": "C",
+      "first_frame_image": null,
+      "mid_frame_image": "static/images/fcc3197e-1d38-4a9e-9bd9-c13a37277f34.png",
+      "last_frame_image": "static/images/e34e90da-d30b-447d-9d36-a646ede0c353.png",
+      "video_url": "static/videos/f9ec616f-1308-4c66-b312-cbe94e5a50a3.mp4",
+      "composed_video_url": "static/composed/6be2c9df-a232-482c-8dc5-8482a8c88580.mp4",
+      "keyframes_confirmed": 1,
+      "keyframes_junction_hash": "ea24bffa7130f4a2746bf37d3ee4c34b27d511223fd73e89d56e3f66c7df753c",
+      "keyframes_stale_reason": null
+    },
+    {
+      "id": 589,
+      "storyboard_number": 17,
+      "combo": "C",
+      "first_frame_image": null,
+      "mid_frame_image": "static/images/17a97ce2-f989-4323-8acc-0a7c2eb0d486.png",
+      "last_frame_image": "static/images/89a4509e-c318-4a5e-a2bb-ae0c7731e2da.png",
+      "video_url": "static/videos/7e532b9d-acf2-426f-9184-9006d41025cb.mp4",
+      "composed_video_url": "static/composed/75fd5855-ab45-484c-95d2-4c2b6ffb5315.mp4",
+      "keyframes_confirmed": 1,
+      "keyframes_junction_hash": "63bd611f7519536bc862e7232d21f0bf34572b88e791dc09d8da30be5667621f",
+      "keyframes_stale_reason": null
+    },
+    {
+      "id": 590,
+      "storyboard_number": 18,
+      "combo": "C",
+      "first_frame_image": null,
+      "mid_frame_image": "static/images/61bae211-30ae-444c-8216-251d842a41b4.png",
+      "last_frame_image": "static/images/d6bd9b15-147b-49fa-8c6b-2ef235dd4914.png",
+      "video_url": "static/videos/4cbf80b8-9c35-4309-a996-7e65bec1dd52.mp4",
+      "composed_video_url": "static/composed/134dd015-24bb-41c3-b44f-3bc6613ec936.mp4",
+      "keyframes_confirmed": 1,
+      "keyframes_junction_hash": "1e0833eba48d89d8631ea07935afa4f0471dfa430964c6f05f6e19b19f1beb5f",
+      "keyframes_stale_reason": null
+    },
+    {
+      "id": 591,
+      "storyboard_number": 19,
+      "combo": "C",
+      "first_frame_image": null,
+      "mid_frame_image": "static/images/6c796fda-d2dd-4f2c-bd75-5179bf1b2f59.png",
+      "last_frame_image": "static/images/d14491ad-4b21-45b5-a97e-8eb9c326e6d8.png",
+      "video_url": "static/videos/32bf09dd-c9f7-40e3-af5a-dee2a6a7e1a2.mp4",
+      "composed_video_url": "static/composed/5da00381-ceaf-422a-b64c-cab725129775.mp4",
+      "keyframes_confirmed": 1,
+      "keyframes_junction_hash": "d0629aca82c506b21338ede62e794fc4f015ffd90f49c05d4a59ca826f79dab1",
+      "keyframes_stale_reason": null
+    },
+    {
+      "id": 592,
+      "storyboard_number": 20,
+      "combo": "C",
+      "first_frame_image": null,
+      "mid_frame_image": "static/images/71685205-e7f4-420f-96d3-8b66ffa9d45a.png",
+      "last_frame_image": "static/images/ed9fee8f-b571-4849-a726-6f3c97216320.png",
+      "video_url": "static/videos/acfcfc7b-e31d-49ae-afa6-55d4c65fd29a.mp4",
+      "composed_video_url": "static/composed/46deb195-6d37-48cb-bf42-e101ea223343.mp4",
+      "keyframes_confirmed": 1,
+      "keyframes_junction_hash": "d3493de3aa6eaa6c7ae005381f9bbd212b6ec2f79e9e7c5fdc4da81b59ebfeb1",
+      "keyframes_stale_reason": null
+    },
+    {
+      "id": 593,
+      "storyboard_number": 21,
+      "combo": "C",
+      "first_frame_image": null,
+      "mid_frame_image": "static/images/ce5d6706-e159-4116-a671-f958de6dc6bb.png",
+      "last_frame_image": "static/images/b92548c4-cd0e-40c4-ba79-9ee1ead49d77.png",
+      "video_url": "static/videos/9e460785-820a-4191-a777-c1d2c12f26da.mp4",
+      "composed_video_url": "static/composed/5eb1553a-0a01-428d-ba97-d779bef878fb.mp4",
+      "keyframes_confirmed": 1,
+      "keyframes_junction_hash": "71192df6d9424f9a027e0d5cf852f026389108d4813c9d9f6282780bce22c1e5",
+      "keyframes_stale_reason": null
+    },
+    {
+      "id": 594,
+      "storyboard_number": 22,
+      "combo": "C",
+      "first_frame_image": null,
+      "mid_frame_image": "static/images/b4d4321e-ea4f-4cd6-bee7-4b6419348d52.png",
+      "last_frame_image": "static/images/4914d4a1-1255-4e50-ad86-712d9511f0d8.png",
+      "video_url": "static/videos/57955400-e40b-4cfe-b91f-36121d4a6934.mp4",
+      "composed_video_url": "static/composed/92d9b977-faa1-4ea8-95a3-f93f93eb524e.mp4",
+      "keyframes_confirmed": 1,
+      "keyframes_junction_hash": "f837da6759bc0a7c4bd548ce5f6b2615f05be7911d3db02cd78698b625667d1c",
+      "keyframes_stale_reason": null
+    }
+  ],
+  "scenes": [
+    {
+      "id": 111,
+      "location": "霸上",
+      "image_url": "static/images/391d6e28-bd6f-4963-ba4e-3038530eb451.png",
+      "final_prompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark, 固定机位广角镜头，清晰的建立镜头，公元前207年初冬的咸阳城外霸上旷野高坡，清晨，前景（画面左下与右缘是枯黄倒伏的草丛与一道翻起的黄土坎沿）、中景（一片缓斜的黄土台地，坡面被稀疏枯草与碎石覆盖，一条碾压出的土路自画面下方斜向右上延伸，通向远处城门方向）、后景（稀疏的落叶乔木秃枝立在坡脊上，再远处是灰黑色咸阳城墙轮廓与城楼，被灰白薄雾吞没）三层分层构图，出入口（画面右下方的土路作为坡地通往咸阳城门的通道，路两侧立着一块低矮的秦式石标），地面（干燥的关中黄土，车辙与脚印压实成浅沟，边缘散着碎石与枯草屑），墙面（无墙体，仅远处夯土台地的立面无窗，表面风化、颜色灰褐），稀疏秃枝落叶乔木沿坡脊左右散立，土路与坡地的高差自洽、空间结构连续、自洽，清晨初冬的雾光，太阳尚未升高，低角度柔和冷调光线掠过坡面，灰白色薄雾横向漫过坡地，光影平缓、明暗对比低，空气寒冷寂静，远景被雾吞没，画面中没有任何人物，空场景，电影质感"
+    },
+    {
+      "id": 112,
+      "location": "咸阳城门",
+      "image_url": "static/images/050a7ba7-601d-4865-8f25-5b3d765f90c8.png",
+      "final_prompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark, 固定机位广角镜头，清晰的建立镜头，公元前207年秦代咸阳城门，上午。前景（画面左右两侧各有一截低矮土坡与散落的碎石、枯草，浅坑洼的黄土路面从画面下缘延伸进中景）。中景（主体空间是城门门洞与城楼基座：夯土城墙墙面，表面有夯筑层痕与风化剥落，墙顶架起木构城楼，城楼为深褐木柱与坡面屋顶，门洞居中，双扇厚重的暗褐木门向内敞开，门框上嵌有秦式方折回纹木构件，门洞内是一条幽深的夯土通道，通道尽头透出一点远处的街道微光）。后景（城门内更远的城郭街巷轮廓，被门洞裁成一段窄长深处，上方是上午泛白的天色）。出入口（画面中央门洞为城内外的唯一通道，双扇木门向内打开、贴靠在门洞内侧土壁上）。地面（门外为被车轮碾压出数道平行车辙的黄土路面，路面上浮着薄尘）。墙面（夯土城墙呈灰黄土色，墙面有风雨冲刷的竖向沟痕与斑驳剥落）。主要陈设及其固定相对位置：城门门洞居于画面正中，城楼横跨城墙顶端正对门洞上方，门外土路正对门洞朝画面下缘延伸，路面车辙与门洞中线对齐，路两侧土坡分列左右。空间结构连续、自洽，门内门外的层次前后贯通。上午的冷白日光从画面上方偏后斜照，雾已散薄，门外路面被照得发亮、门洞内通道暗沉，明暗对比强烈，空气中有薄尘悬浮，氛围清冷肃静。画面中没有任何人物，空场景，电影质感"
+    },
+    {
+      "id": 113,
+      "location": "轵道",
+      "image_url": "static/images/0b148c9f-0008-482a-b4a8-4331a16288dc.png",
+      "final_prompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark, 固定机位广角镜头，清晰的建立镜头，公元前207年秦代咸阳城外的轵道，上午，初冬时节，前景（画面左下角一小段塌陷的土坎，坎边枯黄的草丛与几根裸露的树根，作为框景）；中景（一条车辙深陷的黄土土路自画面左下方斜向贯穿至右上方，路面被碾压出两道平行的深车辙，辙底积着薄泥与浅灰积水痕，路侧立一块低矮的秦式路旁石标，方形石身、顶部略削平、表面无字迹、边缘被风化磨圆）；后景（灰褐色的初冬田野铺向地平线，几株秃枝老树错落立在路右一侧，枝干细瘦无叶，更远处是模糊的咸阳城郭剪影与低矮城楼轮廓），出入口（画面右上方土路笔直延伸消失于远处城郭方向，画面左侧中段有一条细窄岔道从主路分出，通向左后方的田野），地面（压实黄土路面，表面干硬泛浅灰高光，辙沟、碎石与枯草根散布，路缘有薄霜与残雾痕），墙面（无墙，仅有路旁低矮的黄土坎断面，土质粗粒、断口干裂，边缘零星长着枯草），空间结构连续、自洽，上午偏白的日光从画面左上方斜射，色温偏冷、光线均匀略显阴冷，明暗对比柔和，初冬雾气残留贴伏于地表，土路反出浅灰高光，空气清寒寂寥，画面中没有任何人物，空场景，电影质感"
+    },
+    {
+      "id": 114,
+      "location": "咸阳宫",
+      "image_url": "static/images/48646d2e-63ec-4c43-8584-92872effb191.png",
+      "final_prompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark, 固定机位广角镜头，清晰的建立镜头，公元前207年秦代咸阳宫高台之上的殿堂内部，深夜，前景（画面左右两侧各一根粗壮的深色木柱与垂落的素色帷幕边缘框住画面，柱脚旁一只青铜灯架的火苗低矮跳动）、中景（殿内开阔的铺砖地面向纵深延伸，正中靠后立起一方高台，高台上安放一张漆木御座，座前两侧对称排列青铜灯架与成对的垂挂帷幕，砖面被灯火照出暖黄的光斑与长长的影线）、后景（殿堂深处的黑漆描红梁枋与成排立柱逐层没入黑暗，最深处一道高墙与后方廊道口隐在阴影里）三层分层构图，出入口（画面右侧一扇厚重的对开木殿门半掩，门外是幽暗的前廊，门缝里透进微弱的夜色冷光），地面（方形铺砖地面，砖缝清晰，年代久远踩磨出浅淡的凹痕与薄薄一层浮尘），墙面（夯土与木构墙面，梁枋以黑漆描红纹样，色彩沉暗斑驳），主要陈设及其固定相对位置（高台居殿内中轴靠后，御座朝向前廊方向，御座左右各三只青铜灯架等距排在柱间，帷幕从梁下垂挂于灯架之间，殿门位于画面右侧与御座成斜向相对），空间结构连续、自洽，光源为青铜灯架与烛火的暖黄火光，火点跳动，御座区明亮、殿角与梁顶沉入深黑，光比极大，空气沉闷寂静、殿内空落，画面中没有任何人物，空场景，电影质感"
+    },
+    {
+      "id": 115,
+      "location": "咸阳街道",
+      "image_url": "static/images/ad030aed-3e58-4837-a6eb-9993f029a5ce.png",
+      "final_prompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark, 固定机位广角镜头，清晰的建立镜头，公元前207年秦代咸阳城内街道，上午，前景（画面左缘露出一段暗褐色木格店面门框与街边一只石墩，作框景遮挡）、中景（压实黄土的街道主体横贯画面并向纵深收窄，路面留有两道深陷车辙，街心略微起伏）、后景（街道尽头是宫城方向的高台建筑剪影，层层夯土台基与屋顶轮廓被上午的空气薄尘虚化）三层分层构图，出入口（街道两侧各有巷道口，画面右侧一条窄巷向内延伸，画面左侧街面正对宫城方向为开放式通道），地面（压实黄土路面，干硬开裂，车辙内积着浅浮土与细碎石粒），墙面（两侧民居为夯土墙，墙体灰黄斑驳、表面有细裂纹与雨水冲刷的浅痕，门面为暗褐色木格门窗），主要陈设及其固定相对位置（街道两侧低矮夯土木构民居与店铺沿街对称排布，右侧靠墙立一条长木制水槽、槽口朝向街面，左侧近前景处一只石墩，几根木构檐柱沿檐口排开并互相平行），空间结构连续、自洽，上午明亮自然光从街道上方斜射，日光在左侧土墙上留下柔和的长斜阴影，色温偏暖褐，明暗对比柔和，空气中浮着细尘，画面中没有任何人物，空场景，电影质感"
+    },
+    {
+      "id": 116,
+      "location": "咸阳",
+      "image_url": "static/images/e89e0f08-712f-4ac8-893b-c161291c05a9.png",
+      "final_prompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark, 固定机位广角镜头，清晰的建立镜头，公元前206年秦都咸阳城，被大火吞没的秦式高台宫殿群，夜晚，\n前景（画面下方与左右边缘是塌落下来的黑漆木构梁枋残段与成堆碎瓦，一截断裂的粗木柱斜搭在前景右侧，表面炭化开裂，几簇火苗正沿着木料缝隙向上舔烧）、中景（一座秦代高台木构主殿正成片燃烧，夯土墙体被熏成焦黑，屋顶已经塌落、露出烧断的木椽骨架，火舌从门窗缺口里翻卷而出，殿前台阶断裂错落，地面散落焦黑木料与碎瓦）、后景（更高的台榭与宫室轮廓在浓烟中层层退远，数道巨大的烟柱竖直升入夜空，远处城郭的夯土城墙轮廓被火光映出一圈暗红边线）三层分层构图，\n出入口（中景主殿左侧是一条通往宫城的宽阔夯土甬道，甬道尽头被倒塌的木料半掩，画面右缘一道宫墙的缺口向外透出开阔的城外暗夜），地面（夯实黄土被火光烤得龟裂，遍布炭屑、焦黑木块与碎裂瓦片，塌落的梁木横在路面上），墙面（夯土墙面大面积熏黑剥落，露出内部灰白的土芯，残余黑漆描红的木构件在火光中闪着暗红光），\n主要陈设及其固定相对位置：主殿居中偏左占据中景核心，殿前石阶自殿门向下正对镜头，右侧一道宫墙沿画面纵深延伸至后景，左侧甬道平行于宫墙通向城内深处，殿与墙之间的空地散落若干烧塌的木架与瓦砾堆，\n空间结构连续、自洽，\n唯一光源是冲天大火，橙红火光自中景殿体向上翻涌，映亮整片宫室废墟与烟柱，墙面与柱脚投下浓重晃动的硬阴影，天空被浓烟压暗成深褐灰，色调炽烈而压抑，空气里浮着火星与灰烬，\n画面中没有任何人物，空场景，电影质感"
+    },
+    {
+      "id": 120,
+      "location": "霸上军营",
+      "image_url": "static/images/5535e5be-5489-4b3e-ae55-51623c1c98e5.png",
+      "final_prompt": "Chinese guofeng 2.5D illustration style, semi-realistic donghua-quality character art, elegant flowing line work, rich traditional Chinese aesthetic elements, layered ink-wash inspired atmospheric backgrounds, refined silk and fabric textures, soft luminous lighting with gentle haze, sophisticated muted jewel-tone palette, xianxia drama poster quality, consistent character design across shots, avoid flat cel shading, avoid western comic ink style, avoid photorealism, avoid plastic 3D look, avoid modern clothing and props unless specified, 固定机位广角镜头，清晰的建立镜头，霸上的一处军营营地，夜，前景（画面左下角一道斜插的木栅立柱与拉紧的绳索，柱顶插着一支燃烧的火把，栅栏外的草地边缘延伸到画面下缘）、中景（平坦草地上的营地主体空间，数顶灰褐色帐篷沿通道两侧整齐排列，帐篷间留出可通行的空隙，帐篷门口挂着半掀的帘布）、后景（营门两根粗木立柱夹一道横杆立于中景右侧，营门前接一段石砌高台阶向上通向略高的夯土平台，远处地平线上咸阳城墙的轮廓与宫室屋顶的暗影沉在夜色里）三层分层构图，出入口（营门位于画面右侧，两根粗木立柱夹横杆，营门前石砌高台阶自画面右下方往上通往夯土平台），地面（平整草地上被踩出浅淡的土黄痕，帐篷之间通道碎石零星，火把下投出暖色光斑），墙面（营地四周的木栅与绳索围合，栅木粗糙有裂纹，帐篷布面灰褐、边角沾着尘土与褶皱），主要陈设（成排火把沿通道与营门两侧立起、橙黄光点在暗色夜空里连成一线，帐篷群自画面左前方一顶接一顶向中景深处排开，营门与石砌台阶固定在画面右侧，夯土平台高出营地地面），空间结构连续、自洽，夜间光源为成排火把的橙黄火苗，帐篷边缘、木栅与远处城墙沉入深蓝黑，火光与夜色对比强烈，空气里带着夜露的凉意与微弱烟味，画面中没有任何人物，空场景，电影质感"
+    },
+    {
+      "id": 122,
+      "location": "大泽乡",
+      "image_url": "static/images/31144355-79a0-4a5f-bc03-e53d19984df3.png",
+      "final_prompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark, 固定机位广角镜头，清晰的建立镜头，公元前209年秦代蕲县大泽乡的泽畔荒野，清晨，雨后不久的阴湿天色，前景（画面左右两侧是齐腰高的枯黄芦苇丛与倒伏的湿草，一株折断的芦苇斜垂在左下角框住画面边缘）、中景（一条被雨水泡软的泥泞土路自画面左侧蜿蜒横穿，路面车辙与脚印积着浑水，土路向右前方延伸至一片开阔的芦苇沼泽，路旁散着三两个浅水洼，水面平如镜面映出灰白天空）、后景（沼泽水面向远处铺展直至雾气吞没，稀疏的枯树与低矮土坡的轮廓在薄雾里层层淡出）三层分层构图，出入口（画面左侧土路自坡后转入，画面右侧芦苇间留出一道被踩出的窄小缺口通向沼泽深处），地面（深褐色泥地湿滑发亮，踩踏处翻起泥浆，水洼边缘有薄薄的泥痕与细碎草屑），墙面（无建筑，视野内只有坡地泥土断面与芦苇丛的层叠叶影），主要陈设及其固定相对位置（泥泞土路居画面中线偏左、为唯一通行动线，沼泽水面在其右后方占据画面右半，枯树群集中在中景与后景交界的土坡高处，浅水洼贴着土路右缘排列），空间结构连续、自洽，光源为雨后清晨从灰白云层透出的漫射日光，无明确方向、色温偏冷，光线均匀低平，水面与水洼反出灰白亮斑，芦苇丛下方与土坡背面压出柔和浓重的暗部，雾气贴着地面低垂、远处层次被雾削弱，空气湿冷、氛围荒凉压抑而静谧，画面中没有任何人物，空场景，电影质感"
+    }
+  ],
+  "props": [
+    {
+      "id": 217,
+      "name": "行军地图",
+      "image_url": "static/images/2e6eda55-3b3b-4a62-9ac9-07f98f504b7f.png",
+      "final_prompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark, 单品产品图，标准产品摄影视角，正俯视平铺构图：一幅公元前三世纪末秦末时期的行军路线示意图，绘制在米黄色丝帛上，整幅平铺展开，无卷曲、无遮挡。丝帛质地细密，帛面可见经线纹理与自然折痕，边缘为手工裁切的齐边并略微起毛，帛色因年代而呈米黄微旧、局部有淡淡的水渍与磨损痕迹。图上以墨线绘制内容：山脊以连绵起伏的墨线勾勒并加晕染以表示山脉走向，河流以双道平行曲线蜿蜒贯穿，道路以细直线连接各点；关隘与城邑用方形墨线符号标出，符号大小一致、分布成一条由东向西推进的路径，粒度到关隘与城邑一级。图面素净，仅有墨线与符号，不出现任何文字、地名标注或印章。器物年代、形制与用墨工艺符合秦末实物，图上笔墨为当时墨色、笔触有浓淡变化与枯笔痕。物品各部分比例准确，丝帛四边完整入镜，画面四周留白充足，边缘完整无裁切。背景为纯白无影背景、无渐变、无投影，背景纯净不承载任何叙事内容，无其他物品、无人物、无场景。柔和均匀的影棚光，轻淡阴影，高细节，无现代加工痕迹、无印刷质感。",
+      "asset_type": "prop",
+      "faithful": 0
+    }
+  ],
+  "segments": [
+    {
+      "storyboard_id": 573,
+      "base_ref": "{\"kind\":\"asset\",\"asset_kind\":\"scene\",\"asset_id\":112,\"version_task_id\":null}",
+      "layer_doc": "{\"version\":1,\"base\":{\"path\":\"static/images/050a7ba7-601d-4865-8f25-5b3d765f90c8.png\",\"width\":544,\"height\":960,\"source_width\":1920,\"source_height\":1088,\"filter\":{\"paper\":0.16,\"tint\":\"sepia\",\"tint_strength\":0.18,\"vignette\":0.28}},\"theme\":\"archival\",\"layers\":[{\"id\":\"L1\",\"type\":\"label\",\"name\":\"公元前207年11月14日\",\"visible\":true,\"locked\":false,\"z\":1,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.725,\"h\":0.09},\"text\":\"公元前207年11月14日\",\"style\":{\"font\":\"serif\",\"size\":0.03,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L2\",\"type\":\"label\",\"name\":\"皇帝\",\"visible\":true,\"locked\":false,\"z\":2,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.22,\"w\":0.248,\"h\":0.09},\"text\":\"皇帝\",\"style\":{\"font\":\"serif\",\"size\":0.052,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L3\",\"type\":\"label\",\"name\":\"只用了十五年（前221 — 前207）\",\"visible\":true,\"locked\":false,\"z\":3,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.88,\"h\":0.14},\"text\":\"只用了十五年（前221 — 前207）\",\"style\":{\"font\":\"serif\",\"size\":0.03,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}}]}",
+      "junction_path": "static/layer-frames/21-63bd611f7519536bc862e7232d21f0bf34572b88e791dc09d8da30be5667621f.png",
+      "junction_hash": "63bd611f7519536bc862e7232d21f0bf34572b88e791dc09d8da30be5667621f",
+      "status": "ready",
+      "stale_reasons": "[]",
+      "base_check": null
+    },
+    {
+      "storyboard_id": 574,
+      "base_ref": "{\"kind\":\"asset\",\"asset_kind\":\"scene\",\"asset_id\":111,\"version_task_id\":null}",
+      "layer_doc": "{\"version\":1,\"base\":{\"path\":\"static/images/391d6e28-bd6f-4963-ba4e-3038530eb451.png\",\"width\":544,\"height\":960,\"source_width\":1920,\"source_height\":1088,\"filter\":{\"paper\":0.16,\"tint\":\"sepia\",\"tint_strength\":0.18,\"vignette\":0.28}},\"theme\":\"archival\",\"layers\":[{\"id\":\"L1\",\"type\":\"label\",\"name\":\"汉元年十月 · 霸上\",\"visible\":true,\"locked\":false,\"z\":1,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.68,\"h\":0.09},\"text\":\"汉元年十月 · 霸上\",\"style\":{\"font\":\"serif\",\"size\":0.036,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L2\",\"type\":\"label\",\"name\":\"咸阳城外\",\"visible\":true,\"locked\":false,\"z\":2,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.22,\"w\":0.431,\"h\":0.09},\"text\":\"咸阳城外\",\"style\":{\"font\":\"serif\",\"size\":0.052,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L3\",\"type\":\"label\",\"name\":\"楚\",\"visible\":true,\"locked\":false,\"z\":3,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.22,\"w\":0.156,\"h\":0.09},\"text\":\"楚\",\"style\":{\"font\":\"serif\",\"size\":0.052,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}}]}",
+      "junction_path": "static/layer-frames/22-f837da6759bc0a7c4bd548ce5f6b2615f05be7911d3db02cd78698b625667d1c.png",
+      "junction_hash": "f837da6759bc0a7c4bd548ce5f6b2615f05be7911d3db02cd78698b625667d1c",
+      "status": "ready",
+      "stale_reasons": "[]",
+      "base_check": null
+    },
+    {
+      "storyboard_id": 575,
+      "base_ref": "{\"kind\":\"asset\",\"asset_kind\":\"scene\",\"asset_id\":112,\"version_task_id\":null}",
+      "layer_doc": "{\"version\":1,\"base\":{\"path\":\"static/images/050a7ba7-601d-4865-8f25-5b3d765f90c8.png\",\"width\":544,\"height\":960,\"source_width\":1920,\"source_height\":1088,\"filter\":{\"paper\":0.16,\"tint\":\"sepia\",\"tint_strength\":0.18,\"vignette\":0.28}},\"theme\":\"archival\",\"layers\":[{\"id\":\"L1\",\"type\":\"label\",\"name\":\"他只带了三样东西\",\"visible\":true,\"locked\":false,\"z\":1,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.553,\"h\":0.09},\"text\":\"他只带了三样东西\",\"style\":{\"font\":\"serif\",\"size\":0.036,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L2\",\"type\":\"label\",\"name\":\"三样\",\"visible\":true,\"locked\":false,\"z\":2,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.22,\"w\":0.248,\"h\":0.09},\"text\":\"三样\",\"style\":{\"font\":\"serif\",\"size\":0.052,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}}]}",
+      "junction_path": "static/layer-frames/23-2520cfc5c13242d757fb2bf302ed0c52b90494f8dbe92cf814b1417260297014.png",
+      "junction_hash": "2520cfc5c13242d757fb2bf302ed0c52b90494f8dbe92cf814b1417260297014",
+      "status": "ready",
+      "stale_reasons": "[]",
+      "base_check": null
+    },
+    {
+      "storyboard_id": 576,
+      "base_ref": "{\"kind\":\"asset\",\"asset_kind\":\"scene\",\"asset_id\":112,\"version_task_id\":null}",
+      "layer_doc": "{\"version\":1,\"base\":{\"path\":\"static/images/050a7ba7-601d-4865-8f25-5b3d765f90c8.png\",\"width\":544,\"height\":960,\"source_width\":1920,\"source_height\":1088,\"filter\":{\"paper\":0.16,\"tint\":\"sepia\",\"tint_strength\":0.18,\"vignette\":0.28}},\"theme\":\"archival\",\"layers\":[{\"id\":\"L1\",\"type\":\"label\",\"name\":\"第一样 · 白车白马\",\"visible\":true,\"locked\":false,\"z\":1,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.68,\"h\":0.09},\"text\":\"第一样 · 白车白马\",\"style\":{\"font\":\"serif\",\"size\":0.036,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L2\",\"type\":\"label\",\"name\":\"白色不是颜色，是丧礼\",\"visible\":true,\"locked\":false,\"z\":2,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.68,\"h\":0.09},\"text\":\"白色不是颜色，是丧礼\",\"style\":{\"font\":\"serif\",\"size\":0.036,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}}]}",
+      "junction_path": "static/layer-frames/24-2520cfc5c13242d757fb2bf302ed0c52b90494f8dbe92cf814b1417260297014.png",
+      "junction_hash": "2520cfc5c13242d757fb2bf302ed0c52b90494f8dbe92cf814b1417260297014",
+      "status": "ready",
+      "stale_reasons": "[]",
+      "base_check": null
+    },
+    {
+      "storyboard_id": 577,
+      "base_ref": "{\"kind\":\"asset\",\"asset_kind\":\"scene\",\"asset_id\":113,\"version_task_id\":null}",
+      "layer_doc": "{\"version\":1,\"base\":{\"path\":\"static/images/0b148c9f-0008-482a-b4a8-4331a16288dc.png\",\"width\":544,\"height\":960,\"source_width\":1920,\"source_height\":1088,\"filter\":{\"paper\":0.16,\"tint\":\"sepia\",\"tint_strength\":0.18,\"vignette\":0.28}},\"theme\":\"archival\",\"layers\":[{\"id\":\"L1\",\"type\":\"label\",\"name\":\"第二样 · 系颈以组\",\"visible\":true,\"locked\":false,\"z\":1,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.68,\"h\":0.09},\"text\":\"第二样 · 系颈以组\",\"style\":{\"font\":\"serif\",\"size\":0.036,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L2\",\"type\":\"label\",\"name\":\"《史记》只留下四个字\",\"visible\":true,\"locked\":false,\"z\":2,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.68,\"h\":0.09},\"text\":\"《史记》只留下四个字\",\"style\":{\"font\":\"serif\",\"size\":0.036,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L3\",\"type\":\"label\",\"name\":\"系颈以组\",\"visible\":true,\"locked\":false,\"z\":3,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.22,\"w\":0.431,\"h\":0.09},\"text\":\"系颈以组\",\"style\":{\"font\":\"serif\",\"size\":0.052,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}}]}",
+      "junction_path": "static/layer-frames/25-cae7a24e7283819e385bc55eb23a1e15d39727c604597ec19959e3fdc2889065.png",
+      "junction_hash": "cae7a24e7283819e385bc55eb23a1e15d39727c604597ec19959e3fdc2889065",
+      "status": "ready",
+      "stale_reasons": "[]",
+      "base_check": null
+    },
+    {
+      "storyboard_id": 578,
+      "base_ref": "{\"kind\":\"asset\",\"asset_kind\":\"scene\",\"asset_id\":112,\"version_task_id\":null}",
+      "layer_doc": "{\"version\":1,\"base\":{\"path\":\"static/images/050a7ba7-601d-4865-8f25-5b3d765f90c8.png\",\"width\":544,\"height\":960,\"source_width\":1920,\"source_height\":1088,\"filter\":{\"paper\":0.16,\"tint\":\"sepia\",\"tint_strength\":0.18,\"vignette\":0.28}},\"theme\":\"archival\",\"layers\":[{\"id\":\"L1\",\"type\":\"label\",\"name\":\"把绳子先系好了\",\"visible\":true,\"locked\":false,\"z\":1,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.489,\"h\":0.09},\"text\":\"把绳子先系好了\",\"style\":{\"font\":\"serif\",\"size\":0.036,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L2\",\"type\":\"label\",\"name\":\"替对方省下了绑他的那道手续\",\"visible\":true,\"locked\":false,\"z\":2,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.725,\"h\":0.09},\"text\":\"替对方省下了绑他的那道手续\",\"style\":{\"font\":\"serif\",\"size\":0.03,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}}]}",
+      "junction_path": "static/layer-frames/26-2520cfc5c13242d757fb2bf302ed0c52b90494f8dbe92cf814b1417260297014.png",
+      "junction_hash": "2520cfc5c13242d757fb2bf302ed0c52b90494f8dbe92cf814b1417260297014",
+      "status": "ready",
+      "stale_reasons": "[]",
+      "base_check": null
+    },
+    {
+      "storyboard_id": 579,
+      "base_ref": "{\"kind\":\"asset\",\"asset_kind\":\"scene\",\"asset_id\":113,\"version_task_id\":null}",
+      "layer_doc": "{\"version\":1,\"base\":{\"path\":\"static/images/0b148c9f-0008-482a-b4a8-4331a16288dc.png\",\"width\":544,\"height\":960,\"source_width\":1920,\"source_height\":1088,\"filter\":{\"paper\":0.16,\"tint\":\"sepia\",\"tint_strength\":0.18,\"vignette\":0.28}},\"theme\":\"archival\",\"layers\":[{\"id\":\"L1\",\"type\":\"label\",\"name\":\"第三样 · 皇帝玺与符节\",\"visible\":true,\"locked\":false,\"z\":1,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.807,\"h\":0.09},\"text\":\"第三样 · 皇帝玺与符节\",\"style\":{\"font\":\"serif\",\"size\":0.036,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L2\",\"type\":\"label\",\"name\":\"玺与节\",\"visible\":true,\"locked\":false,\"z\":2,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.22,\"w\":0.34,\"h\":0.09},\"text\":\"玺与节\",\"style\":{\"font\":\"serif\",\"size\":0.052,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L3\",\"type\":\"label\",\"name\":\"权力的实物凭证\",\"visible\":true,\"locked\":false,\"z\":3,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.489,\"h\":0.09},\"text\":\"权力的实物凭证\",\"style\":{\"font\":\"serif\",\"size\":0.036,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}}]}",
+      "junction_path": "static/layer-frames/27-cae7a24e7283819e385bc55eb23a1e15d39727c604597ec19959e3fdc2889065.png",
+      "junction_hash": "cae7a24e7283819e385bc55eb23a1e15d39727c604597ec19959e3fdc2889065",
+      "status": "ready",
+      "stale_reasons": "[]",
+      "base_check": null
+    },
+    {
+      "storyboard_id": 580,
+      "base_ref": "{\"kind\":\"asset\",\"asset_kind\":\"scene\",\"asset_id\":112,\"version_task_id\":null}",
+      "layer_doc": "{\"version\":1,\"base\":{\"path\":\"static/images/050a7ba7-601d-4865-8f25-5b3d765f90c8.png\",\"width\":544,\"height\":960,\"source_width\":1920,\"source_height\":1088,\"filter\":{\"paper\":0.16,\"tint\":\"sepia\",\"tint_strength\":0.18,\"vignette\":0.28}},\"theme\":\"archival\",\"layers\":[{\"id\":\"L1\",\"type\":\"label\",\"name\":\"他叫子婴\",\"visible\":true,\"locked\":false,\"z\":1,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.22,\"w\":0.431,\"h\":0.09},\"text\":\"他叫子婴\",\"style\":{\"font\":\"serif\",\"size\":0.052,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L2\",\"type\":\"label\",\"name\":\"秦王\",\"visible\":true,\"locked\":false,\"z\":2,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.22,\"w\":0.248,\"h\":0.09},\"text\":\"秦王\",\"style\":{\"font\":\"serif\",\"size\":0.052,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L3\",\"type\":\"label\",\"name\":\"他没当过皇帝　史书叫他秦王\",\"visible\":true,\"locked\":false,\"z\":3,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.725,\"h\":0.09},\"text\":\"他没当过皇帝　史书叫他秦王\",\"style\":{\"font\":\"serif\",\"size\":0.03,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}}]}",
+      "junction_path": "static/layer-frames/28-63bd611f7519536bc862e7232d21f0bf34572b88e791dc09d8da30be5667621f.png",
+      "junction_hash": "63bd611f7519536bc862e7232d21f0bf34572b88e791dc09d8da30be5667621f",
+      "status": "ready",
+      "stale_reasons": "[]",
+      "base_check": null
+    },
+    {
+      "storyboard_id": 581,
+      "base_ref": "{\"kind\":\"asset\",\"asset_kind\":\"scene\",\"asset_id\":114,\"version_task_id\":null}",
+      "layer_doc": "{\"version\":1,\"base\":{\"path\":\"static/images/48646d2e-63ec-4c43-8584-92872effb191.png\",\"width\":544,\"height\":960,\"source_width\":1920,\"source_height\":1088,\"filter\":{\"paper\":0.16,\"tint\":\"sepia\",\"tint_strength\":0.18,\"vignette\":0.28}},\"theme\":\"archival\",\"layers\":[{\"id\":\"L1\",\"type\":\"label\",\"name\":\"四十六天\",\"visible\":true,\"locked\":false,\"z\":1,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.22,\"w\":0.431,\"h\":0.09},\"text\":\"四十六天\",\"style\":{\"font\":\"serif\",\"size\":0.052,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L2\",\"type\":\"label\",\"name\":\"他杀了权臣赵高\",\"visible\":true,\"locked\":false,\"z\":2,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.489,\"h\":0.09},\"text\":\"他杀了权臣赵高\",\"style\":{\"font\":\"serif\",\"size\":0.036,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L3\",\"type\":\"label\",\"name\":\"而赵高，刚刚杀了秦二世\",\"visible\":true,\"locked\":false,\"z\":3,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.743,\"h\":0.09},\"text\":\"而赵高，刚刚杀了秦二世\",\"style\":{\"font\":\"serif\",\"size\":0.036,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}}]}",
+      "junction_path": "static/layer-frames/29-e388de430b026f22fa8568be0ed77c2c8344df92831741f5331c50f827b4abb4.png",
+      "junction_hash": "e388de430b026f22fa8568be0ed77c2c8344df92831741f5331c50f827b4abb4",
+      "status": "ready",
+      "stale_reasons": "[]",
+      "base_check": null
+    },
+    {
+      "storyboard_id": 582,
+      "base_ref": "{\"kind\":\"asset\",\"asset_kind\":\"scene\",\"asset_id\":114,\"version_task_id\":null}",
+      "layer_doc": "{\"version\":1,\"base\":{\"path\":\"static/images/48646d2e-63ec-4c43-8584-92872effb191.png\",\"width\":544,\"height\":960,\"source_width\":1920,\"source_height\":1088,\"filter\":{\"paper\":0.16,\"tint\":\"sepia\",\"tint_strength\":0.18,\"vignette\":0.28}},\"theme\":\"archival\",\"layers\":[{\"id\":\"L1\",\"type\":\"label\",\"name\":\"咸阳宫里的血\",\"visible\":true,\"locked\":false,\"z\":1,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.426,\"h\":0.09},\"text\":\"咸阳宫里的血\",\"style\":{\"font\":\"serif\",\"size\":0.036,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L2\",\"type\":\"label\",\"name\":\"不是禅让，是一场刺杀\",\"visible\":true,\"locked\":false,\"z\":2,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.68,\"h\":0.09},\"text\":\"不是禅让，是一场刺杀\",\"style\":{\"font\":\"serif\",\"size\":0.036,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}}]}",
+      "junction_path": "static/layer-frames/30-ee6dfd5754e84d7e8cdc234911ef3b81dbacad07d4131d8310b0e948902698b7.png",
+      "junction_hash": "ee6dfd5754e84d7e8cdc234911ef3b81dbacad07d4131d8310b0e948902698b7",
+      "status": "ready",
+      "stale_reasons": "[]",
+      "base_check": null
+    },
+    {
+      "storyboard_id": 583,
+      "base_ref": "{\"kind\":\"asset\",\"asset_kind\":\"scene\",\"asset_id\":113,\"version_task_id\":null}",
+      "layer_doc": "{\"version\":1,\"base\":{\"path\":\"static/images/0b148c9f-0008-482a-b4a8-4331a16288dc.png\",\"width\":544,\"height\":960,\"source_width\":1920,\"source_height\":1088,\"filter\":{\"paper\":0.16,\"tint\":\"sepia\",\"tint_strength\":0.18,\"vignette\":0.28}},\"theme\":\"archival\",\"layers\":[{\"id\":\"L1\",\"type\":\"label\",\"name\":\"轵道旁\",\"visible\":true,\"locked\":false,\"z\":1,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.22,\"w\":0.34,\"h\":0.09},\"text\":\"轵道旁\",\"style\":{\"font\":\"serif\",\"size\":0.052,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L2\",\"type\":\"label\",\"name\":\"不是宫殿，不是宗庙，是路边\",\"visible\":true,\"locked\":false,\"z\":2,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.725,\"h\":0.09},\"text\":\"不是宫殿，不是宗庙，是路边\",\"style\":{\"font\":\"serif\",\"size\":0.03,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L3\",\"type\":\"label\",\"name\":\"路边\",\"visible\":true,\"locked\":false,\"z\":3,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.22,\"w\":0.248,\"h\":0.09},\"text\":\"路边\",\"style\":{\"font\":\"serif\",\"size\":0.052,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}}]}",
+      "junction_path": "static/layer-frames/31-cae7a24e7283819e385bc55eb23a1e15d39727c604597ec19959e3fdc2889065.png",
+      "junction_hash": "cae7a24e7283819e385bc55eb23a1e15d39727c604597ec19959e3fdc2889065",
+      "status": "ready",
+      "stale_reasons": "[]",
+      "base_check": null
+    },
+    {
+      "storyboard_id": 584,
+      "base_ref": "{\"kind\":\"asset\",\"asset_kind\":\"scene\",\"asset_id\":113,\"version_task_id\":null}",
+      "layer_doc": "{\"version\":1,\"base\":{\"path\":\"static/images/0b148c9f-0008-482a-b4a8-4331a16288dc.png\",\"width\":544,\"height\":960,\"source_width\":1920,\"source_height\":1088,\"filter\":{\"paper\":0.16,\"tint\":\"sepia\",\"tint_strength\":0.18,\"vignette\":0.28}},\"theme\":\"archival\",\"layers\":[{\"id\":\"L1\",\"type\":\"label\",\"name\":\"有人低声劝：杀了他\",\"visible\":true,\"locked\":false,\"z\":1,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.616,\"h\":0.09},\"text\":\"有人低声劝：杀了他\",\"style\":{\"font\":\"serif\",\"size\":0.036,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L2\",\"type\":\"label\",\"name\":\"免得后患\",\"visible\":true,\"locked\":false,\"z\":2,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.22,\"w\":0.431,\"h\":0.09},\"text\":\"免得后患\",\"style\":{\"font\":\"serif\",\"size\":0.052,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L3\",\"type\":\"label\",\"name\":\"杀之不祥\",\"visible\":true,\"locked\":false,\"z\":3,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.22,\"w\":0.431,\"h\":0.09},\"text\":\"杀之不祥\",\"style\":{\"font\":\"serif\",\"size\":0.052,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}}]}",
+      "junction_path": "static/layer-frames/32-cae7a24e7283819e385bc55eb23a1e15d39727c604597ec19959e3fdc2889065.png",
+      "junction_hash": "cae7a24e7283819e385bc55eb23a1e15d39727c604597ec19959e3fdc2889065",
+      "status": "ready",
+      "stale_reasons": "[]",
+      "base_check": null
+    },
+    {
+      "storyboard_id": 585,
+      "base_ref": "{\"kind\":\"asset\",\"asset_kind\":\"scene\",\"asset_id\":113,\"version_task_id\":null}",
+      "layer_doc": "{\"version\":1,\"base\":{\"path\":\"static/images/0b148c9f-0008-482a-b4a8-4331a16288dc.png\",\"width\":544,\"height\":960,\"source_width\":1920,\"source_height\":1088,\"filter\":{\"paper\":0.16,\"tint\":\"sepia\",\"tint_strength\":0.18,\"vignette\":0.28}},\"theme\":\"archival\",\"layers\":[{\"id\":\"L1\",\"type\":\"label\",\"name\":\"换你是刘邦：杀，还是不杀\",\"visible\":true,\"locked\":false,\"z\":1,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.807,\"h\":0.09},\"text\":\"换你是刘邦：杀，还是不杀\",\"style\":{\"font\":\"serif\",\"size\":0.036,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L2\",\"type\":\"label\",\"name\":\"杀，泄一时之愤；不杀，落一世之名\",\"visible\":true,\"locked\":false,\"z\":2,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.88,\"h\":0.09},\"text\":\"杀，泄一时之愤；不杀，落一世之名\",\"style\":{\"font\":\"serif\",\"size\":0.03,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L3\",\"type\":\"label\",\"name\":\"乱世里，名声比刀更贵\",\"visible\":true,\"locked\":false,\"z\":3,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.68,\"h\":0.09},\"text\":\"乱世里，名声比刀更贵\",\"style\":{\"font\":\"serif\",\"size\":0.036,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}}]}",
+      "junction_path": "static/layer-frames/33-cae7a24e7283819e385bc55eb23a1e15d39727c604597ec19959e3fdc2889065.png",
+      "junction_hash": "cae7a24e7283819e385bc55eb23a1e15d39727c604597ec19959e3fdc2889065",
+      "status": "ready",
+      "stale_reasons": "[]",
+      "base_check": null
+    },
+    {
+      "storyboard_id": 586,
+      "base_ref": "{\"kind\":\"asset\",\"asset_kind\":\"scene\",\"asset_id\":115,\"version_task_id\":null}",
+      "layer_doc": "{\"version\":1,\"base\":{\"path\":\"static/images/ad030aed-3e58-4837-a6eb-9993f029a5ce.png\",\"width\":544,\"height\":960,\"source_width\":1920,\"source_height\":1088,\"filter\":{\"paper\":0.16,\"tint\":\"sepia\",\"tint_strength\":0.18,\"vignette\":0.28}},\"theme\":\"archival\",\"layers\":[{\"id\":\"L1\",\"type\":\"label\",\"name\":\"进城之后　他不颁布新法\",\"visible\":true,\"locked\":false,\"z\":1,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.743,\"h\":0.09},\"text\":\"进城之后　他不颁布新法\",\"style\":{\"font\":\"serif\",\"size\":0.036,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L2\",\"type\":\"label\",\"name\":\"只留下三句话\",\"visible\":true,\"locked\":false,\"z\":2,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.426,\"h\":0.09},\"text\":\"只留下三句话\",\"style\":{\"font\":\"serif\",\"size\":0.036,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L3\",\"type\":\"label\",\"name\":\"杀人者死　伤人及盗抵罪\",\"visible\":true,\"locked\":false,\"z\":3,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.743,\"h\":0.09},\"text\":\"杀人者死　伤人及盗抵罪\",\"style\":{\"font\":\"serif\",\"size\":0.036,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L4\",\"type\":\"label\",\"name\":\"约法三章\",\"visible\":true,\"locked\":false,\"z\":4,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.22,\"w\":0.431,\"h\":0.09},\"text\":\"约法三章\",\"style\":{\"font\":\"serif\",\"size\":0.052,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}}]}",
+      "junction_path": "static/layer-frames/34-5b20a3f1512524aebf1e86846132fa9ac195da05d119b574b75388b97e1a9c32.png",
+      "junction_hash": "5b20a3f1512524aebf1e86846132fa9ac195da05d119b574b75388b97e1a9c32",
+      "status": "ready",
+      "stale_reasons": "[]",
+      "base_check": null
+    },
+    {
+      "storyboard_id": 587,
+      "base_ref": "{\"kind\":\"asset\",\"asset_kind\":\"scene\",\"asset_id\":115,\"version_task_id\":null}",
+      "layer_doc": "{\"version\":1,\"base\":{\"path\":\"static/images/ad030aed-3e58-4837-a6eb-9993f029a5ce.png\",\"width\":544,\"height\":960,\"source_width\":1920,\"source_height\":1088,\"filter\":{\"paper\":0.16,\"tint\":\"sepia\",\"tint_strength\":0.18,\"vignette\":0.28}},\"theme\":\"archival\",\"layers\":[{\"id\":\"L1\",\"type\":\"label\",\"name\":\"其余秦法　一并废掉\",\"visible\":true,\"locked\":false,\"z\":1,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.616,\"h\":0.09},\"text\":\"其余秦法　一并废掉\",\"style\":{\"font\":\"serif\",\"size\":0.036,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L2\",\"type\":\"label\",\"name\":\"徭役　连坐　轻罪重刑\",\"visible\":true,\"locked\":false,\"z\":2,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.68,\"h\":0.09},\"text\":\"徭役　连坐　轻罪重刑\",\"style\":{\"font\":\"serif\",\"size\":0.036,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L3\",\"type\":\"label\",\"name\":\"十五年\",\"visible\":true,\"locked\":false,\"z\":3,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.22,\"w\":0.34,\"h\":0.09},\"text\":\"十五年\",\"style\":{\"font\":\"serif\",\"size\":0.052,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}}]}",
+      "junction_path": "static/layer-frames/35-71192df6d9424f9a027e0d5cf852f026389108d4813c9d9f6282780bce22c1e5.png",
+      "junction_hash": "71192df6d9424f9a027e0d5cf852f026389108d4813c9d9f6282780bce22c1e5",
+      "status": "ready",
+      "stale_reasons": "[]",
+      "base_check": null
+    },
+    {
+      "storyboard_id": 588,
+      "base_ref": "{\"kind\":\"asset\",\"asset_kind\":\"scene\",\"asset_id\":120,\"version_task_id\":null}",
+      "layer_doc": "{\"version\":1,\"base\":{\"path\":\"static/images/5535e5be-5489-4b3e-ae55-51623c1c98e5.png\",\"width\":544,\"height\":960,\"source_width\":1920,\"source_height\":1088,\"filter\":{\"paper\":0.16,\"tint\":\"sepia\",\"tint_strength\":0.18,\"vignette\":0.28}},\"theme\":\"archival\",\"layers\":[{\"id\":\"L1\",\"type\":\"label\",\"name\":\"关中百姓大喜　争着送牛羊酒食\",\"visible\":true,\"locked\":false,\"z\":1,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.778,\"h\":0.09},\"text\":\"关中百姓大喜　争着送牛羊酒食\",\"style\":{\"font\":\"serif\",\"size\":0.03,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L2\",\"type\":\"label\",\"name\":\"牛羊酒食\",\"visible\":true,\"locked\":false,\"z\":2,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.22,\"w\":0.431,\"h\":0.09},\"text\":\"牛羊酒食\",\"style\":{\"font\":\"serif\",\"size\":0.052,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L3\",\"type\":\"label\",\"name\":\"刘邦推辞不收\",\"visible\":true,\"locked\":false,\"z\":3,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.426,\"h\":0.09},\"text\":\"刘邦推辞不收\",\"style\":{\"font\":\"serif\",\"size\":0.036,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L4\",\"type\":\"label\",\"name\":\"仓里有粮\",\"visible\":true,\"locked\":false,\"z\":4,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.22,\"w\":0.431,\"h\":0.09},\"text\":\"仓里有粮\",\"style\":{\"font\":\"serif\",\"size\":0.052,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}}]}",
+      "junction_path": "static/layer-frames/36-ea24bffa7130f4a2746bf37d3ee4c34b27d511223fd73e89d56e3f66c7df753c.png",
+      "junction_hash": "ea24bffa7130f4a2746bf37d3ee4c34b27d511223fd73e89d56e3f66c7df753c",
+      "status": "ready",
+      "stale_reasons": "[]",
+      "base_check": null
+    },
+    {
+      "storyboard_id": 589,
+      "base_ref": "{\"kind\":\"asset\",\"asset_kind\":\"scene\",\"asset_id\":112,\"version_task_id\":null}",
+      "layer_doc": "{\"version\":1,\"base\":{\"path\":\"static/images/050a7ba7-601d-4865-8f25-5b3d765f90c8.png\",\"width\":544,\"height\":960,\"source_width\":1920,\"source_height\":1088,\"filter\":{\"paper\":0.16,\"tint\":\"sepia\",\"tint_strength\":0.18,\"vignette\":0.28}},\"theme\":\"archival\",\"layers\":[{\"id\":\"L1\",\"type\":\"label\",\"name\":\"算一笔时间账\",\"visible\":true,\"locked\":false,\"z\":1,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.426,\"h\":0.09},\"text\":\"算一笔时间账\",\"style\":{\"font\":\"serif\",\"size\":0.036,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L2\",\"type\":\"label\",\"name\":\"从秦灭六国 · 天下一统　到这一天：十五年\",\"visible\":true,\"locked\":false,\"z\":2,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.88,\"h\":0.14},\"text\":\"从秦灭六国 · 天下一统　到这一天：十五年\",\"style\":{\"font\":\"serif\",\"size\":0.03,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L3\",\"type\":\"label\",\"name\":\"前221 — 前207\",\"visible\":true,\"locked\":false,\"z\":3,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.743,\"h\":0.09},\"text\":\"前221 — 前207\",\"style\":{\"font\":\"serif\",\"size\":0.036,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}}]}",
+      "junction_path": "static/layer-frames/37-63bd611f7519536bc862e7232d21f0bf34572b88e791dc09d8da30be5667621f.png",
+      "junction_hash": "63bd611f7519536bc862e7232d21f0bf34572b88e791dc09d8da30be5667621f",
+      "status": "ready",
+      "stale_reasons": "[]",
+      "base_check": null
+    },
+    {
+      "storyboard_id": 590,
+      "base_ref": "{\"kind\":\"asset\",\"asset_kind\":\"scene\",\"asset_id\":122,\"version_task_id\":null}",
+      "layer_doc": "{\"version\":1,\"base\":{\"path\":\"static/images/31144355-79a0-4a5f-bc03-e53d19984df3.png\",\"width\":544,\"height\":960,\"source_width\":1920,\"source_height\":1088,\"filter\":{\"paper\":0.16,\"tint\":\"sepia\",\"tint_strength\":0.18,\"vignette\":0.28}},\"theme\":\"archival\",\"layers\":[{\"id\":\"L1\",\"type\":\"label\",\"name\":\"大泽乡\",\"visible\":true,\"locked\":false,\"z\":1,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.22,\"w\":0.34,\"h\":0.09},\"text\":\"大泽乡\",\"style\":{\"font\":\"serif\",\"size\":0.052,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L2\",\"type\":\"label\",\"name\":\"王侯将相宁有种乎\",\"visible\":true,\"locked\":false,\"z\":2,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.553,\"h\":0.09},\"text\":\"王侯将相宁有种乎\",\"style\":{\"font\":\"serif\",\"size\":0.036,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L3\",\"type\":\"label\",\"name\":\"到咸阳城门打开\",\"visible\":true,\"locked\":false,\"z\":3,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.489,\"h\":0.09},\"text\":\"到咸阳城门打开\",\"style\":{\"font\":\"serif\",\"size\":0.036,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L4\",\"type\":\"label\",\"name\":\"只过了两年多\",\"visible\":true,\"locked\":false,\"z\":4,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.426,\"h\":0.09},\"text\":\"只过了两年多\",\"style\":{\"font\":\"serif\",\"size\":0.036,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}}]}",
+      "junction_path": "static/layer-frames/38-1e0833eba48d89d8631ea07935afa4f0471dfa430964c6f05f6e19b19f1beb5f.png",
+      "junction_hash": "1e0833eba48d89d8631ea07935afa4f0471dfa430964c6f05f6e19b19f1beb5f",
+      "status": "ready",
+      "stale_reasons": "[]",
+      "base_check": null
+    },
+    {
+      "storyboard_id": 591,
+      "base_ref": "{\"kind\":\"asset\",\"asset_kind\":\"prop\",\"asset_id\":217,\"version_task_id\":1681}",
+      "layer_doc": "{\"version\":1,\"base\":{\"path\":\"static/images/2e6eda55-3b3b-4a62-9ac9-07f98f504b7f.png\",\"width\":544,\"height\":960,\"source_width\":1024,\"source_height\":1024,\"crop\":{\"x\":0.05,\"y\":0.14,\"w\":0.9,\"h\":0.72},\"filter\":{\"paper\":0.16,\"tint\":\"sepia\",\"tint_strength\":0.18,\"vignette\":0.28}},\"theme\":\"archival\",\"layers\":[{\"id\":\"L1\",\"type\":\"label\",\"name\":\"巨鹿一战\",\"visible\":true,\"locked\":false,\"z\":1,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.22,\"w\":0.431,\"h\":0.09},\"text\":\"巨鹿一战\",\"style\":{\"font\":\"serif\",\"size\":0.052,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L2\",\"type\":\"label\",\"name\":\"秦军主力被项羽打垮\",\"visible\":true,\"locked\":false,\"z\":2,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.616,\"h\":0.09},\"text\":\"秦军主力被项羽打垮\",\"style\":{\"font\":\"serif\",\"size\":0.036,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L3\",\"type\":\"label\",\"name\":\"刘邦绕道武关　直取国都\",\"visible\":true,\"locked\":false,\"z\":3,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.743,\"h\":0.09},\"text\":\"刘邦绕道武关　直取国都\",\"style\":{\"font\":\"serif\",\"size\":0.036,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L4\",\"type\":\"label\",\"name\":\"外面一刀　里面一刀\",\"visible\":true,\"locked\":false,\"z\":4,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.616,\"h\":0.09},\"text\":\"外面一刀　里面一刀\",\"style\":{\"font\":\"serif\",\"size\":0.036,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}}]}",
+      "junction_path": "static/layer-frames/39-d0629aca82c506b21338ede62e794fc4f015ffd90f49c05d4a59ca826f79dab1.png",
+      "junction_hash": "d0629aca82c506b21338ede62e794fc4f015ffd90f49c05d4a59ca826f79dab1",
+      "status": "ready",
+      "stale_reasons": "[]",
+      "base_check": null
+    },
+    {
+      "storyboard_id": 592,
+      "base_ref": "{\"kind\":\"asset\",\"asset_kind\":\"scene\",\"asset_id\":116,\"version_task_id\":null}",
+      "layer_doc": "{\"version\":1,\"base\":{\"path\":\"static/images/e89e0f08-712f-4ac8-893b-c161291c05a9.png\",\"width\":544,\"height\":960,\"source_width\":1920,\"source_height\":1088,\"filter\":{\"paper\":0.16,\"tint\":\"sepia\",\"tint_strength\":0.18,\"vignette\":0.28}},\"theme\":\"archival\",\"layers\":[{\"id\":\"L1\",\"type\":\"label\",\"name\":\"可投降没有救他\",\"visible\":true,\"locked\":false,\"z\":1,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.489,\"h\":0.09},\"text\":\"可投降没有救他\",\"style\":{\"font\":\"serif\",\"size\":0.036,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L2\",\"type\":\"label\",\"name\":\"两个多月后 · 项羽屠咸阳　杀子婴\",\"visible\":true,\"locked\":false,\"z\":2,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.88,\"h\":0.14},\"text\":\"两个多月后 · 项羽屠咸阳　杀子婴\",\"style\":{\"font\":\"serif\",\"size\":0.03,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L3\",\"type\":\"label\",\"name\":\"烧秦宫室　火三月不灭\",\"visible\":true,\"locked\":false,\"z\":3,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.68,\"h\":0.09},\"text\":\"烧秦宫室　火三月不灭\",\"style\":{\"font\":\"serif\",\"size\":0.036,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}}]}",
+      "junction_path": "static/layer-frames/40-d3493de3aa6eaa6c7ae005381f9bbd212b6ec2f79e9e7c5fdc4da81b59ebfeb1.png",
+      "junction_hash": "d3493de3aa6eaa6c7ae005381f9bbd212b6ec2f79e9e7c5fdc4da81b59ebfeb1",
+      "status": "ready",
+      "stale_reasons": "[]",
+      "base_check": null
+    },
+    {
+      "storyboard_id": 593,
+      "base_ref": "{\"kind\":\"asset\",\"asset_kind\":\"scene\",\"asset_id\":115,\"version_task_id\":null}",
+      "layer_doc": "{\"version\":1,\"base\":{\"path\":\"static/images/ad030aed-3e58-4837-a6eb-9993f029a5ce.png\",\"width\":544,\"height\":960,\"source_width\":1920,\"source_height\":1088,\"filter\":{\"paper\":0.16,\"tint\":\"sepia\",\"tint_strength\":0.18,\"vignette\":0.28}},\"theme\":\"archival\",\"layers\":[{\"id\":\"L1\",\"type\":\"label\",\"name\":\"秦不是被一支军队打倒的\",\"visible\":true,\"locked\":false,\"z\":1,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.743,\"h\":0.09},\"text\":\"秦不是被一支军队打倒的\",\"style\":{\"font\":\"serif\",\"size\":0.036,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L2\",\"type\":\"label\",\"name\":\"十五年的徭役\",\"visible\":true,\"locked\":false,\"z\":2,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.426,\"h\":0.09},\"text\":\"十五年的徭役\",\"style\":{\"font\":\"serif\",\"size\":0.036,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L3\",\"type\":\"label\",\"name\":\"秦法无数条　刘邦只留三句\",\"visible\":true,\"locked\":false,\"z\":3,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.807,\"h\":0.09},\"text\":\"秦法无数条　刘邦只留三句\",\"style\":{\"font\":\"serif\",\"size\":0.036,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L4\",\"type\":\"label\",\"name\":\"一句「杀降不祥」\",\"visible\":true,\"locked\":false,\"z\":4,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.553,\"h\":0.09},\"text\":\"一句「杀降不祥」\",\"style\":{\"font\":\"serif\",\"size\":0.036,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L5\",\"type\":\"label\",\"name\":\"一点点让出了天下\",\"visible\":true,\"locked\":false,\"z\":5,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.553,\"h\":0.09},\"text\":\"一点点让出了天下\",\"style\":{\"font\":\"serif\",\"size\":0.036,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}}]}",
+      "junction_path": "static/layer-frames/41-71192df6d9424f9a027e0d5cf852f026389108d4813c9d9f6282780bce22c1e5.png",
+      "junction_hash": "71192df6d9424f9a027e0d5cf852f026389108d4813c9d9f6282780bce22c1e5",
+      "status": "ready",
+      "stale_reasons": "[]",
+      "base_check": null
+    },
+    {
+      "storyboard_id": 594,
+      "base_ref": "{\"kind\":\"asset\",\"asset_kind\":\"scene\",\"asset_id\":111,\"version_task_id\":null}",
+      "layer_doc": "{\"version\":1,\"base\":{\"path\":\"static/images/391d6e28-bd6f-4963-ba4e-3038530eb451.png\",\"width\":544,\"height\":960,\"source_width\":1920,\"source_height\":1088,\"filter\":{\"paper\":0.16,\"tint\":\"sepia\",\"tint_strength\":0.18,\"vignette\":0.28}},\"theme\":\"archival\",\"layers\":[{\"id\":\"L1\",\"type\":\"label\",\"name\":\"下一期\",\"visible\":true,\"locked\":false,\"z\":1,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.22,\"w\":0.34,\"h\":0.09},\"text\":\"下一期\",\"style\":{\"font\":\"serif\",\"size\":0.052,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L2\",\"type\":\"label\",\"name\":\"刘邦去了鸿门\",\"visible\":true,\"locked\":false,\"z\":2,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.426,\"h\":0.09},\"text\":\"刘邦去了鸿门\",\"style\":{\"font\":\"serif\",\"size\":0.036,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L3\",\"type\":\"label\",\"name\":\"鸿门\",\"visible\":true,\"locked\":false,\"z\":3,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.22,\"w\":0.248,\"h\":0.09},\"text\":\"鸿门\",\"style\":{\"font\":\"serif\",\"size\":0.052,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}},{\"id\":\"L4\",\"type\":\"label\",\"name\":\"那一天，中国差一点就没有汉朝\",\"visible\":true,\"locked\":false,\"z\":4,\"opacity\":1,\"rotation\":0,\"box\":{\"x\":0.07,\"y\":0.3,\"w\":0.778,\"h\":0.09},\"text\":\"那一天，中国差一点就没有汉朝\",\"style\":{\"font\":\"serif\",\"size\":0.03,\"color\":\"#f7efe0\",\"stroke\":\"#1d1712\",\"stroke_width\":0.0022,\"bg\":\"#1d1712\",\"bg_opacity\":0.62,\"align\":\"left\",\"bold\":true}}]}",
+      "junction_path": "static/layer-frames/42-f837da6759bc0a7c4bd548ce5f6b2615f05be7911d3db02cd78698b625667d1c.png",
+      "junction_hash": "f837da6759bc0a7c4bd548ce5f6b2615f05be7911d3db02cd78698b625667d1c",
+      "status": "ready",
+      "stale_reasons": "[]",
+      "base_check": null
+    }
+  ],
+  "merges": [
+    {
+      "id": 34,
+      "status": "completed",
+      "merged_url": "static/merged/f9426ebb-7cdd-4e4f-9125-12c296b84c57.mp4",
+      "duration": 253,
+      "created_at": "2026-11-11T00:12:42.004Z",
+      "completed_at": "2026-11-11T00:12:49.015Z"
+    },
+    {
+      "id": 33,
+      "status": "completed",
+      "merged_url": "static/merged/43ad7ee4-5b79-4cb3-8c35-d9690f1fdeda.mp4",
+      "duration": 253,
+      "created_at": "2026-11-11T00:05:47.526Z",
+      "completed_at": "2026-11-11T00:05:54.443Z"
+    },
+    {
+      "id": 32,
+      "status": "completed",
+      "merged_url": "static/merged/30e9c453-47b5-4f5f-a950-8dcffd956b09.mp4",
+      "duration": 253,
+      "created_at": "2026-11-10T23:54:12.123Z",
+      "completed_at": "2026-11-10T23:54:19.208Z"
+    }
+  ]
+}

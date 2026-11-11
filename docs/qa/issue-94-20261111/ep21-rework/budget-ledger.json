@@ -1,0 +1,26 @@
+{
+  "caps": { "images": 75, "videos": 26, "tts": 0, "text_calls": 30 },
+  "actual_attempted": {
+    "asset_images": 8,
+    "keyframe_image_attempts": 46,
+    "total_image_attempts": 54,
+    "video_attempts": 22,
+    "tts_attempts": 0,
+    "scene_generate_prompt_calls": 7,
+    "layer_base_check_vision_calls": 3,
+    "total_billed_text_calls": 10
+  },
+  "remaining_by_cap": { "images": 21, "videos": 4, "tts": 0, "text_calls": 20 },
+  "task_ids": {
+    "asset_images": [1808, 1809, 1810, 1811, 1812, 1813, 1814, 1815],
+    "layer_render_batches": [1819, 1846],
+    "keyframe_batch": 19,
+    "layer_base_checks": [1838, 1842, 1917],
+    "video_batch": 23
+  },
+  "notes": [
+    "Keyframe image attempts comprise 39 initial selected slots plus retry-failed scopes of 4, 2, and 1.",
+    "The 3 base-check vision calls are task IDs 1838, 1842, and 1917; 1917 was the post-release observability check.",
+    "No compose, merge, or subtitle-generation write was submitted after the visual guide-frame defect blocked the branch."
+  ]
+}

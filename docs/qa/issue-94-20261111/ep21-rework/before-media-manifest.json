@@ -1,0 +1,767 @@
+{
+  "scenesBefore": [
+    {
+      "id": 111,
+      "drama_id": 15,
+      "episode_id": null,
+      "location": "霸上",
+      "time": "清晨",
+      "prompt": "公元前207年（汉元年十月）初冬的咸阳城外霸上，秦地关中平原边缘的旷野高坡，枯黄草丛与黄土台地，稀疏落叶乔木，远处可见咸阳城墙轮廓与灰黑色的城楼；坡上一条土路通向城门方向，薄雾中远处有一列楚军步卒与旗影（远景剪影，不辨面容）。",
+      "lighting": "清晨初冬的雾光，灰白色薄雾横向漫过坡地，冷调，太阳尚未升高，光线柔和低角度，远景被雾吞没。",
+      "final_prompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark, 固定机位广角镜头，清晰的建立镜头，9:16 竖构图，公元前207年（汉元年十月）初冬的咸阳城外霸上，清晨，秦地关中平原边缘的旷野高坡，上层为灰白天空与横向漫过的薄雾，中层是坡地主体——枯黄草丛与黄土台地，坡面沿画面自下而上层层抬升，稀疏落叶乔木立于坡腰，一条土路自画面下方蜿蜒上坡通向远处的城门方向，下层为前景坡脚与土层断面，露出黄土与经冬枯草根；\n前景（画面底部一段干裂的黄土坡脚、被踩实的草茬与几块散落的土石），中景（坡地上开阔的黄土台地面，土路斜切而过，路面被车辙压出浅沟，两侧枯黄草丛成片），后景（远处咸阳城墙的轮廓与灰黑色城楼被薄雾吞没，只余模糊剪影）；\n出入口（土路自画面右下延伸至上方远景城门，坡顶另有一条小径绕向画面左侧消失在雾中）；\n地面（粗糙黄土台地，干裂泛白，坡脚处有浅车辙与踩踏痕迹），墙面（无墙面，坡顶有一道低矮夯土台地边缘，土色灰褐）；\n主要陈设及其固定相对位置：土路自画面下方向上贯穿坡地中轴偏右，坡腰左侧立着三株秃枝落叶乔木，坡地右侧是一片密集枯黄草丛，坡顶靠上缘为一段断续的夯土矮坎，\n空间结构连续、自洽；\n清晨初冬的雾光，太阳尚未升高、位于画面右上方画外，低角度柔和冷光斜切过坡面，灰白色薄雾横向漫过坡地、远景被雾吞没，冷调，明暗对比柔和，空气清冷肃静；\n画面中没有任何人物，空场景，电影质感",
+      "final_prompt_source": "agent",
+      "final_prompt_updated_at": "2026-11-11T06:53:57.924Z",
+      "storyboard_count": 1,
+      "image_url": "static/images/391d6e28-bd6f-4963-ba4e-3038530eb451.png",
+      "reference_images": null,
+      "status": "processing",
+      "local_path": null,
+      "exposition": 0,
+      "created_at": "2026-11-10T16:24:23.988Z",
+      "updated_at": "2026-11-11T07:00:04.133Z",
+      "deleted_at": null,
+      "image_versions": [
+        {
+          "id": 1592,
+          "url": "static/images/391d6e28-bd6f-4963-ba4e-3038530eb451.png",
+          "provider": "qwen-jobs",
+          "model": "qwen-image-2.1",
+          "prompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark, 固定机位广角镜头，清晰的建立镜头，公元前207年初冬的咸阳城外霸上旷野高坡，清晨，前景（画面左下与右缘是枯黄倒伏的草丛与一道翻起的黄土坎沿）、中景（一片缓斜的黄土台地，坡面被稀疏枯草与碎石覆盖，一条碾压出的土路自画面下方斜向右上延伸，通向远处城门方向）、后景（稀疏的落叶乔木秃枝立在坡脊上，再远处是灰黑色咸阳城墙轮廓与城楼，被灰白薄雾吞没）三层分层构图，出入口（画面右下方的土路作为坡地通往咸阳城门的通道，路两侧立着一块低矮的秦式石标），地面（干燥的关中黄土，车辙与脚印压实成浅沟，边缘散着碎石与枯草屑），墙面（无墙体，仅远处夯土台地的立面无窗，表面风化、颜色灰褐），稀疏秃枝落叶乔木沿坡脊左右散立，土路与坡地的高差自洽、空间结构连续、自洽，清晨初冬的雾光，太阳尚未升高，低角度柔和冷调光线掠过坡面，灰白色薄雾横向漫过坡地，光影平缓、明暗对比低，空气寒冷寂静，远景被雾吞没，画面中没有任何人物，空场景，电影质感",
+          "created_at": "2026-11-10T17:57:43.379Z",
+          "generated_at": 1794333648,
+          "is_current": true,
+          "fidelity": null,
+          "fidelity_reason": null
+        },
+        {
+          "id": 1576,
+          "url": "static/images/4bd6352e-da45-4103-9def-648c88227486.png",
+          "provider": "qwen-jobs",
+          "model": "qwen-image-2.1",
+          "prompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark, 固定机位广角镜头，清晰的建立镜头，公元前207年初冬咸阳城外的霸上，旷野高坡，清晨，前景（画面左下一片枯黄草丛中斜插着几根残断的枯枝与一块裸露的黄土碎石，右侧一角是一段被雨水冲出沟槽的坡地边缘），中景（连绵起伏的黄土台地缓坡占据画面中部，坡面覆盖稀疏枯黄草丛与一道道枯萎的草痕，一条土路自画面右下方斜向穿过坡地、延伸向远处城门方向，坡上散布几株枝干裸露的落叶乔木，树影被低角度光线拉长），后景（远处关中平原边缘的地平线上浮着灰黑色的咸阳城墙轮廓与层叠的城楼剪影，被灰白色薄雾横向吞没而轮廓虚化），出入口（那条土路是唯一的通道，自画面近处斜向上通往远方城楼方向，路面被车辙与踩踏压出浅硬的路心），地面（黄土与碎石混杂，草根间露出干裂的土面，路边积着薄薄的白霜与零星的枯叶），墙面（无建筑墙体，仅中景坡地后方有一道低矮的夯土台坎，土色灰黄、表面风化剥落），主要陈设（土路沿坡斜行、左侧草坡高于右侧缓下的台地，几株落叶乔木立在路的左上方与右下方，远处城楼正对土路尽头），空间结构连续、自洽，清晨初冬的雾光从坡顶低角度斜射过来，冷调灰白，太阳尚未升高，薄雾横向漫过坡地，光线柔和、明暗对比低而层次分明，空气清冷空旷，画面中没有任何人物，空场景，电影质感",
+          "created_at": "2026-11-10T17:26:48.221Z",
+          "generated_at": 1794332123,
+          "is_current": false,
+          "fidelity": null,
+          "fidelity_reason": null
+        }
+      ],
+      "image_generated_at": 1794333648
+    },
+    {
+      "id": 112,
+      "drama_id": 15,
+      "episode_id": null,
+      "location": "咸阳城门",
+      "time": "上午",
+      "prompt": "公元前207年秦代咸阳城城门，夯土与木构城楼，双扇厚重的暗褐木门向内打开，门洞内是幽深的通道，门框上有秦式纹样木构件，门外是碾压过的黄土路面与低矮的土坡，门两侧无守卫队列，无人物。",
+      "lighting": "上午的冷白日光，雾已散薄，门洞内暗、门外亮，明暗对比强烈，空气中有薄尘。",
+      "final_prompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark, 固定机位广角镜头，清晰的建立镜头，9:16 竖构图，公元前207年秦代咸阳城门，上午，前景（画面下缘一道被车轮反复碾压的黄土路面，路面中央留着两道深陷车辙与散碎的干草屑，右下角一段低矮土坡的斜面与几块夯土碎块），中景（画面中部的主体：夯土城台与木构城楼全貌完整入画，顶部不被截断，双扇厚重的暗褐木门向内打开，门板上钉着金属门钉与木闩，门框上装有秦式纹样木构件，门洞内是幽深的通道，向里延伸至暗处收束），后景（城台墙体沿高度方向向上延伸至画面顶部，墙头露出木构屋檐与雉堞轮廓，上方留出上午开阔的天空纵深），出入口（画面正中央的双扇木门门洞，门框外两侧各一段夯土垛墙，墙体上可见风化的夯层与苔痕），地面（门外为压实黄土路面，表面有车辙、泥脚印与散落的浮土），墙面（夯土城墙表面呈土黄色，夯层纹理粗粝，有剥落的浅坑与水渍痕，木构件为暗褐色并带锯切与手工凿刻的痕迹），主要陈设及其固定相对位置（门洞居中，左右各立一根粗木门柱，门柱根部有石础；门洞内侧左壁悬一段木栅，门洞内侧右壁立一只木架，门外路面左侧横放一根拦门木杠），空间结构连续、自洽，上午冷白日光自画面左前方斜射进门洞，门外土路亮而泛浅灰高光，门洞内幽暗形成强烈明暗对比，空气中浮着薄尘，雾已散薄，空气清冷肃静，画面中没有任何人物，空场景，电影质感",
+      "final_prompt_source": "agent",
+      "final_prompt_updated_at": "2026-11-11T06:54:42.256Z",
+      "storyboard_count": 1,
+      "image_url": "static/images/050a7ba7-601d-4865-8f25-5b3d765f90c8.png",
+      "reference_images": null,
+      "status": "processing",
+      "local_path": null,
+      "exposition": 0,
+      "created_at": "2026-11-10T16:24:23.988Z",
+      "updated_at": "2026-11-11T07:00:04.141Z",
+      "deleted_at": null,
+      "image_versions": [
+        {
+          "id": 1577,
+          "url": "static/images/050a7ba7-601d-4865-8f25-5b3d765f90c8.png",
+          "provider": "qwen-jobs",
+          "model": "qwen-image-2.1",
+          "prompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark, 固定机位广角镜头，清晰的建立镜头，公元前207年秦代咸阳城门，上午。前景（画面左右两侧各有一截低矮土坡与散落的碎石、枯草，浅坑洼的黄土路面从画面下缘延伸进中景）。中景（主体空间是城门门洞与城楼基座：夯土城墙墙面，表面有夯筑层痕与风化剥落，墙顶架起木构城楼，城楼为深褐木柱与坡面屋顶，门洞居中，双扇厚重的暗褐木门向内敞开，门框上嵌有秦式方折回纹木构件，门洞内是一条幽深的夯土通道，通道尽头透出一点远处的街道微光）。后景（城门内更远的城郭街巷轮廓，被门洞裁成一段窄长深处，上方是上午泛白的天色）。出入口（画面中央门洞为城内外的唯一通道，双扇木门向内打开、贴靠在门洞内侧土壁上）。地面（门外为被车轮碾压出数道平行车辙的黄土路面，路面上浮着薄尘）。墙面（夯土城墙呈灰黄土色，墙面有风雨冲刷的竖向沟痕与斑驳剥落）。主要陈设及其固定相对位置：城门门洞居于画面正中，城楼横跨城墙顶端正对门洞上方，门外土路正对门洞朝画面下缘延伸，路面车辙与门洞中线对齐，路两侧土坡分列左右。空间结构连续、自洽，门内门外的层次前后贯通。上午的冷白日光从画面上方偏后斜照，雾已散薄，门外路面被照得发亮、门洞内通道暗沉，明暗对比强烈，空气中有薄尘悬浮，氛围清冷肃静。画面中没有任何人物，空场景，电影质感",
+          "created_at": "2026-11-10T17:27:08.579Z",
+          "generated_at": 1794332291,
+          "is_current": true,
+          "fidelity": null,
+          "fidelity_reason": null
+        }
+      ],
+      "image_generated_at": 1794332291
+    },
+    {
+      "id": 113,
+      "drama_id": 15,
+      "episode_id": null,
+      "location": "轵道",
+      "time": "上午",
+      "prompt": "公元前207年咸阳城外的轵道旁，一条车辙深陷的黄土土路横贯画面，路旁是初冬枯草、低矮土坎与几株秃枝老树，远处是灰褐色的田野与咸阳城郭剪影；路侧有一块低矮的秦式路旁石标，无宫殿、无宗庙、无人物。",
+      "lighting": "上午偏白的日光，光线均匀略显阴冷，初冬雾气残留于地表，土路反出浅灰高光。",
+      "final_prompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark, 固定机位广角镜头，清晰的建立镜头，9:16 竖构图，公元前207年秦代咸阳城外的轵道，上午，初冬时节，前景（画面下缘一道低矮黄土土坎与几丛枯黄杂草，路面边缘散着碎石与浅淡霜痕）、中景（一条车辙深陷的黄土土路自画面下方延伸并横贯主体空间，车辙两侧翻起的黄土干裂，路旁立着一块低矮的秦式路旁石标，方柱形、顶部平削、表面粗粝无纹），后景（沿高度方向向上延伸：土路向远处山口方向收束，两旁是灰褐色冬田与几株秃枝老树的枝干轮廓，画面顶部是灰蒙蒙的初冬天空与远处的咸阳城郭土墙及城楼剪影，城郭全貌完整入画、顶部不被截断），出入口（土路以画面下方近处为来路、向上通向远处城郭方向，是画面唯一的通路，两侧并无岔道），地面（黄土路面被车轮反复碾压，中央数道平行深车辙，辙底泛出浅灰高光，路肩松软黄土被踩出零散凹坑），墙面（无墙，仅土坎断面露出层状夯黄土，边缘风化剥落、草根外露），主要陈设及固定相对位置（秦式石标固定在土路左缘中段，正对车辙方向；土路右缘是一段低矮土坎与三两株秃枝老树，树身歪斜、枝干枯细；远处城郭土墙横压在画面顶部，与土路走向垂直相对），空间结构连续、自洽，上午偏白的日光自画面斜上方均匀洒下，色温冷白、明暗对比平淡，初冬雾气残余贴着地表漫过土坎与车辙，光线均匀略显阴冷，空气清冷空旷，画面中没有任何人物，空场景，电影质感",
+      "final_prompt_source": "agent",
+      "final_prompt_updated_at": "2026-11-11T06:55:10.107Z",
+      "storyboard_count": 1,
+      "image_url": "static/images/0b148c9f-0008-482a-b4a8-4331a16288dc.png",
+      "reference_images": null,
+      "status": "processing",
+      "local_path": null,
+      "exposition": 0,
+      "created_at": "2026-11-10T16:24:23.988Z",
+      "updated_at": "2026-11-11T07:00:04.144Z",
+      "deleted_at": null,
+      "image_versions": [
+        {
+          "id": 1578,
+          "url": "static/images/0b148c9f-0008-482a-b4a8-4331a16288dc.png",
+          "provider": "qwen-jobs",
+          "model": "qwen-image-2.1",
+          "prompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark, 固定机位广角镜头，清晰的建立镜头，公元前207年秦代咸阳城外的轵道，上午，初冬时节，前景（画面左下角一小段塌陷的土坎，坎边枯黄的草丛与几根裸露的树根，作为框景）；中景（一条车辙深陷的黄土土路自画面左下方斜向贯穿至右上方，路面被碾压出两道平行的深车辙，辙底积着薄泥与浅灰积水痕，路侧立一块低矮的秦式路旁石标，方形石身、顶部略削平、表面无字迹、边缘被风化磨圆）；后景（灰褐色的初冬田野铺向地平线，几株秃枝老树错落立在路右一侧，枝干细瘦无叶，更远处是模糊的咸阳城郭剪影与低矮城楼轮廓），出入口（画面右上方土路笔直延伸消失于远处城郭方向，画面左侧中段有一条细窄岔道从主路分出，通向左后方的田野），地面（压实黄土路面，表面干硬泛浅灰高光，辙沟、碎石与枯草根散布，路缘有薄霜与残雾痕），墙面（无墙，仅有路旁低矮的黄土坎断面，土质粗粒、断口干裂，边缘零星长着枯草），空间结构连续、自洽，上午偏白的日光从画面左上方斜射，色温偏冷、光线均匀略显阴冷，明暗对比柔和，初冬雾气残留贴伏于地表，土路反出浅灰高光，空气清寒寂寥，画面中没有任何人物，空场景，电影质感",
+          "created_at": "2026-11-10T17:27:16.700Z",
+          "generated_at": 1794332306,
+          "is_current": true,
+          "fidelity": null,
+          "fidelity_reason": null
+        }
+      ],
+      "image_generated_at": 1794332306
+    },
+    {
+      "id": 114,
+      "drama_id": 15,
+      "episode_id": null,
+      "location": "咸阳宫",
+      "time": "深夜",
+      "prompt": "公元前207年秦代咸阳宫殿内，高台之上的殿堂，粗壮木柱与黑漆描红梁枋，殿内铺砖地面，正面设一方高台上的漆木御座，两侧列青铜灯架与帷幕，殿门通向前廊；宫殿为秦式高台建筑，木构件厚重，无人物。",
+      "lighting": "深夜殿堂内昏暗，青铜灯架与烛火为唯一光源，暖黄光点在黑漆梁柱上跳动，御座区亮、殿角沉入黑暗。",
+      "final_prompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark, 固定机位广角镜头，清晰的建立镜头，9:16 竖构图，公元前207年秦代咸阳宫殿内高台之上的殿堂，深夜，殿堂全貌沿高度方向完整入画、顶部梁枋不被截断，上方留出梁枋与殿顶的纵深，下方留出铺砖地面与殿前台阶，前景（画面下方近处一角列着两盏青铜灯架与卷起的帷幕边缘，殿前第级台阶横过画面底部）、中景（殿堂中央的主体空间，一方高台上的漆木御座正对画面居中，御座前一段平整的铺砖地面）、后景（殿堂深处的黑漆描红梁枋与粗壮木柱向纵深排开，殿后墙面沉入暗处）三层分层构图，出入口（画面左侧一扇厚重的秦式对开木门通向前廊，门缝外是夜色与微弱的廊灯）、地面（方形铺砖地面，砖缝均匀，砖面有经年踏磨的浅光与薄薄灰尘）、墙面（素色夯泥墙与黑漆描红梁枋，朱红线条沿木构横向延伸，柱身漆面斑驳有磨损）、主要陈设（高台漆木御座居于殿堂正中轴线，两侧青铜灯架对称列于柱脚，御座后方与两侧垂下素色帷幕，殿角堆放两方木几），空间结构连续、自洽，青铜灯架与烛火为唯一光源，暖黄光点跳动在黑漆梁柱上，御座区明亮、殿角沉入黑暗，暖橙与暗褐的强明暗对比，殿堂空旷寂静、空气沉闷而森冷，画面中没有任何人物，空场景，电影质感",
+      "final_prompt_source": "agent",
+      "final_prompt_updated_at": "2026-11-11T06:55:36.652Z",
+      "storyboard_count": 1,
+      "image_url": "static/images/48646d2e-63ec-4c43-8584-92872effb191.png",
+      "reference_images": null,
+      "status": "processing",
+      "local_path": null,
+      "exposition": 0,
+      "created_at": "2026-11-10T16:24:23.988Z",
+      "updated_at": "2026-11-11T07:00:04.147Z",
+      "deleted_at": null,
+      "image_versions": [
+        {
+          "id": 1579,
+          "url": "static/images/48646d2e-63ec-4c43-8584-92872effb191.png",
+          "provider": "qwen-jobs",
+          "model": "qwen-image-2.1",
+          "prompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark, 固定机位广角镜头，清晰的建立镜头，公元前207年秦代咸阳宫高台之上的殿堂内部，深夜，前景（画面左右两侧各一根粗壮的深色木柱与垂落的素色帷幕边缘框住画面，柱脚旁一只青铜灯架的火苗低矮跳动）、中景（殿内开阔的铺砖地面向纵深延伸，正中靠后立起一方高台，高台上安放一张漆木御座，座前两侧对称排列青铜灯架与成对的垂挂帷幕，砖面被灯火照出暖黄的光斑与长长的影线）、后景（殿堂深处的黑漆描红梁枋与成排立柱逐层没入黑暗，最深处一道高墙与后方廊道口隐在阴影里）三层分层构图，出入口（画面右侧一扇厚重的对开木殿门半掩，门外是幽暗的前廊，门缝里透进微弱的夜色冷光），地面（方形铺砖地面，砖缝清晰，年代久远踩磨出浅淡的凹痕与薄薄一层浮尘），墙面（夯土与木构墙面，梁枋以黑漆描红纹样，色彩沉暗斑驳），主要陈设及其固定相对位置（高台居殿内中轴靠后，御座朝向前廊方向，御座左右各三只青铜灯架等距排在柱间，帷幕从梁下垂挂于灯架之间，殿门位于画面右侧与御座成斜向相对），空间结构连续、自洽，光源为青铜灯架与烛火的暖黄火光，火点跳动，御座区明亮、殿角与梁顶沉入深黑，光比极大，空气沉闷寂静、殿内空落，画面中没有任何人物，空场景，电影质感",
+          "created_at": "2026-11-10T17:27:42.570Z",
+          "generated_at": 1794332480,
+          "is_current": true,
+          "fidelity": null,
+          "fidelity_reason": null
+        }
+      ],
+      "image_generated_at": 1794332480
+    },
+    {
+      "id": 115,
+      "drama_id": 15,
+      "episode_id": null,
+      "location": "咸阳街道",
+      "time": "上午",
+      "prompt": "公元前207年秦代咸阳城内街道，两侧是夯土与木构的低矮民居和店铺，门面为暗褐色木格门窗，街面为压实黄土并有车辙，街道向远处延伸至宫城方向的高台建筑剪影，街边设木制水槽与石墩；画面无人物、无摊位货物。",
+      "lighting": "上午的明亮自然光，斜射日光在土墙上留下柔和阴影，色调偏暖褐色，空气中浮着细尘。",
+      "final_prompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark, 固定机位广角镜头，清晰的建立镜头，9:16 竖构图，公元前207年秦代咸阳城内街道，上午，前景（画面下缘横过一段被车辙碾实的黄土街面，一尊粗凿石墩立在下缘偏右，几级磨损的土阶通向右侧民居门槛）、中景（街道中段两侧为夯土与木构的低矮民居与店铺，暗褐色木格门窗与手刨木梁沿街排开，画面中段偏右一只木制水槽贴墙固定、槽沿磨损发亮，街面压实黄土上留着数道平行的深车辙向前延伸）、后景（街道顺画面高度向上收窄，尽头是宫城方向高台建筑的剪影，屋顶与夯土台基层层向上叠入画面顶端）、出入口（画面左侧一条窄巷口横插进街面，右侧店铺的木门槛正面敞开形成入口），地面（压实黄土街面，车辙深陷、浮着细尘，边角积聚干草碎屑），墙面（两侧夯土墙呈暖褐泥色，剥落处露出草筋与灰白泥胎，木构件劈痕明显），主要陈设及其固定相对位置（木制水槽贴在右侧墙根，石墩位于下缘左前方，左右店铺的门廊立柱沿街一件接一件排列，街面中央无任何摊位货物），空间结构连续、自洽，上午的明亮自然光自画面上方斜射下来，暖褐色调，斜射日光在夯土墙面留下柔和的长阴影，街道纵深渐次收窄、光线由亮转柔，空中浮着细尘在光柱里泛白，画面中没有任何人物，空场景，电影质感",
+      "final_prompt_source": "agent",
+      "final_prompt_updated_at": "2026-11-11T06:56:08.212Z",
+      "storyboard_count": 1,
+      "image_url": "static/images/ad030aed-3e58-4837-a6eb-9993f029a5ce.png",
+      "reference_images": null,
+      "status": "processing",
+      "local_path": null,
+      "exposition": 0,
+      "created_at": "2026-11-10T16:24:23.988Z",
+      "updated_at": "2026-11-11T07:00:04.149Z",
+      "deleted_at": null,
+      "image_versions": [
+        {
+          "id": 1580,
+          "url": "static/images/ad030aed-3e58-4837-a6eb-9993f029a5ce.png",
+          "provider": "qwen-jobs",
+          "model": "qwen-image-2.1",
+          "prompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark, 固定机位广角镜头，清晰的建立镜头，公元前207年秦代咸阳城内街道，上午，前景（画面左缘露出一段暗褐色木格店面门框与街边一只石墩，作框景遮挡）、中景（压实黄土的街道主体横贯画面并向纵深收窄，路面留有两道深陷车辙，街心略微起伏）、后景（街道尽头是宫城方向的高台建筑剪影，层层夯土台基与屋顶轮廓被上午的空气薄尘虚化）三层分层构图，出入口（街道两侧各有巷道口，画面右侧一条窄巷向内延伸，画面左侧街面正对宫城方向为开放式通道），地面（压实黄土路面，干硬开裂，车辙内积着浅浮土与细碎石粒），墙面（两侧民居为夯土墙，墙体灰黄斑驳、表面有细裂纹与雨水冲刷的浅痕，门面为暗褐色木格门窗），主要陈设及其固定相对位置（街道两侧低矮夯土木构民居与店铺沿街对称排布，右侧靠墙立一条长木制水槽、槽口朝向街面，左侧近前景处一只石墩，几根木构檐柱沿檐口排开并互相平行），空间结构连续、自洽，上午明亮自然光从街道上方斜射，日光在左侧土墙上留下柔和的长斜阴影，色温偏暖褐，明暗对比柔和，空气中浮着细尘，画面中没有任何人物，空场景，电影质感",
+          "created_at": "2026-11-10T17:27:48.095Z",
+          "generated_at": 1794332488,
+          "is_current": true,
+          "fidelity": null,
+          "fidelity_reason": null
+        }
+      ],
+      "image_generated_at": 1794332488
+    },
+    {
+      "id": 116,
+      "drama_id": 15,
+      "episode_id": null,
+      "location": "咸阳",
+      "time": "夜晚",
+      "prompt": "公元前206年项羽屠咸阳后的秦都咸阳城，秦式高台宫殿群被大火吞没，黑漆木构与夯土墙体成片燃烧，宫室屋顶塌落，城中街巷空无一人，远处城郭轮廓被火光映出；建筑为秦代高台木构形制，地面散落焦黑木料与碎瓦。",
+      "lighting": "夜晚，唯一光源是冲天大火，橙红火光映亮整片宫室废墟与烟柱，天空被浓烟压暗，色调炽烈而压抑。",
+      "final_prompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark, 固定机位广角镜头，清晰的建立镜头，9:16 竖构图，公元前206年秦都咸阳城，秦式高台宫殿建筑群，夜晚。竖构图沿高度方向分层取景，主体宫室沿画面纵向完整入画：近景地面为焦黑木料与碎裂瓦当散落于碾压过的黄土街面，中景是成片燃烧的秦代高台木构宫室，粗壮黑漆立柱与夯土墙体被烈焰吞没，屋顶梁架塌落出缺口、断木斜支，远处城郭夯土城墙轮廓在火光上方延伸至画面顶部，天空占了画面上部三分之一，被浓烟压成暗灰橙的幕布，烟柱从宫室顶端向上翻卷冲出画面顶端不被截断。左侧一条空荡的街巷向深处延伸，右侧是坍塌的廊台与倾颓的夯土墙，墙体微俯可见焦裂剥落的痕迹。地面铺压实的黄土路面，留有车辙与灰烬；墙面为被火熏黑的夯土，表层开裂起翘。主要陈设的相对位置固定：画面下方偏右是倾倒的宫室柱础与残柱，中部横向一大片燃烧的殿宇基址，左上方高台台阶向上通向已焚毁的殿门门洞，右上方是城郭城墙与灰黑色城楼轮廓。空间结构连续、自洽。唯一光源是冲天大火，橙红火光从画面中部向上映亮整片宫室废墟与领空的烟柱，火光在断木与碎瓦上投下跳动的高对比阴影，天空浓烟压暗使画面上下形成炽烈与压抑的冷暖反差，整体色调炽烈而压抑。画面中没有任何人物，空场景，电影质感。",
+      "final_prompt_source": "agent",
+      "final_prompt_updated_at": "2026-11-11T06:56:27.952Z",
+      "storyboard_count": 1,
+      "image_url": "static/images/e89e0f08-712f-4ac8-893b-c161291c05a9.png",
+      "reference_images": null,
+      "status": "processing",
+      "local_path": null,
+      "exposition": 1,
+      "created_at": "2026-11-10T16:24:23.988Z",
+      "updated_at": "2026-11-11T07:00:04.152Z",
+      "deleted_at": null,
+      "image_versions": [
+        {
+          "id": 1581,
+          "url": "static/images/e89e0f08-712f-4ac8-893b-c161291c05a9.png",
+          "provider": "qwen-jobs",
+          "model": "qwen-image-2.1",
+          "prompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark, 固定机位广角镜头，清晰的建立镜头，公元前206年秦都咸阳城，被大火吞没的秦式高台宫殿群，夜晚，\n前景（画面下方与左右边缘是塌落下来的黑漆木构梁枋残段与成堆碎瓦，一截断裂的粗木柱斜搭在前景右侧，表面炭化开裂，几簇火苗正沿着木料缝隙向上舔烧）、中景（一座秦代高台木构主殿正成片燃烧，夯土墙体被熏成焦黑，屋顶已经塌落、露出烧断的木椽骨架，火舌从门窗缺口里翻卷而出，殿前台阶断裂错落，地面散落焦黑木料与碎瓦）、后景（更高的台榭与宫室轮廓在浓烟中层层退远，数道巨大的烟柱竖直升入夜空，远处城郭的夯土城墙轮廓被火光映出一圈暗红边线）三层分层构图，\n出入口（中景主殿左侧是一条通往宫城的宽阔夯土甬道，甬道尽头被倒塌的木料半掩，画面右缘一道宫墙的缺口向外透出开阔的城外暗夜），地面（夯实黄土被火光烤得龟裂，遍布炭屑、焦黑木块与碎裂瓦片，塌落的梁木横在路面上），墙面（夯土墙面大面积熏黑剥落，露出内部灰白的土芯，残余黑漆描红的木构件在火光中闪着暗红光），\n主要陈设及其固定相对位置：主殿居中偏左占据中景核心，殿前石阶自殿门向下正对镜头，右侧一道宫墙沿画面纵深延伸至后景，左侧甬道平行于宫墙通向城内深处，殿与墙之间的空地散落若干烧塌的木架与瓦砾堆，\n空间结构连续、自洽，\n唯一光源是冲天大火，橙红火光自中景殿体向上翻涌，映亮整片宫室废墟与烟柱，墙面与柱脚投下浓重晃动的硬阴影，天空被浓烟压暗成深褐灰，色调炽烈而压抑，空气里浮着火星与灰烬，\n画面中没有任何人物，空场景，电影质感",
+          "created_at": "2026-11-10T17:27:54.032Z",
+          "generated_at": 1794332671,
+          "is_current": true,
+          "fidelity": null,
+          "fidelity_reason": null
+        }
+      ],
+      "image_generated_at": 1794332671
+    },
+    {
+      "id": 122,
+      "drama_id": 15,
+      "episode_id": null,
+      "location": "大泽乡",
+      "time": "清晨",
+      "prompt": "公元前209年蕲县大泽乡：雨后泽畔荒野，泥泞土路通向芦苇沼泽，浅水洼映着灰白天空，远处稀疏枯树与低矮土坡，画面无人。",
+      "lighting": "雨后清晨灰白天光，雾气低垂，湿冷",
+      "final_prompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark, 固定机位广角镜头，清晰的建立镜头，9:16 竖构图，公元前209年秦代蕲县大泽乡的雨后泽畔荒野，清晨，前景（画面下方近处一段被雨水泡软的泥泞土路，路面布满深陷的车辙与水迹，路边几簇倒伏的湿草与一小片积水的浅水洼，水面映着灰白天空）、中景（泥泞土路沿画面自下向上延伸，通向一片开阔的芦苇沼泽，成片芦苇沿浅水立起，几处水面反射天光，沼泽边缘有零散泥块与踩踏出的窄岔道）、后景（画面纵深处稀疏的枯树与低矮土坡相接，坡线与树梢向上送进灰白色的清晨雾霭，远天低垂，雾气把更远处吞没）三层分层构图，沿画面高度方向由近及远展开，出入口（中景偏右侧一条窄岔道从泥路分出，穿过芦苇缝隙通向沼泽方向，是这片荒野唯一的通道），地面（被雨浸泡的黄土与黏泥，表面起皱、有浅浅的积水反光与水洼边缘的泥痕），墙面（以土坡与沼泽岸线取代墙体，坡面是雨后的湿黄土与苔痕草根，沼泽岸线泥土松软、带水渍），主要陈设及固定相对位置（泥泞土路沿画面纵向贯穿，积水浅洼固定在路面近端左侧，芦苇沼泽占据中景右半并向纵深铺开，枯树群立在后方偏左的土坡上），空间结构连续、自洽，光源是清晨雨后低垂的灰白天光，雾气低垂、色温湿冷偏灰青，明暗对比柔和低弱，空气沉闷潮湿，雨后水汽与雾霭贴地弥漫，画面中没有任何人物，空场景，电影质感",
+      "final_prompt_source": "agent",
+      "final_prompt_updated_at": "2026-11-11T06:59:39.994Z",
+      "storyboard_count": 1,
+      "image_url": "static/images/31144355-79a0-4a5f-bc03-e53d19984df3.png",
+      "reference_images": null,
+      "status": "processing",
+      "local_path": null,
+      "exposition": 0,
+      "created_at": "2026-11-10T19:36:27.824Z",
+      "updated_at": "2026-11-11T07:00:04.154Z",
+      "deleted_at": null,
+      "image_versions": [
+        {
+          "id": 1691,
+          "url": "static/images/31144355-79a0-4a5f-bc03-e53d19984df3.png",
+          "provider": "qwen-jobs",
+          "model": "qwen-image-2.1",
+          "prompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark, 固定机位广角镜头，清晰的建立镜头，公元前209年秦代蕲县大泽乡的泽畔荒野，清晨，雨后不久的阴湿天色，前景（画面左右两侧是齐腰高的枯黄芦苇丛与倒伏的湿草，一株折断的芦苇斜垂在左下角框住画面边缘）、中景（一条被雨水泡软的泥泞土路自画面左侧蜿蜒横穿，路面车辙与脚印积着浑水，土路向右前方延伸至一片开阔的芦苇沼泽，路旁散着三两个浅水洼，水面平如镜面映出灰白天空）、后景（沼泽水面向远处铺展直至雾气吞没，稀疏的枯树与低矮土坡的轮廓在薄雾里层层淡出）三层分层构图，出入口（画面左侧土路自坡后转入，画面右侧芦苇间留出一道被踩出的窄小缺口通向沼泽深处），地面（深褐色泥地湿滑发亮，踩踏处翻起泥浆，水洼边缘有薄薄的泥痕与细碎草屑），墙面（无建筑，视野内只有坡地泥土断面与芦苇丛的层叠叶影），主要陈设及其固定相对位置（泥泞土路居画面中线偏左、为唯一通行动线，沼泽水面在其右后方占据画面右半，枯树群集中在中景与后景交界的土坡高处，浅水洼贴着土路右缘排列），空间结构连续、自洽，光源为雨后清晨从灰白云层透出的漫射日光，无明确方向、色温偏冷，光线均匀低平，水面与水洼反出灰白亮斑，芦苇丛下方与土坡背面压出柔和浓重的暗部，雾气贴着地面低垂、远处层次被雾削弱，空气湿冷、氛围荒凉压抑而静谧，画面中没有任何人物，空场景，电影质感",
+          "created_at": "2026-11-10T19:36:57.323Z",
+          "generated_at": 1794339601,
+          "is_current": true,
+          "fidelity": null,
+          "fidelity_reason": null
+        }
+      ],
+      "image_generated_at": 1794339601
+    }
+  ],
+  "prop": {
+    "id": 217,
+    "drama_id": 15,
+    "name": "行军地图",
+    "type": "路线示意图 · 秦末关中",
+    "description": "一幅铺展开的行军路线示意图，绘在米黄色丝帛上；以墨线标明山脉、河流与道路走向，用方形符号标出关隘城邑的位置，图上不出现任何文字与地名标注；图为公元前三世纪末秦末楚军西进的路线示意，粒度到关隘与城邑一级。",
+    "prompt": null,
+    "final_prompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark, 单品产品图，标准产品摄影视角，正俯视平铺构图：一幅公元前三世纪末秦末时期的行军路线示意图，绘制在米黄色丝帛上，整幅平铺展开，无卷曲、无遮挡。丝帛质地细密，帛面可见经线纹理与自然折痕，边缘为手工裁切的齐边并略微起毛，帛色因年代而呈米黄微旧、局部有淡淡的水渍与磨损痕迹。图上以墨线绘制内容：山脊以连绵起伏的墨线勾勒并加晕染以表示山脉走向，河流以双道平行曲线蜿蜒贯穿，道路以细直线连接各点；关隘与城邑用方形墨线符号标出，符号大小一致、分布成一条由东向西推进的路径，粒度到关隘与城邑一级。图面素净，仅有墨线与符号，不出现任何文字、地名标注或印章。器物年代、形制与用墨工艺符合秦末实物，图上笔墨为当时墨色、笔触有浓淡变化与枯笔痕。物品各部分比例准确，丝帛四边完整入镜，画面四周留白充足，边缘完整无裁切。背景为纯白无影背景、无渐变、无投影，背景纯净不承载任何叙事内容，无其他物品、无人物、无场景。柔和均匀的影棚光，轻淡阴影，高细节，无现代加工痕迹、无印刷质感。",
+    "final_prompt_source": "agent",
+    "final_prompt_updated_at": "2026-11-10T18:59:54.573Z",
+    "image_url": "static/images/2e6eda55-3b3b-4a62-9ac9-07f98f504b7f.png",
+    "reference_images": null,
+    "local_path": "static/images/0031d650-5cb0-442d-bf9c-fde249032066.png",
+    "faithful": 0,
+    "faithful_source": null,
+    "semantics": null,
+    "asset_type": "prop",
+    "exposition": 0,
+    "created_at": "2026-11-10T16:51:55.082Z",
+    "updated_at": "2026-11-10T19:01:35.261Z",
+    "deleted_at": null,
+    "image_versions": [
+      {
+        "id": 1681,
+        "url": "static/images/2e6eda55-3b3b-4a62-9ac9-07f98f504b7f.png",
+        "provider": "qwen-jobs",
+        "model": "qwen-image-2.1",
+        "prompt": "cinematic historical documentary still, 35mm, desaturated cool slate palette with amber highlights, soft overcast daylight, low contrast, subtle film grain, gentle vignette, period-accurate production design, no modern objects, no lettering, no watermark, 单品产品图，标准产品摄影视角，正俯视平铺构图：一幅公元前三世纪末秦末时期的行军路线示意图，绘制在米黄色丝帛上，整幅平铺展开，无卷曲、无遮挡。丝帛质地细密，帛面可见经线纹理与自然折痕，边缘为手工裁切的齐边并略微起毛，帛色因年代而呈米黄微旧、局部有淡淡的水渍与磨损痕迹。图上以墨线绘制内容：山脊以连绵起伏的墨线勾勒并加晕染以表示山脉走向，河流以双道平行曲线蜿蜒贯穿，道路以细直线连接各点；关隘与城邑用方形墨线符号标出，符号大小一致、分布成一条由东向西推进的路径，粒度到关隘与城邑一级。图面素净，仅有墨线与符号，不出现任何文字、地名标注或印章。器物年代、形制与用墨工艺符合秦末实物，图上笔墨为当时墨色、笔触有浓淡变化与枯笔痕。物品各部分比例准确，丝帛四边完整入镜，画面四周留白充足，边缘完整无裁切。背景为纯白无影背景、无渐变、无投影，背景纯净不承载任何叙事内容，无其他物品、无人物、无场景。柔和均匀的影棚光，轻淡阴影，高细节，无现代加工痕迹、无印刷质感。",
+        "created_at": "2026-11-10T18:59:59.424Z",
+        "generated_at": 1794337295,
+        "is_current": true,
+        "fidelity": null,
+        "fidelity_reason": null
+      },
+      {
+        "id": 1567,
+        "url": "static/images/0031d650-5cb0-442d-bf9c-fde249032066.png",
+        "provider": "import",
+        "model": "qwen-image-2.1",
+        "prompt": "Chinese guofeng 2.5D illustration style, semi-realistic donghua-quality character art, elegant flowing line work, rich traditional Chinese aesthetic elements, layered ink-wash inspired atmospheric backgrounds, refined silk and fabric textures, soft luminous lighting with gentle haze, sophisticated muted jewel-tone palette, xianxia drama poster quality, consistent character design across shots, avoid flat cel shading, avoid western comic ink style, avoid photorealism, avoid plastic 3D look, avoid modern clothing and props unless specified, 单品产品图，标准产品摄影视角，正俯视平铺构图的秦末行军路线图：一整幅米黄色丝帛铺展开呈方形，帛面质地细腻、边缘略有卷起的丝缕感，帛面之上以墨线勾勒山脉的起伏轮廓与蜿蜒河流，以较粗墨线画出道路走向，沿途用方形墨框符号标注关隘与城邑，每个符号旁侧以毛笔小楷竖写地名，可见「戏」「函谷关」「武关」「峣关」「霸上」「咸阳」六处墨书地名，墨色浓淡有笔锋的枯润变化，部分字迹边缘有轻微晕染，图上路线自东向西顺次连通这些关隘城邑，构图元素稀疏有致、粒度只到关隘与城邑一级。丝帛整体比例准确，各段路线与符号的相对位置关系真实，丝帛完整入镜、四周留白，边缘无裁切，背景纯净不承载任何叙事内容，无其他物品、无人物、无场景，柔和均匀的影棚光，轻淡阴影，高细节",
+        "created_at": "2026-11-10T08:53:25.703Z",
+        "generated_at": 1794302920,
+        "is_current": false,
+        "fidelity": null,
+        "fidelity_reason": null
+      }
+    ],
+    "image_generated_at": 1794337295
+  },
+  "sceneDownloads": [
+    {
+      "path": "static/images/391d6e28-bd6f-4963-ba4e-3038530eb451.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/assets/scene-111.png",
+      "bytes": 4075275,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/050a7ba7-601d-4865-8f25-5b3d765f90c8.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/assets/scene-112.png",
+      "bytes": 3704053,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/0b148c9f-0008-482a-b4a8-4331a16288dc.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/assets/scene-113.png",
+      "bytes": 4579024,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/48646d2e-63ec-4c43-8584-92872effb191.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/assets/scene-114.png",
+      "bytes": 2212233,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/ad030aed-3e58-4837-a6eb-9993f029a5ce.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/assets/scene-115.png",
+      "bytes": 3559239,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/e89e0f08-712f-4ac8-893b-c161291c05a9.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/assets/scene-116.png",
+      "bytes": 3132020,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/31144355-79a0-4a5f-bc03-e53d19984df3.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/assets/scene-122.png",
+      "bytes": 4075960,
+      "contentType": "image/png"
+    }
+  ],
+  "propDl": {
+    "path": "static/images/2e6eda55-3b3b-4a62-9ac9-07f98f504b7f.png",
+    "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/assets/prop-217.png",
+    "bytes": 1417098,
+    "contentType": "image/png"
+  },
+  "junctionDownloads": [
+    {
+      "path": "static/layer-frames/21-63bd611f7519536bc862e7232d21f0bf34572b88e791dc09d8da30be5667621f.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/junctions/shot-1.png",
+      "bytes": 995653,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/layer-frames/22-f837da6759bc0a7c4bd548ce5f6b2615f05be7911d3db02cd78698b625667d1c.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/junctions/shot-2.png",
+      "bytes": 1019667,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/layer-frames/23-2520cfc5c13242d757fb2bf302ed0c52b90494f8dbe92cf814b1417260297014.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/junctions/shot-3.png",
+      "bytes": 1004194,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/layer-frames/24-2520cfc5c13242d757fb2bf302ed0c52b90494f8dbe92cf814b1417260297014.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/junctions/shot-4.png",
+      "bytes": 1004194,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/layer-frames/25-cae7a24e7283819e385bc55eb23a1e15d39727c604597ec19959e3fdc2889065.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/junctions/shot-5.png",
+      "bytes": 1182548,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/layer-frames/26-2520cfc5c13242d757fb2bf302ed0c52b90494f8dbe92cf814b1417260297014.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/junctions/shot-6.png",
+      "bytes": 1004194,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/layer-frames/27-cae7a24e7283819e385bc55eb23a1e15d39727c604597ec19959e3fdc2889065.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/junctions/shot-7.png",
+      "bytes": 1182548,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/layer-frames/28-63bd611f7519536bc862e7232d21f0bf34572b88e791dc09d8da30be5667621f.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/junctions/shot-8.png",
+      "bytes": 995653,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/layer-frames/29-e388de430b026f22fa8568be0ed77c2c8344df92831741f5331c50f827b4abb4.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/junctions/shot-9.png",
+      "bytes": 792168,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/layer-frames/30-ee6dfd5754e84d7e8cdc234911ef3b81dbacad07d4131d8310b0e948902698b7.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/junctions/shot-10.png",
+      "bytes": 792102,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/layer-frames/31-cae7a24e7283819e385bc55eb23a1e15d39727c604597ec19959e3fdc2889065.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/junctions/shot-11.png",
+      "bytes": 1182548,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/layer-frames/32-cae7a24e7283819e385bc55eb23a1e15d39727c604597ec19959e3fdc2889065.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/junctions/shot-12.png",
+      "bytes": 1182548,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/layer-frames/33-cae7a24e7283819e385bc55eb23a1e15d39727c604597ec19959e3fdc2889065.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/junctions/shot-13.png",
+      "bytes": 1182548,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/layer-frames/34-5b20a3f1512524aebf1e86846132fa9ac195da05d119b574b75388b97e1a9c32.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/junctions/shot-14.png",
+      "bytes": 1016378,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/layer-frames/35-71192df6d9424f9a027e0d5cf852f026389108d4813c9d9f6282780bce22c1e5.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/junctions/shot-15.png",
+      "bytes": 1032127,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/layer-frames/36-ea24bffa7130f4a2746bf37d3ee4c34b27d511223fd73e89d56e3f66c7df753c.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/junctions/shot-16.png",
+      "bytes": 878006,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/layer-frames/37-63bd611f7519536bc862e7232d21f0bf34572b88e791dc09d8da30be5667621f.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/junctions/shot-17.png",
+      "bytes": 995653,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/layer-frames/38-1e0833eba48d89d8631ea07935afa4f0471dfa430964c6f05f6e19b19f1beb5f.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/junctions/shot-18.png",
+      "bytes": 1060480,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/layer-frames/39-d0629aca82c506b21338ede62e794fc4f015ffd90f49c05d4a59ca826f79dab1.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/junctions/shot-19.png",
+      "bytes": 836072,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/layer-frames/40-d3493de3aa6eaa6c7ae005381f9bbd212b6ec2f79e9e7c5fdc4da81b59ebfeb1.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/junctions/shot-20.png",
+      "bytes": 1019998,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/layer-frames/41-71192df6d9424f9a027e0d5cf852f026389108d4813c9d9f6282780bce22c1e5.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/junctions/shot-21.png",
+      "bytes": 1032127,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/layer-frames/42-f837da6759bc0a7c4bd548ce5f6b2615f05be7911d3db02cd78698b625667d1c.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/junctions/shot-22.png",
+      "bytes": 1019667,
+      "contentType": "image/png"
+    }
+  ],
+  "kfDownloads": [
+    {
+      "path": "static/images/abafb7e8-b67f-4ee5-8830-916e9b5cfecc.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/keyframes/shot-1-mid.png",
+      "bytes": 1606170,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/4df7860c-dcff-4991-a181-8f03cc79fbd8.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/keyframes/shot-1-last.png",
+      "bytes": 1681833,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/247696b2-78cb-4ec8-9d79-3ec203c81d8c.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/keyframes/shot-2-mid.png",
+      "bytes": 1645598,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/ba68788e-f738-4306-8c0f-da876bce7d4b.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/keyframes/shot-2-last.png",
+      "bytes": 1705984,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/1a0c5ecf-a02d-4905-b4c7-c59c9608212c.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/keyframes/shot-3-mid.png",
+      "bytes": 1744755,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/2ff22a59-4288-416b-a77b-b58df2d6dc99.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/keyframes/shot-3-last.png",
+      "bytes": 1732957,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/590451ef-ceb0-48e9-b70a-d7551adecc1e.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/keyframes/shot-4-mid.png",
+      "bytes": 1758370,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/4ae13f18-0ec7-4fec-9836-2d2ce8650955.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/keyframes/shot-4-last.png",
+      "bytes": 1685442,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/9b95ad66-6c75-4ede-8d91-7c3471a96462.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/keyframes/shot-5-mid.png",
+      "bytes": 1654050,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/b9fa7e50-f612-4731-8fe9-f3f8d726f12c.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/keyframes/shot-5-last.png",
+      "bytes": 1764245,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/bb3e72d0-a305-448b-a173-3c0fe945fff5.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/keyframes/shot-6-mid.png",
+      "bytes": 1727805,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/655f159d-964d-4614-bc69-02bd5d9b7feb.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/keyframes/shot-6-last.png",
+      "bytes": 1741699,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/582b21f4-b81a-45e2-90d2-44a506b41637.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/keyframes/shot-7-mid.png",
+      "bytes": 1827377,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/79eb8276-50c8-435e-9cd9-c039531b6f28.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/keyframes/shot-7-last.png",
+      "bytes": 1827339,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/0995bc6d-5723-4031-89d9-7ff3ad07f5d7.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/keyframes/shot-8-mid.png",
+      "bytes": 1843841,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/1e8ecaf3-25f4-45cd-8b50-2d9aee14fd1a.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/keyframes/shot-8-last.png",
+      "bytes": 1726028,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/14abf355-300a-4e37-90db-d8bd0cdff769.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/keyframes/shot-9-mid.png",
+      "bytes": 1067928,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/23025369-ee19-46ae-843b-e79e56d6e25f.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/keyframes/shot-9-last.png",
+      "bytes": 954642,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/9ded7211-f6b8-4eb8-9404-cf6ad0170e19.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/keyframes/shot-10-mid.png",
+      "bytes": 1120332,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/f7e064d8-a1fc-4dc7-805c-6e74aec00273.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/keyframes/shot-10-last.png",
+      "bytes": 1027767,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/6d11c7c7-90b8-4757-a523-2dab4dc6ce6b.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/keyframes/shot-11-mid.png",
+      "bytes": 1819631,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/bef5f3a9-53ba-44bd-99a2-26013cd2f66e.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/keyframes/shot-11-last.png",
+      "bytes": 1930867,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/cfd27aaf-3e25-48e1-af81-20ebf03889c5.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/keyframes/shot-12-mid.png",
+      "bytes": 1939465,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/618b45c1-7df0-427f-a751-87534b015662.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/keyframes/shot-12-last.png",
+      "bytes": 1917746,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/76561e4a-fa3d-4cec-b5cf-4db928889a70.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/keyframes/shot-13-mid.png",
+      "bytes": 1873013,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/b574c436-b39b-432d-a416-410b813efe87.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/keyframes/shot-13-last.png",
+      "bytes": 1859626,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/e81fdb03-62fe-4b3e-bf20-b23cfa91dc67.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/keyframes/shot-14-first.png",
+      "bytes": 1734870,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/171b53be-3f66-453d-95ce-5406b574a337.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/keyframes/shot-14-mid.png",
+      "bytes": 1853199,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/430c084a-d70e-4fa8-9f7f-c288b3adb4c4.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/keyframes/shot-15-mid.png",
+      "bytes": 2166210,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/e2665bfe-9558-49f4-8b0d-93b29b7548ca.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/keyframes/shot-15-last.png",
+      "bytes": 2161834,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/fcc3197e-1d38-4a9e-9bd9-c13a37277f34.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/keyframes/shot-16-mid.png",
+      "bytes": 1836826,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/e34e90da-d30b-447d-9d36-a646ede0c353.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/keyframes/shot-16-last.png",
+      "bytes": 1763240,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/17a97ce2-f989-4323-8acc-0a7c2eb0d486.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/keyframes/shot-17-mid.png",
+      "bytes": 1677227,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/89a4509e-c318-4a5e-a2bb-ae0c7731e2da.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/keyframes/shot-17-last.png",
+      "bytes": 1571416,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/61bae211-30ae-444c-8216-251d842a41b4.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/keyframes/shot-18-mid.png",
+      "bytes": 1807583,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/d6bd9b15-147b-49fa-8c6b-2ef235dd4914.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/keyframes/shot-18-last.png",
+      "bytes": 1718783,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/6c796fda-d2dd-4f2c-bd75-5179bf1b2f59.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/keyframes/shot-19-mid.png",
+      "bytes": 1876439,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/d14491ad-4b21-45b5-a97e-8eb9c326e6d8.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/keyframes/shot-19-last.png",
+      "bytes": 1781427,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/71685205-e7f4-420f-96d3-8b66ffa9d45a.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/keyframes/shot-20-mid.png",
+      "bytes": 1534373,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/ed9fee8f-b571-4849-a726-6f3c97216320.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/keyframes/shot-20-last.png",
+      "bytes": 1611019,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/ce5d6706-e159-4116-a671-f958de6dc6bb.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/keyframes/shot-21-mid.png",
+      "bytes": 1802707,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/b92548c4-cd0e-40c4-ba79-9ee1ead49d77.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/keyframes/shot-21-last.png",
+      "bytes": 1776890,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/b4d4321e-ea4f-4cd6-bee7-4b6419348d52.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/keyframes/shot-22-mid.png",
+      "bytes": 1696856,
+      "contentType": "image/png"
+    },
+    {
+      "path": "static/images/4914d4a1-1255-4e50-ad86-712d9511f0d8.png",
+      "out": "/home/joysort/projects/huobao-drama-issue-94/docs/qa/issue-94-20261111/ep21-rework/before/keyframes/shot-22-last.png",
+      "bytes": 1720728,
+      "contentType": "image/png"
+    }
+  ]
+}

@@ -1,0 +1,236 @@
+{
+  "status": "done",
+  "total": 22,
+  "completed": 22,
+  "failed": 0,
+  "started_at": "2026-11-11T07:16:17.108Z",
+  "finished_at": "2026-11-11T07:17:23.990Z",
+  "task_id": 1819,
+  "scope": {
+    "included": [
+      {
+        "storyboard_id": 573,
+        "storyboard_number": 1
+      },
+      {
+        "storyboard_id": 574,
+        "storyboard_number": 2
+      },
+      {
+        "storyboard_id": 575,
+        "storyboard_number": 3
+      },
+      {
+        "storyboard_id": 576,
+        "storyboard_number": 4
+      },
+      {
+        "storyboard_id": 577,
+        "storyboard_number": 5
+      },
+      {
+        "storyboard_id": 578,
+        "storyboard_number": 6
+      },
+      {
+        "storyboard_id": 579,
+        "storyboard_number": 7
+      },
+      {
+        "storyboard_id": 580,
+        "storyboard_number": 8
+      },
+      {
+        "storyboard_id": 581,
+        "storyboard_number": 9
+      },
+      {
+        "storyboard_id": 582,
+        "storyboard_number": 10
+      },
+      {
+        "storyboard_id": 583,
+        "storyboard_number": 11
+      },
+      {
+        "storyboard_id": 584,
+        "storyboard_number": 12
+      },
+      {
+        "storyboard_id": 585,
+        "storyboard_number": 13
+      },
+      {
+        "storyboard_id": 586,
+        "storyboard_number": 14
+      },
+      {
+        "storyboard_id": 587,
+        "storyboard_number": 15
+      },
+      {
+        "storyboard_id": 588,
+        "storyboard_number": 16
+      },
+      {
+        "storyboard_id": 589,
+        "storyboard_number": 17
+      },
+      {
+        "storyboard_id": 590,
+        "storyboard_number": 18
+      },
+      {
+        "storyboard_id": 591,
+        "storyboard_number": 19
+      },
+      {
+        "storyboard_id": 592,
+        "storyboard_number": 20
+      },
+      {
+        "storyboard_id": 593,
+        "storyboard_number": 21
+      },
+      {
+        "storyboard_id": 594,
+        "storyboard_number": 22
+      }
+    ],
+    "excluded": []
+  },
+  "items": [
+    {
+      "storyboard_id": 573,
+      "storyboard_number": 1,
+      "state": "completed",
+      "reason": null
+    },
+    {
+      "storyboard_id": 574,
+      "storyboard_number": 2,
+      "state": "completed",
+      "reason": null
+    },
+    {
+      "storyboard_id": 575,
+      "storyboard_number": 3,
+      "state": "completed",
+      "reason": null
+    },
+    {
+      "storyboard_id": 576,
+      "storyboard_number": 4,
+      "state": "completed",
+      "reason": null
+    },
+    {
+      "storyboard_id": 577,
+      "storyboard_number": 5,
+      "state": "completed",
+      "reason": null
+    },
+    {
+      "storyboard_id": 578,
+      "storyboard_number": 6,
+      "state": "completed",
+      "reason": null
+    },
+    {
+      "storyboard_id": 579,
+      "storyboard_number": 7,
+      "state": "completed",
+      "reason": null
+    },
+    {
+      "storyboard_id": 580,
+      "storyboard_number": 8,
+      "state": "completed",
+      "reason": null
+    },
+    {
+      "storyboard_id": 581,
+      "storyboard_number": 9,
+      "state": "completed",
+      "reason": null
+    },
+    {
+      "storyboard_id": 582,
+      "storyboard_number": 10,
+      "state": "completed",
+      "reason": null
+    },
+    {
+      "storyboard_id": 583,
+      "storyboard_number": 11,
+      "state": "completed",
+      "reason": null
+    },
+    {
+      "storyboard_id": 584,
+      "storyboard_number": 12,
+      "state": "completed",
+      "reason": null
+    },
+    {
+      "storyboard_id": 585,
+      "storyboard_number": 13,
+      "state": "completed",
+      "reason": null
+    },
+    {
+      "storyboard_id": 586,
+      "storyboard_number": 14,
+      "state": "completed",
+      "reason": null
+    },
+    {
+      "storyboard_id": 587,
+      "storyboard_number": 15,
+      "state": "completed",
+      "reason": null
+    },
+    {
+      "storyboard_id": 588,
+      "storyboard_number": 16,
+      "state": "completed",
+      "reason": null
+    },
+    {
+      "storyboard_id": 589,
+      "storyboard_number": 17,
+      "state": "completed",
+      "reason": null
+    },
+    {
+      "storyboard_id": 590,
+      "storyboard_number": 18,
+      "state": "completed",
+      "reason": null
+    },
+    {
+      "storyboard_id": 591,
+      "storyboard_number": 19,
+      "state": "completed",
+      "reason": null
+    },
+    {
+      "storyboard_id": 592,
+      "storyboard_number": 20,
+      "state": "completed",
+      "reason": null
+    },
+    {
+      "storyboard_id": 593,
+      "storyboard_number": 21,
+      "state": "completed",
+      "reason": null
+    },
+    {
+      "storyboard_id": 594,
+      "storyboard_number": 22,
+      "state": "completed",
+      "reason": null
+    }
+  ]
+}

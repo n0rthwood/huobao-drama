@@ -1,0 +1,630 @@
+{
+  "items": [
+    {
+      "storyboard_id": 573,
+      "storyboard_number": 1,
+      "slot": "first",
+      "status": "skipped",
+      "checked": false,
+      "reason": "该槽位由衔接帧或承接上一镜尾帧锁定继承，不单独出图"
+    },
+    {
+      "storyboard_id": 573,
+      "storyboard_number": 1,
+      "slot": "mid",
+      "status": "changed",
+      "checked": true,
+      "selected_version_no": 1
+    },
+    {
+      "storyboard_id": 573,
+      "storyboard_number": 1,
+      "slot": "last",
+      "status": "changed",
+      "checked": true,
+      "selected_version_no": 1
+    },
+    {
+      "storyboard_id": 574,
+      "storyboard_number": 2,
+      "slot": "first",
+      "status": "skipped",
+      "checked": false,
+      "reason": "该槽位由衔接帧或承接上一镜尾帧锁定继承，不单独出图"
+    },
+    {
+      "storyboard_id": 574,
+      "storyboard_number": 2,
+      "slot": "mid",
+      "status": "changed",
+      "checked": true,
+      "selected_version_no": 1
+    },
+    {
+      "storyboard_id": 574,
+      "storyboard_number": 2,
+      "slot": "last",
+      "status": "changed",
+      "checked": true,
+      "selected_version_no": 1
+    },
+    {
+      "storyboard_id": 575,
+      "storyboard_number": 3,
+      "slot": "first",
+      "status": "skipped",
+      "checked": false,
+      "reason": "该槽位由衔接帧或承接上一镜尾帧锁定继承，不单独出图"
+    },
+    {
+      "storyboard_id": 575,
+      "storyboard_number": 3,
+      "slot": "mid",
+      "status": "changed",
+      "checked": true,
+      "selected_version_no": 1
+    },
+    {
+      "storyboard_id": 575,
+      "storyboard_number": 3,
+      "slot": "last",
+      "status": "changed",
+      "checked": true,
+      "selected_version_no": 1
+    },
+    {
+      "storyboard_id": 576,
+      "storyboard_number": 4,
+      "slot": "first",
+      "status": "skipped",
+      "checked": false,
+      "reason": "该槽位由衔接帧或承接上一镜尾帧锁定继承，不单独出图"
+    },
+    {
+      "storyboard_id": 576,
+      "storyboard_number": 4,
+      "slot": "mid",
+      "status": "changed",
+      "checked": true,
+      "selected_version_no": 1
+    },
+    {
+      "storyboard_id": 576,
+      "storyboard_number": 4,
+      "slot": "last",
+      "status": "changed",
+      "checked": true,
+      "selected_version_no": 1
+    },
+    {
+      "storyboard_id": 577,
+      "storyboard_number": 5,
+      "slot": "first",
+      "status": "skipped",
+      "checked": false,
+      "reason": "该槽位由衔接帧或承接上一镜尾帧锁定继承，不单独出图"
+    },
+    {
+      "storyboard_id": 577,
+      "storyboard_number": 5,
+      "slot": "mid",
+      "status": "changed",
+      "checked": true,
+      "selected_version_no": 1
+    },
+    {
+      "storyboard_id": 577,
+      "storyboard_number": 5,
+      "slot": "last",
+      "status": "changed",
+      "checked": true,
+      "selected_version_no": 1
+    },
+    {
+      "storyboard_id": 578,
+      "storyboard_number": 6,
+      "slot": "first",
+      "status": "skipped",
+      "checked": false,
+      "reason": "该槽位由衔接帧或承接上一镜尾帧锁定继承，不单独出图"
+    },
+    {
+      "storyboard_id": 578,
+      "storyboard_number": 6,
+      "slot": "mid",
+      "status": "changed",
+      "checked": true,
+      "selected_version_no": 1
+    },
+    {
+      "storyboard_id": 578,
+      "storyboard_number": 6,
+      "slot": "last",
+      "status": "changed",
+      "checked": true,
+      "selected_version_no": 1
+    },
+    {
+      "storyboard_id": 579,
+      "storyboard_number": 7,
+      "slot": "first",
+      "status": "skipped",
+      "checked": false,
+      "reason": "该槽位由衔接帧或承接上一镜尾帧锁定继承，不单独出图"
+    },
+    {
+      "storyboard_id": 579,
+      "storyboard_number": 7,
+      "slot": "mid",
+      "status": "changed",
+      "checked": true,
+      "selected_version_no": 1
+    },
+    {
+      "storyboard_id": 579,
+      "storyboard_number": 7,
+      "slot": "last",
+      "status": "changed",
+      "checked": true,
+      "selected_version_no": 3
+    },
+    {
+      "storyboard_id": 580,
+      "storyboard_number": 8,
+      "slot": "first",
+      "status": "skipped",
+      "checked": false,
+      "reason": "该槽位由衔接帧或承接上一镜尾帧锁定继承，不单独出图"
+    },
+    {
+      "storyboard_id": 580,
+      "storyboard_number": 8,
+      "slot": "mid",
+      "status": "changed",
+      "checked": true,
+      "selected_version_no": 1
+    },
+    {
+      "storyboard_id": 580,
+      "storyboard_number": 8,
+      "slot": "last",
+      "status": "changed",
+      "checked": true,
+      "selected_version_no": 1
+    },
+    {
+      "storyboard_id": 581,
+      "storyboard_number": 9,
+      "slot": "first",
+      "status": "skipped",
+      "checked": false,
+      "reason": "该槽位由衔接帧或承接上一镜尾帧锁定继承，不单独出图"
+    },
+    {
+      "storyboard_id": 581,
+      "storyboard_number": 9,
+      "slot": "mid",
+      "status": "changed",
+      "checked": true,
+      "selected_version_no": 1
+    },
+    {
+      "storyboard_id": 581,
+      "storyboard_number": 9,
+      "slot": "last",
+      "status": "unchanged",
+      "checked": false,
+      "matched_version_no": 1,
+      "selected_version_no": 1
+    },
+    {
+      "storyboard_id": 582,
+      "storyboard_number": 10,
+      "slot": "first",
+      "status": "skipped",
+      "checked": false,
+      "reason": "该槽位由衔接帧或承接上一镜尾帧锁定继承，不单独出图"
+    },
+    {
+      "storyboard_id": 582,
+      "storyboard_number": 10,
+      "slot": "mid",
+      "status": "changed",
+      "checked": true,
+      "selected_version_no": 1
+    },
+    {
+      "storyboard_id": 582,
+      "storyboard_number": 10,
+      "slot": "last",
+      "status": "changed",
+      "checked": true,
+      "selected_version_no": 1
+    },
+    {
+      "storyboard_id": 583,
+      "storyboard_number": 11,
+      "slot": "first",
+      "status": "skipped",
+      "checked": false,
+      "reason": "该槽位由衔接帧或承接上一镜尾帧锁定继承，不单独出图"
+    },
+    {
+      "storyboard_id": 583,
+      "storyboard_number": 11,
+      "slot": "mid",
+      "status": "changed",
+      "checked": true,
+      "selected_version_no": 1
+    },
+    {
+      "storyboard_id": 583,
+      "storyboard_number": 11,
+      "slot": "last",
+      "status": "changed",
+      "checked": true,
+      "selected_version_no": 1
+    },
+    {
+      "storyboard_id": 584,
+      "storyboard_number": 12,
+      "slot": "first",
+      "status": "skipped",
+      "checked": false,
+      "reason": "该槽位由衔接帧或承接上一镜尾帧锁定继承，不单独出图"
+    },
+    {
+      "storyboard_id": 584,
+      "storyboard_number": 12,
+      "slot": "mid",
+      "status": "changed",
+      "checked": true,
+      "selected_version_no": 1
+    },
+    {
+      "storyboard_id": 584,
+      "storyboard_number": 12,
+      "slot": "last",
+      "status": "changed",
+      "checked": true,
+      "selected_version_no": 1
+    },
+    {
+      "storyboard_id": 585,
+      "storyboard_number": 13,
+      "slot": "first",
+      "status": "skipped",
+      "checked": false,
+      "reason": "该槽位由衔接帧或承接上一镜尾帧锁定继承，不单独出图"
+    },
+    {
+      "storyboard_id": 585,
+      "storyboard_number": 13,
+      "slot": "mid",
+      "status": "changed",
+      "checked": true,
+      "selected_version_no": 1
+    },
+    {
+      "storyboard_id": 585,
+      "storyboard_number": 13,
+      "slot": "last",
+      "status": "changed",
+      "checked": true,
+      "selected_version_no": 1
+    },
+    {
+      "storyboard_id": 586,
+      "storyboard_number": 14,
+      "slot": "first",
+      "status": "changed",
+      "checked": true,
+      "selected_version_no": 1
+    },
+    {
+      "storyboard_id": 586,
+      "storyboard_number": 14,
+      "slot": "mid",
+      "status": "changed",
+      "checked": true,
+      "selected_version_no": 1
+    },
+    {
+      "storyboard_id": 586,
+      "storyboard_number": 14,
+      "slot": "last",
+      "status": "skipped",
+      "checked": false,
+      "reason": "该槽位由衔接帧或承接上一镜尾帧锁定继承，不单独出图"
+    },
+    {
+      "storyboard_id": 587,
+      "storyboard_number": 15,
+      "slot": "first",
+      "status": "skipped",
+      "checked": false,
+      "reason": "该槽位由衔接帧或承接上一镜尾帧锁定继承，不单独出图"
+    },
+    {
+      "storyboard_id": 587,
+      "storyboard_number": 15,
+      "slot": "mid",
+      "status": "unchanged",
+      "checked": false,
+      "matched_version_no": 1,
+      "selected_version_no": 1
+    },
+    {
+      "storyboard_id": 587,
+      "storyboard_number": 15,
+      "slot": "last",
+      "status": "unchanged",
+      "checked": false,
+      "matched_version_no": 1,
+      "selected_version_no": 1
+    },
+    {
+      "storyboard_id": 588,
+      "storyboard_number": 16,
+      "slot": "first",
+      "status": "skipped",
+      "checked": false,
+      "reason": "该槽位由衔接帧或承接上一镜尾帧锁定继承，不单独出图"
+    },
+    {
+      "storyboard_id": 588,
+      "storyboard_number": 16,
+      "slot": "mid",
+      "status": "changed",
+      "checked": true,
+      "selected_version_no": 1
+    },
+    {
+      "storyboard_id": 588,
+      "storyboard_number": 16,
+      "slot": "last",
+      "status": "changed",
+      "checked": true,
+      "selected_version_no": 1
+    },
+    {
+      "storyboard_id": 589,
+      "storyboard_number": 17,
+      "slot": "first",
+      "status": "skipped",
+      "checked": false,
+      "reason": "该槽位由衔接帧或承接上一镜尾帧锁定继承，不单独出图"
+    },
+    {
+      "storyboard_id": 589,
+      "storyboard_number": 17,
+      "slot": "mid",
+      "status": "changed",
+      "checked": true,
+      "selected_version_no": 1
+    },
+    {
+      "storyboard_id": 589,
+      "storyboard_number": 17,
+      "slot": "last",
+      "status": "changed",
+      "checked": true,
+      "selected_version_no": 1
+    },
+    {
+      "storyboard_id": 590,
+      "storyboard_number": 18,
+      "slot": "first",
+      "status": "skipped",
+      "checked": false,
+      "reason": "该槽位由衔接帧或承接上一镜尾帧锁定继承，不单独出图"
+    },
+    {
+      "storyboard_id": 590,
+      "storyboard_number": 18,
+      "slot": "mid",
+      "status": "changed",
+      "checked": true,
+      "selected_version_no": 1
+    },
+    {
+      "storyboard_id": 590,
+      "storyboard_number": 18,
+      "slot": "last",
+      "status": "changed",
+      "checked": true,
+      "selected_version_no": 1
+    },
+    {
+      "storyboard_id": 591,
+      "storyboard_number": 19,
+      "slot": "first",
+      "status": "skipped",
+      "checked": false,
+      "reason": "该槽位由衔接帧或承接上一镜尾帧锁定继承，不单独出图"
+    },
+    {
+      "storyboard_id": 591,
+      "storyboard_number": 19,
+      "slot": "mid",
+      "status": "unchanged",
+      "checked": false,
+      "matched_version_no": 1,
+      "selected_version_no": 1
+    },
+    {
+      "storyboard_id": 591,
+      "storyboard_number": 19,
+      "slot": "last",
+      "status": "unchanged",
+      "checked": false,
+      "matched_version_no": 1,
+      "selected_version_no": 1
+    },
+    {
+      "storyboard_id": 592,
+      "storyboard_number": 20,
+      "slot": "first",
+      "status": "skipped",
+      "checked": false,
+      "reason": "该槽位由衔接帧或承接上一镜尾帧锁定继承，不单独出图"
+    },
+    {
+      "storyboard_id": 592,
+      "storyboard_number": 20,
+      "slot": "mid",
+      "status": "changed",
+      "checked": true,
+      "selected_version_no": 1
+    },
+    {
+      "storyboard_id": 592,
+      "storyboard_number": 20,
+      "slot": "last",
+      "status": "changed",
+      "checked": true,
+      "selected_version_no": 1
+    },
+    {
+      "storyboard_id": 593,
+      "storyboard_number": 21,
+      "slot": "first",
+      "status": "skipped",
+      "checked": false,
+      "reason": "该槽位由衔接帧或承接上一镜尾帧锁定继承，不单独出图"
+    },
+    {
+      "storyboard_id": 593,
+      "storyboard_number": 21,
+      "slot": "mid",
+      "status": "changed",
+      "checked": true,
+      "selected_version_no": 1
+    },
+    {
+      "storyboard_id": 593,
+      "storyboard_number": 21,
+      "slot": "last",
+      "status": "changed",
+      "checked": true,
+      "selected_version_no": 1
+    },
+    {
+      "storyboard_id": 594,
+      "storyboard_number": 22,
+      "slot": "first",
+      "status": "skipped",
+      "checked": false,
+      "reason": "该槽位由衔接帧或承接上一镜尾帧锁定继承，不单独出图"
+    },
+    {
+      "storyboard_id": 594,
+      "storyboard_number": 22,
+      "slot": "mid",
+      "status": "changed",
+      "checked": true,
+      "selected_version_no": 1
+    },
+    {
+      "storyboard_id": 594,
+      "storyboard_number": 22,
+      "slot": "last",
+      "status": "changed",
+      "checked": true,
+      "selected_version_no": 1
+    }
+  ],
+  "scope": {
+    "included": [
+      {
+        "storyboard_id": 573,
+        "storyboard_number": 1
+      },
+      {
+        "storyboard_id": 574,
+        "storyboard_number": 2
+      },
+      {
+        "storyboard_id": 575,
+        "storyboard_number": 3
+      },
+      {
+        "storyboard_id": 576,
+        "storyboard_number": 4
+      },
+      {
+        "storyboard_id": 577,
+        "storyboard_number": 5
+      },
+      {
+        "storyboard_id": 578,
+        "storyboard_number": 6
+      },
+      {
+        "storyboard_id": 579,
+        "storyboard_number": 7
+      },
+      {
+        "storyboard_id": 580,
+        "storyboard_number": 8
+      },
+      {
+        "storyboard_id": 581,
+        "storyboard_number": 9
+      },
+      {
+        "storyboard_id": 582,
+        "storyboard_number": 10
+      },
+      {
+        "storyboard_id": 583,
+        "storyboard_number": 11
+      },
+      {
+        "storyboard_id": 584,
+        "storyboard_number": 12
+      },
+      {
+        "storyboard_id": 585,
+        "storyboard_number": 13
+      },
+      {
+        "storyboard_id": 586,
+        "storyboard_number": 14
+      },
+      {
+        "storyboard_id": 587,
+        "storyboard_number": 15
+      },
+      {
+        "storyboard_id": 588,
+        "storyboard_number": 16
+      },
+      {
+        "storyboard_id": 589,
+        "storyboard_number": 17
+      },
+      {
+        "storyboard_id": 590,
+        "storyboard_number": 18
+      },
+      {
+        "storyboard_id": 591,
+        "storyboard_number": 19
+      },
+      {
+        "storyboard_id": 592,
+        "storyboard_number": 20
+      },
+      {
+        "storyboard_id": 593,
+        "storyboard_number": 21
+      },
+      {
+        "storyboard_id": 594,
+        "storyboard_number": 22
+      }
+    ],
+    "excluded": []
+  }
+}
