@@ -153,6 +153,9 @@ test('字段规则：引文必须成对引号；必填缺失；Poster 专用类�
   assert.deepEqual(codes(problemsOf('h-left-stack', [layer('p', 'poster_title', { main: '关沟咽喉' })], H)), ['error:text_role_medium'])
   assert.deepEqual(codes(problemsOf('h-left-stack', [layer('d', 'date', { main: '明代' })], V)), ['error:text_layout_aspect_mismatch'])
   assert.deepEqual(codes(front.textLayerProblems({ ...docFor(undefined, [layer('d', 'date', { main: '明代' })]) }, H)), ['error:text_layout_missing'])
+  // 说明句里两处以上并列必须改成列表；一处并列仍是一句话
+  assert.deepEqual(codes(problemsOf('h-left-stack', [layer('s', 'statement', { main: '条石为基、青砖包砌、顶宽五马并行' })], H)), ['error:text_statement_parallel'])
+  assert.deepEqual(problemsOf('h-left-stack', [layer('s', 'statement', { main: '条石为基、青砖包砌。' })], H), [])
 })
 
 test('Poster 变量绑定：栏目名取项目名变量，项目改名后文字跟着变', () => {

@@ -412,6 +412,10 @@ export function layoutTextBox(
           problems.push({ code: 'text_field_pattern', level: 'error', layer_id: layerId, field: field.key, message: `「${role.name}」的「${field.label}」不符合要求：${field.pattern_hint || '格式不符'}` })
         }
       }
+      // 并列 ≥2 处（、；）的说明句必须改成列表或拆拍（DESIGN §3.4）
+      if (roleId === 'statement' && field.key === 'main' && !empty && (String(value).match(/[、；;]/g) || []).length >= 2) {
+        problems.push({ code: 'text_statement_parallel', level: 'error', layer_id: layerId, field: field.key, message: '「事实说明」里有两处以上并列（、；），请改成「要点列表」或拆成几拍' })
+      }
     }
   }
 
