@@ -133,6 +133,8 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 - 提取：`POST /episodes/{e}/extract {target}` ×3 → `extract-status` → 读 `characters/scenes/props`。
 - 字段与关联：`PUT /scenes/{id}`、`PUT /props/{id}`、`POST /episodes/{e}/assets/link`、`DELETE .../assets/link`。
 - 单资产出图：`generate-prompt`（可 `force`）→ `generate-image` → `GET /tasks/{id}` → 下载并打开。`reused` 是复用有效稿，正常成功；`regenerated` 才是 Agent 保存了不同的新稿。`unchanged_after_rewrite` 是 force 后逐字未变：批量单列该状态且允许提交图片（`asset-batch-select.ts`），**单发 generate-prompt 经 savedPromptOf 只接受 reused/regenerated，其余返回 400**，不能把旧稿冒称本次新稿。`failed/skipped` 不提交批量图片；不为制造差异盲目重试。资产文本/风格改变或人要求重写时才用 force。
+- **资产画幅（Issue #94，`[S]`）**：场景出图尺寸按项目画幅查唯一尺寸表 `assetImageSizeFor`（`services/asset-image-size.ts`）：16:9=1920×1080、9:16=1080×1920（qwen 对齐成 1088×1920）、4:3=1664×1248、3:4=1248×1664、1:1=1440×1440；角色 1920×1080、道具 1024×1024 不变。场景任务带 `params.aspect_locked`：qwen-jobs 有参考图也走 `reference_to_image`（不再 `image_edit` 跟随参考图比例），完成时实测比例与要求相差 >2% 直接判失败、不回写当前图。非 16:9 项目的场景最终提示词必须逐字含 `{aspect_ratio} {composition}`（`read_scenes` 返回这两个字段），缺失或方向冲突时保存退回、已存稿视为无效重生成；16:9 项目已存稿不受影响。
+- **项目画幅版本（Issue #94，`[S]`）**：`POST /{scenes|props|characters}/{id}/aspect-version {episode_id, config_id?}` → `{task_id, size}`。以当前图为唯一参考、按项目画幅（场景尺寸表）重出一版，完成后照常成为当前图（跟随当前图的图层段底图自动切换；钉选了 `version_task_id` 的段不自动切换，编辑器提示切换）。拒绝（400 `{code,message,error}`）：忠实素材（`props.faithful=1` 或当前版本来自 upload/import）、地图道具（`asset_type='map'`）、没有图、当前图已是项目画幅。**案例背景**：drama 15 / ep 21（9:16）的 1024² 地图道具被图层用作底图；**为何需要**：只有被图层当底图的资产才会因比例不符而需要处理，用户要求「手动触发、以当前图为参考」，不自动烧算力。属于 GPU 图片额度。
 - 批量：`POST /dramas/{d}/assets/batch-generate/preview` → 人确认范围 → 同 body 启动 → `GET` 状态。
 - 纪录片审核：`POST /episodes/{e}/asset-review/run` → `GET /asset-review` → 逐条 `PUT /asset-review/items/{id}`（`not_needed` 必须写理由）。
 - 语义：`purpose:"precision"` 不是“精确复原”，而是“带权威参照、程序 gate 与人工审批的生成逼近”，产物仍是艺术再现；不得声称考古/器物级精确复原。
@@ -222,6 +224,13 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
   - D：生成段 → 首精确帧作为生成段尾帧 → 图层收束。
 - 陷阱：设计卡未确认不能写/渲；无合格底图 → 400 `missing_base`；重渲改变 junction hash 会让关键帧确认失效；`timeline.fps` 不是可选项——保存时一律被改写为本集目标帧率，自己传的值会被忽略，混帧率会导致 stale。
 - **输出规格（Issue #69）**：画幅取本集已有**模型视频**实测值；本集还没有视频时按画幅比例用内置默认（16:9 = 960×544、9:16 = 544×960、1:1 = 768×768）。源图可为 1920×1088 或 1024×1024，按 contain/裁切记录在 `base.source_width/source_height`。**目标帧率 = 本集最靠前的有效既存图层计划的 `timeline.fps`**；没有计划才回退到实测视频帧率（保留三位小数，29.97 不取整为 30），再没有才用默认 25。合法范围 1–60，所以 24 / 25 / 29.97 等都成立：**不要再假设全项目恒为 25fps**。最终 compose/merge 沿用同一画幅与同一目标帧率，模型 raw 的不同帧率由 `fps` 滤镜统一，不需要改图层去迎合 raw。
+- **底图永不拉伸 + 视觉验证（Issue #94，`[S]`）**：
+  - 案例背景：drama 15 / ep 21（9:16）22 段图层的底图是 1920×1088 横版场景，旧渲染 `fit:'fill'` 把它横向压扁约 3.1× 写进衔接帧，C 组合视频从变形画面开始；生产库 42 段里 41 段比例不符（含 16:9 项目里 1024² 道具被横向拉宽）。用户裁决：任何情况下不拉伸。
+  - 取景框 `baseFrameOf(base, spec)`：边界 = `base.crop`（缺省整图），像素比例与成片相差 ≤1% → `cover`；否则 `contain`：取景框沿短边扩到成片比例（归一化到整张原图，可超出 [0,1]），底图等比完整居中，留白用同图放大模糊垫底。viewport 一律归一到成片比例并夹在取景框内；`contain` 时文字/线宽尺寸单位 = 取景框像素高（「size = 成片画布高度比例」照旧成立），图层坐标允许 [-3,4] 以便把字放进留白带。裁切框按**成片比例**（不再写死 16:9）。渲染前断言取景比例，违反直接报「取景比例与成片不符，拒绝拉伸」。
+  - 升级影响：`contain` 段的渲染签名含取景框，发布前比例不符的段读时变为过期，需要重渲（drama 6/8/10 的 19 段、drama 15 ep 21 的 22 段）。
+  - 视觉验证：底图有裁切或为 `contain` 时必须验证。渲染成功后自动起文本任务 `kind='layer_base_check'`（阶段 `layer_base_check`，用 `vision=1` 配置；任务中心可回看对话），输入原图 + 无字取景画面（C/D 另附衔接帧），判主体完整、取景位置、变形、留白；结果写 `storyboard_layer_segments.base_check`（`pending|passed|failed|error|overridden`，签名 = 底图 sha + crop + 取景框 + 成片尺寸 + 衔接帧 hash，改文字不重验）。`GET /layer-segments/storyboards/{id}` 返回 `base_check`、`base_check_required`、`base_check_satisfied`。`POST /layer-segments/storyboards/{id}/base-check` 重验；`POST …/base-check/override {reason}` 人工放行（**人决定端点**，必须先开图并有人的授权原话，理由必填）。
+  - 闸门：验证未满足时衔接帧不可用（关键帧不就绪）、视频批次预览该镜 `blocked`（原因「图层底图待视觉验证」/「图层底图视觉验证未通过：…」，A 组合同样阻断）、单镜生成视频与合成拒绝。不影响图层段新鲜度（批量渲染不会因此反复重渲）。
+  - 推荐顺序：竖版项目先让场景按竖版出图；道具/角色被选作底图且比例不符 → `aspect-version`；忠实素材/地图 → 裁切到成片比例或留白 + 视觉验证。
 
 ### S7 关键帧
 - 端点（全路径）：`GET /episodes/{e}/keyframe-prompts/scope`、`POST /episodes/{e}/generate-keyframe-prompts`、`GET /episodes/{e}/keyframe-prompts-status`、`POST /episodes/{e}/keyframe-batch/preview`、`POST /episodes/{e}/keyframe-batch {items}`、`GET /episodes/{e}/keyframe-batch`、`POST /storyboards/{id}/keyframes/{slot}/generate`、`GET /storyboards/{id}/keyframes/{slot}/versions`、`PUT /storyboards/{id}/keyframes/{slot} {image|inherit}`、`POST /storyboards/{id}/confirm-keyframes`。
@@ -334,7 +343,7 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 - **资产**：本集关联是否正确；名字无空格；`faithful` 未进扩散；审核清单 0 missing；程序 gate 与人工例外分开记录。
 - **Poster**：编辑工程用 `layer_doc`（无 `layout`、无本地画布上传）；版本由 `POST …/poster/versions` 服务端渲染并已 `select`；文字未裁切、底图来源正确、未调用不必要生图。
 - **设计卡**：纪录片已先确认骨架并有有效配音（无配音时服务端直接阻断）；各信息点都有 `via`，必要视觉任务未丢失；预算不超限；每镜都有 combo（AI 首次填入仍待人工审阅）；AI 输出的必要语义/几何依赖真实、归属和版本相容且可执行，不能以「待标注」占位算完成；无锚定层确实不依赖资产内位置；`tts.duration_ms` 缺失显示「待配音」而非 0.0s；底图缩略图看的是**该候选的实际版本**（`version_task_id`），`must_mark`/`reference_assets` 芯片显示的是该资产**当前图**（要核特定版本得去资产弹窗）；未解析引用经「改绑引用」处理而不是靠新增标注；确认状态仍由人决定。
-- **图层段**：`base` 尺寸/裁切正确；文字安全边；junction 去文字；`timeline.fps` = 本集目标帧率（服务端派生，与成片一致，不假设 25）；`thumbnail` 实际打开。
+- **图层段**：`base` 尺寸/裁切正确；底图比例与成片一致，否则确认是 contain/裁切且 `base_check_satisfied=true`（衔接帧与中/尾关键帧并排看几何比例）；文字安全边；junction 去文字；`timeline.fps` = 本集目标帧率（服务端派生，与成片一致，不假设 25）；`thumbnail` 实际打开。
 - **关键帧**：预览分类正确；锁定槽未出图；版本签名与当前提示词/参考图一致；确认后再提交视频。
 - **旁白**：字数 ≤80（按 spokenText）；发音标记合法；配音实测时长；fit 不截断旁白；字幕与音频逐字对齐。
 - **视频**：raw 时长/帧率；首帧 vs junction（C）/尾帧 vs junction（D）；引导链；参考图顺序。
