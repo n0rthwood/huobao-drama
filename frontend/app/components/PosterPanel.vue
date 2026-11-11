@@ -45,7 +45,7 @@
             <span class="dim">{{ t('poster.concept.modelLine', { model: poster.concept.model, n: poster.concept.script_segments_used }) }}</span>
           </div>
           <div class="poster-concept-grid">
-            <article v-for="composition in poster.concept.compositions" :key="composition.id" class="poster-concept">
+            <article v-for="(composition, index) in poster.concept.compositions" :key="composition.id" class="poster-concept">
               <header class="poster-concept-head">
                 <strong>{{ composition.approach }}</strong>
                 <span v-if="composition.recommended" class="poster-recommended">{{ t('poster.concept.recommended') }}</span>
@@ -68,7 +68,14 @@
               <details class="poster-concept-details">
                 <summary>{{ t('poster.concept.copy') }}</summary>
                 <p class="poster-pre">{{ copyText(composition.copy) }}</p>
-                <p class="dim">{{ t('poster.concept.layers', { n: composition.layer_plan.length }) }}</p>
+                <p v-if="conceptPlans[index].layout" class="dim">{{ t('layerText.posterPlan.layout', { layout: layoutName(conceptPlans[index].layout) }) }}</p>
+                <ul v-if="conceptPlans[index].items.length" class="poster-pre poster-plan">
+                  <li v-for="(item, itemIndex) in conceptPlans[index].items" :key="itemIndex">
+                    <strong>{{ roleName(item.role) }}</strong>
+                    <span>{{ planFields(item) }}</span>
+                  </li>
+                </ul>
+                <p v-else-if="conceptPlans[index].legacy" class="dim">{{ t('layerText.posterPlan.legacy', { n: conceptPlans[index].legacy }) }}</p>
               </details>
               <div class="poster-concept-status">
                 <span v-if="candidateFailure(composition.id)" class="poster-error">{{ candidateFailure(composition.id) }}</span>
@@ -224,6 +231,7 @@ import { useI18n } from 'vue-i18n'
 import { Loader2 } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { posterAPI, taskAPI } from '~/composables/useApi'
+import { useLayerTextNames, useLayerTextSpec } from '~/composables/useLayerTextSpec'
 import { useTasks } from '~/composables/useTasks'
 import { thumbFallback, thumbOf } from '~/composables/useMedia'
 import { mediaUrl } from '~/utils/url'
@@ -241,6 +249,8 @@ const props = defineProps({
   chatConfigId: { type: Number, default: undefined },
 })
 const { t } = useI18n()
+const { version: specVersion } = useLayerTextSpec()
+const { roleName, fieldLabel, layoutName } = useLayerTextNames()
 const { registerTask, onTaskFinished, activeTasks, episodeTasks, loadEpisodeTasks } = useTasks()
 
 const poster = ref(null)
@@ -330,8 +340,31 @@ watch([pickerOpen, compositeVersionId, conflict], () => link.set({
   pconflict: conflict.value ? `${conflict.value.kind}:${conflict.value.compositionId}` : '',
 }), { immediate: true })
 
+/**
+ * 概念构图的文字计划（#96）：新形态是 `layer_plan: { text_layout, items:[{role, fields}] }`；
+ * 旧形态是自由图层的数组——照实标成 legacy 并提示重新生成，不猜它想表达什么。
+ */
+function textPlanOf(composition) {
+  const plan = composition?.layer_plan
+  if (!plan) return { layout: '', items: [], legacy: 0 }
+  if (Array.isArray(plan)) return { layout: '', items: [], legacy: plan.length }
+  return { layout: String(plan.text_layout || ''), items: Array.isArray(plan.items) ? plan.items : [], legacy: 0 }
+}
+/** 一条计划图层 = 角色 + 「字段名：值」，列表字段用顿号连接。 */
+function planFields(item) {
+  return Object.entries(item?.fields || {})
+    .filter(([, value]) => (Array.isArray(value) ? value.length > 0 : String(value ?? '').trim() !== ''))
+    .map(([key, value]) => `${fieldLabel(item.role, key)}：${Array.isArray(value) ? value.join('、') : value}`)
+    .join(' · ')
+}
+const conceptPlans = computed(() => {
+  void specVersion.value
+  return (poster.value?.concept?.compositions || []).map(textPlanOf)
+})
+
 function copyText(value) {
-  return [value.title, value.subtitle, value.era, value.place, ...(value.notes || [])].filter(Boolean).join(' · ')
+  const copy = value || {}
+  return [copy.title, copy.subtitle, copy.era, copy.place, ...(copy.notes || [])].filter(Boolean).join(' · ')
 }
 
 function formatVersionTime(version) {
@@ -611,6 +644,9 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.poster-plan { margin: 0; padding-left: 16px; }
+.poster-plan li { display: flex; gap: 6px; }
+.poster-plan li strong { color: var(--text-1); }
 /* 画布优先：编辑器占满一行，构想/生图/版本在下方按列排开（1280 工作台下画布仍有 700px+）。 */
 .poster-panel {
   display: flex;

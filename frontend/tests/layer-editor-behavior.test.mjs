@@ -7,13 +7,19 @@ import { parse, compileScript } from 'vue/compiler-sfc'
 import { createI18n } from 'vue-i18n'
 import { baseAspectIssue, baseFrameOf, clampTimelineToFrame, cropRectOf } from '../app/utils/layerQuality.js'
 import { semanticEntries, semanticLayerPatch, anchorState } from '../app/utils/semanticGeometry.js'
+import { TEXT_SPEC, setLayerTextSpec, textLayerRects, textLayoutsFor } from '../app/utils/layerText.js'
 import { deeplinkRuntimeModule } from './sfc-deeplink-runtime.mjs'
 
 // Resolve Nuxt's compile-time aliases while executing the real Vue composables.
 const app = new URL('../app/', import.meta.url)
 function moduleUrl(path, aliases = {}) {
   let source = readFileSync(new URL(path, app), 'utf8')
-  for (const [name, url] of Object.entries({ vue: import.meta.resolve('vue'), '~/utils/layerSvg': new URL('utils/layerSvg.js', app).href, ...aliases })) {
+  for (const [name, url] of Object.entries({
+    vue: import.meta.resolve('vue'),
+    '~/utils/layerSvg': new URL('utils/layerSvg.js', app).href,
+    '~/utils/layerText': new URL('utils/layerText.js', app).href,
+    ...aliases,
+  })) {
     source = source.replaceAll(`from '${name}'`, `from '${url}'`)
   }
   const output = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText
@@ -106,6 +112,38 @@ test('semantic quick-create and manual reanchor keep whole-image pixel coordinat
   assert.equal(anchorState(editor.doc.value.layers[0],entries,true,1),'manual')
 })
 
+test('第一个模板文本框自动选一套版式，换套保留图层，几何补丁被忽略（#96）', async () => {
+  const editor = useLayerDoc(undefined, undefined, undefined, { medium: 'video' })
+  editor.load(emptyLayerDoc({ width: 1920, height: 1080 }))
+  await nextTick()
+  const first = textLayoutsFor('16:9', 'video')[0]
+  const layer = editor.addLayer('text', { role: 'heading' })
+  assert.equal(editor.doc.value.text_layout, first.id, '第一个文本框按成片画幅与媒介选第一套')
+  assert.equal(layer.type, 'text')
+  assert.equal(layer.role, 'heading')
+  assert.equal(layer.name, TEXT_SPEC.roles.heading.name, '文本框名字就是角色名（与后端缺省一致）')
+  assert.equal(layer.box, undefined, '模板文本框没有自由几何')
+  // 几何补丁静默丢弃：拖不动不应该在文档里留下没用的框/旋转
+  editor.patchLayer(layer.id, { box: { x: 0.5, y: 0.5, w: 0.2, h: 0.1 }, rotation: 42 })
+  assert.equal(layer.box, undefined)
+  assert.equal(layer.rotation, 0)
+  editor.patchLayer(layer.id, { fields: { main: '甲午战争' } })
+  const second = textLayoutsFor('16:9', 'video')[1]
+  editor.setTextLayout(second.id)
+  assert.equal(editor.doc.value.text_layout, second.id)
+  assert.deepEqual(editor.doc.value.layers.map(item => [item.id, item.role, item.fields]), [[layer.id, 'heading', { main: '甲午战争' }]], '换套只改文档级套，图层原样保留')
+
+  // 竖版项目走海报媒介的 9:16 套
+  const poster = useLayerDoc(undefined, undefined, undefined, { medium: 'poster' })
+  poster.load(emptyLayerDoc({ width: 1080, height: 1920 }))
+  await nextTick()
+  poster.addLayer('text', { role: 'poster_title' })
+  assert.equal(poster.doc.value.text_layout, textLayoutsFor('9:16', 'poster')[0].id)
+  // 没有角色的文本框不建：不产生必然非法的文档
+  assert.equal(poster.addLayer('text'), null)
+  assert.equal(poster.doc.value.layers.length, 1)
+})
+
 // Mount the actual SFCs with Vue's host-independent renderer. Only browser layout,
 // unrelated child panels, URL configuration and API transport are test seams.
 const dataModule = source => `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`
@@ -114,9 +152,17 @@ const pickerPanel = dataModule(`import {h} from '${import.meta.resolve('vue')}';
 export default {props:['assets','open'],emits:['confirm'],setup(props,{emit}) {
   return () => h('asset-picker-test',{assets:props.assets,onChoose:items=>emit('confirm',items)})
 }}`)
-const testApi = dataModule(`export const assetPipelineAPI = {baseCandidates:async()=>({candidates:[
+// 规范（#96）在测试里只注入一次：模板文本框的排版/命中框都由它算。
+const textSpec = JSON.parse(readFileSync(new URL('../../backend/src/config/layer-text-spec.json', import.meta.url), 'utf8'))
+setLayerTextSpec(textSpec)
+const testApi = dataModule(`export const api = { get: async () => (${JSON.stringify(textSpec)}) };
+export const assetPipelineAPI = {baseCandidates:async()=>({candidates:[
   {asset_kind:'prop',asset_id:7,asset_name:'Replacement',version_task_id:9,path:'static/replacement.png',width:2048,height:2048}
 ]})}; export const propAPI = {semantics:async()=>({semantics:{}})};`)
+const textSpecComposable = moduleUrl('composables/useLayerTextSpec.ts', {
+  'vue-i18n': import.meta.resolve('vue-i18n'),
+  '~/composables/useApi': testApi,
+})
 const componentAliases = {
   vue: import.meta.resolve('vue'),
   'vue-i18n': import.meta.resolve('vue-i18n'),
@@ -127,10 +173,14 @@ const componentAliases = {
   '~/utils/semanticGeometry': new URL('utils/semanticGeometry.js', app).href,
   '~/utils/url': dataModule("export const mediaUrl = path => path; export const apiBase = () => '/api/v1';"),
   '~/composables/useApi': testApi,
+  '~/utils/layerText': new URL('utils/layerText.js', app).href,
+  '~/composables/useLayerTextSpec': textSpecComposable,
+  '~/composables/useMissingGlyphs': glyphModule,
   '~/composables/useQuerySync': deeplinkRuntimeModule,
   '~/components/AssetPicker.vue': pickerPanel,
   './LayerList.vue': emptyPanel,
   './LayerStyle.vue': emptyPanel,
+  './LayerImagePicker.vue': emptyPanel,
 }
 async function loadComponent(name) {
   const { descriptor } = parse(readFileSync(new URL(`components/LayerCanvas/${name}.vue`, app), 'utf8'))
@@ -142,6 +192,8 @@ async function loadComponent(name) {
 }
 const Canvas = await loadComponent('LayerCanvas')
 const Rail = await loadComponent('LayerRail')
+const List = await loadComponent('LayerList')
+const Style = await loadComponent('LayerStyle')
 const messages = JSON.parse(readFileSync(new URL('locales/en.json', app), 'utf8'))
 function allNodes(root) { return [root, ...root.children.flatMap(allNodes)] }
 function withClass(root, name) { return allNodes(root).find(node => String(node.props.class || '').split(' ').includes(name)) }
@@ -303,6 +355,80 @@ test('legacy source load is display-only and does not resize or save the output 
   mounted.instance.startCrop()
   await nextTick()
   assert.equal(withClass(mounted.root, 'lc-ui').props.viewBox, '0 0 1024 1024')
+})
+
+const textDoc = () => ({
+  ...emptyLayerDoc({ path: 'static/original.png', width: 960, height: 544 }),
+  text_layout: 'h-left-stack',
+  layers: [{ id: 'text', type: 'text', role: 'heading', name: '主题标题', fields: { main: '甲午战争' },
+    visible: true, locked: false, opacity: 1, z: 0, rotation: 0, style: {} }],
+})
+
+test('模板文本框按取景框映射命中框、不出手柄、方向键不产生补丁（#96）', async t => {
+  const doc = textDoc()
+  const patches = []
+  const history = []
+  const mounted = await mountCanvasComponent(t, Canvas, {
+    doc, baseSrc: doc.base.path, selectedIds: ['text'],
+    onPatch: patch => patches.push(patch), onHistory: () => history.push('history'),
+  })
+  assert.match(withClass(mounted.root, 'lc-overlay').props.innerHTML, /data-layer="text"/, '规范就绪后文本框进入画面 SVG')
+  const rect = textLayerRects(doc, { width: 960, height: 544 }).text
+  const hit = withClass(mounted.root, 'lc-hit')
+  assert.ok(hit.props.class.split(' ').includes('text'), '文本框的命中框与普通图层区分')
+  assert.ok(Math.abs(hit.props.x - rect.x * 960) < 1e-6, '命中框按成片画面映射到画布')
+  assert.ok(Math.abs(hit.props.y - rect.y * 544) < 1e-6)
+  assert.ok(Math.abs(hit.props.width - Math.max(rect.w * 960, 8)) < 1e-6)
+  const select = withClass(mounted.root, 'lc-select')
+  assert.ok(Math.abs(select.props.x - rect.x * 960) < 1e-6, '选中框就是排版框')
+  assert.equal(withClass(mounted.root, 'lc-handle'), undefined, '模板文本框不出缩放手柄')
+  assert.equal(withClass(mounted.root, 'lc-rotate'), undefined, '模板文本框不出旋转手柄')
+  const canvasRoot = allNodes(mounted.root).find(node => node.props.class === 'layer-canvas')
+  canvasRoot.props.onKeydown({ key: 'ArrowRight', target: { tagName: 'DIV' }, preventDefault() {} })
+  assert.equal(patches.length, 0, '方向键不移动文本框')
+  assert.equal(history.length, 0, '方向键不为文本框压空历史')
+})
+
+test('图层列表按媒介给出文本框类型与旧图层入口：媒体分组、视频/海报/地图各不相同（#96）', async t => {
+  const doc = emptyLayerDoc({ width: 1920, height: 1080 })
+  const added = []
+  const video = await mountCanvasComponent(t, List, { doc, medium: 'video', onAdd: (type, partial) => added.push([type, partial]) })
+  const block = withClass(video.root, 'll-text-add')
+  assert.ok(block, '视频媒介提供模板文本框入口')
+  const groups = allNodes(block).filter(node => node.type === 'optgroup').map(node => node.props.label)
+  assert.deepEqual(groups, ['Identifier', 'Narrative', 'Emphasis', 'Quotation', 'Data', 'Structure'], '按角色分类分组')
+  allNodes(block).find(node => node.type === 'button').props.onClick()
+  assert.deepEqual(added, [['text', { role: 'date' }]], '默认选第一个角色，添加时带上 role')
+  const videoAdds = allNodes(video.root).filter(node => node.type === 'button' && String(node.props.class || '').includes('ll-add-btn')).map(nodeText)
+  assert.ok(videoAdds.includes('Text'), `图层段保留锚定文字标注：${JSON.stringify(videoAdds)}`)
+  assert.ok(!videoAdds.includes('Card'), '图层段不再提供自由卡片')
+
+  const poster = await mountCanvasComponent(t, List, { doc, medium: 'poster' })
+  const posterGroups = allNodes(withClass(poster.root, 'll-text-add')).filter(node => node.type === 'optgroup').map(node => node.props.label)
+  assert.ok(posterGroups.includes('Poster'), '海报媒介可用海报专用类型')
+  const posterAdds = allNodes(poster.root).filter(node => node.type === 'button' && String(node.props.class || '').includes('ll-add-btn')).map(nodeText)
+  assert.ok(!posterAdds.includes('Text') && !posterAdds.includes('Card'), `海报编辑器不再提供旧文字层：${JSON.stringify(posterAdds)}`)
+
+  const map = await mountCanvasComponent(t, List, { doc })
+  assert.equal(withClass(map.root, 'll-text-add'), undefined, '地图编辑器一个文本框入口都没有')
+})
+
+test('模板文本框样式面板给出容量与引擎问题：同位置区两个框即阻断（#96）', async t => {
+  const layer = { id: 'text', type: 'text', role: 'heading', name: '主题标题', fields: { main: '甲午战争' },
+    visible: true, locked: false, opacity: 1, z: 0, rotation: 0, style: {} }
+  const doc = { ...emptyLayerDoc({ width: 1920, height: 1080 }), text_layout: 'h-left-stack', layers: [layer] }
+  const mounted = await mountCanvasComponent(t, Style, { doc, layer, layerOnly: true })
+  const text = nodeText(mounted.root)
+  assert.ok(text.includes('主题标题'), '标题显示角色名')
+  assert.match(text, /chars per line × \d+ lines, 4 used/, '容量提示按规范算并统计已用字数')
+  assert.equal(withClass(mounted.root, 'ls-problems'), undefined, '单独一个文本框没有问题')
+
+  const conflict = { ...layer, id: 'second', role: 'statement', name: '事实说明', fields: { main: '北洋水师覆灭' } }
+  const two = { ...doc, layers: [layer, conflict] }
+  const conflictMounted = await mountCanvasComponent(t, Style, { doc: two, layer: conflict, layerOnly: true })
+  const problems = withClass(conflictMounted.root, 'ls-problems')
+  assert.ok(problems, '同拍同位置区要在样式面板里直接报出来')
+  assert.ok(nodeText(problems).includes('在同一位置区'), nodeText(problems))
 })
 
 test('same-size source/output canvas and legacy crop coordinates remain unchanged', async t => {

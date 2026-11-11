@@ -1661,7 +1661,8 @@
         "marker": "マーカー",
         "label": "ラベル",
         "card": "カード",
-        "image": "画像"
+        "image": "画像",
+        "text": "テンプレートテキスト"
       },
       "assetKind": {
         "character": "キャラクター",
@@ -3347,7 +3348,6 @@
       "imagePrompt": "画面プロンプト",
       "textDescription": "文字レイアウト説明",
       "copy": "ポスターコピー",
-      "layers": "文字レイヤー {n} 個",
       "noImage": "候補画像はまだありません",
       "generating": "生成中…",
       "candidateReady": "候補 #{n}",
@@ -3579,7 +3579,8 @@
       "marker": "地点",
       "label": "文字",
       "card": "カード",
-      "image": "画像"
+      "image": "画像",
+      "text": "テンプレートテキスト"
     },
     "theme": {
       "archival": "アーカイブ風",
@@ -3690,6 +3691,120 @@
       "portraitPath": "ポートレートのパス",
       "saved": "保存済み · {n} レイヤー",
       "serverRender": "サーバーレンダリング結果"
+    }
+  },
+  "layerText": {
+    "role": {
+      "date": "時間アンカー",
+      "heading": "主題タイトル",
+      "statement": "事実説明",
+      "keyword": "キーワード",
+      "quote": "引用",
+      "metric": "データ結論",
+      "bullets": "要点リスト",
+      "poster_project": "シリーズ識別",
+      "poster_title": "ポスター主タイトル",
+      "poster_details": "ポスター情報カード"
+    },
+    "field": {
+      "date": {
+        "main": "時間",
+        "sub": "時代補足"
+      },
+      "heading": {
+        "main": "タイトル",
+        "sub": "眉題"
+      },
+      "statement": {
+        "main": "説明",
+        "sub": "出典または限定"
+      },
+      "keyword": {
+        "main": "キーワード",
+        "sub": "語釈"
+      },
+      "quote": {
+        "main": "引用",
+        "sub": "出典"
+      },
+      "metric": {
+        "main": "数値",
+        "sub": "指標"
+      },
+      "bullets": {
+        "items": "要点"
+      },
+      "poster_project": {
+        "main": "プロジェクト名",
+        "sub": "話数"
+      },
+      "poster_title": {
+        "main": "主タイトル"
+      },
+      "poster_details": {
+        "subtitle": "サブタイトル",
+        "era": "年代",
+        "place": "場所",
+        "items": "要点"
+      }
+    },
+    "category": {
+      "identifier": "識別",
+      "narrative": "叙事",
+      "emphasis": "強調",
+      "quote": "引用",
+      "data": "データ",
+      "structure": "構造",
+      "poster": "ポスター"
+    },
+    "layout": {
+      "v-left-column": "左上コンテキスト／中央本文／左下キーワード",
+      "v-right-ledger": "右上コンテキスト／中央本文／右下キーワード",
+      "v-center-top": "上部コンテキスト／中央本文／下部キーワード",
+      "v-left-low": "左上キーワード／中央コンテキスト／左下本文",
+      "h-left-stack": "左上コンテキスト／左本文／左下キーワード",
+      "h-right-stack": "右上コンテキスト／右本文／右下キーワード",
+      "h-center-top": "上部コンテキスト／中央本文／下部キーワード",
+      "h-bottom-left": "左上キーワード／左コンテキスト／左下本文",
+      "p-vertical-left": "左余白：シリーズ／タイトル／アーカイブ",
+      "p-vertical-right": "右アーカイブ",
+      "p-vertical-top": "上部タイトル",
+      "p-vertical-bottom": "下部アーカイブ",
+      "p-landscape-left": "左タイトル",
+      "p-landscape-right": "右タイトル",
+      "p-landscape-bottom": "左上タイトル／左下アーカイブ（狭）",
+      "p-landscape-top": "上部タイトル"
+    },
+    "capacity": {
+      "text": "1行 {per} 字 × {lines} 行、{used} 字使用",
+      "list": "最大 {max} 件、1行 {per} 字 × {lines} 行、{used} 字使用"
+    },
+    "optional": "任意",
+    "add": {
+      "title": "テンプレートテキスト",
+      "button": "追加",
+      "loading": "仕様を読み込み中…",
+      "rolePlaceholder": "種類を選択",
+      "roleMissing": "先に種類を選び、その後フィールドを入力してください"
+    },
+    "list": {
+      "add": "項目を追加",
+      "remove": "この項目を削除"
+    },
+    "layoutPicker": {
+      "label": "レイアウトセット",
+      "hint": "位置はレイアウトセットで決まります。切り替えても種類と文字は残ります。",
+      "none": "未選択",
+      "mismatch": "現在のセットは {family} 仕様で、出力の画角と一致しません。セットを変更してください"
+    },
+    "problems": {
+      "title": "テキストの問題"
+    },
+    "bindProjectTitle": "プロジェクト名変数に束縛",
+    "bindProjectTitleHint": "束縛すると主フィールドは読み取り専用になり、描画時にプロジェクト情報から解決されます。",
+    "posterPlan": {
+      "layout": "レイアウトセット：{layout}",
+      "legacy": "この構図は旧式の自由テキストレイヤー（{n} 個）を使っています。テンプレートテキストを得るにはコンセプトを再生成してください。"
     }
   }
 }

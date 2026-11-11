@@ -140,13 +140,14 @@
       <section class="ls-side">
         <LayerRail v-if="segment" :doc="doc" :selected-ids="selectedIds"
           :episode-id="episodeId"
-          :drama-id="dramaId"
+          :drama-id="dramaId" medium="video" :beats="beats"
           :spec="{width:specW,height:specH}" :inherited="inherited"
           @select="selectedIds = $event" @history="pushHistory" @patch="onPatch"
           @style="onStyle" @theme="setTheme" @filter="setFilter"
           @reorder="reorder($event.id, $event.toIndex)" @add="addLayer"
           @remove="removeSelected" @duplicate="duplicateSelected"
           @base="replaceBase" @crop-request="enterCanvasTool('crop')" @reanchor="reanchorLayer($event.id,$event.patch)"
+          @text-layout="setTextLayout"
           @assets-changed="markDirty"
         />
       </section>
@@ -173,6 +174,7 @@ import { assetAspectAPI, assetPipelineAPI, layerSegmentAPI } from '~/composables
 import { openTaskCenter } from '~/composables/useTasks'
 import { frameStateAt } from '~/utils/segmentTimeline'
 import { baseFilterLayers, layerDocToSvg } from '~/utils/layerSvg'
+import { useLayerTextSpec } from '~/composables/useLayerTextSpec'
 import { mediaUrl } from '~/utils/url'
 
 const props = defineProps({
@@ -207,7 +209,7 @@ const spec = computed(() => props.state?.spec || null)
 const {
   doc, selectedIds, canUndo, canRedo, missingGlyphs,
   load, acceptSaved, pushHistory, undo, redo, patchLayer, patchStyle, detachAnchors, reanchorLayer,
-  addLayer, removeSelected, duplicateSelected, reorder, setTheme, setFilter,
+  addLayer, removeSelected, duplicateSelected, reorder, setTheme, setFilter, setTextLayout,
 } = useLayerDoc(() => {
   if (!segment.value) return
   dirty.value = true
@@ -215,7 +217,9 @@ const {
 }, {
   snapshot: () => ({timeline:timeline.value,duration:duration.value}),
   restore: snapshot => {timeline.value=snapshot.timeline;duration.value=snapshot.duration},
-})
+}, { medium: 'video' })
+// 模板文本框（#96）：规范到达后重画预览（文字排版由规范驱动）
+const { version: specVersion } = useLayerTextSpec()
 
 const specW = computed(() => spec.value?.width || doc.value.base.width || 960)
 const specH = computed(() => spec.value?.height || doc.value.base.height || 544)
@@ -228,6 +232,20 @@ const aspectIssue = computed(() => baseAspectIssue(doc.value.base, {width:specW.
 const junction = computed(() => {
   const combo=props.state?.storyboard?.combo || props.state?.combo
   return combo==='C' ? {slot:'last',t:duration.value} : combo==='D' ? {slot:'first',t:0} : null
+})
+/**
+ * 文本框检查的「拍」（#96）：每个关键帧可见的图层集合；不属于任何关键帧的图层单独成一拍
+ * （它们全程常显，同样要参与同拍位置区/重复检查）。
+ */
+const beats = computed(() => {
+  const seen = new Set()
+  const frames = (timeline.value.keyframes || []).map(frame => {
+    const ids = [...new Set(frame.visible || [])]
+    ids.forEach(id => seen.add(id))
+    return ids
+  })
+  const absent = doc.value.layers.filter(layer => !seen.has(layer.id)).map(layer => layer.id)
+  return absent.length ? [...frames, absent] : frames
 })
 
 // ── 底图视觉验证（Issue #94） ──────────────────────────────
@@ -334,12 +352,15 @@ const frame = computed(() => frameStateAt(timeline.value, time.value))
  * `visibleIds` 必须显式给：`opacity` 只覆盖时间线提到过的图层，缺省 key 在
  * layerDocToSvg 里按 alpha=1 画，没被任何关键帧勾选的图层会全程常显（后端渲染同样排除它们）。
  */
-const frameSvg = computed(() => layerDocToSvg(doc.value, { width: specW.value, height: specH.value }, {
-  opacity: frame.value.opacity,
-  viewport: {x:0,y:0,w:1,h:1},
-  visibleIds: Object.keys(frame.value.opacity).filter(id => frame.value.opacity[id] > 0),
-  resolveImage: path => mediaUrl(path),
-}))
+const frameSvg = computed(() => {
+  void specVersion.value
+  return layerDocToSvg(doc.value, { width: specW.value, height: specH.value }, {
+    opacity: frame.value.opacity,
+    viewport: {x:0,y:0,w:1,h:1},
+    visibleIds: Object.keys(frame.value.opacity).filter(id => frame.value.opacity[id] > 0),
+    resolveImage: path => mediaUrl(path),
+  })
+})
 const baseFilters = computed(() => baseFilterLayers(doc.value.base.filter, { width: specW.value, height: specH.value }))
 function filterStyle(filter) {
   return { backgroundImage: `url("data:image/svg+xml;charset=utf8,${encodeURIComponent(filter.svg)}")` }

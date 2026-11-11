@@ -1661,7 +1661,8 @@
         "marker": "마커",
         "label": "라벨",
         "card": "카드",
-        "image": "이미지"
+        "image": "이미지",
+        "text": "템플릿 텍스트 상자"
       },
       "assetKind": {
         "character": "캐릭터",
@@ -3347,7 +3348,6 @@
       "imagePrompt": "화면 프롬프트",
       "textDescription": "문자 배치 설명",
       "copy": "포스터 카피",
-      "layers": "텍스트 레이어 {n}개",
       "noImage": "아직 후보 이미지가 없습니다",
       "generating": "생성 중…",
       "candidateReady": "후보 #{n}",
@@ -3579,7 +3579,8 @@
       "marker": "지점",
       "label": "텍스트",
       "card": "카드",
-      "image": "이미지"
+      "image": "이미지",
+      "text": "템플릿 텍스트"
     },
     "theme": {
       "archival": "아카이브풍",
@@ -3690,6 +3691,120 @@
       "portraitPath": "인물 사진 경로",
       "saved": "저장됨 · {n}개 레이어",
       "serverRender": "서버 렌더링 결과"
+    }
+  },
+  "layerText": {
+    "role": {
+      "date": "시간 앵커",
+      "heading": "주제 제목",
+      "statement": "사실 설명",
+      "keyword": "핵심어",
+      "quote": "인용",
+      "metric": "데이터 결론",
+      "bullets": "요점 목록",
+      "poster_project": "시리즈 식별",
+      "poster_title": "포스터 주제목",
+      "poster_details": "포스터 정보 카드"
+    },
+    "field": {
+      "date": {
+        "main": "시간",
+        "sub": "시대 보충"
+      },
+      "heading": {
+        "main": "제목",
+        "sub": "눈썹제목"
+      },
+      "statement": {
+        "main": "설명",
+        "sub": "출처 또는 한정"
+      },
+      "keyword": {
+        "main": "핵심어",
+        "sub": "뜻풀이"
+      },
+      "quote": {
+        "main": "인용",
+        "sub": "출처"
+      },
+      "metric": {
+        "main": "수치",
+        "sub": "지표"
+      },
+      "bullets": {
+        "items": "요점"
+      },
+      "poster_project": {
+        "main": "프로젝트명",
+        "sub": "회차"
+      },
+      "poster_title": {
+        "main": "주제목"
+      },
+      "poster_details": {
+        "subtitle": "부제목",
+        "era": "연대",
+        "place": "장소",
+        "items": "요점"
+      }
+    },
+    "category": {
+      "identifier": "식별",
+      "narrative": "서사",
+      "emphasis": "강조",
+      "quote": "인용",
+      "data": "데이터",
+      "structure": "구조",
+      "poster": "포스터"
+    },
+    "layout": {
+      "v-left-column": "좌상 맥락／중앙 본문／좌하 핵심어",
+      "v-right-ledger": "우상 맥락／중앙 본문／우하 핵심어",
+      "v-center-top": "상단 맥락／중앙 본문／하단 핵심어",
+      "v-left-low": "좌상 핵심어／중앙 맥락／좌하 본문",
+      "h-left-stack": "좌상 맥락／좌측 본문／좌하 핵심어",
+      "h-right-stack": "우상 맥락／우측 본문／우하 핵심어",
+      "h-center-top": "상단 맥락／중앙 본문／하단 핵심어",
+      "h-bottom-left": "좌상 핵심어／좌측 맥락／좌하 본문",
+      "p-vertical-left": "좌측 여백: 시리즈／제목／아카이브",
+      "p-vertical-right": "우측 아카이브",
+      "p-vertical-top": "상단 제목",
+      "p-vertical-bottom": "하단 아카이브",
+      "p-landscape-left": "좌측 제목",
+      "p-landscape-right": "우측 제목",
+      "p-landscape-bottom": "좌상 제목／좌하 아카이브(좁음)",
+      "p-landscape-top": "상단 제목"
+    },
+    "capacity": {
+      "text": "한 줄 {per}자 × {lines}줄, {used}자 사용",
+      "list": "최대 {max}개, 한 줄 {per}자 × {lines}줄, {used}자 사용"
+    },
+    "optional": "선택",
+    "add": {
+      "title": "템플릿 텍스트 상자",
+      "button": "추가",
+      "loading": "사양 불러오는 중…",
+      "rolePlaceholder": "유형 선택",
+      "roleMissing": "먼저 유형을 고른 뒤 필드를 입력하세요"
+    },
+    "list": {
+      "add": "항목 추가",
+      "remove": "이 항목 삭제"
+    },
+    "layoutPicker": {
+      "label": "레이아웃 세트",
+      "hint": "상자 위치는 레이아웃 세트가 결정합니다. 바꿔도 유형과 텍스트는 유지됩니다.",
+      "none": "미선택",
+      "mismatch": "현재 세트는 {family} 사양이라 출력 화면비와 맞지 않습니다. 세트를 바꾸세요"
+    },
+    "problems": {
+      "title": "텍스트 상자 문제"
+    },
+    "bindProjectTitle": "프로젝트명 변수에 연결",
+    "bindProjectTitleHint": "연결하면 주 필드는 읽기 전용이 되고 렌더링 시 프로젝트 데이터로 해석됩니다.",
+    "posterPlan": {
+      "layout": "레이아웃 세트: {layout}",
+      "legacy": "이 구도는 예전 자유 텍스트 레이어({n}개)를 사용합니다. 템플릿 텍스트 상자를 얻으려면 콘셉트를 다시 생성하세요."
     }
   }
 }

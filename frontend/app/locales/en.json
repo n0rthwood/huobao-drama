@@ -1661,7 +1661,8 @@
         "marker": "Marker",
         "label": "Label",
         "card": "Card",
-        "image": "Image"
+        "image": "Image",
+        "text": "Template text box"
       },
       "assetKind": {
         "character": "Character",
@@ -3347,7 +3348,6 @@
       "imagePrompt": "Visual prompt",
       "textDescription": "Typography description",
       "copy": "Poster copy",
-      "layers": "{n} text layers",
       "noImage": "No candidate image yet",
       "generating": "Generating…",
       "candidateReady": "Candidate #{n}",
@@ -3579,7 +3579,8 @@
       "marker": "Place",
       "label": "Text",
       "card": "Card",
-      "image": "Image"
+      "image": "Image",
+      "text": "Template text"
     },
     "theme": {
       "archival": "Archival",
@@ -3690,6 +3691,120 @@
       "portraitPath": "Portrait path",
       "saved": "Saved · {n} layers",
       "serverRender": "Server render"
+    }
+  },
+  "layerText": {
+    "role": {
+      "date": "Date anchor",
+      "heading": "Heading",
+      "statement": "Statement",
+      "keyword": "Keyword",
+      "quote": "Quotation",
+      "metric": "Metric",
+      "bullets": "Bullet points",
+      "poster_project": "Series label",
+      "poster_title": "Poster title",
+      "poster_details": "Poster details"
+    },
+    "field": {
+      "date": {
+        "main": "Time",
+        "sub": "Era note"
+      },
+      "heading": {
+        "main": "Heading",
+        "sub": "Eyebrow"
+      },
+      "statement": {
+        "main": "Statement",
+        "sub": "Source or scope"
+      },
+      "keyword": {
+        "main": "Keyword",
+        "sub": "Gloss"
+      },
+      "quote": {
+        "main": "Quotation",
+        "sub": "Source"
+      },
+      "metric": {
+        "main": "Number",
+        "sub": "Measure"
+      },
+      "bullets": {
+        "items": "Points"
+      },
+      "poster_project": {
+        "main": "Project name",
+        "sub": "Episode no."
+      },
+      "poster_title": {
+        "main": "Main title"
+      },
+      "poster_details": {
+        "subtitle": "Subtitle",
+        "era": "Era",
+        "place": "Place",
+        "items": "Points"
+      }
+    },
+    "category": {
+      "identifier": "Identifier",
+      "narrative": "Narrative",
+      "emphasis": "Emphasis",
+      "quote": "Quotation",
+      "data": "Data",
+      "structure": "Structure",
+      "poster": "Poster"
+    },
+    "layout": {
+      "v-left-column": "Left context / center body / bottom-left keyword",
+      "v-right-ledger": "Right context / center body / bottom-right keyword",
+      "v-center-top": "Top context / center body / bottom keyword",
+      "v-left-low": "Top-left keyword / center context / bottom-left body",
+      "h-left-stack": "Top-left context / left body / bottom-left keyword",
+      "h-right-stack": "Top-right context / right body / bottom-right keyword",
+      "h-center-top": "Top context / center body / bottom keyword",
+      "h-bottom-left": "Top-left keyword / left context / bottom-left body",
+      "p-vertical-left": "Left margin: series / title / archive",
+      "p-vertical-right": "Right archive",
+      "p-vertical-top": "Top title",
+      "p-vertical-bottom": "Bottom archive",
+      "p-landscape-left": "Left title",
+      "p-landscape-right": "Right title",
+      "p-landscape-bottom": "Top-left title / bottom-left archive (narrow)",
+      "p-landscape-top": "Top title"
+    },
+    "capacity": {
+      "text": "{per} chars per line × {lines} lines, {used} used",
+      "list": "Up to {max} items, {per} chars per line × {lines} lines, {used} used"
+    },
+    "optional": "Optional",
+    "add": {
+      "title": "Template text box",
+      "button": "Add",
+      "loading": "Loading spec…",
+      "rolePlaceholder": "Choose a role",
+      "roleMissing": "Pick a role first, then fill the fields"
+    },
+    "list": {
+      "add": "Add item",
+      "remove": "Remove item"
+    },
+    "layoutPicker": {
+      "label": "Layout set",
+      "hint": "Box positions come from the layout set; switching keeps the roles and text.",
+      "none": "Not selected",
+      "mismatch": "The current set belongs to the {family} spec, which does not match the output aspect — switch sets"
+    },
+    "problems": {
+      "title": "Text box issues"
+    },
+    "bindProjectTitle": "Bind project-title variable",
+    "bindProjectTitleHint": "Once bound, the main field is read-only and resolved from project data at render time.",
+    "posterPlan": {
+      "layout": "Layout set: {layout}",
+      "legacy": "This concept uses {n} legacy free-text layers; regenerate the concept to get template text boxes."
     }
   }
 }

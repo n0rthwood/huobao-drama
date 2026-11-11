@@ -41,7 +41,7 @@
           <input type="range" min="0" max="1" step="0.05" :value="layer.opacity" @input="setLayer('opacity', Number($event.target.value))" @change="endEdit">
           <em>{{ layer.opacity }}</em>
         </label>
-        <label class="ls-row">
+        <label v-if="layer.type !== 'text'" class="ls-row">
           <span>{{ t('layerCanvas.style.rotation') }}</span>
           <input type="range" min="-180" max="180" step="1" :value="layer.rotation" @input="setLayer('rotation', Number($event.target.value))" @change="endEdit">
           <em>{{ layer.rotation }}°</em>
@@ -120,6 +120,44 @@
         <label class="ls-row"><span>{{ t('layerCanvas.style.scale') }}</span><input type="range" min="0.4" max="2.5" step="0.05" :value="value('scale')" @input="setStyle('scale', Number($event.target.value))" @change="endEdit"><em>{{ value('scale') }}</em></label>
       </section>
 
+      <!-- 模板文本框（#96）：类型 + 字段 + 容量，位置由规范算，没有样式可改 -->
+      <section v-else-if="layer.type === 'text'" class="ls-block">
+        <h4>{{ roleName(layer.role) }}</h4>
+        <p v-if="rolePurpose" class="ls-purpose">{{ rolePurpose }}</p>
+        <label v-if="layer.role === 'poster_project'" class="ls-row ls-wide">
+          <span>{{ t('layerText.bindProjectTitle') }}</span>
+          <input type="checkbox" :checked="boundVariable('main') === 'project_title'" @change="toggleFieldVar('main', $event.target.checked ? 'project_title' : '')">
+        </label>
+        <small v-if="layer.role === 'poster_project'" class="ls-hint">{{ t('layerText.bindProjectTitleHint') }}</small>
+        <div v-for="field in textFieldDefs" :key="field.key" class="ls-text-field">
+          <span class="ls-field-head">
+            {{ fieldLabel(layer.role, field.key) }}
+            <em v-if="field.optional" class="ls-optional">{{ t('layerText.optional') }}</em>
+          </span>
+          <em v-if="boundVariable(field.key)" class="ls-readonly">{{ variables?.[boundVariable(field.key)] || '' }}</em>
+          <div v-else-if="field.kind === 'list'" class="ls-list">
+            <div v-for="(item, index) in listValue(field.key)" :key="index" class="ls-list-row">
+              <input :aria-label="fieldLabel(layer.role, field.key)" :value="item"
+                @input="setListItem(field.key, index, $event.target.value)" @change="endEdit">
+              <button type="button" class="btn-ghost ls-del" :title="t('layerText.list.remove')" @click="removeListItem(field.key, index)">×</button>
+            </div>
+            <button type="button" class="btn-ghost ls-add-btn" :disabled="listValue(field.key).length >= field.max_items"
+              @click="addListItem(field.key)">{{ t('layerText.list.add') }}</button>
+          </div>
+          <textarea v-else-if="field.max_lines > 1" class="ls-input" rows="2" :aria-label="fieldLabel(layer.role, field.key)"
+            :value="fieldValue(field.key)" @input="setText(field.key, $event.target.value)" @change="endEdit" />
+          <input v-else class="ls-input" :aria-label="fieldLabel(layer.role, field.key)"
+            :value="fieldValue(field.key)" @input="setText(field.key, $event.target.value)" @change="endEdit">
+          <small v-if="field.cap" :class="['ls-cap', { over: fieldUsed(field) > field.cap.max_chars }]">{{ capacityHint(field) }}</small>
+        </div>
+        <p v-if="textProblems.length" class="ls-problems-title">{{ t('layerText.problems.title') }}</p>
+        <ul v-if="textProblems.length" class="ls-problems">
+          <li v-for="problem in textProblems" :key="`${problem.code}|${problem.layer_id || ''}|${problem.message}`" :class="problem.level">
+            <TriangleAlert :size="12" />{{ problem.message }}
+          </li>
+        </ul>
+      </section>
+
       <section v-else class="ls-block">
         <div class="ls-image">
           <img v-if="layer.src?.path && !imageError" :src="mediaUrl(layer.src.path)" alt="" @error="imageError = true">
@@ -150,9 +188,11 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { THEME_PRESETS, unsupportedChars } from '~/utils/layerSvg'
+import { textCapacity, textFieldValue, textLayerProblems, textLayerTexts } from '~/utils/layerText'
 import { TriangleAlert, ImagePlus } from 'lucide-vue-next'
 import LayerImagePicker from './LayerImagePicker.vue'
 import { missingGlyphsOf } from '~/composables/useMissingGlyphs'
+import { textRoleDef, useLayerTextNames, useLayerTextSpec } from '~/composables/useLayerTextSpec'
 import { mediaUrl } from '~/utils/url'
 import { deeplinkInitial, querySingle } from '~/composables/useQuerySync'
 
@@ -166,6 +206,11 @@ const props = defineProps({
   episodeId: { type: Number, default: 0 },
   // Poster 固定文本变量（Issue #72）
   variables: { type: Object, default: null },
+  /**
+   * 时间线的「拍」（#96）：每个关键帧可见的图层 id 集合。
+   * 图层段由精确关键帧给出，Poster 只有一拍（缺省 = 全部可见图层）。
+   */
+  beats: { type: Array, default: () => [] },
 })
 const emit = defineEmits(['patch', 'style', 'history', 'theme', 'filter', 'registered'])
 const { t } = useI18n()
@@ -178,11 +223,98 @@ const VARIABLES = ['project_title', 'episode_title', 'episode_no']
 const ALIGNS = ['left', 'center', 'right']
 const TEMPLATES = ['name', 'year', 'chapter']
 
+const { version: specVersion } = useLayerTextSpec()
+const { roleName, fieldLabel } = useLayerTextNames()
+
 const editingKey = ref(null)
 const filter = computed(() => ({ paper: 0, tint: 'none', tint_strength: 0.35, vignette: 0, ...(props.doc.base.filter || {}) }))
 
-const missingChars = computed(() => missingGlyphsOf(props.layer, props.variables))
+const outputSize = computed(() => ({
+  width: props.doc.base.width || 1344,
+  height: props.doc.base.height || 768,
+}))
+const isTextLayer = computed(() => props.layer?.type === 'text')
+const rolePurpose = computed(() => textRoleDef(props.layer?.role)?.purpose || '')
+/** 每个字段的容量（规范按套与成片尺寸算），列表字段带上限条数。 */
+const textFieldDefs = computed(() => {
+  void specVersion.value
+  if (!isTextLayer.value) return []
+  const caps = textCapacity(props.doc.text_layout, props.layer.role, outputSize.value)
+  return (textRoleDef(props.layer.role)?.fields || []).map(def => {
+    const cap = caps.find(item => item.field === def.key) || null
+    return { key: def.key, optional: Boolean(def.optional), cap, kind: cap?.kind || 'text', max_lines: cap?.max_lines || 1, max_items: cap?.max_items || 0 }
+  })
+})
+const textProblems = computed(() => {
+  void specVersion.value
+  if (!isTextLayer.value) return []
+  return textLayerProblems(props.doc, outputSize.value, {
+    beats: props.beats.length ? props.beats : undefined,
+    variables: props.variables,
+  }).filter(problem => !problem.layer_id || problem.layer_id === props.layer.id)
+})
+/** 文本框要画的文字按角色字段/变量解析后再查缺字，列表字段逐条查。 */
+const textMissingChars = computed(() => {
+  void specVersion.value
+  if (!isTextLayer.value) return []
+  return [...new Set(textLayerTexts(props.layer, props.variables).flatMap(text => unsupportedChars(text)))]
+})
+
+const missingChars = computed(() => isTextLayer.value ? textMissingChars.value : missingGlyphsOf(props.layer, props.variables))
 const fieldMissing = text => unsupportedChars(text)
+
+function boundVariable(key) {
+  return props.layer?.field_vars?.[key] || ''
+}
+function fieldValue(key) {
+  const value = textFieldValue(props.layer, key, props.variables)
+  return Array.isArray(value) ? value.join('\n') : value
+}
+function listValue(key) {
+  const value = textFieldValue(props.layer, key, props.variables)
+  return Array.isArray(value) ? value : []
+}
+function fieldUsed(field) {
+  const value = textFieldValue(props.layer, field.key, props.variables)
+  return Array.isArray(value)
+    ? value.reduce((total, item) => total + Array.from(String(item)).length, 0)
+    : Array.from(String(value)).length
+}
+/** 「每行 N 字 × M 行，已用 K 字」——容量按规范算，不按浏览器字体。 */
+function capacityHint(field) {
+  const cap = field.cap
+  const used = fieldUsed(field)
+  return cap.kind === 'list'
+    ? t('layerText.capacity.list', { max: cap.max_items, per: cap.chars_per_line, lines: cap.max_lines, used })
+    : t('layerText.capacity.text', { per: cap.chars_per_line, lines: cap.max_lines, used })
+}
+function setText(key, value) {
+  beginEdit(`text:${key}`)
+  emit('patch', { id: props.layer.id, patch: { fields: { ...(props.layer.fields || {}), [key]: value } } })
+}
+function setListItem(key, index, value) {
+  beginEdit(`text:${key}`)
+  const items = [...listValue(key)]
+  items[index] = value
+  emit('patch', { id: props.layer.id, patch: { fields: { ...(props.layer.fields || {}), [key]: items } } })
+}
+function addListItem(key) {
+  beginEdit(`text:${key}`)
+  emit('patch', { id: props.layer.id, patch: { fields: { ...(props.layer.fields || {}), [key]: [...listValue(key), ''] } } })
+}
+function removeListItem(key, index) {
+  beginEdit(`text:${key}`)
+  emit('patch', { id: props.layer.id, patch: { fields: { ...(props.layer.fields || {}), [key]: listValue(key).filter((_, i) => i !== index) } } })
+}
+/** Poster 栏目识别可以绑到项目名变量：绑定后字段只读，由剧集数据现场解析。 */
+function toggleFieldVar(key, variable) {
+  beginEdit('field_vars')
+  const vars = { ...(props.layer.field_vars || {}) }
+  if (variable) vars[key] = variable
+  else delete vars[key]
+  emit('patch', { id: props.layer.id, patch: { field_vars: Object.keys(vars).length ? vars : undefined } })
+  endEdit()
+}
 // deeplink（#86）：lpick=1 且带 lpmode 时由本宿主重开图片选择器（lpmode 没有时属于 LayerRail 的底图选择器）；
 // 键的发布仍由 LayerImagePicker 的分组负责，这里只恢复开关，不自己写 URL
 const imagePicker = ref(querySingle(deeplinkInitial('lpick')) === '1' && Boolean(deeplinkInitial('lpmode'))
@@ -259,4 +391,22 @@ function setVariable(value) {
 .ls-pick { display: inline-flex; align-items: center; gap: 5px; }
 .ls-source { font-size: 11px; color: var(--text-2); }
 .ls-readonly { font-style: normal; color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ls-purpose { margin: 0; color: var(--text-2); font-size: 11px; line-height: 1.5; }
+.ls-hint { color: var(--text-3); font-size: 11px; }
+.ls-text-field { display: flex; flex-direction: column; gap: 3px; }
+.ls-field-head { display: flex; align-items: center; gap: 4px; color: var(--text-2); }
+.ls-optional { font-style: normal; font-size: 10px; color: var(--text-3); }
+.ls-input { font-size: 12px; }
+.ls-list { display: flex; flex-direction: column; gap: 4px; }
+.ls-list-row { display: flex; align-items: center; gap: 4px; }
+.ls-list-row input { flex: 1; min-width: 0; font-size: 12px; }
+.ls-del { font-size: 12px; padding: 0 4px; color: var(--text-3); }
+.ls-add-btn { align-self: flex-start; font-size: 11px; padding: 2px 6px; }
+.ls-cap { font-size: 10px; color: var(--text-3); }
+.ls-cap.over { color: var(--danger, #c0472e); }
+.ls-problems { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 3px; font-size: 11px; }
+.ls-problems li { display: flex; align-items: flex-start; gap: 4px; line-height: 1.5; }
+.ls-problems li.error { color: var(--danger, #c0472e); }
+.ls-problems li.warning { color: var(--warning, #b7791f); }
+.ls-problems-title { margin: 2px 0 0; font-size: 11px; font-weight: 600; color: var(--text-2); }
 </style>

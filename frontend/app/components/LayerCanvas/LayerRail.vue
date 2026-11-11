@@ -56,14 +56,27 @@
     </details>
     <details open class="lr-section">
       <summary><Layers :size="15" />{{ t('layerCanvas.list.title') }}</summary>
-      <LayerList :doc="doc" :selected-ids="selectedIds" :anchor-states="anchorStates" :variables="variables"
+      <LayerList :doc="doc" :selected-ids="selectedIds" :anchor-states="anchorStates" :variables="variables" :medium="medium"
         @select="emit('select', $event)" @history="emit('history')" @patch="emit('patch', $event)"
         @reorder="emit('reorder', $event)" @add="(type, partial) => emit('add', type, partial)" @remove="emit('remove')"
         @duplicate="emit('duplicate')" @relink="startRelink" />
     </details>
+    <!-- 版式套（#96）：文本框的位置不是自由坐标，换套只改文档级 text_layout，图层原样保留 -->
+    <details v-if="hasTextLayers" open class="lr-section">
+      <summary><LayoutTemplate :size="15" />{{ t('layerText.layoutPicker.label') }}</summary>
+      <div class="lr-layout">
+        <select :value="doc.text_layout || ''" :aria-label="t('layerText.layoutPicker.label')"
+          @change="emit('text-layout', $event.target.value)">
+          <option v-if="!doc.text_layout" value="">{{ t('layerText.layoutPicker.none') }}</option>
+          <option v-for="layout in layoutChoices" :key="layout.id" :value="layout.id">{{ layoutName(layout.id) }}</option>
+        </select>
+        <small class="lr-guide">{{ t('layerText.layoutPicker.hint') }}</small>
+        <p v-if="layoutMismatch" class="lr-error">{{ t('layerText.layoutPicker.mismatch', { family: textFamily }) }}</p>
+      </div>
+    </details>
     <details open class="lr-section">
       <summary><SlidersHorizontal :size="15" />{{ t('layerCanvas.style.docTitle') }}</summary>
-      <LayerStyle :doc="doc" :layer="selectedLayer" :assets="imageAssets" :drama-id="dramaId" :episode-id="episodeId" :variables="variables" layer-only
+      <LayerStyle :doc="doc" :layer="selectedLayer" :assets="imageAssets" :drama-id="dramaId" :episode-id="episodeId" :variables="variables" :beats="beats" layer-only
         @patch="emit('patch', $event)" @style="emit('style', $event)" @history="emit('history')" @registered="emit('assets-changed', $event)" />
     </details>
     <AssetPicker v-if="!externalSources" :open="pickerOpen" :assets="baseChoices" @close="pickerOpen = false" @confirm="chooseBase" />
@@ -81,13 +94,15 @@
  */
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Image, ImagePlus, Crop, ShieldCheck, Link2, Lock, Info, Anchor, Lasso, Route, MapPin, Layers, SlidersHorizontal } from 'lucide-vue-next'
+import { Image, ImagePlus, Crop, ShieldCheck, Link2, Lock, Info, Anchor, Lasso, Route, MapPin, Layers, SlidersHorizontal, LayoutTemplate } from 'lucide-vue-next'
 import AssetPicker from '~/components/AssetPicker.vue'
 import LayerList from './LayerList.vue'
 import LayerStyle from './LayerStyle.vue'
 import { assetPipelineAPI, propAPI } from '~/composables/useApi'
 import { semanticEntries, semanticLayerPatch, anchorState } from '~/utils/semanticGeometry'
 import { normalizeCrop } from '~/utils/layerQuality'
+import { textFamilyOf, textLayoutById, textLayoutsFor } from '~/utils/layerText'
+import { useLayerTextNames, useLayerTextSpec } from '~/composables/useLayerTextSpec'
 import { mediaUrl } from '~/utils/url'
 import { DEEPLINK_KEYS, querySingle, useDeeplink } from '~/composables/useQuerySync'
 import { toast } from 'vue-sonner'
@@ -105,8 +120,12 @@ const props = defineProps({
   variables: { type: Object, default: null },
   // Poster 底图候选（Issue #72）：生成/合成版本、人工上传、资产图；非空时不再请求资产流水线候选
   baseSources: { type: Array, default: null },
+  /** 编辑器媒介（#96）：video = 图层段、poster = 海报、'' = 地图（不提供文本框） */
+  medium: { type: String, default: '' },
+  /** 时间线的「拍」（#96）：每个关键帧可见的图层 id 集合，供文本框同拍/相邻拍检查 */
+  beats: { type: Array, default: () => [] },
 })
-const emit = defineEmits(['select', 'patch', 'style', 'history', 'reorder', 'add', 'remove', 'duplicate', 'theme', 'filter', 'base', 'crop-request', 'reanchor', 'assets-changed'])
+const emit = defineEmits(['select', 'patch', 'style', 'history', 'reorder', 'add', 'remove', 'duplicate', 'theme', 'filter', 'base', 'crop-request', 'reanchor', 'assets-changed', 'text-layout'])
 const { t } = useI18n()
 const GROUPS = ['points', 'regions', 'lines', 'labels']
 const candidates = ref([])
@@ -162,6 +181,28 @@ const outputRatio = computed(() => {
   return Math.min(crop.w * sourceSize.value.width / finalSize.value.width, crop.h * sourceSize.value.height / finalSize.value.height).toFixed(1)
 })
 const selectedLayer = computed(() => props.doc.layers.find(layer => props.selectedIds.includes(layer.id)) || null)
+const { version: specVersion } = useLayerTextSpec()
+const { layoutName } = useLayerTextNames()
+const hasTextLayers = computed(() => {
+  void specVersion.value
+  return props.doc.layers.some(layer => layer.type === 'text')
+})
+// 成片画幅就是 spec（后端给的输出尺寸）；没有 spec 时退回文档的 base
+const textFamily = computed(() => textFamilyOf(
+  props.spec.width || props.doc.base.width || 1344,
+  props.spec.height || props.doc.base.height || 768,
+))
+const layoutChoices = computed(() => {
+  void specVersion.value
+  const list = textLayoutsFor(textFamily.value, props.medium || 'video')
+  // 文档里的套若属于别的画幅/媒介也照实列出来，让用户看见并换掉，而不是静默变成空选项
+  const current = props.doc.text_layout ? textLayoutById(props.doc.text_layout) : null
+  return current && !list.some(item => item.id === current.layout.id) ? [...list, current.layout] : list
+})
+const layoutMismatch = computed(() => {
+  const current = props.doc.text_layout ? textLayoutById(props.doc.text_layout) : null
+  return Boolean(current && current.family !== textFamily.value)
+})
 const anchorStates = computed(() => Object.fromEntries(props.doc.layers.map(layer => [layer.id,
   anchorState(layer, entries.value, semanticsLoaded.value, props.doc.base.ref?.asset_id ?? null),
 ])))
@@ -266,6 +307,8 @@ defineExpose({ refreshSemantics })
 .lr-entry button:disabled { opacity: .4; cursor: not-allowed; }
 .lr-relink { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; color: var(--accent); }
 .lr-error { margin: 0; color: var(--danger, #c0472e); }
+.lr-layout { padding: 0 10px 10px; display: flex; flex-direction: column; gap: 6px; }
+.lr-layout select { font-size: 12px; }
 .lr-poster-bases { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; }
 .lr-poster-base { display: flex; flex-direction: column; gap: 3px; padding: 4px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-card); color: var(--text-2); font-size: 10px; cursor: pointer; }
 .lr-poster-base img { width: 100%; height: 56px; object-fit: cover; border-radius: 4px; }

@@ -1661,7 +1661,8 @@
         "marker": "标记",
         "label": "标签",
         "card": "卡片",
-        "image": "图片"
+        "image": "图片",
+        "text": "模板文本框"
       },
       "assetKind": {
         "character": "角色",
@@ -3347,7 +3348,6 @@
       "imagePrompt": "画面 prompt",
       "textDescription": "文字描述",
       "copy": "海报文案",
-      "layers": "{n} 个文字图层",
       "noImage": "还没有候选图",
       "generating": "生成中…",
       "candidateReady": "候选 #{n}",
@@ -3579,7 +3579,8 @@
       "marker": "地点",
       "label": "文字",
       "card": "卡片",
-      "image": "图片"
+      "image": "图片",
+      "text": "模板文本框"
     },
     "theme": {
       "archival": "档案风",
@@ -3690,6 +3691,120 @@
       "portraitPath": "肖像路径",
       "saved": "已保存 · {n} 个图层",
       "serverRender": "服务端渲染结果"
+    }
+  },
+  "layerText": {
+    "role": {
+      "date": "时间锚",
+      "heading": "主题标题",
+      "statement": "事实说明",
+      "keyword": "关键词",
+      "quote": "引文",
+      "metric": "数据结论",
+      "bullets": "要点列表",
+      "poster_project": "栏目识别",
+      "poster_title": "海报主标题",
+      "poster_details": "海报信息卡"
+    },
+    "field": {
+      "date": {
+        "main": "时间",
+        "sub": "时代补充"
+      },
+      "heading": {
+        "main": "标题",
+        "sub": "眉题"
+      },
+      "statement": {
+        "main": "说明",
+        "sub": "出处或限定"
+      },
+      "keyword": {
+        "main": "关键词",
+        "sub": "释义"
+      },
+      "quote": {
+        "main": "引文",
+        "sub": "出处"
+      },
+      "metric": {
+        "main": "数值",
+        "sub": "指标"
+      },
+      "bullets": {
+        "items": "要点"
+      },
+      "poster_project": {
+        "main": "项目名",
+        "sub": "集号"
+      },
+      "poster_title": {
+        "main": "主标题"
+      },
+      "poster_details": {
+        "subtitle": "副标题",
+        "era": "年代",
+        "place": "地点",
+        "items": "要点"
+      }
+    },
+    "category": {
+      "identifier": "标识类",
+      "narrative": "叙事类",
+      "emphasis": "强调类",
+      "quote": "引语类",
+      "data": "数据类",
+      "structure": "结构类",
+      "poster": "海报类"
+    },
+    "layout": {
+      "v-left-column": "左上语境／左中主叙事／左下关键词",
+      "v-right-ledger": "右上语境／右中主叙事／右下关键词",
+      "v-center-top": "上中语境／中部主叙事／下中关键词",
+      "v-left-low": "左上关键词／左中语境／左下主叙事",
+      "h-left-stack": "左上语境／左中主叙事／左下关键词",
+      "h-right-stack": "右上语境／右中主叙事／右下关键词",
+      "h-center-top": "上中语境／中部主叙事／下中关键词",
+      "h-bottom-left": "左上关键词／左中语境／左下主叙事",
+      "p-vertical-left": "左侧留白：栏目／片名／档案信息",
+      "p-vertical-right": "右侧档案",
+      "p-vertical-top": "上中片名",
+      "p-vertical-bottom": "下部档案",
+      "p-landscape-left": "左侧片名",
+      "p-landscape-right": "右侧片名",
+      "p-landscape-bottom": "左上片名／左下档案（收窄）",
+      "p-landscape-top": "上中片名"
+    },
+    "capacity": {
+      "text": "每行 {per} 字 × {lines} 行，已用 {used} 字",
+      "list": "最多 {max} 条，每行 {per} 字 × {lines} 行，已用 {used} 字"
+    },
+    "optional": "可选",
+    "add": {
+      "title": "模板文本框",
+      "button": "添加",
+      "loading": "规范加载中…",
+      "rolePlaceholder": "选择类型",
+      "roleMissing": "先选文本框类型，再填字段"
+    },
+    "list": {
+      "add": "添加一条",
+      "remove": "删除这一条"
+    },
+    "layoutPicker": {
+      "label": "版式套",
+      "hint": "文本框位置由版式套决定；换套保留已填的类型与文字。",
+      "none": "未选择",
+      "mismatch": "当前版式套属于 {family} 规范，与成片画幅不符，请换套"
+    },
+    "problems": {
+      "title": "文本框问题"
+    },
+    "bindProjectTitle": "绑定项目名变量",
+    "bindProjectTitleHint": "绑定后主字段只读，渲染时用项目名与集号现场解析。",
+    "posterPlan": {
+      "layout": "版式套：{layout}",
+      "legacy": "该构图使用旧版自由文字图层（{n} 个），建议重新生成概念以获得模板文本框。"
     }
   }
 }

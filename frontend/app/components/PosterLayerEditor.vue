@@ -8,8 +8,8 @@
       <button type="button" class="btn btn-sm" :disabled="saving" @click="redo" :title="t('layerCanvas.toolbar.redo')"><Redo2 :size="15" /></button>
       <button type="button" class="btn btn-sm" @click="uploadBase" :title="t('poster.editor.uploadBase')"><Upload :size="15" />{{ t('poster.editor.uploadBase') }}</button>
       <span class="ple-divider" />
-      <button v-for="variable in VARIABLES" :key="variable" type="button" class="btn btn-sm" @click="addVariable(variable)">
-        + {{ t(`poster.variables.${variable}`) }}
+      <button type="button" class="btn btn-sm" :disabled="!specReady" @click="addPosterProject">
+        + {{ roleName('poster_project') }}
       </button>
       <span class="ple-divider" />
       <button type="button" class="btn btn-sm" :disabled="saving" @click="save">{{ saving ? t('poster.saving') : t('poster.editor.save') }}</button>
@@ -49,6 +49,7 @@
           :selected-ids="selectedIds"
           :episode-id="episodeId"
           :drama-id="dramaId"
+          medium="poster"
           :spec="{ width, height }"
           :variables="variables"
           :base-sources="baseSources"
@@ -63,6 +64,7 @@
           @remove="removeSelected"
           @duplicate="duplicateSelected"
           @base="replaceBase"
+          @text-layout="setTextLayout"
           @assets-changed="markDirty"
         />
       </section>
@@ -84,6 +86,7 @@ import { Undo2, Redo2, Upload } from 'lucide-vue-next'
 import LayerCanvas from '~/components/LayerCanvas/LayerCanvas.vue'
 import LayerRail from '~/components/LayerCanvas/LayerRail.vue'
 import { useLayerDoc } from '~/composables/useLayerDoc'
+import { useLayerTextNames, useLayerTextSpec } from '~/composables/useLayerTextSpec'
 import { assetPipelineAPI, posterAPI, uploadAPI } from '~/composables/useApi'
 import { baseAspectIssue } from '~/utils/layerQuality'
 import { mediaUrl } from '~/utils/url'
@@ -98,8 +101,9 @@ const props = defineProps({
 const emit = defineEmits(['changed'])
 const { t } = useI18n()
 
-const VARIABLES = ['project_title', 'episode_title', 'episode_no']
 const saving = ref(false)
+const { ready: specReady } = useLayerTextSpec()
+const { roleName } = useLayerTextNames()
 const rendering = ref(false)
 const saveState = ref('')
 const error = ref('')
@@ -109,8 +113,8 @@ const assetCandidates = ref([])
 const {
   doc, selectedIds, canUndo, canRedo, missingGlyphs,
   load, acceptSaved, pushHistory, undo, redo, patchLayer, patchStyle,
-  addLayer, removeSelected, duplicateSelected, reorder, setTheme, setFilter,
-} = useLayerDoc(undefined, undefined, () => props.variables)
+  addLayer, removeSelected, duplicateSelected, reorder, setTheme, setFilter, setTextLayout,
+} = useLayerDoc(undefined, undefined, () => props.variables, { medium: 'poster' })
 
 const width = computed(() => {
   const [w] = String(props.poster.size || '1344x768').split('x').map(Number)
@@ -194,15 +198,13 @@ function replaceBase(base) {
   markDirty()
 }
 
-/** 固定文本变量层：只读绑定，文本由渲染层按剧集数据现场解析。 */
-function addVariable(variable) {
-  const layer = addLayer('label', {
-    name: t(`poster.variables.${variable}`),
-    text: '',
-    variable,
-    box: { x: 0.08, y: variable === 'project_title' ? 0.78 : variable === 'episode_no' ? 0.9 : 0.84, w: 0.84, h: 0.1 },
-    style: { font: 'serif', size: 0.045, color: '#f4ecd8', align: 'center', bold: true, stroke: '#2b2118', stroke_width: 0.004, shadow: true },
-  })
+/**
+ * 栏目识别（#96）：主字段默认绑项目名变量——文本由渲染层按剧集数据现场解析，
+ * 不再往文档里写死项目名。绑定可在样式面板里解除。
+ */
+function addPosterProject() {
+  const layer = addLayer('text', { role: 'poster_project', fields: {}, field_vars: { main: 'project_title' } })
+  if (!layer) return
   selectedIds.value = [layer.id]
   markDirty()
 }

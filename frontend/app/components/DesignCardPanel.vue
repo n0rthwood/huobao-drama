@@ -440,30 +440,66 @@
             <div class="dc-field">
               <span class="dc-label">{{ t('episode.design.field.plannedLayers') }}</span>
               <div class="dc-rows">
-                <div v-for="(layer, index) in layerPlan.planned_layers" :key="index" class="dc-row">
-                  <select
-                    class="input dc-select dc-row-type"
-                    :value="layer.type"
-                    :aria-label="t('episode.design.field.plannedLayers')"
-                    @change="patchLayer(index, { type: $event.target.value })"
-                  >
-                    <option v-for="type in ctx.planned_layer_types" :key="type" :value="type">{{ t(`episode.design.layerType.${type}`) }}</option>
-                  </select>
-                  <input
-                    class="input dc-row-text" type="text" :value="layer.text || ''"
-                    :aria-label="t('episode.design.field.plannedLayers')"
-                    @input="patchLayer(index, { text: $event.target.value }, true)"
-                    @blur="saveNow()"
-                  >
-                  <input
-                    class="input dc-row-at" type="number" min="0" step="0.5" :value="layer.at_s"
-                    :aria-label="t('episode.design.atSeconds', { n: layer.at_s })"
-                    @change="patchLayer(index, { at_s: toSeconds($event.target.value) })"
-                  >
-                  <button type="button" class="dc-chip-del" :aria-label="t('episode.design.actions.remove')" @click="removeLayer(index)">×</button>
+                <div v-for="(layer, index) in layerPlan.planned_layers" :key="index" class="dc-layer">
+                  <div class="dc-row">
+                    <select
+                      class="input dc-select dc-row-type"
+                      :value="layer.type"
+                      :aria-label="t('episode.design.field.plannedLayers')"
+                      @change="patchLayer(index, { type: $event.target.value })"
+                    >
+                      <option v-for="type in ctx.planned_layer_types" :key="type" :value="type">{{ t(`episode.design.layerType.${type}`) }}</option>
+                    </select>
+                    <!-- 模板文本框只有类型 + 字段：位置由版式套算，行里不再有自由文本框名 -->
+                    <select
+                      v-if="layer.type === 'text'"
+                      class="input dc-select dc-row-text"
+                      :value="layer.role || ''"
+                      :aria-label="t('episode.design.field.plannedLayers')"
+                      @change="patchLayer(index, { role: $event.target.value })"
+                    >
+                      <option value="" disabled>{{ t('layerText.add.rolePlaceholder') }}</option>
+                      <option v-for="role in textVideoRoles" :key="role" :value="role">{{ roleName(role) }}</option>
+                    </select>
+                    <input
+                      v-else
+                      class="input dc-row-text" type="text" :value="layer.text || ''"
+                      :aria-label="t('episode.design.field.plannedLayers')"
+                      @input="patchLayer(index, { text: $event.target.value }, true)"
+                      @blur="saveNow()"
+                    >
+                    <input
+                      class="input dc-row-at" type="number" min="0" step="0.5" :value="layer.at_s"
+                      :aria-label="t('episode.design.atSeconds', { n: layer.at_s })"
+                      @change="patchLayer(index, { at_s: toSeconds($event.target.value) })"
+                    >
+                    <button type="button" class="dc-chip-del" :aria-label="t('episode.design.actions.remove')" @click="removeLayer(index)">×</button>
+                  </div>
+                  <div v-if="layer.type === 'text'" class="dc-text-fields">
+                    <p v-if="!layer.role" class="dc-hint">{{ t('layerText.add.roleMissing') }}</p>
+                    <label v-for="field in textFieldsOf(layer)" :key="field.key" class="dc-text-field">
+                      <span>{{ fieldLabel(layer.role, field.key) }}<em v-if="field.optional" class="dc-optional">{{ t('layerText.optional') }}</em></span>
+                      <textarea v-if="field.kind === 'list'" class="input" rows="2"
+                        :aria-label="fieldLabel(layer.role, field.key)" :value="layerFieldValue(layer, field.key)"
+                        @input="setLayerField(index, field.key, $event.target.value)" @blur="saveNow()" />
+                      <input v-else class="input" :aria-label="fieldLabel(layer.role, field.key)" :value="layerFieldValue(layer, field.key)"
+                        @input="setLayerField(index, field.key, $event.target.value)" @blur="saveNow()">
+                      <small v-if="field.cap" :class="['dc-cap', { over: layerFieldUsed(layer, field.key) > field.cap.max_chars }]">{{ cardCapacityHint(field, layer) }}</small>
+                    </label>
+                  </div>
                 </div>
                 <button type="button" class="btn btn-sm" @click="addLayer">{{ t('episode.design.actions.add') }}</button>
               </div>
+            </div>
+
+            <!-- 版式套（#96）：文本框计划必须有套；换套只改文档级 text_layout，计划图层原样保留 -->
+            <div v-if="hasTextPlanned" class="dc-field">
+              <span class="dc-label">{{ t('layerText.layoutPicker.label') }}</span>
+              <select class="input dc-select" :value="layerPlan.text_layout || ''" @change="setTextLayout($event.target.value)">
+                <option value="">{{ t('layerText.layoutPicker.none') }}</option>
+                <option v-for="layout in textVideoLayouts" :key="layout.id" :value="layout.id">{{ layoutName(layout.id) }}</option>
+              </select>
+              <p v-if="textLayoutMismatch" class="dc-hint">{{ t('layerText.layoutPicker.mismatch', { family: projectFamily }) }}</p>
             </div>
           </div>
 
@@ -665,6 +701,8 @@ import AssetPicker from '~/components/AssetPicker.vue'
 import ComboSwitchDialog from '~/components/ShotProduction/ComboSwitchDialog.vue'
 import TaskWorkMetrics from '~/components/TaskWorkMetrics.vue'
 import { mediaUrl } from '~/utils/url'
+import { textCapacity, textFamilyOf, textLayoutById, textLayoutsFor, textRolesFor } from '~/utils/layerText'
+import { textRoleDef, useLayerTextNames, useLayerTextSpec } from '~/composables/useLayerTextSpec'
 import { COMBOS, episodeAPI, narrationSkeletonAPI, storyboardAPI, ttsRequiredOf } from '~/composables/useApi'
 import { DEEPLINK_KEYS, queryEnum, queryIdList, querySingle, useDeeplink } from '~/composables/useQuerySync'
 import { onTaskFinished, refreshTasks, useTasks } from '~/composables/useTasks'
@@ -672,6 +710,8 @@ import { useWorkflowGates } from '~/composables/useWorkflowGates'
 import { toastError, toastServerMessage } from '~/composables/useToast'
 
 const { t, te } = useI18n()
+const { version: specVersion } = useLayerTextSpec()
+const { roleName, fieldLabel, layoutName } = useLayerTextNames()
 
 const props = defineProps({
   episodeId: { type: Number, required: true },
@@ -689,7 +729,9 @@ const EMPTY_CTX = {
   base_candidates: [],
   combos: ['A', 'B', 'C', 'D'],
   info_point_vias: ['layer', 'generated', 'narration_only'],
-  planned_layer_types: ['polygon', 'polyline', 'marker', 'label', 'card', 'image'],
+  planned_layer_types: ['polygon', 'polyline', 'marker', 'label', 'card', 'image', 'text'],
+  // 模板文本框规范（#96）：本画幅家族的版式/类型/容量；接口未给时客户端引擎自己算
+  text_spec: null,
   limits: { layer_s: 30, gen_s: 15, narration_cps: 4.2, info_points: 12, planned_layers: 20, must_mark: 12, rationale: 600 },
 }
 
@@ -1023,6 +1065,7 @@ function fromState(state) {
     base: card.layer_plan?.base ? { ...card.layer_plan.base } : null,
     must_mark: (card.layer_plan?.must_mark || []).map(item => ({ ...item })),
     planned_layers: (card.layer_plan?.planned_layers || []).map(item => ({ ...item })),
+    ...(card.layer_plan?.text_layout ? { text_layout: card.layer_plan.text_layout } : {}),
   }
   next.gen_plan = {
     reference_assets: (card.gen_plan?.reference_assets || []).map(item => ({ ...item })),
@@ -1043,6 +1086,72 @@ function syncDraft() {
 }
 
 const layerPlan = computed(() => draft.value.layer_plan)
+
+/**
+ * 项目画幅家族（#96）：设计卡上下文给出 `text_family` / `aspect_ratio` 时用它们；
+ * 都没给就跟着卡片已选的套走（那是用户确认过的画幅），最后才按横版兜底。
+ */
+const projectFamily = computed(() => {
+  void specVersion.value
+  const declared = String(ctx.value.text_family || '')
+  if (declared === '16:9' || declared === '9:16') return declared
+  // 上下文按项目画幅下发本家族的版式，套 id 本身就是家族的答案（h-* 横版 / v-* 竖版）
+  const fromSpec = textLayoutById(ctx.value.text_spec?.layouts?.[0]?.id || '')?.family
+  if (fromSpec) return fromSpec
+  const match = /^(\d+(?:\.\d+)?)\s*[:x/]\s*(\d+(?:\.\d+)?)$/.exec(String(ctx.value.aspect_ratio || ''))
+  if (match) return textFamilyOf(Number(match[1]), Number(match[2]))
+  return textLayoutById(layerPlan.value.text_layout || '')?.family || '16:9'
+})
+const textVideoRoles = computed(() => {
+  void specVersion.value
+  return textRolesFor('video')
+})
+/** 画幅对应的视频版式套；卡片里的套若属于别的画幅也照实列出来，让用户看见并换掉。 */
+const textVideoLayouts = computed(() => {
+  void specVersion.value
+  const list = textLayoutsFor(projectFamily.value, 'video')
+  const current = layerPlan.value.text_layout ? textLayoutById(layerPlan.value.text_layout) : null
+  return current && !list.some(item => item.id === current.layout.id) ? [...list, current.layout] : list
+})
+const textLayoutMismatch = computed(() => {
+  const current = layerPlan.value.text_layout ? textLayoutById(layerPlan.value.text_layout) : null
+  return Boolean(current && current.family !== projectFamily.value)
+})
+const hasTextPlanned = computed(() => layerPlan.value.planned_layers.some(layer => layer.type === 'text'))
+
+/** 计划文本框的字段：规范字段 + 该套的容量（套还没选时只有字段定义）。 */
+function textFieldsOf(layer) {
+  void specVersion.value
+  if (layer?.type !== 'text' || !layer.role) return []
+  const caps = textCapacity(layerPlan.value.text_layout || '', layer.role)
+  return (textRoleDef(layer.role)?.fields || []).map(def => {
+    const cap = caps.find(item => item.field === def.key) || null
+    return { key: def.key, optional: Boolean(def.optional), cap, kind: cap?.kind || 'text' }
+  })
+}
+function layerFieldValue(layer, key) {
+  const value = layer?.fields?.[key]
+  return Array.isArray(value) ? value.join('\n') : String(value ?? '')
+}
+function layerFieldUsed(layer, key) {
+  const value = layer?.fields?.[key]
+  return (Array.isArray(value) ? value : [value ?? ''])
+    .reduce((total, item) => total + Array.from(String(item)).length, 0)
+}
+/** 列表字段按「一行一条」编辑（设计卡的行状界面里没有增删按钮的空间）。 */
+function setLayerField(index, key, raw) {
+  const layer = layerPlan.value.planned_layers[index]
+  const isList = textFieldsOf(layer).find(field => field.key === key)?.kind === 'list'
+  const value = isList ? String(raw).split('\n').map(item => item.trim()).filter(item => item !== '') : raw
+  patchLayer(index, { fields: { ...(layer?.fields || {}), [key]: value } }, true)
+}
+function cardCapacityHint(field, layer) {
+  const cap = field.cap
+  const used = layerFieldUsed(layer, field.key)
+  return cap.kind === 'list'
+    ? t('layerText.capacity.list', { max: cap.max_items, per: cap.chars_per_line, lines: cap.max_lines, used })
+    : t('layerText.capacity.text', { per: cap.chars_per_line, lines: cap.max_lines, used })
+}
 const genPlan = computed(() => draft.value.gen_plan)
 const suggestedCombo = computed(() => draft.value.suggested_combo)
 const issues = computed(() => (current.value.issues || []).filter(issue => !budgetMissing.value
@@ -1275,12 +1384,31 @@ function removeMustMark(index) {
 }
 function addLayer() {
   if (layerPlan.value.planned_layers.length >= ctx.value.limits.planned_layers) return
-  const type = ctx.value.planned_layer_types[0] || 'label'
-  patchDraft({ layer_plan: { ...layerPlan.value, planned_layers: [...layerPlan.value.planned_layers, { type, text: '', at_s: 0 }] } })
+  // 新计划层默认就是模板文本框：自由文字层是旧形态，只有显式切换才用
+  const type = ctx.value.planned_layer_types.includes('text') ? 'text' : (ctx.value.planned_layer_types[0] || 'label')
+  // 文本框必然有类型：新行先给本媒介第一个类型（选择器里可见、可改），否则服务端规范化会丢掉空类型的行
+  const next = type === 'text' ? { type, role: textVideoRoles.value[0] || '', fields: {}, at_s: 0 } : { type, text: '', at_s: 0 }
+  const plan = { ...layerPlan.value, planned_layers: [...layerPlan.value.planned_layers, next] }
+  // 文本框必须有一套版式：第一次加文本框时按项目画幅选第一套（选择器里可见、可换）
+  if (type === 'text' && !layerPlan.value.text_layout) plan.text_layout = textVideoLayouts.value[0]?.id
+  patchDraft({ layer_plan: plan })
 }
 function patchLayer(index, patch, debounce = false) {
-  const list = layerPlan.value.planned_layers.map((item, i) => (i === index ? { ...item, ...patch } : item))
+  const list = layerPlan.value.planned_layers.map((item, i) => {
+    if (i !== index) return item
+    const next = { ...item, ...patch }
+    // 换类型时旧形态的取值不通用：文本框只留角色/字段，自由图层不留角色
+    if (patch.type && patch.type !== item.type) {
+      delete next.role
+      delete next.fields
+      if (patch.type === 'text') next.role = textVideoRoles.value[0] || ''
+    }
+    return next
+  })
   patchDraft({ layer_plan: { ...layerPlan.value, planned_layers: list } }, debounce)
+}
+function setTextLayout(value) {
+  patchDraft({ layer_plan: { ...layerPlan.value, text_layout: value || undefined } })
 }
 function removeLayer(index) {
   patchDraft({ layer_plan: { ...layerPlan.value, planned_layers: layerPlan.value.planned_layers.filter((_, i) => i !== index) } })
@@ -1893,6 +2021,13 @@ onBeforeUnmount(() => {
   background: var(--bg-3); color: var(--text-3); font-size: 11px; cursor: help;
 }
 .dc-hint { margin: 0; font-size: 11px; color: var(--text-3); }
+.dc-layer { display: flex; flex-direction: column; gap: 4px; }
+.dc-text-fields { display: flex; flex-direction: column; gap: 4px; padding: 2px 0 4px 8px; border-left: 2px solid var(--border); }
+.dc-text-field { display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: var(--text-2); }
+.dc-text-field span { display: flex; align-items: center; gap: 4px; }
+.dc-optional { font-style: normal; font-size: 10px; color: var(--text-3); }
+.dc-cap { font-size: 10px; color: var(--text-3); }
+.dc-cap.over { color: var(--danger, #c0472e); }
 .dc-field { display: flex; flex-direction: column; gap: 4px; }
 .dc-label { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-2); }
 .dc-read { margin: 0; font-size: 12px; line-height: 1.5; }

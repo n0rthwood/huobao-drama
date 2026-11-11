@@ -479,7 +479,7 @@ export type Combo = 'A' | 'B' | 'C' | 'D'
 export const COMBOS: readonly Combo[] = ['A', 'B', 'C', 'D']
 export type DesignCardStatus = 'blank' | 'ai_filling' | 'pending' | 'confirmed' | 'stale'
 export type InfoPointVia = 'layer' | 'generated' | 'narration_only'
-export type PlannedLayerType = 'polygon' | 'polyline' | 'marker' | 'label' | 'card' | 'image'
+export type PlannedLayerType = 'polygon' | 'polyline' | 'marker' | 'label' | 'card' | 'image' | 'text'
 
 export interface InfoPoint {
   id: string
@@ -519,6 +519,9 @@ export interface PlannedLayer {
   text?: string
   anchor?: SemanticRef
   at_s: number
+  /** type='text'（#96）：模板文本框类型与字段 */
+  role?: string
+  fields?: Record<string, string | string[]>
 }
 
 export type CardIssueCode =
@@ -526,6 +529,7 @@ export type CardIssueCode =
   | 'missing_base' | 'gen_slot_missing'
   | 'info_point_unassigned' | 'must_mark_not_planned' | 'reference_not_mentioned'
   | 'budget_tight' | 'unresolved_ref'
+  | 'text_plan_invalid' | 'text_plan_warning'
 
 export interface CardIssue {
   code: CardIssueCode
@@ -538,7 +542,7 @@ export interface DesignCard {
   version: 2
   info_points: InfoPoint[]
   budget: { layer_s: number | null; gen_s: number | null }
-  layer_plan?: { base: BaseRef | null; must_mark: SemanticRef[]; planned_layers: PlannedLayer[] }
+  layer_plan?: { base: BaseRef | null; must_mark: SemanticRef[]; planned_layers: PlannedLayer[]; text_layout?: string }
   gen_plan?: { reference_assets: AssetRef[]; first?: string; mid?: string; last?: string }
   rationale: string
   suggested_combo: Combo | null
@@ -577,6 +581,13 @@ export interface DesignCardContext {
     planned_layers: number
     must_mark: number
     rationale: number
+  }
+  /** #96：项目画幅 + 该画幅视频的模板文本框规范摘要（容量由引擎现算） */
+  aspect_ratio?: string
+  text_spec?: {
+    layouts: Array<{ id: string; name: string; slots: Array<{ role: string; zone: string }> }>
+    roles: Array<{ id: string; name: string; category: string; purpose: string; extract: string; fields: Array<{ key: string; label: string; optional?: boolean; kind?: string }> }>
+    capacity: Record<string, Record<string, Array<Record<string, unknown>>>>
   }
 }
 
@@ -1766,6 +1777,7 @@ export interface SegmentKeyframe {
 export interface SegmentTimeline { fps: number; ease: 'linear' | 'inout'; fade_ms: number; keyframes: SegmentKeyframe[] }
 export interface LayerSegmentIssue {
   code: 'missing_base' | 'card_subtitle_overlap' | 'must_mark_not_marked' | 'reference_not_mentioned' | 'budget_mismatch'
+    | 'text_layer_invalid' | 'text_layer_warning'
   severity: 'warn' | 'block'
   message: string
   [key: string]: unknown

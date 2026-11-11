@@ -32,12 +32,15 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Copy, Diamond, DiamondPlus, Info, Lock, Trash2, TriangleAlert, X } from 'lucide-vue-next'
 import { layerDocToSvg } from '~/utils/layerSvg'
+import { useLayerTextSpec } from '~/composables/useLayerTextSpec'
 import { endHoldOf, clampSegmentDuration, normalizeViewport, SEGMENT_MAX_KEYFRAMES } from '~/utils/segmentTimeline'
 import { baseFrameOf } from '~/utils/layerQuality'
 import { mediaUrl } from '~/utils/url'
 const props = defineProps({timeline:{type:Object,required:true}, duration:{type:Number,required:true}, doc:{type:Object,required:true}, spec:{type:Object,required:true}, junction:{type:Object,default:null}, quality:{type:Array,default:()=>[]}, selectedIndex:{type:Number,default:0}, time:{type:Number,default:0}})
 const emit = defineEmits(['update:timeline','update:duration','update:time','update:selectedIndex','select-frame','history','viewport-pick'])
 const {t}=useI18n()
+// 模板文本框（#96）：规范到达后缩略图要重画一次（文字排版由规范驱动）
+const { version: specVersion } = useLayerTextSpec()
 const teaching=ref(false)
 const baseFailed=ref(false)
 onMounted(()=>{teaching.value=localStorage.getItem('huobao.layerKeyframeTip') !== 'dismissed'})
@@ -47,7 +50,7 @@ const endHold=computed(()=>endHoldOf(props.timeline,props.duration))
 const baseSrc=computed(()=>props.doc.base.path ? mediaUrl(props.doc.base.path) : '')
 watch(baseSrc,()=>{baseFailed.value=false})
 function isJunction(index){return !!props.junction && index === (props.junction.slot === 'last' ? props.timeline.keyframes.length-1 : 0)}
-const junctionTextCount=computed(()=>{if(!props.junction)return 0;const f=props.timeline.keyframes[props.junction.slot==='last'?props.timeline.keyframes.length-1:0];return props.doc.layers.filter(l=>f?.visible.includes(l.id)&&(['label','card'].includes(l.type)||(l.type==='marker'&&l.text))).length})
+const junctionTextCount=computed(()=>{if(!props.junction)return 0;const f=props.timeline.keyframes[props.junction.slot==='last'?props.timeline.keyframes.length-1:0];return props.doc.layers.filter(l=>f?.visible.includes(l.id)&&(['label','card','text'].includes(l.type)||(l.type==='marker'&&l.text))).length})
 function selectFrame(index){emit('update:selectedIndex',index);emit('select-frame',index);emit('update:time',props.timeline.keyframes[index].t)}
 function updateFrames(keyframes, selected){emit('history');const target=keyframes[selected];keyframes.sort((a,b)=>a.t-b.t);emit('update:timeline',{...props.timeline,keyframes});if(target){emit('update:selectedIndex',keyframes.indexOf(target));emit('update:time',target.t)}}
 function addFrame(copy){const previous=copy ? props.timeline.keyframes[Math.max(0,props.selectedIndex-1)] : current.value;const frame=JSON.parse(JSON.stringify(previous||{viewport:{x:0,y:0,w:1,h:1},visible:[]}));frame.t=Math.max(0,Math.min(props.duration,props.time));const frames=[...props.timeline.keyframes,frame];updateFrames(frames,frames.length-1)}
@@ -70,7 +73,7 @@ const thumbnailBaseStyle = computed(() => {
   return { left: `${box.x * 100}%`, top: `${box.y * 100}%`, width: `${box.w * 100}%`, height: `${box.h * 100}%` }
 })
 function thumbnailStyle(frame){const v=frame.viewport;return{position:'absolute',width:`${100/v.w}%`,height:`${100/v.h}%`,left:`${-100*v.x/v.w}%`,top:`${-100*v.y/v.h}%`}}
-function thumbnailSvg(frame){return layerDocToSvg(props.doc,props.spec,{viewport:{x:0,y:0,w:1,h:1},visibleIds:frame.visible,resolveImage:mediaUrl})}
+function thumbnailSvg(frame){void specVersion.value;return layerDocToSvg(props.doc,props.spec,{viewport:{x:0,y:0,w:1,h:1},visibleIds:frame.visible,resolveImage:mediaUrl})}
 </script>
 <style scoped>
 .pk-bar{border:1px solid var(--border);border-radius:8px;padding:12px;background:var(--bg-2);min-width:0}.pk-controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.pk-controls label{margin-left:auto}.pk-bar input[type=number]{width:64px;background:var(--bg-1);border:1px solid var(--border);border-radius:4px;padding:4px;color:var(--text-1)}.pk-scrub{width:100%;margin:14px 0}.pk-track{display:flex;align-items:flex-end;gap:16px;overflow-x:auto;padding:4px 4px 12px;border-bottom:1px solid var(--border)}.pk-frame{display:flex;flex:none;flex-direction:column;align-items:center;gap:4px;width:90px;border:1px solid transparent;border-radius:6px;padding:5px;color:var(--text-2);background:transparent}.pk-frame.selected{border-color:var(--accent);background:var(--bg-3)}.pk-frame.junction .pk-diamond{outline:2px solid var(--accent);border-radius:50%}.pk-thumbnail{height:48px;width:80px;position:relative;overflow:hidden;background:var(--bg-1)}.pk-thumbnail :deep(svg),.pk-thumbnail>div>div{position:absolute;width:100%;height:100%;inset:0}.pk-thumbnail img{position:absolute}.pk-diamond{position:relative;display:flex;align-items:center;gap:2px}.pk-low{width:7px;height:7px;border-radius:50%;background:#d69b29;position:absolute;right:-5px;top:0}.pk-end{margin-left:auto;align-self:center;white-space:nowrap}.pk-inspector{display:grid;grid-template-columns:90px 1fr 1fr 1fr;gap:12px;padding-top:12px}.pk-inspector fieldset{border:1px solid var(--border);border-radius:5px;display:flex;gap:5px;flex-wrap:wrap;min-width:0}.pk-inspector label{display:flex;gap:4px;align-items:center;flex-wrap:wrap;font-size:11px}.pk-inspector legend{font-size:11px;color:var(--text-3)}.pk-visible{max-height:110px;overflow:auto}.pk-teach,.pk-warning{display:flex;align-items:center;gap:8px;font-size:12px;line-height:1.6;padding:8px;background:var(--bg-3);border-radius:5px;margin-bottom:10px}.pk-warning{color:var(--warning)}.pk-teach .btn{margin-left:auto;flex:none}

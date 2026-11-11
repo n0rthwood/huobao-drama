@@ -47,7 +47,7 @@
         <svg class="lc-ui" :viewBox="uiViewBox" preserveAspectRatio="none">
           <rect
             v-for="hit in hitShapes" :key="hit.id"
-            class="lc-hit" :class="{ locked: hit.locked }"
+            class="lc-hit" :class="{ locked: hit.locked, text: hit.text }"
             :x="hit.x" :y="hit.y" :width="hit.w" :height="hit.h"
             :transform="hit.transform"
             @pointerdown.stop="onLayerDown(hit.id, $event)"
@@ -61,7 +61,7 @@
               class="lc-select" :x="selectionBox.x" :y="selectionBox.y"
               :width="selectionBox.w" :height="selectionBox.h" :stroke-width="uiScale * 1.5"
             />
-            <template v-if="singleSelection">
+            <template v-if="geometrySelection">
               <line
                 class="lc-select" :x1="selectionBox.x + selectionBox.w / 2" :y1="selectionBox.y"
                 :x2="selectionBox.x + selectionBox.w / 2" :y2="selectionBox.y - uiScale * 24" :stroke-width="uiScale * 1.5"
@@ -112,6 +112,8 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { MousePointer2, Hand, Frame, Crop, Undo2, Redo2, Magnet, ZoomIn, ZoomOut, Maximize2, TriangleAlert } from 'lucide-vue-next'
 import { baseFilterLayers, layerBounds, layerDocToSvg, svgWorldOf } from '~/utils/layerSvg'
+import { textLayerRects } from '~/utils/layerText'
+import { useLayerTextSpec } from '~/composables/useLayerTextSpec'
 import { baseFrameOf } from '~/utils/layerQuality'
 import { apiBase, mediaUrl } from '~/utils/url'
 
@@ -132,6 +134,8 @@ const props = defineProps({
 })
 const emit = defineEmits(['select', 'history', 'patch', 'delete', 'duplicate', 'undo', 'redo', 'crop', 'detach', 'viewport'])
 const { t } = useI18n()
+// 模板文本框（#96）：规范到达前不画文本框，到达后靠 version 重算排版与命中框
+const { ready: specReady, version: specVersion } = useLayerTextSpec()
 
 const HANDLE_KEYS = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
 const SNAP_PX = 6
@@ -278,11 +282,18 @@ const backdropStyle = computed(() => {
 })
 const uiScale = computed(() => activeViewport.value.w * docWidth.value / Math.max(1, stageWidth.value))
 
-const svgMarkup = computed(() => layerDocToSvg(renderDoc.value, canvasDimensions.value, {
-  viewport: activeViewport.value,
-  resolveImage: path => mediaUrl(path),
-  variables: props.variables,
-}))
+const svgMarkup = computed(() => {
+  // 规范到达后重绘一次：文字排版由规范驱动，空规范的首帧不画文本框
+  void specVersion.value
+  const doc = mode.value === 'crop'
+    ? { ...renderDoc.value, layers: renderDoc.value.layers.filter(layer => layer.type !== 'text') }
+    : renderDoc.value
+  return layerDocToSvg(doc, canvasDimensions.value, {
+    viewport: activeViewport.value,
+    resolveImage: path => mediaUrl(path),
+    variables: props.variables,
+  })
+})
 const filterLayers = computed(() => baseFilterLayers(props.doc.base.filter, canvasDimensions.value))
 
 /**
@@ -303,11 +314,34 @@ const stageStyle = computed(() => {
 
 const selected = computed(() => props.doc.layers.filter(layer => props.selectedIds.includes(layer.id)))
 const singleSelection = computed(() => selected.value.length === 1 && !selected.value[0].locked)
+/** 只有「有几何可改」的单选才出手柄：模板文本框由规范排版，不可拖动/缩放/旋转。 */
+const geometrySelection = computed(() => singleSelection.value && selected.value[0].type !== 'text')
+
+/** 模板文本框在成片画面里的矩形（归一化到成片宽高），与渲染同一份排版。 */
+const textRects = computed(() => {
+  void specVersion.value
+  return specReady.value ? textLayerRects(props.doc, outputDimensions.value, props.variables) : {}
+})
+
+/**
+ * 图层在画布（整图归一化）里的框。模板文本框是画面坐标：取景框把成片铺到画布上，
+ * 所以先按取景框映射，再乘画布尺寸——与 `layerDocToSvg` 的嵌套 svg 完全同一口径。
+ */
+function layerBox(layer) {
+  if (layer.type === 'text') {
+    const rect = textRects.value[layer.id]
+    if (!rect) return { x: 0, y: 0, w: 0, h: 0 }
+    const view = activeViewport.value
+    return { x: view.x + rect.x * view.w, y: view.y + rect.y * view.h, w: rect.w * view.w, h: rect.h * view.h }
+  }
+  return layerBounds(layer, props.doc.theme, aspect.value, props.variables, unitRatio.value)
+}
 
 const hitShapes = computed(() => props.doc.layers
-  .filter(layer => layer.visible)
+  // 裁切模式在整张源图上编辑裁框：文本框是画面坐标，不参与
+  .filter(layer => layer.visible && (layer.type !== 'text' || (mode.value !== 'crop' && textRects.value[layer.id])))
   .map((layer) => {
-    const box = layerBounds(layer, props.doc.theme, aspect.value, props.variables, unitRatio.value)
+    const box = layerBox(layer)
     const x = box.x * docWidth.value
     const y = box.y * docHeight.value
     const w = Math.max(box.w * docWidth.value, uiScale.value * 8)
@@ -315,18 +349,19 @@ const hitShapes = computed(() => props.doc.layers
     return {
       id: layer.id,
       locked: layer.locked,
+      text: layer.type === 'text',
       x, y, w, h,
-      transform: layer.rotation ? `rotate(${layer.rotation} ${x + w / 2} ${y + h / 2})` : null,
+      transform: layer.rotation && layer.type !== 'text' ? `rotate(${layer.rotation} ${x + w / 2} ${y + h / 2})` : null,
     }
   }))
 
 const selectionBox = computed(() => {
   if (!selected.value.length) return null
   if (singleSelection.value) {
-    const box = layerBounds(selected.value[0], props.doc.theme, aspect.value, props.variables, unitRatio.value)
+    const box = layerBox(selected.value[0])
     return { x: box.x * docWidth.value, y: box.y * docHeight.value, w: box.w * docWidth.value, h: box.h * docHeight.value }
   }
-  const boxes = selected.value.map(layer => layerBounds(layer, props.doc.theme, aspect.value, props.variables, unitRatio.value))
+  const boxes = selected.value.map(layer => layerBox(layer))
   const x = Math.min(...boxes.map(b => b.x)) * docWidth.value
   const y = Math.min(...boxes.map(b => b.y)) * docHeight.value
   const right = Math.max(...boxes.map(b => b.x + b.w)) * docWidth.value
@@ -392,8 +427,8 @@ function snapDelta(box, dx, dy) {
   if (!snapOn.value) return result
   const threshold = (SNAP_PX * uiScale.value) / docWidth.value
   const others = props.doc.layers
-    .filter(layer => layer.visible && !props.selectedIds.includes(layer.id))
-    .map(layer => layerBounds(layer, props.doc.theme, aspect.value, props.variables, unitRatio.value))
+    .filter(layer => layer.visible && layer.type !== 'text' && !props.selectedIds.includes(layer.id))
+    .map(layerBox)
   const xTargets = [0, 0.5, 1, ...others.flatMap(b => [b.x, b.x + b.w / 2, b.x + b.w])]
   const yTargets = [0, 0.5, 1, ...others.flatMap(b => [b.y, b.y + b.h / 2, b.y + b.h])]
   const candidates = [
@@ -430,8 +465,10 @@ function onLayerDown(id, event) {
   }
   if (!props.selectedIds.includes(id)) emit('select', [id])
   if (layer.locked) return
-  const targets = (props.selectedIds.includes(id) ? selected.value : [layer]).filter(item => !item.locked)
-  if (!confirmGeometry(targets)) return
+  // 模板文本框不可拖动（位置由规范排版）：只选中，不进入移动手势
+  const targets = (props.selectedIds.includes(id) ? selected.value : [layer])
+    .filter(item => !item.locked && item.type !== 'text')
+  if (!targets.length || !confirmGeometry(targets)) return
   drag = {
     mode: 'move',
     start: pointFromEvent(event),
@@ -442,7 +479,7 @@ function onLayerDown(id, event) {
 }
 
 function unionBounds(layers) {
-  const boxes = layers.map(layer => layerBounds(layer, props.doc.theme, aspect.value, props.variables, unitRatio.value))
+  const boxes = layers.map(layerBox)
   if (!boxes.length) return { x: 0, y: 0, w: 0, h: 0 }
   const x = Math.min(...boxes.map(b => b.x))
   const y = Math.min(...boxes.map(b => b.y))
@@ -451,7 +488,7 @@ function unionBounds(layers) {
 
 function startResize(handle, event) {
   const layer = selected.value[0]
-  if (!layer || layer.locked) return
+  if (!layer || layer.locked || layer.type === 'text') return
   if (!confirmGeometry([layer])) return
   drag = {
     mode: 'resize',
@@ -459,15 +496,15 @@ function startResize(handle, event) {
     start: pointFromEvent(event),
     layer: layer.id,
     geometry: geometryOf(layer),
-    box: layerBounds(layer, props.doc.theme, aspect.value, props.variables, unitRatio.value),
+    box: layerBox(layer),
   }
   bindPointer(event)
 }
 
 function startRotate(event) {
   const layer = selected.value[0]
-  if (!layer || layer.locked) return
-  const box = layerBounds(layer, props.doc.theme, aspect.value, props.variables, unitRatio.value)
+  if (!layer || layer.locked || layer.type === 'text') return
+  const box = layerBox(layer)
   const center = { x: (box.x + box.w / 2) * docWidth.value, y: (box.y + box.h / 2) * docHeight.value }
   const start = pointFromEvent(event)
   if (!confirmGeometry([layer])) return
@@ -630,7 +667,7 @@ function endPointer() {
     if (box.w > 0.005 || box.h > 0.005) {
       const hits = props.doc.layers.filter((layer) => {
         if (!layer.visible) return false
-        const bounds = layerBounds(layer, props.doc.theme, aspect.value, props.variables, unitRatio.value)
+        const bounds = layerBox(layer)
         return bounds.x < box.x + box.w && bounds.x + bounds.w > box.x && bounds.y < box.y + box.h && bounds.y + bounds.h > box.y
       }).map(layer => layer.id)
       emit('select', drag.additive ? [...new Set([...drag.base, ...hits])] : hits)
@@ -669,9 +706,10 @@ function onKeydown(event) {
   const step = event.shiftKey ? 0.01 : 0.002
   const moves = { arrowleft: [-step, 0], arrowright: [step, 0], arrowup: [0, -step], arrowdown: [0, step] }
   const move = moves[key]
-  if (!move || !selected.value.length) return
+  // 方向键微调只动有几何的图层：模板文本框原地不动（也不压一条空历史）
+  const targets = move ? selected.value.filter(layer => !layer.locked && layer.type !== 'text') : []
+  if (!move || !targets.length) return
   event.preventDefault()
-  const targets = selected.value.filter(layer => !layer.locked)
   if (!confirmGeometry(targets)) return
   drag = { targets: targets.map(layer => ({ id: layer.id, geometry: geometryOf(layer) })) }
   applyMove(move[0], move[1])
@@ -701,9 +739,12 @@ function ensureBundledFonts() {
   if (typeof document === 'undefined' || document.getElementById('layer-canvas-fonts')) return
   const faces = [
     ['Noto Sans SC', 400, 'NotoSansSC-Regular.otf', 'opentype'],
+    ['Noto Sans SC', 500, 'NotoSansSC-Medium.otf', 'opentype'],
     ['Noto Sans SC', 700, 'NotoSansSC-Bold.otf', 'opentype'],
     ['Noto Serif SC', 400, 'NotoSerifSC-Regular.otf', 'opentype'],
     ['Noto Serif SC', 700, 'NotoSerifSC-Bold.otf', 'opentype'],
+    // Issue #96：模板文本框的 900 大字（标题/数据/关键词）与 500 正文
+    ['Noto Serif SC', 900, 'NotoSerifSC-Black.otf', 'opentype'],
     // Issue #72：Poster 四族字体，服务端与编辑器同一批文件
     ['LXGW WenKai', 400, 'LXGWWenKai-Regular.ttf', 'truetype'],
     ['LXGW WenKai', 700, 'LXGWWenKai-Medium.ttf', 'truetype'],
@@ -764,6 +805,8 @@ defineExpose({
 .lc-ui { position: absolute; inset: 0; width: 100%; height: 100%; }
 .lc-hit { fill: transparent; cursor: move; }
 .lc-hit.locked { cursor: not-allowed; }
+/* 模板文本框：可点选但不可拖动 */
+.lc-hit.text { cursor: pointer; }
 .lc-select { fill: none; stroke: var(--accent); stroke-dasharray: none; }
 .lc-handle { fill: var(--surface-card, #fff); stroke: var(--accent); stroke-width: 1; cursor: nwse-resize; }
 .lc-rotate { cursor: grab; }
