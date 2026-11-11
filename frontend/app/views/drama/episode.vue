@@ -3605,17 +3605,21 @@ const extractingLabels = computed(() => EXTRACT_TARGETS.value.filter(x => extrac
 function isExtracting(target) { return extractingTargets.value.includes(target) }
 
 function doExtract(target) {
-  if (isExtracting(target) || !epId.value) return
+  if (isExtracting(target) || !epId.value) return Promise.resolve()
   if (!isDocumentaryProject.value) saveScr()
   extractingTargets.value.push(target)
-  episodeAPI.extract(epId.value, target, chatModelOverride(), chatConfigId())
-    .then(() => pollExtractStatus(target))
+  return episodeAPI.extract(epId.value, target, chatModelOverride(), chatConfigId())
+    .then(() => { pollExtractStatus(target) })
     .catch(e => {
       extractingTargets.value = extractingTargets.value.filter(x => x !== target)
       toastError(e)
     })
 }
-function doExtractAll() { EXTRACT_TARGETS.value.forEach(x => doExtract(x.key)) }
+// 依次等每个 POST 返回（POST 立即返回、任务在后台跑）：场景任务先于道具任务登记，
+// 纪录片的道具提取据此等场景提取结束后再开始（Issue #93）
+async function doExtractAll() {
+  for (const x of EXTRACT_TARGETS.value) await doExtract(x.key)
+}
 
 // ─── 单资产「重新提取本资产信息」（Issue #32）────────────────
 // 后端先清空该资产的提取字段再跑提取 Agent（save_dedup_* 只补空白，不清就测不出规则改动），
@@ -3705,7 +3709,8 @@ watch([chars, scenes, propItems], () => {
   reExtractPending.value = ''
 })
 
-function pollExtractStatus(target, attempts = 150) {
+// 轮询上限 30 分钟：纪录片道具提取要等场景提取结束（Issue #93），两段串行加起来常超过旧的 6 分钟上限
+function pollExtractStatus(target, attempts = 720) {
   const label = EXTRACT_TARGETS.value.find(x => x.key === target)?.label || target
   const tick = async (left) => {
     try {

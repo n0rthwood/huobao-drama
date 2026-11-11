@@ -379,6 +379,10 @@ const progressLines = computed(() => {
   if (textProgress && Number(textProgress.total)) {
     lines.push(t('taskCenter.detail.textProgress', { completed: Number(textProgress.completed || 0), total: Number(textProgress.total) }))
   }
+  // 纪录片道具提取等场景提取结束（Issue #93）
+  if (textProgress?.step === 'waiting_scenes') {
+    lines.push(t('taskCenter.detail.waitingScenes', { id: textProgress.waiting_task_id ?? '?' }))
+  }
   const remote = taskRemoteState(live.value)
   if (remote?.cancel_requested) lines.push(t('common.ring.cancelling'))
   return lines

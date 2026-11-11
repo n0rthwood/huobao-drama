@@ -156,6 +156,7 @@
       "retryOf": "重试自 #{id}",
       "percent": "进度 {percent}%",
       "textProgress": "已完成 {completed} / {total}",
+      "waitingScenes": "等待场景提取（任务 #{id}）完成后开始",
       "rewriteStages": "改写阶段",
       "retry": "换模型重试",
       "retrying": "提交中…",
