@@ -41,6 +41,8 @@ export const AI_STAGES = {
   read_image: { vision: true, label: '读图工具' },
   /** 图层底图视觉验证（Issue #94）：看裁切/留白后的无字取景画面，判主体完整、取景合理、无变形 */
   layer_base_check: { vision: true, label: '图层底图视觉验证' },
+  /** 衔接帧画面描述（Issue #95）：看 C/D 锁定槽位那张衔接帧 PNG，给视频提示词一个真实构图锚点 */
+  junction_caption: { vision: true, label: '衔接帧画面描述' },
 
   // ── 不需要视觉 ────────────────────────────────────────────
   /** 剧情项目拆分分镜：纯剧本文本；绝对图像优先规则下不描述外观 */
@@ -103,6 +105,8 @@ export const AI_CALL_SITES: Record<string, AiStage[]> = {
   'services/asset-semantics-auto.ts': ['asset_semantics'],
   // 图层底图视觉验证（#94）：渲染成功后自动核验裁切/留白结果
   'services/layer-base-check.ts': ['layer_base_check'],
+  // 衔接帧画面描述（#95）：视频提示词批次在 Agent 开跑前描述 C/D 的锁定衔接帧
+  'services/junction-caption.ts': ['junction_caption'],
   // 资产流水线（#56）：资料研究 / 事实表（纯文本）+ QC 清单核验（视觉）
   'services/asset-pipeline/steps.ts': ['asset_spec', 'asset_qc'],
   // 资料检索（#79）：检索计划/预筛（文本）+ 候选图筛选（视觉）

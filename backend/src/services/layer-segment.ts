@@ -45,6 +45,8 @@ import {
 // `layer-base-check.ts` 反向依赖本文件（底图 sha / 段读取 / 画幅）：两边都只在函数体里互相调用，
 // 顶层求值不触碰对方，ESM 循环安全。
 import { LAYER_BASE_CHECK_STATUSES, type LayerBaseCheck, type LayerBaseCheckStatus } from './layer-base-check.js'
+// 衔接帧画面描述（#95）的类型与解析：与 #94 的 base_check 同口径，只在函数体里互相调用，ESM 循环安全。
+import type { JunctionCaptionCache } from './junction-caption.js'
 
 export const LAYER_SEGMENT_STATUSES = ['draft', 'rendering', 'ready', 'failed'] as const
 export type LayerSegmentStatus = typeof LAYER_SEGMENT_STATUSES[number]
@@ -88,6 +90,8 @@ export interface LayerSegment {
   stale_reasons: string[]
   /** 底图视觉验证结论（Issue #94）；null = 从未验证。不参与 `layerSegmentIsFresh` */
   base_check: LayerBaseCheck | null
+  /** 衔接帧画面描述（Issue #95）；null = 从未描述。按 junction_hash 缓存，不参与新鲜度 */
+  junction_caption: JunctionCaptionCache | null
   created_at: string
   updated_at: string
 }
@@ -203,6 +207,26 @@ function parseBaseCheck(raw: string | null): LayerBaseCheck | null {
   return null
 }
 
+/** 衔接帧画面描述（Issue #95）：hash 是这条描述对应的衔接帧，读时与当前 hash 比对 */
+function parseJunctionCaption(raw: string | null): JunctionCaptionCache | null {
+  if (!raw) return null
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return null
+    const row = parsed as Record<string, unknown>
+    if (typeof row.hash !== 'string') return null
+    return {
+      hash: row.hash,
+      caption: typeof row.caption === 'string' ? row.caption : null,
+      error: typeof row.error === 'string' ? row.error : null,
+      config_id: Number.isInteger(row.config_id) ? Number(row.config_id) : null,
+      model: typeof row.model === 'string' ? row.model : null,
+      at: typeof row.at === 'string' ? row.at : '',
+    }
+  } catch { /* 坏 JSON 视为从未描述 */ }
+  return null
+}
+
 /** Stored plans retain their exact target, including fractional FPS; no normalized default. */
 function storedTimelineFps(timeline: unknown): number | undefined {
   const fps = timeline && typeof timeline === 'object' ? (timeline as Record<string, unknown>).fps : undefined
@@ -243,6 +267,7 @@ function parseSegmentRow(row: SegmentRow): LayerSegment {
     status: (row.status as LayerSegmentStatus) || 'draft',
     stale_reasons: parseStringArray(row.staleReasons),
     base_check: parseBaseCheck(row.baseCheck),
+    junction_caption: parseJunctionCaption(row.junctionCaption),
     created_at: row.createdAt,
     updated_at: row.updatedAt,
   }
@@ -358,6 +383,7 @@ export async function saveLayerSegment(
     base_ref: baseRef,
     quality_warnings: warnings,
     base_check: null,
+    junction_caption: null,
     render_path: null,
     render_signature: null,
     rendered_at: null,

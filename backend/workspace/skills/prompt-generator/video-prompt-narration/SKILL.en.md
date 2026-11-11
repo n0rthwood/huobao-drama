@@ -27,3 +27,13 @@ When the frame contains **people who have no character asset** (attendants, sold
 - Counter-example: "an attendant on either side holds him up"; correct: "an attendant on either side (unpatterned grey-brown short tunic, no cap, hair in a plain bun, cloth belt at the waist), each with one hand under his arm"
 
 The same rule as in the video-prompt skill; it applies to narrated episodes too. When unnamed people appear in several 3-second segments, repeat the marker set at their first mention in **each** segment; never spell it out only in the first segment and fall back to "the two of them" or "they" afterwards.
+
+## Locked Junction Frame (combos C / D)
+
+The same rule as "Locked Junction Frame" in the video-prompt skill applies to narrated episodes:
+
+- `locked_frames.caption` from `read_storyboard_context` is a real description of that junction PNG (written by a vision model), not a paraphrase of the base-image prompt.
+- **C** (first frame locked): the first time segment must restate the caption's composition (camera / shot size / what is in frame / light / empty areas) and the subject then enters; **no cut inside the first segment**.
+- **D** (last frame locked): the last time segment must settle onto the caption's composition; **no cut inside the last segment**.
+- When `caption` is `null`, read `caption_note` (not rendered / no vision config / base visual check failed): still do not cut, and never invent picture content.
+- On save, a cut in C's first segment or D's last segment ("cut to", "cuts to", …) is rejected; the rejection carries the caption — rewrite from it, then save again.

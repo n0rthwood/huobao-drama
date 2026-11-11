@@ -38,8 +38,8 @@ export interface TaskParams {
   [key: string]: unknown
 }
 
-/** 持久观测阶段：旁白骨架 / 配音 / 设计卡 / 地图工作流 / 图层底图视觉验证 */
-export type ObservedStage = 'skeleton' | 'voice' | 'design_card' | 'map_workflow' | 'layer_base_check'
+/** 持久观测阶段：旁白骨架 / 配音 / 设计卡 / 地图工作流 / 图层底图视觉验证 / 衔接帧画面描述 */
+export type ObservedStage = 'skeleton' | 'voice' | 'design_card' | 'map_workflow' | 'layer_base_check' | 'junction_caption'
 
 export interface TaskWorkSummaryItem {
   storyboard_id: number | null

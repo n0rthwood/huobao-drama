@@ -28,6 +28,7 @@ import {
   COMBOS,
   INFO_POINT_VIAS,
   PLANNED_LAYER_TYPES,
+  lockedGenSlot,
   normalizeDesignCard,
   parseDesignCard,
   serializeDesignCard,
@@ -38,6 +39,7 @@ import {
 } from '../../services/design-card.js'
 import { checkDesignCardGrounding, groundingRejectionMessage } from '../../services/design-card-grounding.js'
 import { aspectConflictMessage, compositionOf, findAspectConflicts, normalizeAspect } from '../../services/aspect.js'
+import { junctionPromptRejections, lockedFramesOfEpisode } from '../../services/junction-caption.js'
 
 /** 项目画幅（Issue #92）：出图尺寸按它查表，提示词里的画幅/构图写法也必须与它一致 */
 async function dramaAspectRatio(dramaId: number): Promise<string> {
@@ -222,6 +224,9 @@ const readStoryboardContext = createTool({
 
     // 关键帧状态：inherits_first 表示该分镜首帧承接上一分镜的尾关键帧（continue 边界且自身未选首帧）
     const keyframeMap = await loadEpisodeKeyframes(episodeId)
+    // 锁定衔接帧（Issue #95）：C 的首帧 = 图层段末帧、D 的尾帧 = 图层段首帧，这两个槽位
+    // 不单独出图。没有这条事实，写视频提示词的模型会把 0 秒写成切镜、丢掉引导帧。
+    const lockedFrames = await lockedFramesOfEpisode(episodeId)
     const aliveStoryboards = existingStoryboards
       .filter(sb => !sb.deletedAt)
       .sort((a, b) => a.storyboardNumber - b.storyboardNumber)
@@ -260,6 +265,8 @@ const readStoryboardContext = createTool({
           // 同一段落内的镜头才能共用底图与图层状态，而不是各写各的
           design_card: parseDesignCard(sb.designCard),
           combo: toCombo(sb.combo),
+          // 只有 C/D 且已有图层段的镜头才有锁定槽位；`caption` = 视觉模型对实际衔接帧的描述
+          locked_frames: lockedFrames.get(sb.id) || [],
           design_card_status: toDesignCardStatus(sb.designCardStatus),
         }
       }))
@@ -445,6 +452,36 @@ function buildSaveStoryboards(documentary: boolean) {
           rejected: aspectRejected,
           aspect_ratio: aspect,
           composition: compositionOf(aspect),
+        }
+      }
+      // 衔接帧校验（Issue #95）：整批里带 video_prompt 且该镜号已经是 C/D 时，与单镜写入同一条规则。
+      // 新拆出来的镜号还没有 combo，锁定槽位是设计卡阶段才确定的，不校验。同样在清空之前判完。
+      const withVideo = (storyboards as z.infer<typeof storyboardFields>[]).filter(sb => (sb.video_prompt || '').trim())
+      if (withVideo.length) {
+        const existingRows = await db.select({
+          id: schema.storyboards.id,
+          storyboardNumber: schema.storyboards.storyboardNumber,
+          deletedAt: schema.storyboards.deletedAt,
+        }).from(schema.storyboards).where(eq(schema.storyboards.episodeId, episodeId))
+        const idByNumber = new Map(existingRows.filter(row => !row.deletedAt).map(row => [row.storyboardNumber, row.id]))
+        const junctionRejected: { shot_number: number; reason: string }[] = []
+        for (const sb of withVideo) {
+          const existingId = idByNumber.get(sb.shot_number)
+          if (!existingId) continue
+          for (const reason of await junctionPromptRejections(existingId, sb.video_prompt || '')) {
+            junctionRejected.push({ shot_number: sb.shot_number, reason })
+          }
+        }
+        if (junctionRejected.length) {
+          logTaskProgress('StoryboardTool', 'save-junction-rejected', {
+            episodeId,
+            shotNumbers: [...new Set(junctionRejected.map(item => item.shot_number))].join(','),
+          })
+          return {
+            error: `有 ${junctionRejected.length} 条视频提示词从锁定衔接帧切走了画面，整批未保存。请按下面逐镜说明改写后重新调用 save_storyboards。`,
+            count: 0,
+            rejected: junctionRejected,
+          }
         }
       }
     }
@@ -818,6 +855,22 @@ const updateStoryboard = createTool({
         rejected: aspectReasons,
         aspect_ratio: aspect,
         composition: compositionOf(aspect),
+      }
+    }
+    // 衔接帧校验（Issue #95）：C 的首段 / D 的末段不许切镜 —— 该槽位的画面由衔接帧锁定，
+    // 切镜会让视频模型丢掉引导帧。退回信息带上 caption，模型按真实构图重写后重新保存。
+    if ('video_prompt' in fields) {
+      const junctionReasons = await junctionPromptRejections(storyboard_id, fields.video_prompt || '')
+      if (junctionReasons.length) {
+        const combo = toCombo(storyboard.combo)
+        const slot = lockedGenSlot(combo)
+        logTaskProgress('StoryboardTool', 'update-junction-rejected', { episodeId, storyboardId: storyboard_id, combo })
+        return {
+          error: junctionReasons.join(' '),
+          rejected: junctionReasons,
+          combo,
+          locked_frame: slot ? { slot, source: slot === 'first' ? 'layer_last' : 'layer_first' } : null,
+        }
       }
     }
 

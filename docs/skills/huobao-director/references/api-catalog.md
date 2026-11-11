@@ -671,6 +671,16 @@ Body：`{storyboard_ids?, config_id?, model?}`；把已定分镜写成时间段�
 ### `GET /episodes/{e}/video-prompts-status` [R]
 （S9 其余端点：批量 `/episodes/{e}/video-batch*`；单镜 `/storyboards/{id}/generate-video`；估计 `/video-queue/estimate`。）
 
+### Agent 工具 `read_storyboard_context` 的 `locked_frames`（Issue #95）[S]
+每镜新增 `locked_frames: [{slot:"first"|"last", source:"layer_last"|"layer_first", base:{kind:"asset",asset_kind,asset_id,name}|{kind:"inherit_prev"}|null, framing:"full"|"crop"|"contain"|"zoomed", caption, caption_note?}]`：
+- `slot`：C = 首帧、D = 尾帧；`source` 说明衔接帧取自图层段的哪一端（C 末帧、D 首帧）。这两个槽位不单独出图，锁定时列保持 NULL。
+- `framing`：衔接帧的取景（留白 / 裁切 / 推近 / 整图），由 `layer-quality.ts` 的 `baseFrameOf` 与末/首精确帧的取景框现算。
+- `caption`：视觉模型对**实际衔接帧 PNG**（不含文字图层）的一句话描述，按 `junction_hash` 缓存于 `storyboard_layer_segments.junction_caption`（AI 环节 `junction_caption`，vision）。衔接帧未渲染 / 输入已变化 / 底图验证未过 / 无视觉配置 / 调用失败时为 `null`，`caption_note` 写明原因——**不得**据此臆造画面。
+- A/B 组合与还没有图层段的镜头不带 `locked_frames`。
+- `POST /episodes/{e}/generate-video-prompts` 在 Agent 开跑前逐镜补算 caption（同一任务的观测 stage `junction_caption`，任务详情可回看公开请求/响应），并把锁定槽位与 caption 写进提示话术。
+- 保存校验（AI 写入路径：`update_storyboard`，以及 `save_storyboards` 覆盖已有 C/D 镜号时）：解析 `video_prompt` 的时间分段行（`0-3秒：`、`0-2.5秒:`、`0-3s:`、`0–3 s:` 等），C 的首段 / D 的末段含切镜写法（切到/切回/切换为/切换到/转到/硬切、cut to/cuts to、カット/切り替え、컷/전환）→ 退回 `{error, rejected, combo, locked_frame}`，一个字都不落库；退回信息带 caption，按真实构图重写后重新保存。A/B 与剧情镜头不校验。
+- 人工 `PUT /storyboards/{id}` 不做这条校验（与 #92 的画幅校验同口径）；人工编辑不受保护。
+
 ### `POST /episodes/{e}/video-batch/preview` [R]
 Body：`{storyboard_ids?, config_id, model}`
 返回逐镜：`missing`（无版本，默认勾）、`changed`（与所有可比版本都不同，带 `change_reasons`）、`unchanged`（命中历史签名，默认不勾但可强出）、`unknown`（历史缺对比字段）、`blocked`（不可勾）、`skipped`（正在生成）、`excluded`（A 组合 `no_generated_segment`）。
