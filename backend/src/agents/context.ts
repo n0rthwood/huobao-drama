@@ -25,6 +25,8 @@ export interface AgentRequestContextValues {
   narrationShotNumbers?: number[]
   /** 单资产重提取作用的资产名（Issue #32）：名册完整性只对这一个人要求，不牵连其它成员 */
   singleAssetName?: string
+  /** 整集提取的目标类别（Issue #93）：纪录片据此校验道具归属；单资产重提取不设置 */
+  extractTarget?: 'characters' | 'scenes' | 'props'
   /** 题材规则集（Issue #32）；缺省时按项目的 genre + 纪录片开关解析 */
   genreRuleset?: GenreRuleset | null
   /** 项目类型（Issue #45）；缺省时按 dramas.project_type 解析，决定 narration-first 工具变体 */
@@ -48,6 +50,7 @@ export function buildAgentRequestContext(values: AgentRequestContextValues): Req
   if (values.narrationEnabled) rc.set('narrationEnabled', true)
   if (values.narrationShotNumbers !== undefined) rc.set('narrationShotNumbers', values.narrationShotNumbers)
   if (values.singleAssetName) rc.set('singleAssetName', values.singleAssetName)
+  if (values.extractTarget) rc.set('extractTarget', values.extractTarget)
   if (values.textTaskId) rc.set('textTaskId', values.textTaskId)
   if (values.storyboardFillGaps) rc.set('storyboardFillGaps', true)
   // 语言在构建处统一解析：4 条链路（chat/提取/图片提示词/视频提示词）都经过这里，
@@ -118,6 +121,12 @@ export function getProjectType(requestContext: RequestContext | undefined): Proj
 export function getSingleAssetName(requestContext: RequestContext | undefined): string | null {
   const v = requestContext?.get('singleAssetName' as never)
   return typeof v === 'string' && v ? v : null
+}
+
+/** 整集提取的目标类别（Issue #93）；单资产重提取与非提取链路为 null */
+export function getExtractTarget(requestContext: RequestContext | undefined): 'characters' | 'scenes' | 'props' | null {
+  const v = requestContext?.get('extractTarget' as never)
+  return v === 'characters' || v === 'scenes' || v === 'props' ? v : null
 }
 
 /** 读取本次 Agent 运行的检索预算作用域 id */
