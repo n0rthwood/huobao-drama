@@ -130,7 +130,7 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 - 反例：① 自己写正则删「参考：…ISBN」；② 把 502 当作通过直接保存；③ 用 `inspect-narration` 的结果直接 `PUT` 改写正文；④ 拿上一次改写的 `ai_exclusions` 冒充本次草稿的检查结论。
 
 ### S2 资产（纪录片含“提取→审核→精确→美化”）
-- 提取：`POST /episodes/{e}/extract {target}` ×3 → `extract-status` → 读 `characters/scenes/props`。
+- 提取：`POST /episodes/{e}/extract {target}` ×3 → `extract-status` → 读 `characters/scenes/props`。纪录片按 角色 → 场景 → 道具 顺序 POST：道具提取会等场景提取结束，地图由场景提取保存（#93，见 api-core §extract）。
 - 字段与关联：`PUT /scenes/{id}`、`PUT /props/{id}`、`POST /episodes/{e}/assets/link`、`DELETE .../assets/link`。
 - 单资产出图：`generate-prompt`（可 `force`）→ `generate-image` → `GET /tasks/{id}` → 下载并打开。`reused` 是复用有效稿，正常成功；`regenerated` 才是 Agent 保存了不同的新稿。`unchanged_after_rewrite` 是 force 后逐字未变：批量单列该状态且允许提交图片（`asset-batch-select.ts`），**单发 generate-prompt 经 savedPromptOf 只接受 reused/regenerated，其余返回 400**，不能把旧稿冒称本次新稿。`failed/skipped` 不提交批量图片；不为制造差异盲目重试。资产文本/风格改变或人要求重写时才用 force。
 - 批量：`POST /dramas/{d}/assets/batch-generate/preview` → 人确认范围 → 同 body 启动 → `GET` 状态。

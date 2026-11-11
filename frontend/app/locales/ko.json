@@ -156,6 +156,7 @@
       "retryOf": "#{id} 재시도",
       "percent": "진행률 {percent}%",
       "textProgress": "{completed} / {total} 완료",
+      "waitingScenes": "장면 추출(작업 #{id}) 완료를 기다리는 중",
       "rewriteStages": "리라이팅 단계",
       "retry": "모델 변경 후 재시도",
       "retrying": "제출 중…",

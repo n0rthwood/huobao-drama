@@ -1,6 +1,6 @@
 /**
  * 资产提取任务 — 异步执行，按「集 × 类型」粒度跟踪
- * 角色 / 场景 / 道具 可分别单独提取，同一集的不同类型可并行
+ * 角色 / 场景 / 道具 可分别单独提取；纪录片项目的整集道具提取等同一集的场景提取结束后再开始（Issue #93）
  * 任务状态持久化在 sys_task(type='text', params.kind=extract_*)：刷新/切页可恢复，后端重启时标记为失败
  */
 import { mastra } from '../mastra/index.js'
@@ -15,10 +15,12 @@ import {
   findLatestTextTask,
   finishTextTask,
   patchTextTaskParams,
+  updateTextTaskProgress,
   textTaskOutcome,
   type TextTaskKind,
 } from './text-task.js'
 import { resolveStageModel } from './ai-stages.js'
+import { resolveDramaProjectType } from './project-type.js'
 import { isReviewItemMissing, onReviewExtractionFinished } from './asset-review.js'
 import { isFirstAgentFailureSafe, runWithTextTask } from './text-task-context.js'
 import { requeueFirstModelFailure } from './text-task-autoretry.js'
@@ -96,6 +98,25 @@ export async function startSingleAssetExtraction(
   return startExtractorRun(episodeId, dramaId, target, message, { ...opts, singleAssetName: assetName })
 }
 
+/**
+ * 纪录片整集道具提取排在场景提取之后（Issue #93）：道具提取要读取已保存的场景与地图，
+ * 并行时会各自另定一份计划（实测并行漏掉号炮）。只等进程内仍持有的场景提取锁——
+ * 锁在 POST 返回前就已登记，库里没有锁的活跃行只可能是重启前的残留，等它会永远卡住。
+ * 场景提取失败也继续：道具按已保存的结果执行。等待期间进度写 step='waiting_scenes'，任务窗口可见。
+ */
+export async function waitForSceneExtraction(episodeId: number, taskId: number): Promise<void> {
+  const key = `episode:${episodeId}:${EXTRACT_TASK_KINDS.scenes}`
+  let waited = false
+  for (let lock = extractionLocks.get(key); lock; lock = extractionLocks.get(key)) {
+    const sceneTask = await findActiveTextTask(episodeId, EXTRACT_TASK_KINDS.scenes)
+    await updateTextTaskProgress(taskId, { completed: 0, total: 0, failed: 0, step: 'waiting_scenes', waiting_task_id: sceneTask?.id })
+    logTaskProgress('Extract', 'props-wait-scenes', { episodeId, taskId, sceneTaskId: sceneTask?.id })
+    waited = true
+    await lock
+  }
+  if (waited) await patchTextTaskParams(taskId, { progress: undefined })
+}
+
 /** 提取 Agent 的统一运行入口（整集提取与单资产重提取共用） */
 async function startExtractorRun(
   episodeId: number,
@@ -127,6 +148,11 @@ async function startExtractorRun(
       await cancelTextTask(taskId, '条目已被人工处置')
       return null
     }
+    // 单资产重提取只针对一个目标，不参与整集的顺序与归属约束
+    const wholeEpisode = !opts.singleAssetName
+    if (wholeEpisode && target === 'props' && resolveDramaProjectType(dramaId) === 'documentary') {
+      await waitForSceneExtraction(episodeId, taskId)
+    }
     const agent = mastra.getAgent('extractor')
     if (!agent) throw new Error('提取 Agent 不可用')
     const requestContext = buildAgentRequestContext({
@@ -136,6 +162,7 @@ async function startExtractorRun(
       modelOverride: resolved.model,
       textConfigId: resolved.configId ?? undefined,
       singleAssetName: opts.singleAssetName,
+      extractTarget: wholeEpisode ? target : undefined,
     })
     return runAgent(agent, [{ role: 'user', content: message }], {
       maxSteps: 20,

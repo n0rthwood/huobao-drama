@@ -117,6 +117,7 @@ Body：
 Body：`{target:'characters|scenes|props', model?, config_id?}`（target 非法 400，集不存在 404）。
 立即返回 `{target, status:'running', already_running}`；同集同类型并行允许一个，重复请求 `already_running:true`。**[授权要求]**：提取会写资产表（复用去重、只补空白字段）。
 - `GET /episodes/:id/extract-status`：`{characters:…, scenes:…, props:…}`，每类为 `ExtractTask | null`（未启动为 null）。ExtractTask（extraction.ts:30-35）精确为 `{status:'running'|'done'|'error', started_at(ISO), finished_at?(ISO), error?}`——status 由 sys_task 行状态映射，error 为失败原因文案。
+- **纪录片顺序与地图归属（Issue #93）**：纪录片项目的整集道具提取在开始调用模型前，会等同一集正在进行的场景提取结束（等待期间任务仍为 `queued`，`params.progress={step:'waiting_scenes', waiting_task_id}`）；三个 target 按 角色 → 场景 → 道具 依次 POST 即可，不必等前一个完成。地图（`asset_type:'map'` 的道具）由**场景提取**保存，道具提取只保存非地图道具；越界条目在 `save_dedup_props` 返回值 `rejected[{name,reason}]` 中列出、不落库。单资产重提取（`re-extract`、审核清单补提取）与剧情项目不受此约束。背景：Issue #93 实验中三类并行时道具提取漏掉旁白点名的器物（号炮），且「地点单独建场景还是进地图」若分在两次运行里判断会互相推诿。
 
 ### 选角名册（纪录片规则集，Issue #32）
 - `GET /episodes/:id/character-roster`：`{cast:[{name,basis,reason,source:'agent|human'}]|null, exists, status:'draft'|'approved'|null, stale, script_hash, current_hash, updated_at}`。`cast:null` = 从未生成（区别于空名册）；`stale:true` = 剧本在复核后已改动，名册过期。

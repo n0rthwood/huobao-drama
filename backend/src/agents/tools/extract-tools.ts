@@ -15,11 +15,12 @@ import { db, getInsertId, schema } from '../../db/index.js'
 import { eq, and } from 'drizzle-orm'
 import { now } from '../../utils/response.js'
 import { logTaskPayload, logTaskProgress, logTaskSuccess, logTaskWarn } from '../../utils/task-logger.js'
-import { getDramaId, getEpisodeId, getGenreRuleset, getSingleAssetName } from '../context.js'
+import { getDramaId, getEpisodeId, getExtractTarget, getGenreRuleset, getProjectType, getSingleAssetName } from '../context.js'
 import { parseStylingVersion, saveStylingVersion } from '../../services/styling-version.js'
 import { normalizeAssetName, normalizeNearName } from '../../services/asset-name.js'
 import { linkCitationsToAsset } from '../../services/research-citations.js'
 import { markExposition } from '../../services/exposition.js'
+import { documentaryPropRejection } from '../../services/extract-ownership.js'
 import {
   ROSTER_REQUIRED_MESSAGE,
   ROSTER_STALE_MESSAGE,
@@ -638,6 +639,8 @@ const readExistingProps = createTool({
       id: p.id,
       name: p.name,
       type: p.type || '',
+      // 地图归属（Issue #93）：纪录片道具提取据此直接采用场景提取保存的地图
+      asset_type: p.assetType === 'map' ? 'map' : 'prop',
       description: p.description || '',
       normalized_name: normalizeNearName(p.name), // 用于判断近名复用：括号定位/别名视为同名
     }))
@@ -659,7 +662,7 @@ const readExistingProps = createTool({
 // 8. 智能保存道具（按名字去重，与现有数据合并）
 const saveDedupProps = createTool({
   id: 'save_dedup_props',
-  description: 'Save extracted props with deduplication. Existing props (same name) are merged/updated; new ones are created. All are linked to the current episode.',
+  description: 'Save extracted props with deduplication. Existing props (same name) are merged/updated; new ones are created. All are linked to the current episode. Documentary whole-episode extraction: the scene extraction saves only maps (asset_type "map") here, the prop extraction saves only non-map props; items of the other kind are returned in `rejected`.',
   inputSchema: z.object({
     props: z.array(z.object({
       name: z.string(),
@@ -682,9 +685,13 @@ const saveDedupProps = createTool({
     const { episodeId, dramaId } = ids
     const ts = now()
     const results = { created: 0, merged: 0 }
+    const rejected: Array<{ name: string; reason: string }> = []
+    // 纪录片整集提取（Issue #93）：地图归场景提取、器物归道具提取；单资产重提取与剧情项目不设 target
+    const target = getProjectType(context?.requestContext) === 'documentary' ? getExtractTarget(context?.requestContext) : null
     logTaskProgress('ExtractTool', 'save-props-begin', {
       episodeId,
       dramaId,
+      target: target ?? undefined,
       names: props.map(prop => prop.name).join(','),
     })
 
@@ -701,6 +708,14 @@ const saveDedupProps = createTool({
       const normName = normalizeNearName(prop.name)
       const existing = exact || (normName ? propsInProject.find(p => p.name && normalizeNearName(p.name) === normName) : undefined)
       const matchedViaNorm = !!existing && existing !== exact
+      const rejection = target
+        ? documentaryPropRejection(target, prop.asset_type === 'map' ? 'map' : 'prop', existing ? (existing.assetType === 'map' ? 'map' : 'prop') : null)
+        : null
+      if (rejection) {
+        rejected.push({ name: prop.name, reason: rejection })
+        logTaskWarn('ExtractTool', 'save-props-rejected', { episodeId, dramaId, target: target ?? undefined, name: prop.name, reason: rejection })
+        continue
+      }
 
       if (existing) {
         // 归一化命中：括号定位/别名等近名视作同一道具复用
@@ -739,10 +754,11 @@ const saveDedupProps = createTool({
     }
 
     const payload = {
-      message: `道具保存完成：新增 ${results.created}，合并更新 ${results.merged}`,
+      message: `道具保存完成：新增 ${results.created}，合并更新 ${results.merged}${rejected.length ? `，拒收 ${rejected.length}` : ''}`,
       ...results,
+      ...(rejected.length ? { rejected } : {}),
     }
-    logTaskSuccess('ExtractTool', 'save-props-complete', { episodeId, ...results })
+    logTaskSuccess('ExtractTool', 'save-props-complete', { episodeId, ...results, rejected: rejected.length || undefined })
     return payload
   },
 })

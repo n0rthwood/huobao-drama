@@ -156,6 +156,7 @@
       "retryOf": "Retry of #{id}",
       "percent": "Progress {percent}%",
       "textProgress": "{completed} / {total} done",
+      "waitingScenes": "Waiting for scene extraction (task #{id}) to finish",
       "rewriteStages": "Rewrite stages",
       "retry": "Retry with model",
       "retrying": "Submitting…",

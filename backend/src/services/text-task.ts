@@ -94,8 +94,11 @@ export interface TextTaskProgress {
   current_storyboard_id?: number
   /** 分阶段任务的当前阶段（#35 旁白写作：spine = 规划主线，shots = 分块写镜） */
   phase?: 'spine' | 'shots'
-  /** 资产流水线（#56）的当前步名：research/curate/spec/prompt/generate/qc/gate/approval/finalize */
+  /** 资产流水线（#56）的当前步名：research/curate/spec/prompt/generate/qc/gate/approval/finalize；
+   *  纪录片道具提取（#93）等待场景提取时为 'waiting_scenes' */
   step?: string
+  /** step='waiting_scenes' 时正在等待的场景提取任务 id（#93） */
+  waiting_task_id?: number
   items?: TextTaskProgressItem[]
 }
 
