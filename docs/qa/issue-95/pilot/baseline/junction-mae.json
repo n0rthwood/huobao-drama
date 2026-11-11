@@ -1,0 +1,12 @@
+[
+  {
+    "id": 595,
+    "n": 1,
+    "combo": "C",
+    "video": "static/videos/5120f7f4-e352-4e5c-a3b3-f83689a3423e.mp4",
+    "junction": "static/layer-frames/43-da1966b2bb5d2221300e225fa57d137306eb656fa117aac715e1562f88f8ecf2.png",
+    "frame": "pilot/baseline/shot-1-first.png",
+    "mae": 4.2,
+    "pass": true
+  }
+]

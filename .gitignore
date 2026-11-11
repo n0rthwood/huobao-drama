@@ -96,3 +96,10 @@ data/mastra-workflows.db-shm
 # Issue #94 ep21 返工：原始媒体副本（生产 static 可重取），只入库报告/拼版/截图
 /docs/qa/issue-94-20261111/ep21-rework/before/
 /docs/qa/issue-94-20261111/ep21-rework/after/
+
+# Issue #95 验收：逐镜抽帧与放大图可由 junction-mae.mjs 从生产媒体重算，只入库报告/拼版/JSON
+/docs/qa/issue-95/**/shot-*.png
+/docs/qa/issue-95/**/detail/
+/docs/qa/issue-95/**/crops/
+/docs/qa/issue-95/**/breach/
+/docs/qa/issue-95/**/frames/

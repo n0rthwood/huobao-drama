@@ -1,0 +1,30 @@
+[
+  {
+    "storyboard_id": 595,
+    "junction_path": "static/layer-frames/43-da1966b2bb5d2221300e225fa57d137306eb656fa117aac715e1562f88f8ecf2.png",
+    "junction_hash": "da1966b2bb5d2221300e225fa57d137306eb656fa117aac715e1562f88f8ecf2",
+    "junction_caption": "{\"hash\":\"da1966b2bb5d2221300e225fa57d137306eb656fa117aac715e1562f88f8ecf2\",\"caption\":\"远景俯拍。画面主体为蜿蜒于山脊的长城石墙与砖砌敌楼，敌楼位于画面中下部偏左，城墙自前景向右上延伸至远处山脊，两侧为枯褐山坡与层叠灰蓝山峦。光线柔和偏灰，色调冷褐，画面右侧山谷留白。\",\"error\":null,\"config_id\":10,\"model\":\"deepseek-chat\",\"at\":\"2026-11-11T12:31:18.719Z\"}",
+    "base_check": null
+  },
+  {
+    "storyboard_id": 596,
+    "junction_path": "static/layer-frames/44-7372e72b493cc4bc3cc2ed4d23fc608cb9339cd036d0adc727b6980a690bdced.png",
+    "junction_hash": "7372e72b493cc4bc3cc2ed4d23fc608cb9339cd036d0adc727b6980a690bdced",
+    "junction_caption": "{\"hash\":\"7372e72b493cc4bc3cc2ed4d23fc608cb9339cd036d0adc727b6980a690bdced\",\"caption\":\"中景平视，画面中央偏左为一门深灰黑色老式火炮模型，炮管朝向左前方，架在带四个圆轮的木质炮架上，炮身有环状箍纹。背景为纯白，主体下方有淡阴影，留白主要在右侧与上方。光线均匀柔和，整体呈灰黑与白色调。\",\"error\":null,\"config_id\":10,\"model\":\"deepseek-chat\",\"at\":\"2026-11-11T12:31:20.984Z\"}",
+    "base_check": "{\"required\":true,\"signature\":\"eef4f92f3c4cda785ed5189291031d1e6bc436a4300c60c6eb24e00b74a3a312\",\"status\":\"passed\",\"problems\":[],\"notes\":\"炮身、炮架与车轮完整无裁切，主体居中，比例与原件一致，上下模糊垫底衔接自然。\",\"task_id\":1911,\"config_id\":10,\"model\":\"deepseek-chat\",\"checked_at\":\"2026-11-11T08:45:07.509Z\",\"override_reason\":null,\"error\":null}"
+  },
+  {
+    "storyboard_id": 597,
+    "junction_path": "static/layer-frames/45-009eeac59a0512c593abab0c43dbf826c919ad34d292bbe6ed7684768d81c647.png",
+    "junction_hash": "009eeac59a0512c593abab0c43dbf826c919ad34d292bbe6ed7684768d81c647",
+    "junction_caption": "{\"hash\":\"009eeac59a0512c593abab0c43dbf826c919ad34d292bbe6ed7684768d81c647\",\"caption\":\"全景平视。画面为夜间营地：左侧一排浅色帐篷沿草地排开，帐篷前插有燃烧的火把；右侧有石阶通向木制门架与栅栏，草地中央空出通道。整体暗蓝灰色调，火把暖黄光点缀，上方天空大面积留白。\",\"error\":null,\"config_id\":10,\"model\":\"deepseek-chat\",\"at\":\"2026-11-11T12:31:23.106Z\"}",
+    "base_check": "{\"required\":true,\"signature\":\"47bb123ad82e3cf69a9c759d25baf8518d2e22eb5f60683eeb801a78563c18e9\",\"status\":\"passed\",\"problems\":[],\"notes\":\"取景画面完整保留帐篷、火把、石阶与木门架等主体，比例与底图一致，上下模糊垫底带衔接自然，无撕裂或重影。\",\"task_id\":1893,\"config_id\":10,\"model\":\"deepseek-chat\",\"checked_at\":\"2026-11-11T07:31:19.500Z\",\"override_reason\":null,\"error\":null}"
+  },
+  {
+    "storyboard_id": 598,
+    "junction_path": "static/layer-frames/46-da1966b2bb5d2221300e225fa57d137306eb656fa117aac715e1562f88f8ecf2.png",
+    "junction_hash": "da1966b2bb5d2221300e225fa57d137306eb656fa117aac715e1562f88f8ecf2",
+    "junction_caption": "{\"hash\":\"da1966b2bb5d2221300e225fa57d137306eb656fa117aac715e1562f88f8ecf2\",\"caption\":\"远景俯拍。画面主体为蜿蜒于山脊的长城石墙与砖砌敌楼，敌楼位于画面中下部偏左，城墙自前景向右下延伸再折向左上，沿山脊通向远处峰顶的烽火台。两侧为枯褐山坡与层叠灰蓝远山，右侧山谷较深。光线柔和偏灰，色调土黄灰蓝，留白在右上天空与远山处。\",\"error\":null,\"config_id\":10,\"model\":\"deepseek-chat\",\"at\":\"2026-11-11T12:31:25.693Z\"}",
+    "base_check": null
+  }
+]

@@ -1,0 +1,42 @@
+[
+  {
+    "id": 595,
+    "n": 1,
+    "combo": "C",
+    "video": "static/videos/1658fbe8-80be-4b5d-8466-53d4c8f7e81c.mp4",
+    "junction": "static/layer-frames/43-da1966b2bb5d2221300e225fa57d137306eb656fa117aac715e1562f88f8ecf2.png",
+    "frame": "pilot/run1/shot-1-first.png",
+    "mae": 4.2,
+    "pass": true
+  },
+  {
+    "id": 596,
+    "n": 2,
+    "combo": "C",
+    "video": "static/videos/413bf7bd-6eb6-4967-8118-78438f752aaf.mp4",
+    "junction": "static/layer-frames/44-7372e72b493cc4bc3cc2ed4d23fc608cb9339cd036d0adc727b6980a690bdced.png",
+    "frame": "pilot/run1/shot-2-first.png",
+    "mae": 25.2,
+    "pass": false
+  },
+  {
+    "id": 597,
+    "n": 3,
+    "combo": "C",
+    "video": "static/videos/12b7bc38-4c05-465c-b494-5afef4da872f.mp4",
+    "junction": "static/layer-frames/45-009eeac59a0512c593abab0c43dbf826c919ad34d292bbe6ed7684768d81c647.png",
+    "frame": "pilot/run1/shot-3-first.png",
+    "mae": 20.7,
+    "pass": false
+  },
+  {
+    "id": 598,
+    "n": 4,
+    "combo": "D",
+    "video": "static/videos/35762787-1168-49ea-8a2c-9156649eed23.mp4",
+    "junction": "static/layer-frames/46-da1966b2bb5d2221300e225fa57d137306eb656fa117aac715e1562f88f8ecf2.png",
+    "frame": "pilot/run1/shot-4-last.png",
+    "mae": 4.6,
+    "pass": true
+  }
+]

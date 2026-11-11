@@ -1,0 +1,178 @@
+[
+  {
+    "n": 1,
+    "id": 573,
+    "combo": "C",
+    "mae": 6.9,
+    "pass": true,
+    "ssim": 0.774104
+  },
+  {
+    "n": 2,
+    "id": 574,
+    "combo": "C",
+    "mae": 8.3,
+    "pass": true,
+    "ssim": 0.728522
+  },
+  {
+    "n": 3,
+    "id": 575,
+    "combo": "C",
+    "mae": 22.7,
+    "pass": false,
+    "ssim": 0.622206
+  },
+  {
+    "n": 4,
+    "id": 576,
+    "combo": "C",
+    "mae": 7.7,
+    "pass": true,
+    "ssim": 0.774851
+  },
+  {
+    "n": 5,
+    "id": 577,
+    "combo": "C",
+    "mae": 9.8,
+    "pass": true,
+    "ssim": 0.662849
+  },
+  {
+    "n": 6,
+    "id": 578,
+    "combo": "C",
+    "mae": 5.9,
+    "pass": true,
+    "ssim": 0.775062
+  },
+  {
+    "n": 7,
+    "id": 579,
+    "combo": "C",
+    "mae": 12.1,
+    "pass": false,
+    "ssim": 0.672258
+  },
+  {
+    "n": 8,
+    "id": 580,
+    "combo": "C",
+    "mae": 8.2,
+    "pass": true,
+    "ssim": 0.776441
+  },
+  {
+    "n": 9,
+    "id": 581,
+    "combo": "C",
+    "mae": 35.9,
+    "pass": false,
+    "ssim": 0.370661
+  },
+  {
+    "n": 10,
+    "id": 582,
+    "combo": "C",
+    "mae": 5.7,
+    "pass": true,
+    "ssim": 0.936991
+  },
+  {
+    "n": 11,
+    "id": 583,
+    "combo": "C",
+    "mae": 8.9,
+    "pass": true,
+    "ssim": 0.720144
+  },
+  {
+    "n": 12,
+    "id": 584,
+    "combo": "C",
+    "mae": 25.2,
+    "pass": false,
+    "ssim": 0.45731
+  },
+  {
+    "n": 13,
+    "id": 585,
+    "combo": "C",
+    "mae": 35.8,
+    "pass": false,
+    "ssim": 0.337902
+  },
+  {
+    "n": 14,
+    "id": 586,
+    "combo": "D",
+    "mae": 4.6,
+    "pass": true,
+    "ssim": 0.710494
+  },
+  {
+    "n": 15,
+    "id": 587,
+    "combo": "C",
+    "mae": 6.5,
+    "pass": true,
+    "ssim": 0.754923
+  },
+  {
+    "n": 16,
+    "id": 588,
+    "combo": "C",
+    "mae": 6.6,
+    "pass": true,
+    "ssim": 0.940389
+  },
+  {
+    "n": 17,
+    "id": 589,
+    "combo": "C",
+    "mae": 5.2,
+    "pass": true,
+    "ssim": 0.775248
+  },
+  {
+    "n": 18,
+    "id": 590,
+    "combo": "C",
+    "mae": 6.1,
+    "pass": true,
+    "ssim": 0.765026
+  },
+  {
+    "n": 19,
+    "id": 591,
+    "combo": "C",
+    "mae": 22,
+    "pass": false,
+    "ssim": 0.936871
+  },
+  {
+    "n": 20,
+    "id": 592,
+    "combo": "C",
+    "mae": 5.7,
+    "pass": true,
+    "ssim": 0.8586
+  },
+  {
+    "n": 21,
+    "id": 593,
+    "combo": "C",
+    "mae": 5.7,
+    "pass": true,
+    "ssim": 0.745651
+  },
+  {
+    "n": 22,
+    "id": 594,
+    "combo": "C",
+    "mae": 5.6,
+    "pass": true,
+    "ssim": 0.751581
+  }
+]

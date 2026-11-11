@@ -1,0 +1,98 @@
+{
+  "rows": [
+    {
+      "id": 595,
+      "n": 1,
+      "combo": "C",
+      "video": "static/videos/1658fbe8-80be-4b5d-8466-53d4c8f7e81c.mp4",
+      "tiles": [
+        {
+          "t": 0,
+          "path": "pilot/run1/shot-1-C-t0.png"
+        },
+        {
+          "t": 0.5,
+          "path": "pilot/run1/shot-1-C-t0.5.png"
+        },
+        {
+          "t": 1,
+          "path": "pilot/run1/shot-1-C-t1.png"
+        },
+        {
+          "t": 2,
+          "path": "pilot/run1/shot-1-C-t2.png"
+        }
+      ]
+    },
+    {
+      "id": 596,
+      "n": 2,
+      "combo": "C",
+      "video": "static/videos/413bf7bd-6eb6-4967-8118-78438f752aaf.mp4",
+      "tiles": [
+        {
+          "t": 0,
+          "path": "pilot/run1/shot-2-C-t0.png"
+        },
+        {
+          "t": 0.5,
+          "path": "pilot/run1/shot-2-C-t0.5.png"
+        },
+        {
+          "t": 1,
+          "path": "pilot/run1/shot-2-C-t1.png"
+        },
+        {
+          "t": 2,
+          "path": "pilot/run1/shot-2-C-t2.png"
+        }
+      ]
+    },
+    {
+      "id": 597,
+      "n": 3,
+      "combo": "C",
+      "video": "static/videos/12b7bc38-4c05-465c-b494-5afef4da872f.mp4",
+      "tiles": [
+        {
+          "t": 0,
+          "path": "pilot/run1/shot-3-C-t0.png"
+        },
+        {
+          "t": 0.5,
+          "path": "pilot/run1/shot-3-C-t0.5.png"
+        },
+        {
+          "t": 1,
+          "path": "pilot/run1/shot-3-C-t1.png"
+        },
+        {
+          "t": 2,
+          "path": "pilot/run1/shot-3-C-t2.png"
+        }
+      ]
+    },
+    {
+      "id": 598,
+      "n": 4,
+      "combo": "D",
+      "video": "static/videos/35762787-1168-49ea-8a2c-9156649eed23.mp4",
+      "tiles": [
+        {
+          "t": -0.6,
+          "path": "pilot/run1/shot-4-D-sseof-0.6.png"
+        },
+        {
+          "t": -0.3,
+          "path": "pilot/run1/shot-4-D-sseof-0.3.png"
+        },
+        {
+          "t": -0.05,
+          "path": "pilot/run1/shot-4-D-sseof-0.05.png"
+        }
+      ]
+    }
+  ],
+  "sheet": "pilot/run1/timeline-samples.png",
+  "columns": 4
+}

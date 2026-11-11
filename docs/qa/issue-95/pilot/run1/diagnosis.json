@@ -1,0 +1,104 @@
+{
+  "episode": 23,
+  "drama": 17,
+  "measured_shots": [
+    {
+      "storyboard_id": 595,
+      "n": 1,
+      "combo": "C",
+      "junction": "static/layer-frames/43-da1966b2bb5d2221300e225fa57d137306eb656fa117aac715e1562f88f8ecf2.png",
+      "framing": "full",
+      "base_check_required": false,
+      "video": "static/videos/1658fbe8-80be-4b5d-8466-53d4c8f7e81c.mp4",
+      "mae": 4.2,
+      "pass": true
+    },
+    {
+      "storyboard_id": 596,
+      "n": 2,
+      "combo": "C",
+      "junction": "static/layer-frames/44-7372e72b493cc4bc3cc2ed4d23fc608cb9339cd036d0adc727b6980a690bdced.png",
+      "framing": "contain",
+      "base_check_required": true,
+      "video": "static/videos/413bf7bd-6eb6-4967-8118-78438f752aaf.mp4",
+      "mae": 25.2,
+      "pass": false,
+      "content_mae": 34.8,
+      "top_fill_mae": 2.2,
+      "bottom_fill_mae": 23.3,
+      "best_shift": {
+        "dx": -12,
+        "dy": 0,
+        "mae": 16.3
+      }
+    },
+    {
+      "storyboard_id": 597,
+      "n": 3,
+      "combo": "C",
+      "junction": "static/layer-frames/45-009eeac59a0512c593abab0c43dbf826c919ad34d292bbe6ed7684768d81c647.png",
+      "framing": "contain",
+      "base_check_required": true,
+      "video": "static/videos/12b7bc38-4c05-465c-b494-5afef4da872f.mp4",
+      "mae": 20.7,
+      "pass": false,
+      "content_mae": 21.5,
+      "top_fill_mae": 17.1,
+      "bottom_fill_mae": 23.5,
+      "best_shift": {
+        "dx": -1,
+        "dy": 1,
+        "mae": 21.2
+      }
+    },
+    {
+      "storyboard_id": 598,
+      "n": 4,
+      "combo": "D",
+      "junction": "static/layer-frames/46-da1966b2bb5d2221300e225fa57d137306eb656fa117aac715e1562f88f8ecf2.png",
+      "framing": "full",
+      "base_check_required": false,
+      "video": "static/videos/35762787-1168-49ea-8a2c-9156649eed23.mp4",
+      "mae": 4.6,
+      "pass": true
+    }
+  ],
+  "mean_luma": {
+    "596_junction": 213.3,
+    "596_video_f0": 208.7,
+    "597_junction": 53.7,
+    "597_video_f0": 33.0,
+    "595_junction": 111.0,
+    "595_video_f0": 107.2,
+    "598_junction": 111.0,
+    "598_video_last": 106.6
+  },
+  "last_frame_vs_last_keyframe_mae": {
+    "595": 4.9,
+    "596": 4.1,
+    "597": 4.3
+  },
+  "guide_inputs_verified": {
+    "596": {
+      "task": 1953,
+      "comfy_task_id": "041daac1-be0d-431c-b50c-cddce5b8da25",
+      "guide0": "huobao_1953_first.png frame_idx 0",
+      "uploaded_sha256": "7372e72b493cc4bc3cc2ed4d23fc608cb9339cd036d0adc727b6980a690bdced",
+      "junction_sha256": "7372e72b493cc4bc3cc2ed4d23fc608cb9339cd036d0adc727b6980a690bdced"
+    },
+    "597": {
+      "task": 1954,
+      "comfy_task_id": "d07439fd-ca84-4c5c-90fd-28c465e55b80",
+      "guide0": "huobao_1954_first.png frame_idx 0",
+      "uploaded_sha256": "009eeac59a0512c593abab0c43dbf826c919ad34d292bbe6ed7684768d81c647",
+      "junction_sha256": "009eeac59a0512c593abab0c43dbf826c919ad34d292bbe6ed7684768d81c647"
+    },
+    "598": {
+      "task": 1955,
+      "guide2": "huobao_1955_last.png frame_idx -1",
+      "uploaded_sha256": "da1966b2bb5d2221300e225fa57d137306eb656fa117aac715e1562f88f8ecf2",
+      "junction_sha256": "da1966b2bb5d2221300e225fa57d137306eb656fa117aac715e1562f88f8ecf2"
+    }
+  },
+  "finding": "H3 honors a junction whose layer base fills the frame (595/598 full framing: MAE 4.2/4.6) but reframes a contain/letterbox junction rendered with blurred fill (596/597: MAE 25.2/20.7; 596 content offset ~12/136 px and content MAE 34.8; 597 is reframed and ~21 luma darker). Prompts sent to H3 for 596/597 do recite the junction caption in the first segment and the guide image uploaded is byte-identical to the junction PNG, so the inputs and prompt are as intended; the mismatch is in what H3 renders for the first frame."
+}

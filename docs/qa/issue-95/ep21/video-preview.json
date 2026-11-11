@@ -1,0 +1,340 @@
+{
+  "code": 200,
+  "data": {
+    "items": [
+      {
+        "storyboard_id": 573,
+        "storyboard_number": 1,
+        "status": "changed",
+        "checked": true,
+        "selectable": true,
+        "adopted_version_no": 2,
+        "change_reasons": [
+          "提示词"
+        ]
+      },
+      {
+        "storyboard_id": 574,
+        "storyboard_number": 2,
+        "status": "unchanged",
+        "checked": false,
+        "selectable": true,
+        "matched_version_no": 2,
+        "adopted_version_no": 2
+      },
+      {
+        "storyboard_id": 575,
+        "storyboard_number": 3,
+        "status": "changed",
+        "checked": true,
+        "selectable": true,
+        "adopted_version_no": 2,
+        "change_reasons": [
+          "提示词"
+        ]
+      },
+      {
+        "storyboard_id": 576,
+        "storyboard_number": 4,
+        "status": "changed",
+        "checked": true,
+        "selectable": true,
+        "adopted_version_no": 2,
+        "change_reasons": [
+          "提示词"
+        ]
+      },
+      {
+        "storyboard_id": 577,
+        "storyboard_number": 5,
+        "status": "changed",
+        "checked": true,
+        "selectable": true,
+        "adopted_version_no": 2,
+        "change_reasons": [
+          "提示词"
+        ]
+      },
+      {
+        "storyboard_id": 578,
+        "storyboard_number": 6,
+        "status": "changed",
+        "checked": true,
+        "selectable": true,
+        "adopted_version_no": 2,
+        "change_reasons": [
+          "提示词"
+        ]
+      },
+      {
+        "storyboard_id": 579,
+        "storyboard_number": 7,
+        "status": "changed",
+        "checked": true,
+        "selectable": true,
+        "adopted_version_no": 2,
+        "change_reasons": [
+          "提示词"
+        ]
+      },
+      {
+        "storyboard_id": 580,
+        "storyboard_number": 8,
+        "status": "changed",
+        "checked": true,
+        "selectable": true,
+        "adopted_version_no": 2,
+        "change_reasons": [
+          "提示词"
+        ]
+      },
+      {
+        "storyboard_id": 581,
+        "storyboard_number": 9,
+        "status": "changed",
+        "checked": true,
+        "selectable": true,
+        "adopted_version_no": 2,
+        "change_reasons": [
+          "提示词"
+        ]
+      },
+      {
+        "storyboard_id": 582,
+        "storyboard_number": 10,
+        "status": "changed",
+        "checked": true,
+        "selectable": true,
+        "adopted_version_no": 2,
+        "change_reasons": [
+          "提示词"
+        ]
+      },
+      {
+        "storyboard_id": 583,
+        "storyboard_number": 11,
+        "status": "changed",
+        "checked": true,
+        "selectable": true,
+        "adopted_version_no": 2,
+        "change_reasons": [
+          "提示词"
+        ]
+      },
+      {
+        "storyboard_id": 584,
+        "storyboard_number": 12,
+        "status": "changed",
+        "checked": true,
+        "selectable": true,
+        "adopted_version_no": 2,
+        "change_reasons": [
+          "提示词"
+        ]
+      },
+      {
+        "storyboard_id": 585,
+        "storyboard_number": 13,
+        "status": "changed",
+        "checked": true,
+        "selectable": true,
+        "adopted_version_no": 2,
+        "change_reasons": [
+          "提示词"
+        ]
+      },
+      {
+        "storyboard_id": 586,
+        "storyboard_number": 14,
+        "status": "unchanged",
+        "checked": false,
+        "selectable": true,
+        "matched_version_no": 2,
+        "adopted_version_no": 2
+      },
+      {
+        "storyboard_id": 587,
+        "storyboard_number": 15,
+        "status": "changed",
+        "checked": true,
+        "selectable": true,
+        "adopted_version_no": 2,
+        "change_reasons": [
+          "提示词"
+        ]
+      },
+      {
+        "storyboard_id": 588,
+        "storyboard_number": 16,
+        "status": "changed",
+        "checked": true,
+        "selectable": true,
+        "adopted_version_no": 2,
+        "change_reasons": [
+          "提示词"
+        ]
+      },
+      {
+        "storyboard_id": 589,
+        "storyboard_number": 17,
+        "status": "unchanged",
+        "checked": false,
+        "selectable": true,
+        "matched_version_no": 2,
+        "adopted_version_no": 2
+      },
+      {
+        "storyboard_id": 590,
+        "storyboard_number": 18,
+        "status": "changed",
+        "checked": true,
+        "selectable": true,
+        "adopted_version_no": 2,
+        "change_reasons": [
+          "提示词"
+        ]
+      },
+      {
+        "storyboard_id": 591,
+        "storyboard_number": 19,
+        "status": "changed",
+        "checked": true,
+        "selectable": true,
+        "adopted_version_no": 2,
+        "change_reasons": [
+          "提示词",
+          "参考图"
+        ]
+      },
+      {
+        "storyboard_id": 592,
+        "storyboard_number": 20,
+        "status": "changed",
+        "checked": true,
+        "selectable": true,
+        "adopted_version_no": 2,
+        "change_reasons": [
+          "提示词"
+        ]
+      },
+      {
+        "storyboard_id": 593,
+        "storyboard_number": 21,
+        "status": "unchanged",
+        "checked": false,
+        "selectable": true,
+        "matched_version_no": 2,
+        "adopted_version_no": 2
+      },
+      {
+        "storyboard_id": 594,
+        "storyboard_number": 22,
+        "status": "unchanged",
+        "checked": false,
+        "selectable": true,
+        "matched_version_no": 2,
+        "adopted_version_no": 2
+      }
+    ],
+    "scope": {
+      "included": [
+        {
+          "storyboard_id": 573,
+          "storyboard_number": 1
+        },
+        {
+          "storyboard_id": 575,
+          "storyboard_number": 3
+        },
+        {
+          "storyboard_id": 576,
+          "storyboard_number": 4
+        },
+        {
+          "storyboard_id": 577,
+          "storyboard_number": 5
+        },
+        {
+          "storyboard_id": 578,
+          "storyboard_number": 6
+        },
+        {
+          "storyboard_id": 579,
+          "storyboard_number": 7
+        },
+        {
+          "storyboard_id": 580,
+          "storyboard_number": 8
+        },
+        {
+          "storyboard_id": 581,
+          "storyboard_number": 9
+        },
+        {
+          "storyboard_id": 582,
+          "storyboard_number": 10
+        },
+        {
+          "storyboard_id": 583,
+          "storyboard_number": 11
+        },
+        {
+          "storyboard_id": 584,
+          "storyboard_number": 12
+        },
+        {
+          "storyboard_id": 585,
+          "storyboard_number": 13
+        },
+        {
+          "storyboard_id": 587,
+          "storyboard_number": 15
+        },
+        {
+          "storyboard_id": 588,
+          "storyboard_number": 16
+        },
+        {
+          "storyboard_id": 590,
+          "storyboard_number": 18
+        },
+        {
+          "storyboard_id": 591,
+          "storyboard_number": 19
+        },
+        {
+          "storyboard_id": 592,
+          "storyboard_number": 20
+        }
+      ],
+      "excluded": [
+        {
+          "storyboard_id": 574,
+          "storyboard_number": 2,
+          "reason": "unchanged"
+        },
+        {
+          "storyboard_id": 586,
+          "storyboard_number": 14,
+          "reason": "unchanged"
+        },
+        {
+          "storyboard_id": 589,
+          "storyboard_number": 17,
+          "reason": "unchanged"
+        },
+        {
+          "storyboard_id": 593,
+          "storyboard_number": 21,
+          "reason": "unchanged"
+        },
+        {
+          "storyboard_id": 594,
+          "storyboard_number": 22,
+          "reason": "unchanged"
+        }
+      ]
+    }
+  },
+  "message": "success"
+}

@@ -1,0 +1,189 @@
+[
+  {
+    "shotId": 573,
+    "n": 1,
+    "task": 1957,
+    "dur": 6,
+    "status": "completed",
+    "result": "http://tianan2.riadev.top:10280/video/view?filename=task1957_00001_.mp4&subfolder=huobao&type=output",
+    "created": "2026-11-11T13:27:48.705Z",
+    "done": "2026-11-11T13:31:37.502Z",
+    "elapsedms": 228797
+  },
+  {
+    "shotId": 575,
+    "n": 3,
+    "task": 1958,
+    "dur": 6,
+    "status": "completed",
+    "result": "http://tianan2.riadev.top:10280/video/view?filename=task1958_00001_.mp4&subfolder=huobao&type=output",
+    "created": "2026-11-11T13:31:38.953Z",
+    "done": "2026-11-11T13:35:58.371Z",
+    "elapsedms": 259418
+  },
+  {
+    "shotId": 576,
+    "n": 4,
+    "task": 1959,
+    "dur": 7,
+    "status": "completed",
+    "result": "http://tianan2.riadev.top:10280/video/view?filename=task1959_00001_.mp4&subfolder=huobao&type=output",
+    "created": "2026-11-11T13:35:59.198Z",
+    "done": "2026-11-11T13:39:47.438Z",
+    "elapsedms": 228240
+  },
+  {
+    "shotId": 577,
+    "n": 5,
+    "task": 1960,
+    "dur": 6.5,
+    "status": "completed",
+    "result": "http://tianan2.riadev.top:10280/video/view?filename=task1960_00001_.mp4&subfolder=huobao&type=output",
+    "created": "2026-11-11T13:39:49.453Z",
+    "done": "2026-11-11T13:43:24.611Z",
+    "elapsedms": 215158
+  },
+  {
+    "shotId": 578,
+    "n": 6,
+    "task": 1961,
+    "dur": 7,
+    "status": "completed",
+    "result": "http://tianan2.riadev.top:10280/video/view?filename=task1961_00001_.mp4&subfolder=huobao&type=output",
+    "created": "2026-11-11T13:43:29.705Z",
+    "done": "2026-11-11T13:47:17.599Z",
+    "elapsedms": 227894
+  },
+  {
+    "shotId": 579,
+    "n": 7,
+    "task": 1962,
+    "dur": 6.5,
+    "status": "completed",
+    "result": "http://tianan2.riadev.top:10280/video/view?filename=task1962_00001_.mp4&subfolder=huobao&type=output",
+    "created": "2026-11-11T13:47:19.989Z",
+    "done": "2026-11-11T13:51:31.736Z",
+    "elapsedms": 251747
+  },
+  {
+    "shotId": 580,
+    "n": 8,
+    "task": 1963,
+    "dur": 5.5,
+    "status": "completed",
+    "result": "http://tianan2.riadev.top:10280/video/view?filename=task1963_00001_.mp4&subfolder=huobao&type=output",
+    "created": "2026-11-11T13:51:35.250Z",
+    "done": "2026-11-11T13:55:21.646Z",
+    "elapsedms": 226396
+  },
+  {
+    "shotId": 581,
+    "n": 9,
+    "task": 1964,
+    "dur": 6.5,
+    "status": "completed",
+    "result": "http://tianan2.riadev.top:10280/video/view?filename=task1964_00001_.mp4&subfolder=huobao&type=output",
+    "created": "2026-11-11T13:55:25.542Z",
+    "done": "2026-11-11T14:00:48.503Z",
+    "elapsedms": 322961
+  },
+  {
+    "shotId": 582,
+    "n": 10,
+    "task": 1965,
+    "dur": 6.5,
+    "status": "completed",
+    "result": "http://tianan2.riadev.top:10280/video/view?filename=task1965_00001_.mp4&subfolder=huobao&type=output",
+    "created": "2026-11-11T14:00:50.813Z",
+    "done": "2026-11-11T14:04:09.792Z",
+    "elapsedms": 198979
+  },
+  {
+    "shotId": 583,
+    "n": 11,
+    "task": 1967,
+    "dur": 7,
+    "status": "completed",
+    "result": "http://tianan2.riadev.top:10280/video/view?filename=task1967_00001_.mp4&subfolder=huobao&type=output",
+    "created": "2026-11-11T14:04:12.654Z",
+    "done": "2026-11-11T14:09:34.551Z",
+    "elapsedms": 321897
+  },
+  {
+    "shotId": 584,
+    "n": 12,
+    "task": 1970,
+    "dur": 6.5,
+    "status": "completed",
+    "result": "http://tianan2.riadev.top:10280/video/view?filename=task1970_00001_.mp4&subfolder=huobao&type=output",
+    "created": "2026-11-11T14:09:37.927Z",
+    "done": "2026-11-11T14:14:52.017Z",
+    "elapsedms": 314090
+  },
+  {
+    "shotId": 585,
+    "n": 13,
+    "task": 1971,
+    "dur": 7,
+    "status": "completed",
+    "result": "http://tianan2.riadev.top:10280/video/view?filename=task1971_00001_.mp4&subfolder=huobao&type=output",
+    "created": "2026-11-11T14:14:53.194Z",
+    "done": "2026-11-11T14:21:03.490Z",
+    "elapsedms": 370296
+  },
+  {
+    "shotId": 587,
+    "n": 15,
+    "task": 1972,
+    "dur": 6.5,
+    "status": "completed",
+    "result": "http://tianan2.riadev.top:10280/video/view?filename=task1972_00001_.mp4&subfolder=huobao&type=output",
+    "created": "2026-11-11T14:21:08.479Z",
+    "done": "2026-11-11T14:23:31.173Z",
+    "elapsedms": 142694
+  },
+  {
+    "shotId": 588,
+    "n": 16,
+    "task": 1973,
+    "dur": 6.5,
+    "status": "completed",
+    "result": "http://tianan2.riadev.top:10280/video/view?filename=task1973_00001_.mp4&subfolder=huobao&type=output",
+    "created": "2026-11-11T14:23:33.710Z",
+    "done": "2026-11-11T14:27:25.645Z",
+    "elapsedms": 231935
+  },
+  {
+    "shotId": 590,
+    "n": 18,
+    "task": 1974,
+    "dur": 5.5,
+    "status": "completed",
+    "result": "http://tianan2.riadev.top:10280/video/view?filename=task1974_00001_.mp4&subfolder=huobao&type=output",
+    "created": "2026-11-11T14:27:28.950Z",
+    "done": "2026-11-11T14:30:02.995Z",
+    "elapsedms": 154045
+  },
+  {
+    "shotId": 591,
+    "n": 19,
+    "task": 1975,
+    "dur": 7,
+    "status": "completed",
+    "result": "http://tianan2.riadev.top:10280/video/view?filename=task1975_00001_.mp4&subfolder=huobao&type=output",
+    "created": "2026-11-11T14:30:04.182Z",
+    "done": "2026-11-11T14:34:15.077Z",
+    "elapsedms": 250895
+  },
+  {
+    "shotId": 592,
+    "n": 20,
+    "task": 1976,
+    "dur": 6.5,
+    "status": "completed",
+    "result": "http://tianan2.riadev.top:10280/video/view?filename=task1976_00001_.mp4&subfolder=huobao&type=output",
+    "created": "2026-11-11T14:34:19.422Z",
+    "done": "2026-11-11T14:37:43.329Z",
+    "elapsedms": 203907
+  }
+]

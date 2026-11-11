@@ -1,0 +1,107 @@
+[
+  {
+    "task": 1986,
+    "guide": [
+      0,
+      72,
+      -1
+    ],
+    "firstUpload": "huobao_1986_first.png",
+    "uploadSha": "7b8408de432ec2da7b98485cbd6fa4fc8871ee2f5a87fca741e44ef69655b6ba",
+    "junctionSha": "7b8408de432ec2da7b98485cbd6fa4fc8871ee2f5a87fca741e44ef69655b6ba",
+    "bytesMatch": true,
+    "junctionFile": "static/layer-frames/23-7b8408de432ec2da7b98485cbd6fa4fc8871ee2f5a87fca741e44ef69655b6ba.png",
+    "midFrameTime": 3,
+    "refCount": 7
+  },
+  {
+    "task": 1987,
+    "guide": [
+      0,
+      72,
+      -1
+    ],
+    "firstUpload": "huobao_1987_first.png",
+    "uploadSha": "9e201681dda2cfd9a72e7ed4175caef19fc72495cbc9b2d5188611cd0af52b2a",
+    "junctionSha": "9e201681dda2cfd9a72e7ed4175caef19fc72495cbc9b2d5188611cd0af52b2a",
+    "bytesMatch": true,
+    "junctionFile": "static/layer-frames/27-9e201681dda2cfd9a72e7ed4175caef19fc72495cbc9b2d5188611cd0af52b2a.png",
+    "midFrameTime": 3,
+    "refCount": 6
+  },
+  {
+    "task": 1988,
+    "guide": [
+      0,
+      72,
+      -1
+    ],
+    "firstUpload": "huobao_1988_first.png",
+    "uploadSha": "31beb09deaacfa337c0c33dcc8546cf050d4a2e61a79d14ffc3e634ab46d92a9",
+    "junctionSha": "31beb09deaacfa337c0c33dcc8546cf050d4a2e61a79d14ffc3e634ab46d92a9",
+    "bytesMatch": true,
+    "junctionFile": "static/layer-frames/28-31beb09deaacfa337c0c33dcc8546cf050d4a2e61a79d14ffc3e634ab46d92a9.png",
+    "midFrameTime": 3,
+    "refCount": 6
+  },
+  {
+    "task": 1989,
+    "guide": [
+      0,
+      72,
+      -1
+    ],
+    "firstUpload": "huobao_1989_first.png",
+    "uploadSha": "259551d563c3d1010df68ddcec15f5d53b937f878d152aae086c967310c05674",
+    "junctionSha": "259551d563c3d1010df68ddcec15f5d53b937f878d152aae086c967310c05674",
+    "bytesMatch": true,
+    "junctionFile": "static/layer-frames/29-259551d563c3d1010df68ddcec15f5d53b937f878d152aae086c967310c05674.png",
+    "midFrameTime": 3,
+    "refCount": 7
+  },
+  {
+    "task": 1990,
+    "guide": [
+      0,
+      72,
+      -1
+    ],
+    "firstUpload": "huobao_1990_first.png",
+    "uploadSha": "9e201681dda2cfd9a72e7ed4175caef19fc72495cbc9b2d5188611cd0af52b2a",
+    "junctionSha": "9e201681dda2cfd9a72e7ed4175caef19fc72495cbc9b2d5188611cd0af52b2a",
+    "bytesMatch": true,
+    "junctionFile": "static/layer-frames/32-9e201681dda2cfd9a72e7ed4175caef19fc72495cbc9b2d5188611cd0af52b2a.png",
+    "midFrameTime": 3,
+    "refCount": 8
+  },
+  {
+    "task": 1991,
+    "guide": [
+      0,
+      84,
+      -1
+    ],
+    "firstUpload": "huobao_1991_first.png",
+    "uploadSha": "9e201681dda2cfd9a72e7ed4175caef19fc72495cbc9b2d5188611cd0af52b2a",
+    "junctionSha": "9e201681dda2cfd9a72e7ed4175caef19fc72495cbc9b2d5188611cd0af52b2a",
+    "bytesMatch": true,
+    "junctionFile": "static/layer-frames/33-9e201681dda2cfd9a72e7ed4175caef19fc72495cbc9b2d5188611cd0af52b2a.png",
+    "midFrameTime": 3.5,
+    "refCount": 9
+  },
+  {
+    "task": 1992,
+    "guide": [
+      0,
+      84,
+      -1
+    ],
+    "firstUpload": "huobao_1992_first.png",
+    "uploadSha": "6d16e8903993b1331c40814cb35bc0b93f72212786ad6a69db26efcc2afac528",
+    "junctionSha": "6d16e8903993b1331c40814cb35bc0b93f72212786ad6a69db26efcc2afac528",
+    "bytesMatch": true,
+    "junctionFile": "static/layer-frames/39-6d16e8903993b1331c40814cb35bc0b93f72212786ad6a69db26efcc2afac528.png",
+    "midFrameTime": 3.5,
+    "refCount": 7
+  }
+]

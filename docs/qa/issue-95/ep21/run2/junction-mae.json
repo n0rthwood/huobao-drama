@@ -1,0 +1,72 @@
+[
+  {
+    "id": 575,
+    "n": 3,
+    "combo": "C",
+    "video": "static/videos/70c1d739-7cd1-40d0-8e36-b8a8bef18fa3.mp4",
+    "junction": "static/layer-frames/23-7b8408de432ec2da7b98485cbd6fa4fc8871ee2f5a87fca741e44ef69655b6ba.png",
+    "frame": "ep21/run2/shot-3-first.png",
+    "mae": 24.2,
+    "pass": false
+  },
+  {
+    "id": 579,
+    "n": 7,
+    "combo": "C",
+    "video": "static/videos/3e73fb98-af1c-4409-8c4f-0323a6dcb254.mp4",
+    "junction": "static/layer-frames/27-9e201681dda2cfd9a72e7ed4175caef19fc72495cbc9b2d5188611cd0af52b2a.png",
+    "frame": "ep21/run2/shot-7-first.png",
+    "mae": 14.4,
+    "pass": false
+  },
+  {
+    "id": 580,
+    "n": 8,
+    "combo": "C",
+    "video": "static/videos/601e7ea8-52a4-4934-8dd8-9a69e1c55446.mp4",
+    "junction": "static/layer-frames/28-31beb09deaacfa337c0c33dcc8546cf050d4a2e61a79d14ffc3e634ab46d92a9.png",
+    "frame": "ep21/run2/shot-8-first.png",
+    "mae": 10.5,
+    "pass": false
+  },
+  {
+    "id": 581,
+    "n": 9,
+    "combo": "C",
+    "video": "static/videos/f39509d3-b028-4324-8956-f3234ceca4b0.mp4",
+    "junction": "static/layer-frames/29-259551d563c3d1010df68ddcec15f5d53b937f878d152aae086c967310c05674.png",
+    "frame": "ep21/run2/shot-9-first.png",
+    "mae": 40.1,
+    "pass": false
+  },
+  {
+    "id": 584,
+    "n": 12,
+    "combo": "C",
+    "video": "static/videos/218a4ed9-bb48-4916-b4d6-6c3f8bd467ab.mp4",
+    "junction": "static/layer-frames/32-9e201681dda2cfd9a72e7ed4175caef19fc72495cbc9b2d5188611cd0af52b2a.png",
+    "frame": "ep21/run2/shot-12-first.png",
+    "mae": 13.6,
+    "pass": false
+  },
+  {
+    "id": 585,
+    "n": 13,
+    "combo": "C",
+    "video": "static/videos/ac7cbb0c-022c-44fa-9d0d-38b7f6110f0a.mp4",
+    "junction": "static/layer-frames/33-9e201681dda2cfd9a72e7ed4175caef19fc72495cbc9b2d5188611cd0af52b2a.png",
+    "frame": "ep21/run2/shot-13-first.png",
+    "mae": 36.3,
+    "pass": false
+  },
+  {
+    "id": 591,
+    "n": 19,
+    "combo": "C",
+    "video": "static/videos/29438468-897d-437f-99c2-ff49a91bd13c.mp4",
+    "junction": "static/layer-frames/39-6d16e8903993b1331c40814cb35bc0b93f72212786ad6a69db26efcc2afac528.png",
+    "frame": "ep21/run2/shot-19-first.png",
+    "mae": 20.8,
+    "pass": false
+  }
+]

@@ -1,0 +1,937 @@
+{
+  "code": 200,
+  "data": {
+    "items": [
+      {
+        "storyboard_id": 573,
+        "storyboard_number": 1,
+        "title": "皇帝这个词失效了",
+        "inputs": {
+          "video": true,
+          "audio": true,
+          "subtitle": true,
+          "pure_visual": false
+        },
+        "composed_video_url": "static/composed/dc950a79-4202-4ae8-8abf-8c369f650d87.mp4",
+        "selectable": true,
+        "plan": {
+          "dv": 15.103,
+          "da": 12.16,
+          "daScaled": 12.16,
+          "t": 0,
+          "d": 15.103,
+          "narrationStart": 0,
+          "freezeSeconds": 0,
+          "trim": false,
+          "availSeconds": 15.103,
+          "gapRatio": -0.19486194795735945,
+          "blocked": false,
+          "blockReason": null
+        },
+        "signature": "4f568c0e35c72c68bae2a875d8ee712797f13dbae51fe5d5dec5da1ec81eb128",
+        "status": "changed",
+        "checked": true,
+        "exportable": false,
+        "reason": null,
+        "change_reasons": [
+          "图层段已重新渲染",
+          "衔接帧已变化",
+          "生成视频版本已变化",
+          "画面视频已更换或重新生成"
+        ]
+      },
+      {
+        "storyboard_id": 574,
+        "storyboard_number": 2,
+        "title": "楚军停在霸上雾里",
+        "inputs": {
+          "video": true,
+          "audio": true,
+          "subtitle": true,
+          "pure_visual": false
+        },
+        "composed_video_url": "static/composed/f530da3f-b798-40dc-a0cb-8d19b20b7da8.mp4",
+        "selectable": true,
+        "plan": {
+          "dv": 12.292,
+          "da": 9.92,
+          "daScaled": 9.92,
+          "t": 0,
+          "d": 12.292,
+          "narrationStart": 0,
+          "freezeSeconds": 0,
+          "trim": false,
+          "availSeconds": 12.292,
+          "gapRatio": -0.19297103807354377,
+          "blocked": false,
+          "blockReason": null
+        },
+        "signature": "9e795c843c86f15c6e3bff11476a445c1debb506ccc4ab0e8eddad817fe42b33",
+        "status": "changed",
+        "checked": true,
+        "exportable": false,
+        "reason": null,
+        "change_reasons": [
+          "图层段已重新渲染",
+          "衔接帧已变化",
+          "生成视频版本已变化",
+          "画面视频已更换或重新生成"
+        ]
+      },
+      {
+        "storyboard_id": 575,
+        "storyboard_number": 3,
+        "title": "只带了三样东西",
+        "inputs": {
+          "video": true,
+          "audio": true,
+          "subtitle": true,
+          "pure_visual": false
+        },
+        "composed_video_url": "static/composed/c84dfc96-2c49-47fd-9240-0012ef083f26.mp4",
+        "selectable": true,
+        "plan": {
+          "dv": 10.103,
+          "da": 8,
+          "daScaled": 8,
+          "t": 0,
+          "d": 10.103,
+          "narrationStart": 0,
+          "freezeSeconds": 0,
+          "trim": false,
+          "availSeconds": 10.103,
+          "gapRatio": -0.20815599326932593,
+          "blocked": false,
+          "blockReason": null
+        },
+        "signature": "879445d735e909cc219be059c2e0ff9dd4b7b4b763b7834f1e8e68bb340c7ff9",
+        "status": "changed",
+        "checked": true,
+        "exportable": false,
+        "reason": null,
+        "change_reasons": [
+          "图层段已重新渲染",
+          "衔接帧已变化",
+          "生成视频版本已变化",
+          "画面视频已更换或重新生成"
+        ]
+      },
+      {
+        "storyboard_id": 576,
+        "storyboard_number": 4,
+        "title": "第一样：白车白马",
+        "inputs": {
+          "video": true,
+          "audio": true,
+          "subtitle": true,
+          "pure_visual": false
+        },
+        "composed_video_url": "static/composed/d38deb1d-ce72-49c5-86fb-1a097344ab4c.mp4",
+        "selectable": true,
+        "plan": {
+          "dv": 11.812,
+          "da": 10.56,
+          "daScaled": 10.56,
+          "t": 0,
+          "d": 11.812,
+          "narrationStart": 0,
+          "freezeSeconds": 0,
+          "trim": false,
+          "availSeconds": 11.812,
+          "gapRatio": -0.10599390450389426,
+          "blocked": false,
+          "blockReason": null
+        },
+        "signature": "d62afe950045d0b97c1564e7d6969ec3c515e10954082a7c9d211b65486c5040",
+        "status": "changed",
+        "checked": true,
+        "exportable": false,
+        "reason": null,
+        "change_reasons": [
+          "图层段已重新渲染",
+          "衔接帧已变化",
+          "生成视频版本已变化",
+          "画面视频已更换或重新生成"
+        ]
+      },
+      {
+        "storyboard_id": 577,
+        "storyboard_number": 5,
+        "title": "系颈以组",
+        "inputs": {
+          "video": true,
+          "audio": true,
+          "subtitle": true,
+          "pure_visual": false
+        },
+        "composed_video_url": "static/composed/c557ef23-febd-4586-9c2c-9dc828549200.mp4",
+        "selectable": true,
+        "plan": {
+          "dv": 12.292,
+          "da": 10.4,
+          "daScaled": 10.4,
+          "t": 0,
+          "d": 12.292,
+          "narrationStart": 0,
+          "freezeSeconds": 0,
+          "trim": false,
+          "availSeconds": 12.292,
+          "gapRatio": -0.15392124959323134,
+          "blocked": false,
+          "blockReason": null
+        },
+        "signature": "64d8777399b71cae8cdcccd2fd2ad0ca62d58a00bad6f6c59cf39db8fc697cfd",
+        "status": "changed",
+        "checked": true,
+        "exportable": false,
+        "reason": null,
+        "change_reasons": [
+          "图层段已重新渲染",
+          "衔接帧已变化",
+          "生成视频版本已变化",
+          "画面视频已更换或重新生成"
+        ]
+      },
+      {
+        "storyboard_id": 578,
+        "storyboard_number": 6,
+        "title": "先把绳子系好",
+        "inputs": {
+          "video": true,
+          "audio": true,
+          "subtitle": true,
+          "pure_visual": false
+        },
+        "composed_video_url": "static/composed/8310ac56-4d2f-4929-829c-68f32758ca62.mp4",
+        "selectable": true,
+        "plan": {
+          "dv": 10.812,
+          "da": 8.32,
+          "daScaled": 8.32,
+          "t": 0,
+          "d": 10.812,
+          "narrationStart": 0,
+          "freezeSeconds": 0,
+          "trim": false,
+          "availSeconds": 10.812,
+          "gapRatio": -0.23048464668886415,
+          "blocked": false,
+          "blockReason": null
+        },
+        "signature": "dbf2334430adfcb9044f28f8a893b1f4cb4d43c0d66d42d3b0ce15907f80a670",
+        "status": "changed",
+        "checked": true,
+        "exportable": false,
+        "reason": null,
+        "change_reasons": [
+          "图层段已重新渲染",
+          "衔接帧已变化",
+          "生成视频版本已变化",
+          "画面视频已更换或重新生成"
+        ]
+      },
+      {
+        "storyboard_id": 579,
+        "storyboard_number": 7,
+        "title": "第三样：玺与符节",
+        "inputs": {
+          "video": true,
+          "audio": true,
+          "subtitle": true,
+          "pure_visual": false
+        },
+        "composed_video_url": "static/composed/5911ba88-ec00-4c7d-8f92-4955ec40d2b0.mp4",
+        "selectable": true,
+        "plan": {
+          "dv": 11.812,
+          "da": 10.56,
+          "daScaled": 10.56,
+          "t": 0,
+          "d": 11.812,
+          "narrationStart": 0,
+          "freezeSeconds": 0,
+          "trim": false,
+          "availSeconds": 11.812,
+          "gapRatio": -0.10599390450389426,
+          "blocked": false,
+          "blockReason": null
+        },
+        "signature": "03d86852a157ce016a71b155a69c8e3831248e0f7fabf524c3d9224e73d17ee1",
+        "status": "changed",
+        "checked": true,
+        "exportable": false,
+        "reason": null,
+        "change_reasons": [
+          "图层段已重新渲染",
+          "衔接帧已变化",
+          "生成视频版本已变化",
+          "画面视频已更换或重新生成"
+        ]
+      },
+      {
+        "storyboard_id": 580,
+        "storyboard_number": 8,
+        "title": "他叫子婴，史书叫他秦王",
+        "inputs": {
+          "video": true,
+          "audio": true,
+          "subtitle": true,
+          "pure_visual": false
+        },
+        "composed_video_url": "static/composed/15f5cd4c-0c68-495f-aad6-32f0cfaf0116.mp4",
+        "selectable": true,
+        "plan": {
+          "dv": 10.103,
+          "da": 7.68,
+          "daScaled": 7.68,
+          "t": 0,
+          "d": 10.103,
+          "narrationStart": 0,
+          "freezeSeconds": 0,
+          "trim": false,
+          "availSeconds": 10.103,
+          "gapRatio": -0.2398297535385529,
+          "blocked": false,
+          "blockReason": null
+        },
+        "signature": "e9984de0b99e051082c410d18a86878a8afbfa13a124331d7bd485e3a0e5a395",
+        "status": "changed",
+        "checked": true,
+        "exportable": false,
+        "reason": null,
+        "change_reasons": [
+          "图层段已重新渲染",
+          "衔接帧已变化",
+          "生成视频版本已变化",
+          "画面视频已更换或重新生成"
+        ]
+      },
+      {
+        "storyboard_id": 581,
+        "storyboard_number": 9,
+        "title": "四十六天与两次弑杀",
+        "inputs": {
+          "video": true,
+          "audio": true,
+          "subtitle": true,
+          "pure_visual": false
+        },
+        "composed_video_url": "static/composed/d4edc929-b012-4149-b613-f062dbfee7d3.mp4",
+        "selectable": true,
+        "plan": {
+          "dv": 12.292,
+          "da": 9.76,
+          "daScaled": 9.76,
+          "t": 0,
+          "d": 12.292,
+          "narrationStart": 0,
+          "freezeSeconds": 0,
+          "trim": false,
+          "availSeconds": 12.292,
+          "gapRatio": -0.2059876342336479,
+          "blocked": false,
+          "blockReason": null
+        },
+        "signature": "5cd3ea1151e6e8c69493db8475ec927484ba0fcfb562e3baa026a234609631ed",
+        "status": "changed",
+        "checked": true,
+        "exportable": false,
+        "reason": null,
+        "change_reasons": [
+          "图层段已重新渲染",
+          "衔接帧已变化",
+          "生成视频版本已变化",
+          "画面视频已更换或重新生成"
+        ]
+      },
+      {
+        "storyboard_id": 582,
+        "storyboard_number": 10,
+        "title": "宫里的血比城外早",
+        "inputs": {
+          "video": true,
+          "audio": true,
+          "subtitle": true,
+          "pure_visual": false
+        },
+        "composed_video_url": "static/composed/2a870f1f-db46-45c9-9a83-a2f73b07869b.mp4",
+        "selectable": true,
+        "plan": {
+          "dv": 10.812,
+          "da": 8.64,
+          "daScaled": 8.64,
+          "t": 0,
+          "d": 10.812,
+          "narrationStart": 0,
+          "freezeSeconds": 0,
+          "trim": false,
+          "availSeconds": 10.812,
+          "gapRatio": -0.20088790233074352,
+          "blocked": false,
+          "blockReason": null
+        },
+        "signature": "89f205fbf1ef65794e1ce395e4d6f5fd9f3cdbbbe79fe2008439a8f4387a4ff5",
+        "status": "changed",
+        "checked": true,
+        "exportable": false,
+        "reason": null,
+        "change_reasons": [
+          "图层段已重新渲染",
+          "衔接帧已变化",
+          "生成视频版本已变化",
+          "画面视频已更换或重新生成"
+        ]
+      },
+      {
+        "storyboard_id": 583,
+        "storyboard_number": 11,
+        "title": "轵道旁·路边交接",
+        "inputs": {
+          "video": true,
+          "audio": true,
+          "subtitle": true,
+          "pure_visual": false
+        },
+        "composed_video_url": "static/composed/08d08562-02b7-4e5e-8613-630dd38f5fef.mp4",
+        "selectable": true,
+        "plan": {
+          "dv": 12.292,
+          "da": 11.52,
+          "daScaled": 11.52,
+          "t": 0,
+          "d": 12.32,
+          "narrationStart": 0,
+          "freezeSeconds": 0.02800000000000047,
+          "trim": false,
+          "availSeconds": 12.292,
+          "gapRatio": -0.06280507647250246,
+          "blocked": false,
+          "blockReason": null
+        },
+        "signature": "fe2a9506636380d674ea3ae63f49fffe8ed1ad70752a8948981809f4cb4450a6",
+        "status": "changed",
+        "checked": true,
+        "exportable": false,
+        "reason": null,
+        "change_reasons": [
+          "图层段已重新渲染",
+          "衔接帧已变化",
+          "生成视频版本已变化",
+          "画面视频已更换或重新生成"
+        ]
+      },
+      {
+        "storyboard_id": 584,
+        "storyboard_number": 12,
+        "title": "杀了他？杀之不祥",
+        "inputs": {
+          "video": true,
+          "audio": true,
+          "subtitle": true,
+          "pure_visual": false
+        },
+        "composed_video_url": "static/composed/6b1db92f-6465-40d2-a2aa-0f17905248ba.mp4",
+        "selectable": true,
+        "plan": {
+          "dv": 11.292,
+          "da": 9.76,
+          "daScaled": 9.76,
+          "t": 0,
+          "d": 11.292,
+          "narrationStart": 0,
+          "freezeSeconds": 0,
+          "trim": false,
+          "availSeconds": 11.292,
+          "gapRatio": -0.13567127169677648,
+          "blocked": false,
+          "blockReason": null
+        },
+        "signature": "9407fdce70f686166fca3bfb3ccb8ef0beadac53bb3051d8117df72f4e5024d9",
+        "status": "changed",
+        "checked": true,
+        "exportable": false,
+        "reason": null,
+        "change_reasons": [
+          "图层段已重新渲染",
+          "衔接帧已变化",
+          "生成视频版本已变化",
+          "画面视频已更换或重新生成"
+        ]
+      },
+      {
+        "storyboard_id": 585,
+        "storyboard_number": 13,
+        "title": "换你是刘邦",
+        "inputs": {
+          "video": true,
+          "audio": true,
+          "subtitle": true,
+          "pure_visual": false
+        },
+        "composed_video_url": "static/composed/1fdbd071-081b-4fe9-b9a7-314682bc24fc.mp4",
+        "selectable": true,
+        "plan": {
+          "dv": 12.812,
+          "da": 9.76,
+          "daScaled": 9.76,
+          "t": 0,
+          "d": 12.812,
+          "narrationStart": 0,
+          "freezeSeconds": 0,
+          "trim": false,
+          "availSeconds": 12.812,
+          "gapRatio": -0.23821417421167654,
+          "blocked": false,
+          "blockReason": null
+        },
+        "signature": "d1779639abebd03891913c8873a8d6656f2c663becde9baed7910263fad622e2",
+        "status": "changed",
+        "checked": true,
+        "exportable": false,
+        "reason": null,
+        "change_reasons": [
+          "图层段已重新渲染",
+          "衔接帧已变化",
+          "生成视频版本已变化",
+          "画面视频已更换或重新生成"
+        ]
+      },
+      {
+        "storyboard_id": 586,
+        "storyboard_number": 14,
+        "title": "进城只留三句话",
+        "inputs": {
+          "video": true,
+          "audio": true,
+          "subtitle": true,
+          "pure_visual": false
+        },
+        "composed_video_url": "static/composed/95473f28-4aa5-44c5-98b2-6bc02f0a2d70.mp4",
+        "selectable": true,
+        "plan": {
+          "dv": 9.687,
+          "da": 7.84,
+          "daScaled": 7.84,
+          "t": 0,
+          "d": 9.687,
+          "narrationStart": 0,
+          "freezeSeconds": 0,
+          "trim": false,
+          "availSeconds": 9.687,
+          "gapRatio": -0.19066790544028075,
+          "blocked": false,
+          "blockReason": null
+        },
+        "signature": "8ef28aa02f297154f0d29b81aa939140ef9785a03c0536e767dfd74a541554a9",
+        "status": "changed",
+        "checked": true,
+        "exportable": false,
+        "reason": null,
+        "change_reasons": [
+          "图层段已重新渲染",
+          "衔接帧已变化",
+          "生成视频版本已变化",
+          "画面视频已更换或重新生成"
+        ]
+      },
+      {
+        "storyboard_id": 587,
+        "storyboard_number": 15,
+        "title": "其余秦法一并废掉",
+        "inputs": {
+          "video": true,
+          "audio": true,
+          "subtitle": true,
+          "pure_visual": false
+        },
+        "composed_video_url": "static/composed/e3d57c0a-6a5b-4d04-97da-76491e6b926b.mp4",
+        "selectable": true,
+        "plan": {
+          "dv": 12.812,
+          "da": 10.24,
+          "daScaled": 10.24,
+          "t": 0,
+          "d": 12.812,
+          "narrationStart": 0,
+          "freezeSeconds": 0,
+          "trim": false,
+          "availSeconds": 12.812,
+          "gapRatio": -0.20074929753356224,
+          "blocked": false,
+          "blockReason": null
+        },
+        "signature": "cb873f75d9cf3fca6610c7aaffce4e74cc97bc3c3e8b42e7ddd5d4483f39d14a",
+        "status": "changed",
+        "checked": true,
+        "exportable": false,
+        "reason": null,
+        "change_reasons": [
+          "图层段已重新渲染",
+          "衔接帧已变化",
+          "生成视频版本已变化",
+          "画面视频已更换或重新生成"
+        ]
+      },
+      {
+        "storyboard_id": 588,
+        "storyboard_number": 16,
+        "title": "百姓送牛羊，刘邦不收",
+        "inputs": {
+          "video": true,
+          "audio": true,
+          "subtitle": true,
+          "pure_visual": false
+        },
+        "composed_video_url": "static/composed/6be2c9df-a232-482c-8dc5-8482a8c88580.mp4",
+        "selectable": true,
+        "plan": {
+          "dv": 12.812,
+          "da": 10.88,
+          "daScaled": 10.88,
+          "t": 0,
+          "d": 12.812,
+          "narrationStart": 0,
+          "freezeSeconds": 0,
+          "trim": false,
+          "availSeconds": 12.812,
+          "gapRatio": -0.15079612862940983,
+          "blocked": false,
+          "blockReason": null
+        },
+        "signature": "ba263bcc57e1fdae4a5b249cd88e7fc49550e225c6f82e5b5c17ad54236fc949",
+        "status": "changed",
+        "checked": true,
+        "exportable": false,
+        "reason": null,
+        "change_reasons": [
+          "图层段已重新渲染",
+          "衔接帧已变化",
+          "生成视频版本已变化",
+          "画面视频已更换或重新生成"
+        ]
+      },
+      {
+        "storyboard_id": 589,
+        "storyboard_number": 17,
+        "title": "算一笔时间账",
+        "inputs": {
+          "video": true,
+          "audio": true,
+          "subtitle": true,
+          "pure_visual": false
+        },
+        "composed_video_url": "static/composed/75fd5855-ab45-484c-95d2-4c2b6ffb5315.mp4",
+        "selectable": true,
+        "plan": {
+          "dv": 10.583,
+          "da": 7.84,
+          "daScaled": 7.84,
+          "t": 0,
+          "d": 10.583,
+          "narrationStart": 0,
+          "freezeSeconds": 0,
+          "trim": false,
+          "availSeconds": 10.583,
+          "gapRatio": -0.2591892658036474,
+          "blocked": false,
+          "blockReason": null
+        },
+        "signature": "306402eb7ebe41d72233a14f4271ab4d45ffe652b202ce7cad55060abdb03e91",
+        "status": "changed",
+        "checked": true,
+        "exportable": false,
+        "reason": null,
+        "change_reasons": [
+          "图层段已重新渲染",
+          "衔接帧已变化",
+          "生成视频版本已变化",
+          "画面视频已更换或重新生成"
+        ]
+      },
+      {
+        "storyboard_id": 590,
+        "storyboard_number": 18,
+        "title": "大泽乡到咸阳两年多",
+        "inputs": {
+          "video": true,
+          "audio": true,
+          "subtitle": true,
+          "pure_visual": false
+        },
+        "composed_video_url": "static/composed/134dd015-24bb-41c3-b44f-3bc6613ec936.mp4",
+        "selectable": true,
+        "plan": {
+          "dv": 11.583,
+          "da": 8.64,
+          "daScaled": 8.64,
+          "t": 0,
+          "d": 11.583,
+          "narrationStart": 0,
+          "freezeSeconds": 0,
+          "trim": false,
+          "availSeconds": 11.583,
+          "gapRatio": -0.254079254079254,
+          "blocked": false,
+          "blockReason": null
+        },
+        "signature": "aa196d70d1b1071be195e907a15ea711e934f0f7417ad9df2593f23097101b8d",
+        "status": "changed",
+        "checked": true,
+        "exportable": false,
+        "reason": null,
+        "change_reasons": [
+          "图层段已重新渲染",
+          "衔接帧已变化",
+          "生成视频版本已变化",
+          "画面视频已更换或重新生成"
+        ]
+      },
+      {
+        "storyboard_id": 591,
+        "storyboard_number": 19,
+        "title": "巨鹿与武关",
+        "inputs": {
+          "video": true,
+          "audio": true,
+          "subtitle": true,
+          "pure_visual": false
+        },
+        "composed_video_url": "static/composed/5da00381-ceaf-422a-b64c-cab725129775.mp4",
+        "selectable": true,
+        "plan": {
+          "dv": 13.292,
+          "da": 8.16,
+          "daScaled": 8.16,
+          "t": 0,
+          "d": 13.292,
+          "narrationStart": 0,
+          "freezeSeconds": 0,
+          "trim": false,
+          "availSeconds": 13.292,
+          "gapRatio": -0.38609690039121275,
+          "blocked": false,
+          "blockReason": null
+        },
+        "signature": "b96cc85ac252f05ee588d99809a1707e8ec4b5ca4b4e17624aba1b6d5e6afe74",
+        "status": "changed",
+        "checked": true,
+        "exportable": false,
+        "reason": null,
+        "change_reasons": [
+          "图层段已重新渲染",
+          "衔接帧已变化",
+          "生成视频版本已变化",
+          "画面视频已更换或重新生成"
+        ]
+      },
+      {
+        "storyboard_id": 592,
+        "storyboard_number": 20,
+        "title": "投降没救他·项羽屠咸阳",
+        "inputs": {
+          "video": true,
+          "audio": true,
+          "subtitle": true,
+          "pure_visual": false
+        },
+        "composed_video_url": "static/composed/46deb195-6d37-48cb-bf42-e101ea223343.mp4",
+        "selectable": true,
+        "plan": {
+          "dv": 11.292,
+          "da": 8.32,
+          "daScaled": 8.32,
+          "t": 0,
+          "d": 11.292,
+          "narrationStart": 0,
+          "freezeSeconds": 0,
+          "trim": false,
+          "availSeconds": 11.292,
+          "gapRatio": -0.2631951824300389,
+          "blocked": false,
+          "blockReason": null
+        },
+        "signature": "02420bb3d1754ff01806f9a2f3461e3406ca27fd9d3e40650fb2e0580ee4ac57",
+        "status": "changed",
+        "checked": true,
+        "exportable": false,
+        "reason": null,
+        "change_reasons": [
+          "图层段已重新渲染",
+          "衔接帧已变化",
+          "生成视频版本已变化",
+          "画面视频已更换或重新生成"
+        ]
+      },
+      {
+        "storyboard_id": 593,
+        "storyboard_number": 21,
+        "title": "秦不是被一支军队打倒",
+        "inputs": {
+          "video": true,
+          "audio": true,
+          "subtitle": true,
+          "pure_visual": false
+        },
+        "composed_video_url": "static/composed/5eb1553a-0a01-428d-ba97-d779bef878fb.mp4",
+        "selectable": true,
+        "plan": {
+          "dv": 10.258,
+          "da": 9.76,
+          "daScaled": 9.76,
+          "t": 0,
+          "d": 10.56,
+          "narrationStart": 0,
+          "freezeSeconds": 0.3020000000000014,
+          "trim": false,
+          "availSeconds": 10.258,
+          "gapRatio": -0.048547475141353026,
+          "blocked": false,
+          "blockReason": null
+        },
+        "signature": "ff57c7ef3681e6588a334bd7c1e43ff757bb3fd49a25087982a066d4a2f0aa6f",
+        "status": "changed",
+        "checked": true,
+        "exportable": false,
+        "reason": null,
+        "change_reasons": [
+          "图层段已重新渲染",
+          "衔接帧已变化",
+          "生成视频版本已变化",
+          "画面视频已更换或重新生成"
+        ]
+      },
+      {
+        "storyboard_id": 594,
+        "storyboard_number": 22,
+        "title": "下一期·鸿门",
+        "inputs": {
+          "video": true,
+          "audio": true,
+          "subtitle": true,
+          "pure_visual": false
+        },
+        "composed_video_url": "static/composed/92d9b977-faa1-4ea8-95a3-f93f93eb524e.mp4",
+        "selectable": true,
+        "plan": {
+          "dv": 6.658,
+          "da": 6.24,
+          "daScaled": 6.24,
+          "t": 0,
+          "d": 7.04,
+          "narrationStart": 0,
+          "freezeSeconds": 0.3819999999999997,
+          "trim": false,
+          "availSeconds": 6.658,
+          "gapRatio": -0.06278161610093123,
+          "blocked": false,
+          "blockReason": null
+        },
+        "signature": "65557ab540b4b6bdcd28ae75cc045117f8114e13aba5407714359d8eb74f5a87",
+        "status": "changed",
+        "checked": true,
+        "exportable": false,
+        "reason": null,
+        "change_reasons": [
+          "图层段已重新渲染",
+          "衔接帧已变化",
+          "生成视频版本已变化",
+          "画面视频已更换或重新生成"
+        ]
+      }
+    ],
+    "scope": {
+      "included": [
+        {
+          "storyboard_id": 573,
+          "storyboard_number": 1
+        },
+        {
+          "storyboard_id": 574,
+          "storyboard_number": 2
+        },
+        {
+          "storyboard_id": 575,
+          "storyboard_number": 3
+        },
+        {
+          "storyboard_id": 576,
+          "storyboard_number": 4
+        },
+        {
+          "storyboard_id": 577,
+          "storyboard_number": 5
+        },
+        {
+          "storyboard_id": 578,
+          "storyboard_number": 6
+        },
+        {
+          "storyboard_id": 579,
+          "storyboard_number": 7
+        },
+        {
+          "storyboard_id": 580,
+          "storyboard_number": 8
+        },
+        {
+          "storyboard_id": 581,
+          "storyboard_number": 9
+        },
+        {
+          "storyboard_id": 582,
+          "storyboard_number": 10
+        },
+        {
+          "storyboard_id": 583,
+          "storyboard_number": 11
+        },
+        {
+          "storyboard_id": 584,
+          "storyboard_number": 12
+        },
+        {
+          "storyboard_id": 585,
+          "storyboard_number": 13
+        },
+        {
+          "storyboard_id": 586,
+          "storyboard_number": 14
+        },
+        {
+          "storyboard_id": 587,
+          "storyboard_number": 15
+        },
+        {
+          "storyboard_id": 588,
+          "storyboard_number": 16
+        },
+        {
+          "storyboard_id": 589,
+          "storyboard_number": 17
+        },
+        {
+          "storyboard_id": 590,
+          "storyboard_number": 18
+        },
+        {
+          "storyboard_id": 591,
+          "storyboard_number": 19
+        },
+        {
+          "storyboard_id": 592,
+          "storyboard_number": 20
+        },
+        {
+          "storyboard_id": 593,
+          "storyboard_number": 21
+        },
+        {
+          "storyboard_id": 594,
+          "storyboard_number": 22
+        }
+      ],
+      "excluded": []
+    }
+  },
+  "message": "success"
+}
