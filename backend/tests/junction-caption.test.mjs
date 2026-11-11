@@ -7,8 +7,9 @@
  * - 衔接帧画面描述按 `junction_hash` 缓存：第二次读不调模型，hash 变了才重算；
  * - 描述调用挂在发起它的任务观测里（stage `junction_caption`）；
  * - 视频提示词批次在 Agent 开跑前算好描述，并把锁定槽位与 caption 写进话术；
- * - 保存校验只拦 C 的首段 / D 的末段切镜（zh/en 与 `0-2.5秒:`、`0–3 s:` 等写法都认），
- *   A/B 与剧情镜头不受影响；被退回的提示词一个字都不落库。
+ * - 保存校验：C 的首段必须是 ≤1.5 秒的空镜（不许 @ 角色、不许切镜、不许场景过渡），D 的末段不许切镜，
+ *   任一分段不许 0 长 / 倒序（zh/en/ja/ko 与 `0-2.5秒:`、`0–3 s:` 等写法都认）；A/B 与剧情镜头不受影响，
+ *   被退回的提示词一个字都不落库。
  */
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
@@ -85,7 +86,17 @@ const SEED = `
     zoomed: await mk(3, 'D'), full: await mk(4, 'D'),
     layerOnly: await mk(5, 'A'), generated: await mk(6, 'B'),
   }
-  out({ dramaId, episodeId, sceneId, ids })
+  // C 首段不许 @ 角色：本集角色「甲」与道具「甲符」用来验证最长优先匹配（@甲符 是道具，不算人物）
+  const characterId = getInsertId(await db.insert(schema.characters).values({
+    dramaId, name: '甲', createdAt: ts, updatedAt: ts,
+  }))
+  const propId = getInsertId(await db.insert(schema.props).values({
+    dramaId, name: '甲符', createdAt: ts, updatedAt: ts,
+  }))
+  await db.insert(schema.episodeCharacters).values({ episodeId, characterId, createdAt: ts })
+  await db.insert(schema.episodeProps).values({ episodeId, propId, createdAt: ts })
+  await db.insert(schema.episodeScenes).values({ episodeId, sceneId, createdAt: ts })
+  out({ dramaId, episodeId, sceneId, characterId, propId, ids })
 `
 
 /** 一镜的图层段：底图、取景、渲染好的衔接帧 PNG；需要底图验证的镜子直接记通过 */
@@ -399,6 +410,75 @@ test('C 的首段 / D 的末段不许切镜：zh/en 与多种时间写法都退�
   }
 })
 
+test('C 的首段必须是 ≤1.5 秒的空镜：超时 / @ 角色 / 场景过渡 / 0 长与倒序分段都退回，合规两段式放行', () => {
+  const { dir, env, seeded } = prepare()
+  try {
+    const got = run(`${SEGMENTS}
+      const assets = [
+        { kind: 'scene', name: '大殿' },
+        { kind: 'character', name: '甲' },
+        { kind: 'prop', name: '甲符' },
+      ]
+      const caption = '空镜：俯拍全景，殿脊占画面下方三分之二，上方留白，无人物。'
+      const head = '出场人物：@甲；场景：@大殿。\\n'
+      const reasons = {
+        compliant: junctionPromptReasons(head + '0-1秒：俯拍全景，大殿殿脊占画面下方三分之二，上方留白，画面无人。\\n1-4秒：@甲 从画面右侧入画，右手扶柱，双腿站定。', 'first', caption, assets),
+        boundary: junctionPromptReasons(head + '0-1.5秒：俯拍全景，殿脊占画面下方三分之二，画面无人。\\n1.5-4秒：@甲 从画面右侧入画。', 'first', caption, assets),
+        tooLong: junctionPromptReasons(head + '0-3秒：俯拍全景，殿脊占画面下方三分之二，画面无人。\\n3-6秒：@甲 从画面右侧入画。', 'first', caption, assets),
+        characterFirst: junctionPromptReasons(head + '0-1秒：俯拍全景，殿脊占画面下方三分之二，@甲 已站在阶前。\\n1-4秒：@甲 抬头。', 'first', caption, assets),
+        propFirst: junctionPromptReasons(head + '0-1秒：俯拍全景，殿脊占画面下方三分之二，阶前横着 @甲符。\\n1-4秒：@甲 拾起 @甲符。', 'first', caption, assets),
+        transitionZh: junctionPromptReasons(head + '0-1秒：画面由长卷缓缓过渡为山脊荒坡，坡上无人。\\n1-4秒：@甲 走上荒坡。', 'first', caption, assets),
+        transitionEn: junctionPromptReasons('Characters: @Jia; Scene: @Hall.\\n0-1s: the scroll dissolves into the ridge, nobody present.\\n1-4s: @Jia walks up.', 'first', caption, assets),
+        transitionJa: junctionPromptReasons('登場人物：@甲；シーン：@大殿。\\n0-1秒：長巻が山稜へ移り変わる、画面に人物なし。\\n1-4秒：@甲 が山稜へ歩く。', 'first', caption, assets),
+        transitionKo: junctionPromptReasons('등장 인물: @甲; 장면: @大殿.\\n0-1초: 두루마리가 산등성이로 바뀌어, 화면에 인물 없음.\\n1-4초: @甲 이 산등성이로 걸어간다.', 'first', caption, assets),
+        zeroLength: junctionPromptReasons(head + '0-1秒：俯拍全景，殿脊占画面下方三分之二，画面无人。\\n3-3秒：@甲 从画面右侧入画。', 'first', caption, assets),
+        reversedDiff: junctionPromptReasons(head + '0-1秒：俯拍全景，殿脊占画面下方三分之二，画面无人。\\n5-3秒：@甲 从画面右侧入画。', 'last', caption, assets),
+        dFirstOk: junctionPromptReasons(head + '0-3秒：@甲 拾级而上，身侧 @甲符 晃动。\\n3-6秒：殿脊全景，晨雾，画面无人。', 'last', caption, assets),
+      }
+      // 工具路径：@ 角色的 C 提示词、0 长分段都退回且一个字不落库；改成空镜后落库
+      const ctx = { requestContext: buildAgentRequestContext({ episodeId: ${seeded.episodeId}, dramaId: ${seeded.dramaId} }) }
+      const update = storyboardTools.updateStoryboard.execute
+      const promptOf = async id => (await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, id)))[0].videoPrompt
+      const rejected = await update({ storyboard_id: ${seeded.ids.contain}, video_prompt: head + '0-1秒：俯拍全景，殿脊占画面下方三分之二，@甲 已站在阶前。\\n1-4秒：@甲 抬头。' }, ctx)
+      const afterReject = await promptOf(${seeded.ids.contain})
+      const rejectedZero = await update({ storyboard_id: ${seeded.ids.contain}, video_prompt: head + '0-1秒：俯拍全景，殿脊占画面下方三分之二，画面无人。\\n3-3秒：@甲 从画面右侧入画。' }, ctx)
+      const compliant = head + '0-1秒：俯拍全景，大殿殿脊占画面下方三分之二，上方留白，画面无人。\\n1-4秒：@甲 从画面右侧入画，右手扶柱，双腿站定。'
+      const accepted = await update({ storyboard_id: ${seeded.ids.contain}, video_prompt: compliant }, ctx)
+      const afterAccept = await promptOf(${seeded.ids.contain})
+      out({ reasons, rejected, afterReject, rejectedZero, accepted, afterAccept })
+    `, env)
+
+    assert.deepEqual(got.reasons.compliant, [], '0-1秒空镜 + 1-4秒人物入画 → 放行')
+    assert.deepEqual(got.reasons.boundary, [], '1.5 秒是上限，正好 1.5 秒放行')
+    assert.equal(got.reasons.tooLong.length, 1, '首段 0-3 秒超过上限')
+    assert.match(got.reasons.tooLong[0], /≤1\.5 秒/)
+    assert.equal(got.reasons.characterFirst.length, 1, '首段 @ 角色必须退回')
+    assert.match(got.reasons.characterFirst[0], /@甲/)
+    assert.deepEqual(got.reasons.propFirst, [], '最长优先：@甲符 解析成道具，不算人物')
+    assert.match(got.reasons.transitionZh[0], /过渡为/, 'zh 场景过渡写法')
+    assert.match(got.reasons.transitionEn[0], /dissolve/i, 'en dissolve')
+    assert.match(got.reasons.transitionJa[0], /移り変わ/, 'ja 移り変わ')
+    assert.match(got.reasons.transitionKo[0], /바뀌어/, 'ko 바뀌어')
+    for (const key of ['tooLong', 'characterFirst', 'transitionZh']) {
+      assert.match(got.reasons[key][0], /锁定衔接帧的画面是：空镜/, '退回信息必须带 caption')
+    }
+    assert.equal(got.reasons.zeroLength.length, 1, '3-3秒 是 0 长分段')
+    assert.match(got.reasons.zeroLength[0], /3-3秒/)
+    assert.equal(got.reasons.reversedDiff.length, 1, 'D 的分段倒序也退回')
+    assert.match(got.reasons.reversedDiff[0], /5-3秒/)
+    assert.deepEqual(got.reasons.dFirstOk, [], 'D 只看末段，首段 @ 角色不违规')
+
+    assert.ok(got.rejected.error, '@ 角色出现在 C 首段必须退回')
+    assert.deepEqual(got.rejected.locked_frame, { slot: 'first', source: 'layer_last' })
+    assert.equal(got.afterReject, null, '被退回的提示词不得落库')
+    assert.ok(got.rejectedZero.error, '0 长分段必须退回')
+    assert.equal(got.accepted.error, undefined)
+    assert.match(got.afterAccept, /1-4秒：@甲 从画面右侧入画/, '合规提示词原样保存')
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
 test('视频提示词批次在 Agent 开跑前算好描述，并把锁定槽位与 caption 写进话术', () => {
   const { dir, env, seeded } = prepare()
   try {
@@ -455,7 +535,7 @@ test('视频提示词批次在 Agent 开跑前算好描述，并把锁定槽位�
     const instruction = got.agentTexts[0]
     assert.match(instruction, /锁定衔接帧（C 组合）/)
     assert.match(instruction, /锁定画面：空镜：俯拍全景/, '话术里带真实 caption')
-    assert.match(instruction, /第一段必须从这个画面继续演/)
+    assert.match(instruction, /第一段必须是 0-1 秒的空镜/, '批次话术写明 C 首段是空镜、必须 ≤1.5 秒')
     assert.equal(got.videoPrompt, '出场人物：@甲；场景：@大殿。\n0-1秒：俯拍全景，大殿殿脊占画面下方三分之二，上方留白，画面无人。\n1-4秒：@甲 从画面右侧入画，右手扶柱，双腿站定。', '合规提示词经工具保存成功')
     assert.deepEqual(got.status, { status: 'done', completed: 1, failed: 0 })
     assert.match(got.caption, /俯拍全景/)

@@ -12,8 +12,11 @@
  *   衔接帧只烧一次视觉调用，重渲后 hash 变了才重算。失败结论允许重算（视觉配置修好后
  *   不必等重渲），成功结论只在 hash 变化时重算。
  * - 没有视觉配置 / 调用失败 → `caption: null` + 原因，绝不编画面。
- * - 保存校验只做一条可机检的事实：C 的首个时间分段、D 的最后一个时间分段里不许出现切镜写法。
+ * - 保存校验只做可机检的事实：C 的首段时间分段必须是 0–1.5 秒的**空镜**（不许 @ 角色、不许切镜、
+ *   不许场景过渡写法，Issue #95 二次返工），D 的末段不许切镜；时间分段本身必须是正区间。
  *   退回信息带上 caption，让模型按真实构图重写，而不是只报一个错。
+ *   为什么 C 的首段必须短且空：ep 21 实测 7/22 镜首段在 0–3 秒内就写了「@子婴 走向画外」「长卷过渡为山脊」，
+ *   H3 把第一段内容画在第 0 帧，衔接帧被整段替换掉。
  */
 import fs from 'fs'
 import { eq } from 'drizzle-orm'
@@ -38,6 +41,7 @@ import {
 } from './layer-segment.js'
 import { junctionFrameOf, junctionFramesOfEpisode, type JunctionFrame } from './junction-frame.js'
 import { lockedGenSlot, toCombo, type BaseRef } from './design-card.js'
+import { loadEpisodeAssets, parseMentions } from './storyboard-assets.js'
 import type { LayerDocBase } from './layer-doc.js'
 
 export const LOCKED_FRAMINGS = ['full', 'crop', 'contain', 'zoomed'] as const
@@ -301,7 +305,7 @@ export function lockedFramePromptHint(frame: LockedFrame): string {
     ? `锁定画面：${frame.caption}`
     : `锁定画面描述不可用（${frame.caption_note || '尚未计算'}）：仍按衔接帧构图写，不要凭空描写画面里没有的东西。`
   const rule = first
-    ? '第一段必须从这个画面继续演：先复述它的机位/景别/画面里有什么（0 秒不切镜、不重新建立空间），人物在后续动作里入画；切镜只能从第二段开始。'
+    ? '第一段必须是 0-1 秒的空镜：只复述它的机位/景别/画面里有什么，静止或极缓推，不出现人物（不许 @ 角色）、不切镜、不做场景过渡（过渡为/叠化/dissolve 等）；人物入画、切镜与转场只能从第二段（1 秒以后）开始。'
     : '最后一段必须收束到这个画面（停在它的机位/景别/主体位置与光线），最后一段内不许切镜；切镜只能出现在更早的段落。'
   return `${anchor}\n${caption}\n${rule}`
 }
@@ -309,10 +313,11 @@ export function lockedFramePromptHint(frame: LockedFrame): string {
 // ─── 保存校验（AI 写入路径）──────────────────────────────────
 
 /**
- * 时间分段行：`0-3秒：`、`0-2.5秒:`、`0-3s:`、`0–3 s：` 都算。行首的时间范围就是分段边界，
+ * 时间分段行：`0-3秒：`、`0-2.5秒:`、`0-3s:`、`0–3 s：`、`0-3초:` 都算。行首的时间范围就是分段边界，
  * 模型按技能要求一行一段；找不到任何分段行说明格式不合规（校验无从下手）。
+ * 起始/结束秒数要取出来：C 的首段必须 ≤1.5 秒，任何分段都不许是 0 长或倒序（`3-3秒`、`5-3秒`）。
  */
-const SEGMENT_LINE = /^\s*[【\[]?\s*\d+(?:\.\d+)?\s*(?:-|–|—|~)\s*\d+(?:\.\d+)?\s*(?:秒|s|sec|seconds)?\s*[】\]]?\s*[:：]/
+const SEGMENT_LINE = /^\s*[【\[]?\s*(\d+(?:\.\d+)?)\s*(?:-|–|—|~)\s*(\d+(?:\.\d+)?)\s*(?:秒|초|s|sec|seconds)?\s*[】\]]?\s*[:：]/
 
 /**
  * 切镜写法（zh / en / ja / ko）。`切换为` 与 `切换到` 是同一个意思的两种写法，都收；
@@ -325,8 +330,36 @@ const CUT_PATTERNS: RegExp[] = [
   /컷/, /전환/,
 ]
 
+/**
+ * 场景过渡写法：画面「渐变」成另一处空间。它和切镜一样会让 H3 把第 0 帧画成第二处空间，
+ * 衔接帧被整段替换；C 的首段只允许静止或极缓推。
+ */
+const TRANSITION_PATTERNS: RegExp[] = [
+  /过渡为/, /过渡到/, /转入/, /化为/, /变为/, /叠化/,
+  /\bdissolv(?:e|es|ed|ing)\b/i, /\btransition to\b/i, /\bmorphs? into\b/i,
+  /ディゾルブ/, /移り変わ/,
+  /디졸브/, /디졀브/, /바뀌어/,
+]
+
+/** C 的首段上限（秒）：第一段只复述空镜衔接帧，人物与转场必须落到第二段 */
+const FIRST_SEGMENT_MAX_END = 1.5
+
+function firstHit(patterns: RegExp[], text: string): string | null {
+  for (const pattern of patterns) {
+    const match = pattern.exec(text)
+    if (match) return match[0]
+  }
+  return null
+}
+
 interface PromptSegment {
   index: number
+  /** 该段的起始秒数（时间范围左边） */
+  start: number
+  /** 该段的结束秒数（时间范围右边） */
+  end: number
+  /** 行首时间范围的原文（去掉冒号），退回信息里原样引用 */
+  time: string
   /** 去掉时间前缀后的正文，含该段后续被折行的续行（遇到下一个分段行或空行结束） */
   body: string
 }
@@ -337,39 +370,91 @@ function promptSegments(text: string): PromptSegment[] {
   for (let i = 0; i < lines.length; i++) if (SEGMENT_LINE.test(lines[i])) starts.push(i)
   const startSet = new Set(starts)
   return starts.map((start, index) => {
+    const matched = SEGMENT_LINE.exec(lines[start])!
     const body: string[] = [lines[start].replace(SEGMENT_LINE, '')]
     for (let i = start + 1; i < lines.length; i++) {
       if (startSet.has(i) || !lines[i].trim()) break
       body.push(lines[i])
     }
-    return { index, body: body.join('\n') }
+    return {
+      index,
+      start: Number(matched[1]),
+      end: Number(matched[2]),
+      time: matched[0].replace(/\s*[:：]\s*$/, '').trim(),
+      body: body.join('\n'),
+    }
   })
 }
 
+/** 本集可被 @ 的资产（名字 + 种类），C 首段据此判断有没有 @ 到角色 */
+export interface PromptMentionAsset {
+  kind: 'character' | 'scene' | 'prop'
+  name: string
+}
+
 /**
- * C 的首段 / D 的末段不许切镜；A/B 与剧情镜头（无 combo）一律不校验。
+ * 一段正文里 @ 到的角色：按资产名**最长优先**解析（与 `parseMentions` / 参考图装配同口径），
+ * 场景与道具不算——首段照常 @ 场景。
+ */
+function mentionedCharacters(body: string, assets: PromptMentionAsset[]): string[] {
+  const kindByName = new Map<string, string>()
+  for (const asset of assets) {
+    const name = (asset.name || '').trim()
+    // 同名资产以先出现者为准（场景 → 角色 → 道具），与参考图编号同口径
+    if (name && !kindByName.has(name)) kindByName.set(name, asset.kind)
+  }
+  return parseMentions(body, [...kindByName.keys()]).matched
+    .filter(name => kindByName.get(name) === 'character')
+}
+
+/**
+ * C 的首段必须是 0–1.5 秒的空镜（复述 caption、不许 @ 角色、不许切镜、不许场景过渡），D 的末段不许切镜；
+ * 时间分段本身必须是正区间。A/B 与剧情镜头（无 combo）一律不校验。
  * 返回空数组 = 放行；否则每条是一句带 caption 的退回说明。
  */
-export function junctionPromptReasons(text: string, slot: 'first' | 'last', caption: string | null): string[] {
+export function junctionPromptReasons(
+  text: string,
+  slot: 'first' | 'last',
+  caption: string | null,
+  assets: PromptMentionAsset[] = [],
+): string[] {
   const segments = promptSegments(text)
   const label = slot === 'first' ? '第一段' : '最后一段'
   const anchor = slot === 'first'
     ? '本镜是 C 组合：生成段的首帧由图层段末帧（衔接帧）锁定，视频必须从这张画面开始'
     : '本镜是 D 组合：生成段的尾帧由图层段首帧（衔接帧）锁定，视频必须收在这张画面'
+  const captionLine = caption ? `锁定衔接帧的画面是：${caption}。` : '锁定衔接帧的画面描述当前不可用（见 read_storyboard_context 的 caption_note）。'
   if (!segments.length) {
     return [`视频提示词里找不到时间分段行（格式如「0-3秒：…」），无法确认${label}是否从锁定衔接帧继续。${anchor}；请按技能要求逐段写「0-3秒：」「3-6秒：」后重新调用 update_storyboard。`]
   }
+  // 时间轴先要能读数：0 长或倒序的分段（`3-3秒`、`5-3秒`）说明模型没有按连续时间轴写
+  const badRanges = segments.filter(segment => segment.end <= segment.start)
+  if (badRanges.length) {
+    return badRanges.map(segment => `${anchor}；时间分段「${segment.time}」的结束秒数必须大于起始秒数（分段要连续递进，如「0-1秒：」「1-4秒：」）。${captionLine}请改好时间范围后重新调用 update_storyboard。`)
+  }
   const target = slot === 'first' ? segments[0] : segments[segments.length - 1]
-  const hit = CUT_PATTERNS.map(pattern => pattern.exec(target.body)).find(match => match !== null)
-  if (!hit) return []
-  const captionLine = caption ? `锁定衔接帧的画面是：${caption}。` : '锁定衔接帧的画面描述当前不可用（见 read_storyboard_context 的 caption_note）。'
-  const fix = slot === 'first'
-    ? '请把第一段写成从该画面继续演（先复述它的机位/景别/画面里有什么，人物随后入画），把切镜挪到第二段之后'
-    : '请把最后一段写回收束到该画面（停在它的构图），把切镜挪到更早的段落'
-  return [`${anchor}；${label}里出现切镜写法「${hit[0]}」，视频模型会把它当成新镜头、丢掉衔接帧。${captionLine}${fix}后重新调用 update_storyboard。`]
+  if (slot === 'last') {
+    const hit = firstHit(CUT_PATTERNS, target.body)
+    if (!hit) return []
+    return [`${anchor}；${label}里出现切镜写法「${hit}」，视频模型会把它当成新镜头、丢掉衔接帧。${captionLine}请把最后一段写回收束到该画面（停在它的构图），把切镜挪到更早的段落后重新调用 update_storyboard。`]
+  }
+  const problems: string[] = []
+  if (target.end > FIRST_SEGMENT_MAX_END) {
+    problems.push(`首段是「${target.time}」、到 ${target.end} 秒才结束，必须 ≤1.5 秒（写成「0-1秒：」）`)
+  }
+  const characters = mentionedCharacters(target.body, assets)
+  if (characters.length) {
+    problems.push(`首段 @ 到了人物 ${characters.map(name => `@${name}`).join('、')}，而 C 的首帧是空镜衔接帧，人物只能从第二段起入画`)
+  }
+  const transition = firstHit(TRANSITION_PATTERNS, target.body)
+  if (transition) problems.push(`首段出现场景过渡写法「${transition}」`)
+  const cut = firstHit(CUT_PATTERNS, target.body)
+  if (cut) problems.push(`首段出现切镜写法「${cut}」`)
+  if (!problems.length) return []
+  return [`${anchor}；${label}里${problems.join('；')}——H3 会把这段内容画在第 0 帧、把衔接帧整段替换掉。${captionLine}请把第一段写成 0-1 秒的空镜：只复述 caption 的机位/景别/画面与光线，静止或极缓推，不出现人物、不切镜、不转场；人物入画与转场放到第二段（切镜挪到第二段之后）后重新调用 update_storyboard。`]
 }
 
-/** 按分镜当前 combo 与缓存的衔接帧描述判断本次写入是否合规（不调模型） */
+/** 按分镜当前 combo、缓存的衔接帧描述与本集角色资产判断本次写入是否合规（不调模型） */
 export async function junctionPromptRejections(storyboardId: number, videoPrompt: string): Promise<string[]> {
   const text = (videoPrompt || '').trim()
   if (!text) return []
@@ -377,5 +462,7 @@ export async function junctionPromptRejections(storyboardId: number, videoPrompt
   const slot = lockedGenSlot(toCombo(sb?.combo))
   if (!slot) return []
   const segment = await getLayerSegment(storyboardId)
-  return junctionPromptReasons(text, slot, junctionCaptionText(segment))
+  // C 的首段必须空镜：要知道哪些 @ 是本集的角色（场景/道具不算）
+  const assets = sb ? await loadEpisodeAssets(sb.episodeId) : []
+  return junctionPromptReasons(text, slot, junctionCaptionText(segment), assets)
 }

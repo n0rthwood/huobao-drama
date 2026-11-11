@@ -678,7 +678,7 @@ Body：`{storyboard_ids?, config_id?, model?}`；把已定分镜写成时间段�
 - `caption`：视觉模型对**实际衔接帧 PNG**（不含文字图层）的一句话描述，按 `junction_hash` 缓存于 `storyboard_layer_segments.junction_caption`（AI 环节 `junction_caption`，vision）。衔接帧未渲染 / 输入已变化 / 底图验证未过 / 无视觉配置 / 调用失败时为 `null`，`caption_note` 写明原因——**不得**据此臆造画面。
 - A/B 组合与还没有图层段的镜头不带 `locked_frames`。
 - `POST /episodes/{e}/generate-video-prompts` 在 Agent 开跑前逐镜补算 caption（同一任务的观测 stage `junction_caption`，任务详情可回看公开请求/响应），并把锁定槽位与 caption 写进提示话术。
-- 保存校验（AI 写入路径：`update_storyboard`，以及 `save_storyboards` 覆盖已有 C/D 镜号时）：解析 `video_prompt` 的时间分段行（`0-3秒：`、`0-2.5秒:`、`0-3s:`、`0–3 s:` 等），C 的首段 / D 的末段含切镜写法（切到/切回/切换为/切换到/转到/硬切、cut to/cuts to、カット/切り替え、컷/전환）→ 退回 `{error, rejected, combo, locked_frame}`，一个字都不落库；退回信息带 caption，按真实构图重写后重新保存。A/B 与剧情镜头不校验。
+- 保存校验（AI 写入路径：`update_storyboard`，以及 `save_storyboards` 覆盖已有 C/D 镜号时）：解析 `video_prompt` 的时间分段行（`0-3秒：`、`0-2.5秒:`、`0-3s:`、`0–3 s:` 等），C 的首段必须是 **≤1.5 秒的空镜**——超时、@ 到本集角色资产（场景/道具可 @，角色名按最长优先解析）、含场景过渡写法（过渡为/过渡到/转入/化为/变为/叠化、dissolve/transition to/morph into、ディゾルブ/移り変わ、디졸브/바뀌어）或切镜写法（切到/切回/切换为/切换到/转到/硬切、cut to/cuts to、カット/切り替え、컷/전환）→ 退回；D 的首段可以切镜，末段含切镜写法 → 退回；任一分段是 0 长/倒序（`3-3秒`、`5-3秒`）→ 退回。退回 `{error, rejected, combo, locked_frame}`，一个字都不落库；退回信息带 caption，按真实构图重写（人物入画与转场挪到第二段）后重新保存。A/B 与剧情镜头不校验。依据：ep 21 二次验收时首段已无切镜写法，但 7/22 镜仍在首段（0–3 秒）写「@子婴 走向画外」「长卷过渡为山脊」，H3 把第二段内容画到第 0 帧。
 - 人工 `PUT /storyboards/{id}` 不做这条校验（与 #92 的画幅校验同口径）；人工编辑不受保护。
 
 ### `POST /episodes/{e}/video-batch/preview` [R]

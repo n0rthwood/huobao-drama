@@ -69,13 +69,18 @@ Organize every segment in this order (items with no content may be omitted, but 
 
 `readStoryboardContext` returns `locked_frames`: the slots of this shot that are fixed by a layer-segment junction frame — the **first frame** for combo C, the **last frame** for combo D. A locked slot is never rendered on its own; the first or last frame of the video is that junction PNG (it contains no text layers). `caption` is a vision model's description of that picture itself, and `framing` says whether it is the whole base image, a crop, letterboxed or zoomed in.
 
-- **C (`slot:"first"`, `source:"layer_last"`)**: the first time segment must **restate the caption's composition** — camera, shot size, what is in the frame (whether anyone is there and where), light and empty areas; the subject then enters through continuous action from second 1. **No cut inside the first segment** (no "cut to / cuts to / switch to" wording); cuts start from the second segment.
+- **C (`slot:"first"`, `source:"layer_last"`)**: the first segment is a **static restatement segment** (`0-1s: <restate the caption's picture only — still or a very slow push-in, no people, no transition>`); people entering the frame and any transition belong to `1-Ns: <person enters / transition>`. **No cut inside the first segment** (no "cut to / cuts to / switch to" wording); cuts start from the second segment.
   ```
   Characters: @Xiaoming; Scene: @GreatHall.
   0-1s: high-angle wide shot, the hall ridge fills the lower two thirds, empty space above, morning fog backlit, nobody in frame.
   1-4s: @Xiaoming enters from the right of frame, right hand on a hall pillar, both feet planted.
   4-7s: cut to the hall gate in close-up, @Xiaoming pushes the door with his right hand, left hand at his side.
   ```
+  Hard constraints on the first segment (machine-checked on save; violation is rejected):
+  - Time: the first segment must end at **≤ 1.5 s** (write `0-1s:`; never `0-3s:`)
+  - People: the first segment must **not @ any character** (scenes and props are still @-referenced); C's first frame is an empty junction frame, so characters enter from the second segment on
+  - Transition: the first segment must **not contain scene-transition wording** — 过渡为 / 过渡到 / 转入 / 化为 / 变为 / 叠化, dissolve / transition to / morph into, ディゾルブ / 移り変わ, 디졸브 / 바뀌어
+  - Why (measured on ep 21): 7 of 22 shots wrote "@Ziyang walks out of frame" or "the scroll dissolves into the ridge" inside the first 0–3 s, and H3 painted the second segment's content into frame 0, replacing the junction frame
 - **D (`slot:"last"`, `source:"layer_first"`)**: the last time segment must **settle onto the caption's composition** (the image stops at that camera, shot size, subject placement and light); **no cut inside the last segment** — cuts belong to earlier segments.
   ```
   Characters: @Xiaoming; Scene: @GreatHall.
@@ -84,7 +89,7 @@ Organize every segment in this order (items with no content may be omitted, but 
   6-8s: the hall ridge in wide shot, morning fog backlit, empty space above, nobody in frame.
   ```
 - When `caption` is `null`, read `caption_note` (not rendered yet / no vision config / base visual check failed): still do not cut — write "continues from the junction frame" or "settles on the junction frame", and **never invent things the frame does not contain**.
-- On save, `update_storyboard` parses the time-segment lines (`0-3秒：`, `0-2.5秒:`, `0-3s:` …): a cut in C's first segment or D's last segment is rejected, and the rejection carries the caption — rewrite from it, then save again.
+- On save, `update_storyboard` parses the time-segment lines (`0-3秒：`, `0-2.5秒:`, `0-3s:` …): C's first segment running past 1.5 s, @-mentioning a character, or containing a scene transition or a cut is rejected, as is a cut in D's last segment; segments must be a positive time range (`3-3秒`, `5-3秒` are rejected too). The rejection carries the caption — rewrite from it, then save again.
 - Nothing here applies when `locked_frames` is empty (combos A/B, or no layer segment yet).
 
 ## Absolute Rule: Images Come First

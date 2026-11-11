@@ -478,7 +478,7 @@ function buildSaveStoryboards(documentary: boolean) {
             shotNumbers: [...new Set(junctionRejected.map(item => item.shot_number))].join(','),
           })
           return {
-            error: `有 ${junctionRejected.length} 条视频提示词从锁定衔接帧切走了画面，整批未保存。请按下面逐镜说明改写后重新调用 save_storyboards。`,
+            error: `有 ${junctionRejected.length} 条视频提示词不符合锁定衔接帧规则（C 的首段必须是 0-1 秒空镜、@ 角色与切镜/转场只能写在第二段起；D 的末段不许切镜；时间分段必须是正区间），整批未保存。请按下面逐镜说明改写后重新调用 save_storyboards。`,
             count: 0,
             rejected: junctionRejected,
           }
@@ -857,8 +857,9 @@ const updateStoryboard = createTool({
         composition: compositionOf(aspect),
       }
     }
-    // 衔接帧校验（Issue #95）：C 的首段 / D 的末段不许切镜 —— 该槽位的画面由衔接帧锁定，
-    // 切镜会让视频模型丢掉引导帧。退回信息带上 caption，模型按真实构图重写后重新保存。
+    // 衔接帧校验（Issue #95）：C 的首段必须是 0-1 秒空镜（不许 @ 角色、不许切镜、不许场景过渡），
+    // D 的末段不许切镜 —— 该槽位的画面由衔接帧锁定，首段写得越多 H3 越把第 0 帧画成第二段内容。
+    // 退回信息带上 caption，模型按真实构图重写后重新保存。
     if ('video_prompt' in fields) {
       const junctionReasons = await junctionPromptRejections(storyboard_id, fields.video_prompt || '')
       if (junctionReasons.length) {

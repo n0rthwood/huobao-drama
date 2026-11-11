@@ -33,7 +33,8 @@ The same rule as in the video-prompt skill; it applies to narrated episodes too.
 The same rule as "Locked Junction Frame" in the video-prompt skill applies to narrated episodes:
 
 - `locked_frames.caption` from `read_storyboard_context` is a real description of that junction PNG (written by a vision model), not a paraphrase of the base-image prompt.
-- **C** (first frame locked): the first time segment must restate the caption's composition (camera / shot size / what is in frame / light / empty areas) and the subject then enters; **no cut inside the first segment**.
+- **C** (first frame locked): the first segment is a static restatement segment — `0-1s: <restate the caption's picture only, still or a very slow push-in, no people, no transition>`, then `1-Ns: <person enters / transition>`; **no cut inside the first segment**. Three hard constraints on the first segment (machine-checked on save): (a) it ends at ≤ 1.5 s; (b) it never @-mentions a character (scenes/props are still @-referenced); (c) it contains no scene-transition wording (过渡为/过渡到/转入/化为/变为/叠化, dissolve/transition to/morph into, ディゾルブ/移り変わ, 디졸브/바뀌어).
 - **D** (last frame locked): the last time segment must settle onto the caption's composition; **no cut inside the last segment**.
 - When `caption` is `null`, read `caption_note` (not rendered / no vision config / base visual check failed): still do not cut, and never invent picture content.
-- On save, a cut in C's first segment or D's last segment ("cut to", "cuts to", …) is rejected; the rejection carries the caption — rewrite from it, then save again.
+- On save, C's first segment overshooting / @-mentioning a character / containing a transition or cut, a cut in D's last segment, or any zero-length or reversed segment (`3-3秒`, `5-3秒`) is rejected; the rejection carries the caption — rewrite from it, then save again.
+- Why the first segment must be empty: on ep 21, 7 of 22 shots wrote "@Ziyang walks out of frame" or "the scroll dissolves into the ridge" inside the first 0–3 s, H3 painted it into frame 0, and the empty junction frame was replaced wholesale.
