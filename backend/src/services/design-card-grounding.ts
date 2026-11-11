@@ -90,6 +90,7 @@ const LAYER_LABELS: Record<PlannedLayerType, string> = {
   label: '文字标注',
   card: '卡片',
   image: '内嵌图片',
+  text: '模板文本框',
 }
 
 /**

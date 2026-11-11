@@ -13,6 +13,7 @@ import { DATA_ROOT, STORAGE_ROOT } from '../utils/paths.js'
 import { getAbsolutePath } from '../utils/storage.js'
 import type { LayerDoc, LayerVariables } from './layer-doc.js'
 import { layerDocToSvg, resolvedText } from './layer-svg.js'
+import { assertTextLayersRenderable, textLayerTexts } from './layer-text.js'
 import { assertRenderableText, ensureLayerFonts } from './layer-fonts.js'
 import { renderFramePng } from './layer-frame-raster.js'
 
@@ -64,6 +65,7 @@ function collectTexts(doc: LayerDoc, variables?: LayerVariables): string[] {
     if (!layer.visible) continue
     if (layer.type === 'label' || layer.type === 'marker') texts.push(resolvedText(layer, variables))
     if (layer.type === 'card') texts.push(layer.fields.title, layer.fields.sub, layer.fields.meta, layer.fields.years)
+    if (layer.type === 'text') texts.push(...textLayerTexts(layer, variables))
   }
   return texts.filter(Boolean)
 }
@@ -124,11 +126,18 @@ export async function renderLayerDoc(doc: LayerDoc, options: LayerRenderOptions 
   return { buffer, width, height, ms: Date.now() - started }
 }
 
-/** 渲染并落盘到 `static/overlays/<uuid>.png`，返回前端可直接用的相对地址。 */
+/**
+ * 渲染并落盘到 `static/overlays/<uuid>.png`，返回前端可直接用的相对地址。
+ * 落盘的是成品（Poster 版本等）：模板文本框有阻断问题（溢出、缺字段、同位冲突…）时拒绝。
+ */
 export async function renderLayerDocToFile(
   doc: LayerDoc,
   options: LayerRenderOptions = {},
 ): Promise<{ url: string; width: number; height: number; ms: number }> {
+  assertTextLayersRenderable(doc, {
+    width: Math.trunc(options.width || doc.base.width),
+    height: Math.trunc(options.height || doc.base.height),
+  }, { variables: options.variables })
   const result = await renderLayerDoc(doc, options)
   const dir = path.join(STORAGE_ROOT, 'overlays')
   fs.mkdirSync(dir, { recursive: true })

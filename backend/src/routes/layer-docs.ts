@@ -9,6 +9,7 @@ import { success, badRequest, notFound } from '../utils/response.js'
 import { normalizeLayerDoc } from '../services/layer-doc.js'
 import { renderLayerDoc, renderLayerDocToFile } from '../services/layer-render.js'
 import { LAYER_FONT_FILES, ensureLayerFonts } from '../services/layer-fonts.js'
+import { TEXT_SPEC } from '../services/layer-text.js'
 import { logTaskError } from '../utils/task-logger.js'
 
 const app = new Hono()
@@ -65,6 +66,12 @@ app.get('/fonts', async (c) => {
   } catch (err) {
     return badRequest(c, err instanceof Error ? err.message : String(err))
   }
+})
+
+// GET /layer-docs/text-spec — 模板文本框规范（Issue #96）：前端排版引擎的唯一数据来源
+app.get('/text-spec', (c) => {
+  c.header('Cache-Control', 'no-cache')
+  return success(c, TEXT_SPEC)
 })
 
 // GET /layer-docs/fonts/:file — 打包字体，供编辑器 @font-face 做到真正的所见即所得

@@ -20,8 +20,11 @@ export class LayerFontError extends Error {}
 export const LAYER_FONT_FILES = [
   'NotoSansSC-Regular.otf',
   'NotoSansSC-Bold.otf',
+  // Issue #96：模板文本框的 500（说明/列表正文）与 900（标题/数据大字）字重
+  'NotoSansSC-Medium.otf',
   'NotoSerifSC-Regular.otf',
   'NotoSerifSC-Bold.otf',
+  'NotoSerifSC-Black.otf',
   'LXGWWenKai-Regular.ttf',
   'LXGWWenKai-Medium.ttf',
   'MaShanZheng-Regular.ttf',

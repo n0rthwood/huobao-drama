@@ -239,7 +239,7 @@ const out = execFileSync('node', ['--import', 'tsx', '--input-type=module', '--e
 const result = JSON.parse(out.slice(out.lastIndexOf('@@') + 2))
 
 test('字体自检通过并指向仓库内打包字体', () => {
-  assert.equal(result.fonts.files.length, 7)
+  assert.equal(result.fonts.files.length, 9)
   assert.match(result.fonts.font_dir, /backend\/assets\/fonts$/)
   assert.match(result.fonts.config_path, /fontconfig\/layer-fonts\.conf$/)
 })

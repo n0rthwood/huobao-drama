@@ -14,6 +14,7 @@
  */
 import type { CardLayer, ImageLayer, Layer, LayerBox, LayerDoc, LayerTheme, LayerType, MarkerLayer, PolygonLayer, PolylineLayer, LabelLayer, LayerVariables } from './layer-doc.js'
 import { baseFrameOf } from './layer-quality.js'
+import { textLayersSvg } from './layer-text.js'
 
 export const LINE_HEIGHT_EM = 1.35
 export const BASELINE_EM = 0.88
@@ -39,6 +40,7 @@ export const THEME_PRESETS: Record<LayerTheme, Record<LayerType, Record<string, 
     label: { font: 'serif', size: 0.045, color: '#2b2118', stroke: '#f4ecd8', stroke_width: 0.004, bg: '#f4ecd8', bg_opacity: 0, align: 'left', bold: false },
     card: { font: 'serif', bg: '#2b2118', bg_opacity: 0.84, color: '#f4ecd8', accent: '#c0472e', align: 'left' },
     image: { border: '#f4ecd8', border_width: 0.005, radius: 0.006, shadow: true },
+    text: {},
   },
   clean: {
     polygon: { fill: '#2f7bd6', fill_opacity: 0.25, stroke: '#1b4f8f', stroke_width: 0.003, dash: 'none' },
@@ -47,6 +49,7 @@ export const THEME_PRESETS: Record<LayerTheme, Record<LayerType, Record<string, 
     label: { font: 'sans', size: 0.042, color: '#16202c', stroke: '#ffffff', stroke_width: 0.004, bg: '#ffffff', bg_opacity: 0, align: 'left', bold: false },
     card: { font: 'sans', bg: '#16202c', bg_opacity: 0.8, color: '#ffffff', accent: '#2f7bd6', align: 'left' },
     image: { border: '#ffffff', border_width: 0.004, radius: 0.01, shadow: true },
+    text: {},
   },
   ink: {
     polygon: { fill: '#3b3b3b', fill_opacity: 0.22, stroke: '#1a1a1a', stroke_width: 0.004, dash: 'dash' },
@@ -55,6 +58,7 @@ export const THEME_PRESETS: Record<LayerTheme, Record<LayerType, Record<string, 
     label: { font: 'serif', size: 0.044, color: '#1a1a1a', stroke: '#f2f0ea', stroke_width: 0.005, bg: '#f2f0ea', bg_opacity: 0, align: 'left', bold: false },
     card: { font: 'serif', bg: '#f2f0ea', bg_opacity: 0.9, color: '#1a1a1a', accent: '#8a1f1f', align: 'left' },
     image: { border: '#1a1a1a', border_width: 0.003, radius: 0, shadow: false },
+    text: {},
   },
 }
 
@@ -240,7 +244,7 @@ function esc(value: string): string {
 }
 
 function styleOf(layer: Layer, theme: LayerTheme, key: string): unknown {
-  const own = (layer.style || {}) as Record<string, unknown>
+  const own = ('style' in layer ? layer.style || {} : {}) as Record<string, unknown>
   if (own[key] !== undefined && own[key] !== null && own[key] !== '') return own[key]
   return THEME_PRESETS[theme][layer.type][key]
 }
@@ -278,6 +282,8 @@ export function layerBounds(layer: Layer, theme: LayerTheme, aspect = 16 / 9, va
     const bottom = Math.max(cy + radius, cy + offset[1] + size * (LINE_HEIGHT_EM - BASELINE_EM))
     return { x: left, y: top, w: right - left, h: bottom - top }
   }
+  // 模板文本框是画面坐标、由规范排版（layer-text.ts textLayerRects），不在世界坐标里
+  if (layer.type === 'text') return { x: 0, y: 0, w: 0, h: 0 }
   return { ...layer.box }
 }
 
@@ -659,6 +665,12 @@ export function layerDocToSvg(
   }
   const defs = ctx.defs.length ? `<defs>${ctx.defs.join('')}</defs>` : ''
   const view = options.viewport || world.view
+  // 模板文本框（#96）：画面坐标，不随取景框推拉——嵌套 svg 把成片像素坐标映射到当前取景框
+  const text = textLayersSvg(doc, size, { visibleIds: options.visibleIds, opacity: options.opacity, variables: options.variables })
+  if (text) {
+    body.push(`<svg x="${fmt(view.x * worldWidth)}" y="${fmt(view.y * worldHeight)}" width="${fmt(view.w * worldWidth)}" height="${fmt(view.h * worldHeight)}"`
+      + ` viewBox="0 0 ${size.width} ${size.height}" preserveAspectRatio="none" overflow="visible">${text}</svg>`)
+  }
   const viewBox = `${fmt(view.x * worldWidth)} ${fmt(view.y * worldHeight)} ${fmt(view.w * worldWidth)} ${fmt(view.h * worldHeight)}`
   // 世界 = 输出画布时取景是正方（比例已对齐），只有旧的非方取景才需要拉伸兜底
   const stretch = !world.native && view.w !== view.h ? ' preserveAspectRatio="none"' : ''

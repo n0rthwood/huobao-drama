@@ -1,0 +1,2725 @@
+{
+ "version": 1,
+ "source": "Issue #96 设计定稿（Astra 设计 / Fabel 终裁 8.4）",
+ "fonts": {
+  "serif": "Noto Serif SC",
+  "sans": "Noto Sans SC",
+  "kai": "LXGW WenKai"
+ },
+ "palette": {
+  "ink": "#16130f",
+  "paper": "#f4efe5",
+  "mist": "#d9d0c0",
+  "accent": "#b4462b",
+  "gold": "#d1a35a"
+ },
+ "min_gap": 0.012,
+ "safe": {
+  "9:16/video": {
+   "x0": 0.111,
+   "y0": 0.15,
+   "x1": 0.889,
+   "y1": 0.65,
+   "avoid": [
+    {
+     "name": "右侧按钮栏",
+     "x0": 0.722,
+     "y0": 0.4375,
+     "x1": 1,
+     "y1": 1
+    }
+   ]
+  },
+  "16:9/video": {
+   "x0": 0.05,
+   "y0": 0.06,
+   "x1": 0.95,
+   "y1": 0.86,
+   "avoid": []
+  },
+  "9:16/poster": {
+   "x0": 0.06,
+   "y0": 0.15,
+   "x1": 0.94,
+   "y1": 0.85,
+   "avoid": []
+  },
+  "16:9/poster": {
+   "x0": 0.05,
+   "y0": 0.06,
+   "x1": 0.95,
+   "y1": 0.94,
+   "avoid": [
+    {
+     "name": "时长角标",
+     "x0": 0.82,
+     "y0": 0.85,
+     "x1": 1,
+     "y1": 1
+    }
+   ]
+  }
+ },
+ "roles": {
+  "date": {
+   "name": "时间锚",
+   "category": "标识类",
+   "purpose": "给历史事件、制度或阶段建立时间坐标。",
+   "extract": "提取唯一可核实的年、朝代年号或短时间段；优先阿拉伯数字加单位。",
+   "fields": [
+    {
+     "key": "main",
+     "label": "时间",
+     "optional": false
+    },
+    {
+     "key": "sub",
+     "label": "时代补充",
+     "optional": true
+    }
+   ],
+   "styles": {
+    "9:16": {
+     "width": 0.58,
+     "padding": [
+      0.01,
+      0.018,
+      0.01,
+      0.018
+     ],
+     "plate": {
+      "kind": "solid",
+      "color": "$ink",
+      "opacity": 0.84,
+      "radius": 0,
+      "fit": "content"
+     },
+     "decor": [
+      {
+       "kind": "bar",
+       "side": "left",
+       "thickness": 0.003,
+       "color": "$accent",
+       "gap": 0.004
+      }
+     ],
+     "min_scale": 0.9,
+     "rows": [
+      {
+       "field": "main",
+       "font": "sans",
+       "weight": 700,
+       "size": 0.025,
+       "color": "$paper",
+       "tracking": 0.03,
+       "max_lines": 1,
+       "align": "left",
+       "wrap": "greedy",
+       "line_height": 1.35
+      },
+      {
+       "field": "sub",
+       "font": "sans",
+       "weight": 500,
+       "size": 0.015,
+       "color": "$mist",
+       "tracking": 0.08,
+       "max_lines": 1,
+       "align": "left",
+       "wrap": "greedy",
+       "line_height": 1.35
+      }
+     ]
+    },
+    "16:9": {
+     "width": 0.38,
+     "padding": [
+      0.011,
+      0.02,
+      0.011,
+      0.02
+     ],
+     "plate": {
+      "kind": "solid",
+      "color": "$ink",
+      "opacity": 0.84,
+      "radius": 0,
+      "fit": "content"
+     },
+     "decor": [
+      {
+       "kind": "bar",
+       "side": "left",
+       "thickness": 0.003,
+       "color": "$accent",
+       "gap": 0.004
+      }
+     ],
+     "min_scale": 0.9,
+     "rows": [
+      {
+       "field": "main",
+       "font": "sans",
+       "weight": 700,
+       "size": 0.04,
+       "color": "$paper",
+       "tracking": 0.03,
+       "max_lines": 1,
+       "align": "left",
+       "wrap": "greedy",
+       "line_height": 1.35
+      },
+      {
+       "field": "sub",
+       "font": "sans",
+       "weight": 500,
+       "size": 0.023,
+       "color": "$mist",
+       "tracking": 0.08,
+       "max_lines": 1,
+       "align": "left",
+       "wrap": "greedy",
+       "line_height": 1.35
+      }
+     ]
+    }
+   }
+  },
+  "heading": {
+   "name": "主题标题",
+   "category": "叙事类",
+   "purpose": "为一个镜头或段落命名；不是复述旁白。",
+   "extract": "抽取事件、物件、地点或判断的核心名词短语；4—10字，最多两行。",
+   "fields": [
+    {
+     "key": "main",
+     "label": "标题",
+     "optional": false
+    },
+    {
+     "key": "sub",
+     "label": "眉题",
+     "optional": true
+    }
+   ],
+   "styles": {
+    "9:16": {
+     "width": 0.58,
+     "padding": [
+      0.012,
+      0.018,
+      0.014,
+      0.018
+     ],
+     "plate": {
+      "kind": "scrim",
+      "color": "$ink",
+      "opacity": 0.52,
+      "extend": [
+       0.012,
+       0.018,
+       0.014,
+       0.018
+      ],
+      "feather": 0.018
+     },
+     "decor": [
+      {
+       "kind": "bar",
+       "side": "top",
+       "thickness": 0.003,
+       "color": "$accent",
+       "gap": 0.004,
+       "length": 0.18
+      }
+     ],
+     "min_scale": 0.9,
+     "rows": [
+      {
+       "field": "sub",
+       "font": "sans",
+       "weight": 700,
+       "size": 0.015,
+       "color": "$paper",
+       "tracking": 0.16,
+       "max_lines": 1,
+       "gap_after": 0.004,
+       "align": "left",
+       "wrap": "greedy",
+       "line_height": 1.35,
+       "stroke": "$ink",
+       "stroke_width": 0.001,
+       "shadow": true,
+       "shadow_opacity": 0.65
+      },
+      {
+       "field": "main",
+       "font": "serif",
+       "weight": 700,
+       "size": 0.04,
+       "color": "$paper",
+       "max_lines": 2,
+       "align": "left",
+       "wrap": "phrase",
+       "drop_break_punct": true,
+       "shadow": true,
+       "shadow_blur": 0.08,
+       "shadow_opacity": 0.65,
+       "line_height": 1.28,
+       "stroke": "$ink",
+       "stroke_width": 0.0012
+      }
+     ]
+    },
+    "16:9": {
+     "width": 0.42,
+     "padding": [
+      0.014,
+      0.022,
+      0.016,
+      0.022
+     ],
+     "plate": {
+      "kind": "scrim",
+      "color": "$ink",
+      "opacity": 0.52,
+      "extend": [
+       0.012,
+       0.018,
+       0.014,
+       0.018
+      ],
+      "feather": 0.018
+     },
+     "decor": [
+      {
+       "kind": "bar",
+       "side": "top",
+       "thickness": 0.003,
+       "color": "$accent",
+       "gap": 0.004,
+       "length": 0.2
+      }
+     ],
+     "min_scale": 0.9,
+     "rows": [
+      {
+       "field": "sub",
+       "font": "sans",
+       "weight": 700,
+       "size": 0.023,
+       "color": "$paper",
+       "tracking": 0.14,
+       "max_lines": 1,
+       "gap_after": 0.005,
+       "align": "left",
+       "wrap": "greedy",
+       "line_height": 1.35,
+       "stroke": "$ink",
+       "stroke_width": 0.001,
+       "shadow": true,
+       "shadow_opacity": 0.65
+      },
+      {
+       "field": "main",
+       "font": "serif",
+       "weight": 700,
+       "size": 0.052,
+       "color": "$paper",
+       "max_lines": 2,
+       "align": "left",
+       "wrap": "phrase",
+       "drop_break_punct": true,
+       "shadow": true,
+       "shadow_blur": 0.08,
+       "shadow_opacity": 0.65,
+       "line_height": 1.28,
+       "stroke": "$ink",
+       "stroke_width": 0.0012
+      }
+     ]
+    }
+   }
+  },
+  "statement": {
+   "name": "事实说明",
+   "category": "叙事类",
+   "purpose": "放一个可独立理解的事实、定义或因果结论。",
+   "extract": "从信息点提一个主谓完整句；保留必要的人名、地名、数字和否定；不写修辞性旁白。",
+   "fields": [
+    {
+     "key": "main",
+     "label": "说明",
+     "optional": false
+    },
+    {
+     "key": "sub",
+     "label": "出处或限定",
+     "optional": true
+    }
+   ],
+   "styles": {
+    "9:16": {
+     "width": 0.58,
+     "padding": [
+      0.014,
+      0.02,
+      0.014,
+      0.02
+     ],
+     "plate": {
+      "kind": "gradient",
+      "color": "$ink",
+      "opacity": 0.74,
+      "fit": "box",
+      "direction": "up",
+      "extend": 0.025,
+      "to_edge": false,
+      "solid_from": 0.1
+     },
+     "decor": [
+      {
+       "kind": "bar",
+       "side": "left",
+       "thickness": 0.0025,
+       "color": "$gold",
+       "gap": 0.005
+      }
+     ],
+     "min_scale": 0.9,
+     "rows": [
+      {
+       "field": "main",
+       "font": "sans",
+       "weight": 500,
+       "size": 0.022,
+       "color": "$paper",
+       "max_lines": 2,
+       "align": "left",
+       "wrap": "phrase",
+       "line_height": 1.35,
+       "stroke": "$ink",
+       "stroke_width": 0.0011,
+       "shadow": true,
+       "shadow_opacity": 0.58
+      },
+      {
+       "field": "sub",
+       "font": "sans",
+       "weight": 400,
+       "size": 0.015,
+       "color": "$mist",
+       "tracking": 0.06,
+       "max_lines": 1,
+       "align": "left",
+       "wrap": "greedy",
+       "line_height": 1.35,
+       "stroke": "$ink",
+       "stroke_width": 0.001
+      }
+     ]
+    },
+    "16:9": {
+     "width": 0.42,
+     "padding": [
+      0.014,
+      0.022,
+      0.016,
+      0.022
+     ],
+     "plate": {
+      "kind": "gradient",
+      "color": "$ink",
+      "opacity": 0.74,
+      "fit": "box",
+      "direction": "up",
+      "extend": 0.025,
+      "to_edge": false,
+      "solid_from": 0.1
+     },
+     "decor": [
+      {
+       "kind": "bar",
+       "side": "left",
+       "thickness": 0.0025,
+       "color": "$gold",
+       "gap": 0.005
+      }
+     ],
+     "min_scale": 0.9,
+     "rows": [
+      {
+       "field": "main",
+       "font": "sans",
+       "weight": 500,
+       "size": 0.038,
+       "color": "$paper",
+       "max_lines": 2,
+       "align": "left",
+       "wrap": "phrase",
+       "line_height": 1.35,
+       "stroke": "$ink",
+       "stroke_width": 0.0011,
+       "shadow": true,
+       "shadow_opacity": 0.58
+      },
+      {
+       "field": "sub",
+       "font": "sans",
+       "weight": 400,
+       "size": 0.023,
+       "color": "$mist",
+       "tracking": 0.06,
+       "max_lines": 1,
+       "align": "left",
+       "wrap": "greedy",
+       "line_height": 1.35,
+       "stroke": "$ink",
+       "stroke_width": 0.001
+      }
+     ]
+    }
+   }
+  },
+  "keyword": {
+   "name": "关键词",
+   "category": "强调类",
+   "purpose": "强调一个术语、人名、地名或章节词。",
+   "extract": "只取一个不可再缩的核心词或短词组；2—8字；不带解释。",
+   "fields": [
+    {
+     "key": "main",
+     "label": "关键词",
+     "optional": false
+    },
+    {
+     "key": "sub",
+     "label": "释义",
+     "optional": true
+    }
+   ],
+   "styles": {
+    "9:16": {
+     "width": 0.58,
+     "padding": [
+      0.012,
+      0.02,
+      0.014,
+      0.02
+     ],
+     "plate": {
+      "kind": "none"
+     },
+     "decor": [
+      {
+       "kind": "bar",
+       "side": "bottom",
+       "thickness": 0.003,
+       "color": "$accent",
+       "gap": 0.004,
+       "length": 0.32
+      }
+     ],
+     "min_scale": 0.9,
+     "rows": [
+      {
+       "field": "main",
+       "font": "serif",
+       "weight": 900,
+       "size": 0.06,
+       "color": "$paper",
+       "max_lines": 1,
+       "align": "left",
+       "wrap": "greedy",
+       "shadow": true,
+       "shadow_blur": 0.08,
+       "shadow_opacity": 0.72,
+       "line_height": 1.2,
+       "stroke": "$ink",
+       "stroke_width": 0.0018
+      },
+      {
+       "field": "sub",
+       "font": "sans",
+       "weight": 500,
+       "size": 0.015,
+       "color": "$paper",
+       "tracking": 0.1,
+       "max_lines": 1,
+       "align": "left",
+       "wrap": "greedy",
+       "line_height": 1.35,
+       "stroke": "$ink",
+       "stroke_width": 0.0012,
+       "shadow": true
+      }
+     ]
+    },
+    "16:9": {
+     "width": 0.46,
+     "padding": [
+      0.014,
+      0.024,
+      0.016,
+      0.024
+     ],
+     "plate": {
+      "kind": "none"
+     },
+     "decor": [
+      {
+       "kind": "bar",
+       "side": "bottom",
+       "thickness": 0.003,
+       "color": "$accent",
+       "gap": 0.004,
+       "length": 0.32
+      }
+     ],
+     "min_scale": 0.9,
+     "rows": [
+      {
+       "field": "main",
+       "font": "serif",
+       "weight": 900,
+       "size": 0.07,
+       "color": "$paper",
+       "max_lines": 1,
+       "align": "left",
+       "wrap": "greedy",
+       "shadow": true,
+       "shadow_blur": 0.08,
+       "shadow_opacity": 0.72,
+       "line_height": 1.2,
+       "stroke": "$ink",
+       "stroke_width": 0.0018
+      },
+      {
+       "field": "sub",
+       "font": "sans",
+       "weight": 500,
+       "size": 0.023,
+       "color": "$paper",
+       "tracking": 0.1,
+       "max_lines": 1,
+       "align": "left",
+       "wrap": "greedy",
+       "line_height": 1.35,
+       "stroke": "$ink",
+       "stroke_width": 0.0012,
+       "shadow": true
+      }
+     ]
+    }
+   }
+  },
+  "quote": {
+   "name": "引文",
+   "category": "引语类",
+   "purpose": "呈现史料原句、提问或人物原话。",
+   "extract": "只选原句、史料或提问；main 必须保留引号，sub 只能写可核实的人名、书名或地点。",
+   "fields": [
+    {
+     "key": "main",
+     "label": "引文",
+     "optional": false,
+     "pattern": "[「『“\"].+[」』”\"]",
+     "pattern_hint": "引文必须包含成对引号"
+    },
+    {
+     "key": "sub",
+     "label": "出处",
+     "optional": false,
+     "pattern": "\\S+",
+     "pattern_hint": "出处必须填写可核实的人名、书名或地点"
+    }
+   ],
+   "styles": {
+    "9:16": {
+     "width": 0.58,
+     "padding": [
+      0.014,
+      0.02,
+      0.014,
+      0.02
+     ],
+     "plate": {
+      "kind": "gradient",
+      "color": "$ink",
+      "opacity": 0.82,
+      "fit": "box",
+      "direction": "up",
+      "extend": 0.025,
+      "to_edge": false,
+      "solid_from": 0.1
+     },
+     "decor": [
+      {
+       "kind": "bar",
+       "side": "left",
+       "thickness": 0.004,
+       "color": "$accent",
+       "gap": 0
+      }
+     ],
+     "min_scale": 0.9,
+     "rows": [
+      {
+       "field": "main",
+       "font": "kai",
+       "weight": 400,
+       "size": 0.025,
+       "color": "$paper",
+       "max_lines": 2,
+       "align": "left",
+       "wrap": "phrase",
+       "line_height": 1.38,
+       "stroke": "$ink",
+       "stroke_width": 0.0012,
+       "shadow": true,
+       "shadow_opacity": 0.6
+      },
+      {
+       "field": "sub",
+       "font": "sans",
+       "weight": 700,
+       "size": 0.015,
+       "color": "$gold",
+       "tracking": 0.12,
+       "max_lines": 1,
+       "align": "left",
+       "wrap": "greedy",
+       "line_height": 1.35,
+       "stroke": "$ink",
+       "stroke_width": 0.001
+      }
+     ]
+    },
+    "16:9": {
+     "width": 0.42,
+     "padding": [
+      0.016,
+      0.024,
+      0.016,
+      0.024
+     ],
+     "plate": {
+      "kind": "gradient",
+      "color": "$ink",
+      "opacity": 0.82,
+      "fit": "box",
+      "direction": "up",
+      "extend": 0.025,
+      "to_edge": false,
+      "solid_from": 0.1
+     },
+     "decor": [
+      {
+       "kind": "bar",
+       "side": "left",
+       "thickness": 0.004,
+       "color": "$accent",
+       "gap": 0
+      }
+     ],
+     "min_scale": 0.9,
+     "rows": [
+      {
+       "field": "main",
+       "font": "kai",
+       "weight": 400,
+       "size": 0.038,
+       "color": "$paper",
+       "max_lines": 2,
+       "align": "left",
+       "wrap": "phrase",
+       "line_height": 1.38,
+       "stroke": "$ink",
+       "stroke_width": 0.0012,
+       "shadow": true,
+       "shadow_opacity": 0.6
+      },
+      {
+       "field": "sub",
+       "font": "sans",
+       "weight": 700,
+       "size": 0.023,
+       "color": "$gold",
+       "tracking": 0.12,
+       "max_lines": 1,
+       "align": "left",
+       "wrap": "greedy",
+       "line_height": 1.35,
+       "stroke": "$ink",
+       "stroke_width": 0.001
+      }
+     ]
+    }
+   }
+  },
+  "metric": {
+   "name": "数据结论",
+   "category": "数据类",
+   "purpose": "突出一个量化结论、年代跨度或可比数值。",
+   "extract": "main 只放数字与紧随单位；sub 解释口径或对象，最多14字。",
+   "fields": [
+    {
+     "key": "main",
+     "label": "数值",
+     "optional": false
+    },
+    {
+     "key": "sub",
+     "label": "指标",
+     "optional": false
+    }
+   ],
+   "styles": {
+    "9:16": {
+     "width": 0.58,
+     "padding": [
+      0.014,
+      0.02,
+      0.014,
+      0.02
+     ],
+     "plate": {
+      "kind": "none"
+     },
+     "decor": [
+      {
+       "kind": "bar",
+       "side": "top",
+       "thickness": 0.002,
+       "color": "$accent",
+       "gap": 0.005,
+       "length": 0.16
+      }
+     ],
+     "min_scale": 0.9,
+     "rows": [
+      {
+       "field": "main",
+       "font": "serif",
+       "weight": 900,
+       "size": 0.052,
+       "color": "$paper",
+       "max_lines": 1,
+       "align": "left",
+       "wrap": "greedy",
+       "line_height": 1.2,
+       "stroke": "$ink",
+       "stroke_width": 0.0018,
+       "shadow": true,
+       "shadow_opacity": 0.72
+      },
+      {
+       "type": "rule",
+       "thickness": 0.0012,
+       "length": 0.42,
+       "color": "$accent",
+       "gap": 0.004,
+       "align": "left"
+      },
+      {
+       "field": "sub",
+       "font": "sans",
+       "weight": 700,
+       "size": 0.015,
+       "color": "$paper",
+       "tracking": 0.06,
+       "max_lines": 1,
+       "align": "left",
+       "wrap": "greedy",
+       "line_height": 1.35,
+       "stroke": "$ink",
+       "stroke_width": 0.0012,
+       "shadow": true
+      }
+     ]
+    },
+    "16:9": {
+     "width": 0.42,
+     "padding": [
+      0.016,
+      0.024,
+      0.016,
+      0.024
+     ],
+     "plate": {
+      "kind": "none"
+     },
+     "decor": [
+      {
+       "kind": "bar",
+       "side": "top",
+       "thickness": 0.002,
+       "color": "$accent",
+       "gap": 0.005,
+       "length": 0.16
+      }
+     ],
+     "min_scale": 0.9,
+     "rows": [
+      {
+       "field": "main",
+       "font": "serif",
+       "weight": 900,
+       "size": 0.065,
+       "color": "$paper",
+       "max_lines": 1,
+       "align": "left",
+       "wrap": "greedy",
+       "line_height": 1.2,
+       "stroke": "$ink",
+       "stroke_width": 0.0018,
+       "shadow": true,
+       "shadow_opacity": 0.72
+      },
+      {
+       "type": "rule",
+       "thickness": 0.0012,
+       "length": 0.42,
+       "color": "$accent",
+       "gap": 0.004,
+       "align": "left"
+      },
+      {
+       "field": "sub",
+       "font": "sans",
+       "weight": 700,
+       "size": 0.023,
+       "color": "$paper",
+       "tracking": 0.06,
+       "max_lines": 1,
+       "align": "left",
+       "wrap": "greedy",
+       "line_height": 1.35,
+       "stroke": "$ink",
+       "stroke_width": 0.0012,
+       "shadow": true
+      }
+     ]
+    }
+   }
+  },
+  "bullets": {
+   "name": "要点列表",
+   "category": "结构类",
+   "purpose": "把并列的最多三项事实压缩为可扫读清单。",
+   "extract": "每项是同一语法层级的短语，超过三项拆拍。",
+   "fields": [
+    {
+     "key": "items",
+     "label": "要点",
+     "optional": false
+    }
+   ],
+   "styles": {
+    "9:16": {
+     "width": 0.58,
+     "padding": [
+      0.014,
+      0.02,
+      0.014,
+      0.02
+     ],
+     "plate": {
+      "kind": "gradient",
+      "color": "$ink",
+      "opacity": 0.74,
+      "fit": "box",
+      "direction": "up",
+      "extend": 0.025,
+      "to_edge": false,
+      "solid_from": 0.1
+     },
+     "decor": [
+      {
+       "kind": "bar",
+       "side": "top",
+       "thickness": 0.002,
+       "color": "$gold",
+       "gap": 0.004,
+       "length": 0.28
+      }
+     ],
+     "min_scale": 0.9,
+     "rows": [
+      {
+       "type": "list",
+       "field": "items",
+       "marker": "square",
+       "marker_color": "$accent",
+       "size": 0.021,
+       "font": "sans",
+       "weight": 500,
+       "color": "$paper",
+       "max_items": 3,
+       "item_max_lines": 1,
+       "item_gap": 0.007,
+       "line_height": 1.35,
+       "stroke": "$ink",
+       "stroke_width": 0.0011,
+       "shadow": true,
+       "shadow_opacity": 0.58
+      }
+     ]
+    },
+    "16:9": {
+     "width": 0.42,
+     "padding": [
+      0.016,
+      0.024,
+      0.016,
+      0.024
+     ],
+     "plate": {
+      "kind": "gradient",
+      "color": "$ink",
+      "opacity": 0.74,
+      "fit": "box",
+      "direction": "up",
+      "extend": 0.025,
+      "to_edge": false,
+      "solid_from": 0.1
+     },
+     "decor": [
+      {
+       "kind": "bar",
+       "side": "top",
+       "thickness": 0.002,
+       "color": "$gold",
+       "gap": 0.004,
+       "length": 0.28
+      }
+     ],
+     "min_scale": 0.9,
+     "rows": [
+      {
+       "type": "list",
+       "field": "items",
+       "marker": "square",
+       "marker_color": "$accent",
+       "size": 0.038,
+       "font": "sans",
+       "weight": 500,
+       "color": "$paper",
+       "max_items": 3,
+       "item_max_lines": 1,
+       "item_gap": 0.008,
+       "line_height": 1.35,
+       "stroke": "$ink",
+       "stroke_width": 0.0011,
+       "shadow": true,
+       "shadow_opacity": 0.58
+      }
+     ]
+    }
+   }
+  },
+  "poster_project": {
+   "name": "栏目识别",
+   "category": "海报类",
+   "purpose": "标识项目名和集数，只用于 Poster。",
+   "extract": "项目名原样；集号用“第N集”，不写营销语。",
+   "fields": [
+    {
+     "key": "main",
+     "label": "项目名",
+     "optional": false
+    },
+    {
+     "key": "sub",
+     "label": "集号",
+     "optional": true
+    }
+   ],
+   "styles": {
+    "9:16": {
+     "width": 0.46,
+     "padding": [
+      0.008,
+      0.014,
+      0.008,
+      0.014
+     ],
+     "plate": {
+      "kind": "solid",
+      "color": "$ink",
+      "opacity": 0.84,
+      "radius": 0,
+      "fit": "content"
+     },
+     "decor": [
+      {
+       "kind": "bar",
+       "side": "left",
+       "thickness": 0.002,
+       "color": "$accent",
+       "gap": 0.003
+      }
+     ],
+     "min_scale": 0.95,
+     "rows": [
+      {
+       "field": "main",
+       "font": "sans",
+       "weight": 700,
+       "size": 0.015,
+       "color": "$paper",
+       "tracking": 0.12,
+       "max_lines": 1,
+       "align": "left",
+       "wrap": "greedy",
+       "line_height": 1.35
+      },
+      {
+       "field": "sub",
+       "font": "sans",
+       "weight": 500,
+       "size": 0.015,
+       "color": "$gold",
+       "tracking": 0.08,
+       "max_lines": 1,
+       "align": "left",
+       "wrap": "greedy",
+       "line_height": 1.35
+      }
+     ]
+    },
+    "16:9": {
+     "width": 0.42,
+     "padding": [
+      0.01,
+      0.016,
+      0.01,
+      0.016
+     ],
+     "plate": {
+      "kind": "solid",
+      "color": "$ink",
+      "opacity": 0.84,
+      "radius": 0,
+      "fit": "content"
+     },
+     "decor": [
+      {
+       "kind": "bar",
+       "side": "left",
+       "thickness": 0.002,
+       "color": "$accent",
+       "gap": 0.003
+      }
+     ],
+     "min_scale": 0.95,
+     "rows": [
+      {
+       "field": "main",
+       "font": "sans",
+       "weight": 700,
+       "size": 0.023,
+       "color": "$paper",
+       "tracking": 0.12,
+       "max_lines": 1,
+       "align": "left",
+       "wrap": "greedy",
+       "line_height": 1.35
+      },
+      {
+       "field": "sub",
+       "font": "sans",
+       "weight": 500,
+       "size": 0.023,
+       "color": "$gold",
+       "tracking": 0.08,
+       "max_lines": 1,
+       "align": "left",
+       "wrap": "greedy",
+       "line_height": 1.35
+      }
+     ]
+    }
+   }
+  },
+  "poster_title": {
+   "name": "海报主标题",
+   "category": "海报类",
+   "purpose": "承载本集唯一的主叙事钩子。",
+   "extract": "常规片名压缩为6—12字；在语义短语或标点后断行，必要时 fields 中写手动换行；侧栏窄套上限为6字。",
+   "fields": [
+    {
+     "key": "main",
+     "label": "主标题",
+     "optional": false
+    }
+   ],
+   "styles": {
+    "9:16": {
+     "width": 0.58,
+     "padding": [
+      0.016,
+      0.02,
+      0.016,
+      0.02
+     ],
+     "plate": {
+      "kind": "scrim",
+      "color": "$ink",
+      "opacity": 0.56,
+      "extend": [
+       0.014,
+       0.018,
+       0.016,
+       0.018
+      ],
+      "feather": 0.018
+     },
+     "decor": [
+      {
+       "kind": "bar",
+       "side": "top",
+       "thickness": 0.0025,
+       "color": "$accent",
+       "gap": 0.005,
+       "length": 0.24
+      }
+     ],
+     "min_scale": 0.9,
+     "rows": [
+      {
+       "field": "main",
+       "font": "serif",
+       "weight": 900,
+       "size": 0.046,
+       "color": "$paper",
+       "max_lines": 2,
+       "align": "left",
+       "wrap": "phrase",
+       "shadow": true,
+       "shadow_blur": 0.08,
+       "shadow_opacity": 0.72,
+       "line_height": 1.23,
+       "stroke": "$ink",
+       "stroke_width": 0.0015
+      }
+     ]
+    },
+    "16:9": {
+     "width": 0.46,
+     "padding": [
+      0.018,
+      0.026,
+      0.018,
+      0.026
+     ],
+     "plate": {
+      "kind": "scrim",
+      "color": "$ink",
+      "opacity": 0.56,
+      "extend": [
+       0.014,
+       0.022,
+       0.016,
+       0.022
+      ],
+      "feather": 0.018
+     },
+     "decor": [
+      {
+       "kind": "bar",
+       "side": "top",
+       "thickness": 0.0025,
+       "color": "$accent",
+       "gap": 0.005,
+       "length": 0.24
+      }
+     ],
+     "min_scale": 0.9,
+     "rows": [
+      {
+       "field": "main",
+       "font": "serif",
+       "weight": 900,
+       "size": 0.082,
+       "color": "$paper",
+       "max_lines": 2,
+       "align": "left",
+       "wrap": "phrase",
+       "shadow": true,
+       "shadow_blur": 0.08,
+       "shadow_opacity": 0.72,
+       "line_height": 1.23,
+       "stroke": "$ink",
+       "stroke_width": 0.0015
+      }
+     ]
+    }
+   }
+  },
+  "poster_details": {
+   "name": "海报信息卡",
+   "category": "海报类",
+   "purpose": "收纳副标题、年代、地点与3条结构化卖点；仅用于 Poster。",
+   "extract": "副标题、年代、地点各一行；要点最多3条，每条16字内。",
+   "fields": [
+    {
+     "key": "subtitle",
+     "label": "副标题",
+     "optional": false
+    },
+    {
+     "key": "era",
+     "label": "年代",
+     "optional": false
+    },
+    {
+     "key": "place",
+     "label": "地点",
+     "optional": false
+    },
+    {
+     "key": "items",
+     "label": "要点",
+     "optional": false
+    }
+   ],
+   "styles": {
+    "9:16": {
+     "width": 0.5,
+     "padding": [
+      0.014,
+      0.02,
+      0.016,
+      0.02
+     ],
+     "plate": {
+      "kind": "gradient",
+      "color": "$ink",
+      "opacity": 0.84,
+      "fit": "box",
+      "direction": "up",
+      "extend": 0.02,
+      "to_edge": false,
+      "solid_from": 0.08
+     },
+     "decor": [
+      {
+       "kind": "bar",
+       "side": "left",
+       "thickness": 0.004,
+       "color": "$accent",
+       "gap": 0.004
+      }
+     ],
+     "min_scale": 0.9,
+     "rows": [
+      {
+       "field": "subtitle",
+       "font": "sans",
+       "weight": 500,
+       "size": 0.022,
+       "color": "$paper",
+       "max_lines": 2,
+       "gap_after": 0.008,
+       "align": "left",
+       "wrap": "phrase",
+       "line_height": 1.35,
+       "stroke": "$ink",
+       "stroke_width": 0.001
+      },
+      {
+       "field": "era",
+       "font": "sans",
+       "weight": 700,
+       "size": 0.016,
+       "color": "$gold",
+       "tracking": 0.05,
+       "max_lines": 1,
+       "gap_after": 0.004,
+       "align": "left",
+       "wrap": "greedy",
+       "line_height": 1.35
+      },
+      {
+       "field": "place",
+       "font": "sans",
+       "weight": 500,
+       "size": 0.016,
+       "color": "$mist",
+       "max_lines": 1,
+       "gap_after": 0.008,
+       "align": "left",
+       "wrap": "greedy",
+       "line_height": 1.35
+      },
+      {
+       "type": "list",
+       "field": "items",
+       "marker": "square",
+       "marker_color": "$accent",
+       "size": 0.016,
+       "font": "sans",
+       "weight": 500,
+       "color": "$paper",
+       "max_items": 3,
+       "item_max_lines": 1,
+       "item_gap": 0.005,
+       "line_height": 1.35
+      }
+     ]
+    },
+    "16:9": {
+     "width": 0.38,
+     "padding": [
+      0.018,
+      0.026,
+      0.02,
+      0.026
+     ],
+     "plate": {
+      "kind": "gradient",
+      "color": "$ink",
+      "opacity": 0.84,
+      "fit": "box",
+      "direction": "up",
+      "extend": 0.02,
+      "to_edge": false,
+      "solid_from": 0.08
+     },
+     "decor": [
+      {
+       "kind": "bar",
+       "side": "left",
+       "thickness": 0.004,
+       "color": "$accent",
+       "gap": 0.004
+      }
+     ],
+     "min_scale": 0.9,
+     "rows": [
+      {
+       "field": "subtitle",
+       "font": "sans",
+       "weight": 500,
+       "size": 0.037,
+       "color": "$paper",
+       "max_lines": 2,
+       "gap_after": 0.008,
+       "align": "left",
+       "wrap": "phrase",
+       "line_height": 1.35,
+       "stroke": "$ink",
+       "stroke_width": 0.001
+      },
+      {
+       "field": "era",
+       "font": "sans",
+       "weight": 700,
+       "size": 0.025,
+       "color": "$gold",
+       "tracking": 0.05,
+       "max_lines": 1,
+       "gap_after": 0.004,
+       "align": "left",
+       "wrap": "greedy",
+       "line_height": 1.35
+      },
+      {
+       "field": "place",
+       "font": "sans",
+       "weight": 500,
+       "size": 0.025,
+       "color": "$mist",
+       "max_lines": 1,
+       "gap_after": 0.008,
+       "align": "left",
+       "wrap": "greedy",
+       "line_height": 1.35
+      },
+      {
+       "type": "list",
+       "field": "items",
+       "marker": "square",
+       "marker_color": "$accent",
+       "size": 0.025,
+       "font": "sans",
+       "weight": 500,
+       "color": "$paper",
+       "max_items": 3,
+       "item_max_lines": 1,
+       "item_gap": 0.005,
+       "line_height": 1.35
+      }
+     ]
+    }
+   }
+  }
+ },
+ "layouts": {
+  "9:16/video": [
+   {
+    "id": "v-left-column",
+    "name": "左上语境／左中主叙事／左下关键词",
+    "slots": [
+     {
+      "id": "date",
+      "role": "date",
+      "x": 0.12,
+      "y": 0.17,
+      "anchor": "top-left",
+      "zone": "context"
+     },
+     {
+      "id": "heading",
+      "role": "heading",
+      "x": 0.12,
+      "y": 0.29,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "statement",
+      "role": "statement",
+      "x": 0.12,
+      "y": 0.29,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "quote",
+      "role": "quote",
+      "x": 0.12,
+      "y": 0.29,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "metric",
+      "role": "metric",
+      "x": 0.12,
+      "y": 0.29,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "bullets",
+      "role": "bullets",
+      "x": 0.12,
+      "y": 0.29,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "keyword",
+      "role": "keyword",
+      "x": 0.12,
+      "y": 0.62,
+      "anchor": "bottom-left",
+      "zone": "emphasis"
+     }
+    ]
+   },
+   {
+    "id": "v-right-ledger",
+    "name": "右上语境／右中主叙事／右下关键词",
+    "slots": [
+     {
+      "id": "date",
+      "role": "date",
+      "x": 0.712,
+      "y": 0.17,
+      "anchor": "top-right",
+      "align": "right",
+      "zone": "context"
+     },
+     {
+      "id": "heading",
+      "role": "heading",
+      "x": 0.712,
+      "y": 0.29,
+      "anchor": "top-right",
+      "align": "right",
+      "zone": "primary"
+     },
+     {
+      "id": "statement",
+      "role": "statement",
+      "x": 0.712,
+      "y": 0.29,
+      "anchor": "top-right",
+      "align": "right",
+      "zone": "primary"
+     },
+     {
+      "id": "quote",
+      "role": "quote",
+      "x": 0.712,
+      "y": 0.29,
+      "anchor": "top-right",
+      "align": "right",
+      "zone": "primary"
+     },
+     {
+      "id": "metric",
+      "role": "metric",
+      "x": 0.712,
+      "y": 0.29,
+      "anchor": "top-right",
+      "align": "right",
+      "zone": "primary"
+     },
+     {
+      "id": "bullets",
+      "role": "bullets",
+      "x": 0.712,
+      "y": 0.29,
+      "anchor": "top-right",
+      "align": "right",
+      "zone": "primary"
+     },
+     {
+      "id": "keyword",
+      "role": "keyword",
+      "x": 0.712,
+      "y": 0.62,
+      "anchor": "bottom-right",
+      "align": "right",
+      "zone": "emphasis"
+     }
+    ]
+   },
+   {
+    "id": "v-center-top",
+    "name": "上中语境／中部主叙事／下中关键词",
+    "slots": [
+     {
+      "id": "date",
+      "role": "date",
+      "x": 0.5,
+      "y": 0.17,
+      "anchor": "top-center",
+      "align": "center",
+      "zone": "context"
+     },
+     {
+      "id": "heading",
+      "role": "heading",
+      "x": 0.5,
+      "y": 0.29,
+      "anchor": "top-center",
+      "align": "center",
+      "zone": "primary"
+     },
+     {
+      "id": "statement",
+      "role": "statement",
+      "x": 0.5,
+      "y": 0.29,
+      "anchor": "top-center",
+      "align": "center",
+      "zone": "primary"
+     },
+     {
+      "id": "quote",
+      "role": "quote",
+      "x": 0.5,
+      "y": 0.29,
+      "anchor": "top-center",
+      "align": "center",
+      "zone": "primary"
+     },
+     {
+      "id": "metric",
+      "role": "metric",
+      "x": 0.5,
+      "y": 0.29,
+      "anchor": "top-center",
+      "align": "center",
+      "zone": "primary"
+     },
+     {
+      "id": "bullets",
+      "role": "bullets",
+      "x": 0.5,
+      "y": 0.29,
+      "anchor": "top-center",
+      "align": "center",
+      "zone": "primary"
+     },
+     {
+      "id": "keyword",
+      "role": "keyword",
+      "x": 0.405,
+      "y": 0.62,
+      "anchor": "bottom-center",
+      "align": "center",
+      "zone": "emphasis"
+     }
+    ]
+   },
+   {
+    "id": "v-left-low",
+    "name": "左上关键词／左中语境／左下主叙事",
+    "slots": [
+     {
+      "id": "date",
+      "role": "date",
+      "x": 0.12,
+      "y": 0.34,
+      "anchor": "top-left",
+      "zone": "context"
+     },
+     {
+      "id": "heading",
+      "role": "heading",
+      "x": 0.12,
+      "y": 0.43,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "statement",
+      "role": "statement",
+      "x": 0.12,
+      "y": 0.43,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "quote",
+      "role": "quote",
+      "x": 0.12,
+      "y": 0.43,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "metric",
+      "role": "metric",
+      "x": 0.12,
+      "y": 0.43,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "bullets",
+      "role": "bullets",
+      "x": 0.12,
+      "y": 0.43,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "keyword",
+      "role": "keyword",
+      "x": 0.12,
+      "y": 0.18,
+      "anchor": "top-left",
+      "zone": "emphasis"
+     }
+    ]
+   }
+  ],
+  "16:9/video": [
+   {
+    "id": "h-left-stack",
+    "name": "左上语境／左中主叙事／左下关键词",
+    "slots": [
+     {
+      "id": "date",
+      "role": "date",
+      "x": 0.07,
+      "y": 0.1,
+      "anchor": "top-left",
+      "zone": "context"
+     },
+     {
+      "id": "heading",
+      "role": "heading",
+      "x": 0.07,
+      "y": 0.22,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "statement",
+      "role": "statement",
+      "x": 0.07,
+      "y": 0.22,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "quote",
+      "role": "quote",
+      "x": 0.07,
+      "y": 0.22,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "metric",
+      "role": "metric",
+      "x": 0.07,
+      "y": 0.22,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "bullets",
+      "role": "bullets",
+      "x": 0.07,
+      "y": 0.22,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "keyword",
+      "role": "keyword",
+      "x": 0.07,
+      "y": 0.72,
+      "anchor": "bottom-left",
+      "zone": "emphasis"
+     }
+    ]
+   },
+   {
+    "id": "h-right-stack",
+    "name": "右上语境／右中主叙事／右下关键词",
+    "slots": [
+     {
+      "id": "date",
+      "role": "date",
+      "x": 0.93,
+      "y": 0.1,
+      "anchor": "top-right",
+      "align": "right",
+      "zone": "context"
+     },
+     {
+      "id": "heading",
+      "role": "heading",
+      "x": 0.93,
+      "y": 0.22,
+      "anchor": "top-right",
+      "align": "right",
+      "zone": "primary"
+     },
+     {
+      "id": "statement",
+      "role": "statement",
+      "x": 0.93,
+      "y": 0.22,
+      "anchor": "top-right",
+      "align": "right",
+      "zone": "primary"
+     },
+     {
+      "id": "quote",
+      "role": "quote",
+      "x": 0.93,
+      "y": 0.22,
+      "anchor": "top-right",
+      "align": "right",
+      "zone": "primary"
+     },
+     {
+      "id": "metric",
+      "role": "metric",
+      "x": 0.93,
+      "y": 0.22,
+      "anchor": "top-right",
+      "align": "right",
+      "zone": "primary"
+     },
+     {
+      "id": "bullets",
+      "role": "bullets",
+      "x": 0.93,
+      "y": 0.22,
+      "anchor": "top-right",
+      "align": "right",
+      "zone": "primary"
+     },
+     {
+      "id": "keyword",
+      "role": "keyword",
+      "x": 0.93,
+      "y": 0.72,
+      "anchor": "bottom-right",
+      "align": "right",
+      "zone": "emphasis"
+     }
+    ]
+   },
+   {
+    "id": "h-center-top",
+    "name": "上中语境／中部主叙事／下中关键词",
+    "slots": [
+     {
+      "id": "date",
+      "role": "date",
+      "x": 0.5,
+      "y": 0.1,
+      "anchor": "top-center",
+      "align": "center",
+      "zone": "context"
+     },
+     {
+      "id": "heading",
+      "role": "heading",
+      "x": 0.5,
+      "y": 0.22,
+      "anchor": "top-center",
+      "align": "center",
+      "zone": "primary"
+     },
+     {
+      "id": "statement",
+      "role": "statement",
+      "x": 0.5,
+      "y": 0.22,
+      "anchor": "top-center",
+      "align": "center",
+      "zone": "primary"
+     },
+     {
+      "id": "quote",
+      "role": "quote",
+      "x": 0.5,
+      "y": 0.22,
+      "anchor": "top-center",
+      "align": "center",
+      "zone": "primary"
+     },
+     {
+      "id": "metric",
+      "role": "metric",
+      "x": 0.5,
+      "y": 0.22,
+      "anchor": "top-center",
+      "align": "center",
+      "zone": "primary"
+     },
+     {
+      "id": "bullets",
+      "role": "bullets",
+      "x": 0.5,
+      "y": 0.22,
+      "anchor": "top-center",
+      "align": "center",
+      "zone": "primary"
+     },
+     {
+      "id": "keyword",
+      "role": "keyword",
+      "x": 0.5,
+      "y": 0.72,
+      "anchor": "bottom-center",
+      "align": "center",
+      "zone": "emphasis"
+     }
+    ]
+   },
+   {
+    "id": "h-bottom-left",
+    "name": "左上关键词／左中语境／左下主叙事",
+    "slots": [
+     {
+      "id": "date",
+      "role": "date",
+      "x": 0.07,
+      "y": 0.49,
+      "anchor": "top-left",
+      "zone": "context"
+     },
+     {
+      "id": "heading",
+      "role": "heading",
+      "x": 0.07,
+      "y": 0.63,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "statement",
+      "role": "statement",
+      "x": 0.07,
+      "y": 0.63,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "quote",
+      "role": "quote",
+      "x": 0.07,
+      "y": 0.63,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "metric",
+      "role": "metric",
+      "x": 0.07,
+      "y": 0.63,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "bullets",
+      "role": "bullets",
+      "x": 0.07,
+      "y": 0.63,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "keyword",
+      "role": "keyword",
+      "x": 0.07,
+      "y": 0.12,
+      "anchor": "top-left",
+      "zone": "emphasis"
+     }
+    ]
+   }
+  ],
+  "9:16/poster": [
+   {
+    "id": "p-vertical-left",
+    "name": "左侧留白：栏目／片名／档案信息",
+    "slots": [
+     {
+      "id": "project",
+      "role": "poster_project",
+      "x": 0.1,
+      "y": 0.17,
+      "anchor": "top-left",
+      "zone": "context"
+     },
+     {
+      "id": "title",
+      "role": "poster_title",
+      "x": 0.06,
+      "y": 0.25,
+      "anchor": "top-left",
+      "zone": "primary",
+      "w": 0.316
+     },
+     {
+      "id": "details",
+      "role": "poster_details",
+      "x": 0.1,
+      "y": 0.84,
+      "anchor": "bottom-left",
+      "zone": "archive"
+     },
+     {
+      "id": "date",
+      "role": "date",
+      "x": 0.07,
+      "y": 0.25,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "heading",
+      "role": "heading",
+      "x": 0.07,
+      "y": 0.25,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "statement",
+      "role": "statement",
+      "x": 0.07,
+      "y": 0.25,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "keyword",
+      "role": "keyword",
+      "x": 0.07,
+      "y": 0.25,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "quote",
+      "role": "quote",
+      "x": 0.07,
+      "y": 0.25,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "metric",
+      "role": "metric",
+      "x": 0.07,
+      "y": 0.25,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "bullets",
+      "role": "bullets",
+      "x": 0.07,
+      "y": 0.25,
+      "anchor": "top-left",
+      "zone": "primary"
+     }
+    ]
+   },
+   {
+    "id": "p-vertical-right",
+    "name": "右侧档案",
+    "slots": [
+     {
+      "id": "project",
+      "role": "poster_project",
+      "x": 0.9,
+      "y": 0.17,
+      "anchor": "top-right",
+      "align": "right",
+      "zone": "context"
+     },
+     {
+      "id": "title",
+      "role": "poster_title",
+      "x": 0.9,
+      "y": 0.25,
+      "anchor": "top-right",
+      "align": "right",
+      "zone": "primary",
+      "w": 0.316
+     },
+     {
+      "id": "details",
+      "role": "poster_details",
+      "x": 0.9,
+      "y": 0.84,
+      "anchor": "bottom-right",
+      "align": "right",
+      "zone": "archive"
+     },
+     {
+      "id": "date",
+      "role": "date",
+      "x": 0.9,
+      "y": 0.25,
+      "anchor": "top-right",
+      "align": "right",
+      "zone": "primary"
+     },
+     {
+      "id": "heading",
+      "role": "heading",
+      "x": 0.9,
+      "y": 0.25,
+      "anchor": "top-right",
+      "align": "right",
+      "zone": "primary"
+     },
+     {
+      "id": "statement",
+      "role": "statement",
+      "x": 0.9,
+      "y": 0.25,
+      "anchor": "top-right",
+      "align": "right",
+      "zone": "primary"
+     },
+     {
+      "id": "keyword",
+      "role": "keyword",
+      "x": 0.9,
+      "y": 0.25,
+      "anchor": "top-right",
+      "align": "right",
+      "zone": "primary"
+     },
+     {
+      "id": "quote",
+      "role": "quote",
+      "x": 0.9,
+      "y": 0.25,
+      "anchor": "top-right",
+      "align": "right",
+      "zone": "primary"
+     },
+     {
+      "id": "metric",
+      "role": "metric",
+      "x": 0.9,
+      "y": 0.25,
+      "anchor": "top-right",
+      "align": "right",
+      "zone": "primary"
+     },
+     {
+      "id": "bullets",
+      "role": "bullets",
+      "x": 0.9,
+      "y": 0.25,
+      "anchor": "top-right",
+      "align": "right",
+      "zone": "primary"
+     }
+    ]
+   },
+   {
+    "id": "p-vertical-top",
+    "name": "上中片名",
+    "slots": [
+     {
+      "id": "project",
+      "role": "poster_project",
+      "x": 0.5,
+      "y": 0.17,
+      "anchor": "top-center",
+      "align": "center",
+      "zone": "context"
+     },
+     {
+      "id": "title",
+      "role": "poster_title",
+      "x": 0.5,
+      "y": 0.25,
+      "anchor": "top-center",
+      "align": "center",
+      "zone": "primary",
+      "w": 0.58
+     },
+     {
+      "id": "details",
+      "role": "poster_details",
+      "x": 0.1,
+      "y": 0.84,
+      "anchor": "bottom-left",
+      "zone": "archive"
+     },
+     {
+      "id": "date",
+      "role": "date",
+      "x": 0.5,
+      "y": 0.25,
+      "anchor": "top-center",
+      "align": "center",
+      "zone": "primary"
+     },
+     {
+      "id": "heading",
+      "role": "heading",
+      "x": 0.5,
+      "y": 0.25,
+      "anchor": "top-center",
+      "align": "center",
+      "zone": "primary"
+     },
+     {
+      "id": "statement",
+      "role": "statement",
+      "x": 0.5,
+      "y": 0.25,
+      "anchor": "top-center",
+      "align": "center",
+      "zone": "primary"
+     },
+     {
+      "id": "keyword",
+      "role": "keyword",
+      "x": 0.5,
+      "y": 0.25,
+      "anchor": "top-center",
+      "align": "center",
+      "zone": "primary"
+     },
+     {
+      "id": "quote",
+      "role": "quote",
+      "x": 0.5,
+      "y": 0.25,
+      "anchor": "top-center",
+      "align": "center",
+      "zone": "primary"
+     },
+     {
+      "id": "metric",
+      "role": "metric",
+      "x": 0.5,
+      "y": 0.25,
+      "anchor": "top-center",
+      "align": "center",
+      "zone": "primary"
+     },
+     {
+      "id": "bullets",
+      "role": "bullets",
+      "x": 0.5,
+      "y": 0.25,
+      "anchor": "top-center",
+      "align": "center",
+      "zone": "primary"
+     }
+    ]
+   },
+   {
+    "id": "p-vertical-bottom",
+    "name": "下部档案",
+    "slots": [
+     {
+      "id": "project",
+      "role": "poster_project",
+      "x": 0.1,
+      "y": 0.17,
+      "anchor": "top-left",
+      "zone": "context"
+     },
+     {
+      "id": "title",
+      "role": "poster_title",
+      "x": 0.1,
+      "y": 0.25,
+      "anchor": "top-left",
+      "zone": "primary",
+      "w": 0.58
+     },
+     {
+      "id": "details",
+      "role": "poster_details",
+      "x": 0.5,
+      "y": 0.84,
+      "anchor": "bottom-center",
+      "align": "center",
+      "zone": "archive"
+     },
+     {
+      "id": "date",
+      "role": "date",
+      "x": 0.1,
+      "y": 0.25,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "heading",
+      "role": "heading",
+      "x": 0.1,
+      "y": 0.25,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "statement",
+      "role": "statement",
+      "x": 0.1,
+      "y": 0.25,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "keyword",
+      "role": "keyword",
+      "x": 0.1,
+      "y": 0.25,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "quote",
+      "role": "quote",
+      "x": 0.1,
+      "y": 0.25,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "metric",
+      "role": "metric",
+      "x": 0.1,
+      "y": 0.25,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "bullets",
+      "role": "bullets",
+      "x": 0.1,
+      "y": 0.25,
+      "anchor": "top-left",
+      "zone": "primary"
+     }
+    ]
+   }
+  ],
+  "16:9/poster": [
+   {
+    "id": "p-landscape-left",
+    "name": "左侧片名",
+    "slots": [
+     {
+      "id": "project",
+      "role": "poster_project",
+      "x": 0.08,
+      "y": 0.1,
+      "anchor": "top-left",
+      "zone": "context"
+     },
+     {
+      "id": "title",
+      "role": "poster_title",
+      "x": 0.08,
+      "y": 0.19,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "details",
+      "role": "poster_details",
+      "x": 0.08,
+      "y": 0.91,
+      "anchor": "bottom-left",
+      "zone": "archive"
+     },
+     {
+      "id": "date",
+      "role": "date",
+      "x": 0.08,
+      "y": 0.19,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "heading",
+      "role": "heading",
+      "x": 0.08,
+      "y": 0.19,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "statement",
+      "role": "statement",
+      "x": 0.08,
+      "y": 0.19,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "keyword",
+      "role": "keyword",
+      "x": 0.08,
+      "y": 0.19,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "quote",
+      "role": "quote",
+      "x": 0.08,
+      "y": 0.19,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "metric",
+      "role": "metric",
+      "x": 0.08,
+      "y": 0.19,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "bullets",
+      "role": "bullets",
+      "x": 0.08,
+      "y": 0.19,
+      "anchor": "top-left",
+      "zone": "primary"
+     }
+    ]
+   },
+   {
+    "id": "p-landscape-right",
+    "name": "右侧片名",
+    "slots": [
+     {
+      "id": "project",
+      "role": "poster_project",
+      "x": 0.92,
+      "y": 0.1,
+      "anchor": "top-right",
+      "align": "right",
+      "zone": "context"
+     },
+     {
+      "id": "title",
+      "role": "poster_title",
+      "x": 0.92,
+      "y": 0.19,
+      "anchor": "top-right",
+      "align": "right",
+      "zone": "primary"
+     },
+     {
+      "id": "details",
+      "role": "poster_details",
+      "x": 0.78,
+      "y": 0.82,
+      "anchor": "bottom-right",
+      "align": "right",
+      "zone": "archive"
+     },
+     {
+      "id": "date",
+      "role": "date",
+      "x": 0.92,
+      "y": 0.19,
+      "anchor": "top-right",
+      "align": "right",
+      "zone": "primary"
+     },
+     {
+      "id": "heading",
+      "role": "heading",
+      "x": 0.92,
+      "y": 0.19,
+      "anchor": "top-right",
+      "align": "right",
+      "zone": "primary"
+     },
+     {
+      "id": "statement",
+      "role": "statement",
+      "x": 0.92,
+      "y": 0.19,
+      "anchor": "top-right",
+      "align": "right",
+      "zone": "primary"
+     },
+     {
+      "id": "keyword",
+      "role": "keyword",
+      "x": 0.92,
+      "y": 0.19,
+      "anchor": "top-right",
+      "align": "right",
+      "zone": "primary"
+     },
+     {
+      "id": "quote",
+      "role": "quote",
+      "x": 0.92,
+      "y": 0.19,
+      "anchor": "top-right",
+      "align": "right",
+      "zone": "primary"
+     },
+     {
+      "id": "metric",
+      "role": "metric",
+      "x": 0.92,
+      "y": 0.19,
+      "anchor": "top-right",
+      "align": "right",
+      "zone": "primary"
+     },
+     {
+      "id": "bullets",
+      "role": "bullets",
+      "x": 0.92,
+      "y": 0.19,
+      "anchor": "top-right",
+      "align": "right",
+      "zone": "primary"
+     }
+    ]
+   },
+   {
+    "id": "p-landscape-bottom",
+    "name": "左上片名／左下档案（收窄）",
+    "slots": [
+     {
+      "id": "project",
+      "role": "poster_project",
+      "x": 0.08,
+      "y": 0.1,
+      "anchor": "top-left",
+      "zone": "context"
+     },
+     {
+      "id": "title",
+      "role": "poster_title",
+      "x": 0.08,
+      "y": 0.19,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "details",
+      "role": "poster_details",
+      "x": 0.08,
+      "y": 0.91,
+      "anchor": "bottom-left",
+      "zone": "archive",
+      "w": 0.35
+     },
+     {
+      "id": "date",
+      "role": "date",
+      "x": 0.08,
+      "y": 0.19,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "heading",
+      "role": "heading",
+      "x": 0.08,
+      "y": 0.19,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "statement",
+      "role": "statement",
+      "x": 0.08,
+      "y": 0.19,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "keyword",
+      "role": "keyword",
+      "x": 0.08,
+      "y": 0.19,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "quote",
+      "role": "quote",
+      "x": 0.08,
+      "y": 0.19,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "metric",
+      "role": "metric",
+      "x": 0.08,
+      "y": 0.19,
+      "anchor": "top-left",
+      "zone": "primary"
+     },
+     {
+      "id": "bullets",
+      "role": "bullets",
+      "x": 0.08,
+      "y": 0.19,
+      "anchor": "top-left",
+      "zone": "primary"
+     }
+    ]
+   },
+   {
+    "id": "p-landscape-top",
+    "name": "上中片名",
+    "slots": [
+     {
+      "id": "project",
+      "role": "poster_project",
+      "x": 0.5,
+      "y": 0.1,
+      "anchor": "top-center",
+      "align": "center",
+      "zone": "context"
+     },
+     {
+      "id": "title",
+      "role": "poster_title",
+      "x": 0.5,
+      "y": 0.19,
+      "anchor": "top-center",
+      "align": "center",
+      "zone": "primary"
+     },
+     {
+      "id": "details",
+      "role": "poster_details",
+      "x": 0.08,
+      "y": 0.91,
+      "anchor": "bottom-left",
+      "zone": "archive"
+     },
+     {
+      "id": "date",
+      "role": "date",
+      "x": 0.5,
+      "y": 0.19,
+      "anchor": "top-center",
+      "align": "center",
+      "zone": "primary"
+     },
+     {
+      "id": "heading",
+      "role": "heading",
+      "x": 0.5,
+      "y": 0.19,
+      "anchor": "top-center",
+      "align": "center",
+      "zone": "primary"
+     },
+     {
+      "id": "statement",
+      "role": "statement",
+      "x": 0.5,
+      "y": 0.19,
+      "anchor": "top-center",
+      "align": "center",
+      "zone": "primary"
+     },
+     {
+      "id": "keyword",
+      "role": "keyword",
+      "x": 0.5,
+      "y": 0.19,
+      "anchor": "top-center",
+      "align": "center",
+      "zone": "primary"
+     },
+     {
+      "id": "quote",
+      "role": "quote",
+      "x": 0.5,
+      "y": 0.19,
+      "anchor": "top-center",
+      "align": "center",
+      "zone": "primary"
+     },
+     {
+      "id": "metric",
+      "role": "metric",
+      "x": 0.5,
+      "y": 0.19,
+      "anchor": "top-center",
+      "align": "center",
+      "zone": "primary"
+     },
+     {
+      "id": "bullets",
+      "role": "bullets",
+      "x": 0.5,
+      "y": 0.19,
+      "anchor": "top-center",
+      "align": "center",
+      "zone": "primary"
+     }
+    ]
+   }
+  ]
+ }
+}

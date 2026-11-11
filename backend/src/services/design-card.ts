@@ -23,8 +23,8 @@ export type DesignCardStatus = typeof DESIGN_CARD_STATUSES[number]
 export const INFO_POINT_VIAS = ['layer', 'generated', 'narration_only'] as const
 export type InfoPointVia = typeof INFO_POINT_VIAS[number]
 
-/** 计划图层类型（与 #48 LayerDoc 的图层类型同集合） */
-export const PLANNED_LAYER_TYPES = ['polygon', 'polyline', 'marker', 'label', 'card', 'image'] as const
+/** 计划图层类型（与 #48 LayerDoc 的图层类型同集合；`text` = #96 模板文本框） */
+export const PLANNED_LAYER_TYPES = ['polygon', 'polyline', 'marker', 'label', 'card', 'image', 'text'] as const
 export type PlannedLayerType = typeof PLANNED_LAYER_TYPES[number]
 
 export type AssetKindName = 'character' | 'scene' | 'prop'
@@ -83,12 +83,18 @@ export interface PlannedLayer {
   anchor?: SemanticRef
   /** 该层出现的秒数（相对图层段开头） */
   at_s: number
+  /** `type='text'`（#96）：模板文本框类型（layer-text-spec 的 role id） */
+  role?: string
+  /** `type='text'`（#96）：字段值；列表字段为字符串数组 */
+  fields?: Record<string, string | string[]>
 }
 
 export interface LayerPlan {
   base: BaseRef | null
   must_mark: SemanticRef[]
   planned_layers: PlannedLayer[]
+  /** #96：模板文本框的成套位置 id（有 text 计划层时必选） */
+  text_layout?: string
 }
 
 export interface GenPlan {

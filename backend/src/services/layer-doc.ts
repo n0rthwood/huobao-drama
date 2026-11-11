@@ -11,6 +11,7 @@
  *   `layer-svg.ts` 的 THEME_PRESETS 在渲染时兜底（前后端同源）。
  */
 import { z } from 'zod'
+import textSpec from '../config/layer-text-spec.json'
 import { normalizeCrop } from './layer-quality.js'
 
 export const LAYER_DOC_VERSION = 1
@@ -18,7 +19,7 @@ export const LAYER_DOC_VERSION = 1
 export const LAYER_THEMES = ['archival', 'clean', 'ink'] as const
 export type LayerTheme = (typeof LAYER_THEMES)[number]
 
-export const LAYER_TYPES = ['polygon', 'polyline', 'marker', 'label', 'card', 'image'] as const
+export const LAYER_TYPES = ['polygon', 'polyline', 'marker', 'label', 'card', 'image', 'text'] as const
 export type LayerType = (typeof LAYER_TYPES)[number]
 
 export const CARD_TEMPLATES = ['name', 'year', 'chapter'] as const
@@ -137,7 +138,21 @@ export interface ImageLayer extends LayerBase {
   style: LayerStyle
 }
 
-export type Layer = PolygonLayer | PolylineLayer | MarkerLayer | LabelLayer | CardLayer | ImageLayer
+/**
+ * 模板文本框（Issue #96）：只存类型与字段，位置/样式由规范按文档级 `text_layout`（成套位置）
+ * 计算（`services/layer-text.ts`）。画面坐标、不可拖动、不可旋转、不锚定。
+ */
+export interface TextLayer extends LayerBase {
+  type: 'text'
+  /** 规范里的类型 id（date / heading / statement / …） */
+  role: string
+  /** 字段值：普通字段为字符串，列表字段（items）为字符串数组 */
+  fields: Record<string, string | string[]>
+  /** Poster 变量绑定：字段 → 变量（如 poster_project.main → project_title） */
+  field_vars?: Record<string, LayerVariable>
+}
+
+export type Layer = PolygonLayer | PolylineLayer | MarkerLayer | LabelLayer | CardLayer | ImageLayer | TextLayer
 
 export interface BaseFilter {
   paper: number
@@ -167,6 +182,60 @@ export interface LayerDoc {
   base: LayerDocBase
   theme: LayerTheme
   layers: Layer[]
+  /** 模板文本框的成套位置 id（Issue #96）；没有 text 层时可缺省 */
+  text_layout?: string
+}
+
+interface TextSpecShape {
+  roles: Record<string, { name: string; fields: Array<{ key: string }>; styles: Record<string, { rows: Array<{ type?: string; field?: string }> }> }>
+  layouts: Record<string, Array<{ id: string }>>
+}
+const TEXT_SPEC_SHAPE = textSpec as unknown as TextSpecShape
+const TEXT_LAYOUT_IDS: string[] = Object.values(TEXT_SPEC_SHAPE.layouts).flatMap(list => list.map(item => item.id))
+const TEXT_FIELD_MAX = 200
+const TEXT_LIST_MAX = 6
+
+/** 字段是否列表：规范任一样式里该字段的行类型为 list。 */
+function textFieldIsList(role: string, key: string): boolean {
+  const styles = TEXT_SPEC_SHAPE.roles[role]?.styles || {}
+  return Object.values(styles).some(style => style.rows.some(row => row.field === key && row.type === 'list'))
+}
+
+function cleanTextValue(value: unknown): string {
+  const raw = typeof value === 'number' ? String(value) : typeof value === 'string' ? value : ''
+  return raw.replace(/\r\n?/g, '\n').slice(0, TEXT_FIELD_MAX).trim()
+}
+
+function normalizeTextFields(role: string, raw: unknown): Record<string, string | string[]> {
+  const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {}
+  const out: Record<string, string | string[]> = {}
+  for (const field of TEXT_SPEC_SHAPE.roles[role].fields) {
+    const value = source[field.key]
+    if (textFieldIsList(role, field.key)) {
+      const items = (Array.isArray(value) ? value : typeof value === 'string' ? value.split('\n') : [])
+        .map(cleanTextValue)
+        .filter(item => item !== '')
+        .slice(0, TEXT_LIST_MAX)
+      if (items.length) out[field.key] = items
+    } else {
+      const text = cleanTextValue(value)
+      if (text) out[field.key] = text
+    }
+  }
+  return out
+}
+
+function normalizeFieldVars(role: string, raw: unknown): Record<string, LayerVariable> | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined
+  const source = raw as Record<string, unknown>
+  const out: Record<string, LayerVariable> = {}
+  for (const field of TEXT_SPEC_SHAPE.roles[role].fields) {
+    const value = source[field.key]
+    if (typeof value === 'string' && (LAYER_VARIABLES as readonly string[]).includes(value) && !textFieldIsList(role, field.key)) {
+      out[field.key] = value as LayerVariable
+    }
+  }
+  return Object.keys(out).length ? out : undefined
 }
 
 const num = (min: number, max: number, fallback: number) =>
@@ -303,6 +372,7 @@ const STYLE_FIELDS: Record<LayerType, Record<string, z.ZodTypeAny>> = {
     radius: num(0, 0.5, 0),
     shadow: bool(false),
   },
+  text: {},
 }
 
 function normalizeStyle(type: LayerType, raw: unknown): LayerStyle {
@@ -348,6 +418,22 @@ function normalizeLayer(raw: unknown, index: number): Layer | null {
   const anchor = anchorSchema.safeParse(source.anchor)
   if (anchor.success && anchor.data && (anchor.data.asset_id !== undefined || anchor.data.semantic_id !== undefined)) {
     base.anchor = anchor.data as LayerAnchor
+  }
+  if (type === 'text') {
+    const role = typeof source.role === 'string' ? source.role.trim() : ''
+    if (!TEXT_SPEC_SHAPE.roles[role]) return null
+    const layer: TextLayer = {
+      ...base,
+      type,
+      rotation: 0,
+      name: trimmedText(NAME_MAX, TEXT_SPEC_SHAPE.roles[role].name).parse(source.name),
+      role,
+      fields: normalizeTextFields(role, source.fields),
+    }
+    delete layer.anchor
+    const vars = normalizeFieldVars(role, source.field_vars)
+    if (vars) layer.field_vars = vars
+    return layer
   }
   const style = normalizeStyle(type, source.style)
 
@@ -410,6 +496,7 @@ export function defaultLayerName(type: LayerType): string {
     label: '文字',
     card: '卡片',
     image: '图片',
+    text: '文本框',
   }
   return names[type]
 }
@@ -487,12 +574,14 @@ export function normalizeLayerDoc(raw: unknown): LayerDoc {
     seen.add(candidate)
   })
 
-  return {
+  const doc: LayerDoc = {
     version: LAYER_DOC_VERSION,
     base,
     theme: enumWith(LAYER_THEMES, 'archival').parse(source.theme) as LayerTheme,
     layers,
   }
+  if (typeof source.text_layout === 'string' && TEXT_LAYOUT_IDS.includes(source.text_layout)) doc.text_layout = source.text_layout
+  return doc
 }
 
 export interface LayerDocProblem {
@@ -567,6 +656,7 @@ function clampMapLayer(layer: Layer): Layer {
     return { ...layer, points: layer.points.map(([x, y]) => [unit(x), unit(y)] as [number, number]) }
   }
   if (layer.type === 'marker') return { ...layer, at: [unit(layer.at[0]), unit(layer.at[1])] as [number, number] }
+  if (layer.type === 'text') return layer
   return { ...layer, box: { ...layer.box, x: unit(layer.box.x), y: unit(layer.box.y), w: Math.min(2, layer.box.w), h: Math.min(2, layer.box.h) } }
 }
 
@@ -612,6 +702,10 @@ export function strictLayerDocProblems(raw: unknown): { doc: LayerDoc; problems:
         message: `该图层会被整体丢弃：type=${describeValue(type)}；type 必须是 ${LAYER_TYPES.join('/')}，`
           + 'polygon 至少 3 个合法点、polyline 至少 2 个、marker 需要合法 at、image 需要 src.path',
       })
+      return
+    }
+    if (layer.type === 'text') {
+      problems.push({ path, message: '地图不使用模板文本框（text）；地名与标注请用锚定的 label / marker 图层' })
       return
     }
     diffAgainstNormalized(item, layer, path, problems)
