@@ -900,6 +900,9 @@ const columnAdditions: { table: string; column: string; type: string }[] = [
   // 底图视觉验证（Issue #94）：图层段底图有裁切或按 contain 留白时，渲染结果要过一次视觉模型核验。
   // 存量行为 NULL = 从未验证；读时按当前底图/裁切/取景框现算是否需要验证，不做一次性回填。
   { table: 'storyboard_layer_segments', column: 'base_check', type: 'TEXT' },
+  // 衔接帧画面描述（Issue #95）：视觉模型对实际衔接帧 PNG 的描述，按 junction_hash 缓存。
+  // 存量行 NULL = 从未描述过；视频提示词批次在 Agent 开跑前逐镜补算，不做一次性回填。
+  { table: 'storyboard_layer_segments', column: 'junction_caption', type: 'TEXT' },
 ]
 
 /**

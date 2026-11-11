@@ -308,6 +308,12 @@ export const storyboardLayerSegments = sqliteTable('storyboard_layer_segments', 
    * **不并入渲染新鲜度**：验证不通过不等于成品要重渲，批量渲染不能把它当「已变化」。
    */
   baseCheck: text('base_check'),
+  /**
+   * 衔接帧画面描述（Issue #95）：JSON `{ hash, caption, error, config_id, model, at }`。
+   * 视觉模型对实际衔接帧 PNG 的一句话描述，按 `junction_hash` 缓存（hash 变了才重算）；
+   * C 的首段、D 的末段据此写。不参与渲染新鲜度与底图验证签名。
+   */
+  junctionCaption: text('junction_caption'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 }, (table) => [

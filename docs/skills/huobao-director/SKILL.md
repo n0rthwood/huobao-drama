@@ -270,6 +270,7 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
   - 模型不支持关键帧引导时直接报错，不要降级偷偷去掉引导。
   - 视频签名覆盖提示词、引导帧文件名+中间帧时间、参考图顺序、时长/画幅/分辨率、provider/model；改任一项都会 `changed`。
   - 停止批量的语义是“不再提交新镜头”，在跑的那一镜会跑完。
+  - **锁定衔接帧（Issue #95）**：C 的首帧 = 图层段末帧、D 的尾帧 = 图层段首帧，这两张不单独出图（`keyframe-batch/preview` 里 C-first / D-last 是 `skipped`）。`read_storyboard_context` 逐镜返回 `locked_frames[{slot:"first"|"last", source:"layer_last"|"layer_first", base, framing:"full"|"crop"|"contain"|"zoomed", caption, caption_note?}]`：`caption` 是视觉模型对**实际衔接帧 PNG** 的描述（`AI_STAGES.junction_caption` vision，按 `junction_hash` 缓存于 `storyboard_layer_segments.junction_caption`），衔接帧未渲染 / 输入已变化 / 底图验证未过 / 无视觉配置时为 `null` 并带原因，绝不编画面。`generate-video-prompts` 在 Agent 开跑前逐镜补算描述（同一任务的观测 stage `junction_caption`）并把锁定槽位 + caption 写进话术。视频提示词保存时解析时间分段行（`0-3秒：`、`0-2.5秒:`、`0-3s:` 等），C 的首段 / D 的末段出现切镜写法（切到 / 切回 / 切换为 / 切换到 / 转到 / 硬切、cut to / cuts to、カット / 切り替え、컷 / 전환）即退回并带上 caption；A/B 组合不校验。人工 `PUT /storyboards/{id}` 不校验（与 #92 的画幅校验同口径）。
 
 ### S10 合成
 - 端点：`POST /storyboards/{id}/compose`、`POST /episodes/{e}/compose-batch/preview`、`POST .../compose-batch {storyboard_ids}`、`GET .../compose-batch-status`、`POST .../retry-failed`。

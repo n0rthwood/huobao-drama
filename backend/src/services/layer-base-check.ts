@@ -183,8 +183,8 @@ async function writeFramePng(doc: LayerDoc, spec: CheckSpec, signature: string):
   return relative
 }
 
-/** 场景没有 name 列，显示名是「地点 · 时间」 */
-async function assetNameOf(kind: 'character' | 'scene' | 'prop', id: number): Promise<string> {
+/** 场景没有 name 列，显示名是「地点 · 时间」；#95 的锁定衔接帧底图名也用它 */
+export async function assetNameOf(kind: 'character' | 'scene' | 'prop', id: number): Promise<string> {
   if (kind === 'scene') {
     const [scene] = await db.select().from(schema.scenes).where(eq(schema.scenes.id, id))
     return scene ? [scene.location, scene.time].filter(Boolean).join(' · ') : `scene #${id}`

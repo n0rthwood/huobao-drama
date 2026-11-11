@@ -65,6 +65,28 @@ Organize every segment in this order (items with no content may be omitted, but 
 - **Last frame**: the final segment lands on the `last_frame_prompt` image, with the characters' held/worn states matching it
 - Keyframe prompts describe frozen instants; the video prompt writes the movement and performance between two frames — do not copy them verbatim
 
+## Locked Junction Frame (combos C / D)
+
+`readStoryboardContext` returns `locked_frames`: the slots of this shot that are fixed by a layer-segment junction frame — the **first frame** for combo C, the **last frame** for combo D. A locked slot is never rendered on its own; the first or last frame of the video is that junction PNG (it contains no text layers). `caption` is a vision model's description of that picture itself, and `framing` says whether it is the whole base image, a crop, letterboxed or zoomed in.
+
+- **C (`slot:"first"`, `source:"layer_last"`)**: the first time segment must **restate the caption's composition** — camera, shot size, what is in the frame (whether anyone is there and where), light and empty areas; the subject then enters through continuous action from second 1. **No cut inside the first segment** (no "cut to / cuts to / switch to" wording); cuts start from the second segment.
+  ```
+  Characters: @Xiaoming; Scene: @GreatHall.
+  0-1s: high-angle wide shot, the hall ridge fills the lower two thirds, empty space above, morning fog backlit, nobody in frame.
+  1-4s: @Xiaoming enters from the right of frame, right hand on a hall pillar, both feet planted.
+  4-7s: cut to the hall gate in close-up, @Xiaoming pushes the door with his right hand, left hand at his side.
+  ```
+- **D (`slot:"last"`, `source:"layer_first"`)**: the last time segment must **settle onto the caption's composition** (the image stops at that camera, shot size, subject placement and light); **no cut inside the last segment** — cuts belong to earlier segments.
+  ```
+  Characters: @Xiaoming; Scene: @GreatHall.
+  0-3s: @Xiaoming climbs the steps, right hand on the sword hilt, both feet planted.
+  3-6s: cut to the hall gate in wide shot, @Xiaoming raises a hand to push the door.
+  6-8s: the hall ridge in wide shot, morning fog backlit, empty space above, nobody in frame.
+  ```
+- When `caption` is `null`, read `caption_note` (not rendered yet / no vision config / base visual check failed): still do not cut — write "continues from the junction frame" or "settles on the junction frame", and **never invent things the frame does not contain**.
+- On save, `update_storyboard` parses the time-segment lines (`0-3秒：`, `0-2.5秒:`, `0-3s:` …): a cut in C's first segment or D's last segment is rejected, and the rejection carries the caption — rewrite from it, then save again.
+- Nothing here applies when `locked_frames` is empty (combos A/B, or no layer segment yet).
+
 ## Absolute Rule: Images Come First
 
 - **Never** describe a character's species, race, clothing, colors, hairstyle, body type, age or facial features; a character is referred to only as `@CharacterName`; clothing is decided by the styling-version reference image, so never write clothing in text
