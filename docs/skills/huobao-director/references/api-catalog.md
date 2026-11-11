@@ -515,11 +515,15 @@ Body：`{combo:"A"|"B"|"C"|"D"|null, design_card:{...}}`
  layer_plan: {
    base: {kind:"asset", asset_kind:"character"|"scene"|"prop", asset_id, version_task_id|null} | {kind:"inherit_prev"} | null,
    must_mark: [{asset_id, semantic_id, name, unresolved?, unresolved_reason?}],       // SemanticRef，≤20；不是字符串数组
-   planned_layers: [{type:"polygon"|"polyline"|"marker"|"label"|"card"|"image",       // ≤40，按 at_s 升序存
+   planned_layers: [{type:"polygon"|"polyline"|"marker"|"label"|"card"|"image"|"text", // ≤40，按 at_s 升序存
                      at_s: number,                                                    // 必有；缺省/非法归一化为 0
                      text?: string,
-                     anchor?: {asset_id, semantic_id, name, unresolved?, unresolved_reason?}}]
+                     anchor?: {asset_id, semantic_id, name, unresolved?, unresolved_reason?},
+                     role?: "date"|"heading"|"statement"|"keyword"|"quote"|"metric"|"bullets",  // type="text"（#96）
+                     fields?: {main?, sub?, items?: string[]}}],                      // 键取 text_spec.roles[].fields
+   text_layout?: string                                  // #96：有 text 层时必填，取 design-card-context 的 text_spec.layouts[].id
  } | null,
+ // #96 读时问题码：text_plan_invalid（阻断）/ text_plan_warning；AI 写入另拒收 card、无锚点 label
  gen_plan: {
    reference_assets: [{kind, id, name}],
    first?: string, mid?: string, last?: string                          // 每个 ≤400 字；只 @ 名字，不写外形

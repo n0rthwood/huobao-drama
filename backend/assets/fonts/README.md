@@ -10,14 +10,18 @@
 | --- | --- | --- | --- |
 | `NotoSansSC-Regular.otf` | Noto Sans SC | 400 | 5.8 MB |
 | `NotoSansSC-Bold.otf` | Noto Sans SC | 700 | 5.9 MB |
+| `NotoSansSC-Medium.otf` | Noto Sans SC | 500 | 5.8 MB |
 | `NotoSerifSC-Regular.otf` | Noto Serif SC | 400 | 8.1 MB |
 | `NotoSerifSC-Bold.otf` | Noto Serif SC | 700 | 8.4 MB |
+| `NotoSerifSC-Black.otf` | Noto Serif SC | 900 | 8.3 MB |
 | `LXGWWenKai-Regular.ttf` | LXGW WenKai | 400 | 12.7 MB |
 | `LXGWWenKai-Medium.ttf` | LXGW WenKai | 700（Medium） | 12.6 MB |
 | `MaShanZheng-Regular.ttf` | Ma Shan Zheng | 400 | 5.8 MB |
 
-合计 ≈ 58 MB。Poster（Issue #72）的四族字体：`sans` = Noto Sans SC、`serif` = Noto Serif SC、
+合计 ≈ 72 MB。Poster（Issue #72）的四族字体：`sans` = Noto Sans SC、`serif` = Noto Serif SC、
 `kai` = LXGW WenKai、`hand` = Ma Shan Zheng；服务端 fontconfig 与编辑器 `@font-face` 都用这一批文件。
+模板文本框（Issue #96，`backend/src/config/layer-text-spec.json`）另用 Noto Sans SC 500（说明/列表正文）
+与 Noto Serif SC 900（标题/数据大字）两个字重；同族同码位，`FONT_CHAR_RANGES` 不变。
 
 ## 为什么是「子集」而不是全量，也不是更小的常用字表
 
@@ -92,11 +96,13 @@ LXGW WenKai 上游没有 Bold，700 字重用 `LXGWWenKai-Medium.ttf` 注册（`
 ```bash
 uv venv /tmp/fontsub && uv pip install --python /tmp/fontsub/bin/python fonttools
 cd /tmp && for f in Sans/SubsetOTF/SC/NotoSansSC-Regular.otf Sans/SubsetOTF/SC/NotoSansSC-Bold.otf \
-                   Serif/SubsetOTF/SC/NotoSerifSC-Regular.otf Serif/SubsetOTF/SC/NotoSerifSC-Bold.otf; do
+                   Sans/SubsetOTF/SC/NotoSansSC-Medium.otf \
+                   Serif/SubsetOTF/SC/NotoSerifSC-Regular.otf Serif/SubsetOTF/SC/NotoSerifSC-Bold.otf \
+                   Serif/SubsetOTF/SC/NotoSerifSC-Black.otf; do
   curl -sL -O "https://github.com/notofonts/noto-cjk/raw/main/$f"
 done
 UNI='U+0020-007E,U+00A0-00FF,U+2000-206F,U+2190-21FF,U+2460-24FF,U+25A0-25FF,U+3000-30FF,U+4E00-9FFF,U+FF00-FFEF'
-for f in NotoSansSC-Regular NotoSansSC-Bold NotoSerifSC-Regular NotoSerifSC-Bold; do
+for f in NotoSansSC-Regular NotoSansSC-Bold NotoSansSC-Medium NotoSerifSC-Regular NotoSerifSC-Bold NotoSerifSC-Black; do
   /tmp/fontsub/bin/pyftsubset $f.otf --unicodes="$UNI" \
     --layout-features=kern,vert,vrt2,liga,calt --name-IDs='*' --output-file=$f.sub.otf
 done

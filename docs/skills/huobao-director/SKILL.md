@@ -170,6 +170,7 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 - **编辑工程 = `layer_doc`（与分镜图层同源）；#72 起旧 `layout` 字段不再读写，浏览器画布合成也已取消。**精确文字排版的正确做法：`PUT …/poster {layer_doc}` 保存图层 → `POST …/poster/versions`，**服务端**从当前 LayerDoc 渲染合成图（版本记 `provider:"local"`、`model:"layer-doc"`）并自动设为最终版本 → 需要换版时 `PUT …/poster/select`，想回到某版继续编辑用 `POST …/poster/load-version`。不要再本地渲染 PNG 后 `POST /upload/image` 登记版本。
 - `generate` 三种 mode：`initial` = 出不带字的底图（注入项目风格词，AI 构想方案可直接带 `composition_id`）；`composite` = 对已登记的合成版本再生成；`layers` = 底图＋服务端渲染的文字层双参考图再生成（FLUX 配置不支持，会 400）。AI 构想只写 `concept`，套用必须显式调 `concept/apply`（手动字段冲突返回 409 `manual_edit_conflict`，覆盖要人决定并显式 `overwrite`）。
 - 陷阱：把真实照片/地图送扩散重绘会得到伪文字/几何漂移；优先确定性底图 + 图层文字。`POST …/poster/versions` 没有底图（`layer_doc.base.path` 空）会 400。
+- **模板文本框（Issue #96，`[S]`）**：Poster 文字只用 `layer_doc` 的 `{type:"text", role, fields, field_vars?}` + 文档级 `text_layout`（Poster 专用类型 `poster_project / poster_title / poster_details`，位置与样式由套决定，不写坐标/字号/颜色）。AI 构想的 `layer_plan` 是 `{text_layout, items:[{role, fields}]}`，`apply-layer-plan` 只替换 `ai:` 层；旧形状构想套用返回 400 `layer_plan_legacy`（重新生成构想）。文字超容量/缺字段/同区冲突时 `POST …/poster/versions` 返回 400 `text_layer_invalid` + `problems[]`：按 `problems[].message` 改短或换套，不要换回自由 label。容量读 `GET /layer-docs/text-spec` 规范或编辑器提示，不硬编码。**案例背景**：drama 15 / Poster 20 卡片文字溢出卡片两侧、主标题贴边，用户要求「类型 × 成套位置 × 容量」的专业模板（设计定稿见仓库 `docs/design/layer-text-96/`）。
 
 ### S4 分镜拆分
 - 端点：`POST /agent/storyboard_breaker/chat {drama_id, episode_id, config_id, model, message}`；`GET /episodes/{e}/storyboards`；`POST .../storyboards/fill-gaps`。
@@ -202,6 +203,7 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 - 陷阱：预算 `layer_s≤30`、`gen_s≤15` 超限直接拒存；已确认且有产物时改 combo 会被拒，必须走 `POST /storyboards/{id}/combo`（先看 `combo/impact`）；批次只对「无 combo」的镜写 combo，不要指望它纠正人已选的组合；确认失败时读返回体 `issues[].message`，它已包含具体原因。
 - **为何改（#87）**：《历史纵横》E01 的第 01 镜五个计划图层都引用资产 #103 的同名“语义”，实际语义清单为空。旧指令允许“保留规划、空锚点待标注”，使 AI 明知缺信息仍能把设计当成完成；Fabel 判定必须同时修正 prompt、AI 写工具和成功计数，不是一句“不要幻觉”或一个人工补标注按钮能解决。人工审核时仍可打开资产语义弹窗，按实际绑定重查问题；新增标注不等于旧引用自动修好。
 - **人工核对界面（#87，`[S/R]`）**：图像使用 120–180px 流式卡片、contain；底图取候选的 path/version，不拿当前图冒充固定旧版本；引用卡取相应资产当前图。点击开大图，`⌕` 打开现有资产/语义面板。未解析引用按具体层列缺口，可打开语义或改绑真实条目；改绑只改计划层 anchor，不删层、不改资产。新增标注不会自动修好旧引用。本轮已打开真实参考图；固定旧版本及缺失语义修复写入未在生产制造测试数据，仍是源码/行为核验。
+- **屏幕文字 = 模板文本框（Issue #96，`[S]`）**：`layer_plan.planned_layers` 里不锚定的文字一律 `{type:"text", role, fields, at_s}`，同时给 `layer_plan.text_layout`（`design-card-context` 的 `text_spec.layouts[].id`）；`text_spec.capacity[layout][role]` 是每个字段的基准容量（引擎现算）。AI 写入拒收 `card`、无锚点 `label`、无套的 text 与引擎阻断（溢出/缺字段/引文无引号/说明句 ≥2 处并列/同拍同区/同拍重复），拒绝消息带容量数字；人工 PUT 只得到读时问题 `text_plan_invalid`（阻断）/`text_plan_warning`。同区后出现的框替换前一个（日期可与主信息同屏），同一 `at_s` 两个同区框 = 冲突。锚定在地图点线上的地名仍是带 `anchor` 的 `label`/`marker`。
 
 #### S5-87 任务公开对话与真实计量（`[R]`：tasks 1281–1285；未触发分支另标 `[S]`）
 - **新 API 点**：`GET /tasks/{id}/observations?work_id=&cursor=&limit=` 读取持久工作项与实际调用；`GET /tasks/{id}/observations/calls/{callId}/messages?cursor=&limit=` 分页回看某次调用的完整公开消息。游标及字段见 `references/api-catalog.md`，不要拿第一页冒充全历史。
@@ -231,6 +233,7 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
   - 视觉验证：底图有裁切或为 `contain` 时必须验证。渲染成功后自动起文本任务 `kind='layer_base_check'`（阶段 `layer_base_check`，用 `vision=1` 配置；任务中心可回看对话），输入原图 + 无字取景画面（C/D 另附衔接帧），判主体完整、取景位置、变形、留白；结果写 `storyboard_layer_segments.base_check`（`pending|passed|failed|error|overridden`，签名 = 底图 sha + crop + 取景框 + 成片尺寸 + 衔接帧 hash，改文字不重验）。`GET /layer-segments/storyboards/{id}` 返回 `base_check`、`base_check_required`、`base_check_satisfied`。`POST /layer-segments/storyboards/{id}/base-check` 重验；`POST …/base-check/override {reason}` 人工放行（**人决定端点**，必须先开图并有人的授权原话，理由必填）。
   - 闸门：验证未满足时衔接帧不可用（关键帧不就绪）、视频批次预览该镜 `blocked`（原因「图层底图待视觉验证」/「图层底图视觉验证未通过：…」，A 组合同样阻断）、单镜生成视频与合成拒绝。不影响图层段新鲜度（批量渲染不会因此反复重渲）。
   - 推荐顺序：竖版项目先让场景按竖版出图；道具/角色被选作底图且比例不符 → `aspect-version`；忠实素材/地图 → 裁切到成片比例或留白 + 视觉验证。
+- **模板文本框（Issue #96，`[S]`）**：图层段的 text 层是**画面坐标**（不随 Ken Burns 推拉）、不可拖动；`text_layout` 必须与成片画幅同家族（否则 `text_layout_aspect_mismatch`）。`POST …/render` 遇文本阻断问题直接失败（原因 = 引擎消息），段问题码 `text_layer_invalid`/`text_layer_warning`；C/D 衔接帧不含 text 层。验收时打开渲染帧确认：同屏框不重叠、竖版文字不进底部 35% 与右侧按钮栏、横版不进底部字幕区。
 
 ### S7 关键帧
 - 端点（全路径）：`GET /episodes/{e}/keyframe-prompts/scope`、`POST /episodes/{e}/generate-keyframe-prompts`、`GET /episodes/{e}/keyframe-prompts-status`、`POST /episodes/{e}/keyframe-batch/preview`、`POST /episodes/{e}/keyframe-batch {items}`、`GET /episodes/{e}/keyframe-batch`、`POST /storyboards/{id}/keyframes/{slot}/generate`、`GET /storyboards/{id}/keyframes/{slot}/versions`、`PUT /storyboards/{id}/keyframes/{slot} {image|inherit}`、`POST /storyboards/{id}/confirm-keyframes`。
