@@ -39,11 +39,20 @@ const API_RE = /\/huobao\/api\/|:5679\/api\/|huobao[\w.-]*\/api\/v1/i;
 const WRITE_HINT_RE = /\b(POST|PUT|DELETE|PATCH)\b|method\s*=|--data|\s-d\s|-X\s*(POST|PUT|DELETE|PATCH)|\bdata\s*=|json\s*=/;
 const HBWF_IMPORT_RE = /\b(import\s+hbwf|from\s+hbwf|run_path\([^)]*hbwf|importlib[^\n]*hbwf|spec_from_file_location[^\n]*hbwf)/;
 const WF_FILE_RE = /workflow\/(workflow\.json|state\.json|ledger\.jsonl|decisions\.jsonl|attribution\.json|bodies\/|\.lock)/;
-const WF_MUTATE_RE = />|\btee\b|sed\s+-i|\brm\b|\bmv\b|\bcp\b|truncate|\bpython|\bnode\b|\bperl\b|\bbun\b/;
+// Files whose tampering changes guard outcomes; state.json is re-derived on every guarded call.
+const WF_CRITICAL_RE = /workflow\/(workflow\.json|ledger\.jsonl|decisions\.jsonl|attribution\.json|bodies\/|\.lock)|(ledger|decisions)\.jsonl|attribution\.json/;
+const BASH_WF_MUTATE_RE =
+	/(>{1,2}|\btee\b(\s+-a)?|\bsed\s+-i\S*|\brm\b|\bmv\b|\bcp\b|\btruncate\b|\bln\b|\bchmod\b)[^;&|\n]*workflow\/(workflow\.json|state\.json|ledger\.jsonl|decisions\.jsonl|attribution\.json|bodies\/|\.lock)/;
+const INLINE_CODE_RE = /\b(python3?|node|bun|perl|ruby)\b[^\n]*(\s-c\s|\s-e\s|<<)/;
 const BROWSER_MUTATE_DEVICE_RE = /^xd:\/\/mcp__(agent_browser_(click|fill|type|press|select|check|uncheck)|browser39_(submit|fill|click))$/;
 const BROWSER_MUTATE_CLI_RE = /agent-browser[^\n|;&]*\s(click|fill|type|press|select|check|uncheck|upload|drag|keyboard)\b/;
 const SCRIPT_TOKEN_RE = /[\w./~-]+\.(py|js|mjs|cjs|ts|sh)\b/g;
-const WF_WRITE_IN_CODE_RE = /write|open\([^)]*['"][wa]|unlink|rename|Bun\.write/;
+const WRITE_VERB_RE =
+	/\.write(_text|_bytes)?\(|open\([^)]*['"](w|a|x|r\+)[b+]*['"]|Bun\.write|\bunlink\b|os\.remove|shutil\.(move|copy\w*|rmtree)|json\.dump\(|\.rename\(|\.replace\(\s*['"\w]*workflow|truncate|appendFile|writeFile/;
+
+function lineLevelWfWrite(code: string): boolean {
+	return code.split("\n").some(line => WF_FILE_RE.test(line) && WRITE_VERB_RE.test(line));
+}
 
 const RULE =
 	"Huobao workflow is enforced in this directory: business calls go only through " +
@@ -115,8 +124,11 @@ function checkTool(tool: string, input: ToolInput, cwd: string): string | undefi
 		const command = str(input, "command");
 		if (API_RE.test(command)) return "Blocked: direct Huobao API access from bash. Use hbwf (get/check/call).";
 		if (HBWF_IMPORT_RE.test(command)) return "Blocked: importing hbwf internals bypasses its guard. Use the hbwf CLI.";
-		if (WF_FILE_RE.test(command) && WF_MUTATE_RE.test(command) && !/hbwf\.py/.test(command))
-			return "Blocked: workflow state/ledger/decision files are written only by hbwf.";
+		if (!/hbwf\.py/.test(command)) {
+			if (BASH_WF_MUTATE_RE.test(command)) return "Blocked: workflow state/ledger/decision files are written only by hbwf.";
+			if (INLINE_CODE_RE.test(command) && WF_FILE_RE.test(command) && (lineLevelWfWrite(command) || (WF_CRITICAL_RE.test(command) && WRITE_VERB_RE.test(command))))
+				return "Blocked: workflow state/ledger/decision files are written only by hbwf.";
+		}
 		if (BROWSER_MUTATE_CLI_RE.test(command))
 			return "Blocked: UI-mutating browser actions bypass the workflow ledger; browser use is read-only here.";
 		const script = scriptBypass(command, cwd);
@@ -127,7 +139,8 @@ function checkTool(tool: string, input: ToolInput, cwd: string): string | undefi
 		const code = str(input, "code");
 		if (API_RE.test(code)) return "Blocked: direct Huobao API access from eval. Use hbwf via bash.";
 		if (HBWF_IMPORT_RE.test(code)) return "Blocked: importing hbwf internals bypasses its guard.";
-		if (WF_FILE_RE.test(code) && WF_WRITE_IN_CODE_RE.test(code)) return "Blocked: workflow files are written only by hbwf.";
+		if (lineLevelWfWrite(code) || (WF_CRITICAL_RE.test(code) && WRITE_VERB_RE.test(code)))
+			return "Blocked: workflow ledger/decision files are written only by hbwf (reading them is fine; keep writes to other files out of the same cell if they mention these files).";
 		if (/\/huobao\//.test(code) && /\bbrowser\b|\btab\./.test(code))
 			return "Blocked: driving the Huobao UI from eval bypasses the workflow ledger.";
 		return undefined;
