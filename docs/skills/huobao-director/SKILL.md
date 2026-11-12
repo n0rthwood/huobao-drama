@@ -11,6 +11,17 @@ description: 通过火宝 HTTP API 按阶段推进剧本、资产、Poster、分
 >
 > 历史细表：`references/api-core.md`、`references/api-production.md` 为 2026-11-02 快照；与 `references/api-catalog.md` 或本正文冲突时以新文档为准。§3 与 `references/diagnostic-example.md` 是历史案例，其 Poster 本地画布、「镜数=段落数」、固定 25fps 等说法**不得当作现行配方**，现行口径见 §2。错误案例中的 `[R]` 只表示该错误行为真实发生过，不表示流程正确或已获授权。
 
+### 00. 强制工作流（Issue #97；先于一切业务写入）
+
+**任何剧集制作都必须经 `hbwf` 进行，状态以项目文件为准，不以对话记忆为准。** 细则、命令、守卫规则、失效矩阵、交接契约见 [`references/workflow.md`](references/workflow.md)，开工前必读。
+
+1. 开工：在制作项目目录执行 `hbwf init`（记录授权原话、固定模型、Poster 策略、canonical 顺序文件），再执行 `hbwf check`。已有 `workflow/workflow.json` 时直接 `check`。
+2. **所有火宝业务写入只经 `hbwf call`**；读用 `hbwf get`、`hbwf check`。omp 扩展 `huobao-workflow-gate` 会拦截 bash/eval 直连 API、发写请求的脚本、手改 `workflow/` 文件，以及浏览器点击输入类操作。
+3. 每次决策前先 `hbwf check`，按逐镜 `next` 推进。审核、返工、结构性改动、例外用 `hbwf decide` 记录，带授权原话和证据。
+4. 按 profile 走：剧情项目（含“纪录片规则集”的剧情项目）用 `drama_narration`。剧情项目服务端 `gates` 全开、`script/confirm` 是 no-op，设计卡、combo、图层段、骨架、`fill-gaps` 只对 `project_type=documentary` 有效。`skill://huobao-doc-episode-production` 只适用于 documentary。
+5. **Poster 不是“可以不管”**：每集必须作出决定。`required_poster` 时终检要求已选版本并审核通过；否则需要显式 `poster_waiver`。
+6. 交付前 `hbwf final` 必须 PASS；`merge` 也走同一终检。
+
 ### 0. 铁律框（任何模型不得越过；仅汇聚后文，不新增规则）
 
 1. `gates`/`production_unlocked` 为 false 的阶段**不得写入**，无论服务端是否放行。
@@ -164,9 +175,9 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 - **保存粒度**：顶层 `brief/map_spec/mode` 不传则保留，brief 内字段合并；传 `map_spec` 是**完整替换**（含 places/routes/regions）。先 GET 完整 spec，仅改获准的项并带当前 `expected_revision`；人工确认项只保证不被自动检索合并覆盖。
 - **调用量与模式**：brief 1–3 次文本；research/base/drawing 各是多步工具循环（每步一次文本调用，交付≤3 轮，另含 read_image 视觉调用），回退会让目标阶段重跑；style 1 次图片。预算按阶段步数保守预留，紧时显式 `text_config_id` 钉选并用 manual 分段核账。run 入参覆盖保存的 mode，未传默认 manual；advance 永远 manual，只有它支持 skip；PUT mode 只保存选择，不会自行启动。
 
-### S3 Poster（可选，资产之后；Issue #39/#72）
+### S3 Poster（资产之后可与分镜并行；每集必须作出决定并进入导出终检；Issue #39/#72/#97）
 - 端点：`GET /episodes/{e}/poster`、`PUT /episodes/{e}/poster {prompt?, text_prompt?, copy?, reference_images?, base_image?, layer_doc}`、`POST …/poster/generate {mode:"initial"|"composite"|"layers", config_id?, model?, version_id?, composition_id?}`、`POST …/poster/concept`、`POST …/poster/concept/generate`、`POST …/poster/concept/apply`、`POST …/poster/concept/apply-layer-plan`、`POST …/poster/versions {layer_doc?, prompt?, text_prompt?}`、`PUT …/poster/select {version_id}`、`POST …/poster/load-version {version_id}`。
-- 用途：片头海报；**不进主闸门**，不能阻塞资产→分镜。
+- 用途：片头海报。**不阻塞**资产→分镜，但**不是可以静默跳过的步骤**：每集必须作出“做或不做”的决定。做：选定版本并审核后，merge 时传 `poster_version_id`。不做：记录 `poster_waiver` 决定，`required_poster` 的集不允许。ep26 曾因写成“可选”而两次漏排（#97）。
 - **编辑工程 = `layer_doc`（与分镜图层同源）；#72 起旧 `layout` 字段不再读写，浏览器画布合成也已取消。**精确文字排版的正确做法：`PUT …/poster {layer_doc}` 保存图层 → `POST …/poster/versions`，**服务端**从当前 LayerDoc 渲染合成图（版本记 `provider:"local"`、`model:"layer-doc"`）并自动设为最终版本 → 需要换版时 `PUT …/poster/select`，想回到某版继续编辑用 `POST …/poster/load-version`。不要再本地渲染 PNG 后 `POST /upload/image` 登记版本。
 - `generate` 三种 mode：`initial` = 出不带字的底图（注入项目风格词，AI 构想方案可直接带 `composition_id`）；`composite` = 对已登记的合成版本再生成；`layers` = 底图＋服务端渲染的文字层双参考图再生成（FLUX 配置不支持，会 400）。AI 构想只写 `concept`，套用必须显式调 `concept/apply`（手动字段冲突返回 409 `manual_edit_conflict`，覆盖要人决定并显式 `overwrite`）。
 - 陷阱：把真实照片/地图送扩散重绘会得到伪文字/几何漂移；优先确定性底图 + 图层文字。`POST …/poster/versions` 没有底图（`layer_doc.base.path` 空）会 400。
@@ -273,6 +284,8 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
   - 模型不支持关键帧引导时直接报错，不要降级偷偷去掉引导。
   - 视频签名覆盖提示词、引导帧文件名+中间帧时间、参考图顺序、时长/画幅/分辨率、provider/model；改任一项都会 `changed`。
   - 停止批量的语义是“不再提交新镜头”，在跑的那一镜会跑完。
+  - **提示词批量 = 强制重写（#97 源码核实）**：`generate-keyframe-prompts` / `generate-video-prompts` 传非空 `storyboard_ids` 时，所选镜即使已有提示词、已有图、已确认也会重写（`services/keyframe-prompts.ts:53-58`、`services/video-prompts.ts:51-53`）；传 `[]` 会退回默认缺失范围，而不是零镜。`generate-video-prompts` 还会对全集做转场审核并与请求取并集（`video-prompts.ts:56-61`）。`*-prompts-status` 只有最近批次的聚合进度，没有逐镜完成信息：逐镜是否完成要看 `GET /episodes/{e}/storyboards` 的字段，媒体是否需要重出看各 preview 的 `missing/changed/unchanged`。ep26 曾在 05:14 对 105 镜整集强制重写视频提示词。现行做法：只对缺失或无效的镜生成；重写已完整的镜要有 `rework` 决定，并走带 `--ids` 的 `prompt_generator`，由 hbwf 校验并比对越界写入。
+  - **提交前硬校验（#97）**：视频提示词时间轴必须从 0 起连续、终点等于时长；`mid_frame_time` 必须在 (0, 时长) 内。已在视频批次中排队的镜不得改输入：批次执行时才读最新提示词（`video-batch.ts:521-531`），排队期间的改动会被静默使用。
   - **锁定衔接帧（Issue #95）**：C 的首帧 = 图层段末帧、D 的尾帧 = 图层段首帧，这两张不单独出图（`keyframe-batch/preview` 里 C-first / D-last 是 `skipped`）。`read_storyboard_context` 逐镜返回 `locked_frames[{slot:"first"|"last", source:"layer_last"|"layer_first", base, framing:"full"|"crop"|"contain"|"zoomed", caption, caption_note?}]`：`caption` 是视觉模型对**实际衔接帧 PNG** 的描述（`AI_STAGES.junction_caption` vision，按 `junction_hash` 缓存于 `storyboard_layer_segments.junction_caption`），衔接帧未渲染 / 输入已变化 / 底图验证未过 / 无视觉配置时为 `null` 并带原因，绝不编画面。`generate-video-prompts` 在 Agent 开跑前逐镜补算描述（同一任务的观测 stage `junction_caption`）并把锁定槽位 + caption 写进话术。视频提示词保存时解析时间分段行（`0-3秒：`、`0-2.5秒:`、`0-3s:` 等）：C 的首段必须是 **0–1.5 秒的空镜**——超过 1.5 秒、@ 到本集角色资产、出现场景过渡写法（过渡为 / 过渡到 / 转入 / 化为 / 变为 / 叠化、dissolve / transition to / morph into、ディゾルブ / 移り変わ、디졸브 / 바뀌어）或切镜写法（切到 / 切回 / 切换为 / 切换到 / 转到 / 硬切、cut to / cuts to、カット / 切り替え、컷 / 전환）都退回，D 的末段切镜也退回，任一分段是 0 长 / 倒序（`3-3秒`、`5-3秒`）一律退回；退回信息带 caption，人物入画与转场要挪到第二段。收紧依据是 ep 21 二次验收：首段已无切镜写法，但 7/22 镜仍在首段（0–3 秒）写「@子婴 走向画外」「长卷过渡为山脊」，H3 把第二段内容画到第 0 帧、衔接帧被整段替换。A/B 组合不校验。人工 `PUT /storyboards/{id}` 不校验（与 #92 的画幅校验同口径）。
 
 ### S10 合成
@@ -282,6 +295,7 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 - 陷阱：只有 `unchanged` + `exportable:true` 才可导出；`missing/changed/unknown` 要重做；`blocked/skipped` 先按 reason 修。200 与“导出成功”不是一回事。
 - **烧录字幕行宽随输出画面（#91）**：合成时按实际输出尺寸重排每条字幕（单字宽 ≈ 0.0425×输出高，扣 libass 默认左右边距；544×960 = 12 字/行，横屏与方形封顶 20 字/行），一条最多 4 行，窄画面遵守避头点（下一行不以标点开头）；字号/字体不变，配音阶段写的 SRT 不变。只有「烧录 且 行宽 ≠ 20」时行宽才进合成签名，所以横屏既有成片逐字节不变、仍为 `unchanged`；竖屏在 #91 发布前合成的镜头会显示 `changed`（原因「字幕排版已变化（每行 20 字 → 每行 12 字）」），重合成即可，不占 GPU。案例背景：drama 14 / episode 20（9:16）merge 29 的字幕在 544 宽画面左右被裁。
 - **视频预览返回整集**：`POST /episodes/{e}/video-batch/preview {storyboard_ids:[544]}` 实测返回了整集 22 镜的逐镜结果（其中别的镜也可能是 `changed`+`checked`）；启动 `video-batch` 前必须再按自己要做的 ID 过滤，不能把预览里所有 `checked` 原样提交（#91/#92 生产验收时因此误重出一条视频，已改选回原版）。
+- **被动阻断不是执行失败（#97/#98）**：剧情镜没有视频时 `compose_state=blocked`，界面显示“合成成品：阻断”，并不代表调用过合成。`compose-batch` 回执的 `scope.excluded` 会列出整集所有未入选的镜。汇报必须区分“未提交 / 被动阻断 / 提交后失败”。
 
 ### S11 导出
 - 端点（**注意 router 前缀 `/merge`**）：`GET /merge/episodes/{e}/merge`、`POST /merge/episodes/{e}/merge {storyboard_ids, poster_version_id?, poster_duration?}`、`GET /merge/episodes/{e}/merges`、`DELETE /merge/episodes/{e}/merges/{mergeId}`。
