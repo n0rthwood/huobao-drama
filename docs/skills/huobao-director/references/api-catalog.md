@@ -386,7 +386,7 @@ Body：`{expected_revision,brief?,map_spec?,mode?}`，至少一个可保存字�
 
 ---
 
-## 4. Poster（S3，可选旁路，在资产之后）
+## 4. Poster（S3，资产之后的旁路步骤：不阻塞分镜；纪录片必做、不可 waiver，#101）
 
 **当前契约是 `layer_doc` + 服务端渲染（Issue #39/#72，`backend/src/routes/posters.ts`、`services/posters.ts:4-8`）**：编辑工程里的旧 `layout:{texts:[...]}` 已不再读写；文字排版合成图由服务端从 `layer_doc` 渲染，**不需要**浏览器 canvas，也不需要先 `POST /upload/image` 再登记。api-production.md §4/§6B 里「本地渲染 PNG → 上传 → 带 `image` 登记版本」的做法属于 2026-11-02 历史快照，已不可执行。
 本节字段按当前源码核对，未在殷墟/八达岭两轮调用过，一律 `[S]`。
