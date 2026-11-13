@@ -1,0 +1,24 @@
+Source: https://commons.wikimedia.org/wiki/File:Charte_des_ganzen_Russischen-Reiches_in_Europa_und_Asien,_nach_den_neuesten_und_sichersten_astronomischen_Ortsbestimmungen_entworfen_und_berichtigt_auf_der_Sternwarte_Seeberg_bey_Gotha,_Teil_1.jpg
+Revision: 1121318846
+Timestamp: 2025-11-25T16:05:01Z
+LicenseShortName: CC0
+
+=={{int:filedesc}}==
+{{Information
+|description={{de|1=2 Kt. : flächenkolor., Grenzen kolor. (Gesamtgr. 103 x 47 cm, je Teil 51 x 47 cm); Koordinaten E 102°23'00"-W 148°21'00"/N 66°48'00"-N 40°28'00"; Maßstab in graph. Form (Geographische Meilen, Russische Werste). - Titel unten links. - Relief: Gebirge mit Schraffen angedeutet}}
+|date=1809
+|source=Leibniz-Institut für Länderkunde, Leipzig
+|author=Reinecke, Johann Christoph Matthias
+|permission=
+|other versions=
+}}
+
+Westrussland mit Provinzen, Ostsibirien stark generalisiert
+
+=={{int:license-header}}==
+{{cc-zero}}
+
+[[Category:Maps of the Sea of Okhotsk]]
+[[Category:Old maps of Siberia]]
+[[Category:Maps of Russian America]]
+[[Category:Map collection of Leibniz-Institut für Länderkunde]]

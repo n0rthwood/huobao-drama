@@ -1,0 +1,36 @@
+Source: https://commons.wikimedia.org/wiki/File:Hand-Atlas_uber_alle_Theile_der_Erde_1853_(144309495).jpg
+Revision: 1297179159
+Timestamp: 2026-11-07T11:49:26Z
+LicenseShortName: Public domain
+
+{{Book
+ | Author           = {{author|unknown}}
+ | Title            = Hand-Atlas über alle Theile der Erde nach dem neuesten Zustande und über das Weltgebäude
+ | Edition          = [Fünfte Auflage].
+ | Publisher        = Justus Perthes (Gotha) Wydawca
+ | Publication date = 1853
+ | City             = Gotha
+ | Language         = de
+ | Description      = {{pl|1=''Adres wydawniczy'': Gotha: bei Justus Perthes, [1853]<br>''Współtwórcy'': Bär, Joseph Christoph (1789-1848) Opracowanie,Berghaus, Heinrich Karl Wilhelm (1797-1884) Opracowanie,Stieler, Adolf (1775-1836) Opracowanie Redakcja,Stülpnagel, Friedrich (1786-1865) Opracowanie,Edler, Erich Gottfried‏ (?-1867) Rytownik<br>''Opis fizyczny'': 1 atlas (IV, 48, [2] strony, [82] karty) ; miedzioryt, 37 cm}}
+ | Source           = {{Polona|url=https://polona.pl/item/hand-atlas-uber-alle-theile-der-erde-nach-dem-neuesten-zustande-und-uber-das-weltgebaude,MTQzODYxMDMz/131/}}
+ | Permission       = {{PD-anon-expired|1=1853}}
+ | Pageoverview     = 37r
+ | Institution      = {{Institution:National Library, Warsaw}}
+ | Accession number = ZZK 0.319
+}}
+{{Template:National Library in Warsaw partnership}}
+[[Category:Patrimonium 2 (project)]]
+[[Category:Hand-Atlas über alle Theile der Erde (1853)]]
+[[Category:1850s maps of Austria]]
+[[Category:1850s maps of Slovenia]]
+[[Category:Old maps of subdivisions of the Austrian Empire]]
+[[Category:Old maps of the County of Tyrol with Vorarlberg]]
+[[Category:Old maps of the Duchy of Carinthia (1849-1918)]]
+[[Category:Old maps of the Duchy of Styria]]
+[[Category:Old maps of Austria above the Enns (1849-1918)]]
+[[Category:Old maps of Austria below the Enns]]
+[[Category:Old maps of Salzburg (state)]]
+[[Category:19th-century maps of Carniola]]
+[[Category:Old maps of the Austrian Littoral]]
+[[Category:Stielers Handatlas]]
+[[Category:Old maps of the German Confederation (Stielers Handatlas)|1853-7]]

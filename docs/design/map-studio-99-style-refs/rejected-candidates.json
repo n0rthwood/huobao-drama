@@ -1,0 +1,57 @@
+[
+  {
+    "title": "Geological map east sibiria.jpg",
+    "source_page_url": "https://commons.wikimedia.org/wiki/File:Geological_map_east_sibiria.jpg",
+    "reason": "页面声明 CC BY-SA 3.0（开放许可，可商用）；现代上传者处理的1910地质图，题材偏金矿分布，本轮不取，非因NC／ND。"
+  },
+  {
+    "title": "RemezovMap.jpg",
+    "source_page_url": "https://commons.wikimedia.org/wiki/File:RemezovMap.jpg",
+    "reason": "页面署名2005年著作／现代重制，CC BY-SA 4.0；用来源更直接的1701《西伯利亚图册》刊本替代，避免混淆原作与现代作者。"
+  },
+  {
+    "title": "Map of the Liaodong Wall.jpg",
+    "source_page_url": "https://commons.wikimedia.org/wiki/File:Map_of_the_Liaodong_Wall.jpg",
+    "reason": "2009年现代重绘，CC BY-SA 3.0（开放）；低分辨率且并非明代原图，本轮以古地图区域图与长城相关旧图语言为主。"
+  },
+  {
+    "title": "Great Wall of China 1805.jpg",
+    "source_page_url": "https://commons.wikimedia.org/wiki/File:Great_Wall_of_China_1805.jpg",
+    "reason": "仅631×200，作者／出版说明和年代细节不足，虽页面标公版，不够作为高质量样式参考。"
+  },
+  {
+    "title": "Russian growth 1300 1796.jpg",
+    "source_page_url": "https://commons.wikimedia.org/wiki/File:Russian_growth_1300_1796.jpg",
+    "reason": "与已收录谢泼德俄国扩张图高度重复，只保留一套有明确来源的图版。"
+  },
+  {
+    "title": "Map of the growth of Russia in the 14th - 18th centuries.jpg",
+    "source_page_url": "https://commons.wikimedia.org/wiki/File:Map_of_the_growth_of_Russia_in_the_14th_-_18th_centuries.jpg",
+    "reason": "与已收录谢泼德图版重复，不占用小图库名额。"
+  },
+  {
+    "title": "C. 1911 Europe and Russia.jpg",
+    "source_page_url": "https://commons.wikimedia.org/wiki/File:C._1911_Europe_and_Russia.jpg",
+    "reason": "谢泼德同题变体，与已收录1911图版重复。"
+  },
+  {
+    "title": "Ukraine. Camporum Desertorum. Beauplan 1648.jpg",
+    "source_page_url": "https://commons.wikimedia.org/wiki/File:Ukraine._Camporum_Desertorum._Beauplan_1648.jpg",
+    "reason": "同一博普朗1648图的另一数字本；保留国会图书馆来源那一幅。"
+  },
+  {
+    "title": "Kunyu Wanguo Quantu (坤輿萬國全圖).Caspian Sea.jpg",
+    "source_page_url": "https://commons.wikimedia.org/wiki/File:Kunyu_Wanguo_Quantu_(%E5%9D%A4%E8%BC%BF%E8%90%AC%E5%9C%8B%E5%85%A8%E5%9C%96).Caspian_Sea.jpg",
+    "reason": "全图局部裁片，与已收录全图重复；不增加同图计数。"
+  },
+  {
+    "title": "Great Universal Geographic Map WDL4136.jpg",
+    "source_page_url": "https://commons.wikimedia.org/wiki/File:Great_Universal_Geographic_Map_WDL4136.jpg",
+    "reason": "同一坤舆万国全图体系的另一藏本，与所选全图重复；控制参考总数至20。"
+  },
+  {
+    "title": "Charte von China nach Murdochischer Projection entworfen nach den neusten und zuverlässigsten astronomischen Ortsbestimmungen.jpg",
+    "source_page_url": "https://commons.wikimedia.org/wiki/File:Charte_von_China_nach_Murdochischer_Projection_entworfen_nach_den_neusten_und_zuverl%C3%A4ssigsten_astronomischen_Ortsbestimmungen.jpg",
+    "reason": "与1872施蒂勒中国图作用相近，本轮保留较晚版以控制数量。"
+  }
+]

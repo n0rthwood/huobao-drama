@@ -1,0 +1,47 @@
+Source: https://commons.wikimedia.org/wiki/File:Da_qing_wan_nian_yi_tong_di_li_quan_tu_-_btv1b550095891.jpg
+Revision: 1139864561
+Timestamp: 2026-01-01T05:11:12Z
+LicenseShortName: Public domain
+
+=={{int:filedesc}}==
+{{LargeImage}}
+{{Artwork
+ |artist             = 
+ |author             = Chu-Si-Ling. Auteur du texte
+ |title              = Da qing wan nian yi tong di li quan tu
+{{Alternate titles|大清萬年一統地理全圖}}
+ |description        = {{fr|1=Sujet : Chine
+Appartient à l’ensemble documentaire : PFceChi
+Couverture : Chine
+Langue : chinois
+Éditeur : [s.n.]}}
+ |depicted people    = 
+ |depicted place     = 
+ |date               = {{Other date|millennium|2}}
+ |medium             = 
+ |dimensions         = {{Size|unit=cm|width=236|height=133}}
+ |institution        = {{Institution:Bibliothèque nationale de France}}
+ |department         = 
+ |accession number   = 
+ |place of creation  = 
+ |place of discovery = 
+ |object history     = 
+ |exhibition history = 
+ |credit line        = 
+ |inscriptions       = 
+ |notes              = 
+ |references         = {{fr|1=Notice du catalogue : https://catalogue.bnf.fr/ark:/12148/cb40746332d}}
+ |source             = {{fr|1=Bibliothèque nationale de France, département Cartes et plans, GE A-1096 (RES)}}
+{{ARK-BNF|ark:/12148/btv1b550095891}}
+ |permission         = 
+ |other versions     = 
+ |wikidata           = 
+}}
+
+=={{int:license-header}}==
+{{PD-France}}
+
+[[Category:Maps from Gallica (Bibliothèque nationale de France) uploaded by Gzen92Bot]]
+[[Category:Chu-Si-Ling]]
+[[Category:Chinese-language maps of China]]
+[[Category:Old maps of China]]

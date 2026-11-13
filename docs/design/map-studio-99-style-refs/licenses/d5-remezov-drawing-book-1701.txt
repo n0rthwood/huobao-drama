@@ -1,0 +1,20 @@
+Source: https://commons.wikimedia.org/wiki/File:Drawing_Book_of_Siberia_3_map.jpeg
+Revision: 994448445
+Timestamp: 2025-02-06T07:30:02Z
+LicenseShortName: Public domain
+
+=={{int:filedesc}}==
+{{Information
+|description={{ru|1=Чертеж земель Тарского края (карта). Лист 3}}
+|date=1701
+|source=Чертёжная книга Сибири, составленная тобольским сыном боярским Семеном Ремезовым в 1701 году. — СПб., 1882.
+|author={{Creator:Semyon Remezov}}
+|permission=
+|other versions=
+}}
+
+=={{int:license-header}}==
+{{PD-old-100}}{{PD US}}
+
+[[Category:Drawing Book of Siberia]]
+[[Category:Old maps of Siberia]]

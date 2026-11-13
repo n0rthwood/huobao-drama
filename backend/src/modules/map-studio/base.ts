@@ -62,6 +62,8 @@ export async function runBaseStage(input: BaseStageInput): Promise<StageAgentRes
     tools: (session) => ({
       render_base: stageTool(session, {
         id: 'render_base',
+        // Earth 路线内部截图上限 10 分钟（geo/earth.ts），工具墙钟要比它长，让 Earth 自己的超时原因先回给模型
+        timeoutMs: 12 * 60_000,
         description: '按给定路线与取景生产一张底图（不消耗轮次）。返回 artifact_id、图片路径（可用 read_image 查看）以及取景检查结果 frame。'
           + `mode：${MAP_BASE_MODES.join(' / ')}（program=程序底图，Natural Earth 现代地理；earth=Google Earth 真实影像，较慢；image=用户提供的外部参考图配准，需求里没有参考图时不可用）。`
           + 'bbox=[west, south, east, north]（WGS84 度）。layers 不传则沿用当前背景图层设置。',
@@ -118,6 +120,7 @@ export async function runBaseStage(input: BaseStageInput): Promise<StageAgentRes
       read_image: readImage,
       submit_base: stageTool(session, {
         id: 'submit_base',
+        timeoutMs: 12 * 60_000,
         description: '交付一张已生成的底图（消耗一轮）。取景检查有任何问题都会被拒收。',
         inputSchema: z.object({ artifact_id: z.string().describe('render_base 返回的 artifact_id') }),
         execute: async ({ artifact_id }) => {

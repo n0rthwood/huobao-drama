@@ -1,0 +1,22 @@
+Source: https://commons.wikimedia.org/wiki/File:Da-ming-hun-yi-tu.jpg
+Revision: 1163022005
+Timestamp: 2026-02-10T08:04:29Z
+LicenseShortName: Public domain
+
+== {{int:filedesc}} ==
+{{Information
+|Description=The Composite Map of the Ming Empire (''Da Ming Hunyi Tu'') reflects the political situation in AD 1389 but was likely painted much later. Original Chinese labels were later covered with Manchu on paper slips.
+|Source= http://geog.hkbu.edu.hk/GEOG1150/Chinese/Catalog/am31_map1.htm
+|Date= {{other date|>|1389}}
+|Author= Chinese (image enhanced by contributor)
+|Permission=
+|other_versions=
+}}
+
+== {{int:license-header}} ==
+{{PD-Art|PD-old-100}}
+
+[[Category:Old maps of China]]
+[[Category:Maps made in the 14th century]]
+[[Category:Ancient Chinese maps former to 1500|chinese]]
+[[Category:Silk maps]]

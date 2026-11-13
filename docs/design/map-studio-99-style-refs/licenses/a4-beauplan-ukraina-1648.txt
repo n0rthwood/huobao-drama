@@ -1,0 +1,31 @@
+Source: https://commons.wikimedia.org/wiki/File:Delineatio_generalis_Camporum_Desertorum_vulgo_Ukraina_-_cum_adjacentibus_provinciis_LOC_80692351.jpg
+Revision: 936495826
+Timestamp: 2024-10-10T02:22:48Z
+LicenseShortName: Public domain
+
+
+=={{int:Filedesc}}==
+{{Information
+|description = {{en|1=Scale ca. 1:1,750,000. Relief shown pictorially. Oriented with north to the bottom. Available also through the Library of Congress Web site as a raster image. Includes text in Latin and French and ill. Vault AACR2}}
+|date = 1648
+|author = Beauplan, Guillaume Le Vasseur; Hondius, Willem
+|source = https://www.loc.gov/item/80692351/
+|permission = {{LOC-map|id=g7100.ct000383}}
+|other versions = <gallery>
+Delineatio generalis Camporum Desertorum vulgo Ukraina - cum adjacentibus provinciis LOC 80692351.tif
+</gallery>
+|other fields 1 =
+ {{information field|name=Title|value=Delineatio generalis Camporum Desertorum vulgo Ukraina : cum adjacentibus provinciis}}
+ {{information field|name=Shelf ID|value=G7100 1648 .B4}}
+|other fields =
+ {{information field|name=Location|value=Ukraine}}
+ {{information field|name=Part of|value=American Memory · General Maps · Catalog · Geography And Map Division}}
+ {{information field|name=Subject|value=Ukraine · Maps · Early Works To 1800}}
+}}
+
+=={{int:License-header}}==
+{{PD-Art|PD-old-100-expired}}
+
+
+[[Category:Images uploaded by Fæ]]
+[[Category:1648 maps of Ukraine]]

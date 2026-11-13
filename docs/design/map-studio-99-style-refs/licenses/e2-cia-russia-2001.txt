@@ -1,0 +1,23 @@
+Source: https://commons.wikimedia.org/wiki/File:Russia_(Federation)_Administrative_and_political_divisions,_2001.jpg
+Revision: 1256437783
+Timestamp: 2026-08-04T11:58:20Z
+LicenseShortName: Public domain
+
+=={{int:filedesc}}==
+{{Information
+|description={{en|1=Russia (Federation) Administrative and political divisions, 2001}}
+|date=2001
+|source=[https://www.loc.gov/resource/g7061f.ct001574/  Library of Congress]
+|author=Washington, D.C. :  Central Intelligence Agency
+|permission=
+|other versions=
+}}
+
+=={{int:license-header}}==
+
+{{PD-USGov-CIA}}
+
+[[Category:CIA maps of Russia]]
+[[Category:Maps of federal subjects of Russia]]
+[[Category:CIA World Factbook maps of Russia]]
+[[Category:2001 maps of Russia]]

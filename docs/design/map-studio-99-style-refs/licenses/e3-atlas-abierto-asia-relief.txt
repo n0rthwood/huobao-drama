@@ -1,0 +1,22 @@
+Source: https://commons.wikimedia.org/wiki/File:Asia_-_mapa_f%C3%ADsico_con_relieve_(Atlas_Abierto).png
+Revision: 1291923245
+Timestamp: 2026-10-26T12:17:58Z
+LicenseShortName: CC BY 4.0
+
+=={{int:filedesc}}==
+{{Information
+ |description = {{es|1=Mapa físico de Asia con relieve y batimetría, ríos y principales accidentes geográficos, en español. Atlas Abierto: mapas escolares libres (https://atlasabierto.org). Datos: Relieve y batimetría: ETOPO 2022, NOAA (dominio público). Ríos y lagos: Natural Earth (dominio público). Colores y sombreado: elaboración propia.}}
+ |date = 2026
+ |source = {{own}}
+ |author = Atlas Abierto (https://atlasabierto.org)
+ |permission = {{Cc-by-4.0}}
+ |other versions = 
+}}
+
+=={{int:license-header}}==
+
+
+[[Category:Physical maps of Asia]]
+[[Category:Relief maps of Asia]]
+
+[[Category:Uploaded with pattypan]]

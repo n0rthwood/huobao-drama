@@ -1,0 +1,34 @@
+Source: https://commons.wikimedia.org/wiki/File:The_physical_atlas_-_a_series_of_maps_%26_notes_illustrating_the_geographical_distribution_of_natural_phenomena_LOC_2007627199-35.jpg
+Revision: 1013164705
+Timestamp: 2025-03-24T08:19:43Z
+LicenseShortName: Public domain
+
+
+=={{int:Filedesc}}==
+{{Information
+|description = {{en|1=LC Civil War maps (2nd ed.), S183 Phillips, 4173 Available also through the Library of Congress Web site as a raster image. LC copy rebound in red cloth.}}
+|date = 1848
+|author = Johnston, Alexander Keith; Brewster, David; Berghaus, Heinrich Karl Wilhelm; William Blackwood And Sons
+|source = https://www.loc.gov/item/2007627199/
+|permission = {{LOC-map|id=g3201cm.gcws0183}}
+|other versions = <gallery>
+The physical atlas - a series of maps & notes illustrating the geographical distribution of natural phenomena LOC 2007627199-35.tif
+</gallery>
+|other fields 1 =
+ {{information field|name=Title|value=The physical atlas : a series of maps & notes illustrating the geographical distribution of natural phenomena}}
+ {{information field|name=Shelf ID|value=G1046.C1 J57 1848}}
+ {{information field|name=Parent|value=https://www.loc.gov/resource/g3201cm.gcws0183/}}
+ {{information field|name=Sheet title|value=River Systems of Asia and Europe}}
+|other fields =
+ {{information field|name=Location|value=Earth}}
+ {{information field|name=Part of|value=Military Battles And Campaigns · American Memory · Civil War Maps · Catalog · Geography And Map Division}}
+ {{information field|name=Subject|value=Maps · Earth · Physical Geography}}
+}}
+
+=={{int:License-header}}==
+{{PD-Art|PD-old-100-1923}}
+
+
+[[Category:Images uploaded by Fæ]]
+[[Category:The physical atlas - a series of maps & notes illustrating the geographical distribution of natural phenomena]]
+[[Category:1840s maps of Asia|1848 maps]]

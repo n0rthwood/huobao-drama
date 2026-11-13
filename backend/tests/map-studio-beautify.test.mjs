@@ -83,6 +83,40 @@ test('Map Studio QA labels: overlap, far Kashlik, marker overlap, safety edge an
   `), /LABEL_LAYOUT_OK/)
 })
 
+test('Map Studio plates: a legend plate drawn above a marker, another label or another river blocks; text drawn on the plate does not', () => {
+  assert.match(probe(`
+    import assert from 'node:assert/strict'
+    import {labelProblems,autoPlaceLabels} from '__BACKEND__src/modules/map-studio/layout/labels.ts'
+    ${labelFixture}
+    const plate = (id, box) => common(id,'label',{text:'图例',box,style:{size:.025,bg_opacity:.9}})
+    const river = (id, feature, points) => common(id,'polyline',{points,anchor:{semantic_id:feature}})
+    const kyiv = marker('point-kyiv','kyiv',[.2,.5])
+    const dnieper = river('line-dnieper','dnieper',[[.1,.2],[.2,.8]])
+    // Production version 3226: the legend plate sat above 基辅 and the Dnieper.
+    const covering = {...doc,layers:[kyiv,dnieper,plate('legend',{x:.02,y:.4,w:.3,h:.25})]}
+    const covered = labelProblems(covering).filter(p=>p.layer_id==='legend').map(p=>p.code)
+    assert.ok(covered.includes('label_marker_overlap'),'plate above a point marker blocks')
+    assert.ok(labelProblems(covering).some(p=>p.layer_id==='legend'&&/line-dnieper/.test(p.message)),'plate above another river blocks')
+    // Legend entries written on top of the plate are normal layout.
+    const entry = common('entry','label',{text:'蓝线：河流',box:{x:.04,y:.5,w:.2,h:.05},style:{size:.02}})
+    const layered = {...doc,layers:[plate('legend',{x:.6,y:.7,w:.3,h:.25}),entry]}
+    layered.layers[1].box={x:.62,y:.75,w:.2,h:.05}
+    assert.deepEqual(labelProblems(layered),[])
+    // The same plate below the entry in draw order but above it is reported for both layers.
+    const hidden = {...doc,layers:[layered.layers[1],layered.layers[0]]}
+    assert.ok(labelProblems(hidden).some(p=>p.layer_id==='entry'&&p.code==='label_overlap'))
+    // A label's own river under its own plate is fine.
+    const ownLabel = common('dnieper-label','label',{text:'第聂伯河',box:{x:.12,y:.45,w:.12,h:.06},style:{size:.025,bg_opacity:.8},anchor:{semantic_id:'dnieper'}})
+    assert.deepEqual(labelProblems({...doc,layers:[dnieper,ownLabel]}).filter(p=>/line-dnieper/.test(p.message)),[])
+    // auto layout moves an anchored plate label off a foreign marker.
+    const foreign = common('k-plate','label',{text:'喀什里克',box:{x:.15,y:.47,w:.12,h:.06},style:{size:.025,bg_opacity:.8},anchor:{semantic_id:'k'}})
+    const placed = autoPlaceLabels({...doc,layers:[marker('point-k','k',[.3,.5]),kyiv,foreign]})
+    assert.deepEqual(placed.unresolved,[])
+    assert.deepEqual(labelProblems(placed.doc),[])
+    console.log('PLATE_OK')
+  `), /PLATE_OK/)
+})
+
 test('Map Studio manual HTTP save rejects overlapping labels; check/auto-layout are read-only and return the same layout', () => {
   assert.match(probe(`
     import assert from 'node:assert/strict'
