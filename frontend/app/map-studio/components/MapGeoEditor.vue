@@ -49,7 +49,7 @@
             :stroke-width="unit * 1.2"
           ><title>{{ region.name }}</title></polygon>
           <circle
-            v-for="(pt, i) in region.pixels"
+            v-for="(pt, i) in region.vertices"
             :key="`rgv-${region.id}-${i}`"
             :cx="pt[0]"
             :cy="pt[1]"
@@ -78,7 +78,7 @@
             :stroke-width="unit * 1.8"
           ><title>{{ route.name }}</title></polyline>
           <circle
-            v-for="(pt, i) in route.pixels"
+            v-for="(pt, i) in route.vertices"
             :key="`rtv-${route.id}-${i}`"
             :cx="pt[0]"
             :cy="pt[1]"
@@ -243,6 +243,8 @@ interface LinearRow {
   id: string
   name: string
   pixels: Array<[number, number]>
+  /** 画可拖动顶点圆的像素：选中时全画；未选中时数据集/密集形状（>60 点）不画，否则上百个把手会盖住底图 */
+  vertices: Array<[number, number]>
   attr: string
   dataset: boolean
   smooth: number
@@ -382,6 +384,7 @@ function buildLinearRows(list: Array<MapRoute | MapRegion>, kind: LinearKind): L
       id: shape.id,
       name: shape.name,
       pixels,
+      vertices: selectedShape || (shape.origin !== 'dataset' && pixels.length <= 60) ? pixels : [],
       attr: curve.map(pt => `${pt[0] * viewWidth.value},${pt[1] * viewHeight.value}`).join(' '),
       dataset: shape.origin === 'dataset',
       smooth: strength,
