@@ -45,18 +45,32 @@ export function isRejectedHost(url: string | null | undefined): boolean {
 async function getJson(url: string, init: { headers?: Record<string, string> } = {}): Promise<unknown> {
   let last = ''
   for (let attempt = 0; attempt < 3; attempt++) {
+    let res: Response
     try {
-      const res = await fetch(url, { headers: { 'User-Agent': UA, Accept: 'application/json', ...init.headers }, signal: AbortSignal.timeout(TIMEOUT_MS) })
-      if (res.status === 429) {
-        last = 'HTTP 429 限流'
-        await sleep((Number(res.headers.get('retry-after')) || 4 * (attempt + 1)) * 1000)
-        continue
-      }
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      return await res.json()
+      res = await fetch(url, { headers: { 'User-Agent': UA, Accept: 'application/json', ...init.headers }, signal: AbortSignal.timeout(TIMEOUT_MS) })
     } catch (err) {
       last = err instanceof Error ? err.message : String(err)
       // 国际出口偶发连接重置：退避重试
+      await sleep(1500 * (attempt + 1))
+      continue
+    }
+    if (res.status === 429) {
+      // 服务端要求的等待超过 15 秒就不在工具里干等（会把整个阶段挂住），把限流原因直接回给模型
+      const wait = Number(res.headers.get('retry-after')) || 4 * (attempt + 1)
+      if (wait > 15) throw new Error(`HTTP 429 限流：来源要求等待 ${wait} 秒，请稍后或换来源检索`)
+      last = 'HTTP 429 限流'
+      await sleep(wait * 1000)
+      continue
+    }
+    if (!res.ok) {
+      last = `HTTP ${res.status}`
+      await sleep(1500 * (attempt + 1))
+      continue
+    }
+    try {
+      return await res.json()
+    } catch (err) {
+      last = err instanceof Error ? err.message : String(err)
       await sleep(1500 * (attempt + 1))
     }
   }

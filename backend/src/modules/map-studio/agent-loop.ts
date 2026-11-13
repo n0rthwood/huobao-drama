@@ -92,21 +92,33 @@ export interface StageSession<T> {
 }
 
 /**
- * 包一层：工具的任何异常都回给模型（结构化 error），不打断循环。
+ * 单次工具调用的墙钟上限：外部检索、渲染等任何一个工具卡住都不能把整个阶段挂死
+ * （生产验收任务 1 / run 6：四个并行检索里有一个 34 分钟没有返回，阶段停在原地）。
+ * 超时只放弃本次调用并把原因回给模型；底层请求若无法中止会在后台自行结束，结果被丢弃。
+ */
+const TOOL_TIMEOUT_MS = 180_000
+
+/**
+ * 包一层：工具的任何异常（含超时）都回给模型（结构化 error），不打断循环。
  * 只有任务已被取消/接管（Stale/Conflict）才记为致命并让本阶段停下。
  */
 export function stageTool<S extends z.ZodTypeAny>(
   session: { readonly stage: MapAgentStage; fatal: unknown },
-  spec: { id: string; description: string; inputSchema: S; execute: (input: z.infer<S>) => Promise<Record<string, unknown>> },
+  spec: { id: string; description: string; inputSchema: S; timeoutMs?: number; execute: (input: z.infer<S>) => Promise<Record<string, unknown>> },
 ) {
+  const timeoutMs = spec.timeoutMs ?? TOOL_TIMEOUT_MS
   return createTool({
     id: spec.id,
     description: spec.description,
     inputSchema: spec.inputSchema,
     execute: async (input) => {
+      let timer: NodeJS.Timeout | undefined
       try {
         // Mastra 已按 inputSchema 校验过入参（不合格的调用由 Mastra 把校验错误回给模型）
-        return await spec.execute(input as z.infer<S>)
+        const timedOut = new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error(`工具 ${spec.id} 超过 ${Math.round(timeoutMs / 1000)} 秒没有返回，已放弃这次调用；可以换参数或换来源重试`)), timeoutMs)
+        })
+        return await Promise.race([spec.execute(input as z.infer<S>), timedOut])
       } catch (err) {
         if (err instanceof MapStudioStaleError || err instanceof MapStudioConflictError) {
           session.fatal = err
@@ -115,6 +127,8 @@ export function stageTool<S extends z.ZodTypeAny>(
         const message = err instanceof Error ? err.message : String(err)
         logTaskWarn('MapStudio', `tool-error:${spec.id}`, { stage: session.stage, error: message })
         return { error: message, hint: '这是工具执行时出现的错误；请阅读错误原因，修正参数或做法后继续' }
+      } finally {
+        clearTimeout(timer)
       }
     },
   })
