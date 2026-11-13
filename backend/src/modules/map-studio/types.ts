@@ -74,6 +74,8 @@ export interface MapBrief {
   schematic: boolean
   base_mode: MapBaseMode
   style: MapStyleTheme
+  /** Optional explicit style-library input; no reference family/default is selected by code. */
+  style_spec?: Record<string, unknown>
   notes: string
   reference_image: MapBriefReferenceImage | null
   inferred: MapBriefInference[]
@@ -221,6 +223,8 @@ export interface MapWorkflowOutputs {
   kmz: { path: string; provenance: object | null } | null
   /** 几何侧的 LayerDoc（可编辑图层文档），原样透传给前端 */
   layer_doc: object | null
+  /** Render-only sidecar: stored control points and strict LayerDoc remain unchanged. */
+  layer_options?: Record<string, { smooth: number }>
 }
 
 export interface MapWorkflowHistoryEntry {
@@ -312,7 +316,7 @@ export interface MapWorkflowState {
 }
 
 export const EMPTY_OUTPUTS: MapWorkflowOutputs = {
-  base_image: null, texture_image: null, final_image: null, kmz: null, layer_doc: null,
+  base_image: null, texture_image: null, final_image: null, kmz: null, layer_doc: null, layer_options: {},
 }
 
 export function emptySteps(): MapWorkflowStep[] {
@@ -515,6 +519,11 @@ export function normalizeBrief(raw: unknown, previous: MapBrief | null): MapBrie
   if ('detail_level' in record) next.detail_level = enumOf(record.detail_level, MAP_DETAIL_LEVELS, 'brief.detail_level', base.detail_level)
   if ('base_mode' in record) next.base_mode = enumOf(record.base_mode, MAP_BASE_MODES, 'brief.base_mode', base.base_mode)
   if ('style' in record) next.style = enumOf(record.style, MAP_STYLE_THEMES, 'brief.style', base.style)
+  if ('style_spec' in record) {
+    if (record.style_spec === null) delete next.style_spec
+    else if (!record.style_spec || typeof record.style_spec !== 'object' || Array.isArray(record.style_spec)) throw new MapWorkflowValidationError('style_spec 必须是对象或 null', { field: 'brief.style_spec' })
+    else next.style_spec = { ...record.style_spec }
+  }
   if ('schematic' in record) next.schematic = record.schematic === true || record.schematic === 1 || record.schematic === 'true'
   if ('reference_image' in record) next.reference_image = normalizeReferenceImage(record.reference_image)
   if ('inferred' in record) next.inferred = normalizeInferred(record.inferred)

@@ -58,6 +58,16 @@
             @pointerdown.stop="startDrag('region', region.id, i, $event)"
             @dblclick.stop="removeVertex('region', region.id, i)"
           />
+          <g
+            v-for="handle in region.handles"
+            :key="`rgm-${region.id}-${handle.segment}`"
+            class="geo-midpoint"
+            @pointerdown.stop="insertMidpoint('region', region.id, handle.segment)"
+          >
+            <title>{{ t('mapStudio.editor.midpointHint') }}</title>
+            <circle :cx="handle.at[0]" :cy="handle.at[1]" :r="unit * 2.6" class="geo-midpoint-ring" />
+            <path :d="`M ${handle.at[0] - unit * 1.4} ${handle.at[1]} h ${unit * 2.8} M ${handle.at[0]} ${handle.at[1] - unit * 1.4} v ${unit * 2.8}`" class="geo-midpoint-cross" />
+          </g>
           <text v-if="region.pixels[0] && selected?.kind === 'region' && selected.id === region.id" :x="region.pixels[0][0] + unit * 3" :y="region.pixels[0][1] - unit * 2" :font-size="unit * 4" class="geo-text">{{ region.name }}</text>
         </g>
 
@@ -77,6 +87,16 @@
             @pointerdown.stop="startDrag('route', route.id, i, $event)"
             @dblclick.stop="removeVertex('route', route.id, i)"
           />
+          <g
+            v-for="handle in route.handles"
+            :key="`rtm-${route.id}-${handle.segment}`"
+            class="geo-midpoint"
+            @pointerdown.stop="insertMidpoint('route', route.id, handle.segment)"
+          >
+            <title>{{ t('mapStudio.editor.midpointHint') }}</title>
+            <circle :cx="handle.at[0]" :cy="handle.at[1]" :r="unit * 2.6" class="geo-midpoint-ring" />
+            <path :d="`M ${handle.at[0] - unit * 1.4} ${handle.at[1]} h ${unit * 2.8} M ${handle.at[0]} ${handle.at[1] - unit * 1.4} v ${unit * 2.8}`" class="geo-midpoint-cross" />
+          </g>
           <text v-if="route.pixels[0] && selected?.kind === 'route' && selected.id === route.id" :x="route.pixels[0][0] + unit * 3" :y="route.pixels[0][1] - unit * 2" :font-size="unit * 4" class="geo-text">{{ route.name }}</text>
         </g>
 
@@ -149,6 +169,38 @@
           >
             <input class="input geo-name" :value="shape.name" :disabled="disabled" :placeholder="t('mapStudio.editor.name')" @input="setName(section.kind, index, $event)" />
             <span class="geo-count">{{ t('mapStudio.editor.pointCount', { n: vertexCount(section.kind, shape.points) }) }}</span>
+            <div class="geo-smooth">
+              <span>{{ t('mapStudio.editor.smoothTitle') }}</span>
+              <button
+                type="button"
+                class="geo-tool geo-smooth-toggle"
+                :class="{ 'is-on': (section.rows.get(shape.id)?.smooth ?? 0) > 0 }"
+                :aria-pressed="(section.rows.get(shape.id)?.smooth ?? 0) > 0"
+                :aria-label="t('mapStudio.editor.smoothTitle')"
+                :disabled="disabled"
+                :title="t('mapStudio.editor.smoothHint')"
+                @click.stop="setSmooth(shape, (section.rows.get(shape.id)?.smooth ?? 0) > 0 ? 0 : 1)"
+              >
+                {{ (section.rows.get(shape.id)?.smooth ?? 0) > 0 ? t('mapStudio.editor.smoothOn') : t('mapStudio.editor.smoothOff') }}
+              </button>
+              <label class="geo-smooth-range" :title="t('mapStudio.editor.smoothHint')" @click.stop>
+                <span>{{ t('mapStudio.editor.smoothStrength') }}</span>
+                <input
+                  class="geo-smooth-slider"
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  :value="section.rows.get(shape.id)?.smooth ?? 0"
+                  :disabled="disabled"
+                  @input="setSmoothInput(shape, $event)"
+                />
+                <output class="geo-smooth-value">{{ Math.round((section.rows.get(shape.id)?.smooth ?? 0) * 100) }}%</output>
+              </label>
+            </div>
+            <p v-if="deviationWarning(section.kind, shape)" class="geo-warn geo-smooth-warn" :title="t('mapStudio.editor.smoothDeviationTitle')">
+              {{ deviationWarning(section.kind, shape) }}
+            </p>
             <span v-if="shape.origin === 'dataset'" class="geo-lock"><Lock :size="10" />{{ t('mapStudio.editor.datasetBadge') }}</span>
             <span v-if="shape.proposed" class="geo-badge">{{ t('mapStudio.editor.proposed') }}</span>
             <button v-if="shape.proposed" type="button" class="geo-tool" :disabled="disabled" @click.stop="accept(section.kind, index)">{{ t('mapStudio.editor.accept') }}</button>
@@ -165,32 +217,56 @@
 
 <script setup lang="ts">
 /**
- * 地图几何直接编辑器（Issue #84）。
+ * 地图几何直接编辑器（Issue #84；平滑与中点补齐见 #99 阶段③）。
  *
- * 几何真值是 map_spec 里的经纬度，画布只是某一张底图的投影视图：拖点、加线、加面都先把像素按该底图的
+ * 几何真值是 map_spec 里的经纬度，画布只是某一张底图的投影视图：拖点、加线、加面、**插入中点**都先把像素按该底图的
  * registration 反投影成经纬度再写回 spec，所以换底图（程序投影 / Earth 相机 / 外部标定图）后同一份几何仍然对得上。
  * 没有 registration 就只允许按数值编辑，绝不按 bbox 线性猜一个像素映射。
+ *
+ * 平滑不改存储：开关与强度滑杆只发 `layer-options` 草稿（页面随 PUT 提交），画布上的曲线用同源
+ * `utils/smooth.js` 实时预览，控制点始终可见可拖；偏离验收口径时按段提示所需强度，绝不自动改强度。
  */
+import { computed, nextTick, ref, watch } from 'vue'
 import { Lock, X } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { DEEPLINK_KEYS, useDeeplink } from '~/composables/useQuerySync'
 import type { MapFeatureMetadata, MapPlace, MapRegion, MapRoute, MapSpec } from '~/map-studio/api'
 import { geoToPixel, pixelToGeo, registrationSummary, type MapRegistration } from '~/map-studio/utils/mapRegistration'
+import { deviationProblems, insertVertex, smoothKeyFor, smoothPoints } from '~/map-studio/utils/smooth'
 import { mediaUrl } from '~/utils/url'
+
+type LayerOptions = Record<string, { smooth: number }>
+/** 一段平滑曲线的偏离：与 utils/smooth.js 的 deviationProblems 逐字段一致 */
+type LinearDeviation = { segment: number; deviation: number; limit: number; suggested: number }
+interface LinearRow {
+  id: string
+  name: string
+  pixels: Array<[number, number]>
+  attr: string
+  dataset: boolean
+  smooth: number
+  deviation: LinearDeviation | null
+  handles: Array<{ segment: number; at: [number, number] }>
+}
 
 const { t } = useI18n()
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   spec: MapSpec
   persistedSpec: MapSpec | null
   registration: MapRegistration | null
   baseImage: { path: string; width: number; height: number } | null
+  /** 当前图层文档；线/面要素已经有锚定图层时平滑键用图层 id，还没画出来时用要素 id 暂存 */
+  layerDoc?: { layers: Array<{ id: string; type: string; anchor?: { semantic_id?: string } }> } | null
+  /** 平滑草稿：{ 图层 id 或要素 id: { smooth: 0..1 } }，由页面保存时随 PUT 一起提交 */
+  layerOptions?: LayerOptions
   disabled?: boolean
-}>()
+}>(), { layerDoc: null, layerOptions: () => ({}), disabled: false })
 
 const emit = defineEmits<{
   (e: 'update', spec: MapSpec): void
+  (e: 'layer-options', options: LayerOptions): void
   (e: 'base-size', size: { width: number; height: number }): void
 }>()
 
@@ -263,8 +339,26 @@ function vertexCount(kind: LinearKind, points: Array<[number, number]>): number 
   return points.length - (kind === 'region' && points.length > 1 && first && last && first[0] === last[0] && first[1] === last[1] ? 1 : 0)
 }
 
-function shapesOf(list: Array<MapRoute | MapRegion>, kind: LinearKind) {
-  return list.map((shape) => {
+/** 段中点把手（像素）：闭合环最后一段连回首点；只在选中的那条上铺，数据集要素不该占满画布 */
+function pixelMidpoints(pixels: Array<[number, number]>, closed: boolean): Array<{ segment: number; at: [number, number] }> {
+  const segments = closed ? pixels.length : pixels.length - 1
+  const handles: Array<{ segment: number; at: [number, number] }> = []
+  for (let segment = 0; segment < segments; segment++) {
+    const a = pixels[segment]!
+    const b = pixels[(segment + 1) % pixels.length]!
+    handles.push({ segment, at: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] })
+  }
+  return handles
+}
+
+/**
+ * 画布行与侧栏状态一次算好：像素控制点、平滑预览曲线、偏离信息、中点把手。
+ * 预览曲线走 `utils/smooth.js` 的同一个函数（与实际渲染同源），控制点仍按原坐标单独画。
+ */
+function buildLinearRows(list: Array<MapRoute | MapRegion>, kind: LinearKind): LinearRow[] {
+  const closed = kind === 'region'
+  const rows: LinearRow[] = []
+  for (const shape of list) {
     const pixels: Array<[number, number]> = []
     const count = vertexCount(kind, shape.points)
     for (let index = 0; index < count; index++) {
@@ -272,16 +366,52 @@ function shapesOf(list: Array<MapRoute | MapRegion>, kind: LinearKind) {
       const pixel = pixelOf(point[0], point[1])
       if (pixel) pixels.push(pixel)
     }
-    return { id: shape.id, name: shape.name, pixels, attr: pixels.map(pt => `${pt[0]},${pt[1]}`).join(' '), dataset: shape.origin === 'dataset' }
-  }).filter(shape => shape.pixels.length >= 2)
+    const entry = props.layerOptions?.[smoothKeyFor(props.layerDoc, shape.id)]
+    const explicit = entry && typeof entry.smooth === 'number' && Number.isFinite(entry.smooth) ? entry.smooth : null
+    // 没显式写过的要素按后端缺省：数据集关、其余要素开；此处只显示，不悄悄写进草稿
+    const strength = explicit ?? (shape.origin === 'dataset' ? 0 : 1)
+    const normalized = viewWidth.value > 0 && viewHeight.value > 0
+      ? pixels.map(pt => [pt[0] / viewWidth.value, pt[1] / viewHeight.value] as [number, number])
+      : []
+    const smoothOptions = { closed, strength, width: viewWidth.value, height: viewHeight.value }
+    const curve = strength > 0 ? smoothPoints(normalized, smoothOptions) : normalized
+    const selectedShape = selected.value?.kind === kind && selected.value.id === shape.id
+    // 只有整条形状都投出来了才铺中点把手：漏掉的顶点没有像素中点，宁可不出把手也不猜坐标
+    const allVisible = pixels.length === count
+    rows.push({
+      id: shape.id,
+      name: shape.name,
+      pixels,
+      attr: curve.map(pt => `${pt[0] * viewWidth.value},${pt[1] * viewHeight.value}`).join(' '),
+      dataset: shape.origin === 'dataset',
+      smooth: strength,
+      deviation: deviationProblems(normalized, smoothOptions)[0] ?? null,
+      handles: selectedShape && allVisible && !props.disabled && props.registration ? pixelMidpoints(pixels, closed) : [],
+    })
+  }
+  return rows
 }
 
-const routeShapes = computed(() => shapesOf(props.spec.routes, 'route'))
-const regionShapes = computed(() => shapesOf(props.spec.regions, 'region'))
-const linearSections = computed(() => [
-  { kind: 'route' as LinearKind, items: props.spec.routes },
-  { kind: 'region' as LinearKind, items: props.spec.regions },
-])
+const linearRender = computed(() => {
+  const rows = [
+    ...buildLinearRows(props.spec.routes, 'route').map(row => ({ kind: 'route' as LinearKind, row })),
+    ...buildLinearRows(props.spec.regions, 'region').map(row => ({ kind: 'region' as LinearKind, row })),
+  ]
+  const states = new Map<string, { smooth: number; deviation: LinearDeviation | null }>()
+  for (const { kind, row } of rows) states.set(`${kind}:${row.id}`, { smooth: row.smooth, deviation: row.deviation })
+  return { routes: rows.filter(item => item.kind === 'route').map(item => item.row), regions: rows.filter(item => item.kind === 'region').map(item => item.row), states }
+})
+
+const routeShapes = computed(() => linearRender.value.routes.filter(row => row.pixels.length >= 2))
+const regionShapes = computed(() => linearRender.value.regions.filter(row => row.pixels.length >= 2))
+// 平滑控制不依赖底图/配准：尚未绘制时也能用要素 id 预设强度。
+const linearSections = computed(() => {
+  const byId = (rows: LinearRow[]) => new Map(rows.map(row => [row.id, row]))
+  return [
+    { kind: 'route' as LinearKind, items: props.spec.routes, rows: byId(linearRender.value.routes) },
+    { kind: 'region' as LinearKind, items: props.spec.regions, rows: byId(linearRender.value.regions) },
+  ]
+})
 const draftPixels = computed(() => (draft.value?.points ?? []).map(pt => pixelOf(pt[0], pt[1])).filter((pt): pt is [number, number] => !!pt))
 const draftAttr = computed(() => draftPixels.value.map(pt => `${pt[0]},${pt[1]}`).join(' '))
 
@@ -388,6 +518,71 @@ function continueShape(kind: LinearKind, id: string) {
     points.push([point[0], point[1]])
   }
   draft.value = { kind, id, points }
+}
+
+/**
+ * 写平滑草稿：线/面已有锚定图层时键用图层 id（后端按图层 id 取参数），
+ * 还没画出图层时用要素 id 暂存（作图阶段把要素键映射到落地图层 id）。只发草稿，不写接口。
+ */
+function setSmooth(shape: MapRoute | MapRegion, value: number) {
+  if (props.disabled || !Number.isFinite(value)) return
+  const key = smoothKeyFor(props.layerDoc, shape.id)
+  // 滑杆步长 0.05，取两位小数去掉浮点尾巴；显式写 0 表示「关」，不删键（人的选择要看得见）
+  const smooth = Math.round(Math.min(1, Math.max(0, value)) * 100) / 100
+  emit('layer-options', { ...(props.layerOptions ?? {}), [key]: { smooth } })
+}
+
+function setSmoothInput(shape: MapRoute | MapRegion, event: Event) {
+  const target = event.target
+  if (!(target instanceof HTMLInputElement)) return
+  setSmooth(shape, Number(target.value))
+}
+
+/** 侧栏偏离提示：超限的段才出现，数值给到足以照改的精度（强度由人明确调低，绝不自动改） */
+function deviationWarning(kind: LinearKind, shape: MapRoute | MapRegion): string {
+  const deviation = linearRender.value.states.get(`${kind}:${shape.id}`)?.deviation
+  if (!deviation) return ''
+  return t('mapStudio.editor.smoothDeviation', {
+    layer: shape.name || shape.id,
+    segment: deviation.segment,
+    deviation: deviation.deviation.toFixed(0),
+    limit: deviation.limit.toFixed(0),
+    suggest: deviation.suggested,
+  })
+}
+
+/**
+ * 段中点插入顶点：像素中点按该底图的 registration 反投影回经纬度（与拖点同口径），
+ * 原控制点一个不动、顺序不变；插入点是人工确认的几何，不再是 AI 候选。
+ */
+function insertMidpoint(kind: LinearKind, id: string, segment: number) {
+  if (props.disabled || !props.registration) return
+  const source = (kind === 'route' ? props.spec.routes : props.spec.regions).find(item => item.id === id)
+  if (!source) return
+  const count = vertexCount(kind, source.points)
+  const lastSegment = kind === 'region' ? count - 1 : count - 2
+  if (!Number.isInteger(segment) || segment < 0 || segment > lastSegment) return
+  const nextIndex = (segment + 1) % count
+  const a = pixelOf(source.points[segment]![0], source.points[segment]![1])
+  const b = pixelOf(source.points[nextIndex]![0], source.points[nextIndex]![1])
+  // 地球背面等投不出来的点没有像素中点可言，不猜坐标
+  if (!a || !b) return
+  const geo = pixelToGeo(props.registration, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
+  if (!geo) return
+  const next = cloneSpec()
+  const target = (kind === 'route' ? next.routes : next.regions).find(item => item.id === id)
+  if (!target) return
+  target.points = insertVertex(target.points, segment, [Number(geo[0].toFixed(5)), Number(geo[1].toFixed(5))], kind === 'region')
+  if (target.origin === 'dataset') markManual(target, kind)
+  else {
+    target.origin = 'manual'
+    delete target.proposed
+    target.verification = { status: 'confirmed' as const, reasons: [t('mapStudio.editor.manualReason')] }
+  }
+  selected.value = { kind, id }
+  emit('update', next)
+  resetDatasetWarn()
+  toast.success(t('mapStudio.editor.midpointInserted'))
 }
 
 function eventGeo(event: PointerEvent | MouseEvent): [number, number] | null {
@@ -608,6 +803,15 @@ function setPlaceCoord(index: number, axis: 'lon' | 'lat', event: Event) {
 .geo-vertex { fill: var(--surface); stroke: var(--text-1); stroke-width: 1; cursor: grab; }
 .geo-draft { fill: none; stroke: var(--accent-text); stroke-dasharray: 6 4; }
 .geo-draft-vertex { fill: var(--accent-text); }
+.geo-midpoint { cursor: pointer; }
+.geo-midpoint-ring { fill: var(--surface); stroke: var(--accent-text); stroke-width: 1; }
+.geo-midpoint-cross { fill: none; stroke: var(--accent-text); stroke-width: 1; pointer-events: none; }
+.geo-midpoint:hover .geo-midpoint-ring { fill: var(--accent-soft, var(--surface)); }
+.geo-smooth { display: inline-flex; align-items: center; gap: 4px; }
+.geo-smooth-range { display: inline-flex; align-items: center; gap: 3px; color: var(--text-2); font: 600 10px var(--font-body); }
+.geo-smooth-slider { width: 64px; accent-color: var(--accent-text); }
+.geo-smooth-value { font: 500 10px var(--font-mono, var(--font-body)); color: var(--text-2); }
+.geo-smooth-warn { flex: 1 0 100%; }
 .geo-text { fill: var(--text-1); paint-order: stroke; stroke: var(--surface); stroke-width: 2; pointer-events: none; }
 .geo-lists {
   display: grid;

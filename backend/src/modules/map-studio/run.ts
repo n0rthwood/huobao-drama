@@ -10,7 +10,7 @@ import { runObservedWork, type ObservedWorkInput } from '../../services/task-obs
 import { buildSampleKey } from '../../services/task-estimate.js'
 import { normalizeMapSpec, type MapSpec } from './geo/base-render.js'
 import { prepareMapBackground } from './geo/geometry.js'
-import { strictLayerDocProblems, type LayerDocProblem } from '../../services/layer-doc.js'
+import type { LayerDoc, LayerDocProblem } from '../../services/layer-doc.js'
 import { checkBriefSufficiency } from './brief.js'
 import { runResearchStage } from './research.js'
 import { runBaseStage } from './base.js'
@@ -22,7 +22,10 @@ import { activeRunOfTask, insertRun, finishRun, readRunParams, patchRunParams, u
 import { readModels } from './settings.js'
 import { MapStudioConflictError, MapStudioStaleError, MapStudioRequestError, briefHash, loadTask, mutateTask, serializeDetail, setStep, stageIndex, restoreSnapshot, requireHostTarget, type MapStudioDetail, type MutateContext } from './store.js'
 import { MAP_INFRA_RETRIES, MAP_MAX_ROLLBACKS, MAP_WORKFLOW_STAGES, STAGE_LABEL, isMapAgentStage, normalizeBrief, type MapBrief, type MapResearch, type MapResearchFeature, type MapWorkflowIssue, type MapWorkflowMode, type MapWorkflowStage } from './types.js'
-import { geometryUnverified, labelOverflowProblems, confirmedVerification } from './accuracy.js'
+import { geometryUnverified, confirmedVerification } from './accuracy.js'
+import { inspectLayerDraft, layerDraftContext } from './layer-edit.js'
+import { validateLayerOptions } from './render/smooth.js'
+import { MapWorkflowValidationError } from './types.js'
 import { beginStageSpan, endStageSpan } from './stage-spans.js'
 
 export interface MapRunOptions { textConfigId?: number; imageConfigId?: number; imageModel?: string }
@@ -251,12 +254,13 @@ async function executeStageWork(taskId: number, runId: number, stage: MapWorkflo
     const base = state.outputs.base_image
     if (!spec || !base) throw new MapStudioRequestError('缺少底图或地图几何，请先完成底图步骤', 'missing_base')
     const background = await prepareMapBackground({ basePath: base.path, registration: base.provenance && 'registration' in base.provenance ? base.provenance.registration : undefined, texturePath: state.outputs.texture_image?.path })
-    const outcome = await runDrawingStage({ ...await agentInput(), spec, background })
+    const outcome = await runDrawingStage({ ...await agentInput(), spec, background, layerOptions: state.outputs.layer_options, style_spec: brief.style_spec })
     if (outcome.kind === 'rollback') return rollback(outcome)
-    const { doc, rendered, omitted } = outcome.result
+    const { doc, rendered, omitted, layerOptions } = outcome.result
     return finish(ctx => {
       ctx.state.outputs.final_image = { path: rendered.path, width: rendered.width, height: rendered.height, source: 'map-drawing', run_id: runId, provenance: { registration: background.registration, warnings: background.warnings, omitted, base: base.path, base_mode: brief.base_mode, texture: state.outputs.texture_image?.path ?? null, background: background.path, attribution: base.provenance && 'attribution' in base.provenance ? base.provenance.attribution : null } }
       ctx.state.outputs.layer_doc = doc
+      ctx.state.outputs.layer_options = layerOptions
       ctx.state.issues = [...ctx.state.issues.filter(issue => issue.code !== 'drawing_warning' && issue.code !== 'drawing_omitted'), ...background.warnings.map((message): MapWorkflowIssue => ({ field: 'drawing', code: 'drawing_warning', message, blocking: false })), ...omitted.map((item): MapWorkflowIssue => ({ field: 'drawing', code: 'drawing_omitted', blocking: false, message: `要素 ${item.feature_id} 未画入成图：${item.reason}` }))]
     }, { proceed: true, message: `已用图层文档作图（${doc.layers.length} 个图层，${rendered.width}×${rendered.height}）；待交付后成为宿主当前图` })
   }
@@ -412,12 +416,30 @@ export async function saveMapWorkflowDraft(taskId: number, body: {
   expectedRevision?: number | null
   brief?: unknown
   mapSpec?: unknown
+  layerOptions?: unknown
   mode?: MapWorkflowMode
 }): Promise<MapStudioDetail> {
   const hasBrief = body.brief !== undefined
   const hasSpec = body.mapSpec !== undefined
-  if (!hasBrief && !hasSpec && body.mode === undefined) {
-    throw new MapStudioRequestError('请求里没有任何可保存的内容（brief / map_spec / mode 至少给一个）', 'empty_request')
+  const hasOptions = body.layerOptions !== undefined
+  const parsedOptions = hasOptions ? validateLayerOptions(body.layerOptions) : undefined
+  if (parsedOptions?.problems.length) throw new MapLayerDocInvalidError(parsedOptions.problems)
+  if (hasOptions) {
+    const loaded = await loadTask(taskId)
+    if (!loaded) throw new MapStudioRequestError('任务不存在', 'not_found')
+    const specUnchanged = !hasSpec || JSON.stringify(body.mapSpec) === JSON.stringify(loaded.mapSpec)
+    const briefUnchanged = !hasBrief || briefHash(normalizeBrief(body.brief, loaded.brief)) === briefHash(loaded.brief)
+    if (loaded.state.outputs.layer_doc && specUnchanged && briefUnchanged) {
+      const saved = await saveMapLayerDoc(taskId, { layerDoc: loaded.state.outputs.layer_doc, layerOptions: body.layerOptions, expectedRevision: body.expectedRevision })
+      if (!body.mode) return saved
+      return serializeDetail(await mutateTask(taskId, { expectedRevision: saved.revision, requireIdle: true, action: 'edit_mode', actor: 'manual', mutate: ctx => { ctx.state.mode = body.mode! } }))
+    }
+    const nextSpec = hasSpec ? body.mapSpec === null ? null : normalizeMapSpec(body.mapSpec) : loaded.mapSpec
+    const knownIds = new Set([...(nextSpec ? [...nextSpec.places, ...nextSpec.routes, ...nextSpec.regions].map(f => f.id) : []), ...(loaded.state.outputs.layer_doc && 'layers' in loaded.state.outputs.layer_doc && Array.isArray(loaded.state.outputs.layer_doc.layers) ? loaded.state.outputs.layer_doc.layers.map(l => l.id) : [])])
+    for (const id of Object.keys(parsedOptions!.options)) if (!knownIds.has(id)) throw new MapWorkflowValidationError(`layer_options.${id} 不是现有几何要素或图层`, { field: 'layer_options' })
+  }
+  if (!hasBrief && !hasSpec && !hasOptions && body.mode === undefined) {
+    throw new MapStudioRequestError('请求里没有任何可保存的内容（brief / map_spec / layer_options / mode 至少给一个）', 'empty_request')
   }
   const updated = await mutateTask(taskId, {
     expectedRevision: body.expectedRevision,
@@ -428,6 +450,10 @@ export async function saveMapWorkflowDraft(taskId: number, body: {
     snapshot: true,
     mutate: (ctx) => {
       if (body.mode) ctx.state.mode = body.mode
+      if (parsedOptions) {
+        if (JSON.stringify(ctx.state.outputs.layer_options ?? {}) !== JSON.stringify(parsedOptions.options)) ctx.state.outputs.final_image = null
+        ctx.state.outputs.layer_options = parsedOptions.options
+      }
       if (hasBrief) {
         const next = normalizeBrief(body.brief, ctx.brief)
         const changed = briefHash(next) !== ctx.state.brief_hash
@@ -483,6 +509,16 @@ export async function saveMapWorkflowDraft(taskId: number, body: {
         // 底纹只跟风格有关，与几何无关：取景变了也接着用，除非主题换了
         const styleChanged = !!previous && !!next && previous.style.theme !== next.style.theme
         const keptTexture = styleChanged ? null : ctx.state.outputs.texture_image
+        // Keep per-feature smoothing choices while drawing layer ids are invalidated.
+        const previousDoc = ctx.state.outputs.layer_doc as LayerDoc | null
+        const keptOptions = { ...ctx.state.outputs.layer_options }
+        for (const layer of previousDoc?.layers ?? []) {
+          const option = keptOptions[layer.id]
+          if (option && layer.anchor?.semantic_id) {
+            keptOptions[layer.anchor.semantic_id] = option
+            delete keptOptions[layer.id]
+          }
+        }
         ctx.state.outputs = {
           base_image: reframed ? null : ctx.state.outputs.base_image,
           texture_image: keptTexture,
@@ -490,6 +526,7 @@ export async function saveMapWorkflowDraft(taskId: number, body: {
           // 成图与图层文档一定失效：它们画的是旧几何
           final_image: null,
           layer_doc: null,
+          layer_options: keptOptions,
         }
         const resumeFrom: MapWorkflowStage = reframed ? 'base' : 'drawing'
         ctx.state.stage = stageIndex(ctx.state.stage) > stageIndex(resumeFrom) ? resumeFrom : ctx.state.stage
@@ -546,7 +583,7 @@ export class MapLayerDocInvalidError extends Error {
 }
 
 /** Manual and agent images share exactly the same strict validator/render chain. */
-export async function saveMapLayerDoc(taskId: number, body: { layerDoc: unknown; expectedRevision?: number | null }): Promise<MapStudioDetail> {
+export async function saveMapLayerDoc(taskId: number, body: { layerDoc: unknown; layerOptions?: unknown; expectedRevision?: number | null }): Promise<MapStudioDetail> {
   const loaded = await loadTask(taskId)
   if (!loaded) throw new MapStudioRequestError('任务不存在', 'not_found')
   requireHostTarget(loaded)
@@ -555,13 +592,14 @@ export async function saveMapLayerDoc(taskId: number, body: { layerDoc: unknown;
   if (loaded.state.status === 'running') throw new MapStudioConflictError('任务正在执行，请先等待或取消', { code: 'workflow_busy', revision: loaded.state.revision, runId: loaded.state.run_id })
   const current = loaded.state.outputs.layer_doc as { base?: { path?: string; width?: number; height?: number } } | null
   if (!current?.base?.path || !loaded.state.outputs.base_image || !loaded.mapSpec) throw new MapStudioRequestError('还没有图层文档，请先完成标注绘制', 'missing_drawing')
-  const strict = strictLayerDocProblems(body.layerDoc)
-  const problems = [...strict.problems, ...labelOverflowProblems(strict.doc), ...backgroundProblems(strict.doc, { path: current.base.path, width: Number(current.base.width), height: Number(current.base.height) }).map(message => ({ path: 'base', message }))]
+  const strict = inspectLayerDraft(body.layerDoc, body.layerOptions, layerDraftContext(loaded.mapSpec, loaded.state.outputs))
+  const problems = [...strict.problems, ...backgroundProblems(strict.doc, { path: current.base.path, width: Number(current.base.width), height: Number(current.base.height) }).map(message => ({ path: 'base', message }))]
   if (problems.length) throw new MapLayerDocInvalidError(problems)
-  const rendered = await renderMapLayerDoc(strict.doc)
+  const rendered = await renderMapLayerDoc(strict.doc, strict.layerOptions)
   const updated = await mutateTask(taskId, { expectedRevision: loaded.state.revision, expectedBriefHash: briefHash(loaded.brief), requireIdle: true, action: 'edit_layer_doc', actor: 'manual', note: `人工编辑图层（${strict.doc.layers.length} 个图层）`, snapshot: true, mutate: ctx => {
     ctx.state.outputs.final_image = { path: rendered.path, width: rendered.width, height: rendered.height, source: 'map-drawing-manual', run_id: ctx.state.run_id, provenance: { ...ctx.state.outputs.final_image?.provenance, background: current.base!.path, manual_edit: true } }
     ctx.state.outputs.layer_doc = strict.doc
+    ctx.state.outputs.layer_options = strict.layerOptions
     ctx.state.stage = 'complete'; ctx.state.status = 'awaiting_review'; ctx.state.error = null
   } })
   const delivered = await withInfraRetry(taskId, updated.state.run_id ?? 0, 'complete', () => deliverCurrent(taskId, { briefHash: briefHash(updated.brief) }))

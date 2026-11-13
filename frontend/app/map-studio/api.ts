@@ -72,6 +72,11 @@ export interface MapBrief {
   schematic: boolean
   base_mode: MapBaseMode
   style: MapStyleTheme
+  /**
+   * 阶段 ③ 预留的样式规范接入点：只在明确给出时随 brief 提交，后端原样保留；
+   * 缺省 = 现有 THEME_PRESETS 行为不变。本阶段不固化任何参考风格，也不在 UI 提供预设。
+   */
+  style_spec?: Record<string, unknown>
   notes: string
   reference_image: MapReferenceImage | null
   inferred: MapBriefInference[]
@@ -197,12 +202,36 @@ export interface MapImageRef {
   run_id: number | null
   provenance: Record<string, unknown> | null
 }
+/**
+ * 阶段 ③：线面渲染平滑参数，键是图层 id（绘制前是要素 id），`smooth: 0` 关闭、`0 < s <= 1` 是强度。
+ * 只改渲染副本，不改存储的控制点；老记录没有这个字段，缺省按要素默认值计算。
+ */
+export type MapLayerSmoothing = Record<string, { smooth: number }>
+
 export interface MapStudioOutputs {
   base_image: MapImageRef | null
   texture_image: MapImageRef | null
   final_image: MapImageRef | null
   kmz: { path: string; provenance: Record<string, unknown> } | null
   layer_doc: Record<string, unknown> | null
+  layer_options?: MapLayerSmoothing
+}
+
+/** 严格校验 / 标签检查逐条问题：label_* 与 smoothing_* 带图层 id，其余按字段路径定位 */
+export interface MapLayerProblem {
+  path: string
+  message: string
+  layer_id?: string
+  code?: string
+}
+
+/** 只读检查与自动排布的回执；两者都不保存草稿、不消耗模型轮次 */
+export interface MapLayerCheck { problems: MapLayerProblem[] }
+export interface MapLayerAutoLayout {
+  layer_doc: Record<string, unknown>
+  layer_options: MapLayerSmoothing
+  unresolved: Array<{ layer_id: string; message: string }>
+  problems: MapLayerProblem[]
 }
 
 export interface MapStudioHistoryEntry {
@@ -489,8 +518,8 @@ export const mapStudioAPI = {
   },
   createTask: (data: { title: string, brief?: Partial<MapBrief> }) => request<MapStudioDetail>('POST', '/tasks', data),
   get: (taskId: number) => request<MapStudioDetail>('GET', `/tasks/${taskId}`),
-  /** brief 按字段合并，map_spec 整份替换；纯几何修改保留底图/纹理只重绘 */
-  save: (taskId: number, data: { expected_revision?: number, brief?: Partial<MapBrief>, map_spec?: MapSpec }) =>
+  /** brief 按字段合并，map_spec 整份替换；layer_options 与几何同一次 CAS 提交，纯几何修改保留底图/纹理只重绘 */
+  save: (taskId: number, data: { expected_revision?: number, brief?: Partial<MapBrief>, map_spec?: MapSpec, layer_options?: MapLayerSmoothing }) =>
     request<MapStudioDetail>('PUT', `/tasks/${taskId}`, data),
   run: (taskId: number, options: MapStudioRunOptions) => request<MapStudioDetail>('POST', `/tasks/${taskId}/run`, options),
   advance: (taskId: number, options: Omit<MapStudioRunOptions, 'mode'> = {}) =>
@@ -501,9 +530,26 @@ export const mapStudioAPI = {
   /**
    * 人工在图层编辑器里改完的 LayerDoc：服务端严格校验（normalizeLayerDoc 会改动即拒收）、
    * 用同一条 renderLayerDoc 链重绘；宿主任务保存即交付。
+   * layerOptions 只按调用方给的值提交，**不**在这里补默认值——补出来的默认会被当成人工改动。
    */
-  saveLayerDoc: (taskId: number, layerDoc: Record<string, unknown>, expectedRevision?: number) =>
-    request<MapStudioDetail>('PUT', `/tasks/${taskId}/layer-doc`, { layer_doc: layerDoc, expected_revision: expectedRevision }),
+  saveLayerDoc: (taskId: number, layerDoc: Record<string, unknown>, expectedRevision?: number, layerOptions?: MapLayerSmoothing) =>
+    request<MapStudioDetail>('PUT', `/tasks/${taskId}/layer-doc`, {
+      layer_doc: layerDoc,
+      expected_revision: expectedRevision,
+      ...(layerOptions !== undefined ? { layer_options: layerOptions } : {}),
+    }),
+  /** 纯读取检查：严格校验 + 平滑偏离 + 标签排版问题，不保存、不重绘、不消耗轮次 */
+  checkLayerDoc: (taskId: number, layerDoc: Record<string, unknown>, layerOptions?: MapLayerSmoothing) =>
+    request<MapLayerCheck>('POST', `/tasks/${taskId}/layer-doc/check`, {
+      layer_doc: layerDoc,
+      ...(layerOptions !== undefined ? { layer_options: layerOptions } : {}),
+    }),
+  /** 纯函数自动排布标签：返回调整后的文档与排不下的条目；不删除标签、不缩字号 */
+  autoLayoutLayerDoc: (taskId: number, layerDoc: Record<string, unknown>, layerOptions?: MapLayerSmoothing) =>
+    request<MapLayerAutoLayout>('POST', `/tasks/${taskId}/layer-doc/auto-layout`, {
+      layer_doc: layerDoc,
+      ...(layerOptions !== undefined ? { layer_options: layerOptions } : {}),
+    }),
   /** 宿主任务：把当前成图重新交付（幂等，同一 sha256 不重复登记）；独立任务 400 standalone_task */
   deliver: (taskId: number) => request<{ delivered: boolean, version_ids: number[], message: string, deliveries: MapStudioDeliveryRow[] }>('POST', `/tasks/${taskId}/deliver`, {}),
   /** 文件流端点：直接给 <a download>，不要用 fetch（正文是二进制/附件） */
@@ -568,8 +614,8 @@ export function mapStudioConflictOf(err: unknown): { kind: 'revision' | 'busy', 
   return null
 }
 
-/** 400 layer_doc_invalid：严格校验逐条指出「规范化会改动哪里」，草稿一律保留由人改 */
-export function mapLayerDocProblemsOf(err: unknown): { message: string, problems: Array<{ path: string, message: string }> } | null {
+/** 400 layer_doc_invalid：严格校验/标签排版逐条指出「哪里不行」，草稿一律保留由人改 */
+export function mapLayerDocProblemsOf(err: unknown): { message: string, problems: MapLayerProblem[] } | null {
   const body = (err as MapStudioApiError)?.body
   if (!body || body.error !== 'layer_doc_invalid') return null
   const raw = Array.isArray(body.problems) ? body.problems : []
@@ -577,9 +623,24 @@ export function mapLayerDocProblemsOf(err: unknown): { message: string, problems
     message: String(body.message || ''),
     problems: raw.map((item: unknown) => {
       const row = (item ?? {}) as Record<string, unknown>
-      return { path: String(row.path ?? ''), message: String(row.message ?? '') }
+      const problem: MapLayerProblem = { path: String(row.path ?? ''), message: String(row.message ?? '') }
+      if (row.layer_id !== undefined && row.layer_id !== null && String(row.layer_id)) problem.layer_id = String(row.layer_id)
+      if (row.code !== undefined && row.code !== null && String(row.code)) problem.code = String(row.code)
+      return problem
     }),
   }
+}
+
+/**
+ * 问题 → 可点击选中的图层：优先用服务端给的 layer_id，其次按 `layers[N]` 路径取当前文档里的
+ * 图层（这份文档就是服务端校验的那份），都定位不到就返回 null——不猜一个「大概相关」的图层。
+ */
+export function mapLayerProblemLayerId(problem: MapLayerProblem, layers: Array<{ id: string }>): string | null {
+  if (problem.layer_id && layers.some(layer => layer.id === problem.layer_id)) return problem.layer_id
+  const match = /^layers\[(\d+)\]/.exec(problem.path || '')
+  if (!match) return null
+  const layer = layers[Number(match[1])]
+  return layer ? layer.id : null
 }
 
 /* ===== 阶段 ② 几何核验（纯读取与挑选用；闸门永远在服务端） ===== */

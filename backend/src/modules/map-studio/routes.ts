@@ -14,6 +14,8 @@ import { readStageSpans, stageForCallInSpans } from './stage-spans.js'
 import { createStandaloneTask } from './tasks.js'
 import { buildDeliverable, deliverCurrent } from './delivery.js'
 import { RESEARCH_KEY_IDS, researchKeyStatus, readModels, writeModels, setResearchKey } from './settings.js'
+import { inspectLayerDraft, layerDraftContext } from './layer-edit.js'
+import { autoPlaceLabels } from './layout/labels.js'
 
 export const mapStudioRoutes = new Hono()
 const app = mapStudioRoutes
@@ -73,7 +75,7 @@ app.put('/tasks/:id', async c => {
   if (!loaded) return notFound(c, '任务不存在')
   requireHostTarget(loaded)
   if (p.mode !== undefined && p.mode !== 'auto' && p.mode !== 'manual') return badRequest(c, 'mode 只能是 auto 或 manual', { error: 'invalid_mode' })
-  return success(c, await saveMapWorkflowDraft(loaded.row.id, { expectedRevision: optionalNumber(p.expected_revision, 'expected_revision'), ...(p.brief !== undefined ? { brief: p.brief } : {}), ...(p.map_spec !== undefined ? { mapSpec: p.map_spec } : {}), ...(p.mode ? { mode: p.mode as 'auto' | 'manual' } : {}) }))
+  return success(c, await saveMapWorkflowDraft(loaded.row.id, { expectedRevision: optionalNumber(p.expected_revision, 'expected_revision'), ...(p.brief !== undefined ? { brief: p.brief } : {}), ...(p.map_spec !== undefined ? { mapSpec: p.map_spec } : {}), ...(p.layer_options !== undefined ? { layerOptions: p.layer_options } : {}), ...(p.mode ? { mode: p.mode as 'auto' | 'manual' } : {}) }))
 })
 app.post('/tasks/:id/run', async c => {
   const p = await body(c)
@@ -96,7 +98,24 @@ app.post('/tasks/:id/cancel', async c => success(c, await cancelMapWorkflow(idOf
 app.put('/tasks/:id/layer-doc', async c => {
   const p = await body(c)
   if (p.layer_doc === undefined) return badRequest(c, '缺少 layer_doc', { error: 'invalid_body', field: 'layer_doc' })
-  return success(c, await saveMapLayerDoc(idOf(c), { layerDoc: p.layer_doc, expectedRevision: optionalNumber(p.expected_revision, 'expected_revision') }))
+  return success(c, await saveMapLayerDoc(idOf(c), { layerDoc: p.layer_doc, layerOptions: p.layer_options, expectedRevision: optionalNumber(p.expected_revision, 'expected_revision') }))
+})
+// Read-only editor operations. Neither inspection nor auto-layout saves a draft or consumes a round.
+app.post('/tasks/:id/layer-doc/check', async c => {
+  const p = await body(c), loaded = await loadTask(idOf(c))
+  if (!loaded) return notFound(c, '任务不存在')
+  const checked = inspectLayerDraft(p.layer_doc, p.layer_options, layerDraftContext(loaded.mapSpec, loaded.state.outputs))
+  return success(c, { problems: checked.problems })
+})
+app.post('/tasks/:id/layer-doc/auto-layout', async c => {
+  const p = await body(c), loaded = await loadTask(idOf(c))
+  if (!loaded) return notFound(c, '任务不存在')
+  const context = layerDraftContext(loaded.mapSpec, loaded.state.outputs)
+  const checked = inspectLayerDraft(p.layer_doc, p.layer_options, context)
+  if (checked.renderable.length) throw new MapLayerDocInvalidError(checked.renderable)
+  const result = autoPlaceLabels(checked.doc, checked.doc.base, checked.features)
+  const inspected = inspectLayerDraft(result.doc, checked.layerOptions, context)
+  return success(c, { layer_doc: result.doc, layer_options: checked.layerOptions, unresolved: result.unresolved, problems: inspected.problems })
 })
 app.post('/tasks/:id/deliver', async c => {
   const loaded = await loadTask(idOf(c))

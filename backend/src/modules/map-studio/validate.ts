@@ -10,7 +10,9 @@ import type { MapSpec } from './geo/base-render.js'
 import { THEME_PRESETS } from '../../services/layer-svg.js'
 import type { Layer, LayerDoc } from '../../services/layer-doc.js'
 import { extractDatasetGeometry, type ExtractedDatasetGeometry } from './geo/datasets.js'
-import { extentProblems, validExtent, computeRelation, excerptSupportsPoint, labelOverflowProblems } from './accuracy.js'
+import { extentProblems, validExtent, computeRelation, excerptSupportsPoint } from './accuracy.js'
+import { labelProblems, type LabelFeature } from './layout/labels.js'
+import { renderCopyWithSmoothing, type LayerOptions } from './render/smooth.js'
 import type { MapDatasetQuery, MapFeatureCategory, MapFeatureOrigin, MapRelation } from './types.js'
 import type {
   MapBrief,
@@ -415,14 +417,27 @@ export interface SpecFeature {
   name: string
   /** place 为单点；route/region 为顶点序列 */
   coords: Array<[number, number]>
+  origin?: MapFeatureOrigin
 }
 
 export function specFeatures(spec: MapSpec): SpecFeature[] {
   return [
-    ...spec.places.map((place): SpecFeature => ({ id: place.id, kind: 'place', name: place.name, coords: [[place.lon, place.lat]] })),
-    ...spec.routes.map((route): SpecFeature => ({ id: route.id, kind: 'route', name: route.name, coords: route.points })),
-    ...(spec.regions ?? []).map((region): SpecFeature => ({ id: region.id, kind: 'region', name: region.name, coords: region.points })),
+    ...spec.places.map((place): SpecFeature => ({ id: place.id, kind: 'place', name: place.name, origin: place.origin, coords: [[place.lon, place.lat]] })),
+    ...spec.routes.map((route): SpecFeature => ({ id: route.id, kind: 'route', name: route.name, origin: route.origin, coords: route.points })),
+    ...(spec.regions ?? []).map((region): SpecFeature => ({ id: region.id, kind: 'region', name: region.name, origin: region.origin, coords: region.points })),
   ]
+}
+
+/** Project the actual feature, so detached/moved geometry cannot disguise a far-away label. */
+export function projectedLabelFeatures(features: SpecFeature[], registration: MapRegistration): LabelFeature[] {
+  const forward = forwardFor(registration)
+  return features.map(feature => ({
+    id: feature.id, kind: feature.kind,
+    points: feature.coords.flatMap(coord => {
+      const pixel = forward(coord)
+      return pixel ? [[pixel[0] / registration.width, pixel[1] / registration.height] as [number, number]] : []
+    }),
+  }))
 }
 
 export interface FrameFeature {
@@ -567,9 +582,11 @@ export function drawingProblems(input: {
   features: SpecFeature[]
   registration: MapRegistration
   omitted: unknown
+  layerOptions?: LayerOptions
 }): { problems: string[]; omitted: OmittedFeature[] } {
   const { doc, features, registration } = input
-  const problems: string[] = labelOverflowProblems(doc).map(problem => problem.message)
+  const rendered = renderCopyWithSmoothing(doc, input.layerOptions)
+  const problems: string[] = labelProblems(rendered, doc.base, projectedLabelFeatures(features, registration)).map(problem => problem.message)
   const forward = forwardFor(registration)
   const width = registration.width
   const height = registration.height
@@ -645,7 +662,7 @@ export function drawingProblems(input: {
       problems.push(`${label} 的图层 ${layer.id} 有 ${stray.length} 个点离开了要素本身的走向（例如 ${fmt(stray[0]!)}），几何必须贴合要素`)
     }
   }
-  const coverage = opaqueFillCoverage(doc)
+  const coverage = opaqueFillCoverage(rendered)
   if (coverage.total > OPAQUE_COVER_LIMIT) {
     problems.push(`不透明的填充面盖住了画面的 ${(coverage.total * 100).toFixed(0)}%（上限 ${OPAQUE_COVER_LIMIT * 100}%），底图上的地理会被遮掉：`
       + coverage.layers.map(item => `${item.id} 约 ${(item.ratio * 100).toFixed(0)}%`).join('、')

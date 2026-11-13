@@ -5,7 +5,10 @@ import type { LayerDoc } from '../../services/layer-doc.js'
 import { insertDelivery, selectDeliveryBySha } from './db.js'
 import type { MapStudioDeliverable, MapStudioDeliveryResult } from './contract.js'
 import { loadTask, requireHostTarget, briefHash, MapStudioRequestError, MapStudioStaleError, type LoadedTask } from './store.js'
-import { drawnGeometryOf, specFeatures } from './validate.js'
+import { drawnGeometryOf, projectedLabelFeatures, specFeatures } from './validate.js'
+import { renderCopyWithSmoothing, smoothingProblems } from './render/smooth.js'
+import { labelFeaturesOf, labelProblems } from './layout/labels.js'
+import { layerDraftContext } from './layer-edit.js'
 import { geometryUnverified } from './accuracy.js'
 
 /** One immutable payload drives both host delivery and standalone downloads. */
@@ -15,7 +18,14 @@ export function buildDeliverable(loaded: LoadedTask): MapStudioDeliverable {
   const pending = mapSpec ? geometryUnverified(mapSpec) : []
   if (pending.length) throw new MapStudioRequestError(`geometry_unverified：${pending.map(f => `「${f.name}」：${f.reasons.join('；')}`).join(' / ')}`, 'geometry_unverified')
   if (!final || !base || !doc || !mapSpec) throw new MapStudioRequestError('缺少成图、底图、图层文档或地图几何，请先完成标注绘制', 'missing_drawing')
-  const geometry = drawnGeometryOf(doc as LayerDoc, specFeatures(mapSpec))
+  const controlDoc = doc as LayerDoc
+  const options = state.outputs.layer_options ?? {}
+  const renderDoc = renderCopyWithSmoothing(controlDoc, options)
+  const context = layerDraftContext(mapSpec, state.outputs)
+  const anchors = context.registration ? projectedLabelFeatures(context.features, context.registration) : labelFeaturesOf(renderDoc)
+  const problems = [...smoothingProblems(controlDoc, options), ...labelProblems(renderDoc, renderDoc.base, anchors)]
+  if (problems.length) throw new MapStudioRequestError(problems.map(p => p.message).join('；'), 'drawing_invalid')
+  const geometry = drawnGeometryOf(renderDoc, specFeatures(mapSpec))
   const mode = base.provenance && 'mode' in base.provenance ? base.provenance.mode : loaded.brief.base_mode
   const baseMode = mode === 'image' || mode === 'earth' ? mode : 'program'
   const features = specFeatures(mapSpec).map(feature => {
@@ -38,7 +48,7 @@ export function buildDeliverable(loaded: LoadedTask): MapStudioDeliverable {
     texture_image: state.outputs.texture_image ? { path: state.outputs.texture_image.path } : null,
     semantics: { width: geometry.width, height: geometry.height, points: geometry.points, lines: geometry.routes, regions: geometry.regions, labels: [], warnings },
     features, sources: state.research?.sources ?? [], kmz: state.outputs.kmz ? { path: state.outputs.kmz.path } : null,
-    editable_source: { version: 1, map_spec: mapSpec, layer_doc: doc },
+    editable_source: { version: 1, map_spec: mapSpec, layer_doc: doc, layer_options: options },
     manual_edit: final.source === 'map-drawing-manual',
     summary: `${geometry.points.length} 点 / ${geometry.routes.length} 线 / ${geometry.regions.length} 面，底图路线 ${baseMode}`,
   }

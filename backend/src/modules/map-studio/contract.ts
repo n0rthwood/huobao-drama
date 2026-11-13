@@ -33,7 +33,7 @@ export interface MapStudioDeliverable {
   /** research.sources 原样 */
   sources: unknown[]
   kmz: { path: string } | null
-  /** 可编辑源文件：宿主不校验、不解释，只保存与回传。阶段 ① = { version, map_spec, layer_doc } */
+  /** 可编辑源文件：{ version, map_spec, layer_doc, layer_options }；宿主不解释平滑参数。 */
   editable_source: unknown
   /** 来自人工图层编辑保存 */
   manual_edit: boolean

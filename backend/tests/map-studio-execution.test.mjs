@@ -30,14 +30,11 @@ test('地图继续当前阶段：原件与成图原子采用，几何编辑复�
         return{toolCalls:[{name:'submit_base',args:{artifact_id:renders[0].artifact_id}}]}
       }
       if(sys.includes('地图工作流：用图层文档作图')){
-        const skeleton=JSON.parse(user.match(/起始文档骨架：\\n(\\{.*\\})/)[1])
-        const layers=[...user.matchAll(/- id=(\\S+) place「(.+?)」→ 归一化坐标 (\\[.*\\])/g)].map((m,z)=>({
-          id:'l-'+m[1],type:'marker',name:m[2],visible:true,locked:false,z,opacity:1,rotation:0,
-          anchor:{semantic_id:m[1],semantic_name:m[2]},at:JSON.parse(m[3])[0],text:m[2],style:{},
-        }))
-        const doc={...skeleton,layers}
-        if(!toolResults(body,'render_layer_doc').length)return{toolCalls:[{name:'render_layer_doc',args:{layer_doc:doc}}]}
-        return{toolCalls:[{name:'submit_layer_doc',args:{layer_doc:doc}}]}
+        const features=JSON.parse(user.match(/要素摘要（不传顶点）：\\n(.+)/)[1])
+        if(!toolResults(body,'add_feature_layers').length)return{toolCalls:[{name:'add_feature_layers',args:{items:features.map(f=>({feature_id:f.feature_id,style:{}}))}}]}
+        if(!toolResults(body,'auto_layout_labels').length)return{toolCalls:[{name:'auto_layout_labels',args:{}}]}
+        if(!toolResults(body,'render_draft').length)return{toolCalls:[{name:'render_draft',args:{}}]}
+        return{toolCalls:[{name:'submit_draft',args:{}}]}
       }
       return{text:'无事可做'}
     })
