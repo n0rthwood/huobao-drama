@@ -270,7 +270,16 @@
       "noReason": "사유 없음",
       "retry": "재시도",
       "cancelRequested": "취소를 요청했습니다",
-      "cancelFailed": "취소에 실패했습니다"
+      "cancelFailed": "취소에 실패했습니다",
+      "phaseStep": "{phase} · {step}/{total} 단계",
+      "finishIn": "약 {time} 후 완료 예정",
+      "phase": {
+        "encoding": "인코딩",
+        "loading": "모델 로딩",
+        "sampling": "샘플링",
+        "decoding": "디코딩",
+        "saving": "저장"
+      }
     }
   },
   "layout": {
@@ -2059,7 +2068,24 @@
       "etaFallback": "약 {time} 예상 (실측 {n}회 · 출처 {model})",
       "etaNone": "예상 시간 없음",
       "elapsedUsed": "경과 {time}",
-      "elapsedTook": "소요 {time}"
+      "elapsedTook": "소요 {time}",
+      "confirmQueueNote": "선택한 샷을 차례로 조립해 한꺼번에 영상 대기열에 제출하며, 대기열이 GPU 2장으로 병렬 생성합니다. 키프레임을 첫/중간/끝 가이드 프레임으로 사용합니다. 서버에서 실행되므로 페이지를 닫아도 됩니다. 일괄을 중지하면 대기 중인 샷은 취소되고 생성 중인 샷은 끝까지 진행됩니다",
+      "etaQueue": "대기열 예상 {time} ({basis} · 샘플 {n}개 · {key}초 구간) · 지금 제출 시 약 {wait} 대기",
+      "etaBasis": {
+        "measured": "실측 평균",
+        "scaled": "비슷한 길이에서 환산",
+        "default": "기본값"
+      },
+      "queueTitle": "영상 생성 대기열",
+      "queueSummary": "이번 화 생성 중 {running} · 대기 {queued}",
+      "queueEta": "전체 완료까지 약 {time}",
+      "queueProgress": "전체 진행률 {percent}%",
+      "queueOverall": "대기열 전체 실행 {running} · 대기 {queued} · 유휴 GPU {idle}/{total}",
+      "queueOverallHint": "대기열 전체에는 다른 앱(vidgen studio 등)의 작업도 포함되며 개수만 표시합니다",
+      "queueWait": "새 작업 예상 대기 {time}",
+      "queueNoWait": "대기 없음",
+      "taskCancelRequested": "이 영상 작업의 취소를 요청했습니다",
+      "taskCancelFailed": "영상 작업 취소에 실패했습니다"
     },
     "kf": {
       "slotFirst": "첫 프레임",

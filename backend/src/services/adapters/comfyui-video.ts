@@ -25,7 +25,8 @@ import {
   waitEngineIdle,
 } from './comfyui-client'
 import { buildH3Prompt, type H3Mode } from './h3-prompt'
-import { buildFirstLast, buildReference, buildT2v, pickResolution } from './comfyui-workflows'
+import { buildFirstLast, buildReference, buildT2v } from './comfyui-workflows'
+import { pickResolution } from '../video-resolution.js'
 
 const VIDEO_EXT = /\.(mp4|webm|mkv|mov)$/i
 const DEFAULT_DURATION_S = 5

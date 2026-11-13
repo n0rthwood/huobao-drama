@@ -4,9 +4,9 @@
  */
 import { db, getInsertId, schema } from '../db/index.js'
 import { and, eq, inArray } from 'drizzle-orm'
-import { getActiveConfig, getConfigById } from './ai.js'
+import { getActiveConfig, getConfigById, validateVideoModel } from './ai.js'
 import { now } from '../utils/response.js'
-import { downloadFile, fetchImageAsCompressedDataUrl, generateImageThumb, readImageAsCompressedDataUrl, readImageAsDataUrl, readImageAsPngDataUrl, saveBase64Image, saveImageBuffer } from '../utils/storage.js'
+import { downloadFile, fetchImageAsCompressedDataUrl, generateImageThumb, readImageAsCompressedDataUrl, readImageAsDataUrl, readImageAsPngDataUrl, saveBase64Image, saveImageBuffer, saveVideoBuffer } from '../utils/storage.js'
 import { extractVideoPoster } from '../utils/video-poster.js'
 import { authHeaders } from './adapters/comfyui-client'
 import { getImageAdapter, getVideoAdapter } from './adapters/registry'
@@ -37,13 +37,29 @@ import {
   uploadReferenceImage,
 } from './adapters/qwen-jobs-client.js'
 import {
+  assertH3Contract,
+  cancelH3Job,
+  createH3Job,
+  evictH3FileIds,
+  H3_MAX_REFS,
+  H3JobsError,
+  h3QueueModel,
+  h3RequestFileIds,
+  type H3JobMode,
+  type H3JobRequest,
+  uploadH3File,
+} from './adapters/h3-jobs-client.js'
+import { buildH3Prompt } from './adapters/h3-prompt.js'
+import { pickResolution } from './video-resolution.js'
+import {
   ACTIVE_TASK_STATUSES,
   isActiveTaskStatus,
+  isH3JobsTask,
   isQwenJobsTask,
   mapRemoteStatus,
   parseRemoteState,
   patchTaskRemoteState,
-  qwenIdempotencyKey,
+  queueIdempotencyKey,
   remoteSnapshot,
 } from './sys-task.js'
 
@@ -399,6 +415,17 @@ async function processTask(id: number, config: AIConfig) {
       const preparedImage = adapter.prepare ? await adapter.prepare(config, imageRecord) : imageRecord
       ;({ url, method, headers, body } = adapter.buildGenerateRequest(config, preparedImage))
     } else {
+      // h3-jobs：服务端排队的视频任务 API，提交后由追踪器（services/h3-jobs.ts）按远端 id 跟踪
+      if (isH3JobsTask(config.provider)) {
+        if (inFlightH3Submits.has(record.id)) return
+        inFlightH3Submits.add(record.id)
+        try {
+          await submitH3JobsVideo(record, config, params)
+        } finally {
+          inFlightH3Submits.delete(record.id)
+        }
+        return
+      }
       const adapter = getVideoAdapter(config.provider)
       const resolvedImageUrl = await normalizeVideoReferenceUrl(params.imageUrl)
       const resolvedFirstFrameUrl = await normalizeVideoReferenceUrl(params.firstFrameUrl)
@@ -537,7 +564,7 @@ async function submitQwenJobsImage(record: SysTaskRecord, config: AIConfig, para
     throw new Error(`参考图超限：共 ${refs.length} 张，单次最多 ${QWEN_MAX_REFS} 张，请减少绑定的角色/场景/道具`)
   }
   // 已落盘过请求的（重启恢复后走完整提交路径）沿用原键，否则新生成
-  const idempotencyKey = parseRemoteState(record.remoteState).idempotency_key || qwenIdempotencyKey(record.id)
+  const idempotencyKey = parseRemoteState(record.remoteState).idempotency_key || queueIdempotencyKey(record.id)
 
   for (let attempt = 1; attempt <= 2; attempt++) {
     const fileIds: string[] = []
@@ -650,10 +677,10 @@ export async function resumeQwenJobsTask(row: SysTaskRecord, config: AIConfig): 
   try {
     if (!await imageTaskEligible(row)) return
     const state = parseRemoteState(row.remoteState)
-    const idempotencyKey = state.idempotency_key || qwenIdempotencyKey(row.id)
+    const idempotencyKey = state.idempotency_key || queueIdempotencyKey(row.id)
     if (state.request) {
       logTaskProgress('ImageTask', 'qwen-jobs resubmit', { id: row.id, idempotencyKey })
-      const result = await sendQwenJob(row.id, config, state.request, idempotencyKey)
+      const result = await sendQwenJob(row.id, config, state.request as QwenJobRequest, idempotencyKey)
       if (result !== 'stale_refs') return
       // 参考文件已被回收：回到完整提交路径重新上传
     }
@@ -687,6 +714,230 @@ export async function completeImageTaskFromBytes(record: SysTaskRecord, bytes: B
   }
   logTaskSuccess('ImageTask', 'downloaded', { id: record.id, provider: record.provider, localPath })
   await writeBackImageAssets(record, localPath)
+}
+
+// ─── h3-jobs：h3-central 视频任务队列 ───────────────────────────────
+
+/** 本进程正在提交（扩写提示词 → 上传图片 → POST /v1/jobs）的视频任务：追踪器据此不重复提交 */
+const inFlightH3Submits = new Set<number>()
+
+/** 与 ComfyUI 直连同一口径：火宝只发 4–15 的整数秒（整数 × 24 帧恰在 H3 帧网格的输入上） */
+const H3_DEFAULT_DURATION_S = 5
+
+/** 提交前确定的 H3 任务形态（图片仍是 data URL / http 源，上传后才换成 file id） */
+interface H3Plan {
+  body: Omit<H3JobRequest, 'first_frame' | 'mid_frame' | 'last_frame' | 'reference_images'>
+  first?: string
+  mid?: { source: string; time: number }
+  last?: string
+  refs: string[]
+}
+
+/**
+ * 按任务参数确定 H3 任务形态，规则与 ComfyUI 直连（comfyui-video.ts prepare）逐条一致：
+ * 有参考图 → reference（首/中/尾作引导帧）；只有首帧 → firstlast；都没有 → t2v；omni 只走 reference。
+ * persistedPrompt：请求体已落盘过（重启恢复 / 参考图被回收重传）时沿用其中已扩写的提示词，
+ * 绝不重新扩写——扩写结果每次不同，重扩会让同一幂等键对应不同请求体。
+ */
+async function planH3Job(
+  record: SysTaskRecord,
+  config: AIConfig,
+  params: Record<string, any>,
+  persistedPrompt: string | undefined,
+): Promise<H3Plan> {
+  if ((params.referenceVideoUrls ?? []).length || (params.referenceAudioUrls ?? []).length) {
+    throw new Error('H3 视频仅支持参考图，不支持参考视频/音频')
+  }
+  const userPrompt = (record.prompt || '').trim()
+  if (!userPrompt) throw new Error('H3 视频要求必须提供提示词')
+  const modelName = record.model || config.model
+  const modelError = validateVideoModel(config.provider, modelName)
+  if (modelError) throw new Error(`${modelError}: ${modelName}`)
+  const model = h3QueueModel(modelName)
+  const omni = model === 'minimax-h3-fasth3-omni-int8'
+
+  const first = await normalizeVideoReferenceUrl(params.firstFrameUrl || params.imageUrl)
+  const midSource = await normalizeVideoReferenceUrl(params.midFrameUrl)
+  const last = await normalizeVideoReferenceUrl(params.lastFrameUrl)
+  const refs = await normalizeVideoReferenceUrls(params.referenceImageUrls)
+  if (omni && !refs.length && first) refs.push(first)
+  if (omni && !refs.length) throw new Error('FastH3-Omni 需要至少一张参考图或首帧')
+  if (refs.length > H3_MAX_REFS) {
+    throw new Error(`参考图超限：共 ${refs.length} 张，单次最多 ${H3_MAX_REFS} 张，请减少绑定的角色/场景/道具`)
+  }
+  const mode: H3JobMode = refs.length ? 'reference' : first ? 'firstlast' : 't2v'
+  const durationS = Math.min(15, Math.max(4, Math.round(Number(params.duration || H3_DEFAULT_DURATION_S))))
+  const midTime = params.midFrameTime != null ? Number(params.midFrameTime) : NaN
+  // 中间帧引导只在参考图模式可用（契约：firstlast 不收 mid）
+  const mid = mode === 'reference' && midSource && Number.isFinite(midTime) ? { source: midSource, time: midTime } : undefined
+  const prompt = persistedPrompt || await buildH3Prompt(userPrompt, mode, durationS, {
+    hasFirst: mode !== 't2v' && !!first,
+    midTime: mid?.time,
+    hasLast: mode !== 't2v' && !!last,
+  })
+  const [width, height] = pickResolution(params.resolution, params.aspectRatio)
+  const body: H3Plan['body'] = { mode, model, prompt, width, height, duration_seconds: durationS }
+  if (Number.isInteger(params.seed)) body.seed = params.seed
+  if (mode === 't2v') return { body, refs }
+  if (mode === 'firstlast') return { body, refs, first: first!, last: last || undefined }
+  return { body, refs, first: first || undefined, mid, last: last || undefined }
+}
+
+/** 上传形态里的全部图片（同内容命中 file id 缓存），组装最终请求体 */
+async function uploadH3Plan(config: AIConfig, plan: H3Plan, sysTaskId: number): Promise<H3JobRequest> {
+  const body: H3JobRequest = { ...plan.body, metadata: { sys_task_id: sysTaskId } }
+  if (plan.refs.length) {
+    body.reference_images = []
+    for (const ref of plan.refs) body.reference_images.push(await uploadH3File(config, ref))
+  }
+  if (plan.first) body.first_frame = await uploadH3File(config, plan.first)
+  if (plan.mid) body.mid_frame = { file: await uploadH3File(config, plan.mid.source), time_seconds: plan.mid.time }
+  if (plan.last) body.last_frame = await uploadH3File(config, plan.last)
+  return body
+}
+
+/**
+ * h3-jobs 提交（镜像 submitQwenJobsImage）：先把完整请求体（含已上传的 file id 与已扩写的提示词）
+ * 落盘到 remote_state.request，再调 POST /v1/jobs —— 提交途中重启时按同一幂等键原样重发（服务端去重）。
+ * 图片被服务端回收（422）时清掉 file id 缓存并重传一次。
+ */
+async function submitH3JobsVideo(record: SysTaskRecord, config: AIConfig, params: Record<string, any>) {
+  const state = parseRemoteState(record.remoteState)
+  const idempotencyKey = state.idempotency_key || queueIdempotencyKey(record.id)
+  try {
+    await assertH3Contract(config)
+  } catch (err) {
+    if (err instanceof H3JobsError && err.transient) throw new H3JobsError(err.status, err.code, `视频队列不可达：${err.message}`)
+    throw err
+  }
+  const plan = await planH3Job(record, config, params, (state.request as H3JobRequest | undefined)?.prompt)
+  let lastError = ''
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const body = await uploadH3Plan(config, plan, record.id)
+    const row = await patchTaskRemoteState(
+      record.id,
+      { request: body, config_id: config.id, idempotency_key: idempotencyKey },
+      { status: 'queued' },
+    )
+    // 扩写/上传期间被取消：请求体已落盘但不提交，追踪器也只看活跃任务
+    if (!row || !isActiveTaskStatus(row.status)) {
+      logTaskWarn('VideoTask', 'h3-jobs submit skipped (cancelled)', { id: record.id, status: row?.status })
+      return
+    }
+    logTaskPayload('VideoTask', 'h3-jobs request', { id: record.id, body })
+    const result = await sendH3Job(record.id, config, body, idempotencyKey)
+    if (typeof result !== 'object') return
+    lastError = result.error
+    logTaskWarn('VideoTask', 'h3-jobs re-upload files', { id: record.id, attempt, error: lastError })
+  }
+  await failTask(record.id, `图片已被视频队列回收，重新上传后仍然提交失败，请重试（${lastError}）`)
+}
+
+/**
+ * 调远端建任务并立即落盘远端 id（镜像 sendQwenJob）。
+ * 409 幂等冲突是终态；422 且请求带图片 → 清缓存交给调用方重传一次（返回 { error }）。
+ * 网络错误/5xx/429 queue_full 都不是终态：请求体已落盘，任务保持 queued 且没有 task_id，
+ * 追踪器下一拍按同一幂等键原样重发（服务端对失败请求不记幂等键）。
+ */
+async function sendH3Job(
+  id: number,
+  config: AIConfig,
+  body: H3JobRequest,
+  idempotencyKey: string,
+): Promise<'submitted' | 'retry_later' | 'failed' | { error: string }> {
+  try {
+    const record = db.select().from(schema.sysTask).where(eq(schema.sysTask.id, id)).get()
+    if (!record || !isActiveTaskStatus(record.status)) return 'failed'
+    const job = await createH3Job(config, body, idempotencyKey)
+    const row = await patchTaskRemoteState(id, remoteSnapshot(job), {
+      taskId: job.id,
+      status: mapRemoteStatus(job.status) ?? 'processing',
+    })
+    // 提交在途时本地已终结（取消/失败）：远端任务马上取消，别让它白占一张卡
+    if (row && !isActiveTaskStatus(row.status)) {
+      logTaskWarn('VideoTask', 'h3-jobs cancel after local terminal', { id, jobId: job.id, status: row.status })
+      await patchTaskRemoteState(id, { cancel_pending: true })
+      await cancelH3Job(config, job.id).catch(err => {
+        // 取消失败：cancel_pending 已落盘，追踪器会接着重试
+        logTaskWarn('VideoTask', 'h3-jobs cancel retry', { id, jobId: job.id, error: err instanceof Error ? err.message : String(err) })
+      })
+      return 'submitted'
+    }
+    logTaskProgress('VideoTask', 'h3-jobs submitted', { id, jobId: job.id, status: job.status })
+    return 'submitted'
+  } catch (err) {
+    if (err instanceof H3JobsError && err.transient) {
+      logTaskWarn('VideoTask', 'h3-jobs submit retry', { id, error: err.message })
+      return 'retry_later'
+    }
+    if (err instanceof H3JobsError && (err.status === 409 || err.status === 422)) {
+      const files = h3RequestFileIds(body)
+      const evicted = evictH3FileIds(files)
+      if (err.status === 422 && files.length) {
+        logTaskWarn('VideoTask', 'h3-jobs stale files', { id, evicted, error: err.message })
+        return { error: err.message }
+      }
+      await failTask(id, `${err.message}（请重试，将重新上传图片并新建任务）`)
+      return 'failed'
+    }
+    throw err
+  }
+}
+
+/**
+ * 追踪器驱动的恢复（含启动恢复），镜像 resumeQwenJobsTask：
+ * - remote_state.request 已落盘但没有远端 id → 按同一幂等键原样重发；
+ * - 连请求体都没有（扩写/上传途中重启）→ 用 sys_task.params 走完整提交路径。
+ * 本进程正在提交的任务直接跳过，避免追踪器与提交线程重复上传。
+ */
+export async function resumeH3JobsTask(row: SysTaskRecord, config: AIConfig): Promise<void> {
+  if (inFlightH3Submits.has(row.id)) return
+  inFlightH3Submits.add(row.id)
+  try {
+    const state = parseRemoteState(row.remoteState)
+    const idempotencyKey = state.idempotency_key || queueIdempotencyKey(row.id)
+    if (state.request) {
+      logTaskProgress('VideoTask', 'h3-jobs resubmit', { id: row.id, idempotencyKey })
+      const result = await sendH3Job(row.id, config, state.request as H3JobRequest, idempotencyKey)
+      if (typeof result !== 'object') return
+      // 图片已被回收：回到完整提交路径重新上传（沿用已扩写的提示词）
+    }
+    logTaskProgress('VideoTask', 'h3-jobs resume submit', { id: row.id, idempotencyKey })
+    await submitH3JobsVideo(row, config, parseTaskParams(row.params))
+  } catch (err) {
+    if (err instanceof H3JobsError && err.transient) {
+      logTaskWarn('VideoTask', 'h3-jobs resume retry', { id: row.id, error: err.message })
+      return
+    }
+    await failTask(row.id, err instanceof Error ? err.message : String(err))
+  } finally {
+    inFlightH3Submits.delete(row.id)
+  }
+}
+
+/**
+ * 队列输出取回后落盘 → 海报帧 → 仅当任务仍活跃时标 completed 并写回分镜视频。
+ * 与 handleVideoComplete 不同，这里带活跃状态守卫：取消后迟到的结果绝不写回。
+ */
+export async function completeVideoTaskFromBytes(record: SysTaskRecord, bytes: Buffer) {
+  const localPath = await saveVideoBuffer(bytes, 'videos')
+  await extractVideoPoster(localPath)
+  const res = await db.update(schema.sysTask)
+    .set({ localPath, status: 'completed', ...completionStamp(), updatedAt: now() })
+    .where(and(eq(schema.sysTask.id, record.id), inArray(schema.sysTask.status, ACTIVE_TASK_STATUSES)))
+  if (!(res?.changes ?? 0)) {
+    logTaskWarn('VideoTask', 'completion dropped (task no longer active)', { id: record.id, status: record.status })
+    return
+  }
+  logTaskSuccess('VideoTask', 'downloaded', { id: record.id, localPath, storyboardId: record.storyboardId })
+  if (record.storyboardId) {
+    // 与 handleVideoComplete 同口径：只写视频地址，不回写时长（storyboards.duration 是内容时长）
+    const [storyboard] = await db.update(schema.storyboards)
+      .set({ videoUrl: localPath, updatedAt: now() })
+      .where(eq(schema.storyboards.id, record.storyboardId))
+      .returning({ episodeId: schema.storyboards.episodeId })
+    if (storyboard) invalidateSegmentSpec(storyboard.episodeId)
+  }
 }
 
 async function pollTask(record: SysTaskRecord, config: AIConfig, taskId: string) {

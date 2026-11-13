@@ -226,6 +226,22 @@ class FinalGateTest(unittest.TestCase):
         st["poster_policy"] = "required"
         self.assertTrue(hbwf.final_gate_problems(st, None))
 
+    def test_documentary_poster_cannot_be_waived(self):
+        policy = hbwf.poster_policy_for("documentary", False)
+        self.assertEqual(policy, "required")
+        st = state(shot(1), poster_policy=policy, poster={"selected_version_id": None, "approval": "missing", "waiver": ["w1"]})
+        self.assertTrue(any("poster" in p for p in hbwf.final_gate_problems(st, None)))
+        self.assertIsNotNone(hbwf.poster_waiver_refusal("documentary"))
+
+    def test_drama_poster_policy_unchanged(self):
+        self.assertEqual(hbwf.poster_policy_for("drama", False), "decision_required")
+        self.assertEqual(hbwf.poster_policy_for("drama", True), "required")
+        self.assertIsNone(hbwf.poster_waiver_refusal("drama"))
+
+    def test_unknown_project_type_fails_closed(self):
+        self.assertEqual(hbwf.poster_policy_for(None, False), "required")
+        self.assertIsNotNone(hbwf.poster_waiver_refusal(None))
+
 
 if __name__ == "__main__":
     unittest.main()

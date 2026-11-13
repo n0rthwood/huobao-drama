@@ -57,7 +57,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { formatSeconds } from '~/composables/useTaskProgress'
 
-const { t } = useI18n()
+const { t, te } = useI18n()
 
 const props = defineProps({
   status: { type: String, default: '' }, // queued | running | completed | failed | cancelled
@@ -74,6 +74,12 @@ const props = defineProps({
   showActions: { type: Boolean, default: true },
   size: { type: Number, default: 34 },
   compact: { type: Boolean, default: false },
+  /** 运行阶段/步数（视频队列）；仅 detailed 时展示 */
+  phase: { type: String, default: '' },
+  step: { type: Number, default: null },
+  totalSteps: { type: Number, default: null },
+  /** 详细模式（视频队列）：运行中加阶段与步数，排队中加预计完成时间 */
+  detailed: { type: Boolean, default: false },
 })
 const emit = defineEmits(['cancel', 'retry'])
 
@@ -103,15 +109,31 @@ const label = computed(() => {
   return ''
 })
 
+/** 运行阶段 + 步数（如「采样 · 3/8 步」）；无阶段信息时为空 */
+const phaseText = computed(() => {
+  if (!props.detailed || props.status !== 'running' || !props.phase) return ''
+  const key = `common.ring.phase.${props.phase}`
+  const name = te(key) ? t(key) : props.phase
+  return props.step !== null && props.totalSteps
+    ? t('common.ring.phaseStep', { phase: name, step: props.step, total: props.totalSteps })
+    : name
+})
+const finishText = computed(() => props.detailed && props.etaSeconds !== null && (props.status === 'queued' || props.status === 'running')
+  ? t('common.ring.finishIn', { time: formatSeconds(t, props.etaSeconds) })
+  : '')
+
 const sub = computed(() => {
   if (props.status === 'failed') return props.error || t('common.ring.noReason')
   if (props.status === 'running' && props.remainingSeconds !== null) {
-    return props.remainingSeconds <= 1
+    const remaining = props.remainingSeconds <= 1
       ? t('common.ring.almostDone')
       : t('common.ring.remaining', { time: formatSeconds(t, props.remainingSeconds) })
+    return phaseText.value ? `${phaseText.value} · ${remaining}` : remaining
   }
+  if (props.status === 'running' && phaseText.value) return phaseText.value
   if (props.status === 'queued' && props.startSeconds !== null) {
-    return t('common.ring.startsIn', { time: formatSeconds(t, props.startSeconds) })
+    const start = t('common.ring.startsIn', { time: formatSeconds(t, props.startSeconds) })
+    return finishText.value ? `${start} · ${finishText.value}` : start
   }
   return ''
 })
@@ -123,9 +145,11 @@ const tooltip = computed(() => {
     if (props.queueLength) parts.push(t('common.ring.queueLength', { n: props.queueLength }))
     if (props.startSeconds !== null) parts.push(t('common.ring.startsIn', { time: formatSeconds(t, props.startSeconds) }))
   }
+  if (phaseText.value) parts.push(phaseText.value)
   if (props.status === 'running' && props.remainingSeconds !== null) {
     parts.push(t('common.ring.remaining', { time: formatSeconds(t, props.remainingSeconds) }))
   }
+  if (finishText.value) parts.push(finishText.value)
   if (props.status === 'failed' && props.error) parts.push(props.error)
   return parts.join(' · ')
 })

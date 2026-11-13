@@ -270,7 +270,16 @@
       "noReason": "理由なし",
       "retry": "再試行",
       "cancelRequested": "キャンセルを要求しました",
-      "cancelFailed": "キャンセルに失敗しました"
+      "cancelFailed": "キャンセルに失敗しました",
+      "phaseStep": "{phase} · {step}/{total} ステップ",
+      "finishIn": "約 {time} 後に完了予定",
+      "phase": {
+        "encoding": "エンコード",
+        "loading": "モデル読み込み",
+        "sampling": "サンプリング",
+        "decoding": "デコード",
+        "saving": "保存"
+      }
     }
   },
   "layout": {
@@ -2059,7 +2068,24 @@
       "etaFallback": "約 {time} の見込み（実測 {n} 回 · 参照元 {model}）",
       "etaNone": "見積もりなし",
       "elapsedUsed": "経過 {time}",
-      "elapsedTook": "所要 {time}"
+      "elapsedTook": "所要 {time}",
+      "confirmQueueNote": "選択したショットを順に組み立ててまとめて動画キューへ送信し、キューが 2 枚の GPU で並列生成します。キーフレームを先頭／中間／終端のガイドとして使用します。処理はサーバー側で行われるためページを閉じても構いません。一括を停止すると待機中のショットは取り消され、生成中のものは完了まで続きます",
+      "etaQueue": "キュー見込み {time}（{basis} · サンプル {n} 件 · {key} 秒枠）· 今送信すると約 {wait} 待ち",
+      "etaBasis": {
+        "measured": "実測平均",
+        "scaled": "近い長さから換算",
+        "default": "既定値"
+      },
+      "queueTitle": "動画生成キュー",
+      "queueSummary": "この話 生成中 {running} · 待機 {queued}",
+      "queueEta": "全完了まで約 {time}",
+      "queueProgress": "全体進捗 {percent}%",
+      "queueOverall": "キュー全体 実行 {running} · 待機 {queued} · 空き GPU {idle}/{total}",
+      "queueOverallHint": "キュー全体には他のアプリ（vidgen studio など）のジョブも含まれ、件数のみ表示します",
+      "queueWait": "新規ジョブの待ち 約 {time}",
+      "queueNoWait": "待ちなし",
+      "taskCancelRequested": "この動画タスクのキャンセルを要求しました",
+      "taskCancelFailed": "動画タスクのキャンセルに失敗しました"
     },
     "kf": {
       "slotFirst": "先頭フレーム",

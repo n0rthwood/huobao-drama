@@ -285,6 +285,22 @@ def reconcile(prj: Project, vbatch: dict, kbatch: dict) -> dict:
     return {"orphans": orphans, "unknown_calls": unknown_calls, "rows_checked": len(rows)}
 
 
+def poster_policy_for(project_type: str | None, required_flag: bool) -> str:
+    """纪录片 Poster 必做（#101）：documentary 一律 required，不看 workflow.json 的开关。
+    项目类型读不到时 fail-closed 按 required 处理，不默认放行。"""
+    if project_type != "drama" or required_flag:
+        return "required"
+    return "decision_required"
+
+
+def poster_waiver_refusal(project_type: str | None) -> str | None:
+    if project_type == "documentary":
+        return "poster_waiver is not allowed for documentary projects: the Poster is a mandatory step and must be produced (#101)"
+    if project_type != "drama":
+        return f"poster_waiver refused: project_type={project_type!r} could not be confirmed as drama (#101, fail-closed)"
+    return None
+
+
 def derive(prj: Project, write: bool = True) -> dict:
     e = prj.e
     problems: list[str] = []
@@ -416,7 +432,7 @@ def derive(prj: Project, write: bool = True) -> dict:
         "hbwf_sha": file_sha(Path(__file__))[:16],
         "drama_id": prj.d, "episode_id": e,
         "profile": prj.config["profile"],
-        "poster_policy": "required" if prj.config.get("required_poster") else "decision_required",
+        "poster_policy": poster_policy_for(drama.get("project_type"), bool(prj.config.get("required_poster"))),
         "problems": problems,
         "canonical_ids": canon,
         "batches": {
@@ -1048,6 +1064,10 @@ def cmd_decide(a):
                 rec["task_ids"] = a.task_ids.split(",")
             if a.kind in ("structural_change", "exception", "poster_waiver") and not a.note:
                 raise SystemExit(f"{a.kind} requires --note with the reason")
+            if a.kind == "poster_waiver":
+                refusal = poster_waiver_refusal((prj.get(f"/dramas/{prj.d}") or {}).get("project_type"))
+                if refusal:
+                    raise SystemExit(refusal)
         prj.append("decisions.jsonl", rec)
     print(json.dumps({k: rec[k] for k in ("id", "kind", "ids", "bound")}, ensure_ascii=False))
 

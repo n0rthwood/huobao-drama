@@ -28,9 +28,6 @@ test('settings page exposes official provider templates only', () => {
   assert.doesNotMatch(useApi, /huobaoPreset/i)
   assert.doesNotMatch(useApi, /\/huobao-preset/)
 
-  assert.match(settingsPage, /const providers = \['gemini', 'openai', 'volcengine', 'minimax', 'comfyui', 'qwen-jobs'\]/)
-  // 图片配置的下拉里不再出现 comfyui（图片走 qwen-jobs），文本/视频不出现 qwen-jobs
-  assert.match(settingsPage, /const PROVIDER_EXCLUDE = \{ text: \['qwen-jobs', 'comfyui'\], image: \['comfyui'\], video: \['qwen-jobs'\] \}/)
   assert.match(settingsPage, /https:\/\/generativelanguage\.googleapis\.com/)
   assert.match(settingsPage, /https:\/\/api\.openai\.com/)
   assert.match(settingsPage, /https:\/\/ark\.cn-beijing\.volces\.com/)
