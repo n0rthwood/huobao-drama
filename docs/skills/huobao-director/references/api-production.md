@@ -203,8 +203,9 @@ Body `model?/config_id?`。要求该镜 keyframesConfirmed（否则 400），在
 
 ### 视频批量
 - `POST /episodes/{e}/video-batch/preview` body `{storyboard_ids?, model?, config_id?}` → `{items:[{storyboard_id, storyboard_number, status:'missing|changed|unchanged|unknown|blocked|skipped', checked, selectable, matched_version_no?, adopted_version_no?, change_reasons?[], reason?}]}`。blocked=关键帧未确认或提示词与绑定不一致；unknown=历史版本缺字段无法比较。
-- `POST /episodes/{e}/video-batch` body `{storyboard_ids: number[](必填非空), model?, config_id?}`；服务端按提交顺序**串行**，不要并发另投单镜。轮询 `GET /episodes/{e}/video-batch`。
-- `POST /episodes/{e}/video-batch/cancel`：停止提交后续镜头，在跑的一镜继续完成。
+- `POST /episodes/{e}/video-batch` body `{storyboard_ids: number[](必填非空), model?, config_id?}`；轮询 `GET /episodes/{e}/video-batch`。驱动方式按视频配置冻结（Issue #100）：`h3-jobs` 队列 = 勾选镜头逐个组装后**一次性提交**、由队列双卡并行，重启按落盘 `task_id` 续跟不重提；其它 provider = 按提交顺序**串行**，不要并发另投单镜。
+- `POST /episodes/{e}/video-batch/cancel`：停止提交后续镜头；`h3-jobs` 批次另取消 sys_task 仍是 `queued` 的镜（项记 `failed`+`已取消`），在跑的继续完成。单镜立即停用 `POST /tasks/{id}/cancel`（仅 h3-jobs）。
+- 队列观测（h3-jobs）：`GET /video-queue/overview?config_id=` 看队列整体运行/排队/空闲卡与新任务预计等待；逐镜进度看 `GET /tasks/{id}` 的 `remote_state`（排队位置 / 预计开始与完成 / 运行阶段与步数）。
 
 ### 旁白写作
 - `POST /episodes/{e}/generate-narration` body `{storyboard_ids?, model?, config_id?}`（需先 `PUT /episodes/{e} {narration_enabled:true}`，否则 400）。返回 running/already_running(带进度)/idle。轮询 `GET /episodes/{e}/narration-status`（含 total/completed/failed/phase）。

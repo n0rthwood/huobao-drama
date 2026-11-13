@@ -275,7 +275,7 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
   - 发音标记（拼音/同音字/停顿/语气）写错是阻断；拼音注音会关闭整段 normalize。
 
 ### S9 视频
-- 端点（全路径）：`POST /episodes/{e}/generate-video-prompts`、`GET /episodes/{e}/video-prompts-status`、`POST /episodes/{e}/video-batch/preview`、`POST /episodes/{e}/video-batch`、`GET /episodes/{e}/video-batch`、`POST /episodes/{e}/video-batch/cancel`、`POST /episodes/{e}/video-batch/retry-failed`、`POST /storyboards/{id}/generate-video`、`GET /video-queue/estimate`。
+- 端点（全路径）：`POST /episodes/{e}/generate-video-prompts`、`GET /episodes/{e}/video-prompts-status`、`POST /episodes/{e}/video-batch/preview`、`POST /episodes/{e}/video-batch`、`GET /episodes/{e}/video-batch`、`POST /episodes/{e}/video-batch/cancel`、`POST /episodes/{e}/video-batch/retry-failed`、`POST /storyboards/{id}/generate-video`、`GET /video-queue/estimate`、`GET /video-queue/overview`、`POST /tasks/{id}/cancel`（仅 h3-jobs 视频）。
 - 用途：把分镜写成时间段动作/运镜，按签名判断是否需要重出，批量生成。
 - 组合场景：preview（`missing/changed/unchanged/unknown/blocked/skipped/excluded`）→ 勾选 → 启动 → 轮询 → 下载并检查首/中/尾与衔接。
 - 陷阱：
@@ -283,9 +283,10 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
   - 关键帧未确认 / `video_prompt` 有阻断 → 400。
   - 模型不支持关键帧引导时直接报错，不要降级偷偷去掉引导。
   - 视频签名覆盖提示词、引导帧文件名+中间帧时间、参考图顺序、时长/画幅/分辨率、provider/model；改任一项都会 `changed`。
-  - 停止批量的语义是“不再提交新镜头”，在跑的那一镜会跑完。
+  - 停止批量：串行 provider 是“不再提交新镜头，在跑的那一镜跑完”；`h3-jobs` 队列批次（Issue #100，勾选镜头一次性提交、双卡并行）另取消仍在排队的镜，运行中的跑完。
+  - `h3-jobs` 与 ComfyUI 直连跑同一套 H3 工作流与模型：视频签名的引擎分项把两者按同一引擎计，切到队列不会让历史视频全部变成 `changed`。
   - **提示词批量 = 强制重写（#97 源码核实）**：`generate-keyframe-prompts` / `generate-video-prompts` 传非空 `storyboard_ids` 时，所选镜即使已有提示词、已有图、已确认也会重写（`services/keyframe-prompts.ts:53-58`、`services/video-prompts.ts:51-53`）；传 `[]` 会退回默认缺失范围，而不是零镜。`generate-video-prompts` 还会对全集做转场审核并与请求取并集（`video-prompts.ts:56-61`）。`*-prompts-status` 只有最近批次的聚合进度，没有逐镜完成信息：逐镜是否完成要看 `GET /episodes/{e}/storyboards` 的字段，媒体是否需要重出看各 preview 的 `missing/changed/unchanged`。ep26 曾在 05:14 对 105 镜整集强制重写视频提示词。现行做法：只对缺失或无效的镜生成；重写已完整的镜要有 `rework` 决定，并走带 `--ids` 的 `prompt_generator`，由 hbwf 校验并比对越界写入。
-  - **提交前硬校验（#97）**：视频提示词时间轴必须从 0 起连续、终点等于时长；`mid_frame_time` 必须在 (0, 时长) 内。已在视频批次中排队的镜不得改输入：批次执行时才读最新提示词（`video-batch.ts:521-531`），排队期间的改动会被静默使用。
+  - **提交前硬校验（#97）**：视频提示词时间轴必须从 0 起连续、终点等于时长；`mid_frame_time` 必须在 (0, 时长) 内。已在视频批次中等待提交的镜不得改输入：批次在提交那一镜时才读最新提示词，期间的改动会被静默使用（`h3-jobs` 批次启动后很快全部提交，串行批次则可能在很久之后才轮到）。
   - **锁定衔接帧（Issue #95）**：C 的首帧 = 图层段末帧、D 的尾帧 = 图层段首帧，这两张不单独出图（`keyframe-batch/preview` 里 C-first / D-last 是 `skipped`）。`read_storyboard_context` 逐镜返回 `locked_frames[{slot:"first"|"last", source:"layer_last"|"layer_first", base, framing:"full"|"crop"|"contain"|"zoomed", caption, caption_note?}]`：`caption` 是视觉模型对**实际衔接帧 PNG** 的描述（`AI_STAGES.junction_caption` vision，按 `junction_hash` 缓存于 `storyboard_layer_segments.junction_caption`），衔接帧未渲染 / 输入已变化 / 底图验证未过 / 无视觉配置时为 `null` 并带原因，绝不编画面。`generate-video-prompts` 在 Agent 开跑前逐镜补算描述（同一任务的观测 stage `junction_caption`）并把锁定槽位 + caption 写进话术。视频提示词保存时解析时间分段行（`0-3秒：`、`0-2.5秒:`、`0-3s:` 等）：C 的首段必须是 **0–1.5 秒的空镜**——超过 1.5 秒、@ 到本集角色资产、出现场景过渡写法（过渡为 / 过渡到 / 转入 / 化为 / 变为 / 叠化、dissolve / transition to / morph into、ディゾルブ / 移り変わ、디졸브 / 바뀌어）或切镜写法（切到 / 切回 / 切换为 / 切换到 / 转到 / 硬切、cut to / cuts to、カット / 切り替え、컷 / 전환）都退回，D 的末段切镜也退回，任一分段是 0 长 / 倒序（`3-3秒`、`5-3秒`）一律退回；退回信息带 caption，人物入画与转场要挪到第二段。收紧依据是 ep 21 二次验收：首段已无切镜写法，但 7/22 镜仍在首段（0–3 秒）写「@子婴 走向画外」「长卷过渡为山脊」，H3 把第二段内容画到第 0 帧、衔接帧被整段替换。A/B 组合不校验。人工 `PUT /storyboards/{id}` 不校验（与 #92 的画幅校验同口径）。
 
 ### S10 合成
