@@ -26,6 +26,16 @@ export default defineNuxtConfig({
     'pages:extend'(pages) {
       pages.push(
         {
+          name: 'map-studio',
+          path: '/map-studio',
+          file: fileURLToPath(new URL('./app/map-studio/pages/index.vue', import.meta.url)),
+        },
+        {
+          name: 'map-studio-task',
+          path: '/map-studio/:taskId',
+          file: fileURLToPath(new URL('./app/map-studio/pages/task.vue', import.meta.url)),
+        },
+        {
           name: 'drama-detail',
           path: '/drama/:id',
           file: fileURLToPath(new URL('./app/views/drama/detail.vue', import.meta.url)),

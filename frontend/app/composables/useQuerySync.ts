@@ -242,25 +242,27 @@ export const DEEPLINK_KEYS = {
   /** 项目详情页：页签 / 素材类型筛选 / 素材编辑弹窗 */
   detail: ['tab', 'filter', 'asset'],
   /** 项目详情页弹窗：图片大图 / 资产浏览器（含其内部筛选）/ 素材库宿主 / 新增剧集 / 项目设置 / 删除确认外壳 */
-  detailDialogs: ['view', 'browser', 'bkind', 'bq', 'lib', 'addep', 'proj', 'del', 'mfocus'],
+  detailDialogs: ['view', 'browser', 'bkind', 'bq', 'lib', 'addep', 'proj', 'del'],
   /** 剧集工作台：面板 / 剧本子步骤 / 制作页签 / 资产子页签 / 提取筛选 / 资产详情弹窗 */
   workbench: ['panel', 'step', 'tab', 'sub', 'extract', 'asset'],
   /** 工作台弹窗层：弹窗 / 大图 / 选中分镜 / 工作区多选 / 弹窗独立批量范围 */
-  workbenchDialogs: ['dlg', 'view', 'shot', 'sel', 'bsel', 'mfocus'],
+  workbenchDialogs: ['dlg', 'view', 'shot', 'sel', 'bsel'],
   /** 资产详情弹窗内部：定位的语义条目 / 流水线轮次 */
   assetDetail: ['sem', 'run', 'round'],
-  /** 地图几何编辑器：已保存要素的类型与稳定 id；不承载未保存坐标或绘制草稿。 */
-  mapGeometry: ['mfocus'],
-  /** 地图产出大图：产出身份 base|texture|final|calibration；绝不写图片路径，刷新时按当前详情重新求值。 */
-  mapPreview: ['mview'],
-  /**
-   * 地图模型轮次与图层编辑器（Issue #90）：
-   * mlayer=1 打开「编辑图层」（只开界面，不触发保存/重绘；没有 layer_doc 时清键并提示）；
-   * mround=<brief|research|base|style|drawing|complete> 展开该阶段的交付记录。
-   */
-  mapAgent: ['mlayer', 'mround'],
-  /** 地图图层编辑器内部：当前选中的图层 id（稳定实体身份，不承载未保存的几何草稿）。 */
-  mapLayerEditor: ['mlsel'],
+  /** 地图工作室列表：搜索词、宿主筛选、新建表单开关（不恢复草稿）。 */
+  mapStudioList: ['msq', 'mshost', 'mscreate'],
+  /** 地图工作室：选中的阶段与运行容器（稳定 run id）。 */
+  mapStudioRun: ['msstage', 'msrun'],
+  /** 地图工作室：展开的完整公开调用（稳定 call id）。 */
+  mapStudioCall: ['mscall'],
+  /** 地图工作室：图层编辑器开关与模型轮次阶段，只恢复界面。 */
+  mapStudioAgent: ['mslayer', 'msround'],
+  /** 地图工作室：编辑器内选中的稳定图层 id，不含草稿。 */
+  mapStudioLayer: ['mssel'],
+  /** 地图工作室：已保存的几何要素 kind:id，不含坐标草稿。 */
+  mapStudioGeo: ['msgeo'],
+  /** 地图工作室：预览产出身份 base|texture|final|calibration，不含路径。 */
+  mapStudioPreview: ['msview'],
   /** 参考图管理器：素材库弹窗的宿主资产（值 = 类型-id，多实例共用一个键） */
   refLibrary: ['reflib'],
   /** 角色档案图面板：检索弹窗与关键词 */
@@ -292,3 +294,16 @@ export const DEEPLINK_KEYS = {
   /** 存储迁移阻塞遮罩：仅在迁移真的在进行时才可恢复 */
   migrateOverlay: ['migrating'],
 } as const satisfies Record<string, readonly string[]>
+
+/** 旧地图链接退回宿主；通过唯一 store 清键，不另写 router query。 */
+export function dropLegacyMapDeeplinks(): boolean {
+  const keys = ['mfocus', 'mview', 'mlayer', 'mround', 'mlsel']
+  const current = ensureStore()
+  const found = keys.some(key => current.initial(key) !== null)
+  if (found) {
+    const group = current.group('retiredMapWorkflow', keys, false)
+    group.set({})
+    group.release()
+  }
+  return found
+}

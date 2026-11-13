@@ -987,12 +987,7 @@
                 <span>{{ t('episode.documentary.map.panel.sectionTitle') }}</span>
                 <span class="dim">{{ t('episode.documentary.map.panel.sectionHint') }}</span>
               </div>
-              <MapWorkflowPanel
-                :key="`mapflow-${assetDetail.item.id}`"
-                :prop-id="assetDetail.item.id"
-                :asset-name="assetDetail.item.name"
-                @changed="onMapWorkflowChanged(assetDetail.item, $event)"
-              />
+              <MapStudioEntry :asset="assetDetail.item" />
             </section>
 
             <!-- 资产「精确→美化」流水线（Issue #56）：三类资产通用，闸门结论由后端计算 -->
@@ -1558,7 +1553,8 @@ import ReferenceImageManager from '~/components/ReferenceImageManager.vue'
 import ArchivalImagePanel from '~/components/ArchivalImagePanel.vue'
 import PropSemanticsPanel from '~/components/PropSemanticsPanel.vue'
 import AssetPipelinePanel from '~/components/AssetPipelinePanel.vue'
-import MapWorkflowPanel from '~/components/MapWorkflowPanel.vue'
+import MapStudioEntry from '~/components/MapStudioEntry.vue'
+import { dropLegacyMapDeeplinks } from '~/composables/useQuerySync'
 import ResearchCitationList from '~/components/ResearchCitationList.vue'
 import FinalPromptSourceBadge from '~/components/FinalPromptSourceBadge.vue'
 import MediaLibraryDialog from '~/components/MediaLibraryDialog.vue'
@@ -4863,27 +4859,6 @@ function onAssetSemanticsUpdate(item, patch) {
   if (target && target !== item) Object.assign(target, patch)
 }
 
-/**
- * 地图工作流（Issue #84）：阶段推进可能产出新的底图/成品并登记为资产版本，
- * 所以每次详情变化都按服务端重新拉一次道具行，但不覆盖人正在编辑的文本草稿。
- */
-async function onMapWorkflowChanged(item, detail) {
-  if (!detail) return
-  const episodeId = epId.value
-  try {
-    const rows = await episodeAPI.props(episodeId)
-    if (episodeId !== epId.value) return
-    propItems.value = rows
-    const updated = rows.find(prop => prop.id === item.id)
-    if (!updated) return
-    Object.assign(item, updated)
-    if (assetDetail.value.type === 'prop' && assetDetail.value.item?.id === item.id) {
-      Object.assign(assetDetail.value.item, updated)
-    }
-  } catch (err) {
-    toastError(err)
-  }
-}
 
 // 资产类型（Issue #84）：地图是独立类型，地图界面只认服务端持久化的 asset_type
 const ASSET_TYPES = ['prop', 'map']
@@ -5491,6 +5466,7 @@ onMounted(async () => {
   syncWorkbenchQuery()
   syncDialogQuery()
   syncAssetDetailQuery()
+  if (dropLegacyMapDeeplinks()) toast.warning(t('deeplink.missing'))
   deeplinkHydrate()
   loadConfigs()
   syncExtractStatus()
