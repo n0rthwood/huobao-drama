@@ -10,17 +10,30 @@ export function validExtent(raw: unknown): raw is Extent {
     && raw[0] >= -180 && raw[2] <= 180 && raw[1] >= -90 && raw[3] <= 90
     && raw[0] < raw[2] && raw[1] < raw[3] && raw[2] - raw[0] <= 360 && raw[3] - raw[1] <= 180
 }
-export function extentProblems(points: Point[], extent: Extent): string[] {
-  const inside = ([x, y]: Point, margin: number) => x >= extent[0] + margin * (extent[2] - extent[0])
-    && x <= extent[2] - margin * (extent[2] - extent[0]) && y >= extent[1] + margin * (extent[3] - extent[1])
-    && y <= extent[3] - margin * (extent[3] - extent[1])
+/**
+ * One aggregated problem per feature instead of one line per vertex: a whole river outside
+ * the extent used to flood the feedback with hundreds of identical lines and hide the fix.
+ * Swap detection stays a separate message because its remedy is different.
+ */
+export function extentProblems(points: Point[], extent: Extent, options: { dataset?: boolean } = {}): string[] {
+  const round = (value: number) => Number(value.toFixed(4))
+  const inner: Extent = [
+    round(extent[0] + 0.02 * (extent[2] - extent[0])), round(extent[1] + 0.02 * (extent[3] - extent[1])),
+    round(extent[2] - 0.02 * (extent[2] - extent[0])), round(extent[3] - 0.02 * (extent[3] - extent[1])),
+  ]
+  const within = ([x, y]: Point, box: Extent) => x >= box[0] && x <= box[2] && y >= box[1] && y <= box[3]
+  const outside = points.filter(point => !within(point, inner))
+  if (!outside.length) return []
   const problems: string[] = []
-  for (const point of points) {
-    if (inside(point, 0.02)) continue
-    problems.push(!inside(point, 0) && inside([point[1], point[0]], 0)
-      ? `疑似经纬度互换：(${point.join(', ')}) 不在 extent 内，而 (${point[1]}, ${point[0]}) 在范围内`
-      : `坐标 (${point.join(', ')}) 超出 extent 或其 2% 留边；请核对坐标或空间范围`)
-    if (problems.length >= 5) break
+  const swapped = outside.filter(point => !within(point, extent) && within([point[1], point[0]], inner))
+  if (swapped.length) problems.push(`疑似经纬度互换：${swapped.length} 个顶点在 extent 外，而交换后落在范围内（例如 (${swapped[0]!.join(', ')}) → (${swapped[0]![1]}, ${swapped[0]![0]})）；坐标顺序始终是 [lon, lat]，请核对坐标`)
+  const violations = outside.filter(point => !swapped.includes(point))
+  if (violations.length) {
+    const lons = violations.map(point => point[0]), lats = violations.map(point => point[1])
+    problems.push(`${violations.length} 个顶点超出 extent 的 2% 留边（经度 ${round(Math.min(...lons))}–${round(Math.max(...lons))}，纬度 ${round(Math.min(...lats))}–${round(Math.max(...lats))}；extent 留边后的范围是 ${JSON.stringify(inner)}）`
+      + (options.dataset
+        ? '；这是 dataset 要素：请在 dataset_ref.clip_bbox 里把它裁到 extent 内（例如 clip_bbox=' + JSON.stringify(inner) + '），或调整 extent；代码不会自动裁剪'
+        : '；请核对坐标或调整 extent'))
   }
   return problems
 }

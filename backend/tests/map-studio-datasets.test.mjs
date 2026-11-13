@@ -28,19 +28,32 @@ const out = {}
 out.rivers = Object.fromEntries(['Dnipro','Dnieper','Volga','Don','Kama','Tura'].map(name => [name,searchDataset('river',name)]))
 for (const [name,hits] of Object.entries(out.rivers)) {
   assert.ok(hits.length > 0, name)
-  assert.ok(hits[0].ref.startsWith('ne:10m_rivers_lake_centerlines:'), name)
-  assert.equal(hits[0].class, 'River', name)
-  const extracted = extractDatasetGeometry(hits[0].ref)
+  // Single-feature refs behave as before: one feature, all of its own vertices.
+  const single = hits.find(hit => !hit.group && hit.class === 'River')
+  assert.ok(single, name)
+  assert.ok(single.ref.startsWith('ne:10m_rivers_lake_centerlines:'), name)
+  const extracted = extractDatasetGeometry(single.ref)
   assert.equal(extracted.layer, 'river')
   assert.equal(extracted.kind, 'route')
-  const raw = positions(geometry(hits[0].ref).coordinates)
+  const raw = positions(geometry(single.ref).coordinates)
   const allowed = new Set(raw.map(point => JSON.stringify(point)))
   assert.equal(extracted.vertices, raw.length)
   assert.equal(extracted.parts.flat().length, raw.length)
   assert.ok(extracted.parts.flat().every(point => allowed.has(JSON.stringify(point))))
   assert.ok(extracted.length_km > 0)
+  // Group refs cover the same river's River and Lake Centerline features and lead the list.
+  const group = hits.find(hit => hit.group)
+  if (group) {
+    assert.ok(group.ref.startsWith('ne-group:10m_rivers_lake_centerlines:'), name)
+    assert.ok(group.group.members.length >= 2, name)
+    assert.ok(group.group.members.includes(single.ref), name)
+  }
 }
-assert.equal(out.rivers.Dnipro[0].ref,out.rivers.Dnieper[0].ref)
+// A river stored as a single feature needs no group ref and gets none.
+assert.equal(out.rivers.Tura.some(hit => hit.group), false)
+const dniproSingle = out.rivers.Dnipro.find(hit => !hit.group && hit.class === 'River')
+assert.equal(out.rivers.Dnipro.find(hit => hit.group).ref, out.rivers.Dnieper.find(hit => hit.group).ref)
+assert.equal(dniproSingle.ref, out.rivers.Dnieper.find(hit => !hit.group && hit.class === 'River').ref)
 assert.deepEqual(searchDataset('river','Dnieper',[0,0,1,1]),[])
 assert.ok(searchDataset('river','Don').length <= 10)
 assert.ok(searchDataset('river','dNiEpEr')[0].names.includes('Dnieper'))
@@ -57,7 +70,46 @@ const sourceSegments=new Set(volgaRaw.flatMap(part=>part.slice(1).map((point,i)=
 for(const part of joined.parts) for(let i=1;i<part.length;i++) {
   assert.ok(JSON.stringify(part[i-1])===JSON.stringify(part[i])||sourceSegments.has(segmentKey(part[i-1],part[i])))
 }
-assert.equal(extractDatasetGeometry(out.rivers.Dnipro[0].ref).parts.length,geometry(out.rivers.Dnipro[0].ref).coordinates.length)
+assert.equal(extractDatasetGeometry(dniproSingle.ref).parts.length,geometry(dniproSingle.ref).coordinates.length)
+
+// Group refs stitch one river's River + Lake Centerline features: far fewer chains than any single ref.
+const groupExtent=[20,40,55,58]
+out.groups={}
+for (const name of ['Volga','Dnipro','Don','Kama','Dniester']) {
+  const hits=searchDataset('river',name,groupExtent)
+  const group=hits.find(hit=>hit.group)
+  const single=hits.find(hit=>!hit.group&&hit.class==='River')
+  assert.ok(group&&single,name)
+  const allowed=new Set()
+  for (const ref of group.group.members) for (const point of positions(geometry(ref).coordinates)) allowed.add(JSON.stringify(point))
+  const stitched=extractDatasetGeometry(group.ref,groupExtent)
+  assert.equal(stitched.group.members.length,group.group.members.length,name)
+  assert.equal(stitched.parts.length,group.group.chains,name)
+  assert.equal(stitched.group.shortest_chain_km,group.group.shortest_chain_km,name)
+  assert.ok(stitched.parts.flat().every(point=>allowed.has(JSON.stringify(point))),name)
+  assert.ok(stitched.group.joined_parts>0,name)
+  assert.ok(stitched.group.max_join_deg<=0.01,name)
+  assert.equal(datasetRefLayer(group.ref),'river',name)
+  assert.equal(datasetSourceInfo(group.ref).fileId,'10m_rivers_lake_centerlines',name)
+  out.groups[name]={ref:group.ref,individual:extractDatasetGeometry(single.ref,groupExtent).parts.length,group:stitched.parts.length,
+    members:stitched.group.members.length,joined:stitched.group.joined_parts,shortest:stitched.group.shortest_chain_km}
+}
+// Real gaps stay separate: the Volga delta distributary is ~90 km from the main chain.
+assert.ok(out.groups.Volga.group>1)
+// Ambiguous or unusable group refs fail loudly instead of merging unrelated features.
+assert.throws(()=>extractDatasetGeometry('ne-group:10m_rivers_lake_centerlines:verde'),/分属不同河湖/)
+assert.throws(()=>extractDatasetGeometry('ne-group:10m_rivers_lake_centerlines:no-such-river'),/没有任何同名要素/)
+assert.throws(()=>extractDatasetGeometry('ne-group:10m_populated_places_simple:tobolsk'),/只用于 river/)
+assert.throws(()=>extractDatasetGeometry('ne-group:50m_lakes:dead-sea'),/互不相连/)
+assert.throws(()=>extractDatasetGeometry('ne-group:bogus:volga'),/未知数据集/)
+// Lake group refs merge one lake's translated duplicate rows into one ring.
+const zaysan=searchDataset('lake','Lake Zaysan').find(hit=>hit.group)
+assert.ok(zaysan)
+assert.deepEqual([...zaysan.group.members].sort(),['ne:50m_lakes:284','ne:50m_lakes:39'])
+assert.equal(extractDatasetGeometry(zaysan.ref).parts.length,1)
+// A group whose geometry cannot be expressed (polygon holes) is never offered; single refs stay.
+assert.equal(searchDataset('lake','Lake Volta').some(hit=>hit.group),false)
+assert.ok(searchDataset('lake','Lake Volta').length>0)
 
 const oldRivers=original('50m_rivers_lake_centerlines')
 const tenNames=new Set(rivers.flatMap(f=>Object.entries(f.properties).filter(([key,value])=>/^name(?:_?[a-z]+)?$/i.test(key)&&typeof value==='string').map(([,value])=>foldDatasetName(value))))
@@ -90,7 +142,7 @@ assert.equal(extractDatasetGeometry(lake.ref).kind,'region')
 assert.ok(lake.area_km2>0)
 assert.equal(searchDataset('lake','Ozero Chernoye')[0].names.some(name=>name.includes('Chërnoye')),true)
 
-const tobol=searchDataset('river','Tobol')[0]
+const tobol=searchDataset('river','Tobol').find(hit=>!hit.group&&hit.class==='River')
 const full=extractDatasetGeometry(tobol.ref)
 const rawPoints=positions(geometry(tobol.ref).coordinates)
 const allowed=new Set(rawPoints.map(point=>JSON.stringify(point)))
@@ -182,4 +234,17 @@ test('vertex-only clipping, inclusive endpoints, source ownership and actionable
 test('metadata and river-source selection survive normalization and base geometry stripping', () => {
   assert.equal(result.base.scale, '10m')
   assert.equal(result.base.reason, 'dataset_ref')
+})
+test('river group refs stitch one river into far fewer chains than a single-feature ref', () => {
+  // Observed in extent [20,40,55,58]: single River ref -> group ref (River + Lake Centerline).
+  const expected = { Volga: [11, 3], Dnipro: [6, 1], Don: [3, 1], Kama: [2, 1], Dniester: [2, 1] }
+  for (const [name, [individual, group]] of Object.entries(expected)) {
+    assert.equal(result.groups[name].individual, individual, `${name} single-ref chains`)
+    assert.equal(result.groups[name].group, group, `${name} group chains`)
+    assert.ok(result.groups[name].group < result.groups[name].individual, name)
+    assert.ok(result.groups[name].members >= 2, name)
+    assert.ok(result.groups[name].joined > 0, name)
+    assert.ok(result.groups[name].shortest > 0, name)
+  }
+  assert.match(result.groups.Volga.ref, /^ne-group:10m_rivers_lake_centerlines:volga$/)
 })

@@ -11,6 +11,8 @@ description: 地图工作流·资料检索阶段 — 用真实检索工具找资
 
 1. 用 `search_sources` 检索。`wikipedia-zh`、`wikipedia-en`、`europeana`、`smithsonian` 四个来源**每个至少检索一次**，零命中也算检索过。维基用条目名或关键词；Europeana 和 Smithsonian 用英文。命中会登记为 S1、S2…
 2. 用 `search_dataset({layer,query,bbox?})` 找离线 **Natural Earth（公有领域）**原始几何。layer 为 `river/lake/coast/mountain/physical_region/place`；山脉用 mountain，平原/高原/沙漠等用 physical_region。多语名称、大小写、变音和连字符均参与匹配。河流 10m 优先（如 Tura），地名可找 Tobolsk，山脉可找 Ural Mountains / 乌拉尔山脉。每次查询都会登记在 `research.dataset_queries` 供缺失声明核对；结果最多 10 条，带稳定 ref、名称、类别、bbox、顶点数、长度/面积。按名称和范围核对后采用，不要自己描河。
+   - **河流/湖泊优先用组引用 `ne-group:…`**：Natural Earth 把一条河拆成 `River` 要素加若干 `Lake Centerline`（水库段）要素，单个 ref 只含其中一段，裁剪后会碎成互不相连的碎片。带 `group` 字段的候选覆盖同名同 rivernum 的全部要素，代码把端点相同或相差不超过 0.01°（约 1.1 km，4K 画幅上约 1 像素）的链首尾相接成一条河，只追加原始顶点、不插入新顶点，每个被缝合的接缝都计入 `group.joined_parts`。
+   - 组候选的 `group.chains` 是拼接后仍不连通的链数，`group.shortest_chain_km` 是最短链长度。链数多、短链很短（例如支汊或另一处同名河段）说明 clip_bbox 该收紧；**代码不会静默丢弃任何链或顶点**，要排除就显式收紧 `clip_bbox`。真实地理间断（例如河口三角洲分汊）本来就该保持分开。
 3. 需要逐字引用时先 `read_source`，从读到的正文复制原句。除坐标外，还要抽取距离、方位、近河等相对位置证据。
 4. 用 `submit_features({extent,features,relations?,uncertainties?,notes?})` 交付。`extent=[west,south,east,north]` 必填，依据地域与资料；经度左右各留 `(east-west)×2%`，纬度上下各留 `(north-south)×2%`，全部顶点包括已确认几何都必须落在留边后的范围内。每次交付消耗一轮，本阶段共 3 轮。
 5. 如果问题出在需求本身（例如时代、地域写错），而本阶段无法解决，调用 `request_rollback` 回到 `brief`，写清原因。
@@ -23,7 +25,7 @@ description: 地图工作流·资料检索阶段 — 用真实检索工具找资
 | `name` | 要素名称，同类不重名 |
 | `category` | 必填：`river/lake/coast/mountain/settlement/route/territory/other`，与 kind 分别表达地物类别和几何形状 |
 | `geometry_source` | 必填：`dataset/source/model`；声明几何来源，不等于核验通过 |
-| `dataset_ref` | dataset 必填 `{ref,clip_bbox?}`；**不得再写 points/lon/lat**。代码提取原始顶点，裁剪只取实际几何、不平滑；不连通的河段会拆成同 id 前缀的独立线条 |
+| `dataset_ref` | dataset 必填 `{ref,clip_bbox?}`；**不得再写 points/lon/lat**。河流/湖泊用 `ne-group:…` 组引用，单个 `ne:…` 只覆盖一个原始要素。代码提取原始顶点，裁剪只取实际几何、不平滑；拼接后仍不连通的河段会拆成同 id 前缀的独立线条，代码不会替你删掉任何一段 |
 | `dataset_missing` | 自然要素找不到时写 `{queries:[\"实际查过的检索式\"],reason}`；必须先真正查过 search_dataset，不能明有同名候选却声称缺失。接受后标 needs_user，不会自动进入成图 |
 | `acknowledge` | 可选 `[{code,reason}]`，code 为实际返回的 `relation_conflict` 或 `lon_lat_similar`。必须有实质理由；不是确认几何，结论与理由原样交给用户，仍阻断自动出图 |
 | `lon` / `lat` | **只有非 dataset 的 place 写**，WGS84 十进制度数字，不能用占位符或 (0,0)；route/region 不写 |

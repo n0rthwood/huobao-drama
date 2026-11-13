@@ -280,7 +280,7 @@ export function validateFeatureSubmission(raw: unknown, ctx: FeatureSubmissionCo
   if (validExtent(ctx.extent) && ctx.confirmed) {
     for (const feature of specFeatures(ctx.confirmed)) {
       const item = [...ctx.confirmed.places, ...ctx.confirmed.routes, ...ctx.confirmed.regions].find(item => item.id === feature.id)
-      if (item?.proposed !== true) problems.push(...extentProblems(feature.coords, ctx.extent).map(message => `已确认要素「${feature.name}」：${message}`))
+      if (item?.proposed !== true) problems.push(...extentProblems(feature.coords, ctx.extent, { dataset: item?.origin === 'dataset' }).map(message => `已确认要素「${feature.name}」：${message}`))
     }
   }
   if (!Array.isArray(raw)) return { features: [], problems: [...problems, 'features 必须是数组'], relations }
@@ -340,7 +340,7 @@ export function validateFeatureSubmission(raw: unknown, ctx: FeatureSubmissionCo
     feature.parts = geometry?.kind !== 'place' ? geometry?.parts : undefined
     if (geometry) feature.dataset_ref = record.dataset_ref as NonNullable<MapResearchFeature['dataset_ref']>
     const points = geometry ? geometry.kind === 'place' ? [[geometry.lon!, geometry.lat!] as [number, number]] : geometry.parts.flat() : feature.kind === 'place' ? [[feature.lon!, feature.lat!] as [number, number]] : feature.points
-    if (validExtent(ctx.extent)) problems.push(...extentProblems(points, ctx.extent).map(message => `「${feature.name}」：${message}`))
+    if (validExtent(ctx.extent)) problems.push(...extentProblems(points, ctx.extent, { dataset: record.geometry_source === 'dataset' }).map(message => `「${feature.name}」：${message}`))
     const ack = new Set<string>()
     for (const item of Array.isArray(record.acknowledge) ? record.acknowledge : []) {
       if (item && typeof item === 'object' && typeof item.code === 'string' && typeof item.reason === 'string' && item.reason.trim()) ack.add(item.code)
