@@ -115,6 +115,9 @@ export const AI_CALL_SITES: Record<string, AiStage[]> = {
   // 主模型走资料研究环节，看图走 read_image（底图与作图阶段启动时要求有视觉配置）
   'services/map-workflow/brief.ts': ['asset_research'],
   'services/map-workflow/agent-loop.ts': ['asset_research', 'read_image'],
+  // Map Studio (#99); legacy files remain solely for the phase-① historical tests.
+  'modules/map-studio/brief.ts': ['asset_research'],
+  'modules/map-studio/agent-loop.ts': ['asset_research', 'read_image'],
   // 补全剩余（#52）：纪录片拆分分镜的续跑，复用同一视觉环节
   'services/storyboard-fill-gaps.ts': ['storyboard_breaker_documentary'],
   'services/portrait-appearance.ts': ['portrait_appearance'],

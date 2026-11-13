@@ -252,3 +252,16 @@ export async function getConfigById(id: number, expectedServiceType?: ServiceTyp
     suspendedReason: row.suspendedReason,
   }
 }
+
+/** Public configuration choices, without credentials or endpoint URLs. */
+export async function listConfigModelChoices(serviceType: ServiceType): Promise<{ config_id: number; name: string; models: string[]; vision: boolean }[]> {
+  const rows = await db.select().from(schema.aiServiceConfigs).where(eq(schema.aiServiceConfigs.serviceType, serviceType))
+  return rows.filter(row => row.isActive && isOfficialProvider(serviceType, row.provider) && !row.suspendedAt)
+    .sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0))
+    .flatMap(row => {
+      let parsed: unknown
+      try { parsed = JSON.parse(row.model || '[]') } catch { return [] }
+      const models = Array.isArray(parsed) ? parsed.filter((model): model is string => typeof model === 'string' && !!model.trim()) : []
+      return models.length ? [{ config_id: row.id, name: row.name, models, vision: row.vision === true }] : []
+    })
+}

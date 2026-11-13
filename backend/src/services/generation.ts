@@ -117,7 +117,7 @@ interface GenerateImageParams extends TaskOriginParams {
    * 绝不参与任何地理几何。因此这条任务刻意**不带 propId**：它既不回写资产当前图，
    * 也不进该地图的版本历史，只作为工作流的中间产物被引用。
    */
-  mapTexture?: { propId: number; propName: string }
+  mapTexture?: { propId?: number; propName: string }
   /**
    * 画幅锁定（Issue #94）：这张图必须按 `size` 的比例出，**有参考图也不许跟随参考图比例**
    * （qwen-jobs 的 image_edit 模式就是跟随第 1 张参考图的，场景按项目画幅出图正是栽在这里）。

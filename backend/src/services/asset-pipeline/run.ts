@@ -111,8 +111,8 @@ export async function startAssetPipeline(input: {
   // 与河道（第一轮的事故形态）。服务端直接拒绝，UI 上也就没有误触的可能。
   if (input.assetKind === 'prop') {
     const [prop] = await db.select().from(schema.props).where(eq(schema.props.id, input.assetId))
-    if (prop?.mapSpec) {
-      throw new PipelineStateError('该道具是地图底图（已有 map_spec）：几何必须由投影确定性渲染，不能进出图流水线。请用「渲染底图」，文字与标注走叠加图层。')
+    if (prop?.assetType === 'map') {
+      throw new PipelineStateError('该道具是地图资产：几何必须确定性渲染，不能进出图流水线。请打开地图工作室。')
     }
   }
 

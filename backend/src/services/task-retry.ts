@@ -248,10 +248,9 @@ async function retryText(row: SysTaskRow, opts: RetryOptions): Promise<number> {
   const params = parseTextTaskParams(row.params)
   const kind = params?.kind
   const episodeId = row.episodeId
-  // 地图工作流（#84）的状态机在 props.map_workflow 上，重试要带修订号与阶段语义，
-  // 通用重试做不到；给出可操作的说明，绝不建一条注定对不上状态的任务
+  // #99: legacy task rows remain readable, but execution moved to Map Studio.
   if (kind === 'map_workflow') {
-    throw new Error('地图工作流任务不支持在任务中心重试：请到该地图资产的工作流面板，从失败的那一步「继续」或先回退再重跑（已产出的底图/成图都保留）')
+    throw new Error('地图工作流已迁到地图工作室，请从地图道具打开')
   }
   if (!kind || !episodeId) throw new Error('该文本任务缺少重试所需的信息')
   const dramaId = row.dramaId ?? 0

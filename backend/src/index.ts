@@ -22,7 +22,7 @@ import agent from './routes/agent.js'
 import merge from './routes/merge.js'
 import skills from './routes/skills.js'
 import props from './routes/props.js'
-import mapWorkflow from './routes/map-workflow.js'
+import { mapStudioRoutes, initMapStudio, registerMapStudioHost, type MapStudioPlatform } from './modules/map-studio/index.js'
 import settings from './routes/settings.js'
 import storage from './routes/storage.js'
 import serverUpdate from './routes/serverUpdate.js'
@@ -54,7 +54,9 @@ import { resumeQueuedTextTasks } from './services/text-task-restart.js'
 import { freezeInterruptedObservations } from './services/task-observability.js'
 import { releaseInterruptedDesignCardShots } from './services/design-card-batch.js'
 import { failInterruptedRewriteRuns } from './services/script-rewrite/run.js'
-import { failInterruptedMapWorkflows } from './services/map-workflow/run.js'
+import { huobaoMapStudioHost } from './services/map-studio-host.js'
+import { generateImage } from './services/generation.js'
+import { getResearchApiKey } from './services/app-settings.js'
 import { backfillGeneratedAt } from './services/media-time.js'
 import { migrateReferenceImages } from './services/reference-images.js'
 import { migrateAssetNames } from './services/asset-name-migration.js'
@@ -65,6 +67,29 @@ import { logLayerFontStatus } from './services/layer-fonts.js'
 import { backfillScriptConfirmation, GateBlockedError } from './services/workflow-gates.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
+const mapStudioPlatform: MapStudioPlatform = {
+  async submitImage(input) {
+    const match = input.hostRef ? /^prop:([1-9]\d*)$/.exec(input.hostRef) : null
+    const propId = match ? Number(match[1]) : undefined
+    const prop = propId ? db.select().from(schema.props).where(eq(schema.props.id, propId)).get() : null
+    const id = await generateImage({ dramaId: prop?.dramaId, prompt: input.prompt, size: input.size,
+      configId: input.configId, model: input.model, mapTexture: { propId, propName: input.label } })
+    return { ref: `huobao:image:${id}` }
+  },
+  async pollImage(ref) {
+    const match = /^huobao:image:([1-9]\d*)$/.exec(ref)
+    const row = match ? db.select().from(schema.sysTask).where(eq(schema.sysTask.id, Number(match[1]))).get() : null
+    if (!row || row.type !== 'image') return { status: 'missing', path: null, error: '底纹图片任务不存在' }
+    const status = row.status === 'completed' || row.status === 'failed' || row.status === 'cancelled' ? row.status : 'pending'
+    return { status, path: row.localPath || row.resultUrl || null, error: row.errorMsg }
+  },
+  async legacyResearchKeys() {
+    return { europeana: getResearchApiKey('europeana') ?? '', smithsonian: getResearchApiKey('smithsonian') ?? '' }
+  },
+}
+registerMapStudioHost(huobaoMapStudioHost)
+await initMapStudio(mapStudioPlatform)
 const projectRoot = path.resolve(__dirname, '../..')
 
 const app = new Hono()
@@ -125,8 +150,7 @@ api.route('/video-queue', videoQueue)
 api.route('/merge', merge)
 api.route('/skills', skills)
 api.route('/props', props)
-// 地图资产工作流（#84）：/props/:id/map-workflow/*，与道具路由同前缀、分文件
-api.route('/props', mapWorkflow)
+api.route('/map-studio', mapStudioRoutes)
 api.route('/storage', storage)
 api.route('/settings', settings)
 api.route('/server-update', serverUpdate)
@@ -188,8 +212,6 @@ db.update(schema.sysTask)
   .then(() => releaseInterruptedDesignCardShots())
   .then(n => { if (n > 0) console.log(`🔓 已释放 ${n} 个被中断的设计卡镜`) })
   .then(() => failInterruptedRewriteRuns())
-  // 地图工作流（#84）：running 的工作流标失败并说明原因，产出保留，绝不自动重放模型与出图
-  .then(() => failInterruptedMapWorkflows())
   .then(() => resumeQueuedTextTasks())
   // 存量任务补归属集：全局任务中心按剧/集筛选与编号
   .then(() => backfillTaskEpisodeIds())

@@ -10,7 +10,7 @@ import { getKeyframePromptBatchStatus, startKeyframePromptBatch } from '../servi
 import { isKeyframeSlot, keyframesJson, loadEpisodeKeyframes, type KeyframeSlot } from '../services/keyframes.js'
 import { batchScopeOf, scopeFromPreview } from '../services/batch-scope.js'
 import { parseStylingVersion } from '../services/styling-version.js'
-import { serializeProp, type PropRow } from '../services/map-workflow/store.js'
+import { serializeProp, type PropRow } from '../services/prop-asset-type.js'
 import { resolveDramaProjectType } from '../services/project-type.js'
 import { loadLayerSegmentSummaries } from '../services/layer-segment.js'
 import {

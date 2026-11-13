@@ -25,8 +25,8 @@ import { getSemanticsAutoStatus, startSemanticsAuto } from '../services/asset-se
 import { resolveStageModel, stageSelectionErrorPayload } from '../services/ai-stages.js'
 import { bindCreatedAssetToReviewItem, findReviewItemAssetDuplicate, onAssetLibraryChanged, onAssetRemoved, onEpisodeAssetLinkChanged } from '../services/asset-review.js'
 import { getAbsolutePath } from '../utils/storage.js'
-import { parseAssetType } from '../services/map-workflow/types.js'
-import { isMapAsset, serializeProp } from '../services/map-workflow/store.js'
+import { parseAssetType, isMapAsset, serializeProp } from '../services/prop-asset-type.js'
+import { openHostTask } from '../modules/map-studio/index.js'
 import { mountAspectVersionRoute } from './asset-aspect-version.js'
 import { PROP_IMAGE_SIZE } from '../services/asset-image-size.js'
 
@@ -38,7 +38,7 @@ const FAITHFUL_BLOCKED_MESSAGE = '该素材已标记为证据素材（忠实素�
  * 这条拦截比 faithful 更早也更硬——刚建的地图还没有底图、faithful 还是 0，
  * 正是这个窗口期最容易把地图送进重绘。
  */
-const MAP_DIFFUSION_BLOCKED_MESSAGE = '地图资产的画面由地图工作流确定性渲染，不能走通用生图；请在地图工作流里生成底图与成图（扩散模型只用于质感底纹）'
+const MAP_DIFFUSION_BLOCKED_MESSAGE = '地图资产由地图工作室确定性渲染，不能走通用生图；请打开地图工作室（扩散模型只用于质感底纹）'
 
 // POST/DELETE /props/:id/reference-images — 道具参考图（生图输入，与成片图互不影响）
 mountReferenceImageRoutes(app, 'prop')
@@ -121,7 +121,7 @@ app.put('/:id', async (c) => {
   if (body.asset_type !== undefined || body.assetType !== undefined) {
     const nextType = parseAssetType(body.asset_type ?? body.assetType, prop.assetType === 'map' ? 'map' : 'prop')
     if (!nextType) return badRequest(c, 'asset_type 只能是 prop 或 map', { error: 'invalid_asset_type', field: 'asset_type' })
-    const hasMapData = !!prop.mapSpec || !!prop.mapWorkflow
+    const hasMapData = !!prop.mapSpec || !!prop.mapWorkflow || !!prop.mapBrief || !!prop.mapStudioTaskId
     if (nextType === 'prop' && prop.assetType === 'map' && hasMapData && body.confirm_asset_type_change !== true) {
       return badRequest(c, '该地图已有地图数据（几何/工作流）。切回普通道具后它会重新进入通用生图链路；数据会保留，请传 confirm_asset_type_change=true 显式确认', { error: 'asset_type_change_needs_confirm' })
     }
@@ -329,14 +329,15 @@ app.get('/:id/semantics/auto/status', async (c) => {
   return success(c, await getSemanticsAutoStatus(id))
 })
 
-// ─── 地图资产（Issue #84）────────────────────────────────────────────────
-// #56 的 `GET/PUT /props/:id/map-spec`、`POST /props/:id/map-render`、
-// `POST /props/:id/map-suggest` 已全部移除：地图状态的唯一写入口是
-// `/props/:id/map-workflow`（routes/map-workflow.ts）。
-//
-// 原因不是整洁，而是正确性：那三个接口绕过工作流的 CAS 与失效规则，
-// 能在一次执行进行中直接改写 map_spec / 当前图 / 语义，正是 #84 要根治的覆盖事故。
-// 几何读取走 `GET /props/:id/map-workflow` 的 `map_spec`，几何写入走它的 `PUT`，
-// 坐标建议由工作流的「资料检索」步给出（带出处与不确定度，不再是裸坐标）。
+// The host keeps only the brief and a task reference; geometry/state belong to Map Studio.
+app.post('/:id/map-studio/open', async c => {
+  const id = Number(c.req.param('id'))
+  const [prop] = await db.select().from(schema.props).where(eq(schema.props.id, id))
+  if (!prop || prop.deletedAt) return badRequest(c, '道具不存在', { error: 'not_found' })
+  if (!isMapAsset(prop)) return badRequest(c, '该资产不是地图资产', { error: 'not_a_map' })
+  const result = await openHostTask({ host: 'huobao', ref: `prop:${id}`, existingTaskId: prop.mapStudioTaskId })
+  await db.update(schema.props).set({ mapStudioTaskId: result.task_id, updatedAt: now() }).where(eq(schema.props.id, id))
+  return success(c, result)
+})
 
 export default app
