@@ -1,3 +1,5 @@
+> 历史评审存档：下文旧 `/props/{p}/map-workflow*` 及相关操作配方已在 Issue #99 移除（removed in #99），不再是现行API。原评审内容保留用于追溯；现行契约见 SKILL.md S2-84 与 references/api-catalog.md §3.84 Map Studio。
+
 # Issue84 final skill documentation review — role `default`
 
 Stateless completion; pasted requirements, capability notes, current SKILL/references and prior review/disposition only; no tools/history. Exact vendor/model identity not exposed. Earth Clean production retry was pending; this reviews the documentation contract, not acceptance success.

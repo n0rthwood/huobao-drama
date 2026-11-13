@@ -1,3 +1,5 @@
+> 历史评审存档：下文旧 `/props/{p}/map-workflow*` 及相关操作配方已在 Issue #99 移除（removed in #99），不再是现行API。原评审内容保留用于追溯；现行契约见 SKILL.md S2-84 与 references/api-catalog.md §3.84 Map Studio。
+
 # Issue #84 地图技能封闭文档评审
 
 - 记录时间：2026-11-08T17:02:36.768155+00:00

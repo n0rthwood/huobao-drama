@@ -10,7 +10,7 @@
     {"id": "P1", "name": "原始内容", "scope": "episode", "api": ["PUT /episodes/{e} {content}"], "done": "content read back equals source"},
     {"id": "P2", "name": "AI 改写", "scope": "episode", "api": ["POST /agent/script_rewriter/chat"], "done": "script_content saved by Huobao and read back"},
     {"id": "P3", "name": "稿件批准", "scope": "episode", "api": [], "done": "script_approval decision bound to script_content hash (script/confirm is a no-op for drama)"},
-    {"id": "P4", "name": "资产", "scope": "episode", "api": ["POST /episodes/{e}/extract", "POST /dramas/{d}/assets/batch-generate[/preview]", "map-workflow"], "done": "every bound asset has an opened image; faithful maps never enter diffusion"},
+    {"id": "P4", "name": "资产", "scope": "episode", "api": ["POST /episodes/{e}/extract", "POST /dramas/{d}/assets/batch-generate[/preview]", "POST /props/{p}/map-studio/open", "POST /map-studio/tasks/{id}/run"], "done": "every bound asset has an opened image; faithful maps never enter diffusion"},
     {"id": "P5", "name": "Poster", "scope": "episode", "parallel_with": ["P6-P14"], "api": ["/episodes/{e}/poster/*"], "done": "selected version + poster_approval, or poster_waiver when not required"},
     {"id": "P6", "name": "拆镜与旁白分配", "scope": "episode", "api": ["POST /agent/storyboard_breaker/chat (structural_change)", "POST /storyboards + PUT narration_text (structural_change)"], "done": "canonical order file; narration concatenated in that order equals script_content"},
     {"id": "P7", "name": "配音（实测时长，不加速）", "scope": "shot", "api": ["POST /episodes/{e}/narration/voice-batch {storyboard_ids}", "PUT /storyboards/{id}/narration-fit (pad only)"], "done": "narration_status voiced, audio text sha == text sha, no narration_too_long/voice_stale"},
