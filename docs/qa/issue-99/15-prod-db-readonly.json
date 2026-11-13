@@ -1,0 +1,981 @@
+{
+ "captured_at": "2026-11-13T22:52:32.010Z",
+ "props": [
+  {
+   "id": 283,
+   "drama_id": 21,
+   "name": "乌拉尔山东西两麓区位图",
+   "asset_type": "map",
+   "image_url": "static/map-drawings/477421463619d9f29543c177bbdebd6e.png",
+   "faithful": 1,
+   "faithful_source": 3238,
+   "map_studio_task_id": 1,
+   "semantics_len": 57355
+  },
+  {
+   "id": 284,
+   "drama_id": 21,
+   "name": "东欧平原哥萨克聚落分布图",
+   "asset_type": "map",
+   "image_url": "static/map-drawings/a6baadcde8b2865a4606878161c985b5.png",
+   "faithful": 1,
+   "faithful_source": 3236,
+   "map_studio_task_id": 2,
+   "semantics_len": 37797
+  }
+ ],
+ "versions": [
+  {
+   "id": 3146,
+   "prop_id": 283,
+   "provider": "map-render",
+   "model": "map-studio-base",
+   "status": "completed",
+   "local_path": "static/map-bases/d1c62eb2367a756c7a0d4327cccccfe0.png",
+   "source": "map-studio",
+   "task": 1,
+   "sha": null
+  },
+  {
+   "id": 3147,
+   "prop_id": 283,
+   "provider": "map-workflow",
+   "model": "map-layer-doc",
+   "status": "completed",
+   "local_path": "static/map-drawings/be7662303b7fcca53791d19b438d7196.png",
+   "source": "map-studio",
+   "task": 1,
+   "sha": "be7662303b7fcca53791d19b438d7196d239a1f269860834294edf0e01541a4d"
+  },
+  {
+   "id": 3192,
+   "prop_id": 284,
+   "provider": "map-render",
+   "model": "map-studio-base",
+   "status": "completed",
+   "local_path": "static/map-bases/d032ff849475303aa97427af9059069a.png",
+   "source": "map-studio",
+   "task": 2,
+   "sha": null
+  },
+  {
+   "id": 3193,
+   "prop_id": 284,
+   "provider": "map-workflow",
+   "model": "map-layer-doc",
+   "status": "completed",
+   "local_path": "static/map-drawings/bfe005da19641e742985f1f90cf6bfe3.png",
+   "source": "map-studio",
+   "task": 2,
+   "sha": "bfe005da19641e742985f1f90cf6bfe32da51e15e711006cb9d2fe03e9649370"
+  },
+  {
+   "id": 3218,
+   "prop_id": 283,
+   "provider": "map-render",
+   "model": "map-studio-base",
+   "status": "completed",
+   "local_path": "static/map-bases/1e6a9929ec45dc79a20c9fe0061dadbb.png",
+   "source": "map-studio",
+   "task": 1,
+   "sha": null
+  },
+  {
+   "id": 3219,
+   "prop_id": 283,
+   "provider": "map-workflow",
+   "model": "map-layer-doc",
+   "status": "completed",
+   "local_path": "static/map-drawings/412626367814116677669beb334511e3.png",
+   "source": "map-studio",
+   "task": 1,
+   "sha": "412626367814116677669beb334511e3ccc9f06a91157479d99242809a6a1915"
+  },
+  {
+   "id": 3225,
+   "prop_id": 284,
+   "provider": "map-render",
+   "model": "map-studio-base",
+   "status": "completed",
+   "local_path": "static/map-bases/d032ff849475303aa97427af9059069a.png",
+   "source": "map-studio",
+   "task": 2,
+   "sha": null
+  },
+  {
+   "id": 3226,
+   "prop_id": 284,
+   "provider": "map-workflow",
+   "model": "map-layer-doc",
+   "status": "completed",
+   "local_path": "static/map-drawings/eed7b661bf77e50b8736eee078ad8fcf.png",
+   "source": "map-studio",
+   "task": 2,
+   "sha": "eed7b661bf77e50b8736eee078ad8fcf6f61d1f220c9747623af18c5e93131fa"
+  },
+  {
+   "id": 3236,
+   "prop_id": 284,
+   "provider": "map-render",
+   "model": "map-studio-base",
+   "status": "completed",
+   "local_path": "static/map-bases/d032ff849475303aa97427af9059069a.png",
+   "source": "map-studio",
+   "task": 2,
+   "sha": null
+  },
+  {
+   "id": 3237,
+   "prop_id": 284,
+   "provider": "map-workflow",
+   "model": "map-layer-doc",
+   "status": "completed",
+   "local_path": "static/map-drawings/a6baadcde8b2865a4606878161c985b5.png",
+   "source": "map-studio",
+   "task": 2,
+   "sha": "a6baadcde8b2865a4606878161c985b565c45284e5116e009baab66f5b4820bb"
+  },
+  {
+   "id": 3238,
+   "prop_id": 283,
+   "provider": "map-render",
+   "model": "map-studio-base",
+   "status": "completed",
+   "local_path": "static/map-bases/1e6a9929ec45dc79a20c9fe0061dadbb.png",
+   "source": "map-studio",
+   "task": 1,
+   "sha": null
+  },
+  {
+   "id": 3239,
+   "prop_id": 283,
+   "provider": "map-workflow",
+   "model": "map-layer-doc",
+   "status": "completed",
+   "local_path": "static/map-drawings/477421463619d9f29543c177bbdebd6e.png",
+   "source": "map-studio",
+   "task": 1,
+   "sha": "477421463619d9f29543c177bbdebd6e451d9d817d9cd8d6a689b76c6f70acf8"
+  }
+ ],
+ "runs": [
+  {
+   "id": 1,
+   "task_id": 1,
+   "mode": "auto",
+   "start_stage": "brief",
+   "stage": "complete",
+   "status": "completed",
+   "error_msg": null,
+   "created_at": "2026-11-13T15:02:21.124Z",
+   "finished_at": "2026-11-13T16:19:50.786Z"
+  },
+  {
+   "id": 2,
+   "task_id": 1,
+   "mode": "auto",
+   "start_stage": "brief",
+   "stage": "research",
+   "status": "failed",
+   "error_msg": "「资料检索」已用完 3 轮交付仍未通过校验，需要人工处理。最后一轮的问题：「鄂毕河」：21 个顶点超出 extent 的 2% 留边（经度 78.1539–78.4981，纬度 60.2667–60.4154；extent 留边后的范围是 [34.508,45.232,78.092,65.968]）；这是 dataset 要素：请在 dataset_ref.clip_bbox 里把它裁到 extent 内（例如 clip_bbox=[34.508,45.232,78.092,65.968]），或调整 extent；代码不会自动裁剪",
+   "created_at": "2026-11-13T20:24:11.519Z",
+   "finished_at": "2026-11-13T20:30:38.778Z"
+  },
+  {
+   "id": 3,
+   "task_id": 2,
+   "mode": "auto",
+   "start_stage": "brief",
+   "stage": "research",
+   "status": "failed",
+   "error_msg": "geometry_unverified：「扎波罗热哥萨克聚落群（第聂伯河下游代表点）」坐标尚无可核验的原文经纬度或相对位置证据 / 「顿河哥萨克聚落群（顿河中游代表点）」坐标尚无可核验的原文经纬度或相对位置证据 / 「伏尔加哥萨克聚落群（伏尔加河下中游代表点）」坐标尚无可核验的原文经纬度或相对位置证据",
+   "created_at": "2026-11-13T20:24:11.611Z",
+   "finished_at": "2026-11-13T20:30:18.813Z"
+  },
+  {
+   "id": 4,
+   "task_id": 1,
+   "mode": "auto",
+   "start_stage": "research",
+   "stage": "research",
+   "status": "failed",
+   "error_msg": "geometry_unverified：「喀什里克（西伯利亚城）」坐标尚无可核验的原文经纬度或相对位置证据 / 「叶尔马克远征路线（示意）」坐标尚无可核验的原文经纬度或相对位置证据",
+   "created_at": "2026-11-13T20:33:43.559Z",
+   "finished_at": "2026-11-13T20:41:05.556Z"
+  },
+  {
+   "id": 5,
+   "task_id": 2,
+   "mode": "auto",
+   "start_stage": "base",
+   "stage": "complete",
+   "status": "completed",
+   "error_msg": null,
+   "created_at": "2026-11-13T20:33:57.620Z",
+   "finished_at": "2026-11-13T20:54:04.626Z"
+  },
+  {
+   "id": 6,
+   "task_id": 1,
+   "mode": "auto",
+   "start_stage": "research",
+   "stage": "research",
+   "status": "cancelled",
+   "error_msg": "人工取消地图任务",
+   "created_at": "2026-11-13T20:55:58.117Z",
+   "finished_at": "2026-11-13T21:33:14.404Z"
+  },
+  {
+   "id": 7,
+   "task_id": 1,
+   "mode": "auto",
+   "start_stage": "base",
+   "stage": "complete",
+   "status": "completed",
+   "error_msg": null,
+   "created_at": "2026-11-13T21:34:34.392Z",
+   "finished_at": "2026-11-13T21:57:33.917Z"
+  },
+  {
+   "id": 8,
+   "task_id": 2,
+   "mode": "auto",
+   "start_stage": "drawing",
+   "stage": "complete",
+   "status": "completed",
+   "error_msg": null,
+   "created_at": "2026-11-13T21:37:27.378Z",
+   "finished_at": "2026-11-13T22:21:03.961Z"
+  },
+  {
+   "id": 9,
+   "task_id": 2,
+   "mode": "auto",
+   "start_stage": "drawing",
+   "stage": "complete",
+   "status": "completed",
+   "error_msg": null,
+   "created_at": "2026-11-13T22:27:49.343Z",
+   "finished_at": "2026-11-13T22:46:09.329Z"
+  },
+  {
+   "id": 10,
+   "task_id": 1,
+   "mode": "auto",
+   "start_stage": "drawing",
+   "stage": "complete",
+   "status": "completed",
+   "error_msg": null,
+   "created_at": "2026-11-13T22:29:03.959Z",
+   "finished_at": "2026-11-13T22:49:58.025Z"
+  }
+ ],
+ "deliveries": [
+  {
+   "id": 1,
+   "task_id": 1,
+   "run_id": 1,
+   "host_ref": "prop:283",
+   "final_sha256": "be7662303b7fcca53791d19b438d7196d239a1f269860834294edf0e01541a4d",
+   "created_at": "2026-11-13T16:19:50.774Z"
+  },
+  {
+   "id": 2,
+   "task_id": 2,
+   "run_id": 5,
+   "host_ref": "prop:284",
+   "final_sha256": "bfe005da19641e742985f1f90cf6bfe32da51e15e711006cb9d2fe03e9649370",
+   "created_at": "2026-11-13T20:54:04.567Z"
+  },
+  {
+   "id": 3,
+   "task_id": 1,
+   "run_id": 7,
+   "host_ref": "prop:283",
+   "final_sha256": "412626367814116677669beb334511e3ccc9f06a91157479d99242809a6a1915",
+   "created_at": "2026-11-13T21:57:33.819Z"
+  },
+  {
+   "id": 4,
+   "task_id": 2,
+   "run_id": 8,
+   "host_ref": "prop:284",
+   "final_sha256": "eed7b661bf77e50b8736eee078ad8fcf6f61d1f220c9747623af18c5e93131fa",
+   "created_at": "2026-11-13T22:21:03.869Z"
+  },
+  {
+   "id": 5,
+   "task_id": 2,
+   "run_id": 9,
+   "host_ref": "prop:284",
+   "final_sha256": "a6baadcde8b2865a4606878161c985b565c45284e5116e009baab66f5b4820bb",
+   "created_at": "2026-11-13T22:46:09.180Z"
+  },
+  {
+   "id": 6,
+   "task_id": 1,
+   "run_id": 10,
+   "host_ref": "prop:283",
+   "final_sha256": "477421463619d9f29543c177bbdebd6e451d9d817d9cd8d6a689b76c6f70acf8",
+   "created_at": "2026-11-13T22:49:57.854Z"
+  }
+ ],
+ "citations": [
+  {
+   "asset_id": 283,
+   "n": 10
+  },
+  {
+   "asset_id": 284,
+   "n": 10
+  }
+ ],
+ "observed": [
+  {
+   "run_id": 1,
+   "status": "completed",
+   "call_count": 55,
+   "model_ms": 4441448,
+   "queue_ms": 47,
+   "work_ms": 4649659
+  },
+  {
+   "run_id": 2,
+   "status": "failed",
+   "call_count": 19,
+   "model_ms": 359740,
+   "queue_ms": 21,
+   "work_ms": 387242
+  },
+  {
+   "run_id": 3,
+   "status": "completed",
+   "call_count": 20,
+   "model_ms": 362461,
+   "queue_ms": 22,
+   "work_ms": 367197
+  },
+  {
+   "run_id": 4,
+   "status": "completed",
+   "call_count": 14,
+   "model_ms": 438327,
+   "queue_ms": 12,
+   "work_ms": 441993
+  },
+  {
+   "run_id": 5,
+   "status": "completed",
+   "call_count": 52,
+   "model_ms": 961763,
+   "queue_ms": 103,
+   "work_ms": 1206976
+  },
+  {
+   "run_id": 6,
+   "status": "interrupted",
+   "call_count": 1,
+   "model_ms": 14042,
+   "queue_ms": 0,
+   "work_ms": 5482000
+  },
+  {
+   "run_id": 7,
+   "status": "completed",
+   "call_count": 46,
+   "model_ms": 862199,
+   "queue_ms": 354395,
+   "work_ms": 1379477
+  },
+  {
+   "run_id": 8,
+   "status": "completed",
+   "call_count": 93,
+   "model_ms": 1802116,
+   "queue_ms": 743433,
+   "work_ms": 2616492
+  },
+  {
+   "run_id": 9,
+   "status": "completed",
+   "call_count": 33,
+   "model_ms": 602478,
+   "queue_ms": 480175,
+   "work_ms": 1099870
+  },
+  {
+   "run_id": 10,
+   "status": "completed",
+   "call_count": 34,
+   "model_ms": 816339,
+   "queue_ms": 421246,
+   "work_ms": 1253917
+  }
+ ],
+ "tasks": [
+  {
+   "id": 1,
+   "title": "乌拉尔山东西两麓区位图",
+   "host_ref": "prop:283",
+   "places": [
+    [
+     "喀什里克（西伯利亚城）",
+     68.52048,
+     58.14942,
+     "manual",
+     "confirmed"
+    ],
+    [
+     "托博尔斯克",
+     68.264815,
+     58.199793,
+     "dataset",
+     "verified"
+    ],
+    [
+     "秋明（奇姆吉—图拉）",
+     65.529995,
+     57.140012,
+     "dataset",
+     "verified"
+    ],
+    [
+     "喀山",
+     49.124399,
+     55.751888,
+     "dataset",
+     "verified"
+    ],
+    [
+     "莫斯科",
+     37.613577,
+     55.75411,
+     "dataset",
+     "verified"
+    ]
+   ],
+   "regions": [
+    [
+     "乌拉尔山脉",
+     [
+      [
+       66.889903,
+       67.981574
+      ],
+      [
+       66.909679,
+       67.679755
+      ],
+      [
+       66.847789,
+       67.358161
+      ],
+      [
+       66.632457,
+       67.106391
+      ],
+      [
+       66.241954,
+       66.956
+      ],
+      [
+       65.330577,
+       66.79621
+      ],
+      [
+       64.91627,
+       66.697211
+      ],
+      [
+       64.513927,
+       66.56269
+      ],
+      [
+       64.182628,
+       66.414923
+      ],
+      [
+       63.9817,
+       66.276374
+      ],
+      [
+       63.802623,
+       66.127082
+      ],
+      [
+       63.528697,
+       65.956794
+      ],
+      [
+       63.207286,
+       65.802253
+      ],
+      [
+       62.885875,
+       65.700385
+      ],
+      [
+       62.608653,
+       65.632148
+      ],
+      [
+       62.385387,
+       65.544074
+      ],
+      [
+       62.212169,
+       65.42182
+      ],
+      [
+       61.955577,
+       65.074713
+      ],
+      [
+       61.744395,
+       64.938178
+      ],
+      [
+       61.4015,
+       64.827948
+      ],
+      [
+       60.876842,
+       64.730963
+      ],
+      [
+       60.409923,
+       64.552069
+      ],
+      [
+       60.197276,
+       64.26911
+      ],
+      [
+       60.003551,
+       63.52912
+      ],
+      [
+       59.939098,
+       63.109992
+      ],
+      [
+       59.865123,
+       62.159857
+      ],
+      [
+       59.852916,
+       61.251899
+      ],
+      [
+       59.792125,
+       60.755194
+      ],
+      [
+       59.519298,
+       59.815192
+      ],
+      [
+       59.535167,
+       59.46424
+      ],
+      [
+       59.879771,
+       58.014106
+      ],
+      [
+       60.3213,
+       56.620551
+      ],
+      [
+       60.413219,
+       56.160895
+      ],
+      [
+       60.320323,
+       55.777411
+      ],
+      [
+       60.060191,
+       55.295111
+      ],
+      [
+       59.660411,
+       54.799628
+      ],
+      [
+       59.391205,
+       54.567215
+      ],
+      [
+       59.330893,
+       54.515146
+      ],
+      [
+       58.727061,
+       53.993842
+      ],
+      [
+       58.525279,
+       53.579352
+      ],
+      [
+       58.463145,
+       53.159613
+      ],
+      [
+       58.460338,
+       52.760993
+      ],
+      [
+       58.360484,
+       52.36695
+      ],
+      [
+       58.10377,
+       51.989997
+      ],
+      [
+       57.755015,
+       51.700019
+      ],
+      [
+       57.378551,
+       51.566779
+      ],
+      [
+       57.018077,
+       51.606818
+      ],
+      [
+       56.693736,
+       51.773078
+      ],
+      [
+       56.434337,
+       52.039862
+      ],
+      [
+       56.268687,
+       52.381659
+      ],
+      [
+       56.220103,
+       53.10279
+      ],
+      [
+       56.407481,
+       53.788336
+      ],
+      [
+       56.697398,
+       54.371161
+      ],
+      [
+       56.957164,
+       54.784003
+      ],
+      [
+       57.129771,
+       55.241278
+      ],
+      [
+       57.604259,
+       57.597846
+      ],
+      [
+       57.645518,
+       58.166388
+      ],
+      [
+       57.659679,
+       59.364142
+      ],
+      [
+       57.742564,
+       59.970221
+      ],
+      [
+       57.933604,
+       60.609198
+      ],
+      [
+       58.177257,
+       61.219306
+      ],
+      [
+       58.258477,
+       61.394206
+      ],
+      [
+       58.418346,
+       61.738471
+      ],
+      [
+       58.482597,
+       61.955969
+      ],
+      [
+       58.570811,
+       62.254584
+      ],
+      [
+       58.61671,
+       62.832587
+      ],
+      [
+       58.606775,
+       63.049569
+      ],
+      [
+       58.572928,
+       63.788773
+      ],
+      [
+       58.572889,
+       63.789632
+      ],
+      [
+       58.572887,
+       63.789679
+      ],
+      [
+       58.624034,
+       64.108161
+      ],
+      [
+       58.781871,
+       64.43067
+      ],
+      [
+       59.191051,
+       65.08216
+      ],
+      [
+       59.425426,
+       65.35578
+      ],
+      [
+       59.745982,
+       65.531867
+      ],
+      [
+       60.11671,
+       65.623725
+      ],
+      [
+       60.876842,
+       65.669806
+      ],
+      [
+       61.600597,
+       65.825934
+      ],
+      [
+       62.248668,
+       65.924506
+      ],
+      [
+       62.501231,
+       65.993659
+      ],
+      [
+       62.724986,
+       66.102301
+      ],
+      [
+       63.230235,
+       66.462104
+      ],
+      [
+       63.59193,
+       66.659247
+      ],
+      [
+       63.937877,
+       66.819525
+      ],
+      [
+       64.178477,
+       66.908637
+      ],
+      [
+       64.333629,
+       66.98963
+      ],
+      [
+       64.482188,
+       67.12464
+      ],
+      [
+       64.754527,
+       67.414374
+      ],
+      [
+       64.882335,
+       67.496039
+      ],
+      [
+       65.017955,
+       67.53028
+      ],
+      [
+       65.169322,
+       67.548712
+      ],
+      [
+       65.344493,
+       67.582953
+      ],
+      [
+       65.345095,
+       67.583508
+      ],
+      [
+       65.481944,
+       67.709601
+      ],
+      [
+       65.529993,
+       67.86348
+      ],
+      [
+       65.548228,
+       67.921881
+      ],
+      [
+       66.889903,
+       67.981574
+      ]
+     ],
+     "dataset",
+     "verified"
+    ]
+   ]
+  },
+  {
+   "id": 2,
+   "title": "东欧平原哥萨克聚落分布图",
+   "host_ref": "prop:284",
+   "places": [
+    [
+     "基辅",
+     30.514682,
+     50.435313,
+     "dataset",
+     "verified"
+    ],
+    [
+     "切尔尼戈夫",
+     31.301541,
+     51.50493,
+     "dataset",
+     "verified"
+    ],
+    [
+     "波尔塔瓦",
+     34.570282,
+     49.57404,
+     "dataset",
+     "verified"
+    ],
+    [
+     "沃罗涅日",
+     39.186843,
+     51.66539,
+     "dataset",
+     "verified"
+    ],
+    [
+     "萨拉托夫",
+     46.02805,
+     51.581936,
+     "dataset",
+     "verified"
+    ],
+    [
+     "萨马拉",
+     50.149349,
+     53.196953,
+     "dataset",
+     "verified"
+    ],
+    [
+     "喀山",
+     49.124399,
+     55.751888,
+     "dataset",
+     "verified"
+    ],
+    [
+     "阿斯特拉罕",
+     48.054989,
+     46.348655,
+     "dataset",
+     "verified"
+    ],
+    [
+     "扎波罗热哥萨克聚落群（第聂伯河下游代表点）",
+     35.2,
+     47.8,
+     "model",
+     "confirmed"
+    ],
+    [
+     "顿河哥萨克聚落群（顿河中游代表点）",
+     40.6,
+     49.4,
+     "model",
+     "confirmed"
+    ],
+    [
+     "伏尔加哥萨克聚落群（伏尔加河下中游代表点）",
+     45.4,
+     50.4,
+     "model",
+     "confirmed"
+    ]
+   ],
+   "regions": [
+    [
+     "顿河哥萨克聚落带（人工圈定）",
+     [
+      [
+       37.78915,
+       50.44148
+      ],
+      [
+       41.41598,
+       50.76268
+      ],
+      [
+       44.87411,
+       50.0098
+      ],
+      [
+       46.02682,
+       48.54254
+      ],
+      [
+       44.05878,
+       47.39434
+      ],
+      [
+       38.09842,
+       47.98104
+      ],
+      [
+       37.94378,
+       49.22657
+      ],
+      [
+       37.78915,
+       50.44148
+      ]
+     ],
+     "manual",
+     "confirmed"
+    ]
+   ]
+  }
+ ]
+}

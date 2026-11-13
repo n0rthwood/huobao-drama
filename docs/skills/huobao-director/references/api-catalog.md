@@ -4,7 +4,7 @@
 拼接时**去掉路径开头的 `/`** 再拼；用 `urljoin` 会把 `/huobao/api/v1` 前缀丢掉，打到 SPA。
 标注：`[R]` = 对应请求/行为真实运行；历史案例见 references，本轮为 drama 11 / episode 17（八达岭长城测试 1008-2）。`[S]` = 仅源码/实现自测；`[S/R]` = 部分实测。不能把相邻实测扩成全分支验证。
 **源码快照**：非地图部分仍沿用功能代码 `3eec6f7`、main `c6bf2ab`、release `20261108T204444Z`；早期 #80–#82 证据保留。地图现行契约单列于 §3.84（Issue #99）。
-**本轮证据**：`docs/qa/issue-87-20261108/` 的公开观测/消息分页、三阶段预估、auto与暂停pin错误已生产调用；未触发分支保持 `[S]`。**地图索引：§3.84 Map Studio（#99，取代#84/#90）**；阶段① release `20261113T141220Z` 生产证据在 `docs/qa/issue-99/`，阶段②/③尚未发布。旧 `/props/{p}/map-workflow*` 已移除（removed in #99）；Earth/image模块路线须重验，不能沿用旧流程实测标记。#88仍开放。
+**本轮证据**：`docs/qa/issue-87-20261108/` 的公开观测/消息分页、三阶段预估、auto与暂停pin错误已生产调用；未触发分支保持 `[S]`。**地图索引：§3.84 Map Studio（#99，取代#84/#90）**；阶段① `20261113T141220Z`、阶段②/③a `20261113T202336Z`、extent修正 `20261113T203319Z`、工具超时+底板门 `20261113T222716Z`，生产证据 drama21/ep28 props283/284（task1/2、运行1–10）在 `docs/qa/issue-99/`；逐方法范围见 §3.84，未列出分支仍 `[S]`。旧 `/props/{p}/map-workflow*` 已移除（removed in #99）。Earth/image模块路线仍未重验。#88仍开放。
 
 ## 0. 通用约定
 
@@ -287,7 +287,7 @@ Body：`{scope:"all"|"characters"|"scenes"|"props", episode_id?, rewrite_prompts
 
 ### 3.84 地图工作室（S2，Issue #99 接替 #84/#90；模块 API 是唯一入口）[S/R]
 
-> **来源与状态**：地图生产已从火宝 `services/map-workflow` + `/props/{p}/map-workflow*` 迁到仓库内独立模块 `backend/src/modules/map-studio`（Issue #99）。**阶段 ①**（行为等价迁移 + 宿主切换 + 旧路由下线）随 release `20261113T141220Z` 上线并在生产验收：drama 21 / prop 283 / 任务 1 / 运行 1，交付版本 3146（底图 `provider="map-render"`）与 3147（成图 `provider="map-workflow"`、`model="map-layer-doc"`），证据 `docs/qa/issue-99/`。**阶段 ②**（数据集几何、硬/软证据闸门、`geometry_unverified`）与 **阶段 ③**（平滑、标签门、服务器草稿作图、图层检查/自动排版、编辑器）**尚未发布**，标 `[S]`。
+> **来源与状态**：地图生产已从火宝 `services/map-workflow` + `/props/{p}/map-workflow*` 迁到仓库内独立模块 `backend/src/modules/map-studio`（Issue #99）。阶段 ①（行为等价迁移 + 宿主切换 + 旧路由下线）release `20261113T141220Z`；阶段 ②（数据集几何、硬/软证据闸门、`geometry_unverified`）与阶段 ③a（服务器草稿作图、平滑、标签/底板检查、删除旧工作流）release `20261113T202336Z`，随后 extent 研究门取消内缩留边（`20261113T203319Z`）、工具墙钟超时与底板遮挡门（`20261113T222716Z`）。生产验收 drama 21 / ep 28：prop 283 = 工作室任务 1，prop 284 = 任务 2，运行 1–10；交付六对版本（283→3146/3147、3218/3219、3238/3239；284→3192/3193、3225/3226、3236/3237），证据 `docs/qa/issue-99/`。**下方逐方法范围列出的才升 `[R]`；其余分支（advance/skip、PUT layer-doc、自动排版、独立任务、Earth/image、工具超时触发）仍 `[S]`。**
 > **旧入口已下线**：`GET|PUT /props/{p}/map-workflow`、`POST …/map-workflow/run|advance|rollback|cancel`、`PUT …/map-workflow/layer-doc` 在#99阶段①移除（removed in #99）；不再支持，即使兜底返回200+HTML也不是业务成功，必须校验Content-Type。历史任务留痕不重建、不迁移阶段；旧props.map_workflow/map_spec仅留历史，迁移初始化只复制需求到map_brief，不重绘旧资产。
 **背景**：旧地图面板没有串联检索、底图、风格与可编辑几何；#84 用显式类型和持久化阶段解决，扩散只做底纹。实测不能跨方法或跨分支泛化。
 
@@ -297,6 +297,7 @@ Body：`{scope:"all"|"characters"|"scenes"|"props", episode_id?, rewrite_prompts
 - prop 239「乌拉尔山东西两麓区位图」：`map_spec` 里「喀什里克（西比尔，西伯利亚汗国都城）」写成 `lon 58.2 / lat 58.16`（`proposed:true`），落在乌拉尔山以西；它应在托博尔斯克旁（该 spec 的托博尔斯克就是 `68.25 / 58.2`）。`bbox [55.05,56.78,69.97,60.00]` 恰好包住 `58.2`，**单靠 bbox 闸拦不住**，需要「经度≈纬度」与「相对位置/距离声明 vs 计算」这类软证据。
 - prop 241「东欧平原哥萨克聚落分布图」：第聂伯河/顿河/伏尔加河/卡马河是模型手点的 9/8/13/3 个顶点，与底图 Natural Earth 河道不重合；河流必须取数据集几何，不能手描。
 - 旧流程把需求、几何、阶段状态、模型轮次和火宝业务表缠在一起，无法独立演进。**为何需要**：用户要求地图生产成为一个可独立测试的模块（不 import 火宝业务代码），火宝侧只保留需求字段与打开入口；精确度（数据集 + 证据闸门 + 人工核验）与美化（平滑、标签避让、编辑器）在模块内补齐。
+- **验收中的真实错误链（task 1）**：模型在 research 仍会给出错误坐标——第一次主张「喀什里克」`68.9 / 58.2`，没有任何逐字经纬度或一致的相对位置证据，因此 `verification` 不是 verified；research 结束被 `geometry_unverified` 阻断（run 4 failed）。人把坐标改成 `68.52048 / 58.14942`（es.wikipedia「Qashliq」）并经 CAS `PUT map_spec` 确认后，run 7 才继续出图。结论：**模型提议坐标仍可能错，但它未经核验或人工确认就进不了成图**；「能交付」不等于 AI 的坐标已被独立证明。
 
 #### 模型阶段（模块内工具循环；#90 语义保留，作图改为服务器草稿）
 
@@ -307,13 +308,13 @@ Body：`{scope:"all"|"characters"|"scenes"|"props", episode_id?, rewrite_prompts
 - **轮次与回退**：每阶段最多交付 3 轮（一次运行没有交付就结束也算一轮）；模型可用 `request_rollback` 回到更早的模型阶段，每次运行最多 2 次，回退不消耗轮次但目标阶段轮次重新从 0 算；轮次或回退用尽即阶段失败交人，失败原因交给下一次运行的模型。`style` 与 `complete` 是基础设施阶段，失败自动重试 2 次；`complete` 发现成图或语义缺失按回退到 drawing 处理。
 - **步数上限**：research 40 步、base 24 步、drawing 60 步（每步一次文本调用；`render_*`/`get_draft` 等预览类工具不消耗轮次）。预算按步数保守预留，见文末「调用量」。
 - **brief**：单次判定，回复不合约或调用失败就把原因回给模型重答。AI 补全的隐含信息写进 `brief.inferred:[{field,value,basis,confidence}]`，每条都要能解释依据；`issues[].blocking` 阻断时必须补需求，不允许猜。
-- **research 工具（`[S]` 数据集部分）**：
+- **research 工具（数据集部分 `[R]`：task1/task2 生产检索）**：
   - `search_sources {adapter,query}`：`wikipedia-zh / wikipedia-en / europeana / smithsonian` 四个来源每个至少检索一次（零命中也算）；每查询最多登记 8 条命中，全部来源上限 40 条，编号 `S1、S2…`。
   - `search_dataset {layer,query,bbox?}`：离线 Natural Earth 原始几何，`layer ∈ river/lake/coast/mountain/physical_region/place`；返回前 10 个候选（稳定 `ref`、名称集合、类别、bbox、顶点数、长度/面积；河流/湖泊组引用另带 `group`）。每次查询登记在 `research.dataset_queries`，缺失声明会核对它。
   - `read_source {source_id}`：读已登记来源正文；`coordinate_basis:"excerpt"` 的逐字引用必须出自这里。
   - `submit_features {features,extent,relations?,uncertainties?,notes?}`：任何一处不合格整批拒收（见下节硬/软证据）；`extent` 必填。
 - **base 工具**：`render_base {mode,bbox,projection?,layers?}`（底图路线、bbox、取景全由模型定，旧 bbox 只作参考，返回 `artifact_id`、图片路径与 `frame.problems`）、`read_image`、`submit_base {artifact_id}`（要素全部在画面内留 2% 边距，要素外包框最大边 ≥30% 画面；被采用的 bbox 写回 `map_spec`）。
-- **drawing 工具（阶段 ③ `[S]`：服务器草稿，模型永远不收到顶点）**：`add_feature_layers {items:[{feature_id,style}]}`（按存储几何精确投影，place→marker、route→polyline、region→polygon，返回图层 id/像素 bbox/顶点数）、`add_layer`、`update_layer`（小补丁；锚定要素不能改 points/at，非零 rotation 整笔拒收）、`remove_layer`、`get_draft {include_points?}`、`set_smoothing {layer_id,smooth}`、`auto_layout_labels {}`、`render_draft {}`（最终渲染链预览，不消耗轮次）、`submit_draft {omitted?}`（只能交付「已预览且未再改动」的草稿，未解决的几何/平滑/标签问题全部拒收）、`read_image`、`request_rollback`。严格文档上限：60 图层、每条线/面 ≤240 点（只有服务器精确投影的已存储要素可超过且不得截断/移动/重排/插值）、非要素手写形状 ≤200 点、名称 ≤60 字；数据集断段各自一个要素图层，不许桥接。
+- **drawing 工具（阶段 ③ `[R]`：run7–10 交付；服务器草稿，模型永远不收到顶点）**：`add_feature_layers {items:[{feature_id,style}]}`（按存储几何精确投影，place→marker、route→polyline、region→polygon，返回图层 id/像素 bbox/顶点数）、`add_layer`、`update_layer`（小补丁；锚定要素不能改 points/at，非零 rotation 整笔拒收）、`remove_layer`、`get_draft {include_points?}`、`set_smoothing {layer_id,smooth}`、`auto_layout_labels {}`、`render_draft {}`（最终渲染链预览，不消耗轮次）、`submit_draft {omitted?}`（只能交付「已预览且未再改动」的草稿，未解决的几何/平滑/标签问题全部拒收）、`read_image`、`request_rollback`。严格文档上限：60 图层、每条线/面 ≤240 点（只有服务器精确投影的已存储要素可超过且不得截断/移动/重排/插值）、非要素手写形状 ≤200 点、名称 ≤60 字；数据集断段各自一个要素图层，不许桥接。
 - **详情里的 `agent`**：`{run_id, rounds:{brief?,research?,base?,drawing?}, rollbacks, max_rounds:3, max_rollbacks:2, attempts:[{run_id,stage,round,outcome:"accepted"|"rejected"|"no_delivery"|"error"|"rollback"|"infra_retry",problems[],target_stage?,at}]}`。计数按运行计（新运行从 0 算），`attempts` 跨运行保留、最多 80 条、重启不归零。`outputs.layer_doc` 是被采用的模型文档（或人工保存的文档），`final_image.provenance.background` 是它的合成底图（底图+底纹）。
 - **视觉依赖**：会进入 base 或 drawing 的运行（auto 模式在 complete 之前启动，或从 base、drawing 启动）要求存在启用视觉的文本配置（供 `read_image`），否则该次 run 400 `vision_config_unavailable`。只影响这次运行，不影响后端服务。
 
@@ -324,8 +325,8 @@ Body：`{scope:"all"|"characters"|"scenes"|"props", episode_id?, rewrite_prompts
 - **火宝只保存需求与任务引用**：props.map_brief（JSON MapBrief）与props.map_studio_task_id。经 `GET /dramas/{d}` 的props或 `GET /episodes/{e}/props` 读回地图资产，含asset_type/map_brief/map_studio_task_id，不再返回旧map_spec/map_workflow。**没有GET /props/{p}路由**，勿自造。需求字段见下方PUT保存段；生产字段证据prop283。
 - **打开工作室（`[R]`）**：`POST /props/{p}/map-studio/open {}` → `{task_id,path:"/map-studio/<id>"}`。同一地图只有一个工作室任务：已有存活任务直接复用 id，不会新建；`map_studio_task_id` 写回道具。非地图资产 400 `{error:"not_a_map"}`；道具不存在/已删除 400 `{error:"not_found"}`。这是火宝侧唯一的地图入口，**不再有 `/props/{p}/map-workflow*`**（`removed in #99`）。
 - **跨项目导入**：仍用 `kind:"prop"`。导入复制 `map_brief`（其中的 `reference_image.path` 文件一并复制，缺失则整笔失败回滚）、版本、语义与 `faithful_source` 映射；`map_studio_task_id` 置 NULL、`map_workflow`/`map_spec` 置 NULL（不共享运行任务，重新打开会建新任务）。改类为普通道具后仍保留的 `map_brief` 随资产复制，但不自动恢复 map 类型。
-- **逐方法范围 `[R]`（生产release `20261113T141220Z`，drama21/prop283/task1/run1）**：`POST /props/{p}/map-studio/open`（含复用）、`GET /map-studio/tasks`、`GET /map-studio/tasks/1`、`POST /map-studio/tasks/1/run {mode:"auto"}`至complete交付（版本3146/3147）、`GET /map-studio/tasks/1/runs`、`GET /map-studio/runs/1/observed`、`GET /map-studio/settings`、`GET /map-studio/model-options`；宿主图/faithful_source/语义更新见生产证据。新建地图沿用基础props接口，不能把此名单外的方法随整节标[R]。
-- **仍为 `[S]`**：`PUT /map-studio/tasks/:id`、advance（含skip）、rollback、cancel、PUT layer-doc、layer-doc/check与auto-layout、POST deliver（手动重投）、download、calls/messages分页、PUT settings、独立任务、全部阶段②/③闸门、Earth/image模块路线重验、交付出处写入research_citations。GET observed基础读回为[R]，其中阶段归属增强与完整消息翻页未因此升格。
+- **逐方法范围 `[R]`（生产 release `20261113T203319Z`/`20261113T222716Z`，drama21/ep28 props283/284 = task1/2、运行1–10）**：`POST /props/{p}/map-studio/open`（含复用）、`GET /map-studio/tasks`、`GET /map-studio/tasks/{1,2}`、`POST /map-studio/tasks/{id}/run {mode:"auto"}` 至 complete 交付、`GET /map-studio/tasks/{id}/runs`、`GET /map-studio/runs/{id}/observed`、`GET /map-studio/settings`、`GET /map-studio/model-options`；`search_dataset` 与 dataset/`ne-group` 引用、extent 硬闸与聚合拒收、`geometry_unverified` 阻断与人工 CAS 确认、人工几何编辑转 manual/confirmed、`outputs.layer_options` 平滑、`POST …/layer-doc/check`、服务器草稿作图（run 7–10 交付）、`POST …/rollback {stage:"brief"|"drawing"}`、`POST …/cancel`（run 6）、交付版本与 `research_citations`（props283/284 各10条）。新建地图仍沿用基础 props 接口，不属本名单。
+- **仍为 `[S]`**：`PUT /map-studio/tasks/:id`（生产确认用的 CAS PUT 已实测，但其它字段组合未验；故保守标 S——确认路径见精确度段）、advance 与 skip、`PUT …/layer-doc`、`layer-doc/auto-layout`、`POST …/deliver`（手动重投）、`download/*`、`calls/{id}/messages` 分页与 calls 阶段归属增强、`PUT settings`、独立任务、`map_spec` 其它编辑组合、Earth/image 模块路线、工具超时触发、`ne-group` 之外的组名歧义分支。
 
 注意：此处 `asset_type` 是 prop 的地图子类；`POST /tasks/register-upload` 的 `asset_type` 则是目标表类别，地图仍填写 `"prop"`，不能写 `"map"` 作为第四类目标。
 
@@ -334,7 +335,7 @@ Body：`{scope:"all"|"characters"|"scenes"|"props", episode_id?, rewrite_prompts
 **本节其余HTTP签名中的 `/tasks`、`/runs`、`/calls`、`/settings`、`/model-options` 一律先加 `/map-studio` 前缀**，再按目录§0拼HUOBAO_API；不是火宝同名任务接口。成功包裹 `{code:200,data,message}`（新建任务201），错误 `{code:400|404|409,error?,message,…}`；冲突带revision/run_id，图层文档非法带problems。下载例外，直接附件。
 
 - **`GET /tasks?host=&q=`**：`{tasks:[{id,title,host,host_ref,stage,status,updated_at,final_image:{path,width,height}|null}]}`，按更新时间倒序（默认最多 200 条）。`host=''` 只筛独立任务，`host=huobao` 筛宿主任务；`q` 是标题模糊匹配。`[R]`
-- **`GET /tasks/{id}`**（读取方法 `[R]`；下列阶段②/③新增字段及增强校验语义仍为 `[S]`，不因详情读过就算生产验证）：
+- **`GET /tasks/{id}`**（读取方法 `[R]`；`research.dataset_queries/extent/relations`、`verification`、`outputs.layer_options` 与 blocked 状态已在生产读到；`calls[].stage` 归属增强、未触发分支的语义仍 `[S]`，不因详情读过就算生产验证）：
   ```
   {task_id,title,
    host:{id,ref,target:{title,subtitle,return_path}|null,error}|null,
@@ -353,7 +354,7 @@ Body：`{scope:"all"|"characters"|"scenes"|"props", episode_id?, rewrite_prompts
 - **`research`**：`queries[{adapter,query,hits,error}]` 逐源记录（来源固定四个，不是模型自选任意网站）；`dataset_queries[{layer,query,bbox?,hits,refs[],error}]` 登记每次 `search_dataset`；`extent`、`relations[]`（含 `computed` 与 `message`）；`sources[]`（编号、机构、年代、许可、URL、实际摘录）；`features[]`（点线面、`category`、`origin`、`verification{status,reasons}`、`dataset_ref`、`relations`、`coordinate_basis`、`supporting_excerpt`、`source_ids`、`uncertainty`、`conflicts`）；`uncertainties/notes/searched_at`。URL 存在不等于它证明了某个坐标；无 key 的来源失败要如实呈报。
 - **`outputs.layer_doc`** 是被采用的图层文档，**`outputs.layer_options`** 是渲染期平滑参数（阶段③，可为空）。地名与标签由模型在 LayerDoc 里排；模型预览后自检遮挡与可读性，marker 点位必须贴合投影位置。
 - **界面与深链（`[S]`）**：工作室页 `/map-studio/<taskId>` 的阶段、运行、调用、图层编辑器、选中的几何要素与预览产物都进 URL（`msstage/msrun`、`mscall`、`mscf`、`mslayer/msround`、`mssel`、`msgeo`、`msview`，列表页 `msq/mshost/mscreate`）；只恢复界面，未保存的坐标与草稿不入 URL。失效目标给 `deeplink.missing` 提示。宿主页用 `asset=prop-<id>` 定位资产。
-#### `PUT /tasks/{id}`（需求、几何、平滑参数、模式的保存）`[S]`
+#### `PUT /tasks/{id}`（需求、几何、平滑参数、模式的保存）`[S/R]`（`map_spec` 人工确认路径 `[R]`；其余字段组合 `[S]`）
 
 Body：`{expected_revision?,brief?,map_spec?,layer_options?,mode?}`，至少一个可保存字段。顶层未传的字段保留，brief 内字段合并；**`map_spec` 一旦传入就是完整替换**，不是按 ID 合并。先 GET 完整 spec，仅修改获准的项，带当前 `expected_revision` 保存并读回核对；省略已有 places/routes/regions 会丢掉它们。人工确认项的保留承诺仅针对自动检索合并，不会拦住人有意删除。宿主任务的 `brief` 保存会经 `host.writeBrief` 写回 `props.map_brief`；brief 指纹变了会把阶段退回 `brief`、下游步骤标待执行，旧产出留在 `outputs` 与历史里，并留一条 `brief_changed` 提示。`mode` 只保存选择，不会自行启动。`layer_options` 见「图层编辑与平滑」。
 
@@ -371,22 +372,24 @@ Body：`{expected_revision?,brief?,map_spec?,layer_options?,mode?}`，至少一�
 
 - **`POST /tasks/{id}/run {mode:"auto"|"manual",expected_revision?,text_config_id?,image_config_id?,image_model?}`**：mode **必填**，不会默认 manual；继续当前 `stage`，不从 brief 重启。auto 连续到完成或阻断，manual 只执行当前一步。已完成返回 400 `already_completed`，在飞返回 409 `workflow_busy`。auto 跑通到宿主交付 `[R]`，manual `[S]`。
 - **`POST /tasks/{id}/advance {expected_revision?,text_config_id?,image_config_id?,image_model?,skip?}`** `[S]`：固定 manual，只有它支持 `skip:true`，且只跳过 style（其他阶段 400 `stage_not_skippable`）。
-- **`POST /tasks/{id}/rollback {stage,expected_revision?}`** `[S]`：按人的决定恢复目标阶段之前的快照（最近 30 条历史），保留确认几何与上游产物；回退 drawing 保留底纹。`history.stage` 是事件后阶段，`snapshot.stage` 才是快照阶段，不伪造历史。
-- **`POST /tasks/{id}/cancel {}`** `[S]`：按人的决定取消当前 active run，不接收 expected_revision；执行前读回当前 `run_id`，不是取消某个旧快照。已提交底纹仍可能完成并计费，取消不是退费。
+- **`POST /tasks/{id}/rollback {stage,expected_revision?}`** `[R]`：按人的决定恢复目标阶段之前的快照（最近 30 条历史），保留确认几何与上游产物；回退 drawing 保留底纹（生产回退过 `brief` 与 `drawing`）。`history.stage` 是事件后阶段，`snapshot.stage` 才是快照阶段，不伪造历史。
+- **`POST /tasks/{id}/cancel {}`** `[R]`：按人的决定取消当前 active run，不接收 expected_revision；执行前读回当前 `run_id`，不是取消某个旧快照。已提交底纹仍可能完成并计费，取消不是退费（生产 run6 卡住的 research 被人工取消，run 状态 cancelled）。
+- **工具墙钟超时 `[S]`（发布 `20261113T222716Z`，生产尚未触发）**：每个工具单次调用上限 180 秒（base 的 `render_base`/`submit_base` 放宽到 12 分钟）；超时只放弃该次调用，把原因作为结构化 error 回给模型，阶段不挂死（run6 曾有一个检索 34 分钟不返回）。研究来源 429 且 `retry-after`>15 秒时不在工具里干等，直接把限流原因回给模型换来源/稍后重试。超时/失败都不自动重发，不重复计费。
 - 启动返回详情中的模块 `task_id`、运行 `run_id`。用 **`GET /map-studio/tasks/{task_id}`** 读到终态；不要调火宝 `/tasks/{id}`（不同命名空间，id 可撞号）。重启时 processing run 标 `interrupted`，任务标 failed、原因「后端重启中断」，产物与阶段保留；不得假装仍在执行或盲目重投。
 - PUT mode 只保存选择；run 使用请求 mode；advance 固定 manual。显式人工 rollback/cancel/skip、改变路线/风格/示意模式、确认 proposed/待核验几何，以及 map→prop 降级都必须先有人的明确决定。模块模型在已授权运行内的 `request_rollback` 是有上限的内部自纠错，不是助手获准随意调用人工 rollback。
 
-#### 精确度闸门（阶段 ②，全部 `[S]`）
+#### 精确度闸门（阶段 ② `[R]`：task1 run2 extent 三轮失败；task1 run4、task2 run3 `geometry_unverified` 阻断）
 
-- **硬拒收**：非数字、经纬度越界、`(0,0)` 占位；`extent:[west,south,east,north]` 必填且合法（w<e、s<n）；全部要素（含已确认项）的全部顶点必须在 extent 的 2% 留边内。点在 extent 外、交换 lon/lat 后落在内则明确报「疑似经纬度互换」。代码不换轴、不自动裁剪；dataset 越界应由模型显式收紧 `dataset_ref.clip_bbox` 或调整 extent。
+- **硬拒收**：非数字、经纬度越界、`(0,0)` 占位；`extent:[west,south,east,north]` 必填且合法（w<e、s<n）；**全部要素（含已确认项）的全部顶点必须落在 extent 本身**——研究阶段不另加 2% 内缩留边（release `20261113T203319Z`；run2 曾因两层框卡死 3 轮）。点在 extent 外、交换 lon/lat 后落在内则单独报「疑似经纬度互换」。越界按要素聚合成一条消息（列出顶点数与经纬度范围），不逐顶点刷屏。代码不换轴、不自动裁剪；dataset 越界应由模型显式收紧 `dataset_ref.clip_bbox`（可直接设成 extent）或调整 extent。画面内 2% 留边只属于 base 取景门，不属于 research。
 - **自然要素** `river/lake/coast/mountain` 必须走 `geometry_source:"dataset"` 与 `dataset_ref:{ref,clip_bbox?}`，不得同时手写 points/lon/lat/parts。不存在/类别不符/裁剪后为空均整批拒收。确实找不到时 `dataset_missing:{queries:[],reason}` 必须引用本阶段成功查过、没有可采用同名候选的查询；检索异常不是零命中。合格缺失声明也只得到 `needs_user`，不是自动通过。
 - **软证据**：`relations:[{id,subject,object,relation,value_km?,tolerance_km?,excerpt,source_id}]` 的 excerpt 必须逐字支持于来源正文；subject/object 是可唯一定位的要素名。distance_km 偏差 > max(tolerance_km, 声明×30%, 5km)、方向相反、near_river 距离 > max(tolerance_km,15km) 会报 `relation_conflict`；near_river 的 object 必须是数据集河流。非 dataset 点 `|lon-lat|<0.25°` 报 `lon_lat_similar`。先回给模型改；用 `acknowledge:[{code,reason}]` 说明只能接受并保留冲突给人裁决，**不等于核验或人工确认**。
-- **verified 的依据**：数据集原始几何；非近似点的支持原文能解析出相差≤0.1°的经纬度；或与已 verified/confirmed 要素之间有逐字出处支持、计算一致的 relation。`well_known`/`approximate_schematic` 本身不算核验。落库保留 `origin:dataset|source|model|manual` 与 `verification.status:verified|unverified|conflict|needs_user|confirmed`、reasons。
-- **`geometry_unverified`**：research 结束发现仍待核验的 AI proposed 项时 `status=blocked`、research step `awaiting_review`，auto 停下。base/drawing/complete 开始和交付物构建再硬校验；不能用隐藏图层或 omitted 绕过。**人**在研究/几何 UI 逐项确认（去掉 proposed）、编辑或删除后，带 revision 保存完整 map_spec 才可继续；助手不得自行确认。
+- **verified 的依据**：数据集原始几何；非近似点的支持原文能解析出相差≤0.1°的经纬度；或与已 verified/confirmed 要素之间有逐字出处支持、计算一致的 relation。`well_known`/`approximate_schematic` 本身不算核验。落库保留 `origin:dataset|source|model|manual` 与 `verification.status:verified|unverified|conflict|needs_user|confirmed`、reasons。**模型提议的坐标仍可能错**（task1 第一次给喀什里克 68.9/58.2，非 verified），被阻断后由人改为 68.52048/58.14942（es.wikipedia Qashliq）；未核验或未人工确认的 AI 项进不了底图/成图。
+- **`geometry_unverified`**：research 结束发现仍待核验的 AI proposed 项时 `status=blocked`、research step `awaiting_review`，run 以 failed 收尾并逐条列出要素原因（task1 run4、task2 run3）。base/drawing/complete 开始和交付物构建再硬校验；不能用隐藏图层或 omitted 绕过。**人**在研究/几何 UI 逐项或全部确认（去掉 proposed）、编辑或删除后，带 revision 保存完整 `map_spec`（CAS `PUT /tasks/{id}`）才可继续；生产两任务都经此放行（task1→run7、task2→run5）。助手不得自行确认。
+- **人工几何编辑**：在编辑器里拖动/新增/插中点后保存，服务端把该要素转 `origin:"manual"`、去掉 `proposed`/`dataset_ref`、标 `confirmed`（task1 喀什里克为人工点；task2 手画顿河聚落带，8 个存储点含闭合副本、独立顶点 7 个）。确认/编辑都不是史实批准，只是允许进入出图。
 
-#### 数据集引用、河流与底图（阶段 ② `[S]`）
+#### 数据集引用、河流与底图（阶段 ② `[R]`：task2 run5、task1 run7/run10）
 
-- `search_dataset` 返回的 `ref` 才能采用：单要素 `ne:<文件简名>:<0基序号>`；整条河/湖组 `ne-group:<文件简名>:<组名>`（如 `ne-group:10m_rivers_lake_centerlines:volga`），不猜序号或组名。
+- `search_dataset` 返回的 `ref` 才能采用：单要素 `ne:<文件简名>:<0基序号>`；整条河/湖组 `ne-group:<文件简名>:<组名>`（如 `ne-group:10m_rivers_lake_centerlines:volga`），不猜序号或组名。**生产实例**：task2 用 `ne-group:10m_rivers_lake_centerlines:{dnipro,don,volga,kama}` 取第聂伯/顿/伏尔加/卡马，支流顿涅茨 `ne:10m_rivers_lake_centerlines:689`、奥卡 `ne:10m_rivers_lake_centerlines:690` 用单要素；task1 用 volga/kama/chusovaya 组 + 托博尔等单要素。同名裁剪分段保留 `(1/3)` 之类后缀，不能跨空白连线。
 - 组引用涵盖同名、同 rivernum 的 River + Lake Centerline 要素；端点相同或相距≤0.01°的链拼接，只追加原始顶点、不插新顶点。`group.members/member_classes/chains/shortest_chain_km/joined_parts/max_join_deg/stats_bbox` 报告成员、剩余断链与接受的接缝。仍不连通的链全部保留；链过碎应显式收紧 clip_bbox，不能静默删短链或跨空白桥接。
 - 抽取只保留原始顶点段（不造裁剪交点、不简化、不平滑）；MapSpec 不支持的多边形洞明确拒收，不填洞。断开的河段在 spec 中拆成同 id 前缀的独立 route。
 - program 底图与要素必须同源：regional/site 使用 10m 河流，overview 默认 50m；10m dataset_ref 强制选 10m。50m 高亮河道与 10m 底图混用会拒收，须明确换引用或粒度，不静默换源。
@@ -397,19 +400,19 @@ Body：`{expected_revision?,brief?,map_spec?,layer_options?,mode?}`，至少一�
 - Earth 必须 Clean（无 Google 现代标签/道路/边界），独立留出点最大残差≤3px、相机漂移≤0.25px；失败不得登记或改称 program 成功。129×129 控制网格、16384 留出中心；`provenance.registration.grid` 是换算真源，完整证据在 `earth.sidecar_path`，校准摘要/截图/KMZ 保留。旧 #84 Earth 验收不能冒充模块路线已重验（模块 Earth/image `[S]`）。
 - **style** 只生成纸张/底纹（1920×1080，提示词禁地图、文字、地理要素），不把真实地图/影像送扩散。默认35%、最高60% alpha。20分钟等待超时；同配置/主题续跑用运行 params 的不透明 `map_texture_ref` 认领 pending/completed 图片，不重复下单；原图失败或换图片配置/模型才另投并另计费。底图/成图本地渲染不计 GPU，实际底纹请求计 images；取消不保证上游图片停止。
 
-#### 图层编辑、检查、平滑与标签（阶段 ③ 全部 `[S]`）
+#### 图层编辑、检查、平滑与标签（check/平滑/底板 `[R]`；PUT layer-doc 与自动排版 `[S]`）
 
-- **`PUT /tasks/{id}/layer-doc {layer_doc,layer_options?,expected_revision?}`**：已有文档后才能保存（缺失 400 `missing_drawing`）；严格校验→同一渲染链→更新成图与文档→宿主直接交付/独立任务更新可下载物→completed。无模型调用、不计 AI 额度。非法 400 `layer_doc_invalid` + problems，运行中/修订冲突 409；base 不可替换，锚定几何非零 rotation 拒收。
-- **`POST /tasks/{id}/layer-doc/check {layer_doc,layer_options?}`** → `{problems}`。**`POST /tasks/{id}/layer-doc/auto-layout {layer_doc,layer_options?}`** → `{layer_doc,layer_options,unresolved,problems}`。两者只读，不存草稿、不渲染、不调用模型、不消耗轮次；auto-layout 的文档结构/平滑不可渲染时返回 400 layer_doc_invalid。返回文档必须显式 PUT 才保存。
-- 平滑独立存 `outputs.layer_options:{"<图层或要素id>":{"smooth":0..1}}`，不塞进 LayerDoc/style。向心 Catmull-Rom（α=.5）过全部控制点，面闭合、线端点不外推；只改渲染副本，存储点不变。模型/人工逐点线面默认1、dataset默认0。每段最大偏离≤max(6px,长边×.004,段长×.12)，超出 `smoothing_deviation`，必须明确调低/关闭，代码不自动减强度。semantics 取实际渲染曲线；editable_source 同带控制点与 layer_options。
-- 五个标签硬门：`label_overflow`（同 SVG 字体模型的文本/box溢出）、`label_overlap`、`label_marker_overlap`、`label_out_of_frame`（含1%安全边）、`label_far_from_feature`（距锚定点/线/面超过画面对角线6%）。drawing/人工保存/最终交付同口径，marker旁注与card也检查。
+- **`PUT /tasks/{id}/layer-doc {layer_doc,layer_options?,expected_revision?}`** `[S]`：已有文档后才能保存（缺失 400 `missing_drawing`）；严格校验→同一渲染链→更新成图与文档→宿主直接交付/独立任务更新可下载物→completed。无模型调用、不计 AI 额度。非法 400 `layer_doc_invalid` + problems，运行中/修订冲突 409；base 不可替换，锚定几何非零 rotation 拒收。
+- **`POST /tasks/{id}/layer-doc/check {layer_doc,layer_options?}`** `[R]` → `{problems}`（生产检查版本3226文档得12条底板遮挡问题，两任务最终文档0条）。**`POST /tasks/{id}/layer-doc/auto-layout {layer_doc,layer_options?}`** `[S]` → `{layer_doc,layer_options,unresolved,problems}`。两者只读，不存草稿、不渲染、不调用模型、不消耗轮次；auto-layout 的文档结构/平滑不可渲染时返回 400 layer_doc_invalid。返回文档必须显式 PUT 才保存。
+- 平滑 `[R]`（task2 人工圈定面带 `smooth:1`，版本3226/3237；task1 示意路线 `smooth:1`）独立存 `outputs.layer_options:{"<图层或要素id>":{"smooth":0..1}}`，不塞进 LayerDoc/style。向心 Catmull-Rom（α=.5）过全部控制点，面闭合、线端点不外推；只改渲染副本，存储点不变。模型/人工逐点线面默认1、dataset默认0。每段最大偏离≤max(6px,长边×.004,段长×.12)，超出 `smoothing_deviation`，必须明确调低/关闭，代码不自动减强度。semantics 取实际渲染曲线；editable_source 同带控制点与 layer_options。
+- 标签门：`label_overflow`（同 SVG 字体模型的文本/box溢出）、`label_overlap`、`label_marker_overlap`、`label_out_of_frame`（含1%安全边）、`label_far_from_feature`（距锚定点/线/面超过画面对角线6%）为 `[S]`（生产未逐条触发）；drawing/人工保存/最终交付同口径，marker旁注与card也检查。**底板遮挡 `[R]`**（生产版本3226：图例底板压住「基辅」与第聂伯河，task2 run9 重画后通过）：带底板的label（bg_opacity>0）与card若绘制在其它文字、点标记或外要素线之上，同样以 `label_overlap`/`label_marker_overlap` 拒收；图例条目画在底板之上、自己要素的线在自己标签底板下不算。
 - 自动避让只换可移动锚定标签的位置：点八方候选、线最长段旁、面内部候选；标题/card/锁定标签不动、不删除、不缩字。`unresolved` 不等于成功，须设计后重新检查并开图。另有底图可见性硬门：有效不透明度≥.5的 polygon 合计不得覆盖画面30%以上；边框用无填充面或线。
 
 #### 交付、宿主版本与下载
 
 - complete 构建同一不可变交付物：final_image（path/尺寸/sha256）、base_image（mode/provenance）、texture_image、像素 semantics、features（origin/verification/relations/dataset_ref/category/proposed/出处）、sources、KMZ、editable_source（version/map_spec/layer_doc/layer_options）。核验、平滑、标签门未过不能交付。
-- 宿主事务登记两条版本：底图 `provider:"map-render",model:"map-studio-base"`；成图 `provider:"map-workflow",model:"map-layer-doc"`（人工 `map-layer-doc-manual`）。**map-workflow只是保留的provider标识，不代表旧工作流路由仍在使用**；两者params.source='map-studio'且带map_studio_task_id，成图另有png_sha256/base_task_id/geometry/features/sources/kmz/editable_source/texture_image/manual_edit。事务更新props当前图/路径、faithful=1、faithful_source=底图版本id与normalizeSemantics（image.source_task_id=成图版本id）。这是派生图，不得称未改动原件；自动交付[R]仅版本3146/3147。
-- **出处同步 `[S]`**：交付 sources 写入 `research_citations`（asset_kind=prop、tool=`map-studio`），资产「资料来源」面板可读；同资产同 URL+标题不重复，完整来源仍在成图 params.sources。只存公开出处，不存研究 key。
+- 宿主事务登记两条版本：底图 `provider:"map-render",model:"map-studio-base"`；成图 `provider:"map-workflow",model:"map-layer-doc"`（人工 `map-layer-doc-manual`）。**map-workflow只是保留的provider标识，不代表旧工作流路由仍在使用**；两者params.source='map-studio'且带map_studio_task_id，成图另有png_sha256/base_task_id/geometry/features/sources/kmz/editable_source/texture_image/manual_edit。事务更新props当前图/路径、faithful=1、faithful_source=底图版本id与normalizeSemantics（image.source_task_id=成图版本id）。这是派生图，不得称未改动原件。**生产自动交付 `[R]` 六对版本**：283→3146/3147、3218/3219、3238/3239；284→3192/3193、3225/3226、3236/3237。
+- **出处同步 `[R]`**：交付 sources 写入 `research_citations`（asset_kind=prop、tool=`map-studio`），资产「资料来源」面板可读；生产 props 283/284 各 10 行。同资产同 URL+标题不重复，完整来源仍在成图 params.sources。只存公开出处，不存研究 key。
 - **`POST /tasks/{id}/deliver {}`** `[S]` → `{delivered:true,version_ids[],message,deliveries[]}`。只对宿主任务（独立任务400 `standalone_task`），须 stage=complete（否则 `delivery_not_ready`）、无在飞运行；相同任务+PNG sha256 幂等返回既有版本、不重复插行。
 - **`POST /tasks {title,brief?}`** `[S]` 新建独立任务，201详情；host=null，不创建火宝道具/版本。complete 提供下载。
 - **`GET /tasks/{id}/download/{kind}`** `[S]`：kind=`final|kmz|semantics|source`，直接附件（PNG/KMZ/JSON，**无成功 JSON 包裹**）；先构建并校验交付物，缺绘制可能 `missing_drawing`，文件不可用 `download_unavailable`。source含可编辑工程，semantics含像素点线面，不能把下载回执当开图验收。预览图片用 outputs.path 按媒体 URL 规则拼。
@@ -428,13 +431,13 @@ Body：`{expected_revision?,brief?,map_spec?,layer_options?,mode?}`，至少一�
 
 #### 调用量、错误与验收
 
-brief 1–3次文本；research/base/drawing各为多步工具循环（步数上限40/24/60，每步文本，另有read_image视觉调用），交付最多3轮，回退重跑目标阶段；style一次图片（失败另投另计）。按调用行与实际底纹任务计费，不能按工作室容器数量记账。显式text_config_id钉选，manual分阶段核账；先授权、预留预算再run。
+brief 1–3次文本；research/base/drawing各为多步工具循环（步数上限40/24/60，每步文本，另有read_image视觉调用），交付最多3轮，回退重跑目标阶段；style一次图片（失败另投另计）。工具单次墙钟上限180秒（base渲染/交付12分钟）；超时不算一次交付、自动回给模型，不能因此重复计费或声称阶段已跑完。按调用行与实际底纹任务计费，不能按工作室容器数量记账。显式text_config_id钉选，manual分阶段核账；先授权、预留预算再run。
 
 409 `revision_conflict|workflow_busy`：保留草稿、重读、由人决定合并，不无限重试。400 `geometry_unverified` / `layer_doc_invalid` / `drawing_invalid`：按逐项原因处置，不删门槛。关键需求/证据缺失阻断，单源失败/无命中可保留告警，不能把检索失败称为完成考证。
 
 complete只是技术交付，不是人批准史实/许可。manual在complete前开final，auto完成后立即开base/final，记录真实路径与SHA256，核对研究证据、图例文字、配准与标签；人工最终审核不能被completed替代。
 
-**正例**：获准地图与预算→新建map→open工作室→PUT需求→manual检索→读来源/数据集/关系与agent.attempts→geometry_unverified时交人逐项裁决→模型取景→只生成底纹→服务器草稿作图→标签/平滑门通过并开图→complete宿主交付→读回版本/语义/出处→交人审核。**反例**：调用已下线的旧入口；把acknowledge当人工确认；手描河流冒充数据集；桥接断链/自动裁点；放宽Earth门槛；把未核验几何隐藏后交付；上传真实地图后调普通generate-image；把completed当史实或版权通过。
+**正例**：获准地图与预算→新建map→open工作室→PUT需求→manual检索→读来源/数据集/关系与agent.attempts→geometry_unverified时交人逐项裁决→模型取景→只生成底纹→服务器草稿作图→标签/平滑门通过并开图→complete宿主交付→读回版本/语义/出处→交人审核。**反例**：调用已下线的旧入口；把acknowledge当人工确认；手描河流冒充数据集；桥接断链/自动裁点；把研究阶段的2%画面留边套到extent（会把恰好贴边的clip_bbox判越界）；以为AI提议坐标已核验、跳过人工确认直接出图；放宽Earth门槛；把未核验几何隐藏后交付；上传真实地图后调普通generate-image；把completed当史实或版权通过。
 
 ---
 

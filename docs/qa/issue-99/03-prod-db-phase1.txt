@@ -1,0 +1,62 @@
+[
+  {
+    id: 283,
+    drama_id: 21,
+    image_url: 'static/map-drawings/be7662303b7fcca53791d19b438d7196.png',
+    faithful: 1,
+    faithful_source: 3146,
+    map_studio_task_id: 1,
+    sl: 1770,
+    mb: 1
+  },
+  {
+    id: 284,
+    drama_id: 21,
+    image_url: null,
+    faithful: 0,
+    faithful_source: null,
+    map_studio_task_id: 2,
+    sl: null,
+    mb: 0
+  }
+]
+[
+  {
+    id: 3146,
+    prop_id: 283,
+    provider: 'map-render',
+    model: 'map-studio-base',
+    status: 'completed',
+    local_path: 'static/map-bases/d1c62eb2367a756c7a0d4327cccccfe0.png',
+    mt: 1
+  },
+  {
+    id: 3147,
+    prop_id: 283,
+    provider: 'map-workflow',
+    model: 'map-layer-doc',
+    status: 'completed',
+    local_path: 'static/map-drawings/be7662303b7fcca53791d19b438d7196.png',
+    mt: 1
+  }
+]
+[
+  {
+    id: 1,
+    task_id: 1,
+    status: 'completed',
+    stage: 'complete',
+    created_at: '2026-11-13T15:02:21.124Z',
+    finished_at: '2026-11-13T16:19:50.786Z'
+  }
+]
+[
+  {
+    id: 1,
+    task_id: 1,
+    host_ref: 'prop:283',
+    final_sha256: 'be7662303b7fcca53791d19b438d7196d239a1f269860834294edf0e01541a4d',
+    created_at: '2026-11-13T16:19:50.774Z'
+  }
+]
+[ { scope: 'map_studio', works: 1, calls: 55 } ]
