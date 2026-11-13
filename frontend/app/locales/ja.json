@@ -4001,6 +4001,9 @@
       "pointCount": "{n} 点",
       "proposed": "AI 候補",
       "accept": "採用",
+      "datasetBadge": "データセットのジオメトリ",
+      "datasetEditWarning": "このジオメトリはデータセット由来です。変更すると人手のジオメトリ（確認済み）になり、データセット参照が外れます。",
+      "manualReason": "人手で追加または編集",
       "remove": "削除"
     },
     "results": {
@@ -4146,6 +4149,73 @@
       "featureCounts": "点 {places} / 線 {routes} / 面 {regions}",
       "layers": "編集可能なレイヤー"
     },
+    "researchPanel": {
+      "title": "要素の出典と検証",
+      "hint": "項目は現在の map_spec から取得します：出典バッジ、検証状態、理由、相対位置の根拠。「確認」は AI 候補フラグを外して CAS で保存するだけで、通過判定はサーバーが行います。",
+      "pick": "選択",
+      "name": "要素",
+      "category": "分類",
+      "origin": "出典",
+      "verification": "検証",
+      "evidence": "理由 / データセット参照",
+      "unknownValue": "未記録",
+      "noEvidence": "なし",
+      "datasetRef": "データセット {ref}",
+      "noFeatures": "現在のジオメトリに要素はありません。",
+      "extent": "研究範囲（西/南/東/北）",
+      "datasetQueries": "データセット検索数",
+      "unverifiedTitle": "{n} 件の要素のジオメトリが未検証または未確認です",
+      "unverifiedHint": "描画前に各項目を確認するか、ジオメトリ編集で人手の形状に変えてください。判定はサーバー側で、「確認」は AI 候補フラグを外すだけです。",
+      "confirmSelected": "選択を確認（{n}）",
+      "confirmAll": "すべて確認",
+      "confirmed": "{n} 件を確認しました。最終的な検証結果はサーバーが決めます",
+      "relationsTitle": "相対位置の根拠（{n}）",
+      "noRelations": "今回の提出に相対位置の根拠はありません。",
+      "relationSubject": "言明",
+      "relationKind": "関係",
+      "declared": "宣言値",
+      "computed": "座標からの計算値",
+      "consistency": "整合性",
+      "excerpt": "出典原文",
+      "notComputed": "未計算",
+      "km": "{km} km",
+      "tolerance": "±{km} km",
+      "directionConsistent": "方位一致",
+      "directionOpposite": "方位相反",
+      "consistent": "一致",
+      "inconsistent": "矛盾",
+      "originLabel": {
+        "dataset": "データセット",
+        "source": "出典本文",
+        "model": "モデル推定",
+        "manual": "人手"
+      },
+      "statusLabel": {
+        "verified": "検証済み",
+        "unverified": "未確認",
+        "conflict": "矛盾",
+        "needs_user": "人による判断が必要",
+        "confirmed": "確認済み"
+      },
+      "categoryLabel": {
+        "river": "河川",
+        "lake": "湖",
+        "coast": "海岸",
+        "mountain": "山地",
+        "settlement": "集落",
+        "route": "ルート",
+        "territory": "領域",
+        "other": "その他"
+      },
+      "relationLabel": {
+        "distance_km": "距離",
+        "east_of": "東側",
+        "west_of": "西側",
+        "north_of": "北側",
+        "south_of": "南側",
+        "near_river": "河川に近い"
+      }
+    },
     "settings": {
       "title": "スタジオ設定",
       "hint": "Huobao の資料検索とは独立した地図スタジオ専用設定です。",
@@ -4197,6 +4267,9 @@
       "callTarget": "モデル呼出",
       "loadFailed": "プロセスを読み込めません",
       "durationZero": "0 ms",
+      "stageAll": "全ステージ",
+      "stageNone": "ステージ未帰属",
+      "stageFilterEmpty": "読み込み済みの呼び出しにこのステージの記録はありません。「さらに読み込む」か全ステージに切り替えてください。",
       "runStatus": {
         "processing": "実行中",
         "completed": "完了",

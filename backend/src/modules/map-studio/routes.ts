@@ -10,6 +10,7 @@ import { loadTask, parseWorkflow, serializeDetail, runView, MapStudioConflictErr
 import { startMapWorkflow, advanceMapWorkflow, rollbackMapWorkflow, saveMapWorkflowDraft, cancelMapWorkflow, saveMapLayerDoc, MapLayerDocInvalidError } from './run.js'
 import { MapWorkflowValidationError, MAP_WORKFLOW_STAGES, type MapWorkflowStage } from './types.js'
 import { MapSpecValidationError } from './geo/base-render.js'
+import { readStageSpans, stageForCallInSpans } from './stage-spans.js'
 import { createStandaloneTask } from './tasks.js'
 import { buildDeliverable, deliverCurrent } from './delivery.js'
 import { RESEARCH_KEY_IDS, researchKeyStatus, readModels, writeModels, setResearchKey } from './settings.js'
@@ -131,7 +132,10 @@ app.get('/runs/:id/observed', c => {
   const cc = optionalNumber(c.req.query('call_cursor') ?? c.req.query('cursor'), 'cursor') ?? 0
   const pendingWorks = listObservedWork(run.id, 'map_studio').filter(w => w.id > wc)
   const works = pendingWorks.slice(0, limit)
-  const calls = listObservedCalls(run.id, { scope: 'map_studio', afterId: cc, limit })
+  const rawCalls = listObservedCalls(run.id, { scope: 'map_studio', afterId: cc, limit })
+  // 阶段归属是纯包含判定：跨度读一次，逐条调用对齐；没有跨度覆盖就是 null（不按阶段顺序猜）
+  const spans = readStageSpans(run.id)
+  const calls = rawCalls.map(call => ({ ...call, stage: stageForCallInSpans(spans, call.started_at) }))
   const hasMoreCalls = calls.length > 0 && listObservedCalls(run.id, { scope: 'map_studio', afterId: calls[calls.length - 1]!.id, limit: 1 }).length > 0
   const hasMoreWorks = pendingWorks.length > works.length
   return success(c, { run: runSummary(run), works, calls, next_work_cursor: hasMoreWorks ? works[works.length - 1]!.id : null, next_call_cursor: hasMoreCalls ? calls[calls.length - 1]!.id : null, has_more_works: hasMoreWorks, has_more_calls: hasMoreCalls })

@@ -18,12 +18,16 @@ description: 地图工作流·标注绘制阶段 — 用 LayerDoc 矢量图层�
 
 ## 交付标准
 
-- 每个要素都要有**一个**锚定的几何图层：`anchor.semantic_id` 等于要素 id。图层类型按要素类型对应：place 用 `marker`，route 用 `polyline`，region 用 `polygon`。
+- 每个未在工具参数 `omitted` 中说明的要素都要有**一个**锚定几何图层：`anchor.semantic_id` 等于要素 id。类型对应 place→marker、route→polyline、region→polygon。`omitted` 是 render_layer_doc/submit_layer_doc 的独立参数，不是 LayerDoc 顶层字段。
 - **底图必须看得见**：有效不透明度（`opacity × fill_opacity`）≥0.5 的 polygon 合计不能盖住超过 30% 的画面。画框或边框请用 polyline，或者把 polygon 的 `fill_opacity` 设为 0、只保留描边；不然 polygon 会被填成实心，把整张底图盖掉。
-- 几何位置必须与要素的投影位置一致：直接使用提示里给出的归一化坐标，或者用 `geo_to_pixel` 换算。路线可以加点让线更平滑，但每个点都要贴着要素的走向。
+- 几何必须贴合要素的投影位置：使用提示中的归一化坐标或 geo_to_pixel 换算；数据集路线不得平滑、偏移或桥接断段。图层顶点可在投影容差内表达已有走向，但不能修改存储的数据集原始顶点。
 - 确实不画某个要素时，在 `omitted` 里写 `{feature_id, reason}`，说明理由。
 - 文字标签用 `label` 图层，可以锚定到同一要素（`anchor.semantic_id` 写要素 id）。标签不算几何图层。
 - `base` 原样使用提示里给的骨架（`path`、`width`、`height`、`source_width`、`source_height`），不能改。
+- `label_overflow` 是严格拒收项，预览交付和人工保存同口径。宽字=1em、空格=0.33em、其它=0.55em，行高=1.35em；label 有底板时四周留 0.3em。按实际宽度换行后，所需行数/高度不得超过 box，box（含旋转）不得越出画面。card 使用固定模板的字号和行位置，长标题不能横向穿出底板。错误会说明图层 id、需要的行数/高度与 box 高度；你必须调整 box、字号或内容，代码不会自动缩字或截断。
+- 例：50字标题塞进 `box.w=0.2,box.h=0.03,size=0.03` 会被拒收；扩大标题底板并合理安排字号后重新预览。不要忽略错误、删校验或把标题隐藏来交付。
+- 数据集不连通的河段已拆成同 id 前缀的多条路线，每段各用一个对应 id 的 polyline，不能拿跨空白的直线把它们硬接起来；存储的原始地理顶点不做平滑。
+- `geometry_unverified` 在开始 drawing 和交付时再次检查；若出现待确认几何，用户应先在研究面板确认（去掉 proposed）、编辑或删除。不能通过隐藏图层或 omitted 绕过核验。
 
 ## LayerDoc 格式（严格：写全字段、取值合法、不写多余字段）
 

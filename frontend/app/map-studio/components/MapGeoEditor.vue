@@ -45,7 +45,7 @@
         <g v-for="region in regionShapes" :key="`rg-${region.id}`">
           <polygon
             :points="region.attr"
-            :class="['geo-region', { 'is-active': selected?.kind === 'region' && selected.id === region.id }]"
+            :class="['geo-region', { 'is-active': selected?.kind === 'region' && selected.id === region.id, 'is-dataset': region.dataset }]"
             :stroke-width="unit * 1.2"
           ><title>{{ region.name }}</title></polygon>
           <circle
@@ -64,7 +64,7 @@
         <g v-for="route in routeShapes" :key="`rt-${route.id}`">
           <polyline
             :points="route.attr"
-            :class="['geo-route', { 'is-active': selected?.kind === 'route' && selected.id === route.id }]"
+            :class="['geo-route', { 'is-active': selected?.kind === 'route' && selected.id === route.id, 'is-dataset': route.dataset }]"
             :stroke-width="unit * 1.8"
           ><title>{{ route.name }}</title></polyline>
           <circle
@@ -85,7 +85,7 @@
             :cx="place.at[0]"
             :cy="place.at[1]"
             :r="unit * 3"
-            :class="['geo-place', { 'is-active': selected?.kind === 'place' && selected.id === place.id, 'is-proposed': place.proposed }]"
+            :class="['geo-place', { 'is-active': selected?.kind === 'place' && selected.id === place.id, 'is-proposed': place.proposed, 'is-dataset': place.dataset }]"
             @pointerdown.stop="startDrag('place', place.id, 0, $event)"
           ><title>{{ place.name }}</title></circle>
           <text v-if="selected?.kind === 'place' && selected.id === place.id" :x="place.at[0] + unit * 4" :y="place.at[1] + unit * 3" :font-size="unit * 4" class="geo-text">{{ place.name }}</text>
@@ -123,6 +123,7 @@
             <label class="geo-num"><span>{{ t('mapStudio.editor.lat') }}</span>
               <input class="input" type="number" step="0.0001" :value="place.lat" :disabled="disabled" @input="setPlaceCoord(index, 'lat', $event)" />
             </label>
+            <span v-if="place.origin === 'dataset'" class="geo-lock"><Lock :size="10" />{{ t('mapStudio.editor.datasetBadge') }}</span>
             <span v-if="place.proposed" class="geo-badge">{{ t('mapStudio.editor.proposed') }}</span>
             <button v-if="place.proposed" type="button" class="geo-tool" :disabled="disabled" @click.stop="accept('place', index)">{{ t('mapStudio.editor.accept') }}</button>
             <button type="button" class="geo-del" :disabled="disabled" :aria-label="t('mapStudio.editor.remove')" @click.stop="removeFeature('place', index)">
@@ -148,6 +149,7 @@
           >
             <input class="input geo-name" :value="shape.name" :disabled="disabled" :placeholder="t('mapStudio.editor.name')" @input="setName(section.kind, index, $event)" />
             <span class="geo-count">{{ t('mapStudio.editor.pointCount', { n: vertexCount(section.kind, shape.points) }) }}</span>
+            <span v-if="shape.origin === 'dataset'" class="geo-lock"><Lock :size="10" />{{ t('mapStudio.editor.datasetBadge') }}</span>
             <span v-if="shape.proposed" class="geo-badge">{{ t('mapStudio.editor.proposed') }}</span>
             <button v-if="shape.proposed" type="button" class="geo-tool" :disabled="disabled" @click.stop="accept(section.kind, index)">{{ t('mapStudio.editor.accept') }}</button>
             <button type="button" class="geo-tool" :disabled="disabled || !registration" @click.stop="continueShape(section.kind, shape.id)">{{ t('mapStudio.editor.continueShape') }}</button>
@@ -169,11 +171,11 @@
  * registration 反投影成经纬度再写回 spec，所以换底图（程序投影 / Earth 相机 / 外部标定图）后同一份几何仍然对得上。
  * 没有 registration 就只允许按数值编辑，绝不按 bbox 线性猜一个像素映射。
  */
-import { X } from 'lucide-vue-next'
+import { Lock, X } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { DEEPLINK_KEYS, useDeeplink } from '~/composables/useQuerySync'
-import type { MapRegion, MapRoute, MapSpec } from '~/map-studio/api'
+import type { MapFeatureMetadata, MapPlace, MapRegion, MapRoute, MapSpec } from '~/map-studio/api'
 import { geoToPixel, pixelToGeo, registrationSummary, type MapRegistration } from '~/map-studio/utils/mapRegistration'
 import { mediaUrl } from '~/utils/url'
 
@@ -253,7 +255,7 @@ function pixelOf(lon: number, lat: number): [number, number] | null {
 
 const placeShapes = computed(() => props.spec.places.flatMap((place) => {
   const at = pixelOf(place.lon, place.lat)
-  return at ? [{ id: place.id, name: place.name, at, proposed: !!place.proposed }] : []
+  return at ? [{ id: place.id, name: place.name, at, proposed: !!place.proposed, dataset: place.origin === 'dataset' }] : []
 }))
 
 function vertexCount(kind: LinearKind, points: Array<[number, number]>): number {
@@ -270,7 +272,7 @@ function shapesOf(list: Array<MapRoute | MapRegion>, kind: LinearKind) {
       const pixel = pixelOf(point[0], point[1])
       if (pixel) pixels.push(pixel)
     }
-    return { id: shape.id, name: shape.name, pixels, attr: pixels.map(pt => `${pt[0]},${pt[1]}`).join(' ') }
+    return { id: shape.id, name: shape.name, pixels, attr: pixels.map(pt => `${pt[0]},${pt[1]}`).join(' '), dataset: shape.origin === 'dataset' }
   }).filter(shape => shape.pixels.length >= 2)
 }
 
@@ -308,12 +310,61 @@ function newId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
 }
 
+/** 逐字保留阶段 ② 元数据：编辑器只动几何，未触碰的 category / relations / 数据集引用不能被顺手清掉 */
+function cloneMetadata<T extends MapFeatureMetadata & { proposed?: boolean }>(item: T): T {
+  const copy: T = { ...item }
+  if (item.verification) copy.verification = { status: item.verification.status, reasons: [...item.verification.reasons] }
+  if (item.dataset_ref) {
+    copy.dataset_ref = {
+      ref: item.dataset_ref.ref,
+      ...(item.dataset_ref.clip_bbox ? { clip_bbox: [...item.dataset_ref.clip_bbox] as [number, number, number, number] } : {}),
+    }
+  }
+  if (item.relations) copy.relations = [...item.relations]
+  return copy
+}
+
 function cloneSpec(): MapSpec {
   return {
     ...props.spec,
-    places: props.spec.places.map(place => ({ ...place })),
-    routes: props.spec.routes.map(route => ({ ...route, points: route.points.map(pt => [pt[0], pt[1]] as [number, number]) })),
-    regions: props.spec.regions.map(region => ({ ...region, points: region.points.map(pt => [pt[0], pt[1]] as [number, number]) })),
+    places: props.spec.places.map(place => cloneMetadata(place)),
+    routes: props.spec.routes.map(route => ({ ...cloneMetadata(route), points: route.points.map(pt => [pt[0], pt[1]] as [number, number]) })),
+    regions: props.spec.regions.map(region => ({ ...cloneMetadata(region), points: region.points.map(pt => [pt[0], pt[1]] as [number, number]) })),
+  }
+}
+
+/** 数据集几何被人工改动后不再是数据集原值：转 manual + confirmed 并去掉 dataset_ref，其余元数据原样保留 */
+function markManual(item: MapFeatureMetadata & { id: string, proposed?: boolean }, kind: FeatureKind): boolean {
+  if (item.origin !== 'dataset') return false
+  item.origin = 'manual'
+  delete item.proposed
+  delete item.dataset_ref
+  item.verification = { status: 'confirmed', reasons: [t('mapStudio.editor.manualReason')] }
+  warnDatasetEdit(kind, item.id)
+  return true
+}
+
+/**
+ * 一次拖拽里连续多次改写只提示一次；离散动作（提交草稿 / 删点 / 改数值）结束后解除，
+ * 下一次改动仍会得到提示。
+ */
+let lastDatasetWarnKey = ''
+function warnDatasetEdit(kind: FeatureKind, id: string) {
+  const key = `${kind}:${id}`
+  if (lastDatasetWarnKey === key) return
+  lastDatasetWarnKey = key
+  toast.warning(t('mapStudio.editor.datasetEditWarning'))
+}
+function resetDatasetWarn() {
+  lastDatasetWarnKey = ''
+}
+
+/** 人工新增的条目一开始就是「人工 + 已确认」，不留在 AI 候选状态 */
+function manualEntry<T extends { id: string }>(entry: T): T & MapFeatureMetadata {
+  return {
+    ...entry,
+    origin: 'manual' as const,
+    verification: { status: 'confirmed' as const, reasons: [t('mapStudio.editor.manualReason')] },
   }
 }
 
@@ -359,7 +410,7 @@ function onStagePointerDown(event: PointerEvent) {
   if (!geo) return
   if (mode.value === 'place') {
     const next = cloneSpec()
-    const place = { id: newId('place'), name: '', lon: Number(geo[0].toFixed(5)), lat: Number(geo[1].toFixed(5)) }
+    const place = manualEntry<MapPlace>({ id: newId('place'), name: '', lon: Number(geo[0].toFixed(5)), lat: Number(geo[1].toFixed(5)) })
     next.places.push(place)
     selected.value = { kind: 'place', id: place.id }
     emit('update', next)
@@ -375,19 +426,25 @@ function commitDraft() {
   const next = cloneSpec()
   const list = current.kind === 'route' ? next.routes : next.regions
   const existing = current.id ? list.find(item => item.id === current.id) : null
-  if (existing) existing.points = current.points
-  else {
-    const shape = { id: newId(current.kind), name: '', points: current.points }
+  if (existing) {
+    // 只重画了同样的顶点不算改动：数据集要素不该因为「点了继续编辑又原样收尾」被降级成人工几何
+    const changed = JSON.stringify(existing.points) !== JSON.stringify(current.points)
+    existing.points = current.points
+    if (changed) markManual(existing, current.kind)
+  } else {
+    const shape = manualEntry({ id: newId(current.kind), name: '', points: current.points })
     list.push(shape)
     selected.value = { kind: current.kind, id: shape.id }
   }
   draft.value = null
   mode.value = 'select'
   emit('update', next)
+  resetDatasetWarn()
 }
 
 function startDrag(kind: FeatureKind, id: string, index: number, event: PointerEvent) {
   if (props.disabled || mode.value !== 'select') return
+  resetDatasetWarn()
   selected.value = { kind, id }
   dragging.value = { kind, id, index }
   const target = event.target
@@ -404,14 +461,16 @@ function onPointerMove(event: PointerEvent) {
   const lat = Number(geo[1].toFixed(5))
   if (drag.kind === 'place') {
     const place = next.places.find(item => item.id === drag.id)
-    if (!place) return
+    if (!place || (place.lon === lon && place.lat === lat)) return
     place.lon = lon
     place.lat = lat
+    markManual(place, 'place')
   } else {
     const list = drag.kind === 'route' ? next.routes : next.regions
     const shape = list.find(item => item.id === drag.id)
     const point = shape?.points[drag.index]
     if (!shape || !point) return
+    if (point[0] === lon && point[1] === lat) return
     const closed = drag.kind === 'region' && vertexCount('region', shape.points) < shape.points.length
     point[0] = lon
     point[1] = lat
@@ -420,6 +479,7 @@ function onPointerMove(event: PointerEvent) {
       last[0] = lon
       last[1] = lat
     }
+    markManual(shape, drag.kind)
   }
   emit('update', next)
 }
@@ -443,7 +503,9 @@ function removeVertex(kind: LinearKind, id: string, index: number) {
     last[0] = first[0]
     last[1] = first[1]
   }
+  markManual(shape, kind)
   emit('update', next)
+  resetDatasetWarn()
 }
 
 function removeFeature(kind: FeatureKind, index: number) {
@@ -481,9 +543,11 @@ function setPlaceCoord(index: number, axis: 'lon' | 'lat', event: Event) {
   if (!Number.isFinite(value)) return
   const next = cloneSpec()
   const place = next.places[index]
-  if (!place) return
+  if (!place || place[axis] === value) return
   place[axis] = value
+  markManual(place, 'place')
   emit('update', next)
+  resetDatasetWarn()
 }
 </script>
 
@@ -533,10 +597,13 @@ function setPlaceCoord(index: number, axis: 'lon' | 'lat', event: Event) {
 .geo-overlay { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
 .geo-region { fill: var(--accent-text); fill-opacity: 0.14; stroke: var(--accent-text); }
 .geo-region.is-active { fill-opacity: 0.26; }
+.geo-region.is-dataset { fill: #8d7bd8; fill-opacity: 0.16; stroke: #8d7bd8; stroke-dasharray: 5 3; }
 .geo-route { fill: none; stroke: #e2703a; stroke-linecap: round; stroke-linejoin: round; }
 .geo-route.is-active { stroke: var(--accent-text); }
+.geo-route.is-dataset { stroke: #8d7bd8; stroke-dasharray: 6 3; }
 .geo-place { fill: #4fc3f7; cursor: grab; }
 .geo-place.is-proposed { fill: #ffb74d; }
+.geo-place.is-dataset { fill: #8d7bd8; stroke: var(--surface); stroke-width: 1.2; stroke-dasharray: 2.5 2; }
 .geo-place.is-active { stroke: var(--text-1); stroke-width: 1.5; }
 .geo-vertex { fill: var(--surface); stroke: var(--text-1); stroke-width: 1; cursor: grab; }
 .geo-draft { fill: none; stroke: var(--accent-text); stroke-dasharray: 6 4; }
@@ -567,6 +634,16 @@ function setPlaceCoord(index: number, axis: 'lon' | 'lat', event: Event) {
 .geo-num { display: inline-flex; align-items: center; gap: 3px; }
 .geo-num .input { width: 92px; }
 .geo-count { color: var(--text-2); }
+.geo-lock {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  color: var(--text-2);
+  font-weight: 600;
+}
 .geo-badge {
   padding: 1px 6px;
   border-radius: 999px;

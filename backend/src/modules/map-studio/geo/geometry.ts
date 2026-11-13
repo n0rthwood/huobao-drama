@@ -24,6 +24,8 @@ import {
   MapSpecValidationError,
   mapProjectionFor,
   renderMapBase,
+  resolveRiverSource,
+  type MapRiverSourceInfo,
   type MapContextCoverage,
   type MapSpec,
 } from './base-render.js'
@@ -139,6 +141,8 @@ export interface MapBaseProvenance {
   image?: { residual_px: { max: number; rms: number }; control_points: ControlPoint[]; source_url: string; license: string }
   /** program 模式独有：Natural Earth 背景覆盖度与免责说明 */
   context?: MapContextCoverage
+  /** Exact river file and SHA, including overview overridden by adopted 10m refs. */
+  river_source?: MapRiverSourceInfo
 }
 
 export interface MapBaseArtifact {
@@ -477,8 +481,10 @@ function resolveStaticImage(relativePath: string, what: string): string {
 
 /** 程序底图只渲染自然地理；用户点线面留给可编辑图层，避免拖动后留下烧入像素的鬼影。 */
 async function createProgramBase(spec: MapSpec, width?: number): Promise<MapBaseArtifact> {
+  // Resolve BEFORE removing user routes: their dataset refs may require 10m at overview.
+  const riverSource = resolveRiverSource(spec)
   const renderSpec: MapSpec = { ...spec, places: [], routes: [], regions: [] }
-  const rendered = await renderMapBase(renderSpec, width ? { width } : undefined)
+  const rendered = await renderMapBase(renderSpec, { ...(width ? { width } : {}), riverSource })
   // 登记件只取决于投影与 bbox，所以去掉要素后像素换算与带要素时逐像素一致
   const registration = programRegistration(spec, { width: rendered.width, height: rendered.height })
   return {
@@ -488,13 +494,14 @@ async function createProgramBase(spec: MapSpec, width?: number): Promise<MapBase
     registration,
     provenance: {
       mode: 'program',
-      renderer: 'd3-geo+natural-earth-50m',
+      renderer: `d3-geo+natural-earth-${riverSource.scale}-rivers`,
       sha256: rendered.sha256,
+      river_source: rendered.river_source,
       created_at: new Date().toISOString(),
       registration,
       sources: [{
         kind: 'vector',
-        name: 'Natural Earth 50m（land/coastline/rivers/lakes/countries/admin1/populated places）',
+        name: `Natural Earth 50m（land/coastline/lakes/countries/admin1/populated places）+ ${riverSource.scale} rivers（${riverSource.filename}）`,
         url: 'https://www.naturalearthdata.com/',
         license: 'Public domain',
         note: '现代地理底图；省界与城市点仅为定位参照，不代表历史疆界。',

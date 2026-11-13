@@ -6,21 +6,26 @@ import { insertDelivery, selectDeliveryBySha } from './db.js'
 import type { MapStudioDeliverable, MapStudioDeliveryResult } from './contract.js'
 import { loadTask, requireHostTarget, briefHash, MapStudioRequestError, MapStudioStaleError, type LoadedTask } from './store.js'
 import { drawnGeometryOf, specFeatures } from './validate.js'
+import { geometryUnverified } from './accuracy.js'
 
 /** One immutable payload drives both host delivery and standalone downloads. */
 export function buildDeliverable(loaded: LoadedTask): MapStudioDeliverable {
   const { state, mapSpec } = loaded
   const { final_image: final, base_image: base, layer_doc: doc } = state.outputs
+  const pending = mapSpec ? geometryUnverified(mapSpec) : []
+  if (pending.length) throw new MapStudioRequestError(`geometry_unverified：${pending.map(f => `「${f.name}」：${f.reasons.join('；')}`).join(' / ')}`, 'geometry_unverified')
   if (!final || !base || !doc || !mapSpec) throw new MapStudioRequestError('缺少成图、底图、图层文档或地图几何，请先完成标注绘制', 'missing_drawing')
   const geometry = drawnGeometryOf(doc as LayerDoc, specFeatures(mapSpec))
   const mode = base.provenance && 'mode' in base.provenance ? base.provenance.mode : loaded.brief.base_mode
   const baseMode = mode === 'image' || mode === 'earth' ? mode : 'program'
   const features = specFeatures(mapSpec).map(feature => {
     const item = [...mapSpec.places, ...mapSpec.routes, ...(mapSpec.regions ?? [])].find(item => item.id === feature.id)
-    const source = state.research?.features.find(item => item.name === feature.name && item.kind === feature.kind)
+    const source = state.research?.features.find(source => source.kind === feature.kind && (source.name === feature.name || !!item?.dataset_ref && source.dataset_ref?.ref === item.dataset_ref.ref))
     return {
       feature_id: feature.id, name: feature.name, kind: feature.kind,
-      origin: item?.proposed !== true ? 'manual' : source ? 'research' : 'model',
+      origin: item?.origin ?? (item?.proposed !== true ? 'manual' : 'model'),
+      verification: item?.proposed !== true ? { status: 'confirmed', reasons: ['人工确认或编辑'] } : item?.verification,
+      relations: item?.relations ?? [], dataset_ref: item?.dataset_ref ?? null, category: item?.category ?? null,
       proposed: item?.proposed === true, source_ids: source?.source_ids ?? [],
       coordinate_basis: source?.coordinate_basis ?? null, excerpt: source?.supporting_excerpt ?? '',
     }

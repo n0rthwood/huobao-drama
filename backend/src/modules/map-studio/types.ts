@@ -132,6 +132,34 @@ export interface MapFeatureConflict {
   note: string
 }
 
+export type MapFeatureCategory = 'river' | 'lake' | 'coast' | 'mountain' | 'settlement' | 'route' | 'territory' | 'other'
+export type MapFeatureOrigin = 'dataset' | 'source' | 'model' | 'manual'
+export interface MapVerification {
+  status: 'verified' | 'unverified' | 'conflict' | 'needs_user' | 'confirmed'
+  reasons: string[]
+}
+export interface MapDatasetReference { ref: string; clip_bbox?: [number, number, number, number] }
+export interface MapDatasetQuery {
+  layer: string
+  query: string
+  bbox?: [number, number, number, number]
+  hits: number
+  refs: string[]
+  error?: string | null
+}
+export interface MapRelation {
+  id: string
+  subject: string
+  object: string
+  relation: 'distance_km' | 'east_of' | 'west_of' | 'north_of' | 'south_of' | 'near_river'
+  value_km?: number
+  tolerance_km?: number
+  excerpt: string
+  source_id: string
+  computed: { value_km?: number; consistent: boolean }
+  message: string
+}
+
 export interface MapResearchFeature {
   id: string
   kind: MapFeatureKind
@@ -139,6 +167,13 @@ export interface MapResearchFeature {
   lon: number | null
   lat: number | null
   points: Array<[number, number]>
+  /** Disconnected dataset chains remain separate; adoption emits separate spec entries. */
+  parts?: Array<Array<[number, number]>>
+  category?: MapFeatureCategory
+  origin?: MapFeatureOrigin
+  verification?: MapVerification
+  dataset_ref?: MapDatasetReference
+  relations?: MapRelation[]
   coordinate_basis: MapCoordinateBasis
   /** 坐标是怎么来的（与 supporting_excerpt 区分：后者是原文，这里是推理） */
   basis: string
@@ -155,6 +190,9 @@ export interface MapResearchFeature {
 
 export interface MapResearch {
   queries: MapResearchQuery[]
+  dataset_queries?: MapDatasetQuery[]
+  extent?: [number, number, number, number]
+  relations?: MapRelation[]
   sources: MapResearchSource[]
   features: MapResearchFeature[]
   uncertainties: string[]

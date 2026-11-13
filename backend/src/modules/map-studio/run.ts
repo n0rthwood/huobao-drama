@@ -22,6 +22,8 @@ import { activeRunOfTask, insertRun, finishRun, readRunParams, patchRunParams, u
 import { readModels } from './settings.js'
 import { MapStudioConflictError, MapStudioStaleError, MapStudioRequestError, briefHash, loadTask, mutateTask, serializeDetail, setStep, stageIndex, restoreSnapshot, requireHostTarget, type MapStudioDetail, type MutateContext } from './store.js'
 import { MAP_INFRA_RETRIES, MAP_MAX_ROLLBACKS, MAP_WORKFLOW_STAGES, STAGE_LABEL, isMapAgentStage, normalizeBrief, type MapBrief, type MapResearch, type MapResearchFeature, type MapWorkflowIssue, type MapWorkflowMode, type MapWorkflowStage } from './types.js'
+import { geometryUnverified, labelOverflowProblems, confirmedVerification } from './accuracy.js'
+import { beginStageSpan, endStageSpan } from './stage-spans.js'
 
 export interface MapRunOptions { textConfigId?: number; imageConfigId?: number; imageModel?: string }
 const IMAGE_WAIT_TIMEOUT_MS = 20 * 60_000
@@ -67,79 +69,41 @@ export function adoptResearchIntoSpec(spec: MapSpec | null, research: MapResearc
   const notes: string[] = []
   const places = spec ? [...spec.places] : []
   const routes = spec ? [...spec.routes] : []
-  const regions = spec && Array.isArray(spec.regions) ? [...spec.regions] : []
-
-  const adopt = (feature: MapResearchFeature) => {
+  const regions = spec ? [...spec.regions] : []
+  for (const feature of research.features) {
+    const metadata = { category: feature.category, origin: feature.origin, verification: feature.verification, dataset_ref: feature.dataset_ref, relations: feature.relations }
     if (feature.kind === 'place' && feature.lon !== null && feature.lat !== null) {
       const id = featureId('p', feature.name)
       const existing = places.find(item => item.id === id || item.name === feature.name)
-      if (existing && existing.proposed !== true) {
-        if (Math.abs(existing.lon - feature.lon) > 0.01 || Math.abs(existing.lat - feature.lat) > 0.01) {
-          notes.push(`「${feature.name}」已有人工确认坐标（${existing.lon.toFixed(3)}, ${existing.lat.toFixed(3)}），本次检索给出的是（${feature.lon.toFixed(3)}, ${feature.lat.toFixed(3)}），保留人工值`)
-        }
-        return
-      }
-      const entry = { id, name: feature.name, lon: feature.lon, lat: feature.lat, proposed: true as const }
+      if (existing?.proposed !== true && existing) { notes.push(`「${feature.name}」已有人工确认坐标，保留人工值`); continue }
+      const entry = { id, name: feature.name, lon: feature.lon, lat: feature.lat, proposed: true as const, ...metadata }
       if (existing) places.splice(places.indexOf(existing), 1, entry)
       else places.push(entry)
-      return
+      continue
     }
-    if (feature.kind === 'route' && feature.points.length >= 2) {
-      const id = featureId('r', feature.name)
-      const existing = routes.find(item => item.id === id || item.name === feature.name)
-      if (existing && existing.proposed !== true) {
-        notes.push(`路线「${feature.name}」已有人工确认走向，本次检索结果未覆盖`)
-        return
-      }
-      const entry = { id, name: feature.name, points: feature.points, proposed: true as const }
-      if (existing) routes.splice(routes.indexOf(existing), 1, entry)
-      else routes.push(entry)
-      return
+    if (feature.kind === 'region' && !brief.schematic && feature.origin !== 'dataset') {
+      notes.push(`范围「${feature.name}」未并入：未开启示意图模式时不绘制历史疆域边界`); continue
     }
-    if (feature.kind === 'region' && feature.points.length >= 3) {
-      // 历史疆域不虚构：只有显式示意图模式才允许面状边界进入几何。
-      // 这是写几何的唯一一条路径，所以这道闸门放在这里，而不是只在检索解析时拦一次。
-      if (!brief.schematic) {
-        notes.push(`范围「${feature.name}」未并入：未开启示意图模式时不绘制历史疆域边界（不虚构）`)
-        return
-      }
-      const id = featureId('g', feature.name)
-      const existing = regions.find(item => item.id === id || item.name === feature.name)
-      if (existing && existing.proposed !== true) {
-        notes.push(`范围「${feature.name}」已有人工确认边界，本次检索结果未覆盖`)
-        return
-      }
-      const entry = { id, name: feature.name, points: feature.points, proposed: true as const }
-      if (existing) regions.splice(regions.indexOf(existing), 1, entry)
-      else regions.push(entry)
-    }
+    const target = feature.kind === 'route' ? routes : regions
+    const prefix = featureId(feature.kind === 'route' ? 'r' : 'g', feature.name)
+    const previous = target.filter(item => item.id === prefix || item.id.startsWith(`${prefix}__`) || item.name === feature.name)
+    if (previous.some(item => item.proposed !== true)) { notes.push(`「${feature.name}」已有人工确认几何，保留人工值`); continue }
+    for (const item of previous) target.splice(target.indexOf(item), 1)
+    const parts = feature.parts ?? [feature.points]
+    parts.forEach((points, index) => target.push({
+      id: index ? `${prefix}__${index + 1}` : prefix,
+      name: parts.length > 1 ? `${feature.name} (${index + 1}/${parts.length})` : feature.name,
+      points, proposed: true, ...metadata,
+    }))
   }
-  for (const feature of research.features) adopt(feature)
-
-  const coords: Array<[number, number]> = [
-    ...places.map((item): [number, number] => [item.lon, item.lat]),
-    ...routes.flatMap(item => item.points),
-    ...regions.flatMap(item => item.points),
-  ]
-  // 已有 bbox 只是底图阶段模型的参考（#90）：取景由底图阶段的模型决定并经取景校验，这里不判越界。
-  let bbox = spec?.bbox
-  if (!bbox) {
-    if (!coords.length) {
-      throw new MapStudioRequestError('检索没有得到任何可定位的地点，无法确定底图范围；请人工补充至少一个地点坐标后再继续', 'missing_geometry')
-    }
-    bbox = bboxOf(coords)
-  }
-
+  const coords: Array<[number, number]> = [...places.map((p): [number, number] => [p.lon, p.lat]), ...routes.flatMap(r => r.points), ...regions.flatMap(r => r.points)]
+  if (!coords.length) throw new MapStudioRequestError('检索没有得到任何可定位的几何', 'missing_geometry')
   return {
     spec: normalizeMapSpec({
-      version: 1,
-      projection: spec?.projection ?? { type: 'mercator' },
-      bbox,
+      version: 1, projection: spec?.projection ?? { type: 'mercator' },
+      bbox: spec?.bbox ?? research.extent ?? bboxOf(coords), detail_level: brief.detail_level,
       layers: spec?.layers ?? { land: true, coastline: true, rivers: true, lakes: true, countries: true },
-      places,
-      routes,
-      regions,
-      style: { theme: brief.style },
+      places, routes, regions, style: { theme: brief.style },
     }),
     notes,
   }
@@ -210,10 +174,16 @@ async function applyRollback(input: { taskId: number; runId: number; from: MapWo
   return { proceed: input.mode === 'auto', next: input.target, message: `已回退到「${STAGE_LABEL[input.target]}」：${input.reason}` }
 }
 
-async function executeStage(taskId: number, runId: number, stage: MapWorkflowStage): Promise<StageOutcome> {
+function requireVerifiedGeometry(spec: MapSpec | null): void {
+  const pending = geometryUnverified(spec)
+  if (pending.length) throw new MapStudioRequestError(`geometry_unverified：${pending.map(f => `「${f.name}」：${f.reasons.join('；')}`).join(' / ')}`, 'geometry_unverified')
+}
+
+async function executeStageWork(taskId: number, runId: number, stage: MapWorkflowStage): Promise<StageOutcome> {
   const loaded = await loadTask(taskId)
   if (!loaded) throw new MapStudioRequestError('任务不存在', 'not_found')
   requireHostTarget(loaded)
+  if (stage === 'base' || stage === 'drawing' || stage === 'complete') requireVerifiedGeometry(loaded.mapSpec)
   const { state, brief } = loaded
   const opts = { textConfigId: state.text_config_id ?? undefined, imageConfigId: state.image_config_id ?? undefined, imageModel: state.image_model ?? undefined }
   const hashAtStart = briefHash(brief)
@@ -249,14 +219,16 @@ async function executeStage(taskId: number, runId: number, stage: MapWorkflowSta
     if (outcome.kind === 'rollback') return rollback(outcome)
     const research = outcome.result
     const adopted = adoptResearchIntoSpec(loaded.mapSpec, research, brief)
+    const pending = geometryUnverified(adopted.spec)
     return finish(ctx => {
       ctx.state.research = research; ctx.mapSpec = adopted.spec
       ctx.state.issues = [
-        ...ctx.state.issues.filter(issue => issue.code !== 'research_note' && issue.code !== 'approximate_position'),
+        ...ctx.state.issues.filter(issue => !['research_note', 'approximate_position', 'geometry_unverified'].includes(issue.code)),
+        ...pending.map((feature): MapWorkflowIssue => ({ field: 'research', code: 'geometry_unverified', blocking: true, message: `「${feature.name}」：${feature.reasons.join('；')}` })),
         ...[...adopted.notes, ...research.notes].map((message): MapWorkflowIssue => ({ field: 'research', code: 'research_note', message, blocking: false })),
         ...research.features.filter(feature => feature.approximate).map((feature): MapWorkflowIssue => ({ field: 'research', code: 'approximate_position', blocking: false, message: `「${feature.name}」为${feature.coordinate_basis === 'approximate_schematic' ? '示意' : '公认'}位置（不确定度 ${feature.uncertainty}）：${feature.basis || '无逐字出处'}` })),
       ]
-    }, { proceed: true, message: `检索到 ${research.sources.length} 条来源、${research.features.length} 个地理要素（${research.features.filter(f => f.excerpt_verified).length} 个有逐字出处）` })
+    }, { proceed: !pending.length, message: pending.length ? `geometry_unverified：${pending.map(f => `「${f.name}」${f.reasons.join('；')}`).join(' / ')}` : `检索到 ${research.sources.length} 条来源、${research.features.length} 个地理要素，几何核验通过` }, pending.length > 0)
   }
   if (stage === 'base') {
     if (!loaded.mapSpec) throw new MapStudioRequestError('还没有地图几何，请先完成资料检索或人工填写地点', 'missing_map_spec')
@@ -293,6 +265,18 @@ async function executeStage(taskId: number, runId: number, stage: MapWorkflowSta
     const delivered = await deliverCurrent(taskId, { runId, briefHash: hashAtStart })
     return finish(() => {}, { proceed: false, message: delivered.message })
   })
+}
+
+async function executeStage(taskId: number, runId: number, stage: MapWorkflowStage): Promise<StageOutcome> {
+  beginStageSpan(runId, stage)
+  try {
+    const result = await executeStageWork(taskId, runId, stage)
+    endStageSpan(runId, stage, result.next ? 'rollback' : !result.proceed && stage !== 'complete' ? 'blocked' : 'completed')
+    return result
+  } catch (err) {
+    endStageSpan(runId, stage, err instanceof MapStudioStaleError ? 'interrupted' : 'failed')
+    throw err
+  }
 }
 
 function runStages(taskId: number, runId: number, mode: MapWorkflowMode, startStage: MapWorkflowStage, observation: ObservedWorkInput): void {
@@ -341,6 +325,7 @@ async function startRun(taskId: number, input: { mode: MapWorkflowMode; expected
   const brief = loaded.brief
   if (!brief.subject) throw new MapStudioRequestError('请在需求里填写地图主题', 'missing_brief')
   const startStage = loaded.state.stage
+  if (startStage === 'base' || startStage === 'drawing' || startStage === 'complete') requireVerifiedGeometry(loaded.mapSpec)
   const defaults = readModels()
   const opts = {
     textConfigId: input.opts.textConfigId ?? loaded.state.text_config_id ?? defaults.text_config_id ?? undefined,
@@ -464,13 +449,37 @@ export async function saveMapWorkflowDraft(taskId: number, body: {
       if (hasSpec) {
         const previous = ctx.mapSpec
         const next = body.mapSpec === null ? null : normalizeMapSpec(body.mapSpec)
-        ctx.mapSpec = next
         if (JSON.stringify(previous) === JSON.stringify(next)) return
+        if (next) {
+          const oldItems = [...previous?.places ?? [], ...previous?.routes ?? [], ...previous?.regions ?? []]
+          for (const item of [...next.places, ...next.routes, ...next.regions]) {
+            const old = oldItems.find(f => f.id === item.id)
+            const changed = !old || JSON.stringify('lon' in item ? [item.lon, item.lat] : item.points) !== JSON.stringify('lon' in old ? [old.lon, old.lat] : old.points)
+            if (changed) { item.origin = 'manual'; delete item.proposed; item.verification = confirmedVerification(); delete item.dataset_ref }
+            else if (item.proposed !== true) item.verification = confirmedVerification()
+          }
+          for (const feature of ctx.state.research?.features ?? []) {
+            const entries = [...next.places, ...next.routes, ...next.regions].filter(item => item.name === feature.name || item.name.startsWith(`${feature.name} (`))
+            if (!entries.length) continue
+            if (entries.every(item => item.proposed !== true)) feature.verification = confirmedVerification()
+            if (entries.some(item => item.origin === 'manual')) {
+              feature.origin = 'manual'
+              delete feature.dataset_ref
+              if (feature.kind === 'place' && 'lon' in entries[0]!) { feature.lon = entries[0].lon; feature.lat = entries[0].lat }
+              else {
+                feature.parts = entries.flatMap(item => 'points' in item ? [item.points] : [])
+                feature.points = feature.parts[0] ?? []
+              }
+            }
+          }
+        }
+        ctx.mapSpec = next
         // 取景或背景层变更才重做底图；拖点/改线只重绘标注，避免无关的外部请求与模型账单。
         const reframed = !previous || !next
           || previous.projection.type !== next.projection.type
           || previous.bbox.some((value, index) => value !== next.bbox[index])
           || JSON.stringify(previous.layers) !== JSON.stringify(next.layers)
+          || previous.detail_level !== next.detail_level
         // 底纹只跟风格有关，与几何无关：取景变了也接着用，除非主题换了
         const styleChanged = !!previous && !!next && previous.style.theme !== next.style.theme
         const keptTexture = styleChanged ? null : ctx.state.outputs.texture_image
@@ -499,6 +508,15 @@ export async function saveMapWorkflowDraft(taskId: number, body: {
               : '地图几何已修改：沿用现有底图与底纹，只需重新绘制标注',
           },
         ]
+        if (ctx.state.stage === 'research' && ctx.state.research) {
+          const pending = geometryUnverified(next)
+          ctx.state.issues = [...ctx.state.issues.filter(issue => issue.code !== 'geometry_unverified'), ...pending.map(f => ({ field: 'research', code: 'geometry_unverified', blocking: true, message: `「${f.name}」：${f.reasons.join('；')}` }))]
+          if (pending.length) ctx.state.status = 'blocked'
+          else {
+            setStep(ctx.state, 'research', { status: 'completed', message: '研究几何已核验或经人工确认' })
+            ctx.state.stage = 'base'; ctx.state.status = 'awaiting_review'
+          }
+        }
       }
     },
   })
@@ -508,7 +526,11 @@ export async function saveMapWorkflowDraft(taskId: number, body: {
 
 export async function cancelMapWorkflow(taskId: number): Promise<MapStudioDetail> {
   const active = activeRunOfTask(taskId)
-  if (active) finishRun(active.id, 'cancelled', '人工取消地图任务')
+  if (active) {
+    const stage = MAP_WORKFLOW_STAGES.find(stage => stage === active.stage)
+    if (stage) endStageSpan(active.id, stage, 'cancelled')
+    finishRun(active.id, 'cancelled', '人工取消地图任务')
+  }
   return serializeDetail(await mutateTask(taskId, { action: 'cancel', actor: 'manual', note: active ? `取消运行 #${active.id}` : '无运行中的任务', mutate: ctx => {
     for (const step of ctx.state.steps) if (step.status === 'running') Object.assign(step, { status: 'pending', message: '已取消', finished_at: now() })
     ctx.state.run_id = null; ctx.state.status = ctx.state.status === 'completed' ? 'completed' : 'idle'; ctx.state.error = null
@@ -528,12 +550,13 @@ export async function saveMapLayerDoc(taskId: number, body: { layerDoc: unknown;
   const loaded = await loadTask(taskId)
   if (!loaded) throw new MapStudioRequestError('任务不存在', 'not_found')
   requireHostTarget(loaded)
+  requireVerifiedGeometry(loaded.mapSpec)
   if (body.expectedRevision != null && body.expectedRevision !== loaded.state.revision) throw new MapStudioConflictError('任务已更新，请刷新后重试', { code: 'revision_conflict', revision: loaded.state.revision })
   if (loaded.state.status === 'running') throw new MapStudioConflictError('任务正在执行，请先等待或取消', { code: 'workflow_busy', revision: loaded.state.revision, runId: loaded.state.run_id })
   const current = loaded.state.outputs.layer_doc as { base?: { path?: string; width?: number; height?: number } } | null
   if (!current?.base?.path || !loaded.state.outputs.base_image || !loaded.mapSpec) throw new MapStudioRequestError('还没有图层文档，请先完成标注绘制', 'missing_drawing')
   const strict = strictLayerDocProblems(body.layerDoc)
-  const problems = [...strict.problems, ...backgroundProblems(strict.doc, { path: current.base.path, width: Number(current.base.width), height: Number(current.base.height) }).map(message => ({ path: 'base', message }))]
+  const problems = [...strict.problems, ...labelOverflowProblems(strict.doc), ...backgroundProblems(strict.doc, { path: current.base.path, width: Number(current.base.width), height: Number(current.base.height) }).map(message => ({ path: 'base', message }))]
   if (problems.length) throw new MapLayerDocInvalidError(problems)
   const rendered = await renderMapLayerDoc(strict.doc)
   const updated = await mutateTask(taskId, { expectedRevision: loaded.state.revision, expectedBriefHash: briefHash(loaded.brief), requireIdle: true, action: 'edit_layer_doc', actor: 'manual', note: `人工编辑图层（${strict.doc.layers.length} 个图层）`, snapshot: true, mutate: ctx => {

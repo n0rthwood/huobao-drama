@@ -31,19 +31,24 @@ const script = `
     { id: 'S1', adapter: 'wikipedia-zh', title: '邗沟', url: 'https://zh.wikipedia.org/wiki/邗沟', institution: '', date: '', license: '', tier: 'B',
       excerpt: '邗沟是春秋末期吴王夫差开凿的运河，自今扬州引长江水北上，经射阳湖至今淮安入淮河。' },
   ]
+  // 阶段 ②：检索必须交 extent，所有坐标都要落在里面（2% 留边）
+  const EXTENT = [110, 25, 130, 45]
   const ctx = (extra = {}) => ({
     brief: { ...emptyBrief(), subject: '邗沟', schematic: false },
-    sources, searchedAdapters: adapters, requiredAdapters: adapters, confirmed: null, ...extra,
+    sources, searchedAdapters: adapters, requiredAdapters: adapters, confirmed: null, extent: EXTENT,
+    datasetQueries: [{ layer: 'lake', query: '古射阳湖', hits: 0, refs: [] }], ...extra,
   })
   const place = (name, lon, lat, extra = {}) => ({
-    kind: 'place', name, lon, lat, coordinate_basis: 'well_known', source_ids: ['S1'],
+    kind: 'place', name, lon, lat, category: 'settlement', geometry_source: 'model',
+    coordinate_basis: 'well_known', source_ids: ['S1'],
     basis: '现代地名公认位置', uncertainty: 'medium', ...extra,
   })
   const jiangsu = [place('扬州', 119.42, 32.39), place('高邮', 119.46, 32.78), place('宝应', 119.31, 33.24), place('淮安', 119.15, 33.5)]
 
   // 事故 #1353 的原始形状：非示意模式下的 region，lon/lat 抄了模板的 0,0
   const incident = validateFeatureSubmission([...jiangsu, {
-    kind: 'region', name: '古射阳湖（示意范围）', lon: 0, lat: 0,
+    kind: 'region', name: '古射阳湖（示意范围）', lon: 0, lat: 0, category: 'lake', geometry_source: 'model',
+    dataset_missing: { queries: ['古射阳湖'], reason: '历史湖岸不在现代数据集中，需人工裁决示意范围' },
     points: [[119.55, 33.3], [119.45, 33.45], [119.7, 33.35], [119.55, 33.1]],
     coordinate_basis: 'approximate_schematic', source_ids: ['S1'], basis: '据文字概括', uncertainty: 'high',
   }], ctx())
@@ -51,15 +56,16 @@ const script = `
 
   out.zeroPlace = validateFeatureSubmission([...jiangsu, place('射阳湖', 0, 0)], ctx())
   out.stringCoord = validateFeatureSubmission([...jiangsu, place('射阳湖', '<lon>', '<lat>')], ctx())
-  out.outlier = validateFeatureSubmission([...jiangsu, place('远方', 80, 10)], ctx())
-  out.outlierExplained = validateFeatureSubmission([...jiangsu, place('远方', 80, 10, { far_from_others_reason: '图中示意远方来使的出发地' })], ctx())
+  out.outlier = validateFeatureSubmission([...jiangsu, place('远方', 128.5, 43)], ctx())
+  out.outlierExplained = validateFeatureSubmission([...jiangsu, place('远方', 128.5, 43, { far_from_others_reason: '图中示意远方来使的出发地' })], ctx())
   out.badExcerpt = validateFeatureSubmission([place('扬州', 119.42, 32.39, { coordinate_basis: 'excerpt', supporting_excerpt: '扬州是唐代第一大港口城市' })], ctx())
   out.goodExcerpt = validateFeatureSubmission([place('扬州', 119.42, 32.39, { coordinate_basis: 'excerpt', supporting_excerpt: '自今扬州引长江水北上' })], ctx())
   out.unsearched = validateFeatureSubmission(jiangsu, ctx({ searchedAdapters: ['wikipedia-zh'] }))
   out.unknownSource = validateFeatureSubmission([place('扬州', 119.42, 32.39, { source_ids: ['S9'] })], ctx())
   out.confirmed = validateFeatureSubmission(jiangsu, ctx({ confirmed: normalizeMapSpec({ bbox: [118, 31, 121, 34], places: [{ id: 'p_x', name: '淮安', lon: 119.1, lat: 33.5 }] }) }))
   out.schematicRegion = validateFeatureSubmission([...jiangsu, {
-    kind: 'region', name: '射阳湖', points: [[119.55, 33.3], [119.45, 33.45], [119.7, 33.35]],
+    kind: 'region', name: '射阳湖', category: 'lake', geometry_source: 'model', points: [[119.55, 33.3], [119.45, 33.45], [119.7, 33.35]],
+    dataset_missing: { queries: ['古射阳湖'], reason: '历史湖岸不在现代数据集中，需人工裁决示意范围' },
     coordinate_basis: 'approximate_schematic', source_ids: ['S1'], basis: '据文字概括', uncertainty: 'high',
   }], ctx({ brief: { ...emptyBrief(), subject: '邗沟', schematic: true } }))
   out.clean = validateFeatureSubmission(jiangsu, ctx())
@@ -152,6 +158,7 @@ test('逐字出处、来源引用、来源覆盖与人工确认的要素都由�
   assert.match(result.unknownSource.problems.join(), /S9/)
   assert.match(result.confirmed.problems.join(), /淮安.*人工确认/)
   assert.deepEqual(result.schematicRegion.problems, [], '示意图模式下合法的面可以提交')
+  assert.equal(result.schematicRegion.features.find(feature => feature.name === '射阳湖').verification.status, 'needs_user', '数据集缺失的古湖示意范围仍必须人工裁决')
   assert.deepEqual(result.clean.problems, [])
   assert.deepEqual(result.clean.features.map(f => f.name), ['扬州', '高邮', '宝应', '淮安'])
 })

@@ -57,7 +57,7 @@
       </li>
     </ol>
 
-    <MapStagePanel v-if="detail" :detail="detail" :stage="selectedStage" @preview="openPreview" />
+    <MapStagePanel v-if="detail" :detail="detail" :stage="selectedStage" :confirming="action === 'confirm'" @preview="openPreview" @confirm="confirmGeometry" />
     <MapAgentProcess v-if="detail && runsLoaded" :task-id="taskId" :stage="selectedStage" :runs="runs" :selected-run-id="selectedRunId" :loading-runs="false" :now="nowMs" @select-run="navigationTouched = true; selectedRunId = $event" @reload-runs="loadRuns" />
     <MapDeliveries v-if="detail" :task-id="taskId" :deliveries="detail.deliveries" :outputs="detail.outputs" :can-deliver="!!detail.host && !hostMissing && !isRunning && !!detail.outputs.final_image" :busy="busy || delivering" :delivering="delivering" error="" @deliver="redeliver" />
     <section v-if="detail" class="mw-now">
@@ -262,11 +262,13 @@ import MapResults from '~/map-studio/components/MapResults.vue'
 import MapAgentRounds from '~/map-studio/components/MapAgentRounds.vue'
 import MapLayerEditor from '~/map-studio/components/MapLayerEditor.vue'
 import {
+  confirmSpecFeatures,
   mapStudioAPI,
   mapStudioConflictOf,
   type MapAgentAttempt,
   type MapAgentState,
   type MapBrief,
+  type MapConfirmTarget,
   type MapSpec,
   type MapStudioDetail,
   type MapStudioStage,
@@ -320,7 +322,7 @@ const STAGE_ORDER: MapStudioStage[] = ['brief', 'research', 'base', 'style', 'dr
 const detail = ref<MapStudioDetail | null>(null)
 const loading = ref(false)
 const error = ref('')
-const action = ref<'' | 'run' | 'advance' | 'cancel' | 'rollback' | 'brief' | 'spec'>('')
+const action = ref<'' | 'run' | 'advance' | 'cancel' | 'rollback' | 'brief' | 'spec' | 'confirm'>('')
 const conflict = ref<{ kind: 'revision' | 'busy'; message: string } | null>(null)
 const runMode = ref<'auto' | 'manual'>('auto')
 const textConfigId = ref(0)
@@ -389,7 +391,10 @@ function emptySpec(): MapSpec {
   }
 }
 
-/** 后端可能给 null / 缺字段（刚建的地图资产），补齐后模板不做存在性判断 */
+/**
+ * 后端可能给 null / 缺字段（刚建的地图资产），补齐后模板不做存在性判断。
+ * `detail_level` 不能补默认值：它决定底图河道取 10m 还是 50m，丢了会让保存几何时错误地重新取景。
+ */
 function normalizeSpec(raw: MapSpec | null): MapSpec {
   const base = emptySpec()
   if (!raw) return base
@@ -397,6 +402,7 @@ function normalizeSpec(raw: MapSpec | null): MapSpec {
     version: 1,
     projection: { type: raw.projection?.type === 'equirectangular' ? 'equirectangular' : 'mercator' },
     bbox: Array.isArray(raw.bbox) && raw.bbox.length === 4 ? [...raw.bbox] as MapSpec['bbox'] : base.bbox,
+    ...(raw.detail_level ? { detail_level: raw.detail_level } : {}),
     layers: { ...base.layers, ...(raw.layers ?? {}) },
     places: (raw.places ?? []).map(place => ({ ...place })),
     routes: (raw.routes ?? []).map(route => ({ ...route, points: (route.points ?? []).map(pt => [pt[0], pt[1]] as [number, number]) })),
@@ -870,6 +876,32 @@ async function saveSpec() {
     applyDetail(res, 'spec')
     conflict.value = null
     toast.success(t('mapStudio.panel.specSaved'))
+  } catch (err) {
+    if (!stopped) handleError(err, t('mapStudio.panel.saveFailed'))
+  } finally {
+    if (!stopped) action.value = ''
+  }
+}
+
+/**
+ * 确认 AI 提议几何 = PUT map_spec 去掉 proposed（现有 CAS），其余元数据逐字保留；
+ * 核验结论由服务端改写，前端不自行判定放行。失败（含 409 修订冲突）时选择与草稿都不动。
+ */
+async function confirmGeometry(targets: MapConfirmTarget[]) {
+  if (!targets.length || action.value) return
+  const base = detail.value?.map_spec
+  if (!base) return
+  action.value = 'confirm'
+  error.value = ''
+  try {
+    const next = confirmSpecFeatures(base, targets)
+    const res = await mapStudioAPI.save(taskId.value, { expected_revision: detail.value?.revision, map_spec: next })
+    if (stopped) return
+    // 尚未保存的几何草稿里同一批条目仍带着 AI 候选标记：一并去掉，否则之后保存草稿会把人工确认覆盖回候选
+    if (specDirty.value) specDraft.value = confirmSpecFeatures(specDraft.value, targets)
+    applyDetail(res)
+    conflict.value = null
+    toast.success(t('mapStudio.researchPanel.confirmed', { n: targets.length }))
   } catch (err) {
     if (!stopped) handleError(err, t('mapStudio.panel.saveFailed'))
   } finally {

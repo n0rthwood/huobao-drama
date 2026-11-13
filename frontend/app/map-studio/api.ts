@@ -77,15 +77,50 @@ export interface MapBrief {
   inferred: MapBriefInference[]
 }
 
-export interface MapPlace { id: string; name: string; lon: number; lat: number; proposed?: boolean }
-export interface MapRoute { id: string; name: string; points: Array<[number, number]>; proposed?: boolean }
+/** Issue #99 阶段 ②：要素的类别、几何来源、核验结论与相对位置证据（后端原样存进 map_spec） */
+export type MapFeatureCategory = 'river' | 'lake' | 'coast' | 'mountain' | 'settlement' | 'route' | 'territory' | 'other'
+export type MapFeatureOrigin = 'dataset' | 'source' | 'model' | 'manual'
+export type MapVerificationStatus = 'verified' | 'unverified' | 'conflict' | 'needs_user' | 'confirmed'
+export interface MapVerification { status: MapVerificationStatus, reasons: string[] }
+export interface MapDatasetReference { ref: string, clip_bbox?: [number, number, number, number] }
+export type MapRelationKind = 'distance_km' | 'east_of' | 'west_of' | 'north_of' | 'south_of' | 'near_river'
+/** 声明的相对位置证据 + 服务端按坐标算出的结果（computed/message 缺省时按「未计算」显示，不猜） */
+export interface MapRelation {
+  id: string
+  subject: string
+  object: string
+  relation: MapRelationKind
+  value_km?: number
+  tolerance_km?: number
+  excerpt: string
+  source_id: string
+  computed?: { value_km?: number, consistent: boolean }
+  message?: string
+}
+
+/** 所有几何条目共有的阶段 ② 元数据；缺省即「未标注」，绝不按 AI 候选脑补来源 */
+export interface MapFeatureMetadata {
+  category?: MapFeatureCategory
+  origin?: MapFeatureOrigin
+  verification?: MapVerification
+  dataset_ref?: MapDatasetReference
+  relations?: MapRelation[]
+}
+
+export interface MapPlace extends MapFeatureMetadata { id: string; name: string; lon: number; lat: number; proposed?: boolean }
+export interface MapRoute extends MapFeatureMetadata { id: string; name: string; points: Array<[number, number]>; proposed?: boolean }
 /** 面要素：首尾由后端自动闭合，前端按开放环编辑 */
-export interface MapRegion { id: string; name: string; points: Array<[number, number]>; proposed?: boolean }
+export interface MapRegion extends MapFeatureMetadata { id: string; name: string; points: Array<[number, number]>; proposed?: boolean }
 export interface MapSpec {
   version: 1
   projection: { type: 'mercator' | 'equirectangular' }
   /** [west, south, east, north] */
   bbox: [number, number, number, number]
+  /**
+   * 制图细节级别（阶段 ②）：决定底图河道取 10m 还是 50m，以及取景精度。
+   * 保存几何时原样带回；缺省就是真的没有这个字段，不补默认值。
+   */
+  detail_level?: 'overview' | 'regional' | 'site'
   layers: { land: boolean; coastline: boolean; rivers: boolean; lakes: boolean; countries: boolean }
   places: MapPlace[]
   routes: MapRoute[]
@@ -116,19 +151,35 @@ export interface MapResearchSource {
   tier: 'A' | 'B'
   excerpt: string
 }
-export interface MapResearchFeature {
+export interface MapResearchFeature extends MapFeatureMetadata {
+  /** 服务端要素 id（`features[i]` 之外的稳定引用） */
+  id?: string
   kind: 'place' | 'route' | 'region'
   name: string
   lon?: number
   lat?: number
   points?: Array<[number, number]>
+  /** 数据集折线不连通时保留多段；并入 map_spec 时拆成 `name (i/N)` 的同前缀条目 */
+  parts?: Array<Array<[number, number]>>
+  dataset_missing?: { queries: string[], reason: string }
   source_url: string | null
   source_title: string
   uncertainty: 'high' | 'medium' | 'low'
   basis: string
+  coordinate_basis?: string
+  supporting_excerpt?: string
+  excerpt_verified?: boolean
+  approximate?: boolean
 }
+export interface MapDatasetQuery { layer: string, query: string, bbox?: [number, number, number, number], hits: number, refs: string[] }
 export interface MapResearch {
   queries: Array<{ adapter: string; query: string; hits: number; error: string | null }>
+  /** 本阶段 search_dataset 的登记（服务端核对 dataset_missing 用）；老记录没有这个字段 */
+  dataset_queries?: MapDatasetQuery[]
+  /** 该图的空间范围 [west, south, east, north]；阶段 ② 起必填 */
+  extent?: [number, number, number, number]
+  /** 本次提交的相对位置证据及服务端按坐标算出的结论 */
+  relations?: MapRelation[]
   sources: MapResearchSource[]
   features: MapResearchFeature[]
   uncertainties: string[]
@@ -354,6 +405,11 @@ export interface ObservedCallRow {
   message_count: number
   heartbeat_at?: number | null
   created_at?: number
+  /**
+   * 阶段归属：调用 started_at 落在哪个阶段跨度内；没有任何跨度覆盖时为 null
+   * （不按阶段顺序猜，也不把无归属的调用塞给当前阶段）。
+   */
+  stage: MapStudioStage | null
 }
 
 export interface ObservedMessageRow {
@@ -526,3 +582,66 @@ export function mapLayerDocProblemsOf(err: unknown): { message: string, problems
   }
 }
 
+/* ===== 阶段 ② 几何核验（纯读取与挑选用；闸门永远在服务端） ===== */
+
+export type MapSpecFeatureKind = 'place' | 'route' | 'region'
+
+/** 挑选「待确认」条目时用的键；map_spec 三类几何的 id 各自唯一 */
+export function mapSpecFeatureKey(kind: MapSpecFeatureKind, id: string): string {
+  return `${kind}:${id}`
+}
+
+export interface MapPendingGeometry { kind: MapSpecFeatureKind, id: string, name: string, reasons: string[] }
+
+/**
+ * 列出「AI 提议且既不 verified 也不 confirmed」的几何条目——与服务端 research/base/drawing/complete
+ * 闸门的判定同一条件，只用来在界面上挑出待确认行；**放行与否一律以服务端回执为准**
+ * （400 geometry_unverified 的 message 原样显示，不在这里自行放行）。
+ * 服务端把这些要素拆成 `name (i/N)` 同前缀条目时，每一条都会独立出现。
+ */
+export function mapPendingGeometry(spec: MapSpec | null): MapPendingGeometry[] {
+  if (!spec) return []
+  const row = (kind: MapSpecFeatureKind, item: MapPlace | MapRoute | MapRegion): MapPendingGeometry => ({
+    kind,
+    id: item.id,
+    name: item.name,
+    reasons: item.verification?.reasons?.length ? item.verification.reasons : ['AI 提议的坐标缺少可核验依据，请人工确认'],
+  })
+  const pending: MapPendingGeometry[] = []
+  for (const [kind, list] of [
+    ['place', spec.places ?? []],
+    ['route', spec.routes ?? []],
+    ['region', spec.regions ?? []],
+  ] as Array<[MapSpecFeatureKind, Array<MapPlace | MapRoute | MapRegion>]>) {
+    for (const item of list) {
+      // 人工编辑过的条目不算 AI 提议；已经核验过（数据集或逐字坐标证据）也不必再确认
+      if (item.proposed !== true || item.origin === 'manual') continue
+      if (item.verification?.status === 'verified' && item.origin !== undefined) continue
+      pending.push(row(kind, item))
+    }
+  }
+  return pending
+}
+
+export interface MapConfirmTarget { kind: MapSpecFeatureKind, id: string }
+
+/**
+ * 确认 = 去掉 `proposed`（现有 CAS 语义），其余元数据（category / origin / verification / dataset_ref /
+ * relations）逐字保留；核验状态由服务端在保存时改写为 confirmed，前端不替它编结论。
+ * 返回新的 spec 对象，绝不原地改服务端快照。
+ */
+export function confirmSpecFeatures(spec: MapSpec, targets: MapConfirmTarget[]): MapSpec {
+  const wanted = new Set(targets.map(target => mapSpecFeatureKey(target.kind, target.id)))
+  const strip = <T extends { id: string }>(kind: MapSpecFeatureKind, list: T[]): T[] => list.map((item) => {
+    if (!wanted.has(mapSpecFeatureKey(kind, item.id))) return { ...item }
+    const copy = { ...item } as T & { proposed?: boolean }
+    delete copy.proposed
+    return copy
+  })
+  return {
+    ...spec,
+    places: strip('place', spec.places ?? []),
+    routes: strip('route', spec.routes ?? []),
+    regions: strip('region', spec.regions ?? []),
+  }
+}

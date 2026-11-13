@@ -61,17 +61,27 @@
         </ul>
 
         <div class="map-observe-head">
-          <strong>{{ t('mapStudio.agentProcess.callsTitle', { n: calls.length }) }}</strong>
+          <strong>{{ t('mapStudio.agentProcess.callsTitle', { n: stageCalls.length }) }}</strong>
+          <div class="map-stage-toggle">
+            <button type="button" class="map-tool" :aria-pressed="!showAllStages" @click="showAllStages = false">
+              {{ t('mapStudio.stage.' + stage) }}
+            </button>
+            <button type="button" class="map-tool" :aria-pressed="showAllStages" @click="showAllStages = true">
+              {{ t('mapStudio.agentProcess.stageAll') }}
+            </button>
+          </div>
           <button v-if="hasMoreCalls" type="button" class="map-tool" :disabled="loadingObserved" @click="loadObserved(false)">
             {{ t('mapStudio.agentProcess.loadMore') }}
           </button>
         </div>
         <p v-if="!calls.length" class="map-empty dim">{{ t('mapStudio.agentProcess.noCalls') }}</p>
+        <p v-else-if="!stageCalls.length" class="map-empty dim">{{ t('mapStudio.agentProcess.stageFilterEmpty') }}</p>
         <ul v-else class="map-calls">
-          <li v-for="call in calls" :key="call.id" class="map-call" :class="{ 'is-active': call.id === openCallId }">
+          <li v-for="call in stageCalls" :key="call.id" class="map-call" :class="{ 'is-active': call.id === openCallId }">
             <button type="button" class="map-call-head" :aria-expanded="call.id === openCallId" @click="toggleCall(call.id)">
               <span class="map-chip">{{ t('mapStudio.agentProcess.kind.' + call.kind) }}</span>
               <span class="map-chip" :class="`is-${call.status}`">{{ t('mapStudio.agentProcess.workStatus.' + call.status) }}</span>
+              <span v-if="showAllStages" class="map-chip">{{ call.stage ? t('mapStudio.stage.' + call.stage) : t('mapStudio.agentProcess.stageNone') }}</span>
               <strong>{{ call.model || t('mapStudio.agentProcess.unknownModel') }}</strong>
               <span class="dim">{{ call.config_name || t('mapStudio.agentProcess.unknownConfig') }}</span>
               <span>{{ t('mapStudio.agentProcess.called', { value: callDuration(call) }) }}</span>
@@ -123,6 +133,7 @@
  * **排队耗时**（进入执行槽之前等的时间）。都是服务端事实，前端只格式化，不重算、不猜。
  * 进行中的运行与调用用本地时钟补「已用」，终态一律用服务端落盘的数值并冻结，不继续增长。
  * 公开消息（system/user/assistant/tool 正文、工具定义与参数结果）按纯文本分页回看，刷新与重启后仍在。
+ * 调用按阶段跨度归属（后端纯包含判定）：列表默认只看当前阶段，可显式切到「全部阶段」（mscf deeplink）。
  */
 import { Loader2 } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
@@ -248,6 +259,33 @@ async function loadMessages(reset: boolean) {
  */
 const callLink = useDeeplink('mapStudioCall', DEEPLINK_KEYS.mapStudioCall)
 
+/**
+ * 「只看本阶段 / 全部阶段」是嵌套界面状态：取值写进 mscf（all = 全部，空 = 只看当前阶段）。
+ * 缺省是只看当前阶段，因为它与页面的阶段选择一致；切到全部是显式动作，刷新与分享链接都能回到同一视图。
+ */
+const stageFilterLink = useDeeplink('mapStudioCallFilter', DEEPLINK_KEYS.mapStudioCallFilter)
+const showAllStages = ref(stageFilterLink.initial('mscf') === 'all')
+const stageCalls = computed(() => showAllStages.value ? calls.value : calls.value.filter(call => call.stage === props.stage))
+
+/**
+ * 过滤只影响列表展示：展开的调用被过滤出可见集合就收起（消息面板不能凭空消失），
+ * 它仍可在「全部阶段」里重新展开。还没加载到该调用时不动，等分页补齐。
+ */
+function pruneOpenCall(): void {
+  const id = openCallId.value
+  if (id === null) return
+  if (!calls.value.some(call => call.id === id)) return
+  if (showAllStages.value || calls.value.some(call => call.id === id && call.stage === props.stage)) return
+  openCallId.value = null
+}
+
+watch(showAllStages, all => {
+  stageFilterLink.set({ mscf: all ? 'all' : '' })
+  pruneOpenCall()
+})
+
+watch(() => props.stage, pruneOpenCall)
+
 function restoreCallFromLink() {
   if (messagesRestored) return
   const raw = callLink.initial('mscall')
@@ -261,6 +299,8 @@ function restoreCallFromLink() {
     return
   }
   messagesRestored = true
+  // 链接指向的调用不属于当前阶段：先切到全部阶段，否则恢复出来的导航位置在列表里不可见
+  if (!showAllStages.value && calls.value.find(call => call.id === id)!.stage !== props.stage) showAllStages.value = true
   openCallId.value = id
   callLink.set({ mscall: id })
   void loadMessages(true)
@@ -390,7 +430,9 @@ function fmtEpoch(ms: number | null): string {
   cursor: pointer;
 }
 .map-tool:hover:not(:disabled) { color: var(--accent-text); border-color: var(--accent-text); }
+.map-tool[aria-pressed='true'] { color: var(--accent-text); border-color: var(--accent-text); }
 .map-tool:disabled { opacity: 0.5; cursor: not-allowed; }
+.map-stage-toggle { display: flex; align-items: center; gap: 4px; }
 .map-empty { margin: 0; font-size: 10.5px; }
 .map-error { margin: 0; font-size: 10.5px; color: var(--action-danger); }
 .map-error-inline { font-size: 10px; color: var(--action-danger); }

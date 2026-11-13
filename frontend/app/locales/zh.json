@@ -4001,6 +4001,9 @@
       "pointCount": "{n} 点",
       "proposed": "AI 候选",
       "accept": "采纳",
+      "datasetBadge": "数据集几何",
+      "datasetEditWarning": "该要素几何取自数据集；一旦改动就转为人工几何（已确认）并移除数据集引用。",
+      "manualReason": "人工新增或编辑",
       "remove": "删除"
     },
     "results": {
@@ -4146,6 +4149,73 @@
       "featureCounts": "{places} 点 / {routes} 线 / {regions} 面",
       "layers": "可编辑图层"
     },
+    "researchPanel": {
+      "title": "要素来源与核验",
+      "hint": "条目取自当前 map_spec：来源徽标、核验状态、原因与相对位置证据；「确认」只是去掉 AI 候选标记后按 CAS 保存，放行与否以服务端核验为准。",
+      "pick": "选择",
+      "name": "要素",
+      "category": "类别",
+      "origin": "来源",
+      "verification": "核验",
+      "evidence": "原因 / 数据集引用",
+      "unknownValue": "未标注",
+      "noEvidence": "无",
+      "datasetRef": "数据集 {ref}",
+      "noFeatures": "当前几何里还没有要素。",
+      "extent": "研究范围（西/南/东/北）",
+      "datasetQueries": "数据集查询数",
+      "unverifiedTitle": "{n} 个要素的几何尚未核验或确认",
+      "unverifiedHint": "成图前必须逐条确认，或在几何编辑器里改成人工几何；闸门在服务端，确认只去掉 AI 候选标记。",
+      "confirmSelected": "确认所选（{n}）",
+      "confirmAll": "全部确认",
+      "confirmed": "已确认 {n} 个要素；最终核验结论仍以服务端为准",
+      "relationsTitle": "相对位置证据（{n}）",
+      "noRelations": "本轮提交没有相对位置证据。",
+      "relationSubject": "声明",
+      "relationKind": "关系",
+      "declared": "声明值",
+      "computed": "按坐标计算",
+      "consistency": "一致性",
+      "excerpt": "出处原文",
+      "notComputed": "未计算",
+      "km": "{km} km",
+      "tolerance": "±{km} km",
+      "directionConsistent": "方向一致",
+      "directionOpposite": "方向相反",
+      "consistent": "一致",
+      "inconsistent": "矛盾",
+      "originLabel": {
+        "dataset": "数据集",
+        "source": "来源正文",
+        "model": "模型推断",
+        "manual": "人工"
+      },
+      "statusLabel": {
+        "verified": "已核验",
+        "unverified": "待确认",
+        "conflict": "冲突",
+        "needs_user": "需人工裁决",
+        "confirmed": "已确认"
+      },
+      "categoryLabel": {
+        "river": "河流",
+        "lake": "湖泊",
+        "coast": "海岸",
+        "mountain": "山地",
+        "settlement": "聚落",
+        "route": "路线",
+        "territory": "疆域",
+        "other": "其它"
+      },
+      "relationLabel": {
+        "distance_km": "距离",
+        "east_of": "在东侧",
+        "west_of": "在西侧",
+        "north_of": "在北侧",
+        "south_of": "在南侧",
+        "near_river": "邻近河流"
+      }
+    },
     "settings": {
       "title": "模块设置",
       "hint": "设置仅归地图工作室；火宝资产检索设置保持独立。",
@@ -4197,6 +4267,9 @@
       "callTarget": "模型调用",
       "loadFailed": "过程加载失败",
       "durationZero": "0 ms",
+      "stageAll": "全部阶段",
+      "stageNone": "无阶段归属",
+      "stageFilterEmpty": "已加载的调用里没有本阶段的记录；可「载入更多」或切到全部阶段。",
       "runStatus": {
         "processing": "执行中",
         "completed": "已完成",

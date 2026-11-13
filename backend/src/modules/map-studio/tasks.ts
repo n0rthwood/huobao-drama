@@ -6,6 +6,7 @@ import { getHost, setMapStudioPlatform } from './registry.js'
 import { seedLegacyResearchKeys } from './settings.js'
 import { emptyBrief, emptyWorkflow, normalizeBrief } from './types.js'
 import { briefHash, loadTask, parseWorkflow, serializeDetail, MapStudioRequestError } from './store.js'
+import { closeOpenStageSpans } from './stage-spans.js'
 import type { MapStudioPlatform } from './contract.js'
 
 export async function initMapStudio(platform: MapStudioPlatform): Promise<void> {
@@ -20,6 +21,9 @@ export async function initMapStudio(platform: MapStudioPlatform): Promise<void> 
       const hb = Number((lastHeartbeat.get(run.id) as { hb: number | null } | undefined)?.hb ?? 0)
       const frozenAt = new Date(Math.max(Date.parse(run.updated_at) || 0, hb)).toISOString()
       sqlite.prepare("UPDATE map_studio_run SET status = 'interrupted', error_msg = '后端重启中断', finished_at = ? WHERE id = ? AND status = 'processing'").run(frozenAt, run.id)
+      // 阶段跨度按同一个冻结时刻收尾：留着 null 结束时间会把重启后的调用算进上一次运行。
+      // 写 params 会顺带把运行行的 updated_at 推到重启时刻，但墙钟只用 created_at→finished_at，冻结口径不变。
+      closeOpenStageSpans(run.id, 'interrupted', Math.max(0, Date.parse(frozenAt) || 0))
       const row = selectTask(run.task_id)
       if (!row) continue
       const state = parseWorkflow(row.state)

@@ -83,6 +83,7 @@ export async function runBaseStage(input: BaseStageInput): Promise<StageAgentRes
           }
           const spec = normalizeMapSpec({
             ...input.spec,
+            detail_level: input.brief.detail_level,
             bbox: args.bbox,
             projection: { type: args.projection ?? input.spec.projection.type },
             layers: args.layers ?? input.spec.layers,

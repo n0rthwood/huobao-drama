@@ -4001,6 +4001,9 @@
       "pointCount": "{n} points",
       "proposed": "AI candidate",
       "accept": "Accept",
+      "datasetBadge": "Dataset geometry",
+      "datasetEditWarning": "This geometry comes from a dataset; editing it converts it to manual geometry (confirmed) and drops the dataset reference.",
+      "manualReason": "Added or edited by hand",
       "remove": "Delete"
     },
     "results": {
@@ -4146,6 +4149,73 @@
       "featureCounts": "{places} points / {routes} lines / {regions} regions",
       "layers": "Editable layers"
     },
+    "researchPanel": {
+      "title": "Feature provenance and verification",
+      "hint": "Rows come from the current map_spec: origin badge, verification status, reasons and relative-position evidence. Confirm only removes the AI-proposal flag and saves through CAS; the server decides whether the gate opens.",
+      "pick": "Select",
+      "name": "Feature",
+      "category": "Category",
+      "origin": "Origin",
+      "verification": "Verification",
+      "evidence": "Reasons / dataset reference",
+      "unknownValue": "Not recorded",
+      "noEvidence": "None",
+      "datasetRef": "Dataset {ref}",
+      "noFeatures": "No features in the current geometry.",
+      "extent": "Research extent (W/S/E/N)",
+      "datasetQueries": "Dataset queries",
+      "unverifiedTitle": "{n} features have unverified or unconfirmed geometry",
+      "unverifiedHint": "Each must be confirmed, or edited into manual geometry, before drawing; the gate lives on the server and Confirm only removes the AI-proposal flag.",
+      "confirmSelected": "Confirm selected ({n})",
+      "confirmAll": "Confirm all",
+      "confirmed": "Confirmed {n} features; the server's verification result remains authoritative",
+      "relationsTitle": "Relative-position evidence ({n})",
+      "noRelations": "This submission declared no relative-position evidence.",
+      "relationSubject": "Statement",
+      "relationKind": "Relation",
+      "declared": "Declared",
+      "computed": "Computed from coordinates",
+      "consistency": "Consistency",
+      "excerpt": "Source excerpt",
+      "notComputed": "Not computed",
+      "km": "{km} km",
+      "tolerance": "±{km} km",
+      "directionConsistent": "Same direction",
+      "directionOpposite": "Opposite direction",
+      "consistent": "Consistent",
+      "inconsistent": "Conflict",
+      "originLabel": {
+        "dataset": "Dataset",
+        "source": "Source text",
+        "model": "Model",
+        "manual": "Manual"
+      },
+      "statusLabel": {
+        "verified": "Verified",
+        "unverified": "Unconfirmed",
+        "conflict": "Conflict",
+        "needs_user": "Needs decision",
+        "confirmed": "Confirmed"
+      },
+      "categoryLabel": {
+        "river": "River",
+        "lake": "Lake",
+        "coast": "Coast",
+        "mountain": "Mountain",
+        "settlement": "Settlement",
+        "route": "Route",
+        "territory": "Territory",
+        "other": "Other"
+      },
+      "relationLabel": {
+        "distance_km": "Distance",
+        "east_of": "East of",
+        "west_of": "West of",
+        "north_of": "North of",
+        "south_of": "South of",
+        "near_river": "Near river"
+      }
+    },
     "settings": {
       "title": "Studio settings",
       "hint": "These settings belong to Map Studio, separately from Huobao asset research.",
@@ -4197,6 +4267,9 @@
       "callTarget": "Model call",
       "loadFailed": "Could not load process",
       "durationZero": "0 ms",
+      "stageAll": "All stages",
+      "stageNone": "No stage",
+      "stageFilterEmpty": "No loaded call belongs to this stage; load more or switch to all stages.",
       "runStatus": {
         "processing": "Processing",
         "completed": "Completed",

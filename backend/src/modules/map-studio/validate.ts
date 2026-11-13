@@ -9,6 +9,9 @@ import { forwardFor, type MapRegistration } from './geo/geometry.js'
 import type { MapSpec } from './geo/base-render.js'
 import { THEME_PRESETS } from '../../services/layer-svg.js'
 import type { Layer, LayerDoc } from '../../services/layer-doc.js'
+import { extractDatasetGeometry, type ExtractedDatasetGeometry } from './geo/datasets.js'
+import { extentProblems, validExtent, computeRelation, excerptSupportsPoint, labelOverflowProblems } from './accuracy.js'
+import type { MapDatasetQuery, MapFeatureCategory, MapFeatureOrigin, MapRelation } from './types.js'
 import type {
   MapBrief,
   MapCoordinateBasis,
@@ -95,13 +98,16 @@ export interface FeatureSubmissionContext {
   requiredAdapters: string[]
   /** 已由人工确认（非 proposed）的几何：模型不能改写 */
   confirmed: MapSpec | null
+  extent?: unknown
+  relations?: unknown
+  datasetQueries?: MapDatasetQuery[]
 }
 
 /**
  * 校验模型提交的地理要素。任何一处不合格整批拒收，并逐条说明。
  * 合格时返回落库形状（MapResearchFeature），字段原样取自提交，不做降级或补齐。
  */
-export function validateFeatureSubmission(raw: unknown, ctx: FeatureSubmissionContext): { features: MapResearchFeature[]; problems: string[] } {
+function validateFeatureGeometry(raw: unknown, ctx: FeatureSubmissionContext): { features: MapResearchFeature[]; problems: string[] } {
   const problems: string[] = []
   const missingAdapters = ctx.requiredAdapters.filter(adapter => !ctx.searchedAdapters.includes(adapter))
   if (missingAdapters.length) {
@@ -148,7 +154,7 @@ export function validateFeatureSubmission(raw: unknown, ctx: FeatureSubmissionCo
 
     const sourceIds = Array.isArray(record.source_ids) ? record.source_ids.map(String) : []
     const unknownIds = sourceIds.filter(id => !byId.has(id))
-    if (!sourceIds.length) local.push('source_ids 必须至少引用一条本阶段检索到的来源（如 ["S3"]）')
+    if (!sourceIds.length && record.geometry_source !== 'dataset') local.push('source_ids 必须至少引用一条本阶段检索到的来源（如 ["S3"]）')
     if (unknownIds.length) local.push(`source_ids 引用了不存在的来源 ${unknownIds.join('、')}；可用来源是 ${[...byId.keys()].join('、') || '（尚无，请先检索）'}`)
 
     const basis = record.coordinate_basis as MapCoordinateBasis
@@ -196,7 +202,7 @@ export function validateFeatureSubmission(raw: unknown, ctx: FeatureSubmissionCo
       })
       if (kind === 'route' && distinctCount(points) < 2) local.push('route 的 points 至少要有 2 个不同的合法顶点')
       if (kind === 'region') {
-        if (!ctx.brief.schematic) {
+        if (!ctx.brief.schematic && record.geometry_source !== 'dataset') {
           local.push('当前需求没有开启示意图模式，不能提交面状范围（region）：请改成 place（给出能代表它的经纬度及依据）或删掉该要素')
         } else if (distinctCount(points) < 3 || polygonArea(points) < 1e-9) {
           local.push('region 的 points 至少要有 3 个不同且不共线的顶点')
@@ -262,6 +268,143 @@ export function validateFeatureSubmission(raw: unknown, ctx: FeatureSubmissionCo
     }
   }
   return { features: problems.length ? [] : features, problems }
+}
+
+/** Research accuracy contract: resolve trusted geometry, reject hard errors, then evaluate evidence. */
+export function validateFeatureSubmission(raw: unknown, ctx: FeatureSubmissionContext): { features: MapResearchFeature[]; problems: string[]; relations: MapRelation[] } {
+  const problems: string[] = []
+  const relations: MapRelation[] = []
+  if (!validExtent(ctx.extent)) problems.push('extent 必填，必须为合法 [west,south,east,north] 且 west<east、south<north')
+  if (validExtent(ctx.extent) && ctx.confirmed) {
+    for (const feature of specFeatures(ctx.confirmed)) {
+      const item = [...ctx.confirmed.places, ...ctx.confirmed.routes, ...ctx.confirmed.regions].find(item => item.id === feature.id)
+      if (item?.proposed !== true) problems.push(...extentProblems(feature.coords, ctx.extent).map(message => `已确认要素「${feature.name}」：${message}`))
+    }
+  }
+  if (!Array.isArray(raw)) return { features: [], problems: [...problems, 'features 必须是数组'], relations }
+  const records = raw.map(item => item && typeof item === 'object' && !Array.isArray(item) ? { ...item } as Record<string, unknown> : {})
+  const geometries = new Map<number, ExtractedDatasetGeometry>()
+  const missing = new Set<number>()
+  const categories = ['river', 'lake', 'coast', 'mountain', 'settlement', 'route', 'territory', 'other']
+  records.forEach((record, index) => {
+    const tag = `features[${index}]「${String(record.name ?? '')}」`
+    if (!categories.includes(String(record.category))) problems.push(`${tag} category 必须为 ${categories.join(' / ')}`)
+    if (!['dataset', 'source', 'model'].includes(String(record.geometry_source))) problems.push(`${tag} geometry_source 必须为 dataset / source / model`)
+    const natural = ['river', 'lake', 'coast', 'mountain'].includes(String(record.category))
+    if (record.geometry_source === 'dataset') {
+      if (['points', 'lon', 'lat', 'parts'].some(key => record[key] !== undefined)) problems.push(`${tag} dataset 不得手写 points/lon/lat/parts，只提交 dataset_ref`)
+      const ref = record.dataset_ref as { ref?: string; clip_bbox?: [number, number, number, number] } | undefined
+      if (!ref?.ref) { problems.push(`${tag} dataset_ref.ref 必填`); return }
+      if (ref.clip_bbox !== undefined && !validExtent(ref.clip_bbox)) { problems.push(`${tag} clip_bbox 非法`); return }
+      try {
+        const geometry = extractDatasetGeometry(ref.ref, ref.clip_bbox)
+        geometries.set(index, geometry)
+        if (record.kind !== geometry.kind) problems.push(`${tag} dataset 几何为 ${geometry.kind}，请修正 kind`)
+        if (natural && geometry.layer !== record.category) problems.push(`${tag} category=${String(record.category)} 与 dataset 图层 ${geometry.layer} 不符`)
+        if (geometry.kind === 'place') { record.lon = geometry.lon; record.lat = geometry.lat }
+        else record.points = geometry.parts[0]
+      } catch (err) { problems.push(`${tag}：${err instanceof Error ? err.message : String(err)}`) }
+    } else if (natural) {
+      const claim = record.dataset_missing as { queries?: unknown; reason?: unknown } | undefined
+      const queries = Array.isArray(claim?.queries) ? claim.queries : []
+      const searched = queries.length > 0 && queries.every(query => {
+        if (typeof query !== 'string') return false
+        const attempts = ctx.datasetQueries?.filter(q => q.layer === record.category && q.query === query) ?? []
+        if (!attempts.length) return false
+        const keys = [query, String(record.name ?? '')].map(name => matchKey(name.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()).replace(/[-_]/g, ''))
+        return attempts.every(attempt => {
+          if (attempt.error) return false
+          if (!attempt.hits) return true
+          if (!attempt.refs?.length) return false
+          try {
+            return attempt.refs.every(ref => extractDatasetGeometry(ref).names.every(name => !keys.includes(matchKey(name.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()).replace(/[-_]/g, ''))))
+          } catch { return false }
+        })
+      })
+      if (!searched || typeof claim?.reason !== 'string' || !claim.reason.trim()) problems.push(`${tag} 自然要素必须取自 dataset；dataset_missing 必须引用本阶段 search_dataset 真正查过、没有同名候选的 query，并说明原因`)
+      else missing.add(index)
+    }
+  })
+  const base = validateFeatureGeometry(records, ctx)
+  problems.push(...base.problems)
+  if (problems.length) return { features: [], problems, relations }
+  const features = base.features
+  const acknowledgements = new Map<string, Set<string>>()
+  features.forEach((feature, index) => {
+    const record = records[index]!
+    const geometry = geometries.get(index)
+    feature.category = record.category as MapFeatureCategory
+    feature.origin = record.geometry_source as MapFeatureOrigin
+    feature.parts = geometry?.kind !== 'place' ? geometry?.parts : undefined
+    if (geometry) feature.dataset_ref = record.dataset_ref as NonNullable<MapResearchFeature['dataset_ref']>
+    const points = geometry ? geometry.kind === 'place' ? [[geometry.lon!, geometry.lat!] as [number, number]] : geometry.parts.flat() : feature.kind === 'place' ? [[feature.lon!, feature.lat!] as [number, number]] : feature.points
+    if (validExtent(ctx.extent)) problems.push(...extentProblems(points, ctx.extent).map(message => `「${feature.name}」：${message}`))
+    const ack = new Set<string>()
+    for (const item of Array.isArray(record.acknowledge) ? record.acknowledge : []) {
+      if (item && typeof item === 'object' && typeof item.code === 'string' && typeof item.reason === 'string' && item.reason.trim()) ack.add(item.code)
+    }
+    acknowledgements.set(feature.name, ack)
+    const verified = feature.origin === 'dataset' || !feature.approximate && feature.kind === 'place' && feature.excerpt_verified && excerptSupportsPoint(feature.supporting_excerpt, [feature.lon!, feature.lat!])
+    const missingClaim = record.dataset_missing
+    const missingReason = missingClaim && typeof missingClaim === 'object' && 'reason' in missingClaim ? String(missingClaim.reason) : ''
+    const missingQueries = missingClaim && typeof missingClaim === 'object' && 'queries' in missingClaim ? missingClaim.queries : []
+    feature.verification = missing.has(index) ? { status: 'needs_user', reasons: [`dataset_missing：${missingReason}；检索 ${JSON.stringify(missingQueries)}，请人工裁决`] }
+      : verified ? { status: 'verified', reasons: [feature.origin === 'dataset' ? `数据集 ${feature.dataset_ref?.ref}` : '来源正文中的经纬度与该点相差不超过 0.1°'] }
+        : { status: 'unverified', reasons: ['坐标尚无可核验的原文经纬度或相对位置证据'] }
+    if (feature.origin !== 'dataset' && feature.kind === 'place' && Math.abs(feature.lon! - feature.lat!) < 0.25) {
+      const message = `lon_lat_similar：「${feature.name}」经度与纬度相差小于 0.25°，疑似抄错`
+      if (!ack.has('lon_lat_similar')) problems.push(message)
+      feature.verification = { status: 'conflict', reasons: [...feature.verification.reasons, message, ...(Array.isArray(record.acknowledge) ? record.acknowledge.filter(a => a?.code === 'lon_lat_similar').map(a => String(a.reason)) : [])] }
+    }
+  })
+  const named = new Map<string, { point: [number, number]; parts: Array<Array<[number, number]>>; verified: boolean; datasetRiver: boolean; feature?: MapResearchFeature }>(
+    features.map(f => [f.name, { point: (f.kind === 'place' ? [f.lon!, f.lat!] : f.points[0]!) as [number, number], parts: f.parts ?? [f.points], verified: f.verification?.status === 'verified', datasetRiver: f.category === 'river' && f.origin === 'dataset', feature: f }]))
+  for (const f of [...ctx.confirmed?.places ?? [], ...ctx.confirmed?.routes ?? [], ...ctx.confirmed?.regions ?? []]) {
+    if (!named.has(f.name) && (f.proposed !== true || f.verification?.status === 'verified')) named.set(f.name, { point: ('lon' in f ? [f.lon, f.lat] : f.points[0]!) as [number, number], parts: 'points' in f ? [f.points] : [], verified: true, datasetRiver: f.category === 'river' && f.origin === 'dataset' })
+  }
+  const relationNames = [...features, ...[...ctx.confirmed?.places ?? [], ...ctx.confirmed?.routes ?? [], ...ctx.confirmed?.regions ?? []].filter(f => !features.some(feature => feature.name === f.name) && (f.proposed !== true || f.verification?.status === 'verified'))]
+  if (ctx.relations !== undefined && !Array.isArray(ctx.relations)) problems.push('relations 必须为数组')
+  for (const item of Array.isArray(ctx.relations) ? ctx.relations : []) {
+    const r = item as Omit<MapRelation, 'computed' | 'message'>
+    const subject = named.get(r?.subject), object = named.get(r?.object)
+    const source = ctx.sources.find(s => s.id === r?.source_id)
+    if (r && [r.subject, r.object].some(name => relationNames.filter(f => f.name === name).length > 1)) {
+      problems.push(`relations ${String(r.id)} 引用重名要素，名称不能唯一定位；请区分名称后重交`); continue
+    }
+    if (!r || !r.id || !subject || !object || !['distance_km', 'east_of', 'west_of', 'north_of', 'south_of', 'near_river'].includes(r.relation)
+      || typeof r.excerpt !== 'string' || matchKey(r.excerpt).length < 6 || !matchKey(source?.excerpt ?? '').includes(matchKey(r.excerpt))
+      || r.relation === 'distance_km' && !(typeof r.value_km === 'number' && Number.isFinite(r.value_km) && r.value_km >= 0)
+      || r.tolerance_km !== undefined && !(typeof r.tolerance_km === 'number' && Number.isFinite(r.tolerance_km) && r.tolerance_km >= 0)) {
+      problems.push(`relations ${String(r?.id ?? '')} 非法：subject/object 必须指向本批或已核验要素，excerpt 必须逐字引用 source_id 正文，距离及容差必须为非负数字`); continue
+    }
+    if (r.relation === 'near_river' && !object.datasetRiver) { problems.push(`relations ${r.id} near_river 必须指向数据集河流`); continue }
+    const computed = computeRelation(r, subject.point, object.point, object.parts)
+    relations.push(computed)
+    for (const name of [r.subject, r.object]) {
+      const feature = named.get(name)?.feature
+      if (!feature) continue
+      feature.relations = [...feature.relations ?? [], computed]
+      if (!computed.computed.consistent && name === r.subject) {
+        const message = `relation_conflict：${computed.message}`
+        if (!acknowledgements.get(name)?.has('relation_conflict')) problems.push(message)
+        const record = records.find(item => item.name === name)
+        const reasons = (Array.isArray(record?.acknowledge) ? record.acknowledge : []).filter(a => a?.code === 'relation_conflict').map(a => String(a.reason))
+        feature.verification = { status: 'conflict', reasons: [...feature.verification?.reasons ?? [], message, ...reasons] }
+        named.get(name)!.verified = false
+      }
+    }
+  }
+  // Only consistent relations anchored to independently verified/confirmed geometry can verify another point.
+  for (let pass = 0; pass < features.length; pass++) for (const relation of relations) {
+    if (!relation.computed.consistent) continue
+    for (const [name, other] of [[relation.subject, relation.object], [relation.object, relation.subject]]) {
+      const entry = named.get(name!), anchor = named.get(other!)
+      if (!entry?.feature || !anchor?.verified || entry.feature.approximate || entry.feature.verification?.status !== 'unverified') continue
+      entry.verified = true
+      entry.feature.verification = { status: 'verified', reasons: [`关系证据一致：${relation.message}`] }
+    }
+  }
+  return { features: problems.length ? [] : features, problems, relations }
 }
 
 // ───────────────────────────── 取景 ─────────────────────────────
@@ -426,7 +569,7 @@ export function drawingProblems(input: {
   omitted: unknown
 }): { problems: string[]; omitted: OmittedFeature[] } {
   const { doc, features, registration } = input
-  const problems: string[] = []
+  const problems: string[] = labelOverflowProblems(doc).map(problem => problem.message)
   const forward = forwardFor(registration)
   const width = registration.width
   const height = registration.height

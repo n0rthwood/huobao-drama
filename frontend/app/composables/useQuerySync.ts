@@ -255,6 +255,8 @@ export const DEEPLINK_KEYS = {
   mapStudioRun: ['msstage', 'msrun'],
   /** 地图工作室：展开的完整公开调用（稳定 call id）。 */
   mapStudioCall: ['mscall'],
+  /** 地图工作室：过程面板里调用的阶段筛选（mscf=all 全部阶段；缺省只看当前阶段）。 */
+  mapStudioCallFilter: ['mscf'],
   /** 地图工作室：图层编辑器开关与模型轮次阶段，只恢复界面。 */
   mapStudioAgent: ['mslayer', 'msround'],
   /** 地图工作室：编辑器内选中的稳定图层 id，不含草稿。 */

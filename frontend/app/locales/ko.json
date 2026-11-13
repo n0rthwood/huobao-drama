@@ -4001,6 +4001,9 @@
       "pointCount": "{n}점",
       "proposed": "AI 후보",
       "accept": "채택",
+      "datasetBadge": "데이터셋 기하",
+      "datasetEditWarning": "이 기하는 데이터셋에서 왔습니다. 수정하면 사람이 만든 기하(확인됨)로 바뀌고 데이터셋 참조가 제거됩니다.",
+      "manualReason": "사람이 추가 또는 편집",
       "remove": "삭제"
     },
     "results": {
@@ -4146,6 +4149,73 @@
       "featureCounts": "점 {places} / 선 {routes} / 면 {regions}",
       "layers": "편집 가능한 레이어"
     },
+    "researchPanel": {
+      "title": "요소 출처와 검증",
+      "hint": "행은 현재 map_spec에서 가져옵니다: 출처 배지, 검증 상태, 사유, 상대 위치 근거. 「확인」은 AI 후보 표시를 제거해 CAS로 저장할 뿐이며, 통과 판정은 서버가 합니다.",
+      "pick": "선택",
+      "name": "요소",
+      "category": "분류",
+      "origin": "출처",
+      "verification": "검증",
+      "evidence": "사유 / 데이터셋 참조",
+      "unknownValue": "기록 없음",
+      "noEvidence": "없음",
+      "datasetRef": "데이터셋 {ref}",
+      "noFeatures": "현재 기하에 요소가 없습니다.",
+      "extent": "연구 범위 (서/남/동/북)",
+      "datasetQueries": "데이터셋 조회 수",
+      "unverifiedTitle": "{n}개 요소의 기하가 검증 또는 확인되지 않았습니다",
+      "unverifiedHint": "그리기 전에 각 항목을 확인하거나 기하 편집기에서 사람이 만든 기하로 바꿔야 합니다. 판정은 서버가 하며 「확인」은 AI 후보 표시만 제거합니다.",
+      "confirmSelected": "선택 확인 ({n})",
+      "confirmAll": "전체 확인",
+      "confirmed": "{n}개 요소를 확인했습니다. 최종 검증 결과는 서버가 결정합니다",
+      "relationsTitle": "상대 위치 근거 ({n})",
+      "noRelations": "이번 제출에는 상대 위치 근거가 없습니다.",
+      "relationSubject": "선언",
+      "relationKind": "관계",
+      "declared": "선언값",
+      "computed": "좌표 계산값",
+      "consistency": "일치 여부",
+      "excerpt": "출처 원문",
+      "notComputed": "계산 안 됨",
+      "km": "{km} km",
+      "tolerance": "±{km} km",
+      "directionConsistent": "방향 일치",
+      "directionOpposite": "방향 반대",
+      "consistent": "일치",
+      "inconsistent": "모순",
+      "originLabel": {
+        "dataset": "데이터셋",
+        "source": "출처 본문",
+        "model": "모델 추정",
+        "manual": "사람"
+      },
+      "statusLabel": {
+        "verified": "검증됨",
+        "unverified": "미확인",
+        "conflict": "모순",
+        "needs_user": "사람 판단 필요",
+        "confirmed": "확인됨"
+      },
+      "categoryLabel": {
+        "river": "하천",
+        "lake": "호수",
+        "coast": "해안",
+        "mountain": "산지",
+        "settlement": "취락",
+        "route": "경로",
+        "territory": "영역",
+        "other": "기타"
+      },
+      "relationLabel": {
+        "distance_km": "거리",
+        "east_of": "동쪽",
+        "west_of": "서쪽",
+        "north_of": "북쪽",
+        "south_of": "남쪽",
+        "near_river": "하천 인접"
+      }
+    },
     "settings": {
       "title": "스튜디오 설정",
       "hint": "Huobao 자료 검색과 분리된 지도 스튜디오 전용 설정입니다.",
@@ -4197,6 +4267,9 @@
       "callTarget": "모델 호출",
       "loadFailed": "과정 불러오기 실패",
       "durationZero": "0 ms",
+      "stageAll": "전체 단계",
+      "stageNone": "단계 미귀속",
+      "stageFilterEmpty": "불러온 호출에 이 단계의 기록이 없습니다. 더 불러오거나 전체 단계로 전환하세요.",
       "runStatus": {
         "processing": "처리 중",
         "completed": "완료",

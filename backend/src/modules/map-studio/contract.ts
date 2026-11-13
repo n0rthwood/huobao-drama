@@ -28,7 +28,7 @@ export interface MapStudioDeliverable {
   texture_image: { path: string } | null
   /** 像素几何（width/height/points/lines/regions/labels），宿主按自己的语义规范化 */
   semantics: unknown
-  /** 每个要素的出处：{ feature_id, name, kind, origin, proposed, source_ids, coordinate_basis, excerpt? } */
+  /** 要素出处与核验：{ feature_id, name, kind, category, origin: dataset|source|model|manual, verification, relations, dataset_ref, proposed, source_ids, coordinate_basis, excerpt }；宿主不解释。 */
   features: unknown[]
   /** research.sources 原样 */
   sources: unknown[]
