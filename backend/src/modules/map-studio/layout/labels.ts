@@ -150,6 +150,33 @@ export function labelProblems(doc: LayerDoc, size: LabelSize = doc.base, feature
     const feature = features.find(f => f.id === r.feature_id)
     if (feature && featureDistance(r, feature, world) > Math.hypot(world.width, world.height) * 0.06 + EPS) add('label_far_from_feature', r.layer_id, `文字离锚定要素 ${feature.id} 超过画面对角线 6%，请移到该要素附近`)
   }
+  // 底板遮挡（生产验收任务 2 / 版本 3226：图例底板压住「基辅」点和第聂伯河）：带底板的标签与 card 画在
+  // 别的文字、点标记或线要素**之上**时就把它们盖住了。只看绘制顺序在底板之下的内容——
+  // 叠在底板上面的文字（图例条目写在图例底板上）是正常排版。
+  const order = new Map(doc.layers.map((layer, index) => [layer.id, index]))
+  for (const plate of doc.layers) {
+    if (!plate.visible || plate.opacity <= 0) continue
+    if (plate.type !== 'card' && !(plate.type === 'label' && Number(styleOf(plate, doc, 'bg_opacity')) > 0)) continue
+    const b = layerBounds(plate, doc.theme, world.width / world.height, undefined, world.unit / world.height)
+    const box: TextRect = { layer_id: plate.id, x: b.x * world.width, y: b.y * world.height, w: b.w * world.width, h: b.h * world.height }
+    const own = plate.anchor?.semantic_id
+    const above = (id: string) => (order.get(plate.id) ?? 0) > (order.get(id) ?? 0)
+    for (const r of rects) {
+      if (r.layer_id === plate.id || !above(r.layer_id) || !overlaps(box, r)) continue
+      add('label_overlap', plate.id, `底板盖住图层 ${r.layer_id} 的文字；请把底板移到空白处或缩小`)
+      add('label_overlap', r.layer_id, `文字被图层 ${plate.id} 的底板盖住；请移动标签或调用 auto_layout_labels`)
+    }
+    for (const marker of markers) {
+      if (!above(marker.id) || own && marker.anchor?.semantic_id === own) continue
+      const radius = Number(styleOf(marker, doc, 'dot_radius')) * world.unit
+      if (pointRectDistance([marker.at[0] * world.width, marker.at[1] * world.height], box) < radius - EPS) add('label_marker_overlap', plate.id, `底板盖住点标记 ${marker.id}；请把底板移到空白处`)
+    }
+    for (const line of doc.layers) {
+      if (line.type !== 'polyline' || !line.visible || line.opacity <= 0 || !above(line.id) || !line.anchor?.semantic_id || line.anchor.semantic_id === own) continue
+      const points = line.points.map(([x, y]): Point => [x * world.width, y * world.height])
+      if (points.slice(1).some((p, i) => segmentHitsRect(points[i]!, p, box))) add('label_marker_overlap', plate.id, `底板压住线要素图层 ${line.id}；请把底板移到不压要素的空白处`)
+    }
+  }
   return out
 }
 
