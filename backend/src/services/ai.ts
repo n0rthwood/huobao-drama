@@ -5,6 +5,7 @@ import { db, schema } from '../db/index.js'
 import { eq } from 'drizzle-orm'
 import { logTaskProgress, logTaskWarn } from '../utils/task-logger.js'
 import { joinProviderUrl } from './adapters/url.js'
+import { h3QueueModel } from './adapters/h3-jobs-client.js'
 
 export type ServiceType = 'text' | 'image' | 'video' | 'tts'
 
@@ -49,7 +50,7 @@ export function parseConfigTemperature(settingsRaw: string | null | undefined): 
 export const officialProviders: Record<ServiceType, readonly string[]> = {
   text: ['openai', 'gemini', 'volcengine'],
   image: ['openai', 'gemini', 'volcengine', 'qwen-jobs'],
-  video: ['volcengine', 'minimax', 'comfyui'],
+  video: ['volcengine', 'minimax', 'comfyui', 'h3-jobs'],
   tts: ['voxcpm'],
 }
 
@@ -58,11 +59,22 @@ export function isOfficialProvider(serviceType?: string | null, provider?: strin
   return !!providers && providers.includes((provider || '').toLowerCase())
 }
 
+/** H3 系视频 provider 的模型白名单：ComfyUI 直连只认 MiniMax-H3 系，h3-jobs 队列只认能映射到队列 id 的模型 */
 export function validateVideoModel(provider: string | null | undefined, model: string | null | undefined): string | null {
-  if ((provider || '').toLowerCase() !== 'comfyui' || !model) return null
-  return model.toLowerCase().startsWith('minimax-h3')
-    ? null
-    : 'ComfyUI 视频仅支持 MiniMax-H3 模型'
+  const p = (provider || '').toLowerCase()
+  if (!model) return null
+  if (p === 'comfyui') {
+    return model.toLowerCase().startsWith('minimax-h3') ? null : 'ComfyUI 视频仅支持 MiniMax-H3 模型'
+  }
+  if (p === 'h3-jobs') {
+    try {
+      h3QueueModel(model)
+      return null
+    } catch (err) {
+      return err instanceof Error ? err.message : 'H3 视频队列不支持该模型'
+    }
+  }
+  return null
 }
 
 export function validateConfigModels(
@@ -70,7 +82,8 @@ export function validateConfigModels(
   provider: string | null | undefined,
   models: unknown,
 ): string | null {
-  if (serviceType !== 'video' || (provider || '').toLowerCase() !== 'comfyui') return null
+  const p = (provider || '').toLowerCase()
+  if (serviceType !== 'video' || (p !== 'comfyui' && p !== 'h3-jobs')) return null
   const values = Array.isArray(models) ? models : models == null ? [] : [models]
   for (const model of values) {
     if (typeof model !== 'string') return '模型必须为字符串'

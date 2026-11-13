@@ -7,8 +7,9 @@ import { generateImage, generateVideo } from '../services/generation.js'
 import { getActiveConfig, getConfigById, validateVideoModel } from '../services/ai.js'
 import { getDramaStylePrompt } from '../services/style-preset.js'
 import { logTaskError, logTaskPayload, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
-import { serializeTask, serializeTasks } from '../services/sys-task.js'
+import { isH3JobsTask, serializeTask, serializeTasks } from '../services/sys-task.js'
 import { cancelImageTask, discardRemoteJob } from '../services/qwen-jobs.js'
+import { cancelVideoTask, discardRemoteVideoJob } from '../services/h3-jobs.js'
 import { enrichTask, listActiveTasks, listTaskCenter } from '../services/task-center.js'
 import { retryTask } from '../services/task-retry.js'
 import { completionStamp } from '../services/media-time.js'
@@ -376,21 +377,26 @@ app.get('/', async (c) => {
   return success(c, serializeTasks(rows))
 })
 
-// POST /tasks/:id/cancel — 取消排队/运行中的 qwen-jobs 任务（其它供应商不支持）
+// POST /tasks/:id/cancel — 取消排队/运行中的任务队列任务（图片 qwen-jobs / 视频 h3-jobs；其它供应商不支持）
 app.post('/:id/cancel', async (c) => {
   const id = Number(c.req.param('id'))
   try {
-    return success(c, serializeTask(await cancelImageTask(id)))
+    const [row] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, id))
+    const cancelled = row && isH3JobsTask(row.provider) ? await cancelVideoTask(id) : await cancelImageTask(id)
+    return success(c, serializeTask(cancelled))
   } catch (err) {
     return badRequest(c, err instanceof Error ? err.message : '取消失败')
   }
 })
 
-// DELETE /tasks/:id — 丢弃任务记录；qwen-jobs 的远端任务一并取消并清理文件
+// DELETE /tasks/:id — 丢弃任务记录；任务队列的远端任务一并取消并清理文件
 app.delete('/:id', async (c) => {
   const id = Number(c.req.param('id'))
   const [row] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, id))
-  if (row) await discardRemoteJob(row)
+  if (row) {
+    await discardRemoteJob(row)
+    await discardRemoteVideoJob(row)
+  }
   await db.delete(schema.sysTask).where(eq(schema.sysTask.id, id))
   return success(c)
 })

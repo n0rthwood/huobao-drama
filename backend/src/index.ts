@@ -41,14 +41,15 @@ import { TtsRequiredError } from './services/narration-tts-gate.js'
 import { SkeletonNotConfirmedError } from './services/narration-skeleton.js'
 import { requestLogger, errorHandler } from './middleware/logger.js'
 import { db, schema } from './db/index.js'
-import { and, eq, isNull, ne, or } from 'drizzle-orm'
+import { and, eq, isNull, ne, notInArray, or } from 'drizzle-orm'
 import { now } from './utils/response.js'
 import { DATA_ROOT } from './utils/paths.js'
 import { resumeVideoBatches } from './services/video-batch.js'
 import { resumeKeyframeBatches } from './services/keyframe-batch.js'
 import { resumeAssetPipelines } from './services/asset-pipeline/run.js'
 import { startQwenJobsTracker } from './services/qwen-jobs.js'
-import { QWEN_JOBS_PROVIDER } from './services/sys-task.js'
+import { startH3JobsTracker } from './services/h3-jobs.js'
+import { JOB_QUEUE_PROVIDERS } from './services/adapters/registry.js'
 import { backfillTaskEpisodeIds, failInterruptedTextTasks } from './services/task-center.js'
 import { resumeQueuedTextTasks } from './services/text-task-restart.js'
 import { freezeInterruptedObservations } from './services/task-observability.js'
@@ -166,13 +167,13 @@ const port = Number(process.env.PORT || 5679)
 console.log(`🚀 Huobao Drama TS server on http://localhost:${port}`)
 // 进程重启后内存中的轮询线程全部丢失,残留的 processing 任务永远不会完成,
 // 启动时统一标记为 failed,避免前端一直显示"生成中"。
-// qwen-jobs 的任务由服务端排队执行，重启不影响它们：交给追踪器按远端 id 继续跟。
+// 任务队列（图片 qwen-jobs / 视频 h3-jobs）的任务由服务端排队执行，重启不影响它们：交给各自追踪器按远端 id 继续跟。
 db.update(schema.sysTask)
   .set({ status: 'failed', errorMsg: '服务重启，生成任务中断，请重试', updatedAt: now() })
   .where(and(
     eq(schema.sysTask.status, 'processing'),
     ne(schema.sysTask.type, 'text'),
-    or(isNull(schema.sysTask.provider), ne(schema.sysTask.provider, QWEN_JOBS_PROVIDER)),
+    or(isNull(schema.sysTask.provider), notInArray(schema.sysTask.provider, [...JOB_QUEUE_PROVIDERS])),
   ))
   .then(res => {
     const affected = res?.changes ?? 0
@@ -210,6 +211,7 @@ db.update(schema.sysTask)
   .then(() => backfillScriptConfirmation())
   // 清理完成后再恢复批量任务：被重启打断的那一张/那一镜此时已是 failed，由批次重新提交
   .then(() => startQwenJobsTracker())
+  .then(() => startH3JobsTracker())
   .then(() => resumeKeyframeBatches())
   .then(() => resumeVideoBatches())
   // 资产流水线恢复（Issue #56）：suspended 的 run 保持等待人工，running 的原地重放

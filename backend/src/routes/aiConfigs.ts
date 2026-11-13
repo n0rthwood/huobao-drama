@@ -118,6 +118,16 @@ function buildProbe(serviceType: string, provider: string, baseUrl: string, mode
     }
   }
 
+  if (p === 'h3-jobs') {
+    // h3-central 视频队列：/healthz 返回 {service:'h3-central', version, workers, queue} 即队列可达（不调引擎）
+    return {
+      method: 'GET',
+      url: joinProviderUrl(baseUrl, '', '/healthz'),
+      headers: apiKey ? { Authorization: `Basic ${Buffer.from(apiKey, 'utf8').toString('base64')}` } : {},
+      body: undefined,
+    }
+  }
+
   if (p === 'comfyui') {
     // ComfyUI 无鉴权概念，/system_stats 返回 200 即引擎可达；有 key（反代场景）才带 Authorization
     return {

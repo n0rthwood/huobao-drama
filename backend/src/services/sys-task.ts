@@ -2,7 +2,7 @@
  * sys_task 的状态语义与对外序列化 —— 生成链路、批量、路由共用。
  *
  * 状态：queued（远端排队中）| processing（远端运行中或其它 provider 生成中）| completed | failed | cancelled。
- * remote_state（TEXT JSON）保存 qwen-jobs 任务的最近一次快照，另外保留内部键：
+ * remote_state（TEXT JSON）保存任务队列（图片 qwen-jobs / 视频 h3-jobs）任务的最近一次快照，另外保留内部键：
  *   request（提交用的请求体，先落盘再调远端，重启后按同一幂等键原样重发）、
  *   config_id（追踪器据此找回 baseUrl/凭据）、idempotency_key。
  * 这三个内部键只存库，不出 API。
@@ -14,9 +14,10 @@ import { now } from '../utils/response.js'
 import { toSnakeCase } from '../utils/transform.js'
 import { logTaskWarn } from '../utils/task-logger.js'
 import type { QwenJob, QwenJobRequest } from './adapters/qwen-jobs-client.js'
+import type { H3JobRequest } from './adapters/h3-jobs-client.js'
 import { toUnixSeconds } from './media-time.js'
 
-import { isJobQueueImageProvider } from './adapters/registry.js'
+import { isJobQueueImageProvider, isJobQueueVideoProvider } from './adapters/registry.js'
 
 export { QWEN_JOBS_PROVIDER } from './adapters/registry.js'
 
@@ -30,19 +31,41 @@ export function isActiveTaskStatus(status: string | null | undefined): boolean {
   return status === 'queued' || status === 'processing'
 }
 
-/** 该任务是否走服务端任务队列（qwen-jobs）——provider → 执行方式的映射在 adapters/registry.ts */
+/** 该任务是否走服务端图片任务队列（qwen-jobs）——provider → 执行方式的映射在 adapters/registry.ts */
 export function isQwenJobsTask(provider: string | null | undefined): boolean {
   return isJobQueueImageProvider(provider)
 }
 
+/** 该任务是否走服务端视频任务队列（h3-jobs） */
+export function isH3JobsTask(provider: string | null | undefined): boolean {
+  return isJobQueueVideoProvider(provider)
+}
+
+/** 远端任务对象里会进 remote_state 的那部分（图片 qwen-jobs 与视频 h3-jobs 同形） */
+export interface RemoteJobLike {
+  status: QwenJob['status']
+  queue: QwenJob['queue']
+  progress: {
+    phase: string
+    step?: number | null
+    total_steps?: number | null
+    fraction: number
+    elapsed_seconds: number
+    remaining_seconds: number | null
+  } | null
+  estimate: (NonNullable<QwenJob['estimate']> & { duration_key?: number }) | null
+  estimated_finish_seconds: number | null
+  cancel_requested: boolean
+}
+
 export interface RemoteState {
-  request?: QwenJobRequest
+  request?: QwenJobRequest | H3JobRequest
   config_id?: number
   idempotency_key?: string
   remote_status?: string
-  queue?: QwenJob['queue']
-  progress?: QwenJob['progress']
-  estimate?: QwenJob['estimate']
+  queue?: RemoteJobLike['queue']
+  progress?: RemoteJobLike['progress']
+  estimate?: RemoteJobLike['estimate']
   estimated_finish_seconds?: number | null
   cancel_requested?: boolean
   /** 本地已请求取消但远端还没确认（取消接口失败/提交在途）：追踪器据此重试取消且永不写回结果 */
@@ -61,7 +84,7 @@ export function parseRemoteState(raw: string | null | undefined): RemoteState {
 }
 
 /** 远端任务对象 → 对前端可见的 remote_state 字段 */
-export function remoteSnapshot(job: QwenJob): RemoteState {
+export function remoteSnapshot(job: RemoteJobLike): RemoteState {
   return {
     remote_status: job.status,
     queue: job.queue ?? null,
@@ -139,7 +162,7 @@ export function mapRemoteStatus(status: QwenJob['status']): SysTaskStatus | null
  * 只用 sys_task id 不够——id 在数据库重建/拷贝（如 worktree QA）后会重复，服务端按 key 去重会把
  * 新任务当成旧任务（409 idempotency_conflict）。重试必须新建 sys_task（新 key）。
  */
-export function qwenIdempotencyKey(taskId: number): string {
+export function queueIdempotencyKey(taskId: number): string {
   return `huobao-sys_task-${taskId}-${randomUUID()}`
 }
 
@@ -157,7 +180,7 @@ export function serializeTask(row: SysTaskRow): Record<string, any> {
     completed_at_unix: toUnixSeconds(row.completedAt),
     remote_state: Object.keys(visible).length ? visible : null,
     elapsed_ms: elapsedMs(row),
-    cancellable: isActiveTaskStatus(row.status) && isQwenJobsTask(row.provider),
+    cancellable: isActiveTaskStatus(row.status) && (isQwenJobsTask(row.provider) || isH3JobsTask(row.provider)),
   }
 }
 

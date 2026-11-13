@@ -191,7 +191,7 @@ async function videoModelLabel(episodeId: number): Promise<string> {
   const config = (ep?.videoConfigId ? await getConfigById(ep.videoConfigId) : null) || await getActiveConfig('video')
   if (!config) return 'h3'
   const provider = (config.provider || '').toLowerCase()
-  if (provider === 'comfyui') return 'h3'
+  if (provider === 'comfyui' || provider === 'h3-jobs') return 'h3'
   return provider
 }
 
