@@ -285,7 +285,8 @@
   "layout": {
     "nav": {
       "projects": "프로젝트",
-      "settings": "설정"
+      "settings": "설정",
+      "mapStudio": "지도 스튜디오"
     },
     "banner": {
       "missing": "{types} 모델이 아직 설정되지 않아 AI 기능을 사용할 수 없습니다",

@@ -285,7 +285,8 @@
   "layout": {
     "nav": {
       "projects": "プロジェクト",
-      "settings": "設定"
+      "settings": "設定",
+      "mapStudio": "地図スタジオ"
     },
     "banner": {
       "missing": "{types}モデルが未設定のため、AI 機能は使用できません",

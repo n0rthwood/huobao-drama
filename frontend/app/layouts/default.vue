@@ -24,6 +24,10 @@
           <Settings :size="15" :stroke-width="1.8" />
           <span>{{ t('layout.nav.settings') }}</span>
         </NuxtLink>
+        <NuxtLink to="/map-studio" class="nav-link" :class="{ active: route.path.startsWith('/map-studio') }">
+          <MapIcon :size="15" :stroke-width="1.8" />
+          <span>{{ t('layout.nav.mapStudio') }}</span>
+        </NuxtLink>
       </nav>
 
       <div class="header-right">
@@ -57,7 +61,7 @@
 </template>
 
 <script setup>
-import { LayoutGrid, Settings, TriangleAlert, Github } from 'lucide-vue-next'
+import { LayoutGrid, Settings, TriangleAlert, Github, Map as MapIcon } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { aiConfigAPI } from '~/composables/useApi'
 import brandLogo from '~/assets/brand-logo.png'

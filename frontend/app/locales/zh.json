@@ -285,7 +285,8 @@
   "layout": {
     "nav": {
       "projects": "项目",
-      "settings": "设置"
+      "settings": "设置",
+      "mapStudio": "地图工作室"
     },
     "banner": {
       "missing": "尚未配置{types}模型,AI 功能无法使用",

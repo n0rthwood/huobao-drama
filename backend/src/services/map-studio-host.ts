@@ -44,8 +44,31 @@ const registerDelivery = sqlite.transaction((prop: HostProp, d: MapStudioDeliver
   })
   sqlite.prepare('UPDATE props SET image_url = ?, local_path = ?, faithful = 1, faithful_source = ?, semantics = ?, updated_at = ? WHERE id = ?')
     .run(d.final_image.path, d.final_image.path, baseId, JSON.stringify(semantics), ts, prop.id)
+  registerSourceCitations(prop, d.sources, ts)
   return { inserted: true, result: { version_ids: [baseId, finalId], message: `已采用成图（版本 #${finalId}）与忠实底图（版本 #${baseId}）：${d.summary}` } }
 })
+
+/**
+ * 交付的出处同步进资产「资料来源」面板（research_citations，Issue #32 的唯一读取口）。
+ * 同一资产同一出处（URL，缺 URL 时按标题）只记一次；来源本身仍完整存在成图版本的 params.sources 里。
+ */
+function registerSourceCitations(prop: HostProp, sources: unknown[], ts: string): void {
+  const exists = sqlite.prepare("SELECT 1 FROM research_citations WHERE asset_kind = 'prop' AND asset_id = ? AND tool = 'map-studio' AND COALESCE(source_url, '') = ? AND COALESCE(title, '') = ? LIMIT 1")
+  const insert = sqlite.prepare(`INSERT INTO research_citations (drama_id, episode_id, asset_kind, asset_id, asset_name, tool, query, title, source_url, lang, snippet, status, retrieved_at)
+    VALUES (?, NULL, 'prop', ?, ?, 'map-studio', NULL, ?, ?, ?, ?, 'ok', ?)`)
+  for (const raw of sources) {
+    if (!raw || typeof raw !== 'object') continue
+    const source = raw as { title?: unknown; url?: unknown; adapter?: unknown; excerpt?: unknown }
+    const title = typeof source.title === 'string' ? source.title : ''
+    const url = typeof source.url === 'string' ? source.url : ''
+    if (!title && !url) continue
+    if (exists.get(prop.id, url, title)) continue
+    const adapter = typeof source.adapter === 'string' ? source.adapter : ''
+    const lang = adapter.endsWith('-zh') ? 'zh' : adapter.endsWith('-en') ? 'en' : null
+    const snippet = typeof source.excerpt === 'string' && source.excerpt ? source.excerpt.slice(0, 500) : null
+    insert.run(prop.drama_id, prop.id, prop.name, title || null, url || null, lang, snippet, ts)
+  }
+}
 
 export const huobaoMapStudioHost: MapStudioHost = {
   id: 'huobao',

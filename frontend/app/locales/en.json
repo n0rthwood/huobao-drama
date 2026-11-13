@@ -285,7 +285,8 @@
   "layout": {
     "nav": {
       "projects": "Projects",
-      "settings": "Settings"
+      "settings": "Settings",
+      "mapStudio": "Map Studio"
     },
     "banner": {
       "missing": "{types} model not configured yet. AI features are unavailable.",
