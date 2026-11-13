@@ -1,0 +1,13 @@
+12
+label_marker_overlap label_marker_overlap：图层 note 底板压住线要素图层 feature-r_6c54d477；请把底板移到不压要素的空白处
+label_marker_overlap label_marker_overlap：图层 note 底板压住线要素图层 feature-r_6c54d477__2；请把底板移到不压要素的空白处
+label_overlap label_overlap：图层 legend 底板盖住图层 feature-p_50b3c1d8 的文字；请把底板移到空白处或缩小
+label_overlap label_overlap：图层 feature-p_50b3c1d8 文字被图层 legend 的底板盖住；请移动标签或调用 auto_layout_labels
+label_overlap label_overlap：图层 legend 底板盖住图层 feature-p_6cbbbc2a 的文字；请把底板移到空白处或缩小
+label_overlap label_overlap：图层 feature-p_6cbbbc2a 文字被图层 legend 的底板盖住；请移动标签或调用 auto_layout_labels
+label_marker_overlap label_marker_overlap：图层 legend 底板盖住点标记 feature-p_50b3c1d8；请把底板移到空白处
+label_marker_overlap label_marker_overlap：图层 legend 底板盖住点标记 feature-p_6cbbbc2a；请把底板移到空白处
+label_marker_overlap label_marker_overlap：图层 legend 底板压住线要素图层 feature-r_df3916a5；请把底板移到不压要素的空白处
+label_marker_overlap label_marker_overlap：图层 lbl-don 底板盖住点标记 feature-p_b55c4709；请把底板移到空白处
+label_marker_overlap label_marker_overlap：图层 lbl-don 底板压住线要素图层 feature-r_9e3c4f4d；请把底板移到不压要素的空白处
+label_marker_overlap label_marker_overlap：图层 lbl-volga-up 底板压住线要素图层 feature-r_6c54d477__2；请把底板移到不压要素的空白处

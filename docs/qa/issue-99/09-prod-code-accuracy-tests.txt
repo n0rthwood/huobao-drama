@@ -1,0 +1,7 @@
+ok 1 - 硬闸：Tobolsk 经纬度互换、extent 外、缺少 extent/category/geometry_source 都整批拒收
+ok 2 - 托博尔斯克来自真实 place 数据集；喀什里克错误经度与 20km 证据冲突，改正后 verified
+ok 3 - label/card 长标题放入矮 box 返回 label_overflow；作图交付使用同一规则，不缩字号截断
+ok 4 - HTTP base 启动先以 geometry_unverified 拒绝；PUT 确认释放研究阻断，人工图层保存拒绝溢出
+# pass 4
+# fail 0
+8319b2f6 Merge issue/99 phases 2-3a: Map Studio accuracy gates, smoothing, label layout, legacy removal (#99)
