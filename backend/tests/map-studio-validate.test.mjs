@@ -31,7 +31,7 @@ const script = `
     { id: 'S1', adapter: 'wikipedia-zh', title: '邗沟', url: 'https://zh.wikipedia.org/wiki/邗沟', institution: '', date: '', license: '', tier: 'B',
       excerpt: '邗沟是春秋末期吴王夫差开凿的运河，自今扬州引长江水北上，经射阳湖至今淮安入淮河。' },
   ]
-  // 阶段 ②：检索必须交 extent，所有坐标都要落在里面（2% 留边）
+  // 阶段 ②：检索必须交 extent，所有坐标都要落在 extent 内
   const EXTENT = [110, 25, 130, 45]
   const ctx = (extra = {}) => ({
     brief: { ...emptyBrief(), subject: '邗沟', schematic: false },

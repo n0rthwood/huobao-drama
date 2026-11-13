@@ -203,7 +203,7 @@ export async function runResearchStage(input: ResearchStageInput): Promise<Stage
           + '任何一条不合格都会整批拒收并逐条说明原因。',
         inputSchema: z.object({
           features: z.array(featureSubmissionSchema).describe('地理要素数组；dataset 只提交 dataset_ref，不能手写 points/lon/lat'),
-          extent: z.tuple([z.number(), z.number(), z.number(), z.number()]).describe('地图研究空间范围 [west,south,east,north]；所有顶点必须在范围内并保留 2% 留边'),
+          extent: z.tuple([z.number(), z.number(), z.number(), z.number()]).describe('地图研究空间范围 [west,south,east,north]；所有顶点必须落在范围内；数据集要素可直接用 extent 作为 dataset_ref.clip_bbox 裁剪'),
           relations: z.array(relationSubmissionSchema).optional().describe('从正文抽取距离及方位；excerpt 必须逐字引用 source_id 正文'),
           uncertainties: z.array(z.string()).optional(),
           notes: z.array(z.string()).optional(),

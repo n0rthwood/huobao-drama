@@ -14,7 +14,7 @@ description: 地图工作流·资料检索阶段 — 用真实检索工具找资
    - **河流/湖泊优先用组引用 `ne-group:…`**：Natural Earth 把一条河拆成 `River` 要素加若干 `Lake Centerline`（水库段）要素，单个 ref 只含其中一段，裁剪后会碎成互不相连的碎片。带 `group` 字段的候选覆盖同名同 rivernum 的全部要素，代码把端点相同或相差不超过 0.01°（约 1.1 km，4K 画幅上约 1 像素）的链首尾相接成一条河，只追加原始顶点、不插入新顶点，每个被缝合的接缝都计入 `group.joined_parts`。
    - 组候选的 `group.chains` 是拼接后仍不连通的链数，`group.shortest_chain_km` 是最短链长度。链数多、短链很短（例如支汊或另一处同名河段）说明 clip_bbox 该收紧；**代码不会静默丢弃任何链或顶点**，要排除就显式收紧 `clip_bbox`。真实地理间断（例如河口三角洲分汊）本来就该保持分开。
 3. 需要逐字引用时先 `read_source`，从读到的正文复制原句。除坐标外，还要抽取距离、方位、近河等相对位置证据。
-4. 用 `submit_features({extent,features,relations?,uncertainties?,notes?})` 交付。`extent=[west,south,east,north]` 必填，依据地域与资料；经度左右各留 `(east-west)×2%`，纬度上下各留 `(north-south)×2%`，全部顶点包括已确认几何都必须落在留边后的范围内。每次交付消耗一轮，本阶段共 3 轮。
+4. 用 `submit_features({extent,features,relations?,uncertainties?,notes?})` 交付。`extent=[west,south,east,north]` 必填，依据地域与资料；全部顶点（包括已确认几何）都必须落在 extent 内。数据集要素超出时用 `dataset_ref.clip_bbox` 裁剪——直接用 extent 本身作为 clip_bbox 即可，不需要再内缩。每次交付消耗一轮，本阶段共 3 轮。
 5. 如果问题出在需求本身（例如时代、地域写错），而本阶段无法解决，调用 `request_rollback` 回到 `brief`，写清原因。
 
 ## 要素字段（每一项都要写对，不合格整批拒收）

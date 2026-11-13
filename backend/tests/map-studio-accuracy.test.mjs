@@ -60,6 +60,10 @@ const script = `
   out.wholeRiver = validateFeatureSubmission([{ kind: 'route', name: '伏尔加河', category: 'river', geometry_source: 'dataset',
     dataset_ref: { ref: volgaGroup.ref }, coordinate_basis: 'well_known', source_ids: [], basis: 'Natural Earth 组引用', uncertainty: 'low' }],
     ctx({ extent: [20, 40, 55, 58] }))
+  // Production regression (task 1 / run 2): clip_bbox equal to the extent itself must be accepted.
+  out.clippedToExtent = validateFeatureSubmission([{ kind: 'route', name: '伏尔加河', category: 'river', geometry_source: 'dataset',
+    dataset_ref: { ref: volgaGroup.ref, clip_bbox: [20, 40, 55, 58] }, coordinate_basis: 'well_known', source_ids: [], basis: 'Natural Earth 组引用', uncertainty: 'low' }],
+    ctx({ extent: [20, 40, 55, 58] }))
   out.missingCategory = validateFeatureSubmission([place('托博尔斯克', 68.3, 58.2, { category: undefined })], ctx())
   out.missingGeometrySource = validateFeatureSubmission([place('托博尔斯克', 68.3, 58.2, { geometry_source: undefined })], ctx())
   out.conflict = validateFeatureSubmission([
@@ -160,11 +164,16 @@ test('extent 违规按要素聚合成一条问题，并给出 clip_bbox 修法',
   assert.ok(result.wholeRiverVertices >= 300)
   assert.deepEqual(result.wholeRiver.features, [])
   assert.equal(result.wholeRiver.problems.length, 1)
-  assert.match(result.wholeRiver.problems[0], /^「伏尔加河」：\d+ 个顶点超出 extent 的 2% 留边/)
+  assert.match(result.wholeRiver.problems[0], /^「伏尔加河」：\d+ 个顶点超出 extent（/)
   assert.match(result.wholeRiver.problems[0], /经度 [\d.]+–[\d.]+，纬度 [\d.]+–[\d.]+/)
   assert.match(result.wholeRiver.problems[0], /dataset_ref\.clip_bbox/)
-  assert.match(result.wholeRiver.problems[0], /clip_bbox=\[20\.7,40\.36,54\.3,57\.64\]/)
+  assert.match(result.wholeRiver.problems[0], /clip_bbox=\[20,40,55,58\]/)
   assert.doesNotMatch(result.wholeRiver.problems[0], /经纬度互换/)
+})
+
+test('dataset 要素按 extent 本身裁剪即通过：不再有内缩留边的第二层框', () => {
+  assert.deepEqual(result.clippedToExtent.problems, [])
+  assert.ok(result.clippedToExtent.features.length >= 1)
 })
 
 test('托博尔斯克来自真实 place 数据集；喀什里克错误经度与 20km 证据冲突，改正后 verified', () => {
