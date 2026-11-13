@@ -267,6 +267,7 @@ Issue 整理完成后、实施前，必须让 **Fabel（Anthropic）或 Astra（
 - 取消 `POST /tasks/:id/cancel`（排队即取消、运行中 `cancel_requested` 后由队列中断）；估计 `GET /video-queue/estimate` 对 h3-jobs 改问队列（按时长四舍五入到秒分桶，`duration_key` 由队列给出）；概览 `GET /video-queue/overview`（队列整体运行/排队/空闲卡 + 火宝明细）。前端 `components/VideoQueueBar.vue`（剧情视频页、纪录片「视频与成品」、批量确认框）与 `ProgressRing` 的 `detailed`（阶段/步数、排队预计完成）。
 - 批量视频对 h3-jobs 一次性提交勾选镜头（`options.parallel`，见下文批量条目）。
 - **发布分两阶段**：阶段 A 只新增（配置行仍是 `comfyui`，行为不变）；队列上线后才原地 UPDATE 视频配置行（保留行 id 8，provider→`h3-jobs`、base_url→队列 loopback 地址、api_key 置空，先备份原值到仓库外），生产验收通过后阶段 B 删除 ComfyUI 直连代码。
+- **已切换（2026-11-13 11:06Z）**：release `20261113T110627Z` 上线 #100 代码后，`ai_service_configs` id 8 原地改为 `provider='h3-jobs'`、`base_url=http://127.0.0.1:8291`、`api_key` 空，模型列表不变（行名仍是旧的「MiniMax H3 INT8 (ComfyUI 102)」）；`providers.json` 同步。改前备份：`~/.config/huobao-drama-local/ai_service_config_8.bak-20261113T110624Z.json`、`providers.json.bak-20261113T110624Z-h3jobs`、`data/huobao.sqlite3.bak-20261113T110624Z-pre-h3jobs`。h3-central 目前只有 .102 RTX 4090 D 一个可用 worker（3090 已停用）。首条真实任务 sys_task 3071（drama 20 / ep 27，sb 950）11.54 s 960×544 24fps 解码正常。阶段 B（删除 ComfyUI 直连代码）待生产验收后执行。
 
 ### 资产管理器（跨集复用 / 跨项目导入，Issue #9）
 - 资产属于**项目**（`characters/scenes/props.drama_id`），剧集通过 `episode_*` 关联表拥有资产；历史版本 = `sys_task`（`type='image' AND status='completed'`，owner 指向资产），当前版本 = 资产行 `image_url`。
