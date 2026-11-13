@@ -1,0 +1,32 @@
+Source: https://commons.wikimedia.org/wiki/File:Asia._LOC_00557173.jpg
+Revision: 915198084
+Timestamp: 2024-08-24T14:39:22Z
+LicenseShortName: Public domain
+
+
+=={{int:Filedesc}}==
+{{Information
+|description = {{en|1=Relief shown by shading. "802694AI (R02105) 4-00." Available also through the Library of Congress Web site as a raster image. Includes note.}}
+|date = 2000
+|author = United States. Central Intelligence Agency
+|source = https://www.loc.gov/item/00557173/
+|permission = {{LOC-map|id=g7400.ct001727}}
+|other versions = <gallery>
+Asia. LOC 00557173.tif
+</gallery>
+|other fields 1 =
+ {{information field|name=Title|value=Asia.}}
+ {{information field|name=Shelf ID|value=G7400 2000 .U5}}
+|other fields =
+ {{information field|name=Location|value=Asia}}
+ {{information field|name=Part of|value=American Memory · General Maps · Catalog · Geography And Map Division}}
+ {{information field|name=Subject|value=Maps · Maps, Physical · Asia}}
+}}
+
+=={{int:License-header}}==
+{{PD-USGov-CIA}}
+
+
+[[Category:2000 maps]]
+[[Category:Images uploaded by Fæ]]
+[[Category:Old maps of Asia]]

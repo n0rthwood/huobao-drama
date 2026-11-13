@@ -1,0 +1,29 @@
+Source: https://commons.wikimedia.org/wiki/File:Shepherd-c-138-139.jpg
+Revision: 1091692977
+Timestamp: 2025-09-27T15:14:31Z
+LicenseShortName: Public domain
+
+=={{int:filedesc}}==
+{{Information
+|description={{en|1=The Growth of Russia in Europe, 1300–1796. 
+Scale: 1:15,000,000.
+
+From William R. Shepherd (1911), Historical Atlas, New York: Henry Holt and Company, pp 138–139.
+
+Includes territory of modern Norway, Finland, Russia, Estonia, Latvia, Lithuania, Belarus, Poland, Slovakia, Ukraine, Moldova, Hungary, Romania, Bulgaria, Poland, Georgia, Azerbaijan, Kazakhstan, Uzbekistan, Turkmenistan, Iran.}}
+|date=1911
+|source=Perry-Castañeda Library Map Collection, University of Texas at Austin
+Historical Atlas by William R. Shepherd
+Shepherd, William. Historical Atlas. New York: Henry Holt and Company, 1911
+http://legacy.lib.utexas.edu/maps/historical/history_shepherd_1911.html
+|author=[[William Robert Shepherd]]
+|permission=
+|other versions=
+}}
+
+=={{int:license-header}}==
+{{PD-old-70-1923}}
+
+[[Category:Historical Atlas by William R. Shepherd]]
+[[Category:Old maps showing history of Europe]]
+[[Category:Maps of the history of Russia]]

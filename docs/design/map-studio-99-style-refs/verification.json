@@ -1,0 +1,213 @@
+{
+  "reference_count": 20,
+  "family_counts": {
+    "atlas-tint": 6,
+    "relief-shading": 3,
+    "historical-schematic": 4,
+    "ink-chinese": 4,
+    "modern-clean": 3
+  },
+  "license_counts": {
+    "CC0": 1,
+    "Public domain": 18,
+    "CC BY 4.0": 1
+  },
+  "images": [
+    {
+      "id": "a1-russia-1809-seeberg",
+      "path": "img/a1-russia-1809-seeberg.jpg",
+      "width": 1600,
+      "height": 1343,
+      "format": "jpeg",
+      "sha256": "ceee95532b354c128a3481c208a37942cb3f6ea64c641309110a88257b071d00",
+      "full_decode": "passed"
+    },
+    {
+      "id": "a2-russia-1792-schraembl",
+      "path": "img/a2-russia-1792-schraembl.jpg",
+      "width": 1141,
+      "height": 1600,
+      "format": "jpeg",
+      "sha256": "87626d9c53695a27bce19a4319002a712457fa32508a8239fd2da86d41df56dd",
+      "full_decode": "passed"
+    },
+    {
+      "id": "a3-perthes-atlas-1853",
+      "path": "img/a3-perthes-atlas-1853.jpg",
+      "width": 1600,
+      "height": 1322,
+      "format": "jpeg",
+      "sha256": "9e78f3a4c1c3fa1e5e84f7f0ac34237a361f8d85114603acd8ae85b08ded1c8d",
+      "full_decode": "passed"
+    },
+    {
+      "id": "a4-beauplan-ukraina-1648",
+      "path": "img/a4-beauplan-ukraina-1648.jpg",
+      "width": 1600,
+      "height": 1244,
+      "format": "jpeg",
+      "sha256": "449e724504388c35c2f43e716f8637eb874f2f2e69b77f461fb6102c5ca2fae8",
+      "full_decode": "passed"
+    },
+    {
+      "id": "a5-tartaria-de-wit-1680",
+      "path": "img/a5-tartaria-de-wit-1680.jpg",
+      "width": 1600,
+      "height": 1306,
+      "format": "jpeg",
+      "sha256": "a137299c8cc56c379ad61e582f29e87dd9c8c4864d157cf8e7739a39a208214e",
+      "full_decode": "passed"
+    },
+    {
+      "id": "a6-china-east-1872-petermann",
+      "path": "img/a6-china-east-1872-petermann.jpg",
+      "width": 1600,
+      "height": 1283,
+      "format": "jpeg",
+      "sha256": "2f84032858d4a60f485a87743dcaea3014e7922b205bc7a0fd3eb4b14a0b5b07",
+      "full_decode": "passed"
+    },
+    {
+      "id": "b1-shepherd-growth-russia-1911",
+      "path": "img/b1-shepherd-growth-russia-1911.jpg",
+      "width": 1286,
+      "height": 1600,
+      "format": "jpeg",
+      "sha256": "a47dc6169957cf15a16c37030965297f9e39e7a1d8cf913722485cf667787cd1",
+      "full_decode": "passed"
+    },
+    {
+      "id": "b2-shepherd-asia-1801",
+      "path": "img/b2-shepherd-asia-1801.jpg",
+      "width": 1600,
+      "height": 1298,
+      "format": "jpeg",
+      "sha256": "96f46bc0df6c91a77cadfeb7f142e7b93bf7c108839892b087687de543acac65",
+      "full_decode": "passed"
+    },
+    {
+      "id": "b3-cambridge-russia-1725",
+      "path": "img/b3-cambridge-russia-1725.jpg",
+      "width": 960,
+      "height": 1503,
+      "format": "jpeg",
+      "sha256": "85f2c72685a5f2bce43106c341dd5f14ecc0633061b6d257270e77c538fdf9f6",
+      "full_decode": "passed"
+    },
+    {
+      "id": "b4-andree-central-asia-1881",
+      "path": "img/b4-andree-central-asia-1881.jpg",
+      "width": 960,
+      "height": 1321,
+      "format": "jpeg",
+      "sha256": "2911a405eb6c16bc077df091638c4412d22c6641759ae281f4e216f88f30f97d",
+      "full_decode": "passed"
+    },
+    {
+      "id": "c1-asiatic-russia-1868",
+      "path": "img/c1-asiatic-russia-1868.jpg",
+      "width": 1280,
+      "height": 795,
+      "format": "jpeg",
+      "sha256": "a0508d51212166406b2a6b5f3ba8203d77b23bbbfb70b18096b2d3aca5029086",
+      "full_decode": "passed"
+    },
+    {
+      "id": "c2-east-siberia-1861-radde",
+      "path": "img/c2-east-siberia-1861-radde.jpg",
+      "width": 1280,
+      "height": 710,
+      "format": "jpeg",
+      "sha256": "a437f20ef1a54d02c1a1502b0fc672eba80e6a868a392de4065f0d82f5d2784d",
+      "full_decode": "passed"
+    },
+    {
+      "id": "c3-johnston-physical-atlas-1848",
+      "path": "img/c3-johnston-physical-atlas-1848.jpg",
+      "width": 1280,
+      "height": 1081,
+      "format": "jpeg",
+      "sha256": "8fc85d1d05dcd9823b09af097bc9773b82f5170f5b9e7b6443ec52471f1a8a42",
+      "full_decode": "passed"
+    },
+    {
+      "id": "d1-kunyu-wanguo-quantu-1602",
+      "path": "img/d1-kunyu-wanguo-quantu-1602.jpg",
+      "width": 1280,
+      "height": 575,
+      "format": "jpeg",
+      "sha256": "bebac0b83eee99f536155ad0cd59e8428e8e27e6293def6b5a166fe17ecfbe2a",
+      "full_decode": "passed"
+    },
+    {
+      "id": "d3-da-ming-hun-yi-tu-1389",
+      "path": "img/d3-da-ming-hun-yi-tu-1389.jpg",
+      "width": 895,
+      "height": 786,
+      "format": "jpeg",
+      "sha256": "92edc9b01923267c6b530699612daa6b624add47ab2af016b097af744f7c01ba",
+      "full_decode": "passed"
+    },
+    {
+      "id": "d4-da-qing-quan-tu-1806-1809",
+      "path": "img/d4-da-qing-quan-tu-1806-1809.jpg",
+      "width": 1280,
+      "height": 710,
+      "format": "jpeg",
+      "sha256": "089175490972e431bd52b20d334ca6a9dbd7a4814a82b000cf94382bf1c00b2f",
+      "full_decode": "passed"
+    },
+    {
+      "id": "d5-remezov-drawing-book-1701",
+      "path": "img/d5-remezov-drawing-book-1701.jpeg",
+      "width": 1280,
+      "height": 861,
+      "format": "jpeg",
+      "sha256": "b17a060519419e0d6f2edd46090e84a3fa3f7d7533d33afc29b410d72f99a540",
+      "full_decode": "passed"
+    },
+    {
+      "id": "e1-cia-asia-2000",
+      "path": "img/e1-cia-asia-2000.jpg",
+      "width": 960,
+      "height": 1274,
+      "format": "jpeg",
+      "sha256": "612f1475de7d48374d0b849144595fdbc00a8ef24047df0495cd02f510b214dc",
+      "full_decode": "passed"
+    },
+    {
+      "id": "e2-cia-russia-2001",
+      "path": "img/e2-cia-russia-2001.jpg",
+      "width": 1280,
+      "height": 932,
+      "format": "jpeg",
+      "sha256": "774bbda031eaae5e3ef453c3086162eea1f03848ceff4396ced9fa24e6e70fd8",
+      "full_decode": "passed"
+    },
+    {
+      "id": "e3-atlas-abierto-asia-relief",
+      "path": "img/e3-atlas-abierto-asia-relief.png",
+      "width": 1280,
+      "height": 1152,
+      "format": "png",
+      "sha256": "8cc993bbbd1ab84f4d815b351ed1e53346ee27ff510a749a4da7fce6b40b60f3",
+      "full_decode": "passed"
+    }
+  ],
+  "checks": {
+    "all_images_full_decoded": true,
+    "long_side_max_1600": true,
+    "bibliographic_fields_present": true,
+    "license_page_snapshots_present": true,
+    "style_mappings_consistent": true,
+    "all_html_resource_urls_relative_local": true,
+    "all_local_links_present": true,
+    "all_svg_mocks_well_formed": true,
+    "unique_html_anchors": true
+  },
+  "note": "External href links are intentional source/attribution navigation; all rendered image/style/script resources are local. No browser rendering acceptance claimed.",
+  "local_image_resource_count": 20,
+  "local_link_count": 48,
+  "external_source_or_license_links": 53,
+  "svg_mock_count": 5
+}

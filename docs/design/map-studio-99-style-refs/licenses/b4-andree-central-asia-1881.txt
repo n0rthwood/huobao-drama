@@ -1,0 +1,22 @@
+Source: https://commons.wikimedia.org/wiki/File:Central_and_South_Asia,_from_the_first_edition_of_the_%27Allgemeiner_Hand-Atlas%27_by_Richard_Andree_(Leipzig-_Verlag_con_Velhagen_%26_Klasing,_1881)_south_east.jpg
+Revision: 1119539003
+Timestamp: 2025-11-21T20:32:19Z
+LicenseShortName: Public domain
+
+== {{int:filedesc}} ==
+{{Map
+|Description=Central and South Asia, from the first edition of the 'Allgemeiner Hand-Atlas' by Richard Andree (Leipzig: Verlag con Velhagen & Klasing, 1881); 
+|Source=http://www.columbia.edu/itc/mealac/pritchett/00maplinks/overview/asiaphysical/asiaphysical.html
+|Date=1881
+|Author={{creator:Richard Andree}}
+|Permission={{PD-old}}
+|other_versions=
+|warp_status=warped
+|latitude=5.2041467/31.5330217
+|longitude=62.2744539/83.3857165
+}}
+[[Category:Old maps of British India|1881 maps]]
+[[Category:1880s maps of India|1881 maps]]
+[[Category:Maps from Allgemeiner Historischer Handatlas]]
+[[Category:Kalyan-Dombivli]]
+[[Category:Andrees Allgemeiner Handatlas]]

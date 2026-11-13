@@ -1,0 +1,35 @@
+Source: https://commons.wikimedia.org/wiki/File:China_(%C3%B6stl._Theil),_Korea_und_Japan_im_Massstab_1-7.500.000_LOC_2006629397.jpg
+Revision: 1280053595
+Timestamp: 2026-09-24T13:49:12Z
+LicenseShortName: Public domain
+
+
+=={{int:Filedesc}}==
+{{Map
+|description = {{en|1=Relief shown by hachures. Prime meridians: Greenwich, Ferro, Paris. From Stieler's Hand-Atlas. 1872. In upper left: Stieler's Hand Atlas, N⁰ 65. Insets: Schanghai und Umgebung -- Jedo und Umgebung -- Der Canton-Strom und seine Umgebung. Available also through the Library of Congress Web site as a raster image.}}
+|date = 1872
+|author = Petermann, August (1822-1878); Debes, Ernst. (1840-1923)
+|source = https://www.loc.gov/item/2006629397/
+|permission = {{LOC-map|id=g7820.ct005237}}
+|other versions = <gallery>
+China (östl. Theil), Korea und Japan im Massstab 1-7.500.000 LOC 2006629397.tif
+</gallery>
+|warp_status = skip
+|other fields 1 =
+ {{information field|name=Title|value=China (östl. Theil), Korea und Japan im Massstab 1:7.500.000}}
+ {{information field|name=Shelf ID|value=G7820 1872 .P4}}
+|other fields =
+ {{information field|name=Location|value=Korea · China · Japan · Korea. · China. · Japan.}}
+ {{information field|name=Part of|value=American Memory · General Maps · Catalog · Geography And Map Division}}
+ {{information field|name=Subject|value=Maps · Korea · China · Japan}}
+}}
+
+=={{int:License-header}}==
+{{PD-Art|PD-old-95-expired}}
+
+
+[[Category:Images uploaded by Fæ]]
+[[Category:1870s maps of East Asia|1872 maps]]
+[[Category:Maps by August Heinrich Petermann]]
+[[Category:Ernst Debes]]
+[[Category:Stielers Handatlas]]

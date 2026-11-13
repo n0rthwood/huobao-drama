@@ -1,0 +1,33 @@
+Source: https://commons.wikimedia.org/wiki/File:Karta_az%C4%ABi%EF%B8%A0a%EF%B8%A1tsko%C4%AD_Ross%C4%ABi_LOC_99447786.jpg
+Revision: 973535331
+Timestamp: 2024-12-21T14:22:07Z
+LicenseShortName: Public domain
+
+
+=={{int:Filedesc}}==
+{{Information
+|description = {{en|1=Relief shown by shading. Also shows primary administrative divisions. "Ispravlena po 1e apri︠e︡li︠a︡ 1868." In Russian. Ferro and Pulkovo meridians. Available also through the Library of Congress Web site as a raster image. Includes inset of Irkutsk. LC copy missing small edge sections, mounted on cloth backing, trimmed, rubber-stamped, annotated in pencil and ink, has annotated legend in French in lower margin.}}
+|date = 1868
+|author = IlʹIn; Kartograficheskoe Zavedenīe A. IlʹIna
+|source = https://www.loc.gov/item/99447786/
+|permission = {{LOC-map|id=g7115.mf000025}}
+|other versions = <gallery>
+Karta azīi︠a︡tskoĭ Rossīi LOC 99447786.tif
+</gallery>
+|other fields 1 =
+ {{information field|name=Title|value=Karta azīi︠a︡tskoĭ Rossīi}}
+ {{information field|name=Shelf ID|value=G7115 1868 .I4 MLC}}
+|other fields =
+ {{information field|name=Location|value=Irkutsk · Russia · Asiatic Russia}}
+ {{information field|name=Part of|value=American Memory · General Maps · Catalog · Geography And Map Division}}
+ {{information field|name=Subject|value=Asiatic Russia · Irkutsk · Maps · Irkutsk (Russia) · Administrative And Political Divisions · Russia}}
+}}
+
+=={{int:License-header}}==
+{{PD-Art|PD-old-100-expired}}
+
+
+[[Category:Images uploaded by Fæ]]
+[[Category:1868 maps of Russia]]
+[[Category:1868 maps of Asia]]
+[[Category:Old maps of Siberia|1868 Russia]]

@@ -1,0 +1,48 @@
+Source: https://commons.wikimedia.org/wiki/File:Karte_der_S%C3%BCdlichen_Grenzgebiete_von_Ost-Sibirien_-_gezeichnet_von_Gustav_Radde_-_btv1b531467566.jpg
+Revision: 1101360864
+Timestamp: 2025-10-18T10:11:42Z
+LicenseShortName: Public domain
+
+=={{int:filedesc}}==
+{{Artwork
+ |artist             = 
+ |author             = Radde, Gustav Ferdinand Richard (1831-1903). Cartographe
+Klett- Perthes Verlag. Éditeur scientifique
+ |title              = Karte der Südlichen Grenzgebiete von Ost-Sibirien / gezeichnet von Gustav Radde
+ |description        = {{fr|1=Sujet : Sibérie orientale, Plaine de
+Échelle(s) : 1:7 500 000
+Couverture : Russie
+Langue : allemand
+Éditeur : Justus Perthes (Gotha)}}
+ |depicted people    = 
+ |depicted place     = 
+ |date               = 1861
+ |medium             = 
+ |dimensions         = {{Size|unit=cm|width=35|height=65}}
+ |institution        = {{Institution:Bibliothèque nationale de France}}
+ |department         = 
+ |accession number   = 
+ |place of creation  = 
+ |place of discovery = 
+ |object history     = 
+ |exhibition history = 
+ |credit line        = 
+ |inscriptions       = 
+ |notes              = 
+ |references         = {{fr|1=Notice de recueil : http://catalogue.bnf.fr/ark:/12148/cb45124423g
+Appartient à : [Division 23 du portefeuille 1 QUATER du Service hydrographique de la marine consacrée à la Sibérie] ; 1 D
+Notice du catalogue : http://catalogue.bnf.fr/ark:/12148/cb45124474c}}
+ |source             = {{fr|1=Bibliothèque nationale de France, département Cartes et plans, GE SH 19 PF 1 QUATER DIV 23 P 1 D}}
+{{ARK-BNF|ark:/12148/btv1b531467566}}
+ |permission         = 
+ |other versions     = 
+ |wikidata           = 
+}}
+
+=={{int:license-header}}==
+{{PD-France}}
+{{PD-US-expired}}
+
+[[Category:Maps from Gallica (Bibliothèque nationale de France) uploaded by Gzen92Bot]]
+[[Category:Maps from Gallica]]
+[[Category:Maps from Gallica needing categories]]

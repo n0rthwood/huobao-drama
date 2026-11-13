@@ -1,0 +1,28 @@
+Source: https://commons.wikimedia.org/wiki/File:Shepherd-c-170-171.jpg
+Revision: 699612116
+Timestamp: 2022-10-27T12:39:51Z
+LicenseShortName: Public domain
+
+=={{int:filedesc}}==
+{{Information
+|description={{en|1=The Growth of European and Japanese Dominions in Asia since 1801. 
+Scale 1:40,000,000.
+
+British, French, Portuguese, German, Russian, and Japanese possessions. Includes inset: Vicinity of Peking (Beijing), scale: 1:5,000,000. 
+
+From William R. Shepherd (1911), Historical Atlas, New York: Henry Holt and Company, pp 170–171.}}
+|date=1911
+|source=Perry-Castañeda Library Map Collection, University of Texas at Austin
+Historical Atlas by William R. Shepherd
+Shepherd, William. Historical Atlas. New York: Henry Holt and Company, 1911
+http://legacy.lib.utexas.edu/maps/historical/history_shepherd_1911.html
+|author=[[William Robert Shepherd]]
+|permission=
+|other versions=
+}}
+
+=={{int:license-header}}==
+{{PD-old-70-1923}}
+
+[[Category:Historical Atlas by William R. Shepherd]]
+[[Category:Old maps showing history of Asia]]

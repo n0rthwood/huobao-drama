@@ -1,0 +1,23 @@
+Source: https://commons.wikimedia.org/wiki/File:Generalkarte_Russisches_Reich_1792_1.jpg
+Revision: 1179444555
+Timestamp: 2026-03-11T14:36:16Z
+LicenseShortName: Public domain
+
+== {{int:filedesc}} ==
+{{Information
+|Description=Generalkarte des Russischen Reichs mit der Eintheilung in die neu errichteten Statthalterschaften und Kreise
+|Source=[http://www-gdz.sub.uni-goettingen.de/cgi-bin/digbib.cgi?PPN348458665 GDZ]
+|Date=1792
+|Author=Franz A. Schraembl
+|Permission=
+|other_versions=
+}}
+[[Category:1792 maps of Russia]]
+[[Category:Old maps of Siberia]]
+[[Category:Old maps of the Lena River| 1792]]
+[[Category:Old maps of the Yenisei River| 1792]]
+[[Category:Old maps of the Ob River| 1792]]
+[[Category:Generalkarte des Russischen Reichs (1792)]]
+
+== {{int:license-header}} ==
+{{PD-old-100}}

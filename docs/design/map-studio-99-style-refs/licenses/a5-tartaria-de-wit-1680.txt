@@ -1,0 +1,33 @@
+Source: https://commons.wikimedia.org/wiki/File:Magnae_Tartariae_magni_mogolis_imperii_Iaponiae_et_Chinae_nova_descriptio._LOC_2006635534.jpg
+Revision: 1126434217
+Timestamp: 2025-12-06T04:44:31Z
+LicenseShortName: Public domain
+
+
+=={{int:Filedesc}}==
+{{Information
+|description = {{en|1=Relief shown pictorially. Appears in De Wit's Atlas. LC copy stamped on: 493. Mounted on cloth. Available also through the Library of Congress Web site as a raster image.}}
+|date = 1680
+|author = Wit, Frederik De.
+|source = https://www.loc.gov/item/2006635534/
+|permission = {{LOC-map|id=g7820.ct004969}}
+|other versions = <gallery>
+Magnae Tartariae magni mogolis imperii Iaponiae et Chinae nova descriptio. LOC 2006635534.tif
+</gallery>
+|other fields 1 =
+ {{information field|name=Title|value=Magnae Tartariae magni mogolis imperii Iaponiae et Chinae nova descriptio.}}
+ {{information field|name=Shelf ID|value=G7820 1680 .W4}}
+|other fields =
+ {{information field|name=Location|value=Japan · China. · China · Japan.}}
+ {{information field|name=Part of|value=American Memory · General Maps · Catalog · Geography And Map Division}}
+ {{information field|name=Subject|value=Early Maps · Maps · China · Japan}}
+}}
+
+=={{int:License-header}}==
+{{PD-Art|PD-old-100-expired}}
+
+
+[[Category:Old maps of China]]
+[[Category:Images uploaded by Fæ]]
+[[Category:1680 maps]]
+[[Category:Maps of Tartary]]

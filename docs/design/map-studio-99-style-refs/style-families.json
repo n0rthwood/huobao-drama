@@ -1,0 +1,842 @@
+{
+  "version": 1,
+  "status": "draft_for_user_review",
+  "not_adopted": true,
+  "length_unit": "output_height_fraction",
+  "dimensionless_fields": [
+    "opacity",
+    "fill_opacity",
+    "unoccupied_area_target"
+  ],
+  "font_family_mapping": {
+    "sans": "Noto Sans SC",
+    "serif": "Noto Serif SC",
+    "kai": "LXGW WenKai",
+    "hand": "Ma Shan Zheng"
+  },
+  "families": [
+    {
+      "id": "atlas-tint",
+      "name": "01 古典地图集淡彩／铜版",
+      "status": "draft_for_user_review",
+      "purpose": "适合西伯利亚／东欧的区域总览：淡色面、纤细河网、衬线地名。铜版纹理只取语言，不照抄繁密装饰。",
+      "theme_mapping": "archival",
+      "palette": {
+        "background": "#f3ecd9",
+        "land": "#e5d4aa",
+        "water": "#63869a",
+        "ink": "#27261f",
+        "boundary": "#96664f",
+        "accent": "#ad4c38"
+      },
+      "lines": {
+        "river_major": {
+          "stroke": "#63869a",
+          "width": 0.0015,
+          "dash": "none"
+        },
+        "river_minor": {
+          "stroke": "#63869a",
+          "width": 0.0008,
+          "dash": "none"
+        },
+        "coast": {
+          "stroke": "#27261f",
+          "width": 0.0012,
+          "dash": "none"
+        },
+        "border_confirmed": {
+          "stroke": "#96664f",
+          "width": 0.0013,
+          "dash": "none"
+        },
+        "border_uncertain": {
+          "stroke": "#96664f",
+          "width": 0.0011,
+          "dash": "dash"
+        },
+        "regions": {
+          "fill": "#e5d4aa",
+          "fill_opacity": 0.23,
+          "stroke": "#96664f",
+          "stroke_width": 0.0011,
+          "dash": "none"
+        },
+        "routes": {
+          "stroke": "#ad4c38",
+          "width": 0.0028,
+          "dash": "dash",
+          "arrow_start": false,
+          "arrow_end": true
+        },
+        "defense_wall": {
+          "stroke": "#ad4c38",
+          "width": 0.003,
+          "dash": "none",
+          "arrow_start": false,
+          "arrow_end": false
+        }
+      },
+      "markers": {
+        "capital": {
+          "dot_radius": 0.006,
+          "color": "#ad4c38",
+          "stroke": "#f3ecd9",
+          "stroke_width": 0.0015
+        },
+        "city": {
+          "dot_radius": 0.004,
+          "color": "#27261f",
+          "stroke": "#f3ecd9",
+          "stroke_width": 0.0012
+        },
+        "settlement": {
+          "dot_radius": 0.0026,
+          "color": "#27261f",
+          "stroke": "#f3ecd9",
+          "stroke_width": 0.001
+        }
+      },
+      "labels": {
+        "title": {
+          "font": "serif",
+          "size": 0.046,
+          "color": "#27261f",
+          "bold": true,
+          "italic": false
+        },
+        "region": {
+          "font": "serif",
+          "size": 0.033,
+          "color": "#27261f",
+          "bold": false,
+          "italic": false
+        },
+        "city": {
+          "font": "serif",
+          "size": 0.024,
+          "color": "#27261f",
+          "bold": false,
+          "italic": false
+        },
+        "river": {
+          "font": "serif",
+          "size": 0.023,
+          "color": "#63869a",
+          "bold": false,
+          "italic": true
+        }
+      },
+      "halo": {
+        "width": 0.0022,
+        "color": "#f3ecd9"
+      },
+      "layout": {
+        "safe_margins": {
+          "top": 0.065,
+          "right": 0.065,
+          "bottom": 0.075,
+          "left": 0.065
+        },
+        "title_reserved_height": 0.1,
+        "legend_reserved_height": 0.07,
+        "minimum_label_gap": 0.012,
+        "minimum_label_marker_gap": 0.008,
+        "unoccupied_area_target": 0.22
+      },
+      "optional": {
+        "legend": {
+          "enabled": true,
+          "font": "sans",
+          "size": 0.019,
+          "swatch_width": 0.032,
+          "row_gap": 0.028
+        },
+        "scale_bar": {
+          "enabled": false,
+          "width": 0.18,
+          "stroke_width": 0.0012,
+          "font": "sans",
+          "size": 0.018,
+          "requires": "已核验投影与比例尺；本页虚构示意不显示距离"
+        },
+        "graticule": {
+          "enabled": false,
+          "stroke": "#96664f",
+          "width": 0.0005,
+          "dash": "dot",
+          "opacity": 0.35,
+          "requires": "已核验投影；经纬度间隔按地图范围选定"
+        }
+      },
+      "implementation_notes": [
+        "所有线宽、字号、点半径、间距、边距与尺寸均为 output_height_fraction；像素 = 数值 × 输出高度 H。",
+        "颜色是 #rrggbb；font 键映射到顶层 font_family_mapping。河名 italic=true；中文字体未必有真斜体，合成斜体仅为草案。",
+        "dash 沿用 LayerDoc 的 none/dash/dot；本页 SVG 示意用 dash=6w,4w 与 dot=w,3w（w=当前线宽）展示，不改变现有渲染器。",
+        "此 JSON 是候选风格配方，非已接入的 LayerDoc 文档；实际几何、锚点和来源仍由地图工作室验证。",
+        "不从老图复用其地理位置／疆域结论；它们是视觉参考，不是历史准确性证明。"
+      ]
+    },
+    {
+      "id": "historical-schematic",
+      "name": "02 专题图解／历史分区",
+      "status": "draft_for_user_review",
+      "purpose": "适合领土变化、迁徙与河流叙事：一幅图只讲一件事，年代分区或河网为主体，弱化无关地形。",
+      "theme_mapping": "clean",
+      "palette": {
+        "background": "#faf8f1",
+        "land": "#e3ccaf",
+        "water": "#578a9b",
+        "ink": "#252930",
+        "boundary": "#837969",
+        "accent": "#b2443c"
+      },
+      "lines": {
+        "river_major": {
+          "stroke": "#578a9b",
+          "width": 0.0018,
+          "dash": "none"
+        },
+        "river_minor": {
+          "stroke": "#578a9b",
+          "width": 0.0009,
+          "dash": "none"
+        },
+        "coast": {
+          "stroke": "#252930",
+          "width": 0.0012,
+          "dash": "none"
+        },
+        "border_confirmed": {
+          "stroke": "#837969",
+          "width": 0.0013,
+          "dash": "none"
+        },
+        "border_uncertain": {
+          "stroke": "#837969",
+          "width": 0.0011,
+          "dash": "dash"
+        },
+        "regions": {
+          "fill": "#e3ccaf",
+          "fill_opacity": 0.23,
+          "stroke": "#837969",
+          "stroke_width": 0.0011,
+          "dash": "none"
+        },
+        "routes": {
+          "stroke": "#b2443c",
+          "width": 0.0028,
+          "dash": "dash",
+          "arrow_start": false,
+          "arrow_end": true
+        },
+        "defense_wall": {
+          "stroke": "#b2443c",
+          "width": 0.003,
+          "dash": "none",
+          "arrow_start": false,
+          "arrow_end": false
+        }
+      },
+      "markers": {
+        "capital": {
+          "dot_radius": 0.006,
+          "color": "#b2443c",
+          "stroke": "#faf8f1",
+          "stroke_width": 0.0015
+        },
+        "city": {
+          "dot_radius": 0.004,
+          "color": "#252930",
+          "stroke": "#faf8f1",
+          "stroke_width": 0.0012
+        },
+        "settlement": {
+          "dot_radius": 0.0026,
+          "color": "#252930",
+          "stroke": "#faf8f1",
+          "stroke_width": 0.001
+        }
+      },
+      "labels": {
+        "title": {
+          "font": "serif",
+          "size": 0.046,
+          "color": "#252930",
+          "bold": true,
+          "italic": false
+        },
+        "region": {
+          "font": "serif",
+          "size": 0.033,
+          "color": "#252930",
+          "bold": false,
+          "italic": false
+        },
+        "city": {
+          "font": "serif",
+          "size": 0.024,
+          "color": "#252930",
+          "bold": false,
+          "italic": false
+        },
+        "river": {
+          "font": "serif",
+          "size": 0.023,
+          "color": "#578a9b",
+          "bold": false,
+          "italic": true
+        }
+      },
+      "halo": {
+        "width": 0.0022,
+        "color": "#faf8f1"
+      },
+      "layout": {
+        "safe_margins": {
+          "top": 0.065,
+          "right": 0.065,
+          "bottom": 0.075,
+          "left": 0.065
+        },
+        "title_reserved_height": 0.1,
+        "legend_reserved_height": 0.07,
+        "minimum_label_gap": 0.012,
+        "minimum_label_marker_gap": 0.008,
+        "unoccupied_area_target": 0.22
+      },
+      "optional": {
+        "legend": {
+          "enabled": true,
+          "font": "sans",
+          "size": 0.019,
+          "swatch_width": 0.032,
+          "row_gap": 0.028
+        },
+        "scale_bar": {
+          "enabled": false,
+          "width": 0.18,
+          "stroke_width": 0.0012,
+          "font": "sans",
+          "size": 0.018,
+          "requires": "已核验投影与比例尺；本页虚构示意不显示距离"
+        },
+        "graticule": {
+          "enabled": false,
+          "stroke": "#837969",
+          "width": 0.0005,
+          "dash": "dot",
+          "opacity": 0.35,
+          "requires": "已核验投影；经纬度间隔按地图范围选定"
+        }
+      },
+      "implementation_notes": [
+        "所有线宽、字号、点半径、间距、边距与尺寸均为 output_height_fraction；像素 = 数值 × 输出高度 H。",
+        "颜色是 #rrggbb；font 键映射到顶层 font_family_mapping。河名 italic=true；中文字体未必有真斜体，合成斜体仅为草案。",
+        "dash 沿用 LayerDoc 的 none/dash/dot；本页 SVG 示意用 dash=6w,4w 与 dot=w,3w（w=当前线宽）展示，不改变现有渲染器。",
+        "此 JSON 是候选风格配方，非已接入的 LayerDoc 文档；实际几何、锚点和来源仍由地图工作室验证。",
+        "不从老图复用其地理位置／疆域结论；它们是视觉参考，不是历史准确性证明。"
+      ]
+    },
+    {
+      "id": "relief-shading",
+      "name": "03 地形晕渲",
+      "status": "draft_for_user_review",
+      "purpose": "适合乌拉尔山、河谷与东西伯利亚南缘：真实地形必须来自地理数据／已核验底图，地形不能压住文字。",
+      "theme_mapping": "archival",
+      "palette": {
+        "background": "#f1efdf",
+        "land": "#d8d7b0",
+        "water": "#548799",
+        "ink": "#303a32",
+        "boundary": "#847d66",
+        "accent": "#ab583c"
+      },
+      "lines": {
+        "river_major": {
+          "stroke": "#548799",
+          "width": 0.0019,
+          "dash": "none"
+        },
+        "river_minor": {
+          "stroke": "#548799",
+          "width": 0.001,
+          "dash": "none"
+        },
+        "coast": {
+          "stroke": "#303a32",
+          "width": 0.0012,
+          "dash": "none"
+        },
+        "border_confirmed": {
+          "stroke": "#847d66",
+          "width": 0.0013,
+          "dash": "none"
+        },
+        "border_uncertain": {
+          "stroke": "#847d66",
+          "width": 0.0011,
+          "dash": "dash"
+        },
+        "regions": {
+          "fill": "#d8d7b0",
+          "fill_opacity": 0.23,
+          "stroke": "#847d66",
+          "stroke_width": 0.0011,
+          "dash": "none"
+        },
+        "routes": {
+          "stroke": "#ab583c",
+          "width": 0.0028,
+          "dash": "dash",
+          "arrow_start": false,
+          "arrow_end": true
+        },
+        "defense_wall": {
+          "stroke": "#ab583c",
+          "width": 0.003,
+          "dash": "none",
+          "arrow_start": false,
+          "arrow_end": false
+        }
+      },
+      "markers": {
+        "capital": {
+          "dot_radius": 0.006,
+          "color": "#ab583c",
+          "stroke": "#f1efdf",
+          "stroke_width": 0.0015
+        },
+        "city": {
+          "dot_radius": 0.004,
+          "color": "#303a32",
+          "stroke": "#f1efdf",
+          "stroke_width": 0.0012
+        },
+        "settlement": {
+          "dot_radius": 0.0026,
+          "color": "#303a32",
+          "stroke": "#f1efdf",
+          "stroke_width": 0.001
+        }
+      },
+      "labels": {
+        "title": {
+          "font": "sans",
+          "size": 0.046,
+          "color": "#303a32",
+          "bold": true,
+          "italic": false
+        },
+        "region": {
+          "font": "sans",
+          "size": 0.033,
+          "color": "#303a32",
+          "bold": false,
+          "italic": false
+        },
+        "city": {
+          "font": "sans",
+          "size": 0.024,
+          "color": "#303a32",
+          "bold": false,
+          "italic": false
+        },
+        "river": {
+          "font": "serif",
+          "size": 0.023,
+          "color": "#548799",
+          "bold": false,
+          "italic": true
+        }
+      },
+      "halo": {
+        "width": 0.0022,
+        "color": "#f1efdf"
+      },
+      "layout": {
+        "safe_margins": {
+          "top": 0.065,
+          "right": 0.065,
+          "bottom": 0.075,
+          "left": 0.065
+        },
+        "title_reserved_height": 0.1,
+        "legend_reserved_height": 0.07,
+        "minimum_label_gap": 0.012,
+        "minimum_label_marker_gap": 0.008,
+        "unoccupied_area_target": 0.22
+      },
+      "optional": {
+        "legend": {
+          "enabled": true,
+          "font": "sans",
+          "size": 0.019,
+          "swatch_width": 0.032,
+          "row_gap": 0.028
+        },
+        "scale_bar": {
+          "enabled": false,
+          "width": 0.18,
+          "stroke_width": 0.0012,
+          "font": "sans",
+          "size": 0.018,
+          "requires": "已核验投影与比例尺；本页虚构示意不显示距离"
+        },
+        "graticule": {
+          "enabled": false,
+          "stroke": "#847d66",
+          "width": 0.0005,
+          "dash": "dot",
+          "opacity": 0.35,
+          "requires": "已核验投影；经纬度间隔按地图范围选定"
+        }
+      },
+      "implementation_notes": [
+        "所有线宽、字号、点半径、间距、边距与尺寸均为 output_height_fraction；像素 = 数值 × 输出高度 H。",
+        "颜色是 #rrggbb；font 键映射到顶层 font_family_mapping。河名 italic=true；中文字体未必有真斜体，合成斜体仅为草案。",
+        "dash 沿用 LayerDoc 的 none/dash/dot；本页 SVG 示意用 dash=6w,4w 与 dot=w,3w（w=当前线宽）展示，不改变现有渲染器。",
+        "此 JSON 是候选风格配方，非已接入的 LayerDoc 文档；实际几何、锚点和来源仍由地图工作室验证。",
+        "不从老图复用其地理位置／疆域结论；它们是视觉参考，不是历史准确性证明。"
+      ],
+      "terrain": {
+        "enabled": true,
+        "source": "verified_dem_or_basemap",
+        "shade_color": "#696f5e",
+        "opacity": 0.18,
+        "hypsometric_colors": [
+          "#e3e7bd",
+          "#d4c99d",
+          "#bbac8f",
+          "#e5e1d7"
+        ],
+        "data_required": true
+      }
+    },
+    {
+      "id": "ink-chinese",
+      "name": "04 旧图墨色／手绘",
+      "status": "draft_for_user_review",
+      "purpose": "适合明代边防、长城与史料图解：宣纸感、墨色河流、朱红路线。列梅佐夫是俄式手绘旁证，不称中国旧图。",
+      "theme_mapping": "ink",
+      "palette": {
+        "background": "#f4ecd7",
+        "land": "#ded1aa",
+        "water": "#5f7778",
+        "ink": "#36352d",
+        "boundary": "#8c7861",
+        "accent": "#9d473b"
+      },
+      "lines": {
+        "river_major": {
+          "stroke": "#5f7778",
+          "width": 0.002,
+          "dash": "none"
+        },
+        "river_minor": {
+          "stroke": "#5f7778",
+          "width": 0.0011,
+          "dash": "none"
+        },
+        "coast": {
+          "stroke": "#36352d",
+          "width": 0.0012,
+          "dash": "none"
+        },
+        "border_confirmed": {
+          "stroke": "#8c7861",
+          "width": 0.0013,
+          "dash": "none"
+        },
+        "border_uncertain": {
+          "stroke": "#8c7861",
+          "width": 0.0011,
+          "dash": "dash"
+        },
+        "regions": {
+          "fill": "#ded1aa",
+          "fill_opacity": 0.23,
+          "stroke": "#8c7861",
+          "stroke_width": 0.0011,
+          "dash": "none"
+        },
+        "routes": {
+          "stroke": "#9d473b",
+          "width": 0.0028,
+          "dash": "dash",
+          "arrow_start": false,
+          "arrow_end": true
+        },
+        "defense_wall": {
+          "stroke": "#9d473b",
+          "width": 0.003,
+          "dash": "none",
+          "arrow_start": false,
+          "arrow_end": false
+        }
+      },
+      "markers": {
+        "capital": {
+          "dot_radius": 0.006,
+          "color": "#9d473b",
+          "stroke": "#f4ecd7",
+          "stroke_width": 0.0015
+        },
+        "city": {
+          "dot_radius": 0.004,
+          "color": "#36352d",
+          "stroke": "#f4ecd7",
+          "stroke_width": 0.0012
+        },
+        "settlement": {
+          "dot_radius": 0.0026,
+          "color": "#36352d",
+          "stroke": "#f4ecd7",
+          "stroke_width": 0.001
+        }
+      },
+      "labels": {
+        "title": {
+          "font": "kai",
+          "size": 0.046,
+          "color": "#36352d",
+          "bold": true,
+          "italic": false
+        },
+        "region": {
+          "font": "kai",
+          "size": 0.033,
+          "color": "#36352d",
+          "bold": false,
+          "italic": false
+        },
+        "city": {
+          "font": "kai",
+          "size": 0.024,
+          "color": "#36352d",
+          "bold": false,
+          "italic": false
+        },
+        "river": {
+          "font": "serif",
+          "size": 0.023,
+          "color": "#5f7778",
+          "bold": false,
+          "italic": true
+        }
+      },
+      "halo": {
+        "width": 0.0022,
+        "color": "#f4ecd7"
+      },
+      "layout": {
+        "safe_margins": {
+          "top": 0.065,
+          "right": 0.065,
+          "bottom": 0.075,
+          "left": 0.065
+        },
+        "title_reserved_height": 0.1,
+        "legend_reserved_height": 0.07,
+        "minimum_label_gap": 0.012,
+        "minimum_label_marker_gap": 0.008,
+        "unoccupied_area_target": 0.22
+      },
+      "optional": {
+        "legend": {
+          "enabled": true,
+          "font": "sans",
+          "size": 0.019,
+          "swatch_width": 0.032,
+          "row_gap": 0.028
+        },
+        "scale_bar": {
+          "enabled": false,
+          "width": 0.18,
+          "stroke_width": 0.0012,
+          "font": "sans",
+          "size": 0.018,
+          "requires": "已核验投影与比例尺；本页虚构示意不显示距离"
+        },
+        "graticule": {
+          "enabled": false,
+          "stroke": "#8c7861",
+          "width": 0.0005,
+          "dash": "dot",
+          "opacity": 0.35,
+          "requires": "已核验投影；经纬度间隔按地图范围选定"
+        }
+      },
+      "implementation_notes": [
+        "所有线宽、字号、点半径、间距、边距与尺寸均为 output_height_fraction；像素 = 数值 × 输出高度 H。",
+        "颜色是 #rrggbb；font 键映射到顶层 font_family_mapping。河名 italic=true；中文字体未必有真斜体，合成斜体仅为草案。",
+        "dash 沿用 LayerDoc 的 none/dash/dot；本页 SVG 示意用 dash=6w,4w 与 dot=w,3w（w=当前线宽）展示，不改变现有渲染器。",
+        "此 JSON 是候选风格配方，非已接入的 LayerDoc 文档；实际几何、锚点和来源仍由地图工作室验证。",
+        "不从老图复用其地理位置／疆域结论；它们是视觉参考，不是历史准确性证明。"
+      ]
+    },
+    {
+      "id": "modern-clean",
+      "name": "05 现代纪录片简洁",
+      "status": "draft_for_user_review",
+      "purpose": "适合高可读性纪录片默认底图：无旧纸污渍、少色、明确层级；现代行政界只作定位参照，不能冒充古代疆界。",
+      "theme_mapping": "clean",
+      "palette": {
+        "background": "#f8fafb",
+        "land": "#e4e8e3",
+        "water": "#488ba7",
+        "ink": "#233442",
+        "boundary": "#829098",
+        "accent": "#c35d43"
+      },
+      "lines": {
+        "river_major": {
+          "stroke": "#488ba7",
+          "width": 0.002,
+          "dash": "none"
+        },
+        "river_minor": {
+          "stroke": "#488ba7",
+          "width": 0.001,
+          "dash": "none"
+        },
+        "coast": {
+          "stroke": "#233442",
+          "width": 0.0012,
+          "dash": "none"
+        },
+        "border_confirmed": {
+          "stroke": "#829098",
+          "width": 0.0013,
+          "dash": "none"
+        },
+        "border_uncertain": {
+          "stroke": "#829098",
+          "width": 0.0011,
+          "dash": "dash"
+        },
+        "regions": {
+          "fill": "#e4e8e3",
+          "fill_opacity": 0.23,
+          "stroke": "#829098",
+          "stroke_width": 0.0011,
+          "dash": "none"
+        },
+        "routes": {
+          "stroke": "#c35d43",
+          "width": 0.0028,
+          "dash": "dash",
+          "arrow_start": false,
+          "arrow_end": true
+        },
+        "defense_wall": {
+          "stroke": "#c35d43",
+          "width": 0.003,
+          "dash": "none",
+          "arrow_start": false,
+          "arrow_end": false
+        }
+      },
+      "markers": {
+        "capital": {
+          "dot_radius": 0.006,
+          "color": "#c35d43",
+          "stroke": "#f8fafb",
+          "stroke_width": 0.0015
+        },
+        "city": {
+          "dot_radius": 0.004,
+          "color": "#233442",
+          "stroke": "#f8fafb",
+          "stroke_width": 0.0012
+        },
+        "settlement": {
+          "dot_radius": 0.0026,
+          "color": "#233442",
+          "stroke": "#f8fafb",
+          "stroke_width": 0.001
+        }
+      },
+      "labels": {
+        "title": {
+          "font": "sans",
+          "size": 0.046,
+          "color": "#233442",
+          "bold": true,
+          "italic": false
+        },
+        "region": {
+          "font": "sans",
+          "size": 0.033,
+          "color": "#233442",
+          "bold": false,
+          "italic": false
+        },
+        "city": {
+          "font": "sans",
+          "size": 0.024,
+          "color": "#233442",
+          "bold": false,
+          "italic": false
+        },
+        "river": {
+          "font": "serif",
+          "size": 0.023,
+          "color": "#488ba7",
+          "bold": false,
+          "italic": true
+        }
+      },
+      "halo": {
+        "width": 0.0022,
+        "color": "#f8fafb"
+      },
+      "layout": {
+        "safe_margins": {
+          "top": 0.065,
+          "right": 0.065,
+          "bottom": 0.075,
+          "left": 0.065
+        },
+        "title_reserved_height": 0.1,
+        "legend_reserved_height": 0.07,
+        "minimum_label_gap": 0.012,
+        "minimum_label_marker_gap": 0.008,
+        "unoccupied_area_target": 0.22
+      },
+      "optional": {
+        "legend": {
+          "enabled": true,
+          "font": "sans",
+          "size": 0.019,
+          "swatch_width": 0.032,
+          "row_gap": 0.028
+        },
+        "scale_bar": {
+          "enabled": false,
+          "width": 0.18,
+          "stroke_width": 0.0012,
+          "font": "sans",
+          "size": 0.018,
+          "requires": "已核验投影与比例尺；本页虚构示意不显示距离"
+        },
+        "graticule": {
+          "enabled": false,
+          "stroke": "#829098",
+          "width": 0.0005,
+          "dash": "dot",
+          "opacity": 0.35,
+          "requires": "已核验投影；经纬度间隔按地图范围选定"
+        }
+      },
+      "implementation_notes": [
+        "所有线宽、字号、点半径、间距、边距与尺寸均为 output_height_fraction；像素 = 数值 × 输出高度 H。",
+        "颜色是 #rrggbb；font 键映射到顶层 font_family_mapping。河名 italic=true；中文字体未必有真斜体，合成斜体仅为草案。",
+        "dash 沿用 LayerDoc 的 none/dash/dot；本页 SVG 示意用 dash=6w,4w 与 dot=w,3w（w=当前线宽）展示，不改变现有渲染器。",
+        "此 JSON 是候选风格配方，非已接入的 LayerDoc 文档；实际几何、锚点和来源仍由地图工作室验证。",
+        "不从老图复用其地理位置／疆域结论；它们是视觉参考，不是历史准确性证明。"
+      ]
+    }
+  ]
+}

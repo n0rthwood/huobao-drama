@@ -1,0 +1,21 @@
+Source: https://commons.wikimedia.org/wiki/File:Russia_1725.jpg
+Revision: 1167574789
+Timestamp: 2026-02-17T13:36:37Z
+LicenseShortName: Public domain
+
+=={{int:filedesc}}==
+{{Information
+|description={{ru|1=Российская империя в конце правления Петра Великого}}
+|date=1912
+|source=The Cambridge Modern History Atlas, edited by Sir Adolphus William Ward, G.W. Prothero, Sir Stanley Mordaunt Leathes, and E.A. Benians. Cambridge University Press: London, 1912.
+|author=edited by Sir Adolphus William Ward, G.W. Prothero, Sir Stanley Mordaunt Leathes, and E.A. Benians
+|permission=
+|other versions=
+}}
+
+=={{int:license-header}}==
+{{PD-US-expired}}{{PD-old-70}}
+
+[[Category:Cambridge Modern History Atlas]]
+[[Category:Maps of territorial evolution of Russia]]
+[[Category:Maps of the Treaty of Nystad]]

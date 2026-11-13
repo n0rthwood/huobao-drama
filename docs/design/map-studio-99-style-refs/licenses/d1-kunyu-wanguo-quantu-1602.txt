@@ -1,0 +1,61 @@
+Source: https://commons.wikimedia.org/wiki/File:Kunyu_Wanguo_Quantu_(%E5%9D%A4%E8%BC%BF%E8%90%AC%E5%9C%8B%E5%85%A8%E5%9C%96).jpg
+Revision: 1261927428
+Timestamp: 2026-08-16T04:19:56Z
+LicenseShortName: Public domain
+
+{{Assessments|POTY=c|POTYyear=2010|eswiki=1|trwiki=1|zhwiki=1|featured=1|com-nom=坤輿萬國全圖.jpg}}
+{{picture of the day|year=2010|month=06|day=13}}
+=={{int:filedesc}}==
+{{LargeImage}}
+{{Map
+|title=坤輿萬國全圖
+|Description={{mld
+|de=''[[:de:Kunyu Wanguo Quantu|Kunyu Wanguo Quantu]]'' ist die früheste bekannte [[:de:China|chinesische]] [[:de:Weltkarte|Weltkarte]] im Stil der europäischen Karten, es wurde zum ersten Mal in China in 1602 von [[:de:Matteo Ricci|Matteo Ricci]].
+|en=Unattributed, very detailed, two page colored edition (1604?), copy of the 1602 map ''[[:en:Kunyu Wanguo Quantu|Kunyu Wanguo Quantu]]'' by [[:en:Matteo Ricci|Matteo Ricci]] at the request of the [[:en:Wanli Emperor|Wanli Emperor]]. This digitalization of the map is of a Japanese export copy of the original Chinese version, with phonetic annotations in [[:en:Katakana|Katakana]] for foreign place names outside of the Sinic world, predominantly around Europe, Russia and the Near East. Note that 金島 [Kinshima, Island of Gold] in its entirety and the label 銀島 [Ginshima, Island of Silver] have been added to Ricci's original.
+|es=''[[w:es:Kunyu Wanguo Quantu|Kunyu Wanguo Quantu]]'', primer [[w:es:mapamundi|mapamundi]] chino hecho al estilo europeo y primero en mostrar el [[w:es:continente americano|continente americano]]. Hecho originalmente en [[w:es:1602|1602]] por [[w:es:Matteo Ricci|Matteo Ricci]].
+|fr=''|[[w:fr:Kunyu Wanguo Quantu|Kunyu Wanguo Quantu]]'', imprimée en [[w:fr:1602|1602]] par [[w:fr:Matteo Ricci|Matteo Ricci]], est la première carte du monde de style européen connue en chinois.
+|zh-hans=《坤舆万国全图》。
+|zh-hant=《坤輿萬國全圖》。
+|ja=『坤輿万国全図』。
+|vi=Khôn Dư Vạn Quốc Toàn Đồ.
+|ko=「곤여만국전도」.
+|it=Un'edizione anonima a colori ([[:it:1604|1604]]?) della ''[[:it:Carta Geografica Completa di tutti i Regni del Mondo|carta geografica completa di tutti i regni del mondo]]'' ([[:it:Pinyin|pinyin]]: ''Kūnyú Wànguó Quántú''), il più antico [[:it:carta geografica|mappamondo]] [[:it:Cina|cinese]] sullo stile delle mappe europee, realizzato da [[:it:Matteo Ricci|Matteo Ricci]] su richiesta dell'imperatore [[:it:Wanli|Wanli]].
+|tr='''[[:tr:Konyo Bankoku Zenzu|Konyo Bankoku Zenzu]]''', [[:tr:Japonya|Japonya]]'ya ihraç edilen [[:tr:dünya haritası|dünya haritası]] ''[[:tr:Kunyu Wanguo Quantu|Kunyu Wanguo Quantu]]'' 'nun renksiz versiyonuna dayanılarak [[:tr:Kanō (okul)|Kanō]] ressamları tarafından renkli olarak çizilip basılan [[:tr:katakana|katakana]] ilaveli haritadır. Sağ üst köşesinde [[:tr:Kanō (okul)|Kanō]]'nun mühürü görülmektedir.
+|ru=''[[:ru:Куньюй Ваньго Цюаньту|Куньюй Ваньго Цюаньту]]'' самая ранняя известная [[:ru:китай|китайская]] карта мира в стиле европейских географических карт.}}
+|Source= {{mld
+|ja=東北大学附属図書館狩野文庫画像DB[http://www.i-repository.net/contents/tohoku/kano/ezu/kon/kon.html]
+|en=Image Database of the Kano Collection, Tohoku University Library[http://www.i-repository.net/contents/tohoku/kano/ezu/kon/kon.html]
+|zh=[[:File:坤輿萬國全圖（左）.jpg]],[[:File:坤輿萬國全圖（右）.jpg]]}}
+|Date= {{other date|century|17}}
+|Author= {{Creator:Matteo Ricci}}
+|Permission=
+|other_versions={{Image extracted|1=Kunyu Wanguo Quantu (坤輿萬國全圖) (cropped).jpg|2=Kunyu Wanguo Quantu (坤輿萬國全圖) (cropped) 2.jpg}}{{DerivativeVersions|Kunyu Wanguo Quantu (坤輿萬國全圖).Black Sea.jpg|Kunyu Wanguo Quantu (坤輿萬國全圖).Caspian Sea.jpg|Kunyu Wanguo Quantu (坤輿萬國全圖).Caucasus.jpg|Kunyu Wanguo Quantu (坤輿萬國全圖) Middle East.jpg}}
+https://www.lib.umn.edu/bell/riccimap#viewer 
+<gallery>
+File:坤輿萬國全圖（左）.jpg|The left part
+File:坤輿萬國全圖（右）.jpg|The right part
+File:Kunyu Wanguo Quantu by Matteo Ricci Plate 1-3.jpg| The original 1602 Matteo Ricci map, left part
+File:Kunyu Wanguo Quantu by Matteo Ricci Plate 4-6.jpg| The original 1602 Matteo Ricci map, right part
+File:Kunyu Wanguo Quantu by Matteo Ricci All panels.jpg| The original 1602 map, full
+</gallery>
+}}
+
+=={{int:license-header}}==
+{{PD-Art|PD-old-auto-expired|deathyear=1610}}
+
+[[Category:Featured pictures on Wikipedia, Chinese]]
+[[Category:Featured maps]]
+[[Category:Featured pictures of Japan]]
+[[Category:Kunyu Wanguo Quantu]]
+[[Category:Global maps centered 150E]]
+[[Category:Old maps of Rica de Oro]]
+[[Category:Old maps of Rica de Plata]]
+[[Category:Terra Australis]]
+[[Category:World maps with the Great Wall of China]]
+[[Category:Featured pictures in the public domain]]
+{{ImageNote|id=1|x=5892|y=1408|w=103|h=117|dimx=11726|dimy=5266|style=2}}
+銀島 [Ginshima, Island of Silver]
+{{ImageNoteEnd|id=1}}
+{{ImageNote|id=2|x=5790|y=1614|w=117|h=117|dimx=11726|dimy=5266|style=2}}
+金島 [Kinshima, Island of Gold]
+{{ImageNoteEnd|id=2}}
