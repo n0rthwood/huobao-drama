@@ -544,12 +544,7 @@
                 <span>{{ t('episode.documentary.map.panel.sectionTitle') }}</span>
                 <span class="dim">{{ t('episode.documentary.map.panel.sectionHint') }}</span>
               </div>
-              <MapWorkflowPanel
-                :key="`mapflow-${editTarget.id}`"
-                :prop-id="editTarget.id"
-                :asset-name="editTarget.name"
-                @changed="onMapWorkflowChanged"
-              />
+              <MapStudioEntry :asset="editTarget" />
             </section>
 
             <!-- 最终提示词：可生成 / 重新生成 / 手动编辑 -->
@@ -750,7 +745,8 @@ import MediaTime from '~/components/MediaTime.vue'
 import AssetBrowserDialog from '~/components/AssetBrowserDialog.vue'
 import MediaLibraryDialog from '~/components/MediaLibraryDialog.vue'
 import FinalPromptSourceBadge from '~/components/FinalPromptSourceBadge.vue'
-import MapWorkflowPanel from '~/components/MapWorkflowPanel.vue'
+import MapStudioEntry from '~/components/MapStudioEntry.vue'
+import { dropLegacyMapDeeplinks } from '~/composables/useQuerySync'
 import { useNowTicker, ringPropsFromTask, isActiveTaskStatus } from '~/composables/useTaskProgress'
 
 const { t, locale } = useI18n()
@@ -1205,10 +1201,6 @@ async function onAssetTypeChange(item, next) {
   }
 }
 
-/** 工作流推进会登记新的底图/成品版本，拉一次项目数据让卡片封面跟上 */
-async function onMapWorkflowChanged() {
-  await load()
-}
 
 function closeAssetViewer() {
   assetViewer.value = { open: false, kindKey: '', id: 0, src: '', title: '' }
@@ -1457,6 +1449,7 @@ onMounted(async () => {
   publishDetailLink()
   publishDialogLink()
   // 项目与素材都已就绪、各层恢复完毕：此时才允许写回 URL
+  if (dropLegacyMapDeeplinks()) toast.warning(t('deeplink.missing'))
   deeplinkHydrate()
   await loadImageTasks()
 })

@@ -35,7 +35,6 @@ import {
 } from './reference-images.js'
 import { EMPTY_ASSET_NAME_MESSAGE, normalizeAssetName } from './asset-name.js'
 import { fidelityOf, loadPipelineFidelity } from './asset-pipeline/fidelity.js'
-import { prepareImportedWorkflow } from './map-workflow/store.js'
 import { parseSemantics } from './asset-semantics.js'
 
 export const ASSET_KINDS: AssetKind[] = ['character', 'scene', 'prop']
@@ -99,6 +98,8 @@ interface AssetRow {
   assetType?: string | null
   mapSpec?: string | null
   mapWorkflow?: string | null
+  mapBrief?: string | null
+  mapStudioTaskId?: number | null
 }
 
 /** 关联表行的并集视图（episode_characters / episode_scenes / episode_props） */
@@ -648,19 +649,17 @@ export async function importAsset(input: {
       updatedAt: now(),
     }).where(eq(table.id, newId))
 
-    if (kind === 'prop' && (source.assetType === 'map' || source.mapWorkflow)) {
-      const mapWorkflow = prepareImportedWorkflow(source.mapWorkflow, {
-        versionIds: importedVersionIds,
-        copyPath: rel => {
-          const copied = copyOnce(rel)
-          if (!copied) throw new AssetLibraryError(`地图依赖文件已缺失，无法完整导入：${rel}`)
-          return copied
-        },
-      })
+    if (kind === 'prop' && source.assetType === 'map') {
+      const mapBrief = source.mapBrief ? JSON.stringify(JSON.parse(source.mapBrief), (key, value: unknown) => {
+        if (key !== 'path' || typeof value !== 'string' || !value.startsWith('static/')) return value
+        const copied = copyOnce(value)
+        if (!copied) throw new AssetLibraryError(`地图需求的参考文件已缺失，无法完整导入：${value}`)
+        return copied
+      }) : null
       const semantics = parseSemantics(source.semantics)
       if (semantics) semantics.image.source_task_id = importedVersionIds.get(semantics.image.source_task_id ?? 0) ?? null
       await db.update(schema.props).set({
-        mapWorkflow,
+        mapBrief, mapStudioTaskId: null, mapWorkflow: null, mapSpec: null,
         faithfulSource: importedVersionIds.get(Number(source.faithfulSource)) ?? null,
         semantics: semantics ? JSON.stringify(semantics) : null,
       }).where(eq(schema.props.id, newId))
@@ -761,9 +760,11 @@ async function insertAssetRow(
     // 普通道具沿用原有原件重选政策；地图在版本复制完成后按新 id 重建原件和语义引用。
     faithful: Number(source.faithful) === 1 ? 1 : 0,
     semantics: source.semantics ?? null,
-    // 地图身份与几何保留；工作流待文件和版本完整复制后再写入，不能留下源资产引用。
+    // Module execution state is never copied across host targets.
     assetType: source.assetType === 'map' ? 'map' : 'prop',
-    mapSpec: source.mapSpec ?? null,
+    mapBrief: source.mapBrief ?? null,
+    mapStudioTaskId: null,
+    mapSpec: null,
     mapWorkflow: null,
     createdAt: ts,
     updatedAt: ts,

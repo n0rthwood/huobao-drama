@@ -22,11 +22,12 @@ import { getInsertId, sqlite } from '../db/index.js'
 
 // ─── 对外类型 ────────────────────────────────────────────────────────────
 
-export type ObservedStage = 'skeleton' | 'voice' | 'design_card' | 'map_workflow' | 'layer_base_check' | 'junction_caption'
+export type ObservedStage = 'skeleton' | 'voice' | 'design_card' | 'map_workflow' | 'map_studio' | 'layer_base_check' | 'junction_caption'
 export type ObservedStatus = 'processing' | 'completed' | 'failed' | 'interrupted'
 
 export interface ObservedWorkInput {
   taskId: number
+  scope?: string
   stage: ObservedStage
   /** 源文本字数（旁白正文或地图需求文本），**不是**实际发送的提示词字数 */
   sourceChars: number
@@ -39,6 +40,7 @@ export interface ObservedWorkInput {
 export interface ObservedWorkRow {
   id: number
   task_id: number
+  scope: string
   stage: ObservedStage
   source_chars: number
   sample_key: string
@@ -65,6 +67,7 @@ export interface ObservedCallRow {
   id: number
   work_id: number
   task_id: number
+  scope: string
   kind: 'llm' | 'vision_chat' | 'tts'
   config_id: number | null
   config_name: string | null
@@ -94,6 +97,7 @@ export interface ObservedMessageRow {
   call_id: number
   work_id: number
   task_id: number
+  scope: string
   seq: number
   /** request = 本次真实发出的消息；response = 服务端返回；final = 无后续模型调用的收尾工具结果 */
   phase: 'request' | 'response' | 'final'
@@ -291,8 +295,8 @@ function errorText(err: unknown): string {
 
 const insertWorkStmt = sqlite.prepare(
   `INSERT INTO task_observed_work
-    (task_id, stage, source_chars, sample_key, storyboard_id, storyboard_number, started_at, status, heartbeat_at, created_at)
-   VALUES (?, ?, ?, ?, ?, ?, ?, 'processing', ?, ?)`,
+    (scope, task_id, stage, source_chars, sample_key, storyboard_id, storyboard_number, started_at, status, heartbeat_at, created_at)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'processing', ?, ?)`,
 )
 const finishWorkStmt = sqlite.prepare(
   `UPDATE task_observed_work SET status = ?, finished_at = ?, work_ms = MAX(0, ? - started_at), heartbeat_at = ?, error_msg = ?
@@ -312,8 +316,8 @@ const addCallTimeStmt = sqlite.prepare(
 )
 const insertCallStmt = sqlite.prepare(
   `INSERT INTO task_observed_call
-    (work_id, task_id, kind, config_id, config_name, provider, model, url, stream, status, queued_at, started_at, queue_ms, heartbeat_at, created_at)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'processing', ?, ?, ?, ?, ?)`,
+    (scope, work_id, task_id, kind, config_id, config_name, provider, model, url, stream, status, queued_at, started_at, queue_ms, heartbeat_at, created_at)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'processing', ?, ?, ?, ?, ?)`,
 )
 const setCallHttpStmt = sqlite.prepare('UPDATE task_observed_call SET http_status = ?, stream = ?, heartbeat_at = ? WHERE id = ?')
 const addRequestCharsStmt = sqlite.prepare('UPDATE task_observed_call SET request_chars = request_chars + ?, heartbeat_at = ? WHERE id = ?')
@@ -338,8 +342,8 @@ const unidentifiedToolCallsStmt = sqlite.prepare(
 const insertTextStmt = sqlite.prepare('INSERT OR IGNORE INTO task_observed_text (hash, body, chars, created_at) VALUES (?, ?, ?, ?)')
 const insertMessageStmt = sqlite.prepare(
   `INSERT INTO task_observed_message
-    (call_id, work_id, task_id, seq, phase, role, name, tool_call_id, body, text_hash, chars, streaming, created_at)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    (scope, call_id, work_id, task_id, seq, phase, role, name, tool_call_id, body, text_hash, chars, streaming, created_at)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 )
 const updateStreamingStmt = sqlite.prepare('UPDATE task_observed_message SET body = ?, chars = ? WHERE id = ?')
 // 流式工具调用的 id/name 可能晚于第一段参数到达：行先建好，身份后补
@@ -360,19 +364,19 @@ const WORK_SELECT = `SELECT w.*,
       WHERE c.work_id = w.id AND c.status = 'processing' AND w.status = 'processing'
       ORDER BY c.id DESC LIMIT 1) AS active_call_heartbeat_at
   FROM task_observed_work w`
-const worksByTaskStmt = sqlite.prepare(`${WORK_SELECT} WHERE w.task_id = ? ORDER BY w.id ASC`)
-const worksBySampleStmt = sqlite.prepare(`${WORK_SELECT} WHERE w.stage = ? AND w.sample_key = ? ORDER BY w.id DESC LIMIT ?`)
-const callByIdStmt = sqlite.prepare('SELECT * FROM task_observed_call WHERE id = ?')
-const callPageStmt = sqlite.prepare('SELECT * FROM task_observed_call WHERE task_id = ? AND id > ? ORDER BY id ASC LIMIT ?')
-const callPageByWorkStmt = sqlite.prepare('SELECT * FROM task_observed_call WHERE task_id = ? AND id > ? AND work_id = ? ORDER BY id ASC LIMIT ?')
-const countMessagesStmt = sqlite.prepare('SELECT COUNT(*) AS n FROM task_observed_message WHERE call_id = ?')
+const worksByTaskStmt = sqlite.prepare(`${WORK_SELECT} WHERE w.task_id = ? AND w.scope = ? ORDER BY w.id ASC`)
+const worksBySampleStmt = sqlite.prepare(`${WORK_SELECT} WHERE w.stage = ? AND w.sample_key = ? AND w.scope = ? ORDER BY w.id DESC LIMIT ?`)
+const callByIdStmt = sqlite.prepare('SELECT * FROM task_observed_call WHERE id = ? AND scope = ?')
+const callPageStmt = sqlite.prepare('SELECT * FROM task_observed_call WHERE task_id = ? AND scope = ? AND id > ? ORDER BY id ASC LIMIT ?')
+const callPageByWorkStmt = sqlite.prepare('SELECT * FROM task_observed_call WHERE task_id = ? AND scope = ? AND id > ? AND work_id = ? ORDER BY id ASC LIMIT ?')
+const countMessagesStmt = sqlite.prepare('SELECT COUNT(*) AS n FROM task_observed_message WHERE call_id = ? AND scope = ?')
 const requestCharsByCallStmt = sqlite.prepare<[number], { n: number }>("SELECT COALESCE(SUM(chars), 0) AS n FROM task_observed_message WHERE call_id = ? AND phase = 'request'")
 // 正文走内容寻址表，流式进行中的那条还在 body 里：读的时候合并两处
 const messagePageStmt = sqlite.prepare(
-  `SELECT m.id, m.call_id, m.work_id, m.task_id, m.seq, m.phase, m.role, m.name, m.tool_call_id,
+  `SELECT m.id, m.call_id, m.work_id, m.task_id, m.scope, m.seq, m.phase, m.role, m.name, m.tool_call_id,
       COALESCE(m.body, t.body, '') AS body, m.chars, m.streaming, m.created_at
     FROM task_observed_message m LEFT JOIN task_observed_text t ON t.hash = m.text_hash
-   WHERE m.call_id = ? AND m.id > ? ORDER BY m.id ASC LIMIT ?`,
+   WHERE m.call_id = ? AND m.scope = ? AND m.id > ? ORDER BY m.id ASC LIMIT ?`,
 )
 
 // ─── 工作项上下文（ALS 门禁 + 归属）───────────────────────────────────────
@@ -380,6 +384,7 @@ const messagePageStmt = sqlite.prepare(
 interface WorkContext {
   workId: number
   taskId: number
+  scope: string
   stage: ObservedStage
   /** 流式采集是异步的：工作项终态提交前必须等它们落盘，否则会丢最后一段公开正文 */
   pending: Set<Promise<void>>
@@ -395,7 +400,7 @@ function track(ctx: WorkContext, call: CallHandle, promise: Promise<void>): void
   const wrapped = promise.catch(error => {
     ctx.captureErrors.push(error)
     try {
-      if (getObservedCall(call.id)?.status === 'processing') {
+      if (getObservedCall(call.id, ctx.scope)?.status === 'processing') {
         const partial = sqlite.prepare("SELECT COALESCE(SUM(chars), 0) AS n FROM task_observed_message WHERE call_id = ? AND phase <> 'request'").get(call.id) as { n: number }
         completeCall(call, { status: 'failed', responseChars: partial.n, errorMsg: `公开响应采集失败：${errorText(error)}` })
       }
@@ -416,6 +421,7 @@ function track(ctx: WorkContext, call: CallHandle, promise: Promise<void>): void
 export async function runObservedWork<T>(input: ObservedWorkInput, fn: () => Promise<T>): Promise<T> {
   const startedAt = Date.now()
   const workId = getInsertId(insertWorkStmt.run(
+    input.scope ?? 'sys_task',
     input.taskId,
     input.stage,
     Math.max(0, Math.trunc(input.sourceChars) || 0),
@@ -426,7 +432,7 @@ export async function runObservedWork<T>(input: ObservedWorkInput, fn: () => Pro
     startedAt,
     startedAt,
   ))
-  const ctx: WorkContext = { workId, taskId: input.taskId, stage: input.stage, pending: new Set(), captureErrors: [] }
+  const ctx: WorkContext = { workId, taskId: input.taskId, scope: input.scope ?? 'sys_task', stage: input.stage, pending: new Set(), captureErrors: [] }
   const beat = setInterval(() => {
     try {
       const at = Date.now()
@@ -484,6 +490,7 @@ interface CallMetaInternal {
 function beginCall(ctx: WorkContext, meta: CallMetaInternal): CallHandle {
   const queueMs = Math.max(0, meta.startedAt - meta.queuedAt)
   const id = getInsertId(insertCallStmt.run(
+    ctx.scope,
     ctx.workId,
     ctx.taskId,
     meta.kind,
@@ -515,7 +522,7 @@ function appendMessage(call: CallHandle, phase: ObservedMessageRow['phase'], msg
   const at = Date.now()
   insertTextStmt.run(hash, body, body.length, at)
   insertMessageStmt.run(
-    call.id, call.ctx.workId, call.ctx.taskId, call.seq++, phase, msg.role,
+    call.ctx.scope, call.id, call.ctx.workId, call.ctx.taskId, call.seq++, phase, msg.role,
     msg.name ?? null, msg.toolCallId ?? null, null, hash, body.length, 0, at,
   )
 }
@@ -529,7 +536,7 @@ const STREAM_FLUSH_CHARS = 2_048
 
 function beginStreamingMessage(call: CallHandle, phase: ObservedMessageRow['phase'], role: string): StreamingMessage {
   const id = getInsertId(insertMessageStmt.run(
-    call.id, call.ctx.workId, call.ctx.taskId, call.seq++, phase, role, null, null, '', null, 0, 1, Date.now(),
+    call.ctx.scope, call.id, call.ctx.workId, call.ctx.taskId, call.seq++, phase, role, null, null, '', null, 0, 1, Date.now(),
   ))
   return { id, text: '', flushedChars: 0, timer: null, ctx: call.ctx }
 }
@@ -1117,7 +1124,7 @@ export async function recordFinalToolResults(output: unknown): Promise<void> {
     if (toolCallId && hasToolMessageStmt.get(ctx.workId, toolCallId)) continue
     const target = (toolCallId ? toolCallOriginStmt.get(ctx.workId, toolCallId) : undefined) as { id: number } | undefined
     if (!target) throw new Error('工具返回无法归属到已记录的模型调用，公开调用记录不完整')
-    const counted = countMessagesStmt.get(target.id) as { n: number } | undefined
+    const counted = countMessagesStmt.get(target.id, ctx.scope) as { n: number } | undefined
     const call: CallHandle = { id: target.id, ctx, startedAt: 0, queueMs: 0, seq: counted?.n ?? 0 }
     appendMessage(call, 'final', {
       role: 'tool_result',
@@ -1181,13 +1188,13 @@ export function freezeInterruptedObservations(): { works: number; calls: number 
 
 // ─── 读取 ────────────────────────────────────────────────────────────────
 
-export function listObservedWork(taskId: number): ObservedWorkRow[] {
-  return worksByTaskStmt.all(taskId) as ObservedWorkRow[]
+export function listObservedWork(taskId: number, scope = 'sys_task'): ObservedWorkRow[] {
+  return worksByTaskStmt.all(taskId, scope) as ObservedWorkRow[]
 }
 
 /** 同阶段同口径的历史样本（最新在前，上限 500 行）；状态不过滤，由估算方自行取舍 */
-export function listObservedSamples(stage: ObservedStage, sampleKey: string): ObservedWorkRow[] {
-  return worksBySampleStmt.all(stage, sampleKey, 500) as ObservedWorkRow[]
+export function listObservedSamples(stage: ObservedStage, sampleKey: string, scope = 'sys_task'): ObservedWorkRow[] {
+  return worksBySampleStmt.all(stage, sampleKey, scope, 500) as ObservedWorkRow[]
 }
 
 /** 早期 TTS 记录已有完整请求与字数，只漏了调用级累计；只读恢复，不改写历史。 */
@@ -1201,30 +1208,30 @@ function withRecordedRequestChars(call: ObservedCallRow): ObservedCallRow {
 
 export function listObservedCalls(
   taskId: number,
-  opts: { workId?: number; afterId?: number; limit?: number } = {},
+  opts: { workId?: number; afterId?: number; limit?: number; scope?: string } = {},
 ): ObservedCallRow[] {
   const limit = Math.min(Math.max(1, Math.trunc(opts.limit ?? 50)), 200)
   const after = Math.max(0, Math.trunc(opts.afterId ?? 0))
   const calls = (opts.workId != null
-    ? callPageByWorkStmt.all(taskId, after, opts.workId, limit)
-    : callPageStmt.all(taskId, after, limit)) as ObservedCallRow[]
+    ? callPageByWorkStmt.all(taskId, opts.scope ?? 'sys_task', after, opts.workId, limit)
+    : callPageStmt.all(taskId, opts.scope ?? 'sys_task', after, limit)) as ObservedCallRow[]
   return calls.map(withRecordedRequestChars)
 }
 
-export function getObservedCall(callId: number): ObservedCallRow | null {
-  const call = callByIdStmt.get(callId) as ObservedCallRow | undefined
+export function getObservedCall(callId: number, scope = 'sys_task'): ObservedCallRow | null {
+  const call = callByIdStmt.get(callId, scope) as ObservedCallRow | undefined
   return call ? withRecordedRequestChars(call) : null
 }
 
 export function listObservedMessages(
   callId: number,
-  opts: { afterId?: number; limit?: number } = {},
+  opts: { afterId?: number; limit?: number; scope?: string } = {},
 ): ObservedMessageRow[] {
   const limit = Math.min(Math.max(1, Math.trunc(opts.limit ?? 40)), 200)
   const after = Math.max(0, Math.trunc(opts.afterId ?? 0))
-  return messagePageStmt.all(callId, after, limit) as ObservedMessageRow[]
+  return messagePageStmt.all(callId, opts.scope ?? 'sys_task', after, limit) as ObservedMessageRow[]
 }
 
-export function countObservedMessages(callId: number): number {
-  return (countMessagesStmt.get(callId) as { n: number } | undefined)?.n ?? 0
+export function countObservedMessages(callId: number, scope = 'sys_task'): number {
+  return (countMessagesStmt.get(callId, scope) as { n: number } | undefined)?.n ?? 0
 }

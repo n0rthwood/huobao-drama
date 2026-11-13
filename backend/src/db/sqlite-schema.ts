@@ -769,6 +769,9 @@ export const sqliteSchemaStatements = [
  * SQLite 的 ADD COLUMN 不重建表、可空列无默认值即无数据改写，按 PRAGMA table_info 幂等跳过。
  */
 const columnAdditions: { table: string; column: string; type: string }[] = [
+  { table: 'task_observed_work', column: 'scope', type: "TEXT NOT NULL DEFAULT 'sys_task'" },
+  { table: 'task_observed_call', column: 'scope', type: "TEXT NOT NULL DEFAULT 'sys_task'" },
+  { table: 'task_observed_message', column: 'scope', type: "TEXT NOT NULL DEFAULT 'sys_task'" },
   // 场景参考图（与 characters/props 的 reference_images 同语义：用户上传的生图输入）
   { table: 'scenes', column: 'reference_images', type: 'TEXT' },
   // LLM 标注的承接边界
@@ -849,6 +852,8 @@ const columnAdditions: { table: string; column: string; type: string }[] = [
   // asset_type 首次补列时把「已有 map_spec」的存量道具迁成 'map'（见 migrateMapAssetType）。
   { table: 'props', column: 'asset_type', type: "TEXT NOT NULL DEFAULT 'prop'" },
   { table: 'props', column: 'map_workflow', type: 'TEXT' },
+  { table: 'props', column: 'map_brief', type: 'TEXT' },
+  { table: 'props', column: 'map_studio_task_id', type: 'INTEGER' },
   // 背景信息载体（Issue #47）：旁白提到但不出场、需要视觉承载的实体（近卫团、彼得一世、波尔塔瓦）。
   // 不新增第 4 类资产：仍按角色/场景/道具三类落库，这一列只回答「它是不是背景信息载体」，
   // 供表达设计（#49）的 exposition_assets 单列引用。
@@ -1228,12 +1233,24 @@ export function initSqliteSchema(sqlite: Database.Database) {
   applyColumnAdditions(sqlite)
   // 依赖补列的索引：旧库要等 ADD COLUMN 之后才能建
   sqlite.exec('CREATE INDEX IF NOT EXISTS idx_sys_task_episode_id ON sys_task (episode_id)')
+  sqlite.exec('CREATE INDEX IF NOT EXISTS idx_observed_work_scope ON task_observed_work (scope, task_id, id)')
+  sqlite.exec('CREATE INDEX IF NOT EXISTS idx_observed_call_scope ON task_observed_call (scope, task_id, id)')
+  sqlite.exec('CREATE INDEX IF NOT EXISTS idx_observed_message_scope ON task_observed_message (scope, call_id, id)')
   // 先迁移（要读 asset_version_selection）再删列
   if (!hadTargetAssets) migrateStoryboardTargetAssets(sqlite)
   if (!hadPoolSelections) migrateStoryboardPoolSelections(sqlite)
   if (!hadFaithful) migrateFaithfulProps(sqlite)
   // 必须在任何地图工作流读取之前跑完：没迁移的存量地图会被当成普通道具（看不到地图 UI）
   if (!hadAssetType) migrateMapAssetType(sqlite)
+  // #99: copy only the brief once. Legacy stage state/spec/media stay untouched.
+  const legacyMaps = sqlite.prepare("SELECT id, map_workflow FROM props WHERE asset_type = 'map' AND map_brief IS NULL AND map_workflow IS NOT NULL").all() as { id: number; map_workflow: string }[]
+  const copyBrief = sqlite.prepare('UPDATE props SET map_brief = ? WHERE id = ? AND map_brief IS NULL')
+  for (const row of legacyMaps) {
+    try {
+      const brief = JSON.parse(row.map_workflow)?.brief
+      if (brief && typeof brief === 'object' && !Array.isArray(brief)) copyBrief.run(JSON.stringify(brief), row.id)
+    } catch { /* Invalid legacy JSON is history, not a reason to abort startup. */ }
+  }
   applyColumnRemovals(sqlite)
   cleanupStaleAssetLinks(sqlite)
   const insertSeed = sqlite.prepare(SEED_SQL)

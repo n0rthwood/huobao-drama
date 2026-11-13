@@ -567,6 +567,9 @@ export const props = sqliteTable('props', {
   // 地图工作流 JSON（Issue #84）：brief → research → base → style → drawing → complete 的持久状态，
   // 含修订号 / 步骤 / 问题 / 检索证据 / 产出 / 历史快照。唯一读写口在 services/map-workflow/store.ts
   mapWorkflow: text('map_workflow'),
+  // Map Studio (#99): host owns only the brief and the module task reference.
+  mapBrief: text('map_brief'),
+  mapStudioTaskId: integer('map_studio_task_id'),
   // 背景信息载体（Issue #47）：旁白提到但不出场、只作视觉承载的实体
   exposition: integer('exposition').notNull().default(0),
   createdAt: text('created_at').notNull(),

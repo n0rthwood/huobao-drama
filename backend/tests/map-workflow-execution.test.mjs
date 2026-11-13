@@ -155,41 +155,6 @@ test('地图继续当前阶段：原件与成图原子采用，几何编辑复�
     assert.equal(state.status,'completed',state.error)
     assert.equal(state.outputs.texture_image.task_id,imageId)
     assert.equal(state.outputs.base_image.task_id,texturedBase)
-    // Full-copy semantics: redraw must still work after the source files disappear.
-    const targetDramaId=getInsertId(await db.insert(schema.dramas).values({title:'地图导入目标',createdAt:ts,updatedAt:ts}))
-    const imported=await importAsset({targetDramaId,kind:'prop',sourceId:propId})
-    let cloned=serializeDetail(await loadWorkflow(imported.id))
-    const clonedProp=await getProp(imported.id)
-    assert.equal(clonedProp.faithfulSource,cloned.outputs.base_image.task_id)
-    assert.equal(JSON.parse(clonedProp.semantics).image.source_task_id,cloned.outputs.final_image.task_id)
-    for(const key of ['base_image','texture_image','final_image']){
-      const original=state.outputs[key],copied=cloned.outputs[key]
-      assert.notEqual(copied.path,original.path,'Imported media must be independent files')
-      assert.deepEqual(readFileSync(process.env.HUOBAO_DATA_DIR+'/'+copied.path),readFileSync(process.env.HUOBAO_DATA_DIR+'/'+original.path))
-      unlinkSync(process.env.HUOBAO_DATA_DIR+'/'+original.path)
-    }
-    const versions=await db.select().from(schema.sysTask)
-    for(const key of ['base_image','final_image']){
-      assert.equal(versions.find(row=>row.id===cloned.outputs[key].task_id).propId,imported.id)
-    }
-    cloned.map_spec.places[0].lon+=0.01
-    cloned=await saveMapWorkflowDraft(imported.id,{expectedRevision:cloned.revision,mapSpec:cloned.map_spec})
-    await startMapWorkflow(imported.id,{mode:'auto',expectedRevision:cloned.revision,textConfigId:configId})
-    cloned=await settle(imported.id)
-    assert.equal(cloned.status,'completed',cloned.error)
-    assert.equal((await getProp(imported.id)).imageUrl,cloned.outputs.final_image.path)
-    const {eq}=createRequire('file://${backend}package.json')('drizzle-orm')
-    await db.update(schema.props).set({assetType:'prop'}).where(eq(schema.props.id,imported.id))
-    const dormant=await importAsset({targetDramaId,kind:'prop',sourceId:imported.id,name:'保留历史地图数据'})
-    const dormantProp=await getProp(dormant.id)
-    assert.equal(dormantProp.assetType,'prop','Import must not reactivate a map explicitly changed to an ordinary prop')
-    assert.deepEqual(JSON.parse(dormantProp.mapSpec),cloned.map_spec)
-    assert.ok(JSON.parse(dormantProp.mapWorkflow).outputs.base_image.task_id,'Changing category must not erase recoverable map history')
-    const assetIdsBefore=(await db.select().from(schema.props)).map(row=>row.id)
-    const taskIdsBefore=(await db.select().from(schema.sysTask)).map(row=>row.id)
-    await assert.rejects(importAsset({targetDramaId,kind:'prop',sourceId:propId,name:'依赖缺失应回滚'}),error=>error instanceof AssetLibraryError)
-    assert.deepEqual((await db.select().from(schema.props)).map(row=>row.id),assetIdsBefore,'Failed import must not leave a partial asset')
-    assert.deepEqual((await db.select().from(schema.sysTask)).map(row=>row.id),taskIdsBefore,'Failed import must roll back copied versions')
     await mock.close()
     console.log('MAP_EXECUTION_OK')
   `
