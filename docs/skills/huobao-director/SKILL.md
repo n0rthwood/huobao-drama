@@ -19,7 +19,7 @@ description: 通过火宝 HTTP API 按阶段推进剧本、资产、Poster、分
 2. **所有火宝业务写入只经 `hbwf call`**；读用 `hbwf get`、`hbwf check`。omp 扩展 `huobao-workflow-gate` 会拦截 bash/eval 直连 API、发写请求的脚本、手改 `workflow/` 文件，以及浏览器点击输入类操作。
 3. 每次决策前先 `hbwf check`，按逐镜 `next` 推进。审核、返工、结构性改动、例外用 `hbwf decide` 记录，带授权原话和证据。
 4. 按 profile 走：剧情项目（含“纪录片规则集”的剧情项目）用 `drama_narration`。剧情项目服务端 `gates` 全开、`script/confirm` 是 no-op，设计卡、combo、图层段、骨架、`fill-gaps` 只对 `project_type=documentary` 有效。`skill://huobao-doc-episode-production` 只适用于 documentary。
-5. **Poster 不是“可以不管”**：每集必须作出决定。`required_poster` 时终检要求已选版本并审核通过；否则需要显式 `poster_waiver`。
+5. **Poster 不是“可以不管”**：**纪录片（`project_type=documentary`）每集必须制作 Poster，不可选择不做、不可 `poster_waiver`**（#101；`hbwf` 按 `project_type` 自动强制 `poster_policy=required` 并拒绝 waiver，`--required-poster` 对纪录片可省略；项目类型读不到时同样按必做处理）；资产审核清单完成后立即开始，与骨架/设计卡并行，导出前必须已选定并审核，merge 传 `poster_version_id`。剧情项目每集必须作出决定：`required_poster` 时终检要求已选版本并审核通过；否则需要显式 `poster_waiver`。规划、委派、进度汇报的步骤表里 Poster 必须单独占一行。
 6. 交付前 `hbwf final` 必须 PASS；`merge` 也走同一终检。
 
 ### 0. 铁律框（任何模型不得越过；仅汇聚后文，不新增规则）
@@ -40,7 +40,7 @@ description: 通过火宝 HTTP API 按阶段推进剧本、资产、Poster、分
 14. 终产物必须实际打开；精确时长以 ffprobe 为准。
 15. 旁白不得截断凑时长；长度阻断读结构化原因。
 16. **原始内容≠AI 改写**：第一步只导入 `content`；第二步必须在获准后由火宝 `script_rewriter` 生成。不得自行代写后 PUT `script_content` 冒充火宝改写。到达用户指定停止点，或收到立即停止/只改技能指令后，不再调用火宝业务 API（含 GET、清空或撤回）；第一步写后读回只可在尚未收到立即停止指令时完成，不是停止后继续查询的例外。详见 S1 与 §4.5。
-17. 纪录片执行顺序（#70，硬）：**最终旁白稿 → 逐镜旁白骨架 → 人工确认骨架 → 批量配音（实测时长）→ 设计卡 → 制作（关键帧/图层段/视频/合成）**。`[S]` 服务端对无有效配音的镜直接阻断填卡/确认与全部下游制作（`narration-tts-gate.ts`）。§3 的历史示例（先设计卡后配音）不覆盖本条。
+17. 纪录片执行顺序（#70，硬）：**最终旁白稿 → 逐镜旁白骨架 → 人工确认骨架 → 批量配音（实测时长）→ 设计卡 → 制作（关键帧/图层段/视频/合成）**。`[S]` 服务端对无有效配音的镜直接阻断填卡/确认与全部下游制作（`narration-tts-gate.ts`）。§3 的历史示例（先设计卡后配音）不覆盖本条。**Poster 不在这条服务端闸门链里，但是纪录片的必做步骤**（#101）：Poster 构想读取本集资产描述，所以在资产审核清单 missing=0 后开始，与本链并行，导出前完成。
 18. **采集失败 ≠ 业务失败**：助手侧证据采集（截图、页面抓取、媒体下载、证据落盘）失败，或服务端返回「公开调用记录持久化失败」时，**业务副作用可能已经落库**（`runObservedWork` 先跑业务再提交观测，采集异常只把工作项标 failed 并抛错）。必须如实报告「采集失败」而不是「执行失败」，先 GET 读回实际状态（设计卡/骨架/音频/任务），确认缺什么再决定是否获准重发；**绝不未读回就重跑**，避免重复计费与覆盖。
 
 ## 1. 综述：火宝要解决什么
@@ -177,7 +177,7 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 
 ### S3 Poster（资产之后可与分镜并行；每集必须作出决定并进入导出终检；Issue #39/#72/#97）
 - 端点：`GET /episodes/{e}/poster`、`PUT /episodes/{e}/poster {prompt?, text_prompt?, copy?, reference_images?, base_image?, layer_doc}`、`POST …/poster/generate {mode:"initial"|"composite"|"layers", config_id?, model?, version_id?, composition_id?}`、`POST …/poster/concept`、`POST …/poster/concept/generate`、`POST …/poster/concept/apply`、`POST …/poster/concept/apply-layer-plan`、`POST …/poster/versions {layer_doc?, prompt?, text_prompt?}`、`PUT …/poster/select {version_id}`、`POST …/poster/load-version {version_id}`。
-- 用途：片头海报。**不阻塞**资产→分镜，但**不是可以静默跳过的步骤**：每集必须作出“做或不做”的决定。做：选定版本并审核后，merge 时传 `poster_version_id`。不做：记录 `poster_waiver` 决定，`required_poster` 的集不允许。ep26 曾因写成“可选”而两次漏排（#97）。
+- 用途：片头海报。**不阻塞**资产→分镜，但**不是可以静默跳过的步骤**。**纪录片：必须制作**（#101），没有“不做”选项，`poster_waiver` 会被 `hbwf decide` 拒绝，终检要求已选定并审核的版本，merge 时传 `poster_version_id`；drama 20 / ep 27 曾因委派清单只按闸门链书写而漏做。剧情项目：每集必须作出“做或不做”的决定。做：选定版本并审核后，merge 时传 `poster_version_id`。不做：记录 `poster_waiver` 决定，`required_poster` 的集不允许。ep26 曾因写成“可选”而两次漏排（#97）。
 - **编辑工程 = `layer_doc`（与分镜图层同源）；#72 起旧 `layout` 字段不再读写，浏览器画布合成也已取消。**精确文字排版的正确做法：`PUT …/poster {layer_doc}` 保存图层 → `POST …/poster/versions`，**服务端**从当前 LayerDoc 渲染合成图（版本记 `provider:"local"`、`model:"layer-doc"`）并自动设为最终版本 → 需要换版时 `PUT …/poster/select`，想回到某版继续编辑用 `POST …/poster/load-version`。不要再本地渲染 PNG 后 `POST /upload/image` 登记版本。
 - `generate` 三种 mode：`initial` = 出不带字的底图（注入项目风格词，AI 构想方案可直接带 `composition_id`）；`composite` = 对已登记的合成版本再生成；`layers` = 底图＋服务端渲染的文字层双参考图再生成（FLUX 配置不支持，会 400）。AI 构想只写 `concept`，套用必须显式调 `concept/apply`（手动字段冲突返回 409 `manual_edit_conflict`，覆盖要人决定并显式 `overwrite`）。
 - 陷阱：把真实照片/地图送扩散重绘会得到伪文字/几何漂移；优先确定性底图 + 图层文字。`POST …/poster/versions` 没有底图（`layer_doc.base.path` 空）会 400。
