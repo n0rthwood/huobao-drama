@@ -13,11 +13,11 @@
 import crypto from 'crypto'
 import fs from 'fs'
 import path from 'path'
-import { fileURLToPath } from 'url'
 import { geoEquirectangular, geoMercator, geoPath, type GeoProjection } from 'd3-geo'
 import sharp from 'sharp'
 import { z } from 'zod'
 import { STORAGE_ROOT } from '../../../utils/paths.js'
+import { datasetFileInfo, resolveGeoDir, riverScaleForRef, type DatasetScale } from './datasets.js'
 
 export const MAP_BASE_WIDTH = 3840
 export const MAP_BASE_HEIGHT = 2160
@@ -39,12 +39,22 @@ export class MapSpecValidationError extends Error {
   }
 }
 
-export interface MapPlace { id: string; name: string; lon: number; lat: number; proposed?: boolean }
-export interface MapRoute { id: string; name: string; points: Array<[number, number]>; proposed?: boolean }
+/** Local metadata contract: types.ts imports MapSpec, so never import it back here. */
+export interface MapFeatureMetadata {
+  category?: 'river' | 'lake' | 'coast' | 'mountain' | 'settlement' | 'route' | 'territory' | 'other'
+  origin?: 'dataset' | 'source' | 'model' | 'manual'
+  verification?: { status: 'verified' | 'unverified' | 'conflict' | 'needs_user' | 'confirmed'; reasons: string[] }
+  dataset_ref?: { ref: string; clip_bbox?: [number, number, number, number] }
+  relations?: unknown[]
+}
+export interface MapPlace extends MapFeatureMetadata { id: string; name: string; lon: number; lat: number; proposed?: boolean }
+export interface MapRoute extends MapFeatureMetadata { id: string; name: string; points: Array<[number, number]>; proposed?: boolean }
 /** 面要素：外环（首尾点由 normalizeMapSpec 自动闭合），经纬度与 routes 同口径 */
-export interface MapRegion { id: string; name: string; points: Array<[number, number]>; proposed?: boolean }
+export interface MapRegion extends MapFeatureMetadata { id: string; name: string; points: Array<[number, number]>; proposed?: boolean }
 export interface MapSpec {
   version: 1
+  /** Absent legacy specs keep 50m; regional/site use 10m rivers. */
+  detail_level?: 'overview' | 'regional' | 'site'
   projection: { type: 'mercator' | 'equirectangular' }
   /** [west, south, east, north] */
   bbox: [number, number, number, number]
@@ -57,6 +67,31 @@ export interface MapSpec {
 }
 
 export interface MapCanvasSize { width: number; height: number }
+
+export interface MapRiverSourceInfo {
+  scale: DatasetScale
+  reason: 'dataset_ref' | 'detail_level' | 'overview'
+  file_id: string
+  filename: string
+  sha256: string
+}
+/** Dataset adoption overrides overview so highlighted river and background cannot diverge. */
+export function riverSourceScale(spec: Pick<MapSpec, 'detail_level' | 'routes'>): DatasetScale {
+  const refs = spec.routes.flatMap(route => route.dataset_ref ? [{ route, scale: riverScaleForRef(route.dataset_ref.ref) }] : [])
+  const scale = refs.some(item => item.scale === '10m') || spec.detail_level === 'regional' || spec.detail_level === 'site' ? '10m' : '50m'
+  const mismatched = refs.filter(item => item.scale !== null && item.scale !== scale)
+  if (mismatched.length) throw new MapSpecValidationError(
+    `底图河道来源不一致：当前选择 ${scale}，但 ${mismatched.map(({ route }) => `「${route.name || route.id}」(${route.dataset_ref!.ref})`).join('、')} 来自 50m。`
+    + '请改用同名 10m 数据集引用；若没有任何 10m 引用且确需 50m，请将 detail_level 改为 overview。不能静默换源或混画两套河道。',
+  )
+  return scale
+}
+export function resolveRiverSource(spec: Pick<MapSpec, 'detail_level' | 'routes'>): MapRiverSourceInfo {
+  const scale = riverSourceScale(spec)
+  const file = datasetFileInfo(`${scale}_rivers_lake_centerlines`)
+  const fromDataset = spec.routes.some(route => route.dataset_ref && riverScaleForRef(route.dataset_ref.ref) === '10m')
+  return { scale, reason: fromDataset ? 'dataset_ref' : scale === '10m' ? 'detail_level' : 'overview', file_id: file.fileId, filename: file.filename, sha256: file.sha256 }
+}
 
 export interface MapProjectedPoint { id: string; name: string; at: [number, number] }
 export interface MapProjectedRoute { id: string; name: string; points: Array<[number, number]>; color: string }
@@ -73,6 +108,7 @@ export interface MapRenderResult {
   width: number
   height: number
   sha256: string
+  river_source: MapRiverSourceInfo
   points: MapProjectedPoint[]
   routes: MapProjectedRoute[]
   regions: MapProjectedRegion[]
@@ -96,8 +132,28 @@ const finiteNumber = z.number().finite()
 
 const lonLatTuple = z.tuple([finiteNumber, finiteNumber])
 
+const metadataSchema = z.object({
+  category: z.enum(['river', 'lake', 'coast', 'mountain', 'settlement', 'route', 'territory', 'other']).optional(),
+  origin: z.enum(['dataset', 'source', 'model', 'manual']).optional(),
+  verification: z.object({ status: z.enum(['verified', 'unverified', 'conflict', 'needs_user', 'confirmed']), reasons: z.array(z.string()) }).optional(),
+  dataset_ref: z.object({ ref: z.string().min(1), clip_bbox: z.tuple([finiteNumber, finiteNumber, finiteNumber, finiteNumber]).optional() }).optional(),
+  relations: z.array(z.object({}).passthrough()).optional(),
+})
+
+/** Shared by all three feature kinds so normalization never strips research evidence. */
+function featureMetadata(item: MapFeatureMetadata): MapFeatureMetadata {
+  return {
+    ...(item.category !== undefined ? { category: item.category } : {}),
+    ...(item.origin !== undefined ? { origin: item.origin } : {}),
+    ...(item.verification !== undefined ? { verification: { status: item.verification.status, reasons: [...item.verification.reasons] } } : {}),
+    ...(item.dataset_ref !== undefined ? { dataset_ref: { ref: item.dataset_ref.ref, ...(item.dataset_ref.clip_bbox ? { clip_bbox: [...item.dataset_ref.clip_bbox] as [number, number, number, number] } : {}) } } : {}),
+    ...(item.relations !== undefined ? { relations: structuredClone(item.relations) } : {}),
+  }
+}
+
 const specSchema = z.object({
   version: z.literal(1).optional(),
+  detail_level: z.enum(['overview', 'regional', 'site']).optional(),
   projection: z.object({ type: z.enum(['mercator', 'equirectangular']) }).optional(),
   bbox: z.tuple([finiteNumber, finiteNumber, finiteNumber, finiteNumber]),
   layers: z.object({
@@ -113,18 +169,21 @@ const specSchema = z.object({
     lon: finiteNumber,
     lat: finiteNumber,
     proposed: z.boolean().optional(),
+    ...metadataSchema.shape,
   })).optional(),
   routes: z.array(z.object({
     id: z.string().min(1),
     name: z.string(),
     points: z.array(lonLatTuple),
     proposed: z.boolean().optional(),
+    ...metadataSchema.shape,
   })).optional(),
   regions: z.array(z.object({
     id: z.string().min(1),
     name: z.string(),
     points: z.array(lonLatTuple),
     proposed: z.boolean().optional(),
+    ...metadataSchema.shape,
   })).optional(),
   style: z.object({ theme: z.enum(['archival', 'clean', 'ink']) }).optional(),
 })
@@ -230,6 +289,7 @@ export function normalizeMapSpec(raw: unknown): MapSpec {
 
   return {
     version: 1,
+    ...(data.detail_level ? { detail_level: data.detail_level } : {}),
     projection: { type: projectionType },
     bbox: [west, south, east, north],
     layers: {
@@ -245,12 +305,14 @@ export function normalizeMapSpec(raw: unknown): MapSpec {
       lon: item.lon,
       lat: item.lat,
       ...(item.proposed ? { proposed: true as const } : {}),
+      ...featureMetadata(item),
     })),
     routes: routes.map(item => ({
       id: item.id,
       name: item.name,
       points: item.points.map(([lon, lat]) => [lon, lat] as [number, number]),
       ...(item.proposed ? { proposed: true as const } : {}),
+      ...featureMetadata(item),
     })),
     // 外环按 GeoJSON 惯例闭合：首尾同点，重复点不计入上限校验
     regions: regions.map(item => ({
@@ -258,6 +320,7 @@ export function normalizeMapSpec(raw: unknown): MapSpec {
       name: item.name,
       points: closeRing(item.points.map(([lon, lat]) => [lon, lat] as [number, number])),
       ...(item.proposed ? { proposed: true as const } : {}),
+      ...featureMetadata(item),
     })),
     style: { theme: data.style?.theme ?? 'archival' },
   }
@@ -287,7 +350,7 @@ export function normalizeMapCanvas(size: Partial<MapCanvasSize> | undefined): Ma
 /**
  * bbox 矩形环。**必须顺时针**（[w,s]→[w,n]→[e,n]→[e,s]）：d3-geo 按球面语义解释多边形，
  * 逆时针小环表示「整个地球减去这个矩形」，fitExtent 会去拟合全球，豫北 bbox 实测会塌成
- * 1280×720 画布上 5px 宽的一小团（见 tests/map-base-render.test.mjs 的跨度断言）。
+ * 1280×720 画布上 5px 宽的一小团（见 tests/map-studio-base-render.test.mjs 的跨度断言）。
  */
 function bboxPolygon(spec: Pick<MapSpec, 'bbox'>) {
   const [w, s, e, n] = spec.bbox
@@ -298,7 +361,7 @@ function bboxPolygon(spec: Pick<MapSpec, 'bbox'>) {
 }
 /**
  * 渲染与坐标换算共用同一个投影实例口径，否则标注会和底图错位。
- * 导出给 map-geometry：登记件（registration）里只存 projection + bbox + 画布尺寸，
+ * 导出给 geo/geometry：登记件（registration）里只存 projection + bbox + 画布尺寸，
  * 复原投影必须走这个唯一实现，绝不允许第二份 fitExtent 写法。
  */
 export function mapProjectionFor(spec: Pick<MapSpec, 'projection' | 'bbox'>, size: MapCanvasSize): GeoProjection {
@@ -335,38 +398,21 @@ const GEO_FILES: Record<GeoLayerName, string> = {
   cities: 'ne_50m_populated_places.geojson',
 }
 
-/** geojson 单文件最大 3 MB 级别，解析一次常驻；绝不每次渲染都重读 */
-const geoCache = new Map<GeoLayerName, unknown>()
-
-function resolveGeoDir(): string {
-  const here = path.dirname(fileURLToPath(import.meta.url))
-  const candidates = [
-    process.env.HUOBAO_GEO_DIR,
-    // dev / tsx：src/modules/map-studio/geo → backend/assets/geo（通用资产路径，模块只读）
-    path.resolve(here, '../../../../assets/geo'),
-    // 桌面版 esbuild bundle：build/backend.mjs 旁边的 assets/geo
-    path.resolve(here, 'assets/geo'),
-    path.resolve(process.cwd(), 'assets/geo'),
-  ].filter((item): item is string => Boolean(item))
-  for (const dir of candidates) {
-    if (fs.existsSync(path.join(dir, GEO_FILES.land))) return dir
-  }
-  throw new Error(
-    `地图底图数据缺失：在 ${candidates.join(' / ')} 都没找到 ${GEO_FILES.land}；`
-    + '请确认 backend/assets/geo 已随代码发布，或用 HUOBAO_GEO_DIR 指向数据目录。',
-  )
-}
+/** Cache each actual source file, not merely the layer name (10m/50m differ). */
+const geoCache = new Map<string, unknown>()
 
 /** 缺某一层只跳过该层（底图仍可用），缺整个目录才抛 */
-function loadGeoLayer(name: GeoLayerName): unknown | null {
-  if (geoCache.has(name)) return geoCache.get(name) ?? null
-  const file = path.join(resolveGeoDir(), GEO_FILES[name])
+function loadGeoLayer(name: GeoLayerName, riverScale: DatasetScale = '50m'): unknown | null {
+  const filename = name === 'rivers' ? `ne_${riverScale}_rivers_lake_centerlines.geojson` : GEO_FILES[name]
+  if (geoCache.has(filename)) return geoCache.get(filename) ?? null
+  const file = path.join(resolveGeoDir(), filename)
   if (!fs.existsSync(file)) {
-    geoCache.set(name, null)
+    if (name === 'rivers') throw new Error(`地图河流底图文件缺失：${filename}；请随版本发布 backend/assets/geo，不能用另一精度的河道替代。`)
+    geoCache.set(filename, null)
     return null
   }
   const parsed = JSON.parse(fs.readFileSync(file, 'utf8'))
-  geoCache.set(name, parsed)
+  geoCache.set(filename, parsed)
   return parsed
 }
 
@@ -424,7 +470,7 @@ function round(value: number): number {
  * 生成底图 SVG。导出只为测试断言「不含任何 <text 元素」。
  * 注意：这里一个字都不能写——地图文字由叠加图层负责。
  */
-export function buildMapSvg(spec: MapSpec, size: MapCanvasSize): string {
+export function buildMapSvg(spec: MapSpec, size: MapCanvasSize, riverSource: DatasetScale = riverSourceScale(spec)): string {
   const theme = THEMES[spec.style.theme]
   const projection = mapProjectionFor(spec, size)
   // digits 固定小数位：同 spec 必定生成同一串 path，保证字节级确定性
@@ -438,7 +484,7 @@ export function buildMapSvg(spec: MapSpec, size: MapCanvasSize): string {
   const hair = Math.max(1, size.height / 1080)
 
   const draw = (name: GeoLayerName, attrs: string) => {
-    const data = loadGeoLayer(name) as { features?: unknown[] } | null
+    const data = loadGeoLayer(name, riverSource) as { features?: unknown[] } | null
     if (!data?.features) return
     const d = pathGen({ type: 'FeatureCollection', features: data.features } as never)
     if (d) parts.push(`<path d="${d}" ${attrs}/>`)
@@ -511,12 +557,14 @@ export function buildMapSvg(spec: MapSpec, size: MapCanvasSize): string {
 // ---------------------------------------------------------------- 渲染
 
 /** 同 spec + 同尺寸 → 同签名（用于复用已渲染文件与断言确定性） */
-export function mapBaseSignature(spec: MapSpec, size: MapCanvasSize): string {
+export function mapBaseSignature(spec: MapSpec, size: MapCanvasSize, riverSource: DatasetScale = riverSourceScale(spec)): string {
   const canvas = normalizeMapCanvas(size)
   // 字段顺序固定，避免对象字面量书写顺序影响签名
   const canonical = JSON.stringify({
     v: spec.version,
     renderer: 2,
+    // Keep all legacy/overview signatures byte-identical; only 10m adds a source key.
+    ...(riverSource === '10m' ? { rv: '10m' } : {}),
     p: spec.projection.type,
     b: spec.bbox,
     l: [spec.layers.land, spec.layers.coastline, spec.layers.rivers, spec.layers.lakes, spec.layers.countries],
@@ -534,9 +582,10 @@ export function mapBaseSignature(spec: MapSpec, size: MapCanvasSize): string {
 }
 
 /** 渲染底图并落盘。默认 3840×2160（16:9）。**绝不渲染任何文字**（地名/图例/刻度一律没有）。 */
-export async function renderMapBase(spec: MapSpec, opts?: Partial<MapCanvasSize>): Promise<MapRenderResult> {
+export async function renderMapBase(spec: MapSpec, opts?: Partial<MapCanvasSize> & { riverSource?: MapRiverSourceInfo }): Promise<MapRenderResult> {
   const size = normalizeMapCanvas(opts)
-  const signature = mapBaseSignature(spec, size)
+  const riverSource = opts?.riverSource ?? resolveRiverSource(spec)
+  const signature = mapBaseSignature(spec, size, riverSource.scale)
   const dir = path.join(STORAGE_ROOT, 'map-bases')
   const filename = `${signature}.png`
   const absolute = path.join(dir, filename)
@@ -547,7 +596,7 @@ export async function renderMapBase(spec: MapSpec, opts?: Partial<MapCanvasSize>
     reused = true
     buffer = fs.readFileSync(absolute)
   } else {
-    const svg = buildMapSvg(spec, size)
+    const svg = buildMapSvg(spec, size, riverSource.scale)
     buffer = await sharp({
       create: {
         width: size.width,
@@ -594,6 +643,7 @@ export async function renderMapBase(spec: MapSpec, opts?: Partial<MapCanvasSize>
     width: size.width,
     height: size.height,
     sha256: crypto.createHash('sha256').update(buffer).digest('hex'),
+    river_source: riverSource,
     points,
     routes,
     regions,

@@ -1,5 +1,5 @@
 /**
- * 地图工作室的持久化（Issue #99，语义等价于 #84/#90 的 `services/map-workflow/store.ts`）
+ * 地图工作室的持久化（Issue #99，语义等价于 #84/#90 的旧地图工作流持久层，旧代码已在 #99 删除）
  *
  * 任务文档落在 `map_studio_task.state`（JSON），几何落在 `map_studio_task.map_spec`。CAS 的做法不变：
  * UPDATE 的 WHERE 带上写之前读到的三份原文（state / map_spec / brief），任何并发写

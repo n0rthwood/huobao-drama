@@ -15,7 +15,7 @@ import assert from 'node:assert/strict'
 
 const backendRoot = fileURLToPath(new URL('..', import.meta.url))
 // 被测模块经 db/index.ts 建连接：数据目录与库文件一律指到临时目录，绝不碰仓库 data/
-const dataDir = mkdtempSync(path.join(tmpdir(), 'map-workflow-state-'))
+const dataDir = mkdtempSync(path.join(tmpdir(), 'map-studio-state-'))
 after(() => rmSync(dataDir, { recursive: true, force: true }))
 
 const script = `

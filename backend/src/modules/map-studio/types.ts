@@ -1,5 +1,5 @@
 /**
- * 地图工作室的类型与校验（Issue #99，从 #84/#90 的 `services/map-workflow` 迁移而来）
+ * 地图工作室的类型与校验（Issue #99，从 #84/#90 的旧地图工作流迁移而来，旧代码已在 #99 删除）
  *
  * 这一层只做**纯数据**：形状、枚举、输入清洗、文件路径围栏。它不碰数据库、不发请求，
  * 所以每条规则都能单测，也不会在半路写坏模块里的任务文档。
@@ -74,6 +74,8 @@ export interface MapBrief {
   schematic: boolean
   base_mode: MapBaseMode
   style: MapStyleTheme
+  /** Optional explicit style-library input; no reference family/default is selected by code. */
+  style_spec?: Record<string, unknown>
   notes: string
   reference_image: MapBriefReferenceImage | null
   inferred: MapBriefInference[]
@@ -132,6 +134,34 @@ export interface MapFeatureConflict {
   note: string
 }
 
+export type MapFeatureCategory = 'river' | 'lake' | 'coast' | 'mountain' | 'settlement' | 'route' | 'territory' | 'other'
+export type MapFeatureOrigin = 'dataset' | 'source' | 'model' | 'manual'
+export interface MapVerification {
+  status: 'verified' | 'unverified' | 'conflict' | 'needs_user' | 'confirmed'
+  reasons: string[]
+}
+export interface MapDatasetReference { ref: string; clip_bbox?: [number, number, number, number] }
+export interface MapDatasetQuery {
+  layer: string
+  query: string
+  bbox?: [number, number, number, number]
+  hits: number
+  refs: string[]
+  error?: string | null
+}
+export interface MapRelation {
+  id: string
+  subject: string
+  object: string
+  relation: 'distance_km' | 'east_of' | 'west_of' | 'north_of' | 'south_of' | 'near_river'
+  value_km?: number
+  tolerance_km?: number
+  excerpt: string
+  source_id: string
+  computed: { value_km?: number; consistent: boolean }
+  message: string
+}
+
 export interface MapResearchFeature {
   id: string
   kind: MapFeatureKind
@@ -139,6 +169,13 @@ export interface MapResearchFeature {
   lon: number | null
   lat: number | null
   points: Array<[number, number]>
+  /** Disconnected dataset chains remain separate; adoption emits separate spec entries. */
+  parts?: Array<Array<[number, number]>>
+  category?: MapFeatureCategory
+  origin?: MapFeatureOrigin
+  verification?: MapVerification
+  dataset_ref?: MapDatasetReference
+  relations?: MapRelation[]
   coordinate_basis: MapCoordinateBasis
   /** 坐标是怎么来的（与 supporting_excerpt 区分：后者是原文，这里是推理） */
   basis: string
@@ -155,6 +192,9 @@ export interface MapResearchFeature {
 
 export interface MapResearch {
   queries: MapResearchQuery[]
+  dataset_queries?: MapDatasetQuery[]
+  extent?: [number, number, number, number]
+  relations?: MapRelation[]
   sources: MapResearchSource[]
   features: MapResearchFeature[]
   uncertainties: string[]
@@ -183,6 +223,8 @@ export interface MapWorkflowOutputs {
   kmz: { path: string; provenance: object | null } | null
   /** 几何侧的 LayerDoc（可编辑图层文档），原样透传给前端 */
   layer_doc: object | null
+  /** Render-only sidecar: stored control points and strict LayerDoc remain unchanged. */
+  layer_options?: Record<string, { smooth: number }>
 }
 
 export interface MapWorkflowHistoryEntry {
@@ -274,7 +316,7 @@ export interface MapWorkflowState {
 }
 
 export const EMPTY_OUTPUTS: MapWorkflowOutputs = {
-  base_image: null, texture_image: null, final_image: null, kmz: null, layer_doc: null,
+  base_image: null, texture_image: null, final_image: null, kmz: null, layer_doc: null, layer_options: {},
 }
 
 export function emptySteps(): MapWorkflowStep[] {
@@ -477,6 +519,11 @@ export function normalizeBrief(raw: unknown, previous: MapBrief | null): MapBrie
   if ('detail_level' in record) next.detail_level = enumOf(record.detail_level, MAP_DETAIL_LEVELS, 'brief.detail_level', base.detail_level)
   if ('base_mode' in record) next.base_mode = enumOf(record.base_mode, MAP_BASE_MODES, 'brief.base_mode', base.base_mode)
   if ('style' in record) next.style = enumOf(record.style, MAP_STYLE_THEMES, 'brief.style', base.style)
+  if ('style_spec' in record) {
+    if (record.style_spec === null) delete next.style_spec
+    else if (!record.style_spec || typeof record.style_spec !== 'object' || Array.isArray(record.style_spec)) throw new MapWorkflowValidationError('style_spec 必须是对象或 null', { field: 'brief.style_spec' })
+    else next.style_spec = { ...record.style_spec }
+  }
   if ('schematic' in record) next.schematic = record.schematic === true || record.schematic === 1 || record.schematic === 'true'
   if ('reference_image' in record) next.reference_image = normalizeReferenceImage(record.reference_image)
   if ('inferred' in record) next.inferred = normalizeInferred(record.inferred)

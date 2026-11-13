@@ -1,39 +1,30 @@
-/**
- * 地图工作流的标注绘制阶段（Issue #90）：模型用矢量图层（LayerDoc）自己作图。
- *
- * 硬约束：模型预览、最终成图、人工在图层编辑器里修改后的重渲染，**全部走同一条渲染链**
- * （layer-doc.ts 严格校验 → layer-svg.ts → layer-render.ts renderLayerDoc）。
- * 代码不排版、不替模型改文档；交付的文档必须原样就是规范化结果，否则逐字段拒收。
- * 成图就是交付文档的确定性渲染，语义（点/线/面像素坐标）从同一份文档的锚定图层导出。
- */
+/** Map Studio drawing harness: geometry stays server-side; models edit a validated draft with small tools. */
 import crypto from 'crypto'
 import fs from 'fs'
 import path from 'path'
 import { z } from 'zod'
 import { STORAGE_ROOT } from '../../utils/paths.js'
 import type { StageModel } from '../../services/ai-stages.js'
-import type { MapSpec } from './geo/base-render.js'
-import { forwardFor, type MapBackgroundResult } from './geo/geometry.js'
-import { strictLayerDocProblems, type LayerDoc } from '../../services/layer-doc.js'
+import type { Layer, LayerDoc } from '../../services/layer-doc.js'
 import { renderLayerDoc } from '../../services/layer-render.js'
 import { readImage } from '../../agents/tools/vision-tools.js'
+import type { MapSpec } from './geo/base-render.js'
+import { forwardFor, type MapBackgroundResult } from './geo/geometry.js'
 import { mapBriefText, rollbackTool, runStageAgent, stageTool, type StageAgentResult } from './agent-loop.js'
-import { drawingProblems, drawnGeometryOf, specFeatures, type DrawnGeometry, type OmittedFeature, type SpecFeature } from './validate.js'
+import { drawingProblems, drawnGeometryOf, projectedLabelFeatures, specFeatures, type DrawnGeometry, type OmittedFeature, type SpecFeature } from './validate.js'
+import { autoPlaceLabels } from './layout/labels.js'
+import { strictMapLayerDocProblems } from './layer-doc.js'
+import { defaultLayerOptions, renderCopyWithSmoothing, smoothingProblems, validateLayerOptions, type LayerOptions } from './render/smooth.js'
 import type { MapBrief } from './types.js'
 
-const MAX_STEPS = 30
+const MAX_STEPS = 60
+export interface RenderedMapDoc { path: string; sha256: string; width: number; height: number }
 
-export interface RenderedMapDoc {
-  /** `static/map-drawings/<sha>.png`：内容寻址，同一文档同一字节 */
-  path: string
-  sha256: string
-  width: number
-  height: number
-}
-
-/** 同一文档 → 同一字节 → 同一路径：模型预览、成图与人工保存共用这一个出口 */
-export async function renderMapLayerDoc(doc: LayerDoc): Promise<RenderedMapDoc> {
-  const rendered = await renderLayerDoc(doc)
+/** No normalizer here: the module's validated dense dataset vertices must all reach layer-svg. */
+export async function renderMapLayerDoc(doc: LayerDoc, layerOptions: LayerOptions = {}): Promise<RenderedMapDoc> {
+  const problems = smoothingProblems(doc, layerOptions)
+  if (problems.length) throw new Error(problems.map(p => p.message).join('；'))
+  const rendered = await renderLayerDoc(renderCopyWithSmoothing(doc, layerOptions))
   const sha256 = crypto.createHash('sha256').update(rendered.buffer).digest('hex')
   const dir = path.join(STORAGE_ROOT, 'map-drawings')
   fs.mkdirSync(dir, { recursive: true })
@@ -43,137 +34,181 @@ export async function renderMapLayerDoc(doc: LayerDoc): Promise<RenderedMapDoc> 
   return { path: `static/map-drawings/${file}`, sha256, width: rendered.width, height: rendered.height }
 }
 
-/** 地图 LayerDoc 的底图必须就是本次合成的背景（路径与尺寸一致、不裁切：裁切会让语义像素坐标与画面错位） */
 export function backgroundProblems(doc: LayerDoc, background: Pick<MapBackgroundResult, 'path' | 'width' | 'height'>): string[] {
   const problems: string[] = []
   if (doc.base.path !== background.path) problems.push(`base.path 必须是 ${JSON.stringify(background.path)}，当前是 ${JSON.stringify(doc.base.path)}`)
-  if (doc.base.width !== background.width || doc.base.height !== background.height) {
-    problems.push(`base.width/height 必须是 ${background.width}×${background.height}，当前是 ${doc.base.width}×${doc.base.height}`)
-  }
-  if (doc.base.crop) problems.push('地图底图不能裁切（base.crop）：裁切会让语义坐标与画面错位；需要改取景请回到底图阶段')
+  if (doc.base.width !== background.width || doc.base.height !== background.height) problems.push(`base.width/height 必须是 ${background.width}×${background.height}，当前是 ${doc.base.width}×${doc.base.height}`)
+  if (doc.base.crop) problems.push('地图底图不能裁切（base.crop）：需要改取景请回到底图阶段')
   return problems
 }
 
-export interface DrawingStageResult {
-  doc: LayerDoc
-  rendered: RenderedMapDoc
-  geometry: DrawnGeometry
-  omitted: OmittedFeature[]
-}
-
+export interface DrawingStageResult { doc: LayerDoc; rendered: RenderedMapDoc; geometry: DrawnGeometry; omitted: OmittedFeature[]; layerOptions: LayerOptions }
 export interface DrawingStageInput {
-  taskId: number
-  runId: number
-  stageModel: StageModel
-  brief: MapBrief
-  spec: MapSpec
-  background: MapBackgroundResult
-  startRounds: number
-  feedback: string | null
+  taskId: number; runId: number; stageModel: StageModel; brief: MapBrief; spec: MapSpec; background: MapBackgroundResult
+  startRounds: number; feedback: string | null; layerOptions?: LayerOptions
+  /** Optional future reference-library input; absence preserves THEME_PRESETS. */
+  style_spec?: Record<string, unknown>
+}
+export function docKey(doc: LayerDoc, layerOptions: LayerOptions = {}): string {
+  return crypto.createHash('sha256').update(JSON.stringify({ doc, layerOptions })).digest('hex')
 }
 
-const round5 = (value: number) => Math.round(value * 100000) / 100000
+/** Options chosen in the geo editor before drawing are resolved onto the resulting layer ids. */
+export function optionsForDrawing(doc: LayerDoc, features: SpecFeature[], stored: LayerOptions = {}): LayerOptions {
+  const options = defaultLayerOptions(doc, features)
+  for (const layer of doc.layers) {
+    if (layer.type !== 'polygon' && layer.type !== 'polyline') continue
+    const explicit = stored[layer.id] ?? (layer.anchor?.semantic_id ? stored[layer.anchor.semantic_id] : undefined)
+    if (explicit) options[layer.id] = { ...explicit }
+  }
+  return options
+}
 
-export function docKey(doc: LayerDoc): string {
-  return crypto.createHash('sha256').update(JSON.stringify(doc)).digest('hex')
+/** Tool responses deliberately contain bbox/counts instead of the hundreds of stored vertices. */
+export function drawingDraftSummary(doc: LayerDoc, layerOptions: LayerOptions, includePoints = false) {
+  return { version: doc.version, base: doc.base, theme: doc.theme, layer_options: layerOptions, layers: doc.layers.map(layer => {
+    if (layer.type !== 'polygon' && layer.type !== 'polyline' && layer.type !== 'marker') return layer
+    const points = layer.type === 'marker' ? [layer.at] : layer.points
+    const xs = points.map(p => p[0] * doc.base.width), ys = points.map(p => p[1] * doc.base.height)
+    const common = { ...layer, pixel_bbox: [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)], vertex_count: points.length }
+    if (includePoints && !layer.anchor?.semantic_id) return common
+    if ('points' in common) { const { points: _points, ...small } = common; return small }
+    const { at: _at, ...small } = common
+    return small
+  }) }
 }
 
 export async function runDrawingStage(input: DrawingStageInput): Promise<StageAgentResult<DrawingStageResult>> {
   const { background } = input
-  const features: SpecFeature[] = specFeatures(input.spec)
+  const features = specFeatures(input.spec)
   const forward = forwardFor(background.registration)
-  const toNormalized = (coord: [number, number]): [number, number] | null => {
-    const px = forward(coord)
-    return px ? [round5(px[0] / background.width), round5(px[1] / background.height)] : null
-  }
-  /** 渲染成功过的文档 → 渲染结果；交付的文档必须先预览过 */
+  const projectedFeatures = projectedLabelFeatures(features, background.registration)
+  let draft: LayerDoc = { version: 1, base: { path: background.path, width: background.width, height: background.height, source_width: background.width, source_height: background.height }, theme: input.brief.style, layers: [] }
+  let layerOptions: LayerOptions = {}
   const renders = new Map<string, RenderedMapDoc>()
-  const skeleton = {
-    version: 1,
-    base: { path: background.path, width: background.width, height: background.height, source_width: background.width, source_height: background.height },
-    theme: input.brief.style,
-    layers: [],
+  const checkDraft = (omitted: unknown) => {
+    const strict = strictMapLayerDocProblems(draft, { features, registration: background.registration })
+    const renderable = [...strict.problems.map(p => `${p.path}：${p.message}`), ...backgroundProblems(draft, background), ...smoothingProblems(draft, layerOptions).map(p => p.message)]
+    const drawn = drawingProblems({ doc: draft, features, registration: background.registration, omitted, layerOptions })
+    return { renderable, problems: [...renderable, ...drawn.problems], omitted: drawn.omitted }
   }
-  const featureLines = features.map(feature => `- id=${feature.id} ${feature.kind}「${feature.name}」→ 归一化坐标 ${
-    JSON.stringify(feature.coords.map(toNormalized))}`)
-  const checkDoc = (raw: unknown, omitted: unknown) => {
-    const strict = strictLayerDocProblems(raw)
-    const renderable = [
-      ...strict.problems.map(problem => `${problem.path || '(文档)'}：${problem.message}`),
-      ...backgroundProblems(strict.doc, background),
-    ]
-    const drawn = drawingProblems({ doc: strict.doc, features, registration: background.registration, omitted })
-    return { doc: strict.doc, renderable, problems: [...renderable, ...drawn.problems], omitted: drawn.omitted }
+  const acceptDraft = (next: LayerDoc) => {
+    const sorted = { ...next, layers: [...next.layers].sort((a, b) => a.z - b.z) }
+    const strict = strictMapLayerDocProblems(sorted, { features, registration: background.registration })
+    if (strict.problems.length) return { error: '草稿修改被拒，原草稿保留', problems: strict.problems }
+    draft = strict.doc
+    layerOptions = optionsForDrawing(draft, features, { ...input.layerOptions, ...layerOptions })
+    return { draft: drawingDraftSummary(draft, layerOptions) }
   }
-
+  const featureSummary = features.map(feature => {
+    const p = projectedFeatures.find(f => f.id === feature.id)!
+    const xs = p.points.map(point => point[0] * background.width), ys = p.points.map(point => point[1] * background.height)
+    return { feature_id: feature.id, kind: feature.kind, name: feature.name, origin: feature.origin, vertex_count: p.points.length, pixel_bbox: xs.length ? [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)] : null }
+  })
   return await runStageAgent<DrawingStageResult>({
-    taskId: input.taskId,
-    runId: input.runId,
-    stage: 'drawing',
-    stageModel: input.stageModel,
-    skill: 'drawing',
-    maxSteps: MAX_STEPS,
-    startRounds: input.startRounds,
-    initialFeedback: input.feedback,
+    taskId: input.taskId, runId: input.runId, stage: 'drawing', stageModel: input.stageModel, skill: 'drawing', maxSteps: MAX_STEPS, startRounds: input.startRounds, initialFeedback: input.feedback,
     prompt: () => [
-      '请用图层文档（LayerDoc）在下面的底图上画出这张历史地图：画什么、怎么画、标签放哪里都由你决定。'
-        + '先 render_layer_doc 预览并用 read_image 检查成图，满意后用 submit_layer_doc 交付同一份文档。',
-      mapBriefText(input.brief),
-      `底图（已含质感底纹，LayerDoc 的 base 必须原样使用）：${background.path}，${background.width}×${background.height}`,
-      `要素及其在底图上的归一化坐标（x 对宽、y 对高，已按底图登记件换算）：\n${featureLines.join('\n') || '（无）'}`,
-      `起始文档骨架：\n${JSON.stringify(skeleton)}`,
+      '用服务器草稿作图。用 add_feature_layers 按 feature_id 精确投影要素，绝不抄写或提交要素顶点。用 add_layer/update_layer 添加标题及标注，auto_layout_labels 排布，render_draft 预览并 read_image 检查，然后 submit_draft 交付同一草稿。',
+      mapBriefText(input.brief), `底图：${background.path}，${background.width}×${background.height}`,
+      `要素摘要（不传顶点）：\n${JSON.stringify(featureSummary)}`,
+      ...(input.style_spec ? [`可选样式规范：${JSON.stringify(input.style_spec)}`] : []),
     ].join('\n\n'),
-    tools: (session) => ({
-      geo_to_pixel: stageTool(session, {
-        id: 'geo_to_pixel',
-        description: '把经纬度换算成本底图上的归一化坐标 [x, y]（x 对宽、y 对高）。地平线之后不可见时返回 null。',
-        inputSchema: z.object({ points: z.array(z.array(z.number())).describe('[[lon, lat], ...]') }),
-        execute: async ({ points }) => ({
-          normalized: points.map(point => (point.length === 2 ? toNormalized([point[0]!, point[1]!]) : null)),
-        }),
-      }),
-      render_layer_doc: stageTool(session, {
-        id: 'render_layer_doc',
-        description: '用与成图、图层编辑器完全相同的渲染链渲染一份 LayerDoc（不消耗轮次）。文档必须原样合法（不会被修正）；'
-          + '返回成图路径（可用 read_image 检查）以及按交付标准预检出的问题 submit_check。',
-        inputSchema: z.object({
-          layer_doc: z.record(z.string(), z.unknown()).describe('完整的 LayerDoc'),
-          omitted: z.array(z.record(z.string(), z.unknown())).optional().describe('确实不画的要素：[{feature_id, reason}]'),
-        }),
-        execute: async ({ layer_doc, omitted }) => {
-          const checked = checkDoc(layer_doc, omitted)
-          if (checked.renderable.length) return { error: '文档不合法或底图不对，未渲染；请逐条修正', problems: checked.renderable }
-          const rendered = await renderMapLayerDoc(checked.doc)
-          renders.set(docKey(checked.doc), rendered)
-          return {
-            path: rendered.path,
-            width: rendered.width,
-            height: rendered.height,
-            submit_check: checked.problems.length ? checked.problems : '按交付标准预检通过',
+    tools: session => ({
+      add_feature_layers: stageTool(session, {
+        id: 'add_feature_layers', description: '按 feature_id 将存储的地理几何精确投影并加入草稿。点/线/面自动对应 marker/polyline/polygon，数据集断段已有独立 feature_id；只传 id 与样式，不传点。重复添加拒收，返回图层 id、像素 bbox 与顶点数。',
+        inputSchema: z.object({ items: z.array(z.object({ feature_id: z.string(), style: z.record(z.string(), z.unknown()).optional() })) }),
+        execute: async ({ items }) => {
+          const next = { ...draft, layers: [...draft.layers] }
+          const problems: string[] = []
+          for (const item of items) {
+            const feature = features.find(f => f.id === item.feature_id)
+            if (!feature) { problems.push(`未知 feature_id ${item.feature_id}`); continue }
+            if (next.layers.some(l => l.anchor?.semantic_id === feature.id && ['marker', 'polygon', 'polyline'].includes(l.type))) { problems.push(`要素 ${feature.id} 已有几何图层，使用 update_layer 修改样式`); continue }
+            const points = feature.coords.map(coord => {
+              const pixel = forward(coord)
+              return pixel ? [pixel[0] / background.width, pixel[1] / background.height] as [number, number] : null
+            })
+            if (points.some(p => !p)) { problems.push(`要素 ${feature.id} 在当前底图不可见，请回退 base`); continue }
+            const coords = points as [number, number][]
+            const id = feature.id.length <= 56 ? `feature-${feature.id}` : `feature-${crypto.createHash('sha256').update(feature.id).digest('hex').slice(0, 32)}`
+            const common = { id, name: feature.name, visible: true, locked: false, z: next.layers.length, opacity: 1, rotation: 0, anchor: { semantic_id: feature.id, semantic_name: feature.name }, style: item.style ?? {} }
+            next.layers.push(feature.kind === 'place' ? { ...common, type: 'marker', at: coords[0]!, text: feature.name } : { ...common, type: feature.kind === 'region' ? 'polygon' : 'polyline', points: coords })
           }
+          return problems.length ? { error: '未修改草稿', problems } : acceptDraft(next)
+        },
+      }),
+      add_layer: stageTool(session, {
+        id: 'add_layer', description: '新增非要素图层：标签/标题/card/图例/画框。layer 必须写全合法 LayerDoc 字段；手写形状最多200点，不能冒充锚定的要素几何。',
+        inputSchema: z.object({ layer: z.record(z.string(), z.unknown()) }),
+        execute: async ({ layer }) => {
+          if (Array.isArray(layer.points) && layer.points.length > 200) return { error: '手写图层最多200点；要素几何使用 add_feature_layers' }
+          if (layer.anchor && typeof layer.anchor === 'object' && 'semantic_id' in layer.anchor && ['marker', 'polygon', 'polyline'].includes(String(layer.type))) return { error: '要素几何只能用 add_feature_layers 添加' }
+          const strict = strictMapLayerDocProblems({ ...draft, layers: [...draft.layers, layer] }, { features, registration: background.registration })
+          return strict.problems.length ? { error: '图层非法，草稿保留', problems: strict.problems } : acceptDraft(strict.doc)
+        },
+      }),
+      update_layer: stageTool(session, {
+        id: 'update_layer', description: '小补丁更新 style/box/text/name/z/visible/opacity/rotation/fields，style 合并。锚定要素不能改 points/at 或旋转；非要素小形状可改 points/at（最多200点）。id/type/anchor 不可改。',
+        inputSchema: z.object({ layer_id: z.string(), patch: z.record(z.string(), z.unknown()) }),
+        execute: async ({ layer_id, patch }) => {
+          const layer = draft.layers.find(l => l.id === layer_id)
+          if (!layer) return { error: `未知 layer_id ${layer_id}` }
+          const allowed = ['style', 'box', 'text', 'name', 'z', 'visible', 'opacity', 'rotation', 'fields']
+          const geographic = layer.anchor?.semantic_id && ['marker', 'polygon', 'polyline'].includes(layer.type)
+          if (!geographic && (layer.type === 'polygon' || layer.type === 'polyline')) allowed.push('points')
+          if (!geographic && layer.type === 'marker') allowed.push('at')
+          if (Array.isArray(patch.points) && patch.points.length > 200) return { error: '非要素形状最多200点，原草稿保留' }
+          const unsupported = Object.keys(patch).filter(k => !allowed.includes(k))
+          if (unsupported.length) return { error: `不允许修改 ${unsupported.join('、')}；要素几何不得改写` }
+          const next = { ...layer, ...patch, ...('style' in layer && patch.style && typeof patch.style === 'object' && !Array.isArray(patch.style) ? { style: { ...layer.style, ...patch.style } } : {}) }
+          return acceptDraft({ ...draft, layers: draft.layers.map(l => l.id === layer_id ? next as Layer : l) })
+        },
+      }),
+      remove_layer: stageTool(session, {
+        id: 'remove_layer', description: '删除指定图层；必须绘制的要素仍须补回或在 submit_draft.omitted 写理由。', inputSchema: z.object({ layer_id: z.string() }),
+        execute: async ({ layer_id }) => draft.layers.some(l => l.id === layer_id) ? acceptDraft({ ...draft, layers: draft.layers.filter(l => l.id !== layer_id) }) : { error: `未知 layer_id ${layer_id}` },
+      }),
+      get_draft: stageTool(session, {
+        id: 'get_draft', description: '读取草稿摘要。要素几何永远只返回 bbox 和点数，不输出顶点；include_points 只影响手写的非要素小形状。', inputSchema: z.object({ include_points: z.boolean().optional() }),
+        execute: async ({ include_points }) => drawingDraftSummary(draft, layerOptions, include_points === true),
+      }),
+      set_smoothing: stageTool(session, {
+        id: 'set_smoothing', description: '设置线面渲染平滑强度 smooth=0..1。0关，数据集默认0，其余默认1；超偏离需你明确调低，代码不自动改强度。原始点不变。', inputSchema: z.object({ layer_id: z.string(), smooth: z.number() }),
+        execute: async ({ layer_id, smooth }) => {
+          const parsed = validateLayerOptions({ [layer_id]: { smooth } }, draft)
+          if (parsed.problems.length) return { error: '平滑参数非法', problems: parsed.problems }
+          layerOptions = { ...layerOptions, ...parsed.options }
+          return { layer_id, smooth, problems: smoothingProblems(draft, layerOptions) }
+        },
+      }),
+      auto_layout_labels: stageTool(session, {
+        id: 'auto_layout_labels', description: '在当前草稿自动排布标签，不动标题/card，不删除、不缩字。返回 unresolved；完成后仍须 render_draft 看图。', inputSchema: z.object({}),
+        execute: async () => {
+          const placed = autoPlaceLabels(draft, draft.base, projectedFeatures)
+          const accepted = acceptDraft(placed.doc)
+          return { ...accepted, unresolved: placed.unresolved, problems: checkDraft([]).problems }
+        },
+      }),
+      render_draft: stageTool(session, {
+        id: 'render_draft', description: '用最终渲染链预览当前草稿，不消耗轮次；返回成图路径和 submit_check。用 read_image 自检。', inputSchema: z.object({}),
+        execute: async () => {
+          const checked = checkDraft([])
+          if (checked.renderable.length) return { error: '草稿或平滑参数非法，未渲染', problems: checked.renderable }
+          const rendered = await renderMapLayerDoc(draft, layerOptions)
+          renders.set(docKey(draft, layerOptions), rendered)
+          return { ...rendered, submit_check: checked.problems.length ? checked.problems : '按交付标准预检通过' }
+        },
+      }),
+      submit_draft: stageTool(session, {
+        id: 'submit_draft', description: '交付已预览且未改动的当前草稿，消耗一轮；未解决的几何/平滑/标签问题均拒收。', inputSchema: z.object({ omitted: z.array(z.record(z.string(), z.unknown())).optional() }),
+        execute: async ({ omitted }) => {
+          const checked = checkDraft(omitted)
+          const rendered = renders.get(docKey(draft, layerOptions))
+          if (!rendered) checked.problems.push('当前草稿还没有用 render_draft 成功渲染过，请先预览并 read_image 检查')
+          return session.deliver(checked.problems, () => ({ doc: draft, layerOptions, rendered: rendered!, geometry: drawnGeometryOf(renderCopyWithSmoothing(draft, layerOptions), features), omitted: checked.omitted }))
         },
       }),
       read_image: readImage,
-      submit_layer_doc: stageTool(session, {
-        id: 'submit_layer_doc',
-        description: '交付最终图层文档（消耗一轮）。必须是已经用 render_layer_doc 成功渲染过的同一份文档；任何问题都会被拒收并逐条说明。',
-        inputSchema: z.object({
-          layer_doc: z.record(z.string(), z.unknown()).describe('完整的 LayerDoc（与预览过的那份完全相同）'),
-          omitted: z.array(z.record(z.string(), z.unknown())).optional().describe('确实不画的要素：[{feature_id, reason}]'),
-        }),
-        execute: async ({ layer_doc, omitted }) => {
-          const checked = checkDoc(layer_doc, omitted)
-          const rendered = checked.renderable.length ? undefined : renders.get(docKey(checked.doc))
-          const problems = [...checked.problems]
-          if (!checked.renderable.length && !rendered) problems.push('这份文档还没有用 render_layer_doc 成功渲染过：请先预览并用 read_image 检查成图，再交付同一份文档')
-          return await session.deliver(problems, () => ({
-            doc: checked.doc,
-            rendered: rendered!,
-            geometry: drawnGeometryOf(checked.doc, features),
-            omitted: checked.omitted,
-          }))
-        },
-      }),
       request_rollback: rollbackTool(session, { taskId: input.taskId, runId: input.runId }),
     }),
   })

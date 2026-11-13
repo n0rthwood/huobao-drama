@@ -15,6 +15,9 @@ import { fetchText, searchAdapter, type ResearchAdapter, type ResearchHit } from
 import { mapBriefText, rollbackTool, runStageAgent, stageTool, type StageAgentResult } from './agent-loop.js'
 import { validateFeatureSubmission } from './validate.js'
 import type { MapBrief, MapResearch, MapResearchQuery, MapResearchSource } from './types.js'
+import { searchDataset } from './geo/datasets.js'
+import type { MapDatasetQuery } from './types.js'
+import { mutateTask } from './store.js'
 
 /** 用户确认的来源集合：维基系 + Europeana + Smithsonian，不扩散到其它适配器 */
 export const MAP_RESEARCH_ADAPTERS: ResearchAdapter[] = ['wikipedia-zh', 'wikipedia-en', 'europeana', 'smithsonian']
@@ -27,6 +30,34 @@ const HITS_PER_QUERY = 8
 const SNIPPET_FOR_MODEL = 300
 const TEXT_FOR_MODEL = 6000
 const MAX_STEPS = 40
+
+const bboxSchema = z.tuple([z.number(), z.number(), z.number(), z.number()])
+export const featureSubmissionSchema = z.object({
+  kind: z.enum(['place', 'route', 'region']),
+  name: z.string().min(1),
+  category: z.enum(['river', 'lake', 'coast', 'mountain', 'settlement', 'route', 'territory', 'other']),
+  geometry_source: z.enum(['dataset', 'source', 'model']),
+  dataset_ref: z.object({ ref: z.string(), clip_bbox: bboxSchema.optional() }).optional(),
+  dataset_missing: z.object({ queries: z.array(z.string()), reason: z.string() }).optional(),
+  lon: z.number().optional(),
+  lat: z.number().optional(),
+  points: z.array(z.tuple([z.number(), z.number()])).optional(),
+  coordinate_basis: z.enum(['excerpt', 'well_known', 'approximate_schematic']),
+  basis: z.string(),
+  supporting_excerpt: z.string().optional(),
+  source_ids: z.array(z.string()),
+  uncertainty: z.enum(['high', 'medium', 'low']),
+  approximate: z.boolean().optional(),
+  far_from_others_reason: z.string().optional(),
+  acknowledge: z.array(z.object({ code: z.string(), reason: z.string() })).optional(),
+  conflicts: z.array(z.object({ source_id: z.string(), lon: z.number().nullable(), lat: z.number().nullable(), note: z.string() })).optional(),
+})
+export const relationSubmissionSchema = z.object({
+  id: z.string(), subject: z.string(), object: z.string(),
+  relation: z.enum(['distance_km', 'east_of', 'west_of', 'north_of', 'south_of', 'near_river']),
+  value_km: z.number().nonnegative().optional(), tolerance_km: z.number().nonnegative().optional(),
+  excerpt: z.string(), source_id: z.string(),
+})
 
 export interface ResearchStageInput {
   taskId: number
@@ -42,6 +73,7 @@ export async function runResearchStage(input: ResearchStageInput): Promise<Stage
   const sources: MapResearchSource[] = []
   const hitsById = new Map<string, ResearchHit>()
   const queries: MapResearchQuery[] = []
+  const datasetQueries: MapDatasetQuery[] = []
 
   const confirmed = input.spec ? [
     ...input.spec.places.filter(item => item.proposed !== true).map(item => `地点「${item.name}」(${item.lon}, ${item.lat})`),
@@ -65,6 +97,34 @@ export async function runResearchStage(input: ResearchStageInput): Promise<Stage
       sources.length ? `本阶段已检索到的来源（仍可引用）：${sources.map(s => `${s.id} ${s.adapter}「${s.title}」`).join('；')}` : '',
     ].filter(Boolean).join('\n\n'),
     tools: (session) => ({
+      search_dataset: stageTool(session, {
+        id: 'search_dataset',
+        description: '检索离线 Natural Earth 原始几何。自然要素必须优先采用 dataset_ref；没有命中才可提交 dataset_missing。每次查询会被登记并核对。'
+          + '河流/湖泊结果里带 group 字段的是组引用 ne-group:…：它覆盖同一条河/湖的全部要素（River 与 Lake Centerline），拼接成连续几何；'
+          + 'group.members 是成员要素，group.chains 是拼接后仍不连通的链数，group.shortest_chain_km 是最短链长度——链数多或短链很小说明 clip_bbox 该收紧。'
+          + '单个要素 ref（ne:…）只覆盖一个原始要素，裁剪后容易碎成多段。',
+        inputSchema: z.object({
+          layer: z.enum(['river', 'lake', 'coast', 'mountain', 'physical_region', 'place']),
+          query: z.string().min(1),
+          bbox: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional(),
+        }),
+        execute: async ({ layer, query, bbox }) => {
+          try {
+            const hits = searchDataset(layer, query, bbox)
+            datasetQueries.push({ layer, query, ...(bbox ? { bbox } : {}), hits: hits.length, refs: hits.map(hit => hit.ref), error: null })
+            return { candidates: hits }
+          } catch (err) {
+            const error = err instanceof Error ? err.message : String(err)
+            datasetQueries.push({ layer, query, ...(bbox ? { bbox } : {}), hits: 0, refs: [], error })
+            return { error, hint: '这是检索失败，不是零命中；不能用它声称 dataset_missing' }
+          } finally {
+            await mutateTask(input.taskId, { expectedRunId: input.runId, action: 'research_dataset_query', actor: 'auto', mutate: ctx => {
+              ctx.state.research ??= { queries: [], sources: [], features: [], uncertainties: [], notes: [], searched_at: now() }
+              ctx.state.research.dataset_queries = datasetQueries.map(query => ({ ...query, refs: [...query.refs] }))
+            } })
+          }
+        },
+      }),
       search_sources: stageTool(session, {
         id: 'search_sources',
         description: `真实检索一个来源。adapter 只能是 ${MAP_RESEARCH_ADAPTERS.join(' / ')}；每个 adapter 本阶段至少检索一次（零命中也要检索）。`
@@ -142,7 +202,9 @@ export async function runResearchStage(input: ResearchStageInput): Promise<Stage
         description: '交付本阶段结果（消耗一轮）。features 每项字段见技能说明；uncertainties 列出读者需要知道的不确定之处，notes 写其它说明。'
           + '任何一条不合格都会整批拒收并逐条说明原因。',
         inputSchema: z.object({
-          features: z.array(z.record(z.string(), z.unknown())).describe('地理要素数组'),
+          features: z.array(featureSubmissionSchema).describe('地理要素数组；dataset 只提交 dataset_ref，不能手写 points/lon/lat'),
+          extent: z.tuple([z.number(), z.number(), z.number(), z.number()]).describe('地图研究空间范围 [west,south,east,north]；所有顶点必须在范围内并保留 2% 留边'),
+          relations: z.array(relationSubmissionSchema).optional().describe('从正文抽取距离及方位；excerpt 必须逐字引用 source_id 正文'),
           uncertainties: z.array(z.string()).optional(),
           notes: z.array(z.string()).optional(),
         }),
@@ -153,9 +215,15 @@ export async function runResearchStage(input: ResearchStageInput): Promise<Stage
             searchedAdapters: queries.map(query => query.adapter),
             requiredAdapters: MAP_RESEARCH_ADAPTERS,
             confirmed: input.spec,
+            extent: submission.extent,
+            relations: submission.relations,
+            datasetQueries,
           })
           return await session.deliver(checked.problems, () => ({
             queries: [...queries],
+            dataset_queries: [...datasetQueries],
+            extent: submission.extent,
+            relations: checked.relations,
             sources: sources.map(source => ({ ...source })),
             features: checked.features,
             uncertainties: (submission.uncertainties ?? []).map(String).filter(Boolean),

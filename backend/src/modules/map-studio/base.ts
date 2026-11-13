@@ -15,7 +15,7 @@ import { mapBriefText, rollbackTool, runStageAgent, stageTool, type StageAgentRe
 import { frameReport, specFeatures, FRAME_MARGIN, FRAME_MIN_EXTENT } from './validate.js'
 import { MAP_BASE_MODES, type MapBrief } from './types.js'
 
-/** 工作区画幅：与 map-base-render 的 16:9 口径一致 */
+/** 工作区画幅：与 geo/base-render 的 16:9 口径一致 */
 export const MAP_BASE_WIDTH = 3840
 const MAX_STEPS = 24
 
@@ -83,6 +83,7 @@ export async function runBaseStage(input: BaseStageInput): Promise<StageAgentRes
           }
           const spec = normalizeMapSpec({
             ...input.spec,
+            detail_level: input.brief.detail_level,
             bbox: args.bbox,
             projection: { type: args.projection ?? input.spec.projection.type },
             layers: args.layers ?? input.spec.layers,

@@ -2,7 +2,7 @@
 """Google Earth Web 底图抓取（火宝 Issue #84）。
 
 用法：`python earth-map.py` —— 作业描述从 stdin 读 JSON，最后一行 stdout 输出 sidecar JSON。
-调用方是 backend/src/services/map-earth.ts；相机/取景数学两边逐行一致（同一套公式各写一遍，
+调用方是 backend/src/modules/map-studio/geo/earth.ts；相机/取景数学两边逐行一致（同一套公式各写一遍，
 因为浏览器这一侧必须按 Earth **实际落点** 重算裁切框，不能用 Node 侧的计划值）。
 
 数学与控件定位来自 ~/projects/qing_russia_history/src/qrdoc/earth.py（2026-11-01 实测闭合，

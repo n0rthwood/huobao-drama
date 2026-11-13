@@ -1,47 +1,57 @@
 ---
 name: map-workflow-drawing
-description: 地图工作流·标注绘制阶段 — 用 LayerDoc 矢量图层自己作图：预览、看图自检、交付同一份合法文档；渲染与图层编辑器同一条链
+description: 地图工作流·服务器草稿作图 — 小工具精确添加要素，排布标签、预览看图后交付；不传地理顶点
 ---
 
 # 地图工作流：用图层文档作图
 
-这张图由你来画。你写一份 **LayerDoc（图层文档）**，代码用**同一条渲染链**把它渲染成图。图层编辑器和最终成图也用这条链，所以你在预览里看到的，就是最终成图。代码不会替你排版，也不会修改你的文档：文档里只要有一处不合法，就会被逐字段指出并拒收。
+这张图由你来设计，但**要素几何永远留在服务器**。不要复制、发送或重写经纬度/投影顶点。服务器维护一份 LayerDoc 草稿，跨本阶段交付轮次保留；你用小工具增删改图层，预览、最终成图、人工编辑器共用渲染链。非法修改整笔拒收，原草稿保留，错误逐条回给你。
 
-## 工作流程
+## 工作流程与工具
 
-1. 先想清楚这张图要表达什么（用途见需求）：哪些要素是主体，名称标签放在哪里，配色和字号怎么定，标题或图例要不要加。
-2. 写 LayerDoc，用 `render_layer_doc` 预览（不消耗轮次）。返回结果里有两项：
-   - 成图路径：用 `read_image` 看图。检查底图上的海岸、湖泊、河流是否还清楚可见，标签有没有重叠或遮挡，字能不能看清，主题是否突出，有没有元素落在画外；
-   - `submit_check`：按交付标准预先检查出的问题，改到没有问题为止。
-3. 满意之后，用 `submit_layer_doc` 交付**和最后一次预览完全相同**的那份文档（消耗一轮，本阶段共 3 轮）。
-4. 如果底图本身不能用（例如取景不对、要素不在画面里），调用 `request_rollback` 回到 `base`；如果要素数据本身有错，回到 `research`。回退时写清楚原因。
+1. 从提示中的要素摘要选择主体，调用 `add_feature_layers({items:[{feature_id,style:{...}}]})`。服务器精确投影存储几何，place→marker、route→polyline、region→polygon，自动锚定。marker.text 初始为要素名称，可通过 update_layer.text 修改旁注；也可另加锚定的 label。断开的数据集部分已有独立 feature_id，各自添加，不能桥接。响应只含 layer id、像素 bbox、顶点数与样式，**没有长顶点数组**。
+2. 用 `add_layer({layer:{...}})` 添加标题、label、card、图例、画框等非要素图层，格式见下表，完整公共字段必填。非要素手画线面最多 200 点；锚定的要素几何只能用 `add_feature_layers` 创建。
+3. 用 `update_layer({layer_id,patch:{style:{...},box:{...},text:...,name:...,z:...,visible:...,opacity:...,rotation:...,fields:{...}}})` 小补丁修改。只传要改的字段，style 是合并补丁；type/anchor/id 不可改。锚定要素的 points/at 修改及非零 rotation 会整笔拒收，原草稿保留；非要素手画小形状可 patch.points/at（仍最多 200 点）。`remove_layer({layer_id})` 删除图层；删掉必画要素后仍须补回或在交付时说明 omitted。
+4. `get_draft({include_points:false})` 查看草稿摘要与当前 layer_options；include_points 只影响手画非要素的小形状，**要素几何始终不返回顶点**。不要请求/输出完整 LayerDoc，也没有全量文档交付工具。
+5. 调用 `auto_layout_labels({})` 在当前草稿贪心避让：点标签按 E、NE、SE、W、NW、SW、N、S，线标签优先最长段旁，面标签优先最大内切圆中心附近。标题、card、锁定标签不动；不删除、不缩字。返回 unresolved 表示没有可用候选，必须人工设计位置或修改 box/内容，不能当作成功。
+6. `set_smoothing({layer_id,smooth:0..1})` 控制线面渲染平滑，详见下节。参数独立存入 `outputs.layer_options`，**不要塞进 LayerDoc 或 layer.style**。
+7. `render_draft({})` 预览（不消耗轮次），返回成图 path 与 submit_check。用 `read_image({path,question})` 看实际图，检查底图可读、标签清晰、主题突出。修改草稿/平滑后必须重新预览。
+8. 满意后 `submit_draft({omitted:[{feature_id,reason}]})` 交付**当前、已预览且未再改动**的草稿，消耗一轮，共 3 轮。几何/平滑/五类标签问题任一存在都会拒收；按错误修正后重新预览交付。
+9. 底图不能用时 `request_rollback({stage:"base",reason:...})`；要素资料有错则回到 research。代码不替你猜经纬度，不把错误结果降级交付。
+
+## 平滑：只改渲染副本
+
+向心 Catmull-Rom（α=0.5）经过全部原始控制点，面闭合，线端点不外推。逐点模型/人工线面默认强度 1，dataset 默认 0；0 表示关闭。强度缩放曲线相对原折线的偏离，**不改存储顶点**。每段最大偏离必须 ≤ max(6px、画面长边×0.004、该段长度×0.12)，超出即 `smoothing_deviation` 拒收。你须用 set_smoothing 明确调低强度或关闭，再预览；代码绝不自动改强度。dataset 建议维持 0，避免偏离真实密集几何。输出 semantics 的线面取实际渲染曲线，editable_source 同时保留控制点与 layer_options。
 
 ## 交付标准
 
-- 每个要素都要有**一个**锚定的几何图层：`anchor.semantic_id` 等于要素 id。图层类型按要素类型对应：place 用 `marker`，route 用 `polyline`，region 用 `polygon`。
+- 每个未在 `submit_draft.omitted` 中说明的要素都要有一个锚定几何图层（由 add_feature_layers 自动生成）。omitted 不是 LayerDoc 字段；没有可见几何的要素才可省略，不能同时画出和省略。
 - **底图必须看得见**：有效不透明度（`opacity × fill_opacity`）≥0.5 的 polygon 合计不能盖住超过 30% 的画面。画框或边框请用 polyline，或者把 polygon 的 `fill_opacity` 设为 0、只保留描边；不然 polygon 会被填成实心，把整张底图盖掉。
-- 几何位置必须与要素的投影位置一致：直接使用提示里给出的归一化坐标，或者用 `geo_to_pixel` 换算。路线可以加点让线更平滑，但每个点都要贴着要素的走向。
+- 几何必须贴合要素投影位置。add_feature_layers 保证原始精确投影；update_layer 不接受几何补丁。几何有误回退 research/base，人工确认的几何不能被模型覆盖。
 - 确实不画某个要素时，在 `omitted` 里写 `{feature_id, reason}`，说明理由。
 - 文字标签用 `label` 图层，可以锚定到同一要素（`anchor.semantic_id` 写要素 id）。标签不算几何图层。
-- `base` 原样使用提示里给的骨架（`path`、`width`、`height`、`source_width`、`source_height`），不能改。
+- base 由服务器创建且不可修改；取景/底图有问题必须回退。
+- `label_overflow` 是严格拒收项，预览交付和人工保存同口径。宽字=1em、空格=0.33em、其它=0.55em，行高=1.35em；label 有底板时四周留 0.3em。按实际宽度换行后，所需行数/高度不得超过 box，box（含旋转）不得越出画面。card 使用固定模板的字号和行位置，长标题不能横向穿出底板。错误会说明图层 id、需要的行数/高度与 box 高度；你必须调整 box、字号或内容，代码不会自动缩字或截断。
+- 例：50字标题塞进 `box.w=0.2,box.h=0.03,size=0.03` 会被拒收；扩大标题底板并合理安排字号后重新预览。不要忽略错误、删校验或把标题隐藏来交付。
+- `label_overlap`（文字包围盒相交）、`label_marker_overlap`（文字盖住其他要素点标记）、`label_out_of_frame`（含 1% 安全边越界）、`label_far_from_feature`（文字包围盒离其锚定的点/线/面超过画面对角线 6%）同为硬拒收。文字 bbox 使用与 layer-svg 相同的固定宽度/行高/基线模型，含旋转；marker 的旁注和 card 文字也检查。未锚定的标题不检查“远离要素”，但仍检查碰撞与越界。人工编辑保存和最终交付同口径。
+- 正例：两个标签同位 → auto_layout_labels → unresolved 为空 → render_draft 看图 → submit_draft。反例：把「喀什里克」放在远处乌拉尔山内部，即便文字未溢出，仍以 label_far_from_feature 拒收；不能隐藏/删掉标签、缩字或忽略 unresolved 来冒充完成。
+- 数据集不连通的河段已拆成同 id 前缀的多条路线，每段各用一个对应 id 的 polyline，不能拿跨空白的直线把它们硬接起来；存储的原始地理顶点不做平滑。
+- `geometry_unverified` 在开始 drawing 和交付时再次检查；若出现待确认几何，用户应先在研究面板确认（去掉 proposed）、编辑或删除。不能通过隐藏图层或 omitted 绕过核验。
 
-## LayerDoc 格式（严格：写全字段、取值合法、不写多余字段）
+## 非要素图层格式（add_layer；严格，不写未知字段）
 
 坐标都是**归一化值**：x 按画面宽、y 按画面高算，必须在 0–1 之间。所有尺寸（字号、线宽、点半径）都按**画面高度的比例**写，例如 0.03 表示画面高度的 3%。
 
+新增一层示例（位置与内容按实际需求设计，不是默认样式规范）：
+
 ```json
-{
-  "version": 1,
-  "base": { "path": "…骨架里的路径…", "width": 3840, "height": 2160, "source_width": 3840, "source_height": 2160 },
-  "theme": "archival",
-  "layers": [ … 按 z 从小到大排列 … ]
-}
+{"layer":{"id":"title","type":"label","name":"标题","visible":true,"locked":false,"z":20,"opacity":1,"rotation":0,"box":{"x":0.05,"y":0.05,"w":0.5,"h":0.1},"text":"地图标题","style":{"size":0.04}}}
 ```
 
-`theme` 取值：`archival` / `clean` / `ink`，按需求里的风格选。
+文档 theme 沿用需求的 archival / clean / ink 主题预设。可选 style_spec 只有输入明确提供时才用；样式参考库尚未获用户确认，不得私自选择参考风格家族作为默认。
 
 **每个图层都必须写**这些公共字段：
-`id`（全文档唯一）、`type`、`name`（非空，最多 60 字）、`visible`（布尔）、`locked`（布尔）、`z`（0–9999 的整数，数组顺序必须按 z 从小到大）、`opacity`（0–1）、`rotation`（-360 到 360）。
+`id`（全文档唯一）、`type`、`name`（非空，最多 60 字）、`visible`（布尔）、`locked`（布尔）、`z`（0–9999 的整数，服务器维护 z 排序）、`opacity`（0–1）、`rotation`（-360 到 360；锚定要素必须为 0）。
 `anchor` 可选：`{"semantic_id": "要素 id", "semantic_name": "要素名称"}`，只写这两个键。
 
 各类型的字段：
@@ -56,11 +66,11 @@ description: 地图工作流·标注绘制阶段 — 用 LayerDoc 矢量图层�
 
 - 颜色写成 `#rrggbb` 这样的字符串。字体（font）取 `sans`、`serif`、`kai`、`hand` 之一。
 - 文字只能用常用汉字、英文字母、数字和常见标点；生僻字没有字形，会渲染失败。
-- 一份文档最多 60 个图层，每个 polygon 或 polyline 最多 240 个点。
+- 一份文档最多 60 层。非要素手画线面最多 200 点；只有服务器投影并验证精确性的已存储要素几何可超过通用 LayerDoc 的 240 点限制（含数据集及人工确认的密集几何），所有路径保留全量顶点，模型不传这些点。
 - marker 的 `color` 是点的填色，`text_color` 是点旁文字的颜色，`stroke` 同时是点的外圈和**文字描边**的颜色。描边应该用与文字反差大的浅色（例如底色 `#f4ecd8`）；如果描边和文字都用深色，粗体字会糊成一团。label 的 `stroke` 和 `stroke_width` 也是文字描边，用法相同。
 
 ## 作图建议（不是校验项，由你判断）
 
 - 主体要素（例如运河主线）用醒目的颜色和较粗的线；背景或参照要素弱化处理。
-- 标签不要盖住点和线，也不要互相重叠；名字较长时放到空白处，用较小字号。
+- 标签不要盖点、互相叠字或离锚点太远；先用 auto_layout_labels，再按 unresolved 逐条设计。不要把“缩字号/删除标签”当作自动避让。
 - 示意性质的要素要让读者看得出来，例如用虚线，或在标签里写明「示意」。

@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-const helper = fileURLToPath(new URL('../scripts/earth-map.py', import.meta.url))
+const helper = fileURLToPath(new URL('../src/modules/map-studio/earth/earth-map.py', import.meta.url))
 
 // State regression only; actual Flutter/Google Earth import is verified separately.
 test('Earth survives sequential and delayed onboarding without leaving the editor', () => {

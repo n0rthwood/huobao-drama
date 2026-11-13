@@ -86,28 +86,18 @@ const SCRIPT = `
     snippet: '邗沟是春秋末期吴王夫差开凿的运河，自今扬州引长江水北上，经射阳湖至今淮安入淮河。',
   }]
   mapResearchIO.fetchText = async (hit) => hit.snippet
-  const place = (name, lon, lat, extra = {}) => ({ kind: 'place', name, lon, lat, coordinate_basis: 'well_known', source_ids: ['S1'], basis: '现代地名公认位置', uncertainty: 'medium', ...extra })
+  const place = (name, lon, lat, extra = {}) => ({ kind: 'place', name, lon, lat, category: 'settlement', geometry_source: 'model', coordinate_basis: 'well_known', source_ids: ['S1'], basis: '现代地名公认位置', uncertainty: 'medium', ...extra })
   const places = [place('扬州', 119.42, 32.39, { coordinate_basis: 'excerpt', supporting_excerpt: '自今扬州引长江水北上' }), place('高邮', 119.46, 32.78), place('宝应', 119.31, 33.24), place('淮安', 119.15, 33.5)]
-  const route = { kind: 'route', name: '邗沟', points: [[119.42, 32.3], [119.35, 32.85], [119.55, 33.3], [119.15, 33.52]], coordinate_basis: 'approximate_schematic', source_ids: ['S1'], basis: '按资料所述走向示意', uncertainty: 'high' }
-  const incidentRegion = { kind: 'region', name: '古射阳湖（示意范围）', lon: 0, lat: 0, points: [[119.55, 33.3], [119.45, 33.45], [119.7, 33.35], [119.55, 33.1]], coordinate_basis: 'approximate_schematic', source_ids: ['S1'], basis: '据文字概括', uncertainty: 'high' }
-  const sheyang = place('射阳湖（示意）', 119.56, 33.3, { coordinate_basis: 'approximate_schematic', uncertainty: 'high', basis: '取资料所述湖区中部' })
+  const route = { kind: 'route', name: '邗沟', category: 'route', geometry_source: 'model', points: [[119.42, 32.3], [119.35, 32.85], [119.55, 33.3], [119.15, 33.52]], coordinate_basis: 'approximate_schematic', source_ids: ['S1'], basis: '按资料所述走向示意', uncertainty: 'high' }
+  const missingHistoricalLake = { queries: ['古射阳湖'], reason: '历史湖岸不在现代数据集中，需人工裁决示意范围' }
+  const incidentRegion = { kind: 'region', name: '古射阳湖（示意范围）', lon: 0, lat: 0, category: 'lake', geometry_source: 'model', dataset_missing: missingHistoricalLake, points: [[119.55, 33.3], [119.45, 33.45], [119.7, 33.35], [119.55, 33.1]], coordinate_basis: 'approximate_schematic', source_ids: ['S1'], basis: '据文字概括', uncertainty: 'high' }
+  const sheyang = place('射阳湖（示意）', 119.56, 33.3, { category: 'lake', dataset_missing: missingHistoricalLake, coordinate_basis: 'approximate_schematic', uncertainty: 'high', basis: '取资料所述湖区中部' })
+  const RESEARCH_EXTENT = [118.5, 31.9, 120.2, 33.9]
   const WIDE = [100, 20, 130, 45]
   const TIGHT = [118.7, 32.0, 120.0, 33.8]
   let baseRuns = 0
   let drawingVisits = 0
-  const buildDoc = (user, title) => {
-    const skeleton = JSON.parse(user.match(/起始文档骨架：\\n(\\{.*\\})/)[1])
-    const layer = (id, z, extra) => ({ id, name: id, visible: true, locked: false, z, opacity: 1, rotation: 0, ...extra })
-    const layers = []
-    for (const m of user.matchAll(/- id=(\\S+) (place|route|region)「(.+?)」→ 归一化坐标 (\\[.*\\])/g)) {
-      const coords = JSON.parse(m[4])
-      const anchor = { semantic_id: m[1], semantic_name: m[3] }
-      if (m[2] === 'route') layers.push(layer('l-' + m[1], layers.length, { type: 'polyline', anchor, points: coords, style: { stroke: '#8f2f1c', width: 0.008 } }))
-      else layers.push(layer('l-' + m[1], layers.length, { type: 'marker', anchor, at: coords[0], text: m[3], style: { dot_radius: 0.01 } }))
-    }
-    layers.push(layer('title', layers.length, { type: 'label', box: { x: 0.04, y: 0.04, w: 0.4, h: 0.1 }, text: title, style: { size: 0.05 } }))
-    return { ...skeleton, layers }
-  }
+  const titleLayer = text => ({ id:'title', name:'title', visible:true, locked:false, z:20, opacity:1, rotation:0, type:'label', box:{ x:0.04,y:0.04,w:0.4,h:0.1 }, text, style:{size:0.05} })
   const mock = await startMockOpenAIChat(async (body) => {
     const sys = systemText(body)
     const user = userText(body)
@@ -121,8 +111,9 @@ const SCRIPT = `
     if (sys.includes('地图工作流：资料检索')) {
       const submits = toolResults(body, 'submit_features')
       if (!toolResults(body, 'search_sources').length) return { toolCalls: adapters.map(adapter => ({ name: 'search_sources', args: { adapter, query: '邗沟' } })) }
-      if (!submits.length) return { toolCalls: [{ name: 'submit_features', args: { features: [...places, route, incidentRegion] } }] }
-      return { toolCalls: [{ name: 'submit_features', args: { features: [...places, route, sheyang], uncertainties: ['射阳湖湖岸未定，按示意点表示'] } }] }
+      if (!toolResults(body, 'search_dataset').length) return { toolCalls: [{ name: 'search_dataset', args: { layer: 'lake', query: '古射阳湖' } }] }
+      if (!submits.length) return { toolCalls: [{ name: 'submit_features', args: { features: [...places, route, incidentRegion], extent: RESEARCH_EXTENT } }] }
+      return { toolCalls: [{ name: 'submit_features', args: { features: [...places, route, sheyang], extent: RESEARCH_EXTENT, uncertainties: ['射阳湖湖岸未定，按示意点表示'] } }] }
     }
     if (sys.includes('地图工作流：底图')) {
       if (fresh) baseRuns++
@@ -135,15 +126,20 @@ const SCRIPT = `
     if (sys.includes('地图工作流：用图层文档作图')) {
       if (fresh) drawingVisits++
       const rollbacks = toolResults(body, 'request_rollback')
-      const renders = toolResults(body, 'render_layer_doc')
-      const submits = toolResults(body, 'submit_layer_doc')
+      const renders = toolResults(body, 'render_draft')
+      const submits = toolResults(body, 'submit_draft')
       if (drawingVisits <= 3 && !rollbacks.length) return { toolCalls: [{ name: 'request_rollback', args: { stage: 'base', reason: '底图上要素偏挤，请重新确认取景是否合适' } }] }
-      const doc = buildDoc(user, '邗沟走向示意图')
-      if (!renders.length) return { toolCalls: [{ name: 'render_layer_doc', args: { layer_doc: buildDoc(user, '邗沟𠀀') } }] }
-      if (!submits.length) return { toolCalls: [{ name: 'submit_layer_doc', args: { layer_doc: doc } }] }
-      if (renders.length === 1) return { toolCalls: [{ name: 'render_layer_doc', args: { layer_doc: doc } }] }
-      if (!toolResults(body, 'read_image').length) return { toolCalls: [{ name: 'read_image', args: { path: renders[1].path, question: '标签是否重叠？' } }] }
-      return { toolCalls: [{ name: 'submit_layer_doc', args: { layer_doc: doc } }] }
+      const features = JSON.parse(user.match(/要素摘要（不传顶点）：\\n(.+)/)[1])
+      if (!toolResults(body,'add_feature_layers').length) return {toolCalls:[{name:'add_feature_layers',args:{items:features.map(f=>({feature_id:f.feature_id,style:{}}))}}]}
+      if (!toolResults(body,'set_smoothing').length) return {toolCalls:features.filter(f=>f.kind==='route').map(f=>({name:'set_smoothing',args:{layer_id:'feature-'+f.feature_id,smooth:0}}))}
+      if (!toolResults(body,'add_layer').length) return {toolCalls:[{name:'add_layer',args:{layer:titleLayer('邗沟𠀀')}}]}
+      if (!renders.length) return {toolCalls:[{name:'render_draft',args:{}}]}
+      if (!submits.length) return {toolCalls:[{name:'submit_draft',args:{}}]}
+      if (!toolResults(body,'update_layer').length) return {toolCalls:[{name:'update_layer',args:{layer_id:'title',patch:{text:'邗沟走向示意图'}}}]}
+      if (!toolResults(body,'auto_layout_labels').length) return {toolCalls:[{name:'auto_layout_labels',args:{}}]}
+      if (renders.length===1) return {toolCalls:[{name:'render_draft',args:{}}]}
+      if (!toolResults(body,'read_image').length) return {toolCalls:[{name:'read_image',args:{path:renders[1].path,question:'标签是否重叠？'}}]}
+      return {toolCalls:[{name:'submit_draft',args:{}}]}
     }
     return { text: '无事可做' }
   })
@@ -165,10 +161,15 @@ test('拒收→自我修正、工具异常回馈、回退全链路与上限、�
     assert.equal(detail.stage, 'research', detail.error)
     assert.deepEqual(attemptsOf(detail, 'brief'), [['rejected', 1], ['accepted', 2]])
 
-    // research：事故形状（非示意面 + 0,0 占位）被拒收 → 模型改成示意点 → 通过
-    await advanceMapWorkflow(propId, { expectedRevision: detail.revision })
+    // research：事故形状（非示意面 + 0,0 占位）被拒收 → 模型改成示意点 → 校验通过但几何未核验 → 阶段阻断交人
+    await startMapWorkflow(propId, { mode: 'auto', expectedRevision: detail.revision, textConfigId: configId })
     detail = await settle(propId)
-    assert.equal(detail.stage, 'base', detail.error)
+    assert.equal(detail.status, 'blocked', detail.error)
+    assert.equal(detail.stage, 'research')
+    assert.equal(detail.steps.find(step => step.id === 'research').status, 'awaiting_review')
+    assert.equal(baseRuns, 0, 'auto 必须在未核验的 research 停下，不能继续到底图模型')
+    assert.equal(drawingVisits, 0)
+    assert.equal(detail.outputs.base_image, null)
     assert.deepEqual(attemptsOf(detail, 'research'), [['rejected', 1], ['accepted', 2]])
     const researchRejection = detail.agent.attempts.find(a => a.stage === 'research' && a.outcome === 'rejected').problems.join('\\n')
     assert.match(researchRejection, /古射阳湖/)
@@ -176,6 +177,20 @@ test('拒收→自我修正、工具异常回馈、回退全链路与上限、�
     assert.ok(detail.map_spec.places.every(p => !(p.lon === 0 && p.lat === 0)), '不得出现 (0,0) 地点')
     assert.ok(detail.map_spec.places.some(p => p.name === '射阳湖（示意）'))
     assert.equal(detail.research.queries.length, 4)
+    assert.deepEqual(detail.research.dataset_queries.map(query => [query.layer, query.query, query.hits]), [['lake', '古射阳湖', 0]])
+    assert.equal(detail.research.features.find(feature => feature.name === '射阳湖（示意）').verification.status, 'needs_user')
+    const pending = detail.issues.filter(issue => issue.code === 'geometry_unverified' && issue.blocking)
+    assert.ok(pending.length >= 2, '模型点与示意点都必须等人工确认')
+    assert.match(pending.map(issue => issue.message).join('\\n'), /射阳湖（示意）/)
+
+    // 人工确认（去掉 proposed）后放行到 base：AI 提议的几何不能静默进入成图
+    const confirmedSpec = JSON.parse(JSON.stringify(detail.map_spec))
+    for (const item of [...confirmedSpec.places, ...confirmedSpec.routes, ...confirmedSpec.regions]) delete item.proposed
+    detail = await saveMapWorkflowDraft(propId, { mapSpec: confirmedSpec, expectedRevision: detail.revision })
+    assert.equal(detail.status, 'awaiting_review')
+    assert.equal(detail.stage, 'base')
+    assert.ok(!detail.issues.some(issue => issue.code === 'geometry_unverified'))
+    assert.equal(detail.steps.find(step => step.id === 'research').status, 'completed')
 
     // base：东亚大图被取景校验拒收 → 收紧后通过；模型选定的 bbox 写回几何
     await advanceMapWorkflow(propId, { expectedRevision: detail.revision })
@@ -211,21 +226,21 @@ test('拒收→自我修正、工具异常回馈、回退全链路与上限、�
     assert.equal(detail.agent.rollbacks, 2)
     assert.deepEqual(runAttempts.filter(a => a.stage === 'base').map(a => [a.outcome, a.round]), [['accepted', 1], ['accepted', 1]], '回退后目标阶段轮次重置')
     assert.deepEqual(runAttempts.filter(a => a.stage === 'drawing' && a.outcome !== 'rollback').map(a => [a.outcome, a.round]), [['rejected', 1], ['accepted', 2]], '发起回退不消耗作图轮次')
-    assert.match(runAttempts.find(a => a.stage === 'drawing' && a.outcome === 'rejected').problems.join(), /还没有用 render_layer_doc 成功渲染过/)
+    assert.match(runAttempts.find(a => a.stage === 'drawing' && a.outcome === 'rejected').problems.join(), /还没有用 render_draft 成功渲染过/)
     assert.equal(detail.agent.rounds.drawing, 2)
     assert.equal((await db.select().from(schema.sysTask)).filter(row => row.provider === 'map-render').length, 1, 'only delivered base becomes a host version')
     assert.equal(detail.outputs.texture_image.path, texturePath)
     assert.equal(await paidImages(), paidBefore, '回退后重跑 style 只认领已付费底纹，不新出图')
 
     // 工具内部异常（缺字渲染失败）以工具结果回给了模型
-    const glyphError = mock.requests.some(b => toolResults(b, 'render_layer_doc').some(r => typeof r === 'object' && String(r.error ?? '').includes('打包字体未覆盖')))
+    const glyphError = mock.requests.some(b => toolResults(b, 'render_draft').some(r => typeof r === 'object' && String(r.error ?? '').includes('打包字体未覆盖')))
     assert.ok(glyphError, '渲染异常必须作为工具结果回给模型')
     const refused = mock.requests.some(b => toolResults(b, 'request_rollback').some(r => String(r.error ?? '').includes('回退已用完')))
     assert.ok(refused, '第 3 次回退必须被拒并说明')
 
     // 成图 = 交付文档经同一渲染链的确定性重渲染（字节一致）；语义从同一份文档导出
     const finalBytes = fs.readFileSync(process.env.HUOBAO_DATA_DIR + '/' + detail.outputs.final_image.path)
-    const rerendered = await renderMapLayerDoc(detail.outputs.layer_doc)
+    const rerendered = await renderMapLayerDoc(detail.outputs.layer_doc, detail.outputs.layer_options)
     assert.equal(rerendered.path, detail.outputs.final_image.path)
     assert.ok(finalBytes.equals(fs.readFileSync(process.env.HUOBAO_DATA_DIR + '/' + rerendered.path)))
     let prop = await getProp(propId)
@@ -245,7 +260,7 @@ test('拒收→自我修正、工具异常回馈、回退全链路与上限、�
     assert.equal(detail.status, 'completed')
     prop = await getProp(propId)
     assert.equal(prop.imageUrl, detail.outputs.final_image.path)
-    assert.equal((await renderMapLayerDoc(edited)).path, detail.outputs.final_image.path, '人工编辑后的成图就是该文档的确定性渲染')
+    assert.equal((await renderMapLayerDoc(edited, detail.outputs.layer_options)).path, detail.outputs.final_image.path, '人工编辑后的成图就是该文档与平滑参数的确定性渲染')
     assert.equal(JSON.parse(prop.semantics).image.source_task_id, detail.deliveries[0].version_ids[1])
 
     // 重启：在飞运行标中断，轮次与尝试记录不归零
@@ -289,11 +304,19 @@ test('独立地图跑完整模型阶段后可下载成图、语义与可编辑�
     const { mapStudioRoutes } = await import('file://${backend}src/modules/map-studio/index.ts')
     let detail = await createStandaloneTask({ title: '独立邗沟地图', brief: { era: '春秋末期', location: '江苏扬州至淮安一线', purpose: '运河走向示意图' } })
     const taskId = detail.task_id
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 2; i++) {
       await startMapWorkflow(taskId, { mode: 'manual', expectedRevision: detail.revision, textConfigId: configId })
       detail = await settle(taskId)
       assert.notEqual(detail.status, 'failed', detail.error)
     }
+    // 第二次 start 是 research：模型几何未核验 → 阶段阻断（不是失败），人工确认后才能继续
+    assert.equal(detail.status, 'blocked')
+    const approvedSpec = JSON.parse(JSON.stringify(detail.map_spec))
+    for (const item of [...approvedSpec.places, ...approvedSpec.routes, ...approvedSpec.regions]) delete item.proposed
+    detail = await saveMapWorkflowDraft(taskId, { mapSpec: approvedSpec, expectedRevision: detail.revision })
+    assert.equal(detail.stage, 'base')
+    await startMapWorkflow(taskId, { mode: 'manual', expectedRevision: detail.revision, textConfigId: configId })
+    detail = await settle(taskId)
     assert.equal(detail.stage, 'style')
     detail = await advanceMapWorkflow(taskId, { expectedRevision: detail.revision, skip: true })
     drawingVisits = 3
@@ -303,7 +326,7 @@ test('独立地图跑完整模型阶段后可下载成图、语义与可编辑�
     assert.equal(detail.host, null)
     assert.deepEqual(detail.deliveries, [])
     assert.equal((await db.select().from(schema.props)).length, 0)
-    assert.equal((await renderMapLayerDoc(detail.outputs.layer_doc)).path, detail.outputs.final_image.path)
+    assert.equal((await renderMapLayerDoc(detail.outputs.layer_doc, detail.outputs.layer_options)).path, detail.outputs.final_image.path)
     for (const kind of ['final', 'semantics', 'source']) {
       const response = await mapStudioRoutes.request('/tasks/' + taskId + '/download/' + kind)
       assert.equal(response.status, 200)
@@ -313,7 +336,11 @@ test('独立地图跑完整模型阶段后可下载成图、语义与可编辑�
       if (kind === 'source') assert.deepEqual((await response.json()).layer_doc, detail.outputs.layer_doc)
     }
     const runs = await (await mapStudioRoutes.request('/tasks/' + taskId + '/runs')).json()
-    assert.ok(runs.data.runs.every(run => run.status === 'completed'))
+    const researchRuns = runs.data.runs.filter(run => run.start_stage === 'research')
+    assert.equal(researchRuns.length, 1)
+    assert.equal(researchRuns[0].status, 'failed', '研究交付后因待人工确认而阻断的运行不可冒充完成')
+    assert.match(researchRuns[0].error_msg, /geometry_unverified/)
+    assert.ok(runs.data.runs.filter(run => run.start_stage !== 'research').every(run => run.status === 'completed'))
     const latest = runs.data.runs[0]
     const observed = await (await mapStudioRoutes.request('/runs/' + latest.id + '/observed?limit=1')).json()
     assert.ok(observed.data.works.every(work => work.scope === 'map_studio'))

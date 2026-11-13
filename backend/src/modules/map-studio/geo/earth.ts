@@ -10,7 +10,7 @@
  * heading=0 / tilt=0 的球面针孔模型只用于计划机位与识别控制点，不作为真实影像配准的证明。
  * 实测 portrait 下 FOV 轴与旧 landscape 假设不同，因此用正方形窗口消除轴歧义；
  * 最终标注只认实际截图测得、经独立留出点检验的像素网格（地形高度也包含在测量里）。
- * `backend/scripts/earth-map.py`（Playwright）。**这里不依赖 qing_russia_history 的任何运行时文件。**
+ * 截图脚本是模块自带的 `src/modules/map-studio/earth/earth-map.py`（Playwright）。**这里不依赖 qing_russia_history 的任何运行时文件。**
  *
  * 截图分三趟，实际机位一致：
  *   1. 用户 KMZ 的证据图，证明本地 KML 被解析；
@@ -516,17 +516,11 @@ export interface EarthCaptureInput {
 }
 
 function scriptPath(): string {
-  // src/services → backend/scripts（tsx/编译产物同深度），桌面版 bundle 旁也放一份
+  // 模块自带一份（Issue #99）：src/modules/map-studio/geo → ../earth/earth-map.py
   const here = path.dirname(new URL(import.meta.url).pathname)
-  const candidates = [
-    // 模块自带的一份（Issue #99）：src/modules/map-studio/geo → ../earth/earth-map.py
-    path.resolve(here, '../earth/earth-map.py'),
-    path.resolve(here, '../../scripts/earth-map.py'),
-    path.resolve(here, 'scripts/earth-map.py'),
-    path.resolve(process.cwd(), 'scripts/earth-map.py'),
-  ]
-  for (const candidate of candidates) if (fs.existsSync(candidate)) return candidate
-  throw new EarthDependencyError(`Earth 截图脚本缺失：在 ${candidates.join(' / ')} 都没找到 earth-map.py`)
+  const candidate = path.resolve(here, '../earth/earth-map.py')
+  if (fs.existsSync(candidate)) return candidate
+  throw new EarthDependencyError(`Earth 截图脚本缺失：${candidate} 不存在`)
 }
 
 /**

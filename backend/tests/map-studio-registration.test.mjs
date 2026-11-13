@@ -1,10 +1,10 @@
 /**
- * 前端画布配准（Issue #84）：frontend/app/utils/mapRegistration.ts 必须和后端出图时用的投影
+ * 前端画布配准（Issue #84）：frontend/app/map-studio/utils/mapRegistration.ts 必须和后端出图时用的投影
  * 逐像素一致，否则人在图上拖出来的点会被存成另一个地方的经纬度。
  *
  * 这里不读源码、不数调用次数：直接拿后端权威投影（d3 fitExtent / Earth 相机 / 标定仿射）与前端换算
  * 在真实坐标上对数，并检查反向换算、退化标定与坏配准的拒绝行为。
- * 跑在 tsx 子进程里（口径同 tests/map-geometry.test.mjs），不需要 sharp 渲染与浏览器。
+ * 跑在 tsx 子进程里（口径同 tests/map-studio-geometry.test.mjs），不需要 sharp 渲染与浏览器。
  */
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
@@ -33,7 +33,7 @@ const script = `
   import {
     geoToPixel, pixelToGeo, geoToNormalized, normalizedToGeo,
     parseRegistration, registrationFrom, fitControlPoints, registrationFromControlPoints,
-  } from '../frontend/app/utils/mapRegistration.ts'
+  } from '../frontend/app/map-studio/utils/mapRegistration.ts'
 
   const bbox = ${JSON.stringify(BBOX)}
   const sizes = ${JSON.stringify(SIZES)}

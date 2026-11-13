@@ -57,7 +57,7 @@
       </li>
     </ol>
 
-    <MapStagePanel v-if="detail" :detail="detail" :stage="selectedStage" @preview="openPreview" />
+    <MapStagePanel v-if="detail" :detail="detail" :stage="selectedStage" :confirming="action === 'confirm'" @preview="openPreview" @confirm="confirmGeometry" />
     <MapAgentProcess v-if="detail && runsLoaded" :task-id="taskId" :stage="selectedStage" :runs="runs" :selected-run-id="selectedRunId" :loading-runs="false" :now="nowMs" @select-run="navigationTouched = true; selectedRunId = $event" @reload-runs="loadRuns" />
     <MapDeliveries v-if="detail" :task-id="taskId" :deliveries="detail.deliveries" :outputs="detail.outputs" :can-deliver="!!detail.host && !hostMissing && !isRunning && !!detail.outputs.final_image" :busy="busy || delivering" :delivering="delivering" error="" @deliver="redeliver" />
     <section v-if="detail" class="mw-now">
@@ -158,20 +158,23 @@
       <header class="mw-block-head">
         <strong>{{ t('mapStudio.panel.geometryTitle') }}</strong>
         <span class="dim">{{ t('mapStudio.panel.geometryHint') }}</span>
-        <button type="button" class="mw-tool" :disabled="busy || !specDirty" @click="saveSpec">
+        <button type="button" class="mw-tool" :disabled="busy || !geometryDirty" @click="saveSpec">
           <Loader2 v-if="action === 'spec'" :size="11" class="animate-spin" />
           {{ t('mapStudio.panel.saveSpec') }}
         </button>
-        <button type="button" class="mw-tool" :disabled="busy || !specDirty" @click="resetSpec">{{ t('mapStudio.panel.discard') }}</button>
+        <button type="button" class="mw-tool" :disabled="busy || !geometryDirty" @click="resetSpec">{{ t('mapStudio.panel.discard') }}</button>
       </header>
-      <p v-if="specDirty" class="mw-warn">{{ t('mapStudio.panel.specDirtyWarn') }}</p>
+      <p v-if="geometryDirty" class="mw-warn">{{ t('mapStudio.panel.specDirtyWarn') }}</p>
       <MapGeoEditor
         :spec="specDraft"
         :persisted-spec="detail.map_spec"
         :registration="registration"
         :base-image="editorBase"
+        :layer-doc="editorDoc"
+        :layer-options="layerOptionsDraft"
         :disabled="busy"
         @update="specDraft = $event"
+        @layer-options="layerOptionsDraft = $event"
         @base-size="editorNatural = $event"
       />
     </section>
@@ -229,6 +232,7 @@
         v-if="editorOpen && editorDoc && detail"
         :task-id="taskId"
         :layer-doc="editorDoc"
+        :layer-options="layerOptionsDraft"
         :revision="detail.revision"
         :asset-name="detail.title"
         @close="closeLayerEditor"
@@ -262,11 +266,14 @@ import MapResults from '~/map-studio/components/MapResults.vue'
 import MapAgentRounds from '~/map-studio/components/MapAgentRounds.vue'
 import MapLayerEditor from '~/map-studio/components/MapLayerEditor.vue'
 import {
+  confirmSpecFeatures,
   mapStudioAPI,
   mapStudioConflictOf,
   type MapAgentAttempt,
   type MapAgentState,
   type MapBrief,
+  type MapConfirmTarget,
+  type MapLayerSmoothing,
   type MapSpec,
   type MapStudioDetail,
   type MapStudioStage,
@@ -320,7 +327,7 @@ const STAGE_ORDER: MapStudioStage[] = ['brief', 'research', 'base', 'style', 'dr
 const detail = ref<MapStudioDetail | null>(null)
 const loading = ref(false)
 const error = ref('')
-const action = ref<'' | 'run' | 'advance' | 'cancel' | 'rollback' | 'brief' | 'spec'>('')
+const action = ref<'' | 'run' | 'advance' | 'cancel' | 'rollback' | 'brief' | 'spec' | 'confirm'>('')
 const conflict = ref<{ kind: 'revision' | 'busy'; message: string } | null>(null)
 const runMode = ref<'auto' | 'manual'>('auto')
 const textConfigId = ref(0)
@@ -352,9 +359,12 @@ let previewRestored = false
 
 const briefDraft = ref<MapBrief>(emptyBrief())
 const specDraft = ref<MapSpec>(emptySpec())
+/** 阶段 ③：线面平滑参数草稿；与 map_spec 同一次 CAS 提交，服务端快照是 dirty 判定基准 */
+const layerOptionsDraft = ref<MapLayerSmoothing>({})
 // 服务端快照（JSON 串）：dirty 判定与「只提交改过的字段」都以它为基准，必须是响应式的
 const serverBrief = ref(JSON.stringify(briefDraft.value))
 const serverSpec = ref(JSON.stringify(specDraft.value))
+const serverLayerOptions = ref(JSON.stringify(layerOptionsDraft.value))
 // 画布底图的真实像素尺寸（图片 onload 时由编辑器回传），外部原件尚未经后端出图时用于控制点配准
 const editorNatural = ref({ width: 0, height: 0 })
 
@@ -389,7 +399,10 @@ function emptySpec(): MapSpec {
   }
 }
 
-/** 后端可能给 null / 缺字段（刚建的地图资产），补齐后模板不做存在性判断 */
+/**
+ * 后端可能给 null / 缺字段（刚建的地图资产），补齐后模板不做存在性判断。
+ * `detail_level` 不能补默认值：它决定底图河道取 10m 还是 50m，丢了会让保存几何时错误地重新取景。
+ */
 function normalizeSpec(raw: MapSpec | null): MapSpec {
   const base = emptySpec()
   if (!raw) return base
@@ -397,6 +410,7 @@ function normalizeSpec(raw: MapSpec | null): MapSpec {
     version: 1,
     projection: { type: raw.projection?.type === 'equirectangular' ? 'equirectangular' : 'mercator' },
     bbox: Array.isArray(raw.bbox) && raw.bbox.length === 4 ? [...raw.bbox] as MapSpec['bbox'] : base.bbox,
+    ...(raw.detail_level ? { detail_level: raw.detail_level } : {}),
     layers: { ...base.layers, ...(raw.layers ?? {}) },
     places: (raw.places ?? []).map(place => ({ ...place })),
     routes: (raw.routes ?? []).map(route => ({ ...route, points: (route.points ?? []).map(pt => [pt[0], pt[1]] as [number, number]) })),
@@ -412,6 +426,9 @@ const busy = computed(() => !!action.value || loading.value || hostMissing.value
 const statusClass = computed(() => `is-${status.value}`)
 const briefDirty = computed(() => JSON.stringify(briefDraft.value) !== serverBrief.value)
 const specDirty = computed(() => JSON.stringify(specDraft.value) !== serverSpec.value)
+const layerOptionsDirty = computed(() => JSON.stringify(layerOptionsDraft.value) !== serverLayerOptions.value)
+/** 几何区一次保存的是 map_spec + layer_options：两者任一有改动都要走同一次 CAS */
+const geometryDirty = computed(() => specDirty.value || layerOptionsDirty.value)
 const blockingIssues = computed(() => (detail.value?.issues ?? []).filter(issue => issue.blocking))
 const softIssues = computed(() => (detail.value?.issues ?? []).filter(issue => !issue.blocking))
 
@@ -540,7 +557,8 @@ function closeLayerEditor() {
 
 /** 保存成功：服务端已登记新版本并采纳图与语义，整份详情（含成品图）按返回值更新 */
 function onLayerDocSaved(next: MapStudioDetail) {
-  applyDetail(next)
+  // 图层编辑器保存也会提交 layer_options：采用服务端的结果，但不动用户在几何区尚未保存的 map_spec 草稿
+  applyDetail(next, 'layer-options')
   conflict.value = null
 }
 
@@ -665,7 +683,7 @@ const nextAction = computed(() => {
     : t('mapStudio.panel.nextManual', { stage: t('mapStudio.stage.' + stage.value) })
 })
 
-const draftsDirty = computed(() => briefDirty.value || specDirty.value)
+const draftsDirty = computed(() => briefDirty.value || geometryDirty.value)
 const canRun = computed(() => !hostMissing.value && !!detail.value && !isRunning.value && !draftsDirty.value && !blockingIssues.value.length && stage.value !== 'complete')
 const canAdvance = computed(() => canRun.value)
 const runLabel = computed(() => (runMode.value === 'auto'
@@ -688,7 +706,7 @@ function canRollbackTo(target: MapStudioStage): boolean {
  * 其余情况（任务刷新、冲突后回读）只在本地没有改动时才跟随服务端——有改动就一个字都不动，
  * 由人按「保存」或「放弃修改」决定，后台刷新绝不能吞掉正在编辑的内容。
  */
-function applyDetail(next: MapStudioDetail, adopt?: 'brief' | 'spec') {
+function applyDetail(next: MapStudioDetail, adopt?: 'brief' | 'spec' | 'layer-options') {
   // 首次恢复显示服务端实际固定的配置；后台刷新不覆盖用户尚未提交的新选择。
   if (!detail.value) {
     textConfigId.value = next.text_config_id ?? 0
@@ -701,6 +719,10 @@ function applyDetail(next: MapStudioDetail, adopt?: 'brief' | 'spec') {
   const nextSpec = JSON.stringify(normalizeSpec(next.map_spec))
   if (adopt === 'spec' || !specDirty.value) specDraft.value = JSON.parse(nextSpec) as MapSpec
   serverSpec.value = nextSpec
+  // 平滑参数与几何同一次保存：保存成功时采用服务端重映射后的键，未保存的改动一个字都不动
+  const nextOptions = JSON.stringify(next.outputs.layer_options ?? {})
+  if (adopt === 'spec' || adopt === 'layer-options' || !layerOptionsDirty.value) layerOptionsDraft.value = JSON.parse(nextOptions) as MapLayerSmoothing
+  serverLayerOptions.value = nextOptions
 }
 
 async function load(silent = false) {
@@ -861,15 +883,49 @@ async function saveBrief() {
 }
 
 async function saveSpec() {
-  if (busy.value || !specDirty.value) return
+  if (busy.value || !geometryDirty.value) return
   action.value = 'spec'
   error.value = ''
   try {
-    const res = await mapStudioAPI.save(taskId.value, { expected_revision: detail.value?.revision, map_spec: specDraft.value })
+    // map_spec 与 layer_options 同一次 CAS。几何没改时发送服务端原样的 map_spec：
+    // 后端按字节比较「几何是否变化」，只有逐字节相同才走「仅改平滑参数」的重绘路径，
+    // 否则会把只改平滑当成几何变更，白白让成图失效。
+    const spec = specDirty.value ? specDraft.value : (detail.value?.map_spec ?? specDraft.value)
+    const res = await mapStudioAPI.save(taskId.value, {
+      expected_revision: detail.value?.revision,
+      map_spec: spec,
+      layer_options: layerOptionsDraft.value,
+    })
     if (stopped) return
     applyDetail(res, 'spec')
     conflict.value = null
     toast.success(t('mapStudio.panel.specSaved'))
+  } catch (err) {
+    if (!stopped) handleError(err, t('mapStudio.panel.saveFailed'))
+  } finally {
+    if (!stopped) action.value = ''
+  }
+}
+
+/**
+ * 确认 AI 提议几何 = PUT map_spec 去掉 proposed（现有 CAS），其余元数据逐字保留；
+ * 核验结论由服务端改写，前端不自行判定放行。失败（含 409 修订冲突）时选择与草稿都不动。
+ */
+async function confirmGeometry(targets: MapConfirmTarget[]) {
+  if (!targets.length || action.value) return
+  const base = detail.value?.map_spec
+  if (!base) return
+  action.value = 'confirm'
+  error.value = ''
+  try {
+    const next = confirmSpecFeatures(base, targets)
+    const res = await mapStudioAPI.save(taskId.value, { expected_revision: detail.value?.revision, map_spec: next })
+    if (stopped) return
+    // 尚未保存的几何草稿里同一批条目仍带着 AI 候选标记：一并去掉，否则之后保存草稿会把人工确认覆盖回候选
+    if (specDirty.value) specDraft.value = confirmSpecFeatures(specDraft.value, targets)
+    applyDetail(res)
+    conflict.value = null
+    toast.success(t('mapStudio.researchPanel.confirmed', { n: targets.length }))
   } catch (err) {
     if (!stopped) handleError(err, t('mapStudio.panel.saveFailed'))
   } finally {
@@ -883,6 +939,7 @@ function resetBrief() {
 
 function resetSpec() {
   specDraft.value = JSON.parse(serverSpec.value) as MapSpec
+  layerOptionsDraft.value = JSON.parse(serverLayerOptions.value) as MapLayerSmoothing
 }
 
 async function loadConfigs() {

@@ -13,7 +13,7 @@ import { test, after } from 'node:test'
 import assert from 'node:assert/strict'
 
 const backendRoot = fileURLToPath(new URL('..', import.meta.url))
-const dataDir = mkdtempSync(path.join(tmpdir(), 'map-base-render-'))
+const dataDir = mkdtempSync(path.join(tmpdir(), 'map-studio-base-render-'))
 
 // 豫北：安阳 / 殷墟 所在范围
 const BBOX = [113.0, 35.2, 115.6, 36.8]

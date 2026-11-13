@@ -72,20 +72,60 @@ export interface MapBrief {
   schematic: boolean
   base_mode: MapBaseMode
   style: MapStyleTheme
+  /**
+   * 阶段 ③ 预留的样式规范接入点：只在明确给出时随 brief 提交，后端原样保留；
+   * 缺省 = 现有 THEME_PRESETS 行为不变。本阶段不固化任何参考风格，也不在 UI 提供预设。
+   */
+  style_spec?: Record<string, unknown>
   notes: string
   reference_image: MapReferenceImage | null
   inferred: MapBriefInference[]
 }
 
-export interface MapPlace { id: string; name: string; lon: number; lat: number; proposed?: boolean }
-export interface MapRoute { id: string; name: string; points: Array<[number, number]>; proposed?: boolean }
+/** Issue #99 阶段 ②：要素的类别、几何来源、核验结论与相对位置证据（后端原样存进 map_spec） */
+export type MapFeatureCategory = 'river' | 'lake' | 'coast' | 'mountain' | 'settlement' | 'route' | 'territory' | 'other'
+export type MapFeatureOrigin = 'dataset' | 'source' | 'model' | 'manual'
+export type MapVerificationStatus = 'verified' | 'unverified' | 'conflict' | 'needs_user' | 'confirmed'
+export interface MapVerification { status: MapVerificationStatus, reasons: string[] }
+export interface MapDatasetReference { ref: string, clip_bbox?: [number, number, number, number] }
+export type MapRelationKind = 'distance_km' | 'east_of' | 'west_of' | 'north_of' | 'south_of' | 'near_river'
+/** 声明的相对位置证据 + 服务端按坐标算出的结果（computed/message 缺省时按「未计算」显示，不猜） */
+export interface MapRelation {
+  id: string
+  subject: string
+  object: string
+  relation: MapRelationKind
+  value_km?: number
+  tolerance_km?: number
+  excerpt: string
+  source_id: string
+  computed?: { value_km?: number, consistent: boolean }
+  message?: string
+}
+
+/** 所有几何条目共有的阶段 ② 元数据；缺省即「未标注」，绝不按 AI 候选脑补来源 */
+export interface MapFeatureMetadata {
+  category?: MapFeatureCategory
+  origin?: MapFeatureOrigin
+  verification?: MapVerification
+  dataset_ref?: MapDatasetReference
+  relations?: MapRelation[]
+}
+
+export interface MapPlace extends MapFeatureMetadata { id: string; name: string; lon: number; lat: number; proposed?: boolean }
+export interface MapRoute extends MapFeatureMetadata { id: string; name: string; points: Array<[number, number]>; proposed?: boolean }
 /** 面要素：首尾由后端自动闭合，前端按开放环编辑 */
-export interface MapRegion { id: string; name: string; points: Array<[number, number]>; proposed?: boolean }
+export interface MapRegion extends MapFeatureMetadata { id: string; name: string; points: Array<[number, number]>; proposed?: boolean }
 export interface MapSpec {
   version: 1
   projection: { type: 'mercator' | 'equirectangular' }
   /** [west, south, east, north] */
   bbox: [number, number, number, number]
+  /**
+   * 制图细节级别（阶段 ②）：决定底图河道取 10m 还是 50m，以及取景精度。
+   * 保存几何时原样带回；缺省就是真的没有这个字段，不补默认值。
+   */
+  detail_level?: 'overview' | 'regional' | 'site'
   layers: { land: boolean; coastline: boolean; rivers: boolean; lakes: boolean; countries: boolean }
   places: MapPlace[]
   routes: MapRoute[]
@@ -116,19 +156,35 @@ export interface MapResearchSource {
   tier: 'A' | 'B'
   excerpt: string
 }
-export interface MapResearchFeature {
+export interface MapResearchFeature extends MapFeatureMetadata {
+  /** 服务端要素 id（`features[i]` 之外的稳定引用） */
+  id?: string
   kind: 'place' | 'route' | 'region'
   name: string
   lon?: number
   lat?: number
   points?: Array<[number, number]>
+  /** 数据集折线不连通时保留多段；并入 map_spec 时拆成 `name (i/N)` 的同前缀条目 */
+  parts?: Array<Array<[number, number]>>
+  dataset_missing?: { queries: string[], reason: string }
   source_url: string | null
   source_title: string
   uncertainty: 'high' | 'medium' | 'low'
   basis: string
+  coordinate_basis?: string
+  supporting_excerpt?: string
+  excerpt_verified?: boolean
+  approximate?: boolean
 }
+export interface MapDatasetQuery { layer: string, query: string, bbox?: [number, number, number, number], hits: number, refs: string[] }
 export interface MapResearch {
   queries: Array<{ adapter: string; query: string; hits: number; error: string | null }>
+  /** 本阶段 search_dataset 的登记（服务端核对 dataset_missing 用）；老记录没有这个字段 */
+  dataset_queries?: MapDatasetQuery[]
+  /** 该图的空间范围 [west, south, east, north]；阶段 ② 起必填 */
+  extent?: [number, number, number, number]
+  /** 本次提交的相对位置证据及服务端按坐标算出的结论 */
+  relations?: MapRelation[]
   sources: MapResearchSource[]
   features: MapResearchFeature[]
   uncertainties: string[]
@@ -146,12 +202,36 @@ export interface MapImageRef {
   run_id: number | null
   provenance: Record<string, unknown> | null
 }
+/**
+ * 阶段 ③：线面渲染平滑参数，键是图层 id（绘制前是要素 id），`smooth: 0` 关闭、`0 < s <= 1` 是强度。
+ * 只改渲染副本，不改存储的控制点；老记录没有这个字段，缺省按要素默认值计算。
+ */
+export type MapLayerSmoothing = Record<string, { smooth: number }>
+
 export interface MapStudioOutputs {
   base_image: MapImageRef | null
   texture_image: MapImageRef | null
   final_image: MapImageRef | null
   kmz: { path: string; provenance: Record<string, unknown> } | null
   layer_doc: Record<string, unknown> | null
+  layer_options?: MapLayerSmoothing
+}
+
+/** 严格校验 / 标签检查逐条问题：label_* 与 smoothing_* 带图层 id，其余按字段路径定位 */
+export interface MapLayerProblem {
+  path: string
+  message: string
+  layer_id?: string
+  code?: string
+}
+
+/** 只读检查与自动排布的回执；两者都不保存草稿、不消耗模型轮次 */
+export interface MapLayerCheck { problems: MapLayerProblem[] }
+export interface MapLayerAutoLayout {
+  layer_doc: Record<string, unknown>
+  layer_options: MapLayerSmoothing
+  unresolved: Array<{ layer_id: string; message: string }>
+  problems: MapLayerProblem[]
 }
 
 export interface MapStudioHistoryEntry {
@@ -354,6 +434,11 @@ export interface ObservedCallRow {
   message_count: number
   heartbeat_at?: number | null
   created_at?: number
+  /**
+   * 阶段归属：调用 started_at 落在哪个阶段跨度内；没有任何跨度覆盖时为 null
+   * （不按阶段顺序猜，也不把无归属的调用塞给当前阶段）。
+   */
+  stage: MapStudioStage | null
 }
 
 export interface ObservedMessageRow {
@@ -433,8 +518,8 @@ export const mapStudioAPI = {
   },
   createTask: (data: { title: string, brief?: Partial<MapBrief> }) => request<MapStudioDetail>('POST', '/tasks', data),
   get: (taskId: number) => request<MapStudioDetail>('GET', `/tasks/${taskId}`),
-  /** brief 按字段合并，map_spec 整份替换；纯几何修改保留底图/纹理只重绘 */
-  save: (taskId: number, data: { expected_revision?: number, brief?: Partial<MapBrief>, map_spec?: MapSpec }) =>
+  /** brief 按字段合并，map_spec 整份替换；layer_options 与几何同一次 CAS 提交，纯几何修改保留底图/纹理只重绘 */
+  save: (taskId: number, data: { expected_revision?: number, brief?: Partial<MapBrief>, map_spec?: MapSpec, layer_options?: MapLayerSmoothing }) =>
     request<MapStudioDetail>('PUT', `/tasks/${taskId}`, data),
   run: (taskId: number, options: MapStudioRunOptions) => request<MapStudioDetail>('POST', `/tasks/${taskId}/run`, options),
   advance: (taskId: number, options: Omit<MapStudioRunOptions, 'mode'> = {}) =>
@@ -445,9 +530,26 @@ export const mapStudioAPI = {
   /**
    * 人工在图层编辑器里改完的 LayerDoc：服务端严格校验（normalizeLayerDoc 会改动即拒收）、
    * 用同一条 renderLayerDoc 链重绘；宿主任务保存即交付。
+   * layerOptions 只按调用方给的值提交，**不**在这里补默认值——补出来的默认会被当成人工改动。
    */
-  saveLayerDoc: (taskId: number, layerDoc: Record<string, unknown>, expectedRevision?: number) =>
-    request<MapStudioDetail>('PUT', `/tasks/${taskId}/layer-doc`, { layer_doc: layerDoc, expected_revision: expectedRevision }),
+  saveLayerDoc: (taskId: number, layerDoc: Record<string, unknown>, expectedRevision?: number, layerOptions?: MapLayerSmoothing) =>
+    request<MapStudioDetail>('PUT', `/tasks/${taskId}/layer-doc`, {
+      layer_doc: layerDoc,
+      expected_revision: expectedRevision,
+      ...(layerOptions !== undefined ? { layer_options: layerOptions } : {}),
+    }),
+  /** 纯读取检查：严格校验 + 平滑偏离 + 标签排版问题，不保存、不重绘、不消耗轮次 */
+  checkLayerDoc: (taskId: number, layerDoc: Record<string, unknown>, layerOptions?: MapLayerSmoothing) =>
+    request<MapLayerCheck>('POST', `/tasks/${taskId}/layer-doc/check`, {
+      layer_doc: layerDoc,
+      ...(layerOptions !== undefined ? { layer_options: layerOptions } : {}),
+    }),
+  /** 纯函数自动排布标签：返回调整后的文档与排不下的条目；不删除标签、不缩字号 */
+  autoLayoutLayerDoc: (taskId: number, layerDoc: Record<string, unknown>, layerOptions?: MapLayerSmoothing) =>
+    request<MapLayerAutoLayout>('POST', `/tasks/${taskId}/layer-doc/auto-layout`, {
+      layer_doc: layerDoc,
+      ...(layerOptions !== undefined ? { layer_options: layerOptions } : {}),
+    }),
   /** 宿主任务：把当前成图重新交付（幂等，同一 sha256 不重复登记）；独立任务 400 standalone_task */
   deliver: (taskId: number) => request<{ delivered: boolean, version_ids: number[], message: string, deliveries: MapStudioDeliveryRow[] }>('POST', `/tasks/${taskId}/deliver`, {}),
   /** 文件流端点：直接给 <a download>，不要用 fetch（正文是二进制/附件） */
@@ -512,8 +614,8 @@ export function mapStudioConflictOf(err: unknown): { kind: 'revision' | 'busy', 
   return null
 }
 
-/** 400 layer_doc_invalid：严格校验逐条指出「规范化会改动哪里」，草稿一律保留由人改 */
-export function mapLayerDocProblemsOf(err: unknown): { message: string, problems: Array<{ path: string, message: string }> } | null {
+/** 400 layer_doc_invalid：严格校验/标签排版逐条指出「哪里不行」，草稿一律保留由人改 */
+export function mapLayerDocProblemsOf(err: unknown): { message: string, problems: MapLayerProblem[] } | null {
   const body = (err as MapStudioApiError)?.body
   if (!body || body.error !== 'layer_doc_invalid') return null
   const raw = Array.isArray(body.problems) ? body.problems : []
@@ -521,8 +623,86 @@ export function mapLayerDocProblemsOf(err: unknown): { message: string, problems
     message: String(body.message || ''),
     problems: raw.map((item: unknown) => {
       const row = (item ?? {}) as Record<string, unknown>
-      return { path: String(row.path ?? ''), message: String(row.message ?? '') }
+      const problem: MapLayerProblem = { path: String(row.path ?? ''), message: String(row.message ?? '') }
+      if (row.layer_id !== undefined && row.layer_id !== null && String(row.layer_id)) problem.layer_id = String(row.layer_id)
+      if (row.code !== undefined && row.code !== null && String(row.code)) problem.code = String(row.code)
+      return problem
     }),
   }
 }
 
+/**
+ * 问题 → 可点击选中的图层：优先用服务端给的 layer_id，其次按 `layers[N]` 路径取当前文档里的
+ * 图层（这份文档就是服务端校验的那份），都定位不到就返回 null——不猜一个「大概相关」的图层。
+ */
+export function mapLayerProblemLayerId(problem: MapLayerProblem, layers: Array<{ id: string }>): string | null {
+  if (problem.layer_id && layers.some(layer => layer.id === problem.layer_id)) return problem.layer_id
+  const match = /^layers\[(\d+)\]/.exec(problem.path || '')
+  if (!match) return null
+  const layer = layers[Number(match[1])]
+  return layer ? layer.id : null
+}
+
+/* ===== 阶段 ② 几何核验（纯读取与挑选用；闸门永远在服务端） ===== */
+
+export type MapSpecFeatureKind = 'place' | 'route' | 'region'
+
+/** 挑选「待确认」条目时用的键；map_spec 三类几何的 id 各自唯一 */
+export function mapSpecFeatureKey(kind: MapSpecFeatureKind, id: string): string {
+  return `${kind}:${id}`
+}
+
+export interface MapPendingGeometry { kind: MapSpecFeatureKind, id: string, name: string, reasons: string[] }
+
+/**
+ * 列出「AI 提议且既不 verified 也不 confirmed」的几何条目——与服务端 research/base/drawing/complete
+ * 闸门的判定同一条件，只用来在界面上挑出待确认行；**放行与否一律以服务端回执为准**
+ * （400 geometry_unverified 的 message 原样显示，不在这里自行放行）。
+ * 服务端把这些要素拆成 `name (i/N)` 同前缀条目时，每一条都会独立出现。
+ */
+export function mapPendingGeometry(spec: MapSpec | null): MapPendingGeometry[] {
+  if (!spec) return []
+  const row = (kind: MapSpecFeatureKind, item: MapPlace | MapRoute | MapRegion): MapPendingGeometry => ({
+    kind,
+    id: item.id,
+    name: item.name,
+    reasons: item.verification?.reasons?.length ? item.verification.reasons : ['AI 提议的坐标缺少可核验依据，请人工确认'],
+  })
+  const pending: MapPendingGeometry[] = []
+  for (const [kind, list] of [
+    ['place', spec.places ?? []],
+    ['route', spec.routes ?? []],
+    ['region', spec.regions ?? []],
+  ] as Array<[MapSpecFeatureKind, Array<MapPlace | MapRoute | MapRegion>]>) {
+    for (const item of list) {
+      // 人工编辑过的条目不算 AI 提议；已经核验过（数据集或逐字坐标证据）也不必再确认
+      if (item.proposed !== true || item.origin === 'manual') continue
+      if (item.verification?.status === 'verified' && item.origin !== undefined) continue
+      pending.push(row(kind, item))
+    }
+  }
+  return pending
+}
+
+export interface MapConfirmTarget { kind: MapSpecFeatureKind, id: string }
+
+/**
+ * 确认 = 去掉 `proposed`（现有 CAS 语义），其余元数据（category / origin / verification / dataset_ref /
+ * relations）逐字保留；核验状态由服务端在保存时改写为 confirmed，前端不替它编结论。
+ * 返回新的 spec 对象，绝不原地改服务端快照。
+ */
+export function confirmSpecFeatures(spec: MapSpec, targets: MapConfirmTarget[]): MapSpec {
+  const wanted = new Set(targets.map(target => mapSpecFeatureKey(target.kind, target.id)))
+  const strip = <T extends { id: string }>(kind: MapSpecFeatureKind, list: T[]): T[] => list.map((item) => {
+    if (!wanted.has(mapSpecFeatureKey(kind, item.id))) return { ...item }
+    const copy = { ...item } as T & { proposed?: boolean }
+    delete copy.proposed
+    return copy
+  })
+  return {
+    ...spec,
+    places: strip('place', spec.places ?? []),
+    routes: strip('route', spec.routes ?? []),
+    regions: strip('region', spec.regions ?? []),
+  }
+}

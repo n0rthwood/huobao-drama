@@ -94,7 +94,7 @@ data/       — 生成资源文件与 SQLite 数据库
 - 扩散模型只生成独立底纹，地图原件不送模型重画。点、线、区域与地名由程序绘制并可在画布上编辑；原件版本、来源、配准信息与可编辑图层文档保留。
 - 编辑几何后需要重新绘制；投影、范围与背景层不变时保留底图和底纹，运行按钮继续当前阶段，整条重做须显式回退。旧图不代表新几何已生效。图层上限为 60 层、单条线或区域 240 点；超限或要素不在底图覆盖范围内会明确阻断，不截断、钳边或丢掉要素冒充完整成图。
 
-**升级配置**：后端自动增加地图类型与流程存储。Europeana/Smithsonian key 仍在「设置 → 资料检索」管理。Earth 路径另需 Python、Playwright、Pillow 和可运行的 Chromium，部署须包含 `backend/scripts/earth-map.py` 与 `earth_calibration.py`；在仓库外 `${HUOBAO_LOCAL_CONFIG_DIR:-~/.config/huobao-drama-local}/earth-runtime.json` 配置 `{"python":"<Python绝对路径>","chromium":"<Chromium绝对路径>"}`，或使用 `HUOBAO_EARTH_PYTHON` / `HUOBAO_EARTH_CHROMIUM`。依赖缺失或截图失败会显示原因，不会拿程序底图冒充 Earth。
+**升级配置**：后端自动增加地图类型与流程存储。Europeana/Smithsonian key 仍在「设置 → 资料检索」管理。Earth 路径另需 Python、Playwright、Pillow 和可运行的 Chromium，部署须包含 `backend/src/modules/map-studio/earth/earth-map.py` 与 `earth_calibration.py`；在仓库外 `${HUOBAO_LOCAL_CONFIG_DIR:-~/.config/huobao-drama-local}/earth-runtime.json` 配置 `{"python":"<Python绝对路径>","chromium":"<Chromium绝对路径>"}`，或使用 `HUOBAO_EARTH_PYTHON` / `HUOBAO_EARTH_CHROMIUM`。依赖缺失或截图失败会显示原因，不会拿程序底图冒充 Earth。
 
 ### 剧集 Poster
 

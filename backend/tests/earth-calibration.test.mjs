@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-const helper = fileURLToPath(new URL('../scripts/earth_calibration.py', import.meta.url))
+const helper = fileURLToPath(new URL('../src/modules/map-studio/earth/earth_calibration.py', import.meta.url))
 const configPath = path.join(process.env.HUOBAO_LOCAL_CONFIG_DIR || path.join(homedir(), '.config/huobao-drama-local'), 'earth-runtime.json')
 const runtime = process.env.HUOBAO_EARTH_PYTHON || (existsSync(configPath) ? JSON.parse(readFileSync(configPath, 'utf8')).python : null) || 'python3'
 

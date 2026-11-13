@@ -28,12 +28,12 @@ export interface MapStudioDeliverable {
   texture_image: { path: string } | null
   /** 像素几何（width/height/points/lines/regions/labels），宿主按自己的语义规范化 */
   semantics: unknown
-  /** 每个要素的出处：{ feature_id, name, kind, origin, proposed, source_ids, coordinate_basis, excerpt? } */
+  /** 要素出处与核验：{ feature_id, name, kind, category, origin: dataset|source|model|manual, verification, relations, dataset_ref, proposed, source_ids, coordinate_basis, excerpt }；宿主不解释。 */
   features: unknown[]
   /** research.sources 原样 */
   sources: unknown[]
   kmz: { path: string } | null
-  /** 可编辑源文件：宿主不校验、不解释，只保存与回传。阶段 ① = { version, map_spec, layer_doc } */
+  /** 可编辑源文件：{ version, map_spec, layer_doc, layer_options }；宿主不解释平滑参数。 */
   editable_source: unknown
   /** 来自人工图层编辑保存 */
   manual_edit: boolean
