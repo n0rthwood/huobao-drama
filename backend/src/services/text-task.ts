@@ -51,9 +51,9 @@ export type TextTaskKind =
   /** 资产资料检索（Issue #79）：多来源检索 + 视觉筛选，结果落 params.asset_research，供面板入库与事实表引用 */
   | 'asset_research'
   /**
-   * 地图资产工作流（Issue #84）：需求 → 检索 → 底图 → 底纹 → 标注 → 完成。
-   * 状态本体在 `props.map_workflow`，这条任务只是执行容器：`params.map_prop_id` 指向地图资产，
-   * `params.map_stage` 是当前步名。扩散模型只在「底纹」那一步出一张纸纹，不碰几何。
+   * 旧地图资产工作流（Issue #84，Issue #99 起仅保留历史行）：需求 → 检索 → 底图 → 底纹 → 标注 → 完成。
+   * 执行已迁到地图工作室（`map_studio_run`），新任务不再产生这个 kind；保留它只为历史任务详情、
+   * 任务中心标签与重试拒绝提示（`props.map_workflow` 也只是只读历史数据）。
    */
   | 'map_workflow'
   /** 图层底图视觉验证（Issue #94）：渲染后核验裁切/留白的取景画面，结论写 storyboard_layer_segments.base_check */

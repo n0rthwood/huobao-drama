@@ -564,8 +564,9 @@ export const props = sqliteTable('props', {
   assetType: text('asset_type').notNull().default('prop'),
   // 地图底图规格 JSON（Issue #56）：投影 + bbox + 地点 + 路线 + 面（#84）；几何由程序确定性渲染，不经扩散模型
   mapSpec: text('map_spec'),
-  // 地图工作流 JSON（Issue #84）：brief → research → base → style → drawing → complete 的持久状态，
-  // 含修订号 / 步骤 / 问题 / 检索证据 / 产出 / 历史快照。唯一读写口在 services/map-workflow/store.ts
+  // 旧地图工作流 JSON（Issue #84）：brief → research → base → style → drawing → complete 的持久状态，
+  // 含修订号 / 步骤 / 问题 / 检索证据 / 产出 / 历史快照。Issue #99 起只读：地图工作流已迁入 modules/map-studio，
+  // 新任务的持久状态在 map_studio_task，这一列只保留历史数据给任务中心与资产详情展示。
   mapWorkflow: text('map_workflow'),
   // Map Studio (#99): host owns only the brief and the module task reference.
   mapBrief: text('map_brief'),

@@ -2,7 +2,7 @@
  * 地图几何（Issue #84）：面要素、三条底图路线的地理↔像素登记件、KMZ 确定性、
  * 外部图仿射配准与残差、可编辑图层草稿。
  *
- * 渲染要 sharp + TS 源码，放在 tsx 子进程里跑（口径同 tests/map-base-render.test.mjs），
+ * 渲染要 sharp + TS 源码，放在 tsx 子进程里跑（口径同 tests/map-studio-base-render.test.mjs），
  * HUOBAO_DATA_DIR 指向临时目录，绝不写进仓库 data/。
  * Earth 那条路线的**浏览器**部分不在单测里跑（需要外部 Python/Playwright 运行时与公网），
  * 这里只断言它的相机数学、取景与「依赖缺失必须给出可照做的错误」。

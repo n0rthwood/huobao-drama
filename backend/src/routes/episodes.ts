@@ -97,7 +97,7 @@ async function attachImageVersions<T extends { id: number; imageUrl: string | nu
     const versions = versionsOf.get(row.id) ?? []
     return {
       // 道具按地图感知口径序列化（Issue #84）：普通道具不带任何地图字段，
-      // 地图资产带 map_spec 但不驮工作流大文档（它只由 /props/:id/map-workflow 提供）
+      // 地图资产带 map_spec 但不驮旧工作流大文档（Issue #99 起它已是只读历史数据，工作台由地图工作室负责）
       ...(kind === 'prop' ? serializeProp(row as unknown as PropRow) : toSnakeCase(row)),
       image_versions: versions,
       image_generated_at: versions.find(version => version.is_current)?.generated_at ?? null,

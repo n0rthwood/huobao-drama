@@ -350,7 +350,7 @@ export function normalizeMapCanvas(size: Partial<MapCanvasSize> | undefined): Ma
 /**
  * bbox 矩形环。**必须顺时针**（[w,s]→[w,n]→[e,n]→[e,s]）：d3-geo 按球面语义解释多边形，
  * 逆时针小环表示「整个地球减去这个矩形」，fitExtent 会去拟合全球，豫北 bbox 实测会塌成
- * 1280×720 画布上 5px 宽的一小团（见 tests/map-base-render.test.mjs 的跨度断言）。
+ * 1280×720 画布上 5px 宽的一小团（见 tests/map-studio-base-render.test.mjs 的跨度断言）。
  */
 function bboxPolygon(spec: Pick<MapSpec, 'bbox'>) {
   const [w, s, e, n] = spec.bbox
@@ -361,7 +361,7 @@ function bboxPolygon(spec: Pick<MapSpec, 'bbox'>) {
 }
 /**
  * 渲染与坐标换算共用同一个投影实例口径，否则标注会和底图错位。
- * 导出给 map-geometry：登记件（registration）里只存 projection + bbox + 画布尺寸，
+ * 导出给 geo/geometry：登记件（registration）里只存 projection + bbox + 画布尺寸，
  * 复原投影必须走这个唯一实现，绝不允许第二份 fitExtent 写法。
  */
 export function mapProjectionFor(spec: Pick<MapSpec, 'projection' | 'bbox'>, size: MapCanvasSize): GeoProjection {

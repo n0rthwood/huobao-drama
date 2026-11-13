@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { backendLayerId, dedupeLayerIds, normalizeMapLayerDoc, sortLayersByZ } from '../app/utils/mapLayerDoc.js'
+import { backendLayerId, dedupeLayerIds, normalizeMapLayerDoc, sortLayersByZ } from '../app/map-studio/utils/mapLayerDoc.js'
 
 // 期望值对照 backend/src/services/layer-doc.ts 的 normalizeLayerDoc：
 // 稳定排序 `(a.z - b.z) || (a.index - b.index)`，重复 id 取 `${id}-${index+1}` 并在占用时递增。
