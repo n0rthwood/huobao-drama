@@ -14,25 +14,25 @@ export function validExtent(raw: unknown): raw is Extent {
  * One aggregated problem per feature instead of one line per vertex: a whole river outside
  * the extent used to flood the feedback with hundreds of identical lines and hide the fix.
  * Swap detection stays a separate message because its remedy is different.
+ *
+ * 判据是「落在 extent 内」，不再另加 2% 内缩留边：生产验收（任务 1 / run 2）里模型把
+ * clip_bbox 设成 extent 本身，又被内缩留边判越界，三轮都卡在两层框的差上。画面留边由
+ * base 阶段的取景校验负责，研究阶段只管「要素是否属于这张图的空间范围」。
  */
 export function extentProblems(points: Point[], extent: Extent, options: { dataset?: boolean } = {}): string[] {
   const round = (value: number) => Number(value.toFixed(4))
-  const inner: Extent = [
-    round(extent[0] + 0.02 * (extent[2] - extent[0])), round(extent[1] + 0.02 * (extent[3] - extent[1])),
-    round(extent[2] - 0.02 * (extent[2] - extent[0])), round(extent[3] - 0.02 * (extent[3] - extent[1])),
-  ]
   const within = ([x, y]: Point, box: Extent) => x >= box[0] && x <= box[2] && y >= box[1] && y <= box[3]
-  const outside = points.filter(point => !within(point, inner))
+  const outside = points.filter(point => !within(point, extent))
   if (!outside.length) return []
   const problems: string[] = []
-  const swapped = outside.filter(point => !within(point, extent) && within([point[1], point[0]], inner))
+  const swapped = outside.filter(point => within([point[1], point[0]], extent))
   if (swapped.length) problems.push(`疑似经纬度互换：${swapped.length} 个顶点在 extent 外，而交换后落在范围内（例如 (${swapped[0]!.join(', ')}) → (${swapped[0]![1]}, ${swapped[0]![0]})）；坐标顺序始终是 [lon, lat]，请核对坐标`)
   const violations = outside.filter(point => !swapped.includes(point))
   if (violations.length) {
     const lons = violations.map(point => point[0]), lats = violations.map(point => point[1])
-    problems.push(`${violations.length} 个顶点超出 extent 的 2% 留边（经度 ${round(Math.min(...lons))}–${round(Math.max(...lons))}，纬度 ${round(Math.min(...lats))}–${round(Math.max(...lats))}；extent 留边后的范围是 ${JSON.stringify(inner)}）`
+    problems.push(`${violations.length} 个顶点超出 extent（经度 ${round(Math.min(...lons))}–${round(Math.max(...lons))}，纬度 ${round(Math.min(...lats))}–${round(Math.max(...lats))}；extent 是 ${JSON.stringify(extent)}）`
       + (options.dataset
-        ? '；这是 dataset 要素：请在 dataset_ref.clip_bbox 里把它裁到 extent 内（例如 clip_bbox=' + JSON.stringify(inner) + '），或调整 extent；代码不会自动裁剪'
+        ? '；这是 dataset 要素：请在 dataset_ref.clip_bbox 里把它裁到 extent 内（例如 clip_bbox=' + JSON.stringify(extent) + '），或调整 extent；代码不会自动裁剪'
         : '；请核对坐标或调整 extent'))
   }
   return problems
