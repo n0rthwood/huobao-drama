@@ -11,7 +11,7 @@
 import { and, eq, isNull } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
 import { getActiveConfig, getConfigById, validateVideoModel } from './ai.js'
-import { getVideoAdapter } from './adapters/registry'
+import { videoCapabilities } from './adapters/registry'
 import { generateVideo } from './generation.js'
 import { getDramaStylePrompt } from './style-preset.js'
 import { loadEpisodeKeyframes } from './keyframes.js'
@@ -131,7 +131,9 @@ export function computeVideoSignature(input: VideoSignatureInput): {
     ]),
     refs: digest((input.referenceImageUrls || []).map(refBasename)),
     spec: digest([Math.round(Number(input.duration) || 0), input.aspectRatio || '', input.resolution || '']),
-    engine: digest([input.provider || '', input.model || '']),
+    // h3-jobs 队列跑的是与 ComfyUI 直连同一套 H3 工作流与模型，只换调度方式：按同一引擎计签名，
+    // 否则切到队列后所有历史视频都会被判为「模型已变化」而默认勾选重出
+    engine: digest([input.provider === 'h3-jobs' ? 'comfyui' : input.provider || '', input.model || '']),
   }
   return { signature: digest(parts), parts }
 }
@@ -193,8 +195,8 @@ export async function buildStoryboardVideoRequest(
   const modelError = validateVideoModel(config.provider, model || config.model)
   if (modelError) throw new Error(modelError)
 
-  const adapter = getVideoAdapter(config.provider)
-  if (!adapter.supportsFrameGuides) {
+  const capabilities = videoCapabilities(config.provider)
+  if (!capabilities.supportsFrameGuides) {
     throw new Error(`当前视频模型不支持关键帧引导（${config.provider}），请改用 MiniMax-H3 等支持的模型`)
   }
 
@@ -283,7 +285,7 @@ export async function buildStoryboardVideoRequest(
   }
 
   // 中间帧引导只有部分模型支持（H3 走 MiniMaxH3AddGuide），不支持的模型只发首尾帧
-  const midFrameUrl = adapter.supportsMidFrameGuide ? keyframes.mid || undefined : undefined
+  const midFrameUrl = capabilities.supportsMidFrameGuide ? keyframes.mid || undefined : undefined
 
   const params = {
     storyboardId,

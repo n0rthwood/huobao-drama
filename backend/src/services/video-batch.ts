@@ -1,16 +1,21 @@
 /**
- * 服务端批量视频生成 — 按分镜顺序串行，脱离浏览器
+ * 服务端批量视频生成 — 脱离浏览器，两种驱动方式：
  *
- * 提交 → 等待 sys_task 终态（完成即自动采用）→ 下一镜。
- * 前提是本集所有分镜的关键帧都已人工确认；每一镜在提交前再复查一次确认状态。
- * 批次状态持久化在 video_batches，后端重启（开发机 tsx watch 很常见）后自动恢复：
- * 被重启中断的那一镜重新提交（接受上游可能残留的重复任务）。
+ * - 并发（视频配置是 h3-jobs 队列，Issue #100）：勾选镜头逐个组装（含转场审核）后立即提交，
+ *   每提交一镜就落盘 sys_task id，之后只跟踪各任务状态，由队列调度两张卡。同批次镜头的输入互不依赖
+ *   （承接镜首帧取上一镜尾帧**关键帧图**，不读上一镜视频），所以一次性提交是安全的。
+ *   重启后按落盘的 task_id 续跟，绝不重复提交；停止 = 取消仍在排队的镜头、运行中的跑完。
+ * - 串行（其它 provider）：提交 → 等待 sys_task 终态 → 下一镜；重启时被中断的那一镜重新提交
+ *   （这些 provider 的任务已被启动清扫判失败，无法续跟）。
+ *
+ * 每一镜在提交前再复查一次阻断（关键帧确认、提示词一致性）。批次状态持久化在 video_batches。
  */
+import { setTimeout as sleep } from 'node:timers/promises'
 import { and, eq } from 'drizzle-orm'
 import { db, getInsertId, schema } from '../db/index.js'
 import { now } from '../utils/response.js'
 import { getActiveConfig, getConfigById } from './ai.js'
-import { getVideoAdapter } from './adapters/registry'
+import { videoCapabilities } from './adapters/registry'
 import { loadEpisodeKeyframes, type StoryboardKeyframeState } from './keyframes.js'
 import {
   buildStoryboardVideoRequest,
@@ -20,8 +25,9 @@ import {
   submitStoryboardVideo,
   type StoryboardVideoRequest,
 } from './storyboard-video.js'
+import { isActiveTaskStatus, isH3JobsTask } from './sys-task.js'
+import { cancelVideoTask } from './h3-jobs.js'
 import { blockingIssuesFor, checkStoryboardRefs, describeIssues } from './storyboard-assets.js'
-import { isActiveTaskStatus } from './sys-task.js'
 import { logTaskError, logTaskProgress, logTaskStart, logTaskSuccess, logTaskWarn } from '../utils/task-logger.js'
 import { transitionStatus } from './transition.js'
 import { scopeFromPreview, type BatchScope } from './batch-scope.js'
@@ -47,7 +53,7 @@ export interface VideoBatchStatus {
   current_storyboard_id: number | null
   created_at: string
   updated_at: string
-  /** 已请求停止：不再提交新的镜头，在跑的那一镜等它跑完后批次转为 cancelled */
+  /** 已请求停止：不再提交新的镜头；并发批次另取消仍在排队的镜头。运行中的跑完后批次转为 cancelled */
   cancel_requested: boolean
   items: VideoBatchItem[]
   scope: BatchScope
@@ -59,6 +65,8 @@ interface BatchOptions {
   /** 停止请求随批次持久化：重启恢复后仍然生效 */
   cancelRequested?: boolean
   scope?: BatchScope
+  /** 并发驱动（h3-jobs 队列）：启动时按配置冻结，重启恢复沿用同一驱动方式 */
+  parallel?: boolean
 }
 
 /** 单镜等待上限：生成链路自身已有界（等待引擎 30 分钟 + 轮询 50 分钟），这里留出余量兜底 */
@@ -149,7 +157,7 @@ export async function getEpisodeVideoBatch(episodeId: number): Promise<VideoBatc
   return latest ? toStatus(latest) : null
 }
 
-/** 停止：只是不再提交新的镜头；在跑的那一镜继续跑完，之后批次转为 cancelled */
+/** 停止：不再提交新的镜头；并发批次还会取消仍在排队的镜头。运行中的继续跑完，之后批次转为 cancelled */
 export async function cancelEpisodeVideoBatch(episodeId: number): Promise<VideoBatchStatus> {
   const running = await loadRunningBatch(episodeId)
   if (!running) throw new Error('本集没有正在运行的批量视频任务')
@@ -158,9 +166,12 @@ export async function cancelEpisodeVideoBatch(episodeId: number): Promise<VideoB
     .set({ options: JSON.stringify({ ...options, cancelRequested: true }), updatedAt: now() })
     .where(eq(schema.videoBatches.id, running.id))
   logTaskWarn('VideoBatch', 'cancel', { batchId: running.id, episodeId })
-  // 没有 runner 在驱动（runner 异常退出）时直接落盘 cancelled，避免批次永远占着本集的互斥位；
-  // 否则由 runner 在当前镜头结束后的下一轮落盘 cancelled
-  if (!activeRunners.has(running.id)) await setBatchStatus(running.id, 'cancelled')
+  // 批次项只由 runner 写：停止请求在 runner 的下一拍生效。没有 runner 在驱动（异常退出）时：
+  // 并发批次拉起 runner 去取消排队项并收尾；串行批次直接落盘 cancelled，避免永远占着本集的互斥位
+  if (!activeRunners.has(running.id)) {
+    if (options.parallel) void runParallelBatch(running.id)
+    else await setBatchStatus(running.id, 'cancelled')
+  }
   const row = await loadBatch(running.id)
   return toStatus(row!)
 }
@@ -372,9 +383,10 @@ export async function startEpisodeVideoBatch(
   const configId = opts.configId ?? episode.videoConfigId ?? undefined
   const config = configId ? (await getConfigById(configId)) ?? await getActiveConfig('video') : await getActiveConfig('video')
   if (!config) throw new Error('未配置视频模型，请先到「设置」页添加并启用 AI 服务')
-  if (!getVideoAdapter(config.provider).supportsFrameGuides) {
+  if (!videoCapabilities(config.provider).supportsFrameGuides) {
     throw new Error(`当前视频模型不支持关键帧引导（${config.provider}），请改用 MiniMax-H3 等支持的模型`)
   }
+  const parallel = isH3JobsTask(config.provider)
 
   const items: VideoBatchItem[] = targets.map(sb => ({
     storyboard_id: sb.id,
@@ -388,7 +400,7 @@ export async function startEpisodeVideoBatch(
   const res = await db.insert(schema.videoBatches).values({
     episodeId,
     status: 'running',
-    options: JSON.stringify({ model: opts.model, configId: opts.configId, scope }),
+    options: JSON.stringify({ model: opts.model, configId: opts.configId, scope, parallel }),
     items: JSON.stringify(items),
     createdAt: ts,
     updatedAt: ts,
@@ -399,8 +411,10 @@ export async function startEpisodeVideoBatch(
     episodeId,
     total: items.length,
     model: opts.model || undefined,
+    parallel,
   })
-  void runBatch(batchId)
+  if (parallel) void runParallelBatch(batchId)
+  else void runBatch(batchId)
   const row = await loadBatch(batchId)
   return toStatus(row!)
 }
@@ -443,16 +457,27 @@ async function waitForTask(taskId: number): Promise<{ ok: boolean; error: string
     // 与 generation.ts 的轮询同一写法（tsconfig target ES2022 不含 Promise.withResolvers 的类型）
     await new Promise(resolve => setTimeout(resolve, ITEM_POLL_INTERVAL_MS))
     const [task] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, taskId))
-    if (!task) return { ok: false, error: '生成任务记录丢失' }
-    if (task.status === 'completed') return { ok: true, error: null }
-    if (task.status === 'failed') return { ok: false, error: task.errorMsg || '生成失败' }
+    const outcome = taskOutcome(task)
+    if (outcome) return outcome
     if (Date.now() > deadline) return { ok: false, error: '等待生成超时' }
   }
 }
 
 /**
+ * sys_task → 批次项结局；仍活跃返回 null。单镜被用户取消的任务按 failed + 「已取消」记
+ * （不新增项状态枚举），批次继续其它镜，失败重试会把它带上。
+ */
+function taskOutcome(task: typeof schema.sysTask.$inferSelect | undefined): { ok: boolean; error: string | null } | null {
+  if (!task) return { ok: false, error: '生成任务记录丢失' }
+  if (task.status === 'completed') return { ok: true, error: null }
+  if (task.status === 'failed') return { ok: false, error: task.errorMsg || '生成失败' }
+  if (task.status === 'cancelled') return { ok: false, error: '已取消' }
+  return null
+}
+
+/**
  * sys_task 置为 completed 与把视频写回 storyboards.video_url 是两条语句（generation.ts handleVideoComplete），
- * 中间有一次 await。下一镜承接时要读上一镜的采用视频，这里等这一镜的产物真正落到分镜上再推进。
+ * 中间有一次 await。这里等这一镜的产物真正落到分镜上再把该项记为完成，批次进度与分镜视频保持一致。
  * 判定以任务终态为主（调用前已终态）、`video_url === 任务 local_path` 为辅：镜头本来就有旧视频时，
  * 只看“非空”会立刻返回，重生成场景下等于没等。用户中途手动切换采用版本时由超时兜底。
  */
@@ -473,7 +498,7 @@ async function waitForAdoptedVideo(taskId: number, storyboardId: number): Promis
   }
 }
 
-/** 串行驱动一个批次直到完成/取消；进程内同一批次只有一个 runner */
+/** 串行驱动一个批次直到完成/取消（非队列 provider）；进程内同一批次只有一个 runner */
 async function runBatch(batchId: number): Promise<void> {
   if (activeRunners.has(batchId)) return
   activeRunners.add(batchId)
@@ -534,7 +559,7 @@ async function runBatch(batchId: number): Promise<void> {
           const result = await waitForTask(taskId)
           item.state = result.ok ? 'completed' : 'failed'
           item.error = result.error
-          // 等这一镜的新视频写回分镜后再推进，下一镜承接读到的才是刚生成的那条
+          // 等这一镜的新视频写回分镜后再推进，该项「已完成」与分镜上的视频一致
           if (result.ok) await waitForAdoptedVideo(taskId, item.storyboard_id)
         } catch (err) {
           item.state = 'failed'
@@ -568,20 +593,135 @@ async function runBatch(batchId: number): Promise<void> {
   }
 }
 
-/** 启动时恢复被重启打断的批次：状态仍为 running 的批次继续跑，中断的那一镜重新提交 */
+/**
+ * 并发驱动（h3-jobs 队列）：按镜号依次组装并提交全部待生成镜头，每提交一镜立即落盘 task_id；
+ * 之后每拍把 sys_task 状态折算到批次项。项只由本 runner 写（停止接口只改 options）。
+ * 停止：不再提交新镜，并取消 sys_task 仍在排队的镜头；运行中的跑完后批次转 cancelled。
+ */
+async function runParallelBatch(batchId: number): Promise<void> {
+  if (activeRunners.has(batchId)) return
+  activeRunners.add(batchId)
+  try {
+    for (;;) {
+      const row = await loadBatch(batchId)
+      if (!row || row.status !== 'running') return
+      const items = parseItems(row.items)
+
+      // 提交：每镜之前重新读停止标记，提交成功立刻落盘 task_id（重启后据此续跟、不重复提交）
+      for (const item of items) {
+        if (item.state !== 'pending') continue
+        const fresh = await loadBatch(batchId)
+        if (!fresh || fresh.status !== 'running' || parseOptions(fresh.options).cancelRequested) break
+        const blocked = await videoBlockReason(
+          (await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, item.storyboard_id)))[0]!,
+          await loadEpisodeKeyframes(row.episodeId),
+        )
+        if (blocked) {
+          item.state = 'skipped'
+          item.error = `分镜 #${item.storyboard_number} ${blocked}`
+        } else {
+          try {
+            item.task_id = await submitStoryboardVideo(item.storyboard_id, parseOptions(row.options))
+            item.state = 'running'
+            item.error = null
+            logTaskProgress('VideoBatch', 'shot submit', {
+              batchId, storyboardId: item.storyboard_id, shotNumber: item.storyboard_number, taskId: item.task_id,
+            })
+          } catch (err) {
+            item.state = 'failed'
+            item.error = err instanceof Error ? err.message : '生成失败'
+            logTaskError('VideoBatch', 'shot', {
+              batchId, storyboardId: item.storyboard_id, shotNumber: item.storyboard_number, error: item.error,
+            })
+          }
+        }
+        await saveItems(batchId, items)
+      }
+
+      // 停止：取消仍在排队（sys_task queued）的镜头；运行中的跑完
+      const cancelRequested = parseOptions((await loadBatch(batchId))?.options).cancelRequested
+      if (cancelRequested) {
+        for (const item of items) {
+          if (item.state !== 'running' || item.task_id == null) continue
+          const [task] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, item.task_id))
+          if (task?.status !== 'queued') continue
+          await cancelVideoTask(item.task_id).catch(err => {
+            logTaskWarn('VideoBatch', 'cancel queued shot failed', {
+              batchId, taskId: item.task_id, error: err instanceof Error ? err.message : String(err),
+            })
+          })
+        }
+      }
+
+      // 跟踪：sys_task 终态 → 批次项。running 却没有 task_id 只会出现在「提交途中重启」：退回 pending 重新提交
+      for (const item of items) {
+        if (item.state !== 'running') continue
+        if (item.task_id == null) {
+          item.state = 'pending'
+          continue
+        }
+        const [task] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, item.task_id))
+        const outcome = taskOutcome(task)
+        if (!outcome) continue
+        if (outcome.ok) await waitForAdoptedVideo(item.task_id, item.storyboard_id)
+        item.state = outcome.ok ? 'completed' : 'failed'
+        item.error = outcome.error
+        if (outcome.ok) logTaskSuccess('VideoBatch', 'shot', { batchId, storyboardId: item.storyboard_id, taskId: item.task_id })
+        else logTaskError('VideoBatch', 'shot', { batchId, storyboardId: item.storyboard_id, taskId: item.task_id, error: item.error })
+      }
+      await saveItems(batchId, items)
+
+      if (!items.some(item => item.state === 'running')) {
+        if (cancelRequested) {
+          await setBatchStatus(batchId, 'cancelled')
+          logTaskWarn('VideoBatch', 'batch cancelled', { batchId, episodeId: row.episodeId })
+          return
+        }
+        if (!items.some(item => item.state === 'pending')) {
+          await setBatchStatus(batchId, 'done')
+          logTaskSuccess('VideoBatch', 'batch', {
+            batchId,
+            episodeId: row.episodeId,
+            completed: items.filter(item => item.state === 'completed').length,
+            failed: items.filter(item => item.state === 'failed').length,
+            skipped: items.filter(item => item.state === 'skipped').length,
+          })
+          return
+        }
+      }
+      await sleep(ITEM_POLL_INTERVAL_MS)
+    }
+  } catch (err) {
+    logTaskError('VideoBatch', 'batch', { batchId, error: err instanceof Error ? err.message : String(err) })
+    // runner 异常退出：转为 cancelled，释放本集互斥位（已提交的镜头由追踪器继续跟完）
+    await setBatchStatus(batchId, 'cancelled').catch(() => {})
+  } finally {
+    activeRunners.delete(batchId)
+  }
+}
+
+/**
+ * 启动时恢复被重启打断的批次：状态仍为 running 的批次按启动时冻结的驱动方式继续。
+ * 并发批次按落盘的 task_id 续跟（任务由 h3-jobs 追踪器继续推进），不重复提交；
+ * 串行批次被中断的那一镜重新提交（其任务已被启动清扫判失败）。
+ */
 export async function resumeVideoBatches(): Promise<void> {
   try {
     const rows = await db.select().from(schema.videoBatches)
       .where(eq(schema.videoBatches.status, 'running'))
     for (const row of rows) {
-      const interrupted = parseItems(row.items).find(item => item.state === 'running')
+      const parallel = !!parseOptions(row.options).parallel
+      const interrupted = parseItems(row.items).filter(item => item.state === 'running')
       logTaskProgress('VideoBatch', 'resume', {
         batchId: row.id,
         episodeId: row.episodeId,
-        // 上游可能仍在跑同一镜，这里接受重复生成
-        resubmitStoryboardId: interrupted?.storyboard_id ?? null,
+        parallel,
+        ...(parallel
+          ? { trackedTaskIds: interrupted.map(item => item.task_id) }
+          : { resubmitStoryboardId: interrupted[0]?.storyboard_id ?? null }),
       })
-      void runBatch(row.id)
+      if (parallel) void runParallelBatch(row.id)
+      else void runBatch(row.id)
     }
   } catch (err) {
     logTaskError('VideoBatch', 'resume', { error: err instanceof Error ? err.message : String(err) })

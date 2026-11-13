@@ -35,7 +35,7 @@
 `scope` 默认 `recent`（进行中 ∪ 最近 7 天）；`page_size` ≤ 200。
 
 ### `GET /tasks/{id}` [R]
-用途：单任务详情、失败原因、`params`、`remote_state`、`elapsed_ms`、`cancellable`。
+用途：单任务详情、失败原因、`params`、`remote_state`、`elapsed_ms`、`cancellable`。视频配置为 `h3-jobs` 队列（Issue #100）时，`remote_state` 与图片 qwen-jobs 同形：`remote_status`、`queue{position,length,estimated_start_seconds}`（仅排队中）、`progress{phase:encoding|loading|sampling|decoding|saving, step, total_steps, fraction, elapsed_seconds, remaining_seconds}`（仅运行中）、`estimate{run_seconds, basis:measured|scaled|default, samples, duration_key}`、`estimated_finish_seconds`、`cancel_requested`；`cancellable:true`。
 
 ### `GET /tasks/{id}/observations?work_id=&cursor=&limit=&with_messages=&message_limit=` [R]（tasks 1281–1285；65 条调用完整分页）
 用途：回看任务的持久工作项与实际模型调用。`cursor` 是上一页最后一个调用的 `id`，不是分镜序号；`work_id` 可缩小到某个工作项，`limit` 默认 50、钳 1–200；任务不存在时返回 400（不是 404）。
@@ -386,7 +386,7 @@ Body：`{expected_revision,brief?,map_spec?,mode?}`，至少一个可保存字�
 
 ---
 
-## 4. Poster（S3，可选旁路，在资产之后）
+## 4. Poster（S3，资产之后的旁路步骤：不阻塞分镜；纪录片必做、不可 waiver，#101）
 
 **当前契约是 `layer_doc` + 服务端渲染（Issue #39/#72，`backend/src/routes/posters.ts`、`services/posters.ts:4-8`）**：编辑工程里的旧 `layout:{texts:[...]}` 已不再读写；文字排版合成图由服务端从 `layer_doc` 渲染，**不需要**浏览器 canvas，也不需要先 `POST /upload/image` 再登记。api-production.md §4/§6B 里「本地渲染 PNG → 上传 → 带 `image` 登记版本」的做法属于 2026-11-02 历史快照，已不可执行。
 本节字段按当前源码核对，未在殷墟/八达岭两轮调用过，一律 `[S]`。
@@ -673,7 +673,7 @@ Body：`{mode:"pad"|"tempo", pad_ms:0–3000, pad_position:"head"|"tail", tempo_
 ### `POST /episodes/{e}/generate-video-prompts` [R]
 Body：`{storyboard_ids?, config_id?, model?}`；把已定分镜写成时间段动作/运镜/表演，不重拆镜头。
 ### `GET /episodes/{e}/video-prompts-status` [R]
-（S9 其余端点：批量 `/episodes/{e}/video-batch*`；单镜 `/storyboards/{id}/generate-video`；估计 `/video-queue/estimate`。）
+（S9 其余端点：批量 `/episodes/{e}/video-batch*`；单镜 `/storyboards/{id}/generate-video`；估计 `/video-queue/estimate`；队列概览 `/video-queue/overview`；取消 `POST /tasks/{id}/cancel`。）
 
 ### Agent 工具 `read_storyboard_context` 的 `locked_frames`（Issue #95）[S]
 每镜新增 `locked_frames: [{slot:"first"|"last", source:"layer_last"|"layer_first", base:{kind:"asset",asset_kind,asset_id,name}|{kind:"inherit_prev"}|null, framing:"full"|"crop"|"contain"|"zoomed", caption, caption_note?}]`：
@@ -691,11 +691,20 @@ Body：`{storyboard_ids?, config_id, model}`
 ### `POST /episodes/{e}/video-batch` [R]
 Body：`{storyboard_ids:[...], config_id, model}`；必须来自预览勾选；逐镜复查，变为阻断的标 `skipped` 并继续。
 ### `GET /episodes/{e}/video-batch`、`POST …/cancel`、`POST …/retry-failed` [R/S]
-注意：停止只是不再提交新镜头，在跑的那一镜跑完才转 `cancelled`。重试新建任务，不重跑已成功项。
+两种驱动（启动时按视频配置冻结在 `options.parallel`）：
+- `h3-jobs` 队列（Issue #100）：勾选镜头逐个组装（含转场审核）后**一次性提交**，每提交一镜立即落盘 `task_id`，由队列调度双卡；重启按落盘 `task_id` 续跟、**不重复提交**。停止 = 不再提交新镜 + 取消 sys_task 仍是 `queued` 的镜，运行中的跑完后批次转 `cancelled`；被取消的项记 `state:'failed', error:'已取消'`，`retry-failed` 会带上。
+- 其它 provider（comfyui 直连 / minimax / volcengine）：逐镜串行；停止只是不再提交新镜头，在跑的那一镜跑完才转 `cancelled`。
+重试新建任务，不重跑已成功项。依据：同批次镜头输入互不依赖（承接镜首帧取上一镜**尾帧关键帧图**，转场审核只读上一镜关键帧与提示词，都不读上一镜视频）。
 ### `POST /storyboards/{id}/generate-video` [S/R]
 Body：`{config_id?, model?}`；单镜生成。要求关键帧已确认且 `video_prompt` 无阻断问题；模型不支持关键帧引导时直接 400。
-### `GET /video-queue/estimate?config_id=&model=&duration=` [R]
-返回中位数墙钟估计（含排队/上传/扩写/下载），文案必须是「预计/用时」，不是渲染耗时。
+### `POST /tasks/{id}/cancel`（视频）[S]
+`h3-jobs` 视频任务可取消（Issue #100）：排队中立即 `cancelled`；运行中先 `cancel_requested:true`（UI「取消中」），队列中断引擎后 `cancelled`；取消后迟到的成片**绝不**写回分镜。其它视频 provider 返回 400「该供应商不支持取消」。
+### `GET /video-queue/estimate?config_id=&model=&duration=[&resolution=&aspect=&references=]` [R]
+- 本地样本 provider（comfyui 直连 / minimax）：近 30 天本机墙钟中位数（含排队/上传/扩写/下载），文案必须是「预计/用时」，不是渲染耗时。
+- `h3-jobs`（Issue #100）：问队列 `GET /v1/estimate`，`duration` 按提交口径取 4–15 整数秒、尺寸由 `resolution+aspect` 算、`references>0` 即参考图模式；返回 `{supported:true, provider:'h3-jobs', duration, duration_key, run_seconds, samples, basis:'measured'|'scaled'|'default', queue_wait_seconds, estimated_finish_seconds}`。`duration_key = floor(时长+0.5)`（5.4→5、5.5→6）由队列给出，火宝不重算；队列不可达 → `supported:false`。
+### `GET /video-queue/overview?config_id=` [R]（Issue #100）
+返回 `{available:true, counts{running,queued}, workers{total,idle,busy,offline}, estimated_wait_seconds, mine{running[],queued[]}}`：`counts/workers` 是**队列整体**（含 vidgen studio 等其它客户端），`mine[]` 只列火宝自己的条目并附 `sys_task_id/storyboard_id`；其它客户端只计数不给明细。非队列配置 `{available:false, reason:'not_queue'}`，队列不可达 `{available:false, reason:'unreachable'}`。
+背景：.102 两张卡（4090D + 3090）由 h3-central 队列统一调度，火宝透明使用；用户要求视频像图片一样显示「谁在生成（进度）/谁在排队（第几位、预计开始与完成）」，预估按时长四舍五入到秒分桶的实测均值由队列计算。
 ### 视频版本 [S]
 `GET /storyboards/{id}/video/versions`（按内容签名编号，`describeSignatureDiff` 给变化分项）。
 

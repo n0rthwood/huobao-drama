@@ -270,7 +270,16 @@
       "noReason": "无原因说明",
       "retry": "重试",
       "cancelRequested": "已请求取消",
-      "cancelFailed": "取消失败"
+      "cancelFailed": "取消失败",
+      "phaseStep": "{phase} · 第 {step}/{total} 步",
+      "finishIn": "预计 {time} 后完成",
+      "phase": {
+        "encoding": "编码",
+        "loading": "加载模型",
+        "sampling": "采样",
+        "decoding": "解码",
+        "saving": "保存"
+      }
     }
   },
   "layout": {
@@ -2059,7 +2068,24 @@
       "etaFallback": "预计约 {time}（{n} 次实测 · 来源 {model}）",
       "etaNone": "暂无预估",
       "elapsedUsed": "已用 {time}",
-      "elapsedTook": "用时 {time}"
+      "elapsedTook": "用时 {time}",
+      "confirmQueueNote": "勾选镜头依次组装后一次性提交到视频队列，由队列调度两张卡并行生成；关键帧作为首/中/尾引导帧。生成在服务端进行，可以关闭页面。停止批量会取消仍在排队的镜头，正在生成的会跑完",
+      "etaQueue": "队列预计生成 {time}（{basis} · {n} 个样本 · {key} 秒档）· 现在提交约等 {wait}",
+      "etaBasis": {
+        "measured": "实测均值",
+        "scaled": "按相近时长换算",
+        "default": "默认先验"
+      },
+      "queueTitle": "视频生成队列",
+      "queueSummary": "本集 生成中 {running} · 排队 {queued}",
+      "queueEta": "预计全部完成 {time}",
+      "queueProgress": "整体进度 {percent}%",
+      "queueOverall": "队列整体 运行 {running} · 排队 {queued} · 空闲卡 {idle}/{total}",
+      "queueOverallHint": "队列整体含其它应用（如 vidgen studio）的任务，只计数不显示明细",
+      "queueWait": "新任务预计等待 {time}",
+      "queueNoWait": "无需等待",
+      "taskCancelRequested": "已请求取消该视频任务",
+      "taskCancelFailed": "取消视频任务失败"
     },
     "kf": {
       "slotFirst": "首帧",

@@ -7,6 +7,7 @@ import { WORKBENCH_CTX } from '~/utils/workbenchSteps'
 import { batchScopeOf } from '~/utils/documentaryFinal'
 import DocumentaryFinalShot from '~/components/DocumentaryFinalShot.vue'
 import BatchScopeDialog from '~/components/BatchScopeDialog.vue'
+import VideoQueueBar from '~/components/VideoQueueBar.vue'
 import { toast } from 'vue-sonner'
 import { DEEPLINK_KEYS, deeplinkInitial, queryIdList, querySingle, useDeeplink } from '~/composables/useQuerySync'
 const ctx = inject(WORKBENCH_CTX)
@@ -115,6 +116,7 @@ onBeforeUnmount(() => clearInterval(timer))
       <details><summary>{{ t('episode.narration.section') }}</summary><label v-if="voiceSettings">{{ t('episode.final.voice') }}<input v-model="voiceSettings.voice" class="input" /></label><button class="btn btn-sm" @click="ctx.narrationSettingsOpen.value = true">{{ t('episode.final.settings') }} ↗</button></details>
     </div>
     <p v-if="error" class="final-error">{{ error }}</p>
+    <VideoQueueBar :tasks="ctx.activeVideoTasks.value" :config-id="ctx.selectedVideoConfig.value?.id ?? null" />
     <div v-for="kind in kinds" :key="kind" class="final-batch-status">
       <template v-if="batchScopeOf(statuses[kind])">{{ t(`episode.final.batch.${kind}`) }} · {{ statuses[kind].status || statuses[kind].state }} · {{ t('episode.final.scope', { included: batchScopeOf(statuses[kind]).included.length, excluded: batchScopeOf(statuses[kind]).excluded.length }) }}</template>
     </div>

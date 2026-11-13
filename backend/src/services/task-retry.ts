@@ -13,7 +13,7 @@ import { buildAgentRequestContext } from '../agents/context.js'
 import { runAgent } from '../agents/run.js'
 import { createReasoningSink } from '../agents/reasoning-sink.js'
 import { getActiveConfig, getConfigById, validateVideoModel, type AIConfig } from './ai.js'
-import { getVideoAdapter } from './adapters/registry.js'
+import { videoCapabilities } from './adapters/registry.js'
 import { generateImage, generateVideo } from './generation.js'
 import { renderRefPrompt } from './task-center.js'
 import { LAYER_SEGMENT_PROVIDER, startLayerSegmentRenderTask, storyboardIdOfSegmentTask } from './layer-segment-task.js'
@@ -156,9 +156,9 @@ async function retryVideo(row: SysTaskRow, opts: RetryOptions): Promise<number> 
   const modelError = validateVideoModel(config.provider, model || config.model)
   if (modelError) throw new Error(modelError)
 
-  const adapter = getVideoAdapter(config.provider)
+  const capabilities = videoCapabilities(config.provider)
   const usesFrameGuides = !!(params.firstFrameUrl || params.lastFrameUrl || params.midFrameUrl || params.imageUrl)
-  if (usesFrameGuides && !adapter.supportsFrameGuides) {
+  if (usesFrameGuides && !capabilities.supportsFrameGuides) {
     throw new Error(`当前视频模型不支持关键帧引导（${config.provider}），请改用 MiniMax-H3 等支持的模型`)
   }
 
@@ -172,8 +172,8 @@ async function retryVideo(row: SysTaskRow, opts: RetryOptions): Promise<number> 
     imageUrl: params.imageUrl,
     firstFrameUrl: params.firstFrameUrl,
     // 中间帧引导只有部分模型支持：换到不支持的模型时只发首尾帧（与组装链路同口径）
-    midFrameUrl: adapter.supportsMidFrameGuide ? params.midFrameUrl : undefined,
-    midFrameTime: adapter.supportsMidFrameGuide ? params.midFrameTime : undefined,
+    midFrameUrl: capabilities.supportsMidFrameGuide ? params.midFrameUrl : undefined,
+    midFrameTime: capabilities.supportsMidFrameGuide ? params.midFrameTime : undefined,
     lastFrameUrl: params.lastFrameUrl,
     referenceImageUrls: params.referenceImageUrls,
     referenceVideoUrls: params.referenceVideoUrls,

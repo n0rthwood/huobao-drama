@@ -18,6 +18,7 @@ import RefIssueList from '~/components/RefIssueList.vue'
 import ShotFusionPanel from '~/components/ShotFusionPanel.vue'
 import TargetAssetList from '~/components/TargetAssetList.vue'
 import DocumentaryFinalPanel from '~/components/DocumentaryFinalPanel.vue'
+import VideoQueueBar from '~/components/VideoQueueBar.vue'
 import { mediaUrl } from '~/utils/url'
 import { posterOf } from '~/composables/useMedia'
 import { WORKBENCH_CTX } from '~/utils/workbenchSteps'
@@ -139,6 +140,10 @@ const {
   videoPromptIssues,
   videoRightW,
   videoRing,
+  isVideoCancellable,
+  cancelVideoTask,
+  activeVideoTasks,
+  selectedVideoConfig,
   videoSelectMode,
   videoTargetAssets,
   videoTargetLead,
@@ -204,6 +209,7 @@ function hasLayerSegment(sb) {
     <span>{{ t('episode.kf.gateBanner', { done: keyframesConfirmedCount, total: sbs.length }) }}</span>
     <button class="btn btn-sm ml-auto" @click="prodTab = isDocumentaryProject ? 'production' : 'keyframes'">{{ t('episode.kf.gateGoto') }}</button>
   </div>
+  <VideoQueueBar :tasks="activeVideoTasks" :config-id="selectedVideoConfig?.id ?? null" />
   <div v-if="videoBatchVisible" :class="['video-batch-banner', { 'is-running': videoBatchRunning }]">
     <span class="video-batch-state">{{ t('episode.vid.batchBannerTitle') }} · {{ videoBatchStatusLabel }}</span>
     <span class="video-batch-sep">·</span>
@@ -289,7 +295,7 @@ function hasLayerSegment(sb) {
           <div v-else class="video-task-empty">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
           </div>
-          <ProgressRing v-if="videoRing(task.storyboard)" v-bind="videoRing(task.storyboard)" class="video-task-ring" compact :size="22" />
+          <ProgressRing v-if="videoRing(task.storyboard)" v-bind="videoRing(task.storyboard)" class="video-task-ring" compact detailed :size="22" />
           <span class="video-task-index">#{{ String(task.index + 1).padStart(2, '0') }}</span>
         </div>
         <div class="video-task-main">
@@ -423,7 +429,7 @@ function hasLayerSegment(sb) {
               class="video-player-video"
             />
             <div v-else class="video-player-empty">
-              <ProgressRing v-if="videoRing(selectedSb)" v-bind="videoRing(selectedSb)" compact :size="42" />
+              <ProgressRing v-if="videoRing(selectedSb)" v-bind="videoRing(selectedSb)" compact detailed :size="42" />
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
               <div class="video-player-empty-copy">
                 <div class="video-player-empty-title">{{ videoTaskState(selectedSb) === 'pending' ? t('episode.vid.emptyGenerating') : t('episode.vid.emptyNoVideo') }}</div>
@@ -714,6 +720,15 @@ function hasLayerSegment(sb) {
               <div class="video-param-hint">{{ t('episode.inspector.durationHint') }}</div>
               <div v-if="narrationEnabledOf" class="video-param-hint">{{ t('episode.compose.durationNote') }}</div>
             </section>
+            <ProgressRing
+              v-if="videoRing(selectedSb)"
+              v-bind="videoRing(selectedSb)"
+              class="video-footer-ring"
+              detailed
+              :size="28"
+              :cancellable="isVideoCancellable(selectedSb)"
+              @cancel="cancelVideoTask(selectedSb)"
+            />
             <div class="video-eta-line" :title="videoEtaLine">{{ videoEtaLine }}</div>
           </template>
           <button

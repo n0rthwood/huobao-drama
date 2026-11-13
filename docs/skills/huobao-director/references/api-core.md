@@ -245,8 +245,8 @@ data：`{episode_id, steps:{script_rewrite, extract_characters, extract_scenes, 
   - 响应 201 = 新 sys_task 行（serializeTask：snake，含 `remote_state` 解析结果与 `cancellable`；不含 request/config_id/idempotency_key/cancel_pending）。
 - **POST /tasks/register-upload** `{asset_type:'character|scene|prop', asset_id, local_path(须 static/ 前缀), source?:'media-library', copied_from?}`：把上传/库选图登记为资产当前图并纳入版本历史（写 image_url/local_path，场景另置 status='completed'）。data：`{id, local_path}`。
 - **POST /tasks/:id/retry** `{config_id?, model?}` **[授权要求]**：一律新建任务（提示词不可改），可能覆盖下游产物。响应 201 新任务。
-- **POST /tasks/:id/cancel** **[授权要求]**：仅 qwen-jobs 图片任务支持；其它供应商 400。
-- **DELETE /tasks/:id** **[授权要求·删记录]**：丢弃任务行；qwen-jobs 远端任务一并取消并清理文件。
+- **POST /tasks/:id/cancel** **[授权要求]**：qwen-jobs 图片任务与 h3-jobs 视频任务（Issue #100）支持；排队中立即取消，运行中先 `cancel_requested` 再由服务端收尾；取消后不写回结果。其它供应商 400。
+- **DELETE /tasks/:id** **[授权要求·删记录]**：丢弃任务行；qwen-jobs / h3-jobs 远端任务一并取消并清理文件。
 
 ## 13. 队列估计
 
@@ -254,9 +254,13 @@ data：`{episode_id, steps:{script_rewrite, extract_characters, extract_scenes, 
 仅 qwen-jobs 类配置支持（其它返回 `{supported:false}`）。模式推导：无参考=text_to_image；有参考+指定画幅=reference_to_image（关键帧）；只有参考=image_edit（FLUX 配置按 reference_to_image 1024²）。
 data：`{supported:true, per_image_seconds, basis, queue_wait_seconds, online_workers, total_seconds(=queue_wait+⌈count/在线卡⌉×单张；卡全离线为 null)}`。
 
-### 视频 — GET /video-queue/estimate?config_id=&model=&duration= — `backend/src/routes/videoQueue.ts`
-`duration`（秒）必为正数。样本 = 近 30 天本机 completed 视频任务墙钟耗时（comfyui/minimax 有本地样本）。model 必须属于该配置的模型列表，否则回退首个。
+### 视频 — GET /video-queue/estimate?config_id=&model=&duration=[&resolution=&aspect=&references=] — `backend/src/routes/videoQueue.ts`
+`duration`（秒）必为正数。本地样本 provider（comfyui/minimax）：样本 = 近 30 天本机 completed 视频任务墙钟耗时；model 必须属于该配置的模型列表，否则回退首个。
 data（VideoEstimate，video-estimate.ts:21-30）精确为 `{supported, provider, requested_model, source_model(借同 provider 其它模型样本时非 null), duration, run_seconds(中位数估计；无样本 null), samples, basis:'model-duration'|'model-scaled'|'fallback-model'|'none'}`。
+`h3-jobs` 队列配置（Issue #100）改由队列估计：额外字段 `duration_key, queue_wait_seconds, estimated_finish_seconds`，`basis:'measured'|'scaled'|'default'`；`duration` 为提交口径（4–15 整数秒）。队列不可达 `supported:false`。
+
+### 视频队列概览 — GET /video-queue/overview?config_id= — `backend/src/routes/videoQueue.ts`
+仅 h3-jobs 配置可用：`{available, counts{running,queued}, workers{total,idle,busy,offline}, estimated_wait_seconds, mine{running[],queued[]}}`（`mine` 条目附 `sys_task_id/storyboard_id`）；否则 `{available:false, reason}`。
 
 ### 存储位置 — GET /storage — `backend/src/routes/storage.ts`（挂载 index.ts:86，只读）
 无参数。设置页「存储位置」卡片数据源。data：
@@ -414,10 +418,11 @@ dramas.ts、episodes.ts、characters.ts、scenes.ts、props.ts、asset-reextract
 | POST /tasks | §12 | A | tasks.ts + services/generation.ts（video 体 zod schema 在 tasks.ts 内） |
 | POST /tasks/register-upload | §12 | S | tasks.ts |
 | POST /tasks/:id/retry | §12 | A | tasks.ts + services/task-retry.ts |
-| POST /tasks/:id/cancel | §12 | A | tasks.ts + services/qwen-jobs.ts |
+| POST /tasks/:id/cancel | §12 | A | tasks.ts + services/qwen-jobs.ts（图片）/ services/h3-jobs.ts（视频） |
 | DELETE /tasks/:id | §12 | A | 同上 |
 | GET /image-queue/estimate | §13 | S | imageQueue.ts + services/adapters/qwen-jobs-client.ts |
-| GET /video-queue/estimate | §13 | S | videoQueue.ts + services/video-estimate.ts |
+| GET /video-queue/estimate | §13 | S | videoQueue.ts + services/video-estimate.ts / adapters/h3-jobs-client.ts |
+| GET /video-queue/overview | §13 | S | videoQueue.ts + adapters/h3-jobs-client.ts |
 | GET /storage | §13 | S | storage.ts + utils/dirsize.ts（挂载 index.ts:86） |
 | GET /ai-configs | §14 | R | aiConfigs.ts（发现入口实测） |
 | POST /ai-configs | §14 | A | aiConfigs.ts + services/ai.ts |

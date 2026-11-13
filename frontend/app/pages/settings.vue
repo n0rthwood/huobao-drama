@@ -839,13 +839,14 @@ const serviceTypes = computed(() => [
   { type: 'video', label: t('common.serviceType.video') },
   { type: 'tts', label: t('common.serviceType.tts') },
 ])
-const providers = ['gemini', 'openai', 'volcengine', 'minimax', 'comfyui', 'qwen-jobs', 'voxcpm']
-// qwen-jobs 只服务图片；comfyui 的图片路径已下线（图片走 qwen-jobs 任务 API），只保留视频（H3）；voxcpm 只服务旁白配音
+const providers = ['gemini', 'openai', 'volcengine', 'minimax', 'comfyui', 'h3-jobs', 'qwen-jobs', 'voxcpm']
+// qwen-jobs 只服务图片；comfyui 的图片路径已下线（图片走 qwen-jobs 任务 API），只保留视频（H3）；
+// h3-jobs（h3-central 视频队列）只服务视频；voxcpm 只服务旁白配音
 const PROVIDER_EXCLUDE = {
-  text: ['qwen-jobs', 'comfyui', 'voxcpm'],
-  image: ['comfyui', 'voxcpm'],
+  text: ['qwen-jobs', 'comfyui', 'h3-jobs', 'voxcpm'],
+  image: ['comfyui', 'h3-jobs', 'voxcpm'],
   video: ['qwen-jobs', 'voxcpm'],
-  tts: ['gemini', 'openai', 'volcengine', 'minimax', 'comfyui', 'qwen-jobs'],
+  tts: ['gemini', 'openai', 'volcengine', 'minimax', 'comfyui', 'h3-jobs', 'qwen-jobs'],
 }
 const providerSelectOptions = computed(() => providers
   .filter(p => !(PROVIDER_EXCLUDE[cfgForm.service_type] || []).includes(p))
@@ -870,6 +871,8 @@ const providerPresets = {
     volcengine: { label: 'Seedance 2.0 官方', baseUrl: 'https://ark.cn-beijing.volces.com', models: ['doubao-seedance-2-0-mini-260615', 'doubao-seedance-2-0-fast-260128', 'doubao-seedance-2-0-260128'] },
     minimax: { label: 'MiniMax H3 官方', baseUrl: 'https://api.minimaxi.com', models: ['MiniMax-H3'] },
     comfyui: { label: 'ComfyUI · MiniMax H3 本地', baseUrl: 'http://127.0.0.1:8188', models: ['MiniMax-H3-ComfyUI'] },
+    // 队列地址属于部署细节，不写进预设：由本机 providers.json / 设置页填写
+    'h3-jobs': { label: 'h3-jobs · MiniMax H3 双卡任务队列', baseUrl: '', models: ['MiniMax-H3-INT8-ComfyUI', 'MiniMax-H3-FastH3-Omni-INT8'] },
   },
   tts: {
     voxcpm: { label: 'VoxCPM2 · 本地旁白配音', baseUrl: 'http://127.0.0.1:8200', models: [] },

@@ -1374,15 +1374,21 @@ export const imageQueueAPI = {
   },
 }
 
-// 视频任务耗时预估（#28）：墙钟 = 提交 → 完成，文案须称「预计完成/总耗时」
+// 视频任务耗时预估（#28）：墙钟 = 提交 → 完成，文案须称「预计完成/总耗时」；
+// h3-jobs 队列（#100）另需尺寸档位/画幅/参考图张数，估计与排队由队列给出
 export const videoQueueAPI = {
-  estimate: (params: { config_id?: number; model?: string; duration: number }) => {
+  estimate: (params: { config_id?: number; model?: string; duration: number; resolution?: string; aspect?: string; references?: number }) => {
     const query = new URLSearchParams()
     if (params.config_id) query.set('config_id', String(params.config_id))
     if (params.model) query.set('model', params.model)
     query.set('duration', String(params.duration))
+    if (params.resolution) query.set('resolution', params.resolution)
+    if (params.aspect) query.set('aspect', params.aspect)
+    if (params.references !== undefined) query.set('references', String(params.references))
     return api.get(`/video-queue/estimate?${query.toString()}`)
   },
+  // 队列概览：运行/排队/空闲卡/新任务预计等待 + 本客户端明细；非队列配置返回 available:false
+  overview: (configId?: number) => api.get(`/video-queue/overview${configId ? `?config_id=${configId}` : ''}`),
 }
 
 async function uploadReq<T = any>(path: string, file: File): Promise<T> {

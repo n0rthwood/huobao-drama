@@ -73,7 +73,7 @@ $HBWF check            # 派生 state.json，打印逐镜下一步与终检问�
 | `structural_change` | ids 或 method + path | 拆镜、建镜、删镜、改旁白 |
 | `exception` | method + path 正则，**单次有效** | 未纳管的写端点（取消、改其它字段等） |
 | `reconcile` `--call-ids/--task-ids` | — | 认领结果未知的调用、确认孤儿写入 |
-| `poster_waiver` | — | 非必需 Poster 的集决定不做（`required_poster=true` 时无效） |
+| `poster_waiver` | — | 非必需 Poster 的剧情集决定不做（`required_poster=true` 时无效；**纪录片一律拒绝**，#101） |
 
 审批类决定必须带 `--evidence`：实际打开的媒体或审核文件，记录路径与 sha256。这是**留痕**，不是“看过”的证明。所有决定都带 `--authority`（用户授权原话）与 actor，交付时按类型逐条列出。
 
@@ -94,7 +94,7 @@ $HBWF check            # 派生 state.json，打印逐镜下一步与终检问�
   - 每镜 `next=done`；
   - `storyboard_ids` 等于 canonical 顺序；
   - 按该顺序拼接的旁白等于 `script_content`（去空白与【】）；
-  - Poster 已选且审核有效（或非必需时有 waiver），`poster_version_id` 等于选定版本；
+  - Poster 已选且审核有效（或非必需的剧情集有 waiver；纪录片 `poster_policy` 恒为 `required`，#101），`poster_version_id` 等于选定版本；
   - 无在飞批次或任务；
   - 无孤儿写入，无未对账的 unknown 调用。
 - **其余写端点**默认拒绝，除非有单次 `exception` 决定。
@@ -111,7 +111,7 @@ UI 点击、浏览器操作、绕过扩展的脚本产生的写入都会显示�
 - 某镜满足前一步就能进入下一步，不必等整集。
 - 同类批次每集互斥：每集同时只能有一个视频批次、一个关键帧批次、一个提示词任务。不同类批次在镜头不重叠时可以并发，例如 A 组镜头生成视频的同时，B 组镜头出关键帧。
 - voice-batch 与 generate-video-prompts 不并发。
-- Poster 只依赖资产，可与 P6–P14 任意时间并行；必须在导出前选定并通过审核。
+- Poster 只依赖资产，可与 P6–P14 任意时间并行；必须在导出前选定并通过审核。纪录片的 Poster 是必做步骤（#101），资产审核清单完成后就开始，不得等到导出前才补。
 
 ## 失效矩阵
 
