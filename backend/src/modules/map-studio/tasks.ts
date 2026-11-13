@@ -12,9 +12,14 @@ export async function initMapStudio(platform: MapStudioPlatform): Promise<void> 
   for (const sql of MAP_STUDIO_SCHEMA) sqlite.exec(sql)
   setMapStudioPlatform(platform)
   const interrupted = sqlite.prepare("SELECT * FROM map_studio_run WHERE status = 'processing'").all() as RunRow[]
+  // 冻结到最后已持久确认的时刻：运行行只在阶段边界更新，在飞调用的心跳在观测表里；
+  // 取两者较晚者，否则墙钟会短于其中已落盘的模型调用耗时。
+  const lastHeartbeat = sqlite.prepare("SELECT MAX(heartbeat_at) AS hb FROM task_observed_work WHERE scope = 'map_studio' AND task_id = ?")
   sqlite.transaction(() => {
     for (const run of interrupted) {
-      sqlite.prepare("UPDATE map_studio_run SET status = 'interrupted', error_msg = '后端重启中断', finished_at = updated_at WHERE id = ? AND status = 'processing'").run(run.id)
+      const hb = Number((lastHeartbeat.get(run.id) as { hb: number | null } | undefined)?.hb ?? 0)
+      const frozenAt = new Date(Math.max(Date.parse(run.updated_at) || 0, hb)).toISOString()
+      sqlite.prepare("UPDATE map_studio_run SET status = 'interrupted', error_msg = '后端重启中断', finished_at = ? WHERE id = ? AND status = 'processing'").run(frozenAt, run.id)
       const row = selectTask(run.task_id)
       if (!row) continue
       const state = parseWorkflow(row.state)
@@ -23,7 +28,7 @@ export async function initMapStudio(platform: MapStudioPlatform): Promise<void> 
       state.error = '后端重启中断；已产出内容保留，请从当前步骤重新开始'
       state.revision++
       state.updated_at = now()
-      for (const step of state.steps) if (step.status === 'running') Object.assign(step, { status: 'failed', message: state.error, finished_at: run.updated_at })
+      for (const step of state.steps) if (step.status === 'running') Object.assign(step, { status: 'failed', message: state.error, finished_at: frozenAt })
       state.history = [...state.history, { revision: state.revision, at: state.updated_at, stage: state.stage, status: state.status, action: 'restart_interrupted', actor: 'system' as const, note: state.error }].slice(-30)
       updateTask(row.id, { expectedState: row.state, expectedMapSpec: row.map_spec, expectedBrief: row.brief, state: JSON.stringify(state), mapSpec: row.map_spec, brief: row.brief, updatedAt: state.updated_at })
     }
