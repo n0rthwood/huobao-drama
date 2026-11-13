@@ -12,6 +12,7 @@ import NarrationBlock from '~/components/NarrationBlock.vue'
 import ShotFusionPanel from '~/components/ShotFusionPanel.vue'
 import MentionTextarea from '~/components/MentionTextarea.vue'
 import FieldSaveStatus from '~/components/FieldSaveStatus.vue'
+import ProgressRing from '~/components/ProgressRing.vue'
 import { DEEPLINK_KEYS, querySingle, useDeeplink } from '~/composables/useQuerySync'
 const props = defineProps({ storyboard: { type: Object, required: true }, number: Number })
 const ctx = inject(WORKBENCH_CTX)
@@ -138,6 +139,14 @@ onBeforeUnmount(() => clearTimeout(flashTimer))
           </div>
           <button class="btn btn-sm" :disabled="ctx.videoPromptGeneratingIds.value.includes(sb.id)" @click="ctx.genVideoPrompt(sb)">{{ ctx.promptHeadVideoActionLabel(sb) }}</button>
           <video v-if="videoUrl" :src="mediaUrl(videoUrl)" controls preload="metadata" />
+          <ProgressRing
+            v-if="ctx.videoRing(sb)"
+            v-bind="ctx.videoRing(sb)"
+            detailed
+            :size="30"
+            :cancellable="ctx.isVideoCancellable(sb)"
+            @cancel="ctx.cancelVideoTask(sb)"
+          />
           <p v-if="measured > budgetTotal" class="final-warning">{{ t('episode.final.overBudget') }}</p>
           <button class="btn btn-primary" :disabled="!!disabledReason" :title="disabledReason" @click="generate">{{ overConfirm ? t('episode.final.confirmGenerate') : t('episode.vid.generateVideo') }}</button>
           <p v-if="disabledReason" class="final-warning">{{ disabledReason }}</p>

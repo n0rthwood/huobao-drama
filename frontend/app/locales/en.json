@@ -270,7 +270,16 @@
       "noReason": "no reason given",
       "retry": "Retry",
       "cancelRequested": "Cancellation requested",
-      "cancelFailed": "Cancel failed"
+      "cancelFailed": "Cancel failed",
+      "phaseStep": "{phase} · step {step}/{total}",
+      "finishIn": "Done in ~{time}",
+      "phase": {
+        "encoding": "Encoding",
+        "loading": "Loading model",
+        "sampling": "Sampling",
+        "decoding": "Decoding",
+        "saving": "Saving"
+      }
     }
   },
   "layout": {
@@ -2059,7 +2068,24 @@
       "etaFallback": "Est. about {time} ({n} measured runs · from {model})",
       "etaNone": "No estimate available",
       "elapsedUsed": "{time} elapsed",
-      "elapsedTook": "Took {time}"
+      "elapsedTook": "Took {time}",
+      "confirmQueueNote": "Selected shots are assembled one by one and submitted to the video queue together, which runs them in parallel on both GPUs; keyframes are used as first/mid/last frame guides. It runs on the server, so you can close the page. Stopping the batch cancels shots still queued; shots already generating finish",
+      "etaQueue": "Queue estimate {time} ({basis} · {n} samples · {key}s bucket) · wait now ~{wait}",
+      "etaBasis": {
+        "measured": "measured mean",
+        "scaled": "scaled from nearby duration",
+        "default": "default prior"
+      },
+      "queueTitle": "Video generation queue",
+      "queueSummary": "This episode: {running} generating · {queued} queued",
+      "queueEta": "All done in ~{time}",
+      "queueProgress": "Overall {percent}%",
+      "queueOverall": "Whole queue: {running} running · {queued} queued · {idle}/{total} GPUs idle",
+      "queueOverallHint": "The whole queue includes other apps (e.g. vidgen studio); they are counted but not listed",
+      "queueWait": "New job waits ~{time}",
+      "queueNoWait": "no wait",
+      "taskCancelRequested": "Cancellation requested for this video task",
+      "taskCancelFailed": "Failed to cancel the video task"
     },
     "kf": {
       "slotFirst": "First frame",

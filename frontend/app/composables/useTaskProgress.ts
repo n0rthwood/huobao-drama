@@ -61,6 +61,10 @@ export interface RingProps {
   etaSeconds: number | null
   error: string
   cancelRequested: boolean
+  /** 运行阶段与步数（视频队列 h3-jobs 提供；ProgressRing 只在 detailed 时展示） */
+  phase: string
+  step: number | null
+  totalSteps: number | null
 }
 
 export function isActiveTaskStatus(status?: string | null): boolean {
@@ -113,6 +117,7 @@ function countdown(value: number | null | undefined, drift: number): number | nu
 const EMPTY_RING: RingProps = {
   status: '', fraction: null, remainingSeconds: null, queuePosition: null,
   queueLength: null, startSeconds: null, etaSeconds: null, error: '', cancelRequested: false,
+  phase: '', step: null, totalSteps: null,
 }
 
 /** sys_task（含 remote_state）→ 进度环属性 */
@@ -150,6 +155,9 @@ export function ringPropsFromTask(task: TaskLike | null | undefined, now: number
     etaSeconds: countdown(remote?.estimated_finish_seconds, drift),
     error: String(task.error_msg || task.errorMsg || ''),
     cancelRequested: Boolean(remote?.cancel_requested),
+    phase: status === 'running' ? String(progress?.phase || '') : '',
+    step: status === 'running' && Number.isFinite(Number(progress?.step)) ? Number(progress?.step) : null,
+    totalSteps: status === 'running' && Number(progress?.total_steps) > 0 ? Number(progress?.total_steps) : null,
   }
 }
 
@@ -175,6 +183,9 @@ export function ringPropsFromBatchItem(item: BatchItemLike | null | undefined): 
     etaSeconds: Number.isFinite(eta) ? Math.max(0, eta) : null,
     error: String(item.error || ''),
     cancelRequested: false,
+    phase: '',
+    step: null,
+    totalSteps: null,
   }
 }
 

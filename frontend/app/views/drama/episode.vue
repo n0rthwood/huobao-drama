@@ -1325,6 +1325,7 @@
               <div class="batch-video-row"><span>{{ t('episode.vid.confirmTotal') }}</span><strong>{{ t('episode.vid.confirmApprox', { n: batchVideoTotalDuration }) }}</strong></div>
               <div class="batch-video-row"><span>{{ t('episode.vid.confirmModel') }}</span><strong>{{ effectiveVideoModelLabel || t('episode.vid.defaultModel') }}</strong></div>
               <div class="batch-video-row"><span>{{ t('episode.vid.confirmResolution') }}</span><strong>{{ episodeResolutionLabel }}</strong></div>
+              <VideoQueueBar :tasks="activeVideoTasks" :config-id="selectedVideoConfig?.id ?? null" />
               <div class="batch-video-actions">
                 <span class="dim">{{ batchVideoConfirm.scoped ? t('episode.kf.batchScopeSelected', { n: batchVideoConfirm.ids.length }) : t('episode.kf.batchScopeAll') }}</span>
                 <button type="button" class="btn btn-sm ml-auto" @click="setAllVideoChecked(true)">{{ t('episode.sb.selectAll') }}</button>
@@ -1348,7 +1349,7 @@
                 </label>
                 <div v-if="!batchVideoConfirm.items.length" class="batch-video-empty">{{ t('episode.vid.previewNothing') }}</div>
               </div>
-              <p class="batch-video-note">{{ t('episode.vid.confirmSerialNote') }}</p>
+              <p class="batch-video-note">{{ selectedVideoConfig?.provider === 'h3-jobs' ? t('episode.vid.confirmQueueNote') : t('episode.vid.confirmSerialNote') }}</p>
               <p v-if="!videoProviderSupportsMidFrame" class="batch-video-note">{{ t('episode.kf.videoNoMidSupport') }}</p>
               <p class="batch-video-note">{{ t('episode.vid.confirmNote') }}</p>
             </template>
@@ -1558,6 +1559,7 @@ import ReferenceImageManager from '~/components/ReferenceImageManager.vue'
 import ArchivalImagePanel from '~/components/ArchivalImagePanel.vue'
 import PropSemanticsPanel from '~/components/PropSemanticsPanel.vue'
 import AssetPipelinePanel from '~/components/AssetPipelinePanel.vue'
+import VideoQueueBar from '~/components/VideoQueueBar.vue'
 import MapWorkflowPanel from '~/components/MapWorkflowPanel.vue'
 import ResearchCitationList from '~/components/ResearchCitationList.vue'
 import FinalPromptSourceBadge from '~/components/FinalPromptSourceBadge.vue'
@@ -1594,7 +1596,7 @@ import { useTasks, latestActiveVideoTask } from '~/composables/useTasks'
 
 definePageMeta({ layout: 'studio' })
 
-const { t } = useI18n()
+const { t, te } = useI18n()
 
 const route = useRoute()
 const dramaId = Number(route.params.id)
@@ -2587,6 +2589,21 @@ function videoRing(sb) {
   const task = latestActiveVideoTask(sb?.id)
   return task ? ringPropsFromTask(task, now.value) : null
 }
+/** 进行中的视频任务能否取消：以后端 cancellable 为准（h3-jobs 队列任务可取消，其它供应商不行） */
+function isVideoCancellable(sb) {
+  return Boolean(latestActiveVideoTask(sb?.id)?.cancellable)
+}
+async function cancelVideoTask(sb) {
+  const task = latestActiveVideoTask(sb?.id)
+  if (!task?.id) return
+  try {
+    registerTask(await taskAPI.cancel(task.id))
+    toast.success(t('episode.vid.taskCancelRequested'))
+    await refreshTasks()
+  } catch (e) {
+    toastError(e, { fallback: 'episode.vid.taskCancelFailed' })
+  }
+}
 
 /** 秒 → 紧凑时长（`Xm Ys` / `Xs`），ETA 与已用时共用 */
 function fmtDur(seconds) {
@@ -2684,11 +2701,13 @@ const RESOLUTION_TIERS = {
   volcengine: ['480p', '720p'],
   minimax: ['720p', '1080p'],
   comfyui: ['480p', '720p', '1080p'],
+  'h3-jobs': ['480p', '720p', '1080p'],
 }
 const RESOLUTION_DISPLAY = {
   volcengine: { '480p': '480p', '720p': '720p', '1080p': '720p' },
   minimax: { '480p': '768P', '720p': '768P', '1080p': '2K' },
   comfyui: { '480p': '480p', '720p': '720p', '1080p': '1080p' },
+  'h3-jobs': { '480p': '480p', '720p': '720p', '1080p': '1080p' },
 }
 const resolutionProvider = computed(() => RESOLUTION_TIERS[selectedVideoConfig.value?.provider] ? selectedVideoConfig.value.provider : 'volcengine')
 const resolutionOptions = computed(() => RESOLUTION_TIERS[resolutionProvider.value].map(key => ({
@@ -2795,7 +2814,7 @@ let videoEstimateTimer = null
 let videoEstimateSeq = 0
 // selectedSb 在 setup 更后面才声明，watch 的 getter 在 immediate 时会立刻求值 → 必须挂到 onMounted 之后再注册
 onMounted(() => {
-  watch(() => [selectedSb.value?.id, videoModel.value, selectedVideoConfig.value?.id, effectiveVideoModelLabel.value, effectiveVideoDuration.value], () => {
+  watch(() => [selectedSb.value?.id, videoModel.value, selectedVideoConfig.value?.id, effectiveVideoModelLabel.value, effectiveVideoDuration.value, episodeResolution.value, dramaAspectRatio.value, selectedSb.value ? shotVideoRefCount(selectedSb.value) : 0], () => {
     if (videoEstimateTimer) { clearTimeout(videoEstimateTimer); videoEstimateTimer = null }
     videoEstimate.value = { loading: true, data: null }
     videoEstimateTimer = setTimeout(() => { void loadVideoEstimate() }, 300)
@@ -2808,6 +2827,10 @@ async function loadVideoEstimate() {
       config_id: selectedVideoConfig.value?.id || undefined,
       model: effectiveVideoModelLabel.value || undefined,
       duration: effectiveVideoDuration.value,
+      // h3-jobs 队列按尺寸/参考图张数估计；其它 provider 忽略这三项
+      resolution: episodeResolution.value,
+      aspect: dramaAspectRatio.value,
+      references: selectedSb.value ? shotVideoRefCount(selectedSb.value) : 0,
     })
     if (seq !== videoEstimateSeq) return // 过期响应丢弃
     videoEstimate.value = { loading: false, data }
@@ -2829,6 +2852,17 @@ const videoEstimateBaseText = computed(() => {
   const { loading, data } = videoEstimate.value
   if (loading) return t('episode.vid.etaEstimating')
   if (!data || data.supported === false || data.run_seconds == null) return t('episode.vid.etaNone')
+  // h3-jobs 队列：按时长四舍五入到秒的实测均值，由队列给出；另报现在提交的预计排队
+  if (data.duration_key != null) {
+    const basisKey = `episode.vid.etaBasis.${data.basis}`
+    return t('episode.vid.etaQueue', {
+      time: fmtDur(data.run_seconds),
+      basis: te(basisKey) ? t(basisKey) : data.basis,
+      n: Number(data.samples) || 0,
+      key: data.duration_key,
+      wait: fmtDur(data.queue_wait_seconds) || '0s',
+    })
+  }
   const fallback = data.basis === 'fallback-model'
   return t(fallback ? 'episode.vid.etaFallback' : 'episode.vid.etaValue', {
     time: fmtDur(data.run_seconds),
@@ -3013,6 +3047,8 @@ const videoModelMultiCfg = computed(() => hasMultiConfigs(videoModelOptions.valu
 // ========== 分镜视频状态：从全局任务 store 恢复 ==========
 const episodeVideoTasks = computed(() =>
   episodeTasks(epId.value).filter(task => task.type === 'video' && task.storyboard_id))
+// 集级「视频生成队列」汇总条的数据源：本集活跃视频任务（含提交在途、尚无远端 id 的）
+const activeVideoTasks = computed(() => episodeVideoTasks.value.filter(task => isActiveTaskStatus(task.status)))
 
 /**
  * 生成中/失败只是页面内存状态，刷新后会丢；按分镜取最新一条 sys_task 重建，
@@ -3034,10 +3070,10 @@ function syncVideoStateFromTasks() {
   const pending = new Set()
   const failed = {}
   for (const [sbId, task] of latestBySb) {
-    // 分镜已有视频(失败后重试成功)时不再报历史错误
-    if (hasVid(sbs.value.find(s => s.id === sbId))) continue
+    // 活跃任务一律算「生成中」：已有旧视频的镜头重绘时也要计入（与 videoTaskState 的活跃优先同口径）
     if (isActiveTaskStatus(task.status)) pending.add(sbId)
-    else if (task.status === 'failed') failed[sbId] = task.error_msg || t('episode.status.failed')
+    // 分镜已有视频(失败后重试成功)时不再报历史错误
+    else if (task.status === 'failed' && !hasVid(sbs.value.find(s => s.id === sbId))) failed[sbId] = task.error_msg || t('episode.status.failed')
   }
   // 刚点击提交、任务记录尚未进 store 的本地状态保留,避免状态闪退
   for (const id of pendingVideoIds.value) if (!latestBySb.has(id)) pending.add(id)
@@ -4778,7 +4814,7 @@ function isShotConfirmed(sb) {
 const keyframesConfirmedCount = computed(() => sbs.value.filter(sb => isShotConfirmed(sb)).length)
 const allKeyframesConfirmed = computed(() => sbs.value.length > 0 && keyframesConfirmedCount.value === sbs.value.length)
 // 中间帧引导只有 ComfyUI(H3) 支持；MiniMax 云端只用首尾帧，批量确认框里要写明
-const videoProviderSupportsMidFrame = computed(() => selectedVideoConfig.value?.provider === 'comfyui')
+const videoProviderSupportsMidFrame = computed(() => ['comfyui', 'h3-jobs'].includes(selectedVideoConfig.value?.provider))
 
 function pickFile(accept, cb) {
   const input = document.createElement('input')
@@ -5686,6 +5722,10 @@ provide(WORKBENCH_CTX, {
   videoPromptIssues,
   videoRightW,
   videoRing,
+  isVideoCancellable,
+  cancelVideoTask,
+  activeVideoTasks,
+  selectedVideoConfig,
   videoSelectMode,
   videoTargetAssets,
   videoTargetLead,
