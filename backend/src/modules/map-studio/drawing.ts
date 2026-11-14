@@ -96,20 +96,30 @@ export async function runDrawingStage(input: DrawingStageInput): Promise<StageAg
     const drawn = drawingProblems({ doc: draft, features, registration: background.registration, omitted, layerOptions })
     return { renderable, problems: [...renderable, ...drawn.problems], omitted: drawn.omitted }
   }
+  /**
+   * 草稿修改只回报变化的图层：完整图层清单每步都在「当前状态」消息里。
+   * 生产 run 11：每次 add_label/update_layer 回整份草稿（约 1.8 万字），一步并行 4–6 个调用，
+   * 压缩窗口内的三步就累积到 24 万字。
+   */
   const acceptDraft = (next: LayerDoc) => {
     const sorted = { ...next, layers: [...next.layers].sort((a, b) => a.z - b.z) }
     const strict = strictMapLayerDocProblems(sorted, { features, registration: background.registration })
     if (strict.problems.length) return { error: '草稿修改被拒，原草稿保留', problems: strict.problems }
+    const before = new Map(draft.layers.map(layer => [layer.id, JSON.stringify(layer)]))
     draft = strict.doc
     layerOptions = optionsForDrawing(draft, features, { ...input.layerOptions, ...layerOptions })
-    return { draft: drawingDraftSummary(draft, layerOptions) }
+    const changedIds = new Set(draft.layers.filter(layer => before.get(layer.id) !== JSON.stringify(layer)).map(layer => layer.id))
+    const removed = [...before.keys()].filter(id => !draft.layers.some(layer => layer.id === id))
+    return {
+      ok: true,
+      layer_count: draft.layers.length,
+      changed: drawingDraftSummary(draft, layerOptions).layers.filter(layer => changedIds.has(layer.id)),
+      removed,
+    }
   }
   /** 草稿类工具的压缩摘要：只说层数，不复述整份草稿 */
-  const draftStatus = (result: Record<string, unknown>): string => {
-    const summary = result.draft
-    const layers = summary && typeof summary === 'object' && 'layers' in summary ? summary.layers : null
-    return Array.isArray(layers) ? `草稿 ${layers.length} 层` : '草稿未变'
-  }
+  const draftStatus = (result: Record<string, unknown>): string =>
+    typeof result.layer_count === 'number' ? `草稿 ${result.layer_count} 层` : '草稿未变'
   const featureSummary = features.map(feature => {
     const p = projectedFeatures.find(f => f.id === feature.id)!
     const xs = p.points.map(point => point[0] * background.width), ys = p.points.map(point => point[1] * background.height)
@@ -158,8 +168,7 @@ export async function runDrawingStage(input: DrawingStageInput): Promise<StageAg
             if (points.some(p => !p)) { problems.push(`要素 ${feature.id} 在当前底图不可见，请回退 base`); continue }
             const coords = points as [number, number][]
             const id = feature.id.length <= 56 ? `feature-${feature.id}` : `feature-${crypto.createHash('sha256').update(feature.id).digest('hex').slice(0, 32)}`
-            const lengthRatio = coords.slice(1).reduce((sum, point, i) => sum + Math.hypot((point[0] - coords[i]![0]) * background.width, (point[1] - coords[i]![1]) * background.height), 0) / Math.hypot(background.width, background.height)
-            const defaults = selectedStyle ? featureStyleFor(selectedStyle.family, { ...feature, lengthRatio, markerTier: item.importance }) : {}
+            const defaults = selectedStyle ? featureStyleFor(selectedStyle.family, { ...feature, markerTier: item.importance }) : {}
             const common = { id, name: feature.name, visible: true, locked: false, z: next.layers.length, opacity: 1, rotation: 0, anchor: { semantic_id: feature.id, semantic_name: feature.name }, style: { ...defaults, ...item.style } }
             next.layers.push(feature.kind === 'place' ? { ...common, type: 'marker', at: coords[0]!, text: feature.name } : { ...common, type: feature.kind === 'region' ? 'polygon' : 'polyline', points: coords })
           }
@@ -169,6 +178,7 @@ export async function runDrawingStage(input: DrawingStageInput): Promise<StageAg
       add_label: stageTool(session, {
         id: 'add_label', description: '按主题档位添加标题/区域/城市/河流/说明标签，不必逐层手写样式。box 是归一化位置尺寸；feature_id 可锚定要素，style 可覆盖主题。',
         inputSchema: z.object({ tier: z.enum(MAP_LABEL_TIERS), text: z.string(), box: z.object({ x: z.number(), y: z.number(), w: z.number(), h: z.number() }), feature_id: z.string().optional(), style: z.record(z.string(), z.unknown()).optional() }),
+        summarize: draftStatus,
         execute: async ({ tier, text, box, feature_id, style }) => {
           const feature = feature_id ? features.find(item => item.id === feature_id) : undefined
           if (feature_id && !feature) return { error: `未知 feature_id ${feature_id}` }
