@@ -163,3 +163,32 @@ test('explicit empty storyboard selection fills nothing instead of the whole epi
   `)
   assert.deepEqual(result.empty, { started: false, total: 0 })
 })
+
+test('video prompt summary counts only its planned stage, not junction-caption work in the same task (#104)', () => {
+  const result = run(`
+    import { db, schema, sqlite } from './src/db/index.ts'
+    import { getTaskWorkSummary } from './src/services/task-estimate.ts'
+
+    const stamp = '2026-01-01'
+    const sampleKey = 'video_prompts|cfg:1|model:m'
+    await db.insert(schema.sysTask).values({
+      id: 600, type: 'text', status: 'processing', episodeId: 1,
+      params: JSON.stringify({ kind: 'video_prompts', work_plan: {
+        stage: 'video_prompts', unit: 'shot', sample_key: sampleKey, planned_units: 2, planned_source_chars: 200,
+        items: [{ storyboard_id: 21, storyboard_number: 1, source_chars: 100 }, { storyboard_id: 22, storyboard_number: 2, source_chars: 100 }],
+      } }),
+      createdAt: stamp, updatedAt: stamp,
+    })
+    const workStmt = sqlite.prepare('INSERT INTO task_observed_work (id, task_id, stage, source_chars, sample_key, storyboard_id, storyboard_number, started_at, finished_at, status, model_ms, queue_ms, work_ms, heartbeat_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    const t0 = 1_800_000_000_000
+    workStmt.run(11, 600, 'junction_caption', 0, 'junction_caption|cfg:10|model:d', 21, 1, t0, t0 + 1_000, 'completed', 900, 0, 1_000, t0 + 1_000, t0)
+    workStmt.run(12, 600, 'junction_caption', 0, 'junction_caption|cfg:10|model:d', 22, 2, t0 + 1_000, t0 + 2_000, 'completed', 900, 0, 1_000, t0 + 2_000, t0)
+    workStmt.run(13, 600, 'video_prompts', 100, sampleKey, 21, 1, t0 + 2_000, t0 + 32_000, 'completed', 29_000, 0, 30_000, t0 + 32_000, t0)
+    const summary = getTaskWorkSummary(600, t0 + 33_000)
+    console.log('@@' + JSON.stringify({ stage: summary.stage, completed: summary.completed_units, planned: summary.planned_units, samples: summary.rate?.sample_count }))
+  `)
+  assert.equal(result.stage, 'video_prompts')
+  assert.equal(result.completed, 1)
+  assert.equal(result.planned, 2)
+  assert.equal(result.samples, 1)
+})

@@ -195,7 +195,7 @@
         "messageCount": "메시지 {n}개",
         "streaming": "수신 중",
         "unknown": "알 수 없음",
-        "stage": { "skeleton": "내레이션 골격", "voice": "더빙", "design_card": "디자인 카드", "map_workflow": "지도 워크플로", "layer_base_check": "레이어 바탕 시각 검증", "junction_caption": "연결 프레임 화면 묘사" },
+        "stage": { "skeleton": "내레이션 골격", "voice": "더빙", "design_card": "디자인 카드", "map_workflow": "지도 워크플로", "layer_base_check": "레이어 바탕 시각 검증", "junction_caption": "연결 프레임 화면 묘사", "keyframe_prompts": "키프레임 프롬프트", "video_prompts": "영상 프롬프트" },
         "status": { "processing": "진행 중", "completed": "완료", "failed": "실패", "interrupted": "중단됨" },
         "kind": { "llm": "모델 요청", "vision_chat": "이미지 판독", "tts": "음성 합성" },
         "phase": { "request": "발신", "response": "응답", "final": "마무리" },

@@ -195,7 +195,7 @@
         "messageCount": "メッセージ {n} 件",
         "streaming": "受信中",
         "unknown": "不明",
-        "stage": { "skeleton": "ナレーション骨格", "voice": "音声", "design_card": "デザインカード", "map_workflow": "地図ワークフロー", "layer_base_check": "レイヤー下地の目視検証", "junction_caption": "接続フレームの画面描写" },
+        "stage": { "skeleton": "ナレーション骨格", "voice": "音声", "design_card": "デザインカード", "map_workflow": "地図ワークフロー", "layer_base_check": "レイヤー下地の目視検証", "junction_caption": "接続フレームの画面描写", "keyframe_prompts": "キーフレームプロンプト", "video_prompts": "動画プロンプト" },
         "status": { "processing": "進行中", "completed": "完了", "failed": "失敗", "interrupted": "中断" },
         "kind": { "llm": "モデル要求", "vision_chat": "画像読み取り", "tts": "音声合成" },
         "phase": { "request": "送信", "response": "応答", "final": "最終" },
