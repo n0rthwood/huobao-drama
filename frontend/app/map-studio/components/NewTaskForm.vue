@@ -51,6 +51,7 @@ function emptyBrief(): MapBrief {
     schematic: false,
     base_mode: 'program',
     style: 'archival',
+    map_style: null,
     notes: '',
     reference_image: null,
     inferred: [],

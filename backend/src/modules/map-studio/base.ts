@@ -14,6 +14,8 @@ import { readImage } from '../../agents/tools/vision-tools.js'
 import { mapBriefText, rollbackTool, runStageAgent, stageTool, type StageAgentResult } from './agent-loop.js'
 import { frameReport, specFeatures, FRAME_MARGIN, FRAME_MIN_EXTENT } from './validate.js'
 import { MAP_BASE_MODES, type MapBrief } from './types.js'
+import { resolveMapStyle, familyPromptSummary } from './styles/index.js'
+import { readDefaultStyle } from './settings.js'
 
 /** 工作区画幅：与 geo/base-render 的 16:9 口径一致 */
 export const MAP_BASE_WIDTH = 3840
@@ -37,6 +39,7 @@ export interface BaseStageInput {
 }
 
 export async function runBaseStage(input: BaseStageInput): Promise<StageAgentResult<BaseStageResult>> {
+  const selectedStyle = resolveMapStyle(input.brief, { default_style: readDefaultStyle() })
   const features = specFeatures(input.spec)
   const artifacts = new Map<string, { artifact: MapBaseArtifact; mode: MapBaseMode; spec: MapSpec; problems: string[] }>()
   const featureLines = features.map(feature => `- ${feature.id} ${feature.kind}「${feature.name}」：${feature.kind === 'place'
@@ -55,10 +58,15 @@ export async function runBaseStage(input: BaseStageInput): Promise<StageAgentRes
     prompt: () => [
       '请为下面这张历史地图生产底图：选择路线、确定取景，生成后自己检查，再交付。',
       mapBriefText(input.brief),
+      ...(selectedStyle ? [familyPromptSummary(selectedStyle.family)] : []),
       `地图里的要素（必须全部落在画面内）：\n${featureLines.join('\n') || '（无）'}`,
       `当前 map_spec 的取景（仅供参考，不是约束）：bbox=${JSON.stringify(input.spec.bbox)}，投影 ${input.spec.projection.type}，背景图层 ${JSON.stringify(input.spec.layers)}`,
       `交付校验：每个要素的所有顶点都要落在画面 [${FRAME_MARGIN}, ${1 - FRAME_MARGIN}] 内；要素整体外包框的最大边至少占画面 ${FRAME_MIN_EXTENT * 100}%。`,
     ].join('\n\n'),
+    // 底图阶段的状态由代码从本次会话已生成的 artifact 生成：早先 render_base 的 frame 明细被压缩后仍能看见
+    state: () => artifacts.size
+      ? `已生成的底图：\n${[...artifacts].map(([id, item]) => `${id} ${item.mode} bbox=${JSON.stringify(item.spec.bbox)} 投影=${item.spec.projection.type} 路径=${item.artifact.path} 取景${item.problems.length ? `问题：${item.problems.join('；')}` : '检查通过'}`).join('\n')}`
+      : '已生成的底图：无（先 render_base）',
     tools: (session) => ({
       render_base: stageTool(session, {
         id: 'render_base',
@@ -75,6 +83,12 @@ export async function runBaseStage(input: BaseStageInput): Promise<StageAgentRes
             land: z.boolean(), coastline: z.boolean(), rivers: z.boolean(), lakes: z.boolean(), countries: z.boolean(),
           }).optional().describe('程序底图的背景图层开关'),
         }),
+        summarize: result => {
+          const frame = result.frame && typeof result.frame === 'object' && 'problems' in result.frame && Array.isArray(result.frame.problems) ? result.frame.problems : []
+          return frame.length
+            ? `底图 ${String(result.artifact_id)}（${String(result.mode)}）bbox=${JSON.stringify(result.bbox)}，取景 ${frame.length} 个问题：${frame.slice(0, 3).map(String).join('；')}`
+            : `底图 ${String(result.artifact_id)}（${String(result.mode)}）bbox=${JSON.stringify(result.bbox)}，取景检查通过`
+        },
         execute: async (args) => {
           const mode = args.mode as MapBaseMode
           if (!MAP_BASE_MODES.includes(mode)) return { error: `mode 只能是 ${MAP_BASE_MODES.join(' / ')}，收到 ${JSON.stringify(args.mode)}` }
@@ -86,6 +100,7 @@ export async function runBaseStage(input: BaseStageInput): Promise<StageAgentRes
           const spec = normalizeMapSpec({
             ...input.spec,
             detail_level: input.brief.detail_level,
+            style: selectedStyle ? { theme: selectedStyle.theme, map_style: selectedStyle.id } : { theme: input.brief.style },
             bbox: args.bbox,
             projection: { type: args.projection ?? input.spec.projection.type },
             layers: args.layers ?? input.spec.layers,
@@ -123,6 +138,9 @@ export async function runBaseStage(input: BaseStageInput): Promise<StageAgentRes
         timeoutMs: 12 * 60_000,
         description: '交付一张已生成的底图（消耗一轮）。取景检查有任何问题都会被拒收。',
         inputSchema: z.object({ artifact_id: z.string().describe('render_base 返回的 artifact_id') }),
+        summarize: result => result.accepted === true
+          ? `第 ${String(result.round)} 轮交付已接受`
+          : `第 ${String(result.round)} 轮交付被拒收，${Array.isArray(result.problems) ? result.problems.length : 0} 个问题（逐条见当前状态）`,
         execute: async ({ artifact_id }) => {
           const chosen = artifacts.get(String(artifact_id))
           const problems = chosen ? chosen.problems : [`没有底图 ${JSON.stringify(artifact_id)}；已生成：${[...artifacts.keys()].join('、') || '（无，请先 render_base）'}`]

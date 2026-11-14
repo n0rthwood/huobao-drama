@@ -48,7 +48,7 @@ export function buildDeliverable(loaded: LoadedTask): MapStudioDeliverable {
     texture_image: state.outputs.texture_image ? { path: state.outputs.texture_image.path } : null,
     semantics: { width: geometry.width, height: geometry.height, points: geometry.points, lines: geometry.routes, regions: geometry.regions, labels: [], warnings },
     features, sources: state.research?.sources ?? [], kmz: state.outputs.kmz ? { path: state.outputs.kmz.path } : null,
-    editable_source: { version: 1, map_spec: mapSpec, layer_doc: doc, layer_options: options },
+    editable_source: { version: 1, map_style: mapSpec.style.map_style ?? null, map_spec: mapSpec, layer_doc: doc, layer_options: options },
     manual_edit: final.source === 'map-drawing-manual',
     summary: `${geometry.points.length} 点 / ${geometry.routes.length} 线 / ${geometry.regions.length} 面，底图路线 ${baseMode}`,
   }

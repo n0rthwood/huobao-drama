@@ -151,7 +151,7 @@ test('地图继续当前阶段：原件与成图原子采用，几何编辑复�
       params:JSON.stringify({map_texture:{prop_id:propId,prop_name:'测试区位图'}}),
       status:'completed',localPath:texturePath,createdAt:ts,updatedAt:ts,
     }))
-    const interruptedId=insertRun({taskId:propId,mode:'auto',startStage:'style',stage:'style',textConfigId:configId,imageConfigId:null,imageModel:null,params:{map_texture_ref:String(imageId),map_texture_theme:'archival'}})
+    const interruptedId=insertRun({taskId:propId,mode:'auto',startStage:'style',stage:'style',textConfigId:configId,imageConfigId:null,imageModel:null,params:{map_texture_ref:String(imageId),map_texture_theme:'atlas-tint'}})
     await mutateWorkflow(propId,{action:'fixture_texture_interruption',actor:'system',mutate:ctx=>{
       ctx.state.stage='style';ctx.state.status='running';ctx.state.run_id=interruptedId
       ctx.state.steps.find(step=>step.id==='style').status='running'

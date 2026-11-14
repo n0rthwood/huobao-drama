@@ -19,7 +19,7 @@ import { recordAttempt } from './agent-loop.js'
 import { buildDeliverable, deliverCurrent } from './delivery.js'
 import { getMapStudioPlatform } from './registry.js'
 import { activeRunOfTask, insertRun, finishRun, readRunParams, patchRunParams, updateRunStage, selectRunsByTask } from './db.js'
-import { readModels } from './settings.js'
+import { readModels, readDefaultStyle } from './settings.js'
 import { MapStudioConflictError, MapStudioStaleError, MapStudioRequestError, briefHash, loadTask, mutateTask, serializeDetail, setStep, stageIndex, restoreSnapshot, requireHostTarget, type MapStudioDetail, type MutateContext } from './store.js'
 import { MAP_INFRA_RETRIES, MAP_MAX_ROLLBACKS, MAP_WORKFLOW_STAGES, STAGE_LABEL, isMapAgentStage, normalizeBrief, type MapBrief, type MapResearch, type MapResearchFeature, type MapWorkflowIssue, type MapWorkflowMode, type MapWorkflowStage } from './types.js'
 import { geometryUnverified, confirmedVerification } from './accuracy.js'
@@ -27,6 +27,7 @@ import { inspectLayerDraft, layerDraftContext } from './layer-edit.js'
 import { validateLayerOptions } from './render/smooth.js'
 import { MapWorkflowValidationError } from './types.js'
 import { beginStageSpan, endStageSpan } from './stage-spans.js'
+import { resolveMapStyle, textureHintFor, type ResolvedMapStyle } from './styles/index.js'
 
 export interface MapRunOptions { textConfigId?: number; imageConfigId?: number; imageModel?: string }
 const IMAGE_WAIT_TIMEOUT_MS = 20 * 60_000
@@ -68,8 +69,9 @@ function bboxOf(coords: Array<[number, number]>): [number, number, number, numbe
  * **人工确认过的几何（proposed !== true）永远不被覆盖**：重跑检索只会补充新条目，
  * 并把分歧记成说明文字，由人决定要不要改。
  */
-export function adoptResearchIntoSpec(spec: MapSpec | null, research: MapResearch, brief: MapBrief): { spec: MapSpec; notes: string[] } {
+export function adoptResearchIntoSpec(spec: MapSpec | null, research: MapResearch, brief: MapBrief, defaultStyle?: string): { spec: MapSpec; notes: string[] } {
   const notes: string[] = []
+  const selectedStyle = resolveMapStyle(brief, { default_style: defaultStyle })
   const places = spec ? [...spec.places] : []
   const routes = spec ? [...spec.routes] : []
   const regions = spec ? [...spec.regions] : []
@@ -106,7 +108,7 @@ export function adoptResearchIntoSpec(spec: MapSpec | null, research: MapResearc
       version: 1, projection: spec?.projection ?? { type: 'mercator' },
       bbox: spec?.bbox ?? research.extent ?? bboxOf(coords), detail_level: brief.detail_level,
       layers: spec?.layers ?? { land: true, coastline: true, rivers: true, lakes: true, countries: true },
-      places, routes, regions, style: { theme: brief.style },
+      places, routes, regions, style: selectedStyle ? { theme: selectedStyle.theme, map_style: selectedStyle.id } : { theme: brief.style },
     }),
     notes,
   }
@@ -114,20 +116,21 @@ export function adoptResearchIntoSpec(spec: MapSpec | null, research: MapResearc
 
 
 /** Claim opaque image references in run.params before waiting; restarts/retries reuse paid texture. */
-async function generateTexture(input: { taskId: number; runId: number; theme: MapSpec['style']['theme']; opts: MapRunOptions }): Promise<{ path: string }> {
+async function generateTexture(input: { taskId: number; runId: number; theme: MapSpec['style']['theme']; mapStyle: ResolvedMapStyle | null; opts: MapRunOptions }): Promise<{ path: string }> {
   const loaded = await loadTask(input.taskId)
   if (!loaded) throw new MapStudioRequestError('任务不存在', 'not_found')
   const platform = getMapStudioPlatform()
   const params = readRunParams(input.runId)
-  let ref = typeof params.map_texture_ref === 'string' && params.map_texture_theme === input.theme ? params.map_texture_ref : null
+  const styleKey = input.mapStyle?.id ?? input.theme
+  let ref = typeof params.map_texture_ref === 'string' && params.map_texture_theme === styleKey ? params.map_texture_ref : null
   if (ref) {
     const previous = await platform.pollImage(ref)
     if (previous.status !== 'pending' && previous.status !== 'completed') ref = null
   }
   if (!ref) {
-    const submitted = await platform.submitImage({ prompt: `${TEXTURE_PROMPT}, ${TEXTURE_THEME_HINT[input.theme]}`, size: '1920x1080', configId: input.opts.imageConfigId, model: input.opts.imageModel, label: loaded.row.title, hostRef: loaded.row.host_ref })
+    const submitted = await platform.submitImage({ prompt: `${TEXTURE_PROMPT}, ${input.mapStyle ? textureHintFor(input.mapStyle.family) : TEXTURE_THEME_HINT[input.theme]}`, size: '1920x1080', configId: input.opts.imageConfigId, model: input.opts.imageModel, label: loaded.row.title, hostRef: loaded.row.host_ref })
     ref = submitted.ref
-    patchRunParams(input.runId, { map_texture_ref: ref, map_texture_theme: input.theme })
+    patchRunParams(input.runId, { map_texture_ref: ref, map_texture_theme: styleKey, map_style: input.mapStyle?.id ?? null })
   }
   const deadline = Date.now() + IMAGE_WAIT_TIMEOUT_MS
   for (;;) {
@@ -190,6 +193,7 @@ async function executeStageWork(taskId: number, runId: number, stage: MapWorkflo
   const { state, brief } = loaded
   const opts = { textConfigId: state.text_config_id ?? undefined, imageConfigId: state.image_config_id ?? undefined, imageModel: state.image_model ?? undefined }
   const hashAtStart = briefHash(brief)
+  const selectedStyle = resolveMapStyle(loaded.mapSpec?.style.map_style ? { map_style: loaded.mapSpec.style.map_style } : brief, { default_style: readDefaultStyle() })
   const mode = state.mode
   const feedback = state.agent.feedback[stage] ?? null
   const startRounds = isMapAgentStage(stage) && state.agent.run_id === runId ? state.agent.rounds[stage] ?? 0 : 0
@@ -221,7 +225,7 @@ async function executeStageWork(taskId: number, runId: number, stage: MapWorkflo
     const outcome = await runResearchStage({ ...await agentInput(), spec: loaded.mapSpec })
     if (outcome.kind === 'rollback') return rollback(outcome)
     const research = outcome.result
-    const adopted = adoptResearchIntoSpec(loaded.mapSpec, research, brief)
+    const adopted = adoptResearchIntoSpec(loaded.mapSpec, research, brief, readDefaultStyle())
     const pending = geometryUnverified(adopted.spec)
     return finish(ctx => {
       ctx.state.research = research; ctx.mapSpec = adopted.spec
@@ -245,20 +249,20 @@ async function executeStageWork(taskId: number, runId: number, stage: MapWorkflo
     }, { proceed: true, message: `底图已生成（${baseMode}，bbox ${JSON.stringify(spec.bbox)}，${artifact.width}×${artifact.height}）；版本将在交付时登记` })
   }
   if (stage === 'style') {
-    const texture = await withInfraRetry(taskId, runId, stage, () => generateTexture({ taskId, runId, theme: brief.style, opts }))
+    const texture = await withInfraRetry(taskId, runId, stage, () => generateTexture({ taskId, runId, theme: selectedStyle?.theme ?? brief.style, mapStyle: selectedStyle, opts }))
     const meta = await sharp(getAbsolutePath(texture.path)).metadata()
-    return finish(ctx => { ctx.state.outputs.texture_image = { path: texture.path, width: meta.width ?? 0, height: meta.height ?? 0, source: 'diffusion-texture', run_id: runId, provenance: { note: '扩散模型只生成纸张/底纹质感，不参与任何地理几何', prompt: TEXTURE_PROMPT } } }, { proceed: true, message: '质感底纹已生成（只铺背景，不覆盖地理）' })
+    return finish(ctx => { ctx.state.outputs.texture_image = { path: texture.path, width: meta.width ?? 0, height: meta.height ?? 0, source: 'diffusion-texture', run_id: runId, provenance: { map_style: selectedStyle?.id ?? null, note: '扩散模型只生成纸张/底纹质感，不参与任何地理几何', prompt: `${TEXTURE_PROMPT}, ${selectedStyle ? textureHintFor(selectedStyle.family) : TEXTURE_THEME_HINT[brief.style]}` } } }, { proceed: true, message: '质感底纹已生成（只铺背景，不覆盖地理）' })
   }
   if (stage === 'drawing') {
     const spec = loaded.mapSpec
     const base = state.outputs.base_image
     if (!spec || !base) throw new MapStudioRequestError('缺少底图或地图几何，请先完成底图步骤', 'missing_base')
     const background = await prepareMapBackground({ basePath: base.path, registration: base.provenance && 'registration' in base.provenance ? base.provenance.registration : undefined, texturePath: state.outputs.texture_image?.path })
-    const outcome = await runDrawingStage({ ...await agentInput(), spec, background, layerOptions: state.outputs.layer_options, style_spec: brief.style_spec })
+    const outcome = await runDrawingStage({ ...await agentInput(), spec, background, layerOptions: state.outputs.layer_options })
     if (outcome.kind === 'rollback') return rollback(outcome)
     const { doc, rendered, omitted, layerOptions } = outcome.result
     return finish(ctx => {
-      ctx.state.outputs.final_image = { path: rendered.path, width: rendered.width, height: rendered.height, source: 'map-drawing', run_id: runId, provenance: { registration: background.registration, warnings: background.warnings, omitted, base: base.path, base_mode: brief.base_mode, texture: state.outputs.texture_image?.path ?? null, background: background.path, attribution: base.provenance && 'attribution' in base.provenance ? base.provenance.attribution : null } }
+      ctx.state.outputs.final_image = { path: rendered.path, width: rendered.width, height: rendered.height, source: 'map-drawing', run_id: runId, provenance: { map_style: selectedStyle?.id ?? null, registration: background.registration, warnings: background.warnings, omitted, base: base.path, base_mode: brief.base_mode, texture: state.outputs.texture_image?.path ?? null, background: background.path, attribution: base.provenance && 'attribution' in base.provenance ? base.provenance.attribution : null } }
       ctx.state.outputs.layer_doc = doc
       ctx.state.outputs.layer_options = layerOptions
       ctx.state.issues = [...ctx.state.issues.filter(issue => issue.code !== 'drawing_warning' && issue.code !== 'drawing_omitted'), ...background.warnings.map((message): MapWorkflowIssue => ({ field: 'drawing', code: 'drawing_warning', message, blocking: false })), ...omitted.map((item): MapWorkflowIssue => ({ field: 'drawing', code: 'drawing_omitted', blocking: false, message: `要素 ${item.feature_id} 未画入成图：${item.reason}` }))]
@@ -506,8 +510,9 @@ export async function saveMapWorkflowDraft(taskId: number, body: {
           || previous.bbox.some((value, index) => value !== next.bbox[index])
           || JSON.stringify(previous.layers) !== JSON.stringify(next.layers)
           || previous.detail_level !== next.detail_level
+          || JSON.stringify(previous.style) !== JSON.stringify(next.style)
         // 底纹只跟风格有关，与几何无关：取景变了也接着用，除非主题换了
-        const styleChanged = !!previous && !!next && previous.style.theme !== next.style.theme
+        const styleChanged = !!previous && !!next && JSON.stringify(previous.style) !== JSON.stringify(next.style)
         const keptTexture = styleChanged ? null : ctx.state.outputs.texture_image
         // Keep per-feature smoothing choices while drawing layer ids are invalidated.
         const previousDoc = ctx.state.outputs.layer_doc as LayerDoc | null

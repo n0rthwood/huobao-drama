@@ -28,10 +28,10 @@ test('Map Studio QA labels: overlap, far Kashlik, marker overlap, safety edge an
     import assert from 'node:assert/strict'
     import {labelProblems,autoPlaceLabels,textRectsOf} from '__BACKEND__src/modules/map-studio/layout/labels.ts'
     import {normalizeBrief,emptyBrief} from '__BACKEND__src/modules/map-studio/types.ts'
-    assert.ok(!('style_spec' in normalizeBrief({},emptyBrief())),'no reference style default')
-    const explicit=normalizeBrief({style_spec:{approved_reference:'user-supplied'}},emptyBrief())
-    assert.deepEqual(explicit.style_spec,{approved_reference:'user-supplied'})
-    assert.ok(!('style_spec' in normalizeBrief({style_spec:null},explicit)))
+    assert.equal(normalizeBrief({},emptyBrief()).map_style,null,'new briefs follow the module default')
+    const explicit=normalizeBrief({map_style:'modern-clean'},emptyBrief())
+    assert.equal(explicit.map_style,'modern-clean')
+    assert.equal(normalizeBrief({map_style:null},explicit).map_style,null)
     ${labelFixture}
     const original=JSON.stringify(doc)
     assert.ok(labelProblems(doc).some(p=>p.code==='label_overlap'))
@@ -183,7 +183,7 @@ test('Map Studio server draft: 600-vertex dataset river and dense region survive
     await sharp({create:{width:1000,height:600,channels:3,background:'#e2d5ba'}}).png().toFile(process.env.HUOBAO_DATA_DIR+'/static/base.png')
     const river=Array.from({length:600},(_,i)=>[12+6*i/599,14+Math.sin(i/80)*.3])
     const region=Array.from({length:350},(_,i)=>[15+Math.cos(2*Math.PI*i/350)*2,17+Math.sin(2*Math.PI*i/350)*.7])
-    const spec=normalizeMapSpec({bbox:[10,10,20,20],routes:[{id:'river',name:'长河',points:river,origin:'dataset',verification:{status:'verified',reasons:['dataset fixture']}}],regions:[{id:'mountain',name:'山地',points:region,origin:'dataset',verification:{status:'verified',reasons:['dataset fixture']}}]})
+    const spec=normalizeMapSpec({bbox:[10,10,20,20],routes:[{id:'river',name:'长河',points:river,category:'river',origin:'dataset',verification:{status:'verified',reasons:['dataset fixture']}}],regions:[{id:'mountain',name:'山地',points:region,origin:'dataset',verification:{status:'verified',reasons:['dataset fixture']}}]})
     const registration={mode:'program',width:1000,height:600,bbox:spec.bbox,program:{projection:'mercator',bbox:spec.bbox}}
     const expected=spec.routes[0].points.map(p=>{const q=forwardFor(registration)(p);return[q[0]/1000,q[1]/600]})
     const model=await startMockOpenAIChat(async body=>{

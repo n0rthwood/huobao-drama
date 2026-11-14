@@ -331,6 +331,7 @@ const STYLE_FIELDS: Record<LayerType, Record<string, z.ZodTypeAny>> = {
     color: trimmedText(COLOR_MAX),
     text_color: trimmedText(COLOR_MAX),
     stroke: trimmedText(COLOR_MAX),
+    stroke_width: num(0, 0.05, 0),
     size: num(0.005, 0.5, 0.034),
     font: enumWith(LAYER_FONTS, 'sans'),
     bold: bool(false),

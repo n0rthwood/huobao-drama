@@ -286,3 +286,28 @@ test('画布与文档点数不一致时明确拒绝写入，不静默丢弃也�
   // 找不到对应图层也拒绝，而不是把回调当控制点提交
   assert.equal(remapCanvasPatch(mismatched, undefined, renderedLayer, { L1: { smooth: 1 } }), null)
 })
+
+test('按主题重设作为真实编辑器的一条历史，撤销/重做不改变原几何或文字', async () => {
+  const originalFetch = globalThis.fetch
+  const before = {
+    version: 1, base: { path: 'static/map-drawings/base.png', width: 1920, height: 1080 }, theme: 'archival',
+    layers: [{ id: 'river', type: 'polyline', name: '河流', visible: true, locked: false, z: 0, opacity: 1, rotation: 0, anchor: { semantic_id: 'r' }, points: [[.2, .3], [.7, .5]], style: { stroke: '#112233', width: .006 } }],
+  }
+  const after = { ...before, theme: 'clean', layers: before.layers.map(layer => ({ ...layer, style: { stroke: '#488ba7', width: .002 } })) }
+  globalThis.fetch = async () => Response.json({ code: 200, data: { layer_doc: after, map_style: 'modern-clean', problems: [] } })
+  try {
+    const editor = useLayerDoc()
+    editor.load(before)
+    await nextTick()
+    const result = await mapStudioAPI.restyleLayerDoc(8, normalizeMapLayerDoc(editor.doc.value))
+    editor.pushHistory()
+    editor.doc.value = JSON.parse(JSON.stringify(result.layer_doc))
+    await nextTick()
+    assert.deepEqual(editor.doc.value.layers[0].points, before.layers[0].points)
+    assert.equal(editor.canUndo.value, true)
+    editor.undo(); await nextTick()
+    assert.deepEqual(editor.doc.value, before)
+    editor.redo(); await nextTick()
+    assert.deepEqual(editor.doc.value, after)
+  } finally { globalThis.fetch = originalFetch }
+})

@@ -415,7 +415,7 @@ function normalizeSpec(raw: MapSpec | null): MapSpec {
     places: (raw.places ?? []).map(place => ({ ...place })),
     routes: (raw.routes ?? []).map(route => ({ ...route, points: (route.points ?? []).map(pt => [pt[0], pt[1]] as [number, number]) })),
     regions: (raw.regions ?? []).map(region => ({ ...region, points: (region.points ?? []).map(pt => [pt[0], pt[1]] as [number, number]) })),
-    style: { theme: raw.style?.theme === 'clean' ? 'clean' : raw.style?.theme === 'ink' ? 'ink' : 'archival' },
+    style: { ...raw.style, theme: raw.style?.theme === 'clean' ? 'clean' : raw.style?.theme === 'ink' ? 'ink' : 'archival' },
   }
 }
 

@@ -13,6 +13,7 @@
         <button type="button" class="mle-tool" :disabled="!canRedo || saving" :title="t('layerCanvas.toolbar.redo')" @click="redo">
           <Redo2 :size="12" />
         </button>
+        <button type="button" class="mle-tool" :disabled="saving || laying || !doc.layers.length" :title="t('mapStudio.styles.resetHint')" @click="resetThemeStyles">{{ t('mapStudio.styles.reset') }}</button>
         <button type="button" class="btn btn-sm btn-primary" :disabled="saving || !dirty" @click="save">
           <Loader2 v-if="saving" :size="12" class="animate-spin" />
           {{ saving ? t('mapStudio.layerEditor.saving') : t('mapStudio.layerEditor.save') }}
@@ -353,6 +354,23 @@ function scheduleCheck() {
 }
 watch(doc, scheduleCheck, { deep: true })
 watch(() => props.layerOptions, scheduleCheck, { deep: true })
+
+/** Same server defaults as drawing; one history entry, no coordinate/text/layout mutation or implicit save. */
+async function resetThemeStyles() {
+  if (saving.value || laying.value) return
+  const baseline = JSON.stringify(doc.value)
+  laying.value = true
+  error.value = ''
+  try {
+    const result = await mapStudioAPI.restyleLayerDoc(props.taskId, draftPayload(), props.layerOptions)
+    if (JSON.stringify(doc.value) !== baseline) { error.value = t('mapStudio.layerEditor.layoutChanged'); return }
+    pushHistory()
+    doc.value = JSON.parse(JSON.stringify(result.layer_doc))
+    labelProblems.value = result.problems || []
+    toast.success(t('mapStudio.styles.resetDone'))
+  } catch (err) { error.value = String(err?.body?.message || err?.message || err) }
+  finally { laying.value = false }
+}
 
 /** 只读检查：逐条列出严格校验、平滑偏离与标签排版问题；不保存、不重绘 */
 async function refreshProblems() {

@@ -28,13 +28,6 @@
         </select>
         <span class="brief-basis dim">{{ t('mapStudio.brief.detailLevelHint') }}</span>
       </label>
-      <label class="brief-field">
-        <span class="brief-label">{{ t('mapStudio.brief.style') }}</span>
-        <select class="input" :value="brief.style" :disabled="disabled" @change="patchSelect('style', $event)">
-          <option v-for="style in STYLES" :key="style" :value="style">{{ t(`mapStudio.brief.styleOption.${style}`) }}</option>
-        </select>
-        <span class="brief-basis dim">{{ t('mapStudio.brief.styleHint') }}</span>
-      </label>
       <label class="brief-field brief-check">
         <input type="checkbox" :checked="brief.schematic" :disabled="disabled" @change="patchCheckbox($event)" />
         <span>
@@ -43,6 +36,9 @@
         </span>
       </label>
     </div>
+    <MapStylePicker :model-value="brief.map_style" :disabled="disabled" @update:model-value="emit('patch', { map_style: $event })" />
+    <span v-if="inferredOf('map_style')" class="brief-basis dim">{{ t('mapStudio.brief.inferredBasis', { basis: inferredOf('map_style')?.basis }) }}</span>
+    <span v-for="issue in issuesOf('map_style')" :key="issue.code" class="brief-issue">{{ issue.message }}</span>
 
     <section class="brief-modes">
       <span class="brief-label">{{ t('mapStudio.brief.baseMode') }}</span>
@@ -101,7 +97,8 @@
  */
 import { useI18n } from 'vue-i18n'
 import MapCalibration from '~/map-studio/components/MapCalibration.vue'
-import type { MapBaseMode, MapBrief, MapStyleTheme, MapStudioIssue } from '~/map-studio/api'
+import MapStylePicker from '~/map-studio/components/MapStylePicker.vue'
+import type { MapBaseMode, MapBrief, MapStudioIssue } from '~/map-studio/api'
 
 const { t } = useI18n()
 
@@ -116,9 +113,8 @@ const emit = defineEmits<{ (e: 'patch', patch: Partial<MapBrief>): void }>()
 type TextField = 'subject' | 'era' | 'location' | 'purpose'
 const TEXT_FIELDS: TextField[] = ['subject', 'era', 'location', 'purpose']
 const DETAIL_LEVELS: Array<MapBrief['detail_level']> = ['overview', 'regional', 'site']
-const STYLES: MapStyleTheme[] = ['archival', 'clean', 'ink']
 const BASE_MODES: MapBaseMode[] = ['program', 'earth', 'image']
-const FIELD_NAMES = new Set<string>([...TEXT_FIELDS, 'detail_level', 'style', 'schematic', 'base_mode', 'reference_image', 'notes'])
+const FIELD_NAMES = new Set<string>([...TEXT_FIELDS, 'detail_level', 'map_style', 'schematic', 'base_mode', 'reference_image', 'notes'])
 
 function inferredOf(field: string) {
   return props.brief.inferred.find(item => item.field === field) ?? null
@@ -139,11 +135,10 @@ function patchText(field: TextField, event: Event) {
   emit('patch', patch)
 }
 
-function patchSelect(field: 'detail_level' | 'style', event: Event) {
+function patchSelect(field: 'detail_level', event: Event) {
   const target = event.target
   if (!(target instanceof HTMLSelectElement)) return
-  if (field === 'style') emit('patch', { style: target.value as MapStyleTheme })
-  else emit('patch', { detail_level: target.value as MapBrief['detail_level'] })
+  emit('patch', { detail_level: target.value as MapBrief['detail_level'] })
 }
 
 function patchCheckbox(event: Event) {

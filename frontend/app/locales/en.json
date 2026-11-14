@@ -3564,6 +3564,29 @@
     }
   },
   "mapStudio": {
+    "styles": {
+      "title": "Cartographic theme",
+      "hint": "Choose colors, lines and type hierarchy, not geography. AI proposals need a reason and cannot replace a human choice.",
+      "followDefault": "Use module default: {name}",
+      "legacy": "This legacy task keeps archival / clean / ink styling until a family is selected.",
+      "palette": "Theme palette",
+      "referenceHint": "References illustrate appearance, not geographic positions or historical boundaries.",
+      "loadFailed": "Could not load themes",
+      "defaultTitle": "Default cartographic theme",
+      "defaultHint": "Used by new tasks without an explicit choice; existing choices and legacy tasks remain unchanged.",
+      "saveDefault": "Save default theme",
+      "defaultSaved": "Default theme saved",
+      "reset": "Reset styles to theme",
+      "resetHint": "Styles only: geometry, text and layout stay unchanged. Undoable; save separately.",
+      "resetDone": "Draft styles reset to theme; undo is available",
+      "family": {
+        "atlas-tint": { "name": "Classical tinted atlas / engraving", "purpose": "Regional overviews with pale washes, fine rivers and serif place names." },
+        "historical-schematic": { "name": "Historical thematic schematic", "purpose": "Territorial change, migration and river narratives with less background detail." },
+        "relief-shading": { "name": "Shaded relief", "purpose": "Restrained mountain and valley tones; real relief still requires verified data." },
+        "ink-chinese": { "name": "Old-map ink / hand-drawn", "purpose": "Rice-paper tones, ink rivers and vermilion routes for historical diagrams." },
+        "modern-clean": { "name": "Clean modern documentary", "purpose": "Few colors, clear hierarchy and no aged-paper stains." }
+      }
+    },
     "stage": {
       "brief": "Context and purpose",
       "research": "Research (points, lines, regions)",
