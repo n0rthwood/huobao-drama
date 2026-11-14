@@ -75,6 +75,7 @@
 ### `GET /ai-configs?service_type=text|image|video|tts` [R]
 用途：拿到 `config_id` 与可用 `model` 列表。**响应含 `api_key`，不得写入证据**。
 注意：`model` 字段存 JSON 数组，只带首个时不要据此认为只有一种模型。
+文本配置另有 `stages`（专用环节，非空时只在自动模式下服务所列环节并优先，例如 `["design_card"]`）与 `reasoning_effort`（写进请求体的思考强度）——Issue #102；纪录片设计卡因此默认落在专用配置（GLM 5.3 flash，`low`），读图仍走 DeepSeek。查任务实际用了哪条配置看任务 `params.model_used`，不要按优先级推断。
 
 ### `GET /ai-configs/ai-stages` [R][S]
 用途：查看哪些 AI 阶段静态要求视觉模型（vision 标记），不要运行时探测。

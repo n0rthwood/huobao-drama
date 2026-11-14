@@ -1,0 +1,182 @@
+{
+ "arm": "C",
+ "shot": 948,
+ "config_resumed": null,
+ "config_id": 10,
+ "model": "deepseek-chat",
+ "context_window": 3,
+ "post": {
+  "code": 200,
+  "data": {
+   "status": "running",
+   "total": 1
+  },
+  "message": "success"
+ },
+ "task_id": 3121,
+ "wall_s_post_to_done": 192.5,
+ "task": {
+  "id": 3121,
+  "created_at": "2026-11-13T15:29:41.819Z",
+  "completed_at": "2026-11-13T15:32:50.025Z",
+  "status": "completed"
+ },
+ "progress": {
+  "completed": 1,
+  "failed": 0,
+  "total": 1,
+  "items": [
+   {
+    "storyboard_id": 948,
+    "storyboard_number": 19,
+    "state": "completed",
+    "reason": null
+   }
+  ]
+ },
+ "context_window_param": 3,
+ "vision_calls_param": {
+  "count": 1,
+  "prompt_tokens": 982,
+  "completion_tokens": 600,
+  "model": "deepseek-chat"
+ },
+ "works": [
+  {
+   "id": 640,
+   "task_id": 3121,
+   "stage": "design_card",
+   "source_chars": 41,
+   "sample_key": "design_card|cfg:10|model:deepseek-chat",
+   "storyboard_id": 948,
+   "storyboard_number": 19,
+   "started_at": 1794583781821,
+   "finished_at": 1794583970024,
+   "status": "completed",
+   "model_ms": 187357,
+   "queue_ms": 28,
+   "work_ms": 188203,
+   "call_count": 5,
+   "heartbeat_at": 1794583970024,
+   "error_msg": null,
+   "created_at": 1794583781821,
+   "scope": "sys_task",
+   "active_call_started_at": null,
+   "active_call_heartbeat_at": null
+  }
+ ],
+ "calls": [
+  {
+   "id": 1686,
+   "kind": "llm",
+   "config_id": 10,
+   "config_name": "DeepSeek V4.1 Flash 1017 (local)",
+   "model": "deepseek-chat",
+   "duration_ms": 29426,
+   "prompt_tokens": 32671,
+   "completion_tokens": 46,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": 91245,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1687,
+   "kind": "llm",
+   "config_id": 10,
+   "config_name": "DeepSeek V4.1 Flash 1017 (local)",
+   "model": "deepseek-chat",
+   "duration_ms": 23577,
+   "prompt_tokens": 45833,
+   "completion_tokens": 185,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": 121459,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1688,
+   "kind": "vision_chat",
+   "config_id": 10,
+   "config_name": "DeepSeek V4.1 Flash 1017 (local)",
+   "model": "deepseek-chat",
+   "duration_ms": 32334,
+   "prompt_tokens": 982,
+   "completion_tokens": 600,
+   "finish_reason": "stop",
+   "status": "completed",
+   "request_chars": 266,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1689,
+   "kind": "llm",
+   "config_id": 10,
+   "config_name": "DeepSeek V4.1 Flash 1017 (local)",
+   "model": "deepseek-chat",
+   "duration_ms": 71607,
+   "prompt_tokens": 46711,
+   "completion_tokens": 1776,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": 122827,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1690,
+   "kind": "llm",
+   "config_id": 10,
+   "config_name": "DeepSeek V4.1 Flash 1017 (local)",
+   "model": "deepseek-chat",
+   "duration_ms": 30413,
+   "prompt_tokens": 48552,
+   "completion_tokens": 427,
+   "finish_reason": "stop",
+   "status": "completed",
+   "request_chars": 126137,
+   "http_status": 200,
+   "error_msg": null
+  }
+ ],
+ "card_saved": true,
+ "combo": "A",
+ "card_status": "pending",
+ "stale_reason": null,
+ "card": "{\"version\":2,\"info_points\":[{\"id\":\"ip1\",\"text\":\"地理跨度：哥萨克人的聚落自南部草原一路分布到北部伏尔加河上游，横跨东欧平原各地\",\"via\":\"layer\"},{\"id\":\"ip2\",\"text\":\"这些聚落不是历史上某一支成建制的群体，而是散布在平原各处、规模大小不一的无数个居留点\",\"via\":\"layer\"},{\"id\":\"ip3\",\"text\":\"承接上一镜 #21 已立的方位：克里米亚汗国色块（南部草原方向）与莫斯科公国色块（北部伏尔加河上游方向）之间就是这片分布地带\",\"via\":\"layer\"},{\"id\":\"ip4\",\"text\":\"伏尔加河纵贯东欧平原中部，是这些聚落沿线分布的主干水系，旁白中『北部伏尔加河上游』对应这条河的北段\",\"via\":\"layer\"},{\"id\":\"ip5\",\"text\":\"『第聂伯河』这条河在本张底图上没有标注几何，无法用图层指出，由旁白承担\",\"via\":\"narration_only\"},{\"id\":\"ip6\",\"text\":\"本镜旁白是一句分布与规模的空间陈述，没有具体人物出场、没有可演的过程事件，生成段只会凭空造出未被指名的人群\",\"via\":\"narration_only\"}],\"budget\":{\"layer_s\":9,\"gen_s\":null},\"rationale\":\"旁白为「从南部草原到北部伏尔加河上游，哥萨克人组成的聚落分布在东欧平原各地，规模有大有小」，实测配音 8.5 秒，预算只排图层段 9 秒（8.5 + 0.5 表演余量）即覆盖，不改动旁白一字。这一句是纯空间分布陈述：说的是『散落在哪里』和『有多少、多大』，没有任何具体人物出场、没有行进或交火这类可演的过程，若硬加生成段只能凭空造出一群未被指名的人，与纪录片无对白、只依据证据素材的纪律冲突。因此取组合 A（纯图层段），gen_plan 留空，全部信息交给图层在忠实原件上标出来。底图沿用前几镜（#16—#22）同一张 prop #258 @蒙古汗国分布与西征路线图（忠实原件、现在就有图，不钉 version_task_id），因为本镜第一句紧接着上一镜「小叶是伊凡四世地盘上的一个团伙老大」，观众应仍在同一张图上，把『一伙』扩展成『遍地』。我已用 read_image 读该原件确认构图：画面左半（横向 0%—50%）与中下部（纵向 50%—90%）文字色块密集——莫斯科公国色块在横向 25%—35%、纵向 30%—45%，喀山汗国色块在横向 40%—50%、纵向 35%—50%，克里米亚汗国色块在横向 20%—30%、纵向 80%—90%，伏尔加河纵贯中部（文字标签约横向 40%、纵向 65%）；画面右侧横向 75%—100% 除右上西伯利亚汗国虚线框外是大片浅褐空白地形带，右下角纵向 \",\"suggested_combo\":\"A\",\"layer_plan\":{\"base\":{\"kind\":\"asset\",\"asset_kind\":\"prop\",\"asset_id\":258,\"version_task_id\":null},\"must_mark\":[{\"asset_id\":258,\"semantic_id\":\"g_e7dc4ee3\",\"name\":\"克里米亚汗国\"},{\"asset_id\":258,\"semantic_id\":\"g_a3b81df5\",\"name\":\"莫斯科公国\"},{\"asset_id\":258,\"semantic_id\":\"r_0cfaceb2\",\"name\":\"伏尔加河\"},{\"asset_id\":258,\"semantic_id\":\"g_7494af35\",\"name\":\"喀山汗国\"}],\"planned_layers\":[{\"type\":\"text\",\"at_s\":0.3,\"role\":\"date\",\"fields\":{\"main\":\"16世纪\",\"sub\":\"东欧平原\"}},{\"type\":\"text\",\"at_s\":1.2,\"role\":\"heading\",\"fields\":{\"main\":\"聚落遍布东欧平原\",\"sub\":\"南部草原 · 伏尔加河上游\"}},{\"type\":\"polygon\",\"at_s\":2,\"anchor\":{\"asset_id\":258,\"semantic_id\":\"g_e7dc4ee3\",\"name\":\"克里米亚汗国\"}},{\"type\":\"polygon\",\"at_s\":2,\"anchor\":{\"asset_id\":258,\"semantic_id\":\"g_a3b81df5\",\"name\":\"莫斯科公国\"}},{\"type\":\"polyline\",\"at_s\":3,\"anchor\":{\"asset_id\":258,\"semantic_id\":\"r_0cfaceb2\",\"name\":\"伏尔加河\"}},{\"type\":\"polygon\",\"at_s\":4,\"anchor\":{\"asset_id\":258,\"semantic_id\":\"g_7494af35\",\"name\":\"喀山汗国\"}},{\"type\":\"text\",\"at_s\":5,\"role\":\"statement\",\"fields\":{\"main\":\"从南部草原到伏尔加河上游\",\"sub\":\"聚落分布在整个东欧平原\"}},{\"type\":\"text\",\"at_s\":7.2,\"role\":\"keyword\",\"fields\":{\"main\":\"规模不等\",\"sub\":\"大小不一的无数居留点\"}}],\"text_layout\":\"h-right-stack\"},\"gen_plan\":{\"reference_assets\":[]}}",
+ "audit": {
+  "storyboard_id": 948,
+  "shot_number": 19,
+  "narration_text": "从南部草原到北部伏尔加河上游，哥萨克人组成的聚落分布在东欧平原各地，规模有大有小。",
+  "combo": "A",
+  "suggested_combo": "A",
+  "status": "pending",
+  "confirmed_at": null,
+  "stale_reason": null,
+  "has_card": true,
+  "unresolved": 0,
+  "unresolved_layers": [],
+  "video_generated": true,
+  "issues": [
+   {
+    "code": "text_plan_warning",
+    "severity": "warn",
+    "message": "第 4 拍：「从南部草原到伏尔加河上游」与上一拍「南部草原 · 伏尔加河上游」重复，建议换成新信息"
+   }
+  ],
+  "narration_measured_s": 8.5,
+  "tts": {
+   "valid": true,
+   "reason": null,
+   "message": null,
+   "duration_ms": 8480
+  },
+  "budget": {
+   "layer_s": 9,
+   "gen_s": null
+  }
+ }
+}

@@ -1,0 +1,156 @@
+{
+ "arm": "B",
+ "shot": 938,
+ "config_resumed": null,
+ "config_id": 1,
+ "model": "glm-5.3-flash",
+ "context_window": 3,
+ "post": {
+  "code": 200,
+  "data": {
+   "status": "running",
+   "total": 1
+  },
+  "message": "success"
+ },
+ "task_id": 3128,
+ "wall_s_post_to_done": 142.5,
+ "task": {
+  "id": 3128,
+  "created_at": "2026-11-13T16:24:15.172Z",
+  "completed_at": "2026-11-13T16:26:37.289Z",
+  "status": "completed"
+ },
+ "progress": {
+  "completed": 1,
+  "failed": 0,
+  "total": 1,
+  "items": [
+   {
+    "storyboard_id": 938,
+    "storyboard_number": 8,
+    "state": "completed",
+    "reason": null
+   }
+  ]
+ },
+ "context_window_param": 3,
+ "vision_calls_param": null,
+ "works": [
+  {
+   "id": 647,
+   "task_id": 3128,
+   "stage": "design_card",
+   "source_chars": 20,
+   "sample_key": "design_card|cfg:1|model:glm-5.3-flash",
+   "storyboard_id": 938,
+   "storyboard_number": 8,
+   "started_at": 1794587055174,
+   "finished_at": 1794587197288,
+   "status": "completed",
+   "model_ms": 141438,
+   "queue_ms": 14,
+   "work_ms": 142114,
+   "call_count": 4,
+   "heartbeat_at": 1794587197288,
+   "error_msg": null,
+   "created_at": 1794587055174,
+   "scope": "sys_task",
+   "active_call_started_at": null,
+   "active_call_heartbeat_at": null
+  }
+ ],
+ "calls": [
+  {
+   "id": 1726,
+   "kind": "llm",
+   "config_id": 1,
+   "config_name": "GLM 5.3 (local)",
+   "model": "glm-5.3-flash",
+   "duration_ms": 3710,
+   "prompt_tokens": 37100,
+   "completion_tokens": 42,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": 91142,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1727,
+   "kind": "llm",
+   "config_id": 1,
+   "config_name": "GLM 5.3 (local)",
+   "model": "glm-5.3-flash",
+   "duration_ms": 115656,
+   "prompt_tokens": 50645,
+   "completion_tokens": 6379,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": 122452,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1728,
+   "kind": "llm",
+   "config_id": 1,
+   "config_name": "GLM 5.3 (local)",
+   "model": "glm-5.3-flash",
+   "duration_ms": 13803,
+   "prompt_tokens": 51488,
+   "completion_tokens": 954,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": 123827,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1729,
+   "kind": "llm",
+   "config_id": 1,
+   "config_name": "GLM 5.3 (local)",
+   "model": "glm-5.3-flash",
+   "duration_ms": 8269,
+   "prompt_tokens": 52350,
+   "completion_tokens": 343,
+   "finish_reason": "stop",
+   "status": "completed",
+   "request_chars": 125179,
+   "http_status": 200,
+   "error_msg": null
+  }
+ ],
+ "card_saved": true,
+ "combo": "B",
+ "card_status": "pending",
+ "stale_reason": null,
+ "card": "{\"version\":2,\"info_points\":[{\"id\":\"p1\",\"text\":\"小叶的处境必须放进他所处的时代里才能看清——本镜是『时代段』的引子，只承上启下，不引入新事实\",\"via\":\"narration_only\"},{\"id\":\"p2\",\"text\":\"暮色中的小叶在斯特罗加诺夫边疆要塞前停步远望、神情凝重，把『处境』落在具体的人身上\",\"via\":\"generated\"}],\"budget\":{\"layer_s\":null,\"gen_s\":6},\"rationale\":\"本镜旁白实测 4.6 秒，是一句承上启下的过渡：从『小叶的处境』转入『他所处的时代』。旁白里没有任何地名、河流、范围或路线，也没有可核实的年代数字，故全集六张证据素材中没有一张能为它提供 must_mark 依据——本镜不设图层段，取组合 B（纯生成段）。承接前镜 #7：其生成段尾帧是小叶黄昏时停在斯特罗加诺夫边疆要塞木栅墙前、右手搭鞘口、望向画外左前方；本镜生成段从同一画面继续，用『停步远望—凝神近景—背影远眺』三拍把『处境』的重量落在具体的人身上，末拍静立留白约 1 秒作为换幕余量，随后段末硬切进 #9 的时代段（莫斯科宫廷图层段开篇），完成从人到时代的换幕。参考资产两项均有图：character #72 @叶尔马克·齐莫菲叶维奇（定妆参考图）与 scene #178 @斯特罗加诺夫边疆要塞（前镜 #7 已用作生成段参考，#7 尾帧即在该场景），后续提示词阶段将逐条 @ 到，不会出现 card_ref_unmet。budget：gen_s=6.0 ≥ 4.6，留出约 1.4 秒静立余量避免配音压到末帧，layer_s 置空。屏幕文字不上：时代坐标（16 世纪、1480 年等）由 #9 与 #11 的图层段承担，本镜若再出文字会与 #6 已上过的『16世纪』重复，并抢走 #9 的标题位。p1 是修辞性过渡句，画面无法直接呈现，标 narration_only，全卡仅此一条。\",\"suggested_combo\":\"B\",\"gen_plan\":{\"reference_assets\":[{\"kind\":\"character\",\"id\":72,\"name\":\"叶尔马克·齐莫菲叶维奇\"},{\"kind\":\"scene\",\"id\":178,\"name\":\"斯特罗加诺夫边疆要塞\"}],\"first\":\"接前镜尾帧：黄昏的 @斯特罗加诺夫边疆要塞 中全景，@叶尔马克·齐莫菲叶维奇 停步在木栅墙前的夯土场上，右手搭在腰间弯刀鞘口，左手自然垂在体侧，侧脸望向画外左前方远处，暮色更深\",\"mid\":\"近景侧脸：@叶尔马克·齐莫菲叶维奇 眉头紧锁、目光沉向远方，身后 @斯特罗加诺夫边疆要塞 的木栅墙与望楼轮廓渐暗，一缕炊烟升起\",\"last\":\"背影全景：@叶尔马克·齐莫菲叶维奇 背对镜头立在 @斯特罗加诺夫边疆要塞 的木栅墙前，右手仍搭在腰间弯刀鞘口，左手垂在体侧，双腿分开站稳，望向墙外渐暗的河谷与针叶林，天际只剩一线暮光，末拍保持静立\"}}",
+ "audit": {
+  "storyboard_id": 938,
+  "shot_number": 8,
+  "narration_text": "要理解小叶的处境，得先看清他所处的时代。",
+  "combo": "B",
+  "suggested_combo": "B",
+  "status": "pending",
+  "confirmed_at": null,
+  "stale_reason": null,
+  "has_card": true,
+  "unresolved": 0,
+  "unresolved_layers": [],
+  "video_generated": false,
+  "issues": [],
+  "narration_measured_s": 4.6,
+  "tts": {
+   "valid": true,
+   "reason": null,
+   "message": null,
+   "duration_ms": 4640
+  },
+  "budget": {
+   "layer_s": null,
+   "gen_s": 6
+  }
+ }
+}

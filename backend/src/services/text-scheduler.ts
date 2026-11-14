@@ -1,6 +1,6 @@
 import { eq, sql } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
-import { effectiveConcurrency, isOfficialProvider, listActiveTextConfigs } from './ai.js'
+import { effectiveConcurrency, isOfficialProvider, listActiveTextConfigs, parseConfigReasoningEffort, parseConfigStages } from './ai.js'
 import {
   AI_STAGES,
   StagePinUnavailableError,
@@ -26,6 +26,10 @@ export interface TextEndpoint {
   concurrency: number
   temperature: number | null
   settings: string | null
+  /** 专用环节（#102）：非 null 时自动模式只服务这些环节并在其中优先；不带环节的选择看不到它 */
+  stages: string[] | null
+  /** 请求体里的 reasoning_effort（#102），null = 不设置 */
+  reasoningEffort: string | null
   suspended: boolean
   suspendedReason: string | null
   consecutiveErrors: number
@@ -56,8 +60,16 @@ export class TextSlotQueue {
     this.assigned.set(configId, (this.assigned.get(configId) ?? 0) + 1)
   }
 
-  async eligible(opts: { vision: boolean; configId?: number }): Promise<TextEndpoint[]> {
-    return (await this.endpoints()).filter(e => !e.suspended && (!opts.vision || e.vision) && (opts.configId == null || e.configId === opts.configId))
+  /**
+   * 可用端点。`configId`（显式指定）不受专用环节限制；否则专用配置只在 `stage` 命中它的 `stages` 时出现，
+   * 不带 `stage` 的选择（默认看图配置、直连回退）永远看不到专用配置（#102）。
+   */
+  async eligible(opts: { vision: boolean; configId?: number; stage?: string }): Promise<TextEndpoint[]> {
+    return (await this.endpoints()).filter(e => !e.suspended
+      && (!opts.vision || e.vision)
+      && (opts.configId != null
+        ? e.configId === opts.configId
+        : !e.stages || (opts.stage != null && e.stages.includes(opts.stage))))
   }
 
   async run<T>(args: { configId: number; interactive?: boolean; signal?: AbortSignal }, fn: () => Promise<T>): Promise<T> {
@@ -117,6 +129,7 @@ async function readEndpoints(): Promise<TextEndpoint[]> {
     configId: c.id!, provider: c.provider, name: c.name || '', baseUrl: c.baseUrl,
     apiKey: c.apiKey, model: c.model, vision: !!c.vision, concurrency: effectiveConcurrency(c),
     temperature: c.temperature ?? null, settings: c.settings ?? null,
+    stages: parseConfigStages(c.settings), reasoningEffort: parseConfigReasoningEffort(c.settings),
     suspended: !!c.suspendedAt, suspendedReason: c.suspendedReason ?? null,
     consecutiveErrors: c.consecutiveErrors ?? 0,
   }))
@@ -127,7 +140,7 @@ const slots = new TextSlotQueue(readEndpoints, async () => {
   if (id != null) await markTextTaskStarted(id)
 })
 
-export async function listEligibleTextEndpoints(opts: { vision: boolean; configId?: number }): Promise<TextEndpoint[]> {
+export async function listEligibleTextEndpoints(opts: { vision: boolean; configId?: number; stage?: string }): Promise<TextEndpoint[]> {
   return slots.eligible(opts)
 }
 
@@ -139,8 +152,8 @@ export async function selectTextEndpoint(opts: { vision: boolean; excludeConfigI
 }
 
 /** 本环节当前真正能用的配置（显式指定不可用时回给界面当候选） */
-async function stageCandidates(vision: boolean, excluded: Set<number>): Promise<StageCandidate[]> {
-  return (await listEligibleTextEndpoints({ vision }))
+async function stageCandidates(stage: AiStage, vision: boolean, excluded: Set<number>): Promise<StageCandidate[]> {
+  return (await listEligibleTextEndpoints({ vision, stage }))
     .filter(endpoint => !excluded.has(endpoint.configId))
     .map(endpoint => ({
       config_id: endpoint.configId,
@@ -197,10 +210,10 @@ export async function assignTextEndpoint(
     const failedConfigId = parent ? (parseTextTaskParams(parent.params)?.model_used as { config_id?: number | null } | undefined)?.config_id : null
     if (failedConfigId != null) excluded.add(failedConfigId)
   }
-  const endpoints = (await listEligibleTextEndpoints({ vision: spec.vision, configId: opts.configId }))
+  const endpoints = (await listEligibleTextEndpoints({ vision: spec.vision, configId: opts.configId, stage }))
     .filter(endpoint => !excluded.has(endpoint.configId))
-  // Balance by concurrency, then by error count; stable sort keeps priority order for ties.
-  endpoints.sort((a, b) => slots.assignmentScore(a) - slots.assignmentScore(b))
+  // 专用本环节的配置优先（#102）；同档内按并发与错误数均衡，稳定排序保留 priority 顺序。
+  endpoints.sort((a, b) => Number(!!b.stages) - Number(!!a.stages) || slots.assignmentScore(a) - slots.assignmentScore(b))
   const endpoint = endpoints[0]
   if (!endpoint) {
     // 显式指定的配置用不了：指名原因 + 列出可用候选，**绝不**静默换到另一条计费服务，
@@ -209,7 +222,7 @@ export async function assignTextEndpoint(
       throw new StagePinUnavailableError(
         stage, spec.label, spec.vision,
         await pinnedConfigFacts(opts.configId!, spec.vision),
-        await stageCandidates(spec.vision, excluded),
+        await stageCandidates(stage, spec.vision, excluded),
       )
     }
     if (spec.vision) throw new StageVisionUnavailableError(stage, spec.label)
@@ -228,7 +241,7 @@ export async function assignTextEndpoint(
           reason: 'model_mismatch',
           detail: allowed.length ? `这条配置可用的模型：${allowed.join('、')}` : null,
         },
-        await stageCandidates(spec.vision, excluded),
+        await stageCandidates(stage, spec.vision, excluded),
       )
     }
   }

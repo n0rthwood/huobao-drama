@@ -1,0 +1,1260 @@
+{
+ "934": {
+  "task_id": 2942,
+  "work_id": 487,
+  "seq": 15,
+  "created_at": 1794551929779,
+  "combo": null,
+  "card": {
+   "budget": {
+    "gen_s": 6,
+    "layer_s": 6
+   },
+   "combo": "C",
+   "gen_plan": {
+    "first": null,
+    "last": "叶尔马克双手撑着桌沿俯身看图，右手食指停在图幅东侧山麓处，左侧那幅 @叶尔马克肖像画 斜靠在桌面前缘，头灯暖光落在他与图幅上",
+    "mid": "俯瞰桌面，图幅铺在大木桌上，叶尔马克站在桌后左侧、右手将 @乌拉尔山东西两麓领地范围图 的右缘压平，左手垂在体侧，目光落在图幅中部的山脉走向上",
+    "reference_assets": [
+     {
+      "id": 72,
+      "kind": "character",
+      "name": "叶尔马克·齐莫菲叶维奇"
+     },
+     {
+      "id": 257,
+      "kind": "prop",
+      "name": "乌拉尔山东西两麓领地范围图"
+     },
+     {
+      "id": 266,
+      "kind": "prop",
+      "name": "叶尔马克肖像画"
+     }
+    ]
+   },
+   "info_points": [
+    {
+     "id": "ip1",
+     "text": "时间坐标：1581年，距1492年哥伦布到达美洲约90年",
+     "via": "layer"
+    },
+    {
+     "id": "ip2",
+     "text": "这是俄国人向西伯利亚殖民扩张的序幕",
+     "via": "layer"
+    },
+    {
+     "id": "ip3",
+     "text": "这支队伍从卡马河畔的索利卡姆斯克出发，翻越乌拉尔山中段山口，向东进入西伯利亚",
+     "via": "layer"
+    },
+    {
+     "id": "ip4",
+     "text": "乌拉尔山脉是欧洲与西伯利亚之间的天然分界",
+     "via": "layer"
+    },
+    {
+     "id": "ip5",
+     "text": "对比展示：舞台上地图铺开，先立起出发地与山脉走向",
+     "via": "generated"
+    },
+    {
+     "id": "ip6",
+     "text": "对比展示：路线沿线点亮，光标自西麓向东移动越过乌拉尔山",
+     "via": "generated"
+    }
+   ],
+   "layer_plan": {
+    "base": {
+     "asset_id": 257,
+     "asset_kind": "prop",
+     "kind": "asset"
+    },
+    "must_mark": [
+     {
+      "asset_id": 257,
+      "name": "索利卡姆斯克（盐场）",
+      "semantic_id": "p_9f5ea495"
+     },
+     {
+      "asset_id": 257,
+      "name": "乌拉尔山脉中段走向线",
+      "semantic_id": "r_dc64e2ed"
+     },
+     {
+      "asset_id": 257,
+      "name": "1574年向乌拉尔山东麓扩展方向（示意箭头）",
+      "semantic_id": "r_50039870"
+     }
+    ],
+    "planned_layers": [
+     {
+      "anchor": null,
+      "at_s": 0.4,
+      "fields": {
+       "main": "1581年",
+       "sub": "距发现美洲约90年"
+      },
+      "role": "date",
+      "text": null,
+      "type": "text"
+     },
+     {
+      "anchor": null,
+      "at_s": 1.6,
+      "fields": {
+       "main": "向东翻过乌拉尔山",
+       "sub": "俄国的西伯利亚序幕"
+      },
+      "role": "heading",
+      "text": null,
+      "type": "text"
+     },
+     {
+      "anchor": {
+       "asset_id": 257,
+       "name": "索利卡姆斯克（盐场）",
+       "semantic_id": "p_9f5ea495"
+      },
+      "at_s": 2.6,
+      "fields": null,
+      "role": null,
+      "text": null,
+      "type": "marker"
+     },
+     {
+      "anchor": {
+       "asset_id": 257,
+       "name": "乌拉尔山脉中段走向线",
+       "semantic_id": "r_dc64e2ed"
+      },
+      "at_s": 3.4,
+      "fields": null,
+      "role": null,
+      "text": null,
+      "type": "polyline"
+     },
+     {
+      "anchor": {
+       "asset_id": 257,
+       "name": "1574年向乌拉尔山东麓扩展方向（示意箭头）",
+       "semantic_id": "r_50039870"
+      },
+      "at_s": 3.4,
+      "fields": null,
+      "role": null,
+      "text": null,
+      "type": "polyline"
+     }
+    ],
+    "text_layout": "h-left-stack"
+   },
+   "rationale": "本镜旁白为「哥伦布发现新大陆后90年，1581年，另一个欧洲人向东翻过乌拉尔山，揭开了俄国人向西伯利亚殖民扩张的序幕」，实测配音 10.7 秒，预算 6 + 6 = 12 秒覆盖且不改动旁白。底图必须承担「向东翻越乌拉尔山」这一地理关系，因此取 prop #257 @乌拉尔山东西两麓领地范围图 作底图：我已经用 read_image 读该原件，确认画面里卡马河与楚索瓦亚河在左中至中部，中上方为 1558 年授地范围与盐场点位，乌拉尔山走向以一条纵贯中右部的虚线串点呈现，右中部还有指向东南的 1574 年扩展箭头，四周是大片空白，右侧尤其空旷，故选用左侧成套 h-left-stack 让文本框压在空白陆面上，不遮山脉与点位。三条图层都锚在本张资产、本版本真实存在的语义上：marker 用索利卡姆斯克（point，1 点，源图在该处有明确的黄色点位）作为出发地，polyline 用乌拉尔山脉中段走向线（line，4 点）与 1574 年向东扩展方向示意箭头（line，3 点），后两者共用一个 at_s 表达「山脉即东西分界、越山即东进」。must_mark 只列这三条，因为旁白这一句只要求观众得到「从西麓出发、跨过乌拉尔山、向东」——卡马河与楚索瓦亚河属于后镜（第 59 镜沿卡马河进发）会再讲的内容，本镜不抢先把河系都标出来，避免画面信息过载。文字两拍错开 at_s（0.4 / 1.6），同一 primary 区先后替换：date 在 context 区持续显示，capacity 按 h-left-stack 核对，「1581年」5 字、「距发现美洲约90年」9 字、「向东翻过乌拉尔山」7 字、「俄国的西伯利亚序幕」9 字，均在日期 main 15 / sub 25、标题 main 26 以内。组合取 C（先定位再入戏）：图层段先立起时间与山脉分界，再由生成段把这幅图落到一个可触摸的实物舞台上——对比上一镜（#3 新大陆）的壮观海景，这里用「一个人俯身在一张摊开的地图上」的克制的室内戏开场俄国篇章，并与下一镜（#5 叶尔马克其人）的自然衔接。生成段参考资产三项全部被 @：@叶尔马克·齐莫菲叶维奇 本人、@乌拉尔山东西两麓领地范围图 作为桌上正在使用的实体图幅、@叶尔马克肖像画 作为桌沿斜靠的画片，肖像画既有原件（faithful），可作静态道具使用，不按「以后会出图」规划。生成段首帧由图层段末帧继承锁定，故不写 first。本镜与前镜（#3 瓜纳哈尼岛）为换地点硬切，无承接依赖。",
+   "suggested_combo": "C"
+  },
+  "work_ms": 107814,
+  "call_count": 6,
+  "model_ms": 122651,
+  "calls": [
+   {
+    "kind": "llm",
+    "prompt_tokens": 32671,
+    "completion_tokens": 43,
+    "duration_ms": 21853,
+    "config_id": 10,
+    "model": "deepseek-chat",
+    "finish_reason": "tool_calls"
+   },
+   {
+    "kind": "llm",
+    "prompt_tokens": 69667,
+    "completion_tokens": 369,
+    "duration_ms": 27357,
+    "config_id": 10,
+    "model": "deepseek-chat",
+    "finish_reason": "tool_calls"
+   },
+   {
+    "kind": "vision_chat",
+    "prompt_tokens": 950,
+    "completion_tokens": 572,
+    "duration_ms": 15870,
+    "config_id": 10,
+    "model": "deepseek-chat",
+    "finish_reason": "stop"
+   },
+   {
+    "kind": "vision_chat",
+    "prompt_tokens": 952,
+    "completion_tokens": 598,
+    "duration_ms": 15636,
+    "config_id": 10,
+    "model": "deepseek-chat",
+    "finish_reason": "stop"
+   },
+   {
+    "kind": "llm",
+    "prompt_tokens": 71386,
+    "completion_tokens": 1706,
+    "duration_ms": 30826,
+    "config_id": 10,
+    "model": "deepseek-chat",
+    "finish_reason": "tool_calls"
+   },
+   {
+    "kind": "llm",
+    "prompt_tokens": 73114,
+    "completion_tokens": 455,
+    "duration_ms": 11109,
+    "config_id": 10,
+    "model": "deepseek-chat",
+    "finish_reason": "stop"
+   }
+  ]
+ },
+ "935": {
+  "task_id": 2942,
+  "work_id": 488,
+  "seq": 13,
+  "created_at": 1794552012717,
+  "combo": null,
+  "card": {
+   "budget": {
+    "gen_s": null,
+    "layer_s": 9.5
+   },
+   "combo": "A",
+   "gen_plan": null,
+   "info_points": [
+    {
+     "id": "ip1",
+     "text": "这个人名叫叶尔马克·齐莫菲叶维奇",
+     "via": "layer"
+    },
+    {
+     "id": "ip2",
+     "text": "我们称呼他为「小叶」",
+     "via": "layer"
+    },
+    {
+     "id": "ip3",
+     "text": "小叶是 16 世纪伏尔加河一带的哥萨克首领，本集主角（可由肖像原件加屏幕文字直接给出）",
+     "via": "layer"
+    }
+   ],
+   "layer_plan": {
+    "base": {
+     "asset_id": 266,
+     "asset_kind": "prop",
+     "kind": "asset"
+    },
+    "must_mark": [],
+    "planned_layers": [
+     {
+      "anchor": null,
+      "at_s": 0.4,
+      "fields": {
+       "main": "叶尔马克·齐莫菲叶维奇",
+       "sub": "本集主角"
+      },
+      "role": "heading",
+      "text": null,
+      "type": "text"
+     },
+     {
+      "anchor": null,
+      "at_s": 3.6,
+      "fields": {
+       "main": "小叶",
+       "sub": "我们对他的称呼"
+      },
+      "role": "keyword",
+      "text": null,
+      "type": "text"
+     }
+    ],
+    "text_layout": "h-left-stack"
+   },
+   "rationale": "本镜旁白只有一句身份介绍「这个人名叫叶尔马克·齐莫菲叶维奇，我们称呼他为小叶」，实测配音 8.3 秒，信息量极小，画面任务只是把这张脸与这个名字对上。可用的最佳依据就是 prop #266 @叶尔马克肖像画 原件：我已用 read_image 读该原件，确认人物整体偏画面中央偏左，头与躯干中轴约在横向 40%—45%，右手握长杆中下部（画面右下，杆身延至右上角），画面左侧边缘人物左肩外侧至左边界是纵向贯穿的暗色背景留白，右上角与右下角也有较暗的空区。因此本镜用该肖像作图层段底图，选左侧成套位置 h-left-stack：标题与关键词压在左侧暗背景上，不遮面部与躯干中轴。两条文字都是不指向底图具体对象与位置的排版元素（人名、称呼），按 layer-text-design 不写 anchor；容量按 h-left-stack 上限核对：heading.main「叶尔马克·齐莫菲叶维奇」11 字（≤26，两行内）、sub「本集主角」4 字（≤26）；keyword.main「小叶」2 字（≤10）、sub「我们对他的称呼」7 字（≤30）。两拍错开 at_s（0.4 / 3.6），heading 与 keyword 分处 primary 与 emphasis 两区，不互相顶替，均落在 9.5 秒图层段内。必须说明一处缺口：该肖像资产没有任何语义标注（semantics 为空），无法对人物面部或手中长杆做锚定的 label / marker，所以本镜不使用锚定标注，只用人名与称呼两套模板文本框，人名固定在左侧暗背景而不到人物身上，语义上仍成立。段组合取 A（只图层）：旁白只说名字，没有事件过程需要演出来，用原件肖像配合静态文本框比生成一段无信息的运镜更省、也更忠于证据素材；原片画面停顿在本镜的叶尔马克肖像上，与上一镜（#4 地图上向东翻越乌拉尔山）是硬切换载体，故不承接上一镜底图，也不写生成段与关键帧提示词。预算 9.5 秒 ≥ 实测 8.3 秒，保证旁白念完名字与称呼后仍有余量让肖像停留，不压缩旁白。",
+   "suggested_combo": "A",
+   "version": 1
+  },
+  "work_ms": 78280,
+  "call_count": 6,
+  "model_ms": 77533,
+  "calls": [
+   {
+    "kind": "llm",
+    "prompt_tokens": 32671,
+    "completion_tokens": 29,
+    "duration_ms": 20895,
+    "config_id": 10,
+    "model": "deepseek-chat",
+    "finish_reason": "tool_calls"
+   },
+   {
+    "kind": "llm",
+    "prompt_tokens": 70797,
+    "completion_tokens": 187,
+    "duration_ms": 24977,
+    "config_id": 10,
+    "model": "deepseek-chat",
+    "finish_reason": "tool_calls"
+   },
+   {
+    "kind": "llm",
+    "prompt_tokens": 71030,
+    "completion_tokens": 181,
+    "duration_ms": 3713,
+    "config_id": 10,
+    "model": "deepseek-chat",
+    "finish_reason": "tool_calls"
+   },
+   {
+    "kind": "vision_chat",
+    "prompt_tokens": 576,
+    "completion_tokens": 190,
+    "duration_ms": 4448,
+    "config_id": 10,
+    "model": "deepseek-chat",
+    "finish_reason": "stop"
+   },
+   {
+    "kind": "llm",
+    "prompt_tokens": 71456,
+    "completion_tokens": 903,
+    "duration_ms": 17049,
+    "config_id": 10,
+    "model": "deepseek-chat",
+    "finish_reason": "tool_calls"
+   },
+   {
+    "kind": "llm",
+    "prompt_tokens": 72378,
+    "completion_tokens": 250,
+    "duration_ms": 6451,
+    "config_id": 10,
+    "model": "deepseek-chat",
+    "finish_reason": "stop"
+   }
+  ]
+ },
+ "941": {
+  "task_id": 2942,
+  "work_id": 494,
+  "seq": 11,
+  "created_at": 1794552684120,
+  "combo": null,
+  "card": {
+   "budget": {
+    "gen_s": null,
+    "layer_s": 17
+   },
+   "combo": "A",
+   "gen_plan": {
+    "first": null,
+    "last": null,
+    "mid": null,
+    "reference_assets": []
+   },
+   "info_points": [
+    {
+     "id": "ip1",
+     "text": "时间坐标：1480年，蒙古金帐汗国军队逼近莫斯科公国",
+     "via": "layer"
+    },
+    {
+     "id": "ip2",
+     "text": "对峙地点在奥卡河上游的乌格拉河畔，伊凡三世军队与金帐汗国军队隔河相对",
+     "via": "layer"
+    },
+    {
+     "id": "ip3",
+     "text": "地理关系：金帐汗国示意范围在金帐旧都萨莱方向，莫斯科公国在西北，乌格拉河对峙点在两者之间偏北",
+     "via": "layer"
+    },
+    {
+     "id": "ip4",
+     "text": "这次相持持续一个月",
+     "via": "layer"
+    },
+    {
+     "id": "ip5",
+     "text": "最终蒙古军队不战而退，未发生交战",
+     "via": "layer"
+    }
+   ],
+   "issues": [],
+   "layer_plan": {
+    "base": {
+     "asset_id": 258,
+     "asset_kind": "prop",
+     "kind": "asset"
+    },
+    "must_mark": [
+     {
+      "asset_id": 258,
+      "name": "莫斯科公国",
+      "semantic_id": "g_a3b81df5"
+     },
+     {
+      "asset_id": 258,
+      "name": "金帐汗国（旧都萨莱周边）示意范围",
+      "semantic_id": "g_a3867a06"
+     },
+     {
+      "asset_id": 258,
+      "name": "乌格拉河对峙地点（乌格拉河汇入奥卡河一带）",
+      "semantic_id": "p_716d1fac"
+     },
+     {
+      "asset_id": 258,
+      "name": "莫斯科",
+      "semantic_id": "p_c0ffaad3"
+     }
+    ],
+    "planned_layers": [
+     {
+      "anchor": null,
+      "at_s": 0.3,
+      "fields": {
+       "main": "1480年",
+       "sub": "莫斯科公国时期"
+      },
+      "role": "date",
+      "text": null,
+      "type": "text"
+     },
+     {
+      "anchor": null,
+      "at_s": 1.2,
+      "fields": {
+       "main": "乌格拉河对峙",
+       "sub": "蒙古军队逼近莫斯科公国"
+      },
+      "role": "heading",
+      "text": null,
+      "type": "text"
+     },
+     {
+      "anchor": {
+       "asset_id": 258,
+       "name": "莫斯科公国",
+       "semantic_id": "g_a3b81df5"
+      },
+      "at_s": 3,
+      "fields": null,
+      "role": null,
+      "text": null,
+      "type": "polygon"
+     },
+     {
+      "anchor": {
+       "asset_id": 258,
+       "name": "金帐汗国（旧都萨莱周边）示意范围",
+       "semantic_id": "g_a3867a06"
+      },
+      "at_s": 3,
+      "fields": null,
+      "role": null,
+      "text": null,
+      "type": "polygon"
+     },
+     {
+      "anchor": {
+       "asset_id": 258,
+       "name": "莫斯科",
+       "semantic_id": "p_c0ffaad3"
+      },
+      "at_s": 4.2,
+      "fields": null,
+      "role": null,
+      "text": null,
+      "type": "marker"
+     },
+     {
+      "anchor": {
+       "asset_id": 258,
+       "name": "乌格拉河对峙地点（乌格拉河汇入奥卡河一带）",
+       "semantic_id": "p_716d1fac"
+      },
+      "at_s": 5.6,
+      "fields": null,
+      "role": null,
+      "text": null,
+      "type": "marker"
+     },
+     {
+      "anchor": null,
+      "at_s": 7,
+      "fields": {
+       "main": "乌格拉河畔隔河对峙一个月",
+       "sub": "伊凡三世对金帐汗国军队"
+      },
+      "role": "statement",
+      "text": null,
+      "type": "text"
+     },
+     {
+      "anchor": null,
+      "at_s": 12.6,
+      "fields": {
+       "main": "蒙古军队不战而退",
+       "sub": "双方未曾交战"
+      },
+      "role": "statement",
+      "text": null,
+      "type": "text"
+     }
+    ],
+    "text_layout": "h-left-stack"
+   },
+   "rationale": "本镜旁白为「1480年，蒙古金帐汗国的军队逼近莫斯科公国，在奥卡河上游的乌格拉河畔，与伊凡三世的军队隔河对峙。这次相持进行了一个月，最终蒙古军队不战而退」，实测配音 16.3 秒，预算只排图层段 17 秒（16.3 + 0.7 表演余量）即覆盖，不改动旁白一字。这一句的核心任务是地理关系：谁在哪、对峙点在哪——两方隔河相对、一个月不动、最后撤走，都是位置与时序，最适合由地图标注来表达，没有「有过程的事件」需要生成段去演，故取组合 A（纯图层段），不上生成段，gen_plan 留空。底图取 prop #258 @蒙古汗国分布与西征路线图（忠实原件、现在就有图，不钉 version_task_id）：我已用 read_image 读该原件，确认莫斯科点位在横向 24%–26%、纵向 46%–48%，莫斯科公国绿色范围在横向 23%–31%、纵向 36%–48%，金帐汗国示意虚线框在横向 36%–44%、纵向 72%–82%，画面最左侧（横向 0%–15%）、上方（纵向 0%–20%）与右下角（横向 75%–100%、纵向 80%–100%）是干净底色留白，故选用左侧成套位置 h-left-stack，让文本框压在左侧空白陆面与上方底色上，不遮莫斯科色块、金帐色块与河线。四条几何层全部锚在本张资产、本版本真实存在且几何完整、类型相容的语义：polygon 用 g_a3b81df5（region，6 点）与 g_a3867a06（region，6 点）同拍 at_s=3.0 同时亮起，一眼看出「莫斯科公国在西北、金帐汗国在南」的对峙格局；marker 用 p_c0ffaad3（point）打莫斯科、p_716d1fac（point，乌格拉河汇入奥卡河一带）打对峙点，把旁白里的「逼近莫斯科公国」「在乌格拉河畔」落到图上确有的两个点位。旁白提到「奥卡河上游」，本图确有 r_88298d6a（奥卡河，7 点）语义，但这一句的主信息是对峙点而非河网全貌，且本镜已有四层几何，为避免同一画面信息过载，我未把奥卡河整条河线铺上去，只由对峙点位置表达「奥卡河上游一带」；如需强化河名，可在后续镜（#12 讨论历史转折）补画。屏幕文字按 h-left-stack 容量逐条核对：date.main「1480年」5 字（上限 15）、sub「莫斯科公国时期」7 字（上限 25）；heading.main「乌格拉河对峙」6 字（上限 26）、sub「蒙古军队逼近莫斯科公国」11 字（上限 26）；statement.main「乌格拉河畔隔河对峙一个月」12 字（上限 36，单行）、sub「伊凡三世对金帐汗国军队」11 字（上限 28）；statement.main「蒙古军队不战而退」8 字、sub「双方未曾交战」6 字。两条 statement 同处 primary 区，用不同 at_s（7.0 / 12.6）先后替换，date 在 context 区持续显示，heading 在 1.2 秒被后一拍 statement？——不，heading 与 statement 同属 primary 区，heading 会在 7.0 秒被第一条 statement 顶掉，这是同一主叙事线的正常替换（标题先立，事实随后落地），且 7.0 秒已把标题内容读完。全部 at_s 均落在 17 秒图层段内，最晚一条 12.6 秒与此前拍拉开 5.6 秒，符合单条约 ≥1.2 秒的节奏。衔接上本镜承接上一镜（伊凡三世肖像），但换到地图与地理关系，属同一叙事线的下一拍，故 continuity 沿用 continue 标注、不另作硬切处理。",
+   "suggested_combo": "A"
+  },
+  "work_ms": 93633,
+  "call_count": 5,
+  "model_ms": 92829,
+  "calls": [
+   {
+    "kind": "llm",
+    "prompt_tokens": 32671,
+    "completion_tokens": 34,
+    "duration_ms": 20900,
+    "config_id": 10,
+    "model": "deepseek-chat",
+    "finish_reason": "tool_calls"
+   },
+   {
+    "kind": "llm",
+    "prompt_tokens": 75464,
+    "completion_tokens": 183,
+    "duration_ms": 27540,
+    "config_id": 10,
+    "model": "deepseek-chat",
+    "finish_reason": "tool_calls"
+   },
+   {
+    "kind": "vision_chat",
+    "prompt_tokens": 981,
+    "completion_tokens": 329,
+    "duration_ms": 6598,
+    "config_id": 10,
+    "model": "deepseek-chat",
+    "finish_reason": "stop"
+   },
+   {
+    "kind": "llm",
+    "prompt_tokens": 76036,
+    "completion_tokens": 1934,
+    "duration_ms": 30414,
+    "config_id": 10,
+    "model": "deepseek-chat",
+    "finish_reason": "tool_calls"
+   },
+   {
+    "kind": "llm",
+    "prompt_tokens": 77985,
+    "completion_tokens": 302,
+    "duration_ms": 7377,
+    "config_id": 10,
+    "model": "deepseek-chat",
+    "finish_reason": "stop"
+   }
+  ]
+ },
+ "950": {
+  "task_id": 2942,
+  "work_id": 501,
+  "seq": 17,
+  "created_at": 1794554634154,
+  "combo": null,
+  "card": {
+   "budget": {
+    "gen_s": 9,
+    "layer_s": 6.5
+   },
+   "combo": "C",
+   "gen_plan": {
+    "first": "草原聚落外围的夯土矮墙缺口处，一队哥萨克骑马人从土路上穿过，其中一人肩背火枪，院内低矮房屋与草顶棚架铺开，画面中不见明确的主角",
+    "last": "聚落全景收束，黄褐色光线铺在夯土矮墙与木骨泥墙房屋上，草顶棚架、拴马桩与草料堆一同入画，一名哥萨克立在院中、右手提火枪，另一人牵着马停在土路旁，四周是开阔干草原",
+    "mid": "聚落院内中景，土坯与木骨泥墙房屋前立着拴马桩，草顶棚架下的草料堆放得整齐，一名哥萨克背对镜头站在门旁，右手提着一支火枪",
+    "reference_assets": [
+     {
+      "id": 172,
+      "kind": "scene",
+      "name": "哥萨克聚落"
+     },
+     {
+      "id": 260,
+      "kind": "prop",
+      "name": "哥萨克火枪"
+     }
+    ]
+   },
+   "info_points": [
+    {
+     "id": "ip1",
+     "text": "“哥萨克”一词并非单一含义，它在不同语言里有多种解释",
+     "via": "layer"
+    },
+    {
+     "id": "ip2",
+     "text": "在土耳其语中，它指自由人、反叛者、草原强盗、被流放者、雇佣兵",
+     "via": "layer"
+    },
+    {
+     "id": "ip3",
+     "text": "在蒙古语中，它指逃亡者和强盗",
+     "via": "layer"
+    },
+    {
+     "id": "ip4",
+     "text": "两套语言释义并列呈现，是同一个词在不同语境下的两种解释",
+     "via": "layer"
+    },
+    {
+     "id": "ip5",
+     "text": "承接上一镜已立的方位：这个词指向的人散布在东欧平原，南部草原、黑海与里海一带到伏尔加河上游都在其中",
+     "via": "layer"
+    },
+    {
+     "id": "ip6",
+     "text": "画面落到草原上的哥萨克聚落：土坯与木骨泥墙的低矮房屋、草顶棚架、外围夯土矮墙缺口，一群人身背火枪骑马穿行",
+     "via": "generated"
+    },
+    {
+     "id": "ip7",
+     "text": "聚落半农牧半军事：院内有拴马桩与草料堆，人也带武器，既是住户也是武装团伙",
+     "via": "generated"
+    }
+   ],
+   "layer_plan": {
+    "base": {
+     "asset_id": 258,
+     "asset_kind": "prop",
+     "kind": "asset"
+    },
+    "must_mark": [
+     {
+      "asset_id": 258,
+      "name": "莫斯科公国",
+      "semantic_id": "g_a3b81df5"
+     },
+     {
+      "asset_id": 258,
+      "name": "克里米亚汗国",
+      "semantic_id": "g_e7dc4ee3"
+     },
+     {
+      "asset_id": 258,
+      "name": "阿斯特拉罕汗国",
+      "semantic_id": "g_7593bacf"
+     },
+     {
+      "asset_id": 258,
+      "name": "西伯利亚汗国",
+      "semantic_id": "g_27f212da"
+     },
+     {
+      "asset_id": 258,
+      "name": "伏尔加河",
+      "semantic_id": "r_0cfaceb2"
+     }
+    ],
+    "planned_layers": [
+     {
+      "anchor": null,
+      "at_s": 0.3,
+      "fields": {
+       "main": "词义",
+       "sub": "土耳其语与蒙古语两种解释"
+      },
+      "role": "date",
+      "text": null,
+      "type": "text"
+     },
+     {
+      "anchor": {
+       "asset_id": 258,
+       "name": "莫斯科公国",
+       "semantic_id": "g_a3b81df5"
+      },
+      "at_s": 0.3,
+      "fields": null,
+      "role": null,
+      "text": null,
+      "type": "polygon"
+     },
+     {
+      "anchor": {
+       "asset_id": 258,
+       "name": "克里米亚汗国",
+       "semantic_id": "g_e7dc4ee3"
+      },
+      "at_s": 1,
+      "fields": null,
+      "role": null,
+      "text": null,
+      "type": "polygon"
+     },
+     {
+      "anchor": {
+       "asset_id": 258,
+       "name": "阿斯特拉罕汗国",
+       "semantic_id": "g_7593bacf"
+      },
+      "at_s": 1,
+      "fields": null,
+      "role": null,
+      "text": null,
+      "type": "polygon"
+     },
+     {
+      "anchor": {
+       "asset_id": 258,
+       "name": "西伯利亚汗国",
+       "semantic_id": "g_27f212da"
+      },
+      "at_s": 1,
+      "fields": null,
+      "role": null,
+      "text": null,
+      "type": "polygon"
+     },
+     {
+      "anchor": {
+       "asset_id": 258,
+       "name": "伏尔加河",
+       "semantic_id": "r_0cfaceb2"
+      },
+      "at_s": 1.6,
+      "fields": null,
+      "role": null,
+      "text": null,
+      "type": "polyline"
+     },
+     {
+      "anchor": null,
+      "at_s": 0.6,
+      "fields": {
+       "main": "哥萨克是什么意思",
+       "sub": "同一个词的多种解释"
+      },
+      "role": "heading",
+      "text": null,
+      "type": "text"
+     },
+     {
+      "anchor": null,
+      "at_s": 1.8,
+      "fields": {
+       "items": [
+        "土耳其语：自由人、反叛者",
+        "土耳其语：草原强盗、被流放者",
+        "土耳其语：雇佣兵"
+       ]
+      },
+      "role": "bullets",
+      "text": null,
+      "type": "text"
+     },
+     {
+      "anchor": null,
+      "at_s": 4,
+      "fields": {
+       "main": "逃亡者和强盗",
+       "sub": "蒙古语中的释义"
+      },
+      "role": "keyword",
+      "text": null,
+      "type": "text"
+     }
+    ],
+    "text_layout": "h-right-stack"
+   },
+   "rationale": "旁白为「『哥萨克』在土耳其语中有多种涵义：自由人、反叛者、草原强盗、被流放者、雇佣兵等等。蒙古语中它的涵义是：逃亡者和强盗」，实测配音 15 秒，预算 6.5 + 9 = 15.5 秒覆盖且不改动旁白一字。这一句有两个层次：先是一串并列词义（近乎词典式枚举），再是本镜的地理铺陈——这个词指向的人散布在东欧平原，从南部草原到北部伏尔加河上游都是他们的活动范围。词义适合用屏幕文字一次讲清，地理铺陈适合在上一镜（#17）那张地图上接着立住，因此取组合 C（先定位再入戏）。底图沿用 #17 的同一张 prop #258 @蒙古汗国分布与西征路线图（忠实原件、现在就有图，不钉 version_task_id），承接上一镜空间关系无跳变。我已用 read_image 读该原件确认构图：莫斯科公国绿块在中偏左（横向约 24%–33%、纵向约 35%–46%）、西伯利亚汗国在中右偏上、克里米亚汗国在左下、阿斯特拉罕汗国在中左狭长、伏尔加河纵贯中部，右侧条带（横向约 80%–100% 与右下角纵向 60%–100%）最空旷、无文字无色块，故选用右侧成套位置 h-right-stack，让文字压在空白地形带上，不遮汗国色块与河线。五条几何层均锚在本张资产、本版本上真实存在、含义相容且几何完整（各 6–7 个折点）的语义：polygon 用 g_e7dc4ee3（克里米亚汗国）、g_7593bacf（阿斯特拉罕汗国）、g_27f212da（西伯利亚汗国）在 1.0 秒同拍点亮，表达「从黑海与里海一带的南部草原到北部伏尔加河上游」的分布弧；polyline 用 r_0cfaceb2（伏尔加河，7 点）1.6 秒描出这条北上的主干道；polygon 用 g_a3b81df5（莫斯科公国）在 0.3 秒沿用上一镜已点亮的色块，维持方位自洽。文字按 h-right-stack 容量核对：date.main「词义」2 字（≤15）/sub「土耳其语与蒙古语两种解释」12 字（≤25）；heading.main「哥萨克是什么意思」8 字（≤26，两行内）/sub「同一个词的多种解释」8 字（≤26）；bullets 三条各不超过 12 字（≤17，单行）；keyword.main「逃亡者和强盗」6 字（≤10）/sub「蒙古语中的释义」7 字（≤30）。bullets 把土耳其语的五种解释压成三条同语法层级的并列短句，避免 statement 里出现两个以上顿号被拦；keyword 只强调蒙古语那一句的核心词。三拍错开 at_s（0.3 / 0.6 / 1.8 / 4.0），primary 区先 heading 后 bullets 顺次替换，keyword 在 emphasis 区叠加，均落在 6.5 秒图层段内。生成段（9 秒）承接图层段末帧（衔接帧锁定首帧，不写 first），落到草原上的哥萨克聚落：旁白本句不涉及具体人物动作，故按无名人物规范写——身份是院中住户兼武装成员，标识为「灰褐无纹粗呢短衣、无冠束发、腰束布带」，与画面内任何 @角色 皆不同，不进 character_ids；一名哥萨克背对镜头立在门旁、右手提 @哥萨克火枪，另一人牵马停在土路旁（双手握缰），院内拴马桩与草顶棚架下的草料堆同时入画，对应「半农牧半军事」这一判断。参考资产只用 @哥萨克聚落（scene #172）与 @哥萨克火枪（prop #260），两者现在都有图。预算合计 15.5 秒 ≥ 实测 15 秒，未压缩旁白；本镜 continuity 为 continue，承接 #17 同一张地图与同一叙事段。",
+   "suggested_combo": "C"
+  },
+  "work_ms": 562099,
+  "call_count": 8,
+  "model_ms": 549870,
+  "calls": [
+   {
+    "kind": "llm",
+    "prompt_tokens": 32667,
+    "completion_tokens": 30,
+    "duration_ms": 35327,
+    "config_id": 10,
+    "model": "deepseek-chat",
+    "finish_reason": "tool_calls"
+   },
+   {
+    "kind": "llm",
+    "prompt_tokens": 82872,
+    "completion_tokens": 372,
+    "duration_ms": 60727,
+    "config_id": 10,
+    "model": "deepseek-chat",
+    "finish_reason": "tool_calls"
+   },
+   {
+    "kind": "vision_chat",
+    "prompt_tokens": 311,
+    "completion_tokens": 935,
+    "duration_ms": 53410,
+    "config_id": 10,
+    "model": "deepseek-chat",
+    "finish_reason": "stop"
+   },
+   {
+    "kind": "vision_chat",
+    "prompt_tokens": 573,
+    "completion_tokens": 170,
+    "duration_ms": 47047,
+    "config_id": 10,
+    "model": "deepseek-chat",
+    "finish_reason": "stop"
+   },
+   {
+    "kind": "llm",
+    "prompt_tokens": 84493,
+    "completion_tokens": 430,
+    "duration_ms": 36236,
+    "config_id": 10,
+    "model": "deepseek-chat",
+    "finish_reason": "tool_calls"
+   },
+   {
+    "kind": "llm",
+    "prompt_tokens": 85118,
+    "completion_tokens": 2117,
+    "duration_ms": 112577,
+    "config_id": 10,
+    "model": "deepseek-chat",
+    "finish_reason": "tool_calls"
+   },
+   {
+    "kind": "llm",
+    "prompt_tokens": 87510,
+    "completion_tokens": 2332,
+    "duration_ms": 114782,
+    "config_id": 10,
+    "model": "deepseek-chat",
+    "finish_reason": "tool_calls"
+   },
+   {
+    "kind": "llm",
+    "prompt_tokens": 89862,
+    "completion_tokens": 421,
+    "duration_ms": 89764,
+    "config_id": 10,
+    "model": "deepseek-chat",
+    "finish_reason": "stop"
+   }
+  ]
+ },
+ "948": {
+  "task_id": 2942,
+  "work_id": 503,
+  "seq": 13,
+  "created_at": 1794555138186,
+  "combo": null,
+  "card": {
+   "budget": {
+    "gen_s": 7,
+    "layer_s": 5
+   },
+   "combo": "C",
+   "gen_plan": {
+    "first": "草原聚落外围的夯土矮墙缺口处，一队骑马的人从土路上穿过，其中一人肩背火枪，院内低矮房屋与草顶棚架铺开，画面中不见明确的主角",
+    "last": "聚落全景收束，黄褐色光线铺在夯土矮墙与木骨泥墙房屋上，草顶棚架、拴马桩与草料堆一同入画，一名哥萨克立在院中、右手提火枪，另一人牵着马停在土路旁，四周是开阔干草原",
+    "mid": "聚落院内中景，土坯与木骨泥墙房屋前立着拴马桩，草顶棚架下草料堆放整齐，一名哥萨克背对镜头站在门旁，右手提着一支火枪",
+    "reference_assets": [
+     {
+      "id": 172,
+      "kind": "scene",
+      "name": "哥萨克聚落"
+     },
+     {
+      "id": 260,
+      "kind": "prop",
+      "name": "哥萨克火枪"
+     }
+    ]
+   },
+   "info_points": [
+    {
+     "id": "ip1",
+     "text": "哥萨克人的聚落从南部草原一直分布到北部伏尔加河上游",
+     "via": "layer"
+    },
+    {
+     "id": "ip2",
+     "text": "聚落散布在东欧平原各地，不是一个统一的政权或组织",
+     "via": "layer"
+    },
+    {
+     "id": "ip3",
+     "text": "各个聚落规模不等，有大有小",
+     "via": "layer"
+    },
+    {
+     "id": "ip4",
+     "text": "方位关系：南部草原是克里米亚汗国与阿斯特拉罕汗国一带，北部上游是伏尔加河与卡马河交汇一带，聚落分布在两者之间的东欧平原",
+     "via": "layer"
+    },
+    {
+     "id": "ip5",
+     "text": "承接 #18 同一张地图，观众仍在刚才那张诸汗国分布图上读到这条南北向的散布范围",
+     "via": "layer"
+    },
+    {
+     "id": "ip6",
+     "text": "画面落到草原上的哥萨克聚落：土坯与木骨泥墙的低矮房屋、草顶棚架、拴马桩、外围夯土矮墙缺口，规模确实不大",
+     "via": "generated"
+    },
+    {
+     "id": "ip7",
+     "text": "聚落半农牧半军事：院内有草料堆与拴马桩，人也带着火枪，既是住户也是武装团伙",
+     "via": "generated"
+    }
+   ],
+   "layer_plan": {
+    "base": {
+     "asset_id": 258,
+     "asset_kind": "prop",
+     "kind": "asset"
+    },
+    "must_mark": [
+     {
+      "asset_id": 258,
+      "name": "克里米亚汗国",
+      "semantic_id": "g_e7dc4ee3"
+     },
+     {
+      "asset_id": 258,
+      "name": "阿斯特拉罕汗国",
+      "semantic_id": "g_7593bacf"
+     },
+     {
+      "asset_id": 258,
+      "name": "西伯利亚汗国",
+      "semantic_id": "g_27f212da"
+     },
+     {
+      "asset_id": 258,
+      "name": "伏尔加河",
+      "semantic_id": "r_0cfaceb2"
+     },
+     {
+      "asset_id": 258,
+      "name": "卡马河",
+      "semantic_id": "r_2f732e2d"
+     }
+    ],
+    "planned_layers": [
+     {
+      "anchor": null,
+      "at_s": 0.3,
+      "fields": {
+       "main": "16世纪",
+       "sub": "东欧平原"
+      },
+      "role": "date",
+      "text": null,
+      "type": "text"
+     },
+     {
+      "anchor": null,
+      "at_s": 1.2,
+      "fields": {
+       "main": "散居东欧平原各地",
+       "sub": "哥萨克的聚落"
+      },
+      "role": "heading",
+      "text": null,
+      "type": "text"
+     },
+     {
+      "anchor": {
+       "asset_id": 258,
+       "name": "克里米亚汗国",
+       "semantic_id": "g_e7dc4ee3"
+      },
+      "at_s": 2.2,
+      "fields": null,
+      "role": null,
+      "text": null,
+      "type": "polygon"
+     },
+     {
+      "anchor": {
+       "asset_id": 258,
+       "name": "阿斯特拉罕汗国",
+       "semantic_id": "g_7593bacf"
+      },
+      "at_s": 2.2,
+      "fields": null,
+      "role": null,
+      "text": null,
+      "type": "polygon"
+     },
+     {
+      "anchor": {
+       "asset_id": 258,
+       "name": "西伯利亚汗国",
+       "semantic_id": "g_27f212da"
+      },
+      "at_s": 2.2,
+      "fields": null,
+      "role": null,
+      "text": null,
+      "type": "polygon"
+     },
+     {
+      "anchor": {
+       "asset_id": 258,
+       "name": "伏尔加河",
+       "semantic_id": "r_0cfaceb2"
+      },
+      "at_s": 3.2,
+      "fields": null,
+      "role": null,
+      "text": null,
+      "type": "polyline"
+     },
+     {
+      "anchor": {
+       "asset_id": 258,
+       "name": "卡马河",
+       "semantic_id": "r_2f732e2d"
+      },
+      "at_s": 3.6,
+      "fields": null,
+      "role": null,
+      "text": null,
+      "type": "polyline"
+     },
+     {
+      "anchor": null,
+      "at_s": 4.2,
+      "fields": {
+       "main": "从南部草原到伏尔加河上游，聚落散布各地",
+       "sub": "规模有大有小"
+      },
+      "role": "statement",
+      "text": null,
+      "type": "text"
+     }
+    ],
+    "text_layout": "h-right-stack"
+   },
+   "rationale": "本镜旁白为「从南部草原到北部伏尔加河上游，哥萨克人组成的聚落分布在东欧平原各地，规模有大有小」，实测配音 8.5 秒，预算 5 + 7 = 12 秒覆盖且不改动旁白一字。这一句有两层任务：一是南北向的地理散布（南部草原到北部上游、东欧平原各地），二是聚落的形态与规模差异。前者必须由地图承担，后者由生成段承担，故取组合 C（先定位再入戏）：图层段先在 #17/#18 那张图上把「南北散布」立起来，再由生成段落到一处具体的草原聚落。底图沿用前几镜（#17、#18）同一张 prop #258 @蒙古汗国分布与西征路线图（忠实原件、现在就有图，不钉 version_task_id），保证与前镜空间关系无跳变。我已用 read_image 读该原件确认位置：莫斯科公国色块约在 30%/40%，喀山汗国约 46%/42%，西伯利亚汗国约 72%/40%，克里米亚汗国约 22%/85%，阿斯特拉罕汗国约 44%/82%，金帐汗国旧疆示意约 40%/78%，伏尔加河纵贯中部，卡马河在中部向东延伸，额尔齐斯河在右上；画面最右侧约 85%—100% 宽度、以及右下角 70%—100% 宽度 / 60%—100% 高度是完全空白的地形底图，无文字无色块。因此选用右侧成套位置 h-right-stack，让两块文本框压在右侧与右下空白地形带上，不遮任何汗国色块与河线。五条几何层均锚在本张资产、本版本上真实存在、含义相容且几何完整（region 各 6 点、line 各 7 点）的语义：polygon 用 g_e7dc4ee3（克里米亚汗国）与 g_7593bacf（阿斯特拉罕汗国）同拍 2.2 秒，代表旁白说的「南部草原」；g_27f212da（西伯利亚汗国）同拍点出东北一侧的陆地；polyline 用 r_0cfaceb2（伏尔加河）与 r_2f732e2d（卡马河）在 3.2—3.6 秒接续，把「北部伏尔加河上游」这条纵贯南北的水系轴画出来，正是聚落散布的南北方向。文本按 h-right-stack 容量核对：date.main「16世纪」4 字（≤15）、sub「东欧平原」4 字（≤25）；heading.main「散居东欧平原各地」8 字（≤26，两行内）、sub「哥萨克的聚落」6 字（≤26）；statement.main「从南部草原到伏尔加河上游，聚落散布各地」19 字（≤36，两行内）、sub「规模有大有小」6 字（≤28）。三拍错开 at_s（0.3 / 1.2 / 4.2），date 在 context 区、heading 与 statement 先后替换 primary 区，均落在 5 秒图层段内。生成段用 @哥萨克聚落 场景与 @哥萨克火枪 作为参考资产：聚落场景图本身的土坯房屋、草顶棚架、拴马桩、外围夯土矮墙正好对应「规模有大有小」的一处小聚落，火枪则把「半军事」落成可见的物件；旁白不点具体人物，因此不引用任何角色资产，画面里的人是无人名的聚落成员。衔接关系为 continue：本镜紧接 #18，仍在同一张地图、同一叙事段落上推进。",
+   "suggested_combo": "C"
+  },
+  "work_ms": 522758,
+  "call_count": 6,
+  "model_ms": 521843,
+  "calls": [
+   {
+    "kind": "llm",
+    "prompt_tokens": 32671,
+    "completion_tokens": 39,
+    "duration_ms": 117493,
+    "config_id": 10,
+    "model": "deepseek-chat",
+    "finish_reason": "tool_calls"
+   },
+   {
+    "kind": "llm",
+    "prompt_tokens": 84704,
+    "completion_tokens": 208,
+    "duration_ms": 72035,
+    "config_id": 10,
+    "model": "deepseek-chat",
+    "finish_reason": "tool_calls"
+   },
+   {
+    "kind": "vision_chat",
+    "prompt_tokens": 1005,
+    "completion_tokens": 487,
+    "duration_ms": 62098,
+    "config_id": 10,
+    "model": "deepseek-chat",
+    "finish_reason": "stop"
+   },
+   {
+    "kind": "llm",
+    "prompt_tokens": 85474,
+    "completion_tokens": 2150,
+    "duration_ms": 101501,
+    "config_id": 10,
+    "model": "deepseek-chat",
+    "finish_reason": "tool_calls"
+   },
+   {
+    "kind": "llm",
+    "prompt_tokens": 87836,
+    "completion_tokens": 2162,
+    "duration_ms": 60238,
+    "config_id": 10,
+    "model": "deepseek-chat",
+    "finish_reason": "tool_calls"
+   },
+   {
+    "kind": "llm",
+    "prompt_tokens": 90018,
+    "completion_tokens": 382,
+    "duration_ms": 108478,
+    "config_id": 10,
+    "model": "deepseek-chat",
+    "finish_reason": "stop"
+   }
+  ]
+ },
+ "938": {
+  "task_id": 2942,
+  "work_id": 491,
+  "seq": 12,
+  "created_at": 1794552402728,
+  "combo": null,
+  "card": {
+   "budget": {
+    "gen_s": null,
+    "layer_s": 7
+   },
+   "combo": "A",
+   "gen_plan": {
+    "first": null,
+    "last": null,
+    "mid": null,
+    "reference_assets": null
+   },
+   "info_points": [
+    {
+     "id": "ip1",
+     "text": "本段转入时代背景：先看清小叶所处的时代",
+     "via": "layer"
+    },
+    {
+     "id": "ip2",
+     "text": "小叶生活在16世纪，即伊凡四世在位时期",
+     "via": "layer"
+    },
+    {
+     "id": "ip3",
+     "text": "当时俄国是沙皇俄国，处在伊凡四世的统治之下",
+     "via": "layer"
+    }
+   ],
+   "info_points_note": null,
+   "layer_plan": {
+    "base": {
+     "asset_id": 258,
+     "asset_kind": "prop",
+     "kind": "asset"
+    },
+    "must_mark": [],
+    "planned_layers": [
+     {
+      "anchor": null,
+      "at_s": 0.4,
+      "fields": {
+       "main": "16世纪",
+       "sub": "沙皇俄国时期"
+      },
+      "role": "date",
+      "text": null,
+      "type": "text"
+     },
+     {
+      "anchor": null,
+      "at_s": 2,
+      "fields": {
+       "main": "小叶所处的时代",
+       "sub": "伊凡四世在位"
+      },
+      "role": "heading",
+      "text": null,
+      "type": "text"
+     },
+     {
+      "anchor": null,
+      "at_s": 4.2,
+      "fields": {
+       "main": "此时统治俄国的是伊凡四世",
+       "sub": "沙皇俄国"
+      },
+      "role": "statement",
+      "text": null,
+      "type": "text"
+     }
+    ],
+    "text_layout": "h-left-stack"
+   },
+   "rationale": "本镜旁白只有一句过渡句「要理解小叶的处境，得先看清他所处的时代」，实测配音 4.6 秒，它的任务是把叙述从「小叶这个人」转到「他所在的时代」，因此只需要一个时间坐标加一句时代定位，不需要把后面的伊凡四世事迹提前讲出来。取组合 A（纯图层段）：本镜既是段落之间的过渡，也是后面讨论沙皇俄国诸汗国的入口，先把时间与政权名立起来，再由下一镜（伊凡四世）入戏。底图取 prop #258 @蒙古汗国分布与西征路线图：我已用 read_image 读该原件，确认画面中部为喀山、西伯利亚、哈萨克等汗国色块（大约横向 25%–70%），左上角与左侧（横向 0%–20%、纵向 0%–40%）是大片未着色的地形与陆地，右侧边缘为深色地形带，因此选左侧成套位置 h-left-stack，让三块文本框压在左上空白陆面上，不遮任何汗国色块与河流。本镜不做点位、河道或范围的几何标注：旁白没有点出任何具体地名，must_mark 为空，planned_layers 只含三条不指向底图具体对象的排版文本框，按 layer-text-design 不写 anchor。容量按 h-left-stack 核对：date.main「16世纪」4 字（上限 15）、sub「沙皇俄国时期」6 字（上限 25）；heading.main「小叶所处的时代」7 字（上限 26，单行内）、sub「伊凡四世在位」6 字（上限 26）；statement.main「此时统治俄国的是伊凡四世」12 字（上限 36，单行内）、sub「沙皇俄国」4 字（上限 28）。三拍错开 at_s（0.4 / 2 / 4.2），date 在 context 区、heading 与 statement 在 primary 区先后替换、各含不重复的新口径，均落在 7 秒图层段内，且 7 秒 ≥ 实测 4.6 秒、不超过 30 秒上限。本镜无生成段，故 gen_plan 的参考资产与首中尾帧槽位留空，也没有任何需人工补标注的缺口。",
+   "suggested_combo": "A"
+  },
+  "work_ms": 83951,
+  "call_count": 6,
+  "model_ms": 89316,
+  "calls": [
+   {
+    "kind": "llm",
+    "prompt_tokens": 32671,
+    "completion_tokens": 24,
+    "duration_ms": 20942,
+    "config_id": 10,
+    "model": "deepseek-chat",
+    "finish_reason": "tool_calls"
+   },
+   {
+    "kind": "llm",
+    "prompt_tokens": 73452,
+    "completion_tokens": 285,
+    "duration_ms": 27125,
+    "config_id": 10,
+    "model": "deepseek-chat",
+    "finish_reason": "tool_calls"
+   },
+   {
+    "kind": "vision_chat",
+    "prompt_tokens": 254,
+    "completion_tokens": 690,
+    "duration_ms": 13149,
+    "config_id": 10,
+    "model": "deepseek-chat",
+    "finish_reason": "stop"
+   },
+   {
+    "kind": "vision_chat",
+    "prompt_tokens": 945,
+    "completion_tokens": 156,
+    "duration_ms": 6005,
+    "config_id": 10,
+    "model": "deepseek-chat",
+    "finish_reason": "stop"
+   },
+   {
+    "kind": "llm",
+    "prompt_tokens": 74705,
+    "completion_tokens": 940,
+    "duration_ms": 16883,
+    "config_id": 10,
+    "model": "deepseek-chat",
+    "finish_reason": "tool_calls"
+   },
+   {
+    "kind": "llm",
+    "prompt_tokens": 75666,
+    "completion_tokens": 187,
+    "duration_ms": 5212,
+    "config_id": 10,
+    "model": "deepseek-chat",
+    "finish_reason": "stop"
+   }
+  ]
+ }
+}

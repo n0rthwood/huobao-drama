@@ -246,7 +246,7 @@ export async function startDesignCardBatch(
             role: 'user',
             content: evidenceMessageParts(`请为分镜 #${sb.storyboardNumber}(ID:${sb.id}) 填写设计卡（design_card），严格遵循 documentary-storyboard 技能里「设计卡」一节与 layer-text-design 技能的模板文本框规则。${measuredSeconds === undefined ? '' : `
 本镜旁白的**实测配音时长是 ${measuredSeconds} 秒**（已经配音完成，不是估算）：时长预算 budget 必须以这个实测值为准，不要再按字数估算。`}
-先调用 read_storyboard_context，读取本镜旁白、前后镜设计卡及资产，并读取其中的 text_spec（成套位置 layouts、类型 roles、逐字段容量 capacity）：屏幕文字一律用 type:'text' 模板文本框 + layer_plan.text_layout，字数上限只能取自 text_spec.capacity。
+先调用 read_storyboard_context，读取本镜旁白、前后各 3 镜的旁白与设计卡（context_window 说明了附带哪几镜；其余镜头未列出不代表不存在）及本集资产，并读取其中的 text_spec（成套位置 layouts、类型 roles、逐字段容量 capacity）：屏幕文字一律用 type:'text' 模板文本框 + layer_plan.text_layout，字数上限只能取自 text_spec.capacity。
 ${buildDesignCardGroundingInstruction(loadDesignCardContext(episodeId).assets)}
 ${comboOnly ? `本卡已有人工内容，只补选 combo，不重写卡片。现有卡：${sb.designCard}` : `规划信息点、图层段、生成段与预算（${budgetRule}），并填写 rationale。`}
 填写 combo（A 只图层 / B 只生成 / C 图层→生成 / D 生成→图层），同时可填写 suggested_combo；已有组合将保留。

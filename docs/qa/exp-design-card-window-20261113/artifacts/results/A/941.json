@@ -1,0 +1,109 @@
+{
+ "arm": "A",
+ "shot": 941,
+ "config_id": 10,
+ "model": "deepseek-chat",
+ "context_window": 0,
+ "task_id": 2942,
+ "task": {
+  "id": 2942,
+  "created_at": "2026-11-13T06:51:24.120000Z",
+  "completed_at": "2026-11-13T06:51:24.120000Z",
+  "status": "completed"
+ },
+ "wall_s_post_to_done": 93.6,
+ "calls": [
+  {
+   "id": null,
+   "kind": "llm",
+   "config_id": 10,
+   "model": "deepseek-chat",
+   "duration_ms": 20900,
+   "prompt_tokens": 32671,
+   "completion_tokens": 34,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": null
+  },
+  {
+   "id": null,
+   "kind": "llm",
+   "config_id": 10,
+   "model": "deepseek-chat",
+   "duration_ms": 27540,
+   "prompt_tokens": 75464,
+   "completion_tokens": 183,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": null
+  },
+  {
+   "id": null,
+   "kind": "vision_chat",
+   "config_id": 10,
+   "model": "deepseek-chat",
+   "duration_ms": 6598,
+   "prompt_tokens": 981,
+   "completion_tokens": 329,
+   "finish_reason": "stop",
+   "status": "completed",
+   "request_chars": null
+  },
+  {
+   "id": null,
+   "kind": "llm",
+   "config_id": 10,
+   "model": "deepseek-chat",
+   "duration_ms": 30414,
+   "prompt_tokens": 76036,
+   "completion_tokens": 1934,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": null
+  },
+  {
+   "id": null,
+   "kind": "llm",
+   "config_id": 10,
+   "model": "deepseek-chat",
+   "duration_ms": 7377,
+   "prompt_tokens": 77985,
+   "completion_tokens": 302,
+   "finish_reason": "stop",
+   "status": "completed",
+   "request_chars": null
+  }
+ ],
+ "card_saved": true,
+ "card": "{\"budget\": {\"gen_s\": null, \"layer_s\": 17}, \"combo\": \"A\", \"gen_plan\": {\"first\": null, \"last\": null, \"mid\": null, \"reference_assets\": []}, \"info_points\": [{\"id\": \"ip1\", \"text\": \"时间坐标：1480年，蒙古金帐汗国军队逼近莫斯科公国\", \"via\": \"layer\"}, {\"id\": \"ip2\", \"text\": \"对峙地点在奥卡河上游的乌格拉河畔，伊凡三世军队与金帐汗国军队隔河相对\", \"via\": \"layer\"}, {\"id\": \"ip3\", \"text\": \"地理关系：金帐汗国示意范围在金帐旧都萨莱方向，莫斯科公国在西北，乌格拉河对峙点在两者之间偏北\", \"via\": \"layer\"}, {\"id\": \"ip4\", \"text\": \"这次相持持续一个月\", \"via\": \"layer\"}, {\"id\": \"ip5\", \"text\": \"最终蒙古军队不战而退，未发生交战\", \"via\": \"layer\"}], \"issues\": [], \"layer_plan\": {\"base\": {\"asset_id\": 258, \"asset_kind\": \"prop\", \"kind\": \"asset\"}, \"must_mark\": [{\"asset_id\": 258, \"name\": \"莫斯科公国\", \"semantic_id\": \"g_a3b81df5\"}, {\"asset_id\": 258, \"name\": \"金帐汗国（旧都萨莱周边）示意范围\", \"semantic_id\": \"g_a3867a06\"}, {\"asset_id\": 258, \"name\": \"乌格拉河对峙地点（乌格拉河汇入奥卡河一带）\", \"semantic_id\": \"p_716d1fac\"}, {\"asset_id\": 258, \"name\": \"莫斯科\", \"semantic_id\": \"p_c0ffaad3\"}], \"planned_layers\": [{\"anchor\": null, \"at_s\": 0.3, \"fields\": {\"main\": \"1480年\", \"sub\": \"莫斯科公国时期\"}, \"role\": \"date\", \"text\": null, \"type\": \"text\"}, {\"anchor\": null, \"at_s\": 1.2, \"fields\": {\"main\": \"乌格拉河对峙\", \"sub\": \"蒙古军队逼近莫斯科公国\"}, \"role\": \"heading\", \"text\": null, \"type\": \"text\"}, {\"anchor\": {\"asset_id\": 258, \"name\": \"莫斯科公国\", \"semantic_id\": \"g_a3b81df5\"}, \"at_s\": 3, \"fields\": null, \"role\": null, \"text\": null, \"type\": \"polygon\"}, {\"anchor\": {\"asset_id\": 258, \"name\": \"金帐汗国（旧都萨莱周边）示意范围\", \"semantic_id\": \"g_a3867a06\"}, \"at_s\": 3, \"fields\": null, \"role\": null, \"text\": null, \"type\": \"polygon\"}, {\"anchor\": {\"asset_id\": 258, \"name\": \"莫斯科\", \"semantic_id\": \"p_c0ffaad3\"}, \"at_s\": 4.2, \"fields\": null, \"role\": null, \"text\": null, \"type\": \"marker\"}, {\"anchor\": {\"asset_id\": 258, \"name\": \"乌格拉河对峙地点（乌格拉河汇入奥卡河一带）\", \"semantic_id\": \"p_716d1fac\"}, \"at_s\": 5.6, \"fields\": null, \"role\": null, \"text\": null, \"type\": \"marker\"}, {\"anchor\": null, \"at_s\": 7, \"fields\": {\"main\": \"乌格拉河畔隔河对峙一个月\", \"sub\": \"伊凡三世对金帐汗国军队\"}, \"role\": \"statement\", \"text\": null, \"type\": \"text\"}, {\"anchor\": null, \"at_s\": 12.6, \"fields\": {\"main\": \"蒙古军队不战而退\", \"sub\": \"双方未曾交战\"}, \"role\": \"statement\", \"text\": null, \"type\": \"text\"}], \"text_layout\": \"h-left-stack\"}, \"rationale\": \"本镜旁白为「1480年，蒙古金帐汗国的军队逼近莫斯科公国，在奥卡河上游的乌格拉河畔，与伊凡三世的军队隔河对峙。这次相持进行了一个月，最终蒙古军队不战而退」，实测配音 16.3 秒，预算只排图层段 17 秒（16.3 + 0.7 表演余量）即覆盖，不改动旁白一字。这一句的核心任务是地理关系：谁在哪、对峙点在哪——两方隔河相对、一个月不动、最后撤走，都是位置与时序，最适合由地图标注来表达，没有「有过程的事件」需要生成段去演，故取组合 A（纯图层段），不上生成段，gen_plan 留空。底图取 prop #258 @蒙古汗国分布与西征路线图（忠实原件、现在就有图，不钉 version_task_id）：我已用 read_image 读该原件，确认莫斯科点位在横向 24%–26%、纵向 46%–48%，莫斯科公国绿色范围在横向 23%–31%、纵向 36%–48%，金帐汗国示意虚线框在横向 36%–44%、纵向 72%–82%，画面最左侧（横向 0%–15%）、上方（纵向 0%–20%）与右下角（横向 75%–100%、纵向 80%–100%）是干净底色留白，故选用左侧成套位置 h-left-stack，让文本框压在左侧空白陆面与上方底色上，不遮莫斯科色块、金帐色块与河线。四条几何层全部锚在本张资产、本版本真实存在且几何完整、类型相容的语义：polygon 用 g_a3b81df5（region，6 点）与 g_a3867a06（region，6 点）同拍 at_s=3.0 同时亮起，一眼看出「莫斯科公国在西北、金帐汗国在南」的对峙格局；marker 用 p_c0ffaad3（point）打莫斯科、p_716d1fac（point，乌格拉河汇入奥卡河一带）打对峙点，把旁白里的「逼近莫斯科公国」「在乌格拉河畔」落到图上确有的两个点位。旁白提到「奥卡河上游」，本图确有 r_88298d6a（奥卡河，7 点）语义，但这一句的主信息是对峙点而非河网全貌，且本镜已有四层几何，为避免同一画面信息过载，我未把奥卡河整条河线铺上去，只由对峙点位置表达「奥卡河上游一带」；如需强化河名，可在后续镜（#12 讨论历史转折）补画。屏幕文字按 h-left-stack 容量逐条核对：date.main「1480年」5 字（上限 15）、sub「莫斯科公国时期」7 字（上限 25）；heading.main「乌格拉河对峙」6 字（上限 26）、sub「蒙古军队逼近莫斯科公国」11 字（上限 26）；statement.main「乌格拉河畔隔河对峙一个月」12 字（上限 36，单行）、sub「伊凡三世对金帐汗国军队」11 字（上限 28）；statement.main「蒙古军队不战而退」8 字、sub「双方未曾交战」6 字。两条 statement 同处 primary 区，用不同 at_s（7.0 / 12.6）先后替换，date 在 context 区持续显示，heading 在 1.2 秒被后一拍 statement？——不，heading 与 statement 同属 primary 区，heading 会在 7.0 秒被第一条 statement 顶掉，这是同一主叙事线的正常替换（标题先立，事实随后落地），且 7.0 秒已把标题内容读完。全部 at_s 均落在 17 秒图层段内，最晚一条 12.6 秒与此前拍拉开 5.6 秒，符合单条约 ≥1.2 秒的节奏。衔接上本镜承接上一镜（伊凡三世肖像），但换到地图与地理关系，属同一叙事线的下一拍，故 continuity 沿用 continue 标注、不另作硬切处理。\", \"suggested_combo\": \"A\"}",
+ "combo": "A",
+ "card_status": "pending",
+ "stale_reason": null,
+ "audit": {
+  "storyboard_id": 941,
+  "shot_number": 11,
+  "narration_text": "1480年，蒙古金帐汗国的军队逼近莫斯科公国，在奥卡河上游的乌格拉河畔，与伊凡三世的军队隔河对峙。这次相持进行了一个月，最终蒙古军队不战而退。",
+  "combo": "A",
+  "suggested_combo": "A",
+  "status": "pending",
+  "confirmed_at": null,
+  "stale_reason": null,
+  "has_card": true,
+  "unresolved": 0,
+  "unresolved_layers": [],
+  "video_generated": false,
+  "issues": [],
+  "narration_measured_s": 16.3,
+  "tts": {
+   "valid": true,
+   "reason": null,
+   "message": null,
+   "duration_ms": 16320
+  },
+  "budget": {
+   "layer_s": 17,
+   "gen_s": null
+  }
+ },
+ "source": "production full-context run (task 2942); card = AI updateStoryboard arguments from observations"
+}

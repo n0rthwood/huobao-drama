@@ -11,7 +11,7 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { createOpenAI } from '@ai-sdk/openai'
 import { Agent as HttpAgent, fetch as undiciFetch, Response as UndiciResponse } from 'undici'
 import { captureReasoningFromStream, getActiveReasoningSink } from './reasoning-sink.js'
-import { getTextConfig, getTextProviderBaseUrl, getConfigById } from '../services/ai.js'
+import { getTextConfig, getTextProviderBaseUrl, getConfigById, parseConfigReasoningEffort } from '../services/ai.js'
 import { isModelError, noteEndpointError, noteEndpointSuccess, withTextSlot } from '../services/text-scheduler.js'
 import { noteAgentFetchStarted, noteFirstAgentFetchFailed } from '../services/text-task-context.js'
 import { observeQueueWait, observeTextCall } from '../services/task-observability.js'
@@ -320,6 +320,25 @@ function createThinkingOffFetch(providerName: string, baseURL: string, transport
 }
 
 /**
+ * 配置里写了思考强度（Issue #102，settings.reasoning_effort）就原样写进 OpenAI 兼容请求体，
+ * 并取代 thinking-off 补丁：用户为这条配置明确选了强度，就不能再被强制关思考。
+ * 典型用法：GLM-5.3-Flash 不能关闭思考，只能用 `low` 压低（默认档单次输出上万 token）。
+ */
+function createReasoningEffortFetch(effort: string, transport: typeof fetch): typeof fetch {
+  return async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+    try {
+      if (init?.body && typeof init.body === 'string') {
+        const body: unknown = JSON.parse(init.body)
+        if (body && typeof body === 'object' && 'messages' in body && Array.isArray(body.messages)) {
+          init = { ...init, body: JSON.stringify({ ...body, reasoning_effort: effort }) }
+        }
+      }
+    } catch { /* 解析失败则原样透传 */ }
+    return transport(input, init)
+  }
+}
+
+/**
  * 在请求体中写入配置的温度
  *
  * 背景：部分模型服务端强制固定温度（如 kimi-k2 系只允许 0.6，
@@ -470,8 +489,11 @@ export async function getModel(fileModel: string | undefined, modelOverride?: st
     },
     createReasoningCaptureFetch(textModelFetch),
   )
-  // 叠加请求补丁：thinking-off（非官方端点）+ 配置温度 + 输出上限（非官方 OpenAI）
-  const thinkingOffFetch = createThinkingOffFetch(providerName, resolvedBaseURL, observedTransport)
+  // 叠加请求补丁：思考强度（配置指定）或 thinking-off（非官方端点）+ 配置温度 + 输出上限（非官方 OpenAI）
+  const reasoningEffort = parseConfigReasoningEffort(textConfig.settings)
+  const thinkingOffFetch = reasoningEffort
+    ? createReasoningEffortFetch(reasoningEffort, observedTransport)
+    : createThinkingOffFetch(providerName, resolvedBaseURL, observedTransport)
   const tempFetch = temperature !== null
     ? createTemperatureFetch(providerName, temperature, observedTransport, thinkingOffFetch)
     : thinkingOffFetch

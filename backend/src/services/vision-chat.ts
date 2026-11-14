@@ -29,6 +29,8 @@ export interface ChatEndpointConfig {
   apiKey: string
   model: string
   provider: string
+  /** 配置指定的思考强度（#102），写进请求体的 reasoning_effort */
+  reasoningEffort?: string | null
 }
 
 /** OpenAI 兼容的 user 消息正文：纯文本或 text/image_url 片段数组 */
@@ -136,7 +138,10 @@ export async function callTextChat(
           const resp = await observedFetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${endpoint.apiKey}` },
-            body: JSON.stringify({ model: endpoint.model, temperature: opts.temperature, max_tokens: opts.maxTokens, messages }),
+            body: JSON.stringify({
+              model: endpoint.model, temperature: opts.temperature, max_tokens: opts.maxTokens, messages,
+              ...(endpoint.reasoningEffort ? { reasoning_effort: endpoint.reasoningEffort } : {}),
+            }),
             signal,
           })
           if (!resp.ok) throw Object.assign(new Error(`文本服务 ${resp.status}: ${(await resp.text()).slice(0, 300)}`), { status: resp.status })

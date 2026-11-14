@@ -4,7 +4,7 @@ import { db, getInsertId, schema } from '../db/index.js'
 import { success, notFound, created, badRequest, now } from '../utils/response.js'
 import { toSnakeCase } from '../utils/transform.js'
 import { joinProviderUrl } from '../services/adapters/url.js'
-import { hasVersionedPath, isOfficialProvider, parseConfigTemperature, validateConfigModels } from '../services/ai.js'
+import { hasVersionedPath, isOfficialProvider, parseConfigReasoningEffort, parseConfigStages, parseConfigTemperature, validateConfigModels } from '../services/ai.js'
 import { fetchVoices } from '../services/tts.js'
 import { probeVision, resolveVisionTextConfig } from '../services/vision-capability.js'
 import { AI_STAGES } from '../services/ai-stages.js'
@@ -21,6 +21,29 @@ function normalizeTemperature(v: any): number | null {
   return n
 }
 
+/**
+ * 文本配置的路由字段（Issue #102）写进 settings：`stages` 专用环节（必须是已登记的 AI 环节，空数组/null = 通用），
+ * `reasoning_effort` 思考强度（非空字符串原样透传，null/空 = 不设置）。返回错误文案或 null。
+ */
+function applyTextRoutingSettings(settings: Record<string, unknown>, body: Record<string, unknown>, serviceType: string): string | null {
+  const touched = 'stages' in body || 'reasoning_effort' in body
+  if (touched && serviceType !== 'text') return 'stages / reasoning_effort 只适用于文本配置'
+  if ('stages' in body) {
+    const raw = body.stages
+    if (raw === null || (Array.isArray(raw) && raw.length === 0)) delete settings.stages
+    else if (!Array.isArray(raw) || raw.some(stage => typeof stage !== 'string' || !(stage in AI_STAGES))) {
+      return `stages 必须是 AI 环节名数组（可选：${Object.keys(AI_STAGES).join(' / ')}）`
+    } else settings.stages = [...new Set(raw as string[])]
+  }
+  if ('reasoning_effort' in body) {
+    const raw = body.reasoning_effort
+    if (raw === null || raw === '') delete settings.reasoning_effort
+    else if (typeof raw !== 'string' || !raw.trim()) return 'reasoning_effort 必须是非空字符串（如 low / medium / high / max）'
+    else settings.reasoning_effort = raw.trim()
+  }
+  return null
+}
+
 /** 把 settings JSON 中的可写字段透出为顶层字段，便于前端直接读写（api_key 不在此列） */
 function withParsedFields(r: Record<string, unknown>) {
   let settings: Record<string, unknown> = {}
@@ -30,13 +53,16 @@ function withParsedFields(r: Record<string, unknown>) {
   } catch {
     settings = {}
   }
-  const { temperature: _temperature, ...ttsSettings } = settings
+  const { temperature: _temperature, stages: _stages, reasoning_effort: _effort, ...ttsSettings } = settings
   return {
     ...toSnakeCase(r),
     model: typeof r.model === 'string' && r.model ? JSON.parse(r.model) : [],
     temperature: parseConfigTemperature(typeof r.settings === 'string' ? r.settings : null),
     // TTS 的音色与可选参数（voice 由后端在保存时固定，前端只读展示）
     tts_settings: r.serviceType === 'tts' ? ttsSettings : undefined,
+    // 文本配置的专用环节与思考强度（#102）
+    stages: r.serviceType === 'text' ? parseConfigStages(typeof r.settings === 'string' ? r.settings : null) : undefined,
+    reasoning_effort: r.serviceType === 'text' ? parseConfigReasoningEffort(typeof r.settings === 'string' ? r.settings : null) : undefined,
   }
 }
 
@@ -234,7 +260,7 @@ app.post('/', async (c) => {
 
   const settings: Record<string, any> = temperature !== null ? { temperature } : {}
   if ('tts_settings' in body) mergeTtsSettings(settings, body.tts_settings)
-  const voiceError = ttsVoiceError(body.service_type, settings)
+  const voiceError = ttsVoiceError(body.service_type, settings) ?? applyTextRoutingSettings(settings, body, body.service_type)
   if (voiceError) return badRequest(c, voiceError)
 
   const res = await db.insert(schema.aiServiceConfigs).values({
@@ -430,7 +456,7 @@ app.put('/:id', async (c) => {
   if ('is_active' in body) updates.isActive = body.is_active
   // 视觉标定（#51）：非文本配置一律视为非视觉
   if ('vision' in body) updates.vision = serviceType === 'text' && body.vision === true
-  if ('temperature' in body || 'tts_settings' in body) {
+  if ('temperature' in body || 'tts_settings' in body || 'stages' in body || 'reasoning_effort' in body) {
     // 与已有 settings 合并：清空的 temperature 从 JSON 中移除，已固定的 voice 保留不动
     let settings: Record<string, any> = {}
     try { settings = existing.settings ? JSON.parse(existing.settings) : {} } catch { settings = {} }
@@ -445,7 +471,7 @@ app.put('/:id', async (c) => {
       else settings.temperature = temperature
     }
     if ('tts_settings' in body) mergeTtsSettings(settings, body.tts_settings)
-    const voiceError = ttsVoiceError(serviceType, settings)
+    const voiceError = ttsVoiceError(serviceType, settings) ?? applyTextRoutingSettings(settings, body, serviceType)
     if (voiceError) return badRequest(c, voiceError)
     updates.settings = Object.keys(settings).length ? JSON.stringify(settings) : null
   }

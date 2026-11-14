@@ -23,6 +23,7 @@ import { stampFieldSavedAt } from '../../services/storyboard-fields.js'
 import { MAX_NARRATION_CHARS, narrationCharCount, parseNarrationMeta, sha256 } from '../../services/narration.js'
 import { describeNarrationGaps, fitNarrationToGaps, locateNarrationInScript, narrationCoverage, narrationMatchKey, scriptMatchKey, scriptParagraphs } from '../../services/narration-first.js'
 import { layerTextSpecPayload, loadDesignCardContext, semanticEntries } from '../../services/design-card-context.js'
+import { designCardWindow } from '../../services/design-card-window.js'
 import { shotTtsValidity } from '../../services/narration-tts-gate.js'
 import {
   COMBOS,
@@ -233,8 +234,15 @@ const readStoryboardContext = createTool({
       .filter(sb => !sb.deletedAt)
       .sort((a, b) => a.storyboardNumber - b.storyboardNumber)
     const byId = new Map(aliveStoryboards.map(sb => [sb.id, sb]))
+    // 设计卡逐镜填写（#102）：只给本镜 ± 前后各 3 镜，整集设计卡与提示词不再重复发送
+    const targetId = context?.requestContext?.get('storyboardPromptScope' as never) === 'design_card'
+      ? getStoryboardId(context?.requestContext)
+      : null
+    const window = targetId != null ? designCardWindow(aliveStoryboards.map(sb => sb.id), targetId) : null
+    const windowIds = window ? new Set(window.ids) : null
+    const contextStoryboards = windowIds ? aliveStoryboards.filter(sb => windowIds.has(sb.id)) : aliveStoryboards
 
-    const existingStoryboardPayload = await Promise.all(aliveStoryboards
+    const existingStoryboardPayload = await Promise.all(contextStoryboards
       .map(async (sb) => {
         const links = await db.select().from(schema.storyboardCharacters)
           .where(eq(schema.storyboardCharacters.storyboardId, sb.id))
@@ -246,6 +254,8 @@ const readStoryboardContext = createTool({
           id: sb.id,
           shot_number: sb.storyboardNumber,
           title: sb.title || '',
+          // 窗口模式（#102）逐镜给旁白：不必再从整集剧本里自己定位本镜与邻镜念的是哪一段
+          ...(window ? { narration_text: sb.narrationText || '' } : {}),
           scene_id: sb.sceneId,
           character_ids: links.map(link => link.characterId),
           prop_ids: sbPropLinks.map(link => link.propId),
@@ -293,6 +303,15 @@ const readStoryboardContext = createTool({
       props,
       exposition_assets: expositionAssets,
       existing_storyboards: existingStoryboardPayload,
+      ...(window ? {
+        context_window: {
+          note: '设计卡只附本镜与前后相邻镜头；整集其余镜头未列出，不要据此推断它们不存在。',
+          target_storyboard_id: targetId,
+          before: window.before,
+          after: window.after,
+          shot_ids: window.ids,
+        },
+      } : {}),
     }
     logTaskSuccess('StoryboardTool', 'read-context', {
       episodeId,
@@ -302,6 +321,7 @@ const readStoryboardContext = createTool({
       props: props.length,
       expositionAssets: expositionAssets.length,
       existingStoryboards: payload.existing_storyboards.length,
+      ...(window ? { contextWindow: `${window.before}+1+${window.after}` } : {}),
       scriptLength: script.length,
       aspectRatio,
     })

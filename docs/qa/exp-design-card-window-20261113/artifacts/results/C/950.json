@@ -1,0 +1,206 @@
+{
+ "arm": "C",
+ "shot": 950,
+ "config_resumed": null,
+ "config_id": 10,
+ "model": "deepseek-chat",
+ "context_window": 3,
+ "post": {
+  "code": 200,
+  "data": {
+   "status": "running",
+   "total": 1
+  },
+  "message": "success"
+ },
+ "task_id": 3120,
+ "wall_s_post_to_done": 332.7,
+ "task": {
+  "id": 3120,
+  "created_at": "2026-11-13T15:24:09.009Z",
+  "completed_at": "2026-11-13T15:29:40.867Z",
+  "status": "completed"
+ },
+ "progress": {
+  "completed": 1,
+  "failed": 0,
+  "total": 1,
+  "items": [
+   {
+    "storyboard_id": 950,
+    "storyboard_number": 18,
+    "state": "completed",
+    "reason": null
+   }
+  ]
+ },
+ "context_window_param": 3,
+ "vision_calls_param": {
+  "count": 2,
+  "prompt_tokens": 1681,
+  "completion_tokens": 349,
+  "model": "deepseek-chat"
+ },
+ "works": [
+  {
+   "id": 639,
+   "task_id": 3120,
+   "stage": "design_card",
+   "source_chars": 58,
+   "sample_key": "design_card|cfg:10|model:deepseek-chat",
+   "storyboard_id": 950,
+   "storyboard_number": 18,
+   "started_at": 1794583449011,
+   "finished_at": 1794583780866,
+   "status": "completed",
+   "model_ms": 333742,
+   "queue_ms": 37,
+   "work_ms": 331855,
+   "call_count": 7,
+   "heartbeat_at": 1794583780866,
+   "error_msg": null,
+   "created_at": 1794583449011,
+   "scope": "sys_task",
+   "active_call_started_at": null,
+   "active_call_heartbeat_at": null
+  }
+ ],
+ "calls": [
+  {
+   "id": 1679,
+   "kind": "llm",
+   "config_id": 10,
+   "config_name": "DeepSeek V4.1 Flash 1017 (local)",
+   "model": "deepseek-chat",
+   "duration_ms": 12286,
+   "prompt_tokens": 32667,
+   "completion_tokens": 47,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": 91243,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1680,
+   "kind": "llm",
+   "config_id": 10,
+   "config_name": "DeepSeek V4.1 Flash 1017 (local)",
+   "model": "deepseek-chat",
+   "duration_ms": 24979,
+   "prompt_tokens": 44827,
+   "completion_tokens": 306,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": 119674,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1681,
+   "kind": "vision_chat",
+   "config_id": 10,
+   "config_name": "DeepSeek V4.1 Flash 1017 (local)",
+   "model": "deepseek-chat",
+   "duration_ms": 2946,
+   "prompt_tokens": 714,
+   "completion_tokens": 36,
+   "finish_reason": "stop",
+   "status": "completed",
+   "request_chars": 207,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1682,
+   "kind": "vision_chat",
+   "config_id": 10,
+   "config_name": "DeepSeek V4.1 Flash 1017 (local)",
+   "model": "deepseek-chat",
+   "duration_ms": 20147,
+   "prompt_tokens": 967,
+   "completion_tokens": 313,
+   "finish_reason": "stop",
+   "status": "completed",
+   "request_chars": 240,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1683,
+   "kind": "llm",
+   "config_id": 10,
+   "config_name": "DeepSeek V4.1 Flash 1017 (local)",
+   "model": "deepseek-chat",
+   "duration_ms": 110025,
+   "prompt_tokens": 45581,
+   "completion_tokens": 1557,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": 120808,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1684,
+   "kind": "llm",
+   "config_id": 10,
+   "config_name": "DeepSeek V4.1 Flash 1017 (local)",
+   "model": "deepseek-chat",
+   "duration_ms": 146632,
+   "prompt_tokens": 47520,
+   "completion_tokens": 1588,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": 124149,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1685,
+   "kind": "llm",
+   "config_id": 10,
+   "config_name": "DeepSeek V4.1 Flash 1017 (local)",
+   "model": "deepseek-chat",
+   "duration_ms": 16727,
+   "prompt_tokens": 49126,
+   "completion_tokens": 250,
+   "finish_reason": "stop",
+   "status": "completed",
+   "request_chars": 126933,
+   "http_status": 200,
+   "error_msg": null
+  }
+ ],
+ "card_saved": true,
+ "combo": "C",
+ "card_status": "pending",
+ "stale_reason": null,
+ "card": "{\"version\":2,\"info_points\":[{\"id\":\"ip1\",\"text\":\"“哥萨克”不是一个人的名字，而是一个词义多重的外来词\",\"via\":\"layer\"},{\"id\":\"ip2\",\"text\":\"在土耳其语中它有多重含义：自由人、反叛者、草原强盗、被流放者、雇佣兵\",\"via\":\"layer\"},{\"id\":\"ip3\",\"text\":\"在蒙古语中它的含义是逃亡者和强盗\",\"via\":\"layer\"},{\"id\":\"ip4\",\"text\":\"两套语源的落点一致：逃出政权、不守规矩的人——这是本集标题里“草原强盗”一词的出处\",\"via\":\"layer\"},{\"id\":\"ip5\",\"text\":\"画面落到草原聚落院墙缺口：一名哥萨克持火枪守在一侧，旁人牵着驮马穿过土路，聚落就是这群人据点兼住处\",\"via\":\"generated\"},{\"id\":\"ip6\",\"text\":\"承接上一镜 #21 的同一处草原聚落，方位不跳变\",\"via\":\"generated\"}],\"budget\":{\"layer_s\":11,\"gen_s\":4.5},\"rationale\":\"旁白为「『哥萨克』在土耳其语中有多种涵义：自由人、反叛者、草原强盗、被流放者、雇佣兵等等。蒙古语中它的涵义是：逃亡者和强盗」，实测配音 15 秒，预算 11 + 4.5 = 15.5 秒，覆盖实测时长且不改动旁白一字。这一句是纯词义解释——列举两种语言里的多种涵义，没有任何可生成的过程事件；若整镜交给生成段，画面只能凭空拍一个「在说话的人」，与纪录片无对白的纪律冲突；若整镜交给图层段，则连续两镜都是文字卡，节奏过平。因此取组合 C（先定位再入戏）：前 11 秒用屏幕文字逐条列出词义清单（这是本镜真正要传给观众的信息），后 4.5 秒落回上一镜 #21 已经建立的 @哥萨克聚落，让「自由人 / 强盗」这些词有一个可看的人——一名哥萨克双手持 @哥萨克火枪 守在院墙缺口旁，另一人牵驮马穿路，正是上一镜「其中一伙强盗团伙」的继续；生成段首帧由图层段末帧继承锁定，combo C 不写 first。底图沿用上一镜 #21 的图层底图（inherit_prev）——本镜旁白是上一镜「小叶就是伊凡四世地盘上其中一个强盗团伙的老大」的名词释义，观众应仍在同一张图的语境里；本集地图资产 prop #258/@蒙古汗国分布与西征路线图、prop #259/@西伯利亚推进据点网络图、prop #257/@乌拉尔山东西两麓领地范围图 上都没有与「哥萨克词义」相关的任何语义（无可用地名、路线、范围可指）——\",\"suggested_combo\":\"C\",\"layer_plan\":{\"base\":{\"kind\":\"inherit_prev\"},\"must_mark\":[],\"planned_layers\":[{\"type\":\"text\",\"at_s\":0.2,\"role\":\"heading\",\"fields\":{\"main\":\"“哥萨克”是什么意思\",\"sub\":\"一个词的多种涵义\"}},{\"type\":\"text\",\"at_s\":1.6,\"role\":\"bullets\",\"fields\":{\"items\":[\"自由人\",\"反叛者\",\"草原强盗\"]}},{\"type\":\"text\",\"at_s\":5.8,\"role\":\"bullets\",\"fields\":{\"items\":[\"被流放者\",\"雇佣兵\"]}},{\"type\":\"text\",\"at_s\":9,\"role\":\"statement\",\"fields\":{\"main\":\"蒙古语：逃亡者和强盗\",\"sub\":\"同一个词的另一种叫法\"}},{\"type\":\"text\",\"at_s\":10.8,\"role\":\"keyword\",\"fields\":{\"main\":\"草原强盗\",\"sub\":\"多种涵义里最贴切的一个\"}}],\"text_layout\":\"h-right-stack\"},\"gen_plan\":{\"reference_assets\":[{\"kind\":\"scene\",\"id\":172,\"name\":\"哥萨克聚落\"},{\"kind\":\"prop\",\"id\":260,\"name\":\"哥萨克火枪\"}],\"mid\":\"聚落院内中景，夯土矮墙缺口敞开，一名哥萨克立在缺口一侧、双手握 @哥萨克火枪 抵在肩前，枪口朝上，另一名男子牵着驮马从土路上缓步走过，草顶棚架与拴马桩在后\",\"last\":\"聚落全景，一名哥萨克双手握 @哥萨克火枪 立在夯土矮墙缺口一侧，背后是草顶棚架与拴马桩，驮马已牵出画外，黄褐色午后光线铺满干草原\"}}",
+ "audit": {
+  "storyboard_id": 950,
+  "shot_number": 18,
+  "narration_text": "“哥萨克”在土耳其语中有多种涵义：自由人、反叛者、草原强盗、被流放者、雇佣兵等等。蒙古语中它的涵义是：逃亡者和强盗。",
+  "combo": "C",
+  "suggested_combo": "C",
+  "status": "pending",
+  "confirmed_at": null,
+  "stale_reason": null,
+  "has_card": true,
+  "unresolved": 0,
+  "unresolved_layers": [],
+  "video_generated": true,
+  "issues": [],
+  "narration_measured_s": 15,
+  "tts": {
+   "valid": true,
+   "reason": null,
+   "message": null,
+   "duration_ms": 15040
+  },
+  "budget": {
+   "layer_s": 11,
+   "gen_s": 4.5
+  }
+ }
+}

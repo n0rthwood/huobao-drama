@@ -1,0 +1,141 @@
+{
+ "arm": "B2",
+ "shot": 950,
+ "config_resumed": null,
+ "config_id": 1,
+ "model": "glm-5.3-flash",
+ "context_window": 3,
+ "post": {
+  "code": 200,
+  "data": {
+   "status": "running",
+   "total": 1
+  },
+  "message": "success"
+ },
+ "task_id": 3132,
+ "wall_s_post_to_done": 52.4,
+ "task": {
+  "id": 3132,
+  "created_at": "2026-11-13T16:30:57.476Z",
+  "completed_at": "2026-11-13T16:31:47.743Z",
+  "status": "completed"
+ },
+ "progress": {
+  "completed": 1,
+  "failed": 0,
+  "total": 1,
+  "items": [
+   {
+    "storyboard_id": 950,
+    "storyboard_number": 18,
+    "state": "completed",
+    "reason": null
+   }
+  ]
+ },
+ "context_window_param": 3,
+ "vision_calls_param": null,
+ "works": [
+  {
+   "id": 651,
+   "task_id": 3132,
+   "stage": "design_card",
+   "source_chars": 58,
+   "sample_key": "design_card|cfg:1|model:glm-5.3-flash",
+   "storyboard_id": 950,
+   "storyboard_number": 18,
+   "started_at": 1794587457478,
+   "finished_at": 1794587507743,
+   "status": "completed",
+   "model_ms": 49670,
+   "queue_ms": 19,
+   "work_ms": 50265,
+   "call_count": 3,
+   "heartbeat_at": 1794587507743,
+   "error_msg": null,
+   "created_at": 1794587457478,
+   "scope": "sys_task",
+   "active_call_started_at": null,
+   "active_call_heartbeat_at": null
+  }
+ ],
+ "calls": [
+  {
+   "id": 1740,
+   "kind": "llm",
+   "config_id": 1,
+   "config_name": "GLM 5.3 (local)",
+   "model": "glm-5.3-flash",
+   "duration_ms": 2990,
+   "prompt_tokens": 37096,
+   "completion_tokens": 7,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": 91170,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1741,
+   "kind": "llm",
+   "config_id": 1,
+   "config_name": "GLM 5.3 (local)",
+   "model": "glm-5.3-flash",
+   "duration_ms": 39991,
+   "prompt_tokens": 48974,
+   "completion_tokens": 2058,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": 119489,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1742,
+   "kind": "llm",
+   "config_id": 1,
+   "config_name": "GLM 5.3 (local)",
+   "model": "glm-5.3-flash",
+   "duration_ms": 6689,
+   "prompt_tokens": 49866,
+   "completion_tokens": 227,
+   "finish_reason": "stop",
+   "status": "completed",
+   "request_chars": 121101,
+   "http_status": 200,
+   "error_msg": null
+  }
+ ],
+ "card_saved": true,
+ "combo": "A",
+ "card_status": "pending",
+ "stale_reason": null,
+ "card": "{\"version\":2,\"info_points\":[{\"id\":\"p1\",\"text\":\"「哥萨克」在土耳其语中有多种涵义\",\"via\":\"layer\"},{\"id\":\"p2\",\"text\":\"土耳其语的义项逐一上屏：自由人、反叛者、草原强盗、被流放者、雇佣兵\",\"via\":\"layer\"},{\"id\":\"p3\",\"text\":\"蒙古语中它的涵义是：逃亡者和强盗\",\"via\":\"layer\"}],\"budget\":{\"layer_s\":15.5,\"gen_s\":null},\"rationale\":\"本镜旁白为「“哥萨克”在土耳其语中有多种涵义：自由人、反叛者、草原强盗、被流放者、雇佣兵等等。蒙古语中它的涵义是：逃亡者和强盗」，实测配音 15 秒，预算只排图层段 15.5 秒覆盖，不改动旁白一字。这一句是纯粹的词义定义与义项列举，没有任何地理关系（不涉及地名、河流、范围）、也没有可生成的事件过程，故取组合 A（纯图层段），gen_plan 留空；旁白里的地名/路线为零，must_mark 为空是本镜的真实状态而非缺标注。底图不用前几镜的 prop #258 蒙古汗国分布图——词义定义不需要地图方位，硬留地图反而误导观众以为本镜在讲地理；改用 prop #266 叶尔马克肖像画（忠实原件、现在就有图）：他是本集哥萨克叙事的主角，以这幅肖像作背景整体展示，恰好为「哥萨克是什么样的人」提供视觉载体，该资产无任何语义标注，本镜所有信息由屏幕文字承担，不做任何无依据的锚定。我已核对原件构图：竖幅肖像居中占满画面，人物躯干中轴在画面中部，上部与下部留有安全区，故选上中/中部/下中的成套位置 h-center-top，文本框不压人物面部与躯干。屏幕文字按 layer-text-design 规则处理五个并列义项：土耳其语五个义项超过 bullets 三条上限、且 statement 主句并列「、」超两条均被禁，故拆成两拍 bullets（2.2 秒「自由人／反叛者／草原强盗」，5.8 秒「被\",\"suggested_combo\":\"A\",\"layer_plan\":{\"base\":{\"kind\":\"asset\",\"asset_kind\":\"prop\",\"asset_id\":266,\"version_task_id\":null},\"must_mark\":[],\"planned_layers\":[{\"type\":\"text\",\"at_s\":0.5,\"role\":\"heading\",\"fields\":{\"main\":\"多种涵义\",\"sub\":\"土耳其语中的哥萨克\"}},{\"type\":\"text\",\"at_s\":2.2,\"role\":\"bullets\",\"fields\":{\"items\":[\"自由人\",\"反叛者\",\"草原强盗\"]}},{\"type\":\"text\",\"at_s\":5.8,\"role\":\"bullets\",\"fields\":{\"items\":[\"被流放者\",\"雇佣兵\"]}},{\"type\":\"text\",\"at_s\":10.2,\"role\":\"keyword\",\"fields\":{\"main\":\"逃亡者和强盗\",\"sub\":\"蒙古语中的涵义\"}}],\"text_layout\":\"h-center-top\"}}",
+ "audit": {
+  "storyboard_id": 950,
+  "shot_number": 18,
+  "narration_text": "“哥萨克”在土耳其语中有多种涵义：自由人、反叛者、草原强盗、被流放者、雇佣兵等等。蒙古语中它的涵义是：逃亡者和强盗。",
+  "combo": "A",
+  "suggested_combo": "A",
+  "status": "pending",
+  "confirmed_at": null,
+  "stale_reason": null,
+  "has_card": true,
+  "unresolved": 0,
+  "unresolved_layers": [],
+  "video_generated": true,
+  "issues": [],
+  "narration_measured_s": 15,
+  "tts": {
+   "valid": true,
+   "reason": null,
+   "message": null,
+   "duration_ms": 15040
+  },
+  "budget": {
+   "layer_s": 15.5,
+   "gen_s": null
+  }
+ }
+}

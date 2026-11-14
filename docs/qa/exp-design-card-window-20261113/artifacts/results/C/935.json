@@ -1,0 +1,176 @@
+{
+ "arm": "C",
+ "shot": 935,
+ "config_resumed": null,
+ "config_id": 10,
+ "model": "deepseek-chat",
+ "context_window": 3,
+ "post": {
+  "code": 200,
+  "data": {
+   "status": "running",
+   "total": 1
+  },
+  "message": "success"
+ },
+ "task_id": 3118,
+ "wall_s_post_to_done": 272.7,
+ "task": {
+  "id": 3118,
+  "created_at": "2026-11-13T15:14:18.491Z",
+  "completed_at": "2026-11-13T15:18:48.381Z",
+  "status": "completed"
+ },
+ "progress": {
+  "completed": 1,
+  "failed": 0,
+  "total": 1,
+  "items": [
+   {
+    "storyboard_id": 935,
+    "storyboard_number": 5,
+    "state": "completed",
+    "reason": null
+   }
+  ]
+ },
+ "context_window_param": 3,
+ "vision_calls_param": {
+  "count": 1,
+  "prompt_tokens": 572,
+  "completion_tokens": 409,
+  "model": "deepseek-chat"
+ },
+ "works": [
+  {
+   "id": 637,
+   "task_id": 3118,
+   "stage": "design_card",
+   "source_chars": 45,
+   "sample_key": "design_card|cfg:10|model:deepseek-chat",
+   "storyboard_id": 935,
+   "storyboard_number": 5,
+   "started_at": 1794582858493,
+   "finished_at": 1794583128381,
+   "status": "completed",
+   "model_ms": 269076,
+   "queue_ms": 28,
+   "work_ms": 269888,
+   "call_count": 5,
+   "heartbeat_at": 1794583128381,
+   "error_msg": null,
+   "created_at": 1794582858493,
+   "scope": "sys_task",
+   "active_call_started_at": null,
+   "active_call_heartbeat_at": null
+  }
+ ],
+ "calls": [
+  {
+   "id": 1669,
+   "kind": "llm",
+   "config_id": 10,
+   "config_name": "DeepSeek V4.1 Flash 1017 (local)",
+   "model": "deepseek-chat",
+   "duration_ms": 108142,
+   "prompt_tokens": 32671,
+   "completion_tokens": 34,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": 91244,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1670,
+   "kind": "llm",
+   "config_id": 10,
+   "config_name": "DeepSeek V4.1 Flash 1017 (local)",
+   "model": "deepseek-chat",
+   "duration_ms": 28103,
+   "prompt_tokens": 45843,
+   "completion_tokens": 177,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": 121507,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1671,
+   "kind": "vision_chat",
+   "config_id": 10,
+   "config_name": "DeepSeek V4.1 Flash 1017 (local)",
+   "model": "deepseek-chat",
+   "duration_ms": 23211,
+   "prompt_tokens": 572,
+   "completion_tokens": 409,
+   "finish_reason": "stop",
+   "status": "completed",
+   "request_chars": 252,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1672,
+   "kind": "llm",
+   "config_id": 10,
+   "config_name": "DeepSeek V4.1 Flash 1017 (local)",
+   "model": "deepseek-chat",
+   "duration_ms": 81405,
+   "prompt_tokens": 46509,
+   "completion_tokens": 1377,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": 122549,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1673,
+   "kind": "llm",
+   "config_id": 10,
+   "config_name": "DeepSeek V4.1 Flash 1017 (local)",
+   "model": "deepseek-chat",
+   "duration_ms": 28215,
+   "prompt_tokens": 47907,
+   "completion_tokens": 286,
+   "finish_reason": "stop",
+   "status": "completed",
+   "request_chars": 125071,
+   "http_status": 200,
+   "error_msg": null
+  }
+ ],
+ "card_saved": true,
+ "combo": "A",
+ "card_status": "pending",
+ "stale_reason": null,
+ "card": "{\"version\":2,\"info_points\":[{\"id\":\"ip1\",\"text\":\"这个向东翻越乌拉尔山的人名叫叶尔马克·齐莫菲叶维奇\",\"via\":\"layer\"},{\"id\":\"ip2\",\"text\":\"叶尔马克这个名字源自俄语，有「磨石」或「石」的意思\",\"via\":\"layer\"},{\"id\":\"ip3\",\"text\":\"片中为便于称呼，把叶尔马克·齐莫菲叶维奇简称作「小叶」\",\"via\":\"layer\"},{\"id\":\"ip4\",\"text\":\"小叶把唾手可得的大片肥沃荒地留给了买下这片土地的人\",\"via\":\"layer\"},{\"id\":\"ip5\",\"text\":\"小叶放下这片土地，背过身继续往前走\",\"via\":\"layer\"}],\"budget\":{\"layer_s\":9.5,\"gen_s\":null},\"rationale\":\"本镜旁白「这个人名叫叶尔马克·齐莫菲叶维奇，我们称呼他为小叶。他把唾手可得的大片肥沃荒地，留给了买下这片土地的人。小叶放下这片土地，背过身，继续往前走」，实测配音 8.3 秒。任务是把这个「向东翻越乌拉尔山的人」落实到具体名字与他此后选择的处境上，而这一镜紧接上一镜（#4）的地图与山口镜头，人物需要一个权威的形象依据。可用依据里唯一直接指向人物身份的忠实原件是 prop #266 @叶尔马克肖像画（faithful=true，17 世纪佚名肖像，793×988，就是本集给的图 4）。我已用 read_image 读过这张原件：人物半身像占画面中偏左，头部中心在横向约 40%–45%、纵向约 25%–30%，面部略转向画面右侧，左手在画面右下 85%–90% 处握一根红棕色长杆、顶端为银色矛头，背景为深褐墨绿斑驳的暗色底，画面右侧横向 70%–95% 一带空旷无主体 —— 因此选右侧成套位置 h-right-stack，让「名字标题 → 名字含义 → 简称 → 他留下的土地」四拍压在右侧暗色留白带上，不遮面部与矛杆。该资产没有任何语义标注（semantics 为空），本镜也不需要标点位、河道或范围，故 must_mark 为空；四条层都是不指向底图具体对象的排版元素，按 layer-text-design 不写 anchor。容量按 h-bottom-left 之外唯一适用的 h-r\",\"suggested_combo\":\"A\",\"layer_plan\":{\"base\":{\"kind\":\"asset\",\"asset_kind\":\"prop\",\"asset_id\":266,\"version_task_id\":null},\"must_mark\":[],\"planned_layers\":[{\"type\":\"text\",\"at_s\":0.3,\"role\":\"heading\",\"fields\":{\"main\":\"叶尔马克·齐莫菲叶维奇\",\"sub\":\"15世纪末的欧洲航海者之后，向东的那个人\"}},{\"type\":\"text\",\"at_s\":2.6,\"role\":\"statement\",\"fields\":{\"main\":\"「叶尔马克」在俄语里是磨石、石的意思\",\"sub\":\"也有人写作 Yermak Timofeyevich\"}},{\"type\":\"text\",\"at_s\":4.6,\"role\":\"keyword\",\"fields\":{\"main\":\"小叶\",\"sub\":\"本片对他的简称\"}},{\"type\":\"text\",\"at_s\":6.2,\"role\":\"statement\",\"fields\":{\"main\":\"他把唾手可得的大片肥沃荒地，留给了买下土地的人\",\"sub\":\"小叶的选择\"}}],\"text_layout\":\"h-right-stack\"}}",
+ "audit": {
+  "storyboard_id": 935,
+  "shot_number": 5,
+  "narration_text": "这个人名叫叶尔马克·齐莫菲叶维奇(Yermak Timofeyvich)，我们称呼他为小叶。",
+  "combo": "A",
+  "suggested_combo": "A",
+  "status": "pending",
+  "confirmed_at": null,
+  "stale_reason": null,
+  "has_card": true,
+  "unresolved": 0,
+  "unresolved_layers": [],
+  "video_generated": false,
+  "issues": [],
+  "narration_measured_s": 8.3,
+  "tts": {
+   "valid": true,
+   "reason": null,
+   "message": null,
+   "duration_ms": 8320
+  },
+  "budget": {
+   "layer_s": 9.5,
+   "gen_s": null
+  }
+ }
+}

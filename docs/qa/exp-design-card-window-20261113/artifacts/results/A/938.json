@@ -1,0 +1,121 @@
+{
+ "arm": "A",
+ "shot": 938,
+ "config_id": 10,
+ "model": "deepseek-chat",
+ "context_window": 0,
+ "task_id": 2942,
+ "task": {
+  "id": 2942,
+  "created_at": "2026-11-13T06:46:42.728000Z",
+  "completed_at": "2026-11-13T06:46:42.728000Z",
+  "status": "completed"
+ },
+ "wall_s_post_to_done": 84.0,
+ "calls": [
+  {
+   "id": null,
+   "kind": "llm",
+   "config_id": 10,
+   "model": "deepseek-chat",
+   "duration_ms": 20942,
+   "prompt_tokens": 32671,
+   "completion_tokens": 24,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": null
+  },
+  {
+   "id": null,
+   "kind": "llm",
+   "config_id": 10,
+   "model": "deepseek-chat",
+   "duration_ms": 27125,
+   "prompt_tokens": 73452,
+   "completion_tokens": 285,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": null
+  },
+  {
+   "id": null,
+   "kind": "vision_chat",
+   "config_id": 10,
+   "model": "deepseek-chat",
+   "duration_ms": 13149,
+   "prompt_tokens": 254,
+   "completion_tokens": 690,
+   "finish_reason": "stop",
+   "status": "completed",
+   "request_chars": null
+  },
+  {
+   "id": null,
+   "kind": "vision_chat",
+   "config_id": 10,
+   "model": "deepseek-chat",
+   "duration_ms": 6005,
+   "prompt_tokens": 945,
+   "completion_tokens": 156,
+   "finish_reason": "stop",
+   "status": "completed",
+   "request_chars": null
+  },
+  {
+   "id": null,
+   "kind": "llm",
+   "config_id": 10,
+   "model": "deepseek-chat",
+   "duration_ms": 16883,
+   "prompt_tokens": 74705,
+   "completion_tokens": 940,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": null
+  },
+  {
+   "id": null,
+   "kind": "llm",
+   "config_id": 10,
+   "model": "deepseek-chat",
+   "duration_ms": 5212,
+   "prompt_tokens": 75666,
+   "completion_tokens": 187,
+   "finish_reason": "stop",
+   "status": "completed",
+   "request_chars": null
+  }
+ ],
+ "card_saved": true,
+ "card": "{\"budget\": {\"gen_s\": null, \"layer_s\": 7}, \"combo\": \"A\", \"gen_plan\": {\"first\": null, \"last\": null, \"mid\": null, \"reference_assets\": null}, \"info_points\": [{\"id\": \"ip1\", \"text\": \"本段转入时代背景：先看清小叶所处的时代\", \"via\": \"layer\"}, {\"id\": \"ip2\", \"text\": \"小叶生活在16世纪，即伊凡四世在位时期\", \"via\": \"layer\"}, {\"id\": \"ip3\", \"text\": \"当时俄国是沙皇俄国，处在伊凡四世的统治之下\", \"via\": \"layer\"}], \"info_points_note\": null, \"layer_plan\": {\"base\": {\"asset_id\": 258, \"asset_kind\": \"prop\", \"kind\": \"asset\"}, \"must_mark\": [], \"planned_layers\": [{\"anchor\": null, \"at_s\": 0.4, \"fields\": {\"main\": \"16世纪\", \"sub\": \"沙皇俄国时期\"}, \"role\": \"date\", \"text\": null, \"type\": \"text\"}, {\"anchor\": null, \"at_s\": 2, \"fields\": {\"main\": \"小叶所处的时代\", \"sub\": \"伊凡四世在位\"}, \"role\": \"heading\", \"text\": null, \"type\": \"text\"}, {\"anchor\": null, \"at_s\": 4.2, \"fields\": {\"main\": \"此时统治俄国的是伊凡四世\", \"sub\": \"沙皇俄国\"}, \"role\": \"statement\", \"text\": null, \"type\": \"text\"}], \"text_layout\": \"h-left-stack\"}, \"rationale\": \"本镜旁白只有一句过渡句「要理解小叶的处境，得先看清他所处的时代」，实测配音 4.6 秒，它的任务是把叙述从「小叶这个人」转到「他所在的时代」，因此只需要一个时间坐标加一句时代定位，不需要把后面的伊凡四世事迹提前讲出来。取组合 A（纯图层段）：本镜既是段落之间的过渡，也是后面讨论沙皇俄国诸汗国的入口，先把时间与政权名立起来，再由下一镜（伊凡四世）入戏。底图取 prop #258 @蒙古汗国分布与西征路线图：我已用 read_image 读该原件，确认画面中部为喀山、西伯利亚、哈萨克等汗国色块（大约横向 25%–70%），左上角与左侧（横向 0%–20%、纵向 0%–40%）是大片未着色的地形与陆地，右侧边缘为深色地形带，因此选左侧成套位置 h-left-stack，让三块文本框压在左上空白陆面上，不遮任何汗国色块与河流。本镜不做点位、河道或范围的几何标注：旁白没有点出任何具体地名，must_mark 为空，planned_layers 只含三条不指向底图具体对象的排版文本框，按 layer-text-design 不写 anchor。容量按 h-left-stack 核对：date.main「16世纪」4 字（上限 15）、sub「沙皇俄国时期」6 字（上限 25）；heading.main「小叶所处的时代」7 字（上限 26，单行内）、sub「伊凡四世在位」6 字（上限 26）；statement.main「此时统治俄国的是伊凡四世」12 字（上限 36，单行内）、sub「沙皇俄国」4 字（上限 28）。三拍错开 at_s（0.4 / 2 / 4.2），date 在 context 区、heading 与 statement 在 primary 区先后替换、各含不重复的新口径，均落在 7 秒图层段内，且 7 秒 ≥ 实测 4.6 秒、不超过 30 秒上限。本镜无生成段，故 gen_plan 的参考资产与首中尾帧槽位留空，也没有任何需人工补标注的缺口。\", \"suggested_combo\": \"A\"}",
+ "combo": "A",
+ "card_status": "pending",
+ "stale_reason": null,
+ "audit": {
+  "storyboard_id": 938,
+  "shot_number": 8,
+  "narration_text": "要理解小叶的处境，得先看清他所处的时代。",
+  "combo": "A",
+  "suggested_combo": "A",
+  "status": "pending",
+  "confirmed_at": null,
+  "stale_reason": null,
+  "has_card": true,
+  "unresolved": 0,
+  "unresolved_layers": [],
+  "video_generated": false,
+  "issues": [],
+  "narration_measured_s": 4.6,
+  "tts": {
+   "valid": true,
+   "reason": null,
+   "message": null,
+   "duration_ms": 4640
+  },
+  "budget": {
+   "layer_s": 7,
+   "gen_s": null
+  }
+ },
+ "source": "production full-context run (task 2942); card = AI updateStoryboard arguments from observations"
+}
