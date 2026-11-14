@@ -108,14 +108,21 @@ test('Map Studio adopted styles: settings, validation, HTTP rejection, theme cha
         assert.deepEqual(doc.layers.find(l=>l.type==='label').style,labelStyleFor(family,'title'))
         const reset=restyleMapLayers(doc,MAP_STYLE_FAMILIES[4],specFeatures(spec))
         for(let i=0;i<doc.layers.length;i++){const {style:a,...before}=doc.layers[i],{style:b,...after}=reset.layers[i];assert.deepEqual(after,before,'reset changes style only')}
-        await mutateTask(task.task_id,{action:'fixture_end',actor:'system',mutate:ctx=>{ctx.state.status='idle';ctx.state.stage='complete';ctx.state.outputs.layer_doc=doc;ctx.state.outputs.layer_options=outcome.result.layerOptions;ctx.state.outputs.base_image={path:base.path,width:base.width,height:base.height,source:'map-base:program',run_id:runId,provenance:base.provenance}}})
+        await mutateTask(task.task_id,{action:'fixture_end',actor:'system',mutate:ctx=>{ctx.state.status='idle';ctx.state.stage='complete';for(const step of ctx.state.steps)step.status='completed';ctx.state.outputs.layer_doc=doc;ctx.state.outputs.layer_options=outcome.result.layerOptions;ctx.state.outputs.base_image={path:base.path,width:base.width,height:base.height,source:'map-base:program',run_id:runId,provenance:base.provenance}}})
         const revision=(await loadTask(task.task_id)).state.revision
         const result=await request('/tasks/'+task.task_id+'/layer-doc/restyle','POST',{layer_doc:doc})
         assert.equal(result.status,200)
         assert.equal((await loadTask(task.task_id)).state.revision,revision,'restyle never persists')
         const nextFamily=MAP_STYLE_FAMILIES[(MAP_STYLE_FAMILIES.indexOf(family)+1)%5]
+        // Theme-only change after a finished base: research and geometry stay, the flow restarts at base.
         const changed=await saveMapWorkflowDraft(task.task_id,{brief:{map_style:nextFamily.id},expectedRevision:revision})
-        assert.equal(changed.stage,'brief');assert.equal(changed.brief.map_style,nextFamily.id)
+        assert.equal(changed.stage,'base');assert.equal(changed.brief.map_style,nextFamily.id)
+        assert.deepEqual(changed.steps.map(s=>s.status),['completed','completed','pending','pending','pending','pending'])
+        assert.ok(changed.issues.some(i=>i.code==='style_changed'))
+        assert.deepEqual(changed.map_spec.routes,(await loadTask(task.task_id)).mapSpec.routes,'geometry kept')
+        // Any substantive brief change still restarts at brief.
+        const substantive=await saveMapWorkflowDraft(task.task_id,{brief:{era:'changed era '+family.id},expectedRevision:changed.revision})
+        assert.equal(substantive.stage,'brief')
         assert.notEqual(mapBaseSignature(normalizeMapSpec({...spec,style:{map_style:nextFamily.id}}),{width:1280,height:720}),mapBaseSignature(spec,{width:1280,height:720}))
       }
       assert.equal(signatures.size,5)

@@ -193,7 +193,9 @@ async function executeStageWork(taskId: number, runId: number, stage: MapWorkflo
   const { state, brief } = loaded
   const opts = { textConfigId: state.text_config_id ?? undefined, imageConfigId: state.image_config_id ?? undefined, imageModel: state.image_model ?? undefined }
   const hashAtStart = briefHash(brief)
-  const selectedStyle = resolveMapStyle(loaded.mapSpec?.style.map_style ? { map_style: loaded.mapSpec.style.map_style } : brief, { default_style: readDefaultStyle() })
+  // 需求里的主题（或模块默认）是唯一来源；map_spec.style 只记录底图当时用的主题。
+  // 换主题会把流程退回底图（见 saveMapWorkflowDraft），所以底图与作图始终同一主题。
+  const selectedStyle = resolveMapStyle(brief, { default_style: readDefaultStyle() })
   const mode = state.mode
   const feedback = state.agent.feedback[stage] ?? null
   const startRounds = isMapAgentStage(stage) && state.agent.run_id === runId ? state.agent.rounds[stage] ?? 0 : 0
@@ -459,21 +461,31 @@ export async function saveMapWorkflowDraft(taskId: number, body: {
         ctx.state.outputs.layer_options = parsedOptions.options
       }
       if (hasBrief) {
-        const next = normalizeBrief(body.brief, ctx.brief)
+        const previous = ctx.brief
+        const next = normalizeBrief(body.brief, previous)
         const changed = briefHash(next) !== ctx.state.brief_hash
         ctx.brief = next
         ctx.state.brief_hash = briefHash(next)
+        // 只换了主题（map_style / 旧 style）不影响检索与几何：保留已核验的研究结果，从底图起按新主题重出。
+        const presentationOnly = (brief: typeof next) => JSON.stringify({ ...brief, map_style: null, style: null })
+        const baseDone = ctx.state.steps.some(step => step.id === 'base' && step.status === 'completed')
+        const restart: MapWorkflowStage = previous && baseDone && presentationOnly(previous) === presentationOnly(next) ? 'base' : 'brief'
         if (changed) {
-          ctx.state.stage = 'brief'
+          ctx.state.stage = restart
           ctx.state.status = 'idle'
           ctx.state.error = null
           for (const step of ctx.state.steps) {
-            Object.assign(step, { status: 'pending', message: null, started_at: null, finished_at: null })
+            if (stageIndex(step.id) >= stageIndex(restart)) Object.assign(step, { status: 'pending', message: null, started_at: null, finished_at: null })
           }
-          ctx.state.issues = [{
-            field: 'brief', code: 'brief_changed', blocking: false,
-            message: '需求已修改：请重新开始工作流以按新需求检索与出图；此前的底图/成图仍保留在产出与历史中',
-          }]
+          ctx.state.issues = restart === 'base'
+            ? [...ctx.state.issues.filter(issue => issue.code !== 'style_changed'), {
+              field: 'brief', code: 'style_changed', blocking: false,
+              message: '主题已更换：资料调研与几何保留，从底图阶段按新主题重新出图；此前的底图/成图仍保留在产出与历史中',
+            }]
+            : [{
+              field: 'brief', code: 'brief_changed', blocking: false,
+              message: '需求已修改：请重新开始工作流以按新需求检索与出图；此前的底图/成图仍保留在产出与历史中',
+            }]
         }
       }
       if (hasSpec) {
