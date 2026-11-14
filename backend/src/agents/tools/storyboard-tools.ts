@@ -234,8 +234,9 @@ const readStoryboardContext = createTool({
       .filter(sb => !sb.deletedAt)
       .sort((a, b) => a.storyboardNumber - b.storyboardNumber)
     const byId = new Map(aliveStoryboards.map(sb => [sb.id, sb]))
-    // 设计卡逐镜填写（#102）：只给本镜 ± 前后各 3 镜，整集设计卡与提示词不再重复发送
-    const targetId = context?.requestContext?.get('storyboardPromptScope' as never) === 'design_card'
+    // 逐镜批次（设计卡 #102、关键帧/视频提示词 #103）：只给本镜 ± 前后各 3 镜，整集设计卡与提示词不再重复发送
+    const scope = context?.requestContext?.get('storyboardPromptScope' as never) as string | undefined
+    const targetId = scope === 'design_card' || scope === 'keyframes' || scope === 'video'
       ? getStoryboardId(context?.requestContext)
       : null
     const window = targetId != null ? designCardWindow(aliveStoryboards.map(sb => sb.id), targetId) : null
@@ -305,7 +306,7 @@ const readStoryboardContext = createTool({
       existing_storyboards: existingStoryboardPayload,
       ...(window ? {
         context_window: {
-          note: '设计卡只附本镜与前后相邻镜头；整集其余镜头未列出，不要据此推断它们不存在。',
+          note: '只附本镜与前后相邻镜头；整集其余镜头未列出，不要据此推断它们不存在。',
           target_storyboard_id: targetId,
           before: window.before,
           after: window.after,

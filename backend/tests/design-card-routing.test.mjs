@@ -22,7 +22,7 @@ test('design-card window takes target ±3 and truncates at episode edges (#102)'
   `)
 })
 
-test('read_storyboard_context windows only the design_card scope (#102)', () => {
+test('read_storyboard_context windows the per-shot batch scopes (#102, #103)', () => {
   run(`
     import assert from 'node:assert/strict'
     import { db, schema } from './src/db/index.ts'
@@ -46,7 +46,12 @@ test('read_storyboard_context windows only the design_card scope (#102)', () => 
     const noTarget = await read({ storyboardPromptScope: 'design_card' })
     assert.equal(noTarget.existing_storyboards.length, 10)
     assert.equal(noTarget.context_window, undefined)
-    const full = await read({ storyboardPromptScope: 'keyframes', storyboardId: 702 })
+    for (const scope of ['keyframes', 'video']) {
+      const shot = await read({ storyboardPromptScope: scope, storyboardId: 709 })
+      assert.deepEqual(shot.existing_storyboards.map(sb => sb.id), [706, 707, 708, 709, 710])
+      assert.equal(shot.context_window.after, 1)
+    }
+    const full = await read({ storyboardId: 702 })
     assert.equal(full.existing_storyboards.length, 10)
     assert.equal(full.context_window, undefined)
     assert.equal('narration_text' in full.existing_storyboards[0], false)
