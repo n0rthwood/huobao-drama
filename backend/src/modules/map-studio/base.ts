@@ -42,9 +42,12 @@ export async function runBaseStage(input: BaseStageInput): Promise<StageAgentRes
   const selectedStyle = resolveMapStyle(input.brief, { default_style: readDefaultStyle() })
   const features = specFeatures(input.spec)
   const artifacts = new Map<string, { artifact: MapBaseArtifact; mode: MapBaseMode; spec: MapSpec; problems: string[] }>()
-  const featureLines = features.map(feature => `- ${feature.id} ${feature.kind}「${feature.name}」：${feature.kind === 'place'
-    ? `(${feature.coords[0]![0]}, ${feature.coords[0]![1]})`
-    : feature.coords.map(c => `(${c[0]}, ${c[1]})`).join(' → ')}`)
+  // 取景只需要每个要素的经纬度范围：数据集河流有上百个顶点，逐点列出曾让底图阶段首个请求达 11 万字（生产 run 14）
+  const featureLines = features.map(feature => {
+    if (feature.kind === 'place') return `- ${feature.id} place「${feature.name}」：(${feature.coords[0]![0]}, ${feature.coords[0]![1]})`
+    const lons = feature.coords.map(c => c[0]), lats = feature.coords.map(c => c[1])
+    return `- ${feature.id} ${feature.kind}「${feature.name}」：${feature.coords.length} 个顶点，经度 ${Math.min(...lons)}–${Math.max(...lons)}，纬度 ${Math.min(...lats)}–${Math.max(...lats)}`
+  })
 
   return await runStageAgent<BaseStageResult>({
     taskId: input.taskId,
