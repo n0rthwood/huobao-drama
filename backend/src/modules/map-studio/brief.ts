@@ -18,6 +18,8 @@ import { logTaskWarn } from '../../utils/task-logger.js'
 import { MapStageExhaustedError } from './agent-loop.js'
 import { MAP_MAX_STAGE_ROUNDS } from './types.js'
 import type { MapBrief, MapBriefInference, MapWorkflowIssue } from './types.js'
+import { MAP_STYLE_FAMILIES, isMapStyleFamilyId } from './styles/index.js'
+import { loadMapStudioSkill } from './skills.js'
 
 const MAX_TOKENS = Number(process.env.AI_MAX_TOKENS) || 32768
 const TEXT_TIMEOUT_MS = 180_000
@@ -54,6 +56,8 @@ B. 空着的值能否由对象本身唯一推出。只有唯一指向时才补�
    写明为什么必须由人确定，并给出可选项提示。
 
 不确定就给 low 置信度，不要把猜测写成考证结论。配色、是否标注现代地名等次要细节不要列进 missing/ambiguous，放 notes。
+C. 制图主题可在 inferred 里以 field=\"map_style\" 提议一个主题 id，basis 必须解释题材适用性；人工已选主题绝对不得改。主题不是必填维度，不列 missing/ambiguous。可用主题：
+${MAP_STYLE_FAMILIES.map(family => `${family.id}：${family.name}；${family.purpose}`).join('\\n')}
 
 只返回 JSON（四个键都要有，没有内容就给空数组）：
 {"inferred":[{"field":"era","value":"商代晚期（约前13—前11世纪）","basis":"殷墟是商代晚期都城遗址","confidence":"high"}],
@@ -68,6 +72,7 @@ function briefText(brief: MapBrief): string {
     `地域（location）：${brief.location || '（空）'}`,
     `用途（purpose）：${brief.purpose || '（空）'}`,
     `详略：${brief.detail_level}；示意图模式：${brief.schematic ? '开启' : '关闭'}；底图方式：${brief.base_mode}`,
+    `制图主题（map_style）：${brief.map_style === undefined ? '旧任务，沿用旧主题，不得提议迁移' : brief.map_style ?? '未指定，可提议；不提议则使用模块默认'}${brief.map_style ? '（已选，不得改）' : ''}`,
     brief.notes ? `补充说明：${brief.notes}` : '',
   ].filter(Boolean).join('\n')
 }
@@ -115,7 +120,8 @@ function inferenceList(raw: unknown): MapBriefInference[] | null {
     const field = 'field' in item ? String(item.field) : ''
     const value = 'value' in item ? String(item.value ?? '').trim() : ''
     const confidence = 'confidence' in item ? String(item.confidence) : ''
-    if (!(REQUIRED_FIELDS as readonly string[]).includes(field)) return null
+    if (!(REQUIRED_FIELDS as readonly string[]).includes(field) && field !== 'map_style') return null
+    if (field === 'map_style' && (!isMapStyleFamilyId(value) || !('basis' in item) || !String(item.basis).trim())) return null
     if (!value) return null
     if (!(CONFIDENCES as readonly string[]).includes(confidence)) return null
     out.push({ field, value, basis: 'basis' in item ? String(item.basis ?? '') : '', confidence: confidence as MapBriefInference['confidence'] })
@@ -158,7 +164,7 @@ export interface BriefCheckResult {
  */
 export function judgeBrief(brief: MapBrief, verdict: BriefVerdict | null, failureReason?: string): BriefCheckResult {
   const issues: MapWorkflowIssue[] = []
-  const next: MapBrief = { ...brief, inferred: [] }
+  const next: MapBrief = { ...brief, inferred: brief.inferred.filter(item => item.field === 'map_style' && item.value === brief.map_style) }
 
   if (!brief.subject) {
     issues.push({
@@ -231,6 +237,13 @@ export function judgeBrief(brief: MapBrief, verdict: BriefVerdict | null, failur
     })
   }
 
+  const styleProposal = verdict.inferred.find(item => item.field === 'map_style')
+  if (brief.map_style === null && styleProposal && styleProposal.confidence !== 'low' && isMapStyleFamilyId(styleProposal.value) && styleProposal.basis.trim()) {
+    next.map_style = styleProposal.value
+    next.inferred.push(styleProposal)
+    issues.push({ field: 'map_style', code: 'inferred_field', blocking: false, message: `AI 建议制图主题「${styleProposal.value}」：${styleProposal.basis}` })
+  }
+
   return { brief: next, issues }
 }
 
@@ -255,6 +268,7 @@ export async function checkBriefSufficiency(brief: MapBrief, opts: {
 } = {}): Promise<BriefCheckResult> {
   if (!brief.subject) return judgeBrief(brief, { inferred: [], ambiguous: [], missing: [], notes: [] })
   const model = await resolveStageModel('asset_research', { configId: opts.textConfigId })
+  const themeSkill = await loadMapStudioSkill('brief')
   let round = opts.startRounds ?? 0
   let feedback = opts.feedback ?? null
   let problems: string[] = []
@@ -265,7 +279,7 @@ export async function checkBriefSufficiency(brief: MapBrief, opts: {
     let outcome: 'rejected' | 'error' = 'rejected'
     try {
       const reply = await callTextChat(model, [briefText(brief), feedback ? `\n上一轮的情况（请据此修正）：\n${feedback}` : ''].join(''), {
-        systemPrompt: SYSTEM, temperature: 0.1, maxTokens: MAX_TOKENS, timeoutMs: TEXT_TIMEOUT_MS, interactive: true,
+        systemPrompt: `${SYSTEM}\n\n${themeSkill}`, temperature: 0.1, maxTokens: MAX_TOKENS, timeoutMs: TEXT_TIMEOUT_MS, interactive: true,
       })
       replyText = reply.text
       let parsed: unknown = null

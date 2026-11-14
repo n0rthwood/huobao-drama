@@ -72,11 +72,8 @@ export interface MapBrief {
   schematic: boolean
   base_mode: MapBaseMode
   style: MapStyleTheme
-  /**
-   * 阶段 ③ 预留的样式规范接入点：只在明确给出时随 brief 提交，后端原样保留；
-   * 缺省 = 现有 THEME_PRESETS 行为不变。本阶段不固化任何参考风格，也不在 UI 提供预设。
-   */
-  style_spec?: Record<string, unknown>
+  /** null follows module settings; absent preserves a legacy archival/clean/ink brief. */
+  map_style?: string | null
   notes: string
   reference_image: MapReferenceImage | null
   inferred: MapBriefInference[]
@@ -130,7 +127,7 @@ export interface MapSpec {
   places: MapPlace[]
   routes: MapRoute[]
   regions: MapRegion[]
-  style: { theme: MapStyleTheme }
+  style: { theme: MapStyleTheme; map_style?: string }
 }
 
 /* ===== 详情 ===== */
@@ -488,9 +485,20 @@ export interface MapStudioSettingsModels {
   image_config_id: number | null
   image_model: string | null
 }
+export interface MapStudioStyleFamily {
+  id: string
+  name: string
+  purpose: string
+  theme_mapping: MapStyleTheme
+  palette: Record<string, string>
+  preview: string
+  reference: { title: string; license: string; source: string }
+}
+export interface MapStudioStyles { default_style: string; families: MapStudioStyleFamily[] }
 export interface MapStudioSettings {
   research_keys: MapStudioResearchKey[]
   models: MapStudioSettingsModels
+  default_style: string
 }
 
 export interface MapStudioTaskListItem {
@@ -550,6 +558,8 @@ export const mapStudioAPI = {
       layer_doc: layerDoc,
       ...(layerOptions !== undefined ? { layer_options: layerOptions } : {}),
     }),
+  restyleLayerDoc: (taskId: number, layerDoc: Record<string, unknown>, layerOptions?: MapLayerSmoothing) =>
+    request<MapLayerCheck & { layer_doc: Record<string, unknown>; map_style: string | null }>('POST', `/tasks/${taskId}/layer-doc/restyle`, { layer_doc: layerDoc, ...(layerOptions !== undefined ? { layer_options: layerOptions } : {}) }),
   /** 宿主任务：把当前成图重新交付（幂等，同一 sha256 不重复登记）；独立任务 400 standalone_task */
   deliver: (taskId: number) => request<{ delivered: boolean, version_ids: number[], message: string, deliveries: MapStudioDeliveryRow[] }>('POST', `/tasks/${taskId}/deliver`, {}),
   /** 文件流端点：直接给 <a download>，不要用 fetch（正文是二进制/附件） */
@@ -575,9 +585,11 @@ export const mapStudioAPI = {
   },
 
   settings: () => request<MapStudioSettings>('GET', '/settings'),
-  saveSettings: (data: { research_keys?: Partial<Record<ResearchKeyId, string | null>>, models?: Partial<MapStudioSettingsModels> }) =>
+  saveSettings: (data: { research_keys?: Partial<Record<ResearchKeyId, string | null>>, models?: Partial<MapStudioSettingsModels>, default_style?: string }) =>
     request<MapStudioSettings>('PUT', '/settings', data),
   modelOptions: () => request<MapStudioModelOptions>('GET', '/model-options'),
+  styles: () => request<MapStudioStyles>('GET', '/styles'),
+  stylePreviewUrl: (id: string) => endpoint(`/styles/${encodeURIComponent(id)}/preview`),
 
   /**
    * 外部底图原件上传：走通用上传端点（模块没有自己的上传路由）。

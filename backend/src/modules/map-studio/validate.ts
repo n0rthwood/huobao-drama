@@ -418,13 +418,14 @@ export interface SpecFeature {
   /** place 为单点；route/region 为顶点序列 */
   coords: Array<[number, number]>
   origin?: MapFeatureOrigin
+  category?: string
 }
 
 export function specFeatures(spec: MapSpec): SpecFeature[] {
   return [
-    ...spec.places.map((place): SpecFeature => ({ id: place.id, kind: 'place', name: place.name, origin: place.origin, coords: [[place.lon, place.lat]] })),
-    ...spec.routes.map((route): SpecFeature => ({ id: route.id, kind: 'route', name: route.name, origin: route.origin, coords: route.points })),
-    ...(spec.regions ?? []).map((region): SpecFeature => ({ id: region.id, kind: 'region', name: region.name, origin: region.origin, coords: region.points })),
+    ...spec.places.map((place): SpecFeature => ({ id: place.id, kind: 'place', name: place.name, origin: place.origin, category: place.category, coords: [[place.lon, place.lat]] })),
+    ...spec.routes.map((route): SpecFeature => ({ id: route.id, kind: 'route', name: route.name, origin: route.origin, category: route.category, coords: route.points })),
+    ...(spec.regions ?? []).map((region): SpecFeature => ({ id: region.id, kind: 'region', name: region.name, origin: region.origin, category: region.category, coords: region.points })),
   ]
 }
 

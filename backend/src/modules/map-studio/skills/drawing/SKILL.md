@@ -9,8 +9,9 @@ description: 地图工作流·服务器草稿作图 — 小工具精确添加要
 
 ## 工作流程与工具
 
-1. 从提示中的要素摘要选择主体，调用 `add_feature_layers({items:[{feature_id,style:{...}}]})`。服务器精确投影存储几何，place→marker、route→polyline、region→polygon，自动锚定。marker.text 初始为要素名称，可通过 update_layer.text 修改旁注；也可另加锚定的 label。断开的数据集部分已有独立 feature_id，各自添加，不能桥接。响应只含 layer id、像素 bbox、顶点数与样式，**没有长顶点数组**。
-2. 用 `add_layer({layer:{...}})` 添加标题、label、card、图例、画框等非要素图层，格式见下表，完整公共字段必填。非要素手画线面最多 200 点；锚定的要素几何只能用 `add_feature_layers` 创建。
+1. 从提示中的要素摘要选择主体，调用 `add_feature_layers({items:[{feature_id}]})`，**默认不要逐层写 style**。服务器按当前主题与 category 套用河流、海岸、路线、山地、区域与点样式；河流投影长度达到画面对角线 45% 时为主河，否则为支流。点默认 city；确有重要度依据时可传 `importance:"capital"|"city"|"settlement"`。单层 `style` 是覆盖补丁，仅用于明确的叙事强调。服务器精确投影存储几何，place→marker、route→polyline、region→polygon，自动锚定。marker.text 初始为要素名称。断段各自添加，不得桥接；响应只有 id、bbox、点数与样式，没有长顶点数组。
+2. 标题及标签优先用 `add_label({tier:"title"|"region"|"city"|"river"|"note",text,box:{x,y,w,h},feature_id?})`：服务器套用主题的字号、字体、斜体、文字光晕与颜色；`style` 可按需覆盖。有 feature_id 时锚定要素，省略则是未锚定标题/说明。card、图例、画框等用 `add_layer({layer:{...}})`，公共字段必须完整。手画线面最多 200 点；要素几何只能用 add_feature_layers。
+   add_feature_layers / add_label 快捷工具由服务器补齐公共字段，style 是与主题默认合并的补丁。点已有 marker.text；若另加同一点的 city 标签，先用 `update_layer({layer_id,patch:{text:""}})` 清空 marker 旁注，避免重复地名。
 3. 用 `update_layer({layer_id,patch:{style:{...},box:{...},text:...,name:...,z:...,visible:...,opacity:...,rotation:...,fields:{...}}})` 小补丁修改。只传要改的字段，style 是合并补丁；type/anchor/id 不可改。锚定要素的 points/at 修改及非零 rotation 会整笔拒收，原草稿保留；非要素手画小形状可 patch.points/at（仍最多 200 点）。`remove_layer({layer_id})` 删除图层；删掉必画要素后仍须补回或在交付时说明 omitted。
 4. `get_draft({include_points:false})` 查看草稿摘要与当前 layer_options；include_points 只影响手画非要素的小形状，**要素几何始终不返回顶点**。不要请求/输出完整 LayerDoc，也没有全量文档交付工具。
 5. 调用 `auto_layout_labels({})` 在当前草稿贪心避让：点标签按 E、NE、SE、W、NW、SW、N、S，线标签优先最长段旁，面标签优先最大内切圆中心附近。标题、card、锁定标签不动；不删除、不缩字。返回 unresolved 表示没有可用候选，必须人工设计位置或修改 box/内容，不能当作成功。
@@ -27,7 +28,7 @@ description: 地图工作流·服务器草稿作图 — 小工具精确添加要
 
 - 每个未在 `submit_draft.omitted` 中说明的要素都要有一个锚定几何图层（由 add_feature_layers 自动生成）。omitted 不是 LayerDoc 字段；没有可见几何的要素才可省略，不能同时画出和省略。
 - **底图必须看得见**：有效不透明度（`opacity × fill_opacity`）≥0.5 的 polygon 合计不能盖住超过 30% 的画面。画框或边框请用 polyline，或者把 polygon 的 `fill_opacity` 设为 0、只保留描边；不然 polygon 会被填成实心，把整张底图盖掉。
-- 几何必须贴合要素投影位置。add_feature_layers 保证原始精确投影；update_layer 不接受几何补丁。几何有误回退 research/base，人工确认的几何不能被模型覆盖。
+- 几何必须贴合要素投影位置。add_feature_layers 保证原始精确投影；update_layer 不接受锚定要素的几何补丁。几何有误回退 research/base，人工确认的几何不能被模型覆盖。
 - 确实不画某个要素时，在 `omitted` 里写 `{feature_id, reason}`，说明理由。
 - 文字标签用 `label` 图层，可以锚定到同一要素（`anchor.semantic_id` 写要素 id）。标签不算几何图层。
 - base 由服务器创建且不可修改；取景/底图有问题必须回退。
@@ -49,7 +50,9 @@ description: 地图工作流·服务器草稿作图 — 小工具精确添加要
 {"layer":{"id":"title","type":"label","name":"标题","visible":true,"locked":false,"z":20,"opacity":1,"rotation":0,"box":{"x":0.05,"y":0.05,"w":0.5,"h":0.1},"text":"地图标题","style":{"size":0.04}}}
 ```
 
-文档 theme 沿用需求的 archival / clean / ink 主题预设。可选 style_spec 只有输入明确提供时才用；样式参考库尚未获用户确认，不得私自选择参考风格家族作为默认。
+五个主题家族都已采纳：atlas-tint、historical-schematic、relief-shading、ink-chinese、modern-clean。当前主题摘要由服务器提供。新任务 map_style:null 跟随模块默认（atlas-tint 初值），brief 阶段可自动采纳有理由的 high/medium 合法建议并写入 map_style 与 inferred；没有 map_style 字段的既有旧任务仍沿用 archival/clean/ink。默认在 base 阶段写入 map_spec.style.map_style，drawing 使用该解析值，LayerDoc theme 取家族的 theme_mapping。不另传 style_spec。人工已选主题不得改；需要提议时说明题材适用理由，回到 brief 确认/记录，不在 drawing 中偷偷换主题。默认用主题，**不要逐层手调**。
+
+正例：区域河网图使用主题默认色，批量 add_feature_layers 只写 feature_id，再用 add_label 的 river/city/title 档位排字。反例：先给每条河流手写字号线宽、随后逐层改色，这会增加调用且破坏主题一致性。地形晕渲主题只提供样式，不能借此凭空画山或伪造地形。
 
 **每个图层都必须写**这些公共字段：
 `id`（全文档唯一）、`type`、`name`（非空，最多 60 字）、`visible`（布尔）、`locked`（布尔）、`z`（0–9999 的整数，服务器维护 z 排序）、`opacity`（0–1）、`rotation`（-360 到 360；锚定要素必须为 0）。

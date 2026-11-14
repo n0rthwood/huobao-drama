@@ -45,3 +45,20 @@ test('Map Studio errors retain revision/run identity for conflict handling', asy
     })
   } finally { globalThis.fetch = original }
 })
+
+test('Map Studio style catalogue, prefixed reference thumbnail, default setting and reversible restyle use module APIs', async () => {
+  const original = globalThis.fetch
+  const requests = []
+  globalThis.fetch = async (url, init) => { requests.push({ url, init, body: init?.body ? JSON.parse(init.body) : null }); return Response.json({ code: 200, data: {} }) }
+  try {
+    await mapStudioAPI.styles()
+    assert.equal(requests[0].url, '/huobao/api/v1/map-studio/styles')
+    assert.equal(mapStudioAPI.stylePreviewUrl('ink-chinese'), '/huobao/api/v1/map-studio/styles/ink-chinese/preview')
+    await mapStudioAPI.saveSettings({ default_style: 'modern-clean' })
+    assert.deepEqual(requests[1].body, { default_style: 'modern-clean' })
+    const doc = { version: 1, layers: [] }
+    await mapStudioAPI.restyleLayerDoc(4, doc, { river: { smooth: 0 } })
+    assert.equal(requests[2].url, '/huobao/api/v1/map-studio/tasks/4/layer-doc/restyle')
+    assert.deepEqual(requests[2].body, { layer_doc: doc, layer_options: { river: { smooth: 0 } } })
+  } finally { globalThis.fetch = original }
+})

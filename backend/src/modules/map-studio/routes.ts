@@ -13,9 +13,13 @@ import { MapSpecValidationError } from './geo/base-render.js'
 import { readStageSpans, stageForCallInSpans } from './stage-spans.js'
 import { createStandaloneTask } from './tasks.js'
 import { buildDeliverable, deliverCurrent } from './delivery.js'
-import { RESEARCH_KEY_IDS, researchKeyStatus, readModels, writeModels, setResearchKey } from './settings.js'
+import { RESEARCH_KEY_IDS, researchKeyStatus, readModels, writeModels, setResearchKey, readDefaultStyle, writeDefaultStyle } from './settings.js'
 import { inspectLayerDraft, layerDraftContext } from './layer-edit.js'
 import { autoPlaceLabels } from './layout/labels.js'
+import { mapStyleFamilyViews, isMapStyleFamilyId, MapStyleValidationError, resolveMapStyle } from './styles/index.js'
+import { restyleMapLayers } from './styles/restyle.js'
+import { specFeatures } from './validate.js'
+import { THEME_PRESETS } from '../../services/layer-svg.js'
 
 export const mapStudioRoutes = new Hono()
 const app = mapStudioRoutes
@@ -23,6 +27,7 @@ const app = mapStudioRoutes
 app.onError((err, c) => {
   if (err instanceof MapStudioConflictError) return c.json({ code: 409, error: err.code, message: err.message, revision: err.revision, run_id: err.runId }, 409)
   if (err instanceof MapWorkflowValidationError) return badRequest(c, err.message, { error: err.code, field: err.field })
+  if (err instanceof MapStyleValidationError) return badRequest(c, err.message, { error: 'invalid_map_style', field: err.field })
   if (err instanceof MapSpecValidationError) return badRequest(c, err.message, { error: 'invalid_map_spec' })
   if (err instanceof MapLayerDocInvalidError) return badRequest(c, err.message, { error: err.code, problems: err.problems })
   if (err instanceof MapStudioRequestError) return err.code === 'not_found' ? notFound(c, err.message) : badRequest(c, err.message, { error: err.code })
@@ -100,6 +105,18 @@ app.put('/tasks/:id/layer-doc', async c => {
   if (p.layer_doc === undefined) return badRequest(c, '缺少 layer_doc', { error: 'invalid_body', field: 'layer_doc' })
   return success(c, await saveMapLayerDoc(idOf(c), { layerDoc: p.layer_doc, layerOptions: p.layer_options, expectedRevision: optionalNumber(p.expected_revision, 'expected_revision') }))
 })
+app.post('/tasks/:id/layer-doc/restyle', async c => {
+  const p = await body(c), loaded = await loadTask(idOf(c))
+  if (!loaded) return notFound(c, '任务不存在')
+  const context = layerDraftContext(loaded.mapSpec, loaded.state.outputs)
+  const checked = inspectLayerDraft(p.layer_doc, p.layer_options, context)
+  if (checked.renderable.length) throw new MapLayerDocInvalidError(checked.renderable)
+  const selected = resolveMapStyle(loaded.mapSpec?.style.map_style ? { map_style: loaded.mapSpec.style.map_style } : loaded.brief, { default_style: readDefaultStyle() })
+  const doc = selected ? restyleMapLayers(checked.doc, selected.family, loaded.mapSpec ? specFeatures(loaded.mapSpec) : [])
+    : { ...checked.doc, theme: loaded.brief.style, layers: checked.doc.layers.map(layer => ({ ...layer, style: { ...THEME_PRESETS[loaded.brief.style][layer.type] } })) }
+  const inspected = inspectLayerDraft(doc, checked.layerOptions, context)
+  return success(c, { layer_doc: doc, layer_options: checked.layerOptions, map_style: selected?.id ?? null, problems: inspected.problems })
+})
 // Read-only editor operations. Neither inspection nor auto-layout saves a draft or consumes a round.
 app.post('/tasks/:id/layer-doc/check', async c => {
   const p = await body(c), loaded = await loadTask(idOf(c))
@@ -168,10 +185,19 @@ app.get('/calls/:id/messages', c => {
   const hasMore = messages.length > 0 && listObservedMessages(call.id, { scope: 'map_studio', afterId: messages[messages.length - 1]!.id, limit: 1 }).length > 0
   return success(c, { call, total: countObservedMessages(call.id, 'map_studio'), messages, next_cursor: hasMore ? messages[messages.length - 1]!.id : null, has_more: hasMore })
 })
-app.get('/settings', c => success(c, { research_keys: researchKeyStatus(), models: readModels() }))
+app.get('/styles', c => success(c, { default_style: readDefaultStyle(), families: mapStyleFamilyViews() }))
+app.get('/styles/:style/preview', c => {
+  const id = c.req.param('style')
+  if (!isMapStyleFamilyId(id)) return badRequest(c, '未知制图主题', { error: 'invalid_map_style' })
+  c.header('Content-Type', 'image/jpeg')
+  c.header('Cache-Control', 'public, max-age=86400')
+  return c.body(new Uint8Array(fs.readFileSync(new URL(`../../../assets/map-studio-styles/${id}.jpg`, import.meta.url))))
+})
+app.get('/settings', c => success(c, { research_keys: researchKeyStatus(), models: readModels(), default_style: readDefaultStyle() }))
 app.put('/settings', async c => {
   const p = await body(c)
   const keys = p.research_keys
+  if (p.default_style !== undefined && !isMapStyleFamilyId(p.default_style)) return badRequest(c, 'default_style 必须是已采纳的主题 id', { error: 'invalid_map_style', field: 'default_style' })
   if (keys !== undefined && (!keys || typeof keys !== 'object' || Array.isArray(keys))) return badRequest(c, 'research_keys 必须是对象', { error: 'invalid_settings' })
   for (const id of RESEARCH_KEY_IDS) {
     const value = keys && (keys as Record<string, unknown>)[id]
@@ -190,6 +216,7 @@ app.put('/settings', async c => {
   }
   if (keys) for (const id of RESEARCH_KEY_IDS) if (id in (keys as object)) setResearchKey(id, (keys as Record<string, string | null>)[id]!)
   if (p.models !== undefined) writeModels(p.models)
-  return success(c, { research_keys: researchKeyStatus(), models: readModels() })
+  if (p.default_style !== undefined) writeDefaultStyle(p.default_style)
+  return success(c, { research_keys: researchKeyStatus(), models: readModels(), default_style: readDefaultStyle() })
 })
 app.get('/model-options', async c => success(c, { text: await listConfigModelChoices('text'), image: (await listConfigModelChoices('image')).map(({ vision: _vision, ...choice }) => choice) }))

@@ -18,6 +18,7 @@ import sharp from 'sharp'
 import { z } from 'zod'
 import { STORAGE_ROOT } from '../../../utils/paths.js'
 import { datasetFileInfo, resolveGeoDir, riverScaleForRef, type DatasetScale } from './datasets.js'
+import { MAP_STYLE_FAMILY_IDS, mapStyleFamily } from '../styles/index.js'
 
 export const MAP_BASE_WIDTH = 3840
 export const MAP_BASE_HEIGHT = 2160
@@ -63,7 +64,7 @@ export interface MapSpec {
   routes: MapRoute[]
   /** Issue #84：面几何。老 map_spec 没有这个字段，规范化后为 []，渲染签名与改动前逐字节一致。 */
   regions: MapRegion[]
-  style: { theme: 'archival' | 'clean' | 'ink' }
+  style: { theme: 'archival' | 'clean' | 'ink'; map_style?: string }
 }
 
 export interface MapCanvasSize { width: number; height: number }
@@ -185,7 +186,7 @@ const specSchema = z.object({
     proposed: z.boolean().optional(),
     ...metadataSchema.shape,
   })).optional(),
-  style: z.object({ theme: z.enum(['archival', 'clean', 'ink']) }).optional(),
+  style: z.object({ theme: z.enum(['archival', 'clean', 'ink']).optional(), map_style: z.enum(MAP_STYLE_FAMILY_IDS).optional() }).optional(),
 })
 
 function fail(message: string): never {
@@ -322,7 +323,9 @@ export function normalizeMapSpec(raw: unknown): MapSpec {
       ...(item.proposed ? { proposed: true as const } : {}),
       ...featureMetadata(item),
     })),
-    style: { theme: data.style?.theme ?? 'archival' },
+    style: data.style?.map_style
+      ? { theme: mapStyleFamily(data.style.map_style).theme_mapping, map_style: data.style.map_style }
+      : { theme: data.style?.theme ?? 'archival' },
   }
 }
 
@@ -458,6 +461,16 @@ const THEMES: Record<MapSpec['style']['theme'], MapTheme> = {
   ink: { background: '#e8e8e8', land: '#4a4a4a', landStroke: '#2a2a2a', countryStroke: '#6a6a6a' },
 }
 
+/** Legacy specs retain their old colors; a resolved family owns every basemap color. */
+export function mapBasePalette(spec: Pick<MapSpec, 'style'>) {
+  const family = spec.style.map_style ? mapStyleFamily(spec.style.map_style) : null
+  return family ? {
+    background: family.palette.background, land: family.palette.land,
+    landStroke: family.lines.coast.stroke, countryStroke: family.palette.boundary,
+    water: family.palette.water, route: family.lines.routes.stroke, region: family.lines.regions.fill,
+  } : { ...THEMES[spec.style.theme], water: MAP_WATER_COLOR, route: MAP_ROUTE_COLOR, region: MAP_REGION_COLOR }
+}
+
 function escapeAttr(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
@@ -471,7 +484,8 @@ function round(value: number): number {
  * 注意：这里一个字都不能写——地图文字由叠加图层负责。
  */
 export function buildMapSvg(spec: MapSpec, size: MapCanvasSize, riverSource: DatasetScale = riverSourceScale(spec)): string {
-  const theme = THEMES[spec.style.theme]
+  const theme = mapBasePalette(spec)
+  const family = spec.style.map_style ? mapStyleFamily(spec.style.map_style) : null
   const projection = mapProjectionFor(spec, size)
   // digits 固定小数位：同 spec 必定生成同一串 path，保证字节级确定性
   const pathGen = geoPath(projection).digits?.(3) ?? geoPath(projection)
@@ -479,8 +493,8 @@ export function buildMapSvg(spec: MapSpec, size: MapCanvasSize, riverSource: Dat
   const parts: string[] = []
   parts.push(`<rect x="0" y="0" width="${size.width}" height="${size.height}" fill="${theme.background}"/>`)
 
-  const dotRadius = Math.max(6, size.height / 180)
-  const strokeWidth = Math.max(4, size.height / 360)
+  const dotRadius = family ? family.markers.city.dot_radius * size.height : Math.max(6, size.height / 180)
+  const strokeWidth = family ? family.lines.routes.width * size.height : Math.max(4, size.height / 360)
   const hair = Math.max(1, size.height / 1080)
 
   const draw = (name: GeoLayerName, attrs: string) => {
@@ -491,20 +505,20 @@ export function buildMapSvg(spec: MapSpec, size: MapCanvasSize, riverSource: Dat
   }
 
   if (spec.layers.land) draw('land', `fill="${theme.land}" stroke="none"`)
-  if (spec.layers.lakes) draw('lakes', `fill="${MAP_WATER_COLOR}" stroke="none"`)
+  if (spec.layers.lakes) draw('lakes', `fill="${theme.water}" stroke="none"`)
   if (spec.layers.rivers) {
-    draw('rivers', `fill="none" stroke="${MAP_WATER_COLOR}" stroke-width="${round(hair * 2)}" stroke-linejoin="round" stroke-linecap="round"`)
+    draw('rivers', `fill="none" stroke="${theme.water}" stroke-width="${round(family ? family.lines.river_minor.width * size.height : hair * 2)}" stroke-linejoin="round" stroke-linecap="round"`)
   }
   if (spec.layers.countries) {
-    draw('countries', `fill="none" stroke="${theme.countryStroke}" stroke-width="${round(hair * 1.5)}" stroke-dasharray="${round(hair * 8)} ${round(hair * 6)}"`)
+    draw('countries', `fill="none" stroke="${theme.countryStroke}" stroke-width="${round(family ? family.lines.border_uncertain.width * size.height : hair * 1.5)}" stroke-dasharray="${round(hair * 8)} ${round(hair * 6)}"`)
   }
   if (spec.layers.coastline) {
-    draw('coastline', `fill="none" stroke="${theme.landStroke}" stroke-width="${round(hair * 2)}" stroke-linejoin="round"`)
+    draw('coastline', `fill="none" stroke="${theme.landStroke}" stroke-width="${round(family ? family.lines.coast.width * size.height : hair * 2)}" stroke-linejoin="round"`)
   }
 
   const context = projectContext(spec, size)
   // 低对比、无文字；背景小点不同于蓝色已指定地点，不能混入 points 语义结果。
-  parts.push(`<g data-context="admin1" fill="none" stroke="${theme.countryStroke}" stroke-opacity="0.65" stroke-width="${round(hair)}">`)
+  parts.push(`<g data-context="admin1" fill="none" stroke="${theme.countryStroke}" stroke-opacity="0.65" stroke-width="${round(family ? family.lines.border_uncertain.width * size.height * .6 : hair)}">`)
   for (const d of context.boundaryPaths) parts.push(`<path d="${d}"/>`)
   parts.push('</g>')
   parts.push(`<g data-context="cities" fill="${theme.landStroke}" fill-opacity="0.65">`)
@@ -523,8 +537,8 @@ export function buildMapSvg(spec: MapSpec, size: MapCanvasSize, riverSource: Dat
       .map(point => `${round(point[0])},${round(point[1])}`)
     if (pts.length < 3) continue
     parts.push(
-      `<polygon points="${pts.join(' ')}" fill="${MAP_REGION_COLOR}" fill-opacity="0.28"`
-      + ` stroke="${MAP_REGION_COLOR}" stroke-width="${round(strokeWidth * 0.7)}" stroke-linejoin="round"`
+      `<polygon points="${pts.join(' ')}" fill="${theme.region}" fill-opacity="${family?.lines.regions.fill_opacity ?? .28}"`
+      + ` stroke="${family?.lines.regions.stroke ?? theme.region}" stroke-width="${round(family ? family.lines.regions.stroke_width * size.height : strokeWidth * .7)}" stroke-linejoin="round"`
       + ` data-region="${escapeAttr(region.id)}"/>`,
     )
   }
@@ -536,7 +550,7 @@ export function buildMapSvg(spec: MapSpec, size: MapCanvasSize, riverSource: Dat
       .map(point => `${round(point[0])},${round(point[1])}`)
     if (pts.length < 2) continue
     parts.push(
-      `<polyline points="${pts.join(' ')}" fill="none" stroke="${MAP_ROUTE_COLOR}"`
+      `<polyline points="${pts.join(' ')}" fill="none" stroke="${theme.route}"`
       + ` stroke-width="${round(strokeWidth)}" stroke-linejoin="round" stroke-linecap="round" data-route="${escapeAttr(route.id)}"/>`,
     )
   }
@@ -546,7 +560,7 @@ export function buildMapSvg(spec: MapSpec, size: MapCanvasSize, riverSource: Dat
     if (!point) continue
     parts.push(
       `<circle cx="${round(point[0])}" cy="${round(point[1])}" r="${round(dotRadius)}"`
-      + ` fill="${MAP_ROUTE_COLOR}" stroke="#ffffff" stroke-width="${round(dotRadius / 3)}" data-place="${escapeAttr(place.id)}"/>`,
+      + ` fill="${family?.markers.city.color ?? theme.route}" stroke="${family?.markers.city.stroke ?? '#ffffff'}" stroke-width="${round(dotRadius / 3)}" data-place="${escapeAttr(place.id)}"/>`,
     )
   }
 
@@ -575,6 +589,7 @@ export function mapBaseSignature(spec: MapSpec, size: MapCanvasSize, riverSource
       ? { rg: spec.regions.map(item => [item.id, item.name, item.points, item.proposed === true]) }
       : {}),
     s: spec.style.theme,
+    ...(spec.style.map_style ? { family: spec.style.map_style } : {}),
     w: canvas.width,
     h: canvas.height,
   })
@@ -602,7 +617,7 @@ export async function renderMapBase(spec: MapSpec, opts?: Partial<MapCanvasSize>
         width: size.width,
         height: size.height,
         channels: 4,
-        background: THEMES[spec.style.theme].background,
+        background: mapBasePalette(spec).background,
       },
     })
       .composite([{ input: Buffer.from(svg) }])
@@ -626,7 +641,7 @@ export async function renderMapBase(spec: MapSpec, opts?: Partial<MapCanvasSize>
       .map(point => projection(point))
       .filter((point): point is [number, number] => Array.isArray(point))
       .map(point => [point[0], point[1]] as [number, number]),
-    color: MAP_ROUTE_COLOR,
+    color: mapBasePalette(spec).route,
   }))
   const regions: MapProjectedRegion[] = spec.regions.map(region => ({
     id: region.id,
@@ -635,7 +650,7 @@ export async function renderMapBase(spec: MapSpec, opts?: Partial<MapCanvasSize>
       .map(point => projection(point))
       .filter((point): point is [number, number] => Array.isArray(point))
       .map(point => [point[0], point[1]] as [number, number]),
-    color: MAP_REGION_COLOR,
+    color: mapBasePalette(spec).region,
   }))
 
   return {

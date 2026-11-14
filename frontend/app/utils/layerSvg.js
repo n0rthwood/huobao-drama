@@ -365,7 +365,7 @@ function emitMarker(layer, ctx) {
   const legacyOffset = styleOf(layer, ctx.theme, 'label_offset')
   const offset = [Number(layer.style.label_dx ?? legacyOffset[0]), Number(layer.style.label_dy ?? legacyOffset[1])]
   let out = `<circle cx="${fmt(cx)}" cy="${fmt(cy)}" r="${fmt(radius)}" fill="${esc(color)}"`
-    + ` stroke="${esc(stroke)}" stroke-width="${fmt(radius * 0.35)}"/>`
+    + ` stroke="${esc(stroke)}" stroke-width="${fmt(layer.style.stroke_width === undefined ? radius * .35 : Number(layer.style.stroke_width) * ctx.unit)}"/>`
   if (layer.text) {
     out += textBlock([resolvedText(layer, ctx.variables)], {
       x: cx + offset[0] * ctx.width,

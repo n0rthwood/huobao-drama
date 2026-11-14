@@ -212,7 +212,7 @@ test('拒收→自我修正、工具异常回馈、回退全链路与上限、�
       status: 'completed', localPath: texturePath, createdAt: ts, updatedAt: ts,
     }))
     detail = serializeDetail(await loadWorkflow(propId))
-    patchRunParams(detail.run_id, { map_texture_ref: String(textureTask), map_texture_theme: 'archival' })
+    patchRunParams(detail.run_id, { map_texture_ref: String(textureTask), map_texture_theme: 'atlas-tint' })
     const paidImages = async () => (await db.select().from(schema.sysTask).where(eq(schema.sysTask.type, 'image'))).filter(r => r.provider !== 'map-render' && r.provider !== 'map-workflow').length
     const paidBefore = await paidImages()
 

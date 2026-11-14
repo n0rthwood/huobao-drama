@@ -12,6 +12,7 @@
 import fs from 'fs'
 import { toAbsPath } from '../../utils/paths.js'
 import type { MapSpec } from './geo/base-render.js'
+import { isMapStyleFamilyId } from './styles/index.js'
 
 export const MAP_WORKFLOW_STAGES = ['brief', 'research', 'base', 'style', 'drawing', 'complete'] as const
 export type MapWorkflowStage = typeof MAP_WORKFLOW_STAGES[number]
@@ -74,8 +75,8 @@ export interface MapBrief {
   schematic: boolean
   base_mode: MapBaseMode
   style: MapStyleTheme
-  /** Optional explicit style-library input; no reference family/default is selected by code. */
-  style_spec?: Record<string, unknown>
+  /** null follows the module default; absent only on pre-Q4 stored briefs. */
+  map_style?: string | null
   notes: string
   reference_image: MapBriefReferenceImage | null
   inferred: MapBriefInference[]
@@ -354,7 +355,7 @@ export function emptyBrief(): MapBrief {
   return {
     subject: '', era: '', location: '', purpose: '',
     detail_level: 'regional', schematic: false, base_mode: 'program', style: 'archival',
-    notes: '', reference_image: null, inferred: [],
+    map_style: null, notes: '', reference_image: null, inferred: [],
   }
 }
 
@@ -519,11 +520,13 @@ export function normalizeBrief(raw: unknown, previous: MapBrief | null): MapBrie
   if ('detail_level' in record) next.detail_level = enumOf(record.detail_level, MAP_DETAIL_LEVELS, 'brief.detail_level', base.detail_level)
   if ('base_mode' in record) next.base_mode = enumOf(record.base_mode, MAP_BASE_MODES, 'brief.base_mode', base.base_mode)
   if ('style' in record) next.style = enumOf(record.style, MAP_STYLE_THEMES, 'brief.style', base.style)
-  if ('style_spec' in record) {
-    if (record.style_spec === null) delete next.style_spec
-    else if (!record.style_spec || typeof record.style_spec !== 'object' || Array.isArray(record.style_spec)) throw new MapWorkflowValidationError('style_spec 必须是对象或 null', { field: 'brief.style_spec' })
-    else next.style_spec = { ...record.style_spec }
+  if ('map_style' in record) {
+    if (record.map_style !== null && !isMapStyleFamilyId(record.map_style)) throw new MapWorkflowValidationError('map_style 必须是已采纳的主题 id 或 null', { field: 'brief.map_style' })
+    next.map_style = record.map_style as string | null
+    next.inferred = next.inferred.filter(item => item.field !== 'map_style' || item.value === next.map_style)
   }
+  // Retire the pre-adoption arbitrary recipe hook, including persisted snapshots.
+  delete (next as unknown as Record<string, unknown>).style_spec
   if ('schematic' in record) next.schematic = record.schematic === true || record.schematic === 1 || record.schematic === 'true'
   if ('reference_image' in record) next.reference_image = normalizeReferenceImage(record.reference_image)
   if ('inferred' in record) next.inferred = normalizeInferred(record.inferred)

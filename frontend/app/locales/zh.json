@@ -3564,6 +3564,29 @@
     }
   },
   "mapStudio": {
+    "styles": {
+      "title": "制图主题",
+      "hint": "选择配色、线条与文字层级；不会改动地理几何。AI 可提议主题并说明理由，不得覆盖人工选择。",
+      "followDefault": "跟随模块默认：{name}",
+      "legacy": "此旧任务沿用原 archival / clean / ink 风格；选择主题后才启用主题配方。",
+      "palette": "主题色板",
+      "referenceHint": "缩略图仅作视觉参考，不作为地理位置或历史疆界的证据。",
+      "loadFailed": "主题读取失败",
+      "defaultTitle": "默认制图主题",
+      "defaultHint": "未指定主题的新任务使用此默认；已有明确选择与旧任务不变。",
+      "saveDefault": "保存默认主题",
+      "defaultSaved": "默认主题已保存",
+      "reset": "按主题重设样式",
+      "resetHint": "仅重设图层样式，不动几何、文字与排版；可撤销，需另行保存。",
+      "resetDone": "已按主题重设草稿样式，可撤销",
+      "family": {
+        "atlas-tint": { "name": "古典地图集淡彩／铜版", "purpose": "区域总览：淡彩、细河网与衬线地名。" },
+        "historical-schematic": { "name": "专题图解／历史分区", "purpose": "突出领土变化、迁徙或河流叙事，弱化无关地形。" },
+        "relief-shading": { "name": "地形晕渲", "purpose": "山地与河谷的克制地形色调；真实地形仍须已核验数据。" },
+        "ink-chinese": { "name": "旧图墨色／手绘", "purpose": "宣纸感、墨色河流与朱红路线，适合边防史料图解。" },
+        "modern-clean": { "name": "现代纪录片简洁", "purpose": "少色、高可读层级，不用旧纸污渍。" }
+      }
+    },
     "stage": {
       "brief": "上下文与目的",
       "research": "资料调研（点线面）",

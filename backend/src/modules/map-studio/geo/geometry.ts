@@ -143,6 +143,7 @@ export interface MapBaseProvenance {
   context?: MapContextCoverage
   /** Exact river file and SHA, including overview overridden by adopted 10m refs. */
   river_source?: MapRiverSourceInfo
+  map_style?: string | null
 }
 
 export interface MapBaseArtifact {
@@ -710,10 +711,12 @@ export async function createMapBaseArtifact(
   spec: MapSpec,
   options: { mode: MapBaseMode; width?: number; referenceImage?: MapReferenceImage },
 ): Promise<MapBaseArtifact> {
-  if (options.mode === 'program') return createProgramBase(spec, options.width)
-  if (options.mode === 'earth') return createEarthBase(spec, options.width)
-  if (options.mode === 'image') return createImageBase(spec, options.referenceImage, options.width)
-  throw new MapGeometryError(`未知底图模式：${String(options.mode)}`)
+  const artifact = options.mode === 'program' ? await createProgramBase(spec, options.width)
+    : options.mode === 'earth' ? await createEarthBase(spec, options.width)
+    : options.mode === 'image' ? await createImageBase(spec, options.referenceImage, options.width) : null
+  if (!artifact) throw new MapGeometryError(`未知底图模式：${String(options.mode)}`)
+  artifact.provenance.map_style = spec.style.map_style ?? null
+  return artifact
 }
 
 // ---------------------------------------------------------------- 可编辑图层

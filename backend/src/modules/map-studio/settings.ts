@@ -12,6 +12,7 @@
  */
 import { hasSettingRow, readSetting, writeSetting } from './db.js'
 import type { MapStudioPlatform } from './contract.js'
+import { DEFAULT_MAP_STYLE, isMapStyleFamilyId, MapStyleValidationError, type MapStyleFamilyId } from './styles/index.js'
 
 export const RESEARCH_KEY_IDS = ['europeana', 'smithsonian'] as const
 export type ResearchKeyId = typeof RESEARCH_KEY_IDS[number]
@@ -131,4 +132,15 @@ export function writeModels(patch: unknown): MapStudioModels {
   })
   writeSetting(MODELS_SETTING, next)
   return next
+}
+
+export function readDefaultStyle(): MapStyleFamilyId {
+  const stored = readSetting('default_style')
+  return isMapStyleFamilyId(stored) ? stored : DEFAULT_MAP_STYLE
+}
+
+export function writeDefaultStyle(value: unknown): MapStyleFamilyId {
+  if (!isMapStyleFamilyId(value)) throw new MapStyleValidationError('default_style 必须是已采纳的主题 id', 'default_style')
+  writeSetting('default_style', value)
+  return value
 }

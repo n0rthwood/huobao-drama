@@ -38,6 +38,7 @@ export async function initMapStudio(platform: MapStudioPlatform): Promise<void> 
     }
   })()
   await seedLegacyResearchKeys(platform)
+  if (!hasSettingRow('default_style')) writeSetting('default_style', 'atlas-tint')
   if (!hasSettingRow('models')) {
     const text = await getActiveConfig('text')
     const image = await getActiveConfig('image')
@@ -65,6 +66,11 @@ export async function openHostTask(input: { host: string; ref: string; existingT
   const found = existing?.host === input.host && existing.host_ref === input.ref ? existing : selectTaskByHost(input.host, input.ref)
   if (found) return { task_id: found.id, path: `/map-studio/${found.id}` }
   const brief = await host.readBrief(input.ref) ?? { ...emptyBrief(), subject: target.title }
+  // Only newly opened tasks adopt the module default; existing pre-Q4 tasks keep their old theme.
+  if (!Object.hasOwn(brief, 'map_style')) {
+    brief.map_style = null
+    await host.writeBrief(input.ref, brief)
+  }
   const state = emptyWorkflow()
   state.brief = brief; state.brief_hash = briefHash(brief)
   let id: number
