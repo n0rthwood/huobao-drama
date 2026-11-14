@@ -1,0 +1,2454 @@
+{
+ "943": {
+  "keyframe_task": 3454,
+  "keyframe_wall_s": 30.0,
+  "keyframe_status": "completed",
+  "keyframe_error": null,
+  "keyframe_params": {
+   "kind": "keyframe_prompts",
+   "progress": {
+    "completed": 1,
+    "failed": 0,
+    "total": 1
+   },
+   "storyboardIds": [
+    943
+   ],
+   "scope": {
+    "included": [
+     {
+      "storyboard_id": 943,
+      "storyboard_number": 13
+     }
+    ],
+    "excluded": []
+   },
+   "configId": 1,
+   "stage": "keyframe_prompts",
+   "model_used": {
+    "config_id": 1,
+    "name": "GLM 5.3 (local)",
+    "provider": "openai",
+    "model": "glm-5.3-flash",
+    "vision": false
+   },
+   "restart": {
+    "kind": "keyframe_prompts",
+    "args": {
+     "episodeId": 27,
+     "dramaId": 20,
+     "opts": {},
+     "storyboardIds": [
+      943
+     ]
+    }
+   },
+   "reasoning_chars": 541,
+   "output_text": "分镜 #13：已为分镜 #13（ID:943）保存关键帧提示词：\n\n- **first_frame_prompt**：留空 —— 组合 C 的首帧是图层段末帧的锁定衔接帧（俯拍地图全景），不单独出图。\n- **mid_frame_prompt + mid_frame_time=5.5 秒**：生成段起始瞬间——@乌格拉河畔 宽阔河湾远景，正午顶光，十余骑蒙古骑兵（尖顶毡帽、深色长袍、背弓）沿对岸草坡向画面右侧远处撤离，逐人写明骑姿四肢状态，与设计卡 gen_plan.mid 一致。\n- **last_frame_prompt**：与 result「空营收束」一致——骑兵已完全撤离、画面无人，对岸只剩空营、倒伏木栅与渐淡烟柱，近岸木桩与成捆原木在前景，姿态稳定空景，可被下一镜承接。\n\n三条均自足交代了 @场景名、景别机位构图、光线氛围，并逐字包含「16:9 横构图电影感剧照，单帧静态画面」，未描写任何角色外观属性。"
+  },
+  "keyframe_obs": {
+   "works": [
+    {
+     "id": 777,
+     "stage": "keyframe_prompts",
+     "storyboard_id": 943,
+     "storyboard_number": 13,
+     "status": "completed",
+     "work_ms": 25813,
+     "model_ms": 25448,
+     "queue_ms": 3,
+     "call_count": 3,
+     "error_msg": null
+    }
+   ],
+   "calls": [
+    {
+     "id": 2527,
+     "kind": "llm",
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "http_status": 200,
+     "duration_ms": 2026,
+     "queue_ms": 1,
+     "prompt_tokens": 23057,
+     "completion_tokens": 7,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2528,
+     "kind": "llm",
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "http_status": 200,
+     "duration_ms": 15527,
+     "queue_ms": 1,
+     "prompt_tokens": 52789,
+     "completion_tokens": 777,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2529,
+     "kind": "llm",
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "http_status": 200,
+     "duration_ms": 7895,
+     "queue_ms": 1,
+     "prompt_tokens": 53331,
+     "completion_tokens": 265,
+     "finish_reason": "stop",
+     "error_msg": null
+    }
+   ],
+   "call_count": 3,
+   "llm_calls": 3,
+   "max_prompt_tokens": 53331,
+   "total_prompt_tokens": 129177,
+   "total_completion_tokens": 1049,
+   "models": [
+    [
+     1,
+     "GLM 5.3 (local)",
+     "glm-5.3-flash"
+    ]
+   ],
+   "request_params": [
+    {
+     "max_tokens": "131072",
+     "model": "\"glm-5.3-flash\"",
+     "reasoning_effort": "\"low\"",
+     "stream": "true"
+    },
+    {}
+   ]
+  },
+  "keyframe_rejections": [
+   [
+    "20",
+    "拒绝",
+    "[\n  {\n    \"type\": \"function\",\n    \"function\": {\n      \"name\": \"readCharacters\",\n      \"description\": \"读取当前剧集中的所有角色信息，用于生成角色三视图最终提示词。\",\n      \"parameters\": {\n        \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n        \"type\": \"object\",\n        \"properties\": {},\n        \"additionalProperties\": false,\n        \"required\": []\n      }\n    }\n  },\n  {\n    \"type\": \"function\",\n    \"function\": {\n  "
+   ],
+   [
+    null,
+    "card_ref_unmet",
+    "你是专业的 AI 提示词工程师，负责三类提示词的创作与保存：\n1. 角色/场景/道具的「最终提示词」，供生图直接使用\n2. 分镜的「关键帧提示词」（first_frame_prompt / mid_frame_prompt + mid_frame_time / last_frame_prompt），供关键帧生图直接使用\n3. 分镜的「视频提示词」（video_prompt），供视频生成直接使用\n\n## 图片最终提示词\n\n用户请求会告知要为哪些角色、场景或道具生成最终提示词（附带 character_id / scene_id / prop_id）。\n\n工作流程：\n1. 调用 readCharacters / readScenes / readProps 读取资产信息\n2. 按对应技能规范（角色三视图及造型版本 / 场景固定视角 / 道具白底单品）创作最终提示词\n3. 调用 saveChar"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "请为分镜 #13(ID:943)生成关键帧提示词(first_frame_prompt、mid_frame_prompt、mid_frame_time、last_frame_prompt)，严格遵循 keyframe-prompt 技能规范。\n请先调用 read_storyboard_context 读取该分镜的 description(含【镜头N】子镜头)、result、atmosphere、duration、continuity_boundary 及 inherits_first，然后写出关键帧提示词：\n- 每张关键帧都是独立生成的单帧静态画面，只凭资产参考图 + 本条提示词出图，所以每条提示词必须自足（自己交代景别机位构图、@场景名、画面里有哪些 @角色名 及其位置姿态表情、关键 @道具名、光线氛围），禁止写「同上一帧」「保持不变」这类相对描述\n- 绝对图像优先：禁止描写角色的物种、"
+   ],
+   [
+    "readStoryboardContext",
+    "mid_frame_time",
+    "{\n  \"episode\": {\n    \"id\": 27,\n    \"title\": \"中俄百年变局（1）：一个草原强盗的逆袭\",\n    \"episode_number\": 1,\n    \"description\": \"\"\n  },\n  \"aspect_ratio\": \"16:9\",\n  \"composition\": \"横构图\",\n  \"text_spec\": {\n    \"layouts\": [\n      {\n        \"id\": \"h-left-stack\",\n        \"name\": \"左上语境／左中主叙事／左下关键词\",\n        \"slots\": [\n          {\n            \"role\": \"date\",\n            \"zone\": \"context\"\n          },\n          {\n         "
+   ],
+   [
+    "20",
+    "拒绝",
+    "[\n  {\n    \"type\": \"function\",\n    \"function\": {\n      \"name\": \"readCharacters\",\n      \"description\": \"读取当前剧集中的所有角色信息，用于生成角色三视图最终提示词。\",\n      \"parameters\": {\n        \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n        \"type\": \"object\",\n        \"properties\": {},\n        \"additionalProperties\": false,\n        \"required\": []\n      }\n    }\n  },\n  {\n    \"type\": \"function\",\n    \"function\": {\n  "
+   ],
+   [
+    null,
+    "card_ref_unmet",
+    "你是专业的 AI 提示词工程师，负责三类提示词的创作与保存：\n1. 角色/场景/道具的「最终提示词」，供生图直接使用\n2. 分镜的「关键帧提示词」（first_frame_prompt / mid_frame_prompt + mid_frame_time / last_frame_prompt），供关键帧生图直接使用\n3. 分镜的「视频提示词」（video_prompt），供视频生成直接使用\n\n## 图片最终提示词\n\n用户请求会告知要为哪些角色、场景或道具生成最终提示词（附带 character_id / scene_id / prop_id）。\n\n工作流程：\n1. 调用 readCharacters / readScenes / readProps 读取资产信息\n2. 按对应技能规范（角色三视图及造型版本 / 场景固定视角 / 道具白底单品）创作最终提示词\n3. 调用 saveChar"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "请为分镜 #13(ID:943)生成关键帧提示词(first_frame_prompt、mid_frame_prompt、mid_frame_time、last_frame_prompt)，严格遵循 keyframe-prompt 技能规范。\n请先调用 read_storyboard_context 读取该分镜的 description(含【镜头N】子镜头)、result、atmosphere、duration、continuity_boundary 及 inherits_first，然后写出关键帧提示词：\n- 每张关键帧都是独立生成的单帧静态画面，只凭资产参考图 + 本条提示词出图，所以每条提示词必须自足（自己交代景别机位构图、@场景名、画面里有哪些 @角色名 及其位置姿态表情、关键 @道具名、光线氛围），禁止写「同上一帧」「保持不变」这类相对描述\n- 绝对图像优先：禁止描写角色的物种、"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "{\"aspect_ratio\":\"16:9\",\"characters\":[{\"appearance\":\"中年男子，约四十岁，中等偏瘦的身材，方正的长脸，额发向后梳，深色短发齐耳，蓄浓密的褐色络腮胡与八字胡，眼皮微垂，目光疲惫而固执，常驻的冒险者气质。\",\"description\":\"15 世纪末的欧洲航海者，受西班牙国王赞助。本集作为全篇的比较基准出现：他向西横渡大西洋抵达美洲，开启欧洲长达四五百年的航海与殖民时代。\",\"id\":71,\"image_url\":\"static/images/4f02e573-bcaa-4e78-b71d-a21a5a084bda.png\",\"name\":\"哥伦布\",\"reference_images\":[],\"role\":\"航海家 · 西航远征者\",\"styling\":\"深蓝色航海长外套，内穿米白粗布衬衣，腰系棕色皮带，下穿深色窄腿裤与棕色皮靴；胸前挂一枚黄"
+   ],
+   [
+    "updateStoryboard",
+    "mid_frame_time",
+    "{\"first_frame_prompt\":\"\",\"last_frame_prompt\":\"@乌格拉河畔，正午顶光，河面亮白反光强烈，草岸呈明黄绿，天空淡青带薄云，色调清冷明亮，16:9 横构图电影感剧照。中近景平视固定机位，镜头取 @乌格拉河畔 的近岸滩地：前景是河岸滩地上零散的木桩与成捆原木，中景为河湾水面与低缓草岸，远景对岸的木栅营寨已空，营内余烟渐淡成稀薄烟柱，营寨木栅倒伏数处，画面空旷。蒙古骑兵已完全撤离，画面中没有任何骑兵与人影，只有空营、木桩与平静的河面，表达两百多年统治的终点。对岸远处的树林呈深绿细带，构图平稳、层次清晰。画面稳定清晰、空景完整入画，可被下一镜直接承接。16:9 横构图电影感剧照，单帧静态画面\",\"mid_frame_prompt\":\"@乌格拉河畔，正午顶光，河面亮白反光强烈，草岸呈明黄绿，天空淡青带薄云，色调清冷明亮，16:9 横构图电影感剧照。远景广角平"
+   ],
+   [
+    "20",
+    "拒绝",
+    "[\n  {\n    \"type\": \"function\",\n    \"function\": {\n      \"name\": \"readCharacters\",\n      \"description\": \"读取当前剧集中的所有角色信息，用于生成角色三视图最终提示词。\",\n      \"parameters\": {\n        \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n        \"type\": \"object\",\n        \"properties\": {},\n        \"additionalProperties\": false,\n        \"required\": []\n      }\n    }\n  },\n  {\n    \"type\": \"function\",\n    \"function\": {\n  "
+   ],
+   [
+    null,
+    "card_ref_unmet",
+    "你是专业的 AI 提示词工程师，负责三类提示词的创作与保存：\n1. 角色/场景/道具的「最终提示词」，供生图直接使用\n2. 分镜的「关键帧提示词」（first_frame_prompt / mid_frame_prompt + mid_frame_time / last_frame_prompt），供关键帧生图直接使用\n3. 分镜的「视频提示词」（video_prompt），供视频生成直接使用\n\n## 图片最终提示词\n\n用户请求会告知要为哪些角色、场景或道具生成最终提示词（附带 character_id / scene_id / prop_id）。\n\n工作流程：\n1. 调用 readCharacters / readScenes / readProps 读取资产信息\n2. 按对应技能规范（角色三视图及造型版本 / 场景固定视角 / 道具白底单品）创作最终提示词\n3. 调用 saveChar"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "请为分镜 #13(ID:943)生成关键帧提示词(first_frame_prompt、mid_frame_prompt、mid_frame_time、last_frame_prompt)，严格遵循 keyframe-prompt 技能规范。\n请先调用 read_storyboard_context 读取该分镜的 description(含【镜头N】子镜头)、result、atmosphere、duration、continuity_boundary 及 inherits_first，然后写出关键帧提示词：\n- 每张关键帧都是独立生成的单帧静态画面，只凭资产参考图 + 本条提示词出图，所以每条提示词必须自足（自己交代景别机位构图、@场景名、画面里有哪些 @角色名 及其位置姿态表情、关键 @道具名、光线氛围），禁止写「同上一帧」「保持不变」这类相对描述\n- 绝对图像优先：禁止描写角色的物种、"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "{\"aspect_ratio\":\"16:9\",\"characters\":[{\"appearance\":\"中年男子，约四十岁，中等偏瘦的身材，方正的长脸，额发向后梳，深色短发齐耳，蓄浓密的褐色络腮胡与八字胡，眼皮微垂，目光疲惫而固执，常驻的冒险者气质。\",\"description\":\"15 世纪末的欧洲航海者，受西班牙国王赞助。本集作为全篇的比较基准出现：他向西横渡大西洋抵达美洲，开启欧洲长达四五百年的航海与殖民时代。\",\"id\":71,\"image_url\":\"static/images/4f02e573-bcaa-4e78-b71d-a21a5a084bda.png\",\"name\":\"哥伦布\",\"reference_images\":[],\"role\":\"航海家 · 西航远征者\",\"styling\":\"深蓝色航海长外套，内穿米白粗布衬衣，腰系棕色皮带，下穿深色窄腿裤与棕色皮靴；胸前挂一枚黄"
+   ],
+   [
+    "updateStoryboard",
+    "mid_frame_time",
+    "{\"first_frame_prompt\":\"\",\"last_frame_prompt\":\"@乌格拉河畔，正午顶光，河面亮白反光强烈，草岸呈明黄绿，天空淡青带薄云，色调清冷明亮，16:9 横构图电影感剧照。中近景平视固定机位，镜头取 @乌格拉河畔 的近岸滩地：前景是河岸滩地上零散的木桩与成捆原木，中景为河湾水面与低缓草岸，远景对岸的木栅营寨已空，营内余烟渐淡成稀薄烟柱，营寨木栅倒伏数处，画面空旷。蒙古骑兵已完全撤离，画面中没有任何骑兵与人影，只有空营、木桩与平静的河面，表达两百多年统治的终点。对岸远处的树林呈深绿细带，构图平稳、层次清晰。画面稳定清晰、空景完整入画，可被下一镜直接承接。16:9 横构图电影感剧照，单帧静态画面\",\"mid_frame_prompt\":\"@乌格拉河畔，正午顶光，河面亮白反光强烈，草岸呈明黄绿，天空淡青带薄云，色调清冷明亮，16:9 横构图电影感剧照。远景广角平"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "已为分镜 #13（ID:943）保存关键帧提示词：\n\n- **first_frame_prompt**：留空 —— 组合 C 的首帧是图层段末帧的锁定衔接帧（俯拍地图全景），不单独出图。\n- **mid_frame_prompt + mid_frame_time=5.5 秒**：生成段起始瞬间——@乌格拉河畔 宽阔河湾远景，正午顶光，十余骑蒙古骑兵（尖顶毡帽、深色长袍、背弓）沿对岸草坡向画面右侧远处撤离，逐人写明骑姿四肢状态，与设计卡 gen_plan.mid 一致。\n- **last_frame_prompt**：与 result「空营收束」一致——骑兵已完全撤离、画面无人，对岸只剩空营、倒伏木栅与渐淡烟柱，近岸木桩与成捆原木在前景，姿态稳定空景，可被下一镜承接。\n\n三条均自足交代了 @场景名、景别机位构图、光线氛围，并逐字包含「16:9 横构图电影感剧照，单帧静态画面」，未描写任何角色"
+   ]
+  ],
+  "after_kf": {
+   "first_frame_prompt": "",
+   "mid_frame_prompt": "@乌格拉河畔，正午顶光，河面亮白反光强烈，草岸呈明黄绿，天空淡青带薄云，色调清冷明亮，16:9 横构图电影感剧照。远景广角平视固定机位，镜头取 @乌格拉河畔 的宽阔河湾：画面上部为淡青天空与一线河岸树林，中部为宽阔平缓的河面，下部为近岸草坡与滩地上零散的木桩与成捆原木，对岸远处可见木栅营寨。一队蒙古骑兵（尖顶毡帽、深色长袍、背弓，共十余骑）沿对岸草坡向画面右侧远处缓缓撤离，骑手们双腿夹住马腹、右手执缰、左手垂在身侧，马匹四蹄缓步、马头朝向画面右方，队伍成松散纵队、背影朝向镜头方向远去，马蹄踏起的薄尘贴着草面。河面平静无船无桥，正午强光把队伍在草坡上投下短小的深色阴影。构图三层分明、队伍完整入画。16:9 横构图电影感剧照，单帧静态画面",
+   "last_frame_prompt": "@乌格拉河畔，正午顶光，河面亮白反光强烈，草岸呈明黄绿，天空淡青带薄云，色调清冷明亮，16:9 横构图电影感剧照。中近景平视固定机位，镜头取 @乌格拉河畔 的近岸滩地：前景是河岸滩地上零散的木桩与成捆原木，中景为河湾水面与低缓草岸，远景对岸的木栅营寨已空，营内余烟渐淡成稀薄烟柱，营寨木栅倒伏数处，画面空旷。蒙古骑兵已完全撤离，画面中没有任何骑兵与人影，只有空营、木桩与平静的河面，表达两百多年统治的终点。对岸远处的树林呈深绿细带，构图平稳、层次清晰。画面稳定清晰、空景完整入画，可被下一镜直接承接。16:9 横构图电影感剧照，单帧静态画面",
+   "mid_frame_time": 5.5,
+   "video_prompt": "",
+   "field_saved_at": "{\"narration_text\":1794549338,\"design_card\":1794552981,\"first_frame_prompt\":1794664974,\"mid_frame_prompt\":1794664974,\"mid_frame_time\":1794664974,\"last_frame_prompt\":1794664974,\"video_prompt\":1794664463}"
+  },
+  "video_task": 3455,
+  "video_wall_s": 30.0,
+  "video_status": "completed",
+  "video_error": null,
+  "video_params": {
+   "kind": "video_prompts",
+   "progress": {
+    "completed": 1,
+    "failed": 0,
+    "total": 1
+   },
+   "storyboardIds": [
+    943
+   ],
+   "configId": 1,
+   "stage": "video_prompts",
+   "model_used": {
+    "config_id": 1,
+    "name": "GLM 5.3 (local)",
+    "provider": "openai",
+    "model": "glm-5.3-flash",
+    "vision": false
+   },
+   "restart": {
+    "kind": "video_prompts",
+    "args": {
+     "episodeId": 27,
+     "dramaId": 20,
+     "opts": {},
+     "storyboardIds": [
+      943
+     ]
+    }
+   },
+   "reasoning_chars": 1048,
+   "output_text": "分镜 #13：已为分镜 #13（ID:943）保存 video_prompt。要点：\n\n- **组合 C 锁定衔接帧**：第一段 0-1 秒为空镜复述段，只描述衔接帧画面（俯拍地图式全景、米黄底色、红褐色多边形区域、白色小圆点），镜头静止或极缓推，未 @ 角色、未切镜、无场景过渡写法，结束时间 ≤1.5 秒。\n- **1 秒后入戏**：第二段切到 @乌格拉河畔，蒙古骑兵（尖顶毡帽、深色长袍、背弓，共十余骑）沿对岸撤离，逐段写明骑手双腿夹马腹、右手执缰、左手垂身侧的四肢状态，一段一个主动作。\n- **关键帧对齐**：分段起点 5.5 秒正好落在 mid_frame_time，该段画面与中关键帧（宽阔河湾远景 + 骑兵撤离）一致；最后一段收在尾关键帧的空营画面上（骑兵完全撤离、烟柱渐淡、木桩与平静河面）。\n- **旁白不入提示词**：本集开启旁白，「一百多年/两百多年」解说词走独立音轨，未写入 video_prompt；时间与方位信息由图层段承担。\n- 总时长 11 秒，覆盖实测配音 9.1 秒，与预算 5.5+5.5 秒一致。"
+  },
+  "video_obs": {
+   "works": [
+    {
+     "id": 778,
+     "stage": "video_prompts",
+     "storyboard_id": 943,
+     "storyboard_number": 13,
+     "status": "completed",
+     "work_ms": 26677,
+     "model_ms": 26280,
+     "queue_ms": 3,
+     "call_count": 3,
+     "error_msg": null
+    }
+   ],
+   "calls": [
+    {
+     "id": 2530,
+     "kind": "llm",
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "http_status": 200,
+     "duration_ms": 2059,
+     "queue_ms": 1,
+     "prompt_tokens": 23882,
+     "completion_tokens": 7,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2531,
+     "kind": "llm",
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "http_status": 200,
+     "duration_ms": 17870,
+     "queue_ms": 1,
+     "prompt_tokens": 54319,
+     "completion_tokens": 1093,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2532,
+     "kind": "llm",
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "http_status": 200,
+     "duration_ms": 6351,
+     "queue_ms": 1,
+     "prompt_tokens": 55035,
+     "completion_tokens": 326,
+     "finish_reason": "stop",
+     "error_msg": null
+    }
+   ],
+   "call_count": 3,
+   "llm_calls": 3,
+   "max_prompt_tokens": 55035,
+   "total_prompt_tokens": 133236,
+   "total_completion_tokens": 1426,
+   "models": [
+    [
+     1,
+     "GLM 5.3 (local)",
+     "glm-5.3-flash"
+    ]
+   ],
+   "request_params": [
+    {
+     "max_tokens": "131072",
+     "model": "\"glm-5.3-flash\"",
+     "reasoning_effort": "\"low\"",
+     "stream": "true"
+    },
+    {}
+   ]
+  },
+  "video_rejections": [
+   [
+    "20",
+    "拒绝",
+    "[\n  {\n    \"type\": \"function\",\n    \"function\": {\n      \"name\": \"readCharacters\",\n      \"description\": \"读取当前剧集中的所有角色信息，用于生成角色三视图最终提示词。\",\n      \"parameters\": {\n        \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n        \"type\": \"object\",\n        \"properties\": {},\n        \"additionalProperties\": false,\n        \"required\": []\n      }\n    }\n  },\n  {\n    \"type\": \"function\",\n    \"function\": {\n  "
+   ],
+   [
+    null,
+    "card_ref_unmet",
+    "你是专业的 AI 提示词工程师，负责三类提示词的创作与保存：\n1. 角色/场景/道具的「最终提示词」，供生图直接使用\n2. 分镜的「关键帧提示词」（first_frame_prompt / mid_frame_prompt + mid_frame_time / last_frame_prompt），供关键帧生图直接使用\n3. 分镜的「视频提示词」（video_prompt），供视频生成直接使用\n\n## 图片最终提示词\n\n用户请求会告知要为哪些角色、场景或道具生成最终提示词（附带 character_id / scene_id / prop_id）。\n\n工作流程：\n1. 调用 readCharacters / readScenes / readProps 读取资产信息\n2. 按对应技能规范（角色三视图及造型版本 / 场景固定视角 / 道具白底单品）创作最终提示词\n3. 调用 saveChar"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "请为分镜 #13(ID:943)生成视频提示词(video_prompt)。视频模型:MiniMax H3 INT8 (ComfyUI 102) (h3-jobs),请根据该模型的特性和时长限制生成。\n请先调用 read_storyboard_context 获取该分镜的画面描述(含【镜头N】子镜头与台词/旁白)、氛围、时长及三条关键帧提示词(first_frame_prompt/mid_frame_prompt/mid_frame_time/last_frame_prompt)与 locked_frames(该镜被图层段衔接帧锁死的槽位、取景与画面描述 caption)，据此生成 video_prompt(第一行是信息头：列出该分镜出场的人物与场景，用 @角色名/@场景名 引用；之后按 3 秒分段换行、用 @角色名/@场景名/@道具名 引用参考素材；段落内允许多镜头切镜，段与段可以是不同"
+   ],
+   [
+    "readStoryboardContext",
+    "mid_frame_time",
+    "{\n  \"episode\": {\n    \"id\": 27,\n    \"title\": \"中俄百年变局（1）：一个草原强盗的逆袭\",\n    \"episode_number\": 1,\n    \"description\": \"\"\n  },\n  \"aspect_ratio\": \"16:9\",\n  \"composition\": \"横构图\",\n  \"text_spec\": {\n    \"layouts\": [\n      {\n        \"id\": \"h-left-stack\",\n        \"name\": \"左上语境／左中主叙事／左下关键词\",\n        \"slots\": [\n          {\n            \"role\": \"date\",\n            \"zone\": \"context\"\n          },\n          {\n         "
+   ],
+   [
+    "20",
+    "拒绝",
+    "[\n  {\n    \"type\": \"function\",\n    \"function\": {\n      \"name\": \"readCharacters\",\n      \"description\": \"读取当前剧集中的所有角色信息，用于生成角色三视图最终提示词。\",\n      \"parameters\": {\n        \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n        \"type\": \"object\",\n        \"properties\": {},\n        \"additionalProperties\": false,\n        \"required\": []\n      }\n    }\n  },\n  {\n    \"type\": \"function\",\n    \"function\": {\n  "
+   ],
+   [
+    null,
+    "card_ref_unmet",
+    "你是专业的 AI 提示词工程师，负责三类提示词的创作与保存：\n1. 角色/场景/道具的「最终提示词」，供生图直接使用\n2. 分镜的「关键帧提示词」（first_frame_prompt / mid_frame_prompt + mid_frame_time / last_frame_prompt），供关键帧生图直接使用\n3. 分镜的「视频提示词」（video_prompt），供视频生成直接使用\n\n## 图片最终提示词\n\n用户请求会告知要为哪些角色、场景或道具生成最终提示词（附带 character_id / scene_id / prop_id）。\n\n工作流程：\n1. 调用 readCharacters / readScenes / readProps 读取资产信息\n2. 按对应技能规范（角色三视图及造型版本 / 场景固定视角 / 道具白底单品）创作最终提示词\n3. 调用 saveChar"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "请为分镜 #13(ID:943)生成视频提示词(video_prompt)。视频模型:MiniMax H3 INT8 (ComfyUI 102) (h3-jobs),请根据该模型的特性和时长限制生成。\n请先调用 read_storyboard_context 获取该分镜的画面描述(含【镜头N】子镜头与台词/旁白)、氛围、时长及三条关键帧提示词(first_frame_prompt/mid_frame_prompt/mid_frame_time/last_frame_prompt)与 locked_frames(该镜被图层段衔接帧锁死的槽位、取景与画面描述 caption)，据此生成 video_prompt(第一行是信息头：列出该分镜出场的人物与场景，用 @角色名/@场景名 引用；之后按 3 秒分段换行、用 @角色名/@场景名/@道具名 引用参考素材；段落内允许多镜头切镜，段与段可以是不同"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "{\"aspect_ratio\":\"16:9\",\"characters\":[{\"appearance\":\"中年男子，约四十岁，中等偏瘦的身材，方正的长脸，额发向后梳，深色短发齐耳，蓄浓密的褐色络腮胡与八字胡，眼皮微垂，目光疲惫而固执，常驻的冒险者气质。\",\"description\":\"15 世纪末的欧洲航海者，受西班牙国王赞助。本集作为全篇的比较基准出现：他向西横渡大西洋抵达美洲，开启欧洲长达四五百年的航海与殖民时代。\",\"id\":71,\"image_url\":\"static/images/4f02e573-bcaa-4e78-b71d-a21a5a084bda.png\",\"name\":\"哥伦布\",\"reference_images\":[],\"role\":\"航海家 · 西航远征者\",\"styling\":\"深蓝色航海长外套，内穿米白粗布衬衣，腰系棕色皮带，下穿深色窄腿裤与棕色皮靴；胸前挂一枚黄"
+   ],
+   [
+    "20",
+    "拒绝",
+    "[\n  {\n    \"type\": \"function\",\n    \"function\": {\n      \"name\": \"readCharacters\",\n      \"description\": \"读取当前剧集中的所有角色信息，用于生成角色三视图最终提示词。\",\n      \"parameters\": {\n        \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n        \"type\": \"object\",\n        \"properties\": {},\n        \"additionalProperties\": false,\n        \"required\": []\n      }\n    }\n  },\n  {\n    \"type\": \"function\",\n    \"function\": {\n  "
+   ],
+   [
+    null,
+    "card_ref_unmet",
+    "你是专业的 AI 提示词工程师，负责三类提示词的创作与保存：\n1. 角色/场景/道具的「最终提示词」，供生图直接使用\n2. 分镜的「关键帧提示词」（first_frame_prompt / mid_frame_prompt + mid_frame_time / last_frame_prompt），供关键帧生图直接使用\n3. 分镜的「视频提示词」（video_prompt），供视频生成直接使用\n\n## 图片最终提示词\n\n用户请求会告知要为哪些角色、场景或道具生成最终提示词（附带 character_id / scene_id / prop_id）。\n\n工作流程：\n1. 调用 readCharacters / readScenes / readProps 读取资产信息\n2. 按对应技能规范（角色三视图及造型版本 / 场景固定视角 / 道具白底单品）创作最终提示词\n3. 调用 saveChar"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "请为分镜 #13(ID:943)生成视频提示词(video_prompt)。视频模型:MiniMax H3 INT8 (ComfyUI 102) (h3-jobs),请根据该模型的特性和时长限制生成。\n请先调用 read_storyboard_context 获取该分镜的画面描述(含【镜头N】子镜头与台词/旁白)、氛围、时长及三条关键帧提示词(first_frame_prompt/mid_frame_prompt/mid_frame_time/last_frame_prompt)与 locked_frames(该镜被图层段衔接帧锁死的槽位、取景与画面描述 caption)，据此生成 video_prompt(第一行是信息头：列出该分镜出场的人物与场景，用 @角色名/@场景名 引用；之后按 3 秒分段换行、用 @角色名/@场景名/@道具名 引用参考素材；段落内允许多镜头切镜，段与段可以是不同"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "{\"aspect_ratio\":\"16:9\",\"characters\":[{\"appearance\":\"中年男子，约四十岁，中等偏瘦的身材，方正的长脸，额发向后梳，深色短发齐耳，蓄浓密的褐色络腮胡与八字胡，眼皮微垂，目光疲惫而固执，常驻的冒险者气质。\",\"description\":\"15 世纪末的欧洲航海者，受西班牙国王赞助。本集作为全篇的比较基准出现：他向西横渡大西洋抵达美洲，开启欧洲长达四五百年的航海与殖民时代。\",\"id\":71,\"image_url\":\"static/images/4f02e573-bcaa-4e78-b71d-a21a5a084bda.png\",\"name\":\"哥伦布\",\"reference_images\":[],\"role\":\"航海家 · 西航远征者\",\"styling\":\"深蓝色航海长外套，内穿米白粗布衬衣，腰系棕色皮带，下穿深色窄腿裤与棕色皮靴；胸前挂一枚黄"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "已为分镜 #13（ID:943）保存 video_prompt。要点：\n\n- **组合 C 锁定衔接帧**：第一段 0-1 秒为空镜复述段，只描述衔接帧画面（俯拍地图式全景、米黄底色、红褐色多边形区域、白色小圆点），镜头静止或极缓推，未 @ 角色、未切镜、无场景过渡写法，结束时间 ≤1.5 秒。\n- **1 秒后入戏**：第二段切到 @乌格拉河畔，蒙古骑兵（尖顶毡帽、深色长袍、背弓，共十余骑）沿对岸撤离，逐段写明骑手双腿夹马腹、右手执缰、左手垂身侧的四肢状态，一段一个主动作。\n- **关键帧对齐**：分段起点 5.5 秒正好落在 mid_frame_time，该段画面与中关键帧（宽阔河湾远景 + 骑兵撤离）一致；最后一段收在尾关键帧的空营画面上（骑兵完全撤离、烟柱渐淡、木桩与平静河面）。\n- **旁白不入提示词**：本集开启旁白，「一百多年/两百多年」解说词走独立音轨，未写入 video_"
+   ]
+  ],
+  "after_vp": {
+   "first_frame_prompt": "",
+   "mid_frame_prompt": "@乌格拉河畔，正午顶光，河面亮白反光强烈，草岸呈明黄绿，天空淡青带薄云，色调清冷明亮，16:9 横构图电影感剧照。远景广角平视固定机位，镜头取 @乌格拉河畔 的宽阔河湾：画面上部为淡青天空与一线河岸树林，中部为宽阔平缓的河面，下部为近岸草坡与滩地上零散的木桩与成捆原木，对岸远处可见木栅营寨。一队蒙古骑兵（尖顶毡帽、深色长袍、背弓，共十余骑）沿对岸草坡向画面右侧远处缓缓撤离，骑手们双腿夹住马腹、右手执缰、左手垂在身侧，马匹四蹄缓步、马头朝向画面右方，队伍成松散纵队、背影朝向镜头方向远去，马蹄踏起的薄尘贴着草面。河面平静无船无桥，正午强光把队伍在草坡上投下短小的深色阴影。构图三层分明、队伍完整入画。16:9 横构图电影感剧照，单帧静态画面",
+   "last_frame_prompt": "@乌格拉河畔，正午顶光，河面亮白反光强烈，草岸呈明黄绿，天空淡青带薄云，色调清冷明亮，16:9 横构图电影感剧照。中近景平视固定机位，镜头取 @乌格拉河畔 的近岸滩地：前景是河岸滩地上零散的木桩与成捆原木，中景为河湾水面与低缓草岸，远景对岸的木栅营寨已空，营内余烟渐淡成稀薄烟柱，营寨木栅倒伏数处，画面空旷。蒙古骑兵已完全撤离，画面中没有任何骑兵与人影，只有空营、木桩与平静的河面，表达两百多年统治的终点。对岸远处的树林呈深绿细带，构图平稳、层次清晰。画面稳定清晰、空景完整入画，可被下一镜直接承接。16:9 横构图电影感剧照，单帧静态画面",
+   "mid_frame_time": 5.5,
+   "video_prompt": "场景：@乌格拉河畔。\n0-1秒：俯拍地图式全景，米黄底色上分布浅蓝河流与细线边界，左下与下方为浅色海岸轮廓，画面中上部一块红褐色多边形区域、其左下角外侧有一个白色小圆点，中下部偏右另有一块红褐色多边形区域，整体光线均匀、色调偏暖，留白主要在上方与右侧，镜头静止或极缓推，画面无人。\n1-4秒：切到 @乌格拉河畔 的远景广角平视固定机位，画面上部为淡青天空与一线河岸树林，中部为宽阔平缓的河面，下部为近岸草坡与滩地上零散的木桩与成捆原木，对岸远处可见木栅营寨；一队蒙古骑兵（尖顶毡帽、深色长袍、背弓，共十余骑）成松散纵队沿对岸草坡向画面右侧远处缓缓撤离，骑手们双腿夹住马腹、右手执缰、左手垂在身侧，马匹四蹄缓步、马头朝向画面右方，正午顶光把队伍在草坡上投下短小的深色阴影，河面平静无船无桥。\n4-5.5秒：仍取 @乌格拉河畔 的远景广角固定机位，镜头缓推，蒙古骑兵队伍（尖顶毡帽、深色长袍、背弓）继续向画面右侧远处行进，骑手双腿夹马腹、右手执缰、左手垂在身侧，马蹄踏起的薄尘贴着草面，对岸木栅营寨中升起一缕细烟，队伍逐渐远离营寨方向。\n5.5-8.5秒：切到 @乌格拉河畔 的宽阔河湾远景广角平视固定机位，正午顶光、河面亮白反光强烈、草岸明黄绿、天空淡青带薄云；蒙古骑兵队伍（尖顶毡帽、深色长袍、背弓，共十余骑）沿对岸草坡向画面右侧更远处缓缓撤离，骑手们双腿夹住马腹、右手执缰、左手垂在身侧，马匹四蹄缓步、马头朝画面右方，队伍背影朝镜头方向远去、身形逐渐缩小，营寨的细烟在营上空渐淡成稀薄烟柱，河面平静。\n8.5-11秒：切到 @乌格拉河畔 的中近景平视固定机位，正午顶光，河面亮白反光强烈，前景为河岸滩地上零散的木桩与成捆原木，中景为河湾水面与低缓草岸，远景对岸的木栅营寨已空、营内余烟渐淡成稀薄烟柱、营寨木栅倒伏数处，蒙古骑兵已完全撤离，画面中没有任何骑兵与人影，只有空营、木桩与平静的河面，对岸远处树林呈深绿细带，画面空旷，构图平稳，收束为稳定的空景。",
+   "field_saved_at": "{\"narration_text\":1794549338,\"design_card\":1794552981,\"first_frame_prompt\":1794664974,\"mid_frame_prompt\":1794664974,\"mid_frame_time\":1794664974,\"last_frame_prompt\":1794664974,\"video_prompt\":1794665007}"
+  }
+ },
+ "949": {
+  "keyframe_task": 3456,
+  "keyframe_wall_s": 30.0,
+  "keyframe_status": "completed",
+  "keyframe_error": null,
+  "keyframe_params": {
+   "kind": "keyframe_prompts",
+   "progress": {
+    "completed": 1,
+    "failed": 0,
+    "total": 1
+   },
+   "storyboardIds": [
+    949
+   ],
+   "scope": {
+    "included": [
+     {
+      "storyboard_id": 949,
+      "storyboard_number": 20
+     }
+    ],
+    "excluded": []
+   },
+   "configId": 1,
+   "stage": "keyframe_prompts",
+   "model_used": {
+    "config_id": 1,
+    "name": "GLM 5.3 (local)",
+    "provider": "openai",
+    "model": "glm-5.3-flash",
+    "vision": false
+   },
+   "restart": {
+    "kind": "keyframe_prompts",
+    "args": {
+     "episodeId": 27,
+     "dramaId": 20,
+     "opts": {},
+     "storyboardIds": [
+      949
+     ]
+    }
+   },
+   "reasoning_chars": 537,
+   "output_text": "分镜 #20：设计卡为组合 C：首帧为衔接帧（继承上一镜 #19 的图层段末帧），不写 first_frame_prompt；需写 mid 与 last 两条提示词，且每条必须 @ 到 @哥萨克聚落 与 @哥萨克火枪。已保存分镜 #20（ID:949）的关键帧提示词：\n\n- **first_frame_prompt**：留空。本镜组合为 C（图层段▣5s → 生成段▶6.5s），首帧是锁定衔接帧（继承上一镜 #19 图层段末帧：俯拍地图式全景），不出图。\n- **mid_frame_prompt + mid_frame_time=3秒**：对应生成段中的「聚落院内中景」——门旁背身提 @哥萨克火枪 的哥萨克、两名扛捆包的哥萨克（劫掠战利品形态），覆盖设计卡「劫掠的具体形态」信息点；3 秒落在生成段 6.5 秒的合法区间内。\n- **last_frame_prompt**：与尾帧设计卡一致——聚落全景收束，一人院中右手提火枪，另一人牵驮货马、手按捆包，构图稳定、可被下一镜 #21 直接承接。\n\n两条提示词均自足、@ 到全部参考资产（@哥萨克聚落、@哥萨克火枪），16:9 横构图收尾，未写任何角色外观属性与屏幕文字（文字交给图层段）。"
+  },
+  "keyframe_obs": {
+   "works": [
+    {
+     "id": 779,
+     "stage": "keyframe_prompts",
+     "storyboard_id": 949,
+     "storyboard_number": 20,
+     "status": "completed",
+     "work_ms": 28564,
+     "model_ms": 28182,
+     "queue_ms": 4,
+     "call_count": 3,
+     "error_msg": null
+    }
+   ],
+   "calls": [
+    {
+     "id": 2533,
+     "kind": "llm",
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "http_status": 200,
+     "duration_ms": 2003,
+     "queue_ms": 1,
+     "prompt_tokens": 23507,
+     "completion_tokens": 7,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2534,
+     "kind": "llm",
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "http_status": 200,
+     "duration_ms": 19218,
+     "queue_ms": 1,
+     "prompt_tokens": 63947,
+     "completion_tokens": 1257,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2535,
+     "kind": "llm",
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "http_status": 200,
+     "duration_ms": 6961,
+     "queue_ms": 2,
+     "prompt_tokens": 65022,
+     "completion_tokens": 264,
+     "finish_reason": "stop",
+     "error_msg": null
+    }
+   ],
+   "call_count": 3,
+   "llm_calls": 3,
+   "max_prompt_tokens": 65022,
+   "total_prompt_tokens": 152476,
+   "total_completion_tokens": 1528,
+   "models": [
+    [
+     1,
+     "GLM 5.3 (local)",
+     "glm-5.3-flash"
+    ]
+   ],
+   "request_params": [
+    {
+     "max_tokens": "131072",
+     "model": "\"glm-5.3-flash\"",
+     "reasoning_effort": "\"low\"",
+     "stream": "true"
+    },
+    {}
+   ]
+  },
+  "keyframe_rejections": [
+   [
+    "20",
+    "拒绝",
+    "[\n  {\n    \"type\": \"function\",\n    \"function\": {\n      \"name\": \"readCharacters\",\n      \"description\": \"读取当前剧集中的所有角色信息，用于生成角色三视图最终提示词。\",\n      \"parameters\": {\n        \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n        \"type\": \"object\",\n        \"properties\": {},\n        \"additionalProperties\": false,\n        \"required\": []\n      }\n    }\n  },\n  {\n    \"type\": \"function\",\n    \"function\": {\n  "
+   ],
+   [
+    null,
+    "card_ref_unmet",
+    "你是专业的 AI 提示词工程师，负责三类提示词的创作与保存：\n1. 角色/场景/道具的「最终提示词」，供生图直接使用\n2. 分镜的「关键帧提示词」（first_frame_prompt / mid_frame_prompt + mid_frame_time / last_frame_prompt），供关键帧生图直接使用\n3. 分镜的「视频提示词」（video_prompt），供视频生成直接使用\n\n## 图片最终提示词\n\n用户请求会告知要为哪些角色、场景或道具生成最终提示词（附带 character_id / scene_id / prop_id）。\n\n工作流程：\n1. 调用 readCharacters / readScenes / readProps 读取资产信息\n2. 按对应技能规范（角色三视图及造型版本 / 场景固定视角 / 道具白底单品）创作最终提示词\n3. 调用 saveChar"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "请为分镜 #20(ID:949)生成关键帧提示词(first_frame_prompt、mid_frame_prompt、mid_frame_time、last_frame_prompt)，严格遵循 keyframe-prompt 技能规范。\n请先调用 read_storyboard_context 读取该分镜的 description(含【镜头N】子镜头)、result、atmosphere、duration、continuity_boundary 及 inherits_first，然后写出关键帧提示词：\n- 每张关键帧都是独立生成的单帧静态画面，只凭资产参考图 + 本条提示词出图，所以每条提示词必须自足（自己交代景别机位构图、@场景名、画面里有哪些 @角色名 及其位置姿态表情、关键 @道具名、光线氛围），禁止写「同上一帧」「保持不变」这类相对描述\n- 绝对图像优先：禁止描写角色的物种、"
+   ],
+   [
+    "readStoryboardContext",
+    "mid_frame_time",
+    "{\n  \"episode\": {\n    \"id\": 27,\n    \"title\": \"中俄百年变局（1）：一个草原强盗的逆袭\",\n    \"episode_number\": 1,\n    \"description\": \"\"\n  },\n  \"aspect_ratio\": \"16:9\",\n  \"composition\": \"横构图\",\n  \"text_spec\": {\n    \"layouts\": [\n      {\n        \"id\": \"h-left-stack\",\n        \"name\": \"左上语境／左中主叙事／左下关键词\",\n        \"slots\": [\n          {\n            \"role\": \"date\",\n            \"zone\": \"context\"\n          },\n          {\n         "
+   ],
+   [
+    "20",
+    "拒绝",
+    "[\n  {\n    \"type\": \"function\",\n    \"function\": {\n      \"name\": \"readCharacters\",\n      \"description\": \"读取当前剧集中的所有角色信息，用于生成角色三视图最终提示词。\",\n      \"parameters\": {\n        \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n        \"type\": \"object\",\n        \"properties\": {},\n        \"additionalProperties\": false,\n        \"required\": []\n      }\n    }\n  },\n  {\n    \"type\": \"function\",\n    \"function\": {\n  "
+   ],
+   [
+    null,
+    "card_ref_unmet",
+    "你是专业的 AI 提示词工程师，负责三类提示词的创作与保存：\n1. 角色/场景/道具的「最终提示词」，供生图直接使用\n2. 分镜的「关键帧提示词」（first_frame_prompt / mid_frame_prompt + mid_frame_time / last_frame_prompt），供关键帧生图直接使用\n3. 分镜的「视频提示词」（video_prompt），供视频生成直接使用\n\n## 图片最终提示词\n\n用户请求会告知要为哪些角色、场景或道具生成最终提示词（附带 character_id / scene_id / prop_id）。\n\n工作流程：\n1. 调用 readCharacters / readScenes / readProps 读取资产信息\n2. 按对应技能规范（角色三视图及造型版本 / 场景固定视角 / 道具白底单品）创作最终提示词\n3. 调用 saveChar"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "请为分镜 #20(ID:949)生成关键帧提示词(first_frame_prompt、mid_frame_prompt、mid_frame_time、last_frame_prompt)，严格遵循 keyframe-prompt 技能规范。\n请先调用 read_storyboard_context 读取该分镜的 description(含【镜头N】子镜头)、result、atmosphere、duration、continuity_boundary 及 inherits_first，然后写出关键帧提示词：\n- 每张关键帧都是独立生成的单帧静态画面，只凭资产参考图 + 本条提示词出图，所以每条提示词必须自足（自己交代景别机位构图、@场景名、画面里有哪些 @角色名 及其位置姿态表情、关键 @道具名、光线氛围），禁止写「同上一帧」「保持不变」这类相对描述\n- 绝对图像优先：禁止描写角色的物种、"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "{\"aspect_ratio\":\"16:9\",\"characters\":[{\"appearance\":\"中年男子，约四十岁，中等偏瘦的身材，方正的长脸，额发向后梳，深色短发齐耳，蓄浓密的褐色络腮胡与八字胡，眼皮微垂，目光疲惫而固执，常驻的冒险者气质。\",\"description\":\"15 世纪末的欧洲航海者，受西班牙国王赞助。本集作为全篇的比较基准出现：他向西横渡大西洋抵达美洲，开启欧洲长达四五百年的航海与殖民时代。\",\"id\":71,\"image_url\":\"static/images/4f02e573-bcaa-4e78-b71d-a21a5a084bda.png\",\"name\":\"哥伦布\",\"reference_images\":[],\"role\":\"航海家 · 西航远征者\",\"styling\":\"深蓝色航海长外套，内穿米白粗布衬衣，腰系棕色皮带，下穿深色窄腿裤与棕色皮靴；胸前挂一枚黄"
+   ],
+   [
+    "updateStoryboard",
+    "mid_frame_time",
+    "{\"first_frame_prompt\":\"\",\"last_frame_prompt\":\"@哥萨克聚落，午后偏黄的地面光，阳光自画面上方偏右强烈斜照，夯土矮墙与木骨泥墙房屋受光泛暖褐，草顶棚架与干草泛金黄，空气带薄尘雾，色调暖褐，16:9 横构图电影感剧照。远景广角平视固定机位，取 @哥萨克聚落 的全景收束，构图分三层：前景为踩踏出的土路与几处低矮灌木，中景为外围夯土矮墙与木栅缺口、墙内的土坯与木骨泥墙房屋、草顶棚架、拴马桩与成捆草料堆，后景为开阔的干草原与地平线上的一线低矮灌木与淡褐林影，几座土屋的草顶上冒着细淡的炊烟，聚落规模不大、没有官署也没有城墙。一名哥萨克男子（粗呢短袍、黑皮帽、腰束布带、及膝皮靴）立在院中夯土场中央，身体略侧向镜头，右手提着一支 @哥萨克火枪 的枪托后段、枪管朝下斜指地面，火枪侧面的火绳夹与横插的木质通条在他的腿侧清楚可见，左手自然垂在体侧，双腿分开站稳、两只"
+   ],
+   [
+    "20",
+    "拒绝",
+    "[\n  {\n    \"type\": \"function\",\n    \"function\": {\n      \"name\": \"readCharacters\",\n      \"description\": \"读取当前剧集中的所有角色信息，用于生成角色三视图最终提示词。\",\n      \"parameters\": {\n        \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n        \"type\": \"object\",\n        \"properties\": {},\n        \"additionalProperties\": false,\n        \"required\": []\n      }\n    }\n  },\n  {\n    \"type\": \"function\",\n    \"function\": {\n  "
+   ],
+   [
+    null,
+    "card_ref_unmet",
+    "你是专业的 AI 提示词工程师，负责三类提示词的创作与保存：\n1. 角色/场景/道具的「最终提示词」，供生图直接使用\n2. 分镜的「关键帧提示词」（first_frame_prompt / mid_frame_prompt + mid_frame_time / last_frame_prompt），供关键帧生图直接使用\n3. 分镜的「视频提示词」（video_prompt），供视频生成直接使用\n\n## 图片最终提示词\n\n用户请求会告知要为哪些角色、场景或道具生成最终提示词（附带 character_id / scene_id / prop_id）。\n\n工作流程：\n1. 调用 readCharacters / readScenes / readProps 读取资产信息\n2. 按对应技能规范（角色三视图及造型版本 / 场景固定视角 / 道具白底单品）创作最终提示词\n3. 调用 saveChar"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "请为分镜 #20(ID:949)生成关键帧提示词(first_frame_prompt、mid_frame_prompt、mid_frame_time、last_frame_prompt)，严格遵循 keyframe-prompt 技能规范。\n请先调用 read_storyboard_context 读取该分镜的 description(含【镜头N】子镜头)、result、atmosphere、duration、continuity_boundary 及 inherits_first，然后写出关键帧提示词：\n- 每张关键帧都是独立生成的单帧静态画面，只凭资产参考图 + 本条提示词出图，所以每条提示词必须自足（自己交代景别机位构图、@场景名、画面里有哪些 @角色名 及其位置姿态表情、关键 @道具名、光线氛围），禁止写「同上一帧」「保持不变」这类相对描述\n- 绝对图像优先：禁止描写角色的物种、"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "{\"aspect_ratio\":\"16:9\",\"characters\":[{\"appearance\":\"中年男子，约四十岁，中等偏瘦的身材，方正的长脸，额发向后梳，深色短发齐耳，蓄浓密的褐色络腮胡与八字胡，眼皮微垂，目光疲惫而固执，常驻的冒险者气质。\",\"description\":\"15 世纪末的欧洲航海者，受西班牙国王赞助。本集作为全篇的比较基准出现：他向西横渡大西洋抵达美洲，开启欧洲长达四五百年的航海与殖民时代。\",\"id\":71,\"image_url\":\"static/images/4f02e573-bcaa-4e78-b71d-a21a5a084bda.png\",\"name\":\"哥伦布\",\"reference_images\":[],\"role\":\"航海家 · 西航远征者\",\"styling\":\"深蓝色航海长外套，内穿米白粗布衬衣，腰系棕色皮带，下穿深色窄腿裤与棕色皮靴；胸前挂一枚黄"
+   ],
+   [
+    "updateStoryboard",
+    "mid_frame_time",
+    "{\"first_frame_prompt\":\"\",\"last_frame_prompt\":\"@哥萨克聚落，午后偏黄的地面光，阳光自画面上方偏右强烈斜照，夯土矮墙与木骨泥墙房屋受光泛暖褐，草顶棚架与干草泛金黄，空气带薄尘雾，色调暖褐，16:9 横构图电影感剧照。远景广角平视固定机位，取 @哥萨克聚落 的全景收束，构图分三层：前景为踩踏出的土路与几处低矮灌木，中景为外围夯土矮墙与木栅缺口、墙内的土坯与木骨泥墙房屋、草顶棚架、拴马桩与成捆草料堆，后景为开阔的干草原与地平线上的一线低矮灌木与淡褐林影，几座土屋的草顶上冒着细淡的炊烟，聚落规模不大、没有官署也没有城墙。一名哥萨克男子（粗呢短袍、黑皮帽、腰束布带、及膝皮靴）立在院中夯土场中央，身体略侧向镜头，右手提着一支 @哥萨克火枪 的枪托后段、枪管朝下斜指地面，火枪侧面的火绳夹与横插的木质通条在他的腿侧清楚可见，左手自然垂在体侧，双腿分开站稳、两只"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "已保存分镜 #20（ID:949）的关键帧提示词：\n\n- **first_frame_prompt**：留空。本镜组合为 C（图层段▣5s → 生成段▶6.5s），首帧是锁定衔接帧（继承上一镜 #19 图层段末帧：俯拍地图式全景），不出图。\n- **mid_frame_prompt + mid_frame_time=3秒**：对应生成段中的「聚落院内中景」——门旁背身提 @哥萨克火枪 的哥萨克、两名扛捆包的哥萨克（劫掠战利品形态），覆盖设计卡「劫掠的具体形态」信息点；3 秒落在生成段 6.5 秒的合法区间内。\n- **last_frame_prompt**：与尾帧设计卡一致——聚落全景收束，一人院中右手提火枪，另一人牵驮货马、手按捆包，构图稳定、可被下一镜 #21 直接承接。\n\n两条提示词均自足、@ 到全部参考资产（@哥萨克聚落、@哥萨克火枪），16:9 横构图收尾，未写任何角色外观属性与"
+   ]
+  ],
+  "after_kf": {
+   "first_frame_prompt": "",
+   "mid_frame_prompt": "@哥萨克聚落，午后偏黄的地面光，阳光自画面上方偏右强烈斜照，夯土地面被照得发亮，草色泛金黄，空气带薄尘雾，色调暖褐，16:9 横构图电影感剧照。中景平视固定机位，取 @哥萨克聚落 的院内：画面左侧为一座土坯与木骨泥墙低矮房屋的墙面与草顶棚架，棚架下成捆干草与草料堆摞到齐腰高，房屋门前立着一根拴马桩、桩上垂着一段麻绳，画面右侧是踩实的夯土场与一段外围木栅，后景为开阔干草原与一线低矮灌木。一名哥萨克男子（粗呢短袍、黑皮帽、腰束布带、及膝皮靴）背对镜头站在土屋门旁，右手提着一支 @哥萨克火枪 的枪托后段、枪管斜指向地面，火枪侧面的火绳夹与药池朝向镜头一侧清楚可见，左手自然垂在体侧，双腿分开站稳、两只皮靴踩在夯土地面上可见，肩背放松、头微微偏向门内。院落中部另有两名哥萨克男子（同款粗呢短袍、黑皮帽、腰束布带）在草料堆前各自扛着一个用粗麻绳扎紧的捆包，一人屈膝半蹲把捆包卸到墙根、双手按在捆包顶面上、双腿屈膝蹲稳、两只靴底落在地面可见，另一人侧身立着、捆包压在肩背、双手在胸前扶住捆包底沿、双腿前后错开站稳，两人侧脸朝向画面左侧；墙根的木栅立柱旁斜靠着一支 @哥萨克火枪，枪管朝上，草顶边缘冒着细淡的炊烟。午后强光把木栅与草顶染成暖橙，院内暗部沉入褐灰，人物完整入画。16:9 横构图电影感剧照，单帧静态画面",
+   "last_frame_prompt": "@哥萨克聚落，午后偏黄的地面光，阳光自画面上方偏右强烈斜照，夯土矮墙与木骨泥墙房屋受光泛暖褐，草顶棚架与干草泛金黄，空气带薄尘雾，色调暖褐，16:9 横构图电影感剧照。远景广角平视固定机位，取 @哥萨克聚落 的全景收束，构图分三层：前景为踩踏出的土路与几处低矮灌木，中景为外围夯土矮墙与木栅缺口、墙内的土坯与木骨泥墙房屋、草顶棚架、拴马桩与成捆草料堆，后景为开阔的干草原与地平线上的一线低矮灌木与淡褐林影，几座土屋的草顶上冒着细淡的炊烟，聚落规模不大、没有官署也没有城墙。一名哥萨克男子（粗呢短袍、黑皮帽、腰束布带、及膝皮靴）立在院中夯土场中央，身体略侧向镜头，右手提着一支 @哥萨克火枪 的枪托后段、枪管朝下斜指地面，火枪侧面的火绳夹与横插的木质通条在他的腿侧清楚可见，左手自然垂在体侧，双腿分开站稳、两只皮靴踏在夯土地上可见，下颌微抬、目光望向画外右前方的草原。聚落外的土路上另一名哥萨克男子（同款粗呢短袍、黑皮帽、腰束布带）牵着一匹驮货马停在路边，右手握着缰绳、左手按在驮马鞍侧鼓起的捆包上，捆包用粗麻绳扎紧、皮毛面朝外，双腿站定，马匹四腿立在土路面上、马头朝向画面右方。拴马桩旁堆着成捆干草与住户家当，草顶棚架下另有两人扛着的捆包摞在墙根，墙根还有一支 @哥萨克火枪 斜靠在木栅立柱旁、枪管朝上。人、马、火枪与全部院落设施完整入画，四周是开阔干草原，画面平稳开阔、层次清晰，可被下一镜直接承接。16:9 横构图电影感剧照，单帧静态画面",
+   "mid_frame_time": 3.0,
+   "video_prompt": "",
+   "field_saved_at": "{\"narration_text\":1794549338,\"design_card\":1794555735,\"first_frame_prompt\":1794665038,\"mid_frame_prompt\":1794665038,\"mid_frame_time\":1794665038,\"last_frame_prompt\":1794665038,\"video_prompt\":1794664545}"
+  },
+  "video_task": 3457,
+  "video_wall_s": 45.1,
+  "video_status": "completed",
+  "video_error": null,
+  "video_params": {
+   "kind": "video_prompts",
+   "progress": {
+    "completed": 1,
+    "failed": 0,
+    "total": 1
+   },
+   "storyboardIds": [
+    949
+   ],
+   "configId": 1,
+   "stage": "video_prompts",
+   "model_used": {
+    "config_id": 1,
+    "name": "GLM 5.3 (local)",
+    "provider": "openai",
+    "model": "glm-5.3-flash",
+    "vision": false
+   },
+   "restart": {
+    "kind": "video_prompts",
+    "args": {
+     "episodeId": 27,
+     "dramaId": 20,
+     "opts": {},
+     "storyboardIds": [
+      949
+     ]
+    }
+   },
+   "reasoning_chars": 1680,
+   "output_text": "分镜 #20：已为分镜 #20（ID:949）生成并保存 video_prompt。\n\n结构说明（组合 C，图层段 5s → 生成段 6.5s）：\n\n- **0-1秒 空镜复述段**：逐字复述锁定衔接帧 caption 的画面（俯拍地图全景、两条粗蓝折线与箭头、左下红框浅褐多边形、四周留白），镜头静止、无人物、无切镜、无过渡写法。\n- **1-3秒**：切到 @哥萨克聚落 外围缺口远景，一队四人骑马持 @哥萨克火枪 穿过夯土矮墙缺口，逐人写明四肢与持枪状态。\n- **3-6秒**：切到院内中景，对齐 mid_frame_time=3 与中关键帧（门旁男子右手提枪、火绳夹与药池可见；草料堆前两人扛捆包卸货），体现「劫掠所得家当」。\n- **6-9秒**：院中提枪首领近观 + 土路旁牵驮货马者（左手按捆包、皮毛面朝外），衔接尾帧要素。\n- **9-11.5秒**：切回聚落全景收束在尾关键帧画面（全景三层构图、首领右手提枪、驮货马与捆包、墙根火枪、炊烟），末段无切镜，可被下一镜直接承接。\n\n全片未写任何角色外观属性，所有资产均以 @哥萨克聚落 / @哥萨克火枪 引用，旁白未混入提示词。"
+  },
+  "video_obs": {
+   "works": [
+    {
+     "id": 780,
+     "stage": "video_prompts",
+     "storyboard_id": 949,
+     "storyboard_number": 20,
+     "status": "completed",
+     "work_ms": 42763,
+     "model_ms": 42241,
+     "queue_ms": 4,
+     "call_count": 3,
+     "error_msg": null
+    }
+   ],
+   "calls": [
+    {
+     "id": 2536,
+     "kind": "llm",
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "http_status": 200,
+     "duration_ms": 2006,
+     "queue_ms": 1,
+     "prompt_tokens": 24346,
+     "completion_tokens": 7,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2537,
+     "kind": "llm",
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "http_status": 200,
+     "duration_ms": 32606,
+     "queue_ms": 1,
+     "prompt_tokens": 66260,
+     "completion_tokens": 2153,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2538,
+     "kind": "llm",
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "http_status": 200,
+     "duration_ms": 7629,
+     "queue_ms": 2,
+     "prompt_tokens": 67819,
+     "completion_tokens": 360,
+     "finish_reason": "stop",
+     "error_msg": null
+    }
+   ],
+   "call_count": 3,
+   "llm_calls": 3,
+   "max_prompt_tokens": 67819,
+   "total_prompt_tokens": 158425,
+   "total_completion_tokens": 2520,
+   "models": [
+    [
+     1,
+     "GLM 5.3 (local)",
+     "glm-5.3-flash"
+    ]
+   ],
+   "request_params": [
+    {
+     "max_tokens": "131072",
+     "model": "\"glm-5.3-flash\"",
+     "reasoning_effort": "\"low\"",
+     "stream": "true"
+    },
+    {}
+   ]
+  },
+  "video_rejections": [
+   [
+    "20",
+    "拒绝",
+    "[\n  {\n    \"type\": \"function\",\n    \"function\": {\n      \"name\": \"readCharacters\",\n      \"description\": \"读取当前剧集中的所有角色信息，用于生成角色三视图最终提示词。\",\n      \"parameters\": {\n        \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n        \"type\": \"object\",\n        \"properties\": {},\n        \"additionalProperties\": false,\n        \"required\": []\n      }\n    }\n  },\n  {\n    \"type\": \"function\",\n    \"function\": {\n  "
+   ],
+   [
+    null,
+    "card_ref_unmet",
+    "你是专业的 AI 提示词工程师，负责三类提示词的创作与保存：\n1. 角色/场景/道具的「最终提示词」，供生图直接使用\n2. 分镜的「关键帧提示词」（first_frame_prompt / mid_frame_prompt + mid_frame_time / last_frame_prompt），供关键帧生图直接使用\n3. 分镜的「视频提示词」（video_prompt），供视频生成直接使用\n\n## 图片最终提示词\n\n用户请求会告知要为哪些角色、场景或道具生成最终提示词（附带 character_id / scene_id / prop_id）。\n\n工作流程：\n1. 调用 readCharacters / readScenes / readProps 读取资产信息\n2. 按对应技能规范（角色三视图及造型版本 / 场景固定视角 / 道具白底单品）创作最终提示词\n3. 调用 saveChar"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "请为分镜 #20(ID:949)生成视频提示词(video_prompt)。视频模型:MiniMax H3 INT8 (ComfyUI 102) (h3-jobs),请根据该模型的特性和时长限制生成。\n请先调用 read_storyboard_context 获取该分镜的画面描述(含【镜头N】子镜头与台词/旁白)、氛围、时长及三条关键帧提示词(first_frame_prompt/mid_frame_prompt/mid_frame_time/last_frame_prompt)与 locked_frames(该镜被图层段衔接帧锁死的槽位、取景与画面描述 caption)，据此生成 video_prompt(第一行是信息头：列出该分镜出场的人物与场景，用 @角色名/@场景名 引用；之后按 3 秒分段换行、用 @角色名/@场景名/@道具名 引用参考素材；段落内允许多镜头切镜，段与段可以是不同"
+   ],
+   [
+    "readStoryboardContext",
+    "mid_frame_time",
+    "{\n  \"episode\": {\n    \"id\": 27,\n    \"title\": \"中俄百年变局（1）：一个草原强盗的逆袭\",\n    \"episode_number\": 1,\n    \"description\": \"\"\n  },\n  \"aspect_ratio\": \"16:9\",\n  \"composition\": \"横构图\",\n  \"text_spec\": {\n    \"layouts\": [\n      {\n        \"id\": \"h-left-stack\",\n        \"name\": \"左上语境／左中主叙事／左下关键词\",\n        \"slots\": [\n          {\n            \"role\": \"date\",\n            \"zone\": \"context\"\n          },\n          {\n         "
+   ],
+   [
+    "20",
+    "拒绝",
+    "[\n  {\n    \"type\": \"function\",\n    \"function\": {\n      \"name\": \"readCharacters\",\n      \"description\": \"读取当前剧集中的所有角色信息，用于生成角色三视图最终提示词。\",\n      \"parameters\": {\n        \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n        \"type\": \"object\",\n        \"properties\": {},\n        \"additionalProperties\": false,\n        \"required\": []\n      }\n    }\n  },\n  {\n    \"type\": \"function\",\n    \"function\": {\n  "
+   ],
+   [
+    null,
+    "card_ref_unmet",
+    "你是专业的 AI 提示词工程师，负责三类提示词的创作与保存：\n1. 角色/场景/道具的「最终提示词」，供生图直接使用\n2. 分镜的「关键帧提示词」（first_frame_prompt / mid_frame_prompt + mid_frame_time / last_frame_prompt），供关键帧生图直接使用\n3. 分镜的「视频提示词」（video_prompt），供视频生成直接使用\n\n## 图片最终提示词\n\n用户请求会告知要为哪些角色、场景或道具生成最终提示词（附带 character_id / scene_id / prop_id）。\n\n工作流程：\n1. 调用 readCharacters / readScenes / readProps 读取资产信息\n2. 按对应技能规范（角色三视图及造型版本 / 场景固定视角 / 道具白底单品）创作最终提示词\n3. 调用 saveChar"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "请为分镜 #20(ID:949)生成视频提示词(video_prompt)。视频模型:MiniMax H3 INT8 (ComfyUI 102) (h3-jobs),请根据该模型的特性和时长限制生成。\n请先调用 read_storyboard_context 获取该分镜的画面描述(含【镜头N】子镜头与台词/旁白)、氛围、时长及三条关键帧提示词(first_frame_prompt/mid_frame_prompt/mid_frame_time/last_frame_prompt)与 locked_frames(该镜被图层段衔接帧锁死的槽位、取景与画面描述 caption)，据此生成 video_prompt(第一行是信息头：列出该分镜出场的人物与场景，用 @角色名/@场景名 引用；之后按 3 秒分段换行、用 @角色名/@场景名/@道具名 引用参考素材；段落内允许多镜头切镜，段与段可以是不同"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "{\"aspect_ratio\":\"16:9\",\"characters\":[{\"appearance\":\"中年男子，约四十岁，中等偏瘦的身材，方正的长脸，额发向后梳，深色短发齐耳，蓄浓密的褐色络腮胡与八字胡，眼皮微垂，目光疲惫而固执，常驻的冒险者气质。\",\"description\":\"15 世纪末的欧洲航海者，受西班牙国王赞助。本集作为全篇的比较基准出现：他向西横渡大西洋抵达美洲，开启欧洲长达四五百年的航海与殖民时代。\",\"id\":71,\"image_url\":\"static/images/4f02e573-bcaa-4e78-b71d-a21a5a084bda.png\",\"name\":\"哥伦布\",\"reference_images\":[],\"role\":\"航海家 · 西航远征者\",\"styling\":\"深蓝色航海长外套，内穿米白粗布衬衣，腰系棕色皮带，下穿深色窄腿裤与棕色皮靴；胸前挂一枚黄"
+   ],
+   [
+    "20",
+    "拒绝",
+    "[\n  {\n    \"type\": \"function\",\n    \"function\": {\n      \"name\": \"readCharacters\",\n      \"description\": \"读取当前剧集中的所有角色信息，用于生成角色三视图最终提示词。\",\n      \"parameters\": {\n        \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n        \"type\": \"object\",\n        \"properties\": {},\n        \"additionalProperties\": false,\n        \"required\": []\n      }\n    }\n  },\n  {\n    \"type\": \"function\",\n    \"function\": {\n  "
+   ],
+   [
+    null,
+    "card_ref_unmet",
+    "你是专业的 AI 提示词工程师，负责三类提示词的创作与保存：\n1. 角色/场景/道具的「最终提示词」，供生图直接使用\n2. 分镜的「关键帧提示词」（first_frame_prompt / mid_frame_prompt + mid_frame_time / last_frame_prompt），供关键帧生图直接使用\n3. 分镜的「视频提示词」（video_prompt），供视频生成直接使用\n\n## 图片最终提示词\n\n用户请求会告知要为哪些角色、场景或道具生成最终提示词（附带 character_id / scene_id / prop_id）。\n\n工作流程：\n1. 调用 readCharacters / readScenes / readProps 读取资产信息\n2. 按对应技能规范（角色三视图及造型版本 / 场景固定视角 / 道具白底单品）创作最终提示词\n3. 调用 saveChar"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "请为分镜 #20(ID:949)生成视频提示词(video_prompt)。视频模型:MiniMax H3 INT8 (ComfyUI 102) (h3-jobs),请根据该模型的特性和时长限制生成。\n请先调用 read_storyboard_context 获取该分镜的画面描述(含【镜头N】子镜头与台词/旁白)、氛围、时长及三条关键帧提示词(first_frame_prompt/mid_frame_prompt/mid_frame_time/last_frame_prompt)与 locked_frames(该镜被图层段衔接帧锁死的槽位、取景与画面描述 caption)，据此生成 video_prompt(第一行是信息头：列出该分镜出场的人物与场景，用 @角色名/@场景名 引用；之后按 3 秒分段换行、用 @角色名/@场景名/@道具名 引用参考素材；段落内允许多镜头切镜，段与段可以是不同"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "{\"aspect_ratio\":\"16:9\",\"characters\":[{\"appearance\":\"中年男子，约四十岁，中等偏瘦的身材，方正的长脸，额发向后梳，深色短发齐耳，蓄浓密的褐色络腮胡与八字胡，眼皮微垂，目光疲惫而固执，常驻的冒险者气质。\",\"description\":\"15 世纪末的欧洲航海者，受西班牙国王赞助。本集作为全篇的比较基准出现：他向西横渡大西洋抵达美洲，开启欧洲长达四五百年的航海与殖民时代。\",\"id\":71,\"image_url\":\"static/images/4f02e573-bcaa-4e78-b71d-a21a5a084bda.png\",\"name\":\"哥伦布\",\"reference_images\":[],\"role\":\"航海家 · 西航远征者\",\"styling\":\"深蓝色航海长外套，内穿米白粗布衬衣，腰系棕色皮带，下穿深色窄腿裤与棕色皮靴；胸前挂一枚黄"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "已为分镜 #20（ID:949）生成并保存 video_prompt。\n\n结构说明（组合 C，图层段 5s → 生成段 6.5s）：\n\n- **0-1秒 空镜复述段**：逐字复述锁定衔接帧 caption 的画面（俯拍地图全景、两条粗蓝折线与箭头、左下红框浅褐多边形、四周留白），镜头静止、无人物、无切镜、无过渡写法。\n- **1-3秒**：切到 @哥萨克聚落 外围缺口远景，一队四人骑马持 @哥萨克火枪 穿过夯土矮墙缺口，逐人写明四肢与持枪状态。\n- **3-6秒**：切到院内中景，对齐 mid_frame_time=3 与中关键帧（门旁男子右手提枪、火绳夹与药池可见；草料堆前两人扛捆包卸货），体现「劫掠所得家当」。\n- **6-9秒**：院中提枪首领近观 + 土路旁牵驮货马者（左手按捆包、皮毛面朝外），衔接尾帧要素。\n- **9-11.5秒**：切回聚落全景收束在尾关键帧画面（全景三层构图"
+   ]
+  ],
+  "after_vp": {
+   "first_frame_prompt": "",
+   "mid_frame_prompt": "@哥萨克聚落，午后偏黄的地面光，阳光自画面上方偏右强烈斜照，夯土地面被照得发亮，草色泛金黄，空气带薄尘雾，色调暖褐，16:9 横构图电影感剧照。中景平视固定机位，取 @哥萨克聚落 的院内：画面左侧为一座土坯与木骨泥墙低矮房屋的墙面与草顶棚架，棚架下成捆干草与草料堆摞到齐腰高，房屋门前立着一根拴马桩、桩上垂着一段麻绳，画面右侧是踩实的夯土场与一段外围木栅，后景为开阔干草原与一线低矮灌木。一名哥萨克男子（粗呢短袍、黑皮帽、腰束布带、及膝皮靴）背对镜头站在土屋门旁，右手提着一支 @哥萨克火枪 的枪托后段、枪管斜指向地面，火枪侧面的火绳夹与药池朝向镜头一侧清楚可见，左手自然垂在体侧，双腿分开站稳、两只皮靴踩在夯土地面上可见，肩背放松、头微微偏向门内。院落中部另有两名哥萨克男子（同款粗呢短袍、黑皮帽、腰束布带）在草料堆前各自扛着一个用粗麻绳扎紧的捆包，一人屈膝半蹲把捆包卸到墙根、双手按在捆包顶面上、双腿屈膝蹲稳、两只靴底落在地面可见，另一人侧身立着、捆包压在肩背、双手在胸前扶住捆包底沿、双腿前后错开站稳，两人侧脸朝向画面左侧；墙根的木栅立柱旁斜靠着一支 @哥萨克火枪，枪管朝上，草顶边缘冒着细淡的炊烟。午后强光把木栅与草顶染成暖橙，院内暗部沉入褐灰，人物完整入画。16:9 横构图电影感剧照，单帧静态画面",
+   "last_frame_prompt": "@哥萨克聚落，午后偏黄的地面光，阳光自画面上方偏右强烈斜照，夯土矮墙与木骨泥墙房屋受光泛暖褐，草顶棚架与干草泛金黄，空气带薄尘雾，色调暖褐，16:9 横构图电影感剧照。远景广角平视固定机位，取 @哥萨克聚落 的全景收束，构图分三层：前景为踩踏出的土路与几处低矮灌木，中景为外围夯土矮墙与木栅缺口、墙内的土坯与木骨泥墙房屋、草顶棚架、拴马桩与成捆草料堆，后景为开阔的干草原与地平线上的一线低矮灌木与淡褐林影，几座土屋的草顶上冒着细淡的炊烟，聚落规模不大、没有官署也没有城墙。一名哥萨克男子（粗呢短袍、黑皮帽、腰束布带、及膝皮靴）立在院中夯土场中央，身体略侧向镜头，右手提着一支 @哥萨克火枪 的枪托后段、枪管朝下斜指地面，火枪侧面的火绳夹与横插的木质通条在他的腿侧清楚可见，左手自然垂在体侧，双腿分开站稳、两只皮靴踏在夯土地上可见，下颌微抬、目光望向画外右前方的草原。聚落外的土路上另一名哥萨克男子（同款粗呢短袍、黑皮帽、腰束布带）牵着一匹驮货马停在路边，右手握着缰绳、左手按在驮马鞍侧鼓起的捆包上，捆包用粗麻绳扎紧、皮毛面朝外，双腿站定，马匹四腿立在土路面上、马头朝向画面右方。拴马桩旁堆着成捆干草与住户家当，草顶棚架下另有两人扛着的捆包摞在墙根，墙根还有一支 @哥萨克火枪 斜靠在木栅立柱旁、枪管朝上。人、马、火枪与全部院落设施完整入画，四周是开阔干草原，画面平稳开阔、层次清晰，可被下一镜直接承接。16:9 横构图电影感剧照，单帧静态画面",
+   "mid_frame_time": 3.0,
+   "video_prompt": "场景：@哥萨克聚落；道具：@哥萨克火枪。\n0-1秒：俯拍地图式全景，米黄底色上分布浅蓝细线水系与淡灰边界线，画面中部两条粗蓝折线自上方延伸至下方，左端带箭头指向左下红框区域，右端箭头指向右下浅色地块，左下红框内为浅褐多边形，右下与左上各有一块浅米色陆地轮廓，光线均匀无阴影，留白在四周，镜头静止，画面无人。\n1-3秒：@哥萨克聚落，切到聚落外围夯土矮墙缺口处的远景广角平视固定机位，前景为踩踏出的土路与几处低矮灌木，中景为外围夯土矮墙与木栅缺口、墙内土坯与木骨泥墙低矮房屋及草顶棚架、拴马桩与成捆草料堆，后景为开阔干草原与地平线上一线低矮灌木与淡褐林影，聚落规模不大、没有官署也没有城墙；夯土矮墙缺口处，一队骑马持火枪的人（皮帽、粗呢短袍、腰束布带，共四人）正从土路上穿过缺口：为首一人端坐马背、双手握着缰绳搁在鞍前，双腿垂在马腹两侧、双脚踩在马镫上，肩背斜挎一支 @哥萨克火枪、火绳夹朝外、枪管斜指上方，马匹四腿跨步前行、马头朝向画面右侧；身后三骑依次成列，各自双手持缰、双腿垂在马腹两侧，第二骑肩背一支 @哥萨克火枪、枪口朝向身后，马匹四腿迈步；午后偏黄的地面光自画面上方偏右强烈斜照，草色泛金黄，空气带薄尘雾。\n3-6秒：@哥萨克聚落，切到聚落院内中景平视固定机位，画面左侧是一座土坯与木骨泥墙低矮房屋的墙面与草顶棚架，棚架下成捆干草与草料堆摞到齐腰高，房屋门前立着一根拴马桩、桩上垂着一段麻绳，画面右侧是踩实的夯土场与一段外围木栅，后景为开阔干草原与一线低矮灌木；一名哥萨克男子（粗呢短袍、黑皮帽、腰束布带、及膝皮靴）背对镜头站在土屋门旁，右手提着一支 @哥萨克火枪 的枪托后段、枪管斜指向地面，火枪侧面的火绳夹与药池朝向镜头一侧清楚可见，左手自然垂在体侧，双腿分开站稳、两只皮靴踩在夯土地面上可见，肩背放松、头微微偏向门内；院落中部另有两名哥萨克男子（同款粗呢短袍、黑皮帽、腰束布带）各自扛着一个用粗麻绳扎紧的捆包向墙根走来，一人屈膝半蹲把捆包卸到墙根、双手按在捆包顶面上、双腿屈膝蹲稳、两只靴底落在地面可见，另一人侧身立着、捆包压在肩背、双手在胸前扶住捆包底沿、双腿前后错开站稳，两人侧脸朝向画面左侧；墙根的木栅立柱旁斜靠着一支 @哥萨克火枪，枪管朝上，草顶边缘冒着细淡的炊烟；午后强光把木栅与草顶染成暖橙，院内暗部沉入褐灰。\n6-9秒：@哥萨克聚落，切到院内夯土场中景平视固定机位，画面左侧为草顶棚架与成捆干草，画面中部为踩实的夯土场与拴马桩，画面右侧是土路与后景一线低矮灌木；一名哥萨克男子（粗呢短袍、黑皮帽、腰束布带、及膝皮靴）立在夯土场中央，身体略侧向镜头，右手提着一支 @哥萨克火枪 的枪托后段、枪管朝下斜指地面，火枪侧面的火绳夹与横插的木质通条在他的腿侧清楚可见，左手自然垂在体侧，双腿分开站稳、两只皮靴踏在夯土地上可见，下颌微抬、目光望向画外右前方的草原；聚落外的土路上另一名哥萨克男子（同款粗呢短袍、黑皮帽、腰束布带）牵着一匹驮货马停在路边，右手握着缰绳、左手按在驮马鞍侧鼓起的捆包上、捆包用粗麻绳扎紧、皮毛面朝外，双腿站定，马匹四腿立在土路面上、马头朝向画面右方；拴马桩旁堆着成捆干草与住户家当，午后偏黄的地面光把夯土墙照得发亮。\n9-11.5秒：@哥萨克聚落，切回聚落全景远景广角平视固定机位，构图分三层：前景为踩踏出的土路与几处低矮灌木，中景为外围夯土矮墙与木栅缺口、墙内的土坯与木骨泥墙房屋、草顶棚架、拴马桩与成捆草料堆，后景为开阔的干草原与地平线上的一线低矮灌木与淡褐林影，几座土屋的草顶上冒着细淡的炊烟，聚落规模不大、没有官署也没有城墙；院内夯土场中央那名哥萨克男子（粗呢短袍、黑皮帽、腰束布带、及膝皮靴）身体略侧向镜头，右手提着 @哥萨克火枪 的枪托后段、枪管朝下斜指地面，火枪侧面的火绳夹与横插的木质通条在腿侧清楚可见，左手自然垂在体侧，双腿分开站稳、两只皮靴踏在夯土地上可见，下颌微抬、目光望向画外右前方的草原；聚落外的土路上另一名哥萨克男子（同款粗呢短袍、黑皮帽、腰束布带）牵着一匹驮货马停在路边，右手握着缰绳、左手按在驮马鞍侧鼓起的捆包上，捆包用粗麻绳扎紧、皮毛面朝外，双腿站定，马匹四腿立在土路面上、马头朝向画面右方；草顶棚架下两个捆包摞在墙根，墙根另有一支 @哥萨克火枪 斜靠在木栅立柱旁、枪管朝上；午后偏黄的地面光把夯土矮墙与草顶棚架镀成暖褐，四周是开阔干草原，人、马、火枪与全部院落设施完整入画，画面平稳开阔、层次清晰。",
+   "field_saved_at": "{\"narration_text\":1794549338,\"design_card\":1794555735,\"first_frame_prompt\":1794665038,\"mid_frame_prompt\":1794665038,\"mid_frame_time\":1794665038,\"last_frame_prompt\":1794665038,\"video_prompt\":1794665082}"
+  }
+ },
+ "987": {
+  "keyframe_task": 3458,
+  "keyframe_wall_s": 30.0,
+  "keyframe_status": "completed",
+  "keyframe_error": null,
+  "keyframe_params": {
+   "kind": "keyframe_prompts",
+   "progress": {
+    "completed": 1,
+    "failed": 0,
+    "total": 1
+   },
+   "storyboardIds": [
+    987
+   ],
+   "scope": {
+    "included": [
+     {
+      "storyboard_id": 987,
+      "storyboard_number": 57
+     }
+    ],
+    "excluded": []
+   },
+   "configId": 1,
+   "stage": "keyframe_prompts",
+   "model_used": {
+    "config_id": 1,
+    "name": "GLM 5.3 (local)",
+    "provider": "openai",
+    "model": "glm-5.3-flash",
+    "vision": false
+   },
+   "restart": {
+    "kind": "keyframe_prompts",
+    "args": {
+     "episodeId": 27,
+     "dramaId": 20,
+     "opts": {},
+     "storyboardIds": [
+      987
+     ]
+    }
+   },
+   "reasoning_chars": 373,
+   "output_text": "分镜 #57：读取完成。分镜 #987 组合为 C（▣4.5s → ▶6.5s）：首帧是图层段衔接帧（locked_frames slot=first，继承自上一镜 #56 地图层末帧），**不写 first_frame_prompt**；只需写中帧与尾帧。生成段时长 6.5 秒，取中间帧落在 3.0 秒（栈桥端头这一最重要的子镜头起始瞬间）。分镜 #987 的关键帧提示词已保存完成：\n\n- **first_frame_prompt**：留空。本镜为组合 C（图层段 ▣4.5s → 生成段 ▶6.5s），首帧由图层段末帧继承锁定（那张领地范围图的衔接帧），不单独出图。\n- **mid_frame_prompt + mid_frame_time = 3.0 秒**：生成段内最重要的子镜头起始瞬间——小叶立于木栈桥端头，右手提 @哥萨克火枪 垂在腿侧、左手虚扶平底船船舷，身后哥萨克长队沿跳板登船，清晨薄雾淡金光，完整交代「人数众多的远征」而非小股劫掠。\n- **last_frame_prompt**：与 result 一致的收束画面——平底船队已泊成一列、满载行装与原木，小叶立于最前那艘船的船尾横板、右手握枪身左手扶舵桨，岸上仍有数人登船，画面稳定清晰，可被下一镜（#58，组合 A 图层段）直接承接。\n\n三条提示词均自足（场景、机位景别、四肢状态、道具辨识要素、光线氛围齐全），角色一律以 @名字 指代，未含任何外观描写，且已逐条 @ 到设计卡 gen_plan 的全部参考素材（@叶尔马克·齐莫菲叶维奇、@索利卡姆斯克、@哥萨克火枪）。"
+  },
+  "keyframe_obs": {
+   "works": [
+    {
+     "id": 781,
+     "stage": "keyframe_prompts",
+     "storyboard_id": 987,
+     "storyboard_number": 57,
+     "status": "completed",
+     "work_ms": 29918,
+     "model_ms": 29420,
+     "queue_ms": 4,
+     "call_count": 3,
+     "error_msg": null
+    }
+   ],
+   "calls": [
+    {
+     "id": 2539,
+     "kind": "llm",
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "http_status": 200,
+     "duration_ms": 1632,
+     "queue_ms": 1,
+     "prompt_tokens": 23689,
+     "completion_tokens": 7,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2540,
+     "kind": "llm",
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "http_status": 200,
+     "duration_ms": 20254,
+     "queue_ms": 1,
+     "prompt_tokens": 63412,
+     "completion_tokens": 1193,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2541,
+     "kind": "llm",
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "http_status": 200,
+     "duration_ms": 7534,
+     "queue_ms": 2,
+     "prompt_tokens": 64495,
+     "completion_tokens": 328,
+     "finish_reason": "stop",
+     "error_msg": null
+    }
+   ],
+   "call_count": 3,
+   "llm_calls": 3,
+   "max_prompt_tokens": 64495,
+   "total_prompt_tokens": 151596,
+   "total_completion_tokens": 1528,
+   "models": [
+    [
+     1,
+     "GLM 5.3 (local)",
+     "glm-5.3-flash"
+    ]
+   ],
+   "request_params": [
+    {
+     "max_tokens": "131072",
+     "model": "\"glm-5.3-flash\"",
+     "reasoning_effort": "\"low\"",
+     "stream": "true"
+    },
+    {}
+   ]
+  },
+  "keyframe_rejections": [
+   [
+    "20",
+    "拒绝",
+    "[\n  {\n    \"type\": \"function\",\n    \"function\": {\n      \"name\": \"readCharacters\",\n      \"description\": \"读取当前剧集中的所有角色信息，用于生成角色三视图最终提示词。\",\n      \"parameters\": {\n        \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n        \"type\": \"object\",\n        \"properties\": {},\n        \"additionalProperties\": false,\n        \"required\": []\n      }\n    }\n  },\n  {\n    \"type\": \"function\",\n    \"function\": {\n  "
+   ],
+   [
+    null,
+    "card_ref_unmet",
+    "你是专业的 AI 提示词工程师，负责三类提示词的创作与保存：\n1. 角色/场景/道具的「最终提示词」，供生图直接使用\n2. 分镜的「关键帧提示词」（first_frame_prompt / mid_frame_prompt + mid_frame_time / last_frame_prompt），供关键帧生图直接使用\n3. 分镜的「视频提示词」（video_prompt），供视频生成直接使用\n\n## 图片最终提示词\n\n用户请求会告知要为哪些角色、场景或道具生成最终提示词（附带 character_id / scene_id / prop_id）。\n\n工作流程：\n1. 调用 readCharacters / readScenes / readProps 读取资产信息\n2. 按对应技能规范（角色三视图及造型版本 / 场景固定视角 / 道具白底单品）创作最终提示词\n3. 调用 saveChar"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "请为分镜 #57(ID:987)生成关键帧提示词(first_frame_prompt、mid_frame_prompt、mid_frame_time、last_frame_prompt)，严格遵循 keyframe-prompt 技能规范。\n请先调用 read_storyboard_context 读取该分镜的 description(含【镜头N】子镜头)、result、atmosphere、duration、continuity_boundary 及 inherits_first，然后写出关键帧提示词：\n- 每张关键帧都是独立生成的单帧静态画面，只凭资产参考图 + 本条提示词出图，所以每条提示词必须自足（自己交代景别机位构图、@场景名、画面里有哪些 @角色名 及其位置姿态表情、关键 @道具名、光线氛围），禁止写「同上一帧」「保持不变」这类相对描述\n- 绝对图像优先：禁止描写角色的物种、"
+   ],
+   [
+    "readStoryboardContext",
+    "mid_frame_time",
+    "{\n  \"episode\": {\n    \"id\": 27,\n    \"title\": \"中俄百年变局（1）：一个草原强盗的逆袭\",\n    \"episode_number\": 1,\n    \"description\": \"\"\n  },\n  \"aspect_ratio\": \"16:9\",\n  \"composition\": \"横构图\",\n  \"text_spec\": {\n    \"layouts\": [\n      {\n        \"id\": \"h-left-stack\",\n        \"name\": \"左上语境／左中主叙事／左下关键词\",\n        \"slots\": [\n          {\n            \"role\": \"date\",\n            \"zone\": \"context\"\n          },\n          {\n         "
+   ],
+   [
+    "20",
+    "拒绝",
+    "[\n  {\n    \"type\": \"function\",\n    \"function\": {\n      \"name\": \"readCharacters\",\n      \"description\": \"读取当前剧集中的所有角色信息，用于生成角色三视图最终提示词。\",\n      \"parameters\": {\n        \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n        \"type\": \"object\",\n        \"properties\": {},\n        \"additionalProperties\": false,\n        \"required\": []\n      }\n    }\n  },\n  {\n    \"type\": \"function\",\n    \"function\": {\n  "
+   ],
+   [
+    null,
+    "card_ref_unmet",
+    "你是专业的 AI 提示词工程师，负责三类提示词的创作与保存：\n1. 角色/场景/道具的「最终提示词」，供生图直接使用\n2. 分镜的「关键帧提示词」（first_frame_prompt / mid_frame_prompt + mid_frame_time / last_frame_prompt），供关键帧生图直接使用\n3. 分镜的「视频提示词」（video_prompt），供视频生成直接使用\n\n## 图片最终提示词\n\n用户请求会告知要为哪些角色、场景或道具生成最终提示词（附带 character_id / scene_id / prop_id）。\n\n工作流程：\n1. 调用 readCharacters / readScenes / readProps 读取资产信息\n2. 按对应技能规范（角色三视图及造型版本 / 场景固定视角 / 道具白底单品）创作最终提示词\n3. 调用 saveChar"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "请为分镜 #57(ID:987)生成关键帧提示词(first_frame_prompt、mid_frame_prompt、mid_frame_time、last_frame_prompt)，严格遵循 keyframe-prompt 技能规范。\n请先调用 read_storyboard_context 读取该分镜的 description(含【镜头N】子镜头)、result、atmosphere、duration、continuity_boundary 及 inherits_first，然后写出关键帧提示词：\n- 每张关键帧都是独立生成的单帧静态画面，只凭资产参考图 + 本条提示词出图，所以每条提示词必须自足（自己交代景别机位构图、@场景名、画面里有哪些 @角色名 及其位置姿态表情、关键 @道具名、光线氛围），禁止写「同上一帧」「保持不变」这类相对描述\n- 绝对图像优先：禁止描写角色的物种、"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "{\"aspect_ratio\":\"16:9\",\"characters\":[{\"appearance\":\"中年男子，约四十岁，中等偏瘦的身材，方正的长脸，额发向后梳，深色短发齐耳，蓄浓密的褐色络腮胡与八字胡，眼皮微垂，目光疲惫而固执，常驻的冒险者气质。\",\"description\":\"15 世纪末的欧洲航海者，受西班牙国王赞助。本集作为全篇的比较基准出现：他向西横渡大西洋抵达美洲，开启欧洲长达四五百年的航海与殖民时代。\",\"id\":71,\"image_url\":\"static/images/4f02e573-bcaa-4e78-b71d-a21a5a084bda.png\",\"name\":\"哥伦布\",\"reference_images\":[],\"role\":\"航海家 · 西航远征者\",\"styling\":\"深蓝色航海长外套，内穿米白粗布衬衣，腰系棕色皮带，下穿深色窄腿裤与棕色皮靴；胸前挂一枚黄"
+   ],
+   [
+    "updateStoryboard",
+    "mid_frame_time",
+    "{\"last_frame_prompt\":\"@索利卡姆斯克，清晨，薄雾中的低角度淡金色阳光斜落河面，河水浮白雾、水色冷青，屋檐与木栈桥湿亮，色调清冷，16:9 横构图电影感剧照。远景广角平视固定机位，取 @索利卡姆斯克 清晨河岸的全景收束：画面左侧为木栈桥、系船桩与堆放的原木，岸上沿河排列木刻楞民居与白灰石砌作坊，后景是浮着薄雾的河面与远处林线。一列平底船已泊成整齐一排、船头一致朝画面右方的下游，船舱内桨手各自盘坐、双手握着桨杆搭在船舷上，船上摞着捆扎的行装与截短的圆木，船身吃水显示已满载。@叶尔马克·齐莫菲叶维奇 站在最前那艘船的船尾横板上、身形位于画面中部偏右，身体正面朝向画面前方，右手握住 @哥萨克火枪 的枪身中段、枪管朝下斜指船板，火枪侧面的火绳夹与横插在枪身中段的木质通条在他的腿侧清楚可见，左手扶着舵桨的长柄，双腿分开站稳、两只皮靴踏在船尾木板上清晰可见，下颌微抬、目光望向画面前"
+   ],
+   [
+    "20",
+    "拒绝",
+    "[\n  {\n    \"type\": \"function\",\n    \"function\": {\n      \"name\": \"readCharacters\",\n      \"description\": \"读取当前剧集中的所有角色信息，用于生成角色三视图最终提示词。\",\n      \"parameters\": {\n        \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n        \"type\": \"object\",\n        \"properties\": {},\n        \"additionalProperties\": false,\n        \"required\": []\n      }\n    }\n  },\n  {\n    \"type\": \"function\",\n    \"function\": {\n  "
+   ],
+   [
+    null,
+    "card_ref_unmet",
+    "你是专业的 AI 提示词工程师，负责三类提示词的创作与保存：\n1. 角色/场景/道具的「最终提示词」，供生图直接使用\n2. 分镜的「关键帧提示词」（first_frame_prompt / mid_frame_prompt + mid_frame_time / last_frame_prompt），供关键帧生图直接使用\n3. 分镜的「视频提示词」（video_prompt），供视频生成直接使用\n\n## 图片最终提示词\n\n用户请求会告知要为哪些角色、场景或道具生成最终提示词（附带 character_id / scene_id / prop_id）。\n\n工作流程：\n1. 调用 readCharacters / readScenes / readProps 读取资产信息\n2. 按对应技能规范（角色三视图及造型版本 / 场景固定视角 / 道具白底单品）创作最终提示词\n3. 调用 saveChar"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "请为分镜 #57(ID:987)生成关键帧提示词(first_frame_prompt、mid_frame_prompt、mid_frame_time、last_frame_prompt)，严格遵循 keyframe-prompt 技能规范。\n请先调用 read_storyboard_context 读取该分镜的 description(含【镜头N】子镜头)、result、atmosphere、duration、continuity_boundary 及 inherits_first，然后写出关键帧提示词：\n- 每张关键帧都是独立生成的单帧静态画面，只凭资产参考图 + 本条提示词出图，所以每条提示词必须自足（自己交代景别机位构图、@场景名、画面里有哪些 @角色名 及其位置姿态表情、关键 @道具名、光线氛围），禁止写「同上一帧」「保持不变」这类相对描述\n- 绝对图像优先：禁止描写角色的物种、"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "{\"aspect_ratio\":\"16:9\",\"characters\":[{\"appearance\":\"中年男子，约四十岁，中等偏瘦的身材，方正的长脸，额发向后梳，深色短发齐耳，蓄浓密的褐色络腮胡与八字胡，眼皮微垂，目光疲惫而固执，常驻的冒险者气质。\",\"description\":\"15 世纪末的欧洲航海者，受西班牙国王赞助。本集作为全篇的比较基准出现：他向西横渡大西洋抵达美洲，开启欧洲长达四五百年的航海与殖民时代。\",\"id\":71,\"image_url\":\"static/images/4f02e573-bcaa-4e78-b71d-a21a5a084bda.png\",\"name\":\"哥伦布\",\"reference_images\":[],\"role\":\"航海家 · 西航远征者\",\"styling\":\"深蓝色航海长外套，内穿米白粗布衬衣，腰系棕色皮带，下穿深色窄腿裤与棕色皮靴；胸前挂一枚黄"
+   ],
+   [
+    "updateStoryboard",
+    "mid_frame_time",
+    "{\"last_frame_prompt\":\"@索利卡姆斯克，清晨，薄雾中的低角度淡金色阳光斜落河面，河水浮白雾、水色冷青，屋檐与木栈桥湿亮，色调清冷，16:9 横构图电影感剧照。远景广角平视固定机位，取 @索利卡姆斯克 清晨河岸的全景收束：画面左侧为木栈桥、系船桩与堆放的原木，岸上沿河排列木刻楞民居与白灰石砌作坊，后景是浮着薄雾的河面与远处林线。一列平底船已泊成整齐一排、船头一致朝画面右方的下游，船舱内桨手各自盘坐、双手握着桨杆搭在船舷上，船上摞着捆扎的行装与截短的圆木，船身吃水显示已满载。@叶尔马克·齐莫菲叶维奇 站在最前那艘船的船尾横板上、身形位于画面中部偏右，身体正面朝向画面前方，右手握住 @哥萨克火枪 的枪身中段、枪管朝下斜指船板，火枪侧面的火绳夹与横插在枪身中段的木质通条在他的腿侧清楚可见，左手扶着舵桨的长柄，双腿分开站稳、两只皮靴踏在船尾木板上清晰可见，下颌微抬、目光望向画面前"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "分镜 #987 的关键帧提示词已保存完成：\n\n- **first_frame_prompt**：留空。本镜为组合 C（图层段 ▣4.5s → 生成段 ▶6.5s），首帧由图层段末帧继承锁定（那张领地范围图的衔接帧），不单独出图。\n- **mid_frame_prompt + mid_frame_time = 3.0 秒**：生成段内最重要的子镜头起始瞬间——小叶立于木栈桥端头，右手提 @哥萨克火枪 垂在腿侧、左手虚扶平底船船舷，身后哥萨克长队沿跳板登船，清晨薄雾淡金光，完整交代「人数众多的远征」而非小股劫掠。\n- **last_frame_prompt**：与 result 一致的收束画面——平底船队已泊成一列、满载行装与原木，小叶立于最前那艘船的船尾横板、右手握枪身左手扶舵桨，岸上仍有数人登船，画面稳定清晰，可被下一镜（#58，组合 A 图层段）直接承接。\n\n三条提示词均自足（场景、机位"
+   ]
+  ],
+  "after_kf": {
+   "first_frame_prompt": "",
+   "mid_frame_prompt": "@索利卡姆斯克，清晨，薄雾中的低角度淡金色阳光斜落河面与栈桥，河面浮着白雾、水色冷青，木栈桥板面与系船桩湿亮，色调清冷，16:9 横构图电影感剧照。中景平视固定机位，取 @索利卡姆斯克 岸边的木栈桥与泊船处：画面中部偏左是自岸边伸向河面的木栈桥与桥头的系船桩，桥旁水面泊着几只平底船，船舱里摞着捆扎的行装与截短的圆木，画面右侧岸滩上排开一支登船的长队，岸后为沿河排列的木刻楞民居与白灰石砌作坊，芦苇与斜靠的船桨留在桩旁。@叶尔马克·齐莫菲叶维奇 立在木栈桥端头、身形侧向镜头，右手提着 @哥萨克火枪 的枪托后段垂在腿侧、枪管朝下斜指栈桥木板，火枪侧面的火绳夹与横插在枪身中段的木质通条在他的腿侧清楚可见，左手虚扶在身旁那只平底船的船舷上沿，双腿分开站稳、两只皮靴踏在栈桥木板上清晰可见，侧脸朝向河面、背对岸上的队伍，下颌微抬、目光望向浮雾的河面方向。他身后的岸滩上，一列哥萨克（灰褐粗呢短衣、灰毡帽、腰束布带）正依次踏上跳板登船：为首者双手扶住船舷的踏板边沿、双腿迈步跨上船板，其后数人各自单手握着火枪的枪身把枪托扛在肩前、另一手提着卷起的行囊，队伍沿栈桥向岸上延伸、队尾隐在薄雾里。晨光与白雾在栈桥、船身与河面之间分层，人物、船队与栈桥设施完整入画。16:9 横构图电影感剧照，单帧静态画面",
+   "last_frame_prompt": "@索利卡姆斯克，清晨，薄雾中的低角度淡金色阳光斜落河面，河水浮白雾、水色冷青，屋檐与木栈桥湿亮，色调清冷，16:9 横构图电影感剧照。远景广角平视固定机位，取 @索利卡姆斯克 清晨河岸的全景收束：画面左侧为木栈桥、系船桩与堆放的原木，岸上沿河排列木刻楞民居与白灰石砌作坊，后景是浮着薄雾的河面与远处林线。一列平底船已泊成整齐一排、船头一致朝画面右方的下游，船舱内桨手各自盘坐、双手握着桨杆搭在船舷上，船上摞着捆扎的行装与截短的圆木，船身吃水显示已满载。@叶尔马克·齐莫菲叶维奇 站在最前那艘船的船尾横板上、身形位于画面中部偏右，身体正面朝向画面前方，右手握住 @哥萨克火枪 的枪身中段、枪管朝下斜指船板，火枪侧面的火绳夹与横插在枪身中段的木质通条在他的腿侧清楚可见，左手扶着舵桨的长柄，双腿分开站稳、两只皮靴踏在船尾木板上清晰可见，下颌微抬、目光望向画面前方的下游河面，嘴唇抿平。岸上仍有数名哥萨克（灰褐粗呢短衣、灰毡帽、腰束布带）沿跳板登船：为首者双手扶着船舷的跳板边沿、双腿迈步踏上船板，其后各人单手握着火枪的枪身扛在肩前、另一手提着行囊，队尾几人仍立在栈桥上等候。晨雾在船队与河面之间分层，人物、船队与栈桥设施完整入画，构图平稳开阔、层次清晰，可被下一镜直接承接。16:9 横构图电影感剧照，单帧静态画面",
+   "mid_frame_time": 3.0,
+   "video_prompt": "",
+   "field_saved_at": "{\"narration_text\":1794549501,\"design_card\":1794576078,\"first_frame_prompt\":1794664582,\"mid_frame_prompt\":1794665115,\"mid_frame_time\":1794665115,\"last_frame_prompt\":1794665115,\"video_prompt\":1794664620}"
+  },
+  "video_task": 3459,
+  "video_wall_s": 40.0,
+  "video_status": "completed",
+  "video_error": null,
+  "video_params": {
+   "kind": "video_prompts",
+   "progress": {
+    "completed": 1,
+    "failed": 0,
+    "total": 1
+   },
+   "storyboardIds": [
+    987
+   ],
+   "configId": 1,
+   "stage": "video_prompts",
+   "model_used": {
+    "config_id": 1,
+    "name": "GLM 5.3 (local)",
+    "provider": "openai",
+    "model": "glm-5.3-flash",
+    "vision": false
+   },
+   "restart": {
+    "kind": "video_prompts",
+    "args": {
+     "episodeId": 27,
+     "dramaId": 20,
+     "opts": {},
+     "storyboardIds": [
+      987
+     ]
+    }
+   },
+   "reasoning_chars": 1166,
+   "output_text": "分镜 #57：已为分镜 #57（ID:987）保存 video_prompt。要点：\n\n- **C 组合首段锁定衔接帧**：0–1 秒空镜，逐字复述衔接帧 caption（俯拍远景、米黄地图底面、浅蓝边界河流线、蓝色折线箭头与红白圆点、深棕直线箭头），静止无人物、无切镜、无过渡词。\n- **第二段（1 秒后）切入 @索利卡姆斯克** 清晨河岸登船场面（承接 design_card 的 gen_plan.first），哥萨克长队登船体现 1340 人的远征规模。\n- **中间帧对齐**：4.5 秒分段起点画面与 mid_frame_prompt（小叶立于栈桥端头、右手 @哥萨克火枪 垂腿侧、左手扶船舷）一致，对应 mid_frame_time=3 秒附近的中景机位延续。\n- **尾帧收束**：末段（7.5–11 秒）落在 last_frame_prompt 的河岸全景——船队泊成一列、小叶立于最前船尾板持枪扶舵桨，稳定清晰可被下一镜承接。\n- 全程只用 @角色名/@场景名/@道具名 引用，未写任何外观属性；旁白未写入（走独立音轨）；时长 11 秒与图层 4.5s + 生成 6.5s 预算一致。"
+  },
+  "video_obs": {
+   "works": [
+    {
+     "id": 782,
+     "stage": "video_prompts",
+     "storyboard_id": 987,
+     "storyboard_number": 57,
+     "status": "completed",
+     "work_ms": 38264,
+     "model_ms": 37879,
+     "queue_ms": 5,
+     "call_count": 3,
+     "error_msg": null
+    }
+   ],
+   "calls": [
+    {
+     "id": 2542,
+     "kind": "llm",
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "http_status": 200,
+     "duration_ms": 1465,
+     "queue_ms": 1,
+     "prompt_tokens": 24516,
+     "completion_tokens": 7,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2543,
+     "kind": "llm",
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "http_status": 200,
+     "duration_ms": 28269,
+     "queue_ms": 2,
+     "prompt_tokens": 65640,
+     "completion_tokens": 1897,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2544,
+     "kind": "llm",
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "http_status": 200,
+     "duration_ms": 8145,
+     "queue_ms": 2,
+     "prompt_tokens": 66782,
+     "completion_tokens": 321,
+     "finish_reason": "stop",
+     "error_msg": null
+    }
+   ],
+   "call_count": 3,
+   "llm_calls": 3,
+   "max_prompt_tokens": 66782,
+   "total_prompt_tokens": 156938,
+   "total_completion_tokens": 2225,
+   "models": [
+    [
+     1,
+     "GLM 5.3 (local)",
+     "glm-5.3-flash"
+    ]
+   ],
+   "request_params": [
+    {
+     "max_tokens": "131072",
+     "model": "\"glm-5.3-flash\"",
+     "reasoning_effort": "\"low\"",
+     "stream": "true"
+    },
+    {}
+   ]
+  },
+  "video_rejections": [
+   [
+    "20",
+    "拒绝",
+    "[\n  {\n    \"type\": \"function\",\n    \"function\": {\n      \"name\": \"readCharacters\",\n      \"description\": \"读取当前剧集中的所有角色信息，用于生成角色三视图最终提示词。\",\n      \"parameters\": {\n        \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n        \"type\": \"object\",\n        \"properties\": {},\n        \"additionalProperties\": false,\n        \"required\": []\n      }\n    }\n  },\n  {\n    \"type\": \"function\",\n    \"function\": {\n  "
+   ],
+   [
+    null,
+    "card_ref_unmet",
+    "你是专业的 AI 提示词工程师，负责三类提示词的创作与保存：\n1. 角色/场景/道具的「最终提示词」，供生图直接使用\n2. 分镜的「关键帧提示词」（first_frame_prompt / mid_frame_prompt + mid_frame_time / last_frame_prompt），供关键帧生图直接使用\n3. 分镜的「视频提示词」（video_prompt），供视频生成直接使用\n\n## 图片最终提示词\n\n用户请求会告知要为哪些角色、场景或道具生成最终提示词（附带 character_id / scene_id / prop_id）。\n\n工作流程：\n1. 调用 readCharacters / readScenes / readProps 读取资产信息\n2. 按对应技能规范（角色三视图及造型版本 / 场景固定视角 / 道具白底单品）创作最终提示词\n3. 调用 saveChar"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "请为分镜 #57(ID:987)生成视频提示词(video_prompt)。视频模型:MiniMax H3 INT8 (ComfyUI 102) (h3-jobs),请根据该模型的特性和时长限制生成。\n请先调用 read_storyboard_context 获取该分镜的画面描述(含【镜头N】子镜头与台词/旁白)、氛围、时长及三条关键帧提示词(first_frame_prompt/mid_frame_prompt/mid_frame_time/last_frame_prompt)与 locked_frames(该镜被图层段衔接帧锁死的槽位、取景与画面描述 caption)，据此生成 video_prompt(第一行是信息头：列出该分镜出场的人物与场景，用 @角色名/@场景名 引用；之后按 3 秒分段换行、用 @角色名/@场景名/@道具名 引用参考素材；段落内允许多镜头切镜，段与段可以是不同"
+   ],
+   [
+    "readStoryboardContext",
+    "mid_frame_time",
+    "{\n  \"episode\": {\n    \"id\": 27,\n    \"title\": \"中俄百年变局（1）：一个草原强盗的逆袭\",\n    \"episode_number\": 1,\n    \"description\": \"\"\n  },\n  \"aspect_ratio\": \"16:9\",\n  \"composition\": \"横构图\",\n  \"text_spec\": {\n    \"layouts\": [\n      {\n        \"id\": \"h-left-stack\",\n        \"name\": \"左上语境／左中主叙事／左下关键词\",\n        \"slots\": [\n          {\n            \"role\": \"date\",\n            \"zone\": \"context\"\n          },\n          {\n         "
+   ],
+   [
+    "20",
+    "拒绝",
+    "[\n  {\n    \"type\": \"function\",\n    \"function\": {\n      \"name\": \"readCharacters\",\n      \"description\": \"读取当前剧集中的所有角色信息，用于生成角色三视图最终提示词。\",\n      \"parameters\": {\n        \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n        \"type\": \"object\",\n        \"properties\": {},\n        \"additionalProperties\": false,\n        \"required\": []\n      }\n    }\n  },\n  {\n    \"type\": \"function\",\n    \"function\": {\n  "
+   ],
+   [
+    null,
+    "card_ref_unmet",
+    "你是专业的 AI 提示词工程师，负责三类提示词的创作与保存：\n1. 角色/场景/道具的「最终提示词」，供生图直接使用\n2. 分镜的「关键帧提示词」（first_frame_prompt / mid_frame_prompt + mid_frame_time / last_frame_prompt），供关键帧生图直接使用\n3. 分镜的「视频提示词」（video_prompt），供视频生成直接使用\n\n## 图片最终提示词\n\n用户请求会告知要为哪些角色、场景或道具生成最终提示词（附带 character_id / scene_id / prop_id）。\n\n工作流程：\n1. 调用 readCharacters / readScenes / readProps 读取资产信息\n2. 按对应技能规范（角色三视图及造型版本 / 场景固定视角 / 道具白底单品）创作最终提示词\n3. 调用 saveChar"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "请为分镜 #57(ID:987)生成视频提示词(video_prompt)。视频模型:MiniMax H3 INT8 (ComfyUI 102) (h3-jobs),请根据该模型的特性和时长限制生成。\n请先调用 read_storyboard_context 获取该分镜的画面描述(含【镜头N】子镜头与台词/旁白)、氛围、时长及三条关键帧提示词(first_frame_prompt/mid_frame_prompt/mid_frame_time/last_frame_prompt)与 locked_frames(该镜被图层段衔接帧锁死的槽位、取景与画面描述 caption)，据此生成 video_prompt(第一行是信息头：列出该分镜出场的人物与场景，用 @角色名/@场景名 引用；之后按 3 秒分段换行、用 @角色名/@场景名/@道具名 引用参考素材；段落内允许多镜头切镜，段与段可以是不同"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "{\"aspect_ratio\":\"16:9\",\"characters\":[{\"appearance\":\"中年男子，约四十岁，中等偏瘦的身材，方正的长脸，额发向后梳，深色短发齐耳，蓄浓密的褐色络腮胡与八字胡，眼皮微垂，目光疲惫而固执，常驻的冒险者气质。\",\"description\":\"15 世纪末的欧洲航海者，受西班牙国王赞助。本集作为全篇的比较基准出现：他向西横渡大西洋抵达美洲，开启欧洲长达四五百年的航海与殖民时代。\",\"id\":71,\"image_url\":\"static/images/4f02e573-bcaa-4e78-b71d-a21a5a084bda.png\",\"name\":\"哥伦布\",\"reference_images\":[],\"role\":\"航海家 · 西航远征者\",\"styling\":\"深蓝色航海长外套，内穿米白粗布衬衣，腰系棕色皮带，下穿深色窄腿裤与棕色皮靴；胸前挂一枚黄"
+   ],
+   [
+    "20",
+    "拒绝",
+    "[\n  {\n    \"type\": \"function\",\n    \"function\": {\n      \"name\": \"readCharacters\",\n      \"description\": \"读取当前剧集中的所有角色信息，用于生成角色三视图最终提示词。\",\n      \"parameters\": {\n        \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n        \"type\": \"object\",\n        \"properties\": {},\n        \"additionalProperties\": false,\n        \"required\": []\n      }\n    }\n  },\n  {\n    \"type\": \"function\",\n    \"function\": {\n  "
+   ],
+   [
+    null,
+    "card_ref_unmet",
+    "你是专业的 AI 提示词工程师，负责三类提示词的创作与保存：\n1. 角色/场景/道具的「最终提示词」，供生图直接使用\n2. 分镜的「关键帧提示词」（first_frame_prompt / mid_frame_prompt + mid_frame_time / last_frame_prompt），供关键帧生图直接使用\n3. 分镜的「视频提示词」（video_prompt），供视频生成直接使用\n\n## 图片最终提示词\n\n用户请求会告知要为哪些角色、场景或道具生成最终提示词（附带 character_id / scene_id / prop_id）。\n\n工作流程：\n1. 调用 readCharacters / readScenes / readProps 读取资产信息\n2. 按对应技能规范（角色三视图及造型版本 / 场景固定视角 / 道具白底单品）创作最终提示词\n3. 调用 saveChar"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "请为分镜 #57(ID:987)生成视频提示词(video_prompt)。视频模型:MiniMax H3 INT8 (ComfyUI 102) (h3-jobs),请根据该模型的特性和时长限制生成。\n请先调用 read_storyboard_context 获取该分镜的画面描述(含【镜头N】子镜头与台词/旁白)、氛围、时长及三条关键帧提示词(first_frame_prompt/mid_frame_prompt/mid_frame_time/last_frame_prompt)与 locked_frames(该镜被图层段衔接帧锁死的槽位、取景与画面描述 caption)，据此生成 video_prompt(第一行是信息头：列出该分镜出场的人物与场景，用 @角色名/@场景名 引用；之后按 3 秒分段换行、用 @角色名/@场景名/@道具名 引用参考素材；段落内允许多镜头切镜，段与段可以是不同"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "{\"aspect_ratio\":\"16:9\",\"characters\":[{\"appearance\":\"中年男子，约四十岁，中等偏瘦的身材，方正的长脸，额发向后梳，深色短发齐耳，蓄浓密的褐色络腮胡与八字胡，眼皮微垂，目光疲惫而固执，常驻的冒险者气质。\",\"description\":\"15 世纪末的欧洲航海者，受西班牙国王赞助。本集作为全篇的比较基准出现：他向西横渡大西洋抵达美洲，开启欧洲长达四五百年的航海与殖民时代。\",\"id\":71,\"image_url\":\"static/images/4f02e573-bcaa-4e78-b71d-a21a5a084bda.png\",\"name\":\"哥伦布\",\"reference_images\":[],\"role\":\"航海家 · 西航远征者\",\"styling\":\"深蓝色航海长外套，内穿米白粗布衬衣，腰系棕色皮带，下穿深色窄腿裤与棕色皮靴；胸前挂一枚黄"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "已为分镜 #57（ID:987）保存 video_prompt。要点：\n\n- **C 组合首段锁定衔接帧**：0–1 秒空镜，逐字复述衔接帧 caption（俯拍远景、米黄地图底面、浅蓝边界河流线、蓝色折线箭头与红白圆点、深棕直线箭头），静止无人物、无切镜、无过渡词。\n- **第二段（1 秒后）切入 @索利卡姆斯克** 清晨河岸登船场面（承接 design_card 的 gen_plan.first），哥萨克长队登船体现 1340 人的远征规模。\n- **中间帧对齐**：4.5 秒分段起点画面与 mid_frame_prompt（小叶立于栈桥端头、右手 @哥萨克火枪 垂腿侧、左手扶船舷）一致，对应 mid_frame_time=3 秒附近的中景机位延续。\n- **尾帧收束**：末段（7.5–11 秒）落在 last_frame_prompt 的河岸全景——船队泊成一列、小叶立于最前船尾板持"
+   ]
+  ],
+  "after_vp": {
+   "first_frame_prompt": "",
+   "mid_frame_prompt": "@索利卡姆斯克，清晨，薄雾中的低角度淡金色阳光斜落河面与栈桥，河面浮着白雾、水色冷青，木栈桥板面与系船桩湿亮，色调清冷，16:9 横构图电影感剧照。中景平视固定机位，取 @索利卡姆斯克 岸边的木栈桥与泊船处：画面中部偏左是自岸边伸向河面的木栈桥与桥头的系船桩，桥旁水面泊着几只平底船，船舱里摞着捆扎的行装与截短的圆木，画面右侧岸滩上排开一支登船的长队，岸后为沿河排列的木刻楞民居与白灰石砌作坊，芦苇与斜靠的船桨留在桩旁。@叶尔马克·齐莫菲叶维奇 立在木栈桥端头、身形侧向镜头，右手提着 @哥萨克火枪 的枪托后段垂在腿侧、枪管朝下斜指栈桥木板，火枪侧面的火绳夹与横插在枪身中段的木质通条在他的腿侧清楚可见，左手虚扶在身旁那只平底船的船舷上沿，双腿分开站稳、两只皮靴踏在栈桥木板上清晰可见，侧脸朝向河面、背对岸上的队伍，下颌微抬、目光望向浮雾的河面方向。他身后的岸滩上，一列哥萨克（灰褐粗呢短衣、灰毡帽、腰束布带）正依次踏上跳板登船：为首者双手扶住船舷的踏板边沿、双腿迈步跨上船板，其后数人各自单手握着火枪的枪身把枪托扛在肩前、另一手提着卷起的行囊，队伍沿栈桥向岸上延伸、队尾隐在薄雾里。晨光与白雾在栈桥、船身与河面之间分层，人物、船队与栈桥设施完整入画。16:9 横构图电影感剧照，单帧静态画面",
+   "last_frame_prompt": "@索利卡姆斯克，清晨，薄雾中的低角度淡金色阳光斜落河面，河水浮白雾、水色冷青，屋檐与木栈桥湿亮，色调清冷，16:9 横构图电影感剧照。远景广角平视固定机位，取 @索利卡姆斯克 清晨河岸的全景收束：画面左侧为木栈桥、系船桩与堆放的原木，岸上沿河排列木刻楞民居与白灰石砌作坊，后景是浮着薄雾的河面与远处林线。一列平底船已泊成整齐一排、船头一致朝画面右方的下游，船舱内桨手各自盘坐、双手握着桨杆搭在船舷上，船上摞着捆扎的行装与截短的圆木，船身吃水显示已满载。@叶尔马克·齐莫菲叶维奇 站在最前那艘船的船尾横板上、身形位于画面中部偏右，身体正面朝向画面前方，右手握住 @哥萨克火枪 的枪身中段、枪管朝下斜指船板，火枪侧面的火绳夹与横插在枪身中段的木质通条在他的腿侧清楚可见，左手扶着舵桨的长柄，双腿分开站稳、两只皮靴踏在船尾木板上清晰可见，下颌微抬、目光望向画面前方的下游河面，嘴唇抿平。岸上仍有数名哥萨克（灰褐粗呢短衣、灰毡帽、腰束布带）沿跳板登船：为首者双手扶着船舷的跳板边沿、双腿迈步踏上船板，其后各人单手握着火枪的枪身扛在肩前、另一手提着行囊，队尾几人仍立在栈桥上等候。晨雾在船队与河面之间分层，人物、船队与栈桥设施完整入画，构图平稳开阔、层次清晰，可被下一镜直接承接。16:9 横构图电影感剧照，单帧静态画面",
+   "mid_frame_time": 3.0,
+   "video_prompt": "出场人物：@叶尔马克·齐莫菲叶维奇；场景：@索利卡姆斯克；道具：@哥萨克火枪。\n0-1秒：俯拍远景，米黄色地图底面上有浅蓝细线勾勒的边界与河流，左下角有一处蓝色水域，画面中上部偏左有一条蓝色折线箭头、其上方有一枚红白小圆点，中部偏右有另一条蓝色折线箭头与一条深棕色直线箭头交叉，整体色调偏暖、右侧与下方留白较多，镜头静止，画面无人。\n1-4.5秒：接在空镜之后，切到 @索利卡姆斯克 清晨的卡马河岸广角平视固定机位，薄雾浮在河面上、水色冷青，画面中部偏左是自岸边伸向河面的木栈桥与桥头的系船桩，桥旁水面泊着几只平底船，船舱里摞着捆扎的行装与截短的圆木，岸后为沿河排列的木刻楞民居与白灰石砌作坊，芦苇与斜靠的船桨留在桩旁；岸滩上一列哥萨克（灰褐粗呢短衣、灰毡帽、腰束布带）正依次踏上跳板登船：为首者双手扶住船舷的踏板边沿、双腿迈步跨上船板，其后数人各自单手握着火枪的枪身把枪托扛在肩前、另一手提着卷起的行囊，队伍沿栈桥向岸上延伸、队尾隐在薄雾里；清晨薄雾中的低角度淡金色阳光斜落河面与栈桥，木栈桥板面与系船桩湿亮，色调清冷。\n4.5-7.5秒：@索利卡姆斯克，切到岸边木栈桥的中景平视固定机位，画面中部偏左是木栈桥与桥头系船桩，桥旁水面泊着平底船、船舱里摞着行装与截短的圆木，画面右侧岸滩上排开一支登船的长队，岸后为沿河排列的木刻楞民居与白灰石砌作坊；@叶尔马克·齐莫菲叶维奇 走上木栈桥在端头站定、身形侧向镜头，右手握住 @哥萨克火枪 的枪托后段垂在腿侧、枪管朝下斜指栈桥木板，火枪侧面的火绳夹与横插在枪身中段的木质通条在他的腿侧清楚可见，左手抬起虚扶在身旁那只平底船的船舷上沿，双腿分开站稳、两只皮靴踏在栈桥木板上清晰可见，侧脸朝向河面、背对岸上的队伍，下颌微抬、目光望向浮雾的河面方向，嘴唇抿平；他身后的岸滩上，那列哥萨克（灰褐粗呢短衣、灰毡帽、腰束布带）仍在依次踏上跳板登船，为首者双手扶住船舷的踏板边沿、双腿迈步跨上船板，队伍向岸上延伸、队尾隐在薄雾里；晨光与白雾在栈桥、船身与河面之间分层。\n7.5-11秒：@索利卡姆斯克，切到河岸的远景广角平视固定机位，画面左侧为木栈桥、系船桩与堆放的原木，岸上沿河排列木刻楞民居与白灰石砌作坊，后景是浮着薄雾的河面与远处林线；一列平底船已泊成整齐一排、船头一致朝画面右方的下游，船舱内桨手各自盘坐、双手握着桨杆搭在船舷上，船上摞着捆扎的行装与截短的圆木，船身吃水显示已满载；@叶尔马克·齐莫菲叶维奇 站在最前那艘船的船尾横板上、身形位于画面中部偏右，身体正面朝向画面前方，右手握住 @哥萨克火枪 的枪身中段、枪管朝下斜指船板，火枪侧面的火绳夹与横插在枪身中段的木质通条在他的腿侧清楚可见，左手扶着舵桨的长柄，双腿分开站稳、两只皮靴踏在船尾木板上清晰可见，下颌微抬、目光望向画面前方的下游河面，嘴唇抿平；岸上仍有数名哥萨克（灰褐粗呢短衣、灰毡帽、腰束布带）沿跳板登船：为首者双手扶着船舷的跳板边沿、双腿迈步踏上船板，其后各人单手握着火枪的枪身扛在肩前、另一手提着行囊，队尾几人仍立在栈桥上等候；晨雾在船队与河面之间分层，人物、船队与栈桥设施完整入画，构图平稳开阔、层次清晰。",
+   "field_saved_at": "{\"narration_text\":1794549501,\"design_card\":1794576078,\"first_frame_prompt\":1794664582,\"mid_frame_prompt\":1794665115,\"mid_frame_time\":1794665115,\"last_frame_prompt\":1794665115,\"video_prompt\":1794665153}"
+  }
+ },
+ "989": {
+  "keyframe_task": 3460,
+  "keyframe_wall_s": 45.0,
+  "keyframe_status": "completed",
+  "keyframe_error": null,
+  "keyframe_params": {
+   "kind": "keyframe_prompts",
+   "progress": {
+    "completed": 1,
+    "failed": 0,
+    "total": 1
+   },
+   "storyboardIds": [
+    989
+   ],
+   "scope": {
+    "included": [
+     {
+      "storyboard_id": 989,
+      "storyboard_number": 59
+     }
+    ],
+    "excluded": []
+   },
+   "configId": 1,
+   "stage": "keyframe_prompts",
+   "model_used": {
+    "config_id": 1,
+    "name": "GLM 5.3 (local)",
+    "provider": "openai",
+    "model": "glm-5.3-flash",
+    "vision": false
+   },
+   "restart": {
+    "kind": "keyframe_prompts",
+    "args": {
+     "episodeId": 27,
+     "dramaId": 20,
+     "opts": {},
+     "storyboardIds": [
+      989
+     ]
+    }
+   },
+   "reasoning_chars": 1514,
+   "output_text": "分镜 #59：已读取上下文。本镜为组合 C（▣5.5s→▶11s），inherits_first=true，首帧是图层段衔接帧（锁定，不写 first_frame_prompt）；生成段 11 秒，mid 取山口脊线眺望子镜头起始瞬间，尾帧收在塔尔吉河营地扎营画面。分镜 #989 的关键帧提示词已保存完成。要点：\n\n- **组合 C（图层段 ▣5.5s → 生成段 ▶11s）**：首帧是图层段末帧继承的衔接帧（米黄地图底图、红色远征路线折线），已锁定不出图，故 `first_frame_prompt` 留空\n- **mid_frame_time = 5.5 秒**：取生成段开场的山口脊线子镜头起始瞬间——@乌拉尔山口 脊顶眺望东坡河谷，队伍沿雪迹土石小径成列上行，首领右手握矛、左手遮额眺望，全部四肢状态正向枚举\n- **last_frame_prompt**：收束到 @塔尔吉河营地 黄昏扎营画面——树枝原木窝棚、柴堆与营火，首领立在窝棚前持 @哥萨克火枪 垂于腿侧，队伍卸下行装，姿态稳定、构图完整，可被下一镜（#60 军纪惩罚）直接承接\n- 所有提示词自足、无外观描写、人物仅以泛指身份标识（灰褐粗呢长袍、黑色羊皮帽等可见标识，与相邻镜头已定写法一致），并逐帧 @ 到设计卡 reference_assets 中的 @乌拉尔山口 与 @塔尔吉河营地"
+  },
+  "keyframe_obs": {
+   "works": [
+    {
+     "id": 783,
+     "stage": "keyframe_prompts",
+     "storyboard_id": 989,
+     "storyboard_number": 59,
+     "status": "completed",
+     "work_ms": 41039,
+     "model_ms": 40677,
+     "queue_ms": 3,
+     "call_count": 3,
+     "error_msg": null
+    }
+   ],
+   "calls": [
+    {
+     "id": 2545,
+     "kind": "llm",
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "http_status": 200,
+     "duration_ms": 1431,
+     "queue_ms": 1,
+     "prompt_tokens": 23670,
+     "completion_tokens": 7,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2546,
+     "kind": "llm",
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "http_status": 200,
+     "duration_ms": 32779,
+     "queue_ms": 1,
+     "prompt_tokens": 68878,
+     "completion_tokens": 1869,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2547,
+     "kind": "llm",
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "http_status": 200,
+     "duration_ms": 6467,
+     "queue_ms": 1,
+     "prompt_tokens": 69934,
+     "completion_tokens": 311,
+     "finish_reason": "stop",
+     "error_msg": null
+    }
+   ],
+   "call_count": 3,
+   "llm_calls": 3,
+   "max_prompt_tokens": 69934,
+   "total_prompt_tokens": 162482,
+   "total_completion_tokens": 2187,
+   "models": [
+    [
+     1,
+     "GLM 5.3 (local)",
+     "glm-5.3-flash"
+    ]
+   ],
+   "request_params": [
+    {
+     "max_tokens": "131072",
+     "model": "\"glm-5.3-flash\"",
+     "reasoning_effort": "\"low\"",
+     "stream": "true"
+    },
+    {}
+   ]
+  },
+  "keyframe_rejections": [
+   [
+    "20",
+    "拒绝",
+    "[\n  {\n    \"type\": \"function\",\n    \"function\": {\n      \"name\": \"readCharacters\",\n      \"description\": \"读取当前剧集中的所有角色信息，用于生成角色三视图最终提示词。\",\n      \"parameters\": {\n        \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n        \"type\": \"object\",\n        \"properties\": {},\n        \"additionalProperties\": false,\n        \"required\": []\n      }\n    }\n  },\n  {\n    \"type\": \"function\",\n    \"function\": {\n  "
+   ],
+   [
+    null,
+    "card_ref_unmet",
+    "你是专业的 AI 提示词工程师，负责三类提示词的创作与保存：\n1. 角色/场景/道具的「最终提示词」，供生图直接使用\n2. 分镜的「关键帧提示词」（first_frame_prompt / mid_frame_prompt + mid_frame_time / last_frame_prompt），供关键帧生图直接使用\n3. 分镜的「视频提示词」（video_prompt），供视频生成直接使用\n\n## 图片最终提示词\n\n用户请求会告知要为哪些角色、场景或道具生成最终提示词（附带 character_id / scene_id / prop_id）。\n\n工作流程：\n1. 调用 readCharacters / readScenes / readProps 读取资产信息\n2. 按对应技能规范（角色三视图及造型版本 / 场景固定视角 / 道具白底单品）创作最终提示词\n3. 调用 saveChar"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "请为分镜 #59(ID:989)生成关键帧提示词(first_frame_prompt、mid_frame_prompt、mid_frame_time、last_frame_prompt)，严格遵循 keyframe-prompt 技能规范。\n请先调用 read_storyboard_context 读取该分镜的 description(含【镜头N】子镜头)、result、atmosphere、duration、continuity_boundary 及 inherits_first，然后写出关键帧提示词：\n- 每张关键帧都是独立生成的单帧静态画面，只凭资产参考图 + 本条提示词出图，所以每条提示词必须自足（自己交代景别机位构图、@场景名、画面里有哪些 @角色名 及其位置姿态表情、关键 @道具名、光线氛围），禁止写「同上一帧」「保持不变」这类相对描述\n- 绝对图像优先：禁止描写角色的物种、"
+   ],
+   [
+    "readStoryboardContext",
+    "mid_frame_time",
+    "{\n  \"episode\": {\n    \"id\": 27,\n    \"title\": \"中俄百年变局（1）：一个草原强盗的逆袭\",\n    \"episode_number\": 1,\n    \"description\": \"\"\n  },\n  \"aspect_ratio\": \"16:9\",\n  \"composition\": \"横构图\",\n  \"text_spec\": {\n    \"layouts\": [\n      {\n        \"id\": \"h-left-stack\",\n        \"name\": \"左上语境／左中主叙事／左下关键词\",\n        \"slots\": [\n          {\n            \"role\": \"date\",\n            \"zone\": \"context\"\n          },\n          {\n         "
+   ],
+   [
+    "20",
+    "拒绝",
+    "[\n  {\n    \"type\": \"function\",\n    \"function\": {\n      \"name\": \"readCharacters\",\n      \"description\": \"读取当前剧集中的所有角色信息，用于生成角色三视图最终提示词。\",\n      \"parameters\": {\n        \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n        \"type\": \"object\",\n        \"properties\": {},\n        \"additionalProperties\": false,\n        \"required\": []\n      }\n    }\n  },\n  {\n    \"type\": \"function\",\n    \"function\": {\n  "
+   ],
+   [
+    null,
+    "card_ref_unmet",
+    "你是专业的 AI 提示词工程师，负责三类提示词的创作与保存：\n1. 角色/场景/道具的「最终提示词」，供生图直接使用\n2. 分镜的「关键帧提示词」（first_frame_prompt / mid_frame_prompt + mid_frame_time / last_frame_prompt），供关键帧生图直接使用\n3. 分镜的「视频提示词」（video_prompt），供视频生成直接使用\n\n## 图片最终提示词\n\n用户请求会告知要为哪些角色、场景或道具生成最终提示词（附带 character_id / scene_id / prop_id）。\n\n工作流程：\n1. 调用 readCharacters / readScenes / readProps 读取资产信息\n2. 按对应技能规范（角色三视图及造型版本 / 场景固定视角 / 道具白底单品）创作最终提示词\n3. 调用 saveChar"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "请为分镜 #59(ID:989)生成关键帧提示词(first_frame_prompt、mid_frame_prompt、mid_frame_time、last_frame_prompt)，严格遵循 keyframe-prompt 技能规范。\n请先调用 read_storyboard_context 读取该分镜的 description(含【镜头N】子镜头)、result、atmosphere、duration、continuity_boundary 及 inherits_first，然后写出关键帧提示词：\n- 每张关键帧都是独立生成的单帧静态画面，只凭资产参考图 + 本条提示词出图，所以每条提示词必须自足（自己交代景别机位构图、@场景名、画面里有哪些 @角色名 及其位置姿态表情、关键 @道具名、光线氛围），禁止写「同上一帧」「保持不变」这类相对描述\n- 绝对图像优先：禁止描写角色的物种、"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "{\"aspect_ratio\":\"16:9\",\"characters\":[{\"appearance\":\"中年男子，约四十岁，中等偏瘦的身材，方正的长脸，额发向后梳，深色短发齐耳，蓄浓密的褐色络腮胡与八字胡，眼皮微垂，目光疲惫而固执，常驻的冒险者气质。\",\"description\":\"15 世纪末的欧洲航海者，受西班牙国王赞助。本集作为全篇的比较基准出现：他向西横渡大西洋抵达美洲，开启欧洲长达四五百年的航海与殖民时代。\",\"id\":71,\"image_url\":\"static/images/4f02e573-bcaa-4e78-b71d-a21a5a084bda.png\",\"name\":\"哥伦布\",\"reference_images\":[],\"role\":\"航海家 · 西航远征者\",\"styling\":\"深蓝色航海长外套，内穿米白粗布衬衣，腰系棕色皮带，下穿深色窄腿裤与棕色皮靴；胸前挂一枚黄"
+   ],
+   [
+    "updateStoryboard",
+    "mid_frame_time",
+    "{\"first_frame_prompt\":\"\",\"last_frame_prompt\":\"@乌拉尔山口 @塔尔吉河营地，黄昏，低角度橙黄转灰白的斜光铺在雪面上，雪地反光柔和，营火升起的烟在冷空气中散开，营火呈暖橘亮点，背后覆雪的针叶林坡地沉入青灰，16:9 横构图电影感剧照。中全景平视固定机位，取 @塔尔吉河营地 河岸雪地的营地全景收束：画面左侧沿滩地排开几座树枝与原木搭成的低矮窝棚与帆布帐，窝棚前的雪地上堆着砍伐的原木与成垛的柴堆，一堆营火在柴堆旁燃着、火光把木杆与雪面染成暖橘，画面右侧是结了薄冰的河岸与泛着灰白的河面，背后是覆雪的针叶林坡地轮廓。一名哥萨克首领（灰褐粗呢长袍、黑色羊皮帽、腰束布带，共十余人队伍之首）立在最近那座窝棚前、身形位于画面中部偏左，身体略侧向镜头，右手提着 @哥萨克火枪 的枪托后段、枪管朝下斜指雪地，火枪侧面的火绳夹与横插在枪身中段的木质通条在他的腿侧清楚可见"
+   ],
+   [
+    "20",
+    "拒绝",
+    "[\n  {\n    \"type\": \"function\",\n    \"function\": {\n      \"name\": \"readCharacters\",\n      \"description\": \"读取当前剧集中的所有角色信息，用于生成角色三视图最终提示词。\",\n      \"parameters\": {\n        \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n        \"type\": \"object\",\n        \"properties\": {},\n        \"additionalProperties\": false,\n        \"required\": []\n      }\n    }\n  },\n  {\n    \"type\": \"function\",\n    \"function\": {\n  "
+   ],
+   [
+    null,
+    "card_ref_unmet",
+    "你是专业的 AI 提示词工程师，负责三类提示词的创作与保存：\n1. 角色/场景/道具的「最终提示词」，供生图直接使用\n2. 分镜的「关键帧提示词」（first_frame_prompt / mid_frame_prompt + mid_frame_time / last_frame_prompt），供关键帧生图直接使用\n3. 分镜的「视频提示词」（video_prompt），供视频生成直接使用\n\n## 图片最终提示词\n\n用户请求会告知要为哪些角色、场景或道具生成最终提示词（附带 character_id / scene_id / prop_id）。\n\n工作流程：\n1. 调用 readCharacters / readScenes / readProps 读取资产信息\n2. 按对应技能规范（角色三视图及造型版本 / 场景固定视角 / 道具白底单品）创作最终提示词\n3. 调用 saveChar"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "请为分镜 #59(ID:989)生成关键帧提示词(first_frame_prompt、mid_frame_prompt、mid_frame_time、last_frame_prompt)，严格遵循 keyframe-prompt 技能规范。\n请先调用 read_storyboard_context 读取该分镜的 description(含【镜头N】子镜头)、result、atmosphere、duration、continuity_boundary 及 inherits_first，然后写出关键帧提示词：\n- 每张关键帧都是独立生成的单帧静态画面，只凭资产参考图 + 本条提示词出图，所以每条提示词必须自足（自己交代景别机位构图、@场景名、画面里有哪些 @角色名 及其位置姿态表情、关键 @道具名、光线氛围），禁止写「同上一帧」「保持不变」这类相对描述\n- 绝对图像优先：禁止描写角色的物种、"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "{\"aspect_ratio\":\"16:9\",\"characters\":[{\"appearance\":\"中年男子，约四十岁，中等偏瘦的身材，方正的长脸，额发向后梳，深色短发齐耳，蓄浓密的褐色络腮胡与八字胡，眼皮微垂，目光疲惫而固执，常驻的冒险者气质。\",\"description\":\"15 世纪末的欧洲航海者，受西班牙国王赞助。本集作为全篇的比较基准出现：他向西横渡大西洋抵达美洲，开启欧洲长达四五百年的航海与殖民时代。\",\"id\":71,\"image_url\":\"static/images/4f02e573-bcaa-4e78-b71d-a21a5a084bda.png\",\"name\":\"哥伦布\",\"reference_images\":[],\"role\":\"航海家 · 西航远征者\",\"styling\":\"深蓝色航海长外套，内穿米白粗布衬衣，腰系棕色皮带，下穿深色窄腿裤与棕色皮靴；胸前挂一枚黄"
+   ],
+   [
+    "updateStoryboard",
+    "mid_frame_time",
+    "{\"first_frame_prompt\":\"\",\"last_frame_prompt\":\"@乌拉尔山口 @塔尔吉河营地，黄昏，低角度橙黄转灰白的斜光铺在雪面上，雪地反光柔和，营火升起的烟在冷空气中散开，营火呈暖橘亮点，背后覆雪的针叶林坡地沉入青灰，16:9 横构图电影感剧照。中全景平视固定机位，取 @塔尔吉河营地 河岸雪地的营地全景收束：画面左侧沿滩地排开几座树枝与原木搭成的低矮窝棚与帆布帐，窝棚前的雪地上堆着砍伐的原木与成垛的柴堆，一堆营火在柴堆旁燃着、火光把木杆与雪面染成暖橘，画面右侧是结了薄冰的河岸与泛着灰白的河面，背后是覆雪的针叶林坡地轮廓。一名哥萨克首领（灰褐粗呢长袍、黑色羊皮帽、腰束布带，共十余人队伍之首）立在最近那座窝棚前、身形位于画面中部偏左，身体略侧向镜头，右手提着 @哥萨克火枪 的枪托后段、枪管朝下斜指雪地，火枪侧面的火绳夹与横插在枪身中段的木质通条在他的腿侧清楚可见"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "分镜 #989 的关键帧提示词已保存完成。要点：\n\n- **组合 C（图层段 ▣5.5s → 生成段 ▶11s）**：首帧是图层段末帧继承的衔接帧（米黄地图底图、红色远征路线折线），已锁定不出图，故 `first_frame_prompt` 留空\n- **mid_frame_time = 5.5 秒**：取生成段开场的山口脊线子镜头起始瞬间——@乌拉尔山口 脊顶眺望东坡河谷，队伍沿雪迹土石小径成列上行，首领右手握矛、左手遮额眺望，全部四肢状态正向枚举\n- **last_frame_prompt**：收束到 @塔尔吉河营地 黄昏扎营画面——树枝原木窝棚、柴堆与营火，首领立在窝棚前持 @哥萨克火枪 垂于腿侧，队伍卸下行装，姿态稳定、构图完整，可被下一镜（#60 军纪惩罚）直接承接\n- 所有提示词自足、无外观描写、人物仅以泛指身份标识（灰褐粗呢长袍、黑色羊皮帽等可见标识，与相邻镜头已定写法一致）"
+   ]
+  ],
+  "after_kf": {
+   "first_frame_prompt": "",
+   "mid_frame_prompt": "@乌拉尔山口 @塔尔吉河营地，午后偏斜的阳光被林冠切开成斑驳条带，雪迹与土石小径上明暗交错，山谷带薄雾，色调偏冷绿与土褐，16:9 横构图电影感剧照。中景平视固定机位，取 @乌拉尔山口 的山口脊线：画面中部是穿过山口向东延伸的窄幅踩踏土石小径，两侧深绿针叶林覆盖的缓坡丘陵上散落灰色岩块与苔藓，远处可见更低的山脊与河谷轮廓，雪迹沿小径断续延伸。一名哥萨克首领（灰褐粗呢长袍、黑色羊皮帽、腰束布带，共十余人队伍之首）立于山口脊顶、身形位于画面中央偏右，身体略侧向镜头，右手握着长矛的矛杆中段、矛尖朝上，左手抬起遮在额前，双腿分开站稳、两只皮靴踏在脊顶的土石上清晰可见，脸朝向画面右方的东面河谷，下颌微抬、目光眺望谷地方向，嘴唇抿平。他身后下方的坡道上，一列哥萨克（同样的灰褐粗呢长袍、黑色羊皮帽、腰束布带，共十余人）沿小径成单列向上行进：为首者右手扶着肩上扛着的火枪枪身、左手扶住腰间，双腿迈步蹬在雪迹与碎石上，其后各人各自单手握着火枪枪身扛在肩前、另一手提着行囊，队列自画面下方的坡底向上延伸向脊顶，队尾隐在林影与薄雾里。远处的谷地方向即 @塔尔吉河营地 所在的东坡河谷轮廓，在薄雾中层层退远。人物、队列与山口小径完整入画，画面开阔、层次清晰。16:9 横构图电影感剧照，单帧静态画面",
+   "last_frame_prompt": "@乌拉尔山口 @塔尔吉河营地，黄昏，低角度橙黄转灰白的斜光铺在雪面上，雪地反光柔和，营火升起的烟在冷空气中散开，营火呈暖橘亮点，背后覆雪的针叶林坡地沉入青灰，16:9 横构图电影感剧照。中全景平视固定机位，取 @塔尔吉河营地 河岸雪地的营地全景收束：画面左侧沿滩地排开几座树枝与原木搭成的低矮窝棚与帆布帐，窝棚前的雪地上堆着砍伐的原木与成垛的柴堆，一堆营火在柴堆旁燃着、火光把木杆与雪面染成暖橘，画面右侧是结了薄冰的河岸与泛着灰白的河面，背后是覆雪的针叶林坡地轮廓。一名哥萨克首领（灰褐粗呢长袍、黑色羊皮帽、腰束布带，共十余人队伍之首）立在最近那座窝棚前、身形位于画面中部偏左，身体略侧向镜头，右手提着 @哥萨克火枪 的枪托后段、枪管朝下斜指雪地，火枪侧面的火绳夹与横插在枪身中段的木质通条在他的腿侧清楚可见，左手自然垂在体侧，双腿分开站稳、两只皮靴踏在雪地上清晰可见，下颌微抬、目光望向画面前方的河面，嘴唇抿平。他身后的雪地上，其余哥萨克（同样的灰褐粗呢长袍、黑色羊皮帽、腰束布带，共十余人）在窝棚与柴堆之间各自卸下行装：有人双手把捆扎的行囊放在雪地上，有人单手握着火枪的枪身把枪托抵在靴旁、双腿并拢站定，肩上还背着卷起的铺盖，队伍散而不乱。雪地上一行踩踏的脚印从河岸通向窝棚，营地各处设施与人物完整入画，构图平稳清晰、层次分明，可被下一镜直接承接。16:9 横构图电影感剧照，单帧静态画面",
+   "mid_frame_time": 5.5,
+   "video_prompt": "",
+   "field_saved_at": "{\"narration_text\":1794549518,\"design_card\":1794576867,\"first_frame_prompt\":1794665198,\"mid_frame_prompt\":1794665198,\"mid_frame_time\":1794665198,\"last_frame_prompt\":1794665198,\"video_prompt\":1794664691}"
+  },
+  "video_task": 3461,
+  "video_wall_s": 45.0,
+  "video_status": "completed",
+  "video_error": null,
+  "video_params": {
+   "kind": "video_prompts",
+   "progress": {
+    "completed": 1,
+    "failed": 0,
+    "total": 1
+   },
+   "storyboardIds": [
+    989
+   ],
+   "configId": 1,
+   "stage": "video_prompts",
+   "model_used": {
+    "config_id": 1,
+    "name": "GLM 5.3 (local)",
+    "provider": "openai",
+    "model": "glm-5.3-flash",
+    "vision": false
+   },
+   "restart": {
+    "kind": "video_prompts",
+    "args": {
+     "episodeId": 27,
+     "dramaId": 20,
+     "opts": {},
+     "storyboardIds": [
+      989
+     ]
+    }
+   },
+   "reasoning_chars": 2089,
+   "output_text": "分镜 #59：已为分镜 #59（ID:989，组合 C：图层段 5.5s → 生成段 11s）生成并保存 video_prompt，要点如下：\n\n- **0–1 秒空镜衔接段**：逐字复述锁定衔接帧 caption（俯拍全景式地图画面，米黄底色、深褐直线与红色折线箭头），镜头静止、无人、无切镜、无过渡，满足首段 ≤1.5 秒与三条硬约束。\n- **1–5.5 秒**：切到 @乌拉尔山口，承接中关键帧（mid_frame_time=5.5 为山口脊线画面的前置铺垫），队列沿雪迹小径向上行进，四肢状态逐人写明。\n- **5.5–8.5 秒**：分段起点正好落在 mid_frame_time=5.5 秒，画面与中关键帧一致——首领立于脊顶、右手握长矛杆、左手遮额眺望东坡河谷。\n- **8.5–12 秒**：切到 @塔尔吉河营地，收束到尾关键帧画面——窝棚、柴堆、营火，首领提 @哥萨克火枪 垂在腿侧立于窝棚前，队伍卸下行装、散而不乱。\n- 全程 @场景逐段锚定、无角色出场（本镜生成段按设计卡仅 @乌拉尔山口、@塔尔吉河营地 两组参考素材，未绑定角色），旁白不写入提示词（走独立音轨），不跨场景、切镜点对齐「行军翻山→扎营」结构，总时长 12 秒符合 H3 限制。"
+  },
+  "video_obs": {
+   "works": [
+    {
+     "id": 784,
+     "stage": "video_prompts",
+     "storyboard_id": 989,
+     "storyboard_number": 59,
+     "status": "completed",
+     "work_ms": 44294,
+     "model_ms": 43885,
+     "queue_ms": 3,
+     "call_count": 3,
+     "error_msg": null
+    }
+   ],
+   "calls": [
+    {
+     "id": 2548,
+     "kind": "llm",
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "http_status": 200,
+     "duration_ms": 3086,
+     "queue_ms": 1,
+     "prompt_tokens": 24503,
+     "completion_tokens": 7,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2549,
+     "kind": "llm",
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "http_status": 200,
+     "duration_ms": 31404,
+     "queue_ms": 1,
+     "prompt_tokens": 71123,
+     "completion_tokens": 1876,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2550,
+     "kind": "llm",
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "http_status": 200,
+     "duration_ms": 9395,
+     "queue_ms": 1,
+     "prompt_tokens": 72216,
+     "completion_tokens": 372,
+     "finish_reason": "stop",
+     "error_msg": null
+    }
+   ],
+   "call_count": 3,
+   "llm_calls": 3,
+   "max_prompt_tokens": 72216,
+   "total_prompt_tokens": 167842,
+   "total_completion_tokens": 2255,
+   "models": [
+    [
+     1,
+     "GLM 5.3 (local)",
+     "glm-5.3-flash"
+    ]
+   ],
+   "request_params": [
+    {
+     "max_tokens": "131072",
+     "model": "\"glm-5.3-flash\"",
+     "reasoning_effort": "\"low\"",
+     "stream": "true"
+    },
+    {}
+   ]
+  },
+  "video_rejections": [
+   [
+    "20",
+    "拒绝",
+    "[\n  {\n    \"type\": \"function\",\n    \"function\": {\n      \"name\": \"readCharacters\",\n      \"description\": \"读取当前剧集中的所有角色信息，用于生成角色三视图最终提示词。\",\n      \"parameters\": {\n        \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n        \"type\": \"object\",\n        \"properties\": {},\n        \"additionalProperties\": false,\n        \"required\": []\n      }\n    }\n  },\n  {\n    \"type\": \"function\",\n    \"function\": {\n  "
+   ],
+   [
+    null,
+    "card_ref_unmet",
+    "你是专业的 AI 提示词工程师，负责三类提示词的创作与保存：\n1. 角色/场景/道具的「最终提示词」，供生图直接使用\n2. 分镜的「关键帧提示词」（first_frame_prompt / mid_frame_prompt + mid_frame_time / last_frame_prompt），供关键帧生图直接使用\n3. 分镜的「视频提示词」（video_prompt），供视频生成直接使用\n\n## 图片最终提示词\n\n用户请求会告知要为哪些角色、场景或道具生成最终提示词（附带 character_id / scene_id / prop_id）。\n\n工作流程：\n1. 调用 readCharacters / readScenes / readProps 读取资产信息\n2. 按对应技能规范（角色三视图及造型版本 / 场景固定视角 / 道具白底单品）创作最终提示词\n3. 调用 saveChar"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "请为分镜 #59(ID:989)生成视频提示词(video_prompt)。视频模型:MiniMax H3 INT8 (ComfyUI 102) (h3-jobs),请根据该模型的特性和时长限制生成。\n请先调用 read_storyboard_context 获取该分镜的画面描述(含【镜头N】子镜头与台词/旁白)、氛围、时长及三条关键帧提示词(first_frame_prompt/mid_frame_prompt/mid_frame_time/last_frame_prompt)与 locked_frames(该镜被图层段衔接帧锁死的槽位、取景与画面描述 caption)，据此生成 video_prompt(第一行是信息头：列出该分镜出场的人物与场景，用 @角色名/@场景名 引用；之后按 3 秒分段换行、用 @角色名/@场景名/@道具名 引用参考素材；段落内允许多镜头切镜，段与段可以是不同"
+   ],
+   [
+    "readStoryboardContext",
+    "mid_frame_time",
+    "{\n  \"episode\": {\n    \"id\": 27,\n    \"title\": \"中俄百年变局（1）：一个草原强盗的逆袭\",\n    \"episode_number\": 1,\n    \"description\": \"\"\n  },\n  \"aspect_ratio\": \"16:9\",\n  \"composition\": \"横构图\",\n  \"text_spec\": {\n    \"layouts\": [\n      {\n        \"id\": \"h-left-stack\",\n        \"name\": \"左上语境／左中主叙事／左下关键词\",\n        \"slots\": [\n          {\n            \"role\": \"date\",\n            \"zone\": \"context\"\n          },\n          {\n         "
+   ],
+   [
+    "20",
+    "拒绝",
+    "[\n  {\n    \"type\": \"function\",\n    \"function\": {\n      \"name\": \"readCharacters\",\n      \"description\": \"读取当前剧集中的所有角色信息，用于生成角色三视图最终提示词。\",\n      \"parameters\": {\n        \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n        \"type\": \"object\",\n        \"properties\": {},\n        \"additionalProperties\": false,\n        \"required\": []\n      }\n    }\n  },\n  {\n    \"type\": \"function\",\n    \"function\": {\n  "
+   ],
+   [
+    null,
+    "card_ref_unmet",
+    "你是专业的 AI 提示词工程师，负责三类提示词的创作与保存：\n1. 角色/场景/道具的「最终提示词」，供生图直接使用\n2. 分镜的「关键帧提示词」（first_frame_prompt / mid_frame_prompt + mid_frame_time / last_frame_prompt），供关键帧生图直接使用\n3. 分镜的「视频提示词」（video_prompt），供视频生成直接使用\n\n## 图片最终提示词\n\n用户请求会告知要为哪些角色、场景或道具生成最终提示词（附带 character_id / scene_id / prop_id）。\n\n工作流程：\n1. 调用 readCharacters / readScenes / readProps 读取资产信息\n2. 按对应技能规范（角色三视图及造型版本 / 场景固定视角 / 道具白底单品）创作最终提示词\n3. 调用 saveChar"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "请为分镜 #59(ID:989)生成视频提示词(video_prompt)。视频模型:MiniMax H3 INT8 (ComfyUI 102) (h3-jobs),请根据该模型的特性和时长限制生成。\n请先调用 read_storyboard_context 获取该分镜的画面描述(含【镜头N】子镜头与台词/旁白)、氛围、时长及三条关键帧提示词(first_frame_prompt/mid_frame_prompt/mid_frame_time/last_frame_prompt)与 locked_frames(该镜被图层段衔接帧锁死的槽位、取景与画面描述 caption)，据此生成 video_prompt(第一行是信息头：列出该分镜出场的人物与场景，用 @角色名/@场景名 引用；之后按 3 秒分段换行、用 @角色名/@场景名/@道具名 引用参考素材；段落内允许多镜头切镜，段与段可以是不同"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "{\"aspect_ratio\":\"16:9\",\"characters\":[{\"appearance\":\"中年男子，约四十岁，中等偏瘦的身材，方正的长脸，额发向后梳，深色短发齐耳，蓄浓密的褐色络腮胡与八字胡，眼皮微垂，目光疲惫而固执，常驻的冒险者气质。\",\"description\":\"15 世纪末的欧洲航海者，受西班牙国王赞助。本集作为全篇的比较基准出现：他向西横渡大西洋抵达美洲，开启欧洲长达四五百年的航海与殖民时代。\",\"id\":71,\"image_url\":\"static/images/4f02e573-bcaa-4e78-b71d-a21a5a084bda.png\",\"name\":\"哥伦布\",\"reference_images\":[],\"role\":\"航海家 · 西航远征者\",\"styling\":\"深蓝色航海长外套，内穿米白粗布衬衣，腰系棕色皮带，下穿深色窄腿裤与棕色皮靴；胸前挂一枚黄"
+   ],
+   [
+    "20",
+    "拒绝",
+    "[\n  {\n    \"type\": \"function\",\n    \"function\": {\n      \"name\": \"readCharacters\",\n      \"description\": \"读取当前剧集中的所有角色信息，用于生成角色三视图最终提示词。\",\n      \"parameters\": {\n        \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n        \"type\": \"object\",\n        \"properties\": {},\n        \"additionalProperties\": false,\n        \"required\": []\n      }\n    }\n  },\n  {\n    \"type\": \"function\",\n    \"function\": {\n  "
+   ],
+   [
+    null,
+    "card_ref_unmet",
+    "你是专业的 AI 提示词工程师，负责三类提示词的创作与保存：\n1. 角色/场景/道具的「最终提示词」，供生图直接使用\n2. 分镜的「关键帧提示词」（first_frame_prompt / mid_frame_prompt + mid_frame_time / last_frame_prompt），供关键帧生图直接使用\n3. 分镜的「视频提示词」（video_prompt），供视频生成直接使用\n\n## 图片最终提示词\n\n用户请求会告知要为哪些角色、场景或道具生成最终提示词（附带 character_id / scene_id / prop_id）。\n\n工作流程：\n1. 调用 readCharacters / readScenes / readProps 读取资产信息\n2. 按对应技能规范（角色三视图及造型版本 / 场景固定视角 / 道具白底单品）创作最终提示词\n3. 调用 saveChar"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "请为分镜 #59(ID:989)生成视频提示词(video_prompt)。视频模型:MiniMax H3 INT8 (ComfyUI 102) (h3-jobs),请根据该模型的特性和时长限制生成。\n请先调用 read_storyboard_context 获取该分镜的画面描述(含【镜头N】子镜头与台词/旁白)、氛围、时长及三条关键帧提示词(first_frame_prompt/mid_frame_prompt/mid_frame_time/last_frame_prompt)与 locked_frames(该镜被图层段衔接帧锁死的槽位、取景与画面描述 caption)，据此生成 video_prompt(第一行是信息头：列出该分镜出场的人物与场景，用 @角色名/@场景名 引用；之后按 3 秒分段换行、用 @角色名/@场景名/@道具名 引用参考素材；段落内允许多镜头切镜，段与段可以是不同"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "{\"aspect_ratio\":\"16:9\",\"characters\":[{\"appearance\":\"中年男子，约四十岁，中等偏瘦的身材，方正的长脸，额发向后梳，深色短发齐耳，蓄浓密的褐色络腮胡与八字胡，眼皮微垂，目光疲惫而固执，常驻的冒险者气质。\",\"description\":\"15 世纪末的欧洲航海者，受西班牙国王赞助。本集作为全篇的比较基准出现：他向西横渡大西洋抵达美洲，开启欧洲长达四五百年的航海与殖民时代。\",\"id\":71,\"image_url\":\"static/images/4f02e573-bcaa-4e78-b71d-a21a5a084bda.png\",\"name\":\"哥伦布\",\"reference_images\":[],\"role\":\"航海家 · 西航远征者\",\"styling\":\"深蓝色航海长外套，内穿米白粗布衬衣，腰系棕色皮带，下穿深色窄腿裤与棕色皮靴；胸前挂一枚黄"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "已为分镜 #59（ID:989，组合 C：图层段 5.5s → 生成段 11s）生成并保存 video_prompt，要点如下：\n\n- **0–1 秒空镜衔接段**：逐字复述锁定衔接帧 caption（俯拍全景式地图画面，米黄底色、深褐直线与红色折线箭头），镜头静止、无人、无切镜、无过渡，满足首段 ≤1.5 秒与三条硬约束。\n- **1–5.5 秒**：切到 @乌拉尔山口，承接中关键帧（mid_frame_time=5.5 为山口脊线画面的前置铺垫），队列沿雪迹小径向上行进，四肢状态逐人写明。\n- **5.5–8.5 秒**：分段起点正好落在 mid_frame_time=5.5 秒，画面与中关键帧一致——首领立于脊顶、右手握长矛杆、左手遮额眺望东坡河谷。\n- **8.5–12 秒**：切到 @塔尔吉河营地，收束到尾关键帧画面——窝棚、柴堆、营火，首领提 @哥萨克火枪 垂在腿侧立于窝棚前，"
+   ]
+  ],
+  "after_vp": {
+   "first_frame_prompt": "",
+   "mid_frame_prompt": "@乌拉尔山口 @塔尔吉河营地，午后偏斜的阳光被林冠切开成斑驳条带，雪迹与土石小径上明暗交错，山谷带薄雾，色调偏冷绿与土褐，16:9 横构图电影感剧照。中景平视固定机位，取 @乌拉尔山口 的山口脊线：画面中部是穿过山口向东延伸的窄幅踩踏土石小径，两侧深绿针叶林覆盖的缓坡丘陵上散落灰色岩块与苔藓，远处可见更低的山脊与河谷轮廓，雪迹沿小径断续延伸。一名哥萨克首领（灰褐粗呢长袍、黑色羊皮帽、腰束布带，共十余人队伍之首）立于山口脊顶、身形位于画面中央偏右，身体略侧向镜头，右手握着长矛的矛杆中段、矛尖朝上，左手抬起遮在额前，双腿分开站稳、两只皮靴踏在脊顶的土石上清晰可见，脸朝向画面右方的东面河谷，下颌微抬、目光眺望谷地方向，嘴唇抿平。他身后下方的坡道上，一列哥萨克（同样的灰褐粗呢长袍、黑色羊皮帽、腰束布带，共十余人）沿小径成单列向上行进：为首者右手扶着肩上扛着的火枪枪身、左手扶住腰间，双腿迈步蹬在雪迹与碎石上，其后各人各自单手握着火枪枪身扛在肩前、另一手提着行囊，队列自画面下方的坡底向上延伸向脊顶，队尾隐在林影与薄雾里。远处的谷地方向即 @塔尔吉河营地 所在的东坡河谷轮廓，在薄雾中层层退远。人物、队列与山口小径完整入画，画面开阔、层次清晰。16:9 横构图电影感剧照，单帧静态画面",
+   "last_frame_prompt": "@乌拉尔山口 @塔尔吉河营地，黄昏，低角度橙黄转灰白的斜光铺在雪面上，雪地反光柔和，营火升起的烟在冷空气中散开，营火呈暖橘亮点，背后覆雪的针叶林坡地沉入青灰，16:9 横构图电影感剧照。中全景平视固定机位，取 @塔尔吉河营地 河岸雪地的营地全景收束：画面左侧沿滩地排开几座树枝与原木搭成的低矮窝棚与帆布帐，窝棚前的雪地上堆着砍伐的原木与成垛的柴堆，一堆营火在柴堆旁燃着、火光把木杆与雪面染成暖橘，画面右侧是结了薄冰的河岸与泛着灰白的河面，背后是覆雪的针叶林坡地轮廓。一名哥萨克首领（灰褐粗呢长袍、黑色羊皮帽、腰束布带，共十余人队伍之首）立在最近那座窝棚前、身形位于画面中部偏左，身体略侧向镜头，右手提着 @哥萨克火枪 的枪托后段、枪管朝下斜指雪地，火枪侧面的火绳夹与横插在枪身中段的木质通条在他的腿侧清楚可见，左手自然垂在体侧，双腿分开站稳、两只皮靴踏在雪地上清晰可见，下颌微抬、目光望向画面前方的河面，嘴唇抿平。他身后的雪地上，其余哥萨克（同样的灰褐粗呢长袍、黑色羊皮帽、腰束布带，共十余人）在窝棚与柴堆之间各自卸下行装：有人双手把捆扎的行囊放在雪地上，有人单手握着火枪的枪身把枪托抵在靴旁、双腿并拢站定，肩上还背着卷起的铺盖，队伍散而不乱。雪地上一行踩踏的脚印从河岸通向窝棚，营地各处设施与人物完整入画，构图平稳清晰、层次分明，可被下一镜直接承接。16:9 横构图电影感剧照，单帧静态画面",
+   "mid_frame_time": 5.5,
+   "video_prompt": "出场人物：无；场景：@乌拉尔山口、@塔尔吉河营地；道具：@哥萨克火枪。\n0-1秒：俯拍全景式地图画面，米黄底色上分布浅灰细线轮廓与浅蓝细线水系，一条深褐直线自上方中部向下延伸，一条红色折线自左侧圆点向右下延伸，经中部圆点后折向右上，再向右下至右下角，末端有红色箭头，光线均匀、无明暗对比，留白在右上与上方区域，镜头静止，画面无人。\n1-5.5秒：接在空镜之后，切到 @乌拉尔山口 缓坡山道的中远景平视固定机位，午后偏斜的阳光被林冠切开成斑驳条带，雪迹与土石小径上明暗交错，山谷带薄雾，两侧是深绿针叶林覆盖的缓坡丘陵、散落灰色岩块与苔藓；一列哥萨克（灰褐粗呢长袍、黑色羊皮帽、腰束布带，共十余人）沿踩踏出的土石小径成单列向上行进：为首者右手握长矛的矛杆中段、矛尖朝上，左手按在腰间刀柄上，双腿迈步蹬在雪迹与碎石上，其后各人各自单手握着火枪枪身扛在肩前、另一手提着行囊，队列自画面下方的坡底向上延伸向脊顶，队尾隐在林影与薄雾里，土石小径旁的雪迹上留有一行踩踏脚印，队伍持续沿坡道向上、穿过针叶林间的山口。\n5.5-8.5秒：@乌拉尔山口，切到山口脊线的中景平视固定机位，画面中部是穿过山口向东延伸的窄幅踩踏土石小径，远处可见更低的山脊与河谷轮廓，雪迹沿小径断续延伸；为首的哥萨克（灰褐粗呢长袍、黑色羊皮帽、腰束布带）立于山口脊顶、身形位于画面中央偏右，身体略侧向镜头，右手握着长矛的矛杆中段、矛尖朝上，左手抬起遮在额前，双腿分开站稳、两只皮靴踏在脊顶的土石上清晰可见，脸朝向画面右方的东面河谷，下颌微抬、目光眺望谷地方向，嘴唇抿平；他身后下方的坡道上，那列哥萨克（同样的灰褐粗呢长袍、黑色羊皮帽、腰束布带）沿小径成单列继续向上、依次登上山口脊线，各自单手握着火枪枪身扛在肩前、另一手提着行囊；午后偏斜的阳光在雪迹与小径上明暗交错，远处的谷地在薄雾中层层退远。\n8.5-12秒：@塔尔吉河营地，切到河岸雪地的营地全景平视固定机位，镜头极缓推近，黄昏低角度橙黄转灰白的斜光铺在雪面上，雪地反光柔和，背后覆雪的针叶林坡地沉入青灰；画面左侧沿滩地排开几座树枝与原木搭成的低矮窝棚与帆布帐，窝棚前的雪地上堆着砍伐的原木与成垛的柴堆，一堆营火在柴堆旁燃着、火光把木杆与雪面染成暖橘，营火的烟在冷空气中散开，画面右侧是结了薄冰的河岸与泛着灰白的河面；队伍首领（灰褐粗呢长袍、黑色羊皮帽、腰束布带，队伍十余人之首）立在最近那座窝棚前、身形位于画面中部偏左，身体略侧向镜头，右手提着 @哥萨克火枪 的枪托后段、枪管朝下斜指雪地，火枪侧面的火绳夹与横插在枪身中段的木质通条在他的腿侧清楚可见，左手自然垂在体侧，双腿分开站稳、两只皮靴踏在雪地上清晰可见，下颌微抬、目光望向画面前方的河面，嘴唇抿平；其余哥萨克（同样的灰褐粗呢长袍、黑色羊皮帽、腰束布带）在窝棚与柴堆之间各自卸下行装：有人双手把捆扎的行囊放到雪地上，有人单手握着火枪的枪身把枪托抵在靴旁、双腿并拢站定，肩上还背着卷起的铺盖，队伍散而不乱；雪地上一行踩踏的脚印从河岸通向窝棚，营火呈暖橘亮点，营地各处设施与人物完整入画，构图平稳清晰。",
+   "field_saved_at": "{\"narration_text\":1794549518,\"design_card\":1794576867,\"first_frame_prompt\":1794665198,\"mid_frame_prompt\":1794665198,\"mid_frame_time\":1794665198,\"last_frame_prompt\":1794665198,\"video_prompt\":1794665244}"
+  }
+ },
+ "999": {
+  "keyframe_task": 3462,
+  "keyframe_wall_s": 40.0,
+  "keyframe_status": "completed",
+  "keyframe_error": null,
+  "keyframe_params": {
+   "kind": "keyframe_prompts",
+   "progress": {
+    "completed": 1,
+    "failed": 0,
+    "total": 1
+   },
+   "storyboardIds": [
+    999
+   ],
+   "scope": {
+    "included": [
+     {
+      "storyboard_id": 999,
+      "storyboard_number": 68
+     }
+    ],
+    "excluded": []
+   },
+   "configId": 1,
+   "stage": "keyframe_prompts",
+   "model_used": {
+    "config_id": 1,
+    "name": "GLM 5.3 (local)",
+    "provider": "openai",
+    "model": "glm-5.3-flash",
+    "vision": false
+   },
+   "restart": {
+    "kind": "keyframe_prompts",
+    "args": {
+     "episodeId": 27,
+     "dramaId": 20,
+     "opts": {},
+     "storyboardIds": [
+      999
+     ]
+    }
+   },
+   "reasoning_chars": 1119,
+   "output_text": "分镜 #68：组合 C（首帧为衔接帧锁定、不出图），故 `first_frame_prompt` 留空；写中间帧（齐射）与尾帧（肉搏缠斗），生成段 9.5 秒，`mid_frame_time` 取 4.5 秒。已保存分镜 #999 的关键帧提示词（组合 C）：\n\n- **first_frame_prompt**：留空——首帧为图层段衔接帧（锁定、不出图），由图层段末帧继承。\n- **mid_frame_prompt + mid_frame_time（4.5s）**：河滩正面交锋远景——左侧哥萨克横列成排端枪齐射、浓白硝烟翻卷，右侧蒙古骑兵与执矛步卒从对岸压上（人数明显占优），前排中弹栽落；呼应「人数悬殊、步枪横扫冷兵器」，未写字幕文字（留给图层段）。\n- **last_frame_prompt**：硝烟散开后的河滩近身缠斗——双方扭打、火枪当棍棒、长矛对枪身横架，泥水里横卧倒下的人与散落兵器，画面稳定清晰，可直接被下一镜 #69 的战后战场承接。\n\n三条提示词均自足交代 @托博尔河与额尔齐斯河交汇处 场景、景别机位、双方无名人物的服色持物标识（哥萨克：灰褐粗呢长袍/黑色羊皮帽；蒙古兵：尖顶毡帽/深色长袍/背弓执矛）、四肢姿态与清晨低角度晨光氛围，并以「16:9 横构图电影感剧照，单帧静态画面」收尾。"
+  },
+  "keyframe_obs": {
+   "works": [
+    {
+     "id": 785,
+     "stage": "keyframe_prompts",
+     "storyboard_id": 999,
+     "storyboard_number": 68,
+     "status": "completed",
+     "work_ms": 38110,
+     "model_ms": 37605,
+     "queue_ms": 4,
+     "call_count": 3,
+     "error_msg": null
+    }
+   ],
+   "calls": [
+    {
+     "id": 2551,
+     "kind": "llm",
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "http_status": 200,
+     "duration_ms": 2078,
+     "queue_ms": 1,
+     "prompt_tokens": 23840,
+     "completion_tokens": 7,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2552,
+     "kind": "llm",
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "http_status": 200,
+     "duration_ms": 27972,
+     "queue_ms": 1,
+     "prompt_tokens": 71418,
+     "completion_tokens": 1354,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2553,
+     "kind": "llm",
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "http_status": 200,
+     "duration_ms": 7555,
+     "queue_ms": 2,
+     "prompt_tokens": 72422,
+     "completion_tokens": 304,
+     "finish_reason": "stop",
+     "error_msg": null
+    }
+   ],
+   "call_count": 3,
+   "llm_calls": 3,
+   "max_prompt_tokens": 72422,
+   "total_prompt_tokens": 167680,
+   "total_completion_tokens": 1665,
+   "models": [
+    [
+     1,
+     "GLM 5.3 (local)",
+     "glm-5.3-flash"
+    ]
+   ],
+   "request_params": [
+    {
+     "max_tokens": "131072",
+     "model": "\"glm-5.3-flash\"",
+     "reasoning_effort": "\"low\"",
+     "stream": "true"
+    },
+    {}
+   ]
+  },
+  "keyframe_rejections": [
+   [
+    "20",
+    "拒绝",
+    "[\n  {\n    \"type\": \"function\",\n    \"function\": {\n      \"name\": \"readCharacters\",\n      \"description\": \"读取当前剧集中的所有角色信息，用于生成角色三视图最终提示词。\",\n      \"parameters\": {\n        \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n        \"type\": \"object\",\n        \"properties\": {},\n        \"additionalProperties\": false,\n        \"required\": []\n      }\n    }\n  },\n  {\n    \"type\": \"function\",\n    \"function\": {\n  "
+   ],
+   [
+    null,
+    "card_ref_unmet",
+    "你是专业的 AI 提示词工程师，负责三类提示词的创作与保存：\n1. 角色/场景/道具的「最终提示词」，供生图直接使用\n2. 分镜的「关键帧提示词」（first_frame_prompt / mid_frame_prompt + mid_frame_time / last_frame_prompt），供关键帧生图直接使用\n3. 分镜的「视频提示词」（video_prompt），供视频生成直接使用\n\n## 图片最终提示词\n\n用户请求会告知要为哪些角色、场景或道具生成最终提示词（附带 character_id / scene_id / prop_id）。\n\n工作流程：\n1. 调用 readCharacters / readScenes / readProps 读取资产信息\n2. 按对应技能规范（角色三视图及造型版本 / 场景固定视角 / 道具白底单品）创作最终提示词\n3. 调用 saveChar"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "请为分镜 #68(ID:999)生成关键帧提示词(first_frame_prompt、mid_frame_prompt、mid_frame_time、last_frame_prompt)，严格遵循 keyframe-prompt 技能规范。\n请先调用 read_storyboard_context 读取该分镜的 description(含【镜头N】子镜头)、result、atmosphere、duration、continuity_boundary 及 inherits_first，然后写出关键帧提示词：\n- 每张关键帧都是独立生成的单帧静态画面，只凭资产参考图 + 本条提示词出图，所以每条提示词必须自足（自己交代景别机位构图、@场景名、画面里有哪些 @角色名 及其位置姿态表情、关键 @道具名、光线氛围），禁止写「同上一帧」「保持不变」这类相对描述\n- 绝对图像优先：禁止描写角色的物种、"
+   ],
+   [
+    "readStoryboardContext",
+    "mid_frame_time",
+    "{\n  \"episode\": {\n    \"id\": 27,\n    \"title\": \"中俄百年变局（1）：一个草原强盗的逆袭\",\n    \"episode_number\": 1,\n    \"description\": \"\"\n  },\n  \"aspect_ratio\": \"16:9\",\n  \"composition\": \"横构图\",\n  \"text_spec\": {\n    \"layouts\": [\n      {\n        \"id\": \"h-left-stack\",\n        \"name\": \"左上语境／左中主叙事／左下关键词\",\n        \"slots\": [\n          {\n            \"role\": \"date\",\n            \"zone\": \"context\"\n          },\n          {\n         "
+   ],
+   [
+    "20",
+    "拒绝",
+    "[\n  {\n    \"type\": \"function\",\n    \"function\": {\n      \"name\": \"readCharacters\",\n      \"description\": \"读取当前剧集中的所有角色信息，用于生成角色三视图最终提示词。\",\n      \"parameters\": {\n        \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n        \"type\": \"object\",\n        \"properties\": {},\n        \"additionalProperties\": false,\n        \"required\": []\n      }\n    }\n  },\n  {\n    \"type\": \"function\",\n    \"function\": {\n  "
+   ],
+   [
+    null,
+    "card_ref_unmet",
+    "你是专业的 AI 提示词工程师，负责三类提示词的创作与保存：\n1. 角色/场景/道具的「最终提示词」，供生图直接使用\n2. 分镜的「关键帧提示词」（first_frame_prompt / mid_frame_prompt + mid_frame_time / last_frame_prompt），供关键帧生图直接使用\n3. 分镜的「视频提示词」（video_prompt），供视频生成直接使用\n\n## 图片最终提示词\n\n用户请求会告知要为哪些角色、场景或道具生成最终提示词（附带 character_id / scene_id / prop_id）。\n\n工作流程：\n1. 调用 readCharacters / readScenes / readProps 读取资产信息\n2. 按对应技能规范（角色三视图及造型版本 / 场景固定视角 / 道具白底单品）创作最终提示词\n3. 调用 saveChar"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "请为分镜 #68(ID:999)生成关键帧提示词(first_frame_prompt、mid_frame_prompt、mid_frame_time、last_frame_prompt)，严格遵循 keyframe-prompt 技能规范。\n请先调用 read_storyboard_context 读取该分镜的 description(含【镜头N】子镜头)、result、atmosphere、duration、continuity_boundary 及 inherits_first，然后写出关键帧提示词：\n- 每张关键帧都是独立生成的单帧静态画面，只凭资产参考图 + 本条提示词出图，所以每条提示词必须自足（自己交代景别机位构图、@场景名、画面里有哪些 @角色名 及其位置姿态表情、关键 @道具名、光线氛围），禁止写「同上一帧」「保持不变」这类相对描述\n- 绝对图像优先：禁止描写角色的物种、"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "{\"aspect_ratio\":\"16:9\",\"characters\":[{\"appearance\":\"中年男子，约四十岁，中等偏瘦的身材，方正的长脸，额发向后梳，深色短发齐耳，蓄浓密的褐色络腮胡与八字胡，眼皮微垂，目光疲惫而固执，常驻的冒险者气质。\",\"description\":\"15 世纪末的欧洲航海者，受西班牙国王赞助。本集作为全篇的比较基准出现：他向西横渡大西洋抵达美洲，开启欧洲长达四五百年的航海与殖民时代。\",\"id\":71,\"image_url\":\"static/images/4f02e573-bcaa-4e78-b71d-a21a5a084bda.png\",\"name\":\"哥伦布\",\"reference_images\":[],\"role\":\"航海家 · 西航远征者\",\"styling\":\"深蓝色航海长外套，内穿米白粗布衬衣，腰系棕色皮带，下穿深色窄腿裤与棕色皮靴；胸前挂一枚黄"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "组合 C（首帧为衔接帧锁定、不出图），故 `first_frame_prompt` 留空；写中间帧（齐射）与尾帧（肉搏缠斗），生成段 9.5 秒，`mid_frame_time` 取 4.5 秒。"
+   ],
+   [
+    "updateStoryboard",
+    "mid_frame_time",
+    "{\"first_frame_prompt\":\"\",\"last_frame_prompt\":\"@托博尔河与额尔齐斯河交汇处，清晨，淡金色低角度晨光从画面左侧斜照河滩，齐射的硝烟已经散开大半，空气里浮着一层稀薄的灰白烟缕，河面泛着清冷的浅金反光，泥滩湿烂泛暗光，16:9 横构图电影感剧照。中远景广角俯角固定机位，取 @托博尔河与额尔齐斯河交汇处 的河滩正面交锋收束画面：画面下部是踩得湿烂的河滩泥地与几处积着浅水的泥洼，泥水里横卧着数具倒下的身影（尖顶毡帽、深色长袍），四肢摊开、衣袍被泥水浸透，几支倾倒的长矛与折断的弓散落在他们身旁；画面中部是近身缠斗的人堆，十几名双方人物扭打纠缠成一片：哥萨克（灰褐粗呢长袍、黑色羊皮帽、腰束布带）有的双手握着火枪的枪托当棍棒抡起、双腿前后岔开站稳，有的与蒙古兵（尖顶毡帽、深色长袍、腰束布带）抱摔在地、双膝跪在泥里互相攥住对方的衣领，一名蒙古步卒双手握着长矛的矛"
+   ],
+   [
+    "20",
+    "拒绝",
+    "[\n  {\n    \"type\": \"function\",\n    \"function\": {\n      \"name\": \"readCharacters\",\n      \"description\": \"读取当前剧集中的所有角色信息，用于生成角色三视图最终提示词。\",\n      \"parameters\": {\n        \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n        \"type\": \"object\",\n        \"properties\": {},\n        \"additionalProperties\": false,\n        \"required\": []\n      }\n    }\n  },\n  {\n    \"type\": \"function\",\n    \"function\": {\n  "
+   ],
+   [
+    null,
+    "card_ref_unmet",
+    "你是专业的 AI 提示词工程师，负责三类提示词的创作与保存：\n1. 角色/场景/道具的「最终提示词」，供生图直接使用\n2. 分镜的「关键帧提示词」（first_frame_prompt / mid_frame_prompt + mid_frame_time / last_frame_prompt），供关键帧生图直接使用\n3. 分镜的「视频提示词」（video_prompt），供视频生成直接使用\n\n## 图片最终提示词\n\n用户请求会告知要为哪些角色、场景或道具生成最终提示词（附带 character_id / scene_id / prop_id）。\n\n工作流程：\n1. 调用 readCharacters / readScenes / readProps 读取资产信息\n2. 按对应技能规范（角色三视图及造型版本 / 场景固定视角 / 道具白底单品）创作最终提示词\n3. 调用 saveChar"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "请为分镜 #68(ID:999)生成关键帧提示词(first_frame_prompt、mid_frame_prompt、mid_frame_time、last_frame_prompt)，严格遵循 keyframe-prompt 技能规范。\n请先调用 read_storyboard_context 读取该分镜的 description(含【镜头N】子镜头)、result、atmosphere、duration、continuity_boundary 及 inherits_first，然后写出关键帧提示词：\n- 每张关键帧都是独立生成的单帧静态画面，只凭资产参考图 + 本条提示词出图，所以每条提示词必须自足（自己交代景别机位构图、@场景名、画面里有哪些 @角色名 及其位置姿态表情、关键 @道具名、光线氛围），禁止写「同上一帧」「保持不变」这类相对描述\n- 绝对图像优先：禁止描写角色的物种、"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "{\"aspect_ratio\":\"16:9\",\"characters\":[{\"appearance\":\"中年男子，约四十岁，中等偏瘦的身材，方正的长脸，额发向后梳，深色短发齐耳，蓄浓密的褐色络腮胡与八字胡，眼皮微垂，目光疲惫而固执，常驻的冒险者气质。\",\"description\":\"15 世纪末的欧洲航海者，受西班牙国王赞助。本集作为全篇的比较基准出现：他向西横渡大西洋抵达美洲，开启欧洲长达四五百年的航海与殖民时代。\",\"id\":71,\"image_url\":\"static/images/4f02e573-bcaa-4e78-b71d-a21a5a084bda.png\",\"name\":\"哥伦布\",\"reference_images\":[],\"role\":\"航海家 · 西航远征者\",\"styling\":\"深蓝色航海长外套，内穿米白粗布衬衣，腰系棕色皮带，下穿深色窄腿裤与棕色皮靴；胸前挂一枚黄"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "组合 C（首帧为衔接帧锁定、不出图），故 `first_frame_prompt` 留空；写中间帧（齐射）与尾帧（肉搏缠斗），生成段 9.5 秒，`mid_frame_time` 取 4.5 秒。"
+   ],
+   [
+    "updateStoryboard",
+    "mid_frame_time",
+    "{\"first_frame_prompt\":\"\",\"last_frame_prompt\":\"@托博尔河与额尔齐斯河交汇处，清晨，淡金色低角度晨光从画面左侧斜照河滩，齐射的硝烟已经散开大半，空气里浮着一层稀薄的灰白烟缕，河面泛着清冷的浅金反光，泥滩湿烂泛暗光，16:9 横构图电影感剧照。中远景广角俯角固定机位，取 @托博尔河与额尔齐斯河交汇处 的河滩正面交锋收束画面：画面下部是踩得湿烂的河滩泥地与几处积着浅水的泥洼，泥水里横卧着数具倒下的身影（尖顶毡帽、深色长袍），四肢摊开、衣袍被泥水浸透，几支倾倒的长矛与折断的弓散落在他们身旁；画面中部是近身缠斗的人堆，十几名双方人物扭打纠缠成一片：哥萨克（灰褐粗呢长袍、黑色羊皮帽、腰束布带）有的双手握着火枪的枪托当棍棒抡起、双腿前后岔开站稳，有的与蒙古兵（尖顶毡帽、深色长袍、腰束布带）抱摔在地、双膝跪在泥里互相攥住对方的衣领，一名蒙古步卒双手握着长矛的矛"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "已保存分镜 #999 的关键帧提示词（组合 C）：\n\n- **first_frame_prompt**：留空——首帧为图层段衔接帧（锁定、不出图），由图层段末帧继承。\n- **mid_frame_prompt + mid_frame_time（4.5s）**：河滩正面交锋远景——左侧哥萨克横列成排端枪齐射、浓白硝烟翻卷，右侧蒙古骑兵与执矛步卒从对岸压上（人数明显占优），前排中弹栽落；呼应「人数悬殊、步枪横扫冷兵器」，未写字幕文字（留给图层段）。\n- **last_frame_prompt**：硝烟散开后的河滩近身缠斗——双方扭打、火枪当棍棒、长矛对枪身横架，泥水里横卧倒下的人与散落兵器，画面稳定清晰，可直接被下一镜 #69 的战后战场承接。\n\n三条提示词均自足交代 @托博尔河与额尔齐斯河交汇处 场景、景别机位、双方无名人物的服色持物标识（哥萨克：灰褐粗呢长袍/黑色羊皮帽；蒙古兵：尖顶毡帽/"
+   ]
+  ],
+  "after_kf": {
+   "first_frame_prompt": "",
+   "mid_frame_prompt": "@托博尔河与额尔齐斯河交汇处，清晨，淡金色低角度晨光从画面左侧斜照河滩，河面浮着薄雾与水汽，色调清冷，16:9 横构图电影感剧照。远景广角平视固定机位，取 @托博尔河与额尔齐斯河交汇处 的河滩正面交锋：画面左侧的河滩上，一排哥萨克（灰褐粗呢长袍、黑色羊皮帽、腰束布带、及膝皮靴，共十余人）成横列站立，各自双腿分开站稳、两只皮靴踏在覆霜的滩地上清晰可见，双手各自端起一支火绳枪、枪托抵住右肩、枪管齐齐指向画面右前方的对岸，枪机侧面的火绳与木质通条在队列肩侧可辨，一轮齐射的浓白硝烟正从枪口喷出、在队列前方翻卷成一层横贯的白雾；画面右侧的河滩边缘与浅水线上，蒙古骑兵与执矛步卒（尖顶毡帽、深色长袍、背弓，共二十余人）正从对岸压上来，最前排的骑兵双腿夹紧马腹、马匹四蹄踏水溅起水花，执矛步卒各自双手握着长矛的矛杆中段把矛尖压低指向前方、双腿弓步踩进浅滩，队列后方仍有成片的身影在跟进，人数明显多于左侧的哥萨克横列；前排几名骑兵已中弹栽落、人与马倒在滩边的浅水里。画面上部是两条河相接的宽阔水面与对岸一线灰褐的落叶林带轮廓，薄雾在水面浮动，晨光穿过硝烟在滩地上切出光带，泥滩与草甸的明暗层次分明。人物、马匹、兵器与河滩陈设完整入画，构图平稳清晰。16:9 横构图电影感剧照，单帧静态画面，无运动模糊",
+   "last_frame_prompt": "@托博尔河与额尔齐斯河交汇处，清晨，淡金色低角度晨光从画面左侧斜照河滩，齐射的硝烟已经散开大半，空气里浮着一层稀薄的灰白烟缕，河面泛着清冷的浅金反光，泥滩湿烂泛暗光，16:9 横构图电影感剧照。中远景广角俯角固定机位，取 @托博尔河与额尔齐斯河交汇处 的河滩正面交锋收束画面：画面下部是踩得湿烂的河滩泥地与几处积着浅水的泥洼，泥水里横卧着数具倒下的身影（尖顶毡帽、深色长袍），四肢摊开、衣袍被泥水浸透，几支倾倒的长矛与折断的弓散落在他们身旁；画面中部是近身缠斗的人堆，十几名双方人物扭打纠缠成一片：哥萨克（灰褐粗呢长袍、黑色羊皮帽、腰束布带）有的双手握着火枪的枪托当棍棒抡起、双腿前后岔开站稳，有的与蒙古兵（尖顶毡帽、深色长袍、腰束布带）抱摔在地、双膝跪在泥里互相攥住对方的衣领，一名蒙古步卒双手握着长矛的矛杆中段向斜下方刺出、双腿弓步蹬在泥地上，一名哥萨克侧身用火枪的枪身横架住矛杆、双手各扣在枪托与枪管上、单膝跪地支撑；画面上部是宽阔的两色河面与对岸一线灰褐的落叶林带，稀薄烟层贴着水面浮动。泥地上的脚印与拖痕杂乱交错，光线明暗分明、无重阴影，人物、兵器与泥滩陈设完整入画，构图平稳清晰、层次分明，可被下一镜直接承接。16:9 横构图电影感剧照，单帧静态画面，无运动模糊",
+   "mid_frame_time": 4.5,
+   "video_prompt": "",
+   "field_saved_at": "{\"narration_text\":1794549599,\"design_card\":1794585700,\"first_frame_prompt\":1794665284,\"mid_frame_prompt\":1794665284,\"mid_frame_time\":1794665284,\"last_frame_prompt\":1794665284,\"video_prompt\":1794664765}"
+  },
+  "video_task": 3463,
+  "video_wall_s": 35.0,
+  "video_status": "completed",
+  "video_error": null,
+  "video_params": {
+   "kind": "video_prompts",
+   "progress": {
+    "completed": 1,
+    "failed": 0,
+    "total": 1
+   },
+   "storyboardIds": [
+    999
+   ],
+   "configId": 1,
+   "stage": "video_prompts",
+   "model_used": {
+    "config_id": 1,
+    "name": "GLM 5.3 (local)",
+    "provider": "openai",
+    "model": "glm-5.3-flash",
+    "vision": false
+   },
+   "restart": {
+    "kind": "video_prompts",
+    "args": {
+     "episodeId": 27,
+     "dramaId": 20,
+     "opts": {},
+     "storyboardIds": [
+      999
+     ]
+    }
+   },
+   "reasoning_chars": 1070,
+   "output_text": "分镜 #68：分镜 #68 的 video_prompt 已保存完成。\n\n要点说明：\n- **C 组合衔接帧**：首段为 0-1 秒空镜，逐字复述衔接帧画面（俯拍地图、红色折线、白色圆点标记、留白方位），未 @ 角色、无切镜、无场景过渡。\n- **中帧对齐**：4.5 秒分段起点正好落在 mid_frame_time=4.5，画面与中关键帧（哥萨克横列齐射、硝烟横贯、蒙古骑兵压上）一致。\n- **尾帧对齐**：末段（11-15 秒）收束到尾关键帧构图——硝烟散开、泥滩缠斗人堆、倒卧身影与折矛，末段内无切镜。\n- **战斗节奏**：1-4.5 秒列队对峙 → 4.5-7.5 秒齐射与骑兵栽落（「步枪横扫冷兵器」）→ 7.5-15 秒硝烟散开进入肉搏缠斗（「惨烈至肉搏」），完整落实设计卡 p6-p8 信息点。\n- 旁白未写入视频提示词，走独立音轨；哥萨克与蒙古方均为无资产无名人物，全程沿用同一套服色与持物标识。"
+  },
+  "video_obs": {
+   "works": [
+    {
+     "id": 786,
+     "stage": "video_prompts",
+     "storyboard_id": 999,
+     "storyboard_number": 68,
+     "status": "completed",
+     "work_ms": 34337,
+     "model_ms": 33871,
+     "queue_ms": 4,
+     "call_count": 3,
+     "error_msg": null
+    }
+   ],
+   "calls": [
+    {
+     "id": 2554,
+     "kind": "llm",
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "http_status": 200,
+     "duration_ms": 2047,
+     "queue_ms": 1,
+     "prompt_tokens": 24670,
+     "completion_tokens": 7,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2555,
+     "kind": "llm",
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "http_status": 200,
+     "duration_ms": 26248,
+     "queue_ms": 1,
+     "prompt_tokens": 73582,
+     "completion_tokens": 1730,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2556,
+     "kind": "llm",
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "http_status": 200,
+     "duration_ms": 5576,
+     "queue_ms": 2,
+     "prompt_tokens": 75004,
+     "completion_tokens": 293,
+     "finish_reason": "stop",
+     "error_msg": null
+    }
+   ],
+   "call_count": 3,
+   "llm_calls": 3,
+   "max_prompt_tokens": 75004,
+   "total_prompt_tokens": 173256,
+   "total_completion_tokens": 2030,
+   "models": [
+    [
+     1,
+     "GLM 5.3 (local)",
+     "glm-5.3-flash"
+    ]
+   ],
+   "request_params": [
+    {
+     "max_tokens": "131072",
+     "model": "\"glm-5.3-flash\"",
+     "reasoning_effort": "\"low\"",
+     "stream": "true"
+    },
+    {}
+   ]
+  },
+  "video_rejections": [
+   [
+    "20",
+    "拒绝",
+    "[\n  {\n    \"type\": \"function\",\n    \"function\": {\n      \"name\": \"readCharacters\",\n      \"description\": \"读取当前剧集中的所有角色信息，用于生成角色三视图最终提示词。\",\n      \"parameters\": {\n        \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n        \"type\": \"object\",\n        \"properties\": {},\n        \"additionalProperties\": false,\n        \"required\": []\n      }\n    }\n  },\n  {\n    \"type\": \"function\",\n    \"function\": {\n  "
+   ],
+   [
+    null,
+    "card_ref_unmet",
+    "你是专业的 AI 提示词工程师，负责三类提示词的创作与保存：\n1. 角色/场景/道具的「最终提示词」，供生图直接使用\n2. 分镜的「关键帧提示词」（first_frame_prompt / mid_frame_prompt + mid_frame_time / last_frame_prompt），供关键帧生图直接使用\n3. 分镜的「视频提示词」（video_prompt），供视频生成直接使用\n\n## 图片最终提示词\n\n用户请求会告知要为哪些角色、场景或道具生成最终提示词（附带 character_id / scene_id / prop_id）。\n\n工作流程：\n1. 调用 readCharacters / readScenes / readProps 读取资产信息\n2. 按对应技能规范（角色三视图及造型版本 / 场景固定视角 / 道具白底单品）创作最终提示词\n3. 调用 saveChar"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "请为分镜 #68(ID:999)生成视频提示词(video_prompt)。视频模型:MiniMax H3 INT8 (ComfyUI 102) (h3-jobs),请根据该模型的特性和时长限制生成。\n请先调用 read_storyboard_context 获取该分镜的画面描述(含【镜头N】子镜头与台词/旁白)、氛围、时长及三条关键帧提示词(first_frame_prompt/mid_frame_prompt/mid_frame_time/last_frame_prompt)与 locked_frames(该镜被图层段衔接帧锁死的槽位、取景与画面描述 caption)，据此生成 video_prompt(第一行是信息头：列出该分镜出场的人物与场景，用 @角色名/@场景名 引用；之后按 3 秒分段换行、用 @角色名/@场景名/@道具名 引用参考素材；段落内允许多镜头切镜，段与段可以是不同"
+   ],
+   [
+    "readStoryboardContext",
+    "mid_frame_time",
+    "{\n  \"episode\": {\n    \"id\": 27,\n    \"title\": \"中俄百年变局（1）：一个草原强盗的逆袭\",\n    \"episode_number\": 1,\n    \"description\": \"\"\n  },\n  \"aspect_ratio\": \"16:9\",\n  \"composition\": \"横构图\",\n  \"text_spec\": {\n    \"layouts\": [\n      {\n        \"id\": \"h-left-stack\",\n        \"name\": \"左上语境／左中主叙事／左下关键词\",\n        \"slots\": [\n          {\n            \"role\": \"date\",\n            \"zone\": \"context\"\n          },\n          {\n         "
+   ],
+   [
+    "20",
+    "拒绝",
+    "[\n  {\n    \"type\": \"function\",\n    \"function\": {\n      \"name\": \"readCharacters\",\n      \"description\": \"读取当前剧集中的所有角色信息，用于生成角色三视图最终提示词。\",\n      \"parameters\": {\n        \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n        \"type\": \"object\",\n        \"properties\": {},\n        \"additionalProperties\": false,\n        \"required\": []\n      }\n    }\n  },\n  {\n    \"type\": \"function\",\n    \"function\": {\n  "
+   ],
+   [
+    null,
+    "card_ref_unmet",
+    "你是专业的 AI 提示词工程师，负责三类提示词的创作与保存：\n1. 角色/场景/道具的「最终提示词」，供生图直接使用\n2. 分镜的「关键帧提示词」（first_frame_prompt / mid_frame_prompt + mid_frame_time / last_frame_prompt），供关键帧生图直接使用\n3. 分镜的「视频提示词」（video_prompt），供视频生成直接使用\n\n## 图片最终提示词\n\n用户请求会告知要为哪些角色、场景或道具生成最终提示词（附带 character_id / scene_id / prop_id）。\n\n工作流程：\n1. 调用 readCharacters / readScenes / readProps 读取资产信息\n2. 按对应技能规范（角色三视图及造型版本 / 场景固定视角 / 道具白底单品）创作最终提示词\n3. 调用 saveChar"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "请为分镜 #68(ID:999)生成视频提示词(video_prompt)。视频模型:MiniMax H3 INT8 (ComfyUI 102) (h3-jobs),请根据该模型的特性和时长限制生成。\n请先调用 read_storyboard_context 获取该分镜的画面描述(含【镜头N】子镜头与台词/旁白)、氛围、时长及三条关键帧提示词(first_frame_prompt/mid_frame_prompt/mid_frame_time/last_frame_prompt)与 locked_frames(该镜被图层段衔接帧锁死的槽位、取景与画面描述 caption)，据此生成 video_prompt(第一行是信息头：列出该分镜出场的人物与场景，用 @角色名/@场景名 引用；之后按 3 秒分段换行、用 @角色名/@场景名/@道具名 引用参考素材；段落内允许多镜头切镜，段与段可以是不同"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "{\"aspect_ratio\":\"16:9\",\"characters\":[{\"appearance\":\"中年男子，约四十岁，中等偏瘦的身材，方正的长脸，额发向后梳，深色短发齐耳，蓄浓密的褐色络腮胡与八字胡，眼皮微垂，目光疲惫而固执，常驻的冒险者气质。\",\"description\":\"15 世纪末的欧洲航海者，受西班牙国王赞助。本集作为全篇的比较基准出现：他向西横渡大西洋抵达美洲，开启欧洲长达四五百年的航海与殖民时代。\",\"id\":71,\"image_url\":\"static/images/4f02e573-bcaa-4e78-b71d-a21a5a084bda.png\",\"name\":\"哥伦布\",\"reference_images\":[],\"role\":\"航海家 · 西航远征者\",\"styling\":\"深蓝色航海长外套，内穿米白粗布衬衣，腰系棕色皮带，下穿深色窄腿裤与棕色皮靴；胸前挂一枚黄"
+   ],
+   [
+    "20",
+    "拒绝",
+    "[\n  {\n    \"type\": \"function\",\n    \"function\": {\n      \"name\": \"readCharacters\",\n      \"description\": \"读取当前剧集中的所有角色信息，用于生成角色三视图最终提示词。\",\n      \"parameters\": {\n        \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n        \"type\": \"object\",\n        \"properties\": {},\n        \"additionalProperties\": false,\n        \"required\": []\n      }\n    }\n  },\n  {\n    \"type\": \"function\",\n    \"function\": {\n  "
+   ],
+   [
+    null,
+    "card_ref_unmet",
+    "你是专业的 AI 提示词工程师，负责三类提示词的创作与保存：\n1. 角色/场景/道具的「最终提示词」，供生图直接使用\n2. 分镜的「关键帧提示词」（first_frame_prompt / mid_frame_prompt + mid_frame_time / last_frame_prompt），供关键帧生图直接使用\n3. 分镜的「视频提示词」（video_prompt），供视频生成直接使用\n\n## 图片最终提示词\n\n用户请求会告知要为哪些角色、场景或道具生成最终提示词（附带 character_id / scene_id / prop_id）。\n\n工作流程：\n1. 调用 readCharacters / readScenes / readProps 读取资产信息\n2. 按对应技能规范（角色三视图及造型版本 / 场景固定视角 / 道具白底单品）创作最终提示词\n3. 调用 saveChar"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "请为分镜 #68(ID:999)生成视频提示词(video_prompt)。视频模型:MiniMax H3 INT8 (ComfyUI 102) (h3-jobs),请根据该模型的特性和时长限制生成。\n请先调用 read_storyboard_context 获取该分镜的画面描述(含【镜头N】子镜头与台词/旁白)、氛围、时长及三条关键帧提示词(first_frame_prompt/mid_frame_prompt/mid_frame_time/last_frame_prompt)与 locked_frames(该镜被图层段衔接帧锁死的槽位、取景与画面描述 caption)，据此生成 video_prompt(第一行是信息头：列出该分镜出场的人物与场景，用 @角色名/@场景名 引用；之后按 3 秒分段换行、用 @角色名/@场景名/@道具名 引用参考素材；段落内允许多镜头切镜，段与段可以是不同"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "{\"aspect_ratio\":\"16:9\",\"characters\":[{\"appearance\":\"中年男子，约四十岁，中等偏瘦的身材，方正的长脸，额发向后梳，深色短发齐耳，蓄浓密的褐色络腮胡与八字胡，眼皮微垂，目光疲惫而固执，常驻的冒险者气质。\",\"description\":\"15 世纪末的欧洲航海者，受西班牙国王赞助。本集作为全篇的比较基准出现：他向西横渡大西洋抵达美洲，开启欧洲长达四五百年的航海与殖民时代。\",\"id\":71,\"image_url\":\"static/images/4f02e573-bcaa-4e78-b71d-a21a5a084bda.png\",\"name\":\"哥伦布\",\"reference_images\":[],\"role\":\"航海家 · 西航远征者\",\"styling\":\"深蓝色航海长外套，内穿米白粗布衬衣，腰系棕色皮带，下穿深色窄腿裤与棕色皮靴；胸前挂一枚黄"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "分镜 #68 的 video_prompt 已保存完成。\n\n要点说明：\n- **C 组合衔接帧**：首段为 0-1 秒空镜，逐字复述衔接帧画面（俯拍地图、红色折线、白色圆点标记、留白方位），未 @ 角色、无切镜、无场景过渡。\n- **中帧对齐**：4.5 秒分段起点正好落在 mid_frame_time=4.5，画面与中关键帧（哥萨克横列齐射、硝烟横贯、蒙古骑兵压上）一致。\n- **尾帧对齐**：末段（11-15 秒）收束到尾关键帧构图——硝烟散开、泥滩缠斗人堆、倒卧身影与折矛，末段内无切镜。\n- **战斗节奏**：1-4.5 秒列队对峙 → 4.5-7.5 秒齐射与骑兵栽落（「步枪横扫冷兵器」）→ 7.5-15 秒硝烟散开进入肉搏缠斗（「惨烈至肉搏」），完整落实设计卡 p6-p8 信息点。\n- 旁白未写入视频提示词，走独立音轨；哥萨克与蒙古方均为无资产无名人物，全程沿用同一套服色与持物标"
+   ]
+  ],
+  "after_vp": {
+   "first_frame_prompt": "",
+   "mid_frame_prompt": "@托博尔河与额尔齐斯河交汇处，清晨，淡金色低角度晨光从画面左侧斜照河滩，河面浮着薄雾与水汽，色调清冷，16:9 横构图电影感剧照。远景广角平视固定机位，取 @托博尔河与额尔齐斯河交汇处 的河滩正面交锋：画面左侧的河滩上，一排哥萨克（灰褐粗呢长袍、黑色羊皮帽、腰束布带、及膝皮靴，共十余人）成横列站立，各自双腿分开站稳、两只皮靴踏在覆霜的滩地上清晰可见，双手各自端起一支火绳枪、枪托抵住右肩、枪管齐齐指向画面右前方的对岸，枪机侧面的火绳与木质通条在队列肩侧可辨，一轮齐射的浓白硝烟正从枪口喷出、在队列前方翻卷成一层横贯的白雾；画面右侧的河滩边缘与浅水线上，蒙古骑兵与执矛步卒（尖顶毡帽、深色长袍、背弓，共二十余人）正从对岸压上来，最前排的骑兵双腿夹紧马腹、马匹四蹄踏水溅起水花，执矛步卒各自双手握着长矛的矛杆中段把矛尖压低指向前方、双腿弓步踩进浅滩，队列后方仍有成片的身影在跟进，人数明显多于左侧的哥萨克横列；前排几名骑兵已中弹栽落、人与马倒在滩边的浅水里。画面上部是两条河相接的宽阔水面与对岸一线灰褐的落叶林带轮廓，薄雾在水面浮动，晨光穿过硝烟在滩地上切出光带，泥滩与草甸的明暗层次分明。人物、马匹、兵器与河滩陈设完整入画，构图平稳清晰。16:9 横构图电影感剧照，单帧静态画面，无运动模糊",
+   "last_frame_prompt": "@托博尔河与额尔齐斯河交汇处，清晨，淡金色低角度晨光从画面左侧斜照河滩，齐射的硝烟已经散开大半，空气里浮着一层稀薄的灰白烟缕，河面泛着清冷的浅金反光，泥滩湿烂泛暗光，16:9 横构图电影感剧照。中远景广角俯角固定机位，取 @托博尔河与额尔齐斯河交汇处 的河滩正面交锋收束画面：画面下部是踩得湿烂的河滩泥地与几处积着浅水的泥洼，泥水里横卧着数具倒下的身影（尖顶毡帽、深色长袍），四肢摊开、衣袍被泥水浸透，几支倾倒的长矛与折断的弓散落在他们身旁；画面中部是近身缠斗的人堆，十几名双方人物扭打纠缠成一片：哥萨克（灰褐粗呢长袍、黑色羊皮帽、腰束布带）有的双手握着火枪的枪托当棍棒抡起、双腿前后岔开站稳，有的与蒙古兵（尖顶毡帽、深色长袍、腰束布带）抱摔在地、双膝跪在泥里互相攥住对方的衣领，一名蒙古步卒双手握着长矛的矛杆中段向斜下方刺出、双腿弓步蹬在泥地上，一名哥萨克侧身用火枪的枪身横架住矛杆、双手各扣在枪托与枪管上、单膝跪地支撑；画面上部是宽阔的两色河面与对岸一线灰褐的落叶林带，稀薄烟层贴着水面浮动。泥地上的脚印与拖痕杂乱交错，光线明暗分明、无重阴影，人物、兵器与泥滩陈设完整入画，构图平稳清晰、层次分明，可被下一镜直接承接。16:9 横构图电影感剧照，单帧静态画面，无运动模糊",
+   "mid_frame_time": 4.5,
+   "video_prompt": "场景：@托博尔河与额尔齐斯河交汇处。\n0-1秒：俯拍平面地图式画面，米黄底色上分布浅灰细线轮廓与浅蓝河流线，一条红色折线自左侧中部向下折转，横贯画面中部后向右下延伸，末端在右侧偏下位置折起，折线末端与转折处有数个白色圆点标记，光线均匀平坦、无明暗渐变，留白主要在上方与左侧，镜头静止，画面无人。\n1-4.5秒：接在空镜之后，切到 @托博尔河与额尔齐斯河交汇处 的河滩全景广角平视固定机位，清晨淡金色低角度晨光从画面左侧斜照，河面浮着薄雾与水汽，色调清冷；画面左侧的覆霜河滩上，一排哥萨克步兵（灰褐粗呢长袍、黑色羊皮帽、腰束布带、及膝皮靴，共十余人）正由行进转为成横列站定，各自双腿分开站稳、两只皮靴踏在滩地上清晰可见，双手各自把一支火绳枪端起、枪托抵住右肩、枪管齐齐指向画面右前方的对岸，枪机侧面的火绳与横插在枪身中段的木质通条在队列肩侧可辨；画面右侧的浅水线与滩边，蒙古骑兵与执矛步卒（尖顶毡帽、深色长袍、背弓，共二十余人）正从对岸压上来，最前排骑兵双腿夹紧马腹、马匹四蹄踏水溅起水花，执矛步卒各自双手握着长矛的矛杆中段把矛尖压低指向前方、双腿弓步踩进浅滩，后排仍有成片身影在跟进，人数明显多于左侧的哥萨克横列；画面上部是两条河相接的宽阔水面与对岸一线灰褐的落叶林带轮廓，薄雾在水面浮动。\n4.5-7.5秒：@托博尔河与额尔齐斯河交汇处，切到同一河滩的远景广角平视固定机位，镜头停稳，一轮齐射打响：左侧那排哥萨克步兵（灰褐粗呢长袍、黑色羊皮帽、腰束布带、及膝皮靴）保持横列站姿、双腿分开站稳、两只皮靴踏在滩地上可见，双手各自端着火绳枪、枪托抵住右肩、枪管指向画面右前方，枪机侧面的火绳与木质通条在肩侧可辨，枪口喷出浓白硝烟，在队列前方翻卷成一层横贯的白雾并向上飘散；右侧浅水线上的蒙古骑兵与执矛步卒（尖顶毡帽、深色长袍、背弓）前排几名骑兵中弹从马背栽落、人与马倒在滩边浅水里，马匹扬蹄、溅起的水花在晨光下泛亮，后排步卒仍双手压低长矛的矛杆往前逼近；硝烟与薄雾在画面中部交叠，晨光穿过烟层在滩地上切出光带，泥滩与草甸明暗层次分明。\n7.5-11秒：@托博尔河与额尔齐斯河交汇处，切到河滩中部的中景俯角固定机位，齐射的硝烟渐渐散开大半，空气里浮着一层稀薄的灰白烟缕，河面泛着清冷的浅金反光；踩得湿烂的滩地泥地上，几名蒙古骑兵（尖顶毡帽、深色长袍）已经倒下、四肢摊开横在泥水里，身旁散着倾倒的长矛与折断的弓；画面中部的人堆里，哥萨克步兵（灰褐粗呢长袍、黑色羊皮帽、腰束布带）与蒙古步卒（尖顶毡帽、深色长袍、腰束布带）开始贴身近战：一名哥萨克双手握着火绳枪的枪托把枪身当棍棒抡起、双腿前后岔开站稳，两名靴子踩在泥地上可见；一名蒙古步卒双手握着长矛的矛杆中段向斜下方刺出、双腿弓步蹬在泥地上；一名哥萨克侧身用火枪的枪身横架住那根矛杆、双手各扣在枪托与枪管上、单膝跪地支撑；两人缠斗姿态成形，泥地脚印与拖痕杂乱交错，光线明暗分明。\n11-15秒：@托博尔河与额尔齐斯河交汇处，切回河滩正面交锋的中远景广角俯角固定机位，镜头停稳，硝烟散开大半、空气里只余稀薄灰白烟缕，河面泛着清冷的浅金反光，泥滩湿烂泛暗光；画面下部是踩得湿烂的河滩泥地与几处积着浅水的泥洼，泥水里横卧着数具倒下的身影（尖顶毡帽、深色长袍），四肢摊开、衣袍被泥水浸透，几支倾倒的长矛与折断的弓散落身旁；画面中部是近身缠斗的人堆，十几名双方人物扭打纠缠成一片：哥萨克步兵（灰褐粗呢长袍、黑色羊皮帽、腰束布带）有的双手握着火枪的枪托当棍棒抡起、双腿前后岔开站稳，有的与蒙古兵（尖顶毡帽、深色长袍、腰束布带）抱摔在地、双膝跪在泥里互相攥住对方的衣领，一名蒙古步卒双手握着长矛的矛杆中段向斜下方刺出、双腿弓步蹬在泥地上，一名哥萨克侧身用火枪的枪身横架住矛杆、双手各扣在枪托与枪管上、单膝跪地支撑，两人的缠斗姿态定格；画面上部是宽阔的两色河面与对岸一线灰褐的落叶林带，稀薄烟层贴着水面浮动，泥地脚印与拖痕杂乱交错，光线明暗分明、无重阴影，人物、兵器与泥滩陈设完整入画，构图平稳清晰、层次分明。",
+   "field_saved_at": "{\"narration_text\":1794549599,\"design_card\":1794585700,\"first_frame_prompt\":1794665284,\"mid_frame_prompt\":1794665284,\"mid_frame_time\":1794665284,\"last_frame_prompt\":1794665284,\"video_prompt\":1794665323}"
+  }
+ },
+ "1011": {
+  "keyframe_task": 3464,
+  "keyframe_wall_s": 40.0,
+  "keyframe_status": "completed",
+  "keyframe_error": null,
+  "keyframe_params": {
+   "kind": "keyframe_prompts",
+   "progress": {
+    "completed": 1,
+    "failed": 0,
+    "total": 1
+   },
+   "storyboardIds": [
+    1011
+   ],
+   "scope": {
+    "included": [
+     {
+      "storyboard_id": 1011,
+      "storyboard_number": 81
+     }
+    ],
+    "excluded": []
+   },
+   "configId": 1,
+   "stage": "keyframe_prompts",
+   "model_used": {
+    "config_id": 1,
+    "name": "GLM 5.3 (local)",
+    "provider": "openai",
+    "model": "glm-5.3-flash",
+    "vision": false
+   },
+   "restart": {
+    "kind": "keyframe_prompts",
+    "args": {
+     "episodeId": 27,
+     "dramaId": 20,
+     "opts": {},
+     "storyboardIds": [
+      1011
+     ]
+    }
+   },
+   "reasoning_chars": 598,
+   "output_text": "分镜 #81：readStoryboardContext 已读取：分镜 #81（ID 1011），combo=C（图层段 5.2s → 生成段 5.5s），`inherits_first` 为 true，首帧为锁定衔接帧（图层段末帧，不出图），故 `first_frame_prompt` 留空；只写中间帧与尾帧。两条提示词均 @ 全部五项参考资产。分镜 #81（ID 1011）的关键帧提示词已保存完成：\n\n- **first_frame_prompt**：留空——本镜 `inherits_first=true`（承接上一镜 #80），且组合为 C，首帧是图层段末帧继承、锁定的衔接帧，不出图。\n- **mid_frame_prompt + mid_frame_time=2.5 秒**：展示开始的一刻——小伊立在阶前、右手扶着 @黑貂皮捆 的捆绳；四名宫廷侍从围在皮捆旁，两人蹲地解开捆绳、摊开皮张，另两人立柱旁围观；@伊凡四世 坐在雕花木座上、右手握 @沙皇权杖 横在膝前，前倾俯视。生成段参考资产五项（@伊凡四世、@伊凡·科尔佐、@莫斯科宫廷、@黑貂皮捆、@沙皇权杖）在两条提示词中全部被 @ 到。\n- **last_frame_prompt**：与 result 一致的收束画面——皮捆摊开在阶前地面，小伊扶着捆绳立于皮捆旁，沙皇眼睛睁大、嘴唇微张紧盯皮毛，三名侍从围看、一人抬手指向皮张；姿态稳定清晰、人物道具完整入画，可被下一镜（#82 清单与清点场面）直接当开场。"
+  },
+  "keyframe_obs": {
+   "works": [
+    {
+     "id": 787,
+     "stage": "keyframe_prompts",
+     "storyboard_id": 1011,
+     "storyboard_number": 81,
+     "status": "completed",
+     "work_ms": 38610,
+     "model_ms": 38232,
+     "queue_ms": 5,
+     "call_count": 3,
+     "error_msg": null
+    }
+   ],
+   "calls": [
+    {
+     "id": 2557,
+     "kind": "llm",
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "http_status": 200,
+     "duration_ms": 9778,
+     "queue_ms": 1,
+     "prompt_tokens": 23293,
+     "completion_tokens": 7,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2558,
+     "kind": "llm",
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "http_status": 200,
+     "duration_ms": 21044,
+     "queue_ms": 2,
+     "prompt_tokens": 65407,
+     "completion_tokens": 1465,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2559,
+     "kind": "llm",
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "http_status": 200,
+     "duration_ms": 7410,
+     "queue_ms": 2,
+     "prompt_tokens": 66694,
+     "completion_tokens": 305,
+     "finish_reason": "stop",
+     "error_msg": null
+    }
+   ],
+   "call_count": 3,
+   "llm_calls": 3,
+   "max_prompt_tokens": 66694,
+   "total_prompt_tokens": 155394,
+   "total_completion_tokens": 1777,
+   "models": [
+    [
+     1,
+     "GLM 5.3 (local)",
+     "glm-5.3-flash"
+    ]
+   ],
+   "request_params": [
+    {
+     "max_tokens": "131072",
+     "model": "\"glm-5.3-flash\"",
+     "reasoning_effort": "\"low\"",
+     "stream": "true"
+    },
+    {}
+   ]
+  },
+  "keyframe_rejections": [
+   [
+    "20",
+    "拒绝",
+    "[\n  {\n    \"type\": \"function\",\n    \"function\": {\n      \"name\": \"readCharacters\",\n      \"description\": \"读取当前剧集中的所有角色信息，用于生成角色三视图最终提示词。\",\n      \"parameters\": {\n        \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n        \"type\": \"object\",\n        \"properties\": {},\n        \"additionalProperties\": false,\n        \"required\": []\n      }\n    }\n  },\n  {\n    \"type\": \"function\",\n    \"function\": {\n  "
+   ],
+   [
+    null,
+    "card_ref_unmet",
+    "你是专业的 AI 提示词工程师，负责三类提示词的创作与保存：\n1. 角色/场景/道具的「最终提示词」，供生图直接使用\n2. 分镜的「关键帧提示词」（first_frame_prompt / mid_frame_prompt + mid_frame_time / last_frame_prompt），供关键帧生图直接使用\n3. 分镜的「视频提示词」（video_prompt），供视频生成直接使用\n\n## 图片最终提示词\n\n用户请求会告知要为哪些角色、场景或道具生成最终提示词（附带 character_id / scene_id / prop_id）。\n\n工作流程：\n1. 调用 readCharacters / readScenes / readProps 读取资产信息\n2. 按对应技能规范（角色三视图及造型版本 / 场景固定视角 / 道具白底单品）创作最终提示词\n3. 调用 saveChar"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "请为分镜 #81(ID:1011)生成关键帧提示词(first_frame_prompt、mid_frame_prompt、mid_frame_time、last_frame_prompt)，严格遵循 keyframe-prompt 技能规范。\n请先调用 read_storyboard_context 读取该分镜的 description(含【镜头N】子镜头)、result、atmosphere、duration、continuity_boundary 及 inherits_first，然后写出关键帧提示词：\n- 每张关键帧都是独立生成的单帧静态画面，只凭资产参考图 + 本条提示词出图，所以每条提示词必须自足（自己交代景别机位构图、@场景名、画面里有哪些 @角色名 及其位置姿态表情、关键 @道具名、光线氛围），禁止写「同上一帧」「保持不变」这类相对描述\n- 绝对图像优先：禁止描写角色的物种"
+   ],
+   [
+    "readStoryboardContext",
+    "mid_frame_time",
+    "{\n  \"episode\": {\n    \"id\": 27,\n    \"title\": \"中俄百年变局（1）：一个草原强盗的逆袭\",\n    \"episode_number\": 1,\n    \"description\": \"\"\n  },\n  \"aspect_ratio\": \"16:9\",\n  \"composition\": \"横构图\",\n  \"text_spec\": {\n    \"layouts\": [\n      {\n        \"id\": \"h-left-stack\",\n        \"name\": \"左上语境／左中主叙事／左下关键词\",\n        \"slots\": [\n          {\n            \"role\": \"date\",\n            \"zone\": \"context\"\n          },\n          {\n         "
+   ],
+   [
+    "20",
+    "拒绝",
+    "[\n  {\n    \"type\": \"function\",\n    \"function\": {\n      \"name\": \"readCharacters\",\n      \"description\": \"读取当前剧集中的所有角色信息，用于生成角色三视图最终提示词。\",\n      \"parameters\": {\n        \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n        \"type\": \"object\",\n        \"properties\": {},\n        \"additionalProperties\": false,\n        \"required\": []\n      }\n    }\n  },\n  {\n    \"type\": \"function\",\n    \"function\": {\n  "
+   ],
+   [
+    null,
+    "card_ref_unmet",
+    "你是专业的 AI 提示词工程师，负责三类提示词的创作与保存：\n1. 角色/场景/道具的「最终提示词」，供生图直接使用\n2. 分镜的「关键帧提示词」（first_frame_prompt / mid_frame_prompt + mid_frame_time / last_frame_prompt），供关键帧生图直接使用\n3. 分镜的「视频提示词」（video_prompt），供视频生成直接使用\n\n## 图片最终提示词\n\n用户请求会告知要为哪些角色、场景或道具生成最终提示词（附带 character_id / scene_id / prop_id）。\n\n工作流程：\n1. 调用 readCharacters / readScenes / readProps 读取资产信息\n2. 按对应技能规范（角色三视图及造型版本 / 场景固定视角 / 道具白底单品）创作最终提示词\n3. 调用 saveChar"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "请为分镜 #81(ID:1011)生成关键帧提示词(first_frame_prompt、mid_frame_prompt、mid_frame_time、last_frame_prompt)，严格遵循 keyframe-prompt 技能规范。\n请先调用 read_storyboard_context 读取该分镜的 description(含【镜头N】子镜头)、result、atmosphere、duration、continuity_boundary 及 inherits_first，然后写出关键帧提示词：\n- 每张关键帧都是独立生成的单帧静态画面，只凭资产参考图 + 本条提示词出图，所以每条提示词必须自足（自己交代景别机位构图、@场景名、画面里有哪些 @角色名 及其位置姿态表情、关键 @道具名、光线氛围），禁止写「同上一帧」「保持不变」这类相对描述\n- 绝对图像优先：禁止描写角色的物种"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "{\"aspect_ratio\":\"16:9\",\"characters\":[{\"appearance\":\"中年男子，约四十岁，中等偏瘦的身材，方正的长脸，额发向后梳，深色短发齐耳，蓄浓密的褐色络腮胡与八字胡，眼皮微垂，目光疲惫而固执，常驻的冒险者气质。\",\"description\":\"15 世纪末的欧洲航海者，受西班牙国王赞助。本集作为全篇的比较基准出现：他向西横渡大西洋抵达美洲，开启欧洲长达四五百年的航海与殖民时代。\",\"id\":71,\"image_url\":\"static/images/4f02e573-bcaa-4e78-b71d-a21a5a084bda.png\",\"name\":\"哥伦布\",\"reference_images\":[],\"role\":\"航海家 · 西航远征者\",\"styling\":\"深蓝色航海长外套，内穿米白粗布衬衣，腰系棕色皮带，下穿深色窄腿裤与棕色皮靴；胸前挂一枚黄"
+   ],
+   [
+    "updateStoryboard",
+    "mid_frame_time",
+    "{\"first_frame_prompt\":\"\",\"last_frame_prompt\":\"@莫斯科宫廷，1582年冬的夜晚，成排蜡烛与铁环烛台发出暖黄局部照明，墙面与拱窗边缘泛橙，高顶与墙角沉入深暗，明暗对比强烈，16:9 横构图电影感剧照。中景平视固定机位，取 @莫斯科宫廷 接见厅阶前的一刻：画面右后方是阶梯式木质高台与雕花木座、铺开的深红褐色花纹地毯；画面中部偏左的地面上摊开一只散开的 @黑貂皮捆，深褐近黑的皮张摊平铺开、三段粗麻绳松开垂在皮捆一侧清楚可见，旁侧还立着两只捆扎完好的 @黑貂皮捆，捆身毛面朝向镜头。@伊凡·科尔佐 立在皮捆旁侧、身形位于画面中央偏左，身体正面朝向画外右侧的木座、略微侧身，右手扶着散开那只 @黑貂皮捆 的捆绳、手指扣在麻绳股上，左手自然垂在体侧，双腿分开站稳、两只皮靴落在石地面上清晰可见，下颌抬起、嘴唇抿平，目光投向阶上的木座。@伊凡四世 坐在雕花木座上、"
+   ],
+   [
+    "20",
+    "拒绝",
+    "[\n  {\n    \"type\": \"function\",\n    \"function\": {\n      \"name\": \"readCharacters\",\n      \"description\": \"读取当前剧集中的所有角色信息，用于生成角色三视图最终提示词。\",\n      \"parameters\": {\n        \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n        \"type\": \"object\",\n        \"properties\": {},\n        \"additionalProperties\": false,\n        \"required\": []\n      }\n    }\n  },\n  {\n    \"type\": \"function\",\n    \"function\": {\n  "
+   ],
+   [
+    null,
+    "card_ref_unmet",
+    "你是专业的 AI 提示词工程师，负责三类提示词的创作与保存：\n1. 角色/场景/道具的「最终提示词」，供生图直接使用\n2. 分镜的「关键帧提示词」（first_frame_prompt / mid_frame_prompt + mid_frame_time / last_frame_prompt），供关键帧生图直接使用\n3. 分镜的「视频提示词」（video_prompt），供视频生成直接使用\n\n## 图片最终提示词\n\n用户请求会告知要为哪些角色、场景或道具生成最终提示词（附带 character_id / scene_id / prop_id）。\n\n工作流程：\n1. 调用 readCharacters / readScenes / readProps 读取资产信息\n2. 按对应技能规范（角色三视图及造型版本 / 场景固定视角 / 道具白底单品）创作最终提示词\n3. 调用 saveChar"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "请为分镜 #81(ID:1011)生成关键帧提示词(first_frame_prompt、mid_frame_prompt、mid_frame_time、last_frame_prompt)，严格遵循 keyframe-prompt 技能规范。\n请先调用 read_storyboard_context 读取该分镜的 description(含【镜头N】子镜头)、result、atmosphere、duration、continuity_boundary 及 inherits_first，然后写出关键帧提示词：\n- 每张关键帧都是独立生成的单帧静态画面，只凭资产参考图 + 本条提示词出图，所以每条提示词必须自足（自己交代景别机位构图、@场景名、画面里有哪些 @角色名 及其位置姿态表情、关键 @道具名、光线氛围），禁止写「同上一帧」「保持不变」这类相对描述\n- 绝对图像优先：禁止描写角色的物种"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "{\"aspect_ratio\":\"16:9\",\"characters\":[{\"appearance\":\"中年男子，约四十岁，中等偏瘦的身材，方正的长脸，额发向后梳，深色短发齐耳，蓄浓密的褐色络腮胡与八字胡，眼皮微垂，目光疲惫而固执，常驻的冒险者气质。\",\"description\":\"15 世纪末的欧洲航海者，受西班牙国王赞助。本集作为全篇的比较基准出现：他向西横渡大西洋抵达美洲，开启欧洲长达四五百年的航海与殖民时代。\",\"id\":71,\"image_url\":\"static/images/4f02e573-bcaa-4e78-b71d-a21a5a084bda.png\",\"name\":\"哥伦布\",\"reference_images\":[],\"role\":\"航海家 · 西航远征者\",\"styling\":\"深蓝色航海长外套，内穿米白粗布衬衣，腰系棕色皮带，下穿深色窄腿裤与棕色皮靴；胸前挂一枚黄"
+   ],
+   [
+    "updateStoryboard",
+    "mid_frame_time",
+    "{\"first_frame_prompt\":\"\",\"last_frame_prompt\":\"@莫斯科宫廷，1582年冬的夜晚，成排蜡烛与铁环烛台发出暖黄局部照明，墙面与拱窗边缘泛橙，高顶与墙角沉入深暗，明暗对比强烈，16:9 横构图电影感剧照。中景平视固定机位，取 @莫斯科宫廷 接见厅阶前的一刻：画面右后方是阶梯式木质高台与雕花木座、铺开的深红褐色花纹地毯；画面中部偏左的地面上摊开一只散开的 @黑貂皮捆，深褐近黑的皮张摊平铺开、三段粗麻绳松开垂在皮捆一侧清楚可见，旁侧还立着两只捆扎完好的 @黑貂皮捆，捆身毛面朝向镜头。@伊凡·科尔佐 立在皮捆旁侧、身形位于画面中央偏左，身体正面朝向画外右侧的木座、略微侧身，右手扶着散开那只 @黑貂皮捆 的捆绳、手指扣在麻绳股上，左手自然垂在体侧，双腿分开站稳、两只皮靴落在石地面上清晰可见，下颌抬起、嘴唇抿平，目光投向阶上的木座。@伊凡四世 坐在雕花木座上、"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "分镜 #81（ID 1011）的关键帧提示词已保存完成：\n\n- **first_frame_prompt**：留空——本镜 `inherits_first=true`（承接上一镜 #80），且组合为 C，首帧是图层段末帧继承、锁定的衔接帧，不出图。\n- **mid_frame_prompt + mid_frame_time=2.5 秒**：展示开始的一刻——小伊立在阶前、右手扶着 @黑貂皮捆 的捆绳；四名宫廷侍从围在皮捆旁，两人蹲地解开捆绳、摊开皮张，另两人立柱旁围观；@伊凡四世 坐在雕花木座上、右手握 @沙皇权杖 横在膝前，前倾俯视。生成段参考资产五项（@伊凡四世、@伊凡·科尔佐、@莫斯科宫廷、@黑貂皮捆、@沙皇权杖）在两条提示词中全部被 @ 到。\n- **last_frame_prompt**：与 result 一致的收束画面——皮捆摊开在阶前地面，小伊扶着捆绳立于皮捆旁，沙皇眼睛睁大"
+   ]
+  ],
+  "after_kf": {
+   "first_frame_prompt": "",
+   "mid_frame_prompt": "@莫斯科宫廷，1582年冬的夜晚，成排蜡烛与铁环烛台发出暖黄局部照明，墙面与拱窗边缘泛橙，高顶与墙角沉入深暗，明暗对比强烈，16:9 横构图电影感剧照。中景平视固定机位，取 @莫斯科宫廷 接见厅阶前地面的一刻：画面中部偏左的深红褐色花纹地毯前的石砌地面上摊着一只散开的 @黑貂皮捆，深褐近黑的皮张摊平铺开、三段粗麻绳松开垂在皮捆一侧清楚可见，旁侧立着一只捆扎完好的 @黑貂皮捆、毛面朝向镜头。画面左侧与右侧各有一名宫廷侍从（深灰无纹长袍、无冠束发、腰束布带，共四人）围在皮捆旁：左侧一人屈膝蹲下、双膝着地、两条小腿向后收在身下、两只靴底落在石地面上可见，双手把皮捆的捆绳向外解开、五指扣在麻绳结上，头低向毛面；右侧一人同样屈膝蹲稳、双脚收在身下，双手托起摊开的皮张一端、头低看毛面；另两人立在两人身后的木柱旁，各自双腿并拢站定、双手垂在身前交握，头都转向地面的皮捆。@伊凡·科尔佐 立在画面中央偏左的皮捆后侧，身体正面朝向画外右侧的高台方向、略微侧身，右手扶着散开那只 @黑貂皮捆 的捆绳、手指扣在麻绳股上，左手自然垂在体侧，双腿分开站稳、两只皮靴落在石地面上清晰可见，下颌抬起、嘴唇抿平，视线投向阶上。@伊凡四世 坐在画面右后方的雕花木座上、上身绷直前倾、脊背离开椅背，右手握着 @沙皇权杖 的杖身中段把杖横在膝前、杖头镶宝石的多面球饰停在胸前位置、杖身中段的雕花凸环握位清楚可见，左手掌心按在木座扶手上、五指扣住扶手沿，双腿并拢、两只靴尖落在台阶石面上可见，眉骨舒展、眼睛睁大，目光俯向阶前被围看的皮捆，嘴唇微张。烛焰的暖光从侧面照亮摊开的毛面与围看众人的脸，其余陈设沉入暗部。人物、木座、权杖与皮捆全部完整入画，构图平稳清晰、层次分明。16:9 横构图电影感剧照，单帧静态画面",
+   "last_frame_prompt": "@莫斯科宫廷，1582年冬的夜晚，成排蜡烛与铁环烛台发出暖黄局部照明，墙面与拱窗边缘泛橙，高顶与墙角沉入深暗，明暗对比强烈，16:9 横构图电影感剧照。中景平视固定机位，取 @莫斯科宫廷 接见厅阶前的一刻：画面右后方是阶梯式木质高台与雕花木座、铺开的深红褐色花纹地毯；画面中部偏左的地面上摊开一只散开的 @黑貂皮捆，深褐近黑的皮张摊平铺开、三段粗麻绳松开垂在皮捆一侧清楚可见，旁侧还立着两只捆扎完好的 @黑貂皮捆，捆身毛面朝向镜头。@伊凡·科尔佐 立在皮捆旁侧、身形位于画面中央偏左，身体正面朝向画外右侧的木座、略微侧身，右手扶着散开那只 @黑貂皮捆 的捆绳、手指扣在麻绳股上，左手自然垂在体侧，双腿分开站稳、两只皮靴落在石地面上清晰可见，下颌抬起、嘴唇抿平，目光投向阶上的木座。@伊凡四世 坐在雕花木座上、上身绷直前倾、脊背离开椅背，右手握着 @沙皇权杖 的杖身中段把杖横在膝前、杖头镶宝石的多面球饰停在胸前位置、杖身中段的雕花凸环握位清楚可见，左手掌心按在木座扶手上、五指扣住扶手沿，双腿并拢、两只靴尖落在台阶石面上可见，眉骨舒展、眼睛睁大、嘴唇微张，目光紧盯着阶前摊开的皮捆。画面右侧几名宫廷侍从（深灰无纹长袍、无冠束发、腰束布带，共三人）半围着皮捆站定，一人双腿分开站稳、右手抬起虚指地面上的皮张，另两人各自双腿并拢、双手垂在身前交握，三人的头都转向地上的皮捆。烛焰的暖光从侧面照亮皮捆的毛面与阶上的人脸，其余陈设沉入暗部。人物、木座、权杖与皮捆全部完整入画，构图平稳清晰、层次分明，画面稳定、可被下一镜直接当作开场。16:9 横构图电影感剧照，单帧静态画面",
+   "mid_frame_time": 2.5,
+   "video_prompt": "",
+   "field_saved_at": "{\"narration_text\":1794549628,\"design_card\":1794591217,\"first_frame_prompt\":1794665361,\"mid_frame_prompt\":1794665361,\"mid_frame_time\":1794665361,\"last_frame_prompt\":1794665361,\"video_prompt\":1794664847}"
+  },
+  "video_task": 3465,
+  "video_wall_s": 45.0,
+  "video_status": "completed",
+  "video_error": null,
+  "video_params": {
+   "kind": "video_prompts",
+   "progress": {
+    "completed": 1,
+    "failed": 0,
+    "total": 1
+   },
+   "storyboardIds": [
+    1011
+   ],
+   "configId": 1,
+   "stage": "video_prompts",
+   "model_used": {
+    "config_id": 1,
+    "name": "GLM 5.3 (local)",
+    "provider": "openai",
+    "model": "glm-5.3-flash",
+    "vision": false
+   },
+   "restart": {
+    "kind": "video_prompts",
+    "args": {
+     "episodeId": 27,
+     "dramaId": 20,
+     "opts": {},
+     "storyboardIds": [
+      1011
+     ]
+    }
+   },
+   "reasoning_chars": 2324,
+   "output_text": "分镜 #81：已为分镜 #81 保存 video_prompt（ID:1011）。\n\n要点说明：\n- **C 组合首段**：0-1 秒按锁定衔接帧 caption 复述空镜（全景平视昏暗石室、木桌烛台、红褐地毯、石柱烛架、高台木椅、右侧木门、左墙拱窗），静止机位、无人物、无切镜、无过渡词。\n- **中帧对齐**：2.5-5.5 秒段起点正好落在 `mid_frame_time=2.5`，画面与中关键帧一致（侍从蹲下解开 @黑貂皮捆 摊平、@伊凡·科尔佐 扶捆绳、@伊凡四世 前倾睁大眼紧盯皮捆）。\n- **尾帧对齐**：最后一段收在尾关键帧画面——众人围观摊开的皮捆、沙皇震惊前倾、侍从围立，稳定清晰可承接下一镜。\n- **图像优先**：角色全部用 @伊凡四世 / @伊凡·科尔佐 指代，无外观描述；道具 @黑貂皮捆 / @沙皇权杖 每段带持握部位与部件状态；无名宫廷侍从沿用既有标识（深灰无纹长袍、无冠束发、腰束布带）。\n- 时长：1 + 1.5 + 3 + 3 = 8.5 秒生成段，覆盖实测配音 8.6 秒附近的表演余量并与预算一致；旁白未写入视频提示词。"
+  },
+  "video_obs": {
+   "works": [
+    {
+     "id": 788,
+     "stage": "video_prompts",
+     "storyboard_id": 1011,
+     "storyboard_number": 81,
+     "status": "completed",
+     "work_ms": 41593,
+     "model_ms": 41191,
+     "queue_ms": 5,
+     "call_count": 3,
+     "error_msg": null
+    }
+   ],
+   "calls": [
+    {
+     "id": 2560,
+     "kind": "llm",
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "http_status": 200,
+     "duration_ms": 2089,
+     "queue_ms": 1,
+     "prompt_tokens": 24119,
+     "completion_tokens": 7,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2561,
+     "kind": "llm",
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "http_status": 200,
+     "duration_ms": 32036,
+     "queue_ms": 2,
+     "prompt_tokens": 67920,
+     "completion_tokens": 2061,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2562,
+     "kind": "llm",
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "http_status": 200,
+     "duration_ms": 7066,
+     "queue_ms": 2,
+     "prompt_tokens": 68915,
+     "completion_tokens": 352,
+     "finish_reason": "stop",
+     "error_msg": null
+    }
+   ],
+   "call_count": 3,
+   "llm_calls": 3,
+   "max_prompt_tokens": 68915,
+   "total_prompt_tokens": 160954,
+   "total_completion_tokens": 2420,
+   "models": [
+    [
+     1,
+     "GLM 5.3 (local)",
+     "glm-5.3-flash"
+    ]
+   ],
+   "request_params": [
+    {
+     "max_tokens": "131072",
+     "model": "\"glm-5.3-flash\"",
+     "reasoning_effort": "\"low\"",
+     "stream": "true"
+    },
+    {}
+   ]
+  },
+  "video_rejections": [
+   [
+    "20",
+    "拒绝",
+    "[\n  {\n    \"type\": \"function\",\n    \"function\": {\n      \"name\": \"readCharacters\",\n      \"description\": \"读取当前剧集中的所有角色信息，用于生成角色三视图最终提示词。\",\n      \"parameters\": {\n        \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n        \"type\": \"object\",\n        \"properties\": {},\n        \"additionalProperties\": false,\n        \"required\": []\n      }\n    }\n  },\n  {\n    \"type\": \"function\",\n    \"function\": {\n  "
+   ],
+   [
+    null,
+    "card_ref_unmet",
+    "你是专业的 AI 提示词工程师，负责三类提示词的创作与保存：\n1. 角色/场景/道具的「最终提示词」，供生图直接使用\n2. 分镜的「关键帧提示词」（first_frame_prompt / mid_frame_prompt + mid_frame_time / last_frame_prompt），供关键帧生图直接使用\n3. 分镜的「视频提示词」（video_prompt），供视频生成直接使用\n\n## 图片最终提示词\n\n用户请求会告知要为哪些角色、场景或道具生成最终提示词（附带 character_id / scene_id / prop_id）。\n\n工作流程：\n1. 调用 readCharacters / readScenes / readProps 读取资产信息\n2. 按对应技能规范（角色三视图及造型版本 / 场景固定视角 / 道具白底单品）创作最终提示词\n3. 调用 saveChar"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "请为分镜 #81(ID:1011)生成视频提示词(video_prompt)。视频模型:MiniMax H3 INT8 (ComfyUI 102) (h3-jobs),请根据该模型的特性和时长限制生成。\n请先调用 read_storyboard_context 获取该分镜的画面描述(含【镜头N】子镜头与台词/旁白)、氛围、时长及三条关键帧提示词(first_frame_prompt/mid_frame_prompt/mid_frame_time/last_frame_prompt)与 locked_frames(该镜被图层段衔接帧锁死的槽位、取景与画面描述 caption)，据此生成 video_prompt(第一行是信息头：列出该分镜出场的人物与场景，用 @角色名/@场景名 引用；之后按 3 秒分段换行、用 @角色名/@场景名/@道具名 引用参考素材；段落内允许多镜头切镜，段与段可以是不"
+   ],
+   [
+    "readStoryboardContext",
+    "mid_frame_time",
+    "{\n  \"episode\": {\n    \"id\": 27,\n    \"title\": \"中俄百年变局（1）：一个草原强盗的逆袭\",\n    \"episode_number\": 1,\n    \"description\": \"\"\n  },\n  \"aspect_ratio\": \"16:9\",\n  \"composition\": \"横构图\",\n  \"text_spec\": {\n    \"layouts\": [\n      {\n        \"id\": \"h-left-stack\",\n        \"name\": \"左上语境／左中主叙事／左下关键词\",\n        \"slots\": [\n          {\n            \"role\": \"date\",\n            \"zone\": \"context\"\n          },\n          {\n         "
+   ],
+   [
+    "20",
+    "拒绝",
+    "[\n  {\n    \"type\": \"function\",\n    \"function\": {\n      \"name\": \"readCharacters\",\n      \"description\": \"读取当前剧集中的所有角色信息，用于生成角色三视图最终提示词。\",\n      \"parameters\": {\n        \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n        \"type\": \"object\",\n        \"properties\": {},\n        \"additionalProperties\": false,\n        \"required\": []\n      }\n    }\n  },\n  {\n    \"type\": \"function\",\n    \"function\": {\n  "
+   ],
+   [
+    null,
+    "card_ref_unmet",
+    "你是专业的 AI 提示词工程师，负责三类提示词的创作与保存：\n1. 角色/场景/道具的「最终提示词」，供生图直接使用\n2. 分镜的「关键帧提示词」（first_frame_prompt / mid_frame_prompt + mid_frame_time / last_frame_prompt），供关键帧生图直接使用\n3. 分镜的「视频提示词」（video_prompt），供视频生成直接使用\n\n## 图片最终提示词\n\n用户请求会告知要为哪些角色、场景或道具生成最终提示词（附带 character_id / scene_id / prop_id）。\n\n工作流程：\n1. 调用 readCharacters / readScenes / readProps 读取资产信息\n2. 按对应技能规范（角色三视图及造型版本 / 场景固定视角 / 道具白底单品）创作最终提示词\n3. 调用 saveChar"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "请为分镜 #81(ID:1011)生成视频提示词(video_prompt)。视频模型:MiniMax H3 INT8 (ComfyUI 102) (h3-jobs),请根据该模型的特性和时长限制生成。\n请先调用 read_storyboard_context 获取该分镜的画面描述(含【镜头N】子镜头与台词/旁白)、氛围、时长及三条关键帧提示词(first_frame_prompt/mid_frame_prompt/mid_frame_time/last_frame_prompt)与 locked_frames(该镜被图层段衔接帧锁死的槽位、取景与画面描述 caption)，据此生成 video_prompt(第一行是信息头：列出该分镜出场的人物与场景，用 @角色名/@场景名 引用；之后按 3 秒分段换行、用 @角色名/@场景名/@道具名 引用参考素材；段落内允许多镜头切镜，段与段可以是不"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "{\"aspect_ratio\":\"16:9\",\"characters\":[{\"appearance\":\"中年男子，约四十岁，中等偏瘦的身材，方正的长脸，额发向后梳，深色短发齐耳，蓄浓密的褐色络腮胡与八字胡，眼皮微垂，目光疲惫而固执，常驻的冒险者气质。\",\"description\":\"15 世纪末的欧洲航海者，受西班牙国王赞助。本集作为全篇的比较基准出现：他向西横渡大西洋抵达美洲，开启欧洲长达四五百年的航海与殖民时代。\",\"id\":71,\"image_url\":\"static/images/4f02e573-bcaa-4e78-b71d-a21a5a084bda.png\",\"name\":\"哥伦布\",\"reference_images\":[],\"role\":\"航海家 · 西航远征者\",\"styling\":\"深蓝色航海长外套，内穿米白粗布衬衣，腰系棕色皮带，下穿深色窄腿裤与棕色皮靴；胸前挂一枚黄"
+   ],
+   [
+    "20",
+    "拒绝",
+    "[\n  {\n    \"type\": \"function\",\n    \"function\": {\n      \"name\": \"readCharacters\",\n      \"description\": \"读取当前剧集中的所有角色信息，用于生成角色三视图最终提示词。\",\n      \"parameters\": {\n        \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n        \"type\": \"object\",\n        \"properties\": {},\n        \"additionalProperties\": false,\n        \"required\": []\n      }\n    }\n  },\n  {\n    \"type\": \"function\",\n    \"function\": {\n  "
+   ],
+   [
+    null,
+    "card_ref_unmet",
+    "你是专业的 AI 提示词工程师，负责三类提示词的创作与保存：\n1. 角色/场景/道具的「最终提示词」，供生图直接使用\n2. 分镜的「关键帧提示词」（first_frame_prompt / mid_frame_prompt + mid_frame_time / last_frame_prompt），供关键帧生图直接使用\n3. 分镜的「视频提示词」（video_prompt），供视频生成直接使用\n\n## 图片最终提示词\n\n用户请求会告知要为哪些角色、场景或道具生成最终提示词（附带 character_id / scene_id / prop_id）。\n\n工作流程：\n1. 调用 readCharacters / readScenes / readProps 读取资产信息\n2. 按对应技能规范（角色三视图及造型版本 / 场景固定视角 / 道具白底单品）创作最终提示词\n3. 调用 saveChar"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "请为分镜 #81(ID:1011)生成视频提示词(video_prompt)。视频模型:MiniMax H3 INT8 (ComfyUI 102) (h3-jobs),请根据该模型的特性和时长限制生成。\n请先调用 read_storyboard_context 获取该分镜的画面描述(含【镜头N】子镜头与台词/旁白)、氛围、时长及三条关键帧提示词(first_frame_prompt/mid_frame_prompt/mid_frame_time/last_frame_prompt)与 locked_frames(该镜被图层段衔接帧锁死的槽位、取景与画面描述 caption)，据此生成 video_prompt(第一行是信息头：列出该分镜出场的人物与场景，用 @角色名/@场景名 引用；之后按 3 秒分段换行、用 @角色名/@场景名/@道具名 引用参考素材；段落内允许多镜头切镜，段与段可以是不"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "{\"aspect_ratio\":\"16:9\",\"characters\":[{\"appearance\":\"中年男子，约四十岁，中等偏瘦的身材，方正的长脸，额发向后梳，深色短发齐耳，蓄浓密的褐色络腮胡与八字胡，眼皮微垂，目光疲惫而固执，常驻的冒险者气质。\",\"description\":\"15 世纪末的欧洲航海者，受西班牙国王赞助。本集作为全篇的比较基准出现：他向西横渡大西洋抵达美洲，开启欧洲长达四五百年的航海与殖民时代。\",\"id\":71,\"image_url\":\"static/images/4f02e573-bcaa-4e78-b71d-a21a5a084bda.png\",\"name\":\"哥伦布\",\"reference_images\":[],\"role\":\"航海家 · 西航远征者\",\"styling\":\"深蓝色航海长外套，内穿米白粗布衬衣，腰系棕色皮带，下穿深色窄腿裤与棕色皮靴；胸前挂一枚黄"
+   ],
+   [
+    null,
+    "mid_frame_time",
+    "已为分镜 #81 保存 video_prompt（ID:1011）。\n\n要点说明：\n- **C 组合首段**：0-1 秒按锁定衔接帧 caption 复述空镜（全景平视昏暗石室、木桌烛台、红褐地毯、石柱烛架、高台木椅、右侧木门、左墙拱窗），静止机位、无人物、无切镜、无过渡词。\n- **中帧对齐**：2.5-5.5 秒段起点正好落在 `mid_frame_time=2.5`，画面与中关键帧一致（侍从蹲下解开 @黑貂皮捆 摊平、@伊凡·科尔佐 扶捆绳、@伊凡四世 前倾睁大眼紧盯皮捆）。\n- **尾帧对齐**：最后一段收在尾关键帧画面——众人围观摊开的皮捆、沙皇震惊前倾、侍从围立，稳定清晰可承接下一镜。\n- **图像优先**：角色全部用 @伊凡四世 / @伊凡·科尔佐 指代，无外观描述；道具 @黑貂皮捆 / @沙皇权杖 每段带持握部位与部件状态；无名宫廷侍从沿用既有标识（深灰无纹长袍、无冠束发、"
+   ]
+  ],
+  "after_vp": {
+   "first_frame_prompt": "",
+   "mid_frame_prompt": "@莫斯科宫廷，1582年冬的夜晚，成排蜡烛与铁环烛台发出暖黄局部照明，墙面与拱窗边缘泛橙，高顶与墙角沉入深暗，明暗对比强烈，16:9 横构图电影感剧照。中景平视固定机位，取 @莫斯科宫廷 接见厅阶前地面的一刻：画面中部偏左的深红褐色花纹地毯前的石砌地面上摊着一只散开的 @黑貂皮捆，深褐近黑的皮张摊平铺开、三段粗麻绳松开垂在皮捆一侧清楚可见，旁侧立着一只捆扎完好的 @黑貂皮捆、毛面朝向镜头。画面左侧与右侧各有一名宫廷侍从（深灰无纹长袍、无冠束发、腰束布带，共四人）围在皮捆旁：左侧一人屈膝蹲下、双膝着地、两条小腿向后收在身下、两只靴底落在石地面上可见，双手把皮捆的捆绳向外解开、五指扣在麻绳结上，头低向毛面；右侧一人同样屈膝蹲稳、双脚收在身下，双手托起摊开的皮张一端、头低看毛面；另两人立在两人身后的木柱旁，各自双腿并拢站定、双手垂在身前交握，头都转向地面的皮捆。@伊凡·科尔佐 立在画面中央偏左的皮捆后侧，身体正面朝向画外右侧的高台方向、略微侧身，右手扶着散开那只 @黑貂皮捆 的捆绳、手指扣在麻绳股上，左手自然垂在体侧，双腿分开站稳、两只皮靴落在石地面上清晰可见，下颌抬起、嘴唇抿平，视线投向阶上。@伊凡四世 坐在画面右后方的雕花木座上、上身绷直前倾、脊背离开椅背，右手握着 @沙皇权杖 的杖身中段把杖横在膝前、杖头镶宝石的多面球饰停在胸前位置、杖身中段的雕花凸环握位清楚可见，左手掌心按在木座扶手上、五指扣住扶手沿，双腿并拢、两只靴尖落在台阶石面上可见，眉骨舒展、眼睛睁大，目光俯向阶前被围看的皮捆，嘴唇微张。烛焰的暖光从侧面照亮摊开的毛面与围看众人的脸，其余陈设沉入暗部。人物、木座、权杖与皮捆全部完整入画，构图平稳清晰、层次分明。16:9 横构图电影感剧照，单帧静态画面",
+   "last_frame_prompt": "@莫斯科宫廷，1582年冬的夜晚，成排蜡烛与铁环烛台发出暖黄局部照明，墙面与拱窗边缘泛橙，高顶与墙角沉入深暗，明暗对比强烈，16:9 横构图电影感剧照。中景平视固定机位，取 @莫斯科宫廷 接见厅阶前的一刻：画面右后方是阶梯式木质高台与雕花木座、铺开的深红褐色花纹地毯；画面中部偏左的地面上摊开一只散开的 @黑貂皮捆，深褐近黑的皮张摊平铺开、三段粗麻绳松开垂在皮捆一侧清楚可见，旁侧还立着两只捆扎完好的 @黑貂皮捆，捆身毛面朝向镜头。@伊凡·科尔佐 立在皮捆旁侧、身形位于画面中央偏左，身体正面朝向画外右侧的木座、略微侧身，右手扶着散开那只 @黑貂皮捆 的捆绳、手指扣在麻绳股上，左手自然垂在体侧，双腿分开站稳、两只皮靴落在石地面上清晰可见，下颌抬起、嘴唇抿平，目光投向阶上的木座。@伊凡四世 坐在雕花木座上、上身绷直前倾、脊背离开椅背，右手握着 @沙皇权杖 的杖身中段把杖横在膝前、杖头镶宝石的多面球饰停在胸前位置、杖身中段的雕花凸环握位清楚可见，左手掌心按在木座扶手上、五指扣住扶手沿，双腿并拢、两只靴尖落在台阶石面上可见，眉骨舒展、眼睛睁大、嘴唇微张，目光紧盯着阶前摊开的皮捆。画面右侧几名宫廷侍从（深灰无纹长袍、无冠束发、腰束布带，共三人）半围着皮捆站定，一人双腿分开站稳、右手抬起虚指地面上的皮张，另两人各自双腿并拢、双手垂在身前交握，三人的头都转向地上的皮捆。烛焰的暖光从侧面照亮皮捆的毛面与阶上的人脸，其余陈设沉入暗部。人物、木座、权杖与皮捆全部完整入画，构图平稳清晰、层次分明，画面稳定、可被下一镜直接当作开场。16:9 横构图电影感剧照，单帧静态画面",
+   "mid_frame_time": 2.5,
+   "video_prompt": "出场人物：@伊凡四世、@伊凡·科尔佐；场景：@莫斯科宫廷；道具：@黑貂皮捆、@沙皇权杖。\n0-1秒：@莫斯科宫廷，全景平视固定机位，镜头静止，昏暗石室：前景左侧木桌与烛台，地面铺开大片红褐地毯，中景两根石柱上烛架点亮，后方高台上排列木椅，右侧为深色木门，左墙有拱窗，暖黄烛光与冷灰石墙形成对比，右侧门边与上方偏暗留白，画面无人。\n1-2.5秒：@莫斯科宫廷，切到接见厅高台阶前的中景平视固定机位，成排蜡烛与铁环烛台发出暖黄局部照明，墙面与拱窗边缘泛橙，高顶与墙角沉入深暗；@伊凡·科尔佐 立在画面中央偏左的高台阶前，身体正面朝向画外右侧的木座、略微侧身，右手把一只 @黑貂皮捆 的捆绳提起、捆身举到胸前、毛面朝外、三段粗麻绳扎结朝向镜头清楚可见，左手托着捆身下缘，双腿并拢站稳、两只皮靴落在石地面上清晰可见，下颌抬起、嘴唇抿平，视线投向阶上的木座；@伊凡四世 坐在雕花木座上、上身绷直前倾、脊背离开椅背，右手握着 @沙皇权杖 的杖身中段把杖横在膝前、杖头镶宝石的多面球饰停在胸前位置、杖身中段的雕花凸环握位清楚可见，左手掌心按在木座扶手上、五指扣住扶手沿，双腿并拢、两只靴尖落在台阶石面上可见，眼皮微垂，目光落在阶前那只皮捆上；阶下两侧立着几名宫廷侍从（深灰无纹长袍、无冠束发、腰束布带，共五人）成列站定，各自双腿并拢、双手垂在身前交握，头都转向阶前的那只皮捆。\n2.5-5.5秒：@莫斯科宫廷，切到阶前地面的中景平视固定机位，烛焰的暖光从侧面照亮摊开的毛面与围看众人的脸；一名宫廷侍从（深灰无纹长袍、无冠束发、腰束布带）走到画面中部偏左的那只 @黑貂皮捆 旁屈膝蹲下、双膝着地、两条小腿向后收在身下、两只靴底落在石地面上可见，双手把皮捆的捆绳向外解开、五指扣在麻绳结上，将深褐近黑的皮张摊平铺开在石砌地面上、三段粗麻绳松开垂在皮捆一侧清楚可见；@伊凡·科尔佐 立在皮捆旁侧、身形位于画面中央偏左，右手扶着散开那只 @黑貂皮捆 的捆绳、手指扣在麻绳股上，左手自然垂在体侧，双腿分开站稳、两只皮靴落在石地面上清晰可见，下颌抬起、嘴唇抿平，目光投向阶上的木座；@伊凡四世 坐在画面右后方的雕花木座上、上身绷直前倾、脊背离开椅背，右手握着 @沙皇权杖 的杖身中段把杖横在膝前、杖头镶宝石的多面球饰停在胸前位置、杖身中段的雕花凸环握位清楚可见，左手掌心按在木座扶手上、五指扣住扶手沿，双腿并拢、两只靴尖落在台阶石面上可见，眉骨舒展、眼睛睁大、嘴唇微张，目光紧盯着阶前摊开的皮捆；旁侧还立着两只捆扎完好的 @黑貂皮捆、毛面朝向镜头，画面右侧几名宫廷侍从（深灰无纹长袍、无冠束发、腰束布带，共三人）半围着皮捆站定，一人双腿分开站稳、右手抬起虚指地面上的皮张，另两人各自双腿并拢、双手垂在身前交握，三人的头都转向地上的皮捆，众人目光都落在摊开的皮捆上，画面平稳收住。",
+   "field_saved_at": "{\"narration_text\":1794549628,\"design_card\":1794591217,\"first_frame_prompt\":1794665361,\"mid_frame_prompt\":1794665361,\"mid_frame_time\":1794665361,\"last_frame_prompt\":1794665361,\"video_prompt\":1794665405}"
+  }
+ }
+}

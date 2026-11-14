@@ -1,0 +1,1226 @@
+{
+ "943": {
+  "tasks": [
+   3442,
+   3443
+  ],
+  "kf_wall": 20.0,
+  "vp_wall": 40.0,
+  "kf": {
+   "task": 3442,
+   "status": "completed",
+   "error": null,
+   "progress": {
+    "completed": 1,
+    "failed": 0,
+    "total": 1
+   },
+   "model_used": {
+    "config_id": 1,
+    "name": "GLM 5.3 (local)",
+    "provider": "openai",
+    "model": "glm-5.3-flash",
+    "vision": false
+   },
+   "work_ms": 19767,
+   "call_count": 3,
+   "max_prompt_tokens": 55129,
+   "total_prompt_tokens": 132558,
+   "total_completion_tokens": 1085,
+   "models": [
+    [
+     1,
+     "glm-5.3-flash"
+    ]
+   ],
+   "request_params": [
+    {
+     "model": "glm-5.3-flash",
+     "reasoning_effort": "low",
+     "max_tokens": 131072,
+     "stream": true
+    },
+    {
+     "model": "glm-5.3-flash",
+     "reasoning_effort": "low",
+     "max_tokens": 131072,
+     "stream": true
+    }
+   ],
+   "saves": [
+    "{\n  \"message\": \"Storyboard 943 updated\"\n}"
+   ],
+   "context_chars_read": [
+    94193
+   ],
+   "context_chars_in_request": [
+    62309,
+    62309
+   ],
+   "calls": [
+    {
+     "id": 2491,
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "duration_ms": 2107,
+     "prompt_tokens": 23057,
+     "completion_tokens": 7,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2492,
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "duration_ms": 12513,
+     "prompt_tokens": 54372,
+     "completion_tokens": 825,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2493,
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "duration_ms": 4733,
+     "prompt_tokens": 55129,
+     "completion_tokens": 253,
+     "finish_reason": "stop",
+     "error_msg": null
+    }
+   ],
+   "works": [
+    {
+     "id": 765,
+     "stage": "keyframe_prompts",
+     "storyboard_id": 943,
+     "status": "completed",
+     "work_ms": 19767,
+     "call_count": 3,
+     "error_msg": null
+    }
+   ]
+  },
+  "vp": {
+   "task": 3443,
+   "status": "completed",
+   "error": null,
+   "progress": {
+    "completed": 1,
+    "failed": 0,
+    "total": 1
+   },
+   "model_used": {
+    "config_id": 1,
+    "name": "GLM 5.3 (local)",
+    "provider": "openai",
+    "model": "glm-5.3-flash",
+    "vision": false
+   },
+   "work_ms": 37342,
+   "call_count": 3,
+   "max_prompt_tokens": 55927,
+   "total_prompt_tokens": 135006,
+   "total_completion_tokens": 1845,
+   "models": [
+    [
+     1,
+     "glm-5.3-flash"
+    ]
+   ],
+   "request_params": [
+    {
+     "model": "glm-5.3-flash",
+     "reasoning_effort": "low",
+     "max_tokens": 131072,
+     "stream": true
+    },
+    {
+     "model": "glm-5.3-flash",
+     "reasoning_effort": "low",
+     "max_tokens": 131072,
+     "stream": true
+    }
+   ],
+   "saves": [
+    "{\n  \"message\": \"Storyboard 943 updated\"\n}"
+   ],
+   "context_chars_read": [
+    94193
+   ],
+   "context_chars_in_request": [
+    62309,
+    62309
+   ],
+   "calls": [
+    {
+     "id": 2494,
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "duration_ms": 2518,
+     "prompt_tokens": 23882,
+     "completion_tokens": 7,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2495,
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "duration_ms": 27800,
+     "prompt_tokens": 55197,
+     "completion_tokens": 1615,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2496,
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "duration_ms": 6613,
+     "prompt_tokens": 55927,
+     "completion_tokens": 223,
+     "finish_reason": "stop",
+     "error_msg": null
+    }
+   ],
+   "works": [
+    {
+     "id": 766,
+     "stage": "video_prompts",
+     "storyboard_id": 943,
+     "status": "completed",
+     "work_ms": 37342,
+     "call_count": 3,
+     "error_msg": null
+    }
+   ]
+  }
+ },
+ "949": {
+  "tasks": [
+   3444,
+   3445
+  ],
+  "kf_wall": 30.0,
+  "vp_wall": 50.1,
+  "kf": {
+   "task": 3444,
+   "status": "completed",
+   "error": null,
+   "progress": {
+    "completed": 1,
+    "failed": 0,
+    "total": 1
+   },
+   "model_used": {
+    "config_id": 1,
+    "name": "GLM 5.3 (local)",
+    "provider": "openai",
+    "model": "glm-5.3-flash",
+    "vision": false
+   },
+   "work_ms": 26867,
+   "call_count": 3,
+   "max_prompt_tokens": 67934,
+   "total_prompt_tokens": 158270,
+   "total_completion_tokens": 1570,
+   "models": [
+    [
+     1,
+     "glm-5.3-flash"
+    ]
+   ],
+   "request_params": [
+    {
+     "model": "glm-5.3-flash",
+     "reasoning_effort": "low",
+     "max_tokens": 131072,
+     "stream": true
+    },
+    {
+     "model": "glm-5.3-flash",
+     "reasoning_effort": "low",
+     "max_tokens": 131072,
+     "stream": true
+    }
+   ],
+   "saves": [
+    "{\n  \"message\": \"Storyboard 949 updated\"\n}"
+   ],
+   "context_chars_read": [
+    112862
+   ],
+   "context_chars_in_request": [
+    77839,
+    77839
+   ],
+   "calls": [
+    {
+     "id": 2497,
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "duration_ms": 2042,
+     "prompt_tokens": 23507,
+     "completion_tokens": 7,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2498,
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "duration_ms": 17435,
+     "prompt_tokens": 66829,
+     "completion_tokens": 1254,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2499,
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "duration_ms": 6899,
+     "prompt_tokens": 67934,
+     "completion_tokens": 309,
+     "finish_reason": "stop",
+     "error_msg": null
+    }
+   ],
+   "works": [
+    {
+     "id": 767,
+     "stage": "keyframe_prompts",
+     "storyboard_id": 949,
+     "status": "completed",
+     "work_ms": 26867,
+     "call_count": 3,
+     "error_msg": null
+    }
+   ]
+  },
+  "vp": {
+   "task": 3445,
+   "status": "completed",
+   "error": null,
+   "progress": {
+    "completed": 1,
+    "failed": 0,
+    "total": 1
+   },
+   "model_used": {
+    "config_id": 1,
+    "name": "GLM 5.3 (local)",
+    "provider": "openai",
+    "model": "glm-5.3-flash",
+    "vision": false
+   },
+   "work_ms": 47309,
+   "call_count": 3,
+   "max_prompt_tokens": 69268,
+   "total_prompt_tokens": 161282,
+   "total_completion_tokens": 2937,
+   "models": [
+    [
+     1,
+     "glm-5.3-flash"
+    ]
+   ],
+   "request_params": [
+    {
+     "model": "glm-5.3-flash",
+     "reasoning_effort": "low",
+     "max_tokens": 131072,
+     "stream": true
+    },
+    {
+     "model": "glm-5.3-flash",
+     "reasoning_effort": "low",
+     "max_tokens": 131072,
+     "stream": true
+    }
+   ],
+   "saves": [
+    "{\n  \"message\": \"Storyboard 949 updated\"\n}"
+   ],
+   "context_chars_read": [
+    112862
+   ],
+   "context_chars_in_request": [
+    77839,
+    77839
+   ],
+   "calls": [
+    {
+     "id": 2500,
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "duration_ms": 1494,
+     "prompt_tokens": 24346,
+     "completion_tokens": 7,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2501,
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "duration_ms": 39362,
+     "prompt_tokens": 67668,
+     "completion_tokens": 2661,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2502,
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "duration_ms": 5902,
+     "prompt_tokens": 69268,
+     "completion_tokens": 269,
+     "finish_reason": "stop",
+     "error_msg": null
+    }
+   ],
+   "works": [
+    {
+     "id": 768,
+     "stage": "video_prompts",
+     "storyboard_id": 949,
+     "status": "completed",
+     "work_ms": 47309,
+     "call_count": 3,
+     "error_msg": null
+    }
+   ]
+  }
+ },
+ "987": {
+  "tasks": [
+   3446,
+   3447
+  ],
+  "kf_wall": 35.0,
+  "vp_wall": 40.0,
+  "kf": {
+   "task": 3446,
+   "status": "completed",
+   "error": null,
+   "progress": {
+    "completed": 1,
+    "failed": 0,
+    "total": 1
+   },
+   "model_used": {
+    "config_id": 1,
+    "name": "GLM 5.3 (local)",
+    "provider": "openai",
+    "model": "glm-5.3-flash",
+    "vision": false
+   },
+   "work_ms": 34900,
+   "call_count": 3,
+   "max_prompt_tokens": 67529,
+   "total_prompt_tokens": 157506,
+   "total_completion_tokens": 2108,
+   "models": [
+    [
+     1,
+     "glm-5.3-flash"
+    ]
+   ],
+   "request_params": [
+    {
+     "model": "glm-5.3-flash",
+     "reasoning_effort": "low",
+     "max_tokens": 131072,
+     "stream": true
+    },
+    {
+     "model": "glm-5.3-flash",
+     "reasoning_effort": "low",
+     "max_tokens": 131072,
+     "stream": true
+    }
+   ],
+   "saves": [
+    "{\n  \"message\": \"Storyboard 987 updated\"\n}"
+   ],
+   "context_chars_read": [
+    114320
+   ],
+   "context_chars_in_request": [
+    77555,
+    77555
+   ],
+   "calls": [
+    {
+     "id": 2503,
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "duration_ms": 2094,
+     "prompt_tokens": 23689,
+     "completion_tokens": 7,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2504,
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "duration_ms": 25524,
+     "prompt_tokens": 66288,
+     "completion_tokens": 1727,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2505,
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "duration_ms": 6849,
+     "prompt_tokens": 67529,
+     "completion_tokens": 374,
+     "finish_reason": "stop",
+     "error_msg": null
+    }
+   ],
+   "works": [
+    {
+     "id": 769,
+     "stage": "keyframe_prompts",
+     "storyboard_id": 987,
+     "status": "completed",
+     "work_ms": 34900,
+     "call_count": 3,
+     "error_msg": null
+    }
+   ]
+  },
+  "vp": {
+   "task": 3447,
+   "status": "completed",
+   "error": null,
+   "progress": {
+    "completed": 1,
+    "failed": 0,
+    "total": 1
+   },
+   "model_used": {
+    "config_id": 1,
+    "name": "GLM 5.3 (local)",
+    "provider": "openai",
+    "model": "glm-5.3-flash",
+    "vision": false
+   },
+   "work_ms": 37784,
+   "call_count": 3,
+   "max_prompt_tokens": 68593,
+   "total_prompt_tokens": 160337,
+   "total_completion_tokens": 2207,
+   "models": [
+    [
+     1,
+     "glm-5.3-flash"
+    ]
+   ],
+   "request_params": [
+    {
+     "model": "glm-5.3-flash",
+     "reasoning_effort": "low",
+     "max_tokens": 131072,
+     "stream": true
+    },
+    {
+     "model": "glm-5.3-flash",
+     "reasoning_effort": "low",
+     "max_tokens": 131072,
+     "stream": true
+    }
+   ],
+   "saves": [
+    "{\n  \"message\": \"Storyboard 987 updated\"\n}"
+   ],
+   "context_chars_read": [
+    114456
+   ],
+   "context_chars_in_request": [
+    77691,
+    77691
+   ],
+   "calls": [
+    {
+     "id": 2506,
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "duration_ms": 2135,
+     "prompt_tokens": 24516,
+     "completion_tokens": 7,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2507,
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "duration_ms": 27748,
+     "prompt_tokens": 67228,
+     "completion_tokens": 1836,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2508,
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "duration_ms": 7490,
+     "prompt_tokens": 68593,
+     "completion_tokens": 364,
+     "finish_reason": "stop",
+     "error_msg": null
+    }
+   ],
+   "works": [
+    {
+     "id": 770,
+     "stage": "video_prompts",
+     "storyboard_id": 987,
+     "status": "completed",
+     "work_ms": 37784,
+     "call_count": 3,
+     "error_msg": null
+    }
+   ]
+  }
+ },
+ "989": {
+  "tasks": [
+   3448,
+   3449
+  ],
+  "kf_wall": 30.0,
+  "vp_wall": 40.0,
+  "kf": {
+   "task": 3448,
+   "status": "completed",
+   "error": null,
+   "progress": {
+    "completed": 1,
+    "failed": 0,
+    "total": 1
+   },
+   "model_used": {
+    "config_id": 1,
+    "name": "GLM 5.3 (local)",
+    "provider": "openai",
+    "model": "glm-5.3-flash",
+    "vision": false
+   },
+   "work_ms": 25365,
+   "call_count": 3,
+   "max_prompt_tokens": 73471,
+   "total_prompt_tokens": 169665,
+   "total_completion_tokens": 1459,
+   "models": [
+    [
+     1,
+     "glm-5.3-flash"
+    ]
+   ],
+   "request_params": [
+    {
+     "model": "glm-5.3-flash",
+     "reasoning_effort": "low",
+     "max_tokens": 131072,
+     "stream": true
+    },
+    {
+     "model": "glm-5.3-flash",
+     "reasoning_effort": "low",
+     "max_tokens": 131072,
+     "stream": true
+    }
+   ],
+   "saves": [
+    "{\n  \"message\": \"Storyboard 989 updated\"\n}"
+   ],
+   "context_chars_read": [
+    120750
+   ],
+   "context_chars_in_request": [
+    84788,
+    84788
+   ],
+   "calls": [
+    {
+     "id": 2509,
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "duration_ms": 2072,
+     "prompt_tokens": 23670,
+     "completion_tokens": 7,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2510,
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "duration_ms": 17501,
+     "prompt_tokens": 72524,
+     "completion_tokens": 1229,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2511,
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "duration_ms": 5433,
+     "prompt_tokens": 73471,
+     "completion_tokens": 223,
+     "finish_reason": "stop",
+     "error_msg": null
+    }
+   ],
+   "works": [
+    {
+     "id": 771,
+     "stage": "keyframe_prompts",
+     "storyboard_id": 989,
+     "status": "completed",
+     "work_ms": 25365,
+     "call_count": 3,
+     "error_msg": null
+    }
+   ]
+  },
+  "vp": {
+   "task": 3449,
+   "status": "completed",
+   "error": null,
+   "progress": {
+    "completed": 1,
+    "failed": 0,
+    "total": 1
+   },
+   "model_used": {
+    "config_id": 1,
+    "name": "GLM 5.3 (local)",
+    "provider": "openai",
+    "model": "glm-5.3-flash",
+    "vision": false
+   },
+   "work_ms": 39401,
+   "call_count": 3,
+   "max_prompt_tokens": 75418,
+   "total_prompt_tokens": 173261,
+   "total_completion_tokens": 2841,
+   "models": [
+    [
+     1,
+     "glm-5.3-flash"
+    ]
+   ],
+   "request_params": [
+    {
+     "model": "glm-5.3-flash",
+     "reasoning_effort": "low",
+     "max_tokens": 131072,
+     "stream": true
+    },
+    {
+     "model": "glm-5.3-flash",
+     "reasoning_effort": "low",
+     "max_tokens": 131072,
+     "stream": true
+    }
+   ],
+   "saves": [
+    "{\n  \"message\": \"Storyboard 989 updated\"\n}"
+   ],
+   "context_chars_read": [
+    120726
+   ],
+   "context_chars_in_request": [
+    84764,
+    84764
+   ],
+   "calls": [
+    {
+     "id": 2512,
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "duration_ms": 1079,
+     "prompt_tokens": 24503,
+     "completion_tokens": 7,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2513,
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "duration_ms": 28918,
+     "prompt_tokens": 73340,
+     "completion_tokens": 2415,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2514,
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "duration_ms": 8931,
+     "prompt_tokens": 75418,
+     "completion_tokens": 419,
+     "finish_reason": "stop",
+     "error_msg": null
+    }
+   ],
+   "works": [
+    {
+     "id": 772,
+     "stage": "video_prompts",
+     "storyboard_id": 989,
+     "status": "completed",
+     "work_ms": 39401,
+     "call_count": 3,
+     "error_msg": null
+    }
+   ]
+  }
+ },
+ "999": {
+  "tasks": [
+   3450,
+   3451
+  ],
+  "kf_wall": 30.0,
+  "vp_wall": 45.1,
+  "kf": {
+   "task": 3450,
+   "status": "completed",
+   "error": null,
+   "progress": {
+    "completed": 1,
+    "failed": 0,
+    "total": 1
+   },
+   "model_used": {
+    "config_id": 1,
+    "name": "GLM 5.3 (local)",
+    "provider": "openai",
+    "model": "glm-5.3-flash",
+    "vision": false
+   },
+   "work_ms": 27001,
+   "call_count": 3,
+   "max_prompt_tokens": 75059,
+   "total_prompt_tokens": 172807,
+   "total_completion_tokens": 1627,
+   "models": [
+    [
+     1,
+     "glm-5.3-flash"
+    ]
+   ],
+   "request_params": [
+    {
+     "model": "glm-5.3-flash",
+     "reasoning_effort": "low",
+     "max_tokens": 131072,
+     "stream": true
+    },
+    {
+     "model": "glm-5.3-flash",
+     "reasoning_effort": "low",
+     "max_tokens": 131072,
+     "stream": true
+    }
+   ],
+   "saves": [
+    "{\n  \"message\": \"Storyboard 999 updated\"\n}"
+   ],
+   "context_chars_read": [
+    123100
+   ],
+   "context_chars_in_request": [
+    86543,
+    86543
+   ],
+   "calls": [
+    {
+     "id": 2515,
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "duration_ms": 2123,
+     "prompt_tokens": 23840,
+     "completion_tokens": 7,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2516,
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "duration_ms": 17422,
+     "prompt_tokens": 73908,
+     "completion_tokens": 1315,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2517,
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "duration_ms": 7069,
+     "prompt_tokens": 75059,
+     "completion_tokens": 305,
+     "finish_reason": "stop",
+     "error_msg": null
+    }
+   ],
+   "works": [
+    {
+     "id": 773,
+     "stage": "keyframe_prompts",
+     "storyboard_id": 999,
+     "status": "completed",
+     "work_ms": 27001,
+     "call_count": 3,
+     "error_msg": null
+    }
+   ]
+  },
+  "vp": {
+   "task": 3451,
+   "status": "completed",
+   "error": null,
+   "progress": {
+    "completed": 1,
+    "failed": 0,
+    "total": 1
+   },
+   "model_used": {
+    "config_id": 1,
+    "name": "GLM 5.3 (local)",
+    "provider": "openai",
+    "model": "glm-5.3-flash",
+    "vision": false
+   },
+   "work_ms": 42212,
+   "call_count": 3,
+   "max_prompt_tokens": 76311,
+   "total_prompt_tokens": 175768,
+   "total_completion_tokens": 2414,
+   "models": [
+    [
+     1,
+     "glm-5.3-flash"
+    ]
+   ],
+   "request_params": [
+    {
+     "model": "glm-5.3-flash",
+     "reasoning_effort": "low",
+     "max_tokens": 131072,
+     "stream": true
+    },
+    {
+     "model": "glm-5.3-flash",
+     "reasoning_effort": "low",
+     "max_tokens": 131072,
+     "stream": true
+    }
+   ],
+   "saves": [
+    "{\n  \"message\": \"Storyboard 999 updated\"\n}"
+   ],
+   "context_chars_read": [
+    123162
+   ],
+   "context_chars_in_request": [
+    86605,
+    86605
+   ],
+   "calls": [
+    {
+     "id": 2518,
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "duration_ms": 2911,
+     "prompt_tokens": 24670,
+     "completion_tokens": 7,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2519,
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "duration_ms": 30170,
+     "prompt_tokens": 74787,
+     "completion_tokens": 2080,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2520,
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "duration_ms": 8587,
+     "prompt_tokens": 76311,
+     "completion_tokens": 327,
+     "finish_reason": "stop",
+     "error_msg": null
+    }
+   ],
+   "works": [
+    {
+     "id": 774,
+     "stage": "video_prompts",
+     "storyboard_id": 999,
+     "status": "completed",
+     "work_ms": 42212,
+     "call_count": 3,
+     "error_msg": null
+    }
+   ]
+  }
+ },
+ "1011": {
+  "tasks": [
+   3452,
+   3453
+  ],
+  "kf_wall": 30.0,
+  "vp_wall": 50.1,
+  "kf": {
+   "task": 3452,
+   "status": "completed",
+   "error": null,
+   "progress": {
+    "completed": 1,
+    "failed": 0,
+    "total": 1
+   },
+   "model_used": {
+    "config_id": 1,
+    "name": "GLM 5.3 (local)",
+    "provider": "openai",
+    "model": "glm-5.3-flash",
+    "vision": false
+   },
+   "work_ms": 27654,
+   "call_count": 3,
+   "max_prompt_tokens": 70356,
+   "total_prompt_tokens": 162759,
+   "total_completion_tokens": 1631,
+   "models": [
+    [
+     1,
+     "glm-5.3-flash"
+    ]
+   ],
+   "request_params": [
+    {
+     "model": "glm-5.3-flash",
+     "reasoning_effort": "low",
+     "max_tokens": 131072,
+     "stream": true
+    },
+    {
+     "model": "glm-5.3-flash",
+     "reasoning_effort": "low",
+     "max_tokens": 131072,
+     "stream": true
+    }
+   ],
+   "saves": [
+    "{\n  \"message\": \"Storyboard 1011 updated\"\n}"
+   ],
+   "context_chars_read": [
+    112683
+   ],
+   "context_chars_in_request": [
+    80111,
+    80111
+   ],
+   "calls": [
+    {
+     "id": 2521,
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "duration_ms": 2121,
+     "prompt_tokens": 23293,
+     "completion_tokens": 7,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2522,
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "duration_ms": 18028,
+     "prompt_tokens": 69110,
+     "completion_tokens": 1350,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2523,
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "duration_ms": 7143,
+     "prompt_tokens": 70356,
+     "completion_tokens": 274,
+     "finish_reason": "stop",
+     "error_msg": null
+    }
+   ],
+   "works": [
+    {
+     "id": 775,
+     "stage": "keyframe_prompts",
+     "storyboard_id": 1011,
+     "status": "completed",
+     "work_ms": 27654,
+     "call_count": 3,
+     "error_msg": null
+    }
+   ]
+  },
+  "vp": {
+   "task": 3453,
+   "status": "completed",
+   "error": null,
+   "progress": {
+    "completed": 1,
+    "failed": 0,
+    "total": 1
+   },
+   "model_used": {
+    "config_id": 1,
+    "name": "GLM 5.3 (local)",
+    "provider": "openai",
+    "model": "glm-5.3-flash",
+    "vision": false
+   },
+   "work_ms": 48491,
+   "call_count": 3,
+   "max_prompt_tokens": 71963,
+   "total_prompt_tokens": 166030,
+   "total_completion_tokens": 3049,
+   "models": [
+    [
+     1,
+     "glm-5.3-flash"
+    ]
+   ],
+   "request_params": [
+    {
+     "model": "glm-5.3-flash",
+     "reasoning_effort": "low",
+     "max_tokens": 131072,
+     "stream": true
+    },
+    {
+     "model": "glm-5.3-flash",
+     "reasoning_effort": "low",
+     "max_tokens": 131072,
+     "stream": true
+    }
+   ],
+   "saves": [
+    "{\n  \"message\": \"Storyboard 1011 updated\"\n}"
+   ],
+   "context_chars_read": [
+    112695
+   ],
+   "context_chars_in_request": [
+    80123,
+    80123
+   ],
+   "calls": [
+    {
+     "id": 2524,
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "duration_ms": 2393,
+     "prompt_tokens": 24119,
+     "completion_tokens": 7,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2525,
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "duration_ms": 37627,
+     "prompt_tokens": 69948,
+     "completion_tokens": 2644,
+     "finish_reason": "tool_calls",
+     "error_msg": null
+    },
+    {
+     "id": 2526,
+     "config_id": 1,
+     "model": "glm-5.3-flash",
+     "status": "completed",
+     "duration_ms": 8017,
+     "prompt_tokens": 71963,
+     "completion_tokens": 398,
+     "finish_reason": "stop",
+     "error_msg": null
+    }
+   ],
+   "works": [
+    {
+     "id": 776,
+     "stage": "video_prompts",
+     "storyboard_id": 1011,
+     "status": "completed",
+     "work_ms": 48491,
+     "call_count": 3,
+     "error_msg": null
+    }
+   ]
+  }
+ }
+}
