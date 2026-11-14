@@ -18,6 +18,7 @@ import {
   findActiveTextTask,
   findLatestTextTask,
   finishTextTask,
+  patchTextTaskParams,
   promptBatchStatusFrom,
   updateTextTaskProgress,
   type PromptBatchStatus,
@@ -27,6 +28,9 @@ import { resolveStageModel } from './ai-stages.js'
 import { batchScopeOf, type BatchScope } from './batch-scope.js'
 import { isFirstAgentFailureSafe, runWithTextTask } from './text-task-context.js'
 import { requeueFirstModelFailure } from './text-task-autoretry.js'
+import { runObservedWork } from './task-observability.js'
+import { buildSampleKey, buildWorkPlan } from './task-estimate.js'
+import { narrationCharCount } from './narration.js'
 
 export type KeyframePromptBatchStatus = PromptBatchStatus
 
@@ -77,6 +81,18 @@ export async function startKeyframePromptBatch(
     queued: true,
     restart: { kind: 'keyframe_prompts', args: { episodeId, dramaId, opts, storyboardIds } },
   })
+  // 任务观测（Issue #104）：逐镜一个工作项，计划与样本分组随任务落盘，任务窗口据此显示进度/ETA 与完整公开调用
+  const sampleKey = buildSampleKey({ stage: 'keyframe_prompts', configId: resolved.configId, model: resolved.model })
+  const sourceChars = new Map<number, number>(pending.map(sb => [sb.id,
+    narrationCharCount(sb.description) + narrationCharCount(sb.narrationText)]))
+  await patchTextTaskParams(taskId, {
+    work_plan: buildWorkPlan({
+      stage: 'keyframe_prompts',
+      unit: 'shot',
+      sampleKey,
+      items: pending.map(sb => ({ storyboard_id: sb.id, storyboard_number: sb.storyboardNumber, source_chars: sourceChars.get(sb.id) ?? 0 })),
+    }),
+  })
 
   const outputs: string[] = []
   logTaskStart('KeyframePrompt', 'batch', { episodeId, dramaId, total: pending.length, model: opts.model || undefined })
@@ -99,9 +115,17 @@ export async function startKeyframePromptBatch(
       logTaskProgress('KeyframePrompt', 'batch-shot', { episodeId, storyboardId: sb.id, index: progress.completed + progress.failed + 1, total: progress.total })
       sink.heading(`分镜 #${sb.storyboardNumber}`)
       try {
-        const result = await runAgent(agent, [{
-          role: 'user',
-          content: `请为分镜 #${sb.storyboardNumber}(ID:${sb.id})生成关键帧提示词(first_frame_prompt、mid_frame_prompt、mid_frame_time、last_frame_prompt)，严格遵循 keyframe-prompt 技能规范。
+        await runObservedWork({
+          taskId,
+          stage: 'keyframe_prompts',
+          sourceChars: sourceChars.get(sb.id) ?? 0,
+          sampleKey,
+          storyboardId: sb.id,
+          storyboardNumber: sb.storyboardNumber,
+        }, async () => {
+          const result = await runAgent(agent, [{
+            role: 'user',
+            content: `请为分镜 #${sb.storyboardNumber}(ID:${sb.id})生成关键帧提示词(first_frame_prompt、mid_frame_prompt、mid_frame_time、last_frame_prompt)，严格遵循 keyframe-prompt 技能规范。
 请先调用 read_storyboard_context 读取该分镜的 description(含【镜头N】子镜头)、result、atmosphere、duration、continuity_boundary 及 inherits_first，然后写出关键帧提示词：
 - 每张关键帧都是独立生成的单帧静态画面，只凭资产参考图 + 本条提示词出图，所以每条提示词必须自足（自己交代景别机位构图、@场景名、画面里有哪些 @角色名 及其位置姿态表情、关键 @道具名、光线氛围），禁止写「同上一帧」「保持不变」这类相对描述
 - 绝对图像优先：禁止描写角色的物种、服装、颜色、发型、体型等任何外观属性，角色一律只用 @角色名 指代（名字只是代号，不要据此推断长相）
@@ -109,15 +133,20 @@ export async function startKeyframePromptBatch(
 - mid_frame_prompt + mid_frame_time = 除第一个子镜头外最重要的那个子镜头的起始瞬间，mid_frame_time 以秒为单位、必须落在 0.5 秒与 duration-0.5 秒之间；该分镜只有一个子镜头时两者都不要写
 - last_frame_prompt = 段落结尾瞬间，与 result 一致，必须是稳定清晰、可被下一镜当作开场的画面
 ${briefs.get(sb.id)?.text || ''}最后调用 update_storyboard 保存到分镜 ID:${sb.id}。update_storyboard 参数只传 storyboard_id 以及上述关键帧字段,不要回传该分镜的其他任何字段(title、description、video_prompt、scene_id 等一律不传),不要重新拆分整集。`,
-        }], { maxSteps: 8, requestContext }, sink)
-        outputs.push(`分镜 #${sb.storyboardNumber}：${result.text || ''}`)
-        // 以实际落库为准判定成败：尾关键帧提示词是必选项
-        const [fresh] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, sb.id))
-        if ((fresh?.lastFramePrompt || '').trim()) progress.completed++
-        else {
-          progress.failed++
-          logTaskError('KeyframePrompt', 'batch-shot', { storyboardId: sb.id, error: 'agent finished but last_frame_prompt is empty' })
-        }
+          }], { maxSteps: 8, requestContext }, sink)
+          outputs.push(`分镜 #${sb.storyboardNumber}：${result.text || ''}`)
+          // 以实际落库为准判定成败：尾关键帧提示词是必选项——除非尾帧由衔接帧锁定（组合 D），
+          // 那一槽本来就不写提示词，不能把正确结果记成失败样本
+          const [fresh] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, sb.id))
+          const lastLocked = keyframeMap.get(sb.id)?.lockedSlots.includes('last') === true
+          const saved = lastLocked
+            ? !!((fresh?.firstFramePrompt || '').trim() || (fresh?.midFramePrompt || '').trim())
+            : !!(fresh?.lastFramePrompt || '').trim()
+          if (!saved) throw new Error(lastLocked
+            ? 'agent finished but no unlocked keyframe prompt was saved'
+            : 'agent finished but last_frame_prompt is empty')
+        })
+        progress.completed++
       } catch (err: unknown) {
         if (!progress.completed && isFirstAgentFailureSafe(err)) throw err
         progress.failed++

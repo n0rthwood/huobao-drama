@@ -22,7 +22,7 @@ import { getInsertId, sqlite } from '../db/index.js'
 
 // ─── 对外类型 ────────────────────────────────────────────────────────────
 
-export type ObservedStage = 'skeleton' | 'voice' | 'design_card' | 'map_workflow' | 'map_studio' | 'layer_base_check' | 'junction_caption'
+export type ObservedStage = 'skeleton' | 'voice' | 'design_card' | 'map_workflow' | 'map_studio' | 'layer_base_check' | 'junction_caption' | 'keyframe_prompts' | 'video_prompts'
 export type ObservedStatus = 'processing' | 'completed' | 'failed' | 'interrupted'
 
 export interface ObservedWorkInput {

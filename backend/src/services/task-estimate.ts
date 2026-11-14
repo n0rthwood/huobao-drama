@@ -301,11 +301,16 @@ export function stageEstimateOf(plan: TaskWorkPlan, configId: number | null, mod
 
 // ─── 任务汇总 ─────────────────────────────────────────────────
 
+/** 会写 `params.work_plan` 的观测阶段（任务窗口按计划显示进度与 ETA） */
+const WORK_PLAN_STAGES: Record<string, true> = {
+  skeleton: true, voice: true, design_card: true, keyframe_prompts: true, video_prompts: true,
+}
+
 function readPlan(params: Record<string, unknown> | null): TaskWorkPlan | null {
   const raw = params?.work_plan
   if (!raw || typeof raw !== 'object') return null
   const plan = raw as Partial<TaskWorkPlan>
-  if (plan.stage !== 'skeleton' && plan.stage !== 'voice' && plan.stage !== 'design_card') return null
+  if (!(typeof plan.stage === 'string' && plan.stage in WORK_PLAN_STAGES)) return null
   const items = Array.isArray(plan.items) ? plan.items as WorkPlanItem[] : []
   return {
     stage: plan.stage,
@@ -335,7 +340,10 @@ export function getTaskWorkSummary(taskId: number, nowMs: number = Date.now(), c
   if (!row) return null
   const params = parseTextTaskParams(row.params) as Record<string, unknown> | null
   const plan = readPlan(params)
-  const works = listObservedWork(taskId)
+  // 同一任务可能夹带别的阶段的工作项（视频提示词批次先跑衔接帧描述 junction_caption）：
+  // 有计划时进度/ETA 只按计划阶段统计，其余工作项照常留在观测明细里
+  const allWorks = listObservedWork(taskId)
+  const works = plan ? allWorks.filter(w => w.stage === plan.stage) : allWorks
   if (!plan && !works.length) return null
 
   const stage: ObservedStage = plan?.stage ?? works[0]!.stage
