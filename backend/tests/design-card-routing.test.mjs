@@ -22,7 +22,7 @@ test('design-card window takes target ±3 and truncates at episode edges (#102)'
   `)
 })
 
-test('read_storyboard_context windows only the design_card scope (#102)', () => {
+test('read_storyboard_context windows the per-shot batch scopes (#102, #103)', () => {
   run(`
     import assert from 'node:assert/strict'
     import { db, schema } from './src/db/index.ts'
@@ -31,7 +31,7 @@ test('read_storyboard_context windows only the design_card scope (#102)', () => 
     await db.insert(schema.dramas).values({ id: 501, title: 'w', projectType: 'documentary', aspectRatio: '16:9', createdAt: stamp, updatedAt: stamp })
     await db.insert(schema.episodes).values({ id: 601, dramaId: 501, episodeNumber: 1, title: 'e', scriptContent: '全文', createdAt: stamp, updatedAt: stamp })
     for (let n = 1; n <= 10; n++) {
-      await db.insert(schema.storyboards).values({ id: 700 + n, episodeId: 601, storyboardNumber: n, narrationText: '旁白' + n, createdAt: stamp, updatedAt: stamp })
+      await db.insert(schema.storyboards).values({ id: 700 + n, episodeId: 601, storyboardNumber: n, narrationText: '旁白' + n, lastFramePrompt: '尾帧' + n, result: '结果' + n, continuityBoundary: 'continue', createdAt: stamp, updatedAt: stamp })
     }
     const read = async (values) => {
       const rc = new Map(Object.entries({ episodeId: 601, dramaId: 501, ...values }))
@@ -46,7 +46,16 @@ test('read_storyboard_context windows only the design_card scope (#102)', () => 
     const noTarget = await read({ storyboardPromptScope: 'design_card' })
     assert.equal(noTarget.existing_storyboards.length, 10)
     assert.equal(noTarget.context_window, undefined)
-    const full = await read({ storyboardPromptScope: 'keyframes', storyboardId: 702 })
+    for (const scope of ['keyframes', 'video']) {
+      const shot = await read({ storyboardPromptScope: scope, storyboardId: 709 })
+      assert.deepEqual(shot.existing_storyboards.map(sb => sb.id), [706, 707, 708, 709, 710])
+      assert.equal(shot.context_window.after, 1)
+      // 窗口最左一镜（706）的上一镜（705）不在窗口里，承接字段仍按整集算
+      assert.equal(shot.existing_storyboards[0].previous_last_frame_prompt, '尾帧5')
+      assert.equal(shot.existing_storyboards[0].previous_result, '结果5')
+      assert.equal(shot.existing_storyboards[0].inherits_first, true)
+    }
+    const full = await read({ storyboardId: 702 })
     assert.equal(full.existing_storyboards.length, 10)
     assert.equal(full.context_window, undefined)
     assert.equal('narration_text' in full.existing_storyboards[0], false)
