@@ -139,7 +139,7 @@ test('Map Studio adopted styles: settings, validation, HTTP rejection, theme cha
         const spec=normalizeMapSpec({bbox,detail_level:'regional',style:{map_style:family.id},places:[],routes:[],regions:[]})
         const base=await createMapBaseArtifact(spec,{mode:'program',width:1920})
         const forward=forwardFor(base.registration),common=(id,type,style,extra)=>({id,type,name:id,visible:true,locked:false,z:1,opacity:1,rotation:0,style,...extra})
-        const layers=river.parts.map((part,i)=>common('river-'+i,'polyline',featureStyleFor(family,{kind:'route',category:'river',lengthRatio:.7}),{points:part.map(p=>{const q=forward(p);return[q[0]/base.width,q[1]/base.height]})}))
+        const layers=river.parts.map((part,i)=>common('river-'+i,'polyline',featureStyleFor(family,{kind:'route',category:'river'}),{points:part.map(p=>{const q=forward(p);return[q[0]/base.width,q[1]/base.height]})}))
         for(const city of cities){const p=forward([city.geometry.lon,city.geometry.lat]);layers.push(common(city.name,'marker',featureStyleFor(family,{kind:'place',category:'settlement'}),{at:[p[0]/base.width,p[1]/base.height],text:city.name}))}
         layers.push(common('theme-title-1','label',labelStyleFor(family,'title'),{z:100,box:{x:.1,y:.04,w:.8,h:.1},text:family.name}))
         layers.push(common('theme-note-2','label',labelStyleFor(family,'note'),{z:101,box:{x:.05,y:.9,w:.9,h:.07},text:'Natural Earth · Volga / Moscow / Kazan · style sample, not a historical claim'}))

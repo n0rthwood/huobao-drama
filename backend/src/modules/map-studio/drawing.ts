@@ -168,8 +168,7 @@ export async function runDrawingStage(input: DrawingStageInput): Promise<StageAg
             if (points.some(p => !p)) { problems.push(`要素 ${feature.id} 在当前底图不可见，请回退 base`); continue }
             const coords = points as [number, number][]
             const id = feature.id.length <= 56 ? `feature-${feature.id}` : `feature-${crypto.createHash('sha256').update(feature.id).digest('hex').slice(0, 32)}`
-            const lengthRatio = coords.slice(1).reduce((sum, point, i) => sum + Math.hypot((point[0] - coords[i]![0]) * background.width, (point[1] - coords[i]![1]) * background.height), 0) / Math.hypot(background.width, background.height)
-            const defaults = selectedStyle ? featureStyleFor(selectedStyle.family, { ...feature, lengthRatio, markerTier: item.importance }) : {}
+            const defaults = selectedStyle ? featureStyleFor(selectedStyle.family, { ...feature, markerTier: item.importance }) : {}
             const common = { id, name: feature.name, visible: true, locked: false, z: next.layers.length, opacity: 1, rotation: 0, anchor: { semantic_id: feature.id, semantic_name: feature.name }, style: { ...defaults, ...item.style } }
             next.layers.push(feature.kind === 'place' ? { ...common, type: 'marker', at: coords[0]!, text: feature.name } : { ...common, type: feature.kind === 'region' ? 'polygon' : 'polyline', points: coords })
           }

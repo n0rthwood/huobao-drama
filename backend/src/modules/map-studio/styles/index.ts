@@ -157,12 +157,15 @@ export function lineStyleFor(family: MapStyleFamily, tier: MapLineTier): LayerSt
   return { stroke: line.stroke, width: line.width, dash: line.dash, arrow_start: line.arrow_start ?? false, arrow_end: line.arrow_end ?? false }
 }
 export function regionStyleFor(family: MapStyleFamily): LayerStyle { return { ...family.lines.regions } }
-export interface FeatureStyleInput { kind: 'place' | 'route' | 'region'; category?: string; lengthRatio?: number; markerTier?: MapMarkerTier }
-/** Rivers use projected length (>=45% of canvas diagonal is major); no geometry is modified. */
+export interface FeatureStyleInput { kind: 'place' | 'route' | 'region'; category?: string; markerTier?: MapMarkerTier }
+/**
+ * 底图里的全部河网按 river_minor 画（背景参照）；被检索选中、画进图层的河流是这张图的主题，
+ * 一律用 river_major，才能和底图河网区分开（生产版本 3353：主题河流按长度落到 minor，与底图河网同宽，看不出来）。
+ */
 export function featureStyleFor(family: MapStyleFamily, feature: FeatureStyleInput): LayerStyle {
   if (feature.kind === 'place') return markerStyleFor(family, feature.markerTier ?? 'city')
   if (feature.kind === 'region') return regionStyleFor(family)
-  if (feature.category === 'river') return lineStyleFor(family, (feature.lengthRatio ?? 0) >= .45 ? 'river_major' : 'river_minor')
+  if (feature.category === 'river') return lineStyleFor(family, 'river_major')
   if (feature.category === 'coast') return lineStyleFor(family, 'coast')
   // The adopted recipe has no mountain/lake line entry: derive quiet terrain/water hints rather than invent terrain geometry.
   if (feature.category === 'mountain') return { ...lineStyleFor(family, 'coast'), width: family.lines.river_minor.width, dash: 'dot' }
