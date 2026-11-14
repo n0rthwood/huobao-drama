@@ -1,0 +1,1083 @@
+{
+ "943": {
+  "number": 13,
+  "combo": "C",
+  "dictation": 9.12,
+  "OLD": {
+   "card_ref_unmet": [],
+   "unknown_mentions": [],
+   "mid_frame_time": 5.5,
+   "mid_in_gen_window": false,
+   "segments": [
+    [
+     0.0,
+     1.0
+    ],
+    [
+     1.0,
+     4.0
+    ],
+    [
+     4.0,
+     8.0
+    ],
+    [
+     8.0,
+     11.0
+    ]
+   ],
+   "seg_sum": 11.0,
+   "layer_s": 5.5,
+   "gen_s": 5.5,
+   "sum_vs_gen": 5.5,
+   "sum_vs_layer_gen": 0.0,
+   "mid_is_boundary": false,
+   "first_seg_end": 1.0,
+   "first_seg_over_1_5": false,
+   "first_seg_character": false,
+   "first_seg_cut_or_transition": false,
+   "appearance_fields": {
+    "mid": [
+     "毡帽",
+     "长袍"
+    ],
+    "video": [
+     "毡帽",
+     "长袍"
+    ]
+   },
+   "lengths": {
+    "first": 0,
+    "mid": 378,
+    "last": 328,
+    "video": 869
+   }
+  },
+  "NEW_inplace": {
+   "card_ref_unmet": [],
+   "unknown_mentions": [],
+   "mid_frame_time": 5.5,
+   "mid_in_gen_window": false,
+   "segments": [
+    [
+     0.0,
+     1.0
+    ],
+    [
+     1.0,
+     5.5
+    ],
+    [
+     5.5,
+     8.5
+    ],
+    [
+     8.5,
+     11.0
+    ]
+   ],
+   "seg_sum": 11.0,
+   "layer_s": 5.5,
+   "gen_s": 5.5,
+   "sum_vs_gen": 5.5,
+   "sum_vs_layer_gen": 0.0,
+   "mid_is_boundary": true,
+   "first_seg_end": 1.0,
+   "first_seg_over_1_5": false,
+   "first_seg_character": false,
+   "first_seg_cut_or_transition": false,
+   "appearance_fields": {
+    "mid": [
+     "毡帽",
+     "长袍"
+    ],
+    "video": [
+     "毡帽",
+     "长袍"
+    ]
+   },
+   "lengths": {
+    "first": 0,
+    "mid": 378,
+    "last": 328,
+    "video": 840
+   }
+  },
+  "NEW_scratch": {
+   "card_ref_unmet": [],
+   "unknown_mentions": [],
+   "mid_frame_time": 5.5,
+   "mid_in_gen_window": false,
+   "segments": [
+    [
+     0.0,
+     1.0
+    ],
+    [
+     1.0,
+     4.0
+    ],
+    [
+     4.0,
+     5.5
+    ],
+    [
+     5.5,
+     8.5
+    ],
+    [
+     8.5,
+     11.0
+    ]
+   ],
+   "seg_sum": 11.0,
+   "layer_s": 5.5,
+   "gen_s": 5.5,
+   "sum_vs_gen": 5.5,
+   "sum_vs_layer_gen": 0.0,
+   "mid_is_boundary": true,
+   "first_seg_end": 1.0,
+   "first_seg_over_1_5": false,
+   "first_seg_character": false,
+   "first_seg_cut_or_transition": false,
+   "appearance_fields": {
+    "mid": [
+     "毡帽",
+     "长袍"
+    ],
+    "video": [
+     "毡帽",
+     "长袍"
+    ]
+   },
+   "lengths": {
+    "first": 0,
+    "mid": 321,
+    "last": 270,
+    "video": 828
+   }
+  }
+ },
+ "949": {
+  "number": 20,
+  "combo": "C",
+  "dictation": 9.76,
+  "OLD": {
+   "card_ref_unmet": [],
+   "unknown_mentions": [],
+   "mid_frame_time": 3.0,
+   "mid_in_gen_window": true,
+   "segments": [
+    [
+     0.0,
+     1.0
+    ],
+    [
+     1.0,
+     4.0
+    ],
+    [
+     4.0,
+     7.0
+    ],
+    [
+     7.0,
+     9.5
+    ],
+    [
+     9.5,
+     11.5
+    ]
+   ],
+   "seg_sum": 11.5,
+   "layer_s": 5,
+   "gen_s": 6.5,
+   "sum_vs_gen": 5.0,
+   "sum_vs_layer_gen": 0.0,
+   "mid_is_boundary": false,
+   "first_seg_end": 1.0,
+   "first_seg_over_1_5": false,
+   "first_seg_character": false,
+   "first_seg_cut_or_transition": false,
+   "appearance_fields": {
+    "mid": [
+     "靴"
+    ],
+    "last": [
+     "靴"
+    ],
+    "video": [
+     "眉骨",
+     "靴"
+    ]
+   },
+   "lengths": {
+    "first": 0,
+    "mid": 560,
+    "last": 553,
+    "video": 1798
+   }
+  },
+  "NEW_inplace": {
+   "card_ref_unmet": [],
+   "unknown_mentions": [],
+   "mid_frame_time": 3.0,
+   "mid_in_gen_window": true,
+   "segments": [
+    [
+     0.0,
+     1.0
+    ],
+    [
+     1.0,
+     3.0
+    ],
+    [
+     3.0,
+     6.0
+    ],
+    [
+     6.0,
+     9.0
+    ],
+    [
+     9.0,
+     11.5
+    ]
+   ],
+   "seg_sum": 11.5,
+   "layer_s": 5,
+   "gen_s": 6.5,
+   "sum_vs_gen": 5.0,
+   "sum_vs_layer_gen": 0.0,
+   "mid_is_boundary": true,
+   "first_seg_end": 1.0,
+   "first_seg_over_1_5": false,
+   "first_seg_character": false,
+   "first_seg_cut_or_transition": false,
+   "appearance_fields": {
+    "mid": [
+     "靴"
+    ],
+    "last": [
+     "靴"
+    ],
+    "video": [
+     "眉骨",
+     "靴"
+    ]
+   },
+   "lengths": {
+    "first": 0,
+    "mid": 560,
+    "last": 553,
+    "video": 1767
+   }
+  },
+  "NEW_scratch": {
+   "card_ref_unmet": [],
+   "unknown_mentions": [],
+   "mid_frame_time": 3.0,
+   "mid_in_gen_window": true,
+   "segments": [
+    [
+     0.0,
+     1.0
+    ],
+    [
+     1.0,
+     3.0
+    ],
+    [
+     3.0,
+     6.0
+    ],
+    [
+     6.0,
+     9.0
+    ],
+    [
+     9.0,
+     11.5
+    ]
+   ],
+   "seg_sum": 11.5,
+   "layer_s": 5,
+   "gen_s": 6.5,
+   "sum_vs_gen": 5.0,
+   "sum_vs_layer_gen": 0.0,
+   "mid_is_boundary": true,
+   "first_seg_end": 1.0,
+   "first_seg_over_1_5": false,
+   "first_seg_character": false,
+   "first_seg_cut_or_transition": false,
+   "appearance_fields": {
+    "mid": [
+     "靴"
+    ],
+    "last": [
+     "靴"
+    ],
+    "video": [
+     "靴"
+    ]
+   },
+   "lengths": {
+    "first": 0,
+    "mid": 554,
+    "last": 621,
+    "video": 1839
+   }
+  }
+ },
+ "987": {
+  "number": 57,
+  "combo": "C",
+  "dictation": 8.48,
+  "OLD": {
+   "card_ref_unmet": [],
+   "unknown_mentions": [],
+   "mid_frame_time": 7.5,
+   "mid_in_gen_window": false,
+   "segments": [
+    [
+     0.0,
+     1.0
+    ],
+    [
+     1.0,
+     4.0
+    ],
+    [
+     4.0,
+     7.5
+    ],
+    [
+     7.5,
+     10.0
+    ],
+    [
+     10.0,
+     11.0
+    ]
+   ],
+   "seg_sum": 11.0,
+   "layer_s": 4.5,
+   "gen_s": 6.5,
+   "sum_vs_gen": 4.5,
+   "sum_vs_layer_gen": 0.0,
+   "mid_is_boundary": true,
+   "first_seg_end": 1.0,
+   "first_seg_over_1_5": false,
+   "first_seg_character": false,
+   "first_seg_cut_or_transition": false,
+   "appearance_fields": {
+    "mid": [
+     "毡帽",
+     "靴"
+    ],
+    "last": [
+     "毡帽",
+     "靴"
+    ],
+    "video": [
+     "毡帽",
+     "靴"
+    ]
+   },
+   "lengths": {
+    "first": 0,
+    "mid": 579,
+    "last": 590,
+    "video": 1674
+   }
+  },
+  "NEW_inplace": {
+   "card_ref_unmet": [],
+   "unknown_mentions": [],
+   "mid_frame_time": 7.5,
+   "mid_in_gen_window": false,
+   "segments": [
+    [
+     0.0,
+     1.0
+    ],
+    [
+     1.0,
+     4.0
+    ],
+    [
+     4.0,
+     7.5
+    ],
+    [
+     7.5,
+     11.0
+    ]
+   ],
+   "seg_sum": 11.0,
+   "layer_s": 4.5,
+   "gen_s": 6.5,
+   "sum_vs_gen": 4.5,
+   "sum_vs_layer_gen": 0.0,
+   "mid_is_boundary": true,
+   "first_seg_end": 1.0,
+   "first_seg_over_1_5": false,
+   "first_seg_character": false,
+   "first_seg_cut_or_transition": false,
+   "appearance_fields": {
+    "mid": [
+     "毡帽",
+     "靴"
+    ],
+    "last": [
+     "毡帽",
+     "靴"
+    ],
+    "video": [
+     "毡帽",
+     "靴"
+    ]
+   },
+   "lengths": {
+    "first": 0,
+    "mid": 599,
+    "last": 648,
+    "video": 1484
+   }
+  },
+  "NEW_scratch": {
+   "card_ref_unmet": [],
+   "unknown_mentions": [],
+   "mid_frame_time": 3.0,
+   "mid_in_gen_window": true,
+   "segments": [
+    [
+     0.0,
+     1.0
+    ],
+    [
+     1.0,
+     4.5
+    ],
+    [
+     4.5,
+     7.5
+    ],
+    [
+     7.5,
+     11.0
+    ]
+   ],
+   "seg_sum": 11.0,
+   "layer_s": 4.5,
+   "gen_s": 6.5,
+   "sum_vs_gen": 4.5,
+   "sum_vs_layer_gen": 0.0,
+   "mid_is_boundary": false,
+   "first_seg_end": 1.0,
+   "first_seg_over_1_5": false,
+   "first_seg_character": false,
+   "first_seg_cut_or_transition": false,
+   "appearance_fields": {
+    "mid": [
+     "毡帽",
+     "靴"
+    ],
+    "last": [
+     "毡帽",
+     "靴"
+    ],
+    "video": [
+     "毡帽",
+     "靴"
+    ]
+   },
+   "lengths": {
+    "first": 0,
+    "mid": 546,
+    "last": 555,
+    "video": 1310
+   }
+  }
+ },
+ "989": {
+  "number": 59,
+  "combo": "C",
+  "dictation": 14.4,
+  "OLD": {
+   "card_ref_unmet": [],
+   "unknown_mentions": [],
+   "mid_frame_time": 5.5,
+   "mid_in_gen_window": true,
+   "segments": [
+    [
+     0.0,
+     1.0
+    ],
+    [
+     1.0,
+     4.0
+    ],
+    [
+     4.0,
+     5.5
+    ],
+    [
+     5.5,
+     8.5
+    ],
+    [
+     8.5,
+     11.5
+    ],
+    [
+     11.5,
+     14.0
+    ],
+    [
+     14.0,
+     16.5
+    ]
+   ],
+   "seg_sum": 16.5,
+   "layer_s": 5.5,
+   "gen_s": 11,
+   "sum_vs_gen": 5.5,
+   "sum_vs_layer_gen": 0.0,
+   "mid_is_boundary": true,
+   "first_seg_end": 1.0,
+   "first_seg_over_1_5": false,
+   "first_seg_character": false,
+   "first_seg_cut_or_transition": false,
+   "appearance_fields": {
+    "mid": [
+     "长袍",
+     "靴"
+    ],
+    "last": [
+     "长袍",
+     "靴"
+    ],
+    "video": [
+     "眉骨",
+     "长袍",
+     "靴"
+    ]
+   },
+   "lengths": {
+    "first": 0,
+    "mid": 477,
+    "last": 628,
+    "video": 2373
+   }
+  },
+  "NEW_inplace": {
+   "card_ref_unmet": [
+    "last:乌拉尔山口",
+    "mid:塔尔吉河营地"
+   ],
+   "unknown_mentions": [],
+   "mid_frame_time": 5.5,
+   "mid_in_gen_window": true,
+   "segments": [
+    [
+     0.0,
+     1.0
+    ],
+    [
+     1.0,
+     4.0
+    ],
+    [
+     4.0,
+     5.5
+    ],
+    [
+     5.5,
+     8.5
+    ],
+    [
+     8.5,
+     11.5
+    ],
+    [
+     11.5,
+     14.0
+    ],
+    [
+     14.0,
+     16.5
+    ]
+   ],
+   "seg_sum": 16.5,
+   "layer_s": 5.5,
+   "gen_s": 11,
+   "sum_vs_gen": 5.5,
+   "sum_vs_layer_gen": 0.0,
+   "mid_is_boundary": true,
+   "first_seg_end": 1.0,
+   "first_seg_over_1_5": false,
+   "first_seg_character": false,
+   "first_seg_cut_or_transition": false,
+   "appearance_fields": {
+    "mid": [
+     "长袍",
+     "靴"
+    ],
+    "last": [
+     "长袍",
+     "靴"
+    ],
+    "video": [
+     "眉骨",
+     "长袍",
+     "靴"
+    ]
+   },
+   "lengths": {
+    "first": 0,
+    "mid": 469,
+    "last": 620,
+    "video": 2338
+   }
+  },
+  "NEW_scratch": {
+   "card_ref_unmet": [],
+   "unknown_mentions": [],
+   "mid_frame_time": 5.5,
+   "mid_in_gen_window": true,
+   "segments": [
+    [
+     0.0,
+     1.0
+    ],
+    [
+     1.0,
+     5.5
+    ],
+    [
+     5.5,
+     8.5
+    ],
+    [
+     8.5,
+     12.0
+    ]
+   ],
+   "seg_sum": 12.0,
+   "layer_s": 5.5,
+   "gen_s": 11,
+   "sum_vs_gen": 1.0,
+   "sum_vs_layer_gen": -4.5,
+   "mid_is_boundary": true,
+   "first_seg_end": 1.0,
+   "first_seg_over_1_5": false,
+   "first_seg_character": false,
+   "first_seg_cut_or_transition": false,
+   "appearance_fields": {
+    "mid": [
+     "长袍",
+     "靴"
+    ],
+    "last": [
+     "长袍",
+     "靴"
+    ],
+    "video": [
+     "长袍",
+     "靴"
+    ]
+   },
+   "lengths": {
+    "first": 0,
+    "mid": 542,
+    "last": 596,
+    "video": 1285
+   }
+  }
+ },
+ "999": {
+  "number": 68,
+  "combo": "C",
+  "dictation": 11.04,
+  "OLD": {
+   "card_ref_unmet": [],
+   "unknown_mentions": [],
+   "mid_frame_time": 5.5,
+   "mid_in_gen_window": true,
+   "segments": [
+    [
+     0.0,
+     1.0
+    ],
+    [
+     1.0,
+     4.0
+    ],
+    [
+     4.0,
+     7.0
+    ],
+    [
+     7.0,
+     11.0
+    ],
+    [
+     11.0,
+     13.5
+    ]
+   ],
+   "seg_sum": 13.5,
+   "layer_s": 5.5,
+   "gen_s": 9.5,
+   "sum_vs_gen": 4.0,
+   "sum_vs_layer_gen": -1.5,
+   "mid_is_boundary": false,
+   "first_seg_end": 1.0,
+   "first_seg_over_1_5": false,
+   "first_seg_character": false,
+   "first_seg_cut_or_transition": false,
+   "appearance_fields": {
+    "mid": [
+     "毡帽",
+     "长袍",
+     "靴"
+    ],
+    "last": [
+     "毡帽",
+     "长袍",
+     "靴"
+    ],
+    "video": [
+     "毡帽",
+     "长袍",
+     "靴"
+    ]
+   },
+   "lengths": {
+    "first": 0,
+    "mid": 609,
+    "last": 538,
+    "video": 1329
+   }
+  },
+  "NEW_inplace": {
+   "card_ref_unmet": [],
+   "unknown_mentions": [],
+   "mid_frame_time": 5.5,
+   "mid_in_gen_window": true,
+   "segments": [
+    [
+     0.0,
+     1.0
+    ],
+    [
+     1.0,
+     5.5
+    ],
+    [
+     5.5,
+     8.5
+    ],
+    [
+     8.5,
+     11.5
+    ],
+    [
+     11.5,
+     15.0
+    ]
+   ],
+   "seg_sum": 15.0,
+   "layer_s": 5.5,
+   "gen_s": 9.5,
+   "sum_vs_gen": 5.5,
+   "sum_vs_layer_gen": 0.0,
+   "mid_is_boundary": true,
+   "first_seg_end": 1.0,
+   "first_seg_over_1_5": false,
+   "first_seg_character": false,
+   "first_seg_cut_or_transition": false,
+   "appearance_fields": {
+    "mid": [
+     "毡帽",
+     "长袍",
+     "靴"
+    ],
+    "last": [
+     "毡帽",
+     "长袍",
+     "靴"
+    ],
+    "video": [
+     "毡帽",
+     "长袍",
+     "靴"
+    ]
+   },
+   "lengths": {
+    "first": 0,
+    "mid": 629,
+    "last": 559,
+    "video": 1791
+   }
+  },
+  "NEW_scratch": {
+   "card_ref_unmet": [],
+   "unknown_mentions": [],
+   "mid_frame_time": 4.5,
+   "mid_in_gen_window": true,
+   "segments": [
+    [
+     0.0,
+     1.0
+    ],
+    [
+     1.0,
+     4.5
+    ],
+    [
+     4.5,
+     7.5
+    ],
+    [
+     7.5,
+     11.0
+    ],
+    [
+     11.0,
+     15.0
+    ]
+   ],
+   "seg_sum": 15.0,
+   "layer_s": 5.5,
+   "gen_s": 9.5,
+   "sum_vs_gen": 5.5,
+   "sum_vs_layer_gen": 0.0,
+   "mid_is_boundary": true,
+   "first_seg_end": 1.0,
+   "first_seg_over_1_5": false,
+   "first_seg_character": false,
+   "first_seg_cut_or_transition": false,
+   "appearance_fields": {
+    "mid": [
+     "毡帽",
+     "长袍",
+     "靴"
+    ],
+    "last": [
+     "毡帽",
+     "长袍"
+    ],
+    "video": [
+     "毡帽",
+     "长袍",
+     "靴"
+    ]
+   },
+   "lengths": {
+    "first": 0,
+    "mid": 545,
+    "last": 537,
+    "video": 1668
+   }
+  }
+ },
+ "1011": {
+  "number": 81,
+  "combo": "C",
+  "dictation": 8.64,
+  "OLD": {
+   "card_ref_unmet": [],
+   "unknown_mentions": [],
+   "mid_frame_time": 2.5,
+   "mid_in_gen_window": true,
+   "segments": [
+    [
+     0.0,
+     1.0
+    ],
+    [
+     1.0,
+     4.0
+    ],
+    [
+     4.0,
+     7.5
+    ],
+    [
+     7.5,
+     10.5
+    ],
+    [
+     10.5,
+     13.5
+    ],
+    [
+     13.5,
+     16.5
+    ],
+    [
+     16.5,
+     19.5
+    ]
+   ],
+   "seg_sum": 19.5,
+   "layer_s": 5.2,
+   "gen_s": 5.5,
+   "sum_vs_gen": 14.0,
+   "sum_vs_layer_gen": 8.8,
+   "mid_is_boundary": false,
+   "first_seg_end": 1.0,
+   "first_seg_over_1_5": false,
+   "first_seg_character": false,
+   "first_seg_cut_or_transition": false,
+   "appearance_fields": {
+    "mid": [
+     "眉骨",
+     "长袍",
+     "靴"
+    ],
+    "last": [
+     "眉骨",
+     "长袍",
+     "靴"
+    ],
+    "video": [
+     "眉骨",
+     "长袍",
+     "靴"
+    ]
+   },
+   "lengths": {
+    "first": 0,
+    "mid": 668,
+    "last": 671,
+    "video": 2528
+   }
+  },
+  "NEW_inplace": {
+   "card_ref_unmet": [],
+   "unknown_mentions": [],
+   "mid_frame_time": 2.5,
+   "mid_in_gen_window": true,
+   "segments": [
+    [
+     0.0,
+     1.0
+    ],
+    [
+     1.0,
+     2.5
+    ],
+    [
+     2.5,
+     5.5
+    ],
+    [
+     5.5,
+     8.5
+    ],
+    [
+     8.5,
+     11.5
+    ],
+    [
+     11.5,
+     14.5
+    ],
+    [
+     14.5,
+     16.7
+    ]
+   ],
+   "seg_sum": 16.7,
+   "layer_s": 5.2,
+   "gen_s": 5.5,
+   "sum_vs_gen": 11.2,
+   "sum_vs_layer_gen": 6.0,
+   "mid_is_boundary": true,
+   "first_seg_end": 1.0,
+   "first_seg_over_1_5": false,
+   "first_seg_character": false,
+   "first_seg_cut_or_transition": false,
+   "appearance_fields": {
+    "mid": [
+     "眉骨",
+     "长袍",
+     "靴"
+    ],
+    "last": [
+     "眉骨",
+     "长袍",
+     "靴"
+    ],
+    "video": [
+     "眉骨",
+     "长袍",
+     "靴"
+    ]
+   },
+   "lengths": {
+    "first": 0,
+    "mid": 668,
+    "last": 677,
+    "video": 2376
+   }
+  },
+  "NEW_scratch": {
+   "card_ref_unmet": [],
+   "unknown_mentions": [],
+   "mid_frame_time": 2.5,
+   "mid_in_gen_window": true,
+   "segments": [
+    [
+     0.0,
+     1.0
+    ],
+    [
+     1.0,
+     2.5
+    ],
+    [
+     2.5,
+     5.5
+    ]
+   ],
+   "seg_sum": 5.5,
+   "layer_s": 5.2,
+   "gen_s": 5.5,
+   "sum_vs_gen": 0.0,
+   "sum_vs_layer_gen": -5.2,
+   "mid_is_boundary": true,
+   "first_seg_end": 1.0,
+   "first_seg_over_1_5": false,
+   "first_seg_character": false,
+   "first_seg_cut_or_transition": false,
+   "appearance_fields": {
+    "mid": [
+     "眉骨",
+     "长袍",
+     "靴"
+    ],
+    "last": [
+     "眉骨",
+     "长袍",
+     "靴"
+    ],
+    "video": [
+     "眉骨",
+     "长袍",
+     "靴"
+    ]
+   },
+   "lengths": {
+    "first": 0,
+    "mid": 741,
+    "last": 683,
+    "video": 1176
+   }
+  }
+ }
+}

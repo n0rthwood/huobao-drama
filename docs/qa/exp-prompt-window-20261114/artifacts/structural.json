@@ -1,0 +1,1219 @@
+{
+ "assets_missing_image": [
+  "商代马车",
+  "种子",
+  "甲骨文",
+  "莲聚塔",
+  "静房",
+  "弥勒佛殿",
+  "复原马车",
+  "蒙古诸部南下侵扰的说明性画面",
+  "烽燧烟火信号画面",
+  "长城敌台与烽燧分布示意图",
+  "长城防御机制示意图",
+  "明军少量守军据关列阵防守的说明性画面",
+  "1009_通州段_信息不足负例",
+  "八达岭1009普通道具错误路径",
+  "1009_殷墟车马坑_隐含信息核验",
+  "北京西北区位舆图",
+  "京师北面防线形势图",
+  "明长城京北防线图",
+  "京师北面防线图",
+  "关沟地形示意图",
+  "城墙断面或近景特写",
+  "北京西北方向区位图",
+  "明代长城形制示意图或敌台、垛口构造版画",
+  "明代北边舆图",
+  "关沟地形图或舆图",
+  "城墙顶部马道宽度示意图或实景俯拍",
+  "长城沿线敌台、烽燧分布示意图",
+  "从边关到京城的传信路线图",
+  "京师北面防线图（咽喉要道标注）",
+  "实验室",
+  "殷墟车马坑发掘现场",
+  "商代殷都",
+  "商代原野",
+  "宣府",
+  "大同",
+  "京城",
+  "八达岭段墙体、垛口、敌楼的近景细部镜头",
+  "沿城墙连续推移的完整段落航拍镜头",
+  "墙体外侧近景",
+  "烽燧点燃烟火的实景或示意画面",
+  "盘庚",
+  "绛央曲杰·扎西班丹",
+  "仁钦宗哲",
+  "阿旺宗哲"
+ ],
+ "shots": {
+  "943": {
+   "old": {
+    "arm": "OLD",
+    "shot": 943,
+    "mid_frame_time": 5.5,
+    "refs": [
+     "乌格拉河畔"
+    ],
+    "card_ref_unmet": [],
+    "mentions": [
+     "乌格拉河畔"
+    ],
+    "unknown_mentions": [],
+    "video_segments": [
+     [
+      0.0,
+      1.0
+     ],
+     [
+      1.0,
+      4.0
+     ],
+     [
+      4.0,
+      8.0
+     ],
+     [
+      8.0,
+      11.0
+     ]
+    ],
+    "video_seg_sum": 11.0,
+    "seg0": "0-1秒：俯拍地图式全景，米黄底色上分布浅蓝河流与细线边界，左下与下方为浅色海岸轮廓，画面中上部有一块红褐色多边形区域、其左下角外侧有一个白色小圆点，中下部偏右另有一块红褐色多边形区域，整体光线均匀、色调偏暖，留白主要在上方与右侧，镜头极缓推近，画面无人。",
+    "seg0_has_people_words": true,
+    "appearance_hits": {
+     "mid_frame_prompt": [
+      "毡帽",
+      "长袍"
+     ],
+     "video_prompt": [
+      "毡帽",
+      "长袍"
+     ]
+    },
+    "similarity_vs_OLD": {},
+    "lengths": {
+     "first_frame_prompt": 0,
+     "mid_frame_prompt": 378,
+     "last_frame_prompt": 328,
+     "video_prompt": 869
+    }
+   },
+   "new_inplace": {
+    "arm": "NEW-inplace",
+    "shot": 943,
+    "mid_frame_time": 5.5,
+    "refs": [
+     "乌格拉河畔"
+    ],
+    "card_ref_unmet": [],
+    "mentions": [
+     "乌格拉河畔"
+    ],
+    "unknown_mentions": [],
+    "video_segments": [
+     [
+      0.0,
+      1.0
+     ],
+     [
+      1.0,
+      5.5
+     ],
+     [
+      5.5,
+      8.5
+     ],
+     [
+      8.5,
+      11.0
+     ]
+    ],
+    "video_seg_sum": 11.0,
+    "seg0": "0-1秒：俯拍地图式全景，米黄底色上分布浅蓝河流与细线边界，左下与下方为浅色海岸轮廓，画面中上部有一块红褐色多边形区域、其左下角外侧有一个白色小圆点，中下部偏右另有一块红褐色多边形区域，整体光线均匀、色调偏暖，留白主要在上方与右侧，镜头静止极缓推近，画面无人。",
+    "seg0_has_people_words": true,
+    "appearance_hits": {
+     "mid_frame_prompt": [
+      "毡帽",
+      "长袍"
+     ],
+     "video_prompt": [
+      "毡帽",
+      "长袍"
+     ]
+    },
+    "similarity_vs_OLD": {
+     "mid": 1.0,
+     "last": 1.0,
+     "video": 0.806
+    },
+    "lengths": {
+     "first_frame_prompt": 0,
+     "mid_frame_prompt": 378,
+     "last_frame_prompt": 328,
+     "video_prompt": 840
+    }
+   },
+   "new_scratch": {
+    "arm": "NEW-scratch",
+    "shot": 943,
+    "mid_frame_time": 5.5,
+    "refs": [
+     "乌格拉河畔"
+    ],
+    "card_ref_unmet": [],
+    "mentions": [
+     "乌格拉河畔"
+    ],
+    "unknown_mentions": [],
+    "video_segments": [
+     [
+      0.0,
+      1.0
+     ],
+     [
+      1.0,
+      4.0
+     ],
+     [
+      4.0,
+      5.5
+     ],
+     [
+      5.5,
+      8.5
+     ],
+     [
+      8.5,
+      11.0
+     ]
+    ],
+    "video_seg_sum": 11.0,
+    "seg0": "0-1秒：俯拍地图式全景，米黄底色上分布浅蓝河流与细线边界，左下与下方为浅色海岸轮廓，画面中上部一块红褐色多边形区域、其左下角外侧有一个白色小圆点，中下部偏右另有一块红褐色多边形区域，整体光线均匀、色调偏暖，留白主要在上方与右侧，镜头静止或极缓推，画面无人。",
+    "seg0_has_people_words": true,
+    "appearance_hits": {
+     "mid_frame_prompt": [
+      "毡帽",
+      "长袍"
+     ],
+     "video_prompt": [
+      "毡帽",
+      "长袍"
+     ]
+    },
+    "similarity_vs_OLD": {
+     "mid": 0.615,
+     "last": 0.431,
+     "video": 0.238
+    },
+    "lengths": {
+     "first_frame_prompt": 0,
+     "mid_frame_prompt": 321,
+     "last_frame_prompt": 270,
+     "video_prompt": 828
+    }
+   }
+  },
+  "949": {
+   "old": {
+    "arm": "OLD",
+    "shot": 949,
+    "mid_frame_time": 3.0,
+    "refs": [
+     "哥萨克聚落",
+     "哥萨克火枪"
+    ],
+    "card_ref_unmet": [],
+    "mentions": [
+     "哥萨克火枪",
+     "哥萨克聚落"
+    ],
+    "unknown_mentions": [],
+    "video_segments": [
+     [
+      0.0,
+      1.0
+     ],
+     [
+      1.0,
+      4.0
+     ],
+     [
+      4.0,
+      7.0
+     ],
+     [
+      7.0,
+      9.5
+     ],
+     [
+      9.5,
+      11.5
+     ]
+    ],
+    "video_seg_sum": 11.5,
+    "seg0": "0-1秒：@哥萨克聚落，俯拍地图式全景，米黄底色上分布浅蓝细线水系与淡灰边界线，画面中部两条粗蓝折线自上方延伸至下方，左端带箭头指向左下红框区域，右端箭头指向右下浅色地块，左下红框内为浅褐多边形，右下与左上各有一块浅米色陆地轮廓，光线均匀无阴影，留白在四周，镜头极缓推近，画面无人。",
+    "seg0_has_people_words": true,
+    "appearance_hits": {
+     "mid_frame_prompt": [
+      "靴"
+     ],
+     "last_frame_prompt": [
+      "靴"
+     ],
+     "video_prompt": [
+      "靴"
+     ]
+    },
+    "similarity_vs_OLD": {},
+    "lengths": {
+     "first_frame_prompt": 0,
+     "mid_frame_prompt": 560,
+     "last_frame_prompt": 553,
+     "video_prompt": 1798
+    }
+   },
+   "new_inplace": {
+    "arm": "NEW-inplace",
+    "shot": 949,
+    "mid_frame_time": 3.0,
+    "refs": [
+     "哥萨克聚落",
+     "哥萨克火枪"
+    ],
+    "card_ref_unmet": [],
+    "mentions": [
+     "哥萨克火枪",
+     "哥萨克聚落"
+    ],
+    "unknown_mentions": [],
+    "video_segments": [
+     [
+      0.0,
+      1.0
+     ],
+     [
+      1.0,
+      3.0
+     ],
+     [
+      3.0,
+      6.0
+     ],
+     [
+      6.0,
+      9.0
+     ],
+     [
+      9.0,
+      11.5
+     ]
+    ],
+    "video_seg_sum": 11.5,
+    "seg0": "0-1秒：@哥萨克聚落，俯拍地图式全景，米黄底色上分布浅蓝细线水系与淡灰边界线，画面中部两条粗蓝折线自上方延伸至下方，左端带箭头指向左下红框区域，右端箭头指向右下浅色地块，左下红框内为浅褐多边形，右下与左上各有一块浅米色陆地轮廓，光线均匀无阴影，留白在四周，镜头静止，画面无人。",
+    "seg0_has_people_words": true,
+    "appearance_hits": {
+     "mid_frame_prompt": [
+      "靴"
+     ],
+     "last_frame_prompt": [
+      "靴"
+     ],
+     "video_prompt": [
+      "靴"
+     ]
+    },
+    "similarity_vs_OLD": {
+     "mid": 1.0,
+     "last": 1.0,
+     "video": 0.957
+    },
+    "lengths": {
+     "first_frame_prompt": 0,
+     "mid_frame_prompt": 560,
+     "last_frame_prompt": 553,
+     "video_prompt": 1767
+    }
+   },
+   "new_scratch": {
+    "arm": "NEW-scratch",
+    "shot": 949,
+    "mid_frame_time": 3.0,
+    "refs": [
+     "哥萨克聚落",
+     "哥萨克火枪"
+    ],
+    "card_ref_unmet": [],
+    "mentions": [
+     "哥萨克火枪",
+     "哥萨克聚落"
+    ],
+    "unknown_mentions": [],
+    "video_segments": [
+     [
+      0.0,
+      1.0
+     ],
+     [
+      1.0,
+      3.0
+     ],
+     [
+      3.0,
+      6.0
+     ],
+     [
+      6.0,
+      9.0
+     ],
+     [
+      9.0,
+      11.5
+     ]
+    ],
+    "video_seg_sum": 11.5,
+    "seg0": "0-1秒：俯拍地图式全景，米黄底色上分布浅蓝细线水系与淡灰边界线，画面中部两条粗蓝折线自上方延伸至下方，左端带箭头指向左下红框区域，右端箭头指向右下浅色地块，左下红框内为浅褐多边形，右下与左上各有一块浅米色陆地轮廓，光线均匀无阴影，留白在四周，镜头静止，画面无人。",
+    "seg0_has_people_words": true,
+    "appearance_hits": {
+     "mid_frame_prompt": [
+      "靴"
+     ],
+     "last_frame_prompt": [
+      "靴"
+     ],
+     "video_prompt": [
+      "靴"
+     ]
+    },
+    "similarity_vs_OLD": {
+     "mid": 0.49,
+     "last": 0.882,
+     "video": 0.717
+    },
+    "lengths": {
+     "first_frame_prompt": 0,
+     "mid_frame_prompt": 554,
+     "last_frame_prompt": 621,
+     "video_prompt": 1839
+    }
+   }
+  },
+  "987": {
+   "old": {
+    "arm": "OLD",
+    "shot": 987,
+    "mid_frame_time": 7.5,
+    "refs": [
+     "叶尔马克·齐莫菲叶维奇",
+     "索利卡姆斯克",
+     "哥萨克火枪"
+    ],
+    "card_ref_unmet": [],
+    "mentions": [
+     "叶尔马克·齐莫菲叶维奇",
+     "哥萨克火枪",
+     "索利卡姆斯克"
+    ],
+    "unknown_mentions": [],
+    "video_segments": [
+     [
+      0.0,
+      1.0
+     ],
+     [
+      1.0,
+      4.0
+     ],
+     [
+      4.0,
+      7.5
+     ],
+     [
+      7.5,
+      10.0
+     ],
+     [
+      10.0,
+      11.0
+     ]
+    ],
+    "video_seg_sum": 11.0,
+    "seg0": "0-1秒：俯拍远景，米黄色地图底面铺满全幅，上面有浅蓝细线勾勒的边界与河流，左下角有一处蓝色水域；画面中上部偏左有一条蓝色折线箭头，其上方有一枚红白小圆点；中部偏右有另一条蓝色折线箭头，与一条深棕色直线箭头交叉；整体色调偏暖，右侧与下方留白较多，镜头极缓推近，画面无人。",
+    "seg0_has_people_words": true,
+    "appearance_hits": {
+     "mid_frame_prompt": [
+      "毡帽",
+      "靴"
+     ],
+     "last_frame_prompt": [
+      "毡帽",
+      "靴"
+     ],
+     "video_prompt": [
+      "毡帽",
+      "靴"
+     ]
+    },
+    "similarity_vs_OLD": {},
+    "lengths": {
+     "first_frame_prompt": 0,
+     "mid_frame_prompt": 579,
+     "last_frame_prompt": 590,
+     "video_prompt": 1674
+    }
+   },
+   "new_inplace": {
+    "arm": "NEW-inplace",
+    "shot": 987,
+    "mid_frame_time": 7.5,
+    "refs": [
+     "叶尔马克·齐莫菲叶维奇",
+     "索利卡姆斯克",
+     "哥萨克火枪"
+    ],
+    "card_ref_unmet": [],
+    "mentions": [
+     "叶尔马克·齐莫菲叶维奇",
+     "哥萨克火枪",
+     "索利卡姆斯克"
+    ],
+    "unknown_mentions": [],
+    "video_segments": [
+     [
+      0.0,
+      1.0
+     ],
+     [
+      1.0,
+      4.0
+     ],
+     [
+      4.0,
+      7.5
+     ],
+     [
+      7.5,
+      11.0
+     ]
+    ],
+    "video_seg_sum": 11.0,
+    "seg0": "0-1秒：俯拍远景，米黄色地图底面上有浅蓝细线勾勒的边界与河流，左下角有一处蓝色水域，画面中上部偏左有一条蓝色折线箭头、其上方有一枚红白小圆点，中部偏右有另一条蓝色折线箭头、与一条深棕色直线箭头交叉，整体色调偏暖，右侧与下方留白较多，镜头静止，画面无人。",
+    "seg0_has_people_words": true,
+    "appearance_hits": {
+     "mid_frame_prompt": [
+      "毡帽",
+      "靴"
+     ],
+     "last_frame_prompt": [
+      "毡帽",
+      "靴"
+     ],
+     "video_prompt": [
+      "毡帽",
+      "靴"
+     ]
+    },
+    "similarity_vs_OLD": {
+     "mid": 0.981,
+     "last": 0.953,
+     "video": 0.79
+    },
+    "lengths": {
+     "first_frame_prompt": 0,
+     "mid_frame_prompt": 599,
+     "last_frame_prompt": 648,
+     "video_prompt": 1484
+    }
+   },
+   "new_scratch": {
+    "arm": "NEW-scratch",
+    "shot": 987,
+    "mid_frame_time": 3.0,
+    "refs": [
+     "叶尔马克·齐莫菲叶维奇",
+     "索利卡姆斯克",
+     "哥萨克火枪"
+    ],
+    "card_ref_unmet": [],
+    "mentions": [
+     "叶尔马克·齐莫菲叶维奇",
+     "哥萨克火枪",
+     "索利卡姆斯克"
+    ],
+    "unknown_mentions": [],
+    "video_segments": [
+     [
+      0.0,
+      1.0
+     ],
+     [
+      1.0,
+      4.5
+     ],
+     [
+      4.5,
+      7.5
+     ],
+     [
+      7.5,
+      11.0
+     ]
+    ],
+    "video_seg_sum": 11.0,
+    "seg0": "0-1秒：俯拍远景，米黄色地图底面上有浅蓝细线勾勒的边界与河流，左下角有一处蓝色水域，画面中上部偏左有一条蓝色折线箭头、其上方有一枚红白小圆点，中部偏右有另一条蓝色折线箭头与一条深棕色直线箭头交叉，整体色调偏暖、右侧与下方留白较多，镜头静止，画面无人。",
+    "seg0_has_people_words": true,
+    "appearance_hits": {
+     "mid_frame_prompt": [
+      "毡帽",
+      "靴"
+     ],
+     "last_frame_prompt": [
+      "毡帽",
+      "靴"
+     ],
+     "video_prompt": [
+      "毡帽",
+      "靴"
+     ]
+    },
+    "similarity_vs_OLD": {
+     "mid": 0.565,
+     "last": 0.596,
+     "video": 0.397
+    },
+    "lengths": {
+     "first_frame_prompt": 0,
+     "mid_frame_prompt": 546,
+     "last_frame_prompt": 555,
+     "video_prompt": 1310
+    }
+   }
+  },
+  "989": {
+   "old": {
+    "arm": "OLD",
+    "shot": 989,
+    "mid_frame_time": 5.5,
+    "refs": [
+     "乌拉尔山口",
+     "塔尔吉河营地"
+    ],
+    "card_ref_unmet": [],
+    "mentions": [
+     "乌拉尔山口",
+     "叶尔马克·齐莫菲叶维奇",
+     "哥萨克火枪",
+     "塔尔吉河营地"
+    ],
+    "unknown_mentions": [],
+    "video_segments": [
+     [
+      0.0,
+      1.0
+     ],
+     [
+      1.0,
+      4.0
+     ],
+     [
+      4.0,
+      5.5
+     ],
+     [
+      5.5,
+      8.5
+     ],
+     [
+      8.5,
+      11.5
+     ],
+     [
+      11.5,
+      14.0
+     ],
+     [
+      14.0,
+      16.5
+     ]
+    ],
+    "video_seg_sum": 16.5,
+    "seg0": "0-1秒：俯拍全景式地图画面，米黄底色上分布浅灰细线轮廓与浅蓝细线水系，一条深褐直线自上方中部向下延伸，一条红色折线自左侧圆点向右下延伸、经中部圆点后折向右上、再向右下至右下角并在末端带红色箭头，光线均匀、无明暗对比，留白在右上与上方区域，镜头极缓推进。",
+    "seg0_has_people_words": false,
+    "appearance_hits": {
+     "mid_frame_prompt": [
+      "长袍",
+      "靴"
+     ],
+     "last_frame_prompt": [
+      "长袍",
+      "靴"
+     ],
+     "video_prompt": [
+      "长袍",
+      "靴"
+     ]
+    },
+    "similarity_vs_OLD": {},
+    "lengths": {
+     "first_frame_prompt": 0,
+     "mid_frame_prompt": 477,
+     "last_frame_prompt": 628,
+     "video_prompt": 2373
+    }
+   },
+   "new_inplace": {
+    "arm": "NEW-inplace",
+    "shot": 989,
+    "mid_frame_time": 5.5,
+    "refs": [
+     "乌拉尔山口",
+     "塔尔吉河营地"
+    ],
+    "card_ref_unmet": [
+     "last_frame_prompt->@乌拉尔山口",
+     "mid_frame_prompt->@塔尔吉河营地"
+    ],
+    "mentions": [
+     "乌拉尔山口",
+     "叶尔马克·齐莫菲叶维奇",
+     "哥萨克火枪",
+     "塔尔吉河营地"
+    ],
+    "unknown_mentions": [],
+    "video_segments": [
+     [
+      0.0,
+      1.0
+     ],
+     [
+      1.0,
+      4.0
+     ],
+     [
+      4.0,
+      5.5
+     ],
+     [
+      5.5,
+      8.5
+     ],
+     [
+      8.5,
+      11.5
+     ],
+     [
+      11.5,
+      14.0
+     ],
+     [
+      14.0,
+      16.5
+     ]
+    ],
+    "video_seg_sum": 16.5,
+    "seg0": "0-1秒：俯拍全景式地图画面，米黄底色上分布浅灰细线轮廓与浅蓝细线水系，一条深褐直线自上方中部向下延伸，一条红色折线自左侧圆点向右下延伸、经中部圆点后折向右上、再向右下至右下角并在末端带红色箭头，光线均匀、无明暗对比，留白在右上与上方区域，镜头极缓推进，画面无人。",
+    "seg0_has_people_words": true,
+    "appearance_hits": {
+     "mid_frame_prompt": [
+      "长袍",
+      "靴"
+     ],
+     "last_frame_prompt": [
+      "长袍",
+      "靴"
+     ],
+     "video_prompt": [
+      "长袍",
+      "靴"
+     ]
+    },
+    "similarity_vs_OLD": {
+     "mid": 0.992,
+     "last": 0.747,
+     "video": 0.981
+    },
+    "lengths": {
+     "first_frame_prompt": 0,
+     "mid_frame_prompt": 469,
+     "last_frame_prompt": 620,
+     "video_prompt": 2338
+    }
+   },
+   "new_scratch": {
+    "arm": "NEW-scratch",
+    "shot": 989,
+    "mid_frame_time": 5.5,
+    "refs": [
+     "乌拉尔山口",
+     "塔尔吉河营地"
+    ],
+    "card_ref_unmet": [],
+    "mentions": [
+     "乌拉尔山口",
+     "哥萨克火枪",
+     "塔尔吉河营地"
+    ],
+    "unknown_mentions": [],
+    "video_segments": [
+     [
+      0.0,
+      1.0
+     ],
+     [
+      1.0,
+      5.5
+     ],
+     [
+      5.5,
+      8.5
+     ],
+     [
+      8.5,
+      12.0
+     ]
+    ],
+    "video_seg_sum": 12.0,
+    "seg0": "0-1秒：俯拍全景式地图画面，米黄底色上分布浅灰细线轮廓与浅蓝细线水系，一条深褐直线自上方中部向下延伸，一条红色折线自左侧圆点向右下延伸，经中部圆点后折向右上，再向右下至右下角，末端有红色箭头，光线均匀、无明暗对比，留白在右上与上方区域，镜头静止，画面无人。",
+    "seg0_has_people_words": true,
+    "appearance_hits": {
+     "mid_frame_prompt": [
+      "长袍",
+      "靴"
+     ],
+     "last_frame_prompt": [
+      "长袍",
+      "靴"
+     ],
+     "video_prompt": [
+      "长袍",
+      "靴"
+     ]
+    },
+    "similarity_vs_OLD": {
+     "mid": 0.355,
+     "last": 0.523,
+     "video": 0.323
+    },
+    "lengths": {
+     "first_frame_prompt": 0,
+     "mid_frame_prompt": 542,
+     "last_frame_prompt": 596,
+     "video_prompt": 1285
+    }
+   }
+  },
+  "999": {
+   "old": {
+    "arm": "OLD",
+    "shot": 999,
+    "mid_frame_time": 5.5,
+    "refs": [
+     "托博尔河与额尔齐斯河交汇处"
+    ],
+    "card_ref_unmet": [],
+    "mentions": [
+     "托博尔河与额尔齐斯河交汇处"
+    ],
+    "unknown_mentions": [],
+    "video_segments": [
+     [
+      0.0,
+      1.0
+     ],
+     [
+      1.0,
+      4.0
+     ],
+     [
+      4.0,
+      7.0
+     ],
+     [
+      7.0,
+      11.0
+     ],
+     [
+      11.0,
+      13.5
+     ]
+    ],
+    "video_seg_sum": 13.5,
+    "seg0": "0-1秒：俯拍平面地图式画面，米黄底色上分布浅灰细线轮廓与浅蓝河流线，一条红色折线自左侧中部向下折转，横贯画面中部后向右下延伸，末端在右侧偏下位置折起，折线末端与转折处有数个白色圆点标记，光线均匀平坦、无明暗渐变，留白主要在上方与左侧，镜头静止，画面无人。",
+    "seg0_has_people_words": true,
+    "appearance_hits": {
+     "mid_frame_prompt": [
+      "毡帽",
+      "长袍",
+      "靴"
+     ],
+     "last_frame_prompt": [
+      "毡帽",
+      "长袍",
+      "靴"
+     ],
+     "video_prompt": [
+      "毡帽",
+      "长袍",
+      "靴"
+     ]
+    },
+    "similarity_vs_OLD": {},
+    "lengths": {
+     "first_frame_prompt": 0,
+     "mid_frame_prompt": 609,
+     "last_frame_prompt": 538,
+     "video_prompt": 1329
+    }
+   },
+   "new_inplace": {
+    "arm": "NEW-inplace",
+    "shot": 999,
+    "mid_frame_time": 5.5,
+    "refs": [
+     "托博尔河与额尔齐斯河交汇处"
+    ],
+    "card_ref_unmet": [],
+    "mentions": [
+     "托博尔河与额尔齐斯河交汇处"
+    ],
+    "unknown_mentions": [],
+    "video_segments": [
+     [
+      0.0,
+      1.0
+     ],
+     [
+      1.0,
+      5.5
+     ],
+     [
+      5.5,
+      8.5
+     ],
+     [
+      8.5,
+      11.5
+     ],
+     [
+      11.5,
+      15.0
+     ]
+    ],
+    "video_seg_sum": 15.0,
+    "seg0": "0-1秒：俯拍平面地图式画面，米黄底色上分布浅灰细线轮廓与浅蓝河流线，一条红色折线自左侧中部向下折转，横贯画面中部后向右下延伸，末端在右侧偏下位置折起，折线末端与转折处有数个白色圆点标记，光线均匀平坦、无明暗渐变，留白主要在上方与左侧，镜头静止，画面无人。",
+    "seg0_has_people_words": true,
+    "appearance_hits": {
+     "mid_frame_prompt": [
+      "毡帽",
+      "长袍",
+      "靴"
+     ],
+     "last_frame_prompt": [
+      "毡帽",
+      "长袍",
+      "靴"
+     ],
+     "video_prompt": [
+      "毡帽",
+      "长袍",
+      "靴"
+     ]
+    },
+    "similarity_vs_OLD": {
+     "mid": 0.979,
+     "last": 0.963,
+     "video": 0.726
+    },
+    "lengths": {
+     "first_frame_prompt": 0,
+     "mid_frame_prompt": 629,
+     "last_frame_prompt": 559,
+     "video_prompt": 1791
+    }
+   },
+   "new_scratch": {
+    "arm": "NEW-scratch",
+    "shot": 999,
+    "mid_frame_time": 4.5,
+    "refs": [
+     "托博尔河与额尔齐斯河交汇处"
+    ],
+    "card_ref_unmet": [],
+    "mentions": [
+     "托博尔河与额尔齐斯河交汇处"
+    ],
+    "unknown_mentions": [],
+    "video_segments": [
+     [
+      0.0,
+      1.0
+     ],
+     [
+      1.0,
+      4.5
+     ],
+     [
+      4.5,
+      7.5
+     ],
+     [
+      7.5,
+      11.0
+     ],
+     [
+      11.0,
+      15.0
+     ]
+    ],
+    "video_seg_sum": 15.0,
+    "seg0": "0-1秒：俯拍平面地图式画面，米黄底色上分布浅灰细线轮廓与浅蓝河流线，一条红色折线自左侧中部向下折转，横贯画面中部后向右下延伸，末端在右侧偏下位置折起，折线末端与转折处有数个白色圆点标记，光线均匀平坦、无明暗渐变，留白主要在上方与左侧，镜头静止，画面无人。",
+    "seg0_has_people_words": true,
+    "appearance_hits": {
+     "mid_frame_prompt": [
+      "毡帽",
+      "长袍",
+      "靴"
+     ],
+     "last_frame_prompt": [
+      "毡帽",
+      "长袍"
+     ],
+     "video_prompt": [
+      "毡帽",
+      "长袍",
+      "靴"
+     ]
+    },
+    "similarity_vs_OLD": {
+     "mid": 0.454,
+     "last": 0.324,
+     "video": 0.332
+    },
+    "lengths": {
+     "first_frame_prompt": 0,
+     "mid_frame_prompt": 545,
+     "last_frame_prompt": 537,
+     "video_prompt": 1668
+    }
+   }
+  },
+  "1011": {
+   "old": {
+    "arm": "OLD",
+    "shot": 1011,
+    "mid_frame_time": 2.5,
+    "refs": [
+     "伊凡四世",
+     "伊凡·科尔佐",
+     "莫斯科宫廷",
+     "黑貂皮捆",
+     "沙皇权杖"
+    ],
+    "card_ref_unmet": [],
+    "mentions": [
+     "伊凡·科尔佐",
+     "伊凡四世",
+     "沙皇权杖",
+     "莫斯科宫廷",
+     "黑貂皮捆"
+    ],
+    "unknown_mentions": [],
+    "video_segments": [
+     [
+      0.0,
+      1.0
+     ],
+     [
+      1.0,
+      4.0
+     ],
+     [
+      4.0,
+      7.5
+     ],
+     [
+      7.5,
+      10.5
+     ],
+     [
+      10.5,
+      13.5
+     ],
+     [
+      13.5,
+      16.5
+     ],
+     [
+      16.5,
+      19.5
+     ]
+    ],
+    "video_seg_sum": 19.5,
+    "seg0": "0-1秒：@莫斯科宫廷，全景平视固定机位，画面极缓推进，昏暗的接见厅石室：前景左侧是木桌与燧台，地面铺开大片红褐地毯，中景两根石柱上的烛架点亮，后方高台上排列木椅，右侧一扇深色木门，左墙有拱窗，暖黄烛光与冷灰石墙形成对比，右侧门边与上方偏暗留白，画面无人。",
+    "seg0_has_people_words": true,
+    "appearance_hits": {
+     "mid_frame_prompt": [
+      "长袍",
+      "靴"
+     ],
+     "last_frame_prompt": [
+      "长袍",
+      "靴"
+     ],
+     "video_prompt": [
+      "长袍",
+      "靴"
+     ]
+    },
+    "similarity_vs_OLD": {},
+    "lengths": {
+     "first_frame_prompt": 0,
+     "mid_frame_prompt": 668,
+     "last_frame_prompt": 671,
+     "video_prompt": 2528
+    }
+   },
+   "new_inplace": {
+    "arm": "NEW-inplace",
+    "shot": 1011,
+    "mid_frame_time": 2.5,
+    "refs": [
+     "伊凡四世",
+     "伊凡·科尔佐",
+     "莫斯科宫廷",
+     "黑貂皮捆",
+     "沙皇权杖"
+    ],
+    "card_ref_unmet": [],
+    "mentions": [
+     "伊凡·科尔佐",
+     "伊凡四世",
+     "沙皇权杖",
+     "莫斯科宫廷",
+     "黑貂皮捆"
+    ],
+    "unknown_mentions": [],
+    "video_segments": [
+     [
+      0.0,
+      1.0
+     ],
+     [
+      1.0,
+      2.5
+     ],
+     [
+      2.5,
+      5.5
+     ],
+     [
+      5.5,
+      8.5
+     ],
+     [
+      8.5,
+      11.5
+     ],
+     [
+      11.5,
+      14.5
+     ],
+     [
+      14.5,
+      16.7
+     ]
+    ],
+    "video_seg_sum": 16.7,
+    "seg0": "0-1秒：@莫斯科宫廷，全景平视固定机位，镜头静止，昏暗石室：前景左侧木桌与烛台，地面铺开大片红褐地毯，中景两根石柱上烛架点亮，后方高台上排列木椅，右侧为深色木门，左墙有拱窗，暖黄烛光与冷灰石墙形成对比，右侧门边与上方偏暗留白，画面无人。",
+    "seg0_has_people_words": true,
+    "appearance_hits": {
+     "mid_frame_prompt": [
+      "长袍",
+      "靴"
+     ],
+     "last_frame_prompt": [
+      "长袍",
+      "靴"
+     ],
+     "video_prompt": [
+      "长袍",
+      "靴"
+     ]
+    },
+    "similarity_vs_OLD": {
+     "mid": 1.0,
+     "last": 0.991,
+     "video": 0.338
+    },
+    "lengths": {
+     "first_frame_prompt": 0,
+     "mid_frame_prompt": 668,
+     "last_frame_prompt": 677,
+     "video_prompt": 2376
+    }
+   },
+   "new_scratch": {
+    "arm": "NEW-scratch",
+    "shot": 1011,
+    "mid_frame_time": 2.5,
+    "refs": [
+     "伊凡四世",
+     "伊凡·科尔佐",
+     "莫斯科宫廷",
+     "黑貂皮捆",
+     "沙皇权杖"
+    ],
+    "card_ref_unmet": [],
+    "mentions": [
+     "伊凡·科尔佐",
+     "伊凡四世",
+     "沙皇权杖",
+     "莫斯科宫廷",
+     "黑貂皮捆"
+    ],
+    "unknown_mentions": [],
+    "video_segments": [
+     [
+      0.0,
+      1.0
+     ],
+     [
+      1.0,
+      2.5
+     ],
+     [
+      2.5,
+      5.5
+     ]
+    ],
+    "video_seg_sum": 5.5,
+    "seg0": "0-1秒：@莫斯科宫廷，全景平视固定机位，镜头静止，昏暗石室：前景左侧木桌与烛台，地面铺开大片红褐地毯，中景两根石柱上烛架点亮，后方高台上排列木椅，右侧为深色木门，左墙有拱窗，暖黄烛光与冷灰石墙形成对比，右侧门边与上方偏暗留白，画面无人。",
+    "seg0_has_people_words": true,
+    "appearance_hits": {
+     "mid_frame_prompt": [
+      "长袍",
+      "靴"
+     ],
+     "last_frame_prompt": [
+      "长袍",
+      "靴"
+     ],
+     "video_prompt": [
+      "长袍",
+      "靴"
+     ]
+    },
+    "similarity_vs_OLD": {
+     "mid": 0.571,
+     "last": 0.799,
+     "video": 0.435
+    },
+    "lengths": {
+     "first_frame_prompt": 0,
+     "mid_frame_prompt": 741,
+     "last_frame_prompt": 683,
+     "video_prompt": 1176
+    }
+   }
+  }
+ }
+}
