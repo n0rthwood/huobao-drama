@@ -1,0 +1,156 @@
+{
+ "arm": "B2",
+ "shot": 934,
+ "config_resumed": null,
+ "config_id": 1,
+ "model": "glm-5.3-flash",
+ "context_window": 3,
+ "post": {
+  "code": 200,
+  "data": {
+   "status": "running",
+   "total": 1
+  },
+  "message": "success"
+ },
+ "task_id": 3129,
+ "wall_s_post_to_done": 78.6,
+ "task": {
+  "id": 3129,
+  "created_at": "2026-11-13T16:27:59.852Z",
+  "completed_at": "2026-11-13T16:29:15.469Z",
+  "status": "completed"
+ },
+ "progress": {
+  "completed": 1,
+  "failed": 0,
+  "total": 1,
+  "items": [
+   {
+    "storyboard_id": 934,
+    "storyboard_number": 4,
+    "state": "completed",
+    "reason": null
+   }
+  ]
+ },
+ "context_window_param": 3,
+ "vision_calls_param": null,
+ "works": [
+  {
+   "id": 648,
+   "task_id": 3129,
+   "stage": "design_card",
+   "source_chars": 53,
+   "sample_key": "design_card|cfg:1|model:glm-5.3-flash",
+   "storyboard_id": 934,
+   "storyboard_number": 4,
+   "started_at": 1794587279855,
+   "finished_at": 1794587355468,
+   "status": "completed",
+   "model_ms": 74873,
+   "queue_ms": 24,
+   "work_ms": 75613,
+   "call_count": 4,
+   "heartbeat_at": 1794587355468,
+   "error_msg": null,
+   "created_at": 1794587279855,
+   "scope": "sys_task",
+   "active_call_started_at": null,
+   "active_call_heartbeat_at": null
+  }
+ ],
+ "calls": [
+  {
+   "id": 1730,
+   "kind": "llm",
+   "config_id": 1,
+   "config_name": "GLM 5.3 (local)",
+   "model": "glm-5.3-flash",
+   "duration_ms": 3267,
+   "prompt_tokens": 37100,
+   "completion_tokens": 7,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": 91173,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1731,
+   "kind": "llm",
+   "config_id": 1,
+   "config_name": "GLM 5.3 (local)",
+   "model": "glm-5.3-flash",
+   "duration_ms": 40015,
+   "prompt_tokens": 50142,
+   "completion_tokens": 2475,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": 121540,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1732,
+   "kind": "llm",
+   "config_id": 1,
+   "config_name": "GLM 5.3 (local)",
+   "model": "glm-5.3-flash",
+   "duration_ms": 24490,
+   "prompt_tokens": 50225,
+   "completion_tokens": 1355,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": 121899,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1733,
+   "kind": "llm",
+   "config_id": 1,
+   "config_name": "GLM 5.3 (local)",
+   "model": "glm-5.3-flash",
+   "duration_ms": 7101,
+   "prompt_tokens": 51584,
+   "completion_tokens": 265,
+   "finish_reason": "stop",
+   "status": "completed",
+   "request_chars": 124267,
+   "http_status": 200,
+   "error_msg": null
+  }
+ ],
+ "card_saved": true,
+ "combo": "C",
+ "card_status": "pending",
+ "stale_reason": null,
+ "card": "{\"version\":2,\"info_points\":[{\"id\":\"ip1\",\"text\":\"时间坐标：哥伦布发现新大陆后90年，即1581年\",\"via\":\"layer\"},{\"id\":\"ip2\",\"text\":\"另一个欧洲人向东翻过乌拉尔山，进入西伯利亚\",\"via\":\"layer\"},{\"id\":\"ip3\",\"text\":\"翻越乌拉尔山的过程：一个欧洲人沿山道向东越岭而下\",\"via\":\"generated\"},{\"id\":\"ip4\",\"text\":\"这次翻越揭开了俄国人向西伯利亚殖民扩张的序幕\",\"via\":\"layer\"}],\"budget\":{\"layer_s\":5.5,\"gen_s\":6},\"rationale\":\"本镜旁白是承上启下的转场句：从哥伦布跳到90年后的1581年、向东翻越乌拉尔山的另一个欧洲人、俄国西伯利亚殖民的序幕，实测配音10.7秒，预算5.5+6=11.5秒覆盖且不改旁白一字。底图取prop #257 @乌拉尔山东西两麓领地范围图：旁白里的核心地理对象是「乌拉尔山」与「向东翻越」，该图上真实存在并已核验的对应语义有 r_dc64e2ed（乌拉尔山脉中段走向线，line，4点，可作polyline）与 r_50039870（1574年向乌拉尔山东麓扩展方向示意箭头，line，3点，可作polyline，正好表达『向东』的方向感）；我已查看该图原件，中上部为绿色授地范围与点位、中部为水系与山脉虚线、右侧与四周大片空白，故选左侧成套位置h-left-stack，文本框压在空白陆面、不遮山脉线。注意一处降级：旁白说的「翻过乌拉尔山」的具体翻越路线在本集资产中没有对应语义（prop #259的叶尔马克远征路线r_b12b8d09属于下一叙事段的远征路径，本镜人物身份尚未揭示，且跨资产借用不合规），因此翻越过程不落在图层几何上，而由生成段演出。生成段用@乌拉尔山口场景（scene #168，16:9，主体为中景山道）加@叶尔马克·齐莫菲叶维奇背影侧身向东越岭：身份在下一镜才正式揭晓，背影处理既满足『另一个欧洲人』的悬念，也避免提前特写泄底。组合取C（先定位再入戏）：图层段先用date锚\",\"suggested_combo\":\"C\",\"layer_plan\":{\"base\":{\"kind\":\"asset\",\"asset_kind\":\"prop\",\"asset_id\":257,\"version_task_id\":null},\"must_mark\":[{\"asset_id\":257,\"semantic_id\":\"r_dc64e2ed\",\"name\":\"乌拉尔山脉中段走向线\"},{\"asset_id\":257,\"semantic_id\":\"r_50039870\",\"name\":\"1574年向乌拉尔山东麓扩展方向（示意箭头）\"}],\"planned_layers\":[{\"type\":\"text\",\"at_s\":0.3,\"role\":\"date\",\"fields\":{\"main\":\"1581年\",\"sub\":\"哥伦布发现新大陆后90年\"}},{\"type\":\"text\",\"at_s\":1.2,\"role\":\"heading\",\"fields\":{\"main\":\"向东翻过乌拉尔山\",\"sub\":\"另一个欧洲人\"}},{\"type\":\"polyline\",\"at_s\":2.5,\"anchor\":{\"asset_id\":257,\"semantic_id\":\"r_dc64e2ed\",\"name\":\"乌拉尔山脉中段走向线\"}},{\"type\":\"polyline\",\"at_s\":3.4,\"anchor\":{\"asset_id\":257,\"semantic_id\":\"r_50039870\",\"name\":\"1574年向乌拉尔山东麓扩展方向（示意箭头）\"}},{\"type\":\"text\",\"at_s\":4.3,\"role\":\"statement\",\"fields\":{\"main\":\"西伯利亚殖民扩张由此开启\",\"sub\":\"俄国东进的序幕\"}}],\"text_layout\":\"h-left-stack\"},\"gen_plan\":{\"reference_assets\":[{\"kind\":\"character\",\"id\":72,\"name\":\"叶尔马克·齐莫菲叶维奇\"},{\"kind\":\"scene\",\"id\":168,\"name\":\"乌拉尔山口\"}],\"mid\":\"中景侧跟机位：@叶尔马克·齐莫菲叶维奇 在山道上向东行走，右手扶腰间弯刀鞘口，左手垂在体侧，双腿交替迈步，针叶林坡面与灰色岩块在两侧\",\"last\":\"中景：@叶尔马克·齐莫菲叶维奇 背影为主、侧身可见，正沿山道朝画面深处（东方）下坡行走，右手扶在腰间弯刀鞘口，左手自然垂在体侧，双腿迈步清晰，前方是渐开的河谷轮廓\"}}",
+ "audit": {
+  "storyboard_id": 934,
+  "shot_number": 4,
+  "narration_text": "哥伦布发现新大陆后90年，1581年，另一个欧洲人向东翻过乌拉尔山，揭开了俄国人向西伯利亚殖民扩张的序幕，",
+  "combo": "C",
+  "suggested_combo": "C",
+  "status": "pending",
+  "confirmed_at": null,
+  "stale_reason": null,
+  "has_card": true,
+  "unresolved": 0,
+  "unresolved_layers": [],
+  "video_generated": true,
+  "issues": [],
+  "narration_measured_s": 10.7,
+  "tts": {
+   "valid": true,
+   "reason": null,
+   "message": null,
+   "duration_ms": 10720
+  },
+  "budget": {
+   "layer_s": 5.5,
+   "gen_s": 6
+  }
+ }
+}

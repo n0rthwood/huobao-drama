@@ -1,0 +1,141 @@
+{
+ "arm": "B2",
+ "shot": 935,
+ "config_resumed": null,
+ "config_id": 1,
+ "model": "glm-5.3-flash",
+ "context_window": 3,
+ "post": {
+  "code": 200,
+  "data": {
+   "status": "running",
+   "total": 1
+  },
+  "message": "success"
+ },
+ "task_id": 3130,
+ "wall_s_post_to_done": 57.5,
+ "task": {
+  "id": 3130,
+  "created_at": "2026-11-13T16:29:17.429Z",
+  "completed_at": "2026-11-13T16:30:09.938Z",
+  "status": "completed"
+ },
+ "progress": {
+  "completed": 1,
+  "failed": 0,
+  "total": 1,
+  "items": [
+   {
+    "storyboard_id": 935,
+    "storyboard_number": 5,
+    "state": "completed",
+    "reason": null
+   }
+  ]
+ },
+ "context_window_param": 3,
+ "vision_calls_param": null,
+ "works": [
+  {
+   "id": 649,
+   "task_id": 3130,
+   "stage": "design_card",
+   "source_chars": 45,
+   "sample_key": "design_card|cfg:1|model:glm-5.3-flash",
+   "storyboard_id": 935,
+   "storyboard_number": 5,
+   "started_at": 1794587357431,
+   "finished_at": 1794587409937,
+   "status": "completed",
+   "model_ms": 51878,
+   "queue_ms": 20,
+   "work_ms": 52506,
+   "call_count": 3,
+   "heartbeat_at": 1794587409937,
+   "error_msg": null,
+   "created_at": 1794587357431,
+   "scope": "sys_task",
+   "active_call_started_at": null,
+   "active_call_heartbeat_at": null
+  }
+ ],
+ "calls": [
+  {
+   "id": 1734,
+   "kind": "llm",
+   "config_id": 1,
+   "config_name": "GLM 5.3 (local)",
+   "model": "glm-5.3-flash",
+   "duration_ms": 3672,
+   "prompt_tokens": 37100,
+   "completion_tokens": 7,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": 91171,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1735,
+   "kind": "llm",
+   "config_id": 1,
+   "config_name": "GLM 5.3 (local)",
+   "model": "glm-5.3-flash",
+   "duration_ms": 22150,
+   "prompt_tokens": 50107,
+   "completion_tokens": 1161,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": 121484,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1736,
+   "kind": "llm",
+   "config_id": 1,
+   "config_name": "GLM 5.3 (local)",
+   "model": "glm-5.3-flash",
+   "duration_ms": 26056,
+   "prompt_tokens": 50921,
+   "completion_tokens": 293,
+   "finish_reason": "stop",
+   "status": "completed",
+   "request_chars": 122980,
+   "http_status": 200,
+   "error_msg": null
+  }
+ ],
+ "card_saved": true,
+ "combo": "A",
+ "card_status": "pending",
+ "stale_reason": null,
+ "card": "{\"version\":2,\"info_points\":[{\"id\":\"p1\",\"text\":\"翻越乌拉尔山的人名叫叶尔马克·齐莫菲叶维奇（Yermak Timofeyvich）\",\"via\":\"layer\"},{\"id\":\"p2\",\"text\":\"全篇对他的称呼是「小叶」\",\"via\":\"layer\"}],\"budget\":{\"layer_s\":9,\"gen_s\":null},\"rationale\":\"本镜旁白只有一句身份揭示「这个人名叫叶尔马克·齐莫菲叶维奇(Yermak Timofeyvich)，我们称呼他为小叶」，实测配音 8.3 秒。这是一个纯人物命名镜，画面任务是让观众把上一镜翻山的背影与这个名字对上号：底图取 prop #266 叶尔马克肖像画（17 世纪佚名公有领域原作，忠实原件）。我已读过该原件：人物半身像占画面左中与中部，头戴宽檐帽、身前立长杆，右侧与右上为深色暗部背景、留白干净，故选右侧成套位置 h-right-stack，姓名条压在右中暗部，不遮面部。该资产没有任何语义条目，本镜也不涉及地名、河流、路线或范围，must_mark 为空，不存在降级缺口；两条层均为不指向底图具体对象的排版文本框，按 layer-text-design 规则不写 anchor。容量按 h-right-stack 核对：heading.main「叶尔马克·齐莫菲叶维奇」10 字（13 字/行 × 2 行内，单行放下）、heading.sub「Yermak Timofeyvich」18 字符（≤26）；keyword.main「小叶」2 字（≤10）、keyword.sub「本片对他的称呼」7 字（≤30）。两拍错开 at_s（0.5 / 5.5），同 primary→emphasis 不同区不互斥；时间轴对应旁白：先念全名（heading 随之出现），后半句「我们称呼他为小叶」时 \",\"suggested_combo\":\"A\",\"layer_plan\":{\"base\":{\"kind\":\"asset\",\"asset_kind\":\"prop\",\"asset_id\":266,\"version_task_id\":null},\"must_mark\":[],\"planned_layers\":[{\"type\":\"text\",\"at_s\":0.5,\"role\":\"heading\",\"fields\":{\"main\":\"叶尔马克·齐莫菲叶维奇\",\"sub\":\"Yermak Timofeyvich\"}},{\"type\":\"text\",\"at_s\":5.5,\"role\":\"keyword\",\"fields\":{\"main\":\"小叶\",\"sub\":\"本片对他的称呼\"}}],\"text_layout\":\"h-right-stack\"}}",
+ "audit": {
+  "storyboard_id": 935,
+  "shot_number": 5,
+  "narration_text": "这个人名叫叶尔马克·齐莫菲叶维奇(Yermak Timofeyvich)，我们称呼他为小叶。",
+  "combo": "A",
+  "suggested_combo": "A",
+  "status": "pending",
+  "confirmed_at": null,
+  "stale_reason": null,
+  "has_card": true,
+  "unresolved": 0,
+  "unresolved_layers": [],
+  "video_generated": false,
+  "issues": [],
+  "narration_measured_s": 8.3,
+  "tts": {
+   "valid": true,
+   "reason": null,
+   "message": null,
+   "duration_ms": 8320
+  },
+  "budget": {
+   "layer_s": 9,
+   "gen_s": null
+  }
+ }
+}

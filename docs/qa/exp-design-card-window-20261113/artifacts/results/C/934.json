@@ -1,0 +1,191 @@
+{
+ "arm": "C",
+ "shot": 934,
+ "config_resumed": null,
+ "config_id": 10,
+ "model": "deepseek-chat",
+ "context_window": 3,
+ "post": {
+  "code": 200,
+  "data": {
+   "status": "running",
+   "total": 1
+  },
+  "message": "success"
+ },
+ "task_id": 3117,
+ "wall_s_post_to_done": 177.5,
+ "task": {
+  "id": 3117,
+  "created_at": "2026-11-13T15:11:20.790Z",
+  "completed_at": "2026-11-13T15:14:17.277Z",
+  "status": "completed"
+ },
+ "progress": {
+  "completed": 1,
+  "failed": 0,
+  "total": 1,
+  "items": [
+   {
+    "storyboard_id": 934,
+    "storyboard_number": 4,
+    "state": "completed",
+    "reason": null
+   }
+  ]
+ },
+ "context_window_param": 3,
+ "vision_calls_param": {
+  "count": 2,
+  "prompt_tokens": 1905,
+  "completion_tokens": 1149,
+  "model": "deepseek-chat"
+ },
+ "works": [
+  {
+   "id": 636,
+   "task_id": 3117,
+   "stage": "design_card",
+   "source_chars": 53,
+   "sample_key": "design_card|cfg:10|model:deepseek-chat",
+   "storyboard_id": 934,
+   "storyboard_number": 4,
+   "started_at": 1794582680792,
+   "finished_at": 1794582857277,
+   "status": "completed",
+   "model_ms": 191142,
+   "queue_ms": 28,
+   "work_ms": 176485,
+   "call_count": 6,
+   "heartbeat_at": 1794582857277,
+   "error_msg": null,
+   "created_at": 1794582680792,
+   "scope": "sys_task",
+   "active_call_started_at": null,
+   "active_call_heartbeat_at": null
+  }
+ ],
+ "calls": [
+  {
+   "id": 1663,
+   "kind": "llm",
+   "config_id": 10,
+   "config_name": "DeepSeek V4.1 Flash 1017 (local)",
+   "model": "deepseek-chat",
+   "duration_ms": 17856,
+   "prompt_tokens": 32671,
+   "completion_tokens": 24,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": 91246,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1664,
+   "kind": "llm",
+   "config_id": 10,
+   "config_name": "DeepSeek V4.1 Flash 1017 (local)",
+   "model": "deepseek-chat",
+   "duration_ms": 19670,
+   "prompt_tokens": 45908,
+   "completion_tokens": 298,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": 121613,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1665,
+   "kind": "vision_chat",
+   "config_id": 10,
+   "config_name": "DeepSeek V4.1 Flash 1017 (local)",
+   "model": "deepseek-chat",
+   "duration_ms": 39458,
+   "prompt_tokens": 958,
+   "completion_tokens": 825,
+   "finish_reason": "stop",
+   "status": "completed",
+   "request_chars": 236,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1666,
+   "kind": "vision_chat",
+   "config_id": 10,
+   "config_name": "DeepSeek V4.1 Flash 1017 (local)",
+   "model": "deepseek-chat",
+   "duration_ms": 15648,
+   "prompt_tokens": 947,
+   "completion_tokens": 324,
+   "finish_reason": "stop",
+   "status": "completed",
+   "request_chars": 218,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1667,
+   "kind": "llm",
+   "config_id": 10,
+   "config_name": "DeepSeek V4.1 Flash 1017 (local)",
+   "model": "deepseek-chat",
+   "duration_ms": 74600,
+   "prompt_tokens": 47527,
+   "completion_tokens": 1475,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": 124092,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1668,
+   "kind": "llm",
+   "config_id": 10,
+   "config_name": "DeepSeek V4.1 Flash 1017 (local)",
+   "model": "deepseek-chat",
+   "duration_ms": 23910,
+   "prompt_tokens": 49025,
+   "completion_tokens": 330,
+   "finish_reason": "stop",
+   "status": "completed",
+   "request_chars": 126669,
+   "http_status": 200,
+   "error_msg": null
+  }
+ ],
+ "card_saved": true,
+ "combo": "C",
+ "card_status": "pending",
+ "stale_reason": null,
+ "card": "{\"version\":2,\"info_points\":[{\"id\":\"ip1\",\"text\":\"时间是哥伦布发现新大陆之后90年，即1581年\",\"via\":\"layer\"},{\"id\":\"ip2\",\"text\":\"另一个人（叶尔马克）的方向相反：向东，翻过乌拉尔山\",\"via\":\"layer\"},{\"id\":\"ip3\",\"text\":\"这次东行揭开了俄国人向西伯利亚殖民扩张的序幕\",\"via\":\"layer\"},{\"id\":\"ip4\",\"text\":\"乌拉尔山脉是欧亚分界，翻山即进入东侧的西伯利亚方向\",\"via\":\"layer\"},{\"id\":\"ip5\",\"text\":\"乌拉尔山中段的通行山口有针叶林缓坡与土石小径，东侧谷地延伸出去\",\"via\":\"generated\"},{\"id\":\"ip6\",\"text\":\"画面交代叶尔马克本人正在翻越山口，把「另一个欧洲人向东」落到具体的人身上\",\"via\":\"generated\"}],\"budget\":{\"layer_s\":4.5,\"gen_s\":8.5},\"rationale\":\"旁白说明本镜要把「哥伦布之后90年、1581年、方向相反向东、翻过乌拉尔山、揭开俄国向西伯利亚殖民序幕」这五个信息落下来，实测配音 10.7 秒，预算 4.5 + 8.5 = 13 秒覆盖且不改动旁白一字。图层段底图取 inherit_prev，延续上一镜（#3）已经出现的整幅地图，让全片从「向西的新大陆」切到同一张地图尺度上的「向东」——底图资产实为 #257 乌拉尔山东西两麓领地范围图（原件已读：中上部为 1558 年授地绿面与盐场点位，蓝色河道在左侧与中上部，褐色山脉虚线自画面中上向右下延伸，右侧与右下大片空白陆面）。唯一几何层是本张资产、本版本真实存在且几何完整的 r_dc64e2ed（line，4 点）——乌拉尔山脉中段走向线，正好承担「翻过乌拉尔山」这条语义；注意本图上没有「西伯利亚」范围块（西伯利亚汗国范围在 #258 那张图上，不能跨资产借用），因此西伯利亚只用旁白与生成段承接，不画范围面，也不杜撰任何新点位。文本框选右侧成套位置 h-right-stack（底图主体在中上偏左，右侧与右下为空白陆面），三块纯排版元素不指向底图具体对象，按 layer-text-design 不写 anchor；容量按 h-right-stack 核对：date.main「1581年」6字（≤15）、sub「哥伦布西航之后90年」10字（≤25）；heading.main「另一个欧洲\",\"suggested_combo\":\"C\",\"layer_plan\":{\"base\":{\"kind\":\"inherit_prev\"},\"must_mark\":[{\"asset_id\":257,\"semantic_id\":\"r_dc64e2ed\",\"name\":\"乌拉尔山脉中段走向线\"}],\"planned_layers\":[{\"type\":\"text\",\"at_s\":0.3,\"role\":\"date\",\"fields\":{\"main\":\"1581年\",\"sub\":\"哥伦布西航之后90年\"}},{\"type\":\"text\",\"at_s\":1.6,\"role\":\"heading\",\"fields\":{\"main\":\"另一个欧洲人，向东\",\"sub\":\"方向相反的一次远征\"}},{\"type\":\"polyline\",\"at_s\":3.2,\"anchor\":{\"asset_id\":257,\"semantic_id\":\"r_dc64e2ed\",\"name\":\"乌拉尔山脉中段走向线\"}},{\"type\":\"text\",\"at_s\":4.6,\"role\":\"statement\",\"fields\":{\"main\":\"翻过乌拉尔山，揭开俄国向西伯利亚扩张的序幕\",\"sub\":\"继哥伦布之后的新一轮殖民\"}}],\"text_layout\":\"h-right-stack\"},\"gen_plan\":{\"reference_assets\":[{\"kind\":\"character\",\"id\":72,\"name\":\"叶尔马克·齐莫菲叶维奇\"},{\"kind\":\"scene\",\"id\":168,\"name\":\"乌拉尔山口\"}],\"mid\":\"侧身中景：@叶尔马克·齐莫菲叶维奇 立在山口土石小径上，左手压住被风掀起的衣角，右手握拳垂在体侧，双腿分开站稳，脸转向画面右侧的东向谷地\",\"last\":\"中全景：@叶尔马克·齐莫菲叶维奇 停在两坡之间的山口小径上，右手抬到额前方搭棚遮光，左手自然垂在体侧，双腿并立站定，身体朝向画面右侧延伸出去的谷地方向，背后是深绿针叶林缓坡\"}}",
+ "audit": {
+  "storyboard_id": 934,
+  "shot_number": 4,
+  "narration_text": "哥伦布发现新大陆后90年，1581年，另一个欧洲人向东翻过乌拉尔山，揭开了俄国人向西伯利亚殖民扩张的序幕，",
+  "combo": "C",
+  "suggested_combo": "C",
+  "status": "pending",
+  "confirmed_at": null,
+  "stale_reason": null,
+  "has_card": true,
+  "unresolved": 0,
+  "unresolved_layers": [],
+  "video_generated": true,
+  "issues": [],
+  "narration_measured_s": 10.7,
+  "tts": {
+   "valid": true,
+   "reason": null,
+   "message": null,
+   "duration_ms": 10720
+  },
+  "budget": {
+   "layer_s": 4.5,
+   "gen_s": 8.5
+  }
+ }
+}

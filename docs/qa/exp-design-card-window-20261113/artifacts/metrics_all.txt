@@ -1,0 +1,52 @@
+=== arm A
+shot   wall calls llm vis    ptok p_first p_last  p_med  ctok llm_ms vis_ms saved blk wrn combo
+   4  107.8     6   4   2  248740   32671  73114 70526.5  3743 24605.0 15753.0  True   0   0 C
+   5   78.3     6   5   1  318908   32671  72378  71030  1740  17049   4448  True   0   0 A
+  11   93.6     5   4   1  263137   32671  77985 75750.0  2782 24220.0   6598  True   0   0 A
+  18  562.1     8   6   2  463406   32667  89862 84805.5  6807 75245.5 50228.5  True   0   0 C
+  19  522.8     6   5   1  381708   32671  90018  85474  5428 101501  62098  True   0   0 C
+   8   84.0     6   4   2  257693   32671  75666 74078.5  2282 18912.5 9577.0  True   0   0 A
+  wall median 100.7 mean 241.4 total 1448.6
+  ptok/llm-call median 74914.2
+  calls median 6.0, llm median 4.5, vision median 1.5
+  saved 6/6; block issues total 0; warn total 0
+  codes: {}
+=== arm B
+shot   wall calls llm vis    ptok p_first p_last  p_med  ctok llm_ms vis_ms saved blk wrn combo
+   4  577.9     5   4   1  191644   37100  52465 50529.0 31631 96379.5  19757  True   0   0 C
+   5  132.5     3   3   0  138317   37100  50953  50264  7274   6831   None  True   0   0 A
+  11 1213.6    11   7   4  286711   37100  51855 49004.5 51249 152381 67688.0  True   0   0 C
+  18  507.9     7   5   2  236107   37096  50649  49154 19331   9352 71618.0  True   0   0 A
+  19  212.6     3   3   0  137563   37100  50801  49662 12288   4700   None  True   0   0 A
+   8  142.5     4   4   0  191583   37100  52350 51066.5  7718 11036.0   None  True   0   0 B
+  wall median 360.2 mean 464.5 total 2787.0
+  ptok/llm-call median 49963.0
+  calls median 4.5, llm median 4.0, vision median 0.5
+  saved 6/6; block issues total 0; warn total 0
+  codes: {}
+=== arm C
+shot   wall calls llm vis    ptok p_first p_last  p_med  ctok llm_ms vis_ms saved blk wrn combo
+   4  177.5     6   4   2  177036   32671  49025 46717.5  3276 21790.0 27553.0  True   0   0 C
+   5  272.7     5   4   1  173502   32671  47907 46176.0  2283 54810.0  23211  True   0   0 A
+  11  317.7     5   4   1  169571   32671  46925 44487.0  3058 22048.0  52347  True   0   0 C
+  18  332.7     7   5   2  221402   32667  49126  45581  4097  24979 11546.5  True   0   0 C
+  19  192.5     5   4   1  174749   32671  48552 46272.0  3034 29919.5  32334  True   0   1 A
+   8  317.7     6   4   2  177097   32671  49246 47323.5  2861 32078.0 31322.0  True   0   0 A
+  wall median 295.2 mean 268.5 total 1610.8
+  ptok/llm-call median 46224.0
+  calls median 5.5, llm median 4.0, vision median 1.5
+  saved 6/6; block issues total 0; warn total 1
+  codes: {19: ['warn:text_plan_warning']}
+=== arm B2
+shot   wall calls llm vis    ptok p_first p_last  p_med  ctok llm_ms vis_ms saved blk wrn combo
+   4   78.6     4   4   0  189051   37100  51584 50183.5  4102 15795.5   None  True   0   0 C
+   5   57.5     3   3   0  138128   37100  50921  50107  1461  22150   None  True   0   0 A
+  11   42.4     3   3   0  134823   37100  49536  48187  2057   6493   None  True   0   0 A
+  18   52.4     3   3   0  135936   37096  49866  48974  2292   6689   None  True   0   0 A
+  19   37.5     3   3   0  137536   37100  50804  49632  1695   5094   None  True   0   0 A
+   8   92.5     5   4   1  190938   37100  51953 50808.5  2186 8996.5  49442  True   0   0 A
+  wall median 55.0 mean 60.1 total 360.9
+  ptok/llm-call median 49869.5
+  calls median 3.0, llm median 3.0, vision median 0.0
+  saved 6/6; block issues total 0; warn total 0
+  codes: {}

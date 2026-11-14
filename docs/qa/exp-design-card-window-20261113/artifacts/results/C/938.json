@@ -1,0 +1,191 @@
+{
+ "arm": "C",
+ "shot": 938,
+ "config_resumed": null,
+ "config_id": 10,
+ "model": "deepseek-chat",
+ "context_window": 3,
+ "post": {
+  "code": 200,
+  "data": {
+   "status": "running",
+   "total": 1
+  },
+  "message": "success"
+ },
+ "task_id": 3122,
+ "wall_s_post_to_done": 317.7,
+ "task": {
+  "id": 3122,
+  "created_at": "2026-11-13T15:32:54.471Z",
+  "completed_at": "2026-11-13T15:38:08.745Z",
+  "status": "completed"
+ },
+ "progress": {
+  "completed": 1,
+  "failed": 0,
+  "total": 1,
+  "items": [
+   {
+    "storyboard_id": 938,
+    "storyboard_number": 8,
+    "state": "completed",
+    "reason": null
+   }
+  ]
+ },
+ "context_window_param": 3,
+ "vision_calls_param": {
+  "count": 2,
+  "prompt_tokens": 533,
+  "completion_tokens": 753,
+  "model": "deepseek-chat"
+ },
+ "works": [
+  {
+   "id": 641,
+   "task_id": 3122,
+   "stage": "design_card",
+   "source_chars": 20,
+   "sample_key": "design_card|cfg:10|model:deepseek-chat",
+   "storyboard_id": 938,
+   "storyboard_number": 8,
+   "started_at": 1794583974473,
+   "finished_at": 1794584288744,
+   "status": "completed",
+   "model_ms": 324999,
+   "queue_ms": 30,
+   "work_ms": 314271,
+   "call_count": 6,
+   "heartbeat_at": 1794584288744,
+   "error_msg": null,
+   "created_at": 1794583974473,
+   "scope": "sys_task",
+   "active_call_started_at": null,
+   "active_call_heartbeat_at": null
+  }
+ ],
+ "calls": [
+  {
+   "id": 1691,
+   "kind": "llm",
+   "config_id": 10,
+   "config_name": "DeepSeek V4.1 Flash 1017 (local)",
+   "model": "deepseek-chat",
+   "duration_ms": 34246,
+   "prompt_tokens": 32671,
+   "completion_tokens": 33,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": 91244,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1692,
+   "kind": "llm",
+   "config_id": 10,
+   "config_name": "DeepSeek V4.1 Flash 1017 (local)",
+   "model": "deepseek-chat",
+   "duration_ms": 28452,
+   "prompt_tokens": 46724,
+   "completion_tokens": 311,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": 123293,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1693,
+   "kind": "vision_chat",
+   "config_id": 10,
+   "config_name": "DeepSeek V4.1 Flash 1017 (local)",
+   "model": "deepseek-chat",
+   "duration_ms": 51077,
+   "prompt_tokens": 278,
+   "completion_tokens": 586,
+   "finish_reason": "stop",
+   "status": "completed",
+   "request_chars": 250,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1694,
+   "kind": "vision_chat",
+   "config_id": 10,
+   "config_name": "DeepSeek V4.1 Flash 1017 (local)",
+   "model": "deepseek-chat",
+   "duration_ms": 11567,
+   "prompt_tokens": 255,
+   "completion_tokens": 167,
+   "finish_reason": "stop",
+   "status": "completed",
+   "request_chars": 213,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1695,
+   "kind": "llm",
+   "config_id": 10,
+   "config_name": "DeepSeek V4.1 Flash 1017 (local)",
+   "model": "deepseek-chat",
+   "duration_ms": 169747,
+   "prompt_tokens": 47923,
+   "completion_tokens": 1302,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": 125130,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1696,
+   "kind": "llm",
+   "config_id": 10,
+   "config_name": "DeepSeek V4.1 Flash 1017 (local)",
+   "model": "deepseek-chat",
+   "duration_ms": 29910,
+   "prompt_tokens": 49246,
+   "completion_tokens": 462,
+   "finish_reason": "stop",
+   "status": "completed",
+   "request_chars": 127380,
+   "http_status": 200,
+   "error_msg": null
+  }
+ ],
+ "card_saved": true,
+ "combo": "A",
+ "card_status": "pending",
+ "stale_reason": null,
+ "card": "{\"version\":2,\"info_points\":[{\"id\":\"ip1\",\"text\":\"小叶所处的时代是16世纪后半叶，金帐汗国分裂之后不久\",\"via\":\"layer\"},{\"id\":\"ip2\",\"text\":\"金帐汗国分裂出一批汗国，其中喀山、西伯利亚、阿斯特拉罕汗国后来被莫斯科公国吞并\",\"via\":\"layer\"},{\"id\":\"ip3\",\"text\":\"喀山汗国就是伊凡四世在16世纪中叶灭掉的那个汗国\",\"via\":\"layer\"},{\"id\":\"ip4\",\"text\":\"小叶要东征的西伯利亚汗国，正是在分裂出来的那一批汗国之中\",\"via\":\"layer\"}],\"budget\":{\"layer_s\":5.4,\"gen_s\":null},\"rationale\":\"本镜旁白只有一句「要理解小叶的处境，得先看清他所处的时代」，实测配音 4.6 秒，预算只排图层段 5.4 秒（≥4.6）即可覆盖，且不改动旁白一字。这一句不涉及具体地名、河道或行进路线，任务是先立起「时代背景」这个框架，为下一镜 #9 的伊凡四世与后续汗国关系做铺垫，因此取组合 A（纯图层段），不上生成段，避免凭空造出与旁白无关的场景。底图取 prop #268 @金帐汗国分裂诸汗国示意图：它是本集可用依据中唯一直接表现「金帐汗国分裂为诸汗国」的忠实原件（faithful=true，现在就有图，不钉 version_task_id）。我已用 read_image 读过该原件确认内容与构图：图上可读标签为喀山汗国（横向约 30%—40%、纵向约 15%—25%）、西伯利亚汗国（约 50%—65%、10%—25%）、沙俄（10%—20%、20%—30%）、克里米亚汗国（5%—15%、55%—65%）、阿斯特拉罕汗国（20%—30%、45%—60%）、哈萨克汗国（中央大片黄色，35%—85%、25%—75%）、希瓦汗国与布哈拉汗国（下方 70%—80%）、奥斯曼帝国（左下 80%—90%），右侧边缘为东亚方向的地形。主体（哈萨克汗国大片色块）占据画面中央与右下，左侧与左上为沙俄、喀山方向的色块和地形，图形信息自左向右铺开；为保证文本框不压住中央色块与汗国标签，选上中成套位置之外唯一合适的\",\"suggested_combo\":\"A\",\"layer_plan\":{\"base\":{\"kind\":\"asset\",\"asset_kind\":\"prop\",\"asset_id\":268,\"version_task_id\":null},\"must_mark\":[],\"planned_layers\":[{\"type\":\"text\",\"at_s\":0.3,\"role\":\"date\",\"fields\":{\"main\":\"16世纪\",\"sub\":\"金帐汗国分裂之后\"}},{\"type\":\"text\",\"at_s\":1.2,\"role\":\"heading\",\"fields\":{\"main\":\"金帐汗国的一堆碎块\",\"sub\":\"小叶所处的时代\"}},{\"type\":\"text\",\"at_s\":2.6,\"role\":\"statement\",\"fields\":{\"main\":\"喀山与西伯利亚汗国是分裂出的碎块\",\"sub\":\"喀山 1438—1552\"}},{\"type\":\"text\",\"at_s\":4.2,\"role\":\"keyword\",\"fields\":{\"main\":\"碎块\",\"sub\":\"喀山、西伯利亚、阿斯特拉罕\"}}],\"text_layout\":\"h-right-stack\"}}",
+ "audit": {
+  "storyboard_id": 938,
+  "shot_number": 8,
+  "narration_text": "要理解小叶的处境，得先看清他所处的时代。",
+  "combo": "A",
+  "suggested_combo": "A",
+  "status": "pending",
+  "confirmed_at": null,
+  "stale_reason": null,
+  "has_card": true,
+  "unresolved": 0,
+  "unresolved_layers": [],
+  "video_generated": false,
+  "issues": [],
+  "narration_measured_s": 4.6,
+  "tts": {
+   "valid": true,
+   "reason": null,
+   "message": null,
+   "duration_ms": 4640
+  },
+  "budget": {
+   "layer_s": 5.4,
+   "gen_s": null
+  }
+ }
+}

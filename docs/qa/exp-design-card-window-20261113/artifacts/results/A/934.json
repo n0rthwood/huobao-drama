@@ -1,0 +1,121 @@
+{
+ "arm": "A",
+ "shot": 934,
+ "config_id": 10,
+ "model": "deepseek-chat",
+ "context_window": 0,
+ "task_id": 2942,
+ "task": {
+  "id": 2942,
+  "created_at": "2026-11-13T06:38:49.779000Z",
+  "completed_at": "2026-11-13T06:38:49.779000Z",
+  "status": "completed"
+ },
+ "wall_s_post_to_done": 107.8,
+ "calls": [
+  {
+   "id": null,
+   "kind": "llm",
+   "config_id": 10,
+   "model": "deepseek-chat",
+   "duration_ms": 21853,
+   "prompt_tokens": 32671,
+   "completion_tokens": 43,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": null
+  },
+  {
+   "id": null,
+   "kind": "llm",
+   "config_id": 10,
+   "model": "deepseek-chat",
+   "duration_ms": 27357,
+   "prompt_tokens": 69667,
+   "completion_tokens": 369,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": null
+  },
+  {
+   "id": null,
+   "kind": "vision_chat",
+   "config_id": 10,
+   "model": "deepseek-chat",
+   "duration_ms": 15870,
+   "prompt_tokens": 950,
+   "completion_tokens": 572,
+   "finish_reason": "stop",
+   "status": "completed",
+   "request_chars": null
+  },
+  {
+   "id": null,
+   "kind": "vision_chat",
+   "config_id": 10,
+   "model": "deepseek-chat",
+   "duration_ms": 15636,
+   "prompt_tokens": 952,
+   "completion_tokens": 598,
+   "finish_reason": "stop",
+   "status": "completed",
+   "request_chars": null
+  },
+  {
+   "id": null,
+   "kind": "llm",
+   "config_id": 10,
+   "model": "deepseek-chat",
+   "duration_ms": 30826,
+   "prompt_tokens": 71386,
+   "completion_tokens": 1706,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": null
+  },
+  {
+   "id": null,
+   "kind": "llm",
+   "config_id": 10,
+   "model": "deepseek-chat",
+   "duration_ms": 11109,
+   "prompt_tokens": 73114,
+   "completion_tokens": 455,
+   "finish_reason": "stop",
+   "status": "completed",
+   "request_chars": null
+  }
+ ],
+ "card_saved": true,
+ "card": "{\"budget\": {\"gen_s\": 6, \"layer_s\": 6}, \"combo\": \"C\", \"gen_plan\": {\"first\": null, \"last\": \"叶尔马克双手撑着桌沿俯身看图，右手食指停在图幅东侧山麓处，左侧那幅 @叶尔马克肖像画 斜靠在桌面前缘，头灯暖光落在他与图幅上\", \"mid\": \"俯瞰桌面，图幅铺在大木桌上，叶尔马克站在桌后左侧、右手将 @乌拉尔山东西两麓领地范围图 的右缘压平，左手垂在体侧，目光落在图幅中部的山脉走向上\", \"reference_assets\": [{\"id\": 72, \"kind\": \"character\", \"name\": \"叶尔马克·齐莫菲叶维奇\"}, {\"id\": 257, \"kind\": \"prop\", \"name\": \"乌拉尔山东西两麓领地范围图\"}, {\"id\": 266, \"kind\": \"prop\", \"name\": \"叶尔马克肖像画\"}]}, \"info_points\": [{\"id\": \"ip1\", \"text\": \"时间坐标：1581年，距1492年哥伦布到达美洲约90年\", \"via\": \"layer\"}, {\"id\": \"ip2\", \"text\": \"这是俄国人向西伯利亚殖民扩张的序幕\", \"via\": \"layer\"}, {\"id\": \"ip3\", \"text\": \"这支队伍从卡马河畔的索利卡姆斯克出发，翻越乌拉尔山中段山口，向东进入西伯利亚\", \"via\": \"layer\"}, {\"id\": \"ip4\", \"text\": \"乌拉尔山脉是欧洲与西伯利亚之间的天然分界\", \"via\": \"layer\"}, {\"id\": \"ip5\", \"text\": \"对比展示：舞台上地图铺开，先立起出发地与山脉走向\", \"via\": \"generated\"}, {\"id\": \"ip6\", \"text\": \"对比展示：路线沿线点亮，光标自西麓向东移动越过乌拉尔山\", \"via\": \"generated\"}], \"layer_plan\": {\"base\": {\"asset_id\": 257, \"asset_kind\": \"prop\", \"kind\": \"asset\"}, \"must_mark\": [{\"asset_id\": 257, \"name\": \"索利卡姆斯克（盐场）\", \"semantic_id\": \"p_9f5ea495\"}, {\"asset_id\": 257, \"name\": \"乌拉尔山脉中段走向线\", \"semantic_id\": \"r_dc64e2ed\"}, {\"asset_id\": 257, \"name\": \"1574年向乌拉尔山东麓扩展方向（示意箭头）\", \"semantic_id\": \"r_50039870\"}], \"planned_layers\": [{\"anchor\": null, \"at_s\": 0.4, \"fields\": {\"main\": \"1581年\", \"sub\": \"距发现美洲约90年\"}, \"role\": \"date\", \"text\": null, \"type\": \"text\"}, {\"anchor\": null, \"at_s\": 1.6, \"fields\": {\"main\": \"向东翻过乌拉尔山\", \"sub\": \"俄国的西伯利亚序幕\"}, \"role\": \"heading\", \"text\": null, \"type\": \"text\"}, {\"anchor\": {\"asset_id\": 257, \"name\": \"索利卡姆斯克（盐场）\", \"semantic_id\": \"p_9f5ea495\"}, \"at_s\": 2.6, \"fields\": null, \"role\": null, \"text\": null, \"type\": \"marker\"}, {\"anchor\": {\"asset_id\": 257, \"name\": \"乌拉尔山脉中段走向线\", \"semantic_id\": \"r_dc64e2ed\"}, \"at_s\": 3.4, \"fields\": null, \"role\": null, \"text\": null, \"type\": \"polyline\"}, {\"anchor\": {\"asset_id\": 257, \"name\": \"1574年向乌拉尔山东麓扩展方向（示意箭头）\", \"semantic_id\": \"r_50039870\"}, \"at_s\": 3.4, \"fields\": null, \"role\": null, \"text\": null, \"type\": \"polyline\"}], \"text_layout\": \"h-left-stack\"}, \"rationale\": \"本镜旁白为「哥伦布发现新大陆后90年，1581年，另一个欧洲人向东翻过乌拉尔山，揭开了俄国人向西伯利亚殖民扩张的序幕」，实测配音 10.7 秒，预算 6 + 6 = 12 秒覆盖且不改动旁白。底图必须承担「向东翻越乌拉尔山」这一地理关系，因此取 prop #257 @乌拉尔山东西两麓领地范围图 作底图：我已经用 read_image 读该原件，确认画面里卡马河与楚索瓦亚河在左中至中部，中上方为 1558 年授地范围与盐场点位，乌拉尔山走向以一条纵贯中右部的虚线串点呈现，右中部还有指向东南的 1574 年扩展箭头，四周是大片空白，右侧尤其空旷，故选用左侧成套 h-left-stack 让文本框压在空白陆面上，不遮山脉与点位。三条图层都锚在本张资产、本版本真实存在的语义上：marker 用索利卡姆斯克（point，1 点，源图在该处有明确的黄色点位）作为出发地，polyline 用乌拉尔山脉中段走向线（line，4 点）与 1574 年向东扩展方向示意箭头（line，3 点），后两者共用一个 at_s 表达「山脉即东西分界、越山即东进」。must_mark 只列这三条，因为旁白这一句只要求观众得到「从西麓出发、跨过乌拉尔山、向东」——卡马河与楚索瓦亚河属于后镜（第 59 镜沿卡马河进发）会再讲的内容，本镜不抢先把河系都标出来，避免画面信息过载。文字两拍错开 at_s（0.4 / 1.6），同一 primary 区先后替换：date 在 context 区持续显示，capacity 按 h-left-stack 核对，「1581年」5 字、「距发现美洲约90年」9 字、「向东翻过乌拉尔山」7 字、「俄国的西伯利亚序幕」9 字，均在日期 main 15 / sub 25、标题 main 26 以内。组合取 C（先定位再入戏）：图层段先立起时间与山脉分界，再由生成段把这幅图落到一个可触摸的实物舞台上——对比上一镜（#3 新大陆）的壮观海景，这里用「一个人俯身在一张摊开的地图上」的克制的室内戏开场俄国篇章，并与下一镜（#5 叶尔马克其人）的自然衔接。生成段参考资产三项全部被 @：@叶尔马克·齐莫菲叶维奇 本人、@乌拉尔山东西两麓领地范围图 作为桌上正在使用的实体图幅、@叶尔马克肖像画 作为桌沿斜靠的画片，肖像画既有原件（faithful），可作静态道具使用，不按「以后会出图」规划。生成段首帧由图层段末帧继承锁定，故不写 first。本镜与前镜（#3 瓜纳哈尼岛）为换地点硬切，无承接依赖。\", \"suggested_combo\": \"C\"}",
+ "combo": "C",
+ "card_status": "pending",
+ "stale_reason": null,
+ "audit": {
+  "storyboard_id": 934,
+  "shot_number": 4,
+  "narration_text": "哥伦布发现新大陆后90年，1581年，另一个欧洲人向东翻过乌拉尔山，揭开了俄国人向西伯利亚殖民扩张的序幕，",
+  "combo": "C",
+  "suggested_combo": "C",
+  "status": "pending",
+  "confirmed_at": null,
+  "stale_reason": null,
+  "has_card": true,
+  "unresolved": 0,
+  "unresolved_layers": [],
+  "video_generated": true,
+  "issues": [],
+  "narration_measured_s": 10.7,
+  "tts": {
+   "valid": true,
+   "reason": null,
+   "message": null,
+   "duration_ms": 10720
+  },
+  "budget": {
+   "layer_s": 6,
+   "gen_s": 6
+  }
+ },
+ "source": "production full-context run (task 2942); card = AI updateStoryboard arguments from observations"
+}

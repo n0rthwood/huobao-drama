@@ -1,0 +1,141 @@
+{
+ "arm": "B2",
+ "shot": 941,
+ "config_resumed": null,
+ "config_id": 1,
+ "model": "glm-5.3-flash",
+ "context_window": 3,
+ "post": {
+  "code": 200,
+  "data": {
+   "status": "running",
+   "total": 1
+  },
+  "message": "success"
+ },
+ "task_id": 3131,
+ "wall_s_post_to_done": 42.4,
+ "task": {
+  "id": 3131,
+  "created_at": "2026-11-13T16:30:14.960Z",
+  "completed_at": "2026-11-13T16:30:55.466Z",
+  "status": "completed"
+ },
+ "progress": {
+  "completed": 1,
+  "failed": 0,
+  "total": 1,
+  "items": [
+   {
+    "storyboard_id": 941,
+    "storyboard_number": 11,
+    "state": "completed",
+    "reason": null
+   }
+  ]
+ },
+ "context_window_param": 3,
+ "vision_calls_param": null,
+ "works": [
+  {
+   "id": 650,
+   "task_id": 3131,
+   "stage": "design_card",
+   "source_chars": 71,
+   "sample_key": "design_card|cfg:1|model:glm-5.3-flash",
+   "storyboard_id": 941,
+   "storyboard_number": 11,
+   "started_at": 1794587414962,
+   "finished_at": 1794587455466,
+   "status": "completed",
+   "model_ms": 39853,
+   "queue_ms": 20,
+   "work_ms": 40504,
+   "call_count": 3,
+   "heartbeat_at": 1794587455466,
+   "error_msg": null,
+   "created_at": 1794587414962,
+   "scope": "sys_task",
+   "active_call_started_at": null,
+   "active_call_heartbeat_at": null
+  }
+ ],
+ "calls": [
+  {
+   "id": 1737,
+   "kind": "llm",
+   "config_id": 1,
+   "config_name": "GLM 5.3 (local)",
+   "model": "glm-5.3-flash",
+   "duration_ms": 3396,
+   "prompt_tokens": 37100,
+   "completion_tokens": 7,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": 91174,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1738,
+   "kind": "llm",
+   "config_id": 1,
+   "config_name": "GLM 5.3 (local)",
+   "model": "glm-5.3-flash",
+   "duration_ms": 29964,
+   "prompt_tokens": 48187,
+   "completion_tokens": 1820,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": 118166,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1739,
+   "kind": "llm",
+   "config_id": 1,
+   "config_name": "GLM 5.3 (local)",
+   "model": "glm-5.3-flash",
+   "duration_ms": 6493,
+   "prompt_tokens": 49536,
+   "completion_tokens": 230,
+   "finish_reason": "stop",
+   "status": "completed",
+   "request_chars": 120578,
+   "http_status": 200,
+   "error_msg": null
+  }
+ ],
+ "card_saved": true,
+ "combo": "A",
+ "card_status": "pending",
+ "stale_reason": null,
+ "card": "{\"version\":2,\"info_points\":[{\"id\":\"ip1\",\"text\":\"1480年金帐汗国军队逼近莫斯科公国\",\"via\":\"layer\"},{\"id\":\"ip2\",\"text\":\"对峙地点在奥卡河上游的乌格拉河畔\",\"via\":\"layer\"},{\"id\":\"ip3\",\"text\":\"两军隔河对峙，相持一个月\",\"via\":\"layer\"},{\"id\":\"ip4\",\"text\":\"蒙古军队最终不战而退\",\"via\":\"layer\"},{\"id\":\"ip5\",\"text\":\"方位关系：莫斯科公国在西北，金帐汗国（萨莱方向）在南，乌格拉河对峙点夹在莫斯科公国南侧的奥卡河上游一带\",\"via\":\"layer\"},{\"id\":\"ip6\",\"text\":\"本镜为后继结论镜（#12-#14）建立同一张地图底图与同一套空间关系\",\"via\":\"layer\"}],\"budget\":{\"layer_s\":17,\"gen_s\":null},\"rationale\":\"本镜旁白为「1480年，蒙古金帐汗国的军队逼近莫斯科公国，在奥卡河上游的乌格拉河畔，与伊凡三世的军队隔河对峙。这次相持进行了一个月，最终蒙古军队不战而退」，实测配音 16.3 秒，预算只排图层段 17 秒（16.3 + 0.7 余量）即覆盖，不改动旁白一字。旁白全部是时间坐标、方位关系与对峙过程的时间结论，没有需要生成段去演的人物动作事件（镜头不出现具体人物形象，伊凡三世仅以军队方被提及），故取组合 A（纯图层段），gen_plan 留空。底图取 prop #258 @蒙古汗国分布与西征路线图（忠实原件、现在就有图，不钉 version_task_id）：我已核对用户提供的原件截图，该图上真实存在莫斯科公国色块（中偏左）、金帐汗国示意色块（中下萨莱一带）、奥卡河线（莫斯科公国南侧）与乌格拉河对峙点位（奥卡河汇入处一带），四条 must_mark 全部有真实、类型相容、几何完整的语义支撑（polygon 各 6 点、line 7 点、point 1 点），无杜撰。图层按旁白时间轴排布：0.3 秒出「1480年」时间锚，2.2 秒先点亮金帐汗国范围（军队逼近方），3.4 秒点亮莫斯科公国（被逼近方），5.6 秒描奥卡河、6.8 秒钉乌格拉河对峙点，8.8 秒出「一个月」对峙时长数据，12.6 秒收在「不战而退」的事实说明。文字成套位置选 h-left-stack，与前后镜（#12、#1\",\"suggested_combo\":\"A\",\"layer_plan\":{\"base\":{\"kind\":\"asset\",\"asset_kind\":\"prop\",\"asset_id\":258,\"version_task_id\":null},\"must_mark\":[{\"asset_id\":258,\"semantic_id\":\"g_a3b81df5\",\"name\":\"莫斯科公国\"},{\"asset_id\":258,\"semantic_id\":\"g_a3867a06\",\"name\":\"金帐汗国（旧都萨莱周边）示意范围\"},{\"asset_id\":258,\"semantic_id\":\"p_716d1fac\",\"name\":\"乌格拉河对峙地点（乌格拉河汇入奥卡河一带）\"},{\"asset_id\":258,\"semantic_id\":\"r_88298d6a\",\"name\":\"奥卡河\"}],\"planned_layers\":[{\"type\":\"text\",\"at_s\":0.3,\"role\":\"date\",\"fields\":{\"main\":\"1480年\",\"sub\":\"金帐汗国军队逼近莫斯科公国\"}},{\"type\":\"polygon\",\"at_s\":2.2,\"anchor\":{\"asset_id\":258,\"semantic_id\":\"g_a3867a06\",\"name\":\"金帐汗国（旧都萨莱周边）示意范围\"}},{\"type\":\"polygon\",\"at_s\":3.4,\"anchor\":{\"asset_id\":258,\"semantic_id\":\"g_a3b81df5\",\"name\":\"莫斯科公国\"}},{\"type\":\"polyline\",\"at_s\":5.6,\"anchor\":{\"asset_id\":258,\"semantic_id\":\"r_88298d6a\",\"name\":\"奥卡河\"}},{\"type\":\"marker\",\"at_s\":6.8,\"anchor\":{\"asset_id\":258,\"semantic_id\":\"p_716d1fac\",\"name\":\"乌格拉河对峙地点（乌格拉河汇入奥卡河一带）\"}},{\"type\":\"text\",\"at_s\":8.8,\"role\":\"metric\",\"fields\":{\"main\":\"一个月\",\"sub\":\"两军隔河相持的时长\"}},{\"type\":\"text\",\"at_s\":12.6,\"role\":\"statement\",\"fields\":{\"main\":\"蒙古军队不战而退\",\"sub\":\"乌格拉河对峙的结局\"}}],\"text_layout\":\"h-left-stack\"},\"gen_plan\":{\"reference_assets\":[]}}",
+ "audit": {
+  "storyboard_id": 941,
+  "shot_number": 11,
+  "narration_text": "1480年，蒙古金帐汗国的军队逼近莫斯科公国，在奥卡河上游的乌格拉河畔，与伊凡三世的军队隔河对峙。这次相持进行了一个月，最终蒙古军队不战而退。",
+  "combo": "A",
+  "suggested_combo": "A",
+  "status": "pending",
+  "confirmed_at": null,
+  "stale_reason": null,
+  "has_card": true,
+  "unresolved": 0,
+  "unresolved_layers": [],
+  "video_generated": false,
+  "issues": [],
+  "narration_measured_s": 16.3,
+  "tts": {
+   "valid": true,
+   "reason": null,
+   "message": null,
+   "duration_ms": 16320
+  },
+  "budget": {
+   "layer_s": 17,
+   "gen_s": null
+  }
+ }
+}

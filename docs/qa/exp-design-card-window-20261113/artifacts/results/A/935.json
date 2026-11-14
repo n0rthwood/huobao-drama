@@ -1,0 +1,121 @@
+{
+ "arm": "A",
+ "shot": 935,
+ "config_id": 10,
+ "model": "deepseek-chat",
+ "context_window": 0,
+ "task_id": 2942,
+ "task": {
+  "id": 2942,
+  "created_at": "2026-11-13T06:40:12.717000Z",
+  "completed_at": "2026-11-13T06:40:12.717000Z",
+  "status": "completed"
+ },
+ "wall_s_post_to_done": 78.3,
+ "calls": [
+  {
+   "id": null,
+   "kind": "llm",
+   "config_id": 10,
+   "model": "deepseek-chat",
+   "duration_ms": 20895,
+   "prompt_tokens": 32671,
+   "completion_tokens": 29,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": null
+  },
+  {
+   "id": null,
+   "kind": "llm",
+   "config_id": 10,
+   "model": "deepseek-chat",
+   "duration_ms": 24977,
+   "prompt_tokens": 70797,
+   "completion_tokens": 187,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": null
+  },
+  {
+   "id": null,
+   "kind": "llm",
+   "config_id": 10,
+   "model": "deepseek-chat",
+   "duration_ms": 3713,
+   "prompt_tokens": 71030,
+   "completion_tokens": 181,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": null
+  },
+  {
+   "id": null,
+   "kind": "vision_chat",
+   "config_id": 10,
+   "model": "deepseek-chat",
+   "duration_ms": 4448,
+   "prompt_tokens": 576,
+   "completion_tokens": 190,
+   "finish_reason": "stop",
+   "status": "completed",
+   "request_chars": null
+  },
+  {
+   "id": null,
+   "kind": "llm",
+   "config_id": 10,
+   "model": "deepseek-chat",
+   "duration_ms": 17049,
+   "prompt_tokens": 71456,
+   "completion_tokens": 903,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": null
+  },
+  {
+   "id": null,
+   "kind": "llm",
+   "config_id": 10,
+   "model": "deepseek-chat",
+   "duration_ms": 6451,
+   "prompt_tokens": 72378,
+   "completion_tokens": 250,
+   "finish_reason": "stop",
+   "status": "completed",
+   "request_chars": null
+  }
+ ],
+ "card_saved": true,
+ "card": "{\"budget\": {\"gen_s\": null, \"layer_s\": 9.5}, \"combo\": \"A\", \"gen_plan\": null, \"info_points\": [{\"id\": \"ip1\", \"text\": \"这个人名叫叶尔马克·齐莫菲叶维奇\", \"via\": \"layer\"}, {\"id\": \"ip2\", \"text\": \"我们称呼他为「小叶」\", \"via\": \"layer\"}, {\"id\": \"ip3\", \"text\": \"小叶是 16 世纪伏尔加河一带的哥萨克首领，本集主角（可由肖像原件加屏幕文字直接给出）\", \"via\": \"layer\"}], \"layer_plan\": {\"base\": {\"asset_id\": 266, \"asset_kind\": \"prop\", \"kind\": \"asset\"}, \"must_mark\": [], \"planned_layers\": [{\"anchor\": null, \"at_s\": 0.4, \"fields\": {\"main\": \"叶尔马克·齐莫菲叶维奇\", \"sub\": \"本集主角\"}, \"role\": \"heading\", \"text\": null, \"type\": \"text\"}, {\"anchor\": null, \"at_s\": 3.6, \"fields\": {\"main\": \"小叶\", \"sub\": \"我们对他的称呼\"}, \"role\": \"keyword\", \"text\": null, \"type\": \"text\"}], \"text_layout\": \"h-left-stack\"}, \"rationale\": \"本镜旁白只有一句身份介绍「这个人名叫叶尔马克·齐莫菲叶维奇，我们称呼他为小叶」，实测配音 8.3 秒，信息量极小，画面任务只是把这张脸与这个名字对上。可用的最佳依据就是 prop #266 @叶尔马克肖像画 原件：我已用 read_image 读该原件，确认人物整体偏画面中央偏左，头与躯干中轴约在横向 40%—45%，右手握长杆中下部（画面右下，杆身延至右上角），画面左侧边缘人物左肩外侧至左边界是纵向贯穿的暗色背景留白，右上角与右下角也有较暗的空区。因此本镜用该肖像作图层段底图，选左侧成套位置 h-left-stack：标题与关键词压在左侧暗背景上，不遮面部与躯干中轴。两条文字都是不指向底图具体对象与位置的排版元素（人名、称呼），按 layer-text-design 不写 anchor；容量按 h-left-stack 上限核对：heading.main「叶尔马克·齐莫菲叶维奇」11 字（≤26，两行内）、sub「本集主角」4 字（≤26）；keyword.main「小叶」2 字（≤10）、sub「我们对他的称呼」7 字（≤30）。两拍错开 at_s（0.4 / 3.6），heading 与 keyword 分处 primary 与 emphasis 两区，不互相顶替，均落在 9.5 秒图层段内。必须说明一处缺口：该肖像资产没有任何语义标注（semantics 为空），无法对人物面部或手中长杆做锚定的 label / marker，所以本镜不使用锚定标注，只用人名与称呼两套模板文本框，人名固定在左侧暗背景而不到人物身上，语义上仍成立。段组合取 A（只图层）：旁白只说名字，没有事件过程需要演出来，用原件肖像配合静态文本框比生成一段无信息的运镜更省、也更忠于证据素材；原片画面停顿在本镜的叶尔马克肖像上，与上一镜（#4 地图上向东翻越乌拉尔山）是硬切换载体，故不承接上一镜底图，也不写生成段与关键帧提示词。预算 9.5 秒 ≥ 实测 8.3 秒，保证旁白念完名字与称呼后仍有余量让肖像停留，不压缩旁白。\", \"suggested_combo\": \"A\", \"version\": 1}",
+ "combo": "A",
+ "card_status": "pending",
+ "stale_reason": null,
+ "audit": {
+  "storyboard_id": 935,
+  "shot_number": 5,
+  "narration_text": "这个人名叫叶尔马克·齐莫菲叶维奇(Yermak Timofeyvich)，我们称呼他为小叶。",
+  "combo": "A",
+  "suggested_combo": "A",
+  "status": "pending",
+  "confirmed_at": null,
+  "stale_reason": null,
+  "has_card": true,
+  "unresolved": 0,
+  "unresolved_layers": [],
+  "video_generated": false,
+  "issues": [],
+  "narration_measured_s": 8.3,
+  "tts": {
+   "valid": true,
+   "reason": null,
+   "message": null,
+   "duration_ms": 8320
+  },
+  "budget": {
+   "layer_s": 9.5,
+   "gen_s": null
+  }
+ },
+ "source": "production full-context run (task 2942); card = AI updateStoryboard arguments from observations"
+}

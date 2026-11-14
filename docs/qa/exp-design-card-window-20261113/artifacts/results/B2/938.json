@@ -1,0 +1,176 @@
+{
+ "arm": "B2",
+ "shot": 938,
+ "config_resumed": null,
+ "config_id": 1,
+ "model": "glm-5.3-flash",
+ "context_window": 3,
+ "post": {
+  "code": 200,
+  "data": {
+   "status": "running",
+   "total": 1
+  },
+  "message": "success"
+ },
+ "task_id": 3134,
+ "wall_s_post_to_done": 92.5,
+ "task": {
+  "id": 3134,
+  "created_at": "2026-11-13T16:32:27.606Z",
+  "completed_at": "2026-11-13T16:33:56.601Z",
+  "status": "completed"
+ },
+ "progress": {
+  "completed": 1,
+  "failed": 0,
+  "total": 1,
+  "items": [
+   {
+    "storyboard_id": 938,
+    "storyboard_number": 8,
+    "state": "completed",
+    "reason": null
+   }
+  ]
+ },
+ "context_window_param": 3,
+ "vision_calls_param": {
+  "count": 1,
+  "prompt_tokens": 268,
+  "completion_tokens": 550,
+  "model": "deepseek-chat"
+ },
+ "works": [
+  {
+   "id": 653,
+   "task_id": 3134,
+   "stage": "design_card",
+   "source_chars": 20,
+   "sample_key": "design_card|cfg:1|model:glm-5.3-flash",
+   "storyboard_id": 938,
+   "storyboard_number": 8,
+   "started_at": 1794587547608,
+   "finished_at": 1794587636600,
+   "status": "completed",
+   "model_ms": 88311,
+   "queue_ms": 29,
+   "work_ms": 88992,
+   "call_count": 5,
+   "heartbeat_at": 1794587636600,
+   "error_msg": null,
+   "created_at": 1794587547608,
+   "scope": "sys_task",
+   "active_call_started_at": null,
+   "active_call_heartbeat_at": null
+  }
+ ],
+ "calls": [
+  {
+   "id": 1746,
+   "kind": "llm",
+   "config_id": 1,
+   "config_name": "GLM 5.3 (local)",
+   "model": "glm-5.3-flash",
+   "duration_ms": 3023,
+   "prompt_tokens": 37100,
+   "completion_tokens": 7,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": 91171,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1747,
+   "kind": "llm",
+   "config_id": 1,
+   "config_name": "GLM 5.3 (local)",
+   "model": "glm-5.3-flash",
+   "duration_ms": 11940,
+   "prompt_tokens": 50438,
+   "completion_tokens": 437,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": 122259,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1748,
+   "kind": "vision_chat",
+   "config_id": 10,
+   "config_name": "DeepSeek V4.1 Flash 1017 (local)",
+   "model": "deepseek-chat",
+   "duration_ms": 49442,
+   "prompt_tokens": 268,
+   "completion_tokens": 550,
+   "finish_reason": "stop",
+   "status": "completed",
+   "request_chars": 225,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1749,
+   "kind": "llm",
+   "config_id": 1,
+   "config_name": "GLM 5.3 (local)",
+   "model": "glm-5.3-flash",
+   "duration_ms": 17853,
+   "prompt_tokens": 51179,
+   "completion_tokens": 971,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": 123398,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1750,
+   "kind": "llm",
+   "config_id": 1,
+   "config_name": "GLM 5.3 (local)",
+   "model": "glm-5.3-flash",
+   "duration_ms": 6053,
+   "prompt_tokens": 51953,
+   "completion_tokens": 221,
+   "finish_reason": "stop",
+   "status": "completed",
+   "request_chars": 124746,
+   "http_status": 200,
+   "error_msg": null
+  }
+ ],
+ "card_saved": true,
+ "combo": "A",
+ "card_status": "pending",
+ "stale_reason": null,
+ "card": "{\"version\":2,\"info_points\":[{\"id\":\"ip1\",\"text\":\"本段进入「时代」叙事：小叶的处境由他所处的时代决定\",\"via\":\"layer\"},{\"id\":\"ip2\",\"text\":\"时代的地理载体：金帐汗国分裂后的诸汗国格局（喀山、西伯利亚、阿斯特拉罕、克里米亚等）\",\"via\":\"layer\"}],\"budget\":{\"layer_s\":6,\"gen_s\":null},\"rationale\":\"本镜旁白只有一句过渡引子「要理解小叶的处境，得先看清他所处的时代」，实测配音 4.6 秒。它是本节「时代篇」（#9 伊凡四世、#10 伊凡三世、#11 乌格拉河对峙）的开场镜，任务是立一个章节感并把观众的注意力引向「时代」这张概念底图。底图取 prop #268 金帐汗国分裂诸汗国示意图（忠实原件、现在就有图）：我已用 read_image 读过该原件，确认它是地形底图上的诸汗国彩色色块（喀山、西伯利亚、阿斯特拉罕、克里米亚、哈萨克、布哈拉等），正是后继几镜要逐一拆讲的「时代」地理载体；但该资产没有任何语义条目，本镜旁白也不点名任何具体地名/河流/路线/范围，故 must_mark 为空、不上任何锚定几何层——不把图上普通色块冒充语义标注。图层只做两拍排版文本框：0.3 秒出 heading「他所处的时代」呼应旁白句式，3 秒出 statement「金帐汗国已裂为诸汗国」点明这张图讲的时代格局，为 #11 的蒙古-金帐叙事做伏笔。成套位置选 h-left-stack：读图确认画面左上角（沙俄标签上方一带）为大片无色块无标签的空旷地形，右侧与中部色块标签密集，文本框压左上不遮任何汗国标签。容量核对：heading.main「他所处的时代」6 字（≤13/行 ×2 行内）、sub「小叶的处境从何而来」9 字（≤26）；statement.main「金帐汗国已裂为诸汗国」10 字（≤18\",\"suggested_combo\":\"A\",\"layer_plan\":{\"base\":{\"kind\":\"asset\",\"asset_kind\":\"prop\",\"asset_id\":268,\"version_task_id\":null},\"must_mark\":[],\"planned_layers\":[{\"type\":\"text\",\"at_s\":0.3,\"role\":\"heading\",\"fields\":{\"main\":\"他所处的时代\",\"sub\":\"小叶的处境从何而来\"}},{\"type\":\"text\",\"at_s\":3,\"role\":\"statement\",\"fields\":{\"main\":\"金帐汗国已裂为诸汗国\",\"sub\":\"时代背景的地理格局\"}}],\"text_layout\":\"h-left-stack\"}}",
+ "audit": {
+  "storyboard_id": 938,
+  "shot_number": 8,
+  "narration_text": "要理解小叶的处境，得先看清他所处的时代。",
+  "combo": "A",
+  "suggested_combo": "A",
+  "status": "pending",
+  "confirmed_at": null,
+  "stale_reason": null,
+  "has_card": true,
+  "unresolved": 0,
+  "unresolved_layers": [],
+  "video_generated": false,
+  "issues": [],
+  "narration_measured_s": 4.6,
+  "tts": {
+   "valid": true,
+   "reason": null,
+   "message": null,
+   "duration_ms": 4640
+  },
+  "budget": {
+   "layer_s": 6,
+   "gen_s": null
+  }
+ }
+}

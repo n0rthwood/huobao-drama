@@ -1,0 +1,206 @@
+{
+ "arm": "B",
+ "shot": 950,
+ "config_resumed": null,
+ "config_id": 1,
+ "model": "glm-5.3-flash",
+ "context_window": 3,
+ "post": {
+  "code": 200,
+  "data": {
+   "status": "running",
+   "total": 1
+  },
+  "message": "success"
+ },
+ "task_id": 3126,
+ "wall_s_post_to_done": 507.9,
+ "task": {
+  "id": 3126,
+  "created_at": "2026-11-13T16:12:14.437Z",
+  "completed_at": "2026-11-13T16:20:39.322Z",
+  "status": "completed"
+ },
+ "progress": {
+  "completed": 1,
+  "failed": 0,
+  "total": 1,
+  "items": [
+   {
+    "storyboard_id": 950,
+    "storyboard_number": 18,
+    "state": "completed",
+    "reason": null
+   }
+  ]
+ },
+ "context_window_param": 3,
+ "vision_calls_param": {
+  "count": 1,
+  "prompt_tokens": 473,
+  "completion_tokens": 393,
+  "model": "deepseek-chat"
+ },
+ "works": [
+  {
+   "id": 645,
+   "task_id": 3126,
+   "stage": "design_card",
+   "source_chars": 58,
+   "sample_key": "design_card|cfg:1|model:glm-5.3-flash",
+   "storyboard_id": 950,
+   "storyboard_number": 18,
+   "started_at": 1794586334439,
+   "finished_at": 1794586839321,
+   "status": "completed",
+   "model_ms": 503573,
+   "queue_ms": 26,
+   "work_ms": 504882,
+   "call_count": 7,
+   "heartbeat_at": 1794586839321,
+   "error_msg": null,
+   "created_at": 1794586334439,
+   "scope": "sys_task",
+   "active_call_started_at": null,
+   "active_call_heartbeat_at": null
+  }
+ ],
+ "calls": [
+  {
+   "id": 1716,
+   "kind": "llm",
+   "config_id": 1,
+   "config_name": "GLM 5.3 (local)",
+   "model": "glm-5.3-flash",
+   "duration_ms": 6585,
+   "prompt_tokens": 37096,
+   "completion_tokens": 39,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": 91141,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1717,
+   "kind": "llm",
+   "config_id": 1,
+   "config_name": "GLM 5.3 (local)",
+   "model": "glm-5.3-flash",
+   "duration_ms": 205095,
+   "prompt_tokens": 48974,
+   "completion_tokens": 10618,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": 119460,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1718,
+   "kind": "vision_chat",
+   "config_id": 10,
+   "config_name": "DeepSeek V4.1 Flash 1017 (local)",
+   "model": "deepseek-chat",
+   "duration_ms": 119997,
+   "prompt_tokens": null,
+   "completion_tokens": null,
+   "finish_reason": null,
+   "status": "failed",
+   "request_chars": 301,
+   "http_status": null,
+   "error_msg": "The operation was aborted due to timeout"
+  },
+  {
+   "id": 1719,
+   "kind": "llm",
+   "config_id": 1,
+   "config_name": "GLM 5.3 (local)",
+   "model": "glm-5.3-flash",
+   "duration_ms": 4734,
+   "prompt_tokens": 49154,
+   "completion_tokens": 141,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": 119776,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1720,
+   "kind": "vision_chat",
+   "config_id": 10,
+   "config_name": "DeepSeek V4.1 Flash 1017 (local)",
+   "model": "deepseek-chat",
+   "duration_ms": 23239,
+   "prompt_tokens": 473,
+   "completion_tokens": 393,
+   "finish_reason": "stop",
+   "status": "completed",
+   "request_chars": 261,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1721,
+   "kind": "llm",
+   "config_id": 1,
+   "config_name": "GLM 5.3 (local)",
+   "model": "glm-5.3-flash",
+   "duration_ms": 134571,
+   "prompt_tokens": 49761,
+   "completion_tokens": 7740,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": 120773,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1722,
+   "kind": "llm",
+   "config_id": 1,
+   "config_name": "GLM 5.3 (local)",
+   "model": "glm-5.3-flash",
+   "duration_ms": 9352,
+   "prompt_tokens": 50649,
+   "completion_tokens": 400,
+   "finish_reason": "stop",
+   "status": "completed",
+   "request_chars": 122411,
+   "http_status": 200,
+   "error_msg": null
+  }
+ ],
+ "card_saved": true,
+ "combo": "A",
+ "card_status": "pending",
+ "stale_reason": null,
+ "card": "{\"version\":2,\"info_points\":[{\"id\":\"ip1\",\"text\":\"「哥萨克」一词在土耳其语与蒙古语中各有不同涵义\",\"via\":\"layer\"},{\"id\":\"ip2\",\"text\":\"土耳其语涵义：自由人、反叛者、草原强盗、被流放者、雇佣兵等\",\"via\":\"layer\"},{\"id\":\"ip3\",\"text\":\"蒙古语涵义：逃亡者和强盗\",\"via\":\"layer\"},{\"id\":\"ip4\",\"text\":\"承接 #17 生成段收尾的哥萨克聚落：这些词义所指的群体就是画面中草原聚落的居民\",\"via\":\"layer\"}],\"budget\":{\"layer_s\":15.5,\"gen_s\":null},\"rationale\":\"本镜旁白是纯词义辨析（土耳其语五种涵义＋蒙古语两种涵义），没有可生成的过程事件，取组合 A：整镜由图层段渲染，budget layer_s=15.5 ≥ 实测配音 15 秒。底图取 scene #172 哥萨克聚落（现在就有图）：前镜 #17 生成段恰好收在草原聚落院中，本镜直接落在同一场景资产上承接视觉空间；已用 read_image 读该图确认——房屋与棚架集中在中左、上方约三分之一为干净天空、右下与左下为低细节空草地、图内无任何文字，故选右侧成套位置 h-right-stack，文本框压在右侧天空与空草地上，不遮主体。本镜旁白不含任何地名/河流/范围，底图（场景图）也无语义条目，故 must_mark 留空、不设任何锚定层，无需 read_image 再核对语义几何。屏幕文字三条，按实测配音时间轴排：0.3s heading 立词；4.5s（旁白念完「多种涵义：」进入枚举时）bullets 上土耳其语诸义——bullets 上限三条，五种涵义按旁白原顺序两两并入前三项（自由人、反叛者／草原强盗、被流放者／雇佣兵），容量 h-right-stack bullets 每条 17 字内，逐条核对不超；10.8s（蒙古语一句起）statement 落蒙古语涵义，与 bullets 的「强盗」仅 2 字重合，不触相邻拍重复。同 zone 依次替换（heading→bullets→sta\",\"suggested_combo\":\"A\",\"layer_plan\":{\"base\":{\"kind\":\"asset\",\"asset_kind\":\"scene\",\"asset_id\":172,\"version_task_id\":null},\"must_mark\":[],\"planned_layers\":[{\"type\":\"text\",\"at_s\":0.3,\"role\":\"heading\",\"fields\":{\"main\":\"「哥萨克」一词\",\"sub\":\"土耳其语与蒙古语中的涵义\"}},{\"type\":\"text\",\"at_s\":4.5,\"role\":\"bullets\",\"fields\":{\"items\":[\"自由人、反叛者\",\"草原强盗、被流放者\",\"雇佣兵\"]}},{\"type\":\"text\",\"at_s\":10.8,\"role\":\"statement\",\"fields\":{\"main\":\"蒙古语中意指逃亡者和强盗\",\"sub\":\"「哥萨克」的蒙古语涵义\"}}],\"text_layout\":\"h-right-stack\"},\"gen_plan\":{\"reference_assets\":[]}}",
+ "audit": {
+  "storyboard_id": 950,
+  "shot_number": 18,
+  "narration_text": "“哥萨克”在土耳其语中有多种涵义：自由人、反叛者、草原强盗、被流放者、雇佣兵等等。蒙古语中它的涵义是：逃亡者和强盗。",
+  "combo": "A",
+  "suggested_combo": "A",
+  "status": "pending",
+  "confirmed_at": null,
+  "stale_reason": null,
+  "has_card": true,
+  "unresolved": 0,
+  "unresolved_layers": [],
+  "video_generated": true,
+  "issues": [],
+  "narration_measured_s": 15,
+  "tts": {
+   "valid": true,
+   "reason": null,
+   "message": null,
+   "duration_ms": 15040
+  },
+  "budget": {
+   "layer_s": 15.5,
+   "gen_s": null
+  }
+ }
+}

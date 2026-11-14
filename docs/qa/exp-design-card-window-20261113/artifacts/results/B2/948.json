@@ -1,0 +1,141 @@
+{
+ "arm": "B2",
+ "shot": 948,
+ "config_resumed": null,
+ "config_id": 1,
+ "model": "glm-5.3-flash",
+ "context_window": 3,
+ "post": {
+  "code": 200,
+  "data": {
+   "status": "running",
+   "total": 1
+  },
+  "message": "success"
+ },
+ "task_id": 3133,
+ "wall_s_post_to_done": 37.5,
+ "task": {
+  "id": 3133,
+  "created_at": "2026-11-13T16:31:50.106Z",
+  "completed_at": "2026-11-13T16:32:23.722Z",
+  "status": "completed"
+ },
+ "progress": {
+  "completed": 1,
+  "failed": 0,
+  "total": 1,
+  "items": [
+   {
+    "storyboard_id": 948,
+    "storyboard_number": 19,
+    "state": "completed",
+    "reason": null
+   }
+  ]
+ },
+ "context_window_param": 3,
+ "vision_calls_param": null,
+ "works": [
+  {
+   "id": 652,
+   "task_id": 3133,
+   "stage": "design_card",
+   "source_chars": 41,
+   "sample_key": "design_card|cfg:1|model:glm-5.3-flash",
+   "storyboard_id": 948,
+   "storyboard_number": 19,
+   "started_at": 1794587510108,
+   "finished_at": 1794587543721,
+   "status": "completed",
+   "model_ms": 32996,
+   "queue_ms": 20,
+   "work_ms": 33613,
+   "call_count": 3,
+   "heartbeat_at": 1794587543721,
+   "error_msg": null,
+   "created_at": 1794587510108,
+   "scope": "sys_task",
+   "active_call_started_at": null,
+   "active_call_heartbeat_at": null
+  }
+ ],
+ "calls": [
+  {
+   "id": 1743,
+   "kind": "llm",
+   "config_id": 1,
+   "config_name": "GLM 5.3 (local)",
+   "model": "glm-5.3-flash",
+   "duration_ms": 2881,
+   "prompt_tokens": 37100,
+   "completion_tokens": 7,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": 91172,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1744,
+   "kind": "llm",
+   "config_id": 1,
+   "config_name": "GLM 5.3 (local)",
+   "model": "glm-5.3-flash",
+   "duration_ms": 25021,
+   "prompt_tokens": 49632,
+   "completion_tokens": 1479,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": 120777,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1745,
+   "kind": "llm",
+   "config_id": 1,
+   "config_name": "GLM 5.3 (local)",
+   "model": "glm-5.3-flash",
+   "duration_ms": 5094,
+   "prompt_tokens": 50804,
+   "completion_tokens": 209,
+   "finish_reason": "stop",
+   "status": "completed",
+   "request_chars": 122852,
+   "http_status": 200,
+   "error_msg": null
+  }
+ ],
+ "card_saved": true,
+ "combo": "A",
+ "card_status": "pending",
+ "stale_reason": null,
+ "card": "{\"version\":2,\"info_points\":[{\"id\":\"ip1\",\"text\":\"哥萨克聚落的分布范围：南部草原一直延伸到北部伏尔加河上游\",\"via\":\"layer\"},{\"id\":\"ip2\",\"text\":\"地理关系：伏尔加河纵贯东欧平原中部，顿河在其西侧偏南——两河一带的草原与上游河段就是聚落散布的地带\",\"via\":\"layer\"},{\"id\":\"ip3\",\"text\":\"聚落规模有大有小、散布在东欧平原各地\",\"via\":\"layer\"},{\"id\":\"ip4\",\"text\":\"旁白中的『南部草原』为本张底图无对应范围语义的地带性描述，由旁白与两河线共同承担，不另造锚定\",\"via\":\"narration_only\"}],\"budget\":{\"layer_s\":9,\"gen_s\":null},\"rationale\":\"本镜旁白为「从南部草原到北部伏尔加河上游，哥萨克人组成的聚落分布在东欧平原各地，规模有大有小」，实测配音 8.5 秒，预算只排图层段 9 秒覆盖，不改动旁白一字。这一句是纯粹的地理分布陈述：南起草原、北至伏尔加河上游、散布各地，没有任何可生成的事件过程（无人物出场、无行进交火），故取组合 A（纯图层段），gen_plan 留空。底图沿用前后各镜（#16—#22）同一张 prop #258 @蒙古汗国分布与西征路线图（忠实原件、现在就有图，不钉 version_task_id），保证与上一镜 #18、下一镜 #20 的空间关系无跳变。我已读该原件确认构图：伏尔加河标注纵贯画面中部（约 x 610–700、y 380–780），顿河在其西侧偏南（约 x 460–550、y 430–660），莫斯科公国色块在中偏左上，克里米亚汗国色块在左下；右侧（x 约 1100–1600）与右下除西伯利亚汗国框与额尔齐斯河外为无文字、无色块的空白地形带，故沿用右侧成套位置 h-right-stack，与相邻镜一致，文本框压在空白地形上不遮河线与汗国色块。两条几何层均锚在本张资产、本版本真实存在、几何完整且含义相容的语义：polyline 用 r_0cfaceb2（伏尔加河，7 点）在 2.0 秒点亮、r_8598f1f8（顿河，7 点）在 2.4 秒点亮，一南一北撑出旁白所说的分布跨度。降级说明：旁白\",\"suggested_combo\":\"A\",\"layer_plan\":{\"base\":{\"kind\":\"asset\",\"asset_kind\":\"prop\",\"asset_id\":258,\"version_task_id\":null},\"must_mark\":[{\"asset_id\":258,\"semantic_id\":\"r_0cfaceb2\",\"name\":\"伏尔加河\"},{\"asset_id\":258,\"semantic_id\":\"r_8598f1f8\",\"name\":\"顿河\"}],\"planned_layers\":[{\"type\":\"text\",\"at_s\":0.5,\"role\":\"heading\",\"fields\":{\"main\":\"散布东欧平原各地\",\"sub\":\"哥萨克聚落的分布\"}},{\"type\":\"polyline\",\"at_s\":2,\"anchor\":{\"asset_id\":258,\"semantic_id\":\"r_0cfaceb2\",\"name\":\"伏尔加河\"}},{\"type\":\"polyline\",\"at_s\":2.4,\"anchor\":{\"asset_id\":258,\"semantic_id\":\"r_8598f1f8\",\"name\":\"顿河\"}},{\"type\":\"text\",\"at_s\":4.6,\"role\":\"statement\",\"fields\":{\"main\":\"从南部草原到伏尔加河上游\",\"sub\":\"聚落散布、规模有大有小\"}},{\"type\":\"text\",\"at_s\":6.8,\"role\":\"keyword\",\"fields\":{\"main\":\"规模不等\",\"sub\":\"草原聚落彼此独立、大小不一\"}}],\"text_layout\":\"h-right-stack\"}}",
+ "audit": {
+  "storyboard_id": 948,
+  "shot_number": 19,
+  "narration_text": "从南部草原到北部伏尔加河上游，哥萨克人组成的聚落分布在东欧平原各地，规模有大有小。",
+  "combo": "A",
+  "suggested_combo": "A",
+  "status": "pending",
+  "confirmed_at": null,
+  "stale_reason": null,
+  "has_card": true,
+  "unresolved": 0,
+  "unresolved_layers": [],
+  "video_generated": true,
+  "issues": [],
+  "narration_measured_s": 8.5,
+  "tts": {
+   "valid": true,
+   "reason": null,
+   "message": null,
+   "duration_ms": 8480
+  },
+  "budget": {
+   "layer_s": 9,
+   "gen_s": null
+  }
+ }
+}

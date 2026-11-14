@@ -1,0 +1,121 @@
+{
+ "arm": "A",
+ "shot": 948,
+ "config_id": 10,
+ "model": "deepseek-chat",
+ "context_window": 0,
+ "task_id": 2942,
+ "task": {
+  "id": 2942,
+  "created_at": "2026-11-13T07:32:18.186000Z",
+  "completed_at": "2026-11-13T07:32:18.186000Z",
+  "status": "completed"
+ },
+ "wall_s_post_to_done": 522.8,
+ "calls": [
+  {
+   "id": null,
+   "kind": "llm",
+   "config_id": 10,
+   "model": "deepseek-chat",
+   "duration_ms": 117493,
+   "prompt_tokens": 32671,
+   "completion_tokens": 39,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": null
+  },
+  {
+   "id": null,
+   "kind": "llm",
+   "config_id": 10,
+   "model": "deepseek-chat",
+   "duration_ms": 72035,
+   "prompt_tokens": 84704,
+   "completion_tokens": 208,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": null
+  },
+  {
+   "id": null,
+   "kind": "vision_chat",
+   "config_id": 10,
+   "model": "deepseek-chat",
+   "duration_ms": 62098,
+   "prompt_tokens": 1005,
+   "completion_tokens": 487,
+   "finish_reason": "stop",
+   "status": "completed",
+   "request_chars": null
+  },
+  {
+   "id": null,
+   "kind": "llm",
+   "config_id": 10,
+   "model": "deepseek-chat",
+   "duration_ms": 101501,
+   "prompt_tokens": 85474,
+   "completion_tokens": 2150,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": null
+  },
+  {
+   "id": null,
+   "kind": "llm",
+   "config_id": 10,
+   "model": "deepseek-chat",
+   "duration_ms": 60238,
+   "prompt_tokens": 87836,
+   "completion_tokens": 2162,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": null
+  },
+  {
+   "id": null,
+   "kind": "llm",
+   "config_id": 10,
+   "model": "deepseek-chat",
+   "duration_ms": 108478,
+   "prompt_tokens": 90018,
+   "completion_tokens": 382,
+   "finish_reason": "stop",
+   "status": "completed",
+   "request_chars": null
+  }
+ ],
+ "card_saved": true,
+ "card": "{\"budget\": {\"gen_s\": 7, \"layer_s\": 5}, \"combo\": \"C\", \"gen_plan\": {\"first\": \"草原聚落外围的夯土矮墙缺口处，一队骑马的人从土路上穿过，其中一人肩背火枪，院内低矮房屋与草顶棚架铺开，画面中不见明确的主角\", \"last\": \"聚落全景收束，黄褐色光线铺在夯土矮墙与木骨泥墙房屋上，草顶棚架、拴马桩与草料堆一同入画，一名哥萨克立在院中、右手提火枪，另一人牵着马停在土路旁，四周是开阔干草原\", \"mid\": \"聚落院内中景，土坯与木骨泥墙房屋前立着拴马桩，草顶棚架下草料堆放整齐，一名哥萨克背对镜头站在门旁，右手提着一支火枪\", \"reference_assets\": [{\"id\": 172, \"kind\": \"scene\", \"name\": \"哥萨克聚落\"}, {\"id\": 260, \"kind\": \"prop\", \"name\": \"哥萨克火枪\"}]}, \"info_points\": [{\"id\": \"ip1\", \"text\": \"哥萨克人的聚落从南部草原一直分布到北部伏尔加河上游\", \"via\": \"layer\"}, {\"id\": \"ip2\", \"text\": \"聚落散布在东欧平原各地，不是一个统一的政权或组织\", \"via\": \"layer\"}, {\"id\": \"ip3\", \"text\": \"各个聚落规模不等，有大有小\", \"via\": \"layer\"}, {\"id\": \"ip4\", \"text\": \"方位关系：南部草原是克里米亚汗国与阿斯特拉罕汗国一带，北部上游是伏尔加河与卡马河交汇一带，聚落分布在两者之间的东欧平原\", \"via\": \"layer\"}, {\"id\": \"ip5\", \"text\": \"承接 #18 同一张地图，观众仍在刚才那张诸汗国分布图上读到这条南北向的散布范围\", \"via\": \"layer\"}, {\"id\": \"ip6\", \"text\": \"画面落到草原上的哥萨克聚落：土坯与木骨泥墙的低矮房屋、草顶棚架、拴马桩、外围夯土矮墙缺口，规模确实不大\", \"via\": \"generated\"}, {\"id\": \"ip7\", \"text\": \"聚落半农牧半军事：院内有草料堆与拴马桩，人也带着火枪，既是住户也是武装团伙\", \"via\": \"generated\"}], \"layer_plan\": {\"base\": {\"asset_id\": 258, \"asset_kind\": \"prop\", \"kind\": \"asset\"}, \"must_mark\": [{\"asset_id\": 258, \"name\": \"克里米亚汗国\", \"semantic_id\": \"g_e7dc4ee3\"}, {\"asset_id\": 258, \"name\": \"阿斯特拉罕汗国\", \"semantic_id\": \"g_7593bacf\"}, {\"asset_id\": 258, \"name\": \"西伯利亚汗国\", \"semantic_id\": \"g_27f212da\"}, {\"asset_id\": 258, \"name\": \"伏尔加河\", \"semantic_id\": \"r_0cfaceb2\"}, {\"asset_id\": 258, \"name\": \"卡马河\", \"semantic_id\": \"r_2f732e2d\"}], \"planned_layers\": [{\"anchor\": null, \"at_s\": 0.3, \"fields\": {\"main\": \"16世纪\", \"sub\": \"东欧平原\"}, \"role\": \"date\", \"text\": null, \"type\": \"text\"}, {\"anchor\": null, \"at_s\": 1.2, \"fields\": {\"main\": \"散居东欧平原各地\", \"sub\": \"哥萨克的聚落\"}, \"role\": \"heading\", \"text\": null, \"type\": \"text\"}, {\"anchor\": {\"asset_id\": 258, \"name\": \"克里米亚汗国\", \"semantic_id\": \"g_e7dc4ee3\"}, \"at_s\": 2.2, \"fields\": null, \"role\": null, \"text\": null, \"type\": \"polygon\"}, {\"anchor\": {\"asset_id\": 258, \"name\": \"阿斯特拉罕汗国\", \"semantic_id\": \"g_7593bacf\"}, \"at_s\": 2.2, \"fields\": null, \"role\": null, \"text\": null, \"type\": \"polygon\"}, {\"anchor\": {\"asset_id\": 258, \"name\": \"西伯利亚汗国\", \"semantic_id\": \"g_27f212da\"}, \"at_s\": 2.2, \"fields\": null, \"role\": null, \"text\": null, \"type\": \"polygon\"}, {\"anchor\": {\"asset_id\": 258, \"name\": \"伏尔加河\", \"semantic_id\": \"r_0cfaceb2\"}, \"at_s\": 3.2, \"fields\": null, \"role\": null, \"text\": null, \"type\": \"polyline\"}, {\"anchor\": {\"asset_id\": 258, \"name\": \"卡马河\", \"semantic_id\": \"r_2f732e2d\"}, \"at_s\": 3.6, \"fields\": null, \"role\": null, \"text\": null, \"type\": \"polyline\"}, {\"anchor\": null, \"at_s\": 4.2, \"fields\": {\"main\": \"从南部草原到伏尔加河上游，聚落散布各地\", \"sub\": \"规模有大有小\"}, \"role\": \"statement\", \"text\": null, \"type\": \"text\"}], \"text_layout\": \"h-right-stack\"}, \"rationale\": \"本镜旁白为「从南部草原到北部伏尔加河上游，哥萨克人组成的聚落分布在东欧平原各地，规模有大有小」，实测配音 8.5 秒，预算 5 + 7 = 12 秒覆盖且不改动旁白一字。这一句有两层任务：一是南北向的地理散布（南部草原到北部上游、东欧平原各地），二是聚落的形态与规模差异。前者必须由地图承担，后者由生成段承担，故取组合 C（先定位再入戏）：图层段先在 #17/#18 那张图上把「南北散布」立起来，再由生成段落到一处具体的草原聚落。底图沿用前几镜（#17、#18）同一张 prop #258 @蒙古汗国分布与西征路线图（忠实原件、现在就有图，不钉 version_task_id），保证与前镜空间关系无跳变。我已用 read_image 读该原件确认位置：莫斯科公国色块约在 30%/40%，喀山汗国约 46%/42%，西伯利亚汗国约 72%/40%，克里米亚汗国约 22%/85%，阿斯特拉罕汗国约 44%/82%，金帐汗国旧疆示意约 40%/78%，伏尔加河纵贯中部，卡马河在中部向东延伸，额尔齐斯河在右上；画面最右侧约 85%—100% 宽度、以及右下角 70%—100% 宽度 / 60%—100% 高度是完全空白的地形底图，无文字无色块。因此选用右侧成套位置 h-right-stack，让两块文本框压在右侧与右下空白地形带上，不遮任何汗国色块与河线。五条几何层均锚在本张资产、本版本上真实存在、含义相容且几何完整（region 各 6 点、line 各 7 点）的语义：polygon 用 g_e7dc4ee3（克里米亚汗国）与 g_7593bacf（阿斯特拉罕汗国）同拍 2.2 秒，代表旁白说的「南部草原」；g_27f212da（西伯利亚汗国）同拍点出东北一侧的陆地；polyline 用 r_0cfaceb2（伏尔加河）与 r_2f732e2d（卡马河）在 3.2—3.6 秒接续，把「北部伏尔加河上游」这条纵贯南北的水系轴画出来，正是聚落散布的南北方向。文本按 h-right-stack 容量核对：date.main「16世纪」4 字（≤15）、sub「东欧平原」4 字（≤25）；heading.main「散居东欧平原各地」8 字（≤26，两行内）、sub「哥萨克的聚落」6 字（≤26）；statement.main「从南部草原到伏尔加河上游，聚落散布各地」19 字（≤36，两行内）、sub「规模有大有小」6 字（≤28）。三拍错开 at_s（0.3 / 1.2 / 4.2），date 在 context 区、heading 与 statement 先后替换 primary 区，均落在 5 秒图层段内。生成段用 @哥萨克聚落 场景与 @哥萨克火枪 作为参考资产：聚落场景图本身的土坯房屋、草顶棚架、拴马桩、外围夯土矮墙正好对应「规模有大有小」的一处小聚落，火枪则把「半军事」落成可见的物件；旁白不点具体人物，因此不引用任何角色资产，画面里的人是无人名的聚落成员。衔接关系为 continue：本镜紧接 #18，仍在同一张地图、同一叙事段落上推进。\", \"suggested_combo\": \"C\"}",
+ "combo": "C",
+ "card_status": "pending",
+ "stale_reason": null,
+ "audit": {
+  "storyboard_id": 948,
+  "shot_number": 19,
+  "narration_text": "从南部草原到北部伏尔加河上游，哥萨克人组成的聚落分布在东欧平原各地，规模有大有小。",
+  "combo": "C",
+  "suggested_combo": "C",
+  "status": "pending",
+  "confirmed_at": null,
+  "stale_reason": null,
+  "has_card": true,
+  "unresolved": 0,
+  "unresolved_layers": [],
+  "video_generated": true,
+  "issues": [],
+  "narration_measured_s": 8.5,
+  "tts": {
+   "valid": true,
+   "reason": null,
+   "message": null,
+   "duration_ms": 8480
+  },
+  "budget": {
+   "layer_s": 5,
+   "gen_s": 7
+  }
+ },
+ "source": "production full-context run (task 2942); card = AI updateStoryboard arguments from observations"
+}

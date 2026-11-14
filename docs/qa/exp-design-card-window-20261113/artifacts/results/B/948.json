@@ -1,0 +1,141 @@
+{
+ "arm": "B",
+ "shot": 948,
+ "config_resumed": null,
+ "config_id": 1,
+ "model": "glm-5.3-flash",
+ "context_window": 3,
+ "post": {
+  "code": 200,
+  "data": {
+   "status": "running",
+   "total": 1
+  },
+  "message": "success"
+ },
+ "task_id": 3127,
+ "wall_s_post_to_done": 212.6,
+ "task": {
+  "id": 3127,
+  "created_at": "2026-11-13T16:20:42.463Z",
+  "completed_at": "2026-11-13T16:24:12.737Z",
+  "status": "completed"
+ },
+ "progress": {
+  "completed": 1,
+  "failed": 0,
+  "total": 1,
+  "items": [
+   {
+    "storyboard_id": 948,
+    "storyboard_number": 19,
+    "state": "completed",
+    "reason": null
+   }
+  ]
+ },
+ "context_window_param": 3,
+ "vision_calls_param": null,
+ "works": [
+  {
+   "id": 646,
+   "task_id": 3127,
+   "stage": "design_card",
+   "source_chars": 41,
+   "sample_key": "design_card|cfg:1|model:glm-5.3-flash",
+   "storyboard_id": 948,
+   "storyboard_number": 19,
+   "started_at": 1794586842465,
+   "finished_at": 1794587052736,
+   "status": "completed",
+   "model_ms": 209630,
+   "queue_ms": 11,
+   "work_ms": 210271,
+   "call_count": 3,
+   "heartbeat_at": 1794587052736,
+   "error_msg": null,
+   "created_at": 1794586842465,
+   "scope": "sys_task",
+   "active_call_started_at": null,
+   "active_call_heartbeat_at": null
+  }
+ ],
+ "calls": [
+  {
+   "id": 1723,
+   "kind": "llm",
+   "config_id": 1,
+   "config_name": "GLM 5.3 (local)",
+   "model": "glm-5.3-flash",
+   "duration_ms": 3539,
+   "prompt_tokens": 37100,
+   "completion_tokens": 41,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": 91143,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1724,
+   "kind": "llm",
+   "config_id": 1,
+   "config_name": "GLM 5.3 (local)",
+   "model": "glm-5.3-flash",
+   "duration_ms": 201391,
+   "prompt_tokens": 49662,
+   "completion_tokens": 12102,
+   "finish_reason": "tool_calls",
+   "status": "completed",
+   "request_chars": 120813,
+   "http_status": 200,
+   "error_msg": null
+  },
+  {
+   "id": 1725,
+   "kind": "llm",
+   "config_id": 1,
+   "config_name": "GLM 5.3 (local)",
+   "model": "glm-5.3-flash",
+   "duration_ms": 4700,
+   "prompt_tokens": 50801,
+   "completion_tokens": 145,
+   "finish_reason": "stop",
+   "status": "completed",
+   "request_chars": 122814,
+   "http_status": 200,
+   "error_msg": null
+  }
+ ],
+ "card_saved": true,
+ "combo": "A",
+ "card_status": "pending",
+ "stale_reason": null,
+ "card": "{\"version\":2,\"info_points\":[{\"id\":\"ip1\",\"text\":\"分布南端：南部草原——以图幅南部的金帐旧都周边示意范围（南部草原带）高亮作视觉锚\",\"via\":\"layer\"},{\"id\":\"ip2\",\"text\":\"分布北端与联系轴：伏尔加河全线点亮，其北端即图上的伏尔加河上游河段\",\"via\":\"layer\"},{\"id\":\"ip3\",\"text\":\"哥萨克聚落散布东欧平原各地\",\"via\":\"layer\"},{\"id\":\"ip4\",\"text\":\"聚落规模有大有小\",\"via\":\"layer\"}],\"budget\":{\"layer_s\":9,\"gen_s\":null},\"rationale\":\"旁白「从南部草原到北部伏尔加河上游，哥萨克人组成的聚落分布在东欧平原各地，规模有大有小。」实测配音 8.5 秒，预算只排图层段 layer_s=9（8.5+0.5 余量）即覆盖，不改动旁白一字。本句是分布范围的地理判断，无具体人物出场、无行进或交火等可生成的过程事件，故取组合 A（纯图层段），gen_plan 留空。底图沿用本集主线同一张 prop #258 蒙古汗国分布与西征路线图（忠实原件、现在就有图，不钉 version_task_id）：下一镜 #20 的设计卡已写明「承接上一镜 #19 同一张地图，观众仍在『聚落散布东欧平原各地』那张图上」并在此图上收拢到三河流域，本镜必须留在该图才能保证方位无跳变；上一镜 #18 底图是 scene #172 聚落图，此处属换图硬切。锚定依据均逐字取自 #258 本版语义清单：polyline 锚 r_0cfaceb2 伏尔加河（line，7 点，几何完整）于 2.2s 点亮全线，其北端即图上伏尔加河上游河段；polygon 锚 g_a3867a06 金帐汗国（旧都萨莱周边）示意范围（region，6 点）于 0.9s 高亮——本图没有名为「草原」的语义条目，该范围恰为图幅南部的草原地带，故作「南部草原」的含义相容锚点，屏幕文字只称「南部草原」，不称其为金帐汗国；旁白未点名第聂伯河/顿河/莫斯科公国，不额外加层。文本三条按实测时间轴排（\",\"suggested_combo\":\"A\",\"layer_plan\":{\"base\":{\"kind\":\"asset\",\"asset_kind\":\"prop\",\"asset_id\":258,\"version_task_id\":null},\"must_mark\":[{\"asset_id\":258,\"semantic_id\":\"g_a3867a06\",\"name\":\"金帐汗国（旧都萨莱周边）示意范围\"},{\"asset_id\":258,\"semantic_id\":\"r_0cfaceb2\",\"name\":\"伏尔加河\"}],\"planned_layers\":[{\"type\":\"text\",\"at_s\":0.3,\"role\":\"heading\",\"fields\":{\"main\":\"哥萨克聚落的分布\",\"sub\":\"南部草原至伏尔加河上游\"}},{\"type\":\"polygon\",\"at_s\":0.9,\"anchor\":{\"asset_id\":258,\"semantic_id\":\"g_a3867a06\",\"name\":\"金帐汗国（旧都萨莱周边）示意范围\"}},{\"type\":\"polyline\",\"at_s\":2.2,\"anchor\":{\"asset_id\":258,\"semantic_id\":\"r_0cfaceb2\",\"name\":\"伏尔加河\"}},{\"type\":\"text\",\"at_s\":4.2,\"role\":\"statement\",\"fields\":{\"main\":\"聚落散布东欧平原各地\"}},{\"type\":\"text\",\"at_s\":7.1,\"role\":\"statement\",\"fields\":{\"main\":\"聚落规模有大有小\"}}],\"text_layout\":\"h-right-stack\"},\"gen_plan\":{\"reference_assets\":[]}}",
+ "audit": {
+  "storyboard_id": 948,
+  "shot_number": 19,
+  "narration_text": "从南部草原到北部伏尔加河上游，哥萨克人组成的聚落分布在东欧平原各地，规模有大有小。",
+  "combo": "A",
+  "suggested_combo": "A",
+  "status": "pending",
+  "confirmed_at": null,
+  "stale_reason": null,
+  "has_card": true,
+  "unresolved": 0,
+  "unresolved_layers": [],
+  "video_generated": true,
+  "issues": [],
+  "narration_measured_s": 8.5,
+  "tts": {
+   "valid": true,
+   "reason": null,
+   "message": null,
+   "duration_ms": 8480
+  },
+  "budget": {
+   "layer_s": 9,
+   "gen_s": null
+  }
+ }
+}

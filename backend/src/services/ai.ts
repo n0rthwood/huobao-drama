@@ -47,6 +47,33 @@ export function parseConfigTemperature(settingsRaw: string | null | undefined): 
   }
 }
 
+function parseSettingsObject(settingsRaw: string | null | undefined): Record<string, unknown> {
+  if (!settingsRaw) return {}
+  try {
+    const parsed = JSON.parse(settingsRaw)
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+/**
+ * 文本配置的专用环节（Issue #102）：settings.stages 非空时，这条配置只在自动模式下服务所列 AI 环节，
+ * 并在这些环节里优先；默认文本配置、看图配置等不带环节的选择一律看不到它。null = 通用配置。
+ */
+export function parseConfigStages(settingsRaw: string | null | undefined): string[] | null {
+  const stages = parseSettingsObject(settingsRaw).stages
+  if (!Array.isArray(stages)) return null
+  const list = stages.filter((stage): stage is string => typeof stage === 'string' && !!stage.trim()).map(stage => stage.trim())
+  return list.length ? list : null
+}
+
+/** 文本配置的思考强度（Issue #102）：原样写进请求体的 reasoning_effort，null = 不设置 */
+export function parseConfigReasoningEffort(settingsRaw: string | null | undefined): string | null {
+  const effort = parseSettingsObject(settingsRaw).reasoning_effort
+  return typeof effort === 'string' && effort.trim() ? effort.trim() : null
+}
+
 export const officialProviders: Record<ServiceType, readonly string[]> = {
   text: ['openai', 'gemini', 'volcengine'],
   image: ['openai', 'gemini', 'volcengine', 'qwen-jobs'],
@@ -130,7 +157,8 @@ export async function getActiveConfig(serviceType: ServiceType): Promise<AIConfi
   const rows = (await db.select().from(schema.aiServiceConfigs)
     .where(eq(schema.aiServiceConfigs.serviceType, serviceType))
   )
-    .filter(r => r.isActive && isOfficialProvider(serviceType, r.provider) && (serviceType !== 'text' || !r.suspendedAt))
+    // 专用环节的文本配置（#102）不当默认文本模型
+    .filter(r => r.isActive && isOfficialProvider(serviceType, r.provider) && (serviceType !== 'text' || (!r.suspendedAt && !parseConfigStages(r.settings))))
     .sort((a, b) => (b.priority || 0) - (a.priority || 0)) // 高优先级优先
 
   const active = rows[0]
@@ -218,7 +246,7 @@ export async function getActiveConfigId(serviceType: ServiceType): Promise<numbe
   const rows = (await db.select().from(schema.aiServiceConfigs)
     .where(eq(schema.aiServiceConfigs.serviceType, serviceType))
   )
-    .filter(r => r.isActive && isOfficialProvider(serviceType, r.provider))
+    .filter(r => r.isActive && isOfficialProvider(serviceType, r.provider) && (serviceType !== 'text' || !parseConfigStages(r.settings)))
     .sort((a, b) => (b.priority || 0) - (a.priority || 0))
   return rows[0]?.id ?? null
 }
