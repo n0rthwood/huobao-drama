@@ -164,17 +164,19 @@ const DRAWING = `
   // (a) 体积不随步数增长：第 20 步与第 5 步同量级
   assert.ok(sizes[20] < 60000, '作图阶段单次输入要远小于生产 run 9 的 339k，实际 ' + sizes[20])
   assert.ok(sizes[20] <= sizes[5] * 1.5, '第 20 步与第 5 步同量级：' + sizes[5] + ' → ' + sizes[20])
-  assert.ok(expanded[20] > sizes[20] * 2, '压缩确实去掉了历史重量：压缩后 ' + sizes[20] + '，同脚本未压缩口径 ' + expanded[20])
 
   // (b) 最近 3 步的工具结果原文在，更早的是占位
   const lastMessages = agentCalls.at(-1).messages
   const lastToolTexts = toolTexts(lastMessages)
   assert.ok(lastToolTexts.slice(-3).every(text => !text.startsWith(PLACEHOLDER)), '最近 3 步的工具结果原文必须保留')
   assert.ok(compactedOf(lastMessages).length >= 8, '更早的结果换成占位，实际 ' + compactedOf(lastMessages).length)
+  // 草稿修改只回报变化的图层（生产 run 11：每个结果回整份草稿 1.8 万字，窗口内累积到 24 万字）
+  assert.ok(lastToolTexts.every(text => text.length < 5000), '保留原文的工具结果都应是紧凑的变化摘要：' + lastToolTexts.map(text => text.length).join(','))
+  assert.ok(expanded[20] < 60000, '即使不压缩，草稿修改结果也不再复述整份草稿：未压缩口径 ' + expanded[20])
   assert.match(toolTexts(model.requests[2].messages).join('\\n'), /feature-p1/, '早先那一步里 add_feature_layers 的结果还是原文')
-  const addSummaries = lastToolTexts.filter(text => text.includes('feature-p1'))
-  assert.equal(addSummaries.length, 1, '只有最近一次草稿摘要还是原文，更早的已被压缩')
-  assert.ok(!addSummaries[0].startsWith(PLACEHOLDER))
+  // 早先 add_feature_layers 的结果已压缩；该图层的当前摘要只在每步重发的「当前状态」里
+  assert.equal(lastToolTexts.filter(text => text.includes('feature-p1')).length, 0, '早先加图层的原文结果已被压缩')
+  assert.ok(lastMessages.some(message => messageText(message).startsWith('当前状态') && messageText(message).includes('feature-p1')), '当前草稿图层在状态消息里')
   assert.ok(lastToolTexts.some(text => text.startsWith(PLACEHOLDER + 'add_feature_layers')), '同一位置由带工具名的占位说明')
   assert.ok(lastToolTexts.some(text => text.startsWith(PLACEHOLDER + 'read_image') && text.includes('看图结论：')), 'read_image 的结论保留在占位里')
   const readImageStub = lastToolTexts.filter(text => text.startsWith(PLACEHOLDER + 'read_image'))
@@ -209,7 +211,7 @@ const DRAWING = `
   assert.ok(stored.some(message => message.role === 'tool' && message.body.startsWith(PLACEHOLDER)), '观测表里是压缩后的占位，不是原始工具结果')
   assert.ok(stored.some(message => message.role === 'user' && message.body.startsWith('当前状态')), '状态消息也进了观测的请求记录')
   assert.ok(!stored.some(message => message.body.includes('结尾标记')), '被截掉的读图长描述不在观测的请求里')
-  assert.ok(stored.filter(message => message.body.startsWith('{"draft"')).length <= 1, '观测里只有最近一次草稿摘要还是原文')
+  assert.ok(!stored.some(message => message.body.startsWith('{"draft"')), '工具结果不再复述整份草稿')
   const observedChars = listObservedCalls(task.task_id, { scope: 'map_studio', limit: 200 }).at(-1).request_chars
   assert.ok(observedChars < sizes.at(-1) * 1.5, '观测记录的请求字数与实际发出的请求一致：' + observedChars + ' vs ' + sizes.at(-1))
   assert.match(agentCalls.at(-1).model ?? '', /mock-agent/)
