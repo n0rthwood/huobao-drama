@@ -23,10 +23,29 @@
         </div>
         <small class="lr-guide"><Info :size="13" />{{ t('layerCanvas.base.guide') }}</small>
         <div v-if="posterPickerOpen" class="lr-poster-bases">
-          <button v-for="source in baseSources" :key="source.path" type="button" class="lr-poster-base" @click="chooseExternal(source)">
-            <img :src="mediaUrl(source.path)" alt="" loading="lazy">
+          <!-- 选择型网格（Issue #106）：点方块=换底图；右上角放大按钮只看原图 -->
+          <div
+            v-for="source in baseSources"
+            :key="source.path"
+            role="button"
+            tabindex="0"
+            class="lr-poster-base"
+            @click="chooseExternal(source)"
+            @keydown.enter.self.prevent="chooseExternal(source)"
+            @keydown.space.self.prevent="chooseExternal(source)"
+          >
+            <img :src="thumbOf(mediaUrl(source.path))" alt="" loading="lazy" @error="thumbFallback($event, mediaUrl(source.path))">
             <span>{{ source.label }}</span>
-          </button>
+            <button
+              type="button"
+              class="lr-poster-zoom"
+              :aria-label="t('common.viewOriginal')"
+              :title="t('common.viewOriginal')"
+              @click.stop="emit('preview', mediaUrl(source.path), source.label)"
+            >
+              <Maximize2 :size="10" />
+            </button>
+          </div>
         </div>
         <p v-if="loadError" class="lr-error">{{ t('layerCanvas.base.loadError') }}</p>
         <p v-if="pickerError" class="lr-error">{{ t('layerCanvas.image.selectionCount') }}</p>
@@ -94,7 +113,7 @@
  */
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Image, ImagePlus, Crop, ShieldCheck, Link2, Lock, Info, Anchor, Lasso, Route, MapPin, Layers, SlidersHorizontal, LayoutTemplate } from 'lucide-vue-next'
+import { Image, ImagePlus, Crop, Maximize2, ShieldCheck, Link2, Lock, Info, Anchor, Lasso, Route, MapPin, Layers, SlidersHorizontal, LayoutTemplate } from 'lucide-vue-next'
 import AssetPicker from '~/components/AssetPicker.vue'
 import LayerList from './LayerList.vue'
 import LayerStyle from './LayerStyle.vue'
@@ -103,6 +122,7 @@ import { semanticEntries, semanticLayerPatch, anchorState } from '~/utils/semant
 import { normalizeCrop } from '~/utils/layerQuality'
 import { textFamilyOf, textLayoutById, textLayoutsFor } from '~/utils/layerText'
 import { useLayerTextNames, useLayerTextSpec } from '~/composables/useLayerTextSpec'
+import { thumbFallback, thumbOf } from '~/composables/useMedia'
 import { mediaUrl } from '~/utils/url'
 import { DEEPLINK_KEYS, querySingle, useDeeplink } from '~/composables/useQuerySync'
 import { toast } from 'vue-sonner'
@@ -125,7 +145,7 @@ const props = defineProps({
   /** 时间线的「拍」（#96）：每个关键帧可见的图层 id 集合，供文本框同拍/相邻拍检查 */
   beats: { type: Array, default: () => [] },
 })
-const emit = defineEmits(['select', 'patch', 'style', 'history', 'reorder', 'add', 'remove', 'duplicate', 'theme', 'filter', 'base', 'crop-request', 'reanchor', 'assets-changed', 'text-layout'])
+const emit = defineEmits(['select', 'patch', 'style', 'history', 'reorder', 'add', 'remove', 'duplicate', 'theme', 'filter', 'base', 'crop-request', 'reanchor', 'assets-changed', 'text-layout', 'preview'])
 const { t } = useI18n()
 const GROUPS = ['points', 'regions', 'lines', 'labels']
 const candidates = ref([])
@@ -310,8 +330,15 @@ defineExpose({ refreshSemantics })
 .lr-layout { padding: 0 10px 10px; display: flex; flex-direction: column; gap: 6px; }
 .lr-layout select { font-size: 12px; }
 .lr-poster-bases { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; }
-.lr-poster-base { display: flex; flex-direction: column; gap: 3px; padding: 4px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-card); color: var(--text-2); font-size: 10px; cursor: pointer; }
+.lr-poster-base { position: relative; display: flex; flex-direction: column; gap: 3px; padding: 4px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-card); color: var(--text-2); font-size: 10px; cursor: pointer; }
 .lr-poster-base img { width: 100%; height: 56px; object-fit: cover; border-radius: 4px; }
 .lr-poster-base span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 看原图（Issue #106）：只在选择方块里开大图，不换底图 */
+.lr-poster-zoom {
+  position: absolute; top: 3px; right: 3px; display: inline-flex; align-items: center;
+  padding: 1px; border: 1px solid var(--border-strong); border-radius: 999px;
+  background: var(--surface-card); color: var(--text-1); cursor: zoom-in;
+}
+.lr-poster-zoom:hover { color: var(--accent-text); border-color: var(--accent-text); }
 .layer-rail :deep(.layer-list), .layer-rail :deep(.layer-style) { border: 0; }
 </style>

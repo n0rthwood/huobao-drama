@@ -176,6 +176,7 @@ const componentAliases = {
   '~/utils/layerText': new URL('utils/layerText.js', app).href,
   '~/composables/useLayerTextSpec': textSpecComposable,
   '~/composables/useMissingGlyphs': glyphModule,
+  '~/composables/useMedia': moduleUrl('composables/useMedia.ts'),
   '~/composables/useQuerySync': deeplinkRuntimeModule,
   '~/components/AssetPicker.vue': pickerPanel,
   './LayerList.vue': emptyPanel,

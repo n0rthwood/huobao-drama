@@ -8,7 +8,7 @@
       <div class="res-cards">
         <figure v-for="card in cards" :key="card.key" class="res-card">
           <button type="button" class="res-thumb" @click="emit('preview', card.view)">
-            <img :src="card.url" :alt="card.label" loading="lazy" />
+            <img :src="thumbOf(card.url)" :alt="card.label" loading="lazy" @error="thumbFallback($event, card.url)" />
           </button>
           <figcaption class="res-caption">
             <strong>{{ card.label }}</strong>
@@ -27,7 +27,7 @@
       <div class="res-compare">
         <figure v-for="card in [beforeCard, finalCard]" :key="`cmp-${card.key}`" class="res-card res-card--wide">
           <button type="button" class="res-thumb" @click="emit('preview', card.view)">
-            <img :src="card.url" :alt="card.label" loading="lazy" />
+            <img :src="thumbOf(card.url)" :alt="card.label" loading="lazy" @error="thumbFallback($event, card.url)" />
           </button>
           <figcaption class="res-caption"><strong>{{ card.label }}</strong></figcaption>
         </figure>
@@ -115,6 +115,7 @@ import type { MapResearch, MapStudioOutputs } from '~/map-studio/api'
 import { mapPreviewImage, type MapPreviewView } from '~/map-studio/utils/mapPreview'
 import { registrationSummary, type MapRegistration } from '~/map-studio/utils/mapRegistration'
 import { mediaUrl } from '~/utils/url'
+import { thumbFallback, thumbOf } from '~/composables/useMedia'
 
 const { t } = useI18n()
 

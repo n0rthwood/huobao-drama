@@ -234,6 +234,7 @@
     "add": "新增",
     "copy": "复制",
     "download": "下载",
+    "viewOriginal": "查看原图",
     "default": "默认",
     "more": "更多",
     "loading": "加载中…",
@@ -930,7 +931,7 @@
   "episode": {
     "final": {
       "layer": "图层段", "generated": "生成段", "composite": "成品",
-      "budget": "预算 {seconds}s", "measured": "配音实测 {seconds}s",
+      "budget": "预算 {seconds}s", "measured": "配音实测 {seconds}s", "duration": "时长 {seconds}s",
       "noCombo": "设计卡未确认，请先选择段组合",
       "fresh": "最新", "stale": "未渲染或已过期", "failed": "失败", "rendering": "渲染中", "render": "重新渲染",
       "inherited": "锁定继承 {'@'}{seconds}s · 不出图",

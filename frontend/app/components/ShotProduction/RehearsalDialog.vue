@@ -25,7 +25,7 @@
               <span class="rh-cell-label">{{ cell.label }}</span>
               <span class="rh-cell-time mono">{{ cell.seconds.toFixed(1) }}s</span>
             </div>
-            <img v-if="cell.src" class="rh-cell-img" :src="cell.src" alt="">
+            <img v-if="cell.src" class="rh-cell-img" :src="thumbOf(cell.src)" loading="lazy" @error="thumbFallback($event, cell.src)" alt="">
           </div>
         </div>
 
@@ -53,6 +53,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { layerSegmentAPI } from '~/composables/useApi'
+import { thumbFallback, thumbOf } from '~/composables/useMedia'
 import { mediaUrl } from '~/utils/url'
 
 const props = defineProps({

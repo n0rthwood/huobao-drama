@@ -204,7 +204,7 @@ function updateShot(sb) {
             />
             {{ t('episode.export.posterSeconds') }}
           </label>
-          <img v-if="exportPosterEnabled && posterPreviewUrl" :src="posterPreviewUrl" alt="" class="export-poster-preview" />
+          <img v-if="exportPosterEnabled && posterPreviewUrl" :src="posterPreviewUrl" alt="" loading="lazy" class="export-poster-preview" />
         </div>
         <div v-else class="export-merge-empty">{{ t('episode.export.posterNone') }}</div>
         <button v-if="documentary && !posterFinal" class="btn btn-sm" @click="ctx.prodTab.value = 'poster'; panel = 'production'">{{ t('episode.final.posterMissing') }} ↗</button>

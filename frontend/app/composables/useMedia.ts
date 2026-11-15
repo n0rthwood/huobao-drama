@@ -7,9 +7,14 @@
  * 存量文件可用 `npm run backfill-artwork`（backend）补齐。
  */
 
-/** 图片地址 → 缩略图地址；非 /static 图片（远程 URL 等）原样返回 */
+/**
+ * 图片地址 → 缩略图地址；非 /static 图片（远程 URL 等）原样返回。
+ * 已经是缩略图的地址原样返回：列表数据可能来自另一层已做缩略的字段（如提及候选的 image），
+ * 再映射一次会得到 `x_thumb_thumb.webp` 的 404。
+ */
 export function thumbOf(url: string): string {
   if (!url || !url.includes('/static/')) return url
+  if (/-thumb\.webp$|_thumb\.webp$/i.test(url)) return url
   if (!/\.(png|jpe?g|webp|gif)$/i.test(url)) return url
   return url.replace(/\.[^./]+$/, '_thumb.webp')
 }

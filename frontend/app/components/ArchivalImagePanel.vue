@@ -66,8 +66,10 @@
       <li v-for="item in items" :key="item.path" class="arch-item">
         <img
           class="arch-thumb"
-          :src="mediaUrl(item.path)"
+          :src="thumbOf(mediaUrl(item.path))"
           :alt="item.file_title || ''"
+          loading="lazy"
+          @error="thumbFallback($event, mediaUrl(item.path))"
           @click.stop="emit('preview', mediaUrl(item.path), item.file_title || '')"
         />
         <div class="arch-meta">

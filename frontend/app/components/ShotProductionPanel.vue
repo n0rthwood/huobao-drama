@@ -88,6 +88,7 @@
             :state="state"
             @changed="onLayerChanged"
             @goto-design="emit('goto-design')"
+            @preview="(src, title) => emit('preview', src, title)"
           />
           <GeneratedSegmentEditor
             v-else

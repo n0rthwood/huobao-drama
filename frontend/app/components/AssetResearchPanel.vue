@@ -26,7 +26,7 @@
         <div class="rsp-grid">
           <article v-for="c in group.items" :key="c.sha256" class="rsp-card">
             <button type="button" class="rsp-thumb" @click="emit('preview', mediaUrl(c.local_path), c.title)">
-              <img :src="mediaUrl(c.local_path)" :alt="c.title" loading="lazy" />
+              <img :src="thumbOf(mediaUrl(c.local_path))" :alt="c.title" loading="lazy" @error="thumbFallback($event, mediaUrl(c.local_path))" />
             </button>
             <div class="rsp-body">
               <a v-if="c.url" :href="c.url" target="_blank" rel="noreferrer" class="rsp-title">{{ c.title }}</a>

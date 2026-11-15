@@ -234,6 +234,7 @@
     "add": "追加",
     "copy": "コピー",
     "download": "ダウンロード",
+    "viewOriginal": "原図を見る",
     "default": "デフォルト",
     "more": "その他",
     "loading": "読み込み中…",
@@ -930,7 +931,7 @@
   "episode": {
     "final": {
       "layer": "レイヤー区間", "generated": "生成区間", "composite": "完成映像",
-      "budget": "予算 {seconds}s", "measured": "音声実測 {seconds}s",
+      "budget": "予算 {seconds}s", "measured": "音声実測 {seconds}s", "duration": "尺 {seconds}s",
       "noCombo": "設計カードを確認し、区間の組合せを選択してください",
       "fresh": "最新", "stale": "未レンダーまたは古い", "failed": "失敗", "rendering": "レンダー中", "render": "再レンダー",
       "inherited": "継承ロック {seconds}s · 生成不要",
