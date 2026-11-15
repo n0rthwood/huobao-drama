@@ -1,0 +1,73 @@
+{
+ "dramas": [
+  {
+   "id": 20,
+   "title": "中俄百年变局 纪录片测试 1113",
+   "status_override": null,
+   "status_derived": "completed",
+   "status_derived_at": "2026-11-15T08:54:19.969Z"
+  },
+  {
+   "id": 22,
+   "title": "八达岭长城测试 1115",
+   "status_override": null,
+   "status_derived": "active",
+   "status_derived_at": "2026-11-15T08:57:42.614Z"
+  }
+ ],
+ "episodes": [
+  {
+   "id": 27,
+   "drama_id": 20,
+   "status_override": null,
+   "status_derived": "completed",
+   "script_confirmed_at": "2026-11-13T05:04:58.007Z",
+   "asset_review_status": "passed"
+  },
+  {
+   "id": 29,
+   "drama_id": 22,
+   "status_override": null,
+   "status_derived": "active",
+   "script_confirmed_at": "2026-11-15T08:58:43.838Z",
+   "asset_review_status": "passed"
+  }
+ ],
+ "tasks": [
+  {
+   "id": 3447,
+   "type": "text",
+   "status": "completed",
+   "kind": "script_rewrite"
+  },
+  {
+   "id": 3448,
+   "type": "text",
+   "status": "completed",
+   "kind": "extract_characters"
+  },
+  {
+   "id": 3449,
+   "type": "text",
+   "status": "completed",
+   "kind": "extract_scenes"
+  },
+  {
+   "id": 3450,
+   "type": "text",
+   "status": "completed",
+   "kind": "extract_props"
+  },
+  {
+   "id": 3451,
+   "type": "text",
+   "status": "completed",
+   "kind": "asset_review"
+  }
+ ],
+ "merge39": {
+  "id": 39,
+  "status": "completed",
+  "intro_image": "static/overlays/7424d78c-1f80-4538-8acd-fe7ddb694c2c.png"
+ }
+}

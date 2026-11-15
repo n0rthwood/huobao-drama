@@ -542,9 +542,14 @@ def derive(prj: Project, write: bool = True) -> dict:
     sbd = prj.get(f"/episodes/{e}/storyboards")
     shots = sbd if isinstance(sbd, list) else sbd["items"]
     ids = [s["id"] for s in shots]
-    kprev = prj.preview(f"/episodes/{e}/keyframe-batch/preview", {"storyboard_ids": ids, "config_id": m["image"]["config_id"], "model": m["image"]["model"]})
-    vprev = prj.preview(f"/episodes/{e}/video-batch/preview", {"storyboard_ids": ids, "config_id": m["video"]["config_id"], "model": m["video"]["model"]})
-    cprev = prj.preview(f"/episodes/{e}/compose-batch/preview", {"storyboard_ids": ids})
+    # 拆镜之前（原始内容 / 改写 / 资产阶段）没有分镜：逐镜预览接口对空集合 400，
+    # 这时不调用预览，只靠 roadmap 判断步骤——前期步骤同样必须能 check / call（#105）
+    if ids:
+        kprev = prj.preview(f"/episodes/{e}/keyframe-batch/preview", {"storyboard_ids": ids, "config_id": m["image"]["config_id"], "model": m["image"]["model"]})
+        vprev = prj.preview(f"/episodes/{e}/video-batch/preview", {"storyboard_ids": ids, "config_id": m["video"]["config_id"], "model": m["video"]["model"]})
+        cprev = prj.preview(f"/episodes/{e}/compose-batch/preview", {"storyboard_ids": ids})
+    else:
+        kprev, vprev, cprev = {}, {}, {}
     vbatch = prj.get(f"/episodes/{e}/video-batch") or {}
     kbatch = prj.get(f"/episodes/{e}/keyframe-batch") or {}
     cstatus = prj.get(f"/episodes/{e}/compose-batch-status") or {}
