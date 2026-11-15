@@ -30,7 +30,6 @@ const {
   episode,
   exportBlockedSelected,
   exportComposeReadyIds,
-  exportDone,
   exportMerges,
   exportPosterDuration,
   exportPosterEnabled,
@@ -58,7 +57,6 @@ const {
   sbs,
   selectExportReadyOnly,
   shotVidCount,
-  toggleExportDone,
   toggleExportSelect,
   toggleSelectAllExport,
 } = ctx
@@ -116,15 +114,7 @@ function updateShot(sb) {
         <div class="export-section-head">
           <span class="export-section-title">{{ t('episode.export.filmList') }}</span>
           <span class="dim" style="font-size:11px">{{ t('episode.export.countN', { n: exportMerges.length }) }}</span>
-          <button
-            :class="['btn btn-sm ml-auto export-done-btn', { on: exportDone }]"
-            :title="t('episode.export.markDoneTitle')"
-            @click="toggleExportDone"
-          >
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-            {{ exportDone ? t('episode.export.markedDone') : t('episode.export.markDone') }}
-          </button>
-          <button class="btn btn-sm" @click="loadExportMerges">
+          <button class="btn btn-sm ml-auto" @click="loadExportMerges">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
             {{ t('common.refresh') }}
           </button>
@@ -612,13 +602,6 @@ button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
 .merge-card-meta .btn { margin-left: auto; }
 .merge-card-meta .btn + .btn { margin-left: 0; }
 .exp-check.on { background: var(--accent); border-color: var(--accent); }
-/* 导出完成手动标记按钮 */
-.export-done-btn.on {
-  background: var(--success-bg, var(--accent-bg));
-  color: var(--success, var(--accent-text));
-  border-color: transparent;
-  font-weight: 600;
-}
 /* Shared */
 .dim { color: var(--text-3); }
 </style>

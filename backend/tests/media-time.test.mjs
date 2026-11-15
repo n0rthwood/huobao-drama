@@ -104,5 +104,4 @@ test('成片删除：软删 + 删文件 + 回退 video_url + 进行中拒绝 + �
   assert.match(route, /row\.status === 'completed' && row\.mergedUrl/)
   // 所有读取点都过滤软删
   assert.match(route, /app\.get\('\/episodes\/:id\/merge'[\s\S]*?isNull\(schema\.videoMerges\.deletedAt\)/)
-  assert.match(read('src/routes/episodes.ts'), /videoMerges[\s\S]{0,200}isNull\(schema\.videoMerges\.deletedAt\)/)
 })

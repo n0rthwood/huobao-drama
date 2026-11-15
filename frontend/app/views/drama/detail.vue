@@ -110,7 +110,7 @@
               <AppMenuItem
                 v-for="s in epStatusOptions"
                 :key="s.value"
-                :selected="epStatus(ep) === s.value"
+                :selected="selectedEpStatusOption(ep) === s.value"
                 @click="setEpisodeStatus(ep, s.value)"
               >{{ s.label }}</AppMenuItem>
             </AppMenu>
@@ -786,16 +786,25 @@ async function setEpisodeResolution(ep, resolution) {
   }
 }
 
-// 集状态由用户手动标记（持久化到 episodes.status），不再按剧本内容自动推算
+// 集状态默认由 roadmap 推算（status_derived 快照），人工只在需要时覆盖（status_override）。
+// 返回的 `episodes[].status` 是有效值；下拉里的「自动（按进度）」= 清除人工覆盖。
 const epStatusOptions = computed(() => ([
   { label: t('index.status.draft'), value: 'draft' },
   { label: t('index.status.active'), value: 'active' },
   { label: t('index.status.completed'), value: 'completed' },
+  { label: t('index.status.autoOption'), value: 'auto' },
 ]))
 const epStatusMenuId = ref(null)
 
-function epStatus(ep) { return ep.status || 'draft' }
-function epStatusLabel(ep) { return epStatusOptions.value.find(s => s.value === epStatus(ep))?.label || t('index.status.draft') }
+function epStatus(ep) { return ep.status || ep.status_derived || 'draft' }
+/** 下拉当前项：没有人工覆盖时就是「自动」 */
+function selectedEpStatusOption(ep) { return ep.status_override ? epStatus(ep) : 'auto' }
+/** 徽标文案：有效状态 + 来源（自动 / 人工） */
+function epStatusLabel(ep) {
+  const value = epStatus(ep)
+  const label = epStatusOptions.value.find(s => s.value === value)?.label || t('index.status.draft')
+  return `${label} · ${ep.status_override ? t('index.status.manual') : t('index.status.auto')}`
+}
 function epStatusDotClass(ep) { return epStatus(ep) === 'active' ? 'dot-active' : epStatus(ep) === 'completed' ? 'dot-done' : 'dot-pending' }
 
 function formatEpTime(ts) {
@@ -811,13 +820,24 @@ function formatEpTime(ts) {
 
 async function setEpisodeStatus(ep, status) {
   epStatusMenuId.value = null
-  if (epStatus(ep) === status) return
-  const prev = ep.status
-  ep.status = status
+  if (selectedEpStatusOption(ep) === status) return
+  // 'auto' = 清除人工覆盖（服务端接受 null / 'auto'）
+  const sent = status === 'auto' ? null : status
+  const prev = { status: ep.status, status_derived: ep.status_derived, status_override: ep.status_override }
+  ep.status = sent || ep.status_derived || 'draft'
+  ep.status_override = sent
   try {
-    await episodeAPI.update(ep.id, { status })
+    await episodeAPI.update(ep.id, { status: sent })
+    // PUT 只写覆盖：有效值要重新读一次（GET /dramas/:id 带 episodes[] 的有效状态）
+    const fresh = await dramaAPI.get(dramaId)
+    const freshEp = (fresh?.episodes || []).find(item => Number(item.id) === Number(ep.id))
+    if (freshEp) {
+      ep.status = freshEp.status || ep.status_derived || 'draft'
+      ep.status_derived = freshEp.status_derived ?? ep.status_derived
+      ep.status_override = freshEp.status_override ?? sent
+    }
   } catch (e) {
-    ep.status = prev
+    Object.assign(ep, prev)
     toastError(e)
   }
 }

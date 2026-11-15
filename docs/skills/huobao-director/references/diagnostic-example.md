@@ -23,7 +23,7 @@
 - **历史测试写入，仅保留审计，不是首轮导入模板**：当轮曾 `PUT /episodes/14 {content, script_content, narration_enabled:true, audio_mix_mode:"replace", subtitle_timing:"sentence"}`。这条记录不能复制为现行操作步骤，也不能证明 AI 改写已获授权或由火宝执行；普通任务按 S1 分开导入原文、获准后调用火宝改写。
 - `GET /dramas/8`：读回项目/集/资产，核对 ID 与显示集数。
 - **人**确认剧本 → 人授权后 `POST /episodes/14/script/confirm`（Agent 只准备差异与事实报告）。
-- `GET /episodes/14/gates`：确认剧本闸门已开。
+- `GET /episodes/14/roadmap`：读 `current.step/substep` 与各步 `status`；脚本步 `done`（`rewrite.confirm` 完成）、`assets` 已解锁才继续下一阶段（当时那个阶段门禁只读接口已随 #105 删除，现行口径见 `api-catalog.md` §2 / `SKILL.md` §00.1）。
 - 为什么：没有剧本确认，后续所有阶段都不该开工。
 
 ### 步骤 2：资产提取与审核

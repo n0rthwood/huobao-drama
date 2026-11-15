@@ -21,7 +21,10 @@ import AssetReviewBatchDialog from './AssetReviewBatchDialog.vue'
 
 const props = defineProps({
   episodeId: { type: Number, default: 0 },
-  /** `GET /episodes/:id/gates` 的 assets 分项：{ review_status, stale_reasons, missing } */
+  /**
+   * roadmap 的 `assets.review` 子步骤等价事实（#105）：{ review_status, stale_reasons, missing }。
+   * stale_reasons 来自该节点的 notices（非阻断提醒），missing 是计数差额；面板自己轮询真实清单。
+   */
   review: { type: Object, default: () => ({ review_status: 'none', stale_reasons: [], missing: 0 }) },
 })
 

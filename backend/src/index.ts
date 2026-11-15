@@ -66,6 +66,7 @@ import { migrateClipsToLayerSegments } from './services/layer-segment-migration.
 import { backfillPoolProjection } from './services/storyboard-assets.js'
 import { logLayerFontStatus } from './services/layer-fonts.js'
 import { backfillScriptConfirmation, GateBlockedError } from './services/workflow-gates.js'
+import { requestRoadmapRefresh } from './services/workflow-roadmap.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -162,6 +163,8 @@ api.route('/layer-docs', layerDocs)
 api.route('/layer-segments', layerSegments)
 api.route('/asset-pipeline', assetPipeline)
 api.route('/asset-review', assetReviewItems)
+// API 未命中必须保持 404，不能落到 SPA 的 index.html（包括已下线的接口）。
+api.all('*', (c) => c.json({ code: 404, message: '接口不存在' }, 404))
 
 app.route('/api/v1', api)
 
@@ -231,6 +234,8 @@ db.update(schema.sysTask)
   .then(() => backfillPoolProjection())
   // 存量纪录片集补剧本确认（Issue #54）：升级前已拆出分镜的集视为已确认，否则新门禁会把它们锁死，幂等
   .then(() => backfillScriptConfirmation())
+  // 派生状态快照（#105）：启动刷新与列表刷新共用单飞/60 秒节流，不阻塞服务启动。
+  .then(() => requestRoadmapRefresh())
   // 清理完成后再恢复批量任务：被重启打断的那一张/那一镜此时已是 failed，由批次重新提交
   .then(() => startQwenJobsTracker())
   .then(() => startH3JobsTracker())

@@ -511,7 +511,10 @@
       "all": "全部",
       "draft": "待开始",
       "active": "进行中",
-      "completed": "已完成"
+      "completed": "已完成",
+      "auto": "自动",
+      "manual": "人工",
+      "autoOption": "自动（按进度）"
     },
     "createDialog": {
       "title": "新建项目",
@@ -1076,17 +1079,19 @@
       "viewFilm": "查看成片",
       "continue": "继续制作",
       "start": "开始制作",
-      "resolution": "分辨率"
+      "resolution": "分辨率",
+      "milestones": "{done}/{total}",
+      "milestonesTitle": "里程碑完成数（旁白稿 / 制作 / 导出）"
     },
     "model": {
       "defaultWith": "默认 · {model}",
       "notConfigured": "未配置"
     },
     "sidebar": {
-      "inProgress": "进行中",
       "refreshData": "刷新数据",
       "collapse": "收起侧栏",
-      "expand": "展开侧栏"
+      "expand": "展开侧栏",
+      "progressDone": "已完成 {done} / {total}"
     },
     "nav": {
       "prev": "上一步",
@@ -1099,7 +1104,8 @@
       "production": "制作",
       "assets": "资产",
       "assetsDesc": "角色 / 场景 / 道具",
-      "posterDesc": "可选：海报底图与文字排版",
+      "posterDesc": "海报底图与文字排版",
+      "posterRequiredBeforeExport": "导出前必做",
       "keyframes": "分镜关键帧",
       "keyframesDesc": "首/中/尾关键帧与人工确认",
       "videos": "视频制作",
@@ -1111,7 +1117,6 @@
       "prodStage": "制作阶段 · {step}",
       "exportDone": "导出阶段 · 已完成",
       "exportWaiting": "导出阶段 · 等待拼接",
-      "workbench": "工作台",
       "narrationScript": "旁白稿",
       "narrationScriptDesc": "纪录片解说词整理（剧本正文即旁白）",
       "evidenceAssetsDesc": "角色 / 场景 / 证据素材",
@@ -1187,6 +1192,7 @@
         "skipStage": "跳过「{name}」（复制前驱）",
         "retryStage": "重试本阶段",
         "final": "最终稿",
+        "confirm": "确认旁白稿",
         "finalState": {
           "pending": "待更新",
           "adopted": "已采用阶段结果",
@@ -2580,11 +2586,6 @@
       "mergeFailed": "拼接失败",
       "previewShot": "播放该镜头",
       "shotPreview": "镜头 #{n} 预览",
-      "markDone": "标记完成",
-      "markedDone": "已完成",
-      "markDoneTitle": "手动标记本集导出完成（可再次点击取消）",
-      "markedDoneToast": "已标记为完成",
-      "unmarkDoneToast": "已取消完成标记",
       "deleteMerge": "删除该成片",
       "deleteMergeBusy": "拼接进行中，无法删除",
       "deleteMergeTitle": "删除成片",
@@ -2944,15 +2945,17 @@
     },
     "gate": {
       "locked": "未解锁",
-      "checking": "正在校验步骤门禁…",
-      "lockedTooltip": "{reason}",
-      "goFix": "去解决",
-      "needScript": "旁白稿尚未确认",
-      "needAssetReview": "资产审核清单尚未通过",
-      "needDesign": "还没有已确认的分镜设计",
-      "needProduction": "还没有制作就绪的分镜",
-      "needFinal": "还没有最新的成品",
-      "optional": "可选 · 不入链"
+      "checking": "正在校验步骤状态…",
+      "goFix": "去解决"
+    },
+    "stepStatus": {
+      "checking": "校验中",
+      "done": "已完成",
+      "in_progress": "进行中",
+      "available": "待开始",
+      "locked": "锁定",
+      "stale": "需复核",
+      "skipped": "已跳过"
     },
     "assetReview": {
       "batch": {

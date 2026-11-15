@@ -53,8 +53,8 @@ test('确认 / 取消确认：空稿不能确认，确认写时间戳', () => {
     console.log('@@' + JSON.stringify({
       emptyStatus: emptyRes.status,
       okStatus: okRes.status,
-      confirmedFlag: okBody.data.script.confirmed,
-      assetsUnlocked: okBody.data.unlocked.assets,
+      confirmedFlag: okBody.data.steps.find(s => s.key === 'rewrite').substeps.find(s => s.key === 'rewrite.confirm').status === 'done',
+      assetsUnlocked: okBody.data.steps.find(s => s.key === 'assets').unlocked,
       storedAt: !!afterConfirm.scriptConfirmedAt,
       clearedAt: afterUnconfirm.scriptConfirmedAt,
     }))

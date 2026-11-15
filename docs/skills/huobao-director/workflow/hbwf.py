@@ -3,6 +3,9 @@
 
 Every business write for an episode goes through `hbwf call`. State is re-derived from
 Huobao GET/preview endpoints on every guarded call; nothing is tracked from chat memory.
+Step state comes from `GET /episodes/{e}/roadmap` (Issue #105): documentary projects are
+strictly ordered (a write is refused while an earlier strict step is not done/skipped),
+drama projects read the roadmap for information only.
 
 Project layout (production project directory, never inside a repo):
   workflow/workflow.json    static config (ids, profile, fixed models, poster policy)
@@ -44,6 +47,82 @@ SCOPED_KINDS = ("rework", "structural_change", "exception", "reconcile", "poster
 ALL_KINDS = APPROVAL_KINDS + SCOPED_KINDS
 SEGMENT_RE = re.compile(r"(\d+(?:\.\d+)?)\s*[-—–~～至到]\s*(\d+(?:\.\d+)?)\s*(?:秒|s\b|s[:：])")
 BODY_INLINE_LIMIT = 2000
+DONE_STATUSES = ("done", "skipped")
+# Roadmap (Issue #105): GET /episodes/{e}/roadmap is the only step-state source.
+DOC_STEPS = ("raw", "rewrite", "assets", "poster", "design", "production", "final", "export")
+DRAMA_STEP_OF = {"raw": "script", "rewrite": "script", "assets": "assets", "poster": "poster",
+                 "design": "keyframes", "production": "keyframes", "final": "videos", "export": "export"}
+HUMAN_CONFIRM_SUBSTEPS = (("design.skeleton", "await_skeleton_confirm"), ("design.cards", "await_design_card_confirm"))
+# Per-shot actions that only run after the design card gate; a pending card confirmation replaces them.
+DESIGN_GATED_ACTIONS = {"write_keyframe_prompts", "generate_keyframes", "wait_keyframes", "review_keyframes",
+                        "confirm_keyframes", "write_video_prompt", "review_video_prompt", "generate_video",
+                        "wait_video", "review_video", "compose", "review_compose", "done"}
+EPISODE_VOICE_KEYS = {"narration_enabled", "tts_config_id", "subtitle_timing", "audio_mix_mode", "audio_bed_gain_db",
+                      "narration_fit_default", "narration_spine", "narration_normalize"}
+# Explicit write endpoint -> roadmap step table (documentary keys; drama is translated, see DRAMA_STEP_OF).
+# Order matters: most specific pattern first. `PUT /episodes/{id}` and `PUT /storyboards/{id}` are body-refined
+# in write_step_of(). Writes not in this table stay unmanaged (they still need a single-use `exception`).
+WRITE_STEPS = (
+    ("POST", r"/episodes/\d+/script/(?:confirm|unconfirm)", "rewrite", "rewrite.confirm"),
+    ("PUT", r"/episodes/\d+/script-rewrite/final", "rewrite", "rewrite.final"),
+    ("POST", r"/episodes/\d+/script-rewrite(?:/.*)?", "rewrite", None),
+    ("POST", r"/agent/script_rewriter/chat", "rewrite", None),
+    ("PUT", r"/episodes/\d+/narration-skeleton", "design", "design.skeleton"),
+    ("POST", r"/episodes/\d+/narration-skeleton/.+", "design", "design.skeleton"),
+    ("POST", r"/episodes/\d+/storyboards/fill-gaps", "design", "design.skeleton"),
+    ("PUT", r"/episodes/\d+/storyboards/order", "design", "design.skeleton"),
+    ("POST", r"/agent/storyboard_breaker/chat", "design", "design.skeleton"),
+    ("POST", r"/storyboards/\d+/design-card/.+", "design", "design.cards"),
+    ("PUT", r"/storyboards/\d+/design-card", "design", "design.cards"),
+    ("POST", r"/storyboards/\d+/combo", "design", "design.cards"),
+    ("POST", r"/episodes/\d+/design-cards/fill", "design", "design.cards"),
+    ("PUT", r"/storyboards/\d+/narration-fit", "design", "design.voice"),
+    ("DELETE", r"/storyboards/\d+/narration-fit", "design", "design.voice"),
+    ("POST", r"/storyboards/\d+/narration/(?:subtitle|voice|write)", "design", "design.voice"),
+    ("POST", r"/episodes/\d+/generate-narration", "design", "design.voice"),
+    ("POST", r"/episodes/\d+/narration/voice-batch(?:/retry-failed)?", "design", "design.voice"),
+    ("POST", r"/episodes/\d+/extract", "assets", "assets.extract"),
+    ("POST", r"/episodes/\d+/asset-review/run", "assets", "assets.review"),
+    ("PUT", r"/asset-review/items/\d+", "assets", "assets.review"),
+    ("POST", r"/asset-pipeline/.+", "assets", None),
+    ("POST", r"/dramas/\d+/assets/.+", "assets", None),
+    ("POST", r"/episodes/\d+/assets/.+", "assets", None),
+    ("DELETE", r"/episodes/\d+/assets/link", "assets", None),
+    ("POST", r"/props(?:/.+)?", "assets", None),
+    ("PUT", r"/props/\d+(?:/.+)?", "assets", None),
+    ("DELETE", r"/props/\d+", "assets", None),
+    ("POST", r"/scenes(?:/.+)?", "assets", None),
+    ("PUT", r"/scenes/\d+(?:/.+)?", "assets", None),
+    ("DELETE", r"/scenes/\d+", "assets", None),
+    ("POST", r"/characters(?:/.+)?", "assets", None),
+    ("PUT", r"/characters/\d+(?:/.+)?", "assets", None),
+    ("DELETE", r"/characters/\d+", "assets", None),
+    ("POST", r"/map-studio/.+", "assets", None),
+    ("PUT", r"/map-studio/.+", "assets", None),
+    ("PUT", r"/episodes/\d+/poster/select", "poster", None),
+    ("POST", r"/episodes/\d+/poster(?:/.+)?", "poster", None),
+    ("PUT", r"/episodes/\d+/poster", "poster", None),
+    ("POST", r"/layer-segments/storyboards/\d+/draft", "production", "production.layer"),
+    ("POST", r"/layer-segments/storyboards/\d+/render", "production", "production.layer"),
+    ("POST", r"/layer-segments/storyboards/\d+/base-check(?:/override)?", "production", "production.layer"),
+    ("PUT", r"/layer-segments/storyboards/\d+", "production", "production.layer"),
+    ("DELETE", r"/layer-segments/storyboards/\d+", "production", "production.layer"),
+    ("POST", r"/episodes/\d+/generate-keyframe-prompts", "production", "production.keyframes"),
+    ("POST", r"/episodes/\d+/keyframe-batch(?:/(?:retry-failed|cancel))?", "production", "production.keyframes"),
+    ("POST", r"/storyboards/\d+/keyframes/\w+/generate", "production", "production.keyframes"),
+    ("PUT", r"/storyboards/\d+/keyframes/\w+", "production", "production.keyframes"),
+    ("POST", r"/storyboards/\d+/confirm-keyframes", "production", "production.keyframes"),
+    ("POST", r"/agent/prompt_generator/chat", "production", None),
+    ("POST", r"/episodes/\d+/generate-video-prompts", "production", None),
+    ("POST", r"/episodes/\d+/video-batch(?:/(?:retry-failed|cancel))?", "final", None),
+    ("POST", r"/storyboards/\d+/generate-video", "final", None),
+    ("POST", r"/episodes/\d+/compose-batch(?:/retry-failed)?", "final", None),
+    ("POST", r"/storyboards/\d+/compose", "final", None),
+    ("POST", r"/merge/episodes/\d+/merge", "export", None),
+    ("DELETE", r"/merge/episodes/\d+/merges/\d+", "export", None),
+    ("POST", r"/storyboards", "design", "design.skeleton"),
+    ("DELETE", r"/storyboards/\d+", "design", "design.skeleton"),
+)
 
 
 class GuardError(Exception):
@@ -148,6 +227,13 @@ class Project:
         if status != 200 or "json" not in ctype:
             raise SystemExit(f"hbwf: GET {path} -> {status} {ctype}: {str(obj)[:300]} (derivation aborted; nothing written)")
         return obj.get("data")
+
+    def get_optional(self, path: str) -> tuple[object | None, str | None]:
+        """GET that degrades to (None, error) instead of aborting derivation."""
+        status, ctype, obj = self.request("GET", path)
+        if status == 200 and "json" in ctype:
+            return obj.get("data"), None
+        return None, f"GET {path} -> {status} {ctype}: {str(obj)[:200]}"
 
     def preview(self, path: str, body: dict):
         status, ctype, obj = self.request("POST", path, body)
@@ -301,6 +387,137 @@ def poster_waiver_refusal(project_type: str | None) -> str | None:
     return None
 
 
+# ---------------------------------------------------------------- roadmap ---
+
+def walk_roadmap(roadmap: dict | None):
+    for n in (roadmap or {}).get("steps") or []:
+        yield n
+        yield from n.get("substeps") or []
+
+
+def roadmap_node(roadmap: dict | None, key: str) -> dict | None:
+    return next((n for n in walk_roadmap(roadmap) if n.get("key") == key), None)
+
+
+def roadmap_statuses(roadmap: dict | None) -> dict:
+    return {n["key"]: n.get("status") for n in walk_roadmap(roadmap)}
+
+
+def roadmap_snapshot(roadmap: dict | None) -> dict:
+    if not roadmap:
+        return {"available": False}
+    return {"available": True, "current": roadmap.get("current"), "statuses": roadmap_statuses(roadmap),
+            "milestones": {m.get("key"): m.get("status") for m in roadmap.get("milestones") or []}}
+
+
+def roadmap_step_key(roadmap: dict | None, step: str) -> str:
+    """Documentary step keys are the workflow's own; drama roadmap has different keys (informational)."""
+    if roadmap and roadmap.get("project_type") != "documentary":
+        return DRAMA_STEP_OF.get(step, step)
+    return step
+
+
+def _earliest_step(cands: list[tuple[str, str | None]]) -> tuple[str, str | None] | None:
+    return min(cands, key=lambda c: DOC_STEPS.index(c[0])) if cands else None
+
+
+def write_step_of(method: str, path: str, body: dict) -> tuple[str, str | None] | None:
+    """Roadmap step (documentary key) that owns this write endpoint, or None when unmapped."""
+    keys = set(body or {})
+    if method == "PUT" and re.fullmatch(r"/episodes/\d+", path):
+        cands = []
+        if "content" in keys:
+            cands.append(("raw", None))
+        if "script_content" in keys:
+            cands.append(("rewrite", "rewrite.final"))
+        if keys & EPISODE_VOICE_KEYS:
+            cands.append(("design", "design.voice"))
+        return _earliest_step(cands)
+    if method == "PUT" and re.fullmatch(r"/storyboards/\d+", path):
+        if "narration_text" in keys:
+            return "design", "design.voice"
+        if keys and keys <= set(PROMPT_FIELDS) | {"duration", "mid_frame_time"}:
+            return "production", None
+        return "design", None
+    for meth, pattern, step, substep in WRITE_STEPS:
+        if method == meth and re.fullmatch(pattern, path):
+            return step, substep
+    return None
+
+
+def roadmap_gate_errors(roadmap: dict | None, step: str, substep: str | None, e: int) -> list[str]:
+    """Reject writes to a step while an earlier strict step is not done/skipped (documentary only)."""
+    if roadmap is None:
+        return ["roadmap unavailable: step order cannot be proven (fail-closed; "
+                f"GET /episodes/{e}/roadmap failed)"]
+    if not roadmap.get("strict"):
+        return []
+    steps = roadmap.get("steps") or []
+    idx = next((i for i, n in enumerate(steps) if n.get("key") == step), None)
+    if idx is None:
+        return [f"roadmap has no step {step!r} (project_type={roadmap.get('project_type')})"]
+    target = steps[idx]
+    blockers = [f"{n['key']}({n.get('status')})" for n in steps[:idx]
+                if n.get("ordering") == "strict" and n.get("status") not in DONE_STATUSES]
+    if step == "export":
+        blockers += [f"{n['key']}({n.get('status')},required_before=export)" for n in steps
+                     if n.get("required_before") == "export" and n.get("status") not in DONE_STATUSES]
+    if target.get("unlocked") is False:
+        blockers.append(f"{step} locked: {target.get('lock_reason') or 'gate closed'}")
+    if substep:
+        subs = target.get("substeps") or []
+        sidx = next((i for i, s in enumerate(subs) if s.get("key") == substep), None)
+        if sidx is None:
+            blockers.append(f"no substep {substep} under {step}")
+        else:
+            blockers += [f"{s['key']}({s.get('status')})" for s in subs[:sidx]
+                         if s.get("ordering") == "strict" and s.get("status") not in DONE_STATUSES]
+    if not blockers:
+        return []
+    name = f"{step}.{substep}" if substep and not substep.startswith(f"{step}.") else (substep or step)
+    return [f"roadmap blocked: {name} needs every earlier strict step done; blocked_by={blockers} "
+            f"(see GET /episodes/{e}/roadmap missing/goto)"]
+
+
+def roadmap_problems(roadmap: dict | None, require_export: bool = False) -> list[str]:
+    """Completion problems for the final gate. `require_export` = post-export verification (M3)."""
+    if roadmap is None:
+        return ["roadmap unavailable: GET /episodes/{e}/roadmap failed; step completion cannot be proven (fail-closed)"]
+    # A stale export step is what the merge is about to fix; only the post-export check may flag it.
+    probs = [f"roadmap stale: {n['key']} {n.get('label') or ''} needs reverification"
+             for n in walk_roadmap(roadmap)
+             if n.get("status") == "stale" and (require_export or n.get("key") != "export")]
+    steps = roadmap.get("steps") or []
+    if roadmap.get("strict"):
+        pending = [f"{n['key']}({n.get('status')})" for n in steps
+                   if n.get("key") != "export" and n.get("status") not in DONE_STATUSES]
+        if pending:
+            probs.append(f"roadmap: steps unfinished before export: {pending}")
+    if require_export:
+        export = next((n for n in steps if n.get("key") == "export"), None)
+        if export is None:
+            probs.append("roadmap has no export step")
+        elif export.get("status") != "done":
+            probs.append(f"roadmap export step is {export.get('status')}: the merged film does not match the current shots/poster")
+        m3 = next((m for m in roadmap.get("milestones") or [] if m.get("key") == "m3_export"), None)
+        probs.append(f"roadmap milestone m3_export is {m3.get('status') if m3 else 'missing'} (export not verified)")
+    return probs
+
+
+def roadmap_next_action(roadmap: dict | None, action: str) -> str | None:
+    """Documentary: pending human confirmations replace the per-shot next (hbwf only reports them)."""
+    if not roadmap or roadmap.get("project_type") != "documentary":
+        return None
+    for key, replacement in HUMAN_CONFIRM_SUBSTEPS:
+        node = roadmap_node(roadmap, key)
+        if node is None or node.get("status") in DONE_STATUSES:
+            continue
+        if key == "design.skeleton" or action in DESIGN_GATED_ACTIONS:
+            return replacement
+        return None
+    return None
+
+
 def derive(prj: Project, write: bool = True) -> dict:
     e = prj.e
     problems: list[str] = []
@@ -311,6 +528,9 @@ def derive(prj: Project, write: bool = True) -> dict:
     applies = prj.profile.get("applies", {})
     if applies.get("project_type") and drama.get("project_type") != applies["project_type"]:
         problems.append(f"profile {prj.config['profile']} applies to project_type={applies['project_type']}, drama is {drama.get('project_type')}")
+    roadmap, road_err = prj.get_optional(f"/episodes/{e}/roadmap")
+    if road_err:
+        problems.append(f"roadmap unavailable: {road_err}")
     m = prj.config["models"]
     for kind, field in (("image", "image_config_id"), ("video", "video_config_id"), ("tts", "tts_config_id")):
         if episode.get(field) is not None and int(episode[field]) != int(m[kind]["config_id"]):
@@ -404,6 +624,9 @@ def derive(prj: Project, write: bool = True) -> dict:
             },
         }
         rec["next"] = next_action(rec)
+        human = roadmap_next_action(roadmap, rec["next"])
+        if human:
+            rec["next"] = human
         out.append(rec)
 
     canon = prj.canonical_ids()
@@ -448,6 +671,7 @@ def derive(prj: Project, write: bool = True) -> dict:
                    "approval": approval_state(idx, "poster_approval", "poster", poster_hash) if selected else "missing",
                    "waiver": [d["id"] for d in waiver]},
         "reconcile": reconcile(prj, vbatch, kbatch),
+        "roadmap": roadmap,
         "shots": out,
     }
     state["final_gate"] = final_gate_problems(state, None)
@@ -521,6 +745,7 @@ def final_gate_problems(state: dict, merge_body: dict | None) -> list[str]:
             p.append("merge storyboard_ids must equal the canonical order exactly")
         if po["selected_version_id"] and merge_body.get("poster_version_id") != po["selected_version_id"]:
             p.append("merge poster_version_id must equal the approved selected poster version")
+    p += [x for x in roadmap_problems(state.get("roadmap")) if x not in p]
     return p
 
 
@@ -604,6 +829,10 @@ def guard(ctx: dict, method: str, path: str, body: dict, declared_ids: list[int]
         return errors, warnings, None
     if state["problems"]:
         warnings += [f"state problem: {p}" for p in state["problems"]]
+    target = write_step_of(method, path, body)
+    if target:
+        step, substep = target
+        errors += roadmap_gate_errors(state.get("roadmap"), roadmap_step_key(state.get("roadmap"), step), substep, e)
 
     m = re.fullmatch(r"/storyboards/(\d+)(/.*)?", path)
     sid_in_path = int(m.group(1)) if m else None
@@ -799,6 +1028,42 @@ def cmd_init(a):
     print(f"wrote {target}")
 
 
+def _missing_text(m: dict) -> str:
+    return f"{m.get('code')}: {m.get('message')}" + (f" x{m['count']}" if m.get("count") is not None else "")
+
+
+def summarize_roadmap(roadmap: dict | None) -> list[str]:
+    if not roadmap:
+        return ["roadmap: unavailable (GET /episodes/{e}/roadmap failed; step completion cannot be verified)"]
+    st = roadmap.get("status") or {}
+    cur = roadmap.get("current") or {}
+    prog = roadmap.get("progress") or {}
+    current = f"{cur.get('step') or '-'}" + (f"/{cur['substep']}" if cur.get("substep") else "")
+    lines = [f"roadmap: {roadmap.get('project_type')} strict={roadmap.get('strict')} status={st.get('effective')} "
+             f"(derived={st.get('derived')} override={st.get('override')}) progress={prog.get('done')}/{prog.get('total')} current={current}"]
+    lines.append("milestones: " + ", ".join(f"{m.get('key')}={m.get('status')}" for m in roadmap.get("milestones") or []))
+    for n in roadmap.get("steps") or []:
+        extra = []
+        if n.get("unlocked") is False:
+            extra.append(f"locked: {n.get('lock_reason') or 'gate closed'}")
+        if n.get("counts"):
+            extra.append(f"counts {n['counts'].get('done')}/{n['counts'].get('total')}")
+        if n.get("required_before"):
+            extra.append(f"required_before={n['required_before']}")
+        lines.append(f"  {n.get('key', ''):11s} {n.get('status', ''):11s} {n.get('label') or ''}" + (f"  [{', '.join(extra)}]" if extra else ""))
+        for node in [*(n.get("substeps") or []), n]:
+            if node.get("missing"):
+                lines.append(f"    {node['key']} missing: " + "; ".join(_missing_text(m) for m in node["missing"]))
+            if node.get("blocked_by"):
+                lines.append(f"    {node['key']} blocked_by: " + ", ".join(node["blocked_by"]))
+        for x in n.get("notices") or []:
+            lines.append(f"    notice {x.get('code')}: {x.get('message')}")
+        subs = n.get("substeps") or []
+        if subs:
+            lines.append("    substeps: " + ", ".join(f"{s['key'].rsplit('.', 1)[-1]}={s.get('status')}" for s in subs))
+    return lines
+
+
 def summarize(state: dict) -> str:
     groups: dict = {}
     for r in state["shots"]:
@@ -807,17 +1072,21 @@ def summarize(state: dict) -> str:
     lines.append("batches: " + ", ".join(f"{k}={v.get('status')}" for k, v in state["batches"].items()))
     po = state["poster"]
     lines.append(f"poster: policy={state['poster_policy']} selected={po['selected_version_id']} versions={po['versions']} approval={po['approval']} waiver={po['waiver']}")
+    lines += summarize_roadmap(state.get("roadmap"))
     rec = state["reconcile"]
     lines.append(f"reconcile: orphans={[o['key'] for o in rec['orphans']]} unknown_calls={rec['unknown_calls']}")
     for p in state["problems"]:
         lines.append(f"PROBLEM: {p}")
-    order = ["fix_narration", "remove_acceleration", "make_subtitle", "wait_call", "write_keyframe_prompts", "generate_keyframes",
+    order = ["await_skeleton_confirm", "await_design_card_confirm", "fix_narration", "remove_acceleration", "make_subtitle",
+             "wait_call", "write_keyframe_prompts", "generate_keyframes",
              "wait_keyframes", "review_keyframes", "confirm_keyframes", "write_video_prompt", "review_video_prompt",
              "generate_video", "wait_video", "review_video", "compose", "review_compose", "done"]
     lines.append("next action per shot (canonical order):")
     for k in order:
         if k in groups:
             lines.append(f"  {k:22s} {len(groups[k]):3d}  {groups[k]}")
+    if groups.keys() & {"await_skeleton_confirm", "await_design_card_confirm"}:
+        lines.append("await_* = 等待人工确认（hbwf 只提示；不调用 confirm 端点）")
     gate = state["final_gate"]
     lines.append(f"final gate: {'PASS' if not gate else str(len(gate)) + ' problem(s)'}")
     for g in [g for g in gate if not g.startswith('shot ')]:
@@ -908,6 +1177,10 @@ def cmd_call(a):
         state = derive(prj)
         ledger = prj.read_jsonl("ledger.jsonl")
         decisions = prj.read_jsonl("decisions.jsonl")
+        road_before = roadmap_snapshot(state.get("roadmap"))
+        target = write_step_of(method, path, body)
+        target_key = roadmap_step_key(state.get("roadmap"), target[0]) if target else None
+        target_sub = target[1] if target and (state.get("roadmap") or {}).get("project_type") == "documentary" else None
         ctx = {"episode_id": prj.e, "models": prj.config["models"], "decisions": decisions, "ledger": ledger,
                "voice_preview": lambda bd: {x["storyboard_id"]: x.get("status") for x in
                                             prj.preview(f"/episodes/{prj.e}/narration/voice-batch/preview", bd).get("items", [])}}
@@ -930,6 +1203,7 @@ def cmd_call(a):
                     "declared_ids": declared, "target_ids": target_ids_of(path, body, declared), "intent": a.intent,
                     "body": summary, "body_ref": ref, "body_hash": body_hash, "guard": verdict, "dry_run": a.dry_run,
                     "exception_id": exception_id if (not errors and not a.dry_run) else None,
+                    "roadmap_step": target_key, "roadmap_substep": target_sub, "roadmap_current": road_before.get("current"),
                     "state_derived_at": state["derived_at"], "actor": os.environ.get("HBWF_ACTOR") or os.environ.get("USER")}
         if errors or a.dry_run:
             prepared["phase"] = "refused" if errors else "dry_run"
@@ -976,8 +1250,16 @@ def cmd_call(a):
         if missing:
             outcome["not_saved"] = missing
     with prj.lock():
+        try:
+            after = derive(prj)
+        except SystemExit as ex:  # the write already happened: never lose its outcome record
+            after = None
+            print(f"warning: post-write derive failed ({ex}); outcome recorded without roadmap after-state", file=sys.stderr)
+        if target_key:
+            after_snap = roadmap_snapshot((after or {}).get("roadmap")) if after else {"available": False}
+            outcome["roadmap"] = {"step": target_key, "substep": target_sub, "before": road_before, "after": after_snap,
+                                  "terminal": after_snap.get("statuses", {}).get(target_key) in DONE_STATUSES}
         prj.append("ledger.jsonl", outcome)
-        derive(prj)
     if outcome["result"] == "unknown":
         print(f"hbwf: UNKNOWN outcome ({outcome['error']}); do NOT resubmit. Read state with `hbwf check`, then record `hbwf decide reconcile --call-ids {call_id}`.", file=sys.stderr)
         sys.exit(3)
@@ -1076,13 +1358,16 @@ def cmd_final(a):
     prj = Project.find(a.project)
     with prj.lock():
         state = derive(prj)
-    probs = state["final_gate"]
+    roadmap = state.get("roadmap")
+    probs = list(dict.fromkeys(state["final_gate"] + roadmap_problems(roadmap, require_export=True)))
     decisions = prj.read_jsonl("decisions.jsonl")
     kinds: dict = {}
     for d in decisions:
         kinds[d["kind"]] = kinds.get(d["kind"], 0) + 1
     print(f"decisions recorded: {kinds}")
-    print("final gate PASS" if not probs else "final gate FAIL:\n" + "\n".join(f"  - {p}" for p in probs))
+    for line in summarize_roadmap(roadmap):
+        print(line)
+    print("final check PASS" if not probs else "final check FAIL:\n" + "\n".join(f"  - {p}" for p in probs))
     sys.exit(0 if not probs else 2)
 
 
@@ -1105,10 +1390,11 @@ def build_parser():
     p.add_argument("--force", action="store_true")
     p.set_defaults(fn=cmd_init)
 
-    for name, fn, hlp in (("derive", cmd_derive, "re-derive state.json from Huobao"), ("status", cmd_status, "print the last derived state (no network)"),
-                          ("final", cmd_final, "whole-episode export gate")):
+    for name, fn, hlp in (("derive", cmd_derive, "re-derive state.json from Huobao"),
+                          ("status", cmd_status, "print the last derived state (no network)"),
+                          ("final", cmd_final, "post-export completion check (pre-export gate + roadmap M3, no stale steps)")):
         sub.add_parser(name, help=hlp).set_defaults(fn=fn)
-    p = sub.add_parser("check", help="derive and print per-shot next actions")
+    p = sub.add_parser("check", help="derive and print roadmap steps + per-shot next actions")
     p.add_argument("--ids")
     p.add_argument("--json", action="store_true")
     p.add_argument("--final", action="store_true")

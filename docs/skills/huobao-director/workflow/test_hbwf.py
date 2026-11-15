@@ -38,6 +38,50 @@ def shot(sid, **over):
     return r
 
 
+def step_node(key, status="done", ordering="strict", substeps=(), **over):
+    n = {"key": key, "label": key, "order": 0, "ordering": ordering, "status": status,
+         "criteria_met": status in ("done", "skipped"), "unlocked": True, "lock_reason": None, "goto": None,
+         "done_criteria": [], "missing": [], "notices": [], "blocked_by": [], "substeps": list(substeps)}
+    n.update(over)
+    return n
+
+
+def doc_steps(**over):
+    steps = [
+        step_node("raw"),
+        step_node("rewrite", substeps=[step_node("rewrite.prepared"), step_node("rewrite.fidelity", "skipped"),
+                                       step_node("rewrite.bridge"), step_node("rewrite.final"), step_node("rewrite.confirm")]),
+        step_node("assets", substeps=[step_node("assets.extract"), step_node("assets.review")]),
+        step_node("poster", ordering="free", required_before="export"),
+        step_node("design", substeps=[step_node("design.skeleton"), step_node("design.voice"), step_node("design.cards")]),
+        step_node("production", substeps=[step_node("production.layer", ordering="free"),
+                                          step_node("production.keyframes", ordering="free")]),
+        step_node("final"),
+        step_node("export"),
+    ]
+    for key, val in over.items():
+        for n in steps:
+            if n["key"] == key:
+                n.update(val) if isinstance(val, dict) else n.update({"status": val})
+    return steps
+
+
+def roadmap(steps=None, **over):
+    rm = {"episode_id": E, "drama_id": 3, "project_type": "documentary", "strict": True,
+          "status": {"effective": "completed", "derived": "completed", "override": None},
+          "current": {"step": None, "substep": None}, "progress": {"done": 8, "total": 8},
+          "milestones": [{"key": "m1_script", "label": "旁白稿定稿", "status": "done", "achieved_at": None,
+                          "steps": ["raw", "rewrite"], "done_criteria": []},
+                         {"key": "m2_production", "label": "制作完成", "status": "done", "achieved_at": None,
+                          "steps": ["assets", "poster", "design", "production", "final"], "done_criteria": []},
+                         {"key": "m3_export", "label": "成片导出", "status": "done", "achieved_at": None,
+                          "steps": ["export"], "done_criteria": []}],
+          "computed_at": "2026-11-15T00:00:00Z",
+          "steps": doc_steps() if steps is None else steps}
+    rm.update(over)
+    return rm
+
+
 def state(*shots, **over):
     s = {
         "problems": [], "canonical_ids": [x["id"] for x in shots],
@@ -46,6 +90,7 @@ def state(*shots, **over):
         "active_tasks": [], "poster_policy": "required",
         "poster": {"selected_version_id": 5, "versions": 1, "hash": "p", "approval": "valid", "waiver": []},
         "reconcile": {"orphans": [], "unknown_calls": []},
+        "roadmap": roadmap(),
         "shots": list(shots),
     }
     for k, v in over.items():
@@ -241,6 +286,133 @@ class FinalGateTest(unittest.TestCase):
     def test_unknown_project_type_fails_closed(self):
         self.assertEqual(hbwf.poster_policy_for(None, False), "required")
         self.assertIsNotNone(hbwf.poster_waiver_refusal(None))
+
+
+class RoadmapMappingTest(unittest.TestCase):
+    def test_write_endpoints_map_to_steps(self):
+        cases = [
+            ("PUT", f"/episodes/{E}", {"content": "x"}, ("raw", None)),
+            ("PUT", f"/episodes/{E}", {"script_content": "x"}, ("rewrite", "rewrite.final")),
+            ("PUT", f"/episodes/{E}", {"narration_enabled": True}, ("design", "design.voice")),
+            ("POST", f"/episodes/{E}/script/confirm", {}, ("rewrite", "rewrite.confirm")),
+            ("POST", f"/episodes/{E}/narration/voice-batch", {}, ("design", "design.voice")),
+            ("PUT", f"/storyboards/1/design-card", {"combo": "C"}, ("design", "design.cards")),
+            ("POST", f"/episodes/{E}/asset-review/run", {}, ("assets", "assets.review")),
+            ("PUT", f"/episodes/{E}/poster/select", {"version_id": 1}, ("poster", None)),
+            ("PUT", "/storyboards/1", {"video_prompt": "0-9秒：x"}, ("production", None)),
+            ("PUT", "/storyboards/1", {"narration_text": "x"}, ("design", "design.voice")),
+            ("POST", f"/episodes/{E}/keyframe-batch", {}, ("production", "production.keyframes")),
+            ("POST", f"/episodes/{E}/video-batch", {}, ("final", None)),
+            ("POST", f"/merge/episodes/{E}/merge", {}, ("export", None)),
+        ]
+        for method, path, body, want in cases:
+            self.assertEqual(hbwf.write_step_of(method, path, body), want, f"{method} {path} {body}")
+        self.assertIsNone(hbwf.write_step_of("POST", "/tasks/9/cancel", {}))
+        self.assertIsNone(hbwf.write_step_of("GET", f"/episodes/{E}/roadmap", {}))
+
+    def test_drama_keys_are_translated(self):
+        rm = roadmap(project_type="drama", strict=False, steps=[step_node("script", ordering="free")])
+        self.assertEqual(hbwf.roadmap_step_key(rm, "production"), "keyframes")
+        self.assertEqual(hbwf.roadmap_step_key(rm, "final"), "videos")
+        self.assertEqual(hbwf.roadmap_step_key(roadmap(), "production"), "production")
+
+
+class RoadmapGuardTest(unittest.TestCase):
+    def test_later_step_write_refused_with_blocked_by(self):
+        rm = roadmap(steps=doc_steps(design="available", production="locked", final="locked"))
+        errs, _, _ = run(state(shot(1), roadmap=rm), "POST", f"/episodes/{E}/generate-video-prompts",
+                         {"storyboard_ids": [1], "config_id": 10, "model": "deepseek-chat"})
+        self.assertTrue(any("blocked_by" in x and "design(available)" in x for x in errs), errs)
+
+    def test_poster_pending_does_not_block_production_but_blocks_export(self):
+        rm = roadmap(steps=doc_steps(poster="available"))
+        st = state(shot(1), roadmap=rm)
+        errs, _, _ = run(st, "POST", f"/episodes/{E}/compose-batch", {"storyboard_ids": [1]})
+        self.assertFalse(any("blocked_by" in x for x in errs), errs)
+        errs2, _, _ = run(st, "POST", f"/merge/episodes/{E}/merge", {"storyboard_ids": [1], "poster_version_id": 5})
+        self.assertTrue(any("blocked_by" in x and "poster(available" in x for x in errs2), errs2)
+
+    def test_done_or_current_step_writes_allowed(self):
+        current = roadmap(steps=doc_steps(production="in_progress"))
+        errs, _, _ = run(state(shot(1), roadmap=current), "POST", "/storyboards/1/confirm-keyframes", {"confirmed": True})
+        self.assertEqual(errs, [])
+        done = roadmap(steps=doc_steps())
+        errs2, _, _ = run(state(shot(1), roadmap=done), "POST", "/storyboards/1/confirm-keyframes", {"confirmed": True})
+        self.assertEqual(errs2, [])
+
+    def test_locked_step_refused(self):
+        rm = roadmap(steps=doc_steps(poster="locked", design={"status": "locked", "unlocked": False,
+                                                              "lock_reason": "asset review missing"}))
+        errs, _, _ = run(state(shot(1), roadmap=rm), "PUT", "/storyboards/1/design-card", {"design_card": {}})
+        self.assertTrue(any("locked" in x and "asset review missing" in x for x in errs), errs)
+
+    def test_strict_substep_order_enforced(self):
+        rm = roadmap(steps=doc_steps(design={"status": "in_progress", "substeps": [
+            step_node("design.skeleton", "available"), step_node("design.voice"), step_node("design.cards")]}))
+        errs, _, _ = run(state(shot(1), roadmap=rm), "POST", "/storyboards/1/design-card/confirm", {"acknowledge": True})
+        self.assertTrue(any("design.skeleton(available)" in x for x in errs), errs)
+
+    def test_drama_roadmap_is_informational(self):
+        rm = roadmap(project_type="drama", strict=False, steps=[
+            step_node("script", "available", ordering="free"), step_node("export", "available", ordering="free")])
+        errs, _, _ = run(state(shot(1), roadmap=rm), "POST", f"/episodes/{E}/generate-video-prompts",
+                         {"storyboard_ids": [1], "config_id": 10, "model": "deepseek-chat"})
+        self.assertFalse(any("roadmap blocked" in x for x in errs), errs)
+
+    def test_missing_roadmap_fails_closed(self):
+        errs, _, _ = run(state(shot(1), roadmap=None), "POST", f"/episodes/{E}/video-batch", {"storyboard_ids": [1]})
+        self.assertTrue(any("roadmap unavailable" in x for x in errs), errs)
+        self.assertTrue(hbwf.roadmap_gate_errors(None, "final", None, E))
+
+
+class RoadmapCompletionTest(unittest.TestCase):
+    def test_stale_step_blocks_final_gate(self):
+        rm = roadmap(steps=doc_steps(design="stale"))
+        probs = hbwf.final_gate_problems(state(shot(1), roadmap=rm), None)
+        self.assertTrue(any("stale" in p and "design" in p for p in probs), probs)
+
+    def test_unfinished_step_blocks_final_gate(self):
+        rm = roadmap(steps=doc_steps(final="in_progress"))
+        probs = hbwf.final_gate_problems(state(shot(1), roadmap=rm), None)
+        self.assertTrue(any("unfinished before export" in p for p in probs), probs)
+
+    def test_export_milestone_required_for_final_check(self):
+        rm = roadmap(steps=doc_steps(export="available"), milestones=[{"key": "m3_export", "status": "pending"}])
+        self.assertEqual([p for p in hbwf.roadmap_problems(rm) if "export step" in p], [])
+        post = hbwf.roadmap_problems(rm, require_export=True)
+        self.assertTrue(any("export step is available" in p for p in post), post)
+        self.assertTrue(any("m3_export is pending" in p for p in post), post)
+
+    def test_stale_export_does_not_block_merge_but_blocks_post_export(self):
+        rm = roadmap(steps=doc_steps(export="stale"), milestones=[{"key": "m3_export", "status": "stale"}])
+        self.assertEqual(hbwf.roadmap_problems(rm), [])
+        post = hbwf.roadmap_problems(rm, require_export=True)
+        self.assertTrue(any("stale" in p and "export" in p for p in post), post)
+        self.assertTrue(any("m3_export is stale" in p for p in post), post)
+
+    def test_drama_roadmap_is_informational_for_completion(self):
+        rm = roadmap(project_type="drama", strict=False, steps=[
+            step_node("script", ordering="free"), step_node("assets", "in_progress", ordering="free"),
+            step_node("poster", "available", ordering="free"), step_node("keyframes", "in_progress", ordering="free"),
+            step_node("videos", "in_progress", ordering="free"), step_node("export", "available", ordering="free")])
+        self.assertEqual(hbwf.roadmap_problems(rm), [])
+
+
+class RoadmapNextActionTest(unittest.TestCase):
+    def test_documentary_reports_human_confirmations(self):
+        skeleton_pending = roadmap(steps=doc_steps(design={"status": "in_progress", "substeps": [
+            step_node("design.skeleton", "available"), step_node("design.voice"), step_node("design.cards")]}))
+        self.assertEqual(hbwf.roadmap_next_action(skeleton_pending, "generate_keyframes"), "await_skeleton_confirm")
+        cards_pending = roadmap(steps=doc_steps(design={"status": "in_progress", "substeps": [
+            step_node("design.skeleton"), step_node("design.voice"), step_node("design.cards", "in_progress",
+                                                                               counts={"done": 3, "total": 5})]}))
+        self.assertEqual(hbwf.roadmap_next_action(cards_pending, "generate_keyframes"), "await_design_card_confirm")
+        self.assertIsNone(hbwf.roadmap_next_action(cards_pending, "fix_narration"))
+        self.assertEqual(hbwf.roadmap_next_action(roadmap(), "generate_keyframes"), None)
+
+    def test_drama_next_action_unchanged(self):
+        rm = roadmap(project_type="drama", strict=False, steps=[step_node("script", "available", ordering="free")])
+        self.assertIsNone(hbwf.roadmap_next_action(rm, "generate_keyframes"))
 
 
 if __name__ == "__main__":

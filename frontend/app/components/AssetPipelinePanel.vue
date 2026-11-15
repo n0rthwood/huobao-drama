@@ -3,7 +3,7 @@
     <div v-if="!reviewRunId" class="pip-head">
       <span class="pip-label">{{ t('episode.documentary.pipeline.sectionTitle') }}</span>
       <span v-if="activeRun" class="pip-badge" :class="runStatusClass(activeRun.pipeline.state)">
-        {{ pipelineStatus(activeRun.pipeline.state) }}
+        {{ pipelineStateLabel(activeRun.pipeline.state) }}
       </span>
       <span v-if="activeRun?.step && activeRun.pipeline.state === 'running'" class="dim pip-step">{{ pipelineStep(activeRun.step) }}</span>
       <select v-model="purpose" class="input pip-select" :disabled="starting">
@@ -483,7 +483,7 @@ function pascal(value: string): string {
 function roleKey(role: AssetSourceRole): string {
   return pascal(role)
 }
-function pipelineStatus(state: string) {
+function pipelineStateLabel(state: string) {
   return t(`episode.documentary.pipeline.execution${pascal(state)}`)
 }
 function pipelineStep(step: string) {

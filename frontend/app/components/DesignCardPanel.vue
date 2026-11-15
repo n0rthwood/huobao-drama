@@ -20,7 +20,8 @@
         @click="setPhase(item.key)"
       >
         <span class="mono dc-phase-num">{{ index + 1 }}</span>
-        <span class="dc-phase-name">{{ item.label }}</span>
+        <span class="dc-phase-name" :class="stepTextClass(item.status)">{{ item.label }}</span>
+        <StepStatusIcon :status="item.status" :reason="item.reason" :locked="item.locked" />
         <span class="dc-phase-state">{{ item.state }}</span>
       </button>
     </div>
@@ -700,13 +701,15 @@ import NarrationSkeletonPanel from '~/components/NarrationSkeletonPanel.vue'
 import AssetPicker from '~/components/AssetPicker.vue'
 import ComboSwitchDialog from '~/components/ShotProduction/ComboSwitchDialog.vue'
 import TaskWorkMetrics from '~/components/TaskWorkMetrics.vue'
+import StepStatusIcon from '~/components/StepStatusIcon.vue'
 import { mediaUrl } from '~/utils/url'
+import { stepTextClass } from '~/utils/stepStatus'
 import { textCapacity, textFamilyOf, textLayoutById, textLayoutsFor, textRolesFor } from '~/utils/layerText'
 import { textRoleDef, useLayerTextNames, useLayerTextSpec } from '~/composables/useLayerTextSpec'
 import { COMBOS, episodeAPI, narrationSkeletonAPI, storyboardAPI, ttsRequiredOf } from '~/composables/useApi'
 import { DEEPLINK_KEYS, queryEnum, queryIdList, querySingle, useDeeplink } from '~/composables/useQuerySync'
 import { onTaskFinished, refreshTasks, useTasks } from '~/composables/useTasks'
-import { useWorkflowGates } from '~/composables/useWorkflowGates'
+import { useEpisodeRoadmap } from '~/composables/useEpisodeRoadmap'
 import { toastError, toastServerMessage } from '~/composables/useToast'
 
 const { t, te } = useI18n()
@@ -827,25 +830,46 @@ const cardsBlockReason = computed(() => {
   if (!fillableIds.value.length) return t('episode.skeleton.cardsBlockedByTts', { n: skeleton.value.tts.invalid })
   return ''
 })
-const phases = computed(() => [
-  {
-    key: 'skeleton',
-    label: t('episode.skeleton.phaseSkeleton'),
-    state: skeleton.value.confirmed
-      ? t('episode.skeleton.confirmed')
-      : t('episode.skeleton.phaseSkeletonPending', { n: skeleton.value.shots.length }),
-  },
-  {
-    key: 'voice',
-    label: t('episode.skeleton.phaseVoice'),
-    state: t('episode.skeleton.phaseVoiceState', { valid: skeleton.value.tts.valid, total: skeleton.value.tts.total }),
-  },
-  {
-    key: 'cards',
-    label: t('episode.skeleton.phaseCards'),
-    state: t('episode.skeleton.phaseCardsState', { n: fillableIds.value.length }),
-  },
-])
+/**
+ * 三个子阶段各自显示 roadmap 状态（design.skeleton / design.voice / design.cards）；
+ * 配音与设计卡给 roadmap 的计数（有效 / 确认 的 done/total），不再数「可填写数」冒充完成数。
+ */
+const phases = computed(() => {
+  const voice = countsOf('design.voice')
+  const cards = countsOf('design.cards')
+  return [
+    {
+      key: 'skeleton',
+      label: t('episode.skeleton.phaseSkeleton'),
+      status: roadmapReady.value ? statusOf('design.skeleton') : '',
+      reason: lockReasonOf('design.skeleton'),
+      locked: roadmapReady.value && lockedOf('design.skeleton'),
+      state: skeleton.value.confirmed
+        ? t('episode.skeleton.confirmed')
+        : t('episode.skeleton.phaseSkeletonPending', { n: skeleton.value.shots.length }),
+    },
+    {
+      key: 'voice',
+      label: t('episode.skeleton.phaseVoice'),
+      status: roadmapReady.value ? statusOf('design.voice') : '',
+      reason: lockReasonOf('design.voice'),
+      locked: roadmapReady.value && lockedOf('design.voice'),
+      state: voice
+        ? `${voice.done}/${voice.total}`
+        : t('episode.skeleton.phaseVoiceState', { valid: skeleton.value.tts.valid, total: skeleton.value.tts.total }),
+    },
+    {
+      key: 'cards',
+      label: t('episode.skeleton.phaseCards'),
+      status: roadmapReady.value ? statusOf('design.cards') : '',
+      reason: lockReasonOf('design.cards'),
+      locked: roadmapReady.value && lockedOf('design.cards'),
+      state: cards
+        ? `${cards.done}/${cards.total}`
+        : t('episode.skeleton.phaseCardsState', { n: fillableIds.value.length }),
+    },
+  ]
+})
 
 function setPhase(key) {
   phase.value = key
@@ -979,12 +1003,13 @@ onTaskFinished((task) => {
   }
 })
 
-// ===== 门禁 =====
-const { gates, ready: gatesReady, refreshGates, reasonOf, gotoOf } = useWorkflowGates(() => props.episodeId)
-// 门禁未判定（首屏未取到 /gates 或取数失败）时同样按锁定渲染，内容绝不先闪出来
-const designLocked = computed(() => !gatesReady.value || gates.value.unlocked?.design === false)
-const lockReason = computed(() => reasonOf('design') || t('episode.gate.checking'))
-// 门禁出路：交给工作台做应用内切步（panel/tab 的所有者在那里），不整页 location.assign；
+// ===== 步骤状态（#105 roadmap：唯一判定方）=====
+const { ready: roadmapReady, refreshRoadmap, statusOf, countsOf, lockedOf, lockReasonOf, gotoOf } = useEpisodeRoadmap(() => props.episodeId)
+// roadmap 未判定（首屏未取到 /episodes/:id/roadmap 或取数失败）时只渲染「校验中」，
+// 内容绝不先闪出来，也不会同时对同一步显示 ✓ 与锁
+const designLocked = computed(() => !roadmapReady.value || lockedOf('design'))
+const lockReason = computed(() => lockReasonOf('design') || (roadmapReady.value ? t('episode.gate.locked') : t('episode.gate.checking')))
+// 锁定出路：交给工作台做应用内切步（panel/tab 的所有者在那里），不整页 location.assign；
 // 本面板卸载时它的 deeplink 分组会自动释放 phase/shot/dpick/dcombo/dscope，不会跟到新步骤
 function gotoBlocker() {
   emit('goto-step', gotoOf('design') || 'assets')
@@ -1606,7 +1631,7 @@ async function confirm() {
     applyResult(sb.id, res)
     emit('refresh')
     loadAudit()
-    refreshGates({ background: true })
+    refreshRoadmap({ background: true })
   } catch (err) {
     reportError(err, 'episode.design.error.confirmFailed')
   } finally {
@@ -1622,7 +1647,7 @@ async function unconfirm() {
     applyResult(sb.id, res)
     emit('refresh')
     loadAudit()
-    refreshGates({ background: true })
+    refreshRoadmap({ background: true })
   } catch (err) {
     reportError(err, 'episode.design.error.confirmFailed')
   } finally {
@@ -1712,7 +1737,7 @@ async function confirmMany(ids) {
   busy.value = false
   emit('refresh')
   loadAudit()
-  refreshGates({ background: true })
+  refreshRoadmap({ background: true })
 }
 
 /**
@@ -1832,14 +1857,14 @@ watch(() => props.episodeId, () => {
   loadAudit()
   loadSkeleton()
   loadFillEstimate()
-  refreshGates()
+  refreshRoadmap()
 })
 
 // ===== deeplink：先按链接恢复，再把当前子状态发布回 URL =====
 /** 门禁未放行时只渲染锁定页：告诉用户链接指向的位置进不去，并放弃本次恢复 */
 let lockNotified = false
-watch([gatesReady, designLocked], () => {
-  if (lockNotified || !gatesReady.value || !designLocked.value) return
+watch([roadmapReady, designLocked], () => {
+  if (lockNotified || !roadmapReady.value || !designLocked.value) return
   if (!(urlPhase || urlShot || urlPick || urlCombo || urlScope)) return
   lockNotified = true
   shotRestore = false
@@ -1901,7 +1926,7 @@ onMounted(() => {
   loadAudit()
   loadSkeleton()
   loadFillEstimate()
-  refreshGates()
+  refreshRoadmap()
 })
 onBeforeUnmount(() => {
   flushPending()

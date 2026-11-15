@@ -17,14 +17,28 @@ description: 通过火宝 HTTP API 按阶段推进剧本、资产、Poster、分
 
 1. 开工：在制作项目目录执行 `hbwf init`（记录授权原话、固定模型、Poster 策略、canonical 顺序文件），再执行 `hbwf check`。已有 `workflow/workflow.json` 时直接 `check`。
 2. **所有火宝业务写入只经 `hbwf call`**；读用 `hbwf get`、`hbwf check`。omp 扩展 `huobao-workflow-gate` 会拦截 bash/eval 直连 API、发写请求的脚本、手改 `workflow/` 文件，以及浏览器点击输入类操作。
-3. 每次决策前先 `hbwf check`，按逐镜 `next` 推进。审核、返工、结构性改动、例外用 `hbwf decide` 记录，带授权原话和证据。
-4. 按 profile 走：剧情项目（含“纪录片规则集”的剧情项目）用 `drama_narration`。剧情项目服务端 `gates` 全开、`script/confirm` 是 no-op，设计卡、combo、图层段、骨架、`fill-gaps` 只对 `project_type=documentary` 有效。`skill://huobao-doc-episode-production` 只适用于 documentary。
+3. 每次决策前先 `hbwf check`：先读 roadmap（当前步骤/子步骤、每步状态、`missing`、`blocked_by`），再按逐镜 `next` 推进。审核、返工、结构性改动、例外用 `hbwf decide` 记录，带授权原话和证据。
+4. 按 profile 走：剧情项目（含“纪录片规则集”的剧情项目）用 `drama_narration`。剧情项目 roadmap 顺序为 `free`（不加锁）、`script/confirm` 是 no-op，设计卡、combo、图层段、骨架、`fill-gaps` 只对 `project_type=documentary` 有效。`skill://huobao-doc-episode-production` 只适用于 documentary。
 5. **Poster 不是“可以不管”**：**纪录片（`project_type=documentary`）每集必须制作 Poster，不可选择不做、不可 `poster_waiver`**（#101；`hbwf` 按 `project_type` 自动强制 `poster_policy=required` 并拒绝 waiver，`--required-poster` 对纪录片可省略；项目类型读不到时同样按必做处理）；资产审核清单完成后立即开始，与骨架/设计卡并行，导出前必须已选定并审核，merge 传 `poster_version_id`。剧情项目每集必须作出决定：`required_poster` 时终检要求已选版本并审核通过；否则需要显式 `poster_waiver`。规划、委派、进度汇报的步骤表里 Poster 必须单独占一行。
-6. 交付前 `hbwf final` 必须 PASS；`merge` 也走同一终检。
+6. 交付前 `hbwf final` 必须 PASS：导出前判据 + roadmap 导出步骤 `done` + 里程碑 `m3_export` 达成 + 无 `stale` 步骤。`merge` 走同一终检的导出前部分（`hbwf check --final`）。
+
+### 00.1 步骤状态以 roadmap 为准（Issue #105）
+
+**新增 API 点**：`GET /episodes/{e}/roadmap`（只读，唯一步骤状态源，结构见 `references/api-catalog.md` §2）。返回 `project_type`、`strict`、`status{effective,derived,override}`、`current{step,substep}`、`progress`、`milestones[m1_script/m2_production/m3_export]`，以及每个大步骤/子步骤的 `ordering(strict|free)`、`status(locked|available|in_progress|done|stale|skipped)`、`criteria_met`、`unlocked`、`lock_reason`、`goto`、`done_criteria`、`missing[{code,message,count?}]`、`notices`、`blocked_by`、`counts`。
+
+**纪律**：
+1. **每完成一步就读 roadmap**；只有该步为 `done`（或 `skipped`）且下一步已解锁才继续。
+2. 目标步骤为 `in_progress` 且 `blocked_by` 非空时，先补完更早的严格步骤，不要跳级写入。
+3. 纪录片严格顺序：`raw → rewrite → assets → poster → design(skeleton→voice→cards) → production(layer‖keyframes) → final → export`。Poster 顺序自由，但 `required_before=export`；`production` 两个子步骤可并行。剧情项目全部 `free`，roadmap 只作信息，不加锁。
+4. **不得手工设置项目/剧集状态**（`PUT /dramas/:id`、`PUT /episodes/:id` 的 `status` 只写人工覆盖；`status` 主体由 roadmap 推算，传 `null`/`"auto"` 恢复推算）。只有用户明确要求时才改覆盖值，并注明「人工」。
+5. 旧的阶段门禁接口与流水线进度接口已随 #105 删除（404）；步骤状态只读 roadmap，不要再按旧接口规划或排障。
+6. `hbwf` 自 #105 起按 roadmap 做写入顺序守卫：每次写前读 roadmap，若目标步骤之前还有未 `done` 的严格步骤，直接拒绝并列出 `blocked_by`；写入到达终态后重新读 roadmap，在 ledger 里记录前后状态。
+
+**案例背景（为什么有这个 API）**：drama 20 / ep 27（113 镜纪录片）导出已完成、成片入库，项目列表却仍显示「待开始」——因为 `dramas.status`/`episodes.status` 过去是纯人工字段，默认 `draft`，导出流程从不写它；同时「某步骤是否完成」只在三处前端各自拼算（互不一致），`hbwf check` 也看不到骨架确认、设计卡确认、资产审核与导出是否完成，只能等服务端 400 才暴露。结果是人和 AI 都会把「已做完」当成「没开始」、把「未确认」当成「已完成」。用户要求：用一份可取的状态告诉 UI 与 AI 大步骤/子步骤、完成依据、严格或自由顺序、里程碑，并据此推算项目/剧集状态（人工覆盖只在人明确要求时保留）。
 
 ### 0. 铁律框（任何模型不得越过；仅汇聚后文，不新增规则）
 
-1. `gates`/`production_unlocked` 为 false 的阶段**不得写入**，无论服务端是否放行。
+1. roadmap 里 `unlocked=false`（`locked`）的步骤**不得写入**，无论服务端是否放行；`blocked_by` 非空时先补更早的严格步骤。
 2. 人决定端点（确认/审批/combo/verdict/override_gate/not_needed/ignored/unconfirm/DELETE，以及 S2-84 的地图 proposed/待核验几何确认、路线/风格/示意模式选择、跳过底纹、回退/取消与 map→prop 类型降级）**永不自行调用**；只在人明确决定后执行并记录授权原话。
 3. 每次计费提交前查预算台账：GPU（图片/视频/TTS）与**计费文本 LLM 调用**（改写、`inspect-narration`、骨架、填卡、关键帧/视频提示词、地图工作室 brief/research/base/drawing）分列计数；地图 style 底纹是图片额度；余额 ≤0 停下问人；`revise` 轮按 ≥1 图预扣。
 4. **凡有 preview 的入口一律先 preview**：批量入口 `POST /dramas/{d}/assets/batch-generate/preview`、`POST /episodes/{e}/keyframe-batch/preview`、`POST /episodes/{e}/video-batch/preview`、`POST /episodes/{e}/compose-batch/preview`、`POST /episodes/{e}/narration/voice-batch/preview`；镜级 preview `GET /storyboards/{id}/narration-fit/preview`。启动批量传显式 `storyboard_ids`/`items`；没有 preview 的入口（如 `design-cards/fill`、`script-rewrite`、`extract`）按其自身前置检查执行，不得编造预览。`POST /episodes/{e}/work-estimate` 是耗时预估，**不是范围预览**，不能替代上面任何一个 preview。
@@ -57,7 +71,7 @@ description: 通过火宝 HTTP API 按阶段推进剧本、资产、Poster、分
 ### 1.1 Agent 的规划算法（每次接任务先跑一遍）
 
 1. **复述目标**：片种（剧情/纪录片）、集数、镜数、时长、预算（图片/视频/配音各几条，外加计费文本 LLM 调用几次）、人明确要求的产物。
-2. **先核授权再读现状**：明确本次获准的 UI 步骤、可写字段与停止点；仅在授权包含火宝操作时执行 `GET /health` → `GET /tasks/active` → `GET /dramas/{d}` → `GET /episodes/{e}/gates` → 相关阶段列表。若用户已要求停止火宝操作、仅更新技能，不执行这串开工 GET。
+2. **先核授权再读现状**：明确本次获准的 UI 步骤、可写字段与停止点；仅在授权包含火宝操作时执行 `GET /health` → `GET /tasks/active` → `GET /dramas/{d}` → `GET /episodes/{e}/roadmap` → 相关阶段列表。若用户已要求停止火宝操作、仅更新技能，不执行这串开工 GET。
 3. **判断从哪一步继续**：已有产物不重做；已有活跃任务只观察；缺失的才补。**恢复要“补剩余”，不要从头上重跑。**
 4. **拆阶段**：每个阶段先问“这一阶段的闸门是什么、需要人决定什么、我怎么验证”。
 5. **每阶段固定节奏**：读事实 → 需要时 preview → 人决定 → 执行 → 轮询终态 → 读回状态 → 打开真实媒体 → 记录证据。
@@ -126,7 +140,7 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 - **人工文案编辑的界线**：用户逐项明确要求修改既有稿、或原样导入其提供的定稿时，才可用最小 `PUT /episodes/{e} {script_content:...}` 并标明“人工修改/导入”。“用火宝改写”“先看原始材料”不是这类人工代填授权；助手自行创作的初次 AI 改写不得走此例外。
 - **停止优先于纠错惯性**：用户要求停止火宝操作、只改技能后，不再 GET 核对，不自行清空、撤回、重生成或补写第二步。先报告错误；回滚也须等待用户另行授权，不能把“纠正我的错误”当作新业务操作权限。
 - 项目/集基础端点仍为 `POST /dramas`、按当前读回需要时 `PUT /dramas/{d}`、`POST /episodes`。纪录片项目必须 `project_type=documentary` + `documentary_rules=on`；`POST /episodes` 返回 200 而非 201。项目设置与音频设置不因导入原始内容自动获得修改授权。
-- 没有 `GET /episodes/{id}`：从 `GET /dramas/{d}` 的 `episodes[]` 按数据库 ID 找集，核对 `episode_number`；审核链接用显示集数。`content/script_content/script_confirmed_at` 都在集行中。`gates` 只反映服务端状态，不代替用户逐步授权。
+- 没有 `GET /episodes/{id}`：从 `GET /dramas/{d}` 的 `episodes[]` 按数据库 ID 找集，核对 `episode_number`；审核链接用显示集数。`content/script_content/script_confirmed_at` 都在集行中。`roadmap` 只反映推算状态（含未确认的设计卡/骨架/导出），不代替用户逐步授权。
 
 #### S1-80 纪录片旁白稿纯净度（Issue #80，`[R]`：drama 10 / episode 16，run 3 / task 1212）
 
@@ -341,7 +355,7 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 |---|---|
 | 第一页导入原始内容 | 只写 `content`，读回后给 `step=0` 链接；用户要求先等候就到此停止 |
 | 用户已授权 AI 改写 | 纪录片走 `POST /episodes/{e}/script-rewrite` 流水线（旧 `/agent/script_rewriter/chat` 对纪录片 400），剧情项目走 `POST /agent/script_rewriter/chat`；都读回火宝保存的结果，不是助手代写回填 |
-| 每阶段开工 | 先核本次授权；获准操作后再读 `GET /episodes/{e}/gates` / 预览 / `tasks/active`，不猜、不抢跑 |
+| 每阶段开工 | 先核本次授权；获准操作后再读 `GET /episodes/{e}/roadmap`（当前步骤/子步骤、`missing`、`blocked_by`）/ 预览 / `tasks/active`，不猜、不抢跑 |
 | 批量生成 | 有 preview 的入口一律先 preview，读 `checked/status/reason`，人确认后传显式 IDs；没有 preview 的入口（`design-cards/fill` 等）照其前置检查执行，`work-estimate` 不算预览 |
 | 写入 | 先快照 → 最小字段 PUT → 重新 GET 对照 → 报告 before/after |
 | 审批 | 必须开图并附 `opened:[{path,sha256}]`；程序 FAIL 保留，`override_gate` 只写技术例外范围 |

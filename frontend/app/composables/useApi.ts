@@ -9,25 +9,65 @@ export interface ApiError extends Error {
   body?: Record<string, unknown>
 }
 
-/** 纪录片步骤门禁（#54）：`GET /episodes/:id/gates`；剧情项目恒全解锁、reasons 为空 */
-export type GateKey = 'assets' | 'design' | 'production' | 'final' | 'poster' | 'export'
-export interface EpisodeGates {
-  project_type: 'drama' | 'documentary'
-  script: { confirmed: boolean; confirmed_at: string | null }
-  assets: { review_status: 'none' | 'running' | 'pending' | 'passed'; stale_reasons: string[]; missing: number }
-  design: { confirmed: number; total: number }
-  production: { ready: number; total: number }
-  final: { fresh: number; total: number }
-  unlocked: Record<GateKey, boolean>
-  reasons: Partial<Record<GateKey, string>>
-  goto: Partial<Record<GateKey, 'script' | 'assets' | 'design' | 'production' | 'final'>>
+/**
+ * 工作流 roadmap（Issue #105）：`GET /episodes/:id/roadmap` 是 UI 与 AI 的唯一状态源。
+ * 服务端是唯一判定方；前端只渲染它给的状态、原因、出路与计数。
+ */
+export type StepStatus = 'locked' | 'available' | 'in_progress' | 'done' | 'stale' | 'skipped'
+
+export interface RoadmapMissing {
+  code: string
+  message: string
+  count?: number
 }
 
-/** 400 门禁拦截体：`{ error:'gate_blocked', gate, reason }`（由后端全局 onError 统一产出） */
-export function gateBlockedOf(err: unknown): { gate: GateKey; reason: string } | null {
-  const body = (err as ApiError)?.body
-  if (!body || body.error !== 'gate_blocked') return null
-  return { gate: body.gate as GateKey, reason: String(body.reason || '') }
+export interface RoadmapNode {
+  /** 大步骤 key（raw/rewrite/assets/…）或子步骤 key（rewrite.prepared/assets.review/…） */
+  key: string
+  label: string
+  order: number
+  /** strict = 必须相对前面的严格同级步骤按顺序完成；free = 随时可做、可改 */
+  ordering: 'strict' | 'free'
+  /** Poster 专用：导出完成前必须完成，不卡中间步骤 */
+  required_before?: 'export'
+  status: StepStatus
+  /** 本步判据已满足（忽略上游）；为 true 且 status=in_progress 时说明只欠前置步骤 */
+  criteria_met: boolean
+  unlocked: boolean
+  lock_reason: string | null
+  /** 解锁需要先去的步骤 key */
+  goto: string | null
+  done_criteria: string[]
+  missing: RoadmapMissing[]
+  /** 非阻断提醒（例如资产审核清单的过期原因） */
+  notices: { code: string; message: string }[]
+  /** 前面未完成的严格步骤 key（仅在判据满足或进行中时给出） */
+  blocked_by: string[]
+  counts?: { done: number; total: number }
+  substeps: RoadmapNode[]
+}
+
+export interface RoadmapMilestone {
+  key: 'm1_script' | 'm2_production' | 'm3_export'
+  label: string
+  status: 'done' | 'in_progress' | 'pending' | 'stale'
+  achieved_at: string | null
+  steps: string[]
+  done_criteria: string[]
+}
+
+export interface Roadmap {
+  episode_id: number
+  drama_id: number
+  project_type: 'drama' | 'documentary'
+  /** 纪录片 true（严格递进），剧情 false（全部 free、从不 locked） */
+  strict: boolean
+  status: { effective: 'draft' | 'active' | 'completed'; derived: 'draft' | 'active' | 'completed'; override: 'draft' | 'active' | 'completed' | null }
+  current: { step: string | null; substep: string | null }
+  progress: { done: number; total: number }
+  milestones: RoadmapMilestone[]
+  steps: RoadmapNode[]
+  computed_at: string
 }
 
 async function req<T = any>(method: string, path: string, body?: any): Promise<T> {
@@ -85,7 +125,6 @@ export const episodeAPI = {
   scenes: (id: number) => api.get(`/episodes/${id}/scenes`),
   props: (id: number) => api.get(`/episodes/${id}/props`),
   storyboards: (id: number) => api.get(`/episodes/${id}/storyboards`),
-  pipelineStatus: (id: number) => api.get(`/episodes/${id}/pipeline-status`),
   extract: (id: number, target: string, model?: string, configId?: number) => api.post(`/episodes/${id}/extract`, { target, model: model || undefined, config_id: configId || undefined }),
   extractStatus: (id: number) => api.get(`/episodes/${id}/extract-status`),
   // 纪录片选角名册（Issue #32）：谁该建卡的契约，人在集页面复核确认后提取才照它执行
@@ -193,10 +232,10 @@ export const episodeAPI = {
       model: data.model || undefined,
       config_id: data.config_id || undefined,
     }),
-  // 步骤门禁与剧本确认（Issue #54）
-  gates: (id: number) => api.get<EpisodeGates>(`/episodes/${id}/gates`),
-  confirmScript: (id: number) => api.post<EpisodeGates>(`/episodes/${id}/script/confirm`),
-  unconfirmScript: (id: number) => api.post<EpisodeGates>(`/episodes/${id}/script/unconfirm`),
+  // 工作流 roadmap（Issue #105）：唯一的步骤状态源；确认/取消确认同样返回新 roadmap
+  roadmap: (id: number) => api.get<Roadmap>(`/episodes/${id}/roadmap`),
+  confirmScript: (id: number) => api.post<Roadmap>(`/episodes/${id}/script/confirm`),
+  unconfirmScript: (id: number) => api.post<Roadmap>(`/episodes/${id}/script/unconfirm`),
   // 旁白编辑器的语气 / 多音字 / 停顿选项（#38）
   narrationMarkupCatalog: (id: number) =>
     api.get<{

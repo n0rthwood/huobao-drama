@@ -511,7 +511,10 @@
       "all": "전체",
       "draft": "시작 전",
       "active": "진행 중",
-      "completed": "완료"
+      "completed": "완료",
+      "auto": "자동",
+      "manual": "수동",
+      "autoOption": "자동(진행에 따름)"
     },
     "createDialog": {
       "title": "새 프로젝트",
@@ -1076,17 +1079,19 @@
       "viewFilm": "완성 영상 보기",
       "continue": "제작 계속",
       "start": "제작 시작",
-      "resolution": "해상도"
+      "resolution": "해상도",
+      "milestones": "{done}/{total}",
+      "milestonesTitle": "마일스톤 달성 수(대본 / 제작 / 납출)"
     },
     "model": {
       "defaultWith": "기본 · {model}",
       "notConfigured": "미설정"
     },
     "sidebar": {
-      "inProgress": "진행 중",
       "refreshData": "데이터 새로고침",
       "collapse": "사이드바 접기",
-      "expand": "사이드바 펼치기"
+      "expand": "사이드바 펼치기",
+      "progressDone": "완료 {done} / {total}"
     },
     "nav": {
       "prev": "이전",
@@ -1099,7 +1104,8 @@
       "production": "제작",
       "assets": "에셋",
       "assetsDesc": "캐릭터 / 장면 / 소품",
-      "posterDesc": "선택 사항: 포스터 기본 이미지와 텍스트 레이아웃",
+      "posterDesc": "포스터 기본 이미지와 텍스트 레이아웃",
+      "posterRequiredBeforeExport": "납출 전 필수",
       "keyframes": "샷 키프레임",
       "keyframesDesc": "첫/중간/끝 키프레임과 수동 확인",
       "videos": "영상 제작",
@@ -1111,7 +1117,6 @@
       "prodStage": "제작 단계 · {step}",
       "exportDone": "납출 단계 · 완료",
       "exportWaiting": "납출 단계 · 병합 대기",
-      "workbench": "워크벤치",
       "narrationScript": "내레이션 원고",
       "narrationScriptDesc": "다큐멘터리 해설 정리(대본 본문이 곧 내레이션)",
       "evidenceAssetsDesc": "캐릭터 / 장면 / 증거 자료",
@@ -1187,6 +1192,7 @@
         "skipStage": "\"{name}\" 건너뛰기(선행본 복사)",
         "retryStage": "이 단계 재시도",
         "final": "최종본",
+        "confirm": "내레이션 원고 확정",
         "finalState": {
           "pending": "미갱신",
           "adopted": "단계 결과 채택됨",
@@ -2580,11 +2586,6 @@
       "mergeFailed": "병합에 실패했습니다",
       "previewShot": "이 샷 재생",
       "shotPreview": "샷 #{n} 미리보기",
-      "markDone": "완료로 표시",
-      "markedDone": "완료됨",
-      "markDoneTitle": "이 에피소드의 납출을 수동으로 완료 표시(다시 클릭하면 해제)",
-      "markedDoneToast": "완료로 표시했습니다",
-      "unmarkDoneToast": "완료 표시를 해제했습니다",
       "deleteMerge": "이 완성본 삭제",
       "deleteMergeBusy": "병합 중이어서 삭제할 수 없습니다",
       "deleteMergeTitle": "완성본 삭제",
@@ -2944,15 +2945,17 @@
     },
     "gate": {
       "locked": "잠김",
-      "checking": "단계 게이트 확인 중…",
-      "lockedTooltip": "{reason}",
-      "goFix": "해결하러 가기",
-      "needScript": "내레이션 원고가 확정되지 않았습니다",
-      "needAssetReview": "에셋 검수 목록이 통과되지 않았습니다",
-      "needDesign": "확정된 숏 설계가 없습니다",
-      "needProduction": "제작 준비가 된 숏이 없습니다",
-      "needFinal": "최신 합성 결과물이 없습니다",
-      "optional": "선택 · 체인 제외"
+      "checking": "단계 상태 확인 중…",
+      "goFix": "해결하러 가기"
+    },
+    "stepStatus": {
+      "checking": "확인 중",
+      "done": "완료",
+      "in_progress": "진행 중",
+      "available": "시작 가능",
+      "locked": "잠김",
+      "stale": "재검토 필요",
+      "skipped": "건너뜀"
     },
     "assetReview": {
       "batch": {

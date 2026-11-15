@@ -213,6 +213,7 @@ export async function narrationSkeletonState(episodeId: number): Promise<Skeleto
   // 「当前已确认」= 确认过的 revision 仍是当前 revision，而且最终旁白稿仍处于已确认状态、
   // 分配仍然严格成立。撤销剧本确认（即使正文字节没变）同样要收回骨架确认。
   const confirmed = Boolean(confirmedRevision)
+    && Boolean(ep.narrationSkeletonConfirmedAt)
     && confirmedRevision === revision
     && Boolean(ep.scriptConfirmedAt)
     && coverage.complete
@@ -313,10 +314,9 @@ export async function confirmNarrationSkeleton(episodeId: number, revision: stri
   return narrationSkeletonState(episodeId)
 }
 
-/** 撤销确认：批量配音与设计卡填写随即被挡住（已有的音频与卡不动） */
+/** 撤销确认：保留最后确认过的 revision 作为历史事实（roadmap 据此区分需复核与从未确认）。 */
 export async function unconfirmNarrationSkeleton(episodeId: number): Promise<SkeletonState> {
   await db.update(schema.episodes).set({
-    narrationSkeletonRevision: null,
     narrationSkeletonConfirmedAt: null,
     updatedAt: now(),
   }).where(eq(schema.episodes.id, episodeId))

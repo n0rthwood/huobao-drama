@@ -511,7 +511,10 @@
       "all": "すべて",
       "draft": "未開始",
       "active": "進行中",
-      "completed": "完了"
+      "completed": "完了",
+      "auto": "自動",
+      "manual": "手動",
+      "autoOption": "自動（進捗に従う）"
     },
     "createDialog": {
       "title": "新規プロジェクト",
@@ -1076,17 +1079,19 @@
       "viewFilm": "完成映像を見る",
       "continue": "制作を続ける",
       "start": "制作を開始",
-      "resolution": "解像度"
+      "resolution": "解像度",
+      "milestones": "{done}/{total}",
+      "milestonesTitle": "マイルストーン達成数（脚本 / 制作 / 書き出し）"
     },
     "model": {
       "defaultWith": "デフォルト · {model}",
       "notConfigured": "未設定"
     },
     "sidebar": {
-      "inProgress": "進行中",
       "refreshData": "データを更新",
       "collapse": "サイドバーを折りたたむ",
-      "expand": "サイドバーを展開"
+      "expand": "サイドバーを展開",
+      "progressDone": "完了 {done} / {total}"
     },
     "nav": {
       "prev": "前へ",
@@ -1099,7 +1104,8 @@
       "production": "制作",
       "assets": "資産",
       "assetsDesc": "キャラクター / シーン / 小道具",
-      "posterDesc": "任意：ポスターのベース画像と文字レイアウト",
+      "posterDesc": "ポスターのベース画像と文字レイアウト",
+      "posterRequiredBeforeExport": "書き出し前に必須",
       "keyframes": "分镜キーフレーム",
       "keyframesDesc": "先頭／中間／終端キーフレームと手動確認",
       "videos": "動画制作",
@@ -1111,7 +1117,6 @@
       "prodStage": "制作段階 · {step}",
       "exportDone": "書き出し段階 · 完了",
       "exportWaiting": "書き出し段階 · 結合待ち",
-      "workbench": "ワークベンチ",
       "narrationScript": "ナレーション原稿",
       "narrationScriptDesc": "ドキュメンタリーの解説文整理（脚本本文がそのままナレーション）",
       "evidenceAssetsDesc": "キャラクター / シーン / 証拠素材",
@@ -1187,6 +1192,7 @@
         "skipStage": "「{name}」をスキップ（前段をコピー）",
         "retryStage": "この段階を再試行",
         "final": "最終稿",
+        "confirm": "ナレーション原稿の確定",
         "finalState": {
           "pending": "未更新",
           "adopted": "段階結果を採用済み",
@@ -2580,11 +2586,6 @@
       "mergeFailed": "結合に失敗しました",
       "previewShot": "このショットを再生",
       "shotPreview": "ショット #{n} プレビュー",
-      "markDone": "完了にする",
-      "markedDone": "完了",
-      "markDoneTitle": "このエピソードの書き出しを手動で完了にします（再クリックで解除）",
-      "markedDoneToast": "完了としてマークしました",
-      "unmarkDoneToast": "完了マークを解除しました",
       "deleteMerge": "この完成動画を削除",
       "deleteMergeBusy": "結合中のため削除できません",
       "deleteMergeTitle": "完成動画を削除",
@@ -2944,15 +2945,17 @@
     },
     "gate": {
       "locked": "ロック中",
-      "checking": "ステップゲートを確認中…",
-      "lockedTooltip": "{reason}",
-      "goFix": "解決しに行く",
-      "needScript": "ナレーション原稿が未確定です",
-      "needAssetReview": "アセット審査リストが未通過です",
-      "needDesign": "確定済みのショット設計がありません",
-      "needProduction": "制作準備が整ったショットがありません",
-      "needFinal": "最新の合成成果物がありません",
-      "optional": "任意 · 連鎖外"
+      "checking": "ステップ状態を確認中…",
+      "goFix": "解決しに行く"
+    },
+    "stepStatus": {
+      "checking": "確認中",
+      "done": "完了",
+      "in_progress": "進行中",
+      "available": "開始可能",
+      "locked": "ロック中",
+      "stale": "要再確認",
+      "skipped": "スキップ済み"
     },
     "assetReview": {
       "batch": {

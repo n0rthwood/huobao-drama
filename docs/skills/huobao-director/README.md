@@ -45,6 +45,7 @@
 
 | 日期 | 对应 Issue | 技能变更 |
 |---|---|---|
+| 2026-11-15 | #105（drama 20 / ep 27 导出完成仍显示「待开始」） | 新增 `GET /episodes/{e}/roadmap` 作为步骤状态的唯一来源（大步骤/子步骤、`ordering`、`status`、`done_criteria`、`missing`、`blocked_by`、`milestones`、推算状态与人工覆盖）；原阶段门禁与流水线进度两个只读接口删除（404），`SKILL.md` §00.1、`references/api-catalog.md` §2、`api-core.md`、`api-production.md`、`diagnostic-example.md` 同步改写；`hbwf` 派生状态带 roadmap，`check` 打印当前步骤/缺失/`blocked_by`，写入按显式端点→步骤表做严格顺序守卫（纪录片；剧情项目只作信息、不加锁），每次写入后重新读 roadmap 并在 ledger 记录 `before/after/terminal`；逐镜 `next` 增加 `await_skeleton_confirm` / `await_design_card_confirm`（人工动作，只提示不代按）；`merge` 终检增加 roadmap 导出前置与 stale 判据，`hbwf final` 要求导出步骤 `done` + `m3_export` 达成。 |
 | 2026-11-12 | #97（drama 3 / episode 26 制作审计） | 新增 §00 强制工作流与 `references/workflow.md`：`hbwf` 由项目文件派生状态，是唯一写入通道，包含守卫、决定绑定、服务端对账与终检；新增 omp 扩展拦截绕过。S3 Poster 改为“每集必须决定”；S9 写明提示词批量 = 强制重写及提交前时间轴校验；S10 写明剧情镜被动“阻断”语义；剧情链补 Poster；反例表 +7。同步方式改为 `cp -a` + `diff -rq`。补记：#93–#96 的技能变更此前已入库，但未登记本表，托管副本也一直未同步，本次一并同步。 |
 | 2026-11-10 | #91 / #92（drama 14 / episode 20，9:16 竖屏） | S7：`read_storyboard_context` 返回 `aspect_ratio`/`composition`，关键帧提示词画幅校验与无名人物标识规则（#92）；S10：烧录字幕行宽随输出画面、≤4 行、避头点，行宽≠20 时进合成签名（#91）；记录 `video-batch/preview` 返回整集、提交前须按 ID 过滤的实测坑。 |
 | 2026-11-08 | #86 / #87（生产 release `20261108T204444Z`） | 全应用嵌套界面与弹窗 deeplink；设计依赖真实资产与语义；自动/显式视觉模型选择；骨架、配音、设计卡持久调用与字数/耗时/ETA；任务中心公开对话按需分页。drama 11 / episode 17 已真实执行 65 次调用、分页读全 727 条公开消息，保留骨架失败与在飞重启中断；卡片待人工审核，不冒充全部内容通过。全局其他调用另见 #88。 |
