@@ -1,0 +1,11 @@
+total(non-code) 108
+   36      582KB poster
+   24      191KB thumb
+   14       45KB api:layer-segments/storyboards/N
+   14        0KB api:storyboards/N/narration-fit/preview
+    8      195KB api:tasks
+    4      452KB api:tasks/active
+    2       28KB api:episodes/N/narration/voice-batch-status
+    2        0KB api:episodes/N/layer-render-batch-status
+    2       16KB api:episodes/N/video-batch
+    2       22KB api:episodes/N/compose-batch-status
