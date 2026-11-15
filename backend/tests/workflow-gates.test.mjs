@@ -1,7 +1,7 @@
 /**
  * 纪录片步骤门禁（Issue #54）：
  * - 纯函数 computeGates：剧情全解锁；纪录片逐级解锁，上游回退时下游同步锁回，reasons 写最靠上的原因；
- * - 真跑库：GET /episodes/:id/gates 的结构，以及拆分/补镜/填卡/提取被 GateBlockedError 拦住。
+ * - 真跑库：roadmap 的门禁字段，以及拆分/补镜/填卡/提取被 GateBlockedError 拦住。
  * 临时 SQLITE_PATH + 仓库自带 tsx 子进程，绝不碰开发库。
  */
 import { execFileSync } from 'node:child_process'
@@ -31,9 +31,9 @@ const FACTS = (over = '') => `
   const base = {
     projectType: 'documentary',
     script: { confirmed: true, confirmed_at: '2026-01-01T00:00:00.000Z' },
-    assets: { review_status: 'passed', stale_reasons: [] },
+    assets: { review_status: 'passed', stale_reasons: [], missing: 0 },
     design: { confirmed: 2, total: 3 },
-    production: { ready: 1, total: 3 },
+    production: { ready: 1, total: 3, layer: { ready: 1, total: 3 }, keyframes: { ready: 1, total: 3 } },
     final: { fresh: 1, total: 3 },
   }
   ${over}
@@ -140,22 +140,21 @@ const DB_FIXTURE = `
   ])
 `
 
-test('GET /episodes/:id/gates：纪录片未确认剧本 → assets 锁且有原因；剧情集全解锁', () => {
+test('roadmap 门禁字段：纪录片未确认剧本 → assets 未解锁且有原因；剧情集全解锁', () => {
   const result = run(`
     ${DB_FIXTURE}
     const app = (await import('./src/routes/episodes.ts')).default
-    const doc = await (await app.request('/1/gates')).json()
-    const drama = await (await app.request('/2/gates')).json()
+    const doc = await (await app.request('/1/roadmap')).json()
+    const drama = await (await app.request('/2/roadmap')).json()
     console.log('@@' + JSON.stringify({ doc: doc.data, drama: drama.data }))
   `)
   assert.equal(result.doc.project_type, 'documentary')
-  assert.equal(result.doc.script.confirmed, false)
-  assert.equal(result.doc.assets.review_status, 'none')
-  assert.equal(result.doc.unlocked.assets, false)
-  assert.ok(result.doc.reasons.assets.length > 0)
+  const assets = result.doc.steps.find(node => node.key === 'assets')
+  assert.equal(assets.unlocked, false)
+  assert.ok(assets.lock_reason.length > 0)
+  assert.equal(assets.goto, 'rewrite')
   assert.equal(result.drama.project_type, 'drama')
-  assert.deepEqual(result.drama.unlocked, { assets: true, design: true, production: true, final: true, poster: true, export: true })
-  assert.deepEqual(result.drama.reasons, {})
+  assert.ok(result.drama.steps.every(node => node.unlocked && node.lock_reason === null && node.goto === null))
 })
 
 test('assertGate 在剧本未确认 / 清单未通过时抛 GateBlockedError，且不建任务', () => {

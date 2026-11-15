@@ -18,7 +18,9 @@ export const sqliteSchemaStatements = [
     aspect_ratio TEXT DEFAULT '16:9',
     total_episodes INTEGER DEFAULT 1,
     total_duration INTEGER DEFAULT 0,
-    status TEXT NOT NULL DEFAULT 'draft',
+    status_override TEXT,
+    status_derived TEXT,
+    status_derived_at TEXT,
     thumbnail TEXT,
     tags TEXT,
     metadata TEXT,
@@ -36,7 +38,9 @@ export const sqliteSchemaStatements = [
     script_content TEXT,
     description TEXT,
     duration INTEGER DEFAULT 0,
-    status TEXT DEFAULT 'draft',
+    status_override TEXT,
+    status_derived TEXT,
+    status_derived_at TEXT,
     video_url TEXT,
     thumbnail TEXT,
     image_config_id INTEGER,
@@ -908,6 +912,13 @@ const columnAdditions: { table: string; column: string; type: string }[] = [
   // 衔接帧画面描述（Issue #95）：视觉模型对实际衔接帧 PNG 的描述，按 junction_hash 缓存。
   // 存量行 NULL = 从未描述过；视频提示词批次在 Agent 开跑前逐镜补算，不做一次性回填。
   { table: 'storyboard_layer_segments', column: 'junction_caption', type: 'TEXT' },
+  // Issue #105：存量状态全部 draft，不迁入 override；由 roadmap 推算快照。
+  { table: 'dramas', column: 'status_override', type: 'TEXT' },
+  { table: 'dramas', column: 'status_derived', type: 'TEXT' },
+  { table: 'dramas', column: 'status_derived_at', type: 'TEXT' },
+  { table: 'episodes', column: 'status_override', type: 'TEXT' },
+  { table: 'episodes', column: 'status_derived', type: 'TEXT' },
+  { table: 'episodes', column: 'status_derived_at', type: 'TEXT' },
 ]
 
 /**
@@ -920,6 +931,8 @@ const columnRemovals: { table: string; column: string }[] = [
   { table: 'storyboards', column: 'continuity_mode' },
   // 分镜级素材版本选择 → storyboard_target_assets.selected_image（Issue #18，先迁移再删列）
   { table: 'storyboards', column: 'asset_version_selection' },
+  { table: 'dramas', column: 'status' },
+  { table: 'episodes', column: 'status' },
 ]
 
 function applyColumnRemovals(sqlite: Database.Database): void {

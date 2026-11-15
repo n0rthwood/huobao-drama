@@ -1,25 +1,20 @@
 /**
  * 纪录片工作流门禁（Issue #54）— 步骤解锁的唯一实现
  *
- * 读：`episodeGates()` 给前端步骤栏/进度条，`assertGate()` 给服务端写端点。
+ * 读：`episodeGateFactSet()` 给 roadmap，`episodeGates()` / `assertGate()` 给服务端写端点。
  * 写：`confirmScript()` / `unconfirmScript()` / `onScriptChanged()` 是
  *     `episodes.script_confirmed_at` 的唯一写入口（改旁白稿自动取消确认）。
  *
  * 规则逐级传递：上游没解锁，下游一律锁住，不被残留状态绕过；`reasons[step]` 永远写
  * **最靠上**的那个未满足原因，这样 tooltip 的跳转落在真正的阻塞步骤上。
  *
- * 过渡口径（契约 §2，主进程裁决）：
- * - `design.confirmed` 在 R4 落地前读 `storyboards.intent_reviewed`，之后改读 `design_card_status`；
- * - `production.ready` 读 `storyboards.keyframes_confirmed`，R5 改为「本镜启用的段全部 ready」；
- * - `final.fresh` 复用 `compose-state.ts` 的 `exportable`，R7 升到签名 v4。
- *
  * 剧情项目（project_type='drama'）恒全解锁、reasons 为空：行为与 #54 之前逐字一致。
  */
-import { and, eq, isNull } from 'drizzle-orm'
+import { and, asc, eq, isNull } from 'drizzle-orm'
 
 import { db, schema } from '../db/index.js'
 import { assetReviewCounts, assetReviewGateReason } from './asset-review.js'
-import { composeStatesForEpisode } from './compose-state.js'
+import { composeStatesForEpisode, type ComposeStateItem } from './compose-state.js'
 import { resolveDramaProjectType, type ProjectType } from './project-type.js'
 import { now } from '../utils/response.js'
 import { markEpisodeDesignCardsStale } from './staleness.js'
@@ -50,7 +45,17 @@ export interface GateFacts {
   /** `missing` = 还没处置的清单条目数（R2 的 `assetReviewGateReason` 用它组文案） */
   assets: { review_status: AssetReviewStatus; stale_reasons: string[]; missing: number }
   design: { confirmed: number; total: number }
-  production: { ready: number; total: number }
+  /**
+   * `ready` 是「整镜可制作」（设计卡已确认 + 本镜启用的段全部就绪），门禁只看它；
+   * `layer` / `keyframes` 是按段组合拆开的就绪数，roadmap 的两个子步骤直接用这两个计数，
+   * 保证解锁位与子步骤完成度出自同一份事实（Issue #105）。
+   */
+  production: {
+    ready: number
+    total: number
+    layer: { ready: number; total: number; stale?: number }
+    keyframes: { ready: number; total: number; stale?: number }
+  }
   final: { fresh: number; total: number }
 }
 
@@ -114,7 +119,7 @@ export function computeGates(facts: GateFacts): EpisodeGates {
       goto[step.key] = step.goto
     }
   }
-  // Poster 可选、不入链：跟随资产解锁，不因后续步骤未做而锁住
+  // Poster 不阻塞中间步骤：跟随资产解锁；纪录片导出完成另由 roadmap 要求最终 Poster。
   unlocked.poster = unlocked.assets
   if (!unlocked.poster) {
     reasons.poster = reasons.assets
@@ -137,46 +142,86 @@ export function normalizeAssetReviewStatus(v: unknown): AssetReviewStatus {
     : 'none'
 }
 
-/** 本集的门禁事实；剧集不存在返回 null */
-export async function episodeGateFacts(episodeId: number): Promise<GateFacts | null> {
+/**
+ * 一次读库得到的门禁事实集合：门禁（`computeGates`）与 roadmap（`computeRoadmap`）共用同一份，
+ * 不允许第二个模块自己再查一遍分镜/融合状态——两套口径是本 Issue 要消灭的问题。
+ */
+export interface EpisodeGateFactSet {
+  facts: GateFacts
+  episode: typeof schema.episodes.$inferSelect
+  projectType: ProjectType
+  /** 未删除的分镜，按 storyboard_number 升序（导出比对依赖这个顺序） */
+  rows: (typeof schema.storyboards.$inferSelect)[]
+  /** 纪录片的逐镜融合状态（剧情项目不计算，为 null） */
+  composeStates: ComposeStateItem[] | null
+}
+
+/** 本集的门禁事实集合；剧集不存在返回 null */
+export async function episodeGateFactSet(episodeId: number): Promise<EpisodeGateFactSet | null> {
   const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId))
   if (!ep) return null
   const projectType = resolveDramaProjectType(ep.dramaId)
   const rows = await db.select().from(schema.storyboards)
     .where(and(eq(schema.storyboards.episodeId, episodeId), isNull(schema.storyboards.deletedAt)))
+    .orderBy(asc(schema.storyboards.storyboardNumber))
 
+  let composeStates: ComposeStateItem[] | null = null
   let fresh = 0
   if (projectType === 'documentary' && rows.length) {
     // 成品新鲜度与导出预检同源（compose-state 的 exportable），不另算签名
-    const states = await composeStatesForEpisode(episodeId, { rows, episode: ep })
-    fresh = states.filter(item => item.exportable).length
+    composeStates = await composeStatesForEpisode(episodeId, { rows, episode: ep })
+    fresh = composeStates.filter(item => item.exportable).length
   }
   let productionReady = rows.filter(sb => sb.keyframesConfirmed === true).length
+  const layer = { ready: 0, total: 0, stale: 0 }
+  const keyframes = { ready: 0, total: 0, stale: 0 }
   if (projectType === 'documentary') {
     const segments = await segmentsByStoryboard(rows.map(sb => sb.id))
     const spec = await resolveEpisodeSegmentSpec(episodeId)
-    productionReady = rows.filter(sb => {
-      if (sb.designCardStatus !== 'confirmed' || !sb.combo) return false
+    productionReady = 0
+    for (const sb of rows) {
+      const combo = sb.combo
+      if (!combo) continue
       const segment = segments.get(sb.id)
-      const layerReady = Boolean(segment && layerSegmentIsFresh(segment, spec, sb.combo))
-      if (sb.combo === 'A') return layerReady
-      if (sb.combo === 'B') return sb.keyframesConfirmed === true
-      return layerReady && sb.keyframesConfirmed === true
-    }).length
+      const layerReady = Boolean(segment && layerSegmentIsFresh(segment, spec, combo))
+      if (sb.designCardStatus === 'confirmed'
+        && (combo === 'A' ? layerReady : combo === 'B' ? sb.keyframesConfirmed === true : layerReady && sb.keyframesConfirmed === true)) productionReady++
+      if (combo === 'A' || combo === 'C' || combo === 'D') {
+        layer.total++
+        if (layerReady) layer.ready++
+        else if (segment?.render_path) layer.stale++
+      }
+      if (combo === 'B' || combo === 'C' || combo === 'D') {
+        keyframes.total++
+        if (sb.keyframesConfirmed === true) keyframes.ready++
+        else if (sb.keyframesStaleReason) keyframes.stale++
+      }
+    }
   }
 
   return {
+    episode: ep,
     projectType,
-    script: { confirmed: !!ep.scriptConfirmedAt, confirmed_at: ep.scriptConfirmedAt ?? null },
-    assets: {
-      review_status: normalizeAssetReviewStatus(ep.assetReviewStatus),
-      stale_reasons: parseStaleReasons(ep.assetReviewStaleReasons),
-      missing: projectType === 'documentary' ? assetReviewCounts(episodeId).missing : 0,
+    rows,
+    composeStates,
+    facts: {
+      projectType,
+      script: { confirmed: !!ep.scriptConfirmedAt, confirmed_at: ep.scriptConfirmedAt ?? null },
+      assets: {
+        review_status: normalizeAssetReviewStatus(ep.assetReviewStatus),
+        stale_reasons: parseStaleReasons(ep.assetReviewStaleReasons),
+        missing: projectType === 'documentary' ? assetReviewCounts(episodeId).missing : 0,
+      },
+      design: { confirmed: rows.filter(sb => sb.designCardStatus === 'confirmed').length, total: rows.length },
+      production: { ready: productionReady, total: rows.length, layer, keyframes },
+      final: { fresh, total: rows.length },
     },
-    design: { confirmed: rows.filter(sb => sb.designCardStatus === 'confirmed').length, total: rows.length },
-    production: { ready: productionReady, total: rows.length },
-    final: { fresh, total: rows.length },
   }
+}
+
+/** 本集的门禁事实（`computeGates` 的输入）；剧集不存在返回 null */
+export async function episodeGateFacts(episodeId: number): Promise<GateFacts | null> {
+  return (await episodeGateFactSet(episodeId))?.facts ?? null
 }
 
 export async function episodeGates(episodeId: number): Promise<EpisodeGates | null> {

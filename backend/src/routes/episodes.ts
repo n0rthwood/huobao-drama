@@ -16,10 +16,10 @@ import { loadLayerSegmentSummaries } from '../services/layer-segment.js'
 import {
   assertGate,
   confirmScript,
-  episodeGates,
   onScriptChanged,
   unconfirmScript,
 } from '../services/workflow-gates.js'
+import { episodeRoadmap, parseStatusOverride, STATUS_OVERRIDE_MESSAGE, refreshDramaSnapshot } from '../services/workflow-roadmap.js'
 import {
   RevisionConflictError,
   bumpSourceRevision,
@@ -139,12 +139,15 @@ app.post('/', async (c) => {
     subtitleTiming: DEFAULT_SUBTITLE_TIMING,
     // 视频分辨率在创建集时固定（480p/720p/1080p），后续可通过 PUT 修改；各视频适配器再映射为厂商档位
     resolution: ['480p', '720p', '1080p'].includes(body.resolution) ? body.resolution : '720p',
+    statusDerived: 'draft',
+    statusDerivedAt: ts,
     createdAt: ts,
     updatedAt: ts,
   })
 
   const [ep] = await db.select().from(schema.episodes)
     .where(eq(schema.episodes.id, getInsertId(res)))
+  await refreshDramaSnapshot(ep.dramaId)
   return success(c, {
     id: ep.id,
     episode_number: ep.episodeNumber,
@@ -152,6 +155,9 @@ app.post('/', async (c) => {
     image_config_id: ep.imageConfigId,
     video_config_id: ep.videoConfigId,
     resolution: ep.resolution,
+    status: 'draft',
+    status_derived: 'draft',
+    status_override: null,
   })
 })
 
@@ -171,6 +177,7 @@ app.put('/:id', async (c) => {
     if (key in body) updates[key] = body[key]
   }
   if (Object.keys(updates).length === 0) return badRequest(c, '没有可更新的字段')
+  if ('status' in updates && parseStatusOverride(updates.status) === undefined) return badRequest(c, STATUS_OVERRIDE_MESSAGE)
   if ('resolution' in updates && !['480p', '720p', '1080p'].includes(updates.resolution)) {
     return badRequest(c, 'resolution 只支持 480p / 720p / 1080p')
   }
@@ -197,7 +204,7 @@ app.put('/:id', async (c) => {
   if ('script_content' in updates) drizzleUpdates.scriptContent = updates.script_content
   if ('title' in updates) drizzleUpdates.title = updates.title
   if ('description' in updates) drizzleUpdates.description = updates.description
-  if ('status' in updates) drizzleUpdates.status = updates.status
+  if ('status' in updates) drizzleUpdates.statusOverride = parseStatusOverride(updates.status)
   if ('resolution' in updates) drizzleUpdates.resolution = updates.resolution
   if ('narration_enabled' in updates) drizzleUpdates.narrationEnabled = updates.narration_enabled === true
   if ('tts_config_id' in updates) drizzleUpdates.ttsConfigId = updates.tts_config_id ?? null
@@ -264,6 +271,7 @@ app.delete('/:id', async (c) => {
   if (!ep) return notFound(c, '剧集不存在')
   await db.update(schema.episodes).set({ deletedAt: now(), updatedAt: now() })
     .where(eq(schema.episodes.id, id))
+  await refreshDramaSnapshot(ep.dramaId)
   return success(c)
 })
 
@@ -759,12 +767,11 @@ app.get('/:id/narration-coverage', async (c) => {
   return success(c, coverage)
 })
 
-// GET /episodes/:id/gates — 纪录片步骤门禁（#54）：解锁位 + 原因 + 跳转；剧情项目恒全解锁
-app.get('/:id/gates', async (c) => {
-  const id = Number(c.req.param('id'))
-  const gates = await episodeGates(id)
-  if (!gates) return notFound(c, '剧集不存在')
-  return success(c, gates)
+// GET /episodes/:id/roadmap — UI / AI 唯一完成状态源；门禁仍由 computeGates 计算
+app.get('/:id/roadmap', async (c) => {
+  const roadmap = await episodeRoadmap(Number(c.req.param('id')))
+  if (!roadmap) return notFound(c, '剧集不存在')
+  return success(c, roadmap)
 })
 
 // POST /episodes/:id/script/confirm — 确认旁白稿（#54）：确认后才允许拆分/补镜
@@ -773,7 +780,7 @@ app.post('/:id/script/confirm', async (c) => {
   const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, id))
   if (!ep) return notFound(c, '剧集不存在')
   if (!await confirmScript(id)) return badRequest(c, '旁白稿为空，不能确认')
-  return success(c, await episodeGates(id))
+  return success(c, await episodeRoadmap(id))
 })
 
 // POST /episodes/:id/script/unconfirm — 取消确认，回到可改稿状态
@@ -782,7 +789,7 @@ app.post('/:id/script/unconfirm', async (c) => {
   const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, id))
   if (!ep) return notFound(c, '剧集不存在')
   await unconfirmScript(id)
-  return success(c, await episodeGates(id))
+  return success(c, await episodeRoadmap(id))
 })
 
 // POST /episodes/:id/storyboards/fill-gaps — 补全剩余（#52）：保留已拆分镜，只补旁白覆盖缺口
@@ -1050,44 +1057,6 @@ app.get('/:episode_id/storyboards', async (c) => {
         .map(p => serializeProp(p)),
     }
   })))
-})
-
-// GET /episodes/:id/pipeline-status — 流水线进度
-// 按集聚合任务的旧接口 /generation-tasks 已删除：任务中心统一走 GET /tasks/center（sys_task.episode_id）
-app.get('/:id/pipeline-status', async (c) => {
-  const episodeId = Number(c.req.param('id'))
-  const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId))
-  if (!ep) return notFound(c, '剧集不存在')
-
-  const chars = await db.select().from(schema.characters).where(eq(schema.characters.dramaId, ep.dramaId))
-  const scenes = await db.select().from(schema.scenes).where(eq(schema.scenes.dramaId, ep.dramaId))
-  const sbs = await db.select().from(schema.storyboards).where(eq(schema.storyboards.episodeId, episodeId))
-  // 软删的成片不参与「已合成」判断：文件已被删除，继续展示会产生死链
-  const merges = await db.select().from(schema.videoMerges)
-    .where(and(eq(schema.videoMerges.episodeId, episodeId), isNull(schema.videoMerges.deletedAt)))
-
-  const sbsWithImage = sbs.filter(s => s.composedImage)
-  const sbsWithVideo = sbs.filter(s => s.videoUrl)
-  const latestMerge = merges[merges.length - 1]
-
-  function stepStatus(done: boolean, partial?: boolean) {
-    if (done) return 'done'
-    if (partial) return 'partial'
-    return 'pending'
-  }
-
-  return success(c, {
-    episode_id: episodeId,
-    steps: {
-      script_rewrite: { status: ep.scriptContent ? 'done' : (ep.content ? 'ready' : 'pending') },
-      extract_characters: { status: stepStatus(chars.length > 0), count: chars.length },
-      extract_scenes: { status: stepStatus(scenes.length > 0), count: scenes.length },
-      extract_storyboards: { status: stepStatus(sbs.length > 0), count: sbs.length },
-      generate_images: { status: stepStatus(sbsWithImage.length === sbs.length && sbs.length > 0, sbsWithImage.length > 0), completed: sbsWithImage.length, total: sbs.length },
-      generate_videos: { status: stepStatus(sbsWithVideo.length === sbs.length && sbs.length > 0, sbsWithVideo.length > 0), completed: sbsWithVideo.length, total: sbs.length },
-      merge_episode: { status: latestMerge?.status === 'completed' ? 'done' : (latestMerge ? latestMerge.status : 'pending'), merged_url: latestMerge?.mergedUrl },
-    },
-  })
 })
 
 export default app

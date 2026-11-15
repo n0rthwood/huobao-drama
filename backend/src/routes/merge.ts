@@ -10,6 +10,7 @@ import { posterPathFor } from '../utils/video-poster.js'
 import { logTaskError, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
 import { toUnixSeconds } from '../services/media-time.js'
 import { GateBlockedError } from '../services/workflow-gates.js'
+import { episodeRoadmap } from '../services/workflow-roadmap.js'
 
 const app = new Hono()
 
@@ -115,6 +116,8 @@ app.delete('/episodes/:id/merges/:mergeId', async (c) => {
   }
 
   const videoUrl = await syncEpisodeVideoUrl(episodeId, merge.mergedUrl)
+  // 删掉成片可能让导出步退回未完成：立即刷新本集/项目派生状态快照（#105）
+  await episodeRoadmap(episodeId)
   return success(c, { id: mergeId, deleted: true, episode_video_url: videoUrl })
 })
 

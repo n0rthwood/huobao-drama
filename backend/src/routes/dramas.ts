@@ -12,6 +12,7 @@ import { isDocumentaryRuleMode, resolveProjectRuleset } from '../services/genre-
 import { DOCUMENTARY_DEFAULT_STYLE, isProjectType, normalizeProjectType } from '../services/project-type.js'
 import { cancelAssetBatch, getAssetBatch, previewAssetBatch, startAssetBatch } from '../services/asset-batch.js'
 import { isAssetBatchScope, type AssetBatchScope } from '../services/asset-batch-select.js'
+import { parseStatusOverride, requestRoadmapRefresh, refreshDramaSnapshot, statusSnapshot, STATUS_OVERRIDE_MESSAGE } from '../services/workflow-roadmap.js'
 
 const app = new Hono()
 
@@ -25,6 +26,7 @@ const DOCUMENTARY_RULES_LOCKED_MESSAGE = '纪录片项目的纪录片规则固�
 
 // GET /dramas - List dramas
 app.get('/', async (c) => {
+  requestRoadmapRefresh()
   const page = Number(c.req.query('page') || 1)
   const pageSize = Number(c.req.query('page_size') || 20)
   const status = c.req.query('status')
@@ -35,7 +37,7 @@ app.get('/', async (c) => {
     .orderBy(desc(schema.dramas.updatedAt))
   let filtered = allRows
 
-  if (status) filtered = filtered.filter(d => d.status === status)
+  if (status) filtered = filtered.filter(d => statusSnapshot(d).status === status)
   if (keyword) filtered = filtered.filter(d => d.title.includes(keyword))
 
   const total = filtered.length
@@ -51,9 +53,10 @@ app.get('/', async (c) => {
       .where(and(eq(schema.scenes.dramaId, drama.id), isNull(schema.scenes.deletedAt)))
     return {
       ...toSnakeCase(drama),
+      ...statusSnapshot(drama),
       tags: drama.tags ? JSON.parse(drama.tags) : [],
       total_episodes: eps.length,
-      episodes: toSnakeCaseArray(eps),
+      episodes: eps.map(ep => ({ ...toSnakeCase(ep), ...statusSnapshot(ep) })),
       characters: toSnakeCaseArray(chars),
       scenes: toSnakeCaseArray(scns),
     }
@@ -84,7 +87,8 @@ app.post('/', async (c) => {
     aspectRatio: body.aspect_ratio,
     tags: body.tags ? JSON.stringify(body.tags) : null,
     metadata: body.metadata,
-    status: 'draft',
+    statusDerived: 'draft',
+    statusDerivedAt: ts,
     createdAt: ts,
     updatedAt: ts,
   })
@@ -93,16 +97,18 @@ app.post('/', async (c) => {
     .where(eq(schema.dramas.id, getInsertId(res)))
 
   // 不再预建集 — 用户通过「添加集」流程创建（该流程会锁定图片/视频生成配置）
-  return created(c, toSnakeCase(result))
+  return created(c, { ...toSnakeCase(result), ...statusSnapshot(result) })
 })
 
 
 // GET /dramas/stats — must be before /:id
 app.get('/stats', async (c) => {
+  requestRoadmapRefresh()
   const all = await db.select().from(schema.dramas).where(isNull(schema.dramas.deletedAt))
   const byStatus = Object.entries(
     all.reduce((acc, d) => {
-      acc[d.status || 'draft'] = (acc[d.status || 'draft'] || 0) + 1
+      const status = statusSnapshot(d).status
+      acc[status] = (acc[status] || 0) + 1
       return acc
     }, {} as Record<string, number>)
   ).map(([status, count]) => ({ status, count }))
@@ -136,10 +142,11 @@ app.get('/:id', async (c) => {
 
   return success(c, {
     ...toSnakeCase(drama),
+    ...statusSnapshot(drama),
     // 题材规则集（Issue #32）：开关优先、否则按 genre 关键字归一，供项目设置显示归一化结果
     genre_ruleset: resolveProjectRuleset(drama.projectType, drama.genre, drama.documentaryRules),
     tags: drama.tags ? JSON.parse(drama.tags) : [],
-    episodes: toSnakeCaseArray(eps),
+    episodes: eps.map(ep => ({ ...toSnakeCase(ep), ...statusSnapshot(ep) })),
     characters: withTime(chars),
     scenes: withTime(scns),
     // 道具走地图感知的序列化：普通道具不带任何地图字段，地图资产带 map_spec 不带大文档
@@ -183,7 +190,11 @@ app.put('/:id', async (c) => {
   }
   if (body.style !== undefined) updates.style = body.style
   if (body.aspect_ratio !== undefined) updates.aspectRatio = body.aspect_ratio
-  if (body.status !== undefined) updates.status = body.status
+  if ('status' in body) {
+    const override = parseStatusOverride(body.status)
+    if (override === undefined) return badRequest(c, STATUS_OVERRIDE_MESSAGE)
+    updates.statusOverride = override
+  }
   if (body.tags !== undefined) updates.tags = JSON.stringify(body.tags)
   if (body.metadata !== undefined) updates.metadata = body.metadata
   await db.update(schema.dramas).set(updates).where(eq(schema.dramas.id, id))
@@ -348,12 +359,18 @@ app.put('/:id/episodes', async (c) => {
   const episodes = body.episodes || []
   const ts = now()
 
+  // Validate the entire request before writing any row; status is only an override input.
   for (const ep of episodes) {
+    if ('status' in ep && parseStatusOverride(ep.status) === undefined) return badRequest(c, STATUS_OVERRIDE_MESSAGE)
+  }
+  for (const ep of episodes) {
+    const { status, status_override, status_derived, status_derived_at, ...fields } = ep
+    if ('status' in ep) fields.statusOverride = parseStatusOverride(status)
     if (ep.id) {
-      await db.update(schema.episodes).set({ ...ep, updatedAt: ts }).where(eq(schema.episodes.id, ep.id))
+      await db.update(schema.episodes).set({ ...fields, updatedAt: ts }).where(eq(schema.episodes.id, ep.id))
     } else {
       await db.insert(schema.episodes).values({
-        ...ep,
+        ...fields,
         dramaId,
         episodeNumber: ep.episode_number || ep.episodeNumber || 1,
         title: ep.title || '未命名',
@@ -362,6 +379,7 @@ app.put('/:id/episodes', async (c) => {
       })
     }
   }
+  await refreshDramaSnapshot(dramaId)
   return success(c)
 })
 

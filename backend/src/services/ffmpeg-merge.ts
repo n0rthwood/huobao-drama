@@ -18,6 +18,7 @@ import { composeStatesForEpisode, type ComposeStateItem } from './compose-state.
 import type { FfprobeData } from 'fluent-ffmpeg'
 import { resolveDramaProjectType } from './project-type.js'
 import { assertGate } from './workflow-gates.js'
+import { episodeRoadmap } from './workflow-roadmap.js'
 
 // promisify loses the result type of fluent-ffmpeg's overloaded callback API.
 const probeFile = promisify(ffmpeg.ffprobe) as (file: string) => Promise<FfprobeData>
@@ -321,6 +322,9 @@ async function doMerge(mergeId: number, episodeId: number, videos: string[], int
   await db.update(schema.episodes)
     .set({ videoUrl: mergedRelative, updatedAt: now() })
     .where(eq(schema.episodes.id, episodeId))
+  // 成片完成立即更新剧集/项目派生状态；快照失败不把真实成功的合并改成失败。
+  try { await episodeRoadmap(episodeId) }
+  catch (error) { logTaskError('MergeTask', 'roadmap-snapshot', { episodeId, error: error instanceof Error ? error.message : String(error) }) }
 
   logTaskSuccess('MergeTask', 'episode-merge', {
     mergeId,
