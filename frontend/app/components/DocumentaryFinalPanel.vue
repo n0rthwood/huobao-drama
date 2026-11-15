@@ -1,11 +1,12 @@
 <script setup>
-import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { api, episodeAPI } from '~/composables/useApi'
 import { toastError } from '~/composables/useToast'
 import { WORKBENCH_CTX } from '~/utils/workbenchSteps'
 import { batchScopeOf } from '~/utils/documentaryFinal'
 import DocumentaryFinalShot from '~/components/DocumentaryFinalShot.vue'
+import LazyMount from '~/components/LazyMount.vue'
 import BatchScopeDialog from '~/components/BatchScopeDialog.vue'
 import VideoQueueBar from '~/components/VideoQueueBar.vue'
 import { toast } from 'vue-sonner'
@@ -57,6 +58,55 @@ watch([selectMode, selected, () => dialog.value?.kind, retry], () => link.set({
   sel: selectMode.value ? (selected.value.join(',') || 'on') : '',
   fdlg: dialog.value ? `${dialog.value.kind}${retry.value ? ':retry' : ''}` : '',
 }), { deep: true, immediate: true })
+
+// ===== 镜卡懒挂载（#106） =====
+// 从未挂载过的占位按段组合给估计高度：占位太矮（一行镜号）会让 ±1 屏窗口一次命中几十个占位，
+// 形成挂载风暴；这里按真实卡片的量级估，卸载回来的真实高度再平滑替代估计值（滚回占位不跳动）。
+const ESTIMATED_CARD_HEIGHTS = { none: 180, A: 1500, B: 1900, C: 2400, D: 2400 }
+const comboHeights = ref({})
+const shotRefs = {}
+// deeplink 目标（rehearse / voice / nedlg=check:<id>）强制挂载，并在首屏滚入视口一次
+const forcedShotIds = new Set([urlRehearse, urlVoice, urlCheck].filter(id => id > 0))
+let deeplinkScrolled = false
+function comboOf(sb) { return sb.combo || 'none' }
+function shotNumberOf(sb, index) { return sb.storyboard_number || sb.storyboardNumber || index + 1 }
+function estimateOf(sb) { return comboHeights.value[comboOf(sb)] || ESTIMATED_CARD_HEIGHTS[comboOf(sb)] || ESTIMATED_CARD_HEIGHTS.none }
+function rememberCardHeight(sb, height) {
+  if (!(height > 0)) return
+  const combo = comboOf(sb)
+  const prev = comboHeights.value[combo]
+  comboHeights.value = { ...comboHeights.value, [combo]: prev ? Math.round((prev * 2 + height) / 3) : height }
+}
+function setShotRef(id, instance) {
+  if (instance) shotRefs[id] = instance
+  else delete shotRefs[id]
+}
+/** 卸载许可转发给 LazyMount：子卡没挂载/没暴露 canUnload 时视为允许 */
+function shotCanUnload(id) { return shotRefs[id]?.canUnload?.() ?? true }
+/**
+ * deeplink 目标滚入视口一次。占位换成真实卡片会让上方高度变化，所以在前几帧里重复对齐
+ * （最多 4 次、间隔 120ms，位置稳定即停），之后不再打扰用户自己的滚动；恢复本身不产生任何副作用。
+ */
+async function settleDeeplinkScroll() {
+  let lastTop = null
+  for (let attempt = 0; attempt < 4; attempt++) {
+    await nextTick()
+    const el = [...forcedShotIds].map(id => document.getElementById(`final-shot-${id}`)).find(Boolean)
+    if (!el) return
+    el.scrollIntoView({ block: 'center' })
+    const top = Math.round(el.getBoundingClientRect().top)
+    // 两次对齐的位置一样：邻近卡片已经换成真实高度，不再重复滚动
+    if (lastTop !== null && Math.abs(top - lastTop) <= 2) return
+    lastTop = top
+    await new Promise(resolve => setTimeout(resolve, 120))
+  }
+}
+watch(() => shots.value.length, () => {
+  if (deeplinkScrolled || !forcedShotIds.size || !shots.value.length) return
+  deeplinkScrolled = true
+  void settleDeeplinkScroll()
+}, { immediate: true })
+
 function rowsOf(result) { return Array.isArray(result) ? result : result?.items || [] }
 async function preview(kind, retryOnly = false) {
   if (!episodeId.value) return
@@ -122,9 +172,18 @@ onBeforeUnmount(() => clearInterval(timer))
     </div>
     <div v-for="(sb, index) in shots" :key="sb.id">
       <label v-if="selectMode"><input v-model="selected" type="checkbox" :value="sb.id" />#{{ index + 1 }}</label>
-      <DocumentaryFinalShot :storyboard="sb" :number="sb.storyboard_number || sb.storyboardNumber || index + 1" @compose-batch="preview('compose')" />
+      <LazyMount
+        class="final-shot-wrap"
+        :force="forcedShotIds.has(Number(sb.id))"
+        :can-unload="() => shotCanUnload(sb.id)"
+        :estimate="estimateOf(sb)"
+        :label="`#${String(shotNumberOf(sb, index)).padStart(2, '0')} · ${sb.combo || '—'}`"
+        @measured="height => rememberCardHeight(sb, height)"
+      >
+        <DocumentaryFinalShot :ref="el => setShotRef(sb.id, el)" :storyboard="sb" :number="shotNumberOf(sb, index)" @compose-batch="preview('compose')" />
+      </LazyMount>
     </div>
     <BatchScopeDialog v-if="dialog" :title="t(`episode.final.batch.${dialog.kind}`)" :items="dialog.items" :scope="dialog.scope" :retry-mode="retry" :busy="busy" @close="dialog = null" @confirm="start" />
   </div>
 </template>
-<style scoped>.documentary-final{padding:16px;overflow:auto}.final-toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;position:sticky;top:0;background:var(--bg-1);z-index:2;padding:10px}.final-error{color:var(--error)}.final-batch-status{font-size:12px;color:var(--text-2)}</style>
+<style scoped>.documentary-final{padding:16px;overflow:auto}.final-toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;position:sticky;top:0;background:var(--bg-1);z-index:2;padding:10px}.final-error{color:var(--error)}.final-batch-status{font-size:12px;color:var(--text-2)}/* 卡间距放在懒挂载外壳上：占位与已挂载卡占同样的滚动长度 */.final-shot-wrap{margin:16px 0}</style>

@@ -250,6 +250,12 @@ async function runCompose() {
     composing.value = false
   }
 }
+
+/**
+ * 宿主镜卡的卸载保护（#106）：匹配参数有未应用草稿（dirty）或草稿正在计算（busy）、
+ * 正在合成（composing）时不能卸载，否则草稿和进度会丢。
+ */
+defineExpose({ fitDraft, composing })
 </script>
 
 <style scoped>

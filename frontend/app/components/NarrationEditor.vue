@@ -639,6 +639,10 @@ async function openCheck() {
   check.items = items
   check.loading = false
 }
+
+/** 四个浮层是否打开：宿主的镜卡卸载保护据此拒绝卸载（Issue #106），浮层都 Teleport 到 body */
+const dialogOpen = computed(() => pron.open || tone.open || pause.open || check.open)
+defineExpose({ dialogOpen })
 </script>
 
 <style scoped>
