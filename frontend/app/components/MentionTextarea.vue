@@ -30,7 +30,7 @@
               @mousemove="highlightIdx = flatIndex(gi, oi)"
             >
               <span :class="['mention-avatar', `mention-avatar-${opt.kind === 'scene' ? 'scene' : (opt.kind === 'prop' ? 'prop' : 'role')}`]">
-                <img v-if="opt.image" :src="opt.image" alt="" @error="$event.target.style.display = 'none'" />
+                <img v-if="opt.image" :src="thumbOf(opt.image)" alt="" loading="lazy" @error="onOptionImageError($event, opt.image)" />
                 <component v-else :is="groupIcon(opt.kind)" :size="12" :stroke-width="2" />
               </span>
               <span class="mention-name">@{{ opt.label }}</span>
@@ -48,6 +48,7 @@
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { User, MapPin, Package } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
+import { thumbFallback, thumbOf } from '~/composables/useMedia'
 
 const { t } = useI18n()
 
@@ -333,6 +334,16 @@ function onKeydown(e) {
     e.preventDefault()
     closeMention()
   }
+}
+
+/**
+ * 下拉头像（Issue #106）：先取缩略图，缩略图缺失时回退原图；两次都失败才隐藏，避免破图。
+ */
+function onOptionImageError(event, orig) {
+  const el = event.target
+  if (!el) return
+  if (el.dataset.fbk) { el.style.display = 'none'; return }
+  thumbFallback(event, orig)
 }
 
 function pick(opt) {

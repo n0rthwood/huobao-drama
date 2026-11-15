@@ -13,6 +13,7 @@ import path from 'path'
 import { desc, eq } from 'drizzle-orm'
 import { db, schema } from '../../db/index.js'
 import { STORAGE_ROOT } from '../../utils/paths.js'
+import { generateImageThumb } from '../../utils/storage.js'
 import { logTaskError, logTaskStart, logTaskSuccess, logTaskWarn } from '../../utils/task-logger.js'
 import { resolveStageModel, type StageModel } from '../ai-stages.js'
 import { callTextChat, imageContentPart, type ChatContent } from '../vision-chat.js'
@@ -116,15 +117,20 @@ function subjectText(s: ResearchSubject): string {
   return `资产：${s.name}（${KIND_LABEL[s.kind]}）\n描述：${s.description || '（无）'}`
 }
 
-function saveCandidate(bytes: Buffer, mime: string): { localPath: string; sha256: string } {
+async function saveCandidate(bytes: Buffer, mime: string): Promise<{ localPath: string; sha256: string }> {
   const sha256 = crypto.createHash('sha256').update(bytes).digest('hex')
   const ext = { 'image/png': '.png', 'image/webp': '.webp', 'image/gif': '.gif', 'image/tiff': '.tif' }[mime] ?? '.jpg'
   const dir = path.join(STORAGE_ROOT, CANDIDATE_DIR)
   fs.mkdirSync(dir, { recursive: true })
   const file = `${sha256}${ext}`
   const abs = path.join(dir, file)
-  if (!fs.existsSync(abs)) fs.writeFileSync(abs, bytes)
-  return { localPath: `static/${CANDIDATE_DIR}/${file}`, sha256 }
+  const localPath = `static/${CANDIDATE_DIR}/${file}`
+  if (!fs.existsSync(abs)) {
+    fs.writeFileSync(abs, bytes)
+    // 候选图网格用缩略图（Issue #106）；失败只记日志
+    await generateImageThumb(localPath)
+  }
+  return { localPath, sha256 }
 }
 
 const CANDIDATE_ROLES: CandidateRole[] = ['original', 'generation_reference', 'shape_only', 'text_source', 'reject']
@@ -203,7 +209,7 @@ export async function performResearch(subject: ResearchSubject, opts: { textConf
   for (const hit of picked) {
     const file = await downloadImage(hit.image!)
     if (!file) { dropped++; continue }
-    const { localPath, sha256 } = saveCandidate(file.bytes, file.mime)
+    const { localPath, sha256 } = await saveCandidate(file.bytes, file.mime)
     try {
       const image = await imageContentPart(localPath, { maxSide: 1280, quality: 85 })
       const meta = { title: hit.title, institution: hit.institution, date: hit.date, license: hit.license, snippet: hit.snippet }

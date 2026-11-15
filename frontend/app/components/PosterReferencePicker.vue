@@ -21,17 +21,31 @@
               <div v-for="owner in group.owners" :key="owner.name" class="poster-picker-owner">
                 <span class="poster-picker-owner-name">{{ owner.name }}</span>
                 <div class="poster-picker-grid">
-                  <button
+                  <!-- 选择型网格（Issue #106）：点格子=选中/取消；看原图走角标放大按钮 -->
+                  <div
                     v-for="image in owner.images"
                     :key="image.path"
-                    type="button"
+                    role="button"
+                    tabindex="0"
                     :class="['poster-picker-cell', { picked: picked.includes(image.path) }]"
                     :aria-pressed="picked.includes(image.path)"
                     @click="toggle(image.path)"
+                    @keydown.enter.self.prevent="toggle(image.path)"
+                    @keydown.space.self.prevent="toggle(image.path)"
                   >
-                    <img :src="mediaUrl(image.thumb_url)" :alt="owner.name" loading="lazy" />
+                    <img :src="mediaUrl(image.thumb_url)" :alt="owner.name" loading="lazy" @error="thumbFallback($event, mediaUrl(image.path))" />
                     <span v-if="picked.includes(image.path)" class="poster-picker-order">{{ picked.indexOf(image.path) + 1 }}</span>
-                  </button>
+                    <button
+                      v-if="ctx?.openImageViewer"
+                      type="button"
+                      class="poster-picker-zoom"
+                      :aria-label="t('common.viewOriginal')"
+                      :title="t('common.viewOriginal')"
+                      @click.stop="viewOriginal(image, owner.name)"
+                    >
+                      <Maximize2 :size="11" />
+                    </button>
+                  </div>
                 </div>
               </div>
             </section>
@@ -51,12 +65,14 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { inject, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { X } from 'lucide-vue-next'
+import { Maximize2, X } from 'lucide-vue-next'
 import { mediaLibraryAPI } from '~/composables/useApi'
+import { thumbFallback } from '~/composables/useMedia'
 import { toastError } from '~/composables/useToast'
 import { mediaUrl } from '~/utils/url'
+import { WORKBENCH_CTX } from '~/utils/workbenchSteps'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -66,6 +82,12 @@ const props = defineProps({
 })
 const emit = defineEmits(['close', 'confirm'])
 const { t } = useI18n()
+// 工作台的大图查看器（Issue #106）：格子点选语义不变，放大按钮只开原图
+const ctx = inject(WORKBENCH_CTX, null)
+
+function viewOriginal(image, ownerName) {
+  ctx?.openImageViewer?.(mediaUrl(image.path), ownerName)
+}
 
 const loading = ref(false)
 const groups = ref([])
@@ -234,4 +256,19 @@ watch(() => props.open, open => {
   align-items: center;
   justify-content: center;
 }
+/* 看原图（Issue #106）：右下角小按钮，避开左上角选序号 */
+.poster-picker-zoom {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--panel-bg, #14161c);
+  color: var(--text-1, #e6e8ee);
+  cursor: zoom-in;
+}
+.poster-picker-zoom:hover { color: var(--accent, #4f8cff); border-color: var(--accent, #4f8cff); }
 </style>

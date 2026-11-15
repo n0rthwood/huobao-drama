@@ -48,8 +48,9 @@
 
       <ul v-else class="ms-tasks">
         <li v-for="task in tasks" :key="task.id" class="ms-task">
-          <button type="button" class="ms-thumb" :disabled="!task.final_image" @click="open(task.id)">
-            <img v-if="task.final_image" :src="mediaUrl(task.final_image.path)" :alt="task.title" loading="lazy" />
+          <!-- 缩略图点开看原图（Issue #106）：接到任务页已有的产出大图（msview=final），不新建第二套查看器 -->
+          <button type="button" class="ms-thumb" :disabled="!task.final_image" :aria-label="t('common.viewOriginal')" @click="openImage(task)">
+            <img v-if="task.final_image" :src="thumbOf(mediaUrl(task.final_image.path))" :alt="task.title" loading="lazy" @error="thumbFallback($event, mediaUrl(task.final_image.path))" />
             <span v-else class="ms-thumb-empty">{{ t('mapStudio.app.noImage') }}</span>
           </button>
           <div class="ms-task-body">
@@ -86,6 +87,7 @@ import ModuleSettings from '~/map-studio/components/ModuleSettings.vue'
 import { mapStudioAPI, type MapStudioTaskListItem } from '~/map-studio/api'
 import { DEEPLINK_KEYS, deeplinkHydrate, useDeeplink } from '~/composables/useQuerySync'
 import { mediaUrl } from '~/utils/url'
+import { thumbFallback, thumbOf } from '~/composables/useMedia'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -138,6 +140,15 @@ async function load() {
 
 function open(taskId: number) {
   void router.push(`/map-studio/${taskId}`)
+}
+
+/**
+ * 看原图（Issue #106）：任务页已有产出大图查看器，它的 `msview` 是产出身份 deeplink，
+ * 直接带着 `msview=final` 进去复用那一套，不在列表里再造一份大图层。
+ */
+function openImage(task: MapStudioTaskListItem) {
+  if (!task.final_image) return
+  void router.push(`/map-studio/${task.id}?msview=final`)
 }
 
 function onCreated(taskId: number) {

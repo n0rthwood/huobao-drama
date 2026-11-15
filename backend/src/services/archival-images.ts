@@ -14,7 +14,7 @@ import { eq } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
 import { now } from '../utils/response.js'
 import { STORAGE_ROOT } from '../utils/paths.js'
-import { saveImageBuffer } from '../utils/storage.js'
+import { generateImageThumb, saveImageBuffer } from '../utils/storage.js'
 import { commonsFileInfo, fetchCommonsBytes } from './wiki-research.js'
 
 /** 史料画像条目：图片本体 + 完整溯源元数据（来源页/作者/年代/许可证/取用时间） */
@@ -110,6 +110,8 @@ export async function addArchivalImage(characterId: number, fileTitle: string): 
     throw new ArchivalImageError(`画像文件超过 ${Math.round(ARCHIVAL_IMAGE_MAX_BYTES / 1024 / 1024)}MB`)
   }
   const stored = await saveImageBuffer(bytes, ARCHIVAL_MIME[mime] ? mime : info.mime, archivalSubDir(characterId))
+  // 史料面板列表用缩略图（Issue #106）；失败只记日志，画像本身已落盘
+  await generateImageThumb(stored)
   const entry: ArchivalImageEntry = {
     path: stored,
     file_title: info.file_title,

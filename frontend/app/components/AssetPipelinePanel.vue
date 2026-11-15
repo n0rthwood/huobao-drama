@@ -195,7 +195,7 @@
           <p v-if="referenceLoading" class="dim">{{ t('common.loading') }}</p>
           <p v-else-if="referenceError" class="dim">{{ t('episode.documentary.pipeline.referenceUnavailable') }}</p>
           <p v-else-if="!referenceImages.length" class="dim">{{ t('episode.documentary.pipeline.referenceEmpty') }}</p>
-          <img v-for="(url, index) in referenceImages" :key="index" :src="mediaUrl(url)" :alt="t('episode.documentary.pipeline.referenceTitle')" @click.stop="emit('preview', mediaUrl(url), t('episode.documentary.pipeline.referenceTitle'))" />
+          <img v-for="(url, index) in referenceImages" :key="index" :src="thumbOf(mediaUrl(url))" :alt="t('episode.documentary.pipeline.referenceTitle')" loading="lazy" @error="thumbFallback($event, mediaUrl(url))" @click.stop="emit('preview', mediaUrl(url), t('episode.documentary.pipeline.referenceTitle'))" />
           <strong>{{ t('episode.documentary.pipeline.roundImageTitle') }}</strong>
           <p class="dim">{{ t('episode.documentary.pipeline.generatorLabel', { generator: selectedRound.generator || '—' }) }}</p>
           <img

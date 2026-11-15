@@ -14,6 +14,7 @@
 
     <template v-if="enabled">
       <NarrationEditor
+        ref="editor"
         :model-value="narrationText"
         :episode-id="Number(storyboard.episode_id ?? storyboard.episodeId)"
         :placeholder="t('episode.narration.placeholder')"
@@ -90,7 +91,7 @@
       </div>
       <div v-if="subtitleDirty" class="narration-hint">{{ t('episode.narration.timingChangedHint') }}</div>
 
-      <audio v-if="audioUrl" :key="audioUrl" class="narration-audio" :src="mediaUrl(audioUrl)" controls preload="metadata" />
+      <audio v-if="audioUrl" :key="audioUrl" class="narration-audio" :src="mediaUrl(audioUrl)" controls preload="none" />
       <NarrationFitPanel
         v-if="audioUrl && showFit"
         :storyboard="storyboard"
@@ -169,6 +170,8 @@ const writing = ref(false)
 const subtitling = ref(false)
 const subtitleDirty = ref(false)
 const voiceDialogOpen = ref(false)
+// 编辑器实例：标记浮层（多音字检查等）Teleport 到 body，卸载保护要能问到它们是否打开
+const editor = ref(null)
 const busy = computed(() => voicing.value || writing.value || subtitling.value)
 const batchRunning = computed(() => Boolean(props.narrationBatch?.running))
 
@@ -350,6 +353,13 @@ async function regenerateSubtitle() {
     subtitling.value = false
   }
 }
+
+/**
+ * 宿主镜卡的卸载保护（#106）：配音/写作/字幕在飞，或配音参数弹窗、编辑器标记弹窗打开时，
+ * 卡不能被卸载（浮层都 Teleport 到 body，卸载会让它们凭空消失）。
+ */
+const dialogOpen = computed(() => voiceDialogOpen.value || Boolean(editor.value?.dialogOpen))
+defineExpose({ busy, dialogOpen })
 </script>
 
 <style scoped>

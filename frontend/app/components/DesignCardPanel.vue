@@ -403,7 +403,7 @@
                   :title="t('designCard87.viewImage')"
                   @click="previewImage(baseCandidate.path, baseCandidate.name, baseCandidate.version_task_id)"
                 >
-                  <img :src="mediaUrl(baseCandidate.path)" :alt="baseCandidate.name">
+                  <img :src="thumbOf(mediaUrl(baseCandidate.path))" :alt="baseCandidate.name" loading="lazy" @error="thumbFallback($event, mediaUrl(baseCandidate.path))">
                   <span class="dc-thumb-tag mono">{{ baseCandidate.version_task_id ? t('designCard87.version', { n: baseCandidate.version_task_id }) : t('designCard87.currentVersion') }}</span>
                 </button>
               </div>
@@ -423,7 +423,7 @@
                     class="dc-chip-thumb"
                     :title="t('designCard87.viewImage')"
                     @click="previewImage(assetImage('prop', item.asset_id), item.name)"
-                  ><img :src="mediaUrl(assetImage('prop', item.asset_id))" :alt="item.name"></button>
+                  ><img :src="thumbOf(mediaUrl(assetImage('prop', item.asset_id)))" :alt="item.name" loading="lazy" @error="thumbFallback($event, mediaUrl(assetImage('prop', item.asset_id)))"></button>
                   <span v-else class="dc-asset-empty">{{ t('designCard87.noImage') }}</span>
                   <span class="dc-chip-text">{{ item.name }}</span>
                   <button
@@ -524,7 +524,7 @@
                     class="dc-chip-thumb"
                     :title="t('designCard87.viewImage')"
                     @click="previewImage(assetImage(item.kind, item.id), item.name)"
-                  ><img :src="mediaUrl(assetImage(item.kind, item.id))" :alt="item.name"></button>
+                  ><img :src="thumbOf(mediaUrl(assetImage(item.kind, item.id)))" :alt="item.name" loading="lazy" @error="thumbFallback($event, mediaUrl(assetImage(item.kind, item.id)))"></button>
                   <span v-else class="dc-asset-empty">{{ t('designCard87.noImage') }}</span>
                   <span class="dc-chip-text">{{ item.name }}</span>
                   <button

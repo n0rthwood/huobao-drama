@@ -411,9 +411,11 @@
                   <div v-if="c.styling_version" class="asset-styling-version">
                     <img
                       v-if="c.styling_version.image_path"
-                      :src="stylingVersionSrc(c)"
+                      :src="thumbOf(stylingVersionSrc(c))"
                       class="styling-version-thumb"
                       :alt="c.styling_version.name"
+                      loading="lazy"
+                      @error="thumbFallback($event, stylingVersionSrc(c))"
                       @click.stop="openImageViewer(stylingVersionSrc(c), `${c.name} · ${c.styling_version.name}`)"
                     />
                     <div class="styling-version-text">
@@ -1589,7 +1591,7 @@ import DesignCardPanel from '~/components/DesignCardPanel.vue'
 import ShotProductionPanel from '~/components/ShotProductionPanel.vue'
 import VideoShotPanel from '~/components/VideoShotPanel.vue'
 import ExportPanel from '~/components/ExportPanel.vue'
-import { ASSET_SUB_TABS, PROD_TAB_KEYS, WORKBENCH_CTX, isStageGateUnknown, isStageLocked, remapAssetTab, remapProdTab } from '~/utils/workbenchSteps'
+import { ASSET_SUB_TABS, PROD_TAB_KEYS, SAVE_STATUS_FIELDS, WORKBENCH_CTX, isStageGateUnknown, isStageLocked, remapAssetTab, remapProdTab } from '~/utils/workbenchSteps'
 import { aggregateStepStatus, isStepComplete, stepTextClass } from '~/utils/stepStatus'
 import { useEpisodeRoadmap } from '~/composables/useEpisodeRoadmap'
 import { mediaTimeOfPath } from '~/utils/mediaTime'
@@ -3378,8 +3380,7 @@ const selectedVideoTaskNumber = computed(() => {
 })
 
 // ===== 字段级保存状态：键为「分镜 id : 字段」，关键帧页与视频页共用 =====
-// 自动保存且需要给出保存反馈的字段（其余字段如绑定 ids 只做一致性提示，不显示保存状态）
-const SAVE_STATUS_FIELDS = ['description', 'atmosphere', 'first_frame_prompt', 'mid_frame_prompt', 'mid_frame_time', 'last_frame_prompt', 'video_prompt', 'transition_prompt', 'narration_text']
+// 自动保存且需要给出保存反馈的字段清单在 utils/workbenchSteps.js（工作台契约，镜卡卸载保护共用）
 const fieldSaveStates = ref({})
 
 function fieldSaveKey(sb, field) { return `${sb?.id}:${field}` }

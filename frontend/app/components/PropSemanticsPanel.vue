@@ -158,19 +158,32 @@
         <span class="dim">{{ t('episode.documentary.semantics.sourceHint') }}</span>
       </div>
       <div v-if="originalVersions.length" class="sem-source-list">
-        <button
+        <!-- 选择型网格（Issue #106）：点卡片=换底图来源；右上角放大按钮只看原图 -->
+        <div
           v-for="version in originalVersions"
           :key="version.id ?? version.url"
-          type="button"
+          role="button"
+          tabindex="0"
           class="sem-source-card"
           :class="{ on: isCurrentSource(version), failed: version.fidelity === 'failed' }"
-          :disabled="switchingSource || version.fidelity === 'failed' || isCurrentSource(version)"
+          :aria-disabled="switchingSource || version.fidelity === 'failed' || isCurrentSource(version)"
           :title="version.fidelity === 'failed'
             ? (version.fidelity_reason || t('episode.documentary.semantics.fidelityFailed'))
             : (isCurrentSource(version) ? t('episode.documentary.semantics.sourceCurrent') : t('episode.documentary.semantics.sourceUse'))"
           @click.stop="pickSource(version)"
+          @keydown.enter.self.prevent="pickSource(version)"
+          @keydown.space.self.prevent="pickSource(version)"
         >
-          <img :src="mediaUrl(version.url)" loading="lazy" />
+          <img :src="thumbOf(mediaUrl(version.url))" loading="lazy" @error="thumbFallback($event, mediaUrl(version.url))" />
+          <button
+            type="button"
+            class="sem-source-zoom"
+            :aria-label="t('common.viewOriginal')"
+            :title="t('common.viewOriginal')"
+            @click.stop="emit('preview', mediaUrl(version.url), version.provider)"
+          >
+            <Maximize2 :size="11" />
+          </button>
           <span class="sem-source-meta">
             <span class="sem-source-provider">{{ version.provider }}</span>
             <span v-if="isCurrentSource(version)" class="sem-source-flag">{{ t('episode.documentary.semantics.sourceCurrent') }}</span>
@@ -178,7 +191,7 @@
             <span v-else-if="version.fidelity === 'verified'" class="sem-source-flag is-ok">{{ t('episode.documentary.semantics.fidelityVerified') }}</span>
           </span>
           <span v-if="version.fidelity === 'failed' && version.fidelity_reason" class="sem-source-reason">{{ version.fidelity_reason }}</span>
-        </button>
+        </div>
       </div>
       <p v-else class="sem-empty dim">{{ t('episode.documentary.semantics.sourceEmpty') }}</p>
       <p v-if="sourceError" class="sem-error">{{ sourceError }}</p>
@@ -194,7 +207,7 @@
  * 美化版本只是派生物，必须通过忠实度校验才能当底图，所以校验失败的版本在这里不可选。
  * 面板只做「清单 + 叠加预览」：几何编辑（拖点/改线）属于图层编辑器（Issue #48），这里不做。
  */
-import { Loader2, Wand2, X } from 'lucide-vue-next'
+import { Loader2, Maximize2, Wand2, X } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { propAPI } from '~/composables/useApi'
@@ -696,6 +709,7 @@ onBeforeUnmount(() => { stopped = true; stopAutoPoll() })
   cursor: pointer;
   overflow: hidden;
   text-align: left;
+  position: relative;
 }
 .sem-source-card img {
   width: 100%;
@@ -705,8 +719,23 @@ onBeforeUnmount(() => { stopped = true; stopAutoPoll() })
 }
 .sem-source-card.on { border-color: var(--accent-text); }
 .sem-source-card.failed { border-color: var(--action-danger); cursor: not-allowed; }
-.sem-source-card:disabled { opacity: 0.75; cursor: not-allowed; }
-.sem-source-card:hover:not(:disabled) { border-color: var(--accent-text); }
+.sem-source-card[aria-disabled='true'] { opacity: 0.75; cursor: not-allowed; }
+.sem-source-card:hover:not([aria-disabled='true']) { border-color: var(--accent-text); }
+/* 看原图（Issue #106）：右上角小按钮，不触发 pickSource */
+.sem-source-zoom {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--text-1);
+  cursor: zoom-in;
+}
+.sem-source-zoom:hover { color: var(--accent-text); border-color: var(--accent-text); }
 .sem-source-meta {
   display: flex;
   align-items: center;

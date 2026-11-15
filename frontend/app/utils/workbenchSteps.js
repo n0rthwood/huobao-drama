@@ -21,6 +21,13 @@ export const PROD_TAB_KEYS = ['assets', 'poster', 'keyframes', 'videos', 'design
 /** 资产步的子页签（审核清单只在纪录片显示） */
 export const ASSET_SUB_TABS = ['cards', 'review']
 
+/**
+ * 自动保存且需要给出保存反馈的分镜字段（其余字段如绑定 ids 只做一致性提示）。
+ * 工作台用 `fieldSaveInfo(分镜, 字段)` 读状态；「有未保存内容」的判定也认这一份清单，
+ * 镜卡卸载前据此拒绝卸载（Issue #106）。
+ */
+export const SAVE_STATUS_FIELDS = ['description', 'atmosphere', 'first_frame_prompt', 'mid_frame_prompt', 'mid_frame_time', 'last_frame_prompt', 'video_prompt', 'transition_prompt', 'narration_text']
+
 /** 旧步骤 id → 纪录片新步骤 id（#49/#50 的 expression/layers 与共用的 keyframes/videos） */
 const DOC_TAB_REMAP = {
   expression: 'design',

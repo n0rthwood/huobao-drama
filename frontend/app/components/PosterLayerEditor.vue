@@ -65,6 +65,7 @@
           @duplicate="duplicateSelected"
           @base="replaceBase"
           @text-layout="setTextLayout"
+          @preview="(src, title) => emit('preview', src, title)"
           @assets-changed="markDirty"
         />
       </section>
@@ -98,7 +99,7 @@ const props = defineProps({
   dramaId: { type: Number, required: true },
   variables: { type: Object, required: true },
 })
-const emit = defineEmits(['changed'])
+const emit = defineEmits(['changed', 'preview'])
 const { t } = useI18n()
 
 const saving = ref(false)

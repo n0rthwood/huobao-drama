@@ -148,6 +148,7 @@
           @remove="removeSelected" @duplicate="duplicateSelected"
           @base="replaceBase" @crop-request="enterCanvasTool('crop')" @reanchor="reanchorLayer($event.id,$event.patch)"
           @text-layout="setTextLayout"
+          @preview="(src, title) => emit('preview', src, title)"
           @assets-changed="markDirty"
         />
       </section>
@@ -184,7 +185,7 @@ const props = defineProps({
   // 后端 GET /layer-segments/storyboards/:id 的整份返回
   state: { type: Object, default: null },
 })
-const emit = defineEmits(['changed', 'goto-design'])
+const emit = defineEmits(['changed', 'goto-design', 'preview'])
 const { t } = useI18n()
 
 const mode = ref('edit')

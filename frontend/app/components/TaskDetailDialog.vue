@@ -190,9 +190,11 @@
               <img
                 v-for="(url, i) in referenceImages"
                 :key="i"
-                :src="mediaSrc(url)"
+                :src="thumbOf(mediaSrc(url))"
                 :alt="`ref ${i + 1}`"
                 loading="lazy"
+                @error="thumbFallback($event, mediaSrc(url))"
+                @click.stop="showPreview(mediaSrc(url), `ref ${i + 1}`)"
               />
             </div>
           </div>
@@ -276,6 +278,7 @@ import { loadModelOptions, bareModelName } from '~/composables/useModelOptions'
 import { useTasks } from '~/composables/useTasks'
 import { copyToClipboard } from '~/utils/clipboard'
 import { mediaUrl } from '~/utils/url'
+import { thumbFallback, thumbOf } from '~/composables/useMedia'
 import { DEEPLINK_KEYS, deeplinkInitial, querySingle, useDeeplink } from '~/composables/useQuerySync'
 import {
   useNowTicker, ringPropsFromTask, isActiveTaskStatus, formatSeconds, taskRemoteState,
@@ -720,7 +723,7 @@ async function doCancel() {
 .task-detail-refs { display: flex; flex-wrap: wrap; gap: 8px; }
 .task-detail-refs img {
   width: 64px; height: 64px; object-fit: cover;
-  border-radius: var(--radius); border: 1px solid var(--border);
+  border-radius: var(--radius); border: 1px solid var(--border); cursor: zoom-in;
 }
 .task-detail-result { width: 100%; max-height: 320px; object-fit: contain; border-radius: var(--radius); background: var(--overlay-track); }
 .task-detail-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }

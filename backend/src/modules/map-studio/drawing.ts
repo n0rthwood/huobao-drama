@@ -4,6 +4,7 @@ import fs from 'fs'
 import path from 'path'
 import { z } from 'zod'
 import { STORAGE_ROOT } from '../../utils/paths.js'
+import { generateImageThumb } from '../../utils/storage.js'
 import type { StageModel } from '../../services/ai-stages.js'
 import type { Layer, LayerDoc } from '../../services/layer-doc.js'
 import { renderLayerDoc } from '../../services/layer-render.js'
@@ -32,7 +33,11 @@ export async function renderMapLayerDoc(doc: LayerDoc, layerOptions: LayerOption
   fs.mkdirSync(dir, { recursive: true })
   const file = `${sha256.slice(0, 32)}.png`
   const absolute = path.join(dir, file)
-  if (!fs.existsSync(absolute)) fs.writeFileSync(absolute, rendered.buffer)
+  if (!fs.existsSync(absolute)) {
+    fs.writeFileSync(absolute, rendered.buffer)
+    // 结果画廊用缩略图（Issue #106）；失败只记日志，不影响抽图
+    await generateImageThumb(`static/map-drawings/${file}`)
+  }
   return { path: `static/map-drawings/${file}`, sha256, width: rendered.width, height: rendered.height }
 }
 

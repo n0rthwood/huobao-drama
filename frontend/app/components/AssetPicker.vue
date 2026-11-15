@@ -34,24 +34,38 @@
           <!-- 素材网格：语义模式下点卡片进入该素材的条目列表 -->
           <section v-if="!drillAsset" class="ap-main">
             <div v-if="filtered.length" class="ap-grid">
-              <button
+              <!-- 选择型网格（Issue #106）：点卡片=选中；看原图走右上角放大按钮，不劫持选择动作 -->
+              <div
                 v-for="asset in filtered"
                 :key="`${asset.kind}:${asset.id}`"
-                type="button"
+                role="button"
+                tabindex="0"
                 :class="['ap-card', { on: isAssetPicked(asset) }]"
                 :aria-pressed="isAssetPicked(asset)"
                 @click="onAssetClick(asset)"
+                @keydown.enter.self.prevent="onAssetClick(asset)"
+                @keydown.space.self.prevent="onAssetClick(asset)"
               >
                 <span class="ap-card-media">
-                  <img v-if="asset.image" :src="mediaUrl(asset.image)" :alt="asset.name" loading="lazy">
+                  <img v-if="asset.image" :src="thumbOf(mediaUrl(asset.image))" :alt="asset.name" loading="lazy" @error="thumbFallback($event, mediaUrl(asset.image))">
                   <span v-else class="ap-card-noimg">{{ t(`episode.design.assetKind.${asset.kind}`) }}</span>
                   <span v-if="asset.faithful" class="ap-card-badge" :title="t('episode.design.picker.verified')">
                     <ShieldCheck :size="11" />
                   </span>
+                  <button
+                    v-if="asset.image && ctx?.openImageViewer"
+                    type="button"
+                    class="ap-card-zoom"
+                    :aria-label="t('common.viewOriginal')"
+                    :title="t('common.viewOriginal')"
+                    @click.stop="viewOriginal(asset)"
+                  >
+                    <Maximize2 :size="11" />
+                  </button>
                 </span>
                 <span class="ap-card-name" :title="asset.name">{{ asset.name }}</span>
                 <span class="ap-card-kind dim">{{ t(`episode.design.assetKind.${asset.kind}`) }}</span>
-              </button>
+              </div>
             </div>
             <div v-else class="ap-empty">
               <p>{{ hasAnyAsset ? t('episode.design.picker.empty') : t('episode.design.picker.emptyAsset') }}</p>
@@ -175,15 +189,19 @@
  * `propAPI.semantics` 取一次完整标注文档，口径与 `PropSemanticsPanel.vue` 一致：
  * viewBox 用原图像素尺寸，描边随原图尺寸缩放。
  */
-import { computed, ref, watch } from 'vue'
+import { computed, inject, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
-import { ChevronLeft, ShieldCheck, X } from 'lucide-vue-next'
+import { ChevronLeft, Maximize2, ShieldCheck, X } from 'lucide-vue-next'
 import { propAPI } from '~/composables/useApi'
+import { thumbFallback, thumbOf } from '~/composables/useMedia'
 import { mediaUrl } from '~/utils/url'
+import { WORKBENCH_CTX } from '~/utils/workbenchSteps'
 import { DEEPLINK_KEYS, queryEnum, querySingle, queryTypedId, useDeeplink } from '~/composables/useQuerySync'
 
 const { t } = useI18n()
+// 工作台提供的大图查看器（Issue #106）；独立编辑器等无宿主场景为 null，按钮隐藏即可
+const ctx = inject(WORKBENCH_CTX, null)
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -300,6 +318,11 @@ function onAssetClick(asset) {
   pickedAssets.value = exists
     ? pickedAssets.value.filter(item => !(item.id === asset.id && item.kind === asset.kind))
     : [...pickedAssets.value, { kind: asset.kind, id: asset.id, name: asset.name }]
+}
+
+/** 看原图：只开大图，不改选择状态（Issue #106） */
+function viewOriginal(asset) {
+  ctx?.openImageViewer?.(mediaUrl(asset.image), asset.name)
 }
 
 const entries = computed(() => (drillAsset.value?.semantics || []))
@@ -452,6 +475,13 @@ function gotoAssets(asset = null) {
   padding: 2px; border-radius: 999px;
   background: var(--header-bg); color: var(--text-1);
 }
+/* 看原图（Issue #106）：选择型网格的次级入口，放左上角避开右下角的忠实素材徽标 */
+.ap-card-zoom {
+  position: absolute; top: 3px; left: 3px; display: inline-flex; align-items: center;
+  padding: 2px; border: 1px solid var(--border-strong); border-radius: 999px;
+  background: var(--header-bg); color: var(--text-1); cursor: zoom-in;
+}
+.ap-card-zoom:hover { color: var(--accent-text); border-color: var(--accent-text); }
 .ap-card-name { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ap-card-kind { font-size: 11px; }
 

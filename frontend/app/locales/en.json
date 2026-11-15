@@ -234,6 +234,7 @@
     "add": "Add",
     "copy": "Copy",
     "download": "Download",
+    "viewOriginal": "View original",
     "default": "Default",
     "more": "More",
     "loading": "Loading…",
@@ -930,7 +931,7 @@
   "episode": {
     "final": {
       "layer": "Layer segment", "generated": "Generated segment", "composite": "Final composite",
-      "budget": "Budget {seconds}s", "measured": "Measured voice {seconds}s",
+      "budget": "Budget {seconds}s", "measured": "Measured voice {seconds}s", "duration": "Duration {seconds}s",
       "noCombo": "Confirm the design card and select a segment combination",
       "fresh": "Up to date", "stale": "Not rendered or outdated", "failed": "Failed", "rendering": "Rendering", "render": "Render again",
       "inherited": "Locked inheritance at {seconds}s · no generation",

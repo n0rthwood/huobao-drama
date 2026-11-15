@@ -16,6 +16,7 @@
         :drama-id="poster.drama_id || 0"
         :variables="variables"
         @changed="applyPoster"
+        @preview="(src, title) => ctx?.openImageViewer?.(src, title)"
       />
     </div>
 
@@ -134,14 +135,14 @@
           <div v-if="namedAssets.length" class="poster-refs-list">
             <div v-for="asset in namedAssets" :key="`n:${asset.kind}:${asset.id}`" class="poster-ref-item poster-ref-named">
               <span class="poster-ref-index">{{ asset.name }}</span>
-              <img :src="thumbOf(mediaUrl(asset.path))" alt="" loading="lazy" />
+              <img :src="thumbOf(mediaUrl(asset.path))" alt="" loading="lazy" @error="thumbFallback($event, mediaUrl(asset.path))" @click="ctx?.openImageViewer?.(mediaUrl(asset.path), asset.name)">
               <button type="button" class="poster-ref-remove" :title="t('poster.generate.removeRef')" @click="removeNamed(asset)">×</button>
             </div>
           </div>
           <div v-if="manualRefs.length" class="poster-refs-list">
             <div v-for="path in manualRefs" :key="path" class="poster-ref-item">
               <span class="poster-ref-index">{{ poster.reference_images.indexOf(path) + 1 }}</span>
-              <img :src="thumbOf(mediaUrl(path))" alt="" loading="lazy" />
+              <img :src="thumbOf(mediaUrl(path))" alt="" loading="lazy" @error="thumbFallback($event, mediaUrl(path))" @click="ctx?.openImageViewer?.(mediaUrl(path), '')">
               <button type="button" class="poster-ref-remove" :title="t('poster.generate.removeRef')" @click="removeManual(path)">×</button>
             </div>
           </div>
@@ -226,7 +227,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Loader2 } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
@@ -239,6 +240,7 @@ import { toastError, toastServerMessage } from '~/composables/useToast'
 import PosterLayerEditor from '~/components/PosterLayerEditor.vue'
 import PosterReferencePicker from '~/components/PosterReferencePicker.vue'
 import { DEEPLINK_KEYS, querySingle, useDeeplink } from '~/composables/useQuerySync'
+import { WORKBENCH_CTX } from '~/utils/workbenchSteps'
 
 const props = defineProps({
   episodeId: { type: Number, required: true },
@@ -249,6 +251,8 @@ const props = defineProps({
   chatConfigId: { type: Number, default: undefined },
 })
 const { t } = useI18n()
+// 工作台提供的大图查看器（Issue #106）：列表里的缩略图点开看原图
+const ctx = inject(WORKBENCH_CTX, null)
 const { version: specVersion } = useLayerTextSpec()
 const { roleName, fieldLabel, layoutName } = useLayerTextNames()
 const { registerTask, onTaskFinished, activeTasks, episodeTasks, loadEpisodeTasks } = useTasks()
@@ -691,7 +695,7 @@ onBeforeUnmount(() => {
 .poster-refs-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--text-2, #aab); }
 .poster-refs-list { display: flex; flex-wrap: wrap; gap: 6px; }
 .poster-ref-item { position: relative; width: 64px; height: 64px; border-radius: 6px; overflow: hidden; border: 1px solid var(--border-color, #2a2e39); }
-.poster-ref-item img { width: 100%; height: 100%; object-fit: cover; }
+.poster-ref-item img { width: 100%; height: 100%; object-fit: cover; cursor: zoom-in; }
 .poster-ref-index { position: absolute; left: 2px; top: 2px; z-index: 1; max-width: calc(100% - 4px); padding: 0 3px; border-radius: 4px; background: var(--header-bg); color: var(--text-1); font-size: 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .poster-ref-remove { position: absolute; right: 1px; top: 1px; z-index: 1; width: 16px; height: 16px; border: 0; border-radius: 8px; background: rgba(0, 0, 0, .55); color: #fff; cursor: pointer; line-height: 1; }
 .poster-actions { display: flex; gap: 8px; flex-wrap: wrap; }
