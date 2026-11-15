@@ -26,21 +26,6 @@ test('drama detail header links to the asset library page', () => {
   assert.match(page, /navigateTo\(`\/drama\/\$\{drama\.id\}\/assets`\)/)
 })
 
-test('episode status is manually marked, not derived from script content', () => {
-  const page = read('app/pages/drama/[id]/index.vue')
-
-  // 手动状态：选项 + 下拉标记 + 持久化到 episodes.status
-  assert.match(page, /const epStatusOptions = \[/)
-  assert.match(page, /function epStatus\(ep\) \{ return ep\.status \|\| 'draft' \}/)
-  assert.match(page, /function setEpisodeStatus/)
-  assert.match(page, /episodeAPI\.update\(ep\.id, \{ status \}\)/)
-  assert.match(page, /epStatusMenuId/)
-  // 自动推算已移除
-  assert.doesNotMatch(page, /hasScript/)
-  assert.doesNotMatch(page, /已完成剧本/)
-  assert.doesNotMatch(page, /待编写/)
-})
-
 test('asset library page lists character and scene images', () => {
   const page = read('app/pages/drama/[id]/assets.vue')
 

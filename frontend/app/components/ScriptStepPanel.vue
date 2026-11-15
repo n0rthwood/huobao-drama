@@ -12,6 +12,7 @@ import { computed, inject } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Loader2 } from 'lucide-vue-next'
 import ScriptRewritePanel from '~/components/ScriptRewritePanel.vue'
+import StepStatusIcon from '~/components/StepStatusIcon.vue'
 import { WORKBENCH_CTX } from '~/utils/workbenchSteps'
 
 const { t } = useI18n()
@@ -32,6 +33,7 @@ const {
   rawLen,
   refresh,
   rn,
+  roadmapReady,
   rt,
   saveRaw,
   scriptConfirmed,
@@ -40,6 +42,7 @@ const {
   scriptLen,
   scriptStep,
   skipRewrite,
+  statusOf,
   toast,
   unconfirmScript,
 } = ctx
@@ -47,6 +50,15 @@ const {
 // 顶栏的文本模型覆盖是函数（每次读当前选择），改写面板只要当次取值
 const rewriteModel = computed(() => chatModelOverride() || '')
 const rewriteConfigId = computed(() => chatConfigId() || 0)
+/**
+ * 改写阶段条的五个格子各读 roadmap 的权威状态（prepared / fidelity / bridge / final / confirm）。
+ * 运行中的「处理中」由 StageStrip 用任务进度覆盖，这里只给完成判据。
+ */
+const rewriteStatuses = computed(() => {
+  // roadmap 未判定时给 'checking'，阶段条只显示「校验中」；正在跑的阶段仍由运行进度覆盖
+  const at = key => (roadmapReady.value ? statusOf(`rewrite.${key}`) : 'checking')
+  return { prepared_source: at('prepared'), fidelity: at('fidelity'), bridge: at('bridge'), final: at('final'), confirm: at('confirm') }
+})
 </script>
 
 <template>
@@ -92,12 +104,13 @@ const rewriteConfigId = computed(() => chatConfigId() || 0)
       :raw-content="rawContent"
       :chat-model="rewriteModel"
       :chat-config-id="rewriteConfigId"
+      :roadmap-statuses="rewriteStatuses"
       @refresh="refresh"
     />
 
     <!-- 旁白稿确认（#54）：采用/保存都不会自动确认，确认始终是显式动作 -->
     <div class="script-confirm-bar">
-      <span :class="['script-confirm-dot', scriptConfirmed && 'ok']" />
+      <StepStatusIcon :status="rewriteStatuses.confirm" />
       <span v-if="scriptConfirmed" class="script-confirm-state">
         {{ t('episode.script.confirmed') }}
         <span v-if="scriptConfirmedAt" class="dim">· {{ t('episode.script.confirmedAt', { at: scriptConfirmedAt }) }}</span>
@@ -236,7 +249,5 @@ const rewriteConfigId = computed(() => chatConfigId() || 0)
 .merge-card-meta .btn { margin-left: auto; }
 .merge-card-meta .btn + .btn { margin-left: 0; }
 .script-confirm-bar { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-top: 1px solid var(--border); font-size: 12px; }
-.script-confirm-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-dim, #999); flex: none; }
-.script-confirm-dot.ok { background: var(--success, #66bb6a); }
 .script-confirm-state { line-height: 1.5; }
 </style>

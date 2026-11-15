@@ -60,15 +60,17 @@
       :run-active="rw.runActive.value"
       :busy="rw.busy.value"
       :final-state="finalState"
+      :roadmap-statuses="roadmapStatuses"
       @select="selectStage"
       @rerun="key => startFrom(key, false)"
       @skip="key => startFrom(key, true)"
       @retry="key => startFrom(key, false)"
     />
 
-    <div class="rw-body">
+    <div class="rw-body" :class="{ 'is-final': selectedStage === 'final' }">
       <!-- 左：只读阶段输出 / 差异 / 报告（浏览历史不改最终稿） -->
-      <section class="rw-preview" :class="{ 'is-collapsed': !previewOpen }">
+      <!-- 预览只在浏览阶段输出时出现；选中「最终稿」后整块让位给可编辑正文 -->
+      <section v-if="selectedStage !== 'final'" class="rw-preview" :class="{ 'is-collapsed': !previewOpen }">
         <header class="rw-sec-head">
           <button type="button" class="rw-collapse" :aria-expanded="previewOpen" @click="previewOpen = !previewOpen">
             {{ previewOpen ? '▾' : '▸' }}
@@ -166,7 +168,7 @@
       </section>
 
       <!-- 右：当前最终稿（唯一可编辑正文） -->
-      <section class="rw-final">
+      <section class="rw-final" :class="{ on: selectedStage === 'final' }">
         <header class="rw-sec-head">
           <strong class="rw-sec-title">{{ t('episode.rewrite.narrationFinalTitle') }}</strong>
           <span class="dim rw-origin">{{ finalOriginLabel }}</span>
@@ -290,6 +292,8 @@ const props = defineProps({
   rawContent: { type: String, default: '' },
   chatModel: { type: String, default: '' },
   chatConfigId: { type: Number, default: 0 },
+  /** roadmap 的改写五个子步骤状态（#105）：prepared_source / fidelity / bridge / final / confirm */
+  roadmapStatuses: { type: Object, default: () => ({}) },
 })
 const emit = defineEmits(['refresh'])
 
@@ -329,7 +333,8 @@ const urlDialog = querySingle(link.initial('rwdlg'))
 let urlStageActive = Boolean(urlStage)
 let stageRestored = false
 let stagePicked = false
-if (urlStage && urlStage !== 'final') selectedStage.value = urlStage
+// 'final' 也是合法阶段：选中它 = 看最终稿编辑区（#105）
+if (urlStage) selectedStage.value = urlStage
 
 
 const storeKey = computed(() => `huobao:rewrite:${props.episodeId}`)
@@ -406,12 +411,12 @@ function stageName(key) {
 }
 
 function selectStage(key) {
-  // 最终稿不是预览的一格：点它只是把焦点移到可编辑正文，预览与差异保持原样
-  if (key === 'final') { editorEl.value?.focus(); return }
   // 用户已经自己选了格子：异步恢复不得再覆盖
   stagePicked = true
   selectedStage.value = key
   persist()
+  // 选中最终稿 = 切到可编辑正文（预览区让位）；只改界面，不写任何内容
+  if (key === 'final') editorEl.value?.focus()
 }
 function pickRun(event) {
   const value = event.target.value
@@ -688,10 +693,19 @@ onMounted(() => {
   padding: 7px 12px; font-size: 12px; color: var(--text-1);
   background: var(--warn-bg); border-bottom: 1px solid var(--warn-border);
 }
+/* 选中最终稿：编辑区用强调描边标出「当前选中的格子」，与完成状态互不吞掉 */
+.rw-final.on {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: var(--radius);
+}
+
 .rw-body {
   flex: 1; min-height: 0; display: grid; gap: 1px;
   grid-template-columns: 1fr 1.1fr; background: var(--border);
 }
+/* 选中最终稿时左侧预览让位，编辑区占满整行 */
+.rw-body.is-final { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr); }
 /* 1280：上下布局，最终稿保持完整可编辑，差异区可折叠 */
 @media (max-width: 1439px) {
   .rw-body { grid-template-columns: 1fr; grid-template-rows: auto minmax(260px, 1fr); overflow-y: auto; }

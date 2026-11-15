@@ -92,7 +92,7 @@
               <AppMenuItem
                 v-for="s in statusOptions"
                 :key="s.value"
-                :selected="currentStatus(d) === s.value"
+                :selected="selectedStatusOption(d) === s.value"
                 @click="setDramaStatus(d, s.value)"
               >{{ s.label }}</AppMenuItem>
             </AppMenu>
@@ -270,27 +270,50 @@ const filters = computed(() => ([
   { label: t('index.status.active'), value: 'active' },
   { label: t('index.status.completed'), value: 'completed' },
 ]))
-// 项目状态由用户手动标记（持久化到 dramas.status），不再按内容自动推算
+// 项目状态默认由 roadmap 推算（有 status_derived 快照），人工只在需要时覆盖（status_override）。
+// 列表返回的 `status` 是有效值；下拉里的「自动（按进度）」= 清除人工覆盖。
 const statusOptions = computed(() => ([
   { label: t('index.status.draft'), value: 'draft' },
   { label: t('index.status.active'), value: 'active' },
   { label: t('index.status.completed'), value: 'completed' },
+  { label: t('index.status.autoOption'), value: 'auto' },
 ]))
 const statusMenuId = ref(null)
 
-function currentStatus(d) { return d.status || 'draft' }
-function projectStatus(d) { return statusOptions.value.find(s => s.value === currentStatus(d))?.label || t('index.status.draft') }
+function currentStatus(d) { return d.status || d.status_derived || 'draft' }
+/** 下拉当前项：没有人工覆盖时就是「自动」 */
+function selectedStatusOption(d) { return d.status_override ? currentStatus(d) : 'auto' }
+function statusLabel(value) {
+  const option = statusOptions.value.find(item => item.value === value)
+  return option?.label || t('index.status.draft')
+}
+/** 徽标文案：有效状态 + 来源（自动 / 人工），避免把推测值误读成人工确认 */
+function projectStatus(d) {
+  return `${statusLabel(currentStatus(d))} · ${d.status_override ? t('index.status.manual') : t('index.status.auto')}`
+}
 function statusDotClass(d) { return currentStatus(d) === 'active' ? 'on' : currentStatus(d) === 'completed' ? 'done' : '' }
+
+/** 写回有效值（含 status_derived / status_override）：PUT 只写覆盖，有效值要重新读一次 */
+async function applyDramaStatus(d, sent) {
+  await dramaAPI.update(d.id, { status: sent })
+  const fresh = await dramaAPI.get(d.id)
+  d.status = fresh?.status || d.status_derived || 'draft'
+  d.status_derived = fresh?.status_derived ?? d.status_derived
+  d.status_override = fresh?.status_override ?? sent
+}
 
 async function setDramaStatus(d, status) {
   statusMenuId.value = null
-  if (currentStatus(d) === status) return
-  const prev = d.status
-  d.status = status
+  if (selectedStatusOption(d) === status) return
+  // 'auto' = 清除人工覆盖（服务端接受 null / 'auto'）
+  const sent = status === 'auto' ? null : status
+  const prev = { status: d.status, status_derived: d.status_derived, status_override: d.status_override }
+  d.status = sent || d.status_derived || 'draft'
+  d.status_override = sent
   try {
-    await dramaAPI.update(d.id, { status })
+    await applyDramaStatus(d, sent)
   } catch (e) {
-    d.status = prev
+    Object.assign(d, prev)
     toastError(e)
   }
 }
@@ -305,6 +328,7 @@ const filteredDramas = computed(() => {
   const items = dramas.value.filter((d) => {
     const text = [d.title, d.style, styleLabel(d.style), projectStatus(d)].filter(Boolean).join(' ').toLowerCase()
     const matchesSearch = !keyword || text.includes(keyword)
+    // 筛选按有效状态（推算或人工覆盖），不是旧的手工标记值
     const matchesStatus = statusFilter.value === 'all' || currentStatus(d) === statusFilter.value
     return matchesSearch && matchesStatus
   })

@@ -511,7 +511,10 @@
       "all": "All",
       "draft": "Not started",
       "active": "In progress",
-      "completed": "Completed"
+      "completed": "Completed",
+      "auto": "Auto",
+      "manual": "Manual",
+      "autoOption": "Auto (by progress)"
     },
     "createDialog": {
       "title": "New Project",
@@ -1076,17 +1079,19 @@
       "viewFilm": "View Film",
       "continue": "Continue",
       "start": "Start Production",
-      "resolution": "Resolution"
+      "resolution": "Resolution",
+      "milestones": "{done}/{total}",
+      "milestonesTitle": "Milestones completed (script / production / export)"
     },
     "model": {
       "defaultWith": "Default · {model}",
       "notConfigured": "Not configured"
     },
     "sidebar": {
-      "inProgress": "In progress",
       "refreshData": "Refresh Data",
       "collapse": "Collapse sidebar",
-      "expand": "Expand sidebar"
+      "expand": "Expand sidebar",
+      "progressDone": "Done {done} / {total}"
     },
     "nav": {
       "prev": "Back",
@@ -1099,7 +1104,8 @@
       "production": "Production",
       "assets": "Assets",
       "assetsDesc": "Characters / scenes / props",
-      "posterDesc": "Optional: poster base image and text layout",
+      "posterDesc": "Poster base image and text layout",
+      "posterRequiredBeforeExport": "Required before export",
       "keyframes": "Shot Keyframes",
       "keyframesDesc": "First / mid / last keyframes and confirmation",
       "videos": "Video Production",
@@ -1111,7 +1117,6 @@
       "prodStage": "Production · {step}",
       "exportDone": "Export · done",
       "exportWaiting": "Export · waiting to merge",
-      "workbench": "Workbench",
       "narrationScript": "Narration script",
       "narrationScriptDesc": "Documentary narration editing (the script IS the narration)",
       "evidenceAssetsDesc": "Characters / scenes / evidence assets",
@@ -1187,6 +1192,7 @@
         "skipStage": "Skip \"{name}\" (copy predecessor)",
         "retryStage": "Retry this stage",
         "final": "Final script",
+        "confirm": "Confirm narration script",
         "finalState": {
           "pending": "Not updated",
           "adopted": "Stage result adopted",
@@ -2580,11 +2586,6 @@
       "mergeFailed": "Merge failed",
       "previewShot": "Play this shot",
       "shotPreview": "Shot #{n} preview",
-      "markDone": "Mark done",
-      "markedDone": "Done",
-      "markDoneTitle": "Manually mark this episode's export as done (click again to undo)",
-      "markedDoneToast": "Marked as done",
-      "unmarkDoneToast": "Done mark removed",
       "deleteMerge": "Delete this film",
       "deleteMergeBusy": "Merging in progress, cannot delete",
       "deleteMergeTitle": "Delete film",
@@ -2944,15 +2945,17 @@
     },
     "gate": {
       "locked": "Locked",
-      "checking": "Checking step gates…",
-      "lockedTooltip": "{reason}",
-      "goFix": "Go fix it",
-      "needScript": "Narration script is not confirmed yet",
-      "needAssetReview": "Asset review checklist has not passed",
-      "needDesign": "No confirmed shot design yet",
-      "needProduction": "No shot is production-ready yet",
-      "needFinal": "No up-to-date composite yet",
-      "optional": "Optional · not in the chain"
+      "checking": "Checking step status…",
+      "goFix": "Go fix it"
+    },
+    "stepStatus": {
+      "checking": "Checking",
+      "done": "Done",
+      "in_progress": "In progress",
+      "available": "Ready to start",
+      "locked": "Locked",
+      "stale": "Needs review",
+      "skipped": "Skipped"
     },
     "assetReview": {
       "batch": {

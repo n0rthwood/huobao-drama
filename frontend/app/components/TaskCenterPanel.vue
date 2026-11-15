@@ -85,7 +85,7 @@
             compact
             class="tc-row-ring"
           />
-          <span v-else :class="['tc-row-status', 'is-' + stateClass(row.status)]">{{ row.pipeline ? pipelineStatus(row.pipeline.state) : statusLabel(row.status) }}</span>
+          <span v-else :class="['tc-row-status', 'is-' + stateClass(row.status)]">{{ row.pipeline ? pipelineStateLabel(row.pipeline.state) : statusLabel(row.status) }}</span>
         </div>
         <div v-if="isParentRow(row) && expanded.includes(rowKey(row))" class="tc-children">
           <div
@@ -115,7 +115,7 @@
               :size="26"
               compact
             />
-            <span v-else :class="['tc-row-status', 'is-' + stateClass(child.status)]">{{ child.pipeline ? pipelineStatus(child.pipeline.state) : statusLabel(child.status) }}</span>
+            <span v-else :class="['tc-row-status', 'is-' + stateClass(child.status)]">{{ child.pipeline ? pipelineStateLabel(child.pipeline.state) : statusLabel(child.status) }}</span>
           </div>
           <div v-if="!(row.children || []).length" class="tc-child-empty">{{ t('taskCenter.noChildren') }}</div>
         </div>
@@ -287,7 +287,7 @@ function statusLabel(status) {
   const label = t(key)
   return label === key ? String(status || '') : label
 }
-function pipelineStatus(state) {
+function pipelineStateLabel(state) {
   return t(`episode.documentary.pipeline.execution${state.split('_').map(s => s[0].toUpperCase() + s.slice(1)).join('')}`)
 }
 

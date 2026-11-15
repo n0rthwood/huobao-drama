@@ -13,7 +13,14 @@
           <span class="studio-episode-chip">{{ t('episode.topbar.episodeN', { n: episodeNumber }) }}</span>
           <div class="studio-meta-row">
             <span class="studio-meta-pill">{{ currentSubStageLabel }}</span>
-            <span class="studio-meta-pill is-progress">{{ pipelineProgress }}/{{ pipelineTotal }}</span>
+            <span
+              class="studio-meta-pill is-progress"
+              :title="roadmapReady
+                ? t('episode.topbar.milestonesTitle', { done: milestoneDoneCount, total: milestoneTotal })
+                : t('episode.stepStatus.checking')"
+            >{{ roadmapReady
+              ? t('episode.topbar.milestones', { done: milestoneDoneCount, total: milestoneTotal })
+              : t('episode.stepStatus.checking') }}</span>
             <span class="studio-meta-inline">{{ t('episode.topbar.meta', { roles: chars.length, shots: sbs.length }) }}</span>
           </div>
         </div>
@@ -70,27 +77,19 @@
     <!-- ========== LEFT SIDEBAR ========== -->
     <aside class="sidebar" :class="{ collapsed: sidebarCollapsed }">
       <nav class="pipeline">
-        <div
-          v-for="section in sidebarSections"
-          :key="section.id"
-          :class="['pipe-section', 'is-' + sectionState(section.id)]"
-        >
+        <div v-for="section in sidebarSections" :key="section.id" class="pipe-section">
           <div class="pipe-section-label">
-            <span v-if="sectionState(section.id) !== 'none'" class="pipe-section-state">
-              <svg v-if="sectionState(section.id) === 'done'" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
-              <span v-else-if="sectionState(section.id) === 'active'" class="pipe-section-pulse" />
-              <span v-else class="pipe-section-dot" />
-            </span>
-            <span>{{ section.label }}</span>
-            <span v-if="sectionState(section.id) === 'active'" class="pipe-section-tag">{{ t('episode.sidebar.inProgress') }}</span>
+            <StepStatusIcon :status="section.status" />
+            <span :class="stepTextClass(section.status)">{{ section.label }}</span>
           </div>
           <button
             v-for="item in section.items"
             :key="item.key"
             :class="['pipe-item pipe-item-sub', {
               active: activeSubStepKey === item.key,
-              done: sectionState(section.id) === 'done',
-              doing: sectionState(section.id) === 'active',
+              done: item.status === 'done',
+              stale: item.status === 'stale',
+              doing: item.status === 'in_progress',
               'is-locked': item.locked,
             }]"
             :title="item.locked
@@ -98,23 +97,21 @@
               : (sidebarCollapsed ? item.label : undefined)"
             @click="goSubStep(item.key)"
           >
-            <span class="pipe-icon" :class="sectionState(section.id) === 'done' ? 'icon-done' : activeSubStepKey === item.key ? 'icon-active' : ''">
-              <!-- 收起态：始终显示步骤图标，进行中用右上角小脉冲点表达 -->
+            <span class="pipe-icon" :class="item.status === 'done' ? 'icon-done' : activeSubStepKey === item.key ? 'icon-active' : ''">
+              <!-- 收起态：栏宽不够放状态符号，用步骤图标 + 进行中角标脉冲表达 -->
               <template v-if="sidebarCollapsed">
                 <component :is="item.icon" :size="12" />
-                <span v-if="sectionState(section.id) === 'active'" class="pipe-mini-pulse" />
+                <span v-if="item.status === 'in_progress'" class="pipe-mini-pulse" />
               </template>
-              <svg v-else-if="sectionState(section.id) === 'done'" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
-              <span v-else-if="sectionState(section.id) === 'active'" class="pipe-item-pulse" />
               <component v-else :is="item.icon" :size="11" />
             </span>
             <span class="pipe-copy">
-              <span class="pipe-label">
-                <Lock v-if="item.locked" :size="10" class="pipe-lock" />
+              <span class="pipe-label" :class="stepTextClass(item.status)">
                 {{ item.label }}
-                <span v-if="item.optional" class="pipe-optional">{{ t('episode.gate.optional') }}</span>
+                <StepStatusIcon :status="item.status" :reason="item.lockReason" :locked="item.locked" />
+                <span v-if="item.badge" class="pipe-badge">{{ item.badge }}</span>
+                <span v-if="item.hint" class="pipe-optional">{{ item.hint }}</span>
               </span>
-              <span v-if="item.desc" class="pipe-sub">{{ item.desc }}</span>
             </span>
           </button>
         </div>
@@ -131,27 +128,36 @@
           <svg class="sidebar-toggle-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
           <span v-if="!sidebarCollapsed">{{ t('episode.sidebar.collapse') }}</span>
         </button>
-        <!-- 步骤跑马灯：四段主流程进度，当前段流动光效，点击段可跳转 -->
+        <!-- 进度条（#105）：每段 = 一个大步骤的 roadmap 状态；文案给完成数与当前步骤 -->
         <div class="sidebar-progress">
           <div class="sidebar-progress-head">
-            <span class="sidebar-progress-title">{{ currentStageLabel }}</span>
-            <span class="sidebar-progress-count">{{ currentMainIdx + 1 }}/{{ mainProgressSteps.length }}</span>
+            <span class="sidebar-progress-title">{{ roadmapReady
+              ? t('episode.sidebar.progressDone', { done: mainProgressDone, total: mainProgressTotal })
+              : t('episode.stepStatus.checking') }}</span>
+            <span class="sidebar-progress-count">{{ roadmapCurrentLabel }}</span>
           </div>
           <div class="sidebar-progress-track">
             <button
-              v-for="(s, i) in mainProgressSteps"
+              v-for="s in mainProgressSteps"
               :key="s.id"
               type="button"
-              :class="['sidebar-progress-seg', { done: i < currentMainIdx || mainStageDone(s.id), current: i === currentMainIdx, locked: s.locked }]"
-              :title="s.locked ? `${s.label} · ${t('episode.gate.locked')}：${s.reason} · ${t('episode.gate.goFix')}` : s.label"
+              :class="['sidebar-progress-seg', {
+                done: isStepComplete(s.status),
+                current: s.id === activeMainStage,
+                locked: s.locked,
+                stale: s.status === 'stale',
+              }]"
+              :title="s.locked
+                ? `${s.label} · ${t('episode.gate.locked')}：${s.reason} · ${t('episode.gate.goFix')}`
+                : `${s.label} · ${s.status ? t('episode.stepStatus.' + s.status) : t('episode.stepStatus.checking')}`"
               @click="goMainStage(s.id)"
             ><span class="sidebar-progress-seg-fill" /></button>
           </div>
           <div class="sidebar-progress-labels">
             <span
-              v-for="(s, i) in mainProgressSteps"
+              v-for="s in mainProgressSteps"
               :key="s.id"
-              :class="{ on: i === currentMainIdx, done: i < currentMainIdx || mainStageDone(s.id), locked: s.locked }"
+              :class="[{ on: s.id === activeMainStage, locked: s.locked }, stepTextClass(s.status)]"
               :title="s.locked ? `${t('episode.gate.locked')}：${s.reason}` : undefined"
             ><Lock v-if="s.locked" :size="9" class="progress-lock" />{{ s.label }}</span>
           </div>
@@ -171,15 +177,16 @@
       <!-- ===== PRODUCTION PANEL ===== -->
       <div v-else-if="panel === 'production'" class="content-panel">
         <!--
-          门禁锁定（#54）：侧栏点击与 deeplink 直达都只给原因与出路，绝不渲染内容；
-          门禁尚未判定（首屏未取到 /gates 或取数失败）时同样走这里，避免内容先闪一下。
-          这道闸门必须排在「剧本未就绪」提示之前，否则锁定步骤会显示错误的阻断原因。
+          步骤锁定（#105）：侧栏点击与 deeplink 直达都只给原因与出路，绝不渲染内容；
+          roadmap 尚未取到（ready=false）时同样走这里，只显示「校验中」——不臆造完成态，
+          也不会同时出现 ✓ 与锁。这道闸门必须排在「剧本未就绪」提示之前，
+          否则锁定步骤会显示错误的阻断原因。
         -->
         <div v-if="stageLocked(prodTab)" class="step-empty" style="flex:1">
           <div class="empty-visual"><Lock :size="32" /></div>
           <div class="empty-title">{{ stageGateUnknown(prodTab) ? t('episode.gate.checking') : t('episode.gate.locked') }}</div>
           <div class="empty-desc">{{ stageLockReason(prodTab) }}</div>
-          <button v-if="stageGateUnknown(prodTab)" class="btn" @click="refreshGates()">{{ t('episode.sidebar.refreshData') }}</button>
+          <button v-if="stageGateUnknown(prodTab)" class="btn" @click="refreshRoadmap()">{{ t('episode.sidebar.refreshData') }}</button>
           <button v-else class="btn btn-primary" @click="goStageBlocker(prodTab)">{{ t('episode.gate.goFix') }}</button>
         </div>
 
@@ -195,20 +202,23 @@
 
         <template v-else>
           <!-- 制作子步骤导航（资产/分镜拆分/视频生成）由左侧栏承担，顶部不再重复展示 -->
-          <!-- 资产步两个子页签（#54）：资产卡 / 审核清单；剧情项目不渲染该页签 -->
+          <!-- 资产步两个子页签（#54）：资产卡 / 审核清单；各自显示 roadmap 子步骤状态（#105） -->
           <div v-if="prodTab === 'assets' && isDocumentaryProject" class="asset-subtabs">
             <button
               v-for="sub in ASSET_SUB_TABS"
               :key="sub"
               :class="['btn btn-sm', { 'is-on': assetTab === sub }]"
               @click="assetTab = sub"
-            >{{ sub === 'cards' ? t('episode.assets.tabCards') : t('episode.assets.tabReview') }}</button>
+            >
+              {{ sub === 'cards' ? t('episode.assets.tabCards') : t('episode.assets.tabReview') }}
+              <StepStatusIcon :status="stepStatusOf(sub === 'cards' ? 'assets.extract' : 'assets.review')" />
+            </button>
           </div>
           <AssetReviewPanel
             v-if="prodTab === 'assets' && assetTab === 'review' && isDocumentaryProject"
             :episode-id="epId"
-            :review="gateState.assets"
-            @update:status="refreshGates()"
+            :review="assetsReview"
+            @update:status="refreshRoadmap()"
             @open-asset="openAssetFromReview"
             @create-asset="openAssetCreateFromReview"
             @goto-design="prodTab = 'design'"
@@ -720,13 +730,13 @@
       </div>
 
       <!-- ===== EXPORT PANEL ===== -->
-      <!-- 门禁锁定（#54）：导出需要至少一镜成品最新；锁定或门禁未判定时都只给原因与出路 -->
+      <!-- 步骤锁定（#105）：导出需要至少一镜成品最新；锁定或 roadmap 未判定时都只给原因与出路 -->
       <div v-else-if="stageLocked('export')" class="content-panel">
         <div class="step-empty" style="flex:1">
           <div class="empty-visual"><Lock :size="32" /></div>
           <div class="empty-title">{{ stageGateUnknown('export') ? t('episode.gate.checking') : t('episode.gate.locked') }}</div>
           <div class="empty-desc">{{ stageLockReason('export') }}</div>
-          <button v-if="stageGateUnknown('export')" class="btn" @click="refreshGates()">{{ t('episode.sidebar.refreshData') }}</button>
+          <button v-if="stageGateUnknown('export')" class="btn" @click="refreshRoadmap()">{{ t('episode.sidebar.refreshData') }}</button>
           <button v-else class="btn btn-primary" @click="goStageBlocker('export')">{{ t('episode.gate.goFix') }}</button>
         </div>
       </div>
@@ -1574,12 +1584,14 @@ import ComposeBatchDialog from '~/components/ComposeBatchDialog.vue'
 // 每步一个稳定挂载组件（Issue #54）：后续 Issue 只改这些组件内部，不再回 episode.vue 改 markup
 import ScriptStepPanel from '~/components/ScriptStepPanel.vue'
 import AssetReviewPanel from '~/components/AssetReviewPanel.vue'
+import StepStatusIcon from '~/components/StepStatusIcon.vue'
 import DesignCardPanel from '~/components/DesignCardPanel.vue'
 import ShotProductionPanel from '~/components/ShotProductionPanel.vue'
 import VideoShotPanel from '~/components/VideoShotPanel.vue'
 import ExportPanel from '~/components/ExportPanel.vue'
 import { ASSET_SUB_TABS, PROD_TAB_KEYS, WORKBENCH_CTX, isStageGateUnknown, isStageLocked, remapAssetTab, remapProdTab } from '~/utils/workbenchSteps'
-import { useWorkflowGates } from '~/composables/useWorkflowGates'
+import { aggregateStepStatus, isStepComplete, stepTextClass } from '~/utils/stepStatus'
+import { useEpisodeRoadmap } from '~/composables/useEpisodeRoadmap'
 import { mediaTimeOfPath } from '~/utils/mediaTime'
 import {
   useNowTicker,
@@ -2000,19 +2012,6 @@ function shotNumberOf(sb) {
   const i = sbs.value.findIndex(s => s.id === sb?.id)
   return i >= 0 ? i + 1 : 0
 }
-// 导出步骤完成 = 用户手动标记（episodes.status = 'completed'），不再按最新拼接记录推算
-const exportDone = computed(() => episode.value?.status === 'completed')
-async function toggleExportDone() {
-  if (!epId.value) return
-  const status = exportDone.value ? 'active' : 'completed'
-  try {
-    await episodeAPI.update(epId.value, { status })
-    if (episode.value) episode.value.status = status
-    toast.success(status === 'completed' ? t('episode.export.markedDoneToast') : t('episode.export.unmarkDoneToast'))
-  } catch (e) {
-    toastError(e)
-  }
-}
 const assetDetail = ref({ open: false, type: '', item: null })
 const assetTypeSaving = ref(false)
 const assetDetailDraft = ref({ appearance: '', styling: '', prompt: '', lighting: '', description: '', time: '' })
@@ -2176,7 +2175,7 @@ async function saveAssetCreate() {
     await refresh()
     // 从审核清单来的：直接打开新资产详情，用户接着上传原件 / 生图
     if (fromReview && createdRow?.id) openAssetDetailById(type, createdRow.id)
-    if (fromReview) refreshGates()
+    if (fromReview) refreshRoadmap()
   } catch (e) {
     toastError(e)
   } finally {
@@ -2207,9 +2206,12 @@ async function openAssetFromReview(payload) {
  * 不整页 location.assign；被卸载的子面板会自动释放它自己的 deeplink 键，不跟到新步骤。
  */
 function gotoWorkbenchStep(target) {
-  if (target === 'script') { panel.value = 'script'; return }
+  if (!target) return
+  // roadmap 的 goto 可能是子步骤（rewrite.confirm / assets.review）：按所属大步骤落分区
+  const stepKey = String(target).includes('.') ? String(target).split('.')[0] : String(target)
+  if (stepKey === 'script' || stepKey === 'raw' || stepKey === 'rewrite') { panel.value = 'script'; return }
   panel.value = 'production'
-  if (PROD_TAB_KEYS.includes(target)) prodTab.value = target
+  if (PROD_TAB_KEYS.includes(stepKey)) prodTab.value = stepKey
 }
 
 /** 选择器空态「去资产页」：切到资产步，带素材时直接打开那张素材的详情弹窗 */
@@ -3112,28 +3114,29 @@ const pendingAssetImageCount = computed(() => pendingCharacterImageCount.value +
 const assetTotalCount = computed(() => visualCharTotal.value + scenes.value.length + propItems.value.length)
 const assetReadyCount = computed(() => charImgCount.value + sceneImgCount.value + propImgCount.value)
 
-// 纪录片 7 步（Issue #63）：剧本 → 资产 → Poster（可选）→ 分镜设计 → 分镜制作 → 视频与成品 → 导出；
-// 剧情项目的页签与步骤定义与 #54 之前逐项一致。
+// 纪录片 8 个大步骤（#105 roadmap）：原始内容 → AI 改写 → 资产 → Poster → 分镜设计 →
+// 分镜制作 → 视频与成品 → 导出；剧情项目 6 步与 #54 之前逐项一致。
+// 本文件只保留页签身份与图标；完成 / 锁定 / 计数一律来自 roadmap。
 const prodTabDefs = computed(() => (isDocumentaryProject.value
   ? [
-      { id: 'assets', label: t('episode.prod.assets'), icon: FolderKanban, badge: assetTotalCount.value ? `${assetReadyCount.value}/${assetTotalCount.value}` : '' },
-      { id: 'poster', label: t('episode.prod.poster'), icon: ImageIcon, badge: posterData.value?.final_image ? '✓' : '' },
-      { id: 'design', label: t('episode.prod.design'), icon: Lightbulb, badge: sbs.value.length ? `${gateState.value.design.confirmed}/${sbs.value.length}` : '' },
-      { id: 'production', label: t('episode.prod.production'), icon: Images, badge: sbs.value.length ? `${keyframesConfirmedCount.value}/${sbs.value.length}` : '' },
-      { id: 'final', label: t('episode.prod.final'), icon: Clapperboard, badge: sbs.value.length ? `${shotVidCount.value}/${sbs.value.length}` : '' },
+      { id: 'assets', label: t('episode.prod.assets'), icon: FolderKanban, countKey: 'assets.review' },
+      { id: 'poster', label: t('episode.prod.poster'), icon: ImageIcon, countKey: 'poster' },
+      { id: 'design', label: t('episode.prod.design'), icon: Lightbulb, countKey: 'design.cards' },
+      { id: 'production', label: t('episode.prod.production'), icon: Images, countKey: 'production' },
+      { id: 'final', label: t('episode.prod.final'), icon: Clapperboard, countKey: 'final' },
     ]
   : [
-      { id: 'assets', label: t('episode.prod.assets'), icon: FolderKanban, badge: assetTotalCount.value ? `${assetReadyCount.value}/${assetTotalCount.value}` : '' },
-      { id: 'poster', label: t('episode.prod.poster'), icon: ImageIcon, badge: posterData.value?.final_image ? '✓' : '' },
-      { id: 'keyframes', label: t('episode.prod.keyframes'), icon: Images, badge: sbs.value.length ? `${keyframesConfirmedCount.value}/${sbs.value.length}` : '' },
-      { id: 'videos', label: t('episode.prod.videos'), icon: Clapperboard, badge: sbs.value.length ? `${shotVidCount.value}/${sbs.value.length}` : '' },
+      { id: 'assets', label: t('episode.prod.assets'), icon: FolderKanban, countKey: 'assets' },
+      { id: 'poster', label: t('episode.prod.poster'), icon: ImageIcon, countKey: 'poster' },
+      { id: 'keyframes', label: t('episode.prod.keyframes'), icon: Images, countKey: 'keyframes' },
+      { id: 'videos', label: t('episode.prod.videos'), icon: Clapperboard, countKey: 'videos' },
     ]))
 
 const mainStageDefs = computed(() => (isDocumentaryProject.value
   ? [
       { id: 'script', label: t('episode.stage.narrationScript'), desc: t('episode.stage.narrationScriptDesc'), icon: FileText },
       { id: 'assets', label: t('episode.prod.assets'), desc: t('episode.stage.evidenceAssetsDesc'), icon: FolderKanban },
-      { id: 'poster', label: t('episode.prod.poster'), desc: t('episode.stage.posterDesc'), icon: ImageIcon, optional: true },
+      { id: 'poster', label: t('episode.prod.poster'), desc: t('episode.stage.posterDesc'), icon: ImageIcon },
       { id: 'design', label: t('episode.prod.design'), desc: t('episode.stage.designDesc'), icon: Lightbulb },
       { id: 'production', label: t('episode.prod.production'), desc: t('episode.stage.productionDesc'), icon: Images },
       { id: 'final', label: t('episode.prod.final'), desc: t('episode.stage.finalDesc'), icon: Clapperboard },
@@ -3148,28 +3151,82 @@ const mainStageDefs = computed(() => (isDocumentaryProject.value
       { id: 'export', label: t('episode.stage.export'), desc: t('episode.stage.exportDesc'), icon: Download },
     ]))
 
-// 步骤门禁（#54）：服务端是唯一判定方，界面只渲染它给的解锁位 / 原因 / 跳转目标；
-// 门禁未判定（ready=false：首屏尚未取到 /gates，或取数失败）时按锁定渲染，内容绝不先闪出来
-const { gates: gateState, ready: gatesReady, applyGates, refreshGates, reasonOf: gateReasonOf, gotoOf: gateGotoOf } = useWorkflowGates(() => epId.value)
+// ===== 工作流 roadmap（Issue #105）：服务端是唯一判定方 =====
+// 界面只渲染它给的 status / lock_reason / goto / counts / milestone，不再自己拼完成状态。
+const {
+  roadmap, ready: roadmapReady, applyRoadmap, refreshRoadmap,
+  nodeOf, statusOf, countsOf, lockedOf, lockReasonOf, gotoOf, milestones,
+} = useEpisodeRoadmap(() => epId.value)
+const milestoneTotal = computed(() => milestones.value.length)
+const milestoneDoneCount = computed(() => milestones.value.filter(milestone => milestone.status === 'done').length)
+/** 进度条右侧的「当前步骤」：roadmap 认为应该走到哪一步（不是用户正在看的那一页） */
+const roadmapCurrentLabel = computed(() => {
+  const key = roadmap.value?.current?.step
+  if (!key) return ''
+  // raw / rewrite 属于「剧本」分区（界面把两级合成一段）
+  if (key === 'raw' || key === 'rewrite' || key === 'script') {
+    return mainStageDefs.value.find(stage => stage.id === 'script')?.label || nodeOf(key)?.label || ''
+  }
+  return mainStageDefs.value.find(stage => stage.id === key)?.label || nodeOf(key)?.label || ''
+})
+/**
+ * 资产审核面板的初始横幅数据：审核状态、非阻断提醒（stale_reasons）与缺失条数。
+ * 面板自己会轮询 assetReviewAPI，这里只给首屏与刷新后的等价事实。
+ */
+const assetsReview = computed(() => {
+  const node = nodeOf('assets.review')
+  const counts = node?.counts
+  const missing = counts ? Math.max(counts.total - counts.done, 0) : 0
+  return {
+    // 判据已满足即 passed（上游未完成只影响 done，不影响清单本身）；有缺项 = pending
+    review_status: node?.criteria_met ? 'passed' : missing > 0 ? 'pending' : node?.status === 'in_progress' ? 'running' : 'none',
+    stale_reasons: (node?.notices || []).map(notice => notice.message),
+    missing,
+  }
+})
+
+/** 页签徽标：只显示 roadmap 的计数（确认数 / 就绪数 / 总数）；完成符号由 StepStatusIcon 给，不重复 */
+function badgeOf(key) {
+  if (!roadmapReady.value) return ''
+  const counts = countsOf(key)
+  return counts && counts.total > 0 ? `${counts.done}/${counts.total}` : ''
+}
+
+/** 步骤当前的 roadmap 状态；未取到 roadmap 时为 null → 界面只渲染「校验中」 */
+function stepStatusOf(key) {
+  return roadmapReady.value ? statusOf(key) : null
+}
+
 function stageGateUnknown(stageId) {
-  return isStageGateUnknown({ documentary: isDocumentaryProject.value, stageId, gatesReady: gatesReady.value })
+  return isStageGateUnknown({ documentary: isDocumentaryProject.value, stageId, roadmapReady: roadmapReady.value })
 }
 function stageLocked(stageId) {
   return isStageLocked({
     documentary: isDocumentaryProject.value,
     stageId,
-    gatesReady: gatesReady.value,
-    unlocked: gateState.value.unlocked,
+    roadmapReady: roadmapReady.value,
+    unlocked: nodeOf(stageId)?.unlocked,
   })
 }
 function stageLockReason(stageId) {
-  if (stageGateUnknown(stageId)) return ''
-  return stageLocked(stageId) ? gateReasonOf(stageId) : ''
+  return stageLocked(stageId) && !stageGateUnknown(stageId) ? lockReasonOf(stageId) : ''
 }
-/** 点锁定步骤时跳到真正阻塞它的那一步，而不是停在原地 */
+/**
+ * 展示用锁定：只有 roadmap 已判定且节点 unlocked=false 才画锁（与状态并列显示）。
+ * 未判定时只画「校验中」——同一条目绝不同时出现 ✓ 与锁（#105 用户实测问题）。
+ */
+function stepLocked(key) {
+  return roadmapReady.value && lockedOf(key)
+}
+/**
+ * 点锁定步骤时跳到真正阻塞它的那一步（roadmap 的 goto），而不是停在原地。
+ * goto 可能是子步骤 key（rewrite.confirm / assets.review）：按所属大步骤落分区。
+ */
 function goStageBlocker(stageId) {
-  const target = gateGotoOf(stageId)
-  goMainStage(target || stageId)
+  const target = gotoOf(stageId)
+  if (!target) return goMainStage(stageId)
+  const stepKey = target.includes('.') ? target.split('.')[0] : target
+  goMainStage(stepKey === 'raw' || stepKey === 'rewrite' ? 'script' : stepKey)
 }
 
 // 项目类型决定页签集合：旧链接（expression/layers 与纪录片下的 keyframes/videos）统一经
@@ -3180,61 +3237,60 @@ watch([() => drama.value?.project_type, prodTabDefs], ([type]) => {
   assetTab.value = remapAssetTab(assetTab.value, type)
 }, { immediate: true })
 
-// 切换制作页签时重算门禁（裁决：refresh / 剧本保存确认 / 任务结束 / 页签切换）。
-// 导航类刷新是前台的：先作废上一次判定，拿到新结果前新步骤只渲染「校验中」，
-// 不拿上一轮的解锁缓存放行（任务结束 / 剧本保存走 background，不打断正在看的内容）。
-watch([prodTab, panel], () => { if (epId.value) refreshGates() })
+// 切换制作页签时重算 roadmap（裁决：refresh / 剧本保存确认 / 任务结束 / 页签切换）。
+// 导航类刷新是前台的：先作废旧判定，拿到新结果前只渲染「校验中」，不拿上一轮状态放行
+// （任务结束 / 剧本保存走 background，不打断正在看的内容）。
+watch([prodTab, panel], () => { if (epId.value) refreshRoadmap() })
 
-const sidebarSections = computed(() => ([
-  {
-    id: 'script',
-    label: isDocumentaryProject.value ? t('episode.stage.narrationScript') : t('episode.stage.script'),
-    items: [
-      { key: 'script:raw', label: t('episode.script.raw'), desc: '', icon: FileText },
-      { key: 'script:rewrite', label: t(isDocumentaryProject.value ? 'episode.rewrite.narrationRewrite' : 'episode.script.rewrite'), desc: '', icon: FileText },
-    ],
-  },
-  {
-    id: 'production',
-    label: t('episode.stage.production'),
-    items: prodTabDefs.value.map(def => ({
-      key: `prod:${def.id}`,
-      label: def.label,
-      desc: '',
-      icon: def.id === 'assets' ? Users : def.icon,
-      locked: stageLocked(def.id),
-      lockReason: stageLockReason(def.id),
-      optional: def.id === 'poster' && isDocumentaryProject.value,
+// 侧栏每个大步骤条目各自显示 roadmap 状态与锁定原因；分区标题给汇总状态
+const sidebarSections = computed(() => {
+  const sections = [
+    {
+      id: 'script',
+      label: isDocumentaryProject.value ? t('episode.stage.narrationScript') : t('episode.stage.script'),
+      items: [
+        { key: 'script:raw', stepKey: 'raw', label: t('episode.script.raw'), icon: FileText },
+        {
+          key: 'script:rewrite',
+          stepKey: 'rewrite',
+          label: t(isDocumentaryProject.value ? 'episode.rewrite.narrationRewrite' : 'episode.script.rewrite'),
+          icon: FileText,
+        },
+      ],
+    },
+    {
+      id: 'production',
+      label: t('episode.stage.production'),
+      items: prodTabDefs.value.map(def => ({
+        key: `prod:${def.id}`,
+        stepKey: def.id,
+        label: def.label,
+        icon: def.id === 'assets' ? Users : def.icon,
+        // 徽标统一用 roadmap 的 counts（确认数 / 就绪数 / 总数），不再各自数本地数组
+        badge: badgeOf(def.countKey),
+        // 纪录片的 Poster 是导出前置，不是「可选 · 不入链」
+        hint: def.id === 'poster' && isDocumentaryProject.value ? t('episode.stage.posterRequiredBeforeExport') : '',
+      })),
+    },
+    {
+      id: 'export',
+      label: t('episode.stage.export'),
+      items: [
+        { key: 'export:merge', stepKey: 'export', label: t('episode.stage.mergeExport'), icon: Download },
+      ],
+    },
+  ]
+  return sections.map(section => ({
+    ...section,
+    status: roadmapReady.value ? aggregateStepStatus(section.items.map(item => statusOf(item.stepKey))) : '',
+    items: section.items.map(item => ({
+      ...item,
+      status: stepStatusOf(item.stepKey),
+      locked: stepLocked(item.stepKey),
+      lockReason: stageLockReason(item.stepKey),
     })),
-  },
-  {
-    id: 'export',
-    label: t('episode.stage.export'),
-    items: [
-      { key: 'export:merge', label: t('episode.stage.mergeExport'), desc: '', icon: Download },
-    ],
-  },
-]))
-
-// 大环节状态:pending(未开始)/ active(进行中)/ done(已完成)/ none(不显示状态,导出用)
-// 进行中 = 环节内有任意进度但未全部完成,或当前正处于该环节
-function sectionState(sectionId) {
-  if (sectionId === 'export') return 'none'
-  // 制作段完成 = 本项目类型下制作各步骤（Poster 可选除外）全部完成
-  const prodStages = prodTabDefs.value.map(def => def.id).filter(id => id !== 'poster')
-  const done = sectionId === 'script'
-    ? mainStageDone('script')
-    : prodStages.every(id => mainStageDone(id))
-  if (done) return 'done'
-
-  const hasProgress = sectionId === 'script'
-    ? !!(rawContent.value || scriptContent.value)
-    : !!(chars.value.length || scenes.value.length || propItems.value.length || sbs.value.length || shotVidCount.value)
-  const isCurrent = sectionId === 'script'
-    ? panel.value === 'script'
-    : panel.value === 'production'
-  return (hasProgress || isCurrent) ? 'active' : 'pending'
-}
+  }))
+})
 
 const activeMainStage = computed(() => {
   if (panel.value === 'export') return 'export'
@@ -3245,41 +3301,6 @@ const activeMainStage = computed(() => {
   }
   return 'script'
 })
-
-function mainStageDone(stageId) {
-  if (stageId === 'script') {
-    // 纪录片：旁白稿「定稿」= 已确认；剧情项目口径不变（有改写稿即完成）
-    return isDocumentaryProject.value ? !!gateState.value.script.confirmed : !!scriptContent.value
-  }
-  if (stageId === 'assets') {
-    if (isDocumentaryProject.value) return gateState.value.assets.review_status === 'passed'
-    return assetTotalCount.value > 0 && assetReadyCount.value === assetTotalCount.value
-  }
-  // Poster 可选：有最终版本即视为完成，不参与制作分组 done 判定
-  if (stageId === 'poster') return !!posterData.value?.final_image
-  // 分镜设计（纪录片）：每镜设计卡都已确认
-  if (stageId === 'design') {
-    const { confirmed, total } = gateState.value.design
-    return total > 0 && confirmed === total
-  }
-  // 分镜制作（纪录片）：每镜都制作就绪（R5 前过渡读 keyframes_confirmed）
-  if (stageId === 'production') {
-    const { ready, total } = gateState.value.production
-    return total > 0 && ready === total
-  }
-  // 视频与成品（纪录片）：每镜成品都是最新的
-  if (stageId === 'final') {
-    const { fresh, total } = gateState.value.final
-    return total > 0 && fresh === total
-  }
-  // 关键帧步骤完成 = 本集每个分镜的关键帧都已人工确认
-  if (stageId === 'keyframes') return allKeyframesConfirmed.value
-  if (stageId === 'videos') {
-    return !!sbs.value.length && shotVidCount.value === sbs.value.length
-  }
-  if (stageId === 'export') return exportDone.value
-  return false
-}
 
 function goMainStage(stageId) {
   if (stageId === 'script') {
@@ -3305,19 +3326,20 @@ const activeSubStepKey = computed(() => {
   return 'export:merge'
 })
 
-// 步骤跑马灯：主流程各段（按项目类型取定义），段点击跳转、当前段流动光效；
-// 锁定段渲染锁图标 + 灰态，tooltip 给原因，点击跳到真正阻塞它的那一步（#54）
+// 步骤跑马灯：每段 = 一个大步骤的 roadmap 状态；「剧本」段是 raw + rewrite 两级汇总。
+// 选中态（正在看的步骤）用强调底色，与完成/需复核/锁定各自叠加，互不吞掉。
 const mainProgressSteps = computed(() => mainStageDefs.value.map(stage => ({
   id: stage.id,
   label: stage.label,
-  locked: stageLocked(stage.id),
+  status: stage.id === 'script'
+    ? (roadmapReady.value ? aggregateStepStatus(['raw', 'rewrite'].map(statusOf)) : null)
+    : stepStatusOf(stage.id),
+  locked: stepLocked(stage.id),
   reason: stageLockReason(stage.id),
-  optional: !!stage.optional,
 })))
-const currentMainIdx = computed(() => {
-  const i = mainProgressSteps.value.findIndex(s => s.id === activeMainStage.value)
-  return i < 0 ? 0 : i
-})
+/** 进度文案与色段必须同口径：都按界面上可见的段数（剧本段 = raw + rewrite 汇总） */
+const mainProgressTotal = computed(() => mainProgressSteps.value.length)
+const mainProgressDone = computed(() => mainProgressSteps.value.filter(step => isStepComplete(step.status)).length)
 
 function goSubStep(key) {
   if (key.startsWith('script:')) {
@@ -3340,20 +3362,10 @@ function goSubStep(key) {
   panel.value = 'export'
 }
 
-const pipelineTotal = 2
-const pipelineProgress = computed(() =>
-  ['script', 'production'].filter(id => sectionState(id) === 'done').length
-)
-
 const currentStageLabel = computed(() => {
   if (panel.value === 'script') return t('episode.stage.scriptStage', { step: stepLabels.value[scriptStep.value] })
   if (panel.value === 'production') return t('episode.stage.prodStage', { step: prodTabDefs.value[prodTabIdx.value]?.label || t('episode.stage.production') })
-  return exportDone.value ? t('episode.stage.exportDone') : t('episode.stage.exportWaiting')
-})
-
-const currentMainStageLabel = computed(() => {
-  const current = mainStageDefs.value.find(stage => stage.id === activeMainStage.value)
-  return current?.label || t('episode.stage.workbench')
+  return statusOf('export') === 'done' ? t('episode.stage.exportDone') : t('episode.stage.exportWaiting')
 })
 
 const currentSubStageLabel = computed(() => currentStageLabel.value)
@@ -3568,21 +3580,22 @@ async function refresh() {
     toastError(e)
   }
   try { mergeData.value = await mergeAPI.status(epId.value) } catch {}
-  await Promise.all([loadEpisodeTasks(epId.value), loadExportMerges(), refreshGates({ background: true })])
+  await Promise.all([loadEpisodeTasks(epId.value), loadExportMerges(), refreshRoadmap({ background: true })])
   if ((panel.value === 'production' && prodTab.value === 'poster') || panel.value === 'export') await loadPosterData()
 }
 
-// ─── 旁白稿确认（Issue #54）：纪录片门禁链的第一环 ───────────────
+// ─── 旁白稿确认：纪录片严格递进链的第一环（状态读 roadmap 的 rewrite.confirm） ───
 const confirmingScript = ref(false)
-const scriptConfirmed = computed(() => !!gateState.value.script.confirmed)
+const scriptConfirmed = computed(() => statusOf('rewrite.confirm') === 'done')
 const scriptConfirmedAt = computed(() => {
-  const at = gateState.value.script.confirmed_at
+  const at = episode.value?.script_confirmed_at
   return at ? new Date(at).toLocaleString() : ''
 })
 async function confirmScript() {
   confirmingScript.value = true
   try {
-    applyGates(await episodeAPI.confirmScript(epId.value))
+    // 确认/取消确认都返回新的 roadmap：直接落地，省一次往返
+    applyRoadmap(await episodeAPI.confirmScript(epId.value))
     toast.success(t('episode.script.confirmed'))
   } catch (e) {
     toastError(e)
@@ -3593,21 +3606,21 @@ async function confirmScript() {
 async function unconfirmScript() {
   confirmingScript.value = true
   try {
-    applyGates(await episodeAPI.unconfirmScript(epId.value))
+    applyRoadmap(await episodeAPI.unconfirmScript(epId.value))
   } catch (e) {
     toastError(e)
   } finally {
     confirmingScript.value = false
   }
 }
-// 改稿会在服务端自动取消确认（onScriptChanged）：保存后前台重算门禁——先作废上一次判定，
-// 拿到新结果前不再按旧的解锁位渲染任何受管内容，锁定态即时生效
+// 改稿会在服务端自动取消确认（onScriptChanged）：保存后前台重算 roadmap——先作废上一次判定，
+// 拿到新结果前不再按旧状态渲染任何受管内容，锁定态即时生效
 function saveRaw() {
-  episodeAPI.update(epId.value, { content: localRaw.value }).then(() => refreshGates())
+  episodeAPI.update(epId.value, { content: localRaw.value }).then(() => refreshRoadmap())
   episode.value.content = localRaw.value
 }
 function saveScr() {
-  episodeAPI.update(epId.value, { script_content: localScript.value }).then(() => refreshGates())
+  episodeAPI.update(epId.value, { script_content: localScript.value }).then(() => refreshRoadmap())
   episode.value.script_content = localScript.value
 }
 // 发给 Agent 的 message 是功能性提示词而非 UI 文案：产出语言由后端全局「内容语言」指令控制，
@@ -5567,7 +5580,6 @@ provide(WORKBENCH_CTX, {
   episodeSubtitleTiming,
   exportBlockedSelected,
   exportComposeReadyIds,
-  exportDone,
   exportMerges,
   exportPosterDuration,
   exportPosterEnabled,
@@ -5626,6 +5638,7 @@ provide(WORKBENCH_CTX, {
   rawLen,
   refresh,
   removeHistoryVideo,
+  roadmapReady,
   retryFailedVideos,
   rn,
   rt,
@@ -5656,12 +5669,12 @@ provide(WORKBENCH_CTX, {
   shotVideoRefCount,
   skipRewrite,
   startVideoColDrag,
+  statusOf,
   targetAssetVersions,
   targetVersionSaving,
   taskGeneratedAt,
   taskVideoPath,
   toast,
-  toggleExportDone,
   toggleExportSelect,
   toggleSelectAllExport,
   toggleSelectAllVideos,
@@ -5728,8 +5741,8 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
   padding: 8px;
   gap: 8px;
   background: var(--surface-base);
-  /* 选中态:中性反色(浅色近黑/深色近白),与进行中(蓝脉冲)/已完成(绿勾)区分,
-     遵循「颜色只承担状态指示」——选中不是状态,保持无色 */
+  /* 中性选中态令牌：视频/列表类条目的“当前条目”仍用中性反色（--sel*）。
+     侧栏步骤的选中（#105）改用强调色描边/底色，与完成（绿）/进行中（脉冲）/需复核（琥珀）叠加。 */
   --sel: var(--text-0);
   --sel-bg: var(--bg-active);
   --sel-text: var(--text-0);
@@ -5950,45 +5963,17 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
   text-transform: uppercase; letter-spacing: 0.06em;
   padding: 0 7px 2px;
 }
-/* 分组标题保持中性灰,状态色只在左侧小指示器上 */
-.pipe-section-state {
-  width: 13px; height: 13px; border-radius: 999px; flex-shrink: 0;
-  display: inline-flex; align-items: center; justify-content: center;
-}
-.pipe-section.is-done .pipe-section-state {
-  background: var(--success-bg); color: var(--success);
-  border: 1px solid var(--success-bg);
-}
-.pipe-section-dot {
-  width: 5px; height: 5px; border-radius: 999px;
-  background: var(--text-3); opacity: 0.55;
-}
-.pipe-section-pulse {
-  width: 6px; height: 6px; border-radius: 999px;
-  background: var(--accent);
-  animation: pipeSectionPulse 1.6s var(--ease-out) infinite;
-}
-@keyframes pipeSectionPulse {
-  0% { box-shadow: 0 0 0 0 var(--accent-glow); }
-  70% { box-shadow: 0 0 0 5px transparent; }
-  100% { box-shadow: 0 0 0 0 transparent; }
-}
-.pipe-section-tag {
-  font-size: 9.5px; font-weight: 600; letter-spacing: 0.03em;
-  color: var(--text-2); background: var(--bg-2);
-  border-radius: 999px; padding: 1px 5px;
-  text-transform: none;
-}
-/* 子步骤进行中:与大环节同步的脉冲点 */
+/* 分组标题保持中性灰,状态符号只在标题左侧（StepStatusIcon） */
+/* 子步骤进行中:图标底色跟随强调色；完成/需复核的符号在标签里（StepStatusIcon） */
 .pipe-item.doing { color: var(--text-1); }
 .pipe-item.doing .pipe-icon {
   background: var(--accent-bg);
   border-color: var(--accent-glow);
 }
-.pipe-item-pulse {
-  width: 6px; height: 6px; border-radius: 999px;
-  background: var(--accent);
-  animation: pipeSectionPulse 1.6s var(--ease-out) infinite;
+@keyframes pipeSectionPulse {
+  0% { box-shadow: 0 0 0 0 var(--accent-glow); }
+  70% { box-shadow: 0 0 0 5px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
 }
 .pipe-item {
   position: relative;
@@ -6005,10 +5990,11 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
   color: var(--text-0);
 }
 .pipe-item.active {
-  background: var(--sel-bg);
-  color: var(--sel-text);
+  /* 选中（#105）：强调色底色 + 细描边，可与「完成 ✓」「需复核」「进行中」叠加 */
+  background: var(--accent-bg);
+  color: var(--accent-text);
   border-color: transparent;
-  box-shadow: none;
+  box-shadow: inset 0 0 0 1px var(--accent);
 }
 /* ChatFire 签名：激活步骤左侧 3px 品牌色圆角指示条 */
 .pipe-item.active::before {
@@ -6027,6 +6013,11 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
   box-shadow: 0 0 0 3px var(--button-focus), var(--button-shadow);
 }
 .pipe-item.done { color: var(--text-2); }
+/* 需复核 = 琥珀色（上游改动后要回头看）；锁定 = 灰态 + StepStatusIcon 的锁图标与原因 */
+.pipe-item.stale { color: var(--warning); }
+.pipe-item.stale .pipe-icon { background: var(--warning-bg); border-color: var(--warning-bg); color: var(--warning); }
+.pipe-item.is-locked { color: var(--text-3); }
+.pipe-item.is-locked .pipe-icon { opacity: 0.55; }
 .pipe-item-sub {
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
@@ -6053,12 +6044,11 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
   position: relative;
   z-index: 1;
 }
-.pipe-item.active .pipe-icon { background: var(--sel); border-color: var(--sel); color: var(--surface-raised); }
 .pipe-item.done .pipe-icon { background: var(--success-bg); border-color: var(--success-bg); color: var(--success); }
-.pipe-item.active.done .pipe-icon { background: var(--sel); border-color: var(--sel); color: var(--surface-raised); }
-.icon-active { background: var(--sel) !important; border-color: var(--sel) !important; color: var(--surface-raised) !important; }
+.pipe-item.active .pipe-icon { background: var(--accent); border-color: var(--accent); color: var(--surface-raised); }
+.icon-active { background: var(--accent) !important; border-color: var(--accent) !important; color: var(--surface-raised) !important; }
+/* 完成态的图标保持绿色 ✓；被选中时由左侧强调条与底色表达选中，不吞掉完成的绿 */
 .icon-done { background: var(--success-bg) !important; border-color: var(--success-bg) !important; color: var(--success) !important; }
-.pipe-item.active.done .icon-done { background: var(--sel) !important; border-color: var(--sel) !important; color: var(--surface-raised) !important; }
 
 .pipe-label { flex: 1; font-size: 12.5px; }
 .pipe-copy { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
@@ -6075,6 +6065,11 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
   font-family: var(--font-mono);
 }
 .pipe-badge.badge-done { background: var(--success-bg); color: var(--success); }
+/* 步骤旁的提示（如纪录片 Poster 的「导出前必做」） */
+.pipe-optional {
+  font-size: 9.5px; font-weight: 600; color: var(--text-3);
+  background: var(--bg-2); border-radius: 999px; padding: 1px 5px;
+}
 .pipe-spinner { width: 10px; height: 10px; border: 1.5px solid var(--accent-bg); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
 
 /* Sidebar Bottom */
@@ -6103,7 +6098,7 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
 .sidebar.collapsed { width: 46px; }
 .sidebar.collapsed .pipeline { padding: 12px 5px 8px; gap: 10px; }
 .sidebar.collapsed .pipe-section-label { justify-content: center; padding: 0 0 2px; }
-.sidebar.collapsed .pipe-section-label > span:not(.pipe-section-state) { display: none; }
+.sidebar.collapsed .pipe-section-label > span:not(.step-status) { display: none; }
 .sidebar.collapsed .pipe-item {
   grid-template-columns: auto; justify-content: center;
   padding: 6px 0; min-height: 0;
@@ -6172,6 +6167,8 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
   box-shadow: 0 0 0 3px var(--button-focus);
 }
 .sidebar-progress-seg.done { background: var(--success); }
+.sidebar-progress-seg.stale { background: var(--warning); }
+.sidebar-progress-seg.locked { background: var(--bg-3); }
 .sidebar-progress-seg.current { background: var(--accent-bg); }
 /* 跑马灯流动光：当前段内的渐变高光持续滑动 */
 .sidebar-progress-seg.current .sidebar-progress-seg-fill {
@@ -6203,11 +6200,12 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
   font-size: 10.5px;
   color: var(--text-3);
 }
-.sidebar-progress-labels span.done { color: var(--success); }
+.sidebar-progress-labels span.locked { color: var(--text-3); opacity: 0.75; }
 .sidebar-progress-labels span.on {
   color: var(--accent-text);
   font-weight: 700;
 }
+.progress-lock { margin-right: 3px; opacity: 0.75; }
 .refresh-btn {
   width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px;
   min-height: 28px;
