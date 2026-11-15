@@ -100,7 +100,7 @@ Body：
 
 ### PUT /episodes/:id — 修改集字段
 **白名单键**（其余键忽略；空 body → 400「没有可更新的字段」）：
-`content`（原始文本）、`script_content`（AI 改写稿）、`title`、`description`、`status`、`resolution`(枚举)、`narration_enabled`(bool)、`tts_config_id`(null=清除)、`subtitle_timing`(`sentence|char`)、`audio_mix_mode`(`replace|mix`)、`audio_bed_gain_db`(number|null)、`narration_fit_default`(对象或 JSON 串，须过 fit 校验)、`narration_spine`(空白串→null)、`narration_normalize`(bool)。
+`content`（原始文本）、`script_content`（AI 改写稿）、`title`、`description`、`status`（人工覆盖 `draft|active|completed`，`null`/`"auto"` 恢复推算）、`resolution`(枚举)、`narration_enabled`(bool)、`tts_config_id`(null=清除)、`subtitle_timing`(`sentence|char`)、`audio_mix_mode`(`replace|mix`)、`audio_bed_gain_db`(number|null)、`narration_fit_default`(对象或 JSON 串，须过 fit 校验)、`narration_spine`(空白串→null)、`narration_normalize`(bool)。
 最小原始内容导入例：`PUT /episodes/12 {"content":"<原文>"}`。响应 `data:null`。
 
 **阶段授权约束**：上面的白名单只是接口能力，不是同时填写两步的授权。第一步只导入 `content`；用户要求等待时就停下。第二步 AI 改写必须在获准后由火宝生成保存：**纪录片走 `POST /episodes/:id/script-rewrite` 流水线**（旧 `POST /agent/script_rewriter/chat` 对纪录片直接 400），剧情项目走 `POST /agent/script_rewriter/chat {drama_id,episode_id,message}`；不得助手自写后 PUT `script_content` 冒充生成。人工改已有稿/导入用户定稿须另有明确指令，详见主技能 S1 与错误案例 §4.5。用户已要求停止业务操作、仅更新技能时，不调用火宝核对或回滚。
@@ -126,8 +126,10 @@ Body：`{target:'characters|scenes|props', model?, config_id?}`（target 非法 
   - `expected_hash` ≠ `current_hash` → 400（剧本已变，须重新打开复核）。**必须回传 GET 得到的 current_hash**。
   - 保存后以当前剧本重盖指纹；人保存的成员标 `source='human'`。**缺省 status=approved 意味着「保存即确认」，不能当草稿随手存。**
 
-### GET /episodes/:id/pipeline-status — 流水线进度（只读）
-data：`{episode_id, steps:{script_rewrite, extract_characters, extract_scenes, extract_storyboards, generate_images, generate_videos, merge_episode}}`，各步 `{status:'done|partial|pending'|<merge任务状态>, count/completed/total?, merged_url?}`。仅覆盖计数，不代表内容验收。
+### GET /episodes/:id/roadmap — 步骤状态（只读，唯一来源，Issue #105）
+data：`{episode_id, drama_id, project_type, strict, status:{effective,derived,override}, current:{step,substep}, progress:{done,total}, milestones:[...], steps:[...]}`。每一步/子步骤带 `ordering(strict|free)`、`status(locked|available|in_progress|done|stale|skipped)`、`criteria_met`、`unlocked`、`lock_reason`、`goto`、`done_criteria`、`missing`、`notices`、`blocked_by`、`counts?`。完整结构与判读见 `api-catalog.md` §2。**每步完成后读它；只有该步 `done`/`skipped` 且下一步已解锁才继续。** 失败返回 404（剧集不存在）。旧的阶段门禁与流水线进度两个只读接口已随 #105 删除（404），不要再按它们规划或排障。
+
+`PUT /episodes/:id` 与 `PUT /dramas/:id` 的 `status` 只写人工覆盖（`draft|active|completed`；`null`/`"auto"` 清除覆盖）；项目/剧集状态默认由 roadmap 推算，人工覆盖优先。响应里的 `status` 是有效值，另有 `status_derived` 与 `status_override`。
 
 （`/episodes/:id/storyboards`、`/generate-video-prompts`、`/video-prompts-status`、`/generate-narration`、`/narration-*`、`/tts-options`、`/compose-batch*`、`/video-batch*`、`/generate-keyframe-prompts`、`/keyframe-*` 属分镜/关键帧/视频/旁白/合成生产路径，由 **api-production.md**（同级 `references/api-production.md`）主维护；本文件不重复展开，避免两份文档漂移。）
 
@@ -372,7 +374,7 @@ dramas.ts、episodes.ts、characters.ts、scenes.ts、props.ts、asset-reextract
 | GET /episodes/:id/extract-status | §2 | S | 同上 |
 | GET /episodes/:id/character-roster | §2 | S | episodes.ts + services/character-roster.ts |
 | PUT /episodes/:id/character-roster | §2 | A | 同上 |
-| GET /episodes/:id/pipeline-status | §2 | S | episodes.ts |
+| GET /episodes/:id/roadmap | §2 | S | episodes.ts + services/workflow-roadmap.ts（步骤状态唯一来源，#105） |
 | POST /characters | §3 | S | characters.ts |
 | PUT /characters/:id | §3 | S | characters.ts + services/asset-prompt-invalidation.ts |
 | DELETE /characters/:id | §3 | A | characters.ts + services/asset-links.ts |

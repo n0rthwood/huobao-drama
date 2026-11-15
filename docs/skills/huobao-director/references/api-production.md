@@ -55,7 +55,7 @@
 | POST /episodes/{e}/compose-batch/preview | §3 | [R]（d5/e6 从 blocked 到三项 missing/selectable，合成后均 unchanged/exportable） |
 | POST /episodes/{e}/compose-batch | §3 | [R]（d5/e6 显式 `[119,120,121]`，串行终态 completed:3/failed:0/skipped:0） |
 | GET /episodes/{e}/compose-batch-status | §3 | [R]（未启动 null 与上述 completed 终态） |
-| GET /episodes/{e}/pipeline-status；extract/extract-status；assets/link；character-roster；characters/scenes/props | §3 | [S] |
+| GET /episodes/{e}/roadmap；extract/extract-status；assets/link；character-roster；characters/scenes/props | §3 | [S]（`roadmap` = 步骤状态唯一来源，#105） |
 | GET/PUT /episodes/{e}/poster；POST /poster/generate（仅 `mode:"initial"`）；POST /poster/versions；PUT /poster/select | §4 | **契约已变更，不可照用**（当时 [R]：`layout` + 上传画布登记；`composite`／`layers` 当时 [S]）→ 见 api-catalog §4 |
 | POST /merge/episodes/{id}/merge | §5 | [R]（d5/e6 fail-closed 400，以及显式三镜＋Poster 9/2s 的 merge 21 成功） |
 | GET /merge/episodes/{id}/merge；GET /merge/episodes/{id}/merges | §5 | [R]（null/[]、merge 21 completed 与 history 读回） |
@@ -244,7 +244,7 @@ Body `model?/config_id?`。要求该镜 keyframesConfirmed（否则 400），在
 
 
 ### 其它（同文件，简要）
-- `GET /episodes/{e}/pipeline-status`：步骤聚合 `script_rewrite/extract_characters/extract_scenes/extract_storyboards/generate_images/generate_videos/merge_episode`，各 `{status:'pending|ready|partial|done', count?, completed?, total?, merged_url?}`。
+- `GET /episodes/{e}/roadmap`：步骤状态唯一来源（Issue #105，结构见 `api-catalog.md` §2）：`current{step,substep}`、`progress`、`milestones`、每步 `status/missing/blocked_by/counts`。每完成一步读它；未 `done` 不进入下一步。旧的流水线进度接口已随 #105 删除（404）。
 - `POST /episodes/{e}/extract {target:'characters|scenes|props', model?, config_id?}` + `GET /episodes/{e}/extract-status`；资产关联 `POST /episodes/{e}/assets/link {kind, asset_id}` / `DELETE .../assets/link?kind=&asset_id=`。
 - 选角名册 `GET/PUT /episodes/{e}/character-roster`（PUT：`cast[]` 必填逐条校验 name；`status` 缺省按 approved 保存——**不能当草稿随意存**；`expected_hash` 回传 GET 的 `current_hash`）。
 - `GET /episodes/{e}/characters|scenes|props`：本集资产+图片版本（characters 另含 `styling_version`）。
@@ -335,7 +335,7 @@ Body `{version_id:number}`。同步 episodes.thumbnail。返回 bundle；实测�
 
 **纪录片（`project_type=documentary`）**：
 1. **剧本**：`PUT /episodes/{e} {"content":...}` 导入原始内容 →（人明确授权改写后）`POST /episodes/{e}/script-rewrite` 轮询 `GET /episodes/{e}/script-rewrite`。**纪录片不能用 `POST /agent/script_rewriter/chat`（直接 400）**，也不能由助手本地代写再 PUT `script_content`。人工保存旁白稿前先 `POST /episodes/{e}/script-rewrite/inspect-narration` 查非旁白杂质，删留由人决定。人确认：`POST /episodes/{e}/script/confirm`。
-2. **资产**：`POST /episodes/{e}/extract` ×3 → `POST /episodes/{e}/asset-review/run` 对清单补缺 → 需要精确/美化时走 `POST /asset-pipeline/runs` + `approve`（每次 `revise` 再花一轮预算）。每进下一阶段前读 `GET /episodes/{e}/gates`。
+2. **资产**：`POST /episodes/{e}/extract` ×3 → `POST /episodes/{e}/asset-review/run` 对清单补缺 → 需要精确/美化时走 `POST /asset-pipeline/runs` + `approve`（每次 `revise` 再花一轮预算）。每进下一阶段前读 `GET /episodes/{e}/roadmap`：该步骤必须是 `done`（或 `skipped`）且下一阶段已解锁才能继续；`in_progress` + `blocked_by` 说明还欠更早的严格步骤。
 3. **Poster（必做，#101）**：资产审核清单 missing=0 后立即开始，与后续步骤并行，不可跳过、不可 `poster_waiver`：`POST /episodes/{e}/poster/concept` → `POST …/poster/concept/generate`（逐张打开底图候选）→ `POST …/poster/concept/apply` + `POST …/poster/concept/apply-layer-plan`（#96 模板文本框）→ `POST …/poster/versions`（服务端渲染并自动选定）→ 打开成品核对文字未裁切、底图正确 → `hbwf decide --kind poster_approval`。详见 SKILL.md §S3 与 api-catalog §4。
 4. **旁白骨架**：`POST /episodes/{e}/narration-skeleton/generate`（返回整份骨架 + `task_id`）→ 用 `PUT /episodes/{e}/narration-skeleton {validate_only:true}` dry-run 调边界 → 人工 `POST .../narration-skeleton/confirm`。
 5. **配音先行**：先确保本集 `narration_enabled=true`（`PUT /episodes/{e} {"narration_enabled":true}`，否则 voice-batch 抛「本集未开启旁白，无法生成配音」）→ `GET /episodes/{e}/tts-options` 取 `current` 全量作基线 → `POST /episodes/{e}/narration/voice-batch/preview` → `POST /episodes/{e}/narration/voice-batch`（真入批时返回 `task_id`）→ `GET .../voice-batch-status`。**实测时长在这里产生**，后面的设计卡门禁、video_prompt 时间段、合成时长都依赖它。
@@ -345,6 +345,8 @@ Body `{version_id:number}`。同步 episodes.thumbnail。返回 bundle；实测�
 9. **视频 Prompt → 视频**：时长稳定后才 `POST /episodes/{e}/generate-video-prompts`（与 voice-batch **不得并发**），读回核对 `duration`/`mid_frame_time`/末段终点；再 `POST /episodes/{e}/video-batch/preview` → `POST /episodes/{e}/video-batch`（preview 与启动用完全相同的 ids/config/model）。
 10. **合成 → 导出**：`POST /episodes/{e}/compose-batch/preview` → `POST /episodes/{e}/compose-batch {"storyboard_ids":[...]}` → 轮询 `compose-batch-status` → 逐镜 `exportable:true` 后 `POST /merge/episodes/{e}/merge`（显式 ids；**必须带选定的 `poster_version_id` 作片头**，#101）。下载真实字节做解码/字幕/音频检查，不以状态代替媒体验收。
 11. **贯穿**：要看某阶段真的调了什么模型、发了什么 prompt，拿该阶段的任务 ID 去 `GET /tasks/{id}/observations`（#86/#87，代码已上线，生产验收前按 `[S]` 对待）。骨架 `generate`、配音 `voice-batch` 的发起响应**直接带 `task_id`**；**设计卡 `fill` 与 `design-cards/status` 都没有 `task_id`**，要用投单前后两次 `GET /tasks/center?episode_id={e}&type=text&page_size=200` 的差集按 `kind="design_card"` 认领本次任务——取不到 ID 不等于任务失败，不要据此中止（会白费一次已授权生成）。
+
+**每一步之后**：读 `GET /episodes/{e}/roadmap`（`hbwf check` 已包含）。该步必须 `done`（或 `skipped`）且下一步 `unlocked=true` 才继续；`in_progress` + `blocked_by` 先把更早的严格步骤补完；`stale` 需复核。骨架确认、设计卡确认、`confirm-keyframes`、`script/confirm` 都是人的决定，先等人工确认再往下走。导出前还要：导出步骤之前全部 `done`/`skipped`（Poster 是导出前置），没有任何 `stale`；merge 完成后 `hbwf final` 要求导出步骤 `done` 且里程碑 `m3_export` 达成。
 
 **剧情片（`project_type=drama`）** 走另一条链，不要套纪录片的骨架/设计卡/图层段端点：`PUT /episodes/{e} {"content":...}` → `POST /agent/script_rewriter/chat` → `POST /episodes/{e}/extract` ×3 + `POST /episodes/{e}/assets/link` → **Poster 决定（#97：资产完成后即可与后续步骤并行；做则选版审核并在 merge 传 `poster_version_id`，不做须显式 `poster_waiver`）** → `POST /agent/storyboard_breaker/chat`（覆盖式，先快照分镜）→ 之后与上面共用：旁白写作/配音实测（第 5 步）→ 关键帧提示词与批次 → 人工 `confirm-keyframes` → video_prompt 校准 → video-batch → compose-batch → merge。**配音/实测时长仍必须在视频 Prompt 与关键帧确认之前**；`narration-skeleton*`、`design-cards*`、`layer-segments*` 是纪录片专有，剧情片不适用。现行执行一律经 `hbwf`（`references/workflow.md`）。
 

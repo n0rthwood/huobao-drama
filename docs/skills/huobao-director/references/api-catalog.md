@@ -90,7 +90,7 @@
 
 ---
 
-## 2. 项目、剧集与剧本闸门（S1）
+## 2. 项目、剧集、步骤状态与剧本（S1）
 
 ### `POST /dramas` [R]
 Body：`{title, project_type, aspect_ratio, genre, style, description}`
@@ -150,25 +150,39 @@ Body：`{content: string, config_id?: number, model?: string}`（`content` 必�
 服务端在**冻结输入**里唯一定位每条 `text`；定位不到、片段互相重叠、或该片段仍出现在 `content` 中 → 阶段失败，不产生版本。
 `FidelityReport` 新增 `ai_exclusions:[{text,category,reason,start,end}]` 与 `adjusted_baseline_chars`；内容量判定上界按原始基线、下界按扣除剔除清单后的基线，即「变短」必须由可定位的剔除清单解释。
 
-### `GET /episodes/{e}/gates` [R]
-用途：读阶段闸门与阻断原因。**每进入下一阶段前先读**。
-返回结构（实测）：
+### `GET /episodes/{e}/roadmap` [S]（Issue #105）— 步骤状态的唯一来源
+用途：读整集的大步骤/子步骤、完成判据、顺序、里程碑与推算状态。**每完成一步就读它；只有当前步骤为 `done`（或 `skipped`）且下一步已解锁才继续。** 它替代原来的阶段门禁与流水线进度两个只读接口（#105 已删除，返回 404）。
 ```
-{script:{confirmed,confirmed_at},
- assets:{review_status,stale_reasons[],missing},
- design:{confirmed,total},
- production:{ready,total},
- final:{fresh,total},
- project_type,
- unlocked:{assets,design,production,final,export,poster},
- reasons:{design,production,final,export},
- goto:{design:"assets",...}}
+{episode_id, drama_id, project_type: 'documentary'|'drama', strict: bool,
+ status: {effective:'draft|active|completed', derived, override},   // status = 有效值
+ current: {step, substep},                    // 严格项目=第一个未完成的严格（子）步骤；free 项目按展示顺序
+ progress: {done, total},
+ milestones: [{key:'m1_script|m2_production|m3_export', label, status:'done|in_progress|pending|stale',
+               achieved_at, steps:[...], done_criteria:[...]}],
+ steps: [{key, label, order, ordering:'strict'|'free', required_before?:'export',
+          status:'locked|available|in_progress|done|stale|skipped', criteria_met,
+          unlocked, lock_reason, goto, done_criteria:[文字],
+          missing:[{code,message,count?}], notices:[{code,message}],
+          blocked_by:[更早未 done 的严格步骤 key], counts?:{done,total}, substeps:[同结构]}],
+ computed_at}
 ```
-`unlocked=false` 时按 `reasons[stage]` 去对应入口补；不要绕过。
+步骤 key：
+- 纪录片（`strict=true`）：`raw` 原始内容、`rewrite` AI 改写旁白稿（子步骤 `rewrite.prepared/fidelity/bridge/final/confirm`，严格）、`assets` 资产（`assets.extract/review`）、`poster` Poster（`ordering=free`，`required_before=export`）、`design` 分镜设计（`design.skeleton/voice/cards`，严格）、`production` 分镜制作（`production.layer‖keyframes`，free）、`final` 视频与成品、`export` 导出。顺序即上列顺序，除 Poster 与 production 子步骤外均为严格。
+- 剧情（`strict=false`，全部 `free`，永不 `locked`）：`script`、`assets`、`poster`、`keyframes`、`videos`、`export`。Poster 不是导出前置。
+
+判读：
+- `done` = 本步判据成立且前面严格步骤都 done；判据成立但前面未完 → `in_progress` + `criteria_met:true` + `blocked_by` 非空。
+- `stale` = 曾完成但上游变了（设计卡 stale、改稿取消骨架确认、合并成品与当前镜头/Poster 不一致等），需复核后才能算完成。
+- `locked` 只出现在纪录片，`lock_reason` 说明缺什么，`goto` 指向要去的步骤。
+- 资产审核的 `stale_reasons` 只进 `notices`（横幅），不把资产步判成 `stale`。
+- 父步骤 done = 全部子步骤 ∈ {done, skipped} 且前置严格步骤都 done。
+- `status` 是推算值（`derived`），`override` 只有在人明确要求时才写（`PUT` 传 `null`/`"auto"` 恢复推算）；**不要为了“看起来完成”手改状态**。
+- 导出完成 = 最新 completed 合并覆盖当前全部镜头成品（纪录片还要求片头为当前选定 Poster）；部分导出不算完成。
+- 剧情项目（`strict=false`）的 roadmap 只作信息：不参与写入顺序，也不作为 merge 前置；`hbwf final`（导出后终检）同样要求导出步骤 `done` 与 `m3_export` 达成。
 
 ### `POST /episodes/{e}/script/confirm` [R]
-用途：人工确认剧本，解除下游闸门。`{}` 无 body。
-注意：这是**人的确认**，Agent 不得替人按下去；必须由人明确指示。
+用途：人工确认剧本，解除下游闸门；响应体直接返回 roadmap（`data` = 上面结构）。`{}` 无 body。
+注意：这是**人的确认**，Agent 不得替人按下去；必须由人明确指示。`POST /script/unconfirm` 同样返回 roadmap。
 
 ### `POST /episodes/{e}/script/unconfirm` [S]
 用途：撤销剧本确认（回到待审）。破坏性：会重锁下游；需人授权。

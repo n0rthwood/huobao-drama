@@ -37,7 +37,7 @@ $HBWF init <项目目录> --api-base <API 根> --drama D --episode E --profile d
   [--required-poster] --canonical <canonical_ids.json> \
   --models '{"text":{"config_id":..,"model":".."},"image":{..},"video":{..},"tts":{"config_id":..}}' \
   --authorization '<用户授权原话>'
-$HBWF check            # 派生 state.json，打印逐镜下一步与终检问题
+$HBWF check            # 派生 state.json，打印 roadmap（当前步骤/缺失/blocked_by）、逐镜下一步与终检问题
 ```
 
 - API 根写在项目的 `workflow.json`，不进仓库。
@@ -48,18 +48,40 @@ $HBWF check            # 派生 state.json，打印逐镜下一步与终检问�
 
 | 命令 | 作用 |
 |---|---|
-| `check [--ids a,b] [--json] [--final]` | 派生并打印逐镜 `next`、批次、Poster、对账、终检 |
+| `check [--ids a,b] [--json] [--final]` | 派生并打印 roadmap（`current`、每步 `status/missing/blocked_by`、里程碑）、逐镜 `next`、批次、Poster、对账、终检 |
 | `status` | 只读上次 `state.json`，不联网 |
-| `get PATH` | 只读 GET |
-| `call METHOD PATH --body-file f --intent "…" [--ids a,b] [--dry-run]` | **唯一写入通道**：加锁 → 派生 → 守卫 → 记 prepared → 复核在飞批次 → 提交 → 记 outcome |
+| `get PATH` | 只读 GET（`get /episodes/{e}/roadmap` 可看原始 JSON） |
+| `call METHOD PATH --body-file f --intent "…" [--ids a,b] [--dry-run]` | **唯一写入通道**：加锁 → 派生（含 roadmap）→ 守卫（含步骤顺序）→ 记 prepared → 复核在飞批次 → 提交 → 记 outcome（含 roadmap 前后状态） |
 | `decide KIND …` | 记录人/代行人决定，绑定当前对象版本 |
-| `final` | 整集导出终检；`merge` 也走同一检查 |
+| `final` | 导出后终检：导出前判据 + roadmap 导出步骤 `done` + 里程碑 `m3_export` 达成 + 无 stale。导出前的最后检查用 `check --final`；`merge` 走同一批导出前判据 |
+
+## 步骤状态（roadmap，Issue #105）
+
+`derive`/`check` 每次读 `GET /episodes/{e}/roadmap`（结构见 `references/api-catalog.md` §2），并写进 `state.json` 的 `roadmap`。读不到时派生记一条 problem，映射到步骤的写入一律拒绝（fail-closed）。
+
+- 纪录片（`strict=true`）：`raw → rewrite(prepared→fidelity→bridge→final→confirm) → assets(extract→review) → poster(free, required_before=export) → design(skeleton→voice→cards) → production(layer‖keyframes) → final → export`。
+- 剧情项目（`strict=false`）：`script / assets / poster / keyframes / videos / export`，全部 `free`，roadmap 只作信息，不加锁。
+
+**写入守卫（步骤顺序）**：每个写端点映射到所属步骤（显式表在 `hbwf.py` 的 `WRITE_STEPS`；`PUT /episodes/{id}` 与 `PUT /storyboards/{id}` 按 body 键细化，例如 `content`→`raw`、`script_content`→`rewrite.final`、`narration_enabled`→`design.voice`、帧/视频提示词→`production`、`narration_text`→`design.voice`）。提交前读 roadmap：
+
+- 目标步骤之前还有严格步骤不是 `done`/`skipped` → **拒绝**，错误里带 `blocked_by`；Poster 只在写 `export` 时才算前置。
+- 目标步骤自身 `unlocked=false` → 拒绝，错误里带 `lock_reason`/`goto`。
+- 写入已 `done` 的步骤（返工）或当前步骤允许；纪录片子步骤按 `ordering` 判断（`production.layer`/`keyframes` 自由，`design`、`rewrite` 的子步骤严格）。
+- 剧情项目不做步骤顺序守卫。
+- 写入结束后重新派生 roadmap，`outcome` 记录 `roadmap{step,substep,before,after,terminal}`（`terminal=true` 表示该步已达到 `done`/`skipped`）。
 
 ## 逐镜 `next` 与决定绑定
 
 `next` 按以下顺序取第一个未满足项：
 
 `fix_narration` → `remove_acceleration` → `make_subtitle` → `wait_call` → `write_keyframe_prompts` → `generate_keyframes` / `wait_keyframes` → `review_keyframes` → `confirm_keyframes` → `wait_video` → `write_video_prompt` → `review_video_prompt` → `generate_video` → `review_video` → `compose` → `review_compose` → `done`
+
+纪录片项目有两个**人工确认**项排在前面（来自 roadmap，不调用确认端点）：
+
+- 骨架未确认 → 所有镜 `next=await_skeleton_confirm`（`设计 · 骨架确认` 不是 `done`/`skipped`）；
+- 骨架已确认但设计卡未全部确认 → 处于制作阶段的镜 `next=await_design_card_confirm`（`设计 · 设计卡确认` 不是 `done`/`skipped`）。
+
+这两项只报告「等待人工确认」（`check` 末尾有说明行），由人做决定后再继续；Agent 不得自行调用 `narration-skeleton/confirm`、`design-card/confirm`。
 
 | 决定 kind | 绑定对象（变化即 stale） | 用途 |
 |---|---|---|
@@ -95,8 +117,10 @@ $HBWF check            # 派生 state.json，打印逐镜下一步与终检问�
   - `storyboard_ids` 等于 canonical 顺序；
   - 按该顺序拼接的旁白等于 `script_content`（去空白与【】）；
   - Poster 已选且审核有效（或非必需的剧情集有 waiver；纪录片 `poster_policy` 恒为 `required`，#101），`poster_version_id` 等于选定版本；
+  - roadmap（纪录片）：导出步骤之前的所有步骤 `done`/`skipped`（Poster 为 `required_before=export`），且没有 `export` 以外的 `stale` 步骤/子步骤（导出本身 stale = 之前的成片过期，本次 merge 正是要修它）；剧情项目的 roadmap 只作信息，不参与 merge 前置，沿用原逐镜/Poster 判据；
   - 无在飞批次或任务；
   - 无孤儿写入，无未对账的 unknown 调用。
+- **导出后终检**（`hbwf final`）：上面的判据 + roadmap 导出步骤 `done` + 里程碑 `m3_export` 达成（最新 completed 合并按顺序覆盖当前全部成品；纪录片片头 = 当前选定 Poster）。导出步骤 `stale` 在这里算失败（成片与当前镜头/Poster 不一致，重新 merge 后再跑）。剧情项目同样要求 `m3_export`。
 - **其余写端点**默认拒绝，除非有单次 `exception` 决定。
 
 ## 对账（不依赖拦截）
@@ -140,4 +164,4 @@ UI 点击、浏览器操作、绕过扩展的脚本产生的写入都会显示�
 
 - 扩展靠文本特征拦截，不是安全沙箱；被刻意规避时依赖对账与终检兜底。
 - eval prelude 的浏览器 helper 本身不触发 `tool_call`。扩展会拦截代码里同时出现 `/huobao/` 与 browser 的 eval。
-- 派生一次约 50 秒（三次全集 preview + 任务中心分页）；`status` 读缓存不联网。
+- 派生一次约 50 秒（三次全集 preview + 任务中心分页），另加一次 `GET /episodes/{e}/roadmap`（服务端约 1.5–3.5 秒）；`status` 读缓存不联网。
