@@ -38,7 +38,8 @@ import { v4 as uuid } from 'uuid'
 import { STORAGE_ROOT } from '../utils/paths.js'
 import { ffmpeg, checkFfmpegSuite, writeSilentWav } from '../utils/ffmpeg.js'
 import { logTaskProgress } from '../utils/task-logger.js'
-import { getAbsolutePath } from '../utils/storage.js'
+import { generateImageThumb, getAbsolutePath, thumbPathFor } from '../utils/storage.js'
+import { extractVideoPoster } from '../utils/video-poster.js'
 import { mediaFacts } from './media-probe.js'
 import { assertRenderableText, ensureLayerFonts } from './layer-fonts.js'
 import { assertTextLayersRenderable, textLayerTexts } from './layer-text.js'
@@ -269,7 +270,10 @@ async function writeJunctionFrame(
   fs.mkdirSync(dir, { recursive: true })
   const name = `${segmentId}-${hash}.png`
   fs.writeFileSync(path.join(dir, name), png)
-  return { path: `static/${JUNCTION_DIR}/${name}`, hash, t: moment.t }
+  const relativePath = `static/${JUNCTION_DIR}/${name}`
+  // 成品页把衔接帧当列表缩略图用（Issue #106）；取不到缩略图只记日志，帧本身已落盘
+  await generateImageThumb(relativePath)
+  return { path: relativePath, hash, t: moment.t }
 }
 
 /** 清理同段旧 hash 的衔接帧 PNG；`keep` 是别处仍在引用的那一张（契约 §10 裁决 8） */
@@ -277,12 +281,14 @@ export async function pruneJunctionFrames(segmentId: number, keep: Array<string 
   const dir = path.join(STORAGE_ROOT, JUNCTION_DIR)
   if (!fs.existsSync(dir)) return 0
   const keepNames = new Set(keep.filter((item): item is string => Boolean(item)).map(item => path.basename(item)))
+  // 缩略图跟帧同生共死：保留帧的缩略图也要保留，被删帧的缩略图不许留下孤儿
+  const keepThumbs = new Set([...keepNames].map(name => path.basename(thumbPathFor(name))))
   let removed = 0
   for (const name of fs.readdirSync(dir)) {
     if (!name.startsWith(`${segmentId}-`)) continue
-    if (keepNames.has(name)) continue
+    if (keepNames.has(name) || keepThumbs.has(name)) continue
     fs.rmSync(path.join(dir, name), { force: true })
-    removed++
+    if (name.endsWith('.png')) removed++
   }
   return removed
 }
@@ -388,6 +394,8 @@ export async function renderLayerSegment(
   const produced = await mediaFacts(outputPath)
   if (!produced) throw new Error('图层段渲染产物无法读取时长，可能写盘失败')
   const renderPath = `static/layer-segments/${outputName}`
+  // 镜卡视频改为 preload="none" + 封面（Issue #106）：封面取不到只记日志，不影响渲染结果
+  const poster = await extractVideoPoster(renderPath)
   const ms = Date.now() - started
   logTaskProgress('LayerSegmentRender', 'render', {
     path: renderPath,
@@ -395,6 +403,7 @@ export async function renderLayerSegment(
     frames: String(plan.frames),
     renderedFrames: String(renderedFrames),
     junction: junction?.hash || '',
+    poster: poster || '',
     ms: String(ms),
   })
   return {

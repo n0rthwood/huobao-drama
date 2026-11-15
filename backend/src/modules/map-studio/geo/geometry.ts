@@ -17,7 +17,7 @@ import fs from 'fs'
 import path from 'path'
 import sharp from 'sharp'
 import { DATA_ROOT, STORAGE_ROOT } from '../../../utils/paths.js'
-import { getAbsolutePath } from '../../../utils/storage.js'
+import { getAbsolutePath, generateImageThumb } from '../../../utils/storage.js'
 import {
   MAP_REGION_COLOR,
   MAP_ROUTE_COLOR,
@@ -556,6 +556,8 @@ async function createEarthBase(spec: MapSpec, width?: number): Promise<MapBaseAr
     )
     fs.writeFileSync(baseAbs, burnt)
     fs.writeFileSync(sidecarAbs, JSON.stringify(sidecar, null, 2))
+    // 底图画廊用缩略图（Issue #106）；失败只记日志
+    await generateImageThumb(relFromStatic(baseAbs))
   }
 
   const registration = earthRegistration(sidecar)
@@ -642,6 +644,8 @@ async function createImageBase(spec: MapSpec, reference: MapReferenceImage | und
     const resized = await sharp(absolute).resize(targetWidth, targetHeight, { fit: 'fill' }).png().toBuffer()
     const attribution = `来源：${reference.source_url} · 许可：${reference.license}`
     fs.writeFileSync(outAbs, await burnAttribution(resized, { width: targetWidth, height: targetHeight }, attribution))
+    // 底图画廊用缩略图（Issue #106）；失败只记日志
+    await generateImageThumb(relFromStatic(outAbs))
   }
 
   const scaled = {
@@ -865,6 +869,8 @@ export async function prepareMapBackground(options: {
       background = sharp(await background.png().toBuffer()).composite([{ input: texture, blend: 'over' }])
     }
     fs.writeFileSync(backgroundAbs, await background.png().toBuffer())
+    // 底图画廊用缩略图（Issue #106）；失败只记日志
+    await generateImageThumb(relFromStatic(backgroundAbs))
   }
   return { path: relFromStatic(backgroundAbs), width, height, registration, warnings }
 }

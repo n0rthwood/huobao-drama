@@ -10,7 +10,7 @@ import path from 'path'
 import sharp from 'sharp'
 import { v4 as uuid } from 'uuid'
 import { DATA_ROOT, STORAGE_ROOT } from '../utils/paths.js'
-import { getAbsolutePath } from '../utils/storage.js'
+import { generateImageThumb, getAbsolutePath } from '../utils/storage.js'
 import type { LayerDoc, LayerVariables } from './layer-doc.js'
 import { layerDocToSvg, resolvedText } from './layer-svg.js'
 import { assertTextLayersRenderable, textLayerTexts } from './layer-text.js'
@@ -143,5 +143,8 @@ export async function renderLayerDocToFile(
   fs.mkdirSync(dir, { recursive: true })
   const filename = `${uuid()}.png`
   fs.writeFileSync(path.join(dir, filename), result.buffer)
-  return { url: `static/overlays/${filename}`, width: result.width, height: result.height, ms: result.ms }
+  const url = `static/overlays/${filename}`
+  // 列表/网格里的成品图用缩略图（Issue #106）；失败只记日志，成品本身已经落盘
+  await generateImageThumb(url)
+  return { url, width: result.width, height: result.height, ms: result.ms }
 }

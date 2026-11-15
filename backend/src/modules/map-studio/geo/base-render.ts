@@ -17,6 +17,7 @@ import { geoEquirectangular, geoMercator, geoPath, type GeoProjection } from 'd3
 import sharp from 'sharp'
 import { z } from 'zod'
 import { STORAGE_ROOT } from '../../../utils/paths.js'
+import { generateImageThumb } from '../../../utils/storage.js'
 import { datasetFileInfo, resolveGeoDir, riverScaleForRef, type DatasetScale } from './datasets.js'
 import { MAP_STYLE_FAMILY_IDS, mapStyleFamily } from '../styles/index.js'
 
@@ -625,6 +626,8 @@ export async function renderMapBase(spec: MapSpec, opts?: Partial<MapCanvasSize>
       .toBuffer()
     fs.mkdirSync(dir, { recursive: true })
     fs.writeFileSync(absolute, buffer)
+    // 底图选择/结果画廊用缩略图（Issue #106）；失败只记日志，不影响渲染
+    await generateImageThumb(`static/map-bases/${filename}`)
   }
 
   const projection = mapProjectionFor(spec, size)
