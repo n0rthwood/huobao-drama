@@ -3,6 +3,7 @@
  *
  * 参数来源优先级：集级 `episodes.tts_settings` → TTS 配置行 settings → VoxCPM 默认值；
  * 文本规范化沿用 #35：镜级覆盖 → 集级 `episodes.narration_normalize`。
+ * 合成模型（#108）只取 TTS 配置行的模型列表首项（空 = voxcpm2），不进集级设置、不由弹窗提交。
  * 本文件只有纯函数，不碰数据库与网络，便于单测。
  */
 import type { TtsSettings } from './tts.js'
@@ -19,8 +20,34 @@ export const VOXCPM_STEP_PRESETS = [
   { steps: 30, rtf: 0.93 },
 ] as const
 
+/** VoxCPM Studio `v1/audio/speech` 认的模型名（#108）；请求体总是显式带上，不依赖 Studio 端默认 */
+export const TTS_MODELS = ['voxcpm2', 'cosyvoice3'] as const
+export type TtsModel = typeof TTS_MODELS[number]
+export const DEFAULT_TTS_MODEL: TtsModel = 'voxcpm2'
+export const TTS_MODEL_LABELS: Record<TtsModel, string> = { voxcpm2: 'VoxCPM2', cosyvoice3: 'CosyVoice3' }
+/** CosyVoice3 的 RTF：2026-11-16 .202 RTX 4070 实测热生成 0.31–0.35（91 条试听批次）；不随步数变化 */
+export const COSYVOICE3_RTF = 0.35
+
+/** 与 Studio `app/tts_models.py ALIASES` 同口径的别名（如老配置/测试里填的 `voxcpm`） */
+const TTS_MODEL_ALIASES: Record<string, TtsModel> = {
+  voxcpm2: 'voxcpm2', voxcpm: 'voxcpm2', 'voxcpm-2': 'voxcpm2',
+  cosyvoice3: 'cosyvoice3', cosyvoice: 'cosyvoice3', 'cosyvoice-3': 'cosyvoice3', cv3: 'cosyvoice3',
+  'fun-cosyvoice3': 'cosyvoice3', 'fun-cosyvoice3-0.5b-2512': 'cosyvoice3',
+}
+
+/** 配置行模型（`AIConfig.model` = 模型列表首项）→ 规范模型名；空 = voxcpm2，不认识的名字抛错 */
+export function ttsModelOf(model: string | null | undefined): TtsModel {
+  const m = (model || '').trim().toLowerCase()
+  if (!m) return DEFAULT_TTS_MODEL
+  const hit = TTS_MODEL_ALIASES[m]
+  if (hit) return hit
+  throw new Error(`不支持的语音合成模型：${model}（只支持 ${TTS_MODELS.join(' / ')}）`)
+}
+
 /** 一次合成实际请求的参数（seed 为 null = 每次随机） */
 export interface VoiceParams {
+  /** 合成模型（#108）：来自 TTS 配置行 */
+  model: TtsModel
   voice: string
   inference_timesteps: number
   cfg_value: number
@@ -29,8 +56,8 @@ export interface VoiceParams {
   normalize: boolean
 }
 
-/** 集级保存的部分（规范化单独存 narration_normalize） */
-export type EpisodeVoiceSettings = Omit<VoiceParams, 'normalize'>
+/** 集级保存的部分（规范化单独存 narration_normalize；模型属于配置行，不在集级保存） */
+export type EpisodeVoiceSettings = Omit<VoiceParams, 'normalize' | 'model'>
 
 /** 步数 → RTF（与 Studio 相同的分段线性插值） */
 export function rtfForSteps(steps: number): number {
@@ -79,10 +106,11 @@ export function parseEpisodeVoiceSettings(raw: string | null | undefined): Parti
 }
 
 /**
- * 本镜生效参数：每项依次取 集级 → TTS 配置 → VoxCPM 默认；normalize = 镜级覆盖 → 集级。
+ * 本镜生效参数：每项依次取 集级 → TTS 配置 → VoxCPM 默认；normalize = 镜级覆盖 → 集级；model = 配置行（#108）。
  * 音色没有默认值（#35：必须由人选定），缺失时返回空串，由调用方报错。
  */
 export function resolveVoiceParams(input: {
+  model: TtsModel
   episodeSettings: Partial<EpisodeVoiceSettings>
   configSettings: TtsSettings
   episodeNormalize: boolean | null | undefined
@@ -91,6 +119,7 @@ export function resolveVoiceParams(input: {
   const ep = input.episodeSettings
   const cfg = input.configSettings
   return {
+    model: input.model,
     voice: ep.voice ?? cfg.voice ?? '',
     inference_timesteps: ep.inference_timesteps ?? cfg.inferenceTimesteps ?? VOXCPM_STEPS.default,
     cfg_value: ep.cfg_value ?? cfg.cfgValue ?? VOXCPM_CFG.default,
@@ -105,8 +134,9 @@ export class VoiceSettingsError extends Error {}
 /**
  * 弹窗提交的参数 → 合法化后的完整参数。范围钳制到 VoxCPM 的区间；
  * 音色必须在服务端当前的音色列表里（传入 null 表示不校验，仅供单测）。
+ * model 不接受弹窗提交，由调用方按 TTS 配置行传入（#108）。
  */
-export function sanitizeVoiceSettings(raw: unknown, voices: string[] | null): VoiceParams {
+export function sanitizeVoiceSettings(raw: unknown, voices: string[] | null, model: TtsModel): VoiceParams {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new VoiceSettingsError('配音参数格式不正确')
   const s = raw as Record<string, unknown>
   const voice = text(s.voice)
@@ -121,6 +151,7 @@ export function sanitizeVoiceSettings(raw: unknown, voices: string[] | null): Vo
     seed = n
   }
   return {
+    model,
     voice,
     inference_timesteps: Math.round(steps ?? VOXCPM_STEPS.default),
     cfg_value: Math.round((cfg ?? VOXCPM_CFG.default) * 10) / 10,
@@ -131,7 +162,7 @@ export function sanitizeVoiceSettings(raw: unknown, voices: string[] | null): Vo
 }
 
 export function episodeSettingsOf(params: VoiceParams): EpisodeVoiceSettings {
-  const { normalize: _normalize, ...rest } = params
+  const { normalize: _normalize, model: _model, ...rest } = params
   return rest
 }
 
@@ -139,10 +170,12 @@ export function episodeSettingsOf(params: VoiceParams): EpisodeVoiceSettings {
  * 已生成音频当时用的参数。#37 之后记在 `meta.audio.params`；更早的音频按当时的事实重建：
  * 音色/seed 取 meta.audio，normalize=false（#35 之前从未发送；宁多配不漏配），
  * 步数/cfg/风格取当前 TTS 配置（缺省 = VoxCPM 默认）。
+ * #108 之前的 params 没有 model：火宝当时只调用 Studio 默认模型 = VoxCPM2。
  */
 export function paramsOfAudio(audio: NarrationAudioMeta, configSettings: TtsSettings): VoiceParams {
-  if (audio.params) return audio.params
+  if (audio.params) return { ...audio.params, model: audio.params.model ?? DEFAULT_TTS_MODEL }
   return {
+    model: DEFAULT_TTS_MODEL,
     voice: audio.voice || '',
     inference_timesteps: configSettings.inferenceTimesteps ?? VOXCPM_STEPS.default,
     cfg_value: configSettings.cfgValue ?? VOXCPM_CFG.default,
@@ -152,11 +185,14 @@ export function paramsOfAudio(audio: NarrationAudioMeta, configSettings: TtsSett
   }
 }
 
+/** CosyVoice3 不使用步数/cfg/风格描述/规范化（Studio 忽略），只比较 model/voice/seed，改那些参数不触发重配（#108） */
 export function sameVoiceParams(a: VoiceParams, b: VoiceParams): boolean {
-  return a.voice === b.voice
-    && a.inference_timesteps === b.inference_timesteps
+  const ma = a.model ?? DEFAULT_TTS_MODEL
+  const mb = b.model ?? DEFAULT_TTS_MODEL
+  if (ma !== mb || a.voice !== b.voice || a.seed !== b.seed) return false
+  if (ma === 'cosyvoice3') return true
+  return a.inference_timesteps === b.inference_timesteps
     && Math.abs(a.cfg_value - b.cfg_value) < 1e-6
-    && a.seed === b.seed
     && a.instructions === b.instructions
     && a.normalize === b.normalize
 }

@@ -47,7 +47,8 @@ export async function giveShotsValidVoice({ episodeId, storyboardIds, seconds = 
     .set({ narrationEnabled: true, ttsConfigId: config.id, updatedAt: ts })
     .where(eq(schema.episodes.id, episodeId))
   const [episode] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId))
-  const params = gate.effectiveVoiceParams(episode, null, config)
+  // 生产调用方传的是 AIConfig（model = 模型列表首项），不是数据库原始行（model 为 JSON 文本）
+  const params = gate.effectiveVoiceParams(episode, null, { ...config, model: JSON.parse(config.model || '[]')[0] || '' })
 
   const ffmpegBin = createRequire(path.join(process.cwd(), 'tests-entry.cjs'))('ffmpeg-static')
   const dataRoot = process.env.HUOBAO_DATA_DIR

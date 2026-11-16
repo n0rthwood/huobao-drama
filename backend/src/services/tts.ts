@@ -110,6 +110,8 @@ export async function fetchVoiceItems(baseUrl: string, apiKey?: string): Promise
  */
 export function buildSpeechBody(text: string, params: VoiceParams): Record<string, unknown> {
   const body: Record<string, unknown> = {
+    // #108：总是显式指定模型，不依赖 Studio 端可切换的默认模型
+    model: params.model,
     input: text,
     response_format: 'wav',
     voice: params.voice,

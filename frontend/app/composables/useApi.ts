@@ -331,7 +331,10 @@ export interface TtsOptions {
   steps: { min: number; max: number; default: number; presets: { steps: number; rtf: number }[] }
   cfg: { min: number; max: number; default: number }
   chars_per_second: number
-  current: VoiceSettings
+  /** #108：本集生效 TTS 配置的合成模型（只读） */
+  model: { id: 'voxcpm2' | 'cosyvoice3'; label: string; rtf: number | null }
+  /** 后端带回的 model 不由弹窗提交（提交时被忽略） */
+  current: VoiceSettings & { model?: 'voxcpm2' | 'cosyvoice3' }
 }
 
 export interface VoicePlanItem {
