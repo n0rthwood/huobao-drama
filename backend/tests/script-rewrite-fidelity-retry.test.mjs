@@ -1,6 +1,6 @@
 /**
- * 忠实改写的纠正一次（Issue #109）：段落不再限长后，最常见的违例是原文长句没断开。
- * 第一次产出违反单句 80 字上限 → 把违例（超长句给全文）回给模型重写一次；仍不合格才判阶段失败。
+ * 忠实改写的违约纠正（Issue #109）：段落不再限长后，最常见的违例是原文长句没断开。
+ * 产出违反单句 80 字上限 → 把违例（超长句给全文）回给模型重写，最多两次；仍不合格才判阶段失败。
  * 本地 OpenAI 兼容桩服务 + 临时 SQLite，断言运行结果与发给模型的纠正提示。
  */
 import { execFileSync } from 'node:child_process'
@@ -80,9 +80,9 @@ test('长句违例回给模型纠正一次，改对了就采用纠正后的稿�
   assert.equal(result.content, RAW)
 })
 
-test('纠正后仍有长句：阶段判失败，不产出正式版本', () => {
+test('两次纠正后仍有长句：阶段判失败，不产出正式版本', () => {
   const result = run('stubborn')
   assert.equal(result.status, 'failed')
-  assert.equal(result.calls, 2)
+  assert.equal(result.calls, 3)
   assert.equal(result.content, null)
 })
