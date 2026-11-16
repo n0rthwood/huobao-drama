@@ -12,6 +12,7 @@
  */
 import { createHash } from 'node:crypto'
 import type { AIConfig } from './types'
+import { promptMentionsReferences, renderReferencePrompt, usesImageTags } from '../asset-reference-prompt.js'
 
 /** 单任务参考图上限（与服务端 16 张上限相比更保守，沿用火宝既有规则） */
 export const QWEN_MAX_REFS = 9
@@ -131,11 +132,18 @@ export function pickQwenSize(size: string | null | undefined): [number, number] 
   return [snap(w), snap(h)]
 }
 
-/** 提示词没有显式引用参考图时，补一句让模型知道要以参考图为基础 */
-export function withReferenceHint(prompt: string, refCount: number): string {
-  if (!refCount || /<image\d+>/i.test(prompt)) return prompt
-  const tags = Array.from({ length: refCount }, (_, i) => `<image${i + 1}>`).join('、')
-  return `以 ${tags} 为参考：${prompt}`
+/**
+ * 提示词里的参考图引用：中性写法 `@参考图N` 与其它厂商的 `图片N` 都渲染成本厂商的写法
+ * （qwen-jobs → `<imageN>`，其余厂商 → `图片N`，见 services/asset-reference-prompt.ts）。
+ * 提示词本来就没有引用任何参考图时，补一句泛化前缀让模型知道要以参考图为基础；
+ * 已经逐张引用（含中性写法）时不再补，避免和提示词里的逐张说明打架。
+ */
+export function withReferenceHint(prompt: string, refCount: number, provider: string | null = 'qwen-jobs'): string {
+  if (!refCount) return prompt
+  const rendered = renderReferencePrompt(prompt, refCount, provider)
+  if (promptMentionsReferences(prompt)) return rendered
+  const tags = Array.from({ length: refCount }, (_, i) => (usesImageTags(provider) ? `<image${i + 1}>` : `图片${i + 1}`)).join('、')
+  return `以 ${tags} 为参考：${rendered}`
 }
 
 /** FLUX 任务服务（qwen-jobs v1 克隆）的参考图 img2img 去噪强度：服务端默认一致 */
@@ -182,7 +190,8 @@ export function buildImageJobBody(opts: ImageJobBodyOptions): QwenJobRequest {
     const mode: QwenJobMode = refs.length ? 'reference_to_image' : 'text_to_image'
     return {
       mode,
-      prompt,
+      // FLUX 不解析 <imageN>：中性 @参考图N 渲染成「图片N」，不留火宝自己的占位写法
+      prompt: renderReferencePrompt(prompt, fileIds.length, null),
       metadata: {},
       width,
       height,

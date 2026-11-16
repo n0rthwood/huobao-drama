@@ -18,6 +18,7 @@ import { bindCreatedAssetToReviewItem, findReviewItemAssetDuplicate, onAssetRemo
 import { mountAspectVersionRoute } from './asset-aspect-version.js'
 import { assetImageSizeFor, resolveDramaAspect } from '../services/asset-image-size.js'
 import { aspectPhrase } from '../services/aspect.js'
+import { referenceNameIndex } from '../services/asset-reference-prompt.js'
 
 const app = new Hono()
 
@@ -145,7 +146,19 @@ app.post('/:id/generate-image', async (c) => {
     await db.update(schema.scenes).set({ status: 'processing', updatedAt: now() }).where(eq(schema.scenes.id, id))
     // 场景按项目画幅出图（Issue #94）：有参考图时也锁画幅，不跟随参考图比例
     const size = assetImageSizeFor('scene', aspect)
-    const genId = await generateImage({ sceneId: id, episodeId: ep.id, dramaId: scene.dramaId, prompt, model: body.model, size, aspectLocked: true, referenceImages: referenceImages.length ? referenceImages : undefined, configId: body.config_id ?? ep.imageConfigId ?? undefined })
+    const genId = await generateImage({
+      sceneId: id,
+      episodeId: ep.id,
+      dramaId: scene.dramaId,
+      prompt,
+      // 换厂商重试按新 provider 重新渲染 @参考图N；无参考图时不落这两项
+      ...(referenceImages.length ? { sourcePrompt: prompt, refNameIndex: referenceNameIndex(referenceImages.length) } : {}),
+      model: body.model,
+      size,
+      aspectLocked: true,
+      referenceImages: referenceImages.length ? referenceImages : undefined,
+      configId: body.config_id ?? ep.imageConfigId ?? undefined,
+    })
     logTaskSuccess('SceneImage', 'generate', { sceneId: id, generationId: genId })
     return success(c, { image_generation_id: genId, reference_images: referenceImages, missing_reference_images: missing })
   } catch (err: any) {

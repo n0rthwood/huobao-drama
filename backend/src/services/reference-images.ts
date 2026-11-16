@@ -144,6 +144,15 @@ export function partitionMissingReferences(refs: string[]): { present: string[];
   return { present, missing }
 }
 
+/**
+ * 本次生图真正会发送的参考图：库里的条目中磁盘上实际存在的那几张，顺序即发送顺序
+ * （1 起编号）。提示词校验、读工具与生图提交必须用同一口径，否则「提示词引用了
+ * 第 3 张、实际只发了 2 张」这种错位没人能发现。
+ */
+export function effectiveReferenceImages(saved: unknown, override?: unknown): string[] {
+  return partitionMissingReferences(resolveReferenceImages(saved, override)).present
+}
+
 /** 读取某资产的参考图条目（资产不存在报 404）；素材库选图也经此读当前状态 */
 export async function loadReferences(kind: AssetKind, assetId: number): Promise<ReferenceImageEntry[]> {
   const table = ASSET_TABLES[kind]

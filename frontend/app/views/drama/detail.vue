@@ -547,6 +547,25 @@
               <MapStudioEntry :asset="editTarget" />
             </section>
 
+            <!-- 参考图（Issue #107）：素材库弹窗与剧集工作台同款管理器，角色/场景/道具共用；
+                 地图资产由地图工作流出图，不接受参考图 -->
+            <section v-if="assetTypeOf(editTarget) !== 'map'" class="mat-detail-ref-panel">
+              <div class="mat-detail-section-title">
+                <span>{{ t('episode.asset.refSectionTitle') }}</span>
+                <span class="dim">{{ t('episode.asset.refSectionHint') }}</span>
+              </div>
+              <ReferenceImageManager
+                :key="`${editTarget.kindKey}-${editTarget.id}`"
+                :asset-type="editTarget.kindKey"
+                :asset-id="editTarget.id"
+                :references="editTarget.reference_images ?? editTarget.referenceImages"
+                :drama-id="dramaId"
+                size="large"
+                @update="onAssetRefsUpdate"
+                @preview="openRefViewer"
+              />
+            </section>
+
             <!-- 最终提示词：可生成 / 重新生成 / 手动编辑 -->
             <section v-if="assetTypeOf(editTarget) !== 'map'" class="mat-detail-prompt-panel">
               <div class="mat-detail-section-title">
@@ -734,7 +753,7 @@
 
 <script setup>
 import { toast } from 'vue-sonner'
-import { toastError } from '~/composables/useToast'
+import { toastError, toastMissingReferenceImages } from '~/composables/useToast'
 import { useI18n } from 'vue-i18n'
 import { dramaAPI, episodeAPI, characterAPI, sceneAPI, propAPI, uploadAPI, taskAPI, mediaLibraryAPI } from '~/composables/useApi'
 import { Images, Settings2 } from 'lucide-vue-next'
@@ -1113,9 +1132,12 @@ async function generateMaterial(m) {
   if (isPending(m)) return
   submittingMaterials.value = [...submittingMaterials.value, key]
   try {
-    if (m.kindKey === 'character') await characterAPI.generateImage(m.id, epId)
-    else if (m.kindKey === 'scene') await sceneAPI.generateImage(m.id, epId)
-    else await propAPI.generateImage(m.id, epId)
+    let res
+    if (m.kindKey === 'character') res = await characterAPI.generateImage(m.id, epId)
+    else if (m.kindKey === 'scene') res = await sceneAPI.generateImage(m.id, epId)
+    else res = await propAPI.generateImage(m.id, epId)
+    // 参考图里有文件已不存在时后端丢弃它们继续出图：与剧集工作台同一处警告，不能静默
+    toastMissingReferenceImages(res)
     toast.success(t('detail.mat.generating', { kind: m.kind, name: m.name }))
     await loadImageTasks()
   } catch (e) {
@@ -1193,6 +1215,20 @@ async function applyMaterialFromLibrary(urls) {
 
 function openAssetViewer(m) {
   assetViewer.value = { open: true, kindKey: m.kindKey, id: m.id, src: assetSrc(m), title: `${m.kind} · ${m.name}` }
+}
+
+/** 参考图预览：ReferenceImageManager 的事件给的是 (src, title)，不是资产成片图 */
+function openRefViewer(src, title) {
+  assetViewer.value = { open: true, kindKey: '', id: 0, src, title }
+}
+
+/**
+ * 参考图增删后以服务端返回的条目数组为准（与剧集工作台 onAssetRefsUpdate 同口径）。
+ * 只同步弹窗里的目标行：列表在下次 load() 时按服务端数据重绘。
+ */
+function onAssetRefsUpdate(refs) {
+  if (!editTarget.value) return
+  editTarget.value = { ...editTarget.value, reference_images: refs }
 }
 
 // 资产类型（Issue #84）：地图是独立类型，地图界面只认服务端持久化的 asset_type
@@ -2150,6 +2186,16 @@ onUnmounted(() => {
   border-top: 1px solid var(--border);
   padding-top: 16px;
 }
+/* 参考图区（Issue #107）：与提示词区同款分隔，管理器自带网格样式 */
+.mat-detail-ref-panel {
+  margin-top: 18px;
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mat-detail-ref-panel :deep(.ref-images) { border-top: 0; padding-top: 0; }
 .mat-detail-prompt-gen {
   margin-left: auto;
   flex-shrink: 0;

@@ -68,6 +68,15 @@ All set dressing, period texture, and key visual elements in `prompt` (scene des
 - Motion blur, objects in motion (the scene reference image must be still and stable)
 - Merely listing set dressing without giving relative positions (the spatial structure must be continuous and self-consistent)
 
+## Citing Reference Images (mandatory when present)
+
+`readScenes` returns `reference_count` / `reference_images` — the reference images that will actually be sent with this generation, numbered from 1 in send order (files missing on disk are excluded and never listed).
+
+- `reference_count > 0`: cite every one of them in the final prompt as `@参考图1`, `@参考图2`, … and state what each contributes (building form and material, foreground/mid-ground/background layout, furnishings, light mood); the notation is provider-neutral and is converted to the chosen model's labels at submission;
+- A reference only contributes those elements: never copy its composition, frame or background wholesale, and never write "copy this image";
+- `reference_count = 0`: no reference-image marker may appear and no reference detail may be invented;
+- If any reference is left uncited, `saveSceneFinalPrompt` refuses to save and names the missing ones — fix the prompt and call it again.
+
 ## Saving
 
 Call `saveSceneFinalPrompt`: the prompt parameter contains no style words — **the project's visual style is automatically injected by the tool at the very front of the final prompt**.

@@ -19,13 +19,12 @@ import {
   blockingIssuesFor,
   computeRefIssues,
   describeIssues,
-  indexRefs,
   loadEpisodeAssets,
   loadTargetBindings,
   promptFieldsOf,
-  resolvePromptRefs,
   targetAssetRefs,
 } from './storyboard-assets.js'
+import { indexRefs, resolvePromptRefs } from './prompt-refs.js'
 import { createHash } from 'node:crypto'
 import { videoTaskJunction } from './video-guide-snapshot.js'
 import { refBasename } from './storyboard-keyframes.js'

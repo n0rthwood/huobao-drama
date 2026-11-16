@@ -40,3 +40,11 @@ Form details in the prop's `description` that come from verified research must l
 ## 5. No Source Pollution
 
 The prompt must not contain a URL, a domain, "according to Wikipedia", "source" or any other source annotation.
+
+## 6. Citing Reference Images (mandatory when present)
+
+`readProps` returns `reference_count` / `reference_images` — the reference images that will actually be sent with this generation, numbered from 1 in send order (files missing on disk are excluded and never listed).
+
+- `reference_count > 0`: cite every one of them in the final prompt as `@参考图1`, `@参考图2`, … and state what each contributes (period, material and craft, form and size, wear and colour scheme); take only those elements and never copy a reference's composition, frame or background wholesale;
+- `reference_count = 0`: no reference marker may appear and no reference form or inscription may be invented;
+- If any reference is left uncited, `savePropFinalPrompt` refuses to save and names the missing ones — fix the prompt and call it again.

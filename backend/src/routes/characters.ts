@@ -20,6 +20,7 @@ import { bindCreatedAssetToReviewItem, findReviewItemAssetDuplicate, onAssetRemo
 import { stageSelectionErrorPayload } from '../services/ai-stages.js'
 import { mountAspectVersionRoute } from './asset-aspect-version.js'
 import { CHARACTER_IMAGE_SIZE } from '../services/asset-image-size.js'
+import { referenceNameIndex } from '../services/asset-reference-prompt.js'
 
 const app = new Hono()
 
@@ -210,7 +211,19 @@ app.post('/:id/generate-image', async (c) => {
   if (missing.length) logTaskWarn('CharacterImage', 'reference-missing', { characterId: id, missing })
   try {
     logTaskStart('CharacterImage', 'generate', { characterId: id, episodeId: ep.id, dramaId: char.dramaId, references: referenceImages.length })
-    const genId = await generateImage({ characterId: id, episodeId: ep.id, dramaId: char.dramaId, prompt, model: body.model, size: CHARACTER_IMAGE_SIZE, referenceImages: referenceImages.length ? referenceImages : undefined, configId: body.config_id ?? ep.imageConfigId ?? undefined })
+    const genId = await generateImage({
+      characterId: id,
+      episodeId: ep.id,
+      dramaId: char.dramaId,
+      prompt,
+      // 换厂商重试要按新 provider 重新渲染 @参考图N（与关键帧同一套 refNameIndex 机制）；
+      // 无参考图时不落这两项，行为与改动前一致
+      ...(referenceImages.length ? { sourcePrompt: prompt, refNameIndex: referenceNameIndex(referenceImages.length) } : {}),
+      model: body.model,
+      size: CHARACTER_IMAGE_SIZE,
+      referenceImages: referenceImages.length ? referenceImages : undefined,
+      configId: body.config_id ?? ep.imageConfigId ?? undefined,
+    })
     logTaskSuccess('CharacterImage', 'generate', { characterId: id, generationId: genId })
     return success(c, { image_generation_id: genId, reference_images: referenceImages, missing_reference_images: missing })
   } catch (err: any) {

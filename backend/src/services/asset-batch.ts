@@ -49,6 +49,7 @@ import {
   type AssetSelectionState,
 } from './asset-batch-select.js'
 import { assetImageSizeForDrama } from './asset-image-size.js'
+import { referenceNameIndex } from './asset-reference-prompt.js'
 
 /** 文本并发默认 3（图像侧 2 个 worker，并发 3 足以持续喂饱；env 可调） */
 export const ASSET_PROMPT_CONCURRENCY = (() => {
@@ -364,6 +365,8 @@ async function submitImage(asset: LoadedAsset, prompt: string, episodeId: number
     episodeId,
     dramaId: asset.dramaId,
     prompt,
+    // 与单发路由同口径：换厂商重试按新 provider 重新渲染 @参考图N
+    ...(referenceImages.length ? { sourcePrompt: prompt, refNameIndex: referenceNameIndex(referenceImages.length) } : {}),
     model: req.imageModel,
     size: await assetImageSizeForDrama(asset.kind, asset.dramaId),
     // 场景必须按项目画幅出图：有参考图时也不许跟随参考图比例（Issue #94）

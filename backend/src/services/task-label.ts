@@ -97,9 +97,18 @@ export function composeTaskLabel(input: TaskLabelInput): string {
 }
 
 /**
+ * 资产参考图的引用名（1 起）：资产参考图没有「名字」，序号本身就是它的引用名。
+ * 提示词里写 `@参考图N`（services/asset-reference-prompt.ts 的校验与渲染都按这个写法）。
+ */
+export function referenceLabel(index: number): string {
+  return `参考图${index}`
+}
+
+/**
  * 换厂商重试时按新 provider 重新渲染 @名字 引用。
  * 图片：qwen-jobs（Qwen Image 2.1）用 `<imageN>名字`，其它厂商退化成 `图片N名字`；
  * 视频：统一 `@图片N名字`（与 storyboard-video.ts 同口径）。
+ * 资产参考图的引用名就是序号别名（参考图N），渲染时不再追加名字，否则会写成 `<image1>参考图1`。
  * 名字按长度倒序匹配，避免“鼠妈”抢在“鼠妈妈”前面命中；未知 @引用原样保留。
  */
 export function renderRefPrompt(
@@ -112,7 +121,8 @@ export function renderRefPrompt(
   const isQwen = (opts.provider || '').toLowerCase() === 'qwen-jobs'
   const format = (index: number, name: string) => {
     if (opts.type === 'video') return `@图片${index}${name}`
-    return isQwen ? `<image${index}>${name}` : `图片${index}${name}`
+    const token = isQwen ? `<image${index}>` : `图片${index}`
+    return name === referenceLabel(index) ? token : `${token}${name}`
   }
   let out = ''
   for (let i = 0; i < sourcePrompt.length;) {
