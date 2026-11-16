@@ -75,3 +75,45 @@ SHA-256：
 50m 数据不是城市街道详图：安阳近景 bbox `[114.2,36,114.5,36.2]` 内有 1 条省界、0 个城市点；
 既有豫北测试 bbox `[113,35.2,115.6,36.8]` 内有 5 条省界、1 个城市点（邯郸，不是安阳）。
 渲染结果会回报实际覆盖数与缺层警告，不能填造缺失细节或宣称包含安阳城市背景点。
+
+> Issue #107 阶段 1（2026-11-16）起，程序底图**不再画省界与城市点**：这两层只剩数据集检索
+> （`search_dataset` 的 coast / place 图层）用途，底图只有自然地理。
+
+## 底图渲染数据（Issue #107 阶段 1，2026-11-16 入仓）
+
+底图（局部相对起伏晕渲 + 分级水系）用的矢量与高程数据：
+
+| 文件 | 来源 URL | SHA-256 | 用途 |
+| --- | --- | --- | --- |
+| `ne_10m_land.geojson` | https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_land.geojson | `1ac90796408bc6ad6911d69448485d3c4dbf2190370080368a09976e1c9f7416` | 陆海掩码：**用陆地多边形判定陆海**，不能用高程判 0（里海北岸低于海平面，按高程会画成海） |
+| `ne_10m_lakes.geojson` | https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_lakes.geojson | `2d036f53dedec578001c5c30c2959ee7d4eebc1306900fa4367c49929ec8f2d9` | 湖泊填充与湖岸；`featurecla=Reservoir` 的现代水库（雷宾斯克等）一律剔除，否则会把 20 世纪水库画进 1480 年的地图 |
+| `ne_10m_rivers_lake_centerlines.geojson`（既有） | 同上 | `bb854a900ecbd3b408df46d5e16e3e0f974ba55993f9d8b5c26e855273c0905a` | 分级水系：按 `scalerank` 分主干/次干/支流三档线宽，**整条河按名显隐**（避免一条河被剪成碎片） |
+| `ne_50m_geography_regions_polys.geojson`（既有） | 同上 | `33396643d8f0eed408e80bf5ca43dcdb7993f790fdc4eadae311660f8b91fe76` | 山形符号落点：只在 `featurecla` 为 Range/mtn 的山脉多边形内 |
+
+新增两份 10m 文件同样为**原样入仓**（未简化、未裁剪），SHA-256 由
+`backend/src/modules/map-studio/geo/datasets.ts` 的文件表校验，不符即报错。
+
+### 高程：AWS Terrain Tiles（terrarium PNG）
+
+- 来源模板：`https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png`（公开，无需密钥）。
+- 数据来源与署名：**Terrain data: AWS Terrain Tiles, SRTM / GMTED2010 / ETOPO1 (public domain)**。
+- 编码：`h = R*256 + G + B/256 - 32768`（米），标准 Web Mercator 256×256 瓦片。
+- 位置：**数据目录**（不入仓）`$HUOBAO_DATA_DIR/map-data/dem/<z>/<x>/<y>.png`，同目录
+  `manifest.json` 记录每张瓦片的 URL、sha256、抓取时间与字节数。`provenance.relief` 会记 manifest 指纹。
+- 预取：`node --import tsx scripts/prefetch-map-data.ts --bbox w,s,e,n`（只下缺失瓦片，并发 8、失败重试）。
+  **渲染阶段只读本地缓存**：缺瓦片直接报出 `z/x/y` 与这条命令，绝不静默联网。
+
+### 命名河流补充包：OSM（ODbL 1.0）
+
+Natural Earth 缺乌格拉河（Угра）、阿赫图巴（Ахтуба）、卡赞卡（Казанка）这类叙事关键小河。
+它们由 `backend/scripts/prefetch-map-data.ts --rivers` 从 OSM Overpass **预先**抓取，入仓到
+`backend/assets/geo/osm-rivers/`（`<slug>.json` + `manifest.json`：来源 URL、抓取时间、sha256、ODbL 署名）。
+
+- 数据来源与署名：**© OpenStreetMap contributors, ODbL 1.0**（https://www.openstreetmap.org/copyright）。
+- Overpass 必须带自定义 `User-Agent`（否则 406），查询用 POST `data=`；脚本会重试并在主站限流时退到镜像。
+- 运行期**不联网**：地图任务只读本地包；缺某条河时 warning 会点名缺哪条 + 预取命令。
+- 现包内容：`ugra.json`（乌格拉河，26 条 way）、`akhtuba.json`（阿赫图巴河，20 条 way）。
+
+底图成品的署名（provenance.attribution）必须包含：
+`Natural Earth（公共领域）· AWS Terrain Tiles, SRTM / GMTED2010 / ETOPO1（公共领域）`，
+用到命名河流时再加 `· 河流补充 © OpenStreetMap contributors（ODbL 1.0）`。

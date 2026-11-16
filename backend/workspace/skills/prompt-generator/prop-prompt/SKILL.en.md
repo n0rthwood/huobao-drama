@@ -46,6 +46,15 @@ soft even studio light, light shadows, high detail
 - Environmental reflections, colored light
 - Exaggerated perspective, deformation, distorted proportions, cropped edges
 
+## Citing Reference Images (mandatory when present)
+
+`readProps` returns `reference_count` / `reference_images` — the reference images that will actually be sent with this generation, numbered from 1 in send order (files missing on disk are excluded and never listed).
+
+- `reference_count > 0`: cite every one of them in the final prompt as `@参考图1`, `@参考图2`, … and state what each contributes (form and size, material and craft, colour scheme, wear marks); the notation is provider-neutral and is converted to the chosen model's labels at submission;
+- A reference only contributes those elements: never copy its composition, frame or background wholesale, and never write "copy this image";
+- `reference_count = 0`: no reference-image marker may appear and no reference form or inscription may be invented;
+- If any reference is left uncited, `savePropFinalPrompt` refuses to save and names the missing ones — fix the prompt and call it again.
+
 ## Saving
 
 Call `savePropFinalPrompt`: the prompt argument contains no style words — **the project's visual style is automatically injected by the tool at the very front of the final prompt**.

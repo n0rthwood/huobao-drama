@@ -19,16 +19,15 @@ import {
   blockingIssuesFor,
   computeRefIssues,
   describeIssues,
-  indexRefs,
   loadEpisodeAssets,
   loadTargetBindings,
   promptFieldsOf,
-  resolvePromptRefs,
   targetAssetRefs,
   type EpisodeAssetEntry,
   type RefIssue,
   type TargetBindings,
 } from './storyboard-assets.js'
+import { indexRefs, resolvePromptRefs } from './prompt-refs.js'
 import { getDramaStylePrompt } from './style-preset.js'
 import { loadDesignCardContext, resolveDesignCard } from './design-card-context.js'
 import { isQwenJobsTask } from './sys-task.js'

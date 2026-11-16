@@ -30,8 +30,8 @@ const script = `
   import zlib from 'zlib'
   import sharp from 'sharp'
   import {
-    normalizeMapSpec, parseMapSpec, mapBaseSignature, buildMapSvg, projectLonLat,
-    MapSpecValidationError, MAP_REGION_COLOR,
+    normalizeMapSpec, parseMapSpec, mapBaseSignature, projectLonLat,
+    MapSpecValidationError,
     mapProjectionFor,
   } from './src/modules/map-studio/geo/base-render.ts'
   import { buildMapKmz, buildMapKml, kmlColor, specCoordinates } from './src/modules/map-studio/geo/kmz.ts'
@@ -50,6 +50,30 @@ const script = `
   const anyang = ${JSON.stringify(ANYANG)}
   const yinxu = ${JSON.stringify(YINXU)}
   const out = {}
+
+  /**
+   * 程序底图现在需要高程：合成 terrarium 瓦片注入，测试不联网。
+   * 起伏追着经纬度走，保证底图不是平涂色块。
+   */
+  const tileFetcher = async (zoom, x, y) => {
+    const tile = 256, world = tile * 2 ** zoom
+    const buffer = Buffer.alloc(tile * tile * 3)
+    for (let row = 0; row < tile; row++) {
+      const gy = y * tile + row + 0.5
+      const lat = Math.atan(Math.sinh(Math.PI * (1 - 2 * gy / world))) * 180 / Math.PI
+      for (let col = 0; col < tile; col++) {
+        const gx = x * tile + col + 0.5
+        const lon = gx / world * 360 - 180
+        const value = Math.max(0, Math.min(65535, Math.round(150 + 800 * Math.abs(Math.sin(lon * 0.7) * Math.cos(lat * 0.7)) + 32768)))
+        const offset = (row * tile + col) * 3
+        buffer[offset] = Math.floor(value / 256)
+        buffer[offset + 1] = value % 256
+        buffer[offset + 2] = 0
+      }
+    }
+    return sharp(buffer, { raw: { width: tile, height: tile, channels: 3 } }).png().toBuffer()
+  }
+  const dem = { cacheDir: path.join(process.env.HUOBAO_DATA_DIR, 'dem'), fetchTile: tileFetcher }
 
   const ring = [[114.2, 36.0], [114.6, 36.0], [114.6, 36.3], [114.2, 36.3]]
   const fullSpec = normalizeMapSpec({
@@ -94,19 +118,7 @@ const script = `
     deterministic: mapBaseSignature(fullSpec, size) === mapBaseSignature(parseMapSpec(JSON.stringify(fullSpec)), size),
   }
 
-  // 3. 底图 SVG：画出面、仍然一个字都没有
-  const svg = buildMapSvg(fullSpec, size)
-  const polygon = svg.match(/<polygon points="([^"]+)"[^>]*data-region="shang"/)
-  const expectedRing = fullSpec.regions[0].points.map(p => projectLonLat(fullSpec, size, p))
-  const drawn = polygon ? polygon[1].split(' ').map(pair => pair.split(',').map(Number)) : []
-  out.svg = {
-    has_text: svg.includes('<text'),
-    has_region: Boolean(polygon),
-    region_color: svg.includes(MAP_REGION_COLOR),
-    ring_matches: drawn.length === expectedRing.length && drawn.every((p, i) =>
-      Math.hypot(p[0] - expectedRing[i][0], p[1] - expectedRing[i][1]) < 0.02),
-    region_before_route: svg.indexOf('data-region=') < svg.indexOf('data-route='),
-  }
+  // 3. 程序底图不再画用户要素、也不画省界/城市点：底图只剩自然地理（见第 7 段的 provenance 断言）
 
   // 4. KMZ：确定性字节 + 真的是一个能解开的 zip + 三类几何都在
   const kmzA = buildMapKmz(fullSpec)
@@ -217,14 +229,27 @@ const script = `
   }
 
   // 7. program 底图 + 登记件
-  const artifact = await createMapBaseArtifact(fullSpec, { mode: 'program', width: 1280 })
+  const artifact = await createMapBaseArtifact(fullSpec, { mode: 'program', width: 1280, dem })
   const reg = artifact.registration
   const probes = [anyang, yinxu, [bbox[0] + 0.1, bbox[1] + 0.1], ring[2]]
+  const relief = artifact.provenance.relief
   out.program = {
     path: artifact.path,
     size: [artifact.width, artifact.height],
     mode: reg.mode,
     has_program: Boolean(reg.program),
+    provenance: {
+      renderer: artifact.provenance.renderer,
+      source_kinds: artifact.provenance.sources.map(s => s.kind),
+      source_names: artifact.provenance.sources.map(s => s.name),
+      attribution: artifact.provenance.attribution,
+      warnings: artifact.provenance.warnings,
+      relief_role: relief?.role,
+      dem_zoom: relief?.dem_zoom,
+      dem_tiles: relief?.dem_tiles,
+      rivers_visible: relief?.rivers_visible,
+      has_context: 'context' in artifact.provenance,
+    },
     exact_projection: (() => {
       const projection = mapProjectionFor(fullSpec, { width: reg.width, height: reg.height })
       const scaled = rescaleRegistration(reg, reg.width * 2)
@@ -238,7 +263,7 @@ const script = `
     sources: artifact.provenance.sources.map(s => s.kind + ':' + s.license),
     // 新流水线的底图只画自然地理：用户要素由可编辑图层承担，烧进底图会留鬼影
     featureless_path: artifact.path === 'static/map-bases/'
-      + mapBaseSignature(normalizeMapSpec({ bbox }), { width: 1280, height: 720 }) + '.png',
+      + mapBaseSignature(normalizeMapSpec({ bbox }), { width: 1280, height: 720 }, '50m', { role: 'overview', anchors: null }) + '.png',
     attribution: artifact.provenance.attribution,
     matches_render: probes.map(p => {
       const px = geoToPixel(reg, p)
@@ -404,12 +429,21 @@ test('渲染签名：没有面的旧 spec 签名不变，加了面才变（不�
   assert.ok(result.signature.deterministic, '同一个 spec 必须得到同一个签名')
 })
 
-test('底图 SVG：面按投影逐点画出、压在线之下，并且仍然一个字都没有', () => {
-  assert.equal(result.svg.has_text, false, '底图绝不能渲染文字')
-  assert.ok(result.svg.has_region, '面必须出现在 SVG 里')
-  assert.ok(result.svg.region_color, '面要用独立的区域色，便于与路线区分')
-  assert.ok(result.svg.ring_matches, '面的每个顶点必须等于投影结果（几何不经任何模型）')
-  assert.ok(result.svg.region_before_route, '面必须画在路线之前（压在下面）')
+test('程序底图出处：新管线渲染器 + Natural Earth 10m 与高程瓦片来源 + 夸张提醒，且没有旧的省界/城市点覆盖度字段', () => {
+  const provenance = result.program.provenance
+  assert.equal(provenance.renderer, 'd3-geo+natural-earth-10m-relief+aws-terrain')
+  assert.deepEqual(provenance.source_kinds, ['vector', 'terrain'], '数据来源必须列出矢量底图与高程瓦片')
+  assert.match(provenance.source_names[0], /Natural Earth 10m/)
+  assert.match(provenance.source_names[0], /10m rivers/)
+  assert.match(provenance.source_names[1], /AWS Terrain Tiles/)
+  assert.match(provenance.attribution, /Natural Earth/)
+  assert.match(provenance.attribution, /AWS Terrain Tiles/)
+  assert.ok(provenance.warnings.some(warning => warning.includes('地形为夸张表现')), JSON.stringify(provenance.warnings))
+  assert.equal(provenance.relief_role, 'overview')
+  assert.ok(provenance.dem_zoom > 0, 'provenance 必须记录高程档位')
+  assert.ok(provenance.dem_tiles > 0, 'provenance 必须记录本地瓦片数')
+  assert.ok(provenance.rivers_visible > 0, '豫北范围内应有可见河道')
+  assert.equal(provenance.has_context, false, '省界/城市点覆盖度概念已从底图中移除')
 })
 
 test('KMZ：字节确定、是合法单成员 zip、点/线/面齐全且环闭合', () => {

@@ -73,6 +73,15 @@ When an episode registers a styling version (styling_version) for a character, u
 - When over budget, the storyboard layer drops by priority: scene > characters present > props that are used or shown in close-up > props that are merely visible; a dropped prop loses both its binding and its @ mention, so never leave a name that is "@-mentioned but not bound"
 - One character occupies only one reference image: the system automatically picks the version according to `asset_version_selection`, so never bind the base look and a styling version at the same time
 
+## Citing Reference Images (mandatory when present)
+
+`readCharacters` returns `reference_count` / `reference_images` — the reference images that will actually be sent with this generation, numbered from 1 in send order (files missing on disk are excluded and never listed).
+
+- `reference_count > 0`: the final prompt must cite every one of them using `@参考图1`, `@参考图2`, … (provider-neutral; the system converts them to the labels the chosen model understands) and state what each one contributes (face and build, hairstyle, garment form and material, colour scheme, worn details);
+- A reference only contributes those elements: never copy its composition, frame or background wholesale, and never write "copy this image";
+- `reference_count = 0`: the prompt must contain no reference-image marker at all and must not invent reference details;
+- If any reference is left uncited, `saveCharacterFinalPrompt` refuses to save and names the missing ones — fix the prompt and call it again.
+
 ## Saving
 
 Call `saveCharacterFinalPrompt`: the prompt argument contains no style words — **the project's visual style is automatically injected by the tool at the very front of the final prompt**.

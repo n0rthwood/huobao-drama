@@ -49,6 +49,8 @@ export type MapStudioStage = 'brief' | 'research' | 'base' | 'style' | 'drawing'
 export type MapStudioStatus = 'idle' | 'running' | 'awaiting_review' | 'blocked' | 'failed' | 'completed'
 export type MapBaseMode = 'program' | 'earth' | 'image'
 export type MapStyleTheme = 'archival' | 'clean' | 'ink'
+/** 项目画幅（与火宝 dramas.aspect_ratio 白名单一致）；画中画版式与细节框按它计算 */
+export type MapAspect = '16:9' | '9:16' | '4:3' | '3:4' | '1:1'
 
 export interface MapControlPoint { x: number; y: number; lon: number; lat: number }
 export interface MapReferenceImage {
@@ -74,6 +76,11 @@ export interface MapBrief {
   style: MapStyleTheme
   /** null follows module settings; absent preserves a legacy archival/clean/ink brief. */
   map_style?: string | null
+  /**
+   * 项目画幅（宿主按项目设置只读填入，缺省按 16:9 出图）：画中画细节图按版式槽位的宽高比扩框。
+   * 前端不写这个字段，保存 brief 时原样带回。
+   */
+  aspect_ratio?: MapAspect
   notes: string
   reference_image: MapReferenceImage | null
   inferred: MapBriefInference[]
@@ -212,6 +219,54 @@ export interface MapStudioOutputs {
   kmz: { path: string; provenance: Record<string, unknown> } | null
   layer_doc: Record<string, unknown> | null
   layer_options?: MapLayerSmoothing
+  /** 画中画（Issue #107）：底图阶段提出细节框，完成登记时补 details/composite；老任务没有这个字段 */
+  pip?: MapPipOutput | null
+}
+
+/* ===== 画中画（Issue #107）：全览 + 细节 + 版式 ===== */
+
+export type MapPipRole = 'primary' | 'aux'
+export type MapBbox = [number, number, number, number]
+
+/** 细节框：focus_bbox 是模型要看清的范围，bbox 是按资产画幅扩出的实际渲染范围（也是 parent_frame） */
+export interface MapPipFrame {
+  no: number
+  label: string
+  reason: string
+  role: MapPipRole
+  focus_bbox: MapBbox
+  bbox: MapBbox
+  /** 该细节对应的分镜编号（模型给，可为空） */
+  storyboard_numbers: number[]
+}
+
+export interface MapPipImage { path: string; width: number; height: number; sha256: string }
+export interface MapPipDetail extends MapPipImage { no: number }
+export interface MapPipSlot { key: string; x: number; y: number; w: number; h: number }
+export interface MapPipLayout {
+  id: string
+  family: 'A' | 'B'
+  canvas: { width: number, height: number }
+  slots: MapPipSlot[]
+  locator: { width: number, height: number, margin: number } | null
+  label_tier: 'full' | 'reduced' | 'focus_only'
+  min_slot_short_side: number
+}
+
+/**
+ * 三件套：全览（宿主资产）、细节图（每个一条独立资产）、版式 spec。
+ * details 在「完成」登记前为空数组，composite 为 null——UI 必须如实显示「还没渲染」，不能拿占位图冒充。
+ */
+export interface MapPipOutput {
+  version: 1
+  overview_bbox: MapBbox
+  aspect: MapAspect
+  layout: MapPipLayout
+  frames: MapPipFrame[]
+  details: MapPipDetail[]
+  composite: MapPipImage | null
+  /** 写进资产 meta 的用法说明：分镜设计据此决定引用哪张图 */
+  usage: string
 }
 
 /** 严格校验 / 标签检查逐条问题：label_* 与 smoothing_* 带图层 id，其余按字段路径定位 */

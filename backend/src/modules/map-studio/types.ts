@@ -13,6 +13,7 @@ import fs from 'fs'
 import { toAbsPath } from '../../utils/paths.js'
 import type { MapSpec } from './geo/base-render.js'
 import { isMapStyleFamilyId } from './styles/index.js'
+import type { MapPipOutput } from './pip/frames.js'
 
 export const MAP_WORKFLOW_STAGES = ['brief', 'research', 'base', 'style', 'drawing', 'complete'] as const
 export type MapWorkflowStage = typeof MAP_WORKFLOW_STAGES[number]
@@ -36,6 +37,10 @@ export type MapDetailLevel = 'overview' | 'regional' | 'site'
 export const MAP_DETAIL_LEVELS: MapDetailLevel[] = ['overview', 'regional', 'site']
 export type MapStyleTheme = 'archival' | 'clean' | 'ink'
 export const MAP_STYLE_THEMES: MapStyleTheme[] = ['archival', 'clean', 'ink']
+
+/** 项目画幅（由宿主按项目设置提供；缺省 16:9）。与火宝 dramas.aspect_ratio 白名单一致。 */
+export const MAP_ASPECTS = ['16:9', '9:16', '4:3', '3:4', '1:1'] as const
+export type MapAspect = typeof MAP_ASPECTS[number]
 
 export class MapWorkflowValidationError extends Error {
   code: string
@@ -77,6 +82,8 @@ export interface MapBrief {
   style: MapStyleTheme
   /** null follows the module default; absent only on pre-Q4 stored briefs. */
   map_style?: string | null
+  /** 项目画幅：宿主每次读取需求时按项目设置填入；缺省按 16:9 出图。 */
+  aspect_ratio?: MapAspect
   notes: string
   reference_image: MapBriefReferenceImage | null
   inferred: MapBriefInference[]
@@ -226,6 +233,8 @@ export interface MapWorkflowOutputs {
   layer_doc: object | null
   /** Render-only sidecar: stored control points and strict LayerDoc remain unchanged. */
   layer_options?: Record<string, { smooth: number }>
+  /** 画中画：全览 + 细节框方案（base 阶段由模型提出并经校验），细节图/合成图在完成登记前渲染 */
+  pip?: MapPipOutput | null
 }
 
 export interface MapWorkflowHistoryEntry {
@@ -317,7 +326,7 @@ export interface MapWorkflowState {
 }
 
 export const EMPTY_OUTPUTS: MapWorkflowOutputs = {
-  base_image: null, texture_image: null, final_image: null, kmz: null, layer_doc: null, layer_options: {},
+  base_image: null, texture_image: null, final_image: null, kmz: null, layer_doc: null, layer_options: {}, pip: null,
 }
 
 export function emptySteps(): MapWorkflowStep[] {
@@ -527,6 +536,10 @@ export function normalizeBrief(raw: unknown, previous: MapBrief | null): MapBrie
   }
   // Retire the pre-adoption arbitrary recipe hook, including persisted snapshots.
   delete (next as unknown as Record<string, unknown>).style_spec
+  if ('aspect_ratio' in record) {
+    if (record.aspect_ratio === undefined || record.aspect_ratio === null) delete next.aspect_ratio
+    else next.aspect_ratio = enumOf(record.aspect_ratio, [...MAP_ASPECTS], 'brief.aspect_ratio', '16:9')
+  }
   if ('schematic' in record) next.schematic = record.schematic === true || record.schematic === 1 || record.schematic === 'true'
   if ('reference_image' in record) next.reference_image = normalizeReferenceImage(record.reference_image)
   if ('inferred' in record) next.inferred = normalizeInferred(record.inferred)

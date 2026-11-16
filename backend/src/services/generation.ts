@@ -23,6 +23,7 @@ import sharp from 'sharp'
 import { getAbsolutePath } from '../utils/storage.js'
 import { invalidateSegmentSpec } from './layer-segment.js'
 import { aspectLockedMismatchMessage } from './asset-image-size.js'
+import { renderReferencePrompt } from './asset-reference-prompt.js'
 import type { ReferenceOrigin } from './asset-pipeline/references.js'
 import {
   buildImageJobBody,
@@ -407,7 +408,9 @@ async function processTask(id: number, config: AIConfig) {
       const imageRecord: ImageGenerationRecord = {
         id: record.id,
         model: record.model,
-        prompt: record.prompt,
+        // 参考图引用按目标厂商渲染（qwen-jobs 走 <imageN>，其余厂商走 图片N）：
+        // 提示词里存的是厂商无关的 @参考图N，换厂商重试时由 adapter 侧重新渲染
+        prompt: renderReferencePrompt(record.prompt || '', resolvedReferenceImages.length, config.provider),
         size: params.size,
         frameType: params.frameType,
         referenceImages: resolvedReferenceImages.length ? JSON.stringify(resolvedReferenceImages) : null,

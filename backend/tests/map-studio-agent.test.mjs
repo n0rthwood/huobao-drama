@@ -202,17 +202,8 @@ test('拒收→自我修正、工具异常回馈、回退全链路与上限、�
     const firstBaseTask = detail.outputs.base_image.run_id
     await advanceMapWorkflow(propId, { expectedRevision: detail.revision, skip: true })
 
-    // 本运行链上已有付费底纹：回退后重跑 style 只认领它，不重复出图
-    const texturePath = 'static/map-textures/fixture.png'
-    fs.mkdirSync(process.env.STORAGE_PATH + '/map-textures', { recursive: true })
-    await sharp({ create: { width: 64, height: 36, channels: 3, background: '#e2d5ba' } }).png().toFile(process.env.HUOBAO_DATA_DIR + '/' + texturePath)
-    const textureTask = getInsertId(await db.insert(schema.sysTask).values({
-      type: 'image', dramaId, provider: 'qwen-jobs', model: 'fixture-image',
-      params: JSON.stringify({ map_texture: { prop_id: propId, prop_name: '邗沟走向示意图' } }),
-      status: 'completed', localPath: texturePath, createdAt: ts, updatedAt: ts,
-    }))
+    // 质感底纹已取消（#107）：整个流程不产生任何图片任务
     detail = serializeDetail(await loadWorkflow(propId))
-    patchRunParams(detail.run_id, { map_texture_ref: String(textureTask), map_texture_theme: 'atlas-tint' })
     const paidImages = async () => (await db.select().from(schema.sysTask).where(eq(schema.sysTask.type, 'image'))).filter(r => r.provider !== 'map-render' && r.provider !== 'map-workflow').length
     const paidBefore = await paidImages()
 
@@ -229,8 +220,8 @@ test('拒收→自我修正、工具异常回馈、回退全链路与上限、�
     assert.match(runAttempts.find(a => a.stage === 'drawing' && a.outcome === 'rejected').problems.join(), /还没有用 render_draft 成功渲染过/)
     assert.equal(detail.agent.rounds.drawing, 2)
     assert.equal((await db.select().from(schema.sysTask)).filter(row => row.provider === 'map-render').length, 1, 'only delivered base becomes a host version')
-    assert.equal(detail.outputs.texture_image.path, texturePath)
-    assert.equal(await paidImages(), paidBefore, '回退后重跑 style 只认领已付费底纹，不新出图')
+    assert.equal(detail.outputs.texture_image, null)
+    assert.equal(await paidImages(), paidBefore, '新流程不再出底纹图，不产生任何付费图片任务')
 
     // 工具内部异常（缺字渲染失败）以工具结果回给了模型
     const glyphError = mock.requests.some(b => toolResults(b, 'render_draft').some(r => typeof r === 'object' && String(r.error ?? '').includes('打包字体未覆盖')))

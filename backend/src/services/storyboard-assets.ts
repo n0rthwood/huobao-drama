@@ -16,9 +16,7 @@ import { db, schema } from '../db/index.js'
 import { parseStylingVersion } from './styling-version.js'
 import { loadDesignCardContext, resolveDesignCard } from './design-card-context.js'
 import { referenceAssetRefs, type Combo, type DesignCard } from './design-card.js'
-
-/** 参考图上限（与前端面板、Seedance 多模态上限一致） */
-const REF_IMAGE_LIMIT = 9
+import { indexRefs, REF_IMAGE_LIMIT, type AssetRef } from './prompt-refs.js'
 
 /** 旁白角色识别：提取产物中的旁白角色不参与画面生成（与前端 isNarratorCharacter 同口径） */
 const NARRATOR_KEYWORDS = ['旁白', '画外音', 'narrator', 'ナレーター', 'ナレーション', '내레이션', '해설']
@@ -27,44 +25,6 @@ export type AssetKind = 'scene' | 'character' | 'prop'
 
 const KIND_ORDER: Record<AssetKind, number> = { scene: 0, character: 1, prop: 2 }
 const KIND_LABEL: Record<AssetKind, string> = { scene: '场景', character: '角色', prop: '道具' }
-
-export interface AssetRef {
-  name: string
-  url: string
-}
-
-/** 去重并截断到上限，同时给有名字的参考图编号（1 起，顺序即发送顺序） */
-export function indexRefs(refs: AssetRef[]): { urls: string[]; nameToIndex: Record<string, number> } {
-  const ordered: AssetRef[] = []
-  for (const ref of refs) {
-    if (!ref.url || ordered.length >= REF_IMAGE_LIMIT || ordered.some(item => item.url === ref.url)) continue
-    ordered.push(ref)
-  }
-  const nameToIndex: Record<string, number> = {}
-  ordered.forEach((ref, index) => {
-    if (ref.name && !(ref.name in nameToIndex)) nameToIndex[ref.name] = index + 1
-  })
-  return { urls: ordered.map(ref => ref.url), nameToIndex }
-}
-
-/**
- * 把提示词里的 @名字 换成模型可识别的图片引用。
- * 名字按长度倒序匹配，避免“小明”抢在“小明妈妈”前面命中。
- */
-export function resolvePromptRefs(
-  prompt: string,
-  nameToIndex: Record<string, number>,
-  format: (index: number, name: string) => string,
-): string {
-  const names = Object.keys(nameToIndex).sort((a, b) => b.length - a.length)
-  if (!names.length) return prompt
-  return prompt.replace(/@([^\s@]+)/g, (match, raw: string) => {
-    for (const name of names) {
-      if (raw.startsWith(name)) return `${format(nameToIndex[name]!, name)}${raw.slice(name.length)}`
-    }
-    return match
-  })
-}
 
 // ─── 提示词字段与生成目标 ────────────────────────────────────────────
 

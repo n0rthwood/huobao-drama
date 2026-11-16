@@ -30,6 +30,13 @@
       </section>
     </div>
 
+    <!-- Issue #107：质感底纹阶段保留在流程里但恒不出图，人看到这一步时不至于以为少了产出 -->
+    <p v-if="stage === 'style'" class="msp-hint dim">{{ t('mapStudio.results.styleSkipped') }}</p>
+
+    <!-- Issue #107：细节取景框是底图阶段的产出；人换取景框的方式就是回退底图重跑，不另开编辑面板。
+         回退会清空 pip（旧框失效），所以这条提示不能依赖 pip 是否存在。 -->
+    <p v-if="stage === 'base'" class="msp-hint dim">{{ t('mapStudio.stagePanel.pipRollbackHint') }}</p>
+
     <section class="msp-block">
       <strong class="msp-sub">{{ t('mapStudio.stagePanel.issuesTitle') }}</strong>
       <p v-if="!detail.issues.length" class="msp-empty dim">{{ t('mapStudio.stagePanel.noIssues') }}</p>
@@ -166,6 +173,7 @@ import type {
   MapConfirmTarget,
   MapFeatureCategory,
   MapFeatureOrigin,
+  MapPipOutput,
   MapPlace,
   MapRegion,
   MapRelation,
@@ -177,7 +185,7 @@ import type {
 } from '~/map-studio/api'
 import { mapPendingGeometry, mapSpecFeatureKey } from '~/map-studio/api'
 import { registrationFrom, registrationSummary } from '~/map-studio/utils/mapRegistration'
-import type { MapPreviewView } from '~/map-studio/utils/mapPreview'
+import { PIP_COMPOSITE_VIEW, type MapPreviewView } from '~/map-studio/utils/mapPreview'
 
 const { t } = useI18n()
 
@@ -212,6 +220,16 @@ function featureCounts() {
 
 function sizeOf(image: { width: number, height: number } | null | undefined): string {
   return image?.width && image?.height ? t('mapStudio.results.size', { w: image.width, h: image.height }) : t('mapStudio.stagePanel.unknownSize')
+}
+
+/** 画中画一句话摘要：细节数 + 版式 id/族 + 标注层级；这些字段都是服务端定的，不在这里推断 */
+function pipSummary(pip: MapPipOutput): string {
+  return t('mapStudio.pip.factSummary', {
+    n: pip.frames.length,
+    id: pip.layout.id,
+    family: t('mapStudio.pip.family.' + pip.layout.family),
+    tier: t('mapStudio.pip.labelTier.' + pip.layout.label_tier),
+  })
 }
 
 /**
@@ -403,6 +421,7 @@ const outputFacts = computed<Fact[]>(() => {
   if (props.stage === 'base' && images.base_image) {
     list.push({ key: 'base', label: t('mapStudio.results.base_image'), value: sizeOf(images.base_image), href: '#', preview: 'base' })
     if (images.kmz) list.push({ key: 'kmz', label: 'KMZ', value: images.kmz.path })
+    if (images.pip) list.push({ key: 'pip', label: t('mapStudio.pip.title'), value: pipSummary(images.pip) })
   }
   if (props.stage === 'style' && images.texture_image) {
     list.push({ key: 'texture', label: t('mapStudio.results.texture_image'), value: sizeOf(images.texture_image), href: '#', preview: 'texture' })
@@ -412,6 +431,14 @@ const outputFacts = computed<Fact[]>(() => {
   }
   if (props.stage === 'complete' && images.kmz) {
     list.push({ key: 'kmz', label: 'KMZ', value: images.kmz.path })
+  }
+  // 画中画只列真实存在的文件：细节图/组合图在「完成」登记时渲染，没渲染就写 0，不给一个点不开的链接
+  if (props.stage === 'complete' && images.pip) {
+    list.push({ key: 'pip', label: t('mapStudio.pip.title'), value: pipSummary(images.pip) })
+    list.push({ key: 'pipDetails', label: t('mapStudio.pip.detailsTitle'), value: t('mapStudio.pip.renderedDetails', { n: images.pip.details.length }) })
+    if (images.pip.composite) {
+      list.push({ key: 'pipComposite', label: t('mapStudio.pip.compositeTitle'), value: sizeOf(images.pip.composite), href: '#', preview: PIP_COMPOSITE_VIEW })
+    }
   }
   return list
 })
@@ -426,6 +453,7 @@ const outputFacts = computed<Fact[]>(() => {
 .msp-block { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-soft); }
 .msp-sub { font: 600 11px var(--font-body); color: var(--text-1); }
 .msp-empty { margin: 0; font-size: 10.5px; }
+.msp-hint { margin: 0; font-size: 10.5px; }
 .msp-facts { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; font-size: 10.5px; color: var(--text-2); }
 .msp-facts li { display: flex; flex-wrap: wrap; gap: 6px; }
 .msp-label { font: 600 10.5px var(--font-body); color: var(--text-2); }

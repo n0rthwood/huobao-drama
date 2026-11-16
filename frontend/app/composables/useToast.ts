@@ -63,6 +63,38 @@ export function toastError(err: unknown, opts?: { fallback?: string; duration?: 
 }
 
 /**
+ * 参考图失效警告（Issue #107）：后端在参考图文件不存在时会丢弃它们继续出图，只写服务端日志，
+ * 前端以前完全静默——用户以为「按参考图生成了」，实际少了几张。这里显式警告并给出失效文件名
+ * （后端不自动清理库里的条目，删除由用户在前端操作）。
+ * 接受单条任务对象或任务数组；没有失效项时什么都不做。
+ */
+export function toastMissingReferenceImages(result: unknown): void {
+  const rows = Array.isArray(result) ? result : [result]
+  const missing: unknown[] = []
+  for (const row of rows) {
+    if (!row || typeof row !== 'object') continue
+    // 批量接口返回 { tasks: [...] }，单发接口返回单条任务行：两种形状都展开
+    if ('tasks' in row && Array.isArray(row.tasks)) {
+      for (const task of row.tasks) missing.push(...missingRefsOf(task))
+      continue
+    }
+    missing.push(...missingRefsOf(row))
+  }
+  if (!missing.length) return
+  toast.warning(t('episode.asset.referenceMissing', {
+    n: missing.length,
+    files: missing.map(path => String(path).split('/').pop()).join('、'),
+  }), { duration: 7000 })
+}
+
+/** 任务行上的失效参考图路径（字段缺失或形状不对时当作没有） */
+function missingRefsOf(task: unknown): unknown[] {
+  if (!task || typeof task !== 'object' || !('missing_reference_images' in task)) return []
+  const list = task.missing_reference_images
+  return Array.isArray(list) ? list : []
+}
+
+/**
  * 服务端拦截类错误（一致性问题列表、资产池引用锁定等）：message 是后端拼好的中文长句，
  * mapError 会因长度/技术特征回退成泛化文案，这里原样返回，其余情况仍走 mapError。
  */

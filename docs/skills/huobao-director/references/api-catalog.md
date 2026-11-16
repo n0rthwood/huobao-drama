@@ -386,6 +386,12 @@ Body：`{expected_revision?,brief?,map_spec?,layer_options?,mode?}`，至少一�
 - 保存只是改真源，不等于已渲染新图。图层文档上限 60 图层、每条线/面 240 顶点（只有服务器精确投影的已存储要素可超过，不得截断/移动/重排）；超限或越界的文档按严格校验拒收（不丢点、不钳边），见「图层编辑与平滑」。
 - 几何编辑后读回stage：投影/bbox/背景层/detail_level不变则成图与图层文档作废、底图保留，从drawing推进；上述取景配置改变则先重做base并清底图/KMZ。底纹仅在spec.style.theme改变时丢弃；相同规范化spec不作废成图。
 
+#### 底图管线与画中画（Issue #107，`[S]`）
+
+- `outputs.pip`：`{version,overview_bbox,aspect,layout{id,family,canvas,slots,locator,label_tier,min_slot_short_side},frames[{no,label,reason,role,focus_bbox,bbox,storyboard_numbers}],details[{no,path,width,height,sha256}],composite,usage}`。base 阶段工具 `set_frames {artifact_id,frames[]}` 校验细节框（≤4；中心距边≥2%；跨度占全览 3%–60%；IoU<0.5；至多一个 primary），有分镜引用时不调用则 `submit_base` 被拒。`complete` 前渲染 `details/composite`（确定性，同输入同像素）。
+- 宿主：`props.map_pip`（经 `GET /dramas/{d}` 的 props / `GET /episodes/{e}/props` 返回解析后的对象）：全览 `{role:'overview',layout,frames[{…,detail_prop_id}],composite_path,usage}`；细节 `{role:'detail',parent_prop_id,parent_name,frame,overview_bbox,usage,stale?}`。细节是独立地图道具（名「全览名 · 细节N（label）」，faithful，同剧集关联）；重跑按帧编号覆盖，不再出现的标 `stale`。
+- `brief.aspect_ratio` 只读（由项目画幅填入）；底图画布与项目画幅不符时绘制阶段回退到底图。质感底纹步骤直接跳过。
+
 #### 运行与人工控制（以下 `/tasks` 均属于 `/map-studio`）
 
 - **`POST /tasks/{id}/run {mode:"auto"|"manual",expected_revision?,text_config_id?,image_config_id?,image_model?}`**：mode **必填**，不会默认 manual；继续当前 `stage`，不从 brief 重启。auto 连续到完成或阻断，manual 只执行当前一步。已完成返回 400 `already_completed`，在飞返回 409 `workflow_busy`。auto 跑通到宿主交付 `[R]`，manual `[S]`。

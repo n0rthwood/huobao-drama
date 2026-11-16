@@ -1817,6 +1817,7 @@
       "timeRequired": "장면 시간은 비워 둘 수 없습니다",
       "refSectionTitle": "참고 이미지",
       "refSectionHint": "생성 가이드용이며 완성 이미지가 아닙니다. 추가/삭제/라이브러리 선택 가능",
+      "referenceMissing": "참조 이미지 {n}개의 파일이 존재하지 않습니다({files}). 이번 생성은 나머지 참조 이미지만 사용했습니다. 무효한 항목을 삭제한 뒤 다시 시도하세요",
       "assetTypeLabel": "자산 유형",
       "mapDescription": "지도 설명(범위와 목적)",
       "assetType": {
@@ -3663,7 +3664,7 @@
       "textConfig": "텍스트 모델 설정",
       "imageModel": "이미지 모델",
       "defaultConfig": "기본값 사용",
-      "textureHint": "이미지 모델은 질감과 색감만 만들며 지리 형상 결정에는 전혀 관여하지 않습니다.",
+      "textureHint": "새 베이스맵은 질감 텍스처를 만들지 않습니다. 이 이미지 모델은 이미지 작업을 만들지 않습니다(호환을 위해서만 유지).",
       "briefTitle": "작업 지시",
       "briefHint": "대상·연대·지역·용도가 충분히 구체적이어야 고증과 베이스 도면이 성립합니다",
       "saveBrief": "지시 저장",
@@ -3835,7 +3836,10 @@
       "uncertaintiesTitle": "불확실한 점",
       "warningsTitle": "그리기 품질 주의({n}건)",
       "calibrationEvidence": "Earth 실측 기준점 증거",
-      "calibrationCheck": "독립 검증 {n}점 · RMS {rms}px · 최대 오차 {max}px"
+      "calibrationCheck": "독립 검증 {n}점 · RMS {rms}px · 최대 오차 {max}px",
+      "styleSkipped": "질감(텍스처) 단계는 건너뛰었습니다. 새 기본 지도는 고도 음영과 단계별 수계로 대비를 얻으므로 종이 질감을 겹치지 않습니다. 완성 지도는 기본 지도에서 바로 그립니다.",
+      "pipDetail": "세부 {no}: {label}",
+      "pipComposite": "화중화 합성 이미지"
     },
     "preview": {
       "close": "큰 이미지 닫기",
@@ -3963,7 +3967,41 @@
       "projection": "투영법",
       "features": "점·선·면 기하",
       "featureCounts": "점 {places} / 선 {routes} / 면 {regions}",
-      "layers": "편집 가능한 레이어"
+      "layers": "편집 가능한 레이어",
+      "pipRollbackHint": "세부 프레임은 기본 지도 단계에서 정해집니다. 바꾸려면 「기본 지도」로 롤백해 다시 실행하세요. 납품 시 새 프레임으로 세부 이미지가 다시 렌더링됩니다."
+    },
+    "pip": {
+      "title": "화중화(전체 지도 + 세부)",
+      "hint": "전체 지도는 위치와 추세를 세우고, 세부 지도는 사건이 일어난 곳의 산과 강을 보여 줍니다. 각 세부는 독립 자산이라 스토리보드가 단독으로 인용할 수 있습니다.",
+      "layout": "레이아웃 {id} · {family} · 주석: {tier}",
+      "aspect": "화면 비율 {aspect}",
+      "family": {
+        "A": "전체 지도 중심 (설정 샷)",
+        "B": "세부 중심 (서사 체류)"
+      },
+      "labelTier": {
+        "full": "전체",
+        "reduced": "2차",
+        "focus_only": "핵심만"
+      },
+      "role": {
+        "primary": "핵심",
+        "aux": "보조"
+      },
+      "storyboards": "대응 스토리보드 {numbers}",
+      "noStoryboard": "대응 스토리보드 미지정",
+      "bbox": "범위(서/남/동/북): {bbox}",
+      "detailPending": "세부 이미지는 납품 등록 시 렌더링됩니다. 아직 없습니다.",
+      "compositeTitle": "합성 이미지",
+      "compositePending": "합성 이미지는 납품 등록 시 렌더링됩니다. 아직 없습니다.",
+      "usageTitle": "사용법",
+      "noFrames": "이 지도에는 세부 프레임이 없습니다. 전체 지도만 납품됩니다.",
+      "factSummary": "세부 {n}개 · 레이아웃 {id} ({family}, 주석: {tier})",
+      "detailsTitle": "세부 이미지",
+      "renderedDetails": "{n}장 렌더링됨",
+      "overviewBadge": "화중화 · 세부 {n}개",
+      "detailBadge": "세부 {no} · 《{name}》 소속",
+      "stale": "만료됨"
     },
     "researchPanel": {
       "title": "요소 출처와 검증",

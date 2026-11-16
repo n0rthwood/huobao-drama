@@ -24,7 +24,9 @@ export function serializeProp(row: PropRow): Record<string, unknown> {
   if (isMapAsset(row)) {
     try { payload.map_brief = row.mapBrief ? JSON.parse(row.mapBrief) : null } catch { payload.map_brief = null }
     payload.map_studio_task_id = row.mapStudioTaskId ?? null
+    try { payload.map_pip = row.mapPip ? JSON.parse(row.mapPip) : null } catch { payload.map_pip = null }
   } else {
+    delete payload.map_pip
     delete payload.map_brief
     delete payload.map_studio_task_id
   }

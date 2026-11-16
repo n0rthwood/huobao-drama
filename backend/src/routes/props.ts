@@ -27,8 +27,10 @@ import { bindCreatedAssetToReviewItem, findReviewItemAssetDuplicate, onAssetLibr
 import { getAbsolutePath } from '../utils/storage.js'
 import { parseAssetType, isMapAsset, serializeProp } from '../services/prop-asset-type.js'
 import { openHostTask } from '../modules/map-studio/index.js'
+import { pipParentOf } from '../services/map-pip-assets.js'
 import { mountAspectVersionRoute } from './asset-aspect-version.js'
 import { PROP_IMAGE_SIZE } from '../services/asset-image-size.js'
+import { referenceNameIndex } from '../services/asset-reference-prompt.js'
 
 const app = new Hono()
 /** 证据素材不进生图链路时的统一口径（路由 400 与批量 skip_faithful 同义） */
@@ -214,7 +216,18 @@ app.post('/:id/generate-image', async (c) => {
   if (missing.length) logTaskWarn('PropImage', 'reference-missing', { propId: id, missing })
   try {
     logTaskStart('PropImage', 'generate', { propId: id, episodeId: ep.id, dramaId: prop.dramaId, references: referenceImages.length })
-    const genId = await generateImage({ propId: id, episodeId: ep.id, dramaId: prop.dramaId, prompt, model: body.model, size: PROP_IMAGE_SIZE, referenceImages: referenceImages.length ? referenceImages : undefined, configId: body.config_id ?? ep.imageConfigId ?? undefined })
+    const genId = await generateImage({
+      propId: id,
+      episodeId: ep.id,
+      dramaId: prop.dramaId,
+      prompt,
+      // 换厂商重试按新 provider 重新渲染 @参考图N；无参考图时不落这两项
+      ...(referenceImages.length ? { sourcePrompt: prompt, refNameIndex: referenceNameIndex(referenceImages.length) } : {}),
+      model: body.model,
+      size: PROP_IMAGE_SIZE,
+      referenceImages: referenceImages.length ? referenceImages : undefined,
+      configId: body.config_id ?? ep.imageConfigId ?? undefined,
+    })
     logTaskSuccess('PropImage', 'generate', { propId: id, generationId: genId })
     return success(c, { image_generation_id: genId, reference_images: referenceImages, missing_reference_images: missing })
   } catch (err: any) {
@@ -335,6 +348,15 @@ app.post('/:id/map-studio/open', async c => {
   const [prop] = await db.select().from(schema.props).where(eq(schema.props.id, id))
   if (!prop || prop.deletedAt) return badRequest(c, '道具不存在', { error: 'not_found' })
   if (!isMapAsset(prop)) return badRequest(c, '该资产不是地图资产', { error: 'not_a_map' })
+  // 画中画细节图没有自己的工作室任务：编辑它要回到所属全览的任务（回退到底图阶段改细节框）
+  const parentId = pipParentOf(id)
+  if (parentId !== null) {
+    const [parent] = await db.select().from(schema.props).where(eq(schema.props.id, parentId))
+    if (!parent || parent.deletedAt) return badRequest(c, '该细节图所属的全览地图已不存在', { error: 'not_found' })
+    const opened = await openHostTask({ host: 'huobao', ref: `prop:${parentId}`, existingTaskId: parent.mapStudioTaskId })
+    await db.update(schema.props).set({ mapStudioTaskId: opened.task_id, updatedAt: now() }).where(eq(schema.props.id, parentId))
+    return success(c, { ...opened, parent_prop_id: parentId })
+  }
   const result = await openHostTask({ host: 'huobao', ref: `prop:${id}`, existingTaskId: prop.mapStudioTaskId })
   await db.update(schema.props).set({ mapStudioTaskId: result.task_id, updatedAt: now() }).where(eq(schema.props.id, id))
   return success(c, result)

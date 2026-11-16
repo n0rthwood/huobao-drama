@@ -43,17 +43,25 @@ Every identity symbol recorded in `styling` must **land item by item in the clot
 When `readCharacters` returns `has_archival_reference: true`, the character already has an archival portrait on file, and its visible features have been turned into text by the extraction step inside `appearance` / `styling`:
 
 - Face shape, hairline, hairstyle, moustache shape, whether a beard is worn, and salient facial features **follow the `appearance` text strictly** — no beautifying, no rejuvenating, no changing the hairstyle, no improvising;
+- When `readCharacters` returns paths in `archival_images`, you may read them with `read_image` to verify details (for example: "what are this portrait's hairstyle, moustache and court-robe patterns?") and write the confirmed visible features into the prompt; looking at the portrait is how you get the person right — it is not a generation asset;
 - Do not carry the painting's oil brushwork, frame, background or bust composition into the prompt — **what is faithful is the person, not that painting**;
-- The portrait itself does not take part in image generation; do not mention "oil painting", "portrait" or "reference painting" in the prompt.
+- The portrait itself does not take part in image generation (it is not in `reference_images`): do not mention "oil painting", "portrait" or "reference painting" in the prompt, and never cite the portrait as a source (e.g. "according to this portrait").
 
-## 5. No Source Pollution
+## 5. Citing Reference Images (mandatory when present)
+
+- The generation reference images are `reference_count` / `reference_images` from `readCharacters`: numbered from 1 in send order. With `reference_count > 0` the final prompt must cite every one of them as `@参考图1`, `@参考图2`, … and state what each contributes (period, silhouette, material, worn details); take only those elements and never copy a reference's composition, frame or background wholesale. With `reference_count = 0` no marker may appear and no reference detail may be invented;
+- Archival portraits are **not** generation reference images: they only feed the text (section 4) and must never be cited as references;
+- If any generation reference is left uncited, `saveCharacterFinalPrompt` refuses to save and names the missing ones — fix the prompt and call it again.
+
+## 6. No Source Pollution
 
 The prompt must not contain a URL, a domain, "according to Wikipedia", "source" or any other source annotation or citation format.
 
-## 6. Self-check (confirm item by item before saving)
+## 7. Self-check (confirm item by item before saving)
 
 1. Contains all four elements: "character turnaround reference sheet / front close-up / three equal-height full-body views / pure white background";
 2. At least 2 wearable or carryable identity symbols, consistent with `styling`;
 3. No scene, background, environment or prop-tabletop element whatsoever;
 4. No item later than the period;
-5. No URL and no source annotation.
+5. No URL and no source annotation;
+6. With `reference_count > 0`, every generation reference is cited as `@参考图N` with its contribution, and no archival portrait is cited as a reference or a source.

@@ -21,7 +21,7 @@ test('Map Studio adopted styles: settings, validation, HTTP rejection, theme cha
     import {emptyBrief,normalizeBrief} from '__BACKEND__src/modules/map-studio/types.ts'
     import {readDefaultStyle} from '__BACKEND__src/modules/map-studio/settings.ts'
     import {judgeBrief,parseBriefVerdict} from '__BACKEND__src/modules/map-studio/brief.ts'
-    import {normalizeMapSpec,buildMapSvg,mapBaseSignature} from '__BACKEND__src/modules/map-studio/geo/base-render.ts'
+    import {normalizeMapSpec,mapBaseSignature} from '__BACKEND__src/modules/map-studio/geo/base-render.ts'
     import {createMapBaseArtifact,forwardFor} from '__BACKEND__src/modules/map-studio/geo/geometry.ts'
     import {searchDataset,extractDatasetGeometry} from '__BACKEND__src/modules/map-studio/geo/datasets.ts'
     import {createStandaloneTask} from '__BACKEND__src/modules/map-studio/tasks.ts'
@@ -34,6 +34,20 @@ test('Map Studio adopted styles: settings, validation, HTTP rejection, theme cha
     import {specFeatures} from '__BACKEND__src/modules/map-studio/validate.ts'
     import {startMockOpenAIChat,toolResults} from '__BACKEND__tests/fixtures/mock-openai-chat.mjs'
     const require=createRequire('file://__BACKEND__package.json'), sharp=require('sharp')
+    /** 程序底图需要高程：合成 terrarium 瓦片注入，测试不联网（渲染阶段只读本地缓存） */
+    const demFixture={cacheDir:path.join(process.env.HUOBAO_DATA_DIR,'dem'),fetchTile:async(zoom,x,y)=>{
+      const tile=256,world=tile*2**zoom,buffer=Buffer.alloc(tile*tile*3)
+      for(let row=0;row<tile;row++){
+        const gy=y*tile+row+0.5,lat=Math.atan(Math.sinh(Math.PI*(1-2*gy/world)))*180/Math.PI
+        for(let col=0;col<tile;col++){
+          const gx=x*tile+col+0.5,lon=gx/world*360-180
+          const value=Math.max(0,Math.min(65535,Math.round(150+600*Math.abs(Math.sin(lon)*Math.cos(lat))+32768)))
+          const offset=(row*tile+col)*3
+          buffer[offset]=Math.floor(value/256);buffer[offset+1]=value%256;buffer[offset+2]=0
+        }
+      }
+      return sharp(buffer,{raw:{width:tile,height:tile,channels:3}}).png().toBuffer()
+    }}
     await initMapStudio({async submitImage(){throw Error('No image/model generation permitted')},async pollImage(){throw Error('No image/model generation permitted')}})
     const request=async(route,method='GET',body)=>{
       const response=await mapStudioRoutes.request(route,{method,...(body===undefined?{}:{headers:{'content-type':'application/json'},body:JSON.stringify(body)})})
@@ -88,11 +102,12 @@ test('Map Studio adopted styles: settings, validation, HTTP rejection, theme cha
         const themedBrief={...brief,map_style:family.id}
         const spec=normalizeMapSpec({...fixture,style:{theme:'ink',map_style:family.id}})
         assert.equal(spec.style.theme,family.theme_mapping)
-        const svg=buildMapSvg(spec,{width:1280,height:720})
-        assert.ok(svg.includes(family.palette.background));assert.ok(svg.includes(family.palette.land))
         signatures.add(mapBaseSignature(spec,{width:1280,height:720}))
-        const base=await createMapBaseArtifact(spec,{mode:'program',width:1280})
+        // 底图色板是固定地形色（不随主题族变）：主题族只影响可编辑图层的样式，见下方逐层断言
+        const base=await createMapBaseArtifact(spec,{mode:'program',width:1280,dem:demFixture})
         assert.equal(base.provenance.map_style,family.id)
+        assert.equal(base.provenance.relief.role,'overview')
+        assert.match(base.provenance.renderer,/relief/)
         const task=await createStandaloneTask({title:'Theme '+family.id,brief:themedBrief})
         const runId=insertRun({taskId:task.task_id,mode:'manual',startStage:'drawing',stage:'drawing',textConfigId:configId,imageConfigId:null,imageModel:null,params:{}})
         await mutateTask(task.task_id,{action:'fixture',actor:'system',mutate:ctx=>{ctx.state.run_id=runId;ctx.state.status='running';ctx.state.stage='drawing';ctx.mapSpec=spec}})
@@ -137,7 +152,7 @@ test('Map Studio adopted styles: settings, validation, HTTP rejection, theme cha
       const cities=['Moscow','Kazan'].map(name=>{const candidate=searchDataset('place',name,bbox)[0];assert.ok(candidate);return {name,geometry:extractDatasetGeometry(candidate.ref)}})
       for(const family of MAP_STYLE_FAMILIES){
         const spec=normalizeMapSpec({bbox,detail_level:'regional',style:{map_style:family.id},places:[],routes:[],regions:[]})
-        const base=await createMapBaseArtifact(spec,{mode:'program',width:1920})
+        const base=await createMapBaseArtifact(spec,{mode:'program',width:1920,dem:demFixture})
         const forward=forwardFor(base.registration),common=(id,type,style,extra)=>({id,type,name:id,visible:true,locked:false,z:1,opacity:1,rotation:0,style,...extra})
         const layers=river.parts.map((part,i)=>common('river-'+i,'polyline',featureStyleFor(family,{kind:'route',category:'river'}),{points:part.map(p=>{const q=forward(p);return[q[0]/base.width,q[1]/base.height]})}))
         for(const city of cities){const p=forward([city.geometry.lon,city.geometry.lat]);layers.push(common(city.name,'marker',featureStyleFor(family,{kind:'place',category:'settlement'}),{at:[p[0]/base.width,p[1]/base.height],text:city.name}))}

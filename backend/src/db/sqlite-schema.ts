@@ -858,6 +858,7 @@ const columnAdditions: { table: string; column: string; type: string }[] = [
   { table: 'props', column: 'map_workflow', type: 'TEXT' },
   { table: 'props', column: 'map_brief', type: 'TEXT' },
   { table: 'props', column: 'map_studio_task_id', type: 'INTEGER' },
+  { table: 'props', column: 'map_pip', type: 'TEXT' },
   // 背景信息载体（Issue #47）：旁白提到但不出场、需要视觉承载的实体（近卫团、彼得一世、波尔塔瓦）。
   // 不新增第 4 类资产：仍按角色/场景/道具三类落库，这一列只回答「它是不是背景信息载体」，
   // 供表达设计（#49）的 exposition_assets 单列引用。

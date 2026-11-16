@@ -562,6 +562,8 @@
                     <span v-if="isMapAsset(p)" class="tag asset-map-tag" :title="t('episode.asset.assetTypeHint')">{{ t('episode.asset.assetType.map') }}</span>
                     <span v-if="p.faithful" class="tag asset-faithful-tag" :title="t('episode.asset.faithfulHint')">{{ t('episode.asset.faithfulBadge') }}</span>
                   </div>
+                  <!-- 画中画（Issue #107）：全览显示细节个数，细节图显示编号与所属全览；没有 map_pip 的地图不显示 -->
+                  <div v-if="pipBadgeLines.get(p.id)" class="asset-meta asset-pip-line">{{ pipBadgeLines.get(p.id) }}</div>
                   <div class="asset-meta asset-desc dim" :title="p.description || ''">{{ p.description || t('episode.asset.noDescription') }}</div>
                   <div v-if="!isMapAsset(p)" class="asset-meta asset-final" :class="{ dim: !(p.final_prompt || p.finalPrompt) }" :title="p.final_prompt || p.finalPrompt || ''">
                     <span class="afp-label">{{ t('episode.asset.finalPromptWhiteBg') }}</span>
@@ -1560,13 +1562,14 @@ import {
 import { api, dramaAPI, episodeAPI, storyboardAPI, characterAPI, sceneAPI, propAPI, taskAPI, mergeAPI, posterAPI, aiConfigAPI, uploadAPI, mediaLibraryAPI, videoQueueAPI, assetBatchAPI } from '~/composables/useApi'
 import { startTour, autoTour } from '~/composables/useTour'
 import { useAgent } from '~/composables/useAgent'
-import { toastError, mapError, toastServerMessage, MODERATION_RE } from '~/composables/useToast'
+import { toastError, mapError, toastServerMessage, toastMissingReferenceImages, MODERATION_RE } from '~/composables/useToast'
 import LocaleSwitcher from '~/components/LocaleSwitcher.vue'
 import ReferenceImageManager from '~/components/ReferenceImageManager.vue'
 import ArchivalImagePanel from '~/components/ArchivalImagePanel.vue'
 import PropSemanticsPanel from '~/components/PropSemanticsPanel.vue'
 import AssetPipelinePanel from '~/components/AssetPipelinePanel.vue'
 import MapStudioEntry from '~/components/MapStudioEntry.vue'
+import { pipBadgeText } from '~/map-studio/utils/mapPip'
 import { dropLegacyMapDeeplinks } from '~/composables/useQuerySync'
 import VideoQueueBar from '~/components/VideoQueueBar.vue'
 import ResearchCitationList from '~/components/ResearchCitationList.vue'
@@ -4384,10 +4387,14 @@ function watchAsyncResult(check, attempts = 24, delay = 2500) {
 function isPendingPropImage(id) {
   return isAssetImagePending('prop', id)
 }
+/** 后端返回的单条任务或任务数组都归一成行列表（批量/单个入口同形） */
+function createdTaskRows(result) {
+  return Array.isArray(result) ? result : Array.isArray(result?.tasks) ? result.tasks : [result]
+}
+
 /** 后端建好的 sys_task 立刻进全局 store：卡片进度环不必等下一轮轮询 */
 function registerCreatedTasks(result) {
-  const rows = Array.isArray(result) ? result : Array.isArray(result?.tasks) ? result.tasks : [result]
-  for (const row of rows) if (row?.id) registerTask(row)
+  for (const row of createdTaskRows(result)) if (row?.id) registerTask(row)
 }
 
 // 单张生成：后端同步建好 sys_task 再返回，提交后任务即进 store，卡片接上进度环
@@ -4404,7 +4411,9 @@ async function submitAssetImage(type, id, call, startedToastKey) {
         await ensureAssetPrompt(type, id)
       } catch {} // 提示词生成失败不阻断：后端生图前会再兜底生成或回退本地拼接
     }
-    registerCreatedTasks(await call())
+    const result = await call()
+    registerCreatedTasks(result)
+    toastMissingReferenceImages(result)
     toast.success(t(startedToastKey))
     await refresh() // refresh() 内部会载入本集任务快照
   } catch (e) {
@@ -4920,6 +4929,20 @@ function assetTypeOf(item) {
 function isMapAsset(item) {
   return assetTypeOf(item) === 'map'
 }
+
+/**
+ * 画中画徽标（Issue #107）：全览写细节个数，细节图写编号与所属全览，过期单独标出。
+ * 只有带 map_pip 的地图资产有条目；形状不认识时 pipBadgeText 返回空串，这里也不放条目。
+ */
+const pipBadgeLines = computed(() => {
+  const lines = new Map()
+  for (const item of propItems.value) {
+    if (!isMapAsset(item)) continue
+    const line = pipBadgeText(item.map_pip, (key, params) => t(key, params ?? {}))
+    if (line) lines.set(item.id, line)
+  }
+  return lines
+})
 
 /** 地图 → 普通道具要人确认：地图数据不会被删，但整套地图界面会收起来 */
 async function onAssetTypeChange(item, next) {
@@ -7411,6 +7434,8 @@ button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
 .asset-detail-ref-panel :deep(.ref-images) { border-top: 0; padding-top: 0; }
 /* 地图资产（Issue #84）：卡片一眼能看出这是地图，不用点开详情 */
 .asset-map-tag { border-color: var(--accent-text); color: var(--accent-text); }
+/* 画中画徽标（Issue #107）：一行小字，不抢名字/描述的位置 */
+.asset-pip-line { color: var(--accent-text); font-weight: 600; }
 /* 证据素材（Issue #47）：卡片徽标与弹窗开关 */
 .asset-faithful-tag {
   background: var(--warn-bg);

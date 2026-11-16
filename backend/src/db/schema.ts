@@ -576,6 +576,8 @@ export const props = sqliteTable('props', {
   // Map Studio (#99): host owns only the brief and the module task reference.
   mapBrief: text('map_brief'),
   mapStudioTaskId: integer('map_studio_task_id'),
+  // 画中画（Issue #107）：全览/细节地图资产之间的联系与用法 JSON（role overview|detail、parent_prop_id、parent_frame、usage）；唯一读写口 services/map-pip-assets.ts
+  mapPip: text('map_pip'),
   // 背景信息载体（Issue #47）：旁白提到但不出场、只作视觉承载的实体
   exposition: integer('exposition').notNull().default(0),
   createdAt: text('created_at').notNull(),

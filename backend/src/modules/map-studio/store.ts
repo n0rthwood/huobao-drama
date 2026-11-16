@@ -90,7 +90,9 @@ export class MapStudioHostTargetMissingError extends MapStudioRequestError {
 
 export function briefHash(brief: MapBrief | null): string | null {
   if (!brief) return null
-  return crypto.createHash('sha256').update(JSON.stringify(brief), 'utf8').digest('hex')
+  // 画幅是宿主按项目设置现读的派生参数，不属于「需求被改」：项目画幅变化由 run.ts 的画幅核对退回底图
+  const { aspect_ratio: _derived, ...own } = brief
+  return crypto.createHash('sha256').update(JSON.stringify(own), 'utf8').digest('hex')
 }
 
 const STATUSES = ['idle', 'running', 'awaiting_review', 'blocked', 'failed', 'completed'] as const

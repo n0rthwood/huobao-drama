@@ -27,6 +27,8 @@ import { resolveStageModel } from './ai-stages.js'
 import { aspectPhrase, sceneAspectIssue } from './aspect.js'
 import { resolveDramaAspect } from './asset-image-size.js'
 import { isFirstAgentFailureSafe } from './text-task-context.js'
+import { effectiveReferenceImages } from './reference-images.js'
+import { referenceInstruction } from './asset-reference-prompt.js'
 
 type CharacterRow = typeof schema.characters.$inferSelect
 type SceneRow = typeof schema.scenes.$inferSelect
@@ -215,7 +217,7 @@ export async function ensureCharacterFinalPrompt(char: CharacterRow, episodeId: 
       id: char.id,
       episodeId,
       dramaId: char.dramaId,
-      message: `为角色「${char.name}」(character_id=${char.id}) 生成三视图最终提示词，并调用 saveCharacterFinalPrompt 保存。`,
+      message: `为角色「${char.name}」(character_id=${char.id}) 生成三视图最终提示词，并调用 saveCharacterFinalPrompt 保存。${referenceInstruction('角色', effectiveReferenceImages(char.referenceImages).length)}`,
       before: char.finalPrompt,
       force,
       readTool: 'readCharacters',
@@ -256,7 +258,7 @@ export async function ensureSceneFinalPrompt(scene: SceneRow, episodeId: number,
       id: scene.id,
       episodeId,
       dramaId: scene.dramaId,
-      message: `为场景「${scene.location}」(scene_id=${scene.id}) 生成固定视角（前景/中景/后景）最终提示词，并调用 saveSceneFinalPrompt 保存。注意：这是无人物空镜——场景图中不能出现任何的人（含背影、剪影、倒影、照片里的人），即使场景描述提到人物活动也必须剔除，只保留场景本身。本项目画幅是 ${aspectPhrase(aspect)}：提示词必须逐字写出「${aspectPhrase(aspect)}」，并按该画幅组织建立镜头（主体完整入画，竖构图沿高度方向分层）。${time ? `场景时间是「${time}」：提示词必须原样写出「${time}」，光线按该时段描写。` : ''}`,
+      message: `为场景「${scene.location}」(scene_id=${scene.id}) 生成固定视角（前景/中景/后景）最终提示词，并调用 saveSceneFinalPrompt 保存。注意：这是无人物空镜——场景图中不能出现任何的人（含背影、剪影、倒影、照片里的人），即使场景描述提到人物活动也必须剔除，只保留场景本身。本项目画幅是 ${aspectPhrase(aspect)}：提示词必须逐字写出「${aspectPhrase(aspect)}」，并按该画幅组织建立镜头（主体完整入画，竖构图沿高度方向分层）。${time ? `场景时间是「${time}」：提示词必须原样写出「${time}」，光线按该时段描写。` : ''}${referenceInstruction('场景', effectiveReferenceImages(scene.referenceImages).length)}`,
       before: scene.finalPrompt,
       force,
       readTool: 'readScenes',
@@ -307,7 +309,7 @@ export async function ensurePropFinalPrompt(prop: PropRow, episodeId: number, fo
       id: prop.id,
       episodeId,
       dramaId: prop.dramaId,
-      message: `为道具「${prop.name}」(prop_id=${prop.id}) 生成白底单品最终提示词，并调用 savePropFinalPrompt 保存。`,
+      message: `为道具「${prop.name}」(prop_id=${prop.id}) 生成白底单品最终提示词，并调用 savePropFinalPrompt 保存。${referenceInstruction('道具', effectiveReferenceImages(prop.referenceImages).length)}`,
       before: prop.finalPrompt,
       force,
       readTool: 'readProps',

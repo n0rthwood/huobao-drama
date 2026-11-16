@@ -1817,6 +1817,7 @@
       "timeRequired": "シーンの時間は空にできません",
       "refSectionTitle": "参考画像",
       "refSectionHint": "生成のガイドで完成画像ではありません。追加・削除・ライブラリから選択できます",
+      "referenceMissing": "参考画像のうち {n} 枚のファイルが見つかりません（{files}）。今回の生成は残りの参考画像のみで実行します。無効な項目を削除してから再試行してください",
       "assetTypeLabel": "素材タイプ",
       "mapDescription": "地図の説明（範囲と目的）",
       "assetType": {
@@ -3663,7 +3664,7 @@
       "textConfig": "テキストモデル設定",
       "imageModel": "画像モデル",
       "defaultConfig": "既定を使用",
-      "textureHint": "画像モデルは質感と色味のみを生成し、地理形状の決定には一切関与しません。",
+      "textureHint": "新しいベースマップは質感テクスチャを生成しません。この画像モデルは画像タスクを生成しません（互換のため残しています）。",
       "briefTitle": "作図指示",
       "briefHint": "対象・年代・地域・用途が十分に具体的であってはじめて考証とベース図が成り立ちます",
       "saveBrief": "指示を保存",
@@ -3835,7 +3836,10 @@
       "uncertaintiesTitle": "不確かな点",
       "warningsTitle": "描画時の品質注意（{n} 件）",
       "calibrationEvidence": "Earth 実測基準点の証拠",
-      "calibrationCheck": "独立検証 {n} 点 · RMS {rms}px · 最大誤差 {max}px"
+      "calibrationCheck": "独立検証 {n} 点 · RMS {rms}px · 最大誤差 {max}px",
+      "styleSkipped": "質感（テクスチャ）段階はスキップされました。新しいベースマップは高程の陰影と階層化した水系でコントラストを得るため、紙の質感は重ねません。完成図はベースマップから直接描画します。",
+      "pipDetail": "詳細 {no}：{label}",
+      "pipComposite": "ピクチャー・イン・ピクチャーの合成図"
     },
     "preview": {
       "close": "大画像を閉じる",
@@ -3963,7 +3967,41 @@
       "projection": "投影法",
       "features": "点・線・面の形状",
       "featureCounts": "点 {places} / 線 {routes} / 面 {regions}",
-      "layers": "編集可能なレイヤー"
+      "layers": "編集可能なレイヤー",
+      "pipRollbackHint": "詳細の範囲はベース段階で決まります。変更するには「ベース」にロールバックして再実行してください。納品時に新しい範囲で詳細図が再描画されます。"
+    },
+    "pip": {
+      "title": "ピクチャー・イン・ピクチャー（全体図＋詳細）",
+      "hint": "全体図は位置と趨勢を示し、詳細図は事件の場所の山河を見せます。各詳細は独立したアセットなので、絵コンテは単独で参照できます。",
+      "layout": "レイアウト {id} · {family} · 注記：{tier}",
+      "aspect": "画角 {aspect}",
+      "family": {
+        "A": "全体図中心（導入ショット）",
+        "B": "詳細中心（叙述の滞留）"
+      },
+      "labelTier": {
+        "full": "通常",
+        "reduced": "簡略",
+        "focus_only": "重点のみ"
+      },
+      "role": {
+        "primary": "重点",
+        "aux": "補助"
+      },
+      "storyboards": "対応する絵コンテ {numbers}",
+      "noStoryboard": "対応する絵コンテは未指定",
+      "bbox": "範囲（西/南/東/北）：{bbox}",
+      "detailPending": "詳細図は納品時に描画されます。まだありません。",
+      "compositeTitle": "合成図",
+      "compositePending": "合成図は納品時に描画されます。まだありません。",
+      "usageTitle": "使い方",
+      "noFrames": "この地図には詳細枠がありません。全体図のみを納品します。",
+      "factSummary": "詳細 {n} 件 · レイアウト {id}（{family}、注記：{tier}）",
+      "detailsTitle": "詳細図",
+      "renderedDetails": "{n} 枚描画済み",
+      "overviewBadge": "ピクチャー・イン・ピクチャー · 詳細 {n} 件",
+      "detailBadge": "詳細 {no} · 「{name}」に属する",
+      "stale": "期限切れ"
     },
     "researchPanel": {
       "title": "要素の出典と検証",

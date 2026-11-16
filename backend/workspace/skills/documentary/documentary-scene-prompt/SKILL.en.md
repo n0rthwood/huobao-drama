@@ -41,3 +41,11 @@ Describe `lighting` with the **light sources actually available in that period**
 - Any person (including backs, silhouettes, reflections, figures in pictures) — the base specification's highest-priority rule stays in force;
 - Readable modern text, watermarks, signatures;
 - URLs, domains, source annotations.
+
+## 5. Citing Reference Images (mandatory when present)
+
+`readScenes` returns `reference_count` / `reference_images` — the reference images that will actually be sent with this generation, numbered from 1 in send order (files missing on disk are excluded and never listed).
+
+- `reference_count > 0`: cite every one of them in the final prompt as `@参考图1`, `@参考图2`, … and state what each contributes (period, region, building form and material, foreground/mid-ground/background layout, light); take only those elements and never copy a reference's composition, frame or background wholesale;
+- `reference_count = 0`: no reference marker may appear and no reference detail may be invented;
+- If any reference is left uncited, `saveSceneFinalPrompt` refuses to save and names the missing ones — fix the prompt and call it again.
