@@ -37,6 +37,9 @@ In this project the script body **is the narration draft**. Cut the body into se
   `save_storyboards` returns `script_coverage.gaps` and `must_fix` each time: **as long as gaps remain, keep adding shots**,
   inserting new `shot_number`s at sentence boundaries and cutting the missed sentences in verbatim. Finishing with gaps outstanding fails the entire task.
 - Each shot is **≤80 characters** (a hard per-segment limit of the speech synthesizer). If a source paragraph exceeds 80 characters, split it into two adjacent shots at a sentence boundary.
+- **One shot never spans paragraphs**: each blank-line-separated natural paragraph of the script is one **logical group**
+  (the original author used one paragraph to express one idea), so a paragraph boundary is necessarily a shot boundary.
+  A shot spanning paragraphs is rejected on save, and the response reports where the paragraph boundary is. Storyboard design plans the picture per group.
 - The tool validates this: each `narration_text` must be found verbatim in the script body, in the same order as the body; rewritten text is **rejected on save**.
 
 ## 1.2 Three rejection rules enforced by the server
@@ -86,6 +89,22 @@ estimated from the character count: **the budget must follow it**. The "4.5 spok
 
 ## 2.2 The design card `design_card` (required for every shot)
 
+### 2.2.0 Read this group's visual plan first
+
+The design cards are planned per **logical group** (one natural paragraph of the narration draft): the batch first makes one
+group-level visual plan for the whole group (which base image each shot uses, in which shot an image gets fully established,
+which later shots only give a brief hint, which shots go to the generated segment), then fills the cards shot by shot.
+The instruction gives you **this group's plan and this shot's entries**:
+
+- **Fill the combination and the base image from this shot's entries**; the new entries assigned to this shot must land on the picture
+  (`must_mark` + `planned_layers`); when no new entry is assigned to this shot, do not redraw the already established geography full-frame again.
+- A "picture-in-picture" in the plan entries is written as a `type:'image'` layer in `planned_layers`, with `anchor.asset_id` pointing at that image.
+- If you cannot do it (the asset lacks annotations, the budget does not fit), do not silently reroute: handle it per 2.2.7 and state the reason
+  for the deviation in `rationale`. A card that contradicts the plan is flagged `group_plan_deviation` (warning) for human review.
+- Rendering facts: the finished film is spliced by shot number with hard cuts; every shot's layer segment starts again from a clean, full-frame
+  base image, layers drawn in the previous shot do not carry over, and a layer appears no earlier than 0.2 s. When you open on a base image
+  that has already appeared, use a carry-over layer at `at_s=0.2` to restore the state drawn so far, and the first new entry's `at_s ≤ 1`.
+
 Before writing picture content, walk this chain and record the conclusions in `design_card`:
 
 ```
@@ -103,18 +122,21 @@ Each entry `{ id, text, via }`, at most 12:
 - `id`: a short identifier unique within this shot (`p1`, `p2`…), referenceable from `planned_layers` and `rationale`.
 - `text`: one sentence stating the piece of information ("Dzungar control reached Lake Balkhash").
 - `via ∈ layer | generated | narration_only`:
-  - `layer` — marked on the base image by the layer segment (extents, routes, places, name bars, years).
+  - `layer` — marked on the base image by the layer segment (extents, routes, places, name bars, years). Geography mentioned for the
+    **first time** must land on the picture, and must match the new entries this group's plan assigned to this shot.
   - `generated` — acted out by the generated segment (departures, marches, engagements, audiences: events with a process).
-  - `narration_only` — carried by the narration alone, with no picture duty; use sparingly, too many of these means the picture is idle.
+  - `narration_only` — carried by the narration alone, with no picture duty. Geography that earlier shots have already established and that this shot
+    only re-mentions is recorded as this, with `rationale` naming the shot that carries it; too many of these in one shot means the picture is idle.
 
 Every information point needs an owner. Entries without one are flagged `info_point_unassigned` (warning).
 
 ### 2.2.2 `layer_plan`: the layer segment plan
 
 - `base`: the base image of the layer segment. Either `{kind:'asset', asset_kind, asset_id, version_task_id}` pointing at a concrete version
-  of an existing asset, or `{kind:'inherit_prev'}` to continue the previous shot's base image (consecutive shots in the same narrative
-  passage **should share one piece of evidence**, changing only the layer state: S01 shows the three extents, S04 the river, S07 the route,
-  rather than a different map every shot).
+  of an existing asset, or `{kind:'inherit_prev'}` to continue the previous shot's last-frame picture (just an image, with no semantic annotations,
+  so layers cannot be anchored on it). **Consistent image use, restrained returns**: the geographic evidence of one narrative passage stays fixed on
+  one image (no different map every shot), but "sharing an asset" does not mean "returning to that image every shot" — when to open on it is decided by
+  this group's visual plan (2.2.0).
 - `must_mark[]`: the annotated elements this shot must mark on the base image, each `{ asset_id, semantic_id, name }`,
   **copied verbatim** from the `semantics` list returned by `read_storyboard_context` (`asset_id` + `id` + `name` must all match).
   Inventing a name gets it flagged `unresolved`, shown in red on the design card page — the same as not writing it.
@@ -125,7 +147,10 @@ Every information point needs an owner. Entries without one are flagged `info_po
 - `planned_layers[]`: which layers to draw and in which order they appear. Each entry
   `{ type, text?, anchor?: {asset_id, semantic_id, name}, role?, fields?, at_s }`:
   - `type ∈ polygon | polyline | marker | label | text | image`
-    (extent highlight / river·route·arrow / place / place name pinned to a semantic entry / screen text template box / inset image).
+    (extent highlight / river·route·arrow / place / place name pinned to a semantic entry / screen text template box / picture-in-picture inset).
+  - **Picture-in-picture**: `{ type:'image', anchor:{ asset_id } }` puts another asset that has an image (detail map, overview map, archival picture,
+    object plate) into a corner of this shot's base image, for a brief hint on a re-mention, or for an "overview + detail" contrast on a first
+    mention; it cannot be the same image as the base.
   - **Screen typography always uses a `text` template box**: `{ type:'text', role, fields }`, with `role` and the `fields` keys copied verbatim
     from `text_spec.roles` returned by `read_storyboard_context`, and length limits taken from the same `text_spec.capacity`. The detailed rules
     (role boundaries, layouts, same-beat and rhythm rules, failure handling) live in the `layer-text-design` skill. `card` is no longer used;
@@ -160,11 +185,15 @@ Every information point needs an owner. Entries without one are flagged `info_po
 
 - Write `combo ∈ A | B | C | D`; optionally also write `suggested_combo`. Existing choices are preserved for human review or modification.
   Explain the choice in one sentence in `rationale`.
-- Criteria for the four combinations:
-  - **A** "annotation and pans over a map / original document: telling where · who · which year"
-  - **B** "AI-generated shot: telling what happened"
-  - **C** "locate first, then enter the scene"
-  - **D** "enter the scene first, then land on the map / archive"
+- Criteria for the four combinations (read this shot's entries in this group's visual plan first, then review by content):
+  - **A** layer segment only: telling where · who · which year on the map / original document — locating, inventory, genealogy, closing frames.
+  - **B** generated segment only: telling what happened — the first choice when this shot has no new entry that must land on the picture and measures ≤15 s.
+  - **C** locate first, then enter the scene: use it **only when** this shot has new entries that must land on the picture. "This happened somewhere"
+    is not a reason to pick C.
+  - **D** enter the scene first, then land on the map / archive: the result must be pinned back onto the picture (capture, victory, casualties, years),
+    or the next shot opens on the same image, so this shot stops on the image and the cut becomes "image → image" instead of "live action → image".
+  - Layer segment = visual aid and memory anchor (fully established on a first mention, only a hint on a re-mention); generated segment = imagined
+    scenes, atmosphere, immersion.
 - A has only the layer segment ▣; B only the generated segment ▶; C = layer ▣ → generated ▶; D = generated ▶ → layer ▣.
   The first frame of C's generated segment and the last frame of D's are **junction frames ◆**, inherited and locked from the adjacent layer frame.
 
@@ -181,9 +210,11 @@ Every information point needs an owner. Entries without one are flagged `info_po
 
 ### 2.2.6 `rationale`
 
-≤600 characters covering: why the information points are split this way, why you suggest this combination, what it carries over from the
-previous shot ("continuing the flotilla already shown, this shot only marks the destination"), and any missing asset / missing annotation /
-budget conflict.
+≤600 characters covering: why the information points are split this way, which entry of this group's plan the combination and the base image
+correspond to (when deviating, the reason and the substitute), what this shot's opening picture and the previous shot's closing picture each are,
+and why this cut point works; when opening on a base image that has already appeared, state what the carry-over layer restores, which entry it adds,
+and at which second it appears. "Same image as the previous shot, no spatial jump" is **not** a reason. Also state any missing asset / missing
+annotation / budget conflict.
 
 ### 2.2.7 Asset grounding and feasibility (hard constraints for AI card filling)
 
