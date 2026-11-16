@@ -680,7 +680,7 @@ export type DesignGroupAssetRole = 'establish' | 'hint' | 'background'
 export type DesignGroupShotMode = 'new_items' | 'carry_only' | 'no_layer'
 
 export interface DesignGroupAssetRef {
-  kind: AssetKindName
+  asset_kind: AssetKindName
   asset_id: number
 }
 

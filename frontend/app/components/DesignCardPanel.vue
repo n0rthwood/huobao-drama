@@ -182,8 +182,8 @@
                     <button type="button" class="dc-shot-link mono" @click="selectPlanShot(entry.storyboard_id)">{{ shotRef(entry.storyboard_id) }}</button>
                   </td>
                   <td class="mono" :title="comboTitle(entry.combo)">{{ comboGlyph(entry.combo) }}</td>
-                  <td>{{ entry.base ? assetLabel(entry.base.kind, entry.base.asset_id) : t('episode.design.noneShot') }}</td>
-                  <td>{{ entry.pip.length ? entry.pip.map(pip => assetLabel(pip.kind, pip.asset_id)).join(t('common.listJoin')) : t('episode.design.noneShot') }}</td>
+                  <td>{{ entry.base ? assetLabel(entry.base.asset_kind, entry.base.asset_id) : t('episode.design.noneShot') }}</td>
+                  <td>{{ entry.pip.length ? entry.pip.map(pip => assetLabel(pip.asset_kind, pip.asset_id)).join(t('common.listJoin')) : t('episode.design.noneShot') }}</td>
                   <td>{{ t(`episode.design.group.mode.${entry.mode}`) }}</td>
                   <td class="dc-group-task">{{ entry.task }}</td>
                 </tr>
