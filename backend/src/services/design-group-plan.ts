@@ -269,11 +269,9 @@ export function validateGroupPlan(plan: GroupPlan, input: GroupPlanInput): strin
     if (!members.has(item.storyboard_id)) errors.push(`新增条目「${item.text}」指派给了不属于本组的分镜 ${item.storyboard_id}`)
     else if (planned && !hasLayer(planned.combo)) errors.push(`新增条目「${item.text}」指派给了 ${label(item.storyboard_id)}，但该镜是组合 B（没有图层段，落不了图）`)
   }
+  // asset_roles 是给人和逐镜填卡看的说明：建立镜可以在前面的组（如「#59 已建立」），镜号不作硬校验
   for (const role of plan.asset_roles) {
     if (!assets.has(refKey(role))) errors.push(`asset_roles 里的 ${refKey(role)} 不是本集资产`)
-    for (const id of [role.establish_storyboard_id, role.exit_after_storyboard_id]) {
-      if (id !== null && !members.has(id)) errors.push(`asset_roles（${role.name || refKey(role)}）引用的分镜 ${id} 不属于本组`)
-    }
   }
 
   // 回切判定：history（本组之前）+ 本组规划，按镜号顺序
