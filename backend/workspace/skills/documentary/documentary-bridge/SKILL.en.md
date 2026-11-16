@@ -19,11 +19,7 @@ which is preserved byte for byte; you return the JSON of section 4 only, never b
   Operational facts such as "samples were taken", "measurements were made", "then he ordered" are new facts, not relations.
 - **At most one sentence per boundary.** A sentence-final mark (。 ！ ？ ! ? or an English full stop .) may appear only at the very end; a second sentence fails the stage. A decimal point is not sentence-final; avoid ambiguous abbreviations.
   A semicolon does not count as sentence-final, but do not use one to staple two statements together.
-- A bridge is **not exempt** from the 80-character sentence limit: **a bridge longer than 80 characters fails the stage**.
-  A natural paragraph is **not length-limited** (one paragraph is one logical group), so a bridge can **always** join an adjacent paragraph — just choose the right side.
-  A bridge that carries its own sentence-final mark is a sentence of its own, so joining it leaves the host paragraph's sentences untouched.
-  If the bridge has no sentence-final mark it continues the host's edge sentence; if that combined sentence would exceed 80 characters the stage fails — shorten the bridge, or move it to the other side.
-  **Never** downgrade a real gap to `no_bridge` out of fear that the host paragraph grows.
+- A bridge is **not exempt** from the 80-character sentence limit: **a bridge longer than 80 characters fails the stage**; a bridge without a sentence-final mark continues the host's edge sentence, and if that combined sentence exceeds 80 characters it fails as well.
 - A bridge can only land in one of the two adjacent paragraphs: the **end of the left paragraph** (summarising, closing → belongs to the left group) or the **start of the right paragraph** (introducing the next point → belongs to the right group).
   A bridge **never forms its own paragraph**: that would invent an extra logical group, and reporting `standalone` is a contract violation that is sent back for correction.
 - Keep it within **25 spoken characters** where possible (spoken characters = characters left after removing whitespace and punctuation). Exceeding 25 only raises a warning; it never fails the stage.
@@ -36,10 +32,13 @@ which is preserved byte for byte; you return the JSON of section 4 only, never b
 **Bridge** when a relation is **supported by the adjacent content itself, left unsaid, and its absence hurts comprehension** —
 typically "phenomenon → why we now look at it differently" or "method → which question its result answers".
 
-**Do not bridge** (default) when:
+**Do not bridge** (default — the vast majority of boundaries belong here) when:
+- the two paragraphs are two logical groups the author already separated, and **most boundaries are a natural topic progression** that viewers follow without a cue;
 - the move is only chronological or a section/heading change;
 - the paragraphs form a clear parallel or enumeration;
 - the relation is already stated by the existing wording — **do not restate it with another template**.
+
+Every extra bridge adds seconds of narration with no new information. Bridging every boundary ("back to Yermak", "so who exactly were…?") is failed polishing, not diligence.
 
 **Needed but unsafe**: when a real gap exists but cannot be expressed reliably with zero new facts,
 report `needed_but_unsafe` honestly. Never downgrade it to `no_bridge` to look complete, and never invent a relation to fill it.
