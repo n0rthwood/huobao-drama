@@ -1,9 +1,10 @@
 /**
- * 桥句阶段的结构契约（Issue #70 §4 / 验收 13–15）：
+ * 桥句阶段的结构契约（Issue #70 §4 / 验收 13–15，Issue #109 收窄位置取值）：
  * - N 个正文段落必须得到 N−1 条边界决策，缺失、错位、重复一律不产生有效版本；
  * - `needed_but_unsafe` 与 `no_bridge` 必须可区分（弃答不能伪装成「不需要」）；
  * - 每个边界最多一句是硬限制；桥句不得带回来源/许可/链接；
- * - 产出全文 = 前驱逐字节 + 已申报桥句，正文不被改写、删除或重排。
+ * - 桥句只能并入左段段尾或右段段首：`standalone`（独立成段）是契约违例，回喂模型而不是自动改；
+ * - 产出全文 = 前驱逐字节 + 已申报桥句，正文不被改写、删除或重排，段落数不变。
  * 纯函数，用仓库自带 tsx 子进程跑并以 JSON 回传。
  */
 import { execFileSync } from 'node:child_process'
@@ -131,10 +132,31 @@ test('needed_but_unsafe 被保留为独立结论，且不插入任何文字', ()
   assert.equal(result.same, true, '弃答不得改动正文')
 })
 
-test('并入会超过 80 字时改为独立段落，并在报告里说明', () => {
-  const long = `${'甲'.repeat(78)}。`
+test('standalone 是契约违例：回喂模型修正，绝不自动改位置或另起一段', () => {
   const result = run(`
-    const text = ${JSON.stringify(`${'甲'.repeat(78)}。\n\n第二段的内容在这里。`)}
+    ${DECISIONS()}
+    const { paragraphs, boundaries } = prep(${JSON.stringify(SCRIPT)})
+    const attempt = (patch) => {
+      const list = JSON.parse(JSON.stringify(decisions))
+      Object.assign(list[1], patch)
+      try { validateBridgeDecisions(paragraphs, boundaries, { boundaries: list }); return null }
+      catch (err) { return { contract: err instanceof BridgeContractError, message: err.message } }
+    }
+    out({ standalone: attempt({ placement: 'standalone', shot_attribution: 'previous_tail' }), badAttr: attempt({ placement: 'start_of_right', shot_attribution: 'standalone' }), noPlacement: attempt({ placement: null }) })
+  `)
+  for (const key of ['standalone', 'badAttr', 'noPlacement']) {
+    assert.ok(result[key], `${key} 应当失败`)
+    assert.equal(result[key].contract, true, `${key} 应当是契约错误：${result[key].message}`)
+  }
+  assert.match(result.standalone.message, /placement 非法：standalone/)
+  assert.match(result.badAttr.message, /shot_attribution 非法：standalone/)
+})
+
+test('桥句并入很长的宿主段落：段落数不变，只在段尾多一句', () => {
+  // 6 句 × 20 字 = 120 字的自然段：自然段不限长度，桥句照样可以并进去，绝不因此另起一段
+  const host = ['甲', '乙', '丙', '丁', '戊', '己'].map(ch => `${ch.repeat(19)}。`).join('')
+  const result = run(`
+    const text = ${JSON.stringify(`${host}\n\n第二段的内容在这里。`)}
     const { paragraphs, boundaries } = prep(text)
     const decisions = [{
       boundary_id: 'B01', left_paragraph: 'P01', right_paragraph: 'P02', relation: '总结',
@@ -144,10 +166,33 @@ test('并入会超过 80 字时改为独立段落，并在报告里说明', () =
     const report = validateBridgeDecisions(paragraphs, boundaries, { boundaries: decisions })
     out({ report, composed: composeBridged(text, paragraphs, report.decisions) })
   `)
-  assert.equal(result.report.decisions[0].placement, 'standalone')
-  assert.equal(result.report.decisions[0].placement_adjusted, true)
-  assert.ok(result.report.warnings.some(w => w.includes('独立段落')), '报告要说明调整原因')
-  assert.ok(result.composed.includes(`${long}\n\n这一点随后被证实。`), `实际：${result.composed}`)
+  assert.equal(result.report.decisions[0].placement, 'end_of_left')
+  assert.equal(result.report.decisions[0].placement_adjusted, undefined, '不再有自动调整位置')
+  assert.equal(result.report.warnings.length, 0, `不应有警告，实际：${JSON.stringify(result.report.warnings)}`)
+  assert.equal(result.composed.split('\n\n').length, 2, '段落数必须不变（逻辑组不变）')
+  assert.ok(result.composed.includes(`${host}这一点随后被证实。\n\n第二段的内容在这里。`), `实际：${result.composed}`)
+})
+
+test('桥句不带句末标点时会并进宿主那一句：合成后超过 80 字判失败', () => {
+  const host = `${'甲'.repeat(39)}。${'乙'.repeat(76)}。` // 第二句 77 字，是段尾那一句
+  const result = run(`
+    const text = ${JSON.stringify(`${host}\n\n第二段的内容在这里。`)}
+    const { paragraphs, boundaries } = prep(text)
+    const attempt = (bridgeText) => {
+      const decisions = [{
+        boundary_id: 'B01', left_paragraph: 'P01', right_paragraph: 'P02', relation: '总结',
+        decision: 'inserted', reason: '左段收束需要一句承接', bridge_text: bridgeText,
+        placement: 'end_of_left', shot_attribution: 'previous_tail',
+      }]
+      try { return { ok: true, report: validateBridgeDecisions(paragraphs, boundaries, { boundaries: decisions }) } }
+      catch (err) { return { ok: false, contract: err instanceof BridgeContractError, message: err.message } }
+    }
+    out({ merged: attempt('这一点随后被证实'), ownSentence: attempt('这一点随后被证实。') })
+  `)
+  assert.equal(result.merged.ok, false, '宿主段尾那一句 77 字，接上 8 字桥句后 85 字，必须判失败')
+  assert.equal(result.merged.contract, true)
+  assert.match(result.merged.message, /超过单句 80 字上限/)
+  assert.equal(result.ownSentence.ok, true, '桥句自带句末标点时是独立一句，宿主句子不受影响')
 })
 
 // 内容语言可以是 en/ja/ko：桥句里的空格是词边界，删掉就把整句粘成一个词。

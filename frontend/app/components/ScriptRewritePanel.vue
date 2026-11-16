@@ -143,11 +143,28 @@
                     percent: deltaPercent,
                   }) }}
                 </span>
+                <span v-if="typeof fidelityReport.paragraphs_source === 'number'" class="tag mono">
+                  {{ t('episode.rewrite.fidelity.paragraphs', {
+                    output: fidelityReport.paragraphs ?? 0,
+                    source: fidelityReport.paragraphs_source,
+                  }) }}
+                </span>
               </header>
               <p v-if="fidelityReport.within_tolerance === false" class="rw-error">{{ t('episode.rewrite.fidelity.outOfTolerance') }}</p>
-              <ul v-if="overLimitParagraphs.length" class="rw-list">
+              <ul v-if="overLimitSentences.length" class="rw-list">
+                <li v-for="item in overLimitSentences" :key="`${item.paragraph}-${item.sentence}`">
+                  {{ t('episode.rewrite.fidelity.overLimitSentence', {
+                    paragraph: item.paragraph,
+                    sentence: item.sentence,
+                    chars: item.chars,
+                    excerpt: item.excerpt || '—',
+                  }) }}
+                </li>
+              </ul>
+              <!-- 存量报告（#109 之前）只有「每段 80 字」口径的超限段清单：照原样显示，不丢历史信息 -->
+              <ul v-else-if="overLimitParagraphs.length" class="rw-list">
                 <li v-for="item in overLimitParagraphs" :key="item.index">
-                  {{ t('episode.rewrite.fidelity.overLimit', { index: item.index, chars: item.chars }) }}
+                  {{ t('episode.rewrite.fidelity.overLimitParagraph', { index: item.index, chars: item.chars }) }}
                 </li>
               </ul>
               <ul v-if="fidelityWarnings.length" class="rw-list">
@@ -367,9 +384,14 @@ const isSkipVersion = computed(() => previewVersion.value?.source === 'skip_copy
 const fidelityReport = computed(() => (selectedStage.value === 'fidelity' && !isSkipVersion.value
   ? previewVersion.value?.report || null
   : null))
-const overLimitParagraphs = computed(() => (Array.isArray(fidelityReport.value?.over_limit_paragraphs)
-  ? fidelityReport.value.over_limit_paragraphs
+/** 句子级超限（#109）：自然段不限长度，硬上限落在每句 80 字 */
+const overLimitSentences = computed(() => (Array.isArray(fidelityReport.value?.over_limit_sentences)
+  ? fidelityReport.value.over_limit_sentences
   : []))
+/** 存量报告（#109 之前）只有段落级超限清单：新报告没有这个字段时才回退显示 */
+const overLimitParagraphs = computed(() => (overLimitSentences.value.length || !Array.isArray(fidelityReport.value?.over_limit_paragraphs)
+  ? []
+  : fidelityReport.value.over_limit_paragraphs))
 const fidelityWarnings = computed(() => (Array.isArray(fidelityReport.value?.warnings) ? fidelityReport.value.warnings : []))
 const deltaPercent = computed(() => {
   const ratio = Number(fidelityReport.value?.delta_ratio)

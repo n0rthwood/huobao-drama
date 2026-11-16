@@ -19,9 +19,13 @@ which is preserved byte for byte; you return the JSON of section 4 only, never b
   Operational facts such as "samples were taken", "measurements were made", "then he ordered" are new facts, not relations.
 - **At most one sentence per boundary.** A sentence-final mark (。 ！ ？ ! ? or an English full stop .) may appear only at the very end; a second sentence fails the stage. A decimal point is not sentence-final; avoid ambiguous abbreviations.
   A semicolon does not count as sentence-final, but do not use one to staple two statements together.
-- A bridge is **not exempt** from the 80-character paragraph limit: **a bridge longer than 80 characters fails the stage**.
-  If merging it into the host paragraph would exceed 80 characters, the server **automatically** turns the placement into a stand-alone paragraph and records `placement_adjusted` plus a warning.
-  That is not a failure — **never** downgrade a real gap to `no_bridge`, and never switch to `standalone` yourself, out of fear that the host paragraph grows.
+- A bridge is **not exempt** from the 80-character sentence limit: **a bridge longer than 80 characters fails the stage**.
+  A natural paragraph is **not length-limited** (one paragraph is one logical group), so a bridge can **always** join an adjacent paragraph — just choose the right side.
+  A bridge that carries its own sentence-final mark is a sentence of its own, so joining it leaves the host paragraph's sentences untouched.
+  If the bridge has no sentence-final mark it continues the host's edge sentence; if that combined sentence would exceed 80 characters the stage fails — shorten the bridge, or move it to the other side.
+  **Never** downgrade a real gap to `no_bridge` out of fear that the host paragraph grows.
+- A bridge can only land in one of the two adjacent paragraphs: the **end of the left paragraph** (summarising, closing → belongs to the left group) or the **start of the right paragraph** (introducing the next point → belongs to the right group).
+  A bridge **never forms its own paragraph**: that would invent an extra logical group, and reporting `standalone` is a contract violation that is sent back for correction.
 - Keep it within **25 spoken characters** where possible (spoken characters = characters left after removing whitespace and punctuation). Exceeding 25 only raises a warning; it never fails the stage.
 - Sources, licences, permalinks, contributors and usage notes must **never** appear in a bridge, even though they may appear in the raw material you can see
   (such content was stripped from the body automatically before stage 1, but remains in the raw material). The raw material is for fact-checking only; it is not material you may copy back,
@@ -44,8 +48,7 @@ report `needed_but_unsafe` honestly. Never downgrade it to `no_bridge` to look c
 
 - Introduces the next point → `next_head` (head of the next shot; the bridge goes at the start of the right paragraph);
 - Summarises, limits or closes → `previous_tail` (tail of the previous shot; the bridge goes at the end of the left paragraph);
-- `standalone` is yours to choose only when neither side fits (an exceptional stand-alone bridge);
-  a stand-alone caused by length overflow is handled by the server automatically and needs no anticipation from you.
+- These are the only two: whichever paragraph the bridge joins, it belongs to that paragraph's logical group. There is no stand-alone bridge.
 
 Attribution is advice for the later narration skeleton; it does not edit the storyboard.
 
@@ -71,8 +74,8 @@ Attribution is advice for the later narration skeleton; it does not edit the sto
 
 - `boundaries` must cover **B01…Bn−1 in the given order, none missing, none extra**, with the exact `left_paragraph` / `right_paragraph` IDs supplied to you.
 - `decision` is one of `no_bridge | inserted | needed_but_unsafe`.
-- `placement` is one of `end_of_left | start_of_right | standalone`, matching `previous_tail` / `next_head` / `standalone` in section 3.
-- `shot_attribution` is one of `previous_tail | next_head | standalone`.
+- `placement` is one of `end_of_left | start_of_right`, matching `previous_tail` / `next_head` in section 3; it is required for `inserted`, and there is no third value.
+- `shot_attribution` is one of `previous_tail | next_head`.
 - `relation` and `reason` are required on every entry; `reason` must be a **checkable editorial justification** (what each side says, what relation is missing), not a replay of your thinking.
 - When nothing is inserted, `bridge_text` and `placement` are `null`; `shot_attribution` is `null` for `no_bridge`,
   while `needed_but_unsafe` may keep an attribution suggestion for the later human pass.

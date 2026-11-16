@@ -1237,8 +1237,10 @@
       "fidelity": {
         "title": "忠実性チェック",
         "delta": "{baseline} → {output} 文字 · {percent}%",
+        "paragraphs": "段落 {output} 段 · 原文 {source} 段",
         "outOfTolerance": "本文の長さが ±5% の許容を超えています。手動で確認してください。",
-        "overLimit": "第 {index} 段落は {chars} 文字で、段落上限を超えています"
+        "overLimitSentence": "第 {paragraph} 段落の第 {sentence} 文は {chars} 文字で、一文上限を超えています：{excerpt}",
+        "overLimitParagraph": "第 {index} 段落は {chars} 文字で、段落上限を超えています（旧形式のレポート）"
       },
       "filter": {
         "title": "入力準備：自動的に除いたナレーション外の内容",

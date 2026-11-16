@@ -16,6 +16,9 @@ import { getContentLanguage } from '../app-settings.js'
 import { callTextChat } from '../vision-chat.js'
 import { logTaskProgress } from '../../utils/task-logger.js'
 import type { AiStage, StageModel } from '../ai-stages.js'
+import { narrationCharCount } from '../narration.js'
+import { scriptParagraphs } from '../narration-first.js'
+import { splitSentences } from '../subtitle.js'
 import { guardStageOutput, type RemovedSpan } from './source-filter.js'
 import {
   BridgeContractError,
@@ -23,7 +26,7 @@ import {
   paragraphsAndBoundaries,
   parseBlocks,
   validateBridgeDecisions,
-  PARAGRAPH_CHAR_LIMIT,
+  SENTENCE_CHAR_LIMIT,
   type BridgeReport,
 } from './bridge.js'
 
@@ -67,12 +70,26 @@ export interface FidelityReport {
   output_chars: number
   delta_ratio: number
   within_tolerance: boolean
+  /** 产出稿的自然段数（= 逻辑组数，#109） */
   paragraphs: number
-  over_limit_paragraphs: Array<{ index: number; chars: number }>
+  /** 输入稿（自动过滤后的正文）的自然段数：产出分段被拆碎/合并时与上面对不上 */
+  paragraphs_source: number
+  /** 超过单句上限的句子（自然段不限长度，句子才是 80 字硬上限） */
+  over_limit_sentences: OverLimitSentence[]
   warnings: string[]
   post_filter: { removed: RemovedSpan[] }
   ai_exclusions: AiExcludedSpan[]
   adjusted_baseline_chars: number
+}
+
+export interface OverLimitSentence {
+  /** 1 起的自然段号 */
+  paragraph: number
+  /** 段内 1 起的句号 */
+  sentence: number
+  chars: number
+  /** 句首摘录（≤20 字），方便在长篇里定位 */
+  excerpt: string
 }
 
 export interface AiExcludedSpan {
@@ -116,12 +133,14 @@ const FIDELITY_OUTPUT_CONTRACT = [
   '  **不要把这类内容写回正文**，也不要补写输入里没有的事实。',
   '- 旁白稿必须剔除出处块、版权许可、URL/永久链接、贡献者或编辑历史、书目和引用尾注（含 ISBN、出版社）、模板或编辑说明以及不作为朗读稿的声明。',
   '- 正文中的可朗读归属表述（如「据《异域录》记载」）必须保留。',
+  '- 分段保持原作者的自然段（一个自然段 = 一个意思，下游分镜按段做画面规划），不要把长段拆成碎片。',
+  '- 自然段长度不限；但**每一句**必须不超过 ' + SENTENCE_CHAR_LIMIT + ' 字（每镜配音的单段上限）：超长句只在逗号层级改标点断句，不增删内容。',
 ].join('\n')
 
 const fidelity: RewriteStageSpec = {
   key: 'fidelity',
   label: '忠实改写',
-  revision: 'fidelity.v2',
+  revision: 'fidelity.v3',
   aiStage: 'script_rewriter',
   async run(ctx) {
     const lang = await getContentLanguage()
@@ -149,7 +168,7 @@ const fidelity: RewriteStageSpec = {
   },
 }
 
-/** 忠实改写的硬契约违例（±5% 与每段 80 字）：阶段判失败，绝不产生正式版本 */
+/** 忠实改写的硬契约违例（±5% 与每句 80 字）：阶段判失败，绝不产生正式版本 */
 export class FidelityContractError extends Error {
   constructor(message: string, public readonly report: FidelityReport) {
     super(message)
@@ -160,7 +179,11 @@ export class FidelityContractError extends Error {
 /**
  * 保真计量：基线是**自动过滤后的正文**，两侧都去掉 `【节拍】` 标记与空白后再比，
  * 节拍标记只是分段锚点，不是朗读内容，算进去会让短稿出现假超标。
- * 超出 ±5% 或任一段超过 80 字 → 抛 `FidelityContractError`。
+ * 超出 ±5% 或任一句超过 80 字 → 抛 `FidelityContractError`。
+ *
+ * 口径（#109）：自然段不限长度——一个自然段就是一个逻辑组，拆碎会让相邻镜头来回改画面；
+ * 硬上限落在**句子**上，切点与旁白骨架一致（`splitSentences`：`。！？；!?;` 及段尾），
+ * 字数用骨架同一把尺（`narrationCharCount`），所以通过这里的句子一定能成为一镜。
  */
 export function evaluateFidelity(preparedText: string, content: string, removed: RemovedSpan[] = [], exclusions: AiExcludedSpan[] = []): FidelityReport {
   const narrationChars = (text: string) => text.replace(BEAT_MARKER, '').replace(/[\s\u3000]/g, '').length
@@ -169,11 +192,21 @@ export function evaluateFidelity(preparedText: string, content: string, removed:
   const adjustedBaseline = baseline - excluded
   const outputChars = narrationChars(content)
   const deltaRatio = baseline ? (outputChars - baseline) / baseline : 0
-  const blocks = parseBlocks(content)
-  const { paragraphs } = paragraphsAndBoundaries(content, blocks)
-  const overLimit = paragraphs
-    .map((p, index) => ({ index: index + 1, chars: narrationChars(p.text) }))
-    .filter(p => p.chars > PARAGRAPH_CHAR_LIMIT)
+  const paragraphs = scriptParagraphs(content)
+  const paragraphsSource = scriptParagraphs(preparedText).length
+  const overLimit: OverLimitSentence[] = []
+  paragraphs.forEach((paragraph, paragraphIndex) => {
+    splitSentences(paragraph).forEach((sentence, sentenceIndex) => {
+      const chars = narrationCharCount(sentence)
+      if (chars <= SENTENCE_CHAR_LIMIT) return
+      overLimit.push({
+        paragraph: paragraphIndex + 1,
+        sentence: sentenceIndex + 1,
+        chars,
+        excerpt: sentence.replace(/[\s\u3000]/g, '').slice(0, 20),
+      })
+    })
+  })
   const withinTolerance = outputChars <= baseline * (1 + FIDELITY_TOLERANCE) && outputChars >= adjustedBaseline * (1 - FIDELITY_TOLERANCE)
   const warnings: string[] = []
   if (removed.length) warnings.push(`产出里带回了 ${removed.length} 处非旁白内容，已自动剥离（见过滤明细）`)
@@ -184,7 +217,8 @@ export function evaluateFidelity(preparedText: string, content: string, removed:
     delta_ratio: Number(deltaRatio.toFixed(4)),
     within_tolerance: withinTolerance,
     paragraphs: paragraphs.length,
-    over_limit_paragraphs: overLimit,
+    paragraphs_source: paragraphsSource,
+    over_limit_sentences: overLimit,
     warnings,
     ai_exclusions: exclusions,
     adjusted_baseline_chars: adjustedBaseline,
@@ -194,7 +228,9 @@ export function evaluateFidelity(preparedText: string, content: string, removed:
   if (!withinTolerance) {
     violations.push(`内容量相对过滤后正文变化 ${(deltaRatio * 100).toFixed(1)}%（${baseline} → ${outputChars} 字），超过 ±${FIDELITY_TOLERANCE * 100}%；缩短部分未由可定位的非旁白剔除清单充分解释`)
   }
-  for (const p of overLimit) violations.push(`第 ${p.index} 段 ${p.chars} 字，超过每段 ${PARAGRAPH_CHAR_LIMIT} 字上限`)
+  for (const sentence of overLimit) {
+    violations.push(`第 ${sentence.paragraph} 段第 ${sentence.sentence} 句 ${sentence.chars} 字，超过单句 ${SENTENCE_CHAR_LIMIT} 字上限`)
+  }
   if (violations.length) throw new FidelityContractError(`忠实改写不符合保真契约：${violations.join('；')}`, report)
   return report
 }
@@ -217,7 +253,7 @@ function bridgeUserPrompt(ctx: StageRunContext, paragraphs: Array<{ id: string; 
 const bridge: RewriteStageSpec = {
   key: 'bridge',
   label: '桥句润色',
-  revision: 'bridge.v1',
+  revision: 'bridge.v2',
   aiStage: 'script_bridge',
   async run(ctx) {
     const blocks = parseBlocks(ctx.predecessorText)

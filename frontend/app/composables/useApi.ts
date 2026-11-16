@@ -1855,13 +1855,18 @@ export interface RewritePreparedReport {
   prepared_chars?: number
 }
 
-/** 忠实改写报告：±5% 基线按「过滤后正文」计，正文超限段单列 */
+/** 忠实改写报告：±5% 基线按「过滤后正文」计；自然段不限长度，超限的句子单列（#109） */
 export interface RewriteFidelityReport {
   baseline_chars?: number
   output_chars?: number
   delta_ratio?: number
   within_tolerance?: boolean
+  /** 产出稿的自然段数（= 逻辑组数） */
   paragraphs?: number
+  /** 输入稿的自然段数；与 paragraphs 不一致说明分段被拆碎或合并了 */
+  paragraphs_source?: number
+  over_limit_sentences?: Array<{ paragraph: number; sentence: number; chars: number; excerpt: string }>
+  /** 存量报告（#109 之前）的段落级超限清单，只用于回显历史 */
   over_limit_paragraphs?: Array<{ index: number; chars: number }>
   warnings?: string[]
   post_filter?: { removed: RewriteRemovedSpan[] }
@@ -1869,8 +1874,9 @@ export interface RewriteFidelityReport {
 
 /** 桥句决策：no_bridge / inserted / needed_but_unsafe 三分，弃答绝不记成「无需补写」 */
 export type BridgeDecision = 'no_bridge' | 'inserted' | 'needed_but_unsafe'
-export type BridgePlacement = 'end_of_left' | 'start_of_right' | 'standalone'
-export type BridgeAttribution = 'previous_tail' | 'next_head' | 'standalone'
+/** 桥句只能并入左段段尾或右段段首（#109）；`standalone` 只出现在存量报告里 */
+export type BridgePlacement = 'end_of_left' | 'start_of_right'
+export type BridgeAttribution = 'previous_tail' | 'next_head'
 export interface RewriteBridgeBoundary {
   boundary_id: string | number
   left_paragraph?: string
@@ -1879,9 +1885,11 @@ export interface RewriteBridgeBoundary {
   decision: BridgeDecision
   reason?: string
   bridge_text: string | null
-  placement: BridgePlacement | null
-  shot_attribution: BridgeAttribution | null
+  /** standalone 只可能是 #109 之前的存量报告：不产生新的，但必须照原样显示 */
+  placement: BridgePlacement | 'standalone' | null
+  shot_attribution: BridgeAttribution | 'standalone' | null
   spoken_chars: number | null
+  /** 存量报告（#109 之前）：桥句并入会超限时曾被自动改成独立段 */
   placement_adjusted?: boolean
 }
 export interface RewriteBridgeReport {

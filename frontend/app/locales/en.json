@@ -1237,8 +1237,10 @@
       "fidelity": {
         "title": "Fidelity check",
         "delta": "{baseline} → {output} chars · {percent}%",
+        "paragraphs": "{output} paragraphs · {source} in the source",
         "outOfTolerance": "Length is outside the ±5% tolerance; review manually.",
-        "overLimit": "Paragraph {index} has {chars} chars, over the per-paragraph limit"
+        "overLimitSentence": "Paragraph {paragraph}, sentence {sentence}: {chars} chars, over the per-sentence limit — {excerpt}",
+        "overLimitParagraph": "Paragraph {index} has {chars} chars, over the per-paragraph limit (legacy report)"
       },
       "filter": {
         "title": "Input preparation: non-narration content removed",

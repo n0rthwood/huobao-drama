@@ -1237,8 +1237,10 @@
       "fidelity": {
         "title": "충실도 점검",
         "delta": "{baseline} → {output}자 · {percent}%",
+        "paragraphs": "문단 {output}개 · 원문 {source}개",
         "outOfTolerance": "본문 길이가 ±5% 허용치를 벗어났습니다. 수동으로 확인하세요.",
-        "overLimit": "{index}번째 문단 {chars}자로 문단 상한 초과"
+        "overLimitSentence": "{paragraph}번째 문단 {sentence}번째 문장 {chars}자로 문장 상한 초과: {excerpt}",
+        "overLimitParagraph": "{index}번째 문단 {chars}자로 문단 상한 초과(구 형식 보고서)"
       },
       "filter": {
         "title": "입력 준비: 자동 제거된 비내레이션 내용",
