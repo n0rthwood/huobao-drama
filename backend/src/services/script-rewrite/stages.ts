@@ -278,7 +278,7 @@ function bridgeUserPrompt(ctx: StageRunContext, paragraphs: Array<{ id: string; 
 const bridge: RewriteStageSpec = {
   key: 'bridge',
   label: '桥句润色',
-  revision: 'bridge.v2',
+  revision: 'bridge.v3',
   aiStage: 'script_bridge',
   async run(ctx) {
     const blocks = parseBlocks(ctx.predecessorText)
