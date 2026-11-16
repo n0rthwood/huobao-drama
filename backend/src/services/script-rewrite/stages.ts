@@ -147,24 +147,44 @@ const fidelity: RewriteStageSpec = {
     // 与 Agent 路径逐字相同的技能注入（script-rewriter + documentary/documentary-script）
     const skills = await loadAgentSkills('script_rewriter', lang, { projectType: 'documentary' })
     const systemPrompt = `${skills}${FIDELITY_OUTPUT_CONTRACT}`
-    const { text } = await callTextChat(ctx.stageModel, `【原始内容】\n${ctx.preparedText}`, {
-      systemPrompt,
-      temperature: ctx.stageModel.temperature ?? 0.2,
-      maxTokens: MAX_TOKENS,
-      timeoutMs: STAGE_TIMEOUT_MS,
-    })
-    const parsed = parseFidelityOutput(text, ctx.preparedText)
-    const raw = parsed.content
-    if (!raw.trim()) throw new Error('忠实改写阶段没有返回正文')
-    // 二次防漏：模型即使抄回来源/许可/链接，也不会进入下游（验收 17）
-    const guarded = guardStageOutput(raw)
-    const content = guarded.text
-    if (!content.trim()) throw new Error('忠实改写阶段的产出里没有可朗读的正文')
-
-    // 契约违例 = 阶段失败：不产生正式版本，下游不执行，最终稿不被采用。
-    // 诊断仍然完整地留在任务错误信息里，供重试或跳过时查看。
-    const report = evaluateFidelity(ctx.preparedText, content, guarded.removed, parsed.exclusions)
-    return { content, report }
+    const attempt = async (userContent: string) => {
+      const { text } = await callTextChat(ctx.stageModel, userContent, {
+        systemPrompt,
+        temperature: ctx.stageModel.temperature ?? 0.2,
+        maxTokens: MAX_TOKENS,
+        timeoutMs: STAGE_TIMEOUT_MS,
+      })
+      const parsed = parseFidelityOutput(text, ctx.preparedText)
+      if (!parsed.content.trim()) throw new Error('忠实改写阶段没有返回正文')
+      // 二次防漏：模型即使抄回来源/许可/链接，也不会进入下游（验收 17）
+      const guarded = guardStageOutput(parsed.content)
+      if (!guarded.text.trim()) throw new Error('忠实改写阶段的产出里没有可朗读的正文')
+      return { text, parsed, guarded }
+    }
+    const original = `【原始内容】\n${ctx.preparedText}`
+    const first = await attempt(original)
+    try {
+      // 契约违例 = 阶段失败：不产生正式版本，下游不执行，最终稿不被采用。
+      const report = evaluateFidelity(ctx.preparedText, first.guarded.text, first.guarded.removed, first.parsed.exclusions)
+      return { content: first.guarded.text, report }
+    } catch (err) {
+      if (!(err instanceof FidelityContractError)) throw err
+      // #109：段落不再限长后，最常见的违例是原文的长句没断开。把逐条违例（超长句给全文）回给模型纠正一次；
+      // 仍不合格就判阶段失败，诊断完整留在任务错误信息里，不静默截断或改写。
+      const longOnes = longSentences(first.guarded.text)
+      const retry = await attempt([
+        original,
+        '',
+        '# 你上一次的输出',
+        first.text.trim(),
+        '',
+        '# 保真契约没有通过，请逐条改正后重新输出完整 JSON（只改标点断句，不增删内容，不改动其它段落）',
+        `- ${err.message}`,
+        ...longOnes.map(item => `- 第 ${item.paragraph} 段第 ${item.sentence} 句 ${item.chars} 字（上限 ${SENTENCE_CHAR_LIMIT}）：${item.text}`),
+      ].join('\n'))
+      const report = evaluateFidelity(ctx.preparedText, retry.guarded.text, retry.guarded.removed, retry.parsed.exclusions)
+      return { content: retry.guarded.text, report }
+    }
   },
 }
 
@@ -174,6 +194,18 @@ export class FidelityContractError extends Error {
     super(message)
     this.name = 'FidelityContractError'
   }
+}
+
+/** 超过单句上限的句子（含全文，纠正提示要把整句给模型）；切点与计数口径见 `evaluateFidelity` */
+function longSentences(content: string): Array<{ paragraph: number; sentence: number; chars: number; text: string }> {
+  const found: Array<{ paragraph: number; sentence: number; chars: number; text: string }> = []
+  scriptParagraphs(content).forEach((paragraph, paragraphIndex) => {
+    splitSentences(paragraph).forEach((sentence, sentenceIndex) => {
+      const chars = narrationCharCount(sentence)
+      if (chars > SENTENCE_CHAR_LIMIT) found.push({ paragraph: paragraphIndex + 1, sentence: sentenceIndex + 1, chars, text: sentence.trim() })
+    })
+  })
+  return found
 }
 
 /**
@@ -192,21 +224,13 @@ export function evaluateFidelity(preparedText: string, content: string, removed:
   const adjustedBaseline = baseline - excluded
   const outputChars = narrationChars(content)
   const deltaRatio = baseline ? (outputChars - baseline) / baseline : 0
-  const paragraphs = scriptParagraphs(content)
   const paragraphsSource = scriptParagraphs(preparedText).length
-  const overLimit: OverLimitSentence[] = []
-  paragraphs.forEach((paragraph, paragraphIndex) => {
-    splitSentences(paragraph).forEach((sentence, sentenceIndex) => {
-      const chars = narrationCharCount(sentence)
-      if (chars <= SENTENCE_CHAR_LIMIT) return
-      overLimit.push({
-        paragraph: paragraphIndex + 1,
-        sentence: sentenceIndex + 1,
-        chars,
-        excerpt: sentence.replace(/[\s\u3000]/g, '').slice(0, 20),
-      })
-    })
-  })
+  const longOnes = longSentences(content)
+  const overLimit: OverLimitSentence[] = longOnes.map(({ text, ...item }) => ({
+    ...item,
+    excerpt: text.replace(/[\s\u3000]/g, '').slice(0, 20),
+  }))
+  const paragraphs = scriptParagraphs(content)
   const withinTolerance = outputChars <= baseline * (1 + FIDELITY_TOLERANCE) && outputChars >= adjustedBaseline * (1 - FIDELITY_TOLERANCE)
   const warnings: string[] = []
   if (removed.length) warnings.push(`产出里带回了 ${removed.length} 处非旁白内容，已自动剥离（见过滤明细）`)
