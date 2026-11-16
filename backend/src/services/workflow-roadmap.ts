@@ -375,6 +375,24 @@ async function owningRewriteRun(finalVersionId: number | null): Promise<RunRow |
   return null
 }
 
+/**
+ * 每个改写阶段由哪一次运行产出（#109）：只重跑后段（`start_stage='bridge'` + 前驱版本）的运行没有前段的
+ * 阶段行，前段的结论要沿最终稿父链找到产出它的那次运行，否则 roadmap 会把已完成的忠实改写判成未完成。
+ */
+async function rewriteStageRuns(finalVersionId: number | null): Promise<Map<string, number>> {
+  const found = new Map<string, number>()
+  const visited = new Set<number>()
+  let id = finalVersionId
+  while (id !== null && !visited.has(id)) {
+    visited.add(id)
+    const version = await getVersion(id)
+    if (!version) break
+    if (version.runId !== null && !found.has(version.stageKey)) found.set(version.stageKey, version.runId)
+    id = version.predecessorId
+  }
+  return found
+}
+
 /** 完成度包括所有存活的本集资产；@引用池会排除旁白角色，不能借它统计资产完成度。 */
 async function roadmapAssetImages(episodeId: number): Promise<(string | null)[]> {
   const [characters, scenes, props] = await Promise.all([
@@ -405,7 +423,9 @@ export async function episodeRoadmapFacts(episodeId: number): Promise<RoadmapFac
     Promise.all(EXTRACT_TARGETS.map(target => findActiveTextTask(episodeId, EXTRACT_TASK_KINDS[target]))),
   ])
   const workingRun = run ?? (!ep.scriptContent?.trim() ? active : null)
-  const stages = workingRun ? await listStages([workingRun.id]) : []
+  // 工作运行之外，最终稿父链上产出前段的那几次运行也要读（只重跑后段时前段结论在它们那里）
+  const stageRuns = run ? await rewriteStageRuns(ep.finalVersionId) : new Map<string, number>()
+  const stages = workingRun ? await listStages([...new Set([workingRun.id, ...stageRuns.values()])]) : []
   const cards = { confirmed: 0, pending: 0, ai_filling: 0, stale: 0, blank: 0, total: rows.length }
   for (const row of rows) {
     const key = row.designCardStatus as Exclude<keyof typeof cards, 'total'>
@@ -428,7 +448,8 @@ export async function episodeRoadmapFacts(episodeId: number): Promise<RoadmapFac
       owner_run: run ? { id: run.id, status: run.status, prepared_version_id: run.preparedVersionId, source_revision: run.sourceRevision } : null,
       active_run: active ? { id: active.id, status: active.status, prepared_version_id: active.preparedVersionId, source_revision: active.sourceRevision } : null,
       stages: REWRITE_STAGES.map(spec => {
-        const row = stages.find(stage => stage.stageKey === spec.key)
+        const runId = stageRuns.get(spec.key) ?? workingRun?.id
+        const row = stages.find(stage => stage.stageKey === spec.key && stage.runId === runId)
         return { key: spec.key, label: spec.label, status: (row?.status ?? 'pending') as StageStatus, error: row?.errorMsg ?? null }
       }),
       has_final: !!ep.scriptContent?.trim(), final_revision: ep.finalRevision, source_revision: ep.sourceRevision,
