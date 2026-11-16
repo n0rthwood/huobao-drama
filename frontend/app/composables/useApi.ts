@@ -572,6 +572,8 @@ export type CardIssueCode =
   | 'info_point_unassigned' | 'must_mark_not_planned' | 'reference_not_mentioned'
   | 'budget_tight' | 'unresolved_ref'
   | 'text_plan_invalid' | 'text_plan_warning'
+  // #109：本镜的 combo / 底图与所属逻辑组规划的条目不一致（警告级，人工复核）
+  | 'group_plan_deviation'
 
 export interface CardIssue {
   code: CardIssueCode
@@ -664,6 +666,83 @@ export interface DesignCardAuditItem {
   narration_estimate_s: number
   narration_measured_s: number | null
   budget: { layer_s: number | null; gen_s: number | null }
+}
+
+/**
+ * 逻辑组视觉规划（Issue #109，纪录片）：逻辑组 = 最终旁白稿的一个自然段。
+ * 组规划先于填卡跑一次（同一 sys_task），逐镜填卡必须遵循本镜条目；读时不一致给
+ * `group_plan_deviation` 警告。与后端 services/design-group-plan.ts 同形。
+ */
+export type DesignGroupPlanStatus = 'none' | 'ok' | 'failed'
+/** 资产在本组的职能：完整建立 / 简短提示 / 背景 */
+export type DesignGroupAssetRole = 'establish' | 'hint' | 'background'
+/** 本镜的图层用法：本组新增条目 / 只承接已建立的内容 / 不用图层 */
+export type DesignGroupShotMode = 'new_items' | 'carry_only' | 'no_layer'
+
+export interface DesignGroupAssetRef {
+  kind: AssetKindName
+  asset_id: number
+}
+
+export interface DesignGroupPlanEntry {
+  /** 观众看完本组应理解 / 记住什么 */
+  task: string
+  /** 本组新增地理 / 年代条目，每条指派唯一一镜兑现 must_mark */
+  geo_additions: Array<{ text: string; storyboard_id: number }>
+  asset_roles: Array<{
+    asset_kind: AssetKindName
+    asset_id: number
+    name: string
+    role: DesignGroupAssetRole
+    establish_storyboard_id: number | null
+    exit_after_storyboard_id: number | null
+    note: string
+  }>
+  shots: Array<{
+    storyboard_id: number
+    combo: Combo
+    base: DesignGroupAssetRef | null
+    /** 画中画：图层段上引用的另一张图 */
+    pip: DesignGroupAssetRef[]
+    mode: DesignGroupShotMode
+    task: string
+  }>
+  /** 与上一组的接缝方式与理由 */
+  junction: string
+}
+
+export interface DesignGroupPlanWarning {
+  /** shot_cross_group = 一镜跨了段落；shot_group_unlocated = 旁白定位不到段落 */
+  code: 'shot_cross_group' | 'shot_group_unlocated'
+  storyboard_id: number
+  message: string
+}
+
+export interface DesignGroupPlanGroup {
+  /** 1 起的段号 = 组号 */
+  group_no: number
+  paragraph_excerpt: string
+  paragraph_chars: number
+  /** 本组的镜 id，按镜序 */
+  shot_ids: number[]
+  warnings: DesignGroupPlanWarning[]
+  status: DesignGroupPlanStatus
+  error: string | null
+  /** 规划签名与当前组内容一致；false = 下次填卡会重规划 */
+  fresh: boolean
+  updated_at: string | null
+  task_id: number | null
+  plan: DesignGroupPlanEntry | null
+}
+
+/** GET /episodes/:id/design-group-plans */
+export interface DesignGroupPlansPayload {
+  groups: DesignGroupPlanGroup[]
+}
+
+export const designGroupPlanAPI = {
+  /** 只读：组规划随填卡生成，前端不提供编辑入口 */
+  list: (id: number) => api.get<DesignGroupPlansPayload>(`/episodes/${id}/design-group-plans`),
 }
 
 export const storyboardAPI = {

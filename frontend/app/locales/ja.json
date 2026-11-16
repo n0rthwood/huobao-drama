@@ -1472,6 +1472,46 @@
     },
     "design": {
       "title": "絵コンテ設計",
+      "group": {
+        "label": "第 {n} 段落",
+        "shots": "{n} ショット",
+        "warnings": "{n} 件の警告",
+        "toggle": "この段落のグループ視覚計画を展開",
+        "panelLabel": "第 {n} 段落のグループ視覚計画",
+        "collapse": "折りたたむ",
+        "task": "このグループの狙い",
+        "junction": "前のグループとのつなぎ",
+        "geo": "このグループで新たに示す地理",
+        "assets": "素材の役割",
+        "empty": "このグループの計画はまだありません。次のカード記入時に自動生成されます。",
+        "failed": "グループ計画に失敗しました: {reason}",
+        "ungrouped": "未分類",
+        "ungroupedHint": "これらのショットのナレーションは最終稿の段落に位置づけられず、どの論理グループにも属しません",
+        "establishAt": "{shot} で確立",
+        "exitAfter": "{shot} の後に退場",
+        "colShot": "ショット",
+        "colCombo": "組み合わせ",
+        "colBase": "ベース",
+        "colPip": "ピクチャ・イン・ピクチャー",
+        "colMode": "レイヤー用途",
+        "colTask": "このショットの役割",
+        "status": {
+          "none": "未計画",
+          "ok": "計画済み",
+          "failed": "計画失敗",
+          "stale": "計画が期限切れ"
+        },
+        "role": {
+          "establish": "全体を確立",
+          "hint": "簡単な提示",
+          "background": "背景"
+        },
+        "mode": {
+          "new_items": "新規項目",
+          "carry_only": "引き継ぎのみ",
+          "no_layer": "レイヤーなし"
+        }
+      },
       "lockedTitle": "絵コンテ設計はまだ解放されていません",
       "lockedDesc": "{reason}",
       "lockedGoto": "対処する",
@@ -1568,7 +1608,8 @@
         "must_mark_not_planned": "必須注記に対応する計画レイヤーがありません",
         "reference_not_mentioned": "参考素材がどのフレーム記述にも登場しません",
         "budget_tight": "尺の余裕が少なめです",
-        "unresolved_ref": "素材や項目に解決できない参照があります"
+        "unresolved_ref": "素材や項目に解決できない参照があります",
+        "group_plan_deviation": "このショットの組み合わせまたはベースが所属グループの計画と一致しません"
       },
       "migrationComboUnresolved": "旧ショットのセグメント構成には移行先の定義がありません。復元可能な内容は保持されています。構成を明示的に選び直し、設計カードを確認してから確定してください。",
       "migrationComboUnresolvedShort": "旧設計のセグメント構成を特定できません。選び直してください",

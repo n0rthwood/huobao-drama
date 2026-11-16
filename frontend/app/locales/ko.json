@@ -1472,6 +1472,46 @@
     },
     "design": {
       "title": "숏 설계",
+      "group": {
+        "label": "{n}번째 단락",
+        "shots": "{n} 숏",
+        "warnings": "경고 {n}개",
+        "toggle": "이 단락의 그룹 시각 계획 펼치기",
+        "panelLabel": "{n}번째 단락의 그룹 시각 계획",
+        "collapse": "접기",
+        "task": "이 그룹의 목표",
+        "junction": "이전 그룹과의 연결",
+        "geo": "이 그룹의 새 지리 항목",
+        "assets": "자산 역할",
+        "empty": "이 그룹의 계획이 아직 없습니다. 다음 카드 채우기에서 자동 생성됩니다.",
+        "failed": "그룹 계획 실패: {reason}",
+        "ungrouped": "미분류",
+        "ungroupedHint": "이 숏의 내레이션이 최종 원고의 단락에 위치하지 않아 어떤 논리 그룹에도 속하지 않습니다",
+        "establishAt": "{shot}에서 확립",
+        "exitAfter": "{shot} 이후 퇴장",
+        "colShot": "숏",
+        "colCombo": "조합",
+        "colBase": "베이스",
+        "colPip": "화면 속 화면",
+        "colMode": "레이어 용도",
+        "colTask": "이 숏의 역할",
+        "status": {
+          "none": "미계획",
+          "ok": "계획됨",
+          "failed": "계획 실패",
+          "stale": "계획 만료"
+        },
+        "role": {
+          "establish": "전체 확립",
+          "hint": "간단한 힌트",
+          "background": "배경"
+        },
+        "mode": {
+          "new_items": "새 항목",
+          "carry_only": "승계만",
+          "no_layer": "레이어 없음"
+        }
+      },
       "lockedTitle": "숏 설계가 아직 잠겨 있습니다",
       "lockedDesc": "{reason}",
       "lockedGoto": "처리하러 가기",
@@ -1568,7 +1608,8 @@
         "must_mark_not_planned": "필수 표시 항목에 대응하는 계획 레이어가 없습니다",
         "reference_not_mentioned": "참고 소재가 어떤 프레임 설명에도 언급되지 않았습니다",
         "budget_tight": "길이 여유가 빠듯합니다",
-        "unresolved_ref": "소재나 항목으로 해결되지 않는 참조가 있습니다"
+        "unresolved_ref": "소재나 항목으로 해결되지 않는 참조가 있습니다",
+        "group_plan_deviation": "이 숏의 조합 또는 베이스가 속한 논리 그룹의 계획과 일치하지 않습니다"
       },
       "migrationComboUnresolved": "기존 숏의 세그먼트 조합에는 정의된 이전 규칙이 없습니다. 복원 가능한 내용은 유지되었습니다. 조합을 명시적으로 다시 선택하고 설계 카드를 검토한 후 확정하세요.",
       "migrationComboUnresolvedShort": "기존 세그먼트 조합을 확인할 수 없습니다. 다시 선택하세요",
