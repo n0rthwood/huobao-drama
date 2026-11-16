@@ -32,6 +32,8 @@ import {
 
 const MAX_TOKENS = Number(process.env.AI_MAX_TOKENS || 16_384)
 const STAGE_TIMEOUT_MS = 15 * 60_000
+/** 忠实改写违约时回给模型纠正的次数上限（#109 生产 run 19：一次纠正后 8 个长句剩 2 个，均为带长括注的句子） */
+const FIDELITY_CORRECTIONS = 2
 /** 忠实改写的 ±5% 内容量基线容差（以自动过滤后的正文为分母） */
 export const FIDELITY_TOLERANCE = 0.05
 /** 叙事节拍标记（【开场】…）：分段锚点，不是朗读内容，两侧计量都要先去掉 */
@@ -162,28 +164,27 @@ const fidelity: RewriteStageSpec = {
       return { text, parsed, guarded }
     }
     const original = `【原始内容】\n${ctx.preparedText}`
-    const first = await attempt(original)
-    try {
-      // 契约违例 = 阶段失败：不产生正式版本，下游不执行，最终稿不被采用。
-      const report = evaluateFidelity(ctx.preparedText, first.guarded.text, first.guarded.removed, first.parsed.exclusions)
-      return { content: first.guarded.text, report }
-    } catch (err) {
-      if (!(err instanceof FidelityContractError)) throw err
-      // #109：段落不再限长后，最常见的违例是原文的长句没断开。把逐条违例（超长句给全文）回给模型纠正一次；
-      // 仍不合格就判阶段失败，诊断完整留在任务错误信息里，不静默截断或改写。
-      const longOnes = longSentences(first.guarded.text)
-      const retry = await attempt([
-        original,
-        '',
-        '# 你上一次的输出',
-        first.text.trim(),
-        '',
-        '# 保真契约没有通过，请逐条改正后重新输出完整 JSON（只改标点断句，不增删内容，不改动其它段落）',
-        `- ${err.message}`,
-        ...longOnes.map(item => `- 第 ${item.paragraph} 段第 ${item.sentence} 句 ${item.chars} 字（上限 ${SENTENCE_CHAR_LIMIT}）：${item.text}`),
-      ].join('\n'))
-      const report = evaluateFidelity(ctx.preparedText, retry.guarded.text, retry.guarded.removed, retry.parsed.exclusions)
-      return { content: retry.guarded.text, report }
+    let current = await attempt(original)
+    for (let round = 0; ; round++) {
+      try {
+        // 契约违例 = 阶段失败：不产生正式版本，下游不执行，最终稿不被采用。
+        const report = evaluateFidelity(ctx.preparedText, current.guarded.text, current.guarded.removed, current.parsed.exclusions)
+        return { content: current.guarded.text, report }
+      } catch (err) {
+        if (!(err instanceof FidelityContractError) || round >= FIDELITY_CORRECTIONS) throw err
+        // #109：段落不再限长后，最常见的违例是原文的长句没断开。把逐条违例（超长句给全文）回给模型纠正；
+        // 用完纠正次数仍不合格就判阶段失败，诊断完整留在任务错误信息里，不静默截断或改写。
+        current = await attempt([
+          original,
+          '',
+          '# 你上一次的输出',
+          current.text.trim(),
+          '',
+          '# 保真契约没有通过，请逐条改正后重新输出完整 JSON（只改标点断句，不增删内容，不改动其它段落；括号里的长注释可以单独成句）',
+          `- ${err.message}`,
+          ...longSentences(current.guarded.text).map(item => `- 第 ${item.paragraph} 段第 ${item.sentence} 句 ${item.chars} 字（上限 ${SENTENCE_CHAR_LIMIT}）：${item.text}`),
+        ].join('\n'))
+      }
     }
   },
 }
