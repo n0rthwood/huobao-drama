@@ -14,7 +14,8 @@ const script = `
 import fs from 'node:fs'
 import assert from 'node:assert/strict'
 import { searchDataset, extractDatasetGeometry, datasetSourceInfo, datasetRefLayer, foldDatasetName } from './src/modules/map-studio/geo/datasets.ts'
-import { normalizeMapSpec, riverSourceScale, resolveRiverSource, buildMapSvg, mapBaseSignature } from './src/modules/map-studio/geo/base-render.ts'
+import sharp from 'sharp'
+import { normalizeMapSpec, riverSourceScale, resolveRiverSource, mapBaseSignature } from './src/modules/map-studio/geo/base-render.ts'
 import { createMapBaseArtifact } from './src/modules/map-studio/geo/geometry.ts'
 const original = id => JSON.parse(fs.readFileSync('./assets/geo/ne_' + id + '.geojson', 'utf8')).features
 const rivers = original('10m_rivers_lake_centerlines')
@@ -24,6 +25,27 @@ const geometry = (ref) => {
 }
 const positions = raw => typeof raw[0] === 'number' ? [raw] : raw.flatMap(positions)
 const out = {}
+
+/** 程序底图需要高程：合成 terrarium 瓦片注入，测试不联网（渲染阶段只读本地缓存） */
+const tileFetcher = async (zoom, x, y) => {
+  const tile = 256, world = tile * 2 ** zoom
+  const buffer = Buffer.alloc(tile * tile * 3)
+  for (let row = 0; row < tile; row++) {
+    const gy = y * tile + row + 0.5
+    const lat = Math.atan(Math.sinh(Math.PI * (1 - 2 * gy / world))) * 180 / Math.PI
+    for (let col = 0; col < tile; col++) {
+      const gx = x * tile + col + 0.5
+      const lon = gx / world * 360 - 180
+      const value = Math.max(0, Math.min(65535, Math.round(150 + 600 * Math.abs(Math.sin(lon) * Math.cos(lat)) + 32768)))
+      const offset = (row * tile + col) * 3
+      buffer[offset] = Math.floor(value / 256)
+      buffer[offset + 1] = value % 256
+      buffer[offset + 2] = 0
+    }
+  }
+  return sharp(buffer, { raw: { width: tile, height: tile, channels: 3 } }).png().toBuffer()
+}
+const dem = { cacheDir: process.env.HUOBAO_DATA_DIR + '/dem', fetchTile: tileFetcher }
 
 out.rivers = Object.fromEntries(['Dnipro','Dnieper','Volga','Don','Kama','Tura'].map(name => [name,searchDataset('river',name)]))
 for (const [name,hits] of Object.entries(out.rivers)) {
@@ -195,9 +217,14 @@ assert.equal(riverSourceScale({...spec,detail_level:'overview'}),'10m')
 const canvas={width:1280,height:720}
 assert.equal(mapBaseSignature(legacy,canvas),mapBaseSignature(overview,canvas))
 assert.notEqual(mapBaseSignature(overview,canvas),mapBaseSignature(regional,canvas))
-assert.notEqual(buildMapSvg(overview,canvas),buildMapSvg(regional,canvas))
+// 底图水系固定 10m（Issue #107 阶段 1）：overview 与 regional 的底图河道出处必须一致，
+// 只有数据集采用的 ref 口径（river_source）不同。
+const overviewBase = await createMapBaseArtifact(overview,{mode:'program',width:1280,dem})
+const regionalBase = await createMapBaseArtifact(regional,{mode:'program',width:1280,dem})
+assert.match(overviewBase.provenance.sources[0].name,/10m rivers/)
+assert.match(regionalBase.provenance.sources[0].name,/10m rivers/)
 const adoptedOverview={...spec,detail_level:'overview'}
-const base=await createMapBaseArtifact(adoptedOverview,{mode:'program',width:1280})
+const base=await createMapBaseArtifact(adoptedOverview,{mode:'program',width:1280,dem})
 assert.equal(base.provenance.river_source.scale,'10m')
 assert.equal(base.provenance.river_source.reason,'dataset_ref')
 assert.equal(base.provenance.river_source.sha256,out.source.sha256)

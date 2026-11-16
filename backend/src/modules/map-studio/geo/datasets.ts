@@ -36,11 +36,15 @@ export class DatasetError extends Error {
 interface FileDefinition {
   filename: string
   scale: DatasetScale
-  layer: DatasetLayer | 'regions'
+  /** 'asset'：只登记文件与 SHA-256（底图渲染素材），不参与数据集检索/要素抽取 */
+  layer: DatasetLayer | 'regions' | 'asset'
   expectedSha256?: string
 }
 const FILES: Record<string, FileDefinition> = {
   '10m_rivers_lake_centerlines': { filename: 'ne_10m_rivers_lake_centerlines.geojson', scale: '10m', layer: 'river', expectedSha256: 'bb854a900ecbd3b408df46d5e16e3e0f974ba55993f9d8b5c26e855273c0905a' },
+  // 底图渲染素材（Issue #107 阶段 1）：陆海掩码用 10m 陆地多边形，湖泊剔除 Reservoir
+  '10m_land': { filename: 'ne_10m_land.geojson', scale: '10m', layer: 'asset', expectedSha256: '1ac90796408bc6ad6911d69448485d3c4dbf2190370080368a09976e1c9f7416' },
+  '10m_lakes': { filename: 'ne_10m_lakes.geojson', scale: '10m', layer: 'asset', expectedSha256: '2d036f53dedec578001c5c30c2959ee7d4eebc1306900fa4367c49929ec8f2d9' },
   '50m_rivers_lake_centerlines': { filename: 'ne_50m_rivers_lake_centerlines.geojson', scale: '50m', layer: 'river' },
   '50m_lakes': { filename: 'ne_50m_lakes.geojson', scale: '50m', layer: 'lake' },
   '50m_coastline': { filename: 'ne_50m_coastline.geojson', scale: '50m', layer: 'coast' },
@@ -272,7 +276,10 @@ function sourceArea(geometry: Geometry): number {
 function load(fileId: string): LoadedFile {
   const cached = cache.get(fileId)
   if (cached) return cached
-  const def = definition(fileId), { buffer, sha256 } = readFile(fileId)
+  const def = definition(fileId)
+  const layerKind = def.layer
+  if (layerKind === 'asset') throw new DatasetError(`${def.filename} 是底图渲染素材，不参与数据集检索与要素抽取；请使用 search_dataset 返回的 ref。`)
+  const { buffer, sha256 } = readFile(fileId)
   let parsed: { features?: Array<{ properties?: Record<string, unknown> | null; geometry?: Geometry | null }> }
   try { parsed = JSON.parse(buffer.toString('utf8')) } catch { throw new DatasetError(`数据集 ${def.filename} 不是有效 JSON，请恢复原始文件。`) }
   if (!Array.isArray(parsed.features)) throw new DatasetError(`数据集 ${def.filename} 缺少 features 数组`)
@@ -284,7 +291,7 @@ function load(fileId: string): LoadedFile {
     if (!parts.some(part => part.length)) return
     const rawClass = property(properties, 'featurecla'), rawRank = property(properties, 'scalerank'), rawRiver = property(properties, 'rivernum')
     const featureClass = typeof rawClass === 'string' ? rawClass : null
-    const layer = def.layer === 'regions' ? /range|mtn/i.test(featureClass ?? '') ? 'mountain' : 'physical_region' : def.layer
+    const layer = layerKind === 'regions' ? /range|mtn/i.test(featureClass ?? '') ? 'mountain' : 'physical_region' : layerKind
     const names = namesOf(properties)
     const entry: IndexEntry = {
       ref, layer, kind, index, names, folded: names.map(foldDatasetName), class: featureClass,

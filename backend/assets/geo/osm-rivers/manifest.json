@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "license": "ODbL-1.0",
+  "attribution": "© OpenStreetMap contributors, ODbL 1.0",
+  "rivers": [
+    {
+      "name": "Akhtuba",
+      "name_zh": "阿赫图巴河",
+      "file": "akhtuba.json",
+      "ways": 20,
+      "fetched_at": "2026-11-16T08:50:33.187Z",
+      "source_url": "https://overpass-api.de/api/interpreter",
+      "sha256": "f290b905779efea6f26d0c1ab01743afe7e1f316d3011d957e5b6ca248ca3fb0",
+      "bbox": [
+        44.6452754,
+        46.535853,
+        48.3182607,
+        48.8161295
+      ]
+    },
+    {
+      "name": "Kazanka",
+      "name_zh": "卡赞卡河",
+      "file": "kazanka.json",
+      "ways": 46,
+      "fetched_at": "2026-11-16T09:31:12.067Z",
+      "source_url": "https://overpass-api.de/api/interpreter",
+      "sha256": "c8c062d4c09fdcf0292167f037aa4cc8787d1316153d998049d8f5d2594207f7",
+      "bbox": [
+        49.0273284,
+        55.7865178,
+        51.4076954,
+        56.624267
+      ]
+    },
+    {
+      "name": "Ugra",
+      "name_zh": "乌格拉河",
+      "file": "ugra.json",
+      "ways": 26,
+      "fetched_at": "2026-11-16T03:54:52Z",
+      "source_url": "https://overpass-api.de/api/interpreter",
+      "sha256": "8e41d65c17ebd633fdfa89052b443b02846702203847ff32af52d334dda07b44",
+      "bbox": [
+        33.4590468,
+        54.5069754,
+        36.1088306,
+        55.1044716
+      ]
+    }
+  ]
+}

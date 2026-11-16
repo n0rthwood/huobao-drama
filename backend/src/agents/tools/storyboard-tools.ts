@@ -43,6 +43,15 @@ import {
 import { checkDesignCardGrounding, groundingRejectionMessage } from '../../services/design-card-grounding.js'
 import { aspectConflictMessage, compositionOf, findAspectConflicts, normalizeAspect } from '../../services/aspect.js'
 import { junctionPromptRejections, lockedFramesOfEpisode } from '../../services/junction-caption.js'
+import { parsePipMeta } from '../../services/map-pip-assets.js'
+
+function pipSummary(raw: string | null | undefined): Record<string, unknown> | null {
+  const meta = parsePipMeta(raw)
+  if (!meta) return null
+  if (meta.role === 'overview') return { role: 'overview', layout: (meta.layout as { id?: string } | null)?.id ?? null, details: meta.frames.map(f => ({ no: f.no, label: f.label, role: f.role, asset_id: f.detail_prop_id })), usage: meta.usage }
+  return { role: 'detail', parent_asset_id: meta.parent_prop_id, frame: meta.frame, usage: meta.usage, stale: meta.stale === true }
+}
+
 
 /** 项目画幅（Issue #92）：出图尺寸按它查表，提示词里的画幅/构图写法也必须与它一致 */
 async function dramaAspectRatio(dramaId: number): Promise<string> {
@@ -208,6 +217,12 @@ const readStoryboardContext = createTool({
          * 旁白里出现的地名/路线/范围在这张表里找不到，就说明这张图承载不了那句旁白。
          */
         semantics: semanticEntries(p.semantics),
+        /**
+         * 地图画中画（#107）：全览与细节是独立资产，分镜同时引用。`role: overview` 的 frames 列出各细节资产 id；
+         * `role: detail` 给出它所属的全览资产 id 与在全览中的位置。usage 是用法说明——聚焦某细节的镜头以该细节图为底图，
+         * 并在相邻镜头或同镜中用全览图建立位置；讲整体趋势的镜头以全览图为底图。
+         */
+        map_pip: pipSummary(p.mapPip),
       }))
 
     /**

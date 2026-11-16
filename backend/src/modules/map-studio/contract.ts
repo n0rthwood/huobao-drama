@@ -8,6 +8,7 @@
  * 落在这里的类型是**唯一**允许火宝 import 的契约面（`modules/map-studio/contract.js`）。
  */
 import type { MapBrief } from './types.js'
+import type { MapPipOutput } from './pip/frames.js'
 
 /** 宿主目标引用：火宝用 `prop:<id>` */
 export type MapStudioHostRef = string
@@ -39,6 +40,19 @@ export interface MapStudioDeliverable {
   manual_edit: boolean
   /** 人话摘要（N 点 / N 线 / N 面，底图路线） */
   summary: string
+  /** 画中画三件套（有细节框时）；宿主把每个细节登记为独立资产，并保存大图/细节图的联系与用法 */
+  pip: MapPipOutput | null
+}
+
+/** 宿主提供的使用上下文：哪些分镜引用了这张地图、各自要说明什么（只读，不改分镜） */
+export interface MapStudioContextShot {
+  number: number
+  narration: string
+  info_points: string[]
+  must_mark: string[]
+}
+export interface MapStudioContext {
+  shots: MapStudioContextShot[]
 }
 
 export interface MapStudioDeliveryResult {
@@ -54,6 +68,8 @@ export interface MapStudioHost {
   /** 每次被调用都读最新（外部改动要与 state 内快照的 brief_hash 比对） */
   readBrief(ref: MapStudioHostRef): Promise<MapBrief | null>
   writeBrief(ref: MapStudioHostRef, brief: MapBrief): Promise<void>
+  /** 引用这张地图的分镜信息；模块据此自动决定全览范围与细节框（人可回退修改） */
+  readContext?(ref: MapStudioHostRef): Promise<MapStudioContext | null>
   /** 交付；同一任务同一 final_image.sha256 再次调用必须幂等（返回已登记的版本，不重复插行） */
   deliver(ref: MapStudioHostRef, deliverable: MapStudioDeliverable): Promise<MapStudioDeliveryResult>
 }

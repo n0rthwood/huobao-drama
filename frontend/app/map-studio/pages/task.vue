@@ -186,6 +186,7 @@
         :outputs="detail.outputs"
         :research="detail.research"
         :registration="registration"
+        :style-skipped="styleSkipped"
         @preview="openPreview"
       />
     </section>
@@ -221,7 +222,11 @@
             </button>
           </div>
           <img :src="previewImage.url" :alt="previewTitle" class="mw-preview-img" />
-          <p class="mw-preview-meta dim">{{ t('mapStudio.results.size', { w: previewImage.width, h: previewImage.height }) }} · {{ t('mapStudio.results.source', { source: previewImage.source }) }}</p>
+          <p class="mw-preview-meta dim">
+            {{ t('mapStudio.results.size', { w: previewImage.width, h: previewImage.height }) }}
+            <!-- 画中画细节/组合图是确定性渲染，没有影像来源，这一行就不写 -->
+            <span v-if="previewImage.source"> · {{ t('mapStudio.results.source', { source: previewImage.source }) }}</span>
+          </p>
         </div>
       </div>
     </Teleport>
@@ -279,7 +284,7 @@ import {
   type MapStudioStage,
 } from '~/map-studio/api'
 import { registrationFrom, registrationFromControlPoints, type MapRegistration } from '~/map-studio/utils/mapRegistration'
-import { mapPreviewImage, mapPreviewView, type MapPreviewView } from '~/map-studio/utils/mapPreview'
+import { mapPreviewImage, mapPreviewLabel, mapPreviewView, type MapPreviewView } from '~/map-studio/utils/mapPreview'
 import { DEEPLINK_KEYS, deeplinkHydrate, useDeeplink } from '~/composables/useQuerySync'
 
 const { t } = useI18n()
@@ -432,6 +437,16 @@ const geometryDirty = computed(() => specDirty.value || layerOptionsDirty.value)
 const blockingIssues = computed(() => (detail.value?.issues ?? []).filter(issue => issue.blocking))
 const softIssues = computed(() => (detail.value?.issues ?? []).filter(issue => !issue.blocking))
 
+/**
+ * 底纹阶段已完成/被跳过且确实没有纹理图（Issue #107）：成品直接用底图绘制，这是新口径而不是失败。
+ * 只看服务端的 step 状态与产出，不在前端自己推断成图用没用纹理。
+ */
+const styleSkipped = computed(() => {
+  const step = detail.value?.steps.find(item => item.id === 'style')
+  if (!step || !detail.value?.outputs.base_image) return false
+  return (step.status === 'skipped' || step.status === 'completed') && !detail.value.outputs.texture_image
+})
+
 /** 轮次账本：后端没给（旧记录 / 还没跑过模型）时按空账本显示，不编造计数 */
 const EMPTY_AGENT: MapAgentState = { run_id: null, rounds: {}, rollbacks: 0, max_rounds: 3, max_rollbacks: 2, attempts: [] }
 const agentState = computed<MapAgentState>(() => detail.value?.agent ?? EMPTY_AGENT)
@@ -479,16 +494,17 @@ const registration = computed<MapRegistration | null>(() => {
 
 /** 当前预览身份对应的真实图片；产出被回退清掉时为 null（此时不显示大图，只给提示） */
 const previewImage = computed(() => (previewView.value ? mapPreviewImage(previewView.value, detail.value?.outputs, registration.value) : null))
-const previewTitle = computed(() => {
+/** 预览标题的 i18n 取法与产出是否存在无关：画中画细节要带编号与帧标题 */
+const previewLabel = computed(() => {
   const view = previewView.value
   if (!view) return ''
-  const label = t(`mapStudio.results.${previewLabelKey(view)}`)
-  return detail.value?.title ? `${detail.value?.title} · ${label}` : label
+  const label = mapPreviewLabel(view, detail.value?.outputs)
+  return t(`mapStudio.results.${label.key}`, label.params ?? {})
 })
-
-function previewLabelKey(view: MapPreviewView): string {
-  return view === 'calibration' ? 'calibrationEvidence' : `${view}_image`
-}
+const previewTitle = computed(() => {
+  if (!previewView.value) return ''
+  return detail.value?.title ? `${detail.value?.title} · ${previewLabel.value}` : previewLabel.value
+})
 
 function openPreview(view: MapPreviewView) {
   previewWarning.value = ''
@@ -530,7 +546,8 @@ function restorePreviewFromLink() {
     return
   }
   if (!mapPreviewImage(view, detail.value?.outputs, registration.value)) {
-    previewWarning.value = t('mapStudio.preview.unavailable', { view: t(`mapStudio.results.${previewLabelKey(view)}`) })
+    const label = mapPreviewLabel(view, detail.value?.outputs)
+    previewWarning.value = t('mapStudio.preview.unavailable', { view: t(`mapStudio.results.${label.key}`, label.params ?? {}) })
     previewLink.set({ msview: '' })
     return
   }
@@ -541,7 +558,8 @@ function restorePreviewFromLink() {
 watch(previewImage, image => {
   const view = previewView.value
   if (!view || image) return
-  previewWarning.value = t('mapStudio.preview.unavailable', { view: t(`mapStudio.results.${previewLabelKey(view)}`) })
+  const label = mapPreviewLabel(view, detail.value?.outputs)
+  previewWarning.value = t('mapStudio.preview.unavailable', { view: t(`mapStudio.results.${label.key}`, label.params ?? {}) })
   previewView.value = null
 })
 

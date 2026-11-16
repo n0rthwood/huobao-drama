@@ -1,10 +1,12 @@
 /**
- * 地图确定性底图渲染（Issue #56 / R3）
+ * 地图确定性底图渲染（Issue #56 / R3；Issue #107 阶段 1 换管线）
  *
  * 为什么不用扩散模型画地图：资产实验室实测（~/projects/huobao-asset-lab/report.md）
  * 扩散模型会重绘海岸线与河道、把地名锚点挪到几百公里外，地图几何不可用。
- * 所以地图走「确定性底图」：Natural Earth 50m 矢量 + d3-geo 投影 → SVG → sharp 栅格化，
- * 风格化只允许在这张底图之上做低去噪/结构受控的二次处理。
+ * 所以地图走「确定性底图」：Natural Earth 矢量 + AWS Terrain 高程 + d3-geo 投影 →
+ * 局部相对起伏晕渲 + 分级水系，风格化只允许在这张底图之上做低去噪/结构受控的二次处理。
+ *
+ * 具体渲染口径全部在 geo/relief-render.ts；本文件只管 spec 校验、投影、签名、落盘与复用。
  *
  * 本模块**绝不渲染任何文字**（地名、图例、刻度全都没有）：地图上的文字一律由叠加图层系统
  * （backend/src/services/layer-render.ts）在确定性图层里排版，这样文字永远可编辑、永远不糊。
@@ -13,13 +15,14 @@
 import crypto from 'crypto'
 import fs from 'fs'
 import path from 'path'
-import { geoEquirectangular, geoMercator, geoPath, type GeoProjection } from 'd3-geo'
-import sharp from 'sharp'
+import { geoEquirectangular, geoMercator, type GeoProjection } from 'd3-geo'
 import { z } from 'zod'
 import { STORAGE_ROOT } from '../../../utils/paths.js'
 import { generateImageThumb } from '../../../utils/storage.js'
-import { datasetFileInfo, resolveGeoDir, riverScaleForRef, type DatasetScale } from './datasets.js'
+import { datasetFileInfo, riverScaleForRef, type DatasetScale } from './datasets.js'
 import { MAP_STYLE_FAMILY_IDS, mapStyleFamily } from '../styles/index.js'
+import { renderReliefBase, type ReliefParams, type ReliefRenderSummary, type ReliefRole } from './relief-render.js'
+import { chooseDemZoom, demManifestSha256, ensureDemTiles, type DemTileFetcher } from './terrain-cache.js'
 
 export const MAP_BASE_WIDTH = 3840
 export const MAP_BASE_HEIGHT = 2160
@@ -30,9 +33,6 @@ export const MAP_ROUTE_COLOR = '#1f6fd0'
  * 与路线色分开：风格化/抽色时面与线必须可区分，二者混色会让下游把边界当路线。
  */
 export const MAP_REGION_COLOR = '#b4573c'
-
-/** 水体固定冷蓝，比路线色浅，避免风格化后把海洋误当路线 */
-const MAP_WATER_COLOR = '#8fc1e8'
 
 export class MapSpecValidationError extends Error {
   constructor(message: string) {
@@ -98,12 +98,6 @@ export function resolveRiverSource(spec: Pick<MapSpec, 'detail_level' | 'routes'
 export interface MapProjectedPoint { id: string; name: string; at: [number, number] }
 export interface MapProjectedRoute { id: string; name: string; points: Array<[number, number]>; color: string }
 export interface MapProjectedRegion { id: string; name: string; points: Array<[number, number]>; color: string }
-export interface MapContextCoverage {
-  disclaimer: string
-  boundary_features: number
-  city_points: number
-  warnings: string[]
-}
 export interface MapRenderResult {
   /** `static/map-bases/<signature>.png`（STORAGE_ROOT 下的相对路径，getAbsolutePath 口径） */
   path: string
@@ -114,8 +108,10 @@ export interface MapRenderResult {
   points: MapProjectedPoint[]
   routes: MapProjectedRoute[]
   regions: MapProjectedRegion[]
-  /** 现代定位背景，不进入用户审核的 places/routes 语义。 */
-  context: MapContextCoverage
+  /** 高程档位、瓦片数与水系/符号统计；provenance 直接引用，写清「这张图用了哪批高程」 */
+  relief: ReliefRenderSummary
+  dem: { zoom: number; manifest_sha256: string | null }
+  warnings: string[]
   /** 该签名的文件此前已存在（本次未重新栅格化） */
   reused: boolean
 }
@@ -342,13 +338,42 @@ export function parseMapSpec(raw: string | null | undefined): MapSpec | null {
 
 // ---------------------------------------------------------------- 投影
 
-/** 画布强制 16:9（宽为准），最小 1280×720。导出：地图登记件要按同一口径复算画布。 */
+export type MapAspect = '16:9' | '9:16' | '4:3' | '3:4' | '1:1'
+const MAP_ASPECT_RATIOS: Record<MapAspect, number> = { '16:9': 16 / 9, '9:16': 9 / 16, '4:3': 4 / 3, '3:4': 3 / 4, '1:1': 1 }
+const MIN_CANVAS_WIDTH = 1280
+const MIN_CANVAS_HEIGHT = 720
+const MAX_CANVAS_SIDE = 7680
+
+/**
+ * 画布归一化。只给 width 时按 16:9 推高度；width 与 height 都给且比例落在
+ * 0.4..2.5（9:16 0.5625、3:4 0.75、1:1、4:3 1.33 都合法）就保留该比例；
+ * 越界说明尺寸写错了，退回 16:9 而不是画出一张 40:1 的怪画布。
+ * 导出：地图登记件要按同一口径复算画布。
+ */
 export function normalizeMapCanvas(size: Partial<MapCanvasSize> | undefined): MapCanvasSize {
   const rawWidth = Math.trunc(size?.width ?? MAP_BASE_WIDTH)
-  const width = Math.max(1280, Math.min(7680, Number.isFinite(rawWidth) ? rawWidth : MAP_BASE_WIDTH))
+  const width = Math.max(MIN_CANVAS_WIDTH, Math.min(MAX_CANVAS_SIDE, Number.isFinite(rawWidth) ? rawWidth : MAP_BASE_WIDTH))
+  const rawHeight = size?.height
+  if (rawHeight !== undefined && Number.isFinite(rawHeight)) {
+    const height = Math.max(MIN_CANVAS_HEIGHT, Math.min(MAX_CANVAS_SIDE, Math.trunc(rawHeight)))
+    const aspect = width / height
+    if (aspect >= 0.4 && aspect <= 2.5) return { width, height }
+  }
   // 宽为准推 16:9；偶数宽保证高度整数化后比例误差 < 1px
-  const height = Math.max(720, Math.round(width * 9 / 16))
-  return { width, height }
+  return { width, height: Math.max(MIN_CANVAS_HEIGHT, Math.round(width * 9 / 16)) }
+}
+
+/** 项目画幅 → 画布尺寸（长边 = longSide）；竖版横幅都用这一个入口，别各自估算比例 */
+export function canvasForAspect(aspect: MapAspect, longSide: number = MAP_BASE_WIDTH): MapCanvasSize {
+  const ratio = MAP_ASPECT_RATIOS[aspect]
+  if (ratio === undefined) {
+    throw new MapSpecValidationError(`未知画幅「${String(aspect)}」；可用：16:9 / 9:16 / 4:3 / 3:4 / 1:1`)
+  }
+  const long = Math.max(MIN_CANVAS_WIDTH, Math.min(MAX_CANVAS_SIDE, Math.trunc(Number.isFinite(longSide) ? longSide : MAP_BASE_WIDTH)))
+  const toEven = (value: number): number => Math.max(MIN_CANVAS_HEIGHT, Math.round(value / 2) * 2)
+  return ratio >= 1
+    ? { width: toEven(long), height: toEven(long / ratio) }
+    : { width: toEven(long * ratio), height: toEven(long) }
 }
 
 /**
@@ -370,7 +395,7 @@ function bboxPolygon(spec: Pick<MapSpec, 'bbox'>) {
  */
 export function mapProjectionFor(spec: Pick<MapSpec, 'projection' | 'bbox'>, size: MapCanvasSize): GeoProjection {
   const projection = spec.projection.type === 'mercator' ? geoMercator() : geoEquirectangular()
-  // fitExtent 自身保持纵横比并居中，16:9 画幅下允许上下/左右留边
+  // fitExtent 自身保持纵横比并居中：画幅与 bbox 比例不一致时允许上下/左右留边
   projection.fitExtent([[0, 0], [size.width, size.height]], bboxPolygon(spec))
   return projection
 }
@@ -388,198 +413,88 @@ export function unprojectPixel(spec: MapSpec, size: MapCanvasSize, px: [number, 
   return [inverted[0], inverted[1]]
 }
 
-// ---------------------------------------------------------------- 数据
+// ---------------------------------------------------------------- 渲染
 
-type GeoLayerName = 'land' | 'coastline' | 'rivers' | 'lakes' | 'countries' | 'admin1' | 'cities'
-
-const GEO_FILES: Record<GeoLayerName, string> = {
-  land: 'ne_50m_land.geojson',
-  coastline: 'ne_50m_coastline.geojson',
-  rivers: 'ne_50m_rivers_lake_centerlines.geojson',
-  lakes: 'ne_50m_lakes.geojson',
-  countries: 'ne_50m_admin_0_countries.geojson',
-  admin1: 'ne_50m_admin_1_states_provinces_lines.geojson',
-  cities: 'ne_50m_populated_places.geojson',
+/** 透传给 relief-render 的渲染口径（尺寸走 normalizeMapCanvas，不在这里重复） */
+export interface MapRenderOptions {
+  riverSource?: MapRiverSourceInfo
+  /** 'detail' 用细节帧参数（本帧拉伸设色 + 河谷强调）；默认按 spec.detail_level 判断 */
+  role?: ReliefRole
+  /** 继承全览设色锚点（细节帧保持同一色调族）；null = 按本帧拉伸 */
+  anchors?: { p2: number; p98: number } | null
+  /** NE 河名的叙事豁免：分镜/设计卡提到的河永远画出，不按 scalerank 隐掉 */
+  exemptRivers?: string[]
+  /** 预取命名河流包（OSM）里的河名；运行时只读本地包，不联网 */
+  namedRivers?: string[]
+  params?: Partial<ReliefParams>
+  maxRank?: number
+  lakeRank?: number
+  lineScale?: number
+  /** 像素坐标的 SVG 钩子：画中画的取景框/角标交给调用方拼进来 */
+  underSvg?: string
+  overSvg?: string
+  /** 高程缓存目录与瓦片下载器（预取复用/测试注入）；生产默认 DATA_ROOT/map-data/dem */
+  dem?: { cacheDir?: string; fetchTile?: DemTileFetcher }
 }
 
-/** Cache each actual source file, not merely the layer name (10m/50m differ). */
-const geoCache = new Map<string, unknown>()
-
-/** 缺某一层只跳过该层（底图仍可用），缺整个目录才抛 */
-function loadGeoLayer(name: GeoLayerName, riverScale: DatasetScale = '50m'): unknown | null {
-  const filename = name === 'rivers' ? `ne_${riverScale}_rivers_lake_centerlines.geojson` : GEO_FILES[name]
-  if (geoCache.has(filename)) return geoCache.get(filename) ?? null
-  const file = path.join(resolveGeoDir(), filename)
-  if (!fs.existsSync(file)) {
-    if (name === 'rivers') throw new Error(`地图河流底图文件缺失：${filename}；请随版本发布 backend/assets/geo，不能用另一精度的河道替代。`)
-    geoCache.set(filename, null)
-    return null
-  }
-  const parsed = JSON.parse(fs.readFileSync(file, 'utf8'))
-  geoCache.set(filename, parsed)
-  return parsed
-}
-
-/** 背景数据和语义目标使用相同投影；只裁背景，不修改用户指定的坐标或路线。 */
-function projectContext(spec: MapSpec, size: MapCanvasSize) {
-  const projection = mapProjectionFor(spec, size)
-  const [west, south, east, north] = spec.bbox
-  const sw = projection([west, south])!
-  const ne = projection([east, north])!
-  projection.clipExtent([[sw[0], ne[1]], [ne[0], sw[1]]])
-  const pathGen = geoPath(projection).digits(3)
-  const boundaries = loadGeoLayer('admin1') as { features: Parameters<typeof pathGen>[0][] } | null
-  const boundaryPaths = (boundaries?.features ?? []).map(feature => pathGen(feature)).filter((d): d is string => Boolean(d))
-  const cities = loadGeoLayer('cities') as { features: Array<{ geometry: { type: string; coordinates: [number, number] } }> } | null
-  const cityPoints: Array<[number, number]> = []
-  for (const feature of cities?.features ?? []) {
-    if (feature.geometry.type !== 'Point') continue
-    const [lon, lat] = feature.geometry.coordinates
-    if (lon < west || lon > east || lat < south || lat > north) continue
-    const point = projection([lon, lat])
-    if (point) cityPoints.push([point[0], point[1]])
-  }
-  const warnings: string[] = []
-  if (!boundaryPaths.length) warnings.push('Natural Earth 50m 在当前范围未覆盖省界；不能提供该层地理上下文。')
-  if (!cityPoints.length) warnings.push('Natural Earth 50m 在当前范围未覆盖城市点；未补造城市细节。')
-  const coverage: MapContextCoverage = {
-    disclaimer: '省界与城市背景点仅为 Natural Earth 50m 现代定位参照，不表示古代疆界或已审核的历史地点。',
-    boundary_features: boundaryPaths.length,
-    city_points: cityPoints.length,
-    warnings,
-  }
-  return { boundaryPaths, cityPoints, coverage }
-}
-
-// ---------------------------------------------------------------- 配色与 SVG
-
-interface MapTheme { background: string; land: string; landStroke: string; countryStroke: string }
-
-const THEMES: Record<MapSpec['style']['theme'], MapTheme> = {
-  // 米黄纸底 + 棕灰陆地：档案风
-  archival: { background: '#efe4cc', land: '#cdbfa4', landStroke: '#8a7c62', countryStroke: '#9c8f76' },
-  clean: { background: '#ffffff', land: '#e6e6e6', landStroke: '#9a9a9a', countryStroke: '#b4b4b4' },
-  ink: { background: '#e8e8e8', land: '#4a4a4a', landStroke: '#2a2a2a', countryStroke: '#6a6a6a' },
-}
-
-/** Legacy specs retain their old colors; a resolved family owns every basemap color. */
-export function mapBasePalette(spec: Pick<MapSpec, 'style'>) {
-  const family = spec.style.map_style ? mapStyleFamily(spec.style.map_style) : null
-  return family ? {
-    background: family.palette.background, land: family.palette.land,
-    landStroke: family.lines.coast.stroke, countryStroke: family.palette.boundary,
-    water: family.palette.water, route: family.lines.routes.stroke, region: family.lines.regions.fill,
-  } : { ...THEMES[spec.style.theme], water: MAP_WATER_COLOR, route: MAP_ROUTE_COLOR, region: MAP_REGION_COLOR }
-}
-
-function escapeAttr(value: string): string {
-  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
-}
-
-function round(value: number): number {
-  return Math.round(value * 100) / 100
+/** 与 PNG 同名的 sidecar：缓存命中时不重新渲染也能还原 provenance（高程档位、水系统计） */
+interface MapBaseSidecar {
+  relief: ReliefRenderSummary
+  warnings: string[]
+  dem_manifest_sha256: string | null
 }
 
 /**
- * 生成底图 SVG。导出只为测试断言「不含任何 <text 元素」。
- * 注意：这里一个字都不能写——地图文字由叠加图层负责。
+ * 会改变像素的渲染口径（不含高程缓存/下载器与尺寸）。
+ * 它必须进签名：叙事豁免河、预取命名河流、设色锚点、画中画钩子都会改图，
+ * 不进签名就会把「不带乌格拉河」的那张图当成「带乌格拉河」的复用回来。
  */
-export function buildMapSvg(spec: MapSpec, size: MapCanvasSize, riverSource: DatasetScale = riverSourceScale(spec)): string {
-  const theme = mapBasePalette(spec)
-  const family = spec.style.map_style ? mapStyleFamily(spec.style.map_style) : null
-  const projection = mapProjectionFor(spec, size)
-  // digits 固定小数位：同 spec 必定生成同一串 path，保证字节级确定性
-  const pathGen = geoPath(projection).digits?.(3) ?? geoPath(projection)
-
-  const parts: string[] = []
-  parts.push(`<rect x="0" y="0" width="${size.width}" height="${size.height}" fill="${theme.background}"/>`)
-
-  const dotRadius = family ? family.markers.city.dot_radius * size.height : Math.max(6, size.height / 180)
-  const strokeWidth = family ? family.lines.routes.width * size.height : Math.max(4, size.height / 360)
-  const hair = Math.max(1, size.height / 1080)
-
-  const draw = (name: GeoLayerName, attrs: string) => {
-    const data = loadGeoLayer(name, riverSource) as { features?: unknown[] } | null
-    if (!data?.features) return
-    const d = pathGen({ type: 'FeatureCollection', features: data.features } as never)
-    if (d) parts.push(`<path d="${d}" ${attrs}/>`)
-  }
-
-  if (spec.layers.land) draw('land', `fill="${theme.land}" stroke="none"`)
-  if (spec.layers.lakes) draw('lakes', `fill="${theme.water}" stroke="none"`)
-  if (spec.layers.rivers) {
-    draw('rivers', `fill="none" stroke="${theme.water}" stroke-width="${round(family ? family.lines.river_minor.width * size.height : hair * 2)}" stroke-linejoin="round" stroke-linecap="round"`)
-  }
-  if (spec.layers.countries) {
-    draw('countries', `fill="none" stroke="${theme.countryStroke}" stroke-width="${round(family ? family.lines.border_uncertain.width * size.height : hair * 1.5)}" stroke-dasharray="${round(hair * 8)} ${round(hair * 6)}"`)
-  }
-  if (spec.layers.coastline) {
-    draw('coastline', `fill="none" stroke="${theme.landStroke}" stroke-width="${round(family ? family.lines.coast.width * size.height : hair * 2)}" stroke-linejoin="round"`)
-  }
-
-  const context = projectContext(spec, size)
-  // 低对比、无文字；背景小点不同于蓝色已指定地点，不能混入 points 语义结果。
-  parts.push(`<g data-context="admin1" fill="none" stroke="${theme.countryStroke}" stroke-opacity="0.65" stroke-width="${round(family ? family.lines.border_uncertain.width * size.height * .6 : hair)}">`)
-  for (const d of context.boundaryPaths) parts.push(`<path d="${d}"/>`)
-  parts.push('</g>')
-  parts.push(`<g data-context="cities" fill="${theme.landStroke}" fill-opacity="0.65">`)
-  for (const point of context.cityPoints) {
-    parts.push(`<circle cx="${round(point[0])}" cy="${round(point[1])}" r="${round(Math.max(1.5, hair * 2))}"/>`)
-  }
-  parts.push('</g>')
-
-  // 面在线和点之下：范围是背景语义，绝不能盖住路线与地点。
-  // 逐点投影后画 <polygon>，不走 geoPath：d3 的球面多边形语义对环绕方向敏感（见 bboxPolygon 注释），
-  // 用户画的环方向不受控，按球面解释会把「一个省」变成「整个地球减去这个省」。
-  for (const region of spec.regions) {
-    const pts = region.points
-      .map(point => projection(point))
-      .filter((point): point is [number, number] => Array.isArray(point))
-      .map(point => `${round(point[0])},${round(point[1])}`)
-    if (pts.length < 3) continue
-    parts.push(
-      `<polygon points="${pts.join(' ')}" fill="${theme.region}" fill-opacity="${family?.lines.regions.fill_opacity ?? .28}"`
-      + ` stroke="${family?.lines.regions.stroke ?? theme.region}" stroke-width="${round(family ? family.lines.regions.stroke_width * size.height : strokeWidth * .7)}" stroke-linejoin="round"`
-      + ` data-region="${escapeAttr(region.id)}"/>`,
-    )
-  }
-
-  for (const route of spec.routes) {
-    const pts = route.points
-      .map(point => projection(point))
-      .filter((point): point is [number, number] => Array.isArray(point))
-      .map(point => `${round(point[0])},${round(point[1])}`)
-    if (pts.length < 2) continue
-    parts.push(
-      `<polyline points="${pts.join(' ')}" fill="none" stroke="${theme.route}"`
-      + ` stroke-width="${round(strokeWidth)}" stroke-linejoin="round" stroke-linecap="round" data-route="${escapeAttr(route.id)}"/>`,
-    )
-  }
-
-  for (const place of spec.places) {
-    const point = projection([place.lon, place.lat])
-    if (!point) continue
-    parts.push(
-      `<circle cx="${round(point[0])}" cy="${round(point[1])}" r="${round(dotRadius)}"`
-      + ` fill="${family?.markers.city.color ?? theme.route}" stroke="${family?.markers.city.stroke ?? '#ffffff'}" stroke-width="${round(dotRadius / 3)}" data-place="${escapeAttr(place.id)}"/>`,
-    )
-  }
-
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size.width}" height="${size.height}"`
-    + ` viewBox="0 0 ${size.width} ${size.height}">${parts.join('')}</svg>`
+export interface ReliefSignature {
+  role?: ReliefRole
+  anchors?: { p2: number; p98: number } | null
+  exemptRivers?: string[]
+  namedRivers?: string[]
+  maxRank?: number
+  lakeRank?: number
+  lineScale?: number
+  params?: Partial<ReliefParams>
+  underSvg?: string
+  overSvg?: string
 }
 
-// ---------------------------------------------------------------- 渲染
+/** 键/河名排序后再序列化：同一套豁免写法无论顺序都得到同一个签名 */
+function canonicalReliefOptions(relief: ReliefSignature): string {
+  const names = (values?: string[]): string[] | null => values ? [...values].map(name => name.toLowerCase()).sort() : null
+  return JSON.stringify({
+    role: relief.role ?? null,
+    anchors: relief.anchors ? [relief.anchors.p2, relief.anchors.p98] : null,
+    exempt: names(relief.exemptRivers),
+    named: names(relief.namedRivers),
+    maxRank: relief.maxRank ?? null,
+    lakeRank: relief.lakeRank ?? null,
+    lineScale: relief.lineScale ?? null,
+    params: relief.params ? Object.keys(relief.params).sort().map(key => [key, String(relief.params![key as keyof ReliefParams])]) : null,
+    under: relief.underSvg ?? null,
+    over: relief.overSvg ?? null,
+  })
+}
 
-/** 同 spec + 同尺寸 → 同签名（用于复用已渲染文件与断言确定性） */
-export function mapBaseSignature(spec: MapSpec, size: MapCanvasSize, riverSource: DatasetScale = riverSourceScale(spec)): string {
+/** 同 spec + 同尺寸 + 同渲染口径 → 同签名（用于复用已渲染文件与断言确定性） */
+export function mapBaseSignature(
+  spec: MapSpec,
+  size: MapCanvasSize,
+  riverSource: DatasetScale = riverSourceScale(spec),
+  relief?: ReliefSignature,
+): string {
   const canvas = normalizeMapCanvas(size)
   // 字段顺序固定，避免对象字面量书写顺序影响签名
   const canonical = JSON.stringify({
     v: spec.version,
-    renderer: 2,
+    // 3 = 高程晕渲 + 分级水系管线（Issue #107 阶段 1）：2 号渲染器落盘的平涂底图一律不复用
+    renderer: 3,
     // Keep all legacy/overview signatures byte-identical; only 10m adds a source key.
     ...(riverSource === '10m' ? { rv: '10m' } : {}),
+    ...(relief ? { ru: canonicalReliefOptions(relief) } : {}),
     p: spec.projection.type,
     b: spec.bbox,
     l: [spec.layers.land, spec.layers.coastline, spec.layers.rivers, spec.layers.lakes, spec.layers.countries],
@@ -597,40 +512,88 @@ export function mapBaseSignature(spec: MapSpec, size: MapCanvasSize, riverSource
   return crypto.createHash('sha256').update(canonical).digest('hex').slice(0, 32)
 }
 
-/** 渲染底图并落盘。默认 3840×2160（16:9）。**绝不渲染任何文字**（地名/图例/刻度一律没有）。 */
-export async function renderMapBase(spec: MapSpec, opts?: Partial<MapCanvasSize> & { riverSource?: MapRiverSourceInfo }): Promise<MapRenderResult> {
+/**
+ * 渲染底图并落盘。默认 3840×2160（16:9），竖版/方图由 canvasForAspect 给出宽高后传入。
+ * 渲染前先确保该帧的高程瓦片在本地（只下载缺的那几张）；渲染阶段只读缓存。
+ * **绝不渲染任何文字**（地名/图例/刻度一律没有）。
+ */
+export async function renderMapBase(
+  spec: MapSpec,
+  opts?: Partial<MapCanvasSize> & MapRenderOptions,
+): Promise<MapRenderResult> {
   const size = normalizeMapCanvas(opts)
   const riverSource = opts?.riverSource ?? resolveRiverSource(spec)
-  const signature = mapBaseSignature(spec, size, riverSource.scale)
+  const role: ReliefRole = opts?.role ?? (spec.detail_level === 'regional' || spec.detail_level === 'site' ? 'detail' : 'overview')
+  const reliefSignature: ReliefSignature = {
+    role,
+    anchors: opts?.anchors ?? null,
+    ...(opts?.exemptRivers ? { exemptRivers: opts.exemptRivers } : {}),
+    ...(opts?.namedRivers ? { namedRivers: opts.namedRivers } : {}),
+    ...(opts?.maxRank !== undefined ? { maxRank: opts.maxRank } : {}),
+    ...(opts?.lakeRank !== undefined ? { lakeRank: opts.lakeRank } : {}),
+    ...(opts?.lineScale !== undefined ? { lineScale: opts.lineScale } : {}),
+    ...(opts?.params ? { params: opts.params } : {}),
+    ...(opts?.underSvg ? { underSvg: opts.underSvg } : {}),
+    ...(opts?.overSvg ? { overSvg: opts.overSvg } : {}),
+  }
+  const signature = mapBaseSignature(spec, size, riverSource.scale, reliefSignature)
   const dir = path.join(STORAGE_ROOT, 'map-bases')
   const filename = `${signature}.png`
   const absolute = path.join(dir, filename)
+  const sidecarFile = path.join(dir, `${signature}.json`)
+  const projection = mapProjectionFor(spec, size)
 
-  let reused = false
+  let cached: { buffer: Buffer; sidecar: MapBaseSidecar } | null = null
+  if (fs.existsSync(absolute) && fs.existsSync(sidecarFile)) {
+    try {
+      cached = { buffer: fs.readFileSync(absolute), sidecar: JSON.parse(fs.readFileSync(sidecarFile, 'utf8')) as MapBaseSidecar }
+    } catch {
+      // sidecar 读坏了当缓存未命中重渲：宁可多花一次渲染，也不复用出处不明的图
+      cached = null
+    }
+  }
+
   let buffer: Buffer
-  if (fs.existsSync(absolute)) {
+  let sidecar: MapBaseSidecar
+  let reused = false
+  if (cached) {
+    buffer = cached.buffer
+    sidecar = cached.sidecar
     reused = true
-    buffer = fs.readFileSync(absolute)
   } else {
-    const svg = buildMapSvg(spec, size, riverSource.scale)
-    buffer = await sharp({
-      create: {
-        width: size.width,
-        height: size.height,
-        channels: 4,
-        background: mapBasePalette(spec).background,
-      },
+    const zoom = chooseDemZoom(spec.bbox, size, role)
+    // 预取（只下载缺失瓦片）必须先于渲染：渲染器本身只读缓存，缺瓦片会直接报错
+    const prefetch = await ensureDemTiles({
+      projection, width: size.width, height: size.height, zoom,
+      cacheDir: opts?.dem?.cacheDir, fetchTile: opts?.dem?.fetchTile,
     })
-      .composite([{ input: Buffer.from(svg) }])
-      .png()
-      .toBuffer()
+    const relief = await renderReliefBase(spec, size, {
+      role,
+      anchors: opts?.anchors ?? null,
+      params: opts?.params,
+      demZoom: zoom,
+      demCacheDir: opts?.dem?.cacheDir,
+      exemptRivers: opts?.exemptRivers,
+      namedRivers: opts?.namedRivers,
+      maxRank: opts?.maxRank,
+      lakeRank: opts?.lakeRank,
+      lineScale: opts?.lineScale,
+      underSvg: opts?.underSvg,
+      overSvg: opts?.overSvg,
+    })
+    buffer = relief.buffer
+    sidecar = {
+      relief: relief.summary,
+      warnings: relief.warnings,
+      dem_manifest_sha256: prefetch.manifest_sha256 ?? demManifestSha256(opts?.dem?.cacheDir),
+    }
     fs.mkdirSync(dir, { recursive: true })
     fs.writeFileSync(absolute, buffer)
+    fs.writeFileSync(sidecarFile, JSON.stringify(sidecar, null, 2))
     // 底图选择/结果画廊用缩略图（Issue #106）；失败只记日志，不影响渲染
     await generateImageThumb(`static/map-bases/${filename}`)
   }
 
-  const projection = mapProjectionFor(spec, size)
   const points: MapProjectedPoint[] = []
   for (const place of spec.places) {
     const at = projection([place.lon, place.lat])
@@ -644,7 +607,7 @@ export async function renderMapBase(spec: MapSpec, opts?: Partial<MapCanvasSize>
       .map(point => projection(point))
       .filter((point): point is [number, number] => Array.isArray(point))
       .map(point => [point[0], point[1]] as [number, number]),
-    color: mapBasePalette(spec).route,
+    color: MAP_ROUTE_COLOR,
   }))
   const regions: MapProjectedRegion[] = spec.regions.map(region => ({
     id: region.id,
@@ -653,7 +616,7 @@ export async function renderMapBase(spec: MapSpec, opts?: Partial<MapCanvasSize>
       .map(point => projection(point))
       .filter((point): point is [number, number] => Array.isArray(point))
       .map(point => [point[0], point[1]] as [number, number]),
-    color: mapBasePalette(spec).region,
+    color: MAP_REGION_COLOR,
   }))
 
   return {
@@ -665,7 +628,9 @@ export async function renderMapBase(spec: MapSpec, opts?: Partial<MapCanvasSize>
     points,
     routes,
     regions,
-    context: projectContext(spec, size).coverage,
+    relief: sidecar.relief,
+    dem: { zoom: sidecar.relief.dem_zoom, manifest_sha256: sidecar.dem_manifest_sha256 },
+    warnings: sidecar.warnings,
     reused,
   }
 }

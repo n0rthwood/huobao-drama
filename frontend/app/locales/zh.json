@@ -1816,6 +1816,7 @@
       "timeRequired": "场景时间不能为空",
       "refSectionTitle": "参考图",
       "refSectionHint": "引导生成，不是成片图；可添加、删除或从素材库选择",
+      "referenceMissing": "参考图里有 {n} 张的文件已不存在（{files}），本次生成只发送了其余参考图；请删除失效条目后重试",
       "assetTypeLabel": "资产类型",
       "mapDescription": "地图说明（范围与目的）",
       "assetType": {
@@ -3660,7 +3661,7 @@
       "textConfig": "文本模型配置",
       "imageModel": "图像模型",
       "defaultConfig": "使用默认",
-      "textureHint": "图像模型只用于生成纹理与底色，不参与任何地理形状的决定。",
+      "textureHint": "新版底图不再生成质感底纹，这里的图像模型不会产生任何图片任务（仅为兼容保留）。",
       "briefTitle": "任务说明",
       "briefHint": "对象、年代、地域、用途足够明确，后续考证与底图才站得住",
       "saveBrief": "保存说明",
@@ -3832,7 +3833,10 @@
       "uncertaintiesTitle": "不确定之处",
       "warningsTitle": "绘制时的质量提醒（{n} 条）",
       "calibrationEvidence": "Earth 实测控制点证据",
-      "calibrationCheck": "独立检验 {n} 点 · 均方根 {rms}px · 最大偏差 {max}px"
+      "calibrationCheck": "独立检验 {n} 点 · 均方根 {rms}px · 最大偏差 {max}px",
+      "styleSkipped": "底纹阶段已跳过：新底图用高程晕渲与分级水系取得对比度，不再叠纸纹；成品直接用底图绘制。",
+      "pipDetail": "细节 {no}：{label}",
+      "pipComposite": "画中画组合图"
     },
     "preview": {
       "close": "关闭大图",
@@ -3960,7 +3964,41 @@
       "projection": "投影",
       "features": "点线面几何",
       "featureCounts": "{places} 点 / {routes} 线 / {regions} 面",
-      "layers": "可编辑图层"
+      "layers": "可编辑图层",
+      "pipRollbackHint": "细节取景框由底图阶段提出：要改框就回退到「底图」重跑，细节图会在「交付」时按新框重绘。"
+    },
+    "pip": {
+      "title": "画中画（全览 + 细节）",
+      "hint": "全览建立位置与趋势，细节图让人看清事件处的山川河流；每个细节是独立资产，分镜可单独引用。",
+      "layout": "版式 {id} · {family} · 标注：{tier}",
+      "aspect": "画幅 {aspect}",
+      "family": {
+        "A": "全览为主（建立镜头）",
+        "B": "细节为主（叙事停留）"
+      },
+      "labelTier": {
+        "full": "完整",
+        "reduced": "二级",
+        "focus_only": "仅重点"
+      },
+      "role": {
+        "primary": "重点",
+        "aux": "辅助"
+      },
+      "storyboards": "对应分镜 {numbers}",
+      "noStoryboard": "未标注对应分镜",
+      "bbox": "取景范围（西/南/东/北）：{bbox}",
+      "detailPending": "细节图在「交付」登记时渲染，当前还没有图。",
+      "compositeTitle": "组合图",
+      "compositePending": "组合图在「交付」登记时渲染，当前还没有图。",
+      "usageTitle": "用法说明",
+      "noFrames": "这张图没有细节框：只交付全览，不拆画中画。",
+      "factSummary": "{n} 个细节 · 版式 {id}（{family}，标注：{tier}）",
+      "detailsTitle": "细节图",
+      "renderedDetails": "已渲染 {n} 张",
+      "overviewBadge": "画中画 · {n} 个细节",
+      "detailBadge": "细节 {no} · 属于《{name}》",
+      "stale": "已过期"
     },
     "researchPanel": {
       "title": "要素来源与核验",

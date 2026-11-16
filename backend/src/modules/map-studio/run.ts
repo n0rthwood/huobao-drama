@@ -1,8 +1,5 @@
 /** Map Studio stage engine. Ported from #84/#90; module runs own execution records. */
 import crypto from 'node:crypto'
-import sharp from 'sharp'
-import { setTimeout as sleep } from 'node:timers/promises'
-import { getAbsolutePath } from '../../utils/storage.js'
 import { now } from '../../utils/response.js'
 import { logTaskError, logTaskStart, logTaskSuccess, logTaskWarn } from '../../utils/task-logger.js'
 import { resolveStageModel, StageVisionUnavailableError } from '../../services/ai-stages.js'
@@ -17,8 +14,9 @@ import { runBaseStage } from './base.js'
 import { backgroundProblems, renderMapLayerDoc, runDrawingStage } from './drawing.js'
 import { recordAttempt } from './agent-loop.js'
 import { buildDeliverable, deliverCurrent } from './delivery.js'
-import { getMapStudioPlatform } from './registry.js'
-import { activeRunOfTask, insertRun, finishRun, readRunParams, patchRunParams, updateRunStage, selectRunsByTask } from './db.js'
+import { getHost } from './registry.js'
+import { renderPipAssets } from './pip/render.js'
+import { activeRunOfTask, insertRun, finishRun, updateRunStage } from './db.js'
 import { readModels, readDefaultStyle } from './settings.js'
 import { MapStudioConflictError, MapStudioStaleError, MapStudioRequestError, briefHash, loadTask, mutateTask, serializeDetail, setStep, stageIndex, restoreSnapshot, requireHostTarget, type MapStudioDetail, type MutateContext } from './store.js'
 import { MAP_INFRA_RETRIES, MAP_MAX_ROLLBACKS, MAP_WORKFLOW_STAGES, STAGE_LABEL, isMapAgentStage, normalizeBrief, type MapBrief, type MapResearch, type MapResearchFeature, type MapWorkflowIssue, type MapWorkflowMode, type MapWorkflowStage } from './types.js'
@@ -27,13 +25,9 @@ import { inspectLayerDraft, layerDraftContext } from './layer-edit.js'
 import { validateLayerOptions } from './render/smooth.js'
 import { MapWorkflowValidationError } from './types.js'
 import { beginStageSpan, endStageSpan } from './stage-spans.js'
-import { resolveMapStyle, textureHintFor, type ResolvedMapStyle } from './styles/index.js'
+import { resolveMapStyle } from './styles/index.js'
 
 export interface MapRunOptions { textConfigId?: number; imageConfigId?: number; imageModel?: string }
-const IMAGE_WAIT_TIMEOUT_MS = 20 * 60_000
-const IMAGE_POLL_INTERVAL_MS = 5000
-const TEXTURE_PROMPT = 'seamless aged paper texture background only, parchment fiber grain, subtle ink wash stains, soft vignette, uniform tone, absolutely no map, no coastline, no rivers, no borders, no roads, no landmass, no continents, no text, no letters, no numbers, no symbols, no compass, no illustration, no objects'
-const TEXTURE_THEME_HINT: Record<MapSpec['style']['theme'], string> = { archival: 'warm sepia archival parchment tone', clean: 'light neutral paper tone, very low contrast grain', ink: 'cool grey rice-paper tone with faint ink diffusion' }
 function nextStage(stage: MapWorkflowStage): MapWorkflowStage | null {
   const idx = stageIndex(stage)
   return idx >= 0 && idx < MAP_WORKFLOW_STAGES.length - 1 ? MAP_WORKFLOW_STAGES[idx + 1]! : null
@@ -115,33 +109,12 @@ export function adoptResearchIntoSpec(spec: MapSpec | null, research: MapResearc
 }
 
 
-/** Claim opaque image references in run.params before waiting; restarts/retries reuse paid texture. */
-async function generateTexture(input: { taskId: number; runId: number; theme: MapSpec['style']['theme']; mapStyle: ResolvedMapStyle | null; opts: MapRunOptions }): Promise<{ path: string }> {
-  const loaded = await loadTask(input.taskId)
-  if (!loaded) throw new MapStudioRequestError('任务不存在', 'not_found')
-  const platform = getMapStudioPlatform()
-  const params = readRunParams(input.runId)
-  const styleKey = input.mapStyle?.id ?? input.theme
-  let ref = typeof params.map_texture_ref === 'string' && params.map_texture_theme === styleKey ? params.map_texture_ref : null
-  if (ref) {
-    const previous = await platform.pollImage(ref)
-    if (previous.status !== 'pending' && previous.status !== 'completed') ref = null
-  }
-  if (!ref) {
-    const submitted = await platform.submitImage({ prompt: `${TEXTURE_PROMPT}, ${input.mapStyle ? textureHintFor(input.mapStyle.family) : TEXTURE_THEME_HINT[input.theme]}`, size: '1920x1080', configId: input.opts.imageConfigId, model: input.opts.imageModel, label: loaded.row.title, hostRef: loaded.row.host_ref })
-    ref = submitted.ref
-    patchRunParams(input.runId, { map_texture_ref: ref, map_texture_theme: styleKey, map_style: input.mapStyle?.id ?? null })
-  }
-  const deadline = Date.now() + IMAGE_WAIT_TIMEOUT_MS
-  for (;;) {
-    const current = await loadTask(input.taskId)
-    if (current?.state.run_id !== input.runId) throw new MapStudioStaleError('底纹等待已取消或由其他运行接管')
-    const image = await platform.pollImage(ref)
-    if (image.status === 'completed' && image.path) return { path: image.path }
-    if (image.status !== 'pending' && image.status !== 'completed') throw new Error(`质感底纹生成失败：${image.error || image.status}；可换图片模型后重试，或跳过底纹`)
-    if (Date.now() > deadline) throw new Error('等待底纹生成超时（20 分钟）')
-    await sleep(IMAGE_POLL_INTERVAL_MS)
-  }
+/** 项目画幅与底图画布比例不符（项目设置改过画幅）：底图要按新画幅重做 */
+function canvasMismatch(brief: MapBrief, base: { width: number; height: number }): string | null {
+  if (!brief.aspect_ratio) return null
+  const [w, h] = brief.aspect_ratio.split(':').map(Number) as [number, number]
+  const wanted = w / h, actual = base.width / base.height
+  return Math.abs(actual - wanted) / wanted > 0.02 ? `项目画幅已是 ${brief.aspect_ratio}，当前底图 ${base.width}×${base.height} 比例不符，底图需要按新画幅重做` : null
 }
 
 interface StageOutcome { proceed: boolean; message: string; next?: MapWorkflowStage }
@@ -167,7 +140,7 @@ async function applyRollback(input: { taskId: number; runId: number; from: MapWo
       agent.feedback[input.target] = `来自「${STAGE_LABEL[input.from]}」的回退（第 ${used + 1}/${MAP_MAX_ROLLBACKS} 次）：${input.reason}`
       agent.attempts = [...agent.attempts, { run_id: input.runId, stage: input.from, round: 0, outcome: 'rollback' as const, problems: [input.reason], target_stage: input.target, at: now() }].slice(-80)
       const target = stageIndex(input.target)
-      if (target <= stageIndex('base')) { ctx.state.outputs.base_image = null; ctx.state.outputs.kmz = null }
+      if (target <= stageIndex('base')) { ctx.state.outputs.base_image = null; ctx.state.outputs.kmz = null; ctx.state.outputs.pip = null }
       // Texture depends only on theme; preserve its claim and output across rollbacks.
       ctx.state.outputs.final_image = null
       ctx.state.outputs.layer_doc = null
@@ -241,24 +214,28 @@ async function executeStageWork(taskId: number, runId: number, stage: MapWorkflo
   }
   if (stage === 'base') {
     if (!loaded.mapSpec) throw new MapStudioRequestError('还没有地图几何，请先完成资料检索或人工填写地点', 'missing_map_spec')
-    const outcome = await runBaseStage({ ...await agentInput(), spec: loaded.mapSpec })
+    const host = loaded.row.host ? getHost(loaded.row.host) : null
+    const context = host?.readContext && loaded.row.host_ref ? await host.readContext(loaded.row.host_ref) : null
+    const outcome = await runBaseStage({ ...await agentInput(), spec: loaded.mapSpec, context })
     if (outcome.kind === 'rollback') return rollback(outcome)
-    const { artifact, mode: baseMode, spec } = outcome.result
+    const { artifact, mode: baseMode, spec, pip } = outcome.result
     return finish(ctx => {
       ctx.state.outputs.base_image = { path: artifact.path, width: artifact.width, height: artifact.height, source: `map-base:${baseMode}`, run_id: runId, provenance: artifact.provenance }
       ctx.state.outputs.kmz = artifact.kmz_path ? { path: artifact.kmz_path, provenance: artifact.provenance } : null
+      ctx.state.outputs.pip = pip
       ctx.mapSpec = spec
-    }, { proceed: true, message: `底图已生成（${baseMode}，bbox ${JSON.stringify(spec.bbox)}，${artifact.width}×${artifact.height}）；版本将在交付时登记` })
+    }, { proceed: true, message: `底图已生成（${baseMode}，bbox ${JSON.stringify(spec.bbox)}，${artifact.width}×${artifact.height}）${pip ? `；细节框 ${pip.frames.length} 个，版式 ${pip.layout.id}` : ''}；版本将在交付时登记` })
   }
   if (stage === 'style') {
-    const texture = await withInfraRetry(taskId, runId, stage, () => generateTexture({ taskId, runId, theme: selectedStyle?.theme ?? brief.style, mapStyle: selectedStyle, opts }))
-    const meta = await sharp(getAbsolutePath(texture.path)).metadata()
-    return finish(ctx => { ctx.state.outputs.texture_image = { path: texture.path, width: meta.width ?? 0, height: meta.height ?? 0, source: 'diffusion-texture', run_id: runId, provenance: { map_style: selectedStyle?.id ?? null, note: '扩散模型只生成纸张/底纹质感，不参与任何地理几何', prompt: `${TEXTURE_PROMPT}, ${selectedStyle ? textureHintFor(selectedStyle.family) : TEXTURE_THEME_HINT[brief.style]}` } } }, { proceed: true, message: '质感底纹已生成（只铺背景，不覆盖地理）' })
+    // #107：新底图以高程晕渲与分级水系取得对比度，不再叠纸纹；质感底纹步骤保留在流程里但不再出图（不占图片额度）。
+    return finish(ctx => { ctx.state.outputs.texture_image = null }, { proceed: true, message: '已跳过质感底纹：新底图不叠纸纹' })
   }
   if (stage === 'drawing') {
     const spec = loaded.mapSpec
     const base = state.outputs.base_image
     if (!spec || !base) throw new MapStudioRequestError('缺少底图或地图几何，请先完成底图步骤', 'missing_base')
+    const mismatch = canvasMismatch(brief, base)
+    if (mismatch) return rollback({ stage: 'base', reason: mismatch })
     const background = await prepareMapBackground({ basePath: base.path, registration: base.provenance && 'registration' in base.provenance ? base.provenance.registration : undefined, texturePath: state.outputs.texture_image?.path })
     const outcome = await runDrawingStage({ ...await agentInput(), spec, background, layerOptions: state.outputs.layer_options })
     if (outcome.kind === 'rollback') return rollback(outcome)
@@ -270,7 +247,16 @@ async function executeStageWork(taskId: number, runId: number, stage: MapWorkflo
       ctx.state.issues = [...ctx.state.issues.filter(issue => issue.code !== 'drawing_warning' && issue.code !== 'drawing_omitted'), ...background.warnings.map((message): MapWorkflowIssue => ({ field: 'drawing', code: 'drawing_warning', message, blocking: false })), ...omitted.map((item): MapWorkflowIssue => ({ field: 'drawing', code: 'drawing_omitted', blocking: false, message: `要素 ${item.feature_id} 未画入成图：${item.reason}` }))]
     }, { proceed: true, message: `已用图层文档作图（${doc.layers.length} 个图层，${rendered.width}×${rendered.height}）；待交付后成为宿主当前图` })
   }
-  try { buildDeliverable(loaded) } catch (err) { return rollback({ stage: 'drawing', reason: err instanceof Error ? err.message : String(err) }) }
+  // 画中画：交付前确定性渲染各细节整屏图与组合图（同 spec + 取景 + 版式 => 同像素；失败按基础设施失败自动重试）
+  let deliverable = loaded
+  const plan = loaded.state.outputs.pip
+  if (plan?.frames.length && loaded.mapSpec && loaded.state.outputs.base_image && loaded.state.outputs.final_image) {
+    const base = loaded.state.outputs.base_image, final = loaded.state.outputs.final_image
+    const rendered = await withInfraRetry(taskId, runId, stage, () => renderPipAssets({ spec: loaded.mapSpec!, pip: plan, overviewBase: base, overviewFinal: final }))
+    await mutateTask(taskId, { expectedRunId: runId, expectedBriefHash: hashAtStart, action: 'pip_rendered', actor: mode === 'auto' ? 'auto' : 'manual', note: `细节 ${rendered.details.length} 个，版式 ${rendered.layout.id}`, mutate: ctx => { ctx.state.outputs.pip = rendered } })
+    deliverable = (await loadTask(taskId)) ?? loaded
+  }
+  try { buildDeliverable(deliverable) } catch (err) { return rollback({ stage: 'drawing', reason: err instanceof Error ? err.message : String(err) }) }
   return withInfraRetry(taskId, runId, stage, async () => {
     const delivered = await deliverCurrent(taskId, { runId, briefHash: hashAtStart })
     return finish(() => {}, { proceed: false, message: delivered.message })
@@ -357,10 +343,7 @@ async function startRun(taskId: number, input: { mode: MapWorkflowMode; expected
     } }))
   }
   const stageModel = await resolveStageModel(startStage === 'base' || startStage === 'drawing' ? 'read_image' : 'asset_research', { configId: opts.textConfigId })
-  const previousRunId = loaded.state.run_id ?? selectRunsByTask(taskId, 1)[0]?.id
-  const previousParams = previousRunId ? readRunParams(previousRunId) : {}
-  const reuseTexture = (opts.imageConfigId ?? null) === loaded.state.image_config_id && (opts.imageModel ?? null) === loaded.state.image_model
-  const runId = insertRun({ taskId, mode: input.mode, startStage, stage: startStage, textConfigId: opts.textConfigId ?? null, imageConfigId: opts.imageConfigId ?? null, imageModel: opts.imageModel ?? null, params: reuseTexture ? { map_texture_ref: previousParams.map_texture_ref ?? null, map_texture_theme: previousParams.map_texture_theme ?? null } : {} })
+  const runId = insertRun({ taskId, mode: input.mode, startStage, stage: startStage, textConfigId: opts.textConfigId ?? null, imageConfigId: opts.imageConfigId ?? null, imageModel: opts.imageModel ?? null, params: null })
   let detail: MapStudioDetail
   try {
     detail = serializeDetail(await mutateTask(taskId, { expectedRevision: input.expectedRevision, requireIdle: true, action: input.mode === 'auto' ? `run:${startStage}` : `advance:${startStage}`, actor: 'manual', note: `模式 ${input.mode}`, mutate: ctx => {
@@ -544,6 +527,8 @@ export async function saveMapWorkflowDraft(taskId: number, body: {
           final_image: null,
           layer_doc: null,
           layer_options: keptOptions,
+          // 细节框落在全览取景内：取景改了就要重新提出；只改几何（不重做底图）时沿用
+          pip: reframed ? null : ctx.state.outputs.pip ?? null,
         }
         const resumeFrom: MapWorkflowStage = reframed ? 'base' : 'drawing'
         ctx.state.stage = stageIndex(ctx.state.stage) > stageIndex(resumeFrom) ? resumeFrom : ctx.state.stage

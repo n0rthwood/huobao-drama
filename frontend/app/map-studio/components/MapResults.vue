@@ -19,6 +19,11 @@
       </div>
     </section>
 
+    <!-- Issue #107：底纹步骤保留在流程里但不再出图（新底图靠高程晕渲取得对比度），这里如实说明，不当成缺失的失败 -->
+    <p v-if="styleSkipped" class="res-note dim">{{ t('mapStudio.results.styleSkipped') }}</p>
+
+    <MapPipResults v-if="outputs.pip" :pip="outputs.pip" @preview="emit('preview', $event)" />
+
     <section v-if="beforeCard && finalCard" class="res-block">
       <header class="res-head">
         <strong>{{ t('mapStudio.results.compareTitle') }}</strong>
@@ -112,10 +117,11 @@
  */
 import { useI18n } from 'vue-i18n'
 import type { MapResearch, MapStudioOutputs } from '~/map-studio/api'
-import { mapPreviewImage, type MapPreviewView } from '~/map-studio/utils/mapPreview'
+import { mapPreviewImage, type MapFixedPreviewView, type MapPreviewView } from '~/map-studio/utils/mapPreview'
 import { registrationSummary, type MapRegistration } from '~/map-studio/utils/mapRegistration'
 import { mediaUrl } from '~/utils/url'
 import { thumbFallback, thumbOf } from '~/composables/useMedia'
+import MapPipResults from '~/map-studio/components/MapPipResults.vue'
 
 const { t } = useI18n()
 
@@ -123,20 +129,22 @@ const props = defineProps<{
   outputs: MapStudioOutputs
   research: MapResearch | null
   registration: MapRegistration | null
+  /** 底纹阶段已完成/被跳过且确实没有纹理图（Issue #107）：成品直接用底图绘制，不是失败 */
+  styleSkipped?: boolean
 }>()
 
 const emit = defineEmits<{ (e: 'preview', view: MapPreviewView): void }>()
 
 interface ResultCard { key: string; view: MapPreviewView; url: string; label: string; width: number; height: number; source: string }
 
-function cardOf(view: Exclude<MapPreviewView, 'calibration'>): ResultCard | null {
+function cardOf(view: Exclude<MapFixedPreviewView, 'calibration'>): ResultCard | null {
   const image = mapPreviewImage(view, props.outputs, props.registration)
   if (!image) return null
   return {
     key: image.labelKey,
     view,
     url: image.url,
-    label: t(`mapStudio.results.${image.labelKey}`),
+    label: t(`mapStudio.results.${image.labelKey}`, image.labelParams ?? {}),
     width: image.width,
     height: image.height,
     source: image.source,

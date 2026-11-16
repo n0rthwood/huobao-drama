@@ -138,41 +138,16 @@ test('地图继续当前阶段：原件与成图原子采用，几何编辑复�
     assert.equal(state.status,'failed')
     assert.equal(state.steps.find(step=>step.id==='drawing').status,'failed')
     assert.equal(state.outputs.final_image.path,completedFinal,'restart preserves already-produced media')
-    // A paid texture may finish while the map runner is down. Resume must adopt
-    // that image, not submit another billable task or lose its origin.
-    const {createRequire}=await import('node:module')
-    const {mkdirSync,readFileSync,unlinkSync}=await import('node:fs')
-    const sharp=createRequire('file://${backend}package.json')('sharp')
-    mkdirSync(process.env.STORAGE_PATH+'/map-textures',{recursive:true})
-    const texturePath='static/map-textures/recovered.png'
-    await sharp({create:{width:16,height:16,channels:3,background:'#e2d5ba'}}).png().toFile(process.env.HUOBAO_DATA_DIR+'/'+texturePath)
-    const imageId=getInsertId(await db.insert(schema.sysTask).values({
-      type:'image',dramaId,provider:'qwen-jobs',model:'fixture-image',
-      params:JSON.stringify({map_texture:{prop_id:propId,prop_name:'测试区位图'}}),
-      status:'completed',localPath:texturePath,createdAt:ts,updatedAt:ts,
-    }))
-    const interruptedId=insertRun({taskId:propId,mode:'auto',startStage:'style',stage:'style',textConfigId:configId,imageConfigId:null,imageModel:null,params:{map_texture_ref:String(imageId),map_texture_theme:'atlas-tint'}})
-    await mutateWorkflow(propId,{action:'fixture_texture_interruption',actor:'system',mutate:ctx=>{
-      ctx.state.stage='style';ctx.state.status='running';ctx.state.run_id=interruptedId
-      ctx.state.steps.find(step=>step.id==='style').status='running'
-    }})
-    await failInterruptedMapWorkflows()
-    loaded=await loadWorkflow(propId)
-    await startMapWorkflow(propId,{mode:'auto',expectedRevision:loaded.state.revision,textConfigId:configId})
-    state=await settle()
-    assert.equal(state.status,'completed',state.error)
-    assert.equal(state.outputs.texture_image.path,texturePath,'restart must reuse the paid texture task')
-    assert.equal((await getProp(propId)).imageUrl,state.outputs.final_image.path)
-    assert.equal(JSON.parse((await getProp(propId)).semantics).image.source_task_id,state.deliveries[0].version_ids[1])
-    const texturedBase=state.outputs.base_image.run_id
+    // 质感底纹已取消（#107）：回退到作图后只重画标注，底图沿用，不再产生任何底纹
+    const keptBaseRun=state.outputs.base_image.run_id
     await rollbackMapWorkflow(propId,'drawing',state.revision)
     loaded=await loadWorkflow(propId)
-    assert.equal(loaded.state.outputs.texture_image.path,texturePath,'rolling back drawing must preserve completed upstream texture')
+    assert.equal(loaded.state.outputs.texture_image,null)
     await startMapWorkflow(propId,{mode:'auto',expectedRevision:loaded.state.revision,textConfigId:configId})
     state=await settle()
     assert.equal(state.status,'completed',state.error)
-    assert.equal(state.outputs.texture_image.path,texturePath)
-    assert.equal(state.outputs.base_image.run_id,texturedBase)
+    assert.equal(state.outputs.texture_image,null)
+    assert.equal(state.outputs.base_image.run_id,keptBaseRun)
     await mock.close()
     console.log('MAP_EXECUTION_OK')
   `

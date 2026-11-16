@@ -1816,6 +1816,7 @@
       "timeRequired": "Scene time cannot be empty",
       "refSectionTitle": "Reference images",
       "refSectionHint": "Guides generation, not the final image; add, remove or pick from the library",
+      "referenceMissing": "{n} reference image file(s) no longer exist on disk ({files}); only the remaining references were sent — remove the broken entries and retry",
       "assetTypeLabel": "Asset type",
       "mapDescription": "Map description (extent and purpose)",
       "assetType": {
@@ -3660,7 +3661,7 @@
       "textConfig": "Text model config",
       "imageModel": "Image model",
       "defaultConfig": "Use default",
-      "textureHint": "The image model only produces texture and tint; it never decides geographic shape.",
+      "textureHint": "The new base map no longer generates a paper texture; this image model produces no image tasks (kept only for compatibility).",
       "briefTitle": "Brief",
       "briefHint": "Subject, era, location and purpose must be specific enough for research and the base image to stand up",
       "saveBrief": "Save brief",
@@ -3832,7 +3833,10 @@
       "uncertaintiesTitle": "Open uncertainties",
       "warningsTitle": "Drawing quality warnings ({n})",
       "calibrationEvidence": "Earth measured control-point evidence",
-      "calibrationCheck": "{n} independent checks · RMS {rms}px · maximum error {max}px"
+      "calibrationCheck": "{n} independent checks · RMS {rms}px · maximum error {max}px",
+      "styleSkipped": "The texture stage is skipped: the new base map gets contrast from hypsometric shading and graded hydrography, so no paper texture is applied; the final map is drawn straight from the base.",
+      "pipDetail": "Detail {no}: {label}",
+      "pipComposite": "Picture-in-picture composite"
     },
     "preview": {
       "close": "Close preview",
@@ -3960,7 +3964,41 @@
       "projection": "Projection",
       "features": "Feature geometry",
       "featureCounts": "{places} points / {routes} lines / {regions} regions",
-      "layers": "Editable layers"
+      "layers": "Editable layers",
+      "pipRollbackHint": "Detail frames come from the base stage: roll back to “Base” and rerun to change them; detail images are re-rendered with the new frames on delivery."
+    },
+    "pip": {
+      "title": "Picture-in-picture (overview + details)",
+      "hint": "The overview establishes position and trend; each detail shows the rivers and terrain where the event happens. Every detail is its own asset, so storyboards can reference it alone.",
+      "layout": "Layout {id} · {family} · labels: {tier}",
+      "aspect": "Aspect {aspect}",
+      "family": {
+        "A": "overview-led (establishing shot)",
+        "B": "detail-led (dwell)"
+      },
+      "labelTier": {
+        "full": "full",
+        "reduced": "reduced",
+        "focus_only": "focus only"
+      },
+      "role": {
+        "primary": "primary",
+        "aux": "aux"
+      },
+      "storyboards": "Storyboards {numbers}",
+      "noStoryboard": "No storyboard numbers given",
+      "bbox": "Frame (west/south/east/north): {bbox}",
+      "detailPending": "The detail image is rendered when the run is delivered; it does not exist yet.",
+      "compositeTitle": "Composite",
+      "compositePending": "The composite is rendered when the run is delivered; it does not exist yet.",
+      "usageTitle": "How to use",
+      "noFrames": "This map has no detail frames: only the overview is delivered.",
+      "factSummary": "{n} details · layout {id} ({family}, labels: {tier})",
+      "detailsTitle": "Detail images",
+      "renderedDetails": "{n} rendered",
+      "overviewBadge": "PiP · {n} details",
+      "detailBadge": "Detail {no} · part of “{name}”",
+      "stale": "stale"
     },
     "researchPanel": {
       "title": "Feature provenance and verification",

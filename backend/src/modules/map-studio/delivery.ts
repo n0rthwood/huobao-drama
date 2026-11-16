@@ -50,7 +50,8 @@ export function buildDeliverable(loaded: LoadedTask): MapStudioDeliverable {
     features, sources: state.research?.sources ?? [], kmz: state.outputs.kmz ? { path: state.outputs.kmz.path } : null,
     editable_source: { version: 1, map_style: mapSpec.style.map_style ?? null, map_spec: mapSpec, layer_doc: doc, layer_options: options },
     manual_edit: final.source === 'map-drawing-manual',
-    summary: `${geometry.points.length} 点 / ${geometry.routes.length} 线 / ${geometry.regions.length} 面，底图路线 ${baseMode}`,
+    summary: `${geometry.points.length} 点 / ${geometry.routes.length} 线 / ${geometry.regions.length} 面，底图路线 ${baseMode}${state.outputs.pip?.details.length ? `；画中画 ${state.outputs.pip.details.length} 个细节` : ''}`,
+    pip: state.outputs.pip && state.outputs.pip.details.length ? state.outputs.pip : null,
   }
 }
 
@@ -64,9 +65,11 @@ export async function deliverCurrent(taskId: number, expected?: { runId?: number
   if (loaded.state.stage !== 'complete') throw new MapStudioRequestError('当前成果尚未进入交付阶段，请先完成标注绘制', 'delivery_not_ready')
   const d = buildDeliverable(loaded)
   if (!loaded.row.host || !loaded.row.host_ref || !loaded.host) return { version_ids: [], message: `独立地图已完成：${d.summary}；可下载成图、语义与源文件` }
-  const previous = selectDeliveryBySha(taskId, d.final_image.sha256)
+  // 同一张成图但细节/组合图变了（重新取景）必须重新交付
+  const deliveryKey = d.pip ? crypto.createHash('sha256').update(JSON.stringify([d.final_image.sha256, d.pip.details.map(x => x.sha256), d.pip.composite?.sha256 ?? null])).digest('hex') : d.final_image.sha256
+  const previous = selectDeliveryBySha(taskId, deliveryKey)
   if (previous?.result) return JSON.parse(previous.result) as MapStudioDeliveryResult
   const result = await loaded.host.deliver(loaded.row.host_ref, d)
-  insertDelivery({ taskId, runId: loaded.state.run_id, host: loaded.row.host, hostRef: loaded.row.host_ref, finalSha256: d.final_image.sha256, result })
+  insertDelivery({ taskId, runId: loaded.state.run_id, host: loaded.row.host, hostRef: loaded.row.host_ref, finalSha256: deliveryKey, result })
   return result
 }

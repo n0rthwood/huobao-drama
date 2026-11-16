@@ -25,10 +25,13 @@ import {
   mapProjectionFor,
   renderMapBase,
   resolveRiverSource,
+  type MapRenderOptions,
   type MapRiverSourceInfo,
-  type MapContextCoverage,
   type MapSpec,
 } from './base-render.js'
+import { datasetFileInfo } from './datasets.js'
+import type { ReliefRenderSummary } from './relief-render.js'
+import type { DemTileFetcher } from './terrain-cache.js'
 import { buildMapKmz, KMZ_GEOMETRY_NOTE } from './kmz.js'
 import {
   captureEarthBase,
@@ -115,7 +118,7 @@ export interface MapRegistration {
 }
 
 export interface MapSourceRef {
-  kind: 'basemap' | 'imagery' | 'external_image' | 'vector'
+  kind: 'basemap' | 'imagery' | 'external_image' | 'vector' | 'terrain'
   name: string
   url?: string
   license: string
@@ -139,9 +142,12 @@ export interface MapBaseProvenance {
     evidence_image: string
   }
   image?: { residual_px: { max: number; rms: number }; control_points: ControlPoint[]; source_url: string; license: string }
-  /** program 模式独有：Natural Earth 背景覆盖度与免责说明 */
-  context?: MapContextCoverage
-  /** Exact river file and SHA, including overview overridden by adopted 10m refs. */
+  /** program 模式独有：渲染参数、高程档位、本地瓦片 manifest 指纹与水系统计（Issue #107 阶段 1） */
+  relief?: ReliefRenderSummary
+  /**
+   * 数据集采用的河道来源（研究/抽取用的 dataset_ref 所属文件），**不是**底图水系：
+   * 底图水系固定使用 Natural Earth 10m（见 sources 第一条），不受 detail_level 切换。
+   */
   river_source?: MapRiverSourceInfo
   map_style?: string | null
 }
@@ -480,14 +486,61 @@ function resolveStaticImage(relativePath: string, what: string): string {
   return real
 }
 
-/** 程序底图只渲染自然地理；用户点线面留给可编辑图层，避免拖动后留下烧入像素的鬼影。 */
-async function createProgramBase(spec: MapSpec, width?: number): Promise<MapBaseArtifact> {
-  // Resolve BEFORE removing user routes: their dataset refs may require 10m at overview.
+/**
+ * 程序底图只渲染自然地理；用户点线面留给可编辑图层，避免拖动后留下烧入像素的鬼影。
+ *
+ * 管线（Issue #107 阶段 1）：先预取该帧缺失的高程瓦片（renderMapBase 内 ensureDemTiles 先于渲染），
+ * 再渲染局部相对起伏底图。modern 行政界线与城市点已彻底移除——它们既不代表历史疆界，
+ * 又会在成图上被误当成真实边界。
+ */
+async function createProgramBase(
+  spec: MapSpec,
+  width?: number,
+  height?: number,
+  dem?: { cacheDir?: string; fetchTile?: DemTileFetcher },
+  relief?: Omit<MapRenderOptions, 'riverSource' | 'dem'>,
+): Promise<MapBaseArtifact> {
+  // 先在带要素的 spec 上校验数据集河道引用（50m/10m 混用必须报错），再去掉要素渲染
   const riverSource = resolveRiverSource(spec)
   const renderSpec: MapSpec = { ...spec, places: [], routes: [], regions: [] }
-  const rendered = await renderMapBase(renderSpec, { ...(width ? { width } : {}), riverSource })
+  const rendered = await renderMapBase(renderSpec, {
+    ...(width ? { width } : {}),
+    ...(height ? { height } : {}),
+    riverSource,
+    ...(dem ? { dem } : {}),
+    ...(relief ?? {}),
+  })
   // 登记件只取决于投影与 bbox，所以去掉要素后像素换算与带要素时逐像素一致
   const registration = programRegistration(spec, { width: rendered.width, height: rendered.height })
+  const land = datasetFileInfo('10m_land'), lakes = datasetFileInfo('10m_lakes'), rivers = datasetFileInfo('10m_rivers_lake_centerlines')
+  const sources: MapSourceRef[] = [
+    {
+      kind: 'vector',
+      name: `Natural Earth 10m land / 10m lakes / 10m rivers（${land.filename} ${land.sha256.slice(0, 12)}、${lakes.filename} ${lakes.sha256.slice(0, 12)}、${rivers.filename} ${rivers.sha256.slice(0, 12)}）`,
+      url: 'https://www.naturalearthdata.com/',
+      license: 'Public domain',
+      note: '自然地理底图：陆海掩码用陆地多边形（不用高程判 0，里海北岸仍为陆）；湖泊剔除 featurecla=Reservoir 的现代水库；底图不含行政界线与城市点。',
+    },
+    {
+      kind: 'terrain',
+      name: `AWS Terrain Tiles terrarium（z${rendered.dem.zoom}，本地 ${rendered.relief.dem_tiles} 张瓦片，manifest sha256 ${rendered.dem.manifest_sha256 ?? '未登记'}）`,
+      url: 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/',
+      license: 'Public domain（SRTM / GMTED2010 / ETOPO1）',
+      note: '高程只从本地缓存读取；瓦片来源、sha256 与抓取时间登记在数据目录 map-data/dem/manifest.json。',
+    },
+  ]
+  if (rendered.relief.named_rivers_used.length) {
+    sources.push({
+      kind: 'vector',
+      name: `OSM 命名河流预取包（${rendered.relief.named_rivers_used.join('、')}）`,
+      url: 'https://www.openstreetmap.org/',
+      license: 'ODbL 1.0',
+      note: 'Natural Earth 缺失的小河（如乌格拉河/阿赫图巴/卡赞卡）从 OSM 预取入仓；运行期只读本地包，不联网。',
+    })
+  }
+  const attribution = rendered.relief.named_rivers_used.length
+    ? 'Natural Earth（公共领域）· AWS Terrain Tiles，SRTM / GMTED2010 / ETOPO1（公共领域）· 河流补充 © OpenStreetMap contributors（ODbL 1.0）'
+    : 'Natural Earth（公共领域）· AWS Terrain Tiles，SRTM / GMTED2010 / ETOPO1（公共领域）'
   return {
     path: rendered.path,
     width: rendered.width,
@@ -495,22 +548,16 @@ async function createProgramBase(spec: MapSpec, width?: number): Promise<MapBase
     registration,
     provenance: {
       mode: 'program',
-      renderer: `d3-geo+natural-earth-${riverSource.scale}-rivers`,
+      renderer: 'd3-geo+natural-earth-10m-relief+aws-terrain',
       sha256: rendered.sha256,
       river_source: rendered.river_source,
       created_at: new Date().toISOString(),
       registration,
-      sources: [{
-        kind: 'vector',
-        name: `Natural Earth 50m（land/coastline/lakes/countries/admin1/populated places）+ ${riverSource.scale} rivers（${riverSource.filename}）`,
-        url: 'https://www.naturalearthdata.com/',
-        license: 'Public domain',
-        note: '现代地理底图；省界与城市点仅为定位参照，不代表历史疆界。',
-      }],
-      attribution: 'Natural Earth（公共领域）',
+      sources,
+      attribution,
       reused: rendered.reused,
-      warnings: rendered.context.warnings,
-      context: rendered.context,
+      warnings: rendered.warnings,
+      relief: rendered.relief,
     },
   }
 }
@@ -710,12 +757,23 @@ async function createImageBase(spec: MapSpec, reference: MapReferenceImage | und
 /**
  * 生产底图并给出登记件。三条路线的返回结构一致，调用方不需要分支。
  * earth 失败（依赖缺失/相机不可信）一律抛错，**绝不**退回程序底图冒充 Earth。
+ *
+ * `height`：可选画幅高度（竖版/方图用 canvasForAspect 得到宽高后一起传）。
+ * `dem`：高程缓存目录与瓦片下载器（预取复用/测试注入）；program 模式默认走 DATA_ROOT。
+ * `relief`：program 模式的水系/设色口径（叙事豁免河、预取命名河流、设色锚点、细节帧参数、画中画钩子）。
  */
 export async function createMapBaseArtifact(
   spec: MapSpec,
-  options: { mode: MapBaseMode; width?: number; referenceImage?: MapReferenceImage },
+  options: {
+    mode: MapBaseMode
+    width?: number
+    height?: number
+    referenceImage?: MapReferenceImage
+    dem?: { cacheDir?: string; fetchTile?: DemTileFetcher }
+    relief?: Omit<MapRenderOptions, 'riverSource' | 'dem'>
+  },
 ): Promise<MapBaseArtifact> {
-  const artifact = options.mode === 'program' ? await createProgramBase(spec, options.width)
+  const artifact = options.mode === 'program' ? await createProgramBase(spec, options.width, options.height, options.dem, options.relief)
     : options.mode === 'earth' ? await createEarthBase(spec, options.width)
     : options.mode === 'image' ? await createImageBase(spec, options.referenceImage, options.width) : null
   if (!artifact) throw new MapGeometryError(`未知底图模式：${String(options.mode)}`)

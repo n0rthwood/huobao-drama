@@ -247,6 +247,15 @@ without these limits; the AI must never rewrite historical cards, delete layers 
 compatible → required geometry executable → unanchored layers genuinely independent of picture position → no "pending human annotation"
 placeholder → the tool actually accepted the write.
 
+### 2.2.8 Map picture-in-picture: overview and detail are two independent assets (Issue #107)
+
+In `read_storyboard_context`, map props carry `map_pip`: `role: overview` (lists detail asset ids in `details`) or `role: detail` (gives the parent overview `parent_asset_id` and its position in the overview). Follow `usage`:
+
+- Shots about overall trend, extent or relative position use the overview as `base`; shots focused on one geographic feature (river mouth, confluence, pass, standoff site) use the matching detail map as `base` — do not zoom into the overview.
+- A detail must be paired with the overview: within the same narrative segment, put an adjacent shot on the overview so the audience learns where the detail is (establishing shot → detail shot).
+- Use a composite layout (layout id in `map_pip`) only when the script needs a side-by-side comparison; otherwise express it as a two-shot sequence, never cram several details into one shot just to get a "picture-in-picture".
+- A detail marked `stale: true` is no longer in the latest framing plan; do not newly reference it unless necessary.
+
 ## 2.3 Picture discipline
 
 - Picture descriptions **never contain narration text** and never "Narration: …". Narration has its own field; writing it twice makes it read twice.

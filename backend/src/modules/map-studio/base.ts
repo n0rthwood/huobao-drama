@@ -8,24 +8,40 @@
  */
 import { z } from 'zod'
 import type { StageModel } from '../../services/ai-stages.js'
-import { normalizeMapSpec, type MapSpec } from './geo/base-render.js'
+import { normalizeMapSpec, canvasForAspect, type MapSpec } from './geo/base-render.js'
 import { createMapBaseArtifact, type MapBaseArtifact, type MapBaseMode } from './geo/geometry.js'
 import { readImage } from '../../agents/tools/vision-tools.js'
 import { mapBriefText, rollbackTool, runStageAgent, stageTool, type StageAgentResult } from './agent-loop.js'
 import { frameReport, specFeatures, FRAME_MARGIN, FRAME_MIN_EXTENT } from './validate.js'
 import { MAP_BASE_MODES, type MapBrief } from './types.js'
+import type { MapStudioContext } from './contract.js'
+import { validateFrames, type MapPipOutput } from './pip/frames.js'
+import { chooseLayoutId, layoutFor } from './pip/layouts.js'
+import { pipUsageText } from './pip/usage.js'
 import { resolveMapStyle, familyPromptSummary } from './styles/index.js'
 import { readDefaultStyle } from './settings.js'
 
-/** 工作区画幅：与 geo/base-render 的 16:9 口径一致 */
-export const MAP_BASE_WIDTH = 3840
+/** 底图长边像素；画幅由项目参数决定（缺省 16:9） */
+export const MAP_BASE_LONG_SIDE = 3840
 const MAX_STEPS = 24
+
+function contextText(context: MapStudioContext | null): string {
+  if (!context || !context.shots.length) return ''
+  const lines = context.shots.slice(0, 40).map(shot => {
+    const points = shot.info_points.slice(0, 3).join('；')
+    const marks = shot.must_mark.slice(0, 4).join('、')
+    return `- 分镜 #${shot.number}：${shot.narration.slice(0, 90)}${points ? `｜信息点：${points}` : ''}${marks ? `｜必标：${marks}` : ''}`
+  })
+  return `引用这张地图的分镜（${context.shots.length} 个；据此决定全览范围，并用 set_frames 为反复强调、需要看清地理特征的位置设细节框）：\n${lines.join('\n')}`
+}
 
 export interface BaseStageResult {
   artifact: MapBaseArtifact
   mode: MapBaseMode
   /** 模型选定的取景：采用时写回 map_spec */
   spec: MapSpec
+  /** 模型按分镜重点提出的细节框方案（已校验；无细节时为 null） */
+  pip: MapPipOutput | null
 }
 
 export interface BaseStageInput {
@@ -36,12 +52,19 @@ export interface BaseStageInput {
   spec: MapSpec
   startRounds: number
   feedback: string | null
+  /** 引用这张地图的分镜信息（宿主提供；独立任务为 null） */
+  context: MapStudioContext | null
 }
 
 export async function runBaseStage(input: BaseStageInput): Promise<StageAgentResult<BaseStageResult>> {
   const selectedStyle = resolveMapStyle(input.brief, { default_style: readDefaultStyle() })
   const features = specFeatures(input.spec)
   const artifacts = new Map<string, { artifact: MapBaseArtifact; mode: MapBaseMode; spec: MapSpec; problems: string[] }>()
+  const aspect = input.brief.aspect_ratio ?? '16:9'
+  const canvas = canvasForAspect(aspect, MAP_BASE_LONG_SIDE)
+  // 细节框方案按「全览 artifact」登记：换底图取景后必须重新提出（框要落在新的全览范围内）
+  const framePlans = new Map<string, MapPipOutput | null>()
+  const needFrames = (input.context?.shots.length ?? 0) > 0
   // 取景只需要每个要素的经纬度范围：数据集河流有上百个顶点，逐点列出曾让底图阶段首个请求达 11 万字（生产 run 14）
   const featureLines = features.map(feature => {
     if (feature.kind === 'place') return `- ${feature.id} place「${feature.name}」：(${feature.coords[0]![0]}, ${feature.coords[0]![1]})`
@@ -65,7 +88,9 @@ export async function runBaseStage(input: BaseStageInput): Promise<StageAgentRes
       `地图里的要素（必须全部落在画面内）：\n${featureLines.join('\n') || '（无）'}`,
       `当前 map_spec 的取景（仅供参考，不是约束）：bbox=${JSON.stringify(input.spec.bbox)}，投影 ${input.spec.projection.type}，背景图层 ${JSON.stringify(input.spec.layers)}`,
       `交付校验：每个要素的所有顶点都要落在画面 [${FRAME_MARGIN}, ${1 - FRAME_MARGIN}] 内；要素整体外包框的最大边至少占画面 ${FRAME_MIN_EXTENT * 100}%。`,
-    ].join('\n\n'),
+      `项目画幅 ${aspect}（成图 ${canvas.width}×${canvas.height}）。`,
+      contextText(input.context),
+    ].filter(Boolean).join('\n\n'),
     // 底图阶段的状态由代码从本次会话已生成的 artifact 生成：早先 render_base 的 frame 明细被压缩后仍能看见
     state: () => artifacts.size
       ? `已生成的底图：\n${[...artifacts].map(([id, item]) => `${id} ${item.mode} bbox=${JSON.stringify(item.spec.bbox)} 投影=${item.spec.projection.type} 路径=${item.artifact.path} 取景${item.problems.length ? `问题：${item.problems.join('；')}` : '检查通过'}`).join('\n')}`
@@ -110,7 +135,8 @@ export async function runBaseStage(input: BaseStageInput): Promise<StageAgentRes
           })
           const artifact = await createMapBaseArtifact(spec, {
             mode,
-            width: MAP_BASE_WIDTH,
+            width: canvas.width,
+            height: canvas.height,
             referenceImage: mode === 'image' ? input.brief.reference_image ?? undefined : undefined,
           })
           const frame = frameReport(specFeatures(spec), artifact.registration)
@@ -135,19 +161,56 @@ export async function runBaseStage(input: BaseStageInput): Promise<StageAgentRes
           }
         },
       }),
+      set_frames: stageTool(session, {
+        id: 'set_frames',
+        description: '为某张已生成的全览底图提出「画中画」细节框方案（不消耗轮次）。全览 + 细节是独立资产，分镜会同时引用；'
+          + '细节框由分镜重点驱动：旁白/信息点反复强调、需要看清地理特征（河谷、山口、汇流处）的位置才设框，最多 4 个。'
+          + 'frames 可为空数组（说明为什么单张全览就够，例如所有分镜只讲整体趋势）。每个框给 label、reason（支撑哪些分镜、要看清什么）、bbox=[west,south,east,north]、role=primary|aux、storyboard_numbers。'
+          + '框必须落在该全览范围内；代码会按版式槽位的宽高比扩框并选择预置版式。',
+        inputSchema: z.object({
+          artifact_id: z.string().describe('render_base 返回的全览 artifact_id'),
+          frames: z.array(z.object({
+            label: z.string(), reason: z.string(),
+            bbox: z.array(z.number()).describe('[west, south, east, north]'),
+            role: z.string().optional().describe('primary | aux'),
+            storyboard_numbers: z.array(z.number()).optional(),
+          })),
+        }),
+        summarize: result => Array.isArray(result.problems) && result.problems.length
+          ? `细节框方案被拒：${result.problems.slice(0, 3).map(String).join('；')}`
+          : `细节框方案已登记：${String(result.layout_id)}，${String(result.count)} 个细节`,
+        execute: async ({ artifact_id, frames }) => {
+          const chosen = artifacts.get(String(artifact_id))
+          if (!chosen) return { problems: [`没有底图 ${JSON.stringify(artifact_id)}；已生成：${[...artifacts.keys()].join('、') || '（无，请先 render_base）'}`] }
+          const checked = validateFrames(chosen.spec.bbox, frames, aspect)
+          if (checked.problems.length) return { problems: checked.problems }
+          if (!checked.frames.length) { framePlans.set(String(artifact_id), null); return { layout_id: 'L1', count: 0, problems: [] } }
+          const layoutId = chooseLayoutId({ detailCount: checked.frames.length, aspect, hasPrimary: checked.frames.some(f => f.role === 'primary') })
+          const layout = layoutFor(layoutId, canvas)
+          const plan: MapPipOutput = {
+            version: 1, overview_bbox: chosen.spec.bbox, aspect, frames: checked.frames,
+            layout: { id: layout.id, family: layout.family, canvas: layout.canvas, slots: layout.slots, locator: layout.locator, label_tier: layout.label_tier, min_slot_short_side: layout.min_slot_short_side },
+            details: [], composite: null, usage: '',
+          }
+          plan.usage = pipUsageText(plan)
+          framePlans.set(String(artifact_id), plan)
+          return { layout_id: layoutId, family: layout.family, count: checked.frames.length, label_tier: layout.label_tier, frames: checked.frames.map(f => ({ no: f.no, label: f.label, role: f.role, bbox: f.bbox })), problems: [] }
+        },
+      }),
       read_image: readImage,
       submit_base: stageTool(session, {
         id: 'submit_base',
         timeoutMs: 12 * 60_000,
-        description: '交付一张已生成的底图（消耗一轮）。取景检查有任何问题都会被拒收。',
+        description: '交付一张已生成的底图（消耗一轮）。取景检查有任何问题都会被拒收；有分镜引用这张地图时还必须先 set_frames。',
         inputSchema: z.object({ artifact_id: z.string().describe('render_base 返回的 artifact_id') }),
         summarize: result => result.accepted === true
           ? `第 ${String(result.round)} 轮交付已接受`
           : `第 ${String(result.round)} 轮交付被拒收，${Array.isArray(result.problems) ? result.problems.length : 0} 个问题（逐条见当前状态）`,
         execute: async ({ artifact_id }) => {
           const chosen = artifacts.get(String(artifact_id))
-          const problems = chosen ? chosen.problems : [`没有底图 ${JSON.stringify(artifact_id)}；已生成：${[...artifacts.keys()].join('、') || '（无，请先 render_base）'}`]
-          return await session.deliver(problems, () => ({ artifact: chosen!.artifact, mode: chosen!.mode, spec: chosen!.spec }))
+          const problems = chosen ? [...chosen.problems] : [`没有底图 ${JSON.stringify(artifact_id)}；已生成：${[...artifacts.keys()].join('、') || '（无，请先 render_base）'}`]
+          if (chosen && needFrames && !framePlans.has(String(artifact_id))) problems.push('有分镜引用这张地图：请先对该全览调用 set_frames 给出细节框方案（单张全览就够时传空数组并说明原因）')
+          return await session.deliver(problems, () => ({ artifact: chosen!.artifact, mode: chosen!.mode, spec: chosen!.spec, pip: framePlans.get(String(artifact_id)) ?? null }))
         },
       }),
       request_rollback: rollbackTool(session, { taskId: input.taskId, runId: input.runId }),
