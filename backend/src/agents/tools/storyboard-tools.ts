@@ -634,7 +634,17 @@ function buildSaveStoryboards(documentary: boolean) {
             continue
           }
           const located = locateNarrationInScript(scriptKey, spokenText(narration), scriptCursor)
-          const crossReason = located.index >= 0 ? crossGroupReason(located.index, located.index + located.chars) : null
+          // 超长 / 非原文在写库前拒存：否则新镜号会先插一行空旁白，骨架因「旁白为空」不可确认（#109 生产 ep 30 任务 3465）
+          const chars = narrationCharCount(narration)
+          if (chars > MAX_NARRATION_CHARS) {
+            narrationRejected.push({ shot_number: sb.shot_number, reason: `narration is ${chars} characters, exceeding the per-shot limit of ${MAX_NARRATION_CHARS}; split the script passage at a sentence boundary into two shots` })
+            continue
+          }
+          if (located.index < 0) {
+            narrationRejected.push({ shot_number: sb.shot_number, reason: 'narration is not a verbatim stretch of the episode script; copy the script text exactly (whitespace aside) instead of rewriting it' })
+            continue
+          }
+          const crossReason = crossGroupReason(located.index, located.index + located.chars)
           if (crossReason) {
             narrationRejected.push({ shot_number: sb.shot_number, reason: crossReason })
             continue
