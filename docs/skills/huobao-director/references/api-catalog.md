@@ -127,7 +127,8 @@ Body：`{drama_id:d, episode_id:e, message:"用户的具体改写要求", config
 
 ### `POST /episodes/{e}/script-rewrite` [R]（纪录片改写入口，Issue #70/#80）
 Body：`{start_stage?, skip_stages?[], predecessor_version_id?, config_id?, model?, auto_adopt?, source_revision?, final_revision?, acknowledge_source_change?}`；异步，返回 `{run_id, task_id}`。
-阶段：输入准备（自动过滤非旁白内容，必经）→ 忠实改写 `fidelity.v2` → 桥句润色。八达岭实测 run **3** / task **1212** 完成。
+阶段：输入准备（自动过滤非旁白内容，必经）→ 忠实改写 `fidelity.v3` → 桥句润色 `bridge.v2`。八达岭实测 run **3** / task **1212** 完成（当时为 v2）。
+**#109 契约（`[S]`）**：自然段 = 逻辑组（下游分镜按段做组级视觉规划），**段落不限长度**，硬上限改为**每一句 ≤80 字**（切点 `。！？；!?;`，计数与骨架同口径）；报告字段 `paragraphs`（产出段数）、`paragraphs_source`（输入段数）、`over_limit_sentences[{paragraph,sentence,chars,excerpt}]`（旧报告的 `over_limit_paragraphs` 只读兼容）。桥句只能并入相邻段（`placement ∈ end_of_left|start_of_right`），不再独立成段，旧报告里的 `standalone`/`placement_adjusted` 只读展示。背景：旧的「每段 ≤80 字」把一段 224 字原文切成 6 段，段落关系丢失，分镜只能逐镜判断，ep 27 出现同一张地图连续回切。
 ### `GET /episodes/{e}/script-rewrite` [R]
 整页状态：运行、阶段、版本与修订号（`source_revision`/`final_revision`）。
 ### `GET /episodes/{e}/script-rewrite/runs/{runId}` [R]（八达岭 run 3 轮询 31 次）、`POST /episodes/{e}/script-rewrite/runs/{runId}/manual` [S]（本轮未调用）
