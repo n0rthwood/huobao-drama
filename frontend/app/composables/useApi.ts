@@ -2054,6 +2054,8 @@ export interface NarrationSkeletonShotInput {
 export type SkeletonProblemCode =
   | 'empty' | 'too_long' | 'not_verbatim' | 'out_of_order' | 'overlap' | 'gap'
   | 'unknown_id' | 'duplicate_id' | 'script_missing' | 'card_busy'
+  /** #109：一镜旁白跨了两个自然段（逻辑组） */
+  | 'cross_group'
 export interface SkeletonProblem { index: number; code: SkeletonProblemCode; message: string }
 export function skeletonProblemsOf(err: unknown): SkeletonProblem[] | null {
   const body = (err as ApiError)?.body as { error?: string; problems?: SkeletonProblem[] } | undefined
