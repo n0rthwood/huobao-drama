@@ -15,7 +15,7 @@ const backendRoot = fileURLToPath(new URL('..', import.meta.url))
 function run(body) {
   const script = `
     import {
-      normalizeDesignCard, validateDesignCard, estimateCardBudget, storyboardCountCap,
+      normalizeDesignCard, validateDesignCard, estimateCardBudget, storyboardCountCap, paragraphMinShots,
       parseDesignCard, serializeDesignCard, referenceAssetRefs,
       hasLayerSegment, hasGenSegment, lockedGenSlot, toCombo,
     } from './src/services/design-card.ts'
@@ -228,7 +228,7 @@ test('预算与旁白：配音前用估算，配音后用实测，budget 本身�
   assert.deepEqual(got.budget, { layer_s: 6, gen_s: 5 }, '实测值只重算问题，不回写 budget')
 })
 
-test('镜头数硬上限兼顾短稿防过拆与逐段旁白字数下限', () => {
+test('镜头数硬上限兼顾短稿防过拆与逐段句界装满的最少镜数', () => {
   const got = run(`
     const script = '【开场】第一段。\\n\\n第二段。\\n\\n\\n第三段。\\n   \\n第四段。\\n\\n第五段。'
     out({
@@ -239,6 +239,9 @@ test('镜头数硬上限兼顾短稿防过拆与逐段旁白字数下限', () =>
       long: storyboardCountCap(['甲'.repeat(900), '乙'.repeat(900)]),
       mixed: storyboardCountCap(['甲'.repeat(900), ...Array(4).fill('短段。')]),
       marked: storyboardCountCap(['[[重庆|chong2 qing4]][[停顿|1.5]][[语气|sigh]]'.repeat(40)]),
+      // 每句 50 字：两句装不进 80 字，一段 4 句至少 4 镜；只按字数 ceil(200/80)=3 会装不下
+      sentences: storyboardCountCap(Array(10).fill(('甲'.repeat(49) + '。').repeat(4))),
+      packed: paragraphMinShots(('甲'.repeat(49) + '。').repeat(4) + '乙'.repeat(19) + '。' + '丙'.repeat(19) + '。'),
     })
   `)
   assert.equal(got.paragraphs, 5, '节拍标记不单独成段，空白段不计')
@@ -246,8 +249,10 @@ test('镜头数硬上限兼顾短稿防过拆与逐段旁白字数下限', () =>
   assert.deepEqual(got.caps, [2, 3, 5, 6, 8, 9, 13, 23, 43])
   assert.deepEqual(got.empty, [0, 0, 0], '没有剧本就不设限')
   assert.equal(got.yinxu, 8, '殷墟 5 段剧本最多 8 镜')
-  assert.equal(got.long, 24, '两段各900字，逐段ceil(900/80)后相加')
-  assert.equal(got.mixed, 16, '一段900字加四短段，不得先合并总字数再ceil')
+  assert.equal(got.long, 36, '两段各 900 字无句界：units=24，再给 min(ceil(24×1.5), 2×24−2+3)')
+  assert.equal(got.mixed, 24, '一段 900 字加四短段：units=16，按段计不先合并总字数')
+  assert.equal(got.sentences, 60, '10 段每段 4 句 50 字：units=40 > Σceil(字数/80)=30，上限 min(ceil(40×1.5), 2×40−10+3)')
+  assert.equal(got.packed, 5, '4 句 50 字各占一镜，末尾两句 20 字合进一镜')
   assert.equal(got.marked, 2, '注音语法、停顿和语气不虚增朗读字数')
 })
 

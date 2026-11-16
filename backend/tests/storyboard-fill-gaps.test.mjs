@@ -262,9 +262,10 @@ test('fill-gaps returns 400 (not 500) when the documentary vision stage has no v
   assert.equal(result.tasks, 0)
 })
 
-for (const { lengths, cap } of [{ lengths: [900, 900], cap: 24 }, { lengths: [900, 20, 20, 20, 20], cap: 16 }]) {
+// shots = 无句界长段按 80 字硬切的最少镜数；cap = #109 句界装满口径的上限（units 加余量）
+for (const { lengths, shots, cap } of [{ lengths: [900, 900], shots: 24, cap: 36 }, { lengths: [900, 20, 20, 20, 20], shots: 16, cap: 24 }]) {
  for (const fill of [false, true]) {
-  test('long documentary persists all ' + cap + ' legal shots through ' + (fill ? 'fill-gap' : 'normal') + ' save pathway without accepting empty/duplicate narration', () => {
+  test('long documentary persists all ' + shots + ' legal shots through ' + (fill ? 'fill-gap' : 'normal') + ' save pathway without accepting empty/duplicate narration', () => {
     const result = run(`
       import { initDb, db, schema } from './src/db/index.ts'
       import { eq } from 'drizzle-orm'
@@ -296,8 +297,8 @@ for (const { lengths, cap } of [{ lengths: [900, 900], cap: 24 }, { lengths: [90
         gapCount: batches.at(-1).script_coverage.gaps.length,
       }))
     `)
-    assert.deepEqual(result.saved, Array(cap / 8).fill(8))
-    assert.deepEqual(result.caps, Array(cap / 8).fill(cap))
+    assert.deepEqual(result.saved, Array(shots / 8).fill(8))
+    assert.deepEqual(result.caps, Array(shots / 8).fill(cap))
     assert.equal(result.rejectedSaved, 0)
     assert.equal(result.rejected.length, 2)
     assert.match(result.rejected[0].reason, /empty|为空/)

@@ -46,10 +46,10 @@ In this project the script body **is the narration draft**. Cut the body into se
 
 Violating shots are not silently fixed — they are **rejected on save** and listed in `rejected[]` (with a reason). When you see `rejected[]`, rewrite per the reason and save again.
 
-1. **Hard cap on the episode's shot count**: `cap = max( min(ceil(narration paragraph count × 1.5), narration paragraph count + 3), sum over paragraphs of ceil(paragraph characters / 80) )`,
-   where "narration paragraph count" = the number of non-empty paragraphs obtained by splitting the script body on blank lines. Shots beyond `cap` are rejected.
-   When a long paragraph must be split across several shots to respect the 80-character limit, the cap rises accordingly (by character count only — it does not guarantee that a sentence-boundary split always fits).
-   If you want finer cutting for pacing, merge adjacent short sentences instead of adding shots.
+1. **Hard cap on the episode's shot count**: first compute `units` = the sum, over paragraphs, of the minimum number of shots needed when adjacent sentences are packed up to 80 characters at sentence boundaries;
+   `cap = max( min(ceil(paragraph count × 1.5), paragraph count + 3), min(ceil(units × 1.5), 2 × units − paragraph count + 3) )`,
+   where "paragraph count" = the number of non-empty paragraphs obtained by splitting the script body on blank lines. Shots beyond `cap` are rejected. The skeleton task message states this episode's minimum and cap.
+   **Merge adjacent sentences of the same paragraph into one shot** until one more sentence would exceed 80 characters; cut earlier only where the information point clearly changes. Do not cut one sentence per shot — if the cap runs out with script left unclaimed, the whole task fails.
 2. **Every shot must carry narration**: an empty `narration_text` is rejected. Documentaries have no silent picture-only shots;
    empty beats, transitions and map establishing shots all take a stretch of narration too.
 3. **No stretch of narration may be claimed twice**: two shots taking the same sentence (or overlapping each other) are rejected.

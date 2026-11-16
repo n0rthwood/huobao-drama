@@ -554,7 +554,7 @@ Issue 整理完成后、实施前，必须让 **Fabel（Anthropic）或 Astra（
 - **参考图（同一 Issue）**：项目素材库编辑弹窗补上 `ReferenceImageManager`；AI 扩写最终提示词时 `read_characters/read_scenes/read_props` 返回 `reference_images[{n,path}]`/`reference_count`（角色另有 `archival_images` 可用 `read_image` 读），提示词必须用 `@参考图N` 逐张引用并说明各自贡献，未引用 `save_*_final_prompt` 退回；提交时按 provider 渲染为 `<imageN>`（qwen-jobs）或 `图片N`（其它），并落 `sourcePrompt/refNameIndex` 支持换厂商重试（`services/asset-reference-prompt.ts` 为唯一契约）。纪录片角色的史料画像仍不进生图参考集（#32）。
 
 ### 发布前遗留闭环（Issue #61）
-- 拆镜上限接收实际段落文本，取短稿防过拆上限与 `Σceil(narrationCharCount(段落)/MAX_NARRATION_CHARS)` 的较大值；普通拆分与补镜共用保存入口，不能再只传段数。两段各 900 字必须允许 24 镜，900 字加四个短段须按逐段取整得 16 镜。
+- 拆镜上限接收实际段落文本（普通拆分与补镜共用保存入口，不能只传段数）。#109 起按句界装满计：`units = Σ paragraphMinShots(段落)`（`design-card.ts`，同段相邻句装满 80 字的最少镜数），`cap = max(min(ceil(段数×1.5), 段数+3), min(ceil(units×1.5), 2×units−段数+3))`；段落都 ≤80 字时退化为旧短稿上限。旧的 `Σceil(字数/80)` 不计句界、无余量，生产 ep 30（39 段 5602 字）给 88 镜而最少需要 98 镜。骨架任务说明直接给出最少镜数与上限，并要求同段相邻句合进一镜。
 - 首次旧设计迁移只接受已定义的 device × deterministic 组合；未定义组合保留可恢复设计内容、`combo=NULL`、`suggested_combo=NULL`，一律待审，并以 `migration_combo_unresolved` 提示显式重选。已迁移后人工确认的卡不重复回填或降级。
 - 设计卡未选组合/启用段预算为 NULL 时显示缺失状态，不用 0 秒或负余量冒充预算；明确填写 0 仍是无效值。原生类型选择器按内容自适应且不可压缩，紧凑高度必须同步减小纵向 padding。
 - 地图离线数据补 Natural Earth 50m 现代省界与城市背景点（公有领域，来源与校验和见 `backend/assets/geo/LICENSE.md`）；仅作现代定位参照，不代表古代边界，背景点不进入已审核语义点。渲染结果与 UI 明示覆盖计数及缺层警告，城市尺度无数据时不可伪造细节或隐式升级精度。（#99 起地图模块另有 10m 河流 / 50m 地理区 / 10m 居民点用于要素几何，见上节。）
