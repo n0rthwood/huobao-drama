@@ -298,7 +298,7 @@ export function layerFromPlannedLayer(
     }
   }
 
-  // image：肖像 / 档案件插图
+  // image：画中画（#109）——肖像 / 档案件插图 / 细节或全览地图；contain 保证插图完整可见、不裁边
   const source = anchorAsset?.image_path
   if (!source) {
     warnings.push(`第 ${index + 1} 层（image）找不到可用的图片资产，已跳过`)
@@ -308,7 +308,7 @@ export function layerFromPlannedLayer(
   return {
     layer: {
       id, type: 'image', name: anchorAsset?.name || `图片 ${index + 1}`, z: index + 1, box,
-      src: { path: source }, fit: 'cover',
+      src: { path: source }, fit: 'contain',
       anchor: anchorAsset ? { asset_id: anchorAsset.id } : undefined,
     },
     points: [],

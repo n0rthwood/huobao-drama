@@ -430,6 +430,16 @@ Issue 整理完成后、实施前，必须让 **Fabel（Anthropic）或 Astra（
 - 技能（四语）：`documentary-storyboard` 的阶段二规定设计卡链路、AI 首次组合选择与现有资产可实现性；不能保留“缺语义仍规划、空锚点待人工补”的旧成功出口。`documentary-keyframe-prompt` 按 combo 分支（A 不写提示词、C/D 的锁定槽位不写提示词，阻断码为 `card_ref_unmet`）。
 - 前端：`components/DesignCardPanel.vue`（R1 的挂载壳内部）+ `components/AssetPicker.vue`（统一素材/语义条目选择弹层）；i18n 键组 `episode.design.*`（四语同步），`episode.intent.*` 已删除。镜表支持拖拽与上移/下移重排。
 
+### 逻辑组与组级视觉规划（纪录片专属，Issue #109）
+- 起因：ep 27 逐镜填卡（±3 镜窗口）时 75/113 镜选 C、同一张地图连续 17 镜满幅开场，成片在「地图 ↔ 实拍」之间回切 53 次；用户裁定根因是改写丢了原文段落关系、分镜只能逐镜判断。
+- **逻辑组 = 最终旁白稿的一个自然段**（`scriptParagraphs()`：去 `【节拍】` 后按空行切段），不另存标签或映射表。三层口径：朗读单元（单镜 ≤80 字）⊂ 逻辑组 ⊂ 叙事弧。唯一实现 `services/narration-groups.ts`（纯函数）：`paragraphSpans`（`scriptMatchKey` 坐标系，与骨架同口径）、`narrationGroupsOf`（镜 → 组读时现算；存量跨段镜归起始段并警告 `shot_cross_group`，定位不到的镜沿用上一镜的组并警告 `shot_group_unlocated`）、`crossGroupProblems`。
+- 改写契约：`evaluateFidelity` 改为**逐句** ≤80 字（段落不限长）；桥句只并入相邻段（`end_of_left|start_of_right`），不再独立成段。`documentary-script` 技能（四语）规定段落 = 逻辑组：短于约 40 字的过渡/引入段并入它引出的段，超过约 200 字且话题明显转换的段按话题拆开。
+- 骨架：**一镜不得跨段**，在骨架生成验收（`skeletonAcceptanceProblems`）、保存与 dry-run（`saveNarrationSkeleton` / `validateNarrationSkeletonDraft`）、确认（`blocked_reason`）以及 `save_storyboards` 纪录片变体（含补镜）里拒绝，问题码 `cross_group`。**不进 `confirmed` 判定**：#109 之前确认、含跨段镜的骨架保持确认，只是不能原样再次确认。
+- 设计：`design-card-batch.ts` 对纪录片按组顺序执行「组级视觉规划 → 本组逐镜填卡」，前一组落完卡再规划下一组（跨组计数看得到实际组合与底图）。规划 = `design-group-plan-run.ts planGroup()` 一组一次 `callTextChat`（环节 `design_group_plan`，非视觉；pin 到本批 design_card 的同一配置；观测工作项 stage `design_group_plan`，不进 work_plan 进度），规则在技能 `documentary/design-group-plan`（`loadSkillDoc` 直读，不进 `AGENT_SKILL_MAP`）。硬校验 `design-group-plan.ts validateGroupPlan()`（纯函数，`tests/design-group-plan.test.mjs`）：每镜恰好一条、锁定镜（非本批、已有组合）照抄、B ≤15/A ≤30/C·D ≤45 秒、有图层段必须有图的底图、新增条目只能指派给有图层段的镜、**回切**（上一镜不是以同一张图的图层收尾、本镜却以出现过的底图开场）须有指派的新增条目或距上次出现 ≥3 镜、同一底图连续回切开场 ≤2（跨组计数）；不合格回给模型纠正一次，仍不合格该组待填镜按失败计、不写卡。实测 >45 秒在调模型前即判冲突；组内有镜没有当前有效配音整组跳过。
+- 存储：表 `design_group_plans(episode_id, group_no, signature, status, plan, error_msg, task_id)`，`signature` = 段落文本 + 成员镜 id/旁白 + 实测时长 0.5 s 分桶；不指定 `storyboard_ids` 时签名不变即复用，指定时强制重规划。签名变化不自动置卡过期。接口 `GET /episodes/:id/design-group-plans`（只读）。
+- 逐镜填卡指令注入渲染事实（硬切拼接、每镜从干净满幅底图重画、图层最早 0.2 s、承接层 `at_s=0.2`）与本组规划/本镜条目；卡的组合或底图与仍新鲜的规划不一致 → 读时警告 `group_plan_deviation`（`DesignCardContext.plannedShots`，写工具也回给模型）。画中画 = 设计卡 `planned_layers[].type='image'` 锚到另一张有图资产；草稿里 image 层 `fit` 改为 `contain`（插图完整、不裁边）。
+- 前端：`DesignCardPanel` 镜表按组分组，组头内联展开显示组规划（deeplink 键见 `DEEPLINK_KEYS`）。
+
 ### 资产审核清单（纪录片专属，Issue #55）
 - 「资产」步第二个子页签：AI 逐段对照旁白稿列「信息点 → 需要的素材 → 有/缺」，每条必须被处置成 `have|added|ignored|not_needed`，否则 `asset_review_status` 停在 `pending`，#54 的门禁把「分镜设计」锁死。剧情项目（含 `documentary_rules=on` 的 drama 3）不渲染该页签，所有接口 400 `not_documentary`，两列永不写值。
 - 表 `asset_review_items`（`UNIQUE(episode_id, fingerprint)`）。**条目身份 `fingerprint = sha256(归一化信息点 + need_kind)`，不含段号**——剧本中间插一段不会让后面所有条目重来。重跑合并三步：指纹命中 → 只刷新 `run_id/segment_no/narration_excerpt/need_desc`（处置、绑定、`decided_at` 原样保留）；未命中 → 在「本次没被认领且**已处置**」的旧行里按**信息点相似度**（`infoPointSimilarity`，归一化后二元字组 Dice，阈值 `INFO_POINT_MATCH_MIN = 0.5`，包含关系算 1）取最像的一条迁移；仍未命中 → 新行，最后把没被认领的旧行删掉。结果 `{kept, added, removed, changed_item_ids[]}` 落在 `sys_task.params.review_diff`，读接口 `run.diff` 回传，并在合并后**调用一次** `markDesignCardsStaleForReviewItems()`（R4 接缝）把引用这些条目的设计卡置过期。

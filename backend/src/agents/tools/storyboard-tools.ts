@@ -22,6 +22,9 @@ import { parseReferenceImages, referenceImagePaths } from '../../services/refere
 import { stampFieldSavedAt } from '../../services/storyboard-fields.js'
 import { MAX_NARRATION_CHARS, narrationCharCount, parseNarrationMeta, sha256 } from '../../services/narration.js'
 import { describeNarrationGaps, fitNarrationToGaps, locateNarrationInScript, narrationCoverage, narrationMatchKey, scriptMatchKey, scriptParagraphs } from '../../services/narration-first.js'
+import { groupAt, paragraphSpans } from '../../services/narration-groups.js'
+import { groupPlanDeviation } from '../../services/design-group-plan.js'
+import { spokenText } from '../../services/narration-markup.js'
 import { layerTextSpecPayload, loadDesignCardContext, semanticEntries } from '../../services/design-card-context.js'
 import { designCardWindow } from '../../services/design-card-window.js'
 import { shotTtsValidity } from '../../services/narration-tts-gate.js'
@@ -582,6 +585,16 @@ function buildSaveStoryboards(documentary: boolean) {
     const paragraphs = documentary ? scriptParagraphs(episodeRow?.scriptContent || episodeRow?.content) : []
     const paragraphCount = paragraphs.length
     const shotCap = documentary ? storyboardCountCap(paragraphs) : 0
+    // 逻辑组（#109）：剧本的每个自然段是一个组，一镜只能落在一段之内
+    const groupSpans = documentary ? paragraphSpans(episodeRow?.scriptContent || episodeRow?.content) : []
+    const crossGroupReason = (start: number, end: number): string | null => {
+      if (groupSpans.length < 2 || end <= start) return null
+      const first = groupAt(groupSpans, start)!
+      const last = groupAt(groupSpans, end - 1)!
+      if (first.group_no === last.group_no) return null
+      return `这段旁白跨了第 ${first.group_no}–${last.group_no} 段：剧本里每个自然段是一个逻辑组，一镜只能属于一段。`
+        + `请在段落边界（剧本第 ${first.end} 字处，「…${scriptKey.slice(Math.max(start, first.end - 12), first.end)}」之后）拆成两镜`
+    }
     let aliveCount = existingRows.filter(sb => !sb.deletedAt).length
     // 旁白去重：归一化文本 → 已经领走它的镜号（本集既有 + 本批）
     const narrationOwners: Record<string, number> = {}
@@ -620,6 +633,12 @@ function buildSaveStoryboards(documentary: boolean) {
             narrationRejected.push({ shot_number: sb.shot_number, reason: `这段旁白已经被分镜 #${owner} 领走了：每一段剧本原文只能属于一镜，请改切一段还没被领走的文字` })
             continue
           }
+          const located = locateNarrationInScript(scriptKey, spokenText(narration), scriptCursor)
+          const crossReason = located.index >= 0 ? crossGroupReason(located.index, located.index + located.chars) : null
+          if (crossReason) {
+            narrationRejected.push({ shot_number: sb.shot_number, reason: crossReason })
+            continue
+          }
           if (shotCap > 0 && !shotToId.has(sb.shot_number) && aliveCount >= shotCap) {
             narrationRejected.push({ shot_number: sb.shot_number, reason: `本集最多 ${shotCap} 镜（旁白 ${paragraphCount} 段），已经有 ${aliveCount} 镜，请合并相邻的短句而不是继续加镜` })
             continue
@@ -647,6 +666,11 @@ function buildSaveStoryboards(documentary: boolean) {
       }
       if (takenSpans.some(([start, end]) => fit.start < end && start < fit.end)) {
         narrationRejected.push({ shot_number: sb.shot_number, reason: `narration at characters ${fit.start}–${fit.end} overlaps text another shot in this same batch already took; each shot must take a different stretch of the uncovered passage` })
+        continue
+      }
+      const fitCross = crossGroupReason(fit.start, fit.end)
+      if (fitCross) {
+        narrationRejected.push({ shot_number: sb.shot_number, reason: fitCross })
         continue
       }
       takenSpans.push([fit.start, fit.end])
@@ -1013,6 +1037,10 @@ const updateStoryboard = createTool({
       })) {
         cardReport.push({ code: issue.code, message: issue.message })
       }
+      // #109：与本组视觉规划不一致 → 回给模型（警告，不拒存；偏离要在 rationale 写明原因）
+      const planned = ctx.plannedShots?.get(storyboard_id)
+      const deviation = planned ? groupPlanDeviation(planned, combo, actualCard) : null
+      if (deviation) cardReport.push({ code: 'group_plan_deviation', message: deviation })
     }
     const stamp = stampFieldSavedAt(storyboard.fieldSavedAt, Object.keys(fields))
     if (stamp.json) updates.fieldSavedAt = stamp.json

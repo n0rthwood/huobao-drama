@@ -1,0 +1,3019 @@
+{
+ "note": "ep 27 copy-DB plan-only simulation (#109); groups 9/29 re-planned after the asset_kind feedback fix",
+ "groups": [
+  {
+   "group_no": 1,
+   "ok": true,
+   "plan": {
+    "task": "观众记住：1492年哥伦布从西班牙出发向西航行，10月12日到达瓜纳哈尼岛，欧洲人由此进入美洲、开启殖民时代。",
+    "geo_additions": [
+     {
+      "text": "1492年8月3日巴罗斯港出发（哥伦布船队三帆船与90名水手）",
+      "storyboard_id": 931
+     },
+     {
+      "text": "10月12日到达瓜纳哈尼岛（今巴哈马境内）——欧洲人首次到达美洲",
+      "storyboard_id": 932
+     },
+     {
+      "text": "「新大陆」概念与殖民时代开启（收束文字）",
+      "storyboard_id": 933
+     }
+    ],
+    "asset_roles": [
+     {
+      "asset_kind": "prop",
+      "asset_id": 281,
+      "name": "哥伦布三帆船",
+      "role": "establish",
+      "establish_storyboard_id": 931,
+      "exit_after_storyboard_id": 931,
+      "note": "以三帆船档案图为底图建立出发场景，配文字框标注日期与出发地"
+     },
+     {
+      "asset_kind": "scene",
+      "asset_id": 167,
+      "name": "瓜纳哈尼岛",
+      "role": "establish",
+      "establish_storyboard_id": 932,
+      "exit_after_storyboard_id": 932,
+      "note": "以岛屿场景静帧为底图，文字框钉住到达日期与「欧洲人首次到达美洲」"
+     },
+     {
+      "asset_kind": "prop",
+      "asset_id": 281,
+      "name": "哥伦布三帆船",
+      "role": "hint",
+      "establish_storyboard_id": 933,
+      "exit_after_storyboard_id": 933,
+      "note": "收束帧：三帆船静帧再入（隔1镜属组内收束，承载「新大陆/殖民时代」文字）"
+     }
+    ],
+    "shots": [
+     {
+      "storyboard_id": 931,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 281
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "以三帆船档案图为底图，文字框标注1492年8月3日、巴罗斯港出发、向西驶入大西洋，随后入生成段（巴罗斯港场景）演出发"
+     },
+     {
+      "storyboard_id": 932,
+      "combo": "C",
+      "base": {
+       "asset_kind": "scene",
+       "asset_id": 167
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "以瓜纳哈尼岛场景静帧为底图，文字框钉住10月12日到达、欧洲人首次到达美洲，再入生成段演水手望见陆地"
+     },
+     {
+      "storyboard_id": 933,
+      "combo": "A",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 281
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "收束帧：三帆船静帧上叠「新大陆」与「航海与殖民时代开启」文字框，作段落定格"
+     }
+    ],
+    "junction": "本组为开头，无上一组接缝；组尾以三帆船静帧收束，下一组转入1581年叶尔马克东征，切点由旁白年代跳跃自然承接"
+   }
+  },
+  {
+   "group_no": 2,
+   "ok": true,
+   "plan": {
+    "task": "观众记住：1581年（哥伦布后90年）俄国人越过乌拉尔山开启西伯利亚殖民扩张，主角是叶尔马克（小叶）。",
+    "geo_additions": [
+     {
+      "text": "乌拉尔山作为欧亚分界的地理位置（1574年东麓扩张方向）",
+      "storyboard_id": 934
+     },
+     {
+      "text": "叶尔马克·齐莫菲叶维奇（人物肖像与名字说明）",
+      "storyboard_id": 935
+     }
+    ],
+    "asset_roles": [
+     {
+      "asset_kind": "prop",
+      "asset_id": 257,
+      "name": "乌拉尔山东西两麓领地范围图",
+      "role": "establish",
+      "establish_storyboard_id": 934,
+      "exit_after_storyboard_id": 934,
+      "note": "已锁定：在图上标出乌拉尔山脉中段走向与东麓扩张方向箭头，把『翻过乌拉尔山』钉在图上，本镜后退出"
+     },
+     {
+      "asset_kind": "prop",
+      "asset_id": 266,
+      "name": "叶尔马克肖像画",
+      "role": "establish",
+      "establish_storyboard_id": 935,
+      "exit_after_storyboard_id": 935,
+      "note": "非地图底图 + 文字框介绍人物姓名，避免连续第二镜回切同一张地图"
+     }
+    ],
+    "shots": [
+     {
+      "storyboard_id": 934,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 257
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "已锁定：图上标出乌拉尔山走向与东麓扩张方向，落定1581年跨越乌拉尔山这一时间地点"
+     },
+     {
+      "storyboard_id": 935,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 266
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "叶尔马克肖像画 + 文字框（姓名/称呼小叶），完成人物首次建立，衔接下一段其身世"
+     }
+    ],
+    "junction": "上一组以 #3（ID 933）三帆船图层收尾，本组首镜 #4 换到乌拉尔山领地地图且带新增条目，切点成立；尾镜落在叶尔马克肖像上，下一段讲其身世可从人物过渡"
+   }
+  },
+  {
+   "group_no": 3,
+   "ok": true,
+   "plan": {
+    "task": "观众记住：小叶是16世纪伊凡四世时期沙皇俄国的人，他的赞助人不是沙皇、还险些被定叛国罪，他开启的俄国殖民史鲜为人知",
+    "geo_additions": [
+     {
+      "text": "伊凡四世（沙皇俄国时代背景）",
+      "storyboard_id": 936
+     }
+    ],
+    "asset_roles": [
+     {
+      "asset_kind": "scene",
+      "asset_id": 169,
+      "name": "莫斯科",
+      "role": "establish",
+      "establish_storyboard_id": 936,
+      "exit_after_storyboard_id": 936,
+      "note": "锁定镜：用莫斯科场景建立16世纪沙皇俄国的时代与地点底色"
+     },
+     {
+      "asset_kind": "character",
+      "asset_id": 73,
+      "name": "伊凡四世",
+      "role": "hint",
+      "establish_storyboard_id": 936,
+      "exit_after_storyboard_id": 936,
+      "note": "#936 在莫斯科场景上以画中画+文字点出伊凡四世，为下文『赞助人并不是伊凡四世』铺垫"
+     }
+    ],
+    "shots": [
+     {
+      "storyboard_id": 936,
+      "combo": "C",
+      "base": {
+       "asset_kind": "scene",
+       "asset_id": 169
+      },
+      "pip": [
+       {
+        "asset_kind": "character",
+        "asset_id": 73
+       }
+      ],
+      "mode": "new_items",
+      "task": "已锁定照抄：C 底图 scene#169；图层段点出16世纪、伊凡四世的时代标签，随后生成段入小叶生活场景"
+     },
+     {
+      "storyboard_id": 937,
+      "combo": "B",
+      "base": null,
+      "pip": [],
+      "mode": "no_layer",
+      "task": "实测 14 秒、无新增需落图条目：纯生成段，演小叶与赞助人/被指控叛国的处境与鲜为人知的命运，避免再次回切地图"
+     }
+    ],
+    "junction": "上一组以 #935 叶尔马克肖像画（图层段）收尾，本组首镜按锁定切到 scene#169 莫斯科场景底图，属于新底图的非回切开场；下一段开头讲伊凡四世时代，本组 #936 已用画中画点出伊凡四世，衔接顺畅"
+   }
+  },
+  {
+   "group_no": 4,
+   "ok": true,
+   "plan": {
+    "task": "观众理解：要认识小叶，先认识伊凡四世——俄国的『始沙皇』，其统一霸业承自祖父伊凡三世打下的基础。",
+    "geo_additions": [
+     {
+      "text": "伊凡四世人物说明（俄国『始沙皇』，地位类比秦始皇）",
+      "storyboard_id": 939
+     },
+     {
+      "text": "伊凡三世人物说明（为俄国统一打下重要基础）",
+      "storyboard_id": 940
+     }
+    ],
+    "asset_roles": [
+     {
+      "asset_kind": "scene",
+      "asset_id": 170,
+      "name": "莫斯科宫廷",
+      "role": "establish",
+      "establish_storyboard_id": 939,
+      "exit_after_storyboard_id": 940,
+      "note": "本组人物介绍戏的主底图：#939 建立宫廷并点出伊凡四世，#940 承接同一场景、以图层收尾为下一段乌格拉河对峙铺地图衔接"
+     },
+     {
+      "asset_kind": "character",
+      "asset_id": 73,
+      "name": "伊凡四世",
+      "role": "establish",
+      "establish_storyboard_id": 939,
+      "exit_after_storyboard_id": 939,
+      "note": "以说明文字/标签落图，类比秦始皇"
+     },
+     {
+      "asset_kind": "character",
+      "asset_id": 74,
+      "name": "伊凡三世",
+      "role": "establish",
+      "establish_storyboard_id": 940,
+      "exit_after_storyboard_id": 940,
+      "note": "以说明文字/标签落图，衔接下一段 1480 年乌格拉河对峙"
+     }
+    ],
+    "shots": [
+     {
+      "storyboard_id": 938,
+      "combo": "B",
+      "base": null,
+      "pip": [],
+      "mode": "no_layer",
+      "task": "纯氛围入戏：以时代感实拍（莫斯科/宫廷氛围）过渡，不落图，4.8 秒"
+     },
+     {
+      "storyboard_id": 939,
+      "combo": "C",
+      "base": {
+       "asset_kind": "scene",
+       "asset_id": 170
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "已锁定照抄：莫斯科宫廷底图上建立伊凡四世（始沙皇）说明标签"
+     },
+     {
+      "storyboard_id": 940,
+      "combo": "C",
+      "base": {
+       "asset_kind": "scene",
+       "asset_id": 170
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "已锁定照抄：承接宫廷场景，新增伊凡三世说明标签，图层收尾接下一段"
+     }
+    ],
+    "junction": "上一组以 #937 实拍（B）收尾，本组首镜 #938 用实拍 B 顺接不回切；#939 才首次进入宫廷底图并建立伊凡四世，切点成立；#940 以图层收尾，下一段从乌格拉河对峙（prop#258/286）开场时衔接自然。"
+   }
+  },
+  {
+   "group_no": 5,
+   "ok": true,
+   "plan": {
+    "task": "观众理解：1480年乌格拉河对峙终结蒙古人两百多年的统治，是俄国历史的转折点，并与明朝建立做时间对照",
+    "geo_additions": [
+     {
+      "text": "乌格拉河对峙地点与莫斯科公国范围",
+      "storyboard_id": 941
+     },
+     {
+      "text": "时间对照条目：明朝建立（1368）距今一百多年／蒙古人统治罗斯两百余年（文字框落图）",
+      "storyboard_id": 943
+     }
+    ],
+    "asset_roles": [
+     {
+      "asset_kind": "prop",
+      "asset_id": 258,
+      "name": "蒙古汗国分布与西征路线图",
+      "role": "establish",
+      "establish_storyboard_id": 941,
+      "exit_after_storyboard_id": 943,
+      "note": "主图：#941 建立乌格拉河对峙点与莫斯科公国；#943 照抄锁定承接，加时间对照文字框后退出"
+     },
+     {
+      "asset_kind": "scene",
+      "asset_id": 171,
+      "name": "乌格拉河畔",
+      "role": "background",
+      "establish_storyboard_id": 942,
+      "exit_after_storyboard_id": 942,
+      "note": "#942 生成段：对峙与撤退氛围，无落图"
+     }
+    ],
+    "shots": [
+     {
+      "storyboard_id": 941,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 258
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "在蒙古汗国分布图上首次标出乌格拉河对峙地点与莫斯科公国，再入实拍演对峙与不战而退"
+     },
+     {
+      "storyboard_id": 942,
+      "combo": "B",
+      "base": null,
+      "pip": [],
+      "mode": "no_layer",
+      "task": "生成段：乌格拉河畔撤退/民众氛围，承载『历史转折点、鞑靼桎梏』语义，无新增落图条目"
+     },
+     {
+      "storyboard_id": 943,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 258
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "已锁定：承接 #941 图上状态，加时间对照文字框（明朝建立已百余年／统治两百余年）"
+     },
+     {
+      "storyboard_id": 944,
+      "combo": "B",
+      "base": null,
+      "pip": [],
+      "mode": "no_layer",
+      "task": "生成段：历史学家观点的抽象演绎（苦难与恐惧的氛围），为下一段引入哥萨克做口播铺垫"
+     }
+    ],
+    "junction": "上一组以 #10（scene#170 莫斯科宫廷）的 C 收尾；本组首镜 #941 切到首次出现的 prop#258 满幅建立对峙地点，切点成立（非回切）；组尾 #944 以 B 收在实拍/氛围上，下一段『小叶本人』以人物叙事开场，衔接自然"
+   }
+  },
+  {
+   "group_no": 6,
+   "ok": true,
+   "plan": {
+    "task": "让观众认清主角小叶（叶尔马克）的身份：他不是伊凡四世体制内的臣属，而是游离于国家秩序之外的哥萨克人",
+    "geo_additions": [
+     {
+      "text": "叶尔马克·齐莫菲叶维奇（人物介绍：哥萨克出身，非伊凡四世治下属臣）",
+      "storyboard_id": 945
+     }
+    ],
+    "asset_roles": [
+     {
+      "asset_kind": "prop",
+      "asset_id": 266,
+      "name": "叶尔马克肖像画",
+      "role": "establish",
+      "establish_storyboard_id": 945,
+      "exit_after_storyboard_id": 945,
+      "note": "本组唯一一镜：以叶尔马克肖像为底图，配文字框标注其哥萨克身份，为下一段哥萨克起源做铺垫"
+     }
+    ],
+    "shots": [
+     {
+      "storyboard_id": 945,
+      "combo": "A",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 266
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "叶尔马克肖像 + 文字框点出「哥萨克人、不属于伊凡四世的秩序」，实测 9.7 秒，纯图层介绍人物身份"
+     }
+    ],
+    "junction": "上一组以 #14（ID 944）的 B 实拍收尾，本组以非地图的肖像底图开场介绍新人物，不构成地图回切；结尾停在哥萨克身份的落图上，与下一段「哥萨克人的起源」顺接"
+   }
+  },
+  {
+   "group_no": 7,
+   "ok": true,
+   "plan": {
+    "task": "观众理解哥萨克起源于蒙古西征冲击下东欧的流亡自由民群体，以及'哥萨克'一词在土耳其语与蒙古语中的多重涵义",
+    "geo_additions": [
+     {
+      "text": "蒙古西征冲击下的东欧平原（金帐汗国统治范围示意）",
+      "storyboard_id": 946
+     },
+     {
+      "text": "哥萨克人起源：半农牧半军事化多民族流亡群体（文字框说明）",
+      "storyboard_id": 947
+     }
+    ],
+    "asset_roles": [
+     {
+      "asset_kind": "prop",
+      "asset_id": 258,
+      "name": "蒙古汗国分布与西征路线图",
+      "role": "establish",
+      "establish_storyboard_id": 946,
+      "exit_after_storyboard_id": 947,
+      "note": "946 承接前面 #11/#13 已画的汗国分布，落点东欧平原冲击与流亡自由民；947 连续地图戏承接，加'哥萨克起源'文字框后退出"
+     },
+     {
+      "asset_kind": "prop",
+      "asset_id": 269,
+      "name": "叶尔马克船队石版画",
+      "role": "background",
+      "establish_storyboard_id": 950,
+      "exit_after_storyboard_id": 950,
+      "note": "950 无新增地理且 14.4 秒：用哥萨克形象版画作非地图底图 + 词义文字框，避免第三次回切同一张地图"
+     }
+    ],
+    "shots": [
+     {
+      "storyboard_id": 946,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 258
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "锁定 C：承接已画蒙古汗国分布，落在东欧平原，标注西征冲击范围与'流亡自由民'说明（已锁定照抄）"
+     },
+     {
+      "storyboard_id": 947,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 258
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "锁定 C：连续地图戏承接，加'哥萨克起源：半农牧半军事化多民族群体'文字框收束本段（已锁定照抄）"
+     },
+     {
+      "storyboard_id": 950,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 269
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "14.4 秒、无新增地理：改用叶尔马克船队石版画底图 + 土耳其语/蒙古语词义文字框，切换视觉避免地图回切疲劳"
+     }
+    ],
+    "junction": "与上一组接缝：上组 #15 以叶尔马克肖像 A 收尾（prop#266），本组首镜回到 prop#258——该图上次出现于 #13，间隔 ≥3 镜，且 946 有新增条目（东欧平原冲击范围），回切成立；尾镜用非地图底图，避免跨组第三次连续回切同一地图"
+   }
+  },
+  {
+   "group_no": 8,
+   "ok": true,
+   "plan": {
+    "task": "观众记住：哥萨克聚落散布东欧平原；小叶是活跃于伏尔加—第聂伯—顿河三河地带、为害伊凡四世治下商道村落的强盗首领。",
+    "geo_additions": [
+     {
+      "text": "哥萨克聚落分布范围（南部草原至伏尔加河上游的东欧平原）",
+      "storyboard_id": 948
+     },
+     {
+      "text": "小叶活动范围：伏尔加河、第聂伯河与顿河地区（示意范围）",
+      "storyboard_id": 949
+     },
+     {
+      "text": "莫斯科公国（伊凡四世治下，小叶劫掠目标的政权范围提示）",
+      "storyboard_id": 951
+     }
+    ],
+    "asset_roles": [
+     {
+      "asset_kind": "prop",
+      "asset_id": 258,
+      "name": "蒙古汗国分布与西征路线图",
+      "role": "establish",
+      "establish_storyboard_id": 948,
+      "exit_after_storyboard_id": 951,
+      "note": "东欧平原定位主图：#19 建立聚落分布范围，#20 点出三河活动范围，#21 高亮莫斯科公国收束。连续地图戏，逐镜承接不重画"
+     },
+     {
+      "asset_kind": "scene",
+      "asset_id": 172,
+      "name": "哥萨克聚落",
+      "role": "background",
+      "establish_storyboard_id": 948,
+      "exit_after_storyboard_id": 948,
+      "note": "可选作 #19 图层段内的聚落意象配图/文字说明板，不满幅另起"
+     }
+    ],
+    "shots": [
+     {
+      "storyboard_id": 948,
+      "combo": "A",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 258
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "首次建立东欧平原哥萨克聚落分布范围（南起草原、北抵伏尔加河上游），标注聚落示意点与说明文字"
+     },
+     {
+      "storyboard_id": 949,
+      "combo": "A",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 258
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "承接已画的聚落分布，新增小叶三河活动范围（伏尔加、第聂伯、顿河）示意框与首领标签"
+     },
+     {
+      "storyboard_id": 951,
+      "combo": "A",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 258
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "承接三河范围，高亮莫斯科公国（伊凡四世地盘）并落『强盗团伙老大』人物标签，收束本组，为下一段严打铺图接图衔接"
+     }
+    ],
+    "junction": "与上一组的接缝：#18（ID 950）以船队石版画的图层段收尾，本组首镜回到 prop#258，属于叙事转回东欧平原定位线的新增条目回切（聚落分布为首次出现），切点成立；组尾停在 prop#258 高亮莫斯科公国，恰好为下一段『1577 年伊凡四世严打』的图接图开场做铺垫"
+   }
+  },
+  {
+   "group_no": 9,
+   "ok": true,
+   "plan": {
+    "task": "观众理解：1577年沙皇严打迫使哥萨克分流——大部南逃里海草原，小叶率部逆卡马河北上，最终投靠斯特罗加诺夫家族的边疆护卫队",
+    "geo_additions": [
+     {
+      "text": "南逃方向：里海与南部干草地",
+      "storyboard_id": 953
+     },
+     {
+      "text": "卡马河逆流而上路线（伏尔加河支流）",
+      "storyboard_id": 953
+     },
+     {
+      "text": "斯特罗加诺夫家族卡马河授地与边疆护卫队（1558年起）",
+      "storyboard_id": 954
+     }
+    ],
+    "asset_roles": [
+     {
+      "asset_kind": "prop",
+      "asset_id": 258,
+      "name": "蒙古汗国分布与西征路线图",
+      "role": "establish",
+      "establish_storyboard_id": 953,
+      "exit_after_storyboard_id": 953,
+      "note": "承接上一组已画的伏尔加河流域，本镜新增卡马河逆流路线与南逃里海方向后退出"
+     },
+     {
+      "asset_kind": "prop",
+      "asset_id": 257,
+      "name": "乌拉尔山东西两麓领地范围图",
+      "role": "establish",
+      "establish_storyboard_id": 954,
+      "exit_after_storyboard_id": 954,
+      "note": "首次建立斯特罗加诺夫卡马河授地范围，为下一段介绍斯特罗家族铺图"
+     },
+     {
+      "asset_kind": "scene",
+      "asset_id": 170,
+      "name": "莫斯科宫廷",
+      "role": "background",
+      "establish_storyboard_id": 952,
+      "exit_after_storyboard_id": 952,
+      "note": "952 严打行动的实拍背景，避免地图连续回切"
+     }
+    ],
+    "shots": [
+     {
+      "storyboard_id": 952,
+      "combo": "B",
+      "base": null,
+      "pip": [],
+      "mode": "no_layer",
+      "task": "生成段演伊凡四世发起针对哥萨克的严打行动，莫斯科宫廷氛围，无新增地理"
+     },
+     {
+      "storyboard_id": 953,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 258
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "承接上一组伏尔加河图层状态，新增南逃里海方向箭头与卡马河逆流路线（小叶北上）"
+     },
+     {
+      "storyboard_id": 954,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 257
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "切换到领地图，首次建立斯特罗加诺夫卡马河授地范围并点出小叶加入边疆护卫队，为下一段铺图"
+     }
+    ],
+    "junction": "上一组 #14–#21 连续八镜以 prop#258 收尾；本组 #952 先用 B 演严打破开连续地图戏，#953 再回到 prop#258 承接并新增卡马河路线，#954 换 prop#257 建立斯特罗家族授地，正好衔接下一段『斯特罗家族是什么来头』"
+   }
+  },
+  {
+   "group_no": 10,
+   "ok": true,
+   "plan": {
+    "task": "观众理解斯特罗家族的来头：13 世纪起家于诺夫哥罗德的制盐贩盐，两百多年经营成富可敌国的跨区域商贸家族",
+    "geo_additions": [
+     {
+      "text": "诺夫哥罗德（13世纪家族起源地，罗斯诸公国之一）",
+      "storyboard_id": 956
+     },
+     {
+      "text": "伊凡四世时期覆盖西欧与中亚的商贸网络（富可敌国）",
+      "storyboard_id": 957
+     }
+    ],
+    "asset_roles": [
+     {
+      "asset_kind": "scene",
+      "asset_id": 177,
+      "name": "诺夫哥罗德",
+      "role": "establish",
+      "establish_storyboard_id": 956,
+      "exit_after_storyboard_id": 956,
+      "note": "以诺夫哥罗德场景底图建立家族起源地，配地名标签与年代文字框"
+     },
+     {
+      "asset_kind": "prop",
+      "asset_id": 277,
+      "name": "斯特罗加诺夫家族说明性画面",
+      "role": "establish",
+      "establish_storyboard_id": 957,
+      "exit_after_storyboard_id": 957,
+      "note": "以家族说明画面收尾钉住「西欧—中亚商贸网络、富可敌国」文字框，并为下一段授地话题铺衔接"
+     }
+    ],
+    "shots": [
+     {
+      "storyboard_id": 955,
+      "combo": "B",
+      "base": null,
+      "pip": [],
+      "mode": "no_layer",
+      "task": "4 秒设问钩子：实拍（叶尔马克／小叶相关场景）引出「斯特罗家族是什么来头」，不落图"
+     },
+     {
+      "storyboard_id": 956,
+      "combo": "C",
+      "base": {
+       "asset_kind": "scene",
+       "asset_id": 177
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "在诺夫哥罗德场景上建立起源地标（地名标签＋13世纪/1478年被吞并年代文字），讲制盐贩盐发家"
+     },
+     {
+      "storyboard_id": 957,
+      "combo": "D",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 277
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "14.7 秒无地图新增：先演商贸扩张氛围，结尾落在家族说明画面，用文字框钉住西欧—中亚商贸网络与富可敌国"
+     }
+    ],
+    "junction": "上一组以 #24 的 prop#257 领地图层段收尾；本组首镜用 B 实拍设问，切点为「图 → 实拍」成立，避免再次回切地图"
+   }
+  },
+  {
+   "group_no": 11,
+   "ok": true,
+   "plan": {
+    "task": "观众记住：1558年伊凡四世把卡马河—楚索瓦亚河之间的土地授予斯特罗家族（含乌拉尔山西麓），1574年又大幅扩至东麓",
+    "geo_additions": [
+     {
+      "text": "斯特罗加诺夫家族卡马河—楚索瓦亚河授地示意范围（1558年起）",
+      "storyboard_id": 958
+     },
+     {
+      "text": "乌拉尔山脉西麓（矿产丰富）",
+      "storyboard_id": 959
+     },
+     {
+      "text": "1574年向乌拉尔山东麓扩展方向（示意箭头）",
+      "storyboard_id": 959
+     }
+    ],
+    "asset_roles": [
+     {
+      "asset_kind": "prop",
+      "asset_id": 257,
+      "name": "乌拉尔山东西两麓领地范围图",
+      "role": "establish",
+      "establish_storyboard_id": 958,
+      "exit_after_storyboard_id": 959,
+      "note": "#28 再入（距 #24 已隔 4 镜），建立 1558 年授地范围；#29 承接同一张图，补画西麓与 1574 年扩展箭头，以图收束本组"
+     },
+     {
+      "asset_kind": "character",
+      "asset_id": 73,
+      "name": "伊凡四世",
+      "role": "background",
+      "establish_storyboard_id": 958,
+      "exit_after_storyboard_id": 958,
+      "note": "仅在 #28 作为画中画提示授予者身份，不展开"
+     }
+    ],
+    "shots": [
+     {
+      "storyboard_id": 958,
+      "combo": "A",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 257
+      },
+      "pip": [
+       {
+        "asset_kind": "character",
+        "asset_id": 73
+       }
+      ],
+      "mode": "new_items",
+      "task": "再入领地图：建立卡马河—楚索瓦亚河授地范围（1558年起），画中画伊凡四世提示授予者"
+     },
+     {
+      "storyboard_id": 959,
+      "combo": "A",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 257
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "连续地图戏承接：标出矿产丰富的乌拉尔山西麓，并画出 1574 年向山东麓扩展的示意箭头后收束"
+     }
+    ],
+    "junction": "上一组 #27 以 prop#277 图层段收尾（非地图），本组回到 prop#257 属再入（距上次出现已隔 4 镜），且本镜有新增授地条目，回切成立；下一段讲开发要塞，本组以 #959 图收尾，正好为图接实拍的切入铺垫"
+   }
+  },
+  {
+   "group_no": 12,
+   "ok": true,
+   "plan": {
+    "task": "观众理解斯特罗家族与沙皇的权力—资本交换结构（出资开发换特权与保护），并记住其延续至1917年革命的红顶商人身份",
+    "geo_additions": [
+     {
+      "text": "斯特罗加诺夫领地上的新要塞与定居点（农业、矿产开发）",
+      "storyboard_id": 960
+     },
+     {
+      "text": "伊凡四世授予的特权：政治合法性、军事保护、免征捐税20年",
+      "storyboard_id": 961
+     },
+     {
+      "text": "领地内自主管辖权与私人军事武装（义务：协防东方边境）",
+      "storyboard_id": 962
+     },
+     {
+      "text": "盐铁专营最大民间代理人身份",
+      "storyboard_id": 963
+     },
+     {
+      "text": "后代跻身贵族、罗曼诺夫王朝红顶商人，直至1917年革命",
+      "storyboard_id": 964
+     }
+    ],
+    "asset_roles": [
+     {
+      "asset_kind": "scene",
+      "asset_id": 178,
+      "name": "斯特罗加诺夫边疆要塞",
+      "role": "establish",
+      "establish_storyboard_id": 960,
+      "exit_after_storyboard_id": 960,
+      "note": "开场实拍要塞/定居点，表现出资开发，配文字框点出开发内容"
+     },
+     {
+      "asset_kind": "prop",
+      "asset_id": 277,
+      "name": "斯特罗加诺夫家族说明性画面",
+      "role": "establish",
+      "establish_storyboard_id": 961,
+      "exit_after_storyboard_id": 961,
+      "note": "家族底图上列特权条目：合法性、军事保护、免税20年"
+     },
+     {
+      "asset_kind": "scene",
+      "asset_id": 180,
+      "name": "边境村庄",
+      "role": "hint",
+      "establish_storyboard_id": 962,
+      "exit_after_storyboard_id": 962,
+      "note": "边境村庄底图配文字框：自主管辖+私人武装+协防义务"
+     },
+     {
+      "asset_kind": "scene",
+      "asset_id": 176,
+      "name": "索利卡姆斯克制盐工坊",
+      "role": "establish",
+      "establish_storyboard_id": 963,
+      "exit_after_storyboard_id": 963,
+      "note": "制盐工坊实拍入戏，结尾文字框钉住『盐铁专营民间代理人』"
+     },
+     {
+      "asset_kind": "prop",
+      "asset_id": 274,
+      "name": "小伊觐见伊凡四世画",
+      "role": "establish",
+      "establish_storyboard_id": 964,
+      "exit_after_storyboard_id": 964,
+      "note": "觐见画承接『资助沙皇进入统治阶层』，结尾文字框钉住红顶商人→1917革命"
+     }
+    ],
+    "shots": [
+     {
+      "storyboard_id": 960,
+      "combo": "C",
+      "base": {
+       "asset_kind": "scene",
+       "asset_id": 178
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "边疆要塞底图+文字框，建立『出资开发、修建要塞与定居点』"
+     },
+     {
+      "storyboard_id": 961,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 277
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "家族说明画面+文字框列出沙皇给予的特权（合法性、军事保护、免税20年）"
+     },
+     {
+      "storyboard_id": 962,
+      "combo": "C",
+      "base": {
+       "asset_kind": "scene",
+       "asset_id": 180
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "边境村庄底图+文字框：自主管辖权、私人武装及协防东方边境的义务"
+     },
+     {
+      "storyboard_id": 963,
+      "combo": "D",
+      "base": {
+       "asset_kind": "scene",
+       "asset_id": 176
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "先实拍制盐工坊入戏，结尾文字框钉住『盐铁专营最大民间代理人』"
+     },
+     {
+      "storyboard_id": 964,
+      "combo": "D",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 274
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "觐见伊凡四世画承接『资助沙皇、跻身贵族』，结尾文字框钉住红顶商人身份直至1917年革命"
+     }
+    ],
+    "junction": "上一组以 #29 的 prop#257 领地图 A 收尾，且 prop#257 已连续两镜回切开场；本组首镜改用非地图底图（边疆要塞）避免第三次回切，切点为图→实拍，成立；下一段将回到乌拉尔扩张与原住民冲突，本组结尾停在1917年收束，衔接由下一段自行开新图"
+   }
+  },
+  {
+   "group_no": 13,
+   "ok": true,
+   "plan": {
+    "task": "观众理解：斯特罗加诺夫家族东扩触及乌拉尔山东麓，与原住民汉特人、曼西人爆发冲突，原住民袭击殖民地设施、屠戮殖民者。",
+    "geo_additions": [
+     {
+      "text": "汉特人与曼西人（乌拉尔山脉东西两麓原住民，人物说明）",
+      "storyboard_id": 965
+     }
+    ],
+    "asset_roles": [
+     {
+      "asset_kind": "prop",
+      "asset_id": 282,
+      "name": "汉特人与曼西人的说明性画面",
+      "role": "establish",
+      "establish_storyboard_id": 965,
+      "exit_after_storyboard_id": 965,
+      "note": "首次提到这两支原住民：用非地图档案底图完整建立，配说明文字框点出族名与方位（乌拉尔山东西两麓）"
+     },
+     {
+      "asset_kind": "scene",
+      "asset_id": 180,
+      "name": "边境村庄",
+      "role": "background",
+      "establish_storyboard_id": 966,
+      "exit_after_storyboard_id": 966,
+      "note": "#36 讲袭击村庄、毁庄稼、屠戮：纯生成段演冲突过程，不需要落图"
+     },
+     {
+      "asset_kind": "prop",
+      "asset_id": 277,
+      "name": "斯特罗加诺夫家族说明性画面",
+      "role": "background",
+      "establish_storyboard_id": 965,
+      "exit_after_storyboard_id": 965,
+      "note": "如需在 #35 补斯特罗加诺夫扩张语境，仅作画中画提示，不整幅回切领地图"
+     }
+    ],
+    "shots": [
+     {
+      "storyboard_id": 965,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 282
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "首次提到汉特人、曼西人：在原住民说明性画面上配文字框建立两族身份与乌拉尔两麓方位，随后过渡到冲突语境"
+     },
+     {
+      "storyboard_id": 966,
+      "combo": "B",
+      "base": null,
+      "pip": [],
+      "mode": "no_layer",
+      "task": "8.6 秒、无新增需落图条目：生成段演原住民袭击边境村庄、毁坏庄稼与工坊、冲突升级"
+     }
+    ],
+    "junction": "上一组 #34 以 prop#274（D 收尾，实拍侧）结束；本组首镜改用 prop#282 建立原住民，不回切任何已出现底图，无回切问题；#36 以 B 的冲突实拍收尾，直接衔接下一段利沃尼亚战争语境"
+   }
+  },
+  {
+   "group_no": 14,
+   "ok": true,
+   "plan": {
+    "task": "观众理解：沙皇深陷利沃尼亚战争无暇东顾，因而默许哥萨克为斯特罗加诺夫家族效力",
+    "geo_additions": [],
+    "asset_roles": [
+     {
+      "asset_kind": "scene",
+      "asset_id": 179,
+      "name": "利沃尼亚战场",
+      "role": "background",
+      "establish_storyboard_id": 967,
+      "exit_after_storyboard_id": 967,
+      "note": "以战场场景+文字框（1558-1583、三方联军）交代西线战事，不回切地图"
+     },
+     {
+      "asset_kind": "prop",
+      "asset_id": 269,
+      "name": "叶尔马克船队石版画",
+      "role": "background",
+      "establish_storyboard_id": 968,
+      "exit_after_storyboard_id": 968,
+      "note": "哥萨克武装入伙：石版画+文字框（斯特罗加诺夫欢迎/沙皇默许），衔接下一段远征"
+     }
+    ],
+    "shots": [
+     {
+      "storyboard_id": 967,
+      "combo": "C",
+      "base": {
+       "asset_kind": "scene",
+       "asset_id": 179
+      },
+      "pip": [],
+      "mode": "carry_only",
+      "task": "利沃尼亚战场场景 + 文字框（1558-1583、丹麦-挪威/瑞典/波兰-立陶宛三方联军），交代无暇东顾"
+     },
+     {
+      "storyboard_id": 968,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 269
+      },
+      "pip": [],
+      "mode": "carry_only",
+      "task": "船队石版画 + 文字框（斯特罗加诺夫欢迎、沙皇默许），抛出'为什么'收束并为下一段远征铺垫"
+     }
+    ],
+    "junction": "上一组以 #36 的 B 收尾，本组两镜均用非地图底图+文字框，无回切问题；#968 停在船队石版画，与下一段'小叶远征目标'自然衔接"
+   }
+  },
+  {
+   "group_no": 15,
+   "ok": true,
+   "plan": {
+    "task": "观众记住：小叶远征的目标是攻占乌拉尔山以东的西伯利亚汗国首都喀什里克；西伯利亚汗国源自金帐汗国分裂。",
+    "geo_additions": [
+     {
+      "text": "西伯利亚汗国与都城喀什里克（乌拉尔山以东，远征目标）",
+      "storyboard_id": 969
+     },
+     {
+      "text": "金帐汗国分裂出西伯利亚汗国的传承关系",
+      "storyboard_id": 970
+     }
+    ],
+    "asset_roles": [
+     {
+      "asset_kind": "prop",
+      "asset_id": 288,
+      "name": "蒙古汗国分布与西征路线图·细节3（额尔齐斯河畔的西伯利亚汗国与喀什里克）",
+      "role": "establish",
+      "establish_storyboard_id": 969,
+      "exit_after_storyboard_id": 969,
+      "note": "首次点出远征目标喀什里克：细节图上标出喀什里克与西伯利亚汗国，画中画放全览定位其相对乌拉尔山的位置"
+     },
+     {
+      "asset_kind": "prop",
+      "asset_id": 258,
+      "name": "蒙古汗国分布与西征路线图",
+      "role": "hint",
+      "establish_storyboard_id": 969,
+      "exit_after_storyboard_id": 969,
+      "note": "仅作画中画，为细节图提供全览参照，不整段铺开"
+     },
+     {
+      "asset_kind": "prop",
+      "asset_id": 268,
+      "name": "金帐汗国分裂诸汗国示意图",
+      "role": "establish",
+      "establish_storyboard_id": 970,
+      "exit_after_storyboard_id": 970,
+      "note": "解释西伯利亚汗国的出身：在分裂示意图上点出西伯利亚汗国一支"
+     }
+    ],
+    "shots": [
+     {
+      "storyboard_id": 969,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 288
+      },
+      "pip": [
+       {
+        "asset_kind": "prop",
+        "asset_id": 258
+       }
+      ],
+      "mode": "new_items",
+      "task": "在细节图上首次标出西伯利亚汗国与都城喀什里克，画中画用全览交代其位于乌拉尔山以东"
+     },
+     {
+      "storyboard_id": 970,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 268
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "换用金帐汗国分裂示意图，标出西伯利亚汗国一支，讲清汗国传承由来"
+     }
+    ],
+    "junction": "与上一组的接缝：上一组以 #38 的船队石版画（prop#269）图层收尾，本组换底图讲远征目标，属叙事转场，切点成立；下一段从成吉思汗分封讲起，#970 的分裂示意图恰为其铺垫"
+   }
+  },
+  {
+   "group_no": 16,
+   "ok": true,
+   "plan": {
+    "task": "观众理解四大汗国的由来、术赤领地如何经长子西征扩展为金帐汗国，以及罗斯诸公国沦为附庸的格局",
+    "geo_additions": [
+     {
+      "text": "成吉思汗分封四子／四大汗国格局",
+      "storyboard_id": 971
+     },
+     {
+      "text": "术赤领地：额尔齐斯河以西直至铁蹄所至之处",
+      "storyboard_id": 972
+     },
+     {
+      "text": "长子西征推进范围：西伯利亚南部及南俄",
+      "storyboard_id": 973
+     },
+     {
+      "text": "金帐汗国重心钦察草原与首都萨莱；附庸莫斯科公国／罗斯诸公国",
+      "storyboard_id": 974
+     }
+    ],
+    "asset_roles": [
+     {
+      "asset_kind": "prop",
+      "asset_id": 267,
+      "name": "蒙古帝国汗国谱系图",
+      "role": "establish",
+      "establish_storyboard_id": 971,
+      "exit_after_storyboard_id": 971,
+      "note": "用谱系图建立分封四子与四大汗国，一镜即退"
+     },
+     {
+      "asset_kind": "prop",
+      "asset_id": 258,
+      "name": "蒙古汗国分布与西征路线图",
+      "role": "establish",
+      "establish_storyboard_id": 972,
+      "exit_after_storyboard_id": 973,
+      "note": "本组主图：#42 建立术赤领地西界，#43 承接并画出西征推进范围"
+     },
+     {
+      "asset_kind": "prop",
+      "asset_id": 287,
+      "name": "蒙古汗国分布与西征路线图_·_细节2（伏尔加河中下游：喀山、萨莱、阿斯特拉罕）",
+      "role": "establish",
+      "establish_storyboard_id": 974,
+      "exit_after_storyboard_id": 974,
+      "note": "落钦察草原重心与萨莱首都，钉住金帐汗国及附庸格局"
+     },
+     {
+      "asset_kind": "prop",
+      "asset_id": 258,
+      "name": "蒙古汗国分布与西征路线图（全览）",
+      "role": "hint",
+      "establish_storyboard_id": 974,
+      "exit_after_storyboard_id": 974,
+      "note": "作为 #44 细节图的画中画提供全览定位"
+     }
+    ],
+    "shots": [
+     {
+      "storyboard_id": 971,
+      "combo": "A",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 267
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "谱系图上标出成吉思汗分封四子与四大汗国格局（1225年年代标注）"
+     },
+     {
+      "storyboard_id": 972,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 258
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "全览图首次建立：标出术赤领地西起额尔齐斯河、铁蹄所至的范围"
+     },
+     {
+      "storyboard_id": 973,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 258
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "连续地图戏承接：先短演西征出征氛围，回到同一张图推进西征范围至西伯利亚南部及南俄（1235年）"
+     },
+     {
+      "storyboard_id": 974,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 287
+      },
+      "pip": [
+       {
+        "asset_kind": "prop",
+        "asset_id": 258
+       }
+      ],
+      "mode": "new_items",
+      "task": "细节2落钦察草原重心、萨莱首都，点亮金帐汗国；以全览作画中画提示莫斯科公国等罗斯附庸"
+     }
+    ],
+    "junction": "与上一组的接缝：上一组以 #40 prop#268 金帐汗国分裂示意图的图层段收尾，本组首镜换用谱系图从头讲分封，属新叙事线，切点成立；下一段开头讲拖雷继承蒙古本土，#44 停在金帐汗国细节图上，可自然切回谱系／全览语境"
+   }
+  },
+  {
+   "group_no": 17,
+   "ok": true,
+   "plan": {
+    "task": "观众理解拖雷一系（忽必烈建元朝、旭烈兀建伊儿汗国）以及蒙古帝国最终分裂为五大汗国的格局。",
+    "geo_additions": [
+     {
+      "text": "谱系：拖雷→忽必烈（元朝）一支",
+      "storyboard_id": 975
+     },
+     {
+      "text": "伊儿汗国（旭烈兀，今伊朗一带）",
+      "storyboard_id": 976
+     },
+     {
+      "text": "统一的蒙古帝国分裂为五大汗国（收束点标示）",
+      "storyboard_id": 977
+     }
+    ],
+    "asset_roles": [
+     {
+      "asset_kind": "prop",
+      "asset_id": 267,
+      "name": "蒙古帝国汗国谱系图",
+      "role": "establish",
+      "establish_storyboard_id": 975,
+      "exit_after_storyboard_id": 975,
+      "note": "距上次出现（#41）已隔 4 镜，属再入：本镜在谱系图上高亮拖雷→忽必烈一支并配文字框"
+     },
+     {
+      "asset_kind": "prop",
+      "asset_id": 258,
+      "name": "蒙古汗国分布与西征路线图",
+      "role": "establish",
+      "establish_storyboard_id": 976,
+      "exit_after_storyboard_id": 977,
+      "note": "#976 用全览建立伊儿汗国位置；#977 接同一张图收束点出五大汗国分裂格局（连续地图戏，承接已画状态）"
+     }
+    ],
+    "shots": [
+     {
+      "storyboard_id": 975,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 267
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "再入谱系图，高亮拖雷一支并标出忽必烈建元朝，随后入实拍/生成段讲灭宋"
+     },
+     {
+      "storyboard_id": 976,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 258
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "全览图上新增伊儿汗国（今伊朗）位置，配旭烈兀西征说明文字，再入生成段演西征"
+     },
+     {
+      "storyboard_id": 977,
+      "combo": "A",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 258
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "承接上一镜已画状态，点亮五大汗国收束本段：统一蒙古帝国分裂为五"
+     }
+    ],
+    "junction": "上一组以 #44 的细节2图层收尾；本组首镜换到谱系图（已隔 4 镜的再入，且有新增条目），切点成立。结尾停在 prop#258 全览图，与下一段『金帐汗国进一步分裂』的图接图衔接"
+   }
+  },
+  {
+   "group_no": 18,
+   "ok": true,
+   "plan": {
+    "task": "观众理解：1480年乌格拉河对峙后俄蒙攻守易势但俄并无压制性优势，蒙古诸汗国仍频繁袭扰俄国边境并掳人为奴。",
+    "geo_additions": [
+     {
+      "text": "乌格拉河对峙地点与莫斯科公国（攻守易势参照，细节图标注）",
+      "storyboard_id": 978
+     }
+    ],
+    "asset_roles": [
+     {
+      "asset_kind": "prop",
+      "asset_id": 286,
+      "name": "蒙古汗国分布与西征路线图_·_细节1（乌格拉河对峙与莫斯科公国西段）",
+      "role": "establish",
+      "establish_storyboard_id": 978,
+      "exit_after_storyboard_id": 978,
+      "note": "前组已连续两镜以全览#258收场，本组换用未用过的细节图#286建立乌格拉河对峙与攻守易势，避免第三次回切同一底图"
+     },
+     {
+      "asset_kind": "scene",
+      "asset_id": 180,
+      "name": "边境村庄",
+      "role": "background",
+      "establish_storyboard_id": 979,
+      "exit_after_storyboard_id": 979,
+      "note": "生成段：游牧骑兵袭扰边境村庄、掳掠人口的氛围场景，无落图条目"
+     }
+    ],
+    "shots": [
+     {
+      "storyboard_id": 978,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 286
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "在细节图上建立乌格拉河对峙地点与莫斯科公国，标注攻守易势；前半句金帐分裂承前提示即可（文字带过）"
+     },
+     {
+      "storyboard_id": 979,
+      "combo": "B",
+      "base": null,
+      "pip": [],
+      "mode": "no_layer",
+      "task": "生成段：蒙古游牧骑兵袭扰边境村庄、掳俘为奴的场景演绎，13.6→9.5秒无新增落图条目"
+     }
+    ],
+    "junction": "上一组以 #47 的 A 收尾在 prop#258 全览图上；本组首镜换用同族细节图 #286 开场，属于图接图的顺承变体而非第三次回切同一底图；#979 用实拍收尾，下一段接喀山/阿斯特拉罕被灭的图层段（C 开场）切点成立。"
+   }
+  },
+  {
+   "group_no": 19,
+   "ok": true,
+   "plan": {
+    "task": "观众理解：伊凡四世逐一吞并伏尔加河流域的蒙古汗国（喀山1552、阿斯特拉罕1556），并自1549年起借哥萨克之力对抗蒙古人，叶尔马克团伙因此被收编为帝国边军。",
+    "geo_additions": [
+     {
+      "text": "喀山汗国覆灭（1552年）年份标注",
+      "storyboard_id": 980
+     },
+     {
+      "text": "阿斯特拉罕汗国覆灭（1556年）年份标注",
+      "storyboard_id": 980
+     }
+    ],
+    "asset_roles": [
+     {
+      "asset_kind": "prop",
+      "asset_id": 258,
+      "name": "蒙古汗国分布与西征路线图",
+      "role": "establish",
+      "establish_storyboard_id": 980,
+      "exit_after_storyboard_id": 980,
+      "note": "承接前面已建立的喀山/阿斯特拉罕位置，本镜只新增两个汗国覆灭的年份标注，随后退出"
+     },
+     {
+      "asset_kind": "prop",
+      "asset_id": 274,
+      "name": "小伊觐见伊凡四世画",
+      "role": "hint",
+      "establish_storyboard_id": 981,
+      "exit_after_storyboard_id": 981,
+      "note": "#51 结尾用此档案画+文字框钉住『哥萨克编入帝国边军』的结果，为下一段东线转向做衔接"
+     }
+    ],
+    "shots": [
+     {
+      "storyboard_id": 980,
+      "combo": "A",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 258
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "已锁定照抄：在全览图上为喀山、阿斯特拉罕两个汗国加覆灭年份标注（1552/1556），承接前组状态不重画"
+     },
+     {
+      "storyboard_id": 981,
+      "combo": "D",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 274
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "先以生成段演伊凡四世与哥萨克合作（1549年起），结尾落到觐见画+文字框，钉住『强盗团伙摇身一变成帝国边军』，并为下一段『东线西伯利亚』留出叙事转向"
+     }
+    ],
+    "junction": "上一组 #49 以 B 实拍收尾；本组首镜 #50 回切全览图但因有新增年份标注（两个汗国覆灭）成立；#51 以档案画图层收尾，与下一段『东线』的口播转向衔接自然"
+   }
+  },
+  {
+   "group_no": 20,
+   "ok": true,
+   "plan": {
+    "task": "观众理解：1555年西伯利亚汗国名义称臣实未履行、1571年克里米亚焚莫斯科使沙俄自顾不暇、西伯利亚汗国趁机断贡袭边，斯特罗家族为保乌拉尔采矿权出资发动远征。",
+    "geo_additions": [
+     {
+      "text": "西伯利亚汗国与1555年称臣纳贡（贡赋3万张皮毛/实交不足千张）",
+      "storyboard_id": 983
+     },
+     {
+      "text": "克里米亚汗国1571年北突破线与莫斯科被焚",
+      "storyboard_id": 984
+     },
+     {
+      "text": "乌拉尔山脉中段与斯特罗加诺夫家族卡马河—楚索瓦亚河授地（独家采矿权）",
+      "storyboard_id": 986
+     }
+    ],
+    "asset_roles": [
+     {
+      "asset_kind": "prop",
+      "asset_id": 258,
+      "name": "蒙古汗国分布与西征路线图",
+      "role": "establish",
+      "establish_storyboard_id": 983,
+      "exit_after_storyboard_id": 984,
+      "note": "#53 点亮西伯利亚汗国并标1555称臣与贡赋数字；#54 在同一图上画克里米亚→莫斯科突破箭头后收尾，之后退出"
+     },
+     {
+      "asset_kind": "scene",
+      "asset_id": 169,
+      "name": "莫斯科",
+      "role": "background",
+      "establish_storyboard_id": 984,
+      "exit_after_storyboard_id": 984,
+      "note": "#54 前段生成莫斯科被焚实拍，结尾落图钉住1571事件"
+     },
+     {
+      "asset_kind": "prop",
+      "asset_id": 257,
+      "name": "乌拉尔山东西两麓领地范围图",
+      "role": "establish",
+      "establish_storyboard_id": 986,
+      "exit_after_storyboard_id": 986,
+      "note": "#56 建立斯特罗家族授地与乌拉尔采矿权，为下一段出发地索利卡姆斯克铺垫"
+     },
+     {
+      "asset_kind": "scene",
+      "asset_id": 180,
+      "name": "边境村庄",
+      "role": "background",
+      "establish_storyboard_id": 985,
+      "exit_after_storyboard_id": 985,
+      "note": "#55 袭扰边境、斯特罗家族损失：纯生成段氛围"
+     },
+     {
+      "asset_kind": "scene",
+      "asset_id": 172,
+      "name": "哥萨克聚落",
+      "role": "background",
+      "establish_storyboard_id": 982,
+      "exit_after_storyboard_id": 982,
+      "note": "#52 东线蠢蠢欲动的氛围生成段"
+     }
+    ],
+    "shots": [
+     {
+      "storyboard_id": 982,
+      "combo": "B",
+      "base": null,
+      "pip": [],
+      "mode": "no_layer",
+      "task": "转场句：东线另一个汗国蠢蠢欲动的氛围实拍，无新增地理"
+     },
+     {
+      "storyboard_id": 983,
+      "combo": "A",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 258
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "全览图上点亮西伯利亚汗国，标注1555年称臣与贡赋对比（要求3万/实交不足千张）"
+     },
+     {
+      "storyboard_id": 984,
+      "combo": "D",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 258
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "先生成克里米亚骑兵北突破、莫斯科大火实拍，结尾回到同一张全览图画突破箭头钉住1571焚城"
+     },
+     {
+      "storyboard_id": 985,
+      "combo": "B",
+      "base": null,
+      "pip": [],
+      "mode": "no_layer",
+      "task": "风雨飘摇+西伯利亚汗国断贡袭边+斯特罗家族损失：边境村庄被袭实拍，无新增落图条目"
+     },
+     {
+      "storyboard_id": 986,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 257
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "斯特罗家族领地图上标出乌拉尔采矿权与卡马河—楚索瓦亚河授地，落点到出资远征，衔接下一段出发"
+     }
+    ],
+    "junction": "上一组以 #51 的 D 停在小伊觐见画上收尾，本组 #52 用 B 切到东线氛围实拍，切点为「实拍→实拍」顺畅；#56 停在领地图，与下一段索利卡姆斯克出发的地图戏衔接。"
+   }
+  },
+  {
+   "group_no": 21,
+   "ok": true,
+   "plan": {
+    "task": "观众记住远征的起点（索利卡姆斯克）、翻越乌拉尔山的路线，以及抵达塔吉尔河东岸扎营过冬这一结果",
+    "geo_additions": [
+     {
+      "text": "索利卡姆斯克（远征出发地，1340人、1581年9月）",
+      "storyboard_id": 987
+     },
+     {
+      "text": "叶尔马克远征路线东段（卡马河—乌拉尔山中段山口—塔吉尔河）",
+      "storyboard_id": 989
+     },
+     {
+      "text": "塔吉尔河冬营地（今下塔吉尔附近）",
+      "storyboard_id": 989
+     }
+    ],
+    "asset_roles": [
+     {
+      "asset_kind": "prop",
+      "asset_id": 259,
+      "name": "西伯利亚推进据点网络图",
+      "role": "establish",
+      "establish_storyboard_id": 987,
+      "exit_after_storyboard_id": 989,
+      "note": "远征主图：#57 建立出发点索利卡姆斯克，#59 接续画出翻山路线并点出塔吉尔河冬营地后收束"
+     },
+     {
+      "asset_kind": "scene",
+      "asset_id": 176,
+      "name": "索利卡姆斯克制盐工坊",
+      "role": "background",
+      "establish_storyboard_id": 988,
+      "exit_after_storyboard_id": 988,
+      "note": "解释 Soli=盐、斯特罗加诺夫家族产业，避免回到地图重复开场"
+     }
+    ],
+    "shots": [
+     {
+      "storyboard_id": 987,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 259
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "首次建立远征主图：标出出发地索利卡姆斯克与1340人的出发信息；上一镜以 prop#257 图层收尾，本镜切换到新主图并新增条目，回切成立"
+     },
+     {
+      "storyboard_id": 988,
+      "combo": "B",
+      "base": null,
+      "pip": [],
+      "mode": "no_layer",
+      "task": "括号补语无新增地理：用制盐工坊实拍/场景演绎 Soli=盐与斯特罗加诺夫家族产业"
+     },
+     {
+      "storyboard_id": 989,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 259
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "连续地图戏：承接 #57 已标出的出发地，新增卡马河—山口—塔吉尔河路线段，并点出塔吉尔河冬营地收束本组"
+     }
+    ],
+    "junction": "与上一组的接缝：#56 以 prop#257 领地图层收尾，本组 #57 切到新主图 prop#259 并新增出发点，属带新增条目的换图开场，切点成立；#59 以图层收束在冬营地，下一段讲治军（沉河军纪），下组可用 B 实拍承接，无需接图"
+   }
+  },
+  {
+   "group_no": 22,
+   "ok": true,
+   "plan": {
+    "task": "让观众记住小叶治军极严：违反军纪者被捆沙袋沉河，20 名士兵受罚后远征队纪律严明",
+    "geo_additions": [],
+    "asset_roles": [
+     {
+      "asset_kind": "prop",
+      "asset_id": 279,
+      "name": "沉河刑具",
+      "role": "background",
+      "establish_storyboard_id": null,
+      "exit_after_storyboard_id": null,
+      "note": "作为生成段的核心道具意象（捆缚与沙袋），不入图层"
+     },
+     {
+      "asset_kind": "prop",
+      "asset_id": 278,
+      "name": "树枝假人",
+      "role": "background",
+      "establish_storyboard_id": null,
+      "exit_after_storyboard_id": null,
+      "note": "可作为沉河惩罚的演示性意象穿插"
+     }
+    ],
+    "shots": [
+     {
+      "storyboard_id": 990,
+      "combo": "B",
+      "base": null,
+      "pip": [],
+      "mode": "no_layer",
+      "task": "纯生成段：以沉河刑具/树枝假人为意象演绎五花大绑、沙袋沉河的惩罚场景与远征队纪律转变，13.5 秒内无新增地理，不需要落图"
+     }
+    ],
+    "junction": "上一组以 #59（路线图图层段）收尾，本组整组为沉河军纪的实拍戏（B），不回切地图；下一段开头 #61 顺塔尔吉河—图拉河南下需在 prop#259 上新增推进段，届时属新增条目，回切成立"
+   }
+  },
+  {
+   "group_no": 23,
+   "ok": true,
+   "plan": {
+    "task": "观众理解远征队第二年春沿图拉河南下深入西伯利亚腹地，以及在图拉河—托博尔河交汇处遭蒙古人伏击、船队趁夜脱险的经过。",
+    "geo_additions": [
+     {
+      "text": "远征路线新增段：塔吉尔河冬营地—塔尔吉河—图拉河口—沿图拉河南下",
+      "storyboard_id": 991
+     },
+     {
+      "text": "图拉河与托博尔河交汇处伏击点",
+      "storyboard_id": 997
+     }
+    ],
+    "asset_roles": [
+     {
+      "asset_kind": "prop",
+      "asset_id": 259,
+      "name": "西伯利亚推进据点网络图",
+      "role": "establish",
+      "establish_storyboard_id": 991,
+      "exit_after_storyboard_id": 997,
+      "note": "远征路线主图：#61 建立开春南下段（图拉河），#62 点出伏击点后退出，之后不再满幅回切"
+     },
+     {
+      "asset_kind": "prop",
+      "asset_id": 269,
+      "name": "叶尔马克船队石版画",
+      "role": "background",
+      "establish_storyboard_id": 992,
+      "exit_after_storyboard_id": 992,
+      "note": "#63 实测 16.5 秒、无新增地理：以船队版画+文字框承载伏击脱险旁白，避免第三次回切地图"
+     }
+    ],
+    "shots": [
+     {
+      "storyboard_id": 991,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 259
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "距上次 prop#259（#59）仅隔 B 镜，且本镜有新增：承接既有路线，画出开春自塔吉尔河冬营地顺塔尔吉河—图拉河口转向南下的推进段"
+     },
+     {
+      "storyboard_id": 997,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 259
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "承接已画南下段，在图上点出图拉河与托博尔河交汇处伏击点（连续回切到顶），随后入山涧设障实拍"
+     },
+     {
+      "storyboard_id": 992,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 269
+      },
+      "pip": [],
+      "mode": "carry_only",
+      "task": "实测 16.5 秒、无新增地理且已连续两镜回切地图：改用船队石版画 + 文字框演林中埋伏与夜色脱险，结尾停在版画上为下组树枝假人计策的实拍衔接留出非地图切点"
+     }
+    ],
+    "junction": "与上一组的接缝：上一组以 #60 实拍收尾，本组首镜回到 prop#259 路线图并新增南下段，切点成立；本组以 #62 图层入实拍、#63 版画收尾，下组开头讲树枝假人计策，可直接接生成段"
+   }
+  },
+  {
+   "group_no": 24,
+   "ok": true,
+   "plan": {
+    "task": "观众理解小叶用树枝假人调虎离山、从蒙古人身后发动奇袭并致其溃逃的战术过程与伏击地点",
+    "geo_additions": [
+     {
+      "text": "图拉河与托博尔河交汇附近的伏击地点（小叶绕至蒙古人身后发起反击处）",
+      "storyboard_id": 994
+     }
+    ],
+    "asset_roles": [
+     {
+      "asset_kind": "prop",
+      "asset_id": 278,
+      "name": "树枝假人",
+      "role": "establish",
+      "establish_storyboard_id": 993,
+      "exit_after_storyboard_id": 993,
+      "note": "以假人道具图 + 说明文字框演示诈术，避免再回切地图"
+     },
+     {
+      "asset_kind": "prop",
+      "asset_id": 259,
+      "name": "西伯利亚推进据点网络图",
+      "role": "establish",
+      "establish_storyboard_id": 994,
+      "exit_after_storyboard_id": 994,
+      "note": "锁定镜：黎明反击落在已画路线上，新增点出伏击点位置后收束"
+     }
+    ],
+    "shots": [
+     {
+      "storyboard_id": 993,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 278
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "树枝假人道具图 + 文字框交代假船诱敌、主力绕后的计策，不回切地图"
+     },
+     {
+      "storyboard_id": 994,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 259
+      },
+      "pip": [],
+      "mode": "carry_only",
+      "task": "已锁定：黎明伏击战先以实拍/氛围演示枪声与溃逃，结尾落回推进图承接路线、钉住伏击点"
+     }
+    ],
+    "junction": "上一镜 #63 以船队石版画（prop#269）图层收尾；本组首镜换成假人道具底图并叠加说明文字，不构成对同一地图的连续回切；锁定镜 #65 落回推进图点出伏击点，为下一段向喀什里克推进铺图接图衔接"
+   }
+  },
+  {
+   "group_no": 25,
+   "ok": true,
+   "plan": {
+    "task": "观众理解：远征队减员过半、补给有限，被迫加速奔袭喀什里克；同时库楚决意在城外决战，1582年10月两军将在托博尔河—额尔齐斯河交汇处开战。",
+    "geo_additions": [
+     {
+      "text": "远征路线向喀什里克推进段（托博尔河下游→喀什里克）",
+      "storyboard_id": 995
+     },
+     {
+      "text": "库楚（西伯利亚大汗，人物说明）",
+      "storyboard_id": 996
+     },
+     {
+      "text": "1582年10月决战：托博尔河与额尔齐斯河交汇处（时间标注）",
+      "storyboard_id": 996
+     }
+    ],
+    "asset_roles": [
+     {
+      "asset_kind": "prop",
+      "asset_id": 259,
+      "name": "西伯利亚推进据点网络图",
+      "role": "establish",
+      "establish_storyboard_id": 995,
+      "exit_after_storyboard_id": 996,
+      "note": "主路线图：#66 承接已画路线、新增向喀什里克推进段；#67 D 收尾钉住 1582年10月决战点后退出"
+     },
+     {
+      "asset_kind": "character",
+      "asset_id": 75,
+      "name": "库楚",
+      "role": "establish",
+      "establish_storyboard_id": 996,
+      "exit_after_storyboard_id": 996,
+      "note": "#67 生成段演绎库楚决意出击，结尾图层段以画中画给出人物标签"
+     }
+    ],
+    "shots": [
+     {
+      "storyboard_id": 995,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 259
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "承接已画路线，新增向喀什里克推进段，配文字框点出「损失过半、补给有限」，随后入实拍表现艰难行军与严冬压力"
+     },
+     {
+      "storyboard_id": 996,
+      "combo": "D",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 259
+      },
+      "pip": [
+       {
+        "asset_kind": "character",
+        "asset_id": 75
+       }
+      ],
+      "mode": "new_items",
+      "task": "先生成段演库楚决意城外击溃哥萨克（画中画人物标签），结尾落回路线图钉住 1582年10月决战点（托博尔河—额尔齐斯河交汇处），为下一段决战开场铺图接图衔接"
+     }
+    ],
+    "junction": "与上一组的接缝：#65 以 prop#259 的 C 收尾，本组 #66 回切同图并新增推进段，属有新增条目的回切，成立；#67 停在图上，下一段直接以同一张图的决战标注衔接。"
+   }
+  },
+  {
+   "group_no": 26,
+   "ok": true,
+   "plan": {
+    "task": "观众理解：决战惨烈但火枪胜冷兵器，107人阵亡换来决定性胜利；随后进占空城喀什里克、库楚逃亡，并以缴获粮草为据点安顿下来。",
+    "geo_additions": [
+     {
+      "text": "喀什里克（被哥萨克占领的西伯利亚都城）",
+      "storyboard_id": 1000
+     }
+    ],
+    "asset_roles": [
+     {
+      "asset_kind": "prop",
+      "asset_id": 259,
+      "name": "西伯利亚推进据点网络图",
+      "role": "hint",
+      "establish_storyboard_id": 1000,
+      "exit_after_storyboard_id": 1000,
+      "note": "承接前组已画的决战点，#1000 结尾落图点亮喀什里克后退出"
+     },
+     {
+      "asset_kind": "prop",
+      "asset_id": 271,
+      "name": "叶尔马克与库楚之战画",
+      "role": "background",
+      "establish_storyboard_id": 999,
+      "exit_after_storyboard_id": 999,
+      "note": "#999 战斗氛围底图配文字框"
+     },
+     {
+      "asset_kind": "scene",
+      "asset_id": 182,
+      "name": "喀什里克",
+      "role": "background",
+      "establish_storyboard_id": 1000,
+      "exit_after_storyboard_id": 1000,
+      "note": "#1000 前半入城实拍场景"
+     },
+     {
+      "asset_kind": "prop",
+      "asset_id": 280,
+      "name": "缴获的粮食补给",
+      "role": "establish",
+      "establish_storyboard_id": 1001,
+      "exit_after_storyboard_id": 1001,
+      "note": "#1001 以粮草档案图+文字框收束本组，呼应下一段据点叙事"
+     }
+    ],
+    "shots": [
+     {
+      "storyboard_id": 999,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 271
+      },
+      "pip": [],
+      "mode": "carry_only",
+      "task": "战斗惨烈、肉搏：以《叶尔马克与库楚之战画》为底图配对比文字框（人数悬殊 vs 火枪），随后生成段演混战"
+     },
+     {
+      "storyboard_id": 1000,
+      "combo": "D",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 259
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "先生成段演胜利入城与库楚败逃（scene#182 喀什里克），结尾落回推进图点亮喀什里克、标注107人阵亡与占领"
+     },
+     {
+      "storyboard_id": 1001,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 280
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "以缴获粮食档案图配文字框（面粉、大麦、咸鱼→据点安顿），收束本组并衔接下一段据点经营"
+     }
+    ],
+    "junction": "上一组以 #996（ID 996）的 D 落在推进图决战点收尾，本组首镜 #999 改用战斗画做 C，避免对同一张地图第三镜连续回切；#1000 再回到推进图点亮喀什里克（新增条目），承接成立"
+   }
+  },
+  {
+   "group_no": 27,
+   "ok": true,
+   "plan": {
+    "task": "观众理解：小叶战胜后成为西伯利亚霸主并向臣属部落收保护费，但库楚残部仍骚扰据点、不服从的原住民部落遭到残酷镇压",
+    "geo_additions": [],
+    "asset_roles": [
+     {
+      "asset_kind": "scene",
+      "asset_id": 187,
+      "name": "西伯利亚据点要塞",
+      "role": "background",
+      "establish_storyboard_id": 998,
+      "exit_after_storyboard_id": null,
+      "note": "#71 据点收贡场景定调"
+     },
+     {
+      "asset_kind": "scene",
+      "asset_id": 189,
+      "name": "汉特曼西原住民营地",
+      "role": "background",
+      "establish_storyboard_id": 1002,
+      "exit_after_storyboard_id": null,
+      "note": "#72 部落与镇压戏的场地"
+     }
+    ],
+    "shots": [
+     {
+      "storyboard_id": 998,
+      "combo": "B",
+      "base": null,
+      "pip": [],
+      "mode": "no_layer",
+      "task": "10.7 秒无新增地理：实拍/生成小叶据点向部落收贡的场景，讲清『收保护费』的统治逻辑"
+     },
+     {
+      "storyboard_id": 1002,
+      "combo": "B",
+      "base": null,
+      "pip": [],
+      "mode": "no_layer",
+      "task": "14.1 秒无新增地理：生成段演残部骚扰据点与镇压不服从部落的冲突场面，与上一镜实拍形成节奏对比"
+     }
+    ],
+    "junction": "上一组以 #70（prop#280 战利品）的 C 收尾，本组两镜纯生成段讲战后统治与镇压，不在地图上原地踏步；下一段开始派小伊回莫斯科，到时再回到图层建立返程线"
+   }
+  },
+  {
+   "group_no": 28,
+   "ok": true,
+   "plan": {
+    "task": "观众理解小伊率50人奉命返程报捷，经原住民捷径翻乌拉尔山抵达切尔登（距出发地约90公里）",
+    "geo_additions": [
+     {
+      "text": "伊凡·科尔佐（小伊）受命率50人返程报捷（人物说明）",
+      "storyboard_id": 1003
+     },
+     {
+      "text": "返程路线推进段：塔夫达河逆流—原住民捷径翻越乌拉尔山",
+      "storyboard_id": 1004
+     },
+     {
+      "text": "沿维舍拉河到达切尔登，距远征出发地约90公里",
+      "storyboard_id": 1005
+     }
+    ],
+    "asset_roles": [
+     {
+      "asset_kind": "prop",
+      "asset_id": 259,
+      "name": "西伯利亚推进据点网络图",
+      "role": "establish",
+      "establish_storyboard_id": 1003,
+      "exit_after_storyboard_id": 1005,
+      "note": "主图：#73 点出小伊返程起点与人物说明，#74 承接画出塔夫达河—翻山段，#75 先入戏（切尔登/乌拉尔山口场景），结尾落图推进到切尔登并钉住90公里收束，避免连续第3次回切开场"
+     }
+    ],
+    "shots": [
+     {
+      "storyboard_id": 1003,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 259
+      },
+      "pip": [
+       {
+        "asset_kind": "character",
+        "asset_id": 76
+       }
+      ],
+      "mode": "new_items",
+      "task": "在路线图上以画中画点出小伊（人物说明）与率50人返程的起点，喀什里克已有状态承接"
+     },
+     {
+      "storyboard_id": 1004,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 259
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "同一张图连续地图戏，承接返程起点，新增塔夫达河逆流—原住民捷径翻越乌拉尔山的路线段"
+     },
+     {
+      "storyboard_id": 1005,
+      "combo": "D",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 259
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "先演翻山后沿维舍拉河东行抵切尔登的跋涉实拍（无图层开场，规避连续第3次回切），结尾落回路线图推进到维舍拉河—切尔登、点亮切尔登，钉住「距出发地约90公里」文字收束本段，并为下一段莫斯科戏铺垫"
+     }
+    ],
+    "junction": "上一组以 #72 的 B 实拍收尾，本组首镜 #73 回到路线图并指派了新增条目（小伊与返程），回切成立；#74 接图开场构成连续地图戏；#75 改为 D 以实拍开场、图层收尾，不再以同一张地图回切开场（连续回切降为 2 次合规），结尾停在图上有利于与下一段「莫斯科」信息的衔接"
+   }
+  },
+  {
+   "group_no": 29,
+   "ok": true,
+   "plan": {
+    "task": "观众理解：远征队音讯全无令伊凡四世恼怒，西伯利亚汗国趁边防空虚袭扰俄境、切尔登被毁，斯特罗加诺夫家族被问责——为下一段小伊入京请罪埋下伏笔。",
+    "geo_additions": [
+     {
+      "text": "1582年冬·莫斯科（沙皇获知远征队杳无音讯）",
+      "storyboard_id": 1007
+     },
+     {
+      "text": "西伯利亚汗国袭扰俄罗斯东部边境（袭击范围示意）",
+      "storyboard_id": 1008
+     },
+     {
+      "text": "切尔登及附近村落被夷为平地（袭击结果钉点）",
+      "storyboard_id": 1009
+     }
+    ],
+    "asset_roles": [
+     {
+      "asset_kind": "scene",
+      "asset_id": 169,
+      "name": "莫斯科",
+      "role": "background",
+      "establish_storyboard_id": 1006,
+      "exit_after_storyboard_id": 1006,
+      "note": "开场转场：莫斯科城市氛围，交代地点"
+     },
+     {
+      "asset_kind": "prop",
+      "asset_id": 258,
+      "name": "蒙古汗国分布与西征路线图",
+      "role": "hint",
+      "establish_storyboard_id": 1007,
+      "exit_after_storyboard_id": 1008,
+      "note": "沙皇视角全局图：#1007 点出莫斯科与恼怒的时间背景，#1008 收尾标出西伯利亚汗国袭扰东部边境的范围"
+     },
+     {
+      "asset_kind": "scene",
+      "asset_id": 170,
+      "name": "莫斯科宫廷",
+      "role": "background",
+      "establish_storyboard_id": 1007,
+      "exit_after_storyboard_id": 1007,
+      "note": "伊凡四世恼怒的实拍场景"
+     },
+     {
+      "asset_kind": "scene",
+      "asset_id": 180,
+      "name": "边境村庄",
+      "role": "background",
+      "establish_storyboard_id": 1008,
+      "exit_after_storyboard_id": 1008,
+      "note": "边防空虚、村庄遭袭的实拍，结尾落回全览图钉住袭击范围"
+     },
+     {
+      "asset_kind": "prop",
+      "asset_id": 259,
+      "name": "西伯利亚推进据点网络图",
+      "role": "hint",
+      "establish_storyboard_id": 1009,
+      "exit_after_storyboard_id": 1009,
+      "note": "再入（距上次出现已隔 8 镜）：钉住切尔登被毁的结果"
+     },
+     {
+      "asset_kind": "scene",
+      "asset_id": 186,
+      "name": "切尔登",
+      "role": "background",
+      "establish_storyboard_id": 1009,
+      "exit_after_storyboard_id": 1009,
+      "note": "村庄被夷平的实拍，随后落图钉点"
+     },
+     {
+      "asset_kind": "prop",
+      "asset_id": 277,
+      "name": "斯特罗加诺夫家族说明性画面",
+      "role": "hint",
+      "establish_storyboard_id": 1009,
+      "exit_after_storyboard_id": 1009,
+      "note": "问责斯特罗家族的档案画面收尾"
+     }
+    ],
+    "shots": [
+     {
+      "storyboard_id": 1006,
+      "combo": "B",
+      "base": null,
+      "pip": [],
+      "mode": "no_layer",
+      "task": "3.8 秒短句：莫斯科城市实拍转场，『坏消息』氛围定调，不落图"
+     },
+     {
+      "storyboard_id": 1007,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 258
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "全览图上点出莫斯科、标注 1582 年冬沙皇等待消息的时间点，随后切入宫廷实拍演伊凡四世的恼怒"
+     },
+     {
+      "storyboard_id": 1008,
+      "combo": "D",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 258
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "先演边境村庄遭袭实拍（承接上一镜宫廷戏，避开图接图），结尾落回全览图标出西伯利亚汗国袭扰东部边境的范围"
+     },
+     {
+      "storyboard_id": 1009,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 259
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "再入推进据点网络图（距上次出现已隔 8 镜），钉住切尔登被毁的结果，随后用切尔登实拍与斯特罗加诺夫家族档案画面交代问责，收束本组"
+     }
+    ],
+    "junction": "上一组以 #75 的推进据点网络图图层收尾；本组首镜改用莫斯科实拍开场（B），既避免第 9 镜连续回切同一底图，又以场景转换承接『莫斯科」话题。组尾以斯特罗家族问责收束，下一段小伊抵达莫斯科觐见（B/D 均可自然衔接）。"
+   }
+  },
+  {
+   "group_no": 30,
+   "ok": true,
+   "plan": {
+    "task": "观众理解：小伊带着远超预期的皮毛战利品（约为年贡5倍）觐见伊凡四世，从待死之身变为震动宫廷的凯旋者",
+    "geo_additions": [],
+    "asset_roles": [
+     {
+      "asset_kind": "prop",
+      "asset_id": 274,
+      "name": "小伊觐见伊凡四世画",
+      "role": "establish",
+      "establish_storyboard_id": 1011,
+      "exit_after_storyboard_id": 1011,
+      "note": "觐见与战利品展示的场景底图：配宫廷震动说明，13.5 秒内承接汇报段落"
+     },
+     {
+      "asset_kind": "prop",
+      "asset_id": 261,
+      "name": "黑貂皮捆",
+      "role": "establish",
+      "establish_storyboard_id": 1012,
+      "exit_after_storyboard_id": 1012,
+      "note": "战利品盘点底图：非地图，用文字框列出 2400/2000/800 张与『年贡 5 倍』，为本组收束并为下一段皮毛贸易铺垫"
+     }
+    ],
+    "shots": [
+     {
+      "storyboard_id": 1010,
+      "combo": "B",
+      "base": null,
+      "pip": [],
+      "mode": "no_layer",
+      "task": "生成段：绞刑架已备好的危机氛围，短促制造悬念，无新增落图条目"
+     },
+     {
+      "storyboard_id": 1011,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 274
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "用觐见画做底图建立汇报场景，文字框点出『战利品展示—宫廷震动』的转折"
+     },
+     {
+      "storyboard_id": 1012,
+      "combo": "A",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 261
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "黑貂皮捆底图 + 逐项数字文字框（2400 貂 / 2000 河狸 / 800 黑狐）与『年贡 5 倍』对比，本组收束"
+     }
+    ],
+    "junction": "与上一组的接缝：上一组 #79 以 prop#259 图层段收尾（D），本组首镜换为实拍 B（绞刑架悬念），切点是『图 → 实拍』且叙事转场（战场 → 莫斯科），成立；本组收束帧停在皮毛特写上，与下一段『皮毛贸易价格』直接衔接"
+   }
+  },
+  {
+   "group_no": 31,
+   "ok": true,
+   "plan": {
+    "task": "观众理解：欧洲皮毛依赖俄国进口，黑貂皮价格极高（1张=200银元≈100个鸡蛋/6公斤面包），西伯利亚皮毛之于俄国如同南美黄金之于西班牙。",
+    "geo_additions": [
+     {
+      "text": "上好黑貂皮在西欧市场售价 200 西班牙银元（配 prop#262 银元图）",
+      "storyboard_id": 1025
+     },
+     {
+      "text": "银元购买力换算：16世纪末 1 银元 ≈ 100 个鸡蛋 / 6 公斤面包（文字框标注）",
+      "storyboard_id": 1026
+     }
+    ],
+    "asset_roles": [
+     {
+      "asset_kind": "prop",
+      "asset_id": 262,
+      "name": "西班牙银元",
+      "role": "establish",
+      "establish_storyboard_id": 1025,
+      "exit_after_storyboard_id": 1026,
+      "note": "#84 建立：银元图+价格文字框；#85 承接同图补购买力换算文字后退出"
+     },
+     {
+      "asset_kind": "prop",
+      "asset_id": 261,
+      "name": "黑貂皮捆",
+      "role": "hint",
+      "establish_storyboard_id": 1013,
+      "exit_after_storyboard_id": 1013,
+      "note": "该资产在上一组 #82（上一组内）已建立；本组 #86 距其上次出现已隔 4 镜，属再入，作组收束帧，落『皮毛=黄金』类比说明"
+     }
+    ],
+    "shots": [
+     {
+      "storyboard_id": 1019,
+      "combo": "B",
+      "base": null,
+      "pip": [],
+      "mode": "no_layer",
+      "task": "7.6 秒无新增条目：生成段演欧洲皮毛贸易氛围（集市/皮毛装卸），不落图"
+     },
+     {
+      "storyboard_id": 1025,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 262
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "先演西欧市场交易，落到西班牙银元图上，文字框标出『上好黑貂皮=200 西班牙银元』"
+     },
+     {
+      "storyboard_id": 1026,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 262
+      },
+      "pip": [],
+      "mode": "carry_only",
+      "task": "承接同一张银元图（连续图层戏），新增文字框：1 银元≈100 个鸡蛋/6 公斤面包"
+     },
+     {
+      "storyboard_id": 1013,
+      "combo": "A",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 261
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "再入黑貂皮捆（上一组 #82 建立，已隔 4 镜）作收束帧，文字框点出『西伯利亚皮毛之于俄国＝南美黄金之于西班牙』"
+     }
+    ],
+    "junction": "上一组以 #82 黑貂皮捆 A 收尾；本组首镜换成 B 生成段，避免同图空转，切点干净；组尾 #86 重新落回皮毛意象收束，并为下一段伊丽莎白一世猞猁皮毛铺垫"
+   }
+  },
+  {
+   "group_no": 32,
+   "ok": true,
+   "plan": {
+    "task": "认识伊丽莎白一世其人，并记住她披风上猞猁皮毛比黑貂皮更稀有珍贵",
+    "geo_additions": [
+     {
+      "text": "伊丽莎白一世（画像）与披风猞猁皮毛说明",
+      "storyboard_id": 1014
+     }
+    ],
+    "asset_roles": [
+     {
+      "asset_kind": "prop",
+      "asset_id": 273,
+      "name": "伊丽莎白一世画像与猞猁",
+      "role": "establish",
+      "establish_storyboard_id": 1014,
+      "exit_after_storyboard_id": 1014,
+      "note": "首次出现伊丽莎白一世，画像底图完整建立，配猞猁皮毛说明文字"
+     }
+    ],
+    "shots": [
+     {
+      "storyboard_id": 1014,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 273
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "实测 15.8 秒：伊丽莎白画像 + 文字框标注猞猁皮毛位置与『比黑貂更稀有』说明，前段图层后接本镜画像实拍氛围"
+     }
+    ],
+    "junction": "上一组以 #86 黑貂皮捆 A 收尾，本组换用非地图底图（伊丽莎白画像）讲皮毛珍稀，无回切问题"
+   }
+  },
+  {
+   "group_no": 33,
+   "ok": true,
+   "plan": {
+    "task": "观众理解：皮毛让战败受挫的伊凡四世态度逆转——赦免并嘉奖哥萨克，小叶小伊从强盗变为沙皇在西伯利亚汗国的全权代理人。",
+    "geo_additions": [
+     {
+      "text": "西伯利亚汗国划为沙皇全权代理辖区（小叶小伊为代理人）",
+      "storyboard_id": 1017
+     }
+    ],
+    "asset_roles": [
+     {
+      "asset_kind": "prop",
+      "asset_id": 261,
+      "name": "黑貂皮捆",
+      "role": "hint",
+      "establish_storyboard_id": null,
+      "exit_after_storyboard_id": null,
+      "note": "#86 已满幅建立过，#1015 仅靠旁白提及皮毛即可，不再回切"
+     },
+     {
+      "asset_kind": "prop",
+      "asset_id": 258,
+      "name": "蒙古汗国分布与西征路线图",
+      "role": "establish",
+      "establish_storyboard_id": 1016,
+      "exit_after_storyboard_id": 1017,
+      "note": "锁定镜：#1016 在图上标莫斯科与利沃尼亚方向，交代沙皇处境与赦免承诺；#1017 D 收尾在同一图上钉住『西伯利亚汗国＝全权代理辖区』"
+     },
+     {
+      "asset_kind": "prop",
+      "asset_id": 264,
+      "name": "沙皇权杖",
+      "role": "hint",
+      "establish_storyboard_id": null,
+      "exit_after_storyboard_id": null,
+      "note": "#1017 前半生成段（亲吻权杖效忠仪式）中作为关键道具出现"
+     }
+    ],
+    "shots": [
+     {
+      "storyboard_id": 1015,
+      "combo": "B",
+      "base": null,
+      "pip": [],
+      "mode": "no_layer",
+      "task": "回到莫斯科、皮毛改变态度：4.6 秒短镜，用宫廷/沙皇反应的生成段过渡，皮捆上一组刚满幅出现过，不再回切"
+     },
+     {
+      "storyboard_id": 1016,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 258
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "已锁定照抄：在汗国分布图上标出莫斯科与利沃尼亚战败方向，随后入戏演赦免、承诺增援、赐盔甲；新增条目为『利沃尼亚战争战败背景下的莫斯科处境』标注"
+     },
+     {
+      "storyboard_id": 1017,
+      "combo": "D",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 258
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "先生成亲吻权杖效忠仪式（权杖道具），结尾落回同一张汗国图，把『西伯利亚汗国＝沙皇全权代理辖区』钉在图上收束；同时为下一段鄂毕河扩张铺图接图衔接"
+     }
+    ],
+    "junction": "上一组以 #87 的 C（伊丽莎白画像，非地图）收尾，本组 #1015 用 B 过渡、#1016 以 prop#258 开场属首次在本组启用该图且带新增条目，回切成立；#1017 以 D 停在同一张图上，下一段 #88 讲鄂毕河扩张可直接图接图。"
+   }
+  },
+  {
+   "group_no": 34,
+   "ok": true,
+   "plan": {
+    "task": "观众理解：小叶势力东扩到鄂毕河后由盛转衰——增援无补给、守军挨饿、1585年两任头目被诱杀、1340人只剩90人；库楚汗坚持抵抗到1598年才被彻底击溃。",
+    "geo_additions": [
+     {
+      "text": "鄂毕河方向（势力范围东扩至西伯利亚中部）",
+      "storyboard_id": 1018
+     },
+     {
+      "text": "1585年（小伊、小叶先后被诱杀，年代标注）",
+      "storyboard_id": 1021
+     },
+     {
+      "text": "出征1340人→仅存90人（伤亡盘点，落图钉住）",
+      "storyboard_id": 1022
+     },
+     {
+      "text": "1598年库楚汗残部被击溃（年代+额尔齐斯河丛林藏匿地）",
+      "storyboard_id": 1023
+     }
+    ],
+    "asset_roles": [
+     {
+      "asset_kind": "prop",
+      "asset_id": 259,
+      "name": "西伯利亚推进据点网络图",
+      "role": "establish",
+      "establish_storyboard_id": 1018,
+      "exit_after_storyboard_id": 1022,
+      "note": "#91 承接路线并东扩标出鄂毕河方向；#93 锁定C照抄；#94 D收尾钉住90人后退出"
+     },
+     {
+      "asset_kind": "prop",
+      "asset_id": 258,
+      "name": "蒙古汗国分布与西征路线图",
+      "role": "establish",
+      "establish_storyboard_id": 1023,
+      "exit_after_storyboard_id": 1023,
+      "note": "#95 在全览图上建立库楚汗藏匿地与1598年击溃（距上次出现已隔5镜，再入），为下一段俄军重新推进做图接图铺垫"
+     }
+    ],
+    "shots": [
+     {
+      "storyboard_id": 1018,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 259
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "在推进网络图上把势力范围从喀什里克继续向东扩出，标出鄂毕河方向（并提示后文还会讲到）"
+     },
+     {
+      "storyboard_id": 1020,
+      "combo": "B",
+      "base": null,
+      "pip": [],
+      "mode": "no_layer",
+      "task": "生成段演冬季挨饿：雪原要塞、空粮袋、挨饿守军，10.8秒无新增地理"
+     },
+     {
+      "storyboard_id": 1021,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 259
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "锁定照抄：底图prop#259，落1585年年代标注；图上钉住两位头目之死，再入实拍"
+     },
+     {
+      "storyboard_id": 1022,
+      "combo": "D",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 259
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "先演强盗宿命的氛围实拍，结尾落回推进图，用文字框钉住1340→90人的伤亡盘点"
+     },
+     {
+      "storyboard_id": 1023,
+      "combo": "D",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 258
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "先演库楚汗藏匿丛林的实拍，结尾在全览图上标出额尔齐斯河丛林藏匿地与1598年击溃，图收尾为下一段俄军西进的地图戏铺垫"
+     }
+    ],
+    "junction": "上一组以 #90（D，prop#258 图层收尾）结束；本组首镜改用 prop#259 承接远征主线并新增鄂毕河方向，切点成立。组尾 #95 以 prop#258 图层收尾，与下一段俄军推进的地图开场形成图接图衔接。"
+   }
+  },
+  {
+   "group_no": 35,
+   "ok": true,
+   "plan": {
+    "task": "观众记住：残兵溃败后沙皇军队重占并摧毁喀什里克，1587年在两河交汇处建立托博尔斯克——正是决战地点，后来与门捷列夫、末代沙皇都有渊源",
+    "geo_additions": [
+     {
+      "text": "沙皇军队自乌拉尔山向东推进、重占并摧毁喀什里克",
+      "storyboard_id": 1024
+     },
+     {
+      "text": "托博尔斯克：1587年建于托博尔河与额尔齐斯河交汇处（俄国在西伯利亚的第一个行政兼军事据点）",
+      "storyboard_id": 1027
+     }
+    ],
+    "asset_roles": [
+     {
+      "asset_kind": "scene",
+      "asset_id": 168,
+      "name": "乌拉尔山口",
+      "role": "background",
+      "establish_storyboard_id": 1024,
+      "exit_after_storyboard_id": 1024,
+      "note": "残兵西退与俄军东进相遇的实拍氛围"
+     },
+     {
+      "asset_kind": "prop",
+      "asset_id": 259,
+      "name": "西伯利亚推进据点网络图",
+      "role": "establish",
+      "establish_storyboard_id": 1024,
+      "exit_after_storyboard_id": 1024,
+      "note": "D 收尾落图：在喀什里克处钉住『重占并摧毁』，本组此后不再回到此图"
+     },
+     {
+      "asset_kind": "scene",
+      "asset_id": 185,
+      "name": "托博尔河与额尔齐斯河交汇处",
+      "role": "background",
+      "establish_storyboard_id": 1027,
+      "exit_after_storyboard_id": 1027,
+      "note": "生成段呈现两河交汇的地貌，为托博尔斯克选址入戏"
+     },
+     {
+      "asset_kind": "prop",
+      "asset_id": 275,
+      "name": "十七世纪托博尔斯克版画",
+      "role": "establish",
+      "establish_storyboard_id": 1027,
+      "exit_after_storyboard_id": 1028,
+      "note": "非地图底图：#97 落图文字框建立『1587年·托博尔斯克』，#98 承接同一底图补门捷列夫与尼古拉二世的说明文字框"
+     }
+    ],
+    "shots": [
+     {
+      "storyboard_id": 1024,
+      "combo": "D",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 259
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "实拍演残兵西退、与推炮东进的俄军相遇；D 收尾回到推进网络图，在喀什里克处新增『沙皇军队重占并摧毁』标注"
+     },
+     {
+      "storyboard_id": 1027,
+      "combo": "D",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 275
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "生成段两河交汇处，D 收尾落到托博尔斯克版画，文字框建立『1587年·托博尔斯克：俄国在西伯利亚第一个行政兼军事据点』"
+     },
+     {
+      "storyboard_id": 1028,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 275
+      },
+      "pip": [],
+      "mode": "carry_only",
+      "task": "16.8 秒无新增地理：承接托博尔斯克版画底图，补两个文字框（门捷列夫故乡／1917 年尼古拉二世被安置于此），收束本组"
+     }
+    ],
+    "junction": "上一组 #95 以 prop#258 图层收尾；本组首镜 #96 以实拍开场（非回切），结尾才落到 prop#259 钉住喀什里克的结果，切点成立；#97→#98 以同一张托博尔斯克版画图接图衔接，避免地图三连回切"
+   }
+  },
+  {
+   "group_no": 36,
+   "ok": true,
+   "plan": {
+    "task": "观众理解：小叶远征是俄国势力进入西伯利亚的起点，受益者众多，半个多世纪就推进到太平洋，驱动力是皮毛，矿产与移民是更晚的事",
+    "geo_additions": [
+     {
+      "text": "受益群体说明（沙皇军队与官僚、斯特罗家族等商人、哥萨克与俄国猎人冒险者）",
+      "storyboard_id": 1029
+     },
+     {
+      "text": "17世纪中叶俄国人推进至太平洋沿岸（东进示意）",
+      "storyboard_id": 1030
+     }
+    ],
+    "asset_roles": [
+     {
+      "asset_kind": "prop",
+      "asset_id": 259,
+      "name": "西伯利亚推进据点网络图",
+      "role": "establish",
+      "establish_storyboard_id": 1029,
+      "exit_after_storyboard_id": 1030,
+      "note": "主图再入（距#96已隔3镜）：#99 承接远征路线、加受益群体文字框并以图收尾；#100 连续地图戏承接，新增东进至太平洋的示意后退出"
+     },
+     {
+      "asset_kind": "character",
+      "asset_id": 72,
+      "name": "叶尔马克·齐莫菲叶维奇",
+      "role": "hint",
+      "establish_storyboard_id": 1029,
+      "exit_after_storyboard_id": 1029,
+      "note": "#99 画中画提示「这一切的起点」"
+     },
+     {
+      "asset_kind": "prop",
+      "asset_id": 261,
+      "name": "黑貂皮捆",
+      "role": "hint",
+      "establish_storyboard_id": 1031,
+      "exit_after_storyboard_id": 1031,
+      "note": "#101 文字框点出「皮毛是推动进程的主因」的余韵，为下一段小叶模式过渡"
+     }
+    ],
+    "shots": [
+     {
+      "storyboard_id": 1029,
+      "combo": "D",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 259
+      },
+      "pip": [
+       {
+        "asset_kind": "character",
+        "asset_id": 72
+       }
+      ],
+      "mode": "new_items",
+      "task": "再入主图：先以小叶肖像画中画+图上已有远征路线回扣「起点」，再新增受益群体说明文字框，以图收尾接下一镜"
+     },
+     {
+      "storyboard_id": 1030,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 259
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "连续地图戏承接：在主图上新增「17世纪中叶推进至太平洋沿岸」的东进示意与文字框，随后生成段演猎人皮毛商东进的氛围"
+     },
+     {
+      "storyboard_id": 1031,
+      "combo": "B",
+      "base": null,
+      "pip": [],
+      "mode": "no_layer",
+      "task": "无新增地理：生成段表现皮毛贸易与后续开发尚未来临的时代感，旁白带出系列开篇，为下一段小叶模式铺垫"
+     }
+    ],
+    "junction": "上一组以 #98（prop#275 版画）的 C 收尾，本组首镜 #99 切回主图属再入（隔3镜且有新增条目），切点成立；组尾 #101 为 B 实拍，与下一段「小叶模式」的讲述自然衔接"
+   }
+  },
+  {
+   "group_no": 37,
+   "ok": true,
+   "plan": {
+    "task": "观众理解「小叶模式」是此后俄国西伯利亚扩张的通用模式，河流网络是推进通道（Rus=划船者），小叶远征路线即是佐证",
+    "geo_additions": [
+     {
+      "text": "东欧—西伯利亚河流网络（前进通道，以小叶远征路线佐证）",
+      "storyboard_id": 1033
+     }
+    ],
+    "asset_roles": [
+     {
+      "asset_kind": "prop",
+      "asset_id": 269,
+      "name": "叶尔马克船队石版画",
+      "role": "background",
+      "establish_storyboard_id": 1032,
+      "exit_after_storyboard_id": 1032,
+      "note": "#102 用船队石版画作底图 + 文字框列出小叶模式三要素（商人出资/哥萨克与猎人工力/向未知推进），避免第3次回切地图"
+     },
+     {
+      "asset_kind": "prop",
+      "asset_id": 259,
+      "name": "西伯利亚推进据点网络图",
+      "role": "establish",
+      "establish_storyboard_id": 1033,
+      "exit_after_storyboard_id": 1033,
+      "note": "#103 在已建立的远征路线上高亮河流网络作为前进通道，佐证旁白论点后退出"
+     },
+     {
+      "asset_kind": "prop",
+      "asset_id": 272,
+      "name": "小叶远征路线图原图",
+      "role": "hint",
+      "establish_storyboard_id": 1034,
+      "exit_after_storyboard_id": 1034,
+      "note": "#104 先演河道行船实拍，结尾落到路线图原图 + 文字框钉住 Rus=men who row 词源"
+     }
+    ],
+    "shots": [
+     {
+      "storyboard_id": 1032,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 269
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "13.5秒：船队石版画 + 文字框归纳小叶模式三要素（商人出资、哥萨克猎人出力、向未知推进），避免连续第3次回切同一地图"
+     },
+     {
+      "storyboard_id": 1033,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 259
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "14.3秒：承接已画的小叶远征路线，新增河流网络高亮标注，点明河流即前进道路；距该图上次出现已隔 #101、#102 两镜，且有新增条目，回切成立"
+     },
+     {
+      "storyboard_id": 1034,
+      "combo": "D",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 272
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "10.1秒：先演丛林河道行船实拍（维京后裔驾船），结尾落到小叶路线图原图 + 文字框钉住 Rus=划船的人 词源"
+     }
+    ],
+    "junction": "上一组以 #101 的 B 实拍收尾，本组首镜改用船队石版画作底图归纳模式概念，不构成回切；#104 停在路线图原图文字框上，下一段讲远征队规模，从本组结尾的图面/行船意象自然过渡到队伍实拍"
+   }
+  },
+  {
+   "group_no": 38,
+   "ok": true,
+   "plan": {
+    "task": "观众理解：民间远征队规模小但凭火枪技术代差征服原住民、收皮毛税，沙俄政府随后在河流交汇处建要塞据点并派官定居，完成殖民制度化",
+    "geo_additions": [
+     {
+      "text": "火枪对铁器/石器时代部落的装备代差",
+      "storyboard_id": 1036
+     },
+     {
+      "text": "皮毛形式税赋（宣誓效忠）",
+      "storyboard_id": 1037
+     },
+     {
+      "text": "要塞与行政据点选址：主要河流交汇处",
+      "storyboard_id": 1038
+     },
+     {
+      "text": "沙皇派驻官员、哥萨克加入公务员队伍定居西伯利亚",
+      "storyboard_id": 1039
+     }
+    ],
+    "asset_roles": [
+     {
+      "asset_kind": "scene",
+      "asset_id": 172,
+      "name": "哥萨克聚落",
+      "role": "background",
+      "establish_storyboard_id": null,
+      "exit_after_storyboard_id": null,
+      "note": "#105 规模不大的远征队氛围"
+     },
+     {
+      "asset_kind": "prop",
+      "asset_id": 260,
+      "name": "哥萨克火枪",
+      "role": "establish",
+      "establish_storyboard_id": 1036,
+      "exit_after_storyboard_id": null,
+      "note": "#106 技术代差主图，配文字框对比部落文明水平"
+     },
+     {
+      "asset_kind": "prop",
+      "asset_id": 261,
+      "name": "黑貂皮捆",
+      "role": "establish",
+      "establish_storyboard_id": 1037,
+      "exit_after_storyboard_id": null,
+      "note": "#107 皮毛税赋落图"
+     },
+     {
+      "asset_kind": "prop",
+      "asset_id": 259,
+      "name": "西伯利亚推进据点网络图",
+      "role": "hint",
+      "establish_storyboard_id": 1038,
+      "exit_after_storyboard_id": null,
+      "note": "#108 再入（距上次出现已隔4镜），点出河流交汇处选址"
+     },
+     {
+      "asset_kind": "prop",
+      "asset_id": 275,
+      "name": "十七世纪托博尔斯克版画",
+      "role": "hint",
+      "establish_storyboard_id": null,
+      "exit_after_storyboard_id": null,
+      "note": "#109 再入，托博尔斯克版画作行政定居收束，配官员/公务员文字框，并衔接下一段据点网络话题"
+     }
+    ],
+    "shots": [
+     {
+      "storyboard_id": 1035,
+      "combo": "B",
+      "base": null,
+      "pip": [],
+      "mode": "no_layer",
+      "task": "生成段：哥萨克聚落小规模队伍场景，演『数百人或几十人』的体量"
+     },
+     {
+      "storyboard_id": 1036,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 260
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "火枪档案图为底，文字框点出装备代差（火枪 vs 铁器/石器时代部落）"
+     },
+     {
+      "storyboard_id": 1037,
+      "combo": "D",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 261
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "先演逼迫效忠实拍，结尾落到黑貂皮捆钉住『皮毛税赋』"
+     },
+     {
+      "storyboard_id": 1038,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 259
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "再入据点网络图（已隔≥3镜），在图上点出『河流交汇处选址』的新标注"
+     },
+     {
+      "storyboard_id": 1039,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 275
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "托博尔斯克版画为底，文字框落『沙皇派驻官员、哥萨克定居』，为下一段据点网络作铺垫"
+     }
+    ],
+    "junction": "上一组以 #104 的路线图 D 收尾，本组首镜改用 B 生成段开场避免图接图，切点成立；本组末镜落在托博尔斯克版画，正好引出下一段的『据点网络』"
+   }
+  },
+  {
+   "group_no": 39,
+   "ok": true,
+   "plan": {
+    "task": "观众理解：据点网络是沙俄在西伯利亚的核心基础设施——支撑物资流转、殖民生存与贡税征收，沙皇与殖民者双赢，代价由原住民承担",
+    "geo_additions": [
+     {
+      "text": "据点间物资流转路线（食物、武器、皮毛的运输网络）",
+      "storyboard_id": 1040
+     },
+     {
+      "text": "贡品与赋税征收节点（沙皇投资收益示意）",
+      "storyboard_id": 1042
+     }
+    ],
+    "asset_roles": [
+     {
+      "asset_kind": "prop",
+      "asset_id": 259,
+      "name": "西伯利亚推进据点网络图",
+      "role": "establish",
+      "establish_storyboard_id": 1040,
+      "exit_after_storyboard_id": 1042,
+      "note": "本组主图：#110 建立据点网络与物资流转线；#112 再入收束，点出贡税征收节点并留给下一段"
+     }
+    ],
+    "shots": [
+     {
+      "storyboard_id": 1040,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 259
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "锁定 C：在据点网络图上首次建立「据点=基础设施」概念，标出食物、武器、皮毛的流转路线"
+     },
+     {
+      "storyboard_id": 1041,
+      "combo": "B",
+      "base": null,
+      "pip": [],
+      "mode": "no_layer",
+      "task": "14.5 秒、无新增落图条目：用生成段演殖民者依赖补给点生存、沙皇征收贡税的场景，避免第三次回切同一底图"
+     },
+     {
+      "storyboard_id": 1042,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 259
+      },
+      "pip": [],
+      "mode": "new_items",
+      "task": "锁定 C：距上次出现已隔 3 镜且指派新增条目（贡税征收节点），图上点出沙皇收益，收束本段并为下一段殖民扩张铺垫"
+     }
+    ],
+    "junction": "与上一组的接缝：上一组 #109 以托博尔斯克版画的图层段收尾，本组首镜 #110 回到据点网络图并新增物资流转线（锁定组合，且回切有新增条目支撑），切点成立"
+   }
+  },
+  {
+   "group_no": 40,
+   "ok": true,
+   "plan": {
+    "task": "为整集收束做定调：观众明白接下来将展开17世纪俄国人在西伯利亚的殖民扩张及其与大清的首次交手。",
+    "geo_additions": [],
+    "asset_roles": [
+     {
+      "asset_kind": "prop",
+      "asset_id": 276,
+      "name": "苏里科夫叶尔马克征服西伯利亚",
+      "role": "background",
+      "establish_storyboard_id": 1043,
+      "exit_after_storyboard_id": 1043,
+      "note": "过渡镜：以征服西伯利亚名画为底、文字框点题，衔接上一组路线图结束后的叙事转场"
+     }
+    ],
+    "shots": [
+     {
+      "storyboard_id": 1043,
+      "combo": "C",
+      "base": {
+       "asset_kind": "prop",
+       "asset_id": 276
+      },
+      "pip": [],
+      "mode": "carry_only",
+      "task": "8.9 秒点题过渡：用苏里科夫名画定调，文字框预告殖民扩张与中俄首战，避免再次回切据点网络图"
+     }
+    ],
+    "junction": "与上一组的接缝：上一镜 #112 以 prop#259 图层段收尾，本镜改用非地图底图（名画）+ 文字框做点题过渡，切点是图→画，节奏换气；下一段可自由选择开场"
+   }
+  }
+ ]
+}

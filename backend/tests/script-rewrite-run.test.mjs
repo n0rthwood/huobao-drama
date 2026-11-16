@@ -44,7 +44,7 @@ const RAW = ${JSON.stringify(RAW)}
 const OLD_FINAL = ${JSON.stringify(OLD_FINAL)}
 const BRIDGE_SENTENCE = ${JSON.stringify(BRIDGE_SENTENCE)}
 
-// 桩文本服务：忠实改写阶段原样回抄输入正文（满足 ±5% 与每段 80 字），
+// 桩文本服务：忠实改写阶段原样回抄输入正文（满足 ±5% 与每句 80 字），
 // 桥句阶段按提示词里列出的边界逐条回报告；mode='bad' 用来制造一次阶段失败。
 let mode = 'good'
 let delayMs = 0

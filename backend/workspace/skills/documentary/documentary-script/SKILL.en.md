@@ -45,9 +45,20 @@ That winter, Buchholz was ordered to lead nearly three thousand men upstream fro
 ```
 
 - Use `【beat name】` markers to delimit narrative beats (opening / background / turning point / climax / closing, etc.); the storyboard cuts segments at beat boundaries.
+- **One natural paragraph = one logical group**: the storyboard first plans visuals per group, then fills cards shot by shot inside that group.
+  Shredding a source paragraph into fragments makes adjacent shots flip back and forth inside one idea; merging two topics into one paragraph
+  leaves the storyboard no place to change the shot. So paragraphing must stay close to the source author's paragraphs:
+  - by default **keep every source paragraph** (one paragraph, one meaning);
+  - only two adjustments are allowed: **merge a short transition** — a very short transitional / lead-in / back-reference paragraph (about 40 characters or fewer)
+    joins the paragraph it introduces or summarises, and several consecutive one-sentence paragraphs on the same topic may be merged; **split a long paragraph** —
+    a paragraph over about 200 characters with a clear topic change (time jump, place jump, change of subject) splits at that topic boundary;
+  - **never** merge two different topics just to even out paragraph lengths.
 - Every paragraph outside the beat markers is a **directly readable narration paragraph**:
-  - each paragraph carries **exactly one complete idea**, kept within **80 characters or fewer** (a hard per-segment limit of the speech synthesizer; overly long segments are rejected by the storyboard);
-  - paragraphs end at a period / question mark / exclamation mark; do not break a paragraph mid-sentence;
+  - each paragraph carries **exactly one complete idea**;
+  - **every sentence stays within 80 characters** (a hard per-segment limit of the speech synthesizer, one shot per sentence; over-long sentences are rejected by the storyboard).
+    Sentences end at `。！？；` (or `.` `!` `?` `;` in Latin text); when a sentence is too long, split it at a comma-level boundary by turning that punctuation into a sentence end —
+    **punctuation only, no content changes**;
+  - do not break a paragraph mid-sentence;
   - no parenthetical asides, no shot language (framing / angle / camera movement), no picture directions inside a paragraph — the picture is written by the storyboard.
 - Output volume stays **essentially level** with the source (±5%); noticeably longer means you are expanding, noticeably shorter means you are deleting facts — both are regressions.
 
@@ -56,5 +67,5 @@ That winter, Buchholz was ordered to lead nearly three thousand men upstream fro
 1. `read_episode_script` to read the original content.
 2. `rewrite_to_screenplay` to fetch the source (use only `source_content`; ignore its short-drama format instruction).
 3. Prepare the narration draft according to this file.
-4. Self-check: no dialogue lines, no scene headers, no added facts, every paragraph ≤80 characters, years and names verbatim-identical to the source.
+4. Self-check: no dialogue lines, no scene headers, no added facts, **every sentence ≤80 characters**, **paragraphing stays close to the source** (no shredding, no merging across topics), years and names verbatim-identical to the source.
 5. `save_script` to save.

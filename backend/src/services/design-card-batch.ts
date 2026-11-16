@@ -13,7 +13,9 @@ import { requeueFirstModelFailure } from './text-task-autoretry.js'
  * 续跑语义：指定 ids 就重算这几镜，否则只补 `blank` / `stale` 的镜（已 pending/confirmed 的不动）。
  * 覆盖前把旧卡写进本次任务的 `params.previous_card`（主进程裁决 S2：不存 `__prev`）。
  */
-import { eq } from 'drizzle-orm'
+import { and, eq, isNull } from 'drizzle-orm'
+import { episodeGroups, type GroupPlan } from './design-group-plan.js'
+import { describePlanForShot, GroupPlanFailedError, planGroup } from './design-group-plan-run.js'
 import { db, schema } from '../db/index.js'
 import { mastra } from '../mastra/index.js'
 import { buildAgentRequestContext } from '../agents/context.js'
@@ -44,6 +46,14 @@ import { narrationCharCount } from './narration.js'
 import { runObservedWork } from './task-observability.js'
 import { buildSampleKey, buildWorkPlan, stageEstimateOf, type StageWorkEstimate } from './task-estimate.js'
 import { buildDesignCardGroundingInstruction } from './design-card-grounding.js'
+
+/**
+ * 填卡时告诉模型的渲染事实（#109）：不知道这些，模型会把「与前镜同一张图」当成优点，
+ * 实际成片是同一张满幅底图被反复切回。
+ */
+const RENDER_CONTRACT = '渲染事实：成片按镜号硬切拼接；图层段每一镜都从干净、满幅的底图重新开始，上一镜画过的图层不会延续，'
+  + '图层最早在 0.2 秒显现；组合 C 的生成段首帧 = 图层段末帧（衔接帧）。以已经出现过的底图开场时，用 at_s=0.2 的承接层恢复'
+  + '此前已画出的状态，再让新增条目在 1 秒内出现；「与前镜同图、空间无跳变」不是理由。'
 
 export type DesignCardBatchStatus = PromptBatchStatus
 
@@ -206,7 +216,7 @@ export async function startDesignCardBatch(
       textConfigId: resolved.configId ?? undefined,
     })
     const sink = createReasoningSink(taskId)
-    for (const sb of pending) {
+    const fillShot = async (sb: typeof pending[number], planNote: string | null) => {
       const previousStatus = toDesignCardStatus(sb.designCardStatus)
       const progressItem = progress.items!.find(item => item.storyboard_id === sb.id)!
       requestContext.set('storyboardId', sb.id)
@@ -242,16 +252,17 @@ export async function startDesignCardBatch(
           storyboardNumber: sb.storyboardNumber,
         }, async () => {
           const evidence = await buildEvidenceImages(episodeId, { storyboardIds: [sb.id] })
-          const agentResult = await runAgent(agent, [{
-            role: 'user',
-            content: evidenceMessageParts(`请为分镜 #${sb.storyboardNumber}(ID:${sb.id}) 填写设计卡（design_card），严格遵循 documentary-storyboard 技能里「设计卡」一节与 layer-text-design 技能的模板文本框规则。${measuredSeconds === undefined ? '' : `
+          const content = evidenceMessageParts(`请为分镜 #${sb.storyboardNumber}(ID:${sb.id}) 填写设计卡（design_card），严格遵循 documentary-storyboard 技能里「设计卡」一节与 layer-text-design 技能的模板文本框规则。${measuredSeconds === undefined ? '' : `
 本镜旁白的**实测配音时长是 ${measuredSeconds} 秒**（已经配音完成，不是估算）：时长预算 budget 必须以这个实测值为准，不要再按字数估算。`}
 先调用 read_storyboard_context，读取本镜旁白、前后各 3 镜的旁白与设计卡（context_window 说明了附带哪几镜；其余镜头未列出不代表不存在）及本集资产，并读取其中的 text_spec（成套位置 layouts、类型 roles、逐字段容量 capacity）：屏幕文字一律用 type:'text' 模板文本框 + layer_plan.text_layout，字数上限只能取自 text_spec.capacity。
-${buildDesignCardGroundingInstruction(loadDesignCardContext(episodeId).assets)}
+${buildDesignCardGroundingInstruction(loadDesignCardContext(episodeId).assets)}${planNote ? `
+${RENDER_CONTRACT}
+${planNote}
+按本组视觉规划里**本镜条目**填写组合与底图；做不到时在 rationale 写明偏离原因，不要静默换组合或换底图。` : ''}
 ${comboOnly ? `本卡已有人工内容，只补选 combo，不重写卡片。现有卡：${sb.designCard}` : `规划信息点、图层段、生成段与预算（${budgetRule}），并填写 rationale。`}
 填写 combo（A 只图层 / B 只生成 / C 图层→生成 / D 生成→图层），同时可填写 suggested_combo；已有组合将保留。
-最后调用 update_storyboard 保存，参数只传 storyboard_id 和 design_card 两个键。`, evidence),
-          }], { maxSteps: 10, requestContext }, sink)
+最后调用 update_storyboard 保存，参数只传 storyboard_id 和 design_card 两个键。`, evidence)
+          const agentResult = await runAgent(agent, [{ role: 'user', content }], { maxSteps: 10, requestContext }, sink)
           // 以实际落库为准判定成败：模型说完话不等于卡已保存
           const [fresh] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, sb.id))
           const saved = requestContext.get('designCardSaved' as never) === true
@@ -292,6 +303,75 @@ ${comboOnly ? `本卡已有人工内容，只补选 combo，不重写卡片。�
       }
       await updateTextTaskProgress(taskId, progress)
     }
+    /** 整组没进模型（规划失败 / 组内有镜未配音）：组内待填镜按失败计，旧卡原样保留 */
+    const failShots = async (shots: typeof pending, reason: string) => {
+      for (const sb of shots) {
+        const item = progress.items!.find(entry => entry.storyboard_id === sb.id)!
+        item.state = 'failed'
+        item.reason = reason
+        progress.failed++
+      }
+      await updateTextTaskProgress(taskId, progress)
+      logTaskError('DesignCard', 'group-plan', { episodeId, storyboardIds: shots.map(sb => sb.id).join(','), error: reason })
+    }
+
+    if (!documentary) {
+      for (const sb of pending) await fillShot(sb, null)
+      return
+    }
+    // 纪录片（#109）：按逻辑组（自然段）先做组级视觉规划，再按规划逐镜填卡；前一组落完卡再规划下一组，
+    // 所以后一组的规划看得到前面镜头的实际组合与底图（跨组回切计数）。
+    const planModel = await resolveStageModel('design_group_plan', { configId: resolved.configId ?? undefined, model: resolved.model })
+    const planSampleKey = buildSampleKey({ stage: 'design_group_plan', configId: planModel.configId, model: planModel.model })
+    const pendingById = new Map(pending.map(sb => [sb.id, sb]))
+    const groups = episodeGroups(episodeId)
+    const touched = groups.filter(group => group.shots.some(shot => pendingById.has(shot.storyboard_id)))
+    const validity = await episodeTtsValidity(episodeId, { storyboardIds: touched.flatMap(group => group.shots.map(shot => shot.storyboard_id)) })
+    const measuredAll = new Map<number, number>()
+    for (const [id, item] of validity) if (item.valid && item.duration_s !== null) measuredAll.set(id, item.duration_s)
+    const grouped = new Set<number>()
+    for (const group of touched) {
+      const members = group.shots.flatMap(shot => (pendingById.has(shot.storyboard_id) ? [pendingById.get(shot.storyboard_id)!] : []))
+      for (const sb of members) grouped.add(sb.id)
+      const unvoiced = group.shots.filter(shot => !measuredAll.has(shot.storyboard_id))
+      if (unvoiced.length) {
+        await failShots(members, `第 ${group.group_no} 段有镜还没有当前有效配音（${unvoiced.map(shot => `#${shot.storyboard_number}`).join('、')}）：整组暂不规划、不填卡`)
+        continue
+      }
+      progress.current_storyboard_id = members[0]?.id
+      progress.step = 'group_plan'
+      await updateTextTaskProgress(taskId, progress)
+      sink.heading(`第 ${group.group_no} 段 · 组级视觉规划`)
+      const rows = await db.select().from(schema.storyboards)
+        .where(and(eq(schema.storyboards.episodeId, episodeId), isNull(schema.storyboards.deletedAt)))
+        .orderBy(schema.storyboards.storyboardNumber)
+      const ctx = loadDesignCardContext(episodeId)
+      const next = groups[groups.indexOf(group) + 1]
+      let plan: GroupPlan
+      try {
+        plan = (await planGroup({
+          taskId,
+          episodeId,
+          group,
+          nextExcerpt: next ? next.paragraph_text.slice(0, 80) : null,
+          rows,
+          ctx,
+          pendingIds: new Set(pendingById.keys()),
+          measured: measuredAll,
+          stageModel: planModel,
+          sampleKey: planSampleKey,
+          force: storyboardIds !== undefined,
+        })).plan
+      } catch (err: unknown) {
+        if (!(err instanceof GroupPlanFailedError)) throw err
+        await failShots(members, `第 ${group.group_no} 段的组级视觉规划失败：${err.message}`)
+        continue
+      }
+      progress.step = undefined
+      for (const sb of members) await fillShot(sb, describePlanForShot(plan, group, sb.id, ctx))
+    }
+    // 定位不到段落的镜（理论上不会出现：narrationGroupsOf 会把它们并入相邻组）照旧逐镜填
+    for (const sb of pending) if (!grouped.has(sb.id)) await fillShot(sb, null)
   })
     .then(async () => {
       progress.current_storyboard_id = undefined

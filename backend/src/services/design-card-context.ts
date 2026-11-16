@@ -21,6 +21,7 @@ import {
   type DesignCardSemanticEntry,
 } from './design-card.js'
 import { parseNarrationMeta } from './narration.js'
+import { freshPlannedShots, groupPlanDeviation } from './design-group-plan.js'
 import { normalizeAspect, orientationOf } from './aspect.js'
 import {
   TEXT_SPEC,
@@ -106,7 +107,7 @@ export function loadDesignCardContext(episodeId: number): DesignCardContext {
   const [drama] = episode
     ? db.select().from(schema.dramas).where(eq(schema.dramas.id, episode.dramaId)).all()
     : []
-  return { assets, aspect: normalizeAspect(drama?.aspectRatio) }
+  return { assets, aspect: normalizeAspect(drama?.aspectRatio), plannedShots: freshPlannedShots(episodeId) }
 }
 
 /**
@@ -274,6 +275,10 @@ export function resolveDesignCard(
     mentioned: mentioned ?? null,
     aspect: ctx.aspect,
   })
+  // #109：卡与本组视觉规划不一致 → 警告（人工复核；规划过期或没有规划时不检查）
+  const planned = ctx.plannedShots?.get(row.id)
+  const deviation = planned ? groupPlanDeviation(planned, combo, card) : null
+  if (deviation) issues.push({ code: 'group_plan_deviation', severity: 'warn', message: deviation })
   if (card) card.issues = issues
   return { combo, card, issues }
 }

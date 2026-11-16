@@ -220,6 +220,7 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 - **保存语义**：`shots` 不带 `id` = 新建一镜；原有镜不出现在列表 = 合并/删除；保存会改变 `revision`，**原有确认随之失效**，必须重新确认。正文改字会被逐字校验拒绝——要改字去旁白稿，不在骨架里改。
 - 正例：编辑草稿 → `validate_only:true` 看 `problems/gaps/excerpts` → 处置缺口 → 再 dry-run 直到干净 → 正式 `PUT` → 人确认 → 配音 → 逐镜试听（只听 `valid:true`）。
 - 反例：① 直接正式保存去试错；② 把许可/链接缺口并进某镜旁白凑覆盖率；③ 播放 `valid:false` 的旧音频并报告「配音已完成」；④ 用骨架编辑代替旁白稿改写。
+- **一镜不得跨段（#109，`[S]`）**：旁白稿每个自然段 = 一个逻辑组，段落边界必须是镜头边界；生成验收/保存/dry-run/确认里跨段报 `cross_group`。#109 前已确认的含跨段镜骨架保持确认，只是不能原样再确认。
 
 ### S5 设计卡与段组合（含 Issue #82 变更，`[R]`：drama 10 / episode 16，6 镜 AI 首次写入 combo）
 - 端点：`GET /episodes/{e}/design-card-context`、`GET /episodes/{e}/design-cards/audit`、`POST /episodes/{e}/design-cards/fill`、`GET /episodes/{e}/design-cards/status`、`PUT /storyboards/{id}/design-card {combo, design_card}`、`POST /storyboards/{id}/design-card/confirm {acknowledge}`。
@@ -233,6 +234,7 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 - **为何改（#87）**：《历史纵横》E01 的第 01 镜五个计划图层都引用资产 #103 的同名“语义”，实际语义清单为空。旧指令允许“保留规划、空锚点待标注”，使 AI 明知缺信息仍能把设计当成完成；Fabel 判定必须同时修正 prompt、AI 写工具和成功计数，不是一句“不要幻觉”或一个人工补标注按钮能解决。人工审核时仍可打开资产语义弹窗，按实际绑定重查问题；新增标注不等于旧引用自动修好。
 - **人工核对界面（#87，`[S/R]`）**：图像使用 120–180px 流式卡片、contain；底图取候选的 path/version，不拿当前图冒充固定旧版本；引用卡取相应资产当前图。点击开大图，`⌕` 打开现有资产/语义面板。未解析引用按具体层列缺口，可打开语义或改绑真实条目；改绑只改计划层 anchor，不删层、不改资产。新增标注不会自动修好旧引用。本轮已打开真实参考图；固定旧版本及缺失语义修复写入未在生产制造测试数据，仍是源码/行为核验。
 - **屏幕文字 = 模板文本框（Issue #96，`[S]`）**：`layer_plan.planned_layers` 里不锚定的文字一律 `{type:"text", role, fields, at_s}`，同时给 `layer_plan.text_layout`（`design-card-context` 的 `text_spec.layouts[].id`）；`text_spec.capacity[layout][role]` 是每个字段的基准容量（引擎现算）。AI 写入拒收 `card`、无锚点 `label`、无套的 text 与引擎阻断（溢出/缺字段/引文无引号/说明句 ≥2 处并列/同拍同区/同拍重复），拒绝消息带容量数字；人工 PUT 只得到读时问题 `text_plan_invalid`（阻断）/`text_plan_warning`。同区后出现的框替换前一个（日期可与主信息同屏），同一 `at_s` 两个同区框 = 冲突。锚定在地图点线上的地名仍是带 `anchor` 的 `label`/`marker`。
+- **组级视觉规划（#109，`[S]`）**：纪录片 `design-cards/fill` 按逻辑组先规划（哪张图在哪镜完整建立、之后只做画中画/D 收尾/旁白提示、哪几镜交给生成段），再按规划逐镜填卡；结果读 `GET /episodes/{e}/design-group-plans`。卡与规划不一致报 `group_plan_deviation`（warn）。已有 combo 仍保留（#82 规则不变），所以存量集的规划要由人决定是否改组合。案例背景：ep 27 同一张地图连续 17 镜满幅开场、回切 53 次。
 
 #### S5-87 任务公开对话与真实计量（`[R]`：tasks 1281–1285；未触发分支另标 `[S]`）
 - **新 API 点**：`GET /tasks/{id}/observations?work_id=&cursor=&limit=` 读取持久工作项与实际调用；`GET /tasks/{id}/observations/calls/{callId}/messages?cursor=&limit=` 分页回看某次调用的完整公开消息。游标及字段见 `references/api-catalog.md`，不要拿第一页冒充全历史。

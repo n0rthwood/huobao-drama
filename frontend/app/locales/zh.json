@@ -195,7 +195,7 @@
         "messageCount": "{n} 条消息",
         "streaming": "接收中",
         "unknown": "未知",
-        "stage": { "skeleton": "旁白骨架", "voice": "配音", "design_card": "设计卡", "map_workflow": "地图工作流", "layer_base_check": "图层底图视觉验证", "junction_caption": "衔接帧画面描述", "keyframe_prompts": "关键帧提示词", "video_prompts": "视频提示词" },
+        "stage": { "skeleton": "旁白骨架", "voice": "配音", "design_card": "设计卡", "design_group_plan": "组级视觉规划", "map_workflow": "地图工作流", "layer_base_check": "图层底图视觉验证", "junction_caption": "衔接帧画面描述", "keyframe_prompts": "关键帧提示词", "video_prompts": "视频提示词" },
         "status": { "processing": "进行中", "completed": "已完成", "failed": "失败", "interrupted": "已中断" },
         "kind": { "llm": "模型请求", "vision_chat": "读图请求", "tts": "语音合成" },
         "phase": { "request": "发出", "response": "返回", "final": "收尾" },
@@ -1237,8 +1237,10 @@
       "fidelity": {
         "title": "保真核对",
         "delta": "{baseline} → {output} 字 · {percent}%",
+        "paragraphs": "段落 {output} 段 · 原文 {source} 段",
         "outOfTolerance": "正文长度超出 ±5% 容差，请人工复核。",
-        "overLimit": "第 {index} 段 {chars} 字，超出每段上限"
+        "overLimitSentence": "第 {paragraph} 段第 {sentence} 句 {chars} 字，超出单句上限：{excerpt}",
+        "overLimitParagraph": "第 {index} 段 {chars} 字，超出每段上限（旧报告口径）"
       },
       "filter": {
         "title": "输入准备：自动过滤的非旁白内容",
@@ -1472,6 +1474,46 @@
     },
     "design": {
       "title": "分镜设计",
+      "group": {
+        "label": "第 {n} 段",
+        "shots": "{n} 镜",
+        "warnings": "{n} 条警告",
+        "toggle": "展开本段的组级视觉规划",
+        "panelLabel": "第 {n} 段的组级视觉规划",
+        "collapse": "收起",
+        "task": "本组目标",
+        "junction": "与上一组的接缝",
+        "geo": "本组新增地理",
+        "assets": "资产用法",
+        "empty": "本组还没有组规划：随下一次填卡自动生成。",
+        "failed": "组规划失败：{reason}",
+        "ungrouped": "未入组",
+        "ungroupedHint": "这些镜的旁白在最终稿里定位不到段落，未归入任何逻辑组",
+        "establishAt": "{shot} 建立",
+        "exitAfter": "{shot} 之后退出",
+        "colShot": "镜",
+        "colCombo": "组合",
+        "colBase": "底图",
+        "colPip": "画中画",
+        "colMode": "图层用法",
+        "colTask": "本镜任务",
+        "status": {
+          "none": "未规划",
+          "ok": "已规划",
+          "failed": "规划失败",
+          "stale": "规划已过期"
+        },
+        "role": {
+          "establish": "完整建立",
+          "hint": "简短提示",
+          "background": "背景"
+        },
+        "mode": {
+          "new_items": "本组新增",
+          "carry_only": "只承接",
+          "no_layer": "不用图层"
+        }
+      },
       "lockedTitle": "分镜设计尚未解锁",
       "lockedDesc": "{reason}",
       "lockedGoto": "去处理",
@@ -1568,7 +1610,8 @@
         "must_mark_not_planned": "必须标注的条目没有对应的计划图层",
         "reference_not_mentioned": "参考素材没有被任何帧描述提到",
         "budget_tight": "时长余量偏紧",
-        "unresolved_ref": "有引用解析不到对应素材或条目"
+        "unresolved_ref": "有引用解析不到对应素材或条目",
+        "group_plan_deviation": "本镜的段组合或底图与所属逻辑组的规划不一致"
       },
       "migrationComboUnresolved": "旧分镜的段组合没有已定义的迁移映射。可恢复内容已保留，请显式重选组合并审阅设计卡后确认。",
       "migrationComboUnresolvedShort": "旧设计无法确定段组合，请重新选择",

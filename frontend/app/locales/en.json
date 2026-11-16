@@ -195,7 +195,7 @@
         "messageCount": "{n} messages",
         "streaming": "receiving",
         "unknown": "unknown",
-        "stage": { "skeleton": "Narration skeleton", "voice": "Voiceover", "design_card": "Design card", "map_workflow": "Map workflow", "layer_base_check": "Layer base visual check", "junction_caption": "Junction frame caption", "keyframe_prompts": "Keyframe prompts", "video_prompts": "Video prompts" },
+        "stage": { "skeleton": "Narration skeleton", "voice": "Voiceover", "design_card": "Design card", "design_group_plan": "Group visual plan", "map_workflow": "Map workflow", "layer_base_check": "Layer base visual check", "junction_caption": "Junction frame caption", "keyframe_prompts": "Keyframe prompts", "video_prompts": "Video prompts" },
         "status": { "processing": "Running", "completed": "Completed", "failed": "Failed", "interrupted": "Interrupted" },
         "kind": { "llm": "Model request", "vision_chat": "Image read", "tts": "Speech synthesis" },
         "phase": { "request": "sent", "response": "returned", "final": "final" },
@@ -1237,8 +1237,10 @@
       "fidelity": {
         "title": "Fidelity check",
         "delta": "{baseline} → {output} chars · {percent}%",
+        "paragraphs": "{output} paragraphs · {source} in the source",
         "outOfTolerance": "Length is outside the ±5% tolerance; review manually.",
-        "overLimit": "Paragraph {index} has {chars} chars, over the per-paragraph limit"
+        "overLimitSentence": "Paragraph {paragraph}, sentence {sentence}: {chars} chars, over the per-sentence limit — {excerpt}",
+        "overLimitParagraph": "Paragraph {index} has {chars} chars, over the per-paragraph limit (legacy report)"
       },
       "filter": {
         "title": "Input preparation: non-narration content removed",
@@ -1472,6 +1474,46 @@
     },
     "design": {
       "title": "Shot design",
+      "group": {
+        "label": "Paragraph {n}",
+        "shots": "{n} shots",
+        "warnings": "{n} warnings",
+        "toggle": "Expand this paragraph's group visual plan",
+        "panelLabel": "Group visual plan for paragraph {n}",
+        "collapse": "Collapse",
+        "task": "Group goal",
+        "junction": "Junction with the previous group",
+        "geo": "New geography in this group",
+        "assets": "Asset roles",
+        "empty": "No group plan yet: it is generated with the next design-card fill.",
+        "failed": "Group planning failed: {reason}",
+        "ungrouped": "Ungrouped",
+        "ungroupedHint": "These shots' narration cannot be located in the final script's paragraphs, so they belong to no logical group",
+        "establishAt": "established at {shot}",
+        "exitAfter": "exits after {shot}",
+        "colShot": "Shot",
+        "colCombo": "Combo",
+        "colBase": "Base",
+        "colPip": "Picture-in-picture",
+        "colMode": "Layer usage",
+        "colTask": "Shot task",
+        "status": {
+          "none": "Not planned",
+          "ok": "Planned",
+          "failed": "Planning failed",
+          "stale": "Plan outdated"
+        },
+        "role": {
+          "establish": "Establish",
+          "hint": "Brief hint",
+          "background": "Background"
+        },
+        "mode": {
+          "new_items": "New items",
+          "carry_only": "Carry only",
+          "no_layer": "No layer"
+        }
+      },
       "lockedTitle": "Shot design is locked",
       "lockedDesc": "{reason}",
       "lockedGoto": "Go fix it",
@@ -1568,7 +1610,8 @@
         "must_mark_not_planned": "A must-mark entry has no matching planned layer",
         "reference_not_mentioned": "A reference asset is not mentioned by any frame description",
         "budget_tight": "Duration headroom is tight",
-        "unresolved_ref": "A reference cannot be resolved to an asset or entry"
+        "unresolved_ref": "A reference cannot be resolved to an asset or entry",
+        "group_plan_deviation": "This shot's combo or base image differs from its logical group's plan"
       },
       "migrationComboUnresolved": "The legacy segment combination has no defined mapping. Your recoverable content was kept; explicitly choose a combination and review this design card before confirming.",
       "migrationComboUnresolvedShort": "Legacy segment combination unresolved; please choose again",

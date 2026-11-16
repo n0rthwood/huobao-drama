@@ -195,7 +195,7 @@
         "messageCount": "메시지 {n}개",
         "streaming": "수신 중",
         "unknown": "알 수 없음",
-        "stage": { "skeleton": "내레이션 골격", "voice": "더빙", "design_card": "디자인 카드", "map_workflow": "지도 워크플로", "layer_base_check": "레이어 바탕 시각 검증", "junction_caption": "연결 프레임 화면 묘사", "keyframe_prompts": "키프레임 프롬프트", "video_prompts": "영상 프롬프트" },
+        "stage": { "skeleton": "내레이션 골격", "voice": "더빙", "design_card": "디자인 카드", "design_group_plan": "그룹 시각 계획", "map_workflow": "지도 워크플로", "layer_base_check": "레이어 바탕 시각 검증", "junction_caption": "연결 프레임 화면 묘사", "keyframe_prompts": "키프레임 프롬프트", "video_prompts": "영상 프롬프트" },
         "status": { "processing": "진행 중", "completed": "완료", "failed": "실패", "interrupted": "중단됨" },
         "kind": { "llm": "모델 요청", "vision_chat": "이미지 판독", "tts": "음성 합성" },
         "phase": { "request": "발신", "response": "응답", "final": "마무리" },
@@ -1237,8 +1237,10 @@
       "fidelity": {
         "title": "충실도 점검",
         "delta": "{baseline} → {output}자 · {percent}%",
+        "paragraphs": "문단 {output}개 · 원문 {source}개",
         "outOfTolerance": "본문 길이가 ±5% 허용치를 벗어났습니다. 수동으로 확인하세요.",
-        "overLimit": "{index}번째 문단 {chars}자로 문단 상한 초과"
+        "overLimitSentence": "{paragraph}번째 문단 {sentence}번째 문장 {chars}자로 문장 상한 초과: {excerpt}",
+        "overLimitParagraph": "{index}번째 문단 {chars}자로 문단 상한 초과(구 형식 보고서)"
       },
       "filter": {
         "title": "입력 준비: 자동 제거된 비내레이션 내용",
@@ -1472,6 +1474,46 @@
     },
     "design": {
       "title": "숏 설계",
+      "group": {
+        "label": "{n}번째 단락",
+        "shots": "{n} 숏",
+        "warnings": "경고 {n}개",
+        "toggle": "이 단락의 그룹 시각 계획 펼치기",
+        "panelLabel": "{n}번째 단락의 그룹 시각 계획",
+        "collapse": "접기",
+        "task": "이 그룹의 목표",
+        "junction": "이전 그룹과의 연결",
+        "geo": "이 그룹의 새 지리 항목",
+        "assets": "자산 역할",
+        "empty": "이 그룹의 계획이 아직 없습니다. 다음 카드 채우기에서 자동 생성됩니다.",
+        "failed": "그룹 계획 실패: {reason}",
+        "ungrouped": "미분류",
+        "ungroupedHint": "이 숏의 내레이션이 최종 원고의 단락에 위치하지 않아 어떤 논리 그룹에도 속하지 않습니다",
+        "establishAt": "{shot}에서 확립",
+        "exitAfter": "{shot} 이후 퇴장",
+        "colShot": "숏",
+        "colCombo": "조합",
+        "colBase": "베이스",
+        "colPip": "화면 속 화면",
+        "colMode": "레이어 용도",
+        "colTask": "이 숏의 역할",
+        "status": {
+          "none": "미계획",
+          "ok": "계획됨",
+          "failed": "계획 실패",
+          "stale": "계획 만료"
+        },
+        "role": {
+          "establish": "전체 확립",
+          "hint": "간단한 힌트",
+          "background": "배경"
+        },
+        "mode": {
+          "new_items": "새 항목",
+          "carry_only": "승계만",
+          "no_layer": "레이어 없음"
+        }
+      },
       "lockedTitle": "숏 설계가 아직 잠겨 있습니다",
       "lockedDesc": "{reason}",
       "lockedGoto": "처리하러 가기",
@@ -1568,7 +1610,8 @@
         "must_mark_not_planned": "필수 표시 항목에 대응하는 계획 레이어가 없습니다",
         "reference_not_mentioned": "참고 소재가 어떤 프레임 설명에도 언급되지 않았습니다",
         "budget_tight": "길이 여유가 빠듯합니다",
-        "unresolved_ref": "소재나 항목으로 해결되지 않는 참조가 있습니다"
+        "unresolved_ref": "소재나 항목으로 해결되지 않는 참조가 있습니다",
+        "group_plan_deviation": "이 숏의 조합 또는 베이스가 속한 논리 그룹의 계획과 일치하지 않습니다"
       },
       "migrationComboUnresolved": "기존 숏의 세그먼트 조합에는 정의된 이전 규칙이 없습니다. 복원 가능한 내용은 유지되었습니다. 조합을 명시적으로 다시 선택하고 설계 카드를 검토한 후 확정하세요.",
       "migrationComboUnresolvedShort": "기존 세그먼트 조합을 확인할 수 없습니다. 다시 선택하세요",

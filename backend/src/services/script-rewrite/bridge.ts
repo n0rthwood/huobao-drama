@@ -7,9 +7,12 @@
  *
  * 计数口径（固定，不随模型输出漂移）：
  * - 「朗读字符」= 去掉空白与标点/结构标记后的字符数（25 为可见提示，不是失败）；
- * - 每段 ≤80 字沿用纪录片保真契约（超限是硬失败，桥句不豁免）；
- * - 每个边界最多一句是硬限制：句末标点只允许出现在结尾。
+ * - 硬上限落在**句子**上（#109）：自然段不限长度，一个自然段就是一个逻辑组；
+ *   桥句本身必须是 ≤80 字的单句，并进宿主段落后也不能把宿主的那一句撑到 80 字以上；
+ * - 桥句只能并入相邻两段之一（段尾或段首），**不能独立成段**——独立成段就是凭空多出一个逻辑组。
  */
+import { MAX_NARRATION_CHARS, narrationCharCount } from '../narration.js'
+import { splitSentences } from '../subtitle.js'
 import { guardStageOutput } from './source-filter.js'
 
 /** 剧本正文的叙事节拍标记（【开场】…）：只是锚点，不构成正文段落 */
@@ -27,10 +30,7 @@ export interface BridgeParagraph {
   /** 正文（不含块首节拍标记）在前驱全文里的起止偏移 */
   bodyStart: number
   bodyEnd: number
-  /** 所在块的结束偏移：独立桥段插在它后面 */
-  blockEnd: number
   text: string
-  chars: number
 }
 
 export interface BridgeBoundary {
@@ -40,8 +40,9 @@ export interface BridgeBoundary {
 }
 
 export type BridgeDecisionKind = 'no_bridge' | 'inserted' | 'needed_but_unsafe'
-export type BridgePlacement = 'end_of_left' | 'start_of_right' | 'standalone'
-export type BridgeAttribution = 'previous_tail' | 'next_head' | 'standalone'
+/** 桥句只能并进左段段尾或右段段首：独立成段会凭空多出一个逻辑组 */
+export type BridgePlacement = 'end_of_left' | 'start_of_right'
+export type BridgeAttribution = 'previous_tail' | 'next_head'
 
 export interface BridgeDecision {
   boundary_id: string
@@ -54,8 +55,6 @@ export interface BridgeDecision {
   placement: BridgePlacement | null
   shot_attribution: BridgeAttribution | null
   spoken_chars: number | null
-  /** 并入相邻段会超过 80 字时自动改为独立段，报告里显式说明 */
-  placement_adjusted?: boolean
 }
 
 export interface BridgeReport {
@@ -66,8 +65,8 @@ export interface BridgeReport {
   warnings: string[]
 }
 
-/** 单段硬上限（语音合成单段上限，与纪录片改写契约同口径） */
-export const PARAGRAPH_CHAR_LIMIT = 80
+/** 单句硬上限：与语音合成单段上限同一口径（一镜一句，通过这里的句子一定能成为一镜） */
+export const SENTENCE_CHAR_LIMIT = MAX_NARRATION_CHARS
 /** 桥句朗读字符的可见提示阈值（超过只提示，不判失败） */
 export const BRIDGE_SPOKEN_HINT = 25
 
@@ -121,9 +120,7 @@ export function paragraphsAndBoundaries(text: string, blocks: ScriptBlock[]): {
       id: `P${String(paragraphs.length + 1).padStart(2, '0')}`,
       bodyStart: block.bodyStart,
       bodyEnd: block.end,
-      blockEnd: block.end,
       text: body,
-      chars: body.replace(/[\s\u3000]/g, '').length,
     })
   }
   const boundaries: BridgeBoundary[] = []
@@ -147,7 +144,8 @@ export class BridgeContractError extends Error {
 /**
  * 模型返回的逐边界决策 → 校验过的决策表。
  * 任何结构违规都抛 `BridgeContractError`：缺失、重复、错位、非法决策、多句桥句、
- * 超过单段上限、把行政元信息写回正文——都不产生有效版本（阶段失败，可重试或跳过）。
+ * 超过单句上限、独立成段（`standalone`）、把行政元信息写回正文——
+ * 都不产生有效版本（阶段失败，可回喂模型重试或跳过）。
  */
 export function validateBridgeDecisions(
   paragraphs: BridgeParagraph[],
@@ -198,9 +196,11 @@ export function validateBridgeDecisions(
     if (!str(entry.relation, 120)) throw new BridgeContractError(`边界 ${id} 缺少关系分类`)
 
     const attributionRaw = str(entry.shot_attribution, 24)
-    const attribution: BridgeAttribution | null = ['previous_tail', 'next_head', 'standalone'].includes(attributionRaw)
-      ? attributionRaw as BridgeAttribution
-      : null
+    // 归属只剩两种：桥句并进左段就归上一镜尾，并进右段就归下一镜头部；独立桥镜不存在了
+    if (attributionRaw && !['previous_tail', 'next_head'].includes(attributionRaw)) {
+      throw new BridgeContractError(`边界 ${id} 的 shot_attribution 非法：${attributionRaw}（只允许 previous_tail | next_head）`)
+    }
+    const attribution: BridgeAttribution | null = attributionRaw ? attributionRaw as BridgeAttribution : null
 
     if (kind !== 'inserted') {
       decisions.push({
@@ -220,7 +220,7 @@ export function validateBridgeDecisions(
 
     // 只归一化空白、不删空白：内容语言可以是 en/ja/ko（app-settings CONTENT_LANGUAGES），
     // 删掉空格会把 "That night, the expedition pressed on." 粘成一个词。
-    // 计数（80 字上限、并入判断）仍按去空白的口径，与段落 `chars` 同尺。
+    // 计数（单句 80 字上限）仍按去空白的朗读字符口径。
     const text = str(entry.bridge_text, 400).replace(/\s+/g, ' ').trim()
     const compact = text.replace(/\s+/g, '')
     if (!compact) throw new BridgeContractError(`边界 ${id} 标为已补写，却没有桥句正文`)
@@ -233,27 +233,30 @@ export function validateBridgeDecisions(
     if (sentenceEnds.length > 1 || (sentenceEnds.length === 1 && !endsAtTail)) {
       throw new BridgeContractError(`边界 ${id} 的桥句超过一句（每个边界最多一句是硬限制）：「${text.slice(0, 40)}」`)
     }
-    if (compact.length > PARAGRAPH_CHAR_LIMIT) {
-      throw new BridgeContractError(`边界 ${id} 的桥句 ${compact.length} 字，超过单段 ${PARAGRAPH_CHAR_LIMIT} 字上限`)
+    if (compact.length > SENTENCE_CHAR_LIMIT) {
+      throw new BridgeContractError(`边界 ${id} 的桥句 ${compact.length} 字，超过单句 ${SENTENCE_CHAR_LIMIT} 字上限`)
     }
     const spoken = text.replace(PUNCTUATION, '').length
     if (spoken > BRIDGE_SPOKEN_HINT) warnings.push(`${id} 桥句 ${spoken} 个朗读字符，超过 ${BRIDGE_SPOKEN_HINT} 字提示阈值`)
 
+    // 桥句只能并进相邻两段之一：总结/收束 → 左段段尾（属于左组），引出下一知识点 → 右段段首（属于右组）。
+    // 独立成段是契约违例：那等于凭空多出一个逻辑组（#109），必须回喂模型修正，不能替它改。
     const placementRaw = str(entry.placement, 24)
-    // 默认归属已确认：引出下一知识点 → 下一镜开头；总结/限制 → 上一镜尾
-    let placement: BridgePlacement = ['end_of_left', 'start_of_right', 'standalone'].includes(placementRaw)
-      ? placementRaw as BridgePlacement
-      : attribution === 'previous_tail' ? 'end_of_left' : attribution === 'standalone' ? 'standalone' : 'start_of_right'
+    if (!['end_of_left', 'start_of_right'].includes(placementRaw)) {
+      throw new BridgeContractError(`边界 ${id} 的 placement 非法：${placementRaw || '(空)'}（只允许 end_of_left | start_of_right；桥句并入左段段尾或右段段首，不能独立成段）`)
+    }
+    const placement = placementRaw as BridgePlacement
+    const host = byId.get(placement === 'end_of_left' ? expected.left_paragraph : expected.right_paragraph)!
 
-    // 桥句不豁免每段 80 字：并入会超限时改为独立段，并在报告里显式说明
-    let adjusted = false
-    const host = placement === 'end_of_left'
-      ? byId.get(expected.left_paragraph)
-      : placement === 'start_of_right' ? byId.get(expected.right_paragraph) : undefined
-    if (host && host.chars + compact.length > PARAGRAPH_CHAR_LIMIT) {
-      placement = 'standalone'
-      adjusted = true
-      warnings.push(`${id} 桥句并入 ${host.id} 会超过 ${PARAGRAPH_CHAR_LIMIT} 字，已改为独立段落`)
+    // 桥句不豁免单句 80 字：它自己必须是短句；不带句末标点时，接上宿主那一句也不能把那一句撑过上限。
+    // （带句末标点的桥句本身就是一句，宿主句子原样不动，所以长段落照样可以并入。）
+    if (!endsAtTail) {
+      const hostSentences = splitSentences(host.text)
+      const edge = placement === 'end_of_left' ? hostSentences[hostSentences.length - 1] ?? '' : hostSentences[0] ?? ''
+      const mergedChars = narrationCharCount(edge) + narrationCharCount(text)
+      if (mergedChars > SENTENCE_CHAR_LIMIT) {
+        throw new BridgeContractError(`边界 ${id} 的桥句接到 ${host.id} 的${placement === 'end_of_left' ? '段尾' : '段首'}后会变成一句 ${mergedChars} 字，超过单句 ${SENTENCE_CHAR_LIMIT} 字上限：请改放到${placement === 'end_of_left' ? '右段段首' : '左段段尾'}，或把桥句写短`)
+      }
     }
 
     decisions.push({
@@ -265,10 +268,8 @@ export function validateBridgeDecisions(
       reason,
       bridge_text: text,
       placement,
-      shot_attribution: attribution
-        ?? (placement === 'end_of_left' ? 'previous_tail' : placement === 'standalone' ? 'standalone' : 'next_head'),
+      shot_attribution: attribution ?? (placement === 'end_of_left' ? 'previous_tail' : 'next_head'),
       spoken_chars: spoken,
-      ...(adjusted ? { placement_adjusted: true } : {}),
     })
   }
 
@@ -295,23 +296,22 @@ function joined(neighbour: string | undefined, bridge: string, side: 'before' | 
 /**
  * 前驱全文 + 已申报桥句 → 桥句版全文。
  * 只在计算好的偏移处插入桥句字节：前驱的空白、缩进、段落顺序逐字节保留。
+ * 桥句只并入左段段尾或右段段首，段落数不变（逻辑组不变）。
  */
 export function composeBridged(text: string, paragraphs: BridgeParagraph[], decisions: BridgeDecision[]): string {
   const byId = new Map(paragraphs.map(p => [p.id, p]))
-  const inserts: Array<{ at: number; text: string; order: number }> = []
+  const inserts: Array<{ at: number; text: string }> = []
   for (const decision of decisions) {
     if (decision.decision !== 'inserted' || !decision.bridge_text) continue
-    const left = byId.get(decision.left_paragraph)
-    const right = byId.get(decision.right_paragraph)
-    if (decision.placement === 'end_of_left' && left) {
-      inserts.push({ at: left.bodyEnd, text: joined(text[left.bodyEnd - 1], decision.bridge_text, 'before'), order: 1 })
-    } else if (decision.placement === 'start_of_right' && right) {
-      inserts.push({ at: right.bodyStart, text: joined(text[right.bodyStart], decision.bridge_text, 'after'), order: 0 })
-    } else if (left) {
-      inserts.push({ at: left.blockEnd, text: `\n\n${decision.bridge_text}`, order: 2 })
+    if (decision.placement === 'end_of_left') {
+      const left = byId.get(decision.left_paragraph)
+      if (left) inserts.push({ at: left.bodyEnd, text: joined(text[left.bodyEnd - 1], decision.bridge_text, 'before') })
+    } else {
+      const right = byId.get(decision.right_paragraph)
+      if (right) inserts.push({ at: right.bodyStart, text: joined(text[right.bodyStart], decision.bridge_text, 'after') })
     }
   }
-  inserts.sort((a, b) => a.at - b.at || a.order - b.order)
+  inserts.sort((a, b) => a.at - b.at)
   let out = ''
   let at = 0
   for (const insert of inserts) {

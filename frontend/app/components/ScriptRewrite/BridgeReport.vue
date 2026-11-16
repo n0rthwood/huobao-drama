@@ -22,6 +22,7 @@
           <span v-if="item.shot_attribution" class="dim mono br-attr">
             {{ t(`episode.rewrite.bridge.attribution.${item.shot_attribution}`) }}
           </span>
+          <!-- 存量报告（#109 之前）才会带 placement_adjusted：新契约里桥句只并入相邻段落，不再自动改位置 -->
           <span v-if="item.placement_adjusted" class="tag br-adjusted">{{ t('episode.rewrite.bridge.adjusted') }}</span>
         </div>
         <div class="br-context">

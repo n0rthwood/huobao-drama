@@ -572,6 +572,8 @@ export type CardIssueCode =
   | 'info_point_unassigned' | 'must_mark_not_planned' | 'reference_not_mentioned'
   | 'budget_tight' | 'unresolved_ref'
   | 'text_plan_invalid' | 'text_plan_warning'
+  // #109：本镜的 combo / 底图与所属逻辑组规划的条目不一致（警告级，人工复核）
+  | 'group_plan_deviation'
 
 export interface CardIssue {
   code: CardIssueCode
@@ -664,6 +666,83 @@ export interface DesignCardAuditItem {
   narration_estimate_s: number
   narration_measured_s: number | null
   budget: { layer_s: number | null; gen_s: number | null }
+}
+
+/**
+ * 逻辑组视觉规划（Issue #109，纪录片）：逻辑组 = 最终旁白稿的一个自然段。
+ * 组规划先于填卡跑一次（同一 sys_task），逐镜填卡必须遵循本镜条目；读时不一致给
+ * `group_plan_deviation` 警告。与后端 services/design-group-plan.ts 同形。
+ */
+export type DesignGroupPlanStatus = 'none' | 'ok' | 'failed'
+/** 资产在本组的职能：完整建立 / 简短提示 / 背景 */
+export type DesignGroupAssetRole = 'establish' | 'hint' | 'background'
+/** 本镜的图层用法：本组新增条目 / 只承接已建立的内容 / 不用图层 */
+export type DesignGroupShotMode = 'new_items' | 'carry_only' | 'no_layer'
+
+export interface DesignGroupAssetRef {
+  asset_kind: AssetKindName
+  asset_id: number
+}
+
+export interface DesignGroupPlanEntry {
+  /** 观众看完本组应理解 / 记住什么 */
+  task: string
+  /** 本组新增地理 / 年代条目，每条指派唯一一镜兑现 must_mark */
+  geo_additions: Array<{ text: string; storyboard_id: number }>
+  asset_roles: Array<{
+    asset_kind: AssetKindName
+    asset_id: number
+    name: string
+    role: DesignGroupAssetRole
+    establish_storyboard_id: number | null
+    exit_after_storyboard_id: number | null
+    note: string
+  }>
+  shots: Array<{
+    storyboard_id: number
+    combo: Combo
+    base: DesignGroupAssetRef | null
+    /** 画中画：图层段上引用的另一张图 */
+    pip: DesignGroupAssetRef[]
+    mode: DesignGroupShotMode
+    task: string
+  }>
+  /** 与上一组的接缝方式与理由 */
+  junction: string
+}
+
+export interface DesignGroupPlanWarning {
+  /** shot_cross_group = 一镜跨了段落；shot_group_unlocated = 旁白定位不到段落 */
+  code: 'shot_cross_group' | 'shot_group_unlocated'
+  storyboard_id: number
+  message: string
+}
+
+export interface DesignGroupPlanGroup {
+  /** 1 起的段号 = 组号 */
+  group_no: number
+  paragraph_excerpt: string
+  paragraph_chars: number
+  /** 本组的镜 id，按镜序 */
+  shot_ids: number[]
+  warnings: DesignGroupPlanWarning[]
+  status: DesignGroupPlanStatus
+  error: string | null
+  /** 规划签名与当前组内容一致；false = 下次填卡会重规划 */
+  fresh: boolean
+  updated_at: string | null
+  task_id: number | null
+  plan: DesignGroupPlanEntry | null
+}
+
+/** GET /episodes/:id/design-group-plans */
+export interface DesignGroupPlansPayload {
+  groups: DesignGroupPlanGroup[]
+}
+
+export const designGroupPlanAPI = {
+  /** 只读：组规划随填卡生成，前端不提供编辑入口 */
+  list: (id: number) => api.get<DesignGroupPlansPayload>(`/episodes/${id}/design-group-plans`),
 }
 
 export const storyboardAPI = {
@@ -1776,13 +1855,18 @@ export interface RewritePreparedReport {
   prepared_chars?: number
 }
 
-/** 忠实改写报告：±5% 基线按「过滤后正文」计，正文超限段单列 */
+/** 忠实改写报告：±5% 基线按「过滤后正文」计；自然段不限长度，超限的句子单列（#109） */
 export interface RewriteFidelityReport {
   baseline_chars?: number
   output_chars?: number
   delta_ratio?: number
   within_tolerance?: boolean
+  /** 产出稿的自然段数（= 逻辑组数） */
   paragraphs?: number
+  /** 输入稿的自然段数；与 paragraphs 不一致说明分段被拆碎或合并了 */
+  paragraphs_source?: number
+  over_limit_sentences?: Array<{ paragraph: number; sentence: number; chars: number; excerpt: string }>
+  /** 存量报告（#109 之前）的段落级超限清单，只用于回显历史 */
   over_limit_paragraphs?: Array<{ index: number; chars: number }>
   warnings?: string[]
   post_filter?: { removed: RewriteRemovedSpan[] }
@@ -1790,8 +1874,9 @@ export interface RewriteFidelityReport {
 
 /** 桥句决策：no_bridge / inserted / needed_but_unsafe 三分，弃答绝不记成「无需补写」 */
 export type BridgeDecision = 'no_bridge' | 'inserted' | 'needed_but_unsafe'
-export type BridgePlacement = 'end_of_left' | 'start_of_right' | 'standalone'
-export type BridgeAttribution = 'previous_tail' | 'next_head' | 'standalone'
+/** 桥句只能并入左段段尾或右段段首（#109）；`standalone` 只出现在存量报告里 */
+export type BridgePlacement = 'end_of_left' | 'start_of_right'
+export type BridgeAttribution = 'previous_tail' | 'next_head'
 export interface RewriteBridgeBoundary {
   boundary_id: string | number
   left_paragraph?: string
@@ -1800,9 +1885,11 @@ export interface RewriteBridgeBoundary {
   decision: BridgeDecision
   reason?: string
   bridge_text: string | null
-  placement: BridgePlacement | null
-  shot_attribution: BridgeAttribution | null
+  /** standalone 只可能是 #109 之前的存量报告：不产生新的，但必须照原样显示 */
+  placement: BridgePlacement | 'standalone' | null
+  shot_attribution: BridgeAttribution | 'standalone' | null
   spoken_chars: number | null
+  /** 存量报告（#109 之前）：桥句并入会超限时曾被自动改成独立段 */
   placement_adjusted?: boolean
 }
 export interface RewriteBridgeReport {
@@ -1967,6 +2054,8 @@ export interface NarrationSkeletonShotInput {
 export type SkeletonProblemCode =
   | 'empty' | 'too_long' | 'not_verbatim' | 'out_of_order' | 'overlap' | 'gap'
   | 'unknown_id' | 'duplicate_id' | 'script_missing' | 'card_busy'
+  /** #109：一镜旁白跨了两个自然段（逻辑组） */
+  | 'cross_group'
 export interface SkeletonProblem { index: number; code: SkeletonProblemCode; message: string }
 export function skeletonProblemsOf(err: unknown): SkeletonProblem[] | null {
   const body = (err as ApiError)?.body as { error?: string; problems?: SkeletonProblem[] } | undefined

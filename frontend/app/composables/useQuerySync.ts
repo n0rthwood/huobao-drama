@@ -269,8 +269,8 @@ export const DEEPLINK_KEYS = {
   refLibrary: ['reflib'],
   /** 角色档案图面板：检索弹窗与关键词 */
   archival: ['arch', 'archq'],
-  /** 设计卡：子阶段 / 选中分镜 / 选择器 / 切换组合弹窗 / 批量范围 */
-  design: ['phase', 'shot', 'dpick', 'danchor', 'dcombo', 'dscope'],
+  /** 设计卡：子阶段 / 选中分镜 / 选择器 / 切换组合弹窗 / 批量范围 / 展开的逻辑组（#109） */
+  design: ['phase', 'shot', 'dpick', 'danchor', 'dcombo', 'dscope', 'dgroup'],
   /** 素材/语义选择器内部：类型栏 / 关键词 / 下钻到的素材 */
   picker: ['pktype', 'pkq', 'drill'],
   /** 关键帧步骤：选中分镜 / 批量多选 / 资产池弹窗 */

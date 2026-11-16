@@ -115,49 +115,153 @@
       </div>
 
       <div v-else class="dc-body">
+        <!--
+          组规划详情（#109）：左栏镜表只有 220–300px，六列表格放不进可读宽度，所以展开内容以
+          整幅宽的横带上屏（grid-column: 1 / -1，仍是内联展开、不是弹窗，也没有新的弹窗层）；
+          组头的 caret / aria-expanded 就是开关，收起即移除本横带。内容只读，镜号可点选镜。
+        -->
+        <section v-if="expandedPlanGroup" class="dc-group-panel" :aria-label="t('episode.design.group.panelLabel', { n: expandedPlanGroup.group_no })">
+          <header class="dc-group-panel-head">
+            <strong>{{ t('episode.design.group.label', { n: expandedPlanGroup.group_no }) }}</strong>
+            <span :class="['dc-group-chip', 'is-' + groupStatusOf(expandedPlanGroup)]">{{ t(`episode.design.group.status.${groupStatusOf(expandedPlanGroup)}`) }}</span>
+            <span v-if="expandedPlanGroup.warnings.length" class="dc-group-chip is-warn">{{ t('episode.design.group.warnings', { n: expandedPlanGroup.warnings.length }) }}</span>
+            <span class="dc-group-panel-excerpt">{{ expandedPlanGroup.paragraph_excerpt }}</span>
+            <span class="ml-auto" />
+            <button type="button" class="btn btn-sm" @click="expandedGroup = 0">{{ t('episode.design.group.collapse') }}</button>
+          </header>
+          <p v-if="expandedPlanGroup.error" class="dc-group-error">{{ t('episode.design.group.failed', { reason: expandedPlanGroup.error }) }}</p>
+          <ul v-if="expandedPlanGroup.warnings.length" class="dc-issues">
+            <li v-for="warning in expandedPlanGroup.warnings" :key="`${warning.code}-${warning.storyboard_id}`" class="dc-issue is-warn">
+              {{ warning.message }} <small class="mono">({{ warning.code }} · {{ shotRef(warning.storyboard_id) }})</small>
+            </li>
+          </ul>
+          <p v-if="!expandedPlanGroup.plan" class="dc-hint">{{ t('episode.design.group.empty') }}</p>
+          <template v-else>
+            <div class="dc-field">
+              <span class="dc-label">{{ t('episode.design.group.task') }}</span>
+              <p class="dc-read">{{ expandedPlanGroup.plan.task }}</p>
+            </div>
+            <div v-if="expandedPlanGroup.plan.junction" class="dc-field">
+              <span class="dc-label">{{ t('episode.design.group.junction') }}</span>
+              <p class="dc-read dc-junction">{{ expandedPlanGroup.plan.junction }}</p>
+            </div>
+            <div v-if="expandedPlanGroup.plan.geo_additions.length" class="dc-field">
+              <span class="dc-label">{{ t('episode.design.group.geo') }}</span>
+              <div class="dc-chips">
+                <span v-for="(geo, index) in expandedPlanGroup.plan.geo_additions" :key="`${geo.storyboard_id}-${index}`" class="dc-chip">
+                  <span class="dc-chip-text">{{ geo.text }}</span>
+                  <button type="button" class="dc-shot-link mono" @click="selectPlanShot(geo.storyboard_id)">{{ shotRef(geo.storyboard_id) }}</button>
+                </span>
+              </div>
+            </div>
+            <div v-if="expandedPlanGroup.plan.asset_roles.length" class="dc-field">
+              <span class="dc-label">{{ t('episode.design.group.assets') }}</span>
+              <ul class="dc-group-assets">
+                <li v-for="role in expandedPlanGroup.plan.asset_roles" :key="`${role.asset_kind}:${role.asset_id}`">
+                  <span class="dc-group-asset-name">{{ role.name || assetLabel(role.asset_kind, role.asset_id) }}</span>
+                  <span :class="['dc-group-role', 'is-' + role.role]">{{ t(`episode.design.group.role.${role.role}`) }}</span>
+                  <span class="dim mono">{{ roleShots(role) }}</span>
+                  <span v-if="role.note" class="dc-group-note">{{ role.note }}</span>
+                </li>
+              </ul>
+            </div>
+            <table class="dc-group-table">
+              <thead>
+                <tr>
+                  <th>{{ t('episode.design.group.colShot') }}</th>
+                  <th>{{ t('episode.design.group.colCombo') }}</th>
+                  <th>{{ t('episode.design.group.colBase') }}</th>
+                  <th>{{ t('episode.design.group.colPip') }}</th>
+                  <th>{{ t('episode.design.group.colMode') }}</th>
+                  <th>{{ t('episode.design.group.colTask') }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="entry in planShotsOf(expandedPlanGroup.plan)" :key="entry.storyboard_id">
+                  <td>
+                    <button type="button" class="dc-shot-link mono" @click="selectPlanShot(entry.storyboard_id)">{{ shotRef(entry.storyboard_id) }}</button>
+                  </td>
+                  <td class="mono" :title="comboTitle(entry.combo)">{{ comboGlyph(entry.combo) }}</td>
+                  <td>{{ entry.base ? assetLabel(entry.base.asset_kind, entry.base.asset_id) : t('episode.design.noneShot') }}</td>
+                  <td>{{ entry.pip.length ? entry.pip.map(pip => assetLabel(pip.asset_kind, pip.asset_id)).join(t('common.listJoin')) : t('episode.design.noneShot') }}</td>
+                  <td>{{ t(`episode.design.group.mode.${entry.mode}`) }}</td>
+                  <td class="dc-group-task">{{ entry.task }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </template>
+        </section>
+
         <!-- 左：镜列表（镜号 + 组合象形 + 状态点），支持拖拽与上下移动排序 -->
         <section class="dc-list" :aria-label="t('episode.design.order.hint')">
-          <button
-            v-for="(sb, index) in shots"
-            :key="sb.id"
-            type="button"
-            :class="['dc-shot', { on: sb.id === selectedId }]"
-            :aria-pressed="sb.id === selectedId"
-            draggable="true"
-            @click="selectShot(sb.id)"
-            @dragstart="onDragStart(sb)"
-            @dragover.prevent
-            @drop.prevent="onDrop(index)"
-            @dragend="dragId = 0"
-          >
-            <span class="dc-shot-no mono">{{ shotLabel(sb) }}</span>
-            <span class="dc-shot-combo mono" :title="comboTitle(stateOf(sb).combo)">{{ comboGlyph(stateOf(sb).combo) }}</span>
-            <span :class="['dc-dot', 'is-' + stateOf(sb).design_card_status]" :title="t(`episode.design.status.${stateOf(sb).design_card_status}`)" />
-            <span
-              :class="['dc-tts-dot', ttsOf(sb.id).valid ? 'is-ok' : 'is-bad']"
-              :title="ttsTitle(sb.id)"
-            >{{ ttsOf(sb.id).valid ? '♪' : '✕' }}</span>
-            <span class="dc-shot-grip">
+          <template v-for="block in shotBlocks" :key="block.key">
+            <!-- 组头（#109）：组号 + 段首摘录 + 镜数 + 规划状态；点击内联展开组级视觉规划，不另开弹窗 -->
+            <button
+              v-if="block.group"
+              type="button"
+              :class="['dc-group-head', { on: block.no === expandedGroup }]"
+              :aria-expanded="block.no === expandedGroup"
+              :title="t('episode.design.group.toggle')"
+              @click="toggleGroup(block.no)"
+            >
+              <span class="dc-group-no mono">{{ t('episode.design.group.label', { n: block.no }) }}</span>
+              <span class="dc-group-text">{{ block.group.paragraph_excerpt }}</span>
+              <span class="dc-group-count mono">{{ t('episode.design.group.shots', { n: block.rows.length }) }}</span>
+              <span :class="['dc-group-chip', 'is-' + groupStatusOf(block.group)]">{{ t(`episode.design.group.status.${groupStatusOf(block.group)}`) }}</span>
+              <span v-if="block.group.warnings.length" class="dc-group-chip is-warn">{{ t('episode.design.group.warnings', { n: block.group.warnings.length }) }}</span>
+              <span class="dc-group-caret"><ChevronDown :size="12" /></span>
+            </button>
+            <!-- 旁白定位不到段落的镜（正常情况下不该出现）：并列在末尾，不假装属于某一组 -->
+            <div v-else-if="block.ungrouped" class="dc-group-head is-static">
+              <span class="dc-group-no mono">{{ t('episode.design.group.ungrouped') }}</span>
+              <span class="dc-group-text">{{ t('episode.design.group.ungroupedHint') }}</span>
+              <span class="dc-group-count mono">{{ t('episode.design.group.shots', { n: block.rows.length }) }}</span>
+            </div>
+
+            <!-- 展开内容见 .dc-body 顶部整幅宽的组规划横带（左栏只有 220–300px，六列表格放不下） -->
+
+            <button
+              v-for="row in block.rows"
+              :key="row.sb.id"
+              type="button"
+              :class="['dc-shot', { on: row.sb.id === selectedId }]"
+              :aria-pressed="row.sb.id === selectedId"
+              draggable="true"
+              @click="selectShot(row.sb.id)"
+              @dragstart="onDragStart(row.sb)"
+              @dragover.prevent
+              @drop.prevent="onDrop(row.index)"
+              @dragend="dragId = 0"
+            >
+              <span class="dc-shot-no mono">{{ shotLabel(row.sb) }}</span>
+              <span class="dc-shot-combo mono" :title="comboTitle(stateOf(row.sb).combo)">{{ comboGlyph(stateOf(row.sb).combo) }}</span>
+              <span :class="['dc-dot', 'is-' + stateOf(row.sb).design_card_status]" :title="t(`episode.design.status.${stateOf(row.sb).design_card_status}`)" />
               <span
-                class="dc-move"
-                role="button"
-                tabindex="0"
-                :aria-label="t('episode.design.order.up')"
-                :title="t('episode.design.order.up')"
-                @click.stop="move(index, -1)"
-                @keydown.enter.stop.prevent="move(index, -1)"
-              ><ChevronUp :size="11" /></span>
-              <span
-                class="dc-move"
-                role="button"
-                tabindex="0"
-                :aria-label="t('episode.design.order.down')"
-                :title="t('episode.design.order.down')"
-                @click.stop="move(index, 1)"
-                @keydown.enter.stop.prevent="move(index, 1)"
-              ><ChevronDown :size="11" /></span>
-            </span>
-          </button>
+                :class="['dc-tts-dot', ttsOf(row.sb.id).valid ? 'is-ok' : 'is-bad']"
+                :title="ttsTitle(row.sb.id)"
+              >{{ ttsOf(row.sb.id).valid ? '♪' : '✕' }}</span>
+              <span class="dc-shot-grip">
+                <span
+                  class="dc-move"
+                  role="button"
+                  tabindex="0"
+                  :aria-label="t('episode.design.order.up')"
+                  :title="t('episode.design.order.up')"
+                  @click.stop="move(row.index, -1)"
+                  @keydown.enter.stop.prevent="move(row.index, -1)"
+                ><ChevronUp :size="11" /></span>
+                <span
+                  class="dc-move"
+                  role="button"
+                  tabindex="0"
+                  :aria-label="t('episode.design.order.down')"
+                  :title="t('episode.design.order.down')"
+                  @click.stop="move(row.index, 1)"
+                  @keydown.enter.stop.prevent="move(row.index, 1)"
+                ><ChevronDown :size="11" /></span>
+              </span>
+            </button>
+          </template>
         </section>
 
         <!-- 右：选中镜的设计卡 -->
@@ -706,7 +810,7 @@ import { mediaUrl } from '~/utils/url'
 import { stepTextClass } from '~/utils/stepStatus'
 import { textCapacity, textFamilyOf, textLayoutById, textLayoutsFor, textRolesFor } from '~/utils/layerText'
 import { textRoleDef, useLayerTextNames, useLayerTextSpec } from '~/composables/useLayerTextSpec'
-import { COMBOS, episodeAPI, narrationSkeletonAPI, storyboardAPI, ttsRequiredOf } from '~/composables/useApi'
+import { COMBOS, designGroupPlanAPI, episodeAPI, narrationSkeletonAPI, storyboardAPI, ttsRequiredOf } from '~/composables/useApi'
 import { DEEPLINK_KEYS, queryEnum, queryIdList, querySingle, useDeeplink } from '~/composables/useQuerySync'
 import { onTaskFinished, refreshTasks, useTasks } from '~/composables/useTasks'
 import { useEpisodeRoadmap } from '~/composables/useEpisodeRoadmap'
@@ -788,9 +892,12 @@ const urlPick = queryEnum(link.initial('dpick'), ['semantic:must_mark', 'asset:r
 const urlAnchor = querySingle(link.initial('danchor'))
 const urlCombo = queryIdList(link.initial('dcombo'))[0] || 0
 const urlScope = queryEnum(link.initial('dscope'), ['fill', 'confirm'])
+/** #109：展开的逻辑组（组号 = 段号，随剧本重算；失效组由 restoreExpandedGroup 处理） */
+const urlGroup = queryIdList(link.initial('dgroup'))[0] || 0
 /** 子阶段只认 URL：旧版的 localStorage 记忆跨集串味（#86 已删），缺省回到设计卡 */
 const phase = ref(urlPhase || 'cards')
 let shotRestore = urlShot > 0
+let groupRestore = urlGroup > 0
 let childRestore = Boolean(urlPick || urlCombo || urlScope)
 /** 用户在恢复途中自己点过镜：此后链接恢复不再改选中镜（换集时重置） */
 let userPicked = false
@@ -894,6 +1001,8 @@ function onSkeletonRefresh() {
   emit('refresh')
   loadSkeleton()
   loadAudit()
+  // 骨架/配音变了组的内容签名就变了：组规划状态跟着重取（#109），不另起轮询
+  loadGroupPlans()
 }
 
 // ===== 批量填卡进度：全局任务 store 是唯一来源（kind='design_card'），本组件不轮询 =====
@@ -984,8 +1093,9 @@ watch(() => Number(batch.value.completed), (next, before) => {
 onTaskFinished((task) => {
   if (Number(task?.episode_id) !== Number(props.episodeId)) return
   const kind = String(task?.kind || task?.params?.kind || '')
-  // 配音任务结束：实测时长与有效性全部重判（设计卡的硬前置）
-  if (kind === 'narration_tts') { loadSkeleton(); return }
+  // 配音任务结束：实测时长与有效性全部重判（设计卡的硬前置）；实测时长进了组规划签名，
+  // 所以组规划状态也要跟着重取（#109）
+  if (kind === 'narration_tts') { loadSkeleton(); loadGroupPlans(); return }
   if (kind !== 'design_card') return
   fillStarting.value = false
   overrides.value = {}
@@ -994,6 +1104,8 @@ onTaskFinished((task) => {
   // 这一批的真实样本已落库：下一次「开始前预估」用得上
   loadFillEstimate()
   loadSkeleton()
+  // 填卡任务里先跑组规划再填卡：任务结束就是组规划的最新版本（#109）
+  loadGroupPlans()
   nextTick(syncDraft)
   const failed = Number(task?.progress?.failed || task?.params?.progress?.failed || 0)
   if (task?.status === 'completed') {
@@ -1030,6 +1142,93 @@ function pad(n) { return String(n ?? 0).padStart(2, '0') }
 function shotLabel(sb) { return `#${pad(stateOf(sb).shot_number)}` }
 function comboGlyph(combo) { return combo ? COMBO_GLYPH[combo] : t('episode.design.combo.none') }
 function comboTitle(combo) { return combo ? t(`episode.design.combo.${combo}.name`) : t('episode.design.combo.required') }
+
+// ===== 逻辑组（#109）：镜表按最终旁白稿的自然段分段，组头内联展开组级视觉规划 =====
+/**
+ * 组规划由后端在填卡时生成，前端只读展示（不提供编辑入口）。镜→组不入库，接口每次现算，
+ * 所以组号随剧本变化：展开发布的是组号，失效组按 deeplink.missing 处理。
+ */
+const groupPlans = ref([])
+const groupsLoaded = ref(false)
+/** 取数失败（网络/500）不等于「组不存在」：只退回平铺，不给误导性的失效提示 */
+const groupsFailed = ref(false)
+const expandedGroup = ref(0)
+
+const shotGroupNo = computed(() => {
+  const map = new Map()
+  for (const group of groupPlans.value) {
+    for (const id of group.shot_ids || []) map.set(Number(id), Number(group.group_no))
+  }
+  return map
+})
+const groupByNo = computed(() => new Map(groupPlans.value.map(group => [Number(group.group_no), group])))
+
+/** 展开中的组（组号 → 组）；组号可能来自链接，取不到就是 null（横带不渲染） */
+const expandedPlanGroup = computed(() => {
+  if (!expandedGroup.value) return null
+  return groupByNo.value.get(Number(expandedGroup.value)) || null
+})
+
+/**
+ * 镜表分段：组内顺序跟当前镜序（含本地乐观重排），组间顺序跟段号；
+ * 没有组规划时退回平铺一列（旧集 / 接口不可用），末尾附上未入组的镜。
+ */
+const shotBlocks = computed(() => {
+  const rows = shots.value.map((sb, index) => ({ sb, index }))
+  if (!groupPlans.value.length) return rows.length ? [{ key: 'all', no: 0, group: null, ungrouped: false, rows }] : []
+  const buckets = new Map()
+  const ungrouped = []
+  for (const row of rows) {
+    const no = shotGroupNo.value.get(Number(row.sb.id))
+    if (!no || !groupByNo.value.has(no)) { ungrouped.push(row); continue }
+    if (!buckets.has(no)) buckets.set(no, [])
+    buckets.get(no).push(row)
+  }
+  const blocks = []
+  for (const group of [...groupPlans.value].sort((a, b) => Number(a.group_no) - Number(b.group_no))) {
+    const groupRows = buckets.get(Number(group.group_no))
+    if (!groupRows || !groupRows.length) continue
+    blocks.push({ key: `group-${group.group_no}`, no: Number(group.group_no), group, ungrouped: false, rows: groupRows })
+  }
+  if (ungrouped.length) blocks.push({ key: 'ungrouped', no: 0, group: null, ungrouped: true, rows: ungrouped })
+  return blocks
+})
+
+/** 组头 chip：none 未规划 / ok 已规划 / failed 规划失败 / stale 签名变了（下次填卡重规划） */
+function groupStatusOf(group) {
+  if (group.status === 'failed') return 'failed'
+  if (group.status !== 'ok') return 'none'
+  return group.fresh === false ? 'stale' : 'ok'
+}
+function toggleGroup(no) {
+  expandedGroup.value = expandedGroup.value === no ? 0 : no
+}
+/** 规划里的逐镜条目按当前镜序排列，与左栏镜行一一对应 */
+function planShotsOf(plan) {
+  const rank = new Map(shots.value.map((sb, index) => [Number(sb.id), index]))
+  return [...(plan?.shots || [])].sort((a, b) => (rank.get(Number(a.storyboard_id)) ?? 1e9) - (rank.get(Number(b.storyboard_id)) ?? 1e9))
+}
+/** 规划里的镜号是 storyboard id：渲染成当前展示镜号，取不到就标未知，不猜 */
+function shotRef(storyboardId) {
+  const sb = shots.value.find(item => Number(item.id) === Number(storyboardId))
+  return sb ? shotLabel(sb) : '—'
+}
+/** 资产名取本面板已加载的 design-card-context 资产；查不到退回「类型#id」，不编名字 */
+function assetLabel(kind, id) {
+  const asset = (ctx.value.assets || []).find(item => item.kind === kind && Number(item.id) === Number(id))
+  return asset?.name || `${t(`episode.design.assetKind.${kind}`)}#${id}`
+}
+function roleShots(role) {
+  const parts = []
+  if (role.establish_storyboard_id) parts.push(t('episode.design.group.establishAt', { shot: shotRef(role.establish_storyboard_id) }))
+  if (role.exit_after_storyboard_id) parts.push(t('episode.design.group.exitAfter', { shot: shotRef(role.exit_after_storyboard_id) }))
+  return parts.join(' · ')
+}
+/** 展开规划里点镜号：沿用面板既有的选中机制（选中镜本身已在 URL 里），只切界面 */
+function selectPlanShot(storyboardId) {
+  const sb = shots.value.find(item => Number(item.id) === Number(storyboardId))
+  if (sb) selectShot(sb.id)
+}
 
 /** 单镜状态：PUT/确认的响应覆盖 > 审计结果 > 分镜行本身 */
 function stateOf(sb) {
@@ -1810,6 +2009,65 @@ async function loadAudit() {
   } catch { /* 静默：审计只影响左列状态点与批量范围 */ } finally { loaded.audit = true }
 }
 
+/**
+ * 组规划只读取数（#109）：随既有刷新钩子重取（分镜变化 / 换集 / 填卡任务结束 / 骨架刷新），
+ * 不新起轮询。失败静默 —— 镜表退回平铺，组规划不是填卡的前置。
+ */
+async function loadGroupPlans() {
+  const episodeId = props.episodeId
+  if (!episodeId) return
+  try {
+    const data = await designGroupPlanAPI.list(episodeId)
+    // 取数期间换了集：丢弃上一集的结果
+    if (episodeId !== props.episodeId) return
+    groupsFailed.value = false
+    groupPlans.value = (Array.isArray(data?.groups) ? data.groups : [])
+      .filter(group => Number.isInteger(Number(group?.group_no)) && Number(group.group_no) > 0)
+      .map(group => ({
+        group_no: Number(group.group_no),
+        paragraph_excerpt: group.paragraph_excerpt || '',
+        paragraph_chars: Number(group.paragraph_chars) || 0,
+        shot_ids: Array.isArray(group.shot_ids) ? group.shot_ids.map(Number) : [],
+        warnings: Array.isArray(group.warnings) ? group.warnings : [],
+        status: group.status === 'ok' || group.status === 'failed' ? group.status : 'none',
+        error: group.error || null,
+        fresh: group.fresh !== false,
+        updated_at: group.updated_at || null,
+        task_id: group.task_id === null || group.task_id === undefined ? null : Number(group.task_id),
+        plan: group.plan || null,
+      }))
+    // 组号随剧本重算：刷新后展开的组没了就收起并给可读提示，不静默停在空位置
+    const previous = expandedGroup.value
+    if (previous && !groupPlans.value.some(group => Number(group.group_no) === previous)) {
+      expandedGroup.value = 0
+      toast.error(t('deeplink.missingNamed', { target: t('episode.design.group.label', { n: previous }) }))
+    }
+  } catch {
+    if (episodeId !== props.episodeId) return
+    groupsFailed.value = true
+    groupPlans.value = []
+  } finally {
+    if (episodeId === props.episodeId) groupsLoaded.value = true
+  }
+}
+
+/**
+ * 展开组恢复（#86）：数据到位后再展开；失效组清掉自己的键并给可读提示。
+ * 恢复只改界面 —— 不填卡、不写库、不触发任务。
+ */
+function restoreExpandedGroup() {
+  if (!groupRestore || designLocked.value || !groupsLoaded.value || !shots.value.length) return
+  groupRestore = false
+  const found = urlGroup > 0 && shotBlocks.value.some(block => block.group && block.no === urlGroup)
+  if (found) { expandedGroup.value = urlGroup; return }
+  expandedGroup.value = 0
+  // 取数失败 ≠ 组不存在：不假装失效，也不展开一个空组
+  if (urlGroup && !groupsFailed.value) {
+    toast.error(t('deeplink.missingNamed', { target: t('episode.design.group.label', { n: urlGroup }) }))
+  }
+}
+watch([designLocked, groupsLoaded, () => shots.value.length], restoreExpandedGroup)
+
 function ensureSelection() {
   if (!shots.value.length) { selectedId.value = 0; return }
   // 链接点名的镜优先；本集没有这一镜时保持默认选中，并且只在用户确实带着链接来时提示
@@ -1839,6 +2097,7 @@ watch(() => props.storyboards, () => {
   ensureSelection()
   loadSkeleton()
   loadAudit()
+  loadGroupPlans()
   nextTick(syncDraft)
 })
 // 换镜前先把待写内容提交回原来那一镜，再按新镜的服务端事实重建草稿
@@ -1853,9 +2112,16 @@ watch(() => props.episodeId, () => {
   loaded.audit = false
   loaded.skeleton = false
   userPicked = false
+  // 组号属于上一集的剧本：链接里的展开组不再恢复，组表按新集重取
+  groupPlans.value = []
+  groupsLoaded.value = false
+  groupsFailed.value = false
+  expandedGroup.value = 0
+  groupRestore = false
   loadContext()
   loadAudit()
   loadSkeleton()
+  loadGroupPlans()
   loadFillEstimate()
   refreshRoadmap()
 })
@@ -1865,9 +2131,10 @@ watch(() => props.episodeId, () => {
 let lockNotified = false
 watch([roadmapReady, designLocked], () => {
   if (lockNotified || !roadmapReady.value || !designLocked.value) return
-  if (!(urlPhase || urlShot || urlPick || urlCombo || urlScope)) return
+  if (!(urlPhase || urlShot || urlPick || urlCombo || urlScope || urlGroup)) return
   lockNotified = true
   shotRestore = false
+  groupRestore = false
   childRestore = false
   toast.error(t('deeplink.locked'))
 }, { immediate: true })
@@ -1904,8 +2171,9 @@ watch([() => loaded.ctx, () => loaded.audit, () => loaded.skeleton, selectedId, 
   restoreChildren()
 })
 
-// 发布：本组五个键每次写全，关掉子弹层只移除子弹层的键，phase / shot 原样留在地址里
-watch([phase, selectedId, picker, comboSwitch, scope, designLocked], () => {
+// 发布：本组六个键每次写全，关掉子弹层只移除子弹层的键，phase / shot 原样留在地址里
+// dgroup = 展开的逻辑组号（#109），收起即移除
+watch([phase, selectedId, picker, comboSwitch, scope, designLocked, expandedGroup], () => {
   if (designLocked.value) { link.set({}); return }
   link.set({
     phase: phase.value,
@@ -1914,6 +2182,7 @@ watch([phase, selectedId, picker, comboSwitch, scope, designLocked], () => {
     danchor: picker.open && picker.field === 'anchor' ? picker.anchorId : '',
     dcombo: comboSwitch.value.open ? comboSwitch.value.sbId : '',
     dscope: scope.value ? scope.value.kind : '',
+    dgroup: expandedGroup.value || '',
   })
 }, { deep: true, immediate: true })
 
@@ -1925,6 +2194,7 @@ onMounted(() => {
   loadContext()
   loadAudit()
   loadSkeleton()
+  loadGroupPlans()
   loadFillEstimate()
   refreshRoadmap()
 })
@@ -2008,6 +2278,57 @@ onBeforeUnmount(() => {
 .dc-body { display: grid; grid-template-columns: clamp(220px, 16vw, 300px) minmax(0, 1fr); gap: 10px; flex: 1; min-height: 0; }
 
 .dc-list { display: flex; flex-direction: column; gap: 3px; overflow-y: auto; }
+/* 逻辑组组头（#109）：组号 + 段首摘录 + 镜数 + 规划状态；展开内容内联在组头下方 */
+.dc-group-head {
+  display: flex; align-items: center; gap: 6px;
+  margin-top: 6px; padding: 4px 8px; border-radius: 6px;
+  border: 1px dashed var(--border); background: var(--bg-3); color: var(--text-1);
+  font-size: 11px; text-align: left; cursor: pointer;
+}
+.dc-group-head.on { border-style: solid; border-color: var(--accent); }
+.dc-group-head.is-static { cursor: default; }
+.dc-group-no { color: var(--text-2); }
+.dc-group-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); }
+.dc-group-count { color: var(--text-3); }
+.dc-group-chip {
+  padding: 0 5px; border-radius: 999px; background: var(--bg-2); color: var(--text-3); white-space: nowrap;
+}
+.dc-group-chip.is-ok { color: var(--tag-success-text, #81c784); }
+.dc-group-chip.is-failed { color: var(--tag-danger-text, #ef5350); }
+.dc-group-chip.is-stale,
+.dc-group-chip.is-warn { color: var(--tag-warning-text, #ffb74d); }
+.dc-group-caret { display: inline-flex; align-items: center; color: var(--text-3); transition: transform .15s; }
+.dc-group-head.on .dc-group-caret { transform: rotate(180deg); }
+/* 组规划横带（#109）：跨两列，展开时占 .dc-body 第一行；内容只读 */
+.dc-group-panel {
+  grid-column: 1 / -1;
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 8px 10px; border: 1px solid var(--accent); border-radius: 8px;
+  background: var(--bg-2); font-size: 11px; max-height: 46vh; overflow-y: auto;
+}
+.dc-group-panel-head { display: flex; align-items: center; gap: 8px; }
+.dc-group-panel-excerpt {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-3);
+}
+.dc-group-error { margin: 0; color: var(--tag-danger-text, #ef5350); }
+.dc-shot-link {
+  border: 0; background: transparent; padding: 0;
+  color: var(--accent); font-size: 11px; cursor: pointer;
+}
+.dc-shot-link:hover { text-decoration: underline; }
+.dc-group-assets { display: flex; flex-direction: column; gap: 3px; margin: 0; padding: 0; list-style: none; }
+.dc-group-assets li { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px; }
+.dc-group-asset-name { color: var(--text-1); }
+.dc-group-role { padding: 0 5px; border-radius: 999px; background: var(--bg-3); color: var(--text-2); }
+.dc-group-role.is-establish { color: var(--accent); }
+.dc-group-note { color: var(--text-3); }
+.dc-group-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.dc-group-table th {
+  text-align: left; font-weight: 600; color: var(--text-3);
+  padding: 2px 4px; border-bottom: 1px solid var(--border);
+}
+.dc-group-table td { padding: 2px 4px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.dc-group-task { color: var(--text-2); }
 .dc-shot {
   display: flex; align-items: center; gap: 6px;
   padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px;

@@ -121,8 +121,9 @@ const emit = (extra) => console.log('@@' + JSON.stringify({
 `
 
 test('a skeleton run whose shots overlap is marked failed even though no script is left uncovered', () => {
-  // 第三镜把第二镜已经领走的句子又领了一遍：没有缺口，但分配重叠
-  const result = run(`${SETUP([A, B + C, C])}
+  // 第三镜把第二镜已经领走的半句又领了一遍：没有缺口，但分配重叠。
+  // 重叠放在同一段内（#109 起跨段的镜在保存时就被拒，不会落库）
+  const result = run(`${SETUP([A, B, B.slice(5), C])}
     emit({})
   `)
   assert.equal(result.started, true)
@@ -131,8 +132,8 @@ test('a skeleton run whose shots overlap is marked failed even though no script 
   assert.equal(result.status, 'failed')
   assert.match(result.error, /旁白骨架不合法/)
   // 拆出来的分镜全部保留，人可以直接去改边界
-  assert.equal(result.shots, 3)
-  assert.deepEqual(result.texts, [A, B + C, C])
+  assert.equal(result.shots, 4)
+  assert.deepEqual(result.texts, [A, B, B.slice(5), C])
   assert.equal(result.confirmed, false)
   assert.equal(result.confirmable, false)
 })
