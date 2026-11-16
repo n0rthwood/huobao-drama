@@ -41,6 +41,7 @@ import {
   narrationCoverage,
   narrationMatchKey,
   scriptMatchKey,
+  scriptParagraphs,
 } from './narration-first.js'
 import { crossGroupProblems } from './narration-groups.js'
 import {
@@ -48,7 +49,7 @@ import {
   renumberStoryboardsByScript,
 } from './storyboard-fill-gaps.js'
 import { episodeTtsValidity, type ShotTtsValidity } from './narration-tts-gate.js'
-import { toDesignCardStatus, type DesignCardStatus } from './design-card.js'
+import { paragraphMinShots, storyboardCountCap, toDesignCardStatus, type DesignCardStatus } from './design-card.js'
 import { markStale } from './staleness.js'
 import { resolveDramaProjectType } from './project-type.js'
 import { assertGate } from './workflow-gates.js'
@@ -570,12 +571,17 @@ export interface SkeletonGenerateResult {
 }
 
 function skeletonPrompt(script: string): string {
+  const paragraphs = scriptParagraphs(script)
+  const minimum = paragraphs.reduce((sum, paragraph) => sum + Math.max(1, paragraphMinShots(paragraph)), 0)
+  const cap = storyboardCountCap(paragraphs)
   return `请把本集最终剧本正文拆成**逐镜旁白骨架**，只做文本切分，不做任何视觉设计。
 
 规则：
 1. 逐字照抄：按剧本顺序把正文切成连续片段，原样写进 narration_text，不改写、不润色、不补字、不丢字。
 2. 按句切：只能在句号 / 问号 / 感叹号 / 分号之后切开；每镜 ≤${MAX_NARRATION_CHARS} 个朗读字。
    **一镜不得跨段**：剧本里空行分隔的每个自然段是一个逻辑组（一个意思），段落边界必然是镜头边界；跨段的镜会被拒存。
+   **同段相邻的句子合进同一镜**，直到再加一句就超过 ${MAX_NARRATION_CHARS} 字；只有信息点明显切换时才提前切。不要一句一镜。
+   本集 ${paragraphs.length} 段，按句界装满最少 ${minimum} 镜，硬上限 ${cap} 镜；镜数用完还有正文没领走，整次任务失败。
 3. 不重不漏：全集 narration_text 顺序拼接后必须逐字等于剧本正文；save_storyboards 返回的 script_coverage.gaps 还有内容就继续补，直到为空。
 4. title 写一句话，说明这一镜的主信息点。
 5. **本阶段只写 shot_number / narration_text / title / continuity 四项**：设计卡、画面描述、关键帧与视频提示词都属于后面的「按实测配音时长填设计卡」阶段，现在一个字都不要写。

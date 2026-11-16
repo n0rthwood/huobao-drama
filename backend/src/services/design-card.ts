@@ -10,6 +10,7 @@
  * 纯函数模块：不读库、不读文件，解析上下文由调用方装配（`loadDesignCardContext`）。
  */
 import { estimateNarrationSeconds, MAX_NARRATION_CHARS, narrationCharCount } from './narration.js'
+import { splitSentences } from './subtitle.js'
 import type { GroupPlanShot } from './design-group-plan.js'
 import { normalizeLayerDoc, type LayerDoc } from './layer-doc.js'
 import { revealBeats, textZoneOf } from './layer-text-visibility.js'
@@ -789,13 +790,40 @@ export function referenceAssetRefs(card: DesignCard | null, combo: Combo | null)
 }
 
 /**
- * 保留短稿防过拆上限，同时容纳每段按单镜旁白字数上限合法切分所需的镜数。
- * 输入为去掉节拍标记、按空行切分的剧本段落；空稿返回 0（不启用）。
+ * 一段旁白在句界处把相邻句子装满单镜上限所需的最少镜数（Issue #109：一镜不跨段、只在句界切）。
+ * 单句超过上限时按上限向上取整计（那一句本来就存不进去，计数不能因此低于字数下限）。
+ */
+export function paragraphMinShots(paragraph: string): number {
+  let shots = 0
+  let fill = 0
+  for (const sentence of splitSentences(paragraph)) {
+    const chars = narrationCharCount(sentence)
+    if (!chars) continue
+    if (chars > MAX_NARRATION_CHARS) {
+      if (fill) shots++
+      shots += Math.ceil(chars / MAX_NARRATION_CHARS)
+      fill = 0
+    } else if (fill + chars > MAX_NARRATION_CHARS) {
+      shots++
+      fill = chars
+    } else {
+      fill += chars
+    }
+  }
+  return shots + (fill ? 1 : 0)
+}
+
+/**
+ * 本集镜头数硬上限。输入为去掉节拍标记、按空行切分的剧本段落；空稿返回 0（不启用）。
+ * units = 各段 `paragraphMinShots` 之和（句界装满的最少镜数）。段落都 ≤80 字时 units = 段数，
+ * 上限退化为旧的短稿防过拆 `min(ceil(段数×1.5), 段数+3)`；长段落每多出一个必需镜再给一镜余量，
+ * 整体不超过 `ceil(units×1.5)`——#109 起段落保留原文长度，只按字数取整（无余量、不计句界）会让
+ * 合法拆法也装不下（生产 ep 30：39 段 5602 字，上限 88，模型按句切到 88 镜时还剩 2295 字）。
  */
 export function storyboardCountCap(paragraphs: readonly string[]): number {
   if (!paragraphs.length) return 0
-  const shortCap = Math.min(Math.ceil(paragraphs.length * 1.5), paragraphs.length + 3)
-  const narrationMinimum = paragraphs.reduce((sum, paragraph) =>
-    sum + Math.ceil(narrationCharCount(paragraph) / MAX_NARRATION_CHARS), 0)
-  return Math.max(shortCap, narrationMinimum)
+  const count = paragraphs.length
+  const shortCap = Math.min(Math.ceil(count * 1.5), count + 3)
+  const units = paragraphs.reduce((sum, paragraph) => sum + Math.max(1, paragraphMinShots(paragraph)), 0)
+  return Math.max(shortCap, Math.min(Math.ceil(units * 1.5), 2 * units - count + 3))
 }
