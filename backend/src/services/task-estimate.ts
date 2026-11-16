@@ -180,7 +180,7 @@ export function buildSampleKey(input: {
   }
   const inst = instructions ? `${instructions.length}.${hash.toString(36)}` : 'none'
   const seed = v.seed === null || v.seed === undefined ? 'random' : String(v.seed)
-  return `${base}|voice:${v.voice || 'unknown'}|steps:${v.inference_timesteps}|cfgv:${v.cfg_value}`
+  return `${base}|tts:${v.model || 'voxcpm2'}|voice:${v.voice || 'unknown'}|steps:${v.inference_timesteps}|cfgv:${v.cfg_value}`
     + `|norm:${v.normalize ? 1 : 0}|inst:${inst}|seed:${seed}`
 }
 

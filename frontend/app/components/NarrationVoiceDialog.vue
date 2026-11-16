@@ -14,6 +14,11 @@
           <div v-else-if="loadError" class="voice-error">{{ loadError }}</div>
           <template v-else-if="form">
             <p class="voice-source dim">{{ t('episode.voiceDialog.source', { name: options.config_name }) }}</p>
+            <p class="voice-source">
+              {{ t('episode.voiceDialog.model', { name: options.model?.label || 'VoxCPM2' }) }}
+              <span v-if="options.model?.rtf" class="dim"> · RTF {{ options.model.rtf }}</span>
+            </p>
+            <p v-if="isCv3" class="voice-hint">{{ t('episode.voiceDialog.modelCv3Note') }}</p>
 
             <label class="voice-field">
               <span class="voice-label">{{ t('episode.voiceDialog.voice') }}</span>
@@ -26,7 +31,7 @@
               <span v-if="form.voice && !voiceKnown" class="voice-warn">{{ t('episode.voiceDialog.voiceMissing') }}</span>
             </label>
 
-            <div class="voice-field">
+            <div class="voice-field" :class="{ 'is-unused': isCv3 }">
               <span class="voice-label">
                 {{ t('episode.voiceDialog.steps') }}
                 <strong>{{ form.inference_timesteps }}</strong>
@@ -37,6 +42,7 @@
                   v-for="p in options.steps.presets"
                   :key="p.steps"
                   type="button"
+                  :disabled="isCv3"
                   :class="['btn btn-sm', { 'is-on': form.inference_timesteps === p.steps }]"
                   :aria-pressed="form.inference_timesteps === p.steps"
                   @click="form.inference_timesteps = p.steps"
@@ -44,27 +50,27 @@
                   {{ t(`episode.voiceDialog.preset${p.steps}`) }} · RTF {{ p.rtf }}
                 </button>
               </div>
-              <input v-model.number="form.inference_timesteps" type="range" :min="options.steps.min" :max="options.steps.max" step="1" />
+              <input v-model.number="form.inference_timesteps" type="range" :min="options.steps.min" :max="options.steps.max" step="1" :disabled="isCv3" />
               <span class="voice-hint">{{ t('episode.voiceDialog.stepsHint') }}</span>
             </div>
 
-            <div class="voice-field">
+            <div class="voice-field" :class="{ 'is-unused': isCv3 }">
               <span class="voice-label">
                 cfg <strong>{{ Number(form.cfg_value).toFixed(1) }}</strong>
                 <span class="dim">（{{ options.cfg.min.toFixed(1) }}–{{ options.cfg.max.toFixed(1) }}）</span>
               </span>
-              <input v-model.number="form.cfg_value" type="range" :min="options.cfg.min" :max="options.cfg.max" step="0.1" />
+              <input v-model.number="form.cfg_value" type="range" :min="options.cfg.min" :max="options.cfg.max" step="0.1" :disabled="isCv3" />
               <span class="voice-hint">{{ t('episode.voiceDialog.cfgHint') }}</span>
             </div>
 
-            <label class="voice-check">
-              <input v-model="form.normalize" type="checkbox" />
+            <label class="voice-check" :class="{ 'is-unused': isCv3 }">
+              <input v-model="form.normalize" type="checkbox" :disabled="isCv3" />
               <span>
                 {{ t('episode.voiceDialog.normalize') }}
                 <span class="voice-hint">{{ t('episode.voiceDialog.normalizeHint') }}</span>
               </span>
             </label>
-            <p v-if="hasDigits && !form.normalize" class="voice-warn">{{ t('episode.voiceDialog.normalizeSuggest') }}</p>
+            <p v-if="!isCv3 && hasDigits && !form.normalize" class="voice-warn">{{ t('episode.voiceDialog.normalizeSuggest') }}</p>
 
             <div class="voice-field">
               <span class="voice-label">seed</span>
@@ -76,9 +82,9 @@
               <span class="voice-hint">{{ t('episode.voiceDialog.seedHint') }}</span>
             </div>
 
-            <label class="voice-field">
+            <label class="voice-field" :class="{ 'is-unused': isCv3 }">
               <span class="voice-label">{{ t('episode.voiceDialog.instructions') }}</span>
-              <textarea v-model="form.instructions" class="textarea" rows="2" :placeholder="t('episode.voiceDialog.instructionsPlaceholder')" />
+              <textarea v-model="form.instructions" class="textarea" rows="2" :placeholder="t('episode.voiceDialog.instructionsPlaceholder')" :disabled="isCv3" />
             </label>
 
             <div v-if="mode === 'batch'" class="voice-plan">
@@ -168,6 +174,8 @@ const voiceGroups = computed(() => {
   }
   return groups
 })
+/** #108：CosyVoice3 不使用步数/cfg/规范化/风格描述（Studio 忽略），弹窗置灰但保留原值 */
+const isCv3 = computed(() => options.value?.model?.id === 'cosyvoice3')
 const voiceKnown = computed(() => (options.value?.voices || []).some(v => v.name === form.value?.voice))
 
 const hasDigits = computed(() => /\d/.test(props.text || ''))
@@ -322,4 +330,8 @@ function confirm() {
 .voice-eta { margin: 0; font-size: 12px; color: var(--text-1); }
 .voice-state { display: flex; gap: 6px; align-items: center; font-size: 12px; color: var(--text-2); }
 .voice-error { font-size: 12px; color: var(--action-danger); white-space: pre-wrap; }
+.voice-field.is-unused,
+.voice-check.is-unused {
+  opacity: 0.45;
+}
 </style>

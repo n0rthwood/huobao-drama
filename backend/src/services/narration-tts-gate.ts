@@ -36,6 +36,7 @@ import {
   paramsOfAudio,
   parseEpisodeVoiceSettings,
   resolveVoiceParams,
+  ttsModelOf,
   sameVoiceParams,
   type VoiceParams,
 } from './narration-voice-params.js'
@@ -54,13 +55,14 @@ export async function resolveTtsConfig(episode: { ttsConfigId?: number | null })
   return config
 }
 
-/** 本镜生效的配音参数：集级 tts_settings → TTS 配置 → VoxCPM 默认；normalize 镜级覆盖 → 集级（#37） */
+/** 本镜生效的配音参数：集级 tts_settings → TTS 配置 → VoxCPM 默认；normalize 镜级覆盖 → 集级（#37）；model = 配置行（#108） */
 export function effectiveVoiceParams(
   ep: Pick<EpisodeRow, 'ttsSettings' | 'narrationNormalize'>,
   shotNormalize: boolean | null | undefined,
   config: AIConfig,
 ): VoiceParams {
   return resolveVoiceParams({
+    model: ttsModelOf(config.model),
     episodeSettings: parseEpisodeVoiceSettings(ep.ttsSettings),
     configSettings: parseTtsSettings(config.settings),
     episodeNormalize: ep.narrationNormalize,

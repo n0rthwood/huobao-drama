@@ -36,15 +36,15 @@ function call(name, ...args) {
 }
 
 const CONFIG = { voice: '纪录片·沉稳男声', seed: 1720, instructions: '低沉克制', cfgValue: null, inferenceTimesteps: null }
-const DESIRED = { voice: '纪录片·沉稳男声', inference_timesteps: 10, cfg_value: 2, seed: 1720, instructions: '低沉克制', normalize: true }
+const DESIRED = { model: 'voxcpm2', voice: '纪录片·沉稳男声', inference_timesteps: 10, cfg_value: 2, seed: 1720, instructions: '低沉克制', normalize: true }
 const TEXT = '1720年初，三方势力在这片草原上交汇。'
 
 test('生效参数：集级 → TTS 配置 → VoxCPM 默认；规范化镜级覆盖优先', () => {
-  const fromConfig = call('resolveVoiceParams', { episodeSettings: {}, configSettings: CONFIG, episodeNormalize: true, shotNormalize: null })
+  const fromConfig = call('resolveVoiceParams', { model: 'voxcpm2', episodeSettings: {}, configSettings: CONFIG, episodeNormalize: true, shotNormalize: null })
   assert.deepEqual(fromConfig, { ...DESIRED, normalize: true }, '配置没填的步数/cfg 用 VoxCPM 默认 10 / 2.0')
 
   const episode = call('parseEpisodeVoiceSettings', JSON.stringify({ voice: '新闻·男主播', inference_timesteps: 30, seed: null, instructions: '' }))
-  const fromEpisode = call('resolveVoiceParams', { episodeSettings: episode, configSettings: CONFIG, episodeNormalize: true, shotNormalize: false })
+  const fromEpisode = call('resolveVoiceParams', { model: 'voxcpm2', episodeSettings: episode, configSettings: CONFIG, episodeNormalize: true, shotNormalize: false })
   assert.equal(fromEpisode.voice, '新闻·男主播')
   assert.equal(fromEpisode.inference_timesteps, 30)
   assert.equal(fromEpisode.cfg_value, 2, '集级没存 cfg → 配置也没填 → 默认')
@@ -54,11 +54,11 @@ test('生效参数：集级 → TTS 配置 → VoxCPM 默认；规范化镜级�
 })
 
 test('弹窗参数合法化：范围钳制、音色必须在列表里、seed 非负整数或随机', () => {
-  const ok = call('sanitizeVoiceSettings', { voice: '新闻·男主播', inference_timesteps: 99, cfg_value: 0.2, seed: '', instructions: '  平稳 ', normalize: true }, ['新闻·男主播'])
-  assert.deepEqual(ok, { voice: '新闻·男主播', inference_timesteps: 30, cfg_value: 1, seed: null, instructions: '平稳', normalize: true })
-  assert.throws(() => call('sanitizeVoiceSettings', { voice: '不存在的音色' }, ['新闻·男主播']), /音色不存在/)
-  assert.throws(() => call('sanitizeVoiceSettings', { voice: '' }, null), /请选择音色/)
-  assert.throws(() => call('sanitizeVoiceSettings', { voice: 'a', seed: -3 }, null), /seed/)
+  const ok = call('sanitizeVoiceSettings', { voice: '新闻·男主播', inference_timesteps: 99, cfg_value: 0.2, seed: '', instructions: '  平稳 ', normalize: true, model: 'cosyvoice3' }, ['新闻·男主播'], 'voxcpm2')
+  assert.deepEqual(ok, { model: 'voxcpm2', voice: '新闻·男主播', inference_timesteps: 30, cfg_value: 1, seed: null, instructions: '平稳', normalize: true })
+  assert.throws(() => call('sanitizeVoiceSettings', { voice: '不存在的音色' }, ['新闻·男主播'], 'voxcpm2'), /音色不存在/)
+  assert.throws(() => call('sanitizeVoiceSettings', { voice: '' }, null, 'voxcpm2'), /请选择音色/)
+  assert.throws(() => call('sanitizeVoiceSettings', { voice: 'a', seed: -3 }, null, 'voxcpm2'), /seed/)
 })
 
 test('批量分类：缺失 / 文本改过 / 参数不同 / 未变化 / 跳过', () => {
@@ -89,6 +89,33 @@ test('存量音频（没有 params）按当时事实重建：从未发送规范�
   const base = { narrationEnabled: true, text: TEXT, blocked: false, audio: legacy, configSettings: CONFIG }
   assert.equal(call('classifyVoiceShot', { ...base, desired: { ...DESIRED, normalize: false } }), 'unchanged', '参数一致的老配音不重配')
   assert.equal(call('classifyVoiceShot', { ...base, desired: DESIRED }), 'changed', '开启规范化后老配音算已变化')
+})
+
+test('#108 合成模型：取自配置行、旧音频视为 VoxCPM2、换模型算已变化、CosyVoice3 只比较模型/音色/seed', () => {
+  assert.equal(call('ttsModelOf', ''), 'voxcpm2', '配置没填模型 = 一直以来的 VoxCPM2')
+  assert.equal(call('ttsModelOf', ' CosyVoice3 '), 'cosyvoice3')
+  assert.equal(call('ttsModelOf', 'voxcpm'), 'voxcpm2', '与 Studio 同口径的别名')
+  assert.throws(() => call('ttsModelOf', 'tts-1'), /不支持的语音合成模型/)
+
+  const textSha = call('sha256', TEXT)
+  const { model: _m, ...oldParams } = DESIRED
+  const oldAudio = { duration_ms: 9000, chars: 18, voice: DESIRED.voice, seed: 1720, job_id: 'j', provider: 'voxcpm', config_id: 13, generated_at: 'x', text_sha256: textSha, params: oldParams }
+  assert.equal(call('paramsOfAudio', oldAudio, CONFIG).model, 'voxcpm2', '#108 之前的 params 没有 model')
+  const base = { narrationEnabled: true, text: TEXT, blocked: false, audio: oldAudio, configSettings: CONFIG }
+  assert.equal(call('classifyVoiceShot', { ...base, desired: DESIRED }), 'unchanged', '同为 VoxCPM2 的老配音不重配')
+  const cv3 = { ...DESIRED, model: 'cosyvoice3' }
+  assert.equal(call('classifyVoiceShot', { ...base, desired: cv3 }), 'changed', '只换模型也算已变化')
+
+  const cv3Audio = { ...oldAudio, params: cv3 }
+  const cv3Base = { ...base, audio: cv3Audio }
+  assert.equal(call('classifyVoiceShot', { ...cv3Base, desired: { ...cv3, inference_timesteps: 30, cfg_value: 1.5, instructions: '激昂', normalize: false } }),
+    'unchanged', 'CosyVoice3 不用步数/cfg/风格/规范化，改它们不触发重配')
+  assert.equal(call('classifyVoiceShot', { ...cv3Base, desired: { ...cv3, voice: '沉稳男声·冷静讲解' } }), 'changed', '换音色')
+  assert.equal(call('classifyVoiceShot', { ...cv3Base, desired: { ...cv3, seed: null } }), 'changed', '换 seed')
+
+  const saved = call('episodeSettingsOf', cv3)
+  assert.equal('model' in saved, false, '模型属于配置行，不写进集级设置')
+  assert.equal('normalize' in saved, false)
 })
 
 test('RTF 与 Studio 一致：预设点取实测值，中间线性插值，越界取端点', () => {

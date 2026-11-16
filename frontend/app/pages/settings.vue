@@ -560,7 +560,7 @@
               />
               <button type="button" class="btn btn-sm" :disabled="!modelInput.trim()" @click="addModel">{{ t('common.add') }}</button>
             </div>
-            <span class="field-hint">{{ t('settings.cfg.modelsHint') }}</span>
+            <span class="field-hint">{{ cfgForm.service_type === 'tts' ? t('settings.cfg.ttsModelsHint') : t('settings.cfg.modelsHint') }}</span>
           </div>
           <label v-if="cfgForm.service_type === 'text'" class="field">
             <span class="field-label">Temperature <span class="dim">({{ t('settings.cfg.tempHint') }})</span></span>

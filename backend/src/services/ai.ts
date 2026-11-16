@@ -6,6 +6,7 @@ import { eq } from 'drizzle-orm'
 import { logTaskProgress, logTaskWarn } from '../utils/task-logger.js'
 import { joinProviderUrl } from './adapters/url.js'
 import { h3QueueModel } from './adapters/h3-jobs-client.js'
+import { ttsModelOf } from './narration-voice-params.js'
 
 export type ServiceType = 'text' | 'image' | 'video' | 'tts'
 
@@ -110,8 +111,20 @@ export function validateConfigModels(
   models: unknown,
 ): string | null {
   const p = (provider || '').toLowerCase()
-  if (serviceType !== 'video' || (p !== 'comfyui' && p !== 'h3-jobs')) return null
   const values = Array.isArray(models) ? models : models == null ? [] : [models]
+  // TTS（#108）：模型列表首项就是请求 Studio 时带的 model，只认 voxcpm2 / cosyvoice3
+  if (serviceType === 'tts') {
+    for (const model of values) {
+      if (typeof model !== 'string') return '模型必须为字符串'
+      try {
+        ttsModelOf(model)
+      } catch (err) {
+        return err instanceof Error ? err.message : '不支持的语音合成模型'
+      }
+    }
+    return null
+  }
+  if (serviceType !== 'video' || (p !== 'comfyui' && p !== 'h3-jobs')) return null
   for (const model of values) {
     if (typeof model !== 'string') return '模型必须为字符串'
     const error = validateVideoModel(provider, model)

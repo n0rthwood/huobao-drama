@@ -22,6 +22,10 @@ import {
   episodeSettingsOf,
   groupVoices,
   sanitizeVoiceSettings,
+  ttsModelOf,
+  TTS_MODEL_LABELS,
+  COSYVOICE3_RTF,
+  type TtsModel,
   type VoiceOption,
   type VoiceParams,
   type VoicePlanStatus,
@@ -98,7 +102,7 @@ function requireVoxcpm(config: AIConfig) {
 async function validatedVoiceParams(raw: unknown, config: AIConfig): Promise<VoiceParams> {
   requireVoxcpm(config)
   const items = await fetchVoiceItems(config.baseUrl, config.apiKey)
-  return sanitizeVoiceSettings(raw, items.map(v => v.name))
+  return sanitizeVoiceSettings(raw, items.map(v => v.name), ttsModelOf(config.model))
 }
 
 /**
@@ -127,6 +131,8 @@ export interface TtsOptions {
   cfg: { min: number; max: number; default: number }
   /** 预计音频时长用的语速（字/秒），与 estimateNarrationSeconds 同口径 */
   chars_per_second: number
+  /** 本集生效 TTS 配置的合成模型（#108，只读）；rtf 仅 CosyVoice3 给出（VoxCPM2 按步数预设） */
+  model: { id: TtsModel; label: string; rtf: number | null }
   /** 弹窗预填值 = 本集（或本镜）当前生效参数 */
   current: VoiceParams
 }
@@ -172,6 +178,11 @@ export async function getTtsOptions(episodeId: number, storyboardId?: number): P
     steps: { ...VOXCPM_STEPS, presets: VOXCPM_STEP_PRESETS.map(p => ({ ...p })) },
     cfg: { ...VOXCPM_CFG },
     chars_per_second: NARRATION_CHARS_PER_SECOND,
+    model: {
+      id: ttsModelOf(config.model),
+      label: TTS_MODEL_LABELS[ttsModelOf(config.model)],
+      rtf: ttsModelOf(config.model) === 'cosyvoice3' ? COSYVOICE3_RTF : null,
+    },
     current: effectiveVoiceParams(ep, shotNormalize, config),
   }
 }
