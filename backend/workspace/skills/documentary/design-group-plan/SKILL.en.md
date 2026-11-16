@@ -80,6 +80,7 @@ cutting back and forth, marking time. This is not a problem with the assets, it 
 - `role`: `establish` (fully established in one shot of this group) / `hint` (a brief hint only: picture-in-picture, a D ending that lands on the picture, text) / `background` (scene setting).
 - `mode`: `new_items` (this shot adds entries to the picture) / `carry_only` (only carries over the existing state or serves as background, adding nothing) / `no_layer` (no layer segment).
 - `storyboard_id` always uses the storyboard IDs given to you, never shot numbers.
+- Asset references are always `{ "asset_kind": "character" | "scene" | "prop", "asset_id": number }`: maps, archival pictures and object plates are all `prop`; there is no `map` kind.
 
 ## 6. Example (ep 27 expedition passage, excerpt)
 

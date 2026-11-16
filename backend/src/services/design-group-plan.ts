@@ -117,13 +117,15 @@ function asId(value: unknown): number | null {
   const n = Number(value)
   return Number.isInteger(n) && n > 0 ? n : null
 }
-function asRef(value: unknown): PlanAssetRef | null | 'invalid' {
+/** 资产引用；不合法时给出可直接回给模型的原因（不猜：`map` 不会被当成 `prop`） */
+function asRef(value: unknown): PlanAssetRef | null | { invalid: string } {
   if (value === null || value === undefined) return null
-  if (typeof value !== 'object') return 'invalid'
+  if (typeof value !== 'object') return { invalid: `必须是 {asset_kind, asset_id} 对象，收到 ${JSON.stringify(value)}` }
   const raw = value as Record<string, unknown>
   const kind = String(raw.asset_kind ?? raw.kind ?? '')
   const id = asId(raw.asset_id ?? raw.id)
-  if (!KIND_SET[kind] || id === null) return 'invalid'
+  if (!KIND_SET[kind]) return { invalid: `asset_kind 只能是 character / scene / prop（地图、档案画、器物图都是 prop），收到「${kind}」` }
+  if (id === null) return { invalid: `asset_id 必须是资产清单里的正整数 ID，收到 ${JSON.stringify(raw.asset_id ?? raw.id ?? null)}` }
   return { asset_kind: kind as PlanAssetKind, asset_id: id }
 }
 
@@ -148,13 +150,13 @@ export function normalizeGroupPlan(raw: unknown): { plan: GroupPlan | null; erro
     const mode = String(s.mode ?? '')
     if (id === null) { errors.push(`${label}.storyboard_id 缺失或不是正整数`); continue }
     if (!COMBO_SET[combo]) { errors.push(`${label}（分镜 ${id}）combo 必须是 A/B/C/D`); continue }
-    if (base === 'invalid') { errors.push(`${label}（分镜 ${id}）base 必须是 {asset_kind, asset_id} 或 null`); continue }
+    if (base && 'invalid' in base) { errors.push(`${label}（分镜 ${id}）base ${base.invalid}`); continue }
     if (!(PLAN_MODES as readonly string[]).includes(mode)) { errors.push(`${label}（分镜 ${id}）mode 必须是 new_items / carry_only / no_layer`); continue }
     const pip: PlanAssetRef[] = []
     for (const p of Array.isArray(s.pip) ? s.pip : []) {
       const ref = asRef(p)
-      if (ref && ref !== 'invalid') pip.push(ref)
-      else errors.push(`${label}（分镜 ${id}）pip 里有不合法的资产引用`)
+      if (ref && !('invalid' in ref)) pip.push(ref)
+      else errors.push(`${label}（分镜 ${id}）pip ${ref ? ref.invalid : '不能是 null'}`)
     }
     shots.push({ storyboard_id: id, combo: combo as Combo, base, pip, mode: mode as PlanMode, task: asText(s.task, 200) })
   }
@@ -174,7 +176,7 @@ export function normalizeGroupPlan(raw: unknown): { plan: GroupPlan | null; erro
     const r = (item && typeof item === 'object' ? item : {}) as Record<string, unknown>
     const ref = asRef(r)
     const role = String(r.role ?? '')
-    if (!ref || ref === 'invalid') { errors.push('asset_roles 每条都要有 asset_kind 与 asset_id'); continue }
+    if (!ref || 'invalid' in ref) { errors.push(`asset_roles 的资产引用${ref ? ref.invalid : '缺少 asset_kind 与 asset_id'}`); continue }
     if (!(PLAN_ROLES as readonly string[]).includes(role)) { errors.push(`asset_roles（${refKey(ref)}）role 必须是 establish / hint / background`); continue }
     roles.push({
       ...ref,

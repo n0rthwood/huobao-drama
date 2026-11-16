@@ -80,6 +80,7 @@ description: 다큐멘터리 스토리보드 설계의 첫 패스 — 논리 그
 - `role`: `establish`(이 그룹의 어느 숏에서 완전히 확립한다) / `hint`(짧은 힌트만: 화면 속 화면, D의 마무리 착지, 문자) / `background`(장면의 기조).
 - `mode`: `new_items`(이 숏이 지도에 항목을 추가한다) / `carry_only`(기존 상태를 이어받거나 배경으로만 쓰고 추가하지 않는다) / `no_layer`(레이어 구간이 없다).
 - `storyboard_id`는 반드시 주어진 스토리보드 ID를 쓰고, 숏 번호를 쓰지 않는다.
+- 에셋 참조는 항상 `{ "asset_kind": "character" | "scene" | "prop", "asset_id": 숫자 }`로 쓴다: 지도·사료 그림·기물 도판은 모두 `prop`이며 `map`이라는 종류는 없다.
 
 ## 6. 예(ep 27 원정 구간, 발췌)
 

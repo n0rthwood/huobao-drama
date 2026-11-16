@@ -80,6 +80,7 @@ description: 纪录片分镜设计的第一遍 — 以逻辑组（旁白稿的�
 - `role`：`establish`（本组在某一镜完整建立它）/ `hint`（只做简短提示：画中画、D 收尾、文字）/ `background`（场景定调）。
 - `mode`：`new_items`（本镜在图上新增条目）/ `carry_only`（只承接已有状态或作背景，不新增）/ `no_layer`（没有图层段）。
 - `storyboard_id` 一律用给你的分镜 ID，不要用镜号。
+- 资产引用一律写 `{ "asset_kind": "character" | "scene" | "prop", "asset_id": 数字 }`：地图、档案画、器物图都是 `prop`，不存在 `map` 这一类。
 
 ## 6. 示例（ep 27 远征段，节选）
 
