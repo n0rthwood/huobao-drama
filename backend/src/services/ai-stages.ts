@@ -69,6 +69,8 @@ export const AI_STAGES = {
   asset_research: { vision: false, label: '资产资料研究' },
   /** 资产事实表（Issue #56）：资料 → 可逐条机检的 must_have / forbidden / tolerances */
   asset_spec: { vision: false, label: '资产事实表' },
+  /** 组级视觉规划（Issue #109）：按逻辑组排每镜的段组合/底图/画中画；只读旁白、实测时长与资产清单，不读图 */
+  design_group_plan: { vision: false, label: '组级视觉规划' },
   /** 资产审核清单（Issue #55）：输入是旁白稿文本 + 本集资产名/语义条目名清单，不读图 */
   asset_review: { vision: false, label: '资产审核清单' },
   /** Poster AI 构想（Issue #72）：剧本 + 资产文字描述 → 三套构图方案；不读图 */
@@ -89,6 +91,8 @@ export const AI_CALL_SITES: Record<string, AiStage[]> = {
     'extractor', 'final_prompt', 'transition_writer', 'narration_writer',
   ],
   'services/design-card-batch.ts': ['design_card'],
+  // 组级视觉规划（#109）：设计卡批次每组先规划，与本批 design_card 用同一条配置（显式 pin）
+  'services/design-group-plan-run.ts': ['design_group_plan'],
   'services/extraction.ts': ['extractor'],
   'services/final-prompt.ts': ['final_prompt'],
   'services/keyframe-prompts.ts': ['keyframe_prompts'],

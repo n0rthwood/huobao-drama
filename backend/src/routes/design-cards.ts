@@ -35,6 +35,7 @@ import {
 } from '../services/design-card-context.js'
 import { assertShotTtsReady, shotTtsValidity } from '../services/narration-tts-gate.js'
 import { SkeletonNotConfirmedError } from '../services/narration-skeleton.js'
+import { listGroupPlans } from '../services/design-group-plan.js'
 import {
   auditEpisodeDesignCards,
   getDesignCardBatchStatus,
@@ -241,6 +242,14 @@ app.get('/:id/design-card-context', async (c) => {
       narration_cps: NARRATION_CHARS_PER_SECOND,
     },
   })
+})
+
+// GET /episodes/:id/design-group-plans — 逻辑组（自然段）与各组的组级视觉规划（#109）
+app.get('/:id/design-group-plans', async (c) => {
+  const id = Number(c.req.param('id'))
+  const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, id))
+  if (!ep) return notFound(c, '剧集不存在')
+  return success(c, { groups: listGroupPlans(id) })
 })
 
 // GET /episodes/:id/design-cards/audit — 整集设计卡的结构机检（批量范围清单同一份快照）

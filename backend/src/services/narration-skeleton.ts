@@ -42,6 +42,7 @@ import {
   narrationMatchKey,
   scriptMatchKey,
 } from './narration-first.js'
+import { crossGroupProblems } from './narration-groups.js'
 import {
   episodeNarrationCoverage,
   renumberStoryboardsByScript,
@@ -106,6 +107,8 @@ export type SkeletonProblemCode =
   | 'gap'
   | 'unknown_id'
   | 'duplicate_id'
+  /** #109：一镜旁白跨了两个自然段（逻辑组）。只在生成验收 / 保存 / 确认时拒绝，不影响已确认判定 */
+  | 'cross_group'
   | 'script_missing'
   | 'no_shots'
 
@@ -245,7 +248,9 @@ export async function narrationSkeletonState(episodeId: number): Promise<Skeleto
     }
   })
 
-  const blocked = skeletonBlockReason(ep, rows, coverage, strict.problems)
+  // #109「一镜不得跨段」只挡**再次确认**，不进 `confirmed`：存量已确认骨架（含跨段镜）保持确认
+  const crossGroup = crossGroupProblems(script, strict.spans)
+  const blocked = skeletonBlockReason(ep, rows, coverage, [...strict.problems, ...crossGroup])
   return {
     episode_id: episodeId,
     project_type: projectType,
@@ -273,10 +278,12 @@ export async function skeletonAcceptanceProblems(episodeId: number): Promise<Ske
   if (!ep || resolveDramaProjectType(ep.dramaId) !== 'documentary') return []
   const rows = await liveStoryboards(episodeId)
   if (!rows.length) return [{ index: 0, code: 'no_shots', message: '本次拆分没有产出任何分镜' }]
-  return validateSkeletonAllocation(
+  const allocation = validateSkeletonAllocation(
     ep.scriptContent || ep.content,
     rows.map(sb => ({ id: sb.id, narration_text: sb.narrationText || '' })),
-  ).problems
+  )
+  // 新拆出来的骨架必须按段（逻辑组）切：一镜不得跨段（#109）
+  return [...allocation.problems, ...crossGroupProblems(ep.scriptContent || ep.content, allocation.spans)]
 }
 
 /** 可以确认骨架吗？不能就返回具体原因 */
@@ -425,7 +432,7 @@ export async function validateNarrationSkeletonDraft(episodeId: number, revision
     cursor = start + text.length
   })
   if (cursor < key.length) gaps.push({ start: cursor, end: key.length, chars: key.length - cursor, text: key.slice(cursor), next_index: shots.length })
-  return { problems: allocation.problems, gaps: located ? gaps : [], excerpts }
+  return { problems: [...allocation.problems, ...crossGroupProblems(script, allocation.spans)], gaps: located ? gaps : [], excerpts }
 }
 
 /**
@@ -464,6 +471,8 @@ export async function saveNarrationSkeleton(episodeId: number, revision: string,
   })
   const allocation = validateSkeletonAllocation(ep.scriptContent || ep.content, shots)
   problems.push(...allocation.problems)
+  // 一镜不得跨段（#109）：跨段并镜 = 跨逻辑组，先在旁白稿里合并段落再并镜
+  problems.push(...crossGroupProblems(ep.scriptContent || ep.content, allocation.spans))
   // AI 正在写卡的镜不能同时被改边界：否则它会把卡写到一段已经不存在的旁白上
   const busy = rows.filter(sb => seen.has(sb.id) && toDesignCardStatus(sb.designCardStatus) === 'ai_filling')
   if (busy.length) {
@@ -566,6 +575,7 @@ function skeletonPrompt(script: string): string {
 规则：
 1. 逐字照抄：按剧本顺序把正文切成连续片段，原样写进 narration_text，不改写、不润色、不补字、不丢字。
 2. 按句切：只能在句号 / 问号 / 感叹号 / 分号之后切开；每镜 ≤${MAX_NARRATION_CHARS} 个朗读字。
+   **一镜不得跨段**：剧本里空行分隔的每个自然段是一个逻辑组（一个意思），段落边界必然是镜头边界；跨段的镜会被拒存。
 3. 不重不漏：全集 narration_text 顺序拼接后必须逐字等于剧本正文；save_storyboards 返回的 script_coverage.gaps 还有内容就继续补，直到为空。
 4. title 写一句话，说明这一镜的主信息点。
 5. **本阶段只写 shot_number / narration_text / title / continuity 四项**：设计卡、画面描述、关键帧与视频提示词都属于后面的「按实测配音时长填设计卡」阶段，现在一个字都不要写。

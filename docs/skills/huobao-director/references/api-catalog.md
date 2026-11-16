@@ -548,6 +548,7 @@ Body：`{revision, shots:[{id?, narration_text, title?}], validate_only?: true}`
   - **补到下一镜开头**：接到 `shots[next_index].narration_text` 开头（`next_index === shots.length` 时不可用，该缺口在结尾）。
   - **新建一镜领走这段**：在 `next_index` 位置插入一条**不带 `id`** 的 `{narration_text: 缺口原文, title?}`。
   - 单镜上限 80 字：超长缺口先插新镜再拆分。**属于出处/版权/链接的缺口不要并进旁白**，回 S1-80（`inspect-narration` + 旁白稿保存）处理。
+- **一镜不得跨段（#109，`[S]`）**：旁白稿里空行分隔的每个自然段 = 一个逻辑组，段落边界必须是镜头边界。保存 / dry-run / 确认 / 骨架生成验收里跨段的镜报 `problems[].code = 'cross_group'`（400 `skeleton_invalid`，message 给出段落边界附近的原文），合并跨段的两镜同样被拒——要合并先回旁白稿合并段落。#109 之前已确认的骨架即使含跨段镜**仍保持确认**（不影响配音与填卡），只是不能原样再次确认（`confirmable=false`、`blocked_reason` 指出哪一镜跨段）。
 
 ### `POST /episodes/{e}/narration-skeleton/confirm` [R]
 Body：`{revision}`。人的确认，Agent 不自行调用。
@@ -560,6 +561,9 @@ Body：`{revision}`。人的确认，Agent 不自行调用。
 
 ### `GET /episodes/{e}/design-card-context` [R]
 返回：候选资产、语义条目、底图候选、段时长上限（图层 ≤30s、生成 ≤15s）。
+### `GET /episodes/{e}/design-group-plans` [S]（Issue #109）
+返回 `{groups:[{group_no, paragraph_excerpt, paragraph_chars, shot_ids, warnings:[{code:'shot_cross_group'|'shot_group_unlocated', storyboard_id, message}], status:'none'|'ok'|'failed', error, fresh, updated_at, task_id, plan}]}`。`group_no` = 旁白稿段号（逻辑组），镜 → 组按旁白位置读时现算、不入库。`plan = {task, geo_additions:[{text, storyboard_id}], asset_roles:[{asset_kind, asset_id, name, role:'establish'|'hint'|'background', establish_storyboard_id, exit_after_storyboard_id, note}], shots:[{storyboard_id, combo, base, pip:[{asset_kind, asset_id}], mode:'new_items'|'carry_only'|'no_layer', task}], junction}`；`fresh=false` 表示段落文本、成员镜或实测时长（0.5 s 分桶）变了，下次填卡会重新规划。只读接口，没有写入口：规划只由 `design-cards/fill` 产生。
+背景：ep 27 逐镜填卡时 75/113 镜选了 C、同一张地图连续 17 镜满幅开场，成片在「地图 ↔ 实拍」之间回切 53 次；改为先按组规划「哪张图在哪一镜完整建立、之后只做提示（画中画 / D 收尾 / 只靠旁白）」再填卡。
 ### `GET /episodes/{e}/design-cards/audit` [R]（#82 新字段亦为 `[R]`：八达岭 drama 10 / episode 16）
 返回逐镜结构机检：`combo`、`status`、`budget{layer_s,gen_s}`、`issues`、`unresolved`、旁白估算/实测时长。
 #82 新增：
@@ -579,6 +583,7 @@ Body：`{storyboard_ids?, model_mode?:"auto"|"pinned", config_id?, model?}`；�
 - 模型给出**非法/缺失 combo** → 该镜计入 `failed`，状态置 `pending` 并把原因写进 `design_card_stale_reason`。
 - **AI 依赖校验（#87 新行为 `[S/R]`）**：不存在/空白的必要语义、类型/归属/版本不相容、或有名无所需几何的定位/描线/区域设计，不得通过留空必要字段、“待人工补”而落成成功卡。工具把具体层及原因回给模型沿当前工具循环修正；仍不可实现时按失败处理并保留旧卡。无位置依赖的标题/定义/说明卡及无语义图的合法背景用途不因此被禁止；人工 PUT 不套 AI 限制。episode 17 已真实读取图片并保存五张待审卡 `[R]`；各拒绝边界仅行为自测 `[S]`，任务 completed 不等于卡片零阻断或人工通过。
 - 写入后卡片一律 `pending`、`design_card_confirmed_at` 清空；确认仍只能由人按。
+- **#109 组级视觉规划（`[S]`）**：纪录片批次按逻辑组顺序执行——每组先跑一次组级视觉规划（同一 `sys_task`，观测工作项 stage=`design_group_plan`，与本批 design_card 用同一配置），再按规划逐镜填卡；前一组落完卡才规划下一组。指定 `storyboard_ids` 时这些镜所在的组**强制重新规划**；不指定时签名未变的成功规划直接复用。规划两次都过不了校验、或组内有镜没有当前有效配音时，该组待填镜按失败计（`progress.items[].reason` 写原因）、旧卡原样保留。卡的组合/底图与规划不一致时 issues 出 `group_plan_deviation`（warn，人工复核）。规划不需要人工确认。
 ### `GET /episodes/{e}/design-cards/status` [R]
 用途：填卡任务进度。返回 `PromptBatchStatus`：`{status:"running"|"done"|"error", total, completed, failed, current_storyboard_id?, phase?, started_at, finished_at?, error?}`；从未跑过是 `data:null`。**没有 `task_id`**（取法见上）；`status:"done"` 只表示任务结束，必须查 `failed` 与逐镜卡片状态。
 ### `PUT /storyboards/{id}/design-card` [R]

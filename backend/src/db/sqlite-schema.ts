@@ -766,6 +766,23 @@ export const sqliteSchemaStatements = [
   )`,
   `CREATE INDEX IF NOT EXISTS idx_task_observed_message_call ON task_observed_message (call_id, id)`,
   `CREATE INDEX IF NOT EXISTS idx_task_observed_message_tool ON task_observed_message (work_id, tool_call_id)`,
+
+  // ── 组级视觉规划（Issue #109）────────────────────────────
+  // 逻辑组 = 最终旁白稿的一个自然段；分镜设计先按组规划「哪镜用什么图、何时完整展示、何时只提示」，
+  // 再按规划逐镜填设计卡。组号是段号，镜 → 组读时现算（narration-groups.ts）；
+  // signature 覆盖段落文本 + 成员镜旁白 + 实测时长（0.5 s 分桶），不变即复用。
+  `CREATE TABLE IF NOT EXISTS design_group_plans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    episode_id INTEGER NOT NULL,
+    group_no INTEGER NOT NULL,
+    signature TEXT NOT NULL,
+    status TEXT NOT NULL,
+    plan TEXT,
+    error_msg TEXT,
+    task_id INTEGER,
+    updated_at TEXT NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_design_group_plans_group ON design_group_plans (episode_id, group_no)`,
 ]
 
 /**

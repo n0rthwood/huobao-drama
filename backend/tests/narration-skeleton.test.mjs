@@ -121,7 +121,7 @@ const confirm = (body) => skeletonApp.request('/1/narration-skeleton/confirm', {
 const emit = (payload) => console.log('@@' + JSON.stringify(payload))
 `
 
-test('draft validation exposes short gaps and excerpts without writing; insertion and both merge directions preserve text', () => {
+test('draft validation exposes short gaps and excerpts without writing; insertion and both merge directions preserve text; merging across paragraphs is rejected', () => {
   const result = run(`${SETUP}
     await db.update(schema.storyboards).set({ narrationText: S2.slice(3) }).where(eq(schema.storyboards.id, 11))
     const before = (await (await get()).json()).data
@@ -133,16 +133,25 @@ test('draft validation exposes short gaps and excerpts without writing; insertio
     const gap = draft.body.data.gaps[0]
     shots.splice(gap.next_index, 0, { narration_text: gap.text })
     const inserted = await json(await put({ revision: before.revision, shots }))
-    const insertedRows = inserted.body.data.shots.map(s => ({ id: s.storyboard_id, narration_text: s.narration_text }))
-    insertedRows[0].narration_text += insertedRows[1].narration_text
-    insertedRows.splice(1, 1)
-    const up = await json(await put({ revision: inserted.body.data.revision, shots: insertedRows }))
-    const downRows = up.body.data.shots.map(s => ({ id: s.storyboard_id, narration_text: s.narration_text }))
-    downRows[1].narration_text = downRows[0].narration_text + downRows[1].narration_text
-    downRows.splice(0, 1)
-    const down = await json(await put({ revision: up.body.data.revision, shots: downRows }))
+    const insertedRows = () => inserted.body.data.shots.map(s => ({ id: s.storyboard_id, narration_text: s.narration_text }))
+    // 段内向上并（只校验不写）：插入的那一镜并进前一镜所在段落的同段镜
+    const upRows = insertedRows()
+    upRows[1].narration_text += upRows[2].narration_text
+    upRows.splice(2, 1)
+    const up = await json(await put({ revision: inserted.body.data.revision, shots: upRows, validate_only: true }))
+    // 段内向下并（写库）
+    const downRows = insertedRows()
+    downRows[2].narration_text = downRows[1].narration_text + downRows[2].narration_text
+    downRows.splice(1, 1)
+    const down = await json(await put({ revision: inserted.body.data.revision, shots: downRows }))
+    // 跨段并镜（#109）：两段是两个逻辑组，一镜只能属于一段
+    const crossRows = down.body.data.shots.map(s => ({ id: s.storyboard_id, narration_text: s.narration_text }))
+    crossRows[0].narration_text += crossRows[1].narration_text
+    crossRows.splice(1, 1)
+    const cross = await json(await put({ revision: down.body.data.revision, shots: crossRows }))
+    const afterCross = (await (await get()).json()).data
     const conflict = await json(await put({ revision: before.revision, shots, validate_only: true }))
-    emit({ draft, bad, before, afterDryRun, inserted, up, down, conflict })
+    emit({ draft, bad, before, afterDryRun, inserted, up, down, cross, afterCross, conflict })
   `)
   assert.equal(result.draft.status, 200)
   assert.equal(result.draft.body.data.gaps[0].text, S2.slice(0, 3))
@@ -154,9 +163,13 @@ test('draft validation exposes short gaps and excerpts without writing; insertio
   assert.equal(result.inserted.status, 200)
   assert.equal(result.inserted.body.data.coverage.complete, true)
   assert.equal(result.up.status, 200)
+  assert.deepEqual(result.up.body.data.problems, [])
   assert.equal(result.down.status, 200)
   assert.equal(result.down.body.data.coverage.complete, true)
   assert.equal(result.down.body.data.shots.map(s => s.narration_text).join(''), S1 + S2 + S3)
+  assert.equal(result.cross.status, 400)
+  assert.ok(result.cross.body.problems.some(p => p.code === 'cross_group'))
+  assert.equal(result.afterCross.revision, result.down.body.data.revision)
   assert.equal(result.conflict.status, 409)
 })
 
@@ -570,4 +583,21 @@ test('design card audit reports the same current audio duration as the skeleton'
   assert.equal(result.audit, 3000)
   assert.equal(result.measured, 3)
   assert.equal(result.missing, null)
+})
+
+test('a skeleton confirmed before #109 with a shot spanning two paragraphs stays confirmed but cannot be re-confirmed as is', () => {
+  const result = run(`${SETUP}
+    // 存量骨架：#1 一镜领了两段（#109 之前允许），并已确认
+    await db.update(schema.storyboards).set({ narrationText: S1 + S2 }).where(eq(schema.storyboards.id, 10))
+    await db.update(schema.storyboards).set({ deletedAt: ts }).where(eq(schema.storyboards.id, 11))
+    const legacy = (await (await get()).json()).data
+    await db.update(schema.episodes).set({ narrationSkeletonRevision: legacy.revision, narrationSkeletonConfirmedAt: ts }).where(eq(schema.episodes.id, 1))
+    const state = (await (await get()).json()).data
+    const reconfirm = await json(await confirm({ revision: state.revision }))
+    emit({ confirmed: state.confirmed, confirmable: state.confirmable, blocked: state.blocked_reason, reconfirm: reconfirm.status })
+  `)
+  assert.equal(result.confirmed, true)
+  assert.equal(result.confirmable, false)
+  assert.match(result.blocked, /跨了第 1–2 段/)
+  assert.notEqual(result.reconfirm, 200)
 })

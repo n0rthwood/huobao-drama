@@ -10,6 +10,7 @@
  * 纯函数模块：不读库、不读文件，解析上下文由调用方装配（`loadDesignCardContext`）。
  */
 import { estimateNarrationSeconds, MAX_NARRATION_CHARS, narrationCharCount } from './narration.js'
+import type { GroupPlanShot } from './design-group-plan.js'
 import { normalizeLayerDoc, type LayerDoc } from './layer-doc.js'
 import { revealBeats, textZoneOf } from './layer-text-visibility.js'
 import { orientationOf } from './aspect.js'
@@ -149,6 +150,8 @@ export type CardIssueCode =
   | 'reference_not_mentioned'
   | 'budget_tight'
   | 'unresolved_ref'
+  /** #109：组合或底图与本组视觉规划不一致（警告，人工复核） */
+  | 'group_plan_deviation'
 
 export interface CardIssue {
   code: CardIssueCode
@@ -191,6 +194,11 @@ export interface DesignCardContext {
    * 没有这项事实时读写两侧都**跳过**文本框的排版判定（不猜横版，免得误伤竖屏套位）。
    */
   aspect?: string
+  /**
+   * 组级视觉规划（#109）：当前仍新鲜的组规划里每镜的条目（storyboard_id → 条目）。
+   * 卡的组合/底图与它不一致时读时给警告 `group_plan_deviation`；没有规划的镜不检查。
+   */
+  plannedShots?: Map<number, GroupPlanShot>
 }
 
 const KIND_LABELS: Record<AssetKindName, string> = { character: '角色', scene: '场景', prop: '道具' }
