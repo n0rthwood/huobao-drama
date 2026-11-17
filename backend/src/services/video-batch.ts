@@ -27,7 +27,7 @@ import {
 } from './storyboard-video.js'
 import { isActiveTaskStatus, isH3JobsTask } from './sys-task.js'
 import { cancelVideoTask } from './h3-jobs.js'
-import { blockingIssuesFor, checkStoryboardRefs, describeIssues, emptyTargetBindings, loadEpisodeAssets, loadEpisodeTargetBindings } from './storyboard-assets.js'
+import { blockingIssuesFor, checkStoryboardRefs, describeIssues, emptyTargetBindings, loadEpisodeAssets, loadEpisodeTargetBindings, loadTargetBindings } from './storyboard-assets.js'
 import type { EpisodeAssetEntry, TargetBindings } from './storyboard-assets.js'
 import { loadDesignCardContext } from './design-card-context.js'
 import type { DesignCardContext } from './design-card.js'
@@ -218,8 +218,14 @@ async function layerBaseCheckReason(sb: typeof schema.storyboards.$inferSelect):
   return baseCheckBlockReason(segment, await resolveEpisodeSegmentSpec(sb.episodeId))
 }
 
-/** 某镜此刻是否被阻断（底图视觉验证 / 关键帧未确认 / 视频提示词与绑定不一致）；可生成时返回 null */
-async function videoBlockReason(
+/**
+ * 某镜此刻是否被阻断（底图视觉验证 / 关键帧未确认 / 视频提示词与绑定不一致）；可生成时返回 null。
+ *
+ * 绑定来源：预览传整集快照（`preloaded.bindingsByShot`）时按快照判定；批量 runner 不传快照，
+ * 必须现读这一镜的真实绑定——否则视频提示词里 @ 到的资产一律被判 `unbound_mention`，
+ * 整批镜头被当成「提示词与参考图不一致」跳过（Issue #119）。导出供行为测试直接断言判定结果。
+ */
+export async function videoBlockReason(
   sb: typeof schema.storyboards.$inferSelect,
   keyframes: Map<number, StoryboardKeyframeState>,
   preloaded?: { episode?: typeof schema.episodes.$inferSelect; assets?: EpisodeAssetEntry[]; bindingsByShot?: Map<number, TargetBindings>; cardCtx?: DesignCardContext },
@@ -235,9 +241,13 @@ async function videoBlockReason(
   if (baseReason) return baseReason
   if (resolveDramaProjectType(ep?.dramaId) === 'documentary' && sb.combo === 'A') return '未启用生成段'
   if (!keyframes.get(sb.id)?.confirmed) return '关键帧尚未确认'
+  // 有整集快照就按快照（快照里缺这一镜 = 这镜没有绑定行）；没有快照就现读这一镜的绑定行（#119）
+  const bindings = preloaded?.bindingsByShot
+    ? preloaded.bindingsByShot.get(sb.id) ?? emptyTargetBindings()
+    : await loadTargetBindings(sb.id)
   const blocking = blockingIssuesFor(await checkStoryboardRefs(sb, preloaded?.assets, {
     cardCtx: preloaded?.cardCtx,
-    bindings: preloaded?.bindingsByShot?.get(sb.id) ?? emptyTargetBindings(),
+    bindings,
     documentary: resolveDramaProjectType(ep?.dramaId) === 'documentary',
   }), 'video_prompt')
   if (blocking.length) return `视频提示词与参考图不一致：${describeIssues(blocking)}`
