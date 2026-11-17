@@ -127,6 +127,14 @@
         </aside>
       </div>
     </div>
+    <ConfirmDialog
+      :open="discardOpen"
+      :message="t('mapStudio.layerEditor.confirmDiscard')"
+      :confirm-text="t('mapStudio.panel.discard')"
+      :overlay-style="{ zIndex: 243 }"
+      @cancel="discardOpen = false"
+      @confirm="emit('close')"
+    />
   </div>
 </template>
 
@@ -153,6 +161,7 @@ import { Loader2, Redo2, Undo2, X } from 'lucide-vue-next'
 import LayerCanvas from '~/components/LayerCanvas/LayerCanvas.vue'
 import LayerList from '~/components/LayerCanvas/LayerList.vue'
 import LayerStyle from '~/components/LayerCanvas/LayerStyle.vue'
+import ConfirmDialog from '~/components/ConfirmDialog.vue'
 import { useLayerDoc } from '~/composables/useLayerDoc'
 import { mapLayerDocProblemsOf, mapLayerProblemLayerId, mapStudioAPI, mapStudioConflictOf } from '~/map-studio/api'
 import { normalizeMapLayerDoc } from '~/map-studio/utils/mapLayerDoc'
@@ -277,12 +286,14 @@ onBeforeUnmount(() => {
 function onKeydown(event) {
   if (event.key !== 'Escape') return
   event.stopPropagation()
-  requestClose()
+  if (discardOpen.value) discardOpen.value = false
+  else requestClose()
 }
 
+const discardOpen = ref(false)
 function requestClose() {
   if (saving.value) return
-  if (dirty.value && !window.confirm(t('mapStudio.layerEditor.confirmDiscard'))) return
+  if (dirty.value) { discardOpen.value = true; return }
   emit('close')
 }
 

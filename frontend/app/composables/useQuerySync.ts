@@ -242,7 +242,7 @@ export const DEEPLINK_KEYS = {
   /** 项目详情页：页签 / 素材类型筛选 / 素材编辑弹窗 */
   detail: ['tab', 'filter', 'asset'],
   /** 项目详情页弹窗：图片大图 / 资产浏览器（含其内部筛选）/ 素材库宿主 / 新增剧集 / 项目设置 / 删除确认外壳 */
-  detailDialogs: ['view', 'browser', 'bkind', 'bq', 'lib', 'addep', 'proj', 'del'],
+  detailDialogs: ['view', 'browser', 'bkind', 'bq', 'bdrama', 'lib', 'addep', 'proj', 'del'],
   /** 剧集工作台：面板 / 剧本子步骤 / 制作页签 / 资产子页签 / 提取筛选 / 资产详情弹窗 */
   workbench: ['panel', 'step', 'tab', 'sub', 'extract', 'asset'],
   /** 工作台弹窗层：弹窗 / 大图 / 选中分镜 / 工作区多选 / 弹窗独立批量范围 */
@@ -266,7 +266,7 @@ export const DEEPLINK_KEYS = {
   /** 地图工作室：预览产出身份 base|texture|final|calibration，不含路径。 */
   mapStudioPreview: ['msview'],
   /** 参考图管理器：素材库弹窗的宿主资产（值 = 类型-id，多实例共用一个键） */
-  refLibrary: ['reflib'],
+  refLibrary: ['reflib', 'refdel'],
   /** 角色档案图面板：检索弹窗与关键词 */
   archival: ['arch', 'archq'],
   /** 设计卡：子阶段 / 选中分镜 / 选择器 / 切换组合弹窗 / 批量范围 / 展开的逻辑组（#109） */
@@ -275,6 +275,8 @@ export const DEEPLINK_KEYS = {
   picker: ['pktype', 'pkq', 'drill'],
   /** 关键帧步骤：选中分镜 / 批量多选 / 资产池弹窗 */
   keyframes: ['shot', 'sel', 'pool', 'poolkind', 'poolq'],
+  /** 关键帧批量预览：all 或稳定分镜 id 列表；槽位由只读预览计算。 */
+  keyframeBatch: ['kfbatch'],
   /** 分镜制作步骤：选中分镜 / 片段页签 / 弹窗 */
   shotProduction: ['shot', 'seg', 'spdlg'],
   /** 纪录片成片步骤：选中分镜 / 多选 / 预演弹窗 */

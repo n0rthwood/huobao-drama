@@ -649,7 +649,7 @@
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
-          <img :src="assetViewer.src" :alt="assetViewer.title" class="viewer-img" />
+          <img :src="assetViewer.src" :alt="assetViewer.title" class="viewer-img" @error="onViewerError" />
         </div>
       </div>
     </div>
@@ -998,7 +998,7 @@ async function confirmDeleteMaterial() {
 // Issue #86：页面自身的键由 detail 组声明；弹窗层键单独成组，关闭弹窗只摘掉弹窗键
 const link = useDeeplink('detail', DEEPLINK_KEYS.detail)
 // bkind/bq 由 AssetBrowserDialog 自己的分组发布，本页不声明（声明了会抢占同名键的兜底值）
-const dialogLink = useDeeplink('detailDialogs', DEEPLINK_KEYS.detailDialogs.filter(k => k !== 'bkind' && k !== 'bq'))
+const dialogLink = useDeeplink('detailDialogs', DEEPLINK_KEYS.detailDialogs.filter(k => !['bkind', 'bq', 'bdrama'].includes(k)))
 const urlTab = queryEnum(link.initial('tab'), ['episodes', 'assets'])
 const pendingAssetLink = queryTypedId(link.initial('asset'), ['character', 'scene', 'prop'])
 // URL 携带 tab（含非法值）即以 URL 为准，非法回退默认；asset 参数隐含素材库页签
@@ -1217,10 +1217,26 @@ function openAssetViewer(m) {
   assetViewer.value = { open: true, kindKey: m.kindKey, id: m.id, src: assetSrc(m), title: `${m.kind} · ${m.name}` }
 }
 
+function viewerStaticPath(src) {
+  try {
+    const url = new URL(src, window.location.href)
+    if (url.origin !== window.location.origin) return ''
+    const start = url.pathname.indexOf('/static/')
+    if (start < 0) return ''
+    const path = decodeURIComponent(url.pathname.slice(start + 1))
+    return path.split('/').some(part => part === '..' || part === '.' || /[\\\u0000-\u001f]/.test(part)) ? '' : path
+  } catch { return '' }
+}
+
 /** 参考图预览：ReferenceImageManager 的事件给的是 (src, title)，不是资产成片图 */
 function openRefViewer(src, title) {
   assetViewer.value = { open: true, kindKey: '', id: 0, src, title }
 }
+function onViewerError() {
+  closeAssetViewer()
+  toast.warning(t('deeplink.missing'))
+}
+
 
 /**
  * 参考图增删后以服务端返回的条目数组为准（与剧集工作台 onAssetRefsUpdate 同口径）。
@@ -1426,7 +1442,7 @@ function publishDialogLink() {
   const ep = episodeToDelete.value
   const mat = assetToDelete.value
   dialogLink.set({
-    view: viewer.open && viewer.id ? `${viewer.kindKey}-${viewer.id}` : '',
+    view: viewer.open ? (viewer.id ? `${viewer.kindKey}-${viewer.id}` : viewerStaticPath(viewer.src)) : '',
     browser: assetBrowserOpen.value ? '1' : '',
     addep: addDialog.value ? '1' : '',
     proj: showSettings.value ? '1' : '',
@@ -1463,10 +1479,13 @@ function applyAssetDeeplink() {
 
 // 弹窗层恢复：只还原界面，不触发保存/生成/删除；bkind/bq 由资产浏览器自己的分组负责
 function applyDialogDeeplinks() {
-  const viewerRef = queryTypedId(dialogLink.initial('view'), DEEPLINK_KINDS)
-  if (dialogLink.initial('view')) {
+  const viewerValue = querySingle(dialogLink.initial('view'))
+  const viewerRef = queryTypedId(viewerValue, DEEPLINK_KINDS)
+  if (viewerValue) {
     const m = findMaterialByRef(viewerRef)
+    const path = viewerValue.startsWith('static/') ? viewerStaticPath(mediaUrl(viewerValue)) : ''
     if (m && matHasImage(m)) openAssetViewer(m)
+    else if (path) openRefViewer(mediaUrl(path), t('components.referenceImages.label'))
     else if (viewerRef) missingTargetToast(viewerRef)
     else toast.error(t('deeplink.missing'))
   }

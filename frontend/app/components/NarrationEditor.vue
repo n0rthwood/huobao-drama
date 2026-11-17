@@ -549,15 +549,28 @@ const check = reactive({ open: false, loading: false, items: [] })
 // 恢复时先用当前已保存正文校验：对得上才按原样打开，对不上只读打开并明示，绝不插到错位置。
 const link = useDeeplink('narration', DEEPLINK_KEYS.narration.filter(key => key === 'nedlg'))
 const urlDialog = querySingle(link.initial('nedlg'))
+// 只记录正文指纹，不把未保存的正文草稿放进地址。
+function textFingerprint(value) {
+  let a = 2166136261
+  let b = 5381
+  for (let i = 0; i < value.length; i++) {
+    const c = value.charCodeAt(i)
+    a = Math.imul(a ^ c, 16777619)
+    b = Math.imul(b, 33) ^ c
+  }
+  return `${value.length}.${a >>> 0}.${b >>> 0}`
+}
+
 
 /** 当前浮层的链接身份：<种类>:<分镜 id>[:<区间>[:<源文字>]] */
 function markerLinkKey() {
   const id = props.deeplinkId
   if (!(id > 0)) return ''
   if (check.open) return `check:${id}`
-  if (pron.open) return `pron:${id}:${pron.start}-${pron.end}:${encodeURIComponent(pron.base || '')}`
-  if (tone.open) return `tone:${id}:${tone.editing ? `${tone.editing.start}-${tone.editing.end}` : tone.pos}`
-  if (pause.open) return `pause:${id}:${pause.editing ? `${pause.editing.start}-${pause.editing.end}` : pause.pos}`
+  const snapshot = textFingerprint(text.value)
+  if (pron.open) return `pron:${id}:${pron.start}-${pron.end}:${encodeURIComponent(pron.base || '')}:${snapshot}`
+  if (tone.open) return `tone:${id}:${tone.editing ? `${tone.editing.start}-${tone.editing.end}` : tone.pos}::${snapshot}`
+  if (pause.open) return `pause:${id}:${pause.editing ? `${pause.editing.start}-${pause.editing.end}` : pause.pos}::${snapshot}`
   return ''
 }
 watch(
@@ -571,29 +584,25 @@ function markerSegmentAt(start, end, types) {
   return parsed.value.segments.find(seg => seg.start === start && seg.end === end && types.includes(seg.type)) || null
 }
 
-/** 位置对不上时的只读外壳：保留宿主、区间与链接记录的内容，但不允许提交 */
-function openStale(kind, start, end, base) {
-  if (kind === 'pron') {
-    Object.assign(pron, { rows: [], start, end, base, editing: null, mode: 'pinyin', homophone: '', stale: true, open: true })
-  } else if (kind === 'tone') {
-    Object.assign(tone, { value: '', pos: start, editing: null, stale: true, open: true })
-  } else {
-    Object.assign(pause, { seconds: 1, pos: start, editing: null, stale: true, open: true })
-  }
-  toast.warning(t('deeplink.staleRange'))
+/** 正文变化后不打开浮层；用户可在原分镜中重新选择。 */
+function openStale() {
+  toast.warning(t('deeplink.missing'))
+  link.set({ nedlg: '' })
 }
 
 async function restoreMarkerDeeplink() {
-  const matched = /^(check|pron|tone|pause):(\d+)(?::(\d+)(?:-(\d+))?(?::(.*))?)?$/.exec(urlDialog || '')
-  if (!matched) return
-  const [, kind, idText, startText, endText, baseText] = matched
+  const matched = /^(check|pron|tone|pause):(\d+)(?::(\d+)(?:-(\d+))?(?::([^:]*):([^:]*))?)?$/.exec(urlDialog || '')
+  if (!matched) { if (urlDialog) openStale(); return }
+  const [, kind, idText, startText, endText, baseText, snapshot] = matched
   if (!(props.deeplinkId > 0) || Number(idText) !== props.deeplinkId) return
   if (kind === 'check') { void openCheck(); return }
+  if (snapshot === undefined || snapshot !== textFingerprint(text.value)) { openStale(); return }
   const start = Number(startText || 0)
   const end = endText === undefined ? start : Number(endText)
   if (!Number.isInteger(start) || start < 0 || start > text.value.length) { openStale(kind, 0, 0, ''); return }
   if (kind === 'pron') {
-    const base = decodeURIComponent(baseText || '')
+    let base
+    try { base = decodeURIComponent(baseText || '') } catch { openStale(); return }
     const seg = markerSegmentAt(start, end, ['ruby', 'invalid'])
     if (seg && (!base || seg.base === base)) { await openPron({ start, end }, seg); return }
     if (base && text.value.slice(start, end) === base && !markerAt(text.value, start)) { await openPron({ start, end }); return }
