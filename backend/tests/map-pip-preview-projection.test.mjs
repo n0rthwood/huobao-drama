@@ -8,19 +8,18 @@ test('preview focus rectangles match the rendering projection at multiple aspect
   const source = `
     import assert from 'node:assert/strict'
     import { frameRectOn } from './src/modules/map-studio/pip/frames.ts'
-    import { pipFrameRect } from '../frontend/app/map-studio/utils/mapPip.ts'
+    import { frameRectOn as previewFrameRectOn } from '../frontend/app/map-studio/utils/mapPip.ts'
     const overview = [30, 42, 75, 62]
     const focus = [46, 49, 52, 56]
     for (const type of ['mercator', 'equirectangular']) {
       for (const size of [{width: 3840, height: 2160}, {width: 720, height: 1280}, {width: 1000, height: 1000}]) {
         const backend = frameRectOn({ bbox: overview, projection: { type } }, size, focus)
-        const frontend = pipFrameRect(overview, focus, size.width, size.height, type)
-        assert.ok(frontend)
-        for (let i = 0; i < 4; i++) assert.ok(Math.abs(frontend[i] - backend[i]) < 1e-8)
+        const frontend = previewFrameRectOn({ bbox: overview, projection: { type } }, size, focus)
+        assert.deepEqual(frontend, backend)
       }
     }
-    assert.equal(pipFrameRect(null, focus, 100, 100), null)
-    assert.equal(pipFrameRect(overview, focus, 0, 100), null)
+    assert.equal(previewFrameRectOn({ bbox: null, projection: { type: 'mercator' } }, { width: 100, height: 100 }, focus), null)
+    assert.equal(previewFrameRectOn({ bbox: overview, projection: { type: 'mercator' } }, { width: 0, height: 100 }, focus), null)
   `
   execFileSync(process.execPath, ['--import', 'tsx', '--input-type=module', '-e', source], { cwd: root, stdio: 'pipe' })
 })

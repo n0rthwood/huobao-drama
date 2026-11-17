@@ -13,11 +13,12 @@ import { geoEquirectangular, geoMercator } from 'd3-geo'
 type Bbox = [number, number, number, number]
 
 /** Same d3 fitExtent and corner projection as the backend's pip/frames.ts. */
-export function pipFrameRect(overview: unknown, focus: unknown, width: number, height: number, projectionType = 'mercator'): Bbox | null {
+export function frameRectOn(spec: { bbox: unknown, projection: { type: string } }, size: { width: number, height: number }, focus: unknown): Bbox | null {
   const valid = (v: unknown): v is Bbox => Array.isArray(v) && v.length === 4 && v.every(n => typeof n === 'number' && Number.isFinite(n)) && v[0] < v[2] && v[1] < v[3]
-  if (!valid(overview) || !valid(focus) || width <= 0 || height <= 0) return null
-  const [w, s, e, n] = overview
-  const projection = projectionType === 'equirectangular' ? geoEquirectangular() : geoMercator()
+  if (!spec || !size || !valid(spec.bbox) || !valid(focus) || size.width <= 0 || size.height <= 0) return null
+  const [w, s, e, n] = spec.bbox
+  const { width, height } = size
+  const projection = spec.projection.type === 'mercator' ? geoMercator() : geoEquirectangular()
   projection.fitExtent([[0, 0], [width, height]], { type: 'Polygon', coordinates: [[[w, s], [w, n], [e, n], [e, s], [w, s]]] })
   const a = projection([focus[0], focus[3]])
   const b = projection([focus[2], focus[1]])

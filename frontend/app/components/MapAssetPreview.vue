@@ -59,7 +59,7 @@
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { parsePipMeta, pipFrameRect } from '~/map-studio/utils/mapPip'
+import { parsePipMeta, frameRectOn } from '~/map-studio/utils/mapPip'
 import { mediaUrl } from '~/utils/url'
 import { thumbOf, thumbFallback } from '~/composables/useMedia'
 import { assetLibraryAPI } from '~/composables/useApi'
@@ -87,7 +87,7 @@ const rect = computed(() => {
   let spec = parent.value.map_spec || workflow?.map_spec || workflow?.outputs?.map_spec
   if (typeof spec === 'string') { try { spec = JSON.parse(spec) } catch { spec = null } }
   const parentPip = parsePipMeta(parent.value.map_pip)
-  return pipFrameRect(pip.value.overview_bbox || parentPip?.overview_bbox || spec?.bbox, pip.value.frame?.focus_bbox, imageSize.value.width, imageSize.value.height, spec?.projection?.type)
+  return frameRectOn({ bbox: pip.value.overview_bbox || parentPip?.overview_bbox || spec?.bbox, projection: spec?.projection || { type: 'mercator' } }, imageSize.value, pip.value.frame?.focus_bbox)
 })
 watch(() => props.item.id, async id => {
   imageSize.value = { width: 0, height: 0 }

@@ -770,7 +770,7 @@
             </div>
           </header>
 
-          <div class="dialog-body asset-detail-body">
+          <div ref="assetDetailBody" class="dialog-body asset-detail-body">
             <div class="asset-detail-shell">
               <aside class="asset-detail-preview-panel">
                 <div class="asset-detail-section-title">
@@ -826,7 +826,7 @@
                   <p class="asset-version-hint">{{ t('episode.asset.versionHint') }}</p>
                 </section>
 
-                <MapAssetPreview v-if="isMapAsset(assetDetail.item)" :key="assetDetail.item.id" :item="assetDetail.item" :assets="propItems" :episode-numbers="sbs.map(shotNumber)" @open-asset="id => openAssetDetailById('prop', id)" @preview="openImageViewer" />
+                <MapAssetPreview v-if="isMapAsset(assetDetail.item)" :key="assetDetail.item.id" :item="assetDetail.item" :assets="propItems" :episode-numbers="sbs.map(shotNumber)" @open-asset="openPipAsset" @preview="openImageViewer" />
 
                 <div class="asset-detail-meta-row">
                   <div class="asset-detail-meta-item">
@@ -2023,6 +2023,12 @@ function shotNumberOf(sb) {
   return i >= 0 ? i + 1 : 0
 }
 const assetDetail = ref({ open: false, type: '', item: null })
+const assetDetailBody = ref(null)
+function openPipAsset(id) {
+  if (!propItems.value.some(item => item.id === Number(id))) { toast.error(t('deeplink.missing')); return }
+  openAssetDetailById('prop', id)
+  nextTick(() => { if (assetDetailBody.value) assetDetailBody.value.scrollTop = 0 })
+}
 const mapPreviewFailed = ref(false)
 watch(() => [assetDetail.value.item?.id, assetDetail.value.item?.image_url], () => { mapPreviewFailed.value = false })
 function mapImageError(event, src, isMap) {

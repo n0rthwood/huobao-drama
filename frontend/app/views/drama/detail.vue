@@ -416,7 +416,7 @@
             </div>
           </header>
 
-          <div class="dialog-body mat-detail-body">
+          <div ref="matDetailBody" class="dialog-body mat-detail-body">
             <div class="mat-detail-shell">
               <!-- 左侧：视觉预览 -->
               <aside class="mat-detail-preview-panel">
@@ -442,7 +442,7 @@
                   </span>
                 </button>
                 <MediaTime v-if="editTarget.image_generated_at" :at="editTarget.image_generated_at" />
-                <MapAssetPreview v-if="assetTypeOf(editTarget) === 'map'" :key="editTarget.id" :item="editTarget" :assets="materials.filter(m => m.kindKey === 'prop')" @open-asset="id => openEdit(materials.find(m => m.kindKey === 'prop' && m.id === Number(id)))" @preview="openRefViewer" />
+                <MapAssetPreview v-if="assetTypeOf(editTarget) === 'map'" :key="editTarget.id" :item="editTarget" :assets="materials.filter(m => m.kindKey === 'prop')" @open-asset="openPipAsset" @preview="openRefViewer" />
 
                 <div class="mat-detail-meta-row">
                   <div class="mat-detail-meta-item">
@@ -1277,6 +1277,13 @@ function fmtDate(s) {
 const editDialog = ref(false)
 const editSaving = ref(false)
 const editTarget = ref(null)
+const matDetailBody = ref(null)
+function openPipAsset(id) {
+  const target = materials.value.find(m => m.kindKey === 'prop' && m.id === Number(id))
+  if (!target) { toast.error(t('deeplink.missing')); return }
+  openEdit(target)
+  nextTick(() => { if (matDetailBody.value) matDetailBody.value.scrollTop = 0 })
+}
 const mapPreviewFailed = ref(false)
 watch(() => [editTarget.value?.id, editTarget.value?.image_url], () => { mapPreviewFailed.value = false })
 function mapImageError(event, src, isMap) {
