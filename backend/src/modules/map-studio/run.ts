@@ -26,6 +26,7 @@ import { validateLayerOptions } from './render/smooth.js'
 import { MapWorkflowValidationError } from './types.js'
 import { beginStageSpan, endStageSpan } from './stage-spans.js'
 import { resolveMapStyle } from './styles/index.js'
+import { annotateRegionLabels } from './region-annotations.js'
 
 export interface MapRunOptions { textConfigId?: number; imageConfigId?: number; imageModel?: string }
 function nextStage(stage: MapWorkflowStage): MapWorkflowStage | null {
@@ -237,11 +238,11 @@ async function executeStageWork(taskId: number, runId: number, stage: MapWorkflo
     const mismatch = canvasMismatch(brief, base)
     if (mismatch) return rollback({ stage: 'base', reason: mismatch })
     const background = await prepareMapBackground({ basePath: base.path, registration: base.provenance && 'registration' in base.provenance ? base.provenance.registration : undefined, texturePath: state.outputs.texture_image?.path })
-    const outcome = await runDrawingStage({ ...await agentInput(), spec, background, layerOptions: state.outputs.layer_options })
+    const outcome = await runDrawingStage({ ...await agentInput(), spec, background, layerOptions: state.outputs.layer_options, texturePath: state.outputs.texture_image?.path })
     if (outcome.kind === 'rollback') return rollback(outcome)
     const { doc, rendered, omitted, layerOptions } = outcome.result
     return finish(ctx => {
-      ctx.state.outputs.final_image = { path: rendered.path, width: rendered.width, height: rendered.height, source: 'map-drawing', run_id: runId, provenance: { map_style: selectedStyle?.id ?? null, registration: background.registration, warnings: background.warnings, omitted, base: base.path, base_mode: brief.base_mode, texture: state.outputs.texture_image?.path ?? null, background: background.path, attribution: base.provenance && 'attribution' in base.provenance ? base.provenance.attribution : null } }
+      ctx.state.outputs.final_image = { path: rendered.path, width: rendered.width, height: rendered.height, source: 'map-drawing', run_id: runId, provenance: { map_style: selectedStyle?.id ?? null, registration: background.registration, warnings: [...background.warnings, ...(rendered.region_composition === 'bottom-layer' ? ['非程序底图不支持水系下合成；区域填充降级到最底图层。'] : [])], region_composition: rendered.region_composition, omitted, base: base.path, base_mode: brief.base_mode, texture: state.outputs.texture_image?.path ?? null, background: background.path, attribution: base.provenance && 'attribution' in base.provenance ? base.provenance.attribution : null } }
       ctx.state.outputs.layer_doc = doc
       ctx.state.outputs.layer_options = layerOptions
       ctx.state.issues = [...ctx.state.issues.filter(issue => issue.code !== 'drawing_warning' && issue.code !== 'drawing_omitted'), ...background.warnings.map((message): MapWorkflowIssue => ({ field: 'drawing', code: 'drawing_warning', message, blocking: false })), ...omitted.map((item): MapWorkflowIssue => ({ field: 'drawing', code: 'drawing_omitted', blocking: false, message: `要素 ${item.feature_id} 未画入成图：${item.reason}` }))]
@@ -597,11 +598,17 @@ export async function saveMapLayerDoc(taskId: number, body: { layerDoc: unknown;
   const strict = inspectLayerDraft(body.layerDoc, body.layerOptions, layerDraftContext(loaded.mapSpec, loaded.state.outputs))
   const problems = [...strict.problems, ...backgroundProblems(strict.doc, { path: current.base.path, width: Number(current.base.width), height: Number(current.base.height) }).map(message => ({ path: 'base', message }))]
   if (problems.length) throw new MapLayerDocInvalidError(problems)
-  const rendered = await renderMapLayerDoc(strict.doc, strict.layerOptions)
-  const updated = await mutateTask(taskId, { expectedRevision: loaded.state.revision, expectedBriefHash: briefHash(loaded.brief), requireIdle: true, action: 'edit_layer_doc', actor: 'manual', note: `人工编辑图层（${strict.doc.layers.length} 个图层）`, snapshot: true, mutate: ctx => {
-    ctx.state.outputs.final_image = { path: rendered.path, width: rendered.width, height: rendered.height, source: 'map-drawing-manual', run_id: ctx.state.run_id, provenance: { ...ctx.state.outputs.final_image?.provenance, background: current.base!.path, manual_edit: true } }
-    ctx.state.outputs.layer_doc = strict.doc
-    ctx.state.outputs.layer_options = strict.layerOptions
+  const base = loaded.state.outputs.base_image
+  const background = await prepareMapBackground({ basePath: base.path, registration: base.provenance && 'registration' in base.provenance ? base.provenance.registration : undefined, texturePath: loaded.state.outputs.texture_image?.path })
+  const annotated = annotateRegionLabels(strict.doc, loaded.mapSpec, background.registration)
+  if (annotated.error) throw new MapLayerDocInvalidError([{ path: 'layers', message: annotated.error }])
+  const checked = inspectLayerDraft(annotated.doc, strict.layerOptions, layerDraftContext(loaded.mapSpec, loaded.state.outputs))
+  if (checked.problems.length) throw new MapLayerDocInvalidError(checked.problems)
+  const rendered = await renderMapLayerDoc(checked.doc, checked.layerOptions, { spec: loaded.mapSpec, background, texturePath: loaded.state.outputs.texture_image?.path })
+  const updated = await mutateTask(taskId, { expectedRevision: loaded.state.revision, expectedBriefHash: briefHash(loaded.brief), requireIdle: true, action: 'edit_layer_doc', actor: 'manual', note: `人工编辑图层（${checked.doc.layers.length} 个图层）`, snapshot: true, mutate: ctx => {
+    ctx.state.outputs.final_image = { path: rendered.path, width: rendered.width, height: rendered.height, source: 'map-drawing-manual', run_id: ctx.state.run_id, provenance: { ...ctx.state.outputs.final_image?.provenance, background: current.base!.path, manual_edit: true, region_composition: rendered.region_composition, ...(rendered.region_composition === 'bottom-layer' ? { region_composition_warning: '非程序底图不支持水系下合成；区域填充降级到最底图层。' } : {}) } }
+    ctx.state.outputs.layer_doc = checked.doc
+    ctx.state.outputs.layer_options = checked.layerOptions
     ctx.state.stage = 'complete'; ctx.state.status = 'awaiting_review'; ctx.state.error = null
   } })
   const delivered = await withInfraRetry(taskId, updated.state.run_id ?? 0, 'complete', () => deliverCurrent(taskId, { briefHash: briefHash(updated.brief) }))

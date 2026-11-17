@@ -35,7 +35,7 @@ test('Map Studio adopted styles: settings, validation, HTTP rejection, theme cha
     import {startMockOpenAIChat,toolResults} from '__BACKEND__tests/fixtures/mock-openai-chat.mjs'
     const require=createRequire('file://__BACKEND__package.json'), sharp=require('sharp')
     /** 程序底图需要高程：合成 terrarium 瓦片注入，测试不联网（渲染阶段只读本地缓存） */
-    const demFixture={cacheDir:path.join(process.env.HUOBAO_DATA_DIR,'dem'),fetchTile:async(zoom,x,y)=>{
+    const demFixture={cacheDir:path.join(process.env.HUOBAO_DATA_DIR,'map-data/dem'),fetchTile:async(zoom,x,y)=>{
       const tile=256,world=tile*2**zoom,buffer=Buffer.alloc(tile*tile*3)
       for(let row=0;row<tile;row++){
         const gy=y*tile+row+0.5,lat=Math.atan(Math.sinh(Math.PI*(1-2*gy/world)))*180/Math.PI
@@ -55,11 +55,13 @@ test('Map Studio adopted styles: settings, validation, HTTP rejection, theme cha
     }
     assert.equal(MAP_STYLE_FAMILIES.length,5)
     for (const family of MAP_STYLE_FAMILIES) {
-      const ids = ['region-a', 'region-b', 'region-c']
-      const colors = ids.map(id => featureStyleFor(family, {kind:'region', id}).fill)
-      assert.deepEqual(ids.map(id => featureStyleFor(family, {kind:'region', id}).fill), colors)
-      assert.deepEqual(['new-region', ...ids].slice(1).map(id => featureStyleFor(family, {kind:'region', id}).fill), colors)
-      assert.deepEqual(ids.slice(1).map(id => featureStyleFor(family, {kind:'region', id}).fill), colors.slice(1))
+      const ids = ['region-a', 'region-b', 'region-c', 'region-d', 'region-e', 'region-f']
+      const colors = ids.map(id => featureStyleFor(family, {kind:'region', id, regionIds:ids}).fill)
+      assert.equal(new Set(colors).size, ids.length)
+      assert.deepEqual(ids.map(id => featureStyleFor(family, {kind:'region', id, regionIds:ids}).fill), colors)
+      assert.deepEqual(ids.map(id => featureStyleFor(family, {kind:'region', id, regionIds:[...ids,'region-z']}).fill), colors)
+      const prop258Ids = ['g_a3b81df5','g_7494af35','g_7593bacf','g_e7dc4ee3','g_27f212da','g_f3d608f1']
+      assert.equal(new Set(prop258Ids.map(id => featureStyleFor(family, {kind:'region', id, regionIds:prop258Ids}).fill)).size, 6, 'prop-258 的六个区域色不重复')
     }
     assert.equal(readDefaultStyle(),'atlas-tint')
     assert.equal(resolveMapStyle(emptyBrief(),{default_style:readDefaultStyle()}).id,'atlas-tint')
@@ -121,6 +123,17 @@ test('Map Studio adopted styles: settings, validation, HTTP rejection, theme cha
         const outcome=await runDrawingStage({taskId:task.task_id,runId,stageModel,brief:themedBrief,spec,background:{path:base.path,width:base.width,height:base.height,registration:base.registration,warnings:[]},startRounds:0,feedback:null})
         assert.equal(outcome.kind,'accepted')
         const doc=outcome.result.doc
+        assert.equal(outcome.result.rendered.region_composition,'under')
+        if (family.id === 'historical-schematic') {
+          const background={path:base.path,width:base.width,height:base.height,registration:base.registration,warnings:[]}
+          const changed=structuredClone(doc);changed.layers.find(l=>l.id==='feature-region').style.fill='#1263db'
+          const a=await renderMapLayerDoc(doc,outcome.result.layerOptions,{spec,background})
+          const b=await renderMapLayerDoc(changed,outcome.result.layerOptions,{spec,background})
+          assert.notEqual(a.sha256,b.sha256,'changing region fill invalidates the under composition')
+          const fallback=await renderMapLayerDoc(doc,outcome.result.layerOptions,{spec,background:{...background,registration:{...base.registration,mode:'image'}}})
+          assert.equal(fallback.region_composition,'bottom-layer')
+          assert.equal(doc.layers.find(l=>l.id==='feature-region').style.fill,featureStyleFor(family,{kind:'region',id:'region'}).fill,'rendering leaves the editable layer unchanged')
+        }
         assert.equal(doc.theme,family.theme_mapping)
         assert.equal(doc.layers.find(l=>l.id==='feature-river').style.stroke,family.lines.river_major.stroke)
         assert.ok([family.lines.river_major.width,family.lines.river_minor.width].includes(doc.layers.find(l=>l.id==='feature-river').style.width))
@@ -130,6 +143,12 @@ test('Map Studio adopted styles: settings, validation, HTTP rejection, theme cha
         assert.deepEqual(doc.layers.find(l=>l.type==='label').style,labelStyleFor(family,'title'))
         const reset=restyleMapLayers(doc,MAP_STYLE_FAMILIES[4],specFeatures(spec))
         for(let i=0;i<doc.layers.length;i++){const {style:a,...before}=doc.layers[i],{style:b,...after}=reset.layers[i];assert.deepEqual(after,before,'reset changes style only')}
+        const oldDoc=structuredClone(doc)
+        oldDoc.layers.find(l=>l.id==='feature-region').style={fill:'#e3ccaf',fill_opacity:.23,stroke:'#837969',stroke_width:.0011,dash:'none'}
+        const migrated=restyleMapLayers(oldDoc,family,specFeatures(spec))
+        assert.equal(migrated.layers.find(l=>l.id==='feature-region').style.feather,.023)
+        assert.equal(migrated.layers.find(l=>l.id==='feature-region').style.fill,featureStyleFor(family,{kind:'region',id:'region',regionIds:['region']}).fill)
+        assert.deepEqual(restyleMapLayers(migrated,family,specFeatures(spec)),migrated)
         await mutateTask(task.task_id,{action:'fixture_end',actor:'system',mutate:ctx=>{ctx.state.status='idle';ctx.state.stage='complete';for(const step of ctx.state.steps)step.status='completed';ctx.state.outputs.layer_doc=doc;ctx.state.outputs.layer_options=outcome.result.layerOptions;ctx.state.outputs.base_image={path:base.path,width:base.width,height:base.height,source:'map-base:program',run_id:runId,provenance:base.provenance}}})
         const revision=(await loadTask(task.task_id)).state.revision
         const result=await request('/tasks/'+task.task_id+'/layer-doc/restyle','POST',{layer_doc:doc})

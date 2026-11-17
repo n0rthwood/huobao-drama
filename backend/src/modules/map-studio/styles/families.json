@@ -60,7 +60,7 @@
           "feather": 0.023,
           "fill_opacity": 0.23,
           "stroke": "#96664f",
-          "stroke_width": 0.0011,
+          "stroke_width": 0,
           "dash": "none"
         },
         "routes": {
@@ -225,7 +225,7 @@
           "feather": 0.023,
           "fill_opacity": 0.23,
           "stroke": "#837969",
-          "stroke_width": 0.0011,
+          "stroke_width": 0,
           "dash": "none"
         },
         "routes": {
@@ -390,7 +390,7 @@
           "feather": 0.023,
           "fill_opacity": 0.23,
           "stroke": "#847d66",
-          "stroke_width": 0.0011,
+          "stroke_width": 0,
           "dash": "none"
         },
         "routes": {
@@ -568,7 +568,7 @@
           "feather": 0.023,
           "fill_opacity": 0.23,
           "stroke": "#8c7861",
-          "stroke_width": 0.0011,
+          "stroke_width": 0,
           "dash": "none"
         },
         "routes": {
@@ -733,7 +733,7 @@
           "feather": 0.023,
           "fill_opacity": 0.23,
           "stroke": "#829098",
-          "stroke_width": 0.0011,
+          "stroke_width": 0,
           "dash": "none"
         },
         "routes": {

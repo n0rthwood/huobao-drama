@@ -4,13 +4,14 @@ import fs from 'fs'
 import path from 'path'
 import { z } from 'zod'
 import { STORAGE_ROOT } from '../../utils/paths.js'
-import { generateImageThumb } from '../../utils/storage.js'
+import { generateImageThumb, getAbsolutePath } from '../../utils/storage.js'
 import type { StageModel } from '../../services/ai-stages.js'
-import type { Layer, LayerDoc } from '../../services/layer-doc.js'
+import type { Layer, LayerDoc, PolygonLayer } from '../../services/layer-doc.js'
 import { renderLayerDoc } from '../../services/layer-render.js'
+import { layerDocToSvg } from '../../services/layer-svg.js'
 import { readImage } from '../../agents/tools/vision-tools.js'
-import type { MapSpec } from './geo/base-render.js'
-import { forwardFor, type MapBackgroundResult } from './geo/geometry.js'
+import { renderMapBase, resolveRiverSource, type MapSpec } from './geo/base-render.js'
+import { forwardFor, prepareMapBackground, type MapBackgroundResult } from './geo/geometry.js'
 import { mapBriefText, rollbackTool, runStageAgent, stageTool, type StageAgentResult } from './agent-loop.js'
 import { drawingProblems, drawnGeometryOf, projectedLabelFeatures, specFeatures, type DrawnGeometry, type OmittedFeature, type SpecFeature } from './validate.js'
 import { autoPlaceLabels } from './layout/labels.js'
@@ -19,15 +20,38 @@ import { defaultLayerOptions, renderCopyWithSmoothing, smoothingProblems, valida
 import type { MapBrief } from './types.js'
 import { featureStyleFor, labelStyleFor, familyPromptSummary, resolveMapStyle, MAP_LABEL_TIERS, MAP_MARKER_TIERS } from './styles/index.js'
 import { readDefaultStyle } from './settings.js'
+import { annotateRegionLabels } from './region-annotations.js'
 
 const MAX_STEPS = 60
-export interface RenderedMapDoc { path: string; sha256: string; width: number; height: number }
+export interface RenderedMapDoc { path: string; sha256: string; width: number; height: number; region_composition?: 'under' | 'bottom-layer' }
 
 /** No normalizer here: the module's validated dense dataset vertices must all reach layer-svg. */
-export async function renderMapLayerDoc(doc: LayerDoc, layerOptions: LayerOptions = {}): Promise<RenderedMapDoc> {
+export async function renderMapLayerDoc(doc: LayerDoc, layerOptions: LayerOptions = {}, context?: { spec: MapSpec; background: MapBackgroundResult; texturePath?: string }): Promise<RenderedMapDoc> {
   const problems = smoothingProblems(doc, layerOptions)
   if (problems.length) throw new Error(problems.map(p => p.message).join('；'))
-  const rendered = await renderLayerDoc(renderCopyWithSmoothing(doc, layerOptions))
+  let copy = renderCopyWithSmoothing(doc, layerOptions)
+  let regionComposition: RenderedMapDoc['region_composition']
+  if (context) {
+    const regionIds = new Set(context.spec.regions.map(region => region.id))
+    const isRegion = (layer: Layer): layer is PolygonLayer => layer.type === 'polygon' && !!layer.anchor?.semantic_id && regionIds.has(layer.anchor.semantic_id)
+    const regions = copy.layers.filter(isRegion)
+    if (regions.length && context.background.registration.mode === 'program') {
+      const fillDoc = { ...copy, layers: regions.map(layer => ({ ...layer, style: { ...layer.style, stroke_width: 0 } })) }
+      const backgroundHash = crypto.createHash('sha256').update(fs.readFileSync(getAbsolutePath(context.background.path))).digest('hex')
+      const underSvg = `<!-- background ${backgroundHash} -->` + layerDocToSvg(fillDoc, { width: copy.base.width, height: copy.base.height })
+      const spec = { ...context.spec, places: [], routes: [], regions: [] }
+      const base = await renderMapBase(spec, { width: copy.base.width, height: copy.base.height, riverSource: resolveRiverSource(context.spec), underSvg })
+      const background = await prepareMapBackground({ basePath: base.path, registration: context.background.registration, texturePath: context.texturePath })
+      copy = { ...copy, base: { ...copy.base, path: background.path }, layers: copy.layers.map(layer => isRegion(layer) ? { ...layer, style: { ...layer.style, fill_opacity: 0, feather: 0 } } : layer) }
+      regionComposition = 'under'
+    } else if (regions.length) {
+      // Non-program bases have no relief hook; render fills first without mutating the editable document.
+      const fillLayers = regions.map(layer => ({ ...layer, id: `region-fill-${layer.id}`, style: { ...layer.style, stroke_width: 0 } }))
+      copy = { ...copy, layers: [...fillLayers, ...copy.layers.map(layer => isRegion(layer) ? { ...layer, style: { ...layer.style, fill_opacity: 0, feather: 0 } } : layer)] }
+      regionComposition = 'bottom-layer'
+    }
+  }
+  const rendered = await renderLayerDoc(copy)
   const sha256 = crypto.createHash('sha256').update(rendered.buffer).digest('hex')
   const dir = path.join(STORAGE_ROOT, 'map-drawings')
   fs.mkdirSync(dir, { recursive: true })
@@ -38,7 +62,7 @@ export async function renderMapLayerDoc(doc: LayerDoc, layerOptions: LayerOption
     // 结果画廊用缩略图（Issue #106）；失败只记日志，不影响抽图
     await generateImageThumb(`static/map-drawings/${file}`)
   }
-  return { path: `static/map-drawings/${file}`, sha256, width: rendered.width, height: rendered.height }
+  return { path: `static/map-drawings/${file}`, sha256, width: rendered.width, height: rendered.height, ...(regionComposition ? { region_composition: regionComposition } : {}) }
 }
 
 export function backgroundProblems(doc: LayerDoc, background: Pick<MapBackgroundResult, 'path' | 'width' | 'height'>): string[] {
@@ -52,7 +76,7 @@ export function backgroundProblems(doc: LayerDoc, background: Pick<MapBackground
 export interface DrawingStageResult { doc: LayerDoc; rendered: RenderedMapDoc; geometry: DrawnGeometry; omitted: OmittedFeature[]; layerOptions: LayerOptions }
 export interface DrawingStageInput {
   taskId: number; runId: number; stageModel: StageModel; brief: MapBrief; spec: MapSpec; background: MapBackgroundResult
-  startRounds: number; feedback: string | null; layerOptions?: LayerOptions
+  startRounds: number; feedback: string | null; layerOptions?: LayerOptions; texturePath?: string
   /** Family selection is resolved from brief + module settings, never an arbitrary style recipe. */
 }
 export function docKey(doc: LayerDoc, layerOptions: LayerOptions = {}): string {
@@ -107,7 +131,9 @@ export async function runDrawingStage(input: DrawingStageInput): Promise<StageAg
    * 压缩窗口内的三步就累积到 24 万字。
    */
   const acceptDraft = (next: LayerDoc) => {
-    const sorted = { ...next, layers: [...next.layers].sort((a, b) => a.z - b.z) }
+    const annotated = annotateRegionLabels(next, input.spec, background.registration)
+    if (annotated.error) return { error: annotated.error }
+    const sorted = { ...annotated.doc, layers: [...annotated.doc.layers].sort((a, b) => a.z - b.z) }
     const strict = strictMapLayerDocProblems(sorted, { features, registration: background.registration })
     if (strict.problems.length) return { error: '草稿修改被拒，原草稿保留', problems: strict.problems }
     const before = new Map(draft.layers.map(layer => [layer.id, JSON.stringify(layer)]))
@@ -173,7 +199,7 @@ export async function runDrawingStage(input: DrawingStageInput): Promise<StageAg
             if (points.some(p => !p)) { problems.push(`要素 ${feature.id} 在当前底图不可见，请回退 base`); continue }
             const coords = points as [number, number][]
             const id = feature.id.length <= 56 ? `feature-${feature.id}` : `feature-${crypto.createHash('sha256').update(feature.id).digest('hex').slice(0, 32)}`
-            const defaults = selectedStyle ? featureStyleFor(selectedStyle.family, { ...feature, markerTier: item.importance }) : {}
+            const defaults = selectedStyle ? featureStyleFor(selectedStyle.family, { ...feature, regionIds: input.spec.regions.map(region => region.id), markerTier: item.importance }) : {}
             const common = { id, name: feature.name, visible: true, locked: false, z: next.layers.length, opacity: 1, rotation: 0, anchor: { semantic_id: feature.id, semantic_name: feature.name }, style: { ...defaults, ...item.style } }
             next.layers.push(feature.kind === 'place' ? { ...common, type: 'marker', at: coords[0]!, text: feature.name } : { ...common, type: feature.kind === 'region' ? 'polygon' : 'polyline', points: coords })
           }
@@ -263,7 +289,7 @@ export async function runDrawingStage(input: DrawingStageInput): Promise<StageAg
         execute: async () => {
           const checked = checkDraft([])
           if (checked.renderable.length) return { error: '草稿或平滑参数非法，未渲染', problems: checked.renderable }
-          const rendered = await renderMapLayerDoc(draft, layerOptions)
+          const rendered = await renderMapLayerDoc(draft, layerOptions, { spec: input.spec, background, texturePath: input.texturePath })
           renders.set(docKey(draft, layerOptions), rendered)
           lastCheck = checked.problems
           return { ...rendered, submit_check: checked.problems.length ? checked.problems : '按交付标准预检通过' }

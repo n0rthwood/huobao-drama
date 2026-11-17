@@ -159,23 +159,46 @@ export function lineStyleFor(family: MapStyleFamily, tier: MapLineTier): LayerSt
   const line = family.lines[tier]
   return { stroke: line.stroke, width: line.width, dash: line.dash, arrow_start: line.arrow_start ?? false, arrow_end: line.arrow_end ?? false }
 }
-export function regionStyleFor(family: MapStyleFamily, semanticId?: string): LayerStyle {
+/** CIELAB D65 distance gives a deterministic, perceptual ordering of palette entries. */
+function lab(color: string): [number, number, number] {
+  const rgb = [1, 3, 5].map(i => parseInt(color.slice(i, i + 2), 16) / 255).map(v => v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4)
+  const [r, g, b] = rgb as [number, number, number]
+  const f = (v: number) => v > .008856 ? Math.cbrt(v) : 7.787 * v + 16 / 116
+  const x = f((r * .4124564 + g * .3575761 + b * .1804375) / .95047)
+  const y = f(r * .2126729 + g * .7151522 + b * .072175)
+  const z = f((r * .0193339 + g * .119192 + b * .9503041) / 1.08883)
+  return [116 * y - 16, 500 * (x - y), 200 * (y - z)]
+}
+export function regionStyleFor(family: MapStyleFamily, semanticId?: string, regionIds: string[] = []): LayerStyle {
   const { colors, ...style } = family.lines.regions
   if (!semanticId) return style
-  // Identity hashing, rather than a position in the current feature list, keeps
-  // existing assignments stable when unrelated regions are inserted or removed.
-  let hash = 2166136261
-  for (const char of semanticId) hash = Math.imul(hash ^ char.codePointAt(0)!, 16777619)
-  return { ...style, fill: colors[(hash >>> 0) % colors.length] }
+  const ids = [...new Set([...regionIds, semanticId])].sort()
+  const labs = colors.map(lab)
+  const order: number[] = []
+  while (order.length < colors.length) {
+    let best = -1, distance = -1
+    for (let i = 0; i < colors.length; i++) {
+      if (order.includes(i)) continue
+      const d = order.length ? Math.min(...order.map(j => Math.hypot(...labs[i]!.map ( (v, axis) => v - labs[j]![axis]! )))) : Infinity
+      if (d > distance) { best = i; distance = d }
+    }
+    order.push(best)
+  }
+  const index = ids.indexOf(semanticId), cycle = Math.floor(index / colors.length)
+  const color = colors[order[index % colors.length]!]!
+  if (!cycle) return { ...style, fill: color }
+  const delta = (cycle % 2 ? 1 : -1) * Math.ceil(cycle / 2) * .05 * 255
+  const fill = '#' + [1, 3, 5].map(i => Math.max(0, Math.min(255, Math.round(parseInt(color.slice(i, i + 2), 16) + delta))).toString(16).padStart(2, '0')).join('')
+  return { ...style, fill }
 }
-export interface FeatureStyleInput { kind: 'place' | 'route' | 'region'; id?: string; category?: string; markerTier?: MapMarkerTier }
+export interface FeatureStyleInput { kind: 'place' | 'route' | 'region'; id?: string; regionIds?: string[]; category?: string; markerTier?: MapMarkerTier }
 /**
  * 底图里的全部河网按 river_minor 画（背景参照）；被检索选中、画进图层的河流是这张图的主题，
  * 一律用 river_major，才能和底图河网区分开（生产版本 3353：主题河流按长度落到 minor，与底图河网同宽，看不出来）。
  */
 export function featureStyleFor(family: MapStyleFamily, feature: FeatureStyleInput): LayerStyle {
   if (feature.kind === 'place') return markerStyleFor(family, feature.markerTier ?? 'city')
-  if (feature.kind === 'region') return regionStyleFor(family, feature.id)
+  if (feature.kind === 'region') return regionStyleFor(family, feature.id, feature.regionIds)
   if (feature.category === 'river') return lineStyleFor(family, 'river_major')
   if (feature.category === 'coast') return lineStyleFor(family, 'coast')
   // The adopted recipe has no mountain/lake line entry: derive quiet terrain/water hints rather than invent terrain geometry.
