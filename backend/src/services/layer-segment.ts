@@ -16,7 +16,7 @@ import fs from 'fs'
 import crypto from 'crypto'
 import { eq, inArray } from 'drizzle-orm'
 import sharp from 'sharp'
-import { db, getInsertId, schema } from '../db/index.js'
+import { db, getInsertId, schema, sqlite } from '../db/index.js'
 import { now } from '../utils/response.js'
 import { getAbsolutePath } from '../utils/storage.js'
 import { probeVideoSpec } from './media-probe.js'
@@ -273,7 +273,38 @@ function canonicalSegmentDoc(doc: LayerDoc, timeline: SegmentTimeline, baseRef: 
   return { doc: expandMapAssetLayers(adopted.doc, map), timeline: adopted.timeline, map }
 }
 
+/**
+ * 行解析缓存（Issue #118 C）：键 = 行全部持久列 + 底图资产版本指纹。
+ * 段行任何写入都改 updatedAt；地图资产图层变化由 mapAssetLayersOf 的资产键
+ * （updated_at + 当前图 + 钉选版本）体现——这里把该键一并纳入指纹。
+ * 命中即返回同一份读时规范形（消费方只读；写路径一律经 saveLayerSegment 重建）。
+ */
+const segmentParseCache = new Map<string, LayerSegment>()
+
+function segmentParseKey(row: SegmentRow): string {
+  let assetKey = ''
+  try {
+    const raw = JSON.parse(row.layerDoc)
+    const ref = raw && typeof raw === 'object' && raw.base && typeof raw.base === 'object' ? raw.base.ref : null
+    const baseRef = parseBaseRef(row.baseRef)
+    const assetId = ref && typeof ref === 'object' && ref.asset_kind === 'prop' ? ref.asset_id
+      : baseRef?.kind === 'asset' && baseRef.asset_kind === 'prop' ? baseRef.asset_id : null
+    if (assetId != null) {
+      const versionTaskId = ref && typeof ref === 'object' && Number.isInteger(ref.version_task_id) ? ref.version_task_id : null
+      const prop = sqlite.prepare('SELECT updated_at, local_path, image_url FROM props WHERE id = ?').get(assetId) as
+        { updated_at: string | null; local_path: string | null; image_url: string | null } | undefined
+      assetKey = `${assetId}:${versionTaskId ?? ''}:${prop?.updated_at ?? ''}:${prop?.local_path || prop?.image_url || ''}`
+    }
+  } catch { /* 坏 JSON 走原解析路径，缓存键不含资产指纹 */ }
+  return [row.id, row.updatedAt, row.layerDoc, row.timeline, row.duration, row.baseRef, row.qualityWarnings,
+    row.renderPath, row.renderSignature, row.renderedAt, row.junctionPath, row.junctionHash, row.status,
+    row.staleReasons, row.baseCheck, row.junctionCaption, assetKey].join('\u0000')
+}
+
 function parseSegmentRow(row: SegmentRow): LayerSegment {
+  const key = segmentParseKey(row)
+  const cached = segmentParseCache.get(key)
+  if (cached) return cached
   let layerDoc: unknown = null
   let timeline: unknown = null
   try {
@@ -292,7 +323,7 @@ function parseSegmentRow(row: SegmentRow): LayerSegment {
   normalized.fps = storedTimelineFps(timeline) ?? normalized.fps
   const baseRef = parseBaseRef(row.baseRef)
   const canonical = canonicalSegmentDoc(stored, normalized, baseRef)
-  return {
+  const segment: LayerSegment = {
     id: row.id,
     storyboard_id: row.storyboardId,
     layer_doc: canonical.doc,
@@ -314,6 +345,9 @@ function parseSegmentRow(row: SegmentRow): LayerSegment {
     created_at: row.createdAt,
     updated_at: row.updatedAt,
   }
+  if (segmentParseCache.size > 400) segmentParseCache.clear()
+  segmentParseCache.set(key, segment)
+  return segment
 }
 
 export async function getLayerSegment(storyboardId: number): Promise<LayerSegment | null> {
