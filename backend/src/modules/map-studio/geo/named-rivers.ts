@@ -14,6 +14,7 @@ import crypto from 'crypto'
 import fs from 'fs'
 import path from 'path'
 import { resolveGeoDir } from './datasets.js'
+import { loadRegionRiverPack } from './river-region-store.js'
 
 export class NamedRiverError extends Error {
   constructor(message: string) {
@@ -74,6 +75,12 @@ export function namedRiverNames(): string[] {
 
 /** 按英文名或中文名取一条预取河；不在包里返回 null（调用方决定是否算错误） */
 export function loadNamedRiver(nameOrZh: string): NamedRiver | null {
+  if (nameOrZh.startsWith('osm:')) {
+    const { manifest, byId } = loadRegionRiverPack()
+    const river = byId.get(nameOrZh.slice(4))
+    return river ? { name: river.names[0] ?? nameOrZh, name_zh: river.names[0] ?? nameOrZh,
+      ways: river.way_ids.length, license: manifest.license, attribution: manifest.attribution, lines: river.lines } : null
+  }
   const key = nameOrZh.trim()
   if (!key) return null
   const cached = packCache.get(key.toLowerCase())

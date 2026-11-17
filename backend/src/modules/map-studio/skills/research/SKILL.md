@@ -11,6 +11,7 @@ description: 地图工作流·资料检索阶段 — 用真实检索工具找资
 
 1. 用 `search_sources` 检索。`wikipedia-zh`、`wikipedia-en`、`europeana`、`smithsonian` 四个来源**每个至少检索一次**，零命中也算检索过。维基用条目名或关键词；Europeana 和 Smithsonian 用英文。命中会登记为 S1、S2…
 2. 用 `search_dataset({layer,query,bbox?})` 找离线 **Natural Earth（公有领域）**原始几何。layer 为 `river/lake/coast/mountain/physical_region/place`；山脉用 mountain，平原/高原/沙漠等用 physical_region。多语名称、大小写、变音和连字符均参与匹配。河流 10m 优先（如 Tura），地名可找 Tobolsk，山脉可找 Ural Mountains / 乌拉尔山脉。每次查询都会登记在 `research.dataset_queries` 供缺失声明核对；结果最多 10 条，带稳定 ref、名称、类别、bbox、顶点数、长度/面积。按名称和范围核对后采用，不要自己描河。
+   - 河流另检索离线预取的 **OSM 命名河流（ODbL 1.0）**，引用为 `osm:…`；俄境名称通常没有中文译名，请尝试俄文或英文名。同名河可能有多个候选，用 bbox 区分，不要仅凭名字假定是同一条。
    - **河流/湖泊优先用组引用 `ne-group:…`**：Natural Earth 把一条河拆成 `River` 要素加若干 `Lake Centerline`（水库段）要素，单个 ref 只含其中一段，裁剪后会碎成互不相连的碎片。带 `group` 字段的候选覆盖同名同 rivernum 的全部要素，代码把端点相同或相差不超过 0.01°（约 1.1 km，4K 画幅上约 1 像素）的链首尾相接成一条河，只追加原始顶点、不插入新顶点，每个被缝合的接缝都计入 `group.joined_parts`。
    - 组候选的 `group.chains` 是拼接后仍不连通的链数，`group.shortest_chain_km` 是最短链长度。链数多、短链很短（例如支汊或另一处同名河段）说明 clip_bbox 该收紧；**代码不会静默丢弃任何链或顶点**，要排除就显式收紧 `clip_bbox`。真实地理间断（例如河口三角洲分汊）本来就该保持分开。
 3. 需要逐字引用时先 `read_source`，从读到的正文复制原句。除坐标外，还要抽取距离、方位、近河等相对位置证据。

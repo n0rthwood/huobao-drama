@@ -551,8 +551,8 @@ export async function renderReliefBase(
   if (options.namedRivers?.length) {
     const { rivers, missing } = loadNamedRivers(options.namedRivers)
     if (missing.length) {
-      warnings.push(`命名河流「${missing.join('、')}」不在预取包 assets/geo/osm-rivers 里：这些河不会被画出。`
-        + `请运行 node --import tsx scripts/prefetch-map-data.ts --bbox <w,s,e,n> --rivers ${missing.join(',')} 补齐（运行期不联网）。`)
+      warnings.push(`命名河流引用「${missing.join('、')}」不在预取包里：这些河不会被画出。`
+        + '请在 backend 运行 node --import tsx scripts/prefetch-river-region.ts（运行期不联网）。')
     }
     for (const river of rivers) {
       const lines = river.lines

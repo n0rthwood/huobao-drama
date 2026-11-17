@@ -21,10 +21,12 @@ import crypto from 'crypto'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { loadRegionRiverPack, regionRiverPackAvailable } from './river-region-store.js'
+import { foldRiverName } from './river-region.js'
 
 export type DatasetLayer = 'river' | 'lake' | 'coast' | 'mountain' | 'physical_region' | 'place'
 export type DatasetKind = 'place' | 'route' | 'region'
-export type DatasetScale = '10m' | '50m'
+export type DatasetScale = '10m' | '50m' | 'osm'
 export type DatasetBBox = [number, number, number, number]
 export type DatasetPosition = [number, number]
 export const DATASET_LAYERS: readonly DatasetLayer[] = ['river', 'lake', 'coast', 'mountain', 'physical_region', 'place']
@@ -64,7 +66,7 @@ export interface DatasetSourceInfo {
   filename: string
   scale: DatasetScale
   sha256: string
-  license: 'Public domain'
+  license: 'Public domain' | 'ODbL-1.0'
 }
 /** Chain statistics of a group reference: how fragmented the extracted geometry is. */
 export interface DatasetGroupInfo {
@@ -158,6 +160,8 @@ export function datasetFileInfo(fileId: string): DatasetSourceInfo {
 export interface ParsedDatasetRef { fileId: string; index: number | null; group: string | null }
 /** Single-feature refs index one GeoJSON feature; group refs name one river or lake across features. */
 export function parseDatasetRef(ref: string): ParsedDatasetRef {
+  const osm = typeof ref === 'string' ? /^osm:([a-f0-9]{24})$/.exec(ref) : null
+  if (osm) return { fileId: 'osm_rivers', index: null, group: osm[1]! }
   const single = typeof ref === 'string' ? /^ne:([a-z0-9_]+):(0|[1-9]\d*)$/.exec(ref) : null
   if (single && Number.isSafeInteger(Number(single[2]))) { definition(single[1]!); return { fileId: single[1]!, index: Number(single[2]), group: null } }
   // Group keys are folded names with spaces replaced by '-' (foldDatasetName never emits ':' or spaces);
@@ -167,16 +171,23 @@ export function parseDatasetRef(ref: string): ParsedDatasetRef {
   throw new DatasetError(`数据集引用「${String(ref)}」非法：格式必须为 ne:<文件简名>:<序号>（例如 ne:10m_rivers_lake_centerlines:279），或河流/湖泊组引用 ne-group:<文件简名>:<组名>（例如 ne-group:10m_rivers_lake_centerlines:volga）；请采用 search_dataset 返回的 ref。`)
 }
 export function datasetRefFileId(ref: string): string { return parseDatasetRef(ref).fileId }
-export function datasetSourceInfo(ref: string): DatasetSourceInfo { return datasetFileInfo(parseDatasetRef(ref).fileId) }
+export function datasetSourceInfo(ref: string): DatasetSourceInfo {
+  if (ref.startsWith('osm:')) {
+    const { manifest } = loadRegionRiverPack()
+    return { fileId: 'osm_rivers', filename: manifest.file, scale: 'osm', sha256: manifest.sha256, license: 'ODbL-1.0' }
+  }
+  return datasetFileInfo(parseDatasetRef(ref).fileId)
+}
 /** Cheap source selector: parses the ref without loading geometries. */
 export function riverScaleForRef(ref: string): DatasetScale | null {
+  if (ref.startsWith('osm:')) return null
   const { fileId } = parseDatasetRef(ref)
   const def = definition(fileId)
   return def.layer === 'river' ? def.scale : null
 }
 
 export function foldDatasetName(value: string): string {
-  return value.normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase()
+  return value.normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase().replace(/^\s*река\s+/u, '')
     .replace(/[-‐‑‒–—―_/\\.,;:!?"'’‘()[\]{}]/g, ' ').replace(/\s+/g, ' ').trim()
 }
 function namesOf(properties: Record<string, unknown>): string[] {
@@ -314,10 +325,12 @@ function lookup(ref: string): { entry: IndexEntry; file: LoadedFile } {
   return { entry, file }
 }
 export function datasetRefLayer(ref: string): DatasetLayer {
+  if (ref.startsWith('osm:')) { extractDatasetGeometry(ref); return 'river' }
   const parsed = parseDatasetRef(ref)
   return parsed.group === null ? lookup(ref).entry.layer : groupEntries(parsed.fileId, parsed.group)[0]!.layer
 }
 export function datasetRefKind(ref: string): DatasetKind {
+  if (ref.startsWith('osm:')) { extractDatasetGeometry(ref); return 'route' }
   const parsed = parseDatasetRef(ref)
   return parsed.group === null ? lookup(ref).entry.kind : groupParts(groupEntries(parsed.fileId, parsed.group)).kind
 }
@@ -420,9 +433,25 @@ export function searchDataset(layer: DatasetLayer, query: string, bbox?: Dataset
       if (candidate) ranked.push({ candidate, score: groupScore, priority, group: true })
     }
   }
+  if (layer === 'river' && regionRiverPackAvailable()) {
+    const neNames = new Set(hits.flatMap(hit => hit.entry.names.map(foldRiverName)))
+    const wanted = foldRiverName(query)
+    for (const river of loadRegionRiverPack().rivers) {
+      if (river.retired) continue
+      const folded = river.names.map(foldRiverName)
+      if (folded.some(name => neNames.has(name)) || (filter && !intersects(river.bbox, filter))) continue
+      const exact = folded.some(name => name === wanted)
+      if (!exact && !folded.some(name => name.includes(wanted))) continue
+      const parts = river.lines
+      ranked.push({ score: exact ? 100 : 40, priority: LAYER_FILES.river.length, group: false, candidate: {
+        ref: `osm:${river.id}`, names: [...river.names], class: 'River', scalerank: null,
+        bbox: [...river.bbox], vertices: parts.reduce((sum, part) => sum + part.length, 0), length_km: length(parts),
+      } })
+    }
+  }
   ranked.sort((a, b) => b.score - a.score || a.priority - b.priority || Number(b.group) - Number(a.group)
     || Number(a.candidate.class === 'Lake Centerline') - Number(b.candidate.class === 'Lake Centerline')
-    || (a.candidate.scalerank ?? 99) - (b.candidate.scalerank ?? 99) || b.candidate.vertices - a.candidate.vertices || a.candidate.ref.localeCompare(b.candidate.ref))
+    || (a.candidate.scalerank ?? 99) - (b.candidate.scalerank ?? 99) || (b.candidate.length_km ?? 0) - (a.candidate.length_km ?? 0) || b.candidate.vertices - a.candidate.vertices || a.candidate.ref.localeCompare(b.candidate.ref))
   return ranked.slice(0, 10).map(item => item.candidate)
 }
 /** Group candidate: combined geometry plus the chain counts the model needs to choose a clip. */
@@ -519,6 +548,17 @@ function extractGroupGeometry(ref: string, entries: IndexEntry[], clip: DatasetB
 }
 /** Synchronous, actionable errors; returned arrays are caller-owned. */
 export function extractDatasetGeometry(ref: string, clip_bbox?: DatasetBBox): ExtractedDatasetGeometry {
+  if (ref.startsWith('osm:')) {
+    const parsed = parseDatasetRef(ref), river = loadRegionRiverPack().byId.get(parsed.group!)
+    if (!river) throw new DatasetError(`OSM 河流引用 ${ref} 不存在；请重新 search_dataset。`)
+    const clip = clip_bbox === undefined ? null : assertBBox(clip_bbox, 'clip_bbox')
+    const sourceParts = river.lines.map(line => line.map(point => [...point] as DatasetPosition))
+    const parts = clip ? clipParts(sourceParts, 'route', clip) : sourceParts
+    if (!parts.length) throw new DatasetError(`数据集 ${ref} 在 clip_bbox 内没有足够的原始顶点，请扩大裁剪范围。`)
+    return { ref, layer: 'river', kind: 'route', names: [...river.names], parts, bbox: bounds(parts),
+      vertices: parts.reduce((sum, part) => sum + part.length, 0), length_km: length(parts), source: datasetSourceInfo(ref),
+      ...(clip ? { clip_bbox: clip, clip_mode: 'vertex-run' as const } : {}) }
+  }
   const parsed = parseDatasetRef(ref)
   const clip = clip_bbox === undefined ? null : assertBBox(clip_bbox, 'clip_bbox')
   if (parsed.group !== null) return extractGroupGeometry(ref, groupEntries(parsed.fileId, parsed.group), clip)

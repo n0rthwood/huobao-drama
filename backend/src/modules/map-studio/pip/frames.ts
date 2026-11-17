@@ -128,7 +128,13 @@ export function validateFrames(overview: MapBbox, raw: unknown, assetAspect: Map
   return { frames, problems: [] }
 }
 
-export interface MapPipImage { path: string; width: number; height: number; sha256: string }
+export interface MapPipImage {
+  path: string
+  width: number
+  height: number
+  sha256: string
+  provenance?: { attribution: string; sources: Array<{ name: string; url: string; license: string; sha256: string }> }
+}
 
 /**
  * 画中画产出（三件套：全览 + 细节 + 布局 spec）。details/composite 在「完成登记」前由确定性渲染补齐。

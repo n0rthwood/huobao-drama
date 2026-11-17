@@ -105,14 +105,17 @@ SHA-256：
 
 ### 命名河流补充包：OSM（ODbL 1.0）
 
-Natural Earth 缺乌格拉河（Угра）、阿赫图巴（Ахтуба）、卡赞卡（Казанка）这类叙事关键小河。
-它们由 `backend/scripts/prefetch-map-data.ts --rivers` 从 OSM Overpass **预先**抓取，入仓到
-`backend/assets/geo/osm-rivers/`（`<slug>.json` + `manifest.json`：来源 URL、抓取时间、sha256、ODbL 署名）。
+区域河流预取范围为东经 20–100°、北纬 40–70°，仅包括有 `name` 的
+`waterway=river` ways；以同名且端点相连分组，并按 manifest 的容差简化。数据来源与署名：
+**© OpenStreetMap contributors, ODbL 1.0**（https://www.openstreetmap.org/copyright）。
 
-- 数据来源与署名：**© OpenStreetMap contributors, ODbL 1.0**（https://www.openstreetmap.org/copyright）。
-- Overpass 必须带自定义 `User-Agent`（否则 406），查询用 POST `data=`；脚本会重试并在主站限流时退到镜像。
-- 运行期**不联网**：地图任务只读本地包；缺某条河时 warning 会点名缺哪条 + 预取命令。
-- 现包内容：`ugra.json`（乌格拉河，26 条 way）、`akhtuba.json`（阿赫图巴河，20 条 way）。
+- 在 `backend/` 执行 `node --import tsx scripts/prefetch-river-region.ts`；Overpass 请求带自定义
+  User-Agent，逐 1° 方块限速、重试，块数据保存在 `DATA_ROOT/map-data/osm-rivers/chunks/` 以便续抓。
+- 成品 manifest 记录来源、抓取时间、区域、简化容差、sha256、条数、字节数和 gzip 字节数。
+  数据不超过 50 MiB 时放 `backend/assets/geo/osm-rivers/rivers.json`；超过时放
+  `DATA_ROOT/map-data/osm-rivers/rivers.json`，仓库保留 manifest。读取顺序先仓库后数据目录。
+- 运行期只读、校验 sha256，不从 OSM 联网；缺失缓存时提示上述预取命令。新画中画细节版本
+  记录各自来源与署名，历史版本不回写。
 
 底图成品的署名（provenance.attribution）必须包含：
 `Natural Earth（公共领域）· AWS Terrain Tiles, SRTM / GMTED2010 / ETOPO1（公共领域）`，
