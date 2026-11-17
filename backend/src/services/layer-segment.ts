@@ -46,6 +46,14 @@ import {
 import { LAYER_BASE_CHECK_STATUSES, type LayerBaseCheck, type LayerBaseCheckStatus } from './layer-base-check.js'
 // 衔接帧画面描述（#95）的类型与解析：与 #94 的 base_check 同口径，只在函数体里互相调用，ESM 循环安全。
 import type { JunctionCaptionCache } from './junction-caption.js'
+import {
+  adoptMapAssetLayers,
+  expandMapAssetLayers,
+  mapAssetLayersOf,
+  stripRawMapLayers,
+  type MapAssetLayers,
+  type MapSourceInfo,
+} from './map-asset-layers.js'
 
 export const LAYER_SEGMENT_STATUSES = ['draft', 'rendering', 'ready', 'failed'] as const
 export type LayerSegmentStatus = typeof LAYER_SEGMENT_STATUSES[number]
@@ -91,6 +99,11 @@ export interface LayerSegment {
   base_check: LayerBaseCheck | null
   /** 衔接帧画面描述（Issue #95）；null = 从未描述。按 junction_hash 缓存，不参与新鲜度 */
   junction_caption: JunctionCaptionCache | null
+  /**
+   * 底图是带图层文档的地图资产（Issue #117）：`layer_doc` 已读时展开资产的锚定图层（`map:` 前缀、只读），
+   * 底图为资产文档底图；null = 普通底图，文档即库内原样。
+   */
+  map_source: MapSourceInfo | null
   created_at: string
   updated_at: string
 }
@@ -232,6 +245,33 @@ function storedTimelineFps(timeline: unknown): number | undefined {
   return typeof fps === 'number' && Number.isFinite(fps) && fps >= SEGMENT_FPS_MIN && fps <= SEGMENT_FPS_MAX ? fps : undefined
 }
 
+/** 段的底图资产引用：编辑器写的 `layer_doc.base.ref` 优先，其次设计卡落库的 `base_ref` */
+function baseAssetRefOf(doc: LayerDoc, baseRef: BaseRef | null): { asset_kind: string; asset_id: number; version_task_id: number | null } | null {
+  if (doc.base.ref) return { ...doc.base.ref, version_task_id: doc.base.ref.version_task_id ?? null }
+  return baseRef?.kind === 'asset' ? baseRef : null
+}
+
+/** 本段底图对应的地图资产图层文档（非地图资产 / 没有图层文档 → null） */
+function mapAssetOfSegment(doc: LayerDoc, baseRef: BaseRef | null): MapAssetLayers | null {
+  const ref = baseAssetRefOf(doc, baseRef)
+  return ref?.asset_kind === 'prop' ? mapAssetLayersOf(ref.asset_id, ref.version_task_id) : null
+}
+
+/**
+ * 读时规范形（Issue #117）：地图资产底图的段先按 `adoptMapAssetLayers` 换掉旧重画层（时间线同步映射），
+ * 再展开资产图层。所有消费方（编辑器、渲染、签名、衔接帧、合成状态）都只见到这一份。
+ */
+function canonicalSegmentDoc(doc: LayerDoc, timeline: SegmentTimeline, baseRef: BaseRef | null): {
+  doc: LayerDoc
+  timeline: SegmentTimeline
+  map: MapAssetLayers | null
+} {
+  const map = mapAssetOfSegment(doc, baseRef)
+  if (!map) return { doc, timeline, map: null }
+  const adopted = adoptMapAssetLayers(doc, timeline, map)
+  return { doc: expandMapAssetLayers(adopted.doc, map), timeline: adopted.timeline, map }
+}
+
 function parseSegmentRow(row: SegmentRow): LayerSegment {
   let layerDoc: unknown = null
   let timeline: unknown = null
@@ -245,18 +285,20 @@ function parseSegmentRow(row: SegmentRow): LayerSegment {
   } catch {
     timeline = null
   }
-  const doc = normalizeLayerDoc(layerDoc)
+  const stored = normalizeLayerDoc(stripRawMapLayers(layerDoc))
   // 读时只做清洗：取景框的权威归一在保存、渲染与编辑器加载时按真实成片规格做
-  const normalized = normalizeTimeline(timeline, doc.base.crop)
+  const normalized = normalizeTimeline(timeline, stored.base.crop)
   normalized.fps = storedTimelineFps(timeline) ?? normalized.fps
+  const baseRef = parseBaseRef(row.baseRef)
+  const canonical = canonicalSegmentDoc(stored, normalized, baseRef)
   return {
     id: row.id,
     storyboard_id: row.storyboardId,
-    layer_doc: doc,
-    timeline: normalized,
+    layer_doc: canonical.doc,
+    timeline: canonical.timeline,
     duration: row.duration,
-    end_hold: endHoldOf(normalized, row.duration),
-    base_ref: parseBaseRef(row.baseRef),
+    end_hold: endHoldOf(canonical.timeline, row.duration),
+    base_ref: baseRef,
     quality_warnings: parseWarnings(row.qualityWarnings),
     render_path: row.renderPath,
     render_signature: row.renderSignature,
@@ -267,6 +309,7 @@ function parseSegmentRow(row: SegmentRow): LayerSegment {
     stale_reasons: parseStringArray(row.staleReasons),
     base_check: parseBaseCheck(row.baseCheck),
     junction_caption: parseJunctionCaption(row.junctionCaption),
+    map_source: canonical.map ? { asset_id: canonical.map.asset_id, asset_name: canonical.map.asset_name, layer_count: canonical.map.layers.length } : null,
     created_at: row.createdAt,
     updated_at: row.updatedAt,
   }
@@ -320,17 +363,26 @@ export async function saveLayerSegment(
   const existing = await getLayerSegment(storyboardId)
   const [row] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, storyboardId))
   if (!row) throw new Error('分镜不存在')
-  const layerDoc = await withBaseSourceSize(normalizeLayerDoc('layer_doc' in input ? input.layer_doc : existing?.layer_doc))
+  // 资产图层（`map:`）只读：先在原始输入上剥掉，再规范化（否则 60 层上限会挤掉段自己的层），客户端改动一律忽略
+  const submittedDoc = await withBaseSourceSize(normalizeLayerDoc(stripRawMapLayers('layer_doc' in input ? input.layer_doc : existing?.layer_doc)))
   // fps 是派生值：跟随本集既存计划/回退目标，保存时不能把 29.97 取整为 30。
   const spec = await resolveEpisodeSegmentSpec(row.episodeId)
-  const timeline = {
-    ...normalizeTimeline('timeline' in input ? input.timeline : existing?.timeline, baseFrameOf(layerDoc.base, spec).frame),
+  const baseRef = 'base_ref' in input ? input.base_ref ?? null : existing?.base_ref ?? null
+  const map = mapAssetOfSegment(submittedDoc, baseRef)
+  const viewFrame = baseFrameOf(map ? expandMapAssetLayers(submittedDoc, map).base : submittedDoc.base, spec).frame
+  const submittedTimeline = {
+    ...normalizeTimeline('timeline' in input ? input.timeline : existing?.timeline, viewFrame),
     fps: spec.fps,
   }
+  // 地图资产底图：旧的按语义重画层换成资产层（时间线同步映射），库里只存段自己的层
+  const adopted = map ? adoptMapAssetLayers(submittedDoc, submittedTimeline, map) : null
+  const layerDoc = adopted ? adopted.doc : submittedDoc
+  const timeline = adopted ? adopted.timeline : submittedTimeline
+  const readDoc = map ? expandMapAssetLayers(layerDoc, map) : layerDoc
+  const mapSource = map ? { asset_id: map.asset_id, asset_name: map.asset_name, layer_count: map.layers.length } : null
   // 图层段时长没有上限（Issue #110）：1 秒下限，加长由人/AI 的预算决定
   const duration = clampSegmentDuration(input.duration !== undefined ? Number(input.duration) : (existing?.duration ?? 0))
-  const baseRef = 'base_ref' in input ? input.base_ref ?? null : existing?.base_ref ?? null
-  const warnings = qualityWarningsOf(layerDoc, timeline.keyframes, spec)
+  const warnings = qualityWarningsOf(readDoc, timeline.keyframes, spec)
   const ts = now()
   const staleReasons = (existing?.stale_reasons || []).filter(reason =>
     !(reason === SEGMENT_STALE_REASONS.baseRefUnresolved && baseRef)
@@ -348,13 +400,14 @@ export async function saveLayerSegment(
     }).where(eq(schema.storyboardLayerSegments.id, existing.id))
     return {
       ...existing,
-      layer_doc: layerDoc,
+      layer_doc: readDoc,
       timeline,
       duration,
       end_hold: endHoldOf(timeline, duration),
       base_ref: baseRef,
       quality_warnings: warnings,
       stale_reasons: staleReasons,
+      map_source: mapSource,
       updated_at: ts,
     }
   }
@@ -373,7 +426,7 @@ export async function saveLayerSegment(
   return {
     id: getInsertId(result),
     storyboard_id: storyboardId,
-    layer_doc: layerDoc,
+    layer_doc: readDoc,
     timeline,
     duration,
     end_hold: endHoldOf(timeline, duration),
@@ -381,6 +434,7 @@ export async function saveLayerSegment(
     quality_warnings: warnings,
     base_check: null,
     junction_caption: null,
+    map_source: mapSource,
     render_path: null,
     render_signature: null,
     rendered_at: null,
@@ -782,6 +836,9 @@ export async function buildSegmentDraft(storyboardId: number): Promise<SegmentDr
         : '设计卡没有指定图层段底图：请回分镜设计为图层段选择底图',
     }
   }
+  const mapLayers = base.baseRef?.kind === 'asset' && base.baseRef.asset_kind === 'prop'
+    ? mapAssetLayersOf(base.baseRef.asset_id, base.baseRef.version_task_id)
+    : null
   const draft = draftSegment(card, combo, {
     assets,
     base: base.asset,
@@ -790,6 +847,7 @@ export async function buildSegmentDraft(storyboardId: number): Promise<SegmentDr
     duration: sb.duration || 0,
     width: spec.width,
     height: spec.height,
+    map_layers: mapLayers,
   })
   return { ok: true, result: { draft, spec, base_ref: base.baseRef } }
 }
@@ -810,6 +868,43 @@ export async function saveSegmentDraft(storyboardId: number): Promise<SegmentDra
     .set({ keyframesJunctionHash: null, updatedAt: now() })
     .where(eq(schema.storyboards.id, storyboardId))
   return { ok: true, result: { draft: { ...draft, layer_doc: segment.layer_doc }, spec, base_ref } }
+}
+
+/**
+ * 启动迁移（Issue #117，幂等）：地图资产底图的存量段里「按语义重画」的层换成资产图层引用，
+ * 时间线 visible 同步映射，库里只留段自己的层。找不到对应资产层的旧层原样保留并计入报告。
+ * 新签名使旧渲染自然过期，由人/批量重渲。读路径本来就按同一规则规范化，这里只是把结果落库。
+ */
+export async function migrateMapAssetSegments(): Promise<{ converted: number; replaced: number; unmatched: Array<{ storyboard_id: number; layer_id: string; semantic_id: string | null }> }> {
+  const rows = await db.select().from(schema.storyboardLayerSegments)
+  const report = { converted: 0, replaced: 0, unmatched: [] as Array<{ storyboard_id: number; layer_id: string; semantic_id: string | null }> }
+  for (const row of rows) {
+    let raw: unknown = null
+    let rawTimeline: unknown = null
+    try {
+      raw = JSON.parse(row.layerDoc)
+      rawTimeline = JSON.parse(row.timeline)
+    } catch {
+      continue
+    }
+    const doc = normalizeLayerDoc(stripRawMapLayers(raw))
+    const map = mapAssetOfSegment(doc, parseBaseRef(row.baseRef))
+    if (!map) continue
+    const timeline = normalizeTimeline(rawTimeline, doc.base.crop)
+    timeline.fps = storedTimelineFps(rawTimeline) ?? timeline.fps
+    const adopted = adoptMapAssetLayers(doc, timeline, map)
+    for (const item of adopted.unmatched) report.unmatched.push({ storyboard_id: row.storyboardId, layer_id: item.id, semantic_id: item.semantic_id })
+    if (!adopted.replaced.length) continue
+    const { filter: _filter, ...base } = adopted.doc.base
+    await db.update(schema.storyboardLayerSegments).set({
+      layerDoc: JSON.stringify({ ...adopted.doc, base: { ...base, path: map.base.path, source_width: map.base.width, source_height: map.base.height } }),
+      timeline: JSON.stringify(adopted.timeline),
+      updatedAt: now(),
+    }).where(eq(schema.storyboardLayerSegments.id, row.id))
+    report.converted++
+    report.replaced += adopted.replaced.length
+  }
+  return report
 }
 
 /** 段组合要求的图层段位置（机械换源用）：A 整镜替代、C 在模型视频之前、D 在之后、B/未选 = 没有图层段 */

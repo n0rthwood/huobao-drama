@@ -163,6 +163,10 @@ Every information point needs an owner. Entries without one are flagged `info_po
   - `anchor` points at the same semantic entry as `must_mark`, and it must exist on **the asset and version used as this shot's base image**,
     with a compatible type and complete geometry: `polygon` / `polyline` take a vertexed `region` or `line` (≥3 and ≥2 points respectively),
     `marker` takes a `point`, a positioned `label` takes a `label`. Omit `anchor` when the layer does not point at a specific place.
+  - **When the base is a map asset** (`asset_type='map'`), layers anchored to its features are not redrawn in the shot: the layer
+    segment shows every layer the asset already draws for that feature (line, place, label — same line style and colours as the
+    asset's map, not editable in the shot). `type` only has to be compatible with the semantic kind and `at_s` decides when it
+    appears; do not add a separate `label` for the same feature.
   - `at_s`: at which second inside the layer segment this layer appears. **Lay it out on the measured audio timeline**: whatever the narration
     says first appears first; "simultaneously" / "in two columns" is expressed by **two layers with the same `at_s`**, "first … then …" by
     different `at_s` values. `at_s` must not exceed this segment's `layer_s`.

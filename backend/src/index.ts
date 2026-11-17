@@ -63,6 +63,7 @@ import { migrateReferenceImages } from './services/reference-images.js'
 import { migrateAssetNames } from './services/asset-name-migration.js'
 import { migrateIntentToDesignCard } from './services/design-card-migration.js'
 import { migrateClipsToLayerSegments } from './services/layer-segment-migration.js'
+import { migrateMapAssetSegments } from './services/layer-segment.js'
 import { backfillPoolProjection } from './services/storyboard-assets.js'
 import { backfillPipDetailSemantics } from './services/map-pip-detail-semantics.js'
 import { logLayerFontStatus } from './services/layer-fonts.js'
@@ -231,6 +232,12 @@ db.update(schema.sysTask)
   // 图层段迁移（Issue #58）必须在 design-card 迁移之后：后者回填 storyboards.combo，
   // 本迁移据此判断「有 clip 行但 combo 为空」→ stale_reasons=['combo_missing']
   .then(() => migrateClipsToLayerSegments())
+  // 地图资产底图的段改为引用资产图层（Issue #117）：存量重画层换成资产层，幂等；必须在 #58 迁移之后
+  .then(() => migrateMapAssetSegments())
+  .then(report => {
+    if (report.converted) console.log(`🗺️ 地图资产图层段迁移：${report.converted} 段，换掉 ${report.replaced} 个重画层`)
+    if (report.unmatched.length) console.warn(`⚠️ 地图资产图层段迁移：${report.unmatched.length} 个重画层在资产图层里找不到对应要素，已原样保留`, JSON.stringify(report.unmatched))
+  })
   // 本镜资产池投影补齐（Issue #43）：角色/道具关联 = 手选 ∪ 当前 @，幂等
   .then(() => backfillPoolProjection())
   // 存量纪录片集补剧本确认（Issue #54）：升级前已拆出分镜的集视为已确认，否则新门禁会把它们锁死，幂等

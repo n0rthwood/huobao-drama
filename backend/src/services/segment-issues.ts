@@ -82,9 +82,12 @@ function textSizeOf(doc: LayerDoc): { width: number; height: number } {
 function anchoredKeyframes(segment: LayerSegment | null): Set<string> {
   const out = new Set<string>()
   if (!segment) return out
+  // 地图资产图层（#117）整套都在文档里：只有在某个关键帧可见的才算「标注了」
+  const shown = new Set(segment.timeline.keyframes.flatMap(frame => frame.visible))
   for (const layer of segment.layer_doc.layers) {
     const anchor = layer.anchor
     if (!anchor || anchor.detached || !anchor.semantic_id) continue
+    if (layer.from_asset && !shown.has(layer.id)) continue
     out.add(`${anchor.asset_id}:${anchor.semantic_id}`)
   }
   return out

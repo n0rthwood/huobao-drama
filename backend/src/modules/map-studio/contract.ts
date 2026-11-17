@@ -10,6 +10,13 @@
 import type { MapBrief } from './types.js'
 import type { MapPipOutput } from './pip/frames.js'
 
+/**
+ * 交付的 `editable_source.layer_options` 平滑只作用于渲染副本；宿主复用资产图层时（#117）必须用同一实现。
+ * `render/smooth.ts` 只依赖 `services/layer-doc`，从契约面导出不会把模块的 Agent 依赖链带进宿主（index.ts 会，形成循环引用）。
+ */
+export { renderCopyWithSmoothing } from './render/smooth.js'
+export type { LayerOptions as MapLayerOptions } from './render/smooth.js'
+
 /** 宿主目标引用：火宝用 `prop:<id>` */
 export type MapStudioHostRef = string
 

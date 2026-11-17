@@ -23,6 +23,7 @@ import { normalizeLayerDoc, type LayerBox, type LayerDoc } from './layer-doc.js'
 import { TEXT_SPEC, textLayoutById } from './layer-text.js'
 import { revealBeats, textZoneOf } from './layer-text-visibility.js'
 import { baseFrameOf } from './layer-quality.js'
+import { mapLayerIdsBySemantic, type MapAssetLayers } from './map-asset-layers.js'
 import {
   SEGMENT_DEFAULT_FADE_MS,
   SEGMENT_DEFAULT_FPS,
@@ -90,6 +91,11 @@ export interface SegmentDraftContext {
   width: number
   height: number
   fps?: number
+  /**
+   * 底图是带图层文档的地图资产（Issue #117）：锚定底图要素的计划层不再按语义重画，
+   * 而是让资产里该要素的全部图层（`map:` 前缀）在 `at_s` 显现。
+   */
+  map_layers?: MapAssetLayers | null
 }
 
 export interface SegmentDraft {
@@ -353,10 +359,31 @@ export function draftSegment(card: DesignCard, combo: Combo | null, ctx: Segment
   const warnings: string[] = []
   const planned = card.layer_plan?.planned_layers || []
   const modernText = planned.some(item => item.type === 'text') || Boolean(card.layer_plan?.text_layout)
-  const drafted: DraftedLayer[] = []
+  // 一个条目 = 一次显现：段自己新建的层（layer），或地图资产里某要素的全部图层（ids，#117）
+  const drafted: Array<{ layer: Record<string, unknown> | null; ids: string[]; points: Array<[number, number]>; plannedIndex: number }> = []
+  const map = ctx.map_layers ?? null
+  const mapGroups = map ? mapLayerIdsBySemantic(map) : null
   for (const [index, item] of planned.entries()) {
-    const layer = layerFromPlannedLayer(item, index, ctx, warnings, modernText, card.layer_plan?.text_layout)
-    if (layer) drafted.push(layer)
+    const assetId = item.anchor?.asset_id ?? ctx.base?.id
+    if (map && mapGroups && ['polygon', 'polyline', 'marker', 'label'].includes(item.type) && assetId === map.asset_id) {
+      const key = item.anchor?.semantic_id || item.anchor?.name
+      const semanticId = findSemantic(ctx.base, key)?.entry.id ?? key ?? ''
+      const ids = mapGroups.get(semanticId)
+      if (!ids?.length) {
+        warnings.push(`第 ${index + 1} 层：地图资产「${map.asset_name}」的图层里没有要素「${item.anchor?.name || key || '未命名'}」，未显示（不在分镜里重画）`)
+        continue
+      }
+      const points = map.layers.filter(layer => ids.includes(layer.id)).flatMap((layer): Array<[number, number]> => {
+        if (layer.type === 'polygon' || layer.type === 'polyline') return layer.points
+        if (layer.type === 'marker') return [layer.at]
+        if (layer.type === 'label') return [[layer.box.x, layer.box.y], [layer.box.x + layer.box.w, layer.box.y + layer.box.h]]
+        return []
+      })
+      drafted.push({ layer: null, ids, points, plannedIndex: index })
+      continue
+    }
+    const entry = layerFromPlannedLayer(item, index, ctx, warnings, modernText, card.layer_plan?.text_layout)
+    if (entry) drafted.push({ layer: entry.layer, ids: [String(entry.layer.id)], points: entry.points, plannedIndex: index })
   }
 
   const planSeconds = card.budget.layer_s
@@ -380,15 +407,16 @@ export function draftSegment(card: DesignCard, combo: Combo | null, ctx: Segment
       height: ctx.height,
       source_width: baseSize && baseSize.width > 1 ? baseSize.width : undefined,
       source_height: baseSize && baseSize.height > 1 ? baseSize.height : undefined,
-      filter: { paper: 0.16, tint: 'sepia', tint_strength: 0.18, vignette: 0.28 },
+      // 地图资产底图读时换成资产文档底图、不加段滤镜（外观与资产一致）
+      ...(map ? {} : { filter: { paper: 0.16, tint: 'sepia', tint_strength: 0.18, vignette: 0.28 } }),
     },
-    layers: drafted.map(entry => entry.layer),
+    layers: drafted.flatMap(entry => entry.layer ? [entry.layer] : []),
   })
 
   // 精确关键帧：t=0 干净底图 → 按 at_s 逐层显现 → 推近到已显现几何的外接框
   const slots = drafted.length || 1
   const revealAt = drafted.map((entry, index) => {
-    const item = planned[Number(String(entry.layer.id).slice(1)) - 1]
+    const item = planned[entry.plannedIndex]
     const fallback = ((index + 1) / (slots + 1)) * duration
     const t = Math.min(
       duration - 0.4,
@@ -397,15 +425,18 @@ export function draftSegment(card: DesignCard, combo: Combo | null, ctx: Segment
     return Math.round(t * 100) / 100
   })
   // 可见集合走同一个实现：模板文本框同 zone 后出现的替换先出现的，其余图层累计可见
-  const beats = revealBeats(drafted.map((entry, index) => ({
-    id: String(entry.layer.id),
-    zone: entry.layer.type === 'text'
+  // 地图要素一次显现多层：拍按条目算，再把条目展开成它的图层 id
+  const steps = revealBeats(drafted.map((entry, index) => ({
+    id: `#${index}`,
+    zone: entry.layer?.type === 'text'
       ? textZoneOf(card.layer_plan?.text_layout, String(entry.layer.role ?? ''))
       : null,
     at: revealAt[index],
   })))
+  const idsByKey = new Map(drafted.map((entry, index) => [`#${index}`, entry.ids]))
+  const beats = steps.map(beat => beat.flatMap(key => idsByKey.get(key) ?? []))
   const keyframes: PreciseKeyframe[] = [{ t: 0, viewport: { ...frame }, visible: [] }]
-  for (const [index, entry] of drafted.entries()) {
+  for (const [index] of drafted.entries()) {
     // 设计卡不带视口（它是导演层的图纸）：草稿一律取满取景框，取景由图层编辑器（R6）定
     keyframes.push({ t: revealAt[index], viewport: { ...frame }, visible: [...beats[index + 1]] })
   }

@@ -641,15 +641,18 @@ Body：`{acknowledge?:true}`
 返回：`{spec{width,height,fps,source}, combo, design_card_status, production_unlocked, gate_reason, segment, junction{source,t,path,hash,stale,segment_fresh}, issues}`
 - 设计卡未确认 → `production_unlocked=false`，不能写/渲。
 - `junction` 是 C 的末精确帧、D 的首精确帧；`hash` 用于绑定关键帧确认。
+- **地图资产底图（Issue #117）**：底图是 `asset_type='map'` 且有图层文档的道具时，`segment.map_source = {asset_id, asset_name, layer_count}`，`segment.layer_doc` 是**读时展开**的：资产里锚定到语义要素的图层以 `map:<资产层 id>` 出现（`locked:true`、`from_asset{asset_id,layer_id}`、样式与资产成图一致），底图换成资产文档的底图（不加段滤镜）；资产标题/副标题/图例等未锚定层不带。分镜只能用 `timeline.keyframes[].visible` 决定这些层何时出现。案例：ep 27 #59（storyboard 989）原先按语义重画了路线，乌拉尔线成了带箭头的实线，与资产 259 的点线不一致。
 
 ### `POST /layer-segments/storyboards/{id}/draft` [R]
 用途：按设计卡 `layer_plan` 生成图层段草稿。无合格底图 → 400 `missing_base`（回设计卡指定底图）。`image`（画中画）层只认自己 `anchor.asset_id` 指向的资产图：缺锚点 / 资产不在本集 / 资产没有图 → 该层跳过并给警告，**绝不回落底图**（#110）；框的位置由 `layer_plan.text_layout` 现算（文字区对侧）。
+地图资产底图（#117）：锚定底图要素的计划层不新建点线层，而是让资产里该要素的全部 `map:` 层（线 + 标注 + 地点）在 `at_s` 显现；资产图层里没有的要素给警告「…没有要素…，未显示（不在分镜里重画）」。
 
 ### `PUT /layer-segments/storyboards/{id}` [R]
 Body 四选一/组合：`{layer_doc?, timeline?, duration?, base_ref?}`
 - `layer_doc`：`{version, base:{path,width,height,source_width,source_height,crop?}, theme, layers[]}`
   - 图层类型：`label`（文字，`box{x,y,w,h}` 0–1、`style{font,size,color,bold,align,stroke_width,bg_opacity}`）、`polygon`/`polyline`（`points` 0–1、`style{fill/fill_opacity/stroke/width/arrow_end}`）、image 等。
   - `z` 控制叠放；`visible` 控制默认可见性。
+  - `map:` 前缀的层（地图资产图层，#117）**只读**：PUT 里对它们的增删改一律忽略，服务端按资产重新展开；库里只存段自己的层。旧的「锚定到底图地图资产的点线层」会被换成对应的 `map:` 层（时间线同步映射）。
 - `timeline`：`{fps, ease:"inout"|..., fade_ms, keyframes:[{t, viewport{x,y,w,h}, visible:[layerId]}]}`
   - **`fps` 不是可选项，是派生值**：保存时服务端一律写成本集目标帧率（`services/layer-segment.ts:266-272`），请求里的 `fps` 不生效。目标帧率取「本集最前一条有效图层计划的 `timeline.fps`」→ 没有计划时取本集首条模型视频的实测帧率（保留三位小数，29.97 不取整为 30）→ 都没有才用内置默认 25（`services/layer-segment.ts:101-103,520-560`，范围 1–60、允许小数）。
   - 因此 **24 / 29.97 等既有计划帧率会被沿用**（#69），不要为了「统一 25」去改已有集；原生合成会用 fps 滤镜把模型视频统一到这个目标帧率。要确认当前值就读 `GET /layer-segments/storyboards/{id}` 的 `spec.fps`（`spec.source` 只说明**画幅**来自 video 还是 default，不代表帧率来源）。
