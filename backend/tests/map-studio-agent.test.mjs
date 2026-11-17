@@ -130,7 +130,7 @@ const SCRIPT = `
       const submits = toolResults(body, 'submit_draft')
       if (drawingVisits <= 3 && !rollbacks.length) return { toolCalls: [{ name: 'request_rollback', args: { stage: 'base', reason: '底图上要素偏挤，请重新确认取景是否合适' } }] }
       const features = JSON.parse(user.match(/要素摘要（不传顶点）：\\n(.+)/)[1])
-      if (!toolResults(body,'add_feature_layers').length) return {toolCalls:[{name:'add_feature_layers',args:{items:features.map(f=>({feature_id:f.feature_id,style:{}}))}}]}
+      if (!toolResults(body,'add_feature_layers').length) return {toolCalls:[{name:'add_feature_layers',args:{items:features.filter(f=>!f.missing).map(f=>({feature_id:f.feature_id,style:{}}))}}]}
       if (!toolResults(body,'set_smoothing').length) return {toolCalls:features.filter(f=>f.kind==='route').map(f=>({name:'set_smoothing',args:{layer_id:'feature-'+f.feature_id,smooth:0}}))}
       if (!toolResults(body,'add_layer').length) return {toolCalls:[{name:'add_layer',args:{layer:titleLayer('邗沟𠀀')}}]}
       if (!renders.length) return {toolCalls:[{name:'render_draft',args:{}}]}
@@ -229,7 +229,7 @@ test('拒收→自我修正、工具异常回馈、回退全链路与上限、�
     let prop = await getProp(propId)
     assert.equal(prop.imageUrl, detail.outputs.final_image.path)
     const semantics = JSON.parse(prop.semantics)
-    assert.deepEqual(semantics.points.map(p => p.id).sort(), detail.map_spec.places.map(p => p.id).sort())
+    assert.deepEqual(semantics.points.map(p => p.id).sort(), detail.map_spec.places.filter(p => p.name !== '射阳湖（示意）').map(p => p.id).sort())
     assert.deepEqual(semantics.lines.map(l => l.id), detail.map_spec.routes.map(r => r.id))
     assert.equal(semantics.image.source_task_id, detail.deliveries[0].version_ids[1])
 
@@ -315,7 +315,7 @@ test('独立地图跑完整模型阶段后可下载成图、语义与可编辑�
       assert.equal(response.status, 200)
       assert.ok(response.headers.get('content-disposition').includes('attachment'))
       if (kind === 'final') assert.ok((await response.arrayBuffer()).byteLength > 100)
-      if (kind === 'semantics') assert.equal((await response.json()).points.length, detail.map_spec.places.length)
+      if (kind === 'semantics') assert.equal((await response.json()).points.length, detail.map_spec.places.filter(p => p.name !== '射阳湖（示意）').length)
       if (kind === 'source') assert.deepEqual((await response.json()).layer_doc, detail.outputs.layer_doc)
     }
     const runs = await (await mapStudioRoutes.request('/tasks/' + taskId + '/runs')).json()
