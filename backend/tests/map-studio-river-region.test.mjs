@@ -35,8 +35,13 @@ test('OSM refs search and extract by multilingual names, and missing or corrupt 
     const retired = { ...river('c'.repeat(24), 65), retired: true }
     const sample = JSON.parse(readFileSync(path.join(backend, 'tests/fixtures/osm-river-sample.json'), 'utf8')).rivers
     const tobol = { ...river('d'.repeat(24), 66), names: ['Tobol', 'Тобол'] }
+    // Word-prefix queries hit "… River" names; an OSM chain whose bbox NE fully contains with
+    // comparable length is the same watercourse (no duplicate); a separate same-name river stays.
+    const wordRiver = { id: 'e'.repeat(24), names: ['Wordy River'], way_ids: [70], bbox: [70, 57, 71, 58], lines: [[[70, 57], [71, 58]]] }
+    const sameRiver = { id: 'f'.repeat(24), names: ['Tobol River', 'Тобол'], way_ids: [71], bbox: [61, 52, 67, 58], lines: [[[61, 52], [63, 54], [65, 56], [67, 58]]] }
+    const otherTobol = { id: '1'.repeat(24), names: ['Tobol'], way_ids: [80], bbox: [80, 57, 81, 58], lines: [[[80, 57], [81, 58]]] }
     const repeated = Array.from({ length: 15 }, (_, i) => ({ ...river((i + 20).toString(16).padStart(24, '0'), 20 + i), names: ['fixture repeated'] }))
-    const body = JSON.stringify({ rivers: [river(id, 60), river(id2, 63), retired, tobol, ...repeated, ...sample] })
+    const body = JSON.stringify({ rivers: [river(id, 60), river(id2, 63), retired, tobol, wordRiver, sameRiver, otherTobol, ...repeated, ...sample] })
     writeFileSync(path.join(data, 'rivers.json'), body)
     writeFileSync(path.join(data, 'manifest.json'), JSON.stringify({ version: 2, file: 'rivers.json', sha256: crypto.createHash('sha256').update(body).digest('hex'), license: 'ODbL-1.0', attribution: '© OpenStreetMap contributors' }))
     run(`
@@ -51,7 +56,8 @@ assert.deepEqual(extractDatasetGeometry('osm:${'c'.repeat(24)}').bbox,[65,57,66,
 assert.ok(searchDataset('river','Багаряк').some(hit=>hit.ref==='osm:4fdbb33b01418f93f09a6599'))
 assert.equal(searchDataset('river','fixture repeated').length,10)
 assert.ok(searchDataset('river','Тобол').every(x=>!x.ref.startsWith('osm:')))
-assert.ok(searchDataset('river','Tobol').every(x=>!x.ref.startsWith('osm:')))
+assert.ok(searchDataset('river','Wordy').some(x=>x.ref==='osm:${'e'.repeat(24)}'))
+assert.ok(searchDataset('river','Tobol').every(x=>!x.ref.startsWith('osm:')||x.ref==='osm:${'1'.repeat(24)}'))
 import sharp from 'sharp'
 import {normalizeMapSpec} from './src/modules/map-studio/geo/base-render.ts'
 import {createMapBaseArtifact,forwardFor} from './src/modules/map-studio/geo/geometry.ts'
