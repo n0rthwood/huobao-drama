@@ -148,6 +148,16 @@ test('第一个模板文本框自动选一套版式，换套保留图层，几�
 // unrelated child panels, URL configuration and API transport are test seams.
 const dataModule = source => `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`
 const emptyPanel = dataModule('export default { render: () => null }')
+// ConfirmDialog seam (#113): same props/emits, rendered in-tree because the host-independent
+// renderer has no Teleport target. Behavior (open -> confirm/cancel emits) is exercised for real.
+const confirmPanel = dataModule(`import {h} from '${import.meta.resolve('vue')}';
+export default {props:['open','title','message','confirmText'],emits:['confirm','cancel'],setup(props,{emit}) {
+  return () => props.open ? h('confirm-dialog-test',{},[
+    h('span',{class:'confirm-msg'},props.message),
+    h('button',{class:'confirm-yes',onClick:()=>emit('confirm')},props.confirmText||'OK'),
+    h('button',{class:'confirm-no',onClick:()=>emit('cancel')},'Cancel'),
+  ]) : null
+}}`)
 const pickerPanel = dataModule(`import {h} from '${import.meta.resolve('vue')}';
 export default {props:['assets','open'],emits:['confirm'],setup(props,{emit}) {
   return () => h('asset-picker-test',{assets:props.assets,onChoose:items=>emit('confirm',items)})
@@ -182,6 +192,7 @@ const componentAliases = {
   './LayerList.vue': emptyPanel,
   './LayerStyle.vue': emptyPanel,
   './LayerImagePicker.vue': emptyPanel,
+  '~/components/ConfirmDialog.vue': confirmPanel,
 }
 async function loadComponent(name) {
   const { descriptor } = parse(readFileSync(new URL(`components/LayerCanvas/${name}.vue`, app), 'utf8'))
@@ -329,6 +340,7 @@ test('persisted crop projects the same source rectangle for image, SVG, hit test
   withClass(mounted.root, 'lc-hit').props.onPointerdown({
     clientX: 480, clientY: 272, target: {}, pointerId: 1, stopPropagation() {},
   })
+  await new Promise(r => setTimeout(r, 0))
   mounted.listeners.get('pointermove')({ clientX: 480, clientY: 326.4 })
   assert.ok(Math.abs(patches.at(-1).patch.box.y - (.25 + .1 * cropFrame.h)) < 1e-9)
   mounted.listeners.get('pointerup')()
@@ -544,6 +556,58 @@ test('资产层在图层列表里没有改名/删除/复制/锁定/显隐/拖动
 
   assert.equal(ownRow.props.draggable, true, '段自己的层照旧可拖动')
   assert.ok(allNodes(ownRow).filter(node => node.type === 'button').length >= 4, '段自己的层保留全部操作')
+})
+
+test('锚定几何拖动前弹应用内确认框：取消不动几何、确认才解除锚定并进入拖动（#113）', async t => {
+  const doc = makeDoc()
+  const patches = [], detached = [], history = []
+  const mounted = await mountCanvasComponent(t, Canvas, {
+    doc, baseSrc: doc.base.path, selectedIds: ['pin'], anchorNames: {},
+    onPatch: p => patches.push(p), onDetach: ids => detached.push(ids), onHistory: () => history.push(1),
+  })
+  const hit = allNodes(mounted.root).find(node => String(node.props.class || '').includes('lc-hit'))
+  assert.ok(hit, 'hit rect rendered')
+  hit.props.onPointerdown({ clientX: 384, clientY: 217.6, target: {}, pointerId: 1, stopPropagation() {} })
+  await nextTick(); await nextTick(); await nextTick()
+  const dialog = allNodes(mounted.root).find(node => node.type === 'confirm-dialog-test')
+  assert.ok(dialog, '按下后出现确认框而不是 window.confirm')
+  assert.equal(history.length, 0, '确认前不压历史')
+  withClass(mounted.root, 'confirm-no').props.onClick()
+  await new Promise(r => setTimeout(r, 0))
+  assert.equal(allNodes(mounted.root).find(node => node.type === 'confirm-dialog-test'), undefined)
+  assert.equal(detached.length, 0, '取消不解除锚定')
+  assert.equal(patches.length, 0, '取消不产生几何补丁')
+
+  hit.props.onPointerdown({ clientX: 384, clientY: 217.6, target: {}, pointerId: 1, stopPropagation() {} })
+  await new Promise(r => setTimeout(r, 0))
+  withClass(mounted.root, 'confirm-yes').props.onClick()
+  await new Promise(r => setTimeout(r, 0))
+  assert.deepEqual(detached, [['pin']], '确认后解除锚定')
+  assert.ok(history.length >= 1, '确认压一条历史')
+  mounted.listeners.get('pointermove')({ clientX: 480, clientY: 272 })
+  assert.ok(patches.some(p => p.id === 'pin' && p.patch.at), '确认后拖动真的移动图层')
+  mounted.listeners.get('pointerup')()
+})
+
+test('样式面板改锚定图层旋转：应用内确认，取消不发补丁（#113）', async t => {
+  const doc = makeDoc()
+  const patches = []
+  const mounted = await mountCanvasComponent(t, Style, { doc, layer: doc.layers[0], layerOnly: true, onPatch: p => patches.push(p) })
+  const rotation = allNodes(mounted.root).find(node => node.type === 'input' && node.props.type === 'range' && node.props.min === '-180')
+  assert.ok(rotation, '旋转控件存在')
+  rotation.props.onInput({ target: { value: '30' } })
+  await new Promise(r => setTimeout(r, 0))
+  assert.equal(patches.length, 0, '确认前不改')
+  assert.ok(allNodes(mounted.root).find(node => node.type === 'confirm-dialog-test'), '出现确认框')
+  withClass(mounted.root, 'confirm-no').props.onClick()
+  await nextTick()
+  assert.equal(patches.length, 0)
+  rotation.props.onInput({ target: { value: '30' } })
+  await new Promise(r => setTimeout(r, 0))
+  withClass(mounted.root, 'confirm-yes').props.onClick()
+  await nextTick()
+  assert.ok(patches.some(p => p.patch.anchor?.detached === true), '确认先解除锚定')
+  assert.ok(patches.some(p => p.patch.rotation === 30), '再写入旋转')
 })
 
 test('选中资产层时样式面板只给只读说明与地图工作室链接，不出任何样式控件（#117）', async t => {

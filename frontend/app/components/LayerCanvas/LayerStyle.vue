@@ -189,6 +189,9 @@
     </template>
     <LayerImagePicker :open="imagePicker" :assets="assets" :drama-id="dramaId" :episode-id="episodeId"
       @close="imagePicker = false" @select="chooseImage" @registered="emit('registered', $event)" />
+    <ConfirmDialog :open="!!detachAsk" :title="t('layerCanvas.anchor.detachTitle')"
+      :message="t('layerCanvas.anchor.detachConfirm', { name: detachAsk?.name || '' })"
+      :confirm-text="t('layerCanvas.anchor.detachOk')" @confirm="confirmDetach" @cancel="cancelDetach" />
   </div>
 </template>
 
@@ -203,6 +206,7 @@ import { THEME_PRESETS, unsupportedChars } from '~/utils/layerSvg'
 import { textCapacity, textFieldValue, textLayerProblems, textLayerTexts } from '~/utils/layerText'
 import { TriangleAlert, ImagePlus, MapPinned } from 'lucide-vue-next'
 import LayerImagePicker from './LayerImagePicker.vue'
+import ConfirmDialog from '~/components/ConfirmDialog.vue'
 import { missingGlyphsOf } from '~/composables/useMissingGlyphs'
 import { textRoleDef, useLayerTextNames, useLayerTextSpec } from '~/composables/useLayerTextSpec'
 import { mediaUrl } from '~/utils/url'
@@ -366,9 +370,25 @@ function endEdit() {
   editingKey.value = null
 }
 
-function setLayer(key, value) {
+// 锚定几何改动确认走应用内 ConfirmDialog（#113），不再用 window.confirm。
+const detachAsk = ref(null)
+function confirmDetach() {
+  const ask = detachAsk.value
+  detachAsk.value = null
+  ask?.resolve(true)
+}
+function cancelDetach() {
+  const ask = detachAsk.value
+  detachAsk.value = null
+  ask?.resolve(false)
+}
+async function setLayer(key, value) {
   const anchoredGeometry = ['rotation', 'points', 'box', 'at'].includes(key) && props.layer.anchor?.semantic_id && !props.layer.anchor.detached
-  if (anchoredGeometry && !window.confirm(t('layerCanvas.anchor.detachConfirm', { name: props.layer.name || props.layer.anchor.semantic_id }))) return
+  if (anchoredGeometry) {
+    const name = props.layer.name || props.layer.anchor.semantic_id
+    const ok = await new Promise(resolve => { detachAsk.value = { name, resolve } })
+    if (!ok) return
+  }
   beginEdit(`layer:${key}`)
   if (anchoredGeometry) emit('patch', { id: props.layer.id, patch: { anchor: { ...props.layer.anchor, detached: true } } })
   emit('patch', { id: props.layer.id, patch: { [key]: value } })

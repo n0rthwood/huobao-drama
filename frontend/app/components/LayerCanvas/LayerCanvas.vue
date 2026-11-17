@@ -100,6 +100,9 @@
       <span v-if="frameOpacity" class="lc-ghost-note">{{ t('layerCanvas.frameGhostHint') }}</span>
       <span v-if="missingGlyphs.length" class="lc-glyphs" :title="t('layerCanvas.style.missingChars', { chars: missingGlyphs.join(' ') })"><TriangleAlert :size="14" />{{ missingGlyphs.join(' ') }}</span>
     </div>
+    <ConfirmDialog :open="!!detachAsk" :title="t('layerCanvas.anchor.detachTitle')"
+      :message="t('layerCanvas.anchor.detachConfirm', { name: detachAsk?.name || '' })"
+      :confirm-text="t('layerCanvas.anchor.detachOk')" @confirm="confirmDetach" @cancel="cancelDetach" />
   </div>
 </template>
 
@@ -117,6 +120,7 @@ import { textLayerRects } from '~/utils/layerText'
 import { useLayerTextSpec } from '~/composables/useLayerTextSpec'
 import { baseFrameOf } from '~/utils/layerQuality'
 import { apiBase, mediaUrl } from '~/utils/url'
+import ConfirmDialog from '~/components/ConfirmDialog.vue'
 
 const props = defineProps({
   doc: { type: Object, required: true },
@@ -199,11 +203,28 @@ function startRectDrag(resize, event) {
   bindPointer(event)
 }
 
-function confirmGeometry(layers) {
+// 锚定几何改动前的确认走应用内 ConfirmDialog（#113）：window.confirm 在 headless/自动化下不可交互。
+// 手势起点先按原始事件坐标记下，确认后重放（pointerdown 的坐标在 await 之后仍可读）。
+const detachAsk = ref(null)
+function askDetach(name) {
+  return new Promise(resolve => { detachAsk.value = { name, resolve } })
+}
+function confirmDetach() {
+  const ask = detachAsk.value
+  detachAsk.value = null
+  ask?.resolve(true)
+}
+function cancelDetach() {
+  const ask = detachAsk.value
+  detachAsk.value = null
+  ask?.resolve(false)
+}
+async function confirmGeometry(layers) {
   const anchored = layers.filter(layer => layer.anchor?.semantic_id && !layer.anchor.detached)
   if (!anchored.length) { emit('history'); return true }
   const name = anchored.map(layer => props.anchorNames[layer.id] || layer.name || layer.anchor.semantic_id).join(', ')
-  if (!window.confirm(t('layerCanvas.anchor.detachConfirm', { name }))) return false
+  const ok = await askDetach(name)
+  if (!ok) return false
   emit('history')
   emit('detach', anchored.map(layer => layer.id))
   return true
@@ -471,7 +492,7 @@ function snapDelta(box, dx, dy) {
   return result
 }
 
-function onLayerDown(id, event) {
+async function onLayerDown(id, event) {
   if (mode.value !== 'select') { onViewportDown(event); return }
   const layer = props.doc.layers.find(item => item.id === id)
   if (!layer) return
@@ -485,13 +506,12 @@ function onLayerDown(id, event) {
   // 模板文本框不可拖动（位置由规范排版）：只选中，不进入移动手势
   const targets = (props.selectedIds.includes(id) ? selected.value : [layer])
     .filter(item => !item.locked && !item.from_asset && item.type !== 'text')
-  if (!targets.length || !confirmGeometry(targets)) return
-  drag = {
-    mode: 'move',
-    start: pointFromEvent(event),
-    targets: targets.map(item => ({ id: item.id, geometry: geometryOf(item) })),
-    box: unionBounds(targets),
-  }
+  if (!targets.length) return
+  const start = pointFromEvent(event)
+  const snapshot = targets.map(item => ({ id: item.id, geometry: geometryOf(item) }))
+  const box = unionBounds(targets)
+  if (!(await confirmGeometry(targets))) return
+  drag = { mode: 'move', start, targets: snapshot, box }
   bindPointer(event)
 }
 
@@ -503,10 +523,10 @@ function unionBounds(layers) {
   return { x, y, w: Math.max(...boxes.map(b => b.x + b.w)) - x, h: Math.max(...boxes.map(b => b.y + b.h)) - y }
 }
 
-function startResize(handle, event) {
+async function startResize(handle, event) {
   const layer = selected.value[0]
   if (!layer || layer.locked || layer.from_asset || layer.type === 'text') return
-  if (!confirmGeometry([layer])) return
+  if (!(await confirmGeometry([layer]))) return
   drag = {
     mode: 'resize',
     handle,
@@ -518,13 +538,13 @@ function startResize(handle, event) {
   bindPointer(event)
 }
 
-function startRotate(event) {
+async function startRotate(event) {
   const layer = selected.value[0]
   if (!layer || layer.locked || layer.from_asset || layer.type === 'text') return
   const box = layerBox(layer)
   const center = { x: (box.x + box.w / 2) * docWidth.value, y: (box.y + box.h / 2) * docHeight.value }
   const start = pointFromEvent(event)
-  if (!confirmGeometry([layer])) return
+  if (!(await confirmGeometry([layer]))) return
   drag = {
     mode: 'rotate',
     layer: layer.id,
@@ -696,7 +716,7 @@ function endPointer() {
   window.removeEventListener('pointermove', onPointerMove)
 }
 
-function onKeydown(event) {
+async function onKeydown(event) {
   if (['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(event.target.tagName)) return
   if (event.key === 'Escape') { mode.value = 'select'; endPointer(); return }
   const key = event.key.toLowerCase()
@@ -727,7 +747,7 @@ function onKeydown(event) {
   const targets = move ? selected.value.filter(layer => !layer.locked && !layer.from_asset && layer.type !== 'text') : []
   if (!move || !targets.length) return
   event.preventDefault()
-  if (!confirmGeometry(targets)) return
+  if (!(await confirmGeometry(targets))) return
   drag = { targets: targets.map(layer => ({ id: layer.id, geometry: geometryOf(layer) })) }
   applyMove(move[0], move[1])
   drag = null
