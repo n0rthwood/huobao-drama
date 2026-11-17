@@ -329,7 +329,8 @@ const stageStyle = computed(() => {
 })
 
 const selected = computed(() => props.doc.layers.filter(layer => props.selectedIds.includes(layer.id)))
-const singleSelection = computed(() => selected.value.length === 1 && !selected.value[0].locked)
+// 资产层（Issue #117）只读：即使服务端没标 locked，也不出几何手柄、不进移动手势
+const singleSelection = computed(() => selected.value.length === 1 && !selected.value[0].locked && !selected.value[0].from_asset)
 /** 只有「有几何可改」的单选才出手柄：模板文本框由规范排版，不可拖动/缩放/旋转。 */
 const geometrySelection = computed(() => singleSelection.value && selected.value[0].type !== 'text')
 
@@ -480,10 +481,10 @@ function onLayerDown(id, event) {
     return
   }
   if (!props.selectedIds.includes(id)) emit('select', [id])
-  if (layer.locked) return
+  if (layer.locked || layer.from_asset) return
   // 模板文本框不可拖动（位置由规范排版）：只选中，不进入移动手势
   const targets = (props.selectedIds.includes(id) ? selected.value : [layer])
-    .filter(item => !item.locked && item.type !== 'text')
+    .filter(item => !item.locked && !item.from_asset && item.type !== 'text')
   if (!targets.length || !confirmGeometry(targets)) return
   drag = {
     mode: 'move',
@@ -504,7 +505,7 @@ function unionBounds(layers) {
 
 function startResize(handle, event) {
   const layer = selected.value[0]
-  if (!layer || layer.locked || layer.type === 'text') return
+  if (!layer || layer.locked || layer.from_asset || layer.type === 'text') return
   if (!confirmGeometry([layer])) return
   drag = {
     mode: 'resize',
@@ -519,7 +520,7 @@ function startResize(handle, event) {
 
 function startRotate(event) {
   const layer = selected.value[0]
-  if (!layer || layer.locked || layer.type === 'text') return
+  if (!layer || layer.locked || layer.from_asset || layer.type === 'text') return
   const box = layerBox(layer)
   const center = { x: (box.x + box.w / 2) * docWidth.value, y: (box.y + box.h / 2) * docHeight.value }
   const start = pointFromEvent(event)
@@ -723,7 +724,7 @@ function onKeydown(event) {
   const moves = { arrowleft: [-step, 0], arrowright: [step, 0], arrowup: [0, -step], arrowdown: [0, step] }
   const move = moves[key]
   // 方向键微调只动有几何的图层：模板文本框原地不动（也不压一条空历史）
-  const targets = move ? selected.value.filter(layer => !layer.locked && layer.type !== 'text') : []
+  const targets = move ? selected.value.filter(layer => !layer.locked && !layer.from_asset && layer.type !== 'text') : []
   if (!move || !targets.length) return
   event.preventDefault()
   if (!confirmGeometry(targets)) return

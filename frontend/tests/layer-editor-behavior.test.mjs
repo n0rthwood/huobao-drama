@@ -484,3 +484,109 @@ test('replacing a base retains output dimensions and stores candidate dimensions
   assert.deepEqual([replacement.width, replacement.height], [960, 544])
   assert.deepEqual([replacement.source_width, replacement.source_height], [2048, 2048])
 })
+
+// ── Issue #117：地图资产底图的段复用资产自己的图层（只读，只能切关键帧可见性） ──
+const assetDoc = () => ({
+  ...emptyLayerDoc({ path: 'static/map-bg.png', width: 960, height: 544 }),
+  layers: [
+    { id: 'map:l_ermak', type: 'polyline', name: 'Ermak route', visible: true, locked: true, opacity: 1, z: 0, rotation: 0,
+      points: [[.2, .4], [.5, .5]], anchor: { asset_id: 259, semantic_id: 'r_b12b8d09' },
+      from_asset: { asset_id: 259, layer_id: 'l_ermak' }, style: { dash: 'dot' } },
+    { id: 'pin', type: 'marker', name: 'Pin', at: [.4, .4], text: 'place', anchor: { asset_id: 259, semantic_id: 'p_1' },
+      style: {}, visible: true, locked: false, opacity: 1, z: 1, rotation: 0 },
+  ],
+})
+const mapSource = { asset_id: 259, asset_name: 'Ermak map', layer_count: 1 }
+
+test('资产层在任何写操作下都不变：改几何/样式/锚点、删除、复制、重排都是空操作（#117）', async () => {
+  const editor = useLayerDoc()
+  editor.load(assetDoc())
+  await nextTick()
+  const before = JSON.stringify(editor.doc.value)
+  assert.equal(editor.patchLayer('map:l_ermak', { points: [[.6, .6], [.7, .7]] }), null, '几何补丁被丢弃')
+  editor.patchStyle('map:l_ermak', { dash: 'none' })
+  editor.detachAnchors(['map:l_ermak'])
+  editor.reanchorLayer('map:l_ermak', { at: [.1, .1], anchor: { semantic_id: 'p_1' } })
+  editor.reorder('map:l_ermak', 1)
+  assert.equal(JSON.stringify(editor.doc.value), before, '文档原样，锚点也没被解除')
+  assert.equal(editor.canUndo.value, false, '空操作不压假历史')
+
+  editor.selectedIds.value = ['map:l_ermak']
+  editor.removeSelected()
+  editor.duplicateSelected()
+  assert.equal(JSON.stringify(editor.doc.value), before, '资产层删不掉也复制不出来')
+
+  editor.selectedIds.value = ['pin', 'map:l_ermak']
+  editor.removeSelected()
+  assert.deepEqual(editor.doc.value.layers.map(layer => layer.id), ['map:l_ermak'], '只移除段自己的层')
+  assert.deepEqual([...editor.selectedIds.value], ['map:l_ermak'])
+
+  editor.selectedIds.value = []
+  editor.undo()
+  assert.equal(editor.doc.value.layers.length, 2, '删除自己的层可撤销')
+  assert.equal(editor.doc.value.layers.some(layer => layer.id === 'map:l_ermak'), true)
+})
+
+test('资产层在图层列表里没有改名/删除/复制/锁定/显隐/拖动入口，只留「来自资产」徽标（#117）', async t => {
+  const mounted = await mountCanvasComponent(t, List, { doc: assetDoc(), medium: 'video', mapSource })
+  const rows = allNodes(mounted.root).filter(node => node.type === 'li')
+  const assetRow = rows.find(row => nodeText(row).includes('Ermak route'))
+  const ownRow = rows.find(row => nodeText(row).includes('Pin'))
+  assert.equal(assetRow.props.draggable, false, '资产层不可拖动排序')
+  assert.equal(withClass(assetRow, 'll-grip'), undefined)
+  assert.equal(allNodes(assetRow).filter(node => node.type === 'button').length, 0, '没有任何行内按钮')
+  const badge = withClass(assetRow, 'll-badge')
+  assert.equal(nodeText(badge), messages.layerCanvas.list.fromAsset)
+  assert.ok(String(badge.props.title).includes('Ermak map · #259'), `徽标提示写清资产：${badge.props.title}`)
+  withClass(assetRow, 'll-name').props.onDblclick({ stopPropagation() {} })
+  await nextTick()
+  assert.equal(withClass(assetRow, 'll-name-input'), undefined, '双击不进入改名')
+
+  assert.equal(ownRow.props.draggable, true, '段自己的层照旧可拖动')
+  assert.ok(allNodes(ownRow).filter(node => node.type === 'button').length >= 4, '段自己的层保留全部操作')
+})
+
+test('选中资产层时样式面板只给只读说明与地图工作室链接，不出任何样式控件（#117）', async t => {
+  const doc = assetDoc()
+  const opened = []
+  const mounted = await mountCanvasComponent(t, Style, {
+    doc, layer: doc.layers[0], layerOnly: true, mapSource, onAssetOpen: id => opened.push(id),
+  })
+  const text = nodeText(mounted.root)
+  assert.ok(text.includes(messages.layerCanvas.style.assetReadonly.replace('{name}', 'Ermak map · #259')), text)
+  assert.ok(text.includes(messages.layerCanvas.style.assetVisibleHint), text)
+  assert.equal(allNodes(mounted.root).filter(node => node.type === 'input').length, 0, '不出不透明度/旋转/线型等控件')
+  const open = allNodes(mounted.root).find(node => node.type === 'button' && nodeText(node).includes(messages.layerCanvas.style.assetOpenStudio))
+  open.props.onClick()
+  assert.deepEqual(opened, [259], '链接交给宿主用已有的地图工作室入口打开')
+})
+
+test('画布上资产层可选中但不拖动、不出缩放/旋转手柄（#117）', async t => {
+  const doc = assetDoc()
+  const patches = []
+  const history = []
+  const mounted = await mountCanvasComponent(t, Canvas, {
+    doc, baseSrc: doc.base.path, selectedIds: ['map:l_ermak'],
+    onPatch: patch => patches.push(patch), onHistory: () => history.push('history'),
+  })
+  assert.equal(withClass(mounted.root, 'lc-handle'), undefined, '不出缩放手柄')
+  assert.equal(withClass(mounted.root, 'lc-rotate'), undefined, '不出旋转手柄')
+  const hit = allNodes(mounted.root).find(node => node.props.class && String(node.props.class).includes('lc-hit'))
+  hit.props.onPointerdown({ clientX: 100, clientY: 100, target: {}, pointerId: 1, stopPropagation() {} })
+  assert.equal(patches.length, 0, '按下不进入移动手势')
+  assert.equal(history.length, 0, '也不压历史')
+})
+
+test('地图资产底图的 rail 不给语义新建/重锚入口，改为说明要素来自资产（#117）', async t => {
+  const doc = assetDoc()
+  doc.base.ref = { asset_kind: 'prop', asset_id: 259, version_task_id: null }
+  const mapped = await mountCanvasComponent(t, Rail, { doc, mapSource })
+  const text = nodeText(mapped.root)
+  assert.ok(text.includes(messages.layerCanvas.anchor.assetLayersNote.replace('{name}', 'Ermak map')), text)
+  assert.equal(withClass(mapped.root, 'lr-entry'), undefined, '不列语义条目')
+  assert.equal(withClass(mapped.root, 'lr-semantic-group'), undefined)
+
+  const plain = await mountCanvasComponent(t, Rail, { doc })
+  assert.equal(nodeText(plain.root).includes(messages.layerCanvas.anchor.assetLayersNote.replace('{name}', 'Ermak map')), false)
+  assert.ok(nodeText(plain.root).includes(messages.layerCanvas.anchor.noSemantics), '没有 map_source 时照旧走语义条目路径')
+})

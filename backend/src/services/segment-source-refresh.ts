@@ -6,6 +6,7 @@ import { normalizeLayerDoc, type ImageLayer, type LayerAssetRef } from './layer-
 import { layerFromPlannedLayer } from './layer-segment-draft.js'
 import { getLayerSegment, listEpisodeLayerSegments, loadDraftAssets, saveLayerSegment, type LayerSegment } from './layer-segment.js'
 import { markStale } from './staleness.js'
+import { MAP_LAYER_PREFIX, isMapAssetLayer, stripRawMapLayers } from './map-asset-layers.js'
 
 /** Source events are consumed by a successful render; quality_warnings are never gates. */
 export const RENDER_CONSUMED_SOURCE_REASONS = ['base_version_changed', 'asset_version_changed', 'semantic_changed'] as const
@@ -30,7 +31,8 @@ export async function refreshLayerSegmentSources(storyboardId: number): Promise<
   const [sb] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, storyboardId))
   const card = parseDesignCard(sb?.designCard)
   if (!segment || !sb || !card) return false
-  const anchored: PlannedLayer[] = segment.layer_doc.layers.filter(layer => layer.type !== 'image' && layer.anchor?.asset_id && !layer.anchor.detached).map(layer => ({
+  // 地图资产图层（#117）读时由资产展开，不在段里重投影；这里只处理段自己的层
+  const anchored: PlannedLayer[] = segment.layer_doc.layers.filter(layer => !isMapAssetLayer(layer) && layer.type !== 'image' && layer.anchor?.asset_id && !layer.anchor.detached).map(layer => ({
     type: layer.type, at_s: 0,
     anchor: { asset_id: layer.anchor!.asset_id!, semantic_id: layer.anchor!.semantic_id || '', name: layer.name || '' },
   }))
@@ -43,10 +45,13 @@ export async function refreshLayerSegmentSources(storyboardId: number): Promise<
   const sourceCard = { ...card, layer_plan: { ...card.layer_plan, base: baseRef, must_mark: card.layer_plan?.must_mark || [], planned_layers: anchored }, gen_plan: { ...card.gen_plan, reference_assets: [...(card.gen_plan?.reference_assets || []), ...imageRefs] } }
   const assets = await loadDraftAssets(sourceCard)
   const base = baseRef?.kind === 'asset' ? assets.find(asset => asset.kind === baseRef.asset_kind && asset.id === baseRef.asset_id) || null : null
-  let doc = normalizeLayerDoc(segment.layer_doc)
-  let unresolved = false
+  const stored = normalizeLayerDoc(stripRawMapLayers(segment.layer_doc))
+  let doc = stored
+  // 时间线引用了资产图层，却解析不到资产图层文档（资产被删、不再是地图、文档底图文件缺失）：不回退重画，标未解析
+  let unresolved = !segment.map_source && segment.timeline.keyframes.some(frame => frame.visible.some(id => id.startsWith(MAP_LAYER_PREFIX)))
   // An explicit historical version remains pinned. Only an unversioned base follows the asset's current image.
-  if (baseRef?.kind === 'asset' && baseRef.version_task_id === null) {
+  // 地图资产底图（#117）的底图读时取资产图层文档的底图，不在这里改写。
+  if (!segment.map_source && baseRef?.kind === 'asset' && baseRef.version_task_id === null) {
     if (!base?.image_path) unresolved = true
     else if (base.image_path !== doc.base.path) doc = { ...doc, base: { ...doc.base, path: base.image_path, source_width: undefined, source_height: undefined } }
   }
@@ -67,7 +72,7 @@ export async function refreshLayerSegmentSources(storyboardId: number): Promise<
     const geometry = projected.layer
     return { ...layer, ...('points' in geometry ? { points: geometry.points } : {}), ...('at' in geometry ? { at: geometry.at } : {}), ...('box' in geometry ? { box: geometry.box } : {}) }
   }) })
-  if (JSON.stringify(doc) !== JSON.stringify(segment.layer_doc)) await saveLayerSegment(storyboardId, { layer_doc: doc })
+  if (JSON.stringify(doc) !== JSON.stringify(stored)) await saveLayerSegment(storyboardId, { layer_doc: doc })
   const latest = await getLayerSegment(storyboardId)
   if (!latest) return false
   const reasons = latest.stale_reasons.filter(reason => reason !== 'source_unresolved')

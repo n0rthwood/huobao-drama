@@ -109,6 +109,33 @@ test('组合 A 草稿：底图由调用方解析（设计卡 base），语义像
   assert.equal(got.legacyStates, false, '输出只有 keyframes')
 })
 
+test('地图资产底图（#117）：计划层不再按语义重画，资产里该要素的全部图层在 at_s 显现；资产里没有的要素只告警', () => {
+  const got = run(`${MAP_ASSET}${MAP_CARD}
+    const { buildMapAssetLayers } = await import('./src/services/map-asset-layers.ts')
+    const map_layers = buildMapAssetLayers({ asset_id: 39, asset_name: '三方局势图', version_task_id: 9, doc: {
+      base: { path: 'static/map-bg.png', width: 2000, height: 1000 }, theme: 'archival',
+      layers: [
+        { id: 'g', type: 'polygon', z: 1, points: [[0.2, 0.3], [0.45, 0.28], [0.5, 0.5]], anchor: { semantic_id: 'rg-1' } },
+        { id: 'g_label', type: 'label', z: 2, box: { x: 0.3, y: 0.35, w: 0.1, h: 0.04 }, text: '准噶尔', anchor: { semantic_id: 'rg-1' } },
+        { id: 'river', type: 'polyline', z: 3, points: [[0.3, 0.7], [0.52, 0.5]], anchor: { semantic_id: 'ln-1' }, style: { dash: 'dot' } },
+        { id: 'lake', type: 'marker', z: 4, at: [0.55, 0.48], text: '斋桑湖', anchor: { semantic_id: 'pt-1' } },
+      ],
+    } })
+    const draft = draftSegment(card, 'A', { ...ctx, map_layers })
+    out({
+      layers: draft.layer_doc.layers.map(l => l.id),
+      filter: draft.layer_doc.base.filter ?? null,
+      visible: draft.timeline.keyframes.map(k => k.visible),
+      warnings: draft.warnings,
+    })
+  `)
+  assert.deepEqual(got.layers, [], '段里不新建任何点线层')
+  assert.equal(got.filter, null, '地图资产底图不加段滤镜')
+  assert.deepEqual(got.visible.slice(0, 4), [[], ['map:g', 'map:g_label'], ['map:g', 'map:g_label', 'map:river'], ['map:g', 'map:g_label', 'map:river', 'map:lake']])
+  assert.equal(got.warnings.length, 1)
+  assert.match(got.warnings[0], /没有要素「拉萨」/)
+})
+
 test('末帧必须正好落在段尾（C 的衔接帧取 t=duration 才有「末尾停留的最终画面」）', () => {
   const got = run(`${MAP_ASSET}${MAP_CARD}
     const draft = draftSegment(card, 'C', { ...ctx, duration: 6 })

@@ -75,6 +75,11 @@ export interface LayerBase {
   opacity: number
   rotation: number
   anchor?: LayerAnchor
+  /**
+   * 只读：读时由 `map-asset-layers.ts` 从地图资产图层文档展开的层（Issue #117）。
+   * 不进白名单——客户端回传会被丢弃，段里永不存它。
+   */
+  from_asset?: { asset_id: number; layer_id: string }
 }
 
 export type LayerStyle = Record<string, unknown>
