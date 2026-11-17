@@ -75,3 +75,29 @@ test('中帧时刻落在生成段之外是阻断；在生成段内不算', () =>
   assert.equal(got.inside, 0)
   assert.equal(got.noSegment, 0, '不是纪录片（没有生成段长度）就不判')
 })
+
+test('纪录片视频提示词的时间轴必须覆盖生成段：终点不符或不从 0 起是阻断，A 组合与剧情镜不判', () => {
+  const got = run(`
+    const withVideo = (text) => ({ ...prompts('@利哈列夫 站着'), video_prompt: text })
+    const base = { assets, bindings: { first: [], mid: [], last: [], video: [] }, combo: 'C' }
+    const tenOnFive = computeRefIssues({ ...base, prompts: withVideo('0-1秒：空镜\\n1-4秒：推进\\n4-10秒：远航'), generatedSegmentSeconds: 5 })
+    const fits = computeRefIssues({ ...base, prompts: withVideo('0-1秒：空镜\\n1-3秒：推进\\n3-5秒：远航'), generatedSegmentSeconds: 5 })
+    const lateStart = computeRefIssues({ ...base, prompts: withVideo('1-3秒：推进\\n3-5秒：远航'), generatedSegmentSeconds: 5 })
+    const comboA = computeRefIssues({ ...base, combo: 'A', prompts: withVideo('0-10秒：远航'), generatedSegmentSeconds: 5 })
+    const drama = computeRefIssues({ ...base, combo: null, prompts: withVideo('0-10秒：远航'), generatedSegmentSeconds: null })
+    const pick = (issues) => issues.filter(issue => issue.code === 'video_timeline_mismatch')
+    out({
+      tenOnFive: pick(tenOnFive).map(issue => issue.message),
+      blocking: blockingIssuesFor(tenOnFive, 'video_prompt').map(issue => issue.code),
+      fits: pick(fits).length, lateStart: pick(lateStart).length, comboA: pick(comboA).length, drama: pick(drama).length,
+    })
+  `)
+  assert.equal(got.tenOnFive.length, 1)
+  assert.match(got.tenOnFive[0], /0–5 秒/)
+  assert.match(got.tenOnFive[0], /结束在 10 秒/)
+  assert.ok(got.blocking.includes('video_timeline_mismatch'))
+  assert.equal(got.fits, 0, '终点等于生成段放行')
+  assert.equal(got.lateStart, 1, '不从 0 秒开始也是阻断')
+  assert.equal(got.comboA, 0, 'A 组合没有生成段，不判')
+  assert.equal(got.drama, 0, '剧情镜没有生成段长度，不判')
+})
