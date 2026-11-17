@@ -1553,6 +1553,7 @@ async function openBatchConfirm(restoredIds) {
   const scoped = Array.isArray(restoredIds) ? restoredIds.length > 0 : selectMode.value && selectedIds.value.length > 0
   const ids = Array.isArray(restoredIds) ? restoredIds : (scoped ? [...selectedIds.value] : [])
   batchConfirm.value = { open: true, loading: true, scoped, ids, items: [] }
+  const pending = batchConfirm.value
   batchEstimate.value = { loading: false, data: null }
   try {
     const res = await episodeAPI.keyframeBatchPreview(props.episodeId, {
@@ -1560,6 +1561,7 @@ async function openBatchConfirm(restoredIds) {
       model: props.imageModel || undefined,
       config_id: props.imageConfigId || undefined,
     })
+    if (batchConfirm.value !== pending || !pending.open) return
     const items = (Array.isArray(res?.items) ? res.items : []).map(item => ({
       ...item,
       checked: Boolean(item.checked) && item.status !== 'blocked' && item.status !== 'skipped',
@@ -1571,6 +1573,7 @@ async function openBatchConfirm(restoredIds) {
     }
     batchConfirm.value = { open: true, loading: false, scoped, ids, items }
   } catch (e) {
+    if (batchConfirm.value !== pending || !pending.open) return
     batchConfirm.value = { open: false, loading: false, scoped: false, ids: [], items: [] }
     toastServerMessage(e, { fallback: 'episode.kf.genFailed' })
   }

@@ -544,9 +544,8 @@ function confirmPause() {
 
 // ---------- 多音字检查：列出正文（未注音部分）里所有多音字 ----------
 const check = reactive({ open: false, loading: false, items: [] })
-// deeplink（#86）：四个浮层都要能直达。check 是纯本地计算，可以直接恢复；
-// 注音/语气/停顿依附正文位置，链接里带上宿主分镜 + 区间 +（注音还带）源文字，
-// 恢复时先用当前已保存正文校验：对得上才按原样打开，对不上只读打开并明示，绝不插到错位置。
+// deeplink（#86）：检查可直接恢复；其他浮层同时记录宿主、位置与正文指纹。
+// 正文变化时返回该分镜，不打开不匹配的浮层。
 const link = useDeeplink('narration', DEEPLINK_KEYS.narration.filter(key => key === 'nedlg'))
 const urlDialog = querySingle(link.initial('nedlg'))
 // 只记录正文指纹，不把未保存的正文草稿放进地址。

@@ -724,6 +724,14 @@
       </div>
     </div>
     <ConfirmDialog
+      :open="!!assetTypeConfirm"
+      :title="t('common.confirm')"
+      :message="t('episode.asset.assetTypeDowngradeConfirm', { name: assetTypeConfirm?.name || '' })"
+      :confirm-text="t('common.confirm')"
+      @cancel="assetTypeConfirm = null"
+      @confirm="confirmAssetTypeChange"
+    />
+    <ConfirmDialog
       :open="!!episodeToDelete"
       :title="t('detail.ep.deleteTitle')"
       :message="t('detail.epDelete.message', { title: episodeToDelete?.title || t('detail.ep.episodeN', { n: episodeToDelete?.episode_number || episodeToDelete?.episodeNumber }) })"
@@ -1250,16 +1258,23 @@ function onAssetRefsUpdate(refs) {
 // 资产类型（Issue #84）：地图是独立类型，地图界面只认服务端持久化的 asset_type
 const ASSET_TYPES = ['prop', 'map']
 const assetTypeSaving = ref(false)
+const assetTypeConfirm = ref(null)
+
+function confirmAssetTypeChange() {
+  const item = assetTypeConfirm.value
+  assetTypeConfirm.value = null
+  if (item) void onAssetTypeChange(item, 'prop', true)
+}
 
 function assetTypeOf(item) {
   return item?.asset_type === 'map' ? 'map' : 'prop'
 }
 
 /** 地图 → 普通道具要人确认：地图数据不会被删，但整套地图界面会收起来 */
-async function onAssetTypeChange(item, next) {
+async function onAssetTypeChange(item, next, confirmed = false) {
   if (assetTypeSaving.value || !item || assetTypeOf(item) === next) return
   const downgrade = assetTypeOf(item) === 'map' && next === 'prop'
-  if (downgrade && !window.confirm(t('episode.asset.assetTypeDowngradeConfirm', { name: item.name || '' }))) return
+  if (downgrade && !confirmed) { assetTypeConfirm.value = item; return }
   assetTypeSaving.value = true
   try {
     const updated = await propAPI.update(item.id, { asset_type: next, confirm_asset_type_change: downgrade || undefined })
@@ -2134,7 +2149,7 @@ onUnmounted(() => {
 .empty-title { font-size: 14px; font-weight: 600; color: var(--text-1); }
 .empty-desc { font-size: 12px; color: var(--text-3); max-width: 260px; line-height: 1.6; }
 
-.viewer-overlay { align-items: center; }
+.viewer-overlay { align-items: center; z-index: 120; }
 .viewer-dialog { width: min(960px, calc(100vw - 48px)); padding: 14px; }
 .viewer-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
 .viewer-title { font-size: 13px; font-weight: 600; color: var(--text-1); }
