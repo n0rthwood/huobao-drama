@@ -249,4 +249,12 @@ db.update(schema.sysTask)
   // 叠加图层渲染字体自检（Issue #48）：失败只告警，渲染时才阻断（绝不出豆腐块）
   .then(() => logLayerFontStatus())
 
-serve({ fetch: app.fetch, port })
+const server = serve({ fetch: app.fetch, port })
+// 反向代理（Caddy）复用到上游的空闲连接默认最长 2 分钟；Node 默认 5 秒就关掉空闲连接，
+// 两者错开时 Caddy 会在一条刚被关掉的连接上发请求 → 「connection reset by peer」→ 502，
+// 非幂等的 POST 不会被重试（#110 生产走查：确认关键帧、批量出关键帧各撞到一次）。
+// 空闲保持时间必须长于代理侧，headersTimeout 必须再长于它。
+if ('keepAliveTimeout' in server) {
+  server.keepAliveTimeout = 130_000
+  server.headersTimeout = 131_000
+}
