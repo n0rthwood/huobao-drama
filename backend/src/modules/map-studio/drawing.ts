@@ -107,8 +107,8 @@ export async function runDrawingStage(input: DrawingStageInput): Promise<StageAg
    * 压缩窗口内的三步就累积到 24 万字。
    */
   const acceptDraft = (next: LayerDoc) => {
-    const layers = next.layers.map(layer => {
-      if (layer.id === 'schematic-legend' && layer.type === 'label') return { ...layer, text: '部分要素为示意', visible: true }
+    // Reposition the generated legend whenever the draft changes, so later titles cannot cover it.
+    const layers = next.layers.filter(layer => layer.id !== 'schematic-legend').map(layer => {
       const feature = features.find(item => item.id === layer.anchor?.semantic_id)
       if (!feature?.approximate) return layer
       if (layer.type === 'marker') return { ...layer, style: { ...layer.style, hollow: true } }
@@ -135,7 +135,7 @@ export async function runDrawingStage(input: DrawingStageInput): Promise<StageAg
     if (features.some(feature => feature.approximate && !feature.missing
       && sorted.layers.some(layer => layer.anchor?.semantic_id === feature.id && (layer.type === 'marker' || layer.type === 'polyline' || layer.type === 'polygon'))
       && !sorted.layers.some(layer => layer.anchor?.semantic_id === feature.id && (layer.type === 'label' || layer.type === 'marker') && layer.text.includes('（示意）')))) needsLegend = true
-    if (needsLegend && !sorted.layers.some(layer => layer.id === 'schematic-legend')) {
+    if (needsLegend) {
       let placed: LayerDoc | null = null
       for (let y = .03; y <= .87 && !placed; y += .07) for (let x = .03; x <= .63 && !placed; x += .15) {
         const legend: Layer = { id: 'schematic-legend', type: 'label', name: '示意说明', text: '部分要素为示意', box: { x, y, w: .32, h: .06 }, visible: true, locked: false, z: Math.min(9999, Math.max(0, ...sorted.layers.map(item => item.z)) + 1), opacity: 1, rotation: 0, style: { size: .02 } }

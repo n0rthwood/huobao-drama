@@ -123,9 +123,9 @@
         <rect x="1" y="1" width="598" height="358" fill="#f7f2e4" stroke="#9a8871" />
         <path v-for="i in 9" :key="`v${i}`" :d="`M ${i * 60} 0 V 360`" stroke="#cbbfae" />
         <path v-for="i in 5" :key="`h${i}`" :d="`M 0 ${i * 60} H 600`" stroke="#cbbfae" />
-        <polygon v-for="shape in spec.regions" :key="shape.id" :points="previewPoints(shape.points)" fill="#dca77a" fill-opacity=".3" stroke="#b45235" stroke-dasharray="6 4" />
-        <polyline v-for="shape in spec.routes" :key="shape.id" :points="previewPoints(shape.points)" fill="none" stroke="#b45235" stroke-width="2" stroke-dasharray="6 4" />
-        <circle v-for="place in spec.places" :key="place.id" :cx="previewPoint([place.lon, place.lat])[0]" :cy="previewPoint([place.lon, place.lat])[1]" r="5" fill="white" stroke="#b45235"><title>{{ place.name }}</title></circle>
+        <polygon v-for="shape in spec.regions.filter(item => !isMissing(item))" :key="shape.id" :points="previewPoints(shape.points)" fill="#dca77a" fill-opacity=".3" :stroke="isPending(shape) ? '#b45235' : '#557269'" :stroke-dasharray="isPending(shape) ? '6 4' : undefined" />
+        <polyline v-for="shape in spec.routes.filter(item => !isMissing(item))" :key="shape.id" :points="previewPoints(shape.points)" fill="none" :stroke="isPending(shape) ? '#b45235' : '#557269'" stroke-width="2" :stroke-dasharray="isPending(shape) ? '6 4' : undefined" />
+        <circle v-for="place in spec.places.filter(item => !isMissing(item))" :key="place.id" :cx="previewPoint([place.lon, place.lat])[0]" :cy="previewPoint([place.lon, place.lat])[1]" :r="selected?.kind === 'place' && selected.id === place.id ? 7 : 5" :fill="isPending(place) ? 'white' : '#557269'" :stroke="isPending(place) ? '#b45235' : '#557269'"><title>{{ place.name }}</title></circle>
       </svg>
     </div>
 
@@ -323,6 +323,9 @@ watch(() => props.focusTarget, async target => {
 })
 function isPending(item: MapPlace | MapRoute | MapRegion): boolean {
   return item.proposed === true && item.origin !== 'manual' && item.verification?.status !== 'verified' && item.verification?.status !== 'confirmed'
+}
+function isMissing(item: MapPlace | MapRoute | MapRegion): boolean {
+  return item.verification?.reasons?.some(reason => reason.includes('dataset_missing')) === true
 }
 function previewPoint([lon, lat]: [number, number]): [number, number] {
   const [west, south, east, north] = props.spec.bbox

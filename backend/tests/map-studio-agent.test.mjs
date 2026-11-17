@@ -95,6 +95,15 @@ const SCRIPT = `
   const RESEARCH_EXTENT = [118.5, 31.9, 120.2, 33.9]
   const WIDE = [100, 20, 130, 45]
   const TIGHT = [118.7, 32.0, 120.0, 33.8]
+  // Render the real terrain pipeline with deterministic local Terrarium tiles, never the network.
+  const { normalizeMapSpec, mapProjectionFor } = await import('file://${backend}src/modules/map-studio/geo/base-render.ts')
+  const { chooseDemZoom, ensureDemTiles } = await import('file://${backend}src/modules/map-studio/geo/terrain-cache.ts')
+  const size = { width: 3840, height: 2160 }
+  const tile = await sharp({ create: { width: 256, height: 256, channels: 3, background: { r: 128, g: 100, b: 0 } } }).png().toBuffer()
+  for (const bbox of [WIDE, TIGHT]) {
+    const spec = normalizeMapSpec({ bbox })
+    await ensureDemTiles({ projection: mapProjectionFor(spec, size), ...size, zoom: chooseDemZoom(bbox, size, 'overview'), fetchTile: async () => tile })
+  }
   let baseRuns = 0
   let drawingVisits = 0
   const titleLayer = text => ({ id:'title', name:'title', visible:true, locked:false, z:20, opacity:1, rotation:0, type:'label', box:{ x:0.04,y:0.04,w:0.4,h:0.1 }, text, style:{size:0.05} })
@@ -292,12 +301,10 @@ test('独立地图跑完整模型阶段后可下载成图、语义与可编辑�
       detail = await settle(taskId)
       assert.notEqual(detail.status, 'failed', detail.error)
     }
-    // 第二次 start 是 research：模型几何未核验 → 阶段阻断（不是失败），人工确认后才能继续
-    assert.equal(detail.status, 'blocked')
-    const approvedSpec = JSON.parse(JSON.stringify(detail.map_spec))
-    for (const item of [...approvedSpec.places, ...approvedSpec.routes, ...approvedSpec.regions]) delete item.proposed
-    detail = await saveMapWorkflowDraft(taskId, { mapSpec: approvedSpec, expectedRevision: detail.revision })
+    // 未核验要素不阻断，研究单步结束即可继续到底图。
+    assert.equal(detail.status, 'awaiting_review')
     assert.equal(detail.stage, 'base')
+    assert.ok(detail.issues.some(issue => issue.code === 'geometry_approximate' && !issue.blocking))
     await startMapWorkflow(taskId, { mode: 'manual', expectedRevision: detail.revision, textConfigId: configId })
     detail = await settle(taskId)
     assert.equal(detail.stage, 'style')
