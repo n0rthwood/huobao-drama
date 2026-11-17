@@ -567,13 +567,13 @@ function markerLinkKey() {
   if (!(id > 0)) return ''
   if (check.open) return `check:${id}`
   const snapshot = textFingerprint(text.value)
-  if (pron.open) return `pron:${id}:${pron.start}-${pron.end}:${encodeURIComponent(pron.base || '')}:${snapshot}`
+  if (pron.open) return `pron:${id}:${pron.start}-${pron.end}:${encodeURIComponent(pron.base || '')}:${snapshot}:${pron.mode}`
   if (tone.open) return `tone:${id}:${tone.editing ? `${tone.editing.start}-${tone.editing.end}` : tone.pos}::${snapshot}`
   if (pause.open) return `pause:${id}:${pause.editing ? `${pause.editing.start}-${pause.editing.end}` : pause.pos}::${snapshot}`
   return ''
 }
 watch(
-  () => [check.open, pron.open, tone.open, pause.open, pron.start, pron.end, tone.pos, pause.pos].join('|'),
+  () => [check.open, pron.open, tone.open, pause.open, pron.start, pron.end, pron.mode, tone.pos, pause.pos].join('|'),
   () => link.set({ nedlg: markerLinkKey() }),
   { immediate: true },
 )
@@ -590,9 +590,9 @@ function openStale() {
 }
 
 async function restoreMarkerDeeplink() {
-  const matched = /^(check|pron|tone|pause):(\d+)(?::(\d+)(?:-(\d+))?(?::([^:]*):([^:]*))?)?$/.exec(urlDialog || '')
+  const matched = /^(check|pron|tone|pause):(\d+)(?::(\d+)(?:-(\d+))?(?::([^:]*):([^:]*)(?::(pinyin|homophone))?)?)?$/.exec(urlDialog || '')
   if (!matched) { if (urlDialog) openStale(); return }
-  const [, kind, idText, startText, endText, baseText, snapshot] = matched
+  const [, kind, idText, startText, endText, baseText, snapshot, mode] = matched
   if (!(props.deeplinkId > 0) || Number(idText) !== props.deeplinkId) return
   if (kind === 'check') { void openCheck(); return }
   if (snapshot === undefined || snapshot !== textFingerprint(text.value)) { openStale(); return }
@@ -603,9 +603,11 @@ async function restoreMarkerDeeplink() {
     let base
     try { base = decodeURIComponent(baseText || '') } catch { openStale(); return }
     const seg = markerSegmentAt(start, end, ['ruby', 'invalid'])
-    if (seg && (!base || seg.base === base)) { await openPron({ start, end }, seg); return }
-    if (base && text.value.slice(start, end) === base && !markerAt(text.value, start)) { await openPron({ start, end }); return }
-    openStale('pron', start, end, base)
+    if (!mode) { openStale(); return }
+    if (seg && (!base || seg.base === base)) await openPron({ start, end }, seg)
+    else if (base && text.value.slice(start, end) === base && !markerAt(text.value, start)) await openPron({ start, end })
+    else { openStale(); return }
+    pron.mode = mode
     return
   }
   const types = kind === 'tone' ? ['tone'] : ['pause']

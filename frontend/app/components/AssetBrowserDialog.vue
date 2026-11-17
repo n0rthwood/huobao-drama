@@ -274,7 +274,10 @@ async function load() {
     if (requestedDrama && !activeDramaId.value) {
       const hit = dramaOptions.value.find(d => String(d.id) === requestedDrama)
       if (hit) activeDramaId.value = hit.id
-      else toast.warning(t('deeplink.missing'))
+      else {
+        toast.warning(t('deeplink.missing'))
+        link.set({ bkind: kind.value, bq: keyword.value.trim() })
+      }
     } else if (!activeDramaId.value && !requestedDrama) {
       activeDramaId.value = dramaOptions.value[0]?.id || 0
     }
