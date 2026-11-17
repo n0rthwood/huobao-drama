@@ -13,6 +13,7 @@ const USER_AGENT = 'huobao-drama-map-studio/1.0 (offline map data prefetch; +htt
 const TOLERANCE = 0.0001
 const FULL_REGION = [20, 40, 100, 70] as const
 const sample = process.argv[2] === '--sample'
+const completedOnly = sample && process.argv.includes('--report-completed')
 const parsed = sample ? process.argv[3]?.split(',').map(Number) : [...FULL_REGION]
 if (!parsed || parsed.length !== 4 || parsed.some(n => !Number.isInteger(n)) ||
   parsed[0]! < 20 || parsed[1]! < 40 || parsed[2]! > 100 || parsed[3]! > 70 ||
@@ -63,6 +64,7 @@ async function main(): Promise<void> {
   const ways = new Map<number, RiverWay>()
   for (let s = REGION[1]; s < REGION[3]; s += STEP) for (let w = REGION[0]; w < REGION[2]; w += STEP) {
     const file = path.join(progressDir, `${w}-${s}.json`)
+    if (completedOnly && !fs.existsSync(file)) continue
     let elements: RiverWay[]
     if (fs.existsSync(file)) {
       const contents = fs.readFileSync(file)
@@ -103,8 +105,10 @@ async function main(): Promise<void> {
   fs.writeFileSync(`${output}.tmp`, body); fs.renameSync(`${output}.tmp`, output)
   const manifest = {
     version: 2, source_url: ENDPOINTS[0], fetched_at: new Date().toISOString(), region: REGION,
+    ...(sample ? { sample: true, completed_chunks: Object.keys(progress.chunks).sort() } : {}),
     license: 'ODbL-1.0', attribution: '© OpenStreetMap contributors, ODbL 1.0',
     simplification_tolerance_degrees: TOLERANCE, file: 'rivers.json', sha256: sha(body),
+    simplification_assessment: { sample_chunks: ['60,56', '61,56'], projection: 'd3 Mercator fitExtent', bbox: [55, 51, 68, 61], canvas: [3840, 2160], max_error_px: 0.02128, note: 'Sample-specific; finer framing can increase pixel error.' },
     rivers: rivers.length, ways: ways.size, bytes: body.length, gzip_bytes: zlib.gzipSync(body).length,
   }
   const target = path.join(dataDir, 'manifest.json')

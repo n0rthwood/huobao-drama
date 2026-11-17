@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import crypto from 'node:crypto'
@@ -33,7 +33,8 @@ test('OSM refs search and extract by multilingual names, and missing or corrupt 
     const id = 'a'.repeat(24), id2 = 'b'.repeat(24)
     const river = (id, x) => ({ id, names: ['Tagil', 'река Тагил'], way_ids: [x], bbox: [x, 57, x + 1, 58], lines: [[[x, 57], [x + 1, 58]]] })
     const retired = { ...river('c'.repeat(24), 65), retired: true }
-    const body = JSON.stringify({ rivers: [river(id, 60), river(id2, 63), retired] })
+    const sample = JSON.parse(readFileSync(path.join(backend, 'tests/fixtures/osm-river-sample.json'), 'utf8')).rivers
+    const body = JSON.stringify({ rivers: [river(id, 60), river(id2, 63), retired, ...sample] })
     writeFileSync(path.join(data, 'rivers.json'), body)
     writeFileSync(path.join(data, 'manifest.json'), JSON.stringify({ version: 2, file: 'rivers.json', sha256: crypto.createHash('sha256').update(body).digest('hex'), license: 'ODbL-1.0', attribution: '© OpenStreetMap contributors' }))
     run(`
@@ -45,6 +46,7 @@ const feature=extractDatasetGeometry('osm:${id}')
 assert.equal(feature.source.license,'ODbL-1.0')
 assert.deepEqual(feature.bbox,[60,57,61,58])
 assert.deepEqual(extractDatasetGeometry('osm:${'c'.repeat(24)}').bbox,[65,57,66,58])
+assert.ok(searchDataset('river','Багаряк').some(hit=>hit.ref==='osm:4fdbb33b01418f93f09a6599'))
 assert.ok(searchDataset('river','Tobol').every(x=>!x.ref.startsWith('osm:')))
 `, { HUOBAO_DATA_DIR: dir })
     writeFileSync(path.join(data, 'rivers.json'), 'corrupt')

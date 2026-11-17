@@ -111,6 +111,11 @@ SHA-256：
 
 - 在 `backend/` 执行 `node --import tsx scripts/prefetch-river-region.ts`；Overpass 请求带自定义
   User-Agent，逐 1° 方块限速、重试，块数据保存在 `DATA_ROOT/map-data/osm-rivers/chunks/` 以便续抓。
+  两块样本（56–57°N、60–62°E）在经纬度平面按 1° 跨度对应 3840 px 换算，0.0001° 最大偏差
+  约 0.384 px；0.001°/0.002°/0.005° 分别约 3.84/7.68/19.19 px，因此选 0.0001°。
+  这是该尺度的平面估算，不保证任意投影和更小取景框仍小于 1 px。
+  同一样本在 Mercator、`fitExtent`、bbox `[55,51,68,61]`、3840×2160 下逐顶点投影到简化线的
+  最大偏差为 0.0213 px；未超过细节图 2 px 阈值，不增加原始几何档。该数字不保证其他取景。
 - 成品 manifest 记录来源、抓取时间、区域、简化容差、sha256、条数、字节数和 gzip 字节数。
   数据不超过 50 MiB 时放 `backend/assets/geo/osm-rivers/rivers.json`；超过时放
   `DATA_ROOT/map-data/osm-rivers/rivers.json`，仓库保留 manifest。读取顺序先仓库后数据目录。
