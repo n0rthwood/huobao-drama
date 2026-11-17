@@ -14,7 +14,8 @@ import crypto from 'crypto'
 import fs from 'fs'
 import path from 'path'
 import { resolveGeoDir } from './datasets.js'
-import { loadRegionRiverPack } from './river-region-store.js'
+import { loadRegionRiverPack, regionRiverPackAvailable } from './river-region-store.js'
+import { foldRiverName } from './river-region.js'
 
 export class NamedRiverError extends Error {
   constructor(message: string) {
@@ -60,17 +61,52 @@ export function namedRiverPackPath(): string {
 export function readNamedRiverManifest(): NamedRiverPack | null {
   const file = path.join(namedRiverPackPath(), 'manifest.json')
   if (!fs.existsSync(file)) return null
+  let parsed: Omit<NamedRiverPack, 'version'> & { version?: number }
   try {
-    const parsed = JSON.parse(fs.readFileSync(file, 'utf8')) as NamedRiverPack
-    if (!Array.isArray(parsed.rivers)) throw new Error('missing rivers')
-    return parsed
+    parsed = JSON.parse(fs.readFileSync(file, 'utf8')) as Omit<NamedRiverPack, 'version'> & { version?: number }
   } catch (err) {
     throw new NamedRiverError(`命名河流包 manifest 损坏（${file}）：${err instanceof Error ? err.message : String(err)}`)
   }
+  // v2 区域包（#112）没有逐河文件清单：按名取河走 loadRegionRiverPack，这里只服务旧 v1 包。
+  if (parsed.version === 2) return null
+  if (!Array.isArray(parsed.rivers)) throw new NamedRiverError(`命名河流包 manifest 损坏（${file}）：missing rivers`)
+  return parsed as NamedRiverPack
 }
 
 export function namedRiverNames(): string[] {
-  return (readNamedRiverManifest()?.rivers ?? []).map(entry => entry.name)
+  // v2 区域包（#112）：名字来自区域索引（首名）；旧 v1 逐河文件仍可用，两者合并去重。
+  const names = new Set<string>()
+  if (regionRiverPackAvailable()) for (const river of loadRegionRiverPack().rivers) if (!river.retired) names.add(river.names[0] ?? river.id)
+  for (const entry of readNamedRiverManifest()?.rivers ?? []) names.add(entry.name)
+  for (const file of LEGACY_RIVER_FILES) {
+    const abs = path.join(namedRiverPackPath(), file)
+    if (!fs.existsSync(abs)) continue
+    try { const payload = JSON.parse(fs.readFileSync(abs, 'utf8')) as { name?: string }; if (payload.name) names.add(payload.name) } catch { /* 损坏文件由 loadNamedRiver 报 */ }
+  }
+  return [...names]
+}
+
+const LEGACY_RIVER_FILES = ['ugra.json', 'akhtuba.json', 'kazanka.json']
+/** v1 逐河文件直读；v2 manifest 不再列它们，但文件仍在仓库里。 */
+function loadLegacyRiverFile(nameOrZh: string): NamedRiver | null {
+  const key = nameOrZh.trim().toLowerCase()
+  for (const file of LEGACY_RIVER_FILES) {
+    const abs = path.join(namedRiverPackPath(), file)
+    if (!fs.existsSync(abs)) continue
+    let payload: { name?: string; name_zh?: string; lines?: unknown; ways?: number; license?: string; attribution?: string }
+    try { payload = JSON.parse(fs.readFileSync(abs, 'utf8')) } catch { continue }
+    if ((payload.name ?? '').toLowerCase() !== key && payload.name_zh !== nameOrZh.trim()) continue
+    if (!Array.isArray(payload.lines)) continue
+    const river: NamedRiver = {
+      name: payload.name ?? file, name_zh: payload.name_zh ?? payload.name ?? file,
+      ways: payload.ways ?? payload.lines.length, license: payload.license ?? 'ODbL-1.0',
+      attribution: payload.attribution ?? '© OpenStreetMap contributors, ODbL 1.0',
+      lines: payload.lines as [number, number][][],
+    }
+    packCache.set(key, river)
+    return river
+  }
+  return null
 }
 
 /** 按英文名或中文名取一条预取河；不在包里返回 null（调用方决定是否算错误） */
@@ -85,6 +121,16 @@ export function loadNamedRiver(nameOrZh: string): NamedRiver | null {
   if (!key) return null
   const cached = packCache.get(key.toLowerCase())
   if (cached) return cached
+  // v2 区域包：按名字（含多语言别名）在区域索引里找，找到后按 osm: id 取几何。
+  if (regionRiverPackAvailable()) {
+    const { rivers } = loadRegionRiverPack()
+    const folded = foldRiverName(key)
+    const hit = rivers.find(river => !river.retired && river.names.some(name => foldRiverName(name) === folded))
+    if (hit) return loadNamedRiver(`osm:${hit.id}`)
+  }
+  // 旧 v1 逐河文件（乌格拉/阿赫图巴/卡赞卡）仍随仓库发布：v2 manifest 取代清单后按已知文件直读。
+  const legacy = loadLegacyRiverFile(key)
+  if (legacy) return legacy
   const manifest = readNamedRiverManifest()
   const entry = manifest?.rivers.find(item => item.name.toLowerCase() === key.toLowerCase() || item.name_zh === key)
   if (!manifest || !entry) return null
