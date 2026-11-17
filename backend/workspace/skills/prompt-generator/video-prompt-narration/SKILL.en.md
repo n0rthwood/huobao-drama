@@ -28,6 +28,12 @@ When the frame contains **people who have no character asset** (attendants, sold
 
 The same rule as in the video-prompt skill; it applies to narrated episodes too. When unnamed people appear in several 3-second segments, repeat the marker set at their first mention in **each** segment; never spell it out only in the first segment and fall back to "the two of them" or "they" afterwards.
 
+## Documentary: Timeline = Generated Segment Length
+
+- A documentary shot's video plays only the **generated segment**: the timeline starts at `0-` and the last segment ends at this shot's `generated_segment_s` from `read_storyboard_context` (±0.5 s). The layer segment is not included, and `duration` (often 0 for documentaries) is not used.
+- Segment count = generated segment length ÷ 3 s, rounded; a 5 s generated segment gets 2 segments, never a 10 s timeline.
+- Checked on save: a timeline that does not start at 0 or does not end at the generated segment length is rejected; existing ones are blocked as `video_timeline_mismatch`. Ep 30 #01 (5 s generated segment) was once written to 10 s.
+
 ## Locked Junction Frame (combos C / D)
 
 The same rule as "Locked Junction Frame" in the video-prompt skill applies to narrated episodes:

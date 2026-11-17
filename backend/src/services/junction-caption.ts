@@ -42,6 +42,9 @@ import {
 import { junctionFrameOf, junctionFramesOfEpisode, type JunctionFrame } from './junction-frame.js'
 import { lockedGenSlot, toCombo, type BaseRef } from './design-card.js'
 import { loadEpisodeAssets, parseMentions } from './storyboard-assets.js'
+import { generatedSegmentSeconds } from './shot-duration.js'
+// 时间分段解析与 C 首段 ≤1.5 秒、0 长/倒序检查共用一套（#110 起生成段时间轴校验也用它）
+import { promptSegments, videoTimelineProblems } from './video-prompt-timeline.js'
 import type { LayerDocBase } from './layer-doc.js'
 
 export const LOCKED_FRAMINGS = ['full', 'crop', 'contain', 'zoomed'] as const
@@ -313,13 +316,6 @@ export function lockedFramePromptHint(frame: LockedFrame): string {
 // ─── 保存校验（AI 写入路径）──────────────────────────────────
 
 /**
- * 时间分段行：`0-3秒：`、`0-2.5秒:`、`0-3s:`、`0–3 s：`、`0-3초:` 都算。行首的时间范围就是分段边界，
- * 模型按技能要求一行一段；找不到任何分段行说明格式不合规（校验无从下手）。
- * 起始/结束秒数要取出来：C 的首段必须 ≤1.5 秒，任何分段都不许是 0 长或倒序（`3-3秒`、`5-3秒`）。
- */
-const SEGMENT_LINE = /^\s*[【\[]?\s*(\d+(?:\.\d+)?)\s*(?:-|–|—|~)\s*(\d+(?:\.\d+)?)\s*(?:秒|초|s|sec|seconds)?\s*[】\]]?\s*[:：]/
-
-/**
  * 切镜写法（zh / en / ja / ko）。`切换为` 与 `切换到` 是同一个意思的两种写法，都收；
  * 只在这一条时间分段里找，不跨段。
  */
@@ -350,40 +346,6 @@ function firstHit(patterns: RegExp[], text: string): string | null {
     if (match) return match[0]
   }
   return null
-}
-
-interface PromptSegment {
-  index: number
-  /** 该段的起始秒数（时间范围左边） */
-  start: number
-  /** 该段的结束秒数（时间范围右边） */
-  end: number
-  /** 行首时间范围的原文（去掉冒号），退回信息里原样引用 */
-  time: string
-  /** 去掉时间前缀后的正文，含该段后续被折行的续行（遇到下一个分段行或空行结束） */
-  body: string
-}
-
-function promptSegments(text: string): PromptSegment[] {
-  const lines = text.split(/\r?\n/)
-  const starts: number[] = []
-  for (let i = 0; i < lines.length; i++) if (SEGMENT_LINE.test(lines[i])) starts.push(i)
-  const startSet = new Set(starts)
-  return starts.map((start, index) => {
-    const matched = SEGMENT_LINE.exec(lines[start])!
-    const body: string[] = [lines[start].replace(SEGMENT_LINE, '')]
-    for (let i = start + 1; i < lines.length; i++) {
-      if (startSet.has(i) || !lines[i].trim()) break
-      body.push(lines[i])
-    }
-    return {
-      index,
-      start: Number(matched[1]),
-      end: Number(matched[2]),
-      time: matched[0].replace(/\s*[:：]\s*$/, '').trim(),
-      body: body.join('\n'),
-    }
-  })
 }
 
 /** 本集可被 @ 的资产（名字 + 种类），C 首段据此判断有没有 @ 到角色 */
@@ -454,15 +416,28 @@ export function junctionPromptReasons(
   return [`${anchor}；${label}里${problems.join('；')}——H3 会把这段内容画在第 0 帧、把衔接帧整段替换掉。${captionLine}请把第一段写成 0-1 秒的空镜：只复述 caption 的机位/景别/画面与光线，静止或极缓推，不出现人物、不切镜、不转场；人物入画与转场放到第二段（切镜挪到第二段之后）后重新调用 update_storyboard。`]
 }
 
+/**
+ * 纪录片视频提示词的时间轴必须覆盖生成段（#110）。退回给模型的完整说明；空数组 = 放行。
+ */
+export function videoTimelineReasons(text: string, segmentSeconds: number): string[] {
+  const problems = videoTimelineProblems(text, segmentSeconds)
+  if (!problems.length) return []
+  return [`视频提示词的时间轴必须覆盖生成段 0–${segmentSeconds} 秒（读 read_storyboard_context 的 generated_segment_s，不含图层段）：${problems.join('；')}。请按 ${segmentSeconds} 秒重排各段后重新调用 update_storyboard。`]
+}
+
 /** 按分镜当前 combo、缓存的衔接帧描述与本集角色资产判断本次写入是否合规（不调模型） */
 export async function junctionPromptRejections(storyboardId: number, videoPrompt: string): Promise<string[]> {
   const text = (videoPrompt || '').trim()
   if (!text) return []
   const [sb] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, storyboardId))
-  const slot = lockedGenSlot(toCombo(sb?.combo))
-  if (!slot) return []
+  const combo = toCombo(sb?.combo)
+  // 只有纪录片镜有 combo；A 没有生成段，不写视频提示词
+  if (!sb || !combo || combo === 'A') return []
+  const timeline = videoTimelineReasons(text, generatedSegmentSeconds(sb.designCard, sb.duration))
+  const slot = lockedGenSlot(combo)
+  if (!slot) return timeline
   const segment = await getLayerSegment(storyboardId)
   // C 的首段必须空镜：要知道哪些 @ 是本集的角色（场景/道具不算）
-  const assets = sb ? await loadEpisodeAssets(sb.episodeId) : []
-  return junctionPromptReasons(text, slot, junctionCaptionText(segment), assets)
+  const assets = await loadEpisodeAssets(sb.episodeId)
+  return [...timeline, ...junctionPromptReasons(text, slot, junctionCaptionText(segment), assets)]
 }

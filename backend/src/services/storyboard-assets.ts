@@ -17,6 +17,7 @@ import { parseStylingVersion } from './styling-version.js'
 import { loadDesignCardContext, resolveDesignCard } from './design-card-context.js'
 import { resolveDramaProjectType } from './project-type.js'
 import { generatedSegmentSeconds } from './shot-duration.js'
+import { videoTimelineProblems } from './video-prompt-timeline.js'
 import { referenceAssetRefs, type Combo, type DesignCard } from './design-card.js'
 import { indexRefs, REF_IMAGE_LIMIT, type AssetRef } from './prompt-refs.js'
 
@@ -102,6 +103,8 @@ export type RefIssueCode =
   | 'faithful_in_diffusion'
   // Issue #110：中帧时刻落在生成段之外（纪录片按生成段长度判，不是整镜时长）
   | 'mid_time_out_of_range'
+  // Issue #110：视频提示词时间轴没有覆盖生成段（从 0 起、终点 = 生成段时长）
+  | 'video_timeline_mismatch'
 
 export interface RefIssue {
   code: RefIssueCode
@@ -667,6 +670,16 @@ export function computeRefIssues(input: RefCheckInput): RefIssue[] {
       message: `中间帧时刻 ${input.midFrameTime}s 不在生成段（${input.generatedSegmentSeconds}s）的 0.5–${Math.max(0, input.generatedSegmentSeconds - 0.5)} 秒之间：`
         + '中帧时刻是生成段内的时刻（不含图层段），请改到生成段内部；这个值不改会在生成视频时被拒收',
     })
+  }
+  // 视频时间轴（Issue #110）：纪录片提交时长 = 生成段；提示词写到别的秒数，后半段动作会丢失或被压缩
+  if (typeof input.generatedSegmentSeconds === 'number' && input.generatedSegmentSeconds > 0 && !noModelVideo) {
+    const problems = videoTimelineProblems(input.prompts.video_prompt || '', input.generatedSegmentSeconds)
+    if (problems.length) {
+      add('video_timeline_mismatch', {
+        code: 'video_timeline_mismatch', severity: 'block', fields: ['video_prompt'],
+        message: `视频提示词的时间轴要覆盖生成段 0–${input.generatedSegmentSeconds} 秒：${problems.join('；')}。请重新生成或按生成段改写视频提示词`,
+      })
+    }
   }
 
   // 设计卡闸门（Issue #57）：生成段的每一条「参考素材」都要在提示词里被 @ 到，
