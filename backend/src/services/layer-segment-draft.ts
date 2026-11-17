@@ -348,8 +348,10 @@ export function layerFromPlannedLayer(
     layer: {
       id, type: 'image', name: anchorAsset.name || `图片 ${index + 1}`, z: index + 1,
       box: inFrame(frame, imageBoxForLayout(textLayout)),
-      src: { path: anchorAsset.image_path }, fit: 'contain',
-      anchor: { asset_id: anchorAsset.id },
+      // #110：src 带资产种类/id（前端按它显示来源），anchor 也带种类——角色/道具 id 可撞号，
+      // 只存 asset_id 会让下游解析命中另一张表的同号资产（库楚 char75 被标成道具 prop75）。
+      src: { path: anchorAsset.image_path, asset_kind: anchorAsset.kind, asset_id: anchorAsset.id }, fit: 'contain',
+      anchor: { asset_id: anchorAsset.id, asset_kind: anchorAsset.kind },
     },
     points: [],
   }
