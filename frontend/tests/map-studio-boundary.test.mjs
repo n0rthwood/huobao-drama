@@ -10,7 +10,8 @@ const moduleRoot = join(frontend, 'app/map-studio')
 const exact = new Set(['vue', 'vue-i18n', 'vue-sonner', 'lucide-vue-next', 'd3-geo', '#app', '#imports'])
 // 基础设施白名单：无宿主状态、纯计算/纯 URL 的辅助模块。useMedia 只做缩略图/封面地址推导（Issue #106），
 // 与 utils/url 同性质，不含任何火宝业务状态。
-const infrastructure = new Set(['utils/url', 'composables/useQuerySync', 'composables/useNowTicker', 'composables/useLayerDoc', 'utils/layerSvg', 'composables/useMedia'])
+// 通用确认框只依赖图标和 i18n，不持有火宝宿主或业务状态。
+const infrastructure = new Set(['utils/url', 'composables/useQuerySync', 'composables/useNowTicker', 'composables/useLayerDoc', 'utils/layerSvg', 'composables/useMedia', 'components/ConfirmDialog.vue'])
 
 function allowed(file, specifier) {
   if (exact.has(specifier)) return true

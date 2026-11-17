@@ -482,7 +482,7 @@
                           :value="option"
                           :checked="assetTypeOf(editTarget) === option"
                           :disabled="assetTypeSaving"
-                          @change="onAssetTypeChange(editTarget, option)"
+                          @change="$event.target.checked = assetTypeOf(editTarget) === option; onAssetTypeChange(editTarget, option)"
                         />
                         <span>{{ t(`episode.asset.assetType.${option}`) }}</span>
                       </label>
@@ -652,7 +652,7 @@
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
-          <img :src="assetViewer.src" :alt="assetViewer.title" class="viewer-img" />
+          <img :src="assetViewer.src" :alt="assetViewer.title" class="viewer-img" @error="onViewerError" />
         </div>
       </div>
     </div>
@@ -726,6 +726,14 @@
         </div>
       </div>
     </div>
+    <ConfirmDialog
+      :open="!!assetTypeConfirm"
+      :title="t('common.confirm')"
+      :message="t('episode.asset.assetTypeDowngradeConfirm', { name: assetTypeConfirm?.name || '' })"
+      :confirm-text="t('common.confirm')"
+      @cancel="assetTypeConfirm = null"
+      @confirm="confirmAssetTypeChange"
+    />
     <ConfirmDialog
       :open="!!episodeToDelete"
       :title="t('detail.ep.deleteTitle')"
@@ -1002,7 +1010,7 @@ async function confirmDeleteMaterial() {
 // Issue #86：页面自身的键由 detail 组声明；弹窗层键单独成组，关闭弹窗只摘掉弹窗键
 const link = useDeeplink('detail', DEEPLINK_KEYS.detail)
 // bkind/bq 由 AssetBrowserDialog 自己的分组发布，本页不声明（声明了会抢占同名键的兜底值）
-const dialogLink = useDeeplink('detailDialogs', DEEPLINK_KEYS.detailDialogs.filter(k => k !== 'bkind' && k !== 'bq'))
+const dialogLink = useDeeplink('detailDialogs', DEEPLINK_KEYS.detailDialogs.filter(k => !['bkind', 'bq', 'bdrama'].includes(k)))
 const urlTab = queryEnum(link.initial('tab'), ['episodes', 'assets'])
 const pendingAssetLink = queryTypedId(link.initial('asset'), ['character', 'scene', 'prop'])
 // URL 携带 tab（含非法值）即以 URL 为准，非法回退默认；asset 参数隐含素材库页签
@@ -1221,10 +1229,26 @@ function openAssetViewer(m) {
   assetViewer.value = { open: true, kindKey: m.kindKey, id: m.id, src: assetSrc(m), title: `${m.kind} · ${m.name}` }
 }
 
+function viewerStaticPath(src) {
+  try {
+    const url = new URL(src, window.location.href)
+    if (url.origin !== window.location.origin) return ''
+    const start = url.pathname.indexOf('/static/')
+    if (start < 0) return ''
+    const path = decodeURIComponent(url.pathname.slice(start + 1))
+    return path.split('/').some(part => part === '..' || part === '.' || /[\\\u0000-\u001f]/.test(part)) ? '' : path
+  } catch { return '' }
+}
+
 /** 参考图预览：ReferenceImageManager 的事件给的是 (src, title)，不是资产成片图 */
 function openRefViewer(src, title) {
   assetViewer.value = { open: true, kindKey: '', id: 0, src, title }
 }
+function onViewerError() {
+  closeAssetViewer()
+  toast.warning(t('deeplink.missing'))
+}
+
 
 /**
  * 参考图增删后以服务端返回的条目数组为准（与剧集工作台 onAssetRefsUpdate 同口径）。
@@ -1238,16 +1262,23 @@ function onAssetRefsUpdate(refs) {
 // 资产类型（Issue #84）：地图是独立类型，地图界面只认服务端持久化的 asset_type
 const ASSET_TYPES = ['prop', 'map']
 const assetTypeSaving = ref(false)
+const assetTypeConfirm = ref(null)
+
+function confirmAssetTypeChange() {
+  const item = assetTypeConfirm.value
+  assetTypeConfirm.value = null
+  if (item) void onAssetTypeChange(item, 'prop', true)
+}
 
 function assetTypeOf(item) {
   return item?.asset_type === 'map' ? 'map' : 'prop'
 }
 
 /** 地图 → 普通道具要人确认：地图数据不会被删，但整套地图界面会收起来 */
-async function onAssetTypeChange(item, next) {
+async function onAssetTypeChange(item, next, confirmed = false) {
   if (assetTypeSaving.value || !item || assetTypeOf(item) === next) return
   const downgrade = assetTypeOf(item) === 'map' && next === 'prop'
-  if (downgrade && !window.confirm(t('episode.asset.assetTypeDowngradeConfirm', { name: item.name || '' }))) return
+  if (downgrade && !confirmed) { assetTypeConfirm.value = item; return }
   assetTypeSaving.value = true
   try {
     const updated = await propAPI.update(item.id, { asset_type: next, confirm_asset_type_change: downgrade || undefined })
@@ -1443,7 +1474,7 @@ function publishDialogLink() {
   const ep = episodeToDelete.value
   const mat = assetToDelete.value
   dialogLink.set({
-    view: viewer.open && viewer.id ? `${viewer.kindKey}-${viewer.id}` : '',
+    view: viewer.open ? (viewer.id ? `${viewer.kindKey}-${viewer.id}` : viewerStaticPath(viewer.src)) : '',
     browser: assetBrowserOpen.value ? '1' : '',
     addep: addDialog.value ? '1' : '',
     proj: showSettings.value ? '1' : '',
@@ -1480,10 +1511,13 @@ function applyAssetDeeplink() {
 
 // 弹窗层恢复：只还原界面，不触发保存/生成/删除；bkind/bq 由资产浏览器自己的分组负责
 function applyDialogDeeplinks() {
-  const viewerRef = queryTypedId(dialogLink.initial('view'), DEEPLINK_KINDS)
-  if (dialogLink.initial('view')) {
+  const viewerValue = querySingle(dialogLink.initial('view'))
+  const viewerRef = queryTypedId(viewerValue, DEEPLINK_KINDS)
+  if (viewerValue) {
     const m = findMaterialByRef(viewerRef)
+    const path = viewerValue.startsWith('static/') ? viewerStaticPath(mediaUrl(viewerValue)) : ''
     if (m && matHasImage(m)) openAssetViewer(m)
+    else if (path) openRefViewer(mediaUrl(path), t('components.referenceImages.label'))
     else if (viewerRef) missingTargetToast(viewerRef)
     else toast.error(t('deeplink.missing'))
   }
@@ -2132,7 +2166,7 @@ onUnmounted(() => {
 .empty-title { font-size: 14px; font-weight: 600; color: var(--text-1); }
 .empty-desc { font-size: 12px; color: var(--text-3); max-width: 260px; line-height: 1.6; }
 
-.viewer-overlay { align-items: center; }
+.viewer-overlay { align-items: center; z-index: 120; }
 .viewer-dialog { width: min(960px, calc(100vw - 48px)); padding: 14px; }
 .viewer-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
 .viewer-title { font-size: 13px; font-weight: 600; color: var(--text-1); }

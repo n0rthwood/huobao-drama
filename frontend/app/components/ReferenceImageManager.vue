@@ -133,11 +133,20 @@ const picking = ref(false)
 // 多个管理器实例共用 reflib 键，只有真正打开的那一个在发布（关闭即摘键，父层 asset 保持）
 const hostRef = computed(() => `${props.assetType}-${props.assetId}`)
 const refLibLink = useDeeplink('refLibrary', DEEPLINK_KEYS.refLibrary)
-watch(libraryOpen, open => refLibLink.set({ reflib: open ? hostRef.value : '' }))
+const initialRemove = refLibLink.initial('refdel')
+watch([libraryOpen, confirmOpen, pendingRemove], () => refLibLink.set({
+  reflib: libraryOpen.value ? hostRef.value : '',
+  refdel: confirmOpen.value && pendingRemove.value ? `${hostRef.value}:${pendingRemove.value}` : '',
+}))
 onMounted(() => {
   // 同一资产可能同时有卡片和详情管理器；链接指向详情时只由大号实例恢复。
   if (props.size === 'compact' && deeplinkInitial('asset') === hostRef.value) return
   if (refLibLink.initial('reflib') === hostRef.value) libraryOpen.value = true
+  if (initialRemove?.startsWith(`${hostRef.value}:`)) {
+    const path = initialRemove.slice(hostRef.value.length + 1)
+    if (path.startsWith('static/') && refs.value.some(entry => entry.path === path)) askRemove(path)
+    else { toast.warning(t('deeplink.missing')); refLibLink.set({}) }
+  }
 })
 
 const refs = computed(() => parseReferenceImages(props.references))

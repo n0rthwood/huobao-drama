@@ -36,8 +36,8 @@ const urlDialog = querySingle(link.initial('fdlg'))
 let dialogRestored = false
 // 单镜配音弹窗的键属于 NarrationBlock 分组，这里只读初值做「分镜不存在」的提示
 const urlVoice = Number(querySingle(deeplinkInitial('voice')) || 0)
-// 多音字检查弹窗 nedlg=check:<分镜 id>（NarrationEditor 分组），同样只做存在性提示
-const urlCheck = Number(/^check:(\d+)$/.exec(querySingle(deeplinkInitial('nedlg')) || '')?.[1] || 0)
+// 旁白标记弹窗均需强制挂载目标分镜。
+const urlCheck = Number(/^(?:check|pron|tone|pause):(\d+)(?::|$)/.exec(querySingle(deeplinkInitial('nedlg')) || '')?.[1] || 0)
 let selRestored = false
 watch(shots, list => {
   if (selRestored || !list.length) return

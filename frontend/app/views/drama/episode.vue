@@ -875,7 +875,7 @@
                       :value="option"
                       :checked="assetTypeOf(assetDetail.item) === option"
                       :disabled="assetTypeSaving"
-                      @change="onAssetTypeChange(assetDetail.item, option)"
+                      @change="$event.target.checked = assetTypeOf(assetDetail.item) === option; onAssetTypeChange(assetDetail.item, option)"
                     />
                     <span>{{ t(`episode.asset.assetType.${option}`) }}</span>
                   </label>
@@ -1427,6 +1427,14 @@
       </div>
 
       <ConfirmDialog
+        :open="!!assetTypeConfirm"
+        :title="t('common.confirm')"
+        :message="t('episode.asset.assetTypeDowngradeConfirm', { name: assetTypeConfirm?.name || '' })"
+        :confirm-text="t('common.confirm')"
+        @cancel="assetTypeConfirm = null"
+        @confirm="confirmAssetTypeChange"
+      />
+      <ConfirmDialog
         :open="assetDelete.open"
         :title="t('episode.delete.title', { type: assetDeleteTypeLabel })"
         :message="t('episode.delete.message', { type: assetDeleteTypeLabel, name: assetDeleteName })"
@@ -1692,7 +1700,7 @@ const storedPanel = (() => {
 // 父级同时接管未挂载子步骤的初始键，门禁阻断时不会留下可误恢复到另一镜的孤立弹窗。
 const link = useDeeplink('workbench', [...new Set([
   ...DEEPLINK_KEYS.workbench, ...DEEPLINK_KEYS.design, ...DEEPLINK_KEYS.picker,
-  ...DEEPLINK_KEYS.keyframes, ...DEEPLINK_KEYS.shotProduction, ...DEEPLINK_KEYS.finalPanel,
+  ...DEEPLINK_KEYS.keyframes, ...DEEPLINK_KEYS.keyframeBatch, ...DEEPLINK_KEYS.shotProduction, ...DEEPLINK_KEYS.finalPanel,
   ...DEEPLINK_KEYS.rewrite, ...DEEPLINK_KEYS.poster, ...DEEPLINK_KEYS.assetReview,
   ...DEEPLINK_KEYS.mediaLib, ...DEEPLINK_KEYS.layerPicker, ...DEEPLINK_KEYS.narration,
   ...DEEPLINK_KEYS.refLibrary, ...DEEPLINK_KEYS.archival,
@@ -4961,11 +4969,18 @@ const pipBadgeLines = computed(() => {
   return lines
 })
 
+const assetTypeConfirm = ref(null)
+function confirmAssetTypeChange() {
+  const item = assetTypeConfirm.value
+  assetTypeConfirm.value = null
+  if (item) void onAssetTypeChange(item, 'prop', true)
+}
+
 /** 地图 → 普通道具要人确认：地图数据不会被删，但整套地图界面会收起来 */
-async function onAssetTypeChange(item, next) {
+async function onAssetTypeChange(item, next, confirmed = false) {
   if (assetTypeSaving.value || !item || assetTypeOf(item) === next) return
   const downgrade = assetTypeOf(item) === 'map' && next === 'prop'
-  if (downgrade && !window.confirm(t('episode.asset.assetTypeDowngradeConfirm', { name: item.name || '' }))) return
+  if (downgrade && !confirmed) { assetTypeConfirm.value = item; return }
   assetTypeSaving.value = true
   try {
     const updated = await propAPI.update(item.id, { asset_type: next, confirm_asset_type_change: downgrade || undefined })

@@ -163,11 +163,12 @@ const activeDramaId = ref(0)
  * URL 子状态（Issue #86）：弹窗开关键 browser 由宿主发布，这里只管内部的类别页签与关键词；
  * 勾选与改名是未保存的导入草稿，不进 URL、不恢复。
  */
-const link = useDeeplink('assetBrowser', ['bkind', 'bq'])
+const link = useDeeplink('assetBrowser', ['bkind', 'bq', 'bdrama'])
+let requestedDrama = querySingle(link.initial('bdrama'))
 const kind = ref(queryEnum(link.initial('bkind'), ['character', 'scene', 'prop']) || '')
 const keyword = ref(querySingle(link.initial('bq')) || '')
-// 只在挂载期间发布；弹窗关闭 = 组件卸载，分组自动释放这两个键
-watch([kind, keyword], () => link.set({ bkind: kind.value, bq: keyword.value.trim() }))
+// 勾选与改名是未保存的导入草稿，不进 URL。
+watch([kind, keyword, activeDramaId], () => link.set({ bkind: kind.value, bq: keyword.value.trim(), bdrama: activeDramaId.value || '' }))
 // key = `${kind}-${id}` → { item, name }
 const selected = ref({})
 
@@ -270,9 +271,17 @@ async function load() {
     dramas.value = data?.dramas || []
     items.value = data?.items || []
     takenNames.value = data?.taken_names || { character: [], scene: [], prop: [] }
-    if (!activeDramaId.value) {
+    if (requestedDrama && !activeDramaId.value) {
+      const hit = dramaOptions.value.find(d => String(d.id) === requestedDrama)
+      if (hit) activeDramaId.value = hit.id
+      else {
+        toast.warning(t('deeplink.missing'))
+        link.set({ bkind: kind.value, bq: keyword.value.trim() })
+      }
+    } else if (!activeDramaId.value && !requestedDrama) {
       activeDramaId.value = dramaOptions.value[0]?.id || 0
     }
+    requestedDrama = null
   } catch (err) {
     toastError(err)
   } finally {

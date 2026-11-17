@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div v-if="open" class="overlay confirm-overlay" @click.self="emit('cancel')">
+    <div v-if="open" class="overlay confirm-overlay" :style="overlayStyle" @click.self="emit('cancel')">
       <div class="dialog confirm-dialog" role="alertdialog" aria-modal="true" :aria-label="effectiveTitle">
         <div class="confirm-icon">
           <Trash2 :size="20" :stroke-width="1.8" />
@@ -32,6 +32,7 @@ const props = defineProps({
   message: { type: String, default: '' },
   confirmText: { type: String, default: '' },
   loadingText: { type: String, default: '' },
+  overlayStyle: { type: Object, default: undefined },
   loading: { type: Boolean, default: false },
 })
 
