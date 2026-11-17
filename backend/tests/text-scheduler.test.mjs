@@ -65,6 +65,12 @@ test('text scheduling, endpoint selection and persisted health', () => {
     row = (await db.select().from(schema.aiServiceConfigs).where(eq(schema.aiServiceConfigs.id, 9901)))[0]
     assert.equal(row.consecutiveErrors, 0); assert.equal(row.suspendedAt, null)
     assert.equal((await assignTextEndpoint('keyframe_prompts', { configId: 9901 })).configId, 9901)
+    // 欠费不会自愈：一次 402 / 余额文案就暂停，不等 3 次
+    await noteEndpointError(9901, new Error('Insufficient Balance (request_id: x)'))
+    row = (await db.select().from(schema.aiServiceConfigs).where(eq(schema.aiServiceConfigs.id, 9901)))[0]
+    assert.equal(row.consecutiveErrors, 1); assert.ok(row.suspendedAt)
+    assert.equal((await assignTextEndpoint('keyframe_prompts', { excludeConfigIds: [] })).configId === 9901, false)
+    await resumeTextConfig(9901)
     const initial = await assignTextEndpoint('keyframe_prompts')
     const taskId = await createTextTask({ kind: 'asset_review', episodeId: 1, stageModel: initial, queued: true })
     let calls = 0

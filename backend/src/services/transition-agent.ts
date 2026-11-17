@@ -9,6 +9,7 @@ import { buildAgentRequestContext } from '../agents/context.js'
 import { runAgent } from '../agents/run.js'
 import { logTaskError, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
 import { resolveStageModel } from './ai-stages.js'
+import { isModelError } from './text-model-errors.js'
 import {
   legalTechniqueIds,
   loadTransitionPair,
@@ -45,14 +46,18 @@ export async function runTransitionReview(
     shotNumber: pair.current.storyboardNumber,
   })
 
-  const resolved = await resolveStageModel('transition_writer', opts)
-  const requestContext = buildAgentRequestContext({
+  // 模型服务错误（欠费/401/429/5xx/网络）换一条健康端点再试，不占「模型没交决策」的重试次数；
+  // 用户显式指定的配置不静默换（与 assignTextEndpoint 的 pinned 口径一致）。
+  const excludeConfigIds: number[] = []
+  let resolved = await resolveStageModel('transition_writer', opts)
+  const contextFor = (stage: typeof resolved) => buildAgentRequestContext({
     episodeId: pair.episodeId,
     dramaId: pair.dramaId,
     storyboardId,
-    modelOverride: resolved.model,
-    textConfigId: resolved.configId ?? undefined,
+    modelOverride: stage.model,
+    textConfigId: stage.configId ?? undefined,
   })
+  let requestContext = contextFor(resolved)
 
   const errors: string[] = []
   const readReview = async (): Promise<TransitionReview | null> => {
@@ -61,7 +66,7 @@ export async function runTransitionReview(
     const review = parseTransitionReview(fresh?.transitionReview)
     return review && review.input_signature === signature && !review.edited_manually ? review : null
   }
-  for (let attempt = 1; attempt <= 2; attempt++) {
+  for (let attempt = 1; attempt <= 2;) {
     const ask = {
       role: 'user' as const,
       content: `请为分镜 #${pair.current.storyboardNumber}（承接上一镜 #${pair.previous.storyboardNumber} 的尾帧）设计开场转场。${USER_MESSAGE_SUFFIX}`,
@@ -82,12 +87,26 @@ export async function runTransitionReview(
         review = await readReview()
       }
     } catch (err) {
-      errors.push(err instanceof Error ? err.message : String(err))
+      errors.push(`[${resolved.name}] ${err instanceof Error ? err.message : String(err)}`)
+      if (isModelError(err) && !resolved.pinned && resolved.configId != null) {
+        excludeConfigIds.push(resolved.configId)
+        try {
+          resolved = await resolveStageModel('transition_writer', { ...opts, excludeConfigIds })
+        } catch (switchErr) {
+          errors.push(switchErr instanceof Error ? switchErr.message : String(switchErr))
+          break
+        }
+        requestContext = contextFor(resolved)
+        logTaskStart('Transition', 'failover', { storyboardId, configId: resolved.configId ?? undefined, excluded: excludeConfigIds.join(',') })
+        continue
+      }
+      attempt++
       continue
     }
     if (review) {
       if (review.verdict !== 'none' && !legalTechniqueIds().includes(review.technique || '')) {
         errors.push(`technique_id ${review.technique} 不在手法目录中`)
+        attempt++
         continue
       }
       logTaskSuccess('Transition', 'review', {
@@ -100,6 +119,7 @@ export async function runTransitionReview(
       return review
     }
     errors.push('模型没有提交有效的转场决策（update_storyboard 未成功调用或 technique_id 非法）')
+    attempt++
   }
 
   const message = `分镜 #${pair.current.storyboardNumber} 转场生成失败：${errors.join(' | ')}`

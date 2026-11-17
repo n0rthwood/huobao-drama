@@ -26,3 +26,17 @@ export function isModelError(err: unknown): boolean {
   if (/\b(fetch failed|network error|socket hang up|timed?\s*out|timeout)\b/i.test(e.message || '')) return true
   return e.cause != null && e.cause !== err ? isModelError(e.cause) : false
 }
+
+/**
+ * 欠费/额度耗尽：不会自己恢复，重试只会继续失败，所以端点要**立即**暂停，
+ * 而不是像 429/5xx 那样攒满 3 次连续错误。恢复靠充值后在设置页手动「恢复」。
+ */
+export function isBalanceError(err: unknown): boolean {
+  if (!err) return false
+  if (typeof err === 'string') return /insufficient balance|余额不足|欠费|payment required|文本服务\s*402|HTTP\s*402/i.test(err)
+  if (typeof err !== 'object') return false
+  const e = err as { message?: string; status?: number; statusCode?: number; code?: string; cause?: unknown }
+  if ((e.status ?? e.statusCode) === 402) return true
+  if (/insufficient balance|余额不足|欠费|payment required/i.test(`${e.code ?? ''} ${e.message ?? ''}`)) return true
+  return e.cause != null && e.cause !== err ? isBalanceError(e.cause) : false
+}

@@ -12,7 +12,7 @@ import {
   type StagePinFacts,
 } from './ai-stages.js'
 import { currentTextTaskId } from './text-task-context.js'
-import { isModelError } from './text-model-errors.js'
+import { isBalanceError, isModelError } from './text-model-errors.js'
 import { markTextTaskStarted, parseTextTaskParams } from './text-task.js'
 
 export interface TextEndpoint {
@@ -263,10 +263,12 @@ export async function noteEndpointSuccess(configId: number): Promise<void> {
 export async function noteEndpointError(configId: number, err: unknown): Promise<void> {
   if (!isModelError(err)) return
   const reason = err instanceof Error ? err.message.slice(0, 300) : '模型服务错误'
+  // 欠费不会自愈：一次就暂停；其余服务侧错误攒满 3 次连续错误才暂停
+  const threshold = isBalanceError(err) ? 1 : 3
   await db.update(schema.aiServiceConfigs).set({
     consecutiveErrors: sql`${schema.aiServiceConfigs.consecutiveErrors} + 1`,
-    suspendedAt: sql`CASE WHEN ${schema.aiServiceConfigs.consecutiveErrors} + 1 >= 3 THEN datetime('now') ELSE ${schema.aiServiceConfigs.suspendedAt} END`,
-    suspendedReason: sql`CASE WHEN ${schema.aiServiceConfigs.consecutiveErrors} + 1 >= 3 THEN ${reason} ELSE ${schema.aiServiceConfigs.suspendedReason} END`,
+    suspendedAt: sql`CASE WHEN ${schema.aiServiceConfigs.consecutiveErrors} + 1 >= ${threshold} THEN datetime('now') ELSE ${schema.aiServiceConfigs.suspendedAt} END`,
+    suspendedReason: sql`CASE WHEN ${schema.aiServiceConfigs.consecutiveErrors} + 1 >= ${threshold} THEN ${reason} ELSE ${schema.aiServiceConfigs.suspendedReason} END`,
   }).where(eq(schema.aiServiceConfigs.id, configId))
   const rows = await db.select().from(schema.aiServiceConfigs).where(eq(schema.aiServiceConfigs.id, configId))
   if (rows[0]?.suspendedAt) slots.rejectQueued(configId)
