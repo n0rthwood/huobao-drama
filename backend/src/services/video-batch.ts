@@ -27,7 +27,11 @@ import {
 } from './storyboard-video.js'
 import { isActiveTaskStatus, isH3JobsTask } from './sys-task.js'
 import { cancelVideoTask } from './h3-jobs.js'
-import { blockingIssuesFor, checkStoryboardRefs, describeIssues } from './storyboard-assets.js'
+import { blockingIssuesFor, checkStoryboardRefs, describeIssues, emptyTargetBindings, loadEpisodeAssets, loadEpisodeTargetBindings } from './storyboard-assets.js'
+import type { EpisodeAssetEntry, TargetBindings } from './storyboard-assets.js'
+import { loadDesignCardContext } from './design-card-context.js'
+import type { DesignCardContext } from './design-card.js'
+import { getDramaStylePrompt } from './style-preset.js'
 import { logTaskError, logTaskProgress, logTaskStart, logTaskSuccess, logTaskWarn } from '../utils/task-logger.js'
 import { transitionStatus } from './transition.js'
 import { scopeFromPreview, type BatchScope } from './batch-scope.js'
@@ -218,9 +222,10 @@ async function layerBaseCheckReason(sb: typeof schema.storyboards.$inferSelect):
 async function videoBlockReason(
   sb: typeof schema.storyboards.$inferSelect,
   keyframes: Map<number, StoryboardKeyframeState>,
+  preloaded?: { episode?: typeof schema.episodes.$inferSelect; assets?: EpisodeAssetEntry[]; bindingsByShot?: Map<number, TargetBindings>; cardCtx?: DesignCardContext },
 ): Promise<string | null> {
   if (!sb || sb.deletedAt) return '镜头不存在'
-  const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, sb.episodeId))
+  const ep = preloaded?.episode ?? (await db.select().from(schema.episodes).where(eq(schema.episodes.id, sb.episodeId)))[0]
   if (resolveDramaProjectType(ep?.dramaId) === 'documentary') {
     if (!sb.combo || sb.designCardStatus !== 'confirmed') return '设计卡未确认'
   }
@@ -230,7 +235,11 @@ async function videoBlockReason(
   if (baseReason) return baseReason
   if (resolveDramaProjectType(ep?.dramaId) === 'documentary' && sb.combo === 'A') return '未启用生成段'
   if (!keyframes.get(sb.id)?.confirmed) return '关键帧尚未确认'
-  const blocking = blockingIssuesFor(await checkStoryboardRefs(sb), 'video_prompt')
+  const blocking = blockingIssuesFor(await checkStoryboardRefs(sb, preloaded?.assets, {
+    cardCtx: preloaded?.cardCtx,
+    bindings: preloaded?.bindingsByShot?.get(sb.id) ?? emptyTargetBindings(),
+    documentary: resolveDramaProjectType(ep?.dramaId) === 'documentary',
+  }), 'video_prompt')
   if (blocking.length) return `视频提示词与参考图不一致：${describeIssues(blocking)}`
   return null
 }
@@ -252,6 +261,17 @@ export async function previewEpisodeVideoBatch(
 
   const keyframes = await loadEpisodeKeyframes(episodeId)
   const active = await loadActiveStoryboardIds()
+  // 整集事实一次装配（Issue #118 C）：逐镜阻断检查与请求组装不再各自重建整集上下文
+  const [drama] = await db.select().from(schema.dramas).where(eq(schema.dramas.id, episode.dramaId))
+  const preloaded = {
+    episode,
+    drama: drama ?? null,
+    assets: await loadEpisodeAssets(episodeId),
+    bindingsByShot: await loadEpisodeTargetBindings(episodeId),
+    cardCtx: loadDesignCardContext(episodeId),
+    keyframes,
+    stylePrompt: await getDramaStylePrompt(episode.dramaId),
+  }
   // “选择”模式只缩小范围，勾选默认值仍按签名判断
   const targets = opts.storyboardIds !== undefined
     ? storyboards.filter(sb => opts.storyboardIds!.includes(sb.id))
@@ -274,7 +294,7 @@ export async function previewEpisodeVideoBatch(
       result.push({ ...base, status: 'skipped', checked: false, selectable: false, reason: '该镜头正在生成中' })
       continue
     }
-    const blocked = await videoBlockReason(sb, keyframes)
+    const blocked = await videoBlockReason(sb, keyframes, preloaded)
     if (blocked) {
       result.push({ ...base, status: 'blocked', checked: false, selectable: false, reason: blocked })
       continue
@@ -284,7 +304,7 @@ export async function previewEpisodeVideoBatch(
     const pendingTransition = (await transitionStatus(sb, keyframes.get(sb.id)?.inheritsFirst === true)).needsReview
     let request: StoryboardVideoRequest
     try {
-      request = await buildStoryboardVideoRequest(sb.id, { model: opts.model, configId: opts.configId, autoTransition: false })
+      request = await buildStoryboardVideoRequest(sb.id, { model: opts.model, configId: opts.configId, autoTransition: false, preloaded })
     } catch (err) {
       result.push({
         ...base,
