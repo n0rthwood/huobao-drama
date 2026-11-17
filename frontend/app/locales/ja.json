@@ -3638,6 +3638,16 @@
       "legacy": "この構図は旧式の自由テキストレイヤー（{n} 個）を使っています。テンプレートテキストを得るにはコンセプトを再生成してください。"
     }
   },
+  "mapPreview": {
+    "readOnly": "バージョンは閲覧専用です。現在の画像は切り替えられません。",
+    "versionsUnavailable": "バージョン一覧を読み込めません",
+    "imageMissing": "画像を表示できません",
+    "targetMissing": "関連素材は削除済みか未関連のため開けません。",
+    "stale": "期限切れ",
+    "overview": "親の全体図",
+    "openOverview": "全体図を見る",
+    "shotCount": "関連するショット {n} 件"
+  },
   "mapStudio": {
     "styles": {
       "title": "地図テーマ",

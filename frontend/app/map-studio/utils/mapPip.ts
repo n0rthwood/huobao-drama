@@ -8,6 +8,23 @@
  * 这里只做「读得懂就说，读不懂就不说」：形状不对或 role 不是这两种一律返回 null，
  * 绝不按名字或 faithful 猜这是不是画中画资产。
  */
+import { geoEquirectangular, geoMercator } from 'd3-geo'
+
+type Bbox = [number, number, number, number]
+
+/** Same d3 fitExtent and corner projection as the backend's pip/frames.ts. */
+export function pipFrameRect(overview: unknown, focus: unknown, width: number, height: number, projectionType = 'mercator'): Bbox | null {
+  const valid = (v: unknown): v is Bbox => Array.isArray(v) && v.length === 4 && v.every(n => typeof n === 'number' && Number.isFinite(n)) && v[0] < v[2] && v[1] < v[3]
+  if (!valid(overview) || !valid(focus) || width <= 0 || height <= 0) return null
+  const [w, s, e, n] = overview
+  const projection = projectionType === 'equirectangular' ? geoEquirectangular() : geoMercator()
+  projection.fitExtent([[0, 0], [width, height]], { type: 'Polygon', coordinates: [[[w, s], [w, n], [e, n], [e, s], [w, s]]] })
+  const a = projection([focus[0], focus[3]])
+  const b = projection([focus[2], focus[1]])
+  if (!a || !b) return null
+  return [Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[0], b[0]), Math.max(a[1], b[1])]
+}
+
 export interface PipMetaOverview {
   version?: number
   role: 'overview'

@@ -783,16 +783,18 @@
                 <button
                   type="button"
                   class="asset-detail-media-frame"
-                  :disabled="!assetImageSrc(assetDetail.item)"
+                  :disabled="!assetImageSrc(assetDetail.item) || mapPreviewFailed"
                   @click.stop="openImageViewer(assetImageSrc(assetDetail.item), assetDetailImageTitle(assetDetail))"
                 >
                   <img
-                    v-if="assetImageSrc(assetDetail.item)"
+                    v-if="assetImageSrc(assetDetail.item) && !mapPreviewFailed"
                     :src="thumbOf(assetImageSrc(assetDetail.item))"
                     class="previewable-image"
-                    @error="thumbFallback($event, assetImageSrc(assetDetail.item))"
+                    loading="lazy"
+                    @error="mapImageError($event, assetImageSrc(assetDetail.item), isMapAsset(assetDetail.item))"
                   />
-                  <span v-else class="asset-detail-media-empty">
+                  <span v-if="mapPreviewFailed" class="asset-detail-media-empty">{{ t('mapPreview.imageMissing') }}</span>
+                  <span v-else-if="!assetImageSrc(assetDetail.item)" class="asset-detail-media-empty">
                     <svg v-if="assetDetail.type === 'character'" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                     <svg v-else-if="assetDetail.type === 'prop'" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
                     <svg v-else width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
@@ -800,7 +802,7 @@
                 </button>
                 <MediaTime v-if="assetDetail.item?.image_generated_at" class="asset-detail-media-time" :at="assetDetail.item.image_generated_at" />
 
-                <section v-if="assetVersions(assetDetail.item).length" class="asset-version-panel">
+                <section v-if="!isMapAsset(assetDetail.item) && assetVersions(assetDetail.item).length" class="asset-version-panel">
                   <div class="asset-version-head">
                     <strong>{{ t('episode.asset.versions') }}</strong>
                     <span>{{ t('episode.asset.versionCount', { n: assetVersions(assetDetail.item).length }) }}</span>
@@ -823,6 +825,8 @@
                   </div>
                   <p class="asset-version-hint">{{ t('episode.asset.versionHint') }}</p>
                 </section>
+
+                <MapAssetPreview v-if="isMapAsset(assetDetail.item)" :key="assetDetail.item.id" :item="assetDetail.item" :assets="propItems" :episode-numbers="sbs.map(shotNumber)" @open-asset="id => openAssetDetailById('prop', id)" @preview="openImageViewer" />
 
                 <div class="asset-detail-meta-row">
                   <div class="asset-detail-meta-item">
@@ -1572,6 +1576,7 @@ import MapStudioEntry from '~/components/MapStudioEntry.vue'
 import { pipBadgeText } from '~/map-studio/utils/mapPip'
 import { dropLegacyMapDeeplinks } from '~/composables/useQuerySync'
 import VideoQueueBar from '~/components/VideoQueueBar.vue'
+import MapAssetPreview from '~/components/MapAssetPreview.vue'
 import ResearchCitationList from '~/components/ResearchCitationList.vue'
 import FinalPromptSourceBadge from '~/components/FinalPromptSourceBadge.vue'
 import MediaLibraryDialog from '~/components/MediaLibraryDialog.vue'
@@ -2018,6 +2023,12 @@ function shotNumberOf(sb) {
   return i >= 0 ? i + 1 : 0
 }
 const assetDetail = ref({ open: false, type: '', item: null })
+const mapPreviewFailed = ref(false)
+watch(() => [assetDetail.value.item?.id, assetDetail.value.item?.image_url], () => { mapPreviewFailed.value = false })
+function mapImageError(event, src, isMap) {
+  if (isMap && event.target.dataset.fbk) mapPreviewFailed.value = true
+  else thumbFallback(event, src)
+}
 const assetTypeSaving = ref(false)
 const assetDetailDraft = ref({ appearance: '', styling: '', prompt: '', lighting: '', description: '', time: '' })
 // 最终提示词手动编辑：dirty 时才随保存提交，避免无修改保存误清空 Agent 生成的提示词
@@ -7059,9 +7070,9 @@ button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
 }
 .is-map-dialog .asset-detail-head, .is-map-dialog .asset-detail-foot { flex: 0 0 auto; }
 .is-map-dialog .asset-detail-body { flex: 1 1 auto; min-height: 0; overflow: auto; }
-.is-map-dialog .asset-detail-shell { grid-template-columns: minmax(0, 1fr); }
-.is-map-dialog .asset-detail-preview-panel { position: static; display: none; }
-.is-map-dialog .asset-detail-map-panel { overflow: visible; min-width: 1280px; }
+.is-map-dialog .asset-detail-shell { grid-template-columns: minmax(250px, 380px) minmax(0, 1fr); }
+.is-map-dialog .asset-detail-preview-panel { position: static; }
+.is-map-dialog .asset-detail-map-panel { min-width: 0; overflow-x: auto; }
 .asset-detail-head {
   display: flex;
   align-items: center;
