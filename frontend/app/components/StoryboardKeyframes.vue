@@ -494,14 +494,14 @@
                 <div v-if="slot === 'mid'" class="kf-slot-row">
                   <span class="kf-slot-row-label">{{ t('episode.kf.midTime') }}</span>
                   <input
-                    :value="midTime(selected) ?? ''"
+                    :value="midTimeDraft ?? midTime(selected) ?? ''"
                     type="number"
                     step="0.1"
                     min="0.5"
                     :max="midTimeMax(selected)"
                     :class="['input kf-mid-time', { 'is-error': midTimeOutOfRange }]"
                     :placeholder="t('episode.kf.midTimeAuto')"
-                    @input="emit('field-dirty', selected, 'mid_frame_time', $event.target.value === '' ? null : Number($event.target.value))"
+                    @input="onMidTimeInput(selected, $event)"
                     @change="onMidTimeChange(selected, $event)"
                   />
                   <span class="kf-slot-row-unit">{{ t('episode.kf.midTimeUnit') }}</span>
@@ -1266,7 +1266,16 @@ async function setBoundary(sb, value) {
     toastError(e)
   }
 }
+// 输入中的草稿（#110）：field-dirty 会触发重渲染，`:value` 回绑库里旧值会把正在输入的数字冲掉，
+// 所以输入期间以草稿为准，提交（change）或换镜后清空
+const midTimeDraft = ref(null)
+watch(selectedId, () => { midTimeDraft.value = null })
+function onMidTimeInput(sb, e) {
+  midTimeDraft.value = e.target.value
+  emit('field-dirty', sb, 'mid_frame_time', e.target.value === '' ? null : Number(e.target.value))
+}
 function onMidTimeChange(sb, e) {
+  midTimeDraft.value = null
   const raw = String(e.target.value ?? '').trim()
   if (!raw) {
     emit('update-field', sb, 'mid_frame_time', null)
