@@ -592,7 +592,10 @@ def derive(prj: Project, write: bool = True) -> dict:
         tempo = max(float(fit.get("tempo_override") or 1), float(fit_eff.get("tempo_override") or 1))
         narration_ok = bool(s.get("narration_audio_url")) and s.get("narration_status") in ("voiced", "composed", "compose_stale") \
             and audio.get("text_sha256") == meta.get("text_sha256") and not {"narration_too_long", "narration_voice_stale"} & set(blocks)
-        required = [sl for sl in SLOTS if (sl != "first" or not kf.get("inherits_first"))
+        # #110/#95: junction-locked slots (C first / D last, D+continue first) never carry prompts.
+        locked_slots = set(kf.get("locked_slots") or [])
+        required = [sl for sl in SLOTS if sl not in locked_slots
+                    and (sl != "first" or not kf.get("inherits_first"))
                     and (sl != "mid" or kf.get("mid_required") or (s.get("mid_frame_prompt") or "").strip())]
         kf_problems = [f"{sl}_frame_prompt empty" for sl in required if not (s.get(f"{sl}_frame_prompt") or "").strip()]
         if "mid" in required and not (0 < float(s.get("mid_frame_time") or 0) < dur):
