@@ -40,6 +40,9 @@ When the frame contains **people who have no character asset** (attendants, sold
 - When the same group of unnamed people recurs across several shots, **reuse one and the same marker set**: read the neighbouring shots' saved prompts through `read_storyboard_context` and copy the wording already fixed there; never invent a new description
 - This rule applies **only to unnamed people without assets**; a `@CharacterName` that has an asset still follows "Absolute Rule: Images Come First" and gets not one word of appearance
 - **Never** create a character asset for unnamed people
+- **`@角色` / `@CharacterName` are placeholders, not literal text**: replace them with the episode's real asset names (e.g. `@伊凡四世`).
+  A literal "@角色" / "@CharacterName" in a prompt is rejected as an unknown asset (`unknown_mention`).
+  Write the distinction from asset-backed characters as "different from all other people in the frame", never "different from @CharacterName".
 - Counter-example: "an attendant on either side holds him up"; correct: "an attendant on either side (unpatterned grey-brown short tunic, no cap, hair in a plain bun, cloth belt at the waist), each with one hand under his arm"
 
 ## Limb-State Checklist (verify every item in every prompt)
