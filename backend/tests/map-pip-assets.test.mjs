@@ -26,7 +26,7 @@ test('细节资产登记：新增→关联同剧集→重跑覆盖不重复→�
     sqlite.prepare('INSERT INTO episode_props (episode_id, prop_id, created_at) VALUES (?, ?, ?)').run(epId, parentId, ts)
 
     const frame = (no, label, role = 'aux') => ({ no, label, reason: '旁白强调' + label, role, focus_bbox: [30, 50, 36, 53], bbox: [29, 49.5, 37, 53.5], storyboard_numbers: [no * 10] })
-    const detail = (no) => ({ no, path: 'static/map-drawings/pip-detail' + no + '.png', width: 3840, height: 2160, sha256: 'sha' + no })
+    const detail = (no) => ({ no, path: 'static/map-drawings/pip-detail' + no + '.png', width: 3840, height: 2160, sha256: 'sha' + no, provenance: { attribution: '© OpenStreetMap contributors (ODbL 1.0)', sources: [{ name: 'OSM', license: 'ODbL 1.0', url: 'https://www.openstreetmap.org/', sha256: 'test-sha' }] } })
     const deliverable = (frames) => ({
       task_id: 7,
       pip: {
@@ -47,6 +47,7 @@ test('细节资产登记：新增→关联同剧集→重跑覆盖不重复→�
     out.child1 = parsePipMeta(first[0].map_pip)
     out.childFlags = first.map(r => [r.faithful, r.asset_type, r.image_url])
     out.versionCount = sqlite.prepare("SELECT COUNT(*) AS n FROM sys_task WHERE provider = 'map-render' AND model = 'map-studio-detail'").get().n
+    out.detailProvenance = JSON.parse(sqlite.prepare('SELECT params FROM sys_task WHERE id = ?').get(first[0].faithful_source).params).provenance
     out.linked = sqlite.prepare('SELECT COUNT(*) AS n FROM episode_props WHERE episode_id = ? AND prop_id IN (?, ?)').get(epId, first[0].id, first[1].id).n
     out.parentMeta = parsePipMeta(sqlite.prepare('SELECT map_pip FROM props WHERE id = ?').get(parentId).map_pip)
     out.parentOf = [pipParentOf(first[0].id), pipParentOf(parentId)]
@@ -85,6 +86,8 @@ test('细节资产登记：新增→关联同剧集→重跑覆盖不重复→�
     assert.match(out.child1.usage, /细节1「乌格拉河口」.*东欧全览/s)
     assert.deepEqual(out.childFlags, [[1, 'map', 'static/map-drawings/pip-detail1.png'], [1, 'map', 'static/map-drawings/pip-detail2.png']])
     assert.equal(out.versionCount, 2)
+    assert.match(out.detailProvenance.attribution, /OpenStreetMap/)
+    assert.equal(out.detailProvenance.sources[0].license, 'ODbL 1.0')
     assert.equal(out.linked, 2, '细节与全览关联同一剧集')
     assert.equal(out.parentMeta.role, 'overview')
     assert.deepEqual(out.parentMeta.frames.map(f => f.detail_prop_id).length, 2)

@@ -16,6 +16,7 @@ import { mapBriefText, rollbackTool, runStageAgent, stageTool, type StageAgentRe
 import { validateFeatureSubmission } from './validate.js'
 import type { MapBrief, MapResearch, MapResearchQuery, MapResearchSource } from './types.js'
 import { searchDataset } from './geo/datasets.js'
+import { regionRiverPackAvailable } from './geo/river-region-store.js'
 import type { MapDatasetQuery } from './types.js'
 import { mutateTask } from './store.js'
 
@@ -111,7 +112,7 @@ export async function runResearchStage(input: ResearchStageInput): Promise<Stage
     tools: (session) => ({
       search_dataset: stageTool(session, {
         id: 'search_dataset',
-        description: '检索离线 Natural Earth 原始几何。自然要素必须优先采用 dataset_ref；没有命中才可提交 dataset_missing。每次查询会被登记并核对。'
+        description: '检索离线 Natural Earth 原始几何与预取的 OSM 河流（ODbL）。自然要素必须优先采用 dataset_ref；没有命中才可提交 dataset_missing。每次查询会被登记并核对。'
           + '河流/湖泊结果里带 group 字段的是组引用 ne-group:…：它覆盖同一条河/湖的全部要素（River 与 Lake Centerline），拼接成连续几何；'
           + 'group.members 是成员要素，group.chains 是拼接后仍不连通的链数，group.shortest_chain_km 是最短链长度——链数多或短链很小说明 clip_bbox 该收紧。'
           + '单个要素 ref（ne:…）只覆盖一个原始要素，裁剪后容易碎成多段。',
@@ -127,7 +128,9 @@ export async function runResearchStage(input: ResearchStageInput): Promise<Stage
           try {
             const hits = searchDataset(layer, query, bbox)
             datasetQueries.push({ layer, query, ...(bbox ? { bbox } : {}), hits: hits.length, refs: hits.map(hit => hit.ref), error: null })
-            return { candidates: hits }
+            return { candidates: hits, ...(layer === 'river' && !regionRiverPackAvailable()
+              ? { warning: '区域 OSM 河流索引尚未预取；当前仅检索 Natural Earth。请在 backend 运行 node --import tsx scripts/prefetch-river-region.ts。' }
+              : {}) }
           } catch (err) {
             const error = err instanceof Error ? err.message : String(err)
             datasetQueries.push({ layer, query, ...(bbox ? { bbox } : {}), hits: 0, refs: [], error })

@@ -29,7 +29,7 @@ import {
   type MapRiverSourceInfo,
   type MapSpec,
 } from './base-render.js'
-import { datasetFileInfo } from './datasets.js'
+import { datasetFileInfo, datasetSourceInfo } from './datasets.js'
 import type { ReliefRenderSummary } from './relief-render.js'
 import type { DemTileFetcher } from './terrain-cache.js'
 import { buildMapKmz, KMZ_GEOMETRY_NOTE } from './kmz.js'
@@ -502,12 +502,14 @@ async function createProgramBase(
 ): Promise<MapBaseArtifact> {
   // 先在带要素的 spec 上校验数据集河道引用（50m/10m 混用必须报错），再去掉要素渲染
   const riverSource = resolveRiverSource(spec)
+  const namedRivers = spec.routes.flatMap(route => route.dataset_ref?.ref.startsWith('osm:') ? [route.dataset_ref.ref] : [])
   const renderSpec: MapSpec = { ...spec, places: [], routes: [], regions: [] }
   const rendered = await renderMapBase(renderSpec, {
     ...(width ? { width } : {}),
     ...(height ? { height } : {}),
     riverSource,
     ...(dem ? { dem } : {}),
+    ...(namedRivers.length ? { namedRivers } : {}),
     ...(relief ?? {}),
   })
   // 登记件只取决于投影与 bbox，所以去掉要素后像素换算与带要素时逐像素一致
@@ -532,10 +534,10 @@ async function createProgramBase(
   if (rendered.relief.named_rivers_used.length) {
     sources.push({
       kind: 'vector',
-      name: `OSM 命名河流预取包（${rendered.relief.named_rivers_used.join('、')}）`,
+      name: `OSM 命名河流预取包（${rendered.relief.named_rivers_used.join('、')}${namedRivers.length ? `；sha256 ${datasetSourceInfo(namedRivers[0]!).sha256}` : ''}）`,
       url: 'https://www.openstreetmap.org/',
       license: 'ODbL 1.0',
-      note: 'Natural Earth 缺失的小河（如乌格拉河/阿赫图巴/卡赞卡）从 OSM 预取入仓；运行期只读本地包，不联网。',
+      note: 'OSM 命名河流区域预取包；运行期只读本地包，不联网。',
     })
   }
   const attribution = rendered.relief.named_rivers_used.length
