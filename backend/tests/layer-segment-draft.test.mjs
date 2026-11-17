@@ -427,3 +427,35 @@ test('compose 快照 #91：竖屏字幕行宽进签名，横屏与不烧录镜�
   assert.deepEqual(got.pureVisualDiff, ['输入快照与上次合成不一致'], '不烧录时不报字幕排版变化')
   assert.ok(got.diff.some(r => r.includes('字幕排版')))
 })
+
+test('画中画锚点带资产种类：角色/道具撞号时精确解析，src 与 anchor 都保留 kind（#110）', () => {
+  const got = run(`${MAP_ASSET}
+    // 道具 25 与角色 25 撞号：画中画锚到角色 25（肖像），不能解析成同号道具
+    const propTwin = { kind: 'prop', id: 25, name: '同号道具', image_path: 'static/uploads/twin.png', semantics: null }
+    const collisionCtx = { ...ctx, assets: [mapAsset, character, propTwin] }
+    const card = {
+      version: 2,
+      info_points: [{ id: 'ip1', text: '汗王肖像', via: 'layer' }],
+      budget: { layer_s: 6, gen_s: 5 },
+      layer_plan: {
+        base: { kind: 'asset', asset_kind: 'prop', asset_id: 39, version_task_id: null },
+        must_mark: [],
+        planned_layers: [
+          { type: 'image', anchor: { asset_id: 25, asset_kind: 'character', name: '利哈列夫' }, at_s: 1 },
+        ],
+      },
+      rationale: '', suggested_combo: 'C', issues: [],
+    }
+    const draft = draftSegment(card, 'C', collisionCtx)
+    const normalized = normalizeLayerDoc(draft.layer_doc)
+    const img = normalized.layers.find(l => l.type === 'image')
+    out({ img: img || null, warnings: draft.warnings })
+  `)
+  assert.ok(got.img, '画中画层应被草稿保留')
+  assert.equal(got.img.name, '利哈列夫', '撞号时按 anchor.asset_kind 解析到角色，而不是同号道具')
+  assert.equal(got.img.src.path, 'static/images/portrait.png', 'src 指向角色肖像')
+  assert.equal(got.img.src.asset_kind, 'character', 'src 保留资产种类供前端显示来源')
+  assert.equal(got.img.src.asset_id, 25)
+  assert.equal(got.img.anchor.asset_kind, 'character', 'anchor 保留种类，下游解析不再撞号')
+  assert.equal(got.img.anchor.asset_id, 25)
+})

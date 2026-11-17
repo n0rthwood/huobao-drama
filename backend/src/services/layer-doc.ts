@@ -59,6 +59,8 @@ const COORD_MAX = 4
 
 export interface LayerAnchor {
   asset_id?: number
+  /** #110：资产种类——角色/场景/道具 id 可撞号，画中画锚点必须带种类才能精确解析 */
+  asset_kind?: 'prop' | 'scene' | 'character'
   semantic_id?: string
   /** Source label snapshot, independent of editable layer.name; used to detect renamed semantic entries. */
   semantic_name?: string
@@ -301,6 +303,10 @@ const anchorSchema = z.preprocess(
       asset_id: z.preprocess(
         v => (typeof v === 'number' && Number.isFinite(v) ? Math.trunc(v) : undefined),
         z.number().optional(),
+      ),
+      asset_kind: z.preprocess(
+        v => (v === 'prop' || v === 'scene' || v === 'character' ? v : undefined),
+        z.enum(['prop', 'scene', 'character']).optional(),
       ),
       semantic_id: z.preprocess(
         v => (typeof v === 'string' && v.trim() ? v.trim().slice(0, 64) : undefined),

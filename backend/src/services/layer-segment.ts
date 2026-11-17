@@ -752,7 +752,9 @@ export async function loadDraftAssets(card: DesignCard): Promise<SegmentDraftAss
   if (base && base.kind === 'asset') collect(base.asset_id, base.asset_kind, 'prop')
   for (const ref of card.layer_plan?.must_mark || []) collect(ref.asset_id, 'prop', 'prop')
   for (const layer of card.layer_plan?.planned_layers || []) {
-    collect(layer.anchor?.asset_id, 'prop', layer.type === 'image' ? 'character' : 'prop')
+    // #110：锚点带 asset_kind 时按它收集（角色/道具 id 可撞号）；旧数据没 kind 时 image 层默认角色、其余默认道具
+    const anchorKind = (layer.anchor as { asset_kind?: string } | undefined)?.asset_kind
+    collect(layer.anchor?.asset_id, anchorKind, layer.type === 'image' ? 'character' : 'prop')
   }
   for (const ref of card.gen_plan?.reference_assets || []) collect(ref.id, ref.kind, 'character')
 

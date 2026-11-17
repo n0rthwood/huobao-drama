@@ -28,7 +28,7 @@ export interface LayerRecord {
   z: number
   opacity: number
   rotation: number
-  anchor?: { asset_id?: number; semantic_id?: string; semantic_name?: string; detached?: boolean }
+  anchor?: { asset_id?: number; asset_kind?: 'prop' | 'scene' | 'character'; semantic_id?: string; semantic_name?: string; detached?: boolean }
   points?: [number, number][]
   at?: [number, number]
   box?: LayerBox
