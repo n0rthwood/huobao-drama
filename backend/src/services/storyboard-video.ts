@@ -14,7 +14,7 @@ import { getActiveConfig, getConfigById, validateVideoModel } from './ai.js'
 import { videoCapabilities } from './adapters/registry'
 import { generateVideo } from './generation.js'
 import { getDramaStylePrompt } from './style-preset.js'
-import { loadEpisodeKeyframes } from './keyframes.js'
+import { loadEpisodeKeyframes, type StoryboardKeyframeState } from './keyframes.js'
 import {
   blockingIssuesFor,
   computeRefIssues,
@@ -23,6 +23,8 @@ import {
   loadTargetBindings,
   promptFieldsOf,
   targetAssetRefs,
+  type EpisodeAssetEntry,
+  type TargetBindings,
 } from './storyboard-assets.js'
 import { indexRefs, resolvePromptRefs } from './prompt-refs.js'
 import { createHash } from 'node:crypto'
@@ -36,7 +38,7 @@ import {
 } from './transition.js'
 import { runTransitionReview } from './transition-agent.js'
 import { loadDesignCardContext, resolveDesignCard } from './design-card-context.js'
-import { toCombo } from './design-card.js'
+import { toCombo, type DesignCardContext } from './design-card.js'
 import { generatedSegmentSeconds } from './shot-duration.js'
 import { resolveDramaProjectType } from './project-type.js'
 import { assertShotTtsReady } from './narration-tts-gate.js'
@@ -48,6 +50,20 @@ export interface StoryboardVideoOptions {
   configId?: number
   /** 承接镜头缺转场时是否同步跑转场 agent；批量预览传 false（只组装，不写库） */
   autoTransition?: boolean
+  /**
+   * 批量预览预加载（Issue #118 C）：整集一次查完后逐镜分发。
+   * 只替代「整集级」读库（资产/绑定/设计卡上下文/关键帧状态/剧集/项目/风格词），
+   * 单镜事实（图层段、TTS 门禁、转场状态）仍逐镜现读，口径不变。
+   */
+  preloaded?: {
+    episode?: typeof schema.episodes.$inferSelect
+    drama?: typeof schema.dramas.$inferSelect | null
+    assets?: EpisodeAssetEntry[]
+    bindingsByShot?: Map<number, TargetBindings>
+    cardCtx?: DesignCardContext
+    keyframes?: Map<number, StoryboardKeyframeState>
+    stylePrompt?: string
+  }
 }
 
 export interface StoryboardVideoRequest {
@@ -156,10 +172,12 @@ export async function buildStoryboardVideoRequest(
     .where(eq(schema.storyboards.id, storyboardId))
   if (!storyboard || storyboard.deletedAt) throw new Error('镜头不存在')
 
-  const [episode] = await db.select().from(schema.episodes)
-    .where(eq(schema.episodes.id, storyboard.episodeId))
+  const episode = opts.preloaded?.episode
+    ?? (await db.select().from(schema.episodes).where(eq(schema.episodes.id, storyboard.episodeId)))[0]
   if (!episode) throw new Error('剧集不存在')
-  const [drama] = await db.select().from(schema.dramas).where(eq(schema.dramas.id, episode.dramaId))
+  const drama = opts.preloaded?.drama !== undefined
+    ? opts.preloaded.drama
+    : (await db.select().from(schema.dramas).where(eq(schema.dramas.id, episode.dramaId)))[0] ?? null
   const documentary = resolveDramaProjectType(episode.dramaId) === 'documentary'
   const combo = toCombo(storyboard.combo)
   if (documentary && (!combo || storyboard.designCardStatus !== 'confirmed')) throw new Error('设计卡未确认')
@@ -176,7 +194,7 @@ export async function buildStoryboardVideoRequest(
   if (documentary && combo === 'A') throw new Error('未启用生成段')
 
   // 关键帧闸门：就绪且人工确认过才允许生成视频
-  const keyframes = (await loadEpisodeKeyframes(episode.id)).get(storyboardId)
+  const keyframes = (opts.preloaded?.keyframes ?? await loadEpisodeKeyframes(episode.id)).get(storyboardId)
   if (!keyframes?.confirmed) {
     throw new Error(`分镜 #${storyboard.storyboardNumber} 的关键帧尚未确认`)
   }
@@ -240,12 +258,12 @@ export async function buildStoryboardVideoRequest(
 
   // 视频提示词的 @引用 必须与视频绑定一致（Issue #7/#18），否则会出现“提到了却没带参考图”；
   // 带转场提交时，转场段里的 @引用 同样参与检查（转场写入时已同步到视频绑定）
-  const assets = await loadEpisodeAssets(episode.id)
-  const bindings = await loadTargetBindings(storyboardId)
+  const assets = opts.preloaded?.assets ?? await loadEpisodeAssets(episode.id)
+  const bindings = opts.preloaded?.bindingsByShot?.get(storyboardId) ?? await loadTargetBindings(storyboardId)
   const refIssues = computeRefIssues({
     prompts: promptFieldsOf(sb), assets, bindings,
     ...(() => {
-      const resolved = resolveDesignCard(sb, loadDesignCardContext(episode.id))
+      const resolved = resolveDesignCard(sb, opts.preloaded?.cardCtx ?? loadDesignCardContext(episode.id))
       return { card: resolved.card, combo: resolved.combo }
     })(),
   })
@@ -276,7 +294,7 @@ export async function buildStoryboardVideoRequest(
   // 项目视觉风格词注入提示词最前方（与图片侧口径一致）
   let sourcePrompt = rawPrompt
   if (prompt) {
-    const stylePrompt = await getDramaStylePrompt(episode.dramaId)
+    const stylePrompt = opts.preloaded?.stylePrompt ?? await getDramaStylePrompt(episode.dramaId)
     if (stylePrompt) {
       prompt = `${stylePrompt}，\n${prompt}`
       sourcePrompt = `${stylePrompt}，\n${sourcePrompt}`
