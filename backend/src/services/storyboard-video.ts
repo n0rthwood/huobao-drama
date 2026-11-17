@@ -415,9 +415,41 @@ export async function videoSignatureFromTask(task: {
 export async function loadVideoVersions(storyboardId: number): Promise<VideoVersion[]> {
   const tasks = (await db.select().from(schema.sysTask))
     .filter(task => task.type === 'video' && task.provider !== 'layer-segment' && task.status === 'completed' && task.storyboardId === storyboardId)
+  return versionsOfVideoTasks(tasks)
+}
+
+/**
+ * 整集一次查完全部历史视频版本（Issue #118 C）：批量预览逐镜 loadVideoVersions
+ * 每次都全表扫 sys_task；这里按集 join 一次取回，过滤/排序/编号口径与单镜共用。
+ */
+export async function loadEpisodeVideoVersions(episodeId: number): Promise<Map<number, VideoVersion[]>> {
+  const rows = await db.select({ task: schema.sysTask })
+    .from(schema.sysTask)
+    .innerJoin(schema.storyboards, eq(schema.storyboards.id, schema.sysTask.storyboardId))
+    .where(and(
+      eq(schema.storyboards.episodeId, episodeId),
+      eq(schema.sysTask.type, 'video'),
+      eq(schema.sysTask.status, 'completed'),
+    ))
+  const byShot = new Map<number, Array<typeof schema.sysTask.$inferSelect>>()
+  for (const { task } of rows) {
+    if (task.provider === 'layer-segment' || !task.storyboardId) continue
+    const list = byShot.get(task.storyboardId) ?? []
+    list.push(task)
+    byShot.set(task.storyboardId, list)
+  }
+  const result = new Map<number, VideoVersion[]>()
+  for (const [storyboardId, tasks] of byShot) {
+    result.set(storyboardId, await versionsOfVideoTasks(tasks))
+  }
+  return result
+}
+
+async function versionsOfVideoTasks(tasks: Array<typeof schema.sysTask.$inferSelect>): Promise<VideoVersion[]> {
+  const usable = tasks
     .filter(task => task.localPath || task.resultUrl)
     .sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')) || a.id - b.id)
-  return Promise.all(tasks.map(async (task, index) => {
+  return Promise.all(usable.map(async (task, index) => {
     const computed = await videoSignatureFromTask(task)
     return {
       id: task.id,

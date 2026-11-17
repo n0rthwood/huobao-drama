@@ -21,7 +21,7 @@ import {
   buildStoryboardVideoRequest,
   describeSignatureDiff,
   listEpisodeStoryboards,
-  loadVideoVersions,
+  loadEpisodeVideoVersions,
   submitStoryboardVideo,
   type StoryboardVideoRequest,
 } from './storyboard-video.js'
@@ -261,6 +261,8 @@ export async function previewEpisodeVideoBatch(
 
   const keyframes = await loadEpisodeKeyframes(episodeId)
   const active = await loadActiveStoryboardIds()
+  // 历史视频版本整集一次查完（#118 C）：逐镜 loadVideoVersions 不再各自全表扫 sys_task
+  const versionsByShot = await loadEpisodeVideoVersions(episodeId)
   // 整集事实一次装配（Issue #118 C）：逐镜阻断检查与请求组装不再各自重建整集上下文
   const [drama] = await db.select().from(schema.dramas).where(eq(schema.dramas.id, episode.dramaId))
   const preloaded = {
@@ -316,7 +318,7 @@ export async function previewEpisodeVideoBatch(
       continue
     }
 
-    const versions = await loadVideoVersions(sb.id)
+    const versions = versionsByShot.get(sb.id) ?? []
     const adoptedVideo = sb.videoUrl || sb.composedVideoUrl || null
     const adopted = versions.find(version => version.video === adoptedVideo) ?? null
     if (!versions.length) {
