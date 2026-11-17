@@ -36,7 +36,7 @@ A character's look and clothing are decided entirely by the asset reference imag
 When the frame contains **people who have no character asset** (attendants, soldiers, palace servants, clerks, commoners, passers-by, extras and the like):
 
 - **Always** state: how many of them, where they stand (where in the frame / relative to the main subject) and their identity or function; **never** write a bare collective label such as "an attendant", "two people" or "a few soldiers" with no markers
-- **Always** give at least two visible markers out of garment colour, garment cut/style, hat/headwear and carried items, and they must differ from **every** `@CharacterName` in the same frame — never the same colour and the same cut as any `@CharacterName`, otherwise the model copies that character's reference-image look straight onto them
+- **Always** give at least two visible markers out of garment colour, garment cut/style, hat/headwear and carried items, and they must differ from every asset-backed character in the same frame — never the same colour and cut as any of them, otherwise the model copies that character's reference-image look straight onto them. Write the distinction as the fixed phrase "different from all other people in the frame"
 - When the same group of unnamed people recurs across several shots, **reuse one and the same marker set**: read the neighbouring shots' saved prompts through `read_storyboard_context` and copy the wording already fixed there; never invent a new description
 - This rule applies **only to unnamed people without assets**; a `@CharacterName` that has an asset still follows "Absolute Rule: Images Come First" and gets not one word of appearance
 - **Never** create a character asset for unnamed people
