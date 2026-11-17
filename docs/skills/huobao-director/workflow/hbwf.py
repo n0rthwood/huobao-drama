@@ -580,7 +580,9 @@ def derive(prj: Project, write: bool = True) -> dict:
     out = []
     for s in shots:
         sid = s["id"]
-        dur = float(s.get("duration") or 0)
+        # #110: documentary shots submit only the generated segment; storyboards.duration is 0 there.
+        # GET /episodes/{e}/storyboards now exposes generated_segment_s (budget.gen_s); fall back to duration.
+        dur = float(s.get("generated_segment_s") or s.get("duration") or 0)
         kf = s.get("keyframes") or {}
         meta = as_dict(s.get("narration_meta"))
         audio = meta.get("audio") or {}
