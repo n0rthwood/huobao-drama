@@ -585,7 +585,7 @@
             <div class="dc-field">
               <span class="dc-label">{{ t('episode.design.field.plannedLayers') }}</span>
               <div class="dc-rows">
-                <div v-for="(layer, index) in layerPlan.planned_layers" :key="index" class="dc-layer">
+                <div v-for="(layer, index) in layerPlan.planned_layers" :key="layer.id || `idx-${index}`" class="dc-layer">
                   <div class="dc-row">
                     <select
                       class="input dc-select dc-row-type"
@@ -1412,7 +1412,7 @@ function fromState(state) {
   next.layer_plan = {
     base: card.layer_plan?.base ? { ...card.layer_plan.base } : null,
     must_mark: (card.layer_plan?.must_mark || []).map(item => ({ ...item })),
-    planned_layers: (card.layer_plan?.planned_layers || []).map(item => ({ ...item })),
+    planned_layers: (card.layer_plan?.planned_layers || []).map((item, i) => ({ id: item.id || `s-${i}`, ...item })),
     ...(card.layer_plan?.text_layout ? { text_layout: card.layer_plan.text_layout } : {}),
   }
   next.gen_plan = {
@@ -1772,12 +1772,18 @@ function setBase(value) {
 function removeMustMark(index) {
   patchDraft({ layer_plan: { ...layerPlan.value, must_mark: layerPlan.value.must_mark.filter((_, i) => i !== index) } })
 }
+let layerSeq = 0
+function newLayerId() {
+  // #110：客户端稳定 id——服务端按 at_s 重排后仍按 id 认行，编辑不会写到错层
+  layerSeq += 1
+  return `c-${Date.now().toString(36)}-${layerSeq}`
+}
 function addLayer() {
   if (layerPlan.value.planned_layers.length >= ctx.value.limits.planned_layers) return
   // 新计划层默认就是模板文本框：自由文字层是旧形态，只有显式切换才用
   const type = ctx.value.planned_layer_types.includes('text') ? 'text' : (ctx.value.planned_layer_types[0] || 'label')
   // 文本框必然有类型：新行先给本媒介第一个类型（选择器里可见、可改），否则服务端规范化会丢掉空类型的行
-  const next = type === 'text' ? { type, role: textVideoRoles.value[0] || '', fields: {}, at_s: 0 } : { type, text: '', at_s: 0 }
+  const next = type === 'text' ? { id: newLayerId(), type, role: textVideoRoles.value[0] || '', fields: {}, at_s: 0 } : { id: newLayerId(), type, text: '', at_s: 0 }
   const plan = { ...layerPlan.value, planned_layers: [...layerPlan.value.planned_layers, next] }
   // 文本框必须有一套版式：第一次加文本框时按项目画幅选第一套（选择器里可见、可换）
   if (type === 'text' && !layerPlan.value.text_layout) plan.text_layout = textVideoLayouts.value[0]?.id

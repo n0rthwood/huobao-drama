@@ -93,6 +93,8 @@ export interface AssetRef {
 }
 
 export interface PlannedLayer {
+  /** #110：稳定层 id——规范化按 at_s 重排后前端仍按 id 认行，避免 index 键复用 DOM 把编辑写到错层 */
+  id?: string
   type: PlannedLayerType
   text?: string
   anchor?: SemanticRef
@@ -394,12 +396,24 @@ function normalizePlannedTextFields(role: string, raw: unknown): Record<string, 
 function normalizePlannedLayers(raw: unknown, ctx: DesignCardContext | undefined): PlannedLayer[] {
   if (!Array.isArray(raw)) return []
   const items: PlannedLayer[] = []
+  const usedIds = new Set<string>()
+  const takeId = (row: Record<string, unknown>): string => {
+    // #110：保留客户端给的稳定 id（重排后前端按 id 认行）；缺失/重复时补一个不重复的
+    const rawId = typeof row.id === 'string' ? row.id.trim().slice(0, 64) : ''
+    if (rawId && !usedIds.has(rawId)) { usedIds.add(rawId); return rawId }
+    let n = items.length + 1
+    while (usedIds.has(`pl-${n}`)) n += 1
+    const id = `pl-${n}`
+    usedIds.add(id)
+    return id
+  }
   for (const entry of raw.slice(0, MAX_PLANNED_LAYERS)) {
     if (!entry || typeof entry !== 'object') continue
     const row = entry as Record<string, unknown>
     const typeRaw = typeof row.type === 'string' ? row.type.trim().toLowerCase() : ''
     if (!(PLANNED_LAYER_TYPES as readonly string[]).includes(typeRaw)) continue
     const item: PlannedLayer = {
+      id: takeId(row),
       type: typeRaw as PlannedLayerType,
       at_s: typeof row.at_s === 'number' && Number.isFinite(row.at_s)
         ? Math.max(0, Math.round(Number(row.at_s) * 100) / 100)
@@ -408,9 +422,9 @@ function normalizePlannedLayers(raw: unknown, ctx: DesignCardContext | undefined
     if (item.type === 'text') {
       // #96：模板文本框只认类型 + 字段（位置与样式由规范决定，不锚定、不写自由文字）
       const role = typeof row.role === 'string' ? row.role.trim() : ''
-      if (!role) continue
+      if (!role) { usedIds.delete(item.id!); continue }
       const fields = normalizePlannedTextFields(role, row.fields)
-      if (!fields) continue
+      if (!fields) { usedIds.delete(item.id!); continue }
       item.role = role
       item.fields = fields
       items.push(item)

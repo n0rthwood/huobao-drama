@@ -272,3 +272,30 @@ test('生成段参考素材：只有启用了生成段的镜头才要求提示�
   assert.deepEqual(got.none, [])
   assert.deepEqual(got.unresolved, [], '解析不到的参考素材不会变成一条永远修不好的阻断')
 })
+
+test('计划图层稳定 id：客户端 id 经规范化与 at_s 重排后保留，缺失/重复时补不重复 id（#110）', () => {
+  const got = run(`${CTX}
+    const card = normalizeDesignCard({
+      info_points: [], budget: { layer_s: 6, gen_s: 5 },
+      layer_plan: {
+        base: { kind: 'asset', asset_kind: 'prop', asset_id: 39 },
+        must_mark: [],
+        planned_layers: [
+          { id: 'keep-b', type: 'marker', at_s: 2, anchor: { asset_id: 39, semantic_id: 'pt-1' } },
+          { id: 'keep-a', type: 'image', at_s: 0.5, anchor: { asset_id: 25, asset_kind: 'character' } },
+          { type: 'polyline', at_s: 1, anchor: { asset_id: 39, semantic_id: 'ln-1' } },
+          { id: 'keep-b', type: 'label', at_s: 3, anchor: { asset_id: 39, semantic_id: 'pt-1' } },
+        ],
+      },
+      gen_plan: { reference_assets: [] }, rationale: '', suggested_combo: 'C',
+    }, ctx)
+    const layers = card.layer_plan.planned_layers
+    out({ ids: layers.map(l => l.id), order: layers.map(l => l.at_s), types: layers.map(l => l.type) })
+  `)
+  assert.deepEqual(got.order, [0.5, 1, 2, 3], '仍按 at_s 升序')
+  assert.equal(got.ids[0], 'keep-a', '客户端 id 随层走，重排后不漂移')
+  assert.equal(got.ids[2], 'keep-b', '原 id 保留')
+  assert.ok(got.ids[1], '缺 id 的层补一个')
+  assert.ok(got.ids[3] && got.ids[3] !== 'keep-b', '重复 id 被换成不重复的')
+  assert.equal(new Set(got.ids).size, 4, '四个层 id 互不相同')
+})
