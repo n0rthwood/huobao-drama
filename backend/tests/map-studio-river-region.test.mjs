@@ -34,7 +34,9 @@ test('OSM refs search and extract by multilingual names, and missing or corrupt 
     const river = (id, x) => ({ id, names: ['Tagil', 'река Тагил'], way_ids: [x], bbox: [x, 57, x + 1, 58], lines: [[[x, 57], [x + 1, 58]]] })
     const retired = { ...river('c'.repeat(24), 65), retired: true }
     const sample = JSON.parse(readFileSync(path.join(backend, 'tests/fixtures/osm-river-sample.json'), 'utf8')).rivers
-    const body = JSON.stringify({ rivers: [river(id, 60), river(id2, 63), retired, ...sample] })
+    const tobol = { ...river('d'.repeat(24), 66), names: ['Tobol', 'Тобол'] }
+    const repeated = Array.from({ length: 15 }, (_, i) => ({ ...river((i + 20).toString(16).padStart(24, '0'), 20 + i), names: ['fixture repeated'] }))
+    const body = JSON.stringify({ rivers: [river(id, 60), river(id2, 63), retired, tobol, ...repeated, ...sample] })
     writeFileSync(path.join(data, 'rivers.json'), body)
     writeFileSync(path.join(data, 'manifest.json'), JSON.stringify({ version: 2, file: 'rivers.json', sha256: crypto.createHash('sha256').update(body).digest('hex'), license: 'ODbL-1.0', attribution: '© OpenStreetMap contributors' }))
     run(`
@@ -47,7 +49,25 @@ assert.equal(feature.source.license,'ODbL-1.0')
 assert.deepEqual(feature.bbox,[60,57,61,58])
 assert.deepEqual(extractDatasetGeometry('osm:${'c'.repeat(24)}').bbox,[65,57,66,58])
 assert.ok(searchDataset('river','Багаряк').some(hit=>hit.ref==='osm:4fdbb33b01418f93f09a6599'))
+assert.equal(searchDataset('river','fixture repeated').length,10)
+assert.ok(searchDataset('river','Тобол').every(x=>!x.ref.startsWith('osm:')))
 assert.ok(searchDataset('river','Tobol').every(x=>!x.ref.startsWith('osm:')))
+import sharp from 'sharp'
+import {normalizeMapSpec} from './src/modules/map-studio/geo/base-render.ts'
+import {createMapBaseArtifact,forwardFor} from './src/modules/map-studio/geo/geometry.ts'
+import {normalizeLayerDoc} from './src/services/layer-doc.ts'
+import {drawingProblems,specFeatures} from './src/modules/map-studio/validate.ts'
+const spec=normalizeMapSpec({bbox:[59,56,62,59],routes:[{id:'river1',name:'Tagil',points:feature.parts[0],dataset_ref:{ref:'osm:${id}'}}]})
+const tile=await sharp({create:{width:256,height:256,channels:3,background:{r:128,g:0,b:0}}}).png().toBuffer()
+const base=await createMapBaseArtifact(spec,{mode:'program',width:1280,height:720,dem:{cacheDir:process.env.HUOBAO_DATA_DIR+'/dem',fetchTile:async()=>tile}})
+assert.ok(base.provenance.relief.named_rivers_used.length)
+assert.match(base.provenance.attribution,/OpenStreetMap/)
+assert.ok(base.provenance.sources.some(source=>source.license==='ODbL 1.0'))
+const forward=forwardFor(base.registration)
+const points=feature.parts[0].map(point=>{const xy=forward(point);return [xy[0]/base.width,xy[1]/base.height]})
+const doc=normalizeLayerDoc({version:1,base:{path:base.path,width:base.width,height:base.height},theme:'archival',layers:[{id:'river',name:'river',visible:true,locked:false,z:0,opacity:1,rotation:0,type:'polyline',anchor:{semantic_id:'river1',semantic_name:'Tagil'},points,style:{stroke:'#1f5f8b',width:.008}}]})
+const problems=drawingProblems({doc,features:specFeatures(spec),registration:base.registration,omitted:[]}).problems
+assert.ok(!problems.some(problem=>/偏离|离开|没有锚定/.test(problem)),problems.join('\\n'))
 `, { HUOBAO_DATA_DIR: dir })
     writeFileSync(path.join(data, 'rivers.json'), 'corrupt')
     assert.throws(() => run(`import {loadRegionRiverPack} from './src/modules/map-studio/geo/river-region-store.ts'; loadRegionRiverPack()`, { HUOBAO_DATA_DIR: dir }), /sha256/)

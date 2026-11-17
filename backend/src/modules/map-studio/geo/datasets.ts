@@ -434,14 +434,32 @@ export function searchDataset(layer: DatasetLayer, query: string, bbox?: Dataset
     }
   }
   if (layer === 'river' && regionRiverPackAvailable()) {
-    const neNames = new Set(hits.flatMap(hit => hit.entry.names.map(foldRiverName)))
+    const neEntries = LAYER_FILES.river.flatMap((fileId, priority) =>
+      load(fileId).entries.filter(entry => entry.layer === 'river' && (!filter || intersects(entry.bbox, filter)))
+        .map(entry => ({ entry, priority })))
+    const alreadyRanked = new Set(ranked.map(item => item.candidate.ref))
     const wanted = foldRiverName(query)
     for (const river of loadRegionRiverPack().rivers) {
-      if (river.retired) continue
+      if (river.retired || (filter && !intersects(river.bbox, filter))) continue
       const folded = river.names.map(foldRiverName)
-      if (folded.some(name => neNames.has(name)) || (filter && !intersects(river.bbox, filter))) continue
       const exact = folded.some(name => name === wanted)
       if (!exact && !folded.some(name => name.includes(wanted))) continue
+      const duplicates = neEntries.filter(({ entry }) =>
+        intersects(entry.bbox, river.bbox) && entry.names.some(name => folded.includes(foldRiverName(name))))
+      if (duplicates.length) {
+        // An OSM alias may supply the Cyrillic name absent from Natural Earth. Return
+        // the actual NE ref, not a duplicate OSM ref, when that alias is queried.
+        for (const { entry, priority } of duplicates) {
+          if (alreadyRanked.has(entry.ref)) continue
+          alreadyRanked.add(entry.ref)
+          ranked.push({ score: exact ? 100 : 40, priority, group: false, candidate: {
+            ref: entry.ref, names: [...new Set([...entry.names, ...river.names])], class: entry.class,
+            scalerank: entry.scalerank, bbox: [...entry.bbox], vertices: entry.vertices,
+            ...(entry.length_km !== undefined ? { length_km: entry.length_km } : {}),
+          } })
+        }
+        continue
+      }
       const parts = river.lines
       ranked.push({ score: exact ? 100 : 40, priority: LAYER_FILES.river.length, group: false, candidate: {
         ref: `osm:${river.id}`, names: [...river.names], class: 'River', scalerank: null,

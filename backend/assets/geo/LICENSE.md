@@ -119,6 +119,10 @@ SHA-256：
 - 成品 manifest 记录来源、抓取时间、区域、简化容差、sha256、条数、字节数和 gzip 字节数。
   数据不超过 50 MiB 时放 `backend/assets/geo/osm-rivers/rivers.json`；超过时放
   `DATA_ROOT/map-data/osm-rivers/rivers.json`，仓库保留 manifest。读取顺序先仓库后数据目录。
+  迁移：在真实区域包完成前保留旧版三河 v1（旧图仍可读取，研究阶段只查 NE 并提示预取）；
+  区域包完成后先将完整数据与 v2 manifest 原子部署并校验 sha256，再删除旧的三个单河 JSON 和 v1
+  manifest，禁止把仅两块的样本 manifest 当作全区数据部署。预取源是持续变化的数据，部署应复制
+  与 manifest 对应的同一份数据成品；重新向 Overpass 抓取不能保证得到相同 sha256。
 - 运行期只读、校验 sha256，不从 OSM 联网；缺失缓存时提示上述预取命令。新画中画细节版本
   记录各自来源与署名，历史版本不回写。
 
