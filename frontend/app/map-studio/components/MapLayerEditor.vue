@@ -45,6 +45,7 @@
             :doc="canvasDoc"
             :selected-ids="selectedIds"
             :base-src="baseSrc"
+            :overlay-z="243"
             crop-locked
             :missing-glyphs="missingGlyphs"
             :can-undo="canUndo"
@@ -115,10 +116,11 @@
             </div>
             <p v-if="hasSmoothing" class="dim">{{ t('mapStudio.layerEditor.smoothingPreviewNote') }}</p>
           </section>
-          <LayerStyle :doc="doc" document-only @theme="onTheme" @filter="onFilter" />
+          <LayerStyle :doc="doc" document-only :overlay-z="243" @theme="onTheme" @filter="onFilter" />
           <LayerStyle
             :doc="doc"
             :layer="selectedLayer"
+            :overlay-z="243"
             layer-only
             @patch="onPatch"
             @style="onStyle"

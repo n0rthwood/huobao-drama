@@ -151,8 +151,8 @@ const emptyPanel = dataModule('export default { render: () => null }')
 // ConfirmDialog seam (#113): same props/emits, rendered in-tree because the host-independent
 // renderer has no Teleport target. Behavior (open -> confirm/cancel emits) is exercised for real.
 const confirmPanel = dataModule(`import {h} from '${import.meta.resolve('vue')}';
-export default {props:['open','title','message','confirmText'],emits:['confirm','cancel'],setup(props,{emit}) {
-  return () => props.open ? h('confirm-dialog-test',{},[
+export default {props:['open','title','message','confirmText','overlayStyle'],emits:['confirm','cancel'],setup(props,{emit}) {
+  return () => props.open ? h('confirm-dialog-test',{overlayStyle:props.overlayStyle},[
     h('span',{class:'confirm-msg'},props.message),
     h('button',{class:'confirm-yes',onClick:()=>emit('confirm')},props.confirmText||'OK'),
     h('button',{class:'confirm-no',onClick:()=>emit('cancel')},'Cancel'),
@@ -587,6 +587,17 @@ test('锚定几何拖动前弹应用内确认框：取消不动几何、确认�
   mounted.listeners.get('pointermove')({ clientX: 480, clientY: 272 })
   assert.ok(patches.some(p => p.id === 'pin' && p.patch.at), '确认后拖动真的移动图层')
   mounted.listeners.get('pointerup')()
+})
+
+test('高浮层宿主里确认框带宿主 z-index（地图图层编辑器 242 之上）（#113）', async t => {
+  const doc = makeDoc()
+  const mounted = await mountCanvasComponent(t, Canvas, { doc, baseSrc: doc.base.path, selectedIds: ['pin'], overlayZ: 243 })
+  const hit = allNodes(mounted.root).find(node => String(node.props.class || '').includes('lc-hit'))
+  hit.props.onPointerdown({ clientX: 384, clientY: 217.6, target: {}, pointerId: 1, stopPropagation() {} })
+  await nextTick(); await nextTick(); await nextTick()
+  const dialog = allNodes(mounted.root).find(node => node.type === 'confirm-dialog-test')
+  assert.ok(dialog)
+  assert.deepEqual(dialog.props.overlayStyle, { zIndex: 243 }, '确认框盖在宿主浮层之上')
 })
 
 test('样式面板改锚定图层旋转：应用内确认，取消不发补丁（#113）', async t => {

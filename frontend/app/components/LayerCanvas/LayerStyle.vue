@@ -191,7 +191,8 @@
       @close="imagePicker = false" @select="chooseImage" @registered="emit('registered', $event)" />
     <ConfirmDialog :open="!!detachAsk" :title="t('layerCanvas.anchor.detachTitle')"
       :message="t('layerCanvas.anchor.detachConfirm', { name: detachAsk?.name || '' })"
-      :confirm-text="t('layerCanvas.anchor.detachOk')" @confirm="confirmDetach" @cancel="cancelDetach" />
+      :confirm-text="t('layerCanvas.anchor.detachOk')" :overlay-style="overlayZ ? { zIndex: overlayZ } : undefined"
+      @confirm="confirmDetach" @cancel="cancelDetach" />
   </div>
 </template>
 
@@ -213,6 +214,8 @@ import { mediaUrl } from '~/utils/url'
 import { deeplinkInitial, querySingle } from '~/composables/useQuerySync'
 
 const props = defineProps({
+  /** 宿主浮层的 z-index：确认框必须盖在宿主之上；缺省用组件默认 119 */
+  overlayZ: { type: Number, default: 0 },
   doc: { type: Object, required: true },
   layer: { type: Object, default: null },
   documentOnly: { type: Boolean, default: false },

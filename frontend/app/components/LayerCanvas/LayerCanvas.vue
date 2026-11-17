@@ -102,7 +102,8 @@
     </div>
     <ConfirmDialog :open="!!detachAsk" :title="t('layerCanvas.anchor.detachTitle')"
       :message="t('layerCanvas.anchor.detachConfirm', { name: detachAsk?.name || '' })"
-      :confirm-text="t('layerCanvas.anchor.detachOk')" @confirm="confirmDetach" @cancel="cancelDetach" />
+      :confirm-text="t('layerCanvas.anchor.detachOk')" :overlay-style="overlayZ ? { zIndex: overlayZ } : undefined"
+      @confirm="confirmDetach" @cancel="cancelDetach" />
   </div>
 </template>
 
@@ -124,6 +125,8 @@ import ConfirmDialog from '~/components/ConfirmDialog.vue'
 
 const props = defineProps({
   doc: { type: Object, required: true },
+  /** 宿主浮层的 z-index（如地图图层编辑器 242）：确认框必须盖在宿主之上；缺省用组件默认 119 */
+  overlayZ: { type: Number, default: 0 },
   selectedIds: { type: Array, default: () => [] },
   baseSrc: { type: String, default: '' },
   quality: { type: Object, default: null },
