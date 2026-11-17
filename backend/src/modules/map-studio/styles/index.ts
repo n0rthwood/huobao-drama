@@ -14,7 +14,7 @@ type Dash = 'none' | 'dash' | 'dot'
 
 export interface MapStylePalette { background: string; land: string; water: string; ink: string; boundary: string; accent: string }
 export interface MapStyleLine { stroke: string; width: number; dash: Dash; arrow_start?: boolean; arrow_end?: boolean }
-export interface MapStyleRegion { fill: string; fill_opacity: number; stroke: string; stroke_width: number; dash: Dash }
+export interface MapStyleRegion { fill: string; colors: string[]; feather: number; fill_opacity: number; stroke: string; stroke_width: number; dash: Dash }
 export interface MapStyleMarker { dot_radius: number; color: string; stroke: string; stroke_width: number }
 export interface MapStyleLabel { font: LayerFont; size: number; color: string; bold: boolean; italic: boolean }
 export interface MapStyleFamily {
@@ -81,6 +81,9 @@ export function validateMapStyleFamilies(raw: unknown): MapStyleFamily[] {
     const region = record(lines.regions, `${field}.lines.regions`)
     hex(region.fill, `${field}.lines.regions.fill`); hex(region.stroke, `${field}.lines.regions.stroke`)
     fraction(region.fill_opacity, `${field}.lines.regions.fill_opacity`); fraction(region.stroke_width, `${field}.lines.regions.stroke_width`, .05); choice(region.dash, dashes, `${field}.lines.regions.dash`)
+    fraction(region.feather, `${field}.lines.regions.feather`, .1)
+    if (!Array.isArray(region.colors) || !region.colors.length) throw new MapStyleValidationError(`${field}.lines.regions.colors must be non-empty`)
+    region.colors.forEach((color, i) => hex(color, `${field}.lines.regions.colors[${i}]`))
     const markers = record(family.markers, `${field}.markers`)
     for (const key of MAP_MARKER_TIERS) {
       const marker = record(markers[key], `${field}.markers.${key}`)
@@ -156,15 +159,23 @@ export function lineStyleFor(family: MapStyleFamily, tier: MapLineTier): LayerSt
   const line = family.lines[tier]
   return { stroke: line.stroke, width: line.width, dash: line.dash, arrow_start: line.arrow_start ?? false, arrow_end: line.arrow_end ?? false }
 }
-export function regionStyleFor(family: MapStyleFamily): LayerStyle { return { ...family.lines.regions } }
-export interface FeatureStyleInput { kind: 'place' | 'route' | 'region'; category?: string; markerTier?: MapMarkerTier }
+export function regionStyleFor(family: MapStyleFamily, semanticId?: string): LayerStyle {
+  const { colors, ...style } = family.lines.regions
+  if (!semanticId) return style
+  // Identity hashing, rather than a position in the current feature list, keeps
+  // existing assignments stable when unrelated regions are inserted or removed.
+  let hash = 2166136261
+  for (const char of semanticId) hash = Math.imul(hash ^ char.codePointAt(0)!, 16777619)
+  return { ...style, fill: colors[(hash >>> 0) % colors.length] }
+}
+export interface FeatureStyleInput { kind: 'place' | 'route' | 'region'; id?: string; category?: string; markerTier?: MapMarkerTier }
 /**
  * 底图里的全部河网按 river_minor 画（背景参照）；被检索选中、画进图层的河流是这张图的主题，
  * 一律用 river_major，才能和底图河网区分开（生产版本 3353：主题河流按长度落到 minor，与底图河网同宽，看不出来）。
  */
 export function featureStyleFor(family: MapStyleFamily, feature: FeatureStyleInput): LayerStyle {
   if (feature.kind === 'place') return markerStyleFor(family, feature.markerTier ?? 'city')
-  if (feature.kind === 'region') return regionStyleFor(family)
+  if (feature.kind === 'region') return regionStyleFor(family, feature.id)
   if (feature.category === 'river') return lineStyleFor(family, 'river_major')
   if (feature.category === 'coast') return lineStyleFor(family, 'coast')
   // The adopted recipe has no mountain/lake line entry: derive quiet terrain/water hints rather than invent terrain geometry.

@@ -54,6 +54,13 @@ test('Map Studio adopted styles: settings, validation, HTTP rejection, theme cha
       return {status:response.status,data:await response.json()}
     }
     assert.equal(MAP_STYLE_FAMILIES.length,5)
+    for (const family of MAP_STYLE_FAMILIES) {
+      const ids = ['region-a', 'region-b', 'region-c']
+      const colors = ids.map(id => featureStyleFor(family, {kind:'region', id}).fill)
+      assert.deepEqual(ids.map(id => featureStyleFor(family, {kind:'region', id}).fill), colors)
+      assert.deepEqual(['new-region', ...ids].slice(1).map(id => featureStyleFor(family, {kind:'region', id}).fill), colors)
+      assert.deepEqual(ids.slice(1).map(id => featureStyleFor(family, {kind:'region', id}).fill), colors.slice(1))
+    }
     assert.equal(readDefaultStyle(),'atlas-tint')
     assert.equal(resolveMapStyle(emptyBrief(),{default_style:readDefaultStyle()}).id,'atlas-tint')
     const legacy={...emptyBrief(),style:'ink'};delete legacy.map_style
@@ -118,7 +125,7 @@ test('Map Studio adopted styles: settings, validation, HTTP rejection, theme cha
         assert.equal(doc.layers.find(l=>l.id==='feature-river').style.stroke,family.lines.river_major.stroke)
         assert.ok([family.lines.river_major.width,family.lines.river_minor.width].includes(doc.layers.find(l=>l.id==='feature-river').style.width))
         assert.equal(doc.layers.find(l=>l.id==='feature-route').style.stroke,family.lines.routes.stroke)
-        assert.equal(doc.layers.find(l=>l.id==='feature-region').style.fill,family.lines.regions.fill)
+        assert.equal(doc.layers.find(l=>l.id==='feature-region').style.fill,featureStyleFor(family,{kind:'region',id:'region'}).fill)
         assert.equal(doc.layers.find(l=>l.id==='feature-city').style.dot_radius,family.markers.city.dot_radius)
         assert.deepEqual(doc.layers.find(l=>l.type==='label').style,labelStyleFor(family,'title'))
         const reset=restyleMapLayers(doc,MAP_STYLE_FAMILIES[4],specFeatures(spec))

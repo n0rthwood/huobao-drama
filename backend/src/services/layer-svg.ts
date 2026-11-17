@@ -370,6 +370,13 @@ function emitPolygon(layer: PolygonLayer, ctx: SvgContext): string {
   const stroke = strokeWidth > 0
     ? ` stroke="${esc(styleOf(layer, ctx.theme, 'stroke') as string)}" stroke-width="${fmt(strokeWidth)}" stroke-linejoin="round"${dash ? ` stroke-dasharray="${dash}"` : ''}`
     : ''
+  const feather = Number(layer.style.feather ?? 0) * ctx.height
+  if (feather > 0) {
+    const id = `feather-${layer.id}`
+    ctx.defs.push(`<filter id="${esc(id)}" filterUnits="userSpaceOnUse" x="0" y="0" width="${fmt(ctx.width)}" height="${fmt(ctx.height)}"><feGaussianBlur stdDeviation="${fmt(feather)}"/></filter>`)
+    return `<polygon points="${points}" fill="${esc(styleOf(layer, ctx.theme, 'fill') as string)}" fill-opacity="${fmt(styleOf(layer, ctx.theme, 'fill_opacity') as number)}" filter="url(#${esc(id)})"/>`
+      + (stroke ? `<polygon points="${points}" fill="none"${stroke}/>` : '')
+  }
   return `<polygon points="${points}" fill="${esc(styleOf(layer, ctx.theme, 'fill') as string)}"`
     + ` fill-opacity="${fmt(styleOf(layer, ctx.theme, 'fill_opacity') as number)}"${stroke}/>`
 }

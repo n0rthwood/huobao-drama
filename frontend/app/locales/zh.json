@@ -3472,6 +3472,7 @@
       "rotation": "旋转",
       "fill": "填充色",
       "fillOpacity": "填充透明度",
+      "feather": "羽化（2160 高）",
       "stroke": "描边色",
       "strokeWidth": "描边粗细",
       "dash": "线型",

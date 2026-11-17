@@ -3472,6 +3472,7 @@
       "rotation": "회전",
       "fill": "채우기 색",
       "fillOpacity": "채우기 불투명도",
+      "feather": "페더 (높이 2160)",
       "stroke": "테두리 색",
       "strokeWidth": "테두리 굵기",
       "dash": "선 종류",

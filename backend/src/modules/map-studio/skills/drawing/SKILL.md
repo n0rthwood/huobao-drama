@@ -10,6 +10,7 @@ description: 地图工作流·服务器草稿作图 — 小工具精确添加要
 ## 工作流程与工具
 
 1. 从提示中的要素摘要选择主体，调用 `add_feature_layers({items:[{feature_id}]})`，**默认不要逐层写 style**。服务器按当前主题与 category 套用河流、海岸、路线、山地、区域与点样式；河流投影长度达到画面对角线 45% 时为主河，否则为支流。点默认 city；确有重要度依据时可传 `importance:"capital"|"city"|"settlement"`。单层 `style` 是覆盖补丁，仅用于明确的叙事强调。服务器精确投影存储几何，place→marker、route→polyline、region→polygon，自动锚定。marker.text 初始为要素名称。断段各自添加，不得桥接；响应只有 id、bbox、点数与样式，没有长顶点数组。
+   区域默认色由锚定要素的稳定 ID 哈希映射到主题色板，增删其他区域不会改变既有区域的颜色；有限色板可能出现同色。polygon 的 `feather` 为输出高度比例，控制填充高斯模糊，描边不模糊，0 或缺省关闭。
 2. 标题及标签优先用 `add_label({tier:"title"|"region"|"city"|"river"|"note",text,box:{x,y,w,h},feature_id?})`：服务器套用主题的字号、字体、斜体、文字光晕与颜色；`style` 可按需覆盖。有 feature_id 时锚定要素，省略则是未锚定标题/说明。card、图例、画框等用 `add_layer({layer:{...}})`，公共字段必须完整。手画线面最多 200 点；要素几何只能用 add_feature_layers。
    add_feature_layers / add_label 快捷工具由服务器补齐公共字段，style 是与主题默认合并的补丁。点已有 marker.text；若另加同一点的 city 标签，先用 `update_layer({layer_id,patch:{text:""}})` 清空 marker 旁注，避免重复地名。
 3. 用 `update_layer({layer_id,patch:{style:{...},box:{...},text:...,name:...,z:...,visible:...,opacity:...,rotation:...,fields:{...}}})` 小补丁修改。只传要改的字段，style 是合并补丁；type/anchor/id 不可改。锚定要素的 points/at 修改及非零 rotation 会整笔拒收，原草稿保留；非要素手画小形状可 patch.points/at（仍最多 200 点）。`remove_layer({layer_id})` 删除图层；删掉必画要素后仍须补回或在交付时说明 omitted。

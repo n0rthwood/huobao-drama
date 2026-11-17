@@ -315,6 +315,7 @@ const STYLE_FIELDS: Record<LayerType, Record<string, z.ZodTypeAny>> = {
   polygon: {
     fill: trimmedText(COLOR_MAX),
     fill_opacity: num(0, 1, 0.35),
+    feather: num(0, 0.1, 0),
     stroke: trimmedText(COLOR_MAX),
     stroke_width: num(0, 0.05, 0.004),
     dash: enumWith(LAYER_DASHES, 'none'),

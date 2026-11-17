@@ -3472,6 +3472,7 @@
       "rotation": "回転",
       "fill": "塗りつぶし色",
       "fillOpacity": "塗りの不透明度",
+      "feather": "ぼかし（高さ2160）",
       "stroke": "輪郭色",
       "strokeWidth": "輪郭の太さ",
       "dash": "線種",
