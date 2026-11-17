@@ -29,9 +29,21 @@ export function normalizeProjectType(v: unknown): ProjectType {
   return isProjectType(v) ? v : 'drama'
 }
 
-/** 同步读取项目类型（better-sqlite3 的 .get()）；项目不存在按 drama 处理 */
+/**
+ * 同步读取项目类型（better-sqlite3 的 .get()）；项目不存在按 drama 处理。
+ * 类型创建后不可切换（PUT /dramas/:id 拒绝改动），所以按 dramaId 进程内缓存；
+ * 热路径（逐镜 ref 检查/列表/预览）不再每次查库（Issue #118 C）。
+ */
+const projectTypeCache = new Map<number, ProjectType>()
 export function resolveDramaProjectType(dramaId: number | null | undefined): ProjectType {
   if (!dramaId) return 'drama'
+  const cached = projectTypeCache.get(dramaId)
+  if (cached) return cached
   const row = db.select().from(schema.dramas).where(eq(schema.dramas.id, dramaId)).get()
-  return normalizeProjectType(row?.projectType)
+  const type = normalizeProjectType(row?.projectType)
+  if (row) {
+    if (projectTypeCache.size > 500) projectTypeCache.clear()
+    projectTypeCache.set(dramaId, type)
+  }
+  return type
 }
