@@ -19,7 +19,7 @@ import { cachedEpisodeRead } from './episode-read-cache.js'
 import { resolveDramaProjectType } from './project-type.js'
 import { generatedSegmentSeconds } from './shot-duration.js'
 import { videoTimelineProblems } from './video-prompt-timeline.js'
-import { referenceAssetRefs, type Combo, type DesignCard } from './design-card.js'
+import { referenceAssetRefs, type Combo, type DesignCard, type DesignCardContext } from './design-card.js'
 import { indexRefs, REF_IMAGE_LIMIT, type AssetRef } from './prompt-refs.js'
 
 /** 旁白角色识别：提取产物中的旁白角色不参与画面生成（与前端 isNarratorCharacter 同口径） */
@@ -745,16 +745,20 @@ export function computeRefIssues(input: RefCheckInput): RefIssue[] {
 export async function checkStoryboardRefs(
   storyboard: typeof schema.storyboards.$inferSelect,
   assets?: EpisodeAssetEntry[],
+  /** 整集读路径预加载（#118 C）：列表接口逐镜复用，避免每镜重建整集上下文 */
+  preloaded?: { cardCtx?: DesignCardContext; bindings?: TargetBindings; documentary?: boolean },
 ): Promise<RefIssue[]> {
   // 纪录片才判中帧时刻（#110）：生成段长度 = 设计卡 budget.gen_s（老数据回落到 duration）
-  const [episode] = db.select().from(schema.episodes).where(eq(schema.episodes.id, storyboard.episodeId)).all()
-  const documentary = episode ? resolveDramaProjectType(episode.dramaId) === 'documentary' : false
+  const documentary = preloaded?.documentary ?? await (async () => {
+    const [episode] = db.select().from(schema.episodes).where(eq(schema.episodes.id, storyboard.episodeId)).all()
+    return episode ? resolveDramaProjectType(episode.dramaId) === 'documentary' : false
+  })()
   return computeRefIssues({
     prompts: promptFieldsOf(storyboard),
     assets: assets ?? await loadEpisodeAssets(storyboard.episodeId),
-    bindings: await loadTargetBindings(storyboard.id),
+    bindings: preloaded?.bindings ?? await loadTargetBindings(storyboard.id),
     ...(() => {
-      const resolved = resolveDesignCard(storyboard, loadDesignCardContext(storyboard.episodeId))
+      const resolved = resolveDesignCard(storyboard, preloaded?.cardCtx ?? loadDesignCardContext(storyboard.episodeId))
       return { card: resolved.card, combo: resolved.combo }
     })(),
     generatedSegmentSeconds: documentary ? generatedSegmentSeconds(storyboard.designCard, storyboard.duration) : null,
@@ -766,8 +770,9 @@ export async function checkStoryboardRefs(
 export async function loadStoryboardTargetAssets(
   storyboard: typeof schema.storyboards.$inferSelect,
   assets?: EpisodeAssetEntry[],
+  bindings?: TargetBindings,
 ): Promise<Record<BindingTarget, TargetAssetJson[]>> {
-  return targetAssetsJson(assets ?? await loadEpisodeAssets(storyboard.episodeId), await loadTargetBindings(storyboard.id))
+  return targetAssetsJson(assets ?? await loadEpisodeAssets(storyboard.episodeId), bindings ?? await loadTargetBindings(storyboard.id))
 }
 
 /** 某个目标的参考素材（读库版本，关键帧/视频组装用） */
