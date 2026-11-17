@@ -1737,6 +1737,10 @@
         "warn": "警告 {n} 件：{message}",
         "block": "ブロック {n} 件：{message}"
       },
+      "pip": {
+        "pick": "ピクチャー・イン・ピクチャーの画像を選ぶ",
+        "unset": "画像未選択（クリックで選択）"
+      },
       "layerType": {
         "polygon": "ポリゴン",
         "polyline": "折れ線",

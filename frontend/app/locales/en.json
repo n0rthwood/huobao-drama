@@ -1737,6 +1737,10 @@
         "warn": "{n} warning(s): {message}",
         "block": "{n} blocking issue(s): {message}"
       },
+      "pip": {
+        "pick": "Pick the picture-in-picture image",
+        "unset": "No image (click to pick)"
+      },
       "layerType": {
         "polygon": "Polygon",
         "polyline": "Polyline",

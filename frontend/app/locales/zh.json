@@ -1737,6 +1737,10 @@
         "warn": "{n} 条警告：{message}",
         "block": "{n} 个阻断问题：{message}"
       },
+      "pip": {
+        "pick": "选择画中画图片",
+        "unset": "未选图片（点击选择）"
+      },
       "layerType": {
         "polygon": "多边形",
         "polyline": "折线",
