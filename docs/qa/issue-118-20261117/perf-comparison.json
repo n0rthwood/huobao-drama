@@ -1,0 +1,211 @@
+{
+  "baseline_work_1972": {
+    "id": 1972,
+    "task_id": 4282,
+    "stage": "video_prompts",
+    "source_chars": 66,
+    "sample_key": "video_prompts|cfg:1|model:glm-5.3-flash",
+    "storyboard_id": 1317,
+    "storyboard_number": 85,
+    "started_at": 1794939970322,
+    "finished_at": 1794940158103,
+    "status": "completed",
+    "model_ms": 73408,
+    "queue_ms": 2,
+    "work_ms": 187781,
+    "call_count": 3,
+    "heartbeat_at": 1794940158103,
+    "error_msg": null,
+    "created_at": 1794939970322,
+    "scope": "sys_task",
+    "agent_gate_ms": 0
+  },
+  "pre_task_4282_agg": {
+    "n": 63,
+    "avg_work": 108261.49206349206,
+    "avg_model": 54185.12698412698
+  },
+  "post_task_4346_completed": [
+    {
+      "id": 2129,
+      "storyboard_id": 1254,
+      "work_ms": 106494,
+      "model_ms": 58718,
+      "agent_gate_ms": 47428,
+      "queue_ms": 1,
+      "call_count": 4
+    },
+    {
+      "id": 2142,
+      "storyboard_id": 1255,
+      "work_ms": 48979,
+      "model_ms": 39134,
+      "agent_gate_ms": 9568,
+      "queue_ms": 1,
+      "call_count": 3
+    },
+    {
+      "id": 2145,
+      "storyboard_id": 1267,
+      "work_ms": 50197,
+      "model_ms": 21299,
+      "agent_gate_ms": 28491,
+      "queue_ms": 3,
+      "call_count": 3
+    },
+    {
+      "id": 2151,
+      "storyboard_id": 1269,
+      "work_ms": 40287,
+      "model_ms": 16566,
+      "agent_gate_ms": 23293,
+      "queue_ms": 2,
+      "call_count": 3
+    },
+    {
+      "id": 2155,
+      "storyboard_id": 1340,
+      "work_ms": 42534,
+      "model_ms": 18792,
+      "agent_gate_ms": 23325,
+      "queue_ms": 4,
+      "call_count": 3
+    },
+    {
+      "id": 2159,
+      "storyboard_id": 1341,
+      "work_ms": 42907,
+      "model_ms": 21947,
+      "agent_gate_ms": 20375,
+      "queue_ms": 2,
+      "call_count": 3
+    },
+    {
+      "id": 2163,
+      "storyboard_id": 1270,
+      "work_ms": 43270,
+      "model_ms": 21417,
+      "agent_gate_ms": 21290,
+      "queue_ms": 4,
+      "call_count": 3
+    },
+    {
+      "id": 2167,
+      "storyboard_id": 1271,
+      "work_ms": 42450,
+      "model_ms": 24097,
+      "agent_gate_ms": 17890,
+      "queue_ms": 3,
+      "call_count": 3
+    },
+    {
+      "id": 2170,
+      "storyboard_id": 1346,
+      "work_ms": 32714,
+      "model_ms": 22276,
+      "agent_gate_ms": 9287,
+      "queue_ms": 2,
+      "call_count": 3
+    },
+    {
+      "id": 2173,
+      "storyboard_id": 1273,
+      "work_ms": 39715,
+      "model_ms": 19655,
+      "agent_gate_ms": 19647,
+      "queue_ms": 3,
+      "call_count": 3
+    },
+    {
+      "id": 2177,
+      "storyboard_id": 1274,
+      "work_ms": 43428,
+      "model_ms": 23898,
+      "agent_gate_ms": 19044,
+      "queue_ms": 4,
+      "call_count": 3
+    },
+    {
+      "id": 2181,
+      "storyboard_id": 1277,
+      "work_ms": 49478,
+      "model_ms": 19853,
+      "agent_gate_ms": 29252,
+      "queue_ms": 3,
+      "call_count": 3
+    },
+    {
+      "id": 2185,
+      "storyboard_id": 1276,
+      "work_ms": 54768,
+      "model_ms": 24181,
+      "agent_gate_ms": 30131,
+      "queue_ms": 4,
+      "call_count": 3
+    },
+    {
+      "id": 2189,
+      "storyboard_id": 1278,
+      "work_ms": 45551,
+      "model_ms": 21165,
+      "agent_gate_ms": 23964,
+      "queue_ms": 4,
+      "call_count": 3
+    },
+    {
+      "id": 2192,
+      "storyboard_id": 1275,
+      "work_ms": 29692,
+      "model_ms": 20415,
+      "agent_gate_ms": 8845,
+      "queue_ms": 2,
+      "call_count": 3
+    },
+    {
+      "id": 2194,
+      "storyboard_id": 1280,
+      "work_ms": 19867,
+      "model_ms": 19333,
+      "agent_gate_ms": 141,
+      "queue_ms": 3,
+      "call_count": 3
+    },
+    {
+      "id": 2197,
+      "storyboard_id": 1279,
+      "work_ms": 54576,
+      "model_ms": 24879,
+      "agent_gate_ms": 25770,
+      "queue_ms": 3,
+      "call_count": 3
+    },
+    {
+      "id": 2201,
+      "storyboard_id": 1351,
+      "work_ms": 45933,
+      "model_ms": 22686,
+      "agent_gate_ms": 21980,
+      "queue_ms": 2,
+      "call_count": 3
+    },
+    {
+      "id": 2205,
+      "storyboard_id": 1281,
+      "work_ms": 63550,
+      "model_ms": 20563,
+      "agent_gate_ms": 42570,
+      "queue_ms": 3,
+      "call_count": 3
+    },
+    {
+      "id": 2209,
+      "storyboard_id": 1283,
+      "work_ms": 45872,
+      "model_ms": 20923,
+      "agent_gate_ms": 24540,
+      "queue_ms": 3,
+      "call_count": 3
+    }
+  ],
+  "note": "同集 ep30 同模型 cfg:1 glm-5.3-flash；post 含全局闸等待 agent_gate_ms（3 批量并发的人为排队，非 CPU）"
+}

@@ -1,0 +1,75 @@
+[2m19:12:18[0m [32m[StoryboardTool][0m DONE read-context | episodeId=30 dramaId=20 characters=7 scenes=25 props=33 expositionAssets=4 existingStoryboards=112 scriptLength=5766 aspectRatio=16:9
+[2m19:12:18[0m [32m[StoryboardTool][0m DONE read-context | episodeId=30 dramaId=20 characters=7 scenes=25 props=33 expositionAssets=4 existingStoryboards=7 contextWindow=3+1+3 scriptLength=5766 aspectRatio=16:9
+[2m19:12:19[0m [32m[StoryboardTool][0m DONE read-context | episodeId=30 dramaId=20 characters=7 scenes=25 props=33 expositionAssets=4 existingStoryboards=7 contextWindow=3+1+3 scriptLength=5766 aspectRatio=16:9
+[2m19:12:19[0m [32m[StoryboardTool][0m DONE read-context | episodeId=30 dramaId=20 characters=7 scenes=25 props=33 expositionAssets=4 existingStoryboards=7 contextWindow=3+1+3 scriptLength=5766 aspectRatio=16:9
+[2m19:12:19[0m [32m[StoryboardTool][0m DONE read-context | episodeId=30 dramaId=20 characters=7 scenes=25 props=33 expositionAssets=4 existingStoryboards=7 contextWindow=3+1+3 scriptLength=5766 aspectRatio=16:9
+[2m19:12:19[0m [32m[StoryboardTool][0m DONE read-context | episodeId=30 dramaId=20 characters=7 scenes=25 props=33 expositionAssets=4 existingStoryboards=7 contextWindow=3+1+3 scriptLength=5766 aspectRatio=16:9
+[2m19:12:19[0m [32m[StoryboardTool][0m DONE read-context | episodeId=30 dramaId=20 characters=7 scenes=25 props=33 expositionAssets=4 existingStoryboards=7 contextWindow=3+1+3 scriptLength=5766 aspectRatio=16:9
+[2m19:12:19[0m [32m[StoryboardTool][0m DONE read-context | episodeId=30 dramaId=20 characters=7 scenes=25 props=33 expositionAssets=4 existingStoryboards=7 contextWindow=3+1+3 scriptLength=5766 aspectRatio=16:9
+[2m19:12:19[0m [32m[StoryboardTool][0m DONE read-context | episodeId=30 dramaId=20 characters=7 scenes=25 props=33 expositionAssets=4 existingStoryboards=7 contextWindow=3+1+3 scriptLength=5766 aspectRatio=16:9
+[2m19:12:20[0m [32m[StoryboardTool][0m DONE read-context | episodeId=30 dramaId=20 characters=7 scenes=25 props=33 expositionAssets=4 existingStoryboards=7 contextWindow=3+1+3 scriptLength=5766 aspectRatio=16:9
+[2m19:12:20[0m [32m[StoryboardTool][0m DONE read-context | episodeId=30 dramaId=20 characters=7 scenes=25 props=33 expositionAssets=4 existingStoryboards=7 contextWindow=3+1+3 scriptLength=5766 aspectRatio=16:9
+[2m19:12:20[0m [32m[StoryboardTool][0m DONE read-context | episodeId=30 dramaId=20 characters=7 scenes=25 props=33 expositionAssets=4 existingStoryboards=7 contextWindow=3+1+3 scriptLength=5766 aspectRatio=16:9
+[2m19:12:21[0m [32m[StoryboardTool][0m DONE read-context | episodeId=30 dramaId=20 characters=7 scenes=25 props=33 expositionAssets=4 existingStoryboards=7 contextWindow=3+1+3 scriptLength=5766 aspectRatio=16:9
+[2m19:12:21[0m [32m[StoryboardTool][0m DONE read-context | episodeId=30 dramaId=20 characters=7 scenes=25 props=33 expositionAssets=4 existingStoryboards=7 contextWindow=3+1+3 scriptLength=5766 aspectRatio=16:9
+[2m19:12:21[0m [32m[StoryboardTool][0m DONE read-context | episodeId=30 dramaId=20 characters=7 scenes=25 props=33 expositionAssets=4 existingStoryboards=7 contextWindow=3+1+3 scriptLength=5766 aspectRatio=16:9
+{
+  "episodeId": 30,
+  "targetId": 1301,
+  "shot": 57,
+  "fullChars": 470140,
+  "fullMs": 403,
+  "videoChars": 69788,
+  "videoMs": 355,
+  "keyframesChars": 69788,
+  "designChars": 92529,
+  "full": {
+    "total": 33,
+    "detailed": 33,
+    "omitted": 0,
+    "propsChars": 33901,
+    "textSpecChars": 11201,
+    "storyboards": 112
+  },
+  "video": {
+    "total": 33,
+    "detailed": 4,
+    "omitted": 29,
+    "propsChars": 22276,
+    "textSpecChars": 0,
+    "storyboards": 7
+  },
+  "design": {
+    "total": 33,
+    "detailed": 33,
+    "omitted": 0,
+    "propsChars": 33901,
+    "textSpecChars": 11201,
+    "storyboards": 7
+  },
+  "videoHasPropsNote": true,
+  "cacheReport": {
+    "times": [
+      346,
+      12,
+      13,
+      14,
+      14
+    ],
+    "sizes": [
+      61648,
+      61245,
+      59550,
+      59313,
+      58679
+    ],
+    "sawNew": true
+  },
+  "noCacheTimes": [
+    344,
+    335,
+    337,
+    342,
+    344
+  ]
+}

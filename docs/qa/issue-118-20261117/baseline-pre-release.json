@@ -1,0 +1,1265 @@
+{
+  "captured_at": "2026-11-17T19:12:08.621Z",
+  "baseline_work_1972": {
+    "id": 1972,
+    "task_id": 4282,
+    "stage": "video_prompts",
+    "source_chars": 66,
+    "sample_key": "video_prompts|cfg:1|model:glm-5.3-flash",
+    "storyboard_id": 1317,
+    "storyboard_number": 85,
+    "started_at": 1794939970322,
+    "finished_at": 1794940158103,
+    "status": "completed",
+    "model_ms": 73408,
+    "queue_ms": 2,
+    "work_ms": 187781,
+    "call_count": 3,
+    "heartbeat_at": 1794940158103,
+    "error_msg": null,
+    "created_at": 1794939970322,
+    "scope": "sys_task"
+  },
+  "task_4282_completed": [
+    {
+      "id": 1872,
+      "storyboard_id": 1267,
+      "work_ms": 30604,
+      "model_ms": 28986,
+      "queue_ms": 5,
+      "call_count": 3,
+      "started_at": 1794935905337,
+      "finished_at": 1794935935941
+    },
+    {
+      "id": 1874,
+      "storyboard_id": 1269,
+      "work_ms": 31083,
+      "model_ms": 27846,
+      "queue_ms": 5,
+      "call_count": 3,
+      "started_at": 1794935935941,
+      "finished_at": 1794935967024
+    },
+    {
+      "id": 1876,
+      "storyboard_id": 1340,
+      "work_ms": 40916,
+      "model_ms": 40396,
+      "queue_ms": 2,
+      "call_count": 3,
+      "started_at": 1794935967025,
+      "finished_at": 1794936007941
+    },
+    {
+      "id": 1878,
+      "storyboard_id": 1341,
+      "work_ms": 54219,
+      "model_ms": 44749,
+      "queue_ms": 3,
+      "call_count": 3,
+      "started_at": 1794936007941,
+      "finished_at": 1794936062160
+    },
+    {
+      "id": 1880,
+      "storyboard_id": 1270,
+      "work_ms": 23745,
+      "model_ms": 23190,
+      "queue_ms": 4,
+      "call_count": 3,
+      "started_at": 1794936062160,
+      "finished_at": 1794936085905
+    },
+    {
+      "id": 1881,
+      "storyboard_id": 1271,
+      "work_ms": 23619,
+      "model_ms": 23028,
+      "queue_ms": 3,
+      "call_count": 3,
+      "started_at": 1794936085905,
+      "finished_at": 1794936109524
+    },
+    {
+      "id": 1883,
+      "storyboard_id": 1346,
+      "work_ms": 26549,
+      "model_ms": 24453,
+      "queue_ms": 8,
+      "call_count": 4,
+      "started_at": 1794936109526,
+      "finished_at": 1794936136075
+    },
+    {
+      "id": 1884,
+      "storyboard_id": 1273,
+      "work_ms": 26948,
+      "model_ms": 23830,
+      "queue_ms": 4,
+      "call_count": 3,
+      "started_at": 1794936136076,
+      "finished_at": 1794936163024
+    },
+    {
+      "id": 1886,
+      "storyboard_id": 1274,
+      "work_ms": 36412,
+      "model_ms": 34287,
+      "queue_ms": 4,
+      "call_count": 3,
+      "started_at": 1794936163025,
+      "finished_at": 1794936199437
+    },
+    {
+      "id": 1887,
+      "storyboard_id": 1277,
+      "work_ms": 18759,
+      "model_ms": 17963,
+      "queue_ms": 5,
+      "call_count": 3,
+      "started_at": 1794936199438,
+      "finished_at": 1794936218197
+    },
+    {
+      "id": 1889,
+      "storyboard_id": 1276,
+      "work_ms": 32656,
+      "model_ms": 31837,
+      "queue_ms": 4,
+      "call_count": 3,
+      "started_at": 1794936218198,
+      "finished_at": 1794936250854
+    },
+    {
+      "id": 1890,
+      "storyboard_id": 1278,
+      "work_ms": 28959,
+      "model_ms": 28408,
+      "queue_ms": 4,
+      "call_count": 3,
+      "started_at": 1794936250854,
+      "finished_at": 1794936279813
+    },
+    {
+      "id": 1892,
+      "storyboard_id": 1275,
+      "work_ms": 23976,
+      "model_ms": 23285,
+      "queue_ms": 4,
+      "call_count": 3,
+      "started_at": 1794936279814,
+      "finished_at": 1794936303790
+    },
+    {
+      "id": 1894,
+      "storyboard_id": 1280,
+      "work_ms": 33117,
+      "model_ms": 31300,
+      "queue_ms": 4,
+      "call_count": 3,
+      "started_at": 1794936303790,
+      "finished_at": 1794936336907
+    },
+    {
+      "id": 1895,
+      "storyboard_id": 1279,
+      "work_ms": 27251,
+      "model_ms": 25412,
+      "queue_ms": 5,
+      "call_count": 3,
+      "started_at": 1794936336907,
+      "finished_at": 1794936364158
+    },
+    {
+      "id": 1897,
+      "storyboard_id": 1351,
+      "work_ms": 60566,
+      "model_ms": 32340,
+      "queue_ms": 4,
+      "call_count": 3,
+      "started_at": 1794936364159,
+      "finished_at": 1794936424725
+    },
+    {
+      "id": 1898,
+      "storyboard_id": 1281,
+      "work_ms": 41666,
+      "model_ms": 39612,
+      "queue_ms": 5,
+      "call_count": 4,
+      "started_at": 1794936424725,
+      "finished_at": 1794936466391
+    },
+    {
+      "id": 1901,
+      "storyboard_id": 1283,
+      "work_ms": 18832,
+      "model_ms": 18221,
+      "queue_ms": 5,
+      "call_count": 3,
+      "started_at": 1794936466392,
+      "finished_at": 1794936485224
+    },
+    {
+      "id": 1902,
+      "storyboard_id": 1282,
+      "work_ms": 40620,
+      "model_ms": 39873,
+      "queue_ms": 6,
+      "call_count": 4,
+      "started_at": 1794936485224,
+      "finished_at": 1794936525844
+    },
+    {
+      "id": 1904,
+      "storyboard_id": 1359,
+      "work_ms": 18401,
+      "model_ms": 17459,
+      "queue_ms": 5,
+      "call_count": 3,
+      "started_at": 1794936525845,
+      "finished_at": 1794936544246
+    },
+    {
+      "id": 1905,
+      "storyboard_id": 1286,
+      "work_ms": 25170,
+      "model_ms": 24289,
+      "queue_ms": 4,
+      "call_count": 3,
+      "started_at": 1794936544247,
+      "finished_at": 1794936569417
+    },
+    {
+      "id": 1907,
+      "storyboard_id": 1287,
+      "work_ms": 25633,
+      "model_ms": 22554,
+      "queue_ms": 4,
+      "call_count": 3,
+      "started_at": 1794936569417,
+      "finished_at": 1794936595050
+    },
+    {
+      "id": 1909,
+      "storyboard_id": 1288,
+      "work_ms": 26040,
+      "model_ms": 23934,
+      "queue_ms": 5,
+      "call_count": 3,
+      "started_at": 1794936595050,
+      "finished_at": 1794936621090
+    },
+    {
+      "id": 1910,
+      "storyboard_id": 1361,
+      "work_ms": 32435,
+      "model_ms": 28778,
+      "queue_ms": 3,
+      "call_count": 3,
+      "started_at": 1794936621091,
+      "finished_at": 1794936653526
+    },
+    {
+      "id": 1912,
+      "storyboard_id": 1289,
+      "work_ms": 34508,
+      "model_ms": 33550,
+      "queue_ms": 4,
+      "call_count": 3,
+      "started_at": 1794936653526,
+      "finished_at": 1794936688034
+    },
+    {
+      "id": 1914,
+      "storyboard_id": 1285,
+      "work_ms": 30285,
+      "model_ms": 28366,
+      "queue_ms": 5,
+      "call_count": 3,
+      "started_at": 1794936688034,
+      "finished_at": 1794936718319
+    },
+    {
+      "id": 1915,
+      "storyboard_id": 1291,
+      "work_ms": 30564,
+      "model_ms": 28760,
+      "queue_ms": 5,
+      "call_count": 3,
+      "started_at": 1794936718319,
+      "finished_at": 1794936748883
+    },
+    {
+      "id": 1918,
+      "storyboard_id": 1293,
+      "work_ms": 20712,
+      "model_ms": 20171,
+      "queue_ms": 4,
+      "call_count": 3,
+      "started_at": 1794936748884,
+      "finished_at": 1794936769596
+    },
+    {
+      "id": 1919,
+      "storyboard_id": 1292,
+      "work_ms": 17090,
+      "model_ms": 16537,
+      "queue_ms": 4,
+      "call_count": 3,
+      "started_at": 1794936769596,
+      "finished_at": 1794936786686
+    },
+    {
+      "id": 1921,
+      "storyboard_id": 1295,
+      "work_ms": 44330,
+      "model_ms": 43744,
+      "queue_ms": 5,
+      "call_count": 3,
+      "started_at": 1794936786686,
+      "finished_at": 1794936831016
+    },
+    {
+      "id": 1922,
+      "storyboard_id": 1296,
+      "work_ms": 47977,
+      "model_ms": 34291,
+      "queue_ms": 4,
+      "call_count": 3,
+      "started_at": 1794936831016,
+      "finished_at": 1794936878993
+    },
+    {
+      "id": 1924,
+      "storyboard_id": 1299,
+      "work_ms": 44033,
+      "model_ms": 42119,
+      "queue_ms": 5,
+      "call_count": 3,
+      "started_at": 1794936878993,
+      "finished_at": 1794936923026
+    },
+    {
+      "id": 1926,
+      "storyboard_id": 1301,
+      "work_ms": 21631,
+      "model_ms": 21137,
+      "queue_ms": 5,
+      "call_count": 3,
+      "started_at": 1794936923027,
+      "finished_at": 1794936944658
+    },
+    {
+      "id": 1928,
+      "storyboard_id": 1294,
+      "work_ms": 63765,
+      "model_ms": 61957,
+      "queue_ms": 4,
+      "call_count": 4,
+      "started_at": 1794936944658,
+      "finished_at": 1794937008423
+    },
+    {
+      "id": 1930,
+      "storyboard_id": 1305,
+      "work_ms": 46577,
+      "model_ms": 45993,
+      "queue_ms": 3,
+      "call_count": 3,
+      "started_at": 1794937008424,
+      "finished_at": 1794937055001
+    },
+    {
+      "id": 1932,
+      "storyboard_id": 1302,
+      "work_ms": 35631,
+      "model_ms": 32701,
+      "queue_ms": 3,
+      "call_count": 3,
+      "started_at": 1794937055002,
+      "finished_at": 1794937090633
+    },
+    {
+      "id": 1934,
+      "storyboard_id": 1303,
+      "work_ms": 23898,
+      "model_ms": 23352,
+      "queue_ms": 4,
+      "call_count": 3,
+      "started_at": 1794937090633,
+      "finished_at": 1794937114531
+    },
+    {
+      "id": 1935,
+      "storyboard_id": 1300,
+      "work_ms": 145395,
+      "model_ms": 98072,
+      "queue_ms": 6,
+      "call_count": 4,
+      "started_at": 1794937114532,
+      "finished_at": 1794937259927
+    },
+    {
+      "id": 1938,
+      "storyboard_id": 1308,
+      "work_ms": 52847,
+      "model_ms": 52245,
+      "queue_ms": 5,
+      "call_count": 4,
+      "started_at": 1794937259927,
+      "finished_at": 1794937312774
+    },
+    {
+      "id": 1940,
+      "storyboard_id": 1311,
+      "work_ms": 89978,
+      "model_ms": 37206,
+      "queue_ms": 4,
+      "call_count": 3,
+      "started_at": 1794937312775,
+      "finished_at": 1794937402753
+    },
+    {
+      "id": 1942,
+      "storyboard_id": 1304,
+      "work_ms": 197306,
+      "model_ms": 84067,
+      "queue_ms": 3,
+      "call_count": 3,
+      "started_at": 1794937402753,
+      "finished_at": 1794937600059
+    },
+    {
+      "id": 1943,
+      "storyboard_id": 1312,
+      "work_ms": 422911,
+      "model_ms": 122099,
+      "queue_ms": 4,
+      "call_count": 3,
+      "started_at": 1794937600059,
+      "finished_at": 1794938022970
+    },
+    {
+      "id": 1945,
+      "storyboard_id": 1315,
+      "work_ms": 167446,
+      "model_ms": 87937,
+      "queue_ms": 4,
+      "call_count": 3,
+      "started_at": 1794938022970,
+      "finished_at": 1794938190416
+    },
+    {
+      "id": 1947,
+      "storyboard_id": 1316,
+      "work_ms": 370022,
+      "model_ms": 49740,
+      "queue_ms": 3,
+      "call_count": 3,
+      "started_at": 1794938190417,
+      "finished_at": 1794938560439
+    },
+    {
+      "id": 1949,
+      "storyboard_id": 1319,
+      "work_ms": 169366,
+      "model_ms": 73593,
+      "queue_ms": 2,
+      "call_count": 3,
+      "started_at": 1794938560439,
+      "finished_at": 1794938729805
+    },
+    {
+      "id": 1950,
+      "storyboard_id": 1309,
+      "work_ms": 168375,
+      "model_ms": 71458,
+      "queue_ms": 3,
+      "call_count": 3,
+      "started_at": 1794938729807,
+      "finished_at": 1794938898182
+    },
+    {
+      "id": 1952,
+      "storyboard_id": 1323,
+      "work_ms": 270237,
+      "model_ms": 79152,
+      "queue_ms": 5,
+      "call_count": 3,
+      "started_at": 1794938898182,
+      "finished_at": 1794939168419
+    },
+    {
+      "id": 1955,
+      "storyboard_id": 1325,
+      "work_ms": 122811,
+      "model_ms": 69833,
+      "queue_ms": 4,
+      "call_count": 3,
+      "started_at": 1794939168419,
+      "finished_at": 1794939291230
+    },
+    {
+      "id": 1957,
+      "storyboard_id": 1324,
+      "work_ms": 166994,
+      "model_ms": 69357,
+      "queue_ms": 4,
+      "call_count": 3,
+      "started_at": 1794939291230,
+      "finished_at": 1794939458224
+    },
+    {
+      "id": 1958,
+      "storyboard_id": 1329,
+      "work_ms": 164355,
+      "model_ms": 69441,
+      "queue_ms": 5,
+      "call_count": 3,
+      "started_at": 1794939458224,
+      "finished_at": 1794939622579
+    },
+    {
+      "id": 1960,
+      "storyboard_id": 1314,
+      "work_ms": 170094,
+      "model_ms": 63468,
+      "queue_ms": 2,
+      "call_count": 3,
+      "started_at": 1794939622579,
+      "finished_at": 1794939792673
+    },
+    {
+      "id": 1966,
+      "storyboard_id": 1330,
+      "work_ms": 177648,
+      "model_ms": 64124,
+      "queue_ms": 3,
+      "call_count": 3,
+      "started_at": 1794939792673,
+      "finished_at": 1794939970321
+    },
+    {
+      "id": 1972,
+      "storyboard_id": 1317,
+      "work_ms": 187781,
+      "model_ms": 73408,
+      "queue_ms": 2,
+      "call_count": 3,
+      "started_at": 1794939970322,
+      "finished_at": 1794940158103
+    },
+    {
+      "id": 1974,
+      "storyboard_id": 1318,
+      "work_ms": 416142,
+      "model_ms": 211132,
+      "queue_ms": 7,
+      "call_count": 6,
+      "started_at": 1794940158103,
+      "finished_at": 1794940574245
+    },
+    {
+      "id": 1977,
+      "storyboard_id": 1331,
+      "work_ms": 170094,
+      "model_ms": 71697,
+      "queue_ms": 5,
+      "call_count": 3,
+      "started_at": 1794940574246,
+      "finished_at": 1794940744340
+    },
+    {
+      "id": 1979,
+      "storyboard_id": 1320,
+      "work_ms": 344818,
+      "model_ms": 190856,
+      "queue_ms": 7,
+      "call_count": 6,
+      "started_at": 1794940744340,
+      "finished_at": 1794941089158
+    },
+    {
+      "id": 1982,
+      "storyboard_id": 1321,
+      "work_ms": 249296,
+      "model_ms": 79937,
+      "queue_ms": 4,
+      "call_count": 4,
+      "started_at": 1794941089159,
+      "finished_at": 1794941338455
+    },
+    {
+      "id": 1984,
+      "storyboard_id": 1335,
+      "work_ms": 301725,
+      "model_ms": 133633,
+      "queue_ms": 10,
+      "call_count": 5,
+      "started_at": 1794941338456,
+      "finished_at": 1794941640181
+    },
+    {
+      "id": 1986,
+      "storyboard_id": 1336,
+      "work_ms": 183543,
+      "model_ms": 72939,
+      "queue_ms": 3,
+      "call_count": 3,
+      "started_at": 1794941640181,
+      "finished_at": 1794941823724
+    },
+    {
+      "id": 1988,
+      "storyboard_id": 1334,
+      "work_ms": 240597,
+      "model_ms": 44806,
+      "queue_ms": 7,
+      "call_count": 3,
+      "started_at": 1794941823724,
+      "finished_at": 1794942064321
+    },
+    {
+      "id": 1990,
+      "storyboard_id": 1326,
+      "work_ms": 322544,
+      "model_ms": 171270,
+      "queue_ms": 3,
+      "call_count": 3,
+      "started_at": 1794942064321,
+      "finished_at": 1794942386865
+    },
+    {
+      "id": 1992,
+      "storyboard_id": 1327,
+      "work_ms": 141808,
+      "model_ms": 71144,
+      "queue_ms": 3,
+      "call_count": 3,
+      "started_at": 1794942386865,
+      "finished_at": 1794942528673
+    },
+    {
+      "id": 1994,
+      "storyboard_id": 1350,
+      "work_ms": 197164,
+      "model_ms": 92341,
+      "queue_ms": 4,
+      "call_count": 3,
+      "started_at": 1794942528673,
+      "finished_at": 1794942725837
+    }
+  ],
+  "task_4283_completed": [
+    {
+      "id": 1867,
+      "storyboard_id": 932,
+      "work_ms": 74079,
+      "model_ms": 24369,
+      "queue_ms": 5,
+      "call_count": 3,
+      "started_at": 1794935840320,
+      "finished_at": 1794935914399
+    },
+    {
+      "id": 1873,
+      "storyboard_id": 943,
+      "work_ms": 32292,
+      "model_ms": 29853,
+      "queue_ms": 5,
+      "call_count": 3,
+      "started_at": 1794935914400,
+      "finished_at": 1794935946692
+    },
+    {
+      "id": 1875,
+      "storyboard_id": 947,
+      "work_ms": 40859,
+      "model_ms": 37249,
+      "queue_ms": 4,
+      "call_count": 3,
+      "started_at": 1794935946692,
+      "finished_at": 1794935987551
+    },
+    {
+      "id": 1877,
+      "storyboard_id": 950,
+      "work_ms": 58396,
+      "model_ms": 47082,
+      "queue_ms": 5,
+      "call_count": 3,
+      "started_at": 1794935987552,
+      "finished_at": 1794936045948
+    },
+    {
+      "id": 1879,
+      "storyboard_id": 948,
+      "work_ms": 43693,
+      "model_ms": 32392,
+      "queue_ms": 3,
+      "call_count": 3,
+      "started_at": 1794936045949,
+      "finished_at": 1794936089642
+    },
+    {
+      "id": 1882,
+      "storyboard_id": 949,
+      "work_ms": 58802,
+      "model_ms": 57450,
+      "queue_ms": 5,
+      "call_count": 3,
+      "started_at": 1794936089642,
+      "finished_at": 1794936148444
+    },
+    {
+      "id": 1885,
+      "storyboard_id": 951,
+      "work_ms": 67595,
+      "model_ms": 64964,
+      "queue_ms": 4,
+      "call_count": 4,
+      "started_at": 1794936148445,
+      "finished_at": 1794936216040
+    },
+    {
+      "id": 1888,
+      "storyboard_id": 953,
+      "work_ms": 39128,
+      "model_ms": 38289,
+      "queue_ms": 4,
+      "call_count": 3,
+      "started_at": 1794936216040,
+      "finished_at": 1794936255168
+    },
+    {
+      "id": 1891,
+      "storyboard_id": 954,
+      "work_ms": 43729,
+      "model_ms": 42611,
+      "queue_ms": 5,
+      "call_count": 3,
+      "started_at": 1794936255168,
+      "finished_at": 1794936298897
+    },
+    {
+      "id": 1893,
+      "storyboard_id": 957,
+      "work_ms": 45381,
+      "model_ms": 43408,
+      "queue_ms": 4,
+      "call_count": 3,
+      "started_at": 1794936298898,
+      "finished_at": 1794936344279
+    },
+    {
+      "id": 1896,
+      "storyboard_id": 960,
+      "work_ms": 83394,
+      "model_ms": 63327,
+      "queue_ms": 2,
+      "call_count": 3,
+      "started_at": 1794936344279,
+      "finished_at": 1794936427673
+    },
+    {
+      "id": 1899,
+      "storyboard_id": 965,
+      "work_ms": 31212,
+      "model_ms": 29109,
+      "queue_ms": 5,
+      "call_count": 3,
+      "started_at": 1794936427673,
+      "finished_at": 1794936458885
+    },
+    {
+      "id": 1900,
+      "storyboard_id": 966,
+      "work_ms": 55877,
+      "model_ms": 53323,
+      "queue_ms": 6,
+      "call_count": 4,
+      "started_at": 1794936458885,
+      "finished_at": 1794936514762
+    },
+    {
+      "id": 1903,
+      "storyboard_id": 969,
+      "work_ms": 39019,
+      "model_ms": 37876,
+      "queue_ms": 2,
+      "call_count": 3,
+      "started_at": 1794936514762,
+      "finished_at": 1794936553781
+    },
+    {
+      "id": 1906,
+      "storyboard_id": 972,
+      "work_ms": 34025,
+      "model_ms": 31577,
+      "queue_ms": 5,
+      "call_count": 3,
+      "started_at": 1794936553782,
+      "finished_at": 1794936587807
+    },
+    {
+      "id": 1908,
+      "storyboard_id": 973,
+      "work_ms": 44578,
+      "model_ms": 41847,
+      "queue_ms": 6,
+      "call_count": 4,
+      "started_at": 1794936587808,
+      "finished_at": 1794936632386
+    },
+    {
+      "id": 1911,
+      "storyboard_id": 974,
+      "work_ms": 33497,
+      "model_ms": 30205,
+      "queue_ms": 4,
+      "call_count": 3,
+      "started_at": 1794936632387,
+      "finished_at": 1794936665884
+    },
+    {
+      "id": 1913,
+      "storyboard_id": 979,
+      "work_ms": 52456,
+      "model_ms": 51446,
+      "queue_ms": 3,
+      "call_count": 3,
+      "started_at": 1794936665885,
+      "finished_at": 1794936718341
+    },
+    {
+      "id": 1916,
+      "storyboard_id": 986,
+      "work_ms": 26881,
+      "model_ms": 24452,
+      "queue_ms": 4,
+      "call_count": 3,
+      "started_at": 1794936718341,
+      "finished_at": 1794936745222
+    },
+    {
+      "id": 1917,
+      "storyboard_id": 987,
+      "work_ms": 39485,
+      "model_ms": 38669,
+      "queue_ms": 3,
+      "call_count": 3,
+      "started_at": 1794936745223,
+      "finished_at": 1794936784708
+    },
+    {
+      "id": 1920,
+      "storyboard_id": 989,
+      "work_ms": 63393,
+      "model_ms": 52195,
+      "queue_ms": 4,
+      "call_count": 3,
+      "started_at": 1794936784709,
+      "finished_at": 1794936848102
+    },
+    {
+      "id": 1923,
+      "storyboard_id": 990,
+      "work_ms": 38623,
+      "model_ms": 36247,
+      "queue_ms": 4,
+      "call_count": 3,
+      "started_at": 1794936848102,
+      "finished_at": 1794936886725
+    },
+    {
+      "id": 1925,
+      "storyboard_id": 991,
+      "work_ms": 55389,
+      "model_ms": 51708,
+      "queue_ms": 5,
+      "call_count": 4,
+      "started_at": 1794936886725,
+      "finished_at": 1794936942114
+    },
+    {
+      "id": 1927,
+      "storyboard_id": 997,
+      "work_ms": 51963,
+      "model_ms": 51125,
+      "queue_ms": 4,
+      "call_count": 3,
+      "started_at": 1794936942115,
+      "finished_at": 1794936994078
+    },
+    {
+      "id": 1929,
+      "storyboard_id": 992,
+      "work_ms": 37189,
+      "model_ms": 36017,
+      "queue_ms": 4,
+      "call_count": 3,
+      "started_at": 1794936994079,
+      "finished_at": 1794937031268
+    },
+    {
+      "id": 1931,
+      "storyboard_id": 994,
+      "work_ms": 47033,
+      "model_ms": 45898,
+      "queue_ms": 5,
+      "call_count": 3,
+      "started_at": 1794937031268,
+      "finished_at": 1794937078301
+    },
+    {
+      "id": 1933,
+      "storyboard_id": 995,
+      "work_ms": 60616,
+      "model_ms": 58971,
+      "queue_ms": 2,
+      "call_count": 3,
+      "started_at": 1794937078301,
+      "finished_at": 1794937138917
+    },
+    {
+      "id": 1936,
+      "storyboard_id": 996,
+      "work_ms": 118259,
+      "model_ms": 66911,
+      "queue_ms": 3,
+      "call_count": 3,
+      "started_at": 1794937138917,
+      "finished_at": 1794937257176
+    },
+    {
+      "id": 1937,
+      "storyboard_id": 999,
+      "work_ms": 32602,
+      "model_ms": 31484,
+      "queue_ms": 5,
+      "call_count": 3,
+      "started_at": 1794937257176,
+      "finished_at": 1794937289778
+    },
+    {
+      "id": 1939,
+      "storyboard_id": 1000,
+      "work_ms": 112950,
+      "model_ms": 60362,
+      "queue_ms": 3,
+      "call_count": 3,
+      "started_at": 1794937289779,
+      "finished_at": 1794937402729
+    },
+    {
+      "id": 1941,
+      "storyboard_id": 1001,
+      "work_ms": 329939,
+      "model_ms": 69309,
+      "queue_ms": 5,
+      "call_count": 3,
+      "started_at": 1794937402730,
+      "finished_at": 1794937732669
+    },
+    {
+      "id": 1944,
+      "storyboard_id": 998,
+      "work_ms": 302849,
+      "model_ms": 79793,
+      "queue_ms": 4,
+      "call_count": 3,
+      "started_at": 1794937732669,
+      "finished_at": 1794938035518
+    },
+    {
+      "id": 1946,
+      "storyboard_id": 1002,
+      "work_ms": 289694,
+      "model_ms": 154952,
+      "queue_ms": 7,
+      "call_count": 4,
+      "started_at": 1794938035518,
+      "finished_at": 1794938325212
+    },
+    {
+      "id": 1948,
+      "storyboard_id": 1003,
+      "work_ms": 404626,
+      "model_ms": 127780,
+      "queue_ms": 4,
+      "call_count": 4,
+      "started_at": 1794938325212,
+      "finished_at": 1794938729838
+    },
+    {
+      "id": 1951,
+      "storyboard_id": 1004,
+      "work_ms": 168637,
+      "model_ms": 71890,
+      "queue_ms": 3,
+      "call_count": 3,
+      "started_at": 1794938729838,
+      "finished_at": 1794938898475
+    },
+    {
+      "id": 1953,
+      "storyboard_id": 1005,
+      "work_ms": 226090,
+      "model_ms": 86730,
+      "queue_ms": 7,
+      "call_count": 4,
+      "started_at": 1794938898475,
+      "finished_at": 1794939124565
+    },
+    {
+      "id": 1954,
+      "storyboard_id": 1006,
+      "work_ms": 166646,
+      "model_ms": 71314,
+      "queue_ms": 3,
+      "call_count": 3,
+      "started_at": 1794939124565,
+      "finished_at": 1794939291211
+    },
+    {
+      "id": 1956,
+      "storyboard_id": 1009,
+      "work_ms": 167041,
+      "model_ms": 69297,
+      "queue_ms": 4,
+      "call_count": 3,
+      "started_at": 1794939291211,
+      "finished_at": 1794939458252
+    },
+    {
+      "id": 1959,
+      "storyboard_id": 1010,
+      "work_ms": 207653,
+      "model_ms": 114277,
+      "queue_ms": 4,
+      "call_count": 3,
+      "started_at": 1794939458252,
+      "finished_at": 1794939665905
+    },
+    {
+      "id": 1961,
+      "storyboard_id": 1011,
+      "work_ms": 126743,
+      "model_ms": 63455,
+      "queue_ms": 4,
+      "call_count": 3,
+      "started_at": 1794939665905,
+      "finished_at": 1794939792648
+    },
+    {
+      "id": 1965,
+      "storyboard_id": 1012,
+      "work_ms": 177655,
+      "model_ms": 64906,
+      "queue_ms": 4,
+      "call_count": 3,
+      "started_at": 1794939792648,
+      "finished_at": 1794939970303
+    },
+    {
+      "id": 1971,
+      "storyboard_id": 1013,
+      "work_ms": 187921,
+      "model_ms": 74466,
+      "queue_ms": 4,
+      "call_count": 3,
+      "started_at": 1794939970303,
+      "finished_at": 1794940158224
+    },
+    {
+      "id": 1975,
+      "storyboard_id": 1015,
+      "work_ms": 188369,
+      "model_ms": 75406,
+      "queue_ms": 5,
+      "call_count": 3,
+      "started_at": 1794940158225,
+      "finished_at": 1794940346594
+    },
+    {
+      "id": 1976,
+      "storyboard_id": 1016,
+      "work_ms": 227675,
+      "model_ms": 127453,
+      "queue_ms": 3,
+      "call_count": 4,
+      "started_at": 1794940346594,
+      "finished_at": 1794940574269
+    },
+    {
+      "id": 1978,
+      "storyboard_id": 1017,
+      "work_ms": 227837,
+      "model_ms": 126730,
+      "queue_ms": 6,
+      "call_count": 4,
+      "started_at": 1794940574269,
+      "finished_at": 1794940802106
+    },
+    {
+      "id": 1980,
+      "storyboard_id": 1018,
+      "work_ms": 173275,
+      "model_ms": 66053,
+      "queue_ms": 3,
+      "call_count": 3,
+      "started_at": 1794940802127,
+      "finished_at": 1794940975402
+    },
+    {
+      "id": 1981,
+      "storyboard_id": 1020,
+      "work_ms": 289133,
+      "model_ms": 125173,
+      "queue_ms": 5,
+      "call_count": 4,
+      "started_at": 1794940975403,
+      "finished_at": 1794941264536
+    },
+    {
+      "id": 1983,
+      "storyboard_id": 1021,
+      "work_ms": 239438,
+      "model_ms": 168050,
+      "queue_ms": 5,
+      "call_count": 4,
+      "started_at": 1794941264536,
+      "finished_at": 1794941503974
+    },
+    {
+      "id": 1985,
+      "storyboard_id": 1022,
+      "work_ms": 203066,
+      "model_ms": 80641,
+      "queue_ms": 7,
+      "call_count": 4,
+      "started_at": 1794941503974,
+      "finished_at": 1794941707040
+    },
+    {
+      "id": 1987,
+      "storyboard_id": 1023,
+      "work_ms": 186994,
+      "model_ms": 77943,
+      "queue_ms": 4,
+      "call_count": 3,
+      "started_at": 1794941707041,
+      "finished_at": 1794941894035
+    },
+    {
+      "id": 1989,
+      "storyboard_id": 1024,
+      "work_ms": 333312,
+      "model_ms": 85972,
+      "queue_ms": 5,
+      "call_count": 3,
+      "started_at": 1794941894036,
+      "finished_at": 1794942227348
+    },
+    {
+      "id": 1991,
+      "storyboard_id": 1032,
+      "work_ms": 182772,
+      "model_ms": 75146,
+      "queue_ms": 4,
+      "call_count": 3,
+      "started_at": 1794942227349,
+      "finished_at": 1794942410121
+    },
+    {
+      "id": 1993,
+      "storyboard_id": 1033,
+      "work_ms": 209245,
+      "model_ms": 75102,
+      "queue_ms": 3,
+      "call_count": 3,
+      "started_at": 1794942410121,
+      "finished_at": 1794942619366
+    }
+  ],
+  "task_4282": {
+    "id": 4282,
+    "status": "processing",
+    "params": "{\"kind\":\"video_prompts\",\"progress\":{\"completed\":63,\"failed\":0,\"total\":74,\"current_storyboard_id\":1333},\"storyboardIds\":[1267,1269,1340,1341,1270,1271,1346,1273,1274,1277,1276,1278,1275,1280,1279,1351,1281,1283,1282,1359,1286,1287,1288,1361,1289,1285,1291,1293,1292,1295,1296,1299,1301,1294,1305,1302,1303,1300,1308,1311,1304,1312,1315,1316,1319,1309,1323,1325,1324,1329,1314,1330,1317,1318,1331,1320,1321,1335,1336,1334,1326,1327,1350,1333,1352,1353,1355,1332,1356,1363,1357,1364,1354,1358],\"configId\":1,\"stage\":\"video_prompts\",\"model_used\":{\"config_id\":16,\"provider\":\"openai\",\"model\":\"qwen4-max-preview\",\"name\":\"Qwen4 Max Preview (Bailian)\",\"vision\":true},\"restart\":{\"kind\":\"video_prompts\",\"args\":{\"episodeId\":30,\"dramaId\":20,\"opts\":{},\"storyboardIds\":[1267,1269,1340,1341,1270,1271,1346,1273,1274,1277,1276,1278,1275,1280,1279,1351,1281,1283,1282,1359,1286,1287,1288,1361,1289,1285,1291,1293,1292,1295,1296,1299,1301,1294,1305,1302,1303,1300,1308,1311,1312,1315,1316,1319,1309,1323,1325,1324,1329,1314,1330,1317,1318,1331,1320,1321,1335,1336,1334,1327,1350,1333,1352,1353,1355,1332,1356,1363,1357,1364,1354,1358]}},\"work_plan\":{\"stage\":\"video_prompts\",\"unit\":\"shot\",\"sample_key\":\"video_prompts|cfg:1|model:glm-5.3-flash\",\"planned_units\":74,\"planned_source_chars\":3714,\"items\":[{\"storyboard_id\":1267,\"storyboard_number\":18,\"source_chars\":58},{\"storyboard_id\":1269,\"storyboard_number\":19,\"source_chars\":41},{\"storyboard_id\":1340,\"storyboard_number\":20,\"source_chars\":71},{\"storyboard_id\":1341,\"storyboard_number\":22,\"source_chars\":19},{\"storyboard_id\":1270,\"storyboard_number\":23,\"source_chars\":77},{\"storyboard_id\":1271,\"storyboard_number\":25,\"source_chars\":78},{\"storyboard_id\":1346,\"storyboard_number\":26,\"source_chars\":74},{\"storyboard_id\":1273,\"storyboard_number\":28,\"source_chars\":44},{\"storyboard_id\":1274,\"storyboard_number\":29,\"source_chars\":33},{\"storyboard_id\":1277,\"storyboard_number\":30,\"source_chars\":33},{\"storyboard_id\":1276,\"storyboard_number\":31,\"source_chars\":43},{\"storyboard_id\":1278,\"storyboard_number\":32,\"source_chars\":57},{\"storyboard_id\":1275,\"storyboard_number\":33,\"source_chars\":57},{\"storyboard_id\":1280,\"storyboard_number\":34,\"source_chars\":31},{\"storyboard_id\":1279,\"storyboard_number\":35,\"source_chars\":68},{\"storyboard_id\":1351,\"storyboard_number\":36,\"source_chars\":52},{\"storyboard_id\":1281,\"storyboard_number\":37,\"source_chars\":61},{\"storyboard_id\":1283,\"storyboard_number\":38,\"source_chars\":39},{\"storyboard_id\":1282,\"storyboard_number\":39,\"source_chars\":64},{\"storyboard_id\":1359,\"storyboard_number\":40,\"source_chars\":62},{\"storyboard_id\":1286,\"storyboard_number\":41,\"source_chars\":56},{\"storyboard_id\":1287,\"storyboard_number\":44,\"source_chars\":24},{\"storyboard_id\":1288,\"storyboard_number\":45,\"source_chars\":43},{\"storyboard_id\":1361,\"storyboard_number\":46,\"source_chars\":45},{\"storyboard_id\":1289,\"storyboard_number\":47,\"source_chars\":68},{\"storyboard_id\":1285,\"storyboard_number\":48,\"source_chars\":70},{\"storyboard_id\":1291,\"storyboard_number\":50,\"source_chars\":50},{\"storyboard_id\":1293,\"storyboard_number\":51,\"source_chars\":58},{\"storyboard_id\":1292,\"storyboard_number\":52,\"source_chars\":45},{\"storyboard_id\":1295,\"storyboard_number\":53,\"source_chars\":38},{\"storyboard_id\":1296,\"storyboard_number\":54,\"source_chars\":45},{\"storyboard_id\":1299,\"storyboard_number\":55,\"source_chars\":67},{\"storyboard_id\":1301,\"storyboard_number\":57,\"source_chars\":33},{\"storyboard_id\":1294,\"storyboard_number\":58,\"source_chars\":72},{\"storyboard_id\":1305,\"storyboard_number\":59,\"source_chars\":37},{\"storyboard_id\":1302,\"storyboard_number\":60,\"source_chars\":57},{\"storyboard_id\":1303,\"storyboard_number\":61,\"source_chars\":48},{\"storyboard_id\":1300,\"storyboard_number\":63,\"source_chars\":66},{\"storyboard_id\":1308,\"storyboard_number\":64,\"source_chars\":37},{\"storyboard_id\":1311,\"storyboard_number\":65,\"source_chars\":35},{\"storyboard_id\":1304,\"storyboard_number\":66,\"source_chars\":34},{\"storyboard_id\":1312,\"storyboard_number\":68,\"source_chars\":53},{\"storyboard_id\":1315,\"storyboard_number\":69,\"source_chars\":54},{\"storyboard_id\":1316,\"storyboard_number\":71,\"source_chars\":51},{\"storyboard_id\":1319,\"storyboard_number\":72,\"source_chars\":66},{\"storyboard_id\":1309,\"storyboard_number\":76,\"source_chars\":41},{\"storyboard_id\":1323,\"storyboard_number\":77,\"source_chars\":67},{\"storyboard_id\":1325,\"storyboard_number\":78,\"source_chars\":12},{\"storyboard_id\":1324,\"storyboard_number\":79,\"source_chars\":25},{\"storyboard_id\":1329,\"storyboard_number\":80,\"source_chars\":44},{\"storyboard_id\":1314,\"storyboard_number\":82,\"source_chars\":71},{\"storyboard_id\":1330,\"storyboard_number\":83,\"source_chars\":75},{\"storyboard_id\":1317,\"storyboard_number\":85,\"source_chars\":66},{\"storyboard_id\":1318,\"storyboard_number\":86,\"source_chars\":52},{\"storyboard_id\":1331,\"storyboard_number\":87,\"source_chars\":58},{\"storyboard_id\":1320,\"storyboard_number\":88,\"source_chars\":43},{\"storyboard_id\":1321,\"storyboard_number\":89,\"source_chars\":46},{\"storyboard_id\":1335,\"storyboard_number\":90,\"source_chars\":29},{\"storyboard_id\":1336,\"storyboard_number\":91,\"source_chars\":48},{\"storyboard_id\":1334,\"storyboard_number\":92,\"source_chars\":50},{\"storyboard_id\":1326,\"storyboard_number\":95,\"source_chars\":78},{\"storyboard_id\":1327,\"storyboard_number\":96,\"source_chars\":73},{\"storyboard_id\":1350,\"storyboard_number\":99,\"source_chars\":20},{\"storyboard_id\":1333,\"storyboard_number\":100,\"source_chars\":65},{\"storyboard_id\":1352,\"storyboard_number\":102,\"source_chars\":28},{\"storyboard_id\":1353,\"storyboard_number\":103,\"source_chars\":62},{\"storyboard_id\":1355,\"storyboard_number\":104,\"source_chars\":30},{\"storyboard_id\":1332,\"storyboard_number\":105,\"source_chars\":59},{\"storyboard_id\":1356,\"storyboard_number\":106,\"source_chars\":31},{\"storyboard_id\":1363,\"storyboard_number\":107,\"source_chars\":52},{\"storyboard_id\":1357,\"storyboard_number\":108,\"source_chars\":48},{\"storyboard_id\":1364,\"storyboard_number\":109,\"source_chars\":45},{\"storyboard_id\":1354,\"storyboard_number\":110,\"source_chars\":40},{\"storyboard_id\":1358,\"storyboard_number\":112,\"source_chars\":42}]},\"reasoning_chars\":91391}",
+    "created_at": "2026-11-17T17:16:09.511Z"
+  },
+  "task_4283": {
+    "id": 4283,
+    "status": "processing",
+    "params": "{\"kind\":\"video_prompts\",\"progress\":{\"completed\":53,\"failed\":0,\"total\":60,\"current_storyboard_id\":1035},\"storyboardIds\":[932,943,947,950,948,949,951,953,954,957,960,965,966,969,972,973,974,979,986,987,989,990,991,997,992,994,995,996,999,1000,1001,998,1002,1003,1004,1005,1006,1009,1010,1011,1012,1013,1015,1016,1017,1018,1020,1021,1022,1023,1024,1032,1033,1035,1036,1037,1040,1041,1042,1043],\"configId\":1,\"stage\":\"video_prompts\",\"model_used\":{\"config_id\":1,\"name\":\"GLM 5.3 (local)\",\"provider\":\"openai\",\"model\":\"glm-5.3-flash\",\"vision\":false},\"restart\":{\"kind\":\"video_prompts\",\"args\":{\"episodeId\":27,\"dramaId\":20,\"opts\":{},\"storyboardIds\":[932,943,947,950,948,949,951,953,954,957,960,965,966,969,972,973,974,979,986,987,989,990,991,997,992,994,995,996,999,1000,1001,998,1002,1003,1004,1005,1006,1009,1010,1011,1012,1013,1015,1016,1017,1018,1020,1021,1022,1023,1024,1032,1033,1035,1036,1037,1040,1041,1042,1043]}},\"work_plan\":{\"stage\":\"video_prompts\",\"unit\":\"shot\",\"sample_key\":\"video_prompts|cfg:1|model:glm-5.3-flash\",\"planned_units\":60,\"planned_source_chars\":3015,\"items\":[{\"storyboard_id\":932,\"storyboard_number\":2,\"source_chars\":48},{\"storyboard_id\":943,\"storyboard_number\":13,\"source_chars\":42},{\"storyboard_id\":947,\"storyboard_number\":17,\"source_chars\":32},{\"storyboard_id\":950,\"storyboard_number\":18,\"source_chars\":58},{\"storyboard_id\":948,\"storyboard_number\":19,\"source_chars\":41},{\"storyboard_id\":949,\"storyboard_number\":20,\"source_chars\":44},{\"storyboard_id\":951,\"storyboard_number\":21,\"source_chars\":27},{\"storyboard_id\":953,\"storyboard_number\":23,\"source_chars\":55},{\"storyboard_id\":954,\"storyboard_number\":24,\"source_chars\":41},{\"storyboard_id\":957,\"storyboard_number\":27,\"source_chars\":69},{\"storyboard_id\":960,\"storyboard_number\":30,\"source_chars\":44},{\"storyboard_id\":965,\"storyboard_number\":35,\"source_chars\":57},{\"storyboard_id\":966,\"storyboard_number\":36,\"source_chars\":31},{\"storyboard_id\":969,\"storyboard_number\":39,\"source_chars\":61},{\"storyboard_id\":972,\"storyboard_number\":42,\"source_chars\":31},{\"storyboard_id\":973,\"storyboard_number\":43,\"source_chars\":62},{\"storyboard_id\":974,\"storyboard_number\":44,\"source_chars\":56},{\"storyboard_id\":979,\"storyboard_number\":49,\"source_chars\":45},{\"storyboard_id\":986,\"storyboard_number\":56,\"source_chars\":45},{\"storyboard_id\":987,\"storyboard_number\":57,\"source_chars\":37},{\"storyboard_id\":989,\"storyboard_number\":59,\"source_chars\":67},{\"storyboard_id\":990,\"storyboard_number\":60,\"source_chars\":63},{\"storyboard_id\":991,\"storyboard_number\":61,\"source_chars\":72},{\"storyboard_id\":997,\"storyboard_number\":62,\"source_chars\":66},{\"storyboard_id\":992,\"storyboard_number\":63,\"source_chars\":76},{\"storyboard_id\":994,\"storyboard_number\":65,\"source_chars\":66},{\"storyboard_id\":995,\"storyboard_number\":66,\"source_chars\":72},{\"storyboard_id\":996,\"storyboard_number\":67,\"source_chars\":79},{\"storyboard_id\":999,\"storyboard_number\":68,\"source_chars\":53},{\"storyboard_id\":1000,\"storyboard_number\":69,\"source_chars\":54},{\"storyboard_id\":1001,\"storyboard_number\":70,\"source_chars\":29},{\"storyboard_id\":998,\"storyboard_number\":71,\"source_chars\":51},{\"storyboard_id\":1002,\"storyboard_number\":72,\"source_chars\":66},{\"storyboard_id\":1003,\"storyboard_number\":73,\"source_chars\":65},{\"storyboard_id\":1004,\"storyboard_number\":74,\"source_chars\":57},{\"storyboard_id\":1005,\"storyboard_number\":75,\"source_chars\":53},{\"storyboard_id\":1006,\"storyboard_number\":76,\"source_chars\":17},{\"storyboard_id\":1009,\"storyboard_number\":79,\"source_chars\":38},{\"storyboard_id\":1010,\"storyboard_number\":80,\"source_chars\":25},{\"storyboard_id\":1011,\"storyboard_number\":81,\"source_chars\":44},{\"storyboard_id\":1012,\"storyboard_number\":82,\"source_chars\":61},{\"storyboard_id\":1013,\"storyboard_number\":86,\"source_chars\":29},{\"storyboard_id\":1015,\"storyboard_number\":88,\"source_chars\":19},{\"storyboard_id\":1016,\"storyboard_number\":89,\"source_chars\":66},{\"storyboard_id\":1017,\"storyboard_number\":90,\"source_chars\":52},{\"storyboard_id\":1018,\"storyboard_number\":91,\"source_chars\":58},{\"storyboard_id\":1020,\"storyboard_number\":92,\"source_chars\":43},{\"storyboard_id\":1021,\"storyboard_number\":93,\"source_chars\":27},{\"storyboard_id\":1022,\"storyboard_number\":94,\"source_chars\":48},{\"storyboard_id\":1023,\"storyboard_number\":95,\"source_chars\":48},{\"storyboard_id\":1024,\"storyboard_number\":96,\"source_chars\":77},{\"storyboard_id\":1032,\"storyboard_number\":102,\"source_chars\":65},{\"storyboard_id\":1033,\"storyboard_number\":103,\"source_chars\":68},{\"storyboard_id\":1035,\"storyboard_number\":105,\"source_chars\":30},{\"storyboard_id\":1036,\"storyboard_number\":106,\"source_chars\":59},{\"storyboard_id\":1037,\"storyboard_number\":107,\"source_chars\":31},{\"storyboard_id\":1040,\"storyboard_number\":110,\"source_chars\":45},{\"storyboard_id\":1041,\"storyboard_number\":111,\"source_chars\":64},{\"storyboard_id\":1042,\"storyboard_number\":112,\"source_chars\":44},{\"storyboard_id\":1043,\"storyboard_number\":113,\"source_chars\":42}]},\"reasoning_chars\":138734}",
+    "created_at": "2026-11-17T17:17:19.339Z"
+  },
+  "in_flight": [
+    {
+      "id": 1003,
+      "type": "text",
+      "status": "processing",
+      "episode_id": 15,
+      "kind": "asset_pipeline",
+      "updated_at": "2026-11-06T08:56:09.749Z"
+    },
+    {
+      "id": 1004,
+      "type": "text",
+      "status": "processing",
+      "episode_id": 15,
+      "kind": "asset_pipeline",
+      "updated_at": "2026-11-06T08:57:42.054Z"
+    },
+    {
+      "id": 1203,
+      "type": "text",
+      "status": "processing",
+      "episode_id": 15,
+      "kind": "asset_pipeline",
+      "updated_at": "2026-11-07T16:36:10.105Z"
+    },
+    {
+      "id": 1264,
+      "type": "text",
+      "status": "processing",
+      "episode_id": 16,
+      "kind": "asset_pipeline",
+      "updated_at": "2026-11-08T15:18:27.211Z"
+    },
+    {
+      "id": 4282,
+      "type": "text",
+      "status": "processing",
+      "episode_id": 30,
+      "kind": "video_prompts",
+      "updated_at": "2026-11-17T19:12:05.837Z"
+    },
+    {
+      "id": 4283,
+      "type": "text",
+      "status": "processing",
+      "episode_id": 27,
+      "kind": "video_prompts",
+      "updated_at": "2026-11-17T19:10:19.377Z"
+    },
+    {
+      "id": 4305,
+      "type": "video",
+      "status": "processing",
+      "episode_id": 30,
+      "kind": null,
+      "updated_at": "2026-11-17T19:11:56.969Z"
+    },
+    {
+      "id": 4306,
+      "type": "video",
+      "status": "queued",
+      "episode_id": 30,
+      "kind": null,
+      "updated_at": "2026-11-17T19:11:57.393Z"
+    }
+  ]
+}

@@ -1,0 +1,188 @@
+{
+  "window": {
+    "start": 1794946613953,
+    "end": 1794946853953
+  },
+  "stages": {
+    "video_prompts": 12,
+    "keyframe_prompts": 4
+  },
+  "works": [
+    {
+      "id": 2197,
+      "task_id": 4346,
+      "stage": "video_prompts",
+      "status": "completed",
+      "started_at": 1794946616036,
+      "finished_at": 1794946670612,
+      "work_ms": 54576,
+      "model_ms": 24879,
+      "agent_gate_ms": 25770
+    },
+    {
+      "id": 2198,
+      "task_id": 4348,
+      "stage": "keyframe_prompts",
+      "status": "completed",
+      "started_at": 1794946624372,
+      "finished_at": 1794946673320,
+      "work_ms": 48948,
+      "model_ms": 21443,
+      "agent_gate_ms": 23392
+    },
+    {
+      "id": 2199,
+      "task_id": 4355,
+      "stage": "video_prompts",
+      "status": "completed",
+      "started_at": 1794946641811,
+      "finished_at": 1794946692593,
+      "work_ms": 50782,
+      "model_ms": 18019,
+      "agent_gate_ms": 28799
+    },
+    {
+      "id": 2200,
+      "task_id": 4347,
+      "stage": "video_prompts",
+      "status": "completed",
+      "started_at": 1794946647764,
+      "finished_at": 1794946705818,
+      "work_ms": 58054,
+      "model_ms": 25553,
+      "agent_gate_ms": 25555
+    },
+    {
+      "id": 2201,
+      "task_id": 4346,
+      "stage": "video_prompts",
+      "status": "completed",
+      "started_at": 1794946670612,
+      "finished_at": 1794946716545,
+      "work_ms": 45933,
+      "model_ms": 22686,
+      "agent_gate_ms": 21980
+    },
+    {
+      "id": 2202,
+      "task_id": 4355,
+      "stage": "video_prompts",
+      "status": "completed",
+      "started_at": 1794946692593,
+      "finished_at": 1794946736649,
+      "work_ms": 44056,
+      "model_ms": 27098,
+      "agent_gate_ms": 13223
+    },
+    {
+      "id": 2203,
+      "task_id": 4347,
+      "stage": "video_prompts",
+      "status": "completed",
+      "started_at": 1794946705818,
+      "finished_at": 1794946761921,
+      "work_ms": 56103,
+      "model_ms": 42151,
+      "agent_gate_ms": 10727
+    },
+    {
+      "id": 2204,
+      "task_id": 4356,
+      "stage": "keyframe_prompts",
+      "status": "completed",
+      "started_at": 1794946710506,
+      "finished_at": 1794946759117,
+      "work_ms": 48611,
+      "model_ms": 22094,
+      "agent_gate_ms": 26142
+    },
+    {
+      "id": 2205,
+      "task_id": 4346,
+      "stage": "video_prompts",
+      "status": "completed",
+      "started_at": 1794946716545,
+      "finished_at": 1794946780095,
+      "work_ms": 63550,
+      "model_ms": 20563,
+      "agent_gate_ms": 42570
+    },
+    {
+      "id": 2206,
+      "task_id": 4355,
+      "stage": "video_prompts",
+      "status": "completed",
+      "started_at": 1794946736649,
+      "finished_at": 1794946856201,
+      "work_ms": 119552,
+      "model_ms": 55607,
+      "agent_gate_ms": 63251
+    },
+    {
+      "id": 2207,
+      "task_id": 4356,
+      "stage": "keyframe_prompts",
+      "status": "completed",
+      "started_at": 1794946759117,
+      "finished_at": 1794946804638,
+      "work_ms": 45521,
+      "model_ms": 24051,
+      "agent_gate_ms": 20976
+    },
+    {
+      "id": 2208,
+      "task_id": 4347,
+      "stage": "video_prompts",
+      "status": "completed",
+      "started_at": 1794946761921,
+      "finished_at": 1794946835519,
+      "work_ms": 73598,
+      "model_ms": 46991,
+      "agent_gate_ms": 26059
+    },
+    {
+      "id": 2209,
+      "task_id": 4346,
+      "stage": "video_prompts",
+      "status": "completed",
+      "started_at": 1794946780095,
+      "finished_at": 1794946825967,
+      "work_ms": 45872,
+      "model_ms": 20923,
+      "agent_gate_ms": 24540
+    },
+    {
+      "id": 2210,
+      "task_id": 4356,
+      "stage": "keyframe_prompts",
+      "status": "completed",
+      "started_at": 1794946804639,
+      "finished_at": 1794946857032,
+      "work_ms": 52393,
+      "model_ms": 21137,
+      "agent_gate_ms": 30880
+    },
+    {
+      "id": 2211,
+      "task_id": 4346,
+      "stage": "video_prompts",
+      "status": "processing",
+      "started_at": 1794946825967,
+      "finished_at": null,
+      "work_ms": 35002,
+      "model_ms": 900,
+      "agent_gate_ms": 30232
+    },
+    {
+      "id": 2212,
+      "task_id": 4347,
+      "stage": "video_prompts",
+      "status": "processing",
+      "started_at": 1794946835519,
+      "finished_at": null,
+      "work_ms": 30002,
+      "model_ms": 1637,
+      "agent_gate_ms": 21511
+    }
+  ]
+}

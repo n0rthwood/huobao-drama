@@ -1,0 +1,881 @@
+{
+  "report": {
+    "started_at": "2026-11-17T19:42:23.117Z",
+    "samples": 122,
+    "ok": 122,
+    "p50": 367,
+    "p90": 3686,
+    "p95": 3930,
+    "max": 4662,
+    "by_path": [
+      {
+        "path": "/health",
+        "n": 61,
+        "p95": 3989,
+        "max": 4662
+      },
+      {
+        "path": "/tasks/active",
+        "n": 61,
+        "p95": 3896,
+        "max": 3990
+      }
+    ]
+  },
+  "samples": [
+    {
+      "at": 1794944544027,
+      "elapsed_ms": 910,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 909
+    },
+    {
+      "at": 1794944548954,
+      "elapsed_ms": 5837,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 3426
+    },
+    {
+      "at": 1794944550537,
+      "elapsed_ms": 7420,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 83
+    },
+    {
+      "at": 1794944552325,
+      "elapsed_ms": 9208,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 288
+    },
+    {
+      "at": 1794944553986,
+      "elapsed_ms": 10869,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 159
+    },
+    {
+      "at": 1794944558601,
+      "elapsed_ms": 15484,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 3115
+    },
+    {
+      "at": 1794944560473,
+      "elapsed_ms": 17356,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 370
+    },
+    {
+      "at": 1794944562025,
+      "elapsed_ms": 18908,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 52
+    },
+    {
+      "at": 1794944564134,
+      "elapsed_ms": 21017,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 608
+    },
+    {
+      "at": 1794944569254,
+      "elapsed_ms": 26137,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 3619
+    },
+    {
+      "at": 1794944570986,
+      "elapsed_ms": 27869,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 232
+    },
+    {
+      "at": 1794944572615,
+      "elapsed_ms": 29498,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 128
+    },
+    {
+      "at": 1794944574240,
+      "elapsed_ms": 31123,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 125
+    },
+    {
+      "at": 1794944579428,
+      "elapsed_ms": 36311,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 3686
+    },
+    {
+      "at": 1794944581108,
+      "elapsed_ms": 37991,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 180
+    },
+    {
+      "at": 1794944582939,
+      "elapsed_ms": 39822,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 331
+    },
+    {
+      "at": 1794944584807,
+      "elapsed_ms": 41690,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 367
+    },
+    {
+      "at": 1794944589380,
+      "elapsed_ms": 46263,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 3072
+    },
+    {
+      "at": 1794944590999,
+      "elapsed_ms": 47882,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 119
+    },
+    {
+      "at": 1794944592524,
+      "elapsed_ms": 49407,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 23
+    },
+    {
+      "at": 1794944594028,
+      "elapsed_ms": 50911,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 3
+    },
+    {
+      "at": 1794944595558,
+      "elapsed_ms": 52441,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 29
+    },
+    {
+      "at": 1794944597064,
+      "elapsed_ms": 53947,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 4
+    },
+    {
+      "at": 1794944598579,
+      "elapsed_ms": 55462,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 15
+    },
+    {
+      "at": 1794944600083,
+      "elapsed_ms": 56966,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 2
+    },
+    {
+      "at": 1794944602121,
+      "elapsed_ms": 59004,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 538
+    },
+    {
+      "at": 1794944603626,
+      "elapsed_ms": 60509,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 4
+    },
+    {
+      "at": 1794944605153,
+      "elapsed_ms": 62036,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 26
+    },
+    {
+      "at": 1794944606657,
+      "elapsed_ms": 63540,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 4
+    },
+    {
+      "at": 1794944608180,
+      "elapsed_ms": 65063,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 23
+    },
+    {
+      "at": 1794944609686,
+      "elapsed_ms": 66569,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 3
+    },
+    {
+      "at": 1794944611223,
+      "elapsed_ms": 68106,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 37
+    },
+    {
+      "at": 1794944612725,
+      "elapsed_ms": 69608,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 2
+    },
+    {
+      "at": 1794944614740,
+      "elapsed_ms": 71623,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 514
+    },
+    {
+      "at": 1794944616243,
+      "elapsed_ms": 73126,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 3
+    },
+    {
+      "at": 1794944617774,
+      "elapsed_ms": 74657,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 31
+    },
+    {
+      "at": 1794944619278,
+      "elapsed_ms": 76161,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 1
+    },
+    {
+      "at": 1794944620797,
+      "elapsed_ms": 77680,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 18
+    },
+    {
+      "at": 1794944622819,
+      "elapsed_ms": 79702,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 521
+    },
+    {
+      "at": 1794944624656,
+      "elapsed_ms": 81539,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 337
+    },
+    {
+      "at": 1794944629200,
+      "elapsed_ms": 86083,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 3042
+    },
+    {
+      "at": 1794944630809,
+      "elapsed_ms": 87692,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 109
+    },
+    {
+      "at": 1794944632312,
+      "elapsed_ms": 89195,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 2
+    },
+    {
+      "at": 1794944633835,
+      "elapsed_ms": 90718,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 23
+    },
+    {
+      "at": 1794944635902,
+      "elapsed_ms": 92785,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 566
+    },
+    {
+      "at": 1794944637417,
+      "elapsed_ms": 94300,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 14
+    },
+    {
+      "at": 1794944638919,
+      "elapsed_ms": 95802,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 2
+    },
+    {
+      "at": 1794944641638,
+      "elapsed_ms": 98521,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 1218
+    },
+    {
+      "at": 1794944643141,
+      "elapsed_ms": 100024,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 1
+    },
+    {
+      "at": 1794944644659,
+      "elapsed_ms": 101542,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 18
+    },
+    {
+      "at": 1794944646160,
+      "elapsed_ms": 103043,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 1
+    },
+    {
+      "at": 1794944647676,
+      "elapsed_ms": 104559,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 15
+    },
+    {
+      "at": 1794944649598,
+      "elapsed_ms": 106481,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 421
+    },
+    {
+      "at": 1794944651469,
+      "elapsed_ms": 108352,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 370
+    },
+    {
+      "at": 1794944656119,
+      "elapsed_ms": 113002,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 3148
+    },
+    {
+      "at": 1794944657964,
+      "elapsed_ms": 114847,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 344
+    },
+    {
+      "at": 1794944660326,
+      "elapsed_ms": 117209,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 862
+    },
+    {
+      "at": 1794944665587,
+      "elapsed_ms": 122470,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 3760
+    },
+    {
+      "at": 1794944667089,
+      "elapsed_ms": 123972,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 1
+    },
+    {
+      "at": 1794944668605,
+      "elapsed_ms": 125488,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 15
+    },
+    {
+      "at": 1794944670107,
+      "elapsed_ms": 126990,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 1
+    },
+    {
+      "at": 1794944671627,
+      "elapsed_ms": 128510,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 20
+    },
+    {
+      "at": 1794944673130,
+      "elapsed_ms": 130013,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 1
+    },
+    {
+      "at": 1794944674646,
+      "elapsed_ms": 131529,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 16
+    },
+    {
+      "at": 1794944676148,
+      "elapsed_ms": 133031,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 1
+    },
+    {
+      "at": 1794944677663,
+      "elapsed_ms": 134546,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 15
+    },
+    {
+      "at": 1794944679167,
+      "elapsed_ms": 136050,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 1
+    },
+    {
+      "at": 1794944680683,
+      "elapsed_ms": 137566,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 15
+    },
+    {
+      "at": 1794944683220,
+      "elapsed_ms": 140103,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 1036
+    },
+    {
+      "at": 1794944685481,
+      "elapsed_ms": 142364,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 760
+    },
+    {
+      "at": 1794944687319,
+      "elapsed_ms": 144202,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 338
+    },
+    {
+      "at": 1794944691912,
+      "elapsed_ms": 148795,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 3092
+    },
+    {
+      "at": 1794944693874,
+      "elapsed_ms": 150757,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 462
+    },
+    {
+      "at": 1794944695807,
+      "elapsed_ms": 152690,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 433
+    },
+    {
+      "at": 1794944697443,
+      "elapsed_ms": 154326,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 135
+    },
+    {
+      "at": 1794944702031,
+      "elapsed_ms": 158914,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 3088
+    },
+    {
+      "at": 1794944703922,
+      "elapsed_ms": 160805,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 390
+    },
+    {
+      "at": 1794944706621,
+      "elapsed_ms": 163504,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 1199
+    },
+    {
+      "at": 1794944712055,
+      "elapsed_ms": 168938,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 3933
+    },
+    {
+      "at": 1794944714231,
+      "elapsed_ms": 171114,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 675
+    },
+    {
+      "at": 1794944716830,
+      "elapsed_ms": 173713,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 1099
+    },
+    {
+      "at": 1794944721562,
+      "elapsed_ms": 178445,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 3232
+    },
+    {
+      "at": 1794944723139,
+      "elapsed_ms": 180022,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 77
+    },
+    {
+      "at": 1794944725735,
+      "elapsed_ms": 182618,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 1095
+    },
+    {
+      "at": 1794944731651,
+      "elapsed_ms": 188534,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 4416
+    },
+    {
+      "at": 1794944733508,
+      "elapsed_ms": 190391,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 356
+    },
+    {
+      "at": 1794944735782,
+      "elapsed_ms": 192665,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 773
+    },
+    {
+      "at": 1794944740916,
+      "elapsed_ms": 197799,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 3634
+    },
+    {
+      "at": 1794944743157,
+      "elapsed_ms": 200040,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 741
+    },
+    {
+      "at": 1794944744990,
+      "elapsed_ms": 201873,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 333
+    },
+    {
+      "at": 1794944749794,
+      "elapsed_ms": 206677,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 3304
+    },
+    {
+      "at": 1794944752032,
+      "elapsed_ms": 208915,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 737
+    },
+    {
+      "at": 1794944753873,
+      "elapsed_ms": 210756,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 341
+    },
+    {
+      "at": 1794944758652,
+      "elapsed_ms": 215535,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 3278
+    },
+    {
+      "at": 1794944760526,
+      "elapsed_ms": 217409,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 373
+    },
+    {
+      "at": 1794944762860,
+      "elapsed_ms": 219743,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 834
+    },
+    {
+      "at": 1794944768084,
+      "elapsed_ms": 224967,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 3723
+    },
+    {
+      "at": 1794944769599,
+      "elapsed_ms": 226482,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 15
+    },
+    {
+      "at": 1794944772022,
+      "elapsed_ms": 228905,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 922
+    },
+    {
+      "at": 1794944777307,
+      "elapsed_ms": 234190,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 3785
+    },
+    {
+      "at": 1794944779263,
+      "elapsed_ms": 236146,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 455
+    },
+    {
+      "at": 1794944781847,
+      "elapsed_ms": 238730,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 1083
+    },
+    {
+      "at": 1794944787338,
+      "elapsed_ms": 244221,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 3989
+    },
+    {
+      "at": 1794944788992,
+      "elapsed_ms": 245875,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 154
+    },
+    {
+      "at": 1794944791368,
+      "elapsed_ms": 248251,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 875
+    },
+    {
+      "at": 1794944796859,
+      "elapsed_ms": 253742,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 3990
+    },
+    {
+      "at": 1794944798778,
+      "elapsed_ms": 255661,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 419
+    },
+    {
+      "at": 1794944801078,
+      "elapsed_ms": 257961,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 800
+    },
+    {
+      "at": 1794944806877,
+      "elapsed_ms": 263760,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 4299
+    },
+    {
+      "at": 1794944809138,
+      "elapsed_ms": 266021,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 760
+    },
+    {
+      "at": 1794944810969,
+      "elapsed_ms": 267852,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 330
+    },
+    {
+      "at": 1794944816366,
+      "elapsed_ms": 273249,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 3896
+    },
+    {
+      "at": 1794944818295,
+      "elapsed_ms": 275178,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 428
+    },
+    {
+      "at": 1794944820586,
+      "elapsed_ms": 277469,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 791
+    },
+    {
+      "at": 1794944826749,
+      "elapsed_ms": 283632,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 4662
+    },
+    {
+      "at": 1794944828972,
+      "elapsed_ms": 285855,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 722
+    },
+    {
+      "at": 1794944830811,
+      "elapsed_ms": 287694,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 338
+    },
+    {
+      "at": 1794944836243,
+      "elapsed_ms": 293126,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 3930
+    },
+    {
+      "at": 1794944837754,
+      "elapsed_ms": 294637,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 10
+    },
+    {
+      "at": 1794944839398,
+      "elapsed_ms": 296281,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 144
+    },
+    {
+      "at": 1794944841038,
+      "elapsed_ms": 297921,
+      "path": "/health",
+      "status": 200,
+      "ttfb_ms": 139
+    },
+    {
+      "at": 1794944846454,
+      "elapsed_ms": 303337,
+      "path": "/tasks/active",
+      "status": 200,
+      "ttfb_ms": 3916
+    }
+  ]
+}

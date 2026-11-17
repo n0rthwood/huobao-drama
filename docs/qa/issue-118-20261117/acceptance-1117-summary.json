@@ -1,0 +1,85 @@
+{
+  "project": {
+    "drama_id": 23,
+    "title": "八达岭长城测试 1117",
+    "episode_id": 31,
+    "project_type": "documentary",
+    "aspect_ratio": "16:9"
+  },
+  "chain": {
+    "raw_content": "固定 224 字正文 + 出处行（content.md）",
+    "rewrite": {
+      "run_id": 22,
+      "task_id": 4310,
+      "model": "qwen4-max-preview",
+      "stages": "fidelity.v3 + bridge.v3",
+      "adopted": true
+    },
+    "inspect_narration": {
+      "findings": [],
+      "note": "出处行已被 prepared 剔除"
+    },
+    "script_confirm": {
+      "at": "2026-11-17T19:42:30Z",
+      "m1_script": "done"
+    },
+    "extract": {
+      "characters": 0,
+      "scenes": 2,
+      "props": 3,
+      "tasks": "characters/scenes/props 各一次 + 补提取 4341（城墙断面）"
+    },
+    "asset_review": {
+      "task_id": 4322,
+      "total": 17,
+      "have": 15,
+      "added": 1,
+      "ignored": 1,
+      "missing": 0,
+      "note": "961 exposition ignored（旁白承载，理由留痕）；5 条 prop_faithful 绑定地图 293（faithful=1）"
+    },
+    "skeleton": {
+      "shots": 5,
+      "coverage": "242/242 字",
+      "confirmed": true,
+      "revision": "3fb13c9ffcc8786c"
+    },
+    "voice": {
+      "task_id": 4352,
+      "completed": "5/5",
+      "model": "cosyvoice3",
+      "voice": "沉稳男声·冷静讲解（净化）"
+    },
+    "design_cards": {
+      "task_id": 4353,
+      "completed": "5/5",
+      "combos": "全 B（AI 首次填入）",
+      "confirmed": "5/5（audit 0 阻断）"
+    },
+    "keyframe_prompts": {
+      "task_id": 4354,
+      "status": "completed",
+      "completed": "5/5",
+      "failed": 0,
+      "works": 5,
+      "calls": 16,
+      "messages": 177,
+      "note": "1368 承接镜 first_frame_prompt 留空（inherits_first，规则正确）"
+    },
+    "video_prompts": {
+      "task_id": 4355,
+      "status": "completed",
+      "completed": "5/5",
+      "failed": 0,
+      "works": 5,
+      "calls": 19,
+      "messages": 212
+    }
+  },
+  "binding_consistency": {
+    "ep31": "5/5 镜 0 mismatch",
+    "ep30": "78/78 镜 0 mismatch",
+    "ep27": "75/75 镜 0 mismatch"
+  },
+  "not_covered": "Poster、图层段、关键帧出图、视频生成、合成、导出（验收①范围止于提示词批量）"
+}

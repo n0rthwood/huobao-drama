@@ -1,0 +1,277 @@
+{
+  "window": {
+    "start": 1794946998343,
+    "end": 1794947298343
+  },
+  "stages": {
+    "junction_caption": 2,
+    "keyframe_prompts": 8,
+    "video_prompts": 14
+  },
+  "works": [
+    {
+      "id": 2223,
+      "task_id": 4359,
+      "stage": "junction_caption",
+      "status": "completed",
+      "started_at": 1794946999761,
+      "finished_at": 1794947002693,
+      "work_ms": 2932,
+      "model_ms": 2930,
+      "agent_gate_ms": 0
+    },
+    {
+      "id": 2224,
+      "task_id": 4359,
+      "stage": "junction_caption",
+      "status": "completed",
+      "started_at": 1794947002726,
+      "finished_at": 1794947008355,
+      "work_ms": 5629,
+      "model_ms": 5627,
+      "agent_gate_ms": 0
+    },
+    {
+      "id": 2225,
+      "task_id": 4358,
+      "stage": "keyframe_prompts",
+      "status": "completed",
+      "started_at": 1794947006303,
+      "finished_at": 1794947032182,
+      "work_ms": 25879,
+      "model_ms": 25520,
+      "agent_gate_ms": 0
+    },
+    {
+      "id": 2226,
+      "task_id": 4361,
+      "stage": "keyframe_prompts",
+      "status": "failed",
+      "started_at": 1794947007303,
+      "finished_at": 1794947030518,
+      "work_ms": 23215,
+      "model_ms": 0,
+      "agent_gate_ms": 0
+    },
+    {
+      "id": 2227,
+      "task_id": 4359,
+      "stage": "video_prompts",
+      "status": "completed",
+      "started_at": 1794947008479,
+      "finished_at": 1794947101833,
+      "work_ms": 93354,
+      "model_ms": 69095,
+      "agent_gate_ms": 23699
+    },
+    {
+      "id": 2228,
+      "task_id": 4358,
+      "stage": "keyframe_prompts",
+      "status": "completed",
+      "started_at": 1794947032183,
+      "finished_at": 1794947063040,
+      "work_ms": 30857,
+      "model_ms": 25467,
+      "agent_gate_ms": 4999
+    },
+    {
+      "id": 2229,
+      "task_id": 4360,
+      "stage": "video_prompts",
+      "status": "completed",
+      "started_at": 1794947037185,
+      "finished_at": 1794947081865,
+      "work_ms": 44680,
+      "model_ms": 18087,
+      "agent_gate_ms": 25851
+    },
+    {
+      "id": 2230,
+      "task_id": 4360,
+      "stage": "video_prompts",
+      "status": "completed",
+      "started_at": 1794947081867,
+      "finished_at": 1794947129386,
+      "work_ms": 47519,
+      "model_ms": 46904,
+      "agent_gate_ms": 0
+    },
+    {
+      "id": 2231,
+      "task_id": 4359,
+      "stage": "video_prompts",
+      "status": "completed",
+      "started_at": 1794947101834,
+      "finished_at": 1794947119621,
+      "work_ms": 17787,
+      "model_ms": 17118,
+      "agent_gate_ms": 0
+    },
+    {
+      "id": 2232,
+      "task_id": 4362,
+      "stage": "keyframe_prompts",
+      "status": "completed",
+      "started_at": 1794947109809,
+      "finished_at": 1794947142289,
+      "work_ms": 32480,
+      "model_ms": 21761,
+      "agent_gate_ms": 9809
+    },
+    {
+      "id": 2233,
+      "task_id": 4359,
+      "stage": "video_prompts",
+      "status": "completed",
+      "started_at": 1794947119623,
+      "finished_at": 1794947151898,
+      "work_ms": 32275,
+      "model_ms": 22139,
+      "agent_gate_ms": 9762
+    },
+    {
+      "id": 2234,
+      "task_id": 4360,
+      "stage": "video_prompts",
+      "status": "completed",
+      "started_at": 1794947129386,
+      "finished_at": 1794947166885,
+      "work_ms": 37499,
+      "model_ms": 23966,
+      "agent_gate_ms": 12900
+    },
+    {
+      "id": 2235,
+      "task_id": 4362,
+      "stage": "keyframe_prompts",
+      "status": "completed",
+      "started_at": 1794947142290,
+      "finished_at": 1794947174766,
+      "work_ms": 32476,
+      "model_ms": 22313,
+      "agent_gate_ms": 9608
+    },
+    {
+      "id": 2236,
+      "task_id": 4359,
+      "stage": "video_prompts",
+      "status": "completed",
+      "started_at": 1794947151899,
+      "finished_at": 1794947183813,
+      "work_ms": 31914,
+      "model_ms": 16572,
+      "agent_gate_ms": 14986
+    },
+    {
+      "id": 2237,
+      "task_id": 4360,
+      "stage": "video_prompts",
+      "status": "completed",
+      "started_at": 1794947166886,
+      "finished_at": 1794947215350,
+      "work_ms": 48464,
+      "model_ms": 40041,
+      "agent_gate_ms": 7879
+    },
+    {
+      "id": 2238,
+      "task_id": 4362,
+      "stage": "keyframe_prompts",
+      "status": "completed",
+      "started_at": 1794947174767,
+      "finished_at": 1794947215703,
+      "work_ms": 40936,
+      "model_ms": 31532,
+      "agent_gate_ms": 9045
+    },
+    {
+      "id": 2239,
+      "task_id": 4359,
+      "stage": "video_prompts",
+      "status": "completed",
+      "started_at": 1794947183813,
+      "finished_at": 1794947245637,
+      "work_ms": 61824,
+      "model_ms": 29248,
+      "agent_gate_ms": 31535
+    },
+    {
+      "id": 2240,
+      "task_id": 4360,
+      "stage": "video_prompts",
+      "status": "completed",
+      "started_at": 1794947215351,
+      "finished_at": 1794947239938,
+      "work_ms": 24587,
+      "model_ms": 23603,
+      "agent_gate_ms": 350
+    },
+    {
+      "id": 2241,
+      "task_id": 4360,
+      "stage": "video_prompts",
+      "status": "completed",
+      "started_at": 1794947239939,
+      "finished_at": 1794947281818,
+      "work_ms": 41879,
+      "model_ms": 41351,
+      "agent_gate_ms": 0
+    },
+    {
+      "id": 2242,
+      "task_id": 4359,
+      "stage": "video_prompts",
+      "status": "completed",
+      "started_at": 1794947245639,
+      "finished_at": 1794947273239,
+      "work_ms": 27600,
+      "model_ms": 23019,
+      "agent_gate_ms": 0
+    },
+    {
+      "id": 2243,
+      "task_id": 4363,
+      "stage": "keyframe_prompts",
+      "status": "completed",
+      "started_at": 1794947256697,
+      "finished_at": 1794947296043,
+      "work_ms": 39346,
+      "model_ms": 22397,
+      "agent_gate_ms": 16539
+    },
+    {
+      "id": 2244,
+      "task_id": 4359,
+      "stage": "video_prompts",
+      "status": "completed",
+      "started_at": 1794947273239,
+      "finished_at": 1794947305383,
+      "work_ms": 32144,
+      "model_ms": 22992,
+      "agent_gate_ms": 8576
+    },
+    {
+      "id": 2245,
+      "task_id": 4360,
+      "stage": "video_prompts",
+      "status": "completed",
+      "started_at": 1794947281819,
+      "finished_at": 1794947322432,
+      "work_ms": 40613,
+      "model_ms": 25872,
+      "agent_gate_ms": 14222
+    },
+    {
+      "id": 2246,
+      "task_id": 4363,
+      "stage": "keyframe_prompts",
+      "status": "processing",
+      "started_at": 1794947296044,
+      "finished_at": null,
+      "work_ms": 25953,
+      "model_ms": 16081,
+      "agent_gate_ms": 9338
+    }
+  ]
+}

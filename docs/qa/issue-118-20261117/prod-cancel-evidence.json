@@ -1,0 +1,26 @@
+{
+  "cancel_test": {
+    "task_id": 4361,
+    "kind": "keyframe_prompts",
+    "episode_id": 31,
+    "queued_step_before_cancel": "waiting_agent_slot",
+    "cancel_response": {
+      "code": 200,
+      "status": "cancelled",
+      "error_msg": "用户取消"
+    },
+    "gate_log_after_cancel": "queued=1 → queued=0（waiter 出队），active 恒 ≤2，后续批量照常拿槽（20:23:52 acquired gateWaitMs=23699）",
+    "other_batches_unaffected": [
+      {
+        "id": 4359,
+        "status": "processing",
+        "done": 0
+      },
+      {
+        "id": 4360,
+        "status": "processing",
+        "done": 1
+      }
+    ]
+  }
+}

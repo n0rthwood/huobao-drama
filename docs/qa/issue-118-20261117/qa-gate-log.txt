@@ -1,0 +1,12 @@
+[2m19:06:31[0m [36m[AgentGate][0m acquired | active=1 queued=0 limit=2 interactive=false gateWaitMs=0
+[2m19:06:35[0m [36m[AgentGate][0m acquired | active=2 queued=0 limit=2 interactive=false gateWaitMs=0
+[2m19:06:36[0m [36m[AgentGate][0m queue | active=2 queued=0 limit=2 interactive=false
+[2m19:06:58[0m [36m[AgentGate][0m acquired | active=2 queued=0 limit=2 interactive=false gateWaitMs=22360
+[2m19:07:36[0m [36m[AgentGate][0m acquired | active=1 queued=0 limit=2 interactive=false gateWaitMs=0
+[2m19:07:39[0m [36m[AgentGate][0m acquired | active=2 queued=0 limit=2 interactive=false gateWaitMs=0
+[2m19:07:40[0m [36m[AgentGate][0m queue | active=2 queued=0 limit=2 interactive=false
+[2m19:07:58[0m [36m[AgentGate][0m acquired | active=2 queued=0 limit=2 interactive=false gateWaitMs=18289
+[2m19:07:58[0m [36m[AgentGate][0m queue | active=2 queued=0 limit=2 interactive=false
+[2m19:08:22[0m [36m[AgentGate][0m queue | active=2 queued=0 limit=2 interactive=true
+[2m19:08:26[0m [36m[AgentGate][0m acquired | active=2 queued=0 limit=2 interactive=true gateWaitMs=4537
+[2m19:08:49[0m [36m[AgentGate][0m acquired | active=1 queued=0 limit=2 interactive=false gateWaitMs=0

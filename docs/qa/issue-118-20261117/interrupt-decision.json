@@ -1,0 +1,87 @@
+{
+  "at": "2026-11-17T19:13:29.695Z",
+  "authorization": "用户 2026-11-17（Issue #118 任务原话）：可打断在跑任务、升级、重启、发布后在生产验收，尽快实施；sys_task 4282/4283 可被打断，重启按既有政策续跑",
+  "decision": "release.sh 重启 huobao-backend：4282/4283（video_prompts）按 failInterruptedTextTasks 标失败，随后经 POST /tasks/:id/retry 续跑剩余镜（既有恢复政策，写入属授权范围）；1003/1004/1203/1264 为 11-06/08 遗留 asset_pipeline，由 resumeAssetPipelines 接管；4305/4306/4307 为另一会话的 h3-jobs 视频任务，队列侧继续执行、火宝追踪器重启后按 remote_state 续跟（不重复提交）",
+  "in_flight": [
+    {
+      "id": 1003,
+      "type": "text",
+      "status": "processing",
+      "episode_id": 15,
+      "kind": "asset_pipeline",
+      "done": 0,
+      "total": 0,
+      "updated_at": "2026-11-06T08:56:09.749Z"
+    },
+    {
+      "id": 1004,
+      "type": "text",
+      "status": "processing",
+      "episode_id": 15,
+      "kind": "asset_pipeline",
+      "done": 0,
+      "total": 0,
+      "updated_at": "2026-11-06T08:57:42.054Z"
+    },
+    {
+      "id": 1203,
+      "type": "text",
+      "status": "processing",
+      "episode_id": 15,
+      "kind": "asset_pipeline",
+      "done": 0,
+      "total": 0,
+      "updated_at": "2026-11-07T16:36:10.105Z"
+    },
+    {
+      "id": 1264,
+      "type": "text",
+      "status": "processing",
+      "episode_id": 16,
+      "kind": "asset_pipeline",
+      "done": 0,
+      "total": 0,
+      "updated_at": "2026-11-08T15:18:27.211Z"
+    },
+    {
+      "id": 4282,
+      "type": "text",
+      "status": "processing",
+      "episode_id": 30,
+      "kind": "video_prompts",
+      "done": 63,
+      "total": 74,
+      "updated_at": "2026-11-17T19:12:51.157Z"
+    },
+    {
+      "id": 4283,
+      "type": "text",
+      "status": "processing",
+      "episode_id": 27,
+      "kind": "video_prompts",
+      "done": 53,
+      "total": 60,
+      "updated_at": "2026-11-17T19:10:19.377Z"
+    },
+    {
+      "id": 4306,
+      "type": "video",
+      "status": "processing",
+      "episode_id": 30,
+      "kind": null,
+      "done": null,
+      "total": null,
+      "updated_at": "2026-11-17T19:13:23.636Z"
+    },
+    {
+      "id": 4307,
+      "type": "video",
+      "status": "processing",
+      "episode_id": 30,
+      "kind": null,
+      "done": null,
+      "total": null,
+      "updated_at": "2026-11-17T19:13:05.120Z"
+    }
+  ]
+}

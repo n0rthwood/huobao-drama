@@ -1,0 +1,5 @@
+STARTS [{"label":"ep30-video","status":201,"id":4308,"total":76},{"label":"ep27-video","status":201,"id":4309,"total":60},{"label":"ep25-keyframe","status":200}]
+CANCEL 4308 200 "cancelled"
+INTERACTIVE 200 {"code":200,"data":{"narration_text":"八达岭长城位于北京西北的军都山关沟北口，是明代长城中规制最高、保存最完整的段落之一。","narration_enabled":true,"duration":11},"message":"success"}
+FINAL 4308 cancelled {"completed":1,"failed":0,"total":76,"current_storyboard_id":1269,"step":"waiting_agent_slot"}
+FINAL 4309 cancelled {"completed":1,"failed":0,"total":60,"current_storyboard_id":943}

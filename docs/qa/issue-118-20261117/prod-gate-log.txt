@@ -1,0 +1,136 @@
+[2m20:08:49[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=16991
+[2m20:08:49[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:09:06[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=22495
+[2m20:09:12[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:09:12[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=23325
+[2m20:09:12[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:09:32[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=20048
+[2m20:09:32[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:09:35[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=22110
+[2m20:09:35[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:09:52[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=20375
+[2m20:09:52[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:10:03[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=28889
+[2m20:10:03[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:10:15[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=22481
+[2m20:10:15[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:10:31[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=27894
+[2m20:10:36[0m [36m[AgentGate][0m acquired | active=2 queued=0 limit=2 interactive=false gateWaitMs=21290
+[2m20:10:36[0m [36m[AgentGate][0m queue | active=2 queued=0 limit=2 interactive=false
+[2m20:10:37[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:10:58[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=21972
+[2m20:10:58[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:10:58[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=20374
+[2m20:10:58[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:11:16[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=17890
+[2m20:11:29[0m [36m[AgentGate][0m acquired | active=2 queued=0 limit=2 interactive=false gateWaitMs=31466
+[2m20:11:29[0m [36m[AgentGate][0m queue | active=2 queued=0 limit=2 interactive=false
+[2m20:11:40[0m [36m[AgentGate][0m acquired | active=2 queued=0 limit=2 interactive=false gateWaitMs=10973
+[2m20:11:40[0m [36m[AgentGate][0m queue | active=2 queued=0 limit=2 interactive=false
+[2m20:11:50[0m [36m[AgentGate][0m acquired | active=2 queued=0 limit=2 interactive=false gateWaitMs=9287
+[2m20:11:50[0m [36m[AgentGate][0m queue | active=2 queued=0 limit=2 interactive=false
+[2m20:12:06[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:12:13[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=23424
+[2m20:12:13[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:12:25[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=18812
+[2m20:12:25[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:12:33[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=19647
+[2m20:12:33[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:12:42[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=16469
+[2m20:12:42[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:12:53[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=20066
+[2m20:12:53[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:13:10[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=28856
+[2m20:13:10[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:13:12[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=19044
+[2m20:13:12[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:13:31[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=20203
+[2m20:13:31[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:13:36[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=24383
+[2m20:13:36[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:13:58[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=27369
+[2m20:13:58[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:14:05[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=29252
+[2m20:14:05[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:14:13[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=14985
+[2m20:14:13[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:14:26[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=20217
+[2m20:14:26[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:14:39[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=26223
+[2m20:14:39[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:14:56[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=30131
+[2m20:14:56[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:15:00[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=20357
+[2m20:15:00[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:15:20[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=24634
+[2m20:15:20[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:15:27[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=27937
+[2m20:15:27[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:15:44[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=23964
+[2m20:15:46[0m [36m[AgentGate][0m acquired | active=2 queued=0 limit=2 interactive=false gateWaitMs=18487
+[2m20:15:46[0m [36m[AgentGate][0m queue | active=2 queued=0 limit=2 interactive=false
+[2m20:16:06[0m [36m[AgentGate][0m acquired | active=2 queued=0 limit=2 interactive=false gateWaitMs=20031
+[2m20:16:06[0m [36m[AgentGate][0m queue | active=2 queued=0 limit=2 interactive=false
+[2m20:16:15[0m [36m[AgentGate][0m acquired | active=2 queued=0 limit=2 interactive=false gateWaitMs=8845
+[2m20:16:15[0m [36m[AgentGate][0m queue | active=2 queued=0 limit=2 interactive=false
+[2m20:16:36[0m [36m[AgentGate][0m acquired | active=2 queued=0 limit=2 interactive=false gateWaitMs=20843
+[2m20:16:36[0m [36m[AgentGate][0m queue | active=2 queued=0 limit=2 interactive=false
+[2m20:16:36[0m [36m[AgentGate][0m acquired | active=2 queued=0 limit=2 interactive=false gateWaitMs=141
+[2m20:16:36[0m [36m[AgentGate][0m queue | active=2 queued=0 limit=2 interactive=false
+[2m20:16:39[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:16:56[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=19721
+[2m20:16:56[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:17:04[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=24564
+[2m20:17:04[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:17:21[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=25770
+[2m20:17:21[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:17:27[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=23392
+[2m20:17:27[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:17:50[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=28799
+[2m20:17:50[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:17:53[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=25555
+[2m20:18:12[0m [36m[AgentGate][0m acquired | active=2 queued=0 limit=2 interactive=false gateWaitMs=21980
+[2m20:18:12[0m [36m[AgentGate][0m queue | active=2 queued=0 limit=2 interactive=false
+[2m20:18:25[0m [36m[AgentGate][0m acquired | active=2 queued=0 limit=2 interactive=false gateWaitMs=13223
+[2m20:18:25[0m [36m[AgentGate][0m queue | active=2 queued=0 limit=2 interactive=false
+[2m20:18:30[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:18:36[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=10727
+[2m20:18:36[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:18:56[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=26142
+[2m20:18:56[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:19:19[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=42570
+[2m20:19:19[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:19:21[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=25268
+[2m20:19:21[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:19:40[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=20976
+[2m20:19:40[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:19:47[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=26059
+[2m20:19:47[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:20:04[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=24540
+[2m20:20:04[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:20:25[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=37983
+[2m20:20:25[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:20:35[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=30880
+[2m20:20:35[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:20:56[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=30232
+[2m20:20:56[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:20:57[0m [36m[AgentGate][0m acquired | active=2 queued=1 limit=2 interactive=false gateWaitMs=21511
+[2m20:21:11[0m [36m[AgentGate][0m acquired | active=2 queued=0 limit=2 interactive=false gateWaitMs=15321
+[2m20:21:11[0m [36m[AgentGate][0m queue | active=2 queued=0 limit=2 interactive=false
+[2m20:21:45[0m [36m[AgentGate][0m acquired | active=2 queued=0 limit=2 interactive=false gateWaitMs=34262
+[2m20:21:46[0m [36m[AgentGate][0m queue | active=2 queued=0 limit=2 interactive=false
+[2m20:21:48[0m [36m[AgentGate][0m acquired | active=2 queued=0 limit=2 interactive=false gateWaitMs=2100
+[2m20:21:48[0m [36m[AgentGate][0m queue | active=2 queued=0 limit=2 interactive=false
+[2m20:22:13[0m [36m[AgentGate][0m acquired | active=2 queued=0 limit=2 interactive=false gateWaitMs=24975
+[2m20:22:13[0m [36m[AgentGate][0m queue | active=2 queued=0 limit=2 interactive=false
+[2m20:22:15[0m [36m[AgentGate][0m acquired | active=2 queued=0 limit=2 interactive=false gateWaitMs=2050
+[2m20:22:15[0m [36m[AgentGate][0m queue | active=2 queued=0 limit=2 interactive=false
+[2m20:22:43[0m [36m[AgentGate][0m acquired | active=1 queued=0 limit=2 interactive=false gateWaitMs=0
+[2m20:23:11[0m [36m[AgentGate][0m acquired | active=2 queued=0 limit=2 interactive=false gateWaitMs=0
+[2m20:23:26[0m [36m[AgentGate][0m acquired | active=2 queued=0 limit=2 interactive=false gateWaitMs=0
+[2m20:23:27[0m [36m[AgentGate][0m queue | active=2 queued=0 limit=2 interactive=false
+[2m20:23:28[0m [36m[AgentGate][0m queue | active=2 queued=1 limit=2 interactive=false
+[2m20:23:52[0m [36m[AgentGate][0m acquired | active=2 queued=0 limit=2 interactive=false gateWaitMs=23699
+[2m20:23:52[0m [36m[AgentGate][0m queue | active=2 queued=0 limit=2 interactive=false
+[2m20:23:57[0m [36m[AgentGate][0m acquired | active=2 queued=0 limit=2 interactive=false gateWaitMs=4999
+[2m20:23:57[0m [36m[AgentGate][0m queue | active=2 queued=0 limit=2 interactive=false
