@@ -569,8 +569,17 @@ export function serializeDetail(loaded: LoadedTask): MapStudioDetail {
   const { feedback: _feedback, ...agentView } = agent
   const runs = selectRunsByTask(row.id, 20)
   const latest = runs[0] ?? null
+  // Legacy #99 gate: a research stage blocked only by geometry_unverified is no longer blocked (#111).
+  const legacyGate = state.status === 'blocked' && state.stage === 'research'
+    && state.issues.some(issue => issue.code === 'geometry_unverified')
+    && !state.issues.some(issue => issue.blocking && issue.code !== 'geometry_unverified')
   return {
     ...rest,
+    // Same shape as the human-confirm path: research done, base is the next stage to run.
+    ...(legacyGate ? {
+      status: 'awaiting_review' as const, stage: 'base' as const,
+      steps: state.steps.map(step => step.id === 'research' ? { ...step, status: 'completed' as const } : step),
+    } : {}),
     issues: state.issues.some(issue => issue.code === 'geometry_unverified')
       ? [...state.issues.filter(issue => issue.code !== 'geometry_unverified'), ...geometryUnverified(mapSpec).map(feature => ({ field: 'research', code: feature.reasons.some(reason => reason.includes('dataset_missing')) ? 'geometry_missing' : 'geometry_approximate', blocking: false, message: `「${feature.name}」：${feature.reasons.join('；')}` }))]
       : state.issues,

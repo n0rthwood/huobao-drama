@@ -299,6 +299,12 @@ test('HTTP base 缺少 map_spec 时拒绝；PUT 确认释放旧研究阻断，�
       ctx.state.research = { queries: [], sources: [], features: [], uncertainties: [], notes: [], searched_at: new Date().toISOString() }
       ctx.state.issues = [{ field: 'research', code: 'geometry_unverified', blocking: true, message: '「喀什里克」：尚无可核验依据，请人工确认' }]
     } })
+    // A task stored as blocked by the removed #99 gate must read as ready for base, not blocked (#111).
+    const legacy = (await (await mapStudioRoutes.request('/tasks/' + id)).json()).data
+    assert.equal(legacy.status, 'awaiting_review')
+    assert.equal(legacy.stage, 'base')
+    assert.equal(legacy.steps.find(step => step.id === 'research').status, 'completed')
+    assert.ok(legacy.issues.every(issue => !issue.blocking))
     const before = await loadTask(id)
     const confirmed = JSON.parse(JSON.stringify(before.mapSpec))
     for (const item of confirmed.places) delete item.proposed
