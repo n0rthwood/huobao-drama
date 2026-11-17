@@ -35,7 +35,7 @@
       <button type="button" class="mw-tool" @click="resolveConflict('discard')">{{ t('mapStudio.panel.conflictDiscard') }}</button>
     </p>
     <p v-if="error" class="mw-error">{{ error }}</p>
-    <p v-if="detail?.error" class="mw-error">{{ detail.error }}</p>
+    <p v-if="detail?.error && !detail.error.includes('geometry_unverified')" class="mw-error">{{ detail.error }}</p>
 
     <ol v-if="detail" class="mw-rail">
       <li v-for="(step, index) in detail.steps" :key="step.id" class="mw-step" :class="[`is-${step.status}`, { 'is-current': step.id === stage }]">
@@ -43,7 +43,7 @@
         <span class="mw-step-body">
           <button type="button" class="mw-tool" :aria-pressed="selectedStage === step.id" @click="navigationTouched = true; selectedStage = step.id">{{ t('mapStudio.stage.' + step.id) }}</button>
           <span class="mw-step-status">{{ t('mapStudio.stepStatus.' + step.status) }}</span>
-          <span v-if="step.message" class="mw-step-msg">{{ step.message }}</span>
+          <span v-if="step.message" class="mw-step-msg">{{ step.message.includes('geometry_unverified') ? t('mapStudio.researchPanel.pendingOptional', { n: pendingCount }) : step.message }}</span>
         </span>
         <button
           v-if="step.id !== 'complete' && canRollbackTo(step.id)"
@@ -57,7 +57,7 @@
       </li>
     </ol>
 
-    <MapStagePanel v-if="detail" :detail="detail" :stage="selectedStage" :confirming="action === 'confirm'" @preview="openPreview" @confirm="confirmGeometry" />
+    <MapStagePanel v-if="detail" :detail="detail" :stage="selectedStage" :confirming="action === 'confirm'" @preview="openPreview" @confirm="confirmGeometry" @focus="geoFocus = $event" />
     <MapAgentProcess v-if="detail && runsLoaded" :task-id="taskId" :stage="selectedStage" :runs="runs" :selected-run-id="selectedRunId" :loading-runs="false" :now="nowMs" @select-run="navigationTouched = true; selectedRunId = $event" @reload-runs="loadRuns" />
     <MapDeliveries v-if="detail" :task-id="taskId" :deliveries="detail.deliveries" :outputs="detail.outputs" :can-deliver="!!detail.host && !hostMissing && !isRunning && !!detail.outputs.final_image" :busy="busy || delivering" :delivering="delivering" error="" @deliver="redeliver" />
     <section v-if="detail" class="mw-now">
@@ -68,6 +68,7 @@
       <div class="mw-now-row">
         <span class="mw-now-label">{{ t('mapStudio.panel.nextAction') }}</span>
         <span>{{ nextAction }}</span>
+        <a v-if="pendingCount" href="#map-pending-geometry">{{ t('mapStudio.researchPanel.pendingOptional', { n: pendingCount }) }}</a>
       </div>
 
       <div v-if="blockingIssues.length" class="mw-issues">
@@ -94,12 +95,12 @@
 
       <p v-if="draftsDirty" class="mw-warn">{{ t('mapStudio.panel.nextDirty') }}</p>
       <div class="mw-actions">
-        <button type="button" class="btn btn-sm btn-primary" :disabled="busy || !canRun" @click="run">
+        <button type="button" class="btn btn-sm btn-primary" :disabled="busy || !canRun" :title="busy || !canRun ? nextAction : ''" @click="run">
           <Loader2 v-if="action === 'run'" :size="11" class="animate-spin" />
           <Play v-else :size="11" />
           {{ runLabel }}
         </button>
-        <button type="button" class="btn btn-sm" :disabled="busy || !canAdvance" @click="advance">
+        <button type="button" class="btn btn-sm" :disabled="busy || !canAdvance" :title="busy || !canAdvance ? nextAction : ''" @click="advance">
           <Loader2 v-if="action === 'advance'" :size="11" class="animate-spin" />
           <StepForward v-else :size="11" />
           {{ advanceLabel }}
@@ -109,7 +110,7 @@
           <X v-else :size="11" />
           {{ t('mapStudio.panel.cancel') }}
         </button>
-        <button type="button" class="btn btn-sm" :disabled="!canEditLayers" @click="openLayerEditor">
+        <button type="button" class="btn btn-sm" :disabled="!canEditLayers" :title="!canEditLayers ? t('mapStudio.researchPanel.noLayers') : ''" @click="openLayerEditor">
           <PenLine :size="11" />
           {{ t('mapStudio.layerEditor.open') }}
         </button>
@@ -167,6 +168,7 @@
       <p v-if="geometryDirty" class="mw-warn">{{ t('mapStudio.panel.specDirtyWarn') }}</p>
       <MapGeoEditor
         :spec="specDraft"
+        :focus-target="geoFocus"
         :persisted-spec="detail.map_spec"
         :registration="registration"
         :base-image="editorBase"
@@ -272,6 +274,7 @@ import MapAgentRounds from '~/map-studio/components/MapAgentRounds.vue'
 import MapLayerEditor from '~/map-studio/components/MapLayerEditor.vue'
 import {
   confirmSpecFeatures,
+  mapPendingGeometry,
   mapStudioAPI,
   mapStudioConflictOf,
   type MapAgentAttempt,
@@ -434,8 +437,10 @@ const specDirty = computed(() => JSON.stringify(specDraft.value) !== serverSpec.
 const layerOptionsDirty = computed(() => JSON.stringify(layerOptionsDraft.value) !== serverLayerOptions.value)
 /** 几何区一次保存的是 map_spec + layer_options：两者任一有改动都要走同一次 CAS */
 const geometryDirty = computed(() => specDirty.value || layerOptionsDirty.value)
-const blockingIssues = computed(() => (detail.value?.issues ?? []).filter(issue => issue.blocking))
-const softIssues = computed(() => (detail.value?.issues ?? []).filter(issue => !issue.blocking))
+const geoFocus = ref<{ kind: 'place' | 'route' | 'region'; id: string } | null>(null)
+const pendingCount = computed(() => mapPendingGeometry(detail.value?.map_spec ?? null).length + (detail.value?.research?.missing_geometry?.length ?? 0))
+const blockingIssues = computed(() => (detail.value?.issues ?? []).filter(issue => issue.blocking && issue.code !== 'geometry_unverified'))
+const softIssues = computed(() => (detail.value?.issues ?? []).filter(issue => !issue.blocking && !['geometry_approximate', 'geometry_missing'].includes(issue.code)))
 
 /**
  * 底纹阶段已完成/被跳过且确实没有纹理图（Issue #107）：成品直接用底图绘制，这是新口径而不是失败。
@@ -684,6 +689,7 @@ const nextAction = computed(() => {
   if (isRunning.value) return t('mapStudio.panel.nextRunning')
   // 草稿没保存就启动，跑的是服务端的旧值：先说清楚要先保存或放弃
   if (draftsDirty.value) return t('mapStudio.panel.nextDirty')
+  if (status.value === 'blocked' && !blockingIssues.value.length) return t('mapStudio.researchPanel.resumeSchematic')
   if (status.value === 'blocked') {
     const first = blockingIssues.value[0]
     return first ? t('mapStudio.panel.nextBlocked', { reason: first.message }) : t('mapStudio.panel.nextBlockedGeneric')

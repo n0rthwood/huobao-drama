@@ -69,7 +69,7 @@ const script = `
     version: 1, projection: { type: 'mercator' }, bbox: [32, 53, 40.5, 56.1], layers: { land: true, coastline: true, rivers: true, lakes: true, countries: false },
     places: [{ id: 'p1', name: '莫斯科', lon: 37.6, lat: 55.75 }, { id: 'p2', name: '喀山', lon: 49.1, lat: 55.8 }, { id: 'p3', name: '卡卢加', lon: 36.26, lat: 54.51 }],
     routes: [{ id: 'r1', name: '奥卡河', points: [[34, 54.2], [36.5, 54.7], [39, 54.9]], dataset_ref: { ref: 'ne-group:10m_rivers_lake_centerlines:oka' } }],
-    regions: [{ id: 'g1', name: '莫斯科公国', points: [[35, 54.5], [38.5, 54.5], [38.5, 56], [35, 56], [35, 54.5]] }],
+    regions: [{ id: 'g1', name: '莫斯科公国', proposed: true, origin: 'model', verification: { status: 'unverified', reasons: ['示意'] }, points: [[35, 54.5], [38.5, 54.5], [38.5, 56], [35, 56], [35, 54.5]] }],
     style: { theme: 'archival' },
   }
   const size = { width: 3840, height: 2160 }
@@ -77,11 +77,13 @@ const script = `
   const a = pipLabels(spec, projection, size, { tier: 'full', fontScale: 1 })
   const b = pipLabels(spec, projection, size, { tier: 'full', fontScale: 1 })
   const reduced = pipLabels(spec, projection, size, { tier: 'reduced', fontScale: 1 })
+  const verified = pipLabels({ ...spec, regions: spec.regions.map(region => ({ ...region, origin: 'dataset', verification: { status: 'verified', reasons: ['数据集'] } })) }, projection, size, { tier: 'full', fontScale: 1 })
   out.labels = {
     deterministic: a.over === b.over && a.under === b.under,
     hasMoscow: a.over.includes('莫斯科'), hasKazan: a.over.includes('喀山'), hasKaluga: a.over.includes('卡卢加'),
     hasRiver: a.over.includes('奥卡河'), reducedHasRiver: reduced.over.includes('奥卡河'),
     hasSchematicTag: a.over.includes('（示意）'), underHasRegion: a.under.includes('polygon'),
+    verifiedHasTag: verified.over.includes('（示意）'),
   }
   console.log('@@' + JSON.stringify(out))
 `
@@ -160,4 +162,5 @@ test('细节标注：确定性；取景外地点不出现；河名只在 full �
   assert.ok(r.labels.hasRiver)
   assert.equal(r.labels.reducedHasRiver, false)
   assert.ok(r.labels.hasSchematicTag && r.labels.underHasRegion)
+  assert.equal(r.labels.verifiedHasTag, false)
 })

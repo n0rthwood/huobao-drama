@@ -41,6 +41,17 @@ function backend(payload) {
   return JSON.parse(out.slice(out.lastIndexOf('@@') + 2))
 }
 
+test('hollow markers survive normalization and render identically on both sides', () => {
+  const doc = { base: { path: 'static/uploads/map.png', width: 960, height: 540 }, layers: [
+    { id: 'approx', type: 'marker', at: [0.5, 0.5], style: { hollow: true, color: '#b45235' } },
+  ] }
+  const item = { doc, size: { width: 960, height: 540 } }
+  const result = backend({ cases: [item], wraps: [], widths: [], unsupported: [] }).cases[0]
+  assert.equal(result.doc.layers[0].style.hollow, true)
+  assert.match(result.svg, /<circle[^>]*fill="none"[^>]*stroke="#b45235"/)
+  assert.equal(front.layerDocToSvg(result.doc, item.size, { resolveImage }), result.svg)
+})
+
 const MAP_DOC = {
   base: { path: 'static/uploads/map.png', width: 1344, height: 768 },
   theme: 'archival',

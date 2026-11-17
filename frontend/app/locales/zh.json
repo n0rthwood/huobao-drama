@@ -4071,6 +4071,14 @@
       "stale": "已过期"
     },
     "researchPanel": {
+      "reviewTitle": "待你查看的要素",
+      "reviewHint": "流程可继续；确认是可选的。确认后需回退到作图并重渲才会更新成图。",
+      "notDrawn": "数据集中没有几何，暂不绘制",
+      "schematic": "示意",
+      "gridPreview": "位置示意预览（经纬网，并非底图）",
+      "noLayers": "完成作图后才能编辑图层",
+      "pendingOptional": "{n} 个要素待你查看（可选）",
+      "resumeSchematic": "可按示意继续，点击执行下一阶段。",
       "title": "要素来源与核验",
       "hint": "条目取自当前 map_spec：来源徽标、核验状态、原因与相对位置证据；「确认」只是去掉 AI 候选标记后按 CAS 保存，放行与否以服务端核验为准。",
       "pick": "选择",

@@ -4071,6 +4071,14 @@
       "stale": "stale"
     },
     "researchPanel": {
+      "reviewTitle": "Features to review",
+      "reviewHint": "The workflow can continue; confirmation is optional. Return to drawing and rerender to apply confirmation.",
+      "notDrawn": "No dataset geometry; not drawn",
+      "schematic": "Approximate",
+      "gridPreview": "Schematic location preview (graticule, not a basemap)",
+      "noLayers": "Complete drawing before editing layers",
+      "pendingOptional": "{n} features to review (optional)",
+      "resumeSchematic": "Continue with approximate features by running the next stage.",
       "title": "Feature provenance and verification",
       "hint": "Rows come from the current map_spec: origin badge, verification status, reasons and relative-position evidence. Confirm only removes the AI-proposal flag and saves through CAS; the server decides whether the gate opens.",
       "pick": "Select",

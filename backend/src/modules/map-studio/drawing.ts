@@ -13,7 +13,7 @@ import type { MapSpec } from './geo/base-render.js'
 import { forwardFor, type MapBackgroundResult } from './geo/geometry.js'
 import { mapBriefText, rollbackTool, runStageAgent, stageTool, type StageAgentResult } from './agent-loop.js'
 import { drawingProblems, drawnGeometryOf, projectedLabelFeatures, specFeatures, type DrawnGeometry, type OmittedFeature, type SpecFeature } from './validate.js'
-import { autoPlaceLabels } from './layout/labels.js'
+import { autoPlaceLabels, labelProblems } from './layout/labels.js'
 import { strictMapLayerDocProblems } from './layer-doc.js'
 import { defaultLayerOptions, renderCopyWithSmoothing, smoothingProblems, validateLayerOptions, type LayerOptions } from './render/smooth.js'
 import type { MapBrief } from './types.js'
@@ -107,7 +107,45 @@ export async function runDrawingStage(input: DrawingStageInput): Promise<StageAg
    * 压缩窗口内的三步就累积到 24 万字。
    */
   const acceptDraft = (next: LayerDoc) => {
-    const sorted = { ...next, layers: [...next.layers].sort((a, b) => a.z - b.z) }
+    // Reposition the generated legend whenever the draft changes, so later titles cannot cover it.
+    const layers = next.layers.filter(layer => layer.id !== 'schematic-legend').map(layer => {
+      const feature = features.find(item => item.id === layer.anchor?.semantic_id)
+      if (!feature?.approximate) return layer
+      if (layer.type === 'marker') return { ...layer, style: { ...layer.style, hollow: true } }
+      if (layer.type === 'polyline') return { ...layer, style: { ...layer.style, dash: 'dash' as const } }
+      return layer
+    }).sort((a, b) => a.z - b.z)
+    let sorted: LayerDoc = { ...next, layers }
+    let needsLegend = false
+    for (let index = 0; index < sorted.layers.length; index++) {
+      const layer = sorted.layers[index]!
+      const feature = features.find(item => item.id === layer.anchor?.semantic_id)
+      if (!feature?.approximate || feature.missing || (layer.type !== 'marker' && layer.type !== 'label') || !layer.text) continue
+      const text = layer.text.endsWith('（示意）') ? layer.text : `${layer.text}（示意）`
+      const trial = { ...sorted, layers: sorted.layers.map((item, i) => i === index ? { ...layer, text } : item) }
+      const checked = strictMapLayerDocProblems(trial, { features, registration: background.registration })
+      const bad = checked.problems.some(problem => problem.path.startsWith(`layers[${index}]`))
+        || labelProblems(checked.doc, checked.doc.base, projectedFeatures).some(problem => problem.layer_id === layer.id)
+      if (bad) {
+        needsLegend = true
+        sorted = { ...sorted, layers: sorted.layers.map((item, i) => i === index ? { ...layer, text: layer.text.replace(/（示意）$/, '') } : item) }
+      }
+      else sorted = checked.doc
+    }
+    if (features.some(feature => feature.approximate && !feature.missing
+      && sorted.layers.some(layer => layer.anchor?.semantic_id === feature.id && (layer.type === 'marker' || layer.type === 'polyline' || layer.type === 'polygon'))
+      && !sorted.layers.some(layer => layer.anchor?.semantic_id === feature.id && (layer.type === 'label' || layer.type === 'marker') && layer.text.includes('（示意）')))) needsLegend = true
+    if (needsLegend) {
+      let placed: LayerDoc | null = null
+      for (let y = .03; y <= .87 && !placed; y += .07) for (let x = .03; x <= .63 && !placed; x += .15) {
+        const legend: Layer = { id: 'schematic-legend', type: 'label', name: '示意说明', text: '部分要素为示意', box: { x, y, w: .32, h: .06 }, visible: true, locked: false, z: Math.min(9999, Math.max(0, ...sorted.layers.map(item => item.z)) + 1), opacity: 1, rotation: 0, style: { size: .02 } }
+        const trial = { ...sorted, layers: [...sorted.layers, legend] }
+        const checked = strictMapLayerDocProblems(trial, { features, registration: background.registration })
+        if (!checked.problems.length && !labelProblems(checked.doc, checked.doc.base, projectedFeatures).some(problem => problem.layer_id === legend.id)) placed = checked.doc
+      }
+      if (!placed) return { error: '示意说明放不下，请为图例留出空白', problems: ['示意说明无法通过标签校验'] }
+      sorted = placed
+    }
     const strict = strictMapLayerDocProblems(sorted, { features, registration: background.registration })
     if (strict.problems.length) return { error: '草稿修改被拒，原草稿保留', problems: strict.problems }
     const before = new Map(draft.layers.map(layer => [layer.id, JSON.stringify(layer)]))
@@ -128,7 +166,7 @@ export async function runDrawingStage(input: DrawingStageInput): Promise<StageAg
   const featureSummary = features.map(feature => {
     const p = projectedFeatures.find(f => f.id === feature.id)!
     const xs = p.points.map(point => point[0] * background.width), ys = p.points.map(point => point[1] * background.height)
-    return { feature_id: feature.id, kind: feature.kind, category: feature.category, name: feature.name, origin: feature.origin, vertex_count: p.points.length, pixel_bbox: xs.length ? [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)] : null }
+    return { feature_id: feature.id, kind: feature.kind, category: feature.category, name: feature.name, origin: feature.origin, approximate: feature.approximate, missing: feature.missing, vertex_count: p.points.length, pixel_bbox: xs.length ? [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)] : null }
   })
   return await runStageAgent<DrawingStageResult>({
     taskId: input.taskId, runId: input.runId, stage: 'drawing', stageModel: input.stageModel, skill: 'drawing', maxSteps: MAX_STEPS, startRounds: input.startRounds, initialFeedback: input.feedback,
@@ -165,6 +203,7 @@ export async function runDrawingStage(input: DrawingStageInput): Promise<StageAg
           for (const item of items) {
             const feature = features.find(f => f.id === item.feature_id)
             if (!feature) { problems.push(`未知 feature_id ${item.feature_id}`); continue }
+            if (feature.missing) { problems.push(`要素 ${feature.id} 数据集中没有几何，暂不绘制`); continue }
             if (next.layers.some(l => l.anchor?.semantic_id === feature.id && ['marker', 'polygon', 'polyline'].includes(l.type))) { problems.push(`要素 ${feature.id} 已有几何图层，使用 update_layer 修改样式`); continue }
             const points = feature.coords.map(coord => {
               const pixel = forward(coord)

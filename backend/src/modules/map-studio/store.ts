@@ -12,6 +12,7 @@
 import crypto from 'crypto'
 import type { MapSpec } from './geo/base-render.js'
 import { normalizeMapSpec, parseMapSpec } from './geo/base-render.js'
+import { geometryUnverified } from './accuracy.js'
 import { now } from '../../utils/response.js'
 import { getHost } from './registry.js'
 import {
@@ -570,6 +571,9 @@ export function serializeDetail(loaded: LoadedTask): MapStudioDetail {
   const latest = runs[0] ?? null
   return {
     ...rest,
+    issues: state.issues.some(issue => issue.code === 'geometry_unverified')
+      ? [...state.issues.filter(issue => issue.code !== 'geometry_unverified'), ...geometryUnverified(mapSpec).map(feature => ({ field: 'research', code: feature.reasons.some(reason => reason.includes('dataset_missing')) ? 'geometry_missing' : 'geometry_approximate', blocking: false, message: `「${feature.name}」：${feature.reasons.join('；')}` }))]
+      : state.issues,
     task_id: row.id,
     title: row.title,
     brief,
