@@ -16,6 +16,7 @@ import { logTaskWarn } from '../utils/task-logger.js'
 import type { QwenJob, QwenJobRequest } from './adapters/qwen-jobs-client.js'
 import type { H3JobRequest } from './adapters/h3-jobs-client.js'
 import { toUnixSeconds } from './media-time.js'
+import { parseTextTaskParams } from './text-task.js'
 
 import { isJobQueueImageProvider, isJobQueueVideoProvider } from './adapters/registry.js'
 
@@ -180,7 +181,8 @@ export function serializeTask(row: SysTaskRow): Record<string, any> {
     completed_at_unix: toUnixSeconds(row.completedAt),
     remote_state: Object.keys(visible).length ? visible : null,
     elapsed_ms: elapsedMs(row),
-    cancellable: isActiveTaskStatus(row.status) && (isQwenJobsTask(row.provider) || isH3JobsTask(row.provider)),
+    cancellable: isActiveTaskStatus(row.status) && (isQwenJobsTask(row.provider) || isH3JobsTask(row.provider)
+      || (row.type === 'text' && ['keyframe_prompts', 'video_prompts', 'design_card'].includes(parseTextTaskParams(row.params)?.kind ?? ''))),
   }
 }
 

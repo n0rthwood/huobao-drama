@@ -157,6 +157,7 @@
       "percent": "進捗 {percent}%",
       "textProgress": "{completed} / {total} 完了",
       "waitingScenes": "シーン抽出（タスク #{id}）の完了を待っています",
+      "waitingAgentSlot": "グローバル実行スロットを待っています（他のバッチが実行中）",
       "rewriteStages": "リライト段階",
       "retry": "モデルを変えて再実行",
       "retrying": "送信中…",

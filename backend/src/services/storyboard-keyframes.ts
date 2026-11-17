@@ -8,11 +8,11 @@
  * 提示词里 @ 的资产与该槽位绑定不一致时拒绝组装（Issue #7），由调用方返回 400。
  */
 import { createHash } from 'node:crypto'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
 import { getActiveConfig, getConfigById } from './ai.js'
 import { generateImage } from './generation.js'
-import { assertKeyframeEligible, SLOT_FRAME_TYPE, SLOT_LABEL, slotPrompt, type KeyframeSlot } from './keyframes.js'
+import { assertKeyframeEligible, KeyframeIneligibleError, keyframeIneligibility, SLOT_FRAME_TYPE, SLOT_LABEL, slotPrompt, type KeyframeSlot, type StoryboardKeyframeState } from './keyframes.js'
 import { assertShotGate } from './workflow-gates.js'
 import {
   SLOT_PROMPT_FIELD,
@@ -30,6 +30,7 @@ import {
 import { indexRefs, resolvePromptRefs } from './prompt-refs.js'
 import { getDramaStylePrompt } from './style-preset.js'
 import { loadDesignCardContext, resolveDesignCard } from './design-card-context.js'
+import type { DesignCardContext } from './design-card.js'
 import { isQwenJobsTask } from './sys-task.js'
 
 /** 剧集画幅 → 关键帧尺寸（与 H3 的 1080p 档位同画幅，生图侧统一按长边 1344）；Poster 复用同一档位 */
@@ -157,31 +158,70 @@ export async function loadKeyframeVersions(
   storyboardId: number,
   slot: KeyframeSlot,
 ): Promise<KeyframeVersion[]> {
-  const frameType = SLOT_FRAME_TYPE[slot]
   const tasks = (await db.select().from(schema.sysTask))
     .filter(task => task.type === 'image' && task.status === 'completed' && task.storyboardId === storyboardId)
-    .filter((task) => {
-      try {
-        const params: unknown = JSON.parse(task.params || '{}')
-        return !!params && typeof params === 'object' && 'frameType' in params && params.frameType === frameType
-      } catch {
-        return false
-      }
-    })
+  return versionsOfTasks(tasks, SLOT_FRAME_TYPE[slot])
+}
+
+/**
+ * 整集一次查完全部关键帧版本（Issue #118 C）：批量预览逐镜逐槽 loadKeyframeVersions
+ * 的替代。过滤/排序/编号口径与单镜版本逐字相同（共用 versionsOfTasks）。
+ * 键 = `${storyboardId}:${frameType}`；没有版本的槽位不在 Map 里（取用方按空数组处理）。
+ */
+export async function loadEpisodeKeyframeVersions(episodeId: number): Promise<Map<string, KeyframeVersion[]>> {
+  const tasks = await db.select({ task: schema.sysTask })
+    .from(schema.sysTask)
+    .innerJoin(schema.storyboards, eq(schema.storyboards.id, schema.sysTask.storyboardId))
+    .where(and(eq(schema.storyboards.episodeId, episodeId), eq(schema.sysTask.type, 'image'), eq(schema.sysTask.status, 'completed')))
+  const bySlot = new Map<string, { frameType: string; tasks: SysTaskRow[] }>()
+  for (const { task } of tasks) {
+    const frameType = frameTypeOfTask(task.params)
+    if (!frameType) continue
+    const key = `${task.storyboardId}:${frameType}`
+    const entry = bySlot.get(key) ?? { frameType, tasks: [] }
+    entry.tasks.push(task)
+    bySlot.set(key, entry)
+  }
+  const result = new Map<string, KeyframeVersion[]>()
+  for (const [key, entry] of bySlot) {
+    result.set(key, versionsOfTasks(entry.tasks, entry.frameType))
+  }
+  return result
+}
+
+type SysTaskRow = typeof schema.sysTask.$inferSelect
+
+function frameTypeOfTask(raw: string | null): string | null {
+  try {
+    const params: unknown = JSON.parse(raw || '{}')
+    if (params && typeof params === 'object' && 'frameType' in params) {
+      const frameType = params.frameType
+      return typeof frameType === 'string' ? frameType : null
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+/** 过滤 + 排序 + 编号的唯一口径：单镜与整集加载共用 */
+function versionsOfTasks(tasks: SysTaskRow[], frameType: string): KeyframeVersion[] {
+  return tasks
+    .filter(task => frameTypeOfTask(task.params) === frameType)
     .filter(task => task.localPath || task.resultUrl)
     .sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')) || a.id - b.id)
-  return tasks.map((task, index) => ({
-    id: task.id,
-    archived_reason: archivedReasonOf(task.params),
-    image: (task.localPath || task.resultUrl)!,
-    prompt: task.prompt,
-    provider: task.provider,
-    model: task.model,
-    created_at: task.createdAt,
-    generated_at: task.generatedAt ?? null,
-    version_no: index + 1,
-    signature: signatureFromTask(task),
-  }))
+    .map((task, index) => ({
+      id: task.id,
+      archived_reason: archivedReasonOf(task.params),
+      image: (task.localPath || task.resultUrl)!,
+      prompt: task.prompt,
+      provider: task.provider,
+      model: task.model,
+      created_at: task.createdAt,
+      generated_at: task.generatedAt ?? null,
+      version_no: index + 1,
+      signature: signatureFromTask(task),
+    }))
 }
 
 /** 任务 params 里的归档原因（#58 组合切换只归档不删除：被替换的版本仍列在这里，标上原因） */
@@ -232,13 +272,23 @@ export async function buildKeyframeRequest(
     context?: KeyframeBuildContext
     assets?: EpisodeAssetEntry[]
     bindings?: TargetBindings
+    /** 批量预览预加载（#118 C）：整集一次查完后逐镜分发，避免逐槽重复查库 */
+    storyboard?: typeof schema.storyboards.$inferSelect
+    cardCtx?: DesignCardContext
+    keyframeState?: StoryboardKeyframeState
   } = {},
 ): Promise<KeyframeRequest> {
-  const [storyboard] = await db.select().from(schema.storyboards)
-    .where(eq(schema.storyboards.id, storyboardId))
+  const storyboard = opts.storyboard
+    ?? (await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, storyboardId)))[0]
   if (!storyboard || storyboard.deletedAt) throw new Error('镜头不存在')
 
-  await assertKeyframeEligible(storyboardId, slot)
+  if (opts.keyframeState) {
+    // 与 assertKeyframeEligible 同口径（调用方已按整集状态算好纪录片标记）
+    const excluded = keyframeIneligibility(storyboard, slot, opts.context?.drama?.projectType === 'documentary', opts.keyframeState)
+    if (excluded) throw new KeyframeIneligibleError(excluded)
+  } else {
+    await assertKeyframeEligible(storyboardId, slot)
+  }
   const prompt = slotPrompt(storyboard, slot)
 
   const context = opts.context ?? await loadKeyframeBuildContext(storyboard.episodeId, opts)
@@ -248,7 +298,7 @@ export async function buildKeyframeRequest(
   const issues = computeRefIssues({
     prompts: promptFieldsOf(storyboard), assets, bindings,
     ...(() => {
-      const resolved = resolveDesignCard(storyboard, loadDesignCardContext(storyboard.episodeId))
+      const resolved = resolveDesignCard(storyboard, opts.cardCtx ?? loadDesignCardContext(storyboard.episodeId))
       return { card: resolved.card, combo: resolved.combo }
     })(),
   })

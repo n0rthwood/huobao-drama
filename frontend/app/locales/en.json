@@ -157,6 +157,7 @@
       "percent": "Progress {percent}%",
       "textProgress": "{completed} / {total} done",
       "waitingScenes": "Waiting for scene extraction (task #{id}) to finish",
+      "waitingAgentSlot": "Waiting for a global agent slot (other batches are running)",
       "rewriteStages": "Rewrite stages",
       "retry": "Retry with model",
       "retrying": "Submitting…",

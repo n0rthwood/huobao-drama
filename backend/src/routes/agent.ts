@@ -5,6 +5,7 @@ import { Hono } from 'hono'
 import { validAgentTypes } from '../agents/index.js'
 import { buildAgentRequestContext } from '../agents/context.js'
 import { runAgent } from '../agents/run.js'
+import { runAsInteractiveAgent } from '../agents/agent-gate.js'
 import { createReasoningSink } from '../agents/reasoning-sink.js'
 import { mastra } from '../mastra/index.js'
 import { success, badRequest } from '../utils/response.js'
@@ -141,12 +142,12 @@ app.post('/:type/chat', async (c) => {
   }
 
   try {
-    const result = await runWithTextTask(taskId, () => runAgent(
+    const result = await runAsInteractiveAgent(() => runWithTextTask(taskId, () => runAgent(
       agent,
       [{ role: 'user', content: evidenceMessageParts(String(message), evidence) }],
       { maxSteps: 20, requestContext },
       sink,
-    ))
+    )))
 
     // 镜头数硬上限的止损（#57）：连续两批整批被拒就不再让模型重试，把任务判失败并给出合并建议
     if (agentType === 'storyboard_breaker' && kind) {

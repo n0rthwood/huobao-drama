@@ -28,8 +28,8 @@ import {
 import { listEpisodeStoryboards } from './storyboard-video.js'
 import {
   buildKeyframeRequest,
+  loadEpisodeKeyframeVersions,
   loadKeyframeBuildContext,
-  loadKeyframeVersions,
   submitStoryboardKeyframe,
 } from './storyboard-keyframes.js'
 import {
@@ -38,8 +38,9 @@ import {
   checkStoryboardRefs,
   computeRefIssues,
   describeIssues,
+  emptyTargetBindings,
   loadEpisodeAssets,
-  loadTargetBindings,
+  loadEpisodeTargetBindings,
   promptFieldsOf,
   type RefIssue,
 } from './storyboard-assets.js'
@@ -385,10 +386,13 @@ export async function previewEpisodeKeyframeBatch(
 
   const assets = await loadEpisodeAssets(episodeId)
   const cardCtx = loadDesignCardContext(episodeId)
+  // 整集一次查询 + Map 分发（Issue #118 C）：逐镜逐槽的绑定/版本查询不再重复打库
+  const bindingsByShot = await loadEpisodeTargetBindings(episodeId)
+  const versionsBySlot = await loadEpisodeKeyframeVersions(episodeId)
   const result: KeyframePreviewItem[] = []
   for (const sb of targets) {
     const state = keyframes.get(sb.id)
-    const bindings = await loadTargetBindings(sb.id)
+    const bindings = bindingsByShot.get(sb.id) ?? emptyTargetBindings()
     const issues = computeRefIssues({
       prompts: promptFieldsOf(sb), assets, bindings,
       ...(() => {
@@ -420,13 +424,14 @@ export async function previewEpisodeKeyframeBatch(
       try {
         signature = (await buildKeyframeRequest(sb.id, slot, {
           model: opts.model, configId: opts.configId, context, assets, bindings,
+          storyboard: sb, cardCtx, keyframeState: state,
         })).signature
       } catch (err) {
         result.push({ ...base, status: 'skipped', checked: false, reason: err instanceof Error ? err.message : '无法组装生成请求' })
         continue
       }
 
-      const versions = await loadKeyframeVersions(sb.id, slot)
+      const versions = versionsBySlot.get(`${sb.id}:${SLOT_FRAME_TYPE[slot]}`) ?? []
       const ownImage = slotOwnImage(sb, slot)
       const selected = versions.find(version => version.image === ownImage) ?? null
       if (!ownImage) {

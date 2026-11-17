@@ -7,7 +7,7 @@ import { generateImage, generateVideo } from '../services/generation.js'
 import { getActiveConfig, getConfigById, validateVideoModel } from '../services/ai.js'
 import { getDramaStylePrompt } from '../services/style-preset.js'
 import { logTaskError, logTaskPayload, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
-import { isH3JobsTask, serializeTask, serializeTasks } from '../services/sys-task.js'
+import { isActiveTaskStatus, isH3JobsTask, serializeTask, serializeTasks } from '../services/sys-task.js'
 import { cancelImageTask, discardRemoteJob } from '../services/qwen-jobs.js'
 import { cancelVideoTask, discardRemoteVideoJob } from '../services/h3-jobs.js'
 import { enrichTask, listActiveTasks, listTaskCenter } from '../services/task-center.js'
@@ -17,7 +17,8 @@ import { readReasoningFile } from '../agents/reasoning-sink.js'
 import {
   countObservedMessages, getObservedCall, listObservedCalls, listObservedMessages, listObservedWork,
 } from '../services/task-observability.js'
-import { parseTextTaskParams } from '../services/text-task.js'
+import { cancelTextTask, parseTextTaskParams } from '../services/text-task.js'
+import { abortBatchTask } from '../services/text-batch-cancel.js'
 import { onAssetLibraryChanged } from '../services/asset-review.js'
 import { buildStoryboardVideoRequest } from '../services/storyboard-video.js'
 import { resolveDramaProjectType } from '../services/project-type.js'
@@ -377,12 +378,24 @@ app.get('/', async (c) => {
   return success(c, serializeTasks(rows))
 })
 
-// POST /tasks/:id/cancel — 取消排队/运行中的任务队列任务（图片 qwen-jobs / 视频 h3-jobs；其它供应商不支持）
+// POST /tasks/:id/cancel — 取消排队/运行中的任务：图片 qwen-jobs / 视频 h3-jobs /
+// 提示词与设计卡文本批量（#118 B：等待全局 agent 闸的排队立即出队，不泄漏槽）；其它供应商不支持
+const CANCELLABLE_TEXT_KINDS = ['keyframe_prompts', 'video_prompts', 'design_card']
 app.post('/:id/cancel', async (c) => {
   const id = Number(c.req.param('id'))
   try {
     const [row] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, id))
-    const cancelled = row && isH3JobsTask(row.provider) ? await cancelVideoTask(id) : await cancelImageTask(id)
+    if (!row) throw new Error('任务不存在')
+    const textKind = row.type === 'text' ? parseTextTaskParams(row.params)?.kind : undefined
+    if (textKind && CANCELLABLE_TEXT_KINDS.includes(textKind)) {
+      if (!isActiveTaskStatus(row.status)) return success(c, serializeTask(row))
+      // 先标终态再 abort：runner 收尾用 finishTextTaskUnlessCancelled，不会覆盖 cancelled
+      await cancelTextTask(id, '用户取消')
+      abortBatchTask(id, '用户取消')
+      const [fresh] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, id))
+      return success(c, serializeTask(fresh!))
+    }
+    const cancelled = isH3JobsTask(row.provider) ? await cancelVideoTask(id) : await cancelImageTask(id)
     return success(c, serializeTask(cancelled))
   } catch (err) {
     return badRequest(c, err instanceof Error ? err.message : '取消失败')

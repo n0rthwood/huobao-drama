@@ -41,7 +41,7 @@
 用途：回看任务的持久工作项与实际模型调用。`cursor` 是上一页最后一个调用的 `id`，不是分镜序号；`work_id` 可缩小到某个工作项，`limit` 默认 50、钳 1–200；任务不存在时返回 400（不是 404）。
 返回恒定形状 `{task_id, works[], calls[], messages[], message_limit, messages_complete, limit, next_cursor, has_more}`：`messages`/`message_limit`/`messages_complete` **在轻量模式下也始终存在**，分别是 `[]`、`0`、`false`，不要把 `messages_complete:false` 读成「正文被截断」，轻量模式本来就没取正文（`backend/src/routes/tasks.ts:298-325`）。
 - `with_messages=1`（严格等于字符串 `1`，`true` 不生效）才附消息；此时 `message_limit` 默认 20、钳 1–200，是**每条调用**取前 N 条；`messages_complete=true` 仅当本页每条调用的 `message_count ≤ message_limit`。
-- `works[]` 每行：`id/task_id/stage/source_chars/sample_key/storyboard_id/storyboard_number/started_at/finished_at/status/model_ms/queue_ms/work_ms/call_count/heartbeat_at/error_msg/created_at/active_call_started_at/active_call_heartbeat_at`。`stage ∈ skeleton|voice|design_card`，`status ∈ processing|completed|failed|interrupted`。
+- `works[]` 每行：`id/task_id/stage/source_chars/sample_key/storyboard_id/storyboard_number/started_at/finished_at/status/model_ms/queue_ms/agent_gate_ms/work_ms/call_count/heartbeat_at/error_msg/created_at/active_call_started_at/active_call_heartbeat_at`。`stage ∈ skeleton|voice|design_card|design_group_plan|keyframe_prompts|video_prompts|junction_caption|layer_base_check|map_workflow|map_studio`，`status ∈ processing|completed|failed|interrupted`。`agent_gate_ms`（Issue #118）= 全局 agent 并发闸（默认上限 2，env `HUOBAO_AGENT_GLOBAL_CONCURRENCY`）的排队等待，与端点 `queue_ms` 分列；旧任务为 0。批量任务 `params.progress.step='waiting_agent_slot'` 表示当前镜正在等全局槽。
 - `calls[]` 每行：`id/work_id/task_id/kind/config_id/config_name/provider/model/url/stream/status/http_status/queued_at/started_at/finished_at/duration_ms/queue_ms/request_chars/response_chars/prompt_tokens/completion_tokens/finish_reason/error_msg/heartbeat_at/created_at`，外加接口计算的 `message_count`。`kind ∈ llm|vision_chat|tts`（配音记的是真实 TTS 请求，不冒称 LLM 对话）。
 - 时间点是 epoch 毫秒、时长是毫秒；`prompt_tokens`/`completion_tokens` 允许为 null，缺失的 usage 不编造。
 任务窗口列表轮询用轻量模式，展开某条调用后再按需读消息。沿 `next_cursor` 翻页到末尾（`has_more` 为真即继续），不把第一页当完整历史。在飞调用/正文可以原 ID 增量更新，活动视图还须刷新已加载在飞行，不能只读取大于末尾 ID 的新行。旧任务没有观测记录不代表它没调用模型，不能回填伪造历史。
@@ -783,6 +783,11 @@ Body：`{storyboard_ids?, config_id?, model?}`；把已定分镜写成时间段�
 - `generated_segment_s`：纪录片逐镜的生成段秒数（设计卡 `budget.gen_s`，老数据回落 `duration`），写 `mid_frame_time` 时用它判区间；越界存量在 `GET /episodes/{e}/storyboards` 的 `ref_issues` 里是阻断 `mid_time_out_of_range`。
 - 生成段参考素材里的 faithful 道具/地图在 `gen_plan.reference_assets` 被拒收（`faithful_in_diffusion`，改用图层段承载）；目标绑定到这类资产时 `ref_issues` 阻断同码、装配参考图不发这张图（`target_assets[].diffusion_blocked`）。
 - 承接首帧取上一镜**生效尾帧**：上一镜是 D 且衔接帧可用 → 用衔接帧，否则用它的 `last_frame_image` 列。D 的尾帧从不写列，只看列会让 D 之后承接的镜永远没有首帧（ep 30 #03 承接 #02）。
+
+### Agent 工具 `read_storyboard_context` 的提示词批量瘦身（Issue #118）[S]
+- `storyboardPromptScope ∈ video|keyframes`（关键帧/视频提示词批量）时：①`text_spec` 省略（只有设计卡/拆镜 scope 需要模板文本框规范；画幅/构图仍在 `aspect_ratio`/`composition`）；②道具只保留**窗口内各镜绑定/设计卡引用/资产池 @ 到**者的完整 `semantics`+`map_pip`，其余道具一行摘要（`detail_omitted:true`，无 semantics/map_pip），并附 `props_note` 说明可用 `read_props` 补细节。设计卡 scope 与拆镜（无 scope）全量不变。
+- 依据：video-prompt/keyframe-prompt 技能硬规则只引用本镜已绑定资产；ep30 实测 video scope payload 86,724 → 约 60–70K 字符，props 段 33,901 → 约 22K（33 道具中 4 个保留细节）。
+- 批量生命周期缓存：同一批量内整集加载器（关键帧状态/锁定衔接帧/本集资产/设计卡上下文/池关联）按 episodeId 缓存，工具写库后立即失效；#43 同步事务链不读缓存。交互读路径（无批量作用域）不缓存。
 
 ### `POST /episodes/{e}/video-batch/preview` [R]
 Body：`{storyboard_ids?, config_id, model}`
