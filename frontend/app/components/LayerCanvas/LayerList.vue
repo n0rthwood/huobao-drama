@@ -26,36 +26,38 @@
     <ul class="ll-items">
       <li
         v-for="(layer, index) in ordered" :key="layer.id"
-        :class="['ll-item', { selected: selectedIds.includes(layer.id), dragging: dragId === layer.id }]"
-        draggable="true"
+        :class="['ll-item', { selected: selectedIds.includes(layer.id), dragging: dragId === layer.id, asset: layer.from_asset }]"
+        :draggable="!layer.from_asset"
         @click="onClick(layer, $event)"
-        @dragstart="dragId = layer.id"
+        @dragstart="!layer.from_asset && (dragId = layer.id)"
         @dragover.prevent
         @drop.prevent="onDrop(index)"
         @dragend="dragId = null"
       >
-        <GripVertical :size="12" class="ll-grip" />
+        <GripVertical v-if="!layer.from_asset" :size="12" class="ll-grip" />
         <component :is="TYPE_ICONS[layer.type]" :size="14" />
         <input
           v-if="renaming === layer.id" ref="renameInput" class="ll-name-input" :value="layer.name"
           @click.stop @blur="commitRename(layer, $event)" @keydown.enter.prevent="$event.target.blur()"
         >
-        <span v-else class="ll-name" @dblclick.stop="startRename(layer.id)">{{ layer.name }}</span>
+        <span v-else class="ll-name" @dblclick.stop="!layer.from_asset && startRename(layer.id)">{{ layer.name }}</span>
+        <!-- 资产层（Issue #117）：外观与几何由地图资产决定，段里只能切它在关键帧里的可见性 -->
+        <span v-if="layer.from_asset" class="ll-badge" :title="assetTip(layer)">{{ t('layerCanvas.list.fromAsset') }}</span>
         <span v-if="glyphs[layer.id]?.length" class="ll-warning" :title="t('layerCanvas.style.missingChars', { chars: glyphs[layer.id].join(' ') })"><TriangleAlert :size="13" /></span>
-        <button v-if="layer.type !== 'text'" type="button" :class="['ll-icon', 'll-anchor', status(layer)]"
+        <button v-if="layer.type !== 'text' && !layer.from_asset" type="button" :class="['ll-icon', 'll-anchor', status(layer)]"
           :title="t(`layerCanvas.anchor.${status(layer)}`)" :aria-label="t('layerCanvas.anchor.relink')"
           @click.stop="emit('relink', layer.id)"><component :is="ANCHOR_ICONS[status(layer)]" :size="14" /></button>
-        <button type="button" class="ll-icon" :aria-pressed="layer.visible" :title="t('layerCanvas.list.visible')" :aria-label="t('layerCanvas.list.visible')" @click.stop="toggle(layer, 'visible')"><component :is="layer.visible ? Eye : EyeOff" :size="14" /></button>
-        <button type="button" class="ll-icon" :aria-pressed="layer.locked" :title="t('layerCanvas.list.locked')" :aria-label="t('layerCanvas.list.locked')" @click.stop="toggle(layer, 'locked')"><component :is="layer.locked ? Lock : LockOpen" :size="14" /></button>
-        <button v-if="layer.type !== 'text' && layer.anchor && !layer.anchor.detached" type="button" class="ll-icon ll-hover" :title="t('layerCanvas.anchor.toManual')" :aria-label="t('layerCanvas.anchor.toManual')" @click.stop="manual(layer)"><Move :size="13" /></button>
+        <button v-if="!layer.from_asset" type="button" class="ll-icon" :aria-pressed="layer.visible" :title="t('layerCanvas.list.visible')" :aria-label="t('layerCanvas.list.visible')" @click.stop="toggle(layer, 'visible')"><component :is="layer.visible ? Eye : EyeOff" :size="14" /></button>
+        <button v-if="!layer.from_asset" type="button" class="ll-icon" :aria-pressed="layer.locked" :title="t('layerCanvas.list.locked')" :aria-label="t('layerCanvas.list.locked')" @click.stop="toggle(layer, 'locked')"><component :is="layer.locked ? Lock : LockOpen" :size="14" /></button>
+        <button v-if="layer.type !== 'text' && layer.anchor && !layer.anchor.detached && !layer.from_asset" type="button" class="ll-icon ll-hover" :title="t('layerCanvas.anchor.toManual')" :aria-label="t('layerCanvas.anchor.toManual')" @click.stop="manual(layer)"><Move :size="13" /></button>
         <!-- 文本框的角色在一个位置区里唯一：复制出来必然同区冲突，换成从菜单添加另一个角色 -->
-        <button v-if="layer.type !== 'text'" type="button" class="ll-icon ll-hover" :title="t('layerCanvas.list.duplicate')" :aria-label="t('layerCanvas.list.duplicate')" @click.stop="emit('select', [layer.id]); emit('duplicate')"><Copy :size="13" /></button>
-        <button type="button" class="ll-icon ll-hover" :title="t('layerCanvas.list.remove')" :aria-label="t('layerCanvas.list.remove')" @click.stop="emit('select', [layer.id]); emit('remove')"><Trash2 :size="13" /></button>
+        <button v-if="layer.type !== 'text' && !layer.from_asset" type="button" class="ll-icon ll-hover" :title="t('layerCanvas.list.duplicate')" :aria-label="t('layerCanvas.list.duplicate')" @click.stop="emit('select', [layer.id]); emit('duplicate')"><Copy :size="13" /></button>
+        <button v-if="!layer.from_asset" type="button" class="ll-icon ll-hover" :title="t('layerCanvas.list.remove')" :aria-label="t('layerCanvas.list.remove')" @click.stop="emit('select', [layer.id]); emit('remove')"><Trash2 :size="13" /></button>
       </li>
     </ul>
     <div class="ll-foot">
-      <button type="button" class="btn-ghost ll-icon" :title="t('layerCanvas.list.duplicate')" :aria-label="t('layerCanvas.list.duplicate')" :disabled="!selectedIds.length" @click="emit('duplicate')"><Copy :size="15" /></button>
-      <button type="button" class="btn-ghost ll-icon" :title="t('layerCanvas.list.remove')" :aria-label="t('layerCanvas.list.remove')" :disabled="!selectedIds.length" @click="emit('remove')"><Trash2 :size="15" /></button>
+      <button type="button" class="btn-ghost ll-icon" :title="t('layerCanvas.list.duplicate')" :aria-label="t('layerCanvas.list.duplicate')" :disabled="!ownSelected" @click="emit('duplicate')"><Copy :size="15" /></button>
+      <button type="button" class="btn-ghost ll-icon" :title="t('layerCanvas.list.remove')" :aria-label="t('layerCanvas.list.remove')" :disabled="!ownSelected" @click="emit('remove')"><Trash2 :size="15" /></button>
     </div>
   </div>
 </template>
@@ -79,6 +81,8 @@ const props = defineProps({
   variables: { type: Object, default: null },
   /** 编辑器媒介（#96）：video = 图层段（可留锚定文字标注）、poster = 海报、'' = 地图（没有文本框） */
   medium: { type: String, default: '' },
+  /** 段底图的地图资产（Issue #117）：给了就说明文档里有只读的资产层，徽标要说出是哪个资产 */
+  mapSource: { type: Object, default: null },
 })
 const emit = defineEmits(['select', 'patch', 'history', 'reorder', 'add', 'remove', 'duplicate', 'relink'])
 const { t } = useI18n()
@@ -123,6 +127,18 @@ function addText() {
 
 function status(layer) {
   return props.anchorStates[layer.id] || (layer.anchor?.semantic_id && !layer.anchor.detached ? 'anchored' : 'manual')
+}
+
+/** 资产层只读、也不在段里存（Issue #117）：复制/删除只作用于段自己的层 */
+const ownSelected = computed(() => props.selectedIds.some(id => {
+  const layer = props.doc.layers.find(item => item.id === id)
+  return Boolean(layer && !layer.from_asset)
+}))
+
+/** 徽标提示：写清是哪张地图资产——同一个语义要素在资产里可能对应线 + 标注多层 */
+function assetTip(layer) {
+  const id = layer.from_asset?.asset_id
+  return t('layerCanvas.list.fromAssetTip', { name: props.mapSource?.asset_name ? `${props.mapSource.asset_name} · #${id}` : `#${id}` })
 }
 
 function manual(layer) {
@@ -202,6 +218,9 @@ function onDrop(displayIndex) {
 .ll-add-btn, .ll-icon { display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
 .ll-grip { flex-shrink: 0; color: var(--text-3); cursor: grab; }
 .ll-anchor.anchored { color: var(--accent); }
+/* 资产层（Issue #117）：徽标小、灰，不抢名字；行本身不可拖（没有 grip） */
+.ll-badge { flex-shrink: 0; padding: 0 4px; font-size: 10px; color: var(--accent-text, var(--accent)); border: 1px solid var(--border-strong, var(--border)); border-radius: 4px; }
+.ll-item.asset .ll-name { color: var(--text-2); }
 .ll-anchor.manual { color: var(--text-3); }
 .ll-anchor.unlink, .ll-warning { color: var(--danger, #c0472e); }
 .ll-hover { opacity: 0; }

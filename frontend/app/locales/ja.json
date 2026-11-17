@@ -1039,6 +1039,9 @@
       "junctionPreview": "接続フレームの画面：文字レイヤーとピクチャ・イン・ピクチャは表示されません（拡散モデルへ渡さないため）",
       "budgetMismatch": "実長 {actual}s / 予算 {budget}s",
       "createMarker": "マーカーを作成して固定",
+      "showInSegment": "このセグメントで要素を表示",
+      "showInSegmentMissing": "アセットに「{name}」に対応するレイヤーがないため、このセグメントでは表示できません。",
+      "showInSegmentNoFrame": "このセグメントには 0 秒より後のキーフレームがありません。先に追加してください。",
       "markerName": "マーカー",
       "backToCard": "設計カードで修正",
       "junctionLockTag": "接続フレーム",
@@ -3401,7 +3404,7 @@
     "keyframeBar": {"title":"精密キーフレーム","add":"現在時刻に追加","copyPrev":"前のフレームを複製","remove":"削除（先頭は保護）","duration":"区間長","endHold":"末尾保持","junction":"接続フレーム","junctionTextWarn":"接続には文字を含みません：{n} 個の文字レイヤーは出力されません","junctionImageWarn":"接続フレームにピクチャ・イン・ピクチャは含まれません：{n} 個の画像レイヤーは出力されません","teach":"区間は精密キーフレームで構成されます。各フレームは時刻・表示範囲・可視レイヤーを定義し、プログラムが移動とフェードを補間して動画を描画します。スライドではありません。","ease":"次のフレームへの補間","fade":"新レイヤーのフェード","viewportPick":"表示範囲（キャンバスで操作）","visible":"可視レイヤー"},
     "frameGhostHint": "キャンバスは現在時刻の状態を描画します。この時刻で見えないレイヤーは淡く表示されます",
     "base": {"title":"背景","noBase":"背景未選択（先に文字を編集できます）","replace":"背景を変更","cropToOutput":"完成比率に切り抜く","aspectBanner":"背景の比率 {aspect} は完成映像と異なります。余白を付けてレンダリングするため視覚検証が必要です。完成比率に切り抜くか、この素材のプロジェクト比率版を生成してください","cropHelp":"元画像の座標上で完成比率の枠または角をドラッグ。元画像は変更されません。","applyCrop":"適用","cancelCrop":"キャンセル","outputSize":"出力キャンバス {w}×{h}","sourceSize":"元画像 {w}×{h}（原本の画素数）","sourceUnknown":"元画像のサイズは不明です","resolution":"切り抜き後の元画像の画素数は完成映像 {sw}×{sh} の {times} 倍（不足する軸を基準）","verified":"検証済み","inherited":"継承背景（固定）","guide":"元画像の画素数は切り抜き座標と鮮明さの判定に使用し、出力キャンバスのサイズは決めません。切り抜き後の幅・高さともに完成映像の2倍以上を推奨します。","style":"全体スタイル","unknown":"背景","version":"バージョン {version}","saveSize":"元画像のサイズはサーバーで未確認です。保存時に原本を読み取ります。","loadError":"素材または意味情報を読み込めません。","framingClamped":"一部の表示範囲を切り抜き内に収めました。元に戻すと全範囲を復元できます。"},
-    "anchor": {"anchored":"固定済み","manual":"手動","unlink":"参照項目が削除・改名されています","detachConfirm":"このレイヤーは「{name}」に固定されています。解除して移動しますか？","relink":"固定先を選択","toManual":"手動に変更","labelOffset":"ラベル位置補正","addMarker":"マーカー追加","addRegion":"領域追加","addRoute":"経路追加","noSemantics":"意味情報がありません。","inherited":"継承背景では固定を使用できません。","choose":"再固定する項目を選択","cancel":"キャンセル","points":"地点","regions":"領域","lines":"経路","labels":"ラベル"},
+    "anchor": {"anchored":"固定済み","manual":"手動","unlink":"参照項目が削除・改名されています","detachConfirm":"このレイヤーは「{name}」に固定されています。解除して移動しますか？","relink":"固定先を選択","toManual":"手動に変更","labelOffset":"ラベル位置補正","addMarker":"マーカー追加","addRegion":"領域追加","addRoute":"経路追加","noSemantics":"意味情報がありません。","inherited":"継承背景では固定を使用できません。","choose":"再固定する項目を選択","cancel":"キャンセル","points":"地点","regions":"領域","lines":"経路","labels":"ラベル","assetLayersNote":"このセグメントの背景は地図アセット「{name}」です。要素はアセット自身のレイヤーから来るため、ここでは作成や再固定はできません。正確なキーフレームで出現・非表示を決めます。"},
     "quality": {"badge":"有効 {w}×{h} < {sw}×{sh}（拡大過多）","frameDot":"有効画素が出力未満","hint":"高解像度画像を使うか縮小してください。"},
     "image": {"pick":"素材を選択","legacyPath":"旧ローカルパスです。素材を選び直してください。","selectionCount":"画像を1枚選択してください。","cover":"充填","contain":"全体表示","episode":"このエピソードの素材","uploadHint":"アップロード画像はこのエピソードの素材と正式バージョンに登録されます。","contextMissing":"アップロードやフレーム取り込みにはエピソード内で開いてください。"},
     "type": {
@@ -3458,7 +3461,9 @@
       "duplicate": "複製",
       "remove": "削除",
       "anchored": "アンカー付き意味注釈",
-      "detached": "アンカーから外れています"
+      "detached": "アンカーから外れています",
+      "fromAsset": "アセット由来",
+      "fromAssetTip": "外観とジオメトリは地図アセット {name} 由来です。このセグメントではキーフレームで表示/非表示を切り替えるだけです。"
     },
     "style": {
       "docTitle": "画面とベースマップ",
@@ -3468,6 +3473,9 @@
       "paper": "紙質感",
       "vignette": "周辺減光",
       "empty": "レイヤーを選択するとスタイルを編集できます",
+      "assetReadonly": "スタイルとジオメトリは地図アセット「{name}」由来のため、このセグメントでは読み取り専用です。線種・色・注記を変えるにはマップスタジオでアセットを編集してください。",
+      "assetOpenStudio": "マップスタジオでこのアセットを開く",
+      "assetVisibleHint": "このショットで表示/非表示にするには、正確なキーフレームでこのレイヤーにチェックを入れてください。",
       "opacity": "不透明度",
       "rotation": "回転",
       "fill": "塗りつぶし色",

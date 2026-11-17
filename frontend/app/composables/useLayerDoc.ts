@@ -43,6 +43,8 @@ export interface LayerRecord {
   field_vars?: Partial<Record<string, LayerVariable>>
   src?: { path: string; asset_kind?: 'prop' | 'scene' | 'character'; asset_id?: number; version_task_id?: number | null }
   fit?: 'contain' | 'cover'
+  /** 来自地图资产自己的图层文档（Issue #117）：服务端每次读取时展开、保存时剥离，段里只存引用 */
+  from_asset?: { asset_id: number; layer_id: string }
   style: Record<string, unknown>
 }
 export interface LayerDocument {
@@ -73,6 +75,15 @@ export const LAYER_TYPE_LABELS: Record<LayerType, string> = {
 
 /** 图层的几何键：模板文本框没有这些（位置由规范排版），补丁里出现也一律忽略。 */
 const GEOMETRY_KEYS: Array<keyof LayerRecord> = ['points', 'at', 'box', 'rotation']
+
+/**
+ * 资产层（Issue #117）：以地图资产为底图的段，服务端把资产自己的锚定图层展开进文档，
+ * 带 `from_asset` 且 `locked`。外观与几何只读——分镜只能在关键帧里切换它的可见性，
+ * 所以这里所有写操作对它们都是空操作，任何调用方都改不动。
+ */
+function isAssetLayer(layer: Partial<LayerRecord> | null | undefined): boolean {
+  return Boolean(layer?.from_asset)
+}
 
 export function emptyLayerDoc(base?: Partial<LayerDocument['base']>): LayerDocument {
   return {
@@ -204,6 +215,8 @@ export function useLayerDoc(
   function patchLayer(id: string, patch: Partial<LayerRecord>) {
     const layer = doc.value.layers.find(item => item.id === id)
     if (!layer) return
+    // 资产层只读（Issue #117）：几何/名字/可见性都不落在段里，空操作而不是压一条假历史
+    if (isAssetLayer(layer)) return null
     // 模板文本框的位置/旋转由规范排版：几何补丁直接丢弃，不给「拖不动却压了一条历史」的错觉
     const effective = layer.type === 'text'
       ? (Object.fromEntries(Object.entries(patch).filter(([key]) => !GEOMETRY_KEYS.includes(key as keyof LayerRecord))) as Partial<LayerRecord>)
@@ -219,14 +232,14 @@ export function useLayerDoc(
   /** Explicit user-approved detach; history belongs to the complete gesture, not this helper. */
   function detachAnchors(ids: string[]) {
     for (const layer of doc.value.layers) {
-      if (ids.includes(layer.id) && layer.anchor) layer.anchor.detached = true
+      if (ids.includes(layer.id) && layer.anchor && !isAssetLayer(layer)) layer.anchor.detached = true
     }
   }
 
   /** Rebinding is explicit and atomically restores the source geometry and its anchor. */
   function reanchorLayer(id: string, patch: Partial<LayerRecord>) {
     const layer = doc.value.layers.find(item => item.id === id)
-    if (!layer || !patch.anchor?.semantic_id) return
+    if (!layer || !patch.anchor?.semantic_id || isAssetLayer(layer)) return
     pushHistory()
     Object.assign(layer, clampGeometry(patch), { anchor: { ...patch.anchor, detached: false } })
   }
@@ -238,7 +251,7 @@ export function useLayerDoc(
 
   function patchStyle(id: string, patch: Record<string, unknown>) {
     const layer = doc.value.layers.find(item => item.id === id)
-    if (layer) layer.style = { ...layer.style, ...patch }
+    if (layer && !isAssetLayer(layer)) layer.style = { ...layer.style, ...patch }
   }
 
   function addLayer(type: LayerType, partial?: Partial<LayerRecord>) {
@@ -273,17 +286,20 @@ export function useLayerDoc(
   }
 
   function removeSelected() {
-    if (!selectedIds.value.length) return
+    // 资产层不在段里存、删了也会在下次读取时回来：移除操作只作用于段自己的层
+    const removable = selectedIds.value.filter(id => !isAssetLayer(doc.value.layers.find(layer => layer.id === id)))
+    if (!removable.length) return
     pushHistory()
-    doc.value.layers = doc.value.layers.filter(layer => !selectedIds.value.includes(layer.id))
-    selectedIds.value = []
+    doc.value.layers = doc.value.layers.filter(layer => !removable.includes(layer.id))
+    selectedIds.value = selectedIds.value.filter(id => !removable.includes(id))
   }
 
   function duplicateSelected() {
-    if (!selectedIds.value.length) return
+    const sources = selectedLayers.value.filter(layer => !isAssetLayer(layer))
+    if (!sources.length) return
     pushHistory()
     const maxZ = Math.max(...doc.value.layers.map(layer => layer.z), -1)
-    const copies = selectedLayers.value.map((layer, index) => {
+    const copies = sources.map((layer, index) => {
       const copy: LayerRecord = JSON.parse(JSON.stringify(layer))
       copy.id = `${layer.type}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}-${index}`
       copy.name = `${layer.name} 副本`
@@ -301,10 +317,15 @@ export function useLayerDoc(
   /** 把图层移动到列表中的新位置并重排 z（列表里越靠下 z 越大 = 越靠上层）。 */
   function reorder(id: string, toIndex: number) {
     const from = doc.value.layers.findIndex(layer => layer.id === id)
-    if (from < 0 || toIndex < 0 || toIndex >= doc.value.layers.length || from === toIndex) return
+    // 资产层固定排在段自己的层之下（服务端读取时也这样展开），既不能移动也不能被压到下面
+    if (from < 0 || isAssetLayer(doc.value.layers[from])) return
+    const firstOwn = doc.value.layers.findIndex(layer => !isAssetLayer(layer))
+    const floor = firstOwn < 0 ? doc.value.layers.length : firstOwn
+    const target = Math.min(doc.value.layers.length - 1, Math.max(toIndex, floor))
+    if (target === from) return
     pushHistory()
     const [moved] = doc.value.layers.splice(from, 1)
-    doc.value.layers.splice(toIndex, 0, moved)
+    doc.value.layers.splice(target, 0, moved)
     doc.value.layers.forEach((layer, index) => { layer.z = index })
   }
 
@@ -319,10 +340,10 @@ export function useLayerDoc(
     doc.value.base.filter = { paper: 0, tint: 'none', tint_strength: 0.35, vignette: 0, ...(doc.value.base.filter || {}), ...patch }
   }
 
-  /** 选中图层整体平移（拖动与方向键共用）；模板文本框没有几何，原地不动。 */
+  /** 选中图层整体平移（拖动与方向键共用）；模板文本框没有几何、资产层只读，原地不动。 */
   function moveSelected(dx: number, dy: number) {
     for (const layer of selectedLayers.value) {
-      if (layer.locked || layer.type === 'text') continue
+      if (layer.locked || layer.type === 'text' || isAssetLayer(layer)) continue
       if (layer.points) patchLayer(layer.id, { points: layer.points.map(([x, y]) => [x + dx, y + dy]) })
       else if (layer.at) patchLayer(layer.id, { at: [layer.at[0] + dx, layer.at[1] + dy] })
       else if (layer.box) patchLayer(layer.id, { box: { ...layer.box, x: layer.box.x + dx, y: layer.box.y + dy } })

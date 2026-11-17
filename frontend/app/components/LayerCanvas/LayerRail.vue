@@ -53,6 +53,10 @@
           <LayerStyle :doc="doc" document-only @theme="emit('theme', $event)" @filter="emit('filter', $event)" />
         </details>
         <p v-if="inherited" class="lr-guide">{{ t('layerCanvas.anchor.inherited') }}</p>
+        <!-- 地图资产底图（Issue #117）：要素来自资产自己的图层，不在这里新建/重锚，只在关键帧里出现与隐藏 -->
+        <p v-else-if="mapSource" class="lr-guide">
+          <Info :size="13" />{{ t('layerCanvas.anchor.assetLayersNote', { name: mapSourceName }) }}
+        </p>
         <template v-else>
           <div v-if="relinkId" class="lr-relink"><Anchor :size="14" />{{ t('layerCanvas.anchor.choose') }}
             <button type="button" class="btn-ghost" @click="relinkId = null">{{ t('layerCanvas.anchor.cancel') }}</button>
@@ -75,7 +79,7 @@
     </details>
     <details open class="lr-section">
       <summary><Layers :size="15" />{{ t('layerCanvas.list.title') }}</summary>
-      <LayerList :doc="doc" :selected-ids="selectedIds" :anchor-states="anchorStates" :variables="variables" :medium="medium"
+      <LayerList :doc="doc" :selected-ids="selectedIds" :anchor-states="anchorStates" :variables="variables" :medium="medium" :map-source="mapSource"
         @select="emit('select', $event)" @history="emit('history')" @patch="emit('patch', $event)"
         @reorder="emit('reorder', $event)" @add="(type, partial) => emit('add', type, partial)" @remove="emit('remove')"
         @duplicate="emit('duplicate')" @relink="startRelink" />
@@ -95,8 +99,8 @@
     </details>
     <details open class="lr-section">
       <summary><SlidersHorizontal :size="15" />{{ t('layerCanvas.style.docTitle') }}</summary>
-      <LayerStyle :doc="doc" :layer="selectedLayer" :assets="imageAssets" :drama-id="dramaId" :episode-id="episodeId" :variables="variables" :beats="beats" layer-only
-        @patch="emit('patch', $event)" @style="emit('style', $event)" @history="emit('history')" @registered="emit('assets-changed', $event)" />
+      <LayerStyle :doc="doc" :layer="selectedLayer" :assets="imageAssets" :drama-id="dramaId" :episode-id="episodeId" :variables="variables" :beats="beats" :map-source="mapSource" layer-only
+        @patch="emit('patch', $event)" @style="emit('style', $event)" @history="emit('history')" @registered="emit('assets-changed', $event)" @asset-open="emit('asset-open', $event)" />
     </details>
     <AssetPicker v-if="!externalSources" :open="pickerOpen" :assets="baseChoices" @close="pickerOpen = false" @confirm="chooseBase" />
   </aside>
@@ -144,8 +148,13 @@ const props = defineProps({
   medium: { type: String, default: '' },
   /** 时间线的「拍」（#96）：每个关键帧可见的图层 id 集合，供文本框同拍/相邻拍检查 */
   beats: { type: Array, default: () => [] },
+  /**
+   * 段底图的地图资产（Issue #117）：`{asset_id, asset_name, layer_count}`。
+   * 给了就说明要素来自资产自己的图层文档，rail 不再提供「语义条目 → 新建/重锚」。
+   */
+  mapSource: { type: Object, default: null },
 })
-const emit = defineEmits(['select', 'patch', 'style', 'history', 'reorder', 'add', 'remove', 'duplicate', 'theme', 'filter', 'base', 'crop-request', 'reanchor', 'assets-changed', 'text-layout', 'preview'])
+const emit = defineEmits(['select', 'patch', 'style', 'history', 'reorder', 'add', 'remove', 'duplicate', 'theme', 'filter', 'base', 'crop-request', 'reanchor', 'assets-changed', 'text-layout', 'preview', 'asset-open'])
 const { t } = useI18n()
 const GROUPS = ['points', 'regions', 'lines', 'labels']
 const candidates = ref([])
@@ -168,6 +177,8 @@ const link = useDeeplink('layerPicker', DEEPLINK_KEYS.layerPicker)
 const urlPickerOpen = querySingle(link.initial('lpick')) === '1' && !link.initial('lpmode')
 watch(pickerOpen, open => link.set({ lpick: open ? '1' : '', lpmode: '' }), { immediate: true })
 const externalSources = computed(() => Array.isArray(props.baseSources))
+/** 资产名（Issue #117）：说明里指清楚是哪张地图资产，没有名字就用 id */
+const mapSourceName = computed(() => props.mapSource?.asset_name || `#${props.mapSource?.asset_id}`)
 if (urlPickerOpen) {
   // Poster hosts replace the base from an inline source list, so there is no AssetPicker to restore.
   if (externalSources.value) toast.warning(t('deeplink.missing'))
@@ -237,7 +248,7 @@ watch(() => props.episodeId, async (episodeId) => {
   } catch { if (request === candidateRequest) loadError.value = true }
 }, { immediate: true })
 
-watch(() => [props.doc.base.path, props.doc.base.ref?.asset_kind, props.doc.base.ref?.asset_id, props.inherited], refreshSemantics, { immediate: true })
+watch(() => [props.doc.base.path, props.doc.base.ref?.asset_kind, props.doc.base.ref?.asset_id, props.inherited, props.mapSource?.asset_id], refreshSemantics, { immediate: true })
 watch(() => props.doc.base.path, () => { baseImageError.value = false })
 async function refreshSemantics() {
   const request = ++semanticRequest
@@ -245,6 +256,8 @@ async function refreshSemantics() {
   semanticsLoaded.value = false
   relinkId.value = null
   naturalSize.value = { width: 0, height: 0 }
+  // 地图资产底图（Issue #117）：语义条目只用于新建/重锚重画层，这里一律不提供，也就不必拉取
+  if (props.mapSource) return
   if (props.inherited || props.doc.base.ref?.asset_kind !== 'prop' || !props.doc.base.ref?.asset_id) return
   try {
     const result = await propAPI.semantics(props.doc.base.ref.asset_id)
@@ -297,7 +310,7 @@ function useEntry(entry) {
   else emit('add', patch.type, patch)
 }
 function startRelink(id) {
-  if (props.inherited) return
+  if (props.inherited || props.mapSource) return
   relinkId.value = id
   if (baseSection.value) baseSection.value.open = true
 }

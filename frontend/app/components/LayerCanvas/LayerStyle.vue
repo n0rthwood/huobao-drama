@@ -31,7 +31,18 @@
       </label>
     </section>
 
-    <section v-if="!layer && !documentOnly" class="ls-empty">{{ t('layerCanvas.style.empty') }}</section>
+    <!-- 资产层（Issue #117）：外观取自地图资产，段里只读；到地图工作室改资产 -->
+    <section v-if="assetLayer && !documentOnly" class="ls-block">
+      <h4>{{ t(`layerCanvas.type.${assetLayer.type}`) }} · {{ assetLayer.name }}</h4>
+      <span class="ls-asset-badge">{{ t('layerCanvas.list.fromAsset') }} {{ assetLabel }}</span>
+      <p class="ls-purpose">{{ t('layerCanvas.style.assetReadonly', { name: assetLabel }) }}</p>
+      <button type="button" class="btn-ghost ls-pick" @click="emit('asset-open', assetLayer.from_asset.asset_id)">
+        <MapPinned :size="14" />{{ t('layerCanvas.style.assetOpenStudio') }}
+      </button>
+      <small class="ls-hint">{{ t('layerCanvas.style.assetVisibleHint') }}</small>
+    </section>
+
+    <section v-else-if="!layer && !documentOnly" class="ls-empty">{{ t('layerCanvas.style.empty') }}</section>
 
     <template v-else-if="layer && !documentOnly">
       <section class="ls-block">
@@ -189,7 +200,7 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { THEME_PRESETS, unsupportedChars } from '~/utils/layerSvg'
 import { textCapacity, textFieldValue, textLayerProblems, textLayerTexts } from '~/utils/layerText'
-import { TriangleAlert, ImagePlus } from 'lucide-vue-next'
+import { TriangleAlert, ImagePlus, MapPinned } from 'lucide-vue-next'
 import LayerImagePicker from './LayerImagePicker.vue'
 import { missingGlyphsOf } from '~/composables/useMissingGlyphs'
 import { textRoleDef, useLayerTextNames, useLayerTextSpec } from '~/composables/useLayerTextSpec'
@@ -211,8 +222,10 @@ const props = defineProps({
    * 图层段由精确关键帧给出，Poster 只有一拍（缺省 = 全部可见图层）。
    */
   beats: { type: Array, default: () => [] },
+  /** 段底图的地图资产（Issue #117）：资产层的样式只读，说明里要写出是哪张资产 */
+  mapSource: { type: Object, default: null },
 })
-const emit = defineEmits(['patch', 'style', 'history', 'theme', 'filter', 'registered'])
+const emit = defineEmits(['patch', 'style', 'history', 'theme', 'filter', 'registered', 'asset-open'])
 const { t } = useI18n()
 
 const THEMES = ['archival', 'clean', 'ink']
@@ -234,6 +247,12 @@ const outputSize = computed(() => ({
   height: props.doc.base.height || 768,
 }))
 const isTextLayer = computed(() => props.layer?.type === 'text')
+/** 选中的是资产层（Issue #117）：整块样式只读，只给说明与「去地图工作室」 */
+const assetLayer = computed(() => (props.layer?.from_asset ? props.layer : null))
+const assetLabel = computed(() => {
+  const id = assetLayer.value?.from_asset?.asset_id
+  return props.mapSource?.asset_name ? `${props.mapSource.asset_name} · #${id}` : `#${id}`
+})
 const rolePurpose = computed(() => textRoleDef(props.layer?.role)?.purpose || '')
 /** 每个字段的容量（规范按套与成片尺寸算），列表字段带上限条数。 */
 const textFieldDefs = computed(() => {
@@ -392,6 +411,8 @@ function setVariable(value) {
 .ls-source { font-size: 11px; color: var(--text-2); }
 .ls-readonly { font-style: normal; color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ls-purpose { margin: 0; color: var(--text-2); font-size: 11px; line-height: 1.5; }
+/* 资产层（Issue #117）：徽标 + 只读说明，编辑器整块不出 */
+.ls-asset-badge { align-self: flex-start; padding: 0 4px; font-size: 10px; color: var(--accent-text, var(--accent)); border: 1px solid var(--border-strong, var(--border)); border-radius: 4px; }
 .ls-hint { color: var(--text-3); font-size: 11px; }
 .ls-text-field { display: flex; flex-direction: column; gap: 3px; }
 .ls-field-head { display: flex; align-items: center; gap: 4px; color: var(--text-2); }

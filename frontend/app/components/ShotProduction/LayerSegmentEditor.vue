@@ -13,8 +13,8 @@
         v-if="issue.code === 'must_mark_not_marked'"
         type="button" class="btn btn-sm"
         :disabled="saving || !segment"
-        @click="createMarker(issue)"
-      >{{ t('episode.segment.createMarker') }}</button>
+        @click="mapSource ? showInSegment(issue) : createMarker(issue)"
+      >{{ t(mapSource ? 'episode.segment.showInSegment' : 'episode.segment.createMarker') }}</button>
       <button type="button" class="btn btn-sm" @click="emit('goto-design')">{{ t('episode.segment.backToCard') }}</button>
     </div>
 
@@ -142,7 +142,7 @@
       <section class="ls-side">
         <LayerRail v-if="segment" :doc="doc" :selected-ids="selectedIds"
           :episode-id="episodeId"
-          :drama-id="dramaId" medium="video" :beats="beats"
+          :drama-id="dramaId" medium="video" :beats="beats" :map-source="mapSource"
           :spec="{width:specW,height:specH}" :inherited="inherited"
           @select="selectedIds = $event" @history="pushHistory" @patch="onPatch"
           @style="onStyle" @theme="setTheme" @filter="setFilter"
@@ -151,7 +151,7 @@
           @base="replaceBase" @crop-request="enterCanvasTool('crop')" @reanchor="reanchorLayer($event.id,$event.patch)"
           @text-layout="setTextLayout"
           @preview="(src, title) => emit('preview', src, title)"
-          @assets-changed="markDirty"
+          @assets-changed="markDirty" @asset-open="openAssetStudio"
         />
       </section>
     </div>
@@ -173,7 +173,7 @@ import LayerRail from '~/components/LayerCanvas/LayerRail.vue'
 import PreciseKeyframeBar from '~/components/LayerCanvas/PreciseKeyframeBar.vue'
 import { baseAspectIssue, baseFrameOf, qualityWarningsOf, clampTimelineToFrame, normalizeCrop } from '~/utils/layerQuality'
 import { useLayerDoc } from '~/composables/useLayerDoc'
-import { assetAspectAPI, assetPipelineAPI, layerSegmentAPI } from '~/composables/useApi'
+import { assetAspectAPI, assetPipelineAPI, layerSegmentAPI, propAPI } from '~/composables/useApi'
 import { openTaskCenter } from '~/composables/useTasks'
 import { frameStateAt, junctionHiddenLayerIds, stagedLayerIds } from '~/utils/segmentTimeline'
 import { baseFilterLayers, layerDocToSvg } from '~/utils/layerSvg'
@@ -189,6 +189,7 @@ const props = defineProps({
 })
 const emit = defineEmits(['changed', 'goto-design', 'preview'])
 const { t } = useI18n()
+const router = useRouter()
 
 const mode = ref('edit')
 const canvasRef = ref(null)
@@ -208,6 +209,11 @@ const renderStamp = ref(0)
 const segment = computed(() => props.state?.segment || null)
 const issues = computed(() => props.state?.issues || [])
 const spec = computed(() => props.state?.spec || null)
+/**
+ * 段底图的地图资产（Issue #117）：后端读取时展开资产自己的锚定图层、保存时剥离。
+ * 有它时资产层只读、只在关键帧里切可见；语义条目不再用来新建/重锚。
+ */
+const mapSource = computed(() => segment.value?.map_source || null)
 
 const {
   doc, selectedIds, canUndo, canRedo, missingGlyphs,
@@ -598,6 +604,51 @@ async function createMarker(issue) {
   dirty.value = true
   saveState.value = t('episode.segment.unsaved')
   await save()
+}
+
+/**
+ * 资产层段（Issue #117）：「在本段显示该要素」——把该语义要素在资产里的全部只读层
+ * （同一个要素可能是线 + 标注多层）加进每个 t>0 关键帧的可见集合。
+ * 资产层本身不可改，这是分镜对它们唯一的控制；走原有的时间线保存路径，不新增接口。
+ */
+async function showInSegment(issue) {
+  if (!segment.value) return
+  const semanticId = String(issue?.semantic_id || '')
+  const ids = doc.value.layers
+    .filter(layer => layer.from_asset && String(layer.anchor?.semantic_id || '') === semanticId)
+    .map(layer => layer.id)
+  if (!ids.length) {
+    toast.warning(t('episode.segment.showInSegmentMissing', { name: issue?.name || semanticId }))
+    return
+  }
+  const frames = timeline.value.keyframes || []
+  // t=0 的关键帧按约定不含要素（衔接/入场帧），所以只往后续关键帧里加
+  if (!frames.some(frame => frame.t > 0)) {
+    toast.warning(t('episode.segment.showInSegmentNoFrame'))
+    return
+  }
+  pushHistory()
+  timeline.value = {
+    ...timeline.value,
+    keyframes: frames.map(frame => frame.t > 0
+      ? { ...frame, visible: [...new Set([...(frame.visible || []), ...ids])] }
+      : frame),
+  }
+  dirty.value = true
+  saveState.value = t('episode.segment.unsaved')
+  await save()
+}
+
+/** 「去地图工作室」：复用资产弹窗的同一入口（`props/:id/map-studio/open` → 返回的路径），不新造路由 */
+async function openAssetStudio(assetId) {
+  if (!assetId) return
+  error.value = ''
+  try {
+    const result = await propAPI.openMapStudio(Number(assetId))
+    await router.push(result.path)
+  } catch (e) {
+    error.value = e?.body?.reason || e?.body?.message || e?.message || String(e)
+  }
 }
 </script>
 
