@@ -136,7 +136,8 @@ export async function runResearchStage(input: ResearchStageInput): Promise<Stage
             datasetQueries.push({ layer, query, ...(bbox ? { bbox } : {}), hits: 0, refs: [], error })
             return { error, hint: '这是检索失败，不是零命中；不能用它声称 dataset_missing' }
           } finally {
-            await mutateTask(input.taskId, { expectedRunId: input.runId, action: 'research_dataset_query', actor: 'auto', mutate: ctx => {
+            // 逐条查询登记是运行期遥测，不写修订历史：68 次查询曾把回退快照全部挤出 MAX_HISTORY（#111）。
+            await mutateTask(input.taskId, { expectedRunId: input.runId, action: 'research_dataset_query', actor: 'auto', history: false, mutate: ctx => {
               ctx.state.research ??= { queries: [], sources: [], features: [], uncertainties: [], notes: [], searched_at: now() }
               ctx.state.research.dataset_queries = datasetQueries.map(query => ({ ...query, refs: [...query.refs] }))
             } })

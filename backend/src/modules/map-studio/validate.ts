@@ -6,7 +6,7 @@
  * 由调用方原样回给模型；轮次与回退由 agent-loop 管。
  */
 import { forwardFor, type MapRegistration } from './geo/geometry.js'
-import type { MapSpec } from './geo/base-render.js'
+import { MAX_REGIONS, MAX_ROUTES, type MapSpec } from './geo/base-render.js'
 import { THEME_PRESETS } from '../../services/layer-svg.js'
 import type { Layer, LayerDoc } from '../../services/layer-doc.js'
 import { extractDatasetGeometry, type ExtractedDatasetGeometry } from './geo/datasets.js'
@@ -413,6 +413,20 @@ export function validateFeatureSubmission(raw: unknown, ctx: FeatureSubmissionCo
       entry.verified = true
       entry.feature.verification = { status: 'verified', reasons: [`关系证据一致：${relation.message}`] }
     }
+  }
+  // 采纳后的 spec 容量闸（#111）：数据集断段会把一条河拆成多条 route/region，
+  // 提交期就要把「合并后超出 spec 上限」回给模型（收紧 clip_bbox / 合并 / 删减），
+  // 而不是等 adoptResearchIntoSpec → normalizeMapSpec 抛错把整个 run 打成 failed。
+  if (!problems.length) {
+    const count = (kind: MapFeatureKind, incoming: number, confirmed: number) => confirmed + incoming
+    const routeParts = (f: MapResearchFeature) => f.kind === 'route' ? (f.parts?.length || (f.points.length ? 1 : 0)) : 0
+    const regionParts = (f: MapResearchFeature) => f.kind === 'region' ? (f.parts?.length || (f.points.length ? 1 : 0)) : 0
+    const confirmedRoutes = (ctx.confirmed?.routes ?? []).filter(r => r.proposed !== true).length
+    const confirmedRegions = (ctx.confirmed?.regions ?? []).filter(r => r.proposed !== true).length
+    const routeTotal = count('route', features.reduce((n, f) => n + routeParts(f), 0), confirmedRoutes)
+    const regionTotal = count('region', features.reduce((n, f) => n + regionParts(f), 0), confirmedRegions)
+    if (routeTotal > MAX_ROUTES) problems.push(`采纳后路线将达 ${routeTotal} 条（含人工确认 ${confirmedRoutes} 条），超过上限 ${MAX_ROUTES}：数据集河流断段过多，请收紧 clip_bbox、合并同名河或删减次要要素后重交`)
+    if (regionTotal > MAX_REGIONS) problems.push(`采纳后面状范围将达 ${regionTotal} 个（含人工确认 ${confirmedRegions} 个），超过上限 ${MAX_REGIONS}：请合并或删减后重交`)
   }
   return { features: problems.length ? [] : features, problems, relations }
 }
