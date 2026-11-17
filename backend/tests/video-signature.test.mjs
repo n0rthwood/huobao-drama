@@ -120,4 +120,7 @@ test('generated segment duration includes transition overhead rather than adapte
   assert.equal(run('duration', [15, 18, 3]).valid, false)
   assert.equal(run('duration', [15, 15, 0]).valid, true)
   assert.equal(run('duration', [16, 16, 0]).valid, false)
+  // #110：13s 生成段 + 3s 转场被钳到 15s（extra=2）：按实际 extra 判，合法
+  assert.equal(run('duration', [13, 15, 2]).valid, true)
+  assert.equal(run('duration', [13, 15, 3]).valid, false)
 })

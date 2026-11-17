@@ -236,7 +236,9 @@ export async function buildStoryboardVideoRequest(
 
   // H3 silently clamps at 15s; reject before submission so guides, prompt and signature
   // describe the actual generated segment, including transition preparation overhead.
-  if (documentary) assertGeneratedSegmentDuration(contentDuration, submitDuration, transition?.seconds ?? 0)
+  // #110：转场被 planTransitionTiming 钳到 15s 上限时，实际加入的是 extra（可能小于请求秒数），
+  // 断言按 extra 判——否则 13s 生成段 + 3s 转场被钳成 15s 后仍按 13+3=16 误判超限。
+  if (documentary) assertGeneratedSegmentDuration(contentDuration, submitDuration, transition?.extra ?? 0)
 
   // 视频提示词的 @引用 必须与视频绑定一致（Issue #7/#18），否则会出现“提到了却没带参考图”；
   // 带转场提交时，转场段里的 @引用 同样参与检查（转场写入时已同步到视频绑定）
