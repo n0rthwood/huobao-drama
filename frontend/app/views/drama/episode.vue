@@ -1687,7 +1687,7 @@ const storedPanel = (() => {
 // 父级同时接管未挂载子步骤的初始键，门禁阻断时不会留下可误恢复到另一镜的孤立弹窗。
 const link = useDeeplink('workbench', [...new Set([
   ...DEEPLINK_KEYS.workbench, ...DEEPLINK_KEYS.design, ...DEEPLINK_KEYS.picker,
-  ...DEEPLINK_KEYS.keyframes, ...DEEPLINK_KEYS.shotProduction, ...DEEPLINK_KEYS.finalPanel,
+  ...DEEPLINK_KEYS.keyframes, ...DEEPLINK_KEYS.keyframeBatch, ...DEEPLINK_KEYS.shotProduction, ...DEEPLINK_KEYS.finalPanel,
   ...DEEPLINK_KEYS.rewrite, ...DEEPLINK_KEYS.poster, ...DEEPLINK_KEYS.assetReview,
   ...DEEPLINK_KEYS.mediaLib, ...DEEPLINK_KEYS.layerPicker, ...DEEPLINK_KEYS.narration,
   ...DEEPLINK_KEYS.refLibrary, ...DEEPLINK_KEYS.archival,
