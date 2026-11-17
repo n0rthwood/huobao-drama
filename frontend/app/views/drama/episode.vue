@@ -871,7 +871,7 @@
                       :value="option"
                       :checked="assetTypeOf(assetDetail.item) === option"
                       :disabled="assetTypeSaving"
-                      @change="onAssetTypeChange(assetDetail.item, option)"
+                      @change="$event.target.checked = assetTypeOf(assetDetail.item) === option; onAssetTypeChange(assetDetail.item, option)"
                     />
                     <span>{{ t(`episode.asset.assetType.${option}`) }}</span>
                   </label>
