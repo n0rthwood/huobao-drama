@@ -443,16 +443,46 @@ export function searchDataset(layer: DatasetLayer, query: string, bbox?: Dataset
       if (river.retired || (filter && !intersects(river.bbox, filter))) continue
       const folded = river.names.map(foldRiverName)
       const exact = folded.some(name => name === wanted)
-      if (!exact && !folded.some(name => name.includes(wanted))) continue
+      // Word-prefix match too: OSM names are often "Tagil River" while the model queries "Tagil".
+      const wordHit = folded.some(name => name.split(' ').some(word => word.startsWith(wanted)))
+      if (!exact && !wordHit && !folded.some(name => name.includes(wanted))) continue
+      // A generic " River"/" Река" suffix is the same watercourse name: "Tobol River" ≡ "Tobol".
+      const stems = new Set(folded.map(name => name.replace(/\s+(river|река)$/u, '')))
+      const matchesNe = (names: string[]) => names.some(name => {
+        const f = foldRiverName(name)
+        return folded.includes(f) || stems.has(f) || stems.has(f.replace(/\s+(river|река)$/u, ''))
+      })
       const duplicates = neEntries.filter(({ entry }) =>
-        intersects(entry.bbox, river.bbox) && entry.names.some(name => folded.includes(foldRiverName(name))))
+        intersects(entry.bbox, river.bbox) && matchesNe(entry.names))
+      // Same river in NE under any alias: a short OSM fragment inside a much longer NE chain is
+      // the same watercourse, not a new candidate (Tobol/Тобол must not duplicate).
+      const riverKm = length(river.lines)
+      // The NE chain that covers this OSM river's own extent is the same watercourse even when
+      // lengths are comparable (Тобол 896 km vs NE 1173 km); require bbox containment, not just overlap.
+      const contains = (a: DatasetBBox, b: DatasetBBox) => a[0] <= b[0] && a[1] <= b[1] && a[2] >= b[2] && a[3] >= b[3]
+      const covering = duplicates.filter(({ entry }) => (entry.length_km ?? 0) > riverKm * 3
+        || (contains(entry.bbox, river.bbox) && (entry.length_km ?? 0) >= riverKm * 0.8))
+      if (covering.length) {
+        // A short OSM fragment of a river NE already covers is the same watercourse: surface the
+        // NE ref (with the OSM aliases) instead of a duplicate, then skip the fragment.
+        for (const { entry, priority } of covering) {
+          if (alreadyRanked.has(entry.ref)) continue
+          alreadyRanked.add(entry.ref)
+          ranked.push({ score: exact ? 100 : wordHit ? 60 : 40, priority, group: false, candidate: {
+            ref: entry.ref, names: [...new Set([...entry.names, ...river.names])], class: entry.class,
+            scalerank: entry.scalerank, bbox: [...entry.bbox], vertices: entry.vertices,
+            ...(entry.length_km !== undefined ? { length_km: entry.length_km } : {}),
+          } })
+        }
+        continue
+      }
       if (duplicates.length) {
         // An OSM alias may supply the Cyrillic name absent from Natural Earth. Return
         // the actual NE ref, not a duplicate OSM ref, when that alias is queried.
         for (const { entry, priority } of duplicates) {
           if (alreadyRanked.has(entry.ref)) continue
           alreadyRanked.add(entry.ref)
-          ranked.push({ score: exact ? 100 : 40, priority, group: false, candidate: {
+          ranked.push({ score: exact ? 100 : wordHit ? 60 : 40, priority, group: false, candidate: {
             ref: entry.ref, names: [...new Set([...entry.names, ...river.names])], class: entry.class,
             scalerank: entry.scalerank, bbox: [...entry.bbox], vertices: entry.vertices,
             ...(entry.length_km !== undefined ? { length_km: entry.length_km } : {}),
@@ -461,7 +491,7 @@ export function searchDataset(layer: DatasetLayer, query: string, bbox?: Dataset
         continue
       }
       const parts = river.lines
-      ranked.push({ score: exact ? 100 : 40, priority: LAYER_FILES.river.length, group: false, candidate: {
+      ranked.push({ score: exact ? 100 : wordHit ? 60 : 40, priority: LAYER_FILES.river.length, group: false, candidate: {
         ref: `osm:${river.id}`, names: [...river.names], class: 'River', scalerank: null,
         bbox: [...river.bbox], vertices: parts.reduce((sum, part) => sum + part.length, 0), length_km: length(parts),
       } })
