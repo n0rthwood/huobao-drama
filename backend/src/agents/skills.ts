@@ -128,6 +128,8 @@ export const skillWorkspaces: Record<string, Workspace> = Object.fromEntries(
         id: `workspace-${agentType}`,
         name: `${agentType} workspace`,
         filesystem: localFilesystem(),
+        // #110：SKILL.md 内容改动（目录 mtime 不变）也要被重新发现——否则技能修订要等重启才生效
+        checkSkillFileMtime: true,
         skills: () => scanSkillPaths().filter(p =>
           prefixes.some(prefix => p === `skills/${prefix}` || p.startsWith(`skills/${prefix}/`))),
       }),
