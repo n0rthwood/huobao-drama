@@ -27,10 +27,13 @@ its design card / segment combination is not finished — do not invent a diffus
 ## 2. `gen_plan.reference_assets` is a hard constraint: every item must be @-referenced
 
 When a generated segment exists (`combo` is `B` / `C` / `D`), every asset in `design_card.gen_plan.reference_assets`
-(portrait, background information carrier) must be referenced with `@资产名`/`@name` in the prompt you write.
+(portrait, background information carrier) must be referenced with `@资产名`/`@name` in **every** prompt you write —
+**the first, mid and last prompts are judged independently; each one must @ ALL reference assets**, not the three combined.
 
-- The server checks one by one: a reference asset not @-referenced by that prompt → consistency issue `card_ref_unmet` (**blocking** generation),
-  judged separately for the first/mid/last three prompts.
+- The server checks each prompt: any reference asset missing an @ in that prompt → `card_ref_unmet` (**blocks** that slot).
+- Empty shots / wide shots still need the @: with no people in frame, write referenced characters as distant silhouettes / back views
+  (`@name stands as a silhouette…`) and referenced scenes as the location (`the … of @scene`); never drop an @ because "this frame is empty".
+  If a reference truly cannot appear, remove it from `gen_plan.reference_assets` on the design card instead of leaving a prompt without its @.
 - Do not substitute a textual description for the @: writing "a Guards officer standing beside him" does not send that reference image to the image model;
   you must write `@谢苗诺夫近卫团`.
 - When one shot must express two entities at once (a person + the organization he belongs to), @ both, and state their spatial relationship in the frame
