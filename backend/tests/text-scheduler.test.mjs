@@ -161,3 +161,16 @@ test('text scheduling, endpoint selection and persisted health', () => {
     assert.equal(isModelError({ status: 403, message: 'content_filter' }), false)
   `], { cwd: backend, env: { ...process.env, SQLITE_PATH: ':memory:' }, stdio: 'pipe' })
 })
+
+test('402 欠费算服务侧错误：状态码、文本与嵌套 cause 都命中（#110）', () => {
+  execFileSync(process.execPath, ['--import', 'tsx', '--input-type=module', '--eval', `
+    import assert from 'node:assert/strict'
+    import { isModelError } from './src/services/text-model-errors.ts'
+    assert.equal(isModelError({ status: 402, message: 'Payment Required' }), true)
+    assert.equal(isModelError('文本服务 402: {"error":{"message":"Insufficient Balance"}}'), true)
+    assert.equal(isModelError({ message: 'Insufficient Balance (request_id: x)' }), true)
+    assert.equal(isModelError({ message: 'wrapped', cause: { statusCode: 402 } }), true)
+    assert.equal(isModelError({ status: 400, message: 'bad request' }), false)
+    assert.equal(isModelError('内容审核拒绝'), false)
+  `], { cwd: backend, stdio: 'pipe' })
+})

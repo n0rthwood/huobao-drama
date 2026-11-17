@@ -9,14 +9,17 @@ export function isModelError(err: unknown): boolean {
   // 历史调用点只把错误文本写进 finishTextTask，保留字符串兜底分类
   if (typeof err === 'string') {
     if (/content[_ -]?(filter|policy|moderation)|safety[_ -]?(filter|policy)|内容审核|内容安全/i.test(err)) return false
-    if (/文本服务\s*(401|403|429|5\d\d)|HTTP\s*(401|403|429|5\d\d)/i.test(err)) return true
+    if (/文本服务\s*(401|402|403|429|5\d\d)|HTTP\s*(401|402|403|429|5\d\d)/i.test(err)) return true
+    // 402 常不带标准状态字段，只有余额文案（#110：DeepSeek 云配置欠费仍被反复选中）
+    if (/insufficient balance|余额不足|欠费|payment required/i.test(err)) return true
     return /\b(fetch failed|network error|socket hang up|timed?\s*out|timeout)\b/i.test(err)
   }
   if (!err || typeof err !== 'object') return false
   const e = err as { name?: string; message?: string; status?: number; statusCode?: number; code?: string; cause?: unknown }
   if (/content[_ -]?(filter|policy|moderation)|safety[_ -]?(filter|policy)|内容审核|内容安全/i.test(`${e.code ?? ''} ${e.message ?? ''}`)) return false
   const status = e.status ?? e.statusCode
-  if (typeof status === 'number') return status === 401 || status === 403 || status === 429 || status >= 500 && status <= 599
+  if (typeof status === 'number') return status === 401 || status === 402 || status === 403 || status === 429 || status >= 500 && status <= 599
+  if (/insufficient balance|余额不足|欠费|payment required/i.test(`${e.code ?? ''} ${e.message ?? ''}`)) return true
   if (e.name === 'TimeoutError') return true
   if (e.name === 'AbortError' || e.name === 'SyntaxError') return false
   if (e.code && /^(ECONN|ENET|EHOST|ETIMEDOUT|EPIPE|UND_ERR_)/.test(e.code)) return true
