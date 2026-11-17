@@ -78,6 +78,8 @@ export interface SemanticRef {
   asset_id: number
   semantic_id: string
   name: string
+  /** #110：image 层锚点固化资产种类（角色/场景/道具 id 可撞号）；语义锚点不填 */
+  asset_kind?: AssetKindName
   unresolved?: boolean
   unresolved_reason?: string
 }
@@ -322,6 +324,8 @@ function normalizeImageAnchor(raw: unknown, ctx: DesignCardContext | undefined):
   const assetId = Number.isInteger(row.asset_id) ? Number(row.asset_id) : NaN
   if (!Number.isInteger(assetId)) return null
   const ref: SemanticRef = { asset_id: assetId, semantic_id: '', name: '' }
+  const kind = toAssetKind(row.asset_kind)
+  if (kind) ref.asset_kind = kind
   if (!ctx) return ref
   const asset = findAsset(ctx, assetId, toAssetKind(row.asset_kind))
   if (!asset) {
@@ -330,6 +334,8 @@ function normalizeImageAnchor(raw: unknown, ctx: DesignCardContext | undefined):
     return ref
   }
   ref.name = asset.name
+  // 角色/场景/道具 id 各自独立可撞号：解析成功后把种类固化进锚点，读侧不再靠唯一命中猜
+  ref.asset_kind = asset.kind
   return ref
 }
 
