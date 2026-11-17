@@ -416,7 +416,7 @@
             </div>
           </header>
 
-          <div class="dialog-body mat-detail-body">
+          <div ref="matDetailBody" class="dialog-body mat-detail-body">
             <div class="mat-detail-shell">
               <!-- 左侧：视觉预览 -->
               <aside class="mat-detail-preview-panel">
@@ -430,16 +430,19 @@
                 <button
                   type="button"
                   class="mat-detail-media-frame"
-                  :disabled="!matHasImage(editTarget)"
+                  :disabled="!matHasImage(editTarget) || mapPreviewFailed"
                   @click.stop="openAssetViewer(editTarget)"
                 >
-                  <img v-if="matHasImage(editTarget)" :src="thumbOf(assetSrc(editTarget))" @error="thumbFallback($event, assetSrc(editTarget))" />
-                  <span v-else class="mat-detail-media-empty">
+                  <img v-if="matHasImage(editTarget) && !mapPreviewFailed" :src="thumbOf(assetSrc(editTarget))" loading="lazy" @error="mapImageError($event, assetSrc(editTarget), assetTypeOf(editTarget) === 'map')" />
+                  <span v-if="mapPreviewFailed" class="mat-detail-media-empty">{{ t('mapPreview.imageMissing') }}</span>
+                  <span v-else-if="!matHasImage(editTarget)" class="mat-detail-media-empty">
                     <svg v-if="editTarget.kindKey === 'character'" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                     <svg v-else-if="editTarget.kindKey === 'prop'" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
                     <svg v-else width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                   </span>
                 </button>
+                <MediaTime v-if="editTarget.image_generated_at" :at="editTarget.image_generated_at" />
+                <MapAssetPreview v-if="assetTypeOf(editTarget) === 'map'" :key="editTarget.id" :item="editTarget" :assets="materials.filter(m => m.kindKey === 'prop')" @open-asset="openPipAsset" @preview="openRefViewer" />
 
                 <div class="mat-detail-meta-row">
                   <div class="mat-detail-meta-item">
@@ -479,7 +482,7 @@
                           :value="option"
                           :checked="assetTypeOf(editTarget) === option"
                           :disabled="assetTypeSaving"
-                          @change="onAssetTypeChange(editTarget, option)"
+                          @change="$event.target.checked = assetTypeOf(editTarget) === option; onAssetTypeChange(editTarget, option)"
                         />
                         <span>{{ t(`episode.asset.assetType.${option}`) }}</span>
                       </label>
@@ -649,7 +652,7 @@
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
-          <img :src="assetViewer.src" :alt="assetViewer.title" class="viewer-img" />
+          <img :src="assetViewer.src" :alt="assetViewer.title" class="viewer-img" @error="onViewerError" />
         </div>
       </div>
     </div>
@@ -724,6 +727,14 @@
       </div>
     </div>
     <ConfirmDialog
+      :open="!!assetTypeConfirm"
+      :title="t('common.confirm')"
+      :message="t('episode.asset.assetTypeDowngradeConfirm', { name: assetTypeConfirm?.name || '' })"
+      :confirm-text="t('common.confirm')"
+      @cancel="assetTypeConfirm = null"
+      @confirm="confirmAssetTypeChange"
+    />
+    <ConfirmDialog
       :open="!!episodeToDelete"
       :title="t('detail.ep.deleteTitle')"
       :message="t('detail.epDelete.message', { title: episodeToDelete?.title || t('detail.ep.episodeN', { n: episodeToDelete?.episode_number || episodeToDelete?.episodeNumber }) })"
@@ -765,6 +776,7 @@ import AssetBrowserDialog from '~/components/AssetBrowserDialog.vue'
 import MediaLibraryDialog from '~/components/MediaLibraryDialog.vue'
 import FinalPromptSourceBadge from '~/components/FinalPromptSourceBadge.vue'
 import MapStudioEntry from '~/components/MapStudioEntry.vue'
+import MapAssetPreview from '~/components/MapAssetPreview.vue'
 import { dropLegacyMapDeeplinks } from '~/composables/useQuerySync'
 import { useNowTicker, ringPropsFromTask, isActiveTaskStatus } from '~/composables/useTaskProgress'
 
@@ -998,7 +1010,7 @@ async function confirmDeleteMaterial() {
 // Issue #86：页面自身的键由 detail 组声明；弹窗层键单独成组，关闭弹窗只摘掉弹窗键
 const link = useDeeplink('detail', DEEPLINK_KEYS.detail)
 // bkind/bq 由 AssetBrowserDialog 自己的分组发布，本页不声明（声明了会抢占同名键的兜底值）
-const dialogLink = useDeeplink('detailDialogs', DEEPLINK_KEYS.detailDialogs.filter(k => k !== 'bkind' && k !== 'bq'))
+const dialogLink = useDeeplink('detailDialogs', DEEPLINK_KEYS.detailDialogs.filter(k => !['bkind', 'bq', 'bdrama'].includes(k)))
 const urlTab = queryEnum(link.initial('tab'), ['episodes', 'assets'])
 const pendingAssetLink = queryTypedId(link.initial('asset'), ['character', 'scene', 'prop'])
 // URL 携带 tab（含非法值）即以 URL 为准，非法回退默认；asset 参数隐含素材库页签
@@ -1217,10 +1229,26 @@ function openAssetViewer(m) {
   assetViewer.value = { open: true, kindKey: m.kindKey, id: m.id, src: assetSrc(m), title: `${m.kind} · ${m.name}` }
 }
 
+function viewerStaticPath(src) {
+  try {
+    const url = new URL(src, window.location.href)
+    if (url.origin !== window.location.origin) return ''
+    const start = url.pathname.indexOf('/static/')
+    if (start < 0) return ''
+    const path = decodeURIComponent(url.pathname.slice(start + 1))
+    return path.split('/').some(part => part === '..' || part === '.' || /[\\\u0000-\u001f]/.test(part)) ? '' : path
+  } catch { return '' }
+}
+
 /** 参考图预览：ReferenceImageManager 的事件给的是 (src, title)，不是资产成片图 */
 function openRefViewer(src, title) {
   assetViewer.value = { open: true, kindKey: '', id: 0, src, title }
 }
+function onViewerError() {
+  closeAssetViewer()
+  toast.warning(t('deeplink.missing'))
+}
+
 
 /**
  * 参考图增删后以服务端返回的条目数组为准（与剧集工作台 onAssetRefsUpdate 同口径）。
@@ -1234,16 +1262,23 @@ function onAssetRefsUpdate(refs) {
 // 资产类型（Issue #84）：地图是独立类型，地图界面只认服务端持久化的 asset_type
 const ASSET_TYPES = ['prop', 'map']
 const assetTypeSaving = ref(false)
+const assetTypeConfirm = ref(null)
+
+function confirmAssetTypeChange() {
+  const item = assetTypeConfirm.value
+  assetTypeConfirm.value = null
+  if (item) void onAssetTypeChange(item, 'prop', true)
+}
 
 function assetTypeOf(item) {
   return item?.asset_type === 'map' ? 'map' : 'prop'
 }
 
 /** 地图 → 普通道具要人确认：地图数据不会被删，但整套地图界面会收起来 */
-async function onAssetTypeChange(item, next) {
+async function onAssetTypeChange(item, next, confirmed = false) {
   if (assetTypeSaving.value || !item || assetTypeOf(item) === next) return
   const downgrade = assetTypeOf(item) === 'map' && next === 'prop'
-  if (downgrade && !window.confirm(t('episode.asset.assetTypeDowngradeConfirm', { name: item.name || '' }))) return
+  if (downgrade && !confirmed) { assetTypeConfirm.value = item; return }
   assetTypeSaving.value = true
   try {
     const updated = await propAPI.update(item.id, { asset_type: next, confirm_asset_type_change: downgrade || undefined })
@@ -1273,6 +1308,19 @@ function fmtDate(s) {
 const editDialog = ref(false)
 const editSaving = ref(false)
 const editTarget = ref(null)
+const matDetailBody = ref(null)
+function openPipAsset(id) {
+  const target = materials.value.find(m => m.kindKey === 'prop' && m.id === Number(id))
+  if (!target) { toast.error(t('deeplink.missing')); return }
+  openEdit(target)
+  nextTick(() => { if (matDetailBody.value) matDetailBody.value.scrollTop = 0 })
+}
+const mapPreviewFailed = ref(false)
+watch(() => [editTarget.value?.id, editTarget.value?.image_url], () => { mapPreviewFailed.value = false })
+function mapImageError(event, src, isMap) {
+  if (isMap && event.target.dataset.fbk) mapPreviewFailed.value = true
+  else thumbFallback(event, src)
+}
 const editDraft = reactive({})
 
 /** 素材弹窗可编辑的信息字段（按类型）；最终提示词单独处理 */
@@ -1426,7 +1474,7 @@ function publishDialogLink() {
   const ep = episodeToDelete.value
   const mat = assetToDelete.value
   dialogLink.set({
-    view: viewer.open && viewer.id ? `${viewer.kindKey}-${viewer.id}` : '',
+    view: viewer.open ? (viewer.id ? `${viewer.kindKey}-${viewer.id}` : viewerStaticPath(viewer.src)) : '',
     browser: assetBrowserOpen.value ? '1' : '',
     addep: addDialog.value ? '1' : '',
     proj: showSettings.value ? '1' : '',
@@ -1463,10 +1511,13 @@ function applyAssetDeeplink() {
 
 // 弹窗层恢复：只还原界面，不触发保存/生成/删除；bkind/bq 由资产浏览器自己的分组负责
 function applyDialogDeeplinks() {
-  const viewerRef = queryTypedId(dialogLink.initial('view'), DEEPLINK_KINDS)
-  if (dialogLink.initial('view')) {
+  const viewerValue = querySingle(dialogLink.initial('view'))
+  const viewerRef = queryTypedId(viewerValue, DEEPLINK_KINDS)
+  if (viewerValue) {
     const m = findMaterialByRef(viewerRef)
+    const path = viewerValue.startsWith('static/') ? viewerStaticPath(mediaUrl(viewerValue)) : ''
     if (m && matHasImage(m)) openAssetViewer(m)
+    else if (path) openRefViewer(mediaUrl(path), t('components.referenceImages.label'))
     else if (viewerRef) missingTargetToast(viewerRef)
     else toast.error(t('deeplink.missing'))
   }
@@ -2115,7 +2166,7 @@ onUnmounted(() => {
 .empty-title { font-size: 14px; font-weight: 600; color: var(--text-1); }
 .empty-desc { font-size: 12px; color: var(--text-3); max-width: 260px; line-height: 1.6; }
 
-.viewer-overlay { align-items: center; }
+.viewer-overlay { align-items: center; z-index: 120; }
 .viewer-dialog { width: min(960px, calc(100vw - 48px)); padding: 14px; }
 .viewer-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
 .viewer-title { font-size: 13px; font-weight: 600; color: var(--text-1); }
@@ -2139,9 +2190,9 @@ onUnmounted(() => {
 }
 .is-map-dialog .mat-detail-head, .is-map-dialog .mat-detail-foot { flex: 0 0 auto; }
 .is-map-dialog .mat-detail-body { flex: 1 1 auto; min-height: 0; overflow: auto; }
-.is-map-dialog .mat-detail-shell { grid-template-columns: minmax(0, 1fr); }
-.is-map-dialog .mat-detail-preview-panel { position: static; display: none; }
-.is-map-dialog .mat-detail-map-panel { overflow: visible; min-width: 1280px; }
+.is-map-dialog .mat-detail-shell { grid-template-columns: minmax(250px, 380px) minmax(0, 1fr); }
+.is-map-dialog .mat-detail-preview-panel { position: static; }
+.is-map-dialog .mat-detail-map-panel { min-width: 0; overflow-x: auto; }
 .mat-detail-head {
   display: flex; align-items: center; justify-content: space-between;
   gap: 12px; padding: 14px 16px;

@@ -4,30 +4,54 @@ import fs from 'fs'
 import path from 'path'
 import { z } from 'zod'
 import { STORAGE_ROOT } from '../../utils/paths.js'
-import { generateImageThumb } from '../../utils/storage.js'
+import { generateImageThumb, getAbsolutePath } from '../../utils/storage.js'
 import type { StageModel } from '../../services/ai-stages.js'
-import type { Layer, LayerDoc } from '../../services/layer-doc.js'
+import type { Layer, LayerDoc, PolygonLayer } from '../../services/layer-doc.js'
 import { renderLayerDoc } from '../../services/layer-render.js'
+import { layerDocToSvg } from '../../services/layer-svg.js'
 import { readImage } from '../../agents/tools/vision-tools.js'
-import type { MapSpec } from './geo/base-render.js'
-import { forwardFor, type MapBackgroundResult } from './geo/geometry.js'
+import { renderMapBase, resolveRiverSource, type MapSpec } from './geo/base-render.js'
+import { forwardFor, prepareMapBackground, type MapBackgroundResult } from './geo/geometry.js'
 import { mapBriefText, rollbackTool, runStageAgent, stageTool, type StageAgentResult } from './agent-loop.js'
 import { drawingProblems, drawnGeometryOf, projectedLabelFeatures, specFeatures, type DrawnGeometry, type OmittedFeature, type SpecFeature } from './validate.js'
-import { autoPlaceLabels } from './layout/labels.js'
+import { autoPlaceLabels, labelProblems } from './layout/labels.js'
 import { strictMapLayerDocProblems } from './layer-doc.js'
 import { defaultLayerOptions, renderCopyWithSmoothing, smoothingProblems, validateLayerOptions, type LayerOptions } from './render/smooth.js'
 import type { MapBrief } from './types.js'
 import { featureStyleFor, labelStyleFor, familyPromptSummary, resolveMapStyle, MAP_LABEL_TIERS, MAP_MARKER_TIERS } from './styles/index.js'
 import { readDefaultStyle } from './settings.js'
+import { annotateRegionLabels } from './region-annotations.js'
 
 const MAX_STEPS = 60
-export interface RenderedMapDoc { path: string; sha256: string; width: number; height: number }
+export interface RenderedMapDoc { path: string; sha256: string; width: number; height: number; region_composition?: 'under' | 'bottom-layer' }
 
 /** No normalizer here: the module's validated dense dataset vertices must all reach layer-svg. */
-export async function renderMapLayerDoc(doc: LayerDoc, layerOptions: LayerOptions = {}): Promise<RenderedMapDoc> {
+export async function renderMapLayerDoc(doc: LayerDoc, layerOptions: LayerOptions = {}, context?: { spec: MapSpec; background: MapBackgroundResult; texturePath?: string }): Promise<RenderedMapDoc> {
   const problems = smoothingProblems(doc, layerOptions)
   if (problems.length) throw new Error(problems.map(p => p.message).join('；'))
-  const rendered = await renderLayerDoc(renderCopyWithSmoothing(doc, layerOptions))
+  let copy = renderCopyWithSmoothing(doc, layerOptions)
+  let regionComposition: RenderedMapDoc['region_composition']
+  if (context) {
+    const regionIds = new Set(context.spec.regions.map(region => region.id))
+    const isRegion = (layer: Layer): layer is PolygonLayer => layer.type === 'polygon' && !!layer.anchor?.semantic_id && regionIds.has(layer.anchor.semantic_id)
+    const regions = copy.layers.filter(isRegion)
+    if (regions.length && context.background.registration.mode === 'program') {
+      const fillDoc = { ...copy, layers: regions.map(layer => ({ ...layer, style: { ...layer.style, stroke_width: 0 } })) }
+      const backgroundHash = crypto.createHash('sha256').update(fs.readFileSync(getAbsolutePath(context.background.path))).digest('hex')
+      const underSvg = `<!-- background ${backgroundHash} -->` + layerDocToSvg(fillDoc, { width: copy.base.width, height: copy.base.height })
+      const spec = { ...context.spec, places: [], routes: [], regions: [] }
+      const base = await renderMapBase(spec, { width: copy.base.width, height: copy.base.height, riverSource: resolveRiverSource(context.spec), underSvg })
+      const background = await prepareMapBackground({ basePath: base.path, registration: context.background.registration, texturePath: context.texturePath })
+      copy = { ...copy, base: { ...copy.base, path: background.path }, layers: copy.layers.map(layer => isRegion(layer) ? { ...layer, style: { ...layer.style, fill_opacity: 0, feather: 0 } } : layer) }
+      regionComposition = 'under'
+    } else if (regions.length) {
+      // Non-program bases have no relief hook; render fills first without mutating the editable document.
+      const fillLayers = regions.map(layer => ({ ...layer, id: `region-fill-${layer.id}`, style: { ...layer.style, stroke_width: 0 } }))
+      copy = { ...copy, layers: [...fillLayers, ...copy.layers.map(layer => isRegion(layer) ? { ...layer, style: { ...layer.style, fill_opacity: 0, feather: 0 } } : layer)] }
+      regionComposition = 'bottom-layer'
+    }
+  }
+  const rendered = await renderLayerDoc(copy)
   const sha256 = crypto.createHash('sha256').update(rendered.buffer).digest('hex')
   const dir = path.join(STORAGE_ROOT, 'map-drawings')
   fs.mkdirSync(dir, { recursive: true })
@@ -38,7 +62,7 @@ export async function renderMapLayerDoc(doc: LayerDoc, layerOptions: LayerOption
     // 结果画廊用缩略图（Issue #106）；失败只记日志，不影响抽图
     await generateImageThumb(`static/map-drawings/${file}`)
   }
-  return { path: `static/map-drawings/${file}`, sha256, width: rendered.width, height: rendered.height }
+  return { path: `static/map-drawings/${file}`, sha256, width: rendered.width, height: rendered.height, ...(regionComposition ? { region_composition: regionComposition } : {}) }
 }
 
 export function backgroundProblems(doc: LayerDoc, background: Pick<MapBackgroundResult, 'path' | 'width' | 'height'>): string[] {
@@ -52,7 +76,7 @@ export function backgroundProblems(doc: LayerDoc, background: Pick<MapBackground
 export interface DrawingStageResult { doc: LayerDoc; rendered: RenderedMapDoc; geometry: DrawnGeometry; omitted: OmittedFeature[]; layerOptions: LayerOptions }
 export interface DrawingStageInput {
   taskId: number; runId: number; stageModel: StageModel; brief: MapBrief; spec: MapSpec; background: MapBackgroundResult
-  startRounds: number; feedback: string | null; layerOptions?: LayerOptions
+  startRounds: number; feedback: string | null; layerOptions?: LayerOptions; texturePath?: string
   /** Family selection is resolved from brief + module settings, never an arbitrary style recipe. */
 }
 export function docKey(doc: LayerDoc, layerOptions: LayerOptions = {}): string {
@@ -107,7 +131,48 @@ export async function runDrawingStage(input: DrawingStageInput): Promise<StageAg
    * 压缩窗口内的三步就累积到 24 万字。
    */
   const acceptDraft = (next: LayerDoc) => {
-    const sorted = { ...next, layers: [...next.layers].sort((a, b) => a.z - b.z) }
+    // Reposition the generated legend whenever the draft changes, so later titles cannot cover it.
+    // Region labels belong to annotateRegionLabels (#115): suffix or one 「区域为示意范围」 note.
+    const annotated = annotateRegionLabels(next, input.spec, background.registration)
+    if (annotated.error) return { error: annotated.error }
+    const layers = annotated.doc.layers.filter(layer => layer.id !== 'schematic-legend').map(layer => {
+      const feature = features.find(item => item.id === layer.anchor?.semantic_id)
+      if (!feature?.approximate || feature.kind === 'region') return layer
+      if (layer.type === 'marker') return { ...layer, style: { ...layer.style, hollow: true } }
+      if (layer.type === 'polyline') return { ...layer, style: { ...layer.style, dash: 'dash' as const } }
+      return layer
+    }).sort((a, b) => a.z - b.z)
+    let sorted: LayerDoc = { ...annotated.doc, layers }
+    let needsLegend = false
+    for (let index = 0; index < sorted.layers.length; index++) {
+      const layer = sorted.layers[index]!
+      const feature = features.find(item => item.id === layer.anchor?.semantic_id)
+      if (!feature?.approximate || feature.missing || feature.kind === 'region' || (layer.type !== 'marker' && layer.type !== 'label') || !layer.text) continue
+      const text = layer.text.endsWith('（示意）') ? layer.text : `${layer.text}（示意）`
+      const trial = { ...sorted, layers: sorted.layers.map((item, i) => i === index ? { ...layer, text } : item) }
+      const checked = strictMapLayerDocProblems(trial, { features, registration: background.registration })
+      const bad = checked.problems.some(problem => problem.path.startsWith(`layers[${index}]`))
+        || labelProblems(checked.doc, checked.doc.base, projectedFeatures).some(problem => problem.layer_id === layer.id)
+      if (bad) {
+        needsLegend = true
+        sorted = { ...sorted, layers: sorted.layers.map((item, i) => i === index ? { ...layer, text: layer.text.replace(/（示意）$/, '') } : item) }
+      }
+      else sorted = checked.doc
+    }
+    if (features.some(feature => feature.approximate && !feature.missing && feature.kind !== 'region'
+      && sorted.layers.some(layer => layer.anchor?.semantic_id === feature.id && (layer.type === 'marker' || layer.type === 'polyline' || layer.type === 'polygon'))
+      && !sorted.layers.some(layer => layer.anchor?.semantic_id === feature.id && (layer.type === 'label' || layer.type === 'marker') && layer.text.includes('（示意）')))) needsLegend = true
+    if (needsLegend) {
+      let placed: LayerDoc | null = null
+      for (let y = .03; y <= .87 && !placed; y += .07) for (let x = .03; x <= .63 && !placed; x += .15) {
+        const legend: Layer = { id: 'schematic-legend', type: 'label', name: '示意说明', text: '部分要素为示意', box: { x, y, w: .32, h: .06 }, visible: true, locked: false, z: Math.min(9999, Math.max(0, ...sorted.layers.map(item => item.z)) + 1), opacity: 1, rotation: 0, style: { size: .02 } }
+        const trial = { ...sorted, layers: [...sorted.layers, legend] }
+        const checked = strictMapLayerDocProblems(trial, { features, registration: background.registration })
+        if (!checked.problems.length && !labelProblems(checked.doc, checked.doc.base, projectedFeatures).some(problem => problem.layer_id === legend.id)) placed = checked.doc
+      }
+      if (!placed) return { error: '示意说明放不下，请为图例留出空白', problems: ['示意说明无法通过标签校验'] }
+      sorted = placed
+    }
     const strict = strictMapLayerDocProblems(sorted, { features, registration: background.registration })
     if (strict.problems.length) return { error: '草稿修改被拒，原草稿保留', problems: strict.problems }
     const before = new Map(draft.layers.map(layer => [layer.id, JSON.stringify(layer)]))
@@ -128,7 +193,7 @@ export async function runDrawingStage(input: DrawingStageInput): Promise<StageAg
   const featureSummary = features.map(feature => {
     const p = projectedFeatures.find(f => f.id === feature.id)!
     const xs = p.points.map(point => point[0] * background.width), ys = p.points.map(point => point[1] * background.height)
-    return { feature_id: feature.id, kind: feature.kind, category: feature.category, name: feature.name, origin: feature.origin, vertex_count: p.points.length, pixel_bbox: xs.length ? [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)] : null }
+    return { feature_id: feature.id, kind: feature.kind, category: feature.category, name: feature.name, origin: feature.origin, approximate: feature.approximate, missing: feature.missing, vertex_count: p.points.length, pixel_bbox: xs.length ? [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)] : null }
   })
   return await runStageAgent<DrawingStageResult>({
     taskId: input.taskId, runId: input.runId, stage: 'drawing', stageModel: input.stageModel, skill: 'drawing', maxSteps: MAX_STEPS, startRounds: input.startRounds, initialFeedback: input.feedback,
@@ -165,6 +230,7 @@ export async function runDrawingStage(input: DrawingStageInput): Promise<StageAg
           for (const item of items) {
             const feature = features.find(f => f.id === item.feature_id)
             if (!feature) { problems.push(`未知 feature_id ${item.feature_id}`); continue }
+            if (feature.missing) { problems.push(`要素 ${feature.id} 数据集中没有几何，暂不绘制`); continue }
             if (next.layers.some(l => l.anchor?.semantic_id === feature.id && ['marker', 'polygon', 'polyline'].includes(l.type))) { problems.push(`要素 ${feature.id} 已有几何图层，使用 update_layer 修改样式`); continue }
             const points = feature.coords.map(coord => {
               const pixel = forward(coord)
@@ -173,7 +239,7 @@ export async function runDrawingStage(input: DrawingStageInput): Promise<StageAg
             if (points.some(p => !p)) { problems.push(`要素 ${feature.id} 在当前底图不可见，请回退 base`); continue }
             const coords = points as [number, number][]
             const id = feature.id.length <= 56 ? `feature-${feature.id}` : `feature-${crypto.createHash('sha256').update(feature.id).digest('hex').slice(0, 32)}`
-            const defaults = selectedStyle ? featureStyleFor(selectedStyle.family, { ...feature, markerTier: item.importance }) : {}
+            const defaults = selectedStyle ? featureStyleFor(selectedStyle.family, { ...feature, regionIds: input.spec.regions.map(region => region.id), markerTier: item.importance }) : {}
             const common = { id, name: feature.name, visible: true, locked: false, z: next.layers.length, opacity: 1, rotation: 0, anchor: { semantic_id: feature.id, semantic_name: feature.name }, style: { ...defaults, ...item.style } }
             next.layers.push(feature.kind === 'place' ? { ...common, type: 'marker', at: coords[0]!, text: feature.name } : { ...common, type: feature.kind === 'region' ? 'polygon' : 'polyline', points: coords })
           }
@@ -263,7 +329,7 @@ export async function runDrawingStage(input: DrawingStageInput): Promise<StageAg
         execute: async () => {
           const checked = checkDraft([])
           if (checked.renderable.length) return { error: '草稿或平滑参数非法，未渲染', problems: checked.renderable }
-          const rendered = await renderMapLayerDoc(draft, layerOptions)
+          const rendered = await renderMapLayerDoc(draft, layerOptions, { spec: input.spec, background, texturePath: input.texturePath })
           renders.set(docKey(draft, layerOptions), rendered)
           lastCheck = checked.problems
           return { ...rendered, submit_check: checked.problems.length ? checked.problems : '按交付标准预检通过' }

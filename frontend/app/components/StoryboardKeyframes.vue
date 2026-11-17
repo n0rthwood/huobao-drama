@@ -1444,6 +1444,24 @@ async function retryFailedBatch() {
 
 // 批量确认框 = 服务端预览清单（分镜 × 槽位）+ 勾选；选择模式只缩小预览范围
 const batchConfirm = ref({ open: false, loading: false, scoped: false, ids: [], items: [] })
+const batchLink = useDeeplink('keyframeBatch', DEEPLINK_KEYS.keyframeBatch)
+const initialBatch = querySingle(batchLink.initial('kfbatch'))
+let batchRestored = !initialBatch
+watch(() => props.storyboards, list => {
+  if (batchRestored || !list.length) return
+  batchRestored = true
+  const ids = initialBatch === 'all' ? [] : queryIdList(initialBatch)
+  if (initialBatch !== 'all' && (!ids.length || ids.join(',') !== initialBatch || ids.some(id => !list.some(sb => sb.id === id)))) {
+    toast.warning(t('deeplink.missing'))
+    batchLink.set({})
+    return
+  }
+  void nextTick(() => openBatchConfirm(ids))
+}, { immediate: true })
+watch(() => [batchConfirm.value.open, batchConfirm.value.scoped, batchConfirm.value.ids.join(',')], () => {
+  const batch = batchConfirm.value
+  batchLink.set({ kfbatch: batch.open ? (batch.scoped ? batch.ids.join(',') : 'all') : '' })
+})
 const checkedItems = computed(() => batchConfirm.value.items.filter(item => item.checked))
 const previewGroups = computed(() => {
   const groups = []
@@ -1530,11 +1548,12 @@ function blockReasonOf(item) {
   const blocking = issues.filter(i => i.severity === 'block')
   return (blocking.length ? blocking : issues).map(i => i.message).join(t('common.listJoin'))
 }
-async function openBatchConfirm() {
+async function openBatchConfirm(restoredIds) {
   if (batchRunning.value) { toast.info(t('episode.kf.batchAlreadyRunning')); return }
-  const scoped = selectMode.value && selectedIds.value.length > 0
-  const ids = scoped ? [...selectedIds.value] : []
+  const scoped = Array.isArray(restoredIds) ? restoredIds.length > 0 : selectMode.value && selectedIds.value.length > 0
+  const ids = Array.isArray(restoredIds) ? restoredIds : (scoped ? [...selectedIds.value] : [])
   batchConfirm.value = { open: true, loading: true, scoped, ids, items: [] }
+  const pending = batchConfirm.value
   batchEstimate.value = { loading: false, data: null }
   try {
     const res = await episodeAPI.keyframeBatchPreview(props.episodeId, {
@@ -1542,6 +1561,7 @@ async function openBatchConfirm() {
       model: props.imageModel || undefined,
       config_id: props.imageConfigId || undefined,
     })
+    if (batchConfirm.value !== pending || !pending.open) return
     const items = (Array.isArray(res?.items) ? res.items : []).map(item => ({
       ...item,
       checked: Boolean(item.checked) && item.status !== 'blocked' && item.status !== 'skipped',
@@ -1553,6 +1573,7 @@ async function openBatchConfirm() {
     }
     batchConfirm.value = { open: true, loading: false, scoped, ids, items }
   } catch (e) {
+    if (batchConfirm.value !== pending || !pending.open) return
     batchConfirm.value = { open: false, loading: false, scoped: false, ids: [], items: [] }
     toastServerMessage(e, { fallback: 'episode.kf.genFailed' })
   }

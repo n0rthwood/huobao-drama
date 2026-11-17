@@ -55,24 +55,29 @@
 
     <!-- 阶段 ②：研究要素的来源/核验与相对位置证据。条目一律取当前 map_spec 的元数据，
          不拿历史 research 里的提议对象冒充现状；确认走 PUT map_spec 的 CAS。 -->
-    <section v-if="stage === 'research' && research" class="msp-block msp-research">
+    <section v-if="pendingRows.length || missingRows.length || (stage === 'research' && research)" id="map-pending-geometry" class="msp-block msp-research">
       <header class="msp-research-head">
-        <strong class="msp-sub">{{ t('mapStudio.researchPanel.title') }}</strong>
-        <span class="dim">{{ t('mapStudio.researchPanel.hint') }}</span>
+        <strong class="msp-sub">{{ t('mapStudio.researchPanel.reviewTitle') }}</strong>
+        <span class="dim">{{ t('mapStudio.researchPanel.reviewHint') }}</span>
       </header>
 
       <div v-if="pendingRows.length" class="msp-banner">
         <strong>{{ t('mapStudio.researchPanel.unverifiedTitle', { n: pendingRows.length }) }}</strong>
-        <p class="msp-banner-body">{{ t('mapStudio.researchPanel.unverifiedHint') }}</p>
+        <p class="msp-banner-body">{{ t('mapStudio.researchPanel.reviewHint') }}</p>
         <div class="msp-banner-actions">
           <button type="button" class="msp-btn" :disabled="confirming || !selectedCount" @click="confirmSelected">
             {{ t('mapStudio.researchPanel.confirmSelected', { n: selectedCount }) }}
           </button>
-          <button type="button" class="msp-btn" :disabled="confirming" @click="confirmAll">
+          <button type="button" class="msp-btn" :disabled="confirming || !confirmableRows.length" @click="confirmAll">
             {{ t('mapStudio.researchPanel.confirmAll') }}
           </button>
         </div>
       </div>
+      <details v-for="item in missingRows" :key="item.name" class="msp-banner">
+        <summary>{{ item.name }} — {{ t('mapStudio.researchPanel.notDrawn') }}</summary>
+        <p>{{ item.reason }}</p>
+        <p>{{ item.queries.join('、') }}</p>
+      </details>
 
       <p v-if="!featureRows.length" class="msp-empty dim">{{ t('mapStudio.researchPanel.noFeatures') }}</p>
       <table v-else class="msp-table">
@@ -90,7 +95,7 @@
           <tr v-for="row in featureRows" :key="row.key" :class="{ 'is-pending': row.pending }">
             <td class="msp-col-pick">
               <input
-                v-if="row.pending"
+                v-if="row.pending && !row.reasons.some(reason => reason.includes('dataset_missing'))"
                 type="checkbox"
                 :checked="selectedKeys.has(row.key)"
                 :disabled="confirming"
@@ -100,7 +105,7 @@
               <span v-else class="dim">·</span>
             </td>
             <td>
-              <span class="msp-feature-name">{{ row.name }}</span>
+              <button type="button" class="msp-feature-name" @click="emit('focus', { kind: row.kind, id: row.id })">{{ row.name }}</button>
               <span class="dim msp-feature-kind">{{ t('mapStudio.results.kind.' + row.kind) }}</span>
             </td>
             <td>
@@ -117,6 +122,7 @@
             </td>
             <td class="msp-evidence">
               <span v-if="row.datasetRef" class="msp-dataset">{{ t('mapStudio.researchPanel.datasetRef', { ref: row.datasetRef }) }}</span>
+              <span v-if="row.pending" class="msp-reasons">{{ row.reasons.some(reason => reason.includes('dataset_missing')) ? t('mapStudio.researchPanel.notDrawn') : t('mapStudio.researchPanel.schematic') }}</span>
               <span v-if="row.reasons.length" class="msp-reasons">{{ row.reasons.join('；') }}</span>
               <span v-if="!row.reasons.length && !row.datasetRef" class="dim">{{ t('mapStudio.researchPanel.noEvidence') }}</span>
             </td>
@@ -199,11 +205,17 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'preview', view: MapPreviewView): void
   (e: 'confirm', targets: MapConfirmTarget[]): void
+  (e: 'focus', target: MapConfirmTarget): void
 }>()
 
 interface Fact { key: string, label: string, value: string, href?: string, preview?: MapPreviewView }
 
 const research = computed(() => props.detail.research)
+const missingRows = computed(() => research.value?.missing_geometry ?? (research.value?.features ?? []).flatMap(feature => {
+  const reason = feature.dataset_missing?.reason ?? feature.verification?.reasons?.find(value => value.includes('dataset_missing'))
+  if (!reason || (feature.kind === 'place' ? feature.lon != null && feature.lat != null : (feature.points?.length ?? 0) > 0)) return []
+  return [{ name: feature.name, category: feature.category ?? '', queries: feature.dataset_missing?.queries ?? [], reason }]
+}))
 const outputs = computed(() => props.detail.outputs)
 const spec = computed(() => props.detail.map_spec)
 const registration = computed(() => {
@@ -251,6 +263,7 @@ interface FeatureRow {
 }
 
 const pendingRows = computed(() => mapPendingGeometry(spec.value))
+const confirmableRows = computed(() => pendingRows.value.filter(row => !row.reasons.some(reason => reason.includes('dataset_missing'))))
 const pendingKeys = computed(() => new Set(pendingRows.value.map(row => mapSpecFeatureKey(row.kind, row.id))))
 
 function specRow(kind: MapSpecFeatureKind, item: MapPlace | MapRoute | MapRegion): FeatureRow {
@@ -305,8 +318,8 @@ function confirmSelected() {
 }
 
 function confirmAll() {
-  if (props.confirming || !pendingRows.value.length) return
-  emit('confirm', pendingRows.value.map(row => ({ kind: row.kind, id: row.id })))
+  if (props.confirming || !confirmableRows.value.length) return
+  emit('confirm', confirmableRows.value.map(row => ({ kind: row.kind, id: row.id })))
 }
 
 /** 声明 vs 计算：两张表都只呈现服务端给的 relation 对象，缺 computed 就写「未计算」 */

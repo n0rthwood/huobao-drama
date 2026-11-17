@@ -770,7 +770,7 @@
             </div>
           </header>
 
-          <div class="dialog-body asset-detail-body">
+          <div ref="assetDetailBody" class="dialog-body asset-detail-body">
             <div class="asset-detail-shell">
               <aside class="asset-detail-preview-panel">
                 <div class="asset-detail-section-title">
@@ -783,16 +783,18 @@
                 <button
                   type="button"
                   class="asset-detail-media-frame"
-                  :disabled="!assetImageSrc(assetDetail.item)"
+                  :disabled="!assetImageSrc(assetDetail.item) || mapPreviewFailed"
                   @click.stop="openImageViewer(assetImageSrc(assetDetail.item), assetDetailImageTitle(assetDetail))"
                 >
                   <img
-                    v-if="assetImageSrc(assetDetail.item)"
+                    v-if="assetImageSrc(assetDetail.item) && !mapPreviewFailed"
                     :src="thumbOf(assetImageSrc(assetDetail.item))"
                     class="previewable-image"
-                    @error="thumbFallback($event, assetImageSrc(assetDetail.item))"
+                    loading="lazy"
+                    @error="mapImageError($event, assetImageSrc(assetDetail.item), isMapAsset(assetDetail.item))"
                   />
-                  <span v-else class="asset-detail-media-empty">
+                  <span v-if="mapPreviewFailed" class="asset-detail-media-empty">{{ t('mapPreview.imageMissing') }}</span>
+                  <span v-else-if="!assetImageSrc(assetDetail.item)" class="asset-detail-media-empty">
                     <svg v-if="assetDetail.type === 'character'" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                     <svg v-else-if="assetDetail.type === 'prop'" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
                     <svg v-else width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
@@ -800,7 +802,7 @@
                 </button>
                 <MediaTime v-if="assetDetail.item?.image_generated_at" class="asset-detail-media-time" :at="assetDetail.item.image_generated_at" />
 
-                <section v-if="assetVersions(assetDetail.item).length" class="asset-version-panel">
+                <section v-if="!isMapAsset(assetDetail.item) && assetVersions(assetDetail.item).length" class="asset-version-panel">
                   <div class="asset-version-head">
                     <strong>{{ t('episode.asset.versions') }}</strong>
                     <span>{{ t('episode.asset.versionCount', { n: assetVersions(assetDetail.item).length }) }}</span>
@@ -823,6 +825,8 @@
                   </div>
                   <p class="asset-version-hint">{{ t('episode.asset.versionHint') }}</p>
                 </section>
+
+                <MapAssetPreview v-if="isMapAsset(assetDetail.item)" :key="assetDetail.item.id" :item="assetDetail.item" :assets="propItems" :episode-numbers="sbs.map(shotNumber)" @open-asset="openPipAsset" @preview="openImageViewer" />
 
                 <div class="asset-detail-meta-row">
                   <div class="asset-detail-meta-item">
@@ -871,7 +875,7 @@
                       :value="option"
                       :checked="assetTypeOf(assetDetail.item) === option"
                       :disabled="assetTypeSaving"
-                      @change="onAssetTypeChange(assetDetail.item, option)"
+                      @change="$event.target.checked = assetTypeOf(assetDetail.item) === option; onAssetTypeChange(assetDetail.item, option)"
                     />
                     <span>{{ t(`episode.asset.assetType.${option}`) }}</span>
                   </label>
@@ -1423,6 +1427,14 @@
       </div>
 
       <ConfirmDialog
+        :open="!!assetTypeConfirm"
+        :title="t('common.confirm')"
+        :message="t('episode.asset.assetTypeDowngradeConfirm', { name: assetTypeConfirm?.name || '' })"
+        :confirm-text="t('common.confirm')"
+        @cancel="assetTypeConfirm = null"
+        @confirm="confirmAssetTypeChange"
+      />
+      <ConfirmDialog
         :open="assetDelete.open"
         :title="t('episode.delete.title', { type: assetDeleteTypeLabel })"
         :message="t('episode.delete.message', { type: assetDeleteTypeLabel, name: assetDeleteName })"
@@ -1572,6 +1584,7 @@ import MapStudioEntry from '~/components/MapStudioEntry.vue'
 import { pipBadgeText } from '~/map-studio/utils/mapPip'
 import { dropLegacyMapDeeplinks } from '~/composables/useQuerySync'
 import VideoQueueBar from '~/components/VideoQueueBar.vue'
+import MapAssetPreview from '~/components/MapAssetPreview.vue'
 import ResearchCitationList from '~/components/ResearchCitationList.vue'
 import FinalPromptSourceBadge from '~/components/FinalPromptSourceBadge.vue'
 import MediaLibraryDialog from '~/components/MediaLibraryDialog.vue'
@@ -1687,7 +1700,7 @@ const storedPanel = (() => {
 // 父级同时接管未挂载子步骤的初始键，门禁阻断时不会留下可误恢复到另一镜的孤立弹窗。
 const link = useDeeplink('workbench', [...new Set([
   ...DEEPLINK_KEYS.workbench, ...DEEPLINK_KEYS.design, ...DEEPLINK_KEYS.picker,
-  ...DEEPLINK_KEYS.keyframes, ...DEEPLINK_KEYS.shotProduction, ...DEEPLINK_KEYS.finalPanel,
+  ...DEEPLINK_KEYS.keyframes, ...DEEPLINK_KEYS.keyframeBatch, ...DEEPLINK_KEYS.shotProduction, ...DEEPLINK_KEYS.finalPanel,
   ...DEEPLINK_KEYS.rewrite, ...DEEPLINK_KEYS.poster, ...DEEPLINK_KEYS.assetReview,
   ...DEEPLINK_KEYS.mediaLib, ...DEEPLINK_KEYS.layerPicker, ...DEEPLINK_KEYS.narration,
   ...DEEPLINK_KEYS.refLibrary, ...DEEPLINK_KEYS.archival,
@@ -2018,6 +2031,18 @@ function shotNumberOf(sb) {
   return i >= 0 ? i + 1 : 0
 }
 const assetDetail = ref({ open: false, type: '', item: null })
+const assetDetailBody = ref(null)
+function openPipAsset(id) {
+  if (!propItems.value.some(item => item.id === Number(id))) { toast.error(t('deeplink.missing')); return }
+  openAssetDetailById('prop', id)
+  nextTick(() => { if (assetDetailBody.value) assetDetailBody.value.scrollTop = 0 })
+}
+const mapPreviewFailed = ref(false)
+watch(() => [assetDetail.value.item?.id, assetDetail.value.item?.image_url], () => { mapPreviewFailed.value = false })
+function mapImageError(event, src, isMap) {
+  if (isMap && event.target.dataset.fbk) mapPreviewFailed.value = true
+  else thumbFallback(event, src)
+}
 const assetTypeSaving = ref(false)
 const assetDetailDraft = ref({ appearance: '', styling: '', prompt: '', lighting: '', description: '', time: '' })
 // 最终提示词手动编辑：dirty 时才随保存提交，避免无修改保存误清空 Agent 生成的提示词
@@ -4944,11 +4969,18 @@ const pipBadgeLines = computed(() => {
   return lines
 })
 
+const assetTypeConfirm = ref(null)
+function confirmAssetTypeChange() {
+  const item = assetTypeConfirm.value
+  assetTypeConfirm.value = null
+  if (item) void onAssetTypeChange(item, 'prop', true)
+}
+
 /** 地图 → 普通道具要人确认：地图数据不会被删，但整套地图界面会收起来 */
-async function onAssetTypeChange(item, next) {
+async function onAssetTypeChange(item, next, confirmed = false) {
   if (assetTypeSaving.value || !item || assetTypeOf(item) === next) return
   const downgrade = assetTypeOf(item) === 'map' && next === 'prop'
-  if (downgrade && !window.confirm(t('episode.asset.assetTypeDowngradeConfirm', { name: item.name || '' }))) return
+  if (downgrade && !confirmed) { assetTypeConfirm.value = item; return }
   assetTypeSaving.value = true
   try {
     const updated = await propAPI.update(item.id, { asset_type: next, confirm_asset_type_change: downgrade || undefined })
@@ -7059,9 +7091,9 @@ button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
 }
 .is-map-dialog .asset-detail-head, .is-map-dialog .asset-detail-foot { flex: 0 0 auto; }
 .is-map-dialog .asset-detail-body { flex: 1 1 auto; min-height: 0; overflow: auto; }
-.is-map-dialog .asset-detail-shell { grid-template-columns: minmax(0, 1fr); }
-.is-map-dialog .asset-detail-preview-panel { position: static; display: none; }
-.is-map-dialog .asset-detail-map-panel { overflow: visible; min-width: 1280px; }
+.is-map-dialog .asset-detail-shell { grid-template-columns: minmax(250px, 380px) minmax(0, 1fr); }
+.is-map-dialog .asset-detail-preview-panel { position: static; }
+.is-map-dialog .asset-detail-map-panel { min-width: 0; overflow-x: auto; }
 .asset-detail-head {
   display: flex;
   align-items: center;

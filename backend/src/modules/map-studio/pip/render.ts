@@ -14,8 +14,8 @@ import { getAbsolutePath, generateImageThumb } from '../../../utils/storage.js'
 import { mapProjectionFor, type MapSpec } from '../geo/base-render.js'
 import { renderReliefBase } from '../geo/relief-render.js'
 import { chooseDemZoom, ensureDemTiles, type DemTileFetcher } from '../geo/terrain-cache.js'
-import { namedRiverNames } from '../geo/named-rivers.js'
-import { expandBboxToAspect, PIP_COLORS, type MapPipFrame, type MapPipImage, type MapPipOutput } from './frames.js'
+import { datasetSourceInfo } from '../geo/datasets.js'
+import { expandBboxToAspect, frameRectOn, PIP_COLORS, type MapPipFrame, type MapPipImage, type MapPipOutput } from './frames.js'
 import { pipLabels } from './labels.js'
 import type { PipSlot } from './layouts.js'
 
@@ -49,13 +49,6 @@ async function writeImage(buffer: Buffer, prefix: string): Promise<MapPipImage> 
   return { path: rel, width: meta.width ?? 0, height: meta.height ?? 0, sha256 }
 }
 
-/** 框在全览像素里的矩形（与全览用同一投影） */
-function frameRectOn(overviewSpec: MapSpec, size: Size, bbox: Bbox): Rect {
-  const projection = mapProjectionFor(overviewSpec, size)
-  const a = projection([bbox[0], bbox[3]]) ?? [0, 0]
-  const b = projection([bbox[2], bbox[1]]) ?? [0, 0]
-  return [Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[0], b[0]), Math.max(a[1], b[1])]
-}
 
 const badge = (cx: number, cy: number, r: number, color: string, no: number): string =>
   `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${r}" fill="${color}" stroke="#f7f2e4" stroke-width="4"/>`
@@ -86,7 +79,7 @@ function riverExemptions(spec: MapSpec): string[] {
   return [...names]
 }
 
-async function renderDetail(input: RenderPipInput, frame: MapPipFrame, bbox: Bbox, size: Size, withLocator: boolean, locatorWidth: number): Promise<Buffer> {
+async function renderDetail(input: RenderPipInput, frame: MapPipFrame, bbox: Bbox, size: Size, withLocator: boolean, locatorWidth: number): Promise<{ buffer: Buffer; provenance: MapPipImage['provenance'] }> {
   const spec: MapSpec = { ...input.spec, bbox, detail_level: 'regional' }
   const projection = mapProjectionFor(spec, size)
   const zoom = chooseDemZoom(bbox, size, 'detail')
@@ -101,14 +94,20 @@ async function renderDetail(input: RenderPipInput, frame: MapPipFrame, bbox: Bbo
     fontScale: Math.min(1, Math.max(0.8, Math.min(size.width, size.height) / 1400)),
     reserved: withLocator ? [locRect] : [],
   })
+  const namedRivers = spec.routes.flatMap(route => route.dataset_ref?.ref.startsWith('osm:') ? [route.dataset_ref.ref] : [])
   const rendered = await renderReliefBase(spec, size, {
-    role: 'detail', anchors: null, exemptRivers: riverExemptions(spec), namedRivers: namedRiverNames(),
+    role: 'detail', anchors: null, exemptRivers: riverExemptions(spec), namedRivers,
     lineScale: scale * 1.1, demZoom: zoom, demCacheDir: input.demCacheDir,
     underSvg: labels.under, overSvg: labels.over,
   })
-  if (!withLocator) return rendered.buffer
+  const attribution = 'Natural Earth（公共领域）· AWS Terrain Tiles，SRTM / GMTED2010 / ETOPO1（公共领域）'
+    + (rendered.summary.named_rivers_used.length ? ' · 河流补充 © OpenStreetMap contributors（ODbL 1.0）' : '')
+  const provenance = { attribution, sources: rendered.summary.named_rivers_used.length
+    ? [{ name: 'OSM 命名河流', url: 'https://www.openstreetmap.org/', license: 'ODbL 1.0', sha256: datasetSourceInfo(namedRivers[0]!).sha256 }]
+    : [] }
+  if (!withLocator) return { buffer: rendered.buffer, provenance }
   const locator = await locatorPng(input, frame, loc)
-  return await sharp(rendered.buffer).composite([{ input: locator, left: margin, top: size.height - margin - loc.height }]).png().toBuffer()
+  return { buffer: await sharp(rendered.buffer).composite([{ input: locator, left: margin, top: size.height - margin - loc.height }]).png().toBuffer(), provenance }
 }
 
 function tileAspectMatches(slot: PipSlot, canvas: Size): boolean {
@@ -125,10 +124,10 @@ export async function renderPipAssets(input: RenderPipInput): Promise<MapPipOutp
   const details: MapPipOutput['details'] = []
   const detailBuffers = new Map<number, Buffer>()
   for (const frame of pip.frames) {
-    const buffer = await renderDetail(input, frame, frame.bbox, canvas, true, locatorWidth)
-    detailBuffers.set(frame.no, buffer)
-    const image = await writeImage(buffer, `pip-detail${frame.no}`)
-    details.push({ no: frame.no, ...image })
+    const detail = await renderDetail(input, frame, frame.bbox, canvas, true, locatorWidth)
+    detailBuffers.set(frame.no, detail.buffer)
+    const image = await writeImage(detail.buffer, `pip-detail${frame.no}`)
+    details.push({ no: frame.no, ...image, provenance: detail.provenance })
   }
   if (pip.layout.id === 'L1' || !pip.frames.length) return { ...pip, details, composite: null }
 
@@ -161,7 +160,7 @@ export async function renderPipAssets(input: RenderPipInput): Promise<MapPipOutp
         // 槽位宽高比不同：按槽位比例重扩框（中心不变、只扩不裁）后单独渲染，保证标注不被裁切
         const bbox = expandBboxToAspect(frame.focus_bbox, slot.w / slot.h)
         const withLoc = pip.layout.family === 'B' && Math.min(slot.w, slot.h) >= 700
-        tile = await renderDetail(input, frame, bbox, { width: slot.w, height: slot.h }, withLoc, Math.round(slot.w * (frame.role === 'primary' ? 0.26 : 0.3)))
+        tile = (await renderDetail(input, frame, bbox, { width: slot.w, height: slot.h }, withLoc, Math.round(slot.w * (frame.role === 'primary' ? 0.26 : 0.3)))).buffer
       }
       const color = PIP_COLORS[(no - 1) % PIP_COLORS.length]!
       svg += `<rect x="${slot.x}" y="${slot.y}" width="${slot.w}" height="${slot.h}" fill="none" stroke="${color}" stroke-width="6"/>${badge(slot.x + 60, slot.y + 60, 36, color, no)}`

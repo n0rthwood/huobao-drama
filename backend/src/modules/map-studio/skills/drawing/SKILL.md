@@ -10,7 +10,9 @@ description: 地图工作流·服务器草稿作图 — 小工具精确添加要
 ## 工作流程与工具
 
 1. 从提示中的要素摘要选择主体，调用 `add_feature_layers({items:[{feature_id}]})`，**默认不要逐层写 style**。服务器按当前主题与 category 套用河流、海岸、路线、山地、区域与点样式；河流投影长度达到画面对角线 45% 时为主河，否则为支流。点默认 city；确有重要度依据时可传 `importance:"capital"|"city"|"settlement"`。单层 `style` 是覆盖补丁，仅用于明确的叙事强调。服务器精确投影存储几何，place→marker、route→polyline、region→polygon，自动锚定。marker.text 初始为要素名称。断段各自添加，不得桥接；响应只有 id、bbox、点数与样式，没有长顶点数组。
+   区域按锚定要素稳定 ID 字典序分配主题色，色板按 CIELAB 最大间距贪心选择；末尾追加不改变已有颜色，前部插入或删除可能重新分配。polygon 的 `feather` 为输出高度比例，控制填充高斯模糊，描边不模糊，0 或缺省关闭。
 2. 标题及标签优先用 `add_label({tier:"title"|"region"|"city"|"river"|"note",text,box:{x,y,w,h},feature_id?})`：服务器套用主题的字号、字体、斜体、文字光晕与颜色；`style` 可按需覆盖。有 feature_id 时锚定要素，省略则是未锚定标题/说明。card、图例、画框等用 `add_layer({layer:{...}})`，公共字段必须完整。手画线面最多 200 点；要素几何只能用 add_feature_layers。
+   每个要显示名称的区域使用 `feature_id` 锚定区域标签；服务器对非 dataset 区域自动加「（示意）」，加长后放不下时改用一行「区域为示意范围」图例，仍须检查标签布局和预览。
    add_feature_layers / add_label 快捷工具由服务器补齐公共字段，style 是与主题默认合并的补丁。点已有 marker.text；若另加同一点的 city 标签，先用 `update_layer({layer_id,patch:{text:""}})` 清空 marker 旁注，避免重复地名。
 3. 用 `update_layer({layer_id,patch:{style:{...},box:{...},text:...,name:...,z:...,visible:...,opacity:...,rotation:...,fields:{...}}})` 小补丁修改。只传要改的字段，style 是合并补丁；type/anchor/id 不可改。锚定要素的 points/at 修改及非零 rotation 会整笔拒收，原草稿保留；非要素手画小形状可 patch.points/at（仍最多 200 点）。`remove_layer({layer_id})` 删除图层；删掉必画要素后仍须补回或在交付时说明 omitted。
 4. `get_draft({include_points:false})` 查看草稿摘要与当前 layer_options；include_points 只影响手画非要素的小形状，**要素几何始终不返回顶点**。不要请求/输出完整 LayerDoc，也没有全量文档交付工具。
@@ -38,7 +40,7 @@ description: 地图工作流·服务器草稿作图 — 小工具精确添加要
 - **底板遮挡也是硬拒收**：带底板的 label（`bg_opacity>0`）和 card 如果画在别的文字、点标记或其它要素的线之上（绘制顺序在它们后面），会以 `label_overlap` / `label_marker_overlap` 拒收（消息写明被盖住的图层）。标题、图例、说明卡要放在不压任何要素的空白处；图例条目写在图例底板**之上**（z 更大）是正常排版。自己要素的标签底板压住自己的线不算。
 - 正例：两个标签同位 → auto_layout_labels → unresolved 为空 → render_draft 看图 → submit_draft。反例：把「喀什里克」放在远处乌拉尔山内部，即便文字未溢出，仍以 label_far_from_feature 拒收；不能隐藏/删掉标签、缩字或忽略 unresolved 来冒充完成。
 - 数据集不连通的河段已拆成同 id 前缀的多条路线，每段各用一个对应 id 的 polyline，不能拿跨空白的直线把它们硬接起来；存储的原始地理顶点不做平滑。
-- `geometry_unverified` 在开始 drawing 和交付时再次检查；若出现待确认几何，用户应先在研究面板确认（去掉 proposed）、编辑或删除。不能通过隐藏图层或 omitted 绕过核验。
+- 未核验要素以示意继续绘制并保留来源；数据集缺失几何的要素不绘制，列为 omitted。用户可回退后修改；人工确认并不等于史实背书。
 
 ## 非要素图层格式（add_layer；严格，不写未知字段）
 

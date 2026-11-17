@@ -183,6 +183,7 @@ export interface MapResearchFeature {
   origin?: MapFeatureOrigin
   verification?: MapVerification
   dataset_ref?: MapDatasetReference
+  dataset_missing?: { queries: string[]; reason: string }
   relations?: MapRelation[]
   coordinate_basis: MapCoordinateBasis
   /** 坐标是怎么来的（与 supporting_excerpt 区分：后者是原文，这里是推理） */
@@ -201,6 +202,7 @@ export interface MapResearchFeature {
 export interface MapResearch {
   queries: MapResearchQuery[]
   dataset_queries?: MapDatasetQuery[]
+  missing_geometry?: Array<{ name: string; category: MapFeatureCategory; queries: string[]; reason: string }>
   extent?: [number, number, number, number]
   relations?: MapRelation[]
   sources: MapResearchSource[]

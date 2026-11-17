@@ -11,6 +11,15 @@
  */
 import type { MapAspect } from '../types.js'
 import { PIP_MAX_DETAILS, type PipLayout } from './layouts.js'
+import { mapProjectionFor, type MapSpec } from '../geo/base-render.js'
+
+/** Project a geographic focus rectangle using the same fit as the rendered overview. */
+export function frameRectOn(spec: Pick<MapSpec, 'projection' | 'bbox'>, size: { width: number; height: number }, bbox: MapBbox): MapBbox {
+  const projection = mapProjectionFor(spec, size)
+  const a = projection([bbox[0], bbox[3]]) ?? [0, 0]
+  const b = projection([bbox[2], bbox[1]]) ?? [0, 0]
+  return [Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[0], b[0]), Math.max(a[1], b[1])]
+}
 
 export type MapBbox = [number, number, number, number]
 export type MapPipRole = 'primary' | 'aux'
@@ -128,7 +137,13 @@ export function validateFrames(overview: MapBbox, raw: unknown, assetAspect: Map
   return { frames, problems: [] }
 }
 
-export interface MapPipImage { path: string; width: number; height: number; sha256: string }
+export interface MapPipImage {
+  path: string
+  width: number
+  height: number
+  sha256: string
+  provenance?: { attribution: string; sources: Array<{ name: string; url: string; license: string; sha256: string }> }
+}
 
 /**
  * 画中画产出（三件套：全览 + 细节 + 布局 spec）。details/composite 在「完成登记」前由确定性渲染补齐。

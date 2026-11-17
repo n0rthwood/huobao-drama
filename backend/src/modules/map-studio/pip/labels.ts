@@ -39,6 +39,7 @@ export function pipLabels(spec: MapSpec, projection: GeoProjection, size: { widt
 
   // 示意区域：软边色块（多边形模糊）+ 名称 +「（示意）」，画在山河之下
   spec.regions.forEach((region, i) => {
+    if (region.verification?.reasons?.some(reason => reason.includes('dataset_missing'))) return
     const pts = region.points.map(px).filter((p): p is [number, number] => !!p)
     if (pts.length < 3 || !pts.some(p => p[0] > -100 && p[0] < w + 100 && p[1] > -100 && p[1] < h + 100)) return
     const [r, g, b] = REGION_COLORS[i % REGION_COLORS.length]!
@@ -54,7 +55,7 @@ export function pipLabels(spec: MapSpec, projection: GeoProjection, size: { widt
       const rect: Rect = [cx - textWidth(region.name, f) / 2 - 6, cy + off - f, cx + textWidth(region.name, f) / 2 + 6, cy + off + f * 0.95]
       if (rect[0] < 10 || rect[2] > w - 10 || rect[1] < 10 || rect[3] > h - 10 || hits(rect, placed)) continue
       over += `<text x="${cx.toFixed(1)}" y="${(cy + off).toFixed(1)}" text-anchor="middle" ${SERIF} font-weight="700" font-size="${f}" letter-spacing="${(f * .1).toFixed(1)}" fill="${col}" ${HALO} stroke-width="${(f * .18).toFixed(1)}">${esc(region.name)}</text>`
-        + `<text x="${cx.toFixed(1)}" y="${(cy + off + f * .62).toFixed(1)}" text-anchor="middle" ${SERIF} font-size="${fs(26)}" fill="${col}" ${HALO} stroke-width="5">（示意）</text>`
+        + (region.proposed === true && region.origin !== 'manual' && region.verification?.status !== 'verified' && region.verification?.status !== 'confirmed' && !region.name.endsWith('（示意）') ? `<text x="${cx.toFixed(1)}" y="${(cy + off + f * .62).toFixed(1)}" text-anchor="middle" ${SERIF} font-size="${fs(26)}" fill="${col}" ${HALO} stroke-width="5">（示意）</text>` : '')
       placed.push(rect)
       return
     }
@@ -64,6 +65,7 @@ export function pipLabels(spec: MapSpec, projection: GeoProjection, size: { widt
   // 非河流路线（方向/进军线）：虚线 + 末端箭头；河流路线的几何已由水系层绘制，这里只标名
   const riverNames: Array<{ name: string; pts: Array<[number, number]> }> = []
   for (const route of spec.routes) {
+    if (route.verification?.reasons?.some(reason => reason.includes('dataset_missing'))) continue
     const pts = route.points.map(px).filter((p): p is [number, number] => !!p)
     const isRiver = route.category === 'river' || !!route.dataset_ref
     if (isRiver) { if (opts.tier === 'full') riverNames.push({ name: route.name.replace(/\s*\(\d+\/\d+\)$/, ''), pts }); continue }
@@ -84,11 +86,14 @@ export function pipLabels(spec: MapSpec, projection: GeoProjection, size: { widt
   // 地点：圆点 + 名称，按 spec 顺序视为重要性，八方位 × 三档距离贪心避让
   const dirs: Array<[number, number]> = [[1, 0], [-1, 0], [0, -1], [0, 1], [1, -1], [-1, -1], [1, 1], [-1, 1]]
   spec.places.forEach((place, index) => {
+    if (place.verification?.reasons?.some(reason => reason.includes('dataset_missing'))) return
     const pt = px([place.lon, place.lat])
     if (!inside(pt)) return
     const major = index < 3
     if (opts.tier === 'focus_only' && index >= 4) return
-    const f = fs(major ? 46 : 36), dot = fs(major ? 12 : 9), wd = textWidth(place.name, f)
+    const approximate = place.proposed === true && place.origin !== 'manual' && place.verification?.status !== 'verified' && place.verification?.status !== 'confirmed'
+    const name = approximate && !place.name.endsWith('（示意）') ? `${place.name}（示意）` : place.name
+    const f = fs(major ? 46 : 36), dot = fs(major ? 12 : 9), wd = textWidth(name, f)
     let ok = false
     outer: for (const mult of [1, 2.4, 3.8]) for (const [dx, dy] of dirs) {
       const gap = (dot + fs(8)) * mult
@@ -97,8 +102,8 @@ export function pipLabels(spec: MapSpec, projection: GeoProjection, size: { widt
       const rect: Rect = [x0 - 4, y0 - f, x0 + wd + 4, y0 + f * .28]
       if (rect[0] < 10 || rect[2] > w - 10 || rect[1] < 10 || rect[3] > h - 10 || hits(rect, placed)) continue
       placed.push(rect, [pt[0] - dot, pt[1] - dot, pt[0] + dot, pt[1] + dot])
-      over += `<text x="${x0.toFixed(1)}" y="${y0.toFixed(1)}" ${SERIF} font-weight="${major ? 700 : 500}" font-size="${f}" fill="#2b2118" ${HALO} stroke-width="${(f * .2).toFixed(1)}">${esc(place.name)}</text>`
-        + `<circle cx="${pt[0].toFixed(1)}" cy="${pt[1].toFixed(1)}" r="${dot}" fill="${major ? '#2b2118' : '#5a4634'}" stroke="#f7f2e4" stroke-width="3"/>`
+      over += `<text x="${x0.toFixed(1)}" y="${y0.toFixed(1)}" ${SERIF} font-weight="${major ? 700 : 500}" font-size="${f}" fill="#2b2118" ${HALO} stroke-width="${(f * .2).toFixed(1)}">${esc(name)}</text>`
+        + `<circle cx="${pt[0].toFixed(1)}" cy="${pt[1].toFixed(1)}" r="${dot}" fill="${approximate ? 'none' : major ? '#2b2118' : '#5a4634'}" stroke="${approximate ? '#2b2118' : '#f7f2e4'}" stroke-width="3"/>`
       ok = true
       break outer
     }

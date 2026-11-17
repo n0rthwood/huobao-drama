@@ -3472,6 +3472,7 @@
       "rotation": "Rotation",
       "fill": "Fill",
       "fillOpacity": "Fill opacity",
+      "feather": "Feather (2160h)",
       "stroke": "Stroke",
       "strokeWidth": "Stroke width",
       "dash": "Line style",
@@ -3637,6 +3638,16 @@
       "layout": "Layout set: {layout}",
       "legacy": "This concept uses {n} legacy free-text layers; regenerate the concept to get template text boxes."
     }
+  },
+  "mapPreview": {
+    "readOnly": "Versions are read-only; the current image cannot be changed here.",
+    "versionsUnavailable": "Could not load versions",
+    "imageMissing": "Image unavailable",
+    "targetMissing": "The linked asset is deleted or not associated and cannot be opened.",
+    "stale": "Outdated",
+    "overview": "Parent overview",
+    "openOverview": "View overview",
+    "shotCount": "{n} associated shots"
   },
   "mapStudio": {
     "styles": {
@@ -3945,7 +3956,7 @@
       "title": "Edit layers",
       "target": "map layer document",
       "layerTarget": "layer the link points to",
-      "hint": "You are editing the layer document the model delivered; saving re-renders it on the server through the same render chain and registers a new version.",
+      "hint": "Region fills are shown over the base while editing for adjustment only. On save, program maps composite them below rivers; other bases place them at the bottom of the layer stack.",
       "close": "Close",
       "save": "Save and re-render",
       "saving": "Saving…",
@@ -4071,6 +4082,14 @@
       "stale": "stale"
     },
     "researchPanel": {
+      "reviewTitle": "Features to review",
+      "reviewHint": "The workflow can continue; confirmation is optional. Return to drawing and rerender to apply confirmation.",
+      "notDrawn": "No dataset geometry; not drawn",
+      "schematic": "Approximate",
+      "gridPreview": "Schematic location preview (graticule, not a basemap)",
+      "noLayers": "Complete drawing before editing layers",
+      "pendingOptional": "{n} features to review (optional)",
+      "resumeSchematic": "Continue with approximate features by running the next stage.",
       "title": "Feature provenance and verification",
       "hint": "Rows come from the current map_spec: origin badge, verification status, reasons and relative-position evidence. Confirm only removes the AI-proposal flag and saves through CAS; the server decides whether the gate opens.",
       "pick": "Select",

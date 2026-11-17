@@ -33,6 +33,9 @@ const script = `
   }
 
   const adopted = tryCall(() => adoptResearchIntoSpec(input.spec, input.research, input.brief))
+  const missingAdopted = tryCall(() => adoptResearchIntoSpec(input.spec, { ...input.research, features: [...input.research.features,
+    { id: 'missing', kind: 'place', name: '无几何河流', lon: null, lat: null, points: [], category: 'river', dataset_missing: { queries: ['missing'], reason: '无同名数据' }, verification: { status: 'needs_user', reasons: ['dataset_missing：无同名数据'] } },
+  ] }, input.brief))
 
   // 回退：历史里有两次进入 base（旧的一次 + 重跑的一次），
   // 且当前几何里有一条人工确认过的地点，回退不能把它抹掉
@@ -76,6 +79,7 @@ const script = `
     adopted: adopted.ok
       ? { places: adopted.value.spec.places, regions: adopted.value.spec.regions, notes: adopted.value.notes, bbox: adopted.value.spec.bbox }
       : adopted,
+    missingAdopted,
     brokenJson: parseWorkflow('{not json'),
     rollback: {
       note: rollbackNote,
@@ -297,4 +301,10 @@ test('唯一隐含的时代可由 AI 补全并留痕；低置信度推断不算�
   assert.deepEqual(out.inferredRun.blocking, [])
   assert.equal(out.lowRun.era, '', '低置信度猜测不得写进需求')
   assert.deepEqual(out.lowRun.blocking, ['missing_era'])
+})
+
+test('无几何的 dataset_missing 不进入地图几何且不伪造坐标', () => {
+  assert.equal(out.missingAdopted.ok, true)
+  const spec = out.missingAdopted.value.spec
+  assert.equal([...spec.places, ...spec.routes, ...spec.regions].some(item => item.name === '无几何河流'), false)
 })

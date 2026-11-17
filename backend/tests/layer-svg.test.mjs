@@ -41,6 +41,17 @@ function backend(payload) {
   return JSON.parse(out.slice(out.lastIndexOf('@@') + 2))
 }
 
+test('hollow markers survive normalization and render identically on both sides', () => {
+  const doc = { base: { path: 'static/uploads/map.png', width: 960, height: 540 }, layers: [
+    { id: 'approx', type: 'marker', at: [0.5, 0.5], style: { hollow: true, color: '#b45235' } },
+  ] }
+  const item = { doc, size: { width: 960, height: 540 } }
+  const result = backend({ cases: [item], wraps: [], widths: [], unsupported: [] }).cases[0]
+  assert.equal(result.doc.layers[0].style.hollow, true)
+  assert.match(result.svg, /<circle[^>]*fill="none"[^>]*stroke="#b45235"/)
+  assert.equal(front.layerDocToSvg(result.doc, item.size, { resolveImage }), result.svg)
+})
+
 const MAP_DOC = {
   base: { path: 'static/uploads/map.png', width: 1344, height: 768 },
   theme: 'archival',
@@ -145,6 +156,11 @@ const CASES = [
     },
     size: { width: 1920, height: 1080 },
   },
+  ...[0, 0.023].map(feather => ({
+    name: `polygon feather ${feather}`,
+    doc: { ...MAP_DOC, layers: [{ ...MAP_DOC.layers[0], style: { fill: '#c96b59', fill_opacity: 0.23, feather } }] },
+    size: { width: 3840, height: 2160 },
+  })),
 ]
 
 const WRAPS = [
@@ -170,6 +186,18 @@ CASES.forEach((item, index) => {
     const aspect = item.size.width / item.size.height
     assert.deepEqual(doc.layers.map(layer => front.layerBounds(layer, doc.theme, aspect, item.variables)), bounds)
   })
+})
+
+test('polygon feather 规范化保留，零值与缺省 SVG 相同，正值仅模糊填充', () => {
+  const zero = result.cases[CASES.findIndex(item => item.name === 'polygon feather 0')]
+  const blurred = result.cases[CASES.findIndex(item => item.name === 'polygon feather 0.023')]
+  assert.equal(blurred.doc.layers[0].style.feather, 0.023)
+  const without = structuredClone(zero.doc)
+  delete without.layers[0].style.feather
+  assert.equal(front.layerDocToSvg(without, { width: 3840, height: 2160 }, { resolveImage }), zero.svg)
+  assert.doesNotMatch(zero.svg, /feGaussianBlur/)
+  assert.match(blurred.svg, /feGaussianBlur stdDeviation="49\.68"/)
+  assert.match(blurred.svg, /fill="none" stroke=/)
 })
 
 test('SVG 结构：根节点尺寸、图层分组、defs 只在需要时出现', () => {

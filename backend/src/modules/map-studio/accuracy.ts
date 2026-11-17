@@ -86,11 +86,11 @@ export function excerptSupportsPoint(text: string, point: Point): boolean {
   return [...text.matchAll(labelled)].some(m => Math.abs(Number(m[1]) - point[0]) <= 0.1 && Math.abs(Number(m[2]) - point[1]) <= 0.1)
 }
 export function geometryUnverified(spec: MapSpec | null): Array<{ id: string; name: string; reasons: string[] }> {
-  if (!spec) return [{ id: '', name: '地图几何', reasons: ['尚无几何'] }]
+  if (!spec) return []
   return [...spec.places, ...spec.routes, ...spec.regions].flatMap(feature => {
-    if (feature.proposed !== true || feature.origin === 'manual') return []
-    if (feature.verification?.status === 'verified' && feature.origin !== undefined) return []
-    return [{ id: feature.id, name: feature.name, reasons: feature.verification?.reasons?.length ? feature.verification.reasons : ['AI 提议的坐标缺少可核验依据，请人工确认'] }]
+    const missing = feature.verification?.reasons?.some(reason => reason.includes('dataset_missing'))
+    if (!missing && (feature.proposed !== true || feature.origin === 'manual' || feature.verification?.status === 'verified' || feature.verification?.status === 'confirmed')) return []
+    return [{ id: feature.id, name: feature.name, reasons: feature.verification?.reasons?.length ? feature.verification.reasons : ['AI 提议的坐标缺少可核验依据'] }]
   })
 }
 export function confirmedVerification(): MapVerification { return { status: 'confirmed', reasons: ['人工确认或编辑'] } }

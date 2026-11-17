@@ -185,6 +185,7 @@ export interface MapResearch {
   queries: Array<{ adapter: string; query: string; hits: number; error: string | null }>
   /** 本阶段 search_dataset 的登记（服务端核对 dataset_missing 用）；老记录没有这个字段 */
   dataset_queries?: MapDatasetQuery[]
+  missing_geometry?: Array<{ name: string; category: string; queries: string[]; reason: string }>
   /** 该图的空间范围 [west, south, east, north]；阶段 ② 起必填 */
   extent?: [number, number, number, number]
   /** 本次提交的相对位置证据及服务端按坐标算出的结论 */

@@ -3472,6 +3472,7 @@
       "rotation": "旋转",
       "fill": "填充色",
       "fillOpacity": "填充透明度",
+      "feather": "羽化（2160 高）",
       "stroke": "描边色",
       "strokeWidth": "描边粗细",
       "dash": "线型",
@@ -3637,6 +3638,16 @@
       "layout": "版式套：{layout}",
       "legacy": "该构图使用旧版自由文字图层（{n} 个），建议重新生成概念以获得模板文本框。"
     }
+  },
+  "mapPreview": {
+    "readOnly": "版本仅供查看，不能切换当前成图。",
+    "versionsUnavailable": "无法加载版本列表",
+    "imageMissing": "图片不可用",
+    "targetMissing": "关联资产已删除或未关联，无法打开。",
+    "stale": "已过期",
+    "overview": "所属全览",
+    "openOverview": "查看全览",
+    "shotCount": "关联 {n} 个分镜"
   },
   "mapStudio": {
     "styles": {
@@ -3945,7 +3956,7 @@
       "title": "编辑图层",
       "target": "地图图层文档",
       "layerTarget": "链接指向的图层",
-      "hint": "编辑的是模型交付的图层文档；保存后由服务端用同一条渲染链重绘并登记新版本。",
+      "hint": "编辑态区域填充直接叠在底图上，仅供调整；保存后程序底图将填充合成到河流之下，非程序底图则置于最底图层。",
       "close": "关闭",
       "save": "保存并重绘",
       "saving": "保存中…",
@@ -4071,6 +4082,14 @@
       "stale": "已过期"
     },
     "researchPanel": {
+      "reviewTitle": "待你查看的要素",
+      "reviewHint": "流程可继续；确认是可选的。确认后需回退到作图并重渲才会更新成图。",
+      "notDrawn": "数据集中没有几何，暂不绘制",
+      "schematic": "示意",
+      "gridPreview": "位置示意预览（经纬网，并非底图）",
+      "noLayers": "完成作图后才能编辑图层",
+      "pendingOptional": "{n} 个要素待你查看（可选）",
+      "resumeSchematic": "可按示意继续，点击执行下一阶段。",
       "title": "要素来源与核验",
       "hint": "条目取自当前 map_spec：来源徽标、核验状态、原因与相对位置证据；「确认」只是去掉 AI 候选标记后按 CAS 保存，放行与否以服务端核验为准。",
       "pick": "选择",

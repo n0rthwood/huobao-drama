@@ -9,15 +9,12 @@ import { drawnGeometryOf, projectedLabelFeatures, specFeatures } from './validat
 import { renderCopyWithSmoothing, smoothingProblems } from './render/smooth.js'
 import { labelFeaturesOf, labelProblems } from './layout/labels.js'
 import { layerDraftContext } from './layer-edit.js'
-import { geometryUnverified } from './accuracy.js'
 import { projectDetailSemantics } from './pip/semantics.js'
 
 /** One immutable payload drives both host delivery and standalone downloads. */
 export function buildDeliverable(loaded: LoadedTask): MapStudioDeliverable {
   const { state, mapSpec } = loaded
   const { final_image: final, base_image: base, layer_doc: doc } = state.outputs
-  const pending = mapSpec ? geometryUnverified(mapSpec) : []
-  if (pending.length) throw new MapStudioRequestError(`geometry_unverified：${pending.map(f => `「${f.name}」：${f.reasons.join('；')}`).join(' / ')}`, 'geometry_unverified')
   if (!final || !base || !doc || !mapSpec) throw new MapStudioRequestError('缺少成图、底图、图层文档或地图几何，请先完成标注绘制', 'missing_drawing')
   const controlDoc = doc as LayerDoc
   const options = state.outputs.layer_options ?? {}
@@ -38,6 +35,7 @@ export function buildDeliverable(loaded: LoadedTask): MapStudioDeliverable {
       verification: item?.proposed !== true ? { status: 'confirmed', reasons: ['人工确认或编辑'] } : item?.verification,
       relations: item?.relations ?? [], dataset_ref: item?.dataset_ref ?? null, category: item?.category ?? null,
       proposed: item?.proposed === true, source_ids: source?.source_ids ?? [],
+      approximate: feature.approximate === true, omitted: feature.missing === true,
       coordinate_basis: source?.coordinate_basis ?? null, excerpt: source?.supporting_excerpt ?? '',
     }
   })
@@ -59,7 +57,7 @@ export function buildDeliverable(loaded: LoadedTask): MapStudioDeliverable {
     final_image: { path: final.path, width: final.width, height: final.height, sha256: crypto.createHash('sha256').update(fs.readFileSync(getAbsolutePath(final.path))).digest('hex') },
     base_image: { path: base.path, width: base.width, height: base.height, mode: baseMode, provenance: base.provenance },
     texture_image: state.outputs.texture_image ? { path: state.outputs.texture_image.path } : null,
-    semantics: { width: geometry.width, height: geometry.height, points: geometry.points, lines: geometry.routes, regions: geometry.regions, labels: [], warnings },
+    semantics: { width: geometry.width, height: geometry.height, points: geometry.points, lines: geometry.routes, regions: geometry.regions, labels: [], warnings, approximate: features.some(feature => feature.approximate), omitted: features.filter(feature => feature.omitted).map(feature => ({ feature_id: feature.feature_id, name: feature.name, reason: '数据集中没有几何，暂不绘制' })), missing_geometry: state.research?.missing_geometry ?? [] },
     features, sources: state.research?.sources ?? [], kmz: state.outputs.kmz ? { path: state.outputs.kmz.path } : null,
     editable_source: { version: 1, map_style: mapSpec.style.map_style ?? null, map_spec: mapSpec, layer_doc: doc, layer_options: options },
     manual_edit: final.source === 'map-drawing-manual',

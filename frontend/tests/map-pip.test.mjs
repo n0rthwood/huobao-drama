@@ -14,7 +14,9 @@ function load(relative, replacements = []) {
   return import(`data:text/javascript;base64,${Buffer.from(js).toString('base64')}`)
 }
 
-const pip = await load('../app/map-studio/utils/mapPip.ts')
+const pip = await load('../app/map-studio/utils/mapPip.ts', [
+  ["from 'd3-geo'", `from '${import.meta.resolve('d3-geo')}'`],
+])
 const preview = await load('../app/map-studio/utils/mapPreview.ts', [
   ["import type { MapStudioOutputs } from '~/map-studio/api'", ''],
   ["import type { MapRegistration } from '~/map-studio/utils/mapRegistration'", ''],

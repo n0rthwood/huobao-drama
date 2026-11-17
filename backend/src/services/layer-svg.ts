@@ -370,6 +370,13 @@ function emitPolygon(layer: PolygonLayer, ctx: SvgContext): string {
   const stroke = strokeWidth > 0
     ? ` stroke="${esc(styleOf(layer, ctx.theme, 'stroke') as string)}" stroke-width="${fmt(strokeWidth)}" stroke-linejoin="round"${dash ? ` stroke-dasharray="${dash}"` : ''}`
     : ''
+  const feather = Number(layer.style.feather ?? 0) * ctx.height
+  if (feather > 0) {
+    const id = `feather-${layer.id}`
+    ctx.defs.push(`<filter id="${esc(id)}" filterUnits="userSpaceOnUse" x="0" y="0" width="${fmt(ctx.width)}" height="${fmt(ctx.height)}"><feGaussianBlur stdDeviation="${fmt(feather)}"/></filter>`)
+    return `<polygon points="${points}" fill="${esc(styleOf(layer, ctx.theme, 'fill') as string)}" fill-opacity="${fmt(styleOf(layer, ctx.theme, 'fill_opacity') as number)}" filter="url(#${esc(id)})"/>`
+      + (stroke ? `<polygon points="${points}" fill="none"${stroke}/>` : '')
+  }
   return `<polygon points="${points}" fill="${esc(styleOf(layer, ctx.theme, 'fill') as string)}"`
     + ` fill-opacity="${fmt(styleOf(layer, ctx.theme, 'fill_opacity') as number)}"${stroke}/>`
 }
@@ -400,8 +407,8 @@ function emitMarker(layer: MarkerLayer, ctx: SvgContext): string {
   const size = (styleOf(layer, ctx.theme, 'size') as number) * ctx.unit
   const legacyOffset = styleOf(layer, ctx.theme, 'label_offset') as number[]
   const offset = [Number(layer.style.label_dx ?? legacyOffset[0]), Number(layer.style.label_dy ?? legacyOffset[1])]
-  let out = `<circle cx="${fmt(cx)}" cy="${fmt(cy)}" r="${fmt(radius)}" fill="${esc(color)}"`
-    + ` stroke="${esc(stroke)}" stroke-width="${fmt(layer.style.stroke_width === undefined ? radius * .35 : Number(layer.style.stroke_width) * ctx.unit)}"/>`
+  let out = `<circle cx="${fmt(cx)}" cy="${fmt(cy)}" r="${fmt(radius)}" fill="${layer.style.hollow ? 'none' : esc(color)}"`
+    + ` stroke="${esc(layer.style.hollow ? color : stroke)}" stroke-width="${fmt(layer.style.stroke_width === undefined || layer.style.hollow && Number(layer.style.stroke_width) === 0 ? radius * .35 : Number(layer.style.stroke_width) * ctx.unit)}"/>`
   if (layer.text) {
     out += textBlock([resolvedText(layer, ctx.variables)], {
       x: cx + offset[0] * ctx.width,

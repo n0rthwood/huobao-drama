@@ -179,7 +179,9 @@ function validateFeatureGeometry(raw: unknown, ctx: FeatureSubmissionContext): {
     let lon: number | null = null
     let lat: number | null = null
     let points: Array<[number, number]> = []
-    if (kind === 'place') {
+    if (record.__missing_geometry === true) {
+      // A verified missing-dataset claim is evidence, not a fabricated coordinate.
+    } else if (kind === 'place') {
       const read = readLonLat([record.lon, record.lat])
       if ('problem' in read) local.push(`lon/lat：${read.problem}`)
       else {
@@ -289,6 +291,7 @@ export function validateFeatureSubmission(raw: unknown, ctx: FeatureSubmissionCo
   const missing = new Set<number>()
   const categories = ['river', 'lake', 'coast', 'mountain', 'settlement', 'route', 'territory', 'other']
   records.forEach((record, index) => {
+    delete record.__missing_geometry
     const tag = `features[${index}]「${String(record.name ?? '')}」`
     if (!categories.includes(String(record.category))) problems.push(`${tag} category 必须为 ${categories.join(' / ')}`)
     if (!['dataset', 'source', 'model'].includes(String(record.geometry_source))) problems.push(`${tag} geometry_source 必须为 dataset / source / model`)
@@ -324,7 +327,11 @@ export function validateFeatureSubmission(raw: unknown, ctx: FeatureSubmissionCo
         })
       })
       if (!searched || typeof claim?.reason !== 'string' || !claim.reason.trim()) problems.push(`${tag} 自然要素必须取自 dataset；dataset_missing 必须引用本阶段 search_dataset 真正查过、没有同名候选的 query，并说明原因`)
-      else missing.add(index)
+      else {
+        missing.add(index)
+        const noPoint = record.lon == null && record.lat == null && (!Array.isArray(record.points) || !record.points.length)
+        if (noPoint) record.__missing_geometry = true
+      }
     }
   })
   const base = validateFeatureGeometry(records, ctx)
@@ -339,28 +346,29 @@ export function validateFeatureSubmission(raw: unknown, ctx: FeatureSubmissionCo
     feature.origin = record.geometry_source as MapFeatureOrigin
     feature.parts = geometry?.kind !== 'place' ? geometry?.parts : undefined
     if (geometry) feature.dataset_ref = record.dataset_ref as NonNullable<MapResearchFeature['dataset_ref']>
-    const points = geometry ? geometry.kind === 'place' ? [[geometry.lon!, geometry.lat!] as [number, number]] : geometry.parts.flat() : feature.kind === 'place' ? [[feature.lon!, feature.lat!] as [number, number]] : feature.points
+    if (missing.has(index)) feature.dataset_missing = record.dataset_missing as MapResearchFeature['dataset_missing']
+    const points: Array<[number, number]> = geometry ? geometry.kind === 'place' ? [[geometry.lon!, geometry.lat!]] : geometry.parts.flat() : feature.kind === 'place' ? feature.lon !== null && feature.lat !== null ? [[feature.lon, feature.lat]] : [] : feature.points
     if (validExtent(ctx.extent)) problems.push(...extentProblems(points, ctx.extent, { dataset: record.geometry_source === 'dataset' }).map(message => `「${feature.name}」：${message}`))
     const ack = new Set<string>()
     for (const item of Array.isArray(record.acknowledge) ? record.acknowledge : []) {
       if (item && typeof item === 'object' && typeof item.code === 'string' && typeof item.reason === 'string' && item.reason.trim()) ack.add(item.code)
     }
     acknowledgements.set(feature.name, ack)
-    const verified = feature.origin === 'dataset' || !feature.approximate && feature.kind === 'place' && feature.excerpt_verified && excerptSupportsPoint(feature.supporting_excerpt, [feature.lon!, feature.lat!])
+    const verified = feature.origin === 'dataset' || !feature.approximate && feature.kind === 'place' && feature.lon !== null && feature.lat !== null && feature.excerpt_verified && excerptSupportsPoint(feature.supporting_excerpt, [feature.lon, feature.lat])
     const missingClaim = record.dataset_missing
     const missingReason = missingClaim && typeof missingClaim === 'object' && 'reason' in missingClaim ? String(missingClaim.reason) : ''
     const missingQueries = missingClaim && typeof missingClaim === 'object' && 'queries' in missingClaim ? missingClaim.queries : []
     feature.verification = missing.has(index) ? { status: 'needs_user', reasons: [`dataset_missing：${missingReason}；检索 ${JSON.stringify(missingQueries)}，请人工裁决`] }
       : verified ? { status: 'verified', reasons: [feature.origin === 'dataset' ? `数据集 ${feature.dataset_ref?.ref}` : '来源正文中的经纬度与该点相差不超过 0.1°'] }
         : { status: 'unverified', reasons: ['坐标尚无可核验的原文经纬度或相对位置证据'] }
-    if (feature.origin !== 'dataset' && feature.kind === 'place' && Math.abs(feature.lon! - feature.lat!) < 0.25) {
+    if (feature.origin !== 'dataset' && feature.kind === 'place' && feature.lon !== null && feature.lat !== null && Math.abs(feature.lon - feature.lat) < 0.25) {
       const message = `lon_lat_similar：「${feature.name}」经度与纬度相差小于 0.25°，疑似抄错`
-      if (!ack.has('lon_lat_similar')) problems.push(message)
+      problems.push(message)
       feature.verification = { status: 'conflict', reasons: [...feature.verification.reasons, message, ...(Array.isArray(record.acknowledge) ? record.acknowledge.filter(a => a?.code === 'lon_lat_similar').map(a => String(a.reason)) : [])] }
     }
   })
   const named = new Map<string, { point: [number, number]; parts: Array<Array<[number, number]>>; verified: boolean; datasetRiver: boolean; feature?: MapResearchFeature }>(
-    features.map(f => [f.name, { point: (f.kind === 'place' ? [f.lon!, f.lat!] : f.points[0]!) as [number, number], parts: f.parts ?? [f.points], verified: f.verification?.status === 'verified', datasetRiver: f.category === 'river' && f.origin === 'dataset', feature: f }]))
+    features.filter(f => f.kind === 'place' ? f.lon !== null && f.lat !== null : f.points.length > 0).map(f => [f.name, { point: (f.kind === 'place' ? [f.lon!, f.lat!] : f.points[0]!) as [number, number], parts: f.parts ?? [f.points], verified: f.verification?.status === 'verified', datasetRiver: f.category === 'river' && f.origin === 'dataset', feature: f }]))
   for (const f of [...ctx.confirmed?.places ?? [], ...ctx.confirmed?.routes ?? [], ...ctx.confirmed?.regions ?? []]) {
     if (!named.has(f.name) && (f.proposed !== true || f.verification?.status === 'verified')) named.set(f.name, { point: ('lon' in f ? [f.lon, f.lat] : f.points[0]!) as [number, number], parts: 'points' in f ? [f.points] : [], verified: true, datasetRiver: f.category === 'river' && f.origin === 'dataset' })
   }
@@ -388,7 +396,7 @@ export function validateFeatureSubmission(raw: unknown, ctx: FeatureSubmissionCo
       feature.relations = [...feature.relations ?? [], computed]
       if (!computed.computed.consistent && name === r.subject) {
         const message = `relation_conflict：${computed.message}`
-        if (!acknowledgements.get(name)?.has('relation_conflict')) problems.push(message)
+        if (object.verified || subject.verified || !acknowledgements.get(name)?.has('relation_conflict')) problems.push(message)
         const record = records.find(item => item.name === name)
         const reasons = (Array.isArray(record?.acknowledge) ? record.acknowledge : []).filter(a => a?.code === 'relation_conflict').map(a => String(a.reason))
         feature.verification = { status: 'conflict', reasons: [...feature.verification?.reasons ?? [], message, ...reasons] }
@@ -419,13 +427,20 @@ export interface SpecFeature {
   coords: Array<[number, number]>
   origin?: MapFeatureOrigin
   category?: string
+  approximate?: boolean
+  missing?: boolean
 }
 
 export function specFeatures(spec: MapSpec): SpecFeature[] {
+  const metadata = (item: (typeof spec.places)[number] | (typeof spec.routes)[number] | (typeof spec.regions)[number]) => ({
+    origin: item.origin, category: item.category,
+    approximate: item.proposed === true && item.origin !== 'manual' && item.verification?.status !== 'verified' && item.verification?.status !== 'confirmed',
+    missing: item.verification?.reasons?.some(reason => reason.includes('dataset_missing')) === true,
+  })
   return [
-    ...spec.places.map((place): SpecFeature => ({ id: place.id, kind: 'place', name: place.name, origin: place.origin, category: place.category, coords: [[place.lon, place.lat]] })),
-    ...spec.routes.map((route): SpecFeature => ({ id: route.id, kind: 'route', name: route.name, origin: route.origin, category: route.category, coords: route.points })),
-    ...(spec.regions ?? []).map((region): SpecFeature => ({ id: region.id, kind: 'region', name: region.name, origin: region.origin, category: region.category, coords: region.points })),
+    ...spec.places.map((place): SpecFeature => ({ id: place.id, kind: 'place', name: place.name, ...metadata(place), coords: [[place.lon, place.lat]] })),
+    ...spec.routes.map((route): SpecFeature => ({ id: route.id, kind: 'route', name: route.name, ...metadata(route), coords: route.points })),
+    ...(spec.regions ?? []).map((region): SpecFeature => ({ id: region.id, kind: 'region', name: region.name, ...metadata(region), coords: region.points })),
   ]
 }
 
@@ -605,6 +620,9 @@ export function drawingProblems(input: {
     if (!known.has(id)) problems.push(`omitted[${index}].feature_id=${describe(record.feature_id)} 不是本图的要素 id；可用 id：${[...known.keys()].join('、')}`)
     else if (!reason) problems.push(`omitted[${index}]（${id}）必须写明省略理由`)
     else omitted.push({ feature_id: id, reason })
+  }
+  for (const feature of features) {
+    if (feature.missing && !omitted.some(item => item.feature_id === feature.id)) omitted.push({ feature_id: feature.id, reason: '数据集中没有几何，暂不绘制' })
   }
   const omittedIds = new Set(omitted.map(item => item.feature_id))
 
