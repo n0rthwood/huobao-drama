@@ -163,3 +163,34 @@ test('poster reference generation fixes initial aspect but edits composite/layer
     assert.deepEqual(request.reference_images, ['base', 'text'])
   }
 })
+
+test('image job body: minimax-h3-image carries model + fixed 6 steps and <Picture N> citations', () => {
+  const result = runInBackend(`
+    const base = { prompt: '以 @参考图1 的形制、@参考图2 的材质画一只灯笼', size: '1344x768', model: 'minimax-h3-image' }
+    const out = {
+      t2i: client.buildImageJobBody({ ...base, prompt: 'P', fileIds: [], isKeyframe: false, flux: false }),
+      keyframe: client.buildImageJobBody({ ...base, fileIds: ['f1', 'f2'], isKeyframe: true, flux: false }),
+      edit: client.buildImageJobBody({ ...base, fileIds: ['f1', 'f2'], isKeyframe: false, flux: false }),
+      qwenUnchanged: client.buildImageJobBody({ ...base, model: 'qwen-image-2.1', fileIds: ['f1'], isKeyframe: true, flux: false }),
+      pictureFromImageTag: client.buildImageJobBody({ ...base, prompt: '<image1> 的形制', fileIds: ['f1'], isKeyframe: false, flux: false }),
+    }
+    process.stdout.write(JSON.stringify(out))
+  `)
+  assert.deepEqual(result.t2i, { mode: 'text_to_image', model: 'minimax-h3-image', steps: 6, prompt: 'P', metadata: {}, width: 1344, height: 768 })
+  assert.deepEqual(result.keyframe, {
+    mode: 'reference_to_image', model: 'minimax-h3-image', steps: 6,
+    prompt: '以 <Picture 1> 的形制、<Picture 2> 的材质画一只灯笼', metadata: {},
+    width: 1344, height: 768, reference_images: ['f1', 'f2'],
+  })
+  assert.deepEqual(result.edit, {
+    mode: 'image_edit', model: 'minimax-h3-image', steps: 6,
+    prompt: '以 <Picture 1> 的形制、<Picture 2> 的材质画一只灯笼', metadata: {},
+    reference_images: ['f1', 'f2'],
+  })
+  // qwen 模型不受影响：不带 model/steps，引用仍是 <imageN>
+  assert.equal('model' in result.qwenUnchanged, false)
+  assert.equal('steps' in result.qwenUnchanged, false)
+  assert.ok(result.qwenUnchanged.prompt.includes('<image1>'))
+  // 换厂商重试：旧稿里的 <imageN> 也渲染成 <Picture N>
+  assert.equal(result.pictureFromImageTag.prompt, '<Picture 1> 的形制')
+})

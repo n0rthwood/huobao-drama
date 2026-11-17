@@ -591,6 +591,8 @@ async function submitQwenJobsImage(record: SysTaskRecord, config: AIConfig, para
       flux,
       posterMode: params.posterGenMode,
       aspectLocked: params.aspect_locked === true,
+      // 换模型重试（record.model）优先于配置默认：minimax-h3-image 走 .24 双 8G worker
+      model: record.model || config.model,
     })
     body.metadata = flux && refs.length > 1
       ? { sys_task_id: String(record.id), [FLUX_REFS_DROPPED_NOTE]: String(refs.length) }

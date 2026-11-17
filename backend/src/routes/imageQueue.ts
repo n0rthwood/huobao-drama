@@ -30,14 +30,20 @@ app.get('/estimate', async (c) => {
   if (isFluxJobsConfig(config) && mode === 'image_edit') mode = 'reference_to_image'
   const [width, height] = pickQwenSize(mode === 'reference_to_image' && !size ? '1024x1024' : size)
 
+  // 队列按模型分卡（qwen-image-2.1 → 110/202，minimax-h3-image → .24）：
+  // 估计与在线卡数都只算本模型的 worker，旧 central 不带 model 字段时回退全量。
+  const model = (config.model || '').toLowerCase() === 'minimax-h3-image' ? 'minimax-h3-image' : 'qwen-image-2.1'
   try {
     const [estimate, capacity] = await Promise.all([
       getQwenEstimate(config, mode === 'image_edit'
-        ? { mode, references }
-        : { mode, width, height, references }),
+        ? { mode, references, model }
+        : { mode, width, height, references, model }),
       getQwenCapacity(config),
     ])
-    const onlineWorkers = Math.max(0, capacity.total - capacity.offline)
+    const modelWorkers = capacity.workers.filter(w => (w.model || 'qwen-image-2.1') === model)
+    const onlineWorkers = modelWorkers.length
+      ? modelWorkers.filter(w => w.state !== 'offline').length
+      : Math.max(0, capacity.total - capacity.offline)
     const queueWait = estimate.queue_wait_seconds ?? capacity.estimated_wait_seconds ?? 0
     return success(c, {
       supported: true,

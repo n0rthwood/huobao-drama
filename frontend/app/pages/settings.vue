@@ -865,7 +865,9 @@ const providerPresets = {
   image: {
     gemini: { label: 'Gemini 官方', baseUrl: 'https://generativelanguage.googleapis.com', models: ['gemini-3-pro-image', 'gemini-3.1-flash-image'] },
     openai: { label: 'OpenAI 官方', baseUrl: 'https://api.openai.com', models: ['gpt-image-2'] },
-    'qwen-jobs': { label: 'qwen-jobs · Qwen Image 2.1 任务服务', baseUrl: 'https://110.joyai.dev/image', models: ['qwen-image-2.1'] },
+    // 统一队列（.164:8290）按 model 分卡：qwen-image-2.1 → 110/202，minimax-h3-image → .24 双 8G；
+    // 队列地址属于部署细节，不写进预设：由本机 providers.json / 设置页填写
+    'qwen-jobs': { label: 'qwen-jobs · 统一出图队列（Qwen Image 2.1 / MiniMax-H3-Image）', baseUrl: '', models: ['qwen-image-2.1', 'minimax-h3-image'] },
   },
   video: {
     volcengine: { label: 'Seedance 2.0 官方', baseUrl: 'https://ark.cn-beijing.volces.com', models: ['doubao-seedance-2-0-mini-260615', 'doubao-seedance-2-0-fast-260128', 'doubao-seedance-2-0-260128'] },

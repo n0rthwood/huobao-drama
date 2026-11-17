@@ -31,9 +31,9 @@ export function referenceNameIndex(refCount: number): Record<string, number> {
   return index
 }
 
-/** 提示词里可识别的三种写法：中性（@参考图N）、qwen-jobs（<imageN>）、其余厂商（图片N） */
+/** 提示词里可识别的四种写法：中性（@参考图N）、qwen-jobs（<imageN>）、H3-Image（<Picture N>）、其余厂商（图片N） */
 function citationForms(index: number): string[] {
-  return [referenceToken(index), `<image${index}>`, `图片${index}`]
+  return [referenceToken(index), `<image${index}>`, `<Picture ${index}>`, `图片${index}`]
 }
 
 /** 「图片1」不能命中「图片10」：数字后紧跟数字是另一张参考图 */
@@ -72,7 +72,7 @@ export function promptCitesReferences(prompt: string, refCount: number): boolean
 
 /** 提示词里是否已出现任一参考图引用写法（不校验张数）：提交侧据此决定要不要补泛化前缀 */
 export function promptMentionsReferences(prompt: string): boolean {
-  return /@参考图\d+|<image\d+>|图片\d+/i.test(prompt || '')
+  return /@参考图\d+|<image\d+>|<Picture \d+>|图片\d+/i.test(prompt || '')
 }
 
 /**
@@ -98,18 +98,22 @@ export function usesImageTags(provider: string | null | undefined): boolean {
 
 /**
  * 把提示词里的参考图引用渲染成该厂商的写法：
- * `@参考图N`（中性）、`<imageN>`、`图片N` 三种写法统一换成目标厂商的写法。
+ * `@参考图N`（中性）、`<imageN>`、`<Picture N>`、`图片N` 四种写法统一换成目标厂商的写法。
  * 没有参考图时原样返回——资产无参考图的既有行为不变。
+ * `picture`：目标是 MiniMax-H3-Image（按 model 判定，provider 仍是 qwen-jobs）。
  */
 export function renderReferencePrompt(
   prompt: string,
   refCount: number,
   provider: string | null | undefined,
+  picture = false,
 ): string {
   if (!prompt || refCount <= 0) return prompt
-  const tokenOf = usesImageTags(provider)
-    ? (index: number) => `<image${index}>`
-    : (index: number) => `图片${index}`
+  const tokenOf = picture
+    ? (index: number) => `<Picture ${index}>`
+    : usesImageTags(provider)
+      ? (index: number) => `<image${index}>`
+      : (index: number) => `图片${index}`
   let out = resolvePromptRefs(prompt, referenceNameIndex(refCount), tokenOf)
   // 序号从大到小：先换 图片10，再换 图片1，否则后者会把前者的尾巴吃掉
   for (let n = refCount; n >= 1; n--) {

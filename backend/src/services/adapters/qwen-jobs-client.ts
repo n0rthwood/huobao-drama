@@ -21,11 +21,16 @@ const MIN_SIDE = 256
 /** 批量查询一次最多 100 个 id */
 export const QWEN_JOBS_IDS_CHUNK = 100
 
+/** qwen-jobs 统一队列的 MiniMax-H3-Image 模型 id（.24 双 8G worker；6 步 PDD、无 CFG、32px 网格） */
+export const H3_IMAGE_MODEL = 'minimax-h3-image'
+
 export type QwenJobMode = 'text_to_image' | 'image_edit' | 'reference_to_image'
 export type QwenJobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled'
 
 export interface QwenJobRequest {
   mode: QwenJobMode
+  /** 队列模型选择：缺省 qwen-image-2.1；minimax-h3-image 走 .24 双 8G worker */
+  model?: string
   prompt: string
   negative_prompt?: string
   width?: number
@@ -73,7 +78,7 @@ export interface QwenJob {
 }
 
 export interface QwenCapacity {
-  workers: { id: string; state: 'idle' | 'busy' | 'offline'; job_id: string | null }[]
+  workers: { id: string; state: 'idle' | 'busy' | 'offline'; job_id: string | null; model?: string }[]
   total: number
   idle: number
   busy: number
@@ -87,6 +92,7 @@ export interface QwenEstimateResult {
   basis: string
   samples: number
   queue_wait_seconds: number
+  model?: string
 }
 
 /** 远端返回的非 2xx：status 用于区分终态（404/410/409/422）与可重试的网络/5xx 错误 */
@@ -138,11 +144,11 @@ export function pickQwenSize(size: string | null | undefined): [number, number] 
  * 提示词本来就没有引用任何参考图时，补一句泛化前缀让模型知道要以参考图为基础；
  * 已经逐张引用（含中性写法）时不再补，避免和提示词里的逐张说明打架。
  */
-export function withReferenceHint(prompt: string, refCount: number, provider: string | null = 'qwen-jobs'): string {
+export function withReferenceHint(prompt: string, refCount: number, provider: string | null = 'qwen-jobs', picture = false): string {
   if (!refCount) return prompt
-  const rendered = renderReferencePrompt(prompt, refCount, provider)
+  const rendered = renderReferencePrompt(prompt, refCount, provider, picture)
   if (promptMentionsReferences(prompt)) return rendered
-  const tags = Array.from({ length: refCount }, (_, i) => (usesImageTags(provider) ? `<image${i + 1}>` : `图片${i + 1}`)).join('、')
+  const tags = Array.from({ length: refCount }, (_, i) => (picture ? `<Picture ${i + 1}>` : usesImageTags(provider) ? `<image${i + 1}>` : `图片${i + 1}`)).join('、')
   return `以 ${tags} 为参考：${rendered}`
 }
 
@@ -171,6 +177,8 @@ export interface ImageJobBodyOptions {
   posterMode?: string | null
   /** 画幅锁定（Issue #94）：有参考图也必须按 size 出图（场景按项目画幅、资产画幅版本） */
   aspectLocked?: boolean
+  /** 队列模型 id（config.model / record.model）；minimax-h3-image 时按 H3-Image 规则组装 */
+  model?: string | null
 }
 
 /** 多参考图在 FLUX 下被降级为第 1 张时的说明，写入任务 metadata（远端任务详情可查） */
@@ -179,6 +187,8 @@ export const FLUX_REFS_DROPPED_NOTE = 'flux_reference_to_image_only_takes_1_refe
 /**
  * qwen-jobs 图片任务请求体组装（generation.ts 唯一构造点）。
  * - Qwen：无参考图 text_to_image；关键帧/画幅锁定 reference_to_image（带画幅）；其余 image_edit（跟随第 1 张参考图，不带画幅），提示词补 <imageN> 标记。
+ * - H3-Image（model=minimax-h3-image）：模式选择与 Qwen 相同，但显式带 model、固定 6 步（PDD 蒸馏头只认 6 步）、
+ *   引用渲染成 <Picture N>；无 CFG，不带 negative_prompt。
  * - FLUX：无参考图 text_to_image；有参考图一律 reference_to_image（img2img，只带第 1 张参考图，
  *   画幅照常、显式 denoising_strength），提示词不加 <imageN>（FLUX 不解析）。
  */
@@ -198,6 +208,7 @@ export function buildImageJobBody(opts: ImageJobBodyOptions): QwenJobRequest {
       ...(refs.length ? { reference_images: refs, denoising_strength: FLUX_DENOISING_STRENGTH } : {}),
     }
   }
+  const h3img = (opts.model || '').toLowerCase() === H3_IMAGE_MODEL
   // Poster initial 需要按剧集画幅出图；composite/layers 的第一张参考图已是 Poster 画幅，
   // 用 image_edit 跟随它并保留文字保真度。
   // 画幅锁定（#94）同理走 reference_to_image：image_edit 不带 width/height，输出一定跟随参考图比例。
@@ -205,7 +216,8 @@ export function buildImageJobBody(opts: ImageJobBodyOptions): QwenJobRequest {
   const mode: QwenJobMode = !fileIds.length ? 'text_to_image' : fixedAspect ? 'reference_to_image' : 'image_edit'
   return {
     mode,
-    prompt: withReferenceHint(prompt, fileIds.length),
+    ...(h3img ? { model: H3_IMAGE_MODEL, steps: 6 } : {}),
+    prompt: withReferenceHint(prompt, fileIds.length, 'qwen-jobs', h3img),
     metadata: {},
     ...(mode === 'image_edit' ? {} : { width, height }),
     ...(fileIds.length ? { reference_images: fileIds } : {}),
@@ -351,11 +363,12 @@ export async function getQwenCapacity(config: AIConfig): Promise<QwenCapacity> {
 
 export async function getQwenEstimate(
   config: AIConfig,
-  params: { mode: QwenJobMode; width?: number; height?: number; references: number },
+  params: { mode: QwenJobMode; width?: number; height?: number; references: number; model?: string | null },
 ): Promise<QwenEstimateResult> {
   const query = new URLSearchParams({ mode: params.mode, references: String(params.references) })
   if (params.width) query.set('width', String(params.width))
   if (params.height) query.set('height', String(params.height))
+  if (params.model) query.set('model', params.model)
   const resp = await request(config, `/v1/estimate?${query}`, { timeoutMs: 15_000 })
   return (await resp.json()) as QwenEstimateResult
 }
