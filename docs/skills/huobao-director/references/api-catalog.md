@@ -313,7 +313,7 @@ Body：`{scope:"all"|"characters"|"scenes"|"props", episode_id?, rewrite_prompts
 - prop 239「乌拉尔山东西两麓区位图」：`map_spec` 里「喀什里克（西比尔，西伯利亚汗国都城）」写成 `lon 58.2 / lat 58.16`（`proposed:true`），落在乌拉尔山以西；它应在托博尔斯克旁（该 spec 的托博尔斯克就是 `68.25 / 58.2`）。`bbox [55.05,56.78,69.97,60.00]` 恰好包住 `58.2`，**单靠 bbox 闸拦不住**，需要「经度≈纬度」与「相对位置/距离声明 vs 计算」这类软证据。
 - prop 241「东欧平原哥萨克聚落分布图」：第聂伯河/顿河/伏尔加河/卡马河是模型手点的 9/8/13/3 个顶点，与底图 Natural Earth 河道不重合；河流必须取数据集几何，不能手描。
 - 旧流程把需求、几何、阶段状态、模型轮次和火宝业务表缠在一起，无法独立演进。**为何需要**：用户要求地图生产成为一个可独立测试的模块（不 import 火宝业务代码），火宝侧只保留需求字段与打开入口；精确度（数据集 + 证据闸门 + 人工核验）与美化（平滑、标签避让、编辑器）在模块内补齐。
-- **验收中的真实错误链（task 1）**：模型在 research 仍会给出错误坐标——第一次主张「喀什里克」`68.9 / 58.2`，没有任何逐字经纬度或一致的相对位置证据，因此 `verification` 不是 verified；research 结束被 `geometry_unverified` 阻断（run 4 failed）。人把坐标改成 `68.52048 / 58.14942`（es.wikipedia「Qashliq」）并经 CAS `PUT map_spec` 确认后，run 7 才继续出图。结论：**模型提议坐标仍可能错，但它未经核验或人工确认就进不了成图**；「能交付」不等于 AI 的坐标已被独立证明。
+- **历史验收中的真实错误链（task 1）**：模型给出未经核验的喀什里克坐标，旧规则以 `geometry_unverified` 阻断，人工修正后继续。#111 改为未核验要素以示意继续，仍须保留出处和不确定性，不能当作史实批准。
 
 #### 模型阶段（模块内工具循环；#90 语义保留，作图改为服务器草稿）
 
@@ -366,7 +366,7 @@ Body：`{scope:"all"|"characters"|"scenes"|"props", episode_id?, rewrite_prompts
   ```
   image项是 `{path,width,height,source,run_id,provenance}`。task_id是模块任务id；状态/产出中的run_id是执行容器id，不混用。busy=status==="running"；宿主存在但host.target=null时run/deliver报host_target_missing，独立任务host=null正常。host.error为可空诊断字段；deliveries仅最近20条，runs_summary.count是最近载入运行数（最多20），不是全部历史计数。
 - **`stage ∈ brief|research|base|style|drawing|complete`** 是当前或下一待执行阶段；`status ∈ idle|running|awaiting_review|blocked|failed|completed`。检查steps[].status/message与issues判断真实进度，awaiting_review不代表后面阶段完成；blocked不得忽略。
-- **`issues[] = {field,code,message,blocking}`**：`blocking=true` 必须先补齐才能继续；常见码 `brief_changed`、`geometry_unverified`、`geometry_changed`、`research_note`、`approximate_position`、`drawing_warning`、`drawing_omitted`、`rolled_back`。
+- **`issues[] = {field,code,message,blocking}`**：真正 blocking 的问题必须先解决；`geometry_approximate` 与 `geometry_missing` 不阻断，后者不绘制。旧任务 `geometry_unverified` 在重跑时重算。
 - **`research`**：`queries[{adapter,query,hits,error}]` 逐源记录（来源固定四个，不是模型自选任意网站）；`dataset_queries[{layer,query,bbox?,hits,refs[],error}]` 登记每次 `search_dataset`；`extent`、`relations[]`（含 `computed` 与 `message`）；`sources[]`（编号、机构、年代、许可、URL、实际摘录）；`features[]`（点线面、`category`、`origin`、`verification{status,reasons}`、`dataset_ref`、`relations`、`coordinate_basis`、`supporting_excerpt`、`source_ids`、`uncertainty`、`conflicts`）；`uncertainties/notes/searched_at`。URL 存在不等于它证明了某个坐标；无 key 的来源失败要如实呈报。
 - **`outputs.layer_doc`** 是被采用的图层文档，**`outputs.layer_options`** 是渲染期平滑参数（阶段③，可为空）。地名与标签由模型在 LayerDoc 里排；模型预览后自检遮挡与可读性，marker 点位必须贴合投影位置。
 - **界面与深链（`[S]`）**：工作室页 `/map-studio/<taskId>` 的阶段、运行、调用、图层编辑器、选中的几何要素与预览产物都进 URL（`msstage/msrun`、`mscall`、`mscf`、`mslayer/msround`、`mssel`、`msgeo`、`msview`，列表页 `msq/mshost/mscreate`）；只恢复界面，未保存的坐标与草稿不入 URL。失效目标给 `deeplink.missing` 提示。宿主页用 `asset=prop-<id>` 定位资产。
@@ -406,10 +406,9 @@ Body：`{expected_revision?,brief?,map_spec?,layer_options?,mode?}`，至少一�
 #### 精确度闸门（阶段 ② `[R]`：task1 run2 extent 三轮失败；task1 run4、task2 run3 `geometry_unverified` 阻断）
 
 - **硬拒收**：非数字、经纬度越界、`(0,0)` 占位；`extent:[west,south,east,north]` 必填且合法（w<e、s<n）；**全部要素（含已确认项）的全部顶点必须落在 extent 本身**——研究阶段不另加 2% 内缩留边（release `20261113T203319Z`；run2 曾因两层框卡死 3 轮）。点在 extent 外、交换 lon/lat 后落在内则单独报「疑似经纬度互换」。越界按要素聚合成一条消息（列出顶点数与经纬度范围），不逐顶点刷屏。代码不换轴、不自动裁剪；dataset 越界应由模型显式收紧 `dataset_ref.clip_bbox`（可直接设成 extent）或调整 extent。画面内 2% 留边只属于 base 取景门，不属于 research。
-- **自然要素** `river/lake/coast/mountain` 必须走 `geometry_source:"dataset"` 与 `dataset_ref:{ref,clip_bbox?}`，不得同时手写 points/lon/lat/parts。不存在/类别不符/裁剪后为空均整批拒收。确实找不到时 `dataset_missing:{queries:[],reason}` 必须引用本阶段成功查过、没有可采用同名候选的查询；检索异常不是零命中。合格缺失声明也只得到 `needs_user`，不是自动通过。
-- **软证据**：`relations:[{id,subject,object,relation,value_km?,tolerance_km?,excerpt,source_id}]` 的 excerpt 必须逐字支持于来源正文；subject/object 是可唯一定位的要素名。distance_km 偏差 > max(tolerance_km, 声明×30%, 5km)、方向相反、near_river 距离 > max(tolerance_km,15km) 会报 `relation_conflict`；near_river 的 object 必须是数据集河流。非 dataset 点 `|lon-lat|<0.25°` 报 `lon_lat_similar`。先回给模型改；用 `acknowledge:[{code,reason}]` 说明只能接受并保留冲突给人裁决，**不等于核验或人工确认**。
-- **verified 的依据**：数据集原始几何；非近似点的支持原文能解析出相差≤0.1°的经纬度；或与已 verified/confirmed 要素之间有逐字出处支持、计算一致的 relation。`well_known`/`approximate_schematic` 本身不算核验。落库保留 `origin:dataset|source|model|manual` 与 `verification.status:verified|unverified|conflict|needs_user|confirmed`、reasons。**模型提议的坐标仍可能错**（task1 第一次给喀什里克 68.9/58.2，非 verified），被阻断后由人改为 68.52048/58.14942（es.wikipedia Qashliq）；未核验或未人工确认的 AI 项进不了底图/成图。
-- **`geometry_unverified`**：research 结束发现仍待核验的 AI proposed 项时 `status=blocked`、research step `awaiting_review`，run 以 failed 收尾并逐条列出要素原因（task1 run4、task2 run3）。base/drawing/complete 开始和交付物构建再硬校验；不能用隐藏图层或 omitted 绕过。**人**在研究/几何 UI 逐项或全部确认（去掉 proposed）、编辑或删除后，带 revision 保存完整 `map_spec`（CAS `PUT /tasks/{id}`）才可继续；生产两任务都经此放行（task1→run7、task2→run5）。助手不得自行确认。
+- **自然要素** `river/lake/coast/mountain` 使用 dataset_ref；合格 `dataset_missing` 必须引用本阶段成功查过且无同名候选的查询，并保留来源和原因。没有数据集几何的要素列为未绘制，不阻断其他要素。
+- **证据与示意**：与已核验数据集矛盾的关系、疑似经纬度互换必须修正，不可用 acknowledge 放行。其他未核验要素保留出处、按示意继续；点为空心、线为虚线，图上须有示意说明。
+- **人工确认**：用户可选在待查看面板确认或编辑，CAS PUT 完整 map_spec；确认后回退作图重渲。助手不得替人确认；技术交付不代表史实批准。历史 `geometry_unverified` 阻断为旧行为。
 - **人工几何编辑**：在编辑器里拖动/新增/插中点后保存，服务端把该要素转 `origin:"manual"`、去掉 `proposed`/`dataset_ref`、标 `confirmed`（task1 喀什里克为人工点；task2 手画顿河聚落带，8 个存储点含闭合副本、独立顶点 7 个）。确认/编辑都不是史实批准，只是允许进入出图。
 
 #### 数据集引用、河流与底图（阶段 ② `[R]`：task2 run5、task1 run7/run10）
@@ -458,11 +457,11 @@ Body：`{expected_revision?,brief?,map_spec?,layer_options?,mode?}`，至少一�
 
 brief 1–3次文本；research/base/drawing各为多步工具循环（步数上限40/24/60，每步文本，另有read_image视觉调用），交付最多3轮，回退重跑目标阶段；style一次图片（失败另投另计）。工具单次墙钟上限180秒（base渲染/交付12分钟）；超时不算一次交付、自动回给模型，不能因此重复计费或声称阶段已跑完。按调用行与实际底纹任务计费，不能按工作室容器数量记账。显式text_config_id钉选，manual分阶段核账；先授权、预留预算再run。
 
-409 `revision_conflict|workflow_busy`：保留草稿、重读、由人决定合并，不无限重试。400 `geometry_unverified` / `layer_doc_invalid` / `drawing_invalid`：按逐项原因处置，不删门槛。关键需求/证据缺失阻断，单源失败/无命中可保留告警，不能把检索失败称为完成考证。
+409 `revision_conflict|workflow_busy`：保留草稿、重读、由人决定合并，不无限重试。400 `map_spec_missing`、`invalid_extent`、`layer_doc_invalid`、`drawing_invalid` 按逐项原因处置，不删门槛。检索失败不等于完成考证。
 
 complete只是技术交付，不是人批准史实/许可。manual在complete前开final，auto完成后立即开base/final，记录真实路径与SHA256，核对研究证据、图例文字、配准与标签；人工最终审核不能被completed替代。
 
-**正例**：获准地图与预算→新建map→open工作室→PUT需求→manual检索→读来源/数据集/关系与agent.attempts→geometry_unverified时交人逐项裁决→模型取景→只生成底纹→服务器草稿作图→标签/平滑门通过并开图→complete宿主交付→读回版本/语义/出处→交人审核。**反例**：调用已下线的旧入口；把acknowledge当人工确认；手描河流冒充数据集；桥接断链/自动裁点；把研究阶段的2%画面留边套到extent（会把恰好贴边的clip_bbox判越界）；以为AI提议坐标已核验、跳过人工确认直接出图；放宽Earth门槛；把未核验几何隐藏后交付；上传真实地图后调普通generate-image；把completed当史实或版权通过。
+**正例**：获准地图与预算→新建地图→检索并读来源、数据集和关系→按示意继续→作图并检查标注→交付→交人审核。**反例**：把 acknowledge 当人工确认；手描河流冒充数据集；把未核验位置声称为精确史实。
 
 ---
 

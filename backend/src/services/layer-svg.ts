@@ -400,8 +400,8 @@ function emitMarker(layer: MarkerLayer, ctx: SvgContext): string {
   const size = (styleOf(layer, ctx.theme, 'size') as number) * ctx.unit
   const legacyOffset = styleOf(layer, ctx.theme, 'label_offset') as number[]
   const offset = [Number(layer.style.label_dx ?? legacyOffset[0]), Number(layer.style.label_dy ?? legacyOffset[1])]
-  let out = `<circle cx="${fmt(cx)}" cy="${fmt(cy)}" r="${fmt(radius)}" fill="${esc(color)}"`
-    + ` stroke="${esc(stroke)}" stroke-width="${fmt(layer.style.stroke_width === undefined ? radius * .35 : Number(layer.style.stroke_width) * ctx.unit)}"/>`
+  let out = `<circle cx="${fmt(cx)}" cy="${fmt(cy)}" r="${fmt(radius)}" fill="${layer.style.hollow ? 'none' : esc(color)}"`
+    + ` stroke="${esc(layer.style.hollow ? color : stroke)}" stroke-width="${fmt(layer.style.stroke_width === undefined || layer.style.hollow && Number(layer.style.stroke_width) === 0 ? radius * .35 : Number(layer.style.stroke_width) * ctx.unit)}"/>`
   if (layer.text) {
     out += textBlock([resolvedText(layer, ctx.variables)], {
       x: cx + offset[0] * ctx.width,

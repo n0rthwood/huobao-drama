@@ -20,7 +20,7 @@ import { activeRunOfTask, insertRun, finishRun, updateRunStage } from './db.js'
 import { readModels, readDefaultStyle } from './settings.js'
 import { MapStudioConflictError, MapStudioStaleError, MapStudioRequestError, briefHash, loadTask, mutateTask, serializeDetail, setStep, stageIndex, restoreSnapshot, requireHostTarget, type MapStudioDetail, type MutateContext } from './store.js'
 import { MAP_INFRA_RETRIES, MAP_MAX_ROLLBACKS, MAP_WORKFLOW_STAGES, STAGE_LABEL, isMapAgentStage, normalizeBrief, type MapBrief, type MapResearch, type MapResearchFeature, type MapWorkflowIssue, type MapWorkflowMode, type MapWorkflowStage } from './types.js'
-import { geometryUnverified, confirmedVerification } from './accuracy.js'
+import { geometryUnverified, confirmedVerification, validExtent } from './accuracy.js'
 import { inspectLayerDraft, layerDraftContext } from './layer-edit.js'
 import { validateLayerOptions } from './render/smooth.js'
 import { MapWorkflowValidationError } from './types.js'
@@ -57,6 +57,14 @@ function bboxOf(coords: Array<[number, number]>): [number, number, number, numbe
     Math.min(85, north + padLat),
   ]
 }
+function missingResearchGeometry(research: MapResearch): NonNullable<MapResearch['missing_geometry']> {
+  return research.features.flatMap(feature => {
+    const reason = feature.dataset_missing?.reason ?? feature.verification?.reasons?.find(value => value.includes('dataset_missing'))
+    if (!reason || !feature.category || (feature.kind === 'place' ? feature.lon != null && feature.lat != null : feature.points.length > 0)) return []
+    return [{ name: feature.name, category: feature.category, queries: feature.dataset_missing?.queries ?? [], reason }]
+  })
+}
+
 
 /**
  * 把检索到的地物并进 map_spec。
@@ -70,6 +78,7 @@ export function adoptResearchIntoSpec(spec: MapSpec | null, research: MapResearc
   const routes = spec ? [...spec.routes] : []
   const regions = spec ? [...spec.regions] : []
   for (const feature of research.features) {
+    if ((feature.dataset_missing || feature.verification?.reasons?.some(reason => reason.includes('dataset_missing'))) && (feature.kind === 'place' ? feature.lon == null || feature.lat == null : !feature.points.length)) continue
     const metadata = { category: feature.category, origin: feature.origin, verification: feature.verification, dataset_ref: feature.dataset_ref, relations: feature.relations }
     if (feature.kind === 'place' && feature.lon !== null && feature.lat !== null) {
       const id = featureId('p', feature.name)
@@ -96,7 +105,7 @@ export function adoptResearchIntoSpec(spec: MapSpec | null, research: MapResearc
     }))
   }
   const coords: Array<[number, number]> = [...places.map((p): [number, number] => [p.lon, p.lat]), ...routes.flatMap(r => r.points), ...regions.flatMap(r => r.points)]
-  if (!coords.length) throw new MapStudioRequestError('检索没有得到任何可定位的几何', 'missing_geometry')
+  if (!coords.length) throw new MapStudioRequestError('检索没有得到任何可定位的几何', 'map_spec_missing')
   return {
     spec: normalizeMapSpec({
       version: 1, projection: spec?.projection ?? { type: 'mercator' },
@@ -153,16 +162,16 @@ async function applyRollback(input: { taskId: number; runId: number; from: MapWo
   return { proceed: input.mode === 'auto', next: input.target, message: `已回退到「${STAGE_LABEL[input.target]}」：${input.reason}` }
 }
 
-function requireVerifiedGeometry(spec: MapSpec | null): void {
-  const pending = geometryUnverified(spec)
-  if (pending.length) throw new MapStudioRequestError(`geometry_unverified：${pending.map(f => `「${f.name}」：${f.reasons.join('；')}`).join(' / ')}`, 'geometry_unverified')
+function requireMapSpec(spec: MapSpec | null): void {
+  if (!spec) throw new MapStudioRequestError('还没有地图几何，请先完成资料检索或人工填写地点', 'map_spec_missing')
+  if (!validExtent(spec.bbox)) throw new MapStudioRequestError('地图范围无效，请先修正 extent', 'invalid_extent')
 }
 
 async function executeStageWork(taskId: number, runId: number, stage: MapWorkflowStage): Promise<StageOutcome> {
   const loaded = await loadTask(taskId)
   if (!loaded) throw new MapStudioRequestError('任务不存在', 'not_found')
   requireHostTarget(loaded)
-  if (stage === 'base' || stage === 'drawing' || stage === 'complete') requireVerifiedGeometry(loaded.mapSpec)
+  if (stage === 'base' || stage === 'drawing' || stage === 'complete') requireMapSpec(loaded.mapSpec)
   const { state, brief } = loaded
   const opts = { textConfigId: state.text_config_id ?? undefined, imageConfigId: state.image_config_id ?? undefined, imageModel: state.image_model ?? undefined }
   const hashAtStart = briefHash(brief)
@@ -200,17 +209,19 @@ async function executeStageWork(taskId: number, runId: number, stage: MapWorkflo
     const outcome = await runResearchStage({ ...await agentInput(), spec: loaded.mapSpec })
     if (outcome.kind === 'rollback') return rollback(outcome)
     const research = outcome.result
+    research.missing_geometry = missingResearchGeometry(research)
     const adopted = adoptResearchIntoSpec(loaded.mapSpec, research, brief, readDefaultStyle())
     const pending = geometryUnverified(adopted.spec)
     return finish(ctx => {
       ctx.state.research = research; ctx.mapSpec = adopted.spec
       ctx.state.issues = [
-        ...ctx.state.issues.filter(issue => !['research_note', 'approximate_position', 'geometry_unverified'].includes(issue.code)),
-        ...pending.map((feature): MapWorkflowIssue => ({ field: 'research', code: 'geometry_unverified', blocking: true, message: `「${feature.name}」：${feature.reasons.join('；')}` })),
+        ...ctx.state.issues.filter(issue => !['research_note', 'approximate_position', 'geometry_unverified', 'geometry_approximate', 'geometry_missing'].includes(issue.code)),
+        ...pending.map((feature): MapWorkflowIssue => ({ field: 'research', code: feature.reasons.some(reason => reason.includes('dataset_missing')) ? 'geometry_missing' : 'geometry_approximate', blocking: false, message: `「${feature.name}」：${feature.reasons.join('；')}` })),
+        ...(research.missing_geometry ?? []).map((feature): MapWorkflowIssue => ({ field: 'research', code: 'geometry_missing', blocking: false, message: `「${feature.name}」：${feature.reason}；数据集中没有几何，暂不绘制` })),
         ...[...adopted.notes, ...research.notes].map((message): MapWorkflowIssue => ({ field: 'research', code: 'research_note', message, blocking: false })),
         ...research.features.filter(feature => feature.approximate).map((feature): MapWorkflowIssue => ({ field: 'research', code: 'approximate_position', blocking: false, message: `「${feature.name}」为${feature.coordinate_basis === 'approximate_schematic' ? '示意' : '公认'}位置（不确定度 ${feature.uncertainty}）：${feature.basis || '无逐字出处'}` })),
       ]
-    }, { proceed: !pending.length, message: pending.length ? `geometry_unverified：${pending.map(f => `「${f.name}」${f.reasons.join('；')}`).join(' / ')}` : `检索到 ${research.sources.length} 条来源、${research.features.length} 个地理要素，几何核验通过` }, pending.length > 0)
+    }, { proceed: true, message: pending.length ? `${pending.length} 个要素为示意或暂不绘制，可选查看` : `检索到 ${research.sources.length} 条来源、${research.features.length} 个地理要素，几何核验通过` })
   }
   if (stage === 'base') {
     if (!loaded.mapSpec) throw new MapStudioRequestError('还没有地图几何，请先完成资料检索或人工填写地点', 'missing_map_spec')
@@ -320,8 +331,8 @@ async function startRun(taskId: number, input: { mode: MapWorkflowMode; expected
   if (loaded.state.status === 'completed' && loaded.state.stage === 'complete') throw new MapStudioRequestError('任务已完成；如需修改请先回退到要重做的步骤', 'already_completed')
   const brief = loaded.brief
   if (!brief.subject) throw new MapStudioRequestError('请在需求里填写地图主题', 'missing_brief')
-  const startStage = loaded.state.stage
-  if (startStage === 'base' || startStage === 'drawing' || startStage === 'complete') requireVerifiedGeometry(loaded.mapSpec)
+  const startStage = loaded.state.stage === 'research' && loaded.state.status === 'blocked' && loaded.state.research && loaded.state.issues.some(issue => issue.code === 'geometry_unverified') ? 'base' : loaded.state.stage
+  if (startStage === 'base' || startStage === 'drawing' || startStage === 'complete') requireMapSpec(loaded.mapSpec)
   const defaults = readModels()
   const opts = {
     textConfigId: input.opts.textConfigId ?? loaded.state.text_config_id ?? defaults.text_config_id ?? undefined,
@@ -347,6 +358,13 @@ async function startRun(taskId: number, input: { mode: MapWorkflowMode; expected
   let detail: MapStudioDetail
   try {
     detail = serializeDetail(await mutateTask(taskId, { expectedRevision: input.expectedRevision, requireIdle: true, action: input.mode === 'auto' ? `run:${startStage}` : `advance:${startStage}`, actor: 'manual', note: `模式 ${input.mode}`, mutate: ctx => {
+      if (ctx.state.research && !ctx.state.research.missing_geometry) ctx.state.research.missing_geometry = missingResearchGeometry(ctx.state.research)
+      ctx.state.issues = [
+        ...ctx.state.issues.filter(issue => !['geometry_unverified', 'geometry_approximate', 'geometry_missing'].includes(issue.code)),
+        ...geometryUnverified(ctx.mapSpec).map(f => ({ field: 'research', code: f.reasons.some(reason => reason.includes('dataset_missing')) ? 'geometry_missing' : 'geometry_approximate', blocking: false, message: `「${f.name}」：${f.reasons.join('；')}` })),
+        ...(ctx.state.research?.missing_geometry ?? []).map(f => ({ field: 'research', code: 'geometry_missing', blocking: false, message: `「${f.name}」：${f.reason}；数据集中没有几何，暂不绘制` })),
+      ]
+      if (startStage === 'base' && ctx.state.research) setStep(ctx.state, 'research', { status: 'completed', message: '示意要素可选查看', finished_at: now() })
       ctx.state.mode = input.mode; ctx.state.run_id = runId
       ctx.state.agent = { ...ctx.state.agent, run_id: runId, rounds: {}, rollbacks: 0 }
       ctx.state.status = 'running'; ctx.state.error = null; ctx.state.stage = startStage
@@ -547,14 +565,11 @@ export async function saveMapWorkflowDraft(taskId: number, body: {
               : '地图几何已修改：沿用现有底图与底纹，只需重新绘制标注',
           },
         ]
+        const pending = geometryUnverified(next)
+        ctx.state.issues = [...ctx.state.issues.filter(issue => !['geometry_unverified', 'geometry_approximate', 'geometry_missing'].includes(issue.code)), ...pending.map(f => ({ field: 'research', code: f.reasons.some(reason => reason.includes('dataset_missing')) ? 'geometry_missing' : 'geometry_approximate', blocking: false, message: `「${f.name}」：${f.reasons.join('；')}` })), ...(ctx.state.research?.missing_geometry ?? []).map(f => ({ field: 'research', code: 'geometry_missing', blocking: false, message: `「${f.name}」：${f.reason}；数据集中没有几何，暂不绘制` }))]
         if (ctx.state.stage === 'research' && ctx.state.research) {
-          const pending = geometryUnverified(next)
-          ctx.state.issues = [...ctx.state.issues.filter(issue => issue.code !== 'geometry_unverified'), ...pending.map(f => ({ field: 'research', code: 'geometry_unverified', blocking: true, message: `「${f.name}」：${f.reasons.join('；')}` }))]
-          if (pending.length) ctx.state.status = 'blocked'
-          else {
-            setStep(ctx.state, 'research', { status: 'completed', message: '研究几何已核验或经人工确认' })
-            ctx.state.stage = 'base'; ctx.state.status = 'awaiting_review'
-          }
+          setStep(ctx.state, 'research', { status: 'completed', message: pending.length ? `${pending.length} 个要素为示意或暂不绘制` : '研究几何已核验或经人工确认' })
+          ctx.state.stage = 'base'; ctx.state.status = 'awaiting_review'
         }
       }
     },
@@ -589,7 +604,6 @@ export async function saveMapLayerDoc(taskId: number, body: { layerDoc: unknown;
   const loaded = await loadTask(taskId)
   if (!loaded) throw new MapStudioRequestError('任务不存在', 'not_found')
   requireHostTarget(loaded)
-  requireVerifiedGeometry(loaded.mapSpec)
   if (body.expectedRevision != null && body.expectedRevision !== loaded.state.revision) throw new MapStudioConflictError('任务已更新，请刷新后重试', { code: 'revision_conflict', revision: loaded.state.revision })
   if (loaded.state.status === 'running') throw new MapStudioConflictError('任务正在执行，请先等待或取消', { code: 'workflow_busy', revision: loaded.state.revision, runId: loaded.state.run_id })
   const current = loaded.state.outputs.layer_doc as { base?: { path?: string; width?: number; height?: number } } | null

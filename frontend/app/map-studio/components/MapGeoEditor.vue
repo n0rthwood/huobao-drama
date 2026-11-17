@@ -45,7 +45,7 @@
         <g v-for="region in regionShapes" :key="`rg-${region.id}`">
           <polygon
             :points="region.attr"
-            :class="['geo-region', { 'is-active': selected?.kind === 'region' && selected.id === region.id, 'is-dataset': region.dataset }]"
+            :class="['geo-region', { 'is-active': selected?.kind === 'region' && selected.id === region.id, 'is-dataset': region.dataset, 'is-pending': region.pending }]"
             :stroke-width="unit * 1.2"
           ><title>{{ region.name }}</title></polygon>
           <circle
@@ -74,7 +74,7 @@
         <g v-for="route in routeShapes" :key="`rt-${route.id}`">
           <polyline
             :points="route.attr"
-            :class="['geo-route', { 'is-active': selected?.kind === 'route' && selected.id === route.id, 'is-dataset': route.dataset }]"
+            :class="['geo-route', { 'is-active': selected?.kind === 'route' && selected.id === route.id, 'is-dataset': route.dataset, 'is-pending': route.pending }]"
             :stroke-width="unit * 1.8"
           ><title>{{ route.name }}</title></polyline>
           <circle
@@ -117,7 +117,17 @@
         </g>
       </svg>
     </div>
-    <p v-else class="geo-empty dim">{{ t('mapStudio.editor.noBase') }}</p>
+    <div v-else class="geo-preview">
+      <p>{{ t('mapStudio.researchPanel.gridPreview') }}</p>
+      <svg viewBox="0 0 600 360" role="img" :aria-label="t('mapStudio.researchPanel.gridPreview')">
+        <rect x="1" y="1" width="598" height="358" fill="#f7f2e4" stroke="#9a8871" />
+        <path v-for="i in 9" :key="`v${i}`" :d="`M ${i * 60} 0 V 360`" stroke="#cbbfae" />
+        <path v-for="i in 5" :key="`h${i}`" :d="`M 0 ${i * 60} H 600`" stroke="#cbbfae" />
+        <polygon v-for="shape in spec.regions" :key="shape.id" :points="previewPoints(shape.points)" fill="#dca77a" fill-opacity=".3" stroke="#b45235" stroke-dasharray="6 4" />
+        <polyline v-for="shape in spec.routes" :key="shape.id" :points="previewPoints(shape.points)" fill="none" stroke="#b45235" stroke-width="2" stroke-dasharray="6 4" />
+        <circle v-for="place in spec.places" :key="place.id" :cx="previewPoint([place.lon, place.lat])[0]" :cy="previewPoint([place.lon, place.lat])[1]" r="5" fill="white" stroke="#b45235"><title>{{ place.name }}</title></circle>
+      </svg>
+    </div>
 
     <p v-if="offscreenCount" class="geo-warn">{{ t('mapStudio.editor.offscreen', { n: offscreenCount }) }}</p>
 
@@ -133,7 +143,7 @@
             v-for="(place, index) in spec.places"
             :key="place.id"
             class="geo-item"
-            :class="{ 'is-active': selected?.kind === 'place' && selected.id === place.id }"
+            :class="{ 'is-active': selected?.kind === 'place' && selected.id === place.id, 'is-pending': isPending(place) }"
             @click="selected = { kind: 'place', id: place.id }"
           >
             <input class="input geo-name" :value="place.name" :disabled="disabled" :placeholder="t('mapStudio.editor.name')" @input="setName('place', index, $event)" />
@@ -144,8 +154,8 @@
               <input class="input" type="number" step="0.0001" :value="place.lat" :disabled="disabled" @input="setPlaceCoord(index, 'lat', $event)" />
             </label>
             <span v-if="place.origin === 'dataset'" class="geo-lock"><Lock :size="10" />{{ t('mapStudio.editor.datasetBadge') }}</span>
-            <span v-if="place.proposed" class="geo-badge">{{ t('mapStudio.editor.proposed') }}</span>
-            <button v-if="place.proposed" type="button" class="geo-tool" :disabled="disabled" @click.stop="accept('place', index)">{{ t('mapStudio.editor.accept') }}</button>
+            <span v-if="isPending(place)" class="geo-badge">{{ t('mapStudio.researchPanel.schematic') }}</span>
+            <button v-if="isPending(place) && !place.verification?.reasons?.some(reason => reason.includes('dataset_missing'))" type="button" class="geo-tool" :disabled="disabled" @click.stop="accept('place', index)">{{ t('mapStudio.editor.accept') }}</button>
             <button type="button" class="geo-del" :disabled="disabled" :aria-label="t('mapStudio.editor.remove')" @click.stop="removeFeature('place', index)">
               <X :size="12" />
             </button>
@@ -164,7 +174,7 @@
             v-for="(shape, index) in section.items"
             :key="shape.id"
             class="geo-item"
-            :class="{ 'is-active': selected?.kind === section.kind && selected.id === shape.id }"
+            :class="{ 'is-active': selected?.kind === section.kind && selected.id === shape.id, 'is-pending': isPending(shape) }"
             @click="selected = { kind: section.kind, id: shape.id }"
           >
             <input class="input geo-name" :value="shape.name" :disabled="disabled" :placeholder="t('mapStudio.editor.name')" @input="setName(section.kind, index, $event)" />
@@ -202,8 +212,8 @@
               {{ deviationWarning(section.kind, shape) }}
             </p>
             <span v-if="shape.origin === 'dataset'" class="geo-lock"><Lock :size="10" />{{ t('mapStudio.editor.datasetBadge') }}</span>
-            <span v-if="shape.proposed" class="geo-badge">{{ t('mapStudio.editor.proposed') }}</span>
-            <button v-if="shape.proposed" type="button" class="geo-tool" :disabled="disabled" @click.stop="accept(section.kind, index)">{{ t('mapStudio.editor.accept') }}</button>
+            <span v-if="isPending(shape)" class="geo-badge">{{ t('mapStudio.researchPanel.schematic') }}</span>
+            <button v-if="isPending(shape) && !shape.verification?.reasons?.some(reason => reason.includes('dataset_missing'))" type="button" class="geo-tool" :disabled="disabled" @click.stop="accept(section.kind, index)">{{ t('mapStudio.editor.accept') }}</button>
             <button type="button" class="geo-tool" :disabled="disabled || !registration" @click.stop="continueShape(section.kind, shape.id)">{{ t('mapStudio.editor.continueShape') }}</button>
             <button type="button" class="geo-del" :disabled="disabled" :aria-label="t('mapStudio.editor.remove')" @click.stop="removeFeature(section.kind, index)">
               <X :size="12" />
@@ -247,6 +257,7 @@ interface LinearRow {
   vertices: Array<[number, number]>
   attr: string
   dataset: boolean
+  pending: boolean
   smooth: number
   deviation: LinearDeviation | null
   handles: Array<{ segment: number; at: [number, number] }>
@@ -264,6 +275,7 @@ const props = withDefaults(defineProps<{
   /** 平滑草稿：{ 图层 id 或要素 id: { smooth: 0..1 } }，由页面保存时随 PUT 一起提交 */
   layerOptions?: LayerOptions
   disabled?: boolean
+  focusTarget?: { kind: 'place' | 'route' | 'region'; id: string } | null
 }>(), { layerDoc: null, layerOptions: () => ({}), disabled: false })
 
 const emit = defineEmits<{
@@ -303,6 +315,22 @@ if (initialFocus) {
   }
 }
 let focusOnLoad = Boolean(initialFocus && selected.value)
+watch(() => props.focusTarget, async target => {
+  if (!target || !hasFeature(props.spec, target)) return
+  selected.value = target
+  await nextTick()
+  document.querySelector('.geo-item.is-active')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+})
+function isPending(item: MapPlace | MapRoute | MapRegion): boolean {
+  return item.proposed === true && item.origin !== 'manual' && item.verification?.status !== 'verified' && item.verification?.status !== 'confirmed'
+}
+function previewPoint([lon, lat]: [number, number]): [number, number] {
+  const [west, south, east, north] = props.spec.bbox
+  return [600 * (lon - west) / (east - west || 1), 360 * (north - lat) / (north - south || 1)]
+}
+function previewPoints(points: Array<[number, number]>): string {
+  return points.map(point => previewPoint(point).join(',')).join(' ')
+}
 watch([selected, () => props.spec, () => props.persistedSpec], () => {
   const feature = selected.value
   if (feature && !hasFeature(props.spec, feature)) {
@@ -387,6 +415,7 @@ function buildLinearRows(list: Array<MapRoute | MapRegion>, kind: LinearKind): L
       vertices: selectedShape || (shape.origin !== 'dataset' && pixels.length <= 60) ? pixels : [],
       attr: curve.map(pt => `${pt[0] * viewWidth.value},${pt[1] * viewHeight.value}`).join(' '),
       dataset: shape.origin === 'dataset',
+      pending: isPending(shape),
       smooth: strength,
       deviation: deviationProblems(normalized, smoothOptions)[0] ?? null,
       handles: selectedShape && allVisible && !props.disabled && props.registration ? pixelMidpoints(pixels, closed) : [],
@@ -750,6 +779,10 @@ function setPlaceCoord(index: number, axis: 'lon' | 'lat', event: Event) {
 </script>
 
 <style scoped>
+.geo-preview svg { display: block; width: 100%; max-width: 600px; border: 1px solid #b99b83; }
+.geo-item.is-pending { border-color: #d97732; }
+.geo-item.is-active { outline: 2px solid #cf3e32; }
+.geo-route.is-pending, .geo-region.is-pending { stroke: #cf3e32; stroke-dasharray: 8 5; }
 .geo { display: flex; flex-direction: column; gap: 8px; }
 .geo-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .geo-title { font: 600 12px var(--font-body); color: var(--text-1); }

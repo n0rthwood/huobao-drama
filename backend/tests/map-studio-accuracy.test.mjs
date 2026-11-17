@@ -106,6 +106,7 @@ const script = `
   out.naturalNoDataset = validateFeatureSubmission([missingRiver()], riverCtx({}))
   out.datasetMissingUnsearched = validateFeatureSubmission([missingRiver(missingClaim)], riverCtx({ datasetQueries: [] }))
   out.datasetMissing = validateFeatureSubmission([missingRiver(missingClaim)], riverCtx({ datasetQueries: [{ layer: 'river', query: 'historical unnamed tributary', hits: 0, refs: [] }] }))
+  out.emptyMissing = validateFeatureSubmission([missingRiver({ ...missingClaim, points: [] })], riverCtx({ datasetQueries: [{ layer: 'river', query: 'historical unnamed tributary', hits: 0, refs: [] }] }))
 
   out.excerpt = {
     decimal: excerptSupportsPoint('坐标 68.3E, 58.2N', [68.3, 58.2]),
@@ -142,6 +143,8 @@ const script = `
     cardFits: labelOverflowProblems(doc([card('托博尔斯克')])),
     drawing: drawingProblems({ doc: doc([label(longTitle, 0.05)]), features: [], registration, omitted: [] }).problems,
   }
+  out.missingDraw = drawingProblems({ doc: doc([]), features: [{ id: 'missing', name: '缺失河流', kind: 'place', coords: [[68, 58]], missing: true }], registration, omitted: [] })
+  out.missingDrawn = drawingProblems({ doc: doc([layer('missing-marker', { type: 'marker', at: [0.5, 0.5], text: '', style: {}, anchor: { semantic_id: 'missing' } })]), features: [{ id: 'missing', name: '缺失河流', kind: 'place', coords: [[68, 58]], missing: true }], registration, omitted: [] })
   console.log('@@' + JSON.stringify(out))
 `
 
@@ -196,15 +199,12 @@ test('托博尔斯克来自真实 place 数据集；喀什里克错误经度与 
   assert.equal(result.corrected.features[1].verification.status, 'verified')
 })
 
-test('软证据：acknowledge 接受说明但保留 conflict，锚点不被主语冲突污染', () => {
+test('与已核验数据集矛盾和疑似互换不能用 acknowledge 放行', () => {
   assert.match(result.lonLatSimilar.problems.join(), /lon_lat_similar/)
-  assert.deepEqual(result.lonLatAcknowledged.problems, [])
-  assert.equal(result.lonLatAcknowledged.features[0].verification.status, 'conflict')
-  assert.match(result.lonLatAcknowledged.features[0].verification.reasons.join(), /lon_lat_similar.*用户裁决/)
-  assert.deepEqual(result.conflictAcknowledged.problems, [])
-  assert.equal(result.conflictAcknowledged.features[0].verification.status, 'conflict')
-  assert.match(result.conflictAcknowledged.features[0].verification.reasons.join(), /人工裁决/)
-  assert.equal(result.conflictAcknowledged.features[1].verification.status, 'verified', 'dataset object remains an independently verified anchor')
+  assert.match(result.lonLatAcknowledged.problems.join(), /lon_lat_similar/)
+  assert.deepEqual(result.lonLatAcknowledged.features, [])
+  assert.match(result.conflictAcknowledged.problems.join(), /relation_conflict/)
+  assert.deepEqual(result.conflictAcknowledged.features, [])
   assert.match(result.wrongFeatureAcknowledged.problems.join(), /relation_conflict/, 'acknowledgement on the object cannot acknowledge the subject conflict')
   assert.match(result.badRelationExcerpt.problems.join(), /excerpt.*逐字引用/)
   assert.match(result.badRelationSource.problems.join(), /source_id/)
@@ -229,6 +229,12 @@ test('自然要素严格核对类别、几何类型与引用；dataset_missing �
   assert.match(result.datasetMissingUnsearched.problems.join(), /本阶段.*真正查过/)
   assert.deepEqual(result.datasetMissing.problems, [])
   assert.equal(result.datasetMissing.features[0].verification.status, 'needs_user')
+  assert.deepEqual(result.missingDraw.problems, [])
+  assert.equal(result.missingDraw.omitted[0].feature_id, 'missing')
+  assert.match(result.missingDrawn.problems.join(), /同时出现在 omitted/)
+  assert.deepEqual(result.emptyMissing.problems, [])
+  assert.deepEqual(result.emptyMissing.features[0].points, [])
+  assert.equal(result.emptyMissing.features[0].dataset_missing.reason, '该历史支流在数据集中没有命中，请人工裁决')
 })
 
 test('出处中的十进制与度分秒经纬度可核验，只有地名提及不能冒充坐标证据', () => {
@@ -242,7 +248,7 @@ test('几何闸门保留规范化后的核验元数据：verified 及已确认�
   assert.deepEqual(result.gate.blocked.map(feature => feature.id), ['p_model'])
   assert.match(result.gate.blocked[0].reasons.join(), /尚无可核验依据/)
   assert.deepEqual(result.gate.released, [])
-  assert.equal(result.gate.absent.length, 1)
+  assert.deepEqual(result.gate.absent, [])
 })
 
 test('label/card 长标题放入矮 box 返回 label_overflow；作图交付使用同一规则，不缩字号截断', () => {
@@ -255,7 +261,7 @@ test('label/card 长标题放入矮 box 返回 label_overflow；作图交付使�
   assert.match(result.labels.drawing.join(), /label_overflow.*title/)
 })
 
-test('HTTP base 启动先以 geometry_unverified 拒绝；PUT 确认释放研究阻断，人工图层保存拒绝溢出', () => {
+test('HTTP base 缺少 map_spec 时拒绝；PUT 确认释放旧研究阻断，人工图层保存拒绝溢出', () => {
   const dir = mkdtempSync(path.join(tmpdir(), 'map-accuracy-gate-'))
   const probe = path.join(dir, 'probe.mts')
   writeFileSync(probe, `
@@ -278,17 +284,17 @@ test('HTTP base 启动先以 geometry_unverified 拒绝；PUT 确认释放研究
     const id = detail.task_id
     // Fixture starts at base so the HTTP assertion has no configured model to accidentally call.
     await mutateTask(id, { action: 'fixture_base_gate', actor: 'system', mutate: ctx => {
-      ctx.mapSpec = spec(); ctx.state.stage = 'base'; ctx.state.status = 'idle'
+      ctx.mapSpec = null; ctx.state.stage = 'base'; ctx.state.status = 'idle'
     } })
     const denied = await mapStudioRoutes.request('/tasks/' + id + '/advance', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
     assert.equal(denied.status, 400)
     const deniedBody = await denied.json()
-    assert.equal(deniedBody.error, 'geometry_unverified')
-    assert.match(deniedBody.message, /喀什里克.*尚无可核验依据/)
-    assert.equal(selectRunsByTask(id, 10).length, 0, 'reject before creating a run or looking up a model')
+    assert.equal(deniedBody.error, 'map_spec_missing')
+    assert.equal(selectRunsByTask(id, 10).length, 0)
 
     // The real research execution is covered by map-studio-agent; exercise its persisted confirmation state here.
     await mutateTask(id, { action: 'fixture_research_blocked', actor: 'system', mutate: ctx => {
+      ctx.mapSpec = spec()
       ctx.state.stage = 'research'; ctx.state.status = 'blocked'
       ctx.state.research = { queries: [], sources: [], features: [], uncertainties: [], notes: [], searched_at: new Date().toISOString() }
       ctx.state.issues = [{ field: 'research', code: 'geometry_unverified', blocking: true, message: '「喀什里克」：尚无可核验依据，请人工确认' }]
