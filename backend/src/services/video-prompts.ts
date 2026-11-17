@@ -14,7 +14,7 @@ import {
   createTextTask,
   findActiveTextTask,
   findLatestTextTask,
-  finishTextTask,
+  finishTextTaskUnlessCancelled,
   patchTextTaskParams,
   promptBatchStatusFrom,
   updateTextTaskProgress,
@@ -35,6 +35,9 @@ import { requeueFirstModelFailure } from './text-task-autoretry.js'
 import { runObservedWork } from './task-observability.js'
 import { buildSampleKey, buildWorkPlan } from './task-estimate.js'
 import { narrationCharCount } from './narration.js'
+import { releaseEpisodeReadCache, runWithEpisodeReadCache } from './episode-read-cache.js'
+import { registerBatchCancellation, releaseBatchCancellation } from './text-batch-cancel.js'
+import { agentGate } from '../agents/agent-gate.js'
 
 export type VideoPromptBatchStatus = PromptBatchStatus
 
@@ -111,7 +114,9 @@ export async function startVideoPromptBatch(
 
   const outputs: string[] = []
   logTaskStart('VideoPrompt', 'batch', { episodeId, dramaId, total: pending.length, model: opts.model || undefined })
-  void runWithTextTask(taskId, async () => {
+  // 取消注册（#118 B）：POST /tasks/:id/cancel → abort；等待全局闸的 runAgent 立即出队
+  const cancelController = registerBatchCancellation(taskId)
+  void runWithTextTask(taskId, () => runWithEpisodeReadCache(async () => {
     const agent = mastra.getAgent('prompt_generator')
     if (!agent) throw new Error('视频提示词 Agent 不可用')
     const requestContext = buildAgentRequestContext({
@@ -138,8 +143,11 @@ export async function startVideoPromptBatch(
     }
     const lockedFrames = await lockedFramesOfEpisode(episodeId)
     for (const sb of pending) {
+      if (cancelController.signal.aborted) break
       requestContext.set('storyboardId', sb.id)
       progress.current_storyboard_id = sb.id
+      // 全局闸满时先落「等待全局执行槽」（#118 B）：任务详情可见，拿到槽后清掉
+      progress.step = agentGate.stats().active >= agentGate.limit ? 'waiting_agent_slot' : undefined
       await updateTextTaskProgress(taskId, progress)
       logTaskProgress('VideoPrompt', 'batch-shot', { episodeId, storyboardId: sb.id, index: progress.completed + progress.failed + 1, total: progress.total })
       try {
@@ -173,7 +181,7 @@ export async function startVideoPromptBatch(
             content: `请为分镜 #${sb.storyboardNumber}(ID:${sb.id})生成视频提示词(video_prompt)。视频模型:${videoLabel},请根据该模型的特性和时长限制生成。
 请先调用 read_storyboard_context 获取该分镜的画面描述(含【镜头N】子镜头与台词/旁白)、氛围、时长及三条关键帧提示词(first_frame_prompt/mid_frame_prompt/mid_frame_time/last_frame_prompt)与 locked_frames(该镜被图层段衔接帧锁死的槽位、取景与画面描述 caption)，据此生成 video_prompt(第一行是信息头：列出该分镜出场的人物与场景，用 @角色名/@场景名 引用；之后按 3 秒分段换行、用 @角色名/@场景名/@道具名 引用参考素材；段落内允许多镜头切镜，段与段可以是不同景别/角度/对象，但不跨场景，切镜点对齐分镜 description 的【镜头N】结构)。关键帧对齐：视频的首帧就是该分镜的首关键帧画面，第一段必须从首关键帧已经呈现的画面继续演下去，不要额外重新建立空间；若有 mid_frame_time，必须让某个分段的起点正好落在该秒数并与中关键帧画面一致；最后一段收在尾关键帧的画面上。locked_frames 非空时以衔接帧为准：C 的首帧、D 的尾帧就是那张衔接帧，相应段落不许切镜（保存时会被退回）。C 的第一段必须是 0-1 秒的空镜：只复述衔接帧画面（机位/景别/画面里有什么/光线），静止或极缓推，不出现人物（不许 @ 角色）、不切镜、不做场景过渡（过渡为/叠化/dissolve 等）；人物入画与转场只能从第二段（1 秒以后）写起，否则会被退回。图像优先(绝对规则)：禁止描写角色的物种、服装、颜色、发型、体型等任何外观属性，角色一律只用 @角色名 指代，外观完全由参考图决定。
 ${briefs.get(sb.id)?.text || ''}${transitionHint}${lockedHint}然后调用 update_storyboard 保存到分镜 ID:${sb.id}。update_storyboard 参数只传 storyboard_id 和 video_prompt 两个键,不要回传该分镜的其他任何字段,不要重新拆分整集。`,
-          }], { maxSteps: 8, requestContext }, sink)
+          }], { maxSteps: 8, requestContext, abortSignal: cancelController.signal }, sink)
           outputs.push(`分镜 #${sb.storyboardNumber}：${result.text || ''}`)
           // 以实际落库为准判定成败：没保存就在观测窗口内抛错，工作项记 failed
           const [fresh] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, sb.id))
@@ -185,17 +193,22 @@ ${briefs.get(sb.id)?.text || ''}${transitionHint}${lockedHint}然后调用 updat
         progress.failed++
         logTaskError('VideoPrompt', 'batch-shot', { storyboardId: sb.id, error: err instanceof Error ? err.message : String(err) })
       }
+      progress.step = undefined
     }
-  })
+    // 收尾统一清掉等待标记（取消/中断路径可能停在 waiting_agent_slot）
+    progress.step = undefined
+  }).finally(() => { releaseEpisodeReadCache(); releaseBatchCancellation(taskId) }))
     .then(async () => {
       progress.current_storyboard_id = undefined
-      await finishTextTask(taskId, 'completed', { progress, outputText: outputs.filter(s => s.trim()).join('\n\n') })
+      progress.step = undefined
+      await finishTextTaskUnlessCancelled(taskId, 'completed', { progress, outputText: outputs.filter(s => s.trim()).join('\n\n') })
       logTaskSuccess('VideoPrompt', 'batch', { episodeId, total: progress.total, completed: progress.completed, failed: progress.failed })
     })
     .catch(async (err: unknown) => {
       const message = err instanceof Error ? err.message : '批量生成失败'
       progress.current_storyboard_id = undefined
-      await finishTextTask(taskId, 'failed', { errorMsg: message, progress })
+      progress.step = undefined
+      await finishTextTaskUnlessCancelled(taskId, 'failed', { errorMsg: message, progress })
       await requeueFirstModelFailure(taskId, err, isFirstAgentFailureSafe(err))
       logTaskError('VideoPrompt', 'batch', { episodeId, error: message })
     })

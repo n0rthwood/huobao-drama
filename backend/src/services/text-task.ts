@@ -311,6 +311,26 @@ export async function cancelTextTask(id: number, reason: string): Promise<void> 
     .where(and(eq(schema.sysTask.id, id), inArray(schema.sysTask.status, ACTIVE_TASK_STATUSES)))
 }
 
+/**
+ * 收尾但不覆盖已取消的任务（Issue #118 B）：批量被 POST /tasks/:id/cancel 取消后，
+ * runner 的 then/catch 仍会跑完收尾——此时任务行已是 cancelled，不能再写成 completed/failed。
+ * 进度快照仍会落盘（清掉 waiting_agent_slot 等 transient 标记），终态与错误信息不动。
+ * 返回 false 表示任务已被取消、只更新了进度。
+ */
+export async function finishTextTaskUnlessCancelled(
+  id: number,
+  status: 'completed' | 'failed',
+  extra: { errorMsg?: string | null; error?: unknown; progress?: TextTaskProgress; outputText?: string } = {},
+): Promise<boolean> {
+  const row = db.select().from(schema.sysTask).where(eq(schema.sysTask.id, id)).get()
+  if (row?.status === 'cancelled') {
+    if (extra.progress) await patchTextTaskParams(id, { progress: extra.progress })
+    return false
+  }
+  await finishTextTask(id, status, extra)
+  return true
+}
+
 /** 该集该类型是否有正在运行的文本任务（取代原来的内存 Map 判重） */
 export async function findActiveTextTask(episodeId: number, kind: TextTaskKind, excludeId?: number): Promise<SysTaskRow | null> {
   const rows = await db.select().from(schema.sysTask).where(and(

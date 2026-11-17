@@ -2,7 +2,9 @@ import type { Agent, AgentExecutionOptionsBase } from '@mastra/core/agent'
 import type { FullOutput } from '@mastra/core/stream'
 import { runWithReasoningSink, type ReasoningSink } from './reasoning-sink.js'
 import { markAgentFailureIfSafe, runWithAgentTextCall } from '../services/text-task-context.js'
-import { recordFinalToolResults } from '../services/task-observability.js'
+import { recordAgentGateWait, recordFinalToolResults } from '../services/task-observability.js'
+import { agentGate, isInteractiveAgentRun } from './agent-gate.js'
+import { logTaskProgress } from '../utils/task-logger.js'
 
 /**
  * 以流式方式执行 Agent，读完整个流后返回与 agent.generate() 相同结构的结果
@@ -36,19 +38,32 @@ export async function runAgent(
     if (full.error) throw full.error
     return full
   }
-  return runWithAgentTextCall(async () => {
-    try {
-      if (!sink) return await exec()
-      return await runWithReasoningSink(sink, async () => {
-        try {
-          return await exec()
-        } finally {
-          await sink.flush().catch(() => { /* 落盘失败不影响任务结果 */ })
-        }
-      })
-    } catch (err) {
-      markAgentFailureIfSafe(err)
-      throw err
-    }
+  // 全局 agent 并发闸（Issue #118 B）：先全局闸再端点槽；交互请求下一空槽优先（非抢占），
+  // 排队等待单独记 agent_gate_ms，取消（abortSignal）即出队不占槽。
+  const queuedAt = Date.now()
+  const interactive = isInteractiveAgentRun()
+  const signal = options.abortSignal
+  if (agentGate.stats().active >= agentGate.limit) {
+    logTaskProgress('AgentGate', 'queue', { ...agentGate.stats(), interactive })
+  }
+  return agentGate.run({ interactive, signal }, async () => {
+    const gateWaitMs = Date.now() - queuedAt
+    recordAgentGateWait(gateWaitMs)
+    logTaskProgress('AgentGate', 'acquired', { ...agentGate.stats(), interactive, gateWaitMs })
+    return runWithAgentTextCall(async () => {
+      try {
+        if (!sink) return await exec()
+        return await runWithReasoningSink(sink, async () => {
+          try {
+            return await exec()
+          } finally {
+            await sink.flush().catch(() => { /* 落盘失败不影响任务结果 */ })
+          }
+        })
+      } catch (err) {
+        markAgentFailureIfSafe(err)
+        throw err
+      }
+    })
   })
 }

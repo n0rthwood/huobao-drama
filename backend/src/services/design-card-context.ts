@@ -30,6 +30,7 @@ import {
   textRolesFor,
   type TextFieldCapacity,
 } from './layer-text.js'
+import { cachedEpisodeRead } from './episode-read-cache.js'
 
 /**
  * 某张证据素材的语义条目摘要（名称 + 稳定 id + 组别 + 实际几何点数）。
@@ -110,6 +111,15 @@ export function loadDesignCardContext(episodeId: number): DesignCardContext {
     ? db.select().from(schema.dramas).where(eq(schema.dramas.id, episode.dramaId)).all()
     : []
   return { assets, aspect: normalizeAspect(drama?.aspectRatio), plannedShots: freshPlannedShots(episodeId) }
+}
+
+/**
+ * 异步读路径变体（Issue #118 A3）：批量生命周期缓存内的 loadDesignCardContext。
+ * 只给 read_storyboard_context / 批次准备等读路径用；#43 同步事务链继续直接调
+ * 上面的同步版本（保持同步语义，不读缓存）。
+ */
+export async function loadDesignCardContextCached(episodeId: number): Promise<DesignCardContext> {
+  return cachedEpisodeRead(episodeId, 'designCardContext', async () => loadDesignCardContext(episodeId))
 }
 
 /**

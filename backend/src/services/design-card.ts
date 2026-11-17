@@ -954,6 +954,33 @@ export function referenceAssetRefs(card: DesignCard | null, combo: Combo | null)
 }
 
 /**
+ * 提示词批量（video/keyframes scope）里需要完整 semantics/map_pip 的道具（Issue #118 A1）：
+ * 窗口内各镜「目标绑定 ∪ 设计卡引用」的并集。其余道具只给一行摘要——
+ * video-prompt / keyframe-prompt 技能硬规则只引用本镜已绑定资产，未绑定道具的语义细节
+ * 用不到；模型确需细节时有 read_props 工具可查。纯函数：绑定与卡片由调用方读库后传入。
+ */
+export function promptScopeDetailedPropIds(input: {
+  windowBindings: Array<Array<{ kind: string; assetId: number }>>
+  windowCards: Array<{ card: DesignCard | null; combo: Combo | null }>
+}): Set<number> {
+  const ids = new Set<number>()
+  for (const bindings of input.windowBindings) {
+    for (const binding of bindings) if (binding.kind === 'prop') ids.add(binding.assetId)
+  }
+  for (const { card, combo } of input.windowCards) {
+    if (!card) continue
+    for (const ref of referenceAssetRefs(card, combo)) if (ref.kind === 'prop') ids.add(ref.id)
+    const base = card.layer_plan?.base
+    if (base?.kind === 'asset' && base.asset_kind === 'prop') ids.add(base.asset_id)
+    for (const ref of card.layer_plan?.must_mark || []) ids.add(ref.asset_id)
+    for (const layer of card.layer_plan?.planned_layers || []) {
+      if (layer.anchor) ids.add(layer.anchor.asset_id)
+    }
+  }
+  return ids
+}
+
+/**
  * 一段旁白在句界处把相邻句子装满单镜上限所需的最少镜数（Issue #109：一镜不跨段、只在句界切）。
  * 单句超过上限时按上限向上取整计（那一句本来就存不进去，计数不能因此低于字数下限）。
  */
