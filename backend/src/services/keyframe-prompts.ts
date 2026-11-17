@@ -17,7 +17,7 @@ import {
   createTextTask,
   findActiveTextTask,
   findLatestTextTask,
-  finishTextTask,
+  finishTextTaskUnlessCancelled,
   patchTextTaskParams,
   promptBatchStatusFrom,
   updateTextTaskProgress,
@@ -31,6 +31,9 @@ import { requeueFirstModelFailure } from './text-task-autoretry.js'
 import { runObservedWork } from './task-observability.js'
 import { buildSampleKey, buildWorkPlan } from './task-estimate.js'
 import { narrationCharCount } from './narration.js'
+import { releaseEpisodeReadCache, runWithEpisodeReadCache } from './episode-read-cache.js'
+import { registerBatchCancellation, releaseBatchCancellation } from './text-batch-cancel.js'
+import { agentGate } from '../agents/agent-gate.js'
 
 export type KeyframePromptBatchStatus = PromptBatchStatus
 
@@ -96,7 +99,8 @@ export async function startKeyframePromptBatch(
 
   const outputs: string[] = []
   logTaskStart('KeyframePrompt', 'batch', { episodeId, dramaId, total: pending.length, model: opts.model || undefined })
-  void runWithTextTask(taskId, async () => {
+  const cancelController = registerBatchCancellation(taskId)
+  void runWithTextTask(taskId, () => runWithEpisodeReadCache(async () => {
     const agent = mastra.getAgent('prompt_generator')
     if (!agent) throw new Error('提示词 Agent 不可用')
     const requestContext = buildAgentRequestContext({
@@ -109,8 +113,10 @@ export async function startKeyframePromptBatch(
     })
     const sink = createReasoningSink(taskId)
     for (const sb of pending) {
+      if (cancelController.signal.aborted) break
       requestContext.set('storyboardId', sb.id)
       progress.current_storyboard_id = sb.id
+      progress.step = agentGate.stats().active >= agentGate.limit ? 'waiting_agent_slot' : undefined
       await updateTextTaskProgress(taskId, progress)
       logTaskProgress('KeyframePrompt', 'batch-shot', { episodeId, storyboardId: sb.id, index: progress.completed + progress.failed + 1, total: progress.total })
       sink.heading(`分镜 #${sb.storyboardNumber}`)
@@ -133,7 +139,7 @@ export async function startKeyframePromptBatch(
 - mid_frame_prompt + mid_frame_time = 除第一个子镜头外最重要的那个子镜头的起始瞬间，mid_frame_time 以秒为单位、必须落在 0.5 秒与 duration-0.5 秒之间；该分镜只有一个子镜头时两者都不要写
 - last_frame_prompt = 段落结尾瞬间，与 result 一致，必须是稳定清晰、可被下一镜当作开场的画面
 ${briefs.get(sb.id)?.text || ''}最后调用 update_storyboard 保存到分镜 ID:${sb.id}。update_storyboard 参数只传 storyboard_id 以及上述关键帧字段,不要回传该分镜的其他任何字段(title、description、video_prompt、scene_id 等一律不传),不要重新拆分整集。`,
-          }], { maxSteps: 8, requestContext }, sink)
+          }], { maxSteps: 8, requestContext, abortSignal: cancelController.signal }, sink)
           outputs.push(`分镜 #${sb.storyboardNumber}：${result.text || ''}`)
           // 以实际落库为准判定成败：尾关键帧提示词是必选项——除非尾帧由衔接帧锁定（组合 D），
           // 那一槽本来就不写提示词，不能把正确结果记成失败样本
@@ -152,17 +158,20 @@ ${briefs.get(sb.id)?.text || ''}最后调用 update_storyboard 保存到分镜 I
         progress.failed++
         logTaskError('KeyframePrompt', 'batch-shot', { storyboardId: sb.id, error: err instanceof Error ? err.message : String(err) })
       }
+      progress.step = undefined
     }
-  })
+  }).finally(() => { releaseEpisodeReadCache(); releaseBatchCancellation(taskId) }))
     .then(async () => {
       progress.current_storyboard_id = undefined
-      await finishTextTask(taskId, 'completed', { progress, outputText: outputs.filter(s => s.trim()).join('\n\n') })
+      progress.step = undefined
+      await finishTextTaskUnlessCancelled(taskId, 'completed', { progress, outputText: outputs.filter(s => s.trim()).join('\n\n') })
       logTaskSuccess('KeyframePrompt', 'batch', { episodeId, total: progress.total, completed: progress.completed, failed: progress.failed })
     })
     .catch(async (err: unknown) => {
       const message = err instanceof Error ? err.message : '批量生成失败'
       progress.current_storyboard_id = undefined
-      await finishTextTask(taskId, 'failed', { errorMsg: message, progress })
+      progress.step = undefined
+      await finishTextTaskUnlessCancelled(taskId, 'failed', { errorMsg: message, progress })
       await requeueFirstModelFailure(taskId, err, isFirstAgentFailureSafe(err))
       logTaskError('KeyframePrompt', 'batch', { episodeId, error: message })
     })

@@ -11,6 +11,7 @@ import { db, schema } from '../db/index.js'
 import { mastra } from '../mastra/index.js'
 import { buildAgentRequestContext } from '../agents/context.js'
 import { runAgent } from '../agents/run.js'
+import { runAsInteractiveAgent } from '../agents/agent-gate.js'
 import { createReasoningSink } from '../agents/reasoning-sink.js'
 import { getActiveConfig, getConfigById, validateVideoModel, type AIConfig } from './ai.js'
 import { videoCapabilities } from './adapters/registry.js'
@@ -235,7 +236,7 @@ async function retryChatText(row: SysTaskRow, kind: TextTaskKind, episodeId: num
     modelOverride: resolved.model,
     textConfigId: resolved.configId ?? undefined,
   })
-  void runWithTextTask(taskId, () => runAgent(agent, [{ role: 'user', content: message }], { maxSteps: 20, requestContext }, createReasoningSink(taskId)))
+  void runAsInteractiveAgent(() => runWithTextTask(taskId, () => runAgent(agent, [{ role: 'user', content: message }], { maxSteps: 20, requestContext }, createReasoningSink(taskId))))
     .then(result => finishTextTask(taskId, 'completed', { outputText: result.text || '' }))
     .catch(async err => {
       await finishTextTask(taskId, 'failed', { errorMsg: err instanceof Error ? err.message : String(err) })

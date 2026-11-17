@@ -52,6 +52,8 @@ export interface ObservedWorkRow {
   /** 已结束调用的耗时之和（中断工作项另含被心跳确认的那段）；进行中的那次要自己加上 */
   model_ms: number
   queue_ms: number
+  /** 全局 agent 并发闸等待（#118 B）：与端点 queue_ms 分列 */
+  agent_gate_ms: number
   work_ms: number
   call_count: number
   heartbeat_at: number
@@ -313,6 +315,9 @@ const addCallTimeStmt = sqlite.prepare(
      SET model_ms = model_ms + ?, queue_ms = queue_ms + ?, call_count = call_count + 1,
          heartbeat_at = ?, work_ms = MAX(work_ms, MAX(0, ? - started_at))
    WHERE id = ?`,
+)
+const addGateWaitStmt = sqlite.prepare(
+  'UPDATE task_observed_work SET agent_gate_ms = agent_gate_ms + ?, heartbeat_at = ? WHERE id = ?',
 )
 const insertCallStmt = sqlite.prepare(
   `INSERT INTO task_observed_call
@@ -987,6 +992,16 @@ async function captureJsonBody(call: CallHandle, stream: ReadableStream<Uint8Arr
 /** 标记「开始排队」：必须包在取槽位（withTextSlot）之外，槽位内的那一刻才是调用开始 */
 export function observeQueueWait<T>(fn: () => Promise<T>): Promise<T> {
   return queueALS.run({ queuedAt: Date.now() }, fn)
+}
+
+/**
+ * 全局 agent 并发闸的等待时长（Issue #118 B）：单独记在 agent_gate_ms，
+ * 不混入端点 queue_ms（那是拿到全局闸之后、取端点槽的等待）。无观测工作项时不落盘。
+ */
+export function recordAgentGateWait(ms: number): void {
+  const ctx = workALS.getStore()
+  if (!ctx || !(ms > 0)) return
+  addGateWaitStmt.run(Math.trunc(ms), Date.now(), ctx.workId)
 }
 
 /**

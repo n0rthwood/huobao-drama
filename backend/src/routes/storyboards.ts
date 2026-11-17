@@ -31,6 +31,7 @@ import {
   parseTransitionReview,
 } from '../services/transition.js'
 import { runTransitionReview } from '../services/transition-agent.js'
+import { runAsInteractiveAgent } from '../agents/agent-gate.js'
 import { generateShotVoice, regenerateShotSubtitle } from '../services/narration-voice.js'
 import { writeShotNarration } from '../services/narration-script.js'
 import { composeShot } from '../services/shot-compose.js'
@@ -60,6 +61,7 @@ import { junctionFrameOf } from '../services/junction-frame.js'
 import { invalidateSegmentSpec } from '../services/layer-segment.js'
 import { findActiveBatchForStoryboard } from '../services/video-batch.js'
 import { findActiveKeyframeBatchForStoryboard } from '../services/keyframe-batch.js'
+import { invalidateEpisodeReadCache } from '../services/episode-read-cache.js'
 
 const app = new Hono()
 
@@ -257,6 +259,7 @@ app.put('/:id', async (c) => {
   const sync = wrotePrompt
     ? await syncStoryboardBindingsFromPrompts(id, Object.keys(body))
     : null
+  invalidateEpisodeReadCache(storyboard.episodeId)
   const [updated] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, id))
   const assets = sync ? null : await loadEpisodeAssets(updated!.episodeId)
   const pool = sync
@@ -566,7 +569,7 @@ app.post('/:id/transition', async (c) => {
   const body = await c.req.json().catch(() => ({} as Record<string, any>))
   logTaskStart('StoryboardAPI', 'transition', { storyboardId: id, model: body.model, configId: body.config_id })
   try {
-    await runTransitionReview(id, { model: body.model, configId: body.config_id })
+    await runAsInteractiveAgent(() => runTransitionReview(id, { model: body.model, configId: body.config_id }))
     logTaskSuccess('StoryboardAPI', 'transition', { storyboardId: id })
     return success(c, await storyboardJson(id))
   } catch (err) {
@@ -583,10 +586,10 @@ app.post('/:id/narration/write', async (c) => {
   const id = Number(c.req.param('id'))
   const body = await c.req.json().catch(() => ({} as Record<string, any>))
   try {
-    return success(c, await writeShotNarration(id, {
+    return success(c, await runAsInteractiveAgent(() => writeShotNarration(id, {
       model: body.model || undefined,
       configId: body.config_id ?? undefined,
-    }))
+    })))
   } catch (err) {
     const message = err instanceof Error ? err.message : '写旁白失败'
     logTaskError('StoryboardAPI', 'narration-write', { storyboardId: id, error: message })

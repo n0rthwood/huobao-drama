@@ -46,6 +46,7 @@ import {
 import { LAYER_BASE_CHECK_STATUSES, type LayerBaseCheck, type LayerBaseCheckStatus } from './layer-base-check.js'
 // 衔接帧画面描述（#95）的类型与解析：与 #94 的 base_check 同口径，只在函数体里互相调用，ESM 循环安全。
 import type { JunctionCaptionCache } from './junction-caption.js'
+import { invalidateEpisodeReadCache } from './episode-read-cache.js'
 import {
   adoptMapAssetLayers,
   expandMapAssetLayers,
@@ -398,6 +399,7 @@ export async function saveLayerSegment(
       staleReasons: JSON.stringify(staleReasons),
       updatedAt: ts,
     }).where(eq(schema.storyboardLayerSegments.id, existing.id))
+    invalidateEpisodeReadCache(row.episodeId)
     return {
       ...existing,
       layer_doc: readDoc,
@@ -423,6 +425,7 @@ export async function saveLayerSegment(
     createdAt: ts,
     updatedAt: ts,
   })
+  invalidateEpisodeReadCache(row.episodeId)
   return {
     id: getInsertId(result),
     storyboard_id: storyboardId,
@@ -455,6 +458,8 @@ export async function deleteLayerSegment(storyboardId: number): Promise<boolean>
   await db.update(schema.storyboards)
     .set({ keyframesJunctionHash: null, updatedAt: now() })
     .where(eq(schema.storyboards.id, storyboardId))
+  const [sbRow] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, storyboardId))
+  if (sbRow) invalidateEpisodeReadCache(sbRow.episodeId)
   return true
 }
 
@@ -477,6 +482,12 @@ export async function markSegmentRendered(
     status: patch.status,
     updatedAt: now(),
   }).where(eq(schema.storyboardLayerSegments.id, segmentId))
+  const [rendered] = await db.select().from(schema.storyboardLayerSegments)
+    .where(eq(schema.storyboardLayerSegments.id, segmentId))
+  if (rendered) {
+    const [sbRow] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, rendered.storyboardId))
+    if (sbRow) invalidateEpisodeReadCache(sbRow.episodeId)
+  }
 }
 
 export async function markSegmentStatus(segmentId: number, status: LayerSegmentStatus): Promise<void> {

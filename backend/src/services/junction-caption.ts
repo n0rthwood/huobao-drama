@@ -46,6 +46,7 @@ import { generatedSegmentSeconds } from './shot-duration.js'
 // 时间分段解析与 C 首段 ≤1.5 秒、0 长/倒序检查共用一套（#110 起生成段时间轴校验也用它）
 import { promptSegments, videoTimelineProblems } from './video-prompt-timeline.js'
 import type { LayerDocBase } from './layer-doc.js'
+import { cachedEpisodeRead, invalidateEpisodeReadCache } from './episode-read-cache.js'
 
 export const LOCKED_FRAMINGS = ['full', 'crop', 'contain', 'zoomed'] as const
 export type LockedFraming = typeof LOCKED_FRAMINGS[number]
@@ -177,23 +178,26 @@ export function lockedFrameEntryOf(
  * 其余镜头不出现在结果里。每集只探一次规格，避免逐镜重复 probe 视频。
  */
 export async function lockedFramesOfEpisode(episodeId: number): Promise<Map<number, LockedFrame[]>> {
-  const out = new Map<number, LockedFrame[]>()
-  const rows = (await db.select().from(schema.storyboards)
-    .where(eq(schema.storyboards.episodeId, episodeId)))
-    .filter(row => !row.deletedAt && lockedGenSlot(toCombo(row.combo)))
-  if (!rows.length) return out
-  const [spec, segments, junctions] = await Promise.all([
-    resolveEpisodeSegmentSpec(episodeId),
-    segmentsByStoryboard(rows.map(row => row.id)),
-    junctionFramesOfEpisode(episodeId),
-  ])
-  for (const row of rows) {
-    const segment = segments.get(row.id)
-    const junction = junctions.get(row.id)
-    if (!segment || !junction?.source) continue
-    out.set(row.id, [lockedFrameEntryOf(segment, junction, spec, await lockedBaseOf(segment.base_ref))])
-  }
-  return out
+  // 批量生命周期缓存（#118 A3）：ensureJunctionCaption / 段渲染写入会失效本集缓存
+  return cachedEpisodeRead(episodeId, 'lockedFrames', async () => {
+    const out = new Map<number, LockedFrame[]>()
+    const rows = (await db.select().from(schema.storyboards)
+      .where(eq(schema.storyboards.episodeId, episodeId)))
+      .filter(row => !row.deletedAt && lockedGenSlot(toCombo(row.combo)))
+    if (!rows.length) return out
+    const [spec, segments, junctions] = await Promise.all([
+      resolveEpisodeSegmentSpec(episodeId),
+      segmentsByStoryboard(rows.map(row => row.id)),
+      junctionFramesOfEpisode(episodeId),
+    ])
+    for (const row of rows) {
+      const segment = segments.get(row.id)
+      const junction = junctions.get(row.id)
+      if (!segment || !junction?.source) continue
+      out.set(row.id, [lockedFrameEntryOf(segment, junction, spec, await lockedBaseOf(segment.base_ref))])
+    }
+    return out
+  })
 }
 
 // ─── 视觉描述 ────────────────────────────────────────────────
@@ -207,9 +211,16 @@ const CAPTION_TIMEOUT_MS = 120_000
 const SYSTEM_PROMPT = '你是影视分镜的画面描述员。只依据看到的画面回答，不臆测画面外的内容，输出严格 JSON。'
 
 export async function writeJunctionCaption(segmentId: number, cache: JunctionCaptionCache): Promise<void> {
+  const [segment] = await db.select().from(schema.storyboardLayerSegments)
+    .where(eq(schema.storyboardLayerSegments.id, segmentId))
   await db.update(schema.storyboardLayerSegments)
     .set({ junctionCaption: JSON.stringify(cache), updatedAt: now() })
     .where(eq(schema.storyboardLayerSegments.id, segmentId))
+  if (segment) {
+    const [sb] = await db.select().from(schema.storyboards)
+      .where(eq(schema.storyboards.id, segment.storyboardId))
+    if (sb) invalidateEpisodeReadCache(sb.episodeId)
+  }
 }
 
 /**

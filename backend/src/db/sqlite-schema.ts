@@ -791,6 +791,8 @@ export const sqliteSchemaStatements = [
  */
 const columnAdditions: { table: string; column: string; type: string }[] = [
   { table: 'task_observed_work', column: 'scope', type: "TEXT NOT NULL DEFAULT 'sys_task'" },
+  // 全局 agent 并发闸等待（Issue #118 B）：与端点 queue_ms 分列，不混口径
+  { table: 'task_observed_work', column: 'agent_gate_ms', type: 'INTEGER NOT NULL DEFAULT 0' },
   { table: 'task_observed_call', column: 'scope', type: "TEXT NOT NULL DEFAULT 'sys_task'" },
   { table: 'task_observed_message', column: 'scope', type: "TEXT NOT NULL DEFAULT 'sys_task'" },
   // 场景参考图（与 characters/props 的 reference_images 同语义：用户上传的生图输入）

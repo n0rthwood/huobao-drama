@@ -386,6 +386,10 @@ const progressLines = computed(() => {
   if (textProgress?.step === 'waiting_scenes') {
     lines.push(t('taskCenter.detail.waitingScenes', { id: textProgress.waiting_task_id ?? '?' }))
   }
+  // 全局 agent 并发闸排队（Issue #118 B）
+  if (textProgress?.step === 'waiting_agent_slot') {
+    lines.push(t('taskCenter.detail.waitingAgentSlot'))
+  }
   const remote = taskRemoteState(live.value)
   if (remote?.cancel_requested) lines.push(t('common.ring.cancelling'))
   return lines

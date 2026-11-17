@@ -28,7 +28,7 @@ import {
   createTextTask,
   findActiveTextTask,
   findLatestTextTask,
-  finishTextTask,
+  finishTextTaskUnlessCancelled,
   parseTextTaskParams,
   patchTextTaskParams,
   promptBatchStatusFrom,
@@ -46,6 +46,9 @@ import { narrationCharCount } from './narration.js'
 import { runObservedWork } from './task-observability.js'
 import { buildSampleKey, buildWorkPlan, stageEstimateOf, type StageWorkEstimate } from './task-estimate.js'
 import { buildDesignCardGroundingInstruction } from './design-card-grounding.js'
+import { releaseEpisodeReadCache, runWithEpisodeReadCache } from './episode-read-cache.js'
+import { registerBatchCancellation, releaseBatchCancellation } from './text-batch-cancel.js'
+import { agentGate } from '../agents/agent-gate.js'
 
 /**
  * 填卡时告诉模型的渲染事实（#109）：不知道这些，模型会把「与前镜同一张图」当成优点，
@@ -204,7 +207,8 @@ export async function startDesignCardBatch(
 
   const outputs: string[] = []
   logTaskStart('DesignCard', 'batch', { episodeId, dramaId, total: pending.length, model: opts.model || undefined })
-  void runWithTextTask(taskId, async () => {
+  const cancelController = registerBatchCancellation(taskId)
+  void runWithTextTask(taskId, () => runWithEpisodeReadCache(async () => {
     const agent = mastra.getAgent('storyboard_breaker')
     if (!agent) throw new Error('分镜 Agent 不可用')
     const requestContext = buildAgentRequestContext({
@@ -217,6 +221,7 @@ export async function startDesignCardBatch(
     })
     const sink = createReasoningSink(taskId)
     const fillShot = async (sb: typeof pending[number], planNote: string | null) => {
+      if (cancelController.signal.aborted) return
       const previousStatus = toDesignCardStatus(sb.designCardStatus)
       const progressItem = progress.items!.find(item => item.storyboard_id === sb.id)!
       requestContext.set('storyboardId', sb.id)
@@ -226,6 +231,7 @@ export async function startDesignCardBatch(
       requestContext.set('designCardError' as never, null as never)
       progress.current_storyboard_id = sb.id
       progressItem.state = 'processing'
+      progress.step = agentGate.stats().active >= agentGate.limit ? 'waiting_agent_slot' : undefined
       await updateTextTaskProgress(taskId, progress)
       logTaskProgress('DesignCard', 'batch-shot', {
         episodeId, storyboardId: sb.id,
@@ -262,7 +268,7 @@ ${planNote}
 ${comboOnly ? `本卡已有人工内容，只补选 combo，不重写卡片。现有卡：${sb.designCard}` : `规划信息点、图层段、生成段与预算（${budgetRule}），并填写 rationale。`}
 填写 combo（A 只图层 / B 只生成 / C 图层→生成 / D 生成→图层），同时可填写 suggested_combo；已有组合将保留。
 最后调用 update_storyboard 保存，参数只传 storyboard_id 和 design_card 两个键。`, evidence)
-          const agentResult = await runAgent(agent, [{ role: 'user', content }], { maxSteps: 10, requestContext }, sink)
+          const agentResult = await runAgent(agent, [{ role: 'user', content }], { maxSteps: 10, requestContext, abortSignal: cancelController.signal }, sink)
           // 以实际落库为准判定成败：模型说完话不等于卡已保存
           const [fresh] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, sb.id))
           const saved = requestContext.get('designCardSaved' as never) === true
@@ -301,6 +307,7 @@ ${comboOnly ? `本卡已有人工内容，只补选 combo，不重写卡片。�
           logTaskError('DesignCard', 'batch-shot', { storyboardId: sb.id, error: progressItem.reason })
         }
       }
+      progress.step = undefined
       await updateTextTaskProgress(taskId, progress)
     }
     /** 整组没进模型（规划失败 / 组内有镜未配音）：组内待填镜按失败计，旧卡原样保留 */
@@ -331,6 +338,7 @@ ${comboOnly ? `本卡已有人工内容，只补选 combo，不重写卡片。�
     for (const [id, item] of validity) if (item.valid && item.duration_s !== null) measuredAll.set(id, item.duration_s)
     const grouped = new Set<number>()
     for (const group of touched) {
+      if (cancelController.signal.aborted) break
       const members = group.shots.flatMap(shot => (pendingById.has(shot.storyboard_id) ? [pendingById.get(shot.storyboard_id)!] : []))
       for (const sb of members) grouped.add(sb.id)
       const unvoiced = group.shots.filter(shot => !measuredAll.has(shot.storyboard_id))
@@ -372,12 +380,13 @@ ${comboOnly ? `本卡已有人工内容，只补选 combo，不重写卡片。�
     }
     // 定位不到段落的镜（理论上不会出现：narrationGroupsOf 会把它们并入相邻组）照旧逐镜填
     for (const sb of pending) if (!grouped.has(sb.id)) await fillShot(sb, null)
-  })
+  }).finally(() => { releaseEpisodeReadCache(); releaseBatchCancellation(taskId) }))
     .then(async () => {
       progress.current_storyboard_id = undefined
+      progress.step = undefined
       // 模型跑完 ≠ 批次成功：一镜都没保存成就是整批失败，不用 100% 掩盖失败
       const allFailed = progress.completed === 0 && progress.failed > 0
-      await finishTextTask(taskId, allFailed ? 'failed' : 'completed', {
+      await finishTextTaskUnlessCancelled(taskId, allFailed ? 'failed' : 'completed', {
         progress,
         outputText: outputs.filter(s => s.trim()).join('\n\n'),
         errorMsg: progress.failed ? `${progress.failed}/${progress.total} 个镜头未能保存可实现的设计卡` : null,
@@ -387,13 +396,14 @@ ${comboOnly ? `本卡已有人工内容，只补选 combo，不重写卡片。�
     .catch(async (err: unknown) => {
       const message = err instanceof Error ? err.message : '设计卡填写失败'
       progress.current_storyboard_id = undefined
+      progress.step = undefined
       // 进程级异常：把还挂在 ai_filling 的镜放回去，否则整集永远 409
       for (const sb of pending) {
         await db.update(schema.storyboards)
           .set({ designCardStatus: toDesignCardStatus(sb.designCardStatus), updatedAt: now() })
           .where(eq(schema.storyboards.id, sb.id))
       }
-      await finishTextTask(taskId, 'failed', { errorMsg: message, progress })
+      await finishTextTaskUnlessCancelled(taskId, 'failed', { errorMsg: message, progress })
       await requeueFirstModelFailure(taskId, err, isFirstAgentFailureSafe(err))
       logTaskError('DesignCard', 'batch', { episodeId, error: message })
     })

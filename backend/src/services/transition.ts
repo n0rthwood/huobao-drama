@@ -16,6 +16,7 @@ import { loadEpisodeKeyframes } from './keyframes.js'
 import { loadEpisodeAssets } from './storyboard-assets.js'
 import { stampFieldSavedAt } from './storyboard-fields.js'
 import { getConfigById, getActiveConfig } from './ai.js'
+import { invalidateEpisodeReadCache } from './episode-read-cache.js'
 
 type StoryboardRow = typeof schema.storyboards.$inferSelect
 
@@ -364,6 +365,7 @@ export async function saveTransitionReview(
       updatedAt: now(),
     })
     .where(eq(schema.storyboards.id, storyboardId))
+  invalidateEpisodeReadCache(pair.current.episodeId)
   return review
 }
 
@@ -388,6 +390,7 @@ export async function markTransitionEditedManually(storyboard: StoryboardRow): P
   await db.update(schema.storyboards)
     .set({ transitionReview: JSON.stringify(review), updatedAt: now() })
     .where(eq(schema.storyboards.id, storyboard.id))
+  invalidateEpisodeReadCache(storyboard.episodeId)
 }
 
 // ─── 状态判定 ──────────────────────────────────────────────────

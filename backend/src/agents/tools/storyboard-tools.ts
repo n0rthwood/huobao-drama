@@ -6,10 +6,11 @@ import { createTool } from '@mastra/core/tools'
 import type { ToolExecutionContext } from '@mastra/core/tools'
 import { z } from 'zod'
 import { db, getInsertId, schema } from '../../db/index.js'
-import { eq } from 'drizzle-orm'
+import { eq, inArray } from 'drizzle-orm'
 import { now } from '../../utils/response.js'
 import { logTaskProgress, logTaskSuccess } from '../../utils/task-logger.js'
 import { getDramaId, getEpisodeId, getResearchRunId, getStoryboardId, isStoryboardFillGaps } from '../context.js'
+import { cachedEpisodeRead, invalidateEpisodeReadCache } from '../../services/episode-read-cache.js'
 import { resolveDramaProjectType } from '../../services/project-type.js'
 import { loadEpisodeKeyframes } from '../../services/keyframes.js'
 import {
@@ -17,6 +18,8 @@ import {
   applyExplicitBindings,
   deletePoolSelections,
   deleteTargetBindings,
+  loadEpisodeAssets,
+  loadTargetBindings,
   syncStoryboardBindingsFromPrompts,
 } from '../../services/storyboard-assets.js'
 import { parseReferenceImages, referenceImagePaths } from '../../services/reference-images.js'
@@ -27,7 +30,7 @@ import { groupAt, paragraphSpans } from '../../services/narration-groups.js'
 import { groupPlanDeviation } from '../../services/design-group-plan.js'
 import { spokenText } from '../../services/narration-markup.js'
 import { generatedSegmentSeconds } from '../../services/shot-duration.js'
-import { layerTextSpecPayload, loadDesignCardContext, semanticEntries } from '../../services/design-card-context.js'
+import { layerTextSpecPayload, loadDesignCardContext, loadDesignCardContextCached, resolveDesignCard, semanticEntries } from '../../services/design-card-context.js'
 import { designCardWindow } from '../../services/design-card-window.js'
 import { shotTtsValidity } from '../../services/narration-tts-gate.js'
 import {
@@ -41,6 +44,7 @@ import {
   lockedGenSlot,
   normalizeDesignCard,
   parseDesignCard,
+  promptScopeDetailedPropIds,
   serializeDesignCard,
   storyboardCountCap,
   textPlanRejectionMessage,
@@ -202,48 +206,6 @@ const readStoryboardContext = createTool({
         storyboard_count: s.storyboardCount || 0,
       }))
 
-    const props = prps
-      .filter(p => !p.deletedAt)
-      .filter(p => !linkedPropIds.size || linkedPropIds.has(p.id))
-      .map(p => ({
-        id: p.id,
-        name: p.name,
-        type: p.type || '',
-        description: p.description || '',
-        image_url: p.imageUrl || '',
-        /** 证据素材（#47）：永不重绘，表达设计只能在它的语义标注里挑要显示的东西 */
-        faithful: Number(p.faithful) === 1,
-        /**
-         * 语义标注摘要（#47 → #49）：**只有名称、稳定 id 与类别**，没有坐标。
-         * `must_show` / `overlay_plan` 的 `semantic` 必须逐字取自这里；
-         * 旁白里出现的地名/路线/范围在这张表里找不到，就说明这张图承载不了那句旁白。
-         */
-        semantics: semanticEntries(p.semantics),
-        /**
-         * 地图画中画（#107/#110）：全览与细节是独立资产，分镜同时引用。`role: overview` 列出全览范围与各细节资产
-         * （`label` + `bbox`/`focus_bbox` 经纬度）；`role: detail` 给出自己的取景、重点范围、所属全览 id 与全览范围。
-         * 这些地理范围是判断「这一镜的旁白落在哪个细节里」的唯一依据；聚焦某细节的镜头以该细节图为底图，
-         * 并在相邻镜头或同镜中用全览图建立位置；讲整体趋势的镜头以全览图为底图。
-         * `usage` 只保留通用用法（按镜号写的例子已剔除：那些镜号属于别的集）。
-         */
-        map_pip: pipSummary(p.mapPip),
-      }))
-
-    /**
-     * 背景信息载体（Issue #47）：旁白提到但本集不出场的实体（组织/异地人物/异地事件），
-     * 仍然按角色/场景/道具三类落库，这里**单列一份**，让分镜与表达设计知道
-     * 「S13 要同时表达近卫团与彼得一世」时有哪些现成的视觉载体可以 @。
-     * 它们同时留在上面的 characters/scenes/props 里，不改变既有字段语义。
-     */
-    const expositionAssets = [
-      ...characters.filter(item => chars.find(c => c.id === item.id && Number(c.exposition) === 1))
-        .map(item => ({ kind: 'character' as const, id: item.id, name: item.name, note: item.role, image_url: item.image_url })),
-      ...scenes.filter(item => scns.find(s => s.id === item.id && Number(s.exposition) === 1))
-        .map(item => ({ kind: 'scene' as const, id: item.id, name: item.location, note: item.prompt, image_url: item.image_url })),
-      ...props.filter(item => prps.find(p => p.id === item.id && Number(p.exposition) === 1))
-        .map(item => ({ kind: 'prop' as const, id: item.id, name: item.name, note: item.type, image_url: item.image_url })),
-    ]
-
     // 关键帧状态：inherits_first 表示该分镜首帧承接上一分镜的尾关键帧（continue 边界且自身未选首帧）
     const keyframeMap = await loadEpisodeKeyframes(episodeId)
     // 锁定衔接帧（Issue #95）：C 的首帧 = 图层段末帧、D 的尾帧 = 图层段首帧，这两个槽位
@@ -262,48 +224,136 @@ const readStoryboardContext = createTool({
     const windowIds = window ? new Set(window.ids) : null
     const contextStoryboards = windowIds ? aliveStoryboards.filter(sb => windowIds.has(sb.id)) : aliveStoryboards
 
-    const existingStoryboardPayload = await Promise.all(contextStoryboards
-      .map(async (sb) => {
-        const links = await db.select().from(schema.storyboardCharacters)
-          .where(eq(schema.storyboardCharacters.storyboardId, sb.id))
-        const sbPropLinks = await db.select().from(schema.storyboardProps)
-          .where(eq(schema.storyboardProps.storyboardId, sb.id))
-        const kf = keyframeMap.get(sb.id)
-        const prev = kf?.previousId ? byId.get(kf.previousId) : undefined
-        return {
-          id: sb.id,
-          shot_number: sb.storyboardNumber,
-          title: sb.title || '',
-          // 窗口模式（#102）逐镜给旁白：不必再从整集剧本里自己定位本镜与邻镜念的是哪一段
-          ...(window ? { narration_text: sb.narrationText || '' } : {}),
-          scene_id: sb.sceneId,
-          character_ids: links.map(link => link.characterId),
-          prop_ids: sbPropLinks.map(link => link.propId),
-          shot_type: sb.shotType || '',
-          duration: sb.duration || 0,
-          description: sb.description || '',
-          result: sb.result || '',
-          atmosphere: sb.atmosphere || '',
-          video_prompt: sb.videoPrompt || '',
-          continuity_boundary: sb.continuityBoundary || null,
-          first_frame_prompt: sb.firstFramePrompt || '',
-          mid_frame_prompt: sb.midFramePrompt || '',
-          mid_frame_time: sb.midFrameTime ?? null,
-          // 纪录片（Issue #110）：mid_frame_time 是**生成段内**的时刻，模型按这个长度写时间点
-          generated_segment_s: generatedSegmentSeconds(sb.designCard, sb.duration),
-          last_frame_prompt: sb.lastFramePrompt || '',
-          inherits_first: kf?.inheritsFirst === true,
-          previous_last_frame_prompt: prev?.lastFramePrompt || '',
-          previous_result: prev?.result || '',
-          // 分镜设计卡（#57）：前后镜的设计卡让模型知道「上一镜已经让观众看到什么」，
-          // 同一段落内的镜头才能共用底图与图层状态，而不是各写各的
-          design_card: parseDesignCard(sb.designCard),
-          combo: toCombo(sb.combo),
-          // 只有 C/D 且已有图层段的镜头才有锁定槽位；`caption` = 视觉模型对实际衔接帧的描述
-          locked_frames: lockedFrames.get(sb.id) || [],
-          design_card_status: toDesignCardStatus(sb.designCardStatus),
+    // 提示词批量瘦身（Issue #118 A1/A2）：video/keyframes scope 只保留窗口内各镜
+    // 绑定/设计卡引用道具的完整 semantics+map_pip，其余道具一行摘要（read_props 可补细节）；
+    // text_spec 只被拆镜/图层文字设计技能依赖，这两个 scope 省略。设计卡与拆镜 scope 全量不变。
+    const promptScope = scope === 'video' || scope === 'keyframes'
+    const windowShotIds = contextStoryboards.map(sb => sb.id)
+    // 窗口内各镜的池关联一次查完（逐镜两次查询 → 整窗两次；批量生命周期缓存内复用）
+    const [charLinkRows, propLinkRows] = await cachedEpisodeRead(episodeId, `poolLinks:${windowShotIds.join(',')}`, () => Promise.all([
+      windowShotIds.length
+        ? db.select().from(schema.storyboardCharacters).where(inArray(schema.storyboardCharacters.storyboardId, windowShotIds))
+        : Promise.resolve([] as Array<typeof schema.storyboardCharacters.$inferSelect>),
+      windowShotIds.length
+        ? db.select().from(schema.storyboardProps).where(inArray(schema.storyboardProps.storyboardId, windowShotIds))
+        : Promise.resolve([] as Array<typeof schema.storyboardProps.$inferSelect>),
+    ]))
+    const charIdsByShot = new Map<number, number[]>()
+    const propIdsByShot = new Map<number, number[]>()
+    for (const link of charLinkRows) {
+      const list = charIdsByShot.get(link.storyboardId) ?? []
+      list.push(link.characterId)
+      charIdsByShot.set(link.storyboardId, list)
+    }
+    for (const link of propLinkRows) {
+      const list = propIdsByShot.get(link.storyboardId) ?? []
+      list.push(link.propId)
+      propIdsByShot.set(link.storyboardId, list)
+    }
+
+    let detailedPropIds: Set<number> | null = null
+    if (promptScope) {
+      const cardCtx = await loadDesignCardContextCached(episodeId)
+      const windowBindings = await Promise.all(windowShotIds.map(id => loadTargetBindings(id)))
+      detailedPropIds = promptScopeDetailedPropIds({
+        windowBindings: windowBindings.map(bindings => Object.values(bindings).flat()),
+        windowCards: contextStoryboards.map(sb => {
+          const resolved = resolveDesignCard(sb, cardCtx)
+          return { card: resolved.card, combo: resolved.combo }
+        }),
+      })
+      // 窗口内各镜资产池 @ 到的道具也给全量细节（池是提示词上下文的一部分）
+      for (const ids of propIdsByShot.values()) for (const id of ids) detailedPropIds.add(id)
+    }
+
+    const props = prps
+      .filter(p => !p.deletedAt)
+      .filter(p => !linkedPropIds.size || linkedPropIds.has(p.id))
+      .map(p => {
+        const base = {
+          id: p.id,
+          name: p.name,
+          type: p.type || '',
+          description: p.description || '',
+          image_url: p.imageUrl || '',
+          /** 证据素材（#47）：永不重绘，表达设计只能在它的语义标注里挑要显示的东西 */
+          faithful: Number(p.faithful) === 1,
         }
-      }))
+        if (detailedPropIds && !detailedPropIds.has(p.id)) {
+          // 一行摘要（#118 A1）：模型知道它存在；细节需要时用 read_props 查
+          return { ...base, detail_omitted: true }
+        }
+        return {
+          ...base,
+          /**
+           * 语义标注摘要（#47 → #49）：**只有名称、稳定 id 与类别**，没有坐标。
+           * `must_show` / `overlay_plan` 的 `semantic` 必须逐字取自这里；
+           * 旁白里出现的地名/路线/范围在这张表里找不到，就说明这张图承载不了那句旁白。
+           */
+          semantics: semanticEntries(p.semantics),
+          /**
+           * 地图画中画（#107/#110）：全览与细节是独立资产，分镜同时引用。`role: overview` 列出全览范围与各细节资产
+           * （`label` + `bbox`/`focus_bbox` 经纬度）；`role: detail` 给出自己的取景、重点范围、所属全览 id 与全览范围。
+           * 这些地理范围是判断「这一镜的旁白落在哪个细节里」的唯一依据；聚焦某细节的镜头以该细节图为底图，
+           * 并在相邻镜头或同镜中用全览图建立位置；讲整体趋势的镜头以全览图为底图。
+           * `usage` 只保留通用用法（按镜号写的例子已剔除：那些镜号属于别的集）。
+           */
+          map_pip: pipSummary(p.mapPip),
+        }
+      })
+
+    /**
+     * 背景信息载体（Issue #47）：旁白提到但本集不出场的实体（组织/异地人物/异地事件），
+     * 仍然按角色/场景/道具三类落库，这里**单列一份**，让分镜与表达设计知道
+     * 「S13 要同时表达近卫团与彼得一世」时有哪些现成的视觉载体可以 @。
+     * 它们同时留在上面的 characters/scenes/props 里，不改变既有字段语义。
+     */
+    const expositionAssets = [
+      ...characters.filter(item => chars.find(c => c.id === item.id && Number(c.exposition) === 1))
+        .map(item => ({ kind: 'character' as const, id: item.id, name: item.name, note: item.role, image_url: item.image_url })),
+      ...scenes.filter(item => scns.find(s => s.id === item.id && Number(s.exposition) === 1))
+        .map(item => ({ kind: 'scene' as const, id: item.id, name: item.location, note: item.prompt, image_url: item.image_url })),
+      ...props.filter(item => prps.find(p => p.id === item.id && Number(p.exposition) === 1))
+        .map(item => ({ kind: 'prop' as const, id: item.id, name: item.name, note: item.type, image_url: item.image_url })),
+    ]
+
+    const existingStoryboardPayload = contextStoryboards.map((sb) => {
+      const kf = keyframeMap.get(sb.id)
+      const prev = kf?.previousId ? byId.get(kf.previousId) : undefined
+      return {
+        id: sb.id,
+        shot_number: sb.storyboardNumber,
+        title: sb.title || '',
+        // 窗口模式（#102）逐镜给旁白：不必再从整集剧本里自己定位本镜与邻镜念的是哪一段
+        ...(window ? { narration_text: sb.narrationText || '' } : {}),
+        scene_id: sb.sceneId,
+        character_ids: charIdsByShot.get(sb.id) ?? [],
+        prop_ids: propIdsByShot.get(sb.id) ?? [],
+        shot_type: sb.shotType || '',
+        duration: sb.duration || 0,
+        description: sb.description || '',
+        result: sb.result || '',
+        atmosphere: sb.atmosphere || '',
+        video_prompt: sb.videoPrompt || '',
+        continuity_boundary: sb.continuityBoundary || null,
+        first_frame_prompt: sb.firstFramePrompt || '',
+        mid_frame_prompt: sb.midFramePrompt || '',
+        mid_frame_time: sb.midFrameTime ?? null,
+        // 纪录片（Issue #110）：mid_frame_time 是**生成段内**的时刻，模型按这个长度写时间点
+        generated_segment_s: generatedSegmentSeconds(sb.designCard, sb.duration),
+        last_frame_prompt: sb.lastFramePrompt || '',
+        inherits_first: kf?.inheritsFirst === true,
+        previous_last_frame_prompt: prev?.lastFramePrompt || '',
+        previous_result: prev?.result || '',
+        // 分镜设计卡（#57）：前后镜的设计卡让模型知道「上一镜已经让观众看到什么」，
+        // 同一段落内的镜头才能共用底图与图层状态，而不是各写各的
+        design_card: parseDesignCard(sb.designCard),
+        combo: toCombo(sb.combo),
+        // 只有 C/D 且已有图层段的镜头才有锁定槽位；`caption` = 视觉模型对实际衔接帧的描述
+        locked_frames: lockedFrames.get(sb.id) || [],
+        design_card_status: toDesignCardStatus(sb.designCardStatus),
+      }
+    })
 
     // 项目画幅（Issue #92）：关键帧/视频提示词里的画幅与构图方向必须照这两个值写，
     // 技能文本不再写死 16:9；写错方向保存时会被退回。
@@ -317,12 +367,16 @@ const readStoryboardContext = createTool({
       },
       aspect_ratio: aspectRatio,
       composition: compositionOf(aspectRatio),
-      // 模板文本框规范（#96）：本画幅家族的成套位置、类型字段与逐字段容量（数字全部由引擎算）
-      text_spec: layerTextSpecPayload(aspectRatio),
+      // 模板文本框规范（#96）：本画幅家族的成套位置、类型字段与逐字段容量（数字全部由引擎算）。
+      // 只有设计卡/拆镜 scope 需要（#118 A2）；提示词批量省略，画幅/构图仍在上面两个字段。
+      ...(promptScope ? {} : { text_spec: layerTextSpecPayload(aspectRatio) }),
       script,
       characters,
       scenes,
       props,
+      ...(promptScope ? {
+        props_note: '带 detail_omitted 的道具只列了摘要（本窗口没有镜头绑定/引用它）；确需语义细节时用 read_props 查询。提示词只允许 @ 本镜已绑定的资产。',
+      } : {}),
       exposition_assets: expositionAssets,
       existing_storyboards: existingStoryboardPayload,
       ...(window ? {
@@ -809,6 +863,8 @@ function buildSaveStoryboards(documentary: boolean) {
         }
       }
     }
+    // 写后失效（#118 A3）：本集整集读缓存作废，下一镜读到新事实
+    invalidateEpisodeReadCache(episodeId)
 
     // 整集时长 = 当前全部存活分镜时长之和（分批保存时不能再按单批累加）
     const allRows = await db.select().from(schema.storyboards)
@@ -1125,6 +1181,7 @@ const updateStoryboard = createTool({
     if (PROMPT_FIELDS.some(field => field in fields)) {
       await syncStoryboardBindingsFromPrompts(storyboard_id, Object.keys(fields))
     }
+    invalidateEpisodeReadCache(episodeId)
     logTaskSuccess('StoryboardTool', 'update-complete', {
       episodeId,
       storyboardId: storyboard_id,

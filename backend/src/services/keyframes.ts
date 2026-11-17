@@ -21,6 +21,7 @@ import { now } from '../utils/response.js'
 import { getAbsolutePath } from '../utils/storage.js'
 import { toCombo } from './design-card.js'
 import { junctionFramesOfEpisode, type JunctionFrame } from './junction-frame.js'
+import { cachedEpisodeRead } from './episode-read-cache.js'
 import { resolveDramaProjectType } from './project-type.js'
 
 export type KeyframeSlot = 'first' | 'mid' | 'last'
@@ -220,16 +221,19 @@ async function listStoryboards(episodeId: number): Promise<StoryboardRow[]> {
 
 /** 一次性算出整集的关键帧状态（含衔接帧锁定），避免逐镜重复查询 */
 export async function loadEpisodeKeyframes(episodeId: number): Promise<Map<number, StoryboardKeyframeState>> {
-  const [rows, junctions] = await Promise.all([
-    listStoryboards(episodeId),
-    junctionFramesOfEpisode(episodeId),
-  ])
-  const result = new Map<number, StoryboardKeyframeState>()
-  rows.forEach((row, index) => {
-    const previous = index > 0 ? rows[index - 1]! : null
-    result.set(row.id, buildState(row, previous, junctions.get(row.id), previous ? junctions.get(previous.id) : undefined))
+  // 批量生命周期缓存（#118 A3）：只在批量读作用域内复用；#43 同步事务链不经过这里
+  return cachedEpisodeRead(episodeId, 'keyframes', async () => {
+    const [rows, junctions] = await Promise.all([
+      listStoryboards(episodeId),
+      junctionFramesOfEpisode(episodeId),
+    ])
+    const result = new Map<number, StoryboardKeyframeState>()
+    rows.forEach((row, index) => {
+      const previous = index > 0 ? rows[index - 1]! : null
+      result.set(row.id, buildState(row, previous, junctions.get(row.id), previous ? junctions.get(previous.id) : undefined))
+    })
+    return result
   })
-  return result
 }
 
 /** 单镜关键帧状态（内部仍按整集计算，继承关系依赖上一镜） */

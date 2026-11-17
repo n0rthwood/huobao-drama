@@ -15,6 +15,7 @@ import { and, eq, inArray, isNull } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
 import { parseStylingVersion } from './styling-version.js'
 import { loadDesignCardContext, resolveDesignCard } from './design-card-context.js'
+import { cachedEpisodeRead } from './episode-read-cache.js'
 import { resolveDramaProjectType } from './project-type.js'
 import { generatedSegmentSeconds } from './shot-duration.js'
 import { videoTimelineProblems } from './video-prompt-timeline.js'
@@ -137,7 +138,8 @@ export interface EpisodeAssetEntry {
 
 /** 本集全部可被 @ 的资产（场景 → 角色 → 道具，顺序即参考图装配顺序） */
 export async function loadEpisodeAssets(episodeId: number): Promise<EpisodeAssetEntry[]> {
-  return loadEpisodeAssetsSync(episodeId)
+  // 批量生命周期缓存（#118 A3）：读路径专用；下方 Sync 变体（#43 事务链）永不经过缓存
+  return cachedEpisodeRead(episodeId, 'assets', async () => loadEpisodeAssetsSync(episodeId))
 }
 
 // 资产池写事务内使用同步读取，不能在读手选到写投影之间让出执行权。
@@ -352,6 +354,38 @@ function loadTargetBindingsSync(storyboardId: number): TargetBindings {
     result[row.target].push({ kind: row.kind as AssetKind, assetId: row.assetId, selectedImage: row.selectedImage || null })
   }
   return result
+}
+
+/**
+ * 整集一次查完全部目标绑定（Issue #118 C）：批量预览逐镜 loadTargetBindings 的替代。
+ * 行序与逐镜查询一致（按插入顺序），Map 分发后每镜结果与 loadTargetBindingsSync 逐字相同。
+ */
+export async function loadEpisodeTargetBindings(episodeId: number): Promise<Map<number, TargetBindings>> {
+  const rows = await db.select({
+    storyboardId: schema.storyboardTargetAssets.storyboardId,
+    target: schema.storyboardTargetAssets.target,
+    kind: schema.storyboardTargetAssets.kind,
+    assetId: schema.storyboardTargetAssets.assetId,
+    selectedImage: schema.storyboardTargetAssets.selectedImage,
+  }).from(schema.storyboardTargetAssets)
+    .innerJoin(schema.storyboards, eq(schema.storyboards.id, schema.storyboardTargetAssets.storyboardId))
+    .where(eq(schema.storyboards.episodeId, episodeId))
+  const result = new Map<number, TargetBindings>()
+  for (const row of rows) {
+    if (!isBindingTarget(row.target)) continue
+    let bindings = result.get(row.storyboardId)
+    if (!bindings) {
+      bindings = { first: [], mid: [], last: [], video: [] }
+      result.set(row.storyboardId, bindings)
+    }
+    bindings[row.target].push({ kind: row.kind as AssetKind, assetId: row.assetId, selectedImage: row.selectedImage || null })
+  }
+  return result
+}
+
+/** 没有绑定行的镜头的空绑定（与逐镜查询同口径；每次取用新建，避免调用方改写共享对象） */
+export function emptyTargetBindings(): TargetBindings {
+  return { first: [], mid: [], last: [], video: [] }
 }
 
 /** 目标的期望绑定 = 该目标各字段 @ 到的本集资产（按装配顺序） */

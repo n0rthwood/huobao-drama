@@ -247,7 +247,7 @@ data：`{episode_id, drama_id, project_type, strict, status:{effective,derived,o
   - 响应 201 = 新 sys_task 行（serializeTask：snake，含 `remote_state` 解析结果与 `cancellable`；不含 request/config_id/idempotency_key/cancel_pending）。
 - **POST /tasks/register-upload** `{asset_type:'character|scene|prop', asset_id, local_path(须 static/ 前缀), source?:'media-library', copied_from?}`：把上传/库选图登记为资产当前图并纳入版本历史（写 image_url/local_path，场景另置 status='completed'）。data：`{id, local_path}`。
 - **POST /tasks/:id/retry** `{config_id?, model?}` **[授权要求]**：一律新建任务（提示词不可改），可能覆盖下游产物。响应 201 新任务。
-- **POST /tasks/:id/cancel** **[授权要求]**：qwen-jobs 图片任务与 h3-jobs 视频任务（Issue #100）支持；排队中立即取消，运行中先 `cancel_requested` 再由服务端收尾；取消后不写回结果。其它供应商 400。
+- **POST /tasks/:id/cancel** **[授权要求]**：qwen-jobs 图片任务与 h3-jobs 视频任务（Issue #100）支持；排队中立即取消，运行中先 `cancel_requested` 再由服务端收尾；取消后不写回结果。**提示词/设计卡文本批量**（`params.kind ∈ keyframe_prompts|video_prompts|design_card`，Issue #118）也支持：任务行标 `cancelled`，进程内 AbortController 触发——等待全局 agent 闸的排队立即出队（不占槽），在飞模型流按 abortSignal 中断，批次不再提交新镜；收尾不覆盖 cancelled 终态。其它供应商/文本种类 400。
 - **DELETE /tasks/:id** **[授权要求·删记录]**：丢弃任务行；qwen-jobs / h3-jobs 远端任务一并取消并清理文件。
 
 ## 13. 队列估计
