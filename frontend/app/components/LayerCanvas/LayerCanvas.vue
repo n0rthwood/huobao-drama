@@ -97,6 +97,7 @@
         </svg>
       </div>
       <span v-if="quality" class="lc-quality"><TriangleAlert :size="14" />{{ t('layerCanvas.quality.badge', { w: quality.effective_w, h: quality.effective_h, sw: quality.spec_w, sh: quality.spec_h }) }}</span>
+      <span v-if="frameOpacity" class="lc-ghost-note">{{ t('layerCanvas.frameGhostHint') }}</span>
       <span v-if="missingGlyphs.length" class="lc-glyphs" :title="t('layerCanvas.style.missingChars', { chars: missingGlyphs.join(' ') })"><TriangleAlert :size="14" />{{ missingGlyphs.join(' ') }}</span>
     </div>
   </div>
@@ -131,6 +132,8 @@ const props = defineProps({
   viewport: { type: Object, default: null },
   // Poster 固定文本变量（Issue #72）：变量层按剧集数据现场解析
   variables: { type: Object, default: null },
+  // 当前时刻各图层的不透明度（#110）：给了就按它作画，某一帧不可见的图层画成淡影而不是整层常显
+  frameOpacity: { type: Object, default: null },
 })
 const emit = defineEmits(['select', 'history', 'patch', 'delete', 'duplicate', 'undo', 'redo', 'crop', 'detach', 'viewport'])
 const { t } = useI18n()
@@ -282,6 +285,18 @@ const backdropStyle = computed(() => {
 })
 const uiScale = computed(() => activeViewport.value.w * docWidth.value / Math.max(1, stageWidth.value))
 
+/**
+ * 某一时刻不可见的图层画成淡影（#110）：整层隐藏会让人以为图层丢了、也无法选中调整；
+ * 淡影既保留可操作性，又不会把「这一帧没有它」误看成「它在这一帧出现」。
+ */
+const GHOST_ALPHA = 0.15
+const canvasOpacity = computed(() => {
+  const source = props.frameOpacity
+  if (!source) return null
+  const opacity = {}
+  for (const [id, alpha] of Object.entries(source)) opacity[id] = alpha > 0 ? alpha : GHOST_ALPHA
+  return opacity
+})
 const svgMarkup = computed(() => {
   // 规范到达后重绘一次：文字排版由规范驱动，空规范的首帧不画文本框
   void specVersion.value
@@ -292,6 +307,7 @@ const svgMarkup = computed(() => {
     viewport: activeViewport.value,
     resolveImage: path => mediaUrl(path),
     variables: props.variables,
+    opacity: canvasOpacity.value || undefined,
   })
 })
 const filterLayers = computed(() => baseFilterLayers(props.doc.base.filter, canvasDimensions.value))
@@ -824,4 +840,6 @@ defineExpose({
 .lc-frame { fill: transparent; stroke: var(--accent); cursor: move; }
 .lc-quality, .lc-glyphs { position: absolute; bottom: 10px; left: 10px; display: flex; align-items: center; gap: 4px; padding: 5px 7px; font-size: 11px; background: var(--surface-card); color: var(--warning, #b7791f); border: 1px solid currentColor; border-radius: 4px; pointer-events: none; }
 .lc-glyphs { left: auto; right: 10px; color: var(--danger, #c0472e); }
+/* 当前时刻不可见的图层以淡影显示（#110）：画布不是「整份文档」的预览，而是这一帧的画面 */
+.lc-ghost-note { position: absolute; bottom: 44px; left: 10px; padding: 4px 7px; font-size: 11px; background: var(--surface-card); color: var(--text-3); border: 1px solid var(--border); border-radius: 4px; pointer-events: none; }
 </style>

@@ -24,6 +24,7 @@ import {
 import { parseFieldSavedAt, stampFieldSavedAt } from '../services/storyboard-fields.js'
 import { loadDesignCardContext, resolveDesignCard } from '../services/design-card-context.js'
 import { resolveDramaProjectType } from '../services/project-type.js'
+import { generatedSegmentSeconds } from '../services/shot-duration.js'
 import {
   currentTransitionSignature,
   markTransitionEditedManually,
@@ -201,12 +202,20 @@ app.put('/:id', async (c) => {
     const value = body.narration_normalize
     updates.narrationNormalize = value == null || value === '' ? null : value === true
   }
-  // 中间关键帧时间点：首尾各留 0.5 秒，否则引导帧会和首/尾帧挤在一起
+  // 中间关键帧时间点：首尾各留 0.5 秒，否则引导帧会和首/尾帧挤在一起。
+  // 纪录片（Issue #110）：中帧时刻是**生成段内**的时刻（图层段/衔接帧不参与），按生成段长度判，
+  // 而不是 storyboards.duration（纪录片镜头的 duration 常为 0，用整镜时长会永远判超限）。
   if ('mid_frame_time' in body && body.mid_frame_time != null) {
     const duration = Number(('duration' in body ? body.duration : storyboard.duration) || 0)
+    const [episode] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, storyboard.episodeId))
+    const documentary = episode ? resolveDramaProjectType(episode.dramaId) === 'documentary' : false
+    const cardJson = 'design_card' in body && body.design_card != null ? JSON.stringify(body.design_card) : storyboard.designCard
+    const segmentSeconds = documentary ? generatedSegmentSeconds(cardJson, duration) : duration
     const midTime = Number(body.mid_frame_time)
-    if (!Number.isFinite(midTime) || midTime <= 0.5 || midTime >= duration - 0.5) {
-      return badRequest(c, `mid_frame_time 必须在 0.5 秒与 ${Math.max(0, duration - 0.5)} 秒之间`)
+    if (!Number.isFinite(midTime) || midTime <= 0.5 || midTime >= segmentSeconds - 0.5) {
+      return badRequest(c, documentary
+        ? `mid_frame_time 必须在 0.5 秒与 ${Math.max(0, segmentSeconds - 0.5)} 秒之间（生成段 ${segmentSeconds} 秒）`
+        : `mid_frame_time 必须在 0.5 秒与 ${Math.max(0, duration - 0.5)} 秒之间`)
     }
     updates.midFrameTime = midTime
   }
@@ -359,6 +368,12 @@ async function storyboardJson(id: number) {
       return !!signature && signature !== review.input_signature
     })(),
     ref_issues: await checkStoryboardRefs(row),
+    // 纪录片（#110）：生成段长度（设计卡 budget.gen_s，老数据回落 duration）
+    generated_segment_s: await (async () => {
+      const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, row.episodeId))
+      if (!ep || resolveDramaProjectType(ep.dramaId) !== 'documentary') return null
+      return generatedSegmentSeconds(row.designCard, row.duration)
+    })(),
     // design_card 列存的是 JSON 字符串，这里换成按当前语义标注重算过的对象 + 问题列表
     ...(() => {
       const resolved = resolveDesignCard(row, loadDesignCardContext(row.episodeId))

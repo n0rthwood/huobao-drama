@@ -1036,6 +1036,7 @@
       "noSegment": "이 샷에는 아직 레이어 구간 초안이 없습니다. «초안 생성»을 누르세요",
       "missingBase": "적합한 베이스 이미지가 없습니다. 디자인 카드에서 베이스 이미지를 지정한 뒤 초안을 생성하세요",
       "previewAt": "{t}초 화면",
+      "junctionPreview": "연결 프레임 화면: 문자 레이어와 화면 속 화면은 표시되지 않습니다 (확산 모델에 넘기지 않음)",
       "budgetMismatch": "실제 {actual}s / 예산 {budget}s",
       "createMarker": "마커 생성 및 고정",
       "markerName": "마커",
@@ -1529,6 +1530,7 @@
         "label": "세그먼트 조합",
         "required": "필수: 이 숏이 어떤 세그먼트로 구성되고 무엇이 먼저인지",
         "suggested": "추천",
+        "selected": "선택됨",
         "none": "—",
         "A": {
           "name": "A ▣ 레이어만",
@@ -1611,6 +1613,8 @@
         "reference_not_mentioned": "참고 소재가 어떤 프레임 설명에도 언급되지 않았습니다",
         "budget_tight": "길이 여유가 빠듯합니다",
         "unresolved_ref": "소재나 항목으로 해결되지 않는 참조가 있습니다",
+        "pip_invalid": "화면 속 화면 레이어의 참조가 올바르지 않습니다 (소재 없음, 이 에피소드에 이미지 없음, 또는 배경 이미지 자체를 지정)",
+        "faithful_in_diffusion": "충실 소재/지도는 확산 생성에 넣을 수 없습니다. 레이어 구간으로 표현하세요",
         "group_plan_deviation": "이 숏의 조합 또는 베이스가 속한 논리 그룹의 계획과 일치하지 않습니다"
       },
       "migrationComboUnresolved": "기존 숏의 세그먼트 조합에는 정의된 이전 규칙이 없습니다. 복원 가능한 내용은 유지되었습니다. 조합을 명시적으로 다시 선택하고 설계 카드를 검토한 후 확정하세요.",
@@ -1631,7 +1635,11 @@
         "measured": "실측 {n}s ✓",
         "remain": "여유 {n}s",
         "over": "해설을 담지 못합니다. 세그먼트를 늘리거나 화면을 줄이세요",
-        "tight": "빠듯함"
+        "tight": "빠듯함",
+        "extendLayer": "레이어 구간 늘리기",
+        "extendGen": "생성 구간 늘리기",
+        "extendHintLayer": "실측 나레이션 {measured}s: 레이어 구간 {from}s → {to}s (늘리기만 함)",
+        "extendHintGen": "실측 나레이션 {measured}s: 생성 구간 {from}s → {to}s (상한 15s)"
       },
       "junction": {
         "locked": "◆ 연결 프레임 (상속 고정 · 생성하지 않음)",
@@ -1668,14 +1676,16 @@
         "reason": "이유",
         "run": "시작",
         "cancel": "취소",
-        "running": "진행 중…"
+        "running": "진행 중…",
+        "warnTitle": "경고만 있는 컷 ({n}개)",
+        "warnAck": "위 경고를 확인하고 함께 확인 처리",
+        "warnNote": "체크한 컷은 확인함으로 함께 확인합니다. 체크하지 않으면 이번에는 건너뛰고, 차단 문제는 그대로 제외됩니다."
       },
       "exclude": {
         "confirmed": "이미 확인됨",
         "ai_filling": "AI 작성 중",
         "blocked": "차단 문제 있음",
         "notPending": "검토 대기 상태가 아님",
-        "hasIssues": "문제 있음",
         "ttsInvalid": "유효한 현재 음성 없음"
       },
       "order": {
@@ -1715,6 +1725,14 @@
         "confirmFailed": "설계 카드 확인에 실패했습니다",
         "fillFailed": "설계 카드 작성에 실패했습니다",
         "orderFailed": "숏 순서 저장에 실패했습니다"
+      },
+      "confirm": {
+        "gotoIssues": "문제 {n}개 보기",
+        "blockedNote": "차단 {n}개: {message}"
+      },
+      "mark": {
+        "warn": "경고 {n}개: {message}",
+        "block": "차단 {n}개: {message}"
       },
       "layerType": {
         "polygon": "다각형",
@@ -1938,6 +1956,9 @@
       "totalCount": "총 {n}개",
       "duration": "길이",
       "descSection": "스토리보드 설명",
+      "descExpand": "컷 설명 펼치기",
+      "descCollapse": "컷 설명 접기",
+      "descEmptyCollapsed": "이 컷에는 설명·분위기가 없습니다 (필요하면 펼쳐서 입력)",
       "descLabel": "화면 설명",
       "descHint": "【샷1】【샷2】…로 하위 샷마다 기술. 대사는 「캐릭터명의 대사: 「대사」」, 나레이션은 「나레이션: 내용」",
       "descPlaceholder": "스토리보드 화면 설명",
@@ -2184,6 +2205,8 @@
       "midTimeUnit": "초",
       "midTimeAuto": "미설정",
       "midTimeRange": "0.5 ~ {max}s",
+      "midTimeOutOfRange": "현재 {value}s는 생성 구간 {gen}s의 범위 {range}를 벗어납니다: 중간 프레임은 생성 구간 안에 있어야 합니다",
+      "midTimeNoRange": "생성 구간이 {gen}s뿐이라 중간 프레임을 넣을 수 없습니다 (자를 시점을 가지려면 최소 2s 필요)",
       "midTimeInvalid": "중간 프레임 시간은 0.5s와 {max}s 사이여야 합니다",
       "midOptional": "미설정 · 확인에 필수 아님",
       "midOptionalHint": "중간 프레임이 설정되지 않아 키프레임 확인을 막지 않습니다. 이 샷에 중간 프레임이 필요 없다고 검토된 것은 아닙니다. 필요하면 프롬프트를 입력하세요.",
@@ -3375,7 +3398,8 @@
   },
   "layerCanvas": {
     "toolbar": {"select":"선택","pan":"이동","frame":"프레임 시야 편집","crop":"배경 자르기","undo":"실행 취소","redo":"다시 실행","snap":"맞춤","zoomIn":"확대","zoomOut":"축소","fit":"화면 맞춤","edit":"편집","preview":"미리보기","render":"구간 렌더링","rehearse":"샷 시연"},
-    "keyframeBar": {"title":"정밀 키프레임","add":"현재 시각에 추가","copyPrev":"이전 프레임 복제","remove":"삭제 (첫 프레임 보호)","duration":"구간 길이","endHold":"끝 유지","junction":"연결 프레임","junctionTextWarn":"연결에는 문자가 제외됩니다. 문자 레이어 {n}개가 출력되지 않습니다","teach":"구간은 정밀 키프레임으로 구성됩니다. 각 프레임은 시각, 시야와 표시 레이어를 정의하고 프로그램이 이동과 페이드를 보간하여 결정적 영상을 만듭니다. 슬라이드가 아닙니다.","ease":"다음 프레임 보간","fade":"새 레이어 페이드","viewportPick":"시야 (캔버스에서 조정)","visible":"표시 레이어"},
+    "keyframeBar": {"title":"정밀 키프레임","add":"현재 시각에 추가","copyPrev":"이전 프레임 복제","remove":"삭제 (첫 프레임 보호)","duration":"구간 길이","endHold":"끝 유지","junction":"연결 프레임","junctionTextWarn":"연결에는 문자가 제외됩니다. 문자 레이어 {n}개가 출력되지 않습니다","junctionImageWarn":"연결 프레임에는 화면 속 화면이 없습니다: 이미지 레이어 {n}개가 출력되지 않습니다","teach":"구간은 정밀 키프레임으로 구성됩니다. 각 프레임은 시각, 시야와 표시 레이어를 정의하고 프로그램이 이동과 페이드를 보간하여 결정적 영상을 만듭니다. 슬라이드가 아닙니다.","ease":"다음 프레임 보간","fade":"새 레이어 페이드","viewportPick":"시야 (캔버스에서 조정)","visible":"표시 레이어"},
+    "frameGhostHint": "캔버스는 현재 시각의 상태를 그립니다. 이 시각에 보이지 않는 레이어는 흐리게 표시됩니다",
     "base": {"title":"배경","noBase":"배경 미선택 (텍스트를 먼저 편집할 수 있음)","replace":"배경 변경","cropToOutput":"완성 비율로 자르기","aspectBanner":"배경 비율 {aspect}이 완성 영상과 달라 여백을 넣어 렌더링하며 시각 검증이 필요합니다. 완성 비율로 자르거나 이 소재의 프로젝트 비율 버전을 생성하세요","cropHelp":"원본 좌표에서 완성 비율 자르기 틀이나 모서리를 드래그하세요. 원본은 변경되지 않습니다.","applyCrop":"자르기 적용","cancelCrop":"취소","outputSize":"출력 캔버스 {w}×{h}","sourceSize":"원본 {w}×{h} (원본 픽셀)","sourceUnknown":"원본 크기를 알 수 없음","resolution":"자른 원본 픽셀은 최종 영상 {sw}×{sh}의 {times}배 (부족한 축 기준)","verified":"검증됨","inherited":"상속 배경 (잠금)","guide":"원본 픽셀은 자르기 좌표와 선명도를 판단하며 출력 캔버스 크기를 결정하지 않습니다. 자른 후 너비와 높이를 모두 최종 영상의 2배 이상으로 권장합니다.","style":"전체 스타일","unknown":"배경","version":"버전 {version}","saveSize":"서버에서 원본 크기를 아직 확인하지 않았습니다. 저장 시 원본을 읽습니다.","loadError":"소재 또는 의미 정보를 불러오지 못했습니다.","framingClamped":"일부 시야를 자르기 영역 안으로 제한했습니다. 실행 취소하면 모든 시야를 복원합니다."},
     "anchor": {"anchored":"고정됨","manual":"수동","unlink":"원본 항목 삭제 또는 이름 변경","detachConfirm":"이 레이어는 '{name}'에 고정되어 있습니다. 해제 후 이동할까요?","relink":"고정 항목 선택","toManual":"수동으로 변경","labelOffset":"라벨 오프셋","addMarker":"마커 추가","addRegion":"영역 추가","addRoute":"경로 추가","noSemantics":"의미 주석이 없습니다.","inherited":"상속 배경에서는 의미 고정을 사용할 수 없습니다.","choose":"다시 고정할 의미 항목 선택","cancel":"취소","points":"지점","regions":"영역","lines":"경로","labels":"라벨"},
     "quality": {"badge":"유효 {w}×{h} < {sw}×{sh} (과도한 확대)","frameDot":"유효 픽셀이 출력 미만","hint":"고해상도 배경을 사용하거나 축소하세요."},

@@ -599,3 +599,47 @@ test('退回信息带 caption：模型按真实画面重写，而不是只收到
     rmSync(dir, { recursive: true, force: true })
   }
 })
+
+test('D 之后承接（Issue #110）：下一镜首帧继承上一镜 D 的衔接帧；衔接帧过期就不再就绪', () => {
+  const { dir, env, seeded } = prepare()
+  try {
+    const got = run(`${SEGMENTS}
+      import { loadEpisodeKeyframes } from './src/services/keyframes.ts'
+      // D(#4) 之后接 B(#6)：把 A(#5) 的编号挪到末尾，B(#6) 改成承接
+      await db.update(schema.storyboards).set({ storyboardNumber: 50 }).where(eq(schema.storyboards.id, ${seeded.ids.layerOnly}))
+      // B 自己的尾帧图写一张真实文件，否则「就绪」只差尾帧这一项，测不出首帧继承
+      await db.update(schema.storyboards).set({ continuityBoundary: 'continue', lastFrameImage: 'static/uploads/wide.png' }).where(eq(schema.storyboards.id, ${seeded.ids.generated}))
+      const fresh = await loadEpisodeKeyframes(${seeded.episodeId})
+      const d = fresh.get(${seeded.ids.full})
+      const next = fresh.get(${seeded.ids.generated})
+
+      // 衔接帧变旧（签名对不上）：D 的生效尾帧不可用，下一镜就不再就绪
+      const segment = await getLayerSegment(${seeded.ids.full})
+      const [row] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, ${seeded.ids.full}))
+      const spec = await resolveEpisodeSegmentSpec(row.episodeId)
+      await markSegmentRendered(segment.id, {
+        render_path: segment.render_path, render_signature: layerSegmentSignatureOf(segment, spec, 'D') + '-stale',
+        status: 'ready', junction_path: segment.junction_path, junction_hash: segment.junction_hash,
+      })
+      const stale = await loadEpisodeKeyframes(${seeded.episodeId})
+      out({
+        dLast: d ? { lockedSlots: d.lockedSlots, slotLocks: d.slotLocks, last: d.last, ready: d.ready } : null,
+        next: next ? { inheritsFirst: next.inheritsFirst, first: next.first, ready: next.ready } : null,
+        staleNext: (() => { const s = stale.get(${seeded.ids.generated}); return s ? { first: s.first, ready: s.ready } : null })(),
+      })
+    `, env)
+    // D 的尾帧槽位锁定到衔接帧（last_frame_image 列从不写入）
+    assert.deepEqual(got.dLast.lockedSlots, ['last'])
+    assert.equal(got.dLast.last, got.dLast.slotLocks[0].path, 'D 的生效尾帧就是衔接帧路径')
+    assert.ok(got.dLast.last.includes('/layer-frames/'))
+    // 下一镜承接：首帧 = 上一镜 D 的衔接帧路径（不是空的 last_frame_image 列）
+    assert.equal(got.next.inheritsFirst, true)
+    assert.equal(got.next.first, got.dLast.last, '承接首帧取上一镜的生效尾帧（衔接帧）')
+    assert.equal(got.next.ready, true, '有可用首帧就绪')
+    // 衔接帧变旧：继承不到，就不 ready
+    assert.equal(got.staleNext.first, null, '衔接帧过期时继承不到首帧')
+    assert.equal(got.staleNext.ready, false)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})

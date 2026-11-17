@@ -12,6 +12,7 @@ import { batchScopeOf, scopeFromPreview } from '../services/batch-scope.js'
 import { parseStylingVersion } from '../services/styling-version.js'
 import { serializeProp, type PropRow } from '../services/prop-asset-type.js'
 import { resolveDramaProjectType } from '../services/project-type.js'
+import { generatedSegmentSeconds } from '../services/shot-duration.js'
 import { loadLayerSegmentSummaries } from '../services/layer-segment.js'
 import {
   assertGate,
@@ -1016,6 +1017,10 @@ app.get('/:episode_id/storyboards', async (c) => {
       // 本镜融合状态：与批量预览、导出校验同形同源（软删行没有状态）
       compose_state: composeStates.get(row.id) ?? null,
       narration_status: narrationStatusFor(row, episodeNarrationEnabled, composeStates.get(row.id)),
+      // 纪录片（#110）：生成段长度（设计卡 budget.gen_s，老数据回落 duration）。中帧时刻、视频提示词、
+      // 前端时长区间都以它为准，而不是 storyboards.duration（纪录片这个列常为 0）。
+      generated_segment_s: resolveDramaProjectType(narrationEpisode?.dramaId) === 'documentary'
+        ? generatedSegmentSeconds(row.designCard, row.duration) : null,
       narration_chars: narrationCharCount(row.narrationText),
       narration_estimate_seconds: estimateNarrationSeconds(row.narrationText),
       // 本镜生效的文本规范化（#35）：镜级覆盖 > 集级默认（默认开）

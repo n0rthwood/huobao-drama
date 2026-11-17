@@ -37,6 +37,10 @@ description: 다큐멘터리 프로젝트의 키프레임/영상 프롬프트 �
 `layer_plan.must_mark` 는 **시맨틱 항목**(지명, 범위, 경로)이며 레이어 세그먼트가 그린다. **프롬프트에 쓰지 않는다**.
 제외되는 것은 시맨틱 항목 자체뿐이다: 그 자산이 `gen_plan.reference_assets` 에도 있다면 여전히 @ 로 참조해야 한다.
 
+**충실 소재와 지도는 확산 참조가 될 수 없다**: `faithful` 소품과 `asset_type='map'` 지도는 확산 모델이 다시 그려 왜곡한다.
+`gen_plan.reference_assets`에 넣거나 그 이미지를 첫/중간/끝/비디오 목표에 묶으면 차단 `faithful_in_diffusion`이 되고,
+참조 이미지를 조립할 때도 그 이미지는 전송되지 않는다. 화면에 보여주려면 레이어 구간(베이스 이미지 또는 `type:'image'` 화면 속 화면 레이어)으로 담는다.
+
 ## 3. 텍스트는 전부 레이어에 맡기고, 프롬프트에 쓰지 않는다
 
 - 네임바, 연도, 지명 라벨, 경로 주기는 **모두 레이어 세그먼트의 레이어**(`layer_plan.planned_layers`)이며, 프로그램이 렌더링한다.
@@ -59,4 +63,6 @@ description: 다큐멘터리 프로젝트의 키프레임/영상 프롬프트 �
 
 - **절대 이미지 우선**: 캐릭터의 종족, 복장, 색, 헤어스타일, 체형을 쓰지 않고, 캐릭터는 언제나 `@角色名`/`@name` 으로만 지칭한다.
 - 각 프롬프트는 자기완결적: 사이즈, 카메라 위치, 구도, 빛, 분위기를 모두 스스로 서술한다.
-- `inherits_first=true` 일 때 `first_frame_prompt` 는 비워 둔다; `mid_frame_time` 은 0.5 와 생성 세그먼트 길이 `-0.5` 사이에 둔다.
+- `inherits_first=true` 일 때 `first_frame_prompt` 는 비워 둔다; `mid_frame_time` 은 0.5 와 **생성 구간 길이** `-0.5` 사이에 둔다
+  (생성 구간 길이 = 설계 카드의 `budget.gen_s`. `read_storyboard_context`가 숏마다 `generated_segment_s`를 준다. 숏 전체 길이도,
+  `storyboards.duration`도 아니다). 범위를 벗어난 값은 거부되고 차단 `mid_time_out_of_range`가 붙는다.

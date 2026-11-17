@@ -15,6 +15,8 @@ import { and, eq, inArray, isNull } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
 import { parseStylingVersion } from './styling-version.js'
 import { loadDesignCardContext, resolveDesignCard } from './design-card-context.js'
+import { resolveDramaProjectType } from './project-type.js'
+import { generatedSegmentSeconds } from './shot-duration.js'
 import { referenceAssetRefs, type Combo, type DesignCard } from './design-card.js'
 import { indexRefs, REF_IMAGE_LIMIT, type AssetRef } from './prompt-refs.js'
 
@@ -96,6 +98,10 @@ export type RefIssueCode =
   | 'empty_video_prompt' | 'limb_risk'
   // Issue #57：设计卡生成段的「参考素材」没有被该提示词 @ 到（阻断生成）
   | 'card_ref_unmet'
+  // Issue #110：目标绑定到忠实素材 / 地图，扩散模型会重画它们（阻断生成，装配时不发这张图）
+  | 'faithful_in_diffusion'
+  // Issue #110：中帧时刻落在生成段之外（纪录片按生成段长度判，不是整镜时长）
+  | 'mid_time_out_of_range'
 
 export interface RefIssue {
   code: RefIssueCode
@@ -118,6 +124,12 @@ export interface EpisodeAssetEntry {
   name: string
   /** 未选版时使用的图片：角色 = 本集造型图 > 当前成片图；场景/道具 = 当前成片图（空串 = 没有可用图） */
   defaultImage: string
+  /**
+   * 忠实素材（`props.faithful=1`）与地图（`props.asset_type='map'`，Issue #110）：
+   * 这两种图是确定性绘制的证据图，**不能送进扩散模型**（关键帧/视频会被重画、扭曲）。
+   * 绑定到它们的目标给出阻断 `faithful_in_diffusion`，装配参考图时也不发它们。
+   */
+  diffusionBlocked?: boolean
 }
 
 /** 本集全部可被 @ 的资产（场景 → 角色 → 道具，顺序即参考图装配顺序） */
@@ -159,7 +171,10 @@ function loadEpisodeAssetsSync(episodeId: number): EpisodeAssetEntry[] {
     entries.push({ kind: 'character', id: ch.id, name: (ch.name || '').trim(), defaultImage: costumeImages.get(ch.id) || ch.imageUrl || '' })
   }
   for (const prop of props) {
-    entries.push({ kind: 'prop', id: prop.id, name: (prop.name || '').trim(), defaultImage: prop.imageUrl || '' })
+    entries.push({
+      kind: 'prop', id: prop.id, name: (prop.name || '').trim(), defaultImage: prop.imageUrl || '',
+      diffusionBlocked: Number(prop.faithful) === 1 || prop.assetType === 'map',
+    })
   }
   return entries.filter(entry => !!entry.name)
 }
@@ -271,10 +286,13 @@ function boundEntries(assets: EpisodeAssetEntry[], bindings: TargetBinding[]): A
     })
 }
 
-/** 某个目标的参考素材（场景 → 角色 → 道具，不含关键帧），调用方可在前面插入关键帧后再 indexRefs */
+/**
+ * 某个目标的参考素材（场景 → 角色 → 道具，不含关键帧），调用方可在前面插入关键帧后再 indexRefs。
+ * 绑定到忠实素材/地图的条目不发送（Issue #110）：扩散模型会把它们重画，展示必须走图层段。
+ */
 export function targetAssetRefs(assets: EpisodeAssetEntry[], bindings: TargetBinding[]): AssetRef[] {
   return boundEntries(assets, bindings)
-    .filter(entry => !!entry.image)
+    .filter(entry => !!entry.image && !entry.asset.diffusionBlocked)
     .map(entry => ({ name: entry.asset.name, url: entry.image }))
 }
 
@@ -288,6 +306,8 @@ export interface TargetAssetJson {
   default_image: string
   /** 在实际发送的参考图里的编号（1 起；视频的 1 号是首帧关键帧）；null = 无图 / 去重 / 超上限 */
   ref_no: number | null
+  /** true = 忠实素材/地图，装配时被排除（不会发送给扩散模型，Issue #110） */
+  diffusion_blocked?: boolean
 }
 
 /** 前端展示用：各目标的绑定，顺序 = 发送顺序 */
@@ -299,7 +319,8 @@ export function targetAssetsJson(assets: EpisodeAssetEntry[], bindings: TargetBi
     const lead: AssetRef[] = target === 'video' ? [{ name: '', url: '\u0000first-keyframe' }] : []
     const { urls } = indexRefs([...lead, ...entries.map(entry => ({ name: entry.asset.name, url: entry.image }))])
     result[target] = entries.map(entry => {
-      const position = entry.image ? urls.indexOf(entry.image) : -1
+      // #110：忠实素材/地图不会发送，不给出参考图编号（编号只描述真正发出去的图）
+      const position = entry.image && !entry.asset.diffusionBlocked ? urls.indexOf(entry.image) : -1
       return {
         kind: entry.asset.kind,
         asset_id: entry.asset.id,
@@ -308,6 +329,7 @@ export function targetAssetsJson(assets: EpisodeAssetEntry[], bindings: TargetBi
         selected_image: entry.binding.selectedImage,
         default_image: entry.asset.defaultImage,
         ref_no: position >= 0 ? position + 1 : null,
+        ...(entry.asset.diffusionBlocked ? { diffusion_blocked: true } : {}),
       }
     })
   }
@@ -521,11 +543,19 @@ export interface RefCheckInput {
   card?: DesignCard | null
   /** 段组合（#57）；combo='A' 的镜头没有模型视频 */
   combo?: Combo | null
+  /**
+   * 纪录片生成段长度（秒，Issue #110）：只有给了它才判 `mid_time_out_of_range`——
+   * 中帧时刻是生成段内的时刻，拿整镜时长判会误报（纪录片 shot duration 常为 0）。
+   */
+  generatedSegmentSeconds?: number | null
+  /** 中间关键帧时刻（秒） */
+  midFrameTime?: number | null
 }
 
 /**
  * 一致性问题（纯函数，按生成目标判定）：
- * 阻断 = unknown_mention / unbound_mention / missing_image / empty_video_prompt / card_ref_unmet；
+ * 阻断 = unknown_mention / unbound_mention / missing_image / empty_video_prompt / card_ref_unmet /
+ *        faithful_in_diffusion（绑定到忠实素材或地图，装配时不发图）；
  * 警告 = unmentioned_binding / over_capacity / limb_risk。
  */
 export function computeRefIssues(input: RefCheckInput): RefIssue[] {
@@ -585,11 +615,24 @@ export function computeRefIssues(input: RefCheckInput): RefIssue[] {
       }
     }
 
+    // #110：目标绑定到忠实素材/地图 = 这张图会被送进扩散模型重画，阻断该目标
+    for (const binding of bindings) {
+      const asset = byKey.get(assetKey(binding.kind, binding.assetId))
+      if (!asset?.diffusionBlocked) continue
+      add(`faithful_in_diffusion:${target}:${assetKey(asset.kind, asset.id)}`, {
+        code: 'faithful_in_diffusion', severity: 'block', fields: [...fields],
+        kind: asset.kind, asset_id: asset.id, name: asset.name,
+        message: `${label}绑定了忠实素材/地图「${asset.name}」：扩散模型会把它重画、扭曲，忠实素材不进扩散生成。`
+          + `请改用图层段承载这张图（底图或画中画层），并从${label}提示词里去掉 @${asset.name}`,
+      })
+    }
+
     // 装配上限：按图片去重后最多 9 张（视频侧首帧关键帧先占 1 张）
     const limit = target === 'video' ? REF_IMAGE_LIMIT - 1 : REF_IMAGE_LIMIT
     const seen: string[] = []
     for (const entry of boundEntries(input.assets, bindings)) {
-      if (!entry.image) continue
+      // 忠实素材/地图根本不发送，不占参考图名额
+      if (!entry.image || entry.asset.diffusionBlocked) continue
       if (!seen.includes(entry.image)) seen.push(entry.image)
       if (seen.indexOf(entry.image) + 1 <= limit) continue
       const key = assetKey(entry.asset.kind, entry.asset.id)
@@ -611,6 +654,18 @@ export function computeRefIssues(input: RefCheckInput): RefIssue[] {
     add('empty_video_prompt', {
       code: 'empty_video_prompt', severity: 'block', fields: ['video_prompt'],
       message: '视频提示词为空，请先生成或填写 video_prompt 再生成视频',
+    })
+  }
+
+  // 中帧时刻（Issue #110）：落在生成段 0.5–(长度−0.5) 之外就是阻断——出图引导帧会撞到首/尾帧，
+  // 而且纪录片里这个时刻的单位是「生成段内的秒」，不是整镜时长。
+  if (typeof input.midFrameTime === 'number' && Number.isFinite(input.midFrameTime)
+    && typeof input.generatedSegmentSeconds === 'number' && input.generatedSegmentSeconds > 0
+    && (input.midFrameTime <= 0.5 || input.midFrameTime >= input.generatedSegmentSeconds - 0.5)) {
+    add('mid_time_out_of_range', {
+      code: 'mid_time_out_of_range', severity: 'block', fields: ['mid_frame_prompt', 'video_prompt'],
+      message: `中间帧时刻 ${input.midFrameTime}s 不在生成段（${input.generatedSegmentSeconds}s）的 0.5–${Math.max(0, input.generatedSegmentSeconds - 0.5)} 秒之间：`
+        + '中帧时刻是生成段内的时刻（不含图层段），请改到生成段内部；这个值不改会在生成视频时被拒收',
     })
   }
 
@@ -644,6 +699,9 @@ export async function checkStoryboardRefs(
   storyboard: typeof schema.storyboards.$inferSelect,
   assets?: EpisodeAssetEntry[],
 ): Promise<RefIssue[]> {
+  // 纪录片才判中帧时刻（#110）：生成段长度 = 设计卡 budget.gen_s（老数据回落到 duration）
+  const [episode] = db.select().from(schema.episodes).where(eq(schema.episodes.id, storyboard.episodeId)).all()
+  const documentary = episode ? resolveDramaProjectType(episode.dramaId) === 'documentary' : false
   return computeRefIssues({
     prompts: promptFieldsOf(storyboard),
     assets: assets ?? await loadEpisodeAssets(storyboard.episodeId),
@@ -652,6 +710,8 @@ export async function checkStoryboardRefs(
       const resolved = resolveDesignCard(storyboard, loadDesignCardContext(storyboard.episodeId))
       return { card: resolved.card, combo: resolved.combo }
     })(),
+    generatedSegmentSeconds: documentary ? generatedSegmentSeconds(storyboard.designCard, storyboard.duration) : null,
+    midFrameTime: documentary ? storyboard.midFrameTime : null,
   })
 }
 

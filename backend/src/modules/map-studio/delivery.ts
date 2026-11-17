@@ -10,6 +10,7 @@ import { renderCopyWithSmoothing, smoothingProblems } from './render/smooth.js'
 import { labelFeaturesOf, labelProblems } from './layout/labels.js'
 import { layerDraftContext } from './layer-edit.js'
 import { geometryUnverified } from './accuracy.js'
+import { projectDetailSemantics } from './pip/semantics.js'
 
 /** One immutable payload drives both host delivery and standalone downloads. */
 export function buildDeliverable(loaded: LoadedTask): MapStudioDeliverable {
@@ -41,6 +42,18 @@ export function buildDeliverable(loaded: LoadedTask): MapStudioDeliverable {
     }
   })
   const warnings = final.provenance && 'warnings' in final.provenance && Array.isArray(final.provenance.warnings) ? final.provenance.warnings.map(String) : []
+  // #110：细节图上的语义 = 全览语义要素按细节取景投影（id 与全览一致），宿主据此写细节资产的 props.semantics
+  const overviewIds = [...geometry.points, ...geometry.routes, ...geometry.regions].map(item => item.id)
+  const pip = state.outputs.pip && state.outputs.pip.details.length
+    ? {
+      ...state.outputs.pip,
+      details: state.outputs.pip.details.map(detail => {
+        const frame = state.outputs.pip!.frames.find(item => item.no === detail.no)
+        if (!frame) return detail
+        return { ...detail, semantics: projectDetailSemantics(mapSpec, frame.bbox, { width: detail.width, height: detail.height }, overviewIds) }
+      }),
+    }
+    : null
   return {
     task_id: loaded.row.id,
     final_image: { path: final.path, width: final.width, height: final.height, sha256: crypto.createHash('sha256').update(fs.readFileSync(getAbsolutePath(final.path))).digest('hex') },
@@ -50,8 +63,8 @@ export function buildDeliverable(loaded: LoadedTask): MapStudioDeliverable {
     features, sources: state.research?.sources ?? [], kmz: state.outputs.kmz ? { path: state.outputs.kmz.path } : null,
     editable_source: { version: 1, map_style: mapSpec.style.map_style ?? null, map_spec: mapSpec, layer_doc: doc, layer_options: options },
     manual_edit: final.source === 'map-drawing-manual',
-    summary: `${geometry.points.length} 点 / ${geometry.routes.length} 线 / ${geometry.regions.length} 面，底图路线 ${baseMode}${state.outputs.pip?.details.length ? `；画中画 ${state.outputs.pip.details.length} 个细节` : ''}`,
-    pip: state.outputs.pip && state.outputs.pip.details.length ? state.outputs.pip : null,
+    summary: `${geometry.points.length} 点 / ${geometry.routes.length} 线 / ${geometry.regions.length} 面，底图路线 ${baseMode}${pip ? `；画中画 ${pip.details.length} 个细节` : ''}`,
+    pip,
   }
 }
 

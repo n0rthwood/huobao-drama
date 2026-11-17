@@ -98,7 +98,8 @@ The instruction gives you **this group's plan and this shot's entries**:
 
 - **Fill the combination and the base image from this shot's entries**; the new entries assigned to this shot must land on the picture
   (`must_mark` + `planned_layers`); when no new entry is assigned to this shot, do not redraw the already established geography full-frame again.
-- A "picture-in-picture" in the plan entries is written as a `type:'image'` layer in `planned_layers`, with `anchor.asset_id` pointing at that image.
+- A "picture-in-picture" in the plan entries is written as a `type:'image'` layer in `planned_layers`, with `anchor.asset_id`
+  pointing at **the asset id of that image in this episode** (the inset picture itself) — never a semantic entry, never the base image.
 - If you cannot do it (the asset lacks annotations, the budget does not fit), do not silently reroute: handle it per 2.2.7 and state the reason
   for the deviation in `rationale`. A card that contradicts the plan is flagged `group_plan_deviation` (warning) for human review.
 - Rendering facts: the finished film is spliced by shot number with hard cuts; every shot's layer segment starts again from a clean, full-frame
@@ -151,6 +152,10 @@ Every information point needs an owner. Entries without one are flagged `info_po
   - **Picture-in-picture**: `{ type:'image', anchor:{ asset_id } }` puts another asset that has an image (detail map, overview map, archival picture,
     object plate) into a corner of this shot's base image, for a brief hint on a re-mention, or for an "overview + detail" contrast on a first
     mention; it cannot be the same image as the base.
+    `anchor.asset_id` must be **that inset picture's own asset id** (it already has an image); never a semantic entry of the base image, never the base image.
+    Invalid layers are refused on write (`pip_invalid`). If no usable inset asset exists, omit the layer.
+    The draft puts the inset on the side opposite the screen-text layout (right-side layout → top-left, left-side → top-right, centered → top-right and smaller);
+    do not let a `text` layer fight the inset for the same spot.
   - **Screen typography always uses a `text` template box**: `{ type:'text', role, fields }`, with `role` and the `fields` keys copied verbatim
     from `text_spec.roles` returned by `read_storyboard_context`, and length limits taken from the same `text_spec.capacity`. The detailed rules
     (role boundaries, layouts, same-beat and rhythm rules, failure handling) live in the `layer-text-design` skill. `card` is no longer used;
@@ -176,6 +181,9 @@ Every information point needs an owner. Entries without one are flagged `info_po
   from `exposition_assets` in `read_storyboard_context`.
   Example: the narration says "he came from the Semyonovsky Guards, founded by Peter I himself" — the picture must show both the Guards'
   visual carrier and Peter I's portrait, not one man standing on an empty parade ground.
+- **Faithful material and maps never go into `reference_assets`**: `faithful` props and `asset_type='map'` maps are deterministically drawn evidence images;
+  a diffusion model will repaint and distort them (the server blocks with `faithful_in_diffusion`, and AI writes are refused). To show such an image in a shot,
+  use it as the layer segment's base image or as a `type:'image'` picture-in-picture layer; the generated segment references only characters / scenes / objects that must be performed.
 - `first` / `mid` / `last`: one-sentence picture descriptions for the three slots (formal prompts are written later).
   Junction frames are inherited and locked by the layer segment — **do not write them**: combo C omits `first`, combo D omits `last`.
 - Do not use the generated segment to act out geography: a man walking on open ground cannot express "upstream along the Irtysh" — that is the
@@ -199,14 +207,14 @@ Every information point needs an owner. Entries without one are flagged `info_po
 
 ### 2.2.5 `budget`: seconds per segment (driven by the measured audio)
 
-- `layer_s ≤ 30`, `gen_s ≤ 15` are hard limits; a design card exceeding them is **refused on save**.
+- `gen_s ≤ 15` is a hard limit (the diffusion video model's constraint); **the layer segment `layer_s` has no limit** — it is deterministic rendering, so lengthen it to cover however long the narration is.
 - Fill according to the suggested combination: A writes only `layer_s` (`gen_s` null); B only `gen_s`; C / D write both.
 - **Their sum must be ≥ the measured voice-over seconds given in the instruction.** When it does not fit:
-  - you may lengthen the picture, within the per-segment limits;
+  - On AI writes the server **auto-fits the shortfall into the layer segment** (rounded up to 0.5 s, only increases, never decreases; the result is in the tool's `budget_adjusted`).
+    A C / D layer segment may be any length, but leaving ≥0.5 s of headroom over the measured narration is safer;
   - you may **never** truncate, compress or rewrite the narration to fit the budget — it has already been voiced, and changing a
     character invalidates the audio;
-  - if it genuinely cannot fit (e.g. 40 measured seconds against the combination's limits), state the conflict in `rationale` so a human
-    can go back to the skeleton stage and re-cut the shot.
+  - only **B** (the whole shot is one generated segment) can genuinely fail to fit: measured >15 s is a block, so switch to C or D and carry the rest with the layer segment.
 
 ### 2.2.6 `rationale`
 
@@ -280,7 +288,7 @@ placeholder → the tool actually accepted the write.
 
 ### 2.2.8 Map picture-in-picture: overview and detail are two independent assets (Issue #107)
 
-In `read_storyboard_context`, map props carry `map_pip`: `role: overview` (lists detail asset ids in `details`) or `role: detail` (gives the parent overview `parent_asset_id` and its position in the overview). Follow `usage`:
+In `read_storyboard_context`, map props carry `map_pip`: `role: overview` (includes `overview_bbox`, the lon/lat extent, and `details` with each detail's asset id, `label` and `bbox`/`focus_bbox` framing extent) or `role: detail` (gives its own framing and focus extent, the parent overview `parent_asset_id` and the overview extent). **`bbox` is the only basis for judging whether a narration line falls inside that detail**: if the narrated place is outside that detail's framing, do not use it as the base image. `usage` carries only generic rules (examples written against one episode's shot numbers are stripped). A detail's `semantics` are projected from the overview semantics with the same ids, so `must_mark` / anchored layers work on it:
 
 - Shots about overall trend, extent or relative position use the overview as `base`; shots focused on one geographic feature (river mouth, confluence, pass, standoff site) use the matching detail map as `base` — do not zoom into the overview.
 - A detail must be paired with the overview: within the same narrative segment, put an adjacent shot on the overview so the audience learns where the detail is (establishing shot → detail shot).
@@ -296,6 +304,6 @@ In `read_storyboard_context`, map props carry `map_pip`: `role: overview` (lists
 ## 2.4 Duration and beats
 
 - This shot's duration = `budget.layer_s` + `budget.gen_s` (a missing segment counts as 0) and must be ≥ the measured voice-over duration.
-- The per-segment limits are hard: layer segment ≤30 s, generated segment ≤15 s.
+- Only the generated segment has a hard limit (≤15 s); **the layer segment has no limit** (deterministic rendering, Issue #110).
 - `【beat name】` markers in the script are hard-cut boundaries: a shot may not span two beats (already enforced while cutting in stage 1).
 - Do not cram two main information points into one shot to fill time, and do not split one sentence across two shots.

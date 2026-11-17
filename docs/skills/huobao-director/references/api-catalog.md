@@ -513,12 +513,12 @@ Body：`{drama_id, episode_id, config_id?, model?, message}`
 - 镜数要与段落数匹配；不要用拆镜修一条视频 Prompt。
 
 ### `GET /episodes/{e}/storyboards` [R]
-唯一事实源。每个镜头含 `combo`、`design_card`、`design_card_status`、`target_assets`、`ref_issues`、`field_saved_at`、关键帧图与 `compose_state`。
+唯一事实源。每个镜头含 `combo`、`design_card`、`design_card_status`、`target_assets`、`ref_issues`、`field_saved_at`、关键帧图与 `compose_state`。纪录片另有 `generated_segment_s`（#110：生成段秒数 = 设计卡 `budget.gen_s`，老数据回落 `duration`）；`ref_issues` 新增阻断 `mid_time_out_of_range`（中间帧时刻超出生成段）与 `faithful_in_diffusion`（该目标绑定忠实素材/地图），`target_assets[]` 条目带 `diffusion_blocked`。
 ### `POST /episodes/{e}/storyboards/fill-gaps` [S/R]
-用途：只补缺失镜头并按剧本位置重编号（部分失败后恢复，不从头重拆）。
+用途：只补缺失镜头并按剧本位置重编号（部分失败后恢复，不从头重拆）。**只补旁白骨架（#110）**：新增镜只写 `shot_number/narration_text/title/continuity`，画面字段（提示词、`description`、`mid_frame_time`）与 `design_card` 一律不写——这些要等批量配音实测后按设计卡填；纪录片补镜 Agent 的工具集没有 `update_storyboard`，运行包在观测工作项 stage `skeleton` 里。
 ### `POST /storyboards`、`PUT /storyboards/{id}`、`DELETE /storyboards/{id}` [S/R]
-用途：单镜增改删。`PUT` 常用 `{mid_frame_time, continuity_boundary:"continue"|"cut", video_prompt, first_frame_prompt, mid_frame_prompt, last_frame_prompt, narration_text}`。
-`mid_frame_time` 是**生成段内**的时间点（秒），不是整镜时长：提交时直接作为视频中间引导帧时刻。服务端只按分镜 `duration` 粗验 `0.5 < t < duration−0.5`；Agent 必须按设计卡 `budget.gen_s` 自行判断（如 gen_s=6 → mid≈3；gen_s=10 → 0.5–9.5）。C/D 的 gen_s 与整镜时长不同，不要拿整镜时长算 mid。
+用途：单镜增改删。`PUT` 常用 `{mid_frame_time, continuity_boundary:"continue"|"cut", video_prompt, first_frame_prompt, mid_frame_prompt, last_frame_prompt, narration_text}`。**人工 PUT 不校验锁定槽位**：C 的 `first_frame_prompt`、D 的 `last_frame_prompt` 由衔接帧锁定继承，写了也不会用来出图；AI 写工具（`update_storyboard`）直接拒收（#110）。
+`mid_frame_time` 是**生成段内**的时间点（秒），不是整镜时长：提交时直接作为视频中间引导帧时刻。纪录片（Issue #110）服务端按 `design_card.budget.gen_s` 校验 `0.5 < t < gen_s−0.5`（老数据回落 `duration`），越界 400 并给出实际生成段秒数——不要拿整镜时长算 mid（ep 30 #01 是 C 镜、生成段 5 s，曾被写成 8.0 s；旧口径按 `storyboards.duration`（纪录片常为 0）判，修改一律 400「0.5 秒与 0 秒之间」）。生成段长度读 `GET /episodes/{e}/storyboards` 的 `generated_segment_s` 或 `read_storyboard_context` 同名字段；存量越界值在 `ref_issues` 里是阻断 `mid_time_out_of_range`。
 ### `PUT /storyboards/{id}/pool-assets`、`PUT /storyboards/{id}/target-assets/{target}` [S]
 用途：本镜资产池（@候选）；目标级选版（`target ∈ first|mid|last|video`）。绑定本身由提示词 @ 决定，不提供手动增删。
 
@@ -561,7 +561,7 @@ Body：`{revision}`。人的确认，Agent 不自行调用。
 ## 6. 设计卡与段组合（S5）
 
 ### `GET /episodes/{e}/design-card-context` [R]
-返回：候选资产、语义条目、底图候选、段时长上限（图层 ≤30s、生成 ≤15s）。
+返回：候选资产、语义条目、底图候选、段时长上限。**图层段没有上限（Issue #110）**：`limits = {layer_s: null, gen_s: 15, narration_cps}`——`layer_s:null` 表示不限制，15 秒只约束扩散生成段；长旁白靠加长图层段承载，不要再按 30 秒规划图层段。
 ### `GET /episodes/{e}/design-group-plans` [S]（Issue #109）
 返回 `{groups:[{group_no, paragraph_excerpt, paragraph_chars, shot_ids, warnings:[{code:'shot_cross_group'|'shot_group_unlocated', storyboard_id, message}], status:'none'|'ok'|'failed', error, fresh, updated_at, task_id, plan}]}`。`group_no` = 旁白稿段号（逻辑组），镜 → 组按旁白位置读时现算、不入库。`plan = {task, geo_additions:[{text, storyboard_id}], asset_roles:[{asset_kind, asset_id, name, role:'establish'|'hint'|'background', establish_storyboard_id, exit_after_storyboard_id, note}], shots:[{storyboard_id, combo, base, pip:[{asset_kind, asset_id}], mode:'new_items'|'carry_only'|'no_layer', task}], junction}`；`fresh=false` 表示段落文本、成员镜或实测时长（0.5 s 分桶）变了，下次填卡会重新规划。只读接口，没有写入口：规划只由 `design-cards/fill` 产生。
 背景：ep 27 逐镜填卡时 75/113 镜选了 C、同一张地图连续 17 镜满幅开场，成片在「地图 ↔ 实拍」之间回切 53 次；改为先按组规划「哪张图在哪一镜完整建立、之后只做提示（画中画 / D 收尾 / 只靠旁白）」再填卡。
@@ -594,7 +594,7 @@ Body：`{combo:"A"|"B"|"C"|"D"|null, design_card:{...}}`
 {
  version: 2,                                                             // 当前卡片版本号（services/design-card.ts:102-113）
  info_points: [{id, text, via:"layer"|"generated"|"narration_only"}],   // ≤12 条
- budget: {layer_s: number|null, gen_s: number|null},                     // layer≤30, gen≤15
+ budget: {layer_s: number|null, gen_s: number|null},                     // layer_s 无上限（#110），gen_s ≤15
  rationale: string,                                                      // ≤600
  suggested_combo: "A"|"B"|"C"|"D"|null,                                   // 仅展示；实际 combo 存在分镜列上
  layer_plan: {
@@ -617,8 +617,10 @@ Body：`{combo:"A"|"B"|"C"|"D"|null, design_card:{...}}`
 ```
 `via:"narration_only"` 表示该信息点只由旁白/字幕承担，不需要画面资产。
 `must_mark` / `planned_layers[].anchor` 里的 `asset_id` + `semantic_id` 必须来自 `GET /episodes/{e}/design-card-context` 当场返回的候选资产与语义条目（归一化会丢弃类型不在白名单的层，但**不会**替你造语义）。解析不到的引用会带 `unresolved/unresolved_reason` 落卡，并在 `issues` 里出现 `unresolved_ref`（warn），逐条明细读 `GET /episodes/{e}/design-cards/audit` 的 `unresolved_layers`。下游 `POST /layer-segments/storyboards/{id}/draft` 对无几何的 polygon/polyline/marker 只能告警跳过——所以不要凭想象写语义名，先回资产侧补语义。
+- **画中画层（`planned_layers[].type="image"`，#110）**：`anchor.asset_id` 必须指向本集一张**有图**、且**不是本镜 `layer_plan.base`** 的资产（细节地图 / 全览地图 / 档案画 / 器物图）；这一层的 `semantic_id` 不生效（语义属于底图，不能借到插图资产上）。缺锚点、锚到底图、资产不在本集或无图 → 人工 PUT 读时阻断 `pip_invalid`；AI 写入当场拒收（`image_anchor_missing` / `image_anchor_on_base` / `image_source_missing` / `semantic_not_found`）。图层段草稿对 image 层**绝不回落底图**（回落等于把底图再贴一遍），框放在 `text_layout` 文字区的对侧（右侧版式→左上、左侧版式→右上、居中版式→右上缩小），`fit:"contain"`。案例：ep 30 #66 的 image 层没有锚点、#41/#91 锚到全览的语义条目。
+- **忠实素材/地图不进扩散（#110）**：`gen_plan.reference_assets` 含 `faithful` 道具或地图 → 阻断 `faithful_in_diffusion`（AI 写入拒收，提示改用图层段承载）。案例：ep 30 #7 原图路线图 272、#57–#64 船队石版画 269。
 - `A` 图层段 only；`B` 生成段 only；`C` 图层→生成；`D` 生成→图层。**没有默认值**：要么由人显式写入本端点/`POST /storyboards/{id}/combo`，要么由 #82 的设计卡批次在该镜尚无 combo 时首次写入；本端点收到的 `combo` 永远视为人工决定，Agent 不自行调用。
-- `budget.layer_s` ≤30；`budget.gen_s` ≤15；超限直接 400。
+- `budget.gen_s` ≤15（扩散模型约束）；**`budget.layer_s` 没有上限**——超限只有 `gen_s` 一项（400 `budget_over_gen`），图层段预算缺失是 `budget_missing`。AI 写入时服务端按实测旁白自动补时（`fitBudgetToNarration`）：A/C/D 把差额补进 `layer_s`（向上取整 0.5 s，只加不减），B 补到 `min(15, 实测+0.5)`；结果回给模型 `budget_adjusted{from,to,reason}`。装不下旁白是阻断 `budget_under_narration`，实测 >15 s 的 B 镜消息为「改用 C 或 D」。
 - 写卡后状态回 `pending`，需要重新确认。
 - 已确认且已有制作产物时改 `combo` 会被拒（gate `combo_switch`），必须走 `POST /storyboards/{id}/combo`。
 ### `POST /storyboards/{id}/design-card/confirm` [R]
@@ -641,7 +643,7 @@ Body：`{acknowledge?:true}`
 - `junction` 是 C 的末精确帧、D 的首精确帧；`hash` 用于绑定关键帧确认。
 
 ### `POST /layer-segments/storyboards/{id}/draft` [R]
-用途：按设计卡 `layer_plan` 生成图层段草稿。无合格底图 → 400 `missing_base`（回设计卡指定底图）。
+用途：按设计卡 `layer_plan` 生成图层段草稿。无合格底图 → 400 `missing_base`（回设计卡指定底图）。`image`（画中画）层只认自己 `anchor.asset_id` 指向的资产图：缺锚点 / 资产不在本集 / 资产没有图 → 该层跳过并给警告，**绝不回落底图**（#110）；框的位置由 `layer_plan.text_layout` 现算（文字区对侧）。
 
 ### `PUT /layer-segments/storyboards/{id}` [R]
 Body 四选一/组合：`{layer_doc?, timeline?, duration?, base_ref?}`
@@ -651,7 +653,7 @@ Body 四选一/组合：`{layer_doc?, timeline?, duration?, base_ref?}`
 - `timeline`：`{fps, ease:"inout"|..., fade_ms, keyframes:[{t, viewport{x,y,w,h}, visible:[layerId]}]}`
   - **`fps` 不是可选项，是派生值**：保存时服务端一律写成本集目标帧率（`services/layer-segment.ts:266-272`），请求里的 `fps` 不生效。目标帧率取「本集最前一条有效图层计划的 `timeline.fps`」→ 没有计划时取本集首条模型视频的实测帧率（保留三位小数，29.97 不取整为 30）→ 都没有才用内置默认 25（`services/layer-segment.ts:101-103,520-560`，范围 1–60、允许小数）。
   - 因此 **24 / 29.97 等既有计划帧率会被沿用**（#69），不要为了「统一 25」去改已有集；原生合成会用 fps 滤镜把模型视频统一到这个目标帧率。要确认当前值就读 `GET /layer-segments/storyboards/{id}` 的 `spec.fps`（`spec.source` 只说明**画幅**来自 video 还是 default，不代表帧率来源）。
-- `duration`：图层段秒数（≤30）。
+- `duration`：图层段秒数。只有 1 秒下限，**没有上限**（Issue #110：图层段是确定性渲染，15 秒只约束扩散生成段）；长旁白靠加长图层段承载，不要为预算硬切旁白。
 - `base_ref`：A 镜的确定性底图引用（真实照片/地图按 contain 摆放，不重绘）。结构：
   `{kind:"asset", asset_kind:"character"|"scene"|"prop", asset_id, version_task_id:number|null, unresolved?, unresolved_reason?}` 或 `{kind:"inherit_prev"}`；`null`=无引用。
   资产版本变化/文件丢失会让段 `stale_reasons` 出现 `base_ref_unresolved`，需回设计卡指定底图。
@@ -660,6 +662,7 @@ Body 四选一/组合：`{layer_doc?, timeline?, duration?, base_ref?}`
 用途：同步渲染 mp4 + 出衔接帧，建 `sys_task`。返回 `{task_id, spec, segment, junction, keyframes_invalidated}`。
 注意：重渲改变 junction hash 会让已确认关键帧失效；必须重新确认。
 渲染后若底图有裁切或为 contain（`baseFrameOf`，Issue #94），自动起 `layer_base_check` 视觉验证文本任务；未通过前衔接帧不可用、视频/合成阻断。
+衔接帧（C 末帧 / D 首帧）**不含文字层与画中画 `image` 层**：这些层在段内边界前淡出，边界帧交给扩散模型（#110，否则 H3 会把小地图/插图重画）。段签名含 `image` 层时升档：C/D 边界段 `seg-v3-C/D`、A 段 `seg-v2`；不含 `image` 层的段签名逐字不变，所以升级只让含画中画的段读时过期，需要重渲。
 
 ### `POST /layer-segments/storyboards/{id}/base-check`、`POST /layer-segments/storyboards/{id}/base-check/override` [S]
 Issue #94。前者重跑底图视觉验证；后者 `{reason}`（必填）人工放行，属于人决定端点。`GET /layer-segments/storyboards/{id}` 返回 `base_check{required,signature,status: pending|passed|failed|error|overridden,problems,notes,task_id,config_id,model,checked_at,override_reason}`、`base_check_required`、`base_check_satisfied`。
@@ -713,6 +716,7 @@ Body：`{config_id?, model?, prompt?}`
 ### `PUT /storyboards/{id}/keyframes/{slot}` [R]
 Body：`{image}` 选版本；或 `{inherit:true}`（仅首帧，承接上一镜尾帧）。
 注意：选版变化会自动取消关键帧确认，并连带取消继承它的下一镜。
+**承接取上一镜的生效尾帧（#110）**：上一镜是 D 且衔接帧可用 → 承接得到的是那张衔接帧（D 的尾帧从不写入 `last_frame_image`）；`continuity_boundary="continue"` 的镜在前一镜是 D 时首帧由衔接帧锁定（`inheritsFirst`），不需要也不允许人工补图。旧口径只看列，D 之后的承接镜永远没有首帧（ep 30 #03 承接 #02）。
 ### `POST /storyboards/{id}/confirm-keyframes` [R]
 Body：`{confirmed:true|false}`（**必须显式 `true` 才是确认**：服务端 `confirmed = body.confirmed === true`，空 body `{}` 等于取消确认——#96 竖版验收实测踩中）；`ready` 要求首帧与尾帧都有图，且写了中间帧提示词的必须有中间帧图。
 确认会快照当前 junction hash；图层重渲后 hash 变 → 确认自动作废。
@@ -764,11 +768,19 @@ Body：`{storyboard_ids?, config_id?, model?}`；把已定分镜写成时间段�
 每镜新增 `locked_frames: [{slot:"first"|"last", source:"layer_last"|"layer_first", base:{kind:"asset",asset_kind,asset_id,name}|{kind:"inherit_prev"}|null, framing:"full"|"crop"|"contain"|"zoomed", caption, caption_note?}]`：
 - `slot`：C = 首帧、D = 尾帧；`source` 说明衔接帧取自图层段的哪一端（C 末帧、D 首帧）。这两个槽位不单独出图，锁定时列保持 NULL。
 - `framing`：衔接帧的取景（留白 / 裁切 / 推近 / 整图），由 `layer-quality.ts` 的 `baseFrameOf` 与末/首精确帧的取景框现算。
-- `caption`：视觉模型对**实际衔接帧 PNG**（不含文字图层）的一句话描述，按 `junction_hash` 缓存于 `storyboard_layer_segments.junction_caption`（AI 环节 `junction_caption`，vision）。衔接帧未渲染 / 输入已变化 / 底图验证未过 / 无视觉配置 / 调用失败时为 `null`，`caption_note` 写明原因——**不得**据此臆造画面。
+- `caption`：视觉模型对**实际衔接帧 PNG**（不含文字层与画中画 `image` 层）的一句话描述，按 `junction_hash` 缓存于 `storyboard_layer_segments.junction_caption`（AI 环节 `junction_caption`，vision）。衔接帧未渲染 / 输入已变化 / 底图验证未过 / 无视觉配置 / 调用失败时为 `null`，`caption_note` 写明原因——**不得**据此臆造画面。
 - A/B 组合与还没有图层段的镜头不带 `locked_frames`。
 - `POST /episodes/{e}/generate-video-prompts` 在 Agent 开跑前逐镜补算 caption（同一任务的观测 stage `junction_caption`，任务详情可回看公开请求/响应），并把锁定槽位与 caption 写进提示话术。
 - 保存校验（AI 写入路径：`update_storyboard`，以及 `save_storyboards` 覆盖已有 C/D 镜号时）：解析 `video_prompt` 的时间分段行（`0-3秒：`、`0-2.5秒:`、`0-3s:`、`0–3 s:` 等），C 的首段必须是 **≤1.5 秒的空镜**——超时、@ 到本集角色资产（场景/道具可 @，角色名按最长优先解析）、含场景过渡写法（过渡为/过渡到/转入/化为/变为/叠化、dissolve/transition to/morph into、ディゾルブ/移り変わ、디졸브/바뀌어）或切镜写法（切到/切回/切换为/切换到/转到/硬切、cut to/cuts to、カット/切り替え、컷/전환）→ 退回；D 的首段可以切镜，末段含切镜写法 → 退回；任一分段是 0 长/倒序（`3-3秒`、`5-3秒`）→ 退回。退回 `{error, rejected, combo, locked_frame}`，一个字都不落库；退回信息带 caption，按真实构图重写（人物入画与转场挪到第二段）后重新保存。A/B 与剧情镜头不校验。依据：ep 21 二次验收时首段已无切镜写法，但 7/22 镜仍在首段（0–3 秒）写「@子婴 走向画外」「长卷过渡为山脊」，H3 把第二段内容画到第 0 帧。
 - 人工 `PUT /storyboards/{id}` 不做这条校验（与 #92 的画幅校验同口径）；人工编辑不受保护。
+
+### Agent 工具 `read_storyboard_context` 的 `map_pip` / `generated_segment_s`（Issue #110）[S]
+- `map_pip`（#107 画中画资产）：全览道具给 `{role:"overview", layout, overview_bbox, details:[{no, label, role, bbox, focus_bbox, asset_id}], usage}`；细节道具给 `{role:"detail", parent_asset_id, parent_name, label, bbox, focus_bbox, overview_bbox, usage, stale}`。`bbox`/`focus_bbox`/`overview_bbox` 是经纬度范围，是判断「这一镜的旁白落在哪个细节里」的唯一依据。
+- 读路径**剔除** `storyboard_numbers` 与按镜号写的 usage 行（那些镜号属于另一集），只保留通用用法；`props.map_pip` 存量与交付数据不改。组规划资产清单（`pipAssetLine()`）给同一份地理范围。
+- 细节是本集独立地图道具（`asset_type='map'`、`faithful=1`），登记时把全览 `map_spec` 的点/线/面按细节取景投影成 `props.semantics`（`semantic_id` 与全览一致、裁到画内）；升级前登记、无语义的细节由启动 `backfillPipDetailSemantics()` 幂等补算，缺任一事实就跳过，不编造几何。派细节底图没有硬校验：AI 重填后逐镜核对细节底图与旁白地理（ep 30 #35 利沃尼亚战争曾被派到乌格拉河细节）。
+- `generated_segment_s`：纪录片逐镜的生成段秒数（设计卡 `budget.gen_s`，老数据回落 `duration`），写 `mid_frame_time` 时用它判区间；越界存量在 `GET /episodes/{e}/storyboards` 的 `ref_issues` 里是阻断 `mid_time_out_of_range`。
+- 生成段参考素材里的 faithful 道具/地图在 `gen_plan.reference_assets` 被拒收（`faithful_in_diffusion`，改用图层段承载）；目标绑定到这类资产时 `ref_issues` 阻断同码、装配参考图不发这张图（`target_assets[].diffusion_blocked`）。
+- 承接首帧取上一镜**生效尾帧**：上一镜是 D 且衔接帧可用 → 用衔接帧，否则用它的 `last_frame_image` 列。D 的尾帧从不写列，只看列会让 D 之后承接的镜永远没有首帧（ep 30 #03 承接 #02）。
 
 ### `POST /episodes/{e}/video-batch/preview` [R]
 Body：`{storyboard_ids?, config_id, model}`

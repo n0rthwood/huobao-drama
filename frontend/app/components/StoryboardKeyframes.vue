@@ -202,36 +202,53 @@
         </div>
 
         <div class="kf-editor-body">
+          <!--
+            纪录片的分镜描述/氛围通常是空的（叙事在旁白里），全展开会把关键帧挤到折叠线以下（#110）。
+            空内容时默认收起，标题栏一行给出「有没有内容」，点按钮展开；有内容时保持原样展开。
+          -->
           <section class="kf-section">
-            <span class="kf-section-label">{{ t('episode.sb.descSection') }}</span>
-            <label class="kf-field">
-              <span class="kf-field-label">
-                {{ t('episode.sb.descLabel') }} <span class="dim">({{ t('episode.sb.descHint') }})</span>
-                <FieldSaveStatus class="kf-field-save" v-bind="fieldSaveOf('description')" />
-              </span>
-              <textarea
-                :value="selected.description || ''"
-                class="textarea"
-                rows="6"
-                :placeholder="t('episode.sb.descPlaceholder')"
-                @input="emit('field-dirty', selected, 'description', $event.target.value)"
-                @blur="emit('update-field', selected, 'description', $event.target.value)"
-              />
-            </label>
-            <label class="kf-field">
-              <span class="kf-field-label">
-                {{ t('episode.sb.atmosphere') }}
-                <FieldSaveStatus class="kf-field-save" v-bind="fieldSaveOf('atmosphere')" />
-              </span>
-              <textarea
-                :value="selected.atmosphere || ''"
-                class="textarea"
-                rows="2"
-                :placeholder="t('episode.sb.atmospherePlaceholder')"
-                @input="emit('field-dirty', selected, 'atmosphere', $event.target.value)"
-                @blur="emit('update-field', selected, 'atmosphere', $event.target.value)"
-              />
-            </label>
+            <div class="kf-section-head">
+              <span class="kf-section-label">{{ t('episode.sb.descSection') }}</span>
+              <span v-if="storyBlockEmpty && !storyBlockOpen" class="dim kf-section-summary">{{ t('episode.sb.descEmptyCollapsed') }}</span>
+              <span class="ml-auto" />
+              <button
+                v-if="storyBlockCollapsible"
+                type="button"
+                class="btn btn-sm"
+                :aria-expanded="storyBlockOpen"
+                @click="storyBlockOpen = !storyBlockOpen"
+              >{{ storyBlockOpen ? t('episode.sb.descCollapse') : t('episode.sb.descExpand') }}</button>
+            </div>
+            <template v-if="storyBlockOpen">
+              <label class="kf-field">
+                <span class="kf-field-label">
+                  {{ t('episode.sb.descLabel') }} <span class="dim">({{ t('episode.sb.descHint') }})</span>
+                  <FieldSaveStatus class="kf-field-save" v-bind="fieldSaveOf('description')" />
+                </span>
+                <textarea
+                  :value="selected.description || ''"
+                  class="textarea"
+                  rows="6"
+                  :placeholder="t('episode.sb.descPlaceholder')"
+                  @input="emit('field-dirty', selected, 'description', $event.target.value)"
+                  @blur="emit('update-field', selected, 'description', $event.target.value)"
+                />
+              </label>
+              <label class="kf-field">
+                <span class="kf-field-label">
+                  {{ t('episode.sb.atmosphere') }}
+                  <FieldSaveStatus class="kf-field-save" v-bind="fieldSaveOf('atmosphere')" />
+                </span>
+                <textarea
+                  :value="selected.atmosphere || ''"
+                  class="textarea"
+                  rows="2"
+                  :placeholder="t('episode.sb.atmospherePlaceholder')"
+                  @input="emit('field-dirty', selected, 'atmosphere', $event.target.value)"
+                  @blur="emit('update-field', selected, 'atmosphere', $event.target.value)"
+                />
+              </label>
+            </template>
           </section>
 
           <!-- 每镜旁白审核（#30 C.2）：只在剧集旁白开关打开时出现 -->
@@ -481,13 +498,15 @@
                     type="number"
                     step="0.1"
                     min="0.5"
-                    class="input kf-mid-time"
+                    :max="midTimeMax(selected)"
+                    :class="['input kf-mid-time', { 'is-error': midTimeOutOfRange }]"
                     :placeholder="t('episode.kf.midTimeAuto')"
                     @input="emit('field-dirty', selected, 'mid_frame_time', $event.target.value === '' ? null : Number($event.target.value))"
                     @change="onMidTimeChange(selected, $event)"
                   />
                   <span class="kf-slot-row-unit">{{ t('episode.kf.midTimeUnit') }}</span>
-                  <span class="dim" style="font-size:11px">{{ t('episode.kf.midTimeRange', { max: midTimeMax(selected) }) }}</span>
+                  <!-- 区间按生成段算（#110）：整镜时长含图层段，图层段没有中间帧可切 -->
+                  <span :class="['dim', 'kf-mid-range', { 'is-error': midTimeOutOfRange }]" style="font-size:11px">{{ midTimeHint }}</span>
                   <FieldSaveStatus class="ml-auto" v-bind="fieldSaveOf('mid_frame_time')" />
                 </div>
               </div>
@@ -617,6 +636,7 @@ import TargetAssetList from '~/components/TargetAssetList.vue'
 import NarrationBlock from '~/components/NarrationBlock.vue'
 import StoryboardPoolDialog from '~/components/StoryboardPoolDialog.vue'
 import { mediaTimeLabel, mediaTimeOfPath } from '~/utils/mediaTime'
+import { generatedSegmentSecondsOf, midFrameTimeOutOfRange, midFrameTimeRange } from '~/utils/generatedSegment'
 import {
   useNowTicker,
   ringPropsFromTask,
@@ -887,9 +907,40 @@ function midTime(sb) {
   const v = sb?.mid_frame_time ?? sb?.midFrameTime
   return v === null || v === undefined || v === '' ? null : Number(v)
 }
-function midTimeMax(sb) {
-  return Math.max(0.5, Number(sb?.duration || 10) - 0.5).toFixed(1)
+function generatedSecondsOf(sb) {
+  return generatedSegmentSecondsOf(sb) ?? 10
 }
+function midTimeRange(sb) {
+  return midFrameTimeRange(sb)
+}
+function midTimeMax(sb) {
+  return (midTimeRange(sb)?.max ?? 0.5).toFixed(1)
+}
+function formatMidSeconds(value) {
+  const n = Number(value)
+  return Number.isFinite(n) ? String(Math.round(n * 10) / 10) : '—'
+}
+/** 当前中间帧时间是否越出生成段的合法区间（#110）：存量越界值要当成错误显示，不是提示 */
+const midTimeOutOfRange = computed(() => midFrameTimeOutOfRange(midTime(selected.value), selected.value))
+const midTimeRangeText = computed(() => {
+  const range = midTimeRange(selected.value)
+  return range ? `${formatMidSeconds(range.min)} ~ ${formatMidSeconds(range.max)}s` : ''
+})
+/**
+ * 一行提示：正常给区间；越界说清当前值、生成段与合法区间；
+ * 生成段太短则说明根本没有可切的时刻（不能只写一个空的区间让人猜）。
+ */
+const midTimeHint = computed(() => {
+  const sb = selected.value
+  const range = midTimeRange(sb)
+  if (!range) return t('episode.kf.midTimeNoRange', { gen: formatMidSeconds(generatedSecondsOf(sb)) })
+  if (!midTimeOutOfRange.value) return t('episode.kf.midTimeRange', { max: formatMidSeconds(range.max) })
+  return t('episode.kf.midTimeOutOfRange', {
+    value: formatMidSeconds(midTime(sb)),
+    gen: formatMidSeconds(generatedSecondsOf(sb)),
+    range: midTimeRangeText.value,
+  })
+})
 function boundaryOf(sb) {
   return sb?.continuity_boundary ?? sb?.continuityBoundary ?? null
 }
@@ -946,6 +997,15 @@ let poolRestored = !urlPoolOpen
 const selectedId = ref(0)
 const selected = computed(() => props.storyboards.find(sb => sb.id === selectedId.value) || null)
 const selectedIndex = computed(() => props.storyboards.findIndex(sb => sb.id === selectedId.value))
+
+/**
+ * 纪录片的分镜描述/氛围块（#110）：这两个字段在纪录片里通常空着（叙事在旁白里），
+ * 全展开会把关键帧挤到折叠线以下。空内容时默认收起，有内容或用户点开时照常展开。
+ */
+const storyBlockOpen = ref(false)
+const storyBlockEmpty = computed(() => !String(selected.value?.description || '').trim() && !String(selected.value?.atmosphere || '').trim())
+const storyBlockCollapsible = computed(() => props.projectType === 'documentary' && storyBlockEmpty.value)
+watch(() => [selectedId.value, storyBlockCollapsible.value], () => { storyBlockOpen.value = !storyBlockCollapsible.value }, { immediate: true })
 // 本镜资产池（#43）：候选 = 本集全部可视资产（含 selected/manual/mentioned），主面板只显示已选
 const poolItems = computed(() => {
   const list = selected.value ? props.poolCandidates(selected.value) : []
@@ -1213,9 +1273,15 @@ function onMidTimeChange(sb, e) {
     return
   }
   const value = Math.round(Number(raw) * 10) / 10
-  const max = Number(midTimeMax(sb))
-  if (!Number.isFinite(value) || value <= 0.5 || value >= max) {
-    toast.warning(t('episode.kf.midTimeInvalid', { max: midTimeMax(sb) }))
+  // 区间按生成段算（#110）：整镜时长的后段是图层段，没有中间帧可切
+  const range = midTimeRange(sb)
+  if (!range) {
+    toast.warning(t('episode.kf.midTimeNoRange', { gen: formatMidSeconds(generatedSecondsOf(sb)) }))
+    e.target.value = midTime(sb) ?? ''
+    return
+  }
+  if (!Number.isFinite(value) || value <= range.min || value >= range.max) {
+    toast.warning(t('episode.kf.midTimeInvalid', { max: formatMidSeconds(range.max) }))
     e.target.value = midTime(sb) ?? ''
     return
   }
@@ -1822,6 +1888,7 @@ onBeforeUnmount(() => {
 .kf-locked-goto { align-self: flex-start; }
 .kf-locked-stale { margin: 0; font-size: 12px; color: #8a6508; }
 .kf-section-label { font-size: 12px; font-weight: 600; color: var(--text-1); }
+.kf-section-summary { font-size: 11px; }
 .kf-field { display: flex; flex-direction: column; gap: 4px; }
 .kf-field-label { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-2); }
 .kf-boundary { display: flex; gap: 6px; }
@@ -1892,6 +1959,9 @@ onBeforeUnmount(() => {
 .kf-slot-row-label { font-size: 11px; color: var(--text-2); }
 .kf-slot-row-unit { font-size: 11px; color: var(--text-3); }
 .kf-mid-time { width: 92px; }
+/* 越出生成段区间（#110）：不是提醒而是错误——出图时中间帧切到段外，渲染出来就是错的画面 */
+.kf-mid-time.is-error { border-color: var(--danger, #c0472e); }
+.kf-mid-range.is-error { color: var(--danger, #c0472e); }
 .kf-version-select { max-width: 280px; font-size: 12px; }
 
 .kf-editor-foot {

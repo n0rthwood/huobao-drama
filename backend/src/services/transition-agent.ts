@@ -55,24 +55,37 @@ export async function runTransitionReview(
   })
 
   const errors: string[] = []
+  const readReview = async (): Promise<TransitionReview | null> => {
+    // 以实际落库为准：工具校验通过才会写入与当前输入签名一致的审核结果
+    const [fresh] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, storyboardId))
+    const review = parseTransitionReview(fresh?.transitionReview)
+    return review && review.input_signature === signature && !review.edited_manually ? review : null
+  }
   for (let attempt = 1; attempt <= 2; attempt++) {
+    const ask = {
+      role: 'user' as const,
+      content: `请为分镜 #${pair.current.storyboardNumber}（承接上一镜 #${pair.previous.storyboardNumber} 的尾帧）设计开场转场。${USER_MESSAGE_SUFFIX}`,
+    }
+    let review: TransitionReview | null = null
     try {
-      await runAgent(
-        agent,
-        [{
-          role: 'user',
-          content: `请为分镜 #${pair.current.storyboardNumber}（承接上一镜 #${pair.previous.storyboardNumber} 的尾帧）设计开场转场。${USER_MESSAGE_SUFFIX}`,
-        }],
-        { maxSteps: 8, requestContext },
-      )
+      const result = await runAgent(agent, [ask], { maxSteps: 8, requestContext })
+      review = await readReview()
+      // 模型把决策写成正文 JSON 却没调用工具（#110：DeepSeek 在 ep30 #2 上稳定如此）：
+      // 把它自己的正文回给它，要求用 update_storyboard 提交，同一轮内纠正一次
+      const text = (result.text || '').trim()
+      if (!review && text) {
+        await runAgent(agent, [
+          ask,
+          { role: 'assistant' as const, content: text },
+          { role: 'user' as const, content: '你只在正文里写了决策，没有调用 update_storyboard，决策没有保存。请现在调用 update_storyboard 提交这份决策（technique_id 必须取自手法目录），不要再输出正文。' },
+        ], { maxSteps: 4, requestContext })
+        review = await readReview()
+      }
     } catch (err) {
       errors.push(err instanceof Error ? err.message : String(err))
       continue
     }
-    // 以实际落库为准：工具校验通过才会写入与当前输入签名一致的审核结果
-    const [fresh] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, storyboardId))
-    const review = parseTransitionReview(fresh?.transitionReview)
-    if (review && review.input_signature === signature && !review.edited_manually) {
+    if (review) {
       if (review.verdict !== 'none' && !legalTechniqueIds().includes(review.technique || '')) {
         errors.push(`technique_id ${review.technique} 不在手法目录中`)
         continue

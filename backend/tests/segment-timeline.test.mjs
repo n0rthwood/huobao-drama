@@ -15,9 +15,8 @@ function run(body) {
   const script = `
     import {
       normalizeTimeline, normalizeViewport, viewportFromPoints, frameStateAt, frameCount,
-      frameKeyOf, minViewportSize, timelineLayerIds, clampSegmentDuration, MAX_LAYER_SEGMENT_SECONDS, endHoldOf,
+      frameKeyOf, minViewportSize, timelineLayerIds, clampSegmentDuration, endHoldOf,
     } from './src/services/segment-timeline.ts'
-    const MAX_LAYER_SEGMENT_MAX = MAX_LAYER_SEGMENT_SECONDS
     const out = (value) => console.log('@@' + JSON.stringify(value))
     ${body}
   `
@@ -179,16 +178,16 @@ test('帧缓存键：静止段相邻帧同键，推近段逐帧不同', () => {
   assert.equal(got.distinctPushIn, 5, '推近段每帧取景框都不同')
 })
 
-test('时长钳制：图层段上限恒为 30 秒（与组合无关）', () => {
+test('时长钳制：只有 1 秒下限，图层段没有上限（Issue #110）', () => {
   const got = run(`out({
-    max: MAX_LAYER_SEGMENT_MAX,
     long: clampSegmentDuration(42),
+    veryLong: clampSegmentDuration(600),
     short: clampSegmentDuration(0.1),
     nan: clampSegmentDuration(Number.NaN),
-    rounded: clampSegmentDuration(6.4, MAX_LAYER_SEGMENT_MAX),
+    rounded: clampSegmentDuration(6.4),
   })`)
-  assert.equal(got.max, 30)
-  assert.equal(got.long, 30)
+  assert.equal(got.long, 42, '42 秒不再被钳回 30 秒')
+  assert.equal(got.veryLong, 600)
   assert.equal(got.short, 1)
   assert.equal(got.nan, 1)
   assert.equal(got.rounded, 6.4)

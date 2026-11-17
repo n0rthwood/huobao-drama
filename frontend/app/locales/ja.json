@@ -1036,6 +1036,7 @@
       "noSegment": "このカットにはまだレイヤー区間の下書きがありません。「下書きを生成」を押してください",
       "missingBase": "有効なベース画像がありません。設計カードでベース画像を指定してから下書きを生成してください",
       "previewAt": "{t} 秒の画面",
+      "junctionPreview": "接続フレームの画面：文字レイヤーとピクチャ・イン・ピクチャは表示されません（拡散モデルへ渡さないため）",
       "budgetMismatch": "実長 {actual}s / 予算 {budget}s",
       "createMarker": "マーカーを作成して固定",
       "markerName": "マーカー",
@@ -1529,6 +1530,7 @@
         "label": "セグメント構成",
         "required": "必須：このショットがどのセグメントで構成され、どちらが先か",
         "suggested": "推奨",
+        "selected": "選択中",
         "none": "—",
         "A": {
           "name": "A ▣ レイヤーのみ",
@@ -1611,6 +1613,8 @@
         "reference_not_mentioned": "参考素材がどのフレーム記述にも登場しません",
         "budget_tight": "尺の余裕が少なめです",
         "unresolved_ref": "素材や項目に解決できない参照があります",
+        "pip_invalid": "ピクチャ・イン・ピクチャのレイヤー参照が不正です（素材がない・この話に画像がない・下地画像そのものを指す）",
+        "faithful_in_diffusion": "忠実素材/地図は拡散生成に入れられません。レイヤー区間で表現してください",
         "group_plan_deviation": "このショットの組み合わせまたはベースが所属グループの計画と一致しません"
       },
       "migrationComboUnresolved": "旧ショットのセグメント構成には移行先の定義がありません。復元可能な内容は保持されています。構成を明示的に選び直し、設計カードを確認してから確定してください。",
@@ -1631,7 +1635,11 @@
         "measured": "実測 {n}s ✓",
         "remain": "余裕 {n}s",
         "over": "ナレーションが収まりません。セグメントを伸ばすか画面を整理してください",
-        "tight": "やや窮屈"
+        "tight": "やや窮屈",
+        "extendLayer": "レイヤー区間を延長",
+        "extendGen": "生成区間を延長",
+        "extendHintLayer": "実測ナレーション {measured}s：レイヤー区間 {from}s → {to}s（増やすのみ）",
+        "extendHintGen": "実測ナレーション {measured}s：生成区間 {from}s → {to}s（上限 15s）"
       },
       "junction": {
         "locked": "◆ 接続フレーム（継承固定・生成しない）",
@@ -1668,14 +1676,16 @@
         "reason": "理由",
         "run": "開始",
         "cancel": "キャンセル",
-        "running": "実行中…"
+        "running": "実行中…",
+        "warnTitle": "警告のみのカット（{n} 件）",
+        "warnAck": "上記の警告を承知してまとめて確認",
+        "warnNote": "チェックしたカットは承知として確認します。未チェックは今回スキップし、ブロック問題は従来どおり除外します。"
       },
       "exclude": {
         "confirmed": "確認済み",
         "ai_filling": "AI 記入中",
         "blocked": "ブロッキング問題あり",
         "notPending": "審査待ちではない",
-        "hasIssues": "問題あり",
         "ttsInvalid": "有効な音声がありません"
       },
       "order": {
@@ -1715,6 +1725,14 @@
         "confirmFailed": "設計カードの確認に失敗しました",
         "fillFailed": "設計カードの記入に失敗しました",
         "orderFailed": "ショット順の保存に失敗しました"
+      },
+      "confirm": {
+        "gotoIssues": "問題を {n} 件見る",
+        "blockedNote": "ブロック {n} 件：{message}"
+      },
+      "mark": {
+        "warn": "警告 {n} 件：{message}",
+        "block": "ブロック {n} 件：{message}"
       },
       "layerType": {
         "polygon": "ポリゴン",
@@ -1938,6 +1956,9 @@
       "totalCount": "全 {n} 件",
       "duration": "長さ",
       "descSection": "分镜説明",
+      "descExpand": "カット説明を表示",
+      "descCollapse": "カット説明を閉じる",
+      "descEmptyCollapsed": "このカットには説明・雰囲気がありません（必要なら展開して入力）",
       "descLabel": "画面説明",
       "descHint": "【ショット1】【ショット2】…と子ショットごとに記述。セリフは「キャラクター名のセリフ：「セリフ」」、ナレーションは「ナレーション：内容」",
       "descPlaceholder": "分镜の画面説明",
@@ -2184,6 +2205,8 @@
       "midTimeUnit": "秒",
       "midTimeAuto": "未設定",
       "midTimeRange": "0.5 ~ {max}s",
+      "midTimeOutOfRange": "現在の {value}s は生成区間 {gen}s の範囲 {range} を外れています：中間フレームは生成区間内に置く必要があります",
+      "midTimeNoRange": "生成区間は {gen}s しかなく、中間フレームを置けません（切る時刻には最低 2s 必要）",
       "midTimeInvalid": "中間フレーム時刻は 0.5s から {max}s の間で指定してください",
       "midOptional": "未設定 · 確認には不要",
       "midOptionalHint": "中間フレームは未設定のため、キーフレーム確認を妨げません。このショットに中間フレームが不要と審査されたわけではありません。必要ならプロンプトを入力してください。",
@@ -3375,7 +3398,8 @@
   },
   "layerCanvas": {
     "toolbar": {"select":"選択","pan":"移動","frame":"フレームの表示範囲","crop":"背景を切り抜く","undo":"元に戻す","redo":"やり直す","snap":"スナップ","zoomIn":"拡大","zoomOut":"縮小","fit":"画面に合わせる","edit":"編集","preview":"プレビュー","render":"区間を描画","rehearse":"ショット試写"},
-    "keyframeBar": {"title":"精密キーフレーム","add":"現在時刻に追加","copyPrev":"前のフレームを複製","remove":"削除（先頭は保護）","duration":"区間長","endHold":"末尾保持","junction":"接続フレーム","junctionTextWarn":"接続には文字を含みません：{n} 個の文字レイヤーは出力されません","teach":"区間は精密キーフレームで構成されます。各フレームは時刻・表示範囲・可視レイヤーを定義し、プログラムが移動とフェードを補間して動画を描画します。スライドではありません。","ease":"次のフレームへの補間","fade":"新レイヤーのフェード","viewportPick":"表示範囲（キャンバスで操作）","visible":"可視レイヤー"},
+    "keyframeBar": {"title":"精密キーフレーム","add":"現在時刻に追加","copyPrev":"前のフレームを複製","remove":"削除（先頭は保護）","duration":"区間長","endHold":"末尾保持","junction":"接続フレーム","junctionTextWarn":"接続には文字を含みません：{n} 個の文字レイヤーは出力されません","junctionImageWarn":"接続フレームにピクチャ・イン・ピクチャは含まれません：{n} 個の画像レイヤーは出力されません","teach":"区間は精密キーフレームで構成されます。各フレームは時刻・表示範囲・可視レイヤーを定義し、プログラムが移動とフェードを補間して動画を描画します。スライドではありません。","ease":"次のフレームへの補間","fade":"新レイヤーのフェード","viewportPick":"表示範囲（キャンバスで操作）","visible":"可視レイヤー"},
+    "frameGhostHint": "キャンバスは現在時刻の状態を描画します。この時刻で見えないレイヤーは淡く表示されます",
     "base": {"title":"背景","noBase":"背景未選択（先に文字を編集できます）","replace":"背景を変更","cropToOutput":"完成比率に切り抜く","aspectBanner":"背景の比率 {aspect} は完成映像と異なります。余白を付けてレンダリングするため視覚検証が必要です。完成比率に切り抜くか、この素材のプロジェクト比率版を生成してください","cropHelp":"元画像の座標上で完成比率の枠または角をドラッグ。元画像は変更されません。","applyCrop":"適用","cancelCrop":"キャンセル","outputSize":"出力キャンバス {w}×{h}","sourceSize":"元画像 {w}×{h}（原本の画素数）","sourceUnknown":"元画像のサイズは不明です","resolution":"切り抜き後の元画像の画素数は完成映像 {sw}×{sh} の {times} 倍（不足する軸を基準）","verified":"検証済み","inherited":"継承背景（固定）","guide":"元画像の画素数は切り抜き座標と鮮明さの判定に使用し、出力キャンバスのサイズは決めません。切り抜き後の幅・高さともに完成映像の2倍以上を推奨します。","style":"全体スタイル","unknown":"背景","version":"バージョン {version}","saveSize":"元画像のサイズはサーバーで未確認です。保存時に原本を読み取ります。","loadError":"素材または意味情報を読み込めません。","framingClamped":"一部の表示範囲を切り抜き内に収めました。元に戻すと全範囲を復元できます。"},
     "anchor": {"anchored":"固定済み","manual":"手動","unlink":"参照項目が削除・改名されています","detachConfirm":"このレイヤーは「{name}」に固定されています。解除して移動しますか？","relink":"固定先を選択","toManual":"手動に変更","labelOffset":"ラベル位置補正","addMarker":"マーカー追加","addRegion":"領域追加","addRoute":"経路追加","noSemantics":"意味情報がありません。","inherited":"継承背景では固定を使用できません。","choose":"再固定する項目を選択","cancel":"キャンセル","points":"地点","regions":"領域","lines":"経路","labels":"ラベル"},
     "quality": {"badge":"有効 {w}×{h} < {sw}×{sh}（拡大過多）","frameDot":"有効画素が出力未満","hint":"高解像度画像を使うか縮小してください。"},

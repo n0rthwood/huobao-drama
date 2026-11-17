@@ -94,6 +94,7 @@
             :quality="currentQuality" :aspect-issue="aspectIssue" :missing-glyphs="missingGlyphs"
             :can-undo="canUndo" :can-redo="canRedo" :crop-locked="inherited"
             :viewport="timeline.keyframes[keyframeIndex]?.viewport"
+            :frame-opacity="frame.opacity"
             @select="selectedIds = $event" @history="pushHistory" @patch="onPatch"
             @delete="removeSelected" @duplicate="duplicateSelected" @undo="undo" @redo="redo"
             @detach="detachAnchors" @crop="applyCrop" @viewport="onViewport"
@@ -117,6 +118,7 @@
             </div>
             <p v-if="baseFailed" class="ls-error">{{ t('layerCanvas.base.loadError') }}</p>
             <div class="ls-preview-foot mono">{{ t('episode.segment.previewAt', { t: time.toFixed(2) }) }}</div>
+            <p v-if="atJunction" class="ls-preview-foot">{{ t('episode.segment.junctionPreview') }}</p>
           </div>
           <PreciseKeyframeBar
             :doc="doc" :timeline="timeline" :duration="duration"
@@ -173,7 +175,7 @@ import { baseAspectIssue, baseFrameOf, qualityWarningsOf, clampTimelineToFrame, 
 import { useLayerDoc } from '~/composables/useLayerDoc'
 import { assetAspectAPI, assetPipelineAPI, layerSegmentAPI } from '~/composables/useApi'
 import { openTaskCenter } from '~/composables/useTasks'
-import { frameStateAt } from '~/utils/segmentTimeline'
+import { frameStateAt, junctionHiddenLayerIds, stagedLayerIds } from '~/utils/segmentTimeline'
 import { baseFilterLayers, layerDocToSvg } from '~/utils/layerSvg'
 import { useLayerTextSpec } from '~/composables/useLayerTextSpec'
 import { mediaUrl } from '~/utils/url'
@@ -230,9 +232,10 @@ const inherited = computed(() => segment.value?.base_ref?.kind === 'inherit_prev
 const quality = computed(() => qualityWarningsOf(doc.value, timeline.value.keyframes, {width:specW.value,height:specH.value}))
 const currentQuality = computed(() => quality.value.find(q => q.frame_index === keyframeIndex.value) || null)
 const aspectIssue = computed(() => baseAspectIssue(doc.value.base, {width:specW.value,height:specH.value}))
+const combo = computed(() => props.state?.storyboard?.combo || props.state?.combo || '')
 const junction = computed(() => {
-  const combo=props.state?.storyboard?.combo || props.state?.combo
-  return combo==='C' ? {slot:'last',t:duration.value} : combo==='D' ? {slot:'first',t:0} : null
+  const value = combo.value
+  return value==='C' ? {slot:'last',t:duration.value} : value==='D' ? {slot:'first',t:0} : null
 })
 /**
  * 文本框检查的「拍」（#96）：每个关键帧可见的图层集合；不属于任何关键帧的图层单独成一拍
@@ -346,12 +349,24 @@ async function switchToCurrentVersion() {
   await save()
 }
 
-/** 某一时刻：取景框 + 图层不透明度都由时间线插值得出（口径同后端 frameStateAt） */
-const frame = computed(() => frameStateAt(
-  timeline.value,
-  time.value,
-  (doc.value?.layers || []).filter(layer => layer.type === 'text').map(layer => layer.id),
-))
+/**
+ * 某一时刻：取景框 + 图层不透明度都由时间线插值得出（口径同后端 frameStateAt）。
+ * 先出后进的图层是模板文本框 + 画中画 image 层（#110）：同一块版面替换时不能叠着露两份。
+ */
+const frame = computed(() => frameStateAt(timeline.value, time.value, stagedLayerIds(doc.value?.layers || [])))
+/**
+ * 衔接帧时刻（C 末帧 / D 首帧）：文字层与画中画整层不出现（#110），预览必须同口径，
+ * 否则人会以为「渲染出来会带这张小地图」。
+ */
+const atJunction = computed(() => Boolean(junction.value) && Math.abs(time.value - junction.value.t) < 1e-6)
+const junctionHiddenIds = computed(() => (atJunction.value ? junctionHiddenLayerIds(doc.value?.layers || [], combo.value) : []))
+const previewOpacity = computed(() => {
+  const opacity = frame.value.opacity
+  if (!junctionHiddenIds.value.length) return opacity
+  const next = { ...opacity }
+  for (const id of junctionHiddenIds.value) next[id] = 0
+  return next
+})
 /**
  * 叠加层按整幅画出，裁切交给外层 DOM，这样底图/滤镜/图层共用同一个取景框。
  * `visibleIds` 必须显式给：`opacity` 只覆盖时间线提到过的图层，缺省 key 在
@@ -360,9 +375,9 @@ const frame = computed(() => frameStateAt(
 const frameSvg = computed(() => {
   void specVersion.value
   return layerDocToSvg(doc.value, { width: specW.value, height: specH.value }, {
-    opacity: frame.value.opacity,
+    opacity: previewOpacity.value,
     viewport: {x:0,y:0,w:1,h:1},
-    visibleIds: Object.keys(frame.value.opacity).filter(id => frame.value.opacity[id] > 0),
+    visibleIds: Object.keys(previewOpacity.value).filter(id => previewOpacity.value[id] > 0),
     resolveImage: path => mediaUrl(path),
   })
 })

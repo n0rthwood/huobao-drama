@@ -193,8 +193,9 @@ test('documentary agents get the narration-first tool variants and drama agents 
   assert.ok(!result.dramaBreaker.includes('narration_text copied verbatim'))
   assert.ok(result.docNarration.includes('ONLY add pronunciation markers'))
   assert.ok(!result.dramaNarration.includes('ONLY add pronunciation markers'))
-  // 变体只换 save_storyboards：#46 的 read_image 等其它工具两类项目都在
-  assert.deepEqual(result.docBreakerKeys, result.dramaBreakerKeys)
+  // 纪录片拆分/补镜只写骨架（#110）：没有 update_storyboard，其余工具（read_image 等）与剧情项目一致
+  assert.deepEqual(result.docBreakerKeys, result.dramaBreakerKeys.filter(key => key !== 'updateStoryboard'))
+  assert.ok(result.dramaBreakerKeys.includes('updateStoryboard'))
   assert.ok(result.docBreakerKeys.includes('readImage'))
 })
 

@@ -37,11 +37,14 @@ export interface GroundingViolation {
     | 'anchor_not_on_base'
     | 'anchor_required_blank'
     | 'anchor_asset_ambiguous'
+    | 'image_anchor_missing'
+    | 'image_anchor_on_base'
     | 'image_source_missing'
     | 'base_image_missing'
     | 'semantic_version_unverifiable'
     | 'reference_asset_unresolved'
     | 'reference_image_missing'
+    | 'faithful_in_diffusion'
   /** planned_layers 下标（从 0 起）；不是图层问题时为 null */
   layer_index: number | null
   /** must_mark 下标（从 0 起）；不是 must_mark 问题时为 null */
@@ -218,21 +221,40 @@ export function checkDesignCardGrounding(
     }
 
     if (layer.type === 'image') {
-      // image 层画的是资产图片本身（无锚点时用底图），不要求语义；但那张图必须真的存在
-      const source = anchorAsset ?? baseAsset
-      if (anchor && !anchorAsset) {
+      // #110：image 层画的是「放进画面的那张图」（细节地图/全览地图/档案画/器物图），
+      // 必须 anchor 到本集一张有图的资产；既不是语义条目，也不再回落到底图——
+      // 回落等于把底图再贴一遍，画面什么新信息都没有。
+      if (!anchor) {
+        out.push({
+          code: 'image_anchor_missing',
+          layer_index: index,
+          must_mark_index: null,
+          message: `${layerTag(index, layer)} 是画中画（image）层，但没有 anchor：anchor.asset_id 必须指向本集一张有图的资产（要放进画面的那张图本身），不能省略，也不能用底图代替。`,
+        })
+        continue
+      }
+      if (base && anchor.asset_id === base.asset_id) {
+        out.push({
+          code: 'image_anchor_on_base',
+          layer_index: index,
+          must_mark_index: null,
+          message: `${layerTag(index, layer)} 的 anchor.asset_id=${anchor.asset_id} 就是本镜图层段底图「${baseAsset?.name ?? `资产 ${base.asset_id}`}」：画中画要放另一张图（细节图/全览图/档案画），不能把底图再贴一遍。`,
+        })
+        continue
+      }
+      if (!anchorAsset) {
         out.push({
           code: 'semantic_not_found',
           layer_index: index,
           must_mark_index: null,
           message: `${layerTag(index, layer)} 的 anchor.asset_id=${anchor.asset_id} 不在本集。`,
         })
-      } else if (!source?.image) {
+      } else if (!anchorAsset.image) {
         out.push({
           code: 'image_source_missing',
           layer_index: index,
           must_mark_index: null,
-          message: `${layerTag(index, layer)} 没有可用的图片：${source ? `「${source.name}」当前没有生成图/原件` : '既没有 anchor 指向的资产，也没有图层段底图'}。请改用确实已有图片的资产，或换成本镜资产支持的其他表达。`,
+          message: `${layerTag(index, layer)} 指向的「${anchorAsset.name}」当前没有生成图/原件，不能放进画面。请改用确实已有图片的资产，或换成本镜资产支持的其他表达。`,
         })
       }
       continue
@@ -334,6 +356,17 @@ export function checkDesignCardGrounding(
     // 参考资产是**送进生成模型的图**：现在没有图就不是可用依据，不能按「以后会出图」规划
     // 「引用了不存在的资产」任何组合都不许写；「现在还没有图」只在真有生成段时才阻断
     const asset = assetOf(ctx, ref.id, ref.kind)
+    // #110：忠实素材与地图是确定性绘制的证据图，扩散模型会重画/扭曲它们——
+    // 展示这些图必须走图层段（底图/画中画），不能当成生成段的参考图。
+    if (genSegment && asset && (asset.faithful || asset.is_map)) {
+      out.push({
+        code: 'faithful_in_diffusion',
+        layer_index: null,
+        must_mark_index: null,
+        message: `gen_plan.reference_assets 第 ${index + 1} 条「${asset.name}」是${asset.is_map ? '地图' : '忠实素材'}：忠实素材/地图不能进扩散生成（会被重画、扭曲），改用图层段承载——把它设成本镜底图或画中画层，生成段只参考需要演绎的角色/场景。`,
+      })
+      continue
+    }
     if (genSegment && !asset?.image) {
       out.push({
         code: 'reference_image_missing',
@@ -383,7 +416,7 @@ ${inventory}
 1. 以现有资产和既有制作能力完成设计。设计必须能依据当前任务可用的资产图像、属性、语义和既有渲染能力实现；不得把尚未存在的信息、尚未创建的标注、猜测的点位或路线写成已经具备的实现条件。
 2. 选择资产前先确认所需依据。先读与该用途相关的现有信息，确认实际引用的资产及版本；文件名、资产标题、其他版本的图片或其他资产的语义，都不能代替本次引用对象的证据。涉及具体画面内容时用 read_image 看原图确认，不要声称看过没读过的内容。
 3. 区分「尚未读取」与「已确认不存在」。没读就先读；读过确认没有，就不能继续当它存在，也不能用「待人工补充」作为完成设计的理由。
-4. 所有依赖都必须有真实、相容、可执行的依据。要绑定资产内具体位置、对象、路线或区域的图层，必须引用**本镜底图那张资产、那个版本**上真实存在、含义与类型相容、且带所需几何的语义：polygon / polyline 要带折点的 region 或 line（polygon 至少 3 点，polyline 至少 2 点），marker 要 point（坐标），label 的定位框要 label（文字框）。语义 ID / 名称只能取自上面的真实清单；不得杜撰，不得用资产名冒充语义，不得借用其他资产或不相容版本上的同名语义；语义存在但缺少所需几何同样不能算依据。底图与生成段 reference_assets 必须是**现在就有图**的资产（有原件或已生成图），不能按「以后会出图」规划；把底图钉在某个 version_task_id 时，该资产的标注必须能确认是针对那一版做的，确认不了就不要钉版本。
+4. 所有依赖都必须有真实、相容、可执行的依据。要绑定资产内具体位置、对象、路线或区域的图层，必须引用**本镜底图那张资产、那个版本**上真实存在、含义与类型相容、且带所需几何的语义：polygon / polyline 要带折点的 region 或 line（polygon 至少 3 点，polyline 至少 2 点），marker 要 point（坐标），label 的定位框要 label（文字框）。语义 ID / 名称只能取自上面的真实清单；不得杜撰，不得用资产名冒充语义，不得借用其他资产或不相容版本上的同名语义；语义存在但缺少所需几何同样不能算依据。底图与生成段 reference_assets 必须是**现在就有图**的资产（有原件或已生成图），不能按「以后会出图」规划。**画中画（image）层的 anchor.asset_id 指向要放进画面的那张资产本身**（细节地图/全览地图/档案画/器物图），不是语义条目、也不能是本镜底图；**地图与忠实素材（faithful）不能写进 gen_plan.reference_assets**——它们只能由图层段确定性渲染，送进扩散模型会被重画；把底图钉在某个 version_task_id 时，该资产的标注必须能确认是针对那一版做的，确认不了就不要钉版本。
 5. 按实际依赖判断是否需要锚定。纯章节标题、定义、说明类的 label / card，以及不指向资产内具体对象或位置的屏幕排版元素，可以明确不写 anchor。但不要因为图层类型是 label 或 card 就自动免除依据：内容实际指向某个地点、区域或路线时，仍须满足第 4 条。**空锚点本身不是一律错误；需要锚定却留空才是错误**——留空的几何层在渲染时会被整层丢弃，等于这条信息没有出现。
 6. 没有语义标注的图片，可以用于它实际支持的用途：作为背景、整体展示，或其他不依赖缺失标注的表达。不要求每张图都先标注。但不得把普通河网当成某条特定历史路线，不得把「图里有河流」说成「已经具备这条航线的可执行路径」。
 7. 可以更换表现手法，不得静默丢失任务要求。某种表现方式做不到时，改用现有资产支持的其他表达，但必须保留全部信息点，并满足脚本/用户明确要求的视觉任务；不得修改旁白逐字契约，不得把必须由画面呈现的关系静默退成纯旁白。AI 自选的装饰手法可以替换，用户明确要求的视觉功能不能自行取消。

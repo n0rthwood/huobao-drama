@@ -444,10 +444,8 @@ export async function inspectComposeInputs(
     if (sb.keyframesJunctionHash !== junction.hash || !sb.keyframesConfirmed) return fail(`${shot} 的衔接帧已变化，请重新确认故事关键帧并生成视频`)
   }
   if (documentary && combo !== 'A' && !sb.keyframesConfirmed) return fail(`${shot} 的故事关键帧未确认`)
+  // 生成段是扩散模型产出的，仍有 15 秒上限；图层段是确定性渲染，**没有**时长上限（Issue #110）
   if (documentary && combo !== 'A' && modelFacts && modelFacts.durationMs > 15000 + 1) return fail(`${shot} 的生成段实测超过 15 秒`)
-  for (const facts of [replaceFacts, preFacts, postFacts]) {
-    if (documentary && facts && facts.durationMs > 30000 + 1) return fail(`${shot} 的图层段实测超过 30 秒`)
-  }
 
   if (replaceClip) {
     if (!replaceClip.render_path) return fail(`${shot} 的确定性片段还没有渲染，请先渲染片段`)
