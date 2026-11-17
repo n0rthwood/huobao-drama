@@ -15,7 +15,7 @@ import { mapProjectionFor, type MapSpec } from '../geo/base-render.js'
 import { renderReliefBase } from '../geo/relief-render.js'
 import { chooseDemZoom, ensureDemTiles, type DemTileFetcher } from '../geo/terrain-cache.js'
 import { datasetSourceInfo } from '../geo/datasets.js'
-import { expandBboxToAspect, PIP_COLORS, type MapPipFrame, type MapPipImage, type MapPipOutput } from './frames.js'
+import { expandBboxToAspect, frameRectOn, PIP_COLORS, type MapPipFrame, type MapPipImage, type MapPipOutput } from './frames.js'
 import { pipLabels } from './labels.js'
 import type { PipSlot } from './layouts.js'
 
@@ -49,13 +49,6 @@ async function writeImage(buffer: Buffer, prefix: string): Promise<MapPipImage> 
   return { path: rel, width: meta.width ?? 0, height: meta.height ?? 0, sha256 }
 }
 
-/** 框在全览像素里的矩形（与全览用同一投影） */
-function frameRectOn(overviewSpec: MapSpec, size: Size, bbox: Bbox): Rect {
-  const projection = mapProjectionFor(overviewSpec, size)
-  const a = projection([bbox[0], bbox[3]]) ?? [0, 0]
-  const b = projection([bbox[2], bbox[1]]) ?? [0, 0]
-  return [Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[0], b[0]), Math.max(a[1], b[1])]
-}
 
 const badge = (cx: number, cy: number, r: number, color: string, no: number): string =>
   `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${r}" fill="${color}" stroke="#f7f2e4" stroke-width="4"/>`

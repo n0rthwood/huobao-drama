@@ -416,7 +416,7 @@
             </div>
           </header>
 
-          <div class="dialog-body mat-detail-body">
+          <div ref="matDetailBody" class="dialog-body mat-detail-body">
             <div class="mat-detail-shell">
               <!-- 左侧：视觉预览 -->
               <aside class="mat-detail-preview-panel">
@@ -430,16 +430,19 @@
                 <button
                   type="button"
                   class="mat-detail-media-frame"
-                  :disabled="!matHasImage(editTarget)"
+                  :disabled="!matHasImage(editTarget) || mapPreviewFailed"
                   @click.stop="openAssetViewer(editTarget)"
                 >
-                  <img v-if="matHasImage(editTarget)" :src="thumbOf(assetSrc(editTarget))" @error="thumbFallback($event, assetSrc(editTarget))" />
-                  <span v-else class="mat-detail-media-empty">
+                  <img v-if="matHasImage(editTarget) && !mapPreviewFailed" :src="thumbOf(assetSrc(editTarget))" loading="lazy" @error="mapImageError($event, assetSrc(editTarget), assetTypeOf(editTarget) === 'map')" />
+                  <span v-if="mapPreviewFailed" class="mat-detail-media-empty">{{ t('mapPreview.imageMissing') }}</span>
+                  <span v-else-if="!matHasImage(editTarget)" class="mat-detail-media-empty">
                     <svg v-if="editTarget.kindKey === 'character'" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                     <svg v-else-if="editTarget.kindKey === 'prop'" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
                     <svg v-else width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                   </span>
                 </button>
+                <MediaTime v-if="editTarget.image_generated_at" :at="editTarget.image_generated_at" />
+                <MapAssetPreview v-if="assetTypeOf(editTarget) === 'map'" :key="editTarget.id" :item="editTarget" :assets="materials.filter(m => m.kindKey === 'prop')" @open-asset="openPipAsset" @preview="openRefViewer" />
 
                 <div class="mat-detail-meta-row">
                   <div class="mat-detail-meta-item">
@@ -765,6 +768,7 @@ import AssetBrowserDialog from '~/components/AssetBrowserDialog.vue'
 import MediaLibraryDialog from '~/components/MediaLibraryDialog.vue'
 import FinalPromptSourceBadge from '~/components/FinalPromptSourceBadge.vue'
 import MapStudioEntry from '~/components/MapStudioEntry.vue'
+import MapAssetPreview from '~/components/MapAssetPreview.vue'
 import { dropLegacyMapDeeplinks } from '~/composables/useQuerySync'
 import { useNowTicker, ringPropsFromTask, isActiveTaskStatus } from '~/composables/useTaskProgress'
 
@@ -1273,6 +1277,19 @@ function fmtDate(s) {
 const editDialog = ref(false)
 const editSaving = ref(false)
 const editTarget = ref(null)
+const matDetailBody = ref(null)
+function openPipAsset(id) {
+  const target = materials.value.find(m => m.kindKey === 'prop' && m.id === Number(id))
+  if (!target) { toast.error(t('deeplink.missing')); return }
+  openEdit(target)
+  nextTick(() => { if (matDetailBody.value) matDetailBody.value.scrollTop = 0 })
+}
+const mapPreviewFailed = ref(false)
+watch(() => [editTarget.value?.id, editTarget.value?.image_url], () => { mapPreviewFailed.value = false })
+function mapImageError(event, src, isMap) {
+  if (isMap && event.target.dataset.fbk) mapPreviewFailed.value = true
+  else thumbFallback(event, src)
+}
 const editDraft = reactive({})
 
 /** 素材弹窗可编辑的信息字段（按类型）；最终提示词单独处理 */
@@ -2139,9 +2156,9 @@ onUnmounted(() => {
 }
 .is-map-dialog .mat-detail-head, .is-map-dialog .mat-detail-foot { flex: 0 0 auto; }
 .is-map-dialog .mat-detail-body { flex: 1 1 auto; min-height: 0; overflow: auto; }
-.is-map-dialog .mat-detail-shell { grid-template-columns: minmax(0, 1fr); }
-.is-map-dialog .mat-detail-preview-panel { position: static; display: none; }
-.is-map-dialog .mat-detail-map-panel { overflow: visible; min-width: 1280px; }
+.is-map-dialog .mat-detail-shell { grid-template-columns: minmax(250px, 380px) minmax(0, 1fr); }
+.is-map-dialog .mat-detail-preview-panel { position: static; }
+.is-map-dialog .mat-detail-map-panel { min-width: 0; overflow-x: auto; }
 .mat-detail-head {
   display: flex; align-items: center; justify-content: space-between;
   gap: 12px; padding: 14px 16px;

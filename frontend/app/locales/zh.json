@@ -3639,6 +3639,16 @@
       "legacy": "该构图使用旧版自由文字图层（{n} 个），建议重新生成概念以获得模板文本框。"
     }
   },
+  "mapPreview": {
+    "readOnly": "版本仅供查看，不能切换当前成图。",
+    "versionsUnavailable": "无法加载版本列表",
+    "imageMissing": "图片不可用",
+    "targetMissing": "关联资产已删除或未关联，无法打开。",
+    "stale": "已过期",
+    "overview": "所属全览",
+    "openOverview": "查看全览",
+    "shotCount": "关联 {n} 个分镜"
+  },
   "mapStudio": {
     "styles": {
       "title": "制图主题",

@@ -10,6 +10,7 @@
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
+    "d3-geo": "^3.1.2",
     "driver.js": "^1.8.0",
     "lucide-vue-next": "^0.511.0",
     "nuxt": "^3.17.5",
@@ -20,6 +21,7 @@
     "vue-sonner": "^1.2.4"
   },
   "devDependencies": {
+    "@types/d3-geo": "^3.1.1",
     "typescript": "^5.8.3"
   },
   "allowScripts": {

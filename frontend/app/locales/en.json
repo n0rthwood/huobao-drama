@@ -3639,6 +3639,16 @@
       "legacy": "This concept uses {n} legacy free-text layers; regenerate the concept to get template text boxes."
     }
   },
+  "mapPreview": {
+    "readOnly": "Versions are read-only; the current image cannot be changed here.",
+    "versionsUnavailable": "Could not load versions",
+    "imageMissing": "Image unavailable",
+    "targetMissing": "The linked asset is deleted or not associated and cannot be opened.",
+    "stale": "Outdated",
+    "overview": "Parent overview",
+    "openOverview": "View overview",
+    "shotCount": "{n} associated shots"
+  },
   "mapStudio": {
     "styles": {
       "title": "Cartographic theme",
