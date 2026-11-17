@@ -46,8 +46,10 @@ import {
 import {
   checkStoryboardRefs,
   computePoolAssets,
+  emptyTargetBindings,
   loadEpisodeAssets,
   loadEpisodeManualSelections,
+  loadEpisodeTargetBindings,
   loadStoryboardTargetAssets,
   promptFieldsOf,
 } from '../services/storyboard-assets.js'
@@ -948,6 +950,8 @@ app.get('/:episode_id/storyboards', async (c) => {
   const episodeAssets = await loadEpisodeAssets(episodeId)
   // 设计卡的解析上下文（#57）：整集一次装配，逐镜重算引用是否还成立、问题列表读时重算
   const designCardContext = loadDesignCardContext(episodeId)
+  // 整集绑定一次查完（#118 C）：逐镜 checkStoryboardRefs/loadStoryboardTargetAssets 不再各自重建整集上下文
+  const bindingsByShot = await loadEpisodeTargetBindings(episodeId)
   // 本镜资产池（Issue #43）：有效池 = 手选 ∪ 5 个提示词当前 @；整集手选一次查完
   const manualSelections = await loadEpisodeManualSelections(rows.map(row => row.id))
   // 旁白与融合状态一律由服务端算好（前端不自己推 URL 布尔）：
@@ -994,7 +998,7 @@ app.get('/:episode_id/storyboards', async (c) => {
     }
     return {
       ...toSnakeCase(row),
-      target_assets: await loadStoryboardTargetAssets(row, episodeAssets),
+      target_assets: await loadStoryboardTargetAssets(row, episodeAssets, bindingsByShot.get(row.id) ?? emptyTargetBindings()),
       pool_assets: computePoolAssets(episodeAssets, manualSelections.get(row.id) || [], promptFieldsOf(row)),
       field_saved_at: parseFieldSavedAt(row.fieldSavedAt),
       // 分镜设计卡（#57）：列存 JSON 字符串，对外一律给按当前语义标注重算过的对象 + 问题列表
@@ -1003,7 +1007,11 @@ app.get('/:episode_id/storyboards', async (c) => {
         return { combo: resolved.combo, design_card: resolved.card, design_card_issues: resolved.issues }
       })(),
       ref_issues: [
-        ...await checkStoryboardRefs(row, episodeAssets),
+        ...await checkStoryboardRefs(row, episodeAssets, {
+          cardCtx: designCardContext,
+          bindings: bindingsByShot.get(row.id) ?? emptyTargetBindings(),
+          documentary: resolveDramaProjectType(narrationEpisode?.dramaId) === 'documentary',
+        }),
         ...narrationIssues({
           episodeNarrationEnabled,
           shotNarrationEnabled: row.narrationEnabled !== false,
