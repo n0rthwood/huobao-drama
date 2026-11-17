@@ -601,6 +601,14 @@ def derive(prj: Project, write: bool = True) -> dict:
         if "mid" in required and not (0 < float(s.get("mid_frame_time") or 0) < dur):
             kf_problems.append(f"mid_frame_time {s.get('mid_frame_time')} outside (0,{dur})")
         kf_problems += [f"ref_issue:{b}" for b in blocks if b not in ("narration_too_long", "narration_voice_stale", "empty_video_prompt")]
+        # Per-slot blocking view (server gates each slot by its own prompt field; #110):
+        # a card_ref_unmet on the mid prompt must not block the first/last slots.
+        slot_field = {"first": "first_frame_prompt", "mid": "mid_frame_prompt", "last": "last_frame_prompt"}
+        slot_blocks = {sl: sorted({i.get("code") for i in (s.get("ref_issues") or [])
+                                   if i.get("severity") == "block" and (not i.get("fields") or slot_field[sl] in i.get("fields"))}
+                                  - {"narration_too_long", "narration_voice_stale", "empty_video_prompt"})
+                       for sl in SLOTS}
+        slot_empty = {sl: sl in required and not (s.get(f"{sl}_frame_prompt") or "").strip() for sl in SLOTS}
         tl = timeline_check(s.get("video_prompt") or "", dur, s.get("mid_frame_time") if "mid" in required else None)
         vp_problems = (["video_prompt empty"] if not (s.get("video_prompt") or "").strip() else []) + tl["issues"]
         saved = s.get("field_saved_at") or {}
@@ -617,6 +625,7 @@ def derive(prj: Project, write: bool = True) -> dict:
                           "duration_ms": audio.get("duration_ms"), "text": s.get("narration_text") or ""},
             "subtitle_ok": bool(s.get("subtitle_url")),
             "kf_prompts": {"ok": not kf_problems, "problems": kf_problems, "required_slots": required,
+                           "slot_blocks": slot_blocks, "slot_empty": slot_empty,
                            "saved_at": max(int(saved.get(f) or 0) for f in KF_PROMPT_FIELDS)},
             "video_prompt": {"ok": not vp_problems, "problems": vp_problems, "warnings": tl["warnings"], "hash": vp_hash,
                              "saved_at": int(saved.get("video_prompt") or 0)},
@@ -930,8 +939,13 @@ def guard(ctx: dict, method: str, path: str, body: dict, declared_ids: list[int]
             r = shot(sid)
             if not r["narration"]["ok"]:
                 errors.append(f"{sid}: narration not voiced/current (keyframes come after measured audio)")
-            if not r["kf_prompts"]["ok"]:
-                errors.append(f"{sid}: keyframe prompts invalid {r['kf_prompts']['problems']}")
+            kp = r["kf_prompts"]
+            slot_problems = ([f"{slot}_frame_prompt empty"] if kp.get("slot_empty", {}).get(slot) else [])
+            slot_problems += [f"ref_issue:{b}" for b in kp.get("slot_blocks", {}).get(slot, [])]
+            if slot == "mid":
+                slot_problems += [p for p in kp["problems"] if p.startswith("mid_frame_time")]
+            if slot_problems:
+                errors.append(f"{sid}/{slot}: keyframe prompt invalid {slot_problems}")
             if r["video"]["queued"] or r["frozen_by_calls"]:
                 errors.append(f"{sid}: inputs frozen (queued video or unfinished call)")
             stv = r["keyframes"]["slots"].get(slot)
