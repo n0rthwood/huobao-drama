@@ -1734,6 +1734,10 @@
         "warn": "경고 {n}개: {message}",
         "block": "차단 {n}개: {message}"
       },
+      "pip": {
+        "pick": "화면 속 화면 이미지 선택",
+        "unset": "이미지 없음(클릭하여 선택)"
+      },
       "layerType": {
         "polygon": "다각형",
         "polyline": "폴리라인",

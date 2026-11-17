@@ -606,6 +606,17 @@
                       <option value="" disabled>{{ t('layerText.add.rolePlaceholder') }}</option>
                       <option v-for="role in textVideoRoles" :key="role" :value="role">{{ roleName(role) }}</option>
                     </select>
+                    <!-- 画中画（#110）：image 层指向哪张图必须看得见、换得了——空文本框曾让人以为没绑定 -->
+                    <button
+                      v-else-if="layer.type === 'image'"
+                      type="button"
+                      :class="['btn btn-sm dc-row-image', { 'dc-row-image-missing': !layer.anchor?.asset_id }]"
+                      :aria-label="t('episode.design.pip.pick')"
+                      @click="openPipPicker(index)"
+                    >
+                      <img v-if="pipImage(layer)" :src="thumbOf(mediaUrl(pipImage(layer)))" alt="" loading="lazy" class="dc-row-image-thumb" @error="thumbFallback($event, mediaUrl(pipImage(layer)))">
+                      <span>{{ anchorAssetName(layer) || t('episode.design.pip.unset') }}</span>
+                    </button>
                     <input
                       v-else
                       class="input dc-row-text" type="text" :value="layer.text || ''"
@@ -1124,6 +1135,27 @@ const baseCandidate = computed(() => (ctx.value.base_candidates || [])
 function assetImage(kind, id) {
   const asset = (ctx.value.assets || []).find(item => item.kind === kind && Number(item.id) === Number(id))
   return asset?.image || null
+}
+/** 画中画（#110）：image 层锚定的资产（种类不定：地图/档案画是 prop，肖像是 character） */
+function pipAsset(layer) {
+  const id = Number(layer?.anchor?.asset_id)
+  if (!id) return null
+  return (ctx.value.assets || []).find(item => Number(item.id) === id) || null
+}
+function pipImage(layer) {
+  return pipAsset(layer)?.image || null
+}
+function anchorAssetName(layer) {
+  return pipAsset(layer)?.name || ''
+}
+function openPipPicker(index) {
+  picker.field = 'pip'
+  picker.mode = 'asset'
+  picker.layerIndexes = [index]
+  picker.anchorId = ''
+  const asset = pipAsset(layerPlan.value.planned_layers[index])
+  picker.selected = asset ? [{ kind: asset.kind, id: asset.id, asset_id: asset.id, name: asset.name }] : []
+  picker.open = true
 }
 function previewImage(path, title, versionTaskId) {
   if (!path) return
@@ -1810,6 +1842,21 @@ function onPicked(items) {
     patchDraft({ layer_plan: { ...layerPlan.value, planned_layers: layers } })
     saveNow()
     // 等这一镜的保存队列落库后再刷新审计，否则看到的还是改绑前的旧警告
+    void (saveQueues.get(selectedId.value) || Promise.resolve()).then(() => { loadAudit(); emit('refresh') })
+    return
+  }
+  if (picker.field === 'pip') {
+    const pick = items?.[0]
+    const indexes = picker.layerIndexes || []
+    picker.layerIndexes = null
+    if (!pick || !indexes.length) return
+    // image 层只锚资产本身（#110）：不带语义条目
+    const anchor = { asset_id: Number(pick.asset_id ?? pick.id), name: String(pick.name || '') }
+    const layers = layerPlan.value.planned_layers.map((layer, index) => (
+      indexes.includes(index) ? { ...layer, anchor: { ...anchor } } : layer
+    ))
+    patchDraft({ layer_plan: { ...layerPlan.value, planned_layers: layers } })
+    saveNow()
     void (saveQueues.get(selectedId.value) || Promise.resolve()).then(() => { loadAudit(); emit('refresh') })
     return
   }
@@ -2582,6 +2629,10 @@ onBeforeUnmount(() => {
 .dc-row { display: flex; align-items: center; gap: 4px; width: 100%; }
 .dc-row-type { width: auto; min-width: max-content; flex: 0 0 auto; }
 .dc-row-text { flex: 1; min-width: 0; }
+.dc-row-image { flex: 1; min-width: 0; display: inline-flex; align-items: center; gap: 6px; justify-content: flex-start; overflow: hidden; }
+.dc-row-image span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dc-row-image-thumb { width: 22px; height: 22px; object-fit: cover; border-radius: 3px; flex: 0 0 auto; }
+.dc-row-image-missing { border-color: var(--danger, #c0472e); color: var(--danger, #c0472e); }
 .dc-row-at { width: 80px; }
 .dc-select { height: 26px; padding: 2px 8px; font-size: 12px; line-height: normal; }
 .dc-num { width: 80px; height: 24px; font-size: 12px; }
