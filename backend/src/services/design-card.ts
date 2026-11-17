@@ -1,7 +1,7 @@
 /**
  * 分镜设计卡（design card）— `storyboards.design_card` 的唯一 schema / 规范化 / 校验（Issue #57）
  *
- * 一镜最多由两段组成：▣ 图层段（确定性渲染，≤30s）与 ▶ 生成段（视频模型，≤15s），
+ * 一镜最多由两段组成：▣ 图层段（确定性渲染，时长不设上限）与 ▶ 生成段（视频模型，≤15s），
  * 二者不互斥。段组合 A/B/C/D 没有默认值，可由 AI 填写并由人工审阅或修改。
  *
  * 设计卡是导演分镜单：叙事（信息点）→ 结构（组合 + 预算）→ 图层段计划 → 生成段计划 → 理由，
@@ -44,9 +44,7 @@ export type PlannedLayerType = typeof PLANNED_LAYER_TYPES[number]
 
 export type AssetKindName = 'character' | 'scene' | 'prop'
 
-/** 图层段硬上限（秒）：确定性渲染 */
-export const MAX_LAYER_SEGMENT_SECONDS = 30
-/** 生成段硬上限（秒）：视频模型，与 comfyui-video 的 clampDuration 对齐 */
+/** 生成段硬上限（秒）：视频模型，与 comfyui-video 的 clampDuration 对齐（图层段没有上限，Issue #110） */
 export const MAX_GEN_SEGMENT_SECONDS = 15
 /** 预算余量低于这个值就提示「偏紧」 */
 export const BUDGET_TIGHT_SECONDS = 0.5
@@ -136,12 +134,14 @@ export interface DesignCard {
 export type CardIssueCode =
   // 阻断
   | 'combo_missing'
-  | 'budget_over_layer'
   | 'budget_missing'
   | 'budget_over_gen'
   | 'budget_under_narration'
   | 'missing_base'
   | 'gen_slot_missing'
+  // 阻断（#110：画中画层的资产契约 / 忠实素材与地图不进扩散）
+  | 'pip_invalid'
+  | 'faithful_in_diffusion'
   // 阻断/警告（#96 模板文本框）
   | 'text_plan_invalid'
   | 'text_plan_warning'
@@ -179,6 +179,8 @@ export interface DesignCardAssetEntry {
   name: string
   exposition?: boolean
   faithful?: boolean
+  /** 道具是地图资产（`props.asset_type='map'`）：地图是确定性渲染的忠实素材，永不进扩散生成（Issue #110） */
+  is_map?: boolean
   image?: string | null
   semantics?: DesignCardSemanticEntry[]
   /**
@@ -309,6 +311,28 @@ function normalizeSemanticRef(raw: unknown, ctx: DesignCardContext | undefined):
   return ref
 }
 
+/**
+ * 画中画（`type:'image'`）层的锚点（Issue #110）：只认 `asset_id`——它指向「放进画面的那张图」，
+ * 不是语义条目（旧卡把语义 id 写进 image 层锚点，坐标对不上任何东西）。资产解析不到时保留并标
+ * `unresolved`，读时由 `pip_invalid` 阻断；`semantic_id`/`name` 一律清空。
+ */
+function normalizeImageAnchor(raw: unknown, ctx: DesignCardContext | undefined): SemanticRef | null {
+  if (!raw || typeof raw !== 'object') return null
+  const row = raw as Record<string, unknown>
+  const assetId = Number.isInteger(row.asset_id) ? Number(row.asset_id) : NaN
+  if (!Number.isInteger(assetId)) return null
+  const ref: SemanticRef = { asset_id: assetId, semantic_id: '', name: '' }
+  if (!ctx) return ref
+  const asset = findAsset(ctx, assetId, toAssetKind(row.asset_kind))
+  if (!asset) {
+    ref.unresolved = true
+    ref.unresolved_reason = `资产 ${assetId} 不在本集`
+    return ref
+  }
+  ref.name = asset.name
+  return ref
+}
+
 function normalizeAssetRef(raw: unknown, ctx: DesignCardContext | undefined): AssetRef | null {
   if (!raw || typeof raw !== 'object') return null
   const row = raw as Record<string, unknown>
@@ -388,7 +412,8 @@ function normalizePlannedLayers(raw: unknown, ctx: DesignCardContext | undefined
     }
     const body = text(row.text, 200)
     if (body) item.text = body
-    const anchor = normalizeSemanticRef(row.anchor, ctx)
+    // 画中画（image）层的 anchor 只指向「放进去的那张图」的资产 id，不是语义条目（Issue #110）
+    const anchor = item.type === 'image' ? normalizeImageAnchor(row.anchor, ctx) : normalizeSemanticRef(row.anchor, ctx)
     if (anchor) item.anchor = anchor
     items.push(item)
   }
@@ -412,7 +437,8 @@ export function normalizeDesignCard(raw: unknown, ctx?: DesignCardContext): Desi
     version: 2,
     info_points: normalizeInfoPoints(row.info_points),
     budget: {
-      layer_s: normalizeSeconds(budgetRaw.layer_s, MAX_LAYER_SEGMENT_SECONDS),
+      // 图层段没有上限（Issue #110）：15 秒只是扩散视频模型对生成段的约束
+      layer_s: normalizeSeconds(budgetRaw.layer_s, Number.POSITIVE_INFINITY),
       gen_s: normalizeSeconds(budgetRaw.gen_s, MAX_GEN_SEGMENT_SECONDS),
     },
     rationale: text(row.rationale, MAX_RATIONALE),
@@ -649,6 +675,59 @@ export function estimateCardBudget(
   }
 }
 
+export interface BudgetAdjustment {
+  from: { layer_s: number | null; gen_s: number | null }
+  to: { layer_s: number | null; gen_s: number | null }
+  reason: string
+}
+
+/**
+ * 预算按实测旁白自动补时（Issue #110，纯函数；AI 写入路径与前端一键延长同一口径）。
+ *
+ * - 有图层段的组合（A/C/D）：`layer_s + gen_s` 装不下「实测旁白 + 0.5 s 余量」时，
+ *   差额加到 `layer_s`（向上取整到 0.5 秒）。图层段是确定性渲染，**只加不减**。
+ * - B（整镜就是一个生成段）：`gen_s` 提到 `min(15, 实测旁白 + 0.5 s)`；实测超过 15 秒时
+ *   只能到 15，剩下的装不下由 `budget_under_narration` 阻断（改用 C/D）。
+ * - 没有实测秒数（配音还没测出来）时什么都不改：估算值不是事实。
+ */
+export function fitBudgetToNarration(
+  budget: { layer_s: number | null; gen_s: number | null },
+  combo: Combo | null,
+  measuredSeconds: number | null | undefined,
+): { budget: { layer_s: number | null; gen_s: number | null }; adjusted: BudgetAdjustment | null } {
+  const copy = { layer_s: budget.layer_s, gen_s: budget.gen_s }
+  if (!combo || typeof measuredSeconds !== 'number' || !Number.isFinite(measuredSeconds) || measuredSeconds <= 0) {
+    return { budget: copy, adjusted: null }
+  }
+  const target = measuredSeconds + BUDGET_TIGHT_SECONDS
+  const roundUpHalf = (value: number): number => Math.ceil(value * 2) / 2
+  const changed = (reason: string): { budget: typeof copy; adjusted: BudgetAdjustment } => ({
+    budget: copy,
+    adjusted: { from: { layer_s: budget.layer_s, gen_s: budget.gen_s }, to: { ...copy }, reason },
+  })
+  if (hasLayerSegment(combo) && copy.layer_s !== null) {
+    const total = copy.layer_s + (copy.gen_s ?? 0)
+    if (total < target) {
+      const next = roundUpHalf(target - (copy.gen_s ?? 0))
+      if (next > copy.layer_s) {
+        const before = copy.layer_s
+        copy.layer_s = next
+        return changed(`图层段 ${before}s → ${next}s：实测旁白 ${Math.round(measuredSeconds * 10) / 10}s + ${BUDGET_TIGHT_SECONDS}s 余量超过原预算 ${Math.round(total * 10) / 10}s，差额补进图层段`)
+      }
+    }
+    return { budget: copy, adjusted: null }
+  }
+  if (combo === 'B' && copy.gen_s !== null && copy.gen_s < target) {
+    const next = Math.min(MAX_GEN_SEGMENT_SECONDS, roundUpHalf(target))
+    if (next > copy.gen_s) {
+      const before = copy.gen_s
+      copy.gen_s = next
+      return changed(`生成段 ${before}s → ${next}s：实测旁白 ${Math.round(measuredSeconds * 10) / 10}s + ${BUDGET_TIGHT_SECONDS}s 余量超过原预算（生成段上限 ${MAX_GEN_SEGMENT_SECONDS}s）`)
+    }
+  }
+  return { budget: copy, adjusted: null }
+}
+
 export interface CardValidateInput {
   card: DesignCard | null
   combo: Combo | null
@@ -659,14 +738,21 @@ export interface CardValidateInput {
   mentioned?: Array<{ kind: AssetKindName; id: number }> | null
   /** 项目画幅（#96）：模板文本框按它的规范家族排版与校验；缺省时跳过文本框判定 */
   aspect?: string | null
+  /**
+   * 本集资产清单（#110）：`pip_invalid` 要判「画中画锚的资产在本集、有图、不是底图」，
+   * `faithful_in_diffusion` 要判参考素材是不是忠实素材/地图。缺省时只判结构上可判的部分。
+   */
+  assets?: DesignCardAssetEntry[]
 }
 
 /**
- * 校验分级（契约 §3.1）：
- * 阻断 = 未选 combo / 预算超限 / 总时长 < 旁白 / A·C·D 无底图 / B·C·D 缺非锁定槽位描述 /
- *        模板文本框不合法（溢出、缺必填字段、同拍冲突、画幅不符）；
+ * 校验分级（契约 §3.1 + #110）：
+ * 阻断 = 未选 combo / 生成段超限 / 总时长 < 旁白 / A·C·D 无底图 / B·C·D 缺非锁定槽位描述 /
+ *        模板文本框不合法（溢出、缺必填字段、同拍冲突、画幅不符）/
+ *        画中画层资产不合法（`pip_invalid`）/ 忠实素材与地图进扩散生成（`faithful_in_diffusion`）；
  * 警告 = 信息点无归属 / must_mark 未被计划图层锚定 / 参考素材未被 @ / 余量偏紧 / 引用解析不到 /
  *        文本框会被自动缩小或与锚定标注重叠。
+ * 图层段**没有**时长上限（Issue #110：15 秒只约束扩散生成段）。
  */
 export function validateDesignCard(input: CardValidateInput): CardIssue[] {
   const { card, combo } = input
@@ -679,9 +765,6 @@ export function validateDesignCard(input: CardValidateInput): CardIssue[] {
   if (!card) return issues
 
   const budget = estimateCardBudget(card, input.narrationText, input.measuredSeconds)
-  if ((budget.layer_s ?? 0) > MAX_LAYER_SEGMENT_SECONDS) {
-    add('budget_over_layer', 'block', `图层段 ${budget.layer_s}s 超过硬上限 ${MAX_LAYER_SEGMENT_SECONDS}s`)
-  }
   if ((budget.gen_s ?? 0) > MAX_GEN_SEGMENT_SECONDS) {
     add('budget_over_gen', 'block', `生成段 ${budget.gen_s}s 超过硬上限 ${MAX_GEN_SEGMENT_SECONDS}s`)
   }
@@ -690,14 +773,65 @@ export function validateDesignCard(input: CardValidateInput): CardIssue[] {
     || (hasGenSegment(combo) && budget.gen_s === null)
   if (combo && budgetMissing) add('budget_missing', 'block', '请填写每个启用段的时长预算')
   if (!budgetMissing && budget.narration_s > 0 && budget.total_s < budget.narration_s) {
-    add('budget_under_narration', 'block',
-      `总时长 ${budget.total_s}s 装不下旁白（${budget.measured ? '实测' : '估'} ${budget.narration_s}s），需加长段或精简画面`)
+    // B 是唯一真正装不下的组合（整镜就是一个 ≤15 秒的生成段）；A/C/D 有图层段，没有上限
+    add('budget_under_narration', 'block', combo === 'B' && budget.narration_s > MAX_GEN_SEGMENT_SECONDS
+      ? `实测 ${budget.narration_s}s 超过生成段 ${MAX_GEN_SEGMENT_SECONDS}s 上限：改用 C 或 D，用图层段承载余下时长`
+      : `总时长 ${budget.total_s}s 装不下旁白（${budget.measured ? '实测' : '估'} ${budget.narration_s}s），需加长段或精简画面`)
   } else if (!budgetMissing && budget.narration_s > 0 && budget.remain_s < BUDGET_TIGHT_SECONDS) {
     add('budget_tight', 'warn', `余量只剩 ${budget.remain_s}s，偏紧`)
   }
 
   if (hasLayerSegment(combo) && !card.layer_plan?.base) {
     add('missing_base', 'block', '图层段没有底图：请选一张已核验的忠实原件/已生成图，或选择承接上一镜')
+  }
+
+  /**
+   * #110 画中画层的资产契约：`image` 层画的是一张真实资产图（细节地图 / 全览地图 / 档案画 / 器物图）。
+   * 没有 `assets`（本集资产清单）时只判结构上仍可判的两条：缺锚点、锚到本镜底图。
+   */
+  if (combo === null || hasLayerSegment(combo)) {
+    const baseAssetId = card.layer_plan?.base?.kind === 'asset' ? card.layer_plan.base.asset_id : null
+    const assetById = (id: number): DesignCardAssetEntry | undefined => {
+      const matches = (input.assets || []).filter(asset => asset.id === id)
+      return matches.length === 1 ? matches[0] : undefined
+    }
+    ;(card.layer_plan?.planned_layers || []).forEach((layer, index) => {
+      if (layer.type !== 'image') return
+      const label = `第 ${index + 1} 层（画中画）`
+      const assetId = layer.anchor?.asset_id
+      if (assetId === undefined) {
+        add('pip_invalid', 'block',
+          `${label}没有 anchor.asset_id：画中画必须指向本集一张有图的资产（要放进去的那张说明图/细节图本身），不能用底图代替、也不能留空`, index)
+        return
+      }
+      if (baseAssetId !== null && assetId === baseAssetId) {
+        add('pip_invalid', 'block',
+          `${label}的 anchor.asset_id=${assetId} 就是本镜图层段的底图：画中画要放另一张图，不能把底图再贴一遍`, index)
+        return
+      }
+      if (!input.assets) return
+      const asset = assetById(assetId)
+      if (!asset) {
+        add('pip_invalid', 'block',
+          `${label}的 anchor.asset_id=${assetId} 不是本集资产：请改成 read_storyboard_context 返回的本集资产 id`, index)
+        return
+      }
+      if (!asset.image) {
+        add('pip_invalid', 'block',
+          `${label}指向的「${asset.name}」现在没有可用的图片：换一张已经有图的资产，或去掉这一层`, index)
+      }
+    })
+  }
+
+  /** #110：忠实素材与地图是确定性绘制的证据图，进扩散生成会被重画/扭曲，一律阻断。 */
+  if ((combo === null || hasGenSegment(combo)) && card.gen_plan?.reference_assets?.length) {
+    card.gen_plan.reference_assets.forEach((ref, index) => {
+      if (ref.unresolved) return
+      const asset = (input.assets || []).find(item => item.id === ref.id && item.kind === ref.kind)
+      if (!asset || (!asset.faithful && !asset.is_map)) return
+      add('faithful_in_diffusion', 'block',
+        `gen_plan.reference_assets 第 ${index + 1} 条「${asset.name}」是${asset.is_map ? '地图' : '忠实素材'}：忠实素材/地图不能进扩散生成，改用图层段承载`, index)
+    })
   }
 
   if (hasGenSegment(combo)) {
@@ -759,6 +893,30 @@ export function validateDesignCard(input: CardValidateInput): CardIssue[] {
   }
 
   return issues
+}
+
+/**
+ * AI 写入路径的资产契约阻断（Issue #110）：画中画层（`pip_invalid`）与扩散参考素材
+ * （`faithful_in_diffusion`）不合规的卡当场拒收，把问题原文回给模型改正。
+ * 人工 PUT 不走这里（与 #96 文本框规则同口径：人工写入只吃读时问题）。
+ */
+export function aiAssetRuleRejections(
+  card: DesignCard | null,
+  combo: Combo | null,
+  assets: DesignCardAssetEntry[],
+): CardIssue[] {
+  return validateDesignCard({ card, combo, assets }).filter(issue =>
+    issue.severity === 'block' && (issue.code === 'pip_invalid' || issue.code === 'faithful_in_diffusion'))
+}
+
+export function assetRuleRejectionMessage(issues: CardIssue[]): string {
+  return [
+    '设计卡没有保存：画中画层或生成段参考素材违反了资产契约。',
+    ...issues.map((issue, index) => `${index + 1}. ${issue.message}`),
+    '画中画层的 anchor.asset_id 必须指向本集一张有图的资产（要放进去的那张图本身），不能是底图、不能留空；'
+    + '忠实素材与地图不能在生成段里送进扩散模型（会被重画/扭曲），要展示它们就用图层段或画中画承载。'
+    + '改正后重新调用 update_storyboard；不要删掉信息点，也不要改走人工写入绕过。',
+  ].join('\n')
 }
 
 /** 库里的 JSON 文本 → 设计卡（坏数据返回 null，不抛） */

@@ -17,7 +17,6 @@ import {
   COMBOS,
   INFO_POINT_VIAS,
   MAX_GEN_SEGMENT_SECONDS,
-  MAX_LAYER_SEGMENT_SECONDS,
   PLANNED_LAYER_TYPES,
   serializeDesignCard,
   toCombo,
@@ -146,9 +145,8 @@ shots.put('/:id/design-card', async (c) => {
   const ctx = loadDesignCardContext(row.episodeId)
   const rawCard = wantsCard ? body.design_card : (row.designCard ? JSON.parse(row.designCard) : null)
   const resolved = resolveDesignCardFrom(rawCard, combo, ctx, row, tts.duration_s)
-  // 预算硬上限超限直接拒存：段条一旦存进库，下游（图层段 / 视频档位）就会按它排期
-  const overLayer = resolved.issues.find(issue => issue.code === 'budget_over_layer')
-  if (overLayer) return rejected(c, overLayer.message, 'budget_over_layer', resolved.issues)
+  // 预算硬上限超限直接拒存：段条一旦存进库，下游（图层段 / 视频档位）就会按它排期。
+  // 图层段没有上限（Issue #110），只有生成段的 15 秒上限还能在这一步拒存。
   const overGen = resolved.issues.find(issue => issue.code === 'budget_over_gen')
   if (overGen) return rejected(c, overGen.message, 'budget_over_gen', resolved.issues)
 
@@ -237,7 +235,8 @@ app.get('/:id/design-card-context', async (c) => {
     info_point_vias: INFO_POINT_VIAS,
     planned_layer_types: PLANNED_LAYER_TYPES,
     limits: {
-      layer_s: MAX_LAYER_SEGMENT_SECONDS,
+      // 图层段没有上限（Issue #110）：null = 不限制；15 秒只约束扩散生成段
+      layer_s: null,
       gen_s: MAX_GEN_SEGMENT_SECONDS,
       narration_cps: NARRATION_CHARS_PER_SECOND,
     },

@@ -15,7 +15,7 @@ const backendRoot = fileURLToPath(new URL('..', import.meta.url))
 
 function run(body) {
   const script = `
-    import { validateGroupPlan, normalizeGroupPlan, groupPlanSignature, groupPlanDeviation, groupPlanPrecheck } from './src/services/design-group-plan.ts'
+    import { validateGroupPlan, normalizeGroupPlan, groupPlanSignature, groupPlanDeviation } from './src/services/design-group-plan.ts'
     const out = (value) => console.log('@@' + JSON.stringify(value))
     const MAP = { asset_kind: 'prop', asset_id: 259 }
     const ART = { asset_kind: 'prop', asset_id: 269 }
@@ -86,10 +86,11 @@ test('时长、底图、锁定镜与新增条目的硬约束逐条报出', () =>
   assert.match(text, /shots 漏了 #4/)
 })
 
-test('超过任何组合上限的实测时长在调用模型之前就判冲突', () => {
-  const conflicts = run(`out(groupPlanPrecheck(input([[1, 46], [2, 10]])))`)
-  assert.equal(conflicts.length, 1)
-  assert.match(conflicts[0], /#1 实测配音 46 秒/)
+test('长旁白不再是「任何组合都装不下」：46 秒的镜用 C/D 的图层段承载', () => {
+  const errors = run(`out(validateGroupPlan(
+    plan([shot(1, 'C', MAP)], [{ text: '沿途', storyboard_id: 1 }]),
+    input([[1, 46]])))`)
+  assert.deepEqual(errors, [], '图层段没有上限，46 秒的 C 镜合法')
 })
 
 test('结构不合法的输出不猜默认值，原样报错', () => {

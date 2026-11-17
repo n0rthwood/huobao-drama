@@ -64,6 +64,7 @@ import { migrateAssetNames } from './services/asset-name-migration.js'
 import { migrateIntentToDesignCard } from './services/design-card-migration.js'
 import { migrateClipsToLayerSegments } from './services/layer-segment-migration.js'
 import { backfillPoolProjection } from './services/storyboard-assets.js'
+import { backfillPipDetailSemantics } from './services/map-pip-detail-semantics.js'
 import { logLayerFontStatus } from './services/layer-fonts.js'
 import { backfillScriptConfirmation, GateBlockedError } from './services/workflow-gates.js'
 import { requestRoadmapRefresh } from './services/workflow-roadmap.js'
@@ -234,6 +235,8 @@ db.update(schema.sysTask)
   .then(() => backfillPoolProjection())
   // 存量纪录片集补剧本确认（Issue #54）：升级前已拆出分镜的集视为已确认，否则新门禁会把它们锁死，幂等
   .then(() => backfillScriptConfirmation())
+  // 画中画细节语义回填（#110）：细节是独立地图资产，语义按全览 map_spec 投影补算，幂等；没有可算的就跳过
+  .then(() => backfillPipDetailSemantics())
   // 派生状态快照（#105）：启动刷新与列表刷新共用单飞/60 秒节流，不阻塞服务启动。
   .then(() => requestRoadmapRefresh())
   // 清理完成后再恢复批量任务：被重启打断的那一张/那一镜此时已是 failed，由批次重新提交

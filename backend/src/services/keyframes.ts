@@ -127,10 +127,23 @@ function lockedSlotsOf(row: StoryboardRow, inheritsFirst: boolean): KeyframeSlot
   return out
 }
 
+/**
+ * 上一镜的**生效尾帧**（Issue #110）：D 的尾帧槽位由图层段首帧锁定继承，`last_frame_image` 列从不写入——
+ * 只看列会让「D 之后承接」的下一镜永远拿不到首帧。这里按与 `buildState` 相同的口径取：
+ * 上一镜是 D 且衔接帧可用 → 衔接帧路径；否则退回它自己的尾帧列。
+ */
+function effectiveLastOf(previous: StoryboardRow, previousJunction: JunctionFrame | undefined): string | null {
+  const ownLast = usableImage(slotOwnImage(previous, 'last'))
+  if (toCombo(previous.combo) !== 'D') return ownLast
+  const usable = Boolean(previousJunction && !previousJunction.stale && previousJunction.path)
+  return usable ? previousJunction!.path! : ownLast
+}
+
 function buildState(
   row: StoryboardRow,
   previous: StoryboardRow | null,
   junction: JunctionFrame | undefined,
+  previousJunction?: JunctionFrame,
 ): StoryboardKeyframeState {
   const combo = toCombo(row.combo)
   // 生效图一律过一道「文件还在吗」：列里残留的死路径不能算图（否则前端是破图、确认还放行）
@@ -151,7 +164,7 @@ function buildState(
     : null
   const firstIsLocked = lockedSlots.includes('first')
   const lastIsLocked = lockedSlots.includes('last')
-  const previousLast = previous ? usableImage(slotOwnImage(previous, 'last')) : null
+  const previousLast = previous ? effectiveLastOf(previous, previousJunction) : null
   // 每个锁定槽的生效图来源不同：C 首帧与 D 尾帧取衔接帧；D + 承接的首帧取**上一镜尾帧**。
   // 只有「D + 承接」的首帧锁取上一镜尾帧；C 的首帧锁永远是图层段末帧（与承接无关）
   const firstLockFromPrevious = combo === 'D' && inheritsFirst
@@ -213,7 +226,8 @@ export async function loadEpisodeKeyframes(episodeId: number): Promise<Map<numbe
   ])
   const result = new Map<number, StoryboardKeyframeState>()
   rows.forEach((row, index) => {
-    result.set(row.id, buildState(row, index > 0 ? rows[index - 1]! : null, junctions.get(row.id)))
+    const previous = index > 0 ? rows[index - 1]! : null
+    result.set(row.id, buildState(row, previous, junctions.get(row.id), previous ? junctions.get(previous.id) : undefined))
   })
   return result
 }

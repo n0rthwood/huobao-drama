@@ -571,6 +571,31 @@ function buildModel(type: string) {
   }
 }
 
+/**
+ * storyboard_breaker 的工具集（Issue #45/#57/#110，按请求解析；导出是为了行为测试能直接验证这条规则）。
+ *
+ * - 剧情项目：与改动前一致（整套分镜工具 + 读图）。
+ * - 纪录片拆分/补镜：只产出**旁白骨架**——「读上下文 / 读图 / 保存骨架」，**不给 update_storyboard**
+ *   （#110：补镜越权写 first/mid/last/video 提示词、mid_frame_time、description 的根因就是它）。
+ * - 纪录片 design_card 单镜任务：只给「读上下文 / 读图 / 只写 design_card」，不给 save_storyboards——
+ *   重算一镜顺手重拆整集会把旁白分配全冲掉（#57）。
+ */
+export function storyboardBreakerTools(requestContext: RequestContext | undefined): Record<string, any> {
+  if (getProjectType(requestContext) !== 'documentary') return AGENT_TOOLS.storyboard_breaker
+  if (requestContext?.get('storyboardPromptScope' as never) !== 'design_card') {
+    return {
+      readStoryboardContext: documentaryStoryboardTools.readStoryboardContext,
+      saveStoryboards: documentaryStoryboardTools.saveStoryboards,
+      ...visionTools,
+    }
+  }
+  return {
+    readStoryboardContext: documentaryStoryboardTools.readStoryboardContext,
+    ...visionTools,
+    updateStoryboard: promptStoryboardUpdaters.designCard,
+  }
+}
+
 /** 启动时注册的静态 Agent 表（供 Mastra 实例挂载） */
 export const agentRegistry: Record<string, Agent> = Object.fromEntries(
   validAgentTypes.map(type => [
@@ -592,19 +617,7 @@ export const agentRegistry: Record<string, Agent> = Object.fromEntries(
         // narration-first（Issue #45）：纪录片项目换成校验「旁白逐字来自剧本」的工具变体，
         // 其余工具（#46 的 read_image 等）照 AGENT_TOOLS 保留
         : type === 'storyboard_breaker'
-          ? ({ requestContext }) => {
-            const base = getProjectType(requestContext) === 'documentary'
-              ? { ...AGENT_TOOLS.storyboard_breaker, ...documentaryStoryboardTools }
-              : AGENT_TOOLS.storyboard_breaker
-            // 设计卡填写（#57）是单镜任务：只给「读上下文 / 读图 / 只写 design_card」，
-            // 不给 save_storyboards——重算一镜顺手重拆整集会把旁白分配全冲掉
-            if (requestContext?.get('storyboardPromptScope' as never) !== 'design_card') return base
-            return {
-              readStoryboardContext: base.readStoryboardContext,
-              ...visionTools,
-              updateStoryboard: promptStoryboardUpdaters.designCard,
-            }
-          }
+          ? ({ requestContext }) => storyboardBreakerTools(requestContext)
         : type === 'narration_writer'
           ? ({ requestContext }) => (getProjectType(requestContext) === 'documentary'
             ? { ...AGENT_TOOLS.narration_writer, ...documentaryNarrationTools }

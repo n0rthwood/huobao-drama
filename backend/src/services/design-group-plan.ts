@@ -50,18 +50,16 @@ export interface GroupPlan {
   junction: string
 }
 
-/** 单段时长硬上限（与设计卡同口径：图层段 ≤30 s、生成段 ≤15 s） */
-const LAYER_MAX_S = 30
+/** 生成段/整镜生成段的硬上限（秒）；图层段没有上限（Issue #110） */
 const GEN_MAX_S = 15
 /** 「距这张图上次出现 ≥3 镜」允许无新增条目的再入（重新定位） */
 export const REENTRY_GAP = 3
 /** 同一底图连续回切开场的上限 */
 export const MAX_CONSECUTIVE_REOPEN = 2
 
-export function comboLimitSeconds(combo: Combo): number {
-  if (combo === 'A') return LAYER_MAX_S
-  if (combo === 'B') return GEN_MAX_S
-  return LAYER_MAX_S + GEN_MAX_S
+/** 组合的时长上限（秒）；`null` = 没有上限（A/C/D 的图层段是确定性渲染，可以加长承载长旁白） */
+export function comboLimitSeconds(combo: Combo): number | null {
+  return combo === 'B' ? GEN_MAX_S : null
 }
 
 const COMBO_SET: Record<string, true> = { A: true, B: true, C: true, D: true }
@@ -194,17 +192,10 @@ export function normalizeGroupPlan(raw: unknown): { plan: GroupPlan | null; erro
 
 // ─── 硬校验 ──────────────────────────────────────────────────
 
-/** 规划之前就能判死的冲突（模型改不了）：实测时长超过任何组合的上限 */
-export function groupPlanPrecheck(input: GroupPlanInput): string[] {
-  return input.shots
-    .filter(shot => shot.measured_s > comboLimitSeconds('C'))
-    .map(shot => `#${shot.storyboard_number} 实测配音 ${shot.measured_s} 秒，超过任何段组合的上限 ${comboLimitSeconds('C')} 秒：请回到旁白骨架把这一镜拆开`)
-}
-
 /**
  * 规划的硬校验（全部回给模型改正）。规则与技能 2.2.0 逐条对应：
  * 1. 本组每镜恰好一条，不多不少；人工/已确认的镜照抄原组合与底图；
- * 2. 组合装得下实测配音（B ≤15 s、A ≤30 s、C/D ≤45 s）；
+ * 2. 组合装得下实测配音（只有 B ≤15 s——整镜就是一个生成段；A/C/D 的图层段没有上限，永远装得下）；
  * 3. 有图层段的镜必须有底图，底图/画中画必须是本集有图的资产；B 的 mode 只能是 no_layer；
  * 4. 新增条目只能指派给本组有图层段的镜；
  * 5. **回切**（上一镜不是以同一张图的图层收尾，本镜却以已经出现过的底图开场）必须被指派新增条目，
@@ -245,9 +236,10 @@ export function validateGroupPlan(plan: GroupPlan, input: GroupPlanInput): strin
         errors.push(`${where} 已有人工/已确认的设计（组合 ${shot.locked.combo}，底图 ${shot.locked.base ? refKey(shot.locked.base) : '无'}）：规划必须照抄，不得改动`)
       }
     }
-    if (shot.measured_s > comboLimitSeconds(planned.combo)) {
-      errors.push(`${where} 实测配音 ${shot.measured_s} 秒，组合 ${planned.combo} 最多 ${comboLimitSeconds(planned.combo)} 秒：`
-        + (planned.combo === 'B' ? '超过 15 秒不能只用生成段，没有新增条目时用非地图底图（档案画/场景静帧/器物图）+ 文字框的 C/D' : '换一个装得下的组合'))
+    const limit = comboLimitSeconds(planned.combo)
+    if (limit !== null && shot.measured_s > limit) {
+      errors.push(`${where} 实测配音 ${shot.measured_s} 秒，组合 ${planned.combo} 最多 ${limit} 秒：`
+        + '超过 15 秒不能只用生成段，改用 C 或 D（用图层段承载余下时长，图层段没有上限）')
     }
     if (hasLayer(planned.combo)) {
       if (!planned.base) errors.push(`${where} 组合 ${planned.combo} 有图层段，必须给 base`)

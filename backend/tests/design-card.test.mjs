@@ -155,7 +155,7 @@ test('校验阻断码：未选组合 / 预算超限 / 装不下旁白 / 缺底�
     }).filter(i => i.severity === 'block').map(i => i.code)
     out({
       noCombo: codes(null),
-      overLayer: codes('C', { budget: { layer_s: 31, gen_s: 5 } }),
+      longLayer: codes('C', { budget: { layer_s: 31, gen_s: 5 } }),
       overGen: codes('C', { budget: { layer_s: 6, gen_s: 16 } }),
       underNarration: codes('C', { budget: { layer_s: 2, gen_s: 2 } }, { narrationText: '一七一六年，近卫团从托博尔斯克出发，溯额尔齐斯河而上。' }),
       measuredWins: codes('C', { budget: { layer_s: 2, gen_s: 2 } }, { narrationText: '一七一六年，近卫团从托博尔斯克出发，溯额尔齐斯河而上。', measuredSeconds: 3.5 }),
@@ -167,7 +167,7 @@ test('校验阻断码：未选组合 / 预算超限 / 装不下旁白 / 缺底�
     })
   `)
   assert.deepEqual(got.noCombo, ['combo_missing'])
-  assert.ok(got.overLayer.includes('budget_over_layer'))
+  assert.deepEqual(got.longLayer, [], '图层段 31 秒不再超限（Issue #110：图层段没有上限）')
   assert.ok(got.overGen.includes('budget_over_gen'))
   assert.ok(got.underNarration.includes('budget_under_narration'), '旁白估 ≈6.0s，总时长 4.0s 装不下')
   assert.ok(!got.measuredWins.includes('budget_under_narration'), '配音实测 3.5s 时 4.0s 装得下')

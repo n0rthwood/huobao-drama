@@ -6,7 +6,7 @@
       <button class="btn btn-sm" :title="t('layerCanvas.keyframeBar.add')" :disabled="timeline.keyframes.length >= SEGMENT_MAX_KEYFRAMES" @click="addFrame(false)"><DiamondPlus :size="16" /></button>
       <button class="btn btn-sm" :title="t('layerCanvas.keyframeBar.copyPrev')" :disabled="!current || timeline.keyframes.length >= SEGMENT_MAX_KEYFRAMES" @click="addFrame(true)"><Copy :size="16" /></button>
       <button class="btn btn-sm" :title="t('layerCanvas.keyframeBar.remove')" :disabled="selectedIndex === 0 || !current" @click="removeFrame"><Trash2 :size="16" /></button>
-      <label>{{ t('layerCanvas.keyframeBar.duration') }} <input :aria-label="t('layerCanvas.keyframeBar.duration')" type="number" min="1" max="30" step="0.1" :value="duration" @change="changeDuration($event.target.value)">s</label>
+      <label>{{ t('layerCanvas.keyframeBar.duration') }} <input :aria-label="t('layerCanvas.keyframeBar.duration')" type="number" min="1" step="0.1" :value="duration" @change="changeDuration($event.target.value)">s</label>
       <span>{{ t('layerCanvas.keyframeBar.endHold') }} <b>{{ endHold.toFixed(2) }}s</b></span>
     </header>
     <input class="pk-scrub" :aria-label="t('episode.segment.time')" type="range" min="0" :max="duration" step="0.02" :value="time" @input="emit('update:time', Number($event.target.value))">
@@ -19,6 +19,7 @@
       <span class="pk-end">{{ duration.toFixed(2) }}s</span>
     </div>
     <p v-if="junctionTextCount" class="pk-warning"><TriangleAlert :size="14" />{{ t('layerCanvas.keyframeBar.junctionTextWarn', {n:junctionTextCount}) }}</p>
+    <p v-if="junctionImageCount" class="pk-warning"><TriangleAlert :size="14" />{{ t('layerCanvas.keyframeBar.junctionImageWarn', {n:junctionImageCount}) }}</p>
     <div v-if="current" class="pk-inspector">
       <label>{{ t('episode.segment.time') }}<input :aria-label="t('episode.segment.time')" type="number" min="0" :max="duration" step="0.1" :disabled="selectedIndex === 0" :value="current.t" @change="setTime($event.target.value)"></label>
       <fieldset><legend><button type="button" class="btn btn-sm" @click="emit('viewport-pick')">{{ t('layerCanvas.keyframeBar.viewportPick') }}</button></legend><label v-for="key in ['x','y','w','h']" :key="key">{{ key }}<input :aria-label="`${t('layerCanvas.keyframeBar.viewportPick')} ${key}`" type="number" min="-3" max="7" step="0.01" :value="current.viewport[key]" @change="setViewport(key, Number($event.target.value))"></label></fieldset>
@@ -50,7 +51,10 @@ const endHold=computed(()=>endHoldOf(props.timeline,props.duration))
 const baseSrc=computed(()=>props.doc.base.path ? mediaUrl(props.doc.base.path) : '')
 watch(baseSrc,()=>{baseFailed.value=false})
 function isJunction(index){return !!props.junction && index === (props.junction.slot === 'last' ? props.timeline.keyframes.length-1 : 0)}
-const junctionTextCount=computed(()=>{if(!props.junction)return 0;const f=props.timeline.keyframes[props.junction.slot==='last'?props.timeline.keyframes.length-1:0];return props.doc.layers.filter(l=>f?.visible.includes(l.id)&&(['label','card','text'].includes(l.type)||(l.type==='marker'&&l.text))).length})
+const junctionFrame=computed(()=>!props.junction ? null : props.timeline.keyframes[props.junction.slot==='last'?props.timeline.keyframes.length-1:0])
+const junctionTextCount=computed(()=>{const f=junctionFrame.value;if(!f)return 0;return props.doc.layers.filter(l=>f.visible.includes(l.id)&&(['label','card','text'].includes(l.type)||(l.type==='marker'&&l.text))).length})
+// 画中画 image 层同样不进衔接帧（#110）：与文字层一样整层隐藏，先在这里告诉人，免得渲染后才发现
+const junctionImageCount=computed(()=>{const f=junctionFrame.value;if(!f)return 0;return props.doc.layers.filter(l=>f.visible.includes(l.id)&&l.type==='image').length})
 function selectFrame(index){emit('update:selectedIndex',index);emit('select-frame',index);emit('update:time',props.timeline.keyframes[index].t)}
 function updateFrames(keyframes, selected){emit('history');const target=keyframes[selected];keyframes.sort((a,b)=>a.t-b.t);emit('update:timeline',{...props.timeline,keyframes});if(target){emit('update:selectedIndex',keyframes.indexOf(target));emit('update:time',target.t)}}
 function addFrame(copy){const previous=copy ? props.timeline.keyframes[Math.max(0,props.selectedIndex-1)] : current.value;const frame=JSON.parse(JSON.stringify(previous||{viewport:{x:0,y:0,w:1,h:1},visible:[]}));frame.t=Math.max(0,Math.min(props.duration,props.time));const frames=[...props.timeline.keyframes,frame];updateFrames(frames,frames.length-1)}
@@ -66,7 +70,7 @@ function setViewport(key, value) {
   patchFrame({viewport:normalizeViewport(viewport, frame)})
 }
 function toggleVisible(id,on){patchFrame({visible:on?[...current.value.visible.filter(v=>v!==id),id]:current.value.visible.filter(v=>v!==id)})}
-function changeDuration(raw){const duration=clampSegmentDuration(raw,30);emit('history');emit('update:duration',duration);emit('update:timeline',{...props.timeline,keyframes:props.timeline.keyframes.map(f=>({...f,t:Math.min(f.t,duration)}))})}
+function changeDuration(raw){const duration=clampSegmentDuration(Number(raw));emit('history');emit('update:duration',duration);emit('update:timeline',{...props.timeline,keyframes:props.timeline.keyframes.map(f=>({...f,t:Math.min(f.t,duration)}))})}
 /** 缩略图里底图只占 bounds（= crop，缺省整图）：contain 留白带留空，不拉伸 */
 const thumbnailBaseStyle = computed(() => {
   const box = baseFrameOf(props.doc.base, props.spec).bounds

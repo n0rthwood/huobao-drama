@@ -21,6 +21,8 @@ Read them before writing the prompt: **the prompt executes the design card; it i
 
 Batch tasks already filter the pending shots and slots by this table; if you still receive a request for an `A` shot or for a junction-frame slot,
 its design card / segment combination is not finished — do not invent a diffusion prompt for it out of thin air.
+**The server refuses locked slots outright**: writing `first_frame_prompt` on a C shot or `last_frame_prompt` on a D shot is rejected by
+`update_storyboard` with the reason — it is not optional, the junction frame already fixes that frame (a written prompt would never be used for rendering).
 
 ## 2. `gen_plan.reference_assets` is a hard constraint: every item must be @-referenced
 
@@ -36,6 +38,10 @@ When a generated segment exists (`combo` is `B` / `C` / `D`), every asset in `de
 
 `layer_plan.must_mark` holds **semantic entries** (place names, ranges, routes) drawn by the layer segment; **do not put them in the prompt**.
 Only the semantic entries are excluded: if their asset also appears in `gen_plan.reference_assets`, it must still be @-referenced.
+
+**Faithful material and maps cannot be diffusion references**: `faithful` props and `asset_type='map'` maps get repainted and distorted by diffusion models.
+Listing them in `gen_plan.reference_assets`, or binding their image to the first/mid/last/video target, yields a blocking `faithful_in_diffusion`,
+and that image is not sent when assembling references. To show them in a shot, carry them with the layer segment (base image or a `type:'image'` picture-in-picture layer).
 
 ## 3. All text goes to layers; write no text in the prompt
 
@@ -59,4 +65,6 @@ The base `keyframe-prompt` specification requires every frame to be independent 
 
 - **Absolute image first**: do not write a character's species, clothing, colors, hairstyle, or build; characters are always referenced only by `@角色名`/`@name`.
 - Each prompt is self-contained: shot size, camera position, composition, lighting, and atmosphere must all be stated by the prompt itself.
-- Leave `first_frame_prompt` empty when `inherits_first=true`; `mid_frame_time` falls between 0.5 and the generated segment's duration `-0.5`.
+- Leave `first_frame_prompt` empty when `inherits_first=true`; `mid_frame_time` falls between 0.5 and **the generated segment's duration** `-0.5`
+  (the generated segment duration = the design card's `budget.gen_s`; `read_storyboard_context` gives `generated_segment_s` per shot — not the whole-shot duration,
+  not `storyboards.duration`). Out-of-range values are rejected and flagged as a blocking `mid_time_out_of_range`.

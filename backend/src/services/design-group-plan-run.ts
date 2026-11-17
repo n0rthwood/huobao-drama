@@ -18,7 +18,6 @@ import type { StageModel } from './ai-stages.js'
 import { parseDesignCard, toCombo, type DesignCard, type DesignCardContext } from './design-card.js'
 import {
   freshGroupPlan,
-  groupPlanPrecheck,
   normalizeGroupPlan,
   saveGroupPlan,
   validateGroupPlan,
@@ -29,7 +28,7 @@ import {
   type PlanAssetInput,
   type PlanAssetRef,
 } from './design-group-plan.js'
-import { parsePipMeta } from './map-pip-assets.js'
+import { pipAssetLine } from './map-pip-assets.js'
 
 const PLAN_MAX_TOKENS = Number(process.env.AI_MAX_TOKENS || 16384)
 const PLAN_TIMEOUT_MS = 300_000
@@ -101,13 +100,12 @@ export function buildGroupPlanInput(args: {
 }
 
 function assetLines(input: GroupPlanInput, ctx: DesignCardContext): string[] {
+  // #110：画中画资产要带地理范围（label + 取景框经纬度 + 全览范围），否则规划器不知道细节覆盖哪里，
+  // 会把旁白里的地点派给一张根本不含它的细节图。镜号类说明（别的集的分镜号）一律不给。
   const pip = new Map<number, string>()
   for (const row of sqlite.prepare('SELECT id, map_pip FROM props WHERE map_pip IS NOT NULL AND deleted_at IS NULL').all() as Array<{ id: number; map_pip: string }>) {
-    const meta = parsePipMeta(row.map_pip)
-    if (!meta) continue
-    pip.set(row.id, meta.role === 'overview'
-      ? `全览（细节：${meta.frames.map(frame => `prop#${String(frame.detail_prop_id ?? '?')}`).join('、') || '无'}）`
-      : `细节（所属全览 prop#${meta.parent_prop_id}${meta.stale ? '，已过期' : ''}）`)
+    const line = pipAssetLine(row.map_pip)
+    if (line) pip.set(row.id, line)
   }
   const semantics = new Map(ctx.assets.map(asset => [`${asset.kind}#${asset.id}`, asset.semantics ?? []]))
   return input.assets.map((asset) => {
@@ -181,9 +179,6 @@ export async function planGroup(args: {
     saveGroupPlan(episodeId, group.group_no, { signature: group.signature, status: 'failed', plan: null, error: message, taskId })
     throw new GroupPlanFailedError(message)
   }
-  const conflicts = groupPlanPrecheck(input)
-  if (conflicts.length) fail(conflicts.join('；'))
-
   const plan = await runObservedWork({
     taskId,
     stage: 'design_group_plan',

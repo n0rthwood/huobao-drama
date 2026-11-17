@@ -13,7 +13,6 @@ import { db } from '../db/index.js'
 import { MIN_SHOT_SECONDS } from './narration.js'
 import {
   MAX_GEN_SEGMENT_SECONDS,
-  MAX_LAYER_SEGMENT_SECONDS,
   hasGenSegment,
   hasLayerSegment,
   type AssetKindName,
@@ -54,9 +53,10 @@ function comboOf(device: unknown, deterministic: unknown): Combo | null {
   return null
 }
 
-function clampSeconds(duration: number | null, max: number): number {
+/** `max` 为 undefined = 不设上限（图层段，Issue #110） */
+function clampSeconds(duration: number | null, max?: number): number {
   const seconds = Number(duration) > 0 ? Number(duration) : MIN_SHOT_SECONDS
-  return Math.min(Math.max(seconds, MIN_SHOT_SECONDS), max)
+  return max === undefined ? Math.max(seconds, MIN_SHOT_SECONDS) : Math.min(Math.max(seconds, MIN_SHOT_SECONDS), max)
 }
 
 function assetKindOf(raw: unknown, fallback: AssetKindName): AssetKindName {
@@ -171,7 +171,7 @@ export function designCardFromIntent(raw: string | null, duration: number | null
       ? [{ id: 'ip1', text: infoPointText, via: combo === null ? 'narration_only' : combo === 'B' ? 'generated' : 'layer' }]
       : [],
     budget: {
-      layer_s: hasLayerSegment(combo) ? clampSeconds(duration, MAX_LAYER_SEGMENT_SECONDS) : null,
+      layer_s: hasLayerSegment(combo) ? clampSeconds(duration) : null,
       gen_s: hasGenSegment(combo) ? clampSeconds(duration, MAX_GEN_SEGMENT_SECONDS) : null,
     },
     rationale: typeof intent.rationale === 'string' ? intent.rationale : '',

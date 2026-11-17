@@ -1,5 +1,7 @@
 import { isFirstAgentFailureSafe, runWithTextTask } from './text-task-context.js'
 import { requeueFirstModelFailure } from './text-task-autoretry.js'
+import { runObservedWork } from './task-observability.js'
+import { buildSampleKey } from './task-estimate.js'
 
 /**
  * 旁白覆盖缺口的「补全剩余」（Issue #52）。
@@ -279,7 +281,8 @@ ${blocks}
 补镜规则（save_storyboards 会逐条校验，违反就拒存）：
 - 只为上面列出的缺口写新镜头，每一镜的 narration_text 必须逐字取自对应缺口原文，按缺口内顺序依次切分，首尾相接不留空、不重叠，整段切完为止；每镜不超过 ${MAX_NARRATION_CHARS} 字，只在句界处切。
 - 不要传 replace_existing，也不要管 shot_number：服务端会自己安排临时编号，跑完按旁白在剧本中的位置整集重排。既有分镜一条都不会被覆盖。
-- 每一镜照 documentary-storyboard 技能写全画面字段与 intent（表达设计），并与上面给出的上一镜/下一镜承接：continuity 默认 "cut"。
+- 只补**旁白骨架**：每条镜头只写 shot_number / narration_text / title / continuity 四项。画面字段（shot_type、angle、movement、first_frame_prompt / mid_frame_prompt / last_frame_prompt / video_prompt 等）和表达设计（design_card）一律不写——这些要等批量配音实测之后再按设计卡填，提前写出来的提示词不会被保留。
+- 与上面给出的上一镜/下一镜承接：continuity 默认 "cut"。
 - 一批最多 8 镜，分批调用直到工具返回的 script_coverage.gaps 为空。`
 }
 
@@ -349,8 +352,15 @@ export async function startFillGapsTask(
   const sink = createReasoningSink(taskId)
   const knownIds = new Set(rows.map(sb => sb.id))
   logTaskStart('FillGaps', 'run', { episodeId, dramaId, gaps: gaps.length, taskId })
+  // 补镜就是骨架阶段的续跑：包进观测工作项（stage skeleton），任务中心才能看到这次工具调用与耗时
+  // （全局「LLM harness 可观察性」规则；#110）
+  const gapChars = gaps.reduce((sum, gap) => sum + gap.chars, 0)
+  const sampleKey = buildSampleKey({ stage: 'skeleton', configId: resolved.configId, model: resolved.model })
 
-  void runWithTextTask(taskId, () => runAgent(agent, [{ role: 'user', content: evidenceMessageParts(message, evidence) }], { maxSteps: 20, requestContext }, sink))
+  void runWithTextTask(taskId, () => runObservedWork(
+    { taskId, stage: 'skeleton', sourceChars: gapChars, sampleKey },
+    () => runAgent(agent, [{ role: 'user', content: evidenceMessageParts(message, evidence) }], { maxSteps: 20, requestContext }, sink),
+  ))
     .then(async result => {
       // 先按剧本位置归位编号，再按覆盖结果判定成败
       const renumber = await renumberStoryboardsByScript(episodeId)

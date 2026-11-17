@@ -20,11 +20,10 @@ import type {
 import type { BaseRef, Combo, DesignCard, PlannedLayer } from './design-card.js'
 import { hasLayerSegment } from './design-card.js'
 import { normalizeLayerDoc, type LayerBox, type LayerDoc } from './layer-doc.js'
-import { TEXT_SPEC } from './layer-text.js'
+import { TEXT_SPEC, textLayoutById } from './layer-text.js'
 import { revealBeats, textZoneOf } from './layer-text-visibility.js'
 import { baseFrameOf } from './layer-quality.js'
 import {
-  MAX_LAYER_SEGMENT_SECONDS,
   SEGMENT_DEFAULT_FADE_MS,
   SEGMENT_DEFAULT_FPS,
   SEGMENT_MIN_SECONDS,
@@ -44,6 +43,27 @@ export const LAYER_SEGMENT_PUSH_IN_PAD = 1.3
 export const CARD_DEFAULT_BOX = { x: 0.06, y: 0.56, w: 0.46, h: 0.18 }
 /** 字幕安全区上界（归一化）：1080p 下 MarginV=28px + 18pt×1.6 行高 ≈ 底部 8% → 0.88 起算 */
 export const SUBTITLE_SAFE_BOTTOM = 0.88
+
+/** 画中画默认框（图层坐标，相对取景框）：右侧版式放左上 */
+const PIP_BOX_TOP_LEFT = { x: 0.06, y: 0.08, w: 0.3, h: 0.44 }
+/** 左侧版式放右上 */
+const PIP_BOX_TOP_RIGHT = { x: 0.64, y: 0.08, w: 0.3, h: 0.44 }
+/** 居中版式放右上并缩小（不压中部主叙事区） */
+const PIP_BOX_TOP_RIGHT_SMALL = { x: 0.68, y: 0.08, w: 0.22, h: 0.32 }
+
+/**
+ * 画中画框的位置（Issue #110）：放在本镜`text_layout`文字区的**对侧**，不压屏幕文字。
+ * 右侧版式（右上/右中/右下）→ 左上；左侧版式 → 右上；居中版式 → 右上并缩小；
+ * 没有选成套位置（旧卡）时沿用历史默认的右上角框。
+ */
+export function imageBoxForLayout(textLayoutId: string | undefined): LayerBox {
+  const located = textLayoutById(textLayoutId)
+  if (!located) return { ...PIP_BOX_TOP_RIGHT }
+  const anchors = located.layout.slots.map(slot => slot.anchor || 'top-left')
+  if (anchors.some(anchor => anchor.endsWith('right'))) return { ...PIP_BOX_TOP_LEFT }
+  if (anchors.some(anchor => anchor.endsWith('left'))) return { ...PIP_BOX_TOP_RIGHT }
+  return { ...PIP_BOX_TOP_RIGHT_SMALL }
+}
 
 export interface SegmentDraftAsset {
   kind: 'prop' | 'character' | 'scene'
@@ -175,10 +195,12 @@ export function layerFromPlannedLayer(
   ctx: SegmentDraftContext,
   warnings: string[],
   modernText = false,
+  textLayout?: string,
 ): DraftedLayer | null {
   const id = `L${index + 1}`
   const frame = draftFrameOf(ctx)
-  const anchorAsset = assetOf(ctx, item.anchor?.asset_id) ?? ctx.base
+  // #110：image（画中画）层只认自己 anchor 的那张资产图，**绝不回落到底图**——回落等于把底图再贴一遍
+  const anchorAsset = item.type === 'image' ? assetOf(ctx, item.anchor?.asset_id) : assetOf(ctx, item.anchor?.asset_id) ?? ctx.base
   const semantic = findSemantic(anchorAsset, item.anchor?.semantic_id || item.anchor?.name)
   const size = anchorAsset ? imageSizeOf(anchorAsset) : { width: 1, height: 1 }
   // 语义坐标是**原图像素**（#47 契约），图层坐标是归一化 0–1（#48 契约）
@@ -298,18 +320,25 @@ export function layerFromPlannedLayer(
     }
   }
 
-  // image：画中画（#109）——肖像 / 档案件插图 / 细节或全览地图；contain 保证插图完整可见、不裁边
-  const source = anchorAsset?.image_path
-  if (!source) {
-    warnings.push(`第 ${index + 1} 层（image）找不到可用的图片资产，已跳过`)
+  // image：画中画（#109/#110）——肖像 / 档案插图 / 细节或全览地图；contain 保证插图完整可见、不裁边
+  if (!item.anchor?.asset_id) {
+    warnings.push(`第 ${index + 1} 层（image）没有 anchor.asset_id：画中画必须指向本集一张有图的资产，不能用底图代替，已跳过`)
     return null
   }
-  const box = inFrame(frame, { x: 0.62, y: 0.1, w: 0.3, h: 0.44 })
+  if (!anchorAsset) {
+    warnings.push(`第 ${index + 1} 层（image）的 anchor.asset_id=${item.anchor.asset_id} 不在本集资产里，已跳过`)
+    return null
+  }
+  if (!anchorAsset.image_path) {
+    warnings.push(`第 ${index + 1} 层（image）指向的「${anchorAsset.name}」没有可用的图片，已跳过`)
+    return null
+  }
   return {
     layer: {
-      id, type: 'image', name: anchorAsset?.name || `图片 ${index + 1}`, z: index + 1, box,
-      src: { path: source }, fit: 'contain',
-      anchor: anchorAsset ? { asset_id: anchorAsset.id } : undefined,
+      id, type: 'image', name: anchorAsset.name || `图片 ${index + 1}`, z: index + 1,
+      box: inFrame(frame, imageBoxForLayout(textLayout)),
+      src: { path: anchorAsset.image_path }, fit: 'contain',
+      anchor: { asset_id: anchorAsset.id },
     },
     points: [],
   }
@@ -326,7 +355,7 @@ export function draftSegment(card: DesignCard, combo: Combo | null, ctx: Segment
   const modernText = planned.some(item => item.type === 'text') || Boolean(card.layer_plan?.text_layout)
   const drafted: DraftedLayer[] = []
   for (const [index, item] of planned.entries()) {
-    const layer = layerFromPlannedLayer(item, index, ctx, warnings, modernText)
+    const layer = layerFromPlannedLayer(item, index, ctx, warnings, modernText, card.layer_plan?.text_layout)
     if (layer) drafted.push(layer)
   }
 
@@ -337,7 +366,6 @@ export function draftSegment(card: DesignCard, combo: Combo | null, ctx: Segment
       : combo === 'A'
         ? Math.max(ctx.duration, SEGMENT_MIN_SECONDS)
         : LAYER_SEGMENT_PRE_POST_DEFAULT_SECONDS,
-    MAX_LAYER_SEGMENT_SECONDS,
   )
 
   const frame = draftFrameOf(ctx)

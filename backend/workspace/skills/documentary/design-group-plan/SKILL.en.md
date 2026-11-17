@@ -31,16 +31,17 @@ cutting back and forth, marking time. This is not a problem with the assets, it 
 
 ## 3. Segment combinations
 
-- **A** layer segment only: locating, inventory, genealogy, years, a paragraph's closing frame. Measured ≤30 s.
+- **A** layer segment only: locating, inventory, genealogy, years, a paragraph's closing frame. The layer segment is deterministic rendering and has **no duration limit**.
 - **B** generated segment only: telling what happened; the first choice when this shot has no new entry that must land on the picture. Measured ≤15 s.
-- **C** layer segment → generated segment: locate first, then enter the scene. Use it **only when** this shot has new entries that must land on the picture. Measured ≤45 s.
+- **C** layer segment → generated segment: locate first, then enter the scene. Use it **only when** this shot has new entries that must land on the picture. The layer segment has no duration limit.
 - **D** generated segment → layer segment: enter the scene first, then pin the result back onto the picture at the end (capture, victory, casualties, years),
-  or set up an "image → image" junction for the next shot (when the next shot opens on the same image, this shot uses D and stops on the image, so the cut is not "live action → image"). Measured ≤45 s.
+  or set up an "image → image" junction for the next shot (when the next shot opens on the same image, this shot uses D and stops on the image, so the cut is not "live action → image"). The layer segment has no duration limit.
 
 ## 4. Layout rules (verified one by one by the server; failures come back to you)
 
 1. **Exactly one** `shots` entry per shot in this group, no more and no fewer. A shot marked "locked" (edited by a human or already confirmed) must **copy** the given combination and base image as they are.
-2. **The combination must hold the measured voice-over**: B ≤15 s, A ≤30 s, C/D ≤45 s.
+2. **The combination must hold the measured voice-over**: only B has a hard limit (the whole shot is one generated segment, ≤15 s); A/C/D layer segments have no limit —
+   a longer measured shot uses C or D and gives the extra time to the layer segment (on AI design-card writes the server auto-fits the shortfall into `layer_s`, only increasing).
    A shot over 15 s with no new entries: use a **non-map base image** (archival picture, scene still, object plate) with a text box in C or D, and do not return to the map.
 3. Shots with a layer segment (A/C/D) must give `base`, and `mode` cannot be `no_layer`; B has `base` null, `mode` `no_layer`, and no picture-in-picture.
    The base image and the picture-in-picture may only use assets in the asset inventory that **have an image**; the picture-in-picture cannot be the same image as the base.

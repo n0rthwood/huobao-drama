@@ -21,6 +21,8 @@ description: 纪录片项目的关键帧/视频提示词附加规范 — 按设�
 
 批量任务已经按这张表过滤过待处理镜头与槽位；若你仍收到一个 `A` 镜头或一个衔接帧槽位的请求，
 说明它的设计卡 / 段组合还没做好——不要凭空给它编扩散提示词。
+**服务端会直接拒收被锁定的槽位**：C 镜写 `first_frame_prompt`、D 镜写 `last_frame_prompt` 都会被
+`update_storyboard` 拒绝并说明原因——那不是可选项，衔接帧已经把那一帧的画面定死了（写了也不会被用来出图）。
 
 ## 2. `gen_plan.reference_assets` 是硬约束：每一项都要被 @ 到
 
@@ -36,6 +38,10 @@ description: 纪录片项目的关键帧/视频提示词附加规范 — 按设�
 
 `layer_plan.must_mark` 是**语义条目**（地名、范围、路线），由图层段负责画出来，**不要写进提示词**。
 被排除的只是这些语义条目本身；若某个底图资产同时出现在 `gen_plan.reference_assets` 里，它仍然必须被 @。
+
+**忠实素材与地图不能作为扩散参考**：`faithful` 道具与 `asset_type='map'` 的地图会被扩散模型重画、扭曲，
+写进 `gen_plan.reference_assets` 或把它们的图绑到首/中/尾/视频目标都会得到阻断 `faithful_in_diffusion`，
+装配参考图时也不会发这张图。要在镜头里展示它们，用图层段（底图或 `type:'image'` 画中画层）承载。
 
 ## 3. 文字一律交给图层，提示词里不要写字
 
@@ -59,4 +65,6 @@ description: 纪录片项目的关键帧/视频提示词附加规范 — 按设�
 
 - **绝对图像优先**：不写角色的物种、服装、颜色、发型、体型，角色一律只用 `@角色名` 指代。
 - 每条提示词自足：景别、机位、构图、光线、氛围都要自己交代。
-- `first_frame_prompt` 在 `inherits_first=true` 时留空；`mid_frame_time` 落在 0.5 与生成段时长 `-0.5` 之间。
+- `first_frame_prompt` 在 `inherits_first=true` 时留空；`mid_frame_time` 落在 0.5 与**生成段时长** `-0.5` 之间
+  （生成段时长 = 设计卡的 `budget.gen_s`，`read_storyboard_context` 里每镜给出 `generated_segment_s`；不是整镜时长、
+  也不是 `storyboards.duration`）。超出的值会被拒收并标成阻断 `mid_time_out_of_range`。

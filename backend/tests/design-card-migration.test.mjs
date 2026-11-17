@@ -131,7 +131,7 @@ test('映射表逐行：device × deterministic → combo，计划与信息点�
   const c = byId[103].design_card
   assert.ok(c.layer_plan && c.gen_plan, '组合 C 两段计划都有')
   assert.equal(c.gen_plan.first, undefined, '组合 C 的首帧由衔接帧锁定，迁移留空')
-  assert.equal(c.budget.layer_s, 30, '时长 40s 被钳到图层段上限 30s')
+  assert.equal(c.budget.layer_s, 40, '图层段没有上限（Issue #110）：40s 原样迁移')
   assert.equal(c.budget.gen_s, 15, '生成段钳到 15s')
 
   const d = byId[104].design_card

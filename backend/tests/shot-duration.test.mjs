@@ -17,8 +17,8 @@ const legacy = planCompose({dv:6,da:2,t:0,fit:DEFAULT_COMPOSE_FIT,maxSeconds:15}
 console.log(JSON.stringify({limits:combos.map(shotMaxSeconds),issues,plans,retained,legacy}))
 `], { cwd, encoding: 'utf8' }))
 
-test('whole shot caps distinguish layer, generated, hybrid, and legacy drama', () => {
-  assert.deepEqual(result.limits, [30, 15, 45, 45, 15])
+test('whole shot caps: A/C/D are unlimited (layer segment), B and legacy stay 15', () => {
+  assert.deepEqual(result.limits.map(value => Number.isFinite(value) ? value : 'inf'), ['inf', 15, 'inf', 'inf', 15])
 })
 test('20 second A narration is valid while B and legacy drama remain capped at 15', () => {
   assert.deepEqual(result.plans.map(plan => plan.blocked), [false, true, false, false, true])

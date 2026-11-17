@@ -130,7 +130,11 @@ export function validateFrames(overview: MapBbox, raw: unknown, assetAspect: Map
 
 export interface MapPipImage { path: string; width: number; height: number; sha256: string }
 
-/** 画中画产出（三件套：全览 + 细节 + 布局 spec）。details/composite 在「完成登记」前由确定性渲染补齐。 */
+/**
+ * 画中画产出（三件套：全览 + 细节 + 布局 spec）。details/composite 在「完成登记」前由确定性渲染补齐。
+ * `details[].semantics`（Issue #110）是细节图上的语义几何（像素坐标，id 与全览语义一致），
+ * 交付时由 `projectDetailSemantics` 按同一 map_spec 投影得到；宿主据此写入细节资产的 `props.semantics`。
+ */
 export interface MapPipOutput {
   version: 1
   /** 全览取景（经纬度） */
@@ -138,7 +142,7 @@ export interface MapPipOutput {
   aspect: MapAspect
   layout: Pick<PipLayout, 'id' | 'family' | 'canvas' | 'slots' | 'locator' | 'label_tier' | 'min_slot_short_side'>
   frames: MapPipFrame[]
-  details: Array<MapPipImage & { no: number }>
+  details: Array<MapPipImage & { no: number; semantics?: unknown }>
   composite: MapPipImage | null
   /** 写进资产 meta 的用法说明：分镜设计据此决定引用大图/细节图/哪种版式 */
   usage: string

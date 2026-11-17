@@ -240,6 +240,16 @@
                 :class="['dc-tts-dot', ttsOf(row.sb.id).valid ? 'is-ok' : 'is-bad']"
                 :title="ttsTitle(row.sb.id)"
               >{{ ttsOf(row.sb.id).valid ? '♪' : '✕' }}</span>
+              <!-- 有问题 N 要能落到具体镜（#110 F.6）：阻断/警告各一枚图标 + 条数，悬停给第一条原文 -->
+              <span
+                v-if="issueMarks.get(row.sb.id)"
+                :class="['dc-issue-mark', issueMarks.get(row.sb.id).tone]"
+                :title="issueMarks.get(row.sb.id).title"
+              >
+                <OctagonAlert v-if="issueMarks.get(row.sb.id).tone === 'is-block'" :size="11" />
+                <TriangleAlert v-else :size="11" />
+                <span class="mono">{{ issueMarks.get(row.sb.id).count }}</span>
+              </span>
               <span class="dc-shot-grip">
                 <span
                   class="dc-move"
@@ -305,6 +315,20 @@
               @click="confirm"
             >{{ t('episode.design.actions.confirm') }}</button>
           </header>
+          <!--
+            禁用原因就在按钮下面（#110 F.1）：阻断几个、缺什么、要不要勾「已知悉」，
+            并给直达问题清单的入口；「已知悉」勾选框也镜像到这里，不必滚到卡片最底部。
+          -->
+          <div v-if="current.design_card_status !== 'confirmed' && confirmNote" class="dc-confirm-note">
+            <span class="dc-confirm-reason">{{ confirmNote }}</span>
+            <button v-if="blockingIssues.length" type="button" class="btn btn-sm" @click="scrollToIssues">
+              {{ t('episode.design.confirm.gotoIssues', { n: blockingIssues.length }) }}
+            </button>
+            <label v-if="warnOnly" class="dc-ack">
+              <input type="checkbox" :checked="acknowledged" @change="acknowledged = $event.target.checked">
+              {{ t('episode.design.actions.acknowledge') }}
+            </label>
+          </div>
 
           <!-- 叙事 -->
           <div class="dc-section">
@@ -384,6 +408,11 @@
                 @click="pickCombo(key)"
               >
                 <span class="dc-combo-icons">
+                  <!-- 已选 = 勾选按钮 + 描边；「建议」只是 AI 的建议，两者不再混在一起（#110 F.3） -->
+                  <span v-if="draft.combo === key" class="dc-combo-check">
+                    <Check :size="13" />
+                    {{ t('episode.design.combo.selected') }}
+                  </span>
                   <Layers v-if="key !== 'B'" :size="14" />
                   <Sparkles v-if="key !== 'A'" :size="14" />
                   <span v-if="suggestedCombo === key" class="dc-combo-sug">{{ t('episode.design.combo.suggested') }}</span>
@@ -402,8 +431,8 @@
                 <label v-if="hasLayer" class="dc-budget-num">
                   <span class="dim">{{ t('episode.design.budget.layerSegment') }}</span>
                   <input
-                    class="input dc-num" type="number" min="0" :max="ctx.limits.layer_s" step="0.5"
-                    :value="layerSeconds"
+                    class="input dc-num" type="number" min="0" :max="layerLimit ?? undefined" step="0.5"
+                    :value="formatSeconds(layerSeconds)"
                     @change="setSeconds('layer_s', $event.target.value)"
                   >
                 </label>
@@ -411,33 +440,38 @@
                   <span class="dim">{{ t('episode.design.budget.genSegment') }}</span>
                   <input
                     class="input dc-num" type="number" min="0" :max="ctx.limits.gen_s" step="0.5"
-                    :value="genSeconds"
+                    :value="formatSeconds(genSeconds)"
                     @change="setSeconds('gen_s', $event.target.value)"
                   >
                 </label>
-                <span class="dim dc-budget-limit">
-                  {{ t('episode.design.budget.limitLayer', { n: ctx.limits.layer_s }) }} ·
-                  {{ t('episode.design.budget.limitGen', { n: ctx.limits.gen_s }) }}
-                </span>
+                <!-- 图层段不设上限（#110）：只在接口真的给了上限时才显示这一行 -->
+                <span v-if="layerLimit !== null" class="dim dc-budget-limit">{{ t('episode.design.budget.limitLayer', { n: layerLimit }) }}</span>
+                <span v-if="hasGen" class="dim dc-budget-limit">{{ t('episode.design.budget.limitGen', { n: ctx.limits.gen_s }) }}</span>
               </div>
 
               <p v-if="budgetMessage" class="dc-hint">{{ budgetMessage }}</p>
+              <!-- 一键补足（#110）：规则是确定的（实测旁白 + 0.5 s 的差额进图层段），不再交给人拆字 -->
+              <div v-if="budgetFit" class="dc-budget-fit">
+                <span class="dc-hint">{{ budgetFitHint }}</span>
+                <button type="button" class="btn btn-sm" :disabled="busy || batch.running || !selected" @click="extendBudget">
+                  {{ budgetFit.reason === 'gen' ? t('episode.design.budget.extendGen') : t('episode.design.budget.extendLayer') }}
+                </button>
+              </div>
               <div v-if="budgetPositive" ref="barEl" class="dc-bar-track">
                 <span v-if="hasLayer" class="dc-seg is-layer" :style="{ width: layerPct + '%' }">
-                  <span v-if="layerOverPct > 0" class="dc-seg-over" :style="{ width: layerOverPct + '%' }" />
                   <span
+                    v-if="layerLimit !== null"
                     class="dc-seg-tick"
-                    :class="{ 'is-over': layerOverPct > 0 }"
-                    :style="{ left: tickLeft(layerSeconds, ctx.limits.layer_s) + '%' }"
-                    :title="t('episode.design.budget.limitLayer', { n: ctx.limits.layer_s })"
+                    :style="{ left: tickLeft(layerSeconds, layerLimit) + '%' }"
+                    :title="t('episode.design.budget.limitLayer', { n: layerLimit })"
                   />
-                  <span class="dc-seg-text mono">{{ layerSeconds.toFixed(1) }}s</span>
+                  <span class="dc-seg-text mono">{{ formatSeconds(layerSeconds) }}s</span>
                 </span>
                 <span
                   v-if="hasLayer && hasGen"
                   class="dc-divider"
                   role="separator"
-                  :aria-label="t('episode.design.budget.total', { n: totalSeconds.toFixed(1) })"
+                  :aria-label="t('episode.design.budget.total', { n: formatSeconds(totalSeconds) })"
                   @pointerdown="startDrag"
                 >◆</span>
                 <span v-if="hasGen" class="dc-seg is-gen" :style="{ width: genPct + '%' }">
@@ -448,28 +482,34 @@
                     :style="{ left: tickLeft(genSeconds, ctx.limits.gen_s) + '%' }"
                     :title="t('episode.design.budget.limitGen', { n: ctx.limits.gen_s })"
                   />
-                  <span class="dc-seg-text mono">{{ genSeconds.toFixed(1) }}s</span>
+                  <span class="dc-seg-text mono">{{ formatSeconds(genSeconds) }}s</span>
                 </span>
               </div>
 
               <p class="dc-hint mono">
-                {{ t('designCard82.narration') }}: {{ measuredSeconds === null ? t('designCard82.pendingVoice') : `${measuredSeconds.toFixed(1)}s` }}
-                <template v-if="hasLayer"> · {{ t('designCard82.layerBudget') }}: {{ layerSeconds === null ? '—' : `${layerSeconds.toFixed(1)}s` }}</template>
-                <template v-if="hasGen"> · {{ t('designCard82.genBudget') }}: {{ genSeconds === null ? '—' : `${genSeconds.toFixed(1)}s` }}<template v-if="!auditById[selected.id]?.video_generated"> ({{ t('designCard82.notGenerated') }})</template></template>
-                · {{ t('designCard82.total') }}: {{ totalSeconds === null ? '—' : `${totalSeconds.toFixed(1)}s` }}
-                <template v-if="headroom !== null"> · {{ t(headroom < 0 ? 'designCard82.excess' : 'designCard82.remain') }}: {{ Math.abs(headroom).toFixed(1) }}s</template>
+                {{ t('designCard82.narration') }}: {{ measuredSeconds === null ? t('designCard82.pendingVoice') : `${formatSeconds(measuredSeconds)}s` }}
+                <template v-if="hasLayer"> · {{ t('designCard82.layerBudget') }}: {{ layerSeconds === null ? '—' : `${formatSeconds(layerSeconds)}s` }}</template>
+                <template v-if="hasGen"> · {{ t('designCard82.genBudget') }}: {{ genSeconds === null ? '—' : `${formatSeconds(genSeconds)}s` }}<template v-if="!auditById[selected.id]?.video_generated"> ({{ t('designCard82.notGenerated') }})</template></template>
+                · {{ t('designCard82.total') }}: {{ totalSeconds === null ? '—' : `${formatSeconds(totalSeconds)}s` }}
+                <template v-if="headroom !== null"> · {{ t(headroom < 0 ? 'designCard82.excess' : 'designCard82.remain') }}: {{ formatSeconds(Math.abs(headroom)) }}s</template>
               </p>
-              <!-- 旁白时长只认实测（#70）：没有当前有效配音就显示待配音，绝不显示估算 -->
+              <!--
+                旁白时长只认实测（#70）：没有当前有效配音就显示待配音，绝不显示估算。
+                量尺与文字分成两行（#110 F.2）：量尺压在文字上会被看成删除线。
+                余量 ≥ 0 时一律不说「装不下」——只有服务端的 budget_under_narration 才有资格这么断。
+              -->
               <div class="dc-narr-line">
-                <span v-if="budgetPositive && measuredSeconds !== null" :class="['dc-narr-fill', narrationClass]" :style="{ width: narrationPct + '%' }" />
+                <span v-if="budgetPositive && measuredSeconds !== null" class="dc-narr-track">
+                  <span :class="['dc-narr-fill', narrationClass]" :style="{ width: narrationPct + '%' }" />
+                </span>
                 <span class="dc-narr-text mono">
                   <template v-if="measuredSeconds === null">{{ ttsTitle(selected.id) }}</template>
                   <template v-else>
-                    {{ t('episode.design.budget.measured', { n: measuredSeconds.toFixed(1) }) }}
+                    {{ t('episode.design.budget.measured', { n: formatSeconds(measuredSeconds) }) }}
                     <template v-if="!budgetPositive"> · {{ t('episode.design.budget.headroomMissing') }}</template>
-                    <template v-else-if="narrationClass === 'is-over'"> · {{ t('episode.design.budget.over') }}</template>
-                    <template v-else-if="narrationClass === 'is-tight'"> · {{ t('episode.design.budget.tight') }}</template>
-                    <template v-else> · {{ t('episode.design.budget.remain', { n: headroom.toFixed(1) }) }}</template>
+                    <template v-else-if="budgetOverIssue"> · {{ t('episode.design.budget.over') }}</template>
+                    <template v-else-if="budgetTight"> · {{ t('episode.design.budget.tight') }}</template>
+                    <template v-else> · {{ t('episode.design.budget.remain', { n: formatSeconds(headroom) }) }}</template>
                   </template>
                 </span>
               </div>
@@ -574,8 +614,8 @@
                       @blur="saveNow()"
                     >
                     <input
-                      class="input dc-row-at" type="number" min="0" step="0.5" :value="layer.at_s"
-                      :aria-label="t('episode.design.atSeconds', { n: layer.at_s })"
+                      class="input dc-row-at" type="number" min="0" step="0.5" :value="formatSeconds(layer.at_s ?? 0)"
+                      :aria-label="t('episode.design.atSeconds', { n: formatSeconds(layer.at_s ?? 0) })"
                       @change="patchLayer(index, { at_s: toSeconds($event.target.value) })"
                     >
                     <button type="button" class="dc-chip-del" :aria-label="t('episode.design.actions.remove')" @click="removeLayer(index)">×</button>
@@ -678,7 +718,7 @@
               @input="patchDraft({ rationale: $event.target.value }, true)"
               @blur="saveNow()"
             />
-            <ul v-if="groupedIssues.length" class="dc-issues">
+            <ul v-if="groupedIssues.length" ref="issuesEl" class="dc-issues">
               <li v-for="(issue, index) in groupedIssues" :key="`${issue.code}-${index}`" :class="['dc-issue', 'is-' + issue.severity]">
                 {{ issue.message || t(`episode.design.issue.${issue.code}`) }} <small>({{ issue.code }})</small><template v-if="issue.count > 1"> ×{{ issue.count }}</template>
               </li>
@@ -742,18 +782,38 @@
             <h2 class="dialog-title">{{ t('episode.design.batch.scopeTitle') }}</h2>
           </header>
           <div class="dialog-body">
-            <p>{{ t('episode.design.batch.willProcess', { n: scope.include.length }) }}</p>
+            <p>{{ t('episode.design.batch.willProcess', { n: scopeProcessCount }) }}</p>
             <p class="dim">{{ t('episode.design.batch.excluded', { n: scope.exclude.length }) }}</p>
-            <ul class="dc-scope-list">
+            <!--
+              只有警告的镜不再被笼统排除成「存在问题」（#110 F.5）：逐镜列出警告原文，
+              一个勾选框整批「已知悉」，勾上后按 acknowledge=true 一起确认；阻断照旧排除并写明原因。
+            -->
+            <template v-if="scope.warnings.length">
+              <p class="dc-scope-warn">{{ t('episode.design.batch.warnTitle', { n: scope.warnings.length }) }}</p>
+              <ul class="dc-scope-list">
+                <li v-for="item in scope.warnings" :key="item.storyboard_id">
+                  <span class="mono">#{{ pad(item.shot_number) }}</span>
+                  <span class="dim">{{ item.messages.join(t('common.listJoin')) }}</span>
+                </li>
+              </ul>
+              <label class="dc-ack">
+                <input type="checkbox" v-model="scope.acknowledge">
+                {{ t('episode.design.batch.warnAck') }}
+              </label>
+              <p class="dc-hint">{{ t('episode.design.batch.warnNote') }}</p>
+            </template>
+            <ul v-if="scope.exclude.length" class="dc-scope-list">
               <li v-for="item in scope.exclude" :key="item.storyboard_id">
                 <span class="mono">#{{ pad(item.shot_number) }}</span>
-                <span class="dim">{{ t('episode.design.batch.reason') }}: {{ t(`episode.design.exclude.${item.reason}`) }}</span>
+                <span class="dim">
+                  {{ t('episode.design.batch.reason') }}：{{ t(`episode.design.exclude.${item.reason}`) }}<template v-if="item.message"> · {{ item.message }}</template>
+                </span>
               </li>
             </ul>
           </div>
           <footer class="dialog-foot">
             <button class="btn btn-sm" @click="scope = null">{{ t('episode.design.batch.cancel') }}</button>
-            <button class="btn btn-sm btn-primary" :disabled="!scope.include.length" @click="runScope">
+            <button class="btn btn-sm btn-primary" :disabled="!scopeProcessCount" @click="runScope">
               {{ t('episode.design.batch.run') }}
             </button>
           </footer>
@@ -799,7 +859,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
 import { useI18n } from 'vue-i18n'
-import { ChevronDown, ChevronUp, Layers, Loader2, Lock, Sparkles } from 'lucide-vue-next'
+import { Check, ChevronDown, ChevronUp, Layers, Loader2, Lock, OctagonAlert, Sparkles, TriangleAlert } from 'lucide-vue-next'
 import NarrationCoverageBar from '~/components/NarrationCoverageBar.vue'
 import NarrationSkeletonPanel from '~/components/NarrationSkeletonPanel.vue'
 import AssetPicker from '~/components/AssetPicker.vue'
@@ -807,6 +867,7 @@ import ComboSwitchDialog from '~/components/ShotProduction/ComboSwitchDialog.vue
 import TaskWorkMetrics from '~/components/TaskWorkMetrics.vue'
 import StepStatusIcon from '~/components/StepStatusIcon.vue'
 import { mediaUrl } from '~/utils/url'
+import { GEN_MAX_SECONDS, fitBudgetToNarration, formatSeconds } from '~/utils/designCardBudget'
 import { stepTextClass } from '~/utils/stepStatus'
 import { textCapacity, textFamilyOf, textLayoutById, textLayoutsFor, textRolesFor } from '~/utils/layerText'
 import { textRoleDef, useLayerTextNames, useLayerTextSpec } from '~/composables/useLayerTextSpec'
@@ -839,7 +900,8 @@ const EMPTY_CTX = {
   planned_layer_types: ['polygon', 'polyline', 'marker', 'label', 'card', 'image', 'text'],
   // 模板文本框规范（#96）：本画幅家族的版式/类型/容量；接口未给时客户端引擎自己算
   text_spec: null,
-  limits: { layer_s: 30, gen_s: 15, narration_cps: 4.2, info_points: 12, planned_layers: 20, must_mark: 12, rationale: 600 },
+  // 图层段不设上限（#110）：layer_s 为 null = 「没有上限」，生成段仍受扩散模型 15 s 限制
+  limits: { layer_s: null, gen_s: 15, narration_cps: 4.2, info_points: 12, planned_layers: 20, must_mark: 12, rationale: 600 },
 }
 
 const ctx = ref({ ...EMPTY_CTX })
@@ -867,6 +929,8 @@ const fillStarting = ref(false)
 const picker = reactive({ open: false, mode: 'asset', field: '', selected: [], layerIndexes: null, anchorId: '' })
 const comboSwitch = ref({ open: false, sbId: 0, shotNumber: 0, from: '', to: '' })
 const barEl = ref(null)
+/** 问题清单容器：确认按钮旁的「查看 N 个问题」滚到这里 */
+const issuesEl = ref(null)
 
 // ===== 子阶段（#70）：骨架 / 配音 / 设计卡 =====
 const EMPTY_SKELETON = {
@@ -1073,9 +1137,10 @@ function openAssetSemantics(group) {
     section: 'semantics',
   })
 }
-/** 问题卡里逐层显示计划时间点：用草稿里的真实值，没有就显示 0 */
+/** 问题卡里逐层显示计划时间点：用草稿里的真实值，没有就显示 0；浮点噪声先收成 ≤2 位小数 */
 function layerAt(index) {
-  return Number(layerPlan.value.planned_layers?.[index]?.at_s ?? 0)
+  const value = Number(layerPlan.value.planned_layers?.[index]?.at_s ?? 0)
+  return Number.isFinite(value) ? Math.round(value * 100) / 100 : 0
 }
 /** 这一层缺的是「可执行几何」还是「位置锚点」：决定人要补什么 */
 function needOf(type) {
@@ -1263,6 +1328,28 @@ const counts = computed(() => {
   }
 })
 
+/**
+ * 左栏逐镜问题标记（#110 F.6）：页头只有一个「有问题 N」，看不出是哪几镜。
+ * 阻断（block）排在警告前：同一镜既有阻断又有警告时，标的是阻断。
+ * 悬停给第一条原文——摘要里的计数不解释原因，这里补上第一句话。
+ */
+const issueMarks = computed(() => {
+  const map = new Map()
+  for (const sb of shots.value) {
+    const list = stateOf(sb).issues || []
+    if (!list.length) continue
+    const blocking = list.filter(issue => issue.severity === 'block')
+    const first = (blocking.length ? blocking : list)[0]
+    const message = first.message || t(`episode.design.issue.${first.code}`)
+    map.set(sb.id, {
+      tone: blocking.length ? 'is-block' : 'is-warn',
+      count: list.length,
+      title: t(blocking.length ? 'episode.design.mark.block' : 'episode.design.mark.warn', { n: list.length, message }),
+    })
+  }
+  return map
+})
+
 // ===== 卡片草稿：服务端响应即真值，本地只在两次保存之间持有编辑中的内容 =====
 function emptyCard() {
   return {
@@ -1426,12 +1513,15 @@ const budgetMessage = computed(() => {
 })
 const layerPct = computed(() => (budgetPositive.value && hasLayer.value ? (layerSeconds.value / totalSeconds.value) * 100 : 0))
 const genPct = computed(() => (budgetPositive.value && hasGen.value ? (genSeconds.value / totalSeconds.value) * 100 : 0))
-/** 段内超出硬限的比例：刻度画在限额处，右侧溢出部分标红 */
-const layerOverPct = computed(() => (layerSeconds.value > ctx.value.limits.layer_s
-  ? ((layerSeconds.value - ctx.value.limits.layer_s) / layerSeconds.value) * 100 : 0))
+/** 图层段上限（#110）：接口给 null = 不设上限，界面不画刻度、不显示上限文字 */
+const layerLimit = computed(() => {
+  const limit = ctx.value.limits.layer_s
+  return typeof limit === 'number' && Number.isFinite(limit) && limit > 0 ? limit : null
+})
+/** 生成段超出硬限的比例：刻度画在限额处，右侧溢出部分标红 */
 const genOverPct = computed(() => (genSeconds.value > ctx.value.limits.gen_s
   ? ((genSeconds.value - ctx.value.limits.gen_s) / genSeconds.value) * 100 : 0))
-const overLimit = computed(() => layerOverPct.value > 0 || genOverPct.value > 0)
+const overLimit = computed(() => genOverPct.value > 0)
 
 /**
  * 旁白秒数只来自**当前有效配音的实测时长**（#70）。没有有效配音时为 null：
@@ -1454,20 +1544,59 @@ const headroom = computed(() => (budgetPositive.value && measuredSeconds.value !
 const narrationPct = computed(() => (totalSeconds.value > 0 && measuredSeconds.value !== null
   ? Math.min(100, (measuredSeconds.value / totalSeconds.value) * 100)
   : 0))
+/**
+ * 「装不下」只由服务端判定（#110 F.2）：`budget_under_narration` 才是真装不下，
+ * `budget_tight` 是「偏紧（警告）」。前端按余量自行加一句「装不下」会与服务端结论自相矛盾，
+ * 尤其余量恰好 0 的时候。
+ */
+const budgetOverIssue = computed(() => issues.value.find(issue => issue.code === 'budget_under_narration') || null)
+const budgetTight = computed(() => Boolean(budgetOverIssue.value)
+  || issues.value.some(issue => issue.code === 'budget_tight')
+  || (headroom.value !== null && headroom.value < 0.5))
 const narrationClass = computed(() => {
   if (!budgetPositive.value || headroom.value === null) return ''
-  if (headroom.value < 0) return 'is-over'
-  if (headroom.value < 0.5) return 'is-tight'
+  if (budgetOverIssue.value) return 'is-over'
+  if (budgetTight.value) return 'is-tight'
   return 'is-ok'
 })
+
+/**
+ * 一键补足（#110）：预算装不下实测旁白时，规则是确定的——差额进图层段（生成段受 15 s 限制不能动）；
+ * B 镜没有图层段，最多把生成段顶到 15 s，装不下就是真装不下（服务端阻断消息让改 C/D）。
+ * 只在「算出来确实要加」时给按钮，够了就不出现。
+ */
+const budgetFit = computed(() => {
+  if (!budgetPositive.value || measuredSeconds.value === null) return null
+  // B 镜实测超过生成段硬上限：补到 15 s 也装不下，这是换组合的决定，不是加时长的决定，
+  // 只把服务端的阻断消息（改用 C/D）摆出来，不给一个点了也没用的按钮。
+  if (draft.value.combo === 'B' && measuredSeconds.value > GEN_MAX_SECONDS) return null
+  const result = fitBudgetToNarration(draft.value.budget, draft.value.combo, measuredSeconds.value)
+  return result.changed ? result : null
+})
+const budgetFitHint = computed(() => {
+  const fit = budgetFit.value
+  if (!fit) return ''
+  return t(fit.reason === 'gen' ? 'episode.design.budget.extendHintGen' : 'episode.design.budget.extendHintLayer', {
+    measured: formatSeconds(measuredSeconds.value),
+    from: formatSeconds(fit.from),
+    to: formatSeconds(fit.to),
+  })
+})
+/** 一键补足：走与其它编辑同一个整份 PUT（服务端仍是真值，审计随后重算） */
+function extendBudget() {
+  const fit = budgetFit.value
+  if (!fit) return
+  patchDraft({ budget: fit.budget })
+}
 
 function toSeconds(value) {
   const n = Number(value)
   if (!Number.isFinite(n) || n < 0) return 0
   return Math.round(n * 2) / 2
 }
-/** 硬限刻度位置：段内超限时画在限额处，未超限时落在段的右端 */
+/** 硬限刻度位置：段内超限时画在限额处，未超限时落在段的右端（没有上限时不画刻度） */
 function tickLeft(seconds, limit) {
+  if (typeof limit !== 'number' || !Number.isFinite(limit) || limit <= 0) return 100
   return seconds > limit ? (limit / seconds) * 100 : 100
 }
 
@@ -1702,14 +1831,11 @@ const saveQueues = new Map()
 /** 同一镜的写入串行化：整份替换的并发写会用各自的旧快照互相覆盖 */
 function save(sbId, card) {
   if (!sbId || !card) return Promise.resolve()
-  // 超硬上限的段条不往后端送：后端必定 400，回灌服务端事实会把用户刚输入的数字抹掉，
-  // 红色超限段与禁用的确认按钮就永远看不到。留在草稿里，改回上限内再接着存。
-  const overLayer = Number(card.budget?.layer_s || 0) > ctx.value.limits.layer_s
+  // 超硬上限的段条不往后端送：后端必定 400，回灌服务端事实会把用户刚输入的数字抹掉。
+  // 图层段没有上限（#110），只有生成段受扩散模型 15 s 限制，所以只拦生成段。
   const overGen = Number(card.budget?.gen_s || 0) > ctx.value.limits.gen_s
-  if (overLayer || overGen) {
-    if (sbId === selectedId.value) {
-      saveState.value = t(overLayer ? 'episode.design.error.budgetOverLayer' : 'episode.design.error.budgetOverGen')
-    }
+  if (overGen) {
+    if (sbId === selectedId.value) saveState.value = t('episode.design.error.budgetOverGen')
     return Promise.resolve()
   }
   const prev = saveQueues.get(sbId) || Promise.resolve()
@@ -1805,21 +1931,46 @@ function reportError(err, fallback) {
 }
 
 // ===== 确认 / 取消确认 =====
+const blockingIssues = computed(() => issues.value.filter(issue => issue.severity === 'block'))
 const confirmBlockReason = computed(() => {
   if (!ttsOf(selectedId.value).valid) return ttsTitle(selectedId.value)
-  const blocking = issues.value.filter(issue => issue.severity === 'block')
-  if (blocking.length) return blocking.map(issue => issue.message || t(`episode.design.issue.${issue.code}`)).join(t('common.listJoin'))
+  if (blockingIssues.value.length) {
+    return blockingIssues.value.map(issue => issue.message || t(`episode.design.issue.${issue.code}`)).join(t('common.listJoin'))
+  }
   if (!draft.value.combo) return t('episode.design.issue.combo_missing')
   if (budgetMessage.value) return budgetMessage.value
-  if (overLimit.value) {
-    return layerOverPct.value > 0
-      ? t('episode.design.issue.budget_over_layer')
-      : t('episode.design.issue.budget_over_gen')
-  }
+  if (budgetOverIssue.value) return budgetOverIssue.value.message || t('episode.design.issue.budget_under_narration')
+  if (overLimit.value) return t('episode.design.issue.budget_over_gen')
   if (warnOnly.value && !acknowledged.value) return t('episode.design.error.needsAcknowledge')
   return ''
 })
 const canConfirm = computed(() => !confirmBlockReason.value)
+/**
+ * 按钮旁那一行（#110 F.1）：只说结论与数量，正文细节留给问题清单；
+ * 按钮本身就紧挨着它，不必滚到卡片底部找原因。
+ */
+const confirmNote = computed(() => {
+  if (!ttsOf(selectedId.value).valid) return ttsTitle(selectedId.value)
+  if (blockingIssues.value.length) {
+    const first = blockingIssues.value[0]
+    return t('episode.design.confirm.blockedNote', {
+      n: blockingIssues.value.length,
+      message: first.message || t(`episode.design.issue.${first.code}`),
+    })
+  }
+  if (!draft.value.combo) return t('episode.design.issue.combo_missing')
+  if (budgetMessage.value) return budgetMessage.value
+  if (budgetOverIssue.value) return budgetOverIssue.value.message || t('episode.design.issue.budget_under_narration')
+  if (overLimit.value) return t('episode.design.issue.budget_over_gen')
+  if (warnOnly.value && !acknowledged.value) return t('episode.design.error.needsAcknowledge')
+  return ''
+})
+/** 从按钮旁的入口跳到问题清单：滚动到可见并聚焦，避免用户在长卡片里翻找 */
+function scrollToIssues() {
+  const el = issuesEl.value
+  if (!el) return
+  el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+}
 
 async function confirm() {
   const sb = selected.value
@@ -1889,8 +2040,9 @@ async function commitOrder(ids) {
 
 // ===== 批量：先弹范围清单，再执行 =====
 /**
- * 批量范围：「AI 填写」只处理 空白/过期，「批量确认」只处理 待审且零问题，
- * 其余逐镜给出被排除的原因（已确认 / AI 填写中 / 有阻断问题 / 有问题 / 状态不符）。
+ * 批量范围：「AI 填写」只处理 空白/过期，「批量确认」处理 待审的镜——
+ * 零问题的直接确认，只有警告的单独列出来整批「已知悉」（#110 F.5：不再笼统说「存在问题」），
+ * 其余逐镜给出被排除的原因（已确认 / AI 填写中 / 有阻断问题 / 状态不符）。
  */
 function excludeReasonFor(state, kind) {
   // 没有当前有效配音的镜，既不能填卡也不能确认（硬前置，不是提醒）
@@ -1901,34 +2053,63 @@ function excludeReasonFor(state, kind) {
     return ['blank', 'stale'].includes(state.design_card_status) || (state.design_card_status === 'pending' && !state.combo) ? '' : 'notPending'
   }
   if (state.design_card_status !== 'pending') return 'notPending'
+  // 阻断照旧排除；只有警告的镜由 openScope 收进 warnings，不在排除清单里
   if ((state.issues || []).some(issue => issue.severity === 'block')) return 'blocked'
-  if ((state.issues || []).length) return 'hasIssues'
   return ''
+}
+/** 排除行的原因后面要能看见具体问题：阻断镜写出第一条阻断原文 */
+function excludeMessageOf(state) {
+  const issue = (state.issues || []).find(item => item.severity === 'block')
+  return issue ? (issue.message || t(`episode.design.issue.${issue.code}`)) : ''
 }
 function openScope(kind) {
   const include = []
+  const warnings = []
   const exclude = []
   for (const sb of shots.value) {
     const state = stateOf(sb)
     const reason = excludeReasonFor(state, kind)
-    if (reason) exclude.push({ storyboard_id: sb.id, shot_number: state.shot_number, reason })
-    else include.push({ storyboard_id: sb.id, shot_number: state.shot_number })
+    if (reason) {
+      // 只有「有阻断问题」的排除行需要写出原文；其它原因（已确认 / 状态不符）一句话就够
+      exclude.push({
+        storyboard_id: sb.id,
+        shot_number: state.shot_number,
+        reason,
+        message: reason === 'blocked' ? excludeMessageOf(state) : '',
+      })
+      continue
+    }
+    const row = { storyboard_id: sb.id, shot_number: state.shot_number }
+    if (kind === 'confirm' && (state.issues || []).length) {
+      warnings.push({ ...row, messages: (state.issues || []).map(issue => issue.message || t(`episode.design.issue.${issue.code}`)) })
+    } else include.push(row)
   }
-  scope.value = { kind, include, exclude }
+  scope.value = { kind, include, warnings, exclude, acknowledge: false }
 }
+/** 本次真正会处理的镜数：勾上「已知悉」后，只有警告的镜也一并算进来 */
+const scopeProcessCount = computed(() => {
+  const picked = scope.value
+  if (!picked) return 0
+  return picked.include.length + (picked.acknowledge ? picked.warnings.length : 0)
+})
 async function runScope() {
   const picked = scope.value
   scope.value = null
   if (!picked) return
-  if (picked.kind === 'fill') await startFill(picked.include.map(item => item.storyboard_id))
-  else await confirmMany(picked.include.map(item => item.storyboard_id))
+  if (picked.kind === 'fill') { await startFill(picked.include.map(item => item.storyboard_id)); return }
+  const jobs = picked.include.map(item => ({ id: item.storyboard_id, acknowledge: false }))
+  if (picked.acknowledge) {
+    for (const item of picked.warnings) jobs.push({ id: item.storyboard_id, acknowledge: true })
+  }
+  await confirmMany(jobs)
 }
-async function confirmMany(ids) {
+/** `acknowledge=true` 只给用户在范围清单里显式勾了「已知悉」的那些镜 */
+async function confirmMany(jobs) {
   busy.value = true
-  for (const id of ids) {
+  for (const job of jobs) {
     try {
-      const res = await storyboardAPI.confirmDesignCard(id, false)
-      applyResult(id, res)
+      const res = await storyboardAPI.confirmDesignCard(job.id, job.acknowledge)
+      applyResult(job.id, res)
     } catch (err) {
       reportError(err, 'episode.design.error.confirmFailed')
     }
@@ -2335,6 +2516,10 @@ onBeforeUnmount(() => {
   background: var(--bg-2); color: var(--text-1); font-size: 12px; cursor: pointer; text-align: left;
 }
 .dc-shot.on { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* 逐镜问题标记（#110 F.6）：阻断红、警告黄，带条数 */
+.dc-issue-mark { display: inline-flex; align-items: center; gap: 1px; font-size: 10px; cursor: help; }
+.dc-issue-mark.is-block { color: var(--tag-danger-text, #ef5350); }
+.dc-issue-mark.is-warn { color: var(--tag-warning-text, #ffb74d); }
 .dc-shot-no { min-width: 34px; }
 .dc-shot-combo { min-width: 28px; color: var(--text-2); }
 .dc-shot-grip { margin-left: auto; display: flex; gap: 2px; }
@@ -2408,6 +2593,13 @@ onBeforeUnmount(() => {
   background: var(--bg-3); color: var(--text-1); text-align: left; cursor: pointer;
 }
 .dc-combo.on { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* 已选与「AI 建议」必须能分辨（#110 F.3）：已选是勾选按钮 + 描边，建议只是徽标 */
+.dc-combo-check {
+  display: inline-flex; align-items: center; gap: 2px;
+  padding: 0 5px; border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent);
+  font-size: 10px; font-weight: 600;
+}
 .dc-combo-icons { display: flex; align-items: center; gap: 4px; color: var(--text-2); }
 .dc-combo-sug {
   margin-left: auto; padding: 0 5px; border-radius: 999px;
@@ -2419,6 +2611,7 @@ onBeforeUnmount(() => {
 .dc-budget { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .dc-budget-num { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; }
 .dc-budget-limit { font-size: 11px; }
+.dc-budget-fit { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .dc-bar-track { display: flex; align-items: stretch; height: 22px; border-radius: 4px; overflow: hidden; background: var(--bg-3); }
 .dc-seg { position: relative; display: flex; align-items: center; justify-content: center; min-width: 0; }
 .dc-seg.is-layer { background: color-mix(in srgb, var(--accent) 30%, transparent); }
@@ -2429,17 +2622,26 @@ onBeforeUnmount(() => {
 .dc-seg-text { position: relative; font-size: 11px; }
 .dc-divider { display: flex; align-items: center; padding: 0 2px; cursor: col-resize; color: var(--text-2); font-size: 11px; user-select: none; }
 
-.dc-narr-line { position: relative; display: flex; align-items: center; gap: 6px; height: 16px; }
-.dc-narr-fill { position: absolute; left: 0; top: 7px; height: 2px; background: var(--text-3); }
+/* 旁白量尺与文字分两行（#110 F.2）：量尺压在文字上会被读成删除线 */
+.dc-narr-line { display: flex; flex-direction: column; gap: 2px; }
+.dc-narr-track { position: relative; display: block; height: 3px; border-radius: 2px; background: var(--bg-3); overflow: hidden; }
+.dc-narr-fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--text-3); }
 .dc-narr-fill.is-over { background: var(--tag-danger-text, #ef5350); }
 .dc-narr-fill.is-tight { background: var(--tag-warning-text, #ffb74d); }
-.dc-narr-text { position: relative; font-size: 11px; color: var(--text-2); }
+.dc-narr-fill.is-ok { background: var(--tag-success-text, #66bb6a); }
+.dc-narr-text { font-size: 11px; color: var(--text-2); }
 
 .dc-issues { display: flex; flex-direction: column; gap: 2px; margin: 0; padding-left: 16px; font-size: 11px; }
 .dc-issue.is-block { color: var(--tag-danger-text, #ef5350); }
 .dc-issue.is-warn { color: var(--tag-warning-text, #ffb74d); }
 .dc-ack { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-2); }
+/* 确认按钮旁的禁用原因（#110 F.1） */
+.dc-confirm-note { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 11px; }
+.dc-confirm-reason { color: var(--tag-warning-text, #ffb74d); }
 
 .dc-scope { width: 420px; max-width: calc(100vw - 32px); }
 .dc-scope-list { display: flex; flex-direction: column; gap: 2px; margin: 6px 0 0; padding-left: 16px; font-size: 11px; }
+/* 镜号与原因之间必须有间距（#110 F.5：不能再出现「#01原因：已确认」） */
+.dc-scope-list li { display: flex; align-items: baseline; gap: 6px; }
+.dc-scope-warn { margin: 8px 0 0; font-size: 11px; color: var(--tag-warning-text, #ffb74d); }
 </style>

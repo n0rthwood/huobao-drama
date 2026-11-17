@@ -574,6 +574,8 @@ export type CardIssueCode =
   | 'text_plan_invalid' | 'text_plan_warning'
   // #109：本镜的 combo / 底图与所属逻辑组规划的条目不一致（警告级，人工复核）
   | 'group_plan_deviation'
+  // #110：画中画图层的引用不合格；忠实素材/地图进了扩散生成的参考素材
+  | 'pip_invalid' | 'faithful_in_diffusion'
 
 export interface CardIssue {
   code: CardIssueCode
@@ -618,7 +620,8 @@ export interface DesignCardContext {
   info_point_vias: InfoPointVia[]
   planned_layer_types: PlannedLayerType[]
   limits: {
-    layer_s: number
+    /** #110：图层段不设上限，接口给 null（只有生成段仍受扩散模型 15 s 限制） */
+    layer_s: number | null
     gen_s: number
     narration_cps: number
     info_points: number

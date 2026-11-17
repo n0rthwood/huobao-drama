@@ -1036,6 +1036,7 @@
       "noSegment": "本镜还没有图层段草稿，先点「生成草稿」",
       "missingBase": "没有合格底图：回设计卡指定底图后再生成草稿",
       "previewAt": "第 {t} 秒画面",
+      "junctionPreview": "衔接帧画面：文字层与画中画整层不出现（它们不交给扩散模型）",
       "budgetMismatch": "实际 {actual}s / 预算 {budget}s",
       "createMarker": "一键创建标记并锚定",
       "markerName": "标记",
@@ -1529,6 +1530,7 @@
         "label": "段组合",
         "required": "必选：本镜由哪几段组成、谁先谁后",
         "suggested": "建议",
+        "selected": "已选",
         "none": "—",
         "A": {
           "name": "A ▣ 只用图层",
@@ -1611,6 +1613,8 @@
         "reference_not_mentioned": "参考素材没有被任何帧描述提到",
         "budget_tight": "时长余量偏紧",
         "unresolved_ref": "有引用解析不到对应素材或条目",
+        "pip_invalid": "画中画图层的引用不合格（缺素材、本集无图、或指向底图本身）",
+        "faithful_in_diffusion": "忠实素材/地图不能进扩散生成，改用图层段承载",
         "group_plan_deviation": "本镜的段组合或底图与所属逻辑组的规划不一致"
       },
       "migrationComboUnresolved": "旧分镜的段组合没有已定义的迁移映射。可恢复内容已保留，请显式重选组合并审阅设计卡后确认。",
@@ -1631,7 +1635,11 @@
         "measured": "实测 {n}s ✓",
         "remain": "余量 {n}s",
         "over": "装不下旁白，需加长段或精简画面",
-        "tight": "偏紧"
+        "tight": "偏紧",
+        "extendLayer": "延长图层段",
+        "extendGen": "延长生成段",
+        "extendHintLayer": "实测旁白 {measured}s：图层段 {from}s → {to}s（只加不减）",
+        "extendHintGen": "实测旁白 {measured}s：生成段 {from}s → {to}s（上限 15s）"
       },
       "junction": {
         "locked": "◆ 衔接帧（锁定继承 · 不出图）",
@@ -1668,14 +1676,16 @@
         "reason": "原因",
         "run": "开始",
         "cancel": "取消",
-        "running": "进行中…"
+        "running": "进行中…",
+        "warnTitle": "只有警告的镜（{n} 镜）",
+        "warnAck": "已知悉以上警告，一并确认",
+        "warnNote": "勾选后这些镜按「已知悉」一起确认；不勾选则本次跳过，阻断问题照旧排除。"
       },
       "exclude": {
         "confirmed": "已确认",
         "ai_filling": "AI 填写中",
         "blocked": "存在阻断问题",
         "notPending": "不是待审状态",
-        "hasIssues": "存在问题",
         "ttsInvalid": "没有当前有效配音"
       },
       "order": {
@@ -1715,6 +1725,14 @@
         "confirmFailed": "设计卡确认失败",
         "fillFailed": "设计卡填写失败",
         "orderFailed": "镜序保存失败"
+      },
+      "confirm": {
+        "gotoIssues": "查看 {n} 个问题",
+        "blockedNote": "存在 {n} 个阻断问题：{message}"
+      },
+      "mark": {
+        "warn": "{n} 条警告：{message}",
+        "block": "{n} 个阻断问题：{message}"
       },
       "layerType": {
         "polygon": "多边形",
@@ -1938,6 +1956,9 @@
       "totalCount": "共 {n} 个",
       "duration": "时长",
       "descSection": "分镜描述",
+      "descExpand": "展开分镜描述",
+      "descCollapse": "收起分镜描述",
+      "descEmptyCollapsed": "本镜没有分镜描述与氛围（需要时展开补充）",
       "descLabel": "画面描述",
       "descHint": "按【镜头1】【镜头2】…逐子镜头描述；台词写「角色名说：「台词」」，旁白写「旁白：内容」",
       "descPlaceholder": "分镜画面描述",
@@ -2184,6 +2205,8 @@
       "midTimeUnit": "秒",
       "midTimeAuto": "未设置",
       "midTimeRange": "0.5 ~ {max}s",
+      "midTimeOutOfRange": "当前 {value}s 超出生成段 {gen}s 的合法区间 {range}：中间帧必须落在生成段内（图层段没有中间帧）",
+      "midTimeNoRange": "生成段只有 {gen}s，放不下中间帧（至少 2s 才有可切的时刻）",
       "midTimeInvalid": "中间帧时间需在 0.5s 与 {max}s 之间",
       "midOptional": "未设置 · 确认不要求",
       "midOptionalHint": "当前未设置中间帧，不影响关键帧确认；这不代表已审核本镜不需要中间帧。需要时填写提示词。",
@@ -3375,7 +3398,8 @@
   },
   "layerCanvas": {
     "toolbar": {"select":"选择","pan":"平移","frame":"编辑取景框","crop":"裁切底图","undo":"撤销","redo":"重做","snap":"吸附","zoomIn":"放大","zoomOut":"缩小","fit":"适配画布","edit":"编辑","preview":"预览","render":"渲染本段","rehearse":"预演本镜"},
-    "keyframeBar": {"title":"精确关键帧","add":"在当前时刻添加帧","copyPrev":"复制上一帧","remove":"删除帧（首帧不可删）","duration":"段长","endHold":"末尾停留","junction":"衔接帧","junctionTextWarn":"衔接帧不含文字图层：渲染时这 {n} 个文字将不出现","teach":"这一段由若干张精确关键帧组成：每帧=某一时刻的取景+可见图层。程序在帧之间自动推拉与淡入，渲染成确定性视频——它们就是这段的关键帧，不是 PPT 动画。","ease":"到下一帧缓动","fade":"新图层淡入","viewportPick":"取景（在画布框选）","visible":"可见图层"},
+    "keyframeBar": {"title":"精确关键帧","add":"在当前时刻添加帧","copyPrev":"复制上一帧","remove":"删除帧（首帧不可删）","duration":"段长","endHold":"末尾停留","junction":"衔接帧","junctionTextWarn":"衔接帧不含文字图层：渲染时这 {n} 个文字将不出现","junctionImageWarn":"衔接帧不含画中画：渲染时这 {n} 张图将不出现","teach":"这一段由若干张精确关键帧组成：每帧=某一时刻的取景+可见图层。程序在帧之间自动推拉与淡入，渲染成确定性视频——它们就是这段的关键帧，不是 PPT 动画。","ease":"到下一帧缓动","fade":"新图层淡入","viewportPick":"取景（在画布框选）","visible":"可见图层"},
+    "frameGhostHint": "画布按当前时刻作画：这一时刻不可见的图层以淡影显示",
     "base": {"title":"底图","noBase":"未选择底图（可先编辑文字）","replace":"更换底图","cropToOutput":"裁切到成片比例","aspectBanner":"底图比例 {aspect} 与成片不符，将以留白渲染，需视觉验证；可裁切到成片比例或为该资产生成项目画幅版本","cropHelp":"拖动原图坐标中的成片比例裁框或右下角；原图不变。","applyCrop":"应用裁切","cancelCrop":"取消","outputSize":"输出画布 {w}×{h}","sourceSize":"源图 {w}×{h}（原件像素）","sourceUnknown":"源图尺寸未知","resolution":"裁切后源图像素为成片 {sw}×{sh} 的 {times}×（按短板计）","verified":"已核验","inherited":"继承底图（锁定）","guide":"源图像素用于裁切与清晰度判断，不决定输出画布；建议裁切后宽高均≥成片的 2 倍。","style":"整体风格","unknown":"底图","version":"版本 {version}","saveSize":"源图尺寸尚未由服务端确认；保存时会读取原件。","loadError":"素材或语义条目加载失败。","framingClamped":"裁切无法保留部分原取景，已收回有效区域；可撤销恢复原裁切和全部取景。"},
     "anchor": {"anchored":"已锚定","manual":"手动","unlink":"源条目已删除或改名","detachConfirm":"该图层锚定于「{name}」。解除锚定并移动？","relink":"重新选择条目","toManual":"转为手动","labelOffset":"标签偏移","addMarker":"添加标记","addRegion":"添加区域","addRoute":"添加路线","noSemantics":"该素材尚未语义标注。","inherited":"继承底图不可使用语义锚点。","choose":"选择语义条目重新锚定","cancel":"取消","points":"地点","regions":"区域","lines":"路线","labels":"标签"},
     "quality": {"badge":"有效 {w}×{h} < {sw}×{sh}（推近过度）","frameDot":"有效像素低于输出","hint":"请使用更高分辨率底图或缩小推近。"},

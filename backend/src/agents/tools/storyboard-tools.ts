@@ -10,6 +10,7 @@ import { eq } from 'drizzle-orm'
 import { now } from '../../utils/response.js'
 import { logTaskProgress, logTaskSuccess } from '../../utils/task-logger.js'
 import { getDramaId, getEpisodeId, getResearchRunId, getStoryboardId, isStoryboardFillGaps } from '../context.js'
+import { resolveDramaProjectType } from '../../services/project-type.js'
 import { loadEpisodeKeyframes } from '../../services/keyframes.js'
 import {
   PROMPT_FIELDS,
@@ -25,6 +26,7 @@ import { describeNarrationGaps, fitNarrationToGaps, locateNarrationInScript, nar
 import { groupAt, paragraphSpans } from '../../services/narration-groups.js'
 import { groupPlanDeviation } from '../../services/design-group-plan.js'
 import { spokenText } from '../../services/narration-markup.js'
+import { generatedSegmentSeconds } from '../../services/shot-duration.js'
 import { layerTextSpecPayload, loadDesignCardContext, semanticEntries } from '../../services/design-card-context.js'
 import { designCardWindow } from '../../services/design-card-window.js'
 import { shotTtsValidity } from '../../services/narration-tts-gate.js'
@@ -32,7 +34,10 @@ import {
   COMBOS,
   INFO_POINT_VIAS,
   PLANNED_LAYER_TYPES,
+  aiAssetRuleRejections,
   aiTextPlanRejections,
+  assetRuleRejectionMessage,
+  fitBudgetToNarration,
   lockedGenSlot,
   normalizeDesignCard,
   parseDesignCard,
@@ -42,18 +47,12 @@ import {
   toCombo,
   toDesignCardStatus,
   validateDesignCard,
+  type BudgetAdjustment,
 } from '../../services/design-card.js'
 import { checkDesignCardGrounding, groundingRejectionMessage } from '../../services/design-card-grounding.js'
 import { aspectConflictMessage, compositionOf, findAspectConflicts, normalizeAspect } from '../../services/aspect.js'
 import { junctionPromptRejections, lockedFramesOfEpisode } from '../../services/junction-caption.js'
-import { parsePipMeta } from '../../services/map-pip-assets.js'
-
-function pipSummary(raw: string | null | undefined): Record<string, unknown> | null {
-  const meta = parsePipMeta(raw)
-  if (!meta) return null
-  if (meta.role === 'overview') return { role: 'overview', layout: (meta.layout as { id?: string } | null)?.id ?? null, details: meta.frames.map(f => ({ no: f.no, label: f.label, role: f.role, asset_id: f.detail_prop_id })), usage: meta.usage }
-  return { role: 'detail', parent_asset_id: meta.parent_prop_id, frame: meta.frame, usage: meta.usage, stale: meta.stale === true }
-}
+import { pipSummary } from '../../services/map-pip-assets.js'
 
 
 /** 项目画幅（Issue #92）：出图尺寸按它查表，提示词里的画幅/构图写法也必须与它一致 */
@@ -221,9 +220,11 @@ const readStoryboardContext = createTool({
          */
         semantics: semanticEntries(p.semantics),
         /**
-         * 地图画中画（#107）：全览与细节是独立资产，分镜同时引用。`role: overview` 的 frames 列出各细节资产 id；
-         * `role: detail` 给出它所属的全览资产 id 与在全览中的位置。usage 是用法说明——聚焦某细节的镜头以该细节图为底图，
+         * 地图画中画（#107/#110）：全览与细节是独立资产，分镜同时引用。`role: overview` 列出全览范围与各细节资产
+         * （`label` + `bbox`/`focus_bbox` 经纬度）；`role: detail` 给出自己的取景、重点范围、所属全览 id 与全览范围。
+         * 这些地理范围是判断「这一镜的旁白落在哪个细节里」的唯一依据；聚焦某细节的镜头以该细节图为底图，
          * 并在相邻镜头或同镜中用全览图建立位置；讲整体趋势的镜头以全览图为底图。
+         * `usage` 只保留通用用法（按镜号写的例子已剔除：那些镜号属于别的集）。
          */
         map_pip: pipSummary(p.mapPip),
       }))
@@ -288,6 +289,8 @@ const readStoryboardContext = createTool({
           first_frame_prompt: sb.firstFramePrompt || '',
           mid_frame_prompt: sb.midFramePrompt || '',
           mid_frame_time: sb.midFrameTime ?? null,
+          // 纪录片（Issue #110）：mid_frame_time 是**生成段内**的时刻，模型按这个长度写时间点
+          generated_segment_s: generatedSegmentSeconds(sb.designCard, sb.duration),
           last_frame_prompt: sb.lastFramePrompt || '',
           inherits_first: kf?.inheritsFirst === true,
           previous_last_frame_prompt: prev?.lastFramePrompt || '',
@@ -952,6 +955,35 @@ const updateStoryboard = createTool({
       }
     }
 
+    // 纪录片（Issue #110）：`mid_frame_time` 是**生成段内**的时刻（图层段与衔接帧不参与）。
+    // 纪录片的 storyboards.duration 常为 0，若按整镜时长判会把任何取值都判成超限——必须用生成段长度。
+    if ('mid_frame_time' in fields && fields.mid_frame_time != null) {
+      const [epRow] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId))
+      if (epRow && resolveDramaProjectType(epRow.dramaId) === 'documentary') {
+        const cardJson = fields.design_card != null ? JSON.stringify(fields.design_card) : storyboard.designCard
+        const segmentSeconds = generatedSegmentSeconds(cardJson, 'duration' in fields ? fields.duration : storyboard.duration)
+        const midTime = Number(fields.mid_frame_time)
+        if (!Number.isFinite(midTime) || midTime <= 0.5 || midTime >= segmentSeconds - 0.5) {
+          const reason = `mid_frame_time 必须在 0.5 秒与 ${Math.max(0, segmentSeconds - 0.5)} 秒之间（本镜生成段 ${segmentSeconds} 秒）：中帧时刻是生成段内的时刻，不是整镜时长`
+          logTaskProgress('StoryboardTool', 'update-mid-time-rejected', { episodeId, storyboardId: storyboard_id, segmentSeconds, midTime })
+          return { error: reason, rejected: [reason], generated_segment_s: segmentSeconds }
+        }
+      }
+    }
+    // 锁定槽位的提示词写入一律拒绝（Issue #110）：C 的首帧、D 的尾帧由衔接帧锁定继承，
+    // 写进来的提示词永远不会用来出图（旧的提示词批量曾给 C 镜写 first、D 镜写 last）。
+    const comboForLocks = toCombo(storyboard.combo)
+    const lockedWrite = comboForLocks === 'C' && 'first_frame_prompt' in fields && (fields.first_frame_prompt || '').trim()
+      ? 'first'
+      : comboForLocks === 'D' && 'last_frame_prompt' in fields && (fields.last_frame_prompt || '').trim() ? 'last' : null
+    if (lockedWrite) {
+      const reason = `本镜组合 ${comboForLocks} 的${lockedWrite === 'first' ? '首' : '尾'}帧由衔接帧锁定继承（图层段${lockedWrite === 'first' ? '末' : '首'}帧），`
+        + `不能写 ${lockedWrite === 'first' ? 'first_frame_prompt' : 'last_frame_prompt'}：这段提示词永远不会被用来出图。请只写未锁定的槽位。`
+      context?.requestContext?.set('designCardError' as never, reason as never)
+      logTaskProgress('StoryboardTool', 'update-locked-slot-rejected', { episodeId, storyboardId: storyboard_id, combo: comboForLocks, slot: lockedWrite })
+      return { error: reason, rejected: [reason], combo: comboForLocks, locked_slot: lockedWrite }
+    }
+
     const currentCharacterIds = 'character_ids' in fields
       ? fields.character_ids
       : (await db.select().from(schema.storyboardCharacters)
@@ -994,6 +1026,7 @@ const updateStoryboard = createTool({
     if ('duration' in fields) updates.duration = fields.duration
     // 只有设计卡批次接受模型选择；已有组合保留。补选模式绝不改写原有卡片。
     const cardReport: { code: string; message: string }[] = []
+    let cardBudget: BudgetAdjustment | null = null
     if ('design_card' in fields && fields.design_card) {
       const scope = context?.requestContext?.get('storyboardPromptScope' as never)
       const comboOnly = context?.requestContext?.get('designCardComboOnly' as never) === true
@@ -1005,6 +1038,16 @@ const updateStoryboard = createTool({
         const reason = `模型给出非法组合 ${String(fields.design_card.combo ?? '（缺失）')}；请选择 A、B、C 或 D 后重试`
         context?.requestContext?.set('designCardError' as never, reason as never)
         return { error: reason }
+      }
+      // AI 写入路径的资产契约（#110）：画中画层必须锚到本集有图、且不是底图的资产；
+      // 忠实素材/地图不能进生成段参考（会被扩散模型重画）。不合格当场拒收并说明改法。
+      if (!comboOnly && scope === 'design_card' && card) {
+        const assetIssues = aiAssetRuleRejections(card, combo, ctx.assets)
+        if (assetIssues.length) {
+          const reason = assetRuleRejectionMessage(assetIssues)
+          context?.requestContext?.set('designCardError' as never, reason as never)
+          return { error: reason, asset_rule_issues: assetIssues }
+        }
       }
       // AI 写入路径的依据机检（#87）：只认当前已有资产能支撑的设计。
       // 旧实现只拒「填了名字但解析不到」的引用，留空的几何层照样放行——用户已裁定
@@ -1027,6 +1070,17 @@ const updateStoryboard = createTool({
           return { error: reason, grounding_issues: violations }
         }
       }
+      const tts = await shotTtsValidity(storyboard_id)
+      // #110：AI 写入时按实测旁白自动补预算（只加不减）：C/D/A 的差额补进图层段，
+      // B 的生成段补到 min(15, 实测 + 0.5)。调整结果回给模型，让它知道预算已被改写。
+      let budgetAdjusted: BudgetAdjustment | null = null
+      if (card && !comboOnly && tts.valid) {
+        const fitted = fitBudgetToNarration(card.budget, combo, tts.duration_s)
+        if (fitted.adjusted) {
+          card.budget = fitted.budget
+          budgetAdjusted = fitted.adjusted
+        }
+      }
       if (card && !comboOnly) {
         updates.designCard = serializeDesignCard(card)
         updates.designCardStatus = 'pending'
@@ -1037,16 +1091,17 @@ const updateStoryboard = createTool({
       }
       if (scope === 'design_card' && !storyboard.combo && combo) updates.combo = combo
       const actualCard = comboOnly ? parseDesignCard(storyboard.designCard, ctx) : card
-      const tts = await shotTtsValidity(storyboard_id)
       for (const issue of validateDesignCard({
         card: actualCard,
         combo,
         narrationText: storyboard.narrationText,
         measuredSeconds: tts.valid ? tts.duration_s : null,
         aspect: ctx.aspect,
+        assets: ctx.assets,
       })) {
         cardReport.push({ code: issue.code, message: issue.message })
       }
+      if (budgetAdjusted) cardBudget = budgetAdjusted
       // #109：与本组视觉规划不一致 → 回给模型（警告，不拒存；偏离要在 rationale 写明原因）
       const planned = ctx.plannedShots?.get(storyboard_id)
       const deviation = planned ? groupPlanDeviation(planned, combo, actualCard) : null
@@ -1077,9 +1132,15 @@ const updateStoryboard = createTool({
       characterIds: 'character_ids' in fields ? (fields.character_ids || []).join(',') : undefined,
       propIds: 'prop_ids' in fields ? (fields.prop_ids || []).join(',') : undefined,
     })
-    return cardReport.length
-      ? { message: `Storyboard ${storyboard_id} updated`, design_card_issues: cardReport }
-      : { message: `Storyboard ${storyboard_id} updated` }
+    if (cardReport.length || cardBudget) {
+      return {
+        message: `Storyboard ${storyboard_id} updated`,
+        ...(cardReport.length ? { design_card_issues: cardReport } : {}),
+        // #110：预算被自动补时的前后值与原因（模型要知道存进去的不是它写的数字）
+        ...(cardBudget ? { budget_adjusted: cardBudget } : {}),
+      }
+    }
+    return { message: `Storyboard ${storyboard_id} updated` }
   },
 })
 

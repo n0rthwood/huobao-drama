@@ -58,11 +58,6 @@ export const SEGMENT_MAX_KEYFRAMES = 60
 export const SEGMENT_MIN_VIEWPORT = 0.2
 /** 图层段最短时长（秒） */
 export const SEGMENT_MIN_SECONDS = 1
-/**
- * 图层段时长上限（秒，用户确认 #44 Q5 / 二轮 C·D 组合 30+15）。
- * 与 position 无关：一镜只有一个图层段，上限恒为 30 秒。
- */
-export const MAX_LAYER_SEGMENT_SECONDS = 30
 
 export const FULL_VIEWPORT: SegmentViewport = { x: 0, y: 0, w: 1, h: 1 }
 
@@ -311,10 +306,13 @@ export function minViewportSize(timeline: SegmentTimeline): number {
   return clamp(min, SEGMENT_MIN_VIEWPORT, 1)
 }
 
-/** 图层段时长钳制：下限 1 秒、上限 30 秒（`MAX_LAYER_SEGMENT_SECONDS`） */
-export function clampSegmentDuration(seconds: number, maxSeconds = MAX_LAYER_SEGMENT_SECONDS): number {
+/**
+ * 图层段时长钳制：只有下限 1 秒，**没有上限**（Issue #110）——图层段是确定性渲染，
+ * 15 秒是扩散视频模型对生成段的约束，不适用于图层段；长旁白靠加长图层段承载。
+ */
+export function clampSegmentDuration(seconds: number): number {
   const value = Number.isFinite(seconds) ? seconds : SEGMENT_MIN_SECONDS
-  return round(clamp(value, SEGMENT_MIN_SECONDS, maxSeconds), 3)
+  return round(Math.max(value, SEGMENT_MIN_SECONDS), 3)
 }
 
 /**

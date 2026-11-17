@@ -23,7 +23,6 @@ import { probeVideoSpec } from './media-probe.js'
 import { normalizeLayerDoc, type LayerDoc } from './layer-doc.js'
 import { baseFrameOf, qualityWarningsOf } from './layer-quality.js'
 import {
-  MAX_LAYER_SEGMENT_SECONDS,
   SEGMENT_DEFAULT_FPS,
   SEGMENT_FPS_MIN,
   SEGMENT_FPS_MAX,
@@ -328,10 +327,8 @@ export async function saveLayerSegment(
     ...normalizeTimeline('timeline' in input ? input.timeline : existing?.timeline, baseFrameOf(layerDoc.base, spec).frame),
     fps: spec.fps,
   }
-  const duration = clampSegmentDuration(
-    input.duration !== undefined ? Number(input.duration) : (existing?.duration ?? 0),
-    MAX_LAYER_SEGMENT_SECONDS,
-  )
+  // 图层段时长没有上限（Issue #110）：1 秒下限，加长由人/AI 的预算决定
+  const duration = clampSegmentDuration(input.duration !== undefined ? Number(input.duration) : (existing?.duration ?? 0))
   const baseRef = 'base_ref' in input ? input.base_ref ?? null : existing?.base_ref ?? null
   const warnings = qualityWarningsOf(layerDoc, timeline.keyframes, spec)
   const ts = now()
@@ -517,6 +514,9 @@ function renderInputsOf(doc: LayerDoc): LayerDoc {
  * C/D v2 includes the encoded text-free boundary profile; A/legacy retain v1.
  * contain 留白（Issue #94）把取景框并入签名：比例不符的旧段因此变为过期（它们的成片确实是拉伸的），
  * cover 段的签名逐字节不变。
+ *
+ * Issue #110：含 `image`（画中画）层的段渲染口径变了（衔接帧隐藏 image、边界前淡出），
+ * **只有这类段**升到 v3（C/D）/ v2（A）；不含 image 层的段签名逐字不变——ep27 这类存量段零波及。
  */
 export function layerSegmentSignatureOf(
   segment: Pick<LayerSegment, 'layer_doc' | 'timeline' | 'duration'>,
@@ -524,12 +524,16 @@ export function layerSegmentSignatureOf(
   combo?: string | null,
 ): string {
   const images = [segment.layer_doc.base.path]
+  let hasImageLayer = false
   for (const layer of segment.layer_doc.layers) {
-    if (layer.type === 'image') images.push(layer.src.path)
+    if (layer.type !== 'image') continue
+    hasImageLayer = true
+    images.push(layer.src.path)
   }
+  const boundary = combo === 'C' || combo === 'D'
   const base = baseFrameOf(segment.layer_doc.base, spec)
   return crypto.createHash('sha256').update([
-    combo === 'C' || combo === 'D' ? `seg-v2-${combo}` : 'seg-v1',
+    hasImageLayer ? (boundary ? `seg-v3-${combo}` : 'seg-v2') : (boundary ? `seg-v2-${combo}` : 'seg-v1'),
     JSON.stringify(renderInputsOf(segment.layer_doc)),
     JSON.stringify(segment.timeline),
     segment.duration.toFixed(3),

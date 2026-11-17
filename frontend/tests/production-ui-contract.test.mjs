@@ -86,6 +86,7 @@ globalThis.__productionUiApi.storyboardAPI = {
 }
 modules['~/composables/useApi'] = dataModule('export const {episodeAPI,storyboardAPI}=globalThis.__productionUiApi; export const taskAPI={},imageQueueAPI={}')
 modules['~/utils/mediaTime'] = dataModule('export const mediaTimeLabel=()=>null,mediaTimeOfPath=()=>null')
+modules['~/utils/generatedSegment'] = new URL('utils/generatedSegment.js', app).href
 modules['~/composables/useTaskProgress'] = dataModule(`import {ref} from '${vue}'; export const useNowTicker=()=>ref(0),ringPropsFromTask=()=>null,ringPropsFromBatchItem=()=>null,isActiveTaskStatus=()=>false,isActiveBatchItemState=()=>false,formatSeconds=()=>''`)
 modules['~/composables/useTasks'] = dataModule('export const useTasks=()=>({latestKeyframeTask:()=>null,registerTask(){},refreshTasks(){},onTaskFinished(){}})')
 modules['~/composables/useToast'] = dataModule('export const toastError=()=>{},toastServerMessage=()=>{},mapError=()=>null')

@@ -5,6 +5,9 @@
  * `layerDocToSvg(doc, size, { viewport, opacity })` 做「某一时刻画面」的所见即所得，
  * 服务端用同一套规则逐帧渲染，所以预览与成片是同一口径。
  *
+ * Issue #110：图层段**不设上限**（只有扩散生成段受模型 15 s 限制），画中画 `image` 层与模板文本框
+ * 同口径——先出后进、衔接帧不含它。
+ *
  * 逐帧覆盖：某关键帧的 `ease` 覆盖「本帧 → 下一帧」这一区间的插值缓动；
  * 目标帧的 `fade_ms` 覆盖到达该帧时的淡入淡出时长。两者缺省时沿用 timeline 级的值。
  */
@@ -15,8 +18,6 @@ export const SEGMENT_MAX_KEYFRAMES = 60
 /** 取景框最小边长（归一化）：再小就是放大到糊 */
 export const SEGMENT_MIN_VIEWPORT = 0.2
 export const SEGMENT_MIN_SECONDS = 1
-/** 图层段时长上限（秒）：一镜一段，统一 30 秒 */
-export const SEGMENT_MAX_SECONDS = 30
 
 export const FULL_VIEWPORT = { x: 0, y: 0, w: 1, h: 1 }
 
@@ -34,8 +35,13 @@ function num(value, fallback = 0) {
   return Number.isFinite(n) ? n : fallback
 }
 
-export function clampSegmentDuration(seconds, maxSeconds = SEGMENT_MAX_SECONDS) {
-  return round(clamp(num(seconds, SEGMENT_MIN_SECONDS), SEGMENT_MIN_SECONDS, maxSeconds), 2)
+/**
+ * 图层段时长钳制：只有 1 秒下限（#110 删掉了 30 秒上限），保留三位小数。
+ * 与后端 `clampSegmentDuration` 逐行等价：非数字一律按 1 秒处理，不做字符串宽容转换。
+ */
+export function clampSegmentDuration(seconds) {
+  const value = Number.isFinite(seconds) ? seconds : SEGMENT_MIN_SECONDS
+  return round(Math.max(value, SEGMENT_MIN_SECONDS), 3)
 }
 
 /**
@@ -61,6 +67,30 @@ export function normalizeViewport(raw, frame) {
   const cx = clamp(x0 + w0 / 2, 0, 1)
   const cy = clamp(y0 + h0 / 2, 0, 1)
   return { x: round(clamp(cx - size / 2, 0, 1 - size)), y: round(clamp(cy - size / 2, 0, 1 - size)), w: round(size), h: round(size) }
+}
+
+/**
+ * 「先出后进」的独占图层类型：模板文本框（#96）与画中画 `image` 层（#110）。
+ * 两者都占同一块版面，同一区替换时叠着画会同时露出两份内容。
+ */
+export const STAGED_LAYER_TYPES = ['text', 'image']
+
+/** `frameStateAt` 的 `staged` 集合：文本 + 画中画图层 id（淡出前半段、淡入后半段） */
+export function stagedLayerIds(layers) {
+  return (layers || []).filter(layer => STAGED_LAYER_TYPES.includes(layer.type)).map(layer => layer.id)
+}
+
+/**
+ * 衔接帧（C 末帧 / D 首帧）整层隐藏的图层类型（#110）：与后端 `layer-segment-render.ts`
+ * 的 `withoutText` 同口径——文字层与画中画 `image` 层都不交给扩散（忠实素材不进扩散）。
+ * 后端口径变化时只改这一处，编辑器预览与注意事项文字同时跟上。
+ */
+export const JUNCTION_HIDDEN_TYPES = ['text', 'label', 'card', 'image']
+
+/** 某一组合下衔接帧要整层隐藏的图层 id；A/B 没有衔接帧，返回空数组 */
+export function junctionHiddenLayerIds(layers, combo) {
+  if (combo !== 'C' && combo !== 'D') return []
+  return (layers || []).filter(layer => JUNCTION_HIDDEN_TYPES.includes(layer.type)).map(layer => layer.id)
 }
 
 /** 时间线里出现过的全部图层 id（按首次出现的时刻排序） */

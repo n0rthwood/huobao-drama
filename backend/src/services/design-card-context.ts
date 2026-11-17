@@ -95,6 +95,8 @@ export function loadDesignCardContext(episodeId: number): DesignCardContext {
       name: row.name,
       exposition: Number(row.exposition) === 1,
       faithful: Number(row.faithful) === 1,
+      // 地图是确定性渲染的忠实素材：进扩散生成会被重画（Issue #110 的 faithful_in_diffusion）
+      is_map: row.assetType === 'map',
       image: row.localPath || row.imageUrl || null,
       semantics: semanticEntries(row.semantics),
       // #87 的依据机检要判断「语义坐标依据的是哪一版图」，人工手填的标注可能没有版本
@@ -274,6 +276,7 @@ export function resolveDesignCard(
     measuredSeconds: measuredSeconds === undefined ? measuredNarrationSeconds(row) : measuredSeconds,
     mentioned: mentioned ?? null,
     aspect: ctx.aspect,
+    assets: ctx.assets,
   })
   // #109：卡与本组视觉规划不一致 → 警告（人工复核；规划过期或没有规划时不检查）
   const planned = ctx.plannedShots?.get(row.id)
@@ -298,6 +301,7 @@ export function resolveDesignCardFrom(
     narrationText: shot.narrationText,
     measuredSeconds: measuredSeconds === undefined ? measuredNarrationSeconds(shot) : measuredSeconds,
     aspect: ctx.aspect,
+    assets: ctx.assets,
   })
   if (card) card.issues = issues
   return { combo, card, issues }

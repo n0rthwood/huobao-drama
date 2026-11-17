@@ -20,6 +20,7 @@ import { now } from '../utils/response.js'
 import { markEpisodeDesignCardsStale } from './staleness.js'
 import { parseDesignCard, toCombo, toDesignCardStatus, validateDesignCard, type DesignCardStatus } from './design-card.js'
 import { normalizeAspect } from './aspect.js'
+import { loadDesignCardContext } from './design-card-context.js'
 import { segmentsByStoryboard, resolveEpisodeSegmentSpec, layerSegmentIsFresh } from './layer-segment.js'
 import { shotTtsValidity, toBlocked, TtsRequiredError, type TtsBlockedShot } from './narration-tts-gate.js'
 
@@ -289,6 +290,8 @@ export async function productionGateReason(
     narrationText: sb.narrationText,
     measuredSeconds: tts.duration_s,
     aspect,
+    // #110：画中画层与扩散参考素材的资产契约要按本集真实资产判
+    assets: loadDesignCardContext(sb.episodeId).assets,
   }).filter(issue => issue.severity === 'block') : []
   if (fit.length) {
     return {
