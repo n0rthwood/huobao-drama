@@ -56,7 +56,9 @@ function runProbe(body) {
     const failInterruptedMapWorkflows = async () => initMapStudio(platform)
 
     const ts = now()
-    const settle = async (id, ms = 90000) => {
+    // base 阶段真实预取 DEM 瓦片并渲染 4K 晕渲，慢网络下单步可超过 90 s（实测 ~106 s）；
+    // 240 s 仍远小于工具墙钟，卡死依旧会失败。
+    const settle = async (id, ms = 240000) => {
       const deadline = Date.now() + ms
       for (;;) {
         const row = await loadWorkflow(id)
