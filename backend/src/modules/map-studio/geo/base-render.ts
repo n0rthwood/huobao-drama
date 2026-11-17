@@ -118,11 +118,11 @@ export interface MapRenderResult {
 
 // ---------------------------------------------------------------- 校验
 
-const MAX_PLACES = 200
-const MAX_ROUTES = 50
-const MAX_ROUTE_POINTS = 5000
-const MAX_REGIONS = 30
-const MAX_REGION_POINTS = 2000
+export const MAX_PLACES = 200
+export const MAX_ROUTES = 50
+export const MAX_ROUTE_POINTS = 5000
+export const MAX_REGIONS = 30
+export const MAX_REGION_POINTS = 2000
 /** mercator 在两极发散，纬度按 Web 地图惯例截到 ±85 */
 const MERCATOR_LAT_LIMIT = 85
 

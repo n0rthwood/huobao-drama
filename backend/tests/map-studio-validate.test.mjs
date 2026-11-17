@@ -70,6 +70,15 @@ const script = `
   }], ctx({ brief: { ...emptyBrief(), subject: '邗沟', schematic: true } }))
   out.clean = validateFeatureSubmission(jiangsu, ctx())
 
+  // 采纳容量闸（#111）：51 条手绘路线在提交期就被拒，而不是采纳后 normalizeMapSpec 抛错
+  const manyRoutes = Array.from({ length: 51 }, (_, i) => ({
+    kind: 'route', name: '路线' + i, category: 'route', geometry_source: 'model',
+    points: [[119 + i * 0.01, 32.5], [119.05 + i * 0.01, 32.6]],
+    coordinate_basis: 'approximate_schematic', source_ids: ['S1'], basis: '示意', uncertainty: 'high',
+  }))
+  out.routeCap = validateFeatureSubmission(manyRoutes, ctx())
+  out.routeCapOk = validateFeatureSubmission(manyRoutes.slice(0, 50), ctx())
+
   // 取景：同一组要素，东亚大图 vs 收紧到江淮之间
   const features = normalizeMapSpec({
     bbox: [118.5, 31.9, 120.2, 33.8],
@@ -160,6 +169,9 @@ test('逐字出处、来源引用、来源覆盖与人工确认的要素都由�
   assert.deepEqual(result.schematicRegion.problems, [], '示意图模式下合法的面可以提交')
   assert.equal(result.schematicRegion.features.find(feature => feature.name === '射阳湖').verification.status, 'needs_user', '数据集缺失的古湖示意范围仍必须人工裁决')
   assert.deepEqual(result.clean.problems, [])
+  assert.ok(result.routeCap.problems.some(p => /路线将达 51/.test(p)), JSON.stringify(result.routeCap.problems))
+  assert.equal(result.routeCap.features.length, 0)
+  assert.deepEqual(result.routeCapOk.problems, [])
   assert.deepEqual(result.clean.features.map(f => f.name), ['扬州', '高邮', '宝应', '淮安'])
 })
 
