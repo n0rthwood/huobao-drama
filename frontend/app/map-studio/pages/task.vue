@@ -708,7 +708,9 @@ const nextAction = computed(() => {
 })
 
 const draftsDirty = computed(() => briefDirty.value || geometryDirty.value)
-const canRun = computed(() => !hostMissing.value && !!detail.value && !isRunning.value && !draftsDirty.value && !blockingIssues.value.length && stage.value !== 'complete')
+// complete 阶段 awaiting_review 时仍要能「复核通过并继续」触发交付收尾（#111）；
+// 只有已 completed 才禁用运行。
+const canRun = computed(() => !hostMissing.value && !!detail.value && !isRunning.value && !draftsDirty.value && !blockingIssues.value.length && !(stage.value === 'complete' && status.value === 'completed'))
 const canAdvance = computed(() => canRun.value)
 const runLabel = computed(() => (runMode.value === 'auto'
   ? t('mapStudio.panel.runAuto')

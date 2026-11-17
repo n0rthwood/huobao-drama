@@ -79,8 +79,10 @@ test('only text service configs expose the connection test button', () => {
 test('settings page offers the supported official provider presets', () => {
   assert.match(providerPresetBlock('text'), /deepseek-v4-pro/)
   assert.doesNotMatch(providerPresetBlock('text'), /minimax/i)
-  // 图片服务已切到 qwen-jobs 任务 API，ComfyUI 原生图片路径不再是可选项（视频仍保留 comfyui）
-  assert.doesNotMatch(providerPresetBlock('image'), /'ali'|minimax|comfyui/i)
+  // 图片服务已切到 qwen-jobs 统一队列（Qwen Image 2.1 / MiniMax-H3-Image 按 model 分卡），
+  // ComfyUI 原生图片路径与 ali 不再是可选项（视频仍保留 comfyui/minimax）。
+  assert.doesNotMatch(providerPresetBlock('image'), /'ali'|comfyui/i)
+  assert.match(providerPresetBlock('image'), /minimax-h3-image/)
   assert.match(providerPresetBlock('image'), /'qwen-jobs'/)
   assert.match(providerPresetBlock('video'), /volcengine/)
   assert.match(providerPresetBlock('video'), /minimax/)
