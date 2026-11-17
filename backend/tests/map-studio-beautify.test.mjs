@@ -184,7 +184,8 @@ test('Map Studio server draft: 600-vertex dataset river and dense region survive
     const river=Array.from({length:600},(_,i)=>[12+6*i/599,14+Math.sin(i/80)*.3])
     const region=Array.from({length:350},(_,i)=>[15+Math.cos(2*Math.PI*i/350)*2,17+Math.sin(2*Math.PI*i/350)*.7])
     const spec=normalizeMapSpec({bbox:[10,10,20,20],routes:[{id:'river',name:'长河',points:river,category:'river',origin:'dataset',verification:{status:'verified',reasons:['dataset fixture']}}],regions:[{id:'mountain',name:'山地',points:region,origin:'dataset',verification:{status:'verified',reasons:['dataset fixture']}}]})
-    const registration={mode:'program',width:1000,height:600,bbox:spec.bbox,program:{projection:'mercator',bbox:spec.bbox}}
+    const registration={mode:'image',width:1000,height:600,bbox:spec.bbox,image:{forward:[100,0,-1000,0,-60,1200],inverse:[.01,0,10,0,-1/60,20],residual_px:{max:0,rms:0},control_points:[],source_url:'fixture',license:'fixture'}}
+    const background={path:'static/base.png',width:1000,height:600,registration,warnings:[]}
     const expected=spec.routes[0].points.map(p=>{const q=forwardFor(registration)(p);return[q[0]/1000,q[1]/600]})
     const model=await startMockOpenAIChat(async body=>{
       const names=(body.tools??[]).map(t=>t.function?.name)
@@ -203,7 +204,7 @@ test('Map Studio server draft: 600-vertex dataset river and dense region survive
       const runId=insertRun({taskId:task.task_id,mode:'manual',startStage:'drawing',stage:'drawing',textConfigId:configId,imageConfigId:null,imageModel:null,params:{}})
       await mutateTask(task.task_id,{action:'fixture_run',actor:'system',mutate:ctx=>{ctx.state.run_id=runId;ctx.state.status='running';ctx.state.stage='drawing';ctx.mapSpec=spec}})
       const stageModel=await resolveStageModel('read_image',{configId})
-      const outcome=await runDrawingStage({taskId:task.task_id,runId,stageModel,brief:{...emptyBrief(),subject:'精确河流'},spec,background:{path:'static/base.png',width:1000,height:600,registration,warnings:[]},startRounds:0,feedback:null})
+      const outcome=await runDrawingStage({taskId:task.task_id,runId,stageModel,brief:{...emptyBrief(),subject:'精确河流'},spec,background,startRounds:0,feedback:null})
       assert.equal(outcome.kind,'accepted')
       const {doc,rendered,layerOptions}=outcome.result
       const line=doc.layers.find(l=>l.type==='polyline'),polygon=doc.layers.find(l=>l.type==='polygon')
@@ -217,7 +218,7 @@ test('Map Studio server draft: 600-vertex dataset river and dense region survive
       const svg=layerDocToSvg(doc,doc.base)
       assert.equal(/<polyline points="([^"]+)"/.exec(svg)[1].trim().split(/\\s+/).length,600)
       assert.equal(/<polygon points="([^"]+)"/.exec(svg)[1].trim().split(/\\s+/).length,351)
-      assert.equal((await renderMapLayerDoc(doc,layerOptions)).path,rendered.path)
+      assert.equal((await renderMapLayerDoc(doc,layerOptions,{spec,background})).path,rendered.path)
       assert.equal((await sharp(process.env.HUOBAO_DATA_DIR+'/'+rendered.path).metadata()).width,1000)
       for(const request of model.requests)for(const message of request.messages??[]){
         for(const call of message.tool_calls??[])assert.ok(Buffer.byteLength(call.function.arguments)<5000)

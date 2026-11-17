@@ -55,10 +55,12 @@
           "dash": "dash"
         },
         "regions": {
-          "fill": "#e5d4aa",
+          "fill": "#bc6559",
+          "colors": ["#bc6559", "#698cb1", "#83a468", "#b18db1", "#c99451", "#5f9d99", "#ac7880", "#929c56", "#867cb0", "#bd815e", "#6495aa", "#a59068"],
+          "feather": 0.023,
           "fill_opacity": 0.23,
           "stroke": "#96664f",
-          "stroke_width": 0.0011,
+          "stroke_width": 0,
           "dash": "none"
         },
         "routes": {
@@ -218,10 +220,12 @@
           "dash": "dash"
         },
         "regions": {
-          "fill": "#e3ccaf",
+          "fill": "#bc6559",
+          "colors": ["#bc6559", "#698cb1", "#83a468", "#b18db1", "#c99451", "#5f9d99", "#ac7880", "#929c56", "#867cb0", "#bd815e", "#6495aa", "#a59068"],
+          "feather": 0.023,
           "fill_opacity": 0.23,
           "stroke": "#837969",
-          "stroke_width": 0.0011,
+          "stroke_width": 0,
           "dash": "none"
         },
         "routes": {
@@ -381,10 +385,12 @@
           "dash": "dash"
         },
         "regions": {
-          "fill": "#d8d7b0",
+          "fill": "#bc6559",
+          "colors": ["#bc6559", "#698cb1", "#83a468", "#b18db1", "#c99451", "#5f9d99", "#ac7880", "#929c56", "#867cb0", "#bd815e", "#6495aa", "#a59068"],
+          "feather": 0.023,
           "fill_opacity": 0.23,
           "stroke": "#847d66",
-          "stroke_width": 0.0011,
+          "stroke_width": 0,
           "dash": "none"
         },
         "routes": {
@@ -557,10 +563,12 @@
           "dash": "dash"
         },
         "regions": {
-          "fill": "#ded1aa",
+          "fill": "#bc6559",
+          "colors": ["#bc6559", "#698cb1", "#83a468", "#b18db1", "#c99451", "#5f9d99", "#ac7880", "#929c56", "#867cb0", "#bd815e", "#6495aa", "#a59068"],
+          "feather": 0.023,
           "fill_opacity": 0.23,
           "stroke": "#8c7861",
-          "stroke_width": 0.0011,
+          "stroke_width": 0,
           "dash": "none"
         },
         "routes": {
@@ -720,10 +728,12 @@
           "dash": "dash"
         },
         "regions": {
-          "fill": "#e4e8e3",
+          "fill": "#bc6559",
+          "colors": ["#bc6559", "#698cb1", "#83a468", "#b18db1", "#c99451", "#5f9d99", "#ac7880", "#929c56", "#867cb0", "#bd815e", "#6495aa", "#a59068"],
+          "feather": 0.023,
           "fill_opacity": 0.23,
           "stroke": "#829098",
-          "stroke_width": 0.0011,
+          "stroke_width": 0,
           "dash": "none"
         },
         "routes": {

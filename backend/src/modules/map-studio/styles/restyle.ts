@@ -17,6 +17,6 @@ export function restyleMapLayers(doc: LayerDoc, family: MapStyleFamily, features
     if (layer.type !== 'marker' && layer.type !== 'polyline' && layer.type !== 'polygon') return layer
     const kind = layer.type === 'marker' ? 'place' : layer.type === 'polygon' ? 'region' : 'route'
     const markerTier = MAP_MARKER_TIERS.reduce((best, tier) => Math.abs(Number(layer.style.dot_radius ?? family.markers.city.dot_radius) - family.markers[tier].dot_radius) < Math.abs(Number(layer.style.dot_radius ?? family.markers.city.dot_radius) - family.markers[best].dot_radius) ? tier : best, 'city')
-    return { ...layer, style: featureStyleFor(family, { kind, category: feature?.category, markerTier }) }
+    return { ...layer, style: featureStyleFor(family, { kind, id: layer.anchor?.semantic_id, regionIds: features.filter(item => item.kind === 'region').map(item => item.id), category: feature?.category, markerTier }) }
   }) }
 }
