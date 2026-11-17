@@ -115,10 +115,13 @@ type SemanticHit =
   | { group: 'regions'; entry: SemanticRegion }
   | { group: 'lines'; entry: SemanticLine }
 
-function assetOf(ctx: SegmentDraftContext, id: unknown): SegmentDraftAsset | null {
+function assetOf(ctx: SegmentDraftContext, id: unknown, kind?: string): SegmentDraftAsset | null {
   const key = Number(id)
   if (!Number.isInteger(key)) return null
-  return ctx.assets.find(asset => asset.id === key) ?? null
+  // #110：角色/场景/道具 id 可撞号；锚点带种类时精确匹配，否则只在唯一命中时认
+  if (kind) return ctx.assets.find(asset => asset.id === key && asset.kind === kind) ?? null
+  const matches = ctx.assets.filter(asset => asset.id === key)
+  return matches.length === 1 ? matches[0] : null
 }
 
 /** 语义条目：按稳定 id 命中，命中不了按名称匹配（#49 写入时允许写名称而不是 id） */
@@ -206,7 +209,9 @@ export function layerFromPlannedLayer(
   const id = `L${index + 1}`
   const frame = draftFrameOf(ctx)
   // #110：image（画中画）层只认自己 anchor 的那张资产图，**绝不回落到底图**——回落等于把底图再贴一遍
-  const anchorAsset = item.type === 'image' ? assetOf(ctx, item.anchor?.asset_id) : assetOf(ctx, item.anchor?.asset_id) ?? ctx.base
+  const anchorAsset = item.type === 'image'
+    ? assetOf(ctx, item.anchor?.asset_id, (item.anchor as { asset_kind?: string } | undefined)?.asset_kind)
+    : assetOf(ctx, item.anchor?.asset_id) ?? ctx.base
   const semantic = findSemantic(anchorAsset, item.anchor?.semantic_id || item.anchor?.name)
   const size = anchorAsset ? imageSizeOf(anchorAsset) : { width: 1, height: 1 }
   // 语义坐标是**原图像素**（#47 契约），图层坐标是归一化 0–1（#48 契约）

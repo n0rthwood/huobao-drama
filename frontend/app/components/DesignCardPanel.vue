@@ -1140,7 +1140,12 @@ function assetImage(kind, id) {
 function pipAsset(layer) {
   const id = Number(layer?.anchor?.asset_id)
   if (!id) return null
-  return (ctx.value.assets || []).find(item => Number(item.id) === id) || null
+  const kind = layer?.anchor?.asset_kind
+  const assets = ctx.value.assets || []
+  // 角色/场景/道具的 id 各自独立，可能撞号：锚点带 kind 时精确匹配；旧数据没 kind 时只在唯一命中时认
+  if (kind) return assets.find(item => Number(item.id) === id && item.kind === kind) || null
+  const matches = assets.filter(item => Number(item.id) === id)
+  return matches.length === 1 ? matches[0] : null
 }
 function pipImage(layer) {
   return pipAsset(layer)?.image || null
@@ -1154,7 +1159,7 @@ function openPipPicker(index) {
   picker.layerIndexes = [index]
   picker.anchorId = ''
   const asset = pipAsset(layerPlan.value.planned_layers[index])
-  picker.selected = asset ? [{ kind: asset.kind, id: asset.id, asset_id: asset.id, name: asset.name }] : []
+  picker.selected = asset ? [{ kind: asset.kind, id: asset.id, name: asset.name }] : []
   picker.open = true
 }
 function previewImage(path, title, versionTaskId) {
@@ -1851,7 +1856,7 @@ function onPicked(items) {
     picker.layerIndexes = null
     if (!pick || !indexes.length) return
     // image 层只锚资产本身（#110）：不带语义条目
-    const anchor = { asset_id: Number(pick.asset_id ?? pick.id), name: String(pick.name || '') }
+    const anchor = { asset_id: Number(pick.asset_id ?? pick.id), asset_kind: pick.kind, name: String(pick.name || '') }
     const layers = layerPlan.value.planned_layers.map((layer, index) => (
       indexes.includes(index) ? { ...layer, anchor: { ...anchor } } : layer
     ))
