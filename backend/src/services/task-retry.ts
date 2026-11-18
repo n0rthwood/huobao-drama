@@ -57,6 +57,7 @@ interface StoredParams {
   referenceImages?: string[]
   sourcePrompt?: string
   refNameIndex?: Record<string, number>
+  asset_citation?: boolean
   posterId?: number
   posterGenMode?: 'initial' | 'composite' | 'layers'
   posterConceptComposition?: string
