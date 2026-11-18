@@ -41,6 +41,7 @@
                 <template v-else>
                   <input v-model="licenses[c.sha256]" class="input rsp-license" :placeholder="t('episode.documentary.pipeline.sourceLicense')" />
                   <select v-model="roles[c.sha256]" class="input rsp-role">
+                    <option value="original">{{ t('episode.documentary.pipeline.roleOriginal') }}</option>
                     <option value="generation_reference">{{ t('episode.documentary.pipeline.roleGenerationReference') }}</option>
                     <option value="shape_only">{{ t('episode.documentary.pipeline.roleShapeOnly') }}</option>
                   </select>

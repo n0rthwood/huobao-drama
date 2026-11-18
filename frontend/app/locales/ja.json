@@ -2887,6 +2887,7 @@
         "sourcePickFile": "ファイル未選択",
         "sourceUpload": "アップロードして登録",
         "sourceUploading": "アップロード中…",
+        "roleOriginal": "歴史原件（入库時に資産画像として採用）",
         "roleGenerationReference": "生成参照に使用可",
         "roleShapeOnly": "形状参照のみ",
         "roleRejected": "除外",

@@ -2887,6 +2887,7 @@
         "sourcePickFile": "선택된 파일 없음",
         "sourceUpload": "업로드 후 등록",
         "sourceUploading": "업로드 중…",
+        "roleOriginal": "역사 원본(入库 시 자산 이미지로 채택)",
         "roleGenerationReference": "생성 참조로 사용 가능",
         "roleShapeOnly": "형태 참조 전용",
         "roleRejected": "제외됨",

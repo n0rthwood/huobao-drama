@@ -2887,6 +2887,7 @@
         "sourcePickFile": "No file selected",
         "sourceUpload": "Upload and register",
         "sourceUploading": "Uploading…",
+        "roleOriginal": "Historical original (adopted as asset image on ingest)",
         "roleGenerationReference": "Usable as generation reference",
         "roleShapeOnly": "Shape reference only",
         "roleRejected": "Excluded",

@@ -2887,6 +2887,7 @@
         "sourcePickFile": "未选择文件",
         "sourceUpload": "上传入库",
         "sourceUploading": "上传中…",
+        "roleOriginal": "历史原件（入库即采用为资产图）",
         "roleGenerationReference": "可作生成参考",
         "roleShapeOnly": "仅供形制参考",
         "roleRejected": "已排除",
