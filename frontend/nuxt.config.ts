@@ -26,6 +26,16 @@ export default defineNuxtConfig({
     'pages:extend'(pages) {
       pages.push(
         {
+          name: 'asset-studio',
+          path: '/asset-studio',
+          file: fileURLToPath(new URL('./app/asset-studio/pages/index.vue', import.meta.url)),
+        },
+        {
+          name: 'asset-studio-task',
+          path: '/asset-studio/:taskId',
+          file: fileURLToPath(new URL('./app/asset-studio/pages/task.vue', import.meta.url)),
+        },
+        {
           name: 'map-studio',
           path: '/map-studio',
           file: fileURLToPath(new URL('./app/map-studio/pages/index.vue', import.meta.url)),

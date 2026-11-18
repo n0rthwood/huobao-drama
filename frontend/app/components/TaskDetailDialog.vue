@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <div class="overlay task-detail-overlay" @click.self="emit('close')">
-      <section class="dialog task-detail-dialog" :class="{ 'is-review': reviewing }" role="dialog" aria-modal="true" :aria-label="t('taskCenter.detail.title')">
+      <section class="dialog task-detail-dialog" role="dialog" aria-modal="true" :aria-label="t('taskCenter.detail.title')">
         <header class="dialog-head task-detail-head">
           <div class="task-detail-title-block">
             <span class="task-detail-kicker">{{ t('taskCenter.detail.title') }}</span>
@@ -12,28 +12,12 @@
           </button>
         </header>
 
-        <footer v-if="reviewing" id="pipeline-review-footer" class="dialog-foot task-detail-foot review-foot" />
-
         <div ref="bodyEl" class="task-detail-body">
-          <template v-if="reviewing && live.pipeline">
-            <div class="task-detail-status-row">
-              <span class="task-status-chip">{{ statusLabel }}</span>
-              <span v-if="live.pipeline?.awaiting">{{ t('episode.documentary.pipeline.roundLabel', { n: live.pipeline.awaiting.round_no }) }}</span>
-              <span v-if="elapsedText">{{ t('episode.documentary.pipeline.elapsedIncludingWaiting', { time: elapsedText }) }}</span>
-            </div>
-            <AssetPipelinePanel
-              :asset-kind="live.pipeline.asset_kind" :asset-id="live.pipeline.asset_id"
-              :episode-id="live.episode_id || 0" :review-run-id="live.id"
-              :asset-name="live.label || ''" @preview="showPreview" @update="emit('changed')"
-            />
-          </template>
-          <template v-else>
           <!-- 状态 / 进度 -->
           <div class="task-detail-status-row">
             <span :class="['task-status-chip', 'is-' + stateClass]">{{ statusLabel }}</span>
             <span class="task-detail-id">#{{ live.id }}</span>
             <span v-if="retryOf" class="task-detail-id">{{ t('taskCenter.detail.retryOf', { id: retryOf }) }}</span>
-            <button v-if="live.pipeline?.state === 'waiting_approval'" class="btn btn-sm" @click="reviewing = true">{{ t('episode.documentary.pipeline.reviewAction') }}</button>
             <ProgressRing
               v-if="(!live.pipeline || live.pipeline.state === 'running') && ring.status && ring.status !== 'completed'"
               v-bind="ring"
@@ -206,10 +190,9 @@
             <img v-else :src="mediaSrc(resultUrl)" :alt="live.label || ''" loading="lazy" class="task-detail-result" />
             <MediaTime :at="live.generated_at ?? live.completed_at_unix" />
           </div>
-          </template>
         </div>
 
-        <footer v-if="!reviewing" class="dialog-foot task-detail-foot">
+        <footer class="dialog-foot task-detail-foot">
           <div class="task-detail-retry">
             <ModelSelect
               v-if="modelOptions.length"
@@ -269,7 +252,6 @@ import ConfirmDialog from '~/components/ConfirmDialog.vue'
 import MediaTime from '~/components/MediaTime.vue'
 import TaskConversation from '~/components/TaskConversation.vue'
 import TaskWorkMetrics from '~/components/TaskWorkMetrics.vue'
-import AssetPipelinePanel from '~/components/AssetPipelinePanel.vue'
 import TaskErrorMessage from '~/components/TaskErrorMessage.vue'
 import { taskErrorPresentation } from '~/utils/taskError'
 import { taskAPI } from '~/composables/useApi'
@@ -286,7 +268,6 @@ import {
 
 const props = defineProps({
   task: { type: Object, required: true },
-  reviewMode: { type: Boolean, default: false },
   restoreLink: { type: Boolean, default: false },
   // 全屏正文视图：由宿主（任务中心面板）经 URL 同步（Issue #86 tfull）
   fullView: { type: Boolean, default: false },
@@ -296,7 +277,6 @@ const emit = defineEmits(['close', 'changed', 'update:fullView'])
 const { t } = useI18n()
 const now = useNowTicker()
 const { tasksById, registerTask, refreshTasks } = useTasks()
-const reviewing = ref(props.reviewMode)
 const previewUrl = ref('')
 const previewTitle = ref('')
 function showPreview(url, title) { previewUrl.value = url; previewTitle.value = title }
@@ -649,7 +629,6 @@ async function doCancel() {
   display: flex;
   flex-direction: column;
 }
-.task-detail-dialog.is-review { width: 1120px; max-height: calc(100vh - 48px); }
 .task-detail-head { flex: none; order: 0; }
 .task-detail-body { order: 1; min-height: 0; overflow-wrap: anywhere; }
 .task-detail-foot { flex: none; order: 2; }

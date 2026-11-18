@@ -66,6 +66,7 @@
     "months": "{n} 个月前"
   },
   "taskCenter": {
+    "pipelineReadonlyHint": "历史流水线记录（只读）；续跑请打开资产工作室",
     "errorPresentation": {"outputBlocked":"文本服务的内容审核拦截了模型生成的输出，本次未返回生成结果。","inputBlocked":"文本服务的内容审核拦截了本次输入，请求未返回生成结果。","contentBlocked":"文本服务返回内容审核拦截，本次未返回生成结果。","noPassage":"平台未提供具体命中片段或分类，无法确定哪一句触发了审核。","serviceError":"文本服务请求失败 {status}，请展开诊断信息查看平台响应。","details":"诊断信息","copy":"复制诊断信息","copied":"已复制"},
     "button": "任务",
     "title": "任务中心",

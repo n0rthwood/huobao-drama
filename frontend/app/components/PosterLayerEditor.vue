@@ -88,7 +88,7 @@ import LayerCanvas from '~/components/LayerCanvas/LayerCanvas.vue'
 import LayerRail from '~/components/LayerCanvas/LayerRail.vue'
 import { useLayerDoc } from '~/composables/useLayerDoc'
 import { useLayerTextNames, useLayerTextSpec } from '~/composables/useLayerTextSpec'
-import { assetPipelineAPI, posterAPI, uploadAPI } from '~/composables/useApi'
+import { assetBaseCandidateAPI, posterAPI, uploadAPI } from '~/composables/useApi'
 import { baseAspectIssue } from '~/utils/layerQuality'
 import { mediaUrl } from '~/utils/url'
 import { toastError, toastServerMessage } from '~/composables/useToast'
@@ -177,7 +177,7 @@ watch(() => props.episodeId, async episodeId => {
   assetCandidates.value = []
   if (!episodeId) return
   try {
-    const result = await assetPipelineAPI.baseCandidates(episodeId)
+    const result = await assetBaseCandidateAPI.list(episodeId)
     assetCandidates.value = result.candidates || []
   } catch { /* 资产候选缺失不影响 Poster 生成；用户仍可用 Poster 版本或上传 */ }
 }, { immediate: true })

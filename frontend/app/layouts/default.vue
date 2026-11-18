@@ -28,6 +28,10 @@
           <MapIcon :size="15" :stroke-width="1.8" />
           <span>{{ t('layout.nav.mapStudio') }}</span>
         </NuxtLink>
+        <NuxtLink to="/asset-studio" class="nav-link" :class="{ active: route.path.startsWith('/asset-studio') }">
+          <MapIcon :size="15" :stroke-width="1.8" />
+          <span>{{ t('assetStudio.title') }}</span>
+        </NuxtLink>
       </nav>
 
       <div class="header-right">

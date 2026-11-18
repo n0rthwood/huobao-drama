@@ -249,6 +249,11 @@ export const DEEPLINK_KEYS = {
   workbenchDialogs: ['dlg', 'view', 'shot', 'sel', 'bsel'],
   /** 资产详情弹窗内部：定位的语义条目 / 流水线轮次 */
   assetDetail: ['sem', 'run', 'round'],
+  /** 资产工作室：只恢复导航状态，不恢复审批草稿或自动发起操作。 */
+  assetStudioList: ['asq', 'assetsettings'],
+  assetStudioRun: ['run', 'round', 'approval'],
+  assetStudioPreview: ['asview'],
+  assetStudioCall: ['ascall'],
   /** 地图工作室列表：搜索词、宿主筛选、新建表单开关（不恢复草稿）。 */
   mapStudioList: ['msq', 'mshost', 'mscreate'],
   /** 地图工作室：选中的阶段与运行容器（稳定 run id）。 */

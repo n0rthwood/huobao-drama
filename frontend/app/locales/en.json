@@ -66,6 +66,7 @@
     "months": "{n} months ago"
   },
   "taskCenter": {
+    "pipelineReadonlyHint": "Legacy pipeline record (read-only); resume in Asset Studio",
     "errorPresentation": {"outputBlocked":"The text provider blocked the model-generated output. No generated result was returned.","inputBlocked":"The text provider blocked the input. No generated result was returned.","contentBlocked":"The text provider blocked this request during content moderation. No generated result was returned.","noPassage":"The provider did not supply a matched passage or category; the exact trigger is unknown.","serviceError":"The text service request failed {status}. Expand diagnostics to inspect the provider response.","details":"Diagnostics","copy":"Copy diagnostics","copied":"Copied"},
     "button": "Tasks",
     "title": "Task Center",
