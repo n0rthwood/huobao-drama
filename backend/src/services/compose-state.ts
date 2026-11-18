@@ -444,8 +444,10 @@ export async function inspectComposeInputs(
     if (sb.keyframesJunctionHash !== junction.hash || !sb.keyframesConfirmed) return fail(`${shot} 的衔接帧已变化，请重新确认故事关键帧并生成视频`)
   }
   if (documentary && combo !== 'A' && !sb.keyframesConfirmed) return fail(`${shot} 的故事关键帧未确认`)
-  // 生成段是扩散模型产出的，仍有 15 秒上限；图层段是确定性渲染，**没有**时长上限（Issue #110）
-  if (documentary && combo !== 'A' && modelFacts && modelFacts.durationMs > 15000 + 1) return fail(`${shot} 的生成段实测超过 15 秒`)
+  // 生成段是扩散模型产出的，仍有 15 秒上限；图层段是确定性渲染，**没有**时长上限（Issue #110）。
+  // 模型按整数帧出片：请求 15 s 可能多出 1–2 帧（24 fps 下 ≈ 42–83 ms，ep 30 #35 实测 15.08 s），
+  // 这是帧取整伪影不是设计超限，给 0.2 s（≥ 4 帧 @24fps）容差；真正超 15 s 的生成段仍阻断。
+  if (documentary && combo !== 'A' && modelFacts && modelFacts.durationMs > 15000 + 200) return fail(`${shot} 的生成段实测超过 15 秒`)
 
   if (replaceClip) {
     if (!replaceClip.render_path) return fail(`${shot} 的确定性片段还没有渲染，请先渲染片段`)
