@@ -139,7 +139,8 @@
           <input v-model="form.artist" class="input" :placeholder="t('episode.documentary.pipeline.sourceArtist')" />
           <input v-model="form.era" class="input" :placeholder="t('episode.documentary.pipeline.sourceEra')" />
           <select v-model="form.role" class="input">
-            <option value="generation_reference">{{ t('episode.documentary.pipeline.roleGenerationReference') }}</option>
+            <option value="original">{{ t('episode.documentary.pipeline.roleOriginal') }}</option>
+<option value="generation_reference">{{ t('episode.documentary.pipeline.roleGenerationReference') }}</option>
             <option value="shape_only">{{ t('episode.documentary.pipeline.roleShapeOnly') }}</option>
             <option value="rejected">{{ t('episode.documentary.pipeline.roleRejected') }}</option>
           </select>

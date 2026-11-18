@@ -6,7 +6,7 @@ import { generateImage } from '../services/generation.js'
 import { getDramaStylePrompt } from '../services/style-preset.js'
 import { ensurePropFinalPrompt, savedPromptOf } from '../services/final-prompt.js'
 import { logTaskError, logTaskStart, logTaskSuccess, logTaskWarn } from '../utils/task-logger.js'
-import { deleteAllReferenceImages, partitionMissingReferences, resolveReferenceImages } from '../services/reference-images.js'
+import { deleteAllReferenceImages } from '../services/reference-images.js'
 import { deleteAssetLinks } from '../services/asset-links.js'
 import { mountReferenceImageRoutes } from './reference-images.js'
 import { EMPTY_ASSET_NAME_MESSAGE, normalizeAssetName } from '../services/asset-name.js'
@@ -30,7 +30,9 @@ import { openHostTask } from '../modules/map-studio/index.js'
 import { pipParentOf } from '../services/map-pip-assets.js'
 import { mountAspectVersionRoute } from './asset-aspect-version.js'
 import { PROP_IMAGE_SIZE } from '../services/asset-image-size.js'
-import { referenceNameIndex } from '../services/asset-reference-prompt.js'
+import { planAssetReferences, AssetReferenceError, descriptionCitationsOf } from '../services/asset-submit-refs.js'
+import { referenceCitationIssue } from '../services/asset-reference-prompt.js'
+import { effectiveReferenceImages } from '../services/reference-images.js'
 
 const app = new Hono()
 /** 证据素材不进生图链路时的统一口径（路由 400 与批量 skip_faithful 同义） */
@@ -143,6 +145,13 @@ app.put('/:id', async (c) => {
   else if (body.imageUrl !== undefined) updates.imageUrl = body.imageUrl
   if (body.local_path !== undefined) updates.localPath = body.local_path
   else if (body.localPath !== undefined) updates.localPath = body.localPath
+  // #121：手写最终提示词过同一引用核验（越界/描述引用未落地 → 400）
+  const incomingPrompt = body.final_prompt !== undefined ? body.final_prompt : body.finalPrompt
+  if (typeof incomingPrompt === 'string' && incomingPrompt.trim()) {
+    const merged = { ...prop, ...updates } as unknown as Record<string, unknown>
+    const issue = referenceCitationIssue(incomingPrompt, effectiveReferenceImages(prop.referenceImages).length, descriptionCitationsOf('prop', merged))
+    if (issue) return badRequest(c, issue)
+  }
   // 手写最终提示词以传入值为准；否则名称/类型/描述改了值 → 旧提示词失效（Issue #24）
   Object.assign(updates, planFinalPromptWrite({
     currentFinalPrompt: prop.finalPrompt,
@@ -210,9 +219,15 @@ app.post('/:id/generate-image', async (c) => {
   const stylePrompt = await getDramaStylePrompt(prop.dramaId)
   const finalPrompt = savedPromptOf(await ensurePropFinalPrompt(prop, ep.id, false, { model: body.text_model, configId: body.text_config_id ?? undefined }))
   const prompt = finalPrompt || propImagePrompt(prop, stylePrompt)
-  // 默认用道具自己保存的参考图；请求显式传 reference_images（含空数组）时以请求为准
-  const resolved = resolveReferenceImages(prop.referenceImages, body.reference_images)
-  const { present: referenceImages, missing } = partitionMissingReferences(resolved)
+  // #121：发送集合只按 final_prompt 实际引用的参考图（零引用零发送）
+  let plan
+  try {
+    plan = await planAssetReferences('prop', id, prompt, body.reference_images)
+  } catch (err) {
+    if (err instanceof AssetReferenceError) return badRequest(c, err.message)
+    throw err
+  }
+  const { referenceImages, missing } = plan
   if (missing.length) logTaskWarn('PropImage', 'reference-missing', { propId: id, missing })
   try {
     logTaskStart('PropImage', 'generate', { propId: id, episodeId: ep.id, dramaId: prop.dramaId, references: referenceImages.length })
@@ -221,8 +236,9 @@ app.post('/:id/generate-image', async (c) => {
       episodeId: ep.id,
       dramaId: prop.dramaId,
       prompt,
-      // 换厂商重试按新 provider 重新渲染 @参考图N；无参考图时不落这两项
-      ...(referenceImages.length ? { sourcePrompt: prompt, refNameIndex: referenceNameIndex(referenceImages.length) } : {}),
+      // #121：refNameIndex = 资产编号→请求编号映射；重试沿用落盘发送子集
+      assetCitation: true,
+      ...(referenceImages.length ? { sourcePrompt: prompt, refNameIndex: plan.refNameIndex } : {}),
       model: body.model,
       size: PROP_IMAGE_SIZE,
       referenceImages: referenceImages.length ? referenceImages : undefined,

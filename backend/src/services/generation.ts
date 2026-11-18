@@ -23,7 +23,7 @@ import sharp from 'sharp'
 import { getAbsolutePath } from '../utils/storage.js'
 import { invalidateSegmentSpec } from './layer-segment.js'
 import { aspectLockedMismatchMessage } from './asset-image-size.js'
-import { renderReferencePrompt } from './asset-reference-prompt.js'
+import { renderReferencePrompt, citedReferenceIndices, referenceToken } from './asset-reference-prompt.js'
 import type { ReferenceOrigin } from './asset-pipeline/references.js'
 import {
   buildImageJobBody,
@@ -92,6 +92,11 @@ interface TaskOriginParams {
   sourcePrompt?: string
   refNameIndex?: Record<string, number>
   retryOf?: number
+  /**
+   * 资产引用任务（Issue #121）：referenceImages 已是按 final_prompt 引用过滤的发送子集，
+   * 提示词编号 = 请求编号；提交侧先归一成中性 @参考图N 再按厂商渲染。重试沿用落盘子集。
+   */
+  assetCitation?: boolean
   /** Poster 任务归属（Issue #39）：只带 episode/drama，完成后回写 poster_versions */
   posterId?: number
   posterGenMode?: 'initial' | 'composite' | 'layers'
@@ -199,6 +204,7 @@ export async function generateImage(params: GenerateImageParams): Promise<number
   }, {
     size: params.size || '1920x1080',
     ...(params.aspectLocked ? { aspect_locked: true } : {}),
+    ...(params.assetCitation ? { asset_citation: true } : {}),
     ...(params.aspectVersion ? { aspect_version: true } : {}),
     frameType: params.frameType,
     referenceImages: params.referenceImages,
@@ -408,9 +414,13 @@ async function processTask(id: number, config: AIConfig) {
       const imageRecord: ImageGenerationRecord = {
         id: record.id,
         model: record.model,
-        // 参考图引用按目标厂商渲染（qwen-jobs 走 <imageN>，其余厂商走 图片N）：
-        // 提示词里存的是厂商无关的 @参考图N，换厂商重试时由 adapter 侧重新渲染
-        prompt: renderReferencePrompt(record.prompt || '', resolvedReferenceImages.length, config.provider),
+        // 资产引用任务（#121）：params.referenceImages 已是按引用过滤的发送子集，
+        // 提示词里的编号是请求编号；先归一成中性 @参考图N，再由提交侧按目标厂商渲染，
+        // 换厂商重试不会把旧厂商的 <imageN> 当资产编号二次映射。
+        // 其余任务（关键帧/Poster/旧任务）沿用全量渲染旧口径。
+        prompt: params.asset_citation === true
+          ? neutralizeAssetCitations(record.prompt || '', (params.refNameIndex || {}) as Record<string, number>)
+          : renderReferencePrompt(record.prompt || '', resolvedReferenceImages.length, config.provider),
         size: params.size,
         frameType: params.frameType,
         referenceImages: resolvedReferenceImages.length ? JSON.stringify(resolvedReferenceImages) : null,
@@ -558,6 +568,29 @@ const inFlightQwenSubmits = new Set<number>()
  * 再调 POST /v1/jobs —— 提交途中重启时启动恢复可按同一幂等键原样重发（服务端去重）。
  * 参考图被服务端回收（422 unknown reference image）时清掉 file id 缓存并重传一次。
  */
+/**
+ * 资产引用任务（#121）的提示词归一：请求编号 1..M 的五种写法统一换成中性 @参考图N，
+ * 提交侧再按目标厂商渲染。从大到小替换，避免 图片1 吃掉 图片10 的尾巴。
+ */
+export function neutralizeAssetCitations(prompt: string, nameToIndex: Record<string, number>): string {
+  if (!prompt) return prompt
+  // 资产编号 → 请求编号：只归一映射里存在的编号（@ 前缀可选、一次吃掉，避免 @@）。
+  // 从大到小：先处理 参考图10 再处理 参考图1，否则裸写法会吃掉两位数的尾巴。
+  const entries = Object.entries(nameToIndex)
+    .map(([name, requestNo]) => ({ assetNo: Number(name.replace('参考图', '')), requestNo }))
+    .filter(e => Number.isFinite(e.assetNo))
+    .sort((a, b) => b.assetNo - a.assetNo)
+  let out = prompt
+  for (const { assetNo, requestNo } of entries) {
+    const token = referenceToken(requestNo)
+    out = out.replace(new RegExp(`@?参考图${assetNo}(?!\\d)`, 'gi'), token)
+    out = out.replace(new RegExp(`<image${assetNo}>`, 'gi'), token)
+    out = out.replace(new RegExp(`<Picture ${assetNo}>`, 'gi'), token)
+    out = out.replace(new RegExp(`图片${assetNo}(?!\\d)`, 'gi'), token)
+  }
+  return out
+}
+
 async function submitQwenJobsImage(record: SysTaskRecord, config: AIConfig, params: Record<string, any>) {
   if (!await imageTaskEligible(record, params)) return
   const refs = params.posterId
@@ -584,7 +617,9 @@ async function submitQwenJobsImage(record: SysTaskRecord, config: AIConfig, para
     // FLUX：有参考图一律 reference_to_image + denoising_strength，只带第 1 张，不加 <imageN>。
     const isKeyframe = !!FRAME_TYPE_SLOT[String(params.frameType || '')]
     const body: QwenJobRequest = buildImageJobBody({
-      prompt: record.prompt || '',
+      prompt: params.asset_citation === true
+        ? neutralizeAssetCitations(record.prompt || '', (params.refNameIndex || {}) as Record<string, number>)
+        : record.prompt || '',
       fileIds,
       isKeyframe,
       size: params.size,

@@ -1,0 +1,55 @@
+{
+  "character900": {
+    "id": 900,
+    "name": "测试角色",
+    "appearance": "样貌见@参考图1",
+    "faithful": 1,
+    "faithful_source": 4950,
+    "final_prompt_source": "agent",
+    "reference_images": "[{\"path\":\"static/uploads/reference_images/character/900/2a13ee18-320a-44b8-8398-fa1bbac7d740.jpg\",\"uploaded_at\":1794989022,\"usage\":\"reference\",\"classification\":{\"verdict\":\"reference\",\"reason\":\"人工改判\",\"at\":1794989339,\"manual\":true}}]"
+  },
+  "tasks": [
+    {
+      "id": 4945,
+      "status": "completed",
+      "provider": "upload",
+      "model": "direct-adopt",
+      "params": "{\"source\":\"auto-classify\",\"adopted_from\":\"static/uploads/reference_images/character/900/2a13ee18-320a-44b8-8398-fa1bbac7d740.jpg\"}"
+    },
+    {
+      "id": 4946,
+      "status": "completed",
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "params": "{\"size\":\"1920x1080\",\"asset_citation\":true,\"referenceImages\":[\"static/uploads/reference_images/character/900/2a13ee18-320a-44b8-8398-fa1bbac7d740.jpg\"],\"sourcePrompt\":\"以@参考图2的五官为准，纯白背景\",\"refNameIndex\":{\"参考图2\":1}}"
+    },
+    {
+      "id": 4947,
+      "status": "completed",
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "params": "{\"size\":\"1920x1080\",\"asset_citation\":true,\"referenceImages\":[\"static/uploads/reference_images/character/900/2a13ee18-320a-44b8-8398-fa1bbac7d740.jpg\"],\"sourcePrompt\":\"以@参考图2的五官为准，纯白背景\",\"refNameIndex\":{\"参考图2\":1}}"
+    },
+    {
+      "id": 4948,
+      "status": "completed",
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "params": "{\"size\":\"1920x1080\",\"asset_citation\":true,\"referenceImages\":[\"static/uploads/reference_images/character/900/2a13ee18-320a-44b8-8398-fa1bbac7d740.jpg\"],\"sourcePrompt\":\"以@参考图2的五官为准，纯白背景\",\"refNameIndex\":{\"参考图2\":1}}"
+    },
+    {
+      "id": 4949,
+      "status": "completed",
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "params": "{\"size\":\"1920x1080\",\"asset_citation\":true}"
+    },
+    {
+      "id": 4950,
+      "status": "completed",
+      "provider": "upload",
+      "model": "direct-adopt",
+      "params": "{\"source\":\"manual-adopt\",\"adopted_from\":\"static/uploads/reference_images/character/900/2a13ee18-320a-44b8-8398-fa1bbac7d740.jpg\"}"
+    }
+  ]
+}

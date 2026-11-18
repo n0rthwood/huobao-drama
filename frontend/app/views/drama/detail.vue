@@ -491,7 +491,7 @@
                   </div>
                   <label class="mat-detail-edit-field">
                     <span>{{ assetTypeOf(editTarget) === 'map' ? t('episode.asset.mapDescription') : t('episode.asset.appearanceOfObject') }}</span>
-                    <textarea v-model="editDraft.description" class="textarea mat-detail-textarea" rows="6" :placeholder="assetTypeOf(editTarget) === 'map' ? t('episode.asset.mapDescription') : t('episode.asset.appearancePlaceholder')" />
+                    <MentionTextarea v-model="editDraft.description" :options="editRefMentionOptions" input-class="textarea mat-detail-textarea" :rows="6" :placeholder="assetTypeOf(editTarget) === 'map' ? t('episode.asset.mapDescription') : t('episode.asset.appearancePlaceholder')" />
                   </label>
                 </div>
 
@@ -507,15 +507,15 @@
                   </label>
                   <label class="mat-detail-edit-field">
                     <span>{{ t('episode.asset.appearanceField') }}</span>
-                    <textarea v-model="editDraft.appearance" class="textarea mat-detail-textarea" rows="5" :placeholder="t('episode.asset.appearanceFieldPlaceholder')" />
+                    <MentionTextarea v-model="editDraft.appearance" :options="editRefMentionOptions" input-class="textarea mat-detail-textarea" :rows="5" :placeholder="t('episode.asset.appearanceFieldPlaceholder')" />
                   </label>
                   <label class="mat-detail-edit-field">
                     <span>{{ t('episode.asset.stylingField') }}</span>
-                    <textarea v-model="editDraft.styling" class="textarea mat-detail-textarea" rows="5" :placeholder="t('episode.asset.stylingFieldPlaceholder')" />
+                    <MentionTextarea v-model="editDraft.styling" :options="editRefMentionOptions" input-class="textarea mat-detail-textarea" :rows="5" :placeholder="t('episode.asset.stylingFieldPlaceholder')" />
                   </label>
                   <label class="mat-detail-edit-field">
                     <span>{{ t('detail.mat.personaField') }}</span>
-                    <textarea v-model="editDraft.description" class="textarea mat-detail-textarea" rows="4" :placeholder="t('detail.mat.personaPlaceholder')" />
+                    <MentionTextarea v-model="editDraft.description" :options="editRefMentionOptions" input-class="textarea mat-detail-textarea" :rows="4" :placeholder="t('detail.mat.personaPlaceholder')" />
                   </label>
                 </div>
 
@@ -531,11 +531,11 @@
                   </label>
                   <label class="mat-detail-edit-field">
                     <span>{{ t('episode.asset.sceneDescField') }}</span>
-                    <textarea v-model="editDraft.prompt" class="textarea mat-detail-textarea" rows="5" :placeholder="t('episode.asset.sceneDescPlaceholder')" />
+                    <MentionTextarea v-model="editDraft.prompt" :options="editRefMentionOptions" input-class="textarea mat-detail-textarea" :rows="5" :placeholder="t('episode.asset.sceneDescPlaceholder')" />
                   </label>
                   <label class="mat-detail-edit-field">
                     <span>{{ t('episode.asset.sceneLightField') }}</span>
-                    <textarea v-model="editDraft.lighting" class="textarea mat-detail-textarea" rows="5" :placeholder="t('episode.asset.sceneLightPlaceholder')" />
+                    <MentionTextarea v-model="editDraft.lighting" :options="editRefMentionOptions" input-class="textarea mat-detail-textarea" :rows="5" :placeholder="t('episode.asset.sceneLightPlaceholder')" />
                   </label>
                 </div>
               </section>
@@ -766,7 +766,8 @@
 import { toast } from 'vue-sonner'
 import { toastError, toastMissingReferenceImages } from '~/composables/useToast'
 import { useI18n } from 'vue-i18n'
-import { dramaAPI, episodeAPI, characterAPI, sceneAPI, propAPI, uploadAPI, taskAPI, mediaLibraryAPI } from '~/composables/useApi'
+import { dramaAPI, episodeAPI, characterAPI, sceneAPI, propAPI, uploadAPI, taskAPI, mediaLibraryAPI, parseReferenceImages } from '~/composables/useApi'
+import MentionTextarea from '~/components/MentionTextarea.vue'
 import { Images, Settings2 } from 'lucide-vue-next'
 import BaseSelect from '~/components/BaseSelect.vue'
 import { useStylePresets, ASPECT_RATIO_OPTIONS } from '~/composables/useStylePresets'
@@ -1258,6 +1259,19 @@ function onAssetRefsUpdate(refs) {
   if (!editTarget.value) return
   editTarget.value = { ...editTarget.value, reference_images: refs }
 }
+
+// #121：素材弹窗描述字段的 @参考图 候选 = 本资产参考图（编号 = 列表序）
+const editRefMentionOptions = computed(() => {
+  const item = editTarget.value
+  if (!item) return []
+  return parseReferenceImages(item.reference_images ?? item.referenceImages).map((entry, i) => ({
+    label: `参考图${i + 1}`,
+    value: `参考图${i + 1}`,
+    kind: 'prop',
+    group: t('components.referenceImages.label'),
+    image: thumbOf(mediaUrl(entry.path)),
+  }))
+})
 
 // 资产类型（Issue #84）：地图是独立类型，地图界面只认服务端持久化的 asset_type
 const ASSET_TYPES = ['prop', 'map']

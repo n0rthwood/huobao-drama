@@ -122,7 +122,9 @@ export function renderRefPrompt(
   const format = (index: number, name: string) => {
     if (opts.type === 'video') return `@图片${index}${name}`
     const token = isQwen ? `<image${index}>` : `图片${index}`
-    return name === referenceLabel(index) ? token : `${token}${name}`
+    // 资产参考图的引用名就是序号别名（参考图N）：渲染后不追加名字。
+    // #121 稀疏映射下资产编号 ≠ 请求编号，按「是参考图别名」判断而不是按编号相等。
+    return /^参考图\d+$/.test(name) ? token : `${token}${name}`
   }
   let out = ''
   for (let i = 0; i < sourcePrompt.length;) {

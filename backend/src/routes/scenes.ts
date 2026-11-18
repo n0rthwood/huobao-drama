@@ -6,7 +6,7 @@ import { generateImage } from '../services/generation.js'
 import { getDramaStylePrompt } from '../services/style-preset.js'
 import { ensureSceneFinalPrompt, savedPromptOf } from '../services/final-prompt.js'
 import { logTaskError, logTaskStart, logTaskSuccess, logTaskWarn } from '../utils/task-logger.js'
-import { deleteAllReferenceImages, partitionMissingReferences, resolveReferenceImages } from '../services/reference-images.js'
+import { deleteAllReferenceImages } from '../services/reference-images.js'
 import { deleteAssetLinks } from '../services/asset-links.js'
 import { mountReferenceImageRoutes } from './reference-images.js'
 import { planSceneTimePatch } from '../services/scene-time.js'
@@ -18,7 +18,9 @@ import { bindCreatedAssetToReviewItem, findReviewItemAssetDuplicate, onAssetRemo
 import { mountAspectVersionRoute } from './asset-aspect-version.js'
 import { assetImageSizeFor, resolveDramaAspect } from '../services/asset-image-size.js'
 import { aspectPhrase } from '../services/aspect.js'
-import { referenceNameIndex } from '../services/asset-reference-prompt.js'
+import { planAssetReferences, AssetReferenceError, descriptionCitationsOf } from '../services/asset-submit-refs.js'
+import { referenceCitationIssue } from '../services/asset-reference-prompt.js'
+import { effectiveReferenceImages } from '../services/reference-images.js'
 
 const app = new Hono()
 
@@ -84,6 +86,21 @@ app.put('/:id', async (c) => {
   if (body.prompt !== undefined) updates.prompt = body.prompt
   if (body.description !== undefined) updates.prompt = body.description
   if (body.lighting !== undefined) updates.lighting = body.lighting
+  // #121：原件保护开关（与 props 同口径）：关保护需显式确认
+  if (body.faithful !== undefined) {
+    const next = body.faithful === true || body.faithful === 1 ? 1 : 0
+    if (next === 0 && Number(scene.faithful) === 1 && body.confirm_unfaithful !== true) {
+      return badRequest(c, '关闭保护会让该场景图重新进入生图/批量重绘，请传 confirm_unfaithful=true 显式确认')
+    }
+    updates.faithful = next
+  }
+  // #121：手写最终提示词过同一引用核验（越界/描述引用未落地 → 400）
+  const incomingPrompt = body.final_prompt !== undefined ? body.final_prompt : body.finalPrompt
+  if (typeof incomingPrompt === 'string' && incomingPrompt.trim()) {
+    const merged = { ...scene, ...updates } as unknown as Record<string, unknown>
+    const issue = referenceCitationIssue(incomingPrompt, effectiveReferenceImages(scene.referenceImages).length, descriptionCitationsOf('scene', merged))
+    if (issue) return badRequest(c, issue)
+  }
   // 场景时间不变量（Issue #21）：提示词必须引用 time；改时间或画面字段让旧提示词失效（Issue #24）
   const timePatch = planSceneTimePatch({
     currentTime: scene.time,
@@ -137,9 +154,16 @@ app.post('/:id/generate-image', async (c) => {
     aspectPhrase(aspect),
     '画面中没有任何人物，空场景，只有场景本身',
   ].filter(Boolean).join(', ')
-  // 默认用场景自己保存的参考图；请求显式传 reference_images（含空数组）时以请求为准
-  const resolved = resolveReferenceImages(scene.referenceImages, body.reference_images)
-  const { present: referenceImages, missing } = partitionMissingReferences(resolved)
+  if (Number(scene.faithful) === 1) return badRequest(c, '该场景图为受保护原件，不进生图；如需重绘请先在资产详情关闭保护')
+  // #121：发送集合只按 final_prompt 实际引用的参考图（零引用零发送）
+  let plan
+  try {
+    plan = await planAssetReferences('scene', id, prompt, body.reference_images)
+  } catch (err) {
+    if (err instanceof AssetReferenceError) return badRequest(c, err.message)
+    throw err
+  }
+  const { referenceImages, missing } = plan
   if (missing.length) logTaskWarn('SceneImage', 'reference-missing', { sceneId: id, missing })
   try {
     logTaskStart('SceneImage', 'generate', { sceneId: id, episodeId: ep.id, dramaId: scene.dramaId, location: scene.location, references: referenceImages.length })
@@ -151,8 +175,9 @@ app.post('/:id/generate-image', async (c) => {
       episodeId: ep.id,
       dramaId: scene.dramaId,
       prompt,
-      // 换厂商重试按新 provider 重新渲染 @参考图N；无参考图时不落这两项
-      ...(referenceImages.length ? { sourcePrompt: prompt, refNameIndex: referenceNameIndex(referenceImages.length) } : {}),
+      // #121：refNameIndex = 资产编号→请求编号映射；重试沿用落盘发送子集
+      assetCitation: true,
+      ...(referenceImages.length ? { sourcePrompt: prompt, refNameIndex: plan.refNameIndex } : {}),
       model: body.model,
       size,
       aspectLocked: true,
@@ -200,6 +225,38 @@ app.delete('/:id', async (c) => {
   // 审核清单（#55）：绑定目标消失 → 相关条目回 missing，门禁重新上锁
   await onAssetRemoved('scene', id)
   return success(c)
+})
+
+
+// ─── 原件保护（Issue #121，与 props.faithful-source 同口径） ──────────────
+
+/** PUT /scenes/:id/faithful-source — 显式把当前图切回某条上传/导入/采用版本 */
+app.put('/:id/faithful-source', async (c) => {
+  const id = Number(c.req.param('id'))
+  const body = await c.req.json()
+  const versionTaskId = Number(body.version_task_id)
+  if (!versionTaskId) return badRequest(c, 'version_task_id 必填')
+  const [row] = await db.select().from(schema.scenes).where(eq(schema.scenes.id, id))
+  if (!row) return badRequest(c, '场景不存在')
+  const [task] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, versionTaskId))
+  const ownerMatch = task && task.sceneId === id
+  if (!ownerMatch || task.type !== 'image' || task.status !== 'completed') {
+    return badRequest(c, '指定的版本不属于该场景，或还没有完成')
+  }
+  if (!['upload', 'import'].includes(task.provider || '')) {
+    return badRequest(c, `只能把上传/导入/采用的原件设为受保护当前图（该版本来自 ${task.provider || '未知来源'}）`)
+  }
+  const path = task.localPath || task.resultUrl
+  if (!path) return badRequest(c, '该版本没有可用的图片地址')
+  await db.update(schema.scenes).set({
+    imageUrl: path,
+    localPath: task.localPath || null,
+    faithful: 1,
+    faithfulSource: versionTaskId,
+    updatedAt: now(),
+  }).where(eq(schema.scenes.id, id))
+  const [updated] = await db.select().from(schema.scenes).where(eq(schema.scenes.id, id))
+  return success(c, toSnakeCase(updated))
 })
 
 export default app

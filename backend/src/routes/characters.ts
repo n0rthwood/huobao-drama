@@ -7,7 +7,7 @@ import { generateImage } from '../services/generation.js'
 import { getDramaStylePrompt } from '../services/style-preset.js'
 import { ensureCharacterFinalPrompt, savedPromptOf } from '../services/final-prompt.js'
 import { logTaskError, logTaskStart, logTaskSuccess, logTaskWarn } from '../utils/task-logger.js'
-import { deleteAllReferenceImages, partitionMissingReferences, resolveReferenceImages } from '../services/reference-images.js'
+import { deleteAllReferenceImages } from '../services/reference-images.js'
 import { deleteAssetLinks } from '../services/asset-links.js'
 import { getStylingVersion, saveStylingVersion } from '../services/styling-version.js'
 import { EMPTY_ASSET_NAME_MESSAGE, normalizeAssetName } from '../services/asset-name.js'
@@ -20,7 +20,9 @@ import { bindCreatedAssetToReviewItem, findReviewItemAssetDuplicate, onAssetRemo
 import { stageSelectionErrorPayload } from '../services/ai-stages.js'
 import { mountAspectVersionRoute } from './asset-aspect-version.js'
 import { CHARACTER_IMAGE_SIZE } from '../services/asset-image-size.js'
-import { referenceNameIndex } from '../services/asset-reference-prompt.js'
+import { planAssetReferences, AssetReferenceError, descriptionCitationsOf } from '../services/asset-submit-refs.js'
+import { referenceCitationIssue } from '../services/asset-reference-prompt.js'
+import { effectiveReferenceImages } from '../services/reference-images.js'
 
 const app = new Hono()
 
@@ -166,6 +168,21 @@ app.put('/:id', async (c) => {
     updates.name = normalizeAssetName(updates.name)
     if (!updates.name) return badRequest(c, EMPTY_ASSET_NAME_MESSAGE)
   }
+  // #121：原件保护开关（与 props 同口径）：关保护需显式确认
+  if (body.faithful !== undefined) {
+    const next = body.faithful === true || body.faithful === 1 ? 1 : 0
+    if (next === 0 && Number(char.faithful) === 1 && body.confirm_unfaithful !== true) {
+      return badRequest(c, '关闭保护会让该角色图重新进入生图/批量重绘，请传 confirm_unfaithful=true 显式确认')
+    }
+    updates.faithful = next
+  }
+  // #121：手写最终提示词过同一引用核验（越界/描述引用未落地 → 400）
+  const incomingPrompt = body.final_prompt !== undefined ? body.final_prompt : body.finalPrompt
+  if (typeof incomingPrompt === 'string' && incomingPrompt.trim()) {
+    const merged = { ...char, ...updates } as unknown as Record<string, unknown>
+    const issue = referenceCitationIssue(incomingPrompt, effectiveReferenceImages(char.referenceImages).length, descriptionCitationsOf('character', merged))
+    if (issue) return badRequest(c, issue)
+  }
   // 手写最终提示词以传入值为准；否则样貌/造型/描述改了值 → 旧提示词失效（Issue #24）
   Object.assign(updates, planFinalPromptWrite({
     currentFinalPrompt: char.finalPrompt,
@@ -202,12 +219,20 @@ app.post('/:id/generate-image', async (c) => {
   const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, Number(body.episode_id)))
   if (!ep) return badRequest(c, '剧集不存在')
 
+  if (Number(char.faithful) === 1) return badRequest(c, '该角色图为受保护原件，不进生图；如需重绘请先在资产详情关闭保护')
   const stylePrompt = await getDramaStylePrompt(char.dramaId)
   const finalPrompt = savedPromptOf(await ensureCharacterFinalPrompt(char, ep.id, false, { model: body.text_model, configId: body.text_config_id ?? undefined }))
   const prompt = finalPrompt || characterImagePrompt(char, stylePrompt)
-  // 默认用角色自己保存的参考图；请求显式传 reference_images（含空数组）时以请求为准
-  const resolved = resolveReferenceImages(char.referenceImages, body.reference_images)
-  const { present: referenceImages, missing } = partitionMissingReferences(resolved)
+  // #121：发送集合只按 final_prompt 实际引用的参考图（零引用零发送）；
+  // 请求显式传 reference_images（含空数组）时以请求为准（旧语义保留）
+  let plan
+  try {
+    plan = await planAssetReferences('character', id, prompt, body.reference_images)
+  } catch (err) {
+    if (err instanceof AssetReferenceError) return badRequest(c, err.message)
+    throw err
+  }
+  const { referenceImages, missing } = plan
   if (missing.length) logTaskWarn('CharacterImage', 'reference-missing', { characterId: id, missing })
   try {
     logTaskStart('CharacterImage', 'generate', { characterId: id, episodeId: ep.id, dramaId: char.dramaId, references: referenceImages.length })
@@ -216,9 +241,9 @@ app.post('/:id/generate-image', async (c) => {
       episodeId: ep.id,
       dramaId: char.dramaId,
       prompt,
-      // 换厂商重试要按新 provider 重新渲染 @参考图N（与关键帧同一套 refNameIndex 机制）；
-      // 无参考图时不落这两项，行为与改动前一致
-      ...(referenceImages.length ? { sourcePrompt: prompt, refNameIndex: referenceNameIndex(referenceImages.length) } : {}),
+      // #121：refNameIndex = 资产编号→请求编号映射；重试沿用落盘发送子集
+      assetCitation: true,
+      ...(referenceImages.length ? { sourcePrompt: prompt, refNameIndex: plan.refNameIndex } : {}),
       model: body.model,
       size: CHARACTER_IMAGE_SIZE,
       referenceImages: referenceImages.length ? referenceImages : undefined,
@@ -320,6 +345,38 @@ app.post('/:id/styling-version/generate-image', async (c) => {
     logTaskError('CharacterImage', 'styling-version', { characterId: id, error: message })
     return badRequest(c, message)
   }
+})
+
+
+// ─── 原件保护（Issue #121，与 props.faithful-source 同口径） ──────────────
+
+/** PUT /characters/:id/faithful-source — 显式把当前图切回某条上传/导入/采用版本 */
+app.put('/:id/faithful-source', async (c) => {
+  const id = Number(c.req.param('id'))
+  const body = await c.req.json()
+  const versionTaskId = Number(body.version_task_id)
+  if (!versionTaskId) return badRequest(c, 'version_task_id 必填')
+  const [row] = await db.select().from(schema.characters).where(eq(schema.characters.id, id))
+  if (!row) return badRequest(c, '角色不存在')
+  const [task] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, versionTaskId))
+  const ownerMatch = task && task.characterId === id
+  if (!ownerMatch || task.type !== 'image' || task.status !== 'completed') {
+    return badRequest(c, '指定的版本不属于该角色，或还没有完成')
+  }
+  if (!['upload', 'import'].includes(task.provider || '')) {
+    return badRequest(c, `只能把上传/导入/采用的原件设为受保护当前图（该版本来自 ${task.provider || '未知来源'}）`)
+  }
+  const path = task.localPath || task.resultUrl
+  if (!path) return badRequest(c, '该版本没有可用的图片地址')
+  await db.update(schema.characters).set({
+    imageUrl: path,
+    localPath: task.localPath || null,
+    faithful: 1,
+    faithfulSource: versionTaskId,
+    updatedAt: now(),
+  }).where(eq(schema.characters.id, id))
+  const [updated] = await db.select().from(schema.characters).where(eq(schema.characters.id, id))
+  return success(c, toSnakeCase(updated))
 })
 
 export default app

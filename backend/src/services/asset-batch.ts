@@ -31,7 +31,6 @@ import {
 } from './final-prompt.js'
 import { sceneFinalPromptCoversTime } from './scene-time.js'
 import { resolveStageModel } from './ai-stages.js'
-import { partitionMissingReferences, resolveReferenceImages } from './reference-images.js'
 import { ACTIVE_TASK_STATUSES, isActiveTaskStatus, isQwenJobsTask, type SysTaskRow } from './sys-task.js'
 import { cancelImageTask } from './qwen-jobs.js'
 import { createTextTask, markTextTaskStarted, parseTextTaskParams, patchTextTaskParams } from './text-task.js'
@@ -49,7 +48,7 @@ import {
   type AssetSelectionState,
 } from './asset-batch-select.js'
 import { assetImageSizeForDrama } from './asset-image-size.js'
-import { referenceNameIndex } from './asset-reference-prompt.js'
+import { planAssetReferences } from './asset-submit-refs.js'
 
 /** 文本并发默认 3（图像侧 2 个 worker，并发 3 足以持续喂饱；env 可调） */
 export const ASSET_PROMPT_CONCURRENCY = (() => {
@@ -141,7 +140,7 @@ interface LoadedAsset {
   finalPrompt: string | null
   /** 有可直接复用的提示词（场景还要求写到了场景时间，Issue #21） */
   hasPrompt: boolean
-  /** 持久的证据素材标记（Issue #47，只有道具会是 1）：一票判定 skip_faithful */
+  /** 持久的原件保护标记（Issue #47 道具；Issue #121 起角色/场景同口径）：一票判定 skip_faithful */
   faithful: number
   /** 地图资产（Issue #84，只有道具可能为 true）：一票判定 skip_map，先于 faithful */
   isMap: boolean
@@ -167,7 +166,7 @@ async function loadScopeAssets(dramaId: number, scope: AssetBatchScope): Promise
         assets.push({
           kind, id: row.id, name: row.name, dramaId: row.dramaId,
           imageUrl: row.imageUrl, localPath: row.localPath, referenceImages: row.referenceImages,
-          finalPrompt: row.finalPrompt, hasPrompt: !!row.finalPrompt, faithful: 0, isMap: false,
+          finalPrompt: row.finalPrompt, hasPrompt: !!row.finalPrompt, faithful: row.faithful ?? 0, isMap: false,
         })
       }
     } else if (kind === 'scene') {
@@ -180,7 +179,7 @@ async function loadScopeAssets(dramaId: number, scope: AssetBatchScope): Promise
           imageUrl: row.imageUrl, localPath: row.localPath, referenceImages: row.referenceImages,
           finalPrompt: row.finalPrompt,
           hasPrompt: !!row.finalPrompt && sceneFinalPromptCoversTime(row.finalPrompt, row.time),
-          faithful: 0, isMap: false,
+          faithful: row.faithful ?? 0, isMap: false,
         })
       }
     } else {
@@ -353,7 +352,8 @@ async function submitImage(asset: LoadedAsset, prompt: string, episodeId: number
   // 结构性兜底：选集判定之外再挡一次。地图资产的几何由地图工作流确定性渲染，
   // 任何路径都不得把它送进扩散模型（选集判定不是安全边界，它只是用来算统计的）。
   if (asset.isMap) throw new Error(`地图资产「${asset.name}」不能走批量生图：请在地图工作流里生成底图与成图`)
-  const { present: referenceImages, missing } = partitionMissingReferences(resolveReferenceImages(asset.referenceImages))
+  // #121：与单发路由同口径——发送集合只按 final_prompt 实际引用的参考图
+  const { referenceImages, refNameIndex, missing } = await planAssetReferences(asset.kind, asset.id, prompt)
   if (missing.length) logTaskWarn('AssetBatch', 'reference-missing', { kind: asset.kind, assetId: asset.id, missing })
   if (asset.kind === 'scene') {
     await db.update(schema.scenes).set({ status: 'processing', updatedAt: now() }).where(eq(schema.scenes.id, asset.id))
@@ -365,8 +365,9 @@ async function submitImage(asset: LoadedAsset, prompt: string, episodeId: number
     episodeId,
     dramaId: asset.dramaId,
     prompt,
-    // 与单发路由同口径：换厂商重试按新 provider 重新渲染 @参考图N
-    ...(referenceImages.length ? { sourcePrompt: prompt, refNameIndex: referenceNameIndex(referenceImages.length) } : {}),
+    // 与单发路由同口径：refNameIndex = 资产编号→请求编号映射
+    assetCitation: true,
+    ...(referenceImages.length ? { sourcePrompt: prompt, refNameIndex } : {}),
     model: req.imageModel,
     size: await assetImageSizeForDrama(asset.kind, asset.dramaId),
     // 场景必须按项目画幅出图：有参考图时也不许跟随参考图比例（Issue #94）

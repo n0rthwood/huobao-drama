@@ -15,8 +15,9 @@ export const ASSET_KINDS: AssetKind[] = ['character', 'scene', 'prop']
 
 export type RoundPurpose = 'precision' | 'beautify'
 export type RoundStatus = 'pending' | 'generating' | 'generated' | 'failed' | 'discarded'
-export type SourceRole = 'generation_reference' | 'shape_only' | 'rejected'
-export const SOURCE_ROLES: SourceRole[] = ['generation_reference', 'shape_only', 'rejected']
+// original（Issue #121）：图上就是目标资产的历史原件，入库即自动采用为资产当前图（受保护）
+export type SourceRole = 'original' | 'generation_reference' | 'shape_only' | 'rejected'
+export const SOURCE_ROLES: SourceRole[] = ['original', 'generation_reference', 'shape_only', 'rejected']
 
 export interface SpecSourceSnapshot {
   source_id: number | null

@@ -329,6 +329,14 @@
       "title": "削除の確認"
     },
     "referenceImages": {
+      "citeHint": "説明やプロンプトで @参考图{n} としてこの画像を引用",
+      "usageDirect": "直接使用可",
+      "usageReference": "参考のみ",
+      "unclassified": "未分類（アップロード後に自動判定、クリックで変更可）",
+      "verdict": {"direct": "歴史原件と判定。資産画像として直接使用可", "reference": "現代図/示意図と判定。生図参考のみ", "unknown": "判定できず"},
+      "adopt": "資産画像として採用",
+      "adoptHint": "この原件を資産の現在画像に設定し保護（一括再生成の対象外）",
+      "adopted": "資産画像として採用しました（保護中）",
       "label": "参照画像",
       "hint": "生成のガイド用で、完成画像ではありません",
       "add": "追加",
@@ -2879,6 +2887,7 @@
         "sourcePickFile": "ファイル未選択",
         "sourceUpload": "アップロードして登録",
         "sourceUploading": "アップロード中…",
+        "roleOriginal": "歴史原件（入库時に資産画像として採用）",
         "roleGenerationReference": "生成参照に使用可",
         "roleShapeOnly": "形状参照のみ",
         "roleRejected": "除外",

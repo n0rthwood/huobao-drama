@@ -9,7 +9,7 @@ import { Hono } from 'hono'
 import { desc, eq } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
 import { badRequest, created, success } from '../utils/response.js'
-import { logTaskError } from '../utils/task-logger.js'
+import { logTaskError, logTaskWarn } from '../utils/task-logger.js'
 import { stageSelectionErrorPayload } from '../services/ai-stages.js'
 import { parseTextTaskParams } from '../services/text-task.js'
 import { isMapAsset } from '../services/prop-asset-type.js'
@@ -32,6 +32,7 @@ import {
   startAssetPipeline,
 } from '../services/asset-pipeline/run.js'
 import { addAssetSource, AssetSourceError, deleteAssetSource } from '../services/asset-pipeline/sources.js'
+import { adoptDirectImage } from '../services/asset-image-usage.js'
 import { loadAssetTarget } from '../services/asset-pipeline/steps.js'
 import { getAssetResearch, ResearchConflictError, startAssetResearch } from '../services/asset-research/run.js'
 import {
@@ -206,7 +207,7 @@ app.post('/asset-sources', async (c) => {
   const assetId = Number(body.asset_id)
   if (!assetId) return badRequest(c, 'asset_id 必填')
   const role = String(body.role ?? '') as SourceRole
-  if (!SOURCE_ROLES.includes(role)) return badRequest(c, 'role 必须是 generation_reference / shape_only / rejected')
+  if (!SOURCE_ROLES.includes(role)) return badRequest(c, 'role 必须是 original / generation_reference / shape_only / rejected')
   try {
     const source = await addAssetSource({
       assetKind: kind,
@@ -222,6 +223,11 @@ app.post('/asset-sources', async (c) => {
       era: body.era ? String(body.era) : null,
       whyExcluded: body.why_excluded ? String(body.why_excluded) : null,
     })
+    // #121：original 入库即自动采用为资产当前图（faithful 保护）；已有受保护当前图不覆盖
+    if (role === 'original' && source.local_path) {
+      const adopted = await adoptDirectImage(kind, assetId, source.local_path, { source: 'original-ingest' })
+      if (!adopted.adopted) logTaskWarn('AssetSource', 'original-adopt-skipped', { kind, assetId, reason: adopted.reason })
+    }
     return created(c, { source })
   } catch (err) {
     if (err instanceof AssetSourceError) return badRequest(c, err.message)

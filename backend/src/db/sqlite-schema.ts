@@ -939,6 +939,11 @@ const columnAdditions: { table: string; column: string; type: string }[] = [
   { table: 'episodes', column: 'status_override', type: 'TEXT' },
   { table: 'episodes', column: 'status_derived', type: 'TEXT' },
   { table: 'episodes', column: 'status_derived_at', type: 'TEXT' },
+  // Issue #121：角色/场景补原件保护列（与 props 同口径），不回填存量
+  { table: 'characters', column: 'faithful', type: 'INTEGER NOT NULL DEFAULT 0' },
+  { table: 'characters', column: 'faithful_source', type: 'INTEGER' },
+  { table: 'scenes', column: 'faithful', type: 'INTEGER NOT NULL DEFAULT 0' },
+  { table: 'scenes', column: 'faithful_source', type: 'INTEGER' },
 ]
 
 /**

@@ -114,6 +114,10 @@ export const characters = sqliteTable('characters', {
   localPath: text('local_path'),
   // 背景信息载体（Issue #47）：旁白提到但不出场、只作视觉承载的实体
   exposition: integer('exposition').notNull().default(0),
+  // 原件保护（Issue #121，与 props.faithful 同口径）：faithful=1 的角色图是原件/定稿，
+  // 不进资产生图/批量重绘；faithful_source 指向被采用的版本 sys_task id
+  faithful: integer('faithful').notNull().default(0),
+  faithfulSource: integer('faithful_source'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
   deletedAt: text('deleted_at'),
@@ -164,6 +168,9 @@ export const scenes = sqliteTable('scenes', {
   localPath: text('local_path'),
   // 背景信息载体（Issue #47）：旁白提到但不出场、只作视觉承载的实体（如波尔塔瓦战场）
   exposition: integer('exposition').notNull().default(0),
+  // 原件保护（Issue #121，与 props.faithful 同口径）
+  faithful: integer('faithful').notNull().default(0),
+  faithfulSource: integer('faithful_source'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
   deletedAt: text('deleted_at'),
