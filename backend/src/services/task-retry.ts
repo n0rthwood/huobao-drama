@@ -130,6 +130,8 @@ async function retryImage(row: SysTaskRow, opts: RetryOptions): Promise<number> 
     configId: config.id,
     sourcePrompt: params.sourcePrompt,
     refNameIndex: params.refNameIndex,
+    // #121：资产引用任务重试沿用原任务落盘的发送子集与映射，不读资产当前列表
+    assetCitation: params.asset_citation === true,
     retryOf: row.id,
     posterId: params.posterId,
     posterGenMode: params.posterGenMode,
