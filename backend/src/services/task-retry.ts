@@ -58,6 +58,8 @@ interface StoredParams {
   sourcePrompt?: string
   refNameIndex?: Record<string, number>
   asset_citation?: boolean
+  pipeline_round?: boolean
+  pipeline_reference_origins?: Parameters<typeof generateImage>[0]['pipelineReferenceOrigins']
   posterId?: number
   posterGenMode?: 'initial' | 'composite' | 'layers'
   posterConceptComposition?: string
@@ -114,6 +116,15 @@ function promptForRetry(row: SysTaskRow, params: StoredParams, type: 'image' | '
 
 async function retryImage(row: SysTaskRow, opts: RetryOptions): Promise<number> {
   const params = storedParams(row.params)
+  if(params.pipeline_round){
+    const ownerId=row.characterId??row.sceneId??row.propId
+    const table=row.characterId?schema.characters:row.sceneId?schema.scenes:schema.props
+    const asset=ownerId?await db.select().from(table).where(eq(table.id,ownerId)).get():undefined
+    const protectedAsset=asset as unknown as {faithful?:number;assetType?:string;deletedAt?:string}|undefined
+    if(!protectedAsset || protectedAsset.deletedAt || protectedAsset.faithful===1 || protectedAsset.assetType==='map'){
+      throw new Error('该工作室资产已删除、受保护或为地图，不能重试生图')
+    }
+  }
   const config = await resolveConfig('image', opts.configId)
   return generateImage({
     storyboardId: row.storyboardId ?? undefined,
@@ -133,6 +144,9 @@ async function retryImage(row: SysTaskRow, opts: RetryOptions): Promise<number> 
     refNameIndex: params.refNameIndex,
     // #121：资产引用任务重试沿用原任务落盘的发送子集与映射，不读资产当前列表
     assetCitation: params.asset_citation === true,
+    // Studio candidates remain isolated even when retried from the generic task center.
+    pipelineRound: params.pipeline_round === true,
+    pipelineReferenceOrigins: params.pipeline_reference_origins,
     retryOf: row.id,
     posterId: params.posterId,
     posterGenMode: params.posterGenMode,
