@@ -145,6 +145,13 @@ app.put('/:id', async (c) => {
   else if (body.imageUrl !== undefined) updates.imageUrl = body.imageUrl
   if (body.local_path !== undefined) updates.localPath = body.local_path
   else if (body.localPath !== undefined) updates.localPath = body.localPath
+  // #121：手写最终提示词过同一引用核验（越界/描述引用未落地 → 400）
+  const incomingPrompt = body.final_prompt !== undefined ? body.final_prompt : body.finalPrompt
+  if (typeof incomingPrompt === 'string' && incomingPrompt.trim()) {
+    const merged = { ...prop, ...updates } as unknown as Record<string, unknown>
+    const issue = referenceCitationIssue(incomingPrompt, effectiveReferenceImages(prop.referenceImages).length, descriptionCitationsOf('prop', merged))
+    if (issue) return badRequest(c, issue)
+  }
   // 手写最终提示词以传入值为准；否则名称/类型/描述改了值 → 旧提示词失效（Issue #24）
   Object.assign(updates, planFinalPromptWrite({
     currentFinalPrompt: prop.finalPrompt,

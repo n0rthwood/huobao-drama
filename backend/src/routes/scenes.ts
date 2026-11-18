@@ -86,6 +86,13 @@ app.put('/:id', async (c) => {
   if (body.prompt !== undefined) updates.prompt = body.prompt
   if (body.description !== undefined) updates.prompt = body.description
   if (body.lighting !== undefined) updates.lighting = body.lighting
+  // #121：手写最终提示词过同一引用核验（越界/描述引用未落地 → 400）
+  const incomingPrompt = body.final_prompt !== undefined ? body.final_prompt : body.finalPrompt
+  if (typeof incomingPrompt === 'string' && incomingPrompt.trim()) {
+    const merged = { ...scene, ...updates } as unknown as Record<string, unknown>
+    const issue = referenceCitationIssue(incomingPrompt, effectiveReferenceImages(scene.referenceImages).length, descriptionCitationsOf('scene', merged))
+    if (issue) return badRequest(c, issue)
+  }
   // 场景时间不变量（Issue #21）：提示词必须引用 time；改时间或画面字段让旧提示词失效（Issue #24）
   const timePatch = planSceneTimePatch({
     currentTime: scene.time,
