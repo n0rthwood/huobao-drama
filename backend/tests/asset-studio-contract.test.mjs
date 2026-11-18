@@ -14,7 +14,7 @@ import assert from 'node:assert/strict'
 const backendRoot = fileURLToPath(new URL('..', import.meta.url))
 
 const script = `
-  import { planNextRound, selectPrecisionSources, MAX_PIPELINE_REFERENCES } from './src/services/asset-pipeline/contract.ts'
+  import { planNextRound, selectPrecisionSources, MAX_PIPELINE_REFERENCES } from './src/modules/asset-studio/contract.ts'
 
   const capture = (fn) => {
     try {

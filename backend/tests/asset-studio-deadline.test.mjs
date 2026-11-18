@@ -13,8 +13,8 @@ import assert from 'node:assert/strict'
 const backendRoot = fileURLToPath(new URL('..', import.meta.url))
 
 const script = `
-  import { abortableSleep, describeStepError, STEP_DEADLINE_MS, StepTimeoutError, withStepDeadline } from './src/services/asset-pipeline/deadline.ts'
-  import { normalizeScore } from './src/services/asset-pipeline/gate.ts'
+  import { abortableSleep, describeStepError, STEP_DEADLINE_MS, StepTimeoutError, withStepDeadline } from './src/modules/asset-studio/deadline.ts'
+  import { normalizeScore } from './src/modules/asset-studio/gate.ts'
 
   // tsx --eval 以 CJS 产出，顶层 await 不可用：整段包进 async IIFE
   const main = async () => {

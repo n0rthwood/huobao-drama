@@ -6,9 +6,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+// Issue #122：QC 闸门持久化与历史只读语义迁到资产工作室模块后的行为回归。
+// 旧「任务中心内嵌审批状态」测试随内嵌审批删除而移除；审批状态现由模块 runView 推导（routes.ts）。
 const backendRoot = fileURLToPath(new URL('..', import.meta.url))
 function isolated(script) {
-  const dir = mkdtempSync(join(tmpdir(), 'huobao-pipeline-approval-'))
+  const dir = mkdtempSync(join(tmpdir(), 'studio-approval-'))
   try {
     const output = execFileSync(process.execPath, ['--import', 'tsx', '--input-type=module', '--eval', script], {
       cwd: backendRoot, encoding: 'utf8', env: { ...process.env, SQLITE_PATH: join(dir, 'db.sqlite3'), HUOBAO_DATA_DIR: dir },
@@ -19,42 +21,20 @@ function isolated(script) {
   }
 }
 
-test('only a current active approval suspension is waiting', () => {
-  const result = isolated(`
-    import { pipelineExecutionFromSnapshot as summary } from './src/services/asset-pipeline/execution.ts'
-    const suspended = { status: 'suspended', suspendedPaths: { approval_0: [2] }, steps: { approval_0: { suspendPayload: { round_id: 4, round_no: 0 } } } }
-    const get = (status, snapshot) => summary(status, 'prop', 100, snapshot)
-    console.log('@@' + JSON.stringify({
-      waiting: get('processing', suspended), running: get('processing', { status: 'running' }),
-      resumed: get('processing', { status: 'success' }), terminal: get('completed', suspended),
-      failed: get('failed', suspended), cancelled: get('cancelled', suspended),
-      missing: get('processing', null), malformed: get('processing', { ...suspended, steps: {} }),
-      other: get('processing', { ...suspended, suspendedPaths: { research: [0] } }),
-    }))
-  `)
-  assert.deepEqual(result.waiting, { state: 'waiting_approval', awaiting: { round_id: 4, round_no: 0 }, asset_kind: 'prop', asset_id: 100 })
-  assert.equal(result.running.state, 'running')
-  for (const key of ['resumed', 'missing', 'malformed', 'other']) {
-    assert.equal(result[key].state, 'unknown')
-    assert.equal(result[key].awaiting, null)
-  }
-  for (const key of ['terminal', 'failed', 'cancelled']) assert.equal(result[key].awaiting, null)
-  assert.equal(result.terminal.state, 'completed')
-  assert.equal(result.failed.state, 'failed')
-  assert.equal(result.cancelled.state, 'cancelled')
-})
-
 test('stored computed gates survive persistence; historical gates report unknown semantics', () => {
   const result = isolated(`
-    import { db, schema } from './src/db/index.ts'
-    import { evaluateGate } from './src/services/asset-pipeline/gate.ts'
-    import { insertQcRecord, latestQcByRound } from './src/services/asset-pipeline/store.ts'
-    import { serializeQcGate } from './src/services/asset-pipeline/gate-serialization.ts'
+    import { sqlite } from './src/db/index.ts'
+    import { initAssetStudio } from './src/modules/asset-studio/index.ts'
+    import { evaluateGate } from './src/modules/asset-studio/gate.ts'
+    import { insertQcRecord, latestQcByRound } from './src/modules/asset-studio/store.ts'
+    import { serializeQcGate } from './src/modules/asset-studio/gate-serialization.ts'
+    await initAssetStudio({ researchKeys: async () => ({}) })
     const spec = { must_have: [{ id: 'm1', element: '两个轮子', why: '', check: '', metric: 'count' }], forbidden: [], tolerances: [], locate_targets: [], locate_anchors: [] }
     const verdicts = { must_have: [{ id: 'm1', verdict: 'minor', evidence: '只有一个' }], forbidden: [], text_in_image: { present: false, evidence: '无文字' }, overall: 'pass' }
     const gate = evaluateGate(spec, verdicts, { semanticsPreserved: { status: 'fail', detail: '标注丢失' } })
     const created = await insertQcRecord({ roundId: 1, assetKind: 'prop', assetId: 100, modelConfigId: null, verdicts, gate, fidelityScore: null, beautyScore: null, suggestions: [] })
-    db.insert(schema.assetQcRecord).values({ roundId: 2, assetKind: 'prop', assetId: 100, gatePass: 1, verdicts: JSON.stringify(verdicts), humanVerdict: 'approve', humanNotes: '已审', createdAt: new Date().toISOString() }).run()
+    // 历史行：只有 gate_pass，没有完整 gate_result（旧记录）
+    sqlite.prepare("INSERT INTO asset_studio_qc_record (round_id, asset_kind, asset_id, gate_pass, verdicts, human_verdict, human_notes, created_at) VALUES (2, 'prop', 100, 1, ?, 'approve', '已审', ?)").run(JSON.stringify(verdicts), new Date().toISOString())
     const rows = await latestQcByRound([1, 2])
     const historical = rows.get(2)
     console.log('@@' + JSON.stringify({ gate, saved: serializeQcGate(rows.get(1), spec), created, historical, oldGate: serializeQcGate(historical, spec) }))
@@ -68,7 +48,7 @@ test('stored computed gates survive persistence; historical gates report unknown
   assert.equal(result.historical.human_notes, '已审')
 })
 
-test('task center exposes pipeline state without trusting stale approval progress', () => {
+test('legacy asset_pipeline task rows stay readable in task center without inline approval', () => {
   const result = isolated(`
     import { db, schema } from './src/db/index.ts'
     import { eq } from 'drizzle-orm'
@@ -85,8 +65,10 @@ test('task center exposes pipeline state without trusting stale approval progres
     const active = await listActiveTasks()
     console.log('@@' + JSON.stringify({ id, detail, center, active }))
   `)
-  const expected = { state: 'unknown', awaiting: null, asset_kind: 'prop', asset_id: 100 }
-  assert.deepEqual(result.detail.pipeline, expected)
-  assert.deepEqual(result.center.items.find(row => row.id === result.id && row.row_type === 'task').pipeline, expected)
-  assert.deepEqual(result.active.items.find(row => row.id === result.id).pipeline, expected)
+  // #122：旧父行只读保留，但不再推导内嵌审批状态（pipeline 字段已删）
+  assert.equal(result.detail.pipeline, undefined)
+  const centerRow = result.center.items.find(row => row.id === result.id && row.row_type === 'task')
+  assert.ok(centerRow, 'legacy row still listed')
+  assert.equal(centerRow.pipeline, undefined)
+  assert.ok(result.active.items.find(row => row.id === result.id), 'legacy active row still listed')
 })

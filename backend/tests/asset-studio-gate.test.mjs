@@ -13,7 +13,7 @@ import assert from 'node:assert/strict'
 const backendRoot = fileURLToPath(new URL('..', import.meta.url))
 
 const script = `
-  import { decideRound, evaluateGate } from './src/services/asset-pipeline/gate.ts'
+  import { decideRound, evaluateGate } from './src/modules/asset-studio/gate.ts'
 
   const spec = {
     must_have: [
