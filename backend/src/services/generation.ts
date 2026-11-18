@@ -572,13 +572,19 @@ const inFlightQwenSubmits = new Set<number>()
  * 资产引用任务（#121）的提示词归一：请求编号 1..M 的五种写法统一换成中性 @参考图N，
  * 提交侧再按目标厂商渲染。从大到小替换，避免 图片1 吃掉 图片10 的尾巴。
  */
-function neutralizeAssetCitations(prompt: string, refCount: number): string {
+export function neutralizeAssetCitations(prompt: string, refCount: number): string {
   if (!prompt || refCount <= 0) return prompt
-  return prompt.replace(/@参考图(\d+)|参考图(\d+)|<image(\d+)>|<Picture (\d+)>|图片(\d+)/gi,
-    (match, a, b, c, d, e) => {
-      const n = Number(a ?? b ?? c ?? d ?? e)
-      return n >= 1 && n <= refCount ? referenceToken(n) : match
-    })
+  let out = prompt
+  // 从大到小：先处理 参考图10 再处理 参考图1，否则裸写法分支会吃掉两位数的尾巴
+  for (let n = refCount; n >= 1; n--) {
+    const token = referenceToken(n)
+    // @ 前缀可选、一次吃掉：先替换裸写法会把 @参考图N 变成 @@参考图N
+    out = out.replace(new RegExp(`@?参考图${n}(?!\\d)`, 'gi'), token)
+    out = out.replace(new RegExp(`<image${n}>`, 'gi'), token)
+    out = out.replace(new RegExp(`<Picture ${n}>`, 'gi'), token)
+    out = out.replace(new RegExp(`图片${n}(?!\\d)`, 'gi'), token)
+  }
+  return out
 }
 
 async function submitQwenJobsImage(record: SysTaskRecord, config: AIConfig, params: Record<string, any>) {

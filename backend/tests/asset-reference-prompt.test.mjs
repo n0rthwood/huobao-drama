@@ -25,7 +25,7 @@ function runTs(script) {
     encoding: 'utf8',
     env: { ...process.env, SQLITE_PATH: sqlitePath, STORAGE_PATH: storagePath },
   })
-  return JSON.parse(out.slice(out.lastIndexOf('@@') + 2))
+  return JSON.parse(out.slice(out.lastIndexOf('\n@@') + 3))
 }
 
 // ─── 识别与核验（纯函数） ────────────────────────────────────────
@@ -267,4 +267,26 @@ test('save tools accept partial citation but reject missing description citation
   assert.equal(result.checkGood.ok, true)
   assert.deepEqual(result.checkGood.will_send, [2])
   assert.equal(result.noRefsSaved, true)
+})
+// ─── 提交侧归一（请求编号 → 中性写法） ───────────────────────────
+
+test('submit neutralization maps request numbers to neutral tokens without eating two-digit tails', () => {
+  const result = runTs(`
+    import { neutralizeAssetCitations } from './src/services/generation.ts'
+    process.stdout.write('@@' + JSON.stringify({
+      // 发送子集只有 1 张：@参考图2（请求编号 2 不存在）原样保留？不——请求编号口径下
+      // 子集 M=1 时提示词只应出现 1；这里验证 M=2 的常规归一
+      two: neutralizeAssetCitations('以@参考图2的五官为准，参考图1的配色', 2),
+      vendor: neutralizeAssetCitations('<image2>形制与图片1材质', 2),
+      // 两位数边界：M=1 时 参考图10 不能被 参考图1 的替换吃掉尾巴
+      ten: neutralizeAssetCitations('参考图10 与 图片1', 1),
+      tenFull: neutralizeAssetCitations('参考图10 与 图片1', 10),
+      none: neutralizeAssetCitations('纯白背景', 0),
+    }))
+  `)
+  assert.equal(result.two, '以@参考图2的五官为准，@参考图1的配色')
+  assert.equal(result.vendor, '@参考图2形制与@参考图1材质')
+  assert.equal(result.ten, '参考图10 与 @参考图1')
+  assert.equal(result.tenFull, '@参考图10 与 @参考图1')
+  assert.equal(result.none, '纯白背景')
 })
