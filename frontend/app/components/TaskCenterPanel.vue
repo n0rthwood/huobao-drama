@@ -67,9 +67,9 @@
                 @click.stop="copyRowError(row)"
               ><Copy :size="12" /></button>
             </div>
+            <!-- #122：旧流水线父行只读保留；等待审批的历史 run 不再提供内嵌审批，去资产工作室续跑 -->
             <div v-if="row.pipeline?.state === 'waiting_approval'" class="tc-approval">
-              <span>{{ t('episode.documentary.pipeline.executionWaitingApproval') }} · {{ t('episode.documentary.pipeline.roundLabel', { n: row.pipeline.awaiting?.round_no }) }} · {{ t('episode.documentary.pipeline.waitingReason') }}</span>
-              <button class="btn btn-sm" @click.stop="openDetail(row, true)">{{ t('episode.documentary.pipeline.reviewAction') }}</button>
+              <span>{{ t('episode.documentary.pipeline.executionWaitingApproval') }} · {{ t('episode.documentary.pipeline.roundLabel', { n: row.pipeline.awaiting?.round_no }) }} · {{ t('taskCenter.pipelineReadonlyHint') }}</span>
             </div>
             <details v-if="batchScopeOf(row)" class="tc-batch-scope" @click.stop>
               <summary>{{ t('episode.final.scope', { included: batchScopeOf(row).included.length, excluded: batchScopeOf(row).excluded.length }) }}</summary>
@@ -132,7 +132,6 @@
     <TaskDetailDialog
       v-if="detailTask"
       :task="detailTask"
-      :review-mode="detailReview"
       :restore-link="restoreDetailUi"
       v-model:full-view="detailFull"
       @close="closeDetail"
@@ -190,7 +189,7 @@ const loading = ref(false)
 const expanded = ref([])
 const detailTask = ref(null)
 const restoreDetailUi = ref(false)
-const detailReview = ref(false)
+// #122：内嵌审批已移入资产工作室，任务中心详情只读
 // 弹窗内部的「全屏正文」视图（Issue #86 tfull）：由弹窗经 v-model 回写
 const detailFull = ref(false)
 const dramas = ref([])
@@ -222,7 +221,6 @@ const urlPage = queryIdList(link.initial('tpage'))[0] || 0
 if (urlPage > 1) page.value = urlPage
 const urlExpanded = queryIdList(link.initial('texp'))
 const urlTask = queryIdList(detailLink.initial('task'))[0] || 0
-const urlReview = querySingle(detailLink.initial('treview')) === '1'
 const urlFull = querySingle(detailLink.initial('tfull')) === '1'
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / PAGE_SIZE)))
@@ -341,10 +339,9 @@ async function copyRowError(row) {
   if (ok) toast.success(t('taskCenter.detail.copied'))
   else toast.error(t('taskCenter.detail.copyFailed'))
 }
-function openDetail(row, review = false) {
+function openDetail(row) {
   userActed = true
   restoreDetailUi.value = false
-  detailReview.value = review || row.pipeline?.state === 'waiting_approval'
   detailFull.value = false
   detailTask.value = row
 }
@@ -411,7 +408,6 @@ function publishDetail() {
   if (!ownsLink.value) { detailLink.set({}); return }
   detailLink.set({
     task: detailTask.value?.id || '',
-    treview: detailTask.value && detailReview.value ? '1' : '',
     tfull: detailTask.value && detailFull.value ? '1' : '',
   })
 }
@@ -448,7 +444,6 @@ async function restoreDetail() {
     return
   }
   registerTask(row)
-  detailReview.value = urlReview || row.pipeline?.state === 'waiting_approval'
   // 弹窗内部视图跟在任务解析成功之后恢复
   detailFull.value = urlFull
   restoreDetailUi.value = true
@@ -468,7 +463,7 @@ watch(
   [onlyEpisode, dramaFilter, episodeFilter, typeFilter, statusFilter, scopeFilter, page, expandedIds, ownsLink],
   publishList,
 )
-watch([detailTask, detailReview, detailFull, ownsLink], publishDetail)
+watch([detailTask, detailFull, ownsLink], publishDetail)
 // 任务结束时列表需要换状态/补结果
 onTaskFinished(() => { void reload() })
 
