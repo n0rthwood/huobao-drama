@@ -34,7 +34,7 @@
         :class="{ 'is-broken': broken.includes(entry.path) }"
       >
         <div class="ref-media">
-          <span class="ref-no" :title="t('components.referenceImages.citeHint', { n: i + 1 })">{{ i + 1 }}</span>
+          <div class="ref-no" :title="`@参考图${i + 1}`">{{ i + 1 }}</div>
           <img
             v-if="!broken.includes(entry.path)"
             :src="thumbOf(srcOf(entry.path))"
