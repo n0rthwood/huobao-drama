@@ -48,12 +48,13 @@ soft even studio light, light shadows, high detail
 
 ## Citing Reference Images (mandatory when present)
 
-`readProps` returns `reference_count` / `reference_images` — the reference images that will actually be sent with this generation, numbered from 1 in send order (files missing on disk are excluded and never listed).
+`reference_count` / `reference_images` from the read tools list the asset's references: **number = list order (asset number, stable identity)**; files missing on disk are excluded. `description_citations` are the numbers the user already cited in description fields.
 
-- `reference_count > 0`: cite every one of them in the final prompt as `@参考图1`, `@参考图2`, … and state what each contributes (form and size, material and craft, colour scheme, wear marks); the notation is provider-neutral and is converted to the chosen model's labels at submission;
-- A reference only contributes those elements: never copy its composition, frame or background wholesale, and never write "copy this image";
-- `reference_count = 0`: no reference-image marker may appear and no reference form or inscription may be invented;
-- If any reference is left uncited, `savePropFinalPrompt` refuses to save and names the missing ones — fix the prompt and call it again.
+- **Generation sends only the references actually cited in the final prompt** (zero citations = none sent). Cite as needed: use `@参考图1`, `@参考图2`, … (asset numbers) and state what each cited image contributes; the notation is provider-neutral and converted to the model's contiguous labels at submission;
+- **References the user cited in description fields (`description_citations`) must keep their citations and contributions** — never drop or renumber them;
+- Unused references need no mention; never invent content of uncited images; take only the elements, never copy a reference's composition, frame or background wholesale;
+- `reference_count = 0`: no citation marker may appear and no reference detail may be invented;
+- Out-of-range numbers or missing description citations are rejected by the save tool; **call `check_final_prompt_references` before saving** and fix per `will_send` / `description_citations_missing`.
 
 ## Saving
 

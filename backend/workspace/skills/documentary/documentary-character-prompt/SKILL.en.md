@@ -49,9 +49,13 @@ When `readCharacters` returns `has_archival_reference: true`, the character alre
 
 ## 5. Citing Reference Images (mandatory when present)
 
-- The generation reference images are `reference_count` / `reference_images` from `readCharacters`: numbered from 1 in send order. With `reference_count > 0` the final prompt must cite every one of them as `@参考图1`, `@参考图2`, … and state what each contributes (period, silhouette, material, worn details); take only those elements and never copy a reference's composition, frame or background wholesale. With `reference_count = 0` no marker may appear and no reference detail may be invented;
-- Archival portraits are **not** generation reference images: they only feed the text (section 4) and must never be cited as references;
-- If any generation reference is left uncited, `saveCharacterFinalPrompt` refuses to save and names the missing ones — fix the prompt and call it again.
+`reference_count` / `reference_images` from the read tools list the asset's references: **number = list order (asset number, stable identity)**; files missing on disk are excluded. `description_citations` are the numbers the user already cited in description fields.
+
+- **Generation sends only the references actually cited in the final prompt** (zero citations = none sent). Cite as needed: use `@参考图1`, `@参考图2`, … (asset numbers) and state what each cited image contributes; the notation is provider-neutral and converted to the model's contiguous labels at submission;
+- **References the user cited in description fields (`description_citations`) must keep their citations and contributions** — never drop or renumber them;
+- Unused references need no mention; never invent content of uncited images; take only the elements, never copy a reference's composition, frame or background wholesale;
+- `reference_count = 0`: no citation marker may appear and no reference detail may be invented;
+- Out-of-range numbers or missing description citations are rejected by the save tool; **call `check_final_prompt_references` before saving** and fix per `will_send` / `description_citations_missing`.
 
 ## 6. No Source Pollution
 
