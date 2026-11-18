@@ -117,7 +117,8 @@ function localTime(iso: string) {
 function seedForm() {
   for (const c of result.value?.candidates ?? []) {
     if (!(c.sha256 in licenses)) licenses[c.sha256] = c.license
-    if (!(c.sha256 in roles)) roles[c.sha256] = c.role === 'original' || c.role === 'generation_reference' ? 'generation_reference' : 'shape_only'
+    // #121：original 不再静默降级——入库即自动采用为受保护资产图
+    if (!(c.sha256 in roles)) roles[c.sha256] = c.role === 'original' ? 'original' : c.role === 'generation_reference' ? 'generation_reference' : 'shape_only'
   }
 }
 

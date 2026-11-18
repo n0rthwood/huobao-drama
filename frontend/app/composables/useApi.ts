@@ -1074,7 +1074,8 @@ export const assetAspectAPI = {
 // 资产「精确→美化」流水线（Issue #56）。闸门结论由后端按清单计算，前端只渲染，不复算也不采信模型自判。
 
 export type AssetPipelineKind = 'character' | 'scene' | 'prop'
-export type AssetSourceRole = 'generation_reference' | 'shape_only' | 'rejected'
+// original（Issue #121）：历史原件，入库即自动采用为受保护资产图
+export type AssetSourceRole = 'original' | 'generation_reference' | 'shape_only' | 'rejected'
 export interface AssetSourceRow {
   id: number
   asset_kind: string
