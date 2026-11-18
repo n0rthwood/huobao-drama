@@ -490,7 +490,10 @@ export async function inspectComposeInputs(
   // 纯画面镜头不做偏移（planCompose 的无旁白分支原样输出画面），T 对产出无影响
   const t = wantsNarration && combo !== 'A' ? transition.t : 0
   const maxSeconds = shotMaxSeconds(combo)
-  if (documentary && dv > maxSeconds + 1e-3) return fail(`${shot} 的实测总时长 ${dv.toFixed(3)} 秒超过 ${maxSeconds} 秒上限`)
+  // B 整镜就是生成段，模型帧取整可能多 1–2 帧（同生成段闸门，给 0.2 s 容差）；
+  // A/C/D 的 maxSeconds 是 Infinity（图层段无上限），不受影响。
+  const totalTolerance = combo === 'B' ? 0.2 : 1e-3
+  if (documentary && dv > maxSeconds + totalTolerance) return fail(`${shot} 的实测总时长 ${dv.toFixed(3)} 秒超过 ${maxSeconds} 秒上限`)
   const fit = resolveComposeFit({
     episodeDefault: ep.narrationFitDefault,
     shotFit: sb.narrationFit,
