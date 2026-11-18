@@ -24,7 +24,8 @@ import { compositionOf, sceneAspectIssue } from '../../services/aspect.js'
 import { resolveDramaAspect } from '../../services/asset-image-size.js'
 import { effectiveReferenceImages } from '../../services/reference-images.js'
 import { parseArchivalImages } from '../../services/archival-images.js'
-import { referenceCitationIssue, referenceToken } from '../../services/asset-reference-prompt.js'
+import { checkReferenceCitations, referenceCitationIssue, referenceToken } from '../../services/asset-reference-prompt.js'
+import { descriptionCitationsOf } from '../../services/asset-submit-refs.js'
 
 /**
  * 参考图字段（Issue #107 追加范围）：编号 1 起即发送顺序。
@@ -39,12 +40,12 @@ function referenceFields(saved: unknown) {
 }
 
 /**
- * 保存工具共用的参考图门槛：有参考图却漏引用某张时退回让模型改写
- * （与 sceneFinalPromptCoversTime 同一语义，不静默兜底、不自动补标记）。
+ * 保存工具共用的参考图门槛（Issue #121 口径）：越界引用、或描述字段里用户引用的
+ * 参考图未在新稿落地时退回让模型改写。未引用的普通参考图不是错误（按需引用）。
  */
-function referenceRejectReason(prompt: string, saved: unknown): string | null {
-  const issue = referenceCitationIssue(prompt, effectiveReferenceImages(saved).length)
-  return issue ? `${issue}（写法 ${referenceToken(1)}、${referenceToken(2)}…）；未保存，请逐张引用后重新调用该保存工具` : null
+function referenceRejectReason(prompt: string, saved: unknown, descriptionCitations: number[]): string | null {
+  const issue = referenceCitationIssue(prompt, effectiveReferenceImages(saved).length, descriptionCitations)
+  return issue ? `${issue}（写法 ${referenceToken(1)}、${referenceToken(2)}…）；未保存，请修正后重新调用该保存工具` : null
 }
 
 // ─── 角色提示词 ───────────────────────────────────────
@@ -67,8 +68,9 @@ const readCharacters = createTool({
         description: c.description || '',
         appearance: c.appearance || '',
         styling: c.styling || '',
-        // 生图参考图：按顺序作为 图片1…图片N 发给模型，提示词必须逐张引用
+        // 生图参考图：编号=列表序；生图只发送最终提示词实际引用的那几张（#121）
         ...referenceFields(c.referenceImages),
+        description_citations: descriptionCitationsOf('character', c as unknown as Record<string, unknown>),
         // 该角色是否已入库史料画像（Issue #32）：画像本身不进生图链路，
         // 但提示词要忠实于 appearance/styling 里已文本化的画像特征，不得自行发挥
         has_archival_reference: !!c.archivalImages && c.archivalImages !== '[]',
@@ -82,10 +84,10 @@ const readCharacters = createTool({
 
 const saveCharacterFinalPrompt = createTool({
   id: 'save_character_final_prompt',
-  description: `保存为角色创作的三视图最终提示词。项目视觉风格会由工具自动拼接，prompt 参数中不要包含风格词。角色有参考图时，prompt 必须逐张引用它们（写法 ${referenceToken(1)}、${referenceToken(2)}…）并说明各自贡献，否则拒绝保存。`,
+  description: `保存为角色创作的三视图最终提示词。项目视觉风格会由工具自动拼接，prompt 参数中不要包含风格词。参考图按需引用（写法 ${referenceToken(1)}、${referenceToken(2)}…，编号=列表序）：生图只发送 prompt 实际引用的那几张，零引用则一张不发；描述字段里用户已引用的参考图必须保留引用并写明贡献，引用不存在的编号会拒绝保存。保存前建议先调用 check_final_prompt_references 自查。`,
   inputSchema: z.object({
     character_id: z.number(),
-    prompt: z.string().describe('角色三视图最终提示词（使用会话语言指令指定的目标语言，不含风格词）'),
+    prompt: z.string().describe('角色三视图最终提示词（使用会话语言指令指定的目标语言，不含风格词；按需引用参考图，描述里用户引用的必须保留）'),
   }),
   execute: async ({ character_id, prompt }, context) => {
     const dramaId = getDramaId(context?.requestContext)
@@ -93,7 +95,7 @@ const saveCharacterFinalPrompt = createTool({
     const [c] = await db.select().from(schema.characters)
       .where(eq(schema.characters.id, character_id))
     if (!c) return { error: 'Character not found' }
-    const referenceIssue = referenceRejectReason(prompt, c.referenceImages)
+    const referenceIssue = referenceRejectReason(prompt, c.referenceImages, descriptionCitationsOf('character', c as unknown as Record<string, unknown>))
     if (referenceIssue) return { error: referenceIssue, saved: false }
 
     const stylePrompt = await getDramaStylePrompt(dramaId)
@@ -137,6 +139,7 @@ const readScenes = createTool({
         prompt: s.prompt || '',
         lighting: s.lighting || '',
         ...referenceFields(s.referenceImages),
+        description_citations: descriptionCitationsOf('scene', s as unknown as Record<string, unknown>),
       })),
     }
   },
@@ -144,10 +147,10 @@ const readScenes = createTool({
 
 const saveSceneFinalPrompt = createTool({
   id: 'save_scene_final_prompt',
-  description: `保存为场景创作的固定视角（前景/中景/后景）最终提示词。项目视觉风格会由工具自动拼接，prompt 参数中不要包含风格词。场景 time 非空时 prompt 必须原样包含 time 文字；非 16:9 项目的 prompt 必须逐字包含 read_scenes 返回的「{aspect_ratio} {composition}」；场景有参考图时必须逐张引用它们（写法 ${referenceToken(1)}、${referenceToken(2)}…）并说明各自贡献，否则拒绝保存。`,
+  description: `保存为场景创作的固定视角（前景/中景/后景）最终提示词。项目视觉风格会由工具自动拼接，prompt 参数中不要包含风格词。场景 time 非空时 prompt 必须原样包含 time 文字；非 16:9 项目的 prompt 必须逐字包含 read_scenes 返回的「{aspect_ratio} {composition}」；参考图按需引用（写法 ${referenceToken(1)}、${referenceToken(2)}…）：生图只发送 prompt 实际引用的那几张；描述字段里用户已引用的必须保留，引用不存在的编号拒绝保存。保存前建议先调用 check_final_prompt_references 自查。`,
   inputSchema: z.object({
     scene_id: z.number(),
-    prompt: z.string().describe('场景固定视角最终提示词（使用会话语言指令指定的目标语言，不含风格词；必须原样包含场景 time、项目画幅短语与每张参考图的引用）'),
+    prompt: z.string().describe('场景固定视角最终提示词（使用会话语言指令指定的目标语言，不含风格词；必须原样包含场景 time 与项目画幅短语；按需引用参考图，描述里用户引用的必须保留）'),
   }),
   execute: async ({ scene_id, prompt }, context) => {
     const dramaId = getDramaId(context?.requestContext)
@@ -155,7 +158,7 @@ const saveSceneFinalPrompt = createTool({
     const [s] = await db.select().from(schema.scenes)
       .where(eq(schema.scenes.id, scene_id))
     if (!s) return { error: 'Scene not found' }
-    const referenceIssue = referenceRejectReason(prompt, s.referenceImages)
+    const referenceIssue = referenceRejectReason(prompt, s.referenceImages, descriptionCitationsOf('scene', s as unknown as Record<string, unknown>))
     if (referenceIssue) return { error: referenceIssue, saved: false }
     // 场景时间是正式字段（Issue #21）：最终提示词必须引用它，不满足则让 Agent 重写
     if (!sceneFinalPromptCoversTime(prompt, s.time)) {
@@ -202,6 +205,7 @@ const readProps = createTool({
         type: p.type || '',
         description: p.description || '',
         ...referenceFields(p.referenceImages),
+        description_citations: descriptionCitationsOf('prop', p as unknown as Record<string, unknown>),
       })),
     }
   },
@@ -209,10 +213,10 @@ const readProps = createTool({
 
 const savePropFinalPrompt = createTool({
   id: 'save_prop_final_prompt',
-  description: `保存为道具创作的白底单品最终提示词。项目视觉风格会由工具自动拼接，prompt 参数中不要包含风格词。道具有参考图时必须逐张引用它们（写法 ${referenceToken(1)}、${referenceToken(2)}…）并说明各自贡献，否则拒绝保存。`,
+  description: `保存为道具创作的白底单品最终提示词。项目视觉风格会由工具自动拼接，prompt 参数中不要包含风格词。参考图按需引用（写法 ${referenceToken(1)}、${referenceToken(2)}…）：生图只发送 prompt 实际引用的那几张；描述字段里用户已引用的必须保留，引用不存在的编号拒绝保存。保存前建议先调用 check_final_prompt_references 自查。`,
   inputSchema: z.object({
     prop_id: z.number(),
-    prompt: z.string().describe('道具白底单品最终提示词（使用会话语言指令指定的目标语言，不含风格词；必须引用每张参考图）'),
+    prompt: z.string().describe('道具白底单品最终提示词（使用会话语言指令指定的目标语言，不含风格词；按需引用参考图，描述里用户引用的必须保留）'),
   }),
   execute: async ({ prop_id, prompt }, context) => {
     const dramaId = getDramaId(context?.requestContext)
@@ -220,7 +224,7 @@ const savePropFinalPrompt = createTool({
     const [p] = await db.select().from(schema.props)
       .where(eq(schema.props.id, prop_id))
     if (!p) return { error: 'Prop not found' }
-    const referenceIssue = referenceRejectReason(prompt, p.referenceImages)
+    const referenceIssue = referenceRejectReason(prompt, p.referenceImages, descriptionCitationsOf('prop', p as unknown as Record<string, unknown>))
     if (referenceIssue) return { error: referenceIssue, saved: false }
 
     const stylePrompt = await getDramaStylePrompt(dramaId)
@@ -239,6 +243,39 @@ const savePropFinalPrompt = createTool({
   },
 })
 
+/**
+ * 保存前自查工具（Issue #121）：harness 在调用 save_*_final_prompt 之前用它核验草稿。
+ * 返回实际会发送的参考图、越界引用、描述引用未落地清单；与保存闸门同一纯函数。
+ */
+const checkFinalPromptReferences = createTool({
+  id: 'check_final_prompt_references',
+  description: '核验最终提示词草稿的参考图引用（保存前自查）：返回实际会发送的参考图编号、越界引用、描述字段里用户引用但草稿未落地的编号。与保存闸门同一口径；不写库。',
+  inputSchema: z.object({
+    kind: z.enum(['character', 'scene', 'prop']),
+    asset_id: z.number(),
+    prompt: z.string().describe('待核验的最终提示词草稿（不含风格词也可，引用编号口径一致）'),
+  }),
+  execute: async ({ kind, asset_id, prompt }) => {
+    const table = kind === 'character' ? schema.characters : kind === 'scene' ? schema.scenes : schema.props
+    const [row] = await db.select().from(table).where(eq(table.id, asset_id))
+    if (!row) return { error: 'Asset not found' }
+    const record = row as unknown as Record<string, unknown>
+    const refCount = effectiveReferenceImages(record.referenceImages).length
+    const descriptionCitations = descriptionCitationsOf(kind, record)
+    const result = checkReferenceCitations(prompt, { refCount, descriptionCitations })
+    const issue = referenceCitationIssue(prompt, refCount, descriptionCitations)
+    return {
+      ok: !issue,
+      issue,
+      reference_count: refCount,
+      will_send: result.willSend,
+      out_of_range: result.outOfRange,
+      description_citations: descriptionCitations,
+      description_citations_missing: result.descriptionMissing,
+    }
+  },
+})
+
 export const imagePromptTools = {
   readCharacters,
   saveCharacterFinalPrompt,
@@ -246,4 +283,5 @@ export const imagePromptTools = {
   saveSceneFinalPrompt,
   readProps,
   savePropFinalPrompt,
+  checkFinalPromptReferences,
 }
