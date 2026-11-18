@@ -20,6 +20,7 @@ import {
 import { cancelTextTask, parseTextTaskParams } from '../services/text-task.js'
 import { abortBatchTask } from '../services/text-batch-cancel.js'
 import { onAssetLibraryChanged } from '../services/asset-review.js'
+import { classifyAssetImage } from '../services/asset-image-usage.js'
 import { buildStoryboardVideoRequest } from '../services/storyboard-video.js'
 import { resolveDramaProjectType } from '../services/project-type.js'
 import { GateBlockedError } from '../services/workflow-gates.js'
@@ -236,6 +237,18 @@ app.post('/register-upload', async (c) => {
   }
   // 审核清单（#55）：新版本登记属于资产库变更，按关联表反查逐集记横幅理由
   await onAssetLibraryChanged(kind as 'character' | 'scene' | 'prop', assetId, 'version_registered')
+  // #121：上传为资产当前图尊重人的显式选择，不自动改图；跑一次分类，
+  // 判 reference 时把建议写进版本 params，前端据此提示「建议改作参考图」
+  void classifyAssetImage(kind as 'character' | 'scene' | 'prop', assetId, localPath).then(async verdict => {
+    if (verdict.verdict === 'reference') {
+      const [task] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, taskId))
+      if (task) {
+        const params = task.params ? JSON.parse(task.params) : {}
+        params.usage_suggestion = { verdict: 'reference', reason: verdict.reason, at: Math.floor(Date.now() / 1000) }
+        await db.update(schema.sysTask).set({ params: JSON.stringify(params) }).where(eq(schema.sysTask.id, taskId))
+      }
+    }
+  }).catch(() => {})
   return created(c, { id: taskId, local_path: localPath })
 })
 
