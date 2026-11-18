@@ -1,0 +1,71 @@
+{
+  "drama": {
+    "id": 24,
+    "title": "八达岭长城测试 1118",
+    "project_type": "drama"
+  },
+  "episode": {
+    "id": 32,
+    "drama_id": 24,
+    "episode_number": 1
+  },
+  "char78": {
+    "id": 78,
+    "name": "测试肖像人物",
+    "appearance": "样貌见@参考图2，欧洲文艺复兴风格军官",
+    "final_prompt": "以@参考图2的五官与甲胄为准，纯白背景",
+    "final_prompt_source": "external",
+    "reference_images": "[{\"path\":\"static/uploads/reference_images/character/78/50e35819-b256-42fc-83f9-e884754dfaaf.png\",\"uploaded_at\":1794990682,\"classification\":{\"verdict\":\"reference\",\"reason\":\"这是一张现代底图叠加中文标注、箭头和路线的示意图，与戚继光人物无关，只能作为参考图使用。\",\"at\":1794990686}},{\"path\":\"static/uploads/reference_images/character/78/f2e624ad-6183-4a2d-b6c0-be5debf27c86.jpg\",\"uploaded_at\":1794990682,\"usage\":\"reference\",\"classification\":{\"verdict\":\"reference\",\"reason\":\"画面为欧洲文艺复兴风格的油画肖像（宽檐帽、轮状皱领、鳞甲与长矛），人物形象与明代将领戚继光的服饰、画风均不符，属后世或异域绘制的参考性画像，非戚继光历史原件。\",\"at\":1794990687}}]"
+  },
+  "char79": {
+    "id": 79,
+    "name": "零引用测试",
+    "final_prompt": "角色设定参考图，纯白背景，柔和光线"
+  },
+  "prop296": {
+    "id": 296,
+    "name": "叶尔马克肖像画",
+    "faithful": 1,
+    "faithful_source": 4948,
+    "image_url": "static/uploads/reference_images/prop/296/a672219c-de05-498f-b316-b00ebd3cf3ec.jpg",
+    "reference_images": "[{\"path\":\"static/uploads/reference_images/prop/296/a672219c-de05-498f-b316-b00ebd3cf3ec.jpg\",\"uploaded_at\":1794990723,\"usage\":\"direct\",\"classification\":{\"verdict\":\"direct\",\"reason\":\"画面为17世纪风格油画原作，笔触、颜料老化与人物服饰（鳞甲、拉夫领、宽檐帽）符合历史肖像特征，无现代标注或合成痕迹。\",\"at\":1794990725}}]"
+  },
+  "tasks": [
+    {
+      "id": 4945,
+      "status": "completed",
+      "provider": "upload",
+      "model": "direct-adopt",
+      "local_path": "static/uploads/reference_images/prop/296/a672219c-de05-498f-b316-b00ebd3cf3ec.jpg",
+      "params": "{\"source\":\"auto-classify\",\"adopted_from\":\"static/uploads/reference_images/prop/296/a672219c-de05-498f-b316-b00ebd3cf3ec.jpg\"}",
+      "remote_state": null
+    },
+    {
+      "id": 4946,
+      "status": "completed",
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "local_path": "static/images/6cb81b39-4375-47d8-a526-14b78e8902c4.png",
+      "params": "{\"size\":\"1920x1080\",\"asset_citation\":true,\"referenceImages\":[\"static/uploads/reference_images/character/78/f2e624ad-6183-4a2d-b6c0-be5debf27c86.jpg\"],\"sourcePrompt\":\"以@参考图2的五官与甲胄为准，纯白背景\",\"refNameIndex\":{\"参考图2\":1}}",
+      "remote_state": "{\"request\":{\"mode\":\"image_edit\",\"prompt\":\"以<image1>的五官与甲胄为准，纯白背景\",\"metadata\":{\"sys_task_id\":\"4946\"},\"reference_images\":[\"file_c4c3abe8687640feb7fcf819a2d15a1b\"]},\"config_id\":9,\"idempotency_key\":\"huobao-sys_task-4946-3378898c-2330-4b6c-bc39-a09a9117be3c\",\"remote_status\":\"succeeded\",\"queue\":null,\"progress\":null,\"estimate\":{\"run_seconds\":74.5,\"basis\":\"measured\",\"samples\":4},\"estimated_finish_seconds\":null,\"cancel_requested\":false,\"updated_at\":\"2026-11-18T08:34:09.722Z\"}"
+    },
+    {
+      "id": 4947,
+      "status": "processing",
+      "provider": "qwen-jobs",
+      "model": "qwen-image-2.1",
+      "local_path": null,
+      "params": "{\"size\":\"1920x1080\",\"asset_citation\":true}",
+      "remote_state": "{\"request\":{\"mode\":\"text_to_image\",\"prompt\":\"角色设定参考图，纯白背景，柔和光线\",\"metadata\":{\"sys_task_id\":\"4947\"},\"width\":1920,\"height\":1088},\"config_id\":9,\"idempotency_key\":\"huobao-sys_task-4947-3abc8a66-88b1-41dd-b659-7074eb9a103a\",\"remote_status\":\"running\",\"queue\":null,\"progress\":{\"fraction\":0.843,\"elapsed_seconds\":151.7,\"remaining_seconds\":28.2,\"phase\":\"sampling\",\"step\":24,\"total_steps\":25},\"estimate\":{\"run_seconds\":179.9,\"basis\":\"measured\",\"samples\":11},\"estimated_finish_seconds\":28.2,\"cancel_requested\":false,\"updated_at\":\"2026-11-18T08:35:57.769Z\"}"
+    },
+    {
+      "id": 4948,
+      "status": "completed",
+      "provider": "upload",
+      "model": "direct-adopt",
+      "local_path": "static/uploads/reference_images/prop/296/a672219c-de05-498f-b316-b00ebd3cf3ec.jpg",
+      "params": "{\"source\":\"manual-adopt\",\"adopted_from\":\"static/uploads/reference_images/prop/296/a672219c-de05-498f-b316-b00ebd3cf3ec.jpg\"}",
+      "remote_state": null
+    }
+  ]
+}
