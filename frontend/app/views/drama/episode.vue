@@ -885,11 +885,13 @@
                 <div v-if="assetDetail.type === 'prop'" class="asset-detail-edit-grid asset-detail-edit-grid--prop">
                   <label class="asset-detail-edit-field">
                     <span>{{ isMapAsset(assetDetail.item) ? t('episode.asset.mapDescription') : t('episode.asset.appearanceOfObject') }}</span>
-                    <textarea
+                    <MentionTextarea
                       v-model="assetDetailDraft.description"
-                      class="textarea asset-detail-textarea"
-                      rows="6"
+                      :options="assetRefMentionOptions"
+                      input-class="textarea asset-detail-textarea"
+                      :rows="6"
                       :placeholder="isMapAsset(assetDetail.item) ? t('episode.asset.mapDescription') : t('episode.asset.appearancePlaceholder')"
+                      @commit="persistAssetDetail()"
                     />
                   </label>
                 </div>
@@ -897,38 +899,46 @@
                 <div v-else :class="['asset-detail-edit-grid', `asset-detail-edit-grid--${assetDetail.type}`]">
                   <label v-if="assetDetail.type === 'character'" class="asset-detail-edit-field">
                     <span>{{ t('episode.asset.appearanceField') }}</span>
-                    <textarea
+                    <MentionTextarea
                       v-model="assetDetailDraft.appearance"
-                      class="textarea asset-detail-textarea"
-                      rows="6"
+                      :options="assetRefMentionOptions"
+                      input-class="textarea asset-detail-textarea"
+                      :rows="6"
                       :placeholder="t('episode.asset.appearanceFieldPlaceholder')"
+                      @commit="persistAssetDetail()"
                     />
                   </label>
                   <label v-if="assetDetail.type === 'character'" class="asset-detail-edit-field">
                     <span>{{ t('episode.asset.stylingField') }}</span>
-                    <textarea
+                    <MentionTextarea
                       v-model="assetDetailDraft.styling"
-                      class="textarea asset-detail-textarea"
-                      rows="6"
+                      :options="assetRefMentionOptions"
+                      input-class="textarea asset-detail-textarea"
+                      :rows="6"
                       :placeholder="t('episode.asset.stylingFieldPlaceholder')"
+                      @commit="persistAssetDetail()"
                     />
                   </label>
                   <label v-if="assetDetail.type === 'scene'" class="asset-detail-edit-field">
                     <span>{{ t('episode.asset.sceneDescField') }}</span>
-                    <textarea
+                    <MentionTextarea
                       v-model="assetDetailDraft.prompt"
-                      class="textarea asset-detail-textarea"
-                      rows="5"
+                      :options="assetRefMentionOptions"
+                      input-class="textarea asset-detail-textarea"
+                      :rows="5"
                       :placeholder="t('episode.asset.sceneDescPlaceholder')"
+                      @commit="persistAssetDetail()"
                     />
                   </label>
                   <label v-if="assetDetail.type === 'scene'" class="asset-detail-edit-field">
                     <span>{{ t('episode.asset.sceneLightField') }}</span>
-                    <textarea
+                    <MentionTextarea
                       v-model="assetDetailDraft.lighting"
-                      class="textarea asset-detail-textarea"
-                      rows="5"
+                      :options="assetRefMentionOptions"
+                      input-class="textarea asset-detail-textarea"
+                      :rows="5"
                       :placeholder="t('episode.asset.sceneLightPlaceholder')"
+                      @commit="persistAssetDetail()"
                     />
                   </label>
                 </div>
@@ -949,6 +959,7 @@
                 :drama-id="dramaId"
                 size="large"
                 @update="onAssetRefsUpdate(assetDetail.item, $event)"
+                @adopted="onAssetRefAdopted(assetDetail.item)"
                 @preview="openImageViewer"
               />
             </section>
@@ -969,12 +980,8 @@
               />
             </section>
 
-            <!-- 地图资产走专用工作流，其余证据素材保留语义面板与 deeplink 定位。 -->
-            <section v-if="assetDetail.type === 'prop' && !isMapAsset(assetDetail.item)" ref="assetSemanticsSection" class="asset-detail-ref-panel">
-              <div class="asset-detail-section-title">
-                <span>{{ t('episode.documentary.semantics.sectionTitle') }}</span>
-                <span class="dim">{{ t('episode.documentary.semantics.sectionHint') }}</span>
-              </div>
+            <!-- #121：三类资产统一的原件保护开关（角色/场景此前没有保护） -->
+            <section v-if="!isMapAsset(assetDetail.item)" class="asset-detail-ref-panel">
               <label class="asset-faithful-toggle">
                 <input
                   type="checkbox"
@@ -985,6 +992,14 @@
                 <span>{{ t('episode.asset.faithfulToggle') }}</span>
               </label>
               <p class="asset-faithful-hint dim">{{ t('episode.asset.faithfulHint') }}</p>
+            </section>
+
+            <!-- 地图资产走专用工作流，其余证据素材保留语义面板与 deeplink 定位。 -->
+            <section v-if="assetDetail.type === 'prop' && !isMapAsset(assetDetail.item)" ref="assetSemanticsSection" class="asset-detail-ref-panel">
+              <div class="asset-detail-section-title">
+                <span>{{ t('episode.documentary.semantics.sectionTitle') }}</span>
+                <span class="dim">{{ t('episode.documentary.semantics.sectionHint') }}</span>
+              </div>
               <PropSemanticsPanel
                 :key="`semantics-${assetDetail.item.id}`"
                 :prop-id="assetDetail.item.id"
@@ -1571,7 +1586,8 @@ import {
   Users, FileText, FolderKanban, Clapperboard, Download, Loader2, Images,
   Image as ImageIcon, Plus, X, Trash2, CircleHelp, ChevronRight, Layers, Lightbulb, Lock,
 } from 'lucide-vue-next'
-import { api, dramaAPI, episodeAPI, storyboardAPI, characterAPI, sceneAPI, propAPI, taskAPI, mergeAPI, posterAPI, aiConfigAPI, uploadAPI, mediaLibraryAPI, videoQueueAPI, assetBatchAPI } from '~/composables/useApi'
+import { api, dramaAPI, episodeAPI, storyboardAPI, characterAPI, sceneAPI, propAPI, taskAPI, mergeAPI, posterAPI, aiConfigAPI, uploadAPI, mediaLibraryAPI, videoQueueAPI, assetBatchAPI, parseReferenceImages } from '~/composables/useApi'
+import MentionTextarea from '~/components/MentionTextarea.vue'
 import { startTour, autoTour } from '~/composables/useTour'
 import { useAgent } from '~/composables/useAgent'
 import { toastError, mapError, toastServerMessage, toastMissingReferenceImages, MODERATION_RE } from '~/composables/useToast'
@@ -4927,6 +4943,37 @@ function onAssetRefsUpdate(item, refs) {
   item.reference_images = refs
 }
 
+// #121：资产描述字段的 @参考图 候选 = 本资产参考图（编号 = 列表序，与参考图面板一致）
+const assetRefMentionOptions = computed(() => {
+  const item = assetDetail.value?.item
+  if (!item) return []
+  return parseReferenceImages(item.reference_images ?? item.referenceImages).map((entry, i) => ({
+    label: `参考图${i + 1}`,
+    value: `参考图${i + 1}`,
+    kind: 'prop',
+    group: t('components.referenceImages.label'),
+    image: thumbOf(mediaUrl(entry.path)),
+  }))
+})
+
+// #121：参考图被采用为资产当前图 → 刷新本集资产列表，并把新行同步进弹窗
+async function onAssetRefAdopted(item) {
+  if (!item?.id) return
+  try {
+    const ep = episode.value
+    if (!ep?.id) return
+    const type = assetDetail.value.type
+    const list = type === 'character' ? await episodeAPI.characters(ep.id)
+      : type === 'scene' ? await episodeAPI.scenes(ep.id)
+      : await episodeAPI.props(ep.id)
+    if (type === 'character') chars.value = list
+    else if (type === 'scene') scenes.value = list
+    else propItems.value = list
+    const fresh = list.find(row => row.id === item.id)
+    if (fresh) Object.assign(item, fresh)
+  } catch { /* 刷新失败不阻断采用结果 */ }
+}
+
 // 史料参考（Issue #32）：只做出处留档，不进生图；同样以服务端返回的数组为准
 function onAssetArchivalUpdate(item, entries) {
   item.archival_images = entries
@@ -5018,7 +5065,11 @@ async function applyFaithful(faithful) {
   if (!item?.id || faithfulSaving.value) return
   faithfulSaving.value = true
   try {
-    const row = await propAPI.setFaithful(item.id, faithful)
+    // #121：三类资产同一口径（角色/场景经通用 update，道具沿用 setFaithful）
+    const api = assetDetail.value.type === 'character' ? characterAPI : assetDetail.value.type === 'scene' ? sceneAPI : propAPI
+    const row = assetDetail.value.type === 'prop'
+      ? await propAPI.setFaithful(item.id, faithful)
+      : await api.update(item.id, faithful ? { faithful: true } : { faithful: false, confirm_unfaithful: true })
     onAssetSemanticsUpdate(item, row && typeof row === 'object' ? row : { faithful: faithful ? 1 : 0 })
     faithfulConfirm.value = { open: false, name: '' }
     toast.success(faithful ? t('episode.asset.faithfulOn') : t('episode.asset.faithfulOff'))
