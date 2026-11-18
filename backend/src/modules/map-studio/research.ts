@@ -32,7 +32,10 @@ const SNIPPET_FOR_MODEL = 300
 const TEXT_FOR_MODEL = 6000
 const MAX_STEPS = 40
 
-const bboxSchema = z.tuple([z.number(), z.number(), z.number(), z.number()])
+// 定长数组而非 z.tuple：百炼 qwen4-max-preview 拒绝元组式 JSON Schema（items:[…] → 400
+// invalid_parameter_error，Issue #120，observed call 7020–7022）；.length(N) 校验语义等价
+// （恰好 N 个 number），emitted schema 为 items:{type:number}+minItems/maxItems，各端点通用。
+const bboxSchema = z.array(z.number()).length(4)
 export const featureSubmissionSchema = z.object({
   kind: z.enum(['place', 'route', 'region']),
   name: z.string().min(1),
@@ -42,7 +45,7 @@ export const featureSubmissionSchema = z.object({
   dataset_missing: z.object({ queries: z.array(z.string()), reason: z.string() }).optional(),
   lon: z.number().optional(),
   lat: z.number().optional(),
-  points: z.array(z.tuple([z.number(), z.number()])).optional(),
+  points: z.array(z.array(z.number()).length(2)).optional(),
   coordinate_basis: z.enum(['excerpt', 'well_known', 'approximate_schematic']),
   basis: z.string(),
   supporting_excerpt: z.string().optional(),
@@ -119,12 +122,14 @@ export async function runResearchStage(input: ResearchStageInput): Promise<Stage
         inputSchema: z.object({
           layer: z.enum(['river', 'lake', 'coast', 'mountain', 'physical_region', 'place']),
           query: z.string().min(1),
-          bbox: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional(),
+          bbox: z.array(z.number()).length(4).optional(),
         }),
         summarize: result => Array.isArray(result.candidates)
           ? `${result.candidates.length} 个候选（refs 见查询历史）`
           : `返回错误：${String(result.error ?? '未知')}`,
-        execute: async ({ layer, query, bbox }) => {
+        execute: async ({ layer, query, bbox: rawBbox }) => {
+          // zod .length(4) 类型是 number[]；运行时已校验恰好 4 个 number，收窄回领域元组类型
+          const bbox = rawBbox as [number, number, number, number] | undefined
           try {
             const hits = searchDataset(layer, query, bbox)
             datasetQueries.push({ layer, query, ...(bbox ? { bbox } : {}), hits: hits.length, refs: hits.map(hit => hit.ref), error: null })
@@ -230,7 +235,7 @@ export async function runResearchStage(input: ResearchStageInput): Promise<Stage
           + '任何一条不合格都会整批拒收并逐条说明原因。',
         inputSchema: z.object({
           features: z.array(featureSubmissionSchema).describe('地理要素数组；dataset 只提交 dataset_ref，不能手写 points/lon/lat'),
-          extent: z.tuple([z.number(), z.number(), z.number(), z.number()]).describe('地图研究空间范围 [west,south,east,north]；所有顶点必须落在范围内；数据集要素可直接用 extent 作为 dataset_ref.clip_bbox 裁剪'),
+          extent: z.array(z.number()).length(4).describe('地图研究空间范围 [west,south,east,north]；所有顶点必须落在范围内；数据集要素可直接用 extent 作为 dataset_ref.clip_bbox 裁剪'),
           relations: z.array(relationSubmissionSchema).optional().describe('从正文抽取距离及方位；excerpt 必须逐字引用 source_id 正文'),
           uncertainties: z.array(z.string()).optional(),
           notes: z.array(z.string()).optional(),
@@ -252,7 +257,8 @@ export async function runResearchStage(input: ResearchStageInput): Promise<Stage
           return await session.deliver(checked.problems, () => ({
             queries: [...queries],
             dataset_queries: [...datasetQueries],
-            extent: submission.extent,
+            // zod .length(4) 的类型是 number[]；运行时已校验恰好 4 个 number，收窄回领域元组类型
+            extent: submission.extent as [number, number, number, number],
             relations: checked.relations,
             sources: sources.map(source => ({ ...source })),
             features: checked.features,
