@@ -168,6 +168,14 @@ app.put('/:id', async (c) => {
     updates.name = normalizeAssetName(updates.name)
     if (!updates.name) return badRequest(c, EMPTY_ASSET_NAME_MESSAGE)
   }
+  // #121：原件保护开关（与 props 同口径）：关保护需显式确认
+  if (body.faithful !== undefined) {
+    const next = body.faithful === true || body.faithful === 1 ? 1 : 0
+    if (next === 0 && Number(char.faithful) === 1 && body.confirm_unfaithful !== true) {
+      return badRequest(c, '关闭保护会让该角色图重新进入生图/批量重绘，请传 confirm_unfaithful=true 显式确认')
+    }
+    updates.faithful = next
+  }
   // #121：手写最终提示词过同一引用核验（越界/描述引用未落地 → 400）
   const incomingPrompt = body.final_prompt !== undefined ? body.final_prompt : body.finalPrompt
   if (typeof incomingPrompt === 'string' && incomingPrompt.trim()) {
@@ -337,6 +345,38 @@ app.post('/:id/styling-version/generate-image', async (c) => {
     logTaskError('CharacterImage', 'styling-version', { characterId: id, error: message })
     return badRequest(c, message)
   }
+})
+
+
+// ─── 原件保护（Issue #121，与 props.faithful-source 同口径） ──────────────
+
+/** PUT /characters/:id/faithful-source — 显式把当前图切回某条上传/导入/采用版本 */
+app.put('/:id/faithful-source', async (c) => {
+  const id = Number(c.req.param('id'))
+  const body = await c.req.json()
+  const versionTaskId = Number(body.version_task_id)
+  if (!versionTaskId) return badRequest(c, 'version_task_id 必填')
+  const [row] = await db.select().from(schema.characters).where(eq(schema.characters.id, id))
+  if (!row) return badRequest(c, '角色不存在')
+  const [task] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, versionTaskId))
+  const ownerMatch = task && task.characterId === id
+  if (!ownerMatch || task.type !== 'image' || task.status !== 'completed') {
+    return badRequest(c, '指定的版本不属于该角色，或还没有完成')
+  }
+  if (!['upload', 'import'].includes(task.provider || '')) {
+    return badRequest(c, `只能把上传/导入/采用的原件设为受保护当前图（该版本来自 ${task.provider || '未知来源'}）`)
+  }
+  const path = task.localPath || task.resultUrl
+  if (!path) return badRequest(c, '该版本没有可用的图片地址')
+  await db.update(schema.characters).set({
+    imageUrl: path,
+    localPath: task.localPath || null,
+    faithful: 1,
+    faithfulSource: versionTaskId,
+    updatedAt: now(),
+  }).where(eq(schema.characters.id, id))
+  const [updated] = await db.select().from(schema.characters).where(eq(schema.characters.id, id))
+  return success(c, toSnakeCase(updated))
 })
 
 export default app
