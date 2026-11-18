@@ -329,6 +329,14 @@
       "title": "确认删除"
     },
     "referenceImages": {
+      "citeHint": "在描述或提示词里用 @参考图{n} 引用这张",
+      "usageDirect": "可直接用",
+      "usageReference": "仅参考",
+      "unclassified": "未分类（上传后自动判定，也可点按改判）",
+      "verdict": {"direct": "判定为历史原件，可直接作资产图", "reference": "判定为现代图/示意图，仅作生图参考", "unknown": "未能判定"},
+      "adopt": "采用为资产图",
+      "adoptHint": "把这张原件设为资产当前图并加保护（不进批量重绘）",
+      "adopted": "已采用为资产图（受保护）",
       "label": "参考图",
       "hint": "引导生成，不是成片图",
       "add": "添加",

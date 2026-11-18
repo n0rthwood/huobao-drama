@@ -329,6 +329,14 @@
       "title": "Confirm delete"
     },
     "referenceImages": {
+      "citeHint": "Cite this image as @参考图{n} in descriptions or prompts",
+      "usageDirect": "Direct use",
+      "usageReference": "Reference",
+      "unclassified": "Unclassified (auto-judged after upload; click to override)",
+      "verdict": {"direct": "Judged a historical original; usable as the asset image", "reference": "Judged modern/schematic; generation reference only", "unknown": "Could not judge"},
+      "adopt": "Adopt as asset image",
+      "adoptHint": "Set this original as the current asset image with protection (no batch repaint)",
+      "adopted": "Adopted as asset image (protected)",
       "label": "References",
       "hint": "Guides generation, not the final image",
       "add": "Add",
