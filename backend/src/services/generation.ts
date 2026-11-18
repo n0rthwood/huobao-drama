@@ -24,7 +24,7 @@ import { getAbsolutePath } from '../utils/storage.js'
 import { invalidateSegmentSpec } from './layer-segment.js'
 import { aspectLockedMismatchMessage } from './asset-image-size.js'
 import { renderReferencePrompt, citedReferenceIndices, referenceToken } from './asset-reference-prompt.js'
-import type { ReferenceOrigin } from './asset-pipeline/references.js'
+import type { ReferenceOrigin } from '../modules/asset-studio/index.js'
 import {
   buildImageJobBody,
   cancelQwenJob,

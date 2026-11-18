@@ -13,7 +13,7 @@ import { sqlite } from '../db/index.js'
 import { getContentLanguage } from './app-settings.js'
 import { callTextChat } from './vision-chat.js'
 import { runObservedWork } from './task-observability.js'
-import { parseJsonReply } from './asset-pipeline/prompts.js'
+import { parseJsonReply } from '../modules/asset-studio/index.js'
 import type { StageModel } from './ai-stages.js'
 import { parseDesignCard, toCombo, type DesignCard, type DesignCardContext } from './design-card.js'
 import {

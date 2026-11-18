@@ -256,6 +256,9 @@ async function retryText(row: SysTaskRow, opts: RetryOptions): Promise<number> {
   if (kind === 'map_workflow') {
     throw new Error('地图工作流已迁到地图工作室，请从地图道具打开')
   }
+  if (kind === 'asset_pipeline' || kind === 'asset_research') {
+    throw new Error('旧资产流水线记录只读，请从资产工作室发起新的运行')
+  }
   if (!kind || !episodeId) throw new Error('该文本任务缺少重试所需的信息')
   const dramaId = row.dramaId ?? 0
   if (kind === 'shot_compose') {
