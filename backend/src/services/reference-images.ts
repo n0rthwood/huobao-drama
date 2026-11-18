@@ -26,11 +26,15 @@ export type AssetKind = 'character' | 'scene' | 'prop'
 /**
  * 持久化的参考图条目（上传时间为 unix 秒；存量数据文件缺失时为 null，前端不显示时间）。
  * `copied_from` 只由「从素材库选择」写入，记源图相对路径，用于同一资产的重复选入去重。
+ * `usage`（Issue #121）：reference = 仅参考（缺省）；direct = 可直接采用为资产图（仍可被引用）。
+ * `classification` = 视觉分类结果（verdict direct/reference/unknown + 理由 + unix 秒），人工改判也写它。
  */
 export interface ReferenceImageEntry {
   path: string
   uploaded_at: number | null
   copied_from?: string
+  usage?: 'reference' | 'direct'
+  classification?: { verdict: 'direct' | 'reference' | 'unknown'; reason: string; at: number; manual?: boolean }
 }
 
 /**
@@ -82,6 +86,17 @@ function toEntry(item: unknown): ReferenceImageEntry | null {
     uploaded_at: Number.isFinite(uploadedAt) && uploadedAt > 0 ? Math.floor(uploadedAt) : null,
   }
   if (copiedFrom) entry.copied_from = copiedFrom
+  if (record.usage === 'direct') entry.usage = 'direct'
+  const cls = record.classification as Record<string, unknown> | undefined
+  if (cls && (cls.verdict === 'direct' || cls.verdict === 'reference' || cls.verdict === 'unknown')) {
+    const at = Number(cls.at)
+    entry.classification = {
+      verdict: cls.verdict,
+      reason: String(cls.reason ?? ''),
+      at: Number.isFinite(at) && at > 0 ? Math.floor(at) : 0,
+      ...(cls.manual === true ? { manual: true } : {}),
+    }
+  }
   return entry
 }
 
@@ -153,6 +168,49 @@ export function effectiveReferenceImages(saved: unknown, override?: unknown): st
   return partitionMissingReferences(resolveReferenceImages(saved, override)).present
 }
 
+/** 描述类字段（Issue #121）：各资产类型里允许写 @参考图N 的文本列 */
+const CITABLE_FIELDS: Record<AssetKind, string[]> = {
+  character: ['description', 'appearance', 'styling'],
+  scene: ['prompt', 'lighting'],
+  prop: ['description'],
+}
+
+/**
+ * 文本里的参考图编号重写（纯函数）：删除第 removed 张后，>removed 的编号减 1；
+ * 指向被删图的引用改写成「参考图N（已删除）」失效标记——不静默换图。五种写法统一处理。
+ */
+export function shiftReferenceCitations(text: string, removed: number): string {
+  if (!text) return text
+  return text.replace(/@参考图(\d+)|参考图(\d+)|<image(\d+)>|<Picture (\d+)>|图片(\d+)/gi,
+    (match, a, b, c, d, e) => {
+      const n = Number(a ?? b ?? c ?? d ?? e)
+      if (n === removed) return `参考图${n}（已删除）`
+      if (n > removed) return match.replace(String(n), String(n - 1))
+      return match
+    })
+}
+
+/**
+ * 删除参考图后同步重写描述字段与 final_prompt 里的编号（Issue #121 引用生命周期）。
+ * 在 persistReferences 之后调用；只写真的变了的列。
+ */
+async function rewriteCitationsAfterRemoval(kind: AssetKind, assetId: number, removed: number): Promise<void> {
+  const table = ASSET_TABLES[kind]
+  const [row] = await db.select().from(table).where(eq(table.id, assetId))
+  if (!row) return
+  const record = row as unknown as Record<string, unknown>
+  const updates: Record<string, unknown> = {}
+  for (const field of [...CITABLE_FIELDS[kind], 'finalPrompt']) {
+    const value = record[field]
+    if (typeof value !== 'string' || !value) continue
+    const shifted = shiftReferenceCitations(value, removed)
+    if (shifted !== value) updates[field] = shifted
+  }
+  if (Object.keys(updates).length) {
+    await db.update(table).set({ ...updates, updatedAt: now() }).where(eq(table.id, assetId))
+  }
+}
+
 /** 读取某资产的参考图条目（资产不存在报 404）；素材库选图也经此读当前状态 */
 export async function loadReferences(kind: AssetKind, assetId: number): Promise<ReferenceImageEntry[]> {
   const table = ASSET_TABLES[kind]
@@ -210,6 +268,7 @@ export async function removeReferenceImage(kind: AssetKind, assetId: number, tar
 
   const next = current.filter((_, i) => i !== index)
   await persistReferences(kind, assetId, next)
+  await rewriteCitationsAfterRemoval(kind, assetId, index + 1)
 
   const abs = ownedAbsolutePath(kind, assetId, value)
   if (abs) {
