@@ -13,7 +13,7 @@
 - 异步接口返回 `running/queued/processing` 只代表**受理**，不代表完成。必须轮询状态或任务中心到终态。
 - 媒体路径可能是根绝对形式（`/static/...`）或相对形式（`static/...`）。根绝对路径按 `HUOBAO_BASE` 拼，相对路径按部署前缀拼；拼完必须仍在部署基址内，拒绝 `..` 与绝对注入。
 - `drama_id` / `episode_id` 是数据库 ID；前端路由和审核深链用的是 `episode_number`（显示集数）。二者必须用 `GET /dramas/{d}` 双向核对。
-- **路径简写约定**：目录里的 `...` 续接与省略前缀只用于分组阅读；实际调用必须展开。规则：S7/S8 的批量与状态端点属于 `/episodes/{e}/...`，镜头级属于 `/storyboards/{id}/...`；`/runs/{id}` 属于 `/asset-pipeline/runs/{id}`；`/runs/{id}/approve` 同理。不确定时以本节完整写法为准，宁可显式写全。
+- **路径简写约定**：目录里的 `...` 续接与省略前缀只用于分组阅读；实际调用必须展开。规则：S7/S8 的批量与状态端点属于 `/episodes/{e}/...`，镜头级属于 `/storyboards/{id}/...`；`/runs/{id}` 属于 `/asset-studio/runs/{id}`；`/runs/{id}/approve` 同理。不确定时以本节完整写法为准，宁可显式写全。
 - 所有 GET/POST/PUT/DELETE（含轮询与错误）都要写 actor 自己的 `requests.jsonl`，附脱敏 request/response；`api_key`、认证头、密钥 URL 一律不入证据。
 - 写入前保存受影响字段快照；写入后重新 GET 对照，报告 before/after。
 - AI 配置响应按机密处理：只允许在内存中白名单提取 `id/provider/model/base_url`，不得落盘。

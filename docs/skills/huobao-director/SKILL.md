@@ -109,7 +109,7 @@ description: 通过火宝 HTTP API 按阶段推进剧本、资产、Poster、分
 
 Agent 可以做**技术验收**（结构、时长、音画、可解码、签名一致），但必须标注“技术验收”，不得写成“用户艺术批准”。
 
-**硬禁止**：Agent 永不自行调用下列**破坏性或背书性**写入——`script/confirm|unconfirm`、`design-card/confirm|unconfirm`、`confirm-keyframes`、`character-roster` 的批准保存、`asset-pipeline/runs/{id}/approve` 的 `verdict`/`override_gate`、段组合的人工写入 `PUT /storyboards/{id}/design-card {combo}` 与 `POST /storyboards/{id}/combo`、`asset-review/items/{id}` 的 `not_needed`/`ignored`、`DELETE /storyboards/{id}`、`DELETE /tasks/{id}`、`DELETE /merge/episodes/{e}/merges/{mergeId}`；地图人决定点为 `PUT /map-studio/tasks/{id} {map_spec,brief}` 中去掉 proposed/改动待核验几何或改变路线/风格/示意模式、`POST /map-studio/tasks/{id}/advance {skip:true}`、`POST /map-studio/tasks/{id}/rollback`、`POST /map-studio/tasks/{id}/cancel`，以及 `PUT /props/{p} {confirm_asset_type_change:true}`。这些只在人已给出明确决定后执行，requests.jsonl记录授权原话/时间，否则越权。唯一例外是 #82 纪录片设计卡批次 `POST /episodes/{e}/design-cards/fill`：服务端只给尚无 combo 的镜写一次模型所选 combo，仍为 pending，确认由人按。
+**硬禁止**：Agent 永不自行调用下列**破坏性或背书性**写入——`script/confirm|unconfirm`、`design-card/confirm|unconfirm`、`confirm-keyframes`、`character-roster` 的批准保存、`asset-studio/runs/{id}/approve` 的 `verdict`/`override_gate`、段组合的人工写入 `PUT /storyboards/{id}/design-card {combo}` 与 `POST /storyboards/{id}/combo`、`asset-review/items/{id}` 的 `not_needed`/`ignored`、`DELETE /storyboards/{id}`、`DELETE /tasks/{id}`、`DELETE /merge/episodes/{e}/merges/{mergeId}`；地图人决定点为 `PUT /map-studio/tasks/{id} {map_spec,brief}` 中去掉 proposed/改动待核验几何或改变路线/风格/示意模式、`POST /map-studio/tasks/{id}/advance {skip:true}`、`POST /map-studio/tasks/{id}/rollback`、`POST /map-studio/tasks/{id}/cancel`，以及 `PUT /props/{p} {confirm_asset_type_change:true}`。这些只在人已给出明确决定后执行，requests.jsonl记录授权原话/时间，否则越权。唯一例外是 #82 纪录片设计卡批次 `POST /episodes/{e}/design-cards/fill`：服务端只给尚无 combo 的镜写一次模型所选 combo，仍为 pending，确认由人按。
 （只读 GET、preview、生成提示词/图片/配音/视频等“新增产物”的提交不在此列，但必须受 §1.2 预算台账约束。）
 
 ---
@@ -163,9 +163,9 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 - 批量：`POST /dramas/{d}/assets/batch-generate/preview` → 人确认范围 → 同 body 启动 → `GET` 状态。
 - 纪录片审核：`POST /episodes/{e}/asset-review/run` → `GET /asset-review` → 逐条 `PUT /asset-review/items/{id}`（`not_needed` 必须写理由）。
 - 语义：`purpose:"precision"` 不是“精确复原”，而是“带权威参照、程序 gate 与人工审批的生成逼近”，产物仍是艺术再现；不得声称考古/器物级精确复原。
-- 精确→美化：`POST /asset-pipeline/asset-sources`（权威素材入库）→ `POST /asset-pipeline/runs {purpose:"precision"|"beautify"}` → `GET /runs/{id}` → 程序 gate + 开图 → `POST /runs/{id}/approve {opened:[{path,sha256}]}`；不合格 `verdict:"revise"`。
+- 精确→美化（资产工作室，#122）：`POST /asset-studio/tasks/open {host_ref}` → `POST /asset-studio/sources`（权威素材入库）→ `POST /asset-studio/tasks/{id}/run {purpose:"precision"|"beautify",source_ids}` → `GET /asset-studio/tasks/{id}` → 程序 gate + 开图 → `POST /asset-studio/runs/{id}/approve {opened:[{path,sha256}]}`；不合格 `verdict:"revise"`；通过后 `POST /asset-studio/runs/{id}/deliver {round_id,set_as_current}` 插回资产。
 - 忠实素材：实测 `faithful` 只存在于 `props`（场景/角色没有该字段）。真实照片/地图建 `prop` 并标 `faithful:true` 后只做确定性图层底图；`PUT /props/{id}/faithful-source` 标记原件版本。
-- **faithful 与“精确→美化”互斥**：`faithful:true` 资产不得进入 `asset-pipeline` 的 precision/beautify 生图链路，也不得做 t2i/image_edit/i2v。需要“更好看的艺术再现”时，另建独立场景/道具（`faithful:false`、名称与描述明确“艺术再现”），保留原件、来源与 license，两者分别审核；不得把原件替换成重绘图后仍称原件。
+- **faithful 与“精确→美化”互斥**：`faithful:true` 资产不得进入 `asset-studio` 的 precision/beautify 生图链路，也不得做 t2i/image_edit/i2v。需要“更好看的艺术再现”时，另建独立场景/道具（`faithful:false`、名称与描述明确“艺术再现”），保留原件、来源与 license，两者分别审核；不得把原件替换成重绘图后仍称原件。
 - 组合场景：先提取→审核→（缺项补提取）→ 精确/美化 → 才允许拆镜。
 - 陷阱：资产批量是**项目范围**，传 `episode_id` 不代表只改本集；`rewrite_prompts` 与 `overwrite_images` 是两个独立操作；审批没带 `opened` 会被 400（这是硬规则，防止没看图就批）。
 
