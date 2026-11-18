@@ -34,6 +34,7 @@
         :class="{ 'is-broken': broken.includes(entry.path) }"
       >
         <div class="ref-media">
+          <span class="ref-no" :title="t('components.referenceImages.citeHint', { n: i + 1 })">{{ i + 1 }}</span>
           <img
             v-if="!broken.includes(entry.path)"
             :src="thumbOf(srcOf(entry.path))"
@@ -58,6 +59,20 @@
           </button>
         </div>
         <div class="ref-foot">
+          <button
+            class="ref-usage"
+            :class="entry.usage === 'direct' ? 'is-direct' : 'is-reference'"
+            :title="usageHint(entry)"
+            :disabled="usageSaving === entry.path"
+            @click.stop="toggleUsage(entry)"
+          >{{ entry.usage === 'direct' ? t('components.referenceImages.usageDirect') : t('components.referenceImages.usageReference') }}</button>
+          <button
+            v-if="entry.usage === 'direct'"
+            class="ref-adopt"
+            :disabled="adopting === entry.path"
+            :title="t('components.referenceImages.adoptHint')"
+            @click.stop="adopt(entry.path)"
+          >{{ t('components.referenceImages.adopt') }}</button>
           <MediaTime v-if="entry.uploaded_at" class="ref-time" :at="entry.uploaded_at" />
           <span
             v-if="entry.copied_from"
@@ -117,11 +132,13 @@ const props = defineProps({
   size: { type: String, default: 'compact' },
 })
 
-const emit = defineEmits(['update', 'preview'])
+const emit = defineEmits(['update', 'preview', 'adopted'])
 
 const API_BY_TYPE = { character: characterAPI, scene: sceneAPI, prop: propAPI }
 
 const uploading = ref(false)
+const usageSaving = ref('')
+const adopting = ref('')
 const removing = ref('')
 const pendingRemove = ref('')
 const confirmOpen = ref(false)
@@ -215,6 +232,44 @@ async function pickFromLibrary(urls) {
     toastError(err)
   } finally {
     picking.value = false
+  }
+}
+
+// #121：用途徽标提示（分类理由 / 未分类）
+function usageHint(entry) {
+  const cls = entry.classification
+  if (!cls) return t('components.referenceImages.unclassified')
+  const base = cls.verdict === 'unknown' ? t('components.referenceImages.unclassified') : t(`components.referenceImages.verdict.${cls.verdict}`)
+  return cls.reason ? `${base}：${cls.reason}` : base
+}
+
+// #121：人工改判用途（direct ↔ reference）；改判不自动改当前图
+async function toggleUsage(entry) {
+  if (usageSaving.value) return
+  usageSaving.value = entry.path
+  try {
+    const next = entry.usage === 'direct' ? 'reference' : 'direct'
+    const res = await assetApi.value.setRefUsage(props.assetId, entry.path, next)
+    emit('update', parseReferenceImages(res?.reference_images))
+  } catch (err) {
+    toastError(err)
+  } finally {
+    usageSaving.value = ''
+  }
+}
+
+// #121：把 direct 参考图显式采用为资产当前图（受保护）
+async function adopt(item) {
+  if (adopting.value) return
+  adopting.value = item
+  try {
+    await assetApi.value.adoptRef(props.assetId, item)
+    toast.success(t('components.referenceImages.adopted'))
+    emit('adopted', item)
+  } catch (err) {
+    toastError(err)
+  } finally {
+    adopting.value = ''
   }
 }
 
@@ -399,4 +454,24 @@ async function doRemove() {
 .ref-del-btn:focus-visible { opacity: 1; }
 .ref-del-btn:hover { background: var(--action-danger); }
 .ref-empty { font-size: 10.5px; }
+.ref-no {
+  position: absolute; top: 3px; left: 3px; z-index: 2;
+  min-width: 15px; height: 15px; padding: 0 3px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 9.5px; font-weight: 600; border-radius: 4px;
+  background: var(--header-bg); color: var(--text-1);
+  border: 1px solid var(--border);
+}
+.ref-usage {
+  font-size: 9px; line-height: 1; padding: 2px 5px; border-radius: 4px;
+  border: 1px solid var(--border); background: var(--bg-2); color: var(--text-2);
+  cursor: pointer; flex: 0 0 auto;
+}
+.ref-usage.is-direct { background: var(--success-bg, var(--accent-bg)); color: var(--text-1); border-color: var(--accent, var(--border)); }
+.ref-adopt {
+  font-size: 9px; line-height: 1; padding: 2px 5px; border-radius: 4px;
+  border: 1px solid var(--accent, var(--border)); background: var(--accent-bg); color: var(--text-1);
+  cursor: pointer; flex: 0 0 auto;
+}
+.ref-usage:disabled, .ref-adopt:disabled { opacity: 0.6; cursor: default; }
 </style>
