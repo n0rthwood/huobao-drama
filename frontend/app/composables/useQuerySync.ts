@@ -254,6 +254,7 @@ export const DEEPLINK_KEYS = {
   assetStudioRun: ['run', 'round', 'approval'],
   assetStudioPreview: ['asview'],
   assetStudioCall: ['ascall'],
+  assetStudioResearchCall: ['asrcall'],
   /** 地图工作室列表：搜索词、宿主筛选、新建表单开关（不恢复草稿）。 */
   mapStudioList: ['msq', 'mshost', 'mscreate'],
   /** 地图工作室：选中的阶段与运行容器（稳定 run id）。 */

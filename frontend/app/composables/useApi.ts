@@ -1071,7 +1071,7 @@ export const assetAspectAPI = {
 }
 
 
-// 资产「精确→美化」流水线（Issue #56）。闸门结论由后端按清单计算，前端只渲染，不复算也不采信模型自判。
+/** 宿主资产图层底图候选，不归工作室模块所有。 */
 
 export interface AssetBaseCandidate {
   asset_kind: 'character' | 'scene' | 'prop'

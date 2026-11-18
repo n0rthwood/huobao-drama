@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 
-import { describeTextPolicy } from '../app/utils/pipelineText.js'
+import { describeTextPolicy } from '../app/asset-studio/textPolicy.js'
 
 const messages = JSON.parse(readFileSync(new URL('../app/locales/en.json', import.meta.url), 'utf8'))
 const t = key => key.split('.').reduce((node, part) => (node ? node[part] : undefined), messages) ?? key

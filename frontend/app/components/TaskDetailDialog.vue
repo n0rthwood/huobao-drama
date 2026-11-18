@@ -86,6 +86,10 @@
             </div>
             <pre class="task-detail-output">{{ outputText }}</pre>
           </div>
+          <section v-if="textKind === 'asset_pipeline'" class="task-detail-section">
+            <span class="task-detail-section-title">{{ t('taskCenter.pipelineReadonlyHint') }}</span>
+            <pre class="task-detail-output">{{ JSON.stringify(legacyPipelineParams || params, null, 2) }}</pre>
+          </section>
 
           <!-- 真实字数/调用耗时/ETA（#87）：与阶段面板读同一个 observation_summary -->
           <div v-if="live.observation_summary" class="task-detail-section">
@@ -192,7 +196,7 @@
           </div>
         </div>
 
-        <footer class="dialog-foot task-detail-foot">
+        <footer v-if="textKind !== 'asset_pipeline'" class="dialog-foot task-detail-foot">
           <div class="task-detail-retry">
             <ModelSelect
               v-if="modelOptions.length"
@@ -447,11 +451,13 @@ function onThinkingScroll() {
   followTail.value = el.scrollHeight - el.scrollTop - el.clientHeight < 24
 }
 
+const legacyPipelineParams = ref(null)
 async function fetchDetail() {
   try {
     const res = await taskAPI.get(live.value.id)
     const data = res?.data || res
     if (typeof data?.output_text === 'string') outputText.value = data.output_text
+    if (textKind.value === 'asset_pipeline') legacyPipelineParams.value = data.params || null
   } catch { /* 详情失败静默 */ }
 }
 
@@ -568,8 +574,8 @@ async function fetchModels() {
 }
 
 onMounted(async () => {
-  if (live.value.type === 'text' && live.value.pipeline?.state !== 'waiting_approval') {
-    void fetchReasoning()
+  if (live.value.type === 'text') {
+    if (live.value.pipeline?.state !== 'waiting_approval') void fetchReasoning()
     void fetchDetail()
   }
   void restoreFullView()
