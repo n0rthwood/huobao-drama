@@ -84,7 +84,7 @@ WRITE_STEPS = (
     ("POST", r"/episodes/\d+/extract", "assets", "assets.extract"),
     ("POST", r"/episodes/\d+/asset-review/run", "assets", "assets.review"),
     ("PUT", r"/asset-review/items/\d+", "assets", "assets.review"),
-    ("POST", r"/asset-pipeline/.+", "assets", None),
+    ("POST", r"/asset-studio/.+", "assets", None),
     ("POST", r"/dramas/\d+/assets/.+", "assets", None),
     ("POST", r"/episodes/\d+/assets/.+", "assets", None),
     ("DELETE", r"/episodes/\d+/assets/link", "assets", None),

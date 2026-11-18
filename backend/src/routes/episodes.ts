@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { listBaseCandidates } from '../services/asset-studio-base-candidates.js'
 import { and, eq, isNull } from 'drizzle-orm'
 import { db, getInsertId, schema } from '../db/index.js'
 import { success, notFound, badRequest, now } from '../utils/response.js'
@@ -90,6 +91,12 @@ import { episodeNarrationCoverage, startFillGapsTask } from '../services/storybo
 import { parseFillModelSelection, stageSelectionErrorPayload } from '../services/ai-stages.js'
 
 const app = new Hono()
+
+app.get('/:id/asset-base-candidates', async c => {
+  const id = Number(c.req.param('id'))
+  if (!Number.isSafeInteger(id) || id <= 0) return badRequest(c, 'episode id 非法')
+  return success(c, { candidates: await listBaseCandidates(id) })
+})
 
 async function attachImageVersions<T extends { id: number; imageUrl: string | null }>(
   rows: T[],

@@ -549,6 +549,11 @@
               </div>
               <MapStudioEntry :asset="editTarget" />
             </section>
+            <section v-if="isDocumentaryProject && assetTypeOf(editTarget) !== 'map'" class="mat-detail-map-panel">
+              <button class="btn btn-sm" type="button" :disabled="assetStudioOpening" @click="openAssetStudio(editTarget.kindKey, editTarget.id)">
+                {{ t('assetStudio.open') }}
+              </button>
+            </section>
 
             <!-- 参考图（Issue #107）：素材库弹窗与剧集工作台同款管理器，角色/场景/道具共用；
                  地图资产由地图工作流出图，不接受参考图 -->
@@ -777,6 +782,7 @@ import AssetBrowserDialog from '~/components/AssetBrowserDialog.vue'
 import MediaLibraryDialog from '~/components/MediaLibraryDialog.vue'
 import FinalPromptSourceBadge from '~/components/FinalPromptSourceBadge.vue'
 import MapStudioEntry from '~/components/MapStudioEntry.vue'
+import { assetStudioAPI } from '~/asset-studio/api'
 import MapAssetPreview from '~/components/MapAssetPreview.vue'
 import { dropLegacyMapDeeplinks } from '~/composables/useQuerySync'
 import { useNowTicker, ringPropsFromTask, isActiveTaskStatus } from '~/composables/useTaskProgress'
@@ -784,6 +790,17 @@ import { useNowTicker, ringPropsFromTask, isActiveTaskStatus } from '~/composabl
 const { t, locale } = useI18n()
 
 const route = useRoute()
+const assetStudioRouter = useRouter()
+const assetStudioOpening = ref(false)
+async function openAssetStudio(kind, id) {
+  if (assetStudioOpening.value) return
+  assetStudioOpening.value = true
+  try {
+    const result = await assetStudioAPI.open(`${kind}:${id}`)
+    await assetStudioRouter.push(`/asset-studio/${result.task_id}`)
+  } catch (err) { toast.error(err instanceof Error ? err.message : t('assetStudio.openFailed')) }
+  finally { assetStudioOpening.value = false }
+}
 const drama = ref(null)
 const dramaId = Number(route.params.id)
 const addDialog = ref(false)

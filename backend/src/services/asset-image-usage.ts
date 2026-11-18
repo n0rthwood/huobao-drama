@@ -16,7 +16,7 @@ import { loadSkillDoc } from '../agents/skills.js'
 import { getContentLanguage } from './app-settings.js'
 import { resolveVisionTextConfig } from './vision-capability.js'
 import { callTextChat, imageContentPart } from './vision-chat.js'
-import { parseJsonReply } from './asset-pipeline/prompts.js'
+import { parseJsonReply } from '../modules/asset-studio/index.js'
 import { ASSET_LABELS, loadReferences, persistReferences, type AssetKind } from './reference-images.js'
 
 const ASSET_TABLES = {

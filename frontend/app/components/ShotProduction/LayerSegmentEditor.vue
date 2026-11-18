@@ -173,7 +173,7 @@ import LayerRail from '~/components/LayerCanvas/LayerRail.vue'
 import PreciseKeyframeBar from '~/components/LayerCanvas/PreciseKeyframeBar.vue'
 import { baseAspectIssue, baseFrameOf, qualityWarningsOf, clampTimelineToFrame, normalizeCrop } from '~/utils/layerQuality'
 import { useLayerDoc } from '~/composables/useLayerDoc'
-import { assetAspectAPI, assetPipelineAPI, layerSegmentAPI, propAPI } from '~/composables/useApi'
+import { assetAspectAPI, assetBaseCandidateAPI, layerSegmentAPI, propAPI } from '~/composables/useApi'
 import { openTaskCenter } from '~/composables/useTasks'
 import { frameStateAt, junctionHiddenLayerIds, stagedLayerIds } from '~/utils/segmentTimeline'
 import { baseFilterLayers, layerDocToSvg } from '~/utils/layerSvg'
@@ -288,7 +288,7 @@ watch(() => props.episodeId, async (episodeId) => {
   baseCandidates.value = []
   if (!episodeId) return
   try {
-    const result = await assetPipelineAPI.baseCandidates(episodeId)
+    const result = await assetBaseCandidateAPI.list(episodeId)
     if (props.episodeId === episodeId) baseCandidates.value = result.candidates || []
   } catch { baseCandidates.value = [] }
 }, { immediate: true })

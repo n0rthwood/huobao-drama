@@ -1026,21 +1026,10 @@
               <MapStudioEntry :asset="assetDetail.item" />
             </section>
 
-            <!-- 资产「精确→美化」流水线（Issue #56）：三类资产通用，闸门结论由后端计算 -->
-            <section v-if="!isMapAsset(assetDetail.item)" class="asset-detail-ref-panel">
-              <div class="asset-detail-section-title">
-                <span>{{ t('episode.documentary.pipeline.sectionTitle') }}</span>
-                <span class="dim">{{ t('episode.documentary.pipeline.sectionHint') }}</span>
-              </div>
-              <AssetPipelinePanel
-                :key="`pipeline-${assetDetail.type}-${assetDetail.item.id}`"
-                :asset-kind="assetDetail.type"
-                :asset-id="assetDetail.item.id"
-                :episode-id="epId"
-                :asset-name="assetDetail.item.name"
-                :map-configured="assetDetail.type === 'prop' && isMapAsset(assetDetail.item)"
-                @preview="openImageViewer"
-              />
+            <section v-if="isDocumentaryProject && !isMapAsset(assetDetail.item)" class="asset-detail-ref-panel">
+              <button class="btn btn-sm" type="button" :disabled="assetStudioOpening" @click="openAssetStudio(assetDetail.type, assetDetail.item.id)">
+                {{ t('assetStudio.open') }}
+              </button>
             </section>
 
             <section class="asset-detail-ref-panel">
@@ -1599,7 +1588,7 @@ import LocaleSwitcher from '~/components/LocaleSwitcher.vue'
 import ReferenceImageManager from '~/components/ReferenceImageManager.vue'
 import ArchivalImagePanel from '~/components/ArchivalImagePanel.vue'
 import PropSemanticsPanel from '~/components/PropSemanticsPanel.vue'
-import AssetPipelinePanel from '~/components/AssetPipelinePanel.vue'
+import { assetStudioAPI } from '~/asset-studio/api'
 import MapStudioEntry from '~/components/MapStudioEntry.vue'
 import { pipBadgeText } from '~/map-studio/utils/mapPip'
 import { dropLegacyMapDeeplinks } from '~/composables/useQuerySync'
@@ -1645,6 +1634,17 @@ definePageMeta({ layout: 'studio' })
 const { t, te } = useI18n()
 
 const route = useRoute()
+const assetStudioRouter = useRouter()
+const assetStudioOpening = ref(false)
+async function openAssetStudio(kind, id) {
+  if (assetStudioOpening.value) return
+  assetStudioOpening.value = true
+  try {
+    const result = await assetStudioAPI.open(`${kind}:${id}`)
+    await assetStudioRouter.push(`/asset-studio/${result.task_id}`)
+  } catch (err) { toast.error(err instanceof Error ? err.message : t('assetStudio.openFailed')) }
+  finally { assetStudioOpening.value = false }
+}
 const dramaId = Number(route.params.id)
 const episodeNumber = Number(route.params.episodeNumber)
 

@@ -1071,150 +1071,10 @@ export const assetAspectAPI = {
 }
 
 
-// 资产「精确→美化」流水线（Issue #56）。闸门结论由后端按清单计算，前端只渲染，不复算也不采信模型自判。
+/** 宿主资产图层底图候选，不归工作室模块所有。 */
 
-export type AssetPipelineKind = 'character' | 'scene' | 'prop'
-// original（Issue #121）：历史原件，入库即自动采用为受保护资产图
-export type AssetSourceRole = 'original' | 'generation_reference' | 'shape_only' | 'rejected'
-export interface AssetSourceRow {
-  id: number
-  asset_kind: string
-  asset_id: number
-  url: string | null
-  title: string | null
-  artist: string | null
-  license: string
-  sha256: string
-  local_path: string
-  role: AssetSourceRole
-  why_excluded: string | null
-  era: string | null
-  fetched_at: string | null
-  created_at: string
-}
-export interface AssetPipelineOpenedImage { path: string; sha256: string }
-export interface SpecSourceSnapshot {
-  source_id: number | null
-  kind: 'wikipedia' | 'commons' | 'web' | 'local'
-  url: string | null
-  license: string
-  artist: string | null
-  sha256: string
-  local_path: string
-  role: string
-  why_excluded?: string
-  era?: string
-}
-export interface AssetSpecRow {
-  id: number
-  asset_kind: string
-  asset_id: number
-  version: number
-  summary: string
-  must_have: Array<{ id: string; element: string; why: string; check: string; metric: 'count' | 'arrangement' | 'color' | 'shape' | 'other' }>
-  forbidden: Array<{ id: string; error: string; why: string }>
-  tolerances: string[]
-  uncertainties: string[]
-  palette: string | null
-  composition: string | null
-  locate_targets: Array<{ id: string; name: string }>
-  locate_anchors: Array<{ id: string; name: string }>
-  sources: SpecSourceSnapshot[]
-  created_by_stage: string
-  created_at: string
-}
-export interface LocateCheck { id: string; name: string; status: 'ok' | 'off' | 'not_comparable'; distance: number | null; detail: string }
-export interface GateResult {
-  pass: boolean
-  coverage: number
-  invalid: string[]
-  violations: Array<{ id: string; element: string; verdict: string; evidence: string }>
-  forbidden_hits: Array<{ id: string; error: string; evidence: string }>
-  /** overlay=生成器额外叠加的标签/图例/字幕/水印（违规）；器物自身铭文 overlay=false；旧记录为 null */
-  text_in_image: { present: boolean | null; overlay: boolean | null; evidence: string }
-  locate_checks: LocateCheck[]
-  semantics_preserved: { status: 'pass' | 'fail' | 'not_applicable' | 'unknown'; detail: string }
-  model_overall?: string | null
-}
-export interface QcRecordRow {
-  id: number
-  round_id: number
-  model_config_id: number | null
-  checklist_coverage: number
-  verdicts: {
-    must_have: Array<{ id: string; verdict: 'ok' | 'minor' | 'violation'; evidence: string }>
-    forbidden: Array<{ id: string; detected: boolean; evidence: string }>
-    text_in_image: { present: boolean | null; overlay: boolean | null; evidence: string }
-  }
-  locate_checks: LocateCheck[]
-  gate_pass: 0 | 1
-  gate_invalid: string[]
-  fidelity_score: number | null
-  beauty_score: number | null
-  suggestions: string[]
-  human_verdict: string | null
-  human_notes: string | null
-  human_opened: AssetPipelineOpenedImage[] | null
-  created_at: string
-}
-export interface AssetPipelineRound {
-  id: number
-  pipeline_task_id: number
-  asset_kind: string
-  asset_id: number
-  spec_id: number
-  round_no: number
-  purpose: 'precision' | 'beautify'
-  generator: string | null
-  config_id: number | null
-  prompt: string
-  negative_prompt: string | null
-  reference_ids: number[]
-  image_task_id: number | null
-  image_path: string | null
-  image_sha256: string | null
-  width: number | null
-  height: number | null
-  status: 'pending' | 'generating' | 'generated' | 'failed' | 'discarded'
-  error_msg: string | null
-  created_at: string
-  updated_at: string
-  qc: QcRecordRow | null
-  gate: GateResult | null
-  suggestion: { action: 'pass' | 'revise' | 'rollback' | 'abort'; target_round_no: number | null; reason: string } | null
-}
-export interface AssetPipelineState {
-  state: 'running' | 'waiting_approval' | 'completed' | 'failed' | 'cancelled' | 'unknown'
-  awaiting: { round_id: number; round_no: number } | null
-  asset_kind: string
-  asset_id: number
-}
-export interface AssetPipelineRunSummary {
-  id: number
-  status: 'queued' | 'processing' | 'completed' | 'failed' | 'cancelled'
-  purpose: 'precision' | 'beautify'
-  step: string | null
-  asset_kind: string
-  asset_id: number
-  pipeline: AssetPipelineState
-  created_at: string
-  updated_at: string
-}
-export interface AssetPipelineRunDetail {
-  run: AssetPipelineRunSummary & {
-    episode_id: number
-    mastra_run_id: string | null
-    error: string | null
-    result: { rollback_to: number | null; final_round_no: number | null } | null
-  }
-  spec: AssetSpecRow | null
-  rounds: AssetPipelineRound[]
-  /** 正在等人工审批的轮次（null = 不在等） */
-  awaiting: { round_id: number; round_no: number } | null
-  sources: AssetSourceRow[]
-}
 export interface AssetBaseCandidate {
-  asset_kind: AssetPipelineKind
+  asset_kind: 'character' | 'scene' | 'prop'
   asset_id: number
   asset_name: string
   version_task_id: number
@@ -1224,62 +1084,10 @@ export interface AssetBaseCandidate {
   verified: 'faithful' | 'gate_passed' | 'generated'
 }
 
-export const assetPipelineAPI = {
-  /** source_ids 仅精确轮用：启动时人工选 1–3 张已入库参考图，后端冻结在任务参数里 */
-  start: (data: { asset_kind: AssetPipelineKind; asset_id: number; episode_id: number; purpose?: 'precision' | 'beautify'; source_ids?: number[]; config_id?: number; model?: string; text_config_id?: number }) =>
-    api.post<{ run_id: number; mastra_run_id: string }>('/asset-pipeline/runs', data),
-  list: (assetKind: AssetPipelineKind, assetId: number) =>
-    api.get<{ runs: AssetPipelineRunSummary[] }>(`/asset-pipeline/runs?asset_kind=${encodeURIComponent(assetKind)}&asset_id=${assetId}`),
-  detail: (runId: number) => api.get<AssetPipelineRunDetail>(`/asset-pipeline/runs/${runId}`),
-  approve: (runId: number, data: { round_id: number; verdict: 'approve' | 'revise' | 'rollback' | 'abort'; selected_violations?: string[]; notes?: string; opened: AssetPipelineOpenedImage[]; override_gate?: boolean; next_purpose?: 'precision' | 'beautify' }) =>
-    api.post<{ status: string }>(`/asset-pipeline/runs/${runId}/approve`, data),
-  cancel: (runId: number) => api.post<{ cancelled: boolean }>(`/asset-pipeline/runs/${runId}/cancel`),
-  baseCandidates: (episodeId: number) => api.get<{ candidates: AssetBaseCandidate[] }>(`/asset-pipeline/episodes/${episodeId}/base-candidates`),
-  listSources: (assetKind: AssetPipelineKind, assetId: number) =>
-    api.get<{ sources: AssetSourceRow[] }>(`/asset-pipeline/assets/${assetKind}/${assetId}/sources`),
-  addSource: (data: { asset_kind: AssetPipelineKind; asset_id: number; url?: string; local_path?: string; source_url?: string; title?: string; artist?: string; license: string; role: AssetSourceRole; era?: string; why_excluded?: string }) =>
-    api.post<{ source: AssetSourceRow }>('/asset-pipeline/asset-sources', data),
-  /** multipart 上传：人工把本地原件直接入库，字段与 JSON 模式同名 */
-  uploadSource: (fd: FormData) => formDataReq<{ source: AssetSourceRow }>('/asset-pipeline/asset-sources', fd),
-  deleteSource: (sourceId: number) => api.del<{ deleted: boolean }>(`/asset-pipeline/asset-sources/${sourceId}`),
-  /** 检索权威资料（#79）：多来源检索 + 视觉筛选；入库仍走 addSource（local_path + source_url） */
-  startResearch: (assetKind: AssetPipelineKind, assetId: number, data: { episode_id: number; text_config_id?: number }) =>
-    api.post<{ task_id: number }>(`/asset-pipeline/assets/${assetKind}/${assetId}/research`, data),
-  research: (assetKind: AssetPipelineKind, assetId: number) =>
-    api.get<AssetResearchStatus>(`/asset-pipeline/assets/${assetKind}/${assetId}/research`),
+export const assetBaseCandidateAPI = {
+  list: (episodeId: number) => api.get<{ candidates: AssetBaseCandidate[] }>(`/episodes/${episodeId}/asset-base-candidates`),
 }
 
-export type AssetResearchRole = 'original' | 'generation_reference' | 'shape_only' | 'text_source' | 'reject'
-export interface AssetResearchCandidate {
-  adapter: string
-  title: string
-  url: string | null
-  image: string | null
-  license: string
-  institution: string
-  date: string
-  snippet: string
-  tier: 'A' | 'B'
-  local_path: string
-  sha256: string
-  role: AssetResearchRole
-  depicts: string
-  what_it_proves: string[]
-  cautions: string[]
-}
-export interface AssetResearchStatus {
-  status: 'none' | 'running' | 'done' | 'error'
-  task_id: number | null
-  step: string | null
-  error: string | null
-  finished_at: string | null
-  result: {
-    queries: Array<{ adapter: string; query: string; hits: number; error?: string }>
-    texts: Array<{ adapter: string; title: string; url: string | null; excerpt: string }>
-    candidates: AssetResearchCandidate[]
-    dropped: number
-  } | null
-}
 
 /** 资产审核清单（Issue #55）：纪录片「资产 · 审核清单」页签的全部接口 */
 export type AssetReviewNeedKind = 'character' | 'scene' | 'prop' | 'prop_faithful' | 'exposition' | 'none'

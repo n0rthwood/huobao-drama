@@ -166,7 +166,7 @@ export default {props:['assets','open'],emits:['confirm'],setup(props,{emit}) {
 const textSpec = JSON.parse(readFileSync(new URL('../../backend/src/config/layer-text-spec.json', import.meta.url), 'utf8'))
 setLayerTextSpec(textSpec)
 const testApi = dataModule(`export const api = { get: async () => (${JSON.stringify(textSpec)}) };
-export const assetPipelineAPI = {baseCandidates:async()=>({candidates:[
+export const assetBaseCandidateAPI = {list:async()=>({candidates:[
   {asset_kind:'prop',asset_id:7,asset_name:'Replacement',version_task_id:9,path:'static/replacement.png',width:2048,height:2048}
 ]})}; export const propAPI = {semantics:async()=>({semantics:{}})};`)
 const textSpecComposable = moduleUrl('composables/useLayerTextSpec.ts', {

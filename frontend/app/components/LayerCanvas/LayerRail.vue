@@ -121,7 +121,7 @@ import { Image, ImagePlus, Crop, Maximize2, ShieldCheck, Link2, Lock, Info, Anch
 import AssetPicker from '~/components/AssetPicker.vue'
 import LayerList from './LayerList.vue'
 import LayerStyle from './LayerStyle.vue'
-import { assetPipelineAPI, propAPI } from '~/composables/useApi'
+import { assetBaseCandidateAPI, propAPI } from '~/composables/useApi'
 import { semanticEntries, semanticLayerPatch, anchorState } from '~/utils/semanticGeometry'
 import { normalizeCrop } from '~/utils/layerQuality'
 import { textFamilyOf, textLayoutById, textLayoutsFor } from '~/utils/layerText'
@@ -243,7 +243,7 @@ watch(() => props.episodeId, async (episodeId) => {
   candidates.value = []
   if (externalSources.value || !episodeId) return
   try {
-    const result = await assetPipelineAPI.baseCandidates(episodeId)
+    const result = await assetBaseCandidateAPI.list(episodeId)
     if (request === candidateRequest) candidates.value = result.candidates || []
   } catch { if (request === candidateRequest) loadError.value = true }
 }, { immediate: true })

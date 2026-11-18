@@ -26,7 +26,6 @@ import { composeEpisodeLabel, composeTaskLabel, type TaskTargetKind } from './ta
 import { toUnixSeconds } from './media-time.js'
 import { IMPORTED_TASK_PROVIDER } from './asset-library.js'
 import type { BatchScope } from './batch-scope.js'
-import { pipelineExecution } from './asset-pipeline/execution.js'
 
 export type { TaskLabelInput, TaskTargetKind } from './task-label.js'
 export { composeEpisodeLabel, composeTaskLabel, renderRefPrompt } from './task-label.js'
@@ -34,22 +33,13 @@ export { composeEpisodeLabel, composeTaskLabel, renderRefPrompt } from './task-l
 
 // ─── 启动维护 ─────────────────────────────────────────────────
 
-/**
- * 重启打断的文本任务：执行线程已丢失，统一标记为失败（不自动重跑）。
- *
- * **例外：`asset_pipeline`（Issue #56）**。它的 run 容器可以合法地长时间停在
- * 「等待人工审批」上——执行线程本来就不在跑，快照在 `data/mastra-workflows.db` 里，
- * 重启后由 `resumeAssetPipelines()` 接管。漏掉这个排除项，每次重启都会把
- * 等待审批的 run 全判死（Issue #56 风险 2，验收 4 的必查项）。
- */
+/** Interrupted legacy text tasks have no execution thread after restart. */
 export async function failInterruptedTextTasks(): Promise<void> {
   const active = await db.select().from(schema.sysTask).where(and(
     eq(schema.sysTask.type, 'text'),
     eq(schema.sysTask.status, 'processing'),
   ))
-  const ids = active
-    .filter(row => parseTextTaskParams(row.params)?.kind !== 'asset_pipeline')
-    .map(row => row.id)
+  const ids = active.map(row => row.id)
   if (!ids.length) return
   await db.update(schema.sysTask)
     .set({ status: 'failed', errorMsg: '后端重启中断', updatedAt: now() })
@@ -226,16 +216,9 @@ export function buildTaskRow(row: SysTaskRow, lookups: NameLookups, cache?: Work
 
 export async function enrichTasks(rows: SysTaskRow[]): Promise<TaskRow[]> {
   if (!rows.length) return []
-  const [lookups, pipelines] = await Promise.all([
-    loadLookups(rows),
-    Promise.all(rows.map(row => pipelineExecution(row))),
-  ])
+  const lookups = await loadLookups(rows)
   const cache: WorkSampleCache = new Map()
-  return rows.map((row, index) => {
-    const task = buildTaskRow(row, lookups, cache)
-    if (pipelines[index]) task.pipeline = pipelines[index]
-    return task
-  })
+  return rows.map(row => buildTaskRow(row, lookups, cache))
 }
 
 export async function enrichTask(row: SysTaskRow | undefined | null): Promise<TaskRow | null> {
@@ -467,13 +450,6 @@ export async function listTaskCenter(filters: CenterFilters): Promise<{
   rows.sort((a, b) => Date.parse(String(b.created_at)) - Date.parse(String(a.created_at)) || Number(b.id) - Number(a.id))
   const start = (page - 1) * pageSize
   const items = rows.slice(start, start + pageSize)
-  await Promise.all(items.map(async item => {
-    if (item.row_type !== 'task') return
-    const task = taskById.get(item.id)
-    if (!task) return
-    const pipeline = await pipelineExecution(task)
-    if (pipeline) item.pipeline = pipeline
-  }))
   return { items, total: rows.length, page, page_size: pageSize }
 }
 

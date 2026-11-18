@@ -7,7 +7,7 @@ import { parse, compileScript } from 'vue/compiler-sfc'
 import { createI18n } from 'vue-i18n'
 
 const app = new URL('../app/', import.meta.url)
-const { descriptor } = parse(readFileSync(new URL('components/AssetPipelineFactSheet.vue', app), 'utf8'))
+const { descriptor } = parse(readFileSync(new URL('asset-studio/components/AssetFactSheet.vue', app), 'utf8'))
 let source = compileScript(descriptor, { id: 'fact-sheet-test', inlineTemplate: true }).content
 for (const name of ['vue', 'vue-i18n', 'lucide-vue-next']) {
   source = source.replaceAll(`from '${name}'`, `from '${import.meta.resolve(name)}'`).replaceAll(`from "${name}"`, `from "${import.meta.resolve(name)}"`)

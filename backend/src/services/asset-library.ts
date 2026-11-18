@@ -34,7 +34,7 @@ import {
   type ReferenceImageEntry,
 } from './reference-images.js'
 import { EMPTY_ASSET_NAME_MESSAGE, normalizeAssetName } from './asset-name.js'
-import { fidelityOf, loadPipelineFidelity } from './asset-pipeline/fidelity.js'
+import { fidelityOf, loadPipelineFidelity } from './asset-studio-base-candidates.js'
 import { parseSemantics } from './asset-semantics.js'
 
 export const ASSET_KINDS: AssetKind[] = ['character', 'scene', 'prop']

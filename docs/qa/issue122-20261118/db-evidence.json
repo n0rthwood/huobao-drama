@@ -1,0 +1,71 @@
+{
+  "task": {
+    "id": 1,
+    "host_ref": "prop:910",
+    "title": "测试青铜剑",
+    "created_at": "2026-11-18T09:07:41.294Z",
+    "updated_at": "2026-11-18T09:15:10.524Z",
+    "deleted_at": null
+  },
+  "run1": {
+    "id": 1,
+    "status": "completed",
+    "purpose": "precision",
+    "mastra_run_id": "56c6520a-2d5c-4f7d-b016-fee34c8c69b4"
+  },
+  "round1": {
+    "id": 1,
+    "round_no": 0,
+    "purpose": "precision",
+    "status": "generated",
+    "image_path": "static/images/0ee7fd08-aac9-4aa3-8b3c-d60d002f7561.png",
+    "image_sha256": "b065ee6987b80065b4c11f566c7b94e64cf363e2e492e7d74fee7bb45aef0733",
+    "image_task_id": 4949,
+    "reference_ids": "[1]"
+  },
+  "qc": {
+    "round_id": 1,
+    "gate_pass": 1,
+    "human_verdict": "approve",
+    "human_notes": "QA 验收通过"
+  },
+  "delivery": [
+    {
+      "id": 1,
+      "run_id": 1,
+      "round_id": 1,
+      "image_sha256": "b065ee6987b80065b4c11f566c7b94e64cf363e2e492e7d74fee7bb45aef0733",
+      "version_id": 4949,
+      "set_as_current": 1,
+      "created_at": "2026-11-18T09:15:45.540Z"
+    }
+  ],
+  "prop910": {
+    "id": 910,
+    "image_url": "static/images/0ee7fd08-aac9-4aa3-8b3c-d60d002f7561.png",
+    "description": "外部修改了描述"
+  },
+  "observed": [
+    {
+      "stage": "asset_studio",
+      "status": "completed"
+    },
+    {
+      "stage": "asset_studio",
+      "status": "completed"
+    },
+    {
+      "stage": "asset_studio",
+      "status": "completed"
+    },
+    {
+      "stage": "asset_studio",
+      "status": "completed"
+    }
+  ],
+  "run90_restart": {
+    "id": 90,
+    "status": "failed",
+    "error_msg": "重启恢复：工作流快照缺失"
+  }
+}
