@@ -419,7 +419,7 @@ async function processTask(id: number, config: AIConfig) {
         // 换厂商重试不会把旧厂商的 <imageN> 当资产编号二次映射。
         // 其余任务（关键帧/Poster/旧任务）沿用全量渲染旧口径。
         prompt: params.asset_citation === true
-          ? neutralizeAssetCitations(record.prompt || '', resolvedReferenceImages.length)
+          ? neutralizeAssetCitations(record.prompt || '', (params.refNameIndex || {}) as Record<string, number>)
           : renderReferencePrompt(record.prompt || '', resolvedReferenceImages.length, config.provider),
         size: params.size,
         frameType: params.frameType,
@@ -572,17 +572,21 @@ const inFlightQwenSubmits = new Set<number>()
  * 资产引用任务（#121）的提示词归一：请求编号 1..M 的五种写法统一换成中性 @参考图N，
  * 提交侧再按目标厂商渲染。从大到小替换，避免 图片1 吃掉 图片10 的尾巴。
  */
-export function neutralizeAssetCitations(prompt: string, refCount: number): string {
-  if (!prompt || refCount <= 0) return prompt
+export function neutralizeAssetCitations(prompt: string, nameToIndex: Record<string, number>): string {
+  if (!prompt) return prompt
+  // 资产编号 → 请求编号：只归一映射里存在的编号（@ 前缀可选、一次吃掉，避免 @@）。
+  // 从大到小：先处理 参考图10 再处理 参考图1，否则裸写法会吃掉两位数的尾巴。
+  const entries = Object.entries(nameToIndex)
+    .map(([name, requestNo]) => ({ assetNo: Number(name.replace('参考图', '')), requestNo }))
+    .filter(e => Number.isFinite(e.assetNo))
+    .sort((a, b) => b.assetNo - a.assetNo)
   let out = prompt
-  // 从大到小：先处理 参考图10 再处理 参考图1，否则裸写法分支会吃掉两位数的尾巴
-  for (let n = refCount; n >= 1; n--) {
-    const token = referenceToken(n)
-    // @ 前缀可选、一次吃掉：先替换裸写法会把 @参考图N 变成 @@参考图N
-    out = out.replace(new RegExp(`@?参考图${n}(?!\\d)`, 'gi'), token)
-    out = out.replace(new RegExp(`<image${n}>`, 'gi'), token)
-    out = out.replace(new RegExp(`<Picture ${n}>`, 'gi'), token)
-    out = out.replace(new RegExp(`图片${n}(?!\\d)`, 'gi'), token)
+  for (const { assetNo, requestNo } of entries) {
+    const token = referenceToken(requestNo)
+    out = out.replace(new RegExp(`@?参考图${assetNo}(?!\\d)`, 'gi'), token)
+    out = out.replace(new RegExp(`<image${assetNo}>`, 'gi'), token)
+    out = out.replace(new RegExp(`<Picture ${assetNo}>`, 'gi'), token)
+    out = out.replace(new RegExp(`图片${assetNo}(?!\\d)`, 'gi'), token)
   }
   return out
 }
@@ -614,7 +618,7 @@ async function submitQwenJobsImage(record: SysTaskRecord, config: AIConfig, para
     const isKeyframe = !!FRAME_TYPE_SLOT[String(params.frameType || '')]
     const body: QwenJobRequest = buildImageJobBody({
       prompt: params.asset_citation === true
-        ? neutralizeAssetCitations(record.prompt || '', refs.length)
+        ? neutralizeAssetCitations(record.prompt || '', (params.refNameIndex || {}) as Record<string, number>)
         : record.prompt || '',
       fileIds,
       isKeyframe,

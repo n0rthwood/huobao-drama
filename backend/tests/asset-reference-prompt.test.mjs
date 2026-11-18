@@ -274,16 +274,17 @@ test('submit neutralization maps request numbers to neutral tokens without eatin
   const result = runTs(`
     import { neutralizeAssetCitations } from './src/services/generation.ts'
     process.stdout.write('@@' + JSON.stringify({
-      // 发送子集只有 1 张：@参考图2（请求编号 2 不存在）原样保留？不——请求编号口径下
-      // 子集 M=1 时提示词只应出现 1；这里验证 M=2 的常规归一
-      two: neutralizeAssetCitations('以@参考图2的五官为准，参考图1的配色', 2),
-      vendor: neutralizeAssetCitations('<image2>形制与图片1材质', 2),
-      // 两位数边界：M=1 时 参考图10 不能被 参考图1 的替换吃掉尾巴
-      ten: neutralizeAssetCitations('参考图10 与 图片1', 1),
-      tenFull: neutralizeAssetCitations('参考图10 与 图片1', 10),
-      none: neutralizeAssetCitations('纯白背景', 0),
+      // 稀疏映射：资产编号 2 → 请求编号 1（只发 1 张）
+      sparse: neutralizeAssetCitations('以@参考图2的五官为准，纯白背景', { 参考图2: 1 }),
+      two: neutralizeAssetCitations('以@参考图2的五官为准，参考图1的配色', { 参考图1: 1, 参考图2: 2 }),
+      vendor: neutralizeAssetCitations('<image2>形制与图片1材质', { 参考图1: 1, 参考图2: 2 }),
+      // 两位数边界：映射只有 参考图1 时，参考图10 不被吃掉尾巴也不被归一
+      ten: neutralizeAssetCitations('参考图10 与 图片1', { 参考图1: 1 }),
+      tenFull: neutralizeAssetCitations('参考图10 与 图片1', { 参考图1: 1, 参考图10: 10 }),
+      none: neutralizeAssetCitations('纯白背景', {}),
     }))
   `)
+  assert.equal(result.sparse, '以@参考图1的五官为准，纯白背景')
   assert.equal(result.two, '以@参考图2的五官为准，@参考图1的配色')
   assert.equal(result.vendor, '@参考图2形制与@参考图1材质')
   assert.equal(result.ten, '参考图10 与 @参考图1')
