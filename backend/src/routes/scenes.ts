@@ -6,7 +6,7 @@ import { generateImage } from '../services/generation.js'
 import { getDramaStylePrompt } from '../services/style-preset.js'
 import { ensureSceneFinalPrompt, savedPromptOf } from '../services/final-prompt.js'
 import { logTaskError, logTaskStart, logTaskSuccess, logTaskWarn } from '../utils/task-logger.js'
-import { deleteAllReferenceImages, partitionMissingReferences, resolveReferenceImages } from '../services/reference-images.js'
+import { deleteAllReferenceImages } from '../services/reference-images.js'
 import { deleteAssetLinks } from '../services/asset-links.js'
 import { mountReferenceImageRoutes } from './reference-images.js'
 import { planSceneTimePatch } from '../services/scene-time.js'
@@ -18,7 +18,9 @@ import { bindCreatedAssetToReviewItem, findReviewItemAssetDuplicate, onAssetRemo
 import { mountAspectVersionRoute } from './asset-aspect-version.js'
 import { assetImageSizeFor, resolveDramaAspect } from '../services/asset-image-size.js'
 import { aspectPhrase } from '../services/aspect.js'
-import { referenceNameIndex } from '../services/asset-reference-prompt.js'
+import { planAssetReferences, AssetReferenceError, descriptionCitationsOf } from '../services/asset-submit-refs.js'
+import { referenceCitationIssue } from '../services/asset-reference-prompt.js'
+import { effectiveReferenceImages } from '../services/reference-images.js'
 
 const app = new Hono()
 
@@ -137,9 +139,16 @@ app.post('/:id/generate-image', async (c) => {
     aspectPhrase(aspect),
     '画面中没有任何人物，空场景，只有场景本身',
   ].filter(Boolean).join(', ')
-  // 默认用场景自己保存的参考图；请求显式传 reference_images（含空数组）时以请求为准
-  const resolved = resolveReferenceImages(scene.referenceImages, body.reference_images)
-  const { present: referenceImages, missing } = partitionMissingReferences(resolved)
+  if (Number(scene.faithful) === 1) return badRequest(c, '该场景图为受保护原件，不进生图；如需重绘请先在资产详情关闭保护')
+  // #121：发送集合只按 final_prompt 实际引用的参考图（零引用零发送）
+  let plan
+  try {
+    plan = await planAssetReferences('scene', id, prompt, body.reference_images)
+  } catch (err) {
+    if (err instanceof AssetReferenceError) return badRequest(c, err.message)
+    throw err
+  }
+  const { referenceImages, missing } = plan
   if (missing.length) logTaskWarn('SceneImage', 'reference-missing', { sceneId: id, missing })
   try {
     logTaskStart('SceneImage', 'generate', { sceneId: id, episodeId: ep.id, dramaId: scene.dramaId, location: scene.location, references: referenceImages.length })
@@ -151,8 +160,9 @@ app.post('/:id/generate-image', async (c) => {
       episodeId: ep.id,
       dramaId: scene.dramaId,
       prompt,
-      // 换厂商重试按新 provider 重新渲染 @参考图N；无参考图时不落这两项
-      ...(referenceImages.length ? { sourcePrompt: prompt, refNameIndex: referenceNameIndex(referenceImages.length) } : {}),
+      // #121：refNameIndex = 资产编号→请求编号映射；重试沿用落盘发送子集
+      assetCitation: true,
+      ...(referenceImages.length ? { sourcePrompt: prompt, refNameIndex: plan.refNameIndex } : {}),
       model: body.model,
       size,
       aspectLocked: true,
