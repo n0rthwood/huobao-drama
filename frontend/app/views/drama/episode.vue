@@ -564,7 +564,10 @@
                   </div>
                   <!-- 画中画（Issue #107）：全览显示细节个数，细节图显示编号与所属全览；没有 map_pip 的地图不显示 -->
                   <div v-if="pipBadgeLines.get(p.id)" class="asset-meta asset-pip-line">{{ pipBadgeLines.get(p.id) }}</div>
-                  <div class="asset-meta asset-desc dim" :title="p.description || ''">{{ p.description || t('episode.asset.noDescription') }}</div>
+                  <div class="asset-meta asset-desc dim">
+                    <ReferenceCitationText v-if="p.description" :text="p.description" :references="p.reference_images ?? p.referenceImages" @preview="openImageViewer" />
+                    <template v-else>{{ t('episode.asset.noDescription') }}</template>
+                  </div>
                   <div v-if="!isMapAsset(p)" class="asset-meta asset-final" :class="{ dim: !(p.final_prompt || p.finalPrompt) }" :title="p.final_prompt || p.finalPrompt || ''">
                     <span class="afp-label">{{ t('episode.asset.finalPromptWhiteBg') }}</span>
                     {{ p.final_prompt || p.finalPrompt || t('episode.asset.finalPromptAutoWhiteBg') }}
@@ -1588,6 +1591,7 @@ import {
 } from 'lucide-vue-next'
 import { api, dramaAPI, episodeAPI, storyboardAPI, characterAPI, sceneAPI, propAPI, taskAPI, mergeAPI, posterAPI, aiConfigAPI, uploadAPI, mediaLibraryAPI, videoQueueAPI, assetBatchAPI, parseReferenceImages } from '~/composables/useApi'
 import MentionTextarea from '~/components/MentionTextarea.vue'
+import ReferenceCitationText from '~/components/ReferenceCitationText.vue'
 import { startTour, autoTour } from '~/composables/useTour'
 import { useAgent } from '~/composables/useAgent'
 import { toastError, mapError, toastServerMessage, toastMissingReferenceImages, MODERATION_RE } from '~/composables/useToast'
