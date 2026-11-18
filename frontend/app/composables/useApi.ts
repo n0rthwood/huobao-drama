@@ -831,6 +831,10 @@ export interface ReferenceImage {
   uploaded_at: number | null
   /** 从素材库选入时记录的源图相对路径，用于同一资产的重复选入去重 */
   copied_from?: string
+  /** Issue #121：reference = 仅参考（缺省）；direct = 可直接采用为资产图（仍可被引用） */
+  usage?: 'reference' | 'direct'
+  /** Issue #121：视觉分类结果（人工改判 manual=true） */
+  classification?: { verdict: 'direct' | 'reference' | 'unknown'; reason: string; at: number; manual?: boolean }
 }
 
 export type ReferenceImagesResp = { reference_images: ReferenceImage[] }
@@ -863,6 +867,17 @@ export function parseReferenceImages(raw: unknown): ReferenceImage[] {
       const copiedFrom = String(entry.copied_from ?? '').trim()
       const parsed: ReferenceImage = { path, uploaded_at: Number.isFinite(uploadedAt) && uploadedAt > 0 ? uploadedAt : null }
       if (copiedFrom) parsed.copied_from = copiedFrom
+      if (entry.usage === 'direct') parsed.usage = 'direct'
+      const cls = entry.classification as Record<string, unknown> | undefined
+      if (cls && (cls.verdict === 'direct' || cls.verdict === 'reference' || cls.verdict === 'unknown')) {
+        const at = Number(cls.at)
+        parsed.classification = {
+          verdict: cls.verdict,
+          reason: String(cls.reason ?? ''),
+          at: Number.isFinite(at) && at > 0 ? at : 0,
+          ...(cls.manual === true ? { manual: true } : {}),
+        }
+      }
       return parsed
     })
     .filter((entry): entry is ReferenceImage => !!entry)
@@ -959,6 +974,9 @@ export const characterAPI = {
   addReference: (id: number, file: File) => uploadReq<ReferenceImagesResp>(`/characters/${id}/reference-images`, file),
   delReference: (id: number, url: string) => api.del<ReferenceImagesResp>(`/characters/${id}/reference-images?url=${encodeURIComponent(url)}`),
   addRefsFromLibrary: (id: number, urls: string[]) => api.post<LibraryRefsResp>(`/characters/${id}/reference-images/from-library`, { urls }),
+  // Issue #121：参考图用途改判与显式采用
+  setRefUsage: (id: number, url: string, usage: 'reference' | 'direct') => api.put<ReferenceImagesResp>(`/characters/${id}/reference-images/usage`, { url, usage }),
+  adoptRef: (id: number, url: string) => api.post<{ adopted: boolean; version_task_id: number }>(`/characters/${id}/reference-images/adopt`, { url }),
   // 史料参考（Issue #32）：只做档案留存，严格不进生图链路
   addArchivalImage: (id: number, fileTitle: string) => api.post<ArchivalImage[]>(`/characters/${id}/archival-images`, { file_title: fileTitle }),
   removeArchivalImage: (id: number, path: string) => api.del<ArchivalImage[]>(`/characters/${id}/archival-images?path=${encodeURIComponent(path)}`),
@@ -976,6 +994,9 @@ export const sceneAPI = {
   addReference: (id: number, file: File) => uploadReq<ReferenceImagesResp>(`/scenes/${id}/reference-images`, file),
   delReference: (id: number, url: string) => api.del<ReferenceImagesResp>(`/scenes/${id}/reference-images?url=${encodeURIComponent(url)}`),
   addRefsFromLibrary: (id: number, urls: string[]) => api.post<LibraryRefsResp>(`/scenes/${id}/reference-images/from-library`, { urls }),
+  // Issue #121：参考图用途改判与显式采用
+  setRefUsage: (id: number, url: string, usage: 'reference' | 'direct') => api.put<ReferenceImagesResp>(`/scenes/${id}/reference-images/usage`, { url, usage }),
+  adoptRef: (id: number, url: string) => api.post<{ adopted: boolean; version_task_id: number }>(`/scenes/${id}/reference-images/adopt`, { url }),
   reExtract: (id: number, episodeId: number, textModel?: string, textConfigId?: number) => api.post<ReExtractResp>(`/scenes/${id}/re-extract`, { episode_id: episodeId, text_model: textModel || undefined, text_config_id: textConfigId || undefined }),
 }
 
@@ -1027,6 +1048,9 @@ export const propAPI = {
   addReference: (id: number, file: File) => uploadReq<ReferenceImagesResp>(`/props/${id}/reference-images`, file),
   delReference: (id: number, url: string) => api.del<ReferenceImagesResp>(`/props/${id}/reference-images?url=${encodeURIComponent(url)}`),
   addRefsFromLibrary: (id: number, urls: string[]) => api.post<LibraryRefsResp>(`/props/${id}/reference-images/from-library`, { urls }),
+  // Issue #121：参考图用途改判与显式采用
+  setRefUsage: (id: number, url: string, usage: 'reference' | 'direct') => api.put<ReferenceImagesResp>(`/props/${id}/reference-images/usage`, { url, usage }),
+  adoptRef: (id: number, url: string) => api.post<{ adopted: boolean; version_task_id: number }>(`/props/${id}/reference-images/adopt`, { url }),
   reExtract: (id: number, episodeId: number, textModel?: string, textConfigId?: number) => api.post<ReExtractResp>(`/props/${id}/re-extract`, { episode_id: episodeId, text_model: textModel || undefined, text_config_id: textConfigId || undefined }),
   // 证据素材与语义标注（Issue #47）：faithful=1 的道具永不进生图；语义坐标永远相对 faithful_source 那张原图
   setFaithful: (id: number, faithful: boolean) => api.put<PropRow>(`/props/${id}`, faithful ? { faithful: true } : { faithful: false, confirm_unfaithful: true }),
