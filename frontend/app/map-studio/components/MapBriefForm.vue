@@ -36,9 +36,13 @@
         </span>
       </label>
     </div>
-    <MapStylePicker :model-value="brief.map_style" :disabled="disabled" @update:model-value="emit('patch', { map_style: $event })" />
-    <span v-if="inferredOf('map_style')" class="brief-basis dim">{{ t('mapStudio.brief.inferredBasis', { basis: inferredOf('map_style')?.basis }) }}</span>
-    <span v-for="issue in issuesOf('map_style')" :key="issue.code" class="brief-issue">{{ issue.message }}</span>
+    <!-- Issue #126 主题简化：任务级主题选择入口移除；有效样式固定 atlas-tint，历史值只读展示。 -->
+    <section class="brief-styles">
+      <strong class="brief-label">{{ t('mapStudio.styles.defaultTitle') }}</strong>
+      <p class="brief-basis">{{ t('mapStudio.styles.effectiveHint', { id: 'atlas-tint' }) }}</p>
+      <p v-if="brief.map_style || brief.style !== 'archival'" class="brief-basis dim">{{ t('mapStudio.styles.legacyTheme', { value: brief.map_style ?? brief.style }) }}</p>
+      <span v-for="issue in issuesOf('map_style')" :key="issue.code" class="brief-issue">{{ issue.message }}</span>
+    </section>
 
     <section class="brief-modes">
       <span class="brief-label">{{ t('mapStudio.brief.baseMode') }}</span>
@@ -97,7 +101,6 @@
  */
 import { useI18n } from 'vue-i18n'
 import MapCalibration from '~/map-studio/components/MapCalibration.vue'
-import MapStylePicker from '~/map-studio/components/MapStylePicker.vue'
 import type { MapBaseMode, MapBrief, MapStudioIssue } from '~/map-studio/api'
 
 const { t } = useI18n()

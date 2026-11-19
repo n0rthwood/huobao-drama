@@ -47,6 +47,10 @@ async function request<T>(method: 'GET' | 'POST' | 'PUT', path: string, body?: u
 
 export type MapStudioStage = 'brief' | 'research' | 'base' | 'style' | 'drawing' | 'complete'
 export type MapStudioStatus = 'idle' | 'running' | 'awaiting_review' | 'blocked' | 'failed' | 'completed'
+/** manual = 一次一个阶段；auto = 连续到交付；guided = 有界运行（到 stop_at 即停） */
+export type MapStudioMode = 'auto' | 'manual' | 'guided'
+/** 有界运行终点：base 成功即停 / drawing 成功即停（不执行 complete） */
+export type MapRunStopAt = 'base' | 'drawing'
 export type MapBaseMode = 'program' | 'earth' | 'image'
 export type MapStyleTheme = 'archival' | 'clean' | 'ink'
 /** 项目画幅（与火宝 dramas.aspect_ratio 白名单一致）；画中画版式与细节框按它计算 */
@@ -114,6 +118,15 @@ export interface MapFeatureMetadata {
   verification?: MapVerification
   dataset_ref?: MapDatasetReference
   relations?: MapRelation[]
+  /**
+   * #125 语义补充字段：描述/关键词是**人工所有权**（manual），名称所有权另有 name_manual，
+   * source 与两者独立。只读取同源快照里记录的字段；缺失即「未记录」，不拿 keywords/brief 补。
+   */
+  description?: string
+  keywords?: string[]
+  manual?: boolean
+  name_manual?: boolean
+  source?: 'cv' | 'vlm' | 'manual'
 }
 
 export interface MapPlace extends MapFeatureMetadata { id: string; name: string; lon: number; lat: number; proposed?: boolean }
@@ -354,7 +367,9 @@ export interface MapStudioLatestRun {
   id: number
   stage: MapStudioStage
   status: MapStudioRunStatus
-  mode: 'auto' | 'manual'
+  mode: MapStudioMode
+  /** guided 运行的真实终点；manual/auto 或未记录为 null（不按阶段推断） */
+  stop_at: MapRunStopAt | null
   created_at: string
   finished_at: string | null
   error_msg: string | null
@@ -386,7 +401,9 @@ export interface MapStudioDetail {
   host: MapStudioHostRef | null
   stage: MapStudioStage
   status: MapStudioStatus
-  mode: 'auto' | 'manual'
+  mode: MapStudioMode
+  /** 本次（最近）运行的真实执行边界；仅 guided 有值，未记录为 null */
+  stop_at?: MapRunStopAt | null
   revision: number
   busy: boolean
   /** 最新一次运行容器 id（旧 state.task_id） */
@@ -411,7 +428,9 @@ export interface MapStudioDetail {
 }
 
 export interface MapStudioRunOptions {
-  mode: 'auto' | 'manual'
+  mode: MapStudioMode
+  /** 仅 guided 必填；manual/auto 携带会被服务端拒绝 */
+  stop_at?: MapRunStopAt
   text_config_id?: number
   image_config_id?: number
   image_model?: string
