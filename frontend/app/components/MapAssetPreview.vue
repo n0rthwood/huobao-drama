@@ -32,8 +32,8 @@
           <p v-else class="hint">{{ t('mapPreview.targetMissing') }}</p>
           <strong>{{ frame.label }}</strong>
           <span v-if="parsePipMeta(findAsset(frame.detail_prop_id)?.map_pip)?.stale" class="hint">{{ t('mapPreview.stale') }}</span>
-          <small v-if="episodeNumbers">{{ visibleNumbers(frame).map(n => `#${n}`).join('、') }}</small>
-          <small v-else>{{ t('mapPreview.shotCount', { n: (frame.storyboard_numbers || []).length }) }}</small>
+          <!-- Issue #125：引用分镜读时反查（不显示生成时的镜号快照） -->
+          <small v-if="detailCounts(frame).total">{{ t('mapPreview.referencesCounts', detailCounts(frame)) }}</small>
         </div>
       </section>
     </template>
@@ -53,24 +53,69 @@
       </template>
       <p v-else class="hint">{{ t('mapPreview.targetMissing') }}</p>
     </section>
+
+    <!-- Issue #125：资产被哪些分镜引用（动态反查）+ 一键跳到段编辑器或设计卡 -->
+    <section v-if="isMap">
+      <strong>{{ t('mapPreview.referencesTitle') }}</strong>
+      <p class="hint">{{ t('mapPreview.referencesHint') }}</p>
+      <template v-if="refs">
+        <p v-if="!refs.total" class="hint">{{ t('mapPreview.referencesEmpty') }}</p>
+        <template v-else>
+          <p class="ref-counts">{{ t('mapPreview.referencesCounts', { materialized: refs.materialized, planned: refs.planned }) }}</p>
+          <p class="hint">{{ t('mapPreview.referenceUpdateHint') }}</p>
+          <ul class="ref-list">
+            <li v-for="ref in shownRefs" :key="ref.storyboard_id">
+              <NuxtLink class="res-link" :to="routeOf(ref)">{{ t('mapPreview.referenceShot', { ep: ref.episode_number, shot: ref.storyboard_number }) }}</NuxtLink>
+              <span class="ref-via">{{ ref.materialized ? t('mapPreview.referenceMaterialized') : t('mapPreview.referencePlanned') }}</span>
+            </li>
+          </ul>
+          <p v-if="refs.total > shownRefs.length" class="hint">{{ t('mapPreview.referenceMore', { n: refs.total - shownRefs.length }) }}</p>
+        </template>
+      </template>
+      <p v-else-if="refsError" class="hint">{{ t('mapPreview.referencesUnavailable') }}</p>
+    </section>
+
+    <!-- 地图资产的语义条目只读展示（#125）：描述是佐证，名称只是昵称 -->
+    <section v-if="isMap">
+      <strong>{{ t('mapPreview.semanticsTitle') }}</strong>
+      <p class="hint">{{ t('mapPreview.semanticsHint') }}</p>
+      <p v-if="!semanticsEntries.length" class="hint">{{ t('mapPreview.semanticsEmpty') }}</p>
+      <ul v-else class="ref-list sem-list">
+        <li v-for="entry in semanticsEntries" :key="entry.id">
+          <span class="sem-name">{{ entry.name }}</span>
+          <span class="ref-via">{{ t(`episode.documentary.semantics.group.${entry.group}`) }}</span>
+          <p v-if="entry.description" class="sem-desc">{{ entry.description }}</p>
+          <p v-if="entry.keywords?.length" class="sem-keys">{{ entry.keywords.map(word => `#${word}`).join(' ') }}</p>
+        </li>
+      </ul>
+    </section>
   </div>
 </template>
 
 <script setup>
+/**
+ * 地图资产弹窗的只读预览（Issue #107 / #110 / #125）。
+ *
+ * 画中画：全览列出各细节资产与定位框；细节显示所属全览。
+ * 引用（#125）：镜号不再是资产身份或引用依据——**读时反查**「当前被哪些分镜引用」，
+ * 显示「已落段 n / 仅规划 m」并给出直达段编辑器/设计卡的 deeplink；旧 `map_pip`
+ * 里的 `storyboard_numbers` 快照一律不读（存量数据不迁移、不改写）。
+ */
 import { computed, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { parsePipMeta, frameRectOn } from '~/map-studio/utils/mapPip'
 import { mediaUrl } from '~/utils/url'
 import { thumbOf, thumbFallback } from '~/composables/useMedia'
-import { assetLibraryAPI } from '~/composables/useApi'
+import { assetLibraryAPI, propAPI } from '~/composables/useApi'
 import MediaTime from '~/components/MediaTime.vue'
 
-const props = defineProps({ item: { type: Object, required: true }, assets: { type: Array, default: () => [] }, episodeNumbers: { type: Array, default: null } })
+const props = defineProps({ item: { type: Object, required: true }, assets: { type: Array, default: () => [] } })
 const emit = defineEmits(['open-asset', 'preview'])
 const { t } = useI18n()
 const failed = reactive({})
 const imageSize = ref({ width: 0, height: 0 })
 const pip = computed(() => parsePipMeta(props.item.map_pip))
+const isMap = computed(() => (props.item.asset_type || props.item.assetType || 'prop') === 'map')
 const loadedVersions = ref([])
 const versionsError = ref(false)
 const versions = computed(() => (props.item.image_versions || props.item.imageVersions || loadedVersions.value).filter(v => v?.url))
@@ -79,7 +124,59 @@ const findAsset = id => props.assets.find(a => Number(a.id) === Number(id))
 const parent = computed(() => pip.value?.role === 'detail' ? findAsset(pip.value.parent_prop_id) : null)
 const imageUrl = path => path ? mediaUrl(path) : ''
 const assetImage = item => imageUrl(item?.image_url || item?.imageUrl || item?.local_path || item?.localPath)
-const visibleNumbers = frame => (frame.storyboard_numbers || []).filter(n => props.episodeNumbers.includes(n))
+
+// ─── 动态反查引用（#125）─────────────────────────────────
+const refs = ref(null)
+const refsError = ref(false)
+const detailRefs = ref({})
+const shownRefs = computed(() => (refs.value?.references || []).slice(0, 12))
+const detailCounts = frame => detailRefs.value[frame.no] || { total: 0, materialized: 0, planned: 0 }
+/** 已落段 → 段编辑器；仅规划 → 设计卡（两者都在分镜制作工作台里） */
+function routeOf(ref) {
+  const tab = ref.materialized ? 'production' : 'design'
+  const dramaId = refs.value?.drama_id ?? props.item.drama_id
+  return `/drama/${dramaId}/episode/${ref.episode_number}?panel=production&tab=${tab}&shot=${ref.storyboard_id}`
+}
+
+async function loadReferences(id) {
+  refs.value = null
+  detailRefs.value = {}
+  refsError.value = false
+  if (!isMap.value) return
+  try {
+    const result = await propAPI.mapReferences(Number(id))
+    if (props.item.id !== id) return
+    refs.value = result
+    // 全览：各细节资产各自的引用计数（详情列表在细节资产的弹窗里看）
+    if (pip.value?.role === 'overview') {
+      const entries = await Promise.all(frames.value
+        .filter(frame => Number(frame.detail_prop_id) > 0)
+        .map(async frame => [frame.no, await propAPI.mapReferences(Number(frame.detail_prop_id)).catch(() => null)]))
+      if (props.item.id !== id) return
+      const next = {}
+      for (const [no, value] of entries) if (value) next[no] = { total: value.total, materialized: value.materialized, planned: value.planned }
+      detailRefs.value = next
+    }
+  } catch {
+    if (props.item.id === id) refsError.value = true
+  }
+}
+
+// ─── 语义条目只读展示（#125）──────────────────────────────
+const GROUPS = ['labels', 'points', 'regions', 'lines']
+const semanticsEntries = computed(() => {
+  let doc = props.item.semantics
+  if (typeof doc === 'string') { try { doc = JSON.parse(doc) } catch { doc = null } }
+  if (!doc || typeof doc !== 'object') return []
+  return GROUPS.flatMap(group => (Array.isArray(doc[group]) ? doc[group] : []).map(entry => ({
+    id: entry.id || `${group}-${entry.name || entry.text}`,
+    name: group === 'labels' ? entry.text || '' : entry.name || '',
+    group,
+    ...(entry.description ? { description: entry.description } : {}),
+    ...(Array.isArray(entry.keywords) && entry.keywords.length ? { keywords: entry.keywords } : {}),
+  })))
+})
+
 const rect = computed(() => {
   if (pip.value?.role !== 'detail' || !parent.value) return null
   let workflow = parent.value.map_workflow
@@ -93,13 +190,15 @@ watch(() => props.item.id, async id => {
   imageSize.value = { width: 0, height: 0 }
   loadedVersions.value = []
   versionsError.value = false
-  if (props.item.image_versions || props.item.imageVersions) return
-  try {
-    const result = await assetLibraryAPI.detail('prop', id)
-    if (props.item.id === id) loadedVersions.value = result?.image_versions || []
-  } catch {
-    if (props.item.id === id) versionsError.value = true
+  if (!(props.item.image_versions || props.item.imageVersions)) {
+    try {
+      const result = await assetLibraryAPI.detail('prop', id)
+      if (props.item.id === id) loadedVersions.value = result?.image_versions || []
+    } catch {
+      if (props.item.id === id) versionsError.value = true
+    }
   }
+  await loadReferences(id)
 }, { immediate: true })
 function onOverviewLoad(event) { imageSize.value = { width: event.target.naturalWidth, height: event.target.naturalHeight } }
 function onError(event, original) {
@@ -120,4 +219,12 @@ img { display: block; width: 100%; height: auto; object-fit: contain; }
 .detail-row { display: flex; flex-direction: column; gap: 4px; }
 .locator { position: relative; width: 100%; }
 .locator-box { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.ref-counts { margin: 0; font: 600 12px var(--font-body); color: var(--text-1); }
+.ref-list { margin: 0; padding-left: 0; list-style: none; display: flex; flex-direction: column; gap: 3px; }
+.ref-list li { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.ref-via { font-size: 11px; color: var(--text-2); }
+.res-link { font-size: 12px; color: var(--accent-text); text-decoration: none; }
+.sem-name { font: 600 12px var(--font-body); }
+.sem-desc { margin: 0; font-size: 11.5px; color: var(--text-2); }
+.sem-keys { margin: 0; font-size: 11px; color: var(--text-2); }
 </style>

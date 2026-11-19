@@ -2850,7 +2850,13 @@
         "namePlaceholder": "Name",
         "confidence": "Confidence {v}",
         "groupCount": "{n} items",
-        "noEditorHint": "Only renaming and deleting happen here; point, polyline and polygon geometry is edited in the layer editor.",
+        "noEditorHint": "Only renaming, description/keywords and deleting happen here; point, polyline and polygon geometry is edited in the layer editor.",
+        "descriptionLabel": "Description",
+        "descriptionPlaceholder": "One sentence on which place this name means (optional)",
+        "keywordsLabel": "Keywords",
+        "keywordsPlaceholder": "Separate with commas, up to 12",
+        "manualBadge": "manual",
+        "manualHint": "Manually written descriptions/keywords are never overwritten by map delivery; names work the same way.",
         "needsReview": "Needs review",
         "needsReviewHint": "The automatic annotation did not meet the quality bar (low confidence, or suspicious geometry). Treat the coordinates as a draft and correct them.",
         "needsReviewSummary": "{n} automatic annotation(s) need manual review: check every entry marked as needing review.",
@@ -3515,7 +3521,9 @@
     "aspectVersionRunning": "Submitting…",
     "aspectVersionStarted": "Project-aspect version submitted ({size}); it becomes the current image when done",
     "pinnedOutdated": "This segment pins an old version; a newer one is available",
-    "switchToCurrent": "Switch to current version"
+    "switchToCurrent": "Switch to current version",
+    "assetUpdated": "Base asset \"{name}\" has been updated ({at}, version #{version}): re-render this segment; to switch base assets or pick a different detail, use the base picker",
+    "assetUpdatedDetail": "The base is the picture-in-picture detail asset \"{name}\" (updated {at}, version #{version}): detail segments still render the asset image, so re-render this segment; pick another detail in the base picker to change it"
   },
   "layerCanvas": {
     "toolbar": {"select":"Select","pan":"Pan","frame":"Edit frame viewport","crop":"Crop base","undo":"Undo","redo":"Redo","snap":"Snapping","zoomIn":"Zoom in","zoomOut":"Zoom out","fit":"Fit canvas","edit":"Edit","preview":"Preview","render":"Render segment","rehearse":"Rehearse shot"},
@@ -3773,7 +3781,19 @@
     "stale": "Outdated",
     "overview": "Parent overview",
     "openOverview": "View overview",
-    "shotCount": "{n} associated shots"
+    "referencesTitle": "Storyboards referencing this asset (live lookup)",
+    "referencesHint": "Computed when read: storyboards reference the asset; no shot-number snapshot is stored.",
+    "referencesCounts": "Rendered segments {materialized} / planned only {planned}",
+    "referencesEmpty": "No storyboard references this asset yet",
+    "referencesUnavailable": "Reference lookup failed; try again later",
+    "referenceShot": "E{ep} · shot {shot}",
+    "referenceMaterialized": "segment rendered",
+    "referencePlanned": "planned only",
+    "referenceUpdateHint": "The asset changed: follow an entry to update that shot's layer segment or design card.",
+    "referenceMore": "{n} more not listed",
+    "semanticsTitle": "Semantic entries (read-only)",
+    "semanticsHint": "Geometry and the image decide usage; the description only supports or vetoes, and the name is a nickname.",
+    "semanticsEmpty": "This asset has no semantic entries yet"
   },
   "mapStudio": {
     "styles": {
@@ -4214,8 +4234,7 @@
         "primary": "primary",
         "aux": "aux"
       },
-      "storyboards": "Storyboards {numbers}",
-      "noStoryboard": "No storyboard numbers given",
+      "referencesDynamic": "References are shown live on the asset side (no shot numbers stored)",
       "bbox": "Frame (west/south/east/north): {bbox}",
       "detailPending": "The detail image is rendered when the run is delivered; it does not exist yet.",
       "compositeTitle": "Composite",

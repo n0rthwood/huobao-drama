@@ -14,7 +14,7 @@ const REGION_COLORS: ReadonlyArray<[number, number, number]> = [[168, 90, 40], [
 const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;')
 export const textWidth = (s: string, fs: number): number => [...s].reduce((a, c) => a + (/[\x00-\x7f]/.test(c) ? fs * 0.55 : fs), 0)
 
-type Rect = [number, number, number, number]
+export type Rect = [number, number, number, number]
 const hits = (r: Rect, others: Rect[]): boolean => others.some(q => !(r[2] < q[0] || r[0] > q[2] || r[3] < q[1] || r[1] > q[3]))
 
 export interface PipLabelOptions {
@@ -25,13 +25,33 @@ export interface PipLabelOptions {
   reserved?: Rect[]
 }
 
-export interface PipLabelResult { under: string; over: string; placed: Rect[]; dropped: string[] }
+/**
+ * 已排进画面的注记（Issue #127）：文字、包围盒、字号与对齐。
+ * `semantic_id` 是全览语义要素 id（与 `props.semantics` 一致），交付时据此把注记转成锚定的 label 层，
+ * 所以细节图去掉烧录文字后，这些注记仍由资产自己的图层文档承载。
+ */
+export interface PipNote {
+  semantic_id: string
+  /** 画面上的文字（地点可能带「（示意）」后缀，河名已去掉「(n/m)」分段后缀） */
+  name: string
+  kind: 'place' | 'route' | 'region' | 'river'
+  /** 纯文字包围盒（像素，与防碰撞的 `placed` 同口径，不含圆点/箭头） */
+  rect: Rect
+  /** 文字字号（像素） */
+  font: number
+  bold: boolean
+  italic: boolean
+  align: 'left' | 'center' | 'right'
+}
+
+export interface PipLabelResult { under: string; over: string; placed: Rect[]; dropped: string[]; notes: PipNote[] }
 
 export function pipLabels(spec: MapSpec, projection: GeoProjection, size: { width: number; height: number }, opts: PipLabelOptions): PipLabelResult {
   const { width: w, height: h } = size
   const fs = (v: number): number => Math.round(v * opts.fontScale)
   const placed: Rect[] = [...(opts.reserved ?? [])]
   const dropped: string[] = []
+  const notes: PipNote[] = []
   const inside = (p: [number, number] | null, m = 30): p is [number, number] => !!p && p[0] > m && p[0] < w - m && p[1] > m && p[1] < h - m
   const px = (ll: [number, number]): [number, number] | null => { const p = projection(ll); return p ? [p[0], p[1]] : null }
   let under = ''
@@ -57,18 +77,19 @@ export function pipLabels(spec: MapSpec, projection: GeoProjection, size: { widt
       over += `<text x="${cx.toFixed(1)}" y="${(cy + off).toFixed(1)}" text-anchor="middle" ${SERIF} font-weight="700" font-size="${f}" letter-spacing="${(f * .1).toFixed(1)}" fill="${col}" ${HALO} stroke-width="${(f * .18).toFixed(1)}">${esc(region.name)}</text>`
         + (region.proposed === true && region.origin !== 'manual' && region.verification?.status !== 'verified' && region.verification?.status !== 'confirmed' && !region.name.endsWith('（示意）') ? `<text x="${cx.toFixed(1)}" y="${(cy + off + f * .62).toFixed(1)}" text-anchor="middle" ${SERIF} font-size="${fs(26)}" fill="${col}" ${HALO} stroke-width="5">（示意）</text>` : '')
       placed.push(rect)
+      notes.push({ semantic_id: region.id, name: region.name, kind: 'region', rect, font: f, bold: true, italic: false, align: 'center' })
       return
     }
     dropped.push(region.name)
   })
 
   // 非河流路线（方向/进军线）：虚线 + 末端箭头；河流路线的几何已由水系层绘制，这里只标名
-  const riverNames: Array<{ name: string; pts: Array<[number, number]> }> = []
+  const riverNames: Array<{ id: string; name: string; pts: Array<[number, number]> }> = []
   for (const route of spec.routes) {
     if (route.verification?.reasons?.some(reason => reason.includes('dataset_missing'))) continue
     const pts = route.points.map(px).filter((p): p is [number, number] => !!p)
     const isRiver = route.category === 'river' || !!route.dataset_ref
-    if (isRiver) { if (opts.tier === 'full') riverNames.push({ name: route.name.replace(/\s*\(\d+\/\d+\)$/, ''), pts }); continue }
+    if (isRiver) { if (opts.tier === 'full') riverNames.push({ id: route.id, name: route.name.replace(/\s*\(\d+\/\d+\)$/, ''), pts }); continue }
     if (pts.length < 2) continue
     const d = 'M' + pts.map(p => p.map(v => v.toFixed(1)).join(',')).join('L')
     over += `<path d="${d}" fill="none" stroke="#f7f2e4" stroke-width="${fs(13)}" stroke-linecap="round" stroke-linejoin="round"/><path d="${d}" fill="none" stroke="#a8321f" stroke-width="${fs(7)}" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="${fs(22)} ${fs(12)}"/>`
@@ -79,7 +100,11 @@ export function pipLabels(spec: MapSpec, projection: GeoProjection, size: { widt
     const mid = pts[Math.floor(pts.length / 2)]!
     if (inside(mid)) {
       const f = fs(36), rect: Rect = [mid[0] + 12, mid[1] - f * 1.4, mid[0] + 12 + textWidth(route.name, f), mid[1] - f * .3]
-      if (!hits(rect, placed)) { over += `<text x="${(mid[0] + 12).toFixed(1)}" y="${(mid[1] - f * .5).toFixed(1)}" ${SERIF} font-weight="700" font-size="${f}" fill="#a8321f" ${HALO} stroke-width="${(f * .2).toFixed(1)}">${esc(route.name)}</text>`; placed.push(rect) }
+      if (!hits(rect, placed)) {
+        over += `<text x="${(mid[0] + 12).toFixed(1)}" y="${(mid[1] - f * .5).toFixed(1)}" ${SERIF} font-weight="700" font-size="${f}" fill="#a8321f" ${HALO} stroke-width="${(f * .2).toFixed(1)}">${esc(route.name)}</text>`
+        placed.push(rect)
+        notes.push({ semantic_id: route.id, name: route.name, kind: 'route', rect, font: f, bold: true, italic: false, align: 'left' })
+      }
     }
   }
 
@@ -102,6 +127,7 @@ export function pipLabels(spec: MapSpec, projection: GeoProjection, size: { widt
       const rect: Rect = [x0 - 4, y0 - f, x0 + wd + 4, y0 + f * .28]
       if (rect[0] < 10 || rect[2] > w - 10 || rect[1] < 10 || rect[3] > h - 10 || hits(rect, placed)) continue
       placed.push(rect, [pt[0] - dot, pt[1] - dot, pt[0] + dot, pt[1] + dot])
+      notes.push({ semantic_id: place.id, name, kind: 'place', rect, font: f, bold: major, italic: false, align: 'left' })
       over += `<text x="${x0.toFixed(1)}" y="${y0.toFixed(1)}" ${SERIF} font-weight="${major ? 700 : 500}" font-size="${f}" fill="#2b2118" ${HALO} stroke-width="${(f * .2).toFixed(1)}">${esc(name)}</text>`
         + `<circle cx="${pt[0].toFixed(1)}" cy="${pt[1].toFixed(1)}" r="${dot}" fill="${approximate ? 'none' : major ? '#2b2118' : '#5a4634'}" stroke="${approximate ? '#2b2118' : '#f7f2e4'}" stroke-width="3"/>`
       ok = true
@@ -124,7 +150,8 @@ export function pipLabels(spec: MapSpec, projection: GeoProjection, size: { widt
     const rect: Rect = [cx - need / 2, cy - f, cx + need / 2, cy + f * .4]
     if (hits(rect, placed)) continue
     placed.push(rect)
+    notes.push({ semantic_id: river.id, name: river.name, kind: 'river', rect, font: f, bold: false, italic: true, align: 'center' })
     over += `<text transform="translate(${cx.toFixed(1)},${cy.toFixed(1)}) rotate(${(ang * 180 / Math.PI).toFixed(1)})" text-anchor="middle" ${SERIF} font-style="italic" font-size="${f}" fill="#1c4f7a" ${HALO} stroke-width="${(f * .2).toFixed(1)}">${esc(river.name)}</text>`
   }
-  return { under, over, placed, dropped }
+  return { under, over, placed, dropped, notes }
 }

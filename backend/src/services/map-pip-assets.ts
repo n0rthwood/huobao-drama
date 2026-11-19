@@ -1,23 +1,40 @@
 /**
- * 地图「画中画」资产的宿主侧登记（Issue #107 / #110）。
+ * 地图「画中画」资产的宿主侧登记（Issue #107 / #110 / #125）。
  *
  * 全览与细节是**独立资产**：全览 = 原地图道具；每个细节 = 一条独立的地图道具（asset_type='map'、faithful），
  * 与全览同项目、同剧集关联。联系与用法存在 `props.map_pip`（JSON）：
- * - 全览：`{role:'overview', layout, overview_bbox, frames:[{no,label,role,reason,bbox,focus_bbox,storyboard_numbers,detail_prop_id}], composite_path, usage}`
- * - 细节：`{role:'detail', parent_prop_id, frame:{no,label,role,reason,bbox,focus_bbox}, overview_bbox, usage}`
+ * - 全览：`{role:'overview', layout, overview_bbox, frames:[{no,label,role,reason,bbox,focus_bbox,detail_prop_id}], composite_path, usage}`
+ * - 细节：`{role:'detail', parent_prop_id, frame:{no,label,role,reason,bbox,focus_bbox}, overview_bbox, usage, stale?, content_changed_at?}`
  * 细节图的 `parent_frame` 就是 `frame.bbox`（大图中的位置，经纬度）。
  *
- * 读路径（`pipSummary` / `pipAssetLine`）只输出通用事实：`label` + `bbox`/`focus_bbox`（经纬度）+ 全览范围，
- * 并**剔除** `storyboard_numbers` 与 usage 里按镜号写的那几行——那些镜号是某个别的集的分镜，跨集会误读。
- * `props.map_pip` 的存量数据照旧保留（溯源信息不丢）。
+ * 身份与引用（Issue #125）：
+ * - **镜号不再入库**。`storyboard_numbers` 是某个别的集的快照，跨集会误读；引用关系由
+ *   `services/map-asset-references.ts` 读时反查（分镜引用资产，资产侧动态显示）。
+ * - 复用一个旧细节行的判据是**取景重合**（新 `frame.bbox` 与旧 `meta.frame.bbox` 的 IoU ≥ 0.5，
+ *   贪心一对一）：取景整体换了就是一颗新资产，绝不把旧语义/旧名字套到新取景上。
+ * - 字段所有权：几何与图片归交付；`description`/`keywords` 是条目级人工字段（`manual`），
+ *   资产名被人工改过时记 `map_pip.name_manual`，交付不再覆盖。
+ * - 复用行的语义要素 id 集合发生变化 = 资产地理内容换了 → 在 meta 里记 `content_changed_at`，
+ *   宿主据此让引用它的设计卡、组规划与图层段显式过期（见 `map-studio-host.ts`）。
  *
  * 细节资产的语义（#110）：细节图是同一份 map_spec 的局部渲染，登记时把全览语义要素按细节取景
  * 投影成细节图像素坐标（`semantic_id` 与全览一致），写进细节道具的 `props.semantics`，
- * 设计卡才能在细节底图上 anchor / must_mark。存量细节由启动时的幂等回填补算。
+ * 设计卡才能在细节底图上 anchor / must_mark。
  */
 import { sqlite } from '../db/index.js'
-import { normalizeSemantics } from './asset-semantics.js'
+import {
+  normalizeSemantics,
+  parseSemantics,
+  withGeneratedSupplements,
+  type AssetSemantics,
+  type SemanticSupplement,
+} from './asset-semantics.js'
+import { iou, type MapBbox } from '../modules/map-studio/pip/frames.js'
+import { semanticAnnotationsOf } from './map-semantic-annotations.js'
 import type { MapStudioDeliverable } from '../modules/map-studio/contract.js'
+
+/** 复用旧细节行的最小取景重合（与 `pip/frames.ts` 的细节框互斥校验同一口径） */
+export const PIP_DETAIL_MATCH_IOU = 0.5
 
 export interface PipMetaOverview {
   version: 1
@@ -28,6 +45,8 @@ export interface PipMetaOverview {
   /** 全览取景（经纬度）：细节在图上的位置只有配合全览范围才读得懂 */
   overview_bbox?: [number, number, number, number]
   usage: string
+  /** 本资产的语义要素 id 集合变过（内容换了）：引用它的组规划/设计卡读时过期（#125） */
+  content_changed_at?: string
 }
 export interface PipMetaDetail {
   version: 1
@@ -37,7 +56,14 @@ export interface PipMetaDetail {
   frame: Record<string, unknown>
   overview_bbox: [number, number, number, number]
   usage: string
+  /** 最新方案里已经没有这个细节（资产保留，分镜可能已引用） */
   stale?: boolean
+  /** 本行被复用但语义要素 id 集合变过（内容换了）：读时让引用它的东西过期（#125） */
+  content_changed_at?: string
+  /** 交付时算不出投影语义（保留旧值）：界面标「待人工修正」 */
+  needs_review?: boolean
+  /** 资产名被人工改过：交付不再覆盖系统命名（#125） */
+  name_manual?: boolean
 }
 export type PipMeta = PipMetaOverview | PipMetaDetail
 
@@ -56,17 +82,125 @@ export function pipParentOf(propId: number): number | null {
   return meta?.role === 'detail' ? meta.parent_prop_id : null
 }
 
+// ─── 细节资产身份：一对一 IoU 匹配（Issue #125）──────────────────────────
+
+function usableBbox(value: unknown): value is MapBbox {
+  return Array.isArray(value) && value.length === 4
+    && value.every(item => typeof item === 'number' && Number.isFinite(item))
+    && value[0] < value[2] && value[1] < value[3]
+}
+
+export interface PipMatchResult {
+  /** `no` = 新细节框编号，`prop_id` = 复用的旧细节资产 */
+  matches: Array<{ no: number; prop_id: number; iou: number }>
+  /** 没有可复用旧行的新细节框（新建资产） */
+  unmatched_frames: number[]
+  /** 没有被任何新框复用的旧细节资产（标记过期，不删除） */
+  unmatched_props: number[]
+}
+
+/**
+ * 细节资产的**一对一 IoU 匹配**（纯函数）：新框 × 旧行按 IoU 降序贪心配对，≥0.5 复用。
+ * 零面积/非法 bbox 一律新建（不参与比较）——宁可多一颗资产，也不把旧内容套到新取景上。
+ * 用任务 4 的真实帧对校准过：0.5 阈值下恰好恢复 1→1、2→3、3→4，新细节 2 新建。
+ */
+export function matchPipDetailRows(
+  frames: Array<{ no: number; bbox: unknown }>,
+  prior: Array<{ prop_id: number; bbox: unknown }>,
+): PipMatchResult {
+  const candidates: Array<{ no: number; prop_id: number; score: number }> = []
+  for (const frame of frames) {
+    if (!usableBbox(frame.bbox)) continue
+    for (const row of prior) {
+      if (!usableBbox(row.bbox)) continue
+      const score = iou(frame.bbox, row.bbox)
+      if (score >= PIP_DETAIL_MATCH_IOU) candidates.push({ no: frame.no, prop_id: row.prop_id, score })
+    }
+  }
+  candidates.sort((a, b) => b.score - a.score || a.no - b.no)
+  const matches: PipMatchResult['matches'] = []
+  const usedFrames = new Set<number>()
+  const usedProps = new Set<number>()
+  for (const candidate of candidates) {
+    if (usedFrames.has(candidate.no) || usedProps.has(candidate.prop_id)) continue
+    usedFrames.add(candidate.no)
+    usedProps.add(candidate.prop_id)
+    matches.push({ no: candidate.no, prop_id: candidate.prop_id, iou: Math.round(candidate.score * 1000) / 1000 })
+  }
+  return {
+    matches,
+    unmatched_frames: frames.map(frame => frame.no).filter(no => !usedFrames.has(no)),
+    unmatched_props: prior.map(row => row.prop_id).filter(id => !usedProps.has(id)),
+  }
+}
+
+// ─── 登记 ────────────────────────────────────────────────────────────
+
 interface ParentRow { id: number; name: string; drama_id: number }
 
-/** 在交付事务内登记：覆盖/新增细节资产、版本、剧集关联，并写全览的 map_pip。 */
-export function registerPipAssets(parent: ParentRow, d: MapStudioDeliverable, ts: string): void {
+interface PriorDetail {
+  prop_id: number
+  name: string
+  meta: PipMetaDetail
+  semantics: AssetSemantics | null
+}
+
+/** 登记结果：`contentChanged` = 内容换了（语义要素 id 集合变化）的资产 id，供失效传播使用 */
+export interface PipRegisterOutcome {
+  contentChanged: number[]
+  /** 每个细节框复用/新建的配对（交付留痕） */
+  matches: PipMatchResult
+}
+
+/** 语义文档里的全部条目 id（内容是否换了一批地理对象的判据） */
+export function semanticIdSet(doc: AssetSemantics | null): Set<string> {
+  const ids = new Set<string>()
+  if (!doc) return ids
+  for (const entry of [...doc.points, ...doc.lines, ...doc.regions, ...doc.labels]) ids.add(entry.id)
+  return ids
+}
+
+/** 两个 id 集合是否完全一致 */
+export function sameSemanticIdSet(a: Set<string>, b: Set<string>): boolean {
+  if (a.size !== b.size) return false
+  for (const id of a) if (!b.has(id)) return false
+  return true
+}
+
+/** 交付语义几何（`delivery.semantics`）里的要素 id：points/lines/regions */
+export function geometrySemanticIds(geometry: unknown): Set<string> {
+  const ids = new Set<string>()
+  const doc = geometry as { points?: Array<{ id?: unknown }>; lines?: Array<{ id?: unknown }>; regions?: Array<{ id?: unknown }> } | null
+  if (!doc || typeof doc !== 'object') return ids
+  for (const item of [...(doc.points ?? []), ...(doc.lines ?? []), ...(doc.regions ?? [])]) {
+    if (typeof item?.id === 'string' && item.id) ids.add(item.id)
+  }
+  return ids
+}
+
+/**
+ * 在交付事务内登记：按取景重合覆盖/新建细节资产、版本、剧集关联，并写全览的 `map_pip`。
+ *
+ * `parentContentChanged`：全览自己的语义要素 id 集合变了（宿主在覆盖 `props.semantics` 之前比对）。
+ * 返回内容变更的资产 id（含全览），交给宿主做显式失效传播。
+ */
+export function registerPipAssets(
+  parent: ParentRow,
+  d: MapStudioDeliverable,
+  ts: string,
+  options: { parentContentChanged?: boolean } = {},
+): PipRegisterOutcome {
   const pip = d.pip
-  const existing = sqlite.prepare("SELECT id, map_pip FROM props WHERE drama_id = ? AND deleted_at IS NULL AND map_pip LIKE '%\"role\":\"detail\"%'").all(parent.drama_id) as Array<{ id: number; map_pip: string }>
-  const children = new Map<number, { id: number; meta: PipMetaDetail }>()
+  const existing = sqlite.prepare("SELECT id, name, map_pip, semantics FROM props WHERE drama_id = ? AND deleted_at IS NULL AND map_pip LIKE '%\"role\":\"detail\"%'").all(parent.drama_id) as Array<{ id: number; name: string; map_pip: string; semantics: string | null }>
+  const prior: PriorDetail[] = []
   for (const row of existing) {
     const meta = parsePipMeta(row.map_pip)
-    if (meta?.role === 'detail' && meta.parent_prop_id === parent.id) children.set(Number(meta.frame.no), { id: row.id, meta })
+    if (meta?.role !== 'detail' || meta.parent_prop_id !== parent.id) continue
+    prior.push({ prop_id: row.id, name: row.name, meta, semantics: parseSemantics(row.semantics) })
   }
+  const priorById = new Map(prior.map(row => [row.prop_id, row]))
+  const annotations: Map<string, SemanticSupplement> = semanticAnnotationsOf(d.features ?? [], d.sources ?? [])
+
   const insertTask = sqlite.prepare(`INSERT INTO sys_task (type, prop_id, drama_id, provider, model, prompt, params, result_url, local_path, status, created_at, updated_at, completed_at, generated_at)
     VALUES ('image', ?, ?, 'map-render', 'map-studio-detail', ?, ?, ?, ?, 'completed', ?, ?, ?, ?)`)
   const epoch = Math.floor(Date.parse(ts) / 1000)
@@ -74,47 +208,83 @@ export function registerPipAssets(parent: ParentRow, d: MapStudioDeliverable, ts
   const link = sqlite.prepare('INSERT INTO episode_props (episode_id, prop_id, created_at) SELECT ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM episode_props WHERE episode_id = ? AND prop_id = ?)')
 
   const frameRows: Array<Record<string, unknown>> = []
-  const keep = new Set<number>()
+  const contentChanged: number[] = []
+  const matches = pip
+    ? matchPipDetailRows(
+      pip.frames.map(frame => ({ no: frame.no, bbox: frame.bbox })),
+      prior.map(row => ({ prop_id: row.prop_id, bbox: row.meta.frame?.bbox })),
+    )
+    : { matches: [], unmatched_frames: [], unmatched_props: [] }
+  const matchByNo = new Map(matches.matches.map(item => [item.no, item.prop_id]))
   if (pip) {
     for (const frame of pip.frames) {
       const image = pip.details.find(item => item.no === frame.no)
       if (!image) continue
-      keep.add(frame.no)
-      const frameMeta = { no: frame.no, label: frame.label, role: frame.role, reason: frame.reason, bbox: frame.bbox, focus_bbox: frame.focus_bbox, storyboard_numbers: frame.storyboard_numbers }
+      // #125：镜号不再落库（资产先于分镜设计，引用关系读时反查）；模型给的 reason 里偶尔仍带旧镜号句，
+      // 落库前按句剔除——只保留地理描述，整段只剩镜号句时留空，不编造。
+      const reason = stripShotSnapshot(frame.reason)
+      const frameMeta = { no: frame.no, label: frame.label, role: frame.role, reason, bbox: frame.bbox, focus_bbox: frame.focus_bbox }
       const usage = `${pip.usage}\n\n本资产是细节${frame.no}「${frame.label}」，隶属全览《${parent.name}》（资产 #${parent.id}）；它在全览中的位置（经纬度）：${JSON.stringify(frame.bbox)}。`
-      const name = `${parent.name} · 细节${frame.no}（${frame.label}）`
-      const meta: PipMetaDetail = { version: 1, role: 'detail', parent_prop_id: parent.id, parent_name: parent.name, frame: frameMeta, overview_bbox: pip.overview_bbox, usage }
-      const prior = children.get(frame.no)
+      const generatedName = `${parent.name} · 细节${frame.no}（${frame.label}）`
+      const previous = matchByNo.has(frame.no) ? priorById.get(matchByNo.get(frame.no)!) ?? null : null
+      // 字段所有权（#125）：人工改过的名字保留，其余沿用系统命名
+      const name = previous?.meta.name_manual ? previous.name : generatedName
+      const previousIds = semanticIdSet(previous?.semantics ?? null)
+      const projectedIds = image.semantics ? geometrySemanticIds(image.semantics) : new Set<string>()
+      const contentGone = !!previous && previousIds.size > 0 && projectedIds.size > 0 && !sameSemanticIdSet(previousIds, projectedIds)
+      const meta: PipMetaDetail = {
+        version: 1, role: 'detail', parent_prop_id: parent.id, parent_name: parent.name, frame: frameMeta,
+        overview_bbox: pip.overview_bbox, usage,
+        ...(previous?.meta.name_manual ? { name_manual: true } : {}),
+        ...(contentGone ? { content_changed_at: ts } : {}),
+        ...(!image.semantics && previous ? { needs_review: true } : {}),
+      }
+      const description = `地图细节图：${frame.label}。${reason ? `${reason}\n\n` : ''}用法：\n${usage}`
       let childId: number
-      const description = `地图细节图：${frame.label}。${frame.reason}\n\n用法：\n${usage}`
-      if (prior) {
-        childId = prior.id
-      } else {
+      if (previous) childId = previous.prop_id
+      else {
         childId = Number(sqlite.prepare(`INSERT INTO props (drama_id, name, type, description, faithful, asset_type, created_at, updated_at) VALUES (?, ?, '地图细节图', ?, 1, 'map', ?, ?)`)
           .run(parent.drama_id, name, description, ts, ts).lastInsertRowid)
       }
       const versionId = Number(insertTask.run(childId, parent.drama_id, `地图细节图：${name}`,
-        JSON.stringify({ source: 'map-studio', map_studio_task_id: d.task_id, role: 'detail', parent_prop_id: parent.id, frame: frameMeta, png_sha256: image.sha256, ...(image.provenance ? { provenance: image.provenance } : {}) }),
+        JSON.stringify({ source: 'map-studio', map_studio_task_id: d.task_id, role: 'detail', parent_prop_id: parent.id, frame: frameMeta, png_sha256: image.sha256, ...(image.provenance ? { provenance: image.provenance } : {}), ...(image.editable_source ? { editable_source: image.editable_source } : {}) }),
         image.path, image.path, ts, ts, ts, epoch).lastInsertRowid)
       // #110：细节图上的语义 = 全览语义要素按本帧取景投影到细节像素（id 与全览一致）。
-      // 投影在模块侧交付时就算好了（`MapPipOutput.details[].semantics`）：宿主这里只做规范化落库，
-      // 不 import map-studio 运行时（否则 agents 工具图会拉进整个模块）。
-      const semantics = image.semantics ? semanticsJsonOf(image.semantics, versionId, ts) : null
-      sqlite.prepare('UPDATE props SET name = ?, type = ?, description = ?, image_url = ?, local_path = ?, faithful = 1, faithful_source = ?, map_pip = ?, semantics = COALESCE(?, semantics), updated_at = ? WHERE id = ?')
+      // #125：投影缺失时保留旧值并标 needs_review；文字字段只覆盖无人工标记的条目。
+      const semantics = image.semantics
+        ? semanticsJsonOf(image.semantics, versionId, ts, annotations, previous?.semantics ?? null)
+        : previous?.semantics
+          ? JSON.stringify(normalizeSemantics({ ...previous.semantics, needs_review: true, warnings: [...(previous.semantics.warnings ?? []), '本次交付算不出投影语义：保留旧语义，请人工核对取景'] }))
+          : null
+      sqlite.prepare('UPDATE props SET name = ?, type = ?, description = ?, image_url = ?, local_path = ?, faithful = 1, faithful_source = ?, map_pip = ?, semantics = ?, updated_at = ? WHERE id = ?')
         .run(name, '地图细节图', description, image.path, image.path, versionId, JSON.stringify(meta), semantics, ts, childId)
       for (const ep of parentEpisodes) link.run(ep.episode_id, childId, ts, ep.episode_id, childId)
+      if (contentGone) contentChanged.push(childId)
       frameRows.push({ ...frameMeta, detail_prop_id: childId })
     }
   }
-  // 不再出现在最新方案里的旧细节：保留资产（分镜可能已引用），只标记过期，不静默删除
-  for (const [no, child] of children) {
-    if (keep.has(no)) continue
-    sqlite.prepare('UPDATE props SET map_pip = ?, updated_at = ? WHERE id = ?').run(JSON.stringify({ ...child.meta, stale: true }), ts, child.id)
+  // 不再出现在最新方案里的旧细节：保留资产（分镜可能已引用），只标记过期，不静默删除。
+  // `content_changed_at` 只在第一次过期时记下（重新交付不能每次把时间往后推，否则引用它的组规划永远显旧）
+  for (const propId of matches.unmatched_props) {
+    const child = priorById.get(propId)
+    if (!child) continue
+    const staleMeta: PipMetaDetail = {
+      ...child.meta,
+      stale: true,
+      content_changed_at: child.meta.content_changed_at ?? ts,
+    }
+    sqlite.prepare('UPDATE props SET map_pip = ?, updated_at = ? WHERE id = ?').run(JSON.stringify(staleMeta), ts, child.prop_id)
   }
   const overview: PipMetaOverview | null = pip && frameRows.length
-    ? { version: 1, role: 'overview', layout: pip.layout, overview_bbox: pip.overview_bbox, frames: frameRows, composite_path: pip.composite?.path ?? null, usage: pip.usage }
+    ? {
+      version: 1, role: 'overview', layout: pip.layout, overview_bbox: pip.overview_bbox, frames: frameRows,
+      composite_path: pip.composite?.path ?? null, usage: pip.usage,
+      ...(options.parentContentChanged ? { content_changed_at: ts } : {}),
+    }
     : null
   sqlite.prepare('UPDATE props SET map_pip = ?, updated_at = ? WHERE id = ?').run(overview ? JSON.stringify(overview) : null, ts, parent.id)
+  if (options.parentContentChanged) contentChanged.push(parent.id)
+  return { contentChanged, matches }
 }
 
 // ─── 读路径（#110）────────────────────────────────────────────────────
@@ -124,6 +294,50 @@ export function pipGenericUsage(usage: string): string {
   return usage.split('\n').map(line => line.trim())
     .filter(line => line && !/分镜\s*#|对应分镜/.test(line))
     .join('\n')
+}
+
+/** 镜号表达式本身：「分镜 #66–#71/#97/#99/#109」「对应分镜 #109」 */
+const SHOT_REFERENCE_PATTERN = /(?:对应)?分镜\s*#(?:\s*#?\d+(?:\s*[–—\-~]\s*#?\d+)?(?:\s*[/、,，]\s*#?\d+(?:\s*[–—\-~]\s*#?\d+)?)*)/g
+
+/**
+ * 剔除文字里的镜号快照（Issue #125）——与 `pipGenericUsage` 同口径。
+ *
+ * 事实：旧交付写的 `frame.reason` 常是「分镜 #66–#71 反复强调托博尔河交汇处的决战地：需看清…」
+ * ——镜号只是句首从句，后面才是地理描述。所以这里**只删镜号表达式与它带出来的连接词**，
+ * 同一句里的地理描述原样保留；整句只剩镜号（或删完只剩标点）时该句丢弃，
+ * **不编造**替代文字。输出里不再含「分镜 #」，二次调用不变（幂等）。
+ *
+ * 全览/细节的 `reason`、资产 `description` 与存量修复脚本共用这一个实现。
+ */
+export function stripShotSnapshot(text: string | null | undefined): string {
+  if (!text) return ''
+  const kept: string[] = []
+  for (const line of text.split('\n')) {
+    // 保留句末标点：按「标点后」切开，切块自带结尾标点，拼回去就是原文顺序
+    for (const part of line.split(/(?<=[。；;！!？?])/)) {
+      const hadShotRef = /(?:对应)?分镜\s*#/.test(part)
+      let sentence = part.replace(SHOT_REFERENCE_PATTERN, '').trim()
+      // 删掉镜号后句首常留连接词/标点：一并剥离，让剩下的地理描述直接开头
+      sentence = sentence.replace(/^[，,：:、；;\s]+/, '')
+      sentence = sentence.replace(/^(?:反复强调|反复出现|反复描述|多次出现|强调|交代|呈现|展示|覆盖|需要|需|会|停留)[，,：:\s]*/, '')
+      // 旧 usage 的行形如「细节1「…」（辅助）：分镜 #… 反复强调…」：删掉镜号后连接词挂在冒号后面。
+      // 只对**确实删过镜号**的句子做这一步，避免误伤正常文本（「用法：反复强调河流动线」不删）。
+      if (hadShotRef) sentence = sentence.replace(/[：:]\s*(?:反复强调|反复出现|反复描述|多次出现|强调|交代|呈现|展示|覆盖|停留)[，,：:\s]*/g, '：')
+      sentence = sentence.replace(/[：:][ \t]+/g, '：').trim()
+      if (!sentence || !/[\p{L}\p{N}]/u.test(sentence)) continue
+      kept.push(sentence)
+    }
+  }
+  // 删句/删从句会留下标点残渣（旧 usage 的分隔符「；」）：只收缩**连续标点串**并去掉首尾悬空标点，
+  // 不触碰正常文本（「山谷、河流。」这类单标点不动）。
+  let cleaned = kept.join('')
+    .replace(/([，。；;：:、！!？?])[，。；;：:、！!？?]+/g, '$1')
+    .replace(/[ \t]{2,}/g, ' ')
+  cleaned = cleaned.split('\n')
+    .map(line => line.trim().replace(/^[，。；;：:、！!？?]+/, '').replace(/[，、；;：:！!？?]+$/, '').trim())
+    .filter(line => line && /[\p{L}\p{N}]/u.test(line))
+    .join('\n')
+  return cleaned.trim()
 }
 
 /** 经纬度框 → 可读文本；不是 4 个数字时为 null（不编造范围） */
@@ -167,6 +381,7 @@ export function pipSummary(raw: string | null | undefined): Record<string, unkno
     overview_bbox: meta.overview_bbox,
     usage: pipGenericUsage(meta.usage),
     stale: meta.stale === true,
+    ...(meta.needs_review === true ? { needs_review: true } : {}),
   }
 }
 
@@ -193,25 +408,33 @@ export function pipAssetLine(raw: string | null | undefined): string | null {
     + `；所属全览 prop#${meta.parent_prop_id}${overview ? ` 范围 ${overview}` : ''}${meta.stale ? '；已过期（最新方案里没有这个细节）' : ''}`
 }
 
-// ─── 细节语义（#110）───────────────────────────────────────────────────
+// ─── 细节语义（#110 / #125）───────────────────────────────────────────
 
-/** 像素几何 → `props.semantics` JSON（与成图语义同一套规范化口径：source=cv、confidence=1） */
+/**
+ * 像素几何 → `props.semantics` JSON（与成图语义同一套规范化口径：source=cv、confidence=1）。
+ *
+ * `supplements`（#125）把研究阶段的坐标依据 + 原文摘录 + 来源名写进条目 `description`、类别写进
+ * `keywords`；`previous` 提供人工标记——人写过的描述/关键词/名称不被覆盖。
+ */
 export function semanticsJsonOf(
   geometry: unknown,
   sourceTaskId: number,
   ts: string,
+  supplements: Map<string, SemanticSupplement> = new Map(),
+  previous: AssetSemantics | null = null,
 ): string {
   const { width, height, points, lines, regions } = geometry as {
     width: number; height: number; points: unknown[]; lines: unknown[]; regions: unknown[]
   }
   const mark = (items: unknown[]) => items.map(item => ({ ...(item as object), source: 'cv', confidence: 1 }))
-  return JSON.stringify(normalizeSemantics({
+  const doc = withGeneratedSupplements({
     image: { width, height, source_task_id: sourceTaskId },
     points: mark(points),
     regions: mark(regions),
     lines: mark(lines),
     warnings: [], generated_at: ts, model: 'map-pip-detail',
-  }))
+  }, previous, supplements)
+  return JSON.stringify(doc)
 }
 
 /** 需要补算语义的细节资产（`map-pip-detail-semantics.ts` 的输入；投影在宿主侧单独做） */

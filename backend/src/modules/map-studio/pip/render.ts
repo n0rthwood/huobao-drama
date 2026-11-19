@@ -16,7 +16,7 @@ import { renderReliefBase } from '../geo/relief-render.js'
 import { chooseDemZoom, ensureDemTiles, type DemTileFetcher } from '../geo/terrain-cache.js'
 import { datasetSourceInfo } from '../geo/datasets.js'
 import { expandBboxToAspect, frameRectOn, PIP_COLORS, type MapPipFrame, type MapPipImage, type MapPipOutput } from './frames.js'
-import { pipLabels } from './labels.js'
+import { detailLabelPlan, detailLocatorBox, pipDetailBaseName, pipDetailRenderKey, type PipDetailBase } from './layer-doc.js'
 import type { PipSlot } from './layouts.js'
 
 const PAPER = '#efe6d0'
@@ -55,10 +55,10 @@ const badge = (cx: number, cy: number, r: number, color: string, no: number): st
   + `<text x="${cx.toFixed(1)}" y="${(cy + r * 0.36).toFixed(1)}" text-anchor="middle" ${FONT} font-weight="700" font-size="${Math.round(r * 1.15)}" fill="#fff">${no}</text>`
 
 /** 角标定位图：全览缩略 + 框外压暗 + 同色取景框 + 编号，贴在细节图上 */
-async function locatorPng(input: RenderPipInput, frame: MapPipFrame, size: Size): Promise<Buffer> {
-  const base = await sharp(getAbsolutePath(input.overviewBase.path)).resize(size.width, size.height, { fit: 'fill' }).png().toBuffer()
-  const k = size.width / input.overviewBase.width
-  const [x0, y0, x1, y1] = frameRectOn(input.spec, input.overviewBase, frame.bbox).map(v => v * k) as Rect
+async function locatorPng(spec: MapSpec, overviewBase: { path: string; width: number; height: number }, frame: MapPipFrame, size: Size): Promise<Buffer> {
+  const base = await sharp(getAbsolutePath(overviewBase.path)).resize(size.width, size.height, { fit: 'fill' }).png().toBuffer()
+  const k = size.width / overviewBase.width
+  const [x0, y0, x1, y1] = frameRectOn(spec, overviewBase, frame.bbox).map(v => v * k) as Rect
   const color = PIP_COLORS[(frame.no - 1) % PIP_COLORS.length]!
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size.width}" height="${size.height}">`
     + `<path fill-rule="evenodd" fill="#000" fill-opacity=".2" d="M0,0H${size.width}V${size.height}H0Z M${x0.toFixed(1)},${y0.toFixed(1)}H${x1.toFixed(1)}V${y1.toFixed(1)}H${x0.toFixed(1)}Z"/>`
@@ -79,25 +79,76 @@ function riverExemptions(spec: MapSpec): string[] {
   return [...names]
 }
 
-async function renderDetail(input: RenderPipInput, frame: MapPipFrame, bbox: Bbox, size: Size, withLocator: boolean, locatorWidth: number): Promise<{ buffer: Buffer; provenance: MapPipImage['provenance'] }> {
+function detailLineScale(size: Size): number {
+  return Math.max(0.55, Math.min(size.width, size.height) / 2160) * 1.1
+}
+
+/** 细节渲染快照：底图（程序底图 + 角标定位图，不含注记文字）内容寻址落盘，幂等 */
+async function writeDetailBase(buffer: Buffer, no: number, renderKey: string): Promise<PipDetailBase> {
+  const dir = path.join(STORAGE_ROOT, 'map-bases')
+  fs.mkdirSync(dir, { recursive: true })
+  const abs = path.join(dir, pipDetailBaseName(no, renderKey))
+  const sha256 = fs.existsSync(abs)
+    ? crypto.createHash('sha256').update(fs.readFileSync(abs)).digest('hex')
+    : (fs.writeFileSync(abs, buffer), crypto.createHash('sha256').update(buffer).digest('hex'))
+  const meta = await sharp(fs.existsSync(abs) ? fs.readFileSync(abs) : buffer).metadata()
+  return {
+    path: `static/${path.relative(STORAGE_ROOT, abs).split(path.sep).join('/')}`,
+    width: meta.width ?? 0,
+    height: meta.height ?? 0,
+    sha256,
+    render_key: renderKey,
+  }
+}
+
+export interface RenderDetailBaseInput {
+  spec: MapSpec
+  frame: MapPipFrame
+  bbox: Bbox
+  size: Size
+  locatorWidth: number
+  withLocator: boolean
+  /** 角标定位图的全览底图；缺失时底图不含 locator（回归补算记录 `locator:false`） */
+  overviewBase?: { path: string; width: number; height: number }
+  demCacheDir?: string
+  fetchTile?: DemTileFetcher
+}
+
+/**
+ * 细节底图（Issue #127）：同一次渲染的中间程序底图 + 角标定位图，**不含注记文字**。
+ * 展开层的注记由投影 layer_doc 的 label 层承载，所以底图不能再烧文字；
+ * locator 是定位信息（框/编号），保留在底图上，与细节 PNG 一致。
+ */
+export async function renderDetailBaseImage(input: RenderDetailBaseInput): Promise<PipDetailBase> {
+  const spec: MapSpec = { ...input.spec, bbox: input.bbox, detail_level: 'regional' }
+  const zoom = chooseDemZoom(input.bbox, input.size, 'detail')
+  await ensureDemTiles({ projection: mapProjectionFor(spec, input.size), width: input.size.width, height: input.size.height, zoom, cacheDir: input.demCacheDir, fetchTile: input.fetchTile })
+  const rendered = await renderReliefBase(spec, input.size, {
+    role: 'detail', anchors: null, exemptRivers: riverExemptions(spec),
+    namedRivers: spec.routes.flatMap(route => route.dataset_ref?.ref.startsWith('osm:') ? [route.dataset_ref.ref] : []),
+    lineScale: detailLineScale(input.size), demZoom: zoom, demCacheDir: input.demCacheDir,
+  })
+  let buffer = rendered.buffer
+  if (input.withLocator && input.overviewBase) {
+    const box = detailLocatorBox(input.size, input.locatorWidth)
+    const locator = await locatorPng(spec, input.overviewBase, input.frame, { width: box.width, height: box.height })
+    buffer = await sharp(buffer).composite([{ input: locator, left: box.margin, top: input.size.height - box.margin - box.height }]).png().toBuffer()
+  }
+  return writeDetailBase(buffer, input.frame.no, pipDetailRenderKey(input.spec, input.bbox, input.size))
+}
+
+interface DetailRender { buffer: Buffer; provenance: MapPipImage['provenance']; base?: PipDetailBase }
+
+async function renderDetail(input: RenderPipInput, frame: MapPipFrame, bbox: Bbox, size: Size, withLocator: boolean, locatorWidth: number, withBase = false): Promise<DetailRender> {
   const spec: MapSpec = { ...input.spec, bbox, detail_level: 'regional' }
   const projection = mapProjectionFor(spec, size)
   const zoom = chooseDemZoom(bbox, size, 'detail')
   await ensureDemTiles({ projection, width: size.width, height: size.height, zoom, cacheDir: input.demCacheDir, fetchTile: input.fetchTile })
-  const k = Math.max(size.width, size.height) / 3840
-  const loc = { width: Math.round(locatorWidth), height: Math.round(locatorWidth * 9 / 16) }
-  const margin = Math.round(40 * k)
-  const locRect: Rect = [margin - 14, size.height - margin - loc.height - 14, margin + loc.width + 14, size.height - margin + 14]
-  const scale = Math.max(0.55, Math.min(size.width, size.height) / 2160)
-  const labels = pipLabels(spec, projection, size, {
-    tier: input.pip.layout.label_tier,
-    fontScale: Math.min(1, Math.max(0.8, Math.min(size.width, size.height) / 1400)),
-    reserved: withLocator ? [locRect] : [],
-  })
+  const labels = detailLabelPlan(spec, bbox, size, input.pip.layout.label_tier, locatorWidth, withLocator)
   const namedRivers = spec.routes.flatMap(route => route.dataset_ref?.ref.startsWith('osm:') ? [route.dataset_ref.ref] : [])
   const rendered = await renderReliefBase(spec, size, {
     role: 'detail', anchors: null, exemptRivers: riverExemptions(spec), namedRivers,
-    lineScale: scale * 1.1, demZoom: zoom, demCacheDir: input.demCacheDir,
+    lineScale: detailLineScale(size), demZoom: zoom, demCacheDir: input.demCacheDir,
     underSvg: labels.under, overSvg: labels.over,
   })
   const attribution = 'Natural Earth（公共领域）· AWS Terrain Tiles，SRTM / GMTED2010 / ETOPO1（公共领域）'
@@ -105,9 +156,15 @@ async function renderDetail(input: RenderPipInput, frame: MapPipFrame, bbox: Bbo
   const provenance = { attribution, sources: rendered.summary.named_rivers_used.length
     ? [{ name: 'OSM 命名河流', url: 'https://www.openstreetmap.org/', license: 'ODbL 1.0', sha256: datasetSourceInfo(namedRivers[0]!).sha256 }]
     : [] }
-  if (!withLocator) return { buffer: rendered.buffer, provenance }
-  const locator = await locatorPng(input, frame, loc)
-  return { buffer: await sharp(rendered.buffer).composite([{ input: locator, left: margin, top: size.height - margin - loc.height }]).png().toBuffer(), provenance }
+  let buffer = rendered.buffer
+  if (withLocator) {
+    const box = detailLocatorBox(size, locatorWidth)
+    const locator = await locatorPng(spec, input.overviewBase, frame, { width: box.width, height: box.height })
+    buffer = await sharp(buffer).composite([{ input: locator, left: box.margin, top: size.height - box.margin - box.height }]).png().toBuffer()
+  }
+  if (!withBase) return { buffer, provenance }
+  const base = await renderDetailBaseImage({ spec: input.spec, frame, bbox, size, locatorWidth, withLocator, overviewBase: input.overviewBase, demCacheDir: input.demCacheDir, fetchTile: input.fetchTile })
+  return { buffer, provenance, base }
 }
 
 function tileAspectMatches(slot: PipSlot, canvas: Size): boolean {
@@ -124,10 +181,10 @@ export async function renderPipAssets(input: RenderPipInput): Promise<MapPipOutp
   const details: MapPipOutput['details'] = []
   const detailBuffers = new Map<number, Buffer>()
   for (const frame of pip.frames) {
-    const detail = await renderDetail(input, frame, frame.bbox, canvas, true, locatorWidth)
+    const detail = await renderDetail(input, frame, frame.bbox, canvas, true, locatorWidth, true)
     detailBuffers.set(frame.no, detail.buffer)
     const image = await writeImage(detail.buffer, `pip-detail${frame.no}`)
-    details.push({ no: frame.no, ...image, provenance: detail.provenance })
+    details.push({ no: frame.no, ...image, provenance: detail.provenance, ...(detail.base ? { base: detail.base } : {}) })
   }
   if (pip.layout.id === 'L1' || !pip.frames.length) return { ...pip, details, composite: null }
 

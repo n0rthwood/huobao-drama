@@ -2850,7 +2850,13 @@
         "namePlaceholder": "이름",
         "confidence": "신뢰도 {v}",
         "groupCount": "{n}개",
-        "noEditorHint": "여기서는 이름 변경과 삭제만 가능합니다. 점·폴리라인·다각형 편집은 레이어 편집기에서 합니다.",
+        "noEditorHint": "여기서는 이름, 설명/키워드 변경과 삭제만 가능합니다. 점·폴리라인·다각형 편집은 레이어 편집기에서 합니다.",
+        "descriptionLabel": "설명",
+        "descriptionPlaceholder": "이 이름이 가리키는 구체적 장소를 한 문장으로(선택)",
+        "keywordsLabel": "키워드",
+        "keywordsPlaceholder": "쉼표로 구분, 최대 12개",
+        "manualBadge": "수동",
+        "manualHint": "수동으로 쓴 설명/키워드는 지도 납품 시 덮어쓰지 않습니다. 이름도 같은 규칙입니다.",
         "needsReview": "수동 보정 필요",
         "needsReviewHint": "자동 주석이 품질 기준에 미치지 못했습니다(신뢰도가 낮거나 형상 판정이 의심스러움). 좌표는 초안으로 보고 확인 후 수정하세요.",
         "needsReviewSummary": "자동 주석 중 {n}건에 수동 보정이 필요합니다. 「수동 보정 필요」로 표시된 항목을 하나씩 확인하세요.",
@@ -3515,7 +3521,9 @@
     "aspectVersionRunning": "제출 중…",
     "aspectVersionStarted": "프로젝트 비율 버전({size})을 제출했습니다. 완료되면 현재 이미지가 됩니다",
     "pinnedOutdated": "이 구간은 이전 버전을 고정했습니다. 새 버전으로 전환할 수 있습니다",
-    "switchToCurrent": "현재 버전으로 전환"
+    "switchToCurrent": "현재 버전으로 전환",
+    "assetUpdated": "기저 자산 「{name}」이 갱신되었습니다({at}, 버전 #{version}): 이 구간을 다시 렌더링하세요. 기저 자산 변경이나 세부 재선택은 기저 선택에서 합니다",
+    "assetUpdatedDetail": "기저는 화중화 세부 자산 「{name}」입니다({at} 갱신, 버전 #{version}): 세부 구간은 자산 이미지를 구워 넣으므로 이 구간을 다시 렌더링하세요. 다른 세부로 바꾸려면 기저 선택에서 다시 고르세요"
   },
   "layerCanvas": {
     "toolbar": {"select":"선택","pan":"이동","frame":"프레임 시야 편집","crop":"배경 자르기","undo":"실행 취소","redo":"다시 실행","snap":"맞춤","zoomIn":"확대","zoomOut":"축소","fit":"화면 맞춤","edit":"편집","preview":"미리보기","render":"구간 렌더링","rehearse":"샷 시연"},
@@ -3773,7 +3781,19 @@
     "stale": "오래됨",
     "overview": "상위 전체 지도",
     "openOverview": "전체 지도 보기",
-    "shotCount": "연결된 쇼트 {n}개"
+    "referencesTitle": "이 자산을 인용하는 스토리보드(동적 역조회)",
+    "referencesHint": "읽을 때 계산합니다. 스토리보드가 자산을 인용하며 생성 당시의 쇼트 번호는 저장하지 않습니다.",
+    "referencesCounts": "세그먼트 렌더 {materialized} / 계획만 {planned}",
+    "referencesEmpty": "아직 이 자산을 인용하는 스토리보드가 없습니다",
+    "referencesUnavailable": "참조 역조회에 실패했습니다. 나중에 다시 시도하세요",
+    "referenceShot": "E{ep} · 쇼트 {shot}",
+    "referenceMaterialized": "세그먼트 렌더됨",
+    "referencePlanned": "계획만",
+    "referenceUpdateHint": "자산이 갱신되었습니다. 항목을 눌러 해당 쇼트의 레이어 세그먼트나 설계 카드를 갱신하세요.",
+    "referenceMore": "외 {n}개(미표시)",
+    "semanticsTitle": "의미 항목(읽기 전용)",
+    "semanticsHint": "기하와 화면이 선택 근거입니다. 설명은 보강·반박 자료이며 이름은 별칭일 뿐입니다.",
+    "semanticsEmpty": "이 자산에는 아직 의미 항목이 없습니다"
   },
   "mapStudio": {
     "styles": {
@@ -4214,8 +4234,7 @@
         "primary": "핵심",
         "aux": "보조"
       },
-      "storyboards": "대응 스토리보드 {numbers}",
-      "noStoryboard": "대응 스토리보드 미지정",
+      "referencesDynamic": "참조 관계는 자산 쪽에서 동적으로 표시합니다(쇼트 번호 미저장)",
       "bbox": "범위(서/남/동/북): {bbox}",
       "detailPending": "세부 이미지는 납품 등록 시 렌더링됩니다. 아직 없습니다.",
       "compositeTitle": "합성 이미지",

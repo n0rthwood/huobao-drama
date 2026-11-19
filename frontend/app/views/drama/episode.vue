@@ -841,7 +841,7 @@
                   <p class="asset-version-hint">{{ t('episode.asset.versionHint') }}</p>
                 </section>
 
-                <MapAssetPreview v-if="isMapAsset(assetDetail.item)" :key="assetDetail.item.id" :item="assetDetail.item" :assets="propItems" :episode-numbers="sbs.map(shotNumber)" @open-asset="openPipAsset" @preview="openImageViewer" />
+                <MapAssetPreview v-if="isMapAsset(assetDetail.item)" :key="assetDetail.item.id" :item="assetDetail.item" :assets="propItems" @open-asset="openPipAsset" @preview="openImageViewer" />
 
                 <div class="asset-detail-meta-row">
                   <div class="asset-detail-meta-item">
