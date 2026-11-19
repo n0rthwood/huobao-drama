@@ -315,16 +315,29 @@ export function stripShotSnapshot(text: string | null | undefined): string {
   for (const line of text.split('\n')) {
     // 保留句末标点：按「标点后」切开，切块自带结尾标点，拼回去就是原文顺序
     for (const part of line.split(/(?<=[。；;！!？?])/)) {
+      const hadShotRef = /(?:对应)?分镜\s*#/.test(part)
       let sentence = part.replace(SHOT_REFERENCE_PATTERN, '').trim()
       // 删掉镜号后句首常留连接词/标点：一并剥离，让剩下的地理描述直接开头
       sentence = sentence.replace(/^[，,：:、；;\s]+/, '')
       sentence = sentence.replace(/^(?:反复强调|反复出现|反复描述|多次出现|强调|交代|呈现|展示|覆盖|需要|需|会|停留)[，,：:\s]*/, '')
-      sentence = sentence.trim()
+      // 旧 usage 的行形如「细节1「…」（辅助）：分镜 #… 反复强调…」：删掉镜号后连接词挂在冒号后面。
+      // 只对**确实删过镜号**的句子做这一步，避免误伤正常文本（「用法：反复强调河流动线」不删）。
+      if (hadShotRef) sentence = sentence.replace(/[：:]\s*(?:反复强调|反复出现|反复描述|多次出现|强调|交代|呈现|展示|覆盖|停留)[，,：:\s]*/g, '：')
+      sentence = sentence.replace(/[：:][ \t]+/g, '：').trim()
       if (!sentence || !/[\p{L}\p{N}]/u.test(sentence)) continue
       kept.push(sentence)
     }
   }
-  return kept.join('')
+  // 删句/删从句会留下标点残渣（旧 usage 的分隔符「；」）：只收缩**连续标点串**并去掉首尾悬空标点，
+  // 不触碰正常文本（「山谷、河流。」这类单标点不动）。
+  let cleaned = kept.join('')
+    .replace(/([，。；;：:、！!？?])[，。；;：:、！!？?]+/g, '$1')
+    .replace(/[ \t]{2,}/g, ' ')
+  cleaned = cleaned.split('\n')
+    .map(line => line.trim().replace(/^[，。；;：:、！!？?]+/, '').replace(/[，、；;：:！!？?]+$/, '').trim())
+    .filter(line => line && /[\p{L}\p{N}]/u.test(line))
+    .join('\n')
+  return cleaned.trim()
 }
 
 /** 经纬度框 → 可读文本；不是 4 个数字时为 null（不编造范围） */

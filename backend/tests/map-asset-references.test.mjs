@@ -144,6 +144,33 @@ test('IoU 匹配：两个新框抢同一条旧行时只给重叠更高的那个�
   assert.deepEqual(result.unmatched_frames, [2])
 })
 
+test('IoU 匹配：任务 4 真实帧对（2026-11-17 11:41 版本 3510–3513 × 当前全览 259 四个取景）', () => {
+  // 旧帧来自 sys_task 版本 params.frame.bbox（detail props 289–292，2026-11-17T11:41 交付的那一版），
+  // 新帧是 props 259 当前 map_pip.frames[].bbox（15:33 之后的最后一次交付）。
+  // 说明：Issue #125 v2 评论里的 run25 三框矩阵（old1×new=[0.623,0.483,0.167,0.063] 等）来自未落库的
+  // base run 状态，宿主侧只保留每次交付的版本帧；这里用可追溯的真实帧对验证同一套贪心口径。
+  const result = run(`out(matchPipDetailRows(
+    [
+      { no: 1, bbox: [52.9078, 57.3, 64.2922, 60.6] },
+      { no: 2, bbox: [55.8342, 57.6, 65.8658, 60.5] },
+      { no: 3, bbox: [61.2171, 56.6, 68.8829, 58.9] },
+      { no: 4, bbox: [64.1617, 57.3, 73.0383, 59.9] },
+    ],
+    [
+      { prop_id: 9001, bbox: [64.5268, 57.2, 72.6732, 59.6] },
+      { prop_id: 9002, bbox: [50.311, 56.2, 65.989, 60.8] },
+      { prop_id: 9003, bbox: [54.0842, 57.6, 64.1158, 60.5] },
+      { prop_id: 9004, bbox: [58.4486, 56.6, 67.1514, 59.2] },
+    ],
+  ))`)
+  // 真实 IoU：9001(64.5)×new=[0,0.058,0.249,0.784]、9002(50.3)=[0.521,0.403,0.139,0.053]、9003(54.1)=[0.774,0.703,0.088,0]、
+  // 9004(58.4)=[0.226,0.298,0.513,0.142] —— 0.5 阈值下贪心：new4→9001(0.784)、new1→9003(0.774)、new3→9004(0.513)，
+  // new2 没有可复用旧行（9003 已被 new1 占用、9002 的最高分 new1 也被占用）→ 新建
+  assert.deepEqual(result.matches.map(item => [item.no, item.prop_id]), [[4, 9001], [1, 9003], [3, 9004]])
+  assert.deepEqual(result.unmatched_frames, [2])
+  assert.deepEqual(result.unmatched_props, [9002])
+})
+
 test('set_frames 只接受不消费 storyboard_numbers：产出 frame 里没有这个字段', () => {
   const result = run(`out(validateFrames([0, 0, 40, 40], [
     { label: '决战地', reason: '看清汇流处', bbox: [2, 2, 12, 12], storyboard_numbers: [67, 94] },
@@ -181,6 +208,17 @@ test('镜号清洗幂等，且不含镜号的文本逐字不变', () => {
   assert.equal(result.once, '决战地与托博尔斯克—喀什里克。')
   assert.equal(result.twice, result.once)
   assert.equal(result.plain, '河口对峙，需要看清汇流处。')
+})
+
+test('镜号清洗：不留连续标点残渣，正常顿号/句号不受影响', () => {
+  const result = run(`{
+    const raw = '地图细节图：甲。地理：山谷、河流。\\n用法：\\n这是一组资产。；；；；预置版式 L4a。'
+    out({ cleaned: stripShotSnapshot(raw), plain: stripShotSnapshot('山谷、河流。') })
+  }`)
+  assert.doesNotMatch(result.cleaned, /；；/)
+  assert.match(result.cleaned, /山谷、河流。/)
+  assert.match(result.cleaned, /预置版式 L4a。/)
+  assert.equal(result.plain, '山谷、河流。')
 })
 
 // ─── 3. 语义补充字段与人工所有权 ────────────────────────────
