@@ -11,6 +11,8 @@ import {listConfigModelChoices} from './ai.js'
 import {loadPropSemantics} from './asset-semantics.js'
 import {cancelImageTask} from './qwen-jobs.js'
 import {GEOMETRY_MAX_SIDE,isExtractableLineColor,lineColorCoverage,loadRaster,parseHexColor} from './semantics-geometry.js'
+import {loadImageVersions} from './asset-library.js'
+import {addReferenceImage,removeReferenceImage} from './reference-images.js'
 import {AssetStudioDeliveryConflict,ImageSelectionError,type AssetStudioHost,type AssetStudioPlatform,type AssetStudioAssetSnapshot,type AssetKind,type RoundPurpose,FIDELITY_LINE_COVERAGE,type SemanticsPreserved} from '../modules/asset-studio/contract.js'
 function parseRef(ref:string){const m=/^(character|scene|prop):([1-9]\d*)$/.exec(ref);if(!m)throw new Error('资产引用非法');return {kind:m[1] as AssetKind,id:Number(m[2]),table:m[1]==='character'?'characters':m[1]==='scene'?'scenes':'props'}}
 function snapshot(ref:string):AssetStudioAssetSnapshot|null{
@@ -18,7 +20,7 @@ function snapshot(ref:string):AssetStudioAssetSnapshot|null{
  const link=kind==='character'?'episode_characters':kind==='scene'?'episode_scenes':'episode_props';const owner=kind+'_id'
  const episode=sqlite.prepare(`SELECT episode_id FROM ${link} WHERE ${owner}=? ORDER BY episode_id LIMIT 1`).get(id) as {episode_id:number}|undefined
  const refs=JSON.parse(row.reference_images||'[]') as {path:string;usage?:string}[]
- const data={kind,id,dramaId:Number(row.drama_id),episodeId:episode?.episode_id??null,name:String(row.name??row.location),description:kind==='character'?[row.appearance,row.styling,row.description].filter(Boolean).join('；'):kind==='scene'?[row.time,row.lighting,row.prompt].filter(Boolean).join('；'):[row.type,row.description].filter(Boolean).join('；'),appearance:row.appearance??null,styling:row.styling??null,prompt:row.prompt??null,lighting:row.lighting??null,imageUrl:row.local_path||row.image_url||null,faithful:row.faithful===1,isMap:row.asset_type==='map',referenceImages:refs.map(r=>({path:r.path,usage:r.usage}))}
+ const data={kind,id,dramaId:Number(row.drama_id),episodeId:episode?.episode_id??null,name:String(row.name??row.location),description:kind==='character'?[row.appearance,row.styling,row.description].filter(Boolean).join('；'):kind==='scene'?[row.time,row.lighting,row.prompt].filter(Boolean).join('；'):[row.type,row.description].filter(Boolean).join('；'),appearance:row.appearance??null,styling:row.styling??null,prompt:row.prompt??null,lighting:row.lighting??null,subtype:kind==='prop'?(row.type||null):kind==='character'?(row.role||null):(row.time||null),finalPrompt:row.final_prompt??null,imageUrl:row.local_path||row.image_url||null,faithful:row.faithful===1,isMap:row.asset_type==='map',referenceImages:refs.map(r=>({path:r.path,usage:r.usage}))}
  return {...data,fingerprint:crypto.createHash('sha256').update(JSON.stringify(data)).digest('hex')}
 }
 export const huobaoAssetStudioHost:AssetStudioHost={
@@ -53,11 +55,14 @@ export const huobaoAssetStudioHost:AssetStudioHost={
  })()},
  async invalidateFinalPrompt(ref,version){if(version<=1)return;const a=snapshot(ref);if(!a||a.faithful)return;const decision=classifyPromptInvalidation({kind:a.kind,current:{},updates:{},specVersionChanged:true});if(!decision.changed)return;const table=a.kind==='character'?schema.characters:a.kind==='scene'?schema.scenes:schema.props;const [row]=await db.select().from(table).where(eq(table.id,a.id));const write=planFinalPromptWrite({currentFinalPrompt:row?.finalPrompt??null,sourceChanged:true,at:now()});if(Object.keys(write).length)await db.update(table).set({...write,updatedAt:now()}).where(eq(table.id,a.id))},
  async semanticsContext(ref){const a=snapshot(ref);if(!a||a.kind!=='prop')return {labels:[],expected:[]};const s=await loadPropSemantics(a.id);return {labels:s?[...s.labels.map(l=>l.text),...s.points.map(p=>p.name)].filter(Boolean):[],expected:s?s.points.map(p=>({id:p.id,name:p.name,at:p.at})):[]}},
+ async listVersions(ref){const a=snapshot(ref);if(!a)return [];const map=await loadImageVersions(a.kind,[{id:a.id,imageUrl:a.imageUrl}]);return map.get(a.id)??[]},
+ async addReferenceImage(ref,file){const {kind,id}=parseRef(ref);return addReferenceImage(kind,id,file)},
+ async removeReferenceImage(ref,url){const {kind,id}=parseRef(ref);return removeReferenceImage(kind,id,url)},
 }
 export const huobaoAssetStudioPlatform:AssetStudioPlatform={
  async submitImage(i){
   const a=snapshot(i.hostRef)
-  if(!a||a.faithful||a.isMap)throw new Error('该资产受保护，禁止计费生图')
+  if(!a||a.isMap)throw new Error('地图资产请走地图工作室')
   const taskId=await generateImage({
    ...(a.kind==='character'?{characterId:a.id}:a.kind==='scene'?{sceneId:a.id}:{propId:a.id}),
    episodeId:i.episodeId??undefined,dramaId:a.dramaId,prompt:i.prompt,

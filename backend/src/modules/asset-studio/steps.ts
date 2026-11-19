@@ -20,27 +20,26 @@ import { callTextChat, imageContentPart, type ChatContent } from '../../services
 import { evaluateGate, normalizeScore, type GateMetric, type GateResult, type SpecForbidden, type SpecMustHave } from './gate.js'
 import { sizeBucketFor } from './generator.js'
 import { abortableSleep } from './deadline.js'
-import { canonicalReferencePath, resolveReferenceOrigins, type ReferenceOrigin } from './references.js'
+import { canonicalReferencePath, type ReferenceOrigin } from './references.js'
 import {
-  buildImagePrompt,
-  buildNegativePrompt,
   parseJsonReply,
   QC_SYSTEM,
   qcUserPrompt,
   SPEC_SYSTEM,
   specUserPrompt,
 } from './prompts.js'
-import { getAssetResearch, performResearch, type AssetResearchResult } from './research/run.js'
+import type { AssetResearchResult } from './research/run.js'
 import {
   ensureRound,
+  getRound,
   getSpec,
   insertQcRecord,
   insertSpec,
   listSources,
-  listAssetRounds,
   patchRound,
   type AssetKind,
   type AssetRoundRow,
+  type AssetSourceRow,
   type AssetSpecRow,
   type QcVerdicts,
   type RoundPurpose,
@@ -133,42 +132,7 @@ export async function writeStep(pipelineTaskId: number, step: string): Promise<v
  */
 export type ResearchResult = AssetResearchResult | Record<string, unknown>
 
-/**
- * 资料研究（Issue #79）：优先复用该资产最近一次成功的「检索权威资料」任务；
- * 没有时现场只做文字检索（跳过下载与视觉判断，控制在步骤时限内），结果冻结进本次 run。
- */
-async function runResearchBody(input: {
-  pipelineTaskId: number
-  target: AssetTarget
-  textConfigId?: number
-}): Promise<{ result: ResearchResult }> {
-  const row = getRun(input.pipelineTaskId)
-  const cached = parseTextTaskParams(row?.params)?.asset_research
-  if (cached && typeof cached === 'object') return { result: cached as ResearchResult }
-
-  const latest = (await getAssetResearch(input.target.kind, input.target.id)).result
-  const result = latest ?? await performResearch({
-    kind: input.target.kind, id: input.target.id, dramaId: input.target.dramaId,
-    name: input.target.name, description: input.target.description,
-  }, { textConfigId: input.textConfigId, withImages: false })
-  await patchTextTaskParams(input.pipelineTaskId, { asset_research: result })
-  return { result }
-}
-
-// ─── curate ──────────────────────────────────────────────────
-
-/** 素材筛选：角色由人工在面板上定，这里只汇总并把缺口写成告警 */
-export async function runCurate(target: AssetTarget): Promise<{ usable: number; rejected: number; warnings: string[] }> {
-  const sources = await listSources(target.kind, target.id)
-  const usable = sources.filter(item => item.role !== 'rejected')
-  const rejected = sources.filter(item => item.role === 'rejected')
-  const warnings: string[] = []
-  if (!usable.length) {
-    warnings.push('没有任何可用素材：事实表只能依据文字资料，图像佐证缺失已记入 uncertainties')
-  }
-  if (usable.some(item => !item.license.trim())) warnings.push('有素材缺少许可信息')
-  return { usable: usable.length, rejected: rejected.length, warnings }
-}
+// 资料研究步已删（Issue #123）：精确草稿显式选用检索记录，未选则无检索输入，不再内联兜底。
 
 // ─── spec ────────────────────────────────────────────────────
 
@@ -209,22 +173,32 @@ function stringList(raw: unknown): string[] {
   return Array.isArray(raw) ? raw.map(item => String(item).trim()).filter(Boolean) : []
 }
 
-async function runSpecBody(input: {
+export interface RunSpecInput {
   pipelineTaskId: number
   target: AssetTarget
   research: ResearchResult
   textConfigId?: number
   signal?: AbortSignal
-}): Promise<AssetSpecRow> {
-  const row = getRun(input.pipelineTaskId)
-  const specId = parseTextTaskParams(row?.params)?.asset_spec_id as number | undefined
-  if (specId) {
-    const existing = await getSpec(specId)
-    if (existing) return existing
+  /** 草稿展开传选中素材行，覆盖默认全量 listSources（Issue #123） */
+  sources?: AssetSourceRow[]
+  /** 观测隔离：draft 展开传 'asset_studio_draft'，taskId=draft.id（与 run.id 各自自增会撞号） */
+  scope?: string
+  /** 草稿阶段无 run 行：跳过 run.params 读写，spec_id 由调用方落 draft */
+  skipRunParams?: boolean
+}
+
+async function runSpecBody(input: RunSpecInput): Promise<AssetSpecRow> {
+  if (!input.skipRunParams) {
+    const row = getRun(input.pipelineTaskId)
+    const specId = parseTextTaskParams(row?.params)?.asset_spec_id as number | undefined
+    if (specId) {
+      const existing = await getSpec(specId)
+      if (existing) return existing
+    }
   }
 
   const stageModel = await resolveStageModel('asset_spec', { configId: input.textConfigId })
-  const sources = await listSources(input.target.kind, input.target.id)
+  const sources = input.sources ?? await listSources(input.target.kind, input.target.id)
   const parsed = await callJsonChat(stageModel, specUserPrompt({
     assetKind: input.target.kind,
     name: input.target.name,
@@ -259,8 +233,10 @@ async function runSpecBody(input: {
     })),
     createdByStage: 'asset_spec',
   })
-  await patchTextTaskParams(input.pipelineTaskId, { asset_spec_id: spec.id, asset_spec_version: spec.version })
-  await invalidateFinalPromptForSpec(input.target, spec.version)
+  if (!input.skipRunParams) {
+    await patchTextTaskParams(input.pipelineTaskId, { asset_spec_id: spec.id, asset_spec_version: spec.version })
+    await invalidateFinalPromptForSpec(input.target, spec.version)
+  }
   return spec
 }
 
@@ -292,81 +268,69 @@ async function waitForImageTask(
 }
 
 /**
- * 出一轮图。**幂等**：先按 `(pipeline_task_id, round_no)` 查轮次行，已经下过单就只继续等那条
- * 生图任务（重启重放时绝不重复下单——那是最贵的一步）。
+ * 冻结输入的一次生图（Issue #123，取代 runGenerateBody）：prompt/参考图/spec 全部由
+ * generateFromDraft 冻结传入——不重建 prompt、不读 spec、不做 faithful 拦截（isMap 保留）。
+ * **幂等**：先按 `(pipeline_task_id, round_no)` 查轮次行，已下过单只继续等那条生图任务。
+ * **取消守卫**：每个写回点检查 run.status，非 running 即中止（取消后不得复活）。
  */
-async function runGenerateBody(input: {
+export async function runGenerateFrozen(input: {
   pipelineTaskId: number
   episodeId: number
   target: AssetTarget
-  spec: AssetSpecRow
   roundNo: number
   purpose: RoundPurpose
-  /** 上一轮被勾中的 violation 文本，拼进本轮提示词 */
-  reviseNotes: string[]
-  /** 参考图（精确轮用素材，美化轮用上一轮产出图） */
+  prompt: string
+  negativePrompt: string | null
   referenceImages: string[]
-  /** IDs carried forward from selection; omitted callers use unique path lookup only. */
-  referenceOrigins?: ReferenceOrigin[]
+  referenceOrigins: ReferenceOrigin[]
+  specId: number | null
   configId?: number | null
   model?: string | null
   signal?: AbortSignal
 }): Promise<AssetRoundRow> {
-  const latestTarget=await getHost().readAsset(`${input.target.kind}:${input.target.id}`)
-  if(!latestTarget || latestTarget.faithful || latestTarget.isMap) throw new Error('该资产受保护或为地图，不能生成')
-  const generator = await getPlatform().imageSelection({
-    configId: input.configId,
-    model: input.model,
-  })
-  const stylePrompt = input.purpose === 'beautify' ? await getPlatform().stylePrompt(input.target.dramaId) : null
-  const prompt = buildImagePrompt(input.spec, {
-    name: input.target.name,
-    purpose: input.purpose,
-    reviseNotes: input.reviseNotes,
-    stylePrompt,
-  })
-  const negativePrompt = buildNegativePrompt(input.spec)
-
-  const referenceOrigins = resolveReferenceOrigins(
-    input.referenceImages,
-    await listSources(input.target.kind, input.target.id),
-    (await listAssetRounds(input.target.kind, input.target.id)).filter(round =>
-      round.pipeline_task_id !== input.pipelineTaskId || round.round_no < input.roundNo),
-    input.referenceOrigins,
-  )
-  const referenceIds = referenceOrigins.flatMap(item => item.type === 'source' ? [item.source_id] : [])
+  const latestTarget = await getHost().readAsset(`${input.target.kind}:${input.target.id}`)
+  if (!latestTarget || latestTarget.isMap) throw new Error('地图资产请走地图工作室，不能进入生图')
+  const assertRunning = () => {
+    const run = getRun(input.pipelineTaskId)
+    if (!run || run.status !== 'running') throw new Error('运行已取消或中断，停止生图')
+  }
+  assertRunning()
+  const generator = await getPlatform().imageSelection({ configId: input.configId, model: input.model })
+  const referenceIds = input.referenceOrigins.flatMap(item => item.type === 'source' ? [item.source_id] : [])
 
   const { round, created } = await ensureRound({
     pipelineTaskId: input.pipelineTaskId,
     assetKind: input.target.kind,
     assetId: input.target.id,
-    specId: input.spec.id,
+    specId: input.specId,
     roundNo: input.roundNo,
     purpose: input.purpose,
     generator: generator.generator,
     configId: generator.configId,
-    prompt,
-    negativePrompt,
+    prompt: input.prompt,
+    negativePrompt: input.negativePrompt,
     referenceIds,
   })
   if (!created && round.status === 'generated' && round.image_path) return round
 
   let imageTaskId = round.image_task_id
   if (!imageTaskId && round.status === 'generating') {
-    // 崩溃窗口（下单成功但 image_task_id 还没落库）：按 owner + 提示词 + 轮次创建时间
-    // 认领已经存在的那条生图任务，绝不重复下单
-    imageTaskId = await adoptOrphanImageTask(input.target, prompt, round.created_at)
+    // 崩溃窗口（下单成功但 image_task_id 还没落库）：按 owner + 提示词 + 轮次创建时间认领，绝不重复下单
+    imageTaskId = await adoptOrphanImageTask(input.target, input.prompt, round.created_at)
     if (imageTaskId) {
       await patchRound(round.id, { imageTaskId })
       logTaskProgress('AssetPipeline', 'adopted-orphan-image-task', { roundId: round.id, imageTaskId })
     }
   }
   if (!imageTaskId) {
-    // 道具/角色的派生图必须与底图同画幅，否则既有语义坐标全部错位（prop-beautify.ts:62 的不变量）；
-    // 场景则一律按项目画幅出图（Issue #94）——底图可能是改造前留下的横图，跟随它只会把挤压延续下去
+    assertRunning()
+    // 尺寸政策（评审 P2-9）：美化一律按所选版本图的宽高取 bucket（含场景，保持构图画幅）；
+    // 精确：场景按项目画幅锁定（#94），角色/道具按首张参考图取 bucket（语义坐标不变量）。
     const scene = input.target.kind === 'scene'
-    let size: string | undefined = scene ? await getPlatform().sceneSize(input.target.dramaId) : undefined
-    const base = !scene && input.referenceImages[0] ? canonicalReferencePath(input.referenceImages[0]) : null
+    const followBase = input.purpose === 'beautify' || !scene
+    let size: string | undefined = scene && input.purpose !== 'beautify' ? await getPlatform().sceneSize(input.target.dramaId) : undefined
+    const aspectLocked = scene && input.purpose !== 'beautify'
+    const base = followBase && input.referenceImages[0] ? canonicalReferencePath(input.referenceImages[0]) : null
     if (base) {
       try {
         const meta = await sharp(base).metadata()
@@ -377,13 +341,15 @@ async function runGenerateBody(input: {
     }
     await patchRound(round.id, { status: 'generating', generator: generator.generator, configId: generator.configId })
     imageTaskId = (await getPlatform().submitImage({
-      hostRef:`${input.target.kind}:${input.target.id}`,episodeId:input.episodeId,prompt,negativePrompt,size,aspectLocked:scene,
-      model:generator.model,configId:generator.configId,referenceImages:input.referenceImages,referenceOrigins,roundKey:`${input.pipelineTaskId}:${input.roundNo}`,
+      hostRef: `${input.target.kind}:${input.target.id}`, episodeId: input.episodeId, prompt: input.prompt, negativePrompt: input.negativePrompt ?? undefined,
+      size, aspectLocked, model: generator.model, configId: generator.configId,
+      referenceImages: input.referenceImages, referenceOrigins: input.referenceOrigins, roundKey: `${input.pipelineTaskId}:${input.roundNo}`,
     })).taskId
     await patchRound(round.id, { imageTaskId })
   }
 
   const waited = await waitForImageTask(imageTaskId, input.signal)
+  assertRunning()
   if (!waited.ok || !waited.path) {
     await patchRound(round.id, { status: 'failed', errorMsg: waited.error })
     throw new Error(`第 ${input.roundNo} 轮出图失败：${waited.error}`)
@@ -399,20 +365,7 @@ async function runGenerateBody(input: {
     height: meta.height ?? null,
     errorMsg: null,
   })
-  const updated = await ensureRound({
-    pipelineTaskId: input.pipelineTaskId,
-    assetKind: input.target.kind,
-    assetId: input.target.id,
-    specId: input.spec.id,
-    roundNo: input.roundNo,
-    purpose: input.purpose,
-    generator: generator.generator,
-    configId: generator.configId,
-    prompt,
-    negativePrompt,
-    referenceIds,
-  })
-  return updated.round
+  return (await getRound(round.id))!
 }
 
 /**
@@ -446,7 +399,9 @@ function normalizeQcVerdicts(raw: Record<string, unknown>): QcVerdicts {
   }
 }
 
-async function runQcBody(input: {
+export interface QcOutcome { gate: GateResult; verdicts: QcVerdicts; qcId: number }
+
+export interface RunQcInput {
   target: AssetTarget
   spec: AssetSpecRow
   round: AssetRoundRow
@@ -454,7 +409,10 @@ async function runQcBody(input: {
   expected?: Array<{ id: string; name: string; at: [number, number] }>
   textConfigId?: number
   signal?: AbortSignal
-}): Promise<{ gate: GateResult; verdicts: QcVerdicts; qcId: number }> {
+  scope?: string
+}
+
+async function runQcBody(input: RunQcInput): Promise<QcOutcome> {
   if (!input.round.image_path) throw new Error('该轮没有产出图，无法质检')
   const stageModel = await resolveStageModel('asset_qc', { configId: input.textConfigId })
   const prepared = await imageContentPart(input.round.image_path, { maxSide: QC_MAX_SIDE, quality: QC_JPEG_QUALITY })
@@ -519,18 +477,18 @@ async function runQcBody(input: {
   return { gate, verdicts, qcId: record.id }
 }
 
-async function observed<T>(runId:number,stage:string,fn:()=>Promise<T>):Promise<T>{
+async function observed<T>(runId:number,stage:string,fn:()=>Promise<T>,scope='asset_studio',skipRunParams=false):Promise<T>{
   const startedAt=Date.now()
-  const before=listObservedWork(runId,'asset_studio')
+  const before=listObservedWork(runId,scope)
   const after=Math.max(0,...before.map(work=>work.id))
-  const params=parseTextTaskParams(getRun(runId)?.params)
+  const params=skipRunParams?{}:parseTextTaskParams(getRun(runId)?.params)
   const prior=Array.isArray(params.stage_spans)?params.stage_spans:[]
   const span={stage,started_at:startedAt,finished_at:null,status:'running',after_work_id:after,work_ids:[]}
-  await patchTextTaskParams(runId,{stage_spans:[...prior,span]})
+  if(!skipRunParams)await patchTextTaskParams(runId,{stage_spans:[...prior,span]})
   let status='completed'
   try{
     return await runObservedWork({
-      taskId:runId,scope:'asset_studio',stage:'asset_studio',
+      taskId:runId,scope,stage:'asset_studio',
       sourceChars:String(params.snapshot?.description??'').length,
       sampleKey:`asset_studio:${stage}`,
     },fn)
@@ -538,14 +496,14 @@ async function observed<T>(runId:number,stage:string,fn:()=>Promise<T>):Promise<
     status='failed'
     throw error
   }finally{
-    const latest=parseTextTaskParams(getRun(runId)?.params)
-    const workIds=listObservedWork(runId,'asset_studio').filter(work=>work.id>after).map(work=>work.id)
-    await patchTextTaskParams(runId,{stage_spans:latest.stage_spans.map((entry:typeof span)=>
-      entry.started_at===startedAt&&entry.stage===stage
-        ? {...entry,finished_at:Date.now(),status,work_ids:workIds}:entry)})
+    if(!skipRunParams){
+      const latest=parseTextTaskParams(getRun(runId)?.params)
+      const workIds=listObservedWork(runId,scope).filter(work=>work.id>after).map(work=>work.id)
+      await patchTextTaskParams(runId,{stage_spans:latest.stage_spans.map((entry:typeof span)=>
+        entry.started_at===startedAt&&entry.stage===stage
+          ? {...entry,finished_at:Date.now(),status,work_ids:workIds}:entry)})
+    }
   }
 }
-export function runResearch(input:Parameters<typeof runResearchBody>[0]):ReturnType<typeof runResearchBody>{return observed(input.pipelineTaskId,'research',()=>runResearchBody(input))}
-export function runSpec(input:Parameters<typeof runSpecBody>[0]):ReturnType<typeof runSpecBody>{return observed(input.pipelineTaskId,'spec',()=>runSpecBody(input))}
-export function runGenerate(input:Parameters<typeof runGenerateBody>[0]):ReturnType<typeof runGenerateBody>{return observed(input.pipelineTaskId,'generate',()=>runGenerateBody(input))}
-export function runQc(input:Parameters<typeof runQcBody>[0]):ReturnType<typeof runQcBody>{return observed(input.round.pipeline_task_id,'qc',()=>runQcBody(input))}
+export function runSpec(input: RunSpecInput): Promise<AssetSpecRow> { return observed(input.pipelineTaskId, 'spec', () => runSpecBody(input), input.scope ?? 'asset_studio', input.skipRunParams ?? false) }
+export function runQc(input: RunQcInput): Promise<QcOutcome> { return observed(input.round.pipeline_task_id, 'qc', () => runQcBody(input), input.scope ?? 'asset_studio') }

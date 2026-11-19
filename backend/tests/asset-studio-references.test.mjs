@@ -28,9 +28,9 @@ const BOOT = `
   await initAssetStudio(huobaoAssetStudioPlatform)
   const bootAt = '2026-01-01T00:00:00.000Z'
   // 模块 run/task 行（替代旧 sys_task kind=asset_pipeline 容器）
-  sqlite.prepare("INSERT OR IGNORE INTO asset_studio_task (id, host_ref, title, created_at, updated_at) VALUES (1, 'prop:7', 'artifact', ?, ?)").run(bootAt, bootAt)
   for (const id of [100,101,102,103,104,105,106]) {
-    sqlite.prepare("INSERT OR IGNORE INTO asset_studio_run (id, task_id, status, purpose, params, created_at, updated_at) VALUES (?, 1, 'completed', 'precision', ?, ?, ?)").run(id, JSON.stringify({ asset_kind:'prop', asset_id:7 }), bootAt, bootAt)
+    sqlite.prepare("INSERT OR IGNORE INTO asset_studio_task (id, host_ref, title, created_at, updated_at) VALUES (?, 'prop:7', 'artifact', ?, ?)").run(id, bootAt, bootAt)
+    sqlite.prepare("INSERT OR IGNORE INTO asset_studio_run (id, task_id, status, purpose, params, created_at, updated_at) VALUES (?, ?, 'running', 'precision', ?, ?, ?)").run(id, id, JSON.stringify({ asset_kind:'prop', asset_id:7 }), bootAt, bootAt)
   }
 `
 
@@ -45,10 +45,8 @@ try {
     import { db, schema, sqlite } from './src/db/index.ts'
     ${BOOT}
     import { ensureRound, patchRound, insertSpec, getRound, listSources } from './src/modules/asset-studio/store.ts'
-    import { referencesFor } from './src/modules/asset-studio/workflow.ts'
-    import { runGenerate, loadAssetTarget } from './src/modules/asset-studio/steps.ts'
-    import { roundReferenceImages } from './src/modules/asset-studio/references.ts'
-    import { buildImagePrompt } from './src/modules/asset-studio/prompts.ts'
+    import { runGenerateFrozen, loadAssetTarget } from './src/modules/asset-studio/steps.ts'
+    import { roundReferenceImages, draftReferenceImages } from './src/modules/asset-studio/references.ts'
     import { assetStudioRoutes } from './src/modules/asset-studio/routes.ts'
     var at = bootAt
     const root = process.env.STORAGE_PATH
@@ -94,17 +92,21 @@ try {
       sqlite.prepare('UPDATE asset_studio_run SET params=? WHERE id=?').run(JSON.stringify({ asset_kind:'prop', asset_id:7, asset_spec_id: spec.id }), id)
     }
     const target = await loadAssetTarget('prop', 7)
-    const input = { pipelineTaskId: 100, episodeId: 1, target, spec, roundNo: 0, purpose: 'precision', reviseNotes: [], configId: 200 }
-    const state = { input: { pipelineTaskId: 100, assetKind: 'prop', assetId: 7 } }
-    const selected = await referencesFor(state, 0, 'precision')
+    const frozenPrompt = 'frozen audit prompt: historically accurate artifact, no added labels'
+    const input = { pipelineTaskId: 100, episodeId: 1, target, roundNo: 0, purpose: 'precision', prompt: frozenPrompt, negativePrompt: null, specId: spec.id, configId: 200 }
+    // 草稿参考图组装（Issue #123）：选中素材按 source_ids 顺序 + 检索候选去重；美化单图
+    const selectedPaths = draftReferenceImages({ source_ids: [11, 13], research: [], notes: '' }, sources, [], null)
+    const selected = { referenceImages: selectedPaths, referenceOrigins: [{ type: 'source', source_id: 11 }, { type: 'source', source_id: 13 }] }
+    const beautifyPaths = draftReferenceImages({ version_task_id: null, notes: '' }, sources, [], 'static/fixtures/output.png')
+    const dedupPaths = draftReferenceImages({ source_ids: [11, 13], research: [], notes: '' }, sources, ['static/fixtures/one.png', 'static/fixtures/two.png'], null)
     let networkCalls = 0
     const realFetch = globalThis.fetch
     globalThis.fetch = (url, options) => {
       if (new URL(String(url)).origin !== localBase) { networkCalls++; throw new Error('external network forbidden in provenance fixture') }
       return realFetch(url, options)
     }
-    const generated = await runGenerate({ ...input, ...selected })
-    const mixed = await runGenerate({ ...input, pipelineTaskId: 101, referenceImages: ['/static/fixtures/two.png', generated.image_path, 'static/fixtures/./one.png'],
+    const generated = await runGenerateFrozen({ ...input, ...selected })
+    const mixed = await runGenerateFrozen({ ...input, pipelineTaskId: 101, referenceImages: ['/static/fixtures/two.png', generated.image_path, 'static/fixtures/./one.png'],
       referenceOrigins: [{ type: 'source', source_id: 12 }, { type: 'prev_round', round_id: generated.id }, { type: 'source', source_id: 11 }] })
     const generatedTask = (await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, generated.image_task_id)))[0]
     const initialParams = generatedTask.params
@@ -115,7 +117,7 @@ try {
     sqlite.prepare("UPDATE asset_studio_source SET local_path='static/fixtures/unknown.png', role='rejected' WHERE id=11").run()
     const newerSpec = await insertSpec({ assetKind: 'prop', assetId: 7, summary: 'changed current spec', mustHave: [], forbidden: [], tolerances: [], uncertainties: [], sources: [], createdByStage: 'fixture' })
     sqlite.prepare('UPDATE asset_studio_run SET params=? WHERE id=100').run(JSON.stringify({ asset_kind:'prop', asset_id:7, asset_spec_id: newerSpec.id }))
-    const replay = await runGenerate({ ...input, spec: newerSpec, referenceImages: ['static/fixtures/unknown.png'] })
+    const replay = await runGenerateFrozen({ ...input, specId: newerSpec.id, referenceImages: ['static/fixtures/unknown.png'], referenceOrigins: [{ type: 'unknown' }] })
     const historical = (await ensureRound({ pipelineTaskId: 102, assetKind: 'prop', assetId: 7, specId: spec.id, roundNo: 0, purpose: 'precision', generator: 'fixture', configId: 200, prompt: 'historic', negativePrompt: '', referenceIds: [] })).round
     await db.insert(schema.sysTask).values({ id: 500, type: 'image', propId: 7, prompt: 'historic', status: 'completed', params: JSON.stringify({ referenceImages: ['static/fixtures/one.png', 'static/fixtures/unknown.png'] }), localPath: 'static/fixtures/output.png', createdAt: at, updatedAt: at })
     await patchRound(historical.id, { imageTaskId: 500, status: 'generated', imagePath: 'static/fixtures/output.png' })
@@ -126,21 +128,21 @@ try {
     const ambiguous = (await ensureRound({ pipelineTaskId: 103, assetKind: 'prop', assetId: 7, specId: duplicateSpec.id, roundNo: 0, purpose: 'precision', generator: 'fixture', configId: 200, prompt: 'ambiguous', negativePrompt: '', referenceIds: [] })).round
     await db.insert(schema.sysTask).values({ id: 501, type: 'image', params: JSON.stringify({ referenceImages: ['static/fixtures/one.png', generated.image_path, 'static/fixtures/two.png', 'static/fixtures/missing.png', 'static/../outside.png', 'static/fixtures/escape.png', 'https://invalid.example/a.png', '/etc/passwd'] }), status: 'completed', createdAt: at, updatedAt: at })
     await patchRound(ambiguous.id, { imageTaskId: 501 })
-    const orphan = (await ensureRound({ pipelineTaskId: 104, assetKind: 'prop', assetId: 7, specId: spec.id, roundNo: 0, purpose: 'precision', generator: 'fixture', configId: 200, prompt: buildImagePrompt(spec, { name: target.name, purpose: 'precision', reviseNotes: [], stylePrompt: null }), negativePrompt: '', referenceIds: [] })).round
+    const orphan = (await ensureRound({ pipelineTaskId: 104, assetKind: 'prop', assetId: 7, specId: spec.id, roundNo: 0, purpose: 'precision', generator: 'fixture', configId: 200, prompt: frozenPrompt, negativePrompt: '', referenceIds: [] })).round
     await patchRound(orphan.id, { status: 'generating' })
     const orphanParams = JSON.stringify({ referenceImages: ['static/fixtures/two.png'], pipeline_round: true })
     await db.insert(schema.sysTask).values({ id: 502, type: 'image', propId: 7, prompt: orphan.prompt, params: orphanParams, status: 'completed', localPath: 'static/fixtures/output.png', createdAt: new Date(Date.now() + 1000).toISOString(), updatedAt: at })
-    const adopted = await runGenerate({ ...input, pipelineTaskId: 104, referenceImages: ['static/fixtures/three.png'] })
+    const adopted = await runGenerateFrozen({ ...input, pipelineTaskId: 104, referenceImages: ['static/fixtures/three.png'], referenceOrigins: [{ type: 'source', source_id: 13 }] })
     const missing = (await ensureRound({ pipelineTaskId: 105, assetKind: 'prop', assetId: 7, specId: spec.id, roundNo: 0, purpose: 'precision', generator: 'fixture', configId: 200, prompt: 'missing', negativePrompt: '', referenceIds: [] })).round
     const absentDetail = await roundReferenceImages(missing)
     sqlite.prepare("INSERT INTO asset_studio_source (id, asset_kind, asset_id, license, sha256, local_path, role, created_at) VALUES (99, 'prop', 7, 'CC0', '99', 'static/fixtures/two.png', 'generation_reference', ?)").run(at)
-    await runGenerate({ ...input, pipelineTaskId: 106, referenceImages: ['static/fixtures/two.png'] })
+    await runGenerateFrozen({ ...input, pipelineTaskId: 106, referenceImages: ['static/fixtures/two.png'], referenceOrigins: [{ type: 'source', source_id: 12 }] })
     const fallbackRow = sqlite.prepare('SELECT reference_ids FROM asset_studio_round WHERE run_id=106').get()
-    const detailResponse = await assetStudioRoutes.request('/tasks/1?run_id=100')
+    const detailResponse = await assetStudioRoutes.request('/tasks/100?run_id=100')
     const apiDetail = await detailResponse.json()
     await new Promise(resolve => server.close(resolve))
     console.log('@@' + JSON.stringify({
-      selected, generated, mixed, initialMixedDetail,
+      selected, beautifyPaths, dedupPaths, generated, mixed, initialMixedDetail,
       generatedParams: JSON.parse(initialParams), mixedParams: JSON.parse(mixedTask.params),
       replay, beforeCount, afterCount: (await db.select().from(schema.sysTask).where(eq(schema.sysTask.type, 'image'))).length,
       unchangedTask: initialParams === (await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, generated.image_task_id)))[0].params,
@@ -208,7 +210,9 @@ try {
   `)
 } finally { rmSync(dir, { recursive: true, force: true }) }
 
-test('precision source selection carries real IDs and persists only actually enqueued sources through both round writes', () => {
+test('draft reference assembly keeps order, dedups candidates, beautify single image; frozen generation persists enqueued sources', () => {
+  assert.deepEqual(result.beautifyPaths, ['static/fixtures/output.png'])
+  assert.deepEqual(result.dedupPaths, ['static/fixtures/one.png', 'static/fixtures/three.png', 'static/fixtures/two.png'])
   assert.deepEqual(result.selected.referenceImages, ['static/fixtures/one.png', 'static/fixtures/three.png'])
   assert.deepEqual(result.selected.referenceOrigins, [{ type: 'source', source_id: 11 }, { type: 'source', source_id: 13 }])
   assert.deepEqual(result.generated.reference_ids, [11, 13])
@@ -247,7 +251,7 @@ test('legacy detail uniquely matches frozen original spec, preserves unknowns an
 test('ambiguous duplicate cache paths, unsafe, missing and external paths remain unknown without fetching', () => {
   assert.deepEqual(result.ambiguousDetail.map(item => item.type), ['unknown', 'prev_round', 'source', 'unknown', 'unknown', 'unknown', 'unknown', 'unknown'])
   assert.equal(result.ambiguousDetail[2].source_id, 12)
-  assert.deepEqual(result.fallbackIds, [])
+  assert.deepEqual(result.fallbackIds, [12], '显式传入的 origins 直接落 reference_ids（不再做路径回查）')
   assert.equal(result.networkCalls, 0)
 })
 
@@ -259,7 +263,7 @@ test('completed replay and fresh-process reopening ignore changed current source
     { type: 'source', source_id: 11, path: 'static/fixtures/one.png' },
     { type: 'source', source_id: 13, path: 'static/fixtures/three.png' },
   ])
-  assert.equal(result.afterCount, result.beforeCount + 4, 'only three explicit historic fixtures and one local HTTP fixture generation were added')
+  assert.equal(result.afterCount, result.beforeCount + 4, 'three explicit historic fixtures and one local HTTP fixture generation were added')
 })
 
 test('orphan adoption preserves the original task input and historical empty IDs, without a new generation', () => {

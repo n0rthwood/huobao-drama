@@ -19,6 +19,7 @@ import { getPortraitAppearanceStatus, startPortraitAppearance, type StartPortrai
 import { bindCreatedAssetToReviewItem, findReviewItemAssetDuplicate, onAssetRemoved, onEpisodeAssetLinkChanged } from '../services/asset-review.js'
 import { stageSelectionErrorPayload } from '../services/ai-stages.js'
 import { mountAspectVersionRoute } from './asset-aspect-version.js'
+import { mountImageVersionRoutes } from './asset-image-version.js'
 import { CHARACTER_IMAGE_SIZE } from '../services/asset-image-size.js'
 import { planAssetReferences, AssetReferenceError, descriptionCitationsOf } from '../services/asset-submit-refs.js'
 import { referenceCitationIssue } from '../services/asset-reference-prompt.js'
@@ -32,6 +33,8 @@ mountReferenceImageRoutes(app, 'character')
 mountReExtractRoute(app, 'character')
 // POST /characters/:id/aspect-version — 以当前图为参考按项目画幅重出一版（Issue #94）
 mountAspectVersionRoute(app, 'character')
+// DELETE /characters/:id/image-versions/:taskId — 删除已生成的图片版本（Issue #123）
+mountImageVersionRoutes(app, 'character')
 
 // POST /characters/:id/archival-images — 从 Commons 入库史料画像（不进生图链路）
 app.post('/:id/archival-images', async (c) => {

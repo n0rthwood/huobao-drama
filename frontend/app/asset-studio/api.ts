@@ -44,6 +44,7 @@ export interface AssetSourceRow {
   sha256: string
   local_path: string
   role: AssetSourceRole
+  origin: 'user_reference' | 'research' | 'upload' | 'manual'
   why_excluded: string | null
   era: string | null
   fetched_at: string | null
@@ -139,11 +140,10 @@ export interface AssetPipelineRound {
   updated_at: string
   qc: QcRecordRow | null
   gate: GateResult | null
-  suggestion: { action: 'pass' | 'revise' | 'rollback' | 'abort'; target_round_no: number | null; reason: string } | null
+  version_deleted: boolean
 }
 export interface AssetPipelineState {
-  state: 'running' | 'waiting_approval' | 'completed' | 'failed' | 'cancelled' | 'interrupted' | 'unknown'
-  awaiting: { round_id: number; round_no: number } | null
+  state: 'running' | 'completed' | 'failed' | 'cancelled' | 'interrupted' | 'unknown'
   asset_kind: string
   asset_id: number
 }
@@ -163,14 +163,12 @@ export interface AssetPipelineRunSummary {
 export interface AssetPipelineRunDetail {
   run: AssetPipelineRunSummary & {
     episode_id: number
-    mastra_run_id: string | null
     error: string | null
-    result: { rollback_to: number | null; final_round_no: number | null } | null
+    qc_error: string | null
+    result: Record<string, unknown> | null
   }
   spec: AssetSpecRow | null
   rounds: AssetPipelineRound[]
-  /** 正在等人工审批的轮次（null = 不在等） */
-  awaiting: { round_id: number; round_no: number } | null
   sources: AssetSourceRow[]
 }
 export type AssetResearchRole = 'original' | 'generation_reference' | 'shape_only' | 'text_source' | 'reject'
@@ -191,29 +189,59 @@ export interface AssetResearchCandidate {
   what_it_proves: string[]
   cautions: string[]
 }
-export interface AssetResearchStatus {
-  status: 'none' | 'running' | 'done' | 'error'
+export interface AssetResearchResult {
+  queries: Array<{ adapter: string; query: string; hits: number; error?: string }>
+  texts: Array<{ adapter: string; title: string; url: string | null; excerpt: string }>
+  candidates: AssetResearchCandidate[]
+  dropped: number
+}
+/** 检索记录（Issue #123）：每次检索一行，全部可见，可单独/联合选用 */
+export interface AssetResearchRecord {
+  id: number
+  status: 'running' | 'completed' | 'failed'
+  step: string | null
+  instruction: string | null
+  keywords: string | null
+  error: string | null
+  created_at: string
+  completed_at: string | null
+  result: AssetResearchResult | null
   works?: Record<string, unknown>[]
   calls?: ObservedCall[]
   has_more?: boolean
   next_after_id?: number
-  task_id: number | null
-  step: string | null
-  error: string | null
-  finished_at: string | null
-  result: {
-    queries: Array<{ adapter: string; query: string; hits: number; error?: string }>
-    texts: Array<{ adapter: string; title: string; url: string | null; excerpt: string }>
-    candidates: AssetResearchCandidate[]
-    dropped: number
-  } | null
 }
+/** 草稿（Issue #123）：drafting → ready → generating → consumed；failed 可 retry */
+export type DraftStatus = 'drafting' | 'ready' | 'failed' | 'generating' | 'consumed'
+export interface DraftResearchSelection { research_id: number; candidate_shas: string[]; text_indexes: number[] }
+export interface PrecisionDraftInputs { source_ids: number[]; research: DraftResearchSelection[]; notes: string }
+export interface BeautifyDraftInputs { version_task_id: number | null; notes: string }
+export interface AssetStudioDraft {
+  id: number
+  task_id: number
+  asset_kind: AssetPipelineKind
+  asset_id: number
+  tab: 'precision' | 'beautify'
+  status: DraftStatus
+  inputs: Record<string, unknown>
+  spec_id: number | null
+  prompt: string | null
+  negative_prompt: string | null
+  error_msg: string | null
+  text_config_id: number | null
+  image_config_id: number | null
+  image_model: string | null
+  created_at: string
+  updated_at: string
+  spec?: AssetSpecRow | null
+}
+export interface AssetImageVersion { id: number | null; url: string | null; provider: string; model: string | null; prompt: string | null; created_at: string | null; generated_at: number | null; is_current: boolean; fidelity: 'verified' | 'failed' | null; fidelity_reason: string | null }
 
 
 export interface AssetStudioTask { id: number; host_ref: string; title: string; updated_at: string }
-export interface AssetStudioAsset { kind: AssetPipelineKind; id: number; name: string; description: string | null; appearance?: string | null; styling?: string | null; prompt?: string | null; lighting?: string | null; imageUrl: string | null; faithful: boolean; isMap: boolean; referenceImages: {path: string; usage?: string}[] }
+export interface AssetStudioAsset { kind: AssetPipelineKind; id: number; name: string; description: string | null; appearance?: string | null; styling?: string | null; prompt?: string | null; lighting?: string | null; subtype: string | null; finalPrompt: string | null; imageUrl: string | null; faithful: boolean; isMap: boolean; referenceImages: {path: string; usage?: string}[] }
 export interface AssetStudioDelivery { id: number; run_id: number; round_id: number; image_sha256: string; version_id: number | null; set_as_current: boolean | number; created_at: string }
-export interface AssetStudioDetail { task: AssetStudioTask; asset: AssetStudioAsset | null; target: {title: string; subtitle: string | null; return_path: string | null} | null; run: AssetPipelineRunDetail['run'] | null; rounds: AssetPipelineRound[]; spec: AssetSpecRow | null; sources: AssetSourceRow[]; deliveries: AssetStudioDelivery[] }
+export interface AssetStudioDetail { task: AssetStudioTask; asset: AssetStudioAsset | null; target: {title: string; subtitle: string | null; return_path: string | null} | null; run: AssetPipelineRunDetail['run'] | null; rounds: AssetPipelineRound[]; drafts: AssetStudioDraft[]; spec: AssetSpecRow | null; sources: AssetSourceRow[]; deliveries: AssetStudioDelivery[] }
 export interface ModelChoice { config_id: number; config_name: string; provider: string; model: string; priority?: number }
 export interface ObservedCall { id: number; status: string; stage?: string; model?: string; error_msg?: string; [key: string]: unknown }
 export interface ObservedMessage { id: number; role: string; content?: unknown; text?: string; [key: string]: unknown }
@@ -222,15 +250,23 @@ export const assetStudioAPI = {
  open: (host_ref: string) => request<{task_id: number}>('POST', '/tasks/open', {host_ref}),
  task: (id: number, runId?: number) => request<AssetStudioDetail>('GET', `/tasks/${id}${runId ? `?run_id=${runId}` : ''}`),
  runs: (id: number) => request<{runs: AssetPipelineRunSummary[]}>('GET', `/tasks/${id}/runs`),
- start: (id: number, data: {purpose: 'precision'|'beautify'; source_ids?: number[]; config_id?: number; model?: string; text_config_id?: number}) => request<{run_id: number}>('POST', `/tasks/${id}/run`, data),
- approve: (id: number, data: {round_id: number; verdict: 'approve'|'revise'|'rollback'|'abort'; selected_violations?: string[]; notes?: string; opened: AssetPipelineOpenedImage[]; override_gate?: boolean; next_purpose?: 'precision'|'beautify'}) => request('POST', `/runs/${id}/approve`, data),
+ sync: (id: number) => request<{sources: AssetSourceRow[]}>('POST', `/tasks/${id}/sync`),
+ versions: (id: number) => request<{versions: AssetImageVersion[]}>('GET', `/tasks/${id}/versions`),
+ uploadReference: (id: number, data: FormData) => request<{reference_images: {path: string; usage?: string}[]; sources: AssetSourceRow[]}>('POST', `/tasks/${id}/reference-images`, data),
+ deleteReference: (id: number, url: string) => request<{reference_images: {path: string; usage?: string}[]; sources: AssetSourceRow[]}>('DELETE', `/tasks/${id}/reference-images?url=${encodeURIComponent(url)}`),
  cancel: (id: number) => request('POST', `/runs/${id}/cancel`),
  listSources: (id: number) => request<{sources: AssetSourceRow[]}>('GET', `/tasks/${id}/sources`),
- addSource: (data: {task_id: number; host_ref?: string; url?: string; local_path?: string; source_url?: string; title?: string; artist?: string; license: string; role: AssetSourceRole; era?: string}) => request('POST', '/sources', data),
+ addSource: (data: {task_id: number; host_ref?: string; url?: string; local_path?: string; source_url?: string; title?: string; artist?: string; license: string; role: AssetSourceRole; origin?: 'user_reference'|'research'|'upload'|'manual'; era?: string}) => request('POST', '/sources', data),
  uploadSource: (data: FormData) => request('POST', '/sources', data),
  deleteSource: (id: number) => request('DELETE', `/sources/${id}`),
- research: (id: number, afterId = 0) => request<AssetResearchStatus>('GET', `/tasks/${id}/research?after_id=${afterId}`),
- startResearch: (id: number) => request('POST', `/tasks/${id}/research`, {}),
+ researchRecords: (id: number, afterId = 0) => request<{records: AssetResearchRecord[]}>('GET', `/tasks/${id}/research?after_id=${afterId}`),
+ startResearch: (id: number, data: {instruction?: string; keywords?: string; text_config_id?: number} = {}) => request<{task_id: number}>('POST', `/tasks/${id}/research`, data),
+ createDraft: (id: number, data: {tab: 'precision'|'beautify'; inputs: PrecisionDraftInputs | BeautifyDraftInputs; text_config_id?: number}) => request<AssetStudioDraft>('POST', `/tasks/${id}/drafts`, data),
+ drafts: (id: number) => request<{drafts: AssetStudioDraft[]}>('GET', `/tasks/${id}/drafts`),
+ draft: (id: number) => request<AssetStudioDraft>('GET', `/drafts/${id}`),
+ editDraft: (id: number, data: {prompt: string; negative_prompt?: string | null}) => request<AssetStudioDraft>('PUT', `/drafts/${id}`, data),
+ retryDraft: (id: number) => request<AssetStudioDraft>('POST', `/drafts/${id}/retry`),
+ generateDraft: (id: number, data: {config_id?: number; model?: string; expected_updated_at?: string} = {}) => request<{run_id: number; draft: AssetStudioDraft}>('POST', `/drafts/${id}/generate`, data),
  deliver: (id: number, round_id: number, set_as_current: boolean) => request('POST', `/runs/${id}/deliver`, {round_id, set_as_current}),
  settings: () => request<{settings: Record<string, string>}>('GET', '/settings'),
  saveSettings: (settings: Record<string, string>) => request('PUT', '/settings', {settings}),

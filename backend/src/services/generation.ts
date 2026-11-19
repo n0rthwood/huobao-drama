@@ -1117,7 +1117,8 @@ async function handleImageCompleteBase64(record: SysTaskRecord, base64Data: stri
 async function writeBackImageAssets(record: SysTaskRecord, localPath: string) {
   const params = parseTaskParams(record.params)
   // 流水线轮次图只落版本行，不回写资产当前图（Issue #56）
-  if (params.pipeline_round === true) return
+  // 兼容历史数字 1 的行（旧流水线遗留）：防止重试/回写再污染 faithful 资产当前图；新任务一律布尔 true
+  if (params.pipeline_round === true || params.pipeline_round === 1) return
   const posterId = Number(params.posterId || 0)
   if (posterId) {
     // Poster 生图只新增候选版本，不改当前底图/排版，也不自动选中（用户显式选择）

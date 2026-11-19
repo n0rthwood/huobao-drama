@@ -34,7 +34,7 @@ async function load() {
 onMounted(async () => { await load(); deeplinkHydrate() })
 </script>
 <style scoped>
-.as-page { max-width: 1280px; margin: auto; padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+.as-page { max-width: 1280px; margin: auto; padding: 24px; display: flex; flex-direction: column; gap: 16px; flex: 1; min-height: 0; overflow-y: auto; width: 100%; }
 header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 h1 { font-size: 22px; margin: 0; } p { margin: 6px 0; }
 .as-tasks { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }

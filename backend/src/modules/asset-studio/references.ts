@@ -1,20 +1,34 @@
 import fs from 'fs'
 import path from 'path'
 import { STORAGE_ROOT } from '../../utils/paths.js'
-import { getSpec, listAssetRounds, listSources, type AssetKind, type AssetRoundRow, type AssetSourceRow } from './store.js'
-import { selectPrecisionSources } from './contract.js'
-import {getPlatform} from './registry.js'
+import { getSpec, listAssetRounds, type AssetRoundRow, type AssetSourceRow } from './store.js'
+import type { BeautifyDraftInputs, PrecisionDraftInputs } from './contract.js'
+import { getPlatform } from './registry.js'
 
 /**
- * 精确轮参考图的取数口（Issue #73）：纯判定在 `contract.ts`，这里只负责读当前资产的素材表。
- * `ids` 为 undefined = 老 run 没有冻结选择，由 `selectPrecisionSources` 走兼容口径。
+ * 草稿参考图组装（Issue #123，取代 resolvePrecisionReferences）：
+ * 精确 = 选中素材（按 source_ids 顺序）+ 选中检索候选（去重，validate 已挡总量 ≤3）；
+ * 美化 = 选中版本图单张。候选入库（origin='research'）在 generateFromDraft 里做，
+ * 这里只按路径组装，origins 由调用方给（精确全部 source，美化 unknown）。
  */
-export async function resolvePrecisionReferences(
-  kind: AssetKind,
-  assetId: number,
-  ids?: number[] | null,
-): Promise<AssetSourceRow[]> {
-  return selectPrecisionSources(await listSources(kind, assetId), ids)
+export function draftReferenceImages(
+  inputs: PrecisionDraftInputs | BeautifyDraftInputs,
+  sources: AssetSourceRow[],
+  candidatePaths: string[],
+  beautifyPath: string | null,
+): string[] {
+  if (beautifyPath != null) return [beautifyPath]
+  const precision = inputs as PrecisionDraftInputs
+  const paths: string[] = []
+  const seen = new Set<string>()
+  for (const id of precision.source_ids ?? []) {
+    const row = sources.find(item => item.id === Number(id))
+    if (row?.local_path && !seen.has(row.local_path)) { seen.add(row.local_path); paths.push(row.local_path) }
+  }
+  for (const path of candidatePaths) {
+    if (path && !seen.has(path)) { seen.add(path); paths.push(path) }
+  }
+  return paths
 }
 
 /** Identity metadata aligned with sys_task.params.referenceImages; paths live only in that input. */

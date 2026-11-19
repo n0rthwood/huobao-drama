@@ -8,6 +8,8 @@ export type RoundPurpose = 'precision' | 'beautify'
 export type RoundStatus = 'pending' | 'generating' | 'generated' | 'failed' | 'discarded'
 // original（Issue #121）：图上就是目标资产的历史原件，入库即自动采用为资产当前图（受保护）
 export type SourceRole = 'original' | 'generation_reference' | 'shape_only' | 'rejected'
+// 素材来源（Issue #123）：user_reference=资产参考图同步 / research=检索候选入库 / upload=面板上传 / manual=手动入库
+export type SourceOrigin = 'user_reference' | 'research' | 'upload' | 'manual'
 export const SOURCE_ROLES: SourceRole[] = ['original', 'generation_reference', 'shape_only', 'rejected']
 
 export interface SpecSourceSnapshot {
@@ -53,6 +55,7 @@ export interface AssetSourceRow {
   sha256: string
   local_path: string
   role: SourceRole
+  origin: SourceOrigin
   why_excluded: string | null
   era: string | null
   fetched_at: string | null
@@ -207,6 +210,7 @@ function toSourceRow(row: Record<string, any>): AssetSourceRow {
     sha256: row.sha256,
     local_path: row.localPath,
     role: row.role as SourceRole,
+    origin: (row.origin ?? 'manual') as SourceOrigin,
     why_excluded: row.whyExcluded ?? null,
     era: row.era ?? null,
     fetched_at: row.fetchedAt ?? null,

@@ -13,7 +13,7 @@
 - 异步接口返回 `running/queued/processing` 只代表**受理**，不代表完成。必须轮询状态或任务中心到终态。
 - 媒体路径可能是根绝对形式（`/static/...`）或相对形式（`static/...`）。根绝对路径按 `HUOBAO_BASE` 拼，相对路径按部署前缀拼；拼完必须仍在部署基址内，拒绝 `..` 与绝对注入。
 - `drama_id` / `episode_id` 是数据库 ID；前端路由和审核深链用的是 `episode_number`（显示集数）。二者必须用 `GET /dramas/{d}` 双向核对。
-- **路径简写约定**：目录里的 `...` 续接与省略前缀只用于分组阅读；实际调用必须展开。规则：S7/S8 的批量与状态端点属于 `/episodes/{e}/...`，镜头级属于 `/storyboards/{id}/...`；`/runs/{id}` 属于 `/asset-studio/runs/{id}`；`/runs/{id}/approve` 同理。不确定时以本节完整写法为准，宁可显式写全。
+- **路径简写约定**：目录里的 `...` 续接与省略前缀只用于分组阅读；实际调用必须展开。规则：S7/S8 的批量与状态端点属于 `/episodes/{e}/...`，镜头级属于 `/storyboards/{id}/...`；`/runs/{id}` 属于 `/asset-studio/runs/{id}`；`/drafts/{id}` 属于 `/asset-studio/drafts/{id}`。不确定时以本节完整写法为准，宁可显式写全。
 - 所有 GET/POST/PUT/DELETE（含轮询与错误）都要写 actor 自己的 `requests.jsonl`，附脱敏 request/response；`api_key`、认证头、密钥 URL 一律不入证据。
 - 写入前保存受影响字段快照；写入后重新 GET 对照，报告 before/after。
 - AI 配置响应按机密处理：只允许在内存中白名单提取 `id/provider/model/base_url`，不得落盘。
@@ -260,40 +260,62 @@ Body：`{status:"have"|"added"|"ignored"|"not_needed"|"missing", reason?}`
 ### `POST /asset-review/items/{id}/extract` [S]
 用途：对缺失项单资产补提取，完成后自动回链。
 
-### 精确 → 美化流水线（纪录片核心，S2 后段）
+### 资产工作室：双 TAB 草稿引擎（纪录片核心，S2 后段；Issue #123 取代 #56/#73/#79 的 `/asset-pipeline` Mastra 流水线）
 
-### `POST /asset-pipeline/asset-sources` [R]
-multipart（`file`）或 JSON（`url`/`local_path`）：
-`{asset_kind, asset_id, role:"generation_reference"|..., license, title, artist, era}`
-用途：权威素材入库（按内容 sha256 缓存到 `static/asset-sources/`），供精确阶段引用与 QC 对照。
+> 旧 `/asset-pipeline/*` 路由与 `POST /asset-studio/tasks/{id}/run`、`POST /asset-studio/runs/{id}/approve` 已删除（404）。新模型：草稿 → 人编辑确认 → 一次生图 → 版本；QC 仅顾问性，不阻断交付。faithful 资产可生成派生版本，但绝不自动覆盖原件；采用是显式动作。
 
-### `GET /asset-pipeline/assets/{kind}/{id}/sources` [R]
-用途：查看该资产已缓存的权威素材。
+### `POST /asset-studio/tasks/open` [R]
+Body：`{host_ref:"prop:273"|"character:1"|"scene:2"}` → `{task_id, path:"/asset-studio/<id>", task, asset, target}`。打开即同步资产参考图进素材池（origin=user_reference）。
 
-### `POST /asset-pipeline/runs` [R]
-Body：`{asset_kind, asset_id, episode_id, purpose:"precision"|"beautify", config_id?, model?, text_config_id?}`
-用途：启动 Mastra 流水线（研究 → 规格 → 生成 → 视觉 QC → 人工审批 → 修订/美化）。
-语义：`precision` 是“带权威参照、程序 gate 与人工审批的生成逼近”，**不是精确复原**；产物仍是艺术再现，不得声称考古/器物级精确。
-返回：`{run_id, mastra_run_id}`。用 `GET /asset-pipeline/runs/{id}` 轮询阶段与候选。
-注意：**没有“每轮最多几张”的入参**；每个 run 的轮次/候选由服务固定流程决定。Agent 只能按 run 计数并预留预算（每次 `approve revise` 可能再花一轮图），在启动前向人确认这条资产允许几轮。
+### `POST /asset-studio/tasks/{id}/sync` [R]
+幂等显式同步（直达页/刷新用）：把资产 `reference_images` 按 sha256 upsert 进 `asset_studio_source`；同 sha 多来源不覆盖既有 origin/role/license。GET 请求不写库。
 
-### `GET /asset-pipeline/runs/{id}` [R]
-用途：读轮次、候选图、程序 gate 结果、待审状态。**程序 gate FAIL 必须保留**。
-实测字段：`rounds[]{id,purpose,generator,image,image_sha256,qc{hg_verdict,gate_pass,human_opened[{path,sha256}],...},gate{pass,coverage,invalid[],violations[],forbidden_hits[],text_in_image}}`。
-`approve` 的 `opened` 必须是**你实际下载并打开过**的图与 hash：先 GET `rounds[].image` 的媒体字节，本地核对 sha256 与 `rounds[].image_sha256` 一致，再填 `{path,sha256}`。`rounds[].image_sha256` 只是参照值，不能没开图就照抄（否则等于未开图审批，违反反例 8）。
+### `POST /asset-studio/tasks/{id}/reference-images` [R]
+multipart `file` → 上传到资产 reference_images（不触发自动分类/采用）+ 同步素材池 → `{reference_images, sources}`。
+### `DELETE /asset-studio/tasks/{id}/reference-images?url=` [R]
+删除资产参考图 + 只删 origin=user_reference 的匹配素材行。
 
-### `POST /asset-pipeline/runs/{id}/approve` [R]
-Body：`{round_id, verdict:"approve"|"revise"|"rollback"|"abort", selected_violations?, notes?, opened:[{path,sha256}], override_gate?}`
-注意：
-- `opened` **必填**，必须是你实际打开看过的图与 sha256；没开图不能审。
-- `override_gate:true` 只在程序 gate 未过但技术用途可接受时使用；必须在 `notes` 写清理由与适用范围，并保留 `gate_pass=0`。这不是用户艺术批准，且必须由人明确授权后执行。
-- 每次 `approve` 都是一次人工轮次决定：`revise` 会再消耗一轮生成，先核对预算。
+### `GET /asset-studio/tasks/{id}/versions` [R]
+该资产已完成图片版本（与 popup 版本列表同口径）：`{versions:[{id,url,provider,model,is_current,fidelity,fidelity_reason,…}]}`。美化 TAB 的版本选择器数据源。
 
-### `POST /asset-pipeline/runs/{id}/cancel` [S]
-用途：取消运行。
+### `POST /asset-studio/tasks/{id}/research` [R]
+Body：`{keywords?, instruction?, text_config_id?}` → `{task_id}`（检索记录 id）。同资产进行中 409。每次检索一行记录。
+### `GET /asset-studio/tasks/{id}/research` [R]
+→ `{records:[{id,status,step,instruction,keywords,error,created_at,completed_at,result,works?,calls?}]}` 全部 DESC；completed 带 result（queries/texts/candidates），running 附观测页。
 
-### `GET /asset-pipeline/episodes/{e}/base-candidates` [R]
-用途：图层段底图候选（含精确/美化后的资产图、地图、示意底图）。
+### `POST /asset-studio/sources` [R]
+multipart（`file`）或 JSON（`url`/`local_path`+`source_url`）：`{task_id, role:"generation_reference"|"original"|"shape_only"|"rejected", license, title, artist, era, origin?}`。
+候选「存为素材」= role=generation_reference origin=research；「采用为资产图」= role=original（#121 语义：登记 upload 版本+设当前图+faithful=1，**人决定点**）。license 必填。
+### `GET /asset-studio/tasks/{id}/sources` [R] / `DELETE /asset-studio/sources/{id}` [R]
+
+### `POST /asset-studio/tasks/{id}/drafts` [R]
+Body：`{tab:"precision"|"beautify", inputs, text_config_id?}`。
+- precision inputs：`{source_ids:number[], research:[{research_id, candidate_shas:string[], text_indexes:number[]}], notes}`。总图数（素材+候选按路径去重）≤3；总输入≥1（0 图+文本/notes 合法走 t2i）；跨资产/rejected/无文件/重复/检索引用失效 400。
+- beautify inputs：`{version_task_id:number|null, notes}`。null=当前图（创建时解析为具体版本行）；无图 400「美化需要已有资产图」。
+返回 draft（status=drafting）。展开：精确=事实表+`asset_studio_prompt` 扩写（类型模板：角色/道具三视图+细节，场景单视角）；美化=`asset_beautify` 视觉描述。完成冻结 image_config_id/image_model。
+### `GET /asset-studio/tasks/{id}/drafts` [R] / `GET /asset-studio/drafts/{id}` [R]
+draft + 解析 inputs + spec。状态机：drafting→ready→generating→consumed；failed 可 retry。
+### `PUT /asset-studio/drafts/{id}` [R]
+Body：`{prompt, negative_prompt?}`。仅 ready/consumed 可编辑（consumed 复活为 ready）。
+### `POST /asset-studio/drafts/{id}/retry` [R]
+failed 草稿重新展开（inputs 不变）。
+### `POST /asset-studio/drafts/{id}/generate` [R]（**人决定点：生图计费**）
+Body：`{config_id?, model?, expected_updated_at?}`。status 必须 ready；原子认领防双击（409）；expected_updated_at 不匹配 409；输入漂移 400。检索候选先入库 origin=research。冻结 run.params + round 0 → runGenerateFrozen → 精确追加顾问性 QC（失败只记 qc_error，run 仍 completed）→ draft consumed。返回 `{run_id, draft}`。
+
+### `GET /asset-studio/tasks/{id}` [R]
+detail：`{task, asset(含 subtype/finalPrompt/faithful), target, run, spec(最新 draft.spec_id ?? round.spec_id), rounds(全部 run DESC，附 reference_images/qc/gate/version_deleted), drafts, sources, deliveries}`。
+### `POST /asset-studio/runs/{id}/cancel` [R]
+取消运行：远端生图尽力取消，未出图 round 置 discarded，run 置 cancelled；执行体写回点检查 run.status，取消后不复活。
+### `POST /asset-studio/runs/{id}/deliver` [R]（set_as_current=true 是**人决定点**）
+Body：`{round_id, set_as_current}`。只要求 round.status='generated' 且有 image_path/sha；版本行已删除 400。false=仅存为版本（审计+引文，不改当前图）；true=显式采用（fingerprint 冲突 409）。faithful 资产采用后受保护标记不变，原件保留在版本历史。
+### `GET /asset-studio/runs/{id}/observed` [R] / `GET /asset-studio/calls/{id}/messages` [R]
+观测页（scope=asset_studio/asset_studio_research/asset_studio_draft）。
+
+### `DELETE /{characters|scenes|props}/{id}/image-versions/{taskId}` [R]（**人决定点**）
+删除已生成图片版本。守卫：归属/completed → faithful_source 400 → 当前生效图 400 → 分镜/图层钉选 400 → 活跃草稿输入 400。DB 先提交（delivery.version_id 置空），文件清理 best-effort，返回 `{deleted, id, files_removed}`。
+
+### `GET /episodes/{e}/asset-base-candidates` [R]
+用途：图层段底图候选（含工作室交付的资产图、地图、示意底图）。新模型 fidelity：人工采用（delivery set_as_current=1）→ verified；仅保存不改写 QC 结论，按 gate_pass 给 verified/failed + reason「程序闸门…（顾问性），采用即人工确认」；历史 human_verdict 按历史事实读。
 
 ### `POST /dramas/{d}/assets/batch-generate/preview` [S/R]
 Body：`{scope:"all"|"characters"|"scenes"|"props", episode_id?, rewrite_prompts?, overwrite_images?}`

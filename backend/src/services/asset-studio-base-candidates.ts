@@ -187,6 +187,10 @@ export async function loadPipelineFidelity(imageTaskIds: number[]): Promise<Map<
     if (!prev || record.id > prev.id) latestByRound.set(record.roundId, record)
   }
 
+  // 新模型（Issue #123）：人工「采用为当前图」= 显式确认 → verified；仅保存不改写 QC 结论。
+  // 历史 human_verdict 仍按历史事实读取（上面两个分支）。version_id 已置空的交付行不作为采用证据。
+  const adopted=sqlite.prepare(`SELECT round_id FROM asset_studio_delivery WHERE round_id IN (${rounds.map(()=>'?').join(',')}) AND set_as_current=1 AND version_id IS NOT NULL`).all(...rounds.map(r=>r.id)) as {round_id:number}[]
+  const adoptedRounds=new Set(adopted.map(row=>row.round_id))
   for (const round of rounds) {
     const record = latestByRound.get(round.id)
     if (!record) {
@@ -208,9 +212,16 @@ export async function loadPipelineFidelity(imageTaskIds: number[]): Promise<Map<
       })
       continue
     }
+    if (adoptedRounds.has(round.id)) {
+      result.set(round.imageTaskId!, {
+        fidelity: 'verified',
+        reason: `人工已采用为当前图（第 ${round.roundNo} 轮，闸门${record.gatePass ? '通过' : '未通过'}，采用即人工确认）`,
+      })
+      continue
+    }
     result.set(round.imageTaskId!, {
       fidelity: record.gatePass ? 'verified' : 'failed',
-      reason: `程序闸门${record.gatePass ? '通过' : '未通过'}（第 ${round.roundNo} 轮，清单覆盖率 ${Math.round((record.checklistCoverage ?? 0) * 100)}%），等待人工审批`,
+      reason: `程序闸门${record.gatePass ? '通过' : '未通过'}（第 ${round.roundNo} 轮，清单覆盖率 ${Math.round((record.checklistCoverage ?? 0) * 100)}%，顾问性），采用即人工确认`,
     })
   }
   return result

@@ -16,6 +16,7 @@ import { mountReExtractRoute } from './asset-reextract.js'
 import { toSnakeCase } from '../utils/transform.js'
 import { bindCreatedAssetToReviewItem, findReviewItemAssetDuplicate, onAssetRemoved, onEpisodeAssetLinkChanged } from '../services/asset-review.js'
 import { mountAspectVersionRoute } from './asset-aspect-version.js'
+import { mountImageVersionRoutes } from './asset-image-version.js'
 import { assetImageSizeFor, resolveDramaAspect } from '../services/asset-image-size.js'
 import { aspectPhrase } from '../services/aspect.js'
 import { planAssetReferences, AssetReferenceError, descriptionCitationsOf } from '../services/asset-submit-refs.js'
@@ -30,6 +31,8 @@ mountReferenceImageRoutes(app, 'scene')
 mountReExtractRoute(app, 'scene')
 // POST /scenes/:id/aspect-version — 以当前图为参考按项目画幅重出一版（Issue #94）
 mountAspectVersionRoute(app, 'scene')
+// DELETE /scenes/:id/image-versions/:taskId — 删除已生成的图片版本（Issue #123）
+mountImageVersionRoutes(app, 'scene')
 
 // POST /scenes — 手动新增场景（传入 episode_id 时关联到该集）
 app.post('/', async (c) => {

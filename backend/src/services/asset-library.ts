@@ -22,6 +22,7 @@ import path from 'path'
 import { randomUUID } from 'crypto'
 import { and, eq, inArray, isNull } from 'drizzle-orm'
 import { db, getInsertId, schema } from '../db/index.js'
+import { sqlite } from '../db/index.js'
 import { now } from '../utils/response.js'
 import { getAbsolutePath, thumbPathFor } from '../utils/storage.js'
 import { STORAGE_ROOT } from '../utils/paths.js'
@@ -817,4 +818,39 @@ async function insertVersionTask(input: {
     completedAt: source.completedAt ?? source.createdAt,
     generatedAt: source.generatedAt ?? null,
   }))
+}
+
+/**
+ * 版本的下游钉选计数（Issue #123 删除守卫）：分镜绑定行 selected_image、
+ * 图层段 base_ref / layer_doc（base.ref 与 image 层 src）、设计卡 base_ref。
+ * JSON 列先 LIKE 粗筛（兼容紧凑与带空白两种序列化），再 JSON.parse 精确确认，避免误报。
+ */
+export function countVersionPins(kind: AssetKind, assetId: number, taskId: number, versionPath: string | null): number {
+  let count = 0
+  if (versionPath) {
+    count += (sqlite.prepare('SELECT COUNT(*) AS n FROM storyboard_target_assets WHERE kind=? AND asset_id=? AND selected_image=?').get(kind, assetId, versionPath) as { n: number }).n
+  }
+  const like = [`%"version_task_id":${taskId}%`, `%"version_task_id": ${taskId}%`]
+  const hits = (value: unknown): boolean => {
+    if (Array.isArray(value)) return value.some(hits)
+    if (value && typeof value === 'object') {
+      const record = value as Record<string, unknown>
+      if (record.version_task_id === taskId) return true
+      return Object.values(record).some(hits)
+    }
+    return false
+  }
+  const parseHits = (raw: string | null): boolean => {
+    if (!raw) return false
+    try { return hits(JSON.parse(raw)) } catch { return false }
+  }
+  const segments = sqlite.prepare(`SELECT base_ref,layer_doc FROM storyboard_layer_segments WHERE base_ref LIKE ? OR base_ref LIKE ? OR layer_doc LIKE ? OR layer_doc LIKE ?`).all(...like, ...like) as { base_ref: string | null; layer_doc: string | null }[]
+  for (const segment of segments) {
+    if (parseHits(segment.base_ref) || parseHits(segment.layer_doc)) count++
+  }
+  const cards = sqlite.prepare('SELECT design_card FROM storyboards WHERE design_card LIKE ? OR design_card LIKE ?').all(...like) as { design_card: string | null }[]
+  for (const card of cards) {
+    if (parseHits(card.design_card)) count++
+  }
+  return count
 }

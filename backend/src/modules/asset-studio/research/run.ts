@@ -108,8 +108,12 @@ async function jsonChat(model: StageModel, content: ChatContent, systemPrompt: s
   }
 }
 
-function subjectText(s: ResearchSubject): string {
-  return `资产：${s.name}（${KIND_LABEL[s.kind]}）\n描述：${s.description || '（无）'}`
+function subjectText(s: ResearchSubject, opts: { instruction?: string; keywords?: string } = {}): string {
+  return [
+    `资产：${s.name}（${KIND_LABEL[s.kind]}）\n描述：${s.description || '（无）'}`,
+    opts.keywords?.trim() ? `用户检索关键词：${opts.keywords.trim()}` : '',
+    opts.instruction?.trim() ? `用户检索指令：${opts.instruction.trim()}` : '',
+  ].filter(Boolean).join('\n')
 }
 
 async function saveCandidate(bytes: Buffer, mime: string): Promise<{ localPath: string; sha256: string }> {
@@ -135,10 +139,10 @@ const strList = (raw: unknown) => (Array.isArray(raw) ? raw.map(String).filter(B
  * 执行一次完整检索；任何单个来源/单张图失败都只计入结果，不抛。
  * `withImages=false`：只做检索计划 + 文字摘录（流水线内联兜底用，控制在步骤时限内）。
  */
-export async function performResearch(subject: ResearchSubject, opts: { textConfigId?: number; withImages?: boolean; onStep?: (step: string) => void } = {}): Promise<AssetResearchResult> {
+export async function performResearch(subject: ResearchSubject, opts: { textConfigId?: number; withImages?: boolean; instruction?: string; keywords?: string; onStep?: (step: string) => void } = {}): Promise<AssetResearchResult> {
   const text = await resolveStageModel('asset_research', { configId: opts.textConfigId })
   opts.onStep?.('plan')
-  const plan = await jsonChat(text, subjectText(subject), PLAN_SYSTEM)
+  const plan = await jsonChat(text, subjectText(subject, opts), PLAN_SYSTEM)
   const planned = (Array.isArray(plan.queries) ? plan.queries : [])
     .map(item => item as { adapter?: string; query?: string })
     .filter((item): item is { adapter: ResearchAdapter; query: string } =>
@@ -192,7 +196,7 @@ export async function performResearch(subject: ResearchSubject, opts: { textConf
   let picked = pool.slice(0, MAX_IMAGES)
   if (pool.length > MAX_IMAGES) {
     const listing = pool.map((hit, idx) => ({ idx, adapter: hit.adapter, title: hit.title.slice(0, 160), institution: hit.institution.slice(0, 80), date: hit.date, snippet: hit.snippet.slice(0, 160), license: hit.license }))
-    const screen = await jsonChat(text, `${subjectText(subject)}\n候选：${JSON.stringify(listing)}`, SCREEN_SYSTEM)
+    const screen = await jsonChat(text, `${subjectText(subject, opts)}\n候选：${JSON.stringify(listing)}`, SCREEN_SYSTEM)
     const order = (Array.isArray(screen.pick) ? screen.pick : []).map(Number).filter(idx => Number.isInteger(idx) && idx >= 0 && idx < pool.length)
     picked = [...new Set(order)].slice(0, MAX_IMAGES).map(idx => pool[idx]!)
   }
@@ -208,7 +212,7 @@ export async function performResearch(subject: ResearchSubject, opts: { textConf
     try {
       const image = await imageContentPart(localPath, { maxSide: 1280, quality: 85 })
       const meta = { title: hit.title, institution: hit.institution, date: hit.date, license: hit.license, snippet: hit.snippet }
-      const verdict = await jsonChat(vision, [{ type: 'text', text: `目标${subjectText(subject)}\n候选著录：${JSON.stringify(meta)}` }, image.part], CURATE_SYSTEM)
+      const verdict = await jsonChat(vision, [{ type: 'text', text: `目标${subjectText(subject, opts)}\n候选著录：${JSON.stringify(meta)}` }, image.part], CURATE_SYSTEM)
       const role = CANDIDATE_ROLES.includes(verdict.role as CandidateRole) ? verdict.role as CandidateRole : 'shape_only'
       candidates.push({
         ...hit, local_path: localPath, sha256, role, depicts: String(verdict.depicts ?? ''),
@@ -225,11 +229,12 @@ export async function performResearch(subject: ResearchSubject, opts: { textConf
 }
 
 export class ResearchConflictError extends Error {}
-interface ResearchRow {id:number;status:string;step:string;result:string|null;error_msg:string|null;completed_at:string|null}
+interface ResearchRow {id:number;status:string;step:string;result:string|null;error_msg:string|null;instruction:string|null;keywords:string|null;created_at:string;completed_at:string|null}
 function researchRows(kind:ResearchAssetKind,id:number){return stmt('SELECT * FROM asset_studio_research WHERE host_ref=? ORDER BY id DESC').all(`${kind}:${id}`) as ResearchRow[]}
-export async function startAssetResearch(subject:ResearchSubject,_episodeId:number,opts:{textConfigId?:number}={}):Promise<number>{
+export { researchRows }
+export async function startAssetResearch(subject:ResearchSubject,_episodeId:number,opts:{textConfigId?:number;instruction?:string;keywords?:string}={}):Promise<number>{
  if(researchRows(subject.kind,subject.id).some(r=>r.status==='running'))throw new ResearchConflictError('该资产正在检索资料')
- const ts=new Date().toISOString();const id=Number(stmt("INSERT INTO asset_studio_research (host_ref,status,step,created_at,updated_at) VALUES (?,'running','plan',?,?)").run(`${subject.kind}:${subject.id}`,ts,ts).lastInsertRowid)
+ const ts=new Date().toISOString();const id=Number(stmt("INSERT INTO asset_studio_research (host_ref,status,step,instruction,keywords,created_at,updated_at) VALUES (?,'running','plan',?,?,?,?)").run(`${subject.kind}:${subject.id}`,opts.instruction?.trim()||null,opts.keywords?.trim()||null,ts,ts).lastInsertRowid)
  void (async()=>{
   try{
    const result=await runObservedWork({
