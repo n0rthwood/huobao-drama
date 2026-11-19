@@ -220,8 +220,10 @@ export function registerPipAssets(
     for (const frame of pip.frames) {
       const image = pip.details.find(item => item.no === frame.no)
       if (!image) continue
-      // #125：镜号不再落库（资产先于分镜设计，引用关系读时反查）
-      const frameMeta = { no: frame.no, label: frame.label, role: frame.role, reason: frame.reason, bbox: frame.bbox, focus_bbox: frame.focus_bbox }
+      // #125：镜号不再落库（资产先于分镜设计，引用关系读时反查）；模型给的 reason 里偶尔仍带旧镜号句，
+      // 落库前按句剔除——只保留地理描述，整段只剩镜号句时留空，不编造。
+      const reason = stripShotSnapshot(frame.reason)
+      const frameMeta = { no: frame.no, label: frame.label, role: frame.role, reason, bbox: frame.bbox, focus_bbox: frame.focus_bbox }
       const usage = `${pip.usage}\n\n本资产是细节${frame.no}「${frame.label}」，隶属全览《${parent.name}》（资产 #${parent.id}）；它在全览中的位置（经纬度）：${JSON.stringify(frame.bbox)}。`
       const generatedName = `${parent.name} · 细节${frame.no}（${frame.label}）`
       const previous = matchByNo.has(frame.no) ? priorById.get(matchByNo.get(frame.no)!) ?? null : null
@@ -237,7 +239,7 @@ export function registerPipAssets(
         ...(contentGone ? { content_changed_at: ts } : {}),
         ...(!image.semantics && previous ? { needs_review: true } : {}),
       }
-      const description = `地图细节图：${frame.label}。${frame.reason}\n\n用法：\n${usage}`
+      const description = `地图细节图：${frame.label}。${reason ? `${reason}\n\n` : ''}用法：\n${usage}`
       let childId: number
       if (previous) childId = previous.prop_id
       else {
@@ -292,6 +294,37 @@ export function pipGenericUsage(usage: string): string {
   return usage.split('\n').map(line => line.trim())
     .filter(line => line && !/分镜\s*#|对应分镜/.test(line))
     .join('\n')
+}
+
+/** 镜号表达式本身：「分镜 #66–#71/#97/#99/#109」「对应分镜 #109」 */
+const SHOT_REFERENCE_PATTERN = /(?:对应)?分镜\s*#(?:\s*#?\d+(?:\s*[–—\-~]\s*#?\d+)?(?:\s*[/、,，]\s*#?\d+(?:\s*[–—\-~]\s*#?\d+)?)*)/g
+
+/**
+ * 剔除文字里的镜号快照（Issue #125）——与 `pipGenericUsage` 同口径。
+ *
+ * 事实：旧交付写的 `frame.reason` 常是「分镜 #66–#71 反复强调托博尔河交汇处的决战地：需看清…」
+ * ——镜号只是句首从句，后面才是地理描述。所以这里**只删镜号表达式与它带出来的连接词**，
+ * 同一句里的地理描述原样保留；整句只剩镜号（或删完只剩标点）时该句丢弃，
+ * **不编造**替代文字。输出里不再含「分镜 #」，二次调用不变（幂等）。
+ *
+ * 全览/细节的 `reason`、资产 `description` 与存量修复脚本共用这一个实现。
+ */
+export function stripShotSnapshot(text: string | null | undefined): string {
+  if (!text) return ''
+  const kept: string[] = []
+  for (const line of text.split('\n')) {
+    // 保留句末标点：按「标点后」切开，切块自带结尾标点，拼回去就是原文顺序
+    for (const part of line.split(/(?<=[。；;！!？?])/)) {
+      let sentence = part.replace(SHOT_REFERENCE_PATTERN, '').trim()
+      // 删掉镜号后句首常留连接词/标点：一并剥离，让剩下的地理描述直接开头
+      sentence = sentence.replace(/^[，,：:、；;\s]+/, '')
+      sentence = sentence.replace(/^(?:反复强调|反复出现|反复描述|多次出现|强调|交代|呈现|展示|覆盖|需要|需|会|停留)[，,：:\s]*/, '')
+      sentence = sentence.trim()
+      if (!sentence || !/[\p{L}\p{N}]/u.test(sentence)) continue
+      kept.push(sentence)
+    }
+  }
+  return kept.join('')
 }
 
 /** 经纬度框 → 可读文本；不是 4 个数字时为 null（不编造范围） */

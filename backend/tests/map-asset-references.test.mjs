@@ -36,7 +36,7 @@ const CARD_JSON = {
 function run(body) {
   const script = `
     import { referenceViasOf, segmentBaseAssetId, aggregateReferences, semanticRefsOfRow } from './src/services/map-asset-references.ts'
-    import { matchPipDetailRows, semanticIdSet, sameSemanticIdSet } from './src/services/map-pip-assets.ts'
+    import { matchPipDetailRows, semanticIdSet, sameSemanticIdSet, stripShotSnapshot } from './src/services/map-pip-assets.ts'
     import { normalizeSemantics, markManualSupplements, withGeneratedSupplements, SemanticsValidationError } from './src/services/asset-semantics.ts'
     import { semanticAnnotationsOf } from './src/services/map-semantic-annotations.ts'
     import { validateFrames } from './src/modules/map-studio/pip/frames.ts'
@@ -151,6 +151,36 @@ test('set_frames 只接受不消费 storyboard_numbers：产出 frame 里没有�
   assert.equal(result.problems.length, 0)
   assert.equal(result.frames.length, 1)
   assert.equal('storyboard_numbers' in result.frames[0], false)
+})
+
+// ─── 2b. 镜号快照清洗（props.description / map_pip.frame.reason）────────
+
+test('镜号清洗：句首镜号从句删除，同一句里的地理描述保留', () => {
+  const result = run(`out(stripShotSnapshot('分镜 #66–#71/#97/#99 反复强调托博尔河与额尔齐斯河交汇处的 1582 决战地：需看清两处相距很近。'))`)
+  assert.equal(result, '托博尔河与额尔齐斯河交汇处的 1582 决战地：需看清两处相距很近。')
+  assert.doesNotMatch(result, /分镜\s*#/)
+})
+
+test('镜号清洗：只含镜号的句子被丢弃，其余地理句按原顺序保留', () => {
+  const result = run(`out(stripShotSnapshot('决战地与托博尔斯克—喀什里克。对应分镜 #58/#59 停留。需要看清两河相距很近。'))`)
+  assert.equal(result, '决战地与托博尔斯克—喀什里克。看清两河相距很近。')
+  assert.doesNotMatch(result, /分镜\s*#/)
+})
+
+test('镜号清洗：整段只有镜号句时返回空串（不编造替代文字）', () => {
+  const result = run(`out(stripShotSnapshot('分镜 #59/#60/#62 反复出现。对应分镜 #97。'))`)
+  assert.equal(result, '')
+})
+
+test('镜号清洗幂等，且不含镜号的文本逐字不变', () => {
+  const result = run(`{
+    const raw = '决战地与托博尔斯克—喀什里克。分镜 #58/#59 停留。'
+    const once = stripShotSnapshot(raw)
+    out({ once, twice: stripShotSnapshot(once), plain: stripShotSnapshot('河口对峙，需要看清汇流处。') })
+  }`)
+  assert.equal(result.once, '决战地与托博尔斯克—喀什里克。')
+  assert.equal(result.twice, result.once)
+  assert.equal(result.plain, '河口对峙，需要看清汇流处。')
 })
 
 // ─── 3. 语义补充字段与人工所有权 ────────────────────────────
