@@ -1,0 +1,3 @@
+Note: plan.defaultOnStartup is ignored in print mode (no interactive surface to review the plan). Use --plan-yolo for a headless plan flow.
+Working...
+exit=0
