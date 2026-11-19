@@ -17,6 +17,7 @@ import { getAbsolutePath } from '../utils/storage.js'
 import { logTaskSuccess } from '../utils/task-logger.js'
 import { projectDetailSemantics } from '../modules/map-studio/index.js'
 import { backfillSemanticsTargets, semanticsJsonOf } from './map-pip-assets.js'
+import { semanticAnnotationsOf } from './map-semantic-annotations.js'
 
 /** 交付语义文档 / 已存语义里的要素 id（points/routes/lines/regions）；细节只投影这些要素 */
 function semanticIdsOf(raw: unknown): string[] {
@@ -30,7 +31,7 @@ function semanticIdsOf(raw: unknown): string[] {
 }
 
 /** PNG 头里的宽高（同步读 24 字节；读不到返回 null，绝不猜画幅） */
-function pngSizeOf(relativePath: string | null | undefined): { width: number; height: number } | null {
+export function pngSizeOf(relativePath: string | null | undefined): { width: number; height: number } | null {
   if (!relativePath) return null
   try {
     const fd = fs.openSync(getAbsolutePath(relativePath), 'r')
@@ -44,12 +45,21 @@ function pngSizeOf(relativePath: string | null | undefined): { width: number; he
 }
 
 /** 全览道具交付时写下的 map_spec（最新一版 completed 成图任务的 editable_source） */
-function overviewMapSpecOf(parentId: number): unknown {
+export function overviewMapSpecOf(parentId: number): unknown {
   const version = sqlite.prepare("SELECT params FROM sys_task WHERE prop_id = ? AND provider = 'map-workflow' AND status = 'completed' ORDER BY id DESC LIMIT 1").get(parentId) as { params: string | null } | undefined
   try {
     const params = JSON.parse(version?.params ?? '{}') as { editable_source?: { map_spec?: unknown } }
     return params.editable_source?.map_spec ?? null
   } catch { return null }
+}
+
+/** 全览最新一版交付的 `params.features` / `params.sources`（语义 description 的拼接素材） */
+export function overviewDeliveryFactsOf(parentId: number): { features: unknown[]; sources: unknown[] } {
+  const version = sqlite.prepare("SELECT params FROM sys_task WHERE prop_id = ? AND provider = 'map-workflow' AND status = 'completed' ORDER BY id DESC LIMIT 1").get(parentId) as { params: string | null } | undefined
+  try {
+    const params = JSON.parse(version?.params ?? '{}') as { features?: unknown[]; sources?: unknown[] }
+    return { features: Array.isArray(params.features) ? params.features : [], sources: Array.isArray(params.sources) ? params.sources : [] }
+  } catch { return { features: [], sources: [] } }
 }
 
 /** 投影 + 规范化；投影失败（坏 map_spec / 这一帧没有任何要素）返回 null，不写空语义 */
@@ -60,11 +70,12 @@ function projectSemantics(
   ids: string[],
   sourceTaskId: number,
   ts: string,
+  facts: { features: unknown[]; sources: unknown[] },
 ): string | null {
   try {
     const geometry = projectDetailSemantics(mapSpec, bbox, size, ids)
     if (!geometry.points.length && !geometry.lines.length && !geometry.regions.length) return null
-    return semanticsJsonOf(geometry, sourceTaskId, ts)
+    return semanticsJsonOf(geometry, sourceTaskId, ts, semanticAnnotationsOf(facts.features, facts.sources))
   } catch { return null }
 }
 
@@ -78,7 +89,7 @@ export function backfillPipDetailSemantics(): number {
     if (!overviewIds.length || !mapSpec) continue
     const size = pngSizeOf(target.imagePath)
     if (!size || !target.versionTaskId) continue
-    const semantics = projectSemantics(mapSpec, target.bbox, size, overviewIds, target.versionTaskId, ts)
+    const semantics = projectSemantics(mapSpec, target.bbox, size, overviewIds, target.versionTaskId, ts, overviewDeliveryFactsOf(target.parentId))
     if (!semantics) continue
     sqlite.prepare('UPDATE props SET semantics = ?, updated_at = ? WHERE id = ?').run(semantics, ts, target.propId)
     updated++

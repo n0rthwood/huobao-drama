@@ -19,6 +19,7 @@ import { assertShotGate, productionGateReason } from '../services/workflow-gates
 import { parseDesignCard, toCombo, toDesignCardStatus } from '../services/design-card.js'
 import { segmentIssuesOf } from '../services/segment-issues.js'
 import { clampViewportToFrame } from '../services/layer-quality.js'
+import { baseAssetUpdateNotice } from '../services/map-asset-references.js'
 import {
   deleteLayerSegment,
   getLayerSegment,
@@ -86,6 +87,8 @@ async function segmentPayload(storyboardId: number) {
         fresh: layerSegmentIsFresh(segment, spec, sb.combo),
         base_check_required: baseCheckRequired(segment.layer_doc, spec),
         base_check_satisfied: baseCheckSatisfied(segment, spec),
+        // #125：底图资产更新后的横幅数据（资产更新时间/版本 + 命中的理由）；动作是编辑器里已有的重渲/换底图
+        base_asset_notice: baseAssetUpdateNotice(segment.base_ref, segment.stale_reasons),
       }
       : null,
     junction,

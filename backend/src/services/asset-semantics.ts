@@ -38,10 +38,34 @@ export const SEMANTIC_LINE_KINDS: SemanticLineKind[] = ['river', 'route', 'borde
  */
 export const NEEDS_REVIEW_CONFIDENCE = 0.6
 
+/** 条目描述上限（字）：够写一句坐标推理 + 一句原文，再多读路径也不会带进提示词 */
+export const SEMANTIC_DESCRIPTION_MAX = 500
+/** 条目关键词条数上限 */
+export const SEMANTIC_KEYWORDS_MAX = 12
+/** 单个关键词长度上限（字） */
+export const SEMANTIC_KEYWORD_MAX_CHARS = 20
+
 /** 四类条目共有的审阅标记字段 */
 export interface SemanticReviewable {
   /** true = 自动产出的质量存疑，界面标「待人工修正」，`warnings` 里有对应说明 */
   needs_review?: boolean
+  /**
+   * 条目的一句话说明（Issue #125）：地图交付时由代码拼接研究的坐标依据 + 原文摘录 + 来源名；
+   * 设计模型据此判断这个名称指的具体是哪块地方——**佐证/否决用，不当选取依据**。
+   */
+  description?: string
+  /** 检索关键词（Issue #125）：交付时取要素 category，人工可编辑 */
+  keywords?: string[]
+  /** true = `description`/`keywords` 被人工改过：交付不再覆盖（几何/图片仍归交付） */
+  manual?: boolean
+  /** true = 名称被人工改过：交付不再覆盖系统命名 */
+  name_manual?: boolean
+}
+
+/** 地图交付为语义条目补充的 description/keywords（缺字段 = 没有可写的事实） */
+export interface SemanticSupplement {
+  description?: string
+  keywords?: string[]
 }
 
 export interface SemanticLabel extends SemanticReviewable {
@@ -113,6 +137,14 @@ const confidenceSchema = z.number().min(0).max(1)
 const coordSchema = z.number().finite()
 const pointSchema = z.tuple([coordSchema, coordSchema])
 
+/** 四类条目共有的补充字段（Issue #125）：描述 / 关键词 / 人工标记 */
+const supplementSchema = {
+  description: z.string().max(SEMANTIC_DESCRIPTION_MAX).optional(),
+  keywords: z.array(z.string().min(1).max(SEMANTIC_KEYWORD_MAX_CHARS)).max(SEMANTIC_KEYWORDS_MAX).optional(),
+  manual: z.boolean().optional(),
+  name_manual: z.boolean().optional(),
+}
+
 const semanticsSchema = z.object({
   image: z.object({
     width: z.number().int().positive(),
@@ -126,6 +158,7 @@ const semanticsSchema = z.object({
     source: sourceSchema.optional(),
     confidence: confidenceSchema.optional(),
     needs_review: z.boolean().optional(),
+    ...supplementSchema,
   })).max(MAX_ITEMS_PER_GROUP).optional(),
   points: z.array(z.object({
     id: z.string().optional(),
@@ -134,6 +167,7 @@ const semanticsSchema = z.object({
     source: sourceSchema.optional(),
     confidence: confidenceSchema.optional(),
     needs_review: z.boolean().optional(),
+    ...supplementSchema,
   })).max(MAX_ITEMS_PER_GROUP).optional(),
   regions: z.array(z.object({
     id: z.string().optional(),
@@ -142,6 +176,7 @@ const semanticsSchema = z.object({
     source: sourceSchema.optional(),
     confidence: confidenceSchema.optional(),
     needs_review: z.boolean().optional(),
+    ...supplementSchema,
   })).max(MAX_ITEMS_PER_GROUP).optional(),
   lines: z.array(z.object({
     id: z.string().optional(),
@@ -152,6 +187,7 @@ const semanticsSchema = z.object({
     confidence: confidenceSchema.optional(),
     needs_review: z.boolean().optional(),
     color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+    ...supplementSchema,
   })).max(MAX_ITEMS_PER_GROUP).optional(),
   warnings: z.array(z.string()).optional(),
   // 根级审阅标记是派生字段：接受传入（库里存的就带着），但一律按条目与 warnings 重算
@@ -208,7 +244,6 @@ export function normalizeSemantics(raw: unknown): AssetSemantics {
   const doc = parsed.data
   const w = doc.image.width
   const h = doc.image.height
-
   /**
    * 审阅标记：显式传了就以传入为准（自动管线据质量启发式标记），
    * 否则按置信度兜底——`manual` 条目是人自己填/改的，永远不标。
@@ -217,6 +252,27 @@ export function normalizeSemantics(raw: unknown): AssetSemantics {
     if (item.source === 'manual') return false
     if (item.needs_review !== undefined) return item.needs_review
     return (item.confidence ?? 1) < NEEDS_REVIEW_CONFIDENCE
+  }
+  /**
+   * 补充字段（#125）白名单：描述去空白截断、关键词去重截断、人工标记原样保留。
+   * 只保留非空字段——空串/空数组不落库，读路径据此「有则透出」。
+   */
+  const supplementOf = (item: {
+    description?: string; keywords?: string[]; manual?: boolean; name_manual?: boolean
+  }): Pick<SemanticReviewable, 'description' | 'keywords' | 'manual' | 'name_manual'> => {
+    const out: Pick<SemanticReviewable, 'description' | 'keywords' | 'manual' | 'name_manual'> = {}
+    const description = (item.description ?? '').replace(/\s+/g, ' ').trim().slice(0, SEMANTIC_DESCRIPTION_MAX)
+    if (description) out.description = description
+    const keywords: string[] = []
+    for (const raw of item.keywords ?? []) {
+      const word = raw.replace(/\s+/g, ' ').trim().slice(0, SEMANTIC_KEYWORD_MAX_CHARS)
+      if (word && !keywords.includes(word)) keywords.push(word)
+      if (keywords.length >= SEMANTIC_KEYWORDS_MAX) break
+    }
+    if (keywords.length) out.keywords = keywords
+    if (item.manual === true) out.manual = true
+    if (item.name_manual === true) out.name_manual = true
+    return out
   }
   const labels: SemanticLabel[] = (doc.labels ?? []).map((item) => {
     assertInFrame([item.bbox[0], item.bbox[2]], w, `标签「${item.text}」`)
@@ -232,6 +288,7 @@ export function normalizeSemantics(raw: unknown): AssetSemantics {
       source: item.source ?? 'manual',
       confidence: item.confidence ?? 1,
       ...(reviewOf(item) ? { needs_review: true } : {}),
+      ...supplementOf(item),
     }
   })
 
@@ -245,6 +302,7 @@ export function normalizeSemantics(raw: unknown): AssetSemantics {
       source: item.source ?? 'manual',
       confidence: item.confidence ?? 1,
       ...(reviewOf(item) ? { needs_review: true } : {}),
+      ...supplementOf(item),
     }
   })
 
@@ -258,6 +316,7 @@ export function normalizeSemantics(raw: unknown): AssetSemantics {
       source: item.source ?? 'manual',
       confidence: item.confidence ?? 1,
       ...(reviewOf(item) ? { needs_review: true } : {}),
+      ...supplementOf(item),
     }
   })
 
@@ -272,6 +331,7 @@ export function normalizeSemantics(raw: unknown): AssetSemantics {
       source: item.source ?? 'manual',
       confidence: item.confidence ?? 1,
       ...(reviewOf(item) ? { needs_review: true } : {}),
+      ...supplementOf(item),
     }
     if (item.color) line.color = item.color.toLowerCase()
     return line
@@ -310,6 +370,109 @@ export function parseSemantics(raw: string | null | undefined): AssetSemantics |
   }
 }
 
+/** 条目在多组里的统一形状：labels 用 `text` 作名称，其余用 `name` */
+function entryName(entry: SemanticLabel | SemanticPoint | SemanticRegion | SemanticLine): string {
+  return 'text' in entry ? entry.text : entry.name
+}
+
+function sameKeywords(a: string[] | undefined, b: string[] | undefined): boolean {
+  const left = a ?? []
+  const right = b ?? []
+  return left.length === right.length && left.every((word, index) => word === right[index])
+}
+
+/**
+ * 人工 PUT 语义时的**字段打点**（Issue #125）：与库里上一份标注逐条比对，只把真正被改过的
+ * 字段标成人工所有。
+ *
+ * - `description` / `keywords` 与旧值不同（或这条是新加的）→ `manual: true`；
+ * - 名称（`name` / labels 的 `text`）与旧值不同 → `name_manual: true`；
+ * - 没改的字段沿用旧条目的标记（人之前改过的仍算人工所有）。
+ *
+ * 这样交付重新生成文字时只覆盖没人碰过的条目，人工值永远不会被冲掉。
+ */
+export function markManualSupplements(next: AssetSemantics, previous: AssetSemantics | null): AssetSemantics {
+  const previousById = new Map<string, SemanticLabel | SemanticPoint | SemanticRegion | SemanticLine>()
+  if (previous) {
+    for (const entry of [...previous.labels, ...previous.points, ...previous.regions, ...previous.lines]) {
+      previousById.set(entry.id, entry)
+    }
+  }
+  const mark = <T extends SemanticLabel | SemanticPoint | SemanticRegion | SemanticLine>(entry: T): T => {
+    const prior = previousById.get(entry.id)
+    const descriptionChanged = (prior?.description ?? '') !== (entry.description ?? '')
+    const keywordsChanged = !sameKeywords(prior?.keywords, entry.keywords)
+    const nameChanged = !prior || entryName(prior) !== entryName(entry)
+    return {
+      ...entry,
+      ...(prior?.manual || descriptionChanged || keywordsChanged ? { manual: true } : {}),
+      ...(prior?.name_manual || nameChanged ? { name_manual: true } : {}),
+    }
+  }
+  return {
+    ...next,
+    labels: next.labels.map(mark),
+    points: next.points.map(mark),
+    regions: next.regions.map(mark),
+    lines: next.lines.map(mark),
+  }
+}
+
+/**
+ * 交付生成的 description/keywords 写进语义文档（Issue #125）——**字段所有权**：
+ *
+ * - 几何/图片归交付（本函数只动文字字段）；
+ * - `manual` 条目的 description/keywords 保留旧值，`name_manual` 条目的名称保留旧值；
+ * - 没有人工标记的条目接受本次生成值；生成值缺该字段时保持原样（不清空）。
+ *
+ * 结果再过一次 `normalizeSemantics`：读路径、面板与提示词共用同一份白名单口径。
+ */
+export function withGeneratedSupplements(
+  raw: unknown,
+  previous: AssetSemantics | null,
+  supplements: Map<string, SemanticSupplement>,
+): AssetSemantics {
+  const doc = normalizeSemantics(raw)
+  const previousById = new Map<string, SemanticLabel | SemanticPoint | SemanticRegion | SemanticLine>()
+  if (previous) {
+    for (const entry of [...previous.labels, ...previous.points, ...previous.regions, ...previous.lines]) {
+      previousById.set(entry.id, entry)
+    }
+  }
+  const apply = <T extends SemanticLabel | SemanticPoint | SemanticRegion | SemanticLine>(entry: T): T => {
+    const prior = previousById.get(entry.id)
+    const generated = supplements.get(entry.id)
+    const out = { ...entry } as T & { text?: string; name?: string }
+    if (prior?.name_manual) {
+      // labels 用 text 作名称，其余三组用 name
+      const priorName = 'text' in prior ? prior.text : prior.name
+      if ('text' in entry) out.text = priorName
+      else out.name = priorName
+    }
+    if (prior?.manual) {
+      if (prior.description) out.description = prior.description
+      else delete out.description
+      if (prior.keywords?.length) out.keywords = prior.keywords
+      else delete out.keywords
+      out.manual = true
+      return out
+    }
+    if (generated?.description) out.description = generated.description
+    if (generated?.keywords?.length) out.keywords = generated.keywords
+    return out
+  }
+  return normalizeSemantics({
+    image: doc.image,
+    labels: doc.labels.map(apply),
+    points: doc.points.map(apply),
+    regions: doc.regions.map(apply),
+    lines: doc.lines.map(apply),
+    ...(doc.warnings?.length ? { warnings: doc.warnings } : {}),
+    ...(doc.generated_at ? { generated_at: doc.generated_at } : {}),
+    ...(doc.model ? { model: doc.model } : {}),
+  })
+}
+
 /**
  * 自动标注结果与既有标注合并：**人工改过的项（source='manual'）永远保留**，
  * 自动结果里同 id 的条目让位。这是「自动标注不保证一次正确，人工修正是流程的一部分」
@@ -320,8 +483,9 @@ export function parseSemantics(raw: string | null | undefined): AssetSemantics |
  */
 export function mergeSemantics(existing: AssetSemantics | null, fresh: AssetSemantics): AssetSemantics {
   if (!existing) return normalizeSemantics(fresh)
-  const keepManual = <T extends { id: string; source: SemanticSource }>(prev: T[], next: T[]): T[] => {
-    const manual = prev.filter(item => item.source === 'manual')
+  const keepManual = <T extends { id: string; source: SemanticSource; manual?: boolean; name_manual?: boolean }>(prev: T[], next: T[]): T[] => {
+    // 人工改过的名称/描述（#125 的条目级标记）与 source='manual' 同等保护
+    const manual = prev.filter(item => item.source === 'manual' || item.manual === true || item.name_manual === true)
     const manualIds = new Set(manual.map(item => item.id))
     return [...manual, ...next.filter(item => !manualIds.has(item.id))]
   }

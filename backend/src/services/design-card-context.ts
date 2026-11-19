@@ -39,20 +39,29 @@ import { cachedEpisodeRead } from './episode-read-cache.js'
 export function semanticEntries(semanticsJson: string | null | undefined): DesignCardSemanticEntry[] {
   const doc = parseSemantics(semanticsJson)
   if (!doc) return []
+  /** #125：描述/关键词缺省即省略字段（读路径不写空串，提示词才不会堆噪声） */
+  const supplements = (item: { description?: string; keywords?: string[] }) => ({
+    ...(item.description ? { description: item.description } : {}),
+    ...(item.keywords?.length ? { keywords: item.keywords } : {}),
+  })
   return [
     ...doc.labels.map(item => ({
       id: item.id, name: item.text, group: 'label' as const,
       geometry_points: Array.isArray(item.bbox) && item.bbox.length === 4 && item.bbox.every(Number.isFinite) ? 1 : 0,
+      ...supplements(item),
     })),
     ...doc.points.map(item => ({
       id: item.id, name: item.name, group: 'point' as const,
       geometry_points: Array.isArray(item.at) && item.at.length === 2 && item.at.every(Number.isFinite) ? 1 : 0,
+      ...supplements(item),
     })),
     ...doc.regions.map(item => ({
       id: item.id, name: item.name, group: 'region' as const, geometry_points: item.points?.length ?? 0,
+      ...supplements(item),
     })),
     ...doc.lines.map(item => ({
       id: item.id, name: item.name, group: 'line' as const, geometry_points: item.points?.length ?? 0,
+      ...supplements(item),
     })),
   ]
 }
