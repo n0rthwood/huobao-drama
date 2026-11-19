@@ -1,912 +1,871 @@
-<template>
-  <div class="geo">
-    <div class="geo-bar">
-      <strong class="geo-title">{{ t('mapStudio.editor.title') }}</strong>
-      <div class="geo-tools">
-        <button
-          v-for="tool in TOOLS"
-          :key="tool"
-          type="button"
-          class="geo-tool"
-          :class="{ 'is-on': mode === tool }"
-          :aria-pressed="mode === tool"
-          :disabled="disabled || (tool !== 'select' && !registration)"
-          @click="setMode(tool)"
-        >
-          {{ t(`mapStudio.editor.tool.${tool}`) }}
-        </button>
-        <button v-if="draft" type="button" class="geo-tool" :disabled="draft.points.length < minPoints" @click="commitDraft">
-          {{ t('mapStudio.editor.finishShape', { n: draft.points.length }) }}
-        </button>
-        <button v-if="draft" type="button" class="geo-tool" @click="draft = null">
-          {{ t('mapStudio.editor.cancelShape') }}
-        </button>
-      </div>
-      <span v-if="cursorGeo" class="geo-cursor">{{ t('mapStudio.editor.cursor', { lon: cursorGeo[0].toFixed(4), lat: cursorGeo[1].toFixed(4) }) }}</span>
-    </div>
-
-    <p class="geo-hint">{{ modeHint }}</p>
-    <p v-if="registration" class="geo-hint dim">{{ t('mapStudio.editor.registration', { mode: t(`mapStudio.baseMode.${registration.mode}`), detail: registrationSummary(registration) }) }}</p>
-    <p v-else class="geo-warn">{{ t('mapStudio.editor.noRegistration') }}</p>
-
-    <div v-if="baseUrl" class="geo-stage" :class="{ 'is-drawing': mode !== 'select' }">
-      <img :src="baseUrl" class="geo-base" :alt="t('mapStudio.editor.title')" @load="onBaseLoad" />
-      <svg
-        v-if="viewWidth > 0"
-        ref="svgEl"
-        class="geo-overlay"
-        :viewBox="`0 0 ${viewWidth} ${viewHeight}`"
-        preserveAspectRatio="xMidYMid meet"
-        @pointerdown="onStagePointerDown"
-        @pointermove="onPointerMove"
-        @pointerup="onPointerUp"
-        @pointerleave="onPointerUp"
-      >
-        <g v-for="region in regionShapes" :key="`rg-${region.id}`">
-          <polygon
-            :points="region.attr"
-            :class="['geo-region', { 'is-active': selected?.kind === 'region' && selected.id === region.id, 'is-dataset': region.dataset, 'is-pending': region.pending }]"
-            :stroke-width="unit * 1.2"
-          ><title>{{ region.name }}</title></polygon>
-          <circle
-            v-for="(pt, i) in region.vertices"
-            :key="`rgv-${region.id}-${i}`"
-            :cx="pt[0]"
-            :cy="pt[1]"
-            :r="unit * 2.4"
-            class="geo-vertex"
-            @pointerdown.stop="startDrag('region', region.id, i, $event)"
-            @dblclick.stop="removeVertex('region', region.id, i)"
-          />
-          <g
-            v-for="handle in region.handles"
-            :key="`rgm-${region.id}-${handle.segment}`"
-            class="geo-midpoint"
-            @pointerdown.stop="insertMidpoint('region', region.id, handle.segment)"
-          >
-            <title>{{ t('mapStudio.editor.midpointHint') }}</title>
-            <circle :cx="handle.at[0]" :cy="handle.at[1]" :r="unit * 2.6" class="geo-midpoint-ring" />
-            <path :d="`M ${handle.at[0] - unit * 1.4} ${handle.at[1]} h ${unit * 2.8} M ${handle.at[0]} ${handle.at[1] - unit * 1.4} v ${unit * 2.8}`" class="geo-midpoint-cross" />
-          </g>
-          <text v-if="region.pixels[0] && selected?.kind === 'region' && selected.id === region.id" :x="region.pixels[0][0] + unit * 3" :y="region.pixels[0][1] - unit * 2" :font-size="unit * 4" class="geo-text">{{ region.name }}</text>
-        </g>
-
-        <g v-for="route in routeShapes" :key="`rt-${route.id}`">
-          <polyline
-            :points="route.attr"
-            :class="['geo-route', { 'is-active': selected?.kind === 'route' && selected.id === route.id, 'is-dataset': route.dataset, 'is-pending': route.pending }]"
-            :stroke-width="unit * 1.8"
-          ><title>{{ route.name }}</title></polyline>
-          <circle
-            v-for="(pt, i) in route.vertices"
-            :key="`rtv-${route.id}-${i}`"
-            :cx="pt[0]"
-            :cy="pt[1]"
-            :r="unit * 2.4"
-            class="geo-vertex"
-            @pointerdown.stop="startDrag('route', route.id, i, $event)"
-            @dblclick.stop="removeVertex('route', route.id, i)"
-          />
-          <g
-            v-for="handle in route.handles"
-            :key="`rtm-${route.id}-${handle.segment}`"
-            class="geo-midpoint"
-            @pointerdown.stop="insertMidpoint('route', route.id, handle.segment)"
-          >
-            <title>{{ t('mapStudio.editor.midpointHint') }}</title>
-            <circle :cx="handle.at[0]" :cy="handle.at[1]" :r="unit * 2.6" class="geo-midpoint-ring" />
-            <path :d="`M ${handle.at[0] - unit * 1.4} ${handle.at[1]} h ${unit * 2.8} M ${handle.at[0]} ${handle.at[1] - unit * 1.4} v ${unit * 2.8}`" class="geo-midpoint-cross" />
-          </g>
-          <text v-if="route.pixels[0] && selected?.kind === 'route' && selected.id === route.id" :x="route.pixels[0][0] + unit * 3" :y="route.pixels[0][1] - unit * 2" :font-size="unit * 4" class="geo-text">{{ route.name }}</text>
-        </g>
-
-        <g v-for="place in placeShapes" :key="`pl-${place.id}`">
-          <circle
-            :cx="place.at[0]"
-            :cy="place.at[1]"
-            :r="unit * 3"
-            :class="['geo-place', { 'is-active': selected?.kind === 'place' && selected.id === place.id, 'is-proposed': place.proposed, 'is-dataset': place.dataset }]"
-            @pointerdown.stop="startDrag('place', place.id, 0, $event)"
-          ><title>{{ place.name }}</title></circle>
-          <text v-if="selected?.kind === 'place' && selected.id === place.id" :x="place.at[0] + unit * 4" :y="place.at[1] + unit * 3" :font-size="unit * 4" class="geo-text">{{ place.name }}</text>
-        </g>
-
-        <g v-if="draftPixels.length">
-          <polyline :points="draftAttr" class="geo-draft" :stroke-width="unit * 1.6" />
-          <circle v-for="(pt, i) in draftPixels" :key="`dv-${i}`" :cx="pt[0]" :cy="pt[1]" :r="unit * 2.4" class="geo-draft-vertex" />
-        </g>
-      </svg>
-    </div>
-    <div v-else class="geo-preview">
-      <p>{{ t('mapStudio.researchPanel.gridPreview') }}</p>
-      <svg viewBox="0 0 600 360" role="img" :aria-label="t('mapStudio.researchPanel.gridPreview')">
-        <rect x="1" y="1" width="598" height="358" fill="#f7f2e4" stroke="#9a8871" />
-        <path v-for="i in 9" :key="`v${i}`" :d="`M ${i * 60} 0 V 360`" stroke="#cbbfae" />
-        <path v-for="i in 5" :key="`h${i}`" :d="`M 0 ${i * 60} H 600`" stroke="#cbbfae" />
-        <polygon v-for="shape in spec.regions.filter(item => !isMissing(item))" :key="shape.id" :points="previewPoints(shape.points)" fill="#dca77a" fill-opacity=".3" :stroke="isPending(shape) ? '#b45235' : '#557269'" :stroke-dasharray="isPending(shape) ? '6 4' : undefined" />
-        <polyline v-for="shape in spec.routes.filter(item => !isMissing(item))" :key="shape.id" :points="previewPoints(shape.points)" fill="none" :stroke="isPending(shape) ? '#b45235' : '#557269'" stroke-width="2" :stroke-dasharray="isPending(shape) ? '6 4' : undefined" />
-        <circle v-for="place in spec.places.filter(item => !isMissing(item))" :key="place.id" :cx="previewPoint([place.lon, place.lat])[0]" :cy="previewPoint([place.lon, place.lat])[1]" :r="selected?.kind === 'place' && selected.id === place.id ? 7 : 5" :fill="isPending(place) ? 'white' : '#557269'" :stroke="isPending(place) ? '#b45235' : '#557269'"><title>{{ place.name }}</title></circle>
-      </svg>
-    </div>
-
-    <p v-if="offscreenCount" class="geo-warn">{{ t('mapStudio.editor.offscreen', { n: offscreenCount }) }}</p>
-
-    <div class="geo-lists">
-      <section class="geo-list">
-        <header class="geo-list-head">
-          <strong>{{ t('mapStudio.editor.placesTitle', { n: spec.places.length }) }}</strong>
-          <button type="button" class="geo-tool" :disabled="disabled || !registration" @click="setMode('place')">{{ t('mapStudio.editor.tool.place') }}</button>
-        </header>
-        <p v-if="!spec.places.length" class="geo-empty dim">{{ t('mapStudio.editor.empty') }}</p>
-        <ul v-else class="geo-items">
-          <li
-            v-for="(place, index) in spec.places"
-            :key="place.id"
-            class="geo-item"
-            :class="{ 'is-active': selected?.kind === 'place' && selected.id === place.id, 'is-pending': isPending(place) }"
-            @click="selected = { kind: 'place', id: place.id }"
-          >
-            <input class="input geo-name" :value="place.name" :disabled="disabled" :placeholder="t('mapStudio.editor.name')" @input="setName('place', index, $event)" />
-            <label class="geo-num"><span>{{ t('mapStudio.editor.lon') }}</span>
-              <input class="input" type="number" step="0.0001" :value="place.lon" :disabled="disabled" @input="setPlaceCoord(index, 'lon', $event)" />
-            </label>
-            <label class="geo-num"><span>{{ t('mapStudio.editor.lat') }}</span>
-              <input class="input" type="number" step="0.0001" :value="place.lat" :disabled="disabled" @input="setPlaceCoord(index, 'lat', $event)" />
-            </label>
-            <span v-if="place.origin === 'dataset'" class="geo-lock"><Lock :size="10" />{{ t('mapStudio.editor.datasetBadge') }}</span>
-            <span v-if="isPending(place)" class="geo-badge">{{ t('mapStudio.researchPanel.schematic') }}</span>
-            <button v-if="isPending(place) && !place.verification?.reasons?.some(reason => reason.includes('dataset_missing'))" type="button" class="geo-tool" :disabled="disabled" @click.stop="accept('place', index)">{{ t('mapStudio.editor.accept') }}</button>
-            <button type="button" class="geo-del" :disabled="disabled" :aria-label="t('mapStudio.editor.remove')" @click.stop="removeFeature('place', index)">
-              <X :size="12" />
-            </button>
-          </li>
-        </ul>
-      </section>
-
-      <section v-for="section in linearSections" :key="section.kind" class="geo-list">
-        <header class="geo-list-head">
-          <strong>{{ t(`mapStudio.editor.${section.kind}sTitle`, { n: section.items.length }) }}</strong>
-          <button type="button" class="geo-tool" :disabled="disabled || !registration" @click="setMode(section.kind)">{{ t(`mapStudio.editor.tool.${section.kind}`) }}</button>
-        </header>
-        <p v-if="!section.items.length" class="geo-empty dim">{{ t('mapStudio.editor.empty') }}</p>
-        <ul v-else class="geo-items">
-          <li
-            v-for="(shape, index) in section.items"
-            :key="shape.id"
-            class="geo-item"
-            :class="{ 'is-active': selected?.kind === section.kind && selected.id === shape.id, 'is-pending': isPending(shape) }"
-            @click="selected = { kind: section.kind, id: shape.id }"
-          >
-            <input class="input geo-name" :value="shape.name" :disabled="disabled" :placeholder="t('mapStudio.editor.name')" @input="setName(section.kind, index, $event)" />
-            <span class="geo-count">{{ t('mapStudio.editor.pointCount', { n: vertexCount(section.kind, shape.points) }) }}</span>
-            <div class="geo-smooth">
-              <span>{{ t('mapStudio.editor.smoothTitle') }}</span>
-              <button
-                type="button"
-                class="geo-tool geo-smooth-toggle"
-                :class="{ 'is-on': (section.rows.get(shape.id)?.smooth ?? 0) > 0 }"
-                :aria-pressed="(section.rows.get(shape.id)?.smooth ?? 0) > 0"
-                :aria-label="t('mapStudio.editor.smoothTitle')"
-                :disabled="disabled"
-                :title="t('mapStudio.editor.smoothHint')"
-                @click.stop="setSmooth(shape, (section.rows.get(shape.id)?.smooth ?? 0) > 0 ? 0 : 1)"
-              >
-                {{ (section.rows.get(shape.id)?.smooth ?? 0) > 0 ? t('mapStudio.editor.smoothOn') : t('mapStudio.editor.smoothOff') }}
-              </button>
-              <label class="geo-smooth-range" :title="t('mapStudio.editor.smoothHint')" @click.stop>
-                <span>{{ t('mapStudio.editor.smoothStrength') }}</span>
-                <input
-                  class="geo-smooth-slider"
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  :value="section.rows.get(shape.id)?.smooth ?? 0"
-                  :disabled="disabled"
-                  @input="setSmoothInput(shape, $event)"
-                />
-                <output class="geo-smooth-value">{{ Math.round((section.rows.get(shape.id)?.smooth ?? 0) * 100) }}%</output>
-              </label>
-            </div>
-            <p v-if="deviationWarning(section.kind, shape)" class="geo-warn geo-smooth-warn" :title="t('mapStudio.editor.smoothDeviationTitle')">
-              {{ deviationWarning(section.kind, shape) }}
-            </p>
-            <span v-if="shape.origin === 'dataset'" class="geo-lock"><Lock :size="10" />{{ t('mapStudio.editor.datasetBadge') }}</span>
-            <span v-if="isPending(shape)" class="geo-badge">{{ t('mapStudio.researchPanel.schematic') }}</span>
-            <button v-if="isPending(shape) && !shape.verification?.reasons?.some(reason => reason.includes('dataset_missing'))" type="button" class="geo-tool" :disabled="disabled" @click.stop="accept(section.kind, index)">{{ t('mapStudio.editor.accept') }}</button>
-            <button type="button" class="geo-tool" :disabled="disabled || !registration" @click.stop="continueShape(section.kind, shape.id)">{{ t('mapStudio.editor.continueShape') }}</button>
-            <button type="button" class="geo-del" :disabled="disabled" :aria-label="t('mapStudio.editor.remove')" @click.stop="removeFeature(section.kind, index)">
-              <X :size="12" />
-            </button>
-          </li>
-        </ul>
-      </section>
-    </div>
-  </div>
-</template>
-
 <script setup lang="ts">
 /**
- * 地图几何直接编辑器（Issue #84；平滑与中点补齐见 #99 阶段③）。
- *
- * 几何真值是 map_spec 里的经纬度，画布只是某一张底图的投影视图：拖点、加线、加面、**插入中点**都先把像素按该底图的
- * registration 反投影成经纬度再写回 spec，所以换底图（程序投影 / Earth 相机 / 外部标定图）后同一份几何仍然对得上。
- * 没有 registration 就只允许按数值编辑，绝不按 bbox 线性猜一个像素映射。
- *
- * 平滑不改存储：开关与强度滑杆只发 `layer-options` 草稿（页面随 PUT 提交），画布上的曲线用同源
- * `utils/smooth.js` 实时预览，控制点始终可见可拖；偏离验收口径时按段提示所需强度，绝不自动改强度。
+ * Issue #126：页面唯一草稿的几何编辑入口。
+ * 普通地点/顶点编辑立即 cloneSpec → markManual → update；仅活动形状保留局部事务。
+ * 本组件从不写 API。完成编辑仅收尾事务；页面「保存几何」才是唯一 CAS 持久化动作。
  */
-import { computed, nextTick, ref, watch } from 'vue'
-import { Lock, X } from 'lucide-vue-next'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { DEEPLINK_KEYS, useDeeplink } from '~/composables/useQuerySync'
 import type { MapFeatureMetadata, MapPlace, MapRegion, MapRoute, MapSpec } from '~/map-studio/api'
-import { geoToPixel, pixelToGeo, registrationSummary, type MapRegistration } from '~/map-studio/utils/mapRegistration'
+import { geoToPixel, registrationSummary, type MapRegistration } from '~/map-studio/utils/mapRegistration'
 import { deviationProblems, insertVertex, smoothKeyFor, smoothPoints } from '~/map-studio/utils/smooth'
 import { mediaUrl } from '~/utils/url'
+import GeoCanvas, { type CanvasShape, type CanvasCandidate } from './geo/GeoCanvas.vue'
+import GeoFeatureBadges from './geo/GeoFeatureBadges.vue'
+import GeoPointDialog, { type PointRow } from './geo/GeoPointDialog.vue'
+import GeoSmoothWarning from './geo/GeoSmoothWarning.vue'
+import { DEFAULT_VIEW, normalizeView, type GeoView } from './geo/coords'
+import { featureGeometryHash } from './geo/canonical'
+import { coordinateMidpoint, featureCoordinates, isDatasetMissing, isGeometryUnverified, isClosedRing, minVertices, parseCoordinate, segmentCount, vertexCount, type FeatureKind, type LinearKind } from './geo/feature'
 
 type LayerOptions = Record<string, { smooth: number }>
-/** 一段平滑曲线的偏离：与 utils/smooth.js 的 deviationProblems 逐字段一致 */
-type LinearDeviation = { segment: number; deviation: number; limit: number; suggested: number }
-interface LinearRow {
-  id: string
-  name: string
-  pixels: Array<[number, number]>
-  /** 画可拖动顶点圆的像素：选中时全画；未选中时数据集/密集形状（>60 点）不画，否则上百个把手会盖住底图 */
-  vertices: Array<[number, number]>
-  attr: string
-  dataset: boolean
-  pending: boolean
-  smooth: number
-  deviation: LinearDeviation | null
-  handles: Array<{ segment: number; at: [number, number] }>
-}
-
-const { t } = useI18n()
-
+type GeoTab = 'point' | 'line' | 'region'
+type Target = { kind: FeatureKind; id: string }
+type ShapeDraft = { kind: LinearKind; id: string | null; points: Array<[number, number]> }
+type DialogState = { mode: 'places' | 'vertices'; kind?: LinearKind; id?: string | null; draft: boolean; row: number | null; notice: string }
 const props = withDefaults(defineProps<{
   spec: MapSpec
   persistedSpec: MapSpec | null
   registration: MapRegistration | null
   baseImage: { path: string; width: number; height: number } | null
-  /** 当前图层文档；线/面要素已经有锚定图层时平滑键用图层 id，还没画出来时用要素 id 暂存 */
   layerDoc?: { layers: Array<{ id: string; type: string; anchor?: { semantic_id?: string } }> } | null
-  /** 平滑草稿：{ 图层 id 或要素 id: { smooth: 0..1 } }，由页面保存时随 PUT 一起提交 */
   layerOptions?: LayerOptions
   disabled?: boolean
-  focusTarget?: { kind: 'place' | 'route' | 'region'; id: string } | null
+  focusTarget?: Target | null
 }>(), { layerDoc: null, layerOptions: () => ({}), disabled: false })
-
 const emit = defineEmits<{
   (e: 'update', spec: MapSpec): void
   (e: 'layer-options', options: LayerOptions): void
   (e: 'base-size', size: { width: number; height: number }): void
 }>()
-
-type LinearKind = 'route' | 'region'
-type FeatureKind = 'place' | LinearKind
-type ToolMode = 'select' | FeatureKind
-
-const TOOLS: ToolMode[] = ['select', 'place', 'route', 'region']
-
-const mode = ref<ToolMode>('select')
-const selected = ref<{ kind: FeatureKind; id: string } | null>(null)
+const { t } = useI18n()
+const root = ref<HTMLElement | null>(null)
+const dialogRef = ref<InstanceType<typeof GeoPointDialog> | null>(null)
+const tab = ref<GeoTab>('point')
+const tool = ref<'select' | 'draw' | 'pan'>('select')
+const selected = ref<Target | null>(null)
+const memories: Record<GeoTab, Target | null> = { point: null, line: null, region: null }
+const selectedVertex = ref<{ kind: LinearKind; id: string; index: number } | null>(null)
+const selectedEdge = ref<{ kind: LinearKind; id: string; segment: number } | null>(null)
+const view = ref<GeoView>({ ...DEFAULT_VIEW })
 const cursorGeo = ref<[number, number] | null>(null)
-const draft = ref<{ kind: LinearKind; id: string | null; points: Array<[number, number]> } | null>(null)
-const dragging = ref<{ kind: FeatureKind; id: string; index: number } | null>(null)
-const svgEl = ref<SVGSVGElement | null>(null)
+const draft = ref<ShapeDraft | null>(null)
+const dialog = ref<DialogState | null>(null)
+const tabPrompt = ref<{ target: GeoTab; reason: 'shape' | 'input' } | null>(null)
+const overlap = ref<CanvasCandidate[]>([])
+const placeBuffers = ref<Record<string, string>>({})
+const placeDraft = ref<{ name: string; lon: string; lat: string } | null>(null)
+const rejectNotice = ref('')
 const naturalSize = ref({ width: 0, height: 0 })
-
+const enlarged = ref(false)
+const canvasShare = ref(65)
+const listCollapsed = ref(false)
+const listElement = ref<HTMLElement | null>(null)
+const scrollMemory: Record<GeoTab, number> = { point: 0, line: 0, region: 0 }
+const smoothingTouched = ref<string[]>([])
+const TABS: GeoTab[] = ['point', 'line', 'region']
+const TOOLS = ['select', 'draw', 'pan'] as const
 const link = useDeeplink('mapStudioGeo', DEEPLINK_KEYS.mapStudioGeo)
-function hasFeature(spec: MapSpec | null, feature: { kind: FeatureKind; id: string }): boolean {
-  const list = feature.kind === 'place' ? spec?.places : feature.kind === 'route' ? spec?.routes : spec?.regions
-  return !!list?.some(item => item.id === feature.id)
+let viewTimer: ReturnType<typeof setTimeout> | null = null
+let returnFocus: HTMLElement | null = null
+function toggleEnlarged() {
+  enlarged.value = !enlarged.value
+  if (!enlarged.value) focusSelector('.geo-enlarge')
 }
-const initialFocus = link.initial('msgeo')
-if (initialFocus) {
-  const match = /^(place|route|region):(.+)$/.exec(initialFocus)
-  const kind = match?.[1]
-  const id = match?.[2]
-  if ((kind === 'place' || kind === 'route' || kind === 'region') && id && hasFeature(props.persistedSpec, { kind, id })) {
-    selected.value = { kind, id }
-  } else {
-    toast.warning(t('deeplink.missing'))
+
+function tabFor(kind: FeatureKind): GeoTab {
+  return kind === 'place' ? 'point' : kind === 'route' ? 'line' : 'region'
+}
+function kindFor(value: GeoTab): FeatureKind {
+  return value === 'point' ? 'place' : value === 'line' ? 'route' : 'region'
+}
+function listOf(spec: MapSpec | null, kind: FeatureKind): Array<MapPlace | MapRoute | MapRegion> {
+  return kind === 'place' ? spec?.places ?? [] : kind === 'route' ? spec?.routes ?? [] : spec?.regions ?? []
+}
+function featureOf(spec: MapSpec | null, target: Target) {
+  return listOf(spec, target.kind).find(item => item.id === target.id)
+}
+function parseTarget(raw: string | null): Target | null {
+  const match = /^(place|route|region):(.+)$/.exec(raw ?? '')
+  return match ? { kind: match[1] as FeatureKind, id: match[2]! } : null
+}
+function tabLabel(value: GeoTab): string {
+  return t(`mapStudio.editor.tab${value[0]!.toUpperCase()}${value.slice(1)}`)
+}
+function coordinateDirty(target: Target): boolean {
+  const saved = featureOf(props.persistedSpec, target)
+  const current = featureOf(props.spec, target)
+  if (!saved || !current) return true
+  if (draft.value?.kind === target.kind && draft.value.id === target.id) return true
+  return JSON.stringify(featureCoordinates(saved)) !== JSON.stringify(featureCoordinates(current))
+}
+function syncLinks() {
+  if (viewTimer) { clearTimeout(viewTimer); viewTimer = null }
+  const values: Record<string, string> = {}
+  if (tab.value !== 'point') values.msgtab = tab.value
+  if (view.value.zoom !== 1 || view.value.cx !== 0.5 || view.value.cy !== 0.5) {
+    values.msgzoom = String(view.value.zoom)
+    values.msgcx = String(view.value.cx)
+    values.msgcy = String(view.value.cy)
   }
+  if (selected.value && featureOf(props.persistedSpec, selected.value)) values.msgeo = `${selected.value.kind}:${selected.value.id}`
+  const current = dialog.value
+  if (current?.mode === 'places') values.msgpoints = 'all'
+  else if (current?.kind && current.id) {
+    const target = { kind: current.kind, id: current.id }
+    const saved = featureOf(props.persistedSpec, target)
+    if (saved) {
+      values.msgpoints = `${target.kind}:${target.id}`
+      if (current.row !== null && !coordinateDirty(target)) {
+        const hash = featureGeometryHash(saved)
+        if (hash) { values.msgrow = String(current.row + 1); values.msggeorev = hash }
+      }
+    }
+  }
+  link.set(values)
 }
-let focusOnLoad = Boolean(initialFocus && selected.value)
-watch(() => props.focusTarget, async target => {
-  if (!target || !hasFeature(props.spec, target)) return
-  selected.value = target
-  await nextTick()
-  document.querySelector('.geo-item.is-active')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-})
-function isPending(item: MapPlace | MapRoute | MapRegion): boolean {
-  return item.proposed === true && item.origin !== 'manual' && item.verification?.status !== 'verified' && item.verification?.status !== 'confirmed'
+function changeView(next: GeoView) {
+  view.value = next
+  if (!viewTimer) viewTimer = setTimeout(syncLinks, 120)
 }
-function isMissing(item: MapPlace | MapRoute | MapRegion): boolean {
-  return item.verification?.reasons?.some(reason => reason.includes('dataset_missing')) === true
+
+// 恢复只改 UI：先校验已保存实体与坐标 hash，再创建行；初次进入及前进/后退复用同一入口。
+let pendingNavigation: URLSearchParams | null = null
+function restoreUi(query: { get(key: string): string | null }) {
+  selected.value = null
+  selectedVertex.value = null
+  selectedEdge.value = null
+  dialog.value = null
+  const rawTab = query.get('msgtab')
+  tab.value = rawTab && TABS.includes(rawTab as GeoTab) ? rawTab as GeoTab : 'point'
+  const target = parseTarget(query.get('msgeo'))
+  if (target) {
+    if (featureOf(props.persistedSpec, target)) {
+      selected.value = target
+      tab.value = tabFor(target.kind)
+      memories[tab.value] = target
+    } else toast.warning(t('mapStudio.editor.entityMissing'))
+  }
+  const rawZoom = query.get('msgzoom')
+  const normalized = normalizeView({ zoom: rawZoom ?? 1, cx: query.get('msgcx'), cy: query.get('msgcy') })
+  view.value = normalized.view
+  if (rawZoom && normalized.adjustedZoom) toast.warning(t('mapStudio.editor.zoomAdjusted', { zoom: Math.round(view.value.zoom * 100) }))
+  const points = query.get('msgpoints')
+  if (points === 'all') {
+    tab.value = 'point'
+    if (selected.value?.kind !== 'place') selected.value = null
+    dialog.value = { mode: 'places', draft: false, row: null, notice: '' }
+  } else if (points) {
+    const entity = parseTarget(points)
+    if (entity && entity.kind !== 'place') {
+      tab.value = tabFor(entity.kind)
+      const saved = featureOf(props.persistedSpec, entity)
+      if (saved && 'points' in saved) {
+        selected.value = entity
+        memories[tab.value] = entity
+        const row = Number(query.get('msgrow'))
+        const valid = Number.isInteger(row) && row >= 1 && row <= vertexCount(entity.kind, saved.points)
+          && query.get('msggeorev') === featureGeometryHash(saved) && !coordinateDirty(entity)
+        dialog.value = { mode: 'vertices', kind: entity.kind, id: entity.id, draft: false, row: valid ? row - 1 : null, notice: query.get('msgrow') && !valid ? t('mapStudio.editor.rowLost') : '' }
+        if (valid) selectedVertex.value = { kind: entity.kind, id: entity.id, index: row - 1 }
+      } else toast.warning(t('mapStudio.editor.entityMissing'))
+    } else toast.warning(t('mapStudio.editor.entityMissing'))
+  }
+  syncLinks()
 }
-function previewPoint([lon, lat]: [number, number]): [number, number] {
-  const [west, south, east, north] = props.spec.bbox
-  return [600 * (lon - west) / (east - west || 1), 360 * (north - lat) / (north - south || 1)]
-}
-function previewPoints(points: Array<[number, number]>): string {
-  return points.map(point => previewPoint(point).join(',')).join(' ')
-}
-watch([selected, () => props.spec, () => props.persistedSpec], () => {
-  const feature = selected.value
-  if (feature && !hasFeature(props.spec, feature)) {
-    selected.value = null
-    link.set({})
+restoreUi({ get: key => link.initial(key) })
+
+function onHistoryNavigation() {
+  const query = new URLSearchParams(window.location.search)
+  if (dialogRef.value?.hasIncompleteInput()) {
+    focusPendingInput()
+    syncLinks()
     return
   }
-  link.set({ msgeo: feature && hasFeature(props.persistedSpec, feature) ? `${feature.kind}:${feature.id}` : '' })
-}, { immediate: true })
-
-const baseUrl = computed(() => (props.baseImage?.path ? mediaUrl(props.baseImage.path) : ''))
-const viewWidth = computed(() => props.registration?.width || props.baseImage?.width || naturalSize.value.width)
-const viewHeight = computed(() => props.registration?.height || props.baseImage?.height || naturalSize.value.height)
-// 笔画粗细随底图尺寸走，1920 宽和 960 宽上看起来一样
-const unit = computed(() => Math.max(viewWidth.value, viewHeight.value) / 400)
-const minPoints = computed(() => (draft.value?.kind === 'region' ? 3 : 2))
-
-const modeHint = computed(() => {
-  if (!props.registration) return t('mapStudio.editor.hintNumbersOnly')
-  if (mode.value === 'select') return t('mapStudio.editor.hintSelect')
-  if (mode.value === 'place') return t('mapStudio.editor.hintPlace')
-  return t('mapStudio.editor.hintShape')
-})
-
-function pixelOf(lon: number, lat: number): [number, number] | null {
-  return geoToPixel(props.registration, lon, lat)
+  if (draft.value || placeDraft.value || hasInlineIncomplete()) {
+    const entity = parseTarget(query.get('msgpoints')) ?? parseTarget(query.get('msgeo'))
+    dialog.value = null
+    const next = query.get('msgtab')
+    pendingNavigation = query
+    tabPrompt.value = { target: entity ? tabFor(entity.kind) : TABS.includes(next as GeoTab) ? next as GeoTab : 'point', reason: draft.value ? 'shape' : 'input' }
+    syncLinks()
+    return
+  }
+  restoreUi(query)
 }
+function stayCurrentTab() {
+  tabPrompt.value = null
+  pendingNavigation = null
+  syncLinks()
+}
+onMounted(() => window.addEventListener('popstate', onHistoryNavigation))
 
-const placeShapes = computed(() => props.spec.places.flatMap((place) => {
-  const at = pixelOf(place.lon, place.lat)
-  return at ? [{ id: place.id, name: place.name, at, proposed: !!place.proposed, dataset: place.origin === 'dataset' }] : []
+const baseUrl = computed(() => props.baseImage?.path ? mediaUrl(props.baseImage.path) : '')
+const size = computed(() => ({ width: props.registration?.width || props.baseImage?.width || naturalSize.value.width, height: props.registration?.height || props.baseImage?.height || naturalSize.value.height }))
+const activeKind = computed(() => kindFor(tab.value))
+const localSpecDirty = computed(() => {
+  // 页面 normalizeSpec 可补 style/layers；这些不是编辑器改动，不能冒称已经加入草稿。
+  const current = props.spec, saved = props.persistedSpec
+  if (!saved) return !!(current.places.length || current.routes.length || current.regions.length)
+  return JSON.stringify([
+    current.places.map(item => [item.id, item.name, item.lon, item.lat]),
+    current.routes.map(item => [item.id, item.name, item.points]),
+    current.regions.map(item => [item.id, item.name, item.points]),
+  ]) !== JSON.stringify([
+    saved.places.map(item => [item.id, item.name, item.lon, item.lat]),
+    saved.routes.map(item => [item.id, item.name, item.points]),
+    saved.regions.map(item => [item.id, item.name, item.points]),
+  ])
+})
+const activeItems = computed(() => listOf(props.spec, activeKind.value))
+const linearItems = computed(() => activeKind.value === 'place' ? [] : activeItems.value as Array<MapRoute | MapRegion>)
+const pendingCount = computed(() => activeItems.value.filter(isGeometryUnverified).length)
+const proposedCount = computed(() => activeItems.value.filter(item => item.proposed === true).length)
+const canFinish = computed(() => !!draft.value && new Set(draft.value.points.map(point => JSON.stringify(point))).size >= minVertices(draft.value.kind))
+const cursorText = computed(() => !props.registration ? t('mapStudio.editor.canvasNoRegistration') : cursorGeo.value ? t('mapStudio.editor.cursor', { lon: cursorGeo.value[0].toFixed(5), lat: cursorGeo.value[1].toFixed(5) }) : t('mapStudio.editor.cursorOutside'))
+
+const linearRows = computed(() => {
+  const result = new Map<string, { attr: string; smooth: number; problems: Array<{ segment: number; deviation: number; limit: number; suggested: number }>; canPreview: boolean }>()
+  for (const kind of ['route', 'region'] as const) {
+    for (const shape of listOf(props.spec, kind) as Array<MapRoute | MapRegion>) {
+      const count = vertexCount(kind, shape.points)
+      const pixels = shape.points.slice(0, count).map(point => geoToPixel(props.registration, point[0], point[1]))
+      const key = smoothKeyFor(props.layerDoc, shape.id)
+      const explicit = props.layerOptions?.[key]?.smooth
+      const smooth = typeof explicit === 'number' && Number.isFinite(explicit) ? explicit : shape.origin === 'dataset' ? 0 : 1
+      const canPreview = !!props.registration && size.value.width > 0 && size.value.height > 0 && pixels.every(Boolean)
+      const normalizedPoints = canPreview ? pixels.map(point => [point![0] / size.value.width, point![1] / size.value.height] as [number, number]) : []
+      const options = { closed: kind === 'region', strength: smooth, ...size.value }
+      const curve = canPreview ? smoothPoints(normalizedPoints, options) : []
+      const problems = canPreview ? deviationProblems(normalizedPoints, options) : []
+      result.set(`${kind}:${shape.id}`, { attr: curve.map(point => `${point[0] * size.value.width},${point[1] * size.value.height}`).join(' '), smooth, problems, canPreview })
+    }
+  }
+  return result
+})
+const canvasShapes = computed<CanvasShape[]>(() => activeItems.value.filter(item => !isDatasetMissing(item)).map(item => {
+  const editing = draft.value?.id === item.id ? draft.value : null
+  const points: Array<[number, number]> = editing ? editing.points : 'points' in item ? item.points : [[item.lon, item.lat]]
+  const pixels = points.map(point => geoToPixel(props.registration, point[0], point[1]))
+  const attr = editing ? pixels.filter(Boolean).map(point => `${point![0]},${point![1]}`).join(' ') : linearRows.value.get(`${activeKind.value}:${item.id}`)?.attr ?? ''
+  return { kind: activeKind.value, id: item.id, name: item.name, points, attr, dataset: !!item.dataset_ref, pending: isGeometryUnverified(item), visible: pixels.every(Boolean) }
 }))
-
-function vertexCount(kind: LinearKind, points: Array<[number, number]>): number {
-  const first = points[0], last = points[points.length - 1]
-  return points.length - (kind === 'region' && points.length > 1 && first && last && first[0] === last[0] && first[1] === last[1] ? 1 : 0)
-}
-
-/** 段中点把手（像素）：闭合环最后一段连回首点；只在选中的那条上铺，数据集要素不该占满画布 */
-function pixelMidpoints(pixels: Array<[number, number]>, closed: boolean): Array<{ segment: number; at: [number, number] }> {
-  const segments = closed ? pixels.length : pixels.length - 1
-  const handles: Array<{ segment: number; at: [number, number] }> = []
-  for (let segment = 0; segment < segments; segment++) {
-    const a = pixels[segment]!
-    const b = pixels[(segment + 1) % pixels.length]!
-    handles.push({ segment, at: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] })
-  }
-  return handles
-}
-
-/**
- * 画布行与侧栏状态一次算好：像素控制点、平滑预览曲线、偏离信息、中点把手。
- * 预览曲线走 `utils/smooth.js` 的同一个函数（与实际渲染同源），控制点仍按原坐标单独画。
- */
-function buildLinearRows(list: Array<MapRoute | MapRegion>, kind: LinearKind): LinearRow[] {
-  const closed = kind === 'region'
-  const rows: LinearRow[] = []
-  for (const shape of list) {
-    const pixels: Array<[number, number]> = []
-    const count = vertexCount(kind, shape.points)
-    for (let index = 0; index < count; index++) {
-      const point = shape.points[index]!
-      const pixel = pixelOf(point[0], point[1])
-      if (pixel) pixels.push(pixel)
-    }
-    const entry = props.layerOptions?.[smoothKeyFor(props.layerDoc, shape.id)]
-    const explicit = entry && typeof entry.smooth === 'number' && Number.isFinite(entry.smooth) ? entry.smooth : null
-    // 没显式写过的要素按后端缺省：数据集关、其余要素开；此处只显示，不悄悄写进草稿
-    const strength = explicit ?? (shape.origin === 'dataset' ? 0 : 1)
-    const normalized = viewWidth.value > 0 && viewHeight.value > 0
-      ? pixels.map(pt => [pt[0] / viewWidth.value, pt[1] / viewHeight.value] as [number, number])
-      : []
-    const smoothOptions = { closed, strength, width: viewWidth.value, height: viewHeight.value }
-    const curve = strength > 0 ? smoothPoints(normalized, smoothOptions) : normalized
-    const selectedShape = selected.value?.kind === kind && selected.value.id === shape.id
-    // 只有整条形状都投出来了才铺中点把手：漏掉的顶点没有像素中点，宁可不出把手也不猜坐标
-    const allVisible = pixels.length === count
-    rows.push({
-      id: shape.id,
-      name: shape.name,
-      pixels,
-      vertices: selectedShape || (shape.origin !== 'dataset' && pixels.length <= 60) ? pixels : [],
-      attr: curve.map(pt => `${pt[0] * viewWidth.value},${pt[1] * viewHeight.value}`).join(' '),
-      dataset: shape.origin === 'dataset',
-      pending: isPending(shape),
-      smooth: strength,
-      deviation: deviationProblems(normalized, smoothOptions)[0] ?? null,
-      handles: selectedShape && allVisible && !props.disabled && props.registration ? pixelMidpoints(pixels, closed) : [],
-    })
-  }
-  return rows
-}
-
-const linearRender = computed(() => {
-  const rows = [
-    ...buildLinearRows(props.spec.routes, 'route').map(row => ({ kind: 'route' as LinearKind, row })),
-    ...buildLinearRows(props.spec.regions, 'region').map(row => ({ kind: 'region' as LinearKind, row })),
-  ]
-  const states = new Map<string, { smooth: number; deviation: LinearDeviation | null }>()
-  for (const { kind, row } of rows) states.set(`${kind}:${row.id}`, { smooth: row.smooth, deviation: row.deviation })
-  return { routes: rows.filter(item => item.kind === 'route').map(item => item.row), regions: rows.filter(item => item.kind === 'region').map(item => item.row), states }
+const offscreenCount = computed(() => props.registration ? canvasShapes.value.filter(shape => !shape.visible).length : 0)
+const dialogPoints = computed<Array<[number, number]>>(() => {
+  const current = dialog.value
+  if (current?.mode !== 'vertices' || !current.kind) return []
+  if (current.draft && draft.value?.kind === current.kind) return draft.value.points
+  const shape = featureOf(props.spec, { kind: current.kind, id: current.id ?? '' })
+  return shape && 'points' in shape ? shape.points.slice(0, vertexCount(current.kind, shape.points)) : []
+})
+const dialogRows = computed<PointRow[]>(() => dialog.value?.mode === 'places'
+  ? props.spec.places.map((place, index) => ({ key: place.id, index: index + 1, name: place.name, lon: place.lon, lat: place.lat, feature: place }))
+  : dialogPoints.value.map((point, index) => ({ key: String(index), index: index + 1, lon: point[0], lat: point[1] })))
+const dialogEdges = computed(() => {
+  const kind = dialog.value?.kind
+  if (!kind) return []
+  return Array.from({ length: segmentCount(kind, dialogPoints.value) }, (_, segment) => ({ segment, from: segment + 1, to: (segment + 1) % dialogPoints.value.length + 1 }))
+})
+const dialogName = computed(() => {
+  if (dialog.value?.mode === 'places') return t('mapStudio.editor.placesTitle', { n: props.spec.places.length })
+  if (dialog.value?.draft && !draft.value?.id) return t('mapStudio.editor.shapeInProgress', { n: draft.value?.points.length ?? 0, min: draft.value ? minVertices(draft.value.kind) : 0 })
+  const current = dialog.value
+  return current?.kind ? featureOf(props.spec, { kind: current.kind, id: current.id ?? '' })?.name || current.id || '' : ''
 })
 
-const routeShapes = computed(() => linearRender.value.routes.filter(row => row.pixels.length >= 2))
-const regionShapes = computed(() => linearRender.value.regions.filter(row => row.pixels.length >= 2))
-// 平滑控制不依赖底图/配准：尚未绘制时也能用要素 id 预设强度。
-const linearSections = computed(() => {
-  const byId = (rows: LinearRow[]) => new Map(rows.map(row => [row.id, row]))
-  return [
-    { kind: 'route' as LinearKind, items: props.spec.routes, rows: byId(linearRender.value.routes) },
-    { kind: 'region' as LinearKind, items: props.spec.regions, rows: byId(linearRender.value.regions) },
-  ]
-})
-const draftPixels = computed(() => (draft.value?.points ?? []).map(pt => pixelOf(pt[0], pt[1])).filter((pt): pt is [number, number] => !!pt))
-const draftAttr = computed(() => draftPixels.value.map(pt => `${pt[0]},${pt[1]}`).join(' '))
-
-/** 视野外的要素必须明说：Earth 底图里地球背面的点根本投不出来，不能悄悄吞掉 */
-const offscreenCount = computed(() => {
-  if (!props.registration) return 0
-  let missing = props.spec.places.length - placeShapes.value.length
-  missing += props.spec.routes.length - routeShapes.value.length
-  missing += props.spec.regions.length - regionShapes.value.length
-  return Math.max(0, missing)
-})
-
-function onBaseLoad(event: Event) {
-  const img = event.target
-  if (!(img instanceof HTMLImageElement)) return
-  naturalSize.value = { width: img.naturalWidth, height: img.naturalHeight }
-  // 外部原件还没经后端出图时，控制点配准要用这张图的真实像素尺寸
-  emit('base-size', { width: img.naturalWidth, height: img.naturalHeight })
-  if (focusOnLoad && link.initial('msgeo')) {
-    focusOnLoad = false
-    void nextTick(() => svgEl.value?.scrollIntoView({ block: 'center' }))
-  }
-}
-
-function newId(prefix: string): string {
-  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
-}
-
-/** 逐字保留阶段 ② 元数据：编辑器只动几何，未触碰的 category / relations / 数据集引用不能被顺手清掉 */
-function cloneMetadata<T extends MapFeatureMetadata & { proposed?: boolean }>(item: T): T {
-  const copy: T = { ...item }
-  if (item.verification) copy.verification = { status: item.verification.status, reasons: [...item.verification.reasons] }
-  if (item.dataset_ref) {
-    copy.dataset_ref = {
-      ref: item.dataset_ref.ref,
-      ...(item.dataset_ref.clip_bbox ? { clip_bbox: [...item.dataset_ref.clip_bbox] as [number, number, number, number] } : {}),
-    }
-  }
-  if (item.relations) copy.relations = [...item.relations]
-  return copy
-}
-
+/** clone 保留全部未触碰元数据；只有真实坐标改变才 markManual。 */
 function cloneSpec(): MapSpec {
-  return {
-    ...props.spec,
-    places: props.spec.places.map(place => cloneMetadata(place)),
-    routes: props.spec.routes.map(route => ({ ...cloneMetadata(route), points: route.points.map(pt => [pt[0], pt[1]] as [number, number]) })),
-    regions: props.spec.regions.map(region => ({ ...cloneMetadata(region), points: region.points.map(pt => [pt[0], pt[1]] as [number, number]) })),
-  }
+  return JSON.parse(JSON.stringify(props.spec)) as MapSpec
 }
-
-/** 数据集几何被人工改动后不再是数据集原值：转 manual + confirmed 并去掉 dataset_ref，其余元数据原样保留 */
-function markManual(item: MapFeatureMetadata & { id: string, proposed?: boolean }, kind: FeatureKind): boolean {
-  if (item.origin !== 'dataset') return false
+function markManual(item: MapFeatureMetadata & { proposed?: boolean }) {
+  const dataset = item.origin === 'dataset' || !!item.dataset_ref
   item.origin = 'manual'
   delete item.proposed
   delete item.dataset_ref
   item.verification = { status: 'confirmed', reasons: [t('mapStudio.editor.manualReason')] }
-  warnDatasetEdit(kind, item.id)
-  return true
+  if (dataset) toast.warning(t('mapStudio.editor.datasetEditWarning'))
 }
-
-/**
- * 一次拖拽里连续多次改写只提示一次；离散动作（提交草稿 / 删点 / 改数值）结束后解除，
- * 下一次改动仍会得到提示。
- */
-let lastDatasetWarnKey = ''
-function warnDatasetEdit(kind: FeatureKind, id: string) {
-  const key = `${kind}:${id}`
-  if (lastDatasetWarnKey === key) return
-  lastDatasetWarnKey = key
-  toast.warning(t('mapStudio.editor.datasetEditWarning'))
+function manualEntry<T extends { id: string }>(value: T): T & MapFeatureMetadata {
+  return { ...value, origin: 'manual', verification: { status: 'confirmed', reasons: [t('mapStudio.editor.manualReason')] } }
 }
-function resetDatasetWarn() {
-  lastDatasetWarnKey = ''
+function newId(prefix: string): string {
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
 }
-
-/** 人工新增的条目一开始就是「人工 + 已确认」，不留在 AI 候选状态 */
-function manualEntry<T extends { id: string }>(entry: T): T & MapFeatureMetadata {
-  return {
-    ...entry,
-    origin: 'manual' as const,
-    verification: { status: 'confirmed' as const, reasons: [t('mapStudio.editor.manualReason')] },
+function selectFeature(target: Target) {
+  selected.value = target
+  memories[tabFor(target.kind)] = target
+  selectedVertex.value = null
+  selectedEdge.value = null
+  syncLinks()
+}
+function selectVertex(target: { kind: LinearKind; id: string; index: number }) {
+  selected.value = { kind: target.kind, id: target.id }
+  selectedVertex.value = target
+  selectedEdge.value = null
+  if (dialog.value?.mode === 'vertices') dialog.value.row = target.index
+  syncLinks()
+}
+function selectEdge(target: { kind: LinearKind; id: string; segment: number } | null) {
+  selectedEdge.value = target
+  selectedVertex.value = null
+  if (target) selected.value = { kind: target.kind, id: target.id }
+  syncLinks()
+}
+function clearSelection() {
+  selected.value = null
+  selectedVertex.value = null
+  selectedEdge.value = null
+  syncLinks()
+}
+function focusSelector(selector: string) {
+  void nextTick(() => root.value?.querySelector<HTMLElement>(selector)?.focus())
+}
+function hasInlineIncomplete(): boolean {
+  return Object.entries(placeBuffers.value).some(([key, raw]) => parseCoordinate(key.endsWith(':lon') ? 'lon' : 'lat', raw) === null)
+}
+function applyTab(next: GeoTab) {
+  scrollMemory[tab.value] = listElement.value?.scrollTop ?? 0
+  tab.value = next
+  tool.value = 'select'
+  const remembered = memories[next]
+  selected.value = remembered && featureOf(props.spec, remembered) ? remembered : null
+  selectedVertex.value = null
+  selectedEdge.value = null
+  tabPrompt.value = null
+  syncLinks()
+  void nextTick(() => { if (listElement.value) listElement.value.scrollTop = scrollMemory[next] })
+}
+function requestTab(next: GeoTab) {
+  if (next === tab.value) return
+  if (draft.value) { tabPrompt.value = { target: next, reason: 'shape' }; return }
+  if (hasInlineIncomplete() || placeDraft.value) { tabPrompt.value = { target: next, reason: 'input' }; return }
+  applyTab(next)
+}
+function onTabKey(event: KeyboardEvent, index: number) {
+  let next = index
+  if (event.key === 'ArrowRight') next = (index + 1) % TABS.length
+  else if (event.key === 'ArrowLeft') next = (index + TABS.length - 1) % TABS.length
+  else if (event.key === 'Home') next = 0
+  else if (event.key === 'End') next = TABS.length - 1
+  else return
+  event.preventDefault()
+  root.value?.querySelectorAll<HTMLElement>('[role="tab"]')[next]?.focus()
+}
+function resolveTab(action: 'finish' | 'cancel' | 'discard') {
+  const next = tabPrompt.value?.target
+  if (!next) return
+  if (action === 'finish' && !finishDraft()) return
+  if (action === 'cancel') cancelDraft()
+  if (action === 'discard') { placeBuffers.value = {}; placeDraft.value = null }
+  applyTab(next)
+  if (pendingNavigation) {
+    const query = pendingNavigation
+    pendingNavigation = null
+    restoreUi(query)
   }
 }
-
-function setMode(next: ToolMode) {
-  mode.value = next
-  if (next === 'select' || next === 'place') draft.value = null
-  else if (!draft.value || draft.value.kind !== next) draft.value = { kind: next, id: null, points: [] }
+function openDialog(kind?: LinearKind, id?: string | null, row: number | null = null) {
+  returnFocus = typeof document === 'undefined' ? null : document.activeElement as HTMLElement
+  const isDraft = !!kind && draft.value?.kind === kind && draft.value.id === (id ?? null)
+  if (kind && id) selectFeature({ kind, id })
+  dialog.value = kind ? { mode: 'vertices', kind, id, draft: isDraft, row, notice: '' } : { mode: 'places', draft: false, row: null, notice: '' }
+  rejectNotice.value = ''
+  syncLinks()
 }
-
-/** 把已有线/面接着画下去：点进来的那条进草稿，收尾时写回同一个 id */
-function continueShape(kind: LinearKind, id: string) {
-  const list = kind === 'route' ? props.spec.routes : props.spec.regions
-  const shape = list.find(item => item.id === id)
-  if (!shape) return
-  mode.value = kind
-  selected.value = { kind, id }
-  const points: Array<[number, number]> = []
-  const count = vertexCount(kind, shape.points)
-  for (let index = 0; index < count; index++) {
-    const point = shape.points[index]!
-    points.push([point[0], point[1]])
-  }
-  draft.value = { kind, id, points }
-}
-
-/**
- * 写平滑草稿：线/面已有锚定图层时键用图层 id（后端按图层 id 取参数），
- * 还没画出图层时用要素 id 暂存（作图阶段把要素键映射到落地图层 id）。只发草稿，不写接口。
- */
-function setSmooth(shape: MapRoute | MapRegion, value: number) {
-  if (props.disabled || !Number.isFinite(value)) return
-  const key = smoothKeyFor(props.layerDoc, shape.id)
-  // 滑杆步长 0.05，取两位小数去掉浮点尾巴；显式写 0 表示「关」，不删键（人的选择要看得见）
-  const smooth = Math.round(Math.min(1, Math.max(0, value)) * 100) / 100
-  emit('layer-options', { ...(props.layerOptions ?? {}), [key]: { smooth } })
-}
-
-function setSmoothInput(shape: MapRoute | MapRegion, event: Event) {
-  const target = event.target
-  if (!(target instanceof HTMLInputElement)) return
-  setSmooth(shape, Number(target.value))
-}
-
-/** 侧栏偏离提示：超限的段才出现，数值给到足以照改的精度（强度由人明确调低，绝不自动改） */
-function deviationWarning(kind: LinearKind, shape: MapRoute | MapRegion): string {
-  const deviation = linearRender.value.states.get(`${kind}:${shape.id}`)?.deviation
-  if (!deviation) return ''
-  return t('mapStudio.editor.smoothDeviation', {
-    layer: shape.name || shape.id,
-    segment: deviation.segment,
-    deviation: deviation.deviation.toFixed(0),
-    limit: deviation.limit.toFixed(0),
-    suggest: deviation.suggested,
+function closeDialog() {
+  dialog.value = null
+  syncLinks()
+  void nextTick(() => {
+    if (returnFocus?.isConnected) returnFocus.focus()
+    else root.value?.querySelector<HTMLElement>('.geo-list-head')?.focus()
   })
 }
-
-/**
- * 段中点插入顶点：像素中点按该底图的 registration 反投影回经纬度（与拖点同口径），
- * 原控制点一个不动、顺序不变；插入点是人工确认的几何，不再是 AI 候选。
- */
-function insertMidpoint(kind: LinearKind, id: string, segment: number) {
-  if (props.disabled || !props.registration) return
-  const source = (kind === 'route' ? props.spec.routes : props.spec.regions).find(item => item.id === id)
-  if (!source) return
-  const count = vertexCount(kind, source.points)
-  const lastSegment = kind === 'region' ? count - 1 : count - 2
-  if (!Number.isInteger(segment) || segment < 0 || segment > lastSegment) return
-  const nextIndex = (segment + 1) % count
-  const a = pixelOf(source.points[segment]![0], source.points[segment]![1])
-  const b = pixelOf(source.points[nextIndex]![0], source.points[nextIndex]![1])
-  // 地球背面等投不出来的点没有像素中点可言，不猜坐标
-  if (!a || !b) return
-  const geo = pixelToGeo(props.registration, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
-  if (!geo) return
-  const next = cloneSpec()
-  const target = (kind === 'route' ? next.routes : next.regions).find(item => item.id === id)
-  if (!target) return
-  target.points = insertVertex(target.points, segment, [Number(geo[0].toFixed(5)), Number(geo[1].toFixed(5))], kind === 'region')
-  if (target.origin === 'dataset') markManual(target, kind)
-  else {
-    target.origin = 'manual'
-    delete target.proposed
-    target.verification = { status: 'confirmed' as const, reasons: [t('mapStudio.editor.manualReason')] }
-  }
-  selected.value = { kind, id }
-  emit('update', next)
-  resetDatasetWarn()
-  toast.success(t('mapStudio.editor.midpointInserted'))
+function beginShape(kind: LinearKind, id: string | null = null) {
+  if (props.disabled || draft.value) return
+  const existing = id ? featureOf(props.spec, { kind, id }) : null
+  draft.value = { kind, id, points: existing && 'points' in existing ? existing.points.slice(0, vertexCount(kind, existing.points)).map(point => [point[0], point[1]]) : [] }
+  tool.value = 'draw'
+  if (id) selectFeature({ kind, id })
+  if (!id) openDialog(kind, null)
+  syncLinks()
 }
-
-function eventGeo(event: PointerEvent | MouseEvent): [number, number] | null {
-  const svg = svgEl.value
-  if (!svg || !props.registration) return null
-  const rect = svg.getBoundingClientRect()
-  if (!rect.width || !rect.height) return null
-  // preserveAspectRatio=meet：viewBox 等比居中，先还原出信箱边距再换算像素
-  const scale = Math.min(rect.width / viewWidth.value, rect.height / viewHeight.value)
-  const offsetX = (rect.width - viewWidth.value * scale) / 2
-  const offsetY = (rect.height - viewHeight.value * scale) / 2
-  const x = (event.clientX - rect.left - offsetX) / scale
-  const y = (event.clientY - rect.top - offsetY) / scale
-  return pixelToGeo(props.registration, x, y)
+function addCurrent() {
+  if (tab.value === 'point') {
+    placeDraft.value = { name: '', lon: '', lat: '' }
+    focusSelector('[data-new-place="lon"]')
+  } else beginShape(tab.value === 'line' ? 'route' : 'region')
 }
-
-function onStagePointerDown(event: PointerEvent) {
-  if (props.disabled || mode.value === 'select') return
-  const geo = eventGeo(event)
-  if (!geo) return
-  if (mode.value === 'place') {
-    const next = cloneSpec()
-    const place = manualEntry<MapPlace>({ id: newId('place'), name: '', lon: Number(geo[0].toFixed(5)), lat: Number(geo[1].toFixed(5)) })
-    next.places.push(place)
-    selected.value = { kind: 'place', id: place.id }
-    emit('update', next)
-    return
-  }
-  if (!draft.value || draft.value.kind !== mode.value) draft.value = { kind: mode.value, id: null, points: [] }
-  draft.value.points.push([Number(geo[0].toFixed(5)), Number(geo[1].toFixed(5))])
-}
-
-function commitDraft() {
+function finishDraft(): boolean {
   const current = draft.value
-  if (!current || current.points.length < (current.kind === 'region' ? 3 : 2)) return
+  if (!current || !canFinish.value || props.disabled) return false
   const next = cloneSpec()
   const list = current.kind === 'route' ? next.routes : next.regions
   const existing = current.id ? list.find(item => item.id === current.id) : null
+  let id = current.id
   if (existing) {
-    // 只重画了同样的顶点不算改动：数据集要素不该因为「点了继续编辑又原样收尾」被降级成人工几何
-    const changed = JSON.stringify(existing.points) !== JSON.stringify(current.points)
-    existing.points = current.points
-    if (changed) markManual(existing, current.kind)
-  } else {
-    const shape = manualEntry({ id: newId(current.kind), name: '', points: current.points })
-    list.push(shape)
-    selected.value = { kind: current.kind, id: shape.id }
-  }
-  draft.value = null
-  mode.value = 'select'
-  emit('update', next)
-  resetDatasetWarn()
-}
-
-function startDrag(kind: FeatureKind, id: string, index: number, event: PointerEvent) {
-  if (props.disabled || mode.value !== 'select') return
-  resetDatasetWarn()
-  selected.value = { kind, id }
-  dragging.value = { kind, id, index }
-  const target = event.target
-  if (target instanceof Element && target.setPointerCapture) target.setPointerCapture(event.pointerId)
-}
-
-function onPointerMove(event: PointerEvent) {
-  const geo = eventGeo(event)
-  cursorGeo.value = geo
-  const drag = dragging.value
-  if (!drag || !geo || props.disabled) return
-  const next = cloneSpec()
-  const lon = Number(geo[0].toFixed(5))
-  const lat = Number(geo[1].toFixed(5))
-  if (drag.kind === 'place') {
-    const place = next.places.find(item => item.id === drag.id)
-    if (!place || (place.lon === lon && place.lat === lat)) return
-    place.lon = lon
-    place.lat = lat
-    markManual(place, 'place')
-  } else {
-    const list = drag.kind === 'route' ? next.routes : next.regions
-    const shape = list.find(item => item.id === drag.id)
-    const point = shape?.points[drag.index]
-    if (!shape || !point) return
-    if (point[0] === lon && point[1] === lat) return
-    const closed = drag.kind === 'region' && vertexCount('region', shape.points) < shape.points.length
-    point[0] = lon
-    point[1] = lat
-    if (closed && drag.index === 0) {
-      const last = shape.points[shape.points.length - 1]!
-      last[0] = lon
-      last[1] = lat
+    const openPoints = existing.points.slice(0, vertexCount(current.kind, existing.points))
+    if (JSON.stringify(openPoints) !== JSON.stringify(current.points)) {
+      existing.points = current.points.map(point => [point[0], point[1]])
+      markManual(existing)
+      emit('update', next)
     }
-    markManual(shape, drag.kind)
+  } else {
+    id = newId(current.kind)
+    list.push(manualEntry({ id, name: '', points: current.points.map(point => [point[0], point[1]] as [number, number]) }))
+    emit('update', next)
   }
+  const kind = current.kind
+  draft.value = null
+  tool.value = 'select'
+  if (dialog.value?.draft) dialog.value = null
+  if (id) selected.value = { kind, id }
+  syncLinks()
+  focusSelector(`[data-continue="${id}"]`)
+  return true
+}
+function cancelDraft() {
+  const current = draft.value
+  draft.value = null
+  if (dialog.value?.draft) dialog.value = null
+  tool.value = 'select'
+  syncLinks()
+  focusSelector(current?.id ? `[data-continue="${current.id}"]` : '.geo-add-current')
+}
+function appendDraft(point: [number, number]) {
+  if (props.disabled || activeKind.value === 'place') return
+  if (!draft.value) draft.value = { kind: activeKind.value as LinearKind, id: null, points: [] }
+  draft.value.points.push(point)
+}
+function addPlace(point: [number, number], name = '') {
+  if (props.disabled) return
+  const next = cloneSpec()
+  const entry = manualEntry<MapPlace>({ id: newId('place'), name, lon: point[0], lat: point[1] })
+  next.places.push(entry)
+  emit('update', next)
+  selectFeature({ kind: 'place', id: entry.id })
+}
+function createPlace(value: { name: string; lon: number; lat: number }) {
+  addPlace([value.lon, value.lat], value.name)
+}
+function createInlinePlace() {
+  const current = placeDraft.value
+  if (!current) return
+  const lon = parseCoordinate('lon', current.lon), lat = parseCoordinate('lat', current.lat)
+  if (lon === null || lat === null) return
+  addPlace([lon, lat], current.name)
+  placeDraft.value = null
+}
+function setName(kind: FeatureKind, id: string, event: Event | string) {
+  const value = typeof event === 'string' ? event : (event.target as HTMLInputElement).value
+  const current = featureOf(props.spec, { kind, id })
+  if (props.disabled || !current || current.name === value) return
+  const next = cloneSpec()
+  featureOf(next, { kind, id })!.name = value
   emit('update', next)
 }
-
-function onPointerUp() {
-  dragging.value = null
+function setPlaceCoord(id: string, axis: 'lon' | 'lat', value: number) {
+  const current = props.spec.places.find(item => item.id === id)
+  if (props.disabled || !current || current[axis] === value) return
+  const next = cloneSpec()
+  const place = next.places.find(item => item.id === id)!
+  place[axis] = value
+  markManual(place)
+  emit('update', next)
+  syncLinks()
 }
-
+function onPlaceInput(id: string, axis: 'lon' | 'lat', event: Event) {
+  const raw = (event.target as HTMLInputElement).value
+  placeBuffers.value = { ...placeBuffers.value, [`${id}:${axis}`]: raw }
+  const value = parseCoordinate(axis, raw)
+  if (value !== null) setPlaceCoord(id, axis, value)
+}
+function moveCanvasVertex(target: { kind: FeatureKind; id: string; index: number; lon: number; lat: number }) {
+  if (target.kind !== 'place') {
+    moveVertex({ ...target, kind: target.kind })
+    return
+  }
+  const next = cloneSpec()
+  const place = next.places.find(item => item.id === target.id)
+  if (!place || (place.lon === target.lon && place.lat === target.lat)) return
+  place.lon = target.lon
+  place.lat = target.lat
+  markManual(place)
+  emit('update', next)
+}
+function moveVertex(target: { kind: LinearKind; id: string; index: number; lon: number; lat: number }) {
+  if (props.disabled) return
+  const currentDraft = draft.value
+  if (currentDraft?.kind === target.kind && currentDraft.id === target.id) {
+    currentDraft.points[target.index] = [target.lon, target.lat]
+    return
+  }
+  const next = cloneSpec()
+  const shape = featureOf(next, target)
+  if (!shape || !('points' in shape)) return
+  const old = shape.points[target.index]
+  if (!old || (old[0] === target.lon && old[1] === target.lat)) return
+  const closed = isClosedRing(target.kind, shape.points)
+  shape.points[target.index] = [target.lon, target.lat]
+  if (closed && target.index === 0) shape.points[shape.points.length - 1] = [target.lon, target.lat]
+  markManual(shape)
+  emit('update', next)
+  syncLinks()
+}
 function removeVertex(kind: LinearKind, id: string, index: number) {
   if (props.disabled) return
-  const next = cloneSpec()
-  const list = kind === 'route' ? next.routes : next.regions
-  const shape = list.find(item => item.id === id)
-  if (!shape) return
-  const count = vertexCount(kind, shape.points)
-  if (count <= (kind === 'region' ? 3 : 2)) return
-  const closed = kind === 'region' && count < shape.points.length
-  shape.points.splice(index, 1)
-  if (closed) {
-    const first = shape.points[0]!, last = shape.points[shape.points.length - 1]!
-    last[0] = first[0]
-    last[1] = first[1]
+  const currentDraft = draft.value
+  if (currentDraft?.kind === kind && currentDraft.id === id) {
+    currentDraft.points.splice(index, 1)
+    return
   }
-  markManual(shape, kind)
+  const current = featureOf(props.spec, { kind, id })
+  if (!current || !('points' in current)) return
+  const count = vertexCount(kind, current.points)
+  if (count <= minVertices(kind) || (kind === 'region' && new Set(current.points.slice(0, count).filter((_, i) => i !== index).map(point => JSON.stringify(point))).size < 3)) {
+    rejectNotice.value = t(kind === 'region' ? 'mapStudio.editor.minPolygonPoints' : 'mapStudio.editor.minLinePoints')
+    toast.warning(rejectNotice.value)
+    return
+  }
+  const next = cloneSpec()
+  const shape = featureOf(next, { kind, id }) as MapRoute | MapRegion
+  const closed = isClosedRing(kind, shape.points)
+  shape.points.splice(index, 1)
+  if (closed) shape.points[shape.points.length - 1] = [...shape.points[0]!] as [number, number]
+  markManual(shape)
   emit('update', next)
-  resetDatasetWarn()
+  selectedVertex.value = { kind, id, index: Math.min(index, count - 2) }
+  rejectNotice.value = ''
+  syncLinks()
+  focusSelector(`[data-input="${Math.min(index, count - 2)}:lon"]`)
 }
-
-function removeFeature(kind: FeatureKind, index: number) {
+function removeFeature(kind: FeatureKind, id: string) {
   if (props.disabled) return
   const next = cloneSpec()
-  if (kind === 'place') next.places.splice(index, 1)
-  else if (kind === 'route') next.routes.splice(index, 1)
-  else next.regions.splice(index, 1)
+  if (kind === 'place') next.places = next.places.filter(item => item.id !== id)
+  else if (kind === 'route') next.routes = next.routes.filter(item => item.id !== id)
+  else next.regions = next.regions.filter(item => item.id !== id)
   emit('update', next)
+  if (draft.value?.id === id) cancelDraft()
+  if (selected.value?.id === id) clearSelection()
+  syncLinks()
 }
-
-/** 采纳 AI 候选：去掉 proposed 标记就是人工背书，之后它和手画的几何一视同仁 */
-function accept(kind: FeatureKind, index: number) {
-  const next = cloneSpec()
-  const item = kind === 'place' ? next.places[index] : kind === 'route' ? next.routes[index] : next.regions[index]
-  if (!item) return
-  delete item.proposed
-  emit('update', next)
+function insertOnEdge(kind: LinearKind, id: string | null, segment: number) {
+  if (props.disabled) return
+  const activeDraft = draft.value?.kind === kind && draft.value.id === id ? draft.value : null
+  const source = activeDraft?.points ?? (featureOf(props.spec, { kind, id: id ?? '' }) as MapRoute | MapRegion | undefined)?.points
+  if (!source) return
+  const count = vertexCount(kind, source)
+  const a = source[segment], b = source[(segment + 1) % count]
+  if (!a || !b) return
+  const midpoint = coordinateMidpoint(a, b)
+  if (activeDraft) activeDraft.points = insertVertex(source, segment, midpoint, kind === 'region')
+  else {
+    const next = cloneSpec()
+    const shape = featureOf(next, { kind, id: id! }) as MapRoute | MapRegion
+    shape.points = insertVertex(shape.points, segment, midpoint, kind === 'region')
+    markManual(shape)
+    emit('update', next)
+  }
+  if (!dialog.value) openDialog(kind, id, segment + 1)
+  else dialog.value.row = segment + 1
+  selectedVertex.value = id ? { kind, id, index: segment + 1 } : null
+  syncLinks()
+  focusSelector(`[data-input="${segment + 1}:lon"]`)
 }
-
-function setName(kind: FeatureKind, index: number, event: Event) {
-  const target = event.target
-  if (!(target instanceof HTMLInputElement)) return
-  const next = cloneSpec()
-  const item = kind === 'place' ? next.places[index] : kind === 'route' ? next.routes[index] : next.regions[index]
-  if (!item) return
-  item.name = target.value
-  emit('update', next)
+function editDialogVertex(payload: { rowIndex: number; axis: 'lon' | 'lat'; value: number }) {
+  const current = dialog.value
+  if (!current?.kind) return
+  const point = dialogPoints.value[payload.rowIndex]
+  if (!point) return
+  if (current.draft && draft.value) {
+    const next: [number, number] = [point[0], point[1]]
+    next[payload.axis === 'lon' ? 0 : 1] = payload.value
+    draft.value.points[payload.rowIndex] = next
+  } else moveVertex({ kind: current.kind, id: current.id!, index: payload.rowIndex, lon: payload.axis === 'lon' ? payload.value : point[0], lat: payload.axis === 'lat' ? payload.value : point[1] })
 }
-
-function setPlaceCoord(index: number, axis: 'lon' | 'lat', event: Event) {
-  const target = event.target
-  if (!(target instanceof HTMLInputElement)) return
-  const value = Number(target.value)
-  if (!Number.isFinite(value)) return
-  const next = cloneSpec()
-  const place = next.places[index]
-  if (!place || place[axis] === value) return
-  place[axis] = value
-  markManual(place, 'place')
-  emit('update', next)
-  resetDatasetWarn()
+function deleteDialogVertex(payload: { rowIndex: number }) {
+  const current = dialog.value
+  if (!current?.kind) return
+  if (current.draft && draft.value) draft.value.points.splice(payload.rowIndex, 1)
+  else removeVertex(current.kind, current.id!, payload.rowIndex)
 }
+function appendDialogVertex(payload: { lon: number; lat: number }) {
+  const current = dialog.value
+  if (!current?.kind) return
+  if (current.draft && draft.value) draft.value.points.push([payload.lon, payload.lat])
+  else {
+    const next = cloneSpec()
+    const shape = featureOf(next, { kind: current.kind, id: current.id! }) as MapRoute | MapRegion
+    const closed = isClosedRing(current.kind, shape.points)
+    shape.points.splice(closed ? shape.points.length - 1 : shape.points.length, 0, [payload.lon, payload.lat])
+    markManual(shape)
+    emit('update', next)
+    syncLinks()
+  }
+}
+function selectDialogVertex(payload: { rowIndex: number }) {
+  const current = dialog.value
+  if (current?.kind && current.id) selectVertex({ kind: current.kind, id: current.id, index: payload.rowIndex })
+}
+function selectDialogEdge(payload: { segment: number }) {
+  const current = dialog.value
+  if (current?.kind && current.id) selectEdge({ kind: current.kind, id: current.id, segment: payload.segment })
+}
+function insertDialogEdge(payload: { segment: number }) {
+  const current = dialog.value
+  if (current?.kind) insertOnEdge(current.kind, current.id ?? null, payload.segment)
+}
+function setSmooth(shape: MapRoute | MapRegion, value: number) {
+  if (props.disabled || !Number.isFinite(value)) return
+  const key = smoothKeyFor(props.layerDoc, shape.id)
+  const smooth = Math.round(Math.min(1, Math.max(0, value)) * 100) / 100
+  if (props.layerOptions?.[key]?.smooth === smooth) return
+  if (!smoothingTouched.value.includes(shape.id)) smoothingTouched.value.push(shape.id)
+  emit('layer-options', { ...props.layerOptions, [key]: { smooth } })
+}
+function onSmoothInput(shape: MapRoute | MapRegion, event: Event) {
+  setSmooth(shape, Number((event.target as HTMLInputElement).value))
+}
+function chooseCandidate(candidate: CanvasCandidate) {
+  selectFeature({ kind: candidate.kind, id: candidate.id })
+  if (candidate.type === 'vertex' && candidate.kind !== 'place') selectVertex({ kind: candidate.kind, id: candidate.id, index: candidate.index })
+  if (candidate.type === 'edge') selectEdge({ kind: candidate.kind, id: candidate.id, segment: candidate.segment })
+  overlap.value = []
+  focusSelector('.geo-stage')
+}
+function candidateLabel(candidate: CanvasCandidate): string {
+  return candidate.type === 'vertex' ? t('mapStudio.editor.overlapVertex', { name: candidate.name || candidate.id, n: candidate.index + 1 }) : candidate.type === 'edge' ? t('mapStudio.editor.overlapEdge', { name: candidate.name || candidate.id, n: candidate.segment + 1 }) : candidate.name || candidate.id
+}
+function showCandidates(candidates: CanvasCandidate[]) {
+  overlap.value = candidates
+  focusSelector('.geo-overlap button')
+}
+function escapeEditor() {
+  if (overlap.value.length) overlap.value = []
+  else if (tabPrompt.value) stayCurrentTab()
+  else if (draft.value) tabPrompt.value = { target: tab.value, reason: 'shape' }
+  else clearSelection()
+}
+function editorKeydown(event: KeyboardEvent) {
+  const target = event.target as HTMLElement
+  if (target?.closest?.('input,textarea,select,[contenteditable]')) return
+  if (event.key === 'Escape' && !dialog.value) { escapeEditor(); return }
+  if ((event.key === 'Delete' || event.key === 'Backspace') && selectedVertex.value && !dialog.value) {
+    event.preventDefault()
+    removeVertex(selectedVertex.value.kind, selectedVertex.value.id, selectedVertex.value.index)
+  }
+}
+function onBaseSize(value: { width: number; height: number }) {
+  naturalSize.value = value
+  emit('base-size', value)
+}
+function hasPendingInput(): boolean {
+  return !!draft.value || !!placeDraft.value || hasInlineIncomplete() || !!dialogRef.value?.hasIncompleteInput()
+}
+function focusPendingInput() {
+  toast.warning(t('mapStudio.editor.pendingInputSave'))
+  if (draft.value) openDialog(draft.value.kind, draft.value.id)
+  else if (placeDraft.value) focusSelector('[data-new-place="lon"]')
+}
+defineExpose({ hasPendingInput, focusPendingInput })
+watch(() => props.focusTarget, target => {
+  if (!target || !featureOf(props.spec, target)) return
+  memories[tabFor(target.kind)] = target
+  requestTab(tabFor(target.kind))
+  if (!tabPrompt.value) selectFeature(target)
+})
+watch(() => props.spec, () => {
+  if (selected.value && !featureOf(props.spec, selected.value)) clearSelection()
+  const current = dialog.value
+  if (current?.mode === 'vertices' && !current.draft && current.kind && current.id && !featureOf(props.spec, { kind: current.kind, id: current.id })) {
+    closeDialog()
+    toast.warning(t('mapStudio.editor.entityMissing'))
+  }
+  if (current?.kind && current.id && coordinateDirty({ kind: current.kind, id: current.id })) current.row = null
+  syncLinks()
+}, { deep: true })
+onUnmounted(() => {
+  if (viewTimer) clearTimeout(viewTimer)
+  window.removeEventListener('popstate', onHistoryNavigation)
+})
 </script>
 
+<template>
+  <div ref="root" class="geo" :class="{ 'is-enlarged': enlarged }" :style="{ '--canvas-share': `${canvasShare}vh` }" @keydown="editorKeydown">
+    <div :inert="dialog ? true : undefined" class="geo-content">
+      <header class="geo-bar">
+        <div class="geo-tabs" role="tablist" :aria-label="t('mapStudio.editor.categoryTabs')">
+          <button v-for="(value, index) in TABS" :key="value" type="button" role="tab" class="geo-tab" :aria-selected="tab === value" :tabindex="tab === value ? 0 : -1" @click="requestTab(value)" @keydown="onTabKey($event, index)">
+            {{ tabLabel(value) }} <span>{{ listOf(spec, kindFor(value)).length }}</span>
+          </button>
+        </div>
+        <div class="geo-tools">
+          <button v-for="value in TOOLS" :key="value" type="button" class="geo-tool" :class="{ 'is-on': tool === value }" :aria-pressed="tool === value" :disabled="disabled || (value === 'draw' && !registration)" @click="tool = value">{{ t(`mapStudio.editor.tool.${value}`) }}</button>
+          <button type="button" class="geo-tool geo-add-current" :disabled="disabled || !!draft" @click="addCurrent">{{ t('mapStudio.editor.newFeature') }}</button>
+          <button type="button" class="geo-tool geo-enlarge" :aria-pressed="enlarged" @click="toggleEnlarged">{{ t(enlarged ? 'mapStudio.editor.exitEnlarged' : 'mapStudio.editor.enlarge') }}</button>
+        </div>
+      </header>
+      <p class="geo-hint geo-hidden-hint">{{ t('mapStudio.editor.hiddenHint', { label: tabLabel(tab) }) }}</p>
+      <p v-if="registration" class="geo-hint dim">{{ t('mapStudio.editor.registration', { mode: t(`mapStudio.baseMode.${registration.mode}`), detail: registrationSummary(registration) }) }}</p>
+      <p v-else class="geo-warn">{{ t('mapStudio.editor.canvasNoRegistration') }}</p>
+      <div class="geo-layout">
+        <div class="geo-map-column">
+          <GeoCanvas v-if="baseUrl && size.width > 0 && size.height > 0" :base-url="baseUrl" :registration="registration" :size="size" :view="view" :tab="activeKind" :tool="tool" :disabled="disabled" :shapes="canvasShapes" :draft="draft?.id ? null : draft" :selected="selected" :selected-vertex="selectedVertex" :selected-edge="selectedEdge" @view="changeView" @base-size="onBaseSize" @select="selectFeature" @select-vertex="selectVertex" @select-edge="selectEdge" @clear-selection="clearSelection" @vertex-drag-end="moveCanvasVertex" @delete-vertex="removeVertex($event.kind, $event.id, $event.index)" @append-draft="appendDraft" @add-place="addPlace" @cursor="cursorGeo = $event" @overlap="showCandidates" @escape="escapeEditor" />
+          <div v-else class="geo-no-base"><p>{{ t('mapStudio.editor.noBaseStage') }}</p></div>
+          <p class="geo-cursor">{{ cursorText }}</p>
+          <p v-if="offscreenCount" class="geo-warn">{{ t('mapStudio.editor.offscreen', { n: offscreenCount }) }}</p>
+          <p v-if="hasInlineIncomplete()" class="geo-warn" role="alert">{{ t('mapStudio.editor.bufferSwitchPrompt') }}</p>
+          <div v-if="selectedVertex || selectedEdge" class="geo-selected-actions">
+            <template v-if="selectedVertex">
+              <span>{{ t('mapStudio.editor.selectedVertexLabel', { n: selectedVertex.index + 1 }) }}</span>
+              <button type="button" class="geo-tool geo-action" :disabled="disabled" :aria-label="t('mapStudio.editor.deleteVertexOfFeature', { name: featureOf(spec, selectedVertex)?.name || selectedVertex.id, n: selectedVertex.index + 1 })" @click="removeVertex(selectedVertex.kind, selectedVertex.id, selectedVertex.index)">{{ t('mapStudio.editor.deleteVertex') }}</button>
+            </template>
+            <template v-if="selectedEdge">
+              <span>{{ t('mapStudio.editor.selectedEdgeLabel', { n: selectedEdge.segment + 1 }) }}</span>
+              <button type="button" class="geo-tool geo-action" :disabled="disabled" @click="insertOnEdge(selectedEdge.kind, selectedEdge.id, selectedEdge.segment)">{{ t('mapStudio.editor.insertOnEdge') }}</button>
+            </template>
+          </div>
+          <p v-if="rejectNotice" class="geo-warn" role="alert">{{ rejectNotice }}</p>
+          <div v-if="tabPrompt" class="geo-switch-prompt" role="alert">
+            <template v-if="tabPrompt.reason === 'shape'">
+              <span>{{ t('mapStudio.editor.tabSwitchPrompt') }}</span>
+              <button type="button" class="geo-tool" :disabled="!canFinish" @click="resolveTab('finish')">{{ t('mapStudio.editor.tabSwitchFinish') }}</button>
+              <button type="button" class="geo-tool" @click="resolveTab('cancel')">{{ t('mapStudio.editor.tabSwitchCancel') }}</button>
+            </template>
+            <template v-else>
+              <span>{{ t('mapStudio.editor.bufferSwitchPrompt') }}</span>
+              <button type="button" class="geo-tool" @click="resolveTab('discard')">{{ t('mapStudio.editor.bufferSwitchDiscard') }}</button>
+            </template>
+            <button type="button" class="geo-tool" @click="stayCurrentTab">{{ t('mapStudio.editor.tabSwitchStay') }}</button>
+          </div>
+          <div v-if="overlap.length" class="geo-overlap" role="group" :aria-label="t('mapStudio.editor.overlapTitle')">
+            <strong>{{ t('mapStudio.editor.overlapTitle') }}</strong>
+            <button v-for="(candidate, index) in overlap" :key="index" type="button" class="geo-tool" @click="chooseCandidate(candidate)">{{ candidateLabel(candidate) }} · {{ t('mapStudio.editor.selectRow') }}</button>
+            <button type="button" class="geo-tool" @click="overlap = []; focusSelector('.geo-stage')">{{ t('mapStudio.editor.overlapCancel') }}</button>
+          </div>
+        </div>
+        <label v-if="enlarged" class="geo-splitter">{{ t('mapStudio.editor.canvasAllocation') }}<input v-model="canvasShare" type="range" min="35" max="75" step="1" :aria-label="t('mapStudio.editor.canvasAllocation')" /></label>
+        <section class="geo-list" :class="{ 'is-collapsed': listCollapsed }" role="tabpanel" :aria-label="tabLabel(tab)">
+          <header class="geo-list-head" tabindex="-1">
+            <strong>{{ tabLabel(tab) }} ({{ activeItems.length }})</strong>
+            <span>{{ t('mapStudio.editor.pendingCount', { n: pendingCount }) }}</span>
+            <span v-if="proposedCount">{{ t('mapStudio.editor.aiCandidateCount', { n: proposedCount }) }}</span>
+            <button v-if="tab === 'point'" type="button" class="geo-tool" @click="openDialog()">{{ t('mapStudio.editor.allPlacesTitle') }}</button>
+            <button type="button" class="geo-tool" :aria-expanded="!listCollapsed" @click="listCollapsed = !listCollapsed">{{ t(listCollapsed ? 'mapStudio.editor.expandList' : 'mapStudio.editor.collapseList') }}</button>
+            <span v-if="listCollapsed && selected">{{ featureOf(spec, selected)?.name || selected.id }}</span>
+          </header>
+          <div v-if="placeDraft && tab === 'point'" class="geo-item geo-draft-item">
+            <strong>{{ t('mapStudio.editor.newPlace') }}</strong>
+            <input v-model="placeDraft.name" class="input geo-name" :placeholder="t('mapStudio.editor.name')" />
+            <label>{{ t('mapStudio.editor.lon') }}<input v-model="placeDraft.lon" data-new-place="lon" class="input geo-coord" /></label>
+            <label>{{ t('mapStudio.editor.lat') }}<input v-model="placeDraft.lat" class="input geo-coord" /></label>
+            <button type="button" class="geo-tool" :disabled="parseCoordinate('lon', placeDraft.lon) === null || parseCoordinate('lat', placeDraft.lat) === null" @click="createInlinePlace">{{ t('mapStudio.editor.newPlaceAction') }}</button>
+            <button type="button" class="geo-tool" @click="placeDraft = null">{{ t('mapStudio.editor.cancelCurrentShape') }}</button>
+          </div>
+          <div v-if="draft && !draft.id && tabFor(draft.kind) === tab" class="geo-item geo-draft-item">
+            <strong>{{ t('mapStudio.editor.shapeInProgress', { n: draft.points.length, min: minVertices(draft.kind) }) }}</strong>
+            <button type="button" class="geo-tool" @click="openDialog(draft.kind, null)">{{ t('mapStudio.editor.pointsDialogTitle') }}</button>
+            <button type="button" class="geo-tool geo-finish" :disabled="!canFinish || disabled" @click="finishDraft">{{ t('mapStudio.editor.finishEditing') }}</button>
+            <button type="button" class="geo-tool" @click="cancelDraft">{{ t('mapStudio.editor.cancelCurrentShape') }}</button>
+            <p class="geo-hint">{{ draft.kind === 'region' ? t('mapStudio.editor.minPolygonDraw') : t('mapStudio.editor.minLineDraw') }}</p>
+          </div>
+          <p v-if="!activeItems.length" class="geo-empty">{{ t('mapStudio.editor.empty') }}</p>
+          <ul v-if="tab === 'point'" ref="listElement" class="geo-items">
+            <li v-for="place in spec.places" :key="place.id" class="geo-item" :class="{ 'is-active': selected?.id === place.id, 'is-pending': isGeometryUnverified(place) }" @click="selectFeature({ kind: 'place', id: place.id })">
+              <input class="input geo-name" :value="place.name" :disabled="disabled" :placeholder="t('mapStudio.editor.name')" @input="setName('place', place.id, $event)" />
+              <label class="geo-num"><span>{{ t('mapStudio.editor.lon') }}</span><input class="input geo-coord" :value="placeBuffers[`${place.id}:lon`] ?? String(place.lon)" :disabled="disabled" @input="onPlaceInput(place.id, 'lon', $event)" /></label>
+              <label class="geo-num"><span>{{ t('mapStudio.editor.lat') }}</span><input class="input geo-coord" :value="placeBuffers[`${place.id}:lat`] ?? String(place.lat)" :disabled="disabled" @input="onPlaceInput(place.id, 'lat', $event)" /></label>
+              <GeoFeatureBadges :feature="place" />
+              <button type="button" class="geo-tool geo-del" :disabled="disabled" :aria-label="t('mapStudio.editor.deletePlaceLabel', { name: place.name || place.id })" @click.stop="removeFeature('place', place.id)">{{ t('mapStudio.editor.deletePlace') }}</button>
+            </li>
+          </ul>
+          <ul v-else ref="listElement" class="geo-items">
+            <li v-for="shape in linearItems" :key="shape.id" class="geo-item" :class="{ 'is-active': selected?.id === shape.id, 'is-pending': isGeometryUnverified(shape) }" @click="selectFeature({ kind: activeKind, id: shape.id })">
+              <input class="input geo-name" :value="shape.name" :disabled="disabled" :placeholder="t('mapStudio.editor.name')" @input="setName(activeKind, shape.id, $event)" />
+              <button type="button" class="geo-tool geo-count" @click.stop="openDialog(activeKind as LinearKind, shape.id)">{{ t('mapStudio.editor.pointCount', { n: vertexCount(activeKind, shape.points) }) }}</button>
+              <GeoFeatureBadges :feature="shape" />
+              <div class="geo-smooth" @click.stop>
+                <span>{{ t('mapStudio.editor.smoothTitle') }}</span>
+                <button type="button" class="geo-tool geo-smooth-toggle" :aria-pressed="(linearRows.get(`${activeKind}:${shape.id}`)?.smooth ?? 0) > 0" :disabled="disabled" @click="setSmooth(shape, (linearRows.get(`${activeKind}:${shape.id}`)?.smooth ?? 0) > 0 ? 0 : 1)">{{ (linearRows.get(`${activeKind}:${shape.id}`)?.smooth ?? 0) > 0 ? t('mapStudio.editor.smoothOn') : t('mapStudio.editor.smoothOff') }}</button>
+                <label class="geo-smooth-range"><span>{{ t('mapStudio.editor.smoothStrength') }}</span><input class="geo-smooth-slider" type="range" min="0" max="1" step="0.05" :value="linearRows.get(`${activeKind}:${shape.id}`)?.smooth ?? 0" :disabled="disabled" @input="onSmoothInput(shape, $event)" /><output>{{ Math.round((linearRows.get(`${activeKind}:${shape.id}`)?.smooth ?? 0) * 100) }}%</output></label>
+              </div>
+              <GeoSmoothWarning v-if="linearRows.get(`${activeKind}:${shape.id}`) && (linearRows.get(`${activeKind}:${shape.id}`)!.problems.length || ((!linearRows.get(`${activeKind}:${shape.id}`)!.canPreview || smoothingTouched.includes(shape.id)) && linearRows.get(`${activeKind}:${shape.id}`)!.smooth > 0))" :feature-name="shape.name || shape.id" :problems="linearRows.get(`${activeKind}:${shape.id}`)!.problems" :strength="linearRows.get(`${activeKind}:${shape.id}`)!.smooth" :can-preview="linearRows.get(`${activeKind}:${shape.id}`)!.canPreview" :disabled="disabled" @apply-suggested="setSmooth(shape, $event)" @disable="setSmooth(shape, 0)" />
+              <div class="geo-row-actions" @click.stop>
+                <button type="button" class="geo-tool" :data-continue="shape.id" :disabled="disabled || (!!draft && draft.id !== shape.id)" @click="beginShape(activeKind as LinearKind, shape.id)">{{ t('mapStudio.editor.continueShape') }}</button>
+                <button type="button" class="geo-tool geo-finish" :disabled="disabled || draft?.id !== shape.id || !canFinish" :title="draft?.id === shape.id ? t('mapStudio.editor.finishLocalNote') : t('mapStudio.editor.finishNeedsPoints')" @click="finishDraft">{{ t('mapStudio.editor.finishEditing') }}</button>
+                <button v-if="draft?.id === shape.id" type="button" class="geo-tool" @click="cancelDraft">{{ t('mapStudio.editor.cancelCurrentShape') }}</button>
+                <button type="button" class="geo-tool geo-del" :disabled="disabled" @click="removeFeature(activeKind, shape.id)">{{ t('mapStudio.editor.remove') }}</button>
+              </div>
+              <p v-if="draft?.id === shape.id" class="geo-hint">{{ t('mapStudio.editor.datasetManualNote') }}</p>
+            </li>
+          </ul>
+          <p v-if="draft" class="geo-hint">{{ t('mapStudio.editor.finishLocalNote') }}</p>
+        </section>
+      </div>
+      <p v-if="localSpecDirty" class="geo-draft-status" role="status">{{ t('mapStudio.editor.draftStatus') }}</p>
+    </div>
+    <GeoPointDialog
+      v-if="dialog" ref="dialogRef" :mode="dialog.mode" :feature-name="dialogName"
+      :rows="dialogRows" :edges="dialogEdges" :draft="dialog.draft" :kind="dialog.kind"
+      :disabled="disabled" :dirty="localSpecDirty" :linked-row="dialog.row"
+      :notice="dialog.notice" :reject-notice="rejectNotice"
+      @close="closeDialog" @edit-name="setName('place', $event.key, $event.value)"
+      @edit-coordinate="setPlaceCoord($event.key, $event.axis, $event.value)"
+      @edit-vertex="editDialogVertex" @delete-place="removeFeature('place', $event.key)"
+      @delete-vertex="deleteDialogVertex" @select-place="selectFeature({ kind: 'place', id: $event.key })"
+      @select-vertex="selectDialogVertex" @select-edge="selectDialogEdge"
+      @insert-edge="insertDialogEdge" @append-vertex="appendDialogVertex" @create-place="createPlace"
+    />
+  </div>
+</template>
+
 <style scoped>
-.geo-preview svg { display: block; width: 100%; max-width: 600px; border: 1px solid #b99b83; }
-.geo-item.is-pending { border-color: #d97732; }
-.geo-item.is-active { outline: 2px solid #cf3e32; }
-.geo-route.is-pending, .geo-region.is-pending { stroke: #cf3e32; stroke-dasharray: 8 5; }
-.geo { display: flex; flex-direction: column; gap: 8px; }
+.geo, .geo-content { display: flex; flex-direction: column; gap: 8px; }
 .geo-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
-.geo-title { font: 600 12px var(--font-body); color: var(--text-1); }
-.geo-tools { display: flex; flex-wrap: wrap; gap: 4px; }
-.geo-tool {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  padding: 2px 9px;
-  border-radius: 999px;
-  border: 1px solid var(--border-strong);
-  background: transparent;
-  color: var(--text-2);
-  font: 600 10.5px var(--font-body);
-  cursor: pointer;
-}
-.geo-tool:hover:not(:disabled) { color: var(--accent-text); border-color: var(--accent-text); }
-.geo-tool.is-on { color: var(--accent-text); border-color: var(--accent-text); background: var(--accent-soft, transparent); }
-.geo-tool:disabled { opacity: 0.5; cursor: not-allowed; }
-.geo-cursor { margin-left: auto; font: 500 10.5px var(--font-mono, var(--font-body)); color: var(--text-2); }
-.geo-hint { margin: 0; font-size: 10.5px; color: var(--text-2); }
-.geo-warn {
-  margin: 0;
-  padding: 4px 8px;
-  border-radius: 6px;
-  background: var(--warn-bg);
-  border: 1px solid var(--warn-border);
-  color: var(--warn-text);
-  font: 600 10.5px var(--font-body);
-}
-.geo-empty { margin: 0; font-size: 10.5px; }
-.geo-stage {
-  position: relative;
-  width: 100%;
-  min-width: 360px;
-  background: var(--bg-2);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  overflow: hidden;
-}
-.geo-stage.is-drawing { cursor: crosshair; }
-.geo-base { display: block; width: 100%; height: auto; }
-.geo-overlay { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
-.geo-region { fill: var(--accent-text); fill-opacity: 0.14; stroke: var(--accent-text); }
-.geo-region.is-active { fill-opacity: 0.26; }
-.geo-region.is-dataset { fill: #8d7bd8; fill-opacity: 0.16; stroke: #8d7bd8; stroke-dasharray: 5 3; }
-.geo-route { fill: none; stroke: #e2703a; stroke-linecap: round; stroke-linejoin: round; }
-.geo-route.is-active { stroke: var(--accent-text); }
-.geo-route.is-dataset { stroke: #8d7bd8; stroke-dasharray: 6 3; }
-.geo-place { fill: #4fc3f7; cursor: grab; }
-.geo-place.is-proposed { fill: #ffb74d; }
-.geo-place.is-dataset { fill: #8d7bd8; stroke: var(--surface); stroke-width: 1.2; stroke-dasharray: 2.5 2; }
-.geo-place.is-active { stroke: var(--text-1); stroke-width: 1.5; }
-.geo-vertex { fill: var(--surface); stroke: var(--text-1); stroke-width: 1; cursor: grab; }
-.geo-draft { fill: none; stroke: var(--accent-text); stroke-dasharray: 6 4; }
-.geo-draft-vertex { fill: var(--accent-text); }
-.geo-midpoint { cursor: pointer; }
-.geo-midpoint-ring { fill: var(--surface); stroke: var(--accent-text); stroke-width: 1; }
-.geo-midpoint-cross { fill: none; stroke: var(--accent-text); stroke-width: 1; pointer-events: none; }
-.geo-midpoint:hover .geo-midpoint-ring { fill: var(--accent-soft, var(--surface)); }
-.geo-smooth { display: inline-flex; align-items: center; gap: 4px; }
-.geo-smooth-range { display: inline-flex; align-items: center; gap: 3px; color: var(--text-2); font: 600 10px var(--font-body); }
-.geo-smooth-slider { width: 64px; accent-color: var(--accent-text); }
-.geo-smooth-value { font: 500 10px var(--font-mono, var(--font-body)); color: var(--text-2); }
-.geo-smooth-warn { flex: 1 0 100%; }
-.geo-text { fill: var(--text-1); paint-order: stroke; stroke: var(--surface); stroke-width: 2; pointer-events: none; }
-.geo-lists {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 10px;
-}
-.geo-list { display: flex; flex-direction: column; gap: 5px; }
-.geo-list-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 11px; color: var(--text-1); }
-.geo-items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
-.geo-item {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 4px 6px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--surface-soft);
-  font-size: 10.5px;
-  cursor: pointer;
-}
-.geo-item.is-active { border-color: var(--accent-text); }
-.geo-name { flex: 1 1 140px; min-width: 120px; }
-.geo-num { display: inline-flex; align-items: center; gap: 3px; }
-.geo-num .input { width: 92px; }
-.geo-count { color: var(--text-2); }
-.geo-lock {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  padding: 1px 6px;
-  border-radius: 999px;
-  border: 1px solid var(--border-strong);
-  color: var(--text-2);
-  font-weight: 600;
-}
-.geo-badge {
-  padding: 1px 6px;
-  border-radius: 999px;
-  background: var(--warn-bg);
-  border: 1px solid var(--warn-border);
-  color: var(--warn-text);
-  font-weight: 600;
-}
-.geo-del {
-  flex: none;
-  width: 18px;
-  height: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--text-3);
-  cursor: pointer;
-}
-.geo-del:hover:not(:disabled) { background: var(--action-danger); color: #fff; }
+.geo-tabs { display: inline-flex; border: 1px solid var(--border-strong); border-radius: 9px; overflow: hidden; }
+.geo-tab { padding: 8px 15px; border: 0; background: var(--bg-1); color: var(--text-2); font-weight: 600; cursor: pointer; }
+.geo-tab[aria-selected="true"] { background: var(--accent-soft); color: var(--accent-text); box-shadow: inset 0 -2px var(--accent-text); }
+.geo-tab span { font: 500 10px var(--font-mono, monospace); margin-left: 4px; }
+.geo-tools, .geo-row-actions, .geo-selected-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; }
+.geo :deep(.geo-tool) { display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 5px 10px; min-height: 36px; border-radius: 6px; border: 1px solid var(--border-strong); background: var(--bg-1); color: var(--text-2); font: 600 11px var(--font-body); cursor: pointer; }
+.geo :deep(.geo-tool:hover:not(:disabled)), .geo :deep(.geo-tool.is-on) { color: var(--accent-text); border-color: var(--accent-text); background: var(--accent-soft); }
+.geo :deep(.geo-tool:disabled) { opacity: .45; cursor: not-allowed; }
+.geo :deep(.geo-action) { min-height: 44px; min-width: 44px; }
+.geo-layout { display: grid; grid-template-columns: minmax(320px, 62fr) minmax(290px, 38fr); gap: 14px; align-items: start; }
+.geo-map-column { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.geo-list { min-width: 0; display: flex; flex-direction: column; gap: 7px; }
+.geo-list-head { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; color: var(--text-2); font-size: 11px; }
+.geo-items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; max-height: 650px; overflow: auto; }
+.geo-item { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; padding: 9px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-2); font-size: 11px; }
+.geo-item.is-active { border-color: var(--accent-text); outline: 1px solid var(--accent-text); outline-offset: -1px; }
+.geo-item.is-pending { border-left: 3px solid #d97732; }
+.geo-draft-item { border-style: dashed; }
+.geo-name { flex: 1 1 140px; min-width: 100px; }
+.geo-num { display: inline-flex; align-items: center; gap: 4px; }
+.geo-coord { width: 104px; }
+.geo-smooth { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; width: 100%; }
+.geo-smooth-range { display: inline-flex; align-items: center; gap: 5px; }
+.geo-smooth-slider { width: 100px; accent-color: var(--accent-text); }
+.geo-row-actions { width: 100%; }
+.geo-item :deep(.geo-smooth-warn) { flex: 1 0 100%; }
+.geo-hint, .geo-cursor, .geo-empty { margin: 0; font-size: 11px; color: var(--text-2); }
+.geo-hidden-hint { padding: 5px 8px; background: var(--bg-2); border-radius: 6px; }
+.geo-cursor { font-family: var(--font-mono, monospace); }
+.geo-warn, .geo-switch-prompt { margin: 0; padding: 7px 9px; border-radius: 7px; background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--warn-text); font-size: 11px; }
+.geo-switch-prompt, .geo-overlap { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; }
+.geo-overlap { padding: 8px; border: 1px solid var(--border-strong); border-radius: 7px; background: var(--bg-1); }
+.geo-no-base { display: grid; place-items: center; min-height: 320px; border: 1px dashed var(--border-strong); border-radius: 9px; color: var(--text-2); text-align: center; padding: 20px; }
+.geo-draft-status { margin: 0; font-size: 11px; color: var(--accent-text); }
+.geo-del:hover:not(:disabled) { color: var(--danger, #b4382d); border-color: var(--danger, #b4382d); }
+.geo.is-enlarged { position: fixed; inset: 16px; z-index: 1000; padding: 16px; overflow: auto; background: var(--bg-1); border: 1px solid var(--border-strong); border-radius: 12px; }
+.geo.is-enlarged .geo-layout { display: flex; flex-direction: column; }
+.geo.is-enlarged .geo-map-column, .geo.is-enlarged .geo-list { width: 100%; }
+.geo.is-enlarged :deep(.geo-stage) { height: var(--canvas-share); min-height: 320px; }
+.geo.is-enlarged .geo-list { min-height: 160px; }
+.geo-splitter { display: flex; align-items: center; gap: 8px; width: 100%; padding: 4px; color: var(--text-2); font-size: 11px; }
+.geo-splitter input { flex: 1; }
+.geo-list.is-collapsed .geo-items { display: none; }
+@media(max-width: 1050px) { .geo-layout { grid-template-columns: 1fr; } .geo-items { max-height: 400px; } }
 </style>
