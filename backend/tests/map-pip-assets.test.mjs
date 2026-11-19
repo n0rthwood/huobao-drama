@@ -26,7 +26,12 @@ test('细节资产登记：新增→关联同剧集→重跑覆盖不重复→�
     sqlite.prepare('INSERT INTO episode_props (episode_id, prop_id, created_at) VALUES (?, ?, ?)').run(epId, parentId, ts)
 
     const frame = (no, label, role = 'aux') => ({ no, label, reason: '旁白强调' + label, role, focus_bbox: [30, 50, 36, 53], bbox: [29, 49.5, 37, 53.5], storyboard_numbers: [no * 10] })
-    const detail = (no) => ({ no, path: 'static/map-drawings/pip-detail' + no + '.png', width: 3840, height: 2160, sha256: 'sha' + no, provenance: { attribution: '© OpenStreetMap contributors (ODbL 1.0)', sources: [{ name: 'OSM', license: 'ODbL 1.0', url: 'https://www.openstreetmap.org/', sha256: 'test-sha' }] } })
+    const detail = (no) => ({
+      no, path: 'static/map-drawings/pip-detail' + no + '.png', width: 3840, height: 2160, sha256: 'sha' + no,
+      provenance: { attribution: '© OpenStreetMap contributors (ODbL 1.0)', sources: [{ name: 'OSM', license: 'ODbL 1.0', url: 'https://www.openstreetmap.org/', sha256: 'test-sha' }] },
+      // Issue #127：交付侧投影出的 editable_source 原样进细节版本 params（provider 保持 map-render）
+      ...(no === 1 ? { editable_source: { version: 1, source: 'pip-detail', render_key: 'rk-detail-1', frame_no: 1, frame_bbox: [29, 49.5, 37, 53.5], base_image: { path: 'static/map-bases/pip-detail1-rk.png', width: 3840, height: 2160, sha256: 'base-sha' }, layer_doc: { version: 1, theme: 'clean', base: { path: 'static/map-bases/pip-detail1-rk.png', width: 3840, height: 2160 }, layers: [] }, layer_options: null } } : {}),
+    })
     const deliverable = (frames) => ({
       task_id: 7,
       pip: {
@@ -47,7 +52,10 @@ test('细节资产登记：新增→关联同剧集→重跑覆盖不重复→�
     out.child1 = parsePipMeta(first[0].map_pip)
     out.childFlags = first.map(r => [r.faithful, r.asset_type, r.image_url])
     out.versionCount = sqlite.prepare("SELECT COUNT(*) AS n FROM sys_task WHERE provider = 'map-render' AND model = 'map-studio-detail'").get().n
-    out.detailProvenance = JSON.parse(sqlite.prepare('SELECT params FROM sys_task WHERE id = ?').get(first[0].faithful_source).params).provenance
+    out.detailParams = JSON.parse(sqlite.prepare('SELECT params FROM sys_task WHERE id = ?').get(first[0].faithful_source).params)
+    out.detailProvenance = out.detailParams.provenance
+    const secondParams = JSON.parse(sqlite.prepare('SELECT params FROM sys_task WHERE id = ?').get(first[1].faithful_source).params)
+    out.secondHasEditable = 'editable_source' in secondParams
     out.linked = sqlite.prepare('SELECT COUNT(*) AS n FROM episode_props WHERE episode_id = ? AND prop_id IN (?, ?)').get(epId, first[0].id, first[1].id).n
     out.parentMeta = parsePipMeta(sqlite.prepare('SELECT map_pip FROM props WHERE id = ?').get(parentId).map_pip)
     out.parentOf = [pipParentOf(first[0].id), pipParentOf(parentId)]
@@ -87,6 +95,10 @@ test('细节资产登记：新增→关联同剧集→重跑覆盖不重复→�
     assert.deepEqual(out.childFlags, [[1, 'map', 'static/map-drawings/pip-detail1.png'], [1, 'map', 'static/map-drawings/pip-detail2.png']])
     assert.equal(out.versionCount, 2)
     assert.match(out.detailProvenance.attribution, /OpenStreetMap/)
+    assert.equal(out.detailParams.editable_source.source, 'pip-detail')
+    assert.equal(out.detailParams.editable_source.render_key, 'rk-detail-1')
+    assert.equal(out.detailParams.editable_source.base_image.path, 'static/map-bases/pip-detail1-rk.png')
+    assert.equal(out.secondHasEditable, false, '没有投影文档的细节不写 editable_source（不编造）')
     assert.equal(out.detailProvenance.sources[0].license, 'ODbL 1.0')
     assert.equal(out.linked, 2, '细节与全览关联同一剧集')
     assert.equal(out.parentMeta.role, 'overview')

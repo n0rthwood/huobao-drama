@@ -10,6 +10,7 @@ import { renderCopyWithSmoothing, smoothingProblems } from './render/smooth.js'
 import { labelFeaturesOf, labelProblems } from './layout/labels.js'
 import { layerDraftContext } from './layer-edit.js'
 import { projectDetailSemantics } from './pip/semantics.js'
+import { buildDetailEditableSource } from './pip/layer-doc.js'
 
 /** One immutable payload drives both host delivery and standalone downloads. */
 export function buildDeliverable(loaded: LoadedTask): MapStudioDeliverable {
@@ -43,6 +44,7 @@ export function buildDeliverable(loaded: LoadedTask): MapStudioDeliverable {
   })
   const warnings = final.provenance && 'warnings' in final.provenance && Array.isArray(final.provenance.warnings) ? final.provenance.warnings.map(String) : []
   // #110：细节图上的语义 = 全览语义要素按细节取景投影（id 与全览一致），宿主据此写细节资产的 props.semantics
+  // #127：细节版本同时带投影后的 editable_source（#117 复用口径）——底图/文档/版本共享同一渲染快照 render_key
   const overviewIds = [...geometry.points, ...geometry.routes, ...geometry.regions].map(item => item.id)
   const pip = state.outputs.pip && state.outputs.pip.details.length
     ? {
@@ -50,7 +52,17 @@ export function buildDeliverable(loaded: LoadedTask): MapStudioDeliverable {
       details: state.outputs.pip.details.map(detail => {
         const frame = state.outputs.pip!.frames.find(item => item.no === detail.no)
         if (!frame) return detail
-        return { ...detail, semantics: projectDetailSemantics(mapSpec, frame.bbox, { width: detail.width, height: detail.height }, overviewIds) }
+        const semantics = projectDetailSemantics(mapSpec, frame.bbox, { width: detail.width, height: detail.height }, overviewIds)
+        const editable = detail.base
+          ? buildDetailEditableSource({
+            spec: mapSpec, layer_doc: doc, layer_options: state.outputs.layer_options ?? null,
+            frame: { no: frame.no, bbox: frame.bbox }, size: { width: detail.width, height: detail.height },
+            base: detail.base, tier: state.outputs.pip!.layout.label_tier,
+            locatorWidth: state.outputs.pip!.layout.locator?.width ?? Math.round(Math.max(detail.width, detail.height) * 0.2),
+            withLocator: true,
+          })
+          : null
+        return { ...detail, semantics, ...(editable ? { editable_source: editable } : {}) }
       }),
     }
     : null
