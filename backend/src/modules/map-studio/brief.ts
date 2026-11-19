@@ -237,13 +237,8 @@ export function judgeBrief(brief: MapBrief, verdict: BriefVerdict | null, failur
     })
   }
 
-  const styleProposal = verdict.inferred.find(item => item.field === 'map_style')
-  if (brief.map_style === null && styleProposal && styleProposal.confidence !== 'low' && isMapStyleFamilyId(styleProposal.value) && styleProposal.basis.trim()) {
-    next.map_style = styleProposal.value
-    next.inferred.push(styleProposal)
-    issues.push({ field: 'map_style', code: 'inferred_field', blocking: false, message: `AI 建议制图主题「${styleProposal.value}」：${styleProposal.basis}` })
-  }
-
+  // Issue #126 主题简化：样式固定 atlas-tint，不再从需求审核里提议或采纳主题建议；
+  // brief.map_style 只保留既有记录（人工/旧任务值），不参与有效样式解析。
   return { brief: next, issues }
 }
 

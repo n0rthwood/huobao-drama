@@ -504,8 +504,7 @@ export function mapBaseSignature(
     ...(spec.regions.length
       ? { rg: spec.regions.map(item => [item.id, item.name, item.points, item.proposed === true]) }
       : {}),
-    s: spec.style.theme,
-    ...(spec.style.map_style ? { family: spec.style.map_style } : {}),
+    // 主题/样式不参与底图像素（Issue #126 主题简化）：底图色板固定，历史 theme/family 记录不产生伪失效。
     w: canvas.width,
     h: canvas.height,
   })

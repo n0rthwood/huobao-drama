@@ -38,7 +38,6 @@ export async function initMapStudio(platform: MapStudioPlatform): Promise<void> 
     }
   })()
   await seedLegacyResearchKeys(platform)
-  if (!hasSettingRow('default_style')) writeSetting('default_style', 'atlas-tint')
   if (!hasSettingRow('models')) {
     const text = await getActiveConfig('text')
     const image = await getActiveConfig('image')

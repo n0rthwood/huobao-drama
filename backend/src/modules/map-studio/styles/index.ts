@@ -132,15 +132,18 @@ export function mapStyleFamily(id: string): MapStyleFamily {
   if (!family) throw new MapStyleValidationError(`Unknown map style「${id}」`)
   return family
 }
-export interface ResolvedMapStyle { id: MapStyleFamilyId; theme: LayerTheme; family: MapStyleFamily; source: 'brief' | 'default' }
-/** Missing map_style denotes a pre-Q4 brief and keeps its archival/clean/ink behavior. Explicit null follows the module default. */
-export function resolveMapStyle(brief: { map_style?: string | null } | null | undefined, settings: { default_style?: string | null } = {}): ResolvedMapStyle | null {
-  if (brief && !Object.prototype.hasOwnProperty.call(brief, 'map_style')) return null
+export interface ResolvedMapStyle { id: MapStyleFamilyId; theme: LayerTheme; family: MapStyleFamily }
+/**
+ * 有效制图样式（Issue #126 主题简化）：**固定 atlas-tint**，任务级与模块设置的主题记录一律不再参与解析。
+ * 旧 brief.map_style / brief.style、map_spec.style 与 settings.default_style 只作为历史记录保留；
+ * 合法旧值仍接受并校验（非法枚举继续拒绝），但它们既不是默认值也不再驱动出图。
+ * 底图色板本来就是固定地形色（#107），所以换主题不再让底图/成图失效。
+ */
+export function resolveMapStyle(brief?: { map_style?: string | null } | null): ResolvedMapStyle {
   const explicit = brief?.map_style
   if (explicit != null && !isMapStyleFamilyId(explicit)) throw new MapStyleValidationError(`Unknown map style「${String(explicit)}」`, 'brief.map_style')
-  const id = explicit ?? (isMapStyleFamilyId(settings.default_style) ? settings.default_style : DEFAULT_MAP_STYLE)
-  const family = mapStyleFamily(id)
-  return { id, theme: family.theme_mapping, family, source: explicit ? 'brief' : 'default' }
+  const family = mapStyleFamily(DEFAULT_MAP_STYLE)
+  return { id: DEFAULT_MAP_STYLE, theme: family.theme_mapping, family }
 }
 export function mapStyleFamilyViews() {
   return MAP_STYLE_FAMILIES.map(({ id, name, purpose, theme_mapping, palette }) => ({ id, name, purpose, theme_mapping, palette, preview: `/map-studio/styles/${id}/preview`, reference: referenceData[id] }))

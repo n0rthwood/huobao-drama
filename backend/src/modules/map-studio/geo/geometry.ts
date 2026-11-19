@@ -44,6 +44,7 @@ import {
   type EarthWindow,
 } from './earth.js'
 import { applyAffine, fitAffine, type AffineForward, type AffineInverse, type ControlPoint } from './image-calibration.js'
+import { DEFAULT_MAP_STYLE } from '../styles/index.js'
 import { ensureLayerFonts } from '../../../services/layer-fonts.js'
 import { FONT_FAMILIES } from '../../../services/layer-svg.js'
 import { gridGeoToNormalized, gridNormalizedToGeo } from './registration-grid.js'
@@ -779,7 +780,8 @@ export async function createMapBaseArtifact(
     : options.mode === 'earth' ? await createEarthBase(spec, options.width)
     : options.mode === 'image' ? await createImageBase(spec, options.referenceImage, options.width) : null
   if (!artifact) throw new MapGeometryError(`未知底图模式：${String(options.mode)}`)
-  artifact.provenance.map_style = spec.style.map_style ?? null
+  // 底图不再随主题变化（Issue #126）：provenance 记录固定有效样式，旧 spec.style 只作历史记录。
+  artifact.provenance.map_style = DEFAULT_MAP_STYLE
   return artifact
 }
 

@@ -34,6 +34,7 @@ import {
   emptyWorkflow,
   MAP_MAX_ROLLBACKS,
   MAP_MAX_STAGE_ROUNDS,
+  MAP_RUN_STOP_AT,
   MAP_WORKFLOW_STAGES,
   STAGE_LABEL,
   type MapAgentAttempt,
@@ -45,6 +46,7 @@ import {
   type MapWorkflowStage,
   type MapWorkflowStep,
   type MapStepStatus,
+  type MapRunStopAt,
 } from './types.js'
 
 /** 历史快照上限：够回退与追责，又不会把一列 JSON 撑爆 */
@@ -91,8 +93,9 @@ export class MapStudioHostTargetMissingError extends MapStudioRequestError {
 
 export function briefHash(brief: MapBrief | null): string | null {
   if (!brief) return null
-  // 画幅是宿主按项目设置现读的派生参数，不属于「需求被改」：项目画幅变化由 run.ts 的画幅核对退回底图
-  const { aspect_ratio: _derived, ...own } = brief
+  // 只算**有效生产输入**：画幅是宿主按项目设置现读的派生参数（画幅变化由 run.ts 的画幅核对退回底图）；
+  // 主题字段（map_style / 旧 style）在 Issue #126 后只是历史记录，单改主题不失效产物、不打断 research 进度。
+  const { aspect_ratio: _derived, map_style: _theme, style: _legacyTheme, ...own } = brief
   return crypto.createHash('sha256').update(JSON.stringify(own), 'utf8').digest('hex')
 }
 
@@ -131,7 +134,8 @@ export function parseWorkflow(raw: string | null | undefined): MapWorkflowState 
     version: 1,
     stage: pick(record.stage, MAP_WORKFLOW_STAGES, 'brief'),
     status: pick(record.status, STATUSES, 'idle'),
-    mode: pick(record.mode, ['auto', 'manual'] as const, 'manual'),
+    mode: pick(record.mode, ['auto', 'manual', 'guided'] as const, 'manual'),
+    stop_at: (MAP_RUN_STOP_AT as readonly unknown[]).includes(record.stop_at) ? record.stop_at as MapRunStopAt : null,
     revision: Number.isFinite(Number(record.revision)) ? Number(record.revision) : 0,
     run_id: nullableId(record.run_id),
     error: typeof record.error === 'string' ? record.error : null,
@@ -520,7 +524,7 @@ function mergeConfirmed<T extends { id: string; name: string }>(base: T[], confi
 // ─── 详情 ───────────────────────────────────────────────────────────────
 
 export interface MapStudioRunSummary {
-  latest: { id: number; stage: string; status: string; mode: string; created_at: string; finished_at: string | null; error_msg: string | null } | null
+  latest: { id: number; stage: string; status: string; mode: string; stop_at: string | null; created_at: string; finished_at: string | null; error_msg: string | null } | null
   count: number
 }
 
@@ -546,6 +550,14 @@ export interface MapStudioDetail extends Omit<MapWorkflowState, 'version' | 'bri
   agent: Omit<MapAgentState, 'feedback'> & { max_rounds: number; max_rollbacks: number }
   deliveries: MapStudioDeliveryView[]
   runs_summary: MapStudioRunSummary
+}
+
+function stopAtOfParams(params: string | null): string | null {
+  if (!params) return null
+  try {
+    const parsed = JSON.parse(params) as Record<string, unknown>
+    return parsed.stop_at === 'base' || parsed.stop_at === 'drawing' ? parsed.stop_at : null
+  } catch { return null /* 坏参数按未记录处理，不猜边界 */ }
 }
 
 function deliveryView(row: DeliveryRow): MapStudioDeliveryView {
@@ -602,6 +614,7 @@ export function serializeDetail(loaded: LoadedTask): MapStudioDetail {
     runs_summary: {
       latest: latest ? {
         id: latest.id, stage: latest.stage, status: latest.status, mode: latest.mode,
+        stop_at: stopAtOfParams(latest.params),
         created_at: latest.created_at, finished_at: latest.finished_at, error_msg: latest.error_msg,
       } : null,
       count: runs.length,
@@ -613,6 +626,8 @@ export function serializeDetail(loaded: LoadedTask): MapStudioDetail {
 export interface MapStudioRunView {
   id: number
   mode: string
+  /** guided 运行的真实终点；manual/auto 或未记录为 null（不按阶段推断边界） */
+  stop_at: string | null
   start_stage: string
   stage: string
   status: RunRow['status']
@@ -638,6 +653,7 @@ export function runView(row: RunRow, observed: { model_ms: number; queue_ms: num
   return {
     id: row.id,
     mode: row.mode,
+    stop_at: stopAtOfParams(row.params),
     start_stage: row.start_stage,
     stage: row.stage,
     status: row.status,

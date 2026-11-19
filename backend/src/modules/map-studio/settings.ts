@@ -134,9 +134,13 @@ export function writeModels(patch: unknown): MapStudioModels {
   return next
 }
 
+/**
+ * 有效默认样式（Issue #126 主题简化）：**固定 atlas-tint**。
+ * 模块设置里的 `default_style` 只剩历史记录身份，写入仍校验合法枚举以保护旧客户端，
+ * 但不再改变任何任务的有效样式。
+ */
 export function readDefaultStyle(): MapStyleFamilyId {
-  const stored = readSetting('default_style')
-  return isMapStyleFamilyId(stored) ? stored : DEFAULT_MAP_STYLE
+  return DEFAULT_MAP_STYLE
 }
 
 export function writeDefaultStyle(value: unknown): MapStyleFamilyId {

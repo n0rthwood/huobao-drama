@@ -102,7 +102,9 @@ const script = `
     projection: mapBaseSignature(baseSpec({ projection: { type: 'equirectangular' } }), size4k),
     bbox: mapBaseSignature(baseSpec({ bbox: [113.0, 35.2, 115.7, 36.8] }), size4k),
     layers: mapBaseSignature(baseSpec({ layers: { rivers: false } }), size4k),
+    // Issue #126 主题简化：底图色板固定，主题/家族记录不参与像素，也不制造伪失效
     theme: mapBaseSignature(baseSpec({ style: { theme: 'ink' } }), size4k),
+    family: mapBaseSignature(baseSpec({ style: { map_style: 'ink-chinese' } }), size4k),
     places: mapBaseSignature(baseSpec({ places: [{ id: 'p1', name: '安阳', lon: anyang[0], lat: anyang[1] }] }), size4k),
     routes: mapBaseSignature(baseSpec({ routes: [{ id: 'r1', name: '路线', points: [anyang, yinxu] }] }), size4k),
     // 豁免河/命名河流会改像素，必须改签名，否则会把不带乌格拉河的图当缓存复用回来
@@ -220,9 +222,11 @@ test('fitExtent 真的拟合 bbox：豫北范围铺满画布且居中（环绕�
 test('mapBaseSignature：同 spec 稳定，任一字段/尺寸/画幅/渲染口径变化即变', () => {
   assert.equal(result.signature.stable, true)
   const base = result.signature.base
-  for (const key of ['size', 'portrait', 'projection', 'bbox', 'layers', 'theme', 'places', 'routes', 'relief_exempt', 'relief_named', 'relief_hook']) {
+  for (const key of ['size', 'portrait', 'projection', 'bbox', 'layers', 'places', 'routes', 'relief_exempt', 'relief_named', 'relief_hook']) {
     assert.notEqual(result.signature[key], base, `${key} 变化应改变签名`)
   }
+  assert.equal(result.signature.theme, base, '主题记录不改变底图签名')
+  assert.equal(result.signature.family, base, '主题家族记录不改变底图签名')
   assert.equal(result.signature.relief_named, result.signature.relief_named_case, '河名大小写不该产生第二份缓存')
 })
 

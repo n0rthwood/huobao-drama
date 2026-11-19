@@ -19,7 +19,6 @@ import { validateFrames, type MapPipOutput } from './pip/frames.js'
 import { chooseLayoutId, layoutFor } from './pip/layouts.js'
 import { pipUsageText } from './pip/usage.js'
 import { resolveMapStyle, familyPromptSummary } from './styles/index.js'
-import { readDefaultStyle } from './settings.js'
 
 /** 底图长边像素；画幅由项目参数决定（缺省 16:9） */
 export const MAP_BASE_LONG_SIDE = 3840
@@ -57,7 +56,7 @@ export interface BaseStageInput {
 }
 
 export async function runBaseStage(input: BaseStageInput): Promise<StageAgentResult<BaseStageResult>> {
-  const selectedStyle = resolveMapStyle(input.brief, { default_style: readDefaultStyle() })
+  const selectedStyle = resolveMapStyle(input.brief)
   const features = specFeatures(input.spec)
   const artifacts = new Map<string, { artifact: MapBaseArtifact; mode: MapBaseMode; spec: MapSpec; problems: string[] }>()
   const aspect = input.brief.aspect_ratio ?? '16:9'
@@ -84,7 +83,7 @@ export async function runBaseStage(input: BaseStageInput): Promise<StageAgentRes
     prompt: () => [
       '请为下面这张历史地图生产底图：选择路线、确定取景，生成后自己检查，再交付。',
       mapBriefText(input.brief),
-      ...(selectedStyle ? [familyPromptSummary(selectedStyle.family)] : []),
+      ...[familyPromptSummary(selectedStyle.family)],
       `地图里的要素（必须全部落在画面内）：\n${featureLines.join('\n') || '（无）'}`,
       `当前 map_spec 的取景（仅供参考，不是约束）：bbox=${JSON.stringify(input.spec.bbox)}，投影 ${input.spec.projection.type}，背景图层 ${JSON.stringify(input.spec.layers)}`,
       `交付校验：每个要素的所有顶点都要落在画面 [${FRAME_MARGIN}, ${1 - FRAME_MARGIN}] 内；要素整体外包框的最大边至少占画面 ${FRAME_MIN_EXTENT * 100}%。`,
@@ -128,7 +127,7 @@ export async function runBaseStage(input: BaseStageInput): Promise<StageAgentRes
           const spec = normalizeMapSpec({
             ...input.spec,
             detail_level: input.brief.detail_level,
-            style: selectedStyle ? { theme: selectedStyle.theme, map_style: selectedStyle.id } : { theme: input.brief.style },
+            style: { theme: selectedStyle.theme, map_style: selectedStyle.id },
             bbox: args.bbox,
             projection: { type: args.projection ?? input.spec.projection.type },
             layers: args.layers ?? input.spec.layers,

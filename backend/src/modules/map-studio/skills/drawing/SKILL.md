@@ -52,9 +52,9 @@ description: 地图工作流·服务器草稿作图 — 小工具精确添加要
 {"layer":{"id":"title","type":"label","name":"标题","visible":true,"locked":false,"z":20,"opacity":1,"rotation":0,"box":{"x":0.05,"y":0.05,"w":0.5,"h":0.1},"text":"地图标题","style":{"size":0.04}}}
 ```
 
-五个主题家族都已采纳：atlas-tint、historical-schematic、relief-shading、ink-chinese、modern-clean。当前主题摘要由服务器提供。新任务 map_style:null 跟随模块默认（atlas-tint 初值），brief 阶段可自动采纳有理由的 high/medium 合法建议并写入 map_style 与 inferred；没有 map_style 字段的既有旧任务仍沿用 archival/clean/ink。默认在 base 阶段写入 map_spec.style.map_style，drawing 使用该解析值，LayerDoc theme 取家族的 theme_mapping。不另传 style_spec。人工已选主题不得改；需要提议时说明题材适用理由，回到 brief 确认/记录，不在 drawing 中偷偷换主题。默认用主题，**不要逐层手调**。
+样式固定为默认主题 `atlas-tint`（Issue #126 主题简化）：当前主题摘要由服务器提供，LayerDoc theme 取其 theme_mapping。任务级与模块设置里的历史主题值（map_style / style）只是记录，不参与解析；**不要提议或更换主题**，也不另传 style_spec。默认用主题，**不要逐层手调**。
 
-正例：区域河网图使用主题默认色，批量 add_feature_layers 只写 feature_id，再用 add_label 的 river/city/title 档位排字。反例：先给每条河流手写字号线宽、随后逐层改色，这会增加调用且破坏主题一致性。地形晕渲主题只提供样式，不能借此凭空画山或伪造地形。
+正例：区域河网图使用主题默认色，批量 add_feature_layers 只写 feature_id，再用 add_label 的 river/city/title 档位排字。反例：先给每条河流手写字号线宽、随后逐层改色，这会增加调用且破坏样式一致性。样式不提供地形数据，不能借此凭空画山或伪造地形。
 
 **每个图层都必须写**这些公共字段：
 `id`（全文档唯一）、`type`、`name`（非空，最多 60 字）、`visible`（布尔）、`locked`（布尔）、`z`（0–9999 的整数，服务器维护 z 排序）、`opacity`（0–1）、`rotation`（-360 到 360；锚定要素必须为 0）。

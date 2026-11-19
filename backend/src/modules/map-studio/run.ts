@@ -17,9 +17,9 @@ import { buildDeliverable, deliverCurrent } from './delivery.js'
 import { getHost } from './registry.js'
 import { renderPipAssets } from './pip/render.js'
 import { activeRunOfTask, insertRun, finishRun, updateRunStage } from './db.js'
-import { readModels, readDefaultStyle } from './settings.js'
+import { readModels } from './settings.js'
 import { MapStudioConflictError, MapStudioStaleError, MapStudioRequestError, briefHash, loadTask, mutateTask, serializeDetail, setStep, stageIndex, restoreSnapshot, requireHostTarget, type MapStudioDetail, type MutateContext } from './store.js'
-import { MAP_INFRA_RETRIES, MAP_MAX_ROLLBACKS, MAP_WORKFLOW_STAGES, STAGE_LABEL, isMapAgentStage, normalizeBrief, type MapBrief, type MapResearch, type MapResearchFeature, type MapWorkflowIssue, type MapWorkflowMode, type MapWorkflowStage } from './types.js'
+import { MAP_INFRA_RETRIES, MAP_MAX_ROLLBACKS, MAP_RUN_STOP_AT, MAP_WORKFLOW_STAGES, STAGE_LABEL, isMapAgentStage, normalizeBrief, type MapBrief, type MapResearch, type MapResearchFeature, type MapRunStopAt, type MapWorkflowIssue, type MapWorkflowMode, type MapWorkflowStage } from './types.js'
 import { geometryUnverified, confirmedVerification, validExtent } from './accuracy.js'
 import { inspectLayerDraft, layerDraftContext } from './layer-edit.js'
 import { validateLayerOptions } from './render/smooth.js'
@@ -29,6 +29,66 @@ import { resolveMapStyle } from './styles/index.js'
 import { annotateRegionLabels } from './region-annotations.js'
 
 export interface MapRunOptions { textConfigId?: number; imageConfigId?: number; imageModel?: string }
+export interface MapRunBoundary { mode: MapWorkflowMode; stopAt?: MapRunStopAt | null }
+
+/** guided 的合法起点：base 终点之前（brief/research/base），drawing 终点只从 style/drawing 起（不跨过 base 停靠） */
+const GUIDED_START: Record<MapRunStopAt, readonly MapWorkflowStage[]> = {
+  base: ['brief', 'research', 'base'],
+  drawing: ['style', 'drawing'],
+}
+const GUIDED_TARGET: Record<MapRunStopAt, MapWorkflowStage> = { base: 'base', drawing: 'drawing' }
+
+/**
+ * 校验 mode / stop_at 组合。manual、auto 不接受 stop_at；guided 必须给出合法终点。
+ * 拒绝发生在创建 run 之前，非法组合绝不静默降级成 manual。
+ */
+export function checkRunBoundary(mode: MapWorkflowMode, stopAt: unknown): MapRunStopAt | null {
+  if (mode === 'guided') {
+    if (!(MAP_RUN_STOP_AT as readonly unknown[]).includes(stopAt)) {
+      throw new MapStudioRequestError('有界运行（guided）必须给出 stop_at=base 或 drawing', 'invalid_stop_at')
+    }
+    return stopAt as MapRunStopAt
+  }
+  if (stopAt !== undefined && stopAt !== null) throw new MapStudioRequestError(`${mode} 运行不接受 stop_at`, 'invalid_stop_at')
+  return null
+}
+
+/** guided 只从自己终点之前的合法阶段启动；要重做更早的阶段必须先显式回退 */
+export function checkGuidedStart(mode: MapWorkflowMode, stopAt: MapRunStopAt | null, startStage: MapWorkflowStage): void {
+  if (mode !== 'guided' || !stopAt) return
+  if (GUIDED_START[stopAt].includes(startStage)) return
+  throw new MapStudioRequestError(`有界运行 guided/${stopAt} 不能从「${STAGE_LABEL[startStage]}」启动；需要重做早期阶段时先执行服务端回退`, 'invalid_start_stage')
+}
+
+/**
+ * 本次运行在执行完 `stage` 之后是否继续、以及继续到哪一步。null = 本次运行结束。
+ * - manual：一个阶段后结束（含执行器回退）；
+ * - auto：按执行器返回继续，直到不出下一步；
+ * - guided：跨过目标之前的阶段，目标阶段成功即停；绝不执行目标之后的步骤（base 不跑 style/drawing，drawing 不跑 complete）。
+ * 执行器回退（proceed=false）在 guided 里同样结束本次运行，由人按返回状态重新选择动作。
+ */
+export function nextStageOfRun(input: {
+  mode: MapWorkflowMode
+  stopAt: MapRunStopAt | null
+  stage: MapWorkflowStage
+  outcome: { proceed: boolean; next?: MapWorkflowStage }
+}): MapWorkflowStage | null {
+  if (!input.outcome.proceed || input.mode === 'manual') return null
+  if (input.mode === 'auto') return input.outcome.next ?? nextStage(input.stage)
+  if (!input.stopAt) return null
+  const target = GUIDED_TARGET[input.stopAt]
+  if (input.stage === target) return null
+  const next = input.outcome.next ?? nextStage(input.stage)
+  if (!next || stageIndex(next) > stageIndex(target)) return null
+  return next
+}
+
+function runAction(mode: MapWorkflowMode, stopAt: MapRunStopAt | null, startStage: MapWorkflowStage): string {
+  if (mode === 'auto') return `run:${startStage}`
+  if (mode === 'guided') return `run:guided/${stopAt ?? 'unknown'}:${startStage}`
+  return `advance:${startStage}`
+}
+
 function nextStage(stage: MapWorkflowStage): MapWorkflowStage | null {
   const idx = stageIndex(stage)
   return idx >= 0 && idx < MAP_WORKFLOW_STAGES.length - 1 ? MAP_WORKFLOW_STAGES[idx + 1]! : null
@@ -72,9 +132,9 @@ function missingResearchGeometry(research: MapResearch): NonNullable<MapResearch
  * **人工确认过的几何（proposed !== true）永远不被覆盖**：重跑检索只会补充新条目，
  * 并把分歧记成说明文字，由人决定要不要改。
  */
-export function adoptResearchIntoSpec(spec: MapSpec | null, research: MapResearch, brief: MapBrief, defaultStyle?: string): { spec: MapSpec; notes: string[] } {
+export function adoptResearchIntoSpec(spec: MapSpec | null, research: MapResearch, brief: MapBrief): { spec: MapSpec; notes: string[] } {
   const notes: string[] = []
-  const selectedStyle = resolveMapStyle(brief, { default_style: defaultStyle })
+  const selectedStyle = resolveMapStyle(brief)
   const places = spec ? [...spec.places] : []
   const routes = spec ? [...spec.routes] : []
   const regions = spec ? [...spec.regions] : []
@@ -112,7 +172,7 @@ export function adoptResearchIntoSpec(spec: MapSpec | null, research: MapResearc
       version: 1, projection: spec?.projection ?? { type: 'mercator' },
       bbox: spec?.bbox ?? research.extent ?? bboxOf(coords), detail_level: brief.detail_level,
       layers: spec?.layers ?? { land: true, coastline: true, rivers: true, lakes: true, countries: true },
-      places, routes, regions, style: selectedStyle ? { theme: selectedStyle.theme, map_style: selectedStyle.id } : { theme: brief.style },
+      places, routes, regions, style: { theme: selectedStyle.theme, map_style: selectedStyle.id },
     }),
     notes,
   }
@@ -178,7 +238,7 @@ async function executeStageWork(taskId: number, runId: number, stage: MapWorkflo
   const hashAtStart = briefHash(brief)
   // 需求里的主题（或模块默认）是唯一来源；map_spec.style 只记录底图当时用的主题。
   // 换主题会把流程退回底图（见 saveMapWorkflowDraft），所以底图与作图始终同一主题。
-  const selectedStyle = resolveMapStyle(brief, { default_style: readDefaultStyle() })
+  const selectedStyle = resolveMapStyle(brief)
   const mode = state.mode
   const feedback = state.agent.feedback[stage] ?? null
   const startRounds = isMapAgentStage(stage) && state.agent.run_id === runId ? state.agent.rounds[stage] ?? 0 : 0
@@ -212,7 +272,7 @@ async function executeStageWork(taskId: number, runId: number, stage: MapWorkflo
     if (outcome.kind === 'rollback') return rollback(outcome)
     const research = outcome.result
     research.missing_geometry = missingResearchGeometry(research)
-    const adopted = adoptResearchIntoSpec(loaded.mapSpec, research, brief, readDefaultStyle())
+    const adopted = adoptResearchIntoSpec(loaded.mapSpec, research, brief)
     const pending = geometryUnverified(adopted.spec)
     return finish(ctx => {
       ctx.state.research = research; ctx.state.research_progress = null; ctx.mapSpec = adopted.spec
@@ -249,12 +309,14 @@ async function executeStageWork(taskId: number, runId: number, stage: MapWorkflo
     if (!spec || !base) throw new MapStudioRequestError('缺少底图或地图几何，请先完成底图步骤', 'missing_base')
     const mismatch = canvasMismatch(brief, base)
     if (mismatch) return rollback({ stage: 'base', reason: mismatch })
-    const background = await prepareMapBackground({ basePath: base.path, registration: base.provenance && 'registration' in base.provenance ? base.provenance.registration : undefined, texturePath: state.outputs.texture_image?.path })
-    const outcome = await runDrawingStage({ ...await agentInput(), spec, background, layerOptions: state.outputs.layer_options, texturePath: state.outputs.texture_image?.path })
+    // Issue #126 / #107：新 drawing 不消费旧纸纹。历史 texture 引用仍留在 outputs 里作为旧图事实，
+    // 但本次合成只叠底图（固定色板），provenance 如实记 texture: null。
+    const background = await prepareMapBackground({ basePath: base.path, registration: base.provenance && 'registration' in base.provenance ? base.provenance.registration : undefined })
+    const outcome = await runDrawingStage({ ...await agentInput(), spec, background, layerOptions: state.outputs.layer_options })
     if (outcome.kind === 'rollback') return rollback(outcome)
     const { doc, rendered, omitted, layerOptions } = outcome.result
     return finish(ctx => {
-      ctx.state.outputs.final_image = { path: rendered.path, width: rendered.width, height: rendered.height, source: 'map-drawing', run_id: runId, provenance: { map_style: selectedStyle?.id ?? null, registration: background.registration, warnings: [...background.warnings, ...(rendered.region_composition === 'bottom-layer' ? ['非程序底图不支持水系下合成；区域填充降级到最底图层。'] : [])], region_composition: rendered.region_composition, omitted, base: base.path, base_mode: brief.base_mode, texture: state.outputs.texture_image?.path ?? null, background: background.path, attribution: base.provenance && 'attribution' in base.provenance ? base.provenance.attribution : null } }
+      ctx.state.outputs.final_image = { path: rendered.path, width: rendered.width, height: rendered.height, source: 'map-drawing', run_id: runId, provenance: { map_style: selectedStyle.id, registration: background.registration, warnings: [...background.warnings, ...(rendered.region_composition === 'bottom-layer' ? ['非程序底图不支持水系下合成；区域填充降级到最底图层。'] : [])], region_composition: rendered.region_composition, omitted, base: base.path, base_mode: brief.base_mode, texture: null, background: background.path, attribution: base.provenance && 'attribution' in base.provenance ? base.provenance.attribution : null } }
       ctx.state.outputs.layer_doc = doc
       ctx.state.outputs.layer_options = layerOptions
       ctx.state.issues = [...ctx.state.issues.filter(issue => issue.code !== 'drawing_warning' && issue.code !== 'drawing_omitted'), ...background.warnings.map((message): MapWorkflowIssue => ({ field: 'drawing', code: 'drawing_warning', message, blocking: false })), ...omitted.map((item): MapWorkflowIssue => ({ field: 'drawing', code: 'drawing_omitted', blocking: false, message: `要素 ${item.feature_id} 未画入成图：${item.reason}` }))]
@@ -288,7 +350,7 @@ async function executeStage(taskId: number, runId: number, stage: MapWorkflowSta
   }
 }
 
-function runStages(taskId: number, runId: number, mode: MapWorkflowMode, startStage: MapWorkflowStage, observation: ObservedWorkInput): void {
+function runStages(taskId: number, runId: number, mode: MapWorkflowMode, stopAt: MapRunStopAt | null, startStage: MapWorkflowStage, observation: ObservedWorkInput): void {
   void (async () => {
     let stage: MapWorkflowStage | null = startStage
     let lastMessage = ''
@@ -297,8 +359,7 @@ function runStages(taskId: number, runId: number, mode: MapWorkflowMode, startSt
         while (stage) {
           const outcome = await executeStage(taskId, runId, stage)
           lastMessage = outcome.message
-          if (!outcome.proceed || mode !== 'auto') break
-          stage = outcome.next ?? nextStage(stage)
+          stage = nextStageOfRun({ mode, stopAt, stage, outcome })
         }
       })
       const final = await loadTask(taskId)
@@ -327,7 +388,9 @@ function runStages(taskId: number, runId: number, mode: MapWorkflowMode, startSt
   })()
 }
 
-async function startRun(taskId: number, input: { mode: MapWorkflowMode; expectedRevision?: number | null; opts: MapRunOptions; skip?: boolean }): Promise<MapStudioDetail> {
+async function startRun(taskId: number, input: { mode: MapWorkflowMode; stopAt?: unknown; expectedRevision?: number | null; opts: MapRunOptions; skip?: boolean }): Promise<MapStudioDetail> {
+  // 边界先校验：非法 mode/stop_at 组合不创建 run、不改任何状态。
+  const stopAt = checkRunBoundary(input.mode, input.stopAt)
   const loaded = await loadTask(taskId)
   if (!loaded) throw new MapStudioRequestError('任务不存在', 'not_found')
   requireHostTarget(loaded)
@@ -337,6 +400,7 @@ async function startRun(taskId: number, input: { mode: MapWorkflowMode; expected
   const brief = loaded.brief
   if (!brief.subject) throw new MapStudioRequestError('请在需求里填写地图主题', 'missing_brief')
   const startStage = loaded.state.stage === 'research' && loaded.state.status === 'blocked' && loaded.state.research && loaded.state.issues.some(issue => issue.code === 'geometry_unverified') ? 'base' : loaded.state.stage
+  checkGuidedStart(input.mode, stopAt, startStage)
   if (startStage === 'base' || startStage === 'drawing' || startStage === 'complete') requireMapSpec(loaded.mapSpec)
   const defaults = readModels()
   const opts = {
@@ -344,7 +408,8 @@ async function startRun(taskId: number, input: { mode: MapWorkflowMode; expected
     imageConfigId: input.opts.imageConfigId ?? loaded.state.image_config_id ?? defaults.image_config_id ?? undefined,
     imageModel: input.opts.imageModel ?? loaded.state.image_model ?? defaults.image_model ?? undefined,
   }
-  const reachesVision = startStage === 'base' || startStage === 'drawing' || (input.mode === 'auto' && stageIndex(startStage) < stageIndex('complete'))
+  // guided 的终点是 base 或 drawing，两者都需要能看图的文本配置（起点在更早的阶段也一样）。
+  const reachesVision = startStage === 'base' || startStage === 'drawing' || input.mode === 'guided' || (input.mode === 'auto' && stageIndex(startStage) < stageIndex('complete'))
   if (reachesVision && !input.skip) {
     try { await resolveStageModel('read_image', { configId: opts.textConfigId }) } catch (err) {
       if (err instanceof StageVisionUnavailableError || (err instanceof Error && 'facts' in err && (err.facts as { reason?: string }).reason === 'not_vision')) throw new MapStudioRequestError(`底图与作图阶段需要能看图的文本配置：${err.message}`, 'vision_config_unavailable')
@@ -359,10 +424,10 @@ async function startRun(taskId: number, input: { mode: MapWorkflowMode; expected
     } }))
   }
   const stageModel = await resolveStageModel(startStage === 'base' || startStage === 'drawing' ? 'read_image' : 'asset_research', { configId: opts.textConfigId })
-  const runId = insertRun({ taskId, mode: input.mode, startStage, stage: startStage, textConfigId: opts.textConfigId ?? null, imageConfigId: opts.imageConfigId ?? null, imageModel: opts.imageModel ?? null, params: null })
+  const runId = insertRun({ taskId, mode: input.mode, startStage, stage: startStage, textConfigId: opts.textConfigId ?? null, imageConfigId: opts.imageConfigId ?? null, imageModel: opts.imageModel ?? null, params: stopAt ? { stop_at: stopAt } : null })
   let detail: MapStudioDetail
   try {
-    detail = serializeDetail(await mutateTask(taskId, { expectedRevision: input.expectedRevision, requireIdle: true, action: input.mode === 'auto' ? `run:${startStage}` : `advance:${startStage}`, actor: 'manual', note: `模式 ${input.mode}`, mutate: ctx => {
+    detail = serializeDetail(await mutateTask(taskId, { expectedRevision: input.expectedRevision, requireIdle: true, action: runAction(input.mode, stopAt, startStage), actor: 'manual', note: stopAt ? `有界运行 guided/${stopAt}` : `模式 ${input.mode}`, mutate: ctx => {
       if (ctx.state.research && !ctx.state.research.missing_geometry) ctx.state.research.missing_geometry = missingResearchGeometry(ctx.state.research)
       ctx.state.issues = [
         ...ctx.state.issues.filter(issue => !['geometry_unverified', 'geometry_approximate', 'geometry_missing'].includes(issue.code)),
@@ -370,7 +435,7 @@ async function startRun(taskId: number, input: { mode: MapWorkflowMode; expected
         ...(ctx.state.research?.missing_geometry ?? []).map(f => ({ field: 'research', code: 'geometry_missing', blocking: false, message: `「${f.name}」：${f.reason}；数据集中没有几何，暂不绘制` })),
       ]
       if (startStage === 'base' && ctx.state.research) setStep(ctx.state, 'research', { status: 'completed', message: '示意要素可选查看', finished_at: now() })
-      ctx.state.mode = input.mode; ctx.state.run_id = runId
+      ctx.state.mode = input.mode; ctx.state.stop_at = stopAt; ctx.state.run_id = runId
       ctx.state.agent = { ...ctx.state.agent, run_id: runId, rounds: {}, rollbacks: 0 }
       ctx.state.status = 'running'; ctx.state.error = null; ctx.state.stage = startStage
       ctx.state.text_config_id = opts.textConfigId ?? null; ctx.state.image_config_id = opts.imageConfigId ?? null; ctx.state.image_model = opts.imageModel ?? null
@@ -378,13 +443,13 @@ async function startRun(taskId: number, input: { mode: MapWorkflowMode; expected
     } }))
   } catch (err) { finishRun(runId, 'cancelled', String(err)); throw err }
   logTaskStart('MapStudio', 'run', { taskId, runId, mode: input.mode, stage: startStage })
-  runStages(taskId, runId, input.mode, startStage, { taskId: runId, scope: 'map_studio', stage: 'map_studio', sourceChars: brief.subject.length + brief.era.length + brief.location.length + brief.purpose.length + brief.notes.length, sampleKey: `${buildSampleKey({ stage: 'map_studio', configId: stageModel.configId, model: stageModel.model })}|start:${startStage}|base:${brief.base_mode}` })
+  runStages(taskId, runId, input.mode, stopAt, startStage, { taskId: runId, scope: 'map_studio', stage: 'map_studio', sourceChars: brief.subject.length + brief.era.length + brief.location.length + brief.purpose.length + brief.notes.length, sampleKey: `${buildSampleKey({ stage: 'map_studio', configId: stageModel.configId, model: stageModel.model })}|start:${startStage}|base:${brief.base_mode}` })
   return detail
 }
 
-export async function startMapWorkflow(taskId: number, input: { mode: MapWorkflowMode; expectedRevision?: number | null } & MapRunOptions): Promise<MapStudioDetail> {
-  const { mode, expectedRevision, ...opts } = input
-  return startRun(taskId, { mode, expectedRevision, opts })
+export async function startMapWorkflow(taskId: number, input: { mode: MapWorkflowMode; stopAt?: unknown; expectedRevision?: number | null } & MapRunOptions): Promise<MapStudioDetail> {
+  const { mode, stopAt, expectedRevision, ...opts } = input
+  return startRun(taskId, { mode, stopAt, expectedRevision, opts })
 }
 export async function advanceMapWorkflow(taskId: number, input: { expectedRevision?: number | null; skip?: boolean } & MapRunOptions): Promise<MapStudioDetail> {
   const { expectedRevision, skip, ...opts } = input
@@ -439,13 +504,6 @@ export async function saveMapWorkflowDraft(taskId: number, body: {
   if (hasOptions) {
     const loaded = await loadTask(taskId)
     if (!loaded) throw new MapStudioRequestError('任务不存在', 'not_found')
-    const specUnchanged = !hasSpec || JSON.stringify(body.mapSpec) === JSON.stringify(loaded.mapSpec)
-    const briefUnchanged = !hasBrief || briefHash(normalizeBrief(body.brief, loaded.brief)) === briefHash(loaded.brief)
-    if (loaded.state.outputs.layer_doc && specUnchanged && briefUnchanged) {
-      const saved = await saveMapLayerDoc(taskId, { layerDoc: loaded.state.outputs.layer_doc, layerOptions: body.layerOptions, expectedRevision: body.expectedRevision })
-      if (!body.mode) return saved
-      return serializeDetail(await mutateTask(taskId, { expectedRevision: saved.revision, requireIdle: true, action: 'edit_mode', actor: 'manual', mutate: ctx => { ctx.state.mode = body.mode! } }))
-    }
     const nextSpec = hasSpec ? body.mapSpec === null ? null : normalizeMapSpec(body.mapSpec) : loaded.mapSpec
     const knownIds = new Set([...(nextSpec ? [...nextSpec.places, ...nextSpec.routes, ...nextSpec.regions].map(f => f.id) : []), ...(loaded.state.outputs.layer_doc && 'layers' in loaded.state.outputs.layer_doc && Array.isArray(loaded.state.outputs.layer_doc.layers) ? loaded.state.outputs.layer_doc.layers.map(l => l.id) : [])])
     for (const id of Object.keys(parsedOptions!.options)) if (!knownIds.has(id)) throw new MapWorkflowValidationError(`layer_options.${id} 不是现有几何要素或图层`, { field: 'layer_options' })
@@ -463,41 +521,48 @@ export async function saveMapWorkflowDraft(taskId: number, body: {
     mutate: (ctx) => {
       if (body.mode) ctx.state.mode = body.mode
       if (parsedOptions) {
-        if (JSON.stringify(ctx.state.outputs.layer_options ?? {}) !== JSON.stringify(parsedOptions.options)) ctx.state.outputs.final_image = null
+        const optionsChanged = JSON.stringify(ctx.state.outputs.layer_options ?? {}) !== JSON.stringify(parsedOptions.options)
         ctx.state.outputs.layer_options = parsedOptions.options
+        // Issue #126：几何区的选项保存只持久化并标成图过期，绝不借道重渲/交付。
+        // 人工图层文档的高级命令（PUT /layer-doc）保留既有重渲交付副作用，按钮文案单独标注。
+        if (optionsChanged && !hasSpec && ctx.state.outputs.base_image) {
+          ctx.state.outputs.final_image = null
+          if (stageIndex(ctx.state.stage) > stageIndex('drawing')) ctx.state.stage = 'drawing'
+          ctx.state.status = 'idle'
+          ctx.state.error = null
+          for (const step of ctx.state.steps) if (stageIndex(step.id) >= stageIndex('drawing')) Object.assign(step, { status: 'pending', message: null, started_at: null, finished_at: null })
+          ctx.state.issues = [...ctx.state.issues.filter(issue => issue.code !== 'layer_options_changed'), {
+            field: 'layer_options', code: 'layer_options_changed', blocking: false,
+            message: '图层设置已变更：已保存，重新渲染成图后才会更新',
+          }]
+        }
       }
       if (hasBrief) {
         const previous = ctx.brief
         const next = normalizeBrief(body.brief, previous)
+        // briefHash 只算有效生产输入（不含主题记录）：只改主题时 changed=false，既不回退阶段也不失效产物。
         const changed = briefHash(next) !== ctx.state.brief_hash
         ctx.brief = next
         ctx.state.brief_hash = briefHash(next)
-        // 只换了主题（map_style / 旧 style）不影响检索与几何：保留已核验的研究结果，从底图起按新主题重出。
-        const presentationOnly = (brief: typeof next) => JSON.stringify({ ...brief, map_style: null, style: null })
-        const baseDone = ctx.state.steps.some(step => step.id === 'base' && step.status === 'completed')
-        const restart: MapWorkflowStage = previous && baseDone && presentationOnly(previous) === presentationOnly(next) ? 'base' : 'brief'
         if (changed) {
-          ctx.state.stage = restart
+          ctx.state.stage = 'brief'
           ctx.state.status = 'idle'
           ctx.state.error = null
           for (const step of ctx.state.steps) {
-            if (stageIndex(step.id) >= stageIndex(restart)) Object.assign(step, { status: 'pending', message: null, started_at: null, finished_at: null })
+            if (stageIndex(step.id) >= stageIndex('brief')) Object.assign(step, { status: 'pending', message: null, started_at: null, finished_at: null })
           }
-          ctx.state.issues = restart === 'base'
-            ? [...ctx.state.issues.filter(issue => issue.code !== 'style_changed'), {
-              field: 'brief', code: 'style_changed', blocking: false,
-              message: '主题已更换：资料调研与几何保留，从底图阶段按新主题重新出图；此前的底图/成图仍保留在产出与历史中',
-            }]
-            : [{
-              field: 'brief', code: 'brief_changed', blocking: false,
-              message: '需求已修改：请重新开始工作流以按新需求检索与出图；此前的底图/成图仍保留在产出与历史中',
-            }]
+          ctx.state.issues = [{
+            field: 'brief', code: 'brief_changed', blocking: false,
+            message: '需求已修改：请重新开始工作流以按新需求检索与出图；此前的底图/成图仍保留在产出与历史中',
+          }]
         }
       }
       if (hasSpec) {
         const previous = ctx.mapSpec
         const next = body.mapSpec === null ? null : normalizeMapSpec(body.mapSpec)
         if (JSON.stringify(previous) === JSON.stringify(next)) return
+        // 只有 style 记录不同 = 主题字段的历史变化（Issue #126）：保存记录，不失效底图/成图、不挪阶段。
+        const styleOnly = !!previous && !!next && JSON.stringify({ ...previous, style: null }) === JSON.stringify({ ...next, style: null })
         if (next) {
           const oldItems = [...previous?.places ?? [], ...previous?.routes ?? [], ...previous?.regions ?? []]
           for (const item of [...next.places, ...next.routes, ...next.regions]) {
@@ -522,16 +587,16 @@ export async function saveMapWorkflowDraft(taskId: number, body: {
           }
         }
         ctx.mapSpec = next
+        if (styleOnly) return
         // 取景或背景层变更才重做底图；拖点/改线只重绘标注，避免无关的外部请求与模型账单。
+        // 主题（spec.style）只是历史记录（Issue #126），不参与底图像素，也不单独触发重建。
         const reframed = !previous || !next
           || previous.projection.type !== next.projection.type
           || previous.bbox.some((value, index) => value !== next.bbox[index])
           || JSON.stringify(previous.layers) !== JSON.stringify(next.layers)
           || previous.detail_level !== next.detail_level
-          || JSON.stringify(previous.style) !== JSON.stringify(next.style)
-        // 底纹只跟风格有关，与几何无关：取景变了也接着用，除非主题换了
-        const styleChanged = !!previous && !!next && JSON.stringify(previous.style) !== JSON.stringify(next.style)
-        const keptTexture = styleChanged ? null : ctx.state.outputs.texture_image
+        // 底纹只跟风格有关，与几何无关：取景变了也接着用
+        const keptTexture = ctx.state.outputs.texture_image
         // Keep per-feature smoothing choices while drawing layer ids are invalidated.
         const previousDoc = ctx.state.outputs.layer_doc as LayerDoc | null
         const keptOptions = { ...ctx.state.outputs.layer_options }
@@ -592,7 +657,7 @@ export async function cancelMapWorkflow(taskId: number): Promise<MapStudioDetail
   }
   return serializeDetail(await mutateTask(taskId, { action: 'cancel', actor: 'manual', note: active ? `取消运行 #${active.id}` : '无运行中的任务', mutate: ctx => {
     for (const step of ctx.state.steps) if (step.status === 'running') Object.assign(step, { status: 'pending', message: '已取消', finished_at: now() })
-    ctx.state.run_id = null; ctx.state.status = ctx.state.status === 'completed' ? 'completed' : 'idle'; ctx.state.error = null
+    ctx.state.run_id = null; ctx.state.stop_at = null; ctx.state.status = ctx.state.status === 'completed' ? 'completed' : 'idle'; ctx.state.error = null
   } }))
 }
 
