@@ -344,6 +344,10 @@ export interface MapStudioHostTarget {
   subtitle: string | null
   /** 火宝内的 SPA 路径（不含 baseURL 前缀），如 /drama/20/episode/1?panel=assets */
   return_path: string | null
+  /** 宿主资产描述（只读；#126 ① 资产信息） */
+  description?: string | null
+  /** 宿主资产参考图相对路径（只读） */
+  reference_images?: string[]
 }
 export interface MapStudioHostRef {
   id: string

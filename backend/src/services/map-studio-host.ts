@@ -7,6 +7,7 @@ import { registerPipAssets, geometrySemanticIds, sameSemanticIdSet, semanticIdSe
 import { mapAssetReferences, storyboardsReferencing } from './map-asset-references.js'
 import { markStale } from './staleness.js'
 import { semanticAnnotationsOf } from './map-semantic-annotations.js'
+import { parseReferenceImages, referenceImagePaths } from './reference-images.js'
 import { MAP_ASPECTS, type MapAspect, type MapStudioHost, type MapStudioDeliverable, type MapStudioDeliveryResult, type MapBrief } from '../modules/map-studio/index.js'
 
 interface HostProp {
@@ -17,6 +18,7 @@ interface HostProp {
   map_brief: string | null
   /** 覆盖前读一次：用来判「内容是否换了一批地理对象」（#125） */
   semantics: string | null
+  reference_images: string | null
 }
 
 const MAP_ASPECT_WHITELIST: readonly MapAspect[] = MAP_ASPECTS
@@ -28,7 +30,7 @@ function dramaAspect(dramaId: number): MapAspect | undefined {
 function propOf(ref: string): HostProp | null {
   const match = /^prop:([1-9]\d*)$/.exec(ref)
   if (!match) return null
-  return sqlite.prepare("SELECT id, name, description, drama_id, map_brief, semantics FROM props WHERE id = ? AND asset_type = 'map' AND deleted_at IS NULL").get(Number(match[1])) as HostProp | undefined ?? null
+  return sqlite.prepare("SELECT id, name, description, drama_id, map_brief, semantics, reference_images FROM props WHERE id = ? AND asset_type = 'map' AND deleted_at IS NULL").get(Number(match[1])) as HostProp | undefined ?? null
 }
 
 /** Transactional registration: same task + PNG hash returns the existing base/final pair. */
@@ -127,7 +129,9 @@ export const huobaoMapStudioHost: MapStudioHost = {
     const drama = sqlite.prepare('SELECT title FROM dramas WHERE id = ?').get(prop.drama_id) as { title: string } | undefined
     const episode = sqlite.prepare('SELECT e.episode_number FROM episodes e JOIN episode_props ep ON ep.episode_id = e.id WHERE ep.prop_id = ? AND e.deleted_at IS NULL ORDER BY e.episode_number LIMIT 1').get(prop.id) as { episode_number: number } | undefined
     return { title: prop.name, subtitle: drama ? `《${drama.title}》${episode ? `E${String(episode.episode_number).padStart(2, '0')}` : ''}` : null,
-      return_path: episode ? `/drama/${prop.drama_id}/episode/${episode.episode_number}?panel=production&tab=assets&extract=props&asset=prop-${prop.id}` : `/drama/${prop.drama_id}` }
+      return_path: episode ? `/drama/${prop.drama_id}/episode/${episode.episode_number}?panel=production&tab=assets&extract=props&asset=prop-${prop.id}` : `/drama/${prop.drama_id}`,
+      description: prop.description,
+      reference_images: referenceImagePaths(parseReferenceImages(prop.reference_images)) }
   },
   async readBrief(ref) {
     const prop = propOf(ref)
