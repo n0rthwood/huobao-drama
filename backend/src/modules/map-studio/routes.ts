@@ -6,7 +6,7 @@ import { listConfigModelChoices } from '../../services/ai.js'
 import { stageSelectionErrorPayload } from '../../services/ai-stages.js'
 import { listObservedWork, listObservedCalls, listObservedMessages, countObservedMessages, getObservedCall } from '../../services/task-observability.js'
 import { selectTask, selectTasks, selectRunsByTask, selectRun, type RunRow } from './db.js'
-import { loadTask, parseWorkflow, serializeDetail, runView, MapStudioConflictError, MapStudioRequestError, requireHostTarget } from './store.js'
+import { loadTask, mutateTask, parseWorkflow, serializeDetail, runView, MapStudioConflictError, MapStudioRequestError, requireHostTarget } from './store.js'
 import { startMapWorkflow, advanceMapWorkflow, rollbackMapWorkflow, saveMapWorkflowDraft, cancelMapWorkflow, saveMapLayerDoc, MapLayerDocInvalidError } from './run.js'
 import { MapWorkflowValidationError, MAP_WORKFLOW_STAGES, type MapWorkflowStage } from './types.js'
 import { MapSpecValidationError } from './geo/base-render.js'
@@ -98,6 +98,10 @@ app.post('/tasks/:id/rollback', async c => {
   if (!loaded) return notFound(c, '任务不存在')
   requireHostTarget(loaded)
   return success(c, await rollbackMapWorkflow(loaded.row.id, p.stage as MapWorkflowStage, optionalNumber(p.expected_revision, 'expected_revision')))
+})
+app.post('/tasks/:id/research-progress/clear', async c => {
+  const loaded = await mutateTask(idOf(c), { requireIdle: true, action: 'research_progress_clear', actor: 'manual', mutate: ctx => { ctx.state.research_progress = null } })
+  return success(c, serializeDetail(loaded))
 })
 app.post('/tasks/:id/cancel', async c => success(c, await cancelMapWorkflow(idOf(c))))
 app.put('/tasks/:id/layer-doc', async c => {

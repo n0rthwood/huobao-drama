@@ -12,7 +12,7 @@ import { checkBriefSufficiency } from './brief.js'
 import { runResearchStage } from './research.js'
 import { runBaseStage } from './base.js'
 import { backgroundProblems, renderMapLayerDoc, runDrawingStage } from './drawing.js'
-import { recordAttempt } from './agent-loop.js'
+import { MapStageExhaustedError, recordAttempt } from './agent-loop.js'
 import { buildDeliverable, deliverCurrent } from './delivery.js'
 import { getHost } from './registry.js'
 import { renderPipAssets } from './pip/render.js'
@@ -183,7 +183,7 @@ async function executeStageWork(taskId: number, runId: number, stage: MapWorkflo
   const feedback = state.agent.feedback[stage] ?? null
   const startRounds = isMapAgentStage(stage) && state.agent.run_id === runId ? state.agent.rounds[stage] ?? 0 : 0
   await mutateTask(taskId, { expectedRunId: runId, expectedBriefHash: hashAtStart, action: `stage_start:${stage}`, actor: mode === 'auto' ? 'auto' : 'manual', mutate: ctx => {
-    ctx.state.stage = stage; ctx.state.status = 'running'; ctx.state.error = null
+    ctx.state.stage = stage; ctx.state.status = 'running'; ctx.state.error = null; ctx.state.error_detail = null
     delete ctx.state.agent.feedback[stage]
     setStep(ctx.state, stage, { status: 'running', message: null, started_at: now(), finished_at: null })
   } })
@@ -207,14 +207,15 @@ async function executeStageWork(taskId: number, runId: number, stage: MapWorkflo
     return finish(ctx => { ctx.brief = checked.brief; ctx.state.issues = checked.issues }, { proceed: !blocking.length, message: blocking.length ? blocking.map(issue => issue.message).join(' ') : `需求已确认（${checked.brief.inferred.length} 项由 AI 补全）` }, !!blocking.length)
   }
   if (stage === 'research') {
-    const outcome = await runResearchStage({ ...await agentInput(), spec: loaded.mapSpec })
+    const progress = state.research_progress?.brief_hash === hashAtStart ? state.research_progress : null
+    const outcome = await runResearchStage({ ...await agentInput(), spec: loaded.mapSpec, progress })
     if (outcome.kind === 'rollback') return rollback(outcome)
     const research = outcome.result
     research.missing_geometry = missingResearchGeometry(research)
     const adopted = adoptResearchIntoSpec(loaded.mapSpec, research, brief, readDefaultStyle())
     const pending = geometryUnverified(adopted.spec)
     return finish(ctx => {
-      ctx.state.research = research; ctx.mapSpec = adopted.spec
+      ctx.state.research = research; ctx.state.research_progress = null; ctx.mapSpec = adopted.spec
       ctx.state.issues = [
         ...ctx.state.issues.filter(issue => !['research_note', 'approximate_position', 'geometry_unverified', 'geometry_approximate', 'geometry_missing'].includes(issue.code)),
         ...pending.map((feature): MapWorkflowIssue => ({ field: 'research', code: feature.reasons.some(reason => reason.includes('dataset_missing')) ? 'geometry_missing' : 'geometry_approximate', blocking: false, message: `「${feature.name}」：${feature.reasons.join('；')}` })),
@@ -314,6 +315,9 @@ function runStages(taskId: number, runId: number, mode: MapWorkflowMode, startSt
       try {
         await mutateTask(taskId, { expectedRunId: runId, action: 'stage_failed', actor: 'system', note: message, mutate: ctx => {
           ctx.state.status = 'failed'; ctx.state.error = message
+          ctx.state.error_detail = err instanceof MapStageExhaustedError ? {
+            kind: err.kind, rounds: err.rounds.map(round => ({ round: round.round, outcome: round.outcome, problems: round.problems, steps_used: round.stepsUsed })), at: now(),
+          } : null
           setStep(ctx.state, ctx.state.stage, { status: 'failed', message, finished_at: now() })
           ctx.state.agent.feedback[ctx.state.stage] = `上一次执行失败：${message}`
         } })

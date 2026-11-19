@@ -135,6 +135,7 @@ export function parseWorkflow(raw: string | null | undefined): MapWorkflowState 
     revision: Number.isFinite(Number(record.revision)) ? Number(record.revision) : 0,
     run_id: nullableId(record.run_id),
     error: typeof record.error === 'string' ? record.error : null,
+    error_detail: (record.error_detail && typeof record.error_detail === 'object' ? record.error_detail : null) as MapWorkflowState['error_detail'],
     brief: (record.brief && typeof record.brief === 'object' ? record.brief : null) as MapBrief | null,
     brief_hash: typeof record.brief_hash === 'string' ? record.brief_hash : null,
     // 步骤表按**当前代码**的阶段清单重建：新增阶段发布后，旧文档也会立刻出现该步
@@ -152,6 +153,7 @@ export function parseWorkflow(raw: string | null | undefined): MapWorkflowState 
     }),
     issues: Array.isArray(record.issues) ? record.issues as MapWorkflowIssue[] : [],
     research: (record.research && typeof record.research === 'object' ? record.research : null) as MapWorkflowState['research'],
+    research_progress: (record.research_progress && typeof record.research_progress === 'object' ? record.research_progress : null) as MapWorkflowState['research_progress'],
     outputs: { ...EMPTY_OUTPUTS, ...(record.outputs && typeof record.outputs === 'object' ? record.outputs as object : {}) },
     history: Array.isArray(record.history) ? record.history as MapWorkflowHistoryEntry[] : [],
     text_config_id: nullableId(record.text_config_id),
@@ -533,7 +535,8 @@ export interface MapStudioDeliveryView {
   message: string
 }
 
-export interface MapStudioDetail extends Omit<MapWorkflowState, 'version' | 'brief_hash' | 'agent' | 'brief'> {
+export interface MapStudioDetail extends Omit<MapWorkflowState, 'version' | 'brief_hash' | 'agent' | 'brief' | 'research_progress'> {
+  research_progress_summary: { available: boolean; sources: number; dataset_queries: number; uncertainties: number; steps_used: number; rounds_used: number; updated_at: string } | null
   task_id: number
   title: string
   brief: MapBrief
@@ -565,7 +568,7 @@ function deliveryView(row: DeliveryRow): MapStudioDeliveryView {
 
 export function serializeDetail(loaded: LoadedTask): MapStudioDetail {
   const { row, state, mapSpec, brief, host, hostTarget, hostError } = loaded
-  const { brief_hash: _hash, version: _version, brief: _brief, agent, ...rest } = state
+  const { brief_hash: _hash, version: _version, brief: _brief, agent, research_progress: progress, ...rest } = state
   const { feedback: _feedback, ...agentView } = agent
   const runs = selectRunsByTask(row.id, 20)
   const latest = runs[0] ?? null
@@ -575,6 +578,11 @@ export function serializeDetail(loaded: LoadedTask): MapStudioDetail {
     && !state.issues.some(issue => issue.blocking && issue.code !== 'geometry_unverified')
   return {
     ...rest,
+    research_progress_summary: progress ? {
+      available: progress.brief_hash === briefHash(brief), sources: progress.sources.length,
+      dataset_queries: progress.dataset_queries.length, uncertainties: progress.uncertainties.length,
+      steps_used: progress.steps_used, rounds_used: progress.rounds_used, updated_at: progress.updated_at,
+    } : null,
     // Same shape as the human-confirm path: research done, base is the next stage to run.
     ...(legacyGate ? {
       status: 'awaiting_review' as const, stage: 'base' as const,

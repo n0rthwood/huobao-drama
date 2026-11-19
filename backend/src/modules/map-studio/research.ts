@@ -9,16 +9,17 @@
  */
 import { z } from 'zod'
 import { now } from '../../utils/response.js'
+import { logTaskWarn } from '../../utils/task-logger.js'
 import type { StageModel } from '../../services/ai-stages.js'
 import type { MapSpec } from './geo/base-render.js'
 import { fetchText, searchAdapter, type ResearchAdapter, type ResearchHit } from './research-sources.js'
 import { mapBriefText, rollbackTool, runStageAgent, stageTool, type StageAgentResult } from './agent-loop.js'
 import { validateFeatureSubmission } from './validate.js'
-import type { MapBrief, MapResearch, MapResearchQuery, MapResearchSource } from './types.js'
+import type { MapBrief, MapFailureKind, MapResearch, MapResearchProgress, MapResearchQuery, MapResearchSource } from './types.js'
 import { searchDataset } from './geo/datasets.js'
 import { regionRiverPackAvailable } from './geo/river-region-store.js'
 import type { MapDatasetQuery } from './types.js'
-import { mutateTask } from './store.js'
+import { briefHash, MapStudioConflictError, MapStudioStaleError, mutateTask } from './store.js'
 
 /** 用户确认的来源集合：维基系 + Europeana + Smithsonian，不扩散到其它适配器 */
 export const MAP_RESEARCH_ADAPTERS: ResearchAdapter[] = ['wikipedia-zh', 'wikipedia-en', 'europeana', 'smithsonian']
@@ -30,7 +31,6 @@ const MAX_SOURCES = 40
 const HITS_PER_QUERY = 8
 const SNIPPET_FOR_MODEL = 300
 const TEXT_FOR_MODEL = 6000
-const MAX_STEPS = 40
 
 // 定长数组而非 z.tuple：百炼 qwen4-max-preview 拒绝元组式 JSON Schema（items:[…] → 400
 // invalid_parameter_error，Issue #120，observed call 7020–7022）；.length(N) 校验语义等价
@@ -63,6 +63,22 @@ export const relationSubmissionSchema = z.object({
   excerpt: z.string(), source_id: z.string(),
 })
 
+/** 自由文本没有结构化地名表：按分隔符切分，并只把地理类别词结尾的短语作为候选；
+ * 这只是确定性的规模估计，不能把漏识别当作地图事实。续跑没有已提交要素，仍按原规模估算。 */
+export function researchStepBudget(brief: MapBrief, _progress: MapResearchProgress | null): { steps: number; targets: number; basis: string } {
+  const candidates = new Set<string>()
+  for (const text of [brief.subject, brief.location, brief.purpose, brief.notes]) {
+    for (const part of text.split(/[、，,；;。.\n和与至—–/]+/u)) {
+      // 类别词本身包含地名末字，前缀仅一个字符的「长江」等两字地名也要计入。
+      const matches = part.match(/[\p{Script=Han}A-Za-z0-9·\-]{1,30}?(?:汗国|盐场|领地|河|江|湖|山|镇|城)/gu) ?? []
+      for (const match of matches) candidates.add(match)
+    }
+  }
+  const targets = candidates.size || ({ site: 4, regional: 6, overview: 8 } as const)[brief.detail_level]
+  return { steps: Math.min(100, 40 + 6 * targets), targets, basis: candidates.size ? '地理类别词结尾的去重候选' : `detail_level=${brief.detail_level} 保底` }
+}
+
+
 export interface ResearchStageInput {
   taskId: number
   runId: number
@@ -71,19 +87,47 @@ export interface ResearchStageInput {
   spec: MapSpec | null
   startRounds: number
   feedback: string | null
+  progress: MapResearchProgress | null
 }
 
 export async function runResearchStage(input: ResearchStageInput): Promise<StageAgentResult<MapResearch>> {
-  const sources: MapResearchSource[] = []
-  const hitsById = new Map<string, ResearchHit>()
-  const queries: MapResearchQuery[] = []
-  const datasetQueries: MapDatasetQuery[] = []
+  const progress = input.progress
+  const sources: MapResearchSource[] = (progress?.sources ?? []).map(source => ({ ...source }))
+  const hitsById = new Map<string, ResearchHit>(Object.entries(progress?.hits ?? {}) as Array<[string, ResearchHit]>)
+  const queries: MapResearchQuery[] = (progress?.queries ?? []).map(query => ({ ...query }))
+  const datasetQueries: MapDatasetQuery[] = (progress?.dataset_queries ?? []).map(query => ({ ...query, refs: [...query.refs] }))
+  // 命中保留供 fetchText 使用；标记记录已读，即使正文恰好等于摘要也可恢复。
+  const readIds = new Set(sources.filter(source => (hitsById.get(source.id) as (ResearchHit & { _map_studio_read?: boolean }) | undefined)?._map_studio_read === true).map(source => source.id))
+  let uncertainties = [...(progress?.uncertainties ?? [])]
+  let stepsUsed = progress?.steps_used ?? 0
+  let roundsUsed = progress?.rounds_used ?? 0
+  const reportedRounds = new Set<number>()
+  const budget = researchStepBudget(input.brief, progress)
 
   const confirmed = input.spec ? [
     ...input.spec.places.filter(item => item.proposed !== true).map(item => `地点「${item.name}」(${item.lon}, ${item.lat})`),
     ...input.spec.routes.filter(item => item.proposed !== true).map(item => `路线「${item.name}」${item.points.length} 个顶点`),
     ...(input.spec.regions ?? []).filter(item => item.proposed !== true).map(item => `范围「${item.name}」${item.points.length} 个顶点`),
   ] : []
+  const datasetHistory = () => {
+    const groups = new Map<string, { query: MapDatasetQuery; count: number; refs: Set<string>; hits: number }>()
+    for (const query of datasetQueries) {
+      const key = JSON.stringify([query.layer, query.query, query.bbox ?? null])
+      const group = groups.get(key)
+      if (group) {
+        group.count++
+        group.query = query
+        group.hits = Math.max(group.hits, query.hits)
+        for (const ref of query.refs) group.refs.add(ref)
+      } else {
+        groups.set(key, { query, count: 1, refs: new Set(query.refs), hits: query.hits })
+      }
+    }
+    return [...groups.values()].map(({ query, count, refs, hits }) =>
+      `${query.layer}「${query.query}」${query.bbox ? ` bbox=${JSON.stringify(query.bbox)}` : ''}${count > 1 ? ` ×${count} 次 ` : ''}${hits} 命中，refs：${[...refs].join('、') || '无'}${query.error ? `；最近错误：${query.error}` : ''}`,
+    ).join('；')
+  }
+
 
   return await runStageAgent<MapResearch>({
     taskId: input.taskId,
@@ -91,26 +135,49 @@ export async function runResearchStage(input: ResearchStageInput): Promise<Stage
     stage: 'research',
     stageModel: input.stageModel,
     skill: 'research',
-    maxSteps: MAX_STEPS,
+    maxSteps: budget.steps,
+    stepBudget: { steps: budget.steps, extendSteps: 40, warnRemaining: 8, warnText: '步数预算即将用完：先补齐未检索适配器再立即提交已有要素，未尽事项写 uncertainties。' },
+    onRoundEnd: async ({ round, outcome, problems, stepsUsed: used }) => {
+      stepsUsed += used
+      if (!reportedRounds.has(round)) { reportedRounds.add(round); roundsUsed++ }
+      const kind: MapFailureKind = outcome === 'steps_exhausted' || outcome === 'ended_without_delivery' || outcome === 'call_error' || outcome === 'rejected' ? outcome : 'mixed'
+      try {
+        await mutateTask(input.taskId, { expectedRunId: input.runId, expectedBriefHash: briefHash(input.brief), action: 'research_progress', actor: 'auto', history: false, mutate: ctx => {
+          ctx.state.research_progress = {
+            brief_hash: briefHash(input.brief)!, sources: sources.map(source => ({ ...source })),
+            hits: Object.fromEntries(hitsById), queries: queries.map(query => ({ ...query })),
+            dataset_queries: datasetQueries.map(query => ({ ...query, refs: [...query.refs] })),
+            uncertainties: [...uncertainties], steps_used: stepsUsed, rounds_used: roundsUsed,
+            last_failure: outcome === 'accepted' ? null : { kind, problems: [...problems], at: now() }, updated_at: now(),
+          }
+        } })
+      } catch (err) {
+        if (!(err instanceof MapStudioStaleError) && !(err instanceof MapStudioConflictError)) {
+          logTaskWarn('MapStudio', 'research-progress-write', { taskId: input.taskId, runId: input.runId, error: err instanceof Error ? err.message : String(err) })
+        }
+      }
+    },
     startRounds: input.startRounds,
     initialFeedback: input.feedback,
     prompt: () => [
       '请为下面这张历史地图检索资料并提交地理要素。',
       mapBriefText(input.brief),
       confirmed.length ? `已由人工确认、你不能改写也不要再提交的要素：\n${confirmed.join('\n')}` : '',
+      progress ? `续跑：已登记 ${sources.length} 条来源；已读正文：${sources.filter(s => readIds.has(s.id)).map(s => `${s.id}「${s.title}」`).join('、') || '无'}。未决事项：${uncertainties.join('；') || '无'}。不要重复逐字相同的查询。` : '',
       sources.length ? `本阶段已检索到的来源（仍可引用）：${sources.map(s => `${s.id} ${s.adapter}「${s.title}」`).join('；')}` : '',
     ].filter(Boolean).join('\n\n'),
     // 检索阶段的状态全部由代码从本次会话的登记结果生成：早先的检索结果被压缩后，模型从这里看已有来源与查询历史
     state: () => [
       sources.length
-        ? `已登记来源（只列编号与标题，正文需要时再 read_source）：${sources.map(source => `${source.id}「${source.title}」(${source.adapter})`).join('；')}`
+        ? `已登记来源（只列编号与标题，正文需要时再 read_source）：${sources.map(source => `${source.id}「${source.title}」(${source.adapter}，${readIds.has(source.id) ? '已读正文' : '仅摘要'})`).join('；')}`
         : '已登记来源：无（先 search_sources）',
       datasetQueries.length
-        ? `dataset 查询历史：${datasetQueries.map(query => `${query.layer}「${query.query}」${query.error ? `错误：${query.error}` : `${query.hits} 命中`}`).join('；')}`
+        ? `dataset 查询历史：${datasetHistory()}`
         : 'dataset 查询历史：无',
       queries.length
         ? `已检索过的来源适配器：${[...new Set(queries.map(query => query.adapter))].join('、')}（要求全部：${MAP_RESEARCH_ADAPTERS.join('、')}）`
         : `已检索过的来源适配器：无（要求全部：${MAP_RESEARCH_ADAPTERS.join('、')}）`,
+      queries.length ? `来源查询历史：${queries.map(query => `${query.adapter}「${query.query}」${query.error ? `错误：${query.error}` : `${query.hits} 命中`}`).join('；')}` : '',
     ].join('\n'),
     tools: (session) => ({
       search_dataset: stageTool(session, {
@@ -125,7 +192,7 @@ export async function runResearchStage(input: ResearchStageInput): Promise<Stage
           bbox: z.array(z.number()).length(4).optional(),
         }),
         summarize: result => Array.isArray(result.candidates)
-          ? `${result.candidates.length} 个候选（refs 见查询历史）`
+          ? `${result.candidates.length} 个候选（refs 已列入当前状态的查询历史）`
           : `返回错误：${String(result.error ?? '未知')}`,
         execute: async ({ layer, query, bbox: rawBbox }) => {
           // zod .length(4) 类型是 number[]；运行时已校验恰好 4 个 number，收窄回领域元组类型
@@ -140,12 +207,6 @@ export async function runResearchStage(input: ResearchStageInput): Promise<Stage
             const error = err instanceof Error ? err.message : String(err)
             datasetQueries.push({ layer, query, ...(bbox ? { bbox } : {}), hits: 0, refs: [], error })
             return { error, hint: '这是检索失败，不是零命中；不能用它声称 dataset_missing' }
-          } finally {
-            // 逐条查询登记是运行期遥测，不写修订历史：68 次查询曾把回退快照全部挤出 MAX_HISTORY（#111）。
-            await mutateTask(input.taskId, { expectedRunId: input.runId, action: 'research_dataset_query', actor: 'auto', history: false, mutate: ctx => {
-              ctx.state.research ??= { queries: [], sources: [], features: [], uncertainties: [], notes: [], searched_at: now() }
-              ctx.state.research.dataset_queries = datasetQueries.map(query => ({ ...query, refs: [...query.refs] }))
-            } })
           }
         },
       }),
@@ -226,6 +287,8 @@ export async function runResearchStage(input: ResearchStageInput): Promise<Stage
             const body = await mapResearchIO.fetchText(hit, TEXT_FOR_MODEL)
             if (body) source.excerpt = body
           }
+          readIds.add(source.id)
+          Object.assign(hit, { _map_studio_read: true })
           return { id: source.id, title: source.title, url: source.url, text: source.excerpt.slice(0, TEXT_FOR_MODEL), full_text: textual }
         },
       }),
@@ -244,6 +307,7 @@ export async function runResearchStage(input: ResearchStageInput): Promise<Stage
           ? `第 ${String(result.round)} 轮交付已接受`
           : `第 ${String(result.round)} 轮交付被拒收，${Array.isArray(result.problems) ? result.problems.length : 0} 个问题（逐条见当前状态）`,
         execute: async (submission) => {
+          uncertainties = (submission.uncertainties ?? []).map(String).filter(Boolean)
           const checked = validateFeatureSubmission(submission.features, {
             brief: input.brief,
             sources,
