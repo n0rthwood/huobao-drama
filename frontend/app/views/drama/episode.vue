@@ -811,20 +811,32 @@
                     <span>{{ t('episode.asset.versionCount', { n: assetVersions(assetDetail.item).length }) }}</span>
                   </div>
                   <div class="asset-version-list">
-                    <button
+                    <div
                       v-for="version in assetVersions(assetDetail.item)"
                       :key="version.id ?? version.url"
-                      type="button"
                       :class="['asset-version-card', { current: isCurrentAssetVersion(assetDetail.item, version) }]"
-                      :title="isCurrentAssetVersion(assetDetail.item, version) ? t('episode.asset.currentVersion') : t('episode.asset.useVersion')"
-                      :disabled="switchingAssetVersion"
-                      @click="selectAssetVersion(version)"
                     >
-                      <img :src="thumbOf(versionImageSrc(version))" loading="lazy" @error="thumbFallback($event, versionImageSrc(version))" />
-                      <span class="asset-version-meta">{{ version.provider || t('episode.asset.unknownEngine') }}<template v-if="version.model"> · {{ version.model }}</template></span>
-                      <MediaTime :at="version.generated_at" />
-                      <span v-if="isCurrentAssetVersion(assetDetail.item, version)" class="asset-version-current">{{ t('episode.asset.currentVersion') }}</span>
-                    </button>
+                      <button
+                        type="button"
+                        class="asset-version-switch"
+                        :title="isCurrentAssetVersion(assetDetail.item, version) ? t('episode.asset.currentVersion') : t('episode.asset.useVersion')"
+                        :disabled="switchingAssetVersion"
+                        @click="selectAssetVersion(version)"
+                      >
+                        <img :src="thumbOf(versionImageSrc(version))" loading="lazy" @error="thumbFallback($event, versionImageSrc(version))" />
+                        <span class="asset-version-meta">{{ version.provider || t('episode.asset.unknownEngine') }}<template v-if="version.model"> · {{ version.model }}</template></span>
+                        <MediaTime :at="version.generated_at" />
+                        <span v-if="isCurrentAssetVersion(assetDetail.item, version)" class="asset-version-current">{{ t('episode.asset.currentVersion') }}</span>
+                      </button>
+                      <button
+                        v-if="version.id && !isCurrentAssetVersion(assetDetail.item, version)"
+                        type="button"
+                        class="asset-version-del"
+                        :title="t('episode.asset.versionDeleteTitle')"
+                        :aria-label="t('episode.asset.versionDeleteTitle')"
+                        @click="askDeleteVersion(version)"
+                      ><Trash2 :size="11" /></button>
+                    </div>
                   </div>
                   <p class="asset-version-hint">{{ t('episode.asset.versionHint') }}</p>
                 </section>
@@ -1448,6 +1460,15 @@
         :loading="assetDelete.loading"
         @confirm="confirmDeleteAsset"
         @cancel="assetDelete.open = false"
+      />
+
+      <ConfirmDialog
+        :open="versionDelete.open"
+        :title="t('episode.asset.versionDeleteTitle')"
+        :message="t('episode.asset.versionDeleteMessage')"
+        :loading="versionDelete.loading"
+        @confirm="confirmDeleteVersion"
+        @cancel="versionDelete.open = false"
       />
 
       <ConfirmDialog
@@ -2545,6 +2566,32 @@ async function selectAssetVersion(version) {
     toastError(e, { fallback: 'episode.asset.versionSelectFailed' })
   } finally {
     switchingAssetVersion.value = false
+  }
+}
+
+// ─── 删除图片版本（Issue #123）────────────────────────────────
+const versionDelete = ref({ open: false, version: null, loading: false })
+
+function askDeleteVersion(version) {
+  versionDelete.value = { open: true, version, loading: false }
+}
+
+async function confirmDeleteVersion() {
+  const detail = assetDetail.value
+  const version = versionDelete.value.version
+  if (!detail.open || !detail.item?.id || !version?.id || versionDelete.value.loading) return
+  versionDelete.value.loading = true
+  try {
+    if (detail.type === 'character') await characterAPI.deleteVersion(detail.item.id, version.id)
+    else if (detail.type === 'scene') await sceneAPI.deleteVersion(detail.item.id, version.id)
+    else await propAPI.deleteVersion(detail.item.id, version.id)
+    toast.success(t('episode.asset.versionDeleted'))
+    versionDelete.value.open = false
+    await refresh()
+  } catch (e) {
+    toastError(e, { fallback: 'episode.asset.versionDeleteFailed' })
+  } finally {
+    versionDelete.value.loading = false
   }
 }
 
@@ -5468,6 +5515,7 @@ function currentDialogKey() {
   if (roster.value.open) return 'roster'
   if (assetCreate.value.open) return `create:${assetCreate.value.type}`
   if (assetDelete.value.open && assetDelete.value.item?.id) return `delete:${assetDelete.value.type}-${assetDelete.value.item.id}`
+  if (versionDelete.value.open && versionDelete.value.version?.id) return `version-delete:${versionDelete.value.version.id}`
   if (reExtract.value.open && reExtract.value.id) return `reextract:${reExtract.value.type}-${reExtract.value.id}`
   if (faithfulConfirm.value.open) return 'faithful'
   if (assetLibrary.value.open) return `library:${assetLibrary.value.kind}-${assetLibrary.value.id}`
@@ -5514,7 +5562,7 @@ function syncDialogQuery() {
   })
 }
 watch([
-  roster, assetCreate, assetDelete, reExtract, faithfulConfirm, assetLibrary, assetBatch,
+  roster, assetCreate, assetDelete, versionDelete, reExtract, faithfulConfirm, assetLibrary, assetBatch,
   assetBrowserOpen, narrationSettingsOpen, breakdownDialog, voiceBatchDialog, composeDialog,
   batchVideoConfirm, mergeConfirm, mergeDelete, subtitleRegenConfirm, activeMerge, previewShot,
   imageViewer, selectedVideoSbIds, videoSelectMode, exportSelectedIds, panel, prodTab,
@@ -7293,8 +7341,27 @@ button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
   border: 1.5px solid var(--surface-outline);
   border-radius: var(--radius-sm);
   background: var(--bg-2);
+}
+.asset-version-switch { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; border: 0; background: transparent; cursor: pointer; }
+.asset-version-switch:disabled { cursor: default; }
+.asset-version-del {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: rgba(0,0,0,0.6);
+  color: #fff;
   cursor: pointer;
 }
+.asset-version-del:hover { background: var(--danger, #c0392b); }
 .asset-version-card.current { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow); }
 .asset-version-card img { width: 100%; height: 100%; display: block; object-fit: cover; }
 .asset-version-meta {

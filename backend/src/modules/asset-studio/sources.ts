@@ -11,11 +11,12 @@
 import crypto from 'crypto'
 import fs from 'fs'
 import path from 'path'
-import {stmt} from './db.js'
+import { stmt as dbStmt } from './db.js'
 import { now } from '../../utils/response.js'
 import { STORAGE_ROOT } from '../../utils/paths.js'
 import { getAbsolutePath } from '../../utils/storage.js'
-import type { AssetKind, AssetSourceRow, SourceRole } from './store.js'
+import { getHost } from './registry.js'
+import type { AssetKind, AssetSourceRow, SourceOrigin, SourceRole } from './store.js'
 
 const SOURCE_DIR = 'asset-sources'
 /** 单个素材上限 32 MB：历史图版扫描件常在 5–20 MB，超过基本是误传视频 */
@@ -74,6 +75,8 @@ export interface AddSourceInput {
   role: SourceRole
   era?: string | null
   whyExcluded?: string | null
+  /** 素材来源（Issue #123）；缺省 manual。已入库行不覆盖既有 origin/role/license */
+  origin?: SourceOrigin
 }
 
 /**
@@ -126,14 +129,53 @@ export async function addAssetSource(input: AddSourceInput): Promise<AssetSource
   }
 
   const { sha256, relativePath } = storeBytes(bytes, ext)
-  const existing=stmt('SELECT * FROM asset_studio_source WHERE asset_kind=? AND asset_id=? AND sha256=?').get(input.assetKind,input.assetId,sha256) as AssetSourceRow|undefined
-  const values=[input.url??input.sourceUrl??existing?.url??null,input.title??existing?.title??null,input.artist??existing?.artist??null,input.license,input.role,input.whyExcluded??null,input.era??existing?.era??null]
-  let id=existing?.id
-  if(id)stmt('UPDATE asset_studio_source SET url=?,title=?,artist=?,license=?,role=?,why_excluded=?,era=? WHERE id=?').run(...values,id)
-  else id=Number(stmt('INSERT INTO asset_studio_source (url,title,artist,license,role,why_excluded,era,asset_kind,asset_id,sha256,local_path,fetched_at,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)').run(...values,input.assetKind,input.assetId,sha256,relativePath,fetchedAt,now()).lastInsertRowid)
-  return stmt('SELECT * FROM asset_studio_source WHERE id=?').get(id) as AssetSourceRow
+  const existing = dbStmt('SELECT * FROM asset_studio_source WHERE asset_kind=? AND asset_id=? AND sha256=?').get(input.assetKind, input.assetId, sha256) as Record<string, any> | undefined
+  const origin = input.origin ?? 'manual'
+  let id = existing?.id as number | undefined
+  if (existing && id) {
+    // 同 sha 多来源合并（评审 P2-7）：保留首次入库的 role/origin/license，只补空位元数据，
+    // 避免「同步用户参考图」把已入库的检索素材改写成 user_reference
+    dbStmt('UPDATE asset_studio_source SET url=?,title=?,artist=?,era=? WHERE id=?').run(
+      input.url ?? input.sourceUrl ?? existing.url ?? null,
+      input.title ?? existing.title ?? null,
+      input.artist ?? existing.artist ?? null,
+      input.era ?? existing.era ?? null,
+      id,
+    )
+  } else {
+    id = Number(dbStmt('INSERT INTO asset_studio_source (url,title,artist,license,role,origin,why_excluded,era,asset_kind,asset_id,sha256,local_path,fetched_at,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(
+      input.url ?? input.sourceUrl ?? null, input.title ?? null, input.artist ?? null, input.license, input.role, origin,
+      input.whyExcluded ?? null, input.era ?? null, input.assetKind, input.assetId, sha256, relativePath, fetchedAt, now(),
+    ).lastInsertRowid)
+  }
+  return dbStmt('SELECT * FROM asset_studio_source WHERE id=?').get(id) as AssetSourceRow
+}
+
+/**
+ * 把资产 reference_images（用户上传 / 素材库选入的文中图）同步进工作室素材池（Issue #123 修 0/3）。
+ * sha256 upsert 天然去重；已入库的同内容行保留原 origin/role。调用点：openHostTask、
+ * 显式 POST /tasks/:id/sync、工作室参考图上传/删除后。GET 请求不做写。
+ */
+export async function syncUserReferences(taskId: number): Promise<void> {
+  const task = dbStmt('SELECT host_ref FROM asset_studio_task WHERE id=? AND deleted_at IS NULL').get(taskId) as { host_ref: string } | undefined
+  if (!task) return
+  const [kind, idRaw] = task.host_ref.split(':')
+  const asset = await getHost().readAsset(task.host_ref)
+  if (!asset) return
+  for (const ref of asset.referenceImages) {
+    if (!ref.path?.startsWith('static/')) continue
+    await addAssetSource({
+      assetKind: kind as AssetKind, assetId: Number(idRaw), localPath: ref.path,
+      license: '用户参考图', role: 'generation_reference', origin: 'user_reference',
+    })
+  }
+}
+
+/** 删除用户参考图后解除对应素材行：只删 origin='user_reference' 且路径匹配的行（不动检索/手动入库的同图素材） */
+export function removeUserReferenceSource(kind: AssetKind, assetId: number, localPath: string): void {
+  dbStmt("DELETE FROM asset_studio_source WHERE asset_kind=? AND asset_id=? AND origin='user_reference' AND local_path=?").run(kind, assetId, localPath)
 }
 export async function deleteAssetSource(id:number):Promise<boolean> {
  // Cached files may be referenced by historical specifications/runs: removing a registration must retain them.
- return stmt('DELETE FROM asset_studio_source WHERE id=?').run(id).changes>0
+ return dbStmt('DELETE FROM asset_studio_source WHERE id=?').run(id).changes>0
 }

@@ -23,8 +23,6 @@
 
 /** 线条色域覆盖率门槛（沿用 #47 的 80%，常量搬到闸门侧统一管理） */
 export const FIDELITY_LINE_COVERAGE = 0.8
-/** 美化轮上限（写死在流程里，不靠提示词约束模型） */
-export const MAX_BEAUTIFY_ROUNDS = 2
 /** 位置一致性：归一化（两地标间距 = 1）后的最大允许偏差 */
 export const LOCATE_TOLERANCE = 0.12
 
@@ -332,63 +330,6 @@ export function evaluateGate(spec: GateSpec, qc: QcPayload, opts: GateOptions = 
     locate_checks: locateChecks,
     semantics_preserved: semanticsPreserved,
     model_overall: typeof qc.overall === 'string' ? qc.overall : null,
-  }
-}
-
-// ─── 轮次建议 ────────────────────────────────────────────────
-
-export interface RoundHistoryItem {
-  round_no: number
-  purpose: 'precision' | 'beautify'
-  /** 该轮最新一条 QC 的闸门结论；null = 还没核验 */
-  gate_pass: boolean | null
-  /** 人工裁决（approve/revise/rollback/abort）；非空时人工优先 */
-  human_verdict: string | null
-  status: string
-}
-
-export interface RoundDecision {
-  action: 'pass' | 'revise' | 'rollback' | 'abort'
-  target_round_no: number | null
-  reason: string
-}
-
-/**
- * 只产出**建议**，不自动推进（主进程裁决：每轮 qc/gate 后一律 suspend 等人）。
- * 面板把它显示成「本轮 FAIL，建议回退 r1」，最终动作仍是人点的。
- */
-export function decideRound(history: RoundHistoryItem[]): RoundDecision {
-  const rounds = [...history].sort((a, b) => a.round_no - b.round_no)
-  const latest = rounds[rounds.length - 1]
-  if (!latest) return { action: 'abort', target_round_no: null, reason: '还没有任何轮次' }
-
-  const lastPass = [...rounds].reverse().find(item => item.gate_pass === true)
-  if (latest.gate_pass === true) {
-    return { action: 'pass', target_round_no: latest.round_no, reason: `第 ${latest.round_no} 轮通过闸门，建议采用` }
-  }
-  if (latest.gate_pass === null) {
-    return { action: 'abort', target_round_no: latest.round_no, reason: `第 ${latest.round_no} 轮还没有闸门结论` }
-  }
-
-  const beautifyDone = rounds.filter(item => item.purpose === 'beautify').length
-  if (beautifyDone < MAX_BEAUTIFY_ROUNDS) {
-    return {
-      action: 'revise',
-      target_round_no: latest.round_no + 1,
-      reason: `第 ${latest.round_no} 轮未过闸门，美化轮已用 ${beautifyDone}/${MAX_BEAUTIFY_ROUNDS}，建议打回重修`,
-    }
-  }
-  if (lastPass) {
-    return {
-      action: 'rollback',
-      target_round_no: lastPass.round_no,
-      reason: `美化轮已用满 ${MAX_BEAUTIFY_ROUNDS} 轮仍未过闸门，建议回退到最后一个通过的第 ${lastPass.round_no} 轮`,
-    }
-  }
-  return {
-    action: 'abort',
-    target_round_no: null,
-    reason: `美化轮已用满 ${MAX_BEAUTIFY_ROUNDS} 轮且没有任何通过的轮次，建议终止并人工处理`,
   }
 }
 

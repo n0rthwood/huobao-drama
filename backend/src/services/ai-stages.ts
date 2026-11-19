@@ -43,6 +43,8 @@ export const AI_STAGES = {
   layer_base_check: { vision: true, label: '图层底图视觉验证' },
   /** 衔接帧画面描述（Issue #95）：看 C/D 锁定槽位那张衔接帧 PNG，给视频提示词一个真实构图锚点 */
   junction_caption: { vision: true, label: '衔接帧画面描述' },
+  /** 资产美化描述（Issue #123）：看选中的资产版本图，输出保持构图的光影质感优化提示词 */
+  asset_beautify: { vision: true, label: '资产美化描述' },
 
   // ── 不需要视觉 ────────────────────────────────────────────
   /** 剧情项目拆分分镜：纯剧本文本；绝对图像优先规则下不描述外观 */
@@ -69,6 +71,8 @@ export const AI_STAGES = {
   asset_research: { vision: false, label: '资产资料研究' },
   /** 资产事实表（Issue #56）：资料 → 可逐条机检的 must_have / forbidden / tolerances */
   asset_spec: { vision: false, label: '资产事实表' },
+  /** 工作室提示词扩写（Issue #123）：事实表+素材著录+检索文本+类型模板 → 英文生图提示词 */
+  asset_studio_prompt: { vision: false, label: '工作室提示词扩写' },
   /** 组级视觉规划（Issue #109）：按逻辑组排每镜的段组合/底图/画中画；只读旁白、实测时长与资产清单，不读图 */
   design_group_plan: { vision: false, label: '组级视觉规划' },
   /** 资产审核清单（Issue #55）：输入是旁白稿文本 + 本集资产名/语义条目名清单，不读图 */
@@ -115,6 +119,8 @@ export const AI_CALL_SITES: Record<string, AiStage[]> = {
   'modules/asset-studio/steps.ts': ['asset_spec', 'asset_qc'],
   // 资料检索（#79）：检索计划/预筛（文本）+ 候选图筛选（视觉）
   'modules/asset-studio/research/run.ts': ['asset_research', 'asset_curate'],
+  // 草稿引擎（#123）：精确提示词扩写（文本）+ 美化描述（视觉）
+  'modules/asset-studio/drafts.ts': ['asset_studio_prompt', 'asset_beautify'],
   // 地图工作室（#99，取代 #84 → #90 的旧地图工作流）：需求充分性是单次判定（失败回给模型重答）；
   // 检索 / 底图 / 作图是工具循环 Agent，主模型走资料研究环节，看图走 read_image（底图与作图阶段启动时要求有视觉配置）
   'modules/map-studio/brief.ts': ['asset_research'],

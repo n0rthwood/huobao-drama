@@ -43,8 +43,8 @@ description: 通过火宝 HTTP API 按阶段推进剧本、资产、Poster、分
 3. 每次计费提交前查预算台账：GPU（图片/视频/TTS）与**计费文本 LLM 调用**（改写、`inspect-narration`、骨架、填卡、关键帧/视频提示词、地图工作室 brief/research/base/drawing）分列计数；地图 style 底纹是图片额度；余额 ≤0 停下问人；`revise` 轮按 ≥1 图预扣。
 4. **凡有 preview 的入口一律先 preview**：批量入口 `POST /dramas/{d}/assets/batch-generate/preview`、`POST /episodes/{e}/keyframe-batch/preview`、`POST /episodes/{e}/video-batch/preview`、`POST /episodes/{e}/compose-batch/preview`、`POST /episodes/{e}/narration/voice-batch/preview`；镜级 preview `GET /storyboards/{id}/narration-fit/preview`。启动批量传显式 `storyboard_ids`/`items`；没有 preview 的入口（如 `design-cards/fill`、`script-rewrite`、`extract`）按其自身前置检查执行，不得编造预览。`POST /episodes/{e}/work-estimate` 是耗时预估，**不是范围预览**，不能替代上面任何一个 preview。
 5. `merge` 导出必须显式 `storyboard_ids`（省略=整集）。
-6. `opened` 必须**下载并打开**、本地核对 sha256 一致后才能填。
-7. 真实照片/地图/文物/档案**不进** t2i/image_edit/i2v/pipeline；判据是来源真实，与资产类型无关。
+6. 工作室生图前必须**下载并打开**草稿引用的参考图与产出图、本地核对 sha256 一致；`drafts/{id}/generate` 与 `runs/{id}/deliver {set_as_current:true}` 是人决定点，只在人明确确认后执行。
+7. 真实照片/地图/文物/档案**不进** popup 单资产 t2i/image_edit/i2v 链路；工作室（#123）可对其生成派生版本，但产物只落版本、绝不自动覆盖原件，采用须人显式决定。地图资产仍只能走地图工作室。
 8. 段组合 A/B/C/D：纪录片设计卡批次（#82）起**允许 AI 填 combo**，但只在该镜**尚无 combo** 时写入，且必须经人工审阅并由人确认设计卡；Agent 仍不得手工替人改写既有 combo（`PUT /storyboards/{id}/design-card {combo}`、`POST /storyboards/{id}/combo`），预算不足不是选 A 的理由。
 9. HTTP 200 / `completed` / `exportable` **不等于**内容通过；必须打开真实媒体。
 10. 恢复只补剩余（`retry-failed`/`fill-gaps`）；全量重跑需书面理由+人授权。
@@ -99,7 +99,7 @@ description: 通过火宝 HTTP API 按阶段推进剧本、资产、Poster、分
 | 段组合 A/B/C/D 的**审阅与改写** | 决定“这一镜怎么拍”。#82 起纪录片设计卡批次可由 AI 对**尚无 combo** 的镜首次填入，人必须逐镜审阅；改写已有 combo、或手工指定 combo，仍是人的决定 |
 | 设计卡确认 | 导演分镜单背书 |
 | 关键帧确认 `confirm-keyframes` | 视觉表演与构图通过 |
-| 资产流水线 `override_gate` | 程序 gate FAIL 时是否接受，属技术例外，必须写明范围；仍不是艺术批准 |
+| 工作室 `drafts/{id}/generate` 与 `deliver {set_as_current:true}` | 生图计费与「采用为当前图」是人的决定；顾问性 QC 不构成批准，Agent 只能展示草稿与核验结果 |
 | 资产审核 `not_needed` / `ignored` | 两者都等于删减覆盖或消除缺口计数；Agent 只能提建议与理由，由人确认 |
 | 音色与 TTS 审美参数（voice/instructions/seed/步数/cfg） | 声音气质是内容选择；人未给定时 Agent 停下来问，不擅自选 |
 | 视频模型/分辨率档位切换 | 影响成本与能力（关键帧引导支持）；需人确认预算与目标 |
@@ -109,7 +109,7 @@ description: 通过火宝 HTTP API 按阶段推进剧本、资产、Poster、分
 
 Agent 可以做**技术验收**（结构、时长、音画、可解码、签名一致），但必须标注“技术验收”，不得写成“用户艺术批准”。
 
-**硬禁止**：Agent 永不自行调用下列**破坏性或背书性**写入——`script/confirm|unconfirm`、`design-card/confirm|unconfirm`、`confirm-keyframes`、`character-roster` 的批准保存、`asset-studio/runs/{id}/approve` 的 `verdict`/`override_gate`、段组合的人工写入 `PUT /storyboards/{id}/design-card {combo}` 与 `POST /storyboards/{id}/combo`、`asset-review/items/{id}` 的 `not_needed`/`ignored`、`DELETE /storyboards/{id}`、`DELETE /tasks/{id}`、`DELETE /merge/episodes/{e}/merges/{mergeId}`；地图人决定点为 `PUT /map-studio/tasks/{id} {map_spec,brief}` 中去掉 proposed/改动待核验几何或改变路线/风格/示意模式、`POST /map-studio/tasks/{id}/advance {skip:true}`、`POST /map-studio/tasks/{id}/rollback`、`POST /map-studio/tasks/{id}/cancel`，以及 `PUT /props/{p} {confirm_asset_type_change:true}`。这些只在人已给出明确决定后执行，requests.jsonl记录授权原话/时间，否则越权。唯一例外是 #82 纪录片设计卡批次 `POST /episodes/{e}/design-cards/fill`：服务端只给尚无 combo 的镜写一次模型所选 combo，仍为 pending，确认由人按。
+**硬禁止**：Agent 永不自行调用下列**破坏性或背书性**写入——`script/confirm|unconfirm`、`design-card/confirm|unconfirm`、`confirm-keyframes`、`character-roster` 的批准保存、`asset-studio/drafts/{id}/generate`（生图计费确认）、`asset-studio/runs/{id}/deliver {set_as_current:true}`（采用为当前图）、`asset-studio/sources` 的 `role:"original"`（入库即采用为受保护资产图）、`DELETE /{characters|scenes|props}/{id}/image-versions/{taskId}`、段组合的人工写入 `PUT /storyboards/{id}/design-card {combo}` 与 `POST /storyboards/{id}/combo`、`asset-review/items/{id}` 的 `not_needed`/`ignored`、`DELETE /storyboards/{id}`、`DELETE /tasks/{id}`、`DELETE /merge/episodes/{e}/merges/{mergeId}`；地图人决定点为 `PUT /map-studio/tasks/{id} {map_spec,brief}` 中去掉 proposed/改动待核验几何或改变路线/风格/示意模式、`POST /map-studio/tasks/{id}/advance {skip:true}`、`POST /map-studio/tasks/{id}/rollback`、`POST /map-studio/tasks/{id}/cancel`，以及 `PUT /props/{p} {confirm_asset_type_change:true}`。这些只在人已给出明确决定后执行，requests.jsonl记录授权原话/时间，否则越权。唯一例外是 #82 纪录片设计卡批次 `POST /episodes/{e}/design-cards/fill`：服务端只给尚无 combo 的镜写一次模型所选 combo，仍为 pending，确认由人按。
 （只读 GET、preview、生成提示词/图片/配音/视频等“新增产物”的提交不在此列，但必须受 §1.2 预算台账约束。）
 
 ---
@@ -162,12 +162,12 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 - **项目画幅版本（Issue #94，`[S]`）**：`POST /{scenes|props|characters}/{id}/aspect-version {episode_id, config_id?}` → `{task_id, size}`。以当前图为唯一参考、按项目画幅（场景尺寸表）重出一版，完成后照常成为当前图（跟随当前图的图层段底图自动切换；钉选了 `version_task_id` 的段不自动切换，编辑器提示切换）。拒绝（400 `{code,message,error}`）：忠实素材（`props.faithful=1` 或当前版本来自 upload/import）、地图道具（`asset_type='map'`）、没有图、当前图已是项目画幅。**案例背景**：drama 15 / ep 21（9:16）的 1024² 地图道具被图层用作底图；**为何需要**：只有被图层当底图的资产才会因比例不符而需要处理，用户要求「手动触发、以当前图为参考」，不自动烧算力。属于 GPU 图片额度。
 - 批量：`POST /dramas/{d}/assets/batch-generate/preview` → 人确认范围 → 同 body 启动 → `GET` 状态。
 - 纪录片审核：`POST /episodes/{e}/asset-review/run` → `GET /asset-review` → 逐条 `PUT /asset-review/items/{id}`（`not_needed` 必须写理由）。
-- 语义：`purpose:"precision"` 不是“精确复原”，而是“带权威参照、程序 gate 与人工审批的生成逼近”，产物仍是艺术再现；不得声称考古/器物级精确复原。
-- 精确→美化（资产工作室，#122）：`POST /asset-studio/tasks/open {host_ref}` → `POST /asset-studio/sources`（权威素材入库）→ `POST /asset-studio/tasks/{id}/run {purpose:"precision"|"beautify",source_ids}` → `GET /asset-studio/tasks/{id}` → 程序 gate + 开图 → `POST /asset-studio/runs/{id}/approve {opened:[{path,sha256}]}`；不合格 `verdict:"revise"`；通过后 `POST /asset-studio/runs/{id}/deliver {round_id,set_as_current}` 插回资产。
+- 语义：`tab:"precision"` 不是“精确复原”，而是“带权威参照与顾问性核验的生成逼近”，产物仍是艺术再现；不得声称考古/器物级精确复原。
+- 资产工作室（#123 双 TAB 草稿引擎）：`POST /asset-studio/tasks/open {host_ref}` →（可选 `POST /asset-studio/tasks/{id}/reference-images` 上传参考图 / `POST /asset-studio/tasks/{id}/sync` 同步资产参考图）→ `POST /asset-studio/tasks/{id}/research {keywords,instruction}`（每次检索一行记录，`GET …/research` 返回全部）→ `POST /asset-studio/sources`（候选存为素材 origin=research，或 role=original 直接采用为受保护资产图）→ `POST /asset-studio/tasks/{id}/drafts {tab:"precision"|"beautify",inputs}` → 轮询 `GET /asset-studio/drafts/{id}` 至 ready → 人编辑 prompt（`PUT /asset-studio/drafts/{id}`）→ `POST /asset-studio/drafts/{id}/generate {expected_updated_at}` → `GET /asset-studio/tasks/{id}` 看 round → `POST /asset-studio/runs/{id}/deliver {round_id,set_as_current}`（false=仅存为版本，true=显式采用为当前图）。旧 `…/run`、`…/approve` 已删除，不要再调用。
 - 忠实素材：实测 `faithful` 只存在于 `props`（场景/角色没有该字段）。真实照片/地图建 `prop` 并标 `faithful:true` 后只做确定性图层底图；`PUT /props/{id}/faithful-source` 标记原件版本。
-- **faithful 与“精确→美化”互斥**：`faithful:true` 资产不得进入 `asset-studio` 的 precision/beautify 生图链路，也不得做 t2i/image_edit/i2v。需要“更好看的艺术再现”时，另建独立场景/道具（`faithful:false`、名称与描述明确“艺术再现”），保留原件、来源与 license，两者分别审核；不得把原件替换成重绘图后仍称原件。
+- **faithful 原件不得被自动覆盖**（#123 新政策）：工作室对 faithful 资产开放生成，但产物只落版本行（`pipeline_round=true`），绝不自动改当前图；faithful_source 与原件永远保留在版本历史。「采用为当前图」是显式动作（deliver set_as_current=true），采用后受保护标记不变；不得把原件替换成重绘图后仍称原件。popup 单资产生图链路对 faithful 的拦截不变。
 - 组合场景：先提取→审核→（缺项补提取）→ 精确/美化 → 才允许拆镜。
-- 陷阱：资产批量是**项目范围**，传 `episode_id` 不代表只改本集；`rewrite_prompts` 与 `overwrite_images` 是两个独立操作；审批没带 `opened` 会被 400（这是硬规则，防止没看图就批）。
+- 陷阱：资产批量是**项目范围**，传 `episode_id` 不代表只改本集；`rewrite_prompts` 与 `overwrite_images` 是两个独立操作；工作室生图前必须人确认草稿 prompt（generate 带 expected_updated_at，草稿被改过会 409）；版本删除 `DELETE /{characters|scenes|props}/{id}/image-versions/{taskId}` 对当前生效图/faithful_source/被分镜图层钉选/活跃草稿输入的版本返回 400。
 
 #### S2-84 地图资产 → 地图工作室（Issue #99 接替 #84/#90；`[S/R]`）
 
@@ -371,7 +371,7 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 | 每阶段开工 | 先核本次授权；获准操作后再读 `GET /episodes/{e}/roadmap`（当前步骤/子步骤、`missing`、`blocked_by`）/ 预览 / `tasks/active`，不猜、不抢跑 |
 | 批量生成 | 有 preview 的入口一律先 preview，读 `checked/status/reason`，人确认后传显式 IDs；没有 preview 的入口（`design-cards/fill` 等）照其前置检查执行，`work-estimate` 不算预览 |
 | 写入 | 先快照 → 最小字段 PUT → 重新 GET 对照 → 报告 before/after |
-| 审批 | 必须开图并附 `opened:[{path,sha256}]`；程序 FAIL 保留，`override_gate` 只写技术例外范围 |
+| 工作室生图/采用 | 必须先打开草稿参考图与产出图核对 sha256；`drafts/{id}/generate` 与 `deliver {set_as_current:true}` 由人确认；顾问性 QC FAIL 原样保留，不构成阻断也不构成批准 |
 | 返工 | 定位错在哪一层（剧本/资产/绑定/关键帧/时长/模型），从对应入口修；通用规则缺陷交维护任务 |
 | 恢复 | 用批次状态/`fill-gaps`/`retry-failed` 补剩余，不从头重跑；已有活跃任务只观察 |
 | 证据 | 每次调用写 `requests.jsonl`；媒体“已打开”与“未核”分开记录 |
@@ -382,7 +382,7 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
 
 完整的 21 条错误想法 → 为什么错 → 正确做法对照表移至 [`references/anti-patterns.md`](references/anti-patterns.md)（分离只为满足 managed skill 64,000 bytes 上限，条目未删减）。**开工前必须读该表**；它与铁律框等效，不是可选读物。
 
-最常踩的五条：① 把 `content` 与 `script_content` 一次填完冒充火宝改写；② 把 HTTP 200 / `completed` / `exportable` 当内容通过；③ AI 填卡替人确认或改写既有 combo；④ 先定视频时长再配音；⑤ 没开图就 `approve` 或 `override_gate`。
+最常踩的五条：① 把 `content` 与 `script_content` 一次填完冒充火宝改写；② 把 HTTP 200 / `completed` / `exportable` 当内容通过；③ AI 填卡替人确认或改写既有 combo；④ 先定视频时长再配音；⑤ 没开图就确认生图或采用为当前图。
 
 ### 4.4 每阶段最小核对清单
 

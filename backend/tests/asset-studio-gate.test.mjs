@@ -13,7 +13,7 @@ import assert from 'node:assert/strict'
 const backendRoot = fileURLToPath(new URL('..', import.meta.url))
 
 const script = `
-  import { decideRound, evaluateGate } from './src/modules/asset-studio/gate.ts'
+  import { evaluateGate } from './src/modules/asset-studio/gate.ts'
 
   const spec = {
     must_have: [
@@ -175,24 +175,10 @@ const script = `
     semanticsPreserved: { status: 'not_applicable', detail: '无标注' },
   })
 
-  const decisions = {
-    pass: decideRound([{ round_no: 0, purpose: 'precision', gate_pass: true, human_verdict: null, status: 'generated' }]),
-    revise: decideRound([{ round_no: 0, purpose: 'precision', gate_pass: false, human_verdict: null, status: 'generated' }]),
-    rollback: decideRound([
-      { round_no: 0, purpose: 'precision', gate_pass: true, human_verdict: null, status: 'generated' },
-      { round_no: 1, purpose: 'beautify', gate_pass: false, human_verdict: null, status: 'generated' },
-      { round_no: 2, purpose: 'beautify', gate_pass: false, human_verdict: null, status: 'generated' },
-    ]),
-    abort: decideRound([
-      { round_no: 0, purpose: 'beautify', gate_pass: false, human_verdict: null, status: 'generated' },
-      { round_no: 1, purpose: 'beautify', gate_pass: false, human_verdict: null, status: 'generated' },
-    ]),
-  }
-
-  process.stdout.write(JSON.stringify({ results, decisions }))
+  process.stdout.write(JSON.stringify({ results }))
 `
 
-const { results, decisions } = JSON.parse(
+const { results } = JSON.parse(
   execFileSync('npx', ['tsx', '--eval', script], { cwd: backendRoot, encoding: 'utf8' }),
 )
 
@@ -280,11 +266,3 @@ test('保形核验 fail → FAIL；not_applicable 不影响结论', () => {
   assert.equal(results.semanticsNa.pass, true)
 })
 
-test('decideRound 只给建议：通过 / 打回 / 回退最后 PASS 轮 / 终止', () => {
-  assert.equal(decisions.pass.action, 'pass')
-  assert.equal(decisions.revise.action, 'revise')
-  assert.equal(decisions.revise.target_round_no, 1)
-  assert.equal(decisions.rollback.action, 'rollback')
-  assert.equal(decisions.rollback.target_round_no, 0)
-  assert.equal(decisions.abort.action, 'abort')
-})

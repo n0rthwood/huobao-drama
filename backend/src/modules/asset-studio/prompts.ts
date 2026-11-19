@@ -48,7 +48,7 @@ export const QC_SYSTEM = `你是图像质检员。你只负责**描述你在图�
 const SPEC_TEXT_BUDGET = 24_000
 
 /** 把检索结果整理成事实表的输入：文字摘录 + 视觉判断过的图像资料；#79 之前冻结的旧线索原样附 JSON */
-function researchSection(research: unknown): string {
+export function researchSection(research: unknown): string {
   const r = (research && typeof research === 'object' ? research : {}) as {
     texts?: Array<{ title: string; url: string | null; excerpt: string }>
     candidates?: Array<{ title: string; institution: string; date: string; license: string; role: string; depicts: string; what_it_proves: string[]; cautions: string[] }>
@@ -115,6 +115,87 @@ export function buildImagePrompt(spec: AssetSpecRow, input: {
 
 export function buildNegativePrompt(spec: AssetSpecRow): string {
   return spec.forbidden.map(item => item.error).filter(Boolean).join(', ')
+}
+
+// ─── 草稿提示词扩写 / 美化描述（Issue #123）─────────────────────
+
+/** 资产类型模板：角色/道具=三视图+细节 insets；场景=单固定视角分层，无三视图 */
+export const KIND_TEMPLATE: Record<'character' | 'scene' | 'prop', string> = {
+  character: 'character turnaround reference sheet: front view, side view, back view, plus close-up detail insets of face, costume and accessories; consistent proportions across views; plain neutral background',
+  prop: 'object turnaround reference sheet: front view, side view, back view, plus close-up detail insets of material, craftsmanship and markings; consistent proportions; plain neutral background',
+  scene: 'single fixed-camera establishing shot; layered foreground / midground / background composition; NO turnaround, NO multiple views; no people unless the asset description requires',
+}
+
+export const PROMPT_EXPAND_SYSTEM = `你是纪录片美术组的生图提示词撰写人。把事实表、参考素材著录、检索文字资料与用户描述整合成**一条英文生图提示词**（纯文本，不要 JSON、不要 Markdown、不要解释）。
+要求：
+1. 严格遵循给定的资产类型模板（三视图/单视角约束），模板词必须体现在提示词里；
+2. 事实表 must_have 逐条落实为画面描述；forbidden 的内容不得出现；uncertainties 按示意处理，不编造细节；
+3. 参考图按编号引用（reference image 1/2/3），说明每张图提供什么（形制/纹样/色彩/构图），不得要求模型复制参考图里的无关背景；
+4. 用户描述与资料冲突时以资料为准；用户描述里的合理补充要吸收；
+5. 只禁额外添加的标注（no added labels, captions, legend, watermark, signage）；器物本身的铭文/刻字要保留；
+6. 提示词是一段连贯的英文描述，长度适中（150–350 词），可直接交给生图模型。`
+
+export function expandPromptUser(input: {
+  assetKind: 'character' | 'scene' | 'prop'
+  name: string
+  subtype: string | null
+  description: string | null
+  appearance?: string | null
+  styling?: string | null
+  scenePrompt?: string | null
+  lighting?: string | null
+  finalPrompt?: string | null
+  spec: AssetSpecRow
+  sources: AssetSourceRow[]
+  research: unknown
+  notes: string
+}): string {
+  return [
+    `资产类型：${input.assetKind}${input.subtype ? `（${input.subtype}）` : ''}`,
+    `类型模板（必须遵循）：${KIND_TEMPLATE[input.assetKind]}`,
+    `名称：${input.name}`,
+    `用户描述：${input.description || '（无）'}`,
+    input.appearance ? `外貌：${input.appearance}` : '',
+    input.styling ? `造型：${input.styling}` : '',
+    input.scenePrompt ? `场景描述：${input.scenePrompt}` : '',
+    input.lighting ? `光线：${input.lighting}` : '',
+    input.finalPrompt ? `既有最终提示词（仅参考，不照抄）：${input.finalPrompt}` : '',
+    `事实表（JSON）：${JSON.stringify({ summary: input.spec.summary, must_have: input.spec.must_have, forbidden: input.spec.forbidden, tolerances: input.spec.tolerances, uncertainties: input.spec.uncertainties, palette: input.spec.palette, composition: input.spec.composition })}`,
+    '本次选中的参考素材（会作为生图参考图，按顺序编号）：',
+    input.sources.length
+      ? input.sources.map((s, i) => `${i + 1}. ${s.title || s.url || s.local_path}｜角色 ${s.role}｜年代 ${s.era || '未注明'}｜许可 ${s.license}`).join('\n')
+      : '（无参考图，纯文本生图）',
+    researchSection(input.research),
+    `用户本次指令：${input.notes || '（无）'}`,
+  ].filter(Boolean).join('\n')
+}
+
+export const BEAUTIFY_SYSTEM = `你是纪录片美术组的图像优化师。给你一张资产图（角色/场景/道具），先看清它的结构、构图、主体与细节，然后输出**一条英文生图提示词**（纯文本，不要 JSON、不要 Markdown、不要解释），用于以这张图为参考重新出一版更精致的图。
+要求：
+1. 保持原图的结构、构图、主体、视角与画幅不变——这是美化，不是重设计；
+2. 优化光影、质感、清晰度与色彩层次；修复明显的模糊、噪点、压缩痕迹；
+3. 资产类型模板约束必须体现（角色/道具的三视图与细节 insets 若原图已有则保持其版式；场景保持单固定视角分层构图，NO turnaround）；
+4. 用户指令（如「加强披风质感」）要具体落实；项目风格提示要融合；
+5. 不得添加原图没有的主体、文字、标注、水印；器物本身的铭文/刻字保留；
+6. 提示词是一段连贯英文描述（120–300 词），可直接交给生图模型。`
+
+export function beautifyUser(input: {
+  assetKind: 'character' | 'scene' | 'prop'
+  name: string
+  subtype: string | null
+  description: string | null
+  notes: string
+  stylePrompt: string | null
+  framing: string
+}): string {
+  return [
+    `资产：${input.name}（${input.assetKind}${input.subtype ? `／${input.subtype}` : ''}）`,
+    `类型模板（必须遵循）：${KIND_TEMPLATE[input.assetKind]}`,
+    `资产描述：${input.description || '（无）'}`,
+    input.framing,
+    `用户美化指令：${input.notes || '（无，按通用光影质感优化）'}`,
+    input.stylePrompt ? `项目风格：${input.stylePrompt}` : '',
+  ].filter(Boolean).join('\n')
 }
 
 export function qcUserPrompt(spec: AssetSpecRow, framing: string): string {

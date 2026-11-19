@@ -253,6 +253,7 @@ export const DEEPLINK_KEYS = {
   assetStudioList: ['asq', 'assetsettings'],
   assetStudioRun: ['run', 'round', 'approval'],
   assetStudioPreview: ['asview'],
+  assetStudioTab: ['tab'],
   assetStudioCall: ['ascall'],
   assetStudioResearchCall: ['asrcall'],
   /** 地图工作室列表：搜索词、宿主筛选、新建表单开关（不恢复草稿）。 */

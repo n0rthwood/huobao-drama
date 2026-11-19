@@ -29,6 +29,7 @@ import { parseAssetType, isMapAsset, serializeProp } from '../services/prop-asse
 import { openHostTask } from '../modules/map-studio/index.js'
 import { pipParentOf } from '../services/map-pip-assets.js'
 import { mountAspectVersionRoute } from './asset-aspect-version.js'
+import { mountImageVersionRoutes } from './asset-image-version.js'
 import { PROP_IMAGE_SIZE } from '../services/asset-image-size.js'
 import { planAssetReferences, AssetReferenceError, descriptionCitationsOf } from '../services/asset-submit-refs.js'
 import { referenceCitationIssue } from '../services/asset-reference-prompt.js'
@@ -50,6 +51,8 @@ mountReferenceImageRoutes(app, 'prop')
 mountReExtractRoute(app, 'prop')
 // POST /props/:id/aspect-version — 以当前图为参考按项目画幅重出一版（Issue #94）
 mountAspectVersionRoute(app, 'prop')
+// DELETE /props/:id/image-versions/:taskId — 删除已生成的图片版本（Issue #123）
+mountImageVersionRoutes(app, 'prop')
 
 // POST /props — 手动新增道具（传入 episode_id 时关联到该集）
 app.post('/', async (c) => {
