@@ -127,6 +127,9 @@
             <span v-if="entry.needs_review" class="sem-badge sem-review" :title="t('episode.documentary.semantics.needsReviewHint')">
               {{ t('episode.documentary.semantics.needsReview') }}
             </span>
+            <span v-if="entry.manual" class="sem-badge sem-manual" :title="t('episode.documentary.semantics.manualHint')">
+              {{ t('episode.documentary.semantics.manualBadge') }}
+            </span>
             <button
               class="sem-del"
               type="button"
@@ -136,6 +139,23 @@
             >
               <X :size="12" />
             </button>
+            <!-- Issue #125：描述/关键词是人工可改的补充字段，交付只覆盖没有人工标记的条目 -->
+            <div class="sem-supplement">
+              <input
+                class="input sem-desc-input"
+                :value="entry.description || ''"
+                :placeholder="t('episode.documentary.semantics.descriptionPlaceholder')"
+                :aria-label="t('episode.documentary.semantics.descriptionLabel')"
+                @input="editDescription(group, index, $event.target.value)"
+              />
+              <input
+                class="input sem-keys-input"
+                :value="(entry.keywords || []).join('、')"
+                :placeholder="t('episode.documentary.semantics.keywordsPlaceholder')"
+                :aria-label="t('episode.documentary.semantics.keywordsLabel')"
+                @input="editKeywords(group, index, $event.target.value)"
+              />
+            </div>
           </li>
         </ul>
         <p v-else class="sem-empty dim">{{ t('episode.documentary.semantics.empty') }}</p>
@@ -271,6 +291,16 @@ function source(value) {
   return SOURCES.includes(value) ? value : 'manual'
 }
 
+/** #125：条目补充字段（描述/关键词/人工标记）原样保留，未设置时不写空字段 */
+function supplementOf(item) {
+  return {
+    ...(item?.description ? { description: String(item.description) } : {}),
+    ...(Array.isArray(item?.keywords) && item.keywords.length ? { keywords: item.keywords.map(String) } : {}),
+    ...(item?.manual ? { manual: true } : {}),
+    ...(item?.name_manual ? { name_manual: true } : {}),
+  }
+}
+
 /** 后端返回的 doc 可能缺字段/缺整组数组，这里一次性补齐，模板不做存在性判断 */
 function normalizeDoc(raw) {
   let value = raw
@@ -294,6 +324,7 @@ function normalizeDoc(raw) {
         source: source(item.source),
         confidence: num(item.confidence),
         ...(item.needs_review ? { needs_review: true } : {}),
+        ...supplementOf(item),
       })),
     points: (Array.isArray(value.points) ? value.points : [])
       .filter(item => item && Array.isArray(item.at) && item.at.length >= 2)
@@ -304,6 +335,7 @@ function normalizeDoc(raw) {
         source: source(item.source),
         confidence: num(item.confidence),
         ...(item.needs_review ? { needs_review: true } : {}),
+        ...supplementOf(item),
       })),
     regions: (Array.isArray(value.regions) ? value.regions : [])
       .map((item, i) => ({
@@ -313,6 +345,7 @@ function normalizeDoc(raw) {
         source: source(item?.source),
         confidence: num(item?.confidence),
         ...(item?.needs_review ? { needs_review: true } : {}),
+        ...supplementOf(item),
       }))
       .filter(item => item.points.length >= 3),
     lines: (Array.isArray(value.lines) ? value.lines : [])
@@ -324,6 +357,7 @@ function normalizeDoc(raw) {
         source: source(item?.source),
         confidence: num(item?.confidence),
         ...(item?.needs_review ? { needs_review: true } : {}),
+        ...supplementOf(item),
         ...(item?.color ? { color: String(item.color) } : {}),
       }))
       .filter(item => item.points.length >= 2),
@@ -391,6 +425,35 @@ function rename(group, index, value) {
   if (!entry) return
   if (group === 'labels') entry.text = value
   else entry.name = value
+  dirty.value = true
+}
+
+/** 描述上限与后端一致（500 字）：面板与保存闸门口径相同，不在前端另定一套 */
+const DESCRIPTION_MAX = 500
+/** 关键词上限（12 个 × 20 字）：与后端规范化同口径 */
+const KEYWORDS_MAX = 12
+const KEYWORD_MAX_CHARS = 20
+
+function editDescription(group, index, value) {
+  const entry = doc.value[group][index]
+  if (!entry) return
+  const text = String(value || '').slice(0, DESCRIPTION_MAX)
+  if (text) entry.description = text
+  else delete entry.description
+  dirty.value = true
+}
+
+function editKeywords(group, index, value) {
+  const entry = doc.value[group][index]
+  if (!entry) return
+  const words = []
+  for (const part of String(value || '').split(/[、,，\s]+/)) {
+    const word = part.trim().slice(0, KEYWORD_MAX_CHARS)
+    if (word && !words.includes(word)) words.push(word)
+    if (words.length >= KEYWORDS_MAX) break
+  }
+  if (words.length) entry.keywords = words
+  else delete entry.keywords
   dirty.value = true
 }
 
@@ -639,11 +702,17 @@ onBeforeUnmount(() => { stopped = true; stopAutoPoll() })
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-wrap: wrap;
   padding: 4px 6px;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--surface-soft);
 }
+/* #125：描述/关键词是人工可改的补充字段，独占一行放名称下面 */
+.sem-supplement { flex: 1 0 100%; display: flex; gap: 6px; }
+.sem-desc-input { flex: 2 1 0; min-width: 0; font-size: 11px; }
+.sem-keys-input { flex: 1 1 0; min-width: 0; font-size: 11px; }
+.sem-manual { border: 1px solid #4a8f5b; color: #4a8f5b; }
 /* 待人工修正：整行描边提醒 + 文字徽标（Issue #47） */
 .sem-item.is-review { border-color: #d98324; background: color-mix(in srgb, #d98324 8%, var(--surface-soft)); }
 .sem-item.is-focused { outline: 2px solid var(--accent, #4fc3f7); outline-offset: 1px; }

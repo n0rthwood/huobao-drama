@@ -15,6 +15,7 @@ import { mountReExtractRoute } from './asset-reextract.js'
 import { FAITHFUL_PROVIDERS } from '../services/asset-batch-select.js'
 import {
   countSemantics,
+  markManualSupplements,
   normalizeSemantics,
   parseSemantics,
   resolveSemanticsBase,
@@ -28,6 +29,7 @@ import { getAbsolutePath } from '../utils/storage.js'
 import { parseAssetType, isMapAsset, serializeProp } from '../services/prop-asset-type.js'
 import { openHostTask } from '../modules/map-studio/index.js'
 import { pipParentOf } from '../services/map-pip-assets.js'
+import { mapAssetReferences } from '../services/map-asset-references.js'
 import { mountAspectVersionRoute } from './asset-aspect-version.js'
 import { mountImageVersionRoutes } from './asset-image-version.js'
 import { PROP_IMAGE_SIZE } from '../services/asset-image-size.js'
@@ -120,6 +122,13 @@ app.put('/:id', async (c) => {
   if (body.name !== undefined) {
     updates.name = normalizeAssetName(body.name)
     if (!updates.name) return badRequest(c, EMPTY_ASSET_NAME_MESSAGE)
+    // #125：地图资产（全览/细节）被人工改名 → map_pip.name_manual，交付不再覆盖系统命名
+    if (updates.name !== prop.name && prop.assetType === 'map' && prop.mapPip) {
+      try {
+        const meta = JSON.parse(prop.mapPip) as Record<string, unknown>
+        updates.mapPip = JSON.stringify({ ...meta, name_manual: true })
+      } catch { /* 存量 map_pip 不是合法 JSON：不拦改名，也不写入标记 */ }
+    }
   }
   if (body.type !== undefined) updates.type = body.type
   if (body.description !== undefined) updates.description = body.description
@@ -307,6 +316,20 @@ app.get('/:id/semantics', async (c) => {
   })
 })
 
+/**
+ * GET /props/:id/map-references — 地图资产被哪些分镜引用（Issue #125，读时现算）。
+ *
+ * 单一读路径：按分镜聚合、`vias` 去重、显式分开 `planned`（design_card / gen_plan）与
+ * `materialized`（图层段 / 目标资产）。不含任何生成时的镜号快照——资产先于分镜设计。
+ */
+app.get('/:id/map-references', async (c) => {
+  const id = Number(c.req.param('id'))
+  const [prop] = await db.select().from(schema.props).where(eq(schema.props.id, id))
+  if (!prop || prop.deletedAt) return badRequest(c, '道具不存在', { error: 'not_found' })
+  if (!isMapAsset(prop)) return badRequest(c, '该资产不是地图资产', { error: 'not_a_map' })
+  return success(c, mapAssetReferences(id))
+})
+
 // PUT /props/:id/semantics — 人工全量覆盖（服务端校验坐标与形状）
 app.put('/:id/semantics', async (c) => {
   const id = Number(c.req.param('id'))
@@ -315,7 +338,9 @@ app.put('/:id/semantics', async (c) => {
   if (!prop) return badRequest(c, '道具不存在')
   const raw = body.semantics ?? body
   try {
-    const doc = normalizeSemantics(raw)
+    // #125：与库里上一份逐条比对，把真正改过的 description/keywords/名称标成人工所有，
+    // 交付重新生成文字时只覆盖没人碰过的条目。
+    const doc = markManualSupplements(normalizeSemantics(raw), parseSemantics(prop.semantics))
     await savePropSemantics(id, doc)
     logTaskSuccess('Semantics', 'manual-save', { propId: id, ...countSemantics(doc) })
     // 审核清单（#55）：语义条目变了 → 相关条目重新校验 + 记横幅理由

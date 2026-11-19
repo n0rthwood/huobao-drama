@@ -27,9 +27,8 @@
         <p v-else class="pip-missing dim">{{ t('mapStudio.pip.detailPending') }}</p>
         <figcaption class="pip-caption">
           <p class="pip-reason">{{ row.frame.reason }}</p>
-          <span class="pip-fact">{{ row.frame.storyboard_numbers.length
-            ? t('mapStudio.pip.storyboards', { numbers: row.frame.storyboard_numbers.map(n => `#${n}`).join('、') })
-            : t('mapStudio.pip.noStoryboard') }}</span>
+          <!-- Issue #125：镜号不再作为资产身份/引用依据；引用关系在资产侧动态反查 -->
+          <span class="pip-fact dim">{{ t('mapStudio.pip.referencesDynamic') }}</span>
           <span class="pip-fact">{{ t('mapStudio.pip.bbox', { bbox: row.frame.bbox.map(n => Number(n).toFixed(2)).join(' / ') }) }}</span>
         </figcaption>
       </figure>

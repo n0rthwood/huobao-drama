@@ -2850,7 +2850,13 @@
         "namePlaceholder": "名称",
         "confidence": "信頼度 {v}",
         "groupCount": "{n} 件",
-        "noEditorHint": "ここでは名称変更と削除のみできます。点・折れ線・多角形の形状編集はレイヤーエディタで行います。",
+        "noEditorHint": "ここでは名称・説明・キーワードの変更と削除ができます。点・折れ線・多角形の形状編集はレイヤーエディタで行います。",
+        "descriptionLabel": "説明",
+        "descriptionPlaceholder": "この名称が指す具体的な場所を一文で（任意）",
+        "keywordsLabel": "キーワード",
+        "keywordsPlaceholder": "カンマ区切り、最大 12 個",
+        "manualBadge": "手動",
+        "manualHint": "手動で書いた説明・キーワードは地図の納品で上書きされません。名称も同様です。",
         "needsReview": "要手動修正",
         "needsReviewHint": "自動注記が品質基準に達していません（信頼度が低い、または形状の判定が疑わしい）。座標は下書きとして扱い、確認のうえ修正してください。",
         "needsReviewSummary": "自動注記のうち {n} 件に手動修正が必要です。「要手動修正」と付いた項目を一つずつ確認してください。",
@@ -3515,7 +3521,9 @@
     "aspectVersionRunning": "送信中…",
     "aspectVersionStarted": "プロジェクト比率版（{size}）を送信しました。完了後に現在の画像になります",
     "pinnedOutdated": "この区間は旧バージョンを固定しています。新しい版に切り替えられます",
-    "switchToCurrent": "現在のバージョンに切り替え"
+    "switchToCurrent": "現在のバージョンに切り替え",
+    "assetUpdated": "ベース素材「{name}」が更新されました（{at}、バージョン #{version}）：この区間を再レンダリングしてください。ベース素材の変更や詳細の選び直しはベース選択から行います",
+    "assetUpdatedDetail": "ベースはピクチャー・イン・ピクチャーの詳細素材「{name}」です（{at} 更新、バージョン #{version}）：詳細区間は素材画像を焼き込むため、この区間を再レンダリングしてください。別の詳細に変えるにはベース選択で選び直します"
   },
   "layerCanvas": {
     "toolbar": {"select":"選択","pan":"移動","frame":"フレームの表示範囲","crop":"背景を切り抜く","undo":"元に戻す","redo":"やり直す","snap":"スナップ","zoomIn":"拡大","zoomOut":"縮小","fit":"画面に合わせる","edit":"編集","preview":"プレビュー","render":"区間を描画","rehearse":"ショット試写"},
@@ -3773,7 +3781,19 @@
     "stale": "期限切れ",
     "overview": "親の全体図",
     "openOverview": "全体図を見る",
-    "shotCount": "関連するショット {n} 件"
+    "referencesTitle": "この素材を参照する絵コンテ（動的反查）",
+    "referencesHint": "読み込み時に算出します。絵コンテが素材を参照し、生成時のショット番号は保存しません。",
+    "referencesCounts": "セグメント描画済み {materialized} / 計画のみ {planned}",
+    "referencesEmpty": "この素材を参照する絵コンテはまだありません",
+    "referencesUnavailable": "参照の逆引きに失敗しました。後で再試行してください",
+    "referenceShot": "E{ep} · ショット {shot}",
+    "referenceMaterialized": "セグメント描画済み",
+    "referencePlanned": "計画のみ",
+    "referenceUpdateHint": "素材が更新されました。項目を開いて該当ショットのレイヤーセグメントまたは設計カードを更新してください。",
+    "referenceMore": "他 {n} 件（未表示）",
+    "semanticsTitle": "意味エントリ（閲覧のみ）",
+    "semanticsHint": "幾何と画像が選択の根拠です。説明は補強・否定の材料、名称は愛称にすぎません。",
+    "semanticsEmpty": "この素材にはまだ意味エントリがありません"
   },
   "mapStudio": {
     "styles": {
@@ -4214,8 +4234,7 @@
         "primary": "重点",
         "aux": "補助"
       },
-      "storyboards": "対応する絵コンテ {numbers}",
-      "noStoryboard": "対応する絵コンテは未指定",
+      "referencesDynamic": "参照関係は素材側で動的に表示します（ショット番号は保存しません）",
       "bbox": "範囲（西/南/東/北）：{bbox}",
       "detailPending": "詳細図は納品時に描画されます。まだありません。",
       "compositeTitle": "合成図",

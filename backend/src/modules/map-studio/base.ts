@@ -164,8 +164,9 @@ export async function runBaseStage(input: BaseStageInput): Promise<StageAgentRes
       set_frames: stageTool(session, {
         id: 'set_frames',
         description: '为某张已生成的全览底图提出「画中画」细节框方案（不消耗轮次）。全览 + 细节是独立资产，分镜会同时引用；'
-          + '细节框由分镜重点驱动：旁白/信息点反复强调、需要看清地理特征（河谷、山口、汇流处）的位置才设框，最多 4 个。'
-          + 'frames 可为空数组（说明为什么单张全览就够，例如所有分镜只讲整体趋势）。每个框给 label、reason（支撑哪些分镜、要看清什么）、bbox=[west,south,east,north]、role=primary|aux、storyboard_numbers。'
+          + '细节框由「要让观众看清的地理特征」驱动：旁白/信息点反复强调的河谷、山口、汇流处才设框，最多 4 个。'
+          + 'frames 可为空数组（说明为什么单张全览就够，例如所有分镜只讲整体趋势）。每个框给 label、reason（要看清什么地理特征）、bbox=[west,south,east,north]、role=primary|aux。'
+          + '不要写镜号：资产先于分镜设计，镜号不是引用依据（分镜侧读时反查）。'
           + '框必须落在该全览范围内；代码会按版式槽位的宽高比扩框并选择预置版式。',
         inputSchema: z.object({
           artifact_id: z.string().describe('render_base 返回的全览 artifact_id'),
@@ -173,7 +174,7 @@ export async function runBaseStage(input: BaseStageInput): Promise<StageAgentRes
             label: z.string(), reason: z.string(),
             bbox: z.array(z.number()).describe('[west, south, east, north]'),
             role: z.string().optional().describe('primary | aux'),
-            storyboard_numbers: z.array(z.number()).optional(),
+            storyboard_numbers: z.array(z.number()).optional().describe('兼容字段，忽略：镜号不是资产身份/引用依据'),
           })),
         }),
         summarize: result => Array.isArray(result.problems) && result.problems.length

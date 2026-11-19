@@ -30,6 +30,11 @@ export interface MapPipFrameInput {
   reason: string
   bbox: MapBbox
   role?: MapPipRole
+  /**
+   * 兼容字段（Issue #125）：镜号不是资产身份也不是引用依据，这里**只接受、不消费**。
+   * 保留在 schema 里只是为了让别处仍在飞的 base run 带上旧字段时不整批拒收；
+   * 新产出、交付与 UI 一律不写也不读镜号。
+   */
   storyboard_numbers?: number[]
 }
 
@@ -42,7 +47,6 @@ export interface MapPipFrame {
   focus_bbox: MapBbox
   /** 实际渲染范围：按资产画幅（整屏细节）扩出的框，也是 parent_frame */
   bbox: MapBbox
-  storyboard_numbers: number[]
 }
 
 export const PIP_COLORS = ['#6b2c91', '#c46a00', '#00796b', '#b3272d'] as const
@@ -77,7 +81,8 @@ export function expandBboxToAspect(bbox: MapBbox, wOverH: number): MapBbox {
 
 const round = (v: number): number => Math.round(v * 10000) / 10000
 
-function iou(a: MapBbox, b: MapBbox): number {
+/** 两个经纬度矩形的平面 IoU（与细节框互斥校验同口径）；宿主按它做细节资产的一对一身份匹配（#125） */
+export function iou(a: MapBbox, b: MapBbox): number {
   const w = Math.max(0, Math.min(a[2], b[2]) - Math.max(a[0], b[0]))
   const h = Math.max(0, Math.min(a[3], b[3]) - Math.max(a[1], b[1]))
   const inter = w * h
@@ -105,7 +110,7 @@ export function validateFrames(overview: MapBbox, raw: unknown, assetAspect: Map
     const label = typeof rec.label === 'string' ? rec.label.trim() : ''
     const reason = typeof rec.reason === 'string' ? rec.reason.trim() : ''
     if (!label) problems.push(`${tag}.label 不能为空（例如「乌格拉河口」）`)
-    if (!reason) problems.push(`${tag}.reason 不能为空：说明这个细节支撑哪几个分镜、要让观众看清什么地理特征`)
+    if (!reason) problems.push(`${tag}.reason 不能为空：说明要让观众看清什么地理特征`)
     if (!isBbox(rec.bbox)) { problems.push(`${tag}.bbox 必须是 4 个数字 [west, south, east, north]`); return }
     const b = rec.bbox
     if (!(b[0] < b[2] && b[1] < b[3])) { problems.push(`${tag}.bbox 必须满足 west<east 且 south<north`); return }
@@ -116,8 +121,8 @@ export function validateFrames(overview: MapBbox, raw: unknown, assetAspect: Map
     if (ratio < MIN_SPAN) problems.push(`${tag}「${label}」经度跨度只占全览的 ${(ratio * 100).toFixed(1)}%，小于 ${MIN_SPAN * 100}%：范围太小，没有地理语境，请放大框`)
     if (ratio > MAX_SPAN) problems.push(`${tag}「${label}」经度跨度占全览的 ${(ratio * 100).toFixed(0)}%，超过 ${MAX_SPAN * 100}%：这不是细节，请缩小框或改为不设细节`)
     const role = rec.role === 'primary' || rec.role === 'aux' ? rec.role : undefined
-    const numbers = Array.isArray(rec.storyboard_numbers) ? rec.storyboard_numbers.filter((x): x is number => Number.isInteger(x)) : []
-    inputs.push({ label, reason, bbox: b, ...(role ? { role } : {}), storyboard_numbers: numbers })
+    // #125：storyboard_numbers 只接受不消费（镜号不是资产身份/引用依据）
+    inputs.push({ label, reason, bbox: b, ...(role ? { role } : {}) })
   })
   for (let i = 0; i < inputs.length; i++) for (let j = i + 1; j < inputs.length; j++) {
     if (iou(inputs[i]!.bbox, inputs[j]!.bbox) >= MAX_IOU) problems.push(`细节框「${inputs[i]!.label}」与「${inputs[j]!.label}」重叠过半，请合并为一个框`)
@@ -133,7 +138,6 @@ export function validateFrames(overview: MapBbox, raw: unknown, assetAspect: Map
     role: item.role ?? (index === 0 && inputs.length >= 2 && !hasPrimary ? 'primary' : 'aux'),
     focus_bbox: item.bbox,
     bbox: expandBboxToAspect(item.bbox, ratio),
-    storyboard_numbers: item.storyboard_numbers ?? [],
   }))
   return { frames, problems: [] }
 }

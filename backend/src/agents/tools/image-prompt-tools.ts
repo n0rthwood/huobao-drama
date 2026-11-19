@@ -26,6 +26,7 @@ import { effectiveReferenceImages } from '../../services/reference-images.js'
 import { parseArchivalImages } from '../../services/archival-images.js'
 import { checkReferenceCitations, referenceCitationIssue, referenceToken } from '../../services/asset-reference-prompt.js'
 import { descriptionCitationsOf } from '../../services/asset-submit-refs.js'
+import { semanticEntries } from '../../services/design-card-context.js'
 
 /**
  * 参考图字段（Issue #107 追加范围）：编号 1 起即发送顺序。
@@ -206,6 +207,8 @@ const readProps = createTool({
         description: p.description || '',
         ...referenceFields(p.referenceImages),
         description_citations: descriptionCitationsOf('prop', p as unknown as Record<string, unknown>),
+        // #125：语义条目透出 description/keywords（地图/证据素材的设计依据靠它们判断引用哪个要素）
+        semantics: semanticEntries(p.semantics),
       })),
     }
   },
