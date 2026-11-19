@@ -237,8 +237,6 @@ export interface MapPipFrame {
   role: MapPipRole
   focus_bbox: MapBbox
   bbox: MapBbox
-  /** 该细节对应的分镜编号（模型给，可为空） */
-  storyboard_numbers: number[]
 }
 
 export interface MapPipImage { path: string; width: number; height: number; sha256: string }

@@ -1,12 +1,23 @@
 import crypto from 'crypto'
 import { sqlite } from '../db/index.js'
 import { now } from '../utils/response.js'
-import { normalizeSemantics } from './asset-semantics.js'
+import { parseSemantics, withGeneratedSupplements, type AssetSemantics } from './asset-semantics.js'
 import { onAssetLibraryChanged } from './asset-review.js'
-import { registerPipAssets } from './map-pip-assets.js'
+import { registerPipAssets, geometrySemanticIds, sameSemanticIdSet, semanticIdSet } from './map-pip-assets.js'
+import { mapAssetReferences, storyboardsReferencing } from './map-asset-references.js'
+import { markStale } from './staleness.js'
+import { semanticAnnotationsOf } from './map-semantic-annotations.js'
 import { MAP_ASPECTS, type MapAspect, type MapStudioHost, type MapStudioDeliverable, type MapStudioDeliveryResult, type MapBrief } from '../modules/map-studio/index.js'
 
-interface HostProp { id: number; name: string; description: string | null; drama_id: number; map_brief: string | null }
+interface HostProp {
+  id: number
+  name: string
+  description: string | null
+  drama_id: number
+  map_brief: string | null
+  /** 覆盖前读一次：用来判「内容是否换了一批地理对象」（#125） */
+  semantics: string | null
+}
 
 const MAP_ASPECT_WHITELIST: readonly MapAspect[] = MAP_ASPECTS
 /** 项目画幅（#107）：legacy 值（如 adaptive）不在白名单，按缺省 16:9 处理。 */
@@ -17,11 +28,18 @@ function dramaAspect(dramaId: number): MapAspect | undefined {
 function propOf(ref: string): HostProp | null {
   const match = /^prop:([1-9]\d*)$/.exec(ref)
   if (!match) return null
-  return sqlite.prepare("SELECT id, name, description, drama_id, map_brief FROM props WHERE id = ? AND asset_type = 'map' AND deleted_at IS NULL").get(Number(match[1])) as HostProp | undefined ?? null
+  return sqlite.prepare("SELECT id, name, description, drama_id, map_brief, semantics FROM props WHERE id = ? AND asset_type = 'map' AND deleted_at IS NULL").get(Number(match[1])) as HostProp | undefined ?? null
 }
 
 /** Transactional registration: same task + PNG hash returns the existing base/final pair. */
-const registerDelivery = sqlite.transaction((prop: HostProp, d: MapStudioDeliverable): { result: MapStudioDeliveryResult; inserted: boolean } => {
+const registerDelivery = sqlite.transaction((prop: HostProp, d: MapStudioDeliverable): {
+  result: MapStudioDeliveryResult
+  inserted: boolean
+  /** 内容换了的资产（语义要素 id 集合变化）：宿主据此让设计卡/组规划/图层段过期（#125） */
+  contentChanged: number[]
+  /** 本次登记涉及的地图资产（全览 + 细节）：失效传播要覆盖全部引用面 */
+  assetIds: number[]
+} => {
   // Resolve again inside the transaction: deleting/demoting a prop must not accept a late result.
   if (!propOf(`prop:${prop.id}`)) throw new Error('宿主目标已删除或已不再是地图资产')
   const pipKey = d.pip ? crypto.createHash('sha256').update(JSON.stringify(d.pip.details.map(x => x.sha256))).digest('hex') : null
@@ -30,7 +48,12 @@ const registerDelivery = sqlite.transaction((prop: HostProp, d: MapStudioDeliver
     let params: Record<string, unknown>
     try { params = JSON.parse(row.params ?? '{}') } catch { continue }
     if (params.source === 'map-studio' && params.map_studio_task_id === d.task_id && params.png_sha256 === d.final_image.sha256 && (params.pip_key ?? null) === pipKey) {
-      return { inserted: false, result: { version_ids: [Number(params.base_task_id), row.id], message: `成果已登记（底图 #${params.base_task_id}、成图 #${row.id}），无需重复交付` } }
+      return {
+        inserted: false,
+        contentChanged: [],
+        assetIds: [prop.id],
+        result: { version_ids: [Number(params.base_task_id), row.id], message: `成果已登记（底图 #${params.base_task_id}、成图 #${row.id}），无需重复交付` },
+      }
     }
   }
   const ts = now()
@@ -46,17 +69,32 @@ const registerDelivery = sqlite.transaction((prop: HostProp, d: MapStudioDeliver
     d.final_image.path, d.final_image.path, ts, ts, ts, Math.floor(Date.parse(ts) / 1000)).lastInsertRowid)
   const g = d.semantics as { width: number; height: number; points?: unknown[]; lines?: unknown[]; routes?: unknown[]; regions?: unknown[]; labels?: unknown[]; warnings?: string[] }
   const mark = (items: unknown[]) => items.map(item => ({ ...(item as object), source: 'cv', confidence: 1 }))
-  const semantics = normalizeSemantics({
+  const previousDoc: AssetSemantics | null = parseSemantics(prop.semantics)
+  const previousIds = semanticIdSet(previousDoc)
+  const nextIds = geometrySemanticIds(d.semantics)
+  // #125：内容换了一批地理对象 = 语义要素 id 集合变了（首版没有旧语义不算变化）
+  const parentContentChanged = previousIds.size > 0 && nextIds.size > 0 && !sameSemanticIdSet(previousIds, nextIds)
+  // #125：description/keywords 由代码拼接研究事实；人工标记的条目不被覆盖
+  const semantics = withGeneratedSupplements({
     image: { width: g.width, height: g.height, source_task_id: finalId },
     labels: mark(g.labels ?? []), points: mark(g.points ?? []), regions: mark(g.regions ?? []),
     lines: mark(g.lines ?? g.routes ?? []).map(item => ({ ...item, kind: 'route' })),
     warnings: g.warnings ?? [], generated_at: ts, model: 'map-workflow',
-  })
+  }, previousDoc, semanticAnnotationsOf(d.features ?? [], d.sources ?? []))
   sqlite.prepare('UPDATE props SET image_url = ?, local_path = ?, faithful = 1, faithful_source = ?, semantics = ?, updated_at = ? WHERE id = ?')
     .run(d.final_image.path, d.final_image.path, baseId, JSON.stringify(semantics), ts, prop.id)
   registerSourceCitations(prop, d.sources, ts)
-  registerPipAssets({ id: prop.id, name: prop.name, drama_id: prop.drama_id }, d, ts)
-  return { inserted: true, result: { version_ids: [baseId, finalId], message: `已采用成图（版本 #${finalId}）与忠实底图（版本 #${baseId}）：${d.summary}` } }
+  const pipOutcome = registerPipAssets({ id: prop.id, name: prop.name, drama_id: prop.drama_id }, d, ts, { parentContentChanged })
+  const refs = mapAssetReferences(prop.id)
+  const notice = refs && refs.total
+    ? `；引用该资产的分镜：已落段 ${refs.materialized} / 仅规划 ${refs.planned}（设计卡或图层段需按新内容更新）`
+    : ''
+  return {
+    inserted: true,
+    contentChanged: pipOutcome.contentChanged,
+    assetIds: [prop.id, ...pipOutcome.matches.matches.map(item => item.prop_id), ...pipOutcome.matches.unmatched_props],
+    result: { version_ids: [baseId, finalId], message: `已采用成图（版本 #${finalId}）与忠实底图（版本 #${baseId}）：${d.summary}${notice}` },
+  }
 })
 
 /**
@@ -128,10 +166,17 @@ export const huobaoMapStudioHost: MapStudioHost = {
   async deliver(ref, d) {
     const prop = propOf(ref)
     if (!prop) throw new Error('宿主目标不存在或不是地图资产')
-    const { result, inserted } = registerDelivery(prop, d)
+    const { result, inserted, contentChanged, assetIds } = registerDelivery(prop, d)
     if (inserted) {
       await onAssetLibraryChanged('prop', prop.id, 'version_registered')
       await onAssetLibraryChanged('prop', prop.id, 'semantics_changed')
+      // #125 §4：交付后对反查命中的**已落段**显式标过期（幂等），并让内容换了的资产上的设计卡过期。
+      // 只按反查结果传播，不做全库扫描。
+      for (const assetId of assetIds) {
+        const refs = storyboardsReferencing(assetId)
+        await markStale('layer_segment', refs.materialized, 'asset_version_changed')
+        if (contentChanged.includes(assetId)) await markStale('design_card', refs.planned, 'asset_content_changed')
+      }
     }
     return result
   },

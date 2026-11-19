@@ -15,6 +15,7 @@ import { narrationGroupsOf, type GroupWarning } from './narration-groups.js'
 import { narrationMatchKey } from './narration-first.js'
 import { spokenText } from './narration-markup.js'
 import { parseNarrationMeta, sha256 } from './narration.js'
+import { assetContentChangedAt } from './map-asset-references.js'
 import type { Combo, DesignCard } from './design-card.js'
 
 export type PlanAssetKind = 'character' | 'scene' | 'prop'
@@ -434,6 +435,47 @@ export interface GroupPlanView {
   updated_at: string | null
   task_id: number | null
   plan: GroupPlan | null
+  /**
+   * #125：规划引用的地图资产内容换了（读时现算，不落新列）。`fresh=false` 且带这个理由 = 规划过期，
+   * 填卡批处理见过期规划会重新规划；偏差检查也不再拿过期规划卡人。
+   */
+  stale_reasons: string[]
+}
+
+/** 规划里引用的全部资产 id（底图 / 画中画 / 资产分工） */
+function planAssetIds(plan: GroupPlan): number[] {
+  const ids = new Set<number>()
+  for (const shot of plan.shots) {
+    if (shot.base) ids.add(shot.base.asset_id)
+    for (const ref of shot.pip) ids.add(ref.asset_id)
+  }
+  for (const role of plan.asset_roles) ids.add(role.asset_id)
+  return [...ids]
+}
+
+/**
+ * #125：规划写完之后，它引用的资产内容被交付换过吗？
+ * 读 `props.map_pip` 里交付留下的 `content_changed_at`（细节被复用但语义要素换了一批）与过期标记；
+ * 时间比规划 `updated_at` 新 → 规划依据的资产内容已经不是写规划时的那批地理对象。
+ */
+function planAssetStaleReasons(plan: GroupPlan, planUpdatedAt: string | null): string[] {
+  if (!planUpdatedAt) return []
+  const changedAfter = new Map<number, string | null>()
+  for (const assetId of planAssetIds(plan)) {
+    if (!changedAfter.has(assetId)) changedAfter.set(assetId, assetContentChangedAt(assetId))
+  }
+  const reasons: string[] = []
+  for (const at of changedAfter.values()) {
+    if (at && at > planUpdatedAt) reasons.push('asset_content_changed')
+  }
+  return reasons
+}
+
+/** 规划是否仍可作为依据（签名一致 + 成功 + 引用的资产内容没变） */
+function planIsCurrent(row: PlanRow | undefined, signature: string): boolean {
+  if (!row || row.status !== 'ok' || row.signature !== signature) return false
+  const plan = parsePlan(row.plan)
+  return !!plan && planAssetStaleReasons(plan, row.updated_at).length === 0
 }
 
 /** `GET /episodes/:id/design-group-plans` 的返回体 */
@@ -441,6 +483,9 @@ export function listGroupPlans(episodeId: number): GroupPlanView[] {
   const rows = planRows(episodeId)
   return episodeGroups(episodeId).map((group) => {
     const row = rows.get(group.group_no)
+    const plan = parsePlan(row?.plan ?? null)
+    const staleReasons = plan ? planAssetStaleReasons(plan, row?.updated_at ?? null) : []
+    const signatureFresh = !!row && row.signature === group.signature
     return {
       group_no: group.group_no,
       paragraph_excerpt: group.paragraph_text.replace(/\s+/g, ' ').slice(0, 60),
@@ -449,10 +494,11 @@ export function listGroupPlans(episodeId: number): GroupPlanView[] {
       warnings: group.warnings,
       status: row?.status ?? 'none',
       error: row?.error_msg ?? null,
-      fresh: !!row && row.signature === group.signature,
+      fresh: signatureFresh && staleReasons.length === 0,
       updated_at: row?.updated_at ?? null,
       task_id: row?.task_id ?? null,
-      plan: parsePlan(row?.plan ?? null),
+      plan,
+      stale_reasons: signatureFresh ? staleReasons : [...staleReasons, 'signature_changed'],
     }
   })
 }
@@ -464,15 +510,15 @@ export function freshPlannedShots(episodeId: number): Map<number, GroupPlanShot>
   if (!rows.size) return map
   for (const group of episodeGroups(episodeId)) {
     const row = rows.get(group.group_no)
-    if (!row || row.status !== 'ok' || row.signature !== group.signature) continue
-    for (const shot of parsePlan(row.plan)?.shots ?? []) map.set(shot.storyboard_id, shot)
+    if (!planIsCurrent(row, group.signature)) continue
+    for (const shot of parsePlan(row!.plan)?.shots ?? []) map.set(shot.storyboard_id, shot)
   }
   return map
 }
 
-/** 某组当前有效（签名一致、成功）的规划；没有就返回 null */
+/** 某组当前有效（签名一致、成功、引用资产内容没变）的规划；没有就返回 null */
 export function freshGroupPlan(episodeId: number, group: EpisodeGroup): GroupPlan | null {
   const row = planRows(episodeId).get(group.group_no)
-  if (!row || row.status !== 'ok' || row.signature !== group.signature) return null
-  return parsePlan(row.plan)
+  if (!planIsCurrent(row, group.signature)) return null
+  return parsePlan(row!.plan)
 }

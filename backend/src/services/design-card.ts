@@ -175,6 +175,13 @@ export interface DesignCardSemanticEntry {
    * 旧调用方没填时为 undefined，机检按「几何未知」放行，只看组别相容性。
    */
   geometry_points?: number
+  /**
+   * 一句话说明（Issue #125）：地图交付时拼接的坐标依据 + 原文摘录 + 来源名。
+   * 技能口径：几何/bbox 是选取依据，description 只能佐证或否决，不得单独作为选取依据。
+   */
+  description?: string
+  /** 检索关键词（Issue #125）：交付取要素 category，人工可编辑 */
+  keywords?: string[]
 }
 
 export interface DesignCardAssetEntry {

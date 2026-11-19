@@ -1005,13 +1005,25 @@ export const sceneAPI = {
 /**
  * 证据素材语义标注（Issue #47）。坐标一律是 `faithful_source` 那张原图的像素坐标，
  * 前端只按 `image.width/height` 做 viewBox 缩放，不另存一套渲染尺寸。
+ *
+ * 补充字段（Issue #125）：`description` / `keywords` 由地图交付按研究事实拼接（人工可改），
+ * `manual` 标记人工改过的描述/关键词，`name_manual` 标记人工改过的名称——交付不会覆盖它们。
  */
 export type SemanticsSource = 'vlm' | 'cv' | 'manual'
 export type SemanticsLineKind = 'river' | 'route' | 'border'
-export interface SemanticsLabel { id: string; text: string; bbox: [number, number, number, number]; source: SemanticsSource; confidence: number }
-export interface SemanticsPoint { id: string; name: string; at: [number, number]; source: SemanticsSource; confidence: number }
-export interface SemanticsRegion { id: string; name: string; points: Array<[number, number]>; source: SemanticsSource; confidence: number }
-export interface SemanticsLine { id: string; name: string; points: Array<[number, number]>; kind: SemanticsLineKind; source: SemanticsSource; confidence: number; color?: string }
+export interface SemanticsSupplement {
+  description?: string
+  keywords?: string[]
+  manual?: boolean
+  name_manual?: boolean
+}
+export interface SemanticsReviewable {
+  needs_review?: boolean
+}
+export interface SemanticsLabel extends SemanticsSupplement, SemanticsReviewable { id: string; text: string; bbox: [number, number, number, number]; source: SemanticsSource; confidence: number }
+export interface SemanticsPoint extends SemanticsSupplement, SemanticsReviewable { id: string; name: string; at: [number, number]; source: SemanticsSource; confidence: number }
+export interface SemanticsRegion extends SemanticsSupplement, SemanticsReviewable { id: string; name: string; points: Array<[number, number]>; source: SemanticsSource; confidence: number }
+export interface SemanticsLine extends SemanticsSupplement, SemanticsReviewable { id: string; name: string; points: Array<[number, number]>; kind: SemanticsLineKind; source: SemanticsSource; confidence: number; color?: string }
 export interface AssetSemanticsDoc {
   image: { width: number; height: number; source_task_id: number | null }
   labels: SemanticsLabel[]
@@ -1028,6 +1040,31 @@ export interface PropSemanticsResp {
   /** 坐标所针对的底图（设了忠实原件就是那一版，否则是当前图） */
   base_image_url: string | null
   semantics: AssetSemanticsDoc | null
+}
+
+/**
+ * 地图资产的反查引用（Issue #125）：资产侧读时现算「当前被哪些分镜引用」，不保留生成时的镜号快照。
+ * `vias` 是引用路径（计划态 base/mark/layer/gen，已落态 segment/target）。
+ */
+export type MapReferenceVia = 'base' | 'mark' | 'layer' | 'gen' | 'segment' | 'target'
+export interface MapAssetReference {
+  episode_id: number
+  episode_number: number
+  storyboard_id: number
+  storyboard_number: number
+  vias: MapReferenceVia[]
+  planned: boolean
+  materialized: boolean
+}
+export interface MapAssetReferences {
+  asset_id: number
+  drama_id: number
+  total: number
+  /** 只有设计卡计划、还没落段的分镜数 */
+  planned: number
+  /** 已有图层段 / 目标资产引用该资产的分镜数 */
+  materialized: number
+  references: MapAssetReference[]
 }
 export interface PropSemanticsAutoResp { started: boolean; task_id: number }
 export interface PropSemanticsAutoStatus {
@@ -1059,6 +1096,8 @@ export const propAPI = {
   setFaithful: (id: number, faithful: boolean) => api.put<PropRow>(`/props/${id}`, faithful ? { faithful: true } : { faithful: false, confirm_unfaithful: true }),
   setFaithfulSource: (id: number, versionTaskId: number) => api.put<PropRow>(`/props/${id}/faithful-source`, { version_task_id: versionTaskId }),
   semantics: (id: number) => api.get<PropSemanticsResp>(`/props/${id}/semantics`),
+  /** 地图资产被哪些分镜引用（Issue #125）：读时反查，不含生成时的镜号快照 */
+  mapReferences: (id: number) => api.get<MapAssetReferences>(`/props/${id}/map-references`),
   saveSemantics: (id: number, semantics: AssetSemanticsDoc) => api.put<{ semantics: AssetSemanticsDoc }>(`/props/${id}/semantics`, { semantics }),
   autoSemantics: (id: number, episodeId: number, configId?: number) => api.post<PropSemanticsAutoResp>(`/props/${id}/semantics/auto`, { episode_id: episodeId, config_id: configId || undefined }),
   autoSemanticsStatus: (id: number) => api.get<PropSemanticsAutoStatus>(`/props/${id}/semantics/auto/status`),

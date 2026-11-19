@@ -60,6 +60,20 @@
       </button>
     </div>
 
+    <!-- Issue #125：底图资产更新后的显式横幅。动作只写编辑器里实际可做的（重渲本段 / 底图选择里换资产），
+         地图细节段在 #117 接入前仍是烧录 PNG + 语义重绘，不提示「换回旧版本」。 -->
+    <div v-if="baseAssetNotice" class="ls-check warn">
+      <span class="ls-check-text">
+        {{ baseAssetNotice.detail_asset
+          ? t('baseCheck.assetUpdatedDetail', { name: baseAssetNotice.asset_name, at: noticeTime, version: baseAssetNotice.version_task_id ?? '—' })
+          : t('baseCheck.assetUpdated', { name: baseAssetNotice.asset_name, at: noticeTime, version: baseAssetNotice.version_task_id ?? '—' }) }}
+      </span>
+      <span class="ml-auto" />
+      <button type="button" class="btn btn-sm" :disabled="rendering || saving || !segment" @click="render">
+        {{ rendering ? t('episode.segment.rendering') : t('episode.segment.render') }}
+      </button>
+    </div>
+
     <div class="ls-body">
       <!-- 中：图层画布 / 时刻预览 -->
       <section class="ls-main">
@@ -283,6 +297,9 @@ const pinnedOutdated = computed(() => Boolean(
   && currentVersionCandidate.value
   && currentVersionCandidate.value.path !== doc.value.base.path,
 ))
+/** #125：底图资产更新后的横幅数据（后端算好的资产名/更新时间/版本 + 命中的失效理由） */
+const baseAssetNotice = computed(() => segment.value?.base_asset_notice || null)
+const noticeTime = computed(() => String(baseAssetNotice.value?.updated_at || '').replace('T', ' ').slice(0, 16))
 
 watch(() => props.episodeId, async (episodeId) => {
   baseCandidates.value = []

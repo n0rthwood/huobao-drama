@@ -37,6 +37,8 @@ export function buildDeliverable(loaded: LoadedTask): MapStudioDeliverable {
       proposed: item?.proposed === true, source_ids: source?.source_ids ?? [],
       approximate: feature.approximate === true, omitted: feature.missing === true,
       coordinate_basis: source?.coordinate_basis ?? null, excerpt: source?.supporting_excerpt ?? '',
+      /** #125：语义条目 description 的拼接素材（坐标推理）与来源名 */
+      basis: source?.basis ?? '', source_title: source?.source_title ?? '',
     }
   })
   const warnings = final.provenance && 'warnings' in final.provenance && Array.isArray(final.provenance.warnings) ? final.provenance.warnings.map(String) : []
