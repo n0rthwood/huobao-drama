@@ -94,7 +94,7 @@ export function registerPipAssets(parent: ParentRow, d: MapStudioDeliverable, ts
           .run(parent.drama_id, name, description, ts, ts).lastInsertRowid)
       }
       const versionId = Number(insertTask.run(childId, parent.drama_id, `地图细节图：${name}`,
-        JSON.stringify({ source: 'map-studio', map_studio_task_id: d.task_id, role: 'detail', parent_prop_id: parent.id, frame: frameMeta, png_sha256: image.sha256, ...(image.provenance ? { provenance: image.provenance } : {}) }),
+        JSON.stringify({ source: 'map-studio', map_studio_task_id: d.task_id, role: 'detail', parent_prop_id: parent.id, frame: frameMeta, png_sha256: image.sha256, ...(image.provenance ? { provenance: image.provenance } : {}), ...(image.editable_source ? { editable_source: image.editable_source } : {}) }),
         image.path, image.path, ts, ts, ts, epoch).lastInsertRowid)
       // #110：细节图上的语义 = 全览语义要素按本帧取景投影到细节像素（id 与全览一致）。
       // 投影在模块侧交付时就算好了（`MapPipOutput.details[].semantics`）：宿主这里只做规范化落库，

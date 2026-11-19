@@ -11,8 +11,14 @@
  * 资产图层文档来源（`mapAssetLayersOf`，同步读库 + 缓存）：
  * 1. 钉选版本（`version_task_id`）是带 `params.editable_source.layer_doc` 的地图成图 → 用它；
  * 2. 否则取资产当前成图（`props.local_path`）对应的地图成图版本的 `editable_source`（地图工作室交付，按 `layer_options` 平滑）；
+ *    版本查询接受 `provider IN ('map-workflow','map-render')`（Issue #127）：PiP 细节版本的产物是
+ *    `provider='map-render', model='map-studio-detail'`，交付/补算后也带投影后的 `editable_source`；
+ *    底图版本 `model='map-studio-base'` 没有 `editable_source`，不会命中；
  * 3. 旧地图工作流资产：`props.map_workflow.outputs.layer_doc`，且其 `final_image.path` 等于当前图；
  * 4. 都没有 / 资产文档底图文件缺失 → `null`（调用方按非地图资产处理或标 `source_unresolved`，绝不回退重画）。
+ *
+ * 缓存键 = 资产 id + 钉选版本 + `props.updated_at` + 当前图；只补写版本 params 而不同步 touch 资产
+ * `updated_at` 时旧结果会继续命中 —— 补算脚本（`scripts/backfill-pip-layer-docs.ts`）负责 touch。
  */
 import fs from 'fs'
 import { sqlite } from '../db/index.js'
@@ -269,7 +275,9 @@ function resolveFromDb(prop: PropRow, current: string, versionTaskId: number | n
     if (pinned) return build(row!.id, pinned.doc, pinned.options)
   }
   if (!current) return null
-  const rows = sqlite.prepare(`SELECT id, params FROM sys_task WHERE prop_id = ? AND provider = 'map-workflow' AND status = 'completed'
+  // #127：PiP 细节版本保持 provider='map-render'，带 `editable_source.layer_doc` 时也参与解析
+  // （底图版本 model=map-studio-base 没有 editable_source，天然不命中）。只有这两处写 map-render。
+  const rows = sqlite.prepare(`SELECT id, params FROM sys_task WHERE prop_id = ? AND provider IN ('map-workflow', 'map-render') AND status = 'completed'
     AND (local_path = ? OR result_url = ?) ORDER BY id DESC`).all(prop.id, current, current) as Array<{ id: number; params: string | null }>
   for (const row of rows) {
     const source = editableSourceOf(parseJson(row.params))

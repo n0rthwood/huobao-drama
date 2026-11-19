@@ -10,6 +10,7 @@
  *   bbox 是实际渲染范围。
  */
 import type { MapAspect } from '../types.js'
+import type { PipDetailBase } from './layer-doc.js'
 import { PIP_MAX_DETAILS, type PipLayout } from './layouts.js'
 import { mapProjectionFor, type MapSpec } from '../geo/base-render.js'
 
@@ -143,6 +144,11 @@ export interface MapPipImage {
   height: number
   sha256: string
   provenance?: { attribution: string; sources: Array<{ name: string; url: string; license: string; sha256: string }> }
+  /**
+   * 细节图的渲染快照底图（Issue #127）：同一次渲染的程序底图（含角标定位图、不含注记文字），
+   * 内容寻址落盘；交付时写进细节版本的 `editable_source.base_image`。组合图的槽位图没有。
+   */
+  base?: PipDetailBase
 }
 
 /**
@@ -157,7 +163,11 @@ export interface MapPipOutput {
   aspect: MapAspect
   layout: Pick<PipLayout, 'id' | 'family' | 'canvas' | 'slots' | 'locator' | 'label_tier' | 'min_slot_short_side'>
   frames: MapPipFrame[]
-  details: Array<MapPipImage & { no: number; semantics?: unknown }>
+  /**
+   * `details[].editable_source`（Issue #127）：投影后的细节图层文档（#117 复用口径），
+   * 交付时由 `buildDetailEditableSource` 生成；宿主写进细节版本 `params.editable_source`。
+   */
+  details: Array<MapPipImage & { no: number; semantics?: unknown; editable_source?: unknown }>
   composite: MapPipImage | null
   /** 写进资产 meta 的用法说明：分镜设计据此决定引用大图/细节图/哪种版式 */
   usage: string
