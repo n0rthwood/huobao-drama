@@ -18,6 +18,8 @@ description: 地图工作流·资料检索阶段 — 用真实检索工具找资
 4. 用 `submit_features({extent,features,relations?,uncertainties?,notes?})` 交付。`extent=[west,south,east,north]` 必填，依据地域与资料；全部顶点（包括已确认几何）都必须落在 extent 内。数据集要素超出时用 `dataset_ref.clip_bbox` 裁剪——直接用 extent 本身作为 clip_bbox 即可，不需要再内缩。每次交付消耗一轮，本阶段共 3 轮。
 5. 如果问题出在需求本身（例如时代、地域写错），而本阶段无法解决，调用 `request_rollback` 回到 `brief`，写清原因。
 
+注意当前状态中的步数预算与剩余步数。四个适配器都已真实检索且至少一条要素符合校验后，部分交付优于不交付；先提交已有合格要素，查不清或尚未完成的事项写入 `uncertainties`。不要逐字重复已经执行过的查询；只有更换检索式或来源才能获取新信息。
+
 ## 要素字段（每一项都要写对，不合格整批拒收）
 
 | 字段 | 要求 |

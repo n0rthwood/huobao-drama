@@ -298,7 +298,7 @@ export interface MapStudioHistoryEntry {
 }
 
 /** 模型阶段每轮交付的结论；rollback 另记目标阶段 */
-export type MapAgentOutcome = 'accepted' | 'rejected' | 'no_delivery' | 'error' | 'rollback' | 'infra_retry'
+export type MapAgentOutcome = 'accepted' | 'rejected' | 'no_delivery' | 'error' | 'rollback' | 'infra_retry' | 'steps_exhausted' | 'ended_without_delivery' | 'call_error' | 'step_extension'
 export interface MapAgentAttempt {
   /** 所属运行 id（服务端在 run 容器里记录的 run id） */
   run_id: number
@@ -308,6 +308,9 @@ export interface MapAgentAttempt {
   /** 已脱敏的中文原因，直接展示，禁止 v-html */
   problems: string[]
   target_stage?: string
+  steps_used?: number
+  steps_budget?: number
+  extended?: boolean
   at: string
 }
 /**
@@ -363,6 +366,22 @@ export interface MapStudioRunsSummary {
   count: number
 }
 
+export type MapFailureKind = 'steps_exhausted' | 'ended_without_delivery' | 'call_error' | 'rejected' | 'mixed'
+export interface MapErrorDetail {
+  kind: MapFailureKind
+  rounds: Array<{ round: number; outcome: string; problems: string[]; steps_used: number }>
+  at: string
+}
+export interface MapResearchProgressSummary {
+  available: boolean
+  sources: number
+  dataset_queries: number
+  uncertainties: number
+  steps_used: number
+  rounds_used: number
+  updated_at: string
+}
+
 export interface MapStudioDetail {
   task_id: number
   title: string
@@ -378,6 +397,8 @@ export interface MapStudioDetail {
   image_config_id: number | null
   image_model: string | null
   error: string | null
+  error_detail?: MapErrorDetail | null
+  research_progress_summary?: MapResearchProgressSummary | null
   updated_at: string | null
   brief: MapBrief
   steps: MapStudioStep[]
@@ -591,6 +612,7 @@ export const mapStudioAPI = {
   rollback: (taskId: number, stage: MapStudioStage, expectedRevision?: number) =>
     request<MapStudioDetail>('POST', `/tasks/${taskId}/rollback`, { stage, expected_revision: expectedRevision }),
   cancel: (taskId: number) => request<MapStudioDetail>('POST', `/tasks/${taskId}/cancel`, {}),
+  clearResearchProgress: (taskId: number) => request<MapStudioDetail>('POST', `/tasks/${taskId}/research-progress/clear`, {}),
   /**
    * 人工在图层编辑器里改完的 LayerDoc：服务端严格校验（normalizeLayerDoc 会改动即拒收）、
    * 用同一条 renderLayerDoc 链重绘；宿主任务保存即交付。

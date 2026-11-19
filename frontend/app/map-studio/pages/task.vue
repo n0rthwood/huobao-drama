@@ -35,7 +35,38 @@
       <button type="button" class="mw-tool" @click="resolveConflict('discard')">{{ t('mapStudio.panel.conflictDiscard') }}</button>
     </p>
     <p v-if="error" class="mw-error">{{ error }}</p>
-    <p v-if="detail?.error && !detail.error.includes('geometry_unverified')" class="mw-error">{{ detail.error }}</p>
+    <section v-if="detail?.error_detail" class="mw-failure" role="alert">
+      <strong>{{ t('mapStudio.failure.' + detail.error_detail.kind) }}</strong>
+      <p v-if="detail.error" class="mw-error">{{ detail.error }}</p>
+      <ul v-if="detail.error_detail.kind === 'rejected' && lastFailureProblems.length">
+        <li v-for="(problem, index) in lastFailureProblems" :key="index">{{ problem }}</li>
+      </ul>
+      <p>{{ t('mapStudio.failure.' + (detail.error_detail.kind === 'call_error' ? 'changeConfigAdvice' : detail.error_detail.kind === 'rejected' ? 'fixAdvice' : 'changeModelAdvice')) }}</p>
+      <div v-if="detail.error_detail.kind !== 'rejected' || stage === 'research'" class="mw-actions">
+        <label v-if="detail.error_detail.kind !== 'rejected'" class="mw-select">
+          <span>{{ t('mapStudio.panel.textConfig') }}</span>
+          <select v-model="textConfigId" class="input" :disabled="busy">
+            <option :value="0">{{ t('mapStudio.panel.defaultConfig') }}</option>
+            <option v-for="option in textConfigs" :key="option.id" :value="option.id">{{ option.name }}</option>
+          </select>
+        </label>
+        <button v-if="detail.error_detail.kind !== 'rejected'" type="button" class="btn btn-sm" :disabled="busy || !canRun || !textConfigId || textConfigId === detail.text_config_id" @click="run">
+          {{ t('mapStudio.failure.switchAndRetry') }}
+        </button>
+        <button v-if="stage === 'research'" type="button" class="btn btn-sm" :disabled="busy || !canRun" @click="run">
+          {{ t(detail.research_progress_summary?.available ? 'mapStudio.failure.continue' : 'mapStudio.failure.restart') }}
+        </button>
+      </div>
+    </section>
+    <p v-else-if="detail?.error && !detail.error.includes('geometry_unverified')" class="mw-error">{{ detail.error }}</p>
+    <div v-if="detail?.research_progress_summary?.available && !isRunning" class="mw-actions">
+      <button v-if="!confirmClearResearch" type="button" class="btn btn-sm" :disabled="busy" @click="confirmClearResearch = true">{{ t('mapStudio.failure.clear') }}</button>
+      <template v-else>
+        <span>{{ t('mapStudio.failure.clearConfirm') }}</span>
+        <button type="button" class="btn btn-sm" :disabled="busy" @click="clearResearchProgress">{{ t('mapStudio.failure.clear') }}</button>
+        <button type="button" class="btn btn-sm" :disabled="busy" @click="confirmClearResearch = false">{{ t('mapStudio.failure.cancel') }}</button>
+      </template>
+    </div>
 
     <ol v-if="detail" class="mw-rail">
       <li v-for="(step, index) in detail.steps" :key="step.id" class="mw-step" :class="[`is-${step.status}`, { 'is-current': step.id === stage }]">
@@ -335,7 +366,9 @@ const STAGE_ORDER: MapStudioStage[] = ['brief', 'research', 'base', 'style', 'dr
 const detail = ref<MapStudioDetail | null>(null)
 const loading = ref(false)
 const error = ref('')
-const action = ref<'' | 'run' | 'advance' | 'cancel' | 'rollback' | 'brief' | 'spec' | 'confirm'>('')
+const action = ref<'' | 'run' | 'advance' | 'cancel' | 'rollback' | 'brief' | 'spec' | 'confirm' | 'clearResearch'>('')
+const confirmClearResearch = ref(false)
+const lastFailureProblems = computed(() => detail.value?.error_detail?.rounds.at(-1)?.problems ?? [])
 const conflict = ref<{ kind: 'revision' | 'busy'; message: string } | null>(null)
 const runMode = ref<'auto' | 'manual'>('auto')
 const textConfigId = ref(0)
@@ -464,7 +497,7 @@ const canEditLayers = computed(() => !hostMissing.value && !!editorDoc.value && 
  * 当前（或失败）阶段最近一次不被接受的交付：被拒原因要贴着步骤状态显示，不用点开才看得见。
  * 只看当前阶段：别的阶段早已通过，它的旧拒绝不是现在卡住的原因。
  */
-const REJECTED_OUTCOMES = ['rejected', 'no_delivery', 'error']
+const REJECTED_OUTCOMES = ['rejected', 'no_delivery', 'error', 'steps_exhausted', 'ended_without_delivery', 'call_error']
 const latestRejection = computed<MapAgentAttempt | null>(() => {
   const attempts = agentState.value.attempts
   for (let index = attempts.length - 1; index >= 0; index -= 1) {
@@ -810,6 +843,21 @@ function runOptions() {
   }
 }
 
+async function clearResearchProgress() {
+  if (busy.value || isRunning.value || !detail.value?.research_progress_summary?.available) return
+  action.value = 'clearResearch'
+  error.value = ''
+  try {
+    await mapStudioAPI.clearResearchProgress(taskId.value)
+    confirmClearResearch.value = false
+    await load(true)
+  } catch (err) {
+    if (!stopped) handleError(err, t('mapStudio.panel.saveFailed'))
+  } finally {
+    if (!stopped) action.value = ''
+  }
+}
+
 async function run() {
   if (busy.value || !canRun.value) return
   action.value = 'run'
@@ -1039,6 +1087,8 @@ onBeforeUnmount(() => {
 .mw-tool:disabled { opacity: 0.5; cursor: not-allowed; }
 .mw-hint { margin: 0; font-size: 10.5px; color: var(--text-2); }
 .mw-error { margin: 0; font-size: 10.5px; color: var(--action-danger); }
+.mw-failure { display: flex; flex-direction: column; gap: 6px; padding: 8px; border: 1px solid var(--warn-border); border-radius: 6px; background: var(--warn-bg); color: var(--warn-text); font-size: 11px; }
+.mw-failure p, .mw-failure ul { margin: 0; }
 .mw-warn,
 .mw-conflict {
   margin: 0;

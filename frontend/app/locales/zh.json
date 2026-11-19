@@ -4050,6 +4050,22 @@
       "unavailable": "链接里的「{view}」当前没有可显示的产出（已回退或尚未生成），已清掉该预览参数。",
       "invalidLink": "链接里的大图参数「{value}」无法识别，已清掉。"
     },
+    "failure": {
+      "steps_exhausted": "步数耗尽，模型未提交结果（可能与模型能力有关）",
+      "ended_without_delivery": "模型提前结束，未提交结果",
+      "call_error": "模型调用错误",
+      "rejected": "交付未通过校验",
+      "mixed": "各轮因不同原因失败",
+      "changeModelAdvice": "建议切换文本模型后重试。",
+      "changeConfigAdvice": "请更换文本配置后重试。",
+      "fixAdvice": "请根据问题修正后重试。",
+      "switchAndRetry": "切换模型并重试",
+      "continue": "基于已有结果继续",
+      "restart": "重新检索（将从头开始）",
+      "clear": "清空检索成果",
+      "clearConfirm": "确定清空未验收的检索成果？下次检索将从头开始。",
+      "cancel": "取消"
+    },
     "agent": {
       "title": "模型轮次",
       "hint": "每个模型阶段最多 3 轮交付，整次运行最多 2 次跨阶段回退；用完即转人工。",
@@ -4066,11 +4082,17 @@
       "rollbackTarget": "回退到{stage}",
       "latestRejection": "{stage}第 {n} 轮被拒原因",
       "viewAttempts": "查看该阶段交付记录",
+      "steps": "{used}/{budget} 步",
+      "extended": "追加段",
       "outcome": {
         "accepted": "已采纳",
         "rejected": "被拒",
-        "no_delivery": "未交付",
-        "error": "执行出错",
+        "no_delivery": "未交付（旧）",
+        "error": "错误（旧）",
+        "steps_exhausted": "步数耗尽",
+        "ended_without_delivery": "提前收尾",
+        "call_error": "调用错误",
+        "step_extension": "追加步数",
         "rollback": "跨阶段回退",
         "infra_retry": "基础设施重试"
       },

@@ -274,6 +274,23 @@ export const MAP_MAX_ROLLBACKS = 2
 export const MAP_INFRA_RETRIES = 2
 
 export type MapAgentOutcome = 'accepted' | 'rejected' | 'no_delivery' | 'error' | 'rollback' | 'infra_retry'
+  | 'steps_exhausted' | 'ended_without_delivery' | 'call_error' | 'step_extension'
+
+export type MapFailureKind = 'steps_exhausted' | 'ended_without_delivery' | 'call_error' | 'rejected' | 'mixed'
+
+/** 未验收的检索工作集，与已验收的 research 严格分离。 */
+export interface MapResearchProgress {
+  brief_hash: string
+  sources: MapResearchSource[]
+  hits: Record<string, unknown>
+  queries: MapResearchQuery[]
+  dataset_queries: MapDatasetQuery[]
+  uncertainties: string[]
+  last_failure: { kind: MapFailureKind; problems: string[]; at: string } | null
+  steps_used: number
+  rounds_used: number
+  updated_at: string
+}
 
 export interface MapAgentAttempt {
   run_id: number
@@ -283,6 +300,9 @@ export interface MapAgentAttempt {
   outcome: MapAgentOutcome
   problems: string[]
   target_stage?: MapWorkflowStage
+  steps_used?: number
+  steps_budget?: number
+  extended?: boolean
   at: string
 }
 
@@ -312,12 +332,14 @@ export interface MapWorkflowState {
   revision: number
   run_id: number | null
   error: string | null
+  error_detail: { kind: MapFailureKind; rounds: Array<{ round: number; outcome: string; problems: string[]; steps_used: number }>; at: string } | null
   brief: MapBrief | null
   /** brief 内容指纹：异步阶段结果落库前比对，人工改过 brief 就不覆盖 */
   brief_hash: string | null
   steps: MapWorkflowStep[]
   issues: MapWorkflowIssue[]
   research: MapResearch | null
+  research_progress: MapResearchProgress | null
   outputs: MapWorkflowOutputs
   history: MapWorkflowHistoryEntry[]
   text_config_id: number | null
@@ -347,11 +369,13 @@ export function emptyWorkflow(): MapWorkflowState {
     revision: 0,
     run_id: null,
     error: null,
+    error_detail: null,
     brief: null,
     brief_hash: null,
     steps: emptySteps(),
     issues: [],
     research: null,
+    research_progress: null,
     outputs: { ...EMPTY_OUTPUTS },
     history: [],
     text_config_id: null,

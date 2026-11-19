@@ -272,6 +272,7 @@ export async function checkBriefSufficiency(brief: MapBrief, opts: {
   let round = opts.startRounds ?? 0
   let feedback = opts.feedback ?? null
   let problems: string[] = []
+  const rounds: Array<{ round: number; outcome: 'rejected' | 'call_error'; problems: string[]; stepsUsed: number }> = []
   while (round < MAP_MAX_STAGE_ROUNDS) {
     round += 1
     let replyText = ''
@@ -299,7 +300,8 @@ export async function checkBriefSufficiency(brief: MapBrief, opts: {
     // 记录在 try 之外：工作流被取消（Stale）必须终止执行，而不是被当成一次调用出错回给模型
     await opts.record?.(round, verdict ? 'accepted' : outcome, problems)
     if (verdict) return judgeBrief(brief, verdict)
+    rounds.push({ round, outcome: outcome === 'error' ? 'call_error' : 'rejected', problems: [...problems], stepsUsed: 0 })
     feedback = [...problems, replyText ? `你上一轮的回复原文：${replyText.slice(0, 2000)}` : ''].filter(Boolean).join('\n')
   }
-  throw new MapStageExhaustedError('brief', problems)
+  throw new MapStageExhaustedError('brief', [`已用完 ${MAP_MAX_STAGE_ROUNDS} 轮交付：${problems.join('；')}`], rounds)
 }

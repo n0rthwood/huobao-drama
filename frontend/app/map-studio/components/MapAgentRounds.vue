@@ -49,6 +49,10 @@
                   : t('mapStudio.agent.roundNone') }}
               </span>
               <span class="mar-outcome" :class="`is-${attempt.outcome}`">{{ t('mapStudio.agent.outcome.' + attempt.outcome) }}</span>
+              <span v-if="attempt.steps_used != null || attempt.steps_budget != null" class="dim">
+                {{ t('mapStudio.agent.steps', { used: attempt.steps_used ?? '—', budget: attempt.steps_budget ?? '—' }) }}
+              </span>
+              <span v-if="attempt.extended" class="mar-outcome">{{ t('mapStudio.agent.extended') }}</span>
               <span v-if="attempt.outcome === 'rollback' && attempt.target_stage" class="dim">
                 {{ t('mapStudio.agent.rollbackTarget', { stage: stageLabel(attempt.target_stage) }) }}
               </span>
@@ -168,7 +172,10 @@ function relativeAt(at: string): string {
 .mar-outcome.is-accepted { color: var(--accent-text); border-color: var(--accent-text); }
 .mar-outcome.is-rejected,
 .mar-outcome.is-no_delivery,
-.mar-outcome.is-error { background: var(--warn-bg); border-color: var(--warn-border); color: var(--warn-text); }
+.mar-outcome.is-error,
+.mar-outcome.is-steps_exhausted,
+.mar-outcome.is-ended_without_delivery,
+.mar-outcome.is-call_error { background: var(--warn-bg); border-color: var(--warn-border); color: var(--warn-text); }
 .mar-attempts { list-style: none; margin: 0; padding: 0 8px 8px; display: flex; flex-direction: column; gap: 5px; }
 .mar-attempt { display: flex; flex-direction: column; gap: 3px; padding: 5px 7px; border: 1px solid var(--border); border-radius: 6px; }
 .mar-attempt-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 10.5px; color: var(--text-2); }

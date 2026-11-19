@@ -4050,6 +4050,22 @@
       "unavailable": "링크의 「{view}」 산출물을 지금 표시할 수 없습니다(롤백되었거나 아직 생성되지 않음). 미리보기 파라미터를 제거했습니다.",
       "invalidLink": "링크의 미리보기 값 「{value}」을(를) 인식할 수 없어 제거했습니다."
     },
+    "failure": {
+      "steps_exhausted": "단계를 모두 사용하고 제출하지 못했습니다 (모델 성능 문제일 수 있음)",
+      "ended_without_delivery": "모델이 제출 없이 일찍 종료했습니다",
+      "call_error": "모델 호출 오류",
+      "rejected": "제출이 검증을 통과하지 못했습니다",
+      "mixed": "각 라운드의 실패 원인이 다릅니다",
+      "changeModelAdvice": "텍스트 모델을 변경하여 다시 시도하세요.",
+      "changeConfigAdvice": "텍스트 설정을 변경하여 다시 시도하세요.",
+      "fixAdvice": "문제를 수정한 후 다시 시도하세요.",
+      "switchAndRetry": "모델 변경 후 재시도",
+      "continue": "기존 조사 결과에서 계속",
+      "restart": "다시 조사 (처음부터 시작)",
+      "clear": "조사 진행 상황 지우기",
+      "clearConfirm": "승인되지 않은 조사 진행 상황을 지우시겠습니까? 다음 조사는 처음부터 시작합니다.",
+      "cancel": "취소"
+    },
     "agent": {
       "title": "모델 라운드",
       "hint": "모델 단계마다 최대 3회 제출, 실행당 최대 2회 단계 간 롤백이며 모두 소진되면 사람이 이어받습니다.",
@@ -4066,11 +4082,17 @@
       "rollbackTarget": "{stage}(으)로 롤백",
       "latestRejection": "{stage} {n}라운드가 거부된 이유",
       "viewAttempts": "이 단계의 제출 기록 보기",
+      "steps": "{used}/{budget} 단계",
+      "extended": "추가 구간",
       "outcome": {
         "accepted": "채택됨",
         "rejected": "거부됨",
-        "no_delivery": "제출 없음",
-        "error": "실행 오류",
+        "no_delivery": "제출 없음 (이전)",
+        "error": "오류 (이전)",
+        "steps_exhausted": "단계 소진",
+        "ended_without_delivery": "조기 종료",
+        "call_error": "호출 오류",
+        "step_extension": "단계 추가",
         "rollback": "단계 간 롤백",
         "infra_retry": "인프라 재시도"
       },

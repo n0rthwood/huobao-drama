@@ -20,6 +20,7 @@ import { buildAgentRequestContext } from '../../agents/context.js'
 import { now } from '../../utils/response.js'
 import { logTaskWarn } from '../../utils/task-logger.js'
 import type { StageModel } from '../../services/ai-stages.js'
+import { getConfigById } from '../../services/ai.js'
 import { loadTask, mutateTask, stageIndex, MapStudioConflictError, MapStudioStaleError } from './store.js'
 import { loadMapStudioSkill } from './skills.js'
 import {
@@ -28,6 +29,8 @@ import {
   MAP_MAX_STAGE_ROUNDS,
   STAGE_LABEL,
   type MapAgentAttempt,
+  type MapAgentOutcome,
+  type MapFailureKind,
   type MapAgentStage,
   type MapBrief,
   type MapWorkflowStage,
@@ -35,15 +38,37 @@ import {
 
 const MAX_ATTEMPT_RECORDS = 80
 
-/** 阶段轮次耗尽：交人。message 汇总最后一轮的问题 */
+type RoundResult = { round: number; outcome: MapAgentOutcome; problems: string[]; stepsUsed: number }
+
+/** 阶段轮次耗尽：保留逐轮真实结束原因。 */
 export class MapStageExhaustedError extends Error {
   stage: MapAgentStage
   problems: string[]
-  constructor(stage: MapAgentStage, problems: string[]) {
-    super(`「${STAGE_LABEL[stage]}」已用完 ${MAP_MAX_STAGE_ROUNDS} 轮交付仍未通过校验，需要人工处理。最后一轮的问题：${problems.join('；') || '（无交付）'}`)
+  kind: MapFailureKind
+  rounds: RoundResult[]
+  constructor(stage: MapAgentStage, problems: string[], rounds: RoundResult[] = []) {
+    const kinds = new Set(rounds.map(r => r.outcome))
+    const kind: MapFailureKind = kinds.size > 1 ? 'mixed'
+      : (['steps_exhausted', 'ended_without_delivery', 'call_error', 'rejected'] as string[]).includes(rounds[0]?.outcome ?? '')
+        ? rounds[0].outcome as MapFailureKind : 'rejected'
+    const last = problems.join('；') || '（无交付）'
+    const translation = /insufficient balance/i.test(last) ? '供应商余额不足，请充值或更换文本配置。'
+      : /invalid request parameters/i.test(last) ? '请求被模型服务端拒收，请更换模型或联系维护者。'
+      : /文本模型已暂停/.test(last) ? '文本配置已被健康机制暂停（此前连续调用失败或欠费）；请在设置页恢复该配置或更换文本配置后重试。'
+      : '请检查错误或更换文本配置后重试。'
+    const messages: Record<MapFailureKind, string> = {
+      steps_exhausted: `连续 ${rounds.length} 轮耗尽步数仍未提交结果，可能是模型能力问题。建议切换文本模型后重试；如有可恢复的来源与查询，将基于已有工作继续。最后一轮：${last}`,
+      ended_without_delivery: `模型在预算内自行结束但未调用交付工具。建议切换文本模型后重试。最后一轮：${last}`,
+      call_error: `${translation} 原始错误：${last}`,
+      rejected: `交付被校验拒收，请修正后重试。问题：${last}`,
+      mixed: `各轮结束原因不同，请根据问题修正或切换文本模型后重试：${rounds.map(r => `第 ${r.round} 轮 ${r.outcome}：${r.problems.join('；') || '无详情'}`).join('；')}`,
+    }
+    super(`「${STAGE_LABEL[stage]}」${messages[kind]}`)
     this.name = 'MapStageExhaustedError'
     this.stage = stage
     this.problems = problems
+    this.kind = kind
+    this.rounds = rounds
   }
 }
 
@@ -203,10 +228,12 @@ function compactToolResults(messages: readonly MastraDBMessage[], summarizeOf: (
 }
 
 /** 每步注入的「当前状态」：阶段代码给的状态 + 本轮拒收原因，都由代码从会话状态生成 */
-function buildStateText(session: StageSession<unknown>, stageState: string, compacted: number): string {
+function buildStateText(session: StageSession<unknown>, stageState: string, compacted: number, budget?: { used: number; total: number; warnRemaining: number; warnText: string }): string {
   return [
     `当前状态（代码生成，每步更新）：阶段「${STAGE_LABEL[session.stage]}」，已用 ${session.rounds}/${MAP_MAX_STAGE_ROUNDS} 轮交付；本次运行已把 ${compacted} 条更早的工具结果换成了占位。`,
     stageState,
+    budget ? `本段步数：已用 ${budget.used} / 预算 ${budget.total}（剩余 ${Math.max(0, budget.total - budget.used)}）` : '',
+    budget && budget.total - budget.used <= budget.warnRemaining ? budget.warnText : '',
     session.lastProblems.length
       ? `最近一次交付被拒收的原因（必须逐条修正，不能当作已经解决）：\n${session.lastProblems.map((problem, index) => `${index + 1}. ${problem}`).join('\n')}`
       : '',
@@ -333,6 +360,8 @@ export interface StageAgentSpec<T> {
    */
   state: () => string
   tools: (session: StageSession<T>) => ToolsInput
+  stepBudget?: { steps: number; extendSteps: number; warnRemaining: number; warnText: string }
+  onRoundEnd?: (info: RoundResult) => Promise<void>
 }
 
 export type StageAgentResult<T> =
@@ -343,6 +372,23 @@ export type StageAgentResult<T> =
  * 跑一个模型阶段直到：交付被接受 / 模型请求回退 / 轮次耗尽（抛 MapStageExhaustedError）/ 任务被取消（抛 Stale）。
  */
 export async function runStageAgent<T>(spec: StageAgentSpec<T>): Promise<StageAgentResult<T>> {
+  let segmentUsed = 0
+  let segmentBudget = spec.stepBudget?.steps ?? spec.maxSteps
+  let totalUsed = 0
+  let reportedUsed = 0
+  let extended = false
+  const rounds: RoundResult[] = []
+  const finishRound = async (info: RoundResult) => {
+    const delta = Math.max(0, info.stepsUsed - reportedUsed)
+    reportedUsed = info.stepsUsed
+    rounds.push(info)
+    try {
+      await spec.onRoundEnd?.({ ...info, stepsUsed: delta })
+    } catch (err) {
+      if (err instanceof MapStudioStaleError || err instanceof MapStudioConflictError) session.fatal = err
+      else logTaskWarn('MapStudio', 'round-end-error', { stage: spec.stage, error: err instanceof Error ? err.message : String(err) })
+    }
+  }
   const session: StageSession<T> = {
     stage: spec.stage,
     rounds: spec.startRounds,
@@ -359,7 +405,8 @@ export async function runStageAgent<T>(spec: StageAgentSpec<T>): Promise<StageAg
       if (problems.length) {
         session.lastProblems = problems
         session.exhausted = round >= MAP_MAX_STAGE_ROUNDS
-        await recordAttempt(spec.taskId, spec.runId, { stage: spec.stage, round, outcome: 'rejected', problems }, round)
+        await recordAttempt(spec.taskId, spec.runId, { stage: spec.stage, round, outcome: 'rejected', problems, steps_used: segmentUsed, steps_budget: segmentBudget, extended }, round)
+        await finishRound({ round, outcome: 'rejected', problems: [...problems], stepsUsed: totalUsed })
         return {
           accepted: false,
           round,
@@ -371,7 +418,8 @@ export async function runStageAgent<T>(spec: StageAgentSpec<T>): Promise<StageAg
         }
       }
       session.accepted = accept()
-      await recordAttempt(spec.taskId, spec.runId, { stage: spec.stage, round, outcome: 'accepted', problems: [] }, round)
+      await recordAttempt(spec.taskId, spec.runId, { stage: spec.stage, round, outcome: 'accepted', problems: [], steps_used: segmentUsed, steps_budget: segmentBudget, extended }, round)
+      await finishRound({ round, outcome: 'accepted', problems: [], stepsUsed: totalUsed })
       return { accepted: true, round, next: '交付已接受，本阶段结束；请直接结束回答' }
     },
   }
@@ -390,9 +438,13 @@ export async function runStageAgent<T>(spec: StageAgentSpec<T>): Promise<StageAg
   // 每一步发送前压缩历史：更早的工具结果换占位、最近 K 步保留原文、末尾重写一条当前状态。
   // system/技能全文、初始 user 提示、阶段回馈与每个工具调用本身都不动（删掉调用参数模型会重复操作）。
   const prepareStep: NonNullable<AgentExecutionOptionsBase<unknown>['prepareStep']> = (args) => {
+    segmentUsed += 1
+    totalUsed += 1
     const compacted = compactToolResults(args.messages, tool => summarizers.get(tool))
     const kept = args.messages.filter(message => message.id !== STATE_MESSAGE_ID)
-    return { messages: [...kept, stateMessage(buildStateText(session, spec.state(), compacted))] }
+    return { messages: [...kept, stateMessage(buildStateText(session, spec.state(), compacted, spec.stepBudget ? {
+      used: segmentUsed, total: segmentBudget, warnRemaining: spec.stepBudget.warnRemaining, warnText: spec.stepBudget.warnText,
+    } : undefined))] }
   }
   // 模块没有火宝的剧集上下文：episodeId/dramaId 传 0，语言与（空的）题材规则按全局设置解析；
   // 不传 textTaskId —— 模块的运行 id 与 sys_task id 不是一个号段，不能让工具把计量写进别人的任务行。
@@ -404,43 +456,97 @@ export async function runStageAgent<T>(spec: StageAgentSpec<T>): Promise<StageAg
   })
 
   let feedback = spec.initialFeedback
+  let firstRunError: string | null = null
   while (session.rounds < MAP_MAX_STAGE_ROUNDS) {
     session.deliveredThisRun = false
+    segmentUsed = 0
+    totalUsed = 0
+    reportedUsed = 0
+    extended = false
+    segmentBudget = spec.stepBudget?.steps ?? spec.maxSteps
     const controller = new AbortController()
     const roundNote = `这是「${STAGE_LABEL[spec.stage]}」阶段，已用 ${session.rounds}/${MAP_MAX_STAGE_ROUNDS} 轮交付。`
     const message = [roundNote, feedback ? `上一轮的情况（请据此修正）：\n${feedback}` : '', await spec.prompt()]
       .filter(Boolean).join('\n\n')
     let runError: string | null = null
-    try {
-      await runAgent(agent, [{ role: 'user', content: message }], {
-        maxSteps: spec.maxSteps,
-        requestContext,
-        abortSignal: controller.signal,
-        prepareStep,
-        onStepFinish: async () => {
-          if (!session.fatal) {
-            const current = await loadTask(spec.taskId)
-            if (current?.state.run_id !== spec.runId) session.fatal = new MapStudioStaleError('地图任务已被取消或由其他运行接管')
+    let messages: Parameters<Agent['generate']>[0] = [{ role: 'user', content: message }]
+    for (;;) {
+      try {
+        const result = await runAgent(agent, messages, {
+          maxSteps: segmentBudget,
+          requestContext,
+          abortSignal: controller.signal,
+          prepareStep,
+          onStepFinish: async () => {
+            if (!session.fatal) {
+              const current = await loadTask(spec.taskId)
+              if (current?.state.run_id !== spec.runId) session.fatal = new MapStudioStaleError('地图任务已被取消或由其他运行接管')
+            }
+            if (session.accepted || session.rollback || session.exhausted || session.fatal) controller.abort()
+          },
+        })
+        if (!spec.stepBudget || extended || segmentUsed < segmentBudget || session.accepted || session.rollback || session.exhausted || session.fatal) break
+        const previousBudget = segmentBudget
+        extended = true
+        segmentBudget = spec.stepBudget.extendSteps
+        segmentUsed = 0
+        await recordAttempt(spec.taskId, spec.runId, {
+          stage: spec.stage, round: session.deliveredThisRun ? session.rounds : session.rounds + 1, outcome: 'step_extension', problems: [], extended: true, steps_budget: segmentBudget,
+        })
+        messages = [
+          ...messages,
+          ...(result.response.messages?.length ? result.response.messages : [{ role: 'assistant' as const, content: result.text }]),
+          { role: 'user' as const, content: `上一段已耗尽 ${previousBudget} 步仍未交付；必须提交部分结果，查不清的写入 uncertainties 作为后续着重点。` },
+        ]
+      } catch (err) {
+        if (!controller.signal.aborted) {
+          runError = err instanceof Error ? err.message : String(err)
+          // The SDK may retry inside a single runAgent call. If the scheduler
+          // suspends the endpoint between attempts, its stored reason preserves
+          // the upstream response that the final "paused" error obscures.
+          if (!firstRunError && /文本模型已暂停/.test(runError) && spec.stageModel.configId != null) {
+            try {
+              const config = await getConfigById(spec.stageModel.configId, 'text')
+              if (config?.suspendedAt && config.suspendedReason) {
+                runError = `${runError}；配置暂停原因：${config.suspendedReason}`
+              }
+            } catch (lookupError) {
+              logTaskWarn('MapStudio', 'endpoint-error-lookup', { stage: spec.stage, error: lookupError instanceof Error ? lookupError.message : String(lookupError) })
+            }
           }
-          if (session.accepted || session.rollback || session.exhausted || session.fatal) controller.abort()
-        },
-      })
-    } catch (err) {
-      if (!controller.signal.aborted) runError = err instanceof Error ? err.message : String(err)
+          firstRunError ??= runError
+        }
+        break
+      }
     }
-    if (session.fatal) throw session.fatal
+    if (session.fatal) {
+      const fatal = session.fatal
+      await finishRound({ round: session.deliveredThisRun ? session.rounds : session.rounds + 1, outcome: 'error', problems: [String(fatal)], stepsUsed: totalUsed })
+      throw fatal
+    }
     if (session.accepted) return { kind: 'accepted', result: session.accepted, rounds: session.rounds }
-    if (session.rollback) return { kind: 'rollback', ...session.rollback, rounds: session.rounds }
-    if (session.exhausted) throw new MapStageExhaustedError(spec.stage, session.lastProblems)
-    if (!session.deliveredThisRun) {
-      session.rounds += 1
-      const problems = [runError ? `本轮调用出错：${runError}` : '本轮结束时没有调用交付工具（或步数用完仍未交付）']
-      session.lastProblems = problems
-      await recordAttempt(spec.taskId, spec.runId, {
-        stage: spec.stage, round: session.rounds, outcome: runError ? 'error' : 'no_delivery', problems,
-      }, session.rounds)
+    if (session.rollback) {
+      await finishRound({ round: session.rounds + 1, outcome: 'rollback', problems: [], stepsUsed: totalUsed })
+      if (session.fatal) throw session.fatal
+      return { kind: 'rollback', ...session.rollback, rounds: session.rounds }
     }
-    feedback = session.lastProblems.map((problem, index) => `${index + 1}. ${problem}`).join('\n')
+    if (session.exhausted) throw new MapStageExhaustedError(spec.stage, session.lastProblems, rounds)
+    const outcome: MapAgentOutcome = runError ? 'call_error' : extended || segmentUsed >= segmentBudget ? 'steps_exhausted' : 'ended_without_delivery'
+    if (!session.deliveredThisRun) session.rounds += 1
+    const problems = [
+      ...(session.deliveredThisRun ? session.lastProblems : []),
+      runError ? `本轮调用出错：${firstRunError ?? runError}${firstRunError !== runError ? `；后续错误：${runError}` : ''}` : extended
+        ? segmentUsed >= segmentBudget ? '追加段步数已耗尽，仍未交付' : '追加段内模型提前收尾，仍未交付'
+        : outcome === 'steps_exhausted' ? '本段步数已耗尽，未提交结果' : '模型自行结束，未调用交付工具',
+    ]
+    session.lastProblems = problems
+    await recordAttempt(spec.taskId, spec.runId, {
+      stage: spec.stage, round: session.rounds, outcome, problems, steps_used: segmentUsed, steps_budget: segmentBudget, extended,
+    }, session.rounds)
+    if (session.deliveredThisRun && rounds.at(-1)?.round === session.rounds) rounds.pop()
+    await finishRound({ round: session.rounds, outcome, problems, stepsUsed: totalUsed })
+    if (session.fatal) throw session.fatal
+    feedback = problems.map((problem, index) => `${index + 1}. ${problem}`).join('\n')
   }
-  throw new MapStageExhaustedError(spec.stage, session.lastProblems)
+  throw new MapStageExhaustedError(spec.stage, session.lastProblems, rounds)
 }
