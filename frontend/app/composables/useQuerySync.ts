@@ -269,9 +269,13 @@ export const DEEPLINK_KEYS = {
   /** 地图工作室：编辑器内选中的稳定图层 id，不含草稿。 */
   mapStudioLayer: ['mssel'],
   /** 地图工作室：已保存的几何要素 kind:id，不含坐标草稿。 */
-  mapStudioGeo: ['msgeo'],
+  mapStudioGeo: ['msgeo', 'msgtab', 'msgzoom', 'msgcx', 'msgcy', 'msgpoints', 'msgrow', 'msggeorev'],
   /** 地图工作室：预览产出身份 base|texture|final|calibration，不含路径。 */
   mapStudioPreview: ['msview'],
+  /** 地图工作室：所选成图版本（task:revision:kind）、全屏只读大图、图层查看器开关。 */
+  mapStudioImage: ['mssnapshot', 'mspreview', 'mslayers'],
+  /** 地图工作室：AI 活动抽屉开关（1|full），只恢复界面。 */
+  mapStudioActivity: ['msactivity'],
   /** 参考图管理器：素材库弹窗的宿主资产（值 = 类型-id，多实例共用一个键） */
   refLibrary: ['reflib', 'refdel'],
   /** 角色档案图面板：检索弹窗与关键词 */

@@ -63,16 +63,18 @@ test('Map Studio adopted styles: settings, validation, HTTP rejection, theme cha
       const prop258Ids = ['g_a3b81df5','g_7494af35','g_7593bacf','g_e7dc4ee3','g_27f212da','g_f3d608f1']
       assert.equal(new Set(prop258Ids.map(id => featureStyleFor(family, {kind:'region', id, regionIds:prop258Ids}).fill)).size, 6, 'prop-258 的六个区域色不重复')
     }
+    // Issue #126 主题简化：有效样式固定 atlas-tint；主题字段只保留历史记录（合法值仍接受、非法值仍拒绝）。
     assert.equal(readDefaultStyle(),'atlas-tint')
-    assert.equal(resolveMapStyle(emptyBrief(),{default_style:readDefaultStyle()}).id,'atlas-tint')
+    assert.equal(resolveMapStyle(emptyBrief()).id,'atlas-tint')
     const legacy={...emptyBrief(),style:'ink'};delete legacy.map_style
-    assert.equal(resolveMapStyle(legacy,{default_style:'modern-clean'}),null,'legacy remains on old style')
-    assert.equal((await request('/settings','PUT',{default_style:'ink-chinese'})).status,200)
-    assert.equal(resolveMapStyle(emptyBrief(),{default_style:readDefaultStyle()}).id,'ink-chinese')
-    assert.equal(resolveMapStyle({...emptyBrief(),map_style:'modern-clean'},{default_style:readDefaultStyle()}).id,'modern-clean')
+    assert.equal(resolveMapStyle(legacy).id,'atlas-tint','legacy brief.style no longer resolves a style')
+    assert.equal((await request('/settings','PUT',{default_style:'ink-chinese'})).status,200,'legacy settings value stays storable')
+    assert.equal(readDefaultStyle(),'atlas-tint','module setting never changes the effective default')
+    assert.equal(resolveMapStyle({...emptyBrief(),map_style:'modern-clean'}).id,'atlas-tint','stored brief theme is reference-only')
     assert.equal((await request('/settings','PUT',{default_style:'invalid',research_keys:{europeana:'must-not-save'}})).status,400)
     assert.equal((await request('/tasks','POST',{title:'invalid theme',brief:{map_style:'invalid'}})).status,400)
     const catalogue=(await request('/styles')).data.data
+    assert.equal(catalogue.default_style,'atlas-tint')
     assert.equal(catalogue.families.length,5)
     for(const family of catalogue.families){
       const preview=await mapStudioRoutes.request('/styles/'+family.id+'/preview')
@@ -85,10 +87,11 @@ test('Map Studio adopted styles: settings, validation, HTTP rejection, theme cha
     for(const mutate of [d=>d.families[0].palette.water='blue',d=>d.families[0].labels.city.font='Arial',d=>d.families[0].lines.coast.width=3]){
       const bad=structuredClone(raw);mutate(bad);assert.throws(()=>validateMapStyleFamilies(bad))
     }
+    // 主题不再从需求审核里提议/采纳（Issue #126）：审核 JSON 里出现的主题建议被忽略，人工记录值原样保留。
     const verdict={inferred:[{field:'map_style',value:'historical-schematic',basis:'突出迁徙路线与分区',confidence:'high'}],ambiguous:[],missing:[],notes:[]}
     const brief={...emptyBrief(),subject:'迁徙',era:'1600',location:'欧亚',purpose:'迁徙示意图'}
-    assert.equal(judgeBrief(brief,parseBriefVerdict(verdict)).brief.map_style,'historical-schematic')
-    assert.equal(judgeBrief({...brief,map_style:'modern-clean'},parseBriefVerdict(verdict)).brief.map_style,'modern-clean','never override human choice')
+    assert.equal(judgeBrief(brief,parseBriefVerdict(verdict)).brief.map_style,null,'theme proposals are ignored')
+    assert.equal(judgeBrief({...brief,map_style:'modern-clean'},parseBriefVerdict(verdict)).brief.map_style,'modern-clean','recorded human value kept')
     assert.equal(parseBriefVerdict({...verdict,inferred:[{...verdict.inferred[0],basis:''}]}),null)
 
     const fixture=normalizeMapSpec({bbox:[10,10,20,20],layers:{land:true,coastline:true,rivers:false,lakes:true,countries:false},
@@ -114,7 +117,7 @@ test('Map Studio adopted styles: settings, validation, HTTP rejection, theme cha
         signatures.add(mapBaseSignature(spec,{width:1280,height:720}))
         // 底图色板是固定地形色（不随主题族变）：主题族只影响可编辑图层的样式，见下方逐层断言
         const base=await createMapBaseArtifact(spec,{mode:'program',width:1280,dem:demFixture})
-        assert.equal(base.provenance.map_style,family.id)
+        assert.equal(base.provenance.map_style,'atlas-tint','底图 provenance 记录固定有效样式，不随历史主题记录变化')
         assert.equal(base.provenance.relief.role,'overview')
         assert.match(base.provenance.renderer,/relief/)
         const task=await createStandaloneTask({title:'Theme '+family.id,brief:themedBrief})
@@ -124,23 +127,31 @@ test('Map Studio adopted styles: settings, validation, HTTP rejection, theme cha
         assert.equal(outcome.kind,'accepted')
         const doc=outcome.result.doc
         assert.equal(outcome.result.rendered.region_composition,'under')
+        // Issue #126：drawing 的有效样式固定 atlas-tint，历史 brief/spec 主题记录不再参与解析。
+        const defaultFamily=MAP_STYLE_FAMILIES[0]
+        assert.equal(doc.theme,defaultFamily.theme_mapping)
+        assert.equal(doc.layers.find(l=>l.id==='feature-river').style.stroke,defaultFamily.lines.river_major.stroke)
+        // 五个家族仍作为显式 restyle 的纯样式配方存在：同一份排版只换样式，逐层断言不变。
+        const themed=restyleMapLayers(doc,family,specFeatures(spec))
         if (family.id === 'historical-schematic') {
           const background={path:base.path,width:base.width,height:base.height,registration:base.registration,warnings:[]}
-          const changed=structuredClone(doc);changed.layers.find(l=>l.id==='feature-region').style.fill='#1263db'
-          const a=await renderMapLayerDoc(doc,outcome.result.layerOptions,{spec,background})
+          const changed=structuredClone(themed);changed.layers.find(l=>l.id==='feature-region').style.fill='#1263db'
+          const a=await renderMapLayerDoc(themed,outcome.result.layerOptions,{spec,background})
           const b=await renderMapLayerDoc(changed,outcome.result.layerOptions,{spec,background})
           assert.notEqual(a.sha256,b.sha256,'changing region fill invalidates the under composition')
-          const fallback=await renderMapLayerDoc(doc,outcome.result.layerOptions,{spec,background:{...background,registration:{...base.registration,mode:'image'}}})
+          const fallback=await renderMapLayerDoc(themed,outcome.result.layerOptions,{spec,background:{...background,registration:{...base.registration,mode:'image'}}})
           assert.equal(fallback.region_composition,'bottom-layer')
-          assert.equal(doc.layers.find(l=>l.id==='feature-region').style.fill,featureStyleFor(family,{kind:'region',id:'region'}).fill,'rendering leaves the editable layer unchanged')
+          assert.equal(themed.layers.find(l=>l.id==='feature-region').style.fill,featureStyleFor(family,{kind:'region',id:'region'}).fill,'rendering leaves the editable layer unchanged')
         }
-        assert.equal(doc.theme,family.theme_mapping)
-        assert.equal(doc.layers.find(l=>l.id==='feature-river').style.stroke,family.lines.river_major.stroke)
-        assert.ok([family.lines.river_major.width,family.lines.river_minor.width].includes(doc.layers.find(l=>l.id==='feature-river').style.width))
-        assert.equal(doc.layers.find(l=>l.id==='feature-route').style.stroke,family.lines.routes.stroke)
-        assert.equal(doc.layers.find(l=>l.id==='feature-region').style.fill,featureStyleFor(family,{kind:'region',id:'region'}).fill)
-        assert.equal(doc.layers.find(l=>l.id==='feature-city').style.dot_radius,family.markers.city.dot_radius)
-        assert.deepEqual(doc.layers.find(l=>l.type==='label').style,labelStyleFor(family,'title'))
+        assert.equal(themed.theme,family.theme_mapping)
+        assert.equal(themed.layers.find(l=>l.id==='feature-river').style.stroke,family.lines.river_major.stroke)
+        assert.ok([family.lines.river_major.width,family.lines.river_minor.width].includes(themed.layers.find(l=>l.id==='feature-river').style.width))
+        assert.equal(themed.layers.find(l=>l.id==='feature-route').style.stroke,family.lines.routes.stroke)
+        assert.equal(themed.layers.find(l=>l.id==='feature-region').style.fill,featureStyleFor(family,{kind:'region',id:'region'}).fill)
+        assert.equal(themed.layers.find(l=>l.id==='feature-city').style.dot_radius,family.markers.city.dot_radius)
+        assert.deepEqual(themed.layers.find(l=>l.type==='label').style,labelStyleFor(family,'title'))
+        const rendered=await renderMapLayerDoc(themed,outcome.result.layerOptions,{spec,background:{path:base.path,width:base.width,height:base.height,registration:base.registration,warnings:[]}})
+        assert.equal(rendered.region_composition,'under')
         const reset=restyleMapLayers(doc,MAP_STYLE_FAMILIES[4],specFeatures(spec))
         for(let i=0;i<doc.layers.length;i++){const {style:a,...before}=doc.layers[i],{style:b,...after}=reset.layers[i];assert.deepEqual(after,before,'reset changes style only')}
         const oldDoc=structuredClone(doc)
@@ -155,18 +166,22 @@ test('Map Studio adopted styles: settings, validation, HTTP rejection, theme cha
         assert.equal(result.status,200)
         assert.equal((await loadTask(task.task_id)).state.revision,revision,'restyle never persists')
         const nextFamily=MAP_STYLE_FAMILIES[(MAP_STYLE_FAMILIES.indexOf(family)+1)%5]
-        // Theme-only change after a finished base: research and geometry stay, the flow restarts at base.
+        const docBefore=JSON.stringify((await loadTask(task.task_id)).state.outputs.layer_doc)
         const changed=await saveMapWorkflowDraft(task.task_id,{brief:{map_style:nextFamily.id},expectedRevision:revision})
-        assert.equal(changed.stage,'base');assert.equal(changed.brief.map_style,nextFamily.id)
-        assert.deepEqual(changed.steps.map(s=>s.status),['completed','completed','pending','pending','pending','pending'])
-        assert.ok(changed.issues.some(i=>i.code==='style_changed'))
+        // Issue #126：主题只是历史记录——保存主题不挪阶段、不失效产物、不产生 style_changed。
+        assert.equal(changed.stage,'complete','theme-only save never moves the workflow')
+        assert.equal(changed.status,'idle','theme-only save does not change workflow status')
+        assert.equal(changed.brief.map_style,nextFamily.id,'recorded for reference')
+        assert.deepEqual(changed.steps.map(s=>s.status),['completed','completed','completed','completed','completed','completed'])
+        assert.ok(!changed.issues.some(i=>i.code==='style_changed'))
+        assert.equal(JSON.stringify((await loadTask(task.task_id)).state.outputs.layer_doc),docBefore,'图层文档不被主题保存改写')
         assert.deepEqual(changed.map_spec.routes,(await loadTask(task.task_id)).mapSpec.routes,'geometry kept')
         // Any substantive brief change still restarts at brief.
         const substantive=await saveMapWorkflowDraft(task.task_id,{brief:{era:'changed era '+family.id},expectedRevision:changed.revision})
         assert.equal(substantive.stage,'brief')
-        assert.notEqual(mapBaseSignature(normalizeMapSpec({...spec,style:{map_style:nextFamily.id}}),{width:1280,height:720}),mapBaseSignature(spec,{width:1280,height:720}))
+        assert.equal(mapBaseSignature(normalizeMapSpec({...spec,style:{map_style:nextFamily.id}}),{width:1280,height:720}),mapBaseSignature(spec,{width:1280,height:720}),'主题记录不改变底图签名')
       }
-      assert.equal(signatures.size,5)
+      assert.equal(signatures.size,1,'所有历史主题记录共享同一份底图签名')
     }finally{await model.close()}
 
     // Optional coordinator samples use actual Natural Earth river/place features, never a model or image API.

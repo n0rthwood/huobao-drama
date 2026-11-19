@@ -41,9 +41,7 @@
 
     <section class="ms-block">
       <strong class="ms-sub">{{ t('mapStudio.styles.defaultTitle') }}</strong>
-      <p class="ms-note dim">{{ t('mapStudio.styles.defaultHint') }}</p>
-      <MapStylePicker :model-value="styleDraft" :allow-default="false" :disabled="saving || loading" @update:model-value="styleDraft = $event ?? styleDraft" />
-      <button type="button" class="btn btn-sm btn-primary" :disabled="saving || !styleDraft || styleDraft === settings?.default_style" @click="saveStyle">{{ t('mapStudio.styles.saveDefault') }}</button>
+      <p class="ms-note">{{ t('mapStudio.styles.effectiveHint', { id: 'atlas-tint' }) }}</p>
     </section>
 
     <section class="ms-block">
@@ -87,7 +85,6 @@ import {
   type ResearchKeyId,
 } from '~/map-studio/api'
 import MapModelPicker from '~/map-studio/components/MapModelPicker.vue'
-import MapStylePicker from '~/map-studio/components/MapStylePicker.vue'
 
 const { t } = useI18n()
 
@@ -100,7 +97,6 @@ const saving = ref(false)
 const error = ref('')
 const keySaved = ref(false)
 const modelsSaved = ref(false)
-const styleDraft = ref('')
 const keyDrafts = reactive<Record<string, string>>({})
 const modelDraft = reactive({ textConfigId: 0, imageConfigId: null as number | null, imageModel: null as string | null })
 let stopped = false
@@ -115,7 +111,6 @@ const modelsDirty = computed(() => JSON.stringify({
 function applySettings(next: MapStudioSettings, adoptModels = true) {
   settings.value = next
   if (!adoptModels) return
-  styleDraft.value = next.default_style
   modelDraft.textConfigId = next.models.text_config_id ?? 0
   modelDraft.imageConfigId = next.models.image_config_id ?? null
   modelDraft.imageModel = next.models.image_model ?? null
@@ -186,20 +181,6 @@ async function clearKey(id: ResearchKeyId) {
   }
 }
 
-async function saveStyle() {
-  if (saving.value || !styleDraft.value) return
-  saving.value = true
-  error.value = ''
-  try {
-    const next = await mapStudioAPI.saveSettings({ default_style: styleDraft.value })
-    if (stopped) return
-    settings.value = next
-    toast.success(t('mapStudio.styles.defaultSaved'))
-    emit('loaded')
-  } catch (err) {
-    if (!stopped) error.value = err instanceof Error ? err.message : t('mapStudio.settings.saveFailed')
-  } finally { if (!stopped) saving.value = false }
-}
 
 async function saveModels() {
   if (saving.value || !modelsDirty.value) return

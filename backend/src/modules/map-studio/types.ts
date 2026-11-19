@@ -28,7 +28,11 @@ export const STAGE_LABEL: Record<MapWorkflowStage, string> = {
 }
 
 export type MapWorkflowStatus = 'idle' | 'running' | 'awaiting_review' | 'blocked' | 'failed' | 'completed'
-export type MapWorkflowMode = 'auto' | 'manual'
+/** manual = 一次一个阶段；auto = 连续推进到交付；guided = 有界运行，到 stop_at 指定的阶段成功即停（Issue #126 G1） */
+export type MapWorkflowMode = 'auto' | 'manual' | 'guided'
+/** 有界运行的终点：base 成功即停，或 drawing 成功即停（不执行 complete） */
+export const MAP_RUN_STOP_AT = ['base', 'drawing'] as const
+export type MapRunStopAt = typeof MAP_RUN_STOP_AT[number]
 export type MapStepStatus = 'pending' | 'running' | 'awaiting_review' | 'completed' | 'failed' | 'skipped'
 
 export type MapBaseMode = 'program' | 'earth' | 'image'
@@ -329,6 +333,11 @@ export interface MapWorkflowState {
   stage: MapWorkflowStage
   status: MapWorkflowStatus
   mode: MapWorkflowMode
+  /**
+   * 本次（或最近一次）运行的真实执行边界。仅 guided 有值；manual/auto 为 null。
+   * 续跑必须沿用这里的边界，不能按阶段猜测（旧记录没有这个字段 = 未记录，不推断）。
+   */
+  stop_at?: MapRunStopAt | null
   revision: number
   run_id: number | null
   error: string | null
@@ -366,6 +375,7 @@ export function emptyWorkflow(): MapWorkflowState {
     stage: 'brief',
     status: 'idle',
     mode: 'manual',
+    stop_at: null,
     revision: 0,
     run_id: null,
     error: null,

@@ -22,7 +22,7 @@
           <strong>{{ t('mapStudio.agentProcess.runLabel', { id: run.id }) }}</strong>
           <span class="map-chip">{{ t('mapStudio.stage.' + run.stage) }}</span>
           <span class="map-chip" :class="`is-${run.status}`">{{ t('mapStudio.agentProcess.runStatus.' + run.status) }}</span>
-          <span class="dim">{{ run.mode === 'auto' ? t('mapStudio.panel.mode.auto') : t('mapStudio.panel.mode.manual') }}</span>
+          <span class="dim">{{ runModeLabel(run) }}</span>
           <span class="dim">{{ fmtAt(run.created_at) }}</span>
           <span v-if="run.error_msg" class="map-error-inline">{{ run.error_msg }}</span>
         </button>
@@ -167,6 +167,14 @@ const emit = defineEmits<{
 }>()
 
 const selectedRun = computed(() => props.runs.find(run => run.id === props.selectedRunId) ?? null)
+
+/** 运行模式如实显示：guided 带真实终点；缺边界写「未记录」，不按阶段推断。 */
+function runModeLabel(run: MapStudioRun): string {
+  if (run.mode !== 'guided') return t('mapStudio.panel.mode.' + run.mode)
+  return run.stop_at
+    ? t('mapStudio.panel.mode.guidedBoundary', { stop: t('mapStudio.stage.' + run.stop_at) })
+    : t('mapStudio.panel.mode.guidedUnknown')
+}
 const live = computed(() => selectedRun.value?.status === 'processing')
 
 const works = ref<ObservedWorkRow[]>([])

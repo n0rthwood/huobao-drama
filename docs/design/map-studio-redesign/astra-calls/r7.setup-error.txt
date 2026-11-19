@@ -1,0 +1,7 @@
+Attempt: omp -p @r7.md @r2-shared.md @facts.md @02-workflow-state-table.md --model gpt-6-astra --mode text --no-session --max-time 30m
+Working directory: /tmp/astra126b
+Result:
+error: command not found: omp
+Command exited with code 127
+
+No model request was made. Retry added PATH=$HOME/.local/bin:$PATH and used the same first-choice Astra model; see r7.response.md.

@@ -19,7 +19,6 @@ import { strictMapLayerDocProblems } from './layer-doc.js'
 import { defaultLayerOptions, renderCopyWithSmoothing, smoothingProblems, validateLayerOptions, type LayerOptions } from './render/smooth.js'
 import type { MapBrief } from './types.js'
 import { featureStyleFor, labelStyleFor, familyPromptSummary, resolveMapStyle, MAP_LABEL_TIERS, MAP_MARKER_TIERS } from './styles/index.js'
-import { readDefaultStyle } from './settings.js'
 import { annotateRegionLabels } from './region-annotations.js'
 
 const MAX_STEPS = 60
@@ -110,11 +109,11 @@ export function drawingDraftSummary(doc: LayerDoc, layerOptions: LayerOptions, i
 
 export async function runDrawingStage(input: DrawingStageInput): Promise<StageAgentResult<DrawingStageResult>> {
   const { background } = input
-  const selectedStyle = resolveMapStyle(input.spec.style.map_style ? { map_style: input.spec.style.map_style } : input.brief, { default_style: readDefaultStyle() })
+  const selectedStyle = resolveMapStyle(input.brief)
   const features = specFeatures(input.spec)
   const forward = forwardFor(background.registration)
   const projectedFeatures = projectedLabelFeatures(features, background.registration)
-  let draft: LayerDoc = { version: 1, base: { path: background.path, width: background.width, height: background.height, source_width: background.width, source_height: background.height }, theme: selectedStyle?.theme ?? input.brief.style, layers: [] }
+  let draft: LayerDoc = { version: 1, base: { path: background.path, width: background.width, height: background.height, source_width: background.width, source_height: background.height }, theme: selectedStyle.theme, layers: [] }
   let layerOptions: LayerOptions = {}
   /** 最近一次检查（render_draft 的 submit_check / submit_draft 的 problems）：压缩后仍要在状态消息里可见 */
   let lastCheck: string[] = []
@@ -201,7 +200,7 @@ export async function runDrawingStage(input: DrawingStageInput): Promise<StageAg
       '用服务器草稿作图。用 add_feature_layers 按 feature_id 精确投影要素，绝不抄写或提交要素顶点。用 add_layer/update_layer 添加标题及标注，auto_layout_labels 排布，render_draft 预览并 read_image 检查，然后 submit_draft 交付同一草稿。',
       mapBriefText(input.brief), `底图：${background.path}，${background.width}×${background.height}`,
       `要素摘要（不传顶点）：\n${JSON.stringify(featureSummary)}`,
-      ...(selectedStyle ? [familyPromptSummary(selectedStyle.family)] : []),
+      ...[familyPromptSummary(selectedStyle.family)],
     ].join('\n\n'),
     state: () => {
       // 状态消息每一步都重发：只列 id/类型/锚定要素/像素 bbox/点数（见契约 §1），不含顶点与样式
@@ -239,7 +238,7 @@ export async function runDrawingStage(input: DrawingStageInput): Promise<StageAg
             if (points.some(p => !p)) { problems.push(`要素 ${feature.id} 在当前底图不可见，请回退 base`); continue }
             const coords = points as [number, number][]
             const id = feature.id.length <= 56 ? `feature-${feature.id}` : `feature-${crypto.createHash('sha256').update(feature.id).digest('hex').slice(0, 32)}`
-            const defaults = selectedStyle ? featureStyleFor(selectedStyle.family, { ...feature, regionIds: input.spec.regions.map(region => region.id), markerTier: item.importance }) : {}
+            const defaults = featureStyleFor(selectedStyle.family, { ...feature, regionIds: input.spec.regions.map(region => region.id), markerTier: item.importance })
             const common = { id, name: feature.name, visible: true, locked: false, z: next.layers.length, opacity: 1, rotation: 0, anchor: { semantic_id: feature.id, semantic_name: feature.name }, style: { ...defaults, ...item.style } }
             next.layers.push(feature.kind === 'place' ? { ...common, type: 'marker', at: coords[0]!, text: feature.name } : { ...common, type: feature.kind === 'region' ? 'polygon' : 'polyline', points: coords })
           }
@@ -255,7 +254,7 @@ export async function runDrawingStage(input: DrawingStageInput): Promise<StageAg
           if (feature_id && !feature) return { error: `未知 feature_id ${feature_id}` }
           let index = draft.layers.length + 1
           while (draft.layers.some(layer => layer.id === `theme-${tier}-${index}`)) index++
-          const layer: Layer = { id: `theme-${tier}-${index}`, type: 'label', name: text.slice(0, 60) || tier, text, box, visible: true, locked: false, z: Math.min(9999, Math.max(0, ...draft.layers.map(item => item.z)) + 1), opacity: 1, rotation: 0, style: { ...(selectedStyle ? labelStyleFor(selectedStyle.family, tier) : {}), ...style }, ...(feature ? { anchor: { semantic_id: feature.id, semantic_name: feature.name } } : {}) }
+          const layer: Layer = { id: `theme-${tier}-${index}`, type: 'label', name: text.slice(0, 60) || tier, text, box, visible: true, locked: false, z: Math.min(9999, Math.max(0, ...draft.layers.map(item => item.z)) + 1), opacity: 1, rotation: 0, style: { ...labelStyleFor(selectedStyle.family, tier), ...style }, ...(feature ? { anchor: { semantic_id: feature.id, semantic_name: feature.name } } : {}) }
           return acceptDraft({ ...draft, layers: [...draft.layers, layer] })
         },
       }),

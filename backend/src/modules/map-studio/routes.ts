@@ -19,7 +19,6 @@ import { autoPlaceLabels } from './layout/labels.js'
 import { mapStyleFamilyViews, isMapStyleFamilyId, MapStyleValidationError, resolveMapStyle } from './styles/index.js'
 import { restyleMapLayers } from './styles/restyle.js'
 import { specFeatures } from './validate.js'
-import { THEME_PRESETS } from '../../services/layer-svg.js'
 
 export const mapStudioRoutes = new Hono()
 const app = mapStudioRoutes
@@ -84,8 +83,10 @@ app.put('/tasks/:id', async c => {
 })
 app.post('/tasks/:id/run', async c => {
   const p = await body(c)
-  if (p.mode !== 'auto' && p.mode !== 'manual') return badRequest(c, 'mode 必须明确选择 auto 或 manual', { error: 'invalid_mode' })
-  return success(c, await startMapWorkflow(idOf(c), { mode: p.mode, ...runOptions(p) }))
+  if (p.mode !== 'auto' && p.mode !== 'manual' && p.mode !== 'guided') return badRequest(c, 'mode 必须明确选择 manual / guided / auto', { error: 'invalid_mode' })
+  // stop_at 只对 guided 有意义：manual/auto 携带它一律拒绝，不在服务端静默忽略（Issue #126 有界运行契约）。
+  if (p.stop_at !== undefined && typeof p.stop_at !== 'string') return badRequest(c, 'stop_at 只能是 base 或 drawing', { error: 'invalid_stop_at' })
+  return success(c, await startMapWorkflow(idOf(c), { mode: p.mode, stopAt: p.stop_at, ...runOptions(p) }))
 })
 app.post('/tasks/:id/advance', async c => {
   const p = await body(c)
@@ -115,11 +116,11 @@ app.post('/tasks/:id/layer-doc/restyle', async c => {
   const context = layerDraftContext(loaded.mapSpec, loaded.state.outputs)
   const checked = inspectLayerDraft(p.layer_doc, p.layer_options, context)
   if (checked.renderable.length) throw new MapLayerDocInvalidError(checked.renderable)
-  const selected = resolveMapStyle(loaded.mapSpec?.style.map_style ? { map_style: loaded.mapSpec.style.map_style } : loaded.brief, { default_style: readDefaultStyle() })
-  const doc = selected ? restyleMapLayers(checked.doc, selected.family, loaded.mapSpec ? specFeatures(loaded.mapSpec) : [])
-    : { ...checked.doc, theme: loaded.brief.style, layers: checked.doc.layers.map(layer => ({ ...layer, style: { ...THEME_PRESETS[loaded.brief.style][layer.type] } })) }
+  // 主题固定 atlas-tint（Issue #126）：显式 restyle 也只重建默认家族的样式，旧 brief 主题不再参与。
+  const selected = resolveMapStyle(loaded.brief)
+  const doc = restyleMapLayers(checked.doc, selected.family, loaded.mapSpec ? specFeatures(loaded.mapSpec) : [])
   const inspected = inspectLayerDraft(doc, checked.layerOptions, context)
-  return success(c, { layer_doc: doc, layer_options: checked.layerOptions, map_style: selected?.id ?? null, problems: inspected.problems })
+  return success(c, { layer_doc: doc, layer_options: checked.layerOptions, map_style: selected.id, problems: inspected.problems })
 })
 // Read-only editor operations. Neither inspection nor auto-layout saves a draft or consumes a round.
 app.post('/tasks/:id/layer-doc/check', async c => {
