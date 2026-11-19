@@ -4050,6 +4050,22 @@
       "unavailable": "リンクの「{view}」は現在表示できる成果物がありません（巻き戻し済みまたは未生成）。プレビュー用パラメータを削除しました。",
       "invalidLink": "リンクのプレビュー指定「{value}」は認識できないため削除しました。"
     },
+    "failure": {
+      "steps_exhausted": "ステップを使い切り、提出されませんでした（モデル能力の問題の可能性があります）",
+      "ended_without_delivery": "モデルが提出せず早期終了しました",
+      "call_error": "モデル呼び出しエラー",
+      "rejected": "提出が検証を通過しませんでした",
+      "mixed": "各ラウンドの失敗理由が異なります",
+      "changeModelAdvice": "テキストモデルを変更して再試行してください。",
+      "changeConfigAdvice": "テキスト設定を変更して再試行してください。",
+      "fixAdvice": "問題を修正して再試行してください。",
+      "switchAndRetry": "モデルを変更して再試行",
+      "continue": "既存の調査結果から続行",
+      "restart": "再調査（最初から開始）",
+      "clear": "調査の進捗を消去",
+      "clearConfirm": "未承認の調査進捗を消去しますか？次回は最初から調査します。",
+      "cancel": "キャンセル"
+    },
     "agent": {
       "title": "モデルのラウンド",
       "hint": "モデル段階ごとに最大 3 回の提出、1 回の実行で最大 2 回の段階間ロールバック。使い切ると人手に引き継ぎます。",
@@ -4066,11 +4082,17 @@
       "rollbackTarget": "{stage}へロールバック",
       "latestRejection": "{stage}第 {n} ラウンドが却下された理由",
       "viewAttempts": "この段階の提出記録を見る",
+      "steps": "{used}/{budget} ステップ",
+      "extended": "追加区間",
       "outcome": {
         "accepted": "採用",
         "rejected": "却下",
-        "no_delivery": "未提出",
-        "error": "実行エラー",
+        "no_delivery": "未提出（旧）",
+        "error": "エラー（旧）",
+        "steps_exhausted": "ステップ枯渇",
+        "ended_without_delivery": "早期終了",
+        "call_error": "呼び出しエラー",
+        "step_extension": "ステップ追加",
         "rollback": "段階間ロールバック",
         "infra_retry": "インフラ再試行"
       },

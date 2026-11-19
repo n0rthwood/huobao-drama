@@ -4050,6 +4050,22 @@
       "unavailable": "The link's “{view}” output is not available right now (rolled back or not generated yet); the preview parameter was cleared.",
       "invalidLink": "The preview parameter “{value}” in the link is not recognized and was cleared."
     },
+    "failure": {
+      "steps_exhausted": "Step budget exhausted without delivery (the model may be struggling)",
+      "ended_without_delivery": "The model ended early without delivery",
+      "call_error": "Model call failed",
+      "rejected": "Delivery failed validation",
+      "mixed": "Rounds failed for different reasons",
+      "changeModelAdvice": "Try again with a different text model.",
+      "changeConfigAdvice": "Change the text configuration and retry.",
+      "fixAdvice": "Correct the problems and retry.",
+      "switchAndRetry": "Change model and retry",
+      "continue": "Continue from existing research",
+      "restart": "Research again (start from scratch)",
+      "clear": "Clear research progress",
+      "clearConfirm": "Clear unaccepted research progress? The next research run will start from scratch.",
+      "cancel": "Cancel"
+    },
     "agent": {
       "title": "Model rounds",
       "hint": "Each model stage gets at most 3 delivery rounds, and a run gets at most 2 cross-stage rollbacks; once used up it goes to a human.",
@@ -4066,11 +4082,17 @@
       "rollbackTarget": "Rolled back to {stage}",
       "latestRejection": "Why round {n} of {stage} was rejected",
       "viewAttempts": "View this stage's delivery log",
+      "steps": "{used}/{budget} steps",
+      "extended": "Extension",
       "outcome": {
         "accepted": "Accepted",
         "rejected": "Rejected",
-        "no_delivery": "No delivery",
-        "error": "Error",
+        "no_delivery": "No delivery (legacy)",
+        "error": "Error (legacy)",
+        "steps_exhausted": "Steps exhausted",
+        "ended_without_delivery": "Ended early",
+        "call_error": "Call error",
+        "step_extension": "Step extension",
         "rollback": "Cross-stage rollback",
         "infra_retry": "Infrastructure retry"
       },
