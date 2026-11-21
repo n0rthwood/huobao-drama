@@ -36,8 +36,8 @@
 
 `SKILL.md` 已超过 `manage_skill` 的 64,000 字节上限，只能整目录复制，再核对哈希：
 
-1. `cp -a docs/skills/huobao-director/. ~/.omp/agent/managed-skills/huobao-director/`
-2. 先备份并检查运行副本是否存在未入库差异；有差异时仅同步本 Issue 文件并逐项合并，保留无关更改，不用整目录覆盖抹去它们。无差异的完整同步后 `diff -rq docs/skills/huobao-director ~/.omp/agent/managed-skills/huobao-director` 必须无输出。
+1. 先备份并检查运行副本是否存在未入库差异。有差异时仅同步本 Issue 文件并逐项合并，保留无关更改，不用整目录覆盖抹去它们。
+2. 无未入库差异时执行 `cp -a docs/skills/huobao-director/. ~/.omp/agent/managed-skills/huobao-director/`；完整同步后 `diff -rq docs/skills/huobao-director ~/.omp/agent/managed-skills/huobao-director` 必须无输出。逐项合并时保留剩余差异清单与备份路径。
 3. 安装扩展：`mkdir -p ~/.omp/agent/extensions && cp docs/skills/huobao-director/workflow/omp-extension/huobao-workflow-gate.ts ~/.omp/agent/extensions/`。`hbwf call` 会拒绝“已安装扩展与技能副本不一致”。扩展只对新会话生效。
 4. 确认副本中没有真实凭据值、认证头实值、带真实凭据的 URL 或内网地址；必要字段名与占位符不得删掉。
 5. managed skills 是隔离目录，只动 `huobao-director`，不要触碰用户自建技能。
