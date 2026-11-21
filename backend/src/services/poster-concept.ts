@@ -1,4 +1,4 @@
-import { runWithTextTask } from './text-task-context.js'
+import { isFirstAgentFailureSafe, runWithTextTask } from './text-task-context.js'
 import { requeueFirstModelFailure } from './text-task-autoretry.js'
 
 /**
@@ -8,8 +8,10 @@ import { requeueFirstModelFailure } from './text-task-autoretry.js'
  *
  * Issue #96 起文字层不再由模型写坐标与样式：`layer_plan` = `{text_layout, items:[{role, fields}]}`，
  * 只允许 poster_project / poster_title / poster_details 三类模板文本框，位置/字号/断行/缩小由
- * `services/layer-text.ts` 的规范引擎决定。模型输出先用引擎校验（临时 LayerDoc + `textLayerProblems`），
- * 阻断问题连同该槽位基准容量一起回给模型做同一任务内的唯一一次纠正；仍不合格则任务失败并保留原文。
+ * `services/layer-text.ts` 的规范引擎决定。
+ * Issue #128 起构想是 harness 工具循环（`poster-concept-agent.ts`）：模型用 submit_poster_concept
+ * 提交完整三方案，校验工具返回接受/拒绝（逐条中文问题 + 槽位容量），拒绝则同一会话继续下一轮，
+ * 最多 8 轮；结构/文字层/资产校验全部在反馈环内。旧的「两次裸调用 + 一次盲改」已删除。
  * DB 里的旧构想（label/card 数组 + 模型坐标）继续可读可显示，但应用时返回 400 要求重新生成。
  *
  * 本文件不写当前编辑字段：构想结果只落 `episode_posters.concept`，
@@ -18,7 +20,7 @@ import { requeueFirstModelFailure } from './text-task-autoretry.js'
 import { z } from 'zod'
 import { and, eq } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
-import { getContentLanguage } from './app-settings.js'
+import { getContentLanguage, type ContentLanguage } from './app-settings.js'
 import { loadEpisodeAssets, parseMentions } from './storyboard-assets.js'
 import { parseStylingVersion } from './styling-version.js'
 import { resolveStageModel, type StageModel } from './ai-stages.js'
@@ -40,10 +42,16 @@ import {
 import { KEYFRAME_SIZES } from './storyboard-keyframes.js'
 import { QWEN_MAX_REFS } from './adapters/qwen-jobs-client.js'
 import { callTextChat } from './vision-chat.js'
+import { runPosterConceptAgent, PosterConceptAgentError } from './poster-concept-agent.js'
+import { registerBatchCancellation, releaseBatchCancellation } from './text-batch-cancel.js'
+import { runWithEpisodeReadCache } from './episode-read-cache.js'
+import { runObservedWork } from './task-observability.js'
+import { buildSampleKey } from './task-estimate.js'
+import { createReasoningSink } from '../agents/reasoning-sink.js'
 import {
   createTextTask,
   findActiveTextTask,
-  finishTextTask,
+  finishTextTaskUnlessCancelled,
   patchTextTaskParams,
   updateTextTaskProgress,
 } from './text-task.js'
@@ -163,7 +171,7 @@ const compositionSchema = z.preprocess(
   }).nullable(),
 )
 
-const conceptSchema = z.object({
+export const conceptSchema = z.object({
   theme: clipped(300),
   theme_reason: clipped(600),
   compositions: z.preprocess(value => (Array.isArray(value) ? value : []), z.array(compositionSchema)),
@@ -785,10 +793,10 @@ export function posterTextPrompt(frame: PosterFrame): string[] {
   ]
 }
 
-function systemPrompt(lang: string, textPlanLines: string[]): string {
+export function systemPrompt(lang: string, textPlanLines: string[]): string {
   const language = { zh: '中文', en: 'English', ja: '日本語', ko: '한국어' }[lang] || '中文'
   return [
-    '你是一名纪录片/剧情片海报美术指导。只输出一个 JSON 对象，不要 Markdown、不要解释。',
+    '你是一名纪录片/剧情片海报美术指导。构思完成后必须调用 submit_poster_concept 工具提交一个 JSON 对象（结构见下），不要把 JSON 写在正文里。',
     `除 image_prompt 固定用中文外，其余文字用${language}。`,
     '任务：从本集剧本提炼中心思想，并从本集资产里选出最贴近中心思想、且**有图**的场景/道具/人物，构思三套有实质差异的海报构图。',
     '三套方案必须覆盖不同角度，例如：多时代蒙太奇/时间轴式拼接；重点场景 + 多人物群像与姿态；关键物件特写 + 人物/场景。示例不是固定模板。',
@@ -836,7 +844,7 @@ function conceptUserPrompt(args: {
     `# 本集资产（只能从这里选择，共 ${args.assets.length} 项）`,
     assetLines(args.assets),
     '',
-    '请输出 JSON。',
+    '请构思三套方案，然后调用 submit_poster_concept 提交完整构想 JSON；工具拒收时按 problems 逐条修正并重新提交。',
   ].filter(line => line !== '').join('\n')
 }
 
@@ -882,68 +890,9 @@ async function summarizeLongScript(
   return { text: parts.join('\n\n'), chunks: chunks.length }
 }
 
-/** 模型输出两次都不会用：任务失败时保留原文，便于排查（存进文本任务 params.output_text）。 */
-class PosterConceptOutputError extends Error {
-  constructor(message: string, readonly raw: string) {
-    super(message)
-    this.name = 'PosterConceptOutputError'
-  }
-}
-
-async function callConcept(args: {
-  stage: StageModel
-  lang: string
-  userPrompt: string
-  textPlanLines: string[]
-  /** 解析后的结构 + 文字图层校验；返回阻断问题（空数组 = 通过） */
-  validate: (concept: PosterConcept) => string[]
-  onFirstResponse: () => void
-}): Promise<PosterConcept> {
-  const system = systemPrompt(args.lang, args.textPlanLines)
-  const first = await callTextChat(args.stage, args.userPrompt, {
-    systemPrompt: system,
-    temperature: 0.4,
-    maxTokens: CONCEPT_MAX_TOKENS,
-    timeoutMs: CONCEPT_TIMEOUT_MS,
-  })
-  args.onFirstResponse()
-  let reply = first.text
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      const parsed = conceptSchema.safeParse(extractJsonObject(reply))
-      if (!parsed.success) throw new Error(`JSON 结构不符：${parsed.error.issues.slice(0, 6).map(issue => `${issue.path.join('.')}: ${issue.message}`).join('；')}`)
-      const concept = {
-        ...parsed.data,
-        compositions: parsed.data.compositions.map(item => (item
-          ? { ...item, layer_plan: shapeStoredLayerPlan(item.layer_plan) }
-          : item)),
-      } as PosterConcept
-      const problems = args.validate(concept)
-      if (problems.length) throw new Error(`文字图层规划不合格：${problems.slice(0, 8).join('；')}`)
-      return concept
-    } catch (err) {
-      if (attempt === 1) throw new PosterConceptOutputError(err instanceof Error ? err.message : String(err), reply)
-      const message = err instanceof Error ? err.message : String(err)
-      reply = (await callTextChat(args.stage, [
-        '# 上一次输出（需要修正）',
-        reply.slice(0, 8000),
-        '',
-        '# 问题',
-        message,
-        '',
-        '请只输出修正后的完整 JSON，结构必须与要求一致。',
-      ].join('\n'), {
-        systemPrompt: system,
-        temperature: 0.2,
-        maxTokens: CONCEPT_MAX_TOKENS,
-        timeoutMs: CONCEPT_TIMEOUT_MS,
-      })).text
-    }
-  }
-  throw new PosterConceptOutputError('Poster 构想没有产出合法 JSON', reply)
-}
-
 // ─── 任务入口 ──────────────────────────────────────────────────────
+// 构想的模型会话与校验反馈环在 poster-concept-agent.ts（Issue #128）；
+// 本文件只负责输入装载、观测窗口、落库与任务收尾。
 
 export interface StartPosterConceptResult {
   started: boolean
@@ -978,7 +927,11 @@ export async function startPosterConcept(
   logTaskStart('PosterConcept', 'run', { episodeId, posterId: poster.id, model: stage.model })
 
   const lang = await getContentLanguage()
-  void runWithTextTask(taskId, () => runPosterConcept({ taskId, episodeId, posterId: poster.id, context, script, assets, stage, lang }))
+  const cancelController = registerBatchCancellation(taskId)
+  void runWithTextTask(taskId, () => runWithEpisodeReadCache(() => runPosterConcept({
+    taskId, episodeId, posterId: poster.id, context, script, assets, stage, lang,
+    signal: cancelController.signal,
+  })).finally(() => releaseBatchCancellation(taskId)))
   return { started: true, task_id: taskId }
 }
 
@@ -990,119 +943,97 @@ async function runPosterConcept(args: {
   script: string
   assets: PosterConceptAsset[]
   stage: StageModel
-  lang: string
+  lang: ContentLanguage
+  signal: AbortSignal
 }): Promise<void> {
   const progress = { completed: 0, total: 1, failed: 0 }
-  let firstResponse = false
+  const sampleKey = buildSampleKey({ stage: 'poster_concept', configId: args.stage.configId, model: args.stage.model })
+  const sink = createReasoningSink(args.taskId)
   try {
-    const style = await getDramaStylePrompt(args.context.drama.id)
-    let script = args.script
-    let segments = 1
-    if (script.length > SCRIPT_BUDGET_CHARS) {
-      const summarized = await summarizeLongScript(script, args.stage, args.lang, async (done, total) => {
-        firstResponse = true
-        progress.total = total
-        progress.completed = done
-        await updateTextTaskProgress(args.taskId, { ...progress })
+    // 观测窗口 = 整个任务（长剧本分段提炼 + 构想会话 + 落库判定）：提炼的 callTextChat
+    // 与 agent 的每次调用都落公开对话（Issue #128，旁白骨架同款整集一项形状）。
+    await runObservedWork({ taskId: args.taskId, stage: 'poster_concept', sourceChars: args.script.length, sampleKey }, async () => {
+      const style = await getDramaStylePrompt(args.context.drama.id)
+      let script = args.script
+      let segments = 1
+      if (script.length > SCRIPT_BUDGET_CHARS) {
+        const summarized = await summarizeLongScript(script, args.stage, args.lang, async (done, total) => {
+          progress.total = total
+          progress.completed = done
+          await updateTextTaskProgress(args.taskId, { ...progress })
+        })
+        script = summarized.text
+        segments = summarized.chunks + 1
+      }
+      const frame = posterFrameOf(args.context.drama.aspectRatio)
+      const planContext: PosterPlanContext = {
+        family: frame.family,
+        size: { width: frame.width, height: frame.height },
+        variables: posterVariablesOf(args.context),
+        episodeLabel: posterEpisodeLabel(args.context.episode),
+        episodeLabelShort: posterEpisodeNumberLabel(args.context.episode),
+      }
+      const userPrompt = conceptUserPrompt({
+        drama: args.context.drama.title,
+        episode: args.context.episode.title,
+        episodeNo: `EP${String(args.context.episode.episodeNumber || 0).padStart(2, '0')}`,
+        episodeLabel: planContext.episodeLabel,
+        projectType: args.context.drama.projectType || 'drama',
+        style,
+        aspect: args.context.drama.aspectRatio || '16:9',
+        frame,
+        script,
+        assets: args.assets,
+        summarized: segments > 1,
       })
-      script = summarized.text
-      segments = summarized.chunks + 1
-    }
-    const frame = posterFrameOf(args.context.drama.aspectRatio)
-    const planContext: PosterPlanContext = {
-      family: frame.family,
-      size: { width: frame.width, height: frame.height },
-      variables: posterVariablesOf(args.context),
-      episodeLabel: posterEpisodeLabel(args.context.episode),
-      episodeLabelShort: posterEpisodeNumberLabel(args.context.episode),
-    }
-    const userPrompt = conceptUserPrompt({
-      drama: args.context.drama.title,
-      episode: args.context.episode.title,
-      episodeNo: `EP${String(args.context.episode.episodeNumber || 0).padStart(2, '0')}`,
-      episodeLabel: planContext.episodeLabel,
-      projectType: args.context.drama.projectType || 'drama',
-      style,
-      aspect: args.context.drama.aspectRatio || '16:9',
-      frame,
-      script,
-      assets: args.assets,
-      summarized: segments > 1,
+      const parsed = await runPosterConceptAgent({
+        taskId: args.taskId,
+        episodeId: args.episodeId,
+        dramaId: args.context.drama.id,
+        stage: args.stage,
+        lang: args.lang,
+        frame,
+        planContext,
+        assets: args.assets,
+        userPrompt,
+        signal: args.signal,
+        sink,
+      })
+      const concept: PosterConcept = {
+        ...parsed,
+        generated_at: now(),
+        script_segments_used: segments,
+      }
+      // 任务只写 concept；当前编辑字段由显式 apply 写入（provenance 保护）
+      const [poster] = await db.select().from(schema.episodePosters).where(eq(schema.episodePosters.id, args.posterId))
+      if (poster) {
+        const provenance = normalizeProvenance(poster.provenance)
+        await db.update(schema.episodePosters).set({
+          concept: JSON.stringify(concept),
+          conceptUpdatedAt: concept.generated_at,
+          provenance: JSON.stringify({ ...provenance, concept: 'ai' }),
+          updatedAt: now(),
+        }).where(eq(schema.episodePosters.id, args.posterId))
+      }
+      await patchTextTaskParams(args.taskId, {
+        concept_theme: concept.theme,
+        concept_compositions: concept.compositions.map(item => ({ id: item.id, approach: item.approach, recommended: item.recommended })),
+      })
+      await finishTextTaskUnlessCancelled(args.taskId, 'completed', {
+        progress: { completed: progress.total, total: progress.total, failed: 0 },
+        outputText: JSON.stringify(concept),
+      })
+      logTaskSuccess('PosterConcept', 'run', { episodeId: args.episodeId, compositions: concept.compositions.length })
     })
-    const parsed = await callConcept({
-      stage: args.stage,
-      lang: args.lang,
-      userPrompt,
-      textPlanLines: posterTextPrompt(frame),
-      validate: concept => {
-        const problems: string[] = []
-        for (const composition of concept.compositions) {
-          if (!composition) continue
-          const label = composition.id || composition.approach || '方案'
-          const checked = normalizePosterLayerPlan(composition.layer_plan, planContext)
-          problems.push(...checked.errors.map(error => `${label}：${error}`))
-          // 项目名/集号由服务端写死，模型原文只用于容量判断，落库前统一覆盖
-          if (checked.plan) composition.layer_plan = checked.plan
-        }
-        return problems
-      },
-      onFirstResponse: () => { firstResponse = true },
-    })
-    const compositions = parsed.compositions.filter((item): item is PosterComposition => Boolean(item)).slice(0, POSTER_CONCEPT_COUNT)
-    const validated: PosterComposition[] = []
-    const errors: string[] = []
-    for (const composition of compositions) {
-      const result = validateComposition(composition, args.assets)
-      if (result.composition) validated.push(result.composition)
-      else errors.push(`${composition.id || composition.approach}：${result.errors.join('；')}`)
-    }
-    if (validated.length !== POSTER_CONCEPT_COUNT) {
-      throw new Error(`三个构图方案没有全部通过资产校验：${errors.join('；') || '模型返回的方案数量不足'}`)
-    }
-    // 推荐只能一个；模型没标时按第一个兜底，避免前端出现三个“推荐”
-    const recommendedIndex = validated.findIndex(item => item.recommended)
-    validated.forEach((item, index) => { item.recommended = index === (recommendedIndex < 0 ? 0 : recommendedIndex) })
-
-    const concept: PosterConcept = {
-      version: POSTER_CONCEPT_VERSION,
-      theme: parsed.theme,
-      theme_reason: parsed.theme_reason,
-      compositions: validated,
-      selected_composition_id: validated.find(item => item.recommended)?.id || validated[0].id,
-      model: args.stage.model,
-      config_id: args.stage.configId,
-      generated_at: now(),
-      script_segments_used: segments,
-    }
-    // 任务只写 concept；当前编辑字段由显式 apply 写入（provenance 保护）
-    const [poster] = await db.select().from(schema.episodePosters).where(eq(schema.episodePosters.id, args.posterId))
-    if (poster) {
-      const provenance = normalizeProvenance(poster.provenance)
-      await db.update(schema.episodePosters).set({
-        concept: JSON.stringify(concept),
-        conceptUpdatedAt: concept.generated_at,
-        provenance: JSON.stringify({ ...provenance, concept: 'ai' }),
-        updatedAt: now(),
-      }).where(eq(schema.episodePosters.id, args.posterId))
-    }
-    await patchTextTaskParams(args.taskId, {
-      concept_theme: concept.theme,
-      concept_compositions: concept.compositions.map(item => ({ id: item.id, approach: item.approach, recommended: item.recommended })),
-    })
-    await finishTextTask(args.taskId, 'completed', {
-      progress: { completed: progress.total, total: progress.total, failed: 0 },
-      outputText: JSON.stringify(concept),
-    })
-    logTaskSuccess('PosterConcept', 'run', { episodeId: args.episodeId, compositions: concept.compositions.length })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    await finishTextTask(args.taskId, 'failed', {
+    await finishTextTaskUnlessCancelled(args.taskId, 'failed', {
       errorMsg: `Poster 构想失败：${message}`,
       progress: { ...progress },
-      // 两次输出都不合格：保留模型原文，便于从任务详情排查（Issue #96）
-      ...(err instanceof PosterConceptOutputError && err.raw ? { outputText: err.raw } : {}),
+      // 校验不过 / 模型不提交：保留最后提交原文或正文，便于从任务详情排查（Issue #96/#128）
+      ...(err instanceof PosterConceptAgentError && err.raw ? { outputText: err.raw } : {}),
     })
-    await requeueFirstModelFailure(args.taskId, err, !firstResponse)
+    await requeueFirstModelFailure(args.taskId, err, isFirstAgentFailureSafe(err))
     logTaskError('PosterConcept', 'run', { episodeId: args.episodeId, error: message })
   }
 }

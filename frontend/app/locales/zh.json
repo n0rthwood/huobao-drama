@@ -231,7 +231,8 @@
       "storyboard_fill_gaps": "补全剩余分镜",
       "design_card": "填写设计卡",
       "map_workflow": "地图工作流",
-      "narration_tts": "旁白配音"
+      "narration_tts": "旁白配音",
+      "poster_concept": "Poster 构想"
     },
     "detail": {
       "title": "任务详情",
@@ -296,7 +297,7 @@
         "messageCount": "{n} 条消息",
         "streaming": "接收中",
         "unknown": "未知",
-        "stage": { "skeleton": "旁白骨架", "voice": "配音", "design_card": "设计卡", "design_group_plan": "组级视觉规划", "map_workflow": "地图工作流", "layer_base_check": "图层底图视觉验证", "junction_caption": "衔接帧画面描述", "keyframe_prompts": "关键帧提示词", "video_prompts": "视频提示词" },
+        "stage": { "skeleton": "旁白骨架", "voice": "配音", "design_card": "设计卡", "design_group_plan": "组级视觉规划", "map_workflow": "地图工作流", "layer_base_check": "图层底图视觉验证", "junction_caption": "衔接帧画面描述", "keyframe_prompts": "关键帧提示词", "video_prompts": "视频提示词", "poster_concept": "Poster 构想" },
         "status": { "processing": "进行中", "completed": "已完成", "failed": "失败", "interrupted": "已中断" },
         "kind": { "llm": "模型请求", "vision_chat": "读图请求", "tts": "语音合成" },
         "phase": { "request": "发出", "response": "返回", "final": "收尾" },
