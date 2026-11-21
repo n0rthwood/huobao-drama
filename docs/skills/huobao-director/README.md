@@ -11,6 +11,7 @@
 - `references/diagnostic-example.md`：历史五镜诊断片与助手误填案例；保留原始证据及作废流程警告。
 - `references/anti-patterns.md`：强制反模式对照表，约束力与主文档相同。
 - `references/fixed-case-8daling.md`：固定 224 字案例正文、出处、授权边界及首轮实测证据。
+- `references/visual-rework.md`：用户逐镜反馈下的定向返工、参考图与连续性核对、proxy 授权与浏览器保存读回。
 - `references/workflow.md`：强制制作工作流（hbwf 命令、守卫规则、决定绑定、对账、并发、失效矩阵、交接）。
 - `workflow/hbwf.py`、`workflow/profiles/*.json`、`workflow/test_hbwf.py`：工作流工具、profile 与确定性用例（Python 标准库；`python3 -m unittest docs/skills/huobao-director/workflow/test_hbwf.py`）。
 - `workflow/omp-extension/huobao-workflow-gate.ts`：omp 扩展源码，安装到 `~/.omp/agent/extensions/`。
@@ -36,7 +37,7 @@
 `SKILL.md` 已超过 `manage_skill` 的 64,000 字节上限，只能整目录复制，再核对哈希：
 
 1. `cp -a docs/skills/huobao-director/. ~/.omp/agent/managed-skills/huobao-director/`
-2. `diff -rq docs/skills/huobao-director ~/.omp/agent/managed-skills/huobao-director` 必须无输出。
+2. 先备份并检查运行副本是否存在未入库差异；有差异时仅同步本 Issue 文件并逐项合并，保留无关更改，不用整目录覆盖抹去它们。无差异的完整同步后 `diff -rq docs/skills/huobao-director ~/.omp/agent/managed-skills/huobao-director` 必须无输出。
 3. 安装扩展：`mkdir -p ~/.omp/agent/extensions && cp docs/skills/huobao-director/workflow/omp-extension/huobao-workflow-gate.ts ~/.omp/agent/extensions/`。`hbwf call` 会拒绝“已安装扩展与技能副本不一致”。扩展只对新会话生效。
 4. 确认副本中没有真实凭据值、认证头实值、带真实凭据的 URL 或内网地址；必要字段名与占位符不得删掉。
 5. managed skills 是隔离目录，只动 `huobao-director`，不要触碰用户自建技能。
@@ -45,6 +46,7 @@
 
 | 日期 | 对应 Issue | 技能变更 |
 |---|---|---|
+| 2026-11-21 | #129（剧情原声集返工） | 新增 drama_visual；仅服务端明确关闭旁白时跳过 TTS/字幕/融合，保留媒体审核与导出守卫；修正 m3_export=done 的误阻断；补 Poster 人工引用映射、显式 proxy 委任及定向返工说明。无新 API 或供应商配置。 |
 | 2026-11-15 | #105（drama 20 / ep 27 导出完成仍显示「待开始」） | 新增 `GET /episodes/{e}/roadmap` 作为步骤状态的唯一来源（大步骤/子步骤、`ordering`、`status`、`done_criteria`、`missing`、`blocked_by`、`milestones`、推算状态与人工覆盖）；原阶段门禁与流水线进度两个只读接口删除（404），`SKILL.md` §00.1、`references/api-catalog.md` §2、`api-core.md`、`api-production.md`、`diagnostic-example.md` 同步改写；`hbwf` 派生状态带 roadmap，`check` 打印当前步骤/缺失/`blocked_by`，写入按显式端点→步骤表做严格顺序守卫（纪录片；剧情项目只作信息、不加锁），每次写入后重新读 roadmap 并在 ledger 记录 `before/after/terminal`；逐镜 `next` 增加 `await_skeleton_confirm` / `await_design_card_confirm`（人工动作，只提示不代按）；`merge` 终检增加 roadmap 导出前置与 stale 判据，`hbwf final` 要求导出步骤 `done` + `m3_export` 达成。 |
 | 2026-11-12 | #97（drama 3 / episode 26 制作审计） | 新增 §00 强制工作流与 `references/workflow.md`：`hbwf` 由项目文件派生状态，是唯一写入通道，包含守卫、决定绑定、服务端对账与终检；新增 omp 扩展拦截绕过。S3 Poster 改为“每集必须决定”；S9 写明提示词批量 = 强制重写及提交前时间轴校验；S10 写明剧情镜被动“阻断”语义；剧情链补 Poster；反例表 +7。同步方式改为 `cp -a` + `diff -rq`。补记：#93–#96 的技能变更此前已入库，但未登记本表，托管副本也一直未同步，本次一并同步。 |
 | 2026-11-10 | #91 / #92（drama 14 / episode 20，9:16 竖屏） | S7：`read_storyboard_context` 返回 `aspect_ratio`/`composition`，关键帧提示词画幅校验与无名人物标识规则（#92）；S10：烧录字幕行宽随输出画面、≤4 行、避头点，行宽≠20 时进合成签名（#91）；记录 `video-batch/preview` 返回整集、提交前须按 ID 过滤的实测坑。 |

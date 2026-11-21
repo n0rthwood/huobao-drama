@@ -44,6 +44,16 @@ $HBWF check            # 派生 state.json，打印 roadmap（当前步骤/缺�
 - `init` 会记录配置哈希；之后再改 `workflow.json`，派生时报“tampering”。
 - `init` 时已在跑的批次会被“收养”，它们的子任务不算孤儿。
 
+## 原声剧情模式与代理返工（Issue #129）
+
+`drama_visual` 仅用于服务端明确 `project_type=drama`、`episode.narration_enabled=false` 的集；字段缺失、非布尔值或片种不符时阻断，不能把读取失败当作旁白关闭。其余流程继续使用 `drama_narration`。profile 是项目初始化配置，不手改现有 workflow.json 绕过校验。
+
+原声剧情逐镜跳过配音、字幕与融合，merge 使用产品返回的原始视频；仍要求提示词结构、关键帧确认与审核、视频审核、canonical 顺序、Poster 决定、无在飞任务和对账通过。`check` 明示 `narration: required=False`。旁白模式继续校验配音/字幕/融合和原文覆盖率。
+
+导出后只在 roadmap 的 export=done 且 m3_export=done 时通过。服务端将最新完成 merge 的 scenes 路径逐项与当前镜头产物路径及顺序比较；换用视频后旧成片即 stale，不能仅看旧文件仍存在。导出前允许 stale export，正由本次 merge 修复。
+
+用户明确委任代理执行本轮审核和选版时，可以按委任记录 proxy 决定；所有审批仍绑定实际版本、授权原话和已打开的媒体。没有委任时继续等待用户本人决定。该委任不授权修改全局供应商、跳过闸门或新增目标。定向返工见 [visual-rework.md](visual-rework.md)。
+
 ## 命令
 
 | 命令 | 作用 |
@@ -74,7 +84,9 @@ $HBWF check            # 派生 state.json，打印 roadmap（当前步骤/缺�
 
 `next` 按以下顺序取第一个未满足项：
 
-`fix_narration` → `remove_acceleration` → `make_subtitle` → `wait_call` → `write_keyframe_prompts` → `generate_keyframes` / `wait_keyframes` → `review_keyframes` → `confirm_keyframes` → `wait_video` → `write_video_prompt` → `review_video_prompt` → `generate_video` → `review_video` → `compose` → `review_compose` → `done`
+旁白模式：`fix_narration` → `remove_acceleration` → `make_subtitle` → `wait_call` → `write_keyframe_prompts` → `generate_keyframes` / `wait_keyframes` → `review_keyframes` → `confirm_keyframes` → `wait_video` → `write_video_prompt` → `review_video_prompt` → `generate_video` → `review_video` → `compose` → `review_compose` → `done`
+
+`drama_visual` 不进入旁白、字幕、融合动作；视频经审核后到 `done`。
 
 纪录片项目有两个**人工确认**项排在前面（来自 roadmap，不调用确认端点）：
 

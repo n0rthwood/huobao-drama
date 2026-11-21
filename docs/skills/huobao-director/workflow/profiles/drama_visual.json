@@ -1,0 +1,183 @@
+{
+  "name": "drama_visual",
+  "applies": {
+    "project_type": "drama",
+    "narration_enabled": false
+  },
+  "notes": [
+    "Ordinary drama projects: server gates are always open, script/confirm is a no-op, fill-gaps/design cards/combo/layer segments/skeleton are documentary-only. The workflow, not the server, enforces order.",
+    "Narration is OFF: dialogue is spoken by the H3 video model via <d>…</d> lines in video_prompt; no TTS/subtitle/compose stage. Merge uses raw storyboard videos.",
+    "Poster: every episode needs an explicit decision. required_poster=true in workflow.json means the final gate needs an approved selected version; otherwise a poster_waiver decision is required."
+  ],
+  "steps": [
+    {
+      "id": "P0",
+      "name": "授权与 profile",
+      "scope": "episode",
+      "done": "workflow.json initialised with authorization wording, fixed models, poster policy"
+    },
+    {
+      "id": "P1",
+      "name": "原始内容",
+      "scope": "episode",
+      "api": [
+        "PUT /episodes/{e} {content}"
+      ],
+      "done": "content read back equals source"
+    },
+    {
+      "id": "P2",
+      "name": "AI 改写",
+      "scope": "episode",
+      "api": [
+        "POST /agent/script_rewriter/chat"
+      ],
+      "done": "script_content saved by Huobao and read back"
+    },
+    {
+      "id": "P3",
+      "name": "稿件批准",
+      "scope": "episode",
+      "api": [],
+      "done": "script_approval decision bound to script_content hash (script/confirm is a no-op for drama)"
+    },
+    {
+      "id": "P4",
+      "name": "资产",
+      "scope": "episode",
+      "api": [
+        "POST /episodes/{e}/extract",
+        "POST /dramas/{d}/assets/batch-generate[/preview]",
+        "POST /props/{p}/map-studio/open",
+        "POST /map-studio/tasks/{id}/run"
+      ],
+      "done": "every bound asset has an opened image; faithful maps never enter diffusion"
+    },
+    {
+      "id": "P5",
+      "name": "Poster",
+      "scope": "episode",
+      "parallel_with": [
+        "P6-P13"
+      ],
+      "api": [
+        "/episodes/{e}/poster/*"
+      ],
+      "done": "selected version + poster_approval, or poster_waiver when not required"
+    },
+    {
+      "id": "P6",
+      "name": "拆镜",
+      "scope": "episode",
+      "api": [
+        "POST /agent/storyboard_breaker/chat (structural_change)",
+        "POST /storyboards (structural_change)"
+      ],
+      "done": "canonical order file; every shot covers its script beats with verbatim dialogue in description/video_prompt"
+    },
+    {
+      "id": "P9",
+      "name": "关键帧提示词",
+      "scope": "shot",
+      "after": [],
+      "api": [
+        "POST /agent/prompt_generator/chat (--ids)",
+        "POST /episodes/{e}/generate-keyframe-prompts {storyboard_ids}"
+      ],
+      "done": "required slot prompts non-empty, mid_frame_time inside (0,duration), no blocking ref_issues"
+    },
+    {
+      "id": "P10",
+      "name": "视频提示词",
+      "scope": "shot",
+      "after": [
+        "P9"
+      ],
+      "api": [
+        "POST /agent/prompt_generator/chat (--ids)",
+        "POST /episodes/{e}/generate-video-prompts (only for empty prompts)"
+      ],
+      "done": "timeline contiguous from 0 and ends at duration; dialogue lines verbatim; video_prompt_review decision"
+    },
+    {
+      "id": "P11",
+      "name": "关键帧出图",
+      "scope": "shot",
+      "after": [
+        "P9"
+      ],
+      "api": [
+        "POST /episodes/{e}/keyframe-batch {items} (missing/changed only)"
+      ],
+      "done": "every required slot preview unchanged"
+    },
+    {
+      "id": "P12",
+      "name": "关键帧审核与确认",
+      "scope": "shot",
+      "after": [
+        "P11"
+      ],
+      "api": [
+        "POST /storyboards/{id}/confirm-keyframes"
+      ],
+      "done": "keyframe_approval bound to current images, keyframes confirmed"
+    },
+    {
+      "id": "P13",
+      "name": "视频",
+      "scope": "shot",
+      "after": [
+        "P10",
+        "P12"
+      ],
+      "api": [
+        "POST /episodes/{e}/video-batch {storyboard_ids}",
+        "POST /storyboards/{id}/generate-video"
+      ],
+      "done": "video_approval bound to video_url after opening start/mid/end and checking the native audio track"
+    },
+    {
+      "id": "P15",
+      "name": "整集终检",
+      "scope": "episode",
+      "api": [],
+      "done": "hbwf final PASS"
+    },
+    {
+      "id": "P16",
+      "name": "导出",
+      "scope": "episode",
+      "api": [
+        "POST /merge/episodes/{e}/merge {storyboard_ids=canonical, poster_version_id}"
+      ],
+      "done": "merged file downloaded, fully decoded, opened at boundaries"
+    }
+  ],
+  "concurrency": {
+    "exclusive_per_episode": [
+      "video-batch",
+      "keyframe-batch",
+      "video-prompts task",
+      "keyframe-prompts task"
+    ],
+    "never_concurrent": [],
+    "allowed": "different batch types may run together when their shots differ (e.g. video batch for confirmed shots while a keyframe batch serves others)",
+    "frozen_inputs": "a shot queued in a running batch or targeted by an unfinished call cannot have its prompts changed"
+  },
+  "invalidation": {
+    "keyframe prompt or reference image": [
+      "keyframes",
+      "keyframe_approval",
+      "confirmation",
+      "video"
+    ],
+    "video_prompt / duration / mid_frame_time": [
+      "video_prompt_review",
+      "video"
+    ],
+    "video_url": [
+      "video_approval"
+    ]
+  }
+}

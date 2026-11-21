@@ -500,7 +500,8 @@ def roadmap_problems(roadmap: dict | None, require_export: bool = False) -> list
         elif export.get("status") != "done":
             probs.append(f"roadmap export step is {export.get('status')}: the merged film does not match the current shots/poster")
         m3 = next((m for m in roadmap.get("milestones") or [] if m.get("key") == "m3_export"), None)
-        probs.append(f"roadmap milestone m3_export is {m3.get('status') if m3 else 'missing'} (export not verified)")
+        if not m3 or m3.get("status") != "done":
+            probs.append(f"roadmap milestone m3_export is {m3.get('status') if m3 else 'missing'} (export not verified)")
     return probs
 
 
@@ -528,6 +529,13 @@ def derive(prj: Project, write: bool = True) -> dict:
     applies = prj.profile.get("applies", {})
     if applies.get("project_type") and drama.get("project_type") != applies["project_type"]:
         problems.append(f"profile {prj.config['profile']} applies to project_type={applies['project_type']}, drama is {drama.get('project_type')}")
+    # Only an explicit server boolean false in the drama_visual profile may skip narration.
+    visual_profile = prj.config["profile"] == "drama_visual"
+    visual_allowed = visual_profile and drama.get("project_type") == "drama" and episode.get("narration_enabled") is False
+    if visual_profile and not visual_allowed:
+        problems.append("profile drama_visual requires project_type=drama and explicit narration_enabled=false; "
+                        f"episode has {episode.get('narration_enabled')!r}")
+    narration_required = not visual_allowed
     roadmap, road_err = prj.get_optional(f"/episodes/{e}/roadmap")
     if road_err:
         problems.append(f"roadmap unavailable: {road_err}")
@@ -590,8 +598,9 @@ def derive(prj: Project, write: bool = True) -> dict:
         fit = as_dict(s.get("narration_fit"))
         fit_eff = as_dict(s.get("narration_fit_effective"))
         tempo = max(float(fit.get("tempo_override") or 1), float(fit_eff.get("tempo_override") or 1))
-        narration_ok = bool(s.get("narration_audio_url")) and s.get("narration_status") in ("voiced", "composed", "compose_stale") \
-            and audio.get("text_sha256") == meta.get("text_sha256") and not {"narration_too_long", "narration_voice_stale"} & set(blocks)
+        narration_ok = True if not narration_required else (
+            bool(s.get("narration_audio_url")) and s.get("narration_status") in ("voiced", "composed", "compose_stale")
+            and audio.get("text_sha256") == meta.get("text_sha256") and not {"narration_too_long", "narration_voice_stale"} & set(blocks))
         # #110/#95: junction-locked slots (C first / D last, D+continue first) never carry prompts.
         locked_slots = set(kf.get("locked_slots") or [])
         required = [sl for sl in SLOTS if sl not in locked_slots
@@ -621,7 +630,7 @@ def derive(prj: Project, write: bool = True) -> dict:
             "id": sid,
             "number": s.get("storyboard_number"),
             "duration": dur,
-            "narration": {"ok": narration_ok, "status": s.get("narration_status"), "tempo": tempo,
+            "narration": {"ok": narration_ok, "required": narration_required, "status": s.get("narration_status"), "tempo": tempo,
                           "duration_ms": audio.get("duration_ms"), "text": s.get("narration_text") or ""},
             "subtitle_ok": bool(s.get("subtitle_url")),
             "kf_prompts": {"ok": not kf_problems, "problems": kf_problems, "required_slots": required,
@@ -656,7 +665,7 @@ def derive(prj: Project, write: bool = True) -> dict:
             problems.append("duplicate ids in canonical order")
         if set(canon) != set(ids):
             problems.append(f"canonical set differs: missing {sorted(set(ids) - set(canon))}, extra {sorted(set(canon) - set(ids))}")
-        else:
+        elif narration_required:
             by_id = {r["id"]: r for r in out}
             if norm_text("".join(by_id[i]["narration"]["text"] for i in canon)) != norm_text(episode.get("script_content") or ""):
                 problems.append("narration concatenated in canonical order differs from script_content (coverage/order broken)")
@@ -675,6 +684,7 @@ def derive(prj: Project, write: bool = True) -> dict:
         "drama_id": prj.d, "episode_id": e,
         "profile": prj.config["profile"],
         "poster_policy": poster_policy_for(drama.get("project_type"), bool(prj.config.get("required_poster"))),
+        "narration_required": narration_required,
         "problems": problems,
         "canonical_ids": canon,
         "batches": {
@@ -700,12 +710,13 @@ def derive(prj: Project, write: bool = True) -> dict:
 
 
 def next_action(r: dict) -> str:
-    if not r["narration"]["ok"]:
-        return "fix_narration"
-    if r["narration"]["tempo"] > 1:
-        return "remove_acceleration"
-    if not r["subtitle_ok"]:
-        return "make_subtitle"
+    if r["narration"].get("required", True):
+        if not r["narration"]["ok"]:
+            return "fix_narration"
+        if r["narration"]["tempo"] > 1:
+            return "remove_acceleration"
+        if not r["subtitle_ok"]:
+            return "make_subtitle"
     if r["frozen_by_calls"]:
         return "wait_call"
     if not r["kf_prompts"]["ok"]:
@@ -730,11 +741,12 @@ def next_action(r: dict) -> str:
         return "generate_video"
     if r["approvals"]["video_approval"] != "valid":
         return "review_video"
-    c = r["compose"]
-    if c["preview"] != "unchanged" or not c["exportable"]:
-        return "compose"
-    if r["approvals"]["compose_approval"] != "valid":
-        return "review_compose"
+    if r["narration"].get("required", True):
+        c = r["compose"]
+        if c["preview"] != "unchanged" or not c["exportable"]:
+            return "compose"
+        if r["approvals"]["compose_approval"] != "valid":
+            return "review_compose"
     return "done"
 
 
@@ -937,7 +949,7 @@ def guard(ctx: dict, method: str, path: str, body: dict, declared_ids: list[int]
         for it in items:
             sid, slot = int(it["storyboard_id"]), it["slot"]
             r = shot(sid)
-            if not r["narration"]["ok"]:
+            if r["narration"].get("required", True) and not r["narration"]["ok"]:
                 errors.append(f"{sid}: narration not voiced/current (keyframes come after measured audio)")
             kp = r["kf_prompts"]
             slot_problems = ([f"{slot}_frame_prompt empty"] if kp.get("slot_empty", {}).get(slot) else [])
@@ -971,7 +983,7 @@ def guard(ctx: dict, method: str, path: str, body: dict, declared_ids: list[int]
             errors.append("a video batch is already running (one per episode); wait, or use per-shot generate-video for shots outside it")
         for sid in ids:
             r = shot(sid)
-            if not r["narration"]["ok"]:
+            if r["narration"].get("required", True) and not r["narration"]["ok"]:
                 errors.append(f"{sid}: narration not current")
             if not (r["keyframes"]["confirmed"] and r["approvals"]["keyframe_approval"] == "valid"):
                 errors.append(f"{sid}: keyframes not confirmed with a valid approval")
@@ -1096,6 +1108,7 @@ def summarize(state: dict) -> str:
     lines.append("batches: " + ", ".join(f"{k}={v.get('status')}" for k, v in state["batches"].items()))
     po = state["poster"]
     lines.append(f"poster: policy={state['poster_policy']} selected={po['selected_version_id']} versions={po['versions']} approval={po['approval']} waiver={po['waiver']}")
+    lines.append(f"narration: required={state.get('narration_required', True)}")
     lines += summarize_roadmap(state.get("roadmap"))
     rec = state["reconcile"]
     lines.append(f"reconcile: orphans={[o['key'] for o in rec['orphans']]} unknown_calls={rec['unknown_calls']}")

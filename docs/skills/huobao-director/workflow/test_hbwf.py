@@ -415,5 +415,110 @@ class RoadmapNextActionTest(unittest.TestCase):
         self.assertIsNone(hbwf.roadmap_next_action(rm, "generate_keyframes"))
 
 
+
+
+class VisualDramaWorkflowTest(unittest.TestCase):
+    def derive_visual(self, enabled=False, project_type='drama', profile='drama_visual', omit_flag=False):
+        import tempfile
+        from types import SimpleNamespace
+        raw = {'id': 1, 'storyboard_number': 1, 'duration': 8, 'first_frame_prompt': 'start',
+               'last_frame_prompt': 'end', 'first_frame_image': 'static/start.png',
+               'last_frame_image': 'static/end.png', 'video_prompt': '0-8秒：两个朋友玩耍',
+               'video_url': 'static/video.mp4', 'narration_status': 'disabled',
+               'keyframes': {'ready': True, 'confirmed': True}, 'ref_issues': []}
+        ep = {'id': E, 'script_content': 'Unchanged spoken dialogue'}
+        if not omit_flag:
+            ep['narration_enabled'] = enabled
+        drama = {'project_type': project_type, 'episodes': [ep]}
+        def get(path):
+            if path == '/dramas/3':
+                return drama
+            if path == f'/episodes/{E}/storyboards':
+                return [raw]
+            return {}
+        def preview(path, body):
+            if 'keyframe' in path:
+                return {'items': [{'storyboard_id': 1, 'slot': slot, 'status': 'unchanged'} for slot in ('first', 'last')]}
+            return {'items': [{'storyboard_id': 1, 'status': 'unchanged'}]}
+        with tempfile.TemporaryDirectory() as tmp:
+            prj = SimpleNamespace(d=3, e=E, dir=Path(tmp), profile={'applies': {'project_type': 'drama', 'narration_enabled': False}} if profile == 'drama_visual' else {'applies': {}},
+                config={'profile': profile, 'models': MODELS, 'required_poster': True, 'created_at': '2026-11-21T00:00:00Z'},
+                get=get, get_optional=lambda path: (roadmap(project_type=project_type, strict=False), None),
+                preview=preview, read_jsonl=lambda filename: [], canonical_ids=lambda: [1])
+            return hbwf.derive(prj, write=False)
+
+    def test_explicit_visual_drama_skips_only_narration_requirements(self):
+        st = self.derive_visual()
+        self.assertFalse(st['narration_required'])
+        self.assertEqual(st['shots'][0]['next'], 'review_keyframes')
+        self.assertFalse(any('coverage/order' in p for p in st['problems']))
+
+    def test_missing_or_non_boolean_false_does_not_disable_narration(self):
+        for value, omit in [(None, True), (None, False), (0, False), ('false', False), (True, False)]:
+            with self.subTest(value=value, omit=omit):
+                st = self.derive_visual(enabled=value, omit_flag=omit)
+                self.assertTrue(st['narration_required'])
+                self.assertEqual(st['shots'][0]['next'], 'fix_narration')
+                self.assertTrue(any('requires' in p for p in st['problems']))
+                errs, _, _ = run(st, 'POST', f'/episodes/{E}/video-batch', {'storyboard_ids': [1]})
+                self.assertTrue(errs)
+
+    def test_documentary_cannot_use_visual_profile(self):
+        st = self.derive_visual(project_type='documentary')
+        self.assertTrue(st['narration_required'])
+        self.assertTrue(st['problems'])
+
+    def test_existing_narration_profile_still_checks_audio_and_script_coverage(self):
+        st = self.derive_visual(enabled=True, profile='drama_narration')
+        self.assertTrue(st['narration_required'])
+        self.assertEqual(st['shots'][0]['next'], 'fix_narration')
+        self.assertTrue(any('coverage/order' in p for p in st['problems']))
+
+    def visual_shot(self, **over):
+        return shot(1, narration={'required': False, 'ok': True, 'status': 'disabled'},
+                    subtitle_ok=False, compose={'url': None, 'preview': 'disabled', 'exportable': False},
+                    **over)
+
+    def test_reviewed_visual_video_can_complete_and_merge_without_compose(self):
+        r = self.visual_shot()
+        self.assertEqual(r['next'], 'done')
+        st = state(r, roadmap=roadmap(project_type='drama', strict=False))
+        errs, _, _ = run(st, 'POST', f'/merge/episodes/{E}/merge', {'storyboard_ids': [1], 'poster_version_id': 5})
+        self.assertEqual(errs, [])
+
+    def test_visual_mode_still_requires_current_reviewed_video(self):
+        for change, expected in [({'video': {'url': None, 'preview': 'missing'}}, 'generate_video'),
+                                 ({'video': {'preview': 'changed'}}, 'generate_video'),
+                                 ({'approvals': {'video_approval': 'stale'}}, 'review_video')]:
+            with self.subTest(change=change):
+                r = self.visual_shot(**change)
+                self.assertEqual(r['next'], expected)
+                self.assertTrue(hbwf.final_gate_problems(state(r), None))
+
+    def test_visual_mode_preserves_poster_canonical_and_running_task_gates(self):
+        for over in [{'poster': {'approval': 'missing'}}, {'canonical_ids': [2]},
+                     {'active_tasks': [{'id': 99, 'status': 'running'}]},
+                     {'reconcile': {'orphans': [{'key': 'task:99'}], 'unknown_calls': []}}]:
+            with self.subTest(over=over):
+                st = state(self.visual_shot(), **over)
+                body = {'storyboard_ids': [1], 'poster_version_id': 5}
+                self.assertTrue(hbwf.final_gate_problems(st, body))
+
+    def test_completed_export_passes_but_changed_video_requires_reexport(self):
+        # The server compares latest_merge.scenes to the current video paths in order.
+        current = roadmap(project_type='drama', strict=False, steps=[step_node('export')])
+        self.assertEqual(hbwf.roadmap_problems(current, require_export=True), [])
+        changed = copy.deepcopy(current)
+        changed['steps'][0]['status'] = 'stale'
+        changed['steps'][0]['missing'] = [{'code': 'merge_outdated', 'message': 'current video path changed'}]
+        changed['milestones'][-1]['status'] = 'stale'
+        self.assertEqual(hbwf.roadmap_problems(changed), [])
+        self.assertTrue(hbwf.roadmap_problems(changed, require_export=True))
+        self.assertEqual(hbwf.roadmap_problems(current, require_export=True), [])
+
+    def test_missing_export_milestone_remains_blocked(self):
+        self.assertTrue(hbwf.roadmap_problems(roadmap(milestones=[]), require_export=True))
+
+
 if __name__ == "__main__":
     unittest.main()

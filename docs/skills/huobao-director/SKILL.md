@@ -18,7 +18,7 @@ description: 通过火宝 HTTP API 按阶段推进剧本、资产、Poster、分
 1. 开工：在制作项目目录执行 `hbwf init`（记录授权原话、固定模型、Poster 策略、canonical 顺序文件），再执行 `hbwf check`。已有 `workflow/workflow.json` 时直接 `check`。
 2. **所有火宝业务写入只经 `hbwf call`**；读用 `hbwf get`、`hbwf check`。omp 扩展 `huobao-workflow-gate` 会拦截 bash/eval 直连 API、发写请求的脚本、手改 `workflow/` 文件，以及浏览器点击输入类操作。
 3. 每次决策前先 `hbwf check`：先读 roadmap（当前步骤/子步骤、每步状态、`missing`、`blocked_by`），再按逐镜 `next` 推进。审核、返工、结构性改动、例外用 `hbwf decide` 记录，带授权原话和证据。
-4. 按 profile 走：剧情项目（含“纪录片规则集”的剧情项目）用 `drama_narration`。剧情项目 roadmap 顺序为 `free`（不加锁）、`script/confirm` 是 no-op，设计卡、combo、图层段、骨架、`fill-gaps` 只对 `project_type=documentary` 有效。`skill://huobao-doc-episode-production` 只适用于 documentary。
+4. 按 profile 走：剧情项目（含“纪录片规则集”的剧情项目）旁白开启时用 `drama_narration`；服务端明确 `narration_enabled=false` 时用 `drama_visual`（原声视频直出，无 TTS/字幕/融合）。缺字段或片种不符不能按关闭处理。剧情项目 roadmap 顺序为 `free`（不加锁）、`script/confirm` 是 no-op，设计卡、combo、图层段、骨架、`fill-gaps` 只对 `project_type=documentary` 有效。`skill://huobao-doc-episode-production` 只适用于 documentary。
 5. **Poster 不是“可以不管”**：**纪录片（`project_type=documentary`）每集必须制作 Poster，不可选择不做、不可 `poster_waiver`**（#101；`hbwf` 按 `project_type` 自动强制 `poster_policy=required` 并拒绝 waiver，`--required-poster` 对纪录片可省略；项目类型读不到时同样按必做处理）；资产审核清单完成后立即开始，与骨架/设计卡并行，导出前必须已选定并审核，merge 传 `poster_version_id`。剧情项目每集必须作出决定：`required_poster` 时终检要求已选版本并审核通过；否则需要显式 `poster_waiver`。规划、委派、进度汇报的步骤表里 Poster 必须单独占一行。
 6. 交付前 `hbwf final` 必须 PASS：导出前判据 + roadmap 导出步骤 `done` + 里程碑 `m3_export` 达成 + 无 `stale` 步骤。`merge` 走同一终检的导出前部分（`hbwf check --final`）。
 
@@ -78,6 +78,10 @@ description: 通过火宝 HTTP API 按阶段推进剧本、资产、Poster、分
 6. **遇到阻断**：读结构化 `reason/blocked/issues`，定位是哪一层（剧本/资产/绑定/关键帧/时长/模型能力），从对应入口修；修不了就报告缺口，不绕路。
 7. **记录**：首次提交与终态必须逐条写 `requests.jsonl`；中间轮询可按批次汇总。图片/视频/音频的“实际看过”与“推测”分开写。
 8. **软规则偏离**：标注为“默认/软”的流程可偏离，但必须在证据里写一句理由；写不出理由就按默认执行（弱模型无偏离权）。
+
+### 1.1a 已有画面的定向返工（Issue #129）
+
+用户已给逐镜反馈、要求保留剧情时，按 [`references/visual-rework.md`](references/visual-rework.md) 核对人数、位置、参考图与承接帧，只重生成受影响槽位及其失效下游。用户明确委任代理执行审核/选版时，记录授权原话、范围与实际媒体证据，actor 标为 proxy；不能写成用户已亲自看过，也不扩成未授权的全局配置或无限重试。
 
 ### 1.2 预算台账（每次计费请求前必做）
 

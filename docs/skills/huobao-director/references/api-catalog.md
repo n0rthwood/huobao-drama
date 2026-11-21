@@ -498,6 +498,8 @@ complete只是技术交付，不是人批准史实/许可。manual在complete前
 - `provenance` 记录每个字段/每个图层是 `ai` 还是 `manual`，AI 应用方案时据此判冲突。
 ### `PUT /episodes/{e}/poster` [S]
 Body 只传要改的：`{prompt(≤4000), text_prompt(≤2000), copy, reference_images[](必须 static/ 下), base_image(static/ 或 null), layer_doc}`。写入的字段在 `provenance` 里被标成 `manual`；底图像素由服务端 `sharp` 实测写回，输出画布恒为本集画幅。
+**人工参考的命名与顺序（#129，已核对当前实现）**：`@名字` 只解析当前选中构想的 `assets`，且其图片仍在 `reference_images` 内。人工追加图片不会自动建立名字映射。最终引用按「构想命名资产顺序 → 其余人工图片顺序」排列并截到模型上限；不要按 PUT 数组顺序猜编号。恢复图片后仍报未知 `@名字` 时，选择包含该命名资产的构想，或先核对最终列表再用供应商支持的编号语法（Qwen：`<imageN>`；`qwen-jobs-client`/`asset-reference-prompt` 接受该语法）。核对生成回执的 `references` 与 task 实际 prompt，不能把业务角色名字当作已建立的映射。400 且没有 task_id 不代表模型出图失败；结果未知时仍先读回，禁止盲重发。真实出图质量必须另开图核验。
+
 ### `POST /episodes/{e}/poster/concept` [S]
 Body：`{config_id?, model?}`；异步 AI 构想（只写 `concept`，不动编辑字段）。返回 `{task_id}`；已有构想在跑 → 409 `concept_running`；剧本/带图资产不足 → 400。**Issue #128 起是 harness 工具循环**：模型用 `submit_poster_concept` 提交完整三方案，服务端校验（结构/文字层容量/资产引用）拒收时带逐条问题回给模型继续下一轮，最多 **8 轮**；逐轮结果在任务 `params.concept_rounds`（`[{round, outcome:'rejected'|'accepted', problems[]}]`），公开对话走 `GET /tasks/{task_id}/observations`。任务可取消（`POST /tasks/{task_id}/cancel`，`cancellable=true`）；失败分型 `rounds_exhausted / steps_exhausted / no_submission`，error_msg 带已完成轮次与逐轮摘要，最后提交原文保留在 `params.output_text`。重跑会**覆盖**现有 `concept` 字段（其余编辑字段/版本/图片不动）。
 ### `POST /episodes/{e}/poster/concept/generate` [S]
