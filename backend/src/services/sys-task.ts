@@ -182,7 +182,7 @@ export function serializeTask(row: SysTaskRow): Record<string, any> {
     remote_state: Object.keys(visible).length ? visible : null,
     elapsed_ms: elapsedMs(row),
     cancellable: isActiveTaskStatus(row.status) && (isQwenJobsTask(row.provider) || isH3JobsTask(row.provider)
-      || (row.type === 'text' && ['keyframe_prompts', 'video_prompts', 'design_card'].includes(parseTextTaskParams(row.params)?.kind ?? ''))),
+      || (row.type === 'text' && ['keyframe_prompts', 'video_prompts', 'design_card', 'poster_concept'].includes(parseTextTaskParams(row.params)?.kind ?? ''))),
   }
 }
 

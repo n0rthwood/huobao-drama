@@ -108,7 +108,9 @@ export const AI_CALL_SITES: Record<string, AiStage[]> = {
   'services/narration-script.ts': ['narration_writer'],
   'services/task-retry.ts': ['script_rewriter', 'storyboard_breaker', 'storyboard_breaker_documentary'],
   'services/asset-review.ts': ['asset_review'],
+  // Poster 构想（#128）：长剧本分段提炼仍走 callTextChat；构想会话是 submit_poster_concept 工具循环
   'services/poster-concept.ts': ['poster_concept'],
+  'services/poster-concept-agent.ts': ['poster_concept'],
   'services/adapters/h3-prompt.ts': ['h3_prompt'],
   'services/asset-semantics-auto.ts': ['asset_semantics'],
   // 图层底图视觉验证（#94）：渲染成功后自动核验裁切/留白结果

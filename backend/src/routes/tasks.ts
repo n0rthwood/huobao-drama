@@ -392,8 +392,8 @@ app.get('/', async (c) => {
 })
 
 // POST /tasks/:id/cancel — 取消排队/运行中的任务：图片 qwen-jobs / 视频 h3-jobs /
-// 提示词与设计卡文本批量（#118 B：等待全局 agent 闸的排队立即出队，不泄漏槽）；其它供应商不支持
-const CANCELLABLE_TEXT_KINDS = ['keyframe_prompts', 'video_prompts', 'design_card']
+// 提示词与设计卡文本批量（#118 B）与 Poster 构想（#128）：等待全局 agent 闸的排队立即出队，不泄漏槽；其它供应商不支持
+const CANCELLABLE_TEXT_KINDS = ['keyframe_prompts', 'video_prompts', 'design_card', 'poster_concept']
 app.post('/:id/cancel', async (c) => {
   const id = Number(c.req.param('id'))
   try {
