@@ -231,7 +231,8 @@
       "storyboard_fill_gaps": "남은 스토리보드 보완",
       "design_card": "디자인 카드 작성",
       "map_workflow": "지도 워크플로",
-      "narration_tts": "내레이션 더빙"
+      "narration_tts": "내레이션 더빙",
+      "poster_concept": "Poster 구상"
     },
     "detail": {
       "title": "작업 상세",

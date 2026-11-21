@@ -231,7 +231,8 @@
       "storyboard_fill_gaps": "Fill remaining storyboards",
       "design_card": "Design card fill",
       "map_workflow": "Map workflow",
-      "narration_tts": "Narration voice"
+      "narration_tts": "Narration voice",
+      "poster_concept": "Poster concept"
     },
     "detail": {
       "title": "Task detail",
