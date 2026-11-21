@@ -177,3 +177,7 @@ UI 点击、浏览器操作、绕过扩展的脚本产生的写入都会显示�
 - 扩展靠文本特征拦截，不是安全沙箱；被刻意规避时依赖对账与终检兜底。
 - eval prelude 的浏览器 helper 本身不触发 `tool_call`。扩展会拦截代码里同时出现 `/huobao/` 与 browser 的 eval。
 - 派生一次约 50 秒（三次全集 preview + 任务中心分页），另加一次 `GET /episodes/{e}/roadmap`（服务端约 1.5–3.5 秒）；`status` 读缓存不联网。
+
+## H3 多角色返工（Issue #130）
+
+既有原生提示词可跳过自动文本扩写，但不跳过图片/提示词/视频审核与签名。映射核验、语言保留、提交前后证据边界及图像前置条件见 [h3-native-prompts.md](h3-native-prompts.md)。

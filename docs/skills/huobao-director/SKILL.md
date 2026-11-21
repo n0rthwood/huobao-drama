@@ -310,6 +310,7 @@ Agent 可以做**技术验收**（结构、时长、音画、可解码、签名�
   - 发音标记（拼音/同音字/停顿/语气）写错是阻断；拼音注音会关闭整段 normalize。
 
 ### S9 视频
+- H3 自动扩写误认参考编号或多角色反复换人时，先看 [原生提示词与参考编号核验](references/h3-native-prompts.md)；区分提交前绑定、提交后实际参数与媒体结果，保留用户要求的图像前置门槛。
 - 端点（全路径）：`POST /episodes/{e}/generate-video-prompts`、`GET /episodes/{e}/video-prompts-status`、`POST /episodes/{e}/video-batch/preview`、`POST /episodes/{e}/video-batch`、`GET /episodes/{e}/video-batch`、`POST /episodes/{e}/video-batch/cancel`、`POST /episodes/{e}/video-batch/retry-failed`、`POST /storyboards/{id}/generate-video`、`GET /video-queue/estimate`、`GET /video-queue/overview`、`POST /tasks/{id}/cancel`（h3-jobs 视频、qwen-jobs 图片，以及 #118 起的 `keyframe_prompts|video_prompts|design_card` 文本批量）。
 - 用途：把分镜写成时间段动作/运镜，按签名判断是否需要重出，批量生成。
 - 组合场景：preview（`missing/changed/unchanged/unknown/blocked/skipped/excluded`）→ 勾选 → 启动 → 轮询 → 下载并检查首/中/尾与衔接。

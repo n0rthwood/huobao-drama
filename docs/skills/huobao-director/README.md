@@ -11,6 +11,7 @@
 - `references/diagnostic-example.md`：历史五镜诊断片与助手误填案例；保留原始证据及作废流程警告。
 - `references/anti-patterns.md`：强制反模式对照表，约束力与主文档相同。
 - `references/fixed-case-8daling.md`：固定 224 字案例正文、出处、授权边界及首轮实测证据。
+- `references/h3-native-prompts.md`：H3 原生三段提示词、参考编号与实际请求核验、对白语言和图像优先返工。
 - `references/visual-rework.md`：用户逐镜反馈下的定向返工、参考图与连续性核对、proxy 授权与浏览器保存读回。
 - `references/workflow.md`：强制制作工作流（hbwf 命令、守卫规则、决定绑定、对账、并发、失效矩阵、交接）。
 - `workflow/hbwf.py`、`workflow/profiles/*.json`、`workflow/test_hbwf.py`：工作流工具、profile 与确定性用例（Python 标准库；`python3 -m unittest docs/skills/huobao-director/workflow/test_hbwf.py`）。
@@ -46,6 +47,7 @@
 
 | 日期 | 对应 Issue | 技能变更 |
 |---|---|---|
+| 2026-11-21 | #130（H3 多角色返工） | 补既有原生提示词分支、参考绑定与实际参数证据边界、对白原语言、用户要求的全图门槛与失败取消留痕；无新 API、代码、模型或全局配置变更。 |
 | 2026-11-21 | #129（剧情原声集返工） | 新增 drama_visual；仅服务端明确关闭旁白时跳过 TTS/字幕/融合，保留媒体审核与导出守卫；修正 m3_export=done 的误阻断；补 Poster 人工引用映射、显式 proxy 委任及定向返工说明。无新 API 或供应商配置。 |
 | 2026-11-15 | #105（drama 20 / ep 27 导出完成仍显示「待开始」） | 新增 `GET /episodes/{e}/roadmap` 作为步骤状态的唯一来源（大步骤/子步骤、`ordering`、`status`、`done_criteria`、`missing`、`blocked_by`、`milestones`、推算状态与人工覆盖）；原阶段门禁与流水线进度两个只读接口删除（404），`SKILL.md` §00.1、`references/api-catalog.md` §2、`api-core.md`、`api-production.md`、`diagnostic-example.md` 同步改写；`hbwf` 派生状态带 roadmap，`check` 打印当前步骤/缺失/`blocked_by`，写入按显式端点→步骤表做严格顺序守卫（纪录片；剧情项目只作信息、不加锁），每次写入后重新读 roadmap 并在 ledger 记录 `before/after/terminal`；逐镜 `next` 增加 `await_skeleton_confirm` / `await_design_card_confirm`（人工动作，只提示不代按）；`merge` 终检增加 roadmap 导出前置与 stale 判据，`hbwf final` 要求导出步骤 `done` + `m3_export` 达成。 |
 | 2026-11-12 | #97（drama 3 / episode 26 制作审计） | 新增 §00 强制工作流与 `references/workflow.md`：`hbwf` 由项目文件派生状态，是唯一写入通道，包含守卫、决定绑定、服务端对账与终检；新增 omp 扩展拦截绕过。S3 Poster 改为“每集必须决定”；S9 写明提示词批量 = 强制重写及提交前时间轴校验；S10 写明剧情镜被动“阻断”语义；剧情链补 Poster；反例表 +7。同步方式改为 `cp -a` + `diff -rq`。补记：#93–#96 的技能变更此前已入库，但未登记本表，托管副本也一直未同步，本次一并同步。 |

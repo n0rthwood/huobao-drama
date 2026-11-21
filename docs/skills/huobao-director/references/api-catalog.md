@@ -785,6 +785,8 @@ Body：`{mode:"pad"|"tempo", pad_ms:0–3000, pad_position:"head"|"tail", tempo_
 
 ## 10. 视频（S9）
 
+H3 原生三段格式与实际参考编号的核验见 [h3-native-prompts.md](h3-native-prompts.md)（Issue #130；现有能力，无新接口）。
+
 ### `POST /episodes/{e}/generate-video-prompts` [R]
 Body：`{storyboard_ids?, config_id?, model?}`；把已定分镜写成时间段动作/运镜/表演，不重拆镜头。
 ### `GET /episodes/{e}/video-prompts-status` [R]
