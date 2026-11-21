@@ -499,7 +499,7 @@ complete只是技术交付，不是人批准史实/许可。manual在complete前
 ### `PUT /episodes/{e}/poster` [S]
 Body 只传要改的：`{prompt(≤4000), text_prompt(≤2000), copy, reference_images[](必须 static/ 下), base_image(static/ 或 null), layer_doc}`。写入的字段在 `provenance` 里被标成 `manual`；底图像素由服务端 `sharp` 实测写回，输出画布恒为本集画幅。
 ### `POST /episodes/{e}/poster/concept` [S]
-Body：`{config_id?, model?}`；异步 AI 构想（只写 `concept`，不动编辑字段）。返回 `{task_id}`；已有构想在跑 → 409 `concept_running`；剧本/带图资产不足 → 400。
+Body：`{config_id?, model?}`；异步 AI 构想（只写 `concept`，不动编辑字段）。返回 `{task_id}`；已有构想在跑 → 409 `concept_running`；剧本/带图资产不足 → 400。**Issue #128 起是 harness 工具循环**：模型用 `submit_poster_concept` 提交完整三方案，服务端校验（结构/文字层容量/资产引用）拒收时带逐条问题回给模型继续下一轮，最多 **8 轮**；逐轮结果在任务 `params.concept_rounds`（`[{round, outcome:'rejected'|'accepted', problems[]}]`），公开对话走 `GET /tasks/{task_id}/observations`。任务可取消（`POST /tasks/{task_id}/cancel`，`cancellable=true`）；失败分型 `rounds_exhausted / steps_exhausted / no_submission`，error_msg 带已完成轮次与逐轮摘要，最后提交原文保留在 `params.output_text`。重跑会**覆盖**现有 `concept` 字段（其余编辑字段/版本/图片不动）。
 ### `POST /episodes/{e}/poster/concept/generate` [S]
 Body：`{composition_ids?, config_id?, model?}`；为方案各提交一张冻结快照底图（底图不带字）。返回 `{items}`。
 ### `POST /episodes/{e}/poster/concept/apply` [S]
